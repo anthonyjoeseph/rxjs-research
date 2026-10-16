@@ -429,6 +429,7 @@ module Honesty (R : Set) where
     ; cuts   = λ π l → proj₁ (Owned.cuts ow π l) , subst (λ z → _ ∈ᴸ z) (sym ag) (proj₂ (Owned.cuts ow π l))
     ; feeds  = λ π → subst (λ z → _ ∈ᴸ z) (sym ag) (Owned.feeds ow π)
     ; fins   = λ π → subst (λ z → _ ∈ᴸ z) (sym ag) (Owned.fins ow π)
+    ; bodies = λ π i → Owned.bodies ow π (subst (λ z → _ ∈ᴸ z) ag i)
     ; placed = subst (All (Placedᴬ t)) (sym ag) (Owned.placed ow) }
 
   ----------------------------------------------------------------------
@@ -1072,12 +1073,6 @@ module Honesty (R : Set) where
     take1-onward : ∀ {g m} (cr : Carried g m) {Δ A i p c k q n} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i p c k (Strongly.ending q n) s))
                  → firstCall (Carried.ctlAs cr) ≡ just (take1C π) → Hops cr
 
-    -- A connect's cut once its body completes: the ghost alike, a call
-    -- fewer.
-    body-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k fd e rp rt} {s : Sub _ Δ A} {bd : Sub _ (A ∷ Δ) B}
-                  (π : Path (Carried.tree cr) (connectˢ S c b kb k fd rp e rt s bd))
-                → firstCall (Carried.ctlAs cr) ≡ just (bodyC π) → Hops cr
-
     -- The rest of a connect's feed of a value: each subscriber left
     -- shows it or skips it.
     feed-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k x r ss e rp rt} {s : Sub _ Δ A} {bd : Sub _ (A ∷ Δ) B}
@@ -1149,72 +1144,92 @@ module Honesty (R : Set) where
     thrownLanes H (suc n) []                = H
     thrownLanes H (suc n) (lane c k s ∷ ls) = thrownLanes (thrown H c k s) n ls
 
-  postulate
-    -- A completed takeWhile's cut from the agenda's head runs silently
-    -- to the rest of the agenda, over the heap its switch thrown leaves.
-    tear-take : ∀ {g h hp p w σ K act clk ts bs td lg en mk}
-                (cr : Carried g (mach (⟨_,_,_⟩ {h} hp p (run {w = w} act σ K)) clk ts bs td lg en mk))
-                {Δ A i q c k} {s : Sub h Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i q c k taken s)) {ks}
-              → act ≗ ⟦ take2C π ∷ ks ⟧ᶜ → ∀ {m′} → step (mach ⟨ hp , p , run act σ K ⟩ clk ts bs td lg en mk) ≡ silent m′
-              → Σ (Act h ⊤) λ act′ → act′ ≗ ⟦ ks ⟧ᶜ × m′ ⇝ mach ⟨ thrown hp c k s , p , run act′ σ K ⟩ clk ts bs td lg en mk
+  -- Where a cut runs from the agenda's head: a takeWhile already taken,
+  -- or a connect whose body has ended. Each holds no part, and its code
+  -- throws its switch.
+  data Site {h} (t : Sub h [] R) : Set₁ where
+    takeSite : ∀ {Δ A i q c k} {s : Sub h Δ A} → Path t (takeWhileˢ i q c k taken s) → Site t
+    bodySite : ∀ {Δ A B S c b kb k fd e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
+             → Path t (connectˢ S c b kb k fd rp e rt s bd) → Site t
 
-    -- A takeWhile already taken holds no part, so the tree's part is the
-    -- same once its switch is thrown.
-    torn-part : ∀ {g m} (cr : Carried g m) {Δ A i q c k} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i q c k taken s))
-              → At.part (thrown (Conf.heap (Mach.conf m)) c k s) (Carried.tree cr) ≡ At.part (Conf.heap (Mach.conf m)) (Carried.tree cr)
+  siteCall : ∀ {h} {t : Sub h [] R} → Site t → Call t
+  siteCall (takeSite π) = take2C π
+  siteCall (bodySite π) = bodyC π
+
+  -- The heap its cut leaves.
+  siteHeap : ∀ {h} {t : Sub h [] R} → Heapᴹ h → Site t → Heapᴹ h
+  siteHeap H (takeSite {c = c} {k} {s} π)       = thrown H c k s
+  siteHeap H (bodySite {c = c} {k = k} {s = s} π) = thrown H c k s
+
+  postulate
+    -- A cut from the agenda's head runs silently to the rest of the
+    -- agenda, over the heap its switch thrown leaves.
+    tear-cut : ∀ {g h hp p w σ K act clk ts bs td lg en mk}
+               (cr : Carried g (mach (⟨_,_,_⟩ {h} hp p (run {w = w} act σ K)) clk ts bs td lg en mk))
+               (z : Site (Carried.tree cr)) {ks}
+             → act ≗ ⟦ siteCall z ∷ ks ⟧ᶜ → ∀ {m′} → step (mach ⟨ hp , p , run act σ K ⟩ clk ts bs td lg en mk) ≡ silent m′
+             → Σ (Act h ⊤) λ act′ → act′ ≗ ⟦ ks ⟧ᶜ × m′ ⇝ mach ⟨ siteHeap hp z , p , run act′ σ K ⟩ clk ts bs td lg en mk
+
+    -- A site holds no part, a body's by `Owned.bodies`, so the tree's
+    -- part is the same once its switch is thrown.
+    torn-part : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
+              → firstCall (Carried.ctlAs cr) ≡ just (siteCall z)
+              → At.part (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr) ≡ At.part (Conf.heap (Mach.conf m)) (Carried.tree cr)
 
     -- A teardown only throws switches, spends colds and silences
     -- joiners: what is owed of a live switch or an unspent cold was owed
-    -- before, and the cut itself is owed no longer.
-    torn-owned : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} {Δ A i q c k} {s : Sub h Δ A} (π : Path t (takeWhileˢ i q c k taken s))
-                 {p w bs} {act act′ : Act h ⊤} {σ : w ⊑ h} {K ks} {e : act ≗ ⟦ take2C π ∷ ks ⟧ᶜ} {e′ : act′ ≗ ⟦ ks ⟧ᶜ}
-                 {Kᴬ : StackAs t p σ K bs} → Owned H t (runAs (take2C π ∷ ks) e Kᴬ) → Owned (thrown H c k s) t (runAs ks e′ Kᴬ)
+    -- before, the cut itself is owed no longer, and a body that held no
+    -- part holds none.
+    torn-owned : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} (z : Site t)
+                 {p w bs} {act act′ : Act h ⊤} {σ : w ⊑ h} {K ks} {e : act ≗ ⟦ siteCall z ∷ ks ⟧ᶜ} {e′ : act′ ≗ ⟦ ks ⟧ᶜ}
+                 {Kᴬ : StackAs t p σ K bs} → Owned H t (runAs (siteCall z ∷ ks) e Kᴬ) → Owned (siteHeap H z) t (runAs ks e′ Kᴬ)
 
     -- Every subscription still against its kernel: a teardown writes no
     -- slot, no attachment and no stash, and a flatMap's lanes dropped
     -- leave none open.
-    torn-holds : ∀ {g m} (cr : Carried g m) {Δ A i q c k} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i q c k taken s))
-               → At.Holds (thrown (Conf.heap (Mach.conf m)) c k s) (Carried.tree cr) [] rootObs
+    torn-holds : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
+               → At.Holds (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr) [] rootObs
 
     -- Below the thrown switch, what unsubscribing reached is spent, as
     -- `Spent` follows `unsub`; elsewhere every gate as it was.
-    torn-gated : ∀ {g m} (cr : Carried g m) {Δ A i q c k} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i q c k taken s))
-               → At.Gated (thrown (Conf.heap (Mach.conf m)) c k s) (Carried.tree cr)
+    torn-gated : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
+               → At.Gated (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr)
 
     -- A joiner silenced owes nothing; every other as it was.
-    torn-fed : ∀ {g m} (cr : Carried g m) {Δ A i q c k} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i q c k taken s))
-             → At.Fed (thrown (Conf.heap (Mach.conf m)) c k s) (Carried.tree cr) []
+    torn-fed : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
+             → At.Fed (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr) []
 
     -- The queue untouched: its timers each a pending frame's or spent,
     -- the subjects' subscribers joiners or silenced.
-    torn-queue : ∀ {g m} (cr : Carried g m) {Δ A i q c k} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i q c k taken s))
-               → Queue (thrown (Conf.heap (Mach.conf m)) c k s) (Conf.pos (Mach.conf m)) (Mach.clock m) (Mach.timers m) (Carried.tree cr)
+    torn-queue : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
+               → Queue (siteHeap (Conf.heap (Mach.conf m)) z) (Conf.pos (Mach.conf m)) (Mach.clock m) (Mach.timers m) (Carried.tree cr)
 
     -- Every part the ghost holds still heads no earlier than the run.
-    -- The risk: `Each` reads parts below the taken takeWhile too, and a
-    -- flatMap there whose lanes are cut shows a part made of what is left
-    -- of it, its queue and pool, which held no head of its own before.
-    torn-behind : ∀ {g m} (cr : Carried g m) {Δ A i q c k} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i q c k taken s))
-                → Each (thrown (Conf.heap (Mach.conf m)) c k s) (Heads (Conf.pos (Mach.conf m))) (Carried.tree cr)
+    -- The risk: `Each` reads parts below the site too, and a flatMap
+    -- there whose lanes are cut shows a part made of what is left of it,
+    -- its queue and pool, which held no head of its own before.
+    torn-behind : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
+                → Each (siteHeap (Conf.heap (Mach.conf m)) z) (Heads (Conf.pos (Mach.conf m))) (Carried.tree cr)
 
-  -- A completed takeWhile's cut: its kill switch thrown, its source's
-  -- unsubscribe run; the ghost alike, a call fewer.
-  take2-onward : ∀ {g m} (cr : Carried g m) {Δ A i p c k} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i p c k taken s))
-               → firstCall (Carried.ctlAs cr) ≡ just (take2C π) → Hops cr
-  take2-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts bs td lg en mk} cr@record { ctlAs = runAs (_ ∷ ks) e Kᴬ } π refl eq
-    with tear-take cr π {ks} e eq
+  -- A cut: its kill switch thrown, what it holds unsubscribed; the ghost
+  -- alike, a call fewer.
+  cut-onward : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
+             → firstCall (Carried.ctlAs cr) ≡ just (siteCall z) → Hops cr
+  cut-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts bs td lg en mk} cr@record { ctlAs = runAs (_ ∷ ks) e Kᴬ } z refl eq
+    with tear-cut cr z {ks} e eq
   ... | act′ , e′ , path = g , _ , path
     , carried (record
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = Carried.tree cr ; ctlAs = runAs ks e′ Kᴬ
-        ; meets = trans (torn-part cr π) (Carried.meets cr)
-        ; owned = torn-owned hp π (Carried.owned cr)
-        ; kernels = record { holds = torn-holds cr π ; gated = torn-gated cr π }
-        ; meaning = record { fed = torn-fed cr π }
-        ; queue = torn-queue cr π
+        ; meets = trans (torn-part cr z refl) (Carried.meets cr)
+        ; owned = torn-owned hp z (Carried.owned cr)
+        ; kernels = record { holds = torn-holds cr z ; gated = torn-gated cr z }
+        ; meaning = record { fed = torn-fed cr z }
+        ; queue = torn-queue cr z
         ; books = record { fresh = Books.fresh (Carried.books cr) ; clocked = Books.clocked (Carried.books cr)
                          ; paidUp = Books.paidUp (Carried.books cr) ; running = Books.running (Carried.books cr) }
-        ; sorted = hop-sorted cr eq path ; behind = torn-behind cr π })
+        ; sorted = hop-sorted cr eq path ; behind = torn-behind cr z })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , ≤-refl))
+
   ----------------------------------------------------------------------
   -- THE GHOST'S STEP, FROM A PATH EVERY SIBLING OF WHICH WAITS
 
@@ -1622,6 +1637,7 @@ module Honesty (R : Set) where
     ; cuts   = λ π l → proj₁ (Owned.cuts ow π l) , subst (λ z → _ ∈ᴸ z) (sym ag) (proj₂ (Owned.cuts ow π l))
     ; feeds  = λ π → subst (λ z → _ ∈ᴸ z) (sym ag) (Owned.feeds ow π)
     ; fins   = λ π → subst (λ z → _ ∈ᴸ z) (sym ag) (Owned.fins ow π)
+    ; bodies = λ π i → Owned.bodies ow π (subst (λ z → _ ∈ᴸ z) ag i)
     ; placed = subst (All (Placedᴬ t)) (sym ag) (Owned.placed ow) }
 
   -- A spent burst dropped, the stack it holds over resumed.
@@ -1838,8 +1854,8 @@ module Honesty (R : Set) where
   run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (emitC π ∷ _) _ _ } refl eq = emit-onward cr π refl eq
   run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (kontC π ∷ _) _ _ } refl eq = kont-onward cr π refl eq
   run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (take1C π ∷ _) _ _ } refl eq = take1-onward cr π refl eq
-  run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (take2C π ∷ _) _ _ } refl eq = take2-onward cr π refl eq
-  run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (bodyC π ∷ _) _ _ } refl eq = body-onward cr π refl eq
+  run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (take2C π ∷ _) _ _ } refl eq = cut-onward cr (takeSite π) refl eq
+  run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (bodyC π ∷ _) _ _ } refl eq = cut-onward cr (bodySite π) refl eq
   run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (feedC π ∷ _) _ _ } refl eq = feed-onward cr π refl eq
   run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (finC π ∷ _) _ _ } refl eq = fin-onward cr π refl eq
   run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (srcC π ∷ _) _ _ } refl eq = src-onward cr π refl eq
@@ -1929,7 +1945,7 @@ module Honesty (R : Set) where
         ; placed = proj₂ (subst (Placedˢ []) stp (placed-after g (Carried.sane cr) (Carried.placed cr)))
         ; tree = t ; ctlAs = runAs ks ke K ; meets = pe
         ; owned = record { ofs = Owned.ofs ow ; plays = Owned.plays ow ; fires = Owned.fires ow ; begun = Owned.begun ow
-                         ; ends = Owned.ends ow ; cuts = Owned.cuts ow ; feeds = Owned.feeds ow ; fins = Owned.fins ow
+                         ; ends = Owned.ends ow ; cuts = Owned.cuts ow ; feeds = Owned.feeds ow ; fins = Owned.fins ow ; bodies = Owned.bodies ow
                          ; placed = Owned.placed ow }
         ; kernels = Carried.kernels cr ; meaning = Carried.meaning cr ; queue = Carried.queue cr
         ; books = record { fresh = Books.fresh (Carried.books cr) ; clocked = Books.clocked (Carried.books cr)

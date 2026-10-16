@@ -459,6 +459,7 @@ module Moving (R : Set) where
     ; cuts   = λ π′ l → ⊥-elim (no-cut π′ l)
     ; feeds  = λ π′ → ⊥-elim (no-feed π′)
     ; fins   = λ π′ → ⊥-elim (no-fin π′)
+    ; bodies = λ π′ ()
     ; placed = [] }
     where
       fc = coldˢ sk hd (fired τ e (at u x fr))

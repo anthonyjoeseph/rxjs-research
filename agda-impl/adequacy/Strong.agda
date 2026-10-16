@@ -671,6 +671,8 @@ module Strongly (R : Set) where
     -- waits on its end, which its frame's last step delivers. A connect's
     -- body ending does not tear its source: the source stays live until
     -- the switch is thrown, and a note can fall in between.
+    --
+    -- REFUTED: c0bd1892 of a connect's source torn once its body's part is gone, by a concat whose next lane emits from inside the body's completion
     mutual
       Gated : ∀ {Δ A} → Sub h Δ A → Set₁
       Gated (coldˢ s hd ph)                   = Lift _ (spentʰ hd ≡ false → unended ph ≡ true)
@@ -920,6 +922,8 @@ module Strongly (R : Set) where
              → (π : Path t (connectˢ S c b kb k (feeding x q ss) rp e rt s bd)) → (q , feedC π) ∈ agenda ca
       fins   : ∀ {Δ A B S c b kb k q ss e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
              → (π : Path t (connectˢ S c b kb k (finishing q ss) rp e rt s bd)) → (q , finC π) ∈ agenda ca
+      bodies : ∀ {Δ A B S c b kb k fd e rp rt q} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
+             → (π : Path t (connectˢ S c b kb k fd rp e rt s bd)) → (q , bodyC π) ∈ agenda ca → part bd ≡ nothing
       placed : All Placed (agenda ca)
 
   -- Every subscription against what its kernel registered; below a closed
@@ -1039,7 +1043,7 @@ module Strongly (R : Set) where
     ; tree    = pendingˢ o root
     ; ctlAs   = Against.subAs here ([] , []ᴬ , same , refl , ≗-refl _) Against.bottomAs
     ; meets   = refl
-    ; owned   = record { ofs = λ () ; plays = λ () ; fires = λ () ; begun = λ { here → Any.here refl } ; ends = λ () ; cuts = λ () ; feeds = λ () ; fins = λ ()
+    ; owned   = record { ofs = λ () ; plays = λ () ; fires = λ () ; begun = λ { here → Any.here refl } ; ends = λ () ; cuts = λ () ; feeds = λ () ; fins = λ () ; bodies = λ _ ()
                        ; placed = []ᴬ }
     ; kernels = record { holds = _ ; gated = _ }
     ; meaning = record { fed = _ }

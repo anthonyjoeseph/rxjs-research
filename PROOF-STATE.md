@@ -180,8 +180,8 @@ by their own silent steps (`Mirror`).
 - **THE TEARDOWN.** `torn-behind` first: decides whether `Each` may read
   parts below a taken takeWhile at all, since a flatMap there whose lanes
   are cut shows what is left of it. Then the other `torn-` field leaves
-  and `tear-take`, then `body-onward` as the same body over `thrown`,
-  once Carried says a connect's body is done when its cut is owed; then
+  and `tear-cut`, over look/store frame lemmas, `cut-onward` serving a
+  taken takeWhile and an ended body alike; then
   the END CLIMB, a `Climbing` for completes, under `take1-onward`,
   `fin-onward` and `emit-last`. Ruled out: every cold below a cut switch
   spent (a lane cut inside its cold's first burst stays unspent until
@@ -290,10 +290,11 @@ by their own silent steps (`Mirror`).
   subscribed once its body is.
 - **`torn-behind`** (Content) — FALSITY, `NO EVIDENCE`: every part heads no
   earlier after a cut, a flatMap below it shown as what its cut lanes left.
-- **`tear-take`** (Content) — FALSITY, `NO EVIDENCE`: a completed takeWhile's
-  cut runs silently to the agenda's rest over the heap `thrown` leaves.
+- **`tear-cut`** (Content) — FALSITY, `NO EVIDENCE`: a cut at a taken
+  takeWhile or an ended body runs silently to the agenda's rest over the
+  heap `thrown` leaves.
 - **`torn-part`** (Content) — FALSITY, `NO EVIDENCE`: the tree's part is
-  unmoved by a cut below a taken takeWhile.
+  unmoved by a cut at a site holding none, a body's by `Owned.bodies`.
 - **`torn-owned`** (Content) — FALSITY, `NO EVIDENCE`: what a cut leaves owes
   nothing new, the cut itself no longer owed.
 - **`torn-holds`** (Content) — FALSITY, `NO EVIDENCE`: every subscription still
@@ -304,8 +305,6 @@ by their own silent steps (`Mirror`).
   owe nothing, the others as they were.
 - **`torn-queue`** (Content) — FALSITY, `NO EVIDENCE`: the queue and the
   subjects' subscribers still in order after a cut.
-- **`body-onward`** (Content) — FALSITY, `NO EVIDENCE`: a connect's cut once
-  its body completes, a call fewer.
 - **`kont-onward`** (Content) — FALSITY, `NO EVIDENCE`: a subscription's
   continuation stashes its unsubscribe, a call fewer.
 - **`burst-poll`** (Content) — FALSITY, `NO EVIDENCE`: a live burst's sink
