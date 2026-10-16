@@ -177,15 +177,17 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE END CLIMB.** A `Climbing` for completes, under `take1-onward`,
-  `fin-onward` and `emit-last`, now that a cut's run is a body
-  (`cut-onward`, every leaf proven). Decides whether a completion's climb
-  can reuse the value climb's record with the value dropped. Ruled out:
-  every cold below a cut switch spent (a lane cut inside its cold's first
-  burst stays unspent until attached); a connect's source torn once its
-  body ends; heads owed below a site; a cut's run allocating, emitting or
-  yielding; a flatMap torn leaving a lane live; a teardown reopening a
-  gone body (a queue is a `fifo` cell, a kind no teardown writes).
+- **THE END CLIMB.** `close-body`, `close-source`, `close-lanes`,
+  `close-outer`: a completion's climb is a body (`close`, over `Closing`,
+  the value climb's record with the value dropped and the calls owed after
+  it), entered by `take1-enter`, `last-enter`, `fin-enter`. Decides whether
+  an operator's own completion code (a body's cut, a subject's finish, a
+  lane's refill, an outer's settle) leaves a re-entry configuration or a
+  `Closing` one operator up, from what `Closing` carries. Ruled out: a map,
+  scan or defer owing a completion more than its source's (`close-map`,
+  `close-scan`, `close-defer`); a teardown reopening a gone body (a queue
+  is a `fifo` cell, a kind no teardown writes); a cut's run allocating,
+  emitting or yielding.
 - **THE MEASURE.** `emit-void`: a connect's source bursting on into a
   subject nobody reads, past an ended body, take or lane. Decides whether
   the value's climb to the node hiding it raises no subscription, stage,
@@ -234,6 +236,24 @@ by their own silent steps (`Mirror`).
   stepped node's.
 - **`within-step`** (Stepper) — FALSITY, `REFUTED×2`, `X`: a sane, placed root
   ghost's step leaves its parts placed.
+- **`close-body`** (Content) — FALSITY, `NO EVIDENCE`: a connect's body ended
+  delivers the connect's completion, its cut owed after it.
+- **`close-source`** (Content) — FALSITY, `NO EVIDENCE`: a connect's source
+  ended closes its subject, its subscribers' finish owed.
+- **`close-lanes`** (Content) — FALSITY, `NO EVIDENCE`: a lane ended shuts,
+  refills, or ends the flatMap past its outer's end.
+- **`close-outer`** (Content) — FALSITY, `NO EVIDENCE`: a flatMap's outer ended
+  settles: the flatMap ends with no lane left, or runs on.
+- **`close-take`** (Content) — FALSITY, `NO EVIDENCE`: a completion through a
+  live takeWhile, its guard read open.
+- **`close-root`** (Content) — FALSITY, `NO EVIDENCE`: a completion at the root
+  records the run's end.
+- **`take1-enter`** (Content) — FALSITY, `NO EVIDENCE`: a takeWhile's
+  completion begun under its failing value, its cut the frame's rest.
+- **`last-enter`** (Content) — FALSITY, `NO EVIDENCE`: a spent `of`'s
+  completion begun at its end.
+- **`fin-enter`** (Content) — FALSITY, `NO EVIDENCE`: a connect's feed of its
+  source's end, nothing left or the next subscriber's completion begun.
 - **`note-least`** (Content) — FALSITY, `NO EVIDENCE`: a note records the least
   value the ghost holds.
 - **`turn-dry`** (Content) — FALSITY, `NO EVIDENCE`: nothing held and no timer
@@ -263,16 +283,10 @@ by their own silent steps (`Mirror`).
   value feeds its subject's joiners and stops there.
 - **`emit-shut`** (Content) — FALSITY, `NO EVIDENCE`: an `of` whose observer
   path is closed skips its value.
-- **`emit-last`** (Content) — FALSITY, `NO EVIDENCE`: an `of` with nothing left
-  completes and climbs to its end.
 - **`sub-onward`** (Content) — FALSITY, `NO EVIDENCE`: a subscription begun
   runs its kernel to the next re-entry state.
 - **`feed-onward`** (Content) — FALSITY, `NO EVIDENCE`: the rest of a connect's
   feed of a value, each subscriber showing or skipping it.
-- **`fin-onward`** (Content) — FALSITY, `NO EVIDENCE`: the rest of a connect's
-  feed of its source's end.
-- **`take1-onward`** (Content) — FALSITY, `NO EVIDENCE`: a takeWhile's
-  completion delivered, then its cut.
 - **`src-onward`** (Content) — FALSITY, `NO EVIDENCE`: a connect's source
   subscribed once its body is.
 - **`kont-onward`** (Content) — FALSITY, `NO EVIDENCE`: a subscription's

@@ -71,7 +71,7 @@ module Honesty (R : Set) where
   open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; spent?; store; look) renaming (go to goᴵ)
   open Heap using (World; _⊑_; Handle; Quiet) renaming (same to same⊑)
   open Sorting R using (WellMach; WellStep; silentʷ; valueʷ; preserve; Beyond)
-  open Run (Pureᴾ R) using (Act; Observer; Subject; module Kit; module FlatKit)
+  open Run (Pureᴾ R) using (Act; Observer; Subject; _>>ᴬ_; module Kit; module FlatKit)
   open Recording R using (silent-keeps; value-notes)
   open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ;
     flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; Spot; spot; done≗;
@@ -946,10 +946,6 @@ module Honesty (R : Set) where
     -- past a defer's skip.
     sub-onward : ∀ {g m} (cr : Carried g m) → opening (Carried.ctlAs cr) ≡ true → Hops cr
 
-    -- A spent `of`'s completion delivered at its end.
-    emit-last : ∀ {g m} (cr : Carried g m) {Δ A p i} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i []))
-              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → Hops cr
-
     -- An `of` reading its observer closed: its burst over, nothing
     -- delivered.  The ghost must hold nothing of it.
     emit-shut : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
@@ -1061,21 +1057,11 @@ module Honesty (R : Set) where
     kont-onward : ∀ {g m} (cr : Carried g m) {Δ A} {u : Sub _ Δ A} (π : Path (Carried.tree cr) u)
                 → firstCall (Carried.ctlAs cr) ≡ just (kontC π) → Hops cr
 
-    -- A takeWhile's completion delivered under its failing value, then
-    -- its cut.
-    take1-onward : ∀ {g m} (cr : Carried g m) {Δ A i p c k q n} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i p c k (Strongly.ending q n) s))
-                 → firstCall (Carried.ctlAs cr) ≡ just (take1C π) → Hops cr
-
     -- The rest of a connect's feed of a value: each subscriber left
     -- shows it or skips it.
     feed-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k x r ss e rp rt} {s : Sub _ Δ A} {bd : Sub _ (A ∷ Δ) B}
                   (π : Path (Carried.tree cr) (connectˢ S c b kb k (feeding x r ss) rp e rt s bd))
                 → firstCall (Carried.ctlAs cr) ≡ just (feedC π) → Hops cr
-
-    -- The rest of a connect's feed of its source's end.
-    fin-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k r ss e rp rt} {s : Sub _ Δ A} {bd : Sub _ (A ∷ Δ) B}
-                 (π : Path (Carried.tree cr) (connectˢ S c b kb k (finishing r ss) rp e rt s bd))
-               → firstCall (Carried.ctlAs cr) ≡ just (finC π) → Hops cr
 
     -- A connect's source subscribed once its body is: its program begun.
     src-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k fd e s₁ q rp rt} {bd : Sub _ (A ∷ Δ) B}
@@ -1743,6 +1729,197 @@ module Honesty (R : Set) where
 
   soar : ∀ {g m m′} (st : Strong g m) → Σ Mach (λ m₁ → m′ ⇝ m₁ × Aloft g (loadOf st) m₁) → Hopped st m′
   soar st (m₁ , path , aloft {σ = σ} cl) = hopped-pre path (climb st (suc (height σ)) σ ≤-refl cl)
+
+  -- A COMPLETION ON ITS WAY UP: the observer the path walks to about
+  -- to be told its source has ended, the calls `ks` owed after it.  The
+  -- node it leaves shows its end where the run is, and the ghost's step
+  -- is that end lifted along the path.
+  record Closing (g : U.Node [] R) (ℓ : Load) (m₁ : Mach) {Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
+                 (σ : Path T v) : Set₁ where
+    field
+      sane    : Sane [] g
+      placed  : Placed g []
+      {w}     : World
+      {ϑ}     : w ⊑ Conf.world (Mach.conf m₁)
+      {act}   : Act (Conf.world (Mach.conf m₁)) ⊤
+      {K}     : Stack w ⊤
+      {ks}    : List (Call T)
+      ctl     : Conf.ctl (Mach.conf m₁) ≡ run act ϑ K
+      code    : act ≗ (Observer.complete (Here.obs (walk σ top)) >>ᴬ ⟦ ks ⟧ᶜ)
+      stack   : StackAs T (Conf.pos (Mach.conf m₁)) ϑ K (Mach.bursts m₁)
+      ends    : ∀ {c} → At.part (Conf.heap (Mach.conf m₁)) v ≡ just c → U.step c ≡ U.endˢ (Conf.pos (Mach.conf m₁))
+      lifted  : Σ (U.Step [] R) λ S → Lifts (Conf.heap (Mach.conf m₁)) σ (U.endˢ (Conf.pos (Mach.conf m₁))) S × U.step g ≡ S
+      owned   : Owned (Conf.heap (Mach.conf m₁)) T (runAs ks (≗-refl _) stack)
+      kernels : Kernels (Conf.heap (Mach.conf m₁)) T
+      meaning : Meaning (Conf.heap (Mach.conf m₁)) T
+      queue   : Queue (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) (Mach.clock m₁) (Mach.timers m₁) T
+      books   : Books T (runAs ks (≗-refl _) stack) m₁
+      sorted  : Σ Pos λ lo → WellMach lo m₁
+      behind  : Each (Conf.heap (Mach.conf m₁)) (Heads (Conf.pos (Mach.conf m₁))) T
+      kept    : load m₁ T ≼ ℓ
+
+  -- The same completion, restated at another path.
+  reclose : ∀ {g ℓ m₁ Δ A Δ′ A′} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
+              {v′ : Sub (Conf.world (Mach.conf m₁)) Δ′ A′} {σ : Path T v} (cl : Closing g ℓ m₁ σ) {σ′ : Path T v′}
+          → Closing.act cl ≗ (Observer.complete (Here.obs (walk σ′ top)) >>ᴬ ⟦ Closing.ks cl ⟧ᶜ)
+          → (∀ {c} → At.part (Conf.heap (Mach.conf m₁)) v′ ≡ just c → U.step c ≡ U.endˢ (Conf.pos (Mach.conf m₁)))
+          → Σ (U.Step [] R) (λ S → Lifts (Conf.heap (Mach.conf m₁)) σ′ (U.endˢ (Conf.pos (Mach.conf m₁))) S × U.step g ≡ S)
+          → Closing g ℓ m₁ σ′
+  reclose cl cd es lf = record
+    { sane = Closing.sane cl ; placed = Closing.placed cl ; ctl = Closing.ctl cl ; code = cd ; stack = Closing.stack cl ; ends = es
+    ; lifted = lf ; owned = Closing.owned cl ; kernels = Closing.kernels cl ; meaning = Closing.meaning cl ; queue = Closing.queue cl
+    ; books = Closing.books cl ; sorted = Closing.sorted cl ; behind = Closing.behind cl ; kept = Closing.kept cl }
+
+  -- One operator closed: a re-entry configuration reached, or the
+  -- completion one operator higher, the path shorter.
+  data Closed {g m} (st : Strong g m) (m₁ : Mach) {Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
+              (σ : Path T v) : Set₁ where
+    landed : Hopped st m₁ → Closed st m₁ σ
+    rose   : ∀ {m₂ Δ′ A′} {T′ : Sub (Conf.world (Mach.conf m₂)) [] R} {v′ : Sub (Conf.world (Mach.conf m₂)) Δ′ A′} {σ′ : Path T′ v′}
+           → m₁ ⇝ m₂ → height σ′ < height σ → Closing g (loadOf st) m₂ σ′ → Closed st m₁ σ
+
+  -- Some completion on its way up.
+  data Afloat (g : U.Node [] R) (ℓ : Load) (m₁ : Mach) : Set₁ where
+    afloat : ∀ {Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v}
+           → Closing g ℓ m₁ σ → Afloat g ℓ m₁
+
+  -- A part under a node map shows an end where its source does.
+  ends-mapᴹ : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′ k} {F : U.Node Δ A → U.Node Δ′ A′}
+            → (∀ c → U.step c ≡ U.endˢ k → U.step (F c) ≡ U.endˢ k) → (P : Maybe (U.Node Δ A))
+            → (∀ {c} → P ≡ just c → U.step c ≡ U.endˢ k) → ∀ {c} → At.mapᴹ H F P ≡ just c → U.step c ≡ U.endˢ k
+  ends-mapᴹ H hF (just c₀) e refl = hF c₀ (e refl)
+  ends-mapᴹ H hF nothing   e ()
+
+  -- A completion through a map, as it is.
+  close-map : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : A → B} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
+              (ρ : Path T (mapˢ f u)) → Closing g ℓ m₁ (ρ ⊕ in-map here) → Closing g ℓ m₁ ρ
+  close-map {m₁ = m₁} {f = f} {u} ρ cl with Closing.lifted cl
+  ... | S , L , sg with lifts-split ρ (in-map here) L
+  ...   | _ , lifts-map lifts-here , Lρ = reclose cl
+    (subst (λ W → Closing.act cl ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ Closing.ks cl ⟧ᶜ)) (walk-⊕ ρ (in-map here) top) (Closing.code cl))
+    (ends-mapᴹ (Conf.heap (Mach.conf m₁)) (λ c e → cong (U.mapˢ f) e) (At.part (Conf.heap (Mach.conf m₁)) u) (Closing.ends cl))
+    (S , Lρ , sg)
+
+  -- A completion through a scan, as it is: the scan's cell unread.
+  close-scan : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
+               (ρ : Path T (scanˢ f r u)) → Closing g ℓ m₁ (ρ ⊕ in-scan here) → Closing g ℓ m₁ ρ
+  close-scan {m₁ = m₁} {f = f} {r} {u} ρ cl with Closing.lifted cl
+  ... | S , L , sg with lifts-split ρ (in-scan here) L
+  ...   | _ , lifts-scan lifts-here , Lρ = reclose cl
+    (subst (λ W → Closing.act cl ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ Closing.ks cl ⟧ᶜ)) (walk-⊕ ρ (in-scan here) top) (Closing.code cl))
+    (ends-mapᴹ (Conf.heap (Mach.conf m₁)) (λ c e → cong (U.scanˢ f (At.val (Conf.heap (Mach.conf m₁)) r)) e) (At.part (Conf.heap (Mach.conf m₁)) u) (Closing.ends cl))
+    (S , Lρ , sg)
+
+  -- A completion through a defer, as it is.
+  close-defer : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {k} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
+                (ρ : Path T (deferˢ k u)) → Closing g ℓ m₁ (ρ ⊕ in-defer here) → Closing g ℓ m₁ ρ
+  close-defer ρ cl with Closing.lifted cl
+  ... | S , L , sg with lifts-split ρ (in-defer here) L
+  ...   | _ , lifts-defer lifts-here , Lρ = reclose cl
+    (subst (λ W → Closing.act cl ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ Closing.ks cl ⟧ᶜ)) (walk-⊕ ρ (in-defer here) top) (Closing.code cl))
+    (Closing.ends cl) (S , Lρ , sg)
+
+  postulate
+    -- A completion through a live takeWhile: its guard read open, one
+    -- operator up, the take showing its source's end.
+    close-take : ∀ {g m} (st : Strong g m) {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {i p c k tk}
+                 {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ i p c k tk u))
+               → Closing g (loadOf st) m₁ (ρ ⊕ in-take here) → Closed st m₁ (ρ ⊕ in-take here)
+
+    -- A flatMap's outer ended: its done flag written, settled: the
+    -- flatMap ends if no lane is left, or the lanes run on.
+    close-outer : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+                  {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
+                  (ρ : Path T (flatMapˢ op f fl oc k r pl u ls))
+                → Closing g (loadOf st) m₁ (ρ ⊕ in-outer here) → Closed st m₁ (ρ ⊕ in-outer here)
+
+    -- A lane ended: shut, the active count down, the next queued value
+    -- begun or the flatMap ended past its outer's end.
+    close-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B Δ′ C} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+                  {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ′ C}
+                  (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) → OneLane πL
+                → Closing g (loadOf st) m₁ (ρ ⊕ in-lanes πL) → Closed st m₁ (ρ ⊕ in-lanes πL)
+
+    -- A connect's source ended: its subject closed, the finish of its
+    -- subscribers owed.
+    close-source : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
+                   {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {bd : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
+                   (ρ : Path T (connectˢ Sj c b kb k fd rp e rt u bd))
+                 → Closing g (loadOf st) m₁ (ρ ⊕ in-source here) → Closed st m₁ (ρ ⊕ in-source here)
+
+    -- A connect's body ended: the connect's completion delivered, its
+    -- cut owed after it.
+    close-body : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
+                 {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {u : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
+                 (ρ : Path T (connectˢ Sj c b kb k fd rp e rt t u))
+               → Closing g (loadOf st) m₁ (ρ ⊕ in-body here) → Closed st m₁ (ρ ⊕ in-body here)
+
+    -- A completion at the root: the run's end recorded, the ghost's
+    -- step its end.
+    close-root : ∀ {g m} (st : Strong g m) {ℓ m₁} {T : Sub (Conf.world (Mach.conf m₁)) [] R} → Closing g ℓ m₁ {T = T} here → Hopped st m₁
+
+  -- One operator closed, by the operator.
+  close-step : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
+               {v : Sub (Conf.world (Mach.conf m₁)) Δ′ A′} (ρ : Path T u) {s : Path u v} → One s → Closing g (loadOf st) m₁ (ρ ⊕ s) → Closed st m₁ (ρ ⊕ s)
+  close-step st ρ one-map       cl = rose now (one-lower ρ one-map) (close-map ρ cl)
+  close-step st ρ one-scan      cl = rose now (one-lower ρ one-scan) (close-scan ρ cl)
+  close-step st ρ one-take      cl = close-take st ρ cl
+  close-step st ρ one-outer     cl = close-outer st ρ cl
+  close-step st ρ (one-lanes o) cl = close-lanes st ρ _ o cl
+  close-step st ρ one-source    cl = close-source st ρ cl
+  close-step st ρ one-body      cl = close-body st ρ cl
+  close-step st ρ one-defer     cl = rose now (one-lower ρ one-defer) (close-defer ρ cl)
+
+  -- A COMPLETION CLIMBS TO A RE-ENTRY CONFIGURATION, as a value does.
+  close : ∀ {g m} (st : Strong g m) (n : ℕ) {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
+          (σ : Path T v) → height σ < n → Closing g (loadOf st) m₁ σ → Hopped st m₁
+  close st zero    σ () cl
+  close st (suc n) σ lt cl with view σ
+  ... | whole      = close-root st cl
+  ... | snoc ρ s o with close-step st ρ o cl
+  ...   | landed hp         = hp
+  ...   | rose path lt′ cl′ = hopped-pre path (close st n _ (≤-trans lt′ (≤-pred lt)) cl′)
+
+  float : ∀ {g m m′} (st : Strong g m) → Σ Mach (λ m₁ → m′ ⇝ m₁ × Afloat g (loadOf st) m₁) → Hopped st m′
+  float st (m₁ , path , afloat {σ = σ} cl) = hopped-pre path (close st (suc (height σ)) σ ≤-refl cl)
+
+  postulate
+    -- A takeWhile's completion begun under its failing value, its cut
+    -- the frame's rest.
+    take1-enter : ∀ {g m} (cr : Carried g m) {Δ A i p c k q n} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i p c k (Strongly.ending q n) s))
+                → firstCall (Carried.ctlAs cr) ≡ just (take1C π) → ∀ {m′} → step m ≡ silent m′
+                → Σ Mach λ m₁ → m′ ⇝ m₁ × Afloat g (load m (Carried.tree cr)) m₁
+
+    -- A spent `of`'s completion begun at its end.
+    last-enter : ∀ {g m} (cr : Carried g m) {Δ A p i} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i []))
+               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → ∀ {m′} → step m ≡ silent m′
+               → Σ Mach λ m₁ → m′ ⇝ m₁ × Afloat g (load m (Carried.tree cr)) m₁
+
+    -- A connect's feed of its source's end: no subscriber left, the
+    -- agenda on; or the next subscriber's completion begun.
+    fin-enter : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k r ss e rp rt} {s : Sub _ Δ A} {bd : Sub _ (A ∷ Δ) B}
+                (π : Path (Carried.tree cr) (connectˢ S c b kb k (finishing r ss) rp e rt s bd))
+              → firstCall (Carried.ctlAs cr) ≡ just (finC π) → ∀ {m′} → step m ≡ silent m′
+              → Σ Mach λ m₁ → m′ ⇝ m₁ × (Hopped (carried cr) m₁ ⊎ Afloat g (load m (Carried.tree cr)) m₁)
+
+  -- A takeWhile's completion delivered under its failing value, then
+  -- its cut.
+  take1-onward : ∀ {g m} (cr : Carried g m) {Δ A i p c k q n} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i p c k (Strongly.ending q n) s))
+               → firstCall (Carried.ctlAs cr) ≡ just (take1C π) → Hops cr
+  take1-onward cr π fc eq = float (carried cr) (take1-enter cr π fc eq)
+
+  -- A spent `of`'s completion delivered at its end.
+  emit-last : ∀ {g m} (cr : Carried g m) {Δ A p i} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i []))
+            → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → Hops cr
+  emit-last cr π fc eq = float (carried cr) (last-enter cr π fc eq)
+
+  -- The rest of a connect's feed of its source's end.
+  fin-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k r ss e rp rt} {s : Sub _ Δ A} {bd : Sub _ (A ∷ Δ) B}
+               (π : Path (Carried.tree cr) (connectˢ S c b kb k (finishing r ss) rp e rt s bd))
+             → firstCall (Carried.ctlAs cr) ≡ just (finC π) → Hops cr
+  fin-onward cr π fc eq with fin-enter cr π fc eq
+  ... | m₁ , path , inj₁ hp = hopped-pre path hp
+  ... | m₁ , path , inj₂ af = float (carried cr) (m₁ , path , af)
 
   -- An agenda under way: the ghost is the tree's part.
   run-meets : ∀ {h} {t : Sub h [] R} {p c bs} (ca : CtlAs t p c bs) {n g k} → firstCall ca ≡ just k → Meets ca n g → n ≡ just g
