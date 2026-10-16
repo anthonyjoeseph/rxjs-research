@@ -177,23 +177,26 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **B. THE LOCAL INVARIANT.** Each field of `Carried` a fold over the tree
-  of node-local predicates reading only the node's `names`, with one
-  framing lemma per field over `Local`'s `Alike` and `Off`: a store at a
-  node's own name keeps every other node's predicate, so a step owes only
-  its node's fact. `climb-scan` is a body over the `scan-*` framing
-  leaves; next `close-outer`, `close-lanes`, `close-source` the same way.
-  Decides whether the four writes fall with only node-local leaves.
-  `scan-above` is a walk down to the scan: the residue is one `up-*`
-  bound per flatMap side, a part's head bounded by its children's,
-  and `up-ended`, a connect's body shut at its source's end. Done when the framing leaves are proven.
 - **C. THE CALLBACK RELATION.** One per-operator lemma: an observer at a
   path, run from a related state, reaches a related state with the ghost
-  advanced, by recursion up the path. `Climbing` and `Closing` become one
-  record over it, `climb` and `close` its two instances. Decides whether
-  every mid-climb state is the callback relation's, so no third record is
-  ever needed. Done when `climb` and `close` are bodies over it and the
-  old records are deleted.
+  advanced, by recursion up the path. First `Climbing` and `Closing`
+  become one record over the signal climbing (a value or an end), the
+  two records its instances; then the per-operator lemma states every
+  write and close as one call, the `scan-*`, `up-*` and `close-*` rows
+  its postulated leaves. Decides whether every mid-climb state is the
+  callback relation's, so no third record is ever needed. Done when
+  `climb` and `close` are bodies over it and the old records are deleted.
+- **UP-ENDED.** `up-ended`, a connect's body shut at its source's end, is
+  the one scan leaf that is not node-local: it reads what an end leaves
+  behind, which `shut-step` reads too. Decided inside C's record: whether
+  the end signal's fields already carry it, or `Carried` owes a field.
+- **B. THE LOCAL INVARIANT.** Each field of `Carried` a fold over the tree
+  of node-local predicates, one framing lemma per field over `Alike` and
+  `Off`. Ruled out for the scan: a write needs no non-local leaf but
+  `up-ended`. Remaining: an own-cell apartness fold carrying
+  `scan-defined`, `scan-owned`, `scan-meaning`, `scan-sees`; `up-outer`
+  and `up-lanes` by a flatMap head bound; then `close-outer`,
+  `close-lanes`, `close-source` the same way, in the form C consumes.
 - **D. THE KERNEL FOOTPRINT.** A kernel's cells allocated together and read
   only through its own node, `names` agreeing by construction. `names`
   already lists each node's cells, so this leg is CONDITIONAL: done when
