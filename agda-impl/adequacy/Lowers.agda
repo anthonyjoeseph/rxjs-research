@@ -298,7 +298,7 @@ module Lowering (R : Set) where
     gone-cons nothing  xs e = refl , e
     gone-cons (just _) xs ()
 
-    gone-lane : ∀ {Δ B} {b b′ : Bool} (x : Maybe (U.Node Δ B)) {x′} xs {xs′} → (b′ ≡ true → b ≡ true) → (x ≡ nothing → x′ ≡ nothing) → (xs ≡ [] → xs′ ≡ [])
+    gone-lane : ∀ {Δ B} {b b′ : Bool} (x : Maybe (U.Node Δ B)) {x′ : Maybe (U.Node Δ B)} (xs : List (U.Node Δ B)) {xs′ : List (U.Node Δ B)} → (b′ ≡ true → b ≡ true) → (x ≡ nothing → x′ ≡ nothing) → (xs ≡ [] → xs′ ≡ [])
               → (if b then At.consᴹ H x xs else xs) ≡ [] → (if b′ then At.consᴹ H′ x′ xs′ else xs′) ≡ []
     gone-lane {b = false} {false} x xs r g gs e = gs e
     gone-lane {b = true}  {false} x xs r g gs e = gs (proj₂ (gone-cons x xs e))
