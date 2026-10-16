@@ -46,7 +46,7 @@ module Framing (R : Set) where
   open Strongly.Against R using (CtlAs)
   open Tearing R using (Alike; part-alike; look-store; get-put-same; fresh-path; names-path; apart-r; apart-l; ≢-flip)
   open Moving R using (pairs-r)
-  open Ghosting R using (module Climbing; Lifts; Climbing)
+  open Ghosting R using (module Calling; Lifts; Calling; sends)
   open Read
 
   -- A scan's part, its accumulator written: its source's part, the
@@ -295,12 +295,12 @@ module Framing (R : Set) where
   -- The scan and every part above it still head no sooner than where
   -- the run is.
   scan-above : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
-               (ρ : Path T (scanˢ f r u)) {y : A} → Climbing g ℓ m₁ (ρ ⊕ in-scan here) y
+               (ρ : Path T (scanˢ f r u)) {y : A} → Calling g ℓ m₁ (ρ ⊕ in-scan here) (sends y)
              → ∀ {Δ′ A′} {x : Sub (Conf.world (Mach.conf m₁)) Δ′ A′} (ψ : Path T x) → Path x (scanˢ f r u) → seen (Conf.heap (Mach.conf m₁)) ψ ≡ true
              → ∀ {c} → At.part (store (Conf.heap (Mach.conf m₁)) r (lift (f (At.val (Conf.heap (Mach.conf m₁)) r) y))) x ≡ just c
              → Heads (Conf.pos (Mach.conf m₁)) c
   scan-above {m₁ = m₁} {f = f} {r} {u} ρ {y} cl =
-    Above.above H f r u (Books.fresh (Climbing.books cl)) (f (At.val H r) y) (Conf.pos (Mach.conf m₁)) (Climbing.behind cl)
+    Above.above H f r u (Books.fresh (Calling.books cl)) (f (At.val H r) y) (Conf.pos (Mach.conf m₁)) (Calling.behind cl)
     where H = Conf.heap (Mach.conf m₁)
 
   just-of : ∀ {ℓ} {X : Set ℓ} {m : Maybe X} → is-just m ≡ true → Σ X λ c → m ≡ just c
@@ -311,7 +311,7 @@ module Framing (R : Set) where
 
   -- The parts above the scan move with it; every other part reads alike.
   scan-behind : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
-                (ρ : Path T (scanˢ f r u)) {y : A} → Climbing g ℓ m₁ (ρ ⊕ in-scan here) y
+                (ρ : Path T (scanˢ f r u)) {y : A} → Calling g ℓ m₁ (ρ ⊕ in-scan here) (sends y)
               → Each (store (Conf.heap (Mach.conf m₁)) r (lift (f (At.val (Conf.heap (Mach.conf m₁)) r) y))) (Heads (Conf.pos (Mach.conf m₁))) T
   scan-behind {m₁ = m₁} {f = f} {r} ρ {y} cl = record
     { parts = λ {u = x} ψ sn e → [ (λ (al : Alike H H′ (names x)) → Each.parts bh ψ (proj₁ (sees ψ sn)) (trans (sym (part-alike H H′ x al)) e))
@@ -322,7 +322,7 @@ module Framing (R : Set) where
     where
       H  = Conf.heap (Mach.conf m₁)
       H′ = store H r (lift (f (At.val H r) y))
-      fs = Books.fresh (Climbing.books cl)
-      bh = Climbing.behind cl
+      fs = Books.fresh (Calling.books cl)
+      bh = Calling.behind cl
       sees = scan-sees H ρ fs (f (At.val H r) y)
       def  = scan-defined H ρ fs (f (At.val H r) y)

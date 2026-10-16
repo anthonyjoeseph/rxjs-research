@@ -33,7 +33,7 @@ open import adequacy.Moves using (module Moving)
 open import adequacy.Torn using (module Tearing)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Seq using (module Sequencing)
-open import adequacy.Sane using (Sane; sane-out)
+open import adequacy.Sane using (sane-out)
 open import adequacy.Placed using (Placed)
 open import adequacy.Stepper using (placed-after; Placedˢ)
 open import denotation.Denote using (⟦_⟧)
@@ -60,7 +60,7 @@ module Ascending (R : Set) where
   open Tearing R using (fresh-path; takeSite; bodySite)
   open Unsubbing R using (_⇝_; now; then; ≗-trans; wk-same; bind≗)
   open Sequencing R using (seq-assoc)
-  open Ghosting R using (module Far; module Climbing; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-body; lifts-shut; lifts-defer; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; whole; snoc; view; height; one-lower; opened; Climbing; reclimb; relevel; Rises; rises; Climbed; landed; rose; Aloft; aloft; hop-sorted; each-back; hopped-pre)
+  open Ghosting R using (module Far; module Calling; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-body; lifts-shut; lifts-defer; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; whole; snoc; view; height; one-lower; opened; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; Aloft; aloft; hop-sorted; each-back; hopped-pre)
   open Lifting R using (sub-onward; emit-shut; emit-void; emit-run; spread-past; behind-fire; take-out; take-end; climb-outer; climb-lanes; climb-source; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
   open Framing R using (scan-part; scan-owned; scan-kernels; scan-meaning; scan-queue; scan-lifts; scan-behind)
   open Read
@@ -139,270 +139,38 @@ module Ascending (R : Set) where
   ... | false | false = burst-poll cr c bq sp pl eq
   ... | false | true  = burst-play cr c bq sp pl eq
 
-  -- A value through a map: mapped, one operator up.
-  climb-map : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : A → B} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
-              (ρ : Path T (mapˢ f u)) {y : A} → Climbing g ℓ m₁ (ρ ⊕ in-map here) y → Climbing g ℓ m₁ ρ (f y)
-  climb-map {m₁ = m₁} {f = f} ρ {y} cl with Climbing.lifted cl
+  -- A signal through a map: a value mapped, an end as it is.
+  mapᵍ : ∀ {h} {T : Sub h [] R} {A B} → (A → B) → Signal T A → Signal T B
+  mapᵍ f (sends y)   = sends (f y)
+  mapᵍ f (closes ks) = closes ks
+
+  -- A signal through a map, one operator up.
+  call-map : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : A → B} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
+             (ρ : Path T (mapˢ f u)) {sg : Signal T A} → Calling g ℓ m₁ (ρ ⊕ in-map here) sg → Calling g ℓ m₁ ρ (mapᵍ f sg)
+  call-map {m₁ = m₁} {f = f} ρ {sends y} cl with Calling.lifted cl
   ... | c′ , pv , S , L , sg with lifts-split ρ (in-map here) L
-  ...   | _ , lifts-map lifts-here , Lρ = reclimb cl
-    (subst (λ W → Climbing.act cl ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-map here) top) (Climbing.code cl))
+  ...   | _ , lifts-map lifts-here , Lρ = recall cl refl
+    (subst (λ W → Calling.act cl ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-map here) top) (Calling.code cl))
     (U.mapᶜ f c′ , cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.mapᶜ f)) pv , S , Lρ , sg)
+  call-map {m₁ = m₁} {f = f} ρ {closes ks} cl with Calling.lifted cl
+  ... | gn , S , L , sg with lifts-split ρ (in-map here) L
+  ...   | _ , lifts-map lifts-here , Lρ = recall cl refl
+    (subst (λ W → Calling.act cl ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-map here) top) (Calling.code cl))
+    (cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.mapᶜ f)) gn , S , Lρ , sg)
 
-  -- A value through a defer, as it is.
-  climb-defer : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {k} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
-                (ρ : Path T (deferˢ k u)) {y : A} → Climbing g ℓ m₁ (ρ ⊕ in-defer here) y → Climbing g ℓ m₁ ρ y
-  climb-defer ρ {y} cl with Climbing.lifted cl
+  -- A signal through a defer, as it is.
+  call-defer : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {k} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
+               (ρ : Path T (deferˢ k u)) {sg : Signal T A} → Calling g ℓ m₁ (ρ ⊕ in-defer here) sg → Calling g ℓ m₁ ρ sg
+  call-defer ρ {sends y} cl with Calling.lifted cl
   ... | c′ , pv , S , L , sg with lifts-split ρ (in-defer here) L
-  ...   | _ , lifts-defer lifts-here , Lρ = reclimb cl
-    (subst (λ W → Climbing.act cl ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-defer here) top) (Climbing.code cl))
+  ...   | _ , lifts-defer lifts-here , Lρ = recall cl refl
+    (subst (λ W → Calling.act cl ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-defer here) top) (Calling.code cl))
     (c′ , pv , S , Lρ , sg)
-
-  -- A value out of a connect's body, as it is: beside its source, or
-  -- past its source's end.
-  climb-body : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt} {t : Sub (Conf.world (Mach.conf m₁)) Δ A}
-               {u : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B} (ρ : Path T (connectˢ Sj c b kb k fd rp e rt t u)) {y : B}
-             → Climbing g ℓ m₁ (ρ ⊕ in-body here) y → Climbing g ℓ m₁ ρ y
-  climb-body {m₁ = m₁} {e = e} {rp} {rt} ρ {y} cl with Climbing.lifted cl
-  ... | c′ , pv , S , L , sg with lifts-split ρ (in-body here) L
-  ...   | _ , lifts-body pt _ lifts-here , Lρ = reclimb cl
-    (subst (λ W → Climbing.act cl ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-body here) top) (Climbing.code cl))
-    (_ , cong₂ (At.connected (Conf.heap (Mach.conf m₁)) rp e rt) pt pv , S , Lρ , sg)
-  ...   | _ , lifts-shut pt refl _ lifts-here , Lρ = reclimb cl
-    (subst (λ W → Climbing.act cl ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-body here) top) (Climbing.code cl))
-    (_ , cong₂ (At.connected (Conf.heap (Mach.conf m₁)) rp e rt) pt pv , S , Lρ , sg)
-
-  -- A live take's part, its source's lifted.
-  take-part : ∀ {h} (H : Heapᴹ h) {Δ A} {i p c k} {u : Sub h Δ A} {c′} → At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′
-            → At.part H (takeWhileˢ i p c k taking u) ≡ just (U.takeWhileᶜ i p c′)
-  take-part H lv pv rewrite lv | pv = refl
-
-  -- A guard read open over a predicate holding: what it guards.
-  pass-code : ∀ {w} {b q : Bool} {m n : Act w ⊤} → b ≡ true → q ≡ true → Kit.when b (if q then m else n) ≗ m
-  pass-code refl refl = ≗-refl _
-
-  -- A value a live takeWhile passes: its guard read, one operator up,
-  -- the tree's load as it was.
-  take-pass : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {i p c k}
-              {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ i p c k taking u)) {y : A} → p y ≡ true
-            → Climbing g ℓ m₁ (ρ ⊕ in-take here) y → Rises g (load m₁ T) m₁ (ρ ⊕ in-take here)
-  take-pass {g} {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {i = i} {p = p} {c = c} {k = k} {u = u} ρ {y} py
-    record { sane = sn ; placed = pl ; ctl = refl ; code = cd ; stack = sk ; lifted = c′ , pv , S , L , sg ; owned = ow
-           ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
-           ; behind = bh ; kept = kp }
-    with lifts-split ρ (in-take here) L | subst (λ W → _ ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-take here) top) cd
-  ... | _ , lifts-take lv lifts-here , Lρ | readRef≗ refl f =
-    rises (then refl now) (one-lower ρ one-take) (record
-      { sane = sn ; placed = pl ; ctl = refl
-      ; code = ≗-trans (f same⊑ _) (≗-trans (wk-same _) (pass-code lv py))
-      ; stack = sk
-      ; lifted = U.takeWhileᶜ i p c′ , take-part hp {i = i} {p = p} {c = c} {k = k} {u = u} lv pv , S , subst (λ s → Lifts hp ρ s S) (cong (U.taking i p q y c′) py) Lρ , sg
-      ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
-      ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
-      ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; kept = inj₁ refl })
-
-  -- The value risen, held to the climb's load.
-  rise : ∀ {g m} {st : Strong g m} {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v}
-       → load m₁ T ≼ loadOf st → Rises g (load m₁ T) m₁ σ → Climbed st m₁ σ
-  rise le (rises path lt cl) = rose path lt (relevel cl le)
-
-  -- A write, one step: the cell stored, what follows it run.
-  writes : ∀ {h} {hp : Heapᴹ h} {q w} {σ : w ⊑ h} {K : Stack w ⊤} {clk ts bs td lg en mk} {a : Act h ⊤} {t} {r : Ref h t} {z} {n : Act h ⊤}
-         → a ≗ writeRef r z n
-         → Σ (Act h ⊤) λ n′ → n′ ≗ n × (mach ⟨ hp , q , run a σ K ⟩ clk ts bs td lg en mk ⇝ mach ⟨ store hp r (lift z) , q , run n′ σ K ⟩ clk ts bs td lg en mk)
-  writes (writeRef≗ refl refl e) = _ , e , then refl now
-
-  -- A value through a scan: its cell read and written, the accumulated
-  -- value one operator up, the tree's load as it was.
-  scan-pass : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r}
-              {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (scanˢ f r u)) {y : A}
-            → Climbing g ℓ m₁ (ρ ⊕ in-scan here) y → Rises g (load m₁ T) m₁ (ρ ⊕ in-scan here)
-  scan-pass {g} {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {f = f} {r = r} {u = u} ρ {y}
-    cl@record { sane = sn ; placed = pl ; ϑ = ϑ ; K = K ; ctl = refl ; code = cd ; stack = sk ; lifted = c′ , pv , S , L , sg ; owned = ow
-              ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
-              ; behind = bh ; kept = kp }
-    with lifts-split ρ (in-scan here) L | subst (λ W → _ ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-scan here) top) cd
-  ... | _ , lifts-scan lifts-here , Lρ | readRef≗ refl k =
-    rises (then refl (proj₂ (proj₂ wr))) (one-lower ρ one-scan) (record
-      { sane = sn ; placed = pl ; ctl = refl ; code = proj₁ (proj₂ wr) ; stack = sk
-      ; lifted = U.scanᶜ f z c′ , scan-part hp {f = f} {r = r} {u = u} (fresh-path ρ fs) z pv , S , scan-lifts hp ρ fs z Lρ , sg
-      ; owned = scan-owned hp ρ fs z ow ; kernels = scan-kernels hp ρ fs z kn ; meaning = scan-meaning hp ρ fs z mn ; queue = scan-queue hp ρ fs z qu
-      ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
-      ; sorted = sorted-⇝ so (then refl (proj₂ (proj₂ wr))) ; behind = scan-behind ρ cl ; kept = inj₁ refl })
-    where z = f (At.val hp r) y
-          wr = writes {σ = ϑ} {K = K} {clk = clk} {ts} {bs} {td} {lg} {en} {mk} (≗-trans (k same⊑ (At.val hp r)) (wk-same _))
-
-  climb-scan : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r}
-               {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (scanˢ f r u)) {y : A}
-             → Climbing g (loadOf st) m₁ (ρ ⊕ in-scan here) y → Climbed st m₁ (ρ ⊕ in-scan here)
-  climb-scan st ρ cl = rise (Climbing.kept cl) (scan-pass ρ cl)
-
-  -- A value through a takeWhile: passed one operator up; or failing,
-  -- delivered first when inclusive, then the completion climbs, then
-  -- the cut.  The failing value cannot stop at the completion owed with
-  -- the ghost alike unless the take's stage counts: the control's work
-  -- rises.
-  climb-take : ∀ {g m} (st : Strong g m) {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {i p c k tk}
-               {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ i p c k tk u)) {y : A}
-             → Climbing g (loadOf st) m₁ (ρ ⊕ in-take here) y → Climbed st m₁ (ρ ⊕ in-take here)
-  climb-take st {i = i} {p} ρ {y} cl with Climbing.lifted cl
-  ... | c′ , pv , S , L , sg with lifts-split ρ (in-take here) L
-  ...   | _ , lifts-take lv lifts-here , Lρ with p y in py | i
-  ...     | true  | _     = rise (Climbing.kept cl) (take-pass ρ py cl)
-  ...     | false | true  = rise (Climbing.kept cl) (take-out ρ py cl)
-  ...     | false | false with take-end ρ py cl
-  ...       | g″ , m₀ , path , cr , ag , lt = landed (g″ , m₀ , path , carried cr , lowered ag (inj₁ (⊏-≼ lt (Climbing.kept cl))))
-
-  -- A value at the root: recorded next, the ghost's step showing it.
-  climb-root : ∀ {g m} (st : Strong g m) {ℓ m₁} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {y : R} → Climbing g ℓ m₁ {T = T} here y → Hopped st m₁
-  climb-root {g} st {m₁ = mach ⟨ hp , p , _ ⟩ clk ts bs td lg en mk} {T}
-    record { sane = sn ; placed = pl ; ctl = refl ; code = eff≗ ke ; stack = sk ; lifted = c′ , pv , _ , lifts-here , sg ; owned = ow
-           ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = refl } ; sorted = so ; behind = bh } =
-    g , _ , then refl now
-    , carried (record
-        { sane = sn ; placed = pl ; tree = T ; ctlAs = noteAs [] (ke tt) sk ; meets = c′ , pv , sg
-        ; owned = owned-move hp (noteAs [] (ke tt) sk) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
-        ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = refl } 
-        ; sorted = sorted-⇝ so (then refl now) ; behind = bh })
-    , showing (agrees (λ n → agree-refl n _)) (λ ())
-
-  -- One operator climbed, by the operator.
-  climb-step : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
-               {v : Sub (Conf.world (Mach.conf m₁)) Δ′ A′} (ρ : Path T u) {s : Path u v} → One s → ∀ {y} → Climbing g (loadOf st) m₁ (ρ ⊕ s) y → Climbed st m₁ (ρ ⊕ s)
-  climb-step st ρ one-map       cl = rose now (one-lower ρ one-map) (climb-map ρ cl)
-  climb-step st ρ one-scan      cl = climb-scan st ρ cl
-  climb-step st ρ one-take      cl = climb-take st ρ cl
-  climb-step st ρ one-outer     cl = climb-outer st ρ cl
-  climb-step st ρ (one-lanes o) cl = climb-lanes st ρ _ o cl
-  climb-step st ρ one-source    cl = climb-source st ρ cl
-  climb-step st ρ one-body      cl = rose now (one-lower ρ one-body) (climb-body ρ cl)
-  climb-step st ρ one-defer     cl = rose now (one-lower ρ one-defer) (climb-defer ρ cl)
-
-  -- A VALUE CLIMBS TO A RE-ENTRY CONFIGURATION: one operator at a time,
-  -- from the path's far end, each step to a shorter path.
-  climb : ∀ {g m} (st : Strong g m) (n : ℕ) {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
-          (σ : Path T v) {y : A} → height σ < n → Climbing g (loadOf st) m₁ σ y → Hopped st m₁
-  climb st zero    σ () cl
-  climb st (suc n) σ lt cl with view σ
-  ... | whole      = climb-root st cl
-  ... | snoc ρ s o with climb-step st ρ o cl
-  ...   | landed hp         = hp
-  ...   | rose path lt′ cl′ = hopped-pre path (climb st n _ (≤-trans lt′ (≤-pred lt)) cl′)
-
-  soar : ∀ {g m m′} (st : Strong g m) → Σ Mach (λ m₁ → m′ ⇝ m₁ × Aloft g (loadOf st) m₁) → Hopped st m′
-  soar st (m₁ , path , aloft {σ = σ} cl) = hopped-pre path (climb st (suc (height σ)) σ ≤-refl cl)
-
-  -- A COMPLETION ON ITS WAY UP: the observer the path walks to about
-  -- to be told its source has ended, the calls `ks` owed after it.  The
-  -- node it leaves is gone: the call that owed the end is spent, so the
-  -- `of` is done, the take taken, the joiner told.  The ghost's step is
-  -- that end lifted along the path.
-  record Closing (g : U.Node [] R) (ℓ : Load) (m₁ : Mach) {Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
-                 (σ : Path T v) : Set₁ where
-    field
-      sane    : Sane [] g
-      placed  : Placed g []
-      {w}     : World
-      {ϑ}     : w ⊑ Conf.world (Mach.conf m₁)
-      {act}   : Act (Conf.world (Mach.conf m₁)) ⊤
-      {K}     : Stack w ⊤
-      {ks}    : List (Call T)
-      ctl     : Conf.ctl (Mach.conf m₁) ≡ run act ϑ K
-      code    : act ≗ (Observer.complete (Here.obs (walk σ top)) >>ᴬ ⟦ ks ⟧ᶜ)
-      stack   : StackAs T (Conf.pos (Mach.conf m₁)) ϑ K (Mach.bursts m₁)
-      gone    : At.part (Conf.heap (Mach.conf m₁)) v ≡ nothing
-      lifted  : Σ (U.Step [] R) λ S → Lifts (Conf.heap (Mach.conf m₁)) σ (U.endˢ (Conf.pos (Mach.conf m₁))) S × U.step g ≡ S
-      owned   : Owned (Conf.heap (Mach.conf m₁)) T (runAs ks (≗-refl _) stack)
-      kernels : Kernels (Conf.heap (Mach.conf m₁)) T
-      meaning : Meaning (Conf.heap (Mach.conf m₁)) T
-      queue   : Queue (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) (Mach.clock m₁) (Mach.timers m₁) T
-      books   : Books T (runAs ks (≗-refl _) stack) m₁
-      sorted  : Σ Pos λ lo → WellMach lo m₁
-      behind  : Each (Conf.heap (Mach.conf m₁)) (Heads (Conf.pos (Mach.conf m₁))) T
-      kept    : load m₁ T ≼ ℓ
-
-  -- The same completion, restated at another path.
-  reclose : ∀ {g ℓ m₁ Δ A Δ′ A′} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
-              {v′ : Sub (Conf.world (Mach.conf m₁)) Δ′ A′} {σ : Path T v} (cl : Closing g ℓ m₁ σ) {σ′ : Path T v′}
-          → Closing.act cl ≗ (Observer.complete (Here.obs (walk σ′ top)) >>ᴬ ⟦ Closing.ks cl ⟧ᶜ)
-          → At.part (Conf.heap (Mach.conf m₁)) v′ ≡ nothing
-          → Σ (U.Step [] R) (λ S → Lifts (Conf.heap (Mach.conf m₁)) σ′ (U.endˢ (Conf.pos (Mach.conf m₁))) S × U.step g ≡ S)
-          → Closing g ℓ m₁ σ′
-  reclose cl cd gn lf = record
-    { sane = Closing.sane cl ; placed = Closing.placed cl ; ctl = Closing.ctl cl ; code = cd ; stack = Closing.stack cl ; gone = gn
-    ; lifted = lf ; owned = Closing.owned cl ; kernels = Closing.kernels cl ; meaning = Closing.meaning cl ; queue = Closing.queue cl
-    ; books = Closing.books cl ; sorted = Closing.sorted cl ; behind = Closing.behind cl ; kept = Closing.kept cl }
-
-  -- One operator closed: a re-entry configuration reached, or the
-  -- completion one operator higher, the path shorter.
-  data Closed {g m} (st : Strong g m) (m₁ : Mach) {Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
-              (σ : Path T v) : Set₁ where
-    landed : Hopped st m₁ → Closed st m₁ σ
-    rose   : ∀ {m₂ Δ′ A′} {T′ : Sub (Conf.world (Mach.conf m₂)) [] R} {v′ : Sub (Conf.world (Mach.conf m₂)) Δ′ A′} {σ′ : Path T′ v′}
-           → m₁ ⇝ m₂ → height σ′ < height σ → Closing g (loadOf st) m₂ σ′ → Closed st m₁ σ
-
-  -- Some completion on its way up.
-  data Afloat (g : U.Node [] R) (ℓ : Load) (m₁ : Mach) : Set₁ where
-    afloat : ∀ {Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v}
-           → Closing g ℓ m₁ σ → Afloat g ℓ m₁
-
-  -- A completion through a map, as it is.
-  close-map : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : A → B} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
-              (ρ : Path T (mapˢ f u)) → Closing g ℓ m₁ (ρ ⊕ in-map here) → Closing g ℓ m₁ ρ
-  close-map {m₁ = m₁} {f = f} {u} ρ cl with Closing.lifted cl
-  ... | S , L , sg with lifts-split ρ (in-map here) L
-  ...   | _ , lifts-map lifts-here , Lρ = reclose cl
-    (subst (λ W → Closing.act cl ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ Closing.ks cl ⟧ᶜ)) (walk-⊕ ρ (in-map here) top) (Closing.code cl))
-    (cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.mapᶜ f)) (Closing.gone cl))
-    (S , Lρ , sg)
-
-  -- A completion through a scan, as it is: the scan's cell unread.
-  close-scan : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
-               (ρ : Path T (scanˢ f r u)) → Closing g ℓ m₁ (ρ ⊕ in-scan here) → Closing g ℓ m₁ ρ
-  close-scan {m₁ = m₁} {f = f} {r} {u} ρ cl with Closing.lifted cl
-  ... | S , L , sg with lifts-split ρ (in-scan here) L
-  ...   | _ , lifts-scan lifts-here , Lρ = reclose cl
-    (subst (λ W → Closing.act cl ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ Closing.ks cl ⟧ᶜ)) (walk-⊕ ρ (in-scan here) top) (Closing.code cl))
-    (cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.scanᶜ f (At.val (Conf.heap (Mach.conf m₁)) r))) (Closing.gone cl))
-    (S , Lρ , sg)
-
-  -- A completion through a defer, as it is.
-  close-defer : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {k} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
-                (ρ : Path T (deferˢ k u)) → Closing g ℓ m₁ (ρ ⊕ in-defer here) → Closing g ℓ m₁ ρ
-  close-defer ρ cl with Closing.lifted cl
-  ... | S , L , sg with lifts-split ρ (in-defer here) L
-  ...   | _ , lifts-defer lifts-here , Lρ = reclose cl
-    (subst (λ W → Closing.act cl ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ Closing.ks cl ⟧ᶜ)) (walk-⊕ ρ (in-defer here) top) (Closing.code cl))
-    (Closing.gone cl) (S , Lρ , sg)
-
-  -- A guard read open: what it guards.
-  open-code : ∀ {w} {b : Bool} {m : Act w ⊤} → b ≡ true → Kit.when b m ≗ m
-  open-code refl = ≗-refl _
-
-  -- A live take over a gone source is gone.
-  gone-take : ∀ {h} (H : Heapᴹ h) {Δ A} {i p c k} {u : Sub h Δ A} → At.val H (Kit.live c) ≡ true
-            → At.part H u ≡ nothing → At.part H (takeWhileˢ i p c k taking u) ≡ nothing
-  gone-take H lv gn rewrite lv | gn = refl
-
-  -- A completion through a live takeWhile: its guard read open, one
-  -- operator up, the take showing its source's end.
-  close-take : ∀ {g m} (st : Strong g m) {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {i p c k tk}
-               {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ i p c k tk u))
-             → Closing g (loadOf st) m₁ (ρ ⊕ in-take here) → Closed st m₁ (ρ ⊕ in-take here)
-  close-take st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {i = i} {p = p} {c = c} {k = k} {u = u} ρ
-    record { sane = sn ; placed = pl ; ks = ks ; ctl = refl ; code = cd ; stack = sk ; gone = gn ; lifted = S , L , sg ; owned = ow
-           ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
-           ; behind = bh ; kept = kp }
-    with lifts-split ρ (in-take here) L | subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-take here) top) cd
-  ... | _ , lifts-take lv lifts-here , Lρ | readRef≗ refl f =
-    rose (then refl now) (one-lower ρ one-take) (record
-      { sane = sn ; placed = pl ; ctl = refl
-      ; code = ≗-trans (f same⊑ _) (bind≗ (≗-trans (wk-same _) (open-code lv)) λ _ → wk-same _)
-      ; stack = sk
-      ; gone = gone-take hp {i = i} {p = p} {c = c} {k = k} {u = u} lv gn
-      ; lifted = S , Lρ , sg
-      ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
-      ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
-      ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; kept = kp })
+  call-defer ρ {closes ks} cl with Calling.lifted cl
+  ... | gn , S , L , sg with lifts-split ρ (in-defer here) L
+  ...   | _ , lifts-defer lifts-here , Lρ = recall cl refl
+    (subst (λ W → Calling.act cl ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-defer here) top) (Calling.code cl))
+    (gn , S , Lρ , sg)
 
   -- A body's cut owed ahead of the agenda, its body gone.
   owned-body : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} {p c bs p₀ c₀ bs₀} {ca : CtlAs t p c bs} (ca₀ : CtlAs t p₀ c₀ bs₀)
@@ -439,111 +207,269 @@ module Ascending (R : Set) where
   body-end (lifts-body _ _ lifts-here)   = refl
   body-end (lifts-shut _ _ _ lifts-here) = refl
 
-  -- A connect's body ended: the connect's completion delivered, its
-  -- cut owed after it, the body gone as a `bodyC` owed asks.
-  close-body : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
-               {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {u : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
-               (ρ : Path T (connectˢ Sj c b kb k fd rp e rt t u))
-             → Closing g (loadOf st) m₁ (ρ ⊕ in-body here) → Closed st m₁ (ρ ⊕ in-body here)
-  close-body st {m₁ = m₁} {T = T} {Sj} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = t} {u} ρ
-    record { sane = sn ; placed = pl ; ks = ks ; ctl = cx ; code = cd ; stack = sk ; gone = gn ; lifted = S , L , sg ; owned = ow
+  -- A signal out of a connect's body.  A value as it is: beside its
+  -- source, or past its source's end.  An end the connect's completion
+  -- delivered, its cut owed after it, the body gone as a `bodyC` owed
+  -- asks.
+  call-body : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
+              {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {u : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
+              (ρ : Path T (connectˢ Sj c b kb k fd rp e rt t u)) {sg : Signal T B}
+            → Calling g (loadOf st) m₁ (ρ ⊕ in-body here) sg → Called st m₁ (ρ ⊕ in-body here)
+  call-body st {m₁ = m₁} {e = e} {rp} {rt} ρ {sends y} cl with Calling.lifted cl
+  ... | c′ , pv , S , L , sg with lifts-split ρ (in-body here) L
+  ...   | _ , lifts-body pt _ lifts-here , Lρ = rose now (one-lower ρ one-body) (recall cl {sg′ = sends y} refl
+    (subst (λ W → Calling.act cl ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-body here) top) (Calling.code cl))
+    (_ , cong₂ (At.connected (Conf.heap (Mach.conf m₁)) rp e rt) pt pv , S , Lρ , sg))
+  ...   | _ , lifts-shut pt refl _ lifts-here , Lρ = rose now (one-lower ρ one-body) (recall cl {sg′ = sends y} refl
+    (subst (λ W → Calling.act cl ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-body here) top) (Calling.code cl))
+    (_ , cong₂ (At.connected (Conf.heap (Mach.conf m₁)) rp e rt) pt pv , S , Lρ , sg))
+  call-body st {m₁ = m₁} {T = T} {Sj} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = t} {u} ρ {closes ks}
+    record { sane = sn ; placed = pl ; ctl = cx ; code = cd ; stack = sk ; lifted = gn , S , L , sg ; owned = ow
            ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
            ; behind = bh ; kept = kp }
     with lifts-split ρ (in-body here) L
-  ... | _ , Lb , Lρ = rose now (one-lower ρ one-body) (record
-      { sane = sn ; placed = pl ; ks = bodyC ρ ∷ ks ; ctl = cx
+  ... | _ , Lb , Lρ = rose {sg′ = closes (bodyC ρ ∷ ks)} now (one-lower ρ one-body) (record
+      { sane = sn ; placed = pl ; ctl = cx
       ; code = ≗-trans (subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-body here) top) cd) (seq-assoc (Observer.complete (Here.obs (walk ρ top))) (Kit.cut c) ⟦ ks ⟧ᶜ)
       ; stack = sk
-      ; gone = gone-connect (Conf.heap (Mach.conf m₁)) {Sj = Sj} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {e = e} {rp = rp} {rt = rt} {t = t} {u = u} gn
-      ; lifted = S , subst (λ s → Lifts (Conf.heap (Mach.conf m₁)) ρ s S) (body-end Lb) Lρ , sg
+      ; lifted = gone-connect (Conf.heap (Mach.conf m₁)) {Sj = Sj} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {e = e} {rp = rp} {rt = rt} {t = t} {u = u} gn
+               , S , subst (λ s → Lifts (Conf.heap (Mach.conf m₁)) ρ s S) (body-end Lb) Lρ , sg
       ; owned = owned-body (Conf.heap (Mach.conf m₁)) (runAs (bodyC ρ ∷ ks) (≗-refl ⟦ bodyC ρ ∷ ks ⟧ᶜ) sk) ρ refl refl refl gn ow
       ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
       ; sorted = so ; behind = bh ; kept = kp })
+
+  -- A live take's part, its source's lifted.
+  take-part : ∀ {h} (H : Heapᴹ h) {Δ A} {i p c k} {u : Sub h Δ A} {c′} → At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′
+            → At.part H (takeWhileˢ i p c k taking u) ≡ just (U.takeWhileᶜ i p c′)
+  take-part H lv pv rewrite lv | pv = refl
+
+  -- A guard read open over a predicate holding: what it guards.
+  pass-code : ∀ {w} {b q : Bool} {m n : Act w ⊤} → b ≡ true → q ≡ true → Kit.when b (if q then m else n) ≗ m
+  pass-code refl refl = ≗-refl _
+
+  -- A value a live takeWhile passes: its guard read, one operator up,
+  -- the tree's load as it was.
+  take-pass : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {i p c k}
+              {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ i p c k taking u)) {y : A} → p y ≡ true
+            → Calling g ℓ m₁ (ρ ⊕ in-take here) (sends y) → Rises g (load m₁ T) m₁ (ρ ⊕ in-take here)
+  take-pass {g} {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {i = i} {p = p} {c = c} {k = k} {u = u} ρ {y} py
+    record { sane = sn ; placed = pl ; ctl = refl ; code = cd ; stack = sk ; lifted = c′ , pv , S , L , sg ; owned = ow
+           ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
+           ; behind = bh ; kept = kp }
+    with lifts-split ρ (in-take here) L | subst (λ W → _ ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-take here) top) cd
+  ... | _ , lifts-take lv lifts-here , Lρ | readRef≗ refl f =
+    rises {sg′ = sends y} (then refl now) (one-lower ρ one-take) (record
+      { sane = sn ; placed = pl ; ctl = refl
+      ; code = ≗-trans (f same⊑ _) (≗-trans (wk-same _) (pass-code lv py))
+      ; stack = sk
+      ; lifted = U.takeWhileᶜ i p c′ , take-part hp {i = i} {p = p} {c = c} {k = k} {u = u} lv pv , S , subst (λ s → Lifts hp ρ s S) (cong (U.taking i p q y c′) py) Lρ , sg
+      ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
+      ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
+      ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; kept = inj₁ refl })
+
+  -- The signal risen, held to the call's load.
+  rise : ∀ {g m} {st : Strong g m} {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v}
+       → load m₁ T ≼ loadOf st → Rises g (load m₁ T) m₁ σ → Called st m₁ σ
+  rise le (rises path lt cl) = rose path lt (relevel cl le)
+
+  -- A guard read open: what it guards.
+  open-code : ∀ {w} {b : Bool} {m : Act w ⊤} → b ≡ true → Kit.when b m ≗ m
+  open-code refl = ≗-refl _
+
+  -- A live take over a gone source is gone.
+  gone-take : ∀ {h} (H : Heapᴹ h) {Δ A} {i p c k} {u : Sub h Δ A} → At.val H (Kit.live c) ≡ true
+            → At.part H u ≡ nothing → At.part H (takeWhileˢ i p c k taking u) ≡ nothing
+  gone-take H lv gn rewrite lv | gn = refl
+
+  -- A signal through a takeWhile.  A value passed one operator up; or
+  -- failing, delivered first when inclusive, then the completion climbs,
+  -- then the cut.  The failing value cannot stop at the completion owed
+  -- with the ghost alike unless the take's stage counts: the control's
+  -- work rises.  An end through a live take: its guard read open, one
+  -- operator up, the take showing its source's end.
+  call-take : ∀ {g m} (st : Strong g m) {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {i p c k tk}
+              {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ i p c k tk u)) {sg : Signal T A}
+            → Calling g (loadOf st) m₁ (ρ ⊕ in-take here) sg → Called st m₁ (ρ ⊕ in-take here)
+  call-take st {i = i} {p} ρ {sends y} cl with Calling.lifted cl
+  ... | c′ , pv , S , L , sg with lifts-split ρ (in-take here) L
+  ...   | _ , lifts-take lv lifts-here , Lρ with p y in py | i
+  ...     | true  | _     = rise (Calling.kept cl) (take-pass ρ py cl)
+  ...     | false | true  = rise (Calling.kept cl) (take-out ρ py cl)
+  ...     | false | false with take-end ρ py cl
+  ...       | g″ , m₀ , path , cr , ag , lt = landed (g″ , m₀ , path , carried cr , lowered ag (inj₁ (⊏-≼ lt (Calling.kept cl))))
+  call-take st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {i = i} {p = p} {c = c} {k = k} {u = u} ρ {closes ks}
+    record { sane = sn ; placed = pl ; ctl = refl ; code = cd ; stack = sk ; lifted = gn , S , L , sg ; owned = ow
+           ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
+           ; behind = bh ; kept = kp }
+    with lifts-split ρ (in-take here) L | subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-take here) top) cd
+  ... | _ , lifts-take lv lifts-here , Lρ | readRef≗ refl f =
+    rose {sg′ = closes ks} (then refl now) (one-lower ρ one-take) (record
+      { sane = sn ; placed = pl ; ctl = refl
+      ; code = ≗-trans (f same⊑ _) (bind≗ (≗-trans (wk-same _) (open-code lv)) λ _ → wk-same _)
+      ; stack = sk
+      ; lifted = gone-take hp {i = i} {p = p} {c = c} {k = k} {u = u} lv gn , S , Lρ , sg
+      ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
+      ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
+      ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; kept = kp })
+
+  -- A write, one step: the cell stored, what follows it run.
+  writes : ∀ {h} {hp : Heapᴹ h} {q w} {σ : w ⊑ h} {K : Stack w ⊤} {clk ts bs td lg en mk} {a : Act h ⊤} {t} {r : Ref h t} {z} {n : Act h ⊤}
+         → a ≗ writeRef r z n
+         → Σ (Act h ⊤) λ n′ → n′ ≗ n × (mach ⟨ hp , q , run a σ K ⟩ clk ts bs td lg en mk ⇝ mach ⟨ store hp r (lift z) , q , run n′ σ K ⟩ clk ts bs td lg en mk)
+  writes (writeRef≗ refl refl e) = _ , e , then refl now
+
+  -- A value through a scan: its cell read and written, the accumulated
+  -- value one operator up, the tree's load as it was.
+  scan-pass : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r}
+              {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (scanˢ f r u)) {y : A}
+            → Calling g ℓ m₁ (ρ ⊕ in-scan here) (sends y) → Rises g (load m₁ T) m₁ (ρ ⊕ in-scan here)
+  scan-pass {g} {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {f = f} {r = r} {u = u} ρ {y}
+    cl@record { sane = sn ; placed = pl ; ϑ = ϑ ; K = K ; ctl = refl ; code = cd ; stack = sk ; lifted = c′ , pv , S , L , sg ; owned = ow
+              ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
+              ; behind = bh ; kept = kp }
+    with lifts-split ρ (in-scan here) L | subst (λ W → _ ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-scan here) top) cd
+  ... | _ , lifts-scan lifts-here , Lρ | readRef≗ refl k =
+    rises {sg′ = sends z} (then refl (proj₂ (proj₂ wr))) (one-lower ρ one-scan) (record
+      { sane = sn ; placed = pl ; ctl = refl ; code = proj₁ (proj₂ wr) ; stack = sk
+      ; lifted = U.scanᶜ f z c′ , scan-part hp {f = f} {r = r} {u = u} (fresh-path ρ fs) z pv , S , scan-lifts hp ρ fs z Lρ , sg
+      ; owned = scan-owned hp ρ fs z ow ; kernels = scan-kernels hp ρ fs z kn ; meaning = scan-meaning hp ρ fs z mn ; queue = scan-queue hp ρ fs z qu
+      ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
+      ; sorted = sorted-⇝ so (then refl (proj₂ (proj₂ wr))) ; behind = scan-behind ρ cl ; kept = inj₁ refl })
+    where z = f (At.val hp r) y
+          wr = writes {σ = ϑ} {K = K} {clk = clk} {ts} {bs} {td} {lg} {en} {mk} (≗-trans (k same⊑ (At.val hp r)) (wk-same _))
+
+  -- A signal through a scan: a value accumulated; an end as it is, the
+  -- scan's cell unread.
+  call-scan : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r}
+              {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (scanˢ f r u)) {sg : Signal T A}
+            → Calling g (loadOf st) m₁ (ρ ⊕ in-scan here) sg → Called st m₁ (ρ ⊕ in-scan here)
+  call-scan st ρ {sends y} cl = rise (Calling.kept cl) (scan-pass ρ cl)
+  call-scan st {m₁ = m₁} {f = f} {r} ρ {closes ks} cl with Calling.lifted cl
+  ... | gn , S , L , sg with lifts-split ρ (in-scan here) L
+  ...   | _ , lifts-scan lifts-here , Lρ = rose now (one-lower ρ one-scan) (recall cl {sg′ = closes ks} refl
+    (subst (λ W → Calling.act cl ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-scan here) top) (Calling.code cl))
+    (cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.scanᶜ f (At.val (Conf.heap (Mach.conf m₁)) r))) gn , S , Lρ , sg))
 
   postulate
     -- A flatMap's outer ended: its done flag written, settled: the
     -- flatMap ends if no lane is left, or the lanes run on.
     close-outer : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
                   {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
-                  (ρ : Path T (flatMapˢ op f fl oc k r pl u ls))
-                → Closing g (loadOf st) m₁ (ρ ⊕ in-outer here) → Closed st m₁ (ρ ⊕ in-outer here)
+                  (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {ks}
+                → Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (closes ks) → Called st m₁ (ρ ⊕ in-outer here)
 
     -- A lane ended: shut, the active count down, the next queued value
     -- begun or the flatMap ended past its outer's end.
     close-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B Δ′ C} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
                   {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ′ C}
-                  (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) → OneLane πL
-                → Closing g (loadOf st) m₁ (ρ ⊕ in-lanes πL) → Closed st m₁ (ρ ⊕ in-lanes πL)
+                  (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) → OneLane πL → ∀ {ks}
+                → Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (closes ks) → Called st m₁ (ρ ⊕ in-lanes πL)
 
     -- A connect's source ended: its subject closed, the finish of its
     -- subscribers owed.
     close-source : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
                    {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {bd : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
-                   (ρ : Path T (connectˢ Sj c b kb k fd rp e rt u bd))
-                 → Closing g (loadOf st) m₁ (ρ ⊕ in-source here) → Closed st m₁ (ρ ⊕ in-source here)
+                   (ρ : Path T (connectˢ Sj c b kb k fd rp e rt u bd)) {ks}
+                 → Calling g (loadOf st) m₁ (ρ ⊕ in-source here) (closes ks) → Called st m₁ (ρ ⊕ in-source here)
 
-  -- A completion at the root: the run's end asked of the record, the
-  -- ghost's step its end.
-  close-root : ∀ {g m} (st : Strong g m) {ℓ m₁} {T : Sub (Conf.world (Mach.conf m₁)) [] R} → Closing g ℓ m₁ {T = T} here → Hopped st m₁
-  close-root {g} st {m₁ = mach ⟨ hp , p , _ ⟩ clk ts bs td lg en mk}
-    record { sane = sn ; placed = pl ; ctl = refl ; code = eff≗ _ ; lifted = _ , lifts-here , sg ; books = record { running = refl } } =
+  -- A signal reaching a flatMap's outer.
+  call-outer : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+               {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
+               (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {sg : Signal T A}
+             → Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) sg → Called st m₁ (ρ ⊕ in-outer here)
+  call-outer st ρ {sends _}  cl = climb-outer st ρ cl
+  call-outer st ρ {closes _} cl = close-outer st ρ cl
+
+  -- A signal out of a lane.
+  call-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B Δ′ C} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+               {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ′ C}
+               (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) → OneLane πL → ∀ {sg : Signal T C}
+             → Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) sg → Called st m₁ (ρ ⊕ in-lanes πL)
+  call-lanes st ρ πL o {sends _}  cl = climb-lanes st ρ πL o cl
+  call-lanes st ρ πL o {closes _} cl = close-lanes st ρ πL o cl
+
+  -- A signal reaching a connect's subject.
+  call-source : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
+                {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {bd : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
+                (ρ : Path T (connectˢ Sj c b kb k fd rp e rt u bd)) {sg : Signal T A}
+              → Calling g (loadOf st) m₁ (ρ ⊕ in-source here) sg → Called st m₁ (ρ ⊕ in-source here)
+  call-source st ρ {sends _}  cl = climb-source st ρ cl
+  call-source st ρ {closes _} cl = close-source st ρ cl
+
+  -- A signal at the root: a value recorded next, the ghost's step
+  -- showing it; an end the run's end asked of the record, the ghost's
+  -- step its end.
+  call-root : ∀ {g m} (st : Strong g m) {ℓ m₁} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {sg : Signal T R} → Calling g ℓ m₁ {T = T} here sg → Hopped st m₁
+  call-root {g} st {m₁ = mach ⟨ hp , p , _ ⟩ clk ts bs td lg en mk} {T} {sends y}
+    record { sane = sn ; placed = pl ; ctl = refl ; code = eff≗ ke ; stack = sk ; lifted = c′ , pv , _ , lifts-here , sg ; owned = ow
+           ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = refl } ; sorted = so ; behind = bh } =
+    g , _ , then refl now
+    , carried (record
+        { sane = sn ; placed = pl ; tree = T ; ctlAs = noteAs [] (ke tt) sk ; meets = c′ , pv , sg
+        ; owned = owned-move hp (noteAs [] (ke tt) sk) refl refl refl ow ; kernels = kn ; meaning = mn ; queue = qu
+        ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = refl } 
+        ; sorted = sorted-⇝ so (then refl now) ; behind = bh })
+    , showing (agrees (λ n → agree-refl n _)) (λ ())
+  call-root {g} st {m₁ = mach ⟨ hp , p , _ ⟩ clk ts bs td lg en mk} {sg = closes _}
+    record { sane = sn ; placed = pl ; ctl = refl ; code = eff≗ _ ; lifted = _ , _ , lifts-here , sg ; books = record { running = refl } } =
     g , _ , then refl now , closing refl refl sg sn pl , showing (agrees (λ n → agree-refl n _)) (λ ())
 
-  -- One operator closed, by the operator.
-  close-step : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
-               {v : Sub (Conf.world (Mach.conf m₁)) Δ′ A′} (ρ : Path T u) {s : Path u v} → One s → Closing g (loadOf st) m₁ (ρ ⊕ s) → Closed st m₁ (ρ ⊕ s)
-  close-step st ρ one-map       cl = rose now (one-lower ρ one-map) (close-map ρ cl)
-  close-step st ρ one-scan      cl = rose now (one-lower ρ one-scan) (close-scan ρ cl)
-  close-step st ρ one-take      cl = close-take st ρ cl
-  close-step st ρ one-outer     cl = close-outer st ρ cl
-  close-step st ρ (one-lanes o) cl = close-lanes st ρ _ o cl
-  close-step st ρ one-source    cl = close-source st ρ cl
-  close-step st ρ one-body      cl = close-body st ρ cl
-  close-step st ρ one-defer     cl = rose now (one-lower ρ one-defer) (close-defer ρ cl)
+  -- One operator called, by the operator.
+  call-step : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
+              {v : Sub (Conf.world (Mach.conf m₁)) Δ′ A′} (ρ : Path T u) {s : Path u v} → One s → ∀ {sg} → Calling g (loadOf st) m₁ (ρ ⊕ s) sg → Called st m₁ (ρ ⊕ s)
+  call-step st ρ one-map       cl = rose now (one-lower ρ one-map) (call-map ρ cl)
+  call-step st ρ one-scan      cl = call-scan st ρ cl
+  call-step st ρ one-take      cl = call-take st ρ cl
+  call-step st ρ one-outer     cl = call-outer st ρ cl
+  call-step st ρ (one-lanes o) cl = call-lanes st ρ _ o cl
+  call-step st ρ one-source    cl = call-source st ρ cl
+  call-step st ρ one-body      cl = call-body st ρ cl
+  call-step st ρ one-defer     cl = rose now (one-lower ρ one-defer) (call-defer ρ cl)
 
-  -- A COMPLETION CLIMBS TO A RE-ENTRY CONFIGURATION, as a value does.
-  close : ∀ {g m} (st : Strong g m) (n : ℕ) {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
-          (σ : Path T v) → height σ < n → Closing g (loadOf st) m₁ σ → Hopped st m₁
-  close st zero    σ () cl
-  close st (suc n) σ lt cl with view σ
-  ... | whole      = close-root st cl
-  ... | snoc ρ s o with close-step st ρ o cl
+  -- A SIGNAL CLIMBS TO A RE-ENTRY CONFIGURATION: one operator at a time,
+  -- from the path's far end, each step to a shorter path.
+  call : ∀ {g m} (st : Strong g m) (n : ℕ) {m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
+         (σ : Path T v) {sg : Signal T A} → height σ < n → Calling g (loadOf st) m₁ σ sg → Hopped st m₁
+  call st zero    σ () cl
+  call st (suc n) σ lt cl with view σ
+  ... | whole      = call-root st cl
+  ... | snoc ρ s o with call-step st ρ o cl
   ...   | landed hp         = hp
-  ...   | rose path lt′ cl′ = hopped-pre path (close st n _ (≤-trans lt′ (≤-pred lt)) cl′)
+  ...   | rose path lt′ cl′ = hopped-pre path (call st n _ (≤-trans lt′ (≤-pred lt)) cl′)
 
-  float : ∀ {g m m′} (st : Strong g m) → Σ Mach (λ m₁ → m′ ⇝ m₁ × Afloat g (loadOf st) m₁) → Hopped st m′
-  float st (m₁ , path , afloat {σ = σ} cl) = hopped-pre path (close st (suc (height σ)) σ ≤-refl cl)
+  soar : ∀ {g m m′} (st : Strong g m) → Σ Mach (λ m₁ → m′ ⇝ m₁ × Aloft g (loadOf st) m₁) → Hopped st m′
+  soar st (m₁ , path , aloft {σ = σ} cl) = hopped-pre path (call st (suc (height σ)) σ ≤-refl cl)
 
   postulate
     -- A takeWhile's completion begun under its failing value, its cut
     -- the frame's rest.
     take1-enter : ∀ {g m} (cr : Carried g m) {Δ A i p c k q n} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i p c k (Strongly.ending q n) s))
                 → firstCall (Carried.ctlAs cr) ≡ just (take1C π) → ∀ {m′} → step m ≡ silent m′
-                → Σ Mach λ m₁ → m′ ⇝ m₁ × Afloat g (load m (Carried.tree cr)) m₁
+                → Σ Mach λ m₁ → m′ ⇝ m₁ × Aloft g (load m (Carried.tree cr)) m₁
 
     -- A spent `of`'s completion begun at its end.
     last-enter : ∀ {g m} (cr : Carried g m) {Δ A p i} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i []))
                → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → ∀ {m′} → step m ≡ silent m′
-               → Σ Mach λ m₁ → m′ ⇝ m₁ × Afloat g (load m (Carried.tree cr)) m₁
+               → Σ Mach λ m₁ → m′ ⇝ m₁ × Aloft g (load m (Carried.tree cr)) m₁
 
     -- A connect's feed of its source's end: no subscriber left, the
     -- agenda on; or the next subscriber's completion begun.
     fin-enter : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k r ss e rp rt} {s : Sub _ Δ A} {bd : Sub _ (A ∷ Δ) B}
                 (π : Path (Carried.tree cr) (connectˢ S c b kb k (finishing r ss) rp e rt s bd))
               → firstCall (Carried.ctlAs cr) ≡ just (finC π) → ∀ {m′} → step m ≡ silent m′
-              → Σ Mach λ m₁ → m′ ⇝ m₁ × (Hopped (carried cr) m₁ ⊎ Afloat g (load m (Carried.tree cr)) m₁)
+              → Σ Mach λ m₁ → m′ ⇝ m₁ × (Hopped (carried cr) m₁ ⊎ Aloft g (load m (Carried.tree cr)) m₁)
 
   -- A takeWhile's completion delivered under its failing value, then
   -- its cut.
   take1-onward : ∀ {g m} (cr : Carried g m) {Δ A i p c k q n} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i p c k (Strongly.ending q n) s))
                → firstCall (Carried.ctlAs cr) ≡ just (take1C π) → Hops cr
-  take1-onward cr π fc eq = float (carried cr) (take1-enter cr π fc eq)
+  take1-onward cr π fc eq = soar (carried cr) (take1-enter cr π fc eq)
 
   -- A spent `of`'s completion delivered at its end.
   emit-last : ∀ {g m} (cr : Carried g m) {Δ A p i} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i []))
             → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → Hops cr
-  emit-last cr π fc eq = float (carried cr) (last-enter cr π fc eq)
+  emit-last cr π fc eq = soar (carried cr) (last-enter cr π fc eq)
 
   -- The rest of a connect's feed of its source's end.
   fin-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k r ss e rp rt} {s : Sub _ Δ A} {bd : Sub _ (A ∷ Δ) B}
@@ -551,7 +477,7 @@ module Ascending (R : Set) where
              → firstCall (Carried.ctlAs cr) ≡ just (finC π) → Hops cr
   fin-onward cr π fc eq with fin-enter cr π fc eq
   ... | m₁ , path , inj₁ hp = hopped-pre path hp
-  ... | m₁ , path , inj₂ af = float (carried cr) (m₁ , path , af)
+  ... | m₁ , path , inj₂ af = soar (carried cr) (m₁ , path , af)
 
   -- An agenda under way: the ghost is the tree's part.
   run-meets : ∀ {h} {t : Sub h [] R} {p c bs} (ca : CtlAs t p c bs) {n g k} → firstCall ca ≡ just k → Meets ca n g → n ≡ just g

@@ -53,8 +53,8 @@ module Ghosting (R : Set) where
   open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; run)
   open Heap using (World; _⊑_)
   open Sorting R using (WellMach; WellStep; silentʷ; valueʷ; preserve; Beyond)
-  open Run (Pureᴾ R) using (Act; Observer; Subject; module Kit; module FlatKit)
-  open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; Owned; Path; done≗; Call; taking; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; Each; Heads; seen; seenL; isTaking; seen-up; seen-join; ∧-split; ∧-join)
+  open Run (Pureᴾ R) using (Act; Observer; _>>ᴬ_; Subject; module Kit; module FlatKit)
+  open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; Owned; Path; done≗; Call; taking; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; Each; Heads; seen; seenL; isTaking; seen-up; seen-join; ∧-split; ∧-join; ≗-refl) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; bottomAs; restAs; backAs; reholdAs; StackAs; CtlAs; agenda; bursts; begins) renaming (Placed to Placedᴬ)
   open Pure R using (End; finished; dry; cutOff)
   open Moving R using (pend; takes)
@@ -823,12 +823,36 @@ module Ghosting (R : Set) where
     openedL H o (this-lane {c = c} p) = opened H (At.val H (Kit.live c) ∧ o) p
     openedL H o (next-lane p)         = openedL H o p
 
-  -- A VALUE ON ITS WAY UP: `y` about to be delivered to the observer
-  -- the path walks to, the agenda empty above the stack.  The node it
-  -- reaches already past the value, and the ghost's step the value
-  -- lifted along the path.
-  record Climbing (g : U.Node [] R) (ℓ : Load) (m₁ : Mach) {Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
-                  (σ : Path T v) (y : A) : Set₁ where
+  -- What climbs a path: a value, or an end with the calls `ks` owed
+  -- after it.
+  data Signal {h} (T : Sub h [] R) (A : Set) : Set₁ where
+    sends  : A → Signal T A
+    closes : List (Call T) → Signal T A
+
+  -- The calls owed past a signal.
+  owed : ∀ {h} {T : Sub h [] R} {A} → Signal T A → List (Call T)
+  owed (sends _)   = []
+  owed (closes ks) = ks
+
+  -- What a signal makes of the observer it is told to.
+  said : ∀ {h} {T : Sub h [] R} {A} → Observer A h → Signal T A → Act h ⊤
+  said o (sends y)   = Observer.next o y
+  said o (closes ks) = Observer.complete o >>ᴬ ⟦ ks ⟧ᶜ
+
+  -- The node a signal reaches already past it, and the ghost's step the
+  -- signal lifted along the path: a value leaves the node standing, an
+  -- end leaves it gone.
+  Passed : ∀ {h} (H : Heapᴹ h) (q : Pos) (g : U.Node [] R) {T : Sub h [] R} {Δ A} {v : Sub h Δ A} → Path T v → Signal T A → Set₁
+  Passed H q g {Δ = Δ} {A} {v} σ (sends y) =
+    Σ (U.Node Δ A) λ c′ → At.part H v ≡ just c′ × Σ (U.Step [] R) λ S → Lifts H σ (U.outˢ q y c′) S × U.step g ≡ S
+  Passed H q g {v = v} σ (closes _) =
+    At.part H v ≡ nothing × Σ (U.Step [] R) λ S → Lifts H σ (U.endˢ q) S × U.step g ≡ S
+
+  -- A SIGNAL ON ITS WAY UP: `sg` about to be told to the observer the
+  -- path walks to, the agenda empty above the stack but for the calls
+  -- the signal owes.
+  record Calling (g : U.Node [] R) (ℓ : Load) (m₁ : Mach) {Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
+                 (σ : Path T v) (sg : Signal T A) : Set₁ where
     field
       sane    : Sane [] g
       placed  : Placed g []
@@ -837,58 +861,59 @@ module Ghosting (R : Set) where
       {act}   : Act (Conf.world (Mach.conf m₁)) ⊤
       {K}     : Stack w ⊤
       ctl     : Conf.ctl (Mach.conf m₁) ≡ run act ϑ K
-      code    : act ≗ Observer.next (Here.obs (walk σ top)) y
+      code    : act ≗ said (Here.obs (walk σ top)) sg
       stack   : StackAs T (Conf.pos (Mach.conf m₁)) ϑ K (Mach.bursts m₁)
-      lifted  : Σ (U.Node Δ A) λ c′ → At.part (Conf.heap (Mach.conf m₁)) v ≡ just c′
-                × Σ (U.Step [] R) λ S → Lifts (Conf.heap (Mach.conf m₁)) σ (U.outˢ (Conf.pos (Mach.conf m₁)) y c′) S × U.step g ≡ S
-      owned   : Owned (Conf.heap (Mach.conf m₁)) T (runAs [] (done≗ refl) stack)
+      lifted  : Passed (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) g σ sg
+      owned   : Owned (Conf.heap (Mach.conf m₁)) T (runAs (owed sg) (≗-refl _) stack)
       kernels : Kernels (Conf.heap (Mach.conf m₁)) T
       meaning : Meaning (Conf.heap (Mach.conf m₁)) T
       queue   : Queue (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) (Mach.clock m₁) (Mach.timers m₁) T
-      books   : Books T (runAs [] (done≗ refl) stack) m₁
+      books   : Books T (runAs (owed sg) (≗-refl _) stack) m₁
       sorted  : Σ Pos λ lo → WellMach lo m₁
       behind  : Each (Conf.heap (Mach.conf m₁)) (Heads (Conf.pos (Mach.conf m₁))) T
       kept    : load m₁ T ≼ ℓ
 
-  -- The same climb, the value restated at another path.
-  reclimb : ∀ {g ℓ m₁ Δ A Δ′ A′} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
-              {v′ : Sub (Conf.world (Mach.conf m₁)) Δ′ A′} {σ : Path T v} {y : A} (cl : Climbing g ℓ m₁ σ y) {σ′ : Path T v′} {y′ : A′}
-          → Climbing.act cl ≗ Observer.next (Here.obs (walk σ′ top)) y′
-          → Σ (U.Node Δ′ A′) (λ c′ → At.part (Conf.heap (Mach.conf m₁)) v′ ≡ just c′
-              × Σ (U.Step [] R) λ S → Lifts (Conf.heap (Mach.conf m₁)) σ′ (U.outˢ (Conf.pos (Mach.conf m₁)) y′ c′) S × U.step g ≡ S)
-          → Climbing g ℓ m₁ σ′ y′
-  reclimb cl cd lf = record
-    { sane = Climbing.sane cl ; placed = Climbing.placed cl ; ctl = Climbing.ctl cl ; code = cd ; stack = Climbing.stack cl ; lifted = lf
-    ; owned = Climbing.owned cl ; kernels = Climbing.kernels cl ; meaning = Climbing.meaning cl ; queue = Climbing.queue cl
-    ; books = Climbing.books cl ; sorted = Climbing.sorted cl ; behind = Climbing.behind cl ; kept = Climbing.kept cl }
+  -- The same call, the signal restated at another path, owing as much.
+  recall : ∀ {g ℓ m₁ Δ A Δ′ A′} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
+             {v′ : Sub (Conf.world (Mach.conf m₁)) Δ′ A′} {σ : Path T v} {sg : Signal T A} (cl : Calling g ℓ m₁ σ sg) {σ′ : Path T v′} {sg′ : Signal T A′}
+         → owed sg′ ≡ owed sg
+         → Calling.act cl ≗ said (Here.obs (walk σ′ top)) sg′
+         → Passed (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) g σ′ sg′
+         → Calling g ℓ m₁ σ′ sg′
+  recall {m₁ = m₁} {T = T} cl ow cd lf = record
+    { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = Calling.ctl cl ; code = cd ; stack = Calling.stack cl ; lifted = lf
+    ; owned = subst (λ ks → Owned (Conf.heap (Mach.conf m₁)) T (runAs ks (≗-refl _) (Calling.stack cl))) (sym ow) (Calling.owned cl)
+    ; kernels = Calling.kernels cl ; meaning = Calling.meaning cl ; queue = Calling.queue cl
+    ; books = subst (λ ks → Books T (runAs ks (≗-refl _) (Calling.stack cl)) m₁) (sym ow) (Calling.books cl)
+    ; sorted = Calling.sorted cl ; behind = Calling.behind cl ; kept = Calling.kept cl }
 
-  -- The same climb, held to a load no lighter.
-  relevel : ∀ {g ℓ ℓ′ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v} {y : A}
-          → Climbing g ℓ′ m₁ σ y → ℓ′ ≼ ℓ → Climbing g ℓ m₁ σ y
+  -- The same call, held to a load no lighter.
+  relevel : ∀ {g ℓ ℓ′ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v} {sg : Signal T A}
+          → Calling g ℓ′ m₁ σ sg → ℓ′ ≼ ℓ → Calling g ℓ m₁ σ sg
   relevel cl le = record
-    { sane = Climbing.sane cl ; placed = Climbing.placed cl ; ctl = Climbing.ctl cl ; code = Climbing.code cl ; stack = Climbing.stack cl
-    ; lifted = Climbing.lifted cl ; owned = Climbing.owned cl ; kernels = Climbing.kernels cl ; meaning = Climbing.meaning cl
-    ; queue = Climbing.queue cl ; books = Climbing.books cl ; sorted = Climbing.sorted cl ; behind = Climbing.behind cl
-    ; kept = ≼-trans (Climbing.kept cl) le }
+    { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = Calling.ctl cl ; code = Calling.code cl ; stack = Calling.stack cl
+    ; lifted = Calling.lifted cl ; owned = Calling.owned cl ; kernels = Calling.kernels cl ; meaning = Calling.meaning cl
+    ; queue = Calling.queue cl ; books = Calling.books cl ; sorted = Calling.sorted cl ; behind = Calling.behind cl
+    ; kept = ≼-trans (Calling.kept cl) le }
 
-  -- The value one operator higher, the path shorter, the load at most `ℓ`.
+  -- A signal one operator higher, the path shorter, the load at most `ℓ`.
   data Rises (g : U.Node [] R) (ℓ : Load) (m₁ : Mach) {Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
              (σ : Path T v) : Set₁ where
-    rises : ∀ {m₂ Δ′ A′} {T′ : Sub (Conf.world (Mach.conf m₂)) [] R} {v′ : Sub (Conf.world (Mach.conf m₂)) Δ′ A′} {σ′ : Path T′ v′} {y′ : A′}
-          → m₁ ⇝ m₂ → height σ′ < height σ → Climbing g ℓ m₂ σ′ y′ → Rises g ℓ m₁ σ
+    rises : ∀ {m₂ Δ′ A′} {T′ : Sub (Conf.world (Mach.conf m₂)) [] R} {v′ : Sub (Conf.world (Mach.conf m₂)) Δ′ A′} {σ′ : Path T′ v′} {sg′ : Signal T′ A′}
+          → m₁ ⇝ m₂ → height σ′ < height σ → Calling g ℓ m₂ σ′ sg′ → Rises g ℓ m₁ σ
 
-  -- One operator climbed: a re-entry configuration reached, or the
-  -- value one operator higher, the path shorter.
-  data Climbed {g m} (st : Strong g m) (m₁ : Mach) {Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
-               (σ : Path T v) : Set₁ where
-    landed : Hopped st m₁ → Climbed st m₁ σ
-    rose   : ∀ {m₂ Δ′ A′} {T′ : Sub (Conf.world (Mach.conf m₂)) [] R} {v′ : Sub (Conf.world (Mach.conf m₂)) Δ′ A′} {σ′ : Path T′ v′} {y′ : A′}
-           → m₁ ⇝ m₂ → height σ′ < height σ → Climbing g (loadOf st) m₂ σ′ y′ → Climbed st m₁ σ
+  -- One operator called: a re-entry configuration reached, or a signal
+  -- one operator higher, the path shorter.
+  data Called {g m} (st : Strong g m) (m₁ : Mach) {Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
+              (σ : Path T v) : Set₁ where
+    landed : Hopped st m₁ → Called st m₁ σ
+    rose   : ∀ {m₂ Δ′ A′} {T′ : Sub (Conf.world (Mach.conf m₂)) [] R} {v′ : Sub (Conf.world (Mach.conf m₂)) Δ′ A′} {σ′ : Path T′ v′} {sg′ : Signal T′ A′}
+           → m₁ ⇝ m₂ → height σ′ < height σ → Calling g (loadOf st) m₂ σ′ sg′ → Called st m₁ σ
 
-  -- Some value on its way up.
+  -- Some signal on its way up.
   data Aloft (g : U.Node [] R) (ℓ : Load) (m₁ : Mach) : Set₁ where
-    aloft : ∀ {Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v} {y : A}
-          → Climbing g ℓ m₁ σ y → Aloft g ℓ m₁
+    aloft : ∀ {Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v} {sg : Signal T A}
+          → Calling g ℓ m₁ σ sg → Aloft g ℓ m₁
 
   -- A hop's machine sorted.
   hop-sorted : ∀ {g m m′ m₀} → Carried g m → step m ≡ silent m′ → m′ ⇝ m₀ → Σ Pos λ lo → WellMach lo m₀

@@ -56,7 +56,7 @@ module Lifting (R : Set) where
   open Unsubbing R using (_⇝_; site-tears)
   open Locality R using (site-holds; site-gated)
   open Lowering R using (site-lowers; queue-lowers; torn-owned; fed-lowers)
-  open Ghosting R using (module Far; module Climbing; Has; residual; _⊏_; load; loadOf; lowered; Hopped; Hops; opening; firstCall; SourceFirst; BodyFirst; OuterFirst; PoolBehind; RestBehind; LaneFirst; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; Far; Off; Opt; Clear; ClearL; OneLane; opened; Climbing; Rises; Climbed; Aloft; hop-sorted)
+  open Ghosting R using (module Far; module Calling; Has; residual; _⊏_; load; loadOf; lowered; Hopped; Hops; opening; firstCall; SourceFirst; BodyFirst; OuterFirst; PoolBehind; RestBehind; LaneFirst; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; Far; Off; Opt; Clear; ClearL; OneLane; opened; Calling; sends; Rises; Called; Aloft; hop-sorted)
   open Read
 
   postulate
@@ -137,14 +137,14 @@ module Lifting (R : Set) where
     -- the take `ending` where the run is, its completion a call owed.
     take-out : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {p c k}
                {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ true p c k taking u)) {y : A} → p y ≡ false
-             → Climbing g ℓ m₁ (ρ ⊕ in-take here) y → Rises g (load m₁ T) m₁ (ρ ⊕ in-take here)
+             → Calling g ℓ m₁ (ρ ⊕ in-take here) (sends y) → Rises g (load m₁ T) m₁ (ρ ⊕ in-take here)
 
     -- A value an exclusive takeWhile fails on: the take `ending` where
     -- the run is, its completion the agenda's call.  The ghost alike,
     -- the take a stage on.
     take-end : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {p c k}
                {u : Sub (Conf.world (Mach.conf m₁)) Δ A} (ρ : Path T (takeWhileˢ false p c k taking u)) {y : A} → p y ≡ false
-             → Climbing g ℓ m₁ (ρ ⊕ in-take here) y
+             → Calling g ℓ m₁ (ρ ⊕ in-take here) (sends y)
              → Σ (U.Node [] R) λ g″ → Σ Mach λ m₀ → m₁ ⇝ m₀ × Σ (Carried g″ m₀) λ cr
                → (∀ n → Agree n (residual g) (residual g″)) × load m₀ (Carried.tree cr) ⊏ load m₁ T
 
@@ -153,21 +153,21 @@ module Lifting (R : Set) where
     climb-outer : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
                   {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
                   (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {y : A}
-                → Climbing g (loadOf st) m₁ (ρ ⊕ in-outer here) y → Climbed st m₁ (ρ ⊕ in-outer here)
+                → Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (sends y) → Called st m₁ (ρ ⊕ in-outer here)
 
     -- A value out of a lane: guarded by its cut, one operator up, its
     -- observer the flatMap's weakened through `same`.
     climb-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B Δ′ C} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
                   {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ′ C}
                   (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) → OneLane πL → ∀ {y : C}
-                → Climbing g (loadOf st) m₁ (ρ ⊕ in-lanes πL) y → Climbed st m₁ (ρ ⊕ in-lanes πL)
+                → Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (sends y) → Called st m₁ (ρ ⊕ in-lanes πL)
 
     -- A value reaching a connect's subject: the feed of its subscribers
     -- owed, the ghost past the source's skip.
     climb-source : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
                    {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {bd : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
                    (ρ : Path T (connectˢ Sj c b kb k fd rp e rt u bd)) {y : A}
-                 → Climbing g (loadOf st) m₁ (ρ ⊕ in-source here) y → Climbed st m₁ (ρ ⊕ in-source here)
+                 → Calling g (loadOf st) m₁ (ρ ⊕ in-source here) (sends y) → Called st m₁ (ρ ⊕ in-source here)
 
     -- A subscription's continuation handed its unsubscribe, which it
     -- stashes: the ghost alike, a call fewer.

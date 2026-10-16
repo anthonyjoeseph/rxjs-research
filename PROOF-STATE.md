@@ -177,15 +177,16 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **C. THE CALLBACK RELATION.** One per-operator lemma: an observer at a
-  path, run from a related state, reaches a related state with the ghost
-  advanced, by recursion up the path. First `Climbing` and `Closing`
-  become one record over the signal climbing (a value or an end), the
-  two records its instances; then the per-operator lemma states every
-  write and close as one call, the `scan-*`, `up-*` and `close-*` rows
-  its postulated leaves. Decides whether every mid-climb state is the
-  callback relation's, so no third record is ever needed. Done when
-  `climb` and `close` are bodies over it and the old records are deleted.
+- **C. THE CALLBACK RELATION.** `Calling` is one record over the signal
+  climbing, a value or an end with its calls owed, and `call` its one
+  recursion, by `call-step` over one lemma per operator. Ruled out: a
+  third mid-call state; an inclusive take's completion after its failing
+  value rides the stack frame the value runs under, not the calls owed.
+  What remains are the operator leaves: `climb-outer`, `close-outer`,
+  `climb-lanes`, `close-lanes` on a flatMap; `climb-source`,
+  `close-source` on a connect; `take-out`, `take-end` on a take. Each
+  decides whether its operator's call is a write and a framing, as the
+  scan's is, or reads past its node.
 - **UP-ENDED.** `up-ended`, a connect's body shut at its source's end, is
   the one scan leaf that is not node-local: it reads what an end leaves
   behind, which `shut-step` reads too. Decided inside C's record: whether
