@@ -5863,8 +5863,8 @@ module Apart {A : Set} (τ : ℕ) (r : Pos) (i : ℕ) where
   nested c lt = <-irrefl refl (<-≤-trans lt (≤-trans (m≤m+n (weigh r) 1) (chain-weigh c)))
 
   frame-big : ∀ {e} → Chain e → ∀ n {l} → Mark l → weigh X1 < weigh (ix n ∷ sub e ∷ l ∷ [])
-  frame-big {e} c n (ix-mark _) = subst (_< _) (sym x1≡) (s≤s (≤-trans (+-monoˡ-≤ 1 (chain-weigh c)) (n≤1+n (weigh e + 1))))
-  frame-big {e} c n last-mark   = subst (_< _) (sym x1≡) (s≤s (≤-trans (+-monoˡ-≤ 1 (chain-weigh c)) (n≤1+n (weigh e + 1))))
+  frame-big {e} c n {l} (ix-mark _) = subst (_< weigh (ix n ∷ sub e ∷ l ∷ [])) (sym x1≡) (s≤s (≤-trans (+-monoˡ-≤ 1 (chain-weigh c)) (n≤1+n (weigh e + 1))))
+  frame-big {e} c n {l} last-mark   = subst (_< weigh (ix n ∷ sub e ∷ l ∷ [])) (sym x1≡) (s≤s (≤-trans (+-monoˡ-≤ 1 (chain-weigh c)) (n≤1+n (weigh e + 1))))
 
   big : ∀ {h} → weigh X1 < weigh h → ¬ Owned h X1
   big lt o = <-irrefl refl (<-≤-trans lt (owned-weigh _ _ o))
