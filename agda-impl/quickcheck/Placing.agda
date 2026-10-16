@@ -16,7 +16,7 @@
 -- strictly past it.  And nothing is keyed just past another.
 module quickcheck.Placing where
 
-open import Data.Bool using (Bool; true; false; _∧_; _∨_; not)
+open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_; [_]; length; take)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ; zero; suc; _≡ᵇ_; _<ᵇ_)
@@ -41,15 +41,15 @@ private
   drains (suc j) idle      = true
   drains (suc j) _         = false
 
-  placedᵇ : ℕ → Trace → Events ℕ → Bool
-  placedᵇ zero    _             _           = true
-  placedᵇ (suc k) m             hush        = drains 20000 m
-  placedᵇ (suc k) (tau _ l)     (skip _ r)  = placedᵇ k (Trace∞.force l) (Events∞.force r)
-  placedᵇ (suc k) (tau _ l)     e           = placedᵇ k (Trace∞.force l) e
-  placedᵇ (suc k) m             (skip _ r)  = placedᵇ k m (Events∞.force r)
-  placedᵇ (suc k) (out t p a l) (out q b r) = samePos p q ∧ (t ≡ᵇ tick q) ∧ (a ≡ᵇ b) ∧ placedᵇ k (Trace∞.force l) (Events∞.force r)
-  placedᵇ (suc k) (end p)       (end q)     = samePos p q
-  placedᵇ (suc k) _             _           = false
+  placedᵇ : ℕ → ℕ → Trace → Events ℕ → Bool
+  placedᵇ d zero    _             _           = true
+  placedᵇ d (suc k) m             hush        = drains d m
+  placedᵇ d (suc k) (tau _ l)     (skip _ r)  = placedᵇ d k (Trace∞.force l) (Events∞.force r)
+  placedᵇ d (suc k) (tau _ l)     e           = placedᵇ d k (Trace∞.force l) e
+  placedᵇ d (suc k) m             (skip _ r)  = placedᵇ d k m (Events∞.force r)
+  placedᵇ d (suc k) (out t p a l) (out q b r) = samePos p q ∧ (t ≡ᵇ tick q) ∧ (a ≡ᵇ b) ∧ placedᵇ d k (Trace∞.force l) (Events∞.force r)
+  placedᵇ d (suc k) (end p)       (end q)     = samePos p q
+  placedᵇ d (suc k) _             _           = false
 
   headed : Pos → Bool
   headed (ix _ ∷ _) = true
@@ -111,12 +111,13 @@ private
 
   -- What a cut leaves running trails the run: its steps in order, none
   -- before a value coming next, nor before a skip but the one showing
-  -- that very step just past it; all past an end, and none keyed where
-  -- that end would subscribe a lane; nothing left behind silence.
+  -- that very step just past it; all past an end and none inside it,
+  -- none keyed where that end would subscribe a lane; nothing left
+  -- behind silence.
   trailᵇ : Events ℕ → Pos → Bool
   trailᵇ (out n _ _) k = not (k <ᵖ n)
   trailᵇ (skip n _)  k = not (k <ᵖ n) ∨ samePos n (k ++ [ ix 0 ])
-  trailᵇ (end n)     k = (n <ᵖ k) ∧ not (ownedᵇ (n ++ [ ix 1 ]) k)
+  trailᵇ (end n)     k = (n <ᵖ k) ∧ not (inside n k) ∧ not (ownedᵇ (n ++ [ ix 1 ]) k)
   trailᵇ hush        k = false
 
   pinsᵇ : ℕ → Tail → List Pos
@@ -172,7 +173,7 @@ private
 -- steady and keying nothing just past its own events; and what a cut
 -- leaves running trailing it, and its values spread.  Each check by name.
 checks : Prog natᵗ → List (String × Bool)
-checks p = ("placed" , placedᵇ 40000 (trace (begin o)) e) ∷ ("rising" , rising 4000 [] e) ∷ ("steady" , steadyᵇ 4000 e)
+checks p = ("placed" , placedᵇ 20000 40000 (trace (begin o)) e) ∷ ("rising" , rising 4000 [] e) ∷ ("steady" , steadyᵇ 4000 e)
          ∷ ("steps" , stepsᵇ (positions 200 e)) ∷ ("trails" , trailsᵇ 400 s) ∷ ("spread" , spreadᵇ 100 e) ∷ ("untied" , untiedᵇ 4000 e) ∷ []
   where o = toObs timeline 3 p [] [] []
         s = enter (⟦ o ⟧ˢ []) root
@@ -184,9 +185,17 @@ placing p = allᵇ′ (checks p)
         allᵇ′ []             = true
         allᵇ′ ((_ , b) ∷ cs) = b ∧ allᵇ′ cs
 
+-- Shorter placings, run only by name: where a seed outruns its time,
+-- the budget at which it first does.
+shorter : Prog natᵗ → List (String × Bool)
+shorter p = ("placed-1k" , placedᵇ 500 1000 m e) ∷ ("placed-4k" , placedᵇ 2000 4000 m e) ∷ ("placed-12k" , placedᵇ 6000 12000 m e) ∷ []
+  where o = toObs timeline 3 p [] [] []
+        m = trace (begin o)
+        e = Events∞.force (enter (⟦ o ⟧ˢ []) root)
+
 -- The checks named `n` (all of them for "all") a program fails, by name.
 placingParts : String → Prog natᵗ → List String
-placingParts n p = failing (checks p)
+placingParts n p = failing (if n == "all" then checks p else checks p ++ shorter p)
   where failing : List (String × Bool) → List String
         failing []              = []
         failing ((m , b) ∷ cs) with (n == "all") ∨ (n == m) | b
