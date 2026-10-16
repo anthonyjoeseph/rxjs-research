@@ -177,55 +177,35 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE END CLIMB.** `close-source`, `close-lanes`, `close-outer`: a
-  completion's climb is a body (`close`, over `Closing`, the value climb's
-  record with the value dropped, the node it leaves gone and the calls owed
-  after it), entered by `take1-enter`, `last-enter`, `fin-enter`. Decides
-  whether a subject's finish, a lane's refill or an outer's settle leaves a
-  re-entry configuration or a `Closing` one operator up. Ruled out: a map,
-  scan, defer, live take or body owing a completion more than its source's
-  (`close-take`, `close-body`, the body's cut owed with its body gone); the
-  root owing more than the record's end (`close-root`); a completion that
-  cannot cross an ended outer or source at all (`Was`: the ghost steps the
-  node it was).
-- **THE MEASURE.** `emit-void`: a connect's source bursting on into a
-  subject nobody reads, past an ended body, take or lane. Decides whether
-  the value's climb to the node hiding it raises no subscription, stage,
-  timer or burst, everything under an ended part reading closed. Ruled
-  out: the ghost past the burst's skip (no part past an end holds it); a
-  measure without `left`, the values the `of`s still owe; a measure
-  blind to a take's stage.
-- **THE SHUT BODY.** `shut-step`: a connect past its source's end steps
-  its body shut as the body steps, shut after. Decides whether a feed can
-  be under way past the source's end (`Fed` owes `feeding` beside an end
-  ruled out, a field) and whether a pending `connected` in the body ends
-  past the body's next event. Ruled out: every other operator on the
-  climb (`lift-up` is a body), and the record's stored pools and rests as
-  unvouched (`Each` carries them).
-- **GHOST AHEAD.** `spread-past`, then `behind`'s producers: `others-past`
-  is a body over `Carried.behind` (every node the ghost holds heads no
-  earlier than the run) and `spread-past` (no sibling heads under the
-  `of`'s base). A scope returning only lowers the position, so the
-  record's own producers are proven or `behind-fire`; the
-  risk left is each `under l` entry, owed inside the postulated hops
-  (`emit-run`, `sub-onward`, the `-onward` leaves). Ruled out: a
-  per-frame label order read off `backAs`. If a frame's next event is
-  invisible to the record, `under` stores its label in its frame.
-- **THE ORDER.** `under-shown-connect`: decides whether a body step
-  can lie under a source step's shown position, a joiner's tag of a
-  source event inside an earlier one's subtree. Ruled out: a connect's
-  order or steadiness owing more than each side's own plus this
-  (`ordered-connect`, `steady-connect` are walks over `Walk.Side`); a
-  body step keyed over a source's shown step (`Walk.easy-pt`); a joiner
-  owing its source an order on its own tags (`spread-rejoin`, by
-  weight); a connect owing more than `Rise` and the source's marks
-  (`spread-connect`); a take owing more than a value's disjointness
-  from its pins (`trail-take`, `spread-take`).
-- **THE STEPPER.** `step-skips` and `within-step` at the root: the
-  ghost's meaning is what its step shows, skips included, now that a
-  pool's and a rest's skips are the meaning's own. Ruled out: exact
-  agreement anchored in a source's step history. Decides whether the
-  witness's ghost-only fields carry enough to step a merge.
+- **A. THE SUMMARY.** `Lifts` reads, at each ancestor, only the child's
+  next-step summary (its head position, or ended), never its part, so a
+  write inside a node is invisible above it. `Was`, `OuterFirst` and
+  `PoolBehind` restated over the summary; `Climbing.lifted` and
+  `Closing.lifted` follow. Decides whether every ancestor's side condition
+  is a function of the child's summary; one that needs the child's whole
+  node is a finding, not a field. Done when Content is green with no
+  `At.part` of a strict subtree inside `Lifts`.
+- **B. THE LOCAL INVARIANT.** Each field of `Carried` a fold over the tree
+  of node-local predicates reading only the node's `names`, with one
+  framing lemma per field over `Local`'s `Alike` and `Off`: a store at a
+  node's own name keeps every other node's predicate, so a step owes only
+  its node's fact. First consumers `climb-scan`, `close-outer`,
+  `close-lanes`, `close-source`. Decides whether the four writes fall with
+  only node-local leaves; a whole-tree obligation that survives is the
+  finding. Done when the framing lemmas are proven.
+- **C. THE CALLBACK RELATION.** One per-operator lemma: an observer at a
+  path, run from a related state, reaches a related state with the ghost
+  advanced, by recursion up the path. `Climbing` and `Closing` become one
+  record over it, `climb` and `close` its two instances. Decides whether
+  every mid-climb state is the callback relation's, so no third record is
+  ever needed. Done when `climb` and `close` are bodies over it and the
+  old records are deleted.
+- **D. THE KERNEL FOOTPRINT.** A kernel's cells allocated together and read
+  only through its own node, `names` agreeing by construction. `names`
+  already lists each node's cells, so this leg is CONDITIONAL: done when
+  B's framing names no kernel cell read from outside its node, or when
+  that kernel is regrouped through the engine workflow (Agda, QuickCheck,
+  TypeScript, oracle). Decides whether the engine needs to move at all.
 
 ### The ledger
 
