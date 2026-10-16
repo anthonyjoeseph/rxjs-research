@@ -157,12 +157,23 @@ private
   spreadᵇ (suc n) (skip _ r)  = spreadᵇ n (Events∞.force r)
   spreadᵇ (suc n) _           = true
 
+  -- No skip followed straight away by an end at its own position: a
+  -- lane doing so with one queued would have its merge step inside it.
+  untiedᵇ : ℕ → Events ℕ → Bool
+  untiedᵇ zero    _          = true
+  untiedᵇ (suc n) (out _ _ r) = untiedᵇ n (Events∞.force r)
+  untiedᵇ (suc n) (skip k r)  = after (Events∞.force r) ∧ untiedᵇ n (Events∞.force r)
+    where after : Events ℕ → Bool
+          after (end c) = not (samePos k c)
+          after _       = true
+  untiedᵇ (suc n) _           = true
+
 -- The machine's trace placed against the meaning, and the meaning rising,
 -- steady and keying nothing just past its own events; and what a cut
 -- leaves running trailing it, and its values spread.  Each check by name.
 checks : Prog natᵗ → List (String × Bool)
 checks p = ("placed" , placedᵇ 40000 (trace (begin o)) e) ∷ ("rising" , rising 4000 [] e) ∷ ("steady" , steadyᵇ 4000 e)
-         ∷ ("steps" , stepsᵇ (positions 200 e)) ∷ ("trails" , trailsᵇ 400 s) ∷ ("spread" , spreadᵇ 100 e) ∷ []
+         ∷ ("steps" , stepsᵇ (positions 200 e)) ∷ ("trails" , trailsᵇ 400 s) ∷ ("spread" , spreadᵇ 100 e) ∷ ("untied" , untiedᵇ 4000 e) ∷ []
   where o = toObs timeline 3 p [] [] []
         s = enter (⟦ o ⟧ˢ []) root
         e = Events∞.force s
