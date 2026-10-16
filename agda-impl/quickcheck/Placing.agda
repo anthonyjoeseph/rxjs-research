@@ -136,11 +136,31 @@ private
           next (skip _ r′)  = trailsᵇ n r′
           next _            = true
 
+  -- After a value at `x`, nothing later, shown or left running, keys
+  -- where a lane admitted at `x` would, nor under it.
+  apartᵇ : Pos → Pos → Bool
+  apartᵇ a b = not (ownedᵇ a b) ∧ not (ownedᵇ b a)
+
+  laterᵇ : ℕ → Events∞ ℕ → List Pos
+  laterᵇ zero    r = []
+  laterᵇ (suc n) r = pinsᵇ 12 (Events∞.cut r) ++ next (Events∞.force r)
+    where next : Events ℕ → List Pos
+          next (out k _ r′) = k ∷ laterᵇ n r′
+          next (skip k r′)  = k ∷ laterᵇ n r′
+          next (end k)      = k ∷ []
+          next hush         = []
+
+  spreadᵇ : ℕ → Events ℕ → Bool
+  spreadᵇ zero    _           = true
+  spreadᵇ (suc n) (out x _ r) = allᵇ (λ y → apartᵇ (y ++ [ ix 1 ]) (x ++ [ ix 1 ])) (laterᵇ 60 r) ∧ spreadᵇ n (Events∞.force r)
+  spreadᵇ (suc n) (skip _ r)  = spreadᵇ n (Events∞.force r)
+  spreadᵇ (suc n) _           = true
+
 -- The machine's trace placed against the meaning, and the meaning rising,
 -- steady and keying nothing just past its own events; and what a cut
--- leaves running trailing it.
+-- leaves running trailing it, and its values spread.
 placing : Prog natᵗ → Bool
-placing p = placedᵇ 40000 (trace (begin o)) e ∧ rising 4000 [] e ∧ steadyᵇ 4000 e ∧ stepsᵇ (positions 200 e) ∧ trailsᵇ 400 s
+placing p = placedᵇ 40000 (trace (begin o)) e ∧ rising 4000 [] e ∧ steadyᵇ 4000 e ∧ stepsᵇ (positions 200 e) ∧ trailsᵇ 400 s ∧ spreadᵇ 100 e
   where o = toObs timeline 3 p [] [] []
         s = enter (⟦ o ⟧ˢ []) root
         e = Events∞.force s
@@ -148,7 +168,7 @@ placing p = placedᵇ 40000 (trace (begin o)) e ∧ rising 4000 [] e ∧ steady�
 -- Which of those a program fails, by name.
 placingParts : Prog natᵗ → List String
 placingParts p = part "placed" (placedᵇ 40000 (trace (begin o)) e) (part "rising" (rising 4000 [] e) (part "steady" (steadyᵇ 4000 e)
-                   (part "steps" (stepsᵇ (positions 200 e)) (part "trails" (trailsᵇ 400 s) []))))
+                   (part "steps" (stepsᵇ (positions 200 e)) (part "trails" (trailsᵇ 400 s) (part "spread" (spreadᵇ 100 e) [])))))
   where o = toObs timeline 3 p [] [] []
         s = enter (⟦ o ⟧ˢ []) root
         e = Events∞.force s
