@@ -1721,6 +1721,11 @@ everyT-zip : ∀ {P Q : Pos → Set} (t : Tail) → EveryT P t → EveryT Q t �
 everyᵀ (everyT-zip (pin k u) pt qt) = (proj₁ (everyᵀ pt) , proj₁ (everyᵀ qt)) , everyT-zip (later u) (proj₂ (everyᵀ pt)) (proj₂ (everyᵀ qt))
 everyᵀ (everyT-zip idle      pt qt) = tt
 
+-- Each of `t`'s steps with each of `u`'s, read from `u`'s side.
+everyT-flip : ∀ {P : Pos → Pos → Set} (t u : Tail) → EveryT (λ a → EveryT (P a) u) t → EveryT (λ b → EveryT (λ a → P a b) t) u
+everyᵀ (everyT-flip t (pin k v) x) = everyT-mono (λ a e → proj₁ (everyᵀ e)) t x , everyT-flip t (later v) (everyT-mono (λ a e → proj₂ (everyᵀ e)) t x)
+everyᵀ (everyT-flip t idle      x) = tt
+
 every-zip : ∀ {A} {P Q : Pos → Set} (e : Events A) → Every P e → Every Q e → Every (λ h → P h × Q h) e
 every (every-zip (out h _ r) pe qe) = (proj₁ (every pe) , proj₁ (every qe)) , every-zip (force r) (proj₁ (proj₂ (every pe))) (proj₁ (proj₂ (every qe)))
                                       , everyT-zip (cut r) (proj₂ (proj₂ (every pe))) (proj₂ (proj₂ (every qe)))
@@ -3373,16 +3378,11 @@ module FlatOrder (p : Pos) where
       left (pin k _) e = tt , proj₂ (proj₂ (proj₁ (everyᵀ e)))
       left idle      e = tt
 
-  -- Every lane's cut, sorted.
-  sorted-cuts : ∀ {B} {ls : List (Events∞ B)} {rs} → Roots ls rs → SortedT (M.cuts ls)
-  sorted-cuts []ᴿ = sortedT-idle
-  sorted-cuts {ls = l ∷ ls} (st ∷ᴿ R) = sortedT-∪ (cut l) (M.cuts ls) (proj₁ (trail (Lane.trl st))) (sorted-cuts R)
-
   -- What the merge would leave running, sorted.
   sorted-whole : ∀ {B} (o : Maybe (Events∞ (MonotonicList B))) ls t {rs} → Roots ls rs → Heldᴹ o → Pool o rs t → SortedT (M.whole o ls t)
-  sorted-whole nothing  ls t R h pl = sortedT-∪ (M.cuts ls) t (sorted-cuts R) (proj₁ pl)
+  sorted-whole nothing  ls t R h pl = sortedT-∪ (M.cuts ls) t (drops-sorted ls R) (proj₁ pl)
   sorted-whole (just e) ls t R h pl =
-    sortedT-∪ (cut e) (M.cuts ls ∪ t) (proj₁ (trail (Outer.trl h))) (sortedT-∪ (M.cuts ls) t (sorted-cuts R) (proj₁ pl))
+    sortedT-∪ (cut e) (M.cuts ls ∪ t) (proj₁ (trail (Outer.trl h))) (sortedT-∪ (M.cuts ls) t (drops-sorted ls R) (proj₁ pl))
 
   -- No earlier than `k`.
   Lag : Pos → Pos → Set
@@ -3656,11 +3656,31 @@ module FlatOrder (p : Pos) where
   ... | true  = lift-skip k (M.whole o ls (pin k u)) (lag-pool o ls k u e R h pl)
   ... | false = trail-parts op o ls qs (pin k u) R pt asd h pl e
 
+  -- What the dropped lanes and the pool leave running side by side.
+  flat-rest : ∀ {B} (o : Maybe (Events∞ (MonotonicList B))) (ls : List (Events∞ B)) t {rs} → Roots ls rs → Parted rs → Pool o rs t → FlatT (M.cuts ls ∪ t)
+  flat-rest o ls t R pt pl =
+    flatT-∪ (M.cuts ls) t (drops-flat ls R pt) (proj₂ (proj₂ (proj₂ pl)))
+      (everyT-mono (λ a z → everyT-mono (λ b ab → proj₂ ab , proj₁ ab) t z) (M.cuts ls)
+        (everyT-flip t (M.cuts ls)
+          (everyT-mono (λ b z → cuts-every ls (drops-apart b ls R (proj₂ (proj₂ z)) (proj₁ (proj₁ z)) (proj₁ (proj₂ z))))
+            t (everyT-zip t (proj₁ (proj₂ pl)) (proj₁ (proj₂ (proj₂ pl)))))))
+
   -- WHAT THE MERGE WOULD LEAVE RUNNING IS FLAT: no step of the outer's
   -- cut, a lane's or the pool's inside a step of another's.
-  postulate
-    flat-whole : ∀ {B} (o : Maybe (Events∞ (MonotonicList B))) ls t {rs} → Roots ls rs → Parted rs → All (Aside o) rs
-               → Heldᴹ o → Pool o rs t → FlatT (M.whole o ls t)
+  flat-whole : ∀ {B} (o : Maybe (Events∞ (MonotonicList B))) ls t {rs} → Roots ls rs → Parted rs → All (Aside o) rs
+             → Heldᴹ o → Pool o rs t → FlatT (M.whole o ls t)
+  flat-whole nothing  ls t R pt asd h pl = flatT-∪ idle (M.cuts ls ∪ t) flatT-idle (flat-rest nothing ls t R pt pl) everyT-idle
+  flat-whole (just e) ls t {rs} R pt asd h pl =
+    flatT-∪ (cut e) (M.cuts ls ∪ t) (trailᶠ (Outer.trl h)) (flat-rest (just e) ls t R pt pl)
+      (everyT-mono (λ y z → everyT-∪ (M.cuts ls) t
+                     (cuts-every ls (drops-apart y ls R (proj₁ (proj₁ z)) (mapᴬ (λ {r} d → aside-not r y d) (proj₂ (proj₁ z))) (mapᴬ (λ {r} d → proj₂ d) (proj₂ (proj₁ z)))))
+                     (proj₂ z))
+        (cut e) (everyT-zip (cut e) (everyT-zip (cut e) (Outer.kc h) (everyT-all rs (cut e) (mapᴬ (λ {r} a → proj₂ a) asd))) op))
+    where
+      op : EveryT (λ y → EveryT (Apart y) t) (cut e)
+      op = everyT-flip t (cut e)
+             (everyT-mono (λ b af → everyT-mono (λ y fy → (λ x → proj₁ (proj₂ fy) (owned-ext x)) , (λ x → proj₂ (proj₂ fy) (owned-ext x))) (cut e) (proj₂ (proj₂ af)))
+               t (proj₁ (proj₂ pl)))
 
   mutual
     calm-at : ∀ {B} op (o : Maybe (Events∞ (MonotonicList B))) ls qs t {rs} → Roots ls rs → Parted rs → All (Aside o) rs → All Gen qs

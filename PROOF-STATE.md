@@ -186,15 +186,14 @@ by their own silent steps (`Mirror`).
   (`emit-run`, `sub-onward`, the `-onward` leaves). Ruled out: a
   per-frame label order read off `backAs`. If a frame's next event is
   invisible to the record, `under` stores its label in its frame.
-- **THE ORDER.** `flat-whole` first: no step of one part's cut inside
-  a step of another's, over the calm walk's invariants. Decides whether
-  `Pool`'s and `Lane`'s ownership fields say enough about the outer's
-  and each lane's cut, or the walk's records owe a field. Then
-  `trail-take`, `trail-connect`, `trail-defer`, `spread-sub`,
-  `ordered-connect`, `steady-connect`. Ruled out: the merge's next
-  failing to lead every part's cut (`trail-whole` closes from `Roots`,
-  `Pool`, `Aside` and `Heldᴹ` alone), and any operator but a take, a
-  connect and a defer owing a trail of its own.
+- **THE ORDER.** `trail-take` first: a pin at the failing value's own
+  position trails the value but not its completion under `last`, so the
+  statement falls over runs merely in order, steady and trailing.
+  Decides whether `TrailE`'s value clause owes that no pin sits at or
+  under the value, or the take's source supplies it. Then
+  `trail-connect`, `trail-defer`, `spread-sub`, `ordered-connect`,
+  `steady-connect`. Ruled out: the flatMap's merge owing anything past
+  `Roots`, `Pool`, `Aside` and `Heldᴹ` (`trail-whole`, `flat-whole`).
 - **THE STEPPER.** `step-skips` and `within-step` at the root: the
   ghost's meaning is what its step shows, skips included, now that a
   pool's and a rest's skips are the meaning's own. Ruled out: exact
@@ -213,8 +212,6 @@ by their own silent steps (`Mirror`).
 
 ### The ledger
 
-- **`flat-whole`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: no step of the
-  outer's cut, a lane's or the pool's inside a step of another's.
 - **`trail-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a connect's
   source burst left running beside its body's cut trails what it shows next.
 - **`trail-take`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a takeWhile over an
