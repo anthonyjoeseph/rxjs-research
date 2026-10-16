@@ -133,13 +133,6 @@ module Lifting (R : Set) where
                   (π : Path (Carried.tree cr) (coldˢ {Δ = Δ} {A} sk hd (waiting {u = v} τ e (at u x fr))))
                 → Each (Conf.heap (Mach.conf m)) (Heads (Conf.pos (Mach.conf m))) (plant π (coldˢ sk hd (fired τ e (at u x fr))))
 
-    -- A value reaching a flatMap's outer: admitted, a lane begun or
-    -- queued, the ghost past the outer's skip.
-    climb-outer : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
-                  {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
-                  (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {y : A}
-                → Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (sends y) → Called st m₁ (ρ ⊕ in-outer here)
-
     -- A value out of a lane: guarded by its cut, one operator up, its
     -- observer the flatMap's weakened through `same`.
     climb-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B Δ′ C} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}

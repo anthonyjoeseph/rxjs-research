@@ -18,7 +18,7 @@ open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈�
 open import Level using (lift; lower)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Maybe.Properties using (just-injective)
-open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; _≡ᵇ_; _<ᵇ_)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
@@ -53,16 +53,16 @@ module Ascending (R : Set) where
   open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; push; back; spent?; store) renaming (go to goᴵ)
   open Heap using (World; _⊑_; Handle) renaming (same to same⊑)
   open Sorting R using (WellMach)
-  open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct)
-  open Strongly R using (Strong; Carried; Books; carried; closing; Sub; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; under≗; ≗-refl; Meets; Each; Heads; seen) renaming (⟦_⟧ to ⟦_⟧ᶜ)
+  open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; compile)
+  open Strongly R using (Strong; Carried; Books; carried; closing; Sub; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; under≗; ≗-refl; Meets; Each; Heads; seen; ∧-split; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade)
   open Moving R using (takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
   open Tearing R using (fresh-path; takeSite; bodySite)
   open Unsubbing R using (_⇝_; ⇝-trans; now; then; ≗-trans; wk-same; bind≗)
   open Sequencing R using (seq-assoc; seq-done)
-  open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; whole; snoc; view; height; heightL; one-lower; opened; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
-  open Lifting R using (sub-onward; emit-shut; emit-void; emit-run; spread-past; behind-fire; climb-outer; climb-lanes; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
+  open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
+  open Lifting R using (sub-onward; emit-shut; emit-void; emit-run; spread-past; behind-fire; climb-lanes; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
   open Locality R using (stored-at)
   open Framing R using (scan-part; scan-owned; scan-kernels; scan-meaning; scan-queue; scan-lifts; scan-behind)
   open Read
@@ -568,14 +568,39 @@ module Ascending (R : Set) where
                   (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (πL : PathLanes ls u) → OneLane πL → ∀ {ks}
                 → Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (closes ks) → Called st m₁ (ρ ⊕ in-lanes πL)
 
-  -- A flatMap's outer signals only while the flatMap is subscribed: its
-  -- cut is what unsubscribing it pulls, and an emitter whose observer
-  -- path is closed skips.
+  -- A climbing signal's path reads open: an emitter whose observer path
+  -- is closed skips, each operator it passes guarded it on the way up,
+  -- and nothing the path passes is cut while it climbs.
   postulate
-    outer-live : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
-                 {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
-                 (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {sg : Signal T A}
-               → Calling g ℓ m₁ (ρ ⊕ in-outer here) sg → At.val (Conf.heap (Mach.conf m₁)) (Kit.live oc) ≡ true
+    calling-open : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} (σ : Path T v) {sg : Signal T A}
+                 → Calling g ℓ m₁ σ sg → opened (Conf.heap (Mach.conf m₁)) true σ ≡ true
+
+  -- A path's openness read down a joined path: the first part's, handed on.
+  mutual
+    opened-⊕ : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′ Δ″ A″} {t : Sub h Δ A} {u : Sub h Δ′ A′} {v : Sub h Δ″ A″} o (ρ : Path t u) (s : Path u v)
+             → opened H o (ρ ⊕ s) ≡ opened H (opened H o ρ) s
+    opened-⊕ H o here          s = refl
+    opened-⊕ H o (in-map p)    s = opened-⊕ H o p s
+    opened-⊕ H o (in-scan p)   s = opened-⊕ H o p s
+    opened-⊕ H o (in-take p)   s = opened-⊕ H _ p s
+    opened-⊕ H o (in-outer p)  s = opened-⊕ H _ p s
+    opened-⊕ H o (in-lanes p)  s = openedL-⊕ H o p s
+    opened-⊕ H o (in-source p) s = opened-⊕ H _ p s
+    opened-⊕ H o (in-body p)   s = opened-⊕ H o p s
+    opened-⊕ H o (in-defer p)  s = opened-⊕ H o p s
+
+    openedL-⊕ : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′ Δ″ A″} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} {v : Sub h Δ″ A″} o (π : PathLanes ls u) (s : Path u v)
+              → openedL H o (π ⊕ᴸ s) ≡ opened H (openedL H o π) s
+    openedL-⊕ H o (this-lane p) s = opened-⊕ H _ p s
+    openedL-⊕ H o (next-lane p) s = openedL-⊕ H o p s
+
+  -- A flatMap's outer signals only while its cut is live.
+  outer-live : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+               {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
+               (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {sg : Signal T A}
+             → Calling g ℓ m₁ (ρ ⊕ in-outer here) sg → At.val (Conf.heap (Mach.conf m₁)) (Kit.live oc) ≡ true
+  outer-live {m₁ = m₁} ρ cl =
+    proj₁ (∧-split _ (trans (sym (opened-⊕ (Conf.heap (Mach.conf m₁)) true ρ (in-outer here))) (calling-open (ρ ⊕ in-outer here) cl)))
 
   -- A pair of lists both empty.
   nulls : ∀ {a b} {X : Set a} {Y : Set b} (xs : List X) (ys : List Y) → (null xs ∧ null ys) ≡ true → xs ≡ [] × ys ≡ []
@@ -737,6 +762,106 @@ module Ascending (R : Set) where
                                          (At.val (Settles.H′ hp ρ) (FlatKit.Flat.queue fl)))) λ _ → wk-same ⟦ ks ⟧ᶜ)
       ec   = ≗-trans (≗-trans e₅ (bind≗ (shut-code {m = Observer.complete o} (trans (cong (λ x → x ∧ b) (Settles.done-read hp ρ)) eq)) λ _ → ≗-refl ⟦ ks ⟧ᶜ))
                      (proj₂ (Settles.Pooled.pool-calls hp ρ o₀ ks))
+
+  -- The machine with its running act replaced, the rest as it was.
+  rerun : (m₁ : Mach) {w : World} → w ⊑ Conf.world (Mach.conf m₁) → Stack w ⊤ → Act (Conf.world (Mach.conf m₁)) ⊤ → Mach
+  rerun (mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk) ϑ K a = mach ⟨ hp , q , run a ϑ K ⟩ clk ts bs td lg en mk
+
+  -- A flatMap's admit and lane start, under the observer and scope its
+  -- path walks to.
+  admitAt : ∀ {h} {T : Sub h [] R} {Δ A B op f fl oc k r pl} {u : Sub h Δ A} {ls : List (Lane h Δ B)}
+          → Path T (flatMapˢ op f fl oc k r pl u ls) → T.FlatOp → A → Act h ⊤
+  admitAt {op = op} {f} {fl} ρ = Canon.Flat′.admit op f (Here.env (walk ρ top)) (Here.obs (walk ρ top)) fl
+
+  startAt : ∀ {h} {T : Sub h [] R} {Δ A B op f fl oc k r pl} {u : Sub h Δ A} {ls : List (Lane h Δ B)}
+          → Path T (flatMapˢ op f fl oc k r pl u ls) → A → Act h ⊤
+  startAt {op = op} {f} {fl} ρ y = Canon.Flat′.start op f (Here.env (walk ρ top)) (Here.obs (walk ρ top)) fl (compile (f y) (Here.env (walk ρ top)))
+
+  -- Whether an admit begins its lane at once, the active count read; a
+  -- switch kills its lanes first.
+  roomy : T.FlatOp → ℕ → Bool
+  roomy (T.mergeᶠ nothing)  _ = true
+  roomy (T.mergeᶠ (just n)) c = c <ᵇ n
+  roomy T.switchᶠ           _ = false
+  roomy T.exhaustᶠ          c = c ≡ᵇ 0
+
+  postulate
+    -- A lane begun for an admitted value: counted, cut, listed and
+    -- subscribed under the run's `ix 1`, the run at the lane's pending
+    -- node; the ghost past the outer's skip, the lane its own.
+    outer-start : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+                  {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
+                  (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {y : A} (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (sends y))
+                → roomy op (At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.active fl)) ≡ true
+                → ∀ {a} → a ≗ startAt ρ y → Hopped st (rerun m₁ (Calling.ϑ cl) (Calling.K cl) a)
+
+    -- A bounded merge full: the value queued, the ghost past the outer's
+    -- skip, the value its queue's last.
+    outer-queued : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {n f fl oc k r pl}
+                   {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
+                   (ρ : Path T (flatMapˢ (T.mergeᶠ (just n)) f fl oc k r pl u ls)) {y : A} (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (sends y))
+                 → (At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.active fl) <ᵇ n) ≡ false
+                 → ∀ {a} → a ≗ Kit.modifyF (FlatKit.Flat.queue fl) (_++ [ y ]) → Hopped st (rerun m₁ (Calling.ϑ cl) (Calling.K cl) a)
+
+    -- An exhaust busy: the value dropped, the ghost past the outer's skip.
+    outer-drop : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f fl oc k r pl}
+                 {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
+                 (ρ : Path T (flatMapˢ T.exhaustᶠ f fl oc k r pl u ls)) {y : A} (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (sends y))
+               → (At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.active fl) ≡ᵇ 0) ≡ false
+               → ∀ {a} → a ≗ done tt → Hopped st (rerun m₁ (Calling.ϑ cl) (Calling.K cl) a)
+
+    -- A switch admitting: its lanes killed, their rests the pool's, a lane
+    -- begun for the value.
+    outer-switch : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f fl oc k r pl}
+                   {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
+                   (ρ : Path T (flatMapˢ T.switchᶠ f fl oc k r pl u ls)) {y : A} (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (sends y))
+                 → ∀ {a} → a ≗ admitAt ρ T.switchᶠ y → Hopped st (rerun m₁ (Calling.ϑ cl) (Calling.K cl) a)
+
+  -- A bounded merge's count read: room, a lane begun; else queued.
+  room-n : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {n f fl oc k r pl}
+           {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
+           (ρ : Path T (flatMapˢ (T.mergeᶠ (just n)) f fl oc k r pl u ls)) {y : A} (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (sends y))
+         → (b : Bool) → b ≡ (At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.active fl) <ᵇ n)
+         → ∀ {a} → a ≗ (if b then startAt ρ y else Kit.modifyF (FlatKit.Flat.queue fl) (_++ [ y ])) → Hopped st (rerun m₁ (Calling.ϑ cl) (Calling.K cl) a)
+  room-n st ρ cl true  e c = outer-start st ρ cl (sym e) c
+  room-n st ρ cl false e c = outer-queued st ρ cl (sym e) c
+
+  -- An exhaust's count read: idle, a lane begun; else dropped.
+  room-x : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f fl oc k r pl}
+           {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
+           (ρ : Path T (flatMapˢ T.exhaustᶠ f fl oc k r pl u ls)) {y : A} (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (sends y))
+         → (b : Bool) → b ≡ (At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.active fl) ≡ᵇ 0)
+         → ∀ {a} → a ≗ Kit.when b (startAt ρ y) → Hopped st (rerun m₁ (Calling.ϑ cl) (Calling.K cl) a)
+  room-x st ρ cl true  e c = outer-start st ρ cl (sym e) c
+  room-x st ρ cl false e c = outer-drop st ρ cl (sym e) c
+
+  -- A value admitted, by the flatMap's policy.
+  admits : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+           {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
+           (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {y : A} (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (sends y))
+         → ∀ {a} → a ≗ admitAt ρ op y → Hopped st (rerun m₁ (Calling.ϑ cl) (Calling.K cl) a)
+  admits st {op = T.mergeᶠ nothing} ρ cl c = outer-start st ρ cl refl c
+  admits st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {op = T.mergeᶠ (just n)} {fl = fl} ρ {y} cl c with reads c
+  ... | k₂ , f₂ , p₂ = hopped-pre p₂ (room-n st ρ cl (At.val hp (FlatKit.Flat.active fl) <ᵇ n) refl
+                         (≗-trans (f₂ same⊑ (At.val hp (FlatKit.Flat.active fl)))
+                                  (wk-same (if At.val hp (FlatKit.Flat.active fl) <ᵇ n then startAt ρ y else Kit.modifyF (FlatKit.Flat.queue fl) (_++ [ y ])))))
+  admits st {op = T.switchᶠ} ρ cl c = outer-switch st ρ cl c
+  admits st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {op = T.exhaustᶠ} {fl = fl} ρ {y} cl c with reads c
+  ... | k₂ , f₂ , p₂ = hopped-pre p₂ (room-x st ρ cl (At.val hp (FlatKit.Flat.active fl) ≡ᵇ 0) refl
+                         (≗-trans (f₂ same⊑ (At.val hp (FlatKit.Flat.active fl)))
+                                  (wk-same (Kit.when (At.val hp (FlatKit.Flat.active fl) ≡ᵇ 0) (startAt ρ y)))))
+
+  -- A value reaching a flatMap's outer: its guard read open, the value
+  -- admitted.
+  climb-outer : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+                {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
+                (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {y : A}
+              → Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (sends y) → Called st m₁ (ρ ⊕ in-outer here)
+  climb-outer st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {op = op} {oc = oc} ρ {y} cl@record { ctl = refl ; code = cd }
+    with reads (subst (λ W → _ ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-outer here) top) cd)
+  ... | k₁ , f₁ , p₁ = landed (hopped-pre p₁ (admits st ρ cl
+        (≗-trans (f₁ same⊑ (At.val hp (Kit.live oc)))
+                 (≗-trans (wk-same (Kit.when (At.val hp (Kit.live oc)) (admitAt ρ op y))) (open-code (outer-live ρ cl))))))
 
   -- A signal reaching a flatMap's outer.
   call-outer : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}

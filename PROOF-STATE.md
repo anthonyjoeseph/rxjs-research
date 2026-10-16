@@ -185,9 +185,10 @@ by their own silent steps (`Mirror`).
   An operator's call is reads, writes and a RESTAGE of its node,
   node-local but for carrying stack, calls and agenda across it
   (`end-stack`, `fin-calls`, `end-owned`): a take's stage, a connect's
-  feed (over `src-idle`), a flatMap's pool (over `outer-live`,
-  `active-lanes`); an inclusive take's under one `under` step.
-  Remaining: `climb-outer`, `climb-lanes`, `close-lanes`.
+  feed (over `src-idle`), a flatMap's pool (over `active-lanes`), its
+  admit by policy; an inclusive take's under one `under` step. Every
+  guard read open by `calling-open`. Remaining: `outer-start`, the one
+  lane start bounded merge and exhaust share; `climb-lanes`, `close-lanes`.
 - **UP-ENDED.** `up-ended` is a body: the rest's skips by `Each.rests`,
   the shut body by `shut-heads` over what it tells. Ruled out: the end
   signal's fields carrying it; the non-local residue is `tells-past`,
@@ -219,8 +220,16 @@ by their own silent steps (`Mirror`).
   ghost's step leaves its parts placed.
 - **`close-lanes`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane ended shuts,
   refills, or ends the flatMap past its outer's end.
-- **`outer-live`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's outer
-  signals only while its cut is live.
+- **`calling-open`** (Climbs) — FALSITY, `NO EVIDENCE`: a climbing signal's
+  path reads open.
+- **`outer-start`** (Climbs) — FALSITY, `NO EVIDENCE`: an admitted value with
+  room begins a lane, the run at its pending node, the ghost past the skip.
+- **`outer-switch`** (Climbs) — FALSITY, `NO EVIDENCE`: a switch kills its
+  lanes, their rests the pool's, and begins one.
+- **`outer-queued`** (Climbs) — FALSITY, `NO EVIDENCE`: a full bounded merge
+  queues the value, the ghost past the skip.
+- **`outer-drop`** (Climbs) — FALSITY, `NO EVIDENCE`: a busy exhaust drops the
+  value, the ghost past the skip.
 - **`active-lanes`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's count reads
   zero exactly when no lane is live.
 - **`pool-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: an outer ended with lanes
@@ -329,8 +338,6 @@ by their own silent steps (`Mirror`).
   write at a scan's accumulator.
 - **`scan-queue`** (Frame) — FALSITY, `NO EVIDENCE`: `Queue` survives a write
   at a scan's accumulator.
-- **`climb-outer`** (Lift) — FALSITY, `NO EVIDENCE`: an outer value opens a
-  lane and stops at the subscription it begins.
 - **`src-idle`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's source signals
   its subject only with no feed under way.
 - **`fed-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: the tree with a feed
