@@ -4,7 +4,7 @@
 -- relation holds of the rest of the tree.
 module adequacy.Frame where
 
-open import Data.List using (List; []; _∷_)
+open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.Any using (Any; here; there)
 import Data.List.Relation.Unary.Any as Any
 open import Data.List.Relation.Unary.All using (All; []; _∷_; map) renaming (lookup to lookupᴬ)
@@ -14,14 +14,14 @@ open import Data.List.Relation.Unary.Linked using (_∷_)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Level using (lift; lower)
 open import Data.Maybe using (Maybe; just; nothing; is-just)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst)
 open import Data.Sum using (_⊎_; [_,_]′)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
+open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ)
 open import adequacy.Sorted using (_≤ᵖ_; ≤ᵖ-child)
 
-open import denotation.MonotonicList using (Events∞; Timeline; Pos)
+open import denotation.MonotonicList using (Events∞; Timeline; Pos; ix)
 import denotation.Unfold as U
 open import denotation.MonotonicList using () renaming (sub to subᴾ)
 open import operation.Machine using (module Machine)
@@ -31,6 +31,7 @@ import Tree as T
 open import operation.PureObservable using (Out; Pureᴾ)
 open import operation.AbstractObservable using (base; module Heap; module Run) renaming (module Machine to Shared)
 open import adequacy.Ghost using (module Ghosting)
+open import adequacy.Moves using (module Moving)
 
 open Events∞
 
@@ -41,9 +42,10 @@ module Framing (R : Set) where
   open Heap using () renaming (same to same⊑)
   open Strongly R using (Strong; Sub; scanˢ; here; module At; Queue; Kernels; Meaning; Owned; Path; in-scan; in-source; _⊕_; names; Each; Heads; seen; Books;
                          mapˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; PathLanes; this-lane; next-lane; in-map; in-take; in-outer; in-lanes; in-body; in-defer; seen-join;
-                         Taking; taking; taken; cutNames; quietName) renaming (ending to endingᵀ)
+                         Taking; taking; taken; cutNames; quietName; subjectNames) renaming (ending to endingᵀ)
   open Strongly.Against R using (CtlAs)
-  open Tearing R using (Alike; part-alike; look-store; get-put-same; fresh-path; names-path; apart-r; ≢-flip)
+  open Tearing R using (Alike; part-alike; look-store; get-put-same; fresh-path; names-path; apart-r; apart-l; ≢-flip)
+  open Moving R using (pairs-r)
   open Ghosting R using (module Climbing; Lifts; Climbing)
   open Read
 
@@ -120,6 +122,39 @@ module Framing (R : Set) where
   heads-take : ∀ {Γ A q} i (p : A → Bool) {c : U.Node Γ A} → Heads q c → Heads q (U.takeWhileᶜ i p c)
   heads-take i p {c} hd = take-head i p (U.step c) hd
 
+  HeadsS : ∀ {Γ A} → Pos → U.Step Γ A → Set
+  HeadsS q s = ∀ {k} → U.headˢ s ≡ just k → q ≤ᵖ k
+
+  if-head : ∀ {Γ A q} b (s₁ s₂ : U.Step Γ A) → HeadsS q s₁ → HeadsS q s₂ → HeadsS q (if b then s₁ else s₂)
+  if-head true  s₁ s₂ h₁ h₂ = h₁
+  if-head false s₁ s₂ h₁ h₂ = h₂
+
+  child-skip : ∀ {Γ A q} k l (c : U.Node Γ A) → (∀ {k′} → just k ≡ just k′ → q ≤ᵖ k′) → HeadsS q (U.skipˢ (k ++ [ l ]) c)
+  child-skip k l c hd refl = ≤ᵖ-child k (hd refl)
+
+  body-head : ∀ {Γ A B q} r (s : U.Source Γ A) (sb : U.Step (A ∷ Γ) B) → HeadsS q sb → HeadsS q (U.bodyˢ r s sb)
+  body-head r s (U.outˢ k a b) hd = hd
+  body-head r s (U.skipˢ k b)  hd = hd
+  body-head r s (U.endˢ c)     hd = hd
+  body-head r s U.hushˢ        hd ()
+
+  -- A live connect's head is its body's, or under its source's.
+  source-head : ∀ {Γ A B q} r (b : U.Node (A ∷ Γ) B) sb (s : U.Node Γ A) (ss : U.Step Γ A) → HeadsS q sb → HeadsS q ss
+              → HeadsS q (U.sourceˢ r b sb s ss)
+  source-head r b sb s (U.outˢ k a s′) hb hs =
+    if-head (U.beforeˢ (k ++ [ ix 0 ]) sb) (U.skipˢ (k ++ [ ix 0 ]) n) (U.bodyˢ r (U.live s) sb) (child-skip k (ix 0) n hs) (body-head r (U.live s) sb hb)
+    where n = U.connectᶜ r (U.feed (here refl) k (just a) b) (U.live s′)
+  source-head r b sb s (U.skipˢ k s′)  hb hs =
+    if-head (U.beforeˢ (k ++ [ ix 0 ]) sb) (U.skipˢ (k ++ [ ix 0 ]) n) (U.bodyˢ r (U.live s) sb) (child-skip k (ix 0) n hs) (body-head r (U.live s) sb hb)
+    where n = U.connectᶜ r (U.feed (here refl) k nothing b) (U.live s′)
+  source-head r b sb s (U.endˢ c)      hb hs =
+    if-head (U.beforeˢ (c ++ [ ix 0 ]) sb) (U.skipˢ (c ++ [ ix 0 ]) n) (U.bodyˢ r (U.live s) sb) (child-skip c (ix 0) n hs) (body-head r (U.live s) sb hb)
+    where n = U.connectᶜ r (U.shut (here refl) c b) (U.ended c (U.restᶜ s))
+  source-head r b sb s U.hushˢ         hb hs = body-head r (U.live s) sb hb
+
+  heads-source : ∀ {Γ A B q} r {b : U.Node (A ∷ Γ) B} {s : U.Node Γ A} → Heads q s → Heads q b → Heads q (U.connectᶜ r b (U.live s))
+  heads-source r {b} {s} hs hb = source-head r b (U.step b) s (U.step s) hb hs
+
   -- THE PARTS ABOVE A WRITTEN SCAN, walked down to it: a map's, a scan's
   -- and a defer's head is their child's; a take's, a flatMap's and a
   -- connect's are each bounded by what is below them.
@@ -140,10 +175,12 @@ module Framing (R : Set) where
       up-lanes  : ∀ {Δ′ A′ B′} {op g fl oc k rf pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
                   (ψ : Path T (flatMapˢ op g fl oc k rf pl so ls)) {c k′} {t : Sub h Δ′ B′} (m : lane c k′ t ∈ᴸ ls)
                 → Path t (scanˢ f r u) → Up (ψ ⊕ in-lanes (via m)) → Up ψ
-      up-source : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
-                  (ψ : Path T (connectˢ S c b kb k fd rp e rt src bd)) → Path src (scanˢ f r u) → Up (ψ ⊕ in-source here) → Up ψ
-      up-body   : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
-                  (ψ : Path T (connectˢ S c b kb k fd rp e rt src bd)) → Path bd (scanˢ f r u) → Up (ψ ⊕ in-body here) → Up ψ
+      -- A connect past its source's end, the scan in its body: the body
+      -- shut at the source's end.
+      up-ended  : ∀ {Δ′ A′ B′} {S c b kb k fd rp c₀ rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+                  (ψ : Path T (connectˢ S c b kb k fd rp (just c₀) rt src bd)) → Path bd (scanˢ f r u) → Up (ψ ⊕ in-body here)
+                → seen H ψ ≡ true → At.part H src ≡ nothing → ∀ {b′} → At.part H′ bd ≡ just b′
+                → Heads q (U.connectᶜ rp (U.shut (here refl) c₀ b′) (U.ended c₀ rt))
 
     lift-map : ∀ {Δ′ A′ B′} (g : A′ → B′) (m : Maybe (U.Node Δ′ A′)) → (∀ {c} → m ≡ just c → Heads q c)
              → ∀ {c} → At.mapᴹ H′ (U.mapᶜ g) m ≡ just c → Heads q c
@@ -179,6 +216,54 @@ module Framing (R : Set) where
             → Up (ψ ⊕ in-take here) → Up ψ
     up-take {i = i} {p} {c} {tk = tk} {s} ψ π up sn {c′} e =
       take-go ψ up sn (At.val H (Kit.live c)) refl (subst (λ b → (if b then At.taking? H′ i p tk (At.part H′ s) else nothing) ≡ just c′) (live-apart ψ π) e)
+
+    -- A connect's source and body, apart.
+    sides : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+          → Path T (connectˢ S c b kb k fd rp e rt src bd) → AllPairs _≢_ (names src ++ names bd)
+    sides {S = S} {c} {b} {kb} {k} ψ =
+      pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) (fresh-path ψ fs)))))
+
+    src-go : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+             (ψ : Path T (connectˢ S c b kb k fd rp e rt src bd)) → Up (ψ ⊕ in-source here) → seen H ψ ≡ true
+           → ∀ ms′ ms mb → At.part H′ src ≡ ms′ → At.part H src ≡ ms → At.part H bd ≡ mb → is-just ms′ ≡ is-just ms
+           → ∀ {c′} → At.connected H′ rp e rt ms′ mb ≡ just c′ → Heads q c′
+    src-go ψ up sn ms′ ms nothing p′ p pb d ()
+    src-go {rp = rp} {e} ψ up sn (just s′) (just s) (just b′) p′ p pb d refl =
+      heads-source rp {b′} {s′} (up (seen-join H ψ (in-source here) sn (cong (λ m → is-just m ∧ true) pb)) p′)
+        (Each.parts bh (ψ ⊕ in-body here) (seen-join H ψ (in-body here) sn (cong (λ m → (is-just m ∨ is-just e) ∧ true) p)) pb)
+    src-go ψ up sn (just _) nothing  (just _) p′ p pb ()
+    src-go ψ up sn nothing  (just _) (just _) p′ p pb ()
+    src-go {e = nothing} ψ up sn nothing nothing (just b′) p′ p pb d ()
+    src-go {rp = rp} {e = just c₀} {rt} ψ up sn nothing nothing (just b′) p′ p pb d eq =
+      Each.parts bh ψ sn (trans (cong₂ (At.connected H rp (just c₀) rt) p pb) eq)
+
+    up-source : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+                (ψ : Path T (connectˢ S c b kb k fd rp e rt src bd)) → Path src (scanˢ f r u) → Up (ψ ⊕ in-source here) → Up ψ
+    up-source {rp = rp} {e} {rt} {src} {bd} ψ π up sn {c′} pe =
+      src-go ψ up sn (At.part H′ src) (At.part H src) (At.part H bd) refl refl refl
+        (scan-defined H (ψ ⊕ in-source π) fs z (ψ ⊕ in-source here))
+        (subst (λ m → At.connected H′ rp e rt (At.part H′ src) m ≡ just c′)
+               (part-alike H H′ bd (λ j m → look-store H r j (lookupᴬ (apart-r (names src) (sides ψ) (names-path π (here refl))) m))) pe)
+
+    body-go : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+              (ψ : Path T (connectˢ S c b kb k fd rp e rt src bd)) → Path bd (scanˢ f r u) → Up (ψ ⊕ in-body here) → seen H ψ ≡ true
+            → ∀ ms mb′ mb → At.part H src ≡ ms → At.part H′ bd ≡ mb′ → At.part H bd ≡ mb → is-just mb′ ≡ is-just mb
+            → ∀ {c′} → At.connected H′ rp e rt ms mb′ ≡ just c′ → Heads q c′
+    body-go ψ π up sn ms nothing mb p pb′ pb d ()
+    body-go ψ π up sn ms (just _) nothing p pb′ pb ()
+    body-go {rp = rp} {e} ψ π up sn (just s) (just b′) (just b) p pb′ pb d refl =
+      heads-source rp {b′} {s} (Each.parts bh (ψ ⊕ in-source here) (seen-join H ψ (in-source here) sn (cong (λ m → is-just m ∧ true) pb)) p)
+        (up (seen-join H ψ (in-body here) sn (cong (λ m → (is-just m ∨ is-just e) ∧ true) p)) pb′)
+    body-go {e = nothing} ψ π up sn nothing (just b′) (just b) p pb′ pb d ()
+    body-go {e = just c₀} ψ π up sn nothing (just b′) (just b) p pb′ pb d refl = up-ended ψ π up sn p pb′
+
+    up-body : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+              (ψ : Path T (connectˢ S c b kb k fd rp e rt src bd)) → Path bd (scanˢ f r u) → Up (ψ ⊕ in-body here) → Up ψ
+    up-body {rp = rp} {e} {rt} {src} {bd} ψ π up sn {c′} pe =
+      body-go ψ π up sn (At.part H src) (At.part H′ bd) (At.part H bd) refl refl refl
+        (scan-defined H (ψ ⊕ in-body π) fs z (ψ ⊕ in-body here))
+        (subst (λ m → At.connected H′ rp e rt m (At.part H′ bd) ≡ just c′)
+               (part-alike H H′ src (λ j m → look-store H r j (lookupᴬ (apart-l (names src) (sides ψ) (names-path π (here refl))) m))) pe)
 
     base-lemma : (m m′ : Maybe (U.Node Δ A)) → m′ ≡ m → (∀ {c} → At.mapᴹ H (U.scanᶜ f (At.val H r)) m ≡ just c → Heads q c)
                → ∀ {c} → At.mapᴹ H′ (U.scanᶜ f (At.val H′ r)) m′ ≡ just c → Heads q c

@@ -185,8 +185,8 @@ by their own silent steps (`Mirror`).
   leaves; next `close-outer`, `close-lanes`, `close-source` the same way.
   Decides whether the four writes fall with only node-local leaves.
   `scan-above` is a walk down to the scan: the residue is one `up-*`
-  bound per flatMap side and connect side, a part's head bounded
-  by its children's. Done when the framing leaves are proven.
+  bound per flatMap side, a part's head bounded by its children's,
+  and `up-ended`, a connect's body shut at its source's end. Done when the framing leaves are proven.
 - **C. THE CALLBACK RELATION.** One per-operator lemma: an observer at a
   path, run from a related state, reaches a related state with the ghost
   advanced, by recursion up the path. `Climbing` and `Closing` become one
@@ -246,10 +246,9 @@ by their own silent steps (`Mirror`).
   scan in one of its lanes heads no sooner than that lane's part.
 - **`up-outer`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap above a written
   scan in its outer heads no sooner than the outer's part.
-- **`up-source`** (Frame) — FALSITY, `NO EVIDENCE`: a connect above a written
-  scan in its source heads no sooner than the source's part.
-- **`up-body`** (Frame) — FALSITY, `NO EVIDENCE`: a connect above a written
-  scan in its body heads no sooner than the body's part.
+- **`up-ended`** (Frame) — FALSITY, `NO EVIDENCE`: a connect past its
+  source's end, a written scan in its body, heads no sooner than the run
+  with its body shut at that end.
 - **`scan-sees`** (Frame) — FALSITY, `NO EVIDENCE`: a path seen after the write
   was seen before, to a node alike or above the scan.
 - **`scan-defined`** (Frame) — FALSITY, `NO EVIDENCE`: whether a node has a
