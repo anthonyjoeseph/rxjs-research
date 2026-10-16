@@ -1379,6 +1379,13 @@ Beyond k hush        = ⊤
 snoc-atop : ∀ q l k → q <ᵖ k ≡ false → (q ++ [ l ]) <ᵖ k ≡ false
 snoc-atop q l k a = ≮-trans k q (q ++ [ l ]) a (<ᵖ-asym q (q ++ [ l ]) (<ᵖ-below q []))
 
+-- Before the next step, atop it.
+before-atop : ∀ {B} q (x : Events B) → M.before q x ≡ true → Atop q x
+before-atop q (out k _ _) b = <ᵖ-asym q k b
+before-atop q (skip k _)  b = <ᵖ-asym q k b
+before-atop q (end k)     b = <ᵖ-asym q k b
+before-atop q hush        b = tt
+
 atop-weaken : ∀ {A} k k′ (e : Events A) → k <ᵖ k′ ≡ false → Atop k e → Atop k′ e
 atop-weaken k k′ (out h _ _) kk a = ≮-trans k′ k h kk a
 atop-weaken k k′ (skip h _)  kk a = ≮-trans k′ k h kk a
@@ -5294,21 +5301,11 @@ module Walk {A B} (p : Pos) (hp : Headed p) where
   -- THE ORDER WALK: each step the connect shows no earlier than the one
   -- before, the source's past the body's last and the body's past the
   -- source's last.
-  atop-body : ∀ L (σ : Events∞ A) q (x : Events B) → Atop L x → Atop L (M.body r σ q x)
-  atop-body L σ q (out _ _ _) a = a
-  atop-body L σ q (skip _ _)  a = a
-  atop-body L σ q (end _)     a = a
-  atop-body L σ q hush        a = tt
-
-  atop-ahead : ∀ L β (σ : Events∞ A) q b → q <ᵖ L ≡ false → Atop L (force β) → Atop L (M.ahead r β σ q b)
-  atop-ahead L β σ q true  qL a = qL
-  atop-ahead L β σ q false qL a = atop-body L σ q (force β) a
-
-  atop-side : ∀ L β (σ : Events∞ A) e → Cue L e → Atop L (force β) → Atop L (M.side r β σ e)
-  atop-side L β σ (out _ _ _) c a = atop-ahead L β σ _ _ c a
-  atop-side L β σ (skip _ _)  c a = atop-ahead L β σ _ _ c a
-  atop-side L β σ (end _)     c a = atop-ahead L β σ _ _ c a
-  atop-side L β σ hush        c a = a
+  atop-cue : ∀ L β (σ : Events∞ A) e → Cue L e → Atop L (force β) → Atop L (M.side r β σ e)
+  atop-cue L β σ (out _ _ _) c a = atop-ahead r β σ _ _ L a c
+  atop-cue L β σ (skip _ _)  c a = atop-ahead r β σ _ _ L a c
+  atop-cue L β σ (end _)     c a = atop-ahead r β σ _ _ L a c
+  atop-cue L β σ hush        c a = a
 
   mutual
     or-beside : ∀ β σ → Trailing σ → Ordered (force σ) → Ordered (force β) → Ordered (M.beside r β σ)
@@ -5328,7 +5325,7 @@ module Walk {A B} (p : Pos) (hp : Headed p) where
     or-src : ∀ β σ → Trailing σ → Ordered (force σ) → Ordered (force β) → ∀ e → force σ ≡ e → Going e
            → M.before (M.shownAt e) (force β) ≡ true → Ordered (M.ahead r β σ (M.shownAt e) true)
     ordered (or-src β σ ts os ob e eq g be) =
-      atop-side q β σ′ (force σ′) (cue-onward q σ (force σ) refl ts os (subst (λ z → Cue (M.shownAt z) (force σ)) eq (cue-self (force σ))))
+      atop-cue q β σ′ (force σ′) (cue-onward q σ (force σ) refl ts os (subst (λ z → Cue (M.shownAt z) (force σ)) eq (cue-self (force σ))))
         (before-atop q (force β) be)
       , or-beside β σ′ (trailing-onward σ (force σ) refl ts) (ordered-onward σ (force σ) refl ts os) ob
       where q  = M.shownAt e
@@ -5337,9 +5334,9 @@ module Walk {A B} (p : Pos) (hp : Headed p) where
     or-body : ∀ σ → Trailing σ → Ordered (force σ) → ∀ e → force σ ≡ e → Going e → ∀ x → Ordered x
             → M.before (M.shownAt e) x ≡ false → Ordered (M.body r σ (M.shownAt e) x)
     ordered (or-body σ ts os e eq g (out n a β′) ox be) =
-      atop-ahead n β′ σ (M.shownAt e) _ be (proj₁ (ordered ox)) , or-ahead β′ σ ts os (proj₂ (ordered ox)) e eq g _ refl
+      atop-ahead r β′ σ (M.shownAt e) _ n (proj₁ (ordered ox)) be , or-ahead β′ σ ts os (proj₂ (ordered ox)) e eq g _ refl
     ordered (or-body σ ts os e eq g (skip n β′) ox be) =
-      atop-ahead n β′ σ (M.shownAt e) _ be (proj₁ (ordered ox)) , or-ahead β′ σ ts os (proj₂ (ordered ox)) e eq g _ refl
+      atop-ahead r β′ σ (M.shownAt e) _ n (proj₁ (ordered ox)) be , or-ahead β′ σ ts os (proj₂ (ordered ox)) e eq g _ refl
     ordered (or-body σ ts os e eq g (end c)     ox be) = tt
     ordered (or-body σ ts os e eq g hush        ox be) = tt
 
@@ -5469,11 +5466,11 @@ module Walk {A B} (p : Pos) (hp : Headed p) where
   easy-pt : ∀ k q → Owned P₀ k → Disjoint P₀ q → Owned r q → ¬ Prefix k (q ++ [ ix 0 ])
   easy-pt k q ok dq oq pr with prefix-split k q (ix 0) pr
   ... | inj₁ pk = proj₁ dq (owned-trans P₀ k q ok (inj₁ pk))
-  ... | inj₂ eq = shown (subst (Owned P₀) eq ok)
+  ... | inj₂ eq = shown₀ (subst (Owned P₀) eq ok)
     where
-      shown : ¬ Owned P₀ (q ++ [ ix 0 ])
-      shown (inj₂ t) = proj₁ dq (inj₂ (tagged-lane P₀ q 0 t))
-      shown (inj₁ pq) with prefix-split P₀ q (ix 0) pq
+      shown₀ : ¬ Owned P₀ (q ++ [ ix 0 ])
+      shown₀ (inj₂ t) = proj₁ dq (inj₂ (tagged-lane P₀ q 0 t))
+      shown₀ (inj₁ pq) with prefix-split P₀ q (ix 0) pq
       ... | inj₁ pq′ = proj₁ dq (inj₁ pq′)
       ... | inj₂ e   = longer p (ix 1) (subst (Owned r) (sym (proj₁ (snoc-inj p q e))) oq)
 
@@ -5530,12 +5527,6 @@ module Walk {A B} (p : Pos) (hp : Headed p) where
     cq , fresh-tail p (c ++ [ ix 0 ]) (cut σ) cq (everyT-mono (λ j z → marks-past j shown (proj₁ z) (proj₂ (proj₂ z))) (cut σ) (proj₁ (proj₂ (trail tr))))
     where cq = everyT-mono (λ h → fresh-past p L (c ++ [ ix 0 ]) h lq) (cut σ) ct
   fresh-onward L σ hush        () tr lq ct fr
-
-  before-atop : ∀ q (x : Events B) → M.before q x ≡ true → Atop q x
-  before-atop q (out k _ _) h = <ᵖ-asym q k h
-  before-atop q (skip k _)  h = <ᵖ-asym q k h
-  before-atop q (end k)     h = <ᵖ-asym q k h
-  before-atop q hush        h = tt
 
   -- A side the connect last showed at `L`: no earlier than the connect,
   -- nor later than either run's next; both runs' cuts fresh against it.
@@ -5830,53 +5821,124 @@ module FlatFresh (p : Pos) where
         ft′ = everyT-∪ t (cut l) (up L c at t ft) (up L c at (cut l) cl)
     freshᴿ (fr-lane op o bs l as qs t hush L fo fb cl rx kx fa fq ft at od) = tt
 
--- A FLATMAP'S CUTS ARE FRESH, over sorted sources alien to where it
--- subscribes: a lane inside an outer value at `q` is admitted at the skip
--- the flatMap shows just past `q`, and a lane a completion admits at the
--- skip just past that completion.
-fresh-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) → (∀ a → Finite (f a)) → Finite s
-           → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
-           → Fresh∞ p (U.stateᴺ (U.subscribe (flatMap op f s) p) ρ)
-
--- A CONNECT'S CUTS ARE FRESH, over sorted sources alien to where it
--- subscribes: its source's burst lies inside only its own subscription,
--- and its body shows nothing the connect does not.
-fresh-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b
-              → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
-              → Fresh∞ p (U.stateᴺ (U.subscribe (connect s b) p) ρ)
-
--- A DEFER'S CUTS ARE FRESH, its program's being: what is alien to the
--- defer is alien to its program, and before the program's position only
--- if before the defer's skip.
-fresh-defer : ∀ {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Alienᴱ p ρ
-            → Fresh∞ (p ++ [ ix 1 ]) (U.stateᴺ (U.subscribe (Later.force l) (p ++ [ ix 1 ])) ρ)
-            → Fresh∞ p (U.stateᴺ (U.deferᶜ l p []) ρ)
-fresh-defer l p ρ hp cl (fc , fr) =
-  everyT-idle
-  , record { freshᴿ = everyT-≈ _ _ (λ k → agreeᵀ (U.subscribed (Later.force l) (env-refl (U.hots ρ))) P₁) (everyT-mono first _ fc)
-                    , fresh-≈ p S X alike (fresh-widen p P₁ wide S fr) }
+-- Two marks under one position, neither's lane keyed by the other's,
+-- nor its lane by it.
+sibling-spread : ∀ p {l l′} → Mark l → Mark l′ → l ≢ l′
+               → Disjoint ((p ++ [ l ]) ++ [ ix 1 ]) ((p ++ [ l′ ]) ++ [ ix 1 ]) × ¬ Owned (p ++ [ l ]) ((p ++ [ l′ ]) ++ [ ix 1 ])
+sibling-spread p {l} {l′} m m′ ne = disjoint-swap _ _ d₂ , proj₁ d₁
   where
-    open Deferred l p ρ hp cl
-    wide : ∀ k → ¬ Owned p k → ¬ Owned P₁ k
-    wide k no o = no (owned-trans p P₁ k (inj₁ (prefix-++ p [ ix 1 ])) o)
-    first : ∀ h → Fresh P₁ P₁ h → Fresh p (p ++ [ ix 0 ]) h
-    first h f k x d with f k x (wide k d)
-    ... | inj₂ t  = inj₂ t
-    ... | inj₁ kl = inj₁ (below-lane p k 1 0 (λ q → d (inj₁ q)) kl)
+    d₁ = apart-mark (p ++ [ l ]) (p ++ [ l′ ]) (ix 1) (ix-mark 1) (sibling p m′ ne , sibling p m (λ e → ne (sym e)))
+    d₂ = apart-mark ((p ++ [ l′ ]) ++ [ ix 1 ]) (p ++ [ l ]) (ix 1) (ix-mark 1) (disjoint-swap _ _ d₁)
 
--- A FINITE PROGRAM'S CUTS ARE FRESH, where a tick heads it, over sorted
--- sources alien to it: at every state, what it leaves running lies inside
--- nothing alien to it but a bare tick or a position before the step it
--- last showed.
-fresh-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
-           → Fresh∞ p (U.stateᴺ (U.subscribe o p) ρ)
--- A FINITE PROGRAM'S CUTS TRAIL ITS RUN, where a tick heads it, over
--- sorted sources alien to it: at every state, what a cut would leave
--- running is sorted and flat, none of it before a value coming next, nor
--- before a skip but the step that skip shows just past it; all of it past
--- an end, none keyed where that end would subscribe a lane, nor over it.
-trailing-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
-              → Trailing (U.stateᴺ (U.subscribe o p) ρ)
+weigh-++ : ∀ a b → weigh (a ++ b) ≡ weigh a + weigh b
+weigh-++ []      b = refl
+weigh-++ (l ∷ a) b = trans (cong (weighˡ l +_) (weigh-++ a b)) (sym (+-assoc (weighˡ l) (weigh a) (weigh b)))
+
+-- A position keyed under a value's lane shares its second label: a tag
+-- the value's own root holds, so smaller than it.
+second-sub : ∀ r i n e z → Prefix ((r ++ [ ix i ]) ++ [ ix 1 ]) (ix n ∷ sub e ∷ z) → weigh e < weigh r
+second-sub []           i n e z (_ , () , _)
+second-sub (a ∷ [])     i n e z (_ , () , _)
+second-sub (a ∷ b ∷ r′) i n e z (_ , refl , _) = ≤-trans (m≤m+n (suc (weigh e)) (weigh r′)) (m≤n+m _ (weighˡ a))
+
+-- After a value at `r ++ [ ix i ]` of a cold's burst: the burst's later
+-- steps its siblings, and every later frame rooted past the close, its
+-- root tagging the close before it, so heavier than the value's lane.
+module Apart {A : Set} (τ : ℕ) (r : Pos) (i : ℕ) where
+  private
+    X1 = (r ++ [ ix i ]) ++ [ ix 1 ]
+
+  data Chain : Pos → Set where
+    base : Chain (r ++ [ last ])
+    step : ∀ {e} n → Chain e → Chain (ix n ∷ sub e ∷ last ∷ [])
+
+  x1≡ : weigh X1 ≡ (weigh r + 1) + 1
+  x1≡ = trans (weigh-++ (r ++ [ ix i ]) [ ix 1 ]) (cong (_+ 1) (weigh-++ r [ ix i ]))
+
+  chain-weigh : ∀ {e} → Chain e → weigh r + 1 ≤ weigh e
+  chain-weigh base         = subst (_≤ weigh (r ++ [ last ])) (weigh-++ r [ last ]) ≤-refl
+  chain-weigh (step {e} n c) = ≤-trans (chain-weigh c) (≤-trans (m≤m+n (weigh e) 1) (≤-trans (n≤1+n _) (n≤1+n _)))
+
+  nested : ∀ {e} → Chain e → weigh e < weigh r → ⊥
+  nested c lt = <-irrefl refl (<-≤-trans lt (≤-trans (m≤m+n (weigh r) 1) (chain-weigh c)))
+
+  frame-big : ∀ {e} → Chain e → ∀ n {l} → Mark l → weigh X1 < weigh (ix n ∷ sub e ∷ l ∷ [])
+  frame-big {e} c n (ix-mark _) = subst (_< _) (sym x1≡) (s≤s (≤-trans (+-monoˡ-≤ 1 (chain-weigh c)) (n≤1+n (weigh e + 1))))
+  frame-big {e} c n last-mark   = subst (_< _) (sym x1≡) (s≤s (≤-trans (+-monoˡ-≤ 1 (chain-weigh c)) (n≤1+n (weigh e + 1))))
+
+  big : ∀ {h} → weigh X1 < weigh h → ¬ Owned h X1
+  big lt o = <-irrefl refl (<-≤-trans lt (owned-weigh _ _ o))
+
+  big-ext : ∀ {h} z → weigh X1 < weigh h → ¬ Owned (h ++ z) X1
+  big-ext {h} z lt = big (<-≤-trans lt (prefix-weigh h (h ++ z) (prefix-++ h z)))
+
+  no-own : ∀ {e} → Chain e → ¬ Owned X1 e
+  no-own base o = sibling r last-mark (λ ()) (owned-trans (r ++ [ ix i ]) X1 (r ++ [ last ]) (inj₁ (prefix-++ (r ++ [ ix i ]) [ ix 1 ])) o)
+  no-own (step {e} n c) (inj₁ q)        = nested c (second-sub r i n e _ q)
+  no-own (step n c)     (inj₂ (inj₁ o)) = no-own c o
+  no-own (step n c)     (inj₂ (inj₂ ()))
+
+  far : ∀ {e} → Chain e → ∀ n {l} → Mark l → ¬ Owned X1 (ix n ∷ sub e ∷ l ∷ ix 1 ∷ [])
+  far {e} c n m           (inj₁ q)        = nested c (second-sub r i n e _ q)
+  far c n m               (inj₂ (inj₁ o)) = no-own c o
+  far c n (ix-mark _)     (inj₂ (inj₂ ()))
+  far c n last-mark       (inj₂ (inj₂ ()))
+
+  frame-sp : ∀ {e} → Chain e → ∀ n {l} → Mark l → Sp (r ++ [ ix i ]) (ix n ∷ sub e ∷ l ∷ [])
+  frame-sp c n m = (big-ext [ ix 1 ] (frame-big c n m) , far c n m) , big (frame-big c n m)
+
+  mutual
+    frames-apart : ∀ {e t} → Chain e → Sp (r ++ [ ix i ]) e → (m : From A t) → Every (Sp (r ++ [ ix i ])) (M.frames τ e m)
+    frames-apart c ok M.done       = record { every = ok }
+    frames-apart c ok M.quiet      = record { every = tt }
+    frames-apart c ok (M.at t _ b) = chain-burst (τ + t) c 0 b
+
+    chain-burst : ∀ {e t} n → Chain e → ∀ j (b : M.Frame A t) → Every (Sp (r ++ [ ix i ])) (M.burst τ (ix n ∷ sub e ∷ []) j b)
+    every (chain-burst n c j (M.emit a k)) = frame-sp c n (ix-mark j) , chain-burst n c (suc j) (M.Frame∞.force k) , everyT-idle
+    every (chain-burst n c j (M.stall k))  = frame-sp c n (ix-mark j) , chain-burst n c (suc j) (M.Frame∞.force k) , everyT-idle
+    every (chain-burst n c j (M.close k))  =
+      frame-sp c n (ix-mark j) , frames-apart (step n c) (frame-sp c n last-mark) (M.From∞.force k) , everyT-idle
+
+  burst-apart : ∀ {t} j → i < j → (b : M.Frame A t) → Every (Sp (r ++ [ ix i ])) (M.burst τ r j b)
+  every (burst-apart j lt (M.emit a k)) = sib j lt , burst-apart (suc j) (<-≤-trans lt (n≤1+n j)) (M.Frame∞.force k) , everyT-idle
+    where sib : ∀ j → i < j → Sp (r ++ [ ix i ]) (r ++ [ ix j ])
+          sib j lt = sibling-spread r (ix-mark j) (ix-mark i) (λ { refl → <⇒≢ lt refl })
+  every (burst-apart j lt (M.stall k))  = sib j lt , burst-apart (suc j) (<-≤-trans lt (n≤1+n j)) (M.Frame∞.force k) , everyT-idle
+    where sib : ∀ j → i < j → Sp (r ++ [ ix i ]) (r ++ [ ix j ])
+          sib j lt = sibling-spread r (ix-mark j) (ix-mark i) (λ { refl → <⇒≢ lt refl })
+  every (burst-apart j lt (M.close k))  =
+    sibling-spread r (ix-mark j) (ix-mark i) (λ { refl → <⇒≢ lt refl })
+    , frames-apart base (sibling-spread r last-mark (ix-mark i) (λ ())) (M.From∞.force k) , everyT-idle
+
+-- A COLD LEAF'S RUN SPREADS: each burst's steps siblings, each frame
+-- tagged by the close before it.
+spread-frames : ∀ {A t} τ e (m : From A t) → Spread (M.frames τ e m)
+spread-burst : ∀ {A t} τ r i (b : M.Frame A t) → Spread (M.burst τ r i b)
+spread-frames τ e M.done       = record { spread = tt }
+spread-frames τ e M.quiet      = record { spread = tt }
+spread-frames τ e (M.at t _ b) = spread-burst τ (ix (τ + t) ∷ sub e ∷ []) 0 b
+
+spread (spread-burst τ r i (M.emit a k)) =
+  (Apart.burst-apart τ r i (suc i) ≤-refl (M.Frame∞.force k) , everyT-idle) , spread-burst τ r (suc i) (M.Frame∞.force k)
+spread (spread-burst τ r i (M.stall k))  = spread-burst τ r (suc i) (M.Frame∞.force k)
+spread (spread-burst τ r i (M.close k))  = spread-frames τ (r ++ [ last ]) (M.From∞.force k)
+
+spread-start : ∀ {A} p (m : From A 0) → Headed p → Spread (M.start p m)
+spread-start p (M.at zero _ b)    _ = spread-burst (tick p) p 0 b
+spread-start p (M.at (suc t) l b) _ = spread-frames (tick p) (p ++ [ last ]) (M.at (suc t) l b)
+spread-start p M.done             _ = spread-frames {t = 0} (tick p) (p ++ [ last ]) M.done
+spread-start p M.quiet            _ = spread-frames {t = 0} (tick p) (p ++ [ last ]) M.quiet
+
+-- A LIST'S RUN SPREADS: its values siblings, its end beside them.
+of-apart : ∀ {A} p i j (xs : List A) → i < j
+         → Every (λ y → Disjoint (y ++ [ ix 1 ]) ((p ++ [ ix i ]) ++ [ ix 1 ]) × ¬ Owned y ((p ++ [ ix i ]) ++ [ ix 1 ])) (M.ofᴱ p j xs)
+every (of-apart p i j []       lt) = sibling-spread p last-mark (ix-mark i) (λ ())
+every (of-apart p i j (x ∷ xs) lt) =
+  sibling-spread p (ix-mark j) (ix-mark i) (λ { refl → <⇒≢ lt refl }) , of-apart p i (suc j) xs (<-≤-trans lt (m≤n+m j 1)) , everyT-idle
+
+spread-of : ∀ {A} p i (xs : List A) → Spread (M.ofᴱ p i xs)
+spread (spread-of p i [])       = tt
+spread (spread-of p i (x ∷ xs)) = (of-apart p i (suc i) xs ≤-refl , everyT-idle) , spread-of p (suc i) xs
 
 -- A cut shows its source's positions, or a step just under one.
 module _ {P : Pos → Set} (d₀ : ∀ h → P h → P (h ++ [ ix 0 ])) (dₗ : ∀ h → P h → P (h ++ [ last ])) where
@@ -5914,23 +5976,22 @@ sp-cut k t d =
 
 -- A CUT SPREADS ITS SOURCE'S RUN: a failing value kept just inside its
 -- own position, which nothing its source left running keys.
-mutual
-  spread-take : ∀ {A} i (q : A → Bool) (e : Events A) c → Trail e c → Spread e → Spread (M.takeWhileᴱ i q e)
-  spread (spread-take i q (out k a r) c t s) = spread (spread-taking i q k a (q a) r c t s)
-  spread (spread-take i q (skip k r)  c t s) = spread-take i q (force r) (cut r) (proj₂ (proj₂ (trail t))) (spread s)
-  spread (spread-take i q (end k)     c t s) = tt
-  spread (spread-take i q hush        c t s) = tt
+spread-take : ∀ {A} i (q : A → Bool) (e : Events A) c → Trail e c → Spread e → Spread (M.takeWhileᴱ i q e)
+spread-taking : ∀ {A} i (q : A → Bool) k a b (r : Events∞ A) c → Trail (out k a r) c → Spread (out k a r) → Spread (M.taking i q k a b r)
+spread (spread-take i q (out k a r) c t s) = spread (spread-taking i q k a (q a) r c t s)
+spread (spread-take i q (skip k r)  c t s) = spread-take i q (force r) (cut r) (proj₂ (proj₂ (trail t))) (spread s)
+spread (spread-take i q (end k)     c t s) = tt
+spread (spread-take i q hush        c t s) = tt
 
-  spread-taking : ∀ {A} i (q : A → Bool) k a b (r : Events∞ A) c → Trail (out k a r) c → Spread (out k a r) → Spread (M.taking i q k a b r)
-  spread (spread-taking i     q k a true  r c t s) =
-    ( every-cut (λ h → sp-mark k h (ix-mark 0)) (λ h → sp-mark k h last-mark) i q (force r) (proj₁ (proj₁ (spread s)))
-    , proj₂ (proj₁ (spread s)) )
-    , spread-take i q (force r) (cut r) (proj₁ (proj₂ (proj₂ (trail t)))) (proj₂ (spread s))
-  spread (spread-taking true  q k a false r c t s) =
-    ( record { every = sibling-spread k last-mark (ix-mark 0) (λ ()) }
-    , everyT-mono (sp-cut k) (cut r) (proj₂ (proj₂ (proj₂ (trail t)))) )
-    , record { spread = tt }
-  spread (spread-taking false q k a false r c t s) = tt
+spread (spread-taking i     q k a true  r c t s) =
+  ( every-cut (λ h → sp-mark k h (ix-mark 0)) (λ h → sp-mark k h last-mark) i q (force r) (proj₁ (proj₁ (spread s)))
+  , proj₂ (proj₁ (spread s)) )
+  , spread-take i q (force r) (cut r) (proj₁ (proj₂ (proj₂ (trail t)))) (proj₂ (spread s))
+spread (spread-taking true  q k a false r c t s) =
+  ( record { every = sibling-spread k last-mark (ix-mark 0) (λ ()) }
+  , everyT-mono (sp-cut k) (cut r) (proj₂ (proj₂ (proj₂ (trail t)))) )
+  , record { spread = tt }
+spread (spread-taking false q k a false r c t s) = tt
 
 -- Two of a source's positions apart, the second alien to the joiner,
 -- both tagged with it: the first keys nothing of the second's lane.
@@ -6036,125 +6097,54 @@ spread (spread-rejoin p (end c) o st al) with p <ᵖ c
 ... | false = tt
 spread (spread-rejoin p hush o st al) = tt
 
--- Two marks under one position, neither's lane keyed by the other's,
--- nor its lane by it.
-sibling-spread : ∀ p {l l′} → Mark l → Mark l′ → l ≢ l′
-               → Disjoint ((p ++ [ l ]) ++ [ ix 1 ]) ((p ++ [ l′ ]) ++ [ ix 1 ]) × ¬ Owned (p ++ [ l ]) ((p ++ [ l′ ]) ++ [ ix 1 ])
-sibling-spread p {l} {l′} m m′ ne = disjoint-swap _ _ d₂ , proj₁ d₁
+-- A FLATMAP'S CUTS ARE FRESH, over sorted sources alien to where it
+-- subscribes: a lane inside an outer value at `q` is admitted at the skip
+-- the flatMap shows just past `q`, and a lane a completion admits at the
+-- skip just past that completion.
+fresh-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) → (∀ a → Finite (f a)) → Finite s
+           → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+           → Fresh∞ p (U.stateᴺ (U.subscribe (flatMap op f s) p) ρ)
+
+-- A CONNECT'S CUTS ARE FRESH, over sorted sources alien to where it
+-- subscribes: its source's burst lies inside only its own subscription,
+-- and its body shows nothing the connect does not.
+fresh-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b
+              → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+              → Fresh∞ p (U.stateᴺ (U.subscribe (connect s b) p) ρ)
+
+-- A DEFER'S CUTS ARE FRESH, its program's being: what is alien to the
+-- defer is alien to its program, and before the program's position only
+-- if before the defer's skip.
+fresh-defer : ∀ {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Alienᴱ p ρ
+            → Fresh∞ (p ++ [ ix 1 ]) (U.stateᴺ (U.subscribe (Later.force l) (p ++ [ ix 1 ])) ρ)
+            → Fresh∞ p (U.stateᴺ (U.deferᶜ l p []) ρ)
+fresh-defer l p ρ hp cl (fc , fr) =
+  everyT-idle
+  , record { freshᴿ = everyT-≈ _ _ (λ k → agreeᵀ (U.subscribed (Later.force l) (env-refl (U.hots ρ))) P₁) (everyT-mono first _ fc)
+                    , fresh-≈ p S X alike (fresh-widen p P₁ wide S fr) }
   where
-    d₁ = apart-mark (p ++ [ l ]) (p ++ [ l′ ]) (ix 1) (ix-mark 1) (sibling p m′ ne , sibling p m (λ e → ne (sym e)))
-    d₂ = apart-mark ((p ++ [ l′ ]) ++ [ ix 1 ]) (p ++ [ l ]) (ix 1) (ix-mark 1) (disjoint-swap _ _ d₁)
+    open Deferred l p ρ hp cl
+    wide : ∀ k → ¬ Owned p k → ¬ Owned P₁ k
+    wide k no o = no (owned-trans p P₁ k (inj₁ (prefix-++ p [ ix 1 ])) o)
+    first : ∀ h → Fresh P₁ P₁ h → Fresh p (p ++ [ ix 0 ]) h
+    first h f k x d with f k x (wide k d)
+    ... | inj₂ t  = inj₂ t
+    ... | inj₁ kl = inj₁ (below-lane p k 1 0 (λ q → d (inj₁ q)) kl)
 
-weigh-++ : ∀ a b → weigh (a ++ b) ≡ weigh a + weigh b
-weigh-++ []      b = refl
-weigh-++ (l ∷ a) b = trans (cong (weighˡ l +_) (weigh-++ a b)) (sym (+-assoc (weighˡ l) (weigh a) (weigh b)))
+-- A FINITE PROGRAM'S CUTS ARE FRESH, where a tick heads it, over sorted
+-- sources alien to it: at every state, what it leaves running lies inside
+-- nothing alien to it but a bare tick or a position before the step it
+-- last showed.
+fresh-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+           → Fresh∞ p (U.stateᴺ (U.subscribe o p) ρ)
+-- A FINITE PROGRAM'S CUTS TRAIL ITS RUN, where a tick heads it, over
+-- sorted sources alien to it: at every state, what a cut would leave
+-- running is sorted and flat, none of it before a value coming next, nor
+-- before a skip but the step that skip shows just past it; all of it past
+-- an end, none keyed where that end would subscribe a lane, nor over it.
+trailing-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+              → Trailing (U.stateᴺ (U.subscribe o p) ρ)
 
--- A position keyed under a value's lane shares its second label: a tag
--- the value's own root holds, so smaller than it.
-second-sub : ∀ r i n e z → Prefix ((r ++ [ ix i ]) ++ [ ix 1 ]) (ix n ∷ sub e ∷ z) → weigh e < weigh r
-second-sub []           i n e z (_ , () , _)
-second-sub (a ∷ [])     i n e z (_ , () , _)
-second-sub (a ∷ b ∷ r′) i n e z (_ , refl , _) = ≤-trans (m≤m+n (suc (weigh e)) (weigh r′)) (m≤n+m _ (weighˡ a))
-
--- After a value at `r ++ [ ix i ]` of a cold's burst: the burst's later
--- steps its siblings, and every later frame rooted past the close, its
--- root tagging the close before it, so heavier than the value's lane.
-module Apart {A : Set} (τ : ℕ) (r : Pos) (i : ℕ) where
-  private
-    X1 = (r ++ [ ix i ]) ++ [ ix 1 ]
-
-  data Chain : Pos → Set where
-    base : Chain (r ++ [ last ])
-    step : ∀ {e} n → Chain e → Chain (ix n ∷ sub e ∷ last ∷ [])
-
-  x1≡ : weigh X1 ≡ (weigh r + 1) + 1
-  x1≡ = trans (weigh-++ (r ++ [ ix i ]) [ ix 1 ]) (cong (_+ 1) (weigh-++ r [ ix i ]))
-
-  chain-weigh : ∀ {e} → Chain e → weigh r + 1 ≤ weigh e
-  chain-weigh base         = subst (_≤ weigh (r ++ [ last ])) (weigh-++ r [ last ]) ≤-refl
-  chain-weigh (step {e} n c) = ≤-trans (chain-weigh c) (≤-trans (m≤m+n (weigh e) 1) (≤-trans (n≤1+n _) (n≤1+n _)))
-
-  nested : ∀ {e} → Chain e → weigh e < weigh r → ⊥
-  nested c lt = <-irrefl refl (<-≤-trans lt (≤-trans (m≤m+n (weigh r) 1) (chain-weigh c)))
-
-  frame-big : ∀ {e} → Chain e → ∀ n {l} → Mark l → weigh X1 < weigh (ix n ∷ sub e ∷ l ∷ [])
-  frame-big {e} c n (ix-mark _) = subst (_< _) (sym x1≡) (s≤s (≤-trans (+-monoˡ-≤ 1 (chain-weigh c)) (n≤1+n (weigh e + 1))))
-  frame-big {e} c n last-mark   = subst (_< _) (sym x1≡) (s≤s (≤-trans (+-monoˡ-≤ 1 (chain-weigh c)) (n≤1+n (weigh e + 1))))
-
-  big : ∀ {h} → weigh X1 < weigh h → ¬ Owned h X1
-  big lt o = <-irrefl refl (<-≤-trans lt (owned-weigh _ _ o))
-
-  big-ext : ∀ {h} z → weigh X1 < weigh h → ¬ Owned (h ++ z) X1
-  big-ext {h} z lt = big (<-≤-trans lt (prefix-weigh h (h ++ z) (prefix-++ h z)))
-
-  no-own : ∀ {e} → Chain e → ¬ Owned X1 e
-  no-own base o = sibling r last-mark (λ ()) (owned-trans (r ++ [ ix i ]) X1 (r ++ [ last ]) (inj₁ (prefix-++ (r ++ [ ix i ]) [ ix 1 ])) o)
-  no-own (step {e} n c) (inj₁ q)        = nested c (second-sub r i n e _ q)
-  no-own (step n c)     (inj₂ (inj₁ o)) = no-own c o
-  no-own (step n c)     (inj₂ (inj₂ ()))
-
-  far : ∀ {e} → Chain e → ∀ n {l} → Mark l → ¬ Owned X1 (ix n ∷ sub e ∷ l ∷ ix 1 ∷ [])
-  far {e} c n m           (inj₁ q)        = nested c (second-sub r i n e _ q)
-  far c n m               (inj₂ (inj₁ o)) = no-own c o
-  far c n (ix-mark _)     (inj₂ (inj₂ ()))
-  far c n last-mark       (inj₂ (inj₂ ()))
-
-  frame-sp : ∀ {e} → Chain e → ∀ n {l} → Mark l → Sp (r ++ [ ix i ]) (ix n ∷ sub e ∷ l ∷ [])
-  frame-sp c n m = (big-ext [ ix 1 ] (frame-big c n m) , far c n m) , big (frame-big c n m)
-
-  mutual
-    frames-apart : ∀ {e t} → Chain e → Sp (r ++ [ ix i ]) e → (m : From A t) → Every (Sp (r ++ [ ix i ])) (M.frames τ e m)
-    frames-apart c ok M.done       = record { every = ok }
-    frames-apart c ok M.quiet      = record { every = tt }
-    frames-apart c ok (M.at t _ b) = chain-burst (τ + t) c 0 b
-
-    chain-burst : ∀ {e t} n → Chain e → ∀ j (b : M.Frame A t) → Every (Sp (r ++ [ ix i ])) (M.burst τ (ix n ∷ sub e ∷ []) j b)
-    every (chain-burst n c j (M.emit a k)) = frame-sp c n (ix-mark j) , chain-burst n c (suc j) (M.Frame∞.force k) , everyT-idle
-    every (chain-burst n c j (M.stall k))  = frame-sp c n (ix-mark j) , chain-burst n c (suc j) (M.Frame∞.force k) , everyT-idle
-    every (chain-burst n c j (M.close k))  =
-      frame-sp c n (ix-mark j) , frames-apart (step n c) (frame-sp c n last-mark) (M.From∞.force k) , everyT-idle
-
-  burst-apart : ∀ {t} j → i < j → (b : M.Frame A t) → Every (Sp (r ++ [ ix i ])) (M.burst τ r j b)
-  every (burst-apart j lt (M.emit a k)) = sib j lt , burst-apart (suc j) (<-≤-trans lt (n≤1+n j)) (M.Frame∞.force k) , everyT-idle
-    where sib : ∀ j → i < j → Sp (r ++ [ ix i ]) (r ++ [ ix j ])
-          sib j lt = sibling-spread r (ix-mark j) (ix-mark i) (λ { refl → <⇒≢ lt refl })
-  every (burst-apart j lt (M.stall k))  = sib j lt , burst-apart (suc j) (<-≤-trans lt (n≤1+n j)) (M.Frame∞.force k) , everyT-idle
-    where sib : ∀ j → i < j → Sp (r ++ [ ix i ]) (r ++ [ ix j ])
-          sib j lt = sibling-spread r (ix-mark j) (ix-mark i) (λ { refl → <⇒≢ lt refl })
-  every (burst-apart j lt (M.close k))  =
-    sibling-spread r (ix-mark j) (ix-mark i) (λ { refl → <⇒≢ lt refl })
-    , frames-apart base (sibling-spread r last-mark (ix-mark i) (λ ())) (M.From∞.force k) , everyT-idle
-
--- A COLD LEAF'S RUN SPREADS: each burst's steps siblings, each frame
--- tagged by the close before it.
-mutual
-  spread-frames : ∀ {A t} τ e (m : From A t) → Spread (M.frames τ e m)
-  spread-frames τ e M.done       = record { spread = tt }
-  spread-frames τ e M.quiet      = record { spread = tt }
-  spread-frames τ e (M.at t _ b) = spread-burst τ (ix (τ + t) ∷ sub e ∷ []) 0 b
-
-  spread-burst : ∀ {A t} τ r i (b : M.Frame A t) → Spread (M.burst τ r i b)
-  spread (spread-burst τ r i (M.emit a k)) =
-    (Apart.burst-apart τ r i (suc i) ≤-refl (M.Frame∞.force k) , everyT-idle) , spread-burst τ r (suc i) (M.Frame∞.force k)
-  spread (spread-burst τ r i (M.stall k))  = spread-burst τ r (suc i) (M.Frame∞.force k)
-  spread (spread-burst τ r i (M.close k))  = spread-frames τ (r ++ [ last ]) (M.From∞.force k)
-
-spread-start : ∀ {A} p (m : From A 0) → Headed p → Spread (M.start p m)
-spread-start p (M.at zero _ b)    _ = spread-burst (tick p) p 0 b
-spread-start p (M.at (suc t) l b) _ = spread-frames (tick p) (p ++ [ last ]) (M.at (suc t) l b)
-spread-start p M.done             _ = spread-frames {t = 0} (tick p) (p ++ [ last ]) M.done
-spread-start p M.quiet            _ = spread-frames {t = 0} (tick p) (p ++ [ last ]) M.quiet
-
--- A LIST'S RUN SPREADS: its values siblings, its end beside them.
-of-apart : ∀ {A} p i j (xs : List A) → i < j
-         → Every (λ y → Disjoint (y ++ [ ix 1 ]) ((p ++ [ ix i ]) ++ [ ix 1 ]) × ¬ Owned y ((p ++ [ ix i ]) ++ [ ix 1 ])) (M.ofᴱ p j xs)
-every (of-apart p i j []       lt) = sibling-spread p last-mark (ix-mark i) (λ ())
-every (of-apart p i j (x ∷ xs) lt) =
-  sibling-spread p (ix-mark j) (ix-mark i) (λ { refl → <⇒≢ lt refl }) , of-apart p i (suc j) xs (<-≤-trans lt (m≤n+m j 1)) , everyT-idle
-
-spread-of : ∀ {A} p i (xs : List A) → Spread (M.ofᴱ p i xs)
-spread (spread-of p i [])       = tt
-spread (spread-of p i (x ∷ xs)) = (of-apart p i (suc i) xs ≤-refl , everyT-idle) , spread-of p (suc i) xs
 
 -- A FINITE PROGRAM'S VALUES SPREAD, where a tick heads it, over sorted
 -- sources alien to it: after a value at `x`, nothing later, shown or
