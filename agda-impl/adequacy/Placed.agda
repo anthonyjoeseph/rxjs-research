@@ -2313,10 +2313,14 @@ Clean v k v′ h = Strict v v′ k h × ¬ Ext k h
 Next : Bool → Pos → Bool → Pos → Set
 Next v k v′ h = h <ᵖ k ≡ false × Clean v k v′ h
 
+-- What a state would leave running, sorted, flat and trailing it.
+Here : ∀ {A} → Events A → Tail → Set
+Here x c = SortedT c × EveryT (TrailE x) c × FlatT c
+
 mutual
   Calms : ∀ {A} → Events A → Set
-  Calms (out k _ r) = At (Next true k) (force r) × Calm (force r)
-  Calms (skip k r)  = At (Next false k) (force r) × Calm (force r)
+  Calms (out k _ r) = At (Next true k) (force r) × Here (force r) (cut r) × Calm (force r)
+  Calms (skip k r)  = At (Next false k) (force r) × Here (force r) (cut r) × Calm (force r)
   Calms (end _)     = ⊤
   Calms hush        = ⊤
 
@@ -2345,16 +2349,25 @@ next-clear k (end h)     n = proj₂ n
 next-clear k hush        n = tt
 
 calm-ordered : ∀ {A} (e : Events A) → Calm e → Ordered e
-ordered (calm-ordered (out k _ r) c) = next-atop true k _ (proj₁ (calms c)) , calm-ordered _ (proj₂ (calms c))
-ordered (calm-ordered (skip k r)  c) = next-atop false k _ (proj₁ (calms c)) , calm-ordered _ (proj₂ (calms c))
+ordered (calm-ordered (out k _ r) c) = next-atop true k _ (proj₁ (calms c)) , calm-ordered _ (proj₂ (proj₂ (calms c)))
+ordered (calm-ordered (skip k r)  c) = next-atop false k _ (proj₁ (calms c)) , calm-ordered _ (proj₂ (proj₂ (calms c)))
 ordered (calm-ordered (end _)     c) = tt
 ordered (calm-ordered hush        c) = tt
 
 calm-steady : ∀ {A} (e : Events A) → Calm e → Steady e
-steady (calm-steady (out k _ r) c) = next-past k _ (proj₁ (calms c)) , calm-steady _ (proj₂ (calms c))
-steady (calm-steady (skip k r)  c) = next-clear k _ (proj₁ (calms c)) , calm-steady _ (proj₂ (calms c))
+steady (calm-steady (out k _ r) c) = next-past k _ (proj₁ (calms c)) , calm-steady _ (proj₂ (proj₂ (calms c)))
+steady (calm-steady (skip k r)  c) = next-clear k _ (proj₁ (calms c)) , calm-steady _ (proj₂ (proj₂ (calms c)))
 steady (calm-steady (end _)     c) = tt
 steady (calm-steady hush        c) = tt
+
+-- A calm run, each state leaving what trails it, trails from where it
+-- does.
+calm-trail : ∀ {A} (e : Events A) c → Here e c → Calm e → Trail e c
+trail (calm-trail (out k _ r) c (st , et , ft) cm) = st , et , calm-trail (force r) (cut r) (proj₁ (proj₂ (calms cm))) (proj₂ (proj₂ (calms cm)))
+trail (calm-trail (skip k r)  c (st , et , ft) cm) = st , et , calm-trail (force r) (cut r) (proj₁ (proj₂ (calms cm))) (proj₂ (proj₂ (calms cm)))
+trail (calm-trail (end _)     c (st , et , ft) cm) = st , et , tt
+trail (calm-trail hush        c (st , et , ft) cm) = st , et , tt
+trailᶠ (calm-trail e c (st , et , ft) cm) = ft
 
 -- What the merge's parts would show next, against an event at `k`.
 Obl : ∀ {B} → Bool → Pos → Maybe (Events∞ (MonotonicList B)) → List (Events∞ B) → List (MonotonicList B) → Tail → Set
@@ -3360,7 +3373,36 @@ module FlatOrder (p : Pos) where
       left (pin k _) e = tt , proj₂ (proj₂ (proj₁ (everyᵀ e)))
       left idle      e = tt
 
+  -- Every lane's cut, sorted.
+  sorted-cuts : ∀ {B} {ls : List (Events∞ B)} {rs} → Roots ls rs → SortedT (M.cuts ls)
+  sorted-cuts []ᴿ = sortedT-idle
+  sorted-cuts {ls = l ∷ ls} (st ∷ᴿ R) = sortedT-∪ (cut l) (M.cuts ls) (proj₁ (trail (Lane.trl st))) (sorted-cuts R)
+
+  -- What the merge would leave running, sorted.
+  sorted-whole : ∀ {B} (o : Maybe (Events∞ (MonotonicList B))) ls t {rs} → Roots ls rs → Heldᴹ o → Pool o rs t → SortedT (M.whole o ls t)
+  sorted-whole nothing  ls t R h pl = sortedT-∪ (M.cuts ls) t (sorted-cuts R) (proj₁ pl)
+  sorted-whole (just e) ls t R h pl =
+    sortedT-∪ (cut e) (M.cuts ls ∪ t) (proj₁ (trail (Outer.trl h))) (sortedT-∪ (M.cuts ls) t (sorted-cuts R) (proj₁ pl))
+
+  -- WHAT THE MERGE WOULD LEAVE RUNNING TRAILS WHAT IT SHOWS NEXT: the
+  -- outer's cut, every lane's and what ended parts left, against the
+  -- earliest part's next or the pool's skip ahead of them all.
+  postulate
+    trail-whole : ∀ {B} op (o : Maybe (Events∞ (MonotonicList B))) ls qs t {rs} → Roots ls rs → Parted rs → All (Aside o) rs → All Gen qs
+                → Heldᴹ o → Pool o rs t → EveryT (TrailE (M.go op o ls qs t)) (M.whole o ls t)
+
+  -- WHAT THE MERGE WOULD LEAVE RUNNING IS FLAT: no step of the outer's
+  -- cut, a lane's or the pool's inside a step of another's.
+  postulate
+    flat-whole : ∀ {B} (o : Maybe (Events∞ (MonotonicList B))) ls t {rs} → Roots ls rs → Parted rs → All (Aside o) rs
+               → Heldᴹ o → Pool o rs t → FlatT (M.whole o ls t)
+
   mutual
+    calm-at : ∀ {B} op (o : Maybe (Events∞ (MonotonicList B))) ls qs t {rs} → Roots ls rs → Parted rs → All (Aside o) rs → All Gen qs
+               → Heldᴹ o → Pool o rs t → Here (M.go op o ls qs t) (M.whole o ls t) × Calm (M.go op o ls qs t)
+    calm-at op o ls qs t R pt asd gq h pl =
+      (sorted-whole o ls t R h pl , trail-whole op o ls qs t R pt asd gq h pl , flat-whole o ls t R pt asd h pl) , calm-go op o ls qs t R pt asd gq h pl
+
     calm-go : ∀ {B} op (o : Maybe (Events∞ (MonotonicList B))) ls qs t {rs} → Roots ls rs → Parted rs → All (Aside o) rs → All Gen qs
                → Heldᴹ o → Pool o rs t → Calm (M.go op o ls qs t)
     calm-go op o ls qs idle      R pt asd gq h pl = calm-parts op o ls qs idle R pt asd gq h pl tt
@@ -3373,7 +3415,7 @@ module FlatOrder (p : Pos) where
     calms (calm-pool op o ls qs k u {rs} e R pt asd gq h pl) =
       next-go false k op o ls qs (later u) (proj₁ (ahead-atop k o ls e)) (proj₂ (ahead-atop k o ls e)) (proj₁ (sortedᵀ (proj₁ pl)))
         (calm-pool-n o ls qs k u e R pt asd h pl)
-      , calm-go op o ls qs (later u) R pt asd gq h (pool-later o rs k u pl)
+      , calm-at op o ls qs (later u) R pt asd gq h (pool-later o rs k u pl)
 
     calm-parts : ∀ {B} op (o : Maybe (Events∞ (MonotonicList B))) ls qs t {rs} → Roots ls rs → Parted rs → All (Aside o) rs → All Gen qs
                   → Heldᴹ o → Pool o rs t → Behind o ls t → Calm (M.parts op o ls qs t)
@@ -3424,20 +3466,20 @@ module FlatOrder (p : Pos) where
       next-go false (q ++ [ ix 0 ]) op (just w) ls′ qs′ (t ∪ d) at′ (beyond-step q (force w) (past-beyond q (force w) (proj₁ (steady (Outer.std h)))))
         (atopT-∪ (q ++ [ ix 0 ]) t d (pool-step q t at (everyT-mono (λ k af eq → proj₁ (proj₂ (proj₁ (every (proj₁ (proj₂ af))))) (subst (Owned q) eq (inj₁ (prefix-refl q)))) t (proj₁ (proj₂ pl)))) ad)
         (calm-admit op e ls qs t q m w eq R pt asd gq h pl ld at)
-      , calm-go op (just w) ls′ qs′ (t ∪ d) R′ pt′ asd′ gq′ (outer-out h) pl′
+      , calm-at op (just w) ls′ qs′ (t ∪ d) R′ pt′ asd′ gq′ (outer-out h) pl′
     calms (calm-outer op e ls qs t (skip q w) {rs} R pt asd gq h pl ld at) =
       next-go false q op (just w) ls qs t (mapᴬ (λ {l} → beyond-atop q (force l)) ld) (proj₁ (ordered (Outer.ord h))) at
         (calm-oskip e ls qs t q w R pt asd h pl ld at)
-      , calm-go op (just w) ls qs t R pt (mapᴬ (λ a → proj₂ (every (proj₁ a))) asd) gq (outer-skip h)
+      , calm-at op (just w) ls qs t R pt (mapᴬ (λ a → proj₂ (every (proj₁ a))) asd) gq (outer-skip h)
           (pool-oskip q w (cut e) t rs pl)
     calms (calm-outer op e [] [] t (end c) R pt asd gq h pl ld at) = tt
     calms (calm-outer op e [] (m ∷ qs) t (end c) []ᴿ pt asd gq h pl ld at) =
       next-go false c op nothing [] (m ∷ qs) (t ∪ cut e) []ᴬ tt (outer-end-atop c e t h at) (calm-oend e [] (m ∷ qs) t c []ᴿ pt asd h pl ld at)
-      , calm-go op nothing [] (m ∷ qs) (t ∪ cut e) []ᴿ tt []ᴬ gq tt (outer-end-pool c e t [] h asd pl)
+      , calm-at op nothing [] (m ∷ qs) (t ∪ cut e) []ᴿ tt []ᴬ gq tt (outer-end-pool c e t [] h asd pl)
     calms (calm-outer {B} op e (l ∷ ls) qs t (end c) {rs} R pt asd gq h pl ld at) =
       next-go false c op nothing (l ∷ ls) qs (t ∪ cut e) (mapᴬ (λ {x} → beyond-atop c (force x)) ld) tt (outer-end-atop c e t h at)
         (calm-oend e (l ∷ ls) qs t c R pt asd h pl ld at)
-      , calm-go op nothing (l ∷ ls) qs (t ∪ cut e) R pt (aside-none {B} rs) gq tt (outer-end-pool c e t rs h asd pl)
+      , calm-at op nothing (l ∷ ls) qs (t ∪ cut e) R pt (aside-none {B} rs) gq tt (outer-end-pool c e t rs h asd pl)
     calms (calm-outer op e ls qs t hush R pt asd gq h pl ld at) = tt
 
     calm-lane : ∀ {B} op (o : Maybe (Events∞ (MonotonicList B))) bs (l : Events∞ B) as qs t (x : Events B) {rbs r ras}
@@ -3446,10 +3488,10 @@ module FlatOrder (p : Pos) where
                  → All (λ y → Atop k (force y)) as → Atopᴹ k o → AtopT k t → Calm (M.lane op o bs l as qs t x)
     calms (calm-lane op o bs l as qs t (out k b w) rb st ra pt asd gq h pl refl ab aa ao at) =
       next-go true k op o (bs ++ w ∷ as) qs t (All++⁺ ab (proj₁ (ordered (Lane.ord st)) ∷ᴬ aa)) ao at (calm-out o bs l as qs t k b w rb st ra pt asd h pl ab aa ao at)
-      , calm-go op o (bs ++ w ∷ as) qs t (roots-++ rb (lane-out st ∷ᴿ ra)) pt asd gq h pl
+      , calm-at op o (bs ++ w ∷ as) qs t (roots-++ rb (lane-out st ∷ᴿ ra)) pt asd gq h pl
     calms (calm-lane op o bs l as qs t (skip k w) rb st ra pt asd gq h pl refl ab aa ao at) =
       next-go false k op o (bs ++ w ∷ as) qs t (All++⁺ ab (proj₁ (ordered (Lane.ord st)) ∷ᴬ aa)) ao at (calm-skip o bs l as qs t k w rb st ra pt asd h pl ab aa ao at)
-      , calm-go op o (bs ++ w ∷ as) qs t (roots-++ rb (lane-skip st ∷ᴿ ra)) pt asd gq h pl
+      , calm-at op o (bs ++ w ∷ as) qs t (roots-++ rb (lane-skip st ∷ᴿ ra)) pt asd gq h pl
     calms (calm-lane op o bs l as (m ∷ qs) t (end c) {rbs} {r} {ras} rb st ra pt asd (gm ∷ᴬ gq) h pl refl ab aa ao at) =
       next-go false c₀ op o (M.enter m c₁ ∷ bs ++ as) qs (t ∪ cut l)
         (top ∷ᴬ clear-lanes r c (Lane.ok st) orc (roots-++ rb ra) (proj₁ pp) (All++⁺ ab aa))
@@ -3458,7 +3500,7 @@ module FlatOrder (p : Pos) where
            (pool-step c t at (everyT-mono (λ k af eq → proj₁ (all-pick rbs ras (proj₁ af)) (subst (Owned r) eq orc)) t (proj₁ (proj₂ pl))))
            (atopT-every c₀ (cut l) (λ k tr → <ᵖ-step c k (proj₁ tr)) (proj₁ (proj₂ (trail (Lane.trl st))))))
         (calm-queue o bs l as m qs t c rb st ra pt asd gm h pl ab aa ao at)
-      , calm-go op o (M.enter m c₁ ∷ bs ++ as) qs (t ∪ cut l) (fresh c₁ (M.enter m c₁) fit okc ∷ᴿ roots-++ rb ra)
+      , calm-at op o (M.enter m c₁ ∷ bs ++ as) qs (t ∪ cut l) (fresh c₁ (M.enter m c₁) fit okc ∷ᴿ roots-++ rb ra)
           (mapᴬ (λ {r′} od → hand-apart r c r′ uc (proj₁ od) (proj₂ od)) oks , proj₂ pp)
           (hand-aside r c o (Lane.ok st) uc ar h ∷ᴬ proj₂ (all-pick rbs ras asd)) gq h
           (pool-hand o rbs r ras t c l st oks ar h pl)
@@ -3485,12 +3527,13 @@ module FlatOrder (p : Pos) where
     calm-ended : ∀ {B} op (o : Maybe (Events∞ (MonotonicList B))) bs (l : Events∞ B) as t c {rbs r ras}
                → Roots bs rbs → Lane {B} r (end c) (cut l) → Roots as ras → Parted (rbs ++ r ∷ ras) → All (Aside o) (rbs ++ r ∷ ras)
                → Heldᴹ o → Pool o (rbs ++ r ∷ ras) t → All (λ y → Atop c (force y)) bs → All (λ y → Atop c (force y)) as → Atopᴹ c o → AtopT c t
-               → At (Next false c) (M.go op o (bs ++ as) [] (t ∪ cut l)) × Calm (M.go op o (bs ++ as) [] (t ∪ cut l))
+               → At (Next false c) (M.go op o (bs ++ as) [] (t ∪ cut l)) × Here (M.go op o (bs ++ as) [] (t ∪ cut l)) (M.whole o (bs ++ as) (t ∪ cut l))
+                 × Calm (M.go op o (bs ++ as) [] (t ∪ cut l))
     calm-ended op o bs l as t c {rbs} {r} {ras} rb st ra pt asd h pl ab aa ao at =
       next-go false c op o (bs ++ as) [] (t ∪ cut l) (All++⁺ ab aa) ao
         (atopT-∪ c t (cut l) at (atopT-every c (cut l) (λ k tr → <ᵖ-asym c k (proj₁ tr)) (proj₁ (proj₂ (trail (Lane.trl st))))))
         (calm-end o bs l as t c rb st ra pt asd h pl ab aa ao at)
-      , calm-go op o (bs ++ as) [] (t ∪ cut l) (roots-++ rb ra) (proj₂ pp) (proj₂ (all-pick rbs ras asd)) []ᴬ h
+      , calm-at op o (bs ++ as) [] (t ∪ cut l) (roots-++ rb ra) (proj₂ pp) (proj₂ (all-pick rbs ras asd)) []ᴬ h
           (pool-ended o rbs r ras t (cut l) st oks (proj₁ (all-pick rbs ras asd)) h pl)
       where
         pp  = parted-pick rbs r ras pt
@@ -3508,15 +3551,6 @@ module FlatOrder (p : Pos) where
     where
       pack : ∀ h → (Owned j h × Headed h) × (∀ (i : Σ Pos (λ R → Ok R × Disjoint R j)) → ¬ Owned (proj₁ i) h) → Under j h
       pack h ((o , hd) , f) = o , hd , λ R ok d → f (R , ok , d)
-
--- A FLATMAP'S CUTS TRAIL ITS RUN, where a tick heads it, over sorted
--- sources alien to it: what the outer and every lane would leave running,
--- side by side with what ended parts left, trails what the merge shows
--- next.
-postulate
-  trail-flat : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) → (∀ a → Finite (f a)) → Finite s
-             → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
-             → Trailing (U.stateᴺ (U.subscribe (flatMap op f s) p) ρ)
 
 -- A CONNECT'S CUTS TRAIL ITS RUN, where a tick heads it, over sorted
 -- sources alien to it: its source's burst left running beside what its
@@ -3558,8 +3592,8 @@ postulate
 ordered-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
              → Ordered (U.meaning (U.subscribe o p) ρ)
 
--- A FLATMAP SUBSCRIBED MERGES IN ORDER AND STEADY: over sorted sources
--- alien to where it subscribes.  An outer value at `q` shows as a skip
+-- A FLATMAP SUBSCRIBED MERGES IN ORDER AND STEADY, ITS CUTS TRAILING
+-- IT: over sorted sources alien to where it subscribes.  An outer value at `q` shows as a skip
 -- just past `q`, its outer steady so nothing ties there; a lane's end
 -- at `c` with one queued shows a skip just past `c`, and no other lane,
 -- nor the outer, ties at `c`; what an ended part left shows when it is
@@ -3571,6 +3605,7 @@ ordered-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ :
 flat-calm : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) → (∀ a → Finite (f a)) → Finite s
           → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
           → Ordered (U.meaning (U.subscribe (flatMap op f s) p) ρ) × Steady (U.meaning (U.subscribe (flatMap op f s) p) ρ)
+            × Trailing (U.stateᴺ (U.subscribe (flatMap op f s) p) ρ)
 
 -- A SUBSCRIPTION OVER STEADY SOURCES IS STEADY: a joiner's skips for
 -- what it missed sit just past the join, which nothing it rekeys
@@ -3589,7 +3624,7 @@ steady-subᶠ (of xs) _ p ρ hp so cl = steady-of p 0 xs
 steady-subᶠ (map f s) (map-f fs) p ρ hp so cl = steady-map f _ (steady-subᶠ s fs p ρ hp so cl)
 steady-subᶠ (scan f z s) (scan-f fs) p ρ hp so cl = steady-scan f z _ (steady-subᶠ s fs p ρ hp so cl)
 steady-subᶠ (takeWhile i q s) (takeWhile-f fs) p ρ hp so cl = steady-take i q _ (steady-subᶠ s fs p ρ hp so cl)
-steady-subᶠ (flatMap op f s) (flatMap-f ff fs) p ρ hp so cl = proj₂ (flat-calm op f s ff fs p ρ hp so cl)
+steady-subᶠ (flatMap op f s) (flatMap-f ff fs) p ρ hp so cl = proj₁ (proj₂ (flat-calm op f s ff fs p ρ hp so cl))
 steady-subᶠ (connect s b) _ p ρ hp so cl = steady-connect s b p ρ hp so cl
 steady-subᶠ (connected i) _ p ρ hp so cl =
   steady-rejoin p _ (proj₁ (sorted-lookup ρ so i)) (proj₂ (sorted-lookup ρ so i)) (every-lookup (λ h → ¬ Owned p h) ρ cl i)
@@ -3604,7 +3639,7 @@ trailing-subᶠ (map f s) (map-f fs) p ρ hp so cl = trail-map f _ _ (trailing-s
 trailing-subᶠ (scan f z s) (scan-f fs) p ρ hp so cl = trail-scan f z _ _ (trailing-subᶠ s fs p ρ hp so cl)
 trailing-subᶠ (takeWhile i q s) (takeWhile-f fs) p ρ hp so cl =
   trail-take i q _ _ (ordered-subᶠ s fs p ρ hp so cl) (steady-subᶠ s fs p ρ hp so cl) (trailing-subᶠ s fs p ρ hp so cl)
-trailing-subᶠ (flatMap op f s) (flatMap-f ff fs) p ρ hp so cl = trail-flat op f s ff fs p ρ hp so cl
+trailing-subᶠ (flatMap op f s) (flatMap-f ff fs) p ρ hp so cl = proj₂ (proj₂ (flat-calm op f s ff fs p ρ hp so cl))
 trailing-subᶠ (connect s b) _ p ρ hp so cl = trail-connect s b p ρ hp so cl
 trailing-subᶠ (connected i) _ p ρ hp so cl = trail-rejoin p (lookup ρ i)
 trailing-subᶠ (defer l) (defer-f fl) p ρ hp so cl =
@@ -3613,7 +3648,7 @@ trailing-subᶠ (defer l) (defer-f fl) p ρ hp so cl =
 
 flat-calm {Γ} {A} {B} op f s ff fs p ρ hp so cl =
   O.ordered-go (flatOp op) (just E) [] [] idle O.[]ᴿ tt []ᴬ []ᴬ held (sortedT-idle , everyT-idle , everyT-idle , flatT-idle)
-  , calm-steady _ (O.calm-go (flatOp op) (just E) [] [] idle O.[]ᴿ tt []ᴬ []ᴬ held (sortedT-idle , everyT-idle , everyT-idle , flatT-idle))
+  , calm-steady _ (proj₂ c₀) , calm-trail _ _ (proj₁ c₀) (proj₂ c₀)
   where
     module O = FlatOrder p
     S = U.stateᴺ (U.subscribe s p) ρ
@@ -3641,6 +3676,7 @@ flat-calm {Γ} {A} {B} op f s ff fs p ρ hp so cl =
     held = O.outer (ordered-map F _ (ordered-subᶠ s fs p ρ hp so cl)) (steady-map F _ (steady-subᶠ s fs p ρ hp so cl))
              (trail-map F (force S) (cut S) (trailing-subᶠ s fs p ρ hp so cl)) (spread-map F _ (spread-sub s p ρ hp so cl))
              (every-map F _ (proj₁ ko)) (proj₂ ko) (O.spawn-map F _ gen)
+    c₀ = O.calm-at (flatOp op) (just E) [] [] idle O.[]ᴿ tt []ᴬ []ᴬ held (sortedT-idle , everyT-idle , everyT-idle , flatT-idle)
 
 ordered-subᶠ (cold c) _ p ρ hp so cl = subst Ordered (sym (U.start-meaning p (lower c) ρ)) (ordered-start p (lower c) hp)
 ordered-subᶠ empty _ p ρ hp so cl = record { ordered = tt }

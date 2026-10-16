@@ -186,14 +186,15 @@ by their own silent steps (`Mirror`).
   (`emit-run`, `sub-onward`, the `-onward` leaves). Ruled out: a
   per-frame label order read off `backAs`. If a frame's next event is
   invisible to the record, `under` stores its label in its frame.
-- **THE ORDER.** `trail-flat` first: a FlatOrder walk over `M.whole`,
-  each part's cut trailing its own next (`trailing-subᶠ` on the parts).
-  Decides whether the merge keeps parts' cuts trailing what it shows, or
-  `Trail` owes the walk more. Then `trail-take` (a cut left before a
-  failing value against the moved value and `last`), `trail-connect`,
-  `trail-defer`, `spread-sub`, `ordered-connect`, `steady-connect`.
-  Ruled out: a cold leaf's, a list's, a joiner's, a map's or a scan's
-  cut failing to trail (all proven; none leaves anything running).
+- **THE ORDER.** `trail-whole` first, then `flat-whole`: each state of
+  the calm walk, its invariants in hand, against `M.whole`. Decides
+  whether `Roots`, `Pool` and `Heldᴹ` carry enough for the merge's next
+  to lead every part's cut, or the walk's records owe a field. Then
+  `trail-take`, `trail-connect`, `trail-defer`, `spread-sub`,
+  `ordered-connect`, `steady-connect`. Ruled out: a cold leaf's, a
+  list's, a joiner's, a map's or a scan's cut failing to trail (none
+  leaves anything running), and the flatMap's owing more than each
+  state's `whole` (the calm walk carries it).
 - **THE STEPPER.** `step-skips` and `within-step` at the root: the
   ghost's meaning is what its step shows, skips included, now that a
   pool's and a rest's skips are the meaning's own. Ruled out: exact
@@ -212,9 +213,11 @@ by their own silent steps (`Mirror`).
 
 ### The ledger
 
-- **`trail-flat`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: what a flatMap's
-  outer and lanes would leave running, beside what ended parts left, trails
-  what the merge shows next.
+- **`trail-whole`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: what the merge
+  would leave running, the outer's, every lane's and the pool's, trails what it
+  shows next, over the calm walk's invariants.
+- **`flat-whole`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: no step of the
+  outer's cut, a lane's or the pool's inside a step of another's.
 - **`trail-connect`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a connect's
   source burst left running beside its body's cut trails what it shows next.
 - **`trail-take`** (Placed) — FALSITY, `NO EVIDENCE`, `X`: a takeWhile over an
