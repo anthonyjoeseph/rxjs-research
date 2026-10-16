@@ -236,7 +236,7 @@ module Ascending (R : Set) where
   ... | _ , lifts-scan lifts-here , Lρ | readRef≗ refl k =
     rises (then refl (proj₂ (proj₂ wr))) (one-lower ρ one-scan) (record
       { sane = sn ; placed = pl ; ctl = refl ; code = proj₁ (proj₂ wr) ; stack = sk
-      ; lifted = U.scanᶜ f z c′ , scan-part hp (fresh-path ρ fs) z pv , S , scan-lifts hp ρ fs z Lρ , sg
+      ; lifted = U.scanᶜ f z c′ , scan-part hp {f = f} {r = r} {u = u} (fresh-path ρ fs) z pv , S , scan-lifts hp ρ fs z Lρ , sg
       ; owned = scan-owned hp ρ fs z ow ; kernels = scan-kernels hp ρ fs z kn ; meaning = scan-meaning hp ρ fs z mn ; queue = scan-queue hp ρ fs z qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
       ; sorted = sorted-⇝ so (then refl (proj₂ (proj₂ wr))) ; behind = scan-behind ρ cl ; kept = inj₁ refl })
