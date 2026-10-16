@@ -21,7 +21,7 @@ open import Data.List using (List; []; _∷_; _++_; [_]; filterᵇ; upTo; length
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ; zero; suc; _+_; _≡ᵇ_; _<ᵇ_)
 
-open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; Pos; ix; sub; _<ᵖ_; tick; observe; root)
+open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; Pos; ix; sub; _<ᵖ_; tick; enter; root; Tail; Tail∞; pin; idle)
 open import denotation.Unfold using (⟦_⟧ˢ; [])
 open import operation.Machine using (module Machine)
 open import quickcheck.Code using (Prog; toObs; timeline)
@@ -108,12 +108,41 @@ private
   stepsᵇ : List Pos → Bool
   stepsᵇ ps = allᵇ (λ q → allᵇ (λ h → not (ownedᵇ (q ++ [ ix 0 ]) h)) ps) ps
 
+  -- What a cut leaves running trails the run: its steps in order, none
+  -- before a value or the end coming next, nor before a skip but the
+  -- one showing that very step just past it.
+  trailᵇ : Events ℕ → Pos → Bool
+  trailᵇ (out n _ _) k = not (k <ᵖ n)
+  trailᵇ (skip n _)  k = not (k <ᵖ n) ∨ samePos n (k ++ [ ix 0 ])
+  trailᵇ (end n)     k = n <ᵖ k
+  trailᵇ hush        k = true
+
+  pinsᵇ : ℕ → Tail → List Pos
+  pinsᵇ zero    _         = []
+  pinsᵇ (suc n) (pin k u) = k ∷ pinsᵇ n (Tail∞.later u)
+  pinsᵇ (suc n) idle      = []
+
+  sortedᵇ : List Pos → Bool
+  sortedᵇ (x ∷ y ∷ xs) = not (y <ᵖ x) ∧ sortedᵇ (y ∷ xs)
+  sortedᵇ _            = true
+
+  trailsᵇ : ℕ → Events∞ ℕ → Bool
+  trailsᵇ zero    r = true
+  trailsᵇ (suc n) r = sortedᵇ ks ∧ allᵇ (trailᵇ (Events∞.force r)) ks ∧ next (Events∞.force r)
+    where ks = pinsᵇ 12 (Events∞.cut r)
+          next : Events ℕ → Bool
+          next (out _ _ r′) = trailsᵇ n r′
+          next (skip _ r′)  = trailsᵇ n r′
+          next _            = true
+
 -- The machine's trace placed against the meaning, and the meaning rising,
--- steady and keying nothing just past its own events.
+-- steady and keying nothing just past its own events; and what a cut
+-- leaves running trailing it.
 placing : Prog natᵗ → Bool
-placing p = placedᵇ 40000 (trace (begin o)) e ∧ rising 4000 [] e ∧ steadyᵇ 4000 e ∧ stepsᵇ (positions 200 e)
+placing p = placedᵇ 40000 (trace (begin o)) e ∧ rising 4000 [] e ∧ steadyᵇ 4000 e ∧ stepsᵇ (positions 200 e) ∧ trailsᵇ 400 s
   where o = toObs timeline 3 p [] [] []
-        e = observe (⟦ o ⟧ˢ []) root
+        s = enter (⟦ o ⟧ˢ []) root
+        e = Events∞.force s
 
 -- The seeds from f on which the machine's trace strays from the meaning.
 placingFails : ℕ → ℕ → List ℕ
