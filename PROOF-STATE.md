@@ -184,7 +184,8 @@ by their own silent steps (`Mirror`).
   value rides the stack frame the value runs under, not the calls owed.
   An exclusive take's call is a read and a RESTAGE, the take's stage
   moved in the tree: node-local but for carrying the stack and agenda
-  across it (`end-stack`, `end-owned`). Remaining: `take-out`;
+  across it (`end-stack`, `end-owned`); an inclusive one's the same
+  restage under one `under` step (`out-owned`). Remaining:
   `climb-source`, `close-source` on a connect, restages by the same
   shape; `climb-outer`, `close-outer`, `climb-lanes`, `close-lanes` on a
   flatMap.
@@ -257,8 +258,13 @@ by their own silent steps (`Mirror`).
   sooner than the run with a take restaged `ending`.
 - **`end-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: the tree with a take
   restaged `ending` has a sane, placed part meaning what the ghost did.
-- **`take-out`** (Lift) — FALSITY, `NO EVIDENCE`: an inclusive take's failing
-  value climbs under `ix 0`, the take ending where the run is.
+- **`out-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds of the take
+  restaged `ending`, its completion owed in the frame its failing value
+  runs under.
+- **`out-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: `Queue` survives a take
+  restaged `ending`, the run gone under `ix 0`.
+- **`out-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
+  sooner than the run under `ix 0` with a take restaged `ending`.
 - **`emit-void`** (Lift) — FALSITY, `DEAD ROUTE`: an `of` the ghost does not
   hold emits to a guard that drops it, the ghost alike, a value fewer.
 - **`climb-lanes`** (Lift) — FALSITY, `NO EVIDENCE`: a lane's value climbs into
