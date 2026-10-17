@@ -439,15 +439,23 @@ module Framing (R : Set) where
   -- A WRITE AT A SCAN'S ACCUMULATOR, ITS NODE'S CLAUSES: the source's
   -- names apart from the accumulator, so its kernels and feeds read
   -- alike.
+  scan-holds : ∀ {h} (H : Heapᴹ h) {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → AllPairs _≢_ (names (scanˢ f r u))
+             → ∀ z {E o} → At.Holds H (scanˢ f r u) E o → At.Holds (store H r (lift z)) (scanˢ f r u) E o
+  scan-holds H {r = r} {u} (nr ∷ _) z = Heaps.holds-alike H (store H r (lift z)) u (λ j m → look-store H r j (lookupᴬ nr m))
+
+  scan-gated : ∀ {h} (H : Heapᴹ h) {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → AllPairs _≢_ (names (scanˢ f r u))
+             → ∀ z → At.Gated H (scanˢ f r u) → At.Gated (store H r (lift z)) (scanˢ f r u)
+  scan-gated H {r = r} {u} (nr ∷ _) z = Heaps.gated-alike H (store H r (lift z)) u (λ j m → look-store H r j (lookupᴬ nr m))
+
+  scan-spent : ∀ {h} (H : Heapᴹ h) {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → AllPairs _≢_ (names (scanˢ f r u))
+             → ∀ z → At.Spent H (scanˢ f r u) → At.Spent (store H r (lift z)) (scanˢ f r u)
+  scan-spent H {r = r} {u} (nr ∷ _) z = Heaps.spent-alike H (store H r (lift z)) u (λ j m → look-store H r j (lookupᴬ nr m))
+
+  scan-fed : ∀ {h} (H : Heapᴹ h) {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → AllPairs _≢_ (names (scanˢ f r u))
+           → ∀ z ν → At.Fed H (scanˢ f r u) ν → At.Fed (store H r (lift z)) (scanˢ f r u) ν
+  scan-fed H {r = r} {u} (nr ∷ _) z = Heaps.fed-alike H (store H r (lift z)) u (λ j m → look-store H r j (lookupᴬ nr m))
+
   postulate
-    scan-holds : ∀ {h} (H : Heapᴹ h) {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → AllPairs _≢_ (names (scanˢ f r u))
-               → ∀ z {E o} → At.Holds H (scanˢ f r u) E o → At.Holds (store H r (lift z)) (scanˢ f r u) E o
-    scan-gated : ∀ {h} (H : Heapᴹ h) {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → AllPairs _≢_ (names (scanˢ f r u))
-               → ∀ z → At.Gated H (scanˢ f r u) → At.Gated (store H r (lift z)) (scanˢ f r u)
-    scan-spent : ∀ {h} (H : Heapᴹ h) {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → AllPairs _≢_ (names (scanˢ f r u))
-               → ∀ z → At.Spent H (scanˢ f r u) → At.Spent (store H r (lift z)) (scanˢ f r u)
-    scan-fed   : ∀ {h} (H : Heapᴹ h) {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → AllPairs _≢_ (names (scanˢ f r u))
-               → ∀ z ν → At.Fed H (scanˢ f r u) ν → At.Fed (store H r (lift z)) (scanˢ f r u) ν
     scan-queue : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
                → ∀ {p clk ts} z → Queue H p clk ts T → Queue (store H r (lift z)) p clk ts T
 

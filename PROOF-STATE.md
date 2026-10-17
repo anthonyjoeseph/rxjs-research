@@ -409,14 +409,6 @@ by their own silent steps (`Mirror`).
   survives a write at its accumulator.
 - **`scan-owned`** (Frame) — FALSITY, `NO EVIDENCE`: `Owned` survives a write
   at a scan's accumulator.
-- **`scan-holds`** (Frame) — FALSITY, `NO EVIDENCE`: a scan's kernel reads its
-  accumulator nowhere.
-- **`scan-gated`** (Frame) — FALSITY, `NO EVIDENCE`: a scan's gate reads its
-  accumulator nowhere.
-- **`scan-fed`** (Frame) — FALSITY, `NO EVIDENCE`: a scan's feeds read its
-  accumulator nowhere.
-- **`scan-spent`** (Frame) — FALSITY, `NO EVIDENCE`: a scan's spent reads its
-  accumulator nowhere.
 - **`scan-queue`** (Frame) — FALSITY, `NO EVIDENCE`: `Queue` survives a write
   at a scan's accumulator.
 - **`src-idle`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's source signals
