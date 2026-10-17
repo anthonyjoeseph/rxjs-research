@@ -208,16 +208,27 @@ module Lifting (R : Set) where
               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
               → seen (Conf.heap (Mach.conf m)) π ≡ false → VoidSite cr π
 
-    -- At a pool: the pool's next event a pin under the run.  The pool
-    -- took the hidden part's rest, which shows the source's steps inside
-    -- its subscription as `burstingᶜ` pins, the next of them this value's.
-    pool-pin : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+    -- At a pool: the pool's own next event a pin under the run.  The
+    -- pool took the hidden part's rest, which shows the source's steps
+    -- inside its subscription as `burstingᶜ` pins, the next of them this
+    -- value's.
+    pl-pin : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
               → seen (Conf.heap (Mach.conf m)) π ≡ false
               → ∀ {Δ′ A′ B′ op f fl oc k r pl} {so : Sub (Conf.world (Mach.conf m)) Δ′ A′} {ls : List (Lane (Conf.world (Mach.conf m)) Δ′ B′)}
                   (ψ : Path (Carried.tree cr) (flatMapˢ op f fl oc k r pl so ls)) (σ : Path (flatMapˢ op f fl oc k r pl so ls) _) → ψ ⊕ σ ≡ π
               → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {c} → At.part (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl so ls) ≡ just c
-              → Σ Pos λ q → Σ (U.Node Δ′ B′) λ c′ → U.step c ≡ U.skipˢ q c′ × Under p q
+              → Σ Pos λ q → Σ (U.Node Δ′ B′) λ pl′ → U.step pl ≡ U.skipˢ q pl′ × Under p q
+
+    -- At a pool: that pin ahead of its outer and every lane it holds.
+    pool-ahead : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+              → seen (Conf.heap (Mach.conf m)) π ≡ false
+              → ∀ {Δ′ A′ B′ op f fl oc k r pl} {so : Sub (Conf.world (Mach.conf m)) Δ′ A′} {ls : List (Lane (Conf.world (Mach.conf m)) Δ′ B′)}
+                  (ψ : Path (Carried.tree cr) (flatMapˢ op f fl oc k r pl so ls)) (σ : Path (flatMapˢ op f fl oc k r pl so ls) _) → ψ ⊕ σ ≡ π
+              → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {c} → At.part (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl so ls) ≡ just c
+              → ∀ {q pl′} → U.step pl ≡ U.skipˢ q pl′ → Under p q
+              → U.aheadˢ q (U.outerOf (At.part (Conf.heap (Mach.conf m)) so)) (U.earliest (At.partLanes (Conf.heap (Mach.conf m)) ls)) ≡ true
 
     -- Over a hidden `of`, at a part the ghost holds: no sibling its path
     -- passes heads under the run, as at an `of` the ghost holds
@@ -768,6 +779,35 @@ module Lifting (R : Set) where
   run-at (noteAs _ _ _)      ()
   run-at (subAs _ _ _ _)     ()
   run-at (burstAs _ _ _)     ()
+
+  -- A held flatMap's part is its merge.
+  merged-just : ∀ {h H Δ A B} op (g : A → Pos → U.Node Δ B) o ls qs pl {c} → At.merged {h} H op g o ls qs pl ≡ just c → U.flatMapᶜ op g o ls qs pl ≡ c
+  merged-just op g nothing  []      []      pl ()
+  merged-just op g nothing  []      (_ ∷ _) pl refl = refl
+  merged-just op g nothing  (_ ∷ _) qs      pl refl = refl
+  merged-just op g (just _) ls      qs      pl refl = refl
+
+  -- A pool's skip ahead of all else: the flatMap's next event.
+  flat-skip : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) o ls qs p {q p′} → U.step p ≡ U.skipˢ q p′ → U.aheadˢ q o (U.earliest ls) ≡ true
+            → U.flatˢ op g o ls qs p (U.step p) (U.earliest ls) ≡ U.skipˢ q (U.flatMapᶜ op g (U.nodeᵒ o) ls qs p′)
+  flat-skip op g o ls qs p ep ah rewrite ep | ah = refl
+
+  -- At a pool: the flatMap's next event the pool's pin.
+  pool-pin : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+            → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+            → seen (Conf.heap (Mach.conf m)) π ≡ false
+            → ∀ {Δ′ A′ B′ op f fl oc k r pl} {so : Sub (Conf.world (Mach.conf m)) Δ′ A′} {ls : List (Lane (Conf.world (Mach.conf m)) Δ′ B′)}
+                (ψ : Path (Carried.tree cr) (flatMapˢ op f fl oc k r pl so ls)) (σ : Path (flatMapˢ op f fl oc k r pl so ls) _) → ψ ⊕ σ ≡ π
+            → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {c} → At.part (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl so ls) ≡ just c
+            → Σ Pos λ q → Σ (U.Node Δ′ B′) λ c′ → U.step c ≡ U.skipˢ q c′ × Under p q
+  pool-pin {m = m} cr π fc op sn {op = fo} {f = f} {fl = fl} {pl = pl} {so = so} {ls = ls} ψ σ e se {c} pt with pl-pin cr π fc op sn ψ σ e se pt
+  ... | q , pl′ , ep , un =
+    q , _ , trans (cong U.step (sym (merged-just {H = Conf.heap (Mach.conf m)} fo G O LS QS pl pt)))
+                  (flat-skip fo G (U.outerOf O) LS QS pl ep (pool-ahead cr π fc op sn ψ σ e se pt ep un)) , un
+    where G  = λ a j → U.subscribe (f a) j
+          O  = At.part (Conf.heap (Mach.conf m)) so
+          LS = At.partLanes (Conf.heap (Mach.conf m)) ls
+          QS = At.val (Conf.heap (Mach.conf m)) (FlatKit.Flat.queue fl)
 
   -- Over a hidden `of`, a held part's pin lifted through its ancestors,
   -- every sibling of which waits.

@@ -185,8 +185,8 @@ by their own silent steps (`Mirror`).
   out: the ghost alike past a hidden step. `emit-void` is a body over
   its site (`void-site`); at a pool the pin lifts through the ancestors
   by `lift-up`, from any held node, and the rest and `ending` sites
-  alike (`void-up`). Remaining: each site's pin (`pool-pin`,
-  `rest-pin`, `end-pin`) and landing, then `sub-defer` over the sites;
+  alike (`void-up`). Remaining: each site's pin (`pl-pin` and
+  `pool-ahead`, `rest-pin`, `end-pin`) and landing, then `sub-defer` over the sites;
   whether a part's last ghost rests to its leftover (`close-lingers`,
   `settle-lingers`).
 - **C. THE CALLBACK RELATION.** `Calling` is one record over the signal
@@ -359,8 +359,10 @@ by their own silent steps (`Mirror`).
 - **`void-site`** (Lift) — FALSITY, `DEAD ROUTE`: an `of` the ghost does not
   hold sits under a held pool, ended source's rest or `ending` take, or the
   root has no part.
-- **`pool-pin`** (Lift) — FALSITY, `NO EVIDENCE`: a held pool over a hidden
-  `of` steps next as a skip at a pin under the run.
+- **`pl-pin`** (Lift) — FALSITY, `NO EVIDENCE`: a held flatMap's pool over a
+  hidden `of` steps next as a skip at a pin under the run.
+- **`pool-ahead`** (Lift) — FALSITY, `NO EVIDENCE`: that pin is ahead of the
+  flatMap's outer and every lane it holds.
 - **`void-spread`** (Lift) — FALSITY, `NO EVIDENCE`: at any held part over a
   hidden `of`, no sibling its path passes heads under the run.
 - **`pool-land`** (Lift) — FALSITY, `NO EVIDENCE`: the pool's pin lifted is the
