@@ -23,7 +23,7 @@ open import Data.Product using (_×_; _,_; Σ)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import denotation.MonotonicList using (Events∞; Pos; Timeline; agree-refl; at; ix; _<ᵖ_; <ᵖ-trans; <ᵖ-asym; <ᵖ-below)
+open import denotation.MonotonicList using (Events∞; Pos; Timeline; Agree; skip⁼; inside; agree-refl; at; ix; _<ᵖ_; <ᵖ-trans; <ᵖ-asym; <ᵖ-below)
 import denotation.Unfold as U
 open import denotation.MonotonicList using () renaming (sub to subᴾ)
 open import adequacy.Sorted using (_≤ᵖ_; Under; module Sorting)
@@ -51,7 +51,7 @@ module Lifting (R : Set) where
   open Heap using (_⊑_)
   open Sorting R using (Beyond)
   open Run (Pureᴾ R) using (Act; module Kit; module FlatKit)
-  open Strongly R using (Strong; Carried; Books; carried; Sub; pendingˢ; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; emitC; kontC; Leaf; feedC; srcC; taking; taken; feeding; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _≗_; Each; Heads; Lingers; Meets; rootObs; seen; seenL) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
+  open Strongly R using (Strong; Carried; Books; carried; Sub; pendingˢ; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; emitC; kontC; Leaf; feedC; srcC; taking; taken; feeding; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _≗_; Each; Heads; Lingers; Ties; Tied; Meets; rootObs; seen; seenL) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (CtlAs; calmAs; noteAs; runAs; subAs; burstAs; bursts; agenda) renaming (Placed to Placedᴬ)
   open Moving R using (plant; true≢false)
   open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each)
@@ -197,6 +197,98 @@ module Lifting (R : Set) where
             → VoidSite cr π
     no-root : At.part (Conf.heap (Mach.conf m)) (Carried.tree cr) ≡ nothing → VoidSite cr π
 
+  -- Two steps alike as rests: the same pin, or none.
+  data Pinned {Γ} {B C : Set} : U.Step Γ B → U.Step Γ C → Set₁ where
+    pinned   : ∀ {k x y} → Pinned (U.skipˢ k x) (U.skipˢ k y)
+    unpinned : Pinned U.hushˢ U.hushˢ
+
+  pinned-trans : ∀ {Γ B C D} {a : U.Step Γ B} {b : U.Step Γ C} {c : U.Step Γ D} → Pinned a b → Pinned b c → Pinned a c
+  pinned-trans pinned   pinned   = pinned
+  pinned-trans unpinned unpinned = unpinned
+
+  pinned-skip : ∀ {Γ B C} {a : U.Step Γ B} {b : U.Step Γ C} {q y′} → Pinned a b → b ≡ U.skipˢ q y′ → Σ (U.Node Γ B) λ x′ → a ≡ U.skipˢ q x′
+  pinned-skip pinned refl = _ , refl
+
+  union-pinned : ∀ {Γ B C} {x y : U.Node Γ B} {sx sy} {x′ y′ : U.Node Γ C} {sx′ sy′}
+               → Pinned sx sx′ → Pinned sy sy′ → Pinned (U.unionˢ x sx y sy) (U.unionˢ x′ sx′ y′ sy′)
+  union-pinned (pinned {k}) (pinned {k′}) with k <ᵖ k′
+  ... | true  = pinned
+  ... | false = pinned
+  union-pinned pinned   unpinned = pinned
+  union-pinned unpinned q        = q
+
+  under-pinned : ∀ {Γ A D B C} (s : U.Source Γ A) (st : U.Step (A ∷ Γ) D) → Pinned (U.underˢ {B = B} s st) (U.underˢ {B = C} s st)
+  under-pinned s (U.skipˢ _ _)  = pinned
+  under-pinned s (U.outˢ _ _ _) = unpinned
+  under-pinned s (U.endˢ _)     = unpinned
+  under-pinned s U.hushˢ        = unpinned
+
+  -- A node's rest pins alike whatever it is read as.
+  mutual
+    rest-pinned : ∀ {Γ A B C} (c : U.Node Γ A) → Pinned (U.restˢ {B = B} c) (U.restˢ {B = C} c)
+    rest-pinned (U.framesᶜ _ _ _)               = unpinned
+    rest-pinned (U.burstᶜ _ _ _ _)              = unpinned
+    rest-pinned (U.ofᶜ _ _ _)                   = unpinned
+    rest-pinned (U.mapᶜ _ c)                    = rest-pinned c
+    rest-pinned (U.scanᶜ _ _ c)                 = rest-pinned c
+    rest-pinned (U.takeWhileᶜ _ _ c)            = rest-pinned c
+    rest-pinned (U.flatMapᶜ _ _ o ls _ p)       = union-pinned (restᴹ-pinned o) (union-pinned (rests-pinned ls) (rest-pinned p))
+    rest-pinned (U.joinᶜ _ _ _ _)               = unpinned
+    rest-pinned {A = A} (U.connectᶜ r b (U.live s))    = union-pinned (bursts-pinned r s (U.step s)) (under-pinned (U.live s) (U.restˢ {B = A} b))
+    rest-pinned {A = A} (U.connectᶜ r b (U.ended c t)) = union-pinned (bursts-pinned r t (U.step t)) (under-pinned (U.ended c t) (U.restˢ {B = A} b))
+    rest-pinned (U.deferᶜ _ _ _)                = unpinned
+    rest-pinned (U.endingᶜ _ n)                 = rest-pinned n
+    rest-pinned (U.restᶜ n)                     = rest-pinned n
+    rest-pinned U.idleᶜ                         = unpinned
+    rest-pinned (U.unionᶜ x y)                  = union-pinned (rest-pinned x) (rest-pinned y)
+    rest-pinned (U.burstingᶜ r t)               = bursts-pinned r t (U.step t)
+    rest-pinned (U.underᶜ {C = D} s b)          = under-pinned s (U.restˢ {B = D} b)
+
+    bursts-pinned : ∀ {Γ A B C} (r : Pos) (t : U.Node Γ A) (st : U.Step Γ A) → Pinned (U.burstsˢ {B = B} r t st) (U.burstsˢ {B = C} r t st)
+    bursts-pinned r t (U.outˢ k _ _) with inside r k
+    ... | true  = pinned
+    ... | false = rest-pinned t
+    bursts-pinned r t (U.skipˢ k _) with inside r k
+    ... | true  = pinned
+    ... | false = rest-pinned t
+    bursts-pinned r t (U.endˢ _) = rest-pinned t
+    bursts-pinned r t U.hushˢ    = rest-pinned t
+
+    restᴹ-pinned : ∀ {Γ A B C} (o : Maybe (U.Node Γ A)) → Pinned (U.restᴹ {B = B} o) (U.restᴹ {B = C} o)
+    restᴹ-pinned nothing  = unpinned
+    restᴹ-pinned (just o) = rest-pinned o
+
+    rests-pinned : ∀ {Γ A B C} (ls : List (U.Node Γ A)) → Pinned (U.restsˢ {B = B} ls) (U.restsˢ {B = C} ls)
+    rests-pinned []       = unpinned
+    rests-pinned (l ∷ ls) = union-pinned (rest-pinned l) (rests-pinned ls)
+
+  -- A rest's shape: it steps as it rests.
+  data Restful {Γ B} : U.Node Γ B → Set₁ where
+    rf-idle  : Restful U.idleᶜ
+    rf-rest  : ∀ {A} {n : U.Node Γ A} → Restful (U.restᶜ n)
+    rf-union : ∀ {x y} → Restful (U.unionᶜ x y)
+    rf-burst : ∀ {A r} {t : U.Node Γ A} → Restful (U.burstingᶜ r t)
+    rf-under : ∀ {A C} {s : U.Source Γ A} {b : U.Node (A ∷ Γ) C} → Restful (U.underᶜ s b)
+
+  restful-pinned : ∀ {Γ B} {c : U.Node Γ B} → Restful c → Pinned (U.step c) (U.restˢ {B = B} c)
+  restful-pinned rf-idle                    = unpinned
+  restful-pinned (rf-rest {n = n})          = rest-pinned n
+  restful-pinned (rf-union {x = x} {y})     = union-pinned (rest-pinned x) (rest-pinned y)
+  restful-pinned (rf-burst {r = r} {t = t}) = bursts-pinned r t (U.step t)
+  restful-pinned (rf-under {C = C} {s = s} {b = b}) = under-pinned s (U.restˢ {B = C} b)
+
+  -- Two rests tied: the one's next pin the other's.
+  tied-skip : ∀ {Γ A B} {x : U.Node Γ A} {y : U.Node Γ B} {q y′} → Tied x y → U.restˢ {B = ⊤} y ≡ U.skipˢ q y′
+            → Σ (U.Node Γ ⊤) λ x′ → U.restˢ {B = ⊤} x ≡ U.skipˢ q x′
+  tied-skip {x = x} {y = y} t e = shown-skip (U.restˢ {B = ⊤} x) (t 1) e
+    where
+      shown-skip : ∀ {Γ} (s : U.Step Γ ⊤) {s′ : U.Step Γ ⊤} {q y′} → Agree 1 (U.shown s) (U.shown s′) → s′ ≡ U.skipˢ q y′
+                 → Σ (U.Node Γ ⊤) λ x′ → s ≡ U.skipˢ q x′
+      shown-skip (U.skipˢ k x′) (skip⁼ _ _) refl = x′ , refl
+      shown-skip (U.outˢ _ _ _) ()          refl
+      shown-skip (U.endˢ _)     ()          refl
+      shown-skip U.hushˢ        ()          refl
+
   postulate
     -- Every hidden step has its site.
     -- DEAD ROUTE: the ghost past the burst's skip (`U.burstingᶜ`).  A
@@ -208,17 +300,23 @@ module Lifting (R : Set) where
               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
               → seen (Conf.heap (Mach.conf m)) π ≡ false → VoidSite cr π
 
-    -- At a pool: the pool's own next event a pin under the run.  The
-    -- pool took the hidden part's rest, which shows the source's steps
-    -- inside its subscription as `burstingᶜ` pins, the next of them this
-    -- value's.
-    pl-pin : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+    -- A flatMap's pool runs as its rests do: what it starts as, and
+    -- what it gathers and steps to, are rests.
+    pool-restful : ∀ {g m} (cr : Carried g m) {Δ′ A′ B′ op f fl oc k r pl} {so : Sub (Conf.world (Mach.conf m)) Δ′ A′}
+                     {ls : List (Lane (Conf.world (Mach.conf m)) Δ′ B′)}
+                 → Path (Carried.tree cr) (flatMapˢ op f fl oc k r pl so ls) → Restful pl
+
+    -- At a pool over a hidden `of`: what the flatMap's ended parts left
+    -- running pins next under the run.  The hidden part's rest shows the
+    -- source's steps inside its subscription as `burstingᶜ` pins, the
+    -- next of them this value's.
+    pooled-pin : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
               → seen (Conf.heap (Mach.conf m)) π ≡ false
               → ∀ {Δ′ A′ B′ op f fl oc k r pl} {so : Sub (Conf.world (Mach.conf m)) Δ′ A′} {ls : List (Lane (Conf.world (Mach.conf m)) Δ′ B′)}
                   (ψ : Path (Carried.tree cr) (flatMapˢ op f fl oc k r pl so ls)) (σ : Path (flatMapˢ op f fl oc k r pl so ls) _) → ψ ⊕ σ ≡ π
               → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {c} → At.part (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl so ls) ≡ just c
-              → Σ Pos λ q → Σ (U.Node Δ′ B′) λ pl′ → U.step pl ≡ U.skipˢ q pl′ × Under p q
+              → Σ Pos λ q → Σ (U.Node Δ′ ⊤) λ y′ → U.restˢ {B = ⊤} (At.pooled (Conf.heap (Mach.conf m)) fl so ls) ≡ U.skipˢ q y′ × Under p q
 
     -- At a pool over a hidden `of`: neither the flatMap's outer nor any
     -- lane it holds heads under the run, as no sibling along its path
@@ -780,6 +878,20 @@ module Lifting (R : Set) where
   run-at (noteAs _ _ _)      ()
   run-at (subAs _ _ _ _)     ()
   run-at (burstAs _ _ _)     ()
+
+  -- At a pool over a hidden `of`: the pool's own next event a pin under
+  -- the run, as it is tied to what its ended parts left running.
+  pl-pin : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+            → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+            → seen (Conf.heap (Mach.conf m)) π ≡ false
+            → ∀ {Δ′ A′ B′ op f fl oc k r pl} {so : Sub (Conf.world (Mach.conf m)) Δ′ A′} {ls : List (Lane (Conf.world (Mach.conf m)) Δ′ B′)}
+                (ψ : Path (Carried.tree cr) (flatMapˢ op f fl oc k r pl so ls)) (σ : Path (flatMapˢ op f fl oc k r pl so ls) _) → ψ ⊕ σ ≡ π
+            → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {c} → At.part (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl so ls) ≡ just c
+            → Σ Pos λ q → Σ (U.Node Δ′ B′) λ pl′ → U.step pl ≡ U.skipˢ q pl′ × Under p q
+  pl-pin {m = m} cr π fc op sn {fl = fl} {pl = pl} {so = so} {ls = ls} ψ σ e se pt with pooled-pin cr π fc op sn ψ σ e se pt
+  ... | q , y′ , ey , u with tied-skip {x = pl} {y = At.pooled (Conf.heap (Mach.conf m)) fl so ls} (Ties.pools (Lingers.rooted (Carried.lingers cr)) ψ se pt) ey
+  ... | _ , ex with pinned-skip (pinned-trans (restful-pinned (pool-restful cr ψ)) (rest-pinned pl)) ex
+  ... | pl′ , es = q , pl′ , es , u
 
   -- A held flatMap's part is its merge.
   merged-just : ∀ {h H Δ A B} op (g : A → Pos → U.Node Δ B) o ls qs pl {c} → At.merged {h} H op g o ls qs pl ≡ just c → U.flatMapᶜ op g o ls qs pl ≡ c
