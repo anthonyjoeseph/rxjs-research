@@ -1130,7 +1130,7 @@ module Ascending (R : Set) where
       fr-meaning : Meaning H T → Meaning H′ T
       fr-queue   : ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
       fr-behind  : ∀ {q} → Each H (Heads q) T → Each H′ (Heads q) T
-      fr-opened  : ∀ b → opened H′ b ρ ≡ opened H b ρ
+      fr-opened  : ∀ b → opened (freed H (laneOf o) fl) b ρ ≡ opened H b ρ
 
   -- A FLATMAP'S QUEUE WRITTEN: its own cell, read by its node alone;
   -- its children's parts and everything above it as they were.
@@ -1141,7 +1141,7 @@ module Ascending (R : Set) where
     postulate
       dq-part    : At.part H′ t ≡ At.part H t
       dq-lanes   : At.partLanes H′ ls ≡ At.partLanes H ls
-      dq-opened  : ∀ b → opened H′ b ρ ≡ opened H b ρ
+      dq-opened  : ∀ b → opened (store H (FlatKit.Flat.queue fl) (lift ys)) b ρ ≡ opened H b ρ
       dq-lifts   : ∀ {s S} → Lifts H ρ s S → Lifts H′ ρ s S
       dq-owned   : ∀ {p ctl bs} {ca : CtlAs T p ctl bs} → Owned H T ca → Owned H′ T ca
       dq-kernels : Kernels H T → Kernels H′ T
