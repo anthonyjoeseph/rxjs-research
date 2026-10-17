@@ -456,6 +456,63 @@ module Locality (R : Set) where
           agS = keeps off (lanes-path π) (apart-r (names s) P)
           lc = keep off (λ m → ++⁺ʳ (quietName k) (++⁺ʳ (names s) (lanes-path π m))) (Kit.live c) (apart-r (cutNames c) ps (here refl))
 
+    ----------------------------------------------------------------------
+    -- FED
+
+    mutual
+      fed-alike : ∀ {Δ A} (u : Sub h Δ A) → Alike H H′ (names u) → ∀ ν → At.Fed H u ν → At.Fed H′ u ν
+      fed-alike (pendingˢ s q)  ag ν fd = fd
+      fed-alike (coldˢ s hd ph) ag ν fd = fd
+      fed-alike (ofˢ p i xs)    ag ν fd = fd
+      fed-alike doneˢ           ag ν fd = fd
+      fed-alike (mapˢ f s)      ag ν fd = fed-alike s ag ν fd
+      fed-alike (scanˢ f r s)   ag ν fd = fed-alike s (λ j m → ag j (there m)) ν fd
+      fed-alike (takeWhileˢ i p c k tk s) ag ν fd = fed-alike s (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) m))) ν fd
+      fed-alike (flatMapˢ op f fl oc k r pl so ls) ag ν (f₁ , f₂) =
+        fed-alike so (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ m)))))) ν f₁
+        , fedL-alike ls (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) m)))))) ν f₂
+      fed-alike (connectˢ S c b kb k fd rp e rt src bd) ag ν (f₁ , f₂) =
+        fed-alike src (λ j m → ag j (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m))))))) ν f₁
+        , fed-alike bd (λ j m → ag j (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names src) m))))))) _ f₂
+      fed-alike (joinˢ j sk l x st) ag ν (lift g) = lift (λ e → g (trans (cong lower (sym (ag l (there (here refl))))) e))
+      fed-alike (deferˢ k s) ag ν fd = fed-alike s (λ j m → ag j (++⁺ʳ (quietName k) m)) ν fd
+
+      fedL-alike : ∀ {Δ B} (ls : List (Lane h Δ B)) → Alike H H′ (laneNames ls) → ∀ ν → At.FedLanes H ls ν → At.FedLanes H′ ls ν
+      fedL-alike []                ag ν fl = fl
+      fedL-alike (lane c k s ∷ ls) ag ν (f₁ , f₂) =
+        fed-alike s (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ˡ m)))) ν f₁
+        , fedL-alike ls (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ʳ (names s) m)))) ν f₂
+
+    mutual
+      fed-path : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) → AllPairs _≢_ (names t) → Off H H′ (names u)
+               → (∀ ν → At.Fed H u ν → At.Fed H′ u ν) → ∀ ν → At.Fed H t ν → At.Fed H′ t ν
+      fed-path here        ps       off hv ν fd = hv ν fd
+      fed-path (in-map π)  ps       off hv ν fd = fed-path π ps off hv ν fd
+      fed-path (in-scan π) (_ ∷ ps) off hv ν fd = fed-path π ps off hv ν fd
+      fed-path (in-take {c = c} {k} π) ps off hv ν fd = fed-path π (pairs-r (quietName k) (pairs-r (cutNames c) ps)) off hv ν fd
+      fed-path (in-outer {fl = fl} {oc} {k} {r} {t = so} {ls} π) ps off hv ν (f₁ , f₂) =
+        fed-path π (proj₁ (pairs-split (names so) P)) off hv ν f₁ , fedL-alike ls (keeps off (names-path π) (apart-l (names so) P)) ν f₂
+        where P = pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps)))
+      fed-path (in-lanes {fl = fl} {oc} {k} {r} {t = so} {ls} π) ps off hv ν (f₁ , f₂) =
+        fed-alike so (keeps off (lanes-path π) (apart-r (names so) P)) ν f₁ , fedL-path π (pairs-r (names so) P) off hv ν f₂
+        where P = pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps)))
+      fed-path (in-source {S = S} {c} {b} {kb} {k} {t = src} {bd} π) ps off hv ν (f₁ , f₂) =
+        fed-path π (proj₁ (pairs-split (names src) Q₄)) off hv ν f₁ , fed-alike bd (keeps off (names-path π) (apart-l (names src) Q₄)) _ f₂
+        where Q₄ = pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) ps))))
+      fed-path (in-body {S = S} {c} {b} {kb} {k} {t = src} {bd} π) ps off hv ν (f₁ , f₂) =
+        fed-alike src (keeps off (names-path π) (apart-r (names src) Q₄)) ν f₁ , fed-path π (pairs-r (names src) Q₄) off hv _ f₂
+        where Q₄ = pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) ps))))
+      fed-path (in-defer {k = k} π) ps off hv ν fd = fed-path π (pairs-r (quietName k) ps) off hv ν fd
+
+      fedL-path : ∀ {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) → AllPairs _≢_ (laneNames ls) → Off H H′ (names u)
+                → (∀ ν → At.Fed H u ν → At.Fed H′ u ν) → ∀ ν → At.FedLanes H ls ν → At.FedLanes H′ ls ν
+      fedL-path (this-lane {c = c} {k} {t = s} {ls} π) ps off hv ν (f₁ , f₂) =
+        fed-path π (proj₁ (pairs-split (names s) P)) off hv ν f₁ , fedL-alike ls (keeps off (names-path π) (apart-l (names s) P)) ν f₂
+        where P = pairs-r (quietName k) (pairs-r (cutNames c) ps)
+      fedL-path (next-lane {l = lane c k s} π) ps off hv ν (f₁ , f₂) =
+        fed-alike s (keeps off (lanes-path π) (apart-r (names s) P)) ν f₁ , fedL-path π (pairs-r (names s) P) off hv ν f₂
+        where P = pairs-r (quietName k) (pairs-r (cutNames c) ps)
+
   ----------------------------------------------------------------------
   -- AN UNSUBSCRIBE, AT ITS OWN NODE: what it leaves of the kernel, the
   -- spent and the gates of the subscription it tears.  Elsewhere `Off`

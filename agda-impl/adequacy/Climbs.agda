@@ -70,7 +70,7 @@ module Ascending (R : Set) where
   open Lifting R using (sub-onward; emit-shut; emit-void; emit-run; spread-past; behind-fire; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
   open Locality R using (stored-at)
   open Growing R using (wkTree; wkLanes; wkPath)
-  open Framing R using (scan-part; scan-owned; scan-kernels; scan-meaning; scan-queue; scan-lifts; scan-behind)
+  open Framing R using (scan-part; scan-owned; scan-kernels; scan-meaning; scan-queue; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++)
   open Read
 
   handleOf : ∀ {h} {t : Sub h [] R} → Spot t → Maybe (Handle h)
@@ -376,9 +376,6 @@ module Ascending (R : Set) where
       end-ticked  : ∀ {w p′ bs} {ϑ : w ⊑ h} {K : Stack w ⊤} n (sk : StackAs T p′ ϑ K bs) → Ticked T n sk → Ticked T′ n (end-stack sk)
       end-owned   : ∀ {w bs} {ϑ : w ⊑ h} {K : Stack w ⊤} {act} (sk : StackAs T q ϑ K bs) (e : act ≗ ⟦ take1C (planted ρ v) ∷ [] ⟧ᶜ)
               → At.val H (Kit.live c) ≡ true → Owned H T (runAs [] (≗-refl _) sk) → Owned H T′ (runAs (take1C (planted ρ v) ∷ []) e (end-stack sk))
-      end-kernels : Kernels H T → Kernels H T′
-      end-meaning : Meaning H T → Meaning H T′
-      end-queue   : ∀ {clk ts} → Queue H q clk ts T → Queue H q clk ts T′
       end-behind  : Each H (Heads q) T → Each H (Heads q) T′
       out-owned   : ∀ {w bs} {ϑ : w ⊑ h} {K : Stack w ⊤} {N : Act h ⊤} (sk : StackAs T q ϑ K bs) (e : wkAct same⊑ N ≗ ⟦ take1C (planted ρ v) ∷ [] ⟧ᶜ)
               → At.val H (Kit.live c) ≡ true → Owned H T (runAs [] (≗-refl _) sk)
@@ -388,6 +385,19 @@ module Ascending (R : Set) where
       end-ghost : ∀ {g S} → Sane [] g → Placed g [] → At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′
               → Lifts H ρ (U.endˢ (q ++ [ last ])) S → U.step g ≡ S
               → Σ (U.Node [] R) λ g″ → At.part H T′ ≡ just g″ × Sane [] g″ × Placed g″ [] × (∀ n → Agree n (residual g) (residual g″))
+
+    -- The take's stage read by its part alone: no kernel, feed or queue
+    -- clause moves.
+    end-kernels : Kernels H T → Kernels H T′
+    end-kernels kn = record { holds   = holds-plant H {t = T} ρ v refl (λ hs → hs) (Kernels.holds kn)
+                            ; gated   = gated-plant H {t = T} ρ v (λ g → g) (λ d → d) (Kernels.gated kn)
+                            ; settled = settled-plant {t = T} ρ v (λ ow → ow) (λ st → st) (Kernels.settled kn) }
+
+    end-meaning : Meaning H T → Meaning H T′
+    end-meaning mn = record { fed = fed-plant H {t = T} ρ v (λ _ fd → fd) _ (Meaning.fed mn) }
+
+    end-queue : ∀ {clk ts} → Queue H q clk ts T → Queue H q clk ts T′
+    end-queue = plant-queue H ρ v refl refl (λ _ → refl)
 
   -- A value an exclusive takeWhile fails on: its guard read, the take
   -- ended, its completion the agenda's call.
@@ -625,10 +635,20 @@ module Ascending (R : Set) where
       pool-owned   : ∀ {w q bs} {ϑ : w ⊑ h} {K : Stack w ⊤} {act} (sk : StackAs T q ϑ K bs) (ks : List (Call T))
                      (e : act ≗ ⟦ proj₁ (pool-calls ks) ⟧ᶜ)
                    → Owned H T (runAs ks (≗-refl _) sk) → Owned H T′ (runAs (proj₁ (pool-calls ks)) e (pool-stack sk))
-      pool-kernels : Kernels H T → Kernels H T′
-      pool-meaning : Meaning H T → Meaning H T′
-      pool-queue   : ∀ {q clk ts} → Queue H q clk ts T → Queue H q clk ts T′
       pool-behind  : ∀ {q} → Each H (Heads q) T → Each H (Heads q) T′
+
+    -- The pool read by its part alone: no kernel, feed or queue clause
+    -- moves.
+    pool-kernels : Kernels H T → Kernels H T′
+    pool-kernels kn = record { holds   = holds-plant H {t = T} ρ v refl (λ hs → hs) (Kernels.holds kn)
+                             ; gated   = gated-plant H {t = T} ρ v (λ g → g) (λ d → d) (Kernels.gated kn)
+                             ; settled = settled-plant {t = T} ρ v (λ ow → ow) (λ st → st) (Kernels.settled kn) }
+
+    pool-meaning : Meaning H T → Meaning H T′
+    pool-meaning mn = record { fed = fed-plant H {t = T} ρ v (λ _ fd → fd) _ (Meaning.fed mn) }
+
+    pool-queue : ∀ {q clk ts} → Queue H q clk ts T → Queue H q clk ts T′
+    pool-queue = plant-queue H ρ v refl refl (λ _ → refl)
 
   -- A FLATMAP'S OUTER ENDED: its done flag written, nothing else of the
   -- heap or the tree moved; settled, the count read as the live lanes.
@@ -645,11 +665,33 @@ module Ascending (R : Set) where
       sd-part      : ∀ {Δ′ A′} (v : Sub h Δ′ A′) → At.part H′ v ≡ At.part H v
       sd-lifts     : ∀ {Δ′ A′ Δ″ A″} {t : Sub h Δ′ A′} {v : Sub h Δ″ A″} {σ : Path t v} {s S} → Lifts H σ s S → Lifts H′ σ s S
       sd-owned     : ∀ {p ctl bs} {ca : CtlAs T p ctl bs} → Owned H T ca → Owned H′ T ca
-      sd-kernels   : Kernels H T → Kernels H′ T
-      sd-meaning   : Meaning H T → Meaning H′ T
-      sd-queue     : ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
-      sd-behind    : ∀ {q} → Each H (Heads q) T → Each H′ (Heads q) T
       active-lanes : Kernels H T → (At.val H (FlatKit.Flat.active fl) ≡ᵇ 0) ≡ null (At.partLanes H ls)
+
+    -- The done flag the flatMap's own cell: its node's clauses read
+    -- alike, the rest of the tree by the frame.
+    w₀ = flatMapˢ op f fl oc k r pl u ls
+
+    ns : List (Name h)
+    ns = (_ , FlatKit.Flat.outerDone fl) ∷ []
+
+    mine : All (_∈ᴸ names w₀) ns
+    mine = there (here refl) ∷ []
+
+    module Wr (fs : AllPairs _≢_ (names T)) = Wrote H H′ ρ (off-store H (FlatKit.Flat.outerDone fl)) mine fs
+
+    postulate
+      sd-holds : AllPairs _≢_ (names w₀) → ∀ {E o} → At.Holds H w₀ E o → At.Holds H′ w₀ E o
+      sd-gated : AllPairs _≢_ (names w₀) → At.Gated H w₀ → At.Gated H′ w₀
+      sd-spent : AllPairs _≢_ (names w₀) → At.Spent H w₀ → At.Spent H′ w₀
+      sd-fed   : AllPairs _≢_ (names w₀) → ∀ ν → At.Fed H w₀ ν → At.Fed H′ w₀ ν
+      sd-queue : ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
+      sd-behind : ∀ {q} → Each H (Heads q) T → Each H′ (Heads q) T
+
+    sd-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels H′ T
+    sd-kernels fs = Wr.wr-kernels fs (λ {E} {o} → sd-holds (fresh-path ρ fs) {E} {o}) (sd-gated (fresh-path ρ fs)) (sd-spent (fresh-path ρ fs))
+
+    sd-meaning : AllPairs _≢_ (names T) → Meaning H T → Meaning H′ T
+    sd-meaning fs = Wr.wr-meaning fs (sd-fed (fresh-path ρ fs))
 
     settle-eq : Kernels H T → ((At.val H′ (FlatKit.Flat.active fl) ≡ᵇ 0) ∧ null (At.val H′ (FlatKit.Flat.queue fl)))
                               ≡ (null (At.partLanes H ls) ∧ null (At.val H (FlatKit.Flat.queue fl)))
@@ -708,7 +750,7 @@ module Ascending (R : Set) where
       ; lifted = trans (Settles.sd-part hp ρ (flatMapˢ op f fl oc k r po u ls)) (flat-gone hp {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} gn (proj₁ nl) (proj₂ nl)) , S
                , Settles.sd-lifts hp ρ (subst₂ (λ ls′ qs′ → Lifts hp ρ (U.outerˢ op (λ a j → U.subscribe (f a) j) o₀ (U.endˢ q) ls′ qs′ po) S)
                                                (proj₁ nl) (proj₂ nl) Lρ) , sg
-      ; owned = Settles.sd-owned hp ρ ow ; kernels = Settles.sd-kernels hp ρ kn ; meaning = Settles.sd-meaning hp ρ mn
+      ; owned = Settles.sd-owned hp ρ ow ; kernels = Settles.sd-kernels hp ρ fs kn ; meaning = Settles.sd-meaning hp ρ fs mn
       ; queue = Settles.sd-queue hp ρ qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
       ; sorted = sorted-⇝ so path ; behind = Settles.sd-behind hp ρ bh ; kept = inj₁ refl }))
     where
@@ -728,8 +770,8 @@ module Ascending (R : Set) where
         ; ctlAs = runAs (proj₁ (Restaged.pool-calls (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) ks)) ec (Restaged.pool-stack (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) sk)
         ; meets = pg
         ; owned = Restaged.pool-owned (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) sk ks ec (Settles.sd-owned hp ρ ow)
-        ; kernels = Restaged.pool-kernels (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) (Settles.sd-kernels hp ρ kn)
-        ; meaning = Restaged.pool-meaning (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) (Settles.sd-meaning hp ρ mn)
+        ; kernels = Restaged.pool-kernels (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) (Settles.sd-kernels hp ρ fs kn)
+        ; meaning = Restaged.pool-meaning (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) (Settles.sd-meaning hp ρ fs mn)
         ; queue = Restaged.pool-queue (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) (Settles.sd-queue hp ρ qu)
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs
                          ; clocked = proj₁ ck , Restaged.pool-ticked (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
@@ -1227,11 +1269,34 @@ module Ascending (R : Set) where
       fr-lanes   : ∀ {s bs S as} → LiftsLane H πL s bs S as → At.part H u ≡ nothing → At.partLanes H′ ls ≡ bs ++ as
       fr-lifts   : ∀ {s S} → Lifts H ρ s S → Lifts H′ ρ s S
       fr-owned   : ∀ {p ctl bs} {ca : CtlAs T p ctl bs} → Owned H T ca → Owned H′ T ca
-      fr-kernels : Kernels H T → Kernels H′ T
-      fr-meaning : Meaning H T → Meaning H′ T
-      fr-queue   : ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
       fr-behind  : ∀ {q} → Each H (Heads q) T → Each H′ (Heads q) T
       fr-opened  : ∀ b → opened (freed H (laneOf o) fl) b ρ ≡ opened H b ρ
+
+    -- The lane's cut and the count the flatMap's own cells: its node's
+    -- clauses read the count down with the lane gone, the rest of the
+    -- tree by the frame.
+    w₀ = flatMapˢ op f fl oc k r pl t ls
+
+    ns : List (Name h)
+    ns = (_ , Kit.live (laneOf o)) ∷ (_ , FlatKit.Flat.active fl) ∷ []
+
+    postulate
+      fr-mine  : All (_∈ᴸ names w₀) ns
+      fr-holds : AllPairs _≢_ (names w₀) → ∀ {E o} → At.Holds H w₀ E o → At.Holds H′ w₀ E o
+      fr-gated : AllPairs _≢_ (names w₀) → At.Gated H w₀ → At.Gated H′ w₀
+      fr-spent : AllPairs _≢_ (names w₀) → At.Spent H w₀ → At.Spent H′ w₀
+      fr-fed   : AllPairs _≢_ (names w₀) → ∀ ν → At.Fed H w₀ ν → At.Fed H′ w₀ ν
+      fr-queue : ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
+
+    module Wr (fs : AllPairs _≢_ (names T)) =
+      Wrote H H′ ρ (off-++ ((_ , Kit.live (laneOf o)) ∷ []) (off-store H (Kit.live (laneOf o))) (off-store (unlive H (laneOf o)) (FlatKit.Flat.active fl)))
+            fr-mine fs
+
+    fr-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels H′ T
+    fr-kernels fs = Wr.wr-kernels fs (λ {E} {o} → fr-holds (fresh-path ρ fs) {E} {o}) (fr-gated (fresh-path ρ fs)) (fr-spent (fresh-path ρ fs))
+
+    fr-meaning : AllPairs _≢_ (names T) → Meaning H T → Meaning H′ T
+    fr-meaning fs = Wr.wr-meaning fs (fr-fed (fresh-path ρ fs))
 
   -- A FLATMAP'S QUEUE WRITTEN: its own cell, read by its node alone;
   -- its children's parts and everything above it as they were.
@@ -1245,10 +1310,32 @@ module Ascending (R : Set) where
       dq-opened  : ∀ b → opened (store H (FlatKit.Flat.queue fl) (lift ys)) b ρ ≡ opened H b ρ
       dq-lifts   : ∀ {s S} → Lifts H ρ s S → Lifts H′ ρ s S
       dq-owned   : ∀ {p ctl bs} {ca : CtlAs T p ctl bs} → Owned H T ca → Owned H′ T ca
-      dq-kernels : Kernels H T → Kernels H′ T
-      dq-meaning : Meaning H T → Meaning H′ T
-      dq-queue   : ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
       dq-behind  : ∀ {q} → Each H (Heads q) T → Each H′ (Heads q) T
+
+    -- The queue the flatMap's own cell: its node's clauses read alike,
+    -- the rest of the tree by the frame.
+    w₀ = flatMapˢ op f fl oc k r pl t ls
+
+    ns : List (Name h)
+    ns = (_ , FlatKit.Flat.queue fl) ∷ []
+
+    mine : All (_∈ᴸ names w₀) ns
+    mine = there (there (here refl)) ∷ []
+
+    module Wr (fs : AllPairs _≢_ (names T)) = Wrote H H′ ρ (off-store H (FlatKit.Flat.queue fl)) mine fs
+
+    postulate
+      dq-holds : AllPairs _≢_ (names w₀) → ∀ {E o} → At.Holds H w₀ E o → At.Holds H′ w₀ E o
+      dq-gated : AllPairs _≢_ (names w₀) → At.Gated H w₀ → At.Gated H′ w₀
+      dq-spent : AllPairs _≢_ (names w₀) → At.Spent H w₀ → At.Spent H′ w₀
+      dq-fed   : AllPairs _≢_ (names w₀) → ∀ ν → At.Fed H w₀ ν → At.Fed H′ w₀ ν
+      dq-queue : ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
+
+    dq-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels H′ T
+    dq-kernels fs = Wr.wr-kernels fs (λ {E} {o} → dq-holds (fresh-path ρ fs) {E} {o}) (dq-gated (fresh-path ρ fs)) (dq-spent (fresh-path ρ fs))
+
+    dq-meaning : AllPairs _≢_ (names T) → Meaning H T → Meaning H′ T
+    dq-meaning fs = Wr.wr-meaning fs (dq-fed (fresh-path ρ fs))
 
   -- The machine at a new heap running a callback, the call's rest owed
   -- past it.
@@ -1362,7 +1449,7 @@ module Ascending (R : Set) where
                                               (subst (λ S′ → Lifts hp ρ (U.laneˢ op G (At.part hp t) bs′ l S′ as′ (At.val hp (FlatKit.Flat.queue fl)) po) S)
                                                      (lane-step o LL) Lρ)) , sg
       ; owned = owned-move H₂ (runAs [] (≗-refl _) stk) refl refl refl (Freed.fr-owned hp ρ o ow)
-      ; kernels = Freed.fr-kernels hp ρ o kn ; meaning = Freed.fr-meaning hp ρ o mn ; queue = Freed.fr-queue hp ρ o qu
+      ; kernels = Freed.fr-kernels hp ρ o fs kn ; meaning = Freed.fr-meaning hp ρ o fs mn ; queue = Freed.fr-queue hp ρ o qu
       ; books = record { fresh = fs ; clocked = proj₁ ck , proj₁ ck , proj₂ ck ; paidUp = pu ; running = rn }
       ; sorted = sorted-⇝ so path ; behind = Freed.fr-behind hp ρ o bh ; kept = inj₁ refl }))
     where
@@ -1387,8 +1474,8 @@ module Ascending (R : Set) where
         ; ctlAs = runAs (proj₁ (Restaged.pool-calls H₂ ρ pl′ [])) ec (Restaged.pool-stack H₂ ρ pl′ stk)
         ; meets = pg
         ; owned = Restaged.pool-owned H₂ ρ pl′ stk [] ec (owned-move H₂ (runAs [] (≗-refl _) stk) refl refl refl (Freed.fr-owned hp ρ o ow))
-        ; kernels = Restaged.pool-kernels H₂ ρ pl′ (Freed.fr-kernels hp ρ o kn)
-        ; meaning = Restaged.pool-meaning H₂ ρ pl′ (Freed.fr-meaning hp ρ o mn)
+        ; kernels = Restaged.pool-kernels H₂ ρ pl′ (Freed.fr-kernels hp ρ o fs kn)
+        ; meaning = Restaged.pool-meaning H₂ ρ pl′ (Freed.fr-meaning hp ρ o fs mn)
         ; queue = Restaged.pool-queue H₂ ρ pl′ (Freed.fr-queue hp ρ o qu)
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs
                          ; clocked = proj₁ ck , Restaged.pool-ticked H₂ ρ pl′ clk stk (proj₁ ck , proj₂ ck) ; paidUp = pu ; running = rn }
@@ -1427,8 +1514,8 @@ module Ascending (R : Set) where
       ; stack = stk
       ; lifted = S , L₇ , sg
       ; owned = Dequeued.dq-owned H₂ ρ ys (owned-move H₂ (runAs [] (≗-refl _) stk) refl refl refl (Freed.fr-owned hp ρ o ow))
-      ; kernels = Dequeued.dq-kernels H₂ ρ ys (Freed.fr-kernels hp ρ o kn)
-      ; meaning = Dequeued.dq-meaning H₂ ρ ys (Freed.fr-meaning hp ρ o mn)
+      ; kernels = Dequeued.dq-kernels H₂ ρ ys fs (Freed.fr-kernels hp ρ o fs kn)
+      ; meaning = Dequeued.dq-meaning H₂ ρ ys fs (Freed.fr-meaning hp ρ o fs mn)
       ; queue = Dequeued.dq-queue H₂ ρ ys (Freed.fr-queue hp ρ o qu)
       ; books = record { fresh = fs ; clocked = proj₁ ck , proj₁ ck , proj₂ ck ; paidUp = pu ; running = rn }
       ; sorted = sorted-⇝ so (⇝-trans p p′) ; behind = Dequeued.dq-behind H₂ ρ ys (Freed.fr-behind hp ρ o bh) }))
@@ -1517,14 +1604,29 @@ module Ascending (R : Set) where
       fed-ticked  : ∀ {w p′ bs} {ϑ : w ⊑ h} {K : Stack w ⊤} n (sk : StackAs T p′ ϑ K bs) → Ticked T n sk → Ticked T′ n (fed-stack sk)
       fed-owned   : ∀ {w bs} {ϑ : w ⊑ h} {K : Stack w ⊤} {act} (sk : StackAs T q ϑ K bs) (e : act ≗ ⟦ feedC (planted ρ v) ∷ [] ⟧ᶜ)
               → Owned H T (runAs [] (≗-refl _) sk) → Owned H T′ (runAs (feedC (planted ρ v) ∷ []) e (fed-stack sk))
-      fed-kernels : Kernels H T → Kernels H T′
-      fed-meaning : Meaning H T → Meaning H T′
-      fed-queue   : ∀ {clk ts} → Queue H q clk ts T → Queue H q clk ts T′
-      fed-behind  : Each H (Heads q) T → Each H (Heads q) T′
       fed-ghost   : ∀ {g S c′} → Sane [] g → Placed g [] → At.part H u ≡ just c′
               → Lifts H (ρ ⊕ in-source here) (U.outˢ q y c′) S → U.step g ≡ S
               → Σ (U.Node [] R) λ g″ → At.part H T′ ≡ just g″ × Sane [] g″ × Placed g″ []
                 × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
+
+    -- The feed read by the body's meaning alone: the subscribers the feed
+    -- read held what it owes them.
+    w₀ = connectˢ Sj c b kb k idle rp e rt u bd
+
+    postulate
+      fed-joins : ∀ ν → At.Fed H w₀ ν → At.Fed H v ν
+      fed-behind : Each H (Heads q) T → Each H (Heads q) T′
+
+    fed-kernels : Kernels H T → Kernels H T′
+    fed-kernels kn = record { holds   = holds-plant H {t = T} ρ v refl (λ hs → hs) (Kernels.holds kn)
+                            ; gated   = gated-plant H {t = T} ρ v (λ g → g) (λ d → d) (Kernels.gated kn)
+                            ; settled = settled-plant {t = T} ρ v (λ ow → ow) (λ st → st) (Kernels.settled kn) }
+
+    fed-meaning : Meaning H T → Meaning H T′
+    fed-meaning mn = record { fed = fed-plant H {t = T} ρ v fed-joins _ (Meaning.fed mn) }
+
+    fed-queue : ∀ {clk ts} → Queue H q clk ts T → Queue H q clk ts T′
+    fed-queue = plant-queue H ρ v refl refl (λ _ → refl)
 
   -- A connect's source signals its subject only with no feed under way:
   -- the subject's subscribers are fed before the source runs again.
@@ -1580,14 +1682,41 @@ module Ascending (R : Set) where
       fin-owned   : ∀ {w bs} {ϑ : w ⊑ h} {K : Stack w ⊤} {act} (sk : StackAs T q ϑ K bs) (ks : List (Call T))
                     (e : act ≗ ⟦ finC (planted ρ v) ∷ proj₁ (fin-calls ks) ⟧ᶜ)
               → Owned H T (runAs ks (≗-refl _) sk) → Owned H′ T′ (runAs (finC (planted ρ v) ∷ proj₁ (fin-calls ks)) e (fin-stack sk))
-      fin-kernels : Kernels H T → Kernels H′ T′
-      fin-meaning : Meaning H T → Meaning H′ T′
-      fin-queue   : ∀ {clk ts} → Queue H q clk ts T → Queue H′ q clk ts T′
       fin-behind  : Each H (Heads q) T → Each H′ (Heads q) T′
       fin-ghost   : ∀ {g S} → Sane [] g → Placed g [] → At.part H u ≡ nothing
               → Lifts H (ρ ⊕ in-source here) (U.endˢ q) S → U.step g ≡ S
               → Σ (U.Node [] R) λ g″ → At.part H′ T′ ≡ just g″ × Sane [] g″ × Placed g″ []
                 × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
+
+    -- The subject's closed flag the connect's own cell, its node's clauses
+    -- reading alike and the rest of the tree by the frame; then the feed
+    -- restaged, read by the body's meaning alone.
+    w₀ = connectˢ Sj c b kb k idle rp e rt u bd
+
+    ns : List (Name h)
+    ns = (_ , Subject.closed Sj) ∷ []
+
+    mine : All (_∈ᴸ names w₀) ns
+    mine = there (here refl) ∷ []
+
+    module Wr (fs : AllPairs _≢_ (names T)) = Wrote H H′ ρ (off-store H (Subject.closed Sj)) mine fs
+
+    postulate
+      fin-holds : AllPairs _≢_ (names w₀) → ∀ {E o} → At.Holds H w₀ E o → At.Holds H′ w₀ E o
+      fin-gated : AllPairs _≢_ (names w₀) → At.Gated H w₀ → At.Gated H′ w₀
+      fin-spent : AllPairs _≢_ (names w₀) → At.Spent H w₀ → At.Spent H′ w₀
+      fin-fed   : AllPairs _≢_ (names w₀) → ∀ ν → At.Fed H w₀ ν → At.Fed H′ w₀ ν
+      fin-queue : ∀ {clk ts} → Queue H q clk ts T → Queue H′ q clk ts T′
+      fin-joins : ∀ ν → At.Fed H′ w₀ ν → At.Fed H′ v ν
+
+    fin-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels H′ T′
+    fin-kernels fs kn = record { holds   = holds-plant H′ {t = T} ρ v refl (λ hs → hs) (Kernels.holds kn′)
+                               ; gated   = gated-plant H′ {t = T} ρ v (λ g → g) (λ d → d) (Kernels.gated kn′)
+                               ; settled = settled-plant {t = T} ρ v (λ ow → ow) (λ st → st) (Kernels.settled kn′) }
+      where kn′ = Wr.wr-kernels fs (λ {E} {o} → fin-holds (fresh-path ρ fs) {E} {o}) (fin-gated (fresh-path ρ fs)) (fin-spent (fresh-path ρ fs)) kn
+
+    fin-meaning : AllPairs _≢_ (names T) → Meaning H T → Meaning H′ T′
+    fin-meaning fs mn = record { fed = fed-plant H′ {t = T} ρ v fin-joins _ (Meaning.fed (Wr.wr-meaning fs (fin-fed (fresh-path ρ fs)) mn)) }
 
   -- A connect's source ended: its subject closed, the subscribers read,
   -- their finish owed ahead of the calls the end owed.
@@ -1610,7 +1739,7 @@ module Ascending (R : Set) where
         ; ctlAs = runAs (finC (planted ρ v) ∷ proj₁ (Fins.fin-calls hp ρ q ks)) ec (Fins.fin-stack hp ρ q sk)
         ; meets = pg
         ; owned = Fins.fin-owned hp ρ q sk ks ec ow
-        ; kernels = Fins.fin-kernels hp ρ q kn ; meaning = Fins.fin-meaning hp ρ q mn ; queue = Fins.fin-queue hp ρ q qu
+        ; kernels = Fins.fin-kernels hp ρ q fs kn ; meaning = Fins.fin-meaning hp ρ q fs mn ; queue = Fins.fin-queue hp ρ q qu
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs
                          ; clocked = proj₁ ck , Fins.fin-ticked hp ρ q clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
         ; sorted = sorted-⇝ so path ; behind = Fins.fin-behind hp ρ q bh })

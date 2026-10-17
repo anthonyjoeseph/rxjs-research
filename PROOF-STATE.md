@@ -196,13 +196,14 @@ by their own silent steps (`Mirror`).
   which `shut-step` reads too. Decides whether `tells-past` is a field
   `Carried` owes, every producer framing it, or follows from `Owned`'s
   finishes and the agenda's placement.
-- **B. THE LOCAL INVARIANT.** Each field of `Carried` a fold over the tree
-  of node-local predicates, one framing lemma per field over `Alike` and
-  `Off`. Ruled out for the scan: a write needs no non-local leaf but
-  `tells-past`. Remaining: an own-cell apartness fold carrying
-  `scan-defined`, `scan-owned`, `scan-meaning`, `scan-sees`; `up-outer`
-  and `up-lanes` by a flatMap head bound; then `fr-*`, `dq-*`, `bg-*` and
-  `close-outer`'s `sd-*` the same way, in the form C consumes.
+- **B. THE LOCAL INVARIANT.** Every move's `Kernels` and `Meaning` are
+  bodies over two proven frames: a plant at one heap (the `Moving` plant
+  lemmas, `plant-queue`) and a write at one node's own names (`Wrote`,
+  over `holds-path`, `gated-path`, `fed-path`), each premise a leaf
+  reading only the node. Ruled out: a write or restage whose kernel,
+  spent or feed reads a cell outside its node. Remaining: `Queue` and
+  `behind` across a write, whose frames walk the queue's timers and every
+  seen path; `owned`, stack and ticks per move, the same way.
 - **THE RESTAGE FRAME.** `map-restage`, `scan-restage`, `take-restage`
   are bodies: a growth weakens the tree into the allocated heap (the
   `Grown` frame, composing over several allocations), `Moved` plants the
@@ -217,12 +218,6 @@ by their own silent steps (`Mirror`).
   slot needing more than the walk's own observer (`holds-owed` reads it
   there). Remaining: the growth leaves `grows-extend`, `walk-grow`,
   `compile-cong`, `names-wk` themselves.
-- **D. THE KERNEL FOOTPRINT.** A kernel's cells allocated together and read
-  only through its own node, `names` agreeing by construction. `names`
-  already lists each node's cells, so this leg is CONDITIONAL: done when
-  B's framing names no kernel cell read from outside its node, or when
-  that kernel is regrouped through the engine workflow (Agda, QuickCheck,
-  TypeScript, oracle). Decides whether the engine needs to move at all.
 
 ### The ledger
 
@@ -285,12 +280,6 @@ by their own silent steps (`Mirror`).
   did with a flatMap's pool restaged.
 - **`pool-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds with a
   flatMap's pool restaged.
-- **`pool-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: `Kernels` survives a
-  flatMap's pool restaged.
-- **`pool-meaning`** (Climbs) — FALSITY, `NO EVIDENCE`: `Meaning` survives a
-  flatMap's pool restaged.
-- **`pool-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: `Queue` survives a
-  flatMap's pool restaged.
 - **`pool-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
   sooner than the run with a flatMap's pool restaged.
 - **`sd-active`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
@@ -303,10 +292,14 @@ by their own silent steps (`Mirror`).
   flag leaves every lift.
 - **`sd-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
   flag leaves `Owned`.
-- **`sd-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
-  flag leaves `Kernels`.
-- **`sd-meaning`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
-  flag leaves `Meaning`.
+- **`sd-holds`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's kernel reads
+  its done flag nowhere.
+- **`sd-gated`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's gate reads its
+  done flag nowhere.
+- **`sd-fed`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's feeds read its
+  done flag nowhere.
+- **`sd-spent`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's spent reads its
+  done flag nowhere.
 - **`sd-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
   flag leaves `Queue`.
 - **`sd-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
@@ -319,10 +312,16 @@ by their own silent steps (`Mirror`).
   lift to its flatMap.
 - **`fr-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves
   `Owned`.
-- **`fr-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves
-  `Kernels`.
-- **`fr-meaning`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves
-  `Meaning`.
+- **`fr-mine`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's cut and its
+  flatMap's count are the flatMap's names.
+- **`fr-holds`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's kernel holds
+  with a lane ended and the count down.
+- **`fr-gated`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's gate holds with
+  a lane ended.
+- **`fr-fed`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's feeds hold with a
+  lane ended.
+- **`fr-spent`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's spent holds
+  with a lane's cut and the count written.
 - **`fr-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves
   `Queue`.
 - **`fr-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves every
@@ -339,10 +338,14 @@ by their own silent steps (`Mirror`).
   lift to its flatMap.
 - **`dq-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves
   `Owned`.
-- **`dq-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves
-  `Kernels`.
-- **`dq-meaning`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves
-  `Meaning`.
+- **`dq-holds`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's kernel reads
+  its queue nowhere.
+- **`dq-gated`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's gate reads its
+  queue nowhere.
+- **`dq-fed`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's feeds read its
+  queue nowhere.
+- **`dq-spent`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's spent reads its
+  queue cell nowhere.
 - **`dq-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves
   `Queue`.
 - **`dq-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves every
@@ -371,12 +374,6 @@ by their own silent steps (`Mirror`).
   as the stack did.
 - **`end-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds of the take
   restaged `ending`, its completion the one call owed.
-- **`end-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: `Kernels` survives a
-  take restaged `ending`.
-- **`end-meaning`** (Climbs) — FALSITY, `NO EVIDENCE`: `Meaning` survives a
-  take restaged `ending`.
-- **`end-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: `Queue` survives a take
-  restaged `ending`.
 - **`end-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
   sooner than the run with a take restaged `ending`.
 - **`end-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: the tree with a take
@@ -409,10 +406,14 @@ by their own silent steps (`Mirror`).
   survives a write at its accumulator.
 - **`scan-owned`** (Frame) — FALSITY, `NO EVIDENCE`: `Owned` survives a write
   at a scan's accumulator.
-- **`scan-kernels`** (Frame) — FALSITY, `NO EVIDENCE`: `Kernels` survives a
-  write at a scan's accumulator.
-- **`scan-meaning`** (Frame) — FALSITY, `NO EVIDENCE`: `Meaning` survives a
-  write at a scan's accumulator.
+- **`scan-holds`** (Frame) — FALSITY, `NO EVIDENCE`: a scan's kernel reads its
+  accumulator nowhere.
+- **`scan-gated`** (Frame) — FALSITY, `NO EVIDENCE`: a scan's gate reads its
+  accumulator nowhere.
+- **`scan-fed`** (Frame) — FALSITY, `NO EVIDENCE`: a scan's feeds read its
+  accumulator nowhere.
+- **`scan-spent`** (Frame) — FALSITY, `NO EVIDENCE`: a scan's spent reads its
+  accumulator nowhere.
 - **`scan-queue`** (Frame) — FALSITY, `NO EVIDENCE`: `Queue` survives a write
   at a scan's accumulator.
 - **`src-idle`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's source signals
@@ -425,12 +426,8 @@ by their own silent steps (`Mirror`).
   with a connect's feed restaged.
 - **`fed-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds with a feed
   restaged, the feed the one call owed.
-- **`fed-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: `Kernels` survives a
-  connect's feed restaged.
-- **`fed-meaning`** (Climbs) — FALSITY, `NO EVIDENCE`: `Meaning` survives a
-  connect's feed restaged: the joiners' parts move with it.
-- **`fed-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: `Queue` survives a
-  connect's feed restaged.
+- **`fed-joins`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's feed restaged,
+  its body's joiners hold what the feed owes them.
 - **`fed-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
   sooner than the run with a connect's feed restaged.
 - **`fin-calls`** (Climbs) — FALSITY, `NO EVIDENCE`: the calls owed carry
@@ -443,12 +440,18 @@ by their own silent steps (`Mirror`).
   with a connect's finish staged.
 - **`fin-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds with a
   finish staged, the finish ahead of the calls owed.
-- **`fin-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: `Kernels` survives a
-  connect's subject closed and its finish staged.
-- **`fin-meaning`** (Climbs) — FALSITY, `NO EVIDENCE`: `Meaning` survives a
-  connect's subject closed and its finish staged.
+- **`fin-holds`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's kernel reads
+  its subject's closed flag nowhere.
+- **`fin-gated`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's gate reads its
+  subject's closed flag nowhere.
+- **`fin-fed`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's feeds read its
+  subject's closed flag nowhere.
+- **`fin-spent`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's spent reads
+  its subject's closed flag nowhere.
 - **`fin-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: `Queue` survives a
   connect's subject closed and its finish staged.
+- **`fin-joins`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's finish staged,
+  its body's joiners hold what the finish owes them.
 - **`fin-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
   sooner than the run with a connect's finish staged.
 - **`emit-shut`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` whose observer path
@@ -469,29 +472,28 @@ by their own silent steps (`Mirror`).
   `NO EVIDENCE`: the stack, its sources and its ticks carried across a
   weakening.
 - **`grow-part`, `grow-owned`, `grow-kernels`, `grow-meaning`, `grow-queue`,
-  `grow-each`** (Restage) — FALSITY, `NO EVIDENCE`: what the relation reads
-  of a tree it reads of the tree weakened into a grown heap.
-- **`scan-fresh`** (Restage) — FALSITY, `NO EVIDENCE`: a scan's new
-  accumulator is a name the tree did not hold.
+  `grow-each`** (Restage) — FALSITY, `NO EVIDENCE`: what the relation reads of
+  a tree it reads of the tree weakened into a grown heap.
+- **`scan-fresh`** (Restage) — FALSITY, `NO EVIDENCE`: a scan's new accumulator
+  is a name the tree did not hold.
 - **`untake`** (Restage) — FALSITY, `NO EVIDENCE`: a source heads no earlier
   than the take over it.
 - **`take-fresh`** (Restage) — FALSITY, `NO EVIDENCE`: a take's new cut is two
   names the tree did not hold.
-- **`grew-store`** (Restage) — FALSITY, `NO EVIDENCE`: a store into a cell
-  the growth made past its old names keeps the run as it read.
+- **`grew-store`** (Restage) — FALSITY, `NO EVIDENCE`: a store into a cell the
+  growth made past its old names keeps the run as it read.
 - **`names-wk`** (Restage) — FALSITY, `NO EVIDENCE`: a weakened tree's names
   are its names weakened.
-- **`walk-kont-sub`** (Restage) — FALSITY, `NO EVIDENCE`: a walk's
-  continuation reads alike on alike subscriptions.
-- **`flatmap-wk`** (Restage) — FALSITY, `NO EVIDENCE`: a flatMap kit's admit,
-  settle and dequeue weakened read as the node's over related inners.
+- **`walk-kont-sub`** (Restage) — FALSITY, `NO EVIDENCE`: a walk's continuation
+  reads alike on alike subscriptions.
+- **`flat-wk-here`** (Restage) — FALSITY, `RECOVERY`: a flatMap kit's admit,
+  settle and dequeue weakened read as the node's over its compiled inners.
 - **`flat-fresh`** (Restage) — FALSITY, `NO EVIDENCE`: a flatMap's pool, cut
   and slot are names the tree did not hold.
 - **`unflat`** (Restage) — FALSITY, `NO EVIDENCE`: an outer heads no earlier
   than the flatMap over it, no lane begun.
-- **`compile-env`** (Restage) — FALSITY, `NO EVIDENCE`: a compiled
-  subscription reads alike with a weakening moved from its frame into its
-  environment.
+- **`compile-env`** (Restage) — FALSITY, `NO EVIDENCE`: a compiled subscription
+  reads alike with a weakening moved from its frame into its environment.
 - **`connect-fresh`** (Restage) — FALSITY, `NO EVIDENCE`: a connect's five new
   cells are names the tree did not hold.
 - **`connect-owned`** (Restage) — FALSITY, `NO EVIDENCE`: `Owned` holds of a

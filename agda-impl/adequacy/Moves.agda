@@ -851,3 +851,16 @@ module Moving (R : Set) where
                → (∀ ν → At.Fed H u ν → At.Fed H v ν) → ∀ ν → At.FedLanes H ls ν → At.FedLanes H (plantᴸ π v) ν
     fed-plantᴸ H (this-lane π) v fv ν (f , fl)                = fed-plant H π v fv ν f , fl
     fed-plantᴸ H (next-lane {l = lane c k s} π) v fv ν (f , fl) = f , fed-plantᴸ H π v fv ν fl
+
+  -- A map's or a scan's step heads where its source's does.
+  head-map : ∀ {Γ A B} (g : A → B) (s : U.Step Γ A) → U.headˢ (U.mapˢ g s) ≡ U.headˢ s
+  head-map g (U.outˢ k a c) = refl
+  head-map g (U.skipˢ k c)  = refl
+  head-map g (U.endˢ k)     = refl
+  head-map g U.hushˢ        = refl
+
+  head-scan : ∀ {Γ A B} (g : B → A → B) z (s : U.Step Γ A) → U.headˢ (U.scanˢ g z s) ≡ U.headˢ s
+  head-scan g z (U.outˢ k a c) = refl
+  head-scan g z (U.skipˢ k c)  = refl
+  head-scan g z (U.endˢ k)     = refl
+  head-scan g z U.hushˢ        = refl

@@ -8,13 +8,13 @@ open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.Any using (Any; here; there)
 import Data.List.Relation.Unary.Any as Any
 open import Data.List.Relation.Unary.All using (All; []; _∷_; map) renaming (lookup to lookupᴬ)
-open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to all-++⁺)
+open import Data.List.Relation.Unary.All.Properties using (++⁻ˡ; ++⁻ʳ) renaming (++⁺ to all-++⁺)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.List.Relation.Unary.Linked using (_∷_)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Level using (lift; lower)
 open import Data.Maybe using (Maybe; just; nothing; is-just)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 open import Data.Sum using (_⊎_; [_,_]′)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_)
@@ -32,6 +32,7 @@ open import operation.PureObservable using (Out; Pureᴾ)
 open import operation.AbstractObservable using (base; module Heap; module Run) renaming (module Machine to Shared)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Moves using (module Moving)
+open import adequacy.Local using (module Locality)
 
 open Events∞
 
@@ -39,13 +40,14 @@ module Framing (R : Set) where
   open Machine R using (Mach; Read)
   open Run (Pureᴾ R) using (Ref; module Kit)
   open Shared Timeline (Out R) using (Conf; Heapᴹ; store; stored)
-  open Heap using () renaming (same to same⊑)
+  open Heap using (_∋_) renaming (same to same⊑)
   open Strongly R using (Strong; Sub; scanˢ; here; module At; Queue; Kernels; Meaning; Owned; Path; in-scan; in-source; _⊕_; names; Each; Heads; seen; Books;
                          mapˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; PathLanes; this-lane; next-lane; in-map; in-take; in-outer; in-lanes; in-body; in-defer; seen-join;
-                         Taking; taking; taken; cutNames; quietName; subjectNames) renaming (ending to endingᵀ)
+                         Taking; taking; taken; cutNames; quietName; subjectNames; Name; pendings; subjects; joiners) renaming (ending to endingᵀ)
   open Strongly.Against R using (CtlAs)
-  open Tearing R using (Alike; part-alike; look-store; get-put-same; fresh-path; names-path; apart-r; apart-l; ≢-flip)
-  open Moving R using (pairs-r)
+  open Tearing R using (Alike; Off; part-alike; look-store; get-put-same; fresh-path; names-path; apart-r; apart-l; ≢-flip)
+  open Moving R using (pairs-r; plant; pendings-plant; subjects-plant; joiners-plant; head-map; head-scan)
+  open Locality R using (module Heaps)
   open Ghosting R using (module Calling; Lifts; Calling; sends)
   open Read
 
@@ -63,12 +65,6 @@ module Framing (R : Set) where
   postulate
     scan-owned   : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
                  → ∀ {p ctl bs} {ca : CtlAs T p ctl bs} z → Owned H T ca → Owned (store H r (lift z)) T ca
-    scan-kernels : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
-                 → ∀ z → Kernels H T → Kernels (store H r (lift z)) T
-    scan-meaning : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
-                 → ∀ z → Meaning H T → Meaning (store H r (lift z)) T
-    scan-queue   : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
-                 → ∀ {p clk ts} z → Queue H p clk ts T → Queue (store H r (lift z)) p clk ts T
     scan-lifts   : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} (ρ : Path T (scanˢ f r u)) → AllPairs _≢_ (names T)
                  → ∀ {s S} z → Lifts H ρ s S → Lifts (store H r (lift z)) ρ s S
 
@@ -82,18 +78,6 @@ module Framing (R : Set) where
     scan-defined : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
                  → ∀ z {Δ′ A′} {x : Sub h Δ′ A′} → Path T x → is-just (At.part (store H r (lift z)) x) ≡ is-just (At.part H x)
 
-
-  head-map : ∀ {Γ A B} (g : A → B) (s : U.Step Γ A) → U.headˢ (U.mapˢ g s) ≡ U.headˢ s
-  head-map g (U.outˢ k a c) = refl
-  head-map g (U.skipˢ k c)  = refl
-  head-map g (U.endˢ k)     = refl
-  head-map g U.hushˢ        = refl
-
-  head-scan : ∀ {Γ A B} (g : B → A → B) z (s : U.Step Γ A) → U.headˢ (U.scanˢ g z s) ≡ U.headˢ s
-  head-scan g z (U.outˢ k a c) = refl
-  head-scan g z (U.skipˢ k c)  = refl
-  head-scan g z (U.endˢ k)     = refl
-  head-scan g z U.hushˢ        = refl
 
   heads-map : ∀ {Γ A B q} (g : A → B) {c : U.Node Γ A} → Heads q c → Heads q (U.mapᶜ g c)
   heads-map g {c} hd e = hd (trans (sym (head-map g (U.step c))) e)
@@ -406,3 +390,75 @@ module Framing (R : Set) where
       bh = Calling.behind cl
       sees = scan-sees H ρ fs (f (At.val H r) y)
       def  = scan-defined H ρ fs (f (At.val H r) y)
+
+  -- One store leaves every other name alike; two in turn, every name
+  -- neither wrote.
+  off-store : ∀ {h k} (H : Heapᴹ h) (i : h ∋ k) {x} → Off H (store H i x) ((k , i) ∷ [])
+  off-store H i j (ne ∷ []) = look-store H i j (≢-flip ne)
+
+  off-++ : ∀ {h} {H H₁ H₂ : Heapᴹ h} (ns : List (Name h)) {ms} → Off H H₁ ns → Off H₁ H₂ ms → Off H H₂ (ns ++ ms)
+  off-++ ns o₁ o₂ j a = trans (o₂ j (++⁻ʳ ns a)) (o₁ j (++⁻ˡ ns a))
+
+  -- A NODE REPLANTED, QUEUING ALIKE: its pending frames, its subjects
+  -- and its joiners as before, the queue as before.
+  plant-queue : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A} {u : Sub h Δ A} (ρ : Path T u) (v : Sub h Δ A)
+              → pendings u ≡ pendings v → subjects u ≡ subjects v → (∀ E → joiners u E ≡ joiners v E)
+              → ∀ {q clk ts} → Queue H q clk ts T → Queue H q clk ts (plant ρ v)
+  plant-queue H {T} ρ v ep es ej {ts = ts} qu =
+    record { timed   = subst (At.Timed H ts) (sym pend) (Queue.timed qu)
+           ; joined  = subst₂ (At.Joined H) (sym (subjects-plant ρ v es)) (sym (joiners-plant ρ v ej _)) (Queue.joined qu)
+           ; ordered = Queue.ordered qu ; ahead = Queue.ahead qu }
+    where
+      pend : pendings (plant ρ v) ≡ pendings T
+      pend with pendings-plant ρ v
+      ... | xs , ys , e , e′ = trans e′ (trans (cong (λ z → xs ++ z ++ ys) (sym ep)) (sym e))
+
+  -- A WRITE AT ONE NODE'S OWN NAMES: what the kernels and the meaning
+  -- hold of the tree they hold after, the node's own clauses their
+  -- premises.  The write reaches no name outside the node, so every
+  -- other node reads alike.
+  module Wrote {h} (H H′ : Heapᴹ h) {T : Sub h [] R} {Δ A} {u : Sub h Δ A} (ρ : Path T u)
+               {ns : List (Name h)} (off : Off H H′ ns) (mine : All (_∈ᴸ names u) ns) (fs : AllPairs _≢_ (names T)) where
+    private
+      offU : Off H H′ (names u)
+      offU j a = off j (map (lookupᴬ a) mine)
+
+    wr-kernels : (∀ {E o} → At.Holds H u E o → At.Holds H′ u E o) → (At.Gated H u → At.Gated H′ u) → (At.Spent H u → At.Spent H′ u)
+               → Kernels H T → Kernels H′ T
+    wr-kernels hv gv sv kn = record
+      { holds   = Heaps.holds-path H H′ ρ fs offU hv (Kernels.holds kn)
+      ; gated   = Heaps.gated-path H H′ ρ fs offU gv sv (Kernels.gated kn)
+      ; settled = Kernels.settled kn }
+
+    wr-meaning : (∀ ν → At.Fed H u ν → At.Fed H′ u ν) → Meaning H T → Meaning H′ T
+    wr-meaning fv mn = record { fed = Heaps.fed-path H H′ ρ fs offU fv _ (Meaning.fed mn) }
+
+  -- A WRITE AT A SCAN'S ACCUMULATOR, ITS NODE'S CLAUSES: the source's
+  -- names apart from the accumulator, so its kernels and feeds read
+  -- alike.
+  postulate
+    scan-holds : ∀ {h} (H : Heapᴹ h) {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → AllPairs _≢_ (names (scanˢ f r u))
+               → ∀ z {E o} → At.Holds H (scanˢ f r u) E o → At.Holds (store H r (lift z)) (scanˢ f r u) E o
+    scan-gated : ∀ {h} (H : Heapᴹ h) {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → AllPairs _≢_ (names (scanˢ f r u))
+               → ∀ z → At.Gated H (scanˢ f r u) → At.Gated (store H r (lift z)) (scanˢ f r u)
+    scan-spent : ∀ {h} (H : Heapᴹ h) {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → AllPairs _≢_ (names (scanˢ f r u))
+               → ∀ z → At.Spent H (scanˢ f r u) → At.Spent (store H r (lift z)) (scanˢ f r u)
+    scan-fed   : ∀ {h} (H : Heapᴹ h) {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → AllPairs _≢_ (names (scanˢ f r u))
+               → ∀ z ν → At.Fed H (scanˢ f r u) ν → At.Fed (store H r (lift z)) (scanˢ f r u) ν
+    scan-queue : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
+               → ∀ {p clk ts} z → Queue H p clk ts T → Queue (store H r (lift z)) p clk ts T
+
+  -- A WRITE AT A SCAN'S ACCUMULATOR, FRAMED: the node's own clauses, the
+  -- rest of the tree by the frame.
+  module _ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} (ρ : Path T (scanˢ f r u)) (fs : AllPairs _≢_ (names T)) where
+    private
+      fr : AllPairs _≢_ (names (scanˢ f r u))
+      fr = fresh-path ρ fs
+
+      module Wr z = Wrote H (store H r (lift z)) ρ (off-store H r) (here refl ∷ []) fs
+
+    scan-kernels : ∀ z → Kernels H T → Kernels (store H r (lift z)) T
+    scan-kernels z = Wr.wr-kernels z (λ {E} {o} → scan-holds H {f = f} {u = u} fr z {E} {o}) (scan-gated H {f = f} {u = u} fr z) (scan-spent H {f = f} {u = u} fr z)
+
+    scan-meaning : ∀ z → Meaning H T → Meaning (store H r (lift z)) T
+    scan-meaning z = Wr.wr-meaning z (scan-fed H {f = f} {u = u} fr z)

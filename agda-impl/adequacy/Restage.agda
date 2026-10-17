@@ -39,7 +39,6 @@ open import operation.AbstractObservable using (module Heap; module Run) renamin
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Ghost using (module Ghosting)
-open import adequacy.Frame using (module Framing)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Grow using (module Growing)
 open import adequacy.Seq using (module Sequencing)
@@ -65,9 +64,8 @@ module Restaging (R : Set) where
   open Strongly.Against R using (CtlAs; StackAs; BurstAs; subAs; bottomAs; restAs; backAs; reholdAs; Held; bottomᴴ; restᴴ; playsAs; firesAs; overAs; stackJobs; SrcOf; src-of; Ticked; BurstClocked; sources; burstSpots; stackBursts; Placed; agenda)
   open Strongly.Phase R using (playing; fired)
   open Moving R using (plant; plantᴸ; planted; plantedᴸ; pend; pendᴸ; part-plant; names-plant; holds-plant; holds-owed; settled-plant; gated-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant
-                     ; Same; same; same-map; same-scan; same-take; same-flat; same-connect; same-defer)
+                     ; Same; same; same-map; same-scan; same-take; same-flat; same-connect; same-defer; head-map; head-scan)
   open Ghosting R using (walk-⊕; _≺_; measure; each-sub; sorted-⇝)
-  open Framing R using (head-map; head-scan)
 
   -- The program a subscription about to begin begins.
   subOf : ∀ {h} {t : Sub h [] R} {p c bs} → CtlAs t p c bs → Maybe (Σ (List Set) λ Δ → Σ Set λ A → T.Obs Timeline Δ A)
@@ -1270,16 +1268,6 @@ module Restaging (R : Set) where
     walk-kont-sub : ∀ {h Δ A} {t : Sub h [] R} {x : Sub h Δ A} (π : Path t x) {v} (τ : h ⊑ v) {U U′ : Subscription v}
                   → Subscription.unsubscribe U ≗ Subscription.unsubscribe U′ → Here.kont (walk π top) τ U ≗ Here.kont (walk π top) τ U′
 
-    -- A flatMap's kernel, weakened, is the kernel over its weakened pool,
-    -- its inner programs and observer alike.
-    flatmap-wk : ∀ {A B w v} (op : T.FlatOp) (st : FlatKit.Flat A w) (ρ : w ⊑ v)
-                   {f : A → Subscribe B w} {f′ : A → Subscribe B v} {o : Observer B w} {o′ : Observer B v}
-               → (∀ a {u} (ζ : v ⊑ u) {p p′ k k′} → ObsRel p p′ → KontRel k k′ → f a (ρ ⨾ ζ) p k ≗ f′ a ζ p′ k′)
-               → ObsRel (wkObs ρ o) o′
-               → (∀ b a → wkAct ρ (FlatKit.FlatMap.admit op f o st b a) ≗ FlatKit.FlatMap.admit op f′ o′ (FlatKit.wkFlat ρ st) b a)
-                 × wkAct ρ (FlatKit.FlatMap.settle op f o st) ≗ FlatKit.FlatMap.settle op f′ o′ (FlatKit.wkFlat ρ st)
-                 × wkAct ρ (FlatKit.FlatMap.dequeue op f o st) ≗ FlatKit.FlatMap.dequeue op f′ o′ (FlatKit.wkFlat ρ st)
-
   -- A scan's observer over alike observers.
   scanO-cong : ∀ {h A B} (f : B → A → B) (r : Ref h (base B)) {o o′ : Observer B h} → ObsRel o o′ → ObsRel (Canon.scanO f r o) (Canon.scanO f r o′)
   scanO-cong f r (n , c , x) = (λ a → readRef≗ refl λ σ b → wk≗ σ (writeRef≗ refl refl (n (f b a)))) , c , x
@@ -2056,21 +2044,21 @@ module Restaging (R : Set) where
     walk′ : walk π′ top ≡ walk ιo W₈
     walk′ = trans (walk-⊕ ρf ιo top) (cong (walk ιo) (walk-planted π₈ v top))
 
-    -- The inner programs as the kernel subscribes them, against the node's.
-    f-rel : ∀ a {u′} (ζ : h₈ ⊑ u′) {p p′ : Observer B u′} {k k′ : Kont u′} → ObsRel p p′ → KontRel k k′
-          → f₇ a (new ⨾ ζ) p k ≗ compile (f a) E₈ ζ p′ k′
-    f-rel a ζ {p} {p′} {k} {k′} op′ ok =
-      ≗-trans (⊑≗ (λ z → compile (f a) E′ z p k) ((υ ⨾ ν₇) ⨾ (new ⨾ ζ)) ((υ ⨾ ν₈) ⨾ ζ))
-      (≗-trans (compile-env (f a) E′ (υ ⨾ ν₈) ζ)
-      (subst (λ E → compile (f a) (wkEnv (υ ⨾ ν₈) E′) ζ p k ≗ compile (f a) E ζ p′ k′) (Grew.envR G₉) (compile-cong (f a) _ ζ op′ ok)))
-
     o-rel : ObsRel (wkObs new O₇) O₈
     o-rel = obs-trans (obs-sym (obs-⨾ ν₇ new O)) (Grew.obsR G₉)
 
-    fw = flatmap-wk op st₇ new {f′ = λ a → compile (f a) E₈} {o′ = O₈} f-rel o-rel
+    -- The flatMap's kernel, weakened, read as the node's: its admit,
+    -- settle and dequeue over the inner programs as the node compiles
+    -- them and its observer.
+    --
+    -- RECOVERY: git show 188b9050f2 restores the inner programs as the kernel subscribes them related to the node's, and the kernel's weakening generic over related inners.
+    postulate
+      flat-wk-here : (∀ b a → wkAct new (FlatKit.FlatMap.admit op f₇ O₇ st₇ b a) ≗ FlatKit.FlatMap.admit op (λ a → compile (f a) E₈) O₈ (FlatKit.wkFlat new st₇) b a)
+                   × wkAct new (FlatKit.FlatMap.settle op f₇ O₇ st₇) ≗ FlatKit.FlatMap.settle op (λ a → compile (f a) E₈) O₈ (FlatKit.wkFlat new st₇)
+                   × wkAct new (FlatKit.FlatMap.dequeue op f₇ O₇ st₇) ≗ FlatKit.FlatMap.dequeue op (λ a → compile (f a) E₈) O₈ (FlatKit.wkFlat new st₇)
 
     outer-rel : ObsRel KO (Canon.Flat′.outerO op f E₈ O₈ fl₈ oc₈)
-    outer-rel = guarded-cong oc₈ ((λ a → proj₁ fw op a) , writeRef≗ refl refl (proj₁ (proj₂ fw)) , proj₂ (proj₂ o-rel))
+    outer-rel = guarded-cong oc₈ ((λ a → proj₁ flat-wk-here op a) , writeRef≗ refl refl (proj₁ (proj₂ flat-wk-here)) , proj₂ (proj₂ o-rel))
 
     kont-rel : KontRel KK (flatK oc₈ fl₈ K₈)
     kont-rel τ sub = bind≗ at λ _ → ≗-trans (⊑≗ (λ z → Kt z U₁) (ν₇ ⨾ (new ⨾ τ)) (ν₈ ⨾ τ)) (≗-trans (Grew.kontR G₉ τ U₁) (walk-kont-sub π₈ τ ue))
@@ -2124,7 +2112,7 @@ module Restaging (R : Set) where
              (lanes₉ : At.val H₉ (FlatKit.Flat.lanes fl₈) ≡ []) where
 
       slotR : CbRel (look H₉ hereʳ) (Canon.Flat′.refillCb op f E₈ O₈ fl₈)
-      slotR = (λ a → ≗-trans (proj₁ slot₉ a) (proj₂ (proj₂ fw))) , proj₁ (proj₂ slot₉) , proj₂ (proj₂ slot₉)
+      slotR = (λ a → ≗-trans (proj₁ slot₉ a) (proj₂ (proj₂ flat-wk-here))) , proj₁ (proj₂ slot₉) , proj₂ (proj₂ slot₉)
 
       rf-kernels : Kernels H₉ T₈ → Kernels H₉ t′
       rf-kernels kn = record { holds = holds-owed H₉ π₈ v tt (Here.kont top)
