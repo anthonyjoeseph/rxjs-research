@@ -186,9 +186,10 @@ by their own silent steps (`Mirror`).
   take's stage, a connect's feed, a flatMap's pool, its admit, a lane's
   end and settle. Guards open by `calling-open`. `lane-settles` is a
   fact of the call no field carries: the done flag lags the outer's
-  part while the outer's end climbs. A start is one leaf,
-  `lane-begin`, an admit's and a dequeue's alike. Remaining: the strong
-  tree's transport along `_⊑_` that `lane-begin` and `sub-onward` owe.
+  part while the outer's end climbs. A start is `lane-begin`, an
+  admit's and a dequeue's alike: `begin-path`, then the tree weakened by
+  `Growing.wkTree` with the lane planted, `bg-*` its frame. Remaining:
+  `sub-onward`'s leaves over the same growth, one per former.
 - **UP-ENDED.** `up-ended` is a body: the rest's skips by `Each.rests`,
   the shut body by `shut-heads` over what it tells. Ruled out: the end
   signal's fields carrying it; the non-local residue is `tells-past`,
@@ -200,8 +201,14 @@ by their own silent steps (`Mirror`).
   `Off`. Ruled out for the scan: a write needs no non-local leaf but
   `tells-past`. Remaining: an own-cell apartness fold carrying
   `scan-defined`, `scan-owned`, `scan-meaning`, `scan-sees`; `up-outer`
-  and `up-lanes` by a flatMap head bound; then `fr-*`, `dq-*` and
+  and `up-lanes` by a flatMap head bound; then `fr-*`, `dq-*`, `bg-*` and
   `close-outer`'s `sd-*` the same way, in the form C consumes.
+- **THE RESTAGE FRAME.** Every `sub-*` leaf, `bg-stack` and `pool-stack`
+  carry a stack across a node restaged. Only `kontC`'s code reads its
+  target's subtree (`unsub`); every other call reads its node's fields. So
+  a stack crosses a pending node restaged once no continuation is owed at
+  its ancestors. Decides whether that is a fact of `subAs`, which
+  `map-restage` would then discharge as a body, or needs a field.
 - **D. THE KERNEL FOOTPRINT.** A kernel's cells allocated together and read
   only through its own node, `names` agreeing by construction. `names`
   already lists each node's cells, so this leg is CONDITIONAL: done when
@@ -224,9 +231,30 @@ by their own silent steps (`Mirror`).
   flatMap's end: the pool takes its rest, the ghost past the lane's skip.
 - **`calling-open`** (Climbs) — FALSITY, `NO EVIDENCE`: a climbing signal's
   path reads open.
-- **`lane-begin`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane begun: counted,
-  cut, listed, subscribed under the run's `ix 1`; owes the strong tree's
-  transport along `_⊑_`.
+- **`begin-path`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane begun runs to its
+  inner subscribed under `ix 1`: counted, cut, listed, the rest weakened.
+- **`begin-deep`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane begins off the
+  root; an outer's value is sent under a label.
+- **`bg-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane begun: the ghost's
+  admit, the lane planted pending in the grown tree.
+- **`bg-code`** (Climbs) — FALSITY, `NO EVIDENCE`: a begun lane's run is its
+  inner compiled at the lane's env.
+- **`bg-stack`** (Climbs) — FALSITY, `NO EVIDENCE`: a stack against the tree
+  stands against the grown tree with a lane begun.
+- **`bg-ticked`** (Climbs) — FALSITY, `NO EVIDENCE`: the stack ticks as it did
+  with a lane begun.
+- **`bg-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds in the grown
+  tree with a lane begun.
+- **`bg-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: `Kernels` survives a lane
+  begun.
+- **`bg-meaning`** (Climbs) — FALSITY, `NO EVIDENCE`: `Meaning` survives a lane
+  begun.
+- **`bg-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: `Queue` survives a lane
+  begun, the run one level down.
+- **`bg-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no sooner
+  than the run one level down.
+- **`bg-fresh`** (Climbs) — FALSITY, `NO EVIDENCE`: the books stay fresh with a
+  lane begun.
 - **`lanes-counted`** (Climbs) — FALSITY, `NO EVIDENCE`: a climbing outer
   value reads the count as the live lanes; a fact of the call, not a kernel.
 - **`outer-switch`** (Climbs) — FALSITY, `NO EVIDENCE`: a switch kills its
@@ -397,8 +425,19 @@ by their own silent steps (`Mirror`).
   sooner than the run with a connect's finish staged.
 - **`emit-shut`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` whose observer path
   is closed skips its value.
-- **`sub-onward`** (Lift) — FALSITY, `NO EVIDENCE`: a subscription begun runs
-  its kernel to the next re-entry state.
+- **`sub-cold`** (Lift) — FALSITY, `NO EVIDENCE`: a cold begun registers its sink and starts its timeline.
+- **`sub-empty`** (Lift) — FALSITY, `NO EVIDENCE`: an empty begun completes under `last`.
+- **`sub-of`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` begun reaches its burst's first call.
+- **`map-restage`** (Lift) — FALSITY, `NO EVIDENCE`: a map begun runs nothing of its own: the
+  map restaged over its source's subscription, the load lower.
+- **`sub-scan`** (Lift) — FALSITY, `NO EVIDENCE`: a scan begun allocates its accumulator and begins its source.
+- **`sub-take`** (Lift) — FALSITY, `NO EVIDENCE`: a takeWhile begun allocates its cut and begins its source.
+- **`sub-flat`** (Lift) — FALSITY, `NO EVIDENCE`: a flatMap begun allocates its kit and cut, registers its refill and
+  begins its outer.
+- **`sub-connect`** (Lift) — FALSITY, `NO EVIDENCE`: a connect begun allocates its subject and begins its body under
+  `ix 0`.
+- **`sub-joined`** (Lift) — FALSITY, `NO EVIDENCE`: a joiner begun registers on its subject, or completes on a closed one.
+- **`sub-defer`** (Lift) — FALSITY, `NO EVIDENCE`: a defer begun begins its body one level down, the ghost past its skip.
 - **`feed-onward`** (Lift) — FALSITY, `NO EVIDENCE`: the rest of a connect's
   feed of a value, each subscriber showing or skipping it.
 - **`src-onward`** (Lift) — FALSITY, `NO EVIDENCE`: a connect's source

@@ -4,7 +4,7 @@
 -- operator's callback one rise; and the close, its teardown.
 module adequacy.Climbs where
 
-open import Data.List using (List; []; _∷_; _++_; [_]; null; length)
+open import Data.List using (List; []; _∷_; _++_; [_]; null; length) renaming (map to mapList)
 open import Data.List.Properties using (++-assoc)
 open import Data.List.Relation.Unary.Any using (Any; here; there)
 import Data.List.Relation.Unary.Any as Any
@@ -17,7 +17,7 @@ open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.List.Relation.Unary.Linked using (Linked; _∷_; tail)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Level using (lift; lower)
-open import Data.Maybe using (Maybe; just; nothing; is-nothing)
+open import Data.Maybe using (Maybe; just; nothing; is-nothing) renaming (map to mapMaybe)
 open import Data.Maybe.Properties using (just-injective)
 open import Data.Nat using (ℕ; zero; suc; pred; _<_; _≤_; _≡ᵇ_; _<ᵇ_)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
@@ -40,24 +40,25 @@ open import adequacy.Stepper using (placed-after; Placedˢ)
 open import denotation.Denote using (⟦_⟧)
 import Tree as T
 open import operation.PureObservable using (Out; note; Pureᴾ; module Pure)
-open import operation.AbstractObservable using (module Heap; module Run; fifo) renaming (module Machine to Shared)
+open import operation.AbstractObservable using (module Heap; module Run; fifo; list) renaming (module Machine to Shared)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Lift using (module Lifting)
 open import adequacy.Frame using (module Framing)
+open import adequacy.Grow using (module Growing)
 open import adequacy.Local using (module Locality)
 
 open Events∞
 
 module Ascending (R : Set) where
-  open Machine R using (Mach; mach; Playing; Step; silent; value; complete; step; Read; feed)
-  open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; push; back; rest; spent?; store; Callbacks; cbs) renaming (go to goᴵ)
-  open Heap using (World; _⊑_; _⨾_; Handle; Sink) renaming (same to same⊑)
+  open Machine R using (Mach; mach; Playing; Step; silent; value; complete; step; Read; feed; Todo; wkPlaying; wkTodo)
+  open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; push; back; rest; spent?; store; Callbacks; cbs; look; wkVal) renaming (go to goᴵ)
+  open Heap using (World; _⊑_; _⨾_; Handle; Sink; Quiet; wk∋; slot) renaming (same to same⊑)
   open Sorting R using (WellMach)
-  open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile)
-  open Strongly R using (Strong; Carried; Books; carried; closing; Sub; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; Meets; Each; Heads; seen; ∧-split; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
+  open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
+  open Strongly R using (Strong; Carried; Books; carried; closing; Sub; pendingˢ; Name; names; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; Meets; Each; Heads; seen; ∧-split; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots) renaming (Placed to Placedᴬ)
-  open Pure R using (Timer; cascade)
+  open Pure R using (Timer; cascade; wkTimer)
   open Moving R using (takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
   open Tearing R using (fresh-path; takeSite; bodySite; look-store)
   open Unsubbing R using (_⇝_; ⇝-trans; now; then; ≗-trans; wk≗; wk-same; bind≗)
@@ -65,6 +66,7 @@ module Ascending (R : Set) where
   open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
   open Lifting R using (sub-onward; emit-shut; emit-void; emit-run; spread-past; behind-fire; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
   open Locality R using (stored-at)
+  open Growing R using (wkTree; wkLanes; wkPath)
   open Framing R using (scan-part; scan-owned; scan-kernels; scan-meaning; scan-queue; scan-lifts; scan-behind)
   open Read
 
@@ -353,12 +355,19 @@ module Ascending (R : Set) where
     heightL-planted (this-lane ρ)  v = cong suc (height-planted ρ v)
     heightL-planted (next-lane πL) v = heightL-planted πL v
 
-  -- A first value under a position keeps its tick.
+  -- A value under a position keeps its tick.
   tick-ix0 : ∀ r → tick (r ++ [ ix 0 ]) ≡ tick r
   tick-ix0 []           = refl
   tick-ix0 (ix _ ∷ _)   = refl
   tick-ix0 (subᴾ _ ∷ _) = refl
   tick-ix0 (last ∷ _)   = refl
+
+  -- Under any label off the root, likewise.
+  tick-under : ∀ r i → r ≢ [] → tick (r ++ [ ix i ]) ≡ tick r
+  tick-under []           i e = ⊥-elim (e refl)
+  tick-under (ix _ ∷ _)   i _ = refl
+  tick-under (subᴾ _ ∷ _) i _ = refl
+  tick-under (last ∷ _)   i _ = refl
 
   -- A run under `ix 0`: one step down, its rest owed back where it was.
   out-step : ∀ {h} {hp : Heapᴹ h} {q clk ts bs td lg en mk} {w} {ϑ : w ⊑ h} {K : Stack w ⊤} {act M N : Act h ⊤}
@@ -815,7 +824,107 @@ module Ascending (R : Set) where
       books   : Books T (runAs [] (≗-refl _) stack) m
       sorted  : Σ Pos λ lo → WellMach lo m
       behind  : Each (Conf.heap (Mach.conf m)) (Heads (Conf.pos (Mach.conf m))) T
-      kept    : load m T ≼ ℓ
+
+  -- A WORLD GROWN BY A LANE'S START: every name the old heap held where it
+  -- was, weakened, but the count up and the cut listed; the cut live and
+  -- holding nothing.
+  record Grown {h v} (τ : h ⊑ v) (H : Heapᴹ h) (H′ : Heapᴹ v) {A} (fl : FlatKit.Flat A h) (c : Kit.Cut v) : Set₁ where
+    field
+      count   : At.val H′ (wkR τ (FlatKit.Flat.active fl)) ≡ suc (At.val H (FlatKit.Flat.active fl))
+      listed  : At.val H′ (wkR τ (FlatKit.Flat.lanes fl)) ≡ c ∷ wkEl (list Kit.cutTy) τ (At.val H (FlatKit.Flat.lanes fl))
+      live    : At.val H′ (Kit.live c) ≡ true
+      unheld  : At.val H′ (Kit.held c) ≡ nothing
+      cells   : ∀ {t} (x : Ref h t) → _≢_ {A = Name h} (_ , x) (_ , FlatKit.Flat.active fl) → _≢_ {A = Name h} (_ , x) (_ , FlatKit.Flat.lanes fl)
+              → At.val H′ (wkR τ x) ≡ wkEl t τ (At.val H x)
+      slots   : ∀ {X} (s : Sink h X) → CbRel (cbs H′ (wk∋ τ s)) (wkVal (slot X) τ (cbs H s))
+      stashes : ∀ (u : Quiet h) → look H′ (wk∋ τ u) ≗ wkAct τ (look H u)
+      handles : ∀ (hd : Handle h) → At.spentʰ H′ (wk∋ τ hd) ≡ At.spentʰ H hd
+
+  -- A LANE'S START RUN: the observer read open, the count up, the cut
+  -- allocated and listed, the run at the lane's subscription under `ix 1`,
+  -- the rest of the call behind it; the world grown along `grow`, all else
+  -- the machine keeps carried along.
+  record Started {h} (H : Heapᴹ h) (q : Pos) {w} (ϑ : w ⊑ h) (K : Stack w ⊤) clk (ts : List (Timer h)) (bs : List (Maybe (Playing h)))
+                 (td : List (Todo h)) lg en mk {T : Sub h [] R} {Δ A B op f fl oc k r pl} {t : Sub h Δ A} {ls : List (Lane h Δ B)}
+                 (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (y : A) (a : Act h ⊤) : Set₁ where
+    field
+      {v}     : World
+      grow    : h ⊑ v
+      heap′   : Heapᴹ v
+      cut′    : Kit.Cut v
+      {act′}  : Act v ⊤
+      {back′} : Act v ⊤
+      {ϑ′}    : w ⊑ v
+      {ts′}   : List (Timer v)
+      {bs′}   : List (Maybe (Playing v))
+      {td′}   : List (Todo v)
+      runs    : mach ⟨ H , q , run a ϑ K ⟩ clk ts bs td lg en mk
+                ⇝ mach ⟨ heap′ , q ++ [ ix 1 ] , run act′ same⊑ (push (back q back′) ϑ′ K) ⟩ clk ts′ bs′ td′ lg en mk
+      seq′    : ϑ′ ≡ ϑ ⨾ grow
+      timers′ : ts′ ≡ mapList (wkTimer grow) ts
+      bursts′ : bs′ ≡ mapList (mapMaybe (wkPlaying grow)) bs
+      todo′   : td′ ≡ mapList (wkTodo grow) td
+      grown   : Grown grow H heap′ fl cut′
+      code′   : act′ ≗ compile (f y) (Here.env (walk ρ top)) grow
+                  (Kit.guarded cut′ (Canon.Flat′.lane op f (Here.env (walk ρ top)) (Here.obs (walk ρ top)) fl grow cut′)) (λ σ → Kit.attach (Kit.wkCut σ cut′))
+      rests′  : back′ ≗ done tt
+
+  postulate
+    -- A lane about to begin runs to its subscription: the observer read
+    -- open along the path, then the start's reads, writes and two
+    -- allocations, all silent.
+    begin-path : ∀ {g ℓ h} {H : Heapᴹ h} {q w} {ϑ : w ⊑ h} {K : Stack w ⊤} {clk ts bs td lg en mk} {a : Act h ⊤} {T : Sub h [] R} {Δ A B op f fl oc k r pl}
+                   {t : Sub h Δ A} {ls : List (Lane h Δ B)} {ρ : Path T (flatMapˢ op f fl oc k r pl t ls)} {y : A} {pl′}
+               → Begins g ℓ (mach ⟨ H , q , run a ϑ K ⟩ clk ts bs td lg en mk) ρ y pl′ → Started H q ϑ K clk ts bs td lg en mk ρ y a
+
+    -- A lane begins off the root: an outer's value is sent under a label.
+    begin-deep : ∀ {g ℓ h} {H : Heapᴹ h} {q w} {ϑ : w ⊑ h} {K : Stack w ⊤} {clk ts bs td lg en mk} {a : Act h ⊤} {T : Sub h [] R} {Δ A B op f fl oc k r pl}
+                   {t : Sub h Δ A} {ls : List (Lane h Δ B)} {ρ : Path T (flatMapˢ op f fl oc k r pl t ls)} {y : A} {pl′}
+               → Begins g ℓ (mach ⟨ H , q , run a ϑ K ⟩ clk ts bs td lg en mk) ρ y pl′ → q ≢ []
+
+  -- A LANE BEGUN, IN THE GROWN WORLD: the tree weakened along the growth,
+  -- the flatMap its pool `pl′` and the new lane first, pending where it
+  -- subscribes.
+  module Begun {h} {H : Heapᴹ h} {q w} {ϑ : w ⊑ h} {K : Stack w ⊤} {clk ts bs td lg en mk} {a : Act h ⊤} {T : Sub h [] R} {Δ A B op f fl oc k r pl}
+               {t : Sub h Δ A} {ls : List (Lane h Δ B)} {ρ : Path T (flatMapˢ op f fl oc k r pl t ls)} {y : A}
+               (s : Started H q ϑ K clk ts bs td lg en mk ρ y a) (pl′ : U.Node Δ B) where
+    open Started s
+
+    v′ : Sub v Δ B
+    v′ = flatMapˢ op f (FlatKit.wkFlat grow fl) (Kit.wkCut grow oc) (mapMaybe (wk∋ grow) k) (wk∋ grow r) pl′ (wkTree grow t)
+           (lane cut′ nothing (pendingˢ (f y) (q ++ [ ix 1 ])) ∷ wkLanes grow ls)
+
+    T′ : Sub v [] R
+    T′ = plant (wkPath grow ρ) v′
+
+    π′ : Path T′ (pendingˢ (f y) (q ++ [ ix 1 ]))
+    π′ = planted (wkPath grow ρ) v′ ⊕ in-lanes (this-lane here)
+
+    postulate
+      bg-ghost : ∀ {g S} → Sane [] g → Placed g []
+               → Lifts H ρ (U.skipˢ (q ++ [ ix 0 ]) (U.flatMapᶜ op (λ a j → U.subscribe (f a) j) (At.part H t)
+                             (U.subscribe (f y) (q ++ [ ix 1 ]) ∷ At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl′)) S
+               → U.step g ≡ S
+               → Σ (U.Node [] R) λ g″ → At.part heap′ T′ ≡ just g″ × Sane [] g″ × Placed g″ []
+                 × Σ Pos λ k′ → Σ (Events∞ R) λ r′ → (∀ n → Agree n (residual g) (skip k′ r′)) × Past (Events∞.force r′) (residual g″)
+      bg-code  : Σ World λ u → Σ (Env Δ u) λ E′ → Σ (u ⊑ v) λ υ → wkEnv υ E′ ≡ Here.env (walk π′ top)
+                 × act′ ≗ compile (f y) E′ υ (Here.obs (walk π′ top)) (Here.kont (walk π′ top))
+      bg-stack : StackAs T q ϑ K bs → StackAs T′ q ϑ′ K bs′
+
+    stk′ : StackAs T q ϑ K bs → StackAs T′ (q ++ [ ix 1 ]) same⊑ (push (back q back′) ϑ′ K) bs′
+    stk′ sk = backAs q [] (<ᵖ-below q []) (≗-trans (wk-same back′) rests′) (bg-stack sk)
+
+    ca′ : StackAs T q ϑ K bs → CtlAs T′ (q ++ [ ix 1 ]) (run act′ same⊑ (push (back q back′) ϑ′ K)) bs′
+    ca′ sk = subAs π′ bg-code (stk′ sk)
+
+    postulate
+      bg-ticked  : (sk : StackAs T q ϑ K bs) → Ticked T clk sk → Ticked T′ clk (bg-stack sk)
+      bg-owned   : (sk : StackAs T q ϑ K bs) → Owned H T (runAs [] (≗-refl _) sk) → Owned heap′ T′ (ca′ sk)
+      bg-kernels : Kernels H T → Kernels heap′ T′
+      bg-meaning : Meaning H T → Meaning heap′ T′
+      bg-queue   : Queue H q clk ts T → Queue heap′ (q ++ [ ix 1 ]) clk ts′ T′
+      bg-behind  : Each H (Heads q) T → Each heap′ (Heads (q ++ [ ix 1 ])) T′
+      bg-fresh   : AllPairs _≢_ (names T) → AllPairs _≢_ (names T′)
 
   -- The ghost's admit with room: the lane first, nothing dropped.
   admit-room : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) q a (ls : List (U.Node Γ B)) qs d → roomy op (length ls) ≡ true
@@ -833,18 +942,6 @@ module Ascending (R : Set) where
   outer-admit op g o q a o′ ls qs p e rewrite e = refl
 
   postulate
-    -- A lane begun: counted, cut, listed and subscribed under the run's
-    -- `ix 1`, the run at the lane's pending node; the ghost past the
-    -- flatMap's skip, the lane its own.
-    --
-    -- The cut is allocated, so the tree, its heap and every field are
-    -- owed in the grown world: no transport of a strong tree along `_⊑_`
-    -- exists yet, and `sub-onward` owes the same one.
-    lane-begin : ∀ {g m} (st : Strong g m) {m₀ Δ A B op f fl oc k r pl} {T : Sub (Conf.world (Mach.conf m₀)) [] R}
-                 {t : Sub (Conf.world (Mach.conf m₀)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₀)) Δ B)}
-                 {ρ : Path T (flatMapˢ op f fl oc k r pl t ls)} {y : A} {pl′}
-               → Begins g (loadOf st) m₀ ρ y pl′ → Hopped st m₀
-
     -- An outer's value reaching its flatMap: the count its lanes, each
     -- live lane showing.
     --
@@ -856,6 +953,30 @@ module Ascending (R : Set) where
                     (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {y : A}
                   → Calling g ℓ m₁ (ρ ⊕ in-outer here) (sends y)
                   → At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.active fl) ≡ length (At.partLanes (Conf.heap (Mach.conf m₁)) ls)
+
+  -- A lane begun: counted, cut, listed and subscribed under the run's
+  -- `ix 1`, the run at the lane's pending node; the ghost past the
+  -- flatMap's skip, the lane its own.
+  lane-begin : ∀ {g m} (st : Strong g m) {m₀ Δ A B op f fl oc k r pl} {T : Sub (Conf.world (Mach.conf m₀)) [] R}
+               {t : Sub (Conf.world (Mach.conf m₀)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₀)) Δ B)}
+               {ρ : Path T (flatMapˢ op f fl oc k r pl t ls)} {y : A} {pl′}
+             → Begins g (loadOf st) m₀ ρ y pl′ → Hopped st m₀
+  lane-begin st {m₀ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {pl′ = pl′}
+    b@record { sane = sn ; placed = pd ; ctl = refl ; stack = sk ; lifted = S , L , sg ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
+             ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so ; behind = bh }
+    with begin-path b
+  ... | sr with Begun.bg-ghost sr pl′ sn pd L sg
+  ...   | g″ , pg , sn″ , pd″ , k″ , r″ , ag , pp =
+    g″ , _ , Started.runs sr
+    , carried (record
+      { sane = sn″ ; placed = pd″ ; tree = Begun.T′ sr pl′ ; ctlAs = Begun.ca′ sr pl′ sk ; meets = pg
+      ; owned = Begun.bg-owned sr pl′ sk ow ; kernels = Begun.bg-kernels sr pl′ kn ; meaning = Begun.bg-meaning sr pl′ mn
+      ; queue = subst (λ ts″ → Queue (Started.heap′ sr) (q ++ [ ix 1 ]) clk ts″ (Begun.T′ sr pl′)) refl (Begun.bg-queue sr pl′ qu)
+      ; books = record { fresh = Begun.bg-fresh sr pl′ fs
+                       ; clocked = trans (proj₁ ck) (sym (tick-under q 1 (begin-deep b))) , proj₁ ck , Begun.bg-ticked sr pl′ sk (proj₂ ck)
+                       ; paidUp = trans (Started.todo′ sr) (cong (mapList (wkTodo (Started.grow sr))) pu) ; running = rn }
+      ; sorted = sorted-⇝ so (Started.runs sr) ; behind = Begun.bg-behind sr pl′ bh })
+    , passed ag pp
 
   -- An admitted value with room: its lane begun where the value is, the
   -- ghost's admit the runtime's.
@@ -881,7 +1002,7 @@ module Ascending (R : Set) where
                  , sg
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
-      ; sorted = sorted-⇝ so p ; behind = bh ; kept = kp })
+      ; sorted = sorted-⇝ so p ; behind = bh })
     where
       G  = λ a j → U.subscribe (f a) j
       LS = At.partLanes hp ls
@@ -1330,7 +1451,7 @@ module Ascending (R : Set) where
       ; meaning = Dequeued.dq-meaning H₂ ρ ys (Freed.fr-meaning hp ρ o mn)
       ; queue = Dequeued.dq-queue H₂ ρ ys (Freed.fr-queue hp ρ o qu)
       ; books = record { fresh = fs ; clocked = proj₁ ck , proj₁ ck , proj₂ ck ; paidUp = pu ; running = rn }
-      ; sorted = sorted-⇝ so (⇝-trans p p′) ; behind = Dequeued.dq-behind H₂ ρ ys (Freed.fr-behind hp ρ o bh) ; kept = kp }))
+      ; sorted = sorted-⇝ so (⇝-trans p p′) ; behind = Dequeued.dq-behind H₂ ρ ys (Freed.fr-behind hp ρ o bh) }))
     where
       H₂  = freed hp (laneOf o) fl
       H₃  = Dequeued.H′ H₂ ρ ys

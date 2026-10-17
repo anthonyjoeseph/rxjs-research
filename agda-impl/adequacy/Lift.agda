@@ -9,8 +9,8 @@ open import Data.List.Properties using (++-assoc)
 open import Data.List.Relation.Unary.Any using (Any; here)
 import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.Sum using (inj₂; [_,_]′)
-open import Data.Nat.Properties using (≤-refl)
+open import Data.Sum using (inj₁; inj₂; [_,_]′)
+open import Data.Nat.Properties using (≤-refl; <-trans)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; map) renaming (lookup to lookupᴬ)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to all-++⁺)
 open import Data.List.Relation.Unary.AllPairs using (_∷_)
@@ -50,14 +50,19 @@ module Lifting (R : Set) where
   open Sorting R using (Beyond)
   open Run (Pureᴾ R) using (Act; module Kit; module FlatKit)
   open Strongly R using (Strong; Carried; Books; carried; Sub; pendingˢ; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; emitC; kontC; feedC; srcC; taking; taken; feeding; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _≗_; Each; Heads; rootObs; seen; seenL) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
-  open Strongly.Against R using (runAs; bursts)
+  open Strongly.Against R using (CtlAs; calmAs; noteAs; runAs; subAs; burstAs; bursts)
   open Moving R using (plant; true≢false)
   open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each)
   open Unsubbing R using (_⇝_; site-tears)
   open Locality R using (site-holds; site-gated)
   open Lowering R using (site-lowers; queue-lowers; torn-owned; fed-lowers)
-  open Ghosting R using (module Far; module Calling; Has; residual; _⊏_; load; loadOf; lowered; Hopped; Hops; opening; firstCall; SourceFirst; BodyFirst; OuterFirst; PoolBehind; RestBehind; LaneFirst; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; Far; Off; Opt; Clear; ClearL; OneLane; opened; Calling; sends; Rises; Called; Aloft; hop-sorted)
+  open Ghosting R using (module Far; module Calling; Has; residual; _⊏_; ⊏-trans; _≺_; measure; load; loadOf; passed; lowered; showing; Hopped; Hops; opening; firstCall; SourceFirst; BodyFirst; OuterFirst; PoolBehind; RestBehind; LaneFirst; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; Far; Off; Opt; Clear; ClearL; OneLane; opened; Calling; sends; Rises; Called; Aloft; hop-sorted)
   open Read
+
+  -- The program a subscription about to begin begins.
+  subOf : ∀ {h} {t : Sub h [] R} {p c bs} → CtlAs t p c bs → Maybe (Σ (List Set) λ Δ → Σ Set λ A → T.Obs Timeline Δ A)
+  subOf (subAs {s = s} _ _ _) = just (_ , _ , s)
+  subOf _                     = nothing
 
   postulate
     -- The turn, nothing held and no timer queued: the ghost shows
@@ -65,14 +70,27 @@ module Lifting (R : Set) where
     turn-dry : ∀ {g m w} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m → Conf.ctl (Mach.conf m) ≡ held σ bottom
              → Mach.bursts m ≡ [] → Mach.timers m ≡ [] → ∀ {k b} → Has (residual g) k b → ⊥
 
-    -- A subscription begun at its pending node, its kernel run to the
-    -- next re-entry state: its program smaller by what was begun, or
-    -- past a defer's skip.
-    --
-    -- A kernel allocates its cells, so the tree is owed in the grown
-    -- world: no transport of a strong tree along `_⊑_` exists yet, and
-    -- `lane-begin` owes the same one.
-    sub-onward : ∀ {g m} (cr : Carried g m) → opening (Carried.ctlAs cr) ≡ true → Hops cr
+    -- A subscription begun at its pending node, by what it begins: its
+    -- kernel run to the next re-entry state, its program smaller by what
+    -- was begun, or past a defer's skip.  A kernel allocating its cells
+    -- owes the tree in the grown world, along `Growing.wkTree`.
+    sub-cold    : ∀ {g m} (cr : Carried g m) {Δ A} {c : Timeline A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.cold c) → Hops cr
+    sub-empty   : ∀ {g m} (cr : Carried g m) {Δ A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.empty) → Hops cr
+    sub-of      : ∀ {g m} (cr : Carried g m) {Δ A} {xs : List A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.of xs) → Hops cr
+    -- A map begun runs nothing of its own: its source begins under the
+    -- mapped observer, the map restaged over it.
+    map-restage : ∀ {g m} (cr : Carried g m) {Δ A B} {f : A → B} {s : T.Obs Timeline Δ A} → subOf (Carried.ctlAs cr) ≡ just (Δ , B , T.map f s)
+                → Σ (Carried g m) λ cr′ → subOf (Carried.ctlAs cr′) ≡ just (Δ , A , s) × measure (carried cr′) ≺ measure (carried cr)
+    sub-scan    : ∀ {g m} (cr : Carried g m) {Δ A B} {f : B → A → B} {z} {s : T.Obs Timeline Δ A}
+                → subOf (Carried.ctlAs cr) ≡ just (Δ , B , T.scan f z s) → Hops cr
+    sub-take    : ∀ {g m} (cr : Carried g m) {Δ A i} {p : A → Bool} {s : T.Obs Timeline Δ A}
+                → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.takeWhile i p s) → Hops cr
+    sub-flat    : ∀ {g m} (cr : Carried g m) {Δ A B op} {f : A → T.Obs Timeline Δ B} {s : T.Obs Timeline Δ A}
+                → subOf (Carried.ctlAs cr) ≡ just (Δ , B , T.flatMap op f s) → Hops cr
+    sub-connect : ∀ {g m} (cr : Carried g m) {Δ A B} {s : T.Obs Timeline Δ A} {b : T.Obs Timeline (A ∷ Δ) B}
+                → subOf (Carried.ctlAs cr) ≡ just (Δ , B , T.connect s b) → Hops cr
+    sub-joined  : ∀ {g m} (cr : Carried g m) {Δ A} {i : A ∈ᴸ Δ} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.connected i) → Hops cr
+    sub-defer   : ∀ {g m} (cr : Carried g m) {Δ A} {l : T.Later Timeline Δ A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.defer l) → Hops cr
 
     -- An `of` reading its observer closed: its burst over, nothing
     -- delivered.  The ghost must hold nothing of it.
@@ -618,3 +636,37 @@ module Lifting (R : Set) where
                × Lifts (Conf.heap (Mach.conf m)) π (U.step (U.ofᶜ p i (x ∷ xs))) (U.step c)
   heads-lift cr π sn cl with lift-up cr here π sn cl
   ... | c , pc , L , _ = c , pc , L
+
+  ≺-trans : ∀ {a b c} → a ≺ b → b ≺ c → a ≺ c
+  ≺-trans (inj₁ ab)          (inj₁ bc)          = inj₁ (⊏-trans ab bc)
+  ≺-trans (inj₁ ab)          (inj₂ (refl , _))  = inj₁ ab
+  ≺-trans (inj₂ (refl , _))  (inj₁ bc)          = inj₁ bc
+  ≺-trans (inj₂ (refl , ab)) (inj₂ (refl , bc)) = inj₂ (refl , <-trans ab bc)
+
+  -- A hop from a lighter configuration of the same ghost is a hop from
+  -- the heavier.
+  hopped-below : ∀ {g m m₁ m′} {st : Strong g m} {st′ : Strong g m₁} → measure st′ ≺ measure st → Hopped st′ m′ → Hopped st m′
+  hopped-below lt (g″ , m₀ , p , st₀ , passed ag pp)   = g″ , m₀ , p , st₀ , passed ag pp
+  hopped-below lt (g″ , m₀ , p , st₀ , lowered ag lt′) = g″ , m₀ , p , st₀ , lowered ag (≺-trans lt′ lt)
+  hopped-below lt (g″ , m₀ , p , st₀ , showing pp ns)  = g″ , m₀ , p , st₀ , showing pp ns
+
+  -- A subscription begun, by its program.
+  sub-by : ∀ {g m} (cr : Carried g m) {Δ A} (s : T.Obs Timeline Δ A) → subOf (Carried.ctlAs cr) ≡ just (Δ , A , s) → Hops cr
+  sub-by cr (T.cold c)          e eq = sub-cold cr e eq
+  sub-by cr T.empty             e eq = sub-empty cr e eq
+  sub-by cr (T.of xs)           e eq = sub-of cr e eq
+  sub-by cr (T.map f s)         e eq with map-restage cr e
+  ... | cr′ , e′ , lt = hopped-below lt (sub-by cr′ s e′ eq)
+  sub-by cr (T.scan f z s)      e eq = sub-scan cr e eq
+  sub-by cr (T.takeWhile i p s) e eq = sub-take cr e eq
+  sub-by cr (T.flatMap op f s)  e eq = sub-flat cr e eq
+  sub-by cr (T.connect s b)     e eq = sub-connect cr e eq
+  sub-by cr (T.connected i)     e eq = sub-joined cr e eq
+  sub-by cr (T.defer l)         e eq = sub-defer cr e eq
+
+  sub-onward : ∀ {g m} (cr : Carried g m) → opening (Carried.ctlAs cr) ≡ true → Hops cr
+  sub-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = subAs {s = s} _ _ _ } _ = sub-by cr s refl
+  sub-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = calmAs } ()
+  sub-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = noteAs _ _ _ } ()
+  sub-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs _ _ _ } ()
+  sub-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = burstAs _ _ _ } ()
