@@ -21,7 +21,7 @@ open import Data.Maybe using (Maybe; just; nothing; is-just)
 open import Data.Maybe.Properties using (just-injective)
 open import Data.Product using (_×_; _,_; Σ)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import denotation.MonotonicList using (Events∞; Pos; Timeline; agree-refl; at; ix; _<ᵖ_; <ᵖ-trans; <ᵖ-asym; <ᵖ-below)
 import denotation.Unfold as U
@@ -58,7 +58,7 @@ module Lifting (R : Set) where
   open Unsubbing R using (_⇝_; site-tears)
   open Locality R using (site-holds; site-gated)
   open Lowering R using (site-lowers; queue-lowers; torn-owned; fed-lowers)
-  open Ghosting R using (module Far; module Calling; Has; residual; _⊏_; ⊏-trans; _≺_; measure; load; loadOf; passed; lowered; showing; Hopped; Hops; opening; firstCall; SourceFirst; BodyFirst; OuterFirst; PoolBehind; RestBehind; LaneFirst; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; Far; Off; Opt; Clear; ClearL; clear-zip; clear-each; far-apart; OneLane; opened; Calling; sends; Rises; Called; Aloft; hop-sorted)
+  open Ghosting R using (module Far; module Calling; Has; residual; _⊏_; ⊏-trans; _≺_; measure; load; loadOf; passed; lowered; showing; Hopped; Hops; opening; firstCall; SourceFirst; BodyFirst; OuterFirst; PoolBehind; RestBehind; LaneFirst; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; Far; Off; Opt; Clear; ClearL; clear-zip; clear-each; far-apart; opt-zip; all-zip; opt-each; each-lanes; each-sub; OneLane; opened; Calling; sends; Rises; Called; Aloft; hop-sorted)
   open Restaging R using (subOf; Offers; of-restage; empty-restage; map-restage; Restages; scan-restage; take-restage; flat-restage; connect-restage)
   open Read
 
@@ -220,15 +220,16 @@ module Lifting (R : Set) where
               → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {c} → At.part (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl so ls) ≡ just c
               → Σ Pos λ q → Σ (U.Node Δ′ B′) λ pl′ → U.step pl ≡ U.skipˢ q pl′ × Under p q
 
-    -- At a pool: that pin ahead of its outer and every lane it holds.
-    pool-ahead : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+    -- At a pool over a hidden `of`: neither the flatMap's outer nor any
+    -- lane it holds heads under the run, as no sibling along its path
+    -- does (`void-spread`).
+    pool-off : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
               → seen (Conf.heap (Mach.conf m)) π ≡ false
               → ∀ {Δ′ A′ B′ op f fl oc k r pl} {so : Sub (Conf.world (Mach.conf m)) Δ′ A′} {ls : List (Lane (Conf.world (Mach.conf m)) Δ′ B′)}
                   (ψ : Path (Carried.tree cr) (flatMapˢ op f fl oc k r pl so ls)) (σ : Path (flatMapˢ op f fl oc k r pl so ls) _) → ψ ⊕ σ ≡ π
               → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {c} → At.part (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl so ls) ≡ just c
-              → ∀ {q pl′} → U.step pl ≡ U.skipˢ q pl′ → Under p q
-              → U.aheadˢ q (U.outerOf (At.part (Conf.heap (Mach.conf m)) so)) (U.earliest (At.partLanes (Conf.heap (Mach.conf m)) ls)) ≡ true
+              → Opt (Off p) (At.part (Conf.heap (Mach.conf m)) so) × All (Off p) (At.partLanes (Conf.heap (Mach.conf m)) ls)
 
     -- Over a hidden `of`, at a part the ghost holds: no sibling its path
     -- passes heads under the run, as at an `of` the ghost holds
@@ -791,6 +792,39 @@ module Lifting (R : Set) where
   flat-skip : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) o ls qs p {q p′} → U.step p ≡ U.skipˢ q p′ → U.aheadˢ q o (U.earliest ls) ≡ true
             → U.flatˢ op g o ls qs p (U.step p) (U.earliest ls) ≡ U.skipˢ q (U.flatMapᶜ op g (U.nodeᵒ o) ls qs p′)
   flat-skip op g o ls qs p ep ah rewrite ep | ah = refl
+
+  -- A pin under `p` comes before every part beyond `p`.
+  clear-far : ∀ {p q} (s : Maybe Pos) → (∀ {k} → s ≡ just k → Beyond p k) → Under p q → U.clearˢ q s ≡ true
+  clear-far nothing  f u = refl
+  clear-far (just k) f u = far-lt (f refl) u
+
+  ahead-far : ∀ {p Γ A B} (o : Maybe (U.Node Γ A)) (ls : List (U.Node Γ B)) {q} → Opt (Far p) o → All (Far p) ls → Under p q
+            → U.aheadˢ q (U.outerOf o) (U.earliest ls) ≡ true
+  ahead-far nothing  ls fo fs u with U.earliest ls | earliest-far ls fs
+  ... | U.none               | _ = refl
+  ... | U.found _ _ _ _ _    | b = far-lt b u
+  ahead-far (just c) ls fo fs u with U.earliest ls | earliest-far ls fs
+  ... | U.none               | _ = clear-far (U.headˢ (U.step c)) (Far.far-at fo) u
+  ... | U.found _ _ _ _ _    | b = cong₂ _∧_ (clear-far (U.headˢ (U.step c)) (Far.far-at fo) u) (far-lt b u)
+
+  -- At a pool: its pin ahead of the flatMap's outer and every lane it
+  -- holds, each no earlier than the run and not under it.
+  pool-ahead : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+            → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+            → seen (Conf.heap (Mach.conf m)) π ≡ false
+            → ∀ {Δ′ A′ B′ op f fl oc k r pl} {so : Sub (Conf.world (Mach.conf m)) Δ′ A′} {ls : List (Lane (Conf.world (Mach.conf m)) Δ′ B′)}
+                (ψ : Path (Carried.tree cr) (flatMapˢ op f fl oc k r pl so ls)) (σ : Path (flatMapˢ op f fl oc k r pl so ls) _) → ψ ⊕ σ ≡ π
+            → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {c} → At.part (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl so ls) ≡ just c
+            → ∀ {q pl′} → U.step pl ≡ U.skipˢ q pl′ → Under p q
+            → U.aheadˢ q (U.outerOf (At.part (Conf.heap (Mach.conf m)) so)) (U.earliest (At.partLanes (Conf.heap (Mach.conf m)) ls)) ≡ true
+  pool-ahead {m = m} cr {p = p} π fc op sn {so = so} {ls = ls} ψ σ e se pt ep un with pool-off cr π fc op sn ψ σ e se pt
+  ... | oo , ol =
+    ahead-far O (At.partLanes (Conf.heap (Mach.conf m)) ls)
+      (opt-zip {P = Heads p} {Q = Off p} {R′ = Far p} (λ {Γ} {A} {c} → far-apart {p} {Γ} {A} {c}) O (opt-each {H = Conf.heap (Mach.conf m)} {P = Heads p} O (Each.parts ev (in-outer here) refl)) oo)
+      (all-zip {P = Heads p} {Q = Off p} {R′ = Far p} (λ {Γ} {A} {c} → far-apart {p} {Γ} {A} {c}) (each-lanes {H = Conf.heap (Mach.conf m)} {P = Heads p} ls (λ πL sL → Each.parts ev (in-lanes πL) sL)) ol) un
+    where O  = At.part (Conf.heap (Mach.conf m)) so
+          ev = each-sub (subst (λ q′ → Each (Conf.heap (Mach.conf m)) (Heads q′) (Carried.tree cr))
+                               (run-at (Carried.ctlAs cr) fc (Owned.placed (Carried.owned cr))) (Carried.behind cr)) ψ se
 
   -- At a pool: the flatMap's next event the pool's pin.
   pool-pin : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
