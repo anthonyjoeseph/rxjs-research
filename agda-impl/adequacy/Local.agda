@@ -17,7 +17,7 @@ open import Data.Nat using (ℕ; zero; suc)
 open import Data.Empty using (⊥-elim)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
-open import Data.Unit using (tt)
+open import Data.Unit using (⊤; tt)
 open import Level using (lift; lower)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst)
 open import Data.List.Relation.Unary.All using (All; _∷_) renaming ([] to []ᴬ; tabulate to tabulateᴬ; lookup to lookupᴬ; map to mapᴬ)
@@ -36,7 +36,7 @@ open import adequacy.Torn using (module Tearing)
 open import adequacy.Lowers using (module Lowering)
 
 module Locality (R : Set) where
-  open Heap using (Quiet; Sink; _∋_; same)
+  open Heap using (Quiet; Sink; _∋_; same; cell; slot)
   open Shared Timeline (Out R) using (Heapᴹ; look; store; stored; Val; wkVal)
   open Strongly R
   open Moving R using (pairs-split; pairs-r)
@@ -124,6 +124,12 @@ module Locality (R : Set) where
     gatedL-at (this-lane π) (_ , g , _) = gated-at π g
     gatedL-at (next-lane π) (_ , _ , gl) = gatedL-at π gl
 
+  -- What a flatMap's kernel reads: its count, its lanes, its refill
+  -- flag and every name under its head cells.
+  flatReads : ∀ {h Δ A B} → FlatKit.Flat A h → Kit.Cut h → Maybe (Quiet h) → Sink h ⊤ → Sub h Δ A → List (Lane h Δ B) → List (Name h)
+  flatReads fl oc k r so ls = (cell _ , FlatKit.Flat.active fl) ∷ (cell _ , FlatKit.Flat.lanes fl) ∷ (cell _ , FlatKit.Flat.refill fl)
+                              ∷ cutNames oc ++ quietName k ++ (slot _ , r) ∷ names so ++ laneNames ls
+
   module Heaps {h} (H H′ : Heapᴹ h) where
     ----------------------------------------------------------------------
     -- A name apart from the moved ones reads alike
@@ -170,20 +176,14 @@ module Locality (R : Set) where
       holds-alike (takeWhileˢ i p c k tk s) ag (a , hs) =
         attached-alike c k (ag (Kit.held c) (there (here refl))) (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ˡ m))) a
         , holds-alike s (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) m))) hs
-      holds-alike (flatMapˢ op f fl oc k r pl so ls) ag {E} {o} (rf , sl , a , hs , ac , gn , hl) =
-        trans (cong lower (ag (FlatKit.Flat.refill fl) (there (there (there (there (here refl))))))) rf
-        , slot-alike r (ag r (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (here refl))))) sl
-        , attached-alike oc k (ag (Kit.held oc) (++⁺ʳ (flatNames fl) (there (here refl))))
-                              (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ˡ m)))) a
-        , holds-alike so (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ m)))))) hs
-        , trans (cong lower (ag (FlatKit.Flat.active fl) (here refl))) (trans ac (sym (count-lives ls lv)))
-        , gone-alike fl ls (ag (FlatKit.Flat.lanes fl) (there (there (there (here refl))))) lv gn
-        , holdsL-alike ls (λ j m → ag j (inL m)) {op = op} {f = f} {E = E} {o = o} {fl = fl} hl
+      holds-alike (flatMapˢ op f fl oc k r pl so ls) ag = holds-flat {op = op} {f} {fl} {oc} {k} {r} {pl} so ls (λ j m → ag j (rd m))
         where
-          inL : ∀ {x} → x ∈ᴸ laneNames ls → x ∈ᴸ names (flatMapˢ op f fl oc k r pl so ls)
-          inL m = ++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) m))))
-          lv : Lives ls
-          lv {c} m = ag (Kit.live c) (inL (cut-in ls m))
+          rd : ∀ {x} → x ∈ᴸ flatReads fl oc k r so ls → x ∈ᴸ names (flatMapˢ op f fl oc k r pl so ls)
+          rd (here e)                 = here e
+          rd (there (here e))         = there (there (there (here e)))
+          rd (there (there (here e))) = there (there (there (there (here e))))
+          rd (there (there (there m))) = there (there (there (there (there m))))
+
       holds-alike (connectˢ S c b kb k fd rp e rt src bd) ag (a , be , st , hs , hb) =
         attached-alike c k (ag (Kit.held c) (++⁺ʳ (subjectNames S) (there (here refl))))
                            (λ j m → ag j (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ˡ m)))))) a
@@ -195,6 +195,26 @@ module Locality (R : Set) where
       holds-alike (deferˢ k s) ag (st , hs) =
         stashed-alike k (λ j m → ag j (++⁺ˡ m)) st , holds-alike s (λ j m → ag j (++⁺ʳ (quietName k) m)) hs
 
+      -- A flatMap's kernel reads its count, its lanes, its refill flag
+      -- and what lies under its head cells: never its done flag or its
+      -- queue.
+      holds-flat : ∀ {Δ A B op f fl oc k r pl} (so : Sub h Δ A) (ls : List (Lane h Δ B))
+                 → Alike H H′ (flatReads fl oc k r so ls)
+                 → ∀ {E o} → At.Holds H (flatMapˢ op f fl oc k r pl so ls) E o → At.Holds H′ (flatMapˢ op f fl oc k r pl so ls) E o
+      holds-flat {op = op} {f} {fl} {oc} {k} {r} so ls ag {E} {o} (rf , sl , a , hs , ac , gn , hl) =
+        trans (cong lower (ag (FlatKit.Flat.refill fl) (there (there (here refl))))) rf
+        , slot-alike r (ag r (there (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (here refl))))))) sl
+        , attached-alike oc k (ag (Kit.held oc) (there (there (there (there (here refl))))))
+                              (λ j m → ag j (there (there (there (++⁺ʳ (cutNames oc) (++⁺ˡ m)))))) a
+        , holds-alike so (λ j m → ag j (there (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ m)))))))) hs
+        , trans (cong lower (ag (FlatKit.Flat.active fl) (here refl))) (trans ac (sym (count-lives ls lv)))
+        , gone-alike fl ls (ag (FlatKit.Flat.lanes fl) (there (here refl))) lv gn
+        , holdsL-alike ls (λ j m → ag j (inL m)) {op = op} {f = f} {E = E} {o = o} {fl = fl} hl
+        where
+          inL : ∀ {x} → x ∈ᴸ laneNames ls → x ∈ᴸ flatReads fl oc k r so ls
+          inL m = there (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) m))))))
+          lv : Lives ls
+          lv {c} m = ag (Kit.live c) (inL (cut-in ls m))
       holdsL-alike : ∀ {Δ B} (ls : List (Lane h Δ B)) → Alike H H′ (laneNames ls)
                    → ∀ {A : Set} {op f E o fl} → At.HoldsLanes H {A = A} op f E o fl ls → At.HoldsLanes H′ {A = A} op f E o fl ls
       holdsL-alike []                ag hl = hl
@@ -482,6 +502,30 @@ module Locality (R : Set) where
       fedL-alike (lane c k s ∷ ls) ag ν (f₁ , f₂) =
         fed-alike s (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ˡ m)))) ν f₁
         , fedL-alike ls (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ʳ (names s) m)))) ν f₂
+
+    ----------------------------------------------------------------------
+    -- A flatMap whose reads are alike: its done flag and queue free to move
+
+    flat-so : ∀ {Δ A B fl oc k r} {so : Sub h Δ A} {ls : List (Lane h Δ B)} → Alike H H′ (flatReads fl oc k r so ls) → Alike H H′ (names so)
+    flat-so {oc = oc} {k} ag j m = ag j (there (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ m)))))))
+
+    flat-ls : ∀ {Δ A B fl oc k r} {so : Sub h Δ A} {ls : List (Lane h Δ B)} → Alike H H′ (flatReads fl oc k r so ls) → Alike H H′ (laneNames ls)
+    flat-ls {oc = oc} {k} {so = so} ag j m = ag j (there (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) m)))))))
+
+    gated-flat : ∀ {Δ A B op f fl oc k r pl} (so : Sub h Δ A) (ls : List (Lane h Δ B)) → Alike H H′ (flatReads fl oc k r so ls)
+               → At.Gated H (flatMapˢ op f fl oc k r pl so ls) → At.Gated H′ (flatMapˢ op f fl oc k r pl so ls)
+    gated-flat {fl = fl} {oc} {k} {r} so ls ag (g₁ , g₂) =
+      gated-alike so (flat-so {fl = fl} {oc} {k} {r} {so} {ls} ag) g₁ , gatedL-alike ls (flat-ls {fl = fl} {oc} {k} {r} {so} {ls} ag) g₂
+
+    spent-flat : ∀ {Δ A B op f fl oc k r pl} (so : Sub h Δ A) (ls : List (Lane h Δ B)) → Alike H H′ (flatReads fl oc k r so ls)
+               → At.Spent H (flatMapˢ op f fl oc k r pl so ls) → At.Spent H′ (flatMapˢ op f fl oc k r pl so ls)
+    spent-flat {fl = fl} {oc} {k} {r} so ls ag (c₁ , c₂) =
+      cut-alike k so (flat-so {fl = fl} {oc} {k} {r} {so} {ls} ag) c₁ , spentL-alike ls (flat-ls {fl = fl} {oc} {k} {r} {so} {ls} ag) c₂
+
+    fed-flat : ∀ {Δ A B op f fl oc k r pl} (so : Sub h Δ A) (ls : List (Lane h Δ B)) → Alike H H′ (flatReads fl oc k r so ls)
+             → ∀ ν → At.Fed H (flatMapˢ op f fl oc k r pl so ls) ν → At.Fed H′ (flatMapˢ op f fl oc k r pl so ls) ν
+    fed-flat {fl = fl} {oc} {k} {r} so ls ag ν (f₁ , f₂) =
+      fed-alike so (flat-so {fl = fl} {oc} {k} {r} {so} {ls} ag) ν f₁ , fedL-alike ls (flat-ls {fl = fl} {oc} {k} {r} {so} {ls} ag) ν f₂
 
     mutual
       fed-path : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) → AllPairs _≢_ (names t) → Off H H′ (names u)

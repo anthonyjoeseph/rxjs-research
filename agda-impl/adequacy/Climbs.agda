@@ -62,13 +62,13 @@ module Ascending (R : Set) where
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
   open Moving R using (takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; holds-plant; settled-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
-  open Tearing R using (fresh-path; takeSite; bodySite; look-store)
+  open Tearing R using (fresh-path; takeSite; bodySite; look-store; Alike; part-alike; partLanes-alike; part-flat)
   open Unsubbing R using (_⇝_; ⇝-trans; now; then; ≗-trans; wk≗; wk-same; bind≗)
   open Sequencing R using (seq-assoc; seq-done)
   open Restaging R using (walk-planted; tick-ix0)
   open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
   open Lifting R using (sub-onward; emit-shut; emit-void; emit-run; spread-past; behind-fire; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
-  open Locality R using (stored-at)
+  open Locality R using (stored-at; flatReads; module Heaps)
   open Growing R using (wkTree; wkLanes; wkPath)
   open Framing R using (scan-part; scan-owned; scan-kernels; scan-meaning; scan-queue; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++)
   open Read
@@ -662,7 +662,6 @@ module Ascending (R : Set) where
     postulate
       sd-active    : At.val H′ (FlatKit.Flat.active fl) ≡ At.val H (FlatKit.Flat.active fl)
       sd-fifo      : At.val H′ (FlatKit.Flat.queue fl) ≡ At.val H (FlatKit.Flat.queue fl)
-      sd-part      : ∀ {Δ′ A′} (v : Sub h Δ′ A′) → At.part H′ v ≡ At.part H v
       sd-lifts     : ∀ {Δ′ A′ Δ″ A″} {t : Sub h Δ′ A′} {v : Sub h Δ″ A″} {σ : Path t v} {s S} → Lifts H σ s S → Lifts H′ σ s S
       sd-owned     : ∀ {p ctl bs} {ca : CtlAs T p ctl bs} → Owned H T ca → Owned H′ T ca
       active-lanes : Kernels H T → (At.val H (FlatKit.Flat.active fl) ≡ᵇ 0) ≡ null (At.partLanes H ls)
@@ -679,11 +678,29 @@ module Ascending (R : Set) where
 
     module Wr (fs : AllPairs _≢_ (names T)) = Wrote H H′ ρ (off-store H (FlatKit.Flat.outerDone fl)) mine fs
 
+    -- The done flag no read of the node's own clauses.
+    sd-alike : AllPairs _≢_ (names w₀) → Alike H H′ (flatReads fl oc k r u ls)
+    sd-alike (a₀ ∷ a₁ ∷ _) j (here e)  = look-store H (FlatKit.Flat.outerDone fl) j (λ eq → lookupᴬ a₀ (here refl) (sym (trans eq e)))
+    sd-alike (a₀ ∷ a₁ ∷ _) j (there m) = look-store H (FlatKit.Flat.outerDone fl) j (lookupᴬ a₁ (there m))
+
+    sd-part : AllPairs _≢_ (names w₀) → At.part H′ w₀ ≡ At.part H w₀
+    sd-part fr@(_ ∷ a₁ ∷ _) =
+      part-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} u ls (look-store H (FlatKit.Flat.outerDone fl) (FlatKit.Flat.queue fl) (lookupᴬ a₁ (here refl)))
+                (Heaps.flat-so H H′ {fl = fl} {oc} {k} {r} {u} {ls} (sd-alike fr)) (Heaps.flat-ls H H′ {fl = fl} {oc} {k} {r} {u} {ls} (sd-alike fr))
+
+    sd-holds : AllPairs _≢_ (names w₀) → ∀ {E o} → At.Holds H w₀ E o → At.Holds H′ w₀ E o
+    sd-holds fr = Heaps.holds-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} u ls (sd-alike fr)
+
+    sd-gated : AllPairs _≢_ (names w₀) → At.Gated H w₀ → At.Gated H′ w₀
+    sd-gated fr = Heaps.gated-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} u ls (sd-alike fr)
+
+    sd-spent : AllPairs _≢_ (names w₀) → At.Spent H w₀ → At.Spent H′ w₀
+    sd-spent fr = Heaps.spent-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} u ls (sd-alike fr)
+
+    sd-fed : AllPairs _≢_ (names w₀) → ∀ ν → At.Fed H w₀ ν → At.Fed H′ w₀ ν
+    sd-fed fr = Heaps.fed-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} u ls (sd-alike fr)
+
     postulate
-      sd-holds : AllPairs _≢_ (names w₀) → ∀ {E o} → At.Holds H w₀ E o → At.Holds H′ w₀ E o
-      sd-gated : AllPairs _≢_ (names w₀) → At.Gated H w₀ → At.Gated H′ w₀
-      sd-spent : AllPairs _≢_ (names w₀) → At.Spent H w₀ → At.Spent H′ w₀
-      sd-fed   : AllPairs _≢_ (names w₀) → ∀ ν → At.Fed H w₀ ν → At.Fed H′ w₀ ν
       sd-queue : ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
       sd-heads : AllPairs _≢_ (names w₀) → ∀ {q} → Each H (Heads q) w₀ → Each H′ (Heads q) w₀
 
@@ -694,7 +711,7 @@ module Ascending (R : Set) where
     sd-meaning fs = Wr.wr-meaning fs (sd-fed (fresh-path ρ fs))
 
     sd-behind : AllPairs _≢_ (names T) → ∀ {q} → Each H (Heads q) T → Each H′ (Heads q) T
-    sd-behind fs = Wr.wr-behind fs (sd-part w₀) (sd-heads (fresh-path ρ fs))
+    sd-behind fs = Wr.wr-behind fs (sd-part (fresh-path ρ fs)) (sd-heads (fresh-path ρ fs))
 
     settle-eq : Kernels H T → ((At.val H′ (FlatKit.Flat.active fl) ≡ᵇ 0) ∧ null (At.val H′ (FlatKit.Flat.queue fl)))
                               ≡ (null (At.partLanes H ls) ∧ null (At.val H (FlatKit.Flat.queue fl)))
@@ -750,7 +767,7 @@ module Ascending (R : Set) where
       { sane = sn ; placed = pd ; ctl = refl
       ; code = ≗-trans e₅ (bind≗ (open-code {m = Observer.complete o} (trans (cong (λ x → x ∧ b) (Settles.done-read hp ρ)) eq)) λ _ → ≗-refl ⟦ ks ⟧ᶜ)
       ; stack = sk
-      ; lifted = trans (Settles.sd-part hp ρ (flatMapˢ op f fl oc k r po u ls)) (flat-gone hp {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} gn (proj₁ nl) (proj₂ nl)) , S
+      ; lifted = trans (Settles.sd-part hp ρ (fresh-path ρ fs)) (flat-gone hp {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} gn (proj₁ nl) (proj₂ nl)) , S
                , Settles.sd-lifts hp ρ (subst₂ (λ ls′ qs′ → Lifts hp ρ (U.outerˢ op (λ a j → U.subscribe (f a) j) o₀ (U.endˢ q) ls′ qs′ po) S)
                                                (proj₁ nl) (proj₂ nl) Lρ) , sg
       ; owned = Settles.sd-owned hp ρ ow ; kernels = Settles.sd-kernels hp ρ fs kn ; meaning = Settles.sd-meaning hp ρ fs mn
@@ -1308,8 +1325,6 @@ module Ascending (R : Set) where
     H′ = store H (FlatKit.Flat.queue fl) (lift ys)
 
     postulate
-      dq-part    : At.part H′ t ≡ At.part H t
-      dq-lanes   : At.partLanes H′ ls ≡ At.partLanes H ls
       dq-opened  : ∀ b → opened (store H (FlatKit.Flat.queue fl) (lift ys)) b ρ ≡ opened H b ρ
       dq-lifts   : ∀ {s S} → Lifts H ρ s S → Lifts H′ ρ s S
       dq-owned   : ∀ {p ctl bs} {ca : CtlAs T p ctl bs} → Owned H T ca → Owned H′ T ca
@@ -1327,11 +1342,30 @@ module Ascending (R : Set) where
 
     module Wr (fs : AllPairs _≢_ (names T)) = Wrote H H′ ρ (off-store H (FlatKit.Flat.queue fl)) mine fs
 
+    -- The queue no read of the node's own clauses.
+    dq-alike : AllPairs _≢_ (names w₀) → Alike H H′ (flatReads fl oc k r t ls)
+    dq-alike (a₀ ∷ _ ∷ a₂ ∷ _) j (here e)  = look-store H (FlatKit.Flat.queue fl) j (λ eq → lookupᴬ a₀ (there (here refl)) (sym (trans eq e)))
+    dq-alike (a₀ ∷ _ ∷ a₂ ∷ _) j (there m) = look-store H (FlatKit.Flat.queue fl) j (lookupᴬ a₂ m)
+
+    dq-part : AllPairs _≢_ (names w₀) → At.part H′ t ≡ At.part H t
+    dq-part fr = part-alike H H′ t (Heaps.flat-so H H′ {fl = fl} {oc} {k} {r} {t} {ls} (dq-alike fr))
+
+    dq-lanes : AllPairs _≢_ (names w₀) → At.partLanes H′ ls ≡ At.partLanes H ls
+    dq-lanes fr = partLanes-alike H H′ ls (Heaps.flat-ls H H′ {fl = fl} {oc} {k} {r} {t} {ls} (dq-alike fr))
+
+    dq-holds : AllPairs _≢_ (names w₀) → ∀ {E o} → At.Holds H w₀ E o → At.Holds H′ w₀ E o
+    dq-holds fr = Heaps.holds-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} t ls (dq-alike fr)
+
+    dq-gated : AllPairs _≢_ (names w₀) → At.Gated H w₀ → At.Gated H′ w₀
+    dq-gated fr = Heaps.gated-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} t ls (dq-alike fr)
+
+    dq-spent : AllPairs _≢_ (names w₀) → At.Spent H w₀ → At.Spent H′ w₀
+    dq-spent fr = Heaps.spent-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} t ls (dq-alike fr)
+
+    dq-fed : AllPairs _≢_ (names w₀) → ∀ ν → At.Fed H w₀ ν → At.Fed H′ w₀ ν
+    dq-fed fr = Heaps.fed-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} t ls (dq-alike fr)
+
     postulate
-      dq-holds : AllPairs _≢_ (names w₀) → ∀ {E o} → At.Holds H w₀ E o → At.Holds H′ w₀ E o
-      dq-gated : AllPairs _≢_ (names w₀) → At.Gated H w₀ → At.Gated H′ w₀
-      dq-spent : AllPairs _≢_ (names w₀) → At.Spent H w₀ → At.Spent H′ w₀
-      dq-fed   : AllPairs _≢_ (names w₀) → ∀ ν → At.Fed H w₀ ν → At.Fed H′ w₀ ν
       dq-queue : ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
 
     dq-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels H′ T
@@ -1533,8 +1567,8 @@ module Ascending (R : Set) where
                   (trans (sym (queue-freed hp (laneOf o) fl)) eq₀)
                   (subst (λ S′ → Lifts hp ρ (U.laneˢ op G (At.part hp t) bs′ l S′ as′ (At.val hp (FlatKit.Flat.queue fl)) po) S) (lane-step o LL) Lρ)
       L₄  = Dequeued.dq-lifts H₂ ρ ys (Freed.fr-lifts hp ρ o L₁)
-      L₅  = subst (λ x → Lifts H₃ ρ (F x (bs′ ++ as′) ys) S) (sym (trans (Dequeued.dq-part H₂ ρ ys) (Freed.fr-part hp ρ o gn t))) L₄
-      L₆  = subst (λ zs → Lifts H₃ ρ (F (At.part H₃ t) zs ys) S) (sym (trans (Dequeued.dq-lanes H₂ ρ ys) (Freed.fr-lanes hp ρ o LL gn))) L₅
+      L₅  = subst (λ x → Lifts H₃ ρ (F x (bs′ ++ as′) ys) S) (sym (trans (Dequeued.dq-part H₂ ρ ys (fresh-path ρ fs)) (Freed.fr-part hp ρ o gn t))) L₄
+      L₆  = subst (λ zs → Lifts H₃ ρ (F (At.part H₃ t) zs ys) S) (sym (trans (Dequeued.dq-lanes H₂ ρ ys (fresh-path ρ fs)) (Freed.fr-lanes hp ρ o LL gn))) L₅
       L₇  = subst (λ qs → Lifts H₃ ρ (F (At.part H₃ t) (At.partLanes H₃ ls) qs) S) (sym (queue-stored H₂ fl ys)) L₆
 
   -- A freed slot's queue read, by what it holds.

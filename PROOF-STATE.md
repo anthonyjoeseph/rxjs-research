@@ -289,20 +289,10 @@ by their own silent steps (`Mirror`).
   flag leaves its count.
 - **`sd-fifo`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
   flag leaves its queue.
-- **`sd-part`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
-  flag leaves every part.
 - **`sd-lifts`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
   flag leaves every lift.
 - **`sd-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
   flag leaves `Owned`.
-- **`sd-holds`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's kernel reads
-  its done flag nowhere.
-- **`sd-gated`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's gate reads its
-  done flag nowhere.
-- **`sd-fed`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's feeds read its
-  done flag nowhere.
-- **`sd-spent`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's spent reads its
-  done flag nowhere.
 - **`sd-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
   flag leaves `Queue`.
 - **`sd-heads`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
@@ -331,24 +321,12 @@ by their own silent steps (`Mirror`).
   part's head.
 - **`fr-opened`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves its
   flatMap's path open as it was.
-- **`dq-part`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves the
-  outer's part.
-- **`dq-lanes`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves the
-  lanes' parts.
 - **`dq-opened`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves its
   flatMap's path open as it was.
 - **`dq-lifts`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves the
   lift to its flatMap.
 - **`dq-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves
   `Owned`.
-- **`dq-holds`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's kernel reads
-  its queue nowhere.
-- **`dq-gated`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's gate reads its
-  queue nowhere.
-- **`dq-fed`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's feeds read its
-  queue nowhere.
-- **`dq-spent`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's spent reads its
-  queue cell nowhere.
 - **`dq-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves
   `Queue`.
 - **`dq-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves every

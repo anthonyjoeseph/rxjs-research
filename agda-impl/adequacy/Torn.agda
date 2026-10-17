@@ -205,6 +205,13 @@ module Tearing (R : Set) where
             | part-alike H H′ s (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ˡ m))))
             | partLanes-alike H H′ ls (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ʳ (names s) m)))) = refl
 
+    -- A flatMap's part reads its queue and its children's names, never
+    -- its count, done flag, lanes cell or refill flag.
+    part-flat : ∀ {h} (H H′ : Heapᴹ h) {Δ A B op f fl oc k r pl} (so : Sub h Δ A) (ls : List (Lane h Δ B))
+              → look H′ (FlatKit.Flat.queue fl) ≡ look H (FlatKit.Flat.queue fl) → Alike H H′ (names so) → Alike H H′ (laneNames ls)
+              → At.part H′ (flatMapˢ op f fl oc k r pl so ls) ≡ At.part H (flatMapˢ op f fl oc k r pl so ls)
+    part-flat H H′ so ls eq a₁ a₂ rewrite eq | part-alike H H′ so a₁ | partLanes-alike H H′ ls a₂ = refl
+
   ----------------------------------------------------------------------
   -- Names apart
 

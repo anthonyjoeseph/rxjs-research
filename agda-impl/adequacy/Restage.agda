@@ -1236,7 +1236,7 @@ module Restaging (R : Set) where
                                  → firstCall (Carried.ctlAs cr′) ≡ just (emitC π′) × measure (carried cr′) ≺ measure (carried cr)
 
   offer-restage : ∀ {g m} (cr : Carried g m) {Δ A} {s : T.Obs Timeline Δ A} {xs : List A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , s)
-                → (∀ q → U.subscribe s q ≡ U.ofᶜ q 0 xs) → Offering s xs → Offers cr xs
+                → (∀ q → U.subscribe s q ≡ U.ofᶜ q 0 xs) → Offering s xs → Offers cr {Δ} {A} xs
   offer-restage {m = mach ⟨ H , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = subAs {q = q} π cd sk a } refl sp cs =
     record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = N.t′ ; ctlAs = runAs O.ks (O.code′ cd) (N.restack sk a)
            ; meets = trans (part-plant H π O.v (O.eqp H)) (Carried.meets cr) ; owned = O.of-owned H sk a (O.code′ cd) (Carried.owned cr)
@@ -1250,7 +1250,7 @@ module Restaging (R : Set) where
           module N = Moved π O.v
           bk = Carried.books cr
 
-  of-restage : ∀ {g m} (cr : Carried g m) {Δ A} {xs : List A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.of xs) → Offers cr xs
+  of-restage : ∀ {g m} (cr : Carried g m) {Δ A} {xs : List A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.of xs) → Offers cr {Δ} {A} xs
   of-restage cr {xs = xs} e = offer-restage cr e (λ _ → refl) (λ _ _ W → bind≗ (≗-refl (emitAll (Here.obs W) 0 xs)) λ _ → seq-done _)
 
   empty-restage : ∀ {g m} (cr : Carried g m) {Δ A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.empty) → Offers cr {Δ} {A} []
