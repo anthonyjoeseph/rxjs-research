@@ -185,8 +185,9 @@ by their own silent steps (`Mirror`).
   hidden step; an `ending` take as a site; one `Clear` through a pool
   site. The core left: `pooled-pin`, `left-pin`, `pool-off`,
   `spread-held`, one fact: nothing but the `of` heads under the run
-  (`Carried.behind` bounds only at its `p`). Then landings,
-  `sub-defer`, `close-lingers`, `settle-lingers`.
+  (`Carried.behind` bounds only at its `p`). Then landings, a hidden
+  end or completion (`last-void`, `take1-void`), `sub-defer`,
+  `close-lingers`, `settle-lingers`.
 - **C. THE CALLBACK RELATION.** `Calling` is one record over the signal
   climbing, a value or an end with its calls owed, `call` its one
   recursion by `call-step`. Ruled out: a third mid-call state.
@@ -319,10 +320,14 @@ by their own silent steps (`Mirror`).
   `Queue`.
 - **`dq-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves every
   part's head.
-- **`take1-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a takeWhile's completion
-  begun under its failing value, its cut the frame's rest.
-- **`last-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a spent `of`'s completion
-  begun at its end.
+- **`take1-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a held takeWhile's
+  completion begun under its failing value, its cut the frame's rest.
+- **`take1-void`** (Climbs) — FALSITY, `NO EVIDENCE`: a hidden takeWhile's
+  completion, the ghost what the hidden part's rest shows.
+- **`last-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a held open spent `of`'s
+  completion begun at its end.
+- **`last-void`** (Climbs) — FALSITY, `NO EVIDENCE`: a hidden open spent `of`'s
+  end climbs to its guard, as a hidden value does.
 - **`fin-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's feed of its
   source's end, nothing left or the next subscriber's completion begun.
 - **`note-least`** (Lift) — FALSITY, `NO EVIDENCE`: a note records the least
@@ -470,7 +475,7 @@ by their own silent steps (`Mirror`).
 - **`fin-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
   sooner than the run with a connect's finish staged.
 - **`emit-shut`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` whose observer path
-  is closed skips its value.
+  is closed skips its value or its end.
 - **`sub-cold`** (Lift) — FALSITY, `NO EVIDENCE`: a cold begun registers its
   sink and starts its timeline.
 - **`of-owned`** (Restage) — FALSITY, `NO EVIDENCE`: an `of` planted where it

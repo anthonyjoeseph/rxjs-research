@@ -2003,16 +2003,31 @@ module Ascending (R : Set) where
   soar st (m₁ , path , aloft {σ = σ} cl) = hopped-pre path (call st (suc (height σ)) σ ≤-refl cl)
 
   postulate
-    -- A takeWhile's completion begun under its failing value, its cut
-    -- the frame's rest.
+    -- A takeWhile the ghost holds the path to: its completion begun
+    -- under its failing value, its cut the frame's rest.  Only there:
+    -- `Lifts` reads every step it passes held, so no signal is aloft on
+    -- a hidden path.
     take1-enter : ∀ {g m} (cr : Carried g m) {Δ A i p c k q n} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i p c k (Strongly.ending q n) s))
-                → firstCall (Carried.ctlAs cr) ≡ just (take1C π) → ∀ {m′} → step m ≡ silent m′
+                → firstCall (Carried.ctlAs cr) ≡ just (take1C π) → seen (Conf.heap (Mach.conf m)) π ≡ true → ∀ {m′} → step m ≡ silent m′
                 → Σ Mach λ m₁ → m′ ⇝ m₁ × Aloft g (load m (Carried.tree cr)) m₁
 
-    -- A spent `of`'s completion begun at its end.
+    -- A hidden takeWhile's completion, as a hidden `of`'s value
+    -- (`emit-void`): what the ghost shows of it, the hidden part's rest.
+    take1-void : ∀ {g m} (cr : Carried g m) {Δ A i p c k q n} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i p c k (Strongly.ending q n) s))
+               → firstCall (Carried.ctlAs cr) ≡ just (take1C π) → seen (Conf.heap (Mach.conf m)) π ≡ false → Hops cr
+
+    -- A spent `of` the ghost holds, reading its observer open: its
+    -- completion begun at its end.
     last-enter : ∀ {g m} (cr : Carried g m) {Δ A p i} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i []))
-               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → ∀ {m′} → step m ≡ silent m′
+               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+               → seen (Conf.heap (Mach.conf m)) π ≡ true → ∀ {m′} → step m ≡ silent m′
                → Σ Mach λ m₁ → m′ ⇝ m₁ × Aloft g (load m (Carried.tree cr)) m₁
+
+    -- A hidden spent `of` reading its observer open: its end climbs to
+    -- its guard, as a hidden value does (`emit-void`).
+    last-void : ∀ {g m} (cr : Carried g m) {Δ A p i} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i []))
+              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+              → seen (Conf.heap (Mach.conf m)) π ≡ false → Hops cr
 
     -- A connect's feed of its source's end: no subscriber left, the
     -- agenda on; or the next subscriber's completion begun.
@@ -2025,12 +2040,15 @@ module Ascending (R : Set) where
   -- its cut.
   take1-onward : ∀ {g m} (cr : Carried g m) {Δ A i p c k q n} {s : Sub _ Δ A} (π : Path (Carried.tree cr) (takeWhileˢ i p c k (Strongly.ending q n) s))
                → firstCall (Carried.ctlAs cr) ≡ just (take1C π) → Hops cr
-  take1-onward cr π fc eq = soar (carried cr) (take1-enter cr π fc eq)
+  take1-onward {m = m} cr π fc with seen (Conf.heap (Mach.conf m)) π in sn
+  ... | false = take1-void cr π fc sn
+  ... | true  = λ eq → soar (carried cr) (take1-enter cr π fc sn eq)
 
-  -- A spent `of`'s completion delivered at its end.
+  -- A spent `of` the ghost holds: its completion delivered at its end.
   emit-last : ∀ {g m} (cr : Carried g m) {Δ A p i} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i []))
-            → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → Hops cr
-  emit-last cr π fc eq = soar (carried cr) (last-enter cr π fc eq)
+            → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+            → seen (Conf.heap (Mach.conf m)) π ≡ true → Hops cr
+  emit-last cr π fc op sn eq = soar (carried cr) (last-enter cr π fc op sn eq)
 
   -- The rest of a connect's feed of its source's end.
   fin-onward : ∀ {g m} (cr : Carried g m) {Δ A B S c b kb k r ss e rp rt} {s : Sub _ Δ A} {bd : Sub _ (A ∷ Δ) B}
@@ -2076,7 +2094,10 @@ module Ascending (R : Set) where
   -- takeWhile's end.
   emit-onward : ∀ {g m} (cr : Carried g m) {Δ A p i xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i xs))
               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → Hops cr
-  emit-onward cr {xs = []} π fc = emit-last cr π fc
+  emit-onward {m = m} cr {xs = []} π fc with opened (Conf.heap (Mach.conf m)) true π in op | seen (Conf.heap (Mach.conf m)) π in sn
+  ... | false | _     = emit-shut cr π fc op
+  ... | true  | false = last-void cr π fc op sn
+  ... | true  | true  = emit-last cr π fc op sn
   emit-onward {m = m} cr {xs = x ∷ xs} π fc with opened (Conf.heap (Mach.conf m)) true π in op | seen (Conf.heap (Mach.conf m)) π in sn
   ... | false | _     = emit-shut cr π fc op
   ... | true  | false = emit-void cr π fc op sn

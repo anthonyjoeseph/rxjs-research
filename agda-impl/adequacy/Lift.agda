@@ -84,7 +84,7 @@ module Lifting (R : Set) where
 
     -- An `of` reading its observer closed: its burst over, nothing
     -- delivered.  The ghost must hold nothing of it.
-    emit-shut : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+    emit-shut : ∀ {g m} (cr : Carried g m) {Δ A p i xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i xs))
               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ false → Hops cr
 
     -- An `of` reading its observer open, its value handed on under the
