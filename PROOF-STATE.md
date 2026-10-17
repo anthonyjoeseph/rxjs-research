@@ -177,15 +177,16 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **HIDDEN RUNS.** A connect's source runs its subscribe burst under a
-  part that has ended (a cut take, an ended lane, a connect with no
-  body), and the ghost holds that run: a flatMap's pool took the lane's
-  rest, whose `burstingᶜ` shows each source step inside its subscription
-  as a pin. No field of `Carried` ties a pool's or an ended source's
-  rest to the hidden subtree, so `emit-void`'s ghost alike leaves pins
-  stale ahead of every later sibling, and a defer spinning there
-  (`sub-defer`) has no load to lower. Decides the tie: a rest read off
-  the hidden subtree by `part`, or a relation `Carried` owes.
+- **HIDDEN RUNS.** `Carried.lingers` ties each held pool, ended source's
+  rest and ending take's rest to what its hidden subtree still runs
+  (`At.leftover`, flag-free; a pool by its flatMap's own flags,
+  `At.pooled`), from the root and from each connect source still in its
+  subscribe burst; every move carries it by a `*-lingers` leaf. Ruled
+  out: the ghost alike past a hidden step (`emit-void` is `Hops`).
+  Remaining: the hidden step as an assembly, the held pool a pin on and
+  lifted through its ancestors as a `passed` hop, then `sub-defer` over
+  it; whether a part's last ghost rests to its leftover
+  (`close-lingers`, `settle-lingers`).
 - **C. THE CALLBACK RELATION.** `Calling` is one record over the signal
   climbing, a value or an end with its calls owed, `call` its one
   recursion by `call-step`. Ruled out: a third mid-call state.
@@ -354,7 +355,47 @@ by their own silent steps (`Mirror`).
 - **`out-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
   sooner than the run under `ix 0` with a take restaged `ending`.
 - **`emit-void`** (Lift) — FALSITY, `DEAD ROUTE`: an `of` the ghost does not
-  hold emits to a guard that drops it, the ghost alike, a value fewer.
+  hold emits to a guard that drops it, the ghost alike or past a pool's pin.
+- **`close-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: an outer's end, its
+  pool taking the outer's last ghost rested, keeps every tie.
+- **`settle-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end, its
+  pool taking the lane's last ghost rested, keeps every tie.
+- **`next-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end with a
+  value queued, the queue's head taken, keeps every tie.
+- **`end-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a take restaged
+  `ending` over its source's part keeps every tie.
+- **`sd-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's done flag
+  written as it ends keeps every tie.
+- **`pool-idle`** (Climbs) — FALSITY, `NO EVIDENCE`: a pool joined with idle
+  keeps every tie.
+- **`bg-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane begun in the grown
+  world keeps every tie.
+- **`fr-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane freed as its
+  flatMap ends keeps every tie.
+- **`fed-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's feed
+  restaged keeps every tie.
+- **`fin-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's finish
+  staged keeps every tie.
+- **`fire-lingers`** (Lift) — FALSITY, `NO EVIDENCE`: a timer fired keeps every
+  tie.
+- **`torn-lingers`** (Lift) — FALSITY, `NO EVIDENCE`: what a teardown reached
+  keeps every tie.
+- **`scan-lingers`** (Frame) — FALSITY, `NO EVIDENCE`: a write at a scan's
+  accumulator keeps every tie.
+- **`rm-lingers`** (Restage) — FALSITY, `NO EVIDENCE`: a map restaged over its
+  pending source keeps every tie.
+- **`of-lingers`** (Restage) — FALSITY, `NO EVIDENCE`: an `of` restaged keeps
+  every tie.
+- **`rs-lingers`** (Restage) — FALSITY, `NO EVIDENCE`: a scan restaged keeps
+  every tie.
+- **`rt-lingers`** (Restage) — FALSITY, `NO EVIDENCE`: a take restaged keeps
+  every tie.
+- **`connect-lingers`** (Restage) — FALSITY, `NO EVIDENCE`: a connect restaged
+  keeps every tie.
+- **`rf-lingers`** (Restage) — FALSITY, `NO EVIDENCE`: a flatMap restaged
+  keeps every tie.
+- **`grow-lingers`** (Restage) — FALSITY, `NO EVIDENCE`: a growth keeps every
+  tie, weakened.
 - **`up-lanes`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap above a written
   scan in one of its lanes heads no sooner than that lane's part.
 - **`up-outer`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap above a written

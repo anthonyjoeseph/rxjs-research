@@ -35,7 +35,7 @@ open import Data.List.Relation.Unary.AllPairs using (AllPairs) renaming ([] to [
 
 import Tree as T
 open import Tree using (Obs; Later)
-open import denotation.MonotonicList using (Time; Pos; From; Frame; Timeline; at; emit; stall; close; ix; last; tick; root; _<ᵖ_) renaming (done to doneᶠ; quiet to quietᶠ) renaming (sub to subᴾ)
+open import denotation.MonotonicList using (Agree; Time; Pos; From; Frame; Timeline; at; emit; stall; close; ix; last; tick; root; _<ᵖ_) renaming (done to doneᶠ; quiet to quietᶠ) renaming (sub to subᴾ)
 open import operation.AbstractObservable using (base; maybe; quiet; module Run; module Heap) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; Out; note; fin; module Pure)
 open import operation.Machine using (module Machine)
@@ -626,6 +626,47 @@ module Strongly (R : Set) where
       partLanes (lane c k s ∷ ls) = if val (Kit.live c) then consᴹ (part s) (partLanes ls) else partLanes ls
 
     ----------------------------------------------------------------------
+    -- What a subscription leaves running past its end
+
+    -- A source's node: what it shows while it runs, else what it left.
+    sourced : ∀ {Δ A} → Maybe (U.Node Δ A) → U.Node Δ A → U.Node Δ A
+    sourced (just s) _ = s
+    sourced nothing  t = t
+
+    -- Read off the witness past every flag and pool: each connect's
+    -- source run under where it subscribed, beside its body's leftover;
+    -- a pending node's, once begun.
+    mutual
+      leftover : ∀ {Δ A B} → Sub h Δ A → U.Node Δ B
+      leftover (pendingˢ s q)                     = U.restᶜ (U.subscribe s q)
+      leftover (coldˢ s hd ph)                    = U.idleᶜ
+      leftover (ofˢ p i xs)                       = U.idleᶜ
+      leftover doneˢ                              = U.idleᶜ
+      leftover (mapˢ f s)                         = leftover s
+      leftover (scanˢ f r s)                      = leftover s
+      leftover (takeWhileˢ i p c k tk s)          = leftover s
+      leftover (flatMapˢ op f fl oc k r pl so ls) = U.unionᶜ (leftover so) (leftoverL ls)
+      leftover (connectˢ S c b kb k fd rp e rt src bd) =
+        U.unionᶜ (U.burstingᶜ rp n) (U.underᶜ (U.live n) (leftover {B = ⊤} bd))
+        where n = sourced (part src) (leftover src)
+      leftover (joinˢ j sk l x st)                = U.idleᶜ
+      leftover (deferˢ k s)                       = leftover s
+
+      leftoverL : ∀ {Δ A B} → List (Lane h Δ A) → U.Node Δ B
+      leftoverL []                = U.idleᶜ
+      leftoverL (lane c k s ∷ ls) = U.unionᶜ (leftover s) (leftoverL ls)
+
+    -- What a flatMap's pool runs, by its own flags, which turn as its
+    -- pool takes a rest: its outer's leftover once it heard the outer
+    -- end, each lane's once it cut the lane.
+    pooledL : ∀ {Δ A B} → List (Lane h Δ A) → U.Node Δ B
+    pooledL []                = U.idleᶜ
+    pooledL (lane c k s ∷ ls) = if val (Kit.live c) then pooledL ls else U.unionᶜ (leftover s) (pooledL ls)
+
+    pooled : ∀ {Δ A B} → Flat A h → Sub h Δ A → List (Lane h Δ B) → U.Node Δ B
+    pooled fl so ls = U.unionᶜ (if val (Flat.outerDone fl) then leftover so else U.idleᶜ) (pooledL ls)
+
+    ----------------------------------------------------------------------
     -- The joiners' feed
 
     -- Owed the feed's delivery.
@@ -1161,6 +1202,38 @@ module Strongly (R : Set) where
             → ∀ {n} → At.part H (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
             → At.part H src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt
 
+  -- Two rests running alike: the same skips at the same positions.
+  Tied : ∀ {Γ A B} → U.Node Γ A → U.Node Γ B → Set
+  Tied x y = ∀ n → Agree n (U.unfold (U.restᶜ {B = ⊤} x)) (U.unfold (U.restᶜ {B = ⊤} y))
+
+  -- WHAT A HELD NODE KEEPS OF ITS ENDED PARTS IS WHAT THEY STILL RUN.
+  -- Below `t`: a held flatMap's pool runs as its ended parts' leftovers,
+  -- a held connect's ended source's rest as the source's, an ending
+  -- take's as its source's.  The meaning steps each only through its
+  -- own rest, so a part hidden from the ghost that still runs, a
+  -- connect's source inside its subscribe burst, runs there.
+  record Ties {h} (H : Heapᴹ h) {Δ A} (t : Sub h Δ A) : Set₁ where
+    field
+      pools : ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+            → (ψ : Path t (flatMapˢ op f fl oc k r pl so ls)) → seen H ψ ≡ true
+            → ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Tied pl (At.pooled H fl so ls)
+      rests : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+            → (ψ : Path t (connectˢ S c b kb k fd rp e rt src bd)) → seen H ψ ≡ true
+            → ∀ {n} → At.part H (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
+            → At.part H src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Tied rt (At.leftover H {B = ⊤} src)
+      ends  : ∀ {Δ′ A′} {i p c k k′ n} {s : Sub h Δ′ A′}
+            → (ψ : Path t (takeWhileˢ i p c k (ending k′ n) s)) → seen H ψ ≡ true
+            → ∀ {x} → At.part H (takeWhileˢ i p c k (ending k′ n) s) ≡ just x → Tied n (At.leftover H {B = ⊤} s)
+
+  -- Held from the root, and from each connect's source still inside its
+  -- subscribe burst, its unsubscribe not yet stashed: such a source runs
+  -- its burst out whatever holds it.
+  record Lingers {h} (H : Heapᴹ h) {Δ A} (t : Sub h Δ A) : Set₁ where
+    field
+      rooted : Ties H t
+      bursts : ∀ {Δ′ A′ B′} {S c b kb fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+             → Path t (connectˢ S c b kb nothing fd rp e rt src bd) → Ties H src
+
   -- Its next event no earlier than `q`.
   Heads : ∀ {Γ A} → Pos → U.Node Γ A → Set
   Heads q c = ∀ {k} → U.headˢ (U.step c) ≡ just k → q ≤ᵖ k
@@ -1173,7 +1246,8 @@ module Strongly (R : Set) where
   -- holding every subscription the run reaches, whose open part is the
   -- ghost, and the machine's control and stack its agenda; the machine
   -- sorted, every frame it keeps under where it runs; every node the
-  -- ghost holds heading no earlier than where the run is.
+  -- ghost holds heading no earlier than where the run is; what it keeps
+  -- of ended parts, what they still run.
   record Carried (g : U.Node [] R) (m : Mach) : Set₁ where
     H = Conf.heap (Mach.conf m)
     field
@@ -1189,6 +1263,7 @@ module Strongly (R : Set) where
       books   : Books tree ctlAs m
       sorted  : Σ Pos λ lo → WellMach lo m
       behind  : Each H (Heads (Conf.pos (Mach.conf m))) tree
+      lingers : Lingers H tree
 
   -- A RE-ENTRY CONFIGURATION AGAINST THE GHOST: carried, or the root's
   -- completion about to be shown where the ghost ends.
@@ -1337,4 +1412,5 @@ module Strongly (R : Set) where
     ; queue   = record { timed = []ᴬ , []ᴬ ; joined = []ᴬ , []ᴬ ; ordered = []ᴸ ; ahead = []ᴬ }
     ; books   = record { fresh = []ᴾ ; clocked = refl , tt ; paidUp = refl ; running = refl }
     ; sorted  = root , begin-well o
-    ; behind  = record { parts = λ { here _ refl → heads-begin o } ; pools = λ () ; rests = λ () } }
+    ; behind  = record { parts = λ { here _ refl → heads-begin o } ; pools = λ () ; rests = λ () }
+    ; lingers = record { rooted = record { pools = λ () ; rests = λ () ; ends = λ () } ; bursts = λ () } }

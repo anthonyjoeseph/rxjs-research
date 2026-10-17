@@ -58,7 +58,7 @@ module Restaging (R : Set) where
   open Strongly R using (Carried; Books; carried; Sub; pendingˢ; ofˢ; mapˢ; takeWhileˢ; connectˢ; Lane; ending; taken; idle; feeding; finishing; bodyK; srcK
                         ; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane
                         ; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; Leaf; of-leaf; cold-leaf; done-leaf; join-leaf
-                        ; Call; emitC; kontC; Spot; spot; coldˢ; take1C; take2C; bodyC; feedC; finC; srcC; code; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; names; pendings
+                        ; Call; emitC; kontC; Spot; spot; coldˢ; take1C; take2C; bodyC; feedC; finC; srcC; code; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; names; pendings
                         ; seen; seenL; seen-⊕; isTaking; ∧-split; flatMapˢ; killAllᶜ; flatK; scanˢ; joinˢ; doneˢ; deferˢ; lane; CbRel; ≗-refl; newRef≗; taking; takeK; unsubscribing; done≗; register≗; send≗; finish≗; startCold≗; stop≗; stash≗; cancel≗; eff≗; here≗; under≗; diverge≗; unfold≗; readRef≗; writeRef≗; module Canon)
                         renaming (⟦_⟧ to ⟦_⟧ᶜ; at⟦_⟧ to at⟦_⟧ᶜ)
   open Strongly.Against R using (CtlAs; StackAs; BurstAs; subAs; runAs; bottomAs; restAs; backAs; reholdAs; Held; bottomᴴ; restᴴ; playsAs; firesAs; overAs; stackJobs; SrcOf; src-of; Ticked; BurstClocked; sources; burstSpots; stackBursts; Placed; agenda)
@@ -1128,6 +1128,11 @@ module Restaging (R : Set) where
         tr : Each H (Heads p) (pendingˢ (T.map f s) q) → Each H (Heads p) v
         tr eu = record { parts = pa eu ; pools = λ { (in-map ()) } ; rests = λ { (in-map ()) } }
 
+    -- A map runs what its source runs, and its source what it was
+    -- pending to.
+    postulate
+      rm-lingers : ∀ (H : Heapᴹ h) → Lingers H T₀ → Lingers H t′
+
     -- A pending node and a map over one register nothing, queue nothing
     -- and are owed nothing.
     rm-kernels : (H : Heapᴹ h) → Kernels H T₀ → Kernels H t′
@@ -1159,7 +1164,7 @@ module Restaging (R : Set) where
            ; books = record { fresh = subst (AllPairs _≢_) (sym M.names′) (Books.fresh bk)
                             ; clocked = proj₁ (Books.clocked bk) , N.reticked sk a (proj₂ (Books.clocked bk))
                             ; paidUp = Books.paidUp bk ; running = Books.running bk }
-           ; sorted = Carried.sorted cr ; behind = M.rm-behind H (Carried.behind cr) }
+           ; sorted = Carried.sorted cr ; behind = M.rm-behind H (Carried.behind cr) ; lingers = M.rm-lingers H (Carried.lingers cr) }
     , refl , inj₁ (inj₁ M.less)
     where module M = Mapped π
           module N = Moved π M.v
@@ -1230,6 +1235,10 @@ module Restaging (R : Set) where
         tr : Each H (Heads p) (pendingˢ s q) → Each H (Heads p) v
         tr eu = record { parts = λ { here _ pw → Each.parts eu here refl (trans (eqp H) pw) } ; pools = λ () ; rests = λ () }
 
+    -- An `of` runs nothing past its end, nor did it pending.
+    postulate
+      of-lingers : ∀ (H : Heapᴹ h) → Lingers H T₀ → Lingers H t′
+
   -- The configuration an `of` planted makes: its first call its values.
   Offers : ∀ {g m} → Carried g m → ∀ {Δ A} → List A → Set₁
   Offers {g} {m} cr {Δ} {A} xs = Σ (Carried g m) λ cr′ → Σ Pos λ p → Σ (Path (Carried.tree cr′) (ofˢ {Δ = Δ} {A} p 0 xs)) λ π′
@@ -1244,7 +1253,7 @@ module Restaging (R : Set) where
            ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant π O.v refl)) (Books.fresh bk)
                             ; clocked = proj₁ (Books.clocked bk) , N.reticked sk a (proj₂ (Books.clocked bk))
                             ; paidUp = Books.paidUp bk ; running = Books.running bk }
-           ; sorted = Carried.sorted cr ; behind = O.of-behind H (Carried.behind cr) }
+           ; sorted = Carried.sorted cr ; behind = O.of-behind H (Carried.behind cr) ; lingers = O.of-lingers H (Carried.lingers cr) }
     , q , O.π′ , refl , inj₁ (inj₁ O.less)
     where module O = Offered π (sp q) cs
           module N = Moved π O.v
@@ -1336,6 +1345,7 @@ module Restaging (R : Set) where
         grow-meaning : ∀ {t : Sub h [] R} → Meaning H t → Meaning H′ (wkTree τ t)
         grow-queue   : ∀ {t : Sub h [] R} {p clk ts} → Queue H p clk ts t → Queue H′ p clk (mapList (wkTimer τ) ts) (wkTree τ t)
         grow-each    : ∀ {t : Sub h [] R} {P : ∀ {Γ A} → U.Node Γ A → Set} → Each H P t → Each H′ P (wkTree τ t)
+        grow-lingers : ∀ {t : Sub h [] R} → Lingers H t → Lingers H′ (wkTree τ t)
 
   postulate
     -- An allocation grows the world and moves nothing.
@@ -1503,6 +1513,10 @@ module Restaging (R : Set) where
           tr : Each H′ (Heads p) (pendingˢ (T.scan f z s) q) → Each H′ (Heads p) v
           tr eu = record { parts = pa eu ; pools = λ { (in-scan ()) } ; rests = λ { (in-scan ()) } }
 
+      -- A scan runs what its source runs.
+      postulate
+        rs-lingers : Lingers H′ T₁ → Lingers H′ t′
+
       rs-kernels : Kernels H′ T₁ → Kernels H′ t′
       rs-kernels kn = record { holds = holds-plant H′ π₁ v refl (λ hs → hs) (Kernels.holds kn)
                              ; gated = gated-plant H′ π₁ v (λ g → g) (λ d → d) (Kernels.gated kn)
@@ -1537,7 +1551,8 @@ module Restaging (R : Set) where
              ; books = record { fresh = S.scan-fresh (Books.fresh bk)
                               ; clocked = proj₁ (Books.clocked bk) , S.reticked sk₁ a₁ (G.grow-ticked sk (proj₂ (Books.clocked bk)))
                               ; paidUp = cong (mapList (wkTodo new)) (Books.paidUp bk) ; running = Books.running bk }
-             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl now) ; behind = S.rs-behind H′ eqv (G.grow-each gr (Carried.behind cr)) }
+             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl now) ; behind = S.rs-behind H′ eqv (G.grow-each gr (Carried.behind cr))
+             ; lingers = S.rs-lingers H′ eqv (G.grow-lingers gr (Carried.lingers cr)) }
     , refl , inj₁ (inj₁ S.less)
     where module S = Scanned {f = f} {z = z} {s = s} π
           module G = Grown S.ν
@@ -1661,6 +1676,10 @@ module Restaging (R : Set) where
                              ; gated = gated-plant H′ π₂ v (λ g → (λ _ → lift tt) , g) (λ _ → lift tt) (Kernels.gated kn)
                              ; settled = settled-plant π₂ v (λ _ → tt) (λ _ → tt , tt) (Kernels.settled kn) }
 
+      -- A take runs what its source runs.
+      postulate
+        rt-lingers : Lingers H′ T₂ → Lingers H′ t′
+
       rt-meaning : Meaning H′ T₂ → Meaning H′ t′
       rt-meaning mn = record { fed = fed-plant H′ π₂ v (λ _ fd → fd) _ (Meaning.fed mn) }
 
@@ -1700,7 +1719,8 @@ module Restaging (R : Set) where
                               ; clocked = proj₁ (Books.clocked bk) , S.reticked sk₂ a₂ (G₂.grow-ticked sk₁ (G₁.grow-ticked sk (proj₂ (Books.clocked bk))))
                               ; paidUp = cong (mapList (wkTodo new)) (cong (mapList (wkTodo new)) (Books.paidUp bk)) ; running = Books.running bk }
              ; sorted = sorted-⇝ (Carried.sorted cr) (then refl (then (cong (λ x → step (Mx x)) e₁) now))
-             ; behind = S.rt-behind H₂ eqv refl (G₂.grow-each gr₂ (G₁.grow-each gr₁ (Carried.behind cr))) }
+             ; behind = S.rt-behind H₂ eqv refl (G₂.grow-each gr₂ (G₁.grow-each gr₁ (Carried.behind cr)))
+             ; lingers = S.rt-lingers H₂ eqv refl (G₂.grow-lingers gr₂ (G₁.grow-lingers gr₁ (Carried.lingers cr))) }
     , refl , inj₁ (inj₁ S.less)
     where module S = Taken {i = i} {p = p} {s = s} π
           module G₁ = Grown S.ν₁
@@ -1777,6 +1797,7 @@ module Restaging (R : Set) where
       meaning : Meaning H tree
       queue   : Queue H q clk ts tree
       behind  : Each H (Heads q) tree
+      lingers : Lingers H tree
       pends   : pend tree ≡ pend T₀
       named   : ∀ {k} {j : h ∋ k} → (k , j) ∈ names tree → Σ (h₀ ∋ k) λ i → wk∋ ν i ≡ j
 
@@ -1795,7 +1816,7 @@ module Restaging (R : Set) where
     ; meets = trans (Gw.grow-part gr (tree G)) (meets G)
     ; owned = Gw.grow-owned gr (stack G) (owned G)
     ; kernels = Gw.grow-kernels gr (kernels G) ; meaning = Gw.grow-meaning gr (meaning G) ; queue = Gw.grow-queue gr (queue G)
-    ; behind = Gw.grow-each gr (behind G) ; pends = trans (pend-grow new (tree G)) (pends G)
+    ; behind = Gw.grow-each gr (behind G) ; lingers = Gw.grow-lingers gr (lingers G) ; pends = trans (pend-grow new (tree G)) (pends G)
     ; named = λ {_} {j} m → let (i′ , e′ , m′) = names-wk new (tree G) j m ; (i , e) = named G m′
                             in i , trans (sym (wk∋-wk ν new i)) (trans (cong (wk∋ new) e) e′) }
     where open Grew
@@ -1944,6 +1965,8 @@ module Restaging (R : Set) where
       connect-queue  : Queue H₅ q clk ts T₅ → Queue H₅ (q ++ [ ix 0 ]) clk ts t′
       -- Every head no earlier than the run one level down.
       connect-behind : Each H₅ (Heads q) T₅ → Each H₅ (Heads (q ++ [ ix 0 ])) t′
+      -- A connect pending its source runs what it was pending to.
+      connect-lingers : Lingers H₅ T₅ → Lingers H₅ t′
 
   -- A connect begun allocates its subject, flag, cut and stash, begins
   -- its body under `ix 0` and owes its source back where it began, one
@@ -1966,7 +1989,7 @@ module Restaging (R : Set) where
              ; books = record { fresh = C.connect-fresh (Books.fresh bk)
                               ; clocked = trans ck (sym (tick-ix0 q₀)) , ck , C.reticked sk₅ a₅ (Grew.ticked G₅)
                               ; paidUp = cong wd (cong wd (cong wd (cong wd (cong wd (Books.paidUp bk))))) ; running = Books.running bk }
-             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind = C.connect-behind (Grew.behind G₅) }
+             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind = C.connect-behind (Grew.behind G₅) ; lingers = C.connect-lingers (Grew.lingers G₅) }
     , refl , inj₁ (inj₁ (subst (pend C.t′ <_) (Grew.pends G₅) C.less))
     where bk = Carried.books cr
           ck = proj₁ (Books.clocked bk)
@@ -1986,7 +2009,7 @@ module Restaging (R : Set) where
           G₀ = record { tree = Carried.tree cr ; path = π ; stack = sk ; alone = a ; ticked = proj₂ (Books.clocked bk)
                       ; obsR = (λ _ → wk-same _) , wk-same _ , wk-same _ ; kontR = λ τ sub → from-same (λ ζ → Here.kont (walk π top) ζ sub) τ
                       ; envR = e ; meets = refl ; owned = recode (Carried.owned cr) ; kernels = Carried.kernels cr
-                      ; meaning = Carried.meaning cr ; queue = Carried.queue cr ; behind = Carried.behind cr ; pends = refl
+                      ; meaning = Carried.meaning cr ; queue = Carried.queue cr ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; pends = refl
                       ; named = λ {_} {j} _ → j , refl }
           G₅ = grew-step {k = cell (maybe quiet)} (lift nothing) (grew-step {k = cell (maybe quiet)} (lift nothing)
                  (grew-step {k = cell (base Bool)} (lift true) (grew-step {k = cell (base Bool)} (lift false) (grew-step {k = cell (joins A)} (lift []) G₀))))
@@ -2241,6 +2264,11 @@ module Restaging (R : Set) where
                → Owned H₉ t′ (subAs {act = act′} π′ cd′ (restack (Grew.stack G₉) (Grew.alone G₉)) a′)
       rf-owned = Moved.Owning.reowned π₈ v H₉ eqv ιo inner (Grew.stack G₉) (Grew.alone G₉)
 
+      -- A flatMap pending its outer, its pool idle and no lane, runs what
+      -- it was pending to.
+      postulate
+        rf-lingers : Lingers H₉ T₈ → Lingers H₉ t′
+
   -- A flatMap begun allocates its pool and its outer's cut, registers its
   -- refill slot and stores it, and begins its outer under the flatMap's
   -- observer, one subscription fewer owed.
@@ -2268,7 +2296,8 @@ module Restaging (R : Set) where
                               ; clocked = proj₁ (Books.clocked bk) , F.reticked sk₉ a₉ (Grew.ticked G₉)
                               ; paidUp = cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (Books.paidUp bk))))))))
                               ; running = Books.running bk }
-             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind = F.rf-behind refl refl slot₉ refl refl refl (Grew.behind G₉) }
+             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind = F.rf-behind refl refl slot₉ refl refl refl (Grew.behind G₉)
+             ; lingers = F.rf-lingers refl refl slot₉ refl refl refl (Grew.lingers G₉) }
     , refl , inj₁ (inj₁ (subst (pend F.t′ <_) (Grew.pends G₉) F.less))
     where bk = Carried.books cr
           wd : ∀ {k w′} → List (Machine.Todo R w′) → List (Machine.Todo R (k ∷ w′))
@@ -2294,7 +2323,7 @@ module Restaging (R : Set) where
           G₀ = record { tree = Carried.tree cr ; path = π ; stack = sk ; alone = a ; ticked = proj₂ (Books.clocked bk)
                       ; obsR = (λ _ → wk-same _) , wk-same _ , wk-same _ ; kontR = λ τ sub → from-same (λ ζ → Here.kont (walk π top) ζ sub) τ
                       ; envR = e ; meets = refl ; owned = recode (Carried.owned cr) ; kernels = Carried.kernels cr
-                      ; meaning = Carried.meaning cr ; queue = Carried.queue cr ; behind = Carried.behind cr ; pends = refl
+                      ; meaning = Carried.meaning cr ; queue = Carried.queue cr ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; pends = refl
                       ; named = λ {_} {j} _ → j , refl }
           G₈ = grew-step {k = slot ⊤} (record { onNext = λ a → wkAct new (n₇ a) ; onComplete = wkAct new c₇ ; isClosed = wkAct new x₇ })
                  (grew-step {k = cell (maybe quiet)} (lift nothing) (grew-step {k = cell (base Bool)} (lift true)

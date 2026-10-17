@@ -22,7 +22,7 @@ open import Data.Product using (_×_; _,_; Σ)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
-open import denotation.MonotonicList using (Events∞; Pos; Timeline; Agree; agree-refl; at; ix; _<ᵖ_; <ᵖ-trans; <ᵖ-asym; <ᵖ-below)
+open import denotation.MonotonicList using (Events∞; Pos; Timeline; agree-refl; at; ix; _<ᵖ_; <ᵖ-trans; <ᵖ-asym; <ᵖ-below)
 import denotation.Unfold as U
 open import denotation.MonotonicList using () renaming (sub to subᴾ)
 open import adequacy.Sorted using (_≤ᵖ_; Under; module Sorting)
@@ -50,7 +50,7 @@ module Lifting (R : Set) where
   open Heap using (_⊑_)
   open Sorting R using (Beyond)
   open Run (Pureᴾ R) using (Act; module Kit; module FlatKit)
-  open Strongly R using (Strong; Carried; Books; carried; Sub; pendingˢ; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; emitC; kontC; Leaf; feedC; srcC; taking; taken; feeding; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _≗_; Each; Heads; rootObs; seen; seenL) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
+  open Strongly R using (Strong; Carried; Books; carried; Sub; pendingˢ; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; emitC; kontC; Leaf; feedC; srcC; taking; taken; feeding; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _≗_; Each; Heads; Lingers; rootObs; seen; seenL) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (CtlAs; calmAs; noteAs; runAs; subAs; burstAs; bursts)
   open Moving R using (plant; true≢false)
   open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each)
@@ -78,7 +78,7 @@ module Lifting (R : Set) where
     -- unfold there forever (`connect spin` under a cut take, which the
     -- meaning shows as skips forever, as the machine spins): no load
     -- bounds it, so the hop is the ghost past the pin its rest holds,
-    -- and no field of `Carried` ties a rest to the hidden subtree.
+    -- which `Carried.lingers` ties to the hidden subtree.
     sub-defer   : ∀ {g m} (cr : Carried g m) {Δ A} {l : T.Later Timeline Δ A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.defer l) → Hops cr
 
     -- An `of` reading its observer closed: its burst over, nothing
@@ -104,8 +104,9 @@ module Lifting (R : Set) where
     -- `merge (takeWhile false (λ _ → false) (connect (of [1,2]) (of [5])))
     -- (of [7])` means skips at the source's 1 and 2 between the take's
     -- end and the 7.  The ghost alike leaves those pins ahead of every
-    -- later sibling: the hop is the ghost past the pool's pin, and no
-    -- field of `Carried` ties a pool's rest to the hidden `of`.
+    -- later sibling, and `Carried.lingers` ties the pool to what the
+    -- hidden source still runs: the hop is the ghost past the pool's pin,
+    -- the pool a pin on.  Under a part with no pool the ghost is alike.
     -- DEAD ROUTE: the ghost past the burst's skip (`U.burstingᶜ`).  A
     --   part past its end shows nothing under it: a cut takeWhile and a
     --   connect with no body have no part, and an `ending` take's rest
@@ -113,9 +114,7 @@ module Lifting (R : Set) where
     --   burst.  No skip of the hidden part's own is this value.
     emit-void : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
-              → seen (Conf.heap (Mach.conf m)) π ≡ false → ∀ {m′} → step m ≡ silent m′
-              → Σ (U.Node [] R) λ g″ → Σ Mach λ m₀ → m′ ⇝ m₀ × Σ (Carried g″ m₀) λ cr₀
-                → (∀ n → Agree n (residual g) (residual g″)) × load m₀ (Carried.tree cr₀) ⊏ load m (Carried.tree cr)
+              → seen (Conf.heap (Mach.conf m)) π ≡ false → Hops cr
 
     -- An `of` reading its observer open, its value handed on under the
     -- `of`'s scope: the `of` past it, the value on its way up, the
@@ -151,6 +150,11 @@ module Lifting (R : Set) where
     behind-fire : ∀ {g m} (cr : Carried g m) {Δ A τ e v u x sk hd fr}
                   (π : Path (Carried.tree cr) (coldˢ {Δ = Δ} {A} sk hd (waiting {u = v} τ e (at u x fr))))
                 → Each (Conf.heap (Mach.conf m)) (Heads (Conf.pos (Mach.conf m))) (plant π (coldˢ sk hd (fired τ e (at u x fr))))
+
+    -- A timer fired leaves every tie held: a cold runs nothing past its end.
+    fire-lingers : ∀ {g m} (cr : Carried g m) {Δ A τ e v u x sk hd fr}
+                   (π : Path (Carried.tree cr) (coldˢ {Δ = Δ} {A} sk hd (waiting {u = v} τ e (at u x fr))))
+                 → Lingers (Conf.heap (Mach.conf m)) (plant π (coldˢ sk hd (fired τ e (at u x fr))))
 
     -- A subscription's continuation handed its unsubscribe, which it
     -- stashes: the ghost alike, a call fewer.
@@ -236,6 +240,13 @@ module Lifting (R : Set) where
   torn-behind {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (_ ∷ _) _ _ } (bodySite π) refl =
     torn-body-each _ π (Books.fresh (Carried.books cr)) (Owned.bodies (Carried.owned cr) π (here refl)) (Carried.behind cr)
 
+  -- What the teardown reached leaves every tie held: no flag a tie reads
+  -- is a take's or a body's kill switch.
+  postulate
+    torn-lingers : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
+                 → firstCall (Carried.ctlAs cr) ≡ just (siteCall z)
+                 → Lingers (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr)
+
   -- A cut: its kill switch thrown, what it holds unsubscribed; the ghost
   -- alike, a call fewer.
   cut-onward : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
@@ -252,7 +263,7 @@ module Lifting (R : Set) where
         ; queue = torn-queue cr z
         ; books = record { fresh = Books.fresh (Carried.books cr) ; clocked = Books.clocked (Carried.books cr)
                          ; paidUp = Books.paidUp (Carried.books cr) ; running = Books.running (Carried.books cr) }
-        ; sorted = hop-sorted cr eq path ; behind = torn-behind cr z refl })
+        ; sorted = hop-sorted cr eq path ; behind = torn-behind cr z refl ; lingers = torn-lingers cr z refl })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , ≤-refl))
 
   ----------------------------------------------------------------------

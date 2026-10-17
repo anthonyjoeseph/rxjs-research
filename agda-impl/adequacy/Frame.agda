@@ -41,7 +41,7 @@ module Framing (R : Set) where
   open Run (Pureᴾ R) using (Ref; Subject; module Kit; module FlatKit)
   open Shared Timeline (Out R) using (Conf; Heapᴹ; store; stored; look)
   open Heap using (_∋_) renaming (same to same⊑)
-  open Strongly R using (Strong; Sub; scanˢ; here; module At; Queue; Kernels; Meaning; Owned; Path; in-scan; in-source; _⊕_; names; Each; Heads; seen; Books;
+  open Strongly R using (Strong; Sub; scanˢ; here; module At; Queue; Kernels; Meaning; Owned; Path; in-scan; in-source; _⊕_; names; Each; Heads; Lingers; seen; Books;
                          mapˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; PathLanes; this-lane; next-lane; in-map; in-take; in-outer; in-lanes; in-body; in-defer; seen-join;
                          Taking; taking; taken; cutNames; quietName; subjectNames; flatNames; laneNames; Name; pendings; subjects; joiners) renaming (ending to endingᵀ)
   open Strongly.Against R using (CtlAs)
@@ -370,6 +370,12 @@ module Framing (R : Set) where
 
   none-of : ∀ {ℓ} {X : Set ℓ} {m : Maybe X} → is-just m ≡ false → m ≡ nothing
   none-of {m = nothing} _ = refl
+
+  -- A scan's store moves no tie: no tie reads its accumulator.
+  postulate
+    scan-lingers : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
+                   (ρ : Path T (scanˢ f r u)) {y : A} → Calling g ℓ m₁ (ρ ⊕ in-scan here) (sends y)
+                 → Lingers (store (Conf.heap (Mach.conf m₁)) r (lift (f (At.val (Conf.heap (Mach.conf m₁)) r) y))) T
 
   -- The parts above the scan move with it; every other part reads alike.
   scan-behind : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
