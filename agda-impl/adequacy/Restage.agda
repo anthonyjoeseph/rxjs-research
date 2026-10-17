@@ -49,7 +49,7 @@ module Restaging (R : Set) where
   open Machine R using (Mach; mach; step; silent; Playing; wkPlaying; wkTodo)
   open Unsubbing R using (_⇝_; now; then; ≗-trans; wk≗; bind≗; wk-same; wkEnv-same; from-same)
   open Growing R using (wkTree; wkLanes; wkPath)
-  open Sequencing R using (wkEnv-wk; wk-wk; from-⨾; seq-done; seq-assoc; wk∋-wk; wkEl-wk)
+  open Sequencing R using (wkEnv-wk; wk-wk; from-⨾; seq-done; wk∋-wk; wkEl-wk)
   open Pure R using (Timer; wkTimer; mapList)
   open Shared Timeline (Out R) using (Heapᴹ; ⟨_,_,_⟩; Stack; run; Val; extend; look; cbs; wkVal; store; Callbacks)
   open Heap using (World; _⊑_; _⨾_; _∋_; new; grow; wk∋; cell; slot; Sink; Quiet; Handle) renaming (here to hereʳ; same to same⊑)
@@ -1251,7 +1251,7 @@ module Restaging (R : Set) where
           bk = Carried.books cr
 
   of-restage : ∀ {g m} (cr : Carried g m) {Δ A} {xs : List A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.of xs) → Offers cr xs
-  of-restage cr e = offer-restage cr e (λ _ → refl) (λ _ _ _ → ≗-trans (seq-done _) (seq-assoc _ _ _))
+  of-restage cr e = offer-restage cr e (λ _ → refl) (λ _ _ _ → bind≗ (≗-refl _) λ _ → seq-done _)
 
   empty-restage : ∀ {g m} (cr : Carried g m) {Δ A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.empty) → Offers cr {Δ} {A} []
   empty-restage cr e = offer-restage cr e (λ _ → refl) (λ _ _ _ → under≗ (≗-refl _) (seq-done _))
