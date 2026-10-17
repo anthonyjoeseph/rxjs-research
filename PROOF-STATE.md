@@ -182,10 +182,11 @@ by their own silent steps (`Mirror`).
   `At.pooled`). `emit-void` is a body over its site (`void-site`): a
   site's pin lifts by `void-up`; a pool's and a rest's pin read their
   tie (`tied-skip`, `restful-pinned`). Ruled out: the ghost alike past a
-  hidden step; an `ending` take as a site. The core left: `pooled-pin`,
-  `left-pin`, `pool-off`, `void-spread`, one fact: nothing but the
-  hidden `of` heads under the run (`Carried.behind` bounds only at its
-  `p`). Then landings, `sub-defer`, `close-lingers`, `settle-lingers`.
+  hidden step; an `ending` take as a site; one `Clear` through a pool
+  site. The core left: `pooled-pin`, `left-pin`, `pool-off`,
+  `spread-held`, one fact: nothing but the `of` heads under the run
+  (`Carried.behind` bounds only at its `p`). Then landings,
+  `sub-defer`, `close-lingers`, `settle-lingers`.
 - **C. THE CALLBACK RELATION.** `Calling` is one record over the signal
   climbing, a value or an end with its calls owed, `call` its one
   recursion by `call-step`. Ruled out: a third mid-call state.
@@ -328,8 +329,8 @@ by their own silent steps (`Mirror`).
   value the ghost holds.
 - **`turn-dry`** (Lift) — FALSITY, `NO EVIDENCE`: nothing held and no timer
   queued, the ghost shows nothing.
-- **`spread-past`** (Lift) — FALSITY, `NO EVIDENCE`: no sibling an open `of`'s
-  path passes heads under its base; what a source fed, joiners took.
+- **`spread-held`** (Lift) — FALSITY, `NO EVIDENCE`: held or hidden, no sibling
+  an open `of`'s path to a held part passes heads under its base.
 - **`behind-fire`** (Lift) — FALSITY, `NO EVIDENCE`: a timer popped at the
   turn, its fired cold heads no earlier than the run.
 - **`shut-step`** (Lift) — FALSITY, `NO EVIDENCE`: a connect past its source's
@@ -360,15 +361,13 @@ by their own silent steps (`Mirror`).
   `of`, what the flatMap's ended parts left running pins next under the run.
 - **`pool-restful`** (Lift) — FALSITY, `NO EVIDENCE`: every flatMap's pool is a
   rest's shape (idle, rest, union, bursting, under).
-- **`pool-off`** (Lift) — FALSITY, `NO EVIDENCE`: at a pool over a hidden
-  `of`, neither the flatMap's outer nor any lane it holds heads under the run.
-- **`void-spread`** (Lift) — FALSITY, `NO EVIDENCE`: at any held part over a
-  hidden `of`, no sibling its path passes heads under the run.
+- **`pool-off`** (Lift) — FALSITY, `DEAD ROUTE`: at a pool over a hidden `of`,
+  neither the flatMap's outer nor any lane it holds heads under the run.
 - **`pool-land`** (Lift) — FALSITY, `NO EVIDENCE`: the pool's pin lifted is the
   ghost's step: the run dies at its guard, the ghost past that pin.
 - **`left-pin`** (Lift) — FALSITY, `NO EVIDENCE`: at a held connect over a
-  hidden `of` in its ended source, what the source left running pins next
-  under the run.
+  hidden `of` in its ended source, what the source left running pins next under
+  the run.
 - **`rest-body`** (Lift) — FALSITY, `NO EVIDENCE`: there, the body shut at the
   source's end steps after that pin.
 - **`rest-restful`** (Lift) — FALSITY, `NO EVIDENCE`: an ended source's rest is
@@ -383,8 +382,8 @@ by their own silent steps (`Mirror`).
   pool taking the lane's last ghost rested, keeps every tie.
 - **`next-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end with a
   value queued, the queue's head taken, keeps every tie.
-- **`end-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a take restaged
-  `ending` over its source's part keeps every tie.
+- **`end-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a take restaged `ending`
+  over its source's part keeps every tie.
 - **`sd-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's done flag
   written as it ends keeps every tie.
 - **`pool-idle`** (Climbs) — FALSITY, `NO EVIDENCE`: a pool joined with idle
@@ -413,8 +412,8 @@ by their own silent steps (`Mirror`).
   every tie.
 - **`connect-lingers`** (Restage) — FALSITY, `NO EVIDENCE`: a connect restaged
   keeps every tie.
-- **`rf-lingers`** (Restage) — FALSITY, `NO EVIDENCE`: a flatMap restaged
-  keeps every tie.
+- **`rf-lingers`** (Restage) — FALSITY, `NO EVIDENCE`: a flatMap restaged keeps
+  every tie.
 - **`grow-lingers`** (Restage) — FALSITY, `NO EVIDENCE`: a growth keeps every
   tie, weakened.
 - **`up-lanes`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap above a written

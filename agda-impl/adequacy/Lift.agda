@@ -53,7 +53,7 @@ module Lifting (R : Set) where
   open Run (Pureᴾ R) using (Act; module Kit; module FlatKit)
   open Strongly R using (Strong; Carried; Books; carried; Sub; pendingˢ; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; emitC; kontC; Leaf; feedC; srcC; taking; taken; feeding; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _≗_; Each; Heads; Lingers; Ties; Tied; Meets; rootObs; seen; seenL) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (CtlAs; calmAs; noteAs; runAs; subAs; burstAs; bursts; agenda) renaming (Placed to Placedᴬ)
-  open Moving R using (plant; true≢false)
+  open Moving R using (plant; true≢false; ⊕-here)
   open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each)
   open Unsubbing R using (_⇝_; site-tears)
   open Locality R using (site-holds; site-gated)
@@ -108,13 +108,17 @@ module Lifting (R : Set) where
               → At.part (Conf.heap (Mach.conf m)) src ≡ nothing → ∀ {c₁} → e ≡ just c₁ → ∀ {b₀} → At.part (Conf.heap (Mach.conf m)) bd ≡ just b₀
               → U.shutˢᵗ rp c₁ rt (U.step (U.shut (Any.here refl) c₁ b₀)) ≡ U.shutˢᵗ rp c₁ rt (U.step b₀)
 
-    -- The agenda's first call an open `of` the ghost holds: no sibling
-    -- its path passes heads under the `of`'s base.  A value under it the
-    -- ghost still holds is the `of`'s own; what a connect's source fed
-    -- the body's joiners under its earlier values, they have taken.
-    spread-past : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+    -- The agenda's first call an open `of`, held or hidden: no sibling
+    -- the path to a part the ghost holds passes heads under the `of`'s
+    -- base.  A value under it the ghost still holds is the `of`'s own;
+    -- what a connect's source fed the body's joiners under its earlier
+    -- values, they have taken.  Not through a pool over a hidden `of`,
+    -- which steps under the base (`pooled-pin`).
+    spread-held : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
                 → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
-                → seen (Conf.heap (Mach.conf m)) π ≡ true → Clear (Conf.heap (Mach.conf m)) (Off p) π
+                → ∀ {Δ′ A′} {v : Sub (Conf.world (Mach.conf m)) Δ′ A′} (ψ : Path (Carried.tree cr) v) (τ : Path v (ofˢ {Δ = Δ} {A} p i (x ∷ xs))) → ψ ⊕ τ ≡ π
+                → seen (Conf.heap (Mach.conf m)) ψ ≡ true
+                → is-just (At.part (Conf.heap (Mach.conf m)) v) ≡ true → Clear (Conf.heap (Mach.conf m)) (Off p) ψ
 
     -- A live timer popped at the turn: its cold, fired, heads past where
     -- the run is, the queue's timers being past it.
@@ -194,6 +198,12 @@ module Lifting (R : Set) where
             → At.part (Conf.heap (Mach.conf m)) src ≡ nothing → ∀ {c₀} → e ≡ just c₀
             → VoidSite cr π
     no-root : At.part (Conf.heap (Mach.conf m)) (Carried.tree cr) ≡ nothing → VoidSite cr π
+
+  -- At an open `of` the ghost holds, its whole path.
+  spread-past : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+              → seen (Conf.heap (Mach.conf m)) π ≡ true → Clear (Conf.heap (Mach.conf m)) (Off p) π
+  spread-past cr π fc op sn = spread-held cr π fc op π here (⊕-here π) sn refl
 
   -- Two steps alike as rests: the same pin, or none.
   data Pinned {Γ} {B C : Set} : U.Step Γ B → U.Step Γ C → Set₁ where
@@ -318,7 +328,10 @@ module Lifting (R : Set) where
 
     -- At a pool over a hidden `of`: neither the flatMap's outer nor any
     -- lane it holds heads under the run, as no sibling along its path
-    -- does (`void-spread`).
+    -- does (`spread-held`).
+    -- DEAD ROUTE: `spread-held` along the whole path, the flatMap's step
+    --   read off its `Clear`.  That step's `Pooled` asks the pool off the
+    --   run, and at a pool site the pool steps under it (`pooled-pin`).
     pool-off : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
               → seen (Conf.heap (Mach.conf m)) π ≡ false
@@ -326,16 +339,6 @@ module Lifting (R : Set) where
                   (ψ : Path (Carried.tree cr) (flatMapˢ op f fl oc k r pl so ls)) (σ : Path (flatMapˢ op f fl oc k r pl so ls) _) → ψ ⊕ σ ≡ π
               → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {c} → At.part (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl so ls) ≡ just c
               → Opt (Off p) (At.part (Conf.heap (Mach.conf m)) so) × All (Off p) (At.partLanes (Conf.heap (Mach.conf m)) ls)
-
-    -- Over a hidden `of`, at a part the ghost holds: no sibling its path
-    -- passes heads under the run, as at an `of` the ghost holds
-    -- (`spread-past`).
-    void-spread : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
-              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
-              → seen (Conf.heap (Mach.conf m)) π ≡ false
-              → ∀ {Δ′ A′} {v : Sub (Conf.world (Mach.conf m)) Δ′ A′} (ψ : Path (Carried.tree cr) v) (τ : Path v (ofˢ {Δ = Δ} {A} p i (x ∷ xs))) → ψ ⊕ τ ≡ π
-              → seen (Conf.heap (Mach.conf m)) ψ ≡ true
-              → is-just (At.part (Conf.heap (Mach.conf m)) v) ≡ true → Clear (Conf.heap (Mach.conf m)) (Off p) ψ
 
     -- At a pool, the ghost's step its pin lifted: the run climbs to its
     -- guard and dies, the pool a pin on, the ghost past that pin.
@@ -1002,7 +1005,7 @@ module Lifting (R : Set) where
            (clear-zip {P = Heads p} {Q = Off p} {R′ = Far p} (λ {Γ} {A} {c} → far-apart {p} {Γ} {A} {c}) ψ
               (clear-each (subst (λ q′ → Each (Conf.heap (Mach.conf m)) (Heads q′) (Carried.tree cr))
                                  (run-at (Carried.ctlAs cr) fc (Owned.placed (Carried.owned cr))) (Carried.behind cr)) ψ se (cong is-just pt))
-              (void-spread cr π fc op sn ψ τ e se (cong is-just pt)))
+              (spread-held cr π fc op ψ τ e se (cong is-just pt)))
   ... | c₁ , pc , L , _ =
     subst₂ (λ s c″ → Lifts (Conf.heap (Mach.conf m)) ψ s (U.step c″)) ps (just-injective (trans (sym pc) (run-meets (Carried.ctlAs cr) fc (Carried.meets cr)))) L
 
