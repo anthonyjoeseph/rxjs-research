@@ -69,9 +69,16 @@ module Lifting (R : Set) where
 
     -- A subscription begun at its pending node, by what it begins: its
     -- kernel run to the next re-entry state, its program smaller by what
-    -- was begun, or past a defer's skip.
+    -- was begun.
     sub-cold    : ∀ {g m} (cr : Carried g m) {Δ A} {c : Timeline A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.cold c) → Hops cr
     sub-joined  : ∀ {g m} (cr : Carried g m) {Δ A} {i : A ∈ᴸ Δ} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.connected i) → Hops cr
+
+    -- A defer begun: the ghost past its skip.  Under a part that has
+    -- ended it still subscribes, inside a connect's source burst, and may
+    -- unfold there forever (`connect spin` under a cut take, which the
+    -- meaning shows as skips forever, as the machine spins): no load
+    -- bounds it, so the hop is the ghost past the pin its rest holds,
+    -- and no field of `Carried` ties a rest to the hidden subtree.
     sub-defer   : ∀ {g m} (cr : Carried g m) {Δ A} {l : T.Later Timeline Δ A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.defer l) → Hops cr
 
     -- An `of` reading its observer closed: its burst over, nothing
@@ -91,11 +98,19 @@ module Lifting (R : Set) where
     -- under it, so the ghost is alike, and the `of` owes a value fewer.
     -- Nothing under a part that has ended reads open, so no lane is
     -- admitted, no subscription begun on the way.
+    -- The ghost does hold the value when the part that hid it was a
+    -- lane: the flatMap's pool took the lane's rest, whose `burstingᶜ`
+    -- shows each step of the source inside its subscription as a pin.
+    -- `merge (takeWhile false (λ _ → false) (connect (of [1,2]) (of [5])))
+    -- (of [7])` means skips at the source's 1 and 2 between the take's
+    -- end and the 7.  The ghost alike leaves those pins ahead of every
+    -- later sibling: the hop is the ghost past the pool's pin, and no
+    -- field of `Carried` ties a pool's rest to the hidden `of`.
     -- DEAD ROUTE: the ghost past the burst's skip (`U.burstingᶜ`).  A
     --   part past its end shows nothing under it: a cut takeWhile and a
     --   connect with no body have no part, and an `ending` take's rest
     --   stops at its end, which sits before every later value of the
-    --   burst.  No skip of the ghost's is this value.
+    --   burst.  No skip of the hidden part's own is this value.
     emit-void : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
               → seen (Conf.heap (Mach.conf m)) π ≡ false → ∀ {m′} → step m ≡ silent m′

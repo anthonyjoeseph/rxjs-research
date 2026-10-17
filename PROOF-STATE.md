@@ -177,10 +177,18 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
+- **HIDDEN RUNS.** A connect's source runs its subscribe burst under a
+  part that has ended (a cut take, an ended lane, a connect with no
+  body), and the ghost holds that run: a flatMap's pool took the lane's
+  rest, whose `burstingᶜ` shows each source step inside its subscription
+  as a pin. No field of `Carried` ties a pool's or an ended source's
+  rest to the hidden subtree, so `emit-void`'s ghost alike leaves pins
+  stale ahead of every later sibling, and a defer spinning there
+  (`sub-defer`) has no load to lower. Decides the tie: a rest read off
+  the hidden subtree by `part`, or a relation `Carried` owes.
 - **C. THE CALLBACK RELATION.** `Calling` is one record over the signal
-  climbing, a value or an end with its calls owed, and `call` its one
-  recursion, by `call-step` over one lemma per operator. Ruled out: a
-  third mid-call state.
+  climbing, a value or an end with its calls owed, `call` its one
+  recursion by `call-step`. Ruled out: a third mid-call state.
   An operator's call is reads, writes and a RESTAGE of its node,
   node-local but for carrying stack, calls and agenda across it: a
   take's stage, a connect's feed, a flatMap's pool, its admit, a lane's
@@ -190,7 +198,8 @@ by their own silent steps (`Mirror`).
   admit's and a dequeue's alike: `begin-path`, then the tree weakened by
   `Growing.wkTree` with the lane planted, `bg-*` its frame. An `of`
   or `empty` begun is `offer-restage`. Remaining:
-  `sub-cold`, `sub-joined`, `sub-defer` over the same growth.
+  `sub-cold`, `sub-joined` over the same growth; `sub-defer` after
+  HIDDEN RUNS.
 - **UP-ENDED.** `up-ended` is a body: the rest's skips by `Each.rests`,
   the shut body by `shut-heads` over what it tells. Ruled out: the end
   signal's fields carrying it; the non-local residue is `tells-past`,
