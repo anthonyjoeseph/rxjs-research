@@ -13,7 +13,10 @@ can see into build failures.
    the proof cannot hide from the roadmap.
 3. **Staleness** — coverage run BACKWARDS: no row head names a postulate that is no
    longer live. This is the direction that has actually bitten — the two rows in the
-   paragraph above.
+   paragraph above. A row naming NOTHING live is deleted by the check itself
+   (`--prune`, which `make roadmap-check` passes), because deleting a postulate must
+   cost nothing (Anthony) and the repair is always the same. Only a row with a live
+   name left still fails: which part of its hook holds is a human's call.
 4. **Row budget** — each row's PROSE is within `ROW_BUDGET` characters (names are
    free). Research belongs in the postulate's own source header, where it sits in front
    of the next person to pick the row up; a roadmap row is a hook.

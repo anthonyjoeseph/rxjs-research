@@ -19,7 +19,8 @@ open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup) renaming
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (just; nothing)
-open import Data.Nat using (ℕ; zero; suc)
+open import Data.Nat using (ℕ; zero; suc; _+_)
+open import Data.Nat.Properties using (m≤m+n)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.Product using (_×_; _,_)
 open import Data.String using (String; intersperse) renaming (_++_ to _⊕_)
@@ -28,16 +29,20 @@ open import Relation.Binary.PropositionalEquality using (refl)
 
 import Tree as T
 open import Tree using (Obs; Later; renameLater)
-open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; close; Timeline)
+open import denotation.MonotonicList using (From; Frame; Frame∞; From∞; done; quiet; at; emit; close; Timeline)
 open import quickcheck.Ty using (Ty; boolᵗ; listᵗ; ⟦_⟧ᵀ; showᵀ)
 open import quickcheck.Tm using (Vals; Tm; ⟦_⟧ᵗ; position; showTm)
 
--- A cold, as data: frames at offsets from subscribe, then complete or not.
+-- A cold, as data: frames, each a gap of ticks after the one before (the
+-- first after subscribe), then complete or not, or play the frames again,
+-- forever, a tick after the last.  Gaps, so that every script rises; the
+-- oracle is shown the ticks.  A looping script with no frames is silent.
 record Script (t : Ty) : Set where
   constructor script
   field
     frames    : List (ℕ × List ⟦ t ⟧ᵀ)
     completes : Bool
+    loops     : Bool
 
 data Code (Γ Δᵍ Δ Θ : List Ty) : Ty → Set where
   cold      : ∀ {t} → Script t → Code Γ Δᵍ Δ Θ t
@@ -105,7 +110,7 @@ mutual
   -- the recursive program, unfolded only when forced
   knot : ∀ {C Γ Δᵍ Δ Θ t} → Leaf C → ℕ → Code Γ (t ∷ Δᵍ) Δ Θ t
        → Rec C Γ Δᵍ → Rec C Γ Δ → Vals Θ → Later C ⟦ Γ ⟧ᴳ ⟦ t ⟧ᵀ
-  knot leaf zero    c g d θ .Later.force = T.cold (leaf (script [] false))
+  knot leaf zero    c g d θ .Later.force = T.cold (leaf (script [] false false))
   knot leaf (suc n) c g d θ .Later.force = toObs leaf n c (knot leaf n c g d θ ∷ g) d θ
 
   later : ∀ {C Γ Δᵍ Δ Θ t} → Leaf C → ℕ → Code Γ [] (Δᵍ ++ Δ) Θ t
@@ -119,27 +124,33 @@ mutual
 ------------------------------------------------------------------------
 -- A script as a timeline
 
+-- `rs` is the whole script, played again when it loops.
 mutual
-  scriptML : ∀ {A} → List (ℕ × List A) → Bool → ML A
-  scriptML []               true  = done
-  scriptML []               false = quiet
-  scriptML ((t , xs) ∷ fs)  c     = at t (burst xs fs c)
+  scriptML : ∀ {A} b → List (ℕ × List A) → List (ℕ × List A) → Bool → Bool → From A b
+  scriptML b rs []              c     true  = again b rs
+  scriptML b rs []              true  false = done
+  scriptML b rs []              false false = quiet
+  scriptML b rs ((g , xs) ∷ fs) c     l     = at (b + g) (m≤m+n b g) (burst rs xs fs c l)
 
-  burst : ∀ {A} → List A → List (ℕ × List A) → Bool → Burst A
-  burst []       fs c = close λ where .ML∞.force → scriptML fs c
-  burst (x ∷ xs) fs c = emit x λ where .Burst∞.force → burst xs fs c
+  again : ∀ {A} b → List (ℕ × List A) → From A b
+  again b []              = quiet
+  again b ((g , xs) ∷ fs) = at (b + g) (m≤m+n b g) (burst ((g , xs) ∷ fs) xs fs false true)
+
+  burst : ∀ {A t} → List (ℕ × List A) → List A → List (ℕ × List A) → Bool → Bool → Frame A t
+  burst {t = t} rs []       fs c l = close λ where .From∞.force → scriptML (suc t) rs fs c l
+  burst         rs (x ∷ xs) fs c l = emit x λ where .Frame∞.force → burst rs xs fs c l
 
 timeline : Leaf Timeline
-timeline (script fs c) = lift (scriptML fs c)
+timeline (script fs c l) = lift (scriptML 0 fs fs c l)
 
 ------------------------------------------------------------------------
 -- JSON, for the oracle: a node is an array headed by its constructor,
 -- each binder's variable a position counted from the innermost.
 
 private
-  showFrames : ∀ t → List (ℕ × List ⟦ t ⟧ᵀ) → List String
-  showFrames t []             = []
-  showFrames t ((k , xs) ∷ fs) = ("[" ⊕ showℕ k ⊕ "," ⊕ showᵀ (listᵗ t) xs ⊕ "]") ∷ showFrames t fs
+  showFrames : ∀ t → ℕ → List (ℕ × List ⟦ t ⟧ᵀ) → List String
+  showFrames t b []              = []
+  showFrames t b ((g , xs) ∷ fs) = ("[" ⊕ showℕ (b + g) ⊕ "," ⊕ showᵀ (listᵗ t) xs ⊕ "]") ∷ showFrames t (suc (b + g)) fs
 
   showTms : ∀ {Θ t} → List (Tm Θ t) → List String
   showTms []       = []
@@ -156,7 +167,7 @@ private
   showBool false = "false"
 
 showCode : ∀ {Γ Δᵍ Δ Θ} t → Code Γ Δᵍ Δ Θ t → String
-showCode t (cold (script fs c)) = "[\"cold\",[" ⊕ intersperse "," (showFrames t fs) ⊕ "]," ⊕ showBool c ⊕ "]"
+showCode t (cold (script fs c l)) = "[\"cold\",[" ⊕ intersperse "," (showFrames t 0 fs) ⊕ "]," ⊕ showBool c ⊕ "," ⊕ showBool l ⊕ "]"
 showCode t empty                = "[\"empty\"]"
 showCode t (of xs)              = "[\"of\",[" ⊕ intersperse "," (showTms xs) ⊕ "]]"
 showCode t (map {s} f c)        = "[\"map\"," ⊕ showTm f ⊕ "," ⊕ showCode s c ⊕ "]"

@@ -1,4 +1,4 @@
-.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain places ghosts bg bg-check bg-wait \
+.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain ghosts placing placing-count stepping bg bg-check bg-wait \
         wiring wiring-gate wiring-selftest unsafe-check dup-check dup-selftest \
         imports-check imports-fix imports-selftest comments-check comments-selftest \
         roadmap-check roadmap-selftest roadmap-evidence roadmap-moved roadmap-moved-selftest \
@@ -28,6 +28,11 @@ AGDA_BIN ?= agda
 export AGDA_BIN
 AGDA := $(AGDA_BIN) -W error
 
+# PER-DEFINITION TIMES, opt in: `make agda AGDA_PROFILE=--profile=definitions`.
+# Agda leaves profiling options out of an interface's validity key, so this
+# rechecks nothing, and it times only the modules this run rechecks.
+AGDA_PROFILE ?=
+
 all: help
 
 help:
@@ -37,7 +42,8 @@ help:
 	@echo "  bug-cache     compile the bug cache's runner and run every row"
 	@echo "  oracle        the three Agda engines against real rxjs (typescript/ drives it)"
 	@echo "  chain         the denotation's approximants form a chain (ARGS=\"FROM COUNT\")"
-	@echo "  places        the pure run's ghost positions are the denotation's (ARGS=\"FROM COUNT\")"
+	@echo "  placing       the machine's trace is placed against the root's events (ARGS=\"FROM COUNT\", default 0 300, max 500 without SWEEP=1)"
+	@echo "  stepping      the stepper shows what its configuration means, skips included (ARGS=\"FROM COUNT\", default 0 300)"
 	@echo "  ghosts        every observer in the run is shown what its subtree denotes (ARGS=\"FROM COUNT\")"
 	@echo "  postulates    every postulate in $(SRC) by name — the work ledger"
 	@echo "  find          search the declared TYPE of every statement:  make find Q='⊑ lub'"
@@ -69,7 +75,7 @@ gate-cheap:
 	done
 
 agda:
-	@cd $(SRC) && $(AGDA) Main.agda
+	@cd $(SRC) && $(AGDA) $(AGDA_PROFILE) Main.agda
 
 gate:
 	@$(MAKE) --no-print-directory gate-cheap || { scripts/notify.py "RED (cheap checks)"; exit 1; }
@@ -90,7 +96,7 @@ ORACLE_BIN := $(SRC)/_cli/Oracle-CLI
 
 oracle-build:
 	@test -f $(ORACLE_CLI) || { echo "oracle: RED — $(ORACLE_CLI) does not exist yet"; exit 1; }
-	@cd $(SRC) && $(AGDA) --compile --compile-dir=_cli quickcheck/Oracle-CLI.agda
+	@cd $(SRC) && $(AGDA) --compile --compile-dir=_cli --ghc-flag=-rtsopts quickcheck/Oracle-CLI.agda
 
 oracle: oracle-build
 	@cd typescript && AGDA_CLI_BIN=$(CURDIR)/$(ORACLE_BIN) npm run --silent oracle -- $(ARGS)
@@ -103,13 +109,41 @@ chain: oracle-build
 	  if echo "$$out" | grep -q '^chain: FAIL '; then echo "chain: RED"; exit 1; fi; \
 	  echo "chain: GREEN"
 
-# The pure run's ghost positions against the denotation's, on ARGS="FROM
-# COUNT" seeds: green when the run reaches its `done` line and no seed FAILs.
-places: oracle-build
-	@out=$$($(ORACLE_BIN) places $(ARGS)); echo "$$out"; \
-	  echo "$$out" | grep -q '^places: done ' || { echo "places: RED — the run never finished"; exit 1; }; \
-	  if echo "$$out" | grep -q '^places: FAIL '; then echo "places: RED"; exit 1; fi; \
-	  echo "places: GREEN"
+# The machine's trace placed against the meaning, positions included, on
+# ARGS="FROM COUNT" seeds (default "0 300").  A smoke check for a change to
+# the denotation or the engine, never a sweep: COUNT over 500 is refused
+# unless SWEEP=1.  One process per seed, each capped in time and heap, so a
+# seed that runs away is named, with its program and each check alone,
+# instead of taking the runner down with it.
+PLACING_SEED_SECS = 90
+PLACING_ARGS = $(or $(ARGS),0 300)
+placing-count:
+	@set -- $(PLACING_ARGS); \
+	  if [ "$${2:-0}" -gt 500 ] && [ "$(SWEEP)" != 1 ]; then \
+	    echo "placing: COUNT $$2 refused — 300 seeds is the smoke check; SWEEP=1 to override" >&2; exit 2; fi
+
+placing: placing-count oracle-build
+	@set -- $(PLACING_ARGS); s=$$1; e=$$(($$1 + $$2)); bad=0; \
+	  while [ $$s -lt $$e ]; do \
+	    out=$$(timeout $(PLACING_SEED_SECS) $(ORACLE_BIN) placing $$s all +RTS -M3g -RTS 2>&1); code=$$?; \
+	    case "$$out" in \
+	      "placing: ok "*) ;; \
+	      "placing: FAIL "*) echo "$$out"; bad=1 ;; \
+	      *) echo "placing: ABORT seed $$s (exit $$code)"; bad=1; $(ORACLE_BIN) code $$s; \
+	         for c in placed rising steady steps trails spread flat; do \
+	           one=$$(timeout $(PLACING_SEED_SECS) $(ORACLE_BIN) placing $$s $$c +RTS -M3g -RTS 2>&1); \
+	           echo "  $$c (exit $$?): $$one"; done ;; \
+	    esac; s=$$(($$s + 1)); done; \
+	  if [ $$bad = 1 ]; then echo "placing: RED"; exit 1; fi; echo "placing: GREEN"
+
+# The stepper against the meaning, event for event, skips included, on
+# ARGS="FROM COUNT" seeds (default "0 300").
+STEPPING_ARGS = $(or $(ARGS),0 300)
+stepping: oracle-build
+	@out=$$($(ORACLE_BIN) stepping $(STEPPING_ARGS)); echo "$$out"; \
+	  echo "$$out" | grep -q '^stepping: done ' || { echo "stepping: RED — the run never finished"; exit 1; }; \
+	  if echo "$$out" | grep -q '^stepping: FAIL '; then echo "stepping: RED"; exit 1; fi; \
+	  echo "stepping: GREEN"
 
 # Every observer inside the run against its subtree's denotation, on
 # ARGS="FROM COUNT" seeds: green when the run reaches its `done` line and no
@@ -507,7 +541,7 @@ comments-selftest:
 # ~13 minutes — so there is no reason to spend the 13 minutes only to fail on
 # something a textual pass already knew.  Fail fast, then typecheck.
 roadmap-check:
-	@scripts/check-roadmap.py
+	@scripts/check-roadmap.py --prune
 
 # PROVES roadmap-check IS LOAD-BEARING, against fixtures outside PROOF-STATE.md.
 # Same reason dup-selftest exists: the real file is (and should stay) SORTED, so
@@ -642,6 +676,16 @@ roadmap-selftest:
 	  done; \
 	  echo "$$stl" | grep -q "  a-live$$" \
 	    && { echo "SELFTEST FAIL: a still-live postulate was reported stale"; fail=1; }; \
+	  prn=$$(mktemp); cp scripts/roadmap-selftest/stale.md $$prn; \
+	  scripts/check-roadmap.py --file $$prn --prune \
+	       --ledger scripts/roadmap-selftest/ledger-stale.txt --census scripts/roadmap-selftest/census.txt \
+	       --src-names scripts/roadmap-selftest/src-names-stale.txt 2>&1 | grep -q "STALE ROWS" \
+	    && { echo "SELFTEST FAIL: --prune left a row naming nothing live failing the check"; fail=1; }; \
+	  for n in b-discharged c-vanished d-gone-parent; do \
+	    grep -q "$$n" $$prn && { echo "SELFTEST FAIL: --prune kept $$n"; fail=1; }; \
+	  done; \
+	  grep -q "a-live" $$prn || { echo "SELFTEST FAIL: --prune deleted a live row"; fail=1; }; \
+	  rm -f $$prn; \
 	  cln=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
 	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt \
 	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
