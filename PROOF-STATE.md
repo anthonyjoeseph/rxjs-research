@@ -182,11 +182,12 @@ by their own silent steps (`Mirror`).
   (`At.leftover`, flag-free; a pool by its flatMap's own flags,
   `At.pooled`), from the root and from each connect source still in its
   subscribe burst; every move carries it by a `*-lingers` leaf. Ruled
-  out: the ghost alike past a hidden step (`emit-void` is `Hops`).
-  Remaining: the hidden step as an assembly, the held pool a pin on and
-  lifted through its ancestors as a `passed` hop, then `sub-defer` over
-  it; whether a part's last ghost rests to its leftover
-  (`close-lingers`, `settle-lingers`).
+  out: the ghost alike past a hidden step. `emit-void` is a body over
+  its site (`void-site`: a pool, a rest, an `ending` take, no root).
+  Remaining: each site's hop, the tie a pin on and lifted through its
+  ancestors as a `passed` hop, then `sub-defer` over the same sites;
+  whether a part's last ghost rests to its leftover (`close-lingers`,
+  `settle-lingers`).
 - **C. THE CALLBACK RELATION.** `Calling` is one record over the signal
   climbing, a value or an end with its calls owed, `call` its one
   recursion by `call-step`. Ruled out: a third mid-call state.
@@ -354,8 +355,17 @@ by their own silent steps (`Mirror`).
   restaged `ending`, the run gone under `ix 0`.
 - **`out-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
   sooner than the run under `ix 0` with a take restaged `ending`.
-- **`emit-void`** (Lift) — FALSITY, `DEAD ROUTE`: an `of` the ghost does not
-  hold emits to a guard that drops it, the ghost alike or past a pool's pin.
+- **`void-site`** (Lift) — FALSITY, `DEAD ROUTE`: an `of` the ghost does not
+  hold sits under a held pool, ended source's rest or `ending` take, or the
+  root has no part.
+- **`void-pool`** (Lift) — FALSITY, `NO EVIDENCE`: a hidden step under a held
+  pool: the pool a pin on, the ghost past that pin.
+- **`void-rest`** (Lift) — FALSITY, `NO EVIDENCE`: a hidden step under an ended
+  source's rest: the rest a pin on, the ghost past it.
+- **`void-end`** (Lift) — FALSITY, `NO EVIDENCE`: a hidden step under an
+  `ending` take: its rest a pin on, the ghost past it.
+- **`void-gone`** (Lift) — FALSITY, `NO EVIDENCE`: a hidden step with the
+  root's part gone: the ghost alike, the `of` a value fewer.
 - **`close-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: an outer's end, its
   pool taking the outer's last ghost rested, keeps every tie.
 - **`settle-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end, its

@@ -86,36 +86,6 @@ module Lifting (R : Set) where
     emit-shut : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ false → Hops cr
 
-    -- An `of` reading its observer open where the ghost does not hold it:
-    -- a connect's source fed on past what held it.  The source is
-    -- subscribed after the body and its cut attached only once its
-    -- subscribe returns, and it reads its subject, not its connect's
-    -- observer; so a body, or a takeWhile or lane above the connect,
-    -- ending inside that burst leaves the rest of the burst to run into a
-    -- subject nobody reads, as rxjs does.  The value climbs to the node
-    -- that hides it (a takeWhile or lane cut, a connect whose body has
-    -- ended) and dies at a guard; that node's part ignores everything
-    -- under it, so the ghost is alike, and the `of` owes a value fewer.
-    -- Nothing under a part that has ended reads open, so no lane is
-    -- admitted, no subscription begun on the way.
-    -- The ghost does hold the value when the part that hid it was a
-    -- lane: the flatMap's pool took the lane's rest, whose `burstingᶜ`
-    -- shows each step of the source inside its subscription as a pin.
-    -- `merge (takeWhile false (λ _ → false) (connect (of [1,2]) (of [5])))
-    -- (of [7])` means skips at the source's 1 and 2 between the take's
-    -- end and the 7.  The ghost alike leaves those pins ahead of every
-    -- later sibling, and `Carried.lingers` ties the pool to what the
-    -- hidden source still runs: the hop is the ghost past the pool's pin,
-    -- the pool a pin on.  Under a part with no pool the ghost is alike.
-    -- DEAD ROUTE: the ghost past the burst's skip (`U.burstingᶜ`).  A
-    --   part past its end shows nothing under it: a cut takeWhile and a
-    --   connect with no body have no part, and an `ending` take's rest
-    --   stops at its end, which sits before every later value of the
-    --   burst.  No skip of the hidden part's own is this value.
-    emit-void : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
-              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
-              → seen (Conf.heap (Mach.conf m)) π ≡ false → Hops cr
-
     -- An `of` reading its observer open, its value handed on under the
     -- `of`'s scope: the `of` past it, the value on its way up, the
     -- ghost's step the value lifted.
@@ -189,6 +159,101 @@ module Lifting (R : Set) where
     note-least : ∀ {g g′ m w a k K} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m
                → Conf.ctl (Mach.conf m) ≡ asking {B = ⊤} (note a) k σ K → U.step g ≡ U.outˢ (Conf.pos (Mach.conf m)) a g′
                → ∀ {q b} → Has (residual g′) q b → q ≤ᵖ Conf.pos (Mach.conf m) → ⊥
+
+  ----------------------------------------------------------------------
+  -- A HIDDEN STEP: AN `of` READING ITS OBSERVER OPEN WHERE THE GHOST DOES
+  -- NOT HOLD IT
+
+  -- A connect's source fed on past what held it.  The source is
+  -- subscribed after the body and its cut attached only once its
+  -- subscribe returns, and it reads its subject, not its connect's
+  -- observer; so a body, or a takeWhile or lane above the connect,
+  -- ending inside that burst leaves the rest of the burst to run into a
+  -- subject nobody reads, as rxjs does.  The value climbs to the node
+  -- that hides it and dies at a guard.  Nothing under a part that has
+  -- ended reads open, so no lane is admitted, no subscription begun on
+  -- the way.
+
+  -- Where the ghost shows that run: the held node whose tie
+  -- (`Carried.lingers`) runs over the hidden `of`.  A flatMap's pool took
+  -- the ended lane's or outer's rest; an ended source's rest is its
+  -- connect's; an `ending` take's rest is its own.  Each shows the
+  -- source's steps inside its subscription as `burstingᶜ` pins.  Or the
+  -- root has no part left, and the ghost shows nothing more.
+  data VoidSite {g m} (cr : Carried g m) {Δ A} {v : Sub (Conf.world (Mach.conf m)) Δ A} (π : Path (Carried.tree cr) v) : Set₁ where
+    in-pool : ∀ {Δ′ A′ B′ op f fl oc k r pl} {so : Sub (Conf.world (Mach.conf m)) Δ′ A′} {ls : List (Lane (Conf.world (Mach.conf m)) Δ′ B′)}
+                (ψ : Path (Carried.tree cr) (flatMapˢ op f fl oc k r pl so ls)) (σ : Path (flatMapˢ op f fl oc k r pl so ls) v) → ψ ⊕ σ ≡ π
+            → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {c} → At.part (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl so ls) ≡ just c
+            → VoidSite cr π
+    in-rest : ∀ {Δ′ A′ B′ S c b kb k fd rp e rt} {src : Sub (Conf.world (Mach.conf m)) Δ′ A′} {bd : Sub (Conf.world (Mach.conf m)) (A′ ∷ Δ′) B′}
+                (ψ : Path (Carried.tree cr) (connectˢ S c b kb k fd rp e rt src bd)) (σ : Path src v) → ψ ⊕ in-source σ ≡ π
+            → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {n} → At.part (Conf.heap (Mach.conf m)) (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
+            → At.part (Conf.heap (Mach.conf m)) src ≡ nothing → ∀ {c₀} → e ≡ just c₀
+            → VoidSite cr π
+    in-end  : ∀ {Δ′ A′ i p c k k′ n} {s : Sub (Conf.world (Mach.conf m)) Δ′ A′}
+                (ψ : Path (Carried.tree cr) (takeWhileˢ i p c k (endingᵗ k′ n) s)) (σ : Path s v) → ψ ⊕ in-take σ ≡ π
+            → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {x} → At.part (Conf.heap (Mach.conf m)) (takeWhileˢ i p c k (endingᵗ k′ n) s) ≡ just x
+            → VoidSite cr π
+    no-root : At.part (Conf.heap (Mach.conf m)) (Carried.tree cr) ≡ nothing → VoidSite cr π
+
+  postulate
+    -- Every hidden step has its site.
+    -- DEAD ROUTE: the ghost past the burst's skip (`U.burstingᶜ`).  A
+    --   part past its end shows nothing under it: a cut takeWhile and a
+    --   connect with no body have no part, and an `ending` take's rest
+    --   stops at its end, which sits before every later value of the
+    --   burst.  No skip of the hidden part's own is this value.
+    void-site : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+              → seen (Conf.heap (Mach.conf m)) π ≡ false → VoidSite cr π
+
+    -- At a pool: the run climbs to its guard and dies, the pool a pin on,
+    -- the ghost past that pin, lifted through the pool's ancestors.
+    -- `merge (takeWhile false (λ _ → false) (connect (of [1,2]) (of [5])))
+    -- (of [7])` means skips at the source's 1 and 2 between the take's end
+    -- and the 7: the ghost alike would leave those pins ahead of every
+    -- later sibling.
+    void-pool : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+              → seen (Conf.heap (Mach.conf m)) π ≡ false
+              → ∀ {Δ′ A′ B′ op f fl oc k r pl} {so : Sub (Conf.world (Mach.conf m)) Δ′ A′} {ls : List (Lane (Conf.world (Mach.conf m)) Δ′ B′)}
+                  (ψ : Path (Carried.tree cr) (flatMapˢ op f fl oc k r pl so ls)) (σ : Path (flatMapˢ op f fl oc k r pl so ls) _) → ψ ⊕ σ ≡ π
+              → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {c} → At.part (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl so ls) ≡ just c
+              → Hops cr
+
+    -- At an ended source's rest: that rest a pin on, the ghost past it.
+    void-rest : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+              → seen (Conf.heap (Mach.conf m)) π ≡ false
+              → ∀ {Δ′ A′ B′ S c b kb k fd rp e rt} {src : Sub (Conf.world (Mach.conf m)) Δ′ A′} {bd : Sub (Conf.world (Mach.conf m)) (A′ ∷ Δ′) B′}
+                  (ψ : Path (Carried.tree cr) (connectˢ S c b kb k fd rp e rt src bd)) (σ : Path src _) → ψ ⊕ in-source σ ≡ π
+              → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {n} → At.part (Conf.heap (Mach.conf m)) (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
+              → At.part (Conf.heap (Mach.conf m)) src ≡ nothing → ∀ {c₀} → e ≡ just c₀
+              → Hops cr
+
+    -- At an `ending` take: its rest a pin on, the ghost past it.
+    void-end  : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+              → seen (Conf.heap (Mach.conf m)) π ≡ false
+              → ∀ {Δ′ A′ i′ p′ c k k′ n} {s : Sub (Conf.world (Mach.conf m)) Δ′ A′}
+                  (ψ : Path (Carried.tree cr) (takeWhileˢ i′ p′ c k (endingᵗ k′ n) s)) (σ : Path s _) → ψ ⊕ in-take σ ≡ π
+              → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {y} → At.part (Conf.heap (Mach.conf m)) (takeWhileˢ i′ p′ c k (endingᵗ k′ n) s) ≡ just y
+              → Hops cr
+
+    -- The root's part gone: the ghost alike, the `of` a value fewer.
+    void-gone : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+              → seen (Conf.heap (Mach.conf m)) π ≡ false → At.part (Conf.heap (Mach.conf m)) (Carried.tree cr) ≡ nothing
+              → Hops cr
+
+  emit-void : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+            → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+            → seen (Conf.heap (Mach.conf m)) π ≡ false → Hops cr
+  emit-void cr π fc op sn with void-site cr π fc op sn
+  ... | in-pool ψ σ e se pt         = void-pool cr π fc op sn ψ σ e se pt
+  ... | in-rest ψ σ e se pt ps ee   = void-rest cr π fc op sn ψ σ e se pt ps ee
+  ... | in-end ψ σ e se pt          = void-end cr π fc op sn ψ σ e se pt
+  ... | no-root pg                  = void-gone cr π fc op sn pg
 
   ----------------------------------------------------------------------
   -- THE TEARDOWN: what unsubscribing leaves, in the order `unsub` runs
