@@ -69,7 +69,7 @@ module Ascending (R : Set) where
   open Sequencing R using (seq-assoc; seq-done)
   open Restaging R using (walk-planted; tick-ix0)
   open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
-  open Lifting R using (sub-onward; emit-shut; emit-void; emit-run; spread-past; behind-fire; fire-lingers; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
+  open Lifting R using (sub-onward; emit-shut; emit-void; run-meets; run-at; emit-run; spread-past; behind-fire; fire-lingers; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
   open Locality R using (stored-at; flatReads; cuts; cut-in; module Heaps)
   open Growing R using (wkTree; wkLanes; wkPath)
   open Retagging R using (module Body; fed-owed; envP; joiners-path)
@@ -2039,25 +2039,6 @@ module Ascending (R : Set) where
   fin-onward cr π fc eq with fin-enter cr π fc eq
   ... | m₁ , path , inj₁ hp = hopped-pre path hp
   ... | m₁ , path , inj₂ af = soar (carried cr) (m₁ , path , af)
-
-  -- An agenda under way: the ghost is the tree's part.
-  run-meets : ∀ {h} {t : Sub h [] R} {p c bs} (ca : CtlAs t p c bs) {n g k} → firstCall ca ≡ just k → Meets ca n g → n ≡ just g
-  run-meets (runAs (_ ∷ _) _ _) refl mt = mt
-  run-meets (runAs [] _ _)      ()
-  run-meets calmAs              ()
-  run-meets (noteAs _ _ _)      ()
-  run-meets (subAs _ _ _ _)     ()
-  run-meets (burstAs _ _ _)     ()
-
-  -- The agenda's first call an `of` at `p`: the run is at `p`.
-  run-at : ∀ {h} {t : Sub h [] R} {q c bs} (ca : CtlAs t q c bs) {Δ A p i xs} {π : Path t (ofˢ {Δ = Δ} {A} p i xs)}
-         → firstCall ca ≡ just (emitC π) → All (Placedᴬ t) (agenda t ca) → q ≡ p
-  run-at (runAs (_ ∷ _) _ _) refl (pl ∷ _) = pl
-  run-at (runAs [] _ _)      ()
-  run-at calmAs              ()
-  run-at (noteAs _ _ _)      ()
-  run-at (subAs _ _ _ _)     ()
-  run-at (burstAs _ _ _)     ()
 
   -- The agenda's first call an open `of` the ghost holds: every sibling
   -- its path passes heads past the `of`'s base, no earlier than the run

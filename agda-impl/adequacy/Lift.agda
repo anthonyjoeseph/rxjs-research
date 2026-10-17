@@ -18,9 +18,10 @@ open import Data.List.Relation.Unary.Linked using (_∷_)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Level using (Lift)
 open import Data.Maybe using (Maybe; just; nothing; is-just)
+open import Data.Maybe.Properties using (just-injective)
 open import Data.Product using (_×_; _,_; Σ)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
 
 open import denotation.MonotonicList using (Events∞; Pos; Timeline; agree-refl; at; ix; _<ᵖ_; <ᵖ-trans; <ᵖ-asym; <ᵖ-below)
 import denotation.Unfold as U
@@ -50,14 +51,14 @@ module Lifting (R : Set) where
   open Heap using (_⊑_)
   open Sorting R using (Beyond)
   open Run (Pureᴾ R) using (Act; module Kit; module FlatKit)
-  open Strongly R using (Strong; Carried; Books; carried; Sub; pendingˢ; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; emitC; kontC; Leaf; feedC; srcC; taking; taken; feeding; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _≗_; Each; Heads; Lingers; rootObs; seen; seenL) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
-  open Strongly.Against R using (CtlAs; calmAs; noteAs; runAs; subAs; burstAs; bursts)
+  open Strongly R using (Strong; Carried; Books; carried; Sub; pendingˢ; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; emitC; kontC; Leaf; feedC; srcC; taking; taken; feeding; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _≗_; Each; Heads; Lingers; Meets; rootObs; seen; seenL) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
+  open Strongly.Against R using (CtlAs; calmAs; noteAs; runAs; subAs; burstAs; bursts; agenda) renaming (Placed to Placedᴬ)
   open Moving R using (plant; true≢false)
   open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each)
   open Unsubbing R using (_⇝_; site-tears)
   open Locality R using (site-holds; site-gated)
   open Lowering R using (site-lowers; queue-lowers; torn-owned; fed-lowers)
-  open Ghosting R using (module Far; module Calling; Has; residual; _⊏_; ⊏-trans; _≺_; measure; load; loadOf; passed; lowered; showing; Hopped; Hops; opening; firstCall; SourceFirst; BodyFirst; OuterFirst; PoolBehind; RestBehind; LaneFirst; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; Far; Off; Opt; Clear; ClearL; OneLane; opened; Calling; sends; Rises; Called; Aloft; hop-sorted)
+  open Ghosting R using (module Far; module Calling; Has; residual; _⊏_; ⊏-trans; _≺_; measure; load; loadOf; passed; lowered; showing; Hopped; Hops; opening; firstCall; SourceFirst; BodyFirst; OuterFirst; PoolBehind; RestBehind; LaneFirst; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; Far; Off; Opt; Clear; ClearL; clear-zip; clear-each; far-apart; OneLane; opened; Calling; sends; Rises; Called; Aloft; hop-sorted)
   open Restaging R using (subOf; Offers; of-restage; empty-restage; map-restage; Restages; scan-restage; take-restage; flat-restage; connect-restage)
   open Read
 
@@ -207,18 +208,40 @@ module Lifting (R : Set) where
               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
               → seen (Conf.heap (Mach.conf m)) π ≡ false → VoidSite cr π
 
-    -- At a pool: the run climbs to its guard and dies, the pool a pin on,
-    -- the ghost past that pin, lifted through the pool's ancestors.
-    -- `merge (takeWhile false (λ _ → false) (connect (of [1,2]) (of [5])))
-    -- (of [7])` means skips at the source's 1 and 2 between the take's end
-    -- and the 7: the ghost alike would leave those pins ahead of every
-    -- later sibling.
-    void-pool : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+    -- At a pool: the pool's next event a pin under the run.  The pool
+    -- took the hidden part's rest, which shows the source's steps inside
+    -- its subscription as `burstingᶜ` pins, the next of them this value's.
+    pool-pin : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
               → seen (Conf.heap (Mach.conf m)) π ≡ false
               → ∀ {Δ′ A′ B′ op f fl oc k r pl} {so : Sub (Conf.world (Mach.conf m)) Δ′ A′} {ls : List (Lane (Conf.world (Mach.conf m)) Δ′ B′)}
                   (ψ : Path (Carried.tree cr) (flatMapˢ op f fl oc k r pl so ls)) (σ : Path (flatMapˢ op f fl oc k r pl so ls) _) → ψ ⊕ σ ≡ π
               → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {c} → At.part (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl so ls) ≡ just c
+              → Σ Pos λ q → Σ (U.Node Δ′ B′) λ c′ → U.step c ≡ U.skipˢ q c′ × Under p q
+
+    -- At a pool: no sibling its path passes heads under the run, as at
+    -- an `of` the ghost holds (`spread-past`).
+    void-spread : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+              → seen (Conf.heap (Mach.conf m)) π ≡ false
+              → ∀ {Δ′ A′ B′ op f fl oc k r pl} {so : Sub (Conf.world (Mach.conf m)) Δ′ A′} {ls : List (Lane (Conf.world (Mach.conf m)) Δ′ B′)}
+                  (ψ : Path (Carried.tree cr) (flatMapˢ op f fl oc k r pl so ls)) (σ : Path (flatMapˢ op f fl oc k r pl so ls) _) → ψ ⊕ σ ≡ π
+              → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {c} → At.part (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl so ls) ≡ just c
+              → Clear (Conf.heap (Mach.conf m)) (Off p) ψ
+
+    -- At a pool, the ghost's step its pin lifted: the run climbs to its
+    -- guard and dies, the pool a pin on, the ghost past that pin.
+    -- `merge (takeWhile false (λ _ → false) (connect (of [1,2]) (of [5])))
+    -- (of [7])` means skips at the source's 1 and 2 between the take's end
+    -- and the 7: the ghost alike would leave those pins ahead of every
+    -- later sibling.
+    pool-land : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+              → seen (Conf.heap (Mach.conf m)) π ≡ false
+              → ∀ {Δ′ A′ B′ op f fl oc k r pl} {so : Sub (Conf.world (Mach.conf m)) Δ′ A′} {ls : List (Lane (Conf.world (Mach.conf m)) Δ′ B′)}
+                  (ψ : Path (Carried.tree cr) (flatMapˢ op f fl oc k r pl so ls)) (σ : Path (flatMapˢ op f fl oc k r pl so ls) _) → ψ ⊕ σ ≡ π
+              → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {c} → At.part (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl so ls) ≡ just c
+              → ∀ {q c′} → U.step c ≡ U.skipˢ q c′ → Lifts (Conf.heap (Mach.conf m)) ψ (U.skipˢ q c′) (U.step g)
               → Hops cr
 
     -- At an ended source's rest: that rest a pin on, the ghost past it.
@@ -245,15 +268,6 @@ module Lifting (R : Set) where
               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
               → seen (Conf.heap (Mach.conf m)) π ≡ false → At.part (Conf.heap (Mach.conf m)) (Carried.tree cr) ≡ nothing
               → Hops cr
-
-  emit-void : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
-            → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
-            → seen (Conf.heap (Mach.conf m)) π ≡ false → Hops cr
-  emit-void cr π fc op sn with void-site cr π fc op sn
-  ... | in-pool ψ σ e se pt         = void-pool cr π fc op sn ψ σ e se pt
-  ... | in-rest ψ σ e se pt ps ee   = void-rest cr π fc op sn ψ σ e se pt ps ee
-  ... | in-end ψ σ e se pt          = void-end cr π fc op sn ψ σ e se pt
-  ... | no-root pg                  = void-gone cr π fc op sn pg
 
   ----------------------------------------------------------------------
   -- THE TEARDOWN: what unsubscribing leaves, in the order `unsub` runs
@@ -617,36 +631,37 @@ module Lifting (R : Set) where
               → At.part H (connectˢ Sj c b kb k fd rp (just c₁) rt src bd) ≡ just (U.connectᶜ rp (U.shut (Any.here refl) c₁ b₀) (U.ended c₁ rt))
     held-shut ps pb rewrite ps | pb = refl
 
-    -- The value an `of` the ghost holds emits, lifted up a path every
-    -- sibling of which waits: the ghost's part there, its step the `of`'s
-    -- lifted, and its next event under the `of`'s base.
+    -- A step of a part the ghost holds, its next event under `p`, lifted
+    -- up a path every sibling of which waits: the ghost's part there, its
+    -- step the part's lifted, and its next event under `p`.
     mutual
-      lift-up : ∀ {Δ A} {t : Sub W Δ A} (ρ₀ : Path (Carried.tree cr) t) {Δ′ A′ p i x xs} (π : Path t (ofˢ {Δ = Δ′} {A′} p i (x ∷ xs)))
-              → seen H π ≡ true → Clear H (Far p) π
-              → Σ (U.Node Δ A) λ c → At.part H t ≡ just c × Lifts H π (U.step (U.ofᶜ p i (x ∷ xs))) (U.step c) × Below p (U.step c)
-      lift-up ρ₀ {p = p} {i} {x} {xs} here sn cl = U.ofᶜ p i (x ∷ xs) , refl , lifts-here , below refl ([ ix i ] , refl)
-      lift-up ρ₀ (in-map {f = f} ρ) sn cl with lift-up (ρ₀ ⊕ in-map here) ρ sn cl
+      lift-up : ∀ {Δ A} {t : Sub W Δ A} (ρ₀ : Path (Carried.tree cr) t) {Δ′ A′ p} {v : Sub W Δ′ A′} {c₀} (π : Path t v)
+                {Δ″ A″ i x xs} (τ : Path v (ofˢ {Δ = Δ″} {A″} p i (x ∷ xs)))
+              → At.part H v ≡ just c₀ → Below p (U.step c₀) → seen H π ≡ true → Clear H (Far p) π
+              → Σ (U.Node Δ A) λ c → At.part H t ≡ just c × Lifts H π (U.step c₀) (U.step c) × Below p (U.step c)
+      lift-up ρ₀ here τ pv bv sn cl = _ , pv , lifts-here , bv
+      lift-up ρ₀ (in-map {f = f} ρ) τ pv bv sn cl with lift-up (ρ₀ ⊕ in-map here) ρ τ pv bv sn cl
       ... | c , pc , L , b rewrite pc = U.mapᶜ f c , refl , lifts-map L , below-map b
-      lift-up ρ₀ (in-scan {f = f} {r} ρ) sn cl with lift-up (ρ₀ ⊕ in-scan here) ρ sn cl
+      lift-up ρ₀ (in-scan {f = f} {r} ρ) τ pv bv sn cl with lift-up (ρ₀ ⊕ in-scan here) ρ τ pv bv sn cl
       ... | c , pc , L , b rewrite pc = U.scanᶜ f (At.val H r) c , refl , lifts-scan L , below-scan b
-      lift-up ρ₀ (in-take {i = i} {q} {c} {tk = taking} ρ) sn cl with At.val H (Kit.live c) in lv
-      lift-up ρ₀ (in-take {tk = taking} ρ) () cl | false
-      ... | true with lift-up (ρ₀ ⊕ in-take here) ρ sn cl
+      lift-up ρ₀ (in-take {i = i} {q} {c} {tk = taking} ρ) τ pv bv sn cl with At.val H (Kit.live c) in lv
+      lift-up ρ₀ (in-take {tk = taking} ρ) τ pv bv () cl | false
+      ... | true with lift-up (ρ₀ ⊕ in-take here) ρ τ pv bv sn cl
       ...   | c′ , pc , L , b rewrite pc = U.takeWhileᶜ i q c′ , refl , lifts-take lv L , below-take i q b
-      lift-up ρ₀ (in-take {c = c} {tk = endingᵗ _ _} ρ) sn cl with At.val H (Kit.live c)
-      lift-up ρ₀ (in-take {tk = endingᵗ _ _} ρ) () cl | false
-      lift-up ρ₀ (in-take {tk = endingᵗ _ _} ρ) () cl | true
-      lift-up ρ₀ (in-take {c = c} {tk = taken} ρ) sn cl with At.val H (Kit.live c)
-      lift-up ρ₀ (in-take {tk = taken} ρ) () cl | false
-      lift-up ρ₀ (in-take {tk = taken} ρ) () cl | true
-      lift-up ρ₀ (in-outer {Δ = Δf} {A = Af} {B = Bf} {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} {ls = ls} ρ) sn (fl′ , pd , cl) with lift-up (ρ₀ ⊕ in-outer here) ρ sn cl
+      lift-up ρ₀ (in-take {c = c} {tk = endingᵗ _ _} ρ) τ pv bv sn cl with At.val H (Kit.live c)
+      lift-up ρ₀ (in-take {tk = endingᵗ _ _} ρ) τ pv bv () cl | false
+      lift-up ρ₀ (in-take {tk = endingᵗ _ _} ρ) τ pv bv () cl | true
+      lift-up ρ₀ (in-take {c = c} {tk = taken} ρ) τ pv bv sn cl with At.val H (Kit.live c)
+      lift-up ρ₀ (in-take {tk = taken} ρ) τ pv bv () cl | false
+      lift-up ρ₀ (in-take {tk = taken} ρ) τ pv bv () cl | true
+      lift-up ρ₀ (in-outer {Δ = Δf} {A = Af} {B = Bf} {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} {ls = ls} ρ) τ pv bv sn (fl′ , pd , cl) with lift-up (ρ₀ ⊕ in-outer here) ρ τ pv bv sn cl
       ... | o₀ , po , L , b =
         _ , hp , subst (Lifts H (in-outer {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} {ls = ls} ρ) _) (sym st) (lifts-outer (outer-first b fl′) (pool-outer {o₀ = o₀} {E = U.earliest (At.partLanes H ls)} fp b) L) ,
         subst (Below _) (sym st) (below-outer b)
         where hp = held-flat {Δ = Δf} {A = Af} {B = Bf} {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {so = so} {ls = ls} po
               fp = pd hp
               st = flat-outer {op = op} {LS = At.partLanes H ls} {qs = At.val H (FlatKit.Flat.queue fl)} {pl = pl} (pool-outer {o₀ = o₀} {E = U.earliest (At.partLanes H ls)} fp b) (outer-first b fl′)
-      lift-up ρ₀ (in-lanes {Δ = Δf} {A = Af} {B = Bf} {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} {ls = ls} πL) sn (fo , pd , cl) with lift-up-lanes (λ πL′ → ρ₀ ⊕ in-lanes πL′) πL sn cl
+      lift-up ρ₀ (in-lanes {Δ = Δf} {A = Af} {B = Bf} {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} {ls = ls} πL) τ pv bv sn (fo , pd , cl) with lift-up-lanes (λ πL′ → ρ₀ ⊕ in-lanes πL′) πL τ pv bv sn cl
       ... | bs , l , as , eq , LL , fbs , fas , below {q} hq u =
         _ , hp , subst (Lifts H (in-lanes {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} {ls = ls} πL) _) (sym st) (lifts-lanes LL (earliest-found fbs fas hq u) (lane-first fo u) (pool-lane {o = At.part H so} {bs = bs} {l = l} {S = U.step l} {as = as} fp u)) ,
         subst (Below _) (sym st) (below-lane (below hq u))
@@ -655,47 +670,48 @@ module Lifting (R : Set) where
               ea : U.earliest (At.partLanes H ls) ≡ U.found q bs l (U.step l) as
               ea = trans (cong U.earliest eq) (earliest-found fbs fas hq u)
               st = flat-lane {op = op} {o = At.part H so} {LS = At.partLanes H ls} {qs = At.val H (FlatKit.Flat.queue fl)} ea (pool-lane {o = At.part H so} {bs = bs} {l = l} {S = U.step l} {as = as} fp u) (lane-first fo u)
-      lift-up ρ₀ (in-source {S = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {e = ej} {rp = rpj} {rt = rtj} {t = src} {bd = bd} ρ) sn (fb , cl) with peek (At.part H bd)
+      lift-up ρ₀ (in-source {S = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {e = ej} {rp = rpj} {rt = rtj} {t = src} {bd = bd} ρ) τ pv bv sn (fb , cl) with peek (At.part H bd)
       ... | peek-nothing pb = ⊥-elim (true≢false (sym (subst (λ z → is-just z ∧ seen H ρ ≡ true) pb sn)))
-      ... | peek-just pb with lift-up (ρ₀ ⊕ in-source here) ρ (subst (λ z → is-just z ∧ seen H ρ ≡ true) pb sn) cl
+      ... | peek-just pb with lift-up (ρ₀ ⊕ in-source here) ρ τ pv bv (subst (λ z → is-just z ∧ seen H ρ ≡ true) pb sn) cl
       ...   | c₀ , pc , L , b = _ , held-src {Sj = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {rp = rpj} {e = ej} {rt = rtj} {src = src} {bd = bd} pc pb , lifts-source pb (source-first fb′ b) L , below-source (source-first fb′ b) b
         where fb′ = subst (Opt (Far _)) pb fb
-      lift-up ρ₀ (in-body {S = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {e = nothing} {rp = rpj} {rt = rtj} {t = src} {bd = bd} ρ) sn (fc , rd , cl) with peek (At.part H src)
+      lift-up ρ₀ (in-body {S = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {e = nothing} {rp = rpj} {rt = rtj} {t = src} {bd = bd} ρ) τ pv bv sn (fc , rd , cl) with peek (At.part H src)
       ... | peek-nothing ps = ⊥-elim (true≢false (sym (subst (λ z → (is-just z ∨ false) ∧ seen H ρ ≡ true) ps sn)))
-      ... | peek-just {c₀} ps with lift-up (ρ₀ ⊕ in-body here) ρ (subst (λ z → (is-just z ∨ false) ∧ seen H ρ ≡ true) ps sn) cl
+      ... | peek-just {c₀} ps with lift-up (ρ₀ ⊕ in-body here) ρ τ pv bv (subst (λ z → (is-just z ∨ false) ∧ seen H ρ ≡ true) ps sn) cl
       ...   | b₀ , pb , L , b =
         _ , held-src {Sj = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {rp = rpj} {rt = rtj} {src = src} {bd = bd} ps pb , subst (Lifts H _ _) (sym st) (lifts-body ps (body-first fc′ b) L) , subst (Below _) (sym st) (below-body b)
         where fc′ = subst (Opt (Far _)) ps fc
               st = body-step (U.step c₀) (body-first fc′ b)
-      lift-up ρ₀ (in-body {S = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {e = just c₁} {rp = rpj} {rt = rtj} {t = src} {bd = bd} ρ) sn (fc , rd , cl) with peek (At.part H src)
-      ... | peek-just {c₀} ps with lift-up (ρ₀ ⊕ in-body here) ρ (subst (λ z → (is-just z ∨ true) ∧ seen H ρ ≡ true) ps sn) cl
+      lift-up ρ₀ (in-body {S = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {e = just c₁} {rp = rpj} {rt = rtj} {t = src} {bd = bd} ρ) τ pv bv sn (fc , rd , cl) with peek (At.part H src)
+      ... | peek-just {c₀} ps with lift-up (ρ₀ ⊕ in-body here) ρ τ pv bv (subst (λ z → (is-just z ∨ true) ∧ seen H ρ ≡ true) ps sn) cl
       ...   | b₀ , pb , L , b =
         _ , held-src {Sj = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {rp = rpj} {rt = rtj} {src = src} {bd = bd} ps pb , subst (Lifts H _ _) (sym st) (lifts-body ps (body-first fc′ b) L) , subst (Below _) (sym st) (below-body b)
         where fc′ = subst (Opt (Far _)) ps fc
               st = body-step (U.step c₀) (body-first fc′ b)
-      lift-up ρ₀ (in-body {S = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {e = just c₁} {rp = rpj} {rt = rtj} {t = src} {bd = bd} ρ) sn (fc , rd , cl) | peek-nothing ps
-        with lift-up (ρ₀ ⊕ in-body here) ρ (subst (λ z → (is-just z ∨ true) ∧ seen H ρ ≡ true) ps sn) cl
+      lift-up ρ₀ (in-body {S = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {e = just c₁} {rp = rpj} {rt = rtj} {t = src} {bd = bd} ρ) τ pv bv sn (fc , rd , cl) | peek-nothing ps
+        with lift-up (ρ₀ ⊕ in-body here) ρ τ pv bv (subst (λ z → (is-just z ∨ true) ∧ seen H ρ ≡ true) ps sn) cl
       ...   | b₀ , pb , L , b =
         _ , held-shut {Sj = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {rp = rpj} {rt = rtj} {src = src} {bd = bd} ps pb , subst (Lifts H _ _) (sym st) (lifts-shut ps refl rb L) , subst (Below _) (sym st) (below-shut b)
         where fr = rd (held-shut {Sj = Sj} {c = cj} {b = bj} {kb = kbj} {k = kj} {fd = fdj} {rp = rpj} {rt = rtj} {src = src} {bd = bd} ps pb) ps refl
               rb = rest-behind fr b
-              sh = shut-step cr ρ₀ ρ ps refl pb
+              sh = shut-step cr ρ₀ (ρ ⊕ τ) ps refl pb
               hx = trans (sym (shut-head (U.step (U.shut (Any.here refl) c₁ b₀)))) (trans (cong U.headˢ sh) (shut-head (U.step b₀)))
               st = trans (ended-shut rb hx) sh
-      lift-up ρ₀ (in-defer ρ) sn cl with lift-up (ρ₀ ⊕ in-defer here) ρ sn cl
+      lift-up ρ₀ (in-defer ρ) τ pv bv sn cl with lift-up (ρ₀ ⊕ in-defer here) ρ τ pv bv sn cl
       ... | c , pc , L , b = c , pc , lifts-defer L , b
 
       lift-up-lanes : ∀ {Δ B} {ls : List (Lane W Δ B)} (κ : ∀ {Δ″ A″} {w : Sub W Δ″ A″} → PathLanes ls w → Path (Carried.tree cr) w)
-                      {Δ′ A′ p i x xs} (πL : PathLanes ls (ofˢ {Δ = Δ′} {A′} p i (x ∷ xs)))
-                    → seenL H πL ≡ true → ClearL H (Far p) πL
+                      {Δ′ A′ p} {v : Sub W Δ′ A′} {c₀} (πL : PathLanes ls v)
+                      {Δ″ A″ i x xs} (τ : Path v (ofˢ {Δ = Δ″} {A″} p i (x ∷ xs)))
+                    → At.part H v ≡ just c₀ → Below p (U.step c₀) → seenL H πL ≡ true → ClearL H (Far p) πL
                     → Σ (List (U.Node Δ B)) λ bs → Σ (U.Node Δ B) λ l → Σ (List (U.Node Δ B)) λ as
-                      → At.partLanes H ls ≡ bs ++ l ∷ as × LiftsLane H πL (U.step (U.ofᶜ p i (x ∷ xs))) bs (U.step l) as
+                      → At.partLanes H ls ≡ bs ++ l ∷ as × LiftsLane H πL (U.step c₀) bs (U.step l) as
                         × All (Far p) bs × All (Far p) as × Below p (U.step l)
-      lift-up-lanes κ (this-lane {c = c} {ls = ls} ρ) sn (fas , cl) with At.val H (Kit.live c) in lv
-      lift-up-lanes κ (this-lane ρ) () (fas , cl) | false
-      ... | true with lift-up (κ (this-lane here)) ρ sn cl
+      lift-up-lanes κ (this-lane {c = c} {ls = ls} ρ) τ pv bv sn (fas , cl) with At.val H (Kit.live c) in lv
+      lift-up-lanes κ (this-lane ρ) τ pv bv () (fas , cl) | false
+      ... | true with lift-up (κ (this-lane here)) ρ τ pv bv sn cl
       ...   | c′ , pc , L , b rewrite pc = [] , c′ , At.partLanes H ls , refl , lifts-this lv L , [] , fas , b
-      lift-up-lanes κ (next-lane {l = l} {ls} πL) sn (fl , cl) with lift-up-lanes (λ πL′ → κ (next-lane πL′)) πL sn cl
+      lift-up-lanes κ (next-lane {l = l} {ls} πL) τ pv bv sn (fl , cl) with lift-up-lanes (λ πL′ → κ (next-lane πL′)) πL τ pv bv sn cl
       ... | bs , l′ , as , eq , LL , fbs , fas , b =
         At.partLanes H (l ∷ []) ++ bs , l′ , as ,
         trans (lanes-cons l ls) (trans (cong (At.partLanes H (l ∷ []) ++_) eq) (sym (++-assoc (At.partLanes H (l ∷ [])) bs (l′ ∷ as)))) ,
@@ -707,8 +723,56 @@ module Lifting (R : Set) where
              → seen (Conf.heap (Mach.conf m)) π ≡ true → Clear (Conf.heap (Mach.conf m)) (Far p) π
              → Σ (U.Node [] R) λ c → At.part (Conf.heap (Mach.conf m)) (Carried.tree cr) ≡ just c
                × Lifts (Conf.heap (Mach.conf m)) π (U.step (U.ofᶜ p i (x ∷ xs))) (U.step c)
-  heads-lift cr π sn cl with lift-up cr here π sn cl
+  heads-lift cr {i = i} π sn cl with lift-up cr here π here refl (below refl ([ ix i ] , refl)) sn cl
   ... | c , pc , L , _ = c , pc , L
+
+  -- An agenda under way: the ghost is the tree's part.
+  run-meets : ∀ {h} {t : Sub h [] R} {p c bs} (ca : CtlAs t p c bs) {n g k} → firstCall ca ≡ just k → Meets ca n g → n ≡ just g
+  run-meets (runAs (_ ∷ _) _ _) refl mt = mt
+  run-meets (runAs [] _ _)      ()
+  run-meets calmAs              ()
+  run-meets (noteAs _ _ _)      ()
+  run-meets (subAs _ _ _ _)     ()
+  run-meets (burstAs _ _ _)     ()
+
+  -- The agenda's first call an `of` at `p`: the run is at `p`.
+  run-at : ∀ {h} {t : Sub h [] R} {q c bs} (ca : CtlAs t q c bs) {Δ A p i xs} {π : Path t (ofˢ {Δ = Δ} {A} p i xs)}
+         → firstCall ca ≡ just (emitC π) → All (Placedᴬ t) (agenda t ca) → q ≡ p
+  run-at (runAs (_ ∷ _) _ _) refl (pl ∷ _) = pl
+  run-at (runAs [] _ _)      ()
+  run-at calmAs              ()
+  run-at (noteAs _ _ _)      ()
+  run-at (subAs _ _ _ _)     ()
+  run-at (burstAs _ _ _)     ()
+
+  -- At a pool: the pool's pin lifted through its ancestors, every
+  -- sibling of which waits.
+  void-pool : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+            → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+            → seen (Conf.heap (Mach.conf m)) π ≡ false
+            → ∀ {Δ′ A′ B′ op f fl oc k r pl} {so : Sub (Conf.world (Mach.conf m)) Δ′ A′} {ls : List (Lane (Conf.world (Mach.conf m)) Δ′ B′)}
+                (ψ : Path (Carried.tree cr) (flatMapˢ op f fl oc k r pl so ls)) (σ : Path (flatMapˢ op f fl oc k r pl so ls) _) → ψ ⊕ σ ≡ π
+            → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {c} → At.part (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl so ls) ≡ just c
+            → Hops cr
+  void-pool {m = m} cr {p = p} π fc op sn ψ σ e se pt with pool-pin cr π fc op sn ψ σ e se pt
+  ... | q , c′ , ps , un
+    with lift-up cr here ψ σ pt (below (cong U.headˢ ps) un) se
+           (clear-zip {P = Heads p} {Q = Off p} {R′ = Far p} (λ {Γ} {A} {c} → far-apart {p} {Γ} {A} {c}) ψ
+              (clear-each (subst (λ q′ → Each (Conf.heap (Mach.conf m)) (Heads q′) (Carried.tree cr))
+                                 (run-at (Carried.ctlAs cr) fc (Owned.placed (Carried.owned cr))) (Carried.behind cr)) ψ se (cong is-just pt))
+              (void-spread cr π fc op sn ψ σ e se pt))
+  ...   | c₁ , pc , L , _ =
+    pool-land cr π fc op sn ψ σ e se pt ps
+      (subst₂ (λ s c″ → Lifts (Conf.heap (Mach.conf m)) ψ s (U.step c″)) ps (just-injective (trans (sym pc) (run-meets (Carried.ctlAs cr) fc (Carried.meets cr)))) L)
+
+  emit-void : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+            → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+            → seen (Conf.heap (Mach.conf m)) π ≡ false → Hops cr
+  emit-void cr π fc op sn with void-site cr π fc op sn
+  ... | in-pool ψ σ e se pt         = void-pool cr π fc op sn ψ σ e se pt
+  ... | in-rest ψ σ e se pt ps ee   = void-rest cr π fc op sn ψ σ e se pt ps ee
+  ... | in-end ψ σ e se pt          = void-end cr π fc op sn ψ σ e se pt
+  ... | no-root pg                  = void-gone cr π fc op sn pg
 
   ≺-trans : ∀ {a b c} → a ≺ b → b ≺ c → a ≺ c
   ≺-trans (inj₁ ab)          (inj₁ bc)          = inj₁ (⊏-trans ab bc)

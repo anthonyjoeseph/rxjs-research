@@ -183,9 +183,10 @@ by their own silent steps (`Mirror`).
   `At.pooled`), from the root and from each connect source still in its
   subscribe burst; every move carries it by a `*-lingers` leaf. Ruled
   out: the ghost alike past a hidden step. `emit-void` is a body over
-  its site (`void-site`: a pool, a rest, an `ending` take, no root).
-  Remaining: each site's hop, the tie a pin on and lifted through its
-  ancestors as a `passed` hop, then `sub-defer` over the same sites;
+  its site (`void-site`); at a pool the pin lifts through the ancestors
+  by `lift-up`, from any held node. Remaining: the pool's pin
+  (`pool-pin`) and its landing, then the rest and `ending` sites alike,
+  then `sub-defer` over the same sites;
   whether a part's last ghost rests to its leftover (`close-lingers`,
   `settle-lingers`).
 - **C. THE CALLBACK RELATION.** `Calling` is one record over the signal
@@ -358,8 +359,12 @@ by their own silent steps (`Mirror`).
 - **`void-site`** (Lift) — FALSITY, `DEAD ROUTE`: an `of` the ghost does not
   hold sits under a held pool, ended source's rest or `ending` take, or the
   root has no part.
-- **`void-pool`** (Lift) — FALSITY, `NO EVIDENCE`: a hidden step under a held
-  pool: the pool a pin on, the ghost past that pin.
+- **`pool-pin`** (Lift) — FALSITY, `NO EVIDENCE`: a held pool over a hidden
+  `of` steps next as a skip at a pin under the run.
+- **`void-spread`** (Lift) — FALSITY, `NO EVIDENCE`: at a pool over a hidden
+  `of`, no sibling its path passes heads under the run.
+- **`pool-land`** (Lift) — FALSITY, `NO EVIDENCE`: the pool's pin lifted is the
+  ghost's step: the run dies at its guard, the ghost past that pin.
 - **`void-rest`** (Lift) — FALSITY, `NO EVIDENCE`: a hidden step under an ended
   source's rest: the rest a pin on, the ghost past it.
 - **`void-end`** (Lift) — FALSITY, `NO EVIDENCE`: a hidden step under an
