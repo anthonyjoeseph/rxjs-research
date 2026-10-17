@@ -177,19 +177,15 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **HIDDEN RUNS.** `Carried.lingers` ties each held pool, ended source's
-  rest and ending take's rest to what its hidden subtree still runs
-  (`At.leftover`, flag-free; a pool by its flatMap's own flags,
-  `At.pooled`), from the root and from each connect source still in its
-  subscribe burst; every move carries it by a `*-lingers` leaf. Ruled
-  out: the ghost alike past a hidden step. `emit-void` is a body over
-  its site (`void-site`); at a pool the pin lifts through the ancestors
-  by `lift-up`, from any held node, and the rest site alike (`void-up`);
-  ruled out: an `ending` take as a site (it completes inside its failing
-  value's call). Remaining: each site's pin (`pooled-pin`,
-  `pool-restful`, `pool-off`, `left-pin`, `rest-body`, `rest-restful`) and landing, then `sub-defer` over the sites;
-  whether a part's last ghost rests to its leftover (`close-lingers`,
-  `settle-lingers`).
+- **HIDDEN RUNS.** `Carried.lingers` ties each held pool and ended
+  source's rest to what its hidden subtree still runs (`At.leftover`,
+  `At.pooled`). `emit-void` is a body over its site (`void-site`): a
+  site's pin lifts by `void-up`; a pool's and a rest's pin read their
+  tie (`tied-skip`, `restful-pinned`). Ruled out: the ghost alike past a
+  hidden step; an `ending` take as a site. The core left: `pooled-pin`,
+  `left-pin`, `pool-off`, `void-spread`, one fact: nothing but the
+  hidden `of` heads under the run (`Carried.behind` bounds only at its
+  `p`). Then landings, `sub-defer`, `close-lingers`, `settle-lingers`.
 - **C. THE CALLBACK RELATION.** `Calling` is one record over the signal
   climbing, a value or an end with its calls owed, `call` its one
   recursion by `call-step`. Ruled out: a third mid-call state.
