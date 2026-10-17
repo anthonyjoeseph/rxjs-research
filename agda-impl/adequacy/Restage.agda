@@ -1736,7 +1736,7 @@ module Restaging (R : Set) where
     π′ : Path t′ (pendingˢ b (q ++ [ ix 0 ]))
     π′ = ρc ⊕ ιb
 
-    W₅ : Here h₅ [] R
+    W₅ : Here h₅ Δ B
     W₅ = walk π₅ top
 
     walkB : walk π′ top ≡ walk ιb W₅
