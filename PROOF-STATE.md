@@ -186,9 +186,9 @@ by their own silent steps (`Mirror`).
   take's stage, a connect's feed, a flatMap's pool, its admit, a lane's
   end and settle. Guards open by `calling-open`. `lane-settles` is a
   fact of the call no field carries: the done flag lags the outer's
-  part while the outer's end climbs. Remaining:
-  `outer-start` and `lane-next`, which allocate, so wait on a strong
-  tree's transport along `_⊑_` that `sub-onward` owes too.
+  part while the outer's end climbs. A start is one leaf,
+  `lane-begin`. Remaining: `lane-next` over it, then the strong tree's
+  transport along `_⊑_` that `lane-begin` and `sub-onward` owe.
 - **UP-ENDED.** `up-ended` is a body: the rest's skips by `Each.rests`,
   the shut body by `shut-heads` over what it tells. Ruled out: the end
   signal's fields carrying it; the non-local residue is `tells-past`,
@@ -223,11 +223,14 @@ by their own silent steps (`Mirror`).
 - **`lane-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane ended short of its
   flatMap's end: the pool takes its rest, the ghost past the lane's skip.
 - **`lane-next`** (Climbs) — FALSITY, `NO EVIDENCE`: a freed slot with a value
-  queued takes it and begins its lane; allocates, as `outer-start` does.
+  queued takes it and begins its lane; allocates, as `lane-begin` does.
 - **`calling-open`** (Climbs) — FALSITY, `NO EVIDENCE`: a climbing signal's
   path reads open.
-- **`outer-start`** (Climbs) — FALSITY, `NO EVIDENCE`: an admitted value with
-  room begins a lane, the run at its pending node, the ghost past the skip.
+- **`lane-begin`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane begun: counted,
+  cut, listed, subscribed under the run's `ix 1`; owes the strong tree's
+  transport along `_⊑_`.
+- **`lanes-counted`** (Climbs) — FALSITY, `NO EVIDENCE`: a climbing outer
+  value reads the count as the live lanes; a fact of the call, not a kernel.
 - **`outer-switch`** (Climbs) — FALSITY, `NO EVIDENCE`: a switch kills its
   lanes, their rests the pool's, and begins one.
 - **`outer-queued`** (Climbs) — FALSITY, `NO EVIDENCE`: a full bounded merge

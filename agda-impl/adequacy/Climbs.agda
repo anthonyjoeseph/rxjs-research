@@ -4,7 +4,7 @@
 -- operator's callback one rise; and the close, its teardown.
 module adequacy.Climbs where
 
-open import Data.List using (List; []; _∷_; _++_; [_]; null)
+open import Data.List using (List; []; _∷_; _++_; [_]; null; length)
 open import Data.List.Properties using (++-assoc)
 open import Data.List.Relation.Unary.Any using (Any; here; there)
 import Data.List.Relation.Unary.Any as Any
@@ -783,20 +783,111 @@ module Ascending (R : Set) where
   roomy T.switchᶠ           _ = false
   roomy T.exhaustᶠ          c = c ≡ᵇ 0
 
-  postulate
-    -- A lane begun for an admitted value: counted, cut, listed and
-    -- subscribed under the run's `ix 1`, the run at the lane's pending
-    -- node; the ghost past the outer's skip, the lane its own.
-    --
-    -- The cut is allocated, so the tree, its heap and every field of the
-    -- call are owed in the grown world: no transport of a strong tree
-    -- along `_⊑_` exists yet, and `sub-onward` owes the same one.
-    outer-start : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
-                  {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
-                  (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {y : A} (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (sends y))
-                → roomy op (At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.active fl)) ≡ true
-                → ∀ {a} → a ≗ startAt ρ y → Hopped st (rerun m₁ (Calling.ϑ cl) (Calling.K cl) a)
+  -- A LANE ABOUT TO BEGIN: the flatMap at the path's end starting a lane
+  -- for `y` where the run is, its path open; the ghost's step the
+  -- flatMap's skip, the lane subscribed under the run's `ix 1`, the pool
+  -- `pl′`.
+  record Begins (g : U.Node [] R) (ℓ : Load) (m : Mach) {Δ A B op f fl oc k r pl} {T : Sub (Conf.world (Mach.conf m)) [] R}
+                {t : Sub (Conf.world (Mach.conf m)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m)) Δ B)}
+                (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) (y : A) (pl′ : U.Node Δ B) : Set₁ where
+    field
+      sane    : Sane [] g
+      placed  : Placed g []
+      {w}     : World
+      {ϑ}     : w ⊑ Conf.world (Mach.conf m)
+      {act}   : Act (Conf.world (Mach.conf m)) ⊤
+      {K}     : Stack w ⊤
+      ctl     : Conf.ctl (Mach.conf m) ≡ run act ϑ K
+      code    : act ≗ startAt ρ y
+      opens   : opened (Conf.heap (Mach.conf m)) true ρ ≡ true
+      stack   : StackAs T (Conf.pos (Mach.conf m)) ϑ K (Mach.bursts m)
+      lifted  : Σ (U.Step [] R) λ S
+                → Lifts (Conf.heap (Mach.conf m)) ρ
+                    (U.skipˢ (Conf.pos (Mach.conf m) ++ [ ix 0 ])
+                      (U.flatMapᶜ op (λ a j → U.subscribe (f a) j) (At.part (Conf.heap (Mach.conf m)) t)
+                        (U.subscribe (f y) (Conf.pos (Mach.conf m) ++ [ ix 1 ]) ∷ At.partLanes (Conf.heap (Mach.conf m)) ls)
+                        (At.val (Conf.heap (Mach.conf m)) (FlatKit.Flat.queue fl)) pl′)) S
+                  × U.step g ≡ S
+      owned   : Owned (Conf.heap (Mach.conf m)) T (runAs [] (≗-refl _) stack)
+      kernels : Kernels (Conf.heap (Mach.conf m)) T
+      meaning : Meaning (Conf.heap (Mach.conf m)) T
+      queue   : Queue (Conf.heap (Mach.conf m)) (Conf.pos (Mach.conf m)) (Mach.clock m) (Mach.timers m) T
+      books   : Books T (runAs [] (≗-refl _) stack) m
+      sorted  : Σ Pos λ lo → WellMach lo m
+      behind  : Each (Conf.heap (Mach.conf m)) (Heads (Conf.pos (Mach.conf m))) T
+      kept    : load m T ≼ ℓ
 
+  -- The ghost's admit with room: the lane first, nothing dropped.
+  admit-room : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) q a (ls : List (U.Node Γ B)) qs d → roomy op (length ls) ≡ true
+             → U.admit op g q a ls qs d ≡ (g a q ∷ ls , qs , U.idleᶜ)
+  admit-room (T.mergeᶠ nothing)  g q a ls      qs d _  = refl
+  admit-room (T.mergeᶠ (just n)) g q a ls      qs d e  rewrite e = refl
+  admit-room T.switchᶠ           g q a ls      qs d ()
+  admit-room T.exhaustᶠ          g q a []      qs d _  = refl
+  admit-room T.exhaustᶠ          g q a (_ ∷ _) qs d ()
+
+  -- An outer's value admitted: the flatMap's skip under it.
+  outer-admit : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) o q a o′ ls qs p {ls′ qs′ d}
+              → U.admit op g (q ++ [ ix 1 ]) a ls qs (U.restsᶜ ls) ≡ (ls′ , qs′ , d)
+              → U.outerˢ op g o (U.outˢ q a o′) ls qs p ≡ U.skipˢ (q ++ [ ix 0 ]) (U.flatMapᶜ op g (just o′) ls′ qs′ (U.unionᶜ p d))
+  outer-admit op g o q a o′ ls qs p e rewrite e = refl
+
+  postulate
+    -- A lane begun: counted, cut, listed and subscribed under the run's
+    -- `ix 1`, the run at the lane's pending node; the ghost past the
+    -- flatMap's skip, the lane its own.
+    --
+    -- The cut is allocated, so the tree, its heap and every field are
+    -- owed in the grown world: no transport of a strong tree along `_⊑_`
+    -- exists yet, and `sub-onward` owes the same one.
+    lane-begin : ∀ {g m} (st : Strong g m) {m₀ Δ A B op f fl oc k r pl} {T : Sub (Conf.world (Mach.conf m₀)) [] R}
+                 {t : Sub (Conf.world (Mach.conf m₀)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₀)) Δ B)}
+                 {ρ : Path T (flatMapˢ op f fl oc k r pl t ls)} {y : A} {pl′}
+               → Begins g (loadOf st) m₀ ρ y pl′ → Hopped st m₀
+
+    -- An outer's value reaching its flatMap: the count its lanes, each
+    -- live lane showing.
+    --
+    -- Not a fact of the kernels: a lane's part is gone before its cut is
+    -- dropped, while its own end climbs to `close-lanes`; no outer value
+    -- arrives in between, and no field of the call says so.
+    lanes-counted : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+                    {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
+                    (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {y : A}
+                  → Calling g ℓ m₁ (ρ ⊕ in-outer here) (sends y)
+                  → At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.active fl) ≡ length (At.partLanes (Conf.heap (Mach.conf m₁)) ls)
+
+  -- An admitted value with room: its lane begun where the value is, the
+  -- ghost's admit the runtime's.
+  outer-start : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+                {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
+                (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {y : A} (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (sends y))
+              → roomy op (At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.active fl)) ≡ true
+              → ∀ {a} → m₁ ⇝ rerun m₁ (Calling.ϑ cl) (Calling.K cl) a → a ≗ startAt ρ y → Hopped st (rerun m₁ (Calling.ϑ cl) (Calling.K cl) a)
+  outer-start st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} ρ {y}
+    cl@record { sane = sn ; placed = pd ; ctl = refl ; stack = sk ; lifted = c′ , pv , S , L , sg ; owned = ow ; kernels = kn ; meaning = mn
+              ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so ; behind = bh ; kept = kp } rm p c
+    with lifts-split ρ (in-outer here) L
+  ... | _ , lifts-outer {o₀ = o₀} _ _ lifts-here , Lρ = lane-begin st (record
+      { sane = sn ; placed = pd ; ctl = refl ; code = c
+      ; opens = proj₂ (∧-split _ (trans (sym (opened-⊕ hp true ρ (in-outer here))) (calling-open (ρ ⊕ in-outer here) cl)))
+      ; stack = sk
+      ; lifted = S , subst (λ o → Lifts hp ρ (U.skipˢ (q ++ [ ix 0 ]) (U.flatMapᶜ op G o (U.subscribe (f y) (q ++ [ ix 1 ]) ∷ LS) QS (U.unionᶜ po U.idleᶜ))) S)
+                           (sym pv)
+                           (subst (λ s′ → Lifts hp ρ s′ S)
+                                  (outer-admit op G o₀ q y c′ LS QS po
+                                     (admit-room op G (q ++ [ ix 1 ]) y LS QS (U.restsᶜ LS) (subst (λ n → roomy op n ≡ true) (lanes-counted ρ cl) rm)))
+                                  Lρ)
+                 , sg
+      ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
+      ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
+      ; sorted = sorted-⇝ so p ; behind = bh ; kept = kp })
+    where
+      G  = λ a j → U.subscribe (f a) j
+      LS = At.partLanes hp ls
+      QS = At.val hp (FlatKit.Flat.queue fl)
+
+  postulate
     -- A bounded merge full: the value queued, the ghost past the outer's
     -- skip, the value its queue's last.
     outer-queued : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {n f fl oc k r pl}
@@ -824,32 +915,33 @@ module Ascending (R : Set) where
            {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
            (ρ : Path T (flatMapˢ (T.mergeᶠ (just n)) f fl oc k r pl u ls)) {y : A} (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (sends y))
          → (b : Bool) → b ≡ (At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.active fl) <ᵇ n)
-         → ∀ {a} → a ≗ (if b then startAt ρ y else Kit.modifyF (FlatKit.Flat.queue fl) (_++ [ y ])) → Hopped st (rerun m₁ (Calling.ϑ cl) (Calling.K cl) a)
-  room-n st ρ cl true  e c = outer-start st ρ cl (sym e) c
-  room-n st ρ cl false e c = outer-queued st ρ cl (sym e) c
+         → ∀ {a} → m₁ ⇝ rerun m₁ (Calling.ϑ cl) (Calling.K cl) a
+         → a ≗ (if b then startAt ρ y else Kit.modifyF (FlatKit.Flat.queue fl) (_++ [ y ])) → Hopped st (rerun m₁ (Calling.ϑ cl) (Calling.K cl) a)
+  room-n st ρ cl true  e p c = outer-start st ρ cl (sym e) p c
+  room-n st ρ cl false e p c = outer-queued st ρ cl (sym e) c
 
   -- An exhaust's count read: idle, a lane begun; else dropped.
   room-x : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f fl oc k r pl}
            {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
            (ρ : Path T (flatMapˢ T.exhaustᶠ f fl oc k r pl u ls)) {y : A} (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (sends y))
          → (b : Bool) → b ≡ (At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.active fl) ≡ᵇ 0)
-         → ∀ {a} → a ≗ Kit.when b (startAt ρ y) → Hopped st (rerun m₁ (Calling.ϑ cl) (Calling.K cl) a)
-  room-x st ρ cl true  e c = outer-start st ρ cl (sym e) c
-  room-x st ρ cl false e c = outer-drop st ρ cl (sym e) c
+         → ∀ {a} → m₁ ⇝ rerun m₁ (Calling.ϑ cl) (Calling.K cl) a → a ≗ Kit.when b (startAt ρ y) → Hopped st (rerun m₁ (Calling.ϑ cl) (Calling.K cl) a)
+  room-x st ρ cl true  e p c = outer-start st ρ cl (sym e) p c
+  room-x st ρ cl false e p c = outer-drop st ρ cl (sym e) c
 
   -- A value admitted, by the flatMap's policy.
   admits : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
            {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
            (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {y : A} (cl : Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (sends y))
-         → ∀ {a} → a ≗ admitAt ρ op y → Hopped st (rerun m₁ (Calling.ϑ cl) (Calling.K cl) a)
-  admits st {op = T.mergeᶠ nothing} ρ cl c = outer-start st ρ cl refl c
-  admits st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {op = T.mergeᶠ (just n)} {fl = fl} ρ {y} cl c with reads c
-  ... | k₂ , f₂ , p₂ = hopped-pre p₂ (room-n st ρ cl (At.val hp (FlatKit.Flat.active fl) <ᵇ n) refl
+         → ∀ {a} → m₁ ⇝ rerun m₁ (Calling.ϑ cl) (Calling.K cl) a → a ≗ admitAt ρ op y → Hopped st (rerun m₁ (Calling.ϑ cl) (Calling.K cl) a)
+  admits st {op = T.mergeᶠ nothing} ρ cl p c = outer-start st ρ cl refl p c
+  admits st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {op = T.mergeᶠ (just n)} {fl = fl} ρ {y} cl p c with reads c
+  ... | k₂ , f₂ , p₂ = hopped-pre p₂ (room-n st ρ cl (At.val hp (FlatKit.Flat.active fl) <ᵇ n) refl (⇝-trans p p₂)
                          (≗-trans (f₂ same⊑ (At.val hp (FlatKit.Flat.active fl)))
                                   (wk-same (if At.val hp (FlatKit.Flat.active fl) <ᵇ n then startAt ρ y else Kit.modifyF (FlatKit.Flat.queue fl) (_++ [ y ])))))
-  admits st {op = T.switchᶠ} ρ cl c = outer-switch st ρ cl c
-  admits st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {op = T.exhaustᶠ} {fl = fl} ρ {y} cl c with reads c
-  ... | k₂ , f₂ , p₂ = hopped-pre p₂ (room-x st ρ cl (At.val hp (FlatKit.Flat.active fl) ≡ᵇ 0) refl
+  admits st {op = T.switchᶠ} ρ cl p c = outer-switch st ρ cl c
+  admits st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {op = T.exhaustᶠ} {fl = fl} ρ {y} cl p c with reads c
+  ... | k₂ , f₂ , p₂ = hopped-pre p₂ (room-x st ρ cl (At.val hp (FlatKit.Flat.active fl) ≡ᵇ 0) refl (⇝-trans p p₂)
                          (≗-trans (f₂ same⊑ (At.val hp (FlatKit.Flat.active fl)))
                                   (wk-same (Kit.when (At.val hp (FlatKit.Flat.active fl) ≡ᵇ 0) (startAt ρ y)))))
 
@@ -861,7 +953,7 @@ module Ascending (R : Set) where
               → Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (sends y) → Called st m₁ (ρ ⊕ in-outer here)
   climb-outer st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {op = op} {oc = oc} ρ {y} cl@record { ctl = refl ; code = cd }
     with reads (subst (λ W → _ ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-outer here) top) cd)
-  ... | k₁ , f₁ , p₁ = landed (hopped-pre p₁ (admits st ρ cl
+  ... | k₁ , f₁ , p₁ = landed (hopped-pre p₁ (admits st ρ cl p₁
         (≗-trans (f₁ same⊑ (At.val hp (Kit.live oc)))
                  (≗-trans (wk-same (Kit.when (At.val hp (Kit.live oc)) (admitAt ρ op y))) (open-code (outer-live ρ cl))))))
 
