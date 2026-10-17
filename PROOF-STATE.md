@@ -211,9 +211,12 @@ by their own silent steps (`Mirror`).
   needing more of the step than a weakening and `compile-cong`. A node
   whose `unsub` differs is planted by `holds-owed` over `Kernels.settled`
   (no detacher held over what still `Owes`), which every kernels move
-  now carries. `connect-restage` is a body over five growths (`Grew`),
-  its frame leaves postulated like a take's `ending`. Remaining:
-  `flat-restage` (a slot and a store besides growth).
+  now carries. `connect-restage` and `flat-restage` are bodies over
+  `Grew` (a register a growth like any, a store by `grew-store`), their
+  frame leaves postulated like a take's `ending`. Ruled out: a refill
+  slot needing more than the walk's own observer (`holds-owed` reads it
+  there). Remaining: the growth leaves `grows-extend`, `walk-grow`,
+  `compile-cong`, `names-wk` themselves.
 - **D. THE KERNEL FOOTPRINT.** A kernel's cells allocated together and read
   only through its own node, `names` agreeing by construction. `names`
   already lists each node's cells, so this leg is CONDITIONAL: done when
@@ -474,8 +477,18 @@ by their own silent steps (`Mirror`).
   than the take over it.
 - **`take-fresh`** (Restage) — FALSITY, `NO EVIDENCE`: a take's new cut is two
   names the tree did not hold.
-- **`flat-restage`** (Restage) — FALSITY, `NO EVIDENCE`: a flatMap begun
-  allocates its kit and cut and is carried at its outer, less owed.
+- **`grew-store`** (Restage) — FALSITY, `NO EVIDENCE`: a store into a cell
+  the growth made past its old names keeps the run as it read.
+- **`names-wk`** (Restage) — FALSITY, `NO EVIDENCE`: a weakened tree's names
+  are its names weakened.
+- **`walk-kont-sub`** (Restage) — FALSITY, `NO EVIDENCE`: a walk's
+  continuation reads alike on alike subscriptions.
+- **`flatmap-wk`** (Restage) — FALSITY, `NO EVIDENCE`: a flatMap kit's admit,
+  settle and dequeue weakened read as the node's over related inners.
+- **`flat-fresh`** (Restage) — FALSITY, `NO EVIDENCE`: a flatMap's pool, cut
+  and slot are names the tree did not hold.
+- **`unflat`** (Restage) — FALSITY, `NO EVIDENCE`: an outer heads no earlier
+  than the flatMap over it, no lane begun.
 - **`compile-env`** (Restage) — FALSITY, `NO EVIDENCE`: a compiled
   subscription reads alike with a weakening moved from its frame into its
   environment.

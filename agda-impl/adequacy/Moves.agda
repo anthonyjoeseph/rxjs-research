@@ -40,7 +40,7 @@ module Moving (R : Set) where
   open Shared Timeline (Out R) using (Heapᴹ)
   open Pure R using (Timer; cascade)
   open Strongly R
-  open Run (Pureᴾ R) using (module Kit)
+  open Run (Pureᴾ R) using (module Kit; Kont)
 
   true≢false : true ≢ false
   true≢false ()
@@ -754,33 +754,36 @@ module Moving (R : Set) where
   -- detacher above reads the difference.
   mutual
     holds-owed : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-               → Owes u → (∀ {E o} → At.Holds H u E o → At.Holds H v E o) → Settled t
-               → ∀ {E o} → At.Holds H t E o → At.Holds H (plant π v) E o
-    holds-owed H here v ow hv st hs = hv hs
-    holds-owed H (in-map π) v ow hv st hs = holds-owed H π v ow hv st hs
-    holds-owed H (in-scan π) v ow hv st hs = holds-owed H π v ow hv st hs
-    holds-owed H (in-take {c = c} {k = k} π) v ow hv (b , st) (ak , hs) =
-      attached-owed H π v ow c k b ak , holds-owed H π v ow hv st hs
-    holds-owed H (in-outer {oc = oc} {k = k} π) v ow hv (b , st , _) (rf , sl , ak , hs , ac , gn , hl) =
-      rf , sl , attached-owed H π v ow oc k b ak , holds-owed H π v ow hv st hs , ac , gn , hl
-    holds-owed H (in-lanes {op = op} {f = f} {fl = fl} π) v ow hv (_ , _ , st) {E} {o} (rf , sl , ak , hs , ac , (g , ge , ga) , hl) =
+               → Owes u → ∀ {E o} (k : Kont h)
+               → (At.Holds H u (Here.env (walk π (ctx o k E))) (Here.obs (walk π (ctx o k E)))
+                  → At.Holds H v (Here.env (walk π (ctx o k E))) (Here.obs (walk π (ctx o k E))))
+               → Settled t → At.Holds H t E o → At.Holds H (plant π v) E o
+    holds-owed H here v ow k hv st hs = hv hs
+    holds-owed H (in-map π) v ow k hv st hs = holds-owed H π v ow k hv st hs
+    holds-owed H (in-scan π) v ow k hv st hs = holds-owed H π v ow k hv st hs
+    holds-owed H (in-take {c = c} {k = kc} π) v ow k hv (b , st) (ak , hs) =
+      attached-owed H π v ow c kc b ak , holds-owed H π v ow _ hv st hs
+    holds-owed H (in-outer {oc = oc} {k = kc} π) v ow k hv (b , st , _) (rf , sl , ak , hs , ac , gn , hl) =
+      rf , sl , attached-owed H π v ow oc kc b ak , holds-owed H π v ow _ hv st hs , ac , gn , hl
+    holds-owed H (in-lanes {op = op} {f = f} {fl = fl} π) v ow {E} {o} k hv (_ , _ , st) (rf , sl , ak , hs , ac , (g , ge , ga) , hl) =
       rf , sl , ak , hs , trans ac (sym (count-plant H π v)) , (g , trans ge (sym (switches-plant H π v)) , ga)
-      , holds-owedᴸ H π v ow hv st {op = op} {f = f} {E = E} {o = o} {fl = fl} hl
-    holds-owed H (in-source {c = c} {k = k} π) v ow hv (b , _ , st , _) (ak , be , sb , hs , hb) =
-      attached-owed H π v ow c k b ak , be , sb , holds-owed H π v ow hv st hs , hb
-    holds-owed H (in-body {kb = kb} π) v ow hv (_ , bb , _ , st) (ak , be , sb , hs , hb) =
-      ak , be , stashed-owed H π v ow kb bb sb , hs , holds-owed H π v ow hv st hb
-    holds-owed H (in-defer {k = k} π) v ow hv (b , st) (sb , hs) =
-      stashed-owed H π v ow k b sb , holds-owed H π v ow hv st hs
+      , holds-owedᴸ H π v ow {op = op} {f = f} {E = E} {o = o} {fl = fl} k hv st hl
+    holds-owed H (in-source {c = c} {k = kc} π) v ow k hv (b , _ , st , _) (ak , be , sb , hs , hb) =
+      attached-owed H π v ow c kc b ak , be , sb , holds-owed H π v ow _ hv st hs , hb
+    holds-owed H (in-body {kb = kb} π) v ow k hv (_ , bb , _ , st) (ak , be , sb , hs , hb) =
+      ak , be , stashed-owed H π v ow kb bb sb , hs , holds-owed H π v ow _ hv st hb
+    holds-owed H (in-defer {k = kc} π) v ow k hv (b , st) (sb , hs) =
+      stashed-owed H π v ow kc b sb , holds-owed H π v ow _ hv st hs
 
     holds-owedᴸ : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
-                → Owes u → (∀ {E o} → At.Holds H u E o → At.Holds H v E o) → SettledLanes ls
-                → ∀ {A : Set} {op} {f : A → Obs Timeline Δ B} {E o fl}
-                → At.HoldsLanes H op f E o fl ls → At.HoldsLanes H op f E o fl (plantᴸ π v)
-    holds-owedᴸ H (this-lane {c = c} {k = k} π) v ow hv (b , st , _) (ak , hs , hl) =
-      attached-owed H π v ow c k b ak , holds-owed H π v ow hv st hs , hl
-    holds-owedᴸ H (next-lane {l = lane c k s} π) v ow hv (_ , _ , st) {op = op} {f = f} {E = E} {o = o} {fl = fl} (ak , hs , hl) =
-      ak , hs , holds-owedᴸ H π v ow hv st {op = op} {f = f} {E = E} {o = o} {fl = fl} hl
+                → Owes u → ∀ {A : Set} {op} {f : A → Obs Timeline Δ B} {E o fl} (k : Kont h)
+                → (At.Holds H u (Here.env (walkLanes op f fl (ctx o k E) π)) (Here.obs (walkLanes op f fl (ctx o k E) π))
+                   → At.Holds H v (Here.env (walkLanes op f fl (ctx o k E) π)) (Here.obs (walkLanes op f fl (ctx o k E) π)))
+                → SettledLanes ls → At.HoldsLanes H op f E o fl ls → At.HoldsLanes H op f E o fl (plantᴸ π v)
+    holds-owedᴸ H (this-lane {c = c} {k = kc} π) v ow k hv (b , st , _) (ak , hs , hl) =
+      attached-owed H π v ow c kc b ak , holds-owed H π v ow _ hv st hs , hl
+    holds-owedᴸ H (next-lane {l = lane c kc s} π) v ow {op = op} {f = f} {E = E} {o = o} {fl = fl} k hv (_ , _ , st) (ak , hs , hl) =
+      ak , hs , holds-owedᴸ H π v ow {op = op} {f = f} {E = E} {o = o} {fl = fl} k hv st hl
 
   -- What unsubscribing reaches spent: below the planted node from the
   -- new one's, elsewhere from the old tree's.
