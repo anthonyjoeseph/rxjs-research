@@ -18,7 +18,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym
 open import Data.Sum using (_⊎_; [_,_]′)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_)
-open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ)
+open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ)
 open import adequacy.Sorted using (_≤ᵖ_; ≤ᵖ-child)
 
 open import denotation.MonotonicList using (Events∞; Timeline; Pos; ix; last; _<ᵖ_)
@@ -38,17 +38,18 @@ open Events∞
 
 module Framing (R : Set) where
   open Machine R using (Mach; Read)
-  open Run (Pureᴾ R) using (Ref; module Kit)
-  open Shared Timeline (Out R) using (Conf; Heapᴹ; store; stored)
+  open Run (Pureᴾ R) using (Ref; module Kit; module FlatKit)
+  open Shared Timeline (Out R) using (Conf; Heapᴹ; store; stored; look)
   open Heap using (_∋_) renaming (same to same⊑)
   open Strongly R using (Strong; Sub; scanˢ; here; module At; Queue; Kernels; Meaning; Owned; Path; in-scan; in-source; _⊕_; names; Each; Heads; seen; Books;
                          mapˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; PathLanes; this-lane; next-lane; in-map; in-take; in-outer; in-lanes; in-body; in-defer; seen-join;
-                         Taking; taking; taken; cutNames; quietName; subjectNames; Name; pendings; subjects; joiners) renaming (ending to endingᵀ)
+                         Taking; taking; taken; cutNames; quietName; subjectNames; flatNames; laneNames; Name; pendings; subjects; joiners) renaming (ending to endingᵀ)
   open Strongly.Against R using (CtlAs)
-  open Tearing R using (Alike; Off; part-alike; module Seeing; look-store; get-put-same; fresh-path; names-path; apart-r; apart-l; ≢-flip)
-  open Moving R using (pairs-r; plant; pendings-plant; subjects-plant; joiners-plant; head-map; head-scan)
+  open Tearing R using (Alike; Off; part-alike; partLanes-alike; lanes-path; module Seeing; look-store; get-put-same; fresh-path; names-path; apart-r; apart-l; ≢-flip)
+  open Moving R using (pairs-r; pairs-split; plant; pendings-plant; subjects-plant; joiners-plant; head-map; head-scan)
   open Locality R using (module Heaps)
-  open Ghosting R using (module Calling; Lifts; Calling; sends)
+  open Ghosting R using (module Calling; Lifts; LiftsLane; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source;
+                         lifts-body; lifts-shut; lifts-defer; lifts-this; lifts-next; OuterFirst; PoolBehind; LaneFirst; Calling; sends)
   open Read
 
   -- A scan's part, its accumulator written: its source's part, the
@@ -60,13 +61,10 @@ module Framing (R : Set) where
           | part-alike H (store H r (lift z)) u (λ j m → look-store H r j (lookupᴬ nr m)) | pu = refl
 
   -- A WRITE AT A SCAN'S ACCUMULATOR, FRAMED: nothing the relation holds
-  -- reads an accumulator but the parts above it, and an ancestor's lift
-  -- reads only its siblings and its own cells.
+  -- reads an accumulator but the parts above it.
   postulate
     scan-owned   : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
                  → ∀ {p ctl bs} {ca : CtlAs T p ctl bs} z → Owned H T ca → Owned (store H r (lift z)) T ca
-    scan-lifts   : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} (ρ : Path T (scanˢ f r u)) → AllPairs _≢_ (names T)
-                 → ∀ {s S} z → Lifts H ρ s S → Lifts (store H r (lift z)) ρ s S
 
     -- A path the write leaves seen it saw before, to a node that reads
     -- alike or sits above the scan.
@@ -417,6 +415,73 @@ module Framing (R : Set) where
   -- hold of the tree they hold after, the node's own clauses their
   -- premises.  The write reaches no name outside the node, so every
   -- other node reads alike.
+  -- A WRITE INSIDE THE PATH'S END, LIFTED: no ancestor reads its path
+  -- child's names, only its siblings' and its own cells, so every lift
+  -- above the write reads alike.
+  lane1-alike : ∀ {h} (H H′ : Heapᴹ h) {Δ B} {c : Kit.Cut h} {k} {s : Sub h Δ B} → look H′ (Kit.live c) ≡ look H (Kit.live c)
+              → At.part H′ s ≡ At.part H s → At.partLanes H′ (lane c k s ∷ []) ≡ At.partLanes H (lane c k s ∷ [])
+  lane1-alike H H′ el ep rewrite el | ep = refl
+
+  mutual
+    lifts-off : ∀ {h} (H H′ : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (ρ : Path t u) → AllPairs _≢_ (names t)
+              → Off H H′ (names u) → ∀ {s S} → Lifts H ρ s S → Lifts H′ ρ s S
+    lifts-off H H′ here ps off lifts-here = lifts-here
+    lifts-off H H′ (in-map ρ) ps off (lifts-map L) = lifts-map (lifts-off H H′ ρ ps off L)
+    lifts-off H H′ (in-scan {f = f} {r} ρ) (nr ∷ ps) off (lifts-scan {s = s} {S} L) =
+      subst (λ z → Lifts H′ (in-scan {f = f} {r} ρ) s (U.scanˢ f z S)) (cong lower (Heaps.keep H H′ off (names-path ρ) r nr))
+            (lifts-scan (lifts-off H H′ ρ ps off L))
+    lifts-off H H′ (in-take {c = c} {k} ρ) ps@(nl ∷ _) off (lifts-take lv L) =
+      lifts-take (trans (cong lower (Heaps.keep H H′ off (λ m → there (++⁺ʳ (quietName k) (names-path ρ m))) (Kit.live c) nl)) lv)
+                 (lifts-off H H′ ρ (pairs-r (quietName k) (pairs-r (cutNames c) ps)) off L)
+    lifts-off H H′ (in-outer {op = op} {f} {fl} {oc} {k} {r} {pl} {t = so} {ls} ρ) ps@(_ ∷ _ ∷ aq ∷ _) off (lifts-outer {s = s} {S} {o₀} of pb L) =
+      subst₂ (λ zs qs → Lifts H′ (in-outer {op = op} {f} {fl} {oc} {k} {r} {pl} {ls = ls} ρ) s (U.outerˢ op (λ a q → U.subscribe (f a) q) o₀ S zs qs pl)) el eq
+        (lifts-outer (subst (OuterFirst S) (sym el) of) (subst (λ zs → PoolBehind pl (U.outerOf (just o₀)) (U.earliest zs)) (sym el) pb)
+                     (lifts-off H H′ ρ (proj₁ (pairs-split (names so) P)) off L))
+      where
+        P  = pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps)))
+        el = partLanes-alike H H′ ls (Heaps.keeps H H′ off (names-path ρ) (apart-l (names so) P))
+        eq = cong lower (Heaps.keep H H′ off (λ m → there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ (names-path ρ m)))))))
+                                    (FlatKit.Flat.queue fl) aq)
+    lifts-off H H′ (in-lanes {op = op} {f} {fl} {oc} {k} {r} {pl} {t = so} {ls} πL) ps@(_ ∷ _ ∷ aq ∷ _) off (lifts-lanes {s = s} {bs} {l} {S} {as} {q} LL ee lf pb) =
+      subst₂ (λ x qs → Lifts H′ (in-lanes {op = op} {f} {fl} {oc} {k} {r} {pl} {t = so} πL) s (U.laneˢ op (λ a q → U.subscribe (f a) q) x bs l S as qs pl)) ep eq
+        (lifts-lanes (liftsL-off H H′ πL (pairs-r (names so) P) off LL) ee (subst (λ x → LaneFirst x q) (sym ep) lf)
+                     (subst (λ x → PoolBehind pl (U.outerOf x) (U.found q bs l S as)) (sym ep) pb))
+      where
+        P  = pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps)))
+        ep = part-alike H H′ so (Heaps.keeps H H′ off (lanes-path πL) (apart-r (names so) P))
+        eq = cong lower (Heaps.keep H H′ off (λ m → there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) (lanes-path πL m)))))))
+                                    (FlatKit.Flat.queue fl) aq)
+    lifts-off H H′ (in-source {S = Sj} {c} {b} {kb} {k} {t = src} {bd} ρ) ps off (lifts-source pb sf L) =
+      lifts-source (trans (part-alike H H′ bd (Heaps.keeps H H′ off (names-path ρ) (apart-l (names src) Q₄))) pb) sf
+                   (lifts-off H H′ ρ (proj₁ (pairs-split (names src) Q₄)) off L)
+      where Q₄ = pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames Sj) ps))))
+    lifts-off H H′ (in-body {S = Sj} {c} {b} {kb} {k} {t = src} {bd} ρ) ps off (lifts-body pt bf L) =
+      lifts-body (trans (part-alike H H′ src (Heaps.keeps H H′ off (names-path ρ) (apart-r (names src) Q₄))) pt) bf
+                 (lifts-off H H′ ρ (pairs-r (names src) Q₄) off L)
+      where Q₄ = pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames Sj) ps))))
+    lifts-off H H′ (in-body {S = Sj} {c} {b} {kb} {k} {t = src} {bd} ρ) ps off (lifts-shut pt e rb L) =
+      lifts-shut (trans (part-alike H H′ src (Heaps.keeps H H′ off (names-path ρ) (apart-r (names src) Q₄))) pt) e rb
+                 (lifts-off H H′ ρ (pairs-r (names src) Q₄) off L)
+      where Q₄ = pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames Sj) ps))))
+    lifts-off H H′ (in-defer {k = k} ρ) ps off (lifts-defer L) = lifts-defer (lifts-off H H′ ρ (pairs-r (quietName k) ps) off L)
+
+    liftsL-off : ∀ {h} (H H′ : Heapᴹ h) {Δ B Δ′ C} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} (πL : PathLanes ls u) → AllPairs _≢_ (laneNames ls)
+               → Off H H′ (names u) → ∀ {s bs S as} → LiftsLane H πL s bs S as → LiftsLane H′ πL s bs S as
+    liftsL-off H H′ (this-lane {c = c} {k} {t = s₀} {ls} ρ) ps@(nl ∷ _) off (lifts-this {s = s} {S} lv L) =
+      subst (λ zs → LiftsLane H′ (this-lane {c = c} {k} {ls = ls} ρ) s [] S zs) el
+        (lifts-this (trans (cong lower (Heaps.keep H H′ off (λ m → there (++⁺ʳ (quietName k) (++⁺ˡ (names-path ρ m)))) (Kit.live c) nl)) lv)
+                    (lifts-off H H′ ρ (proj₁ (pairs-split (names s₀) P)) off L))
+      where
+        P  = pairs-r (quietName k) (pairs-r (cutNames c) ps)
+        el = partLanes-alike H H′ ls (Heaps.keeps H H′ off (names-path ρ) (apart-l (names s₀) P))
+    liftsL-off H H′ (next-lane {l = lane c k s₀} πL) ps@(nl ∷ _) off (lifts-next {s = s} {bs} {S} {as} LL) =
+      subst (λ zs → LiftsLane H′ (next-lane {l = lane c k s₀} πL) s (zs ++ bs) S as) el
+        (lifts-next (liftsL-off H H′ πL (pairs-r (names s₀) P) off LL))
+      where
+        P  = pairs-r (quietName k) (pairs-r (cutNames c) ps)
+        el = lane1-alike H H′ (Heaps.keep H H′ off (λ m → there (++⁺ʳ (quietName k) (++⁺ʳ (names s₀) (lanes-path πL m)))) (Kit.live c) nl)
+                              (part-alike H H′ s₀ (Heaps.keeps H H′ off (lanes-path πL) (apart-r (names s₀) P)))
+
   module Wrote {h} (H H′ : Heapᴹ h) {T : Sub h [] R} {Δ A} {u : Sub h Δ A} (ρ : Path T u)
                {ns : List (Name h)} (off : Off H H′ ns) (mine : All (_∈ᴸ names u) ns) (fs : AllPairs _≢_ (names T)) where
     private
@@ -433,12 +498,19 @@ module Framing (R : Set) where
     wr-meaning : (∀ ν → At.Fed H u ν → At.Fed H′ u ν) → Meaning H T → Meaning H′ T
     wr-meaning fv mn = record { fed = Heaps.fed-path H H′ ρ fs offU fv _ (Meaning.fed mn) }
 
+    wr-lifts : ∀ {s S} → Lifts H ρ s S → Lifts H′ ρ s S
+    wr-lifts = lifts-off H H′ ρ fs offU
+
     wr-behind : At.part H′ u ≡ At.part H u → ∀ {q} → (Each H (Heads q) u → Each H′ (Heads q) u) → Each H (Heads q) T → Each H′ (Heads q) T
     wr-behind eq tr = Seeing.each-write H H′ {w = u} offU eq fs ρ tr
 
   -- A WRITE AT A SCAN'S ACCUMULATOR, ITS NODE'S CLAUSES: the source's
   -- names apart from the accumulator, so its kernels and feeds read
   -- alike.
+  scan-lifts : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} (ρ : Path T (scanˢ f r u)) → AllPairs _≢_ (names T)
+             → ∀ {s S} z → Lifts H ρ s S → Lifts (store H r (lift z)) ρ s S
+  scan-lifts H {r = r} ρ fs z = Wrote.wr-lifts H (store H r (lift z)) ρ (off-store H r) (here refl ∷ []) fs
+
   scan-holds : ∀ {h} (H : Heapᴹ h) {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → AllPairs _≢_ (names (scanˢ f r u))
              → ∀ z {E o} → At.Holds H (scanˢ f r u) E o → At.Holds (store H r (lift z)) (scanˢ f r u) E o
   scan-holds H {r = r} {u} (nr ∷ _) z = Heaps.holds-alike H (store H r (lift z)) u (λ j m → look-store H r j (lookupᴬ nr m))

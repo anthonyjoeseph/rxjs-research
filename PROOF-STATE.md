@@ -289,8 +289,6 @@ by their own silent steps (`Mirror`).
   flag leaves its count.
 - **`sd-fifo`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
   flag leaves its queue.
-- **`sd-lifts`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
-  flag leaves every lift.
 - **`sd-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
   flag leaves `Owned`.
 - **`sd-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
@@ -301,8 +299,6 @@ by their own silent steps (`Mirror`).
   gone leaves every part.
 - **`fr-lanes`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves the
   lanes beside it as the ghost's.
-- **`fr-lifts`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves the
-  lift to its flatMap.
 - **`fr-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves
   `Owned`.
 - **`fr-mine`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's cut and its
@@ -323,8 +319,6 @@ by their own silent steps (`Mirror`).
   flatMap's path open as it was.
 - **`dq-opened`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves its
   flatMap's path open as it was.
-- **`dq-lifts`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves the
-  lift to its flatMap.
 - **`dq-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves
   `Owned`.
 - **`dq-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves
@@ -383,8 +377,6 @@ by their own silent steps (`Mirror`).
   was seen before, to a node alike or above the scan.
 - **`scan-defined`** (Frame) — FALSITY, `NO EVIDENCE`: whether a node has a
   part never reads an accumulator.
-- **`scan-lifts`** (Frame) — FALSITY, `NO EVIDENCE`: a lift above a scan
-  survives a write at its accumulator.
 - **`scan-owned`** (Frame) — FALSITY, `NO EVIDENCE`: `Owned` survives a write
   at a scan's accumulator.
 - **`scan-queue`** (Frame) — FALSITY, `NO EVIDENCE`: `Queue` survives a write

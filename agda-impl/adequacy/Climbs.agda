@@ -662,7 +662,6 @@ module Ascending (R : Set) where
     postulate
       sd-active    : At.val H′ (FlatKit.Flat.active fl) ≡ At.val H (FlatKit.Flat.active fl)
       sd-fifo      : At.val H′ (FlatKit.Flat.queue fl) ≡ At.val H (FlatKit.Flat.queue fl)
-      sd-lifts     : ∀ {Δ′ A′ Δ″ A″} {t : Sub h Δ′ A′} {v : Sub h Δ″ A″} {σ : Path t v} {s S} → Lifts H σ s S → Lifts H′ σ s S
       sd-owned     : ∀ {p ctl bs} {ca : CtlAs T p ctl bs} → Owned H T ca → Owned H′ T ca
       active-lanes : Kernels H T → (At.val H (FlatKit.Flat.active fl) ≡ᵇ 0) ≡ null (At.partLanes H ls)
 
@@ -703,6 +702,9 @@ module Ascending (R : Set) where
     postulate
       sd-queue : ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
       sd-heads : AllPairs _≢_ (names w₀) → ∀ {q} → Each H (Heads q) w₀ → Each H′ (Heads q) w₀
+
+    sd-lifts : AllPairs _≢_ (names T) → ∀ {s S} → Lifts H ρ s S → Lifts H′ ρ s S
+    sd-lifts fs = Wr.wr-lifts fs
 
     sd-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels H′ T
     sd-kernels fs = Wr.wr-kernels fs (λ {E} {o} → sd-holds (fresh-path ρ fs) {E} {o}) (sd-gated (fresh-path ρ fs)) (sd-spent (fresh-path ρ fs))
@@ -768,7 +770,7 @@ module Ascending (R : Set) where
       ; code = ≗-trans e₅ (bind≗ (open-code {m = Observer.complete o} (trans (cong (λ x → x ∧ b) (Settles.done-read hp ρ)) eq)) λ _ → ≗-refl ⟦ ks ⟧ᶜ)
       ; stack = sk
       ; lifted = trans (Settles.sd-part hp ρ (fresh-path ρ fs)) (flat-gone hp {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} gn (proj₁ nl) (proj₂ nl)) , S
-               , Settles.sd-lifts hp ρ (subst₂ (λ ls′ qs′ → Lifts hp ρ (U.outerˢ op (λ a j → U.subscribe (f a) j) o₀ (U.endˢ q) ls′ qs′ po) S)
+               , Settles.sd-lifts hp ρ fs (subst₂ (λ ls′ qs′ → Lifts hp ρ (U.outerˢ op (λ a j → U.subscribe (f a) j) o₀ (U.endˢ q) ls′ qs′ po) S)
                                                (proj₁ nl) (proj₂ nl) Lρ) , sg
       ; owned = Settles.sd-owned hp ρ ow ; kernels = Settles.sd-kernels hp ρ fs kn ; meaning = Settles.sd-meaning hp ρ fs mn
       ; queue = Settles.sd-queue hp ρ qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
@@ -1287,7 +1289,6 @@ module Ascending (R : Set) where
     postulate
       fr-part    : At.part H u ≡ nothing → ∀ {Δ′ A′} (v : Sub h Δ′ A′) → At.part H′ v ≡ At.part H v
       fr-lanes   : ∀ {s bs S as} → LiftsLane H πL s bs S as → At.part H u ≡ nothing → At.partLanes H′ ls ≡ bs ++ as
-      fr-lifts   : ∀ {s S} → Lifts H ρ s S → Lifts H′ ρ s S
       fr-owned   : ∀ {p ctl bs} {ca : CtlAs T p ctl bs} → Owned H T ca → Owned H′ T ca
       fr-behind  : ∀ {q} → Each H (Heads q) T → Each H′ (Heads q) T
       fr-opened  : ∀ b → opened (freed H (laneOf o) fl) b ρ ≡ opened H b ρ
@@ -1312,6 +1313,9 @@ module Ascending (R : Set) where
       Wrote H H′ ρ (off-++ {H = H} {H₁ = unlive H (laneOf o)} {H₂ = H′} ((_ , Kit.live (laneOf o)) ∷ []) (off-store H (Kit.live (laneOf o))) (off-store (unlive H (laneOf o)) (FlatKit.Flat.active fl)))
             fr-mine fs
 
+    fr-lifts : AllPairs _≢_ (names T) → ∀ {s S} → Lifts H ρ s S → Lifts H′ ρ s S
+    fr-lifts fs = Wr.wr-lifts fs
+
     fr-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels H′ T
     fr-kernels fs = Wr.wr-kernels fs (λ {E} {o} → fr-holds (fresh-path ρ fs) {E} {o}) (fr-gated (fresh-path ρ fs)) (fr-spent (fresh-path ρ fs))
 
@@ -1326,7 +1330,6 @@ module Ascending (R : Set) where
 
     postulate
       dq-opened  : ∀ b → opened (store H (FlatKit.Flat.queue fl) (lift ys)) b ρ ≡ opened H b ρ
-      dq-lifts   : ∀ {s S} → Lifts H ρ s S → Lifts H′ ρ s S
       dq-owned   : ∀ {p ctl bs} {ca : CtlAs T p ctl bs} → Owned H T ca → Owned H′ T ca
       dq-behind  : ∀ {q} → Each H (Heads q) T → Each H′ (Heads q) T
 
@@ -1367,6 +1370,9 @@ module Ascending (R : Set) where
 
     postulate
       dq-queue : ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
+
+    dq-lifts : AllPairs _≢_ (names T) → ∀ {s S} → Lifts H ρ s S → Lifts H′ ρ s S
+    dq-lifts fs = Wr.wr-lifts fs
 
     dq-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels H′ T
     dq-kernels fs = Wr.wr-kernels fs (λ {E} {o} → dq-holds (fresh-path ρ fs) {E} {o}) (dq-gated (fresh-path ρ fs)) (dq-spent (fresh-path ρ fs))
@@ -1482,7 +1488,7 @@ module Ascending (R : Set) where
       ; stack = stk
       ; lifted = flat-gone H₂ {op = op} {f} {fl} {oc} {k} {r} {po} {u = t} {ls} (trans (Freed.fr-part hp ρ o gn t) eo)
                            (trans (Freed.fr-lanes hp ρ o LL gn) (cong₂ _++_ ebs eas)) eq₀
-               , S , Freed.fr-lifts hp ρ o (subst (λ s′ → Lifts hp ρ s′ S) (lane-end op G l q po eo ebs eas eqs)
+               , S , Freed.fr-lifts hp ρ o fs (subst (λ s′ → Lifts hp ρ s′ S) (lane-end op G l q po eo ebs eas eqs)
                                               (subst (λ S′ → Lifts hp ρ (U.laneˢ op G (At.part hp t) bs′ l S′ as′ (At.val hp (FlatKit.Flat.queue fl)) po) S)
                                                      (lane-step o LL) Lρ)) , sg
       ; owned = owned-move H₂ (runAs [] (≗-refl _) stk) refl refl refl (Freed.fr-owned hp ρ o ow)
@@ -1566,7 +1572,7 @@ module Ascending (R : Set) where
       L₁  = subst (λ qs → Lifts hp ρ (U.laneˢ op G (At.part hp t) bs′ l (U.endˢ q) as′ qs po) S)
                   (trans (sym (queue-freed hp (laneOf o) fl)) eq₀)
                   (subst (λ S′ → Lifts hp ρ (U.laneˢ op G (At.part hp t) bs′ l S′ as′ (At.val hp (FlatKit.Flat.queue fl)) po) S) (lane-step o LL) Lρ)
-      L₄  = Dequeued.dq-lifts H₂ ρ ys (Freed.fr-lifts hp ρ o L₁)
+      L₄  = Dequeued.dq-lifts H₂ ρ ys fs (Freed.fr-lifts hp ρ o fs L₁)
       L₅  = subst (λ x → Lifts H₃ ρ (F x (bs′ ++ as′) ys) S) (sym (trans (Dequeued.dq-part H₂ ρ ys (fresh-path ρ fs)) (Freed.fr-part hp ρ o gn t))) L₄
       L₆  = subst (λ zs → Lifts H₃ ρ (F (At.part H₃ t) zs ys) S) (sym (trans (Dequeued.dq-lanes H₂ ρ ys (fresh-path ρ fs)) (Freed.fr-lanes hp ρ o LL gn))) L₅
       L₇  = subst (λ qs → Lifts H₃ ρ (F (At.part H₃ t) (At.partLanes H₃ ls) qs) S) (sym (queue-stored H₂ fl ys)) L₆
