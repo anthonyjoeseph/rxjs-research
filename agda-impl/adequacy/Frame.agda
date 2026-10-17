@@ -9,7 +9,7 @@ open import Data.List.Relation.Unary.Any using (Any; here; there)
 import Data.List.Relation.Unary.Any as Any
 open import Data.List.Relation.Unary.All using (All; []; _∷_; map) renaming (lookup to lookupᴬ)
 open import Data.List.Relation.Unary.All.Properties using (++⁻ˡ; ++⁻ʳ) renaming (++⁺ to all-++⁺)
-open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
+open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_) renaming (head to pairs-hd)
 open import Data.List.Relation.Unary.Linked using (_∷_)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Level using (lift; lower)
@@ -17,7 +17,7 @@ open import Data.Maybe using (Maybe; just; nothing; is-just)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 open import Data.Sum using (_⊎_; [_,_]′)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_)
+open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ)
 open import adequacy.Sorted using (_≤ᵖ_; ≤ᵖ-child)
 
@@ -38,7 +38,7 @@ open Events∞
 
 module Framing (R : Set) where
   open Machine R using (Mach; Read)
-  open Run (Pureᴾ R) using (Ref; module Kit; module FlatKit)
+  open Run (Pureᴾ R) using (Ref; Subject; module Kit; module FlatKit)
   open Shared Timeline (Out R) using (Conf; Heapᴹ; store; stored; look)
   open Heap using (_∋_) renaming (same to same⊑)
   open Strongly R using (Strong; Sub; scanˢ; here; module At; Queue; Kernels; Meaning; Owned; Path; in-scan; in-source; _⊕_; names; Each; Heads; seen; Books;
@@ -49,7 +49,7 @@ module Framing (R : Set) where
   open Moving R using (pairs-r; pairs-split; plant; pendings-plant; subjects-plant; joiners-plant; head-map; head-scan)
   open Locality R using (module Heaps)
   open Ghosting R using (module Calling; Lifts; LiftsLane; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source;
-                         lifts-body; lifts-shut; lifts-defer; lifts-this; lifts-next; OuterFirst; PoolBehind; LaneFirst; Calling; sends)
+                         lifts-body; lifts-shut; lifts-defer; lifts-this; lifts-next; OuterFirst; PoolBehind; LaneFirst; Calling; sends; opened; openedL)
   open Read
 
   -- A scan's part, its accumulator written: its source's part, the
@@ -482,6 +482,42 @@ module Framing (R : Set) where
         el = lane1-alike H H′ {c = c} {k} {s₀} (Heaps.keep H H′ off (λ m → there (++⁺ʳ (quietName k) (++⁺ʳ (names s₀) (lanes-path πL m)))) (Kit.live c) nl)
                               (part-alike H H′ s₀ (Heaps.keeps H H′ off (lanes-path πL) (apart-r (names s₀) P)))
 
+  -- A WRITE INSIDE THE PATH'S END, OPENED: the path opens through its
+  -- ancestors' cuts and subjects, none of them the end's.
+  mutual
+    opened-off : ∀ {h} (H H′ : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (ρ : Path t u) → AllPairs _≢_ (names t)
+               → Off H H′ (names u) → ∀ o → opened H′ o ρ ≡ opened H o ρ
+    opened-off H H′ here ps off o = refl
+    opened-off H H′ (in-map ρ) ps off o = opened-off H H′ ρ ps off o
+    opened-off H H′ (in-scan ρ) (_ ∷ ps) off o = opened-off H H′ ρ ps off o
+    opened-off H H′ (in-take {c = c} {k} ρ) ps@(nl ∷ _) off o =
+      trans (cong (λ x → opened H′ (x ∧ o) ρ) (cong lower (Heaps.keep H H′ off (λ m → there (++⁺ʳ (quietName k) (names-path ρ m))) (Kit.live c) nl)))
+            (opened-off H H′ ρ (pairs-r (quietName k) (pairs-r (cutNames c) ps)) off _)
+    opened-off H H′ (in-outer {fl = fl} {oc} {k} {r} {t = so} ρ) ps off o =
+      trans (cong (λ x → opened H′ (x ∧ o) ρ)
+                  (cong lower (Heaps.keep H H′ off (λ m → there (++⁺ʳ (quietName k) (there (++⁺ˡ (names-path ρ m))))) (Kit.live oc) (pairs-hd (pairs-r (flatNames fl) ps)))))
+            (opened-off H H′ ρ (proj₁ (pairs-split (names so) P)) off _)
+      where P = pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps)))
+    opened-off H H′ (in-lanes {fl = fl} {oc} {k} {r} {t = so} πL) ps off o = openedL-off H H′ πL (pairs-r (names so) P) off o
+      where P = pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps)))
+    opened-off H H′ (in-source {S = Sj} {c} {b} {kb} {k} {t = src} {bd} ρ) ps@(_ ∷ ac ∷ _) off o =
+      trans (cong (λ x → opened H′ (not x) ρ)
+                  (cong lower (Heaps.keep H H′ off (λ m → ++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ (names-path ρ m))))))
+                                          (Subject.closed Sj) ac)))
+            (opened-off H H′ ρ (proj₁ (pairs-split (names src) Q₄)) off _)
+      where Q₄ = pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames Sj) ps))))
+    opened-off H H′ (in-body {S = Sj} {c} {b} {kb} {k} {t = src} ρ) ps off o = opened-off H H′ ρ (pairs-r (names src) Q₄) off o
+      where Q₄ = pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames Sj) ps))))
+    opened-off H H′ (in-defer {k = k} ρ) ps off o = opened-off H H′ ρ (pairs-r (quietName k) ps) off o
+
+    openedL-off : ∀ {h} (H H′ : Heapᴹ h) {Δ B Δ′ C} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} (πL : PathLanes ls u) → AllPairs _≢_ (laneNames ls)
+                → Off H H′ (names u) → ∀ o → openedL H′ o πL ≡ openedL H o πL
+    openedL-off H H′ (this-lane {c = c} {k} {t = s₀} ρ) ps@(nl ∷ _) off o =
+      trans (cong (λ x → opened H′ (x ∧ o) ρ) (cong lower (Heaps.keep H H′ off (λ m → there (++⁺ʳ (quietName k) (++⁺ˡ (names-path ρ m)))) (Kit.live c) nl)))
+            (opened-off H H′ ρ (proj₁ (pairs-split (names s₀) (pairs-r (quietName k) (pairs-r (cutNames c) ps)))) off _)
+    openedL-off H H′ (next-lane {l = lane c k s₀} πL) ps off o =
+      openedL-off H H′ πL (pairs-r (names s₀) (pairs-r (quietName k) (pairs-r (cutNames c) ps))) off o
+
   module Wrote {h} (H H′ : Heapᴹ h) {T : Sub h [] R} {Δ A} {u : Sub h Δ A} (ρ : Path T u)
                {ns : List (Name h)} (off : Off H H′ ns) (mine : All (_∈ᴸ names u) ns) (fs : AllPairs _≢_ (names T)) where
     private
@@ -500,6 +536,9 @@ module Framing (R : Set) where
 
     wr-lifts : ∀ {s S} → Lifts H ρ s S → Lifts H′ ρ s S
     wr-lifts = lifts-off H H′ ρ fs offU
+
+    wr-opened : ∀ o → opened H′ o ρ ≡ opened H o ρ
+    wr-opened = opened-off H H′ ρ fs offU
 
     wr-behind : At.part H′ u ≡ At.part H u → ∀ {q} → (Each H (Heads q) u → Each H′ (Heads q) u) → Each H (Heads q) T → Each H′ (Heads q) T
     wr-behind eq tr = Seeing.each-write H H′ {w = u} offU eq fs ρ tr

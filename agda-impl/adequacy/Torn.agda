@@ -414,6 +414,17 @@ module Tearing (R : Set) where
     seenL-alike H H′ (next-lane {l = lane c k s} πL) ag =
       seenL-alike H H′ πL (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ʳ (names s) m))))
 
+  -- Every path seen as it was, to the part it was: everything held
+  -- passes as it did.
+  each-same : ∀ {h} (H H′ : Heapᴹ h) {P : ∀ {Γ A} → U.Node Γ A → Set} {Δ A} {t : Sub h Δ A}
+            → (∀ {Δ′ A′} {u : Sub h Δ′ A′} (ψ : Path t u) → seen H′ ψ ≡ seen H ψ)
+            → (∀ {Δ′ A′} {u : Sub h Δ′ A′} (ψ : Path t u) → At.part H′ u ≡ At.part H u)
+            → Each H P t → Each H′ P t
+  each-same H H′ se pe ev = record
+    { parts = λ ψ sn e → Each.parts ev ψ (trans (sym (se ψ)) sn) (trans (sym (pe ψ)) e)
+    ; pools = λ ψ sn e → Each.pools ev ψ (trans (sym (se ψ)) sn) (trans (sym (pe ψ)) e)
+    ; rests = λ ψ sn e none ej → Each.rests ev ψ (trans (sym (se ψ)) sn) (trans (sym (pe ψ)) e) (trans (sym (pe (ψ ⊕ in-source here))) none) ej }
+
   -- A path that leaves its root.
   Deep : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Path t u → Set
   Deep here = ⊥

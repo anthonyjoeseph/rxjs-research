@@ -198,15 +198,15 @@ by their own silent steps (`Mirror`).
   `Carried` owes, every producer framing it, or follows from `Owned`'s
   finishes and the agenda's placement.
 - **B. THE LOCAL INVARIANT.** Every move's `Kernels` and `Meaning` are
-  bodies over two proven frames: a plant at one heap (the `Moving` plant
-  lemmas, `plant-queue`) and a write at one node's own names (`Wrote`,
-  over `holds-path`, `gated-path`, `fed-path`), each premise a leaf
-  reading only the node. Ruled out: a write or restage whose kernel,
-  spent or feed reads a cell outside its node. `behind` across a write
-  that leaves every part is `Wrote.wr-behind` over the node's heads.
-  Ruled out: `Queue` framed by the node alone (a silenced flag is any
-  name). Remaining: `behind` where the node's part moves (a dequeue, a
-  lane's end), `Queue` per move; `owned`, stack and ticks per move.
+  bodies over two proven frames: a plant (the `Moving` plant lemmas,
+  `plant-queue`) and a write at one node's own names (`Wrote`), each
+  premise a leaf reading only the node. `behind` across a write leaving
+  every part is `Wrote.wr-behind`; a lane's end drops its own lane alone
+  (`lanes-freed`). Ruled out: a kernel, spent or feed reading outside its
+  node; `Queue` framed by the node alone; a ghost move closed by an
+  equality leaf (`fed-ghost`'s route). Remaining: `behind` where the
+  node's part moves, `Queue` per move; `owned` per move, a connect's
+  body read whole; stack and ticks per move.
 - **THE RESTAGE FRAME.** `map-restage`, `scan-restage`, `take-restage`
   are bodies: a growth weakens the tree into the allocated heap (the
   `Grown` frame, composing over several allocations), `Moved` plants the
@@ -285,20 +285,10 @@ by their own silent steps (`Mirror`).
   flatMap's pool restaged.
 - **`pool-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
   sooner than the run with a flatMap's pool restaged.
-- **`sd-active`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
-  flag leaves its count.
-- **`sd-fifo`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
-  flag leaves its queue.
 - **`sd-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
   flag leaves `Owned`.
 - **`sd-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
   flag leaves `Queue`.
-- **`sd-heads`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
-  flag leaves every head below it.
-- **`fr-part`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end with its part
-  gone leaves every part.
-- **`fr-lanes`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves the
-  lanes beside it as the ghost's.
 - **`fr-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves
   `Owned`.
 - **`fr-holds`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's kernel holds
@@ -313,10 +303,6 @@ by their own silent steps (`Mirror`).
   `Queue`.
 - **`fr-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves every
   part's head.
-- **`fr-opened`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves its
-  flatMap's path open as it was.
-- **`dq-opened`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves its
-  flatMap's path open as it was.
 - **`dq-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves
   `Owned`.
 - **`dq-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves
@@ -381,7 +367,7 @@ by their own silent steps (`Mirror`).
   at a scan's accumulator.
 - **`src-idle`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's source signals
   its subject only with no feed under way.
-- **`fed-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: the tree with a feed
+- **`fed-ghost`** (Climbs) — FALSITY, `DEAD ROUTE`: the tree with a feed
   restaged has a sane, placed part, the ghost past the source's skip.
 - **`fed-stack`** (Climbs) — FALSITY, `NO EVIDENCE`: a stack against the tree
   stands against it with a connect's feed restaged.
@@ -422,7 +408,8 @@ by their own silent steps (`Mirror`).
 - **`sub-cold`** (Lift) — FALSITY, `NO EVIDENCE`: a cold begun registers its
   sink and starts its timeline.
 - **`of-owned`** (Restage) — FALSITY, `NO EVIDENCE`: an `of` planted where it
-  was pending (an `empty` a spent one) owes its values and continuation as the agenda's calls.
+  was pending (an `empty` a spent one) owes its values and continuation as the
+  agenda's calls.
 - **`grows-extend`** (Restage) — FALSITY, `NO EVIDENCE`: an allocation grows
   the heap and reads every old name as it did.
 - **`walk-grow`** (Restage) — FALSITY, `NO EVIDENCE`: a walk along a weakened
