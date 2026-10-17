@@ -25,6 +25,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁻; ++⁺ˡ; ++⁺ʳ)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Maybe using (just; nothing)
+open import Data.Unit using (tt)
 
 open import Tree using (Obs)
 import Tree as T
@@ -680,6 +681,106 @@ module Moving (R : Set) where
       subst (At.Attached H c k) (sym (unsub-plant π v ue)) ak , holds-plant H π v ue hv hs , hl
     holds-plantᴸ H (next-lane {l = lane c k s} π) v ue hv {op = op} {f = f} {E = E} {o = o} {fl = fl} (ak , hs , hl) =
       ak , hs , holds-plantᴸ H π v ue hv {op = op} {f = f} {E = E} {o = o} {fl = fl} hl
+
+  -- A node owing no more than the one it replaced: nothing above it owes
+  -- more.
+  owes-plant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+             → (Owes v → Owes u) → Owes (plant π v) → Owes t
+  owes-plant here v ov ow        = ov ow
+  owes-plant (in-map π) v ov ow  = owes-plant π v ov ow
+  owes-plant (in-scan π) v ov ow = owes-plant π v ov ow
+  owes-plant (in-take π) v ov ()
+  owes-plant (in-outer π) v ov ()
+  owes-plant (in-lanes π) v ov ()
+  owes-plant (in-source π) v ov ow = owes-plant π v ov ow
+  owes-plant (in-body π) v ov ow   = ow
+  owes-plant (in-defer π) v ov ()
+
+  begun-plant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+              → (Owes v → Owes u) → ∀ k → Begun k t → Begun k (plant π v)
+  begun-plant π v ov nothing  b = tt
+  begun-plant π v ov (just _) b = λ ow → b (owes-plant π v ov ow)
+
+  mutual
+    settled-plant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+                  → (Owes v → Owes u) → (Settled u → Settled v) → Settled t → Settled (plant π v)
+    settled-plant here v ov sv st                                = sv st
+    settled-plant (in-map π) v ov sv st                          = settled-plant π v ov sv st
+    settled-plant (in-scan π) v ov sv st                         = settled-plant π v ov sv st
+    settled-plant (in-take {k = k} π) v ov sv (b , st)           = begun-plant π v ov k b , settled-plant π v ov sv st
+    settled-plant (in-outer {k = k} π) v ov sv (b , st , sl)     = begun-plant π v ov k b , settled-plant π v ov sv st , sl
+    settled-plant (in-lanes π) v ov sv (b , st , sl)             = b , st , settled-plantᴸ π v ov sv sl
+    settled-plant (in-source {k = k} π) v ov sv (b , bb , st , sb) = begun-plant π v ov k b , bb , settled-plant π v ov sv st , sb
+    settled-plant (in-body {kb = kb} π) v ov sv (b , bb , st , sb) = b , begun-plant π v ov kb bb , st , settled-plant π v ov sv sb
+    settled-plant (in-defer {k = k} π) v ov sv (b , st)          = begun-plant π v ov k b , settled-plant π v ov sv st
+
+    settled-plantᴸ : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
+                   → (Owes v → Owes u) → (Settled u → Settled v) → SettledLanes ls → SettledLanes (plantᴸ π v)
+    settled-plantᴸ (this-lane {k = k} π) v ov sv (b , st , sl)       = begun-plant π v ov k b , settled-plant π v ov sv st , sl
+    settled-plantᴸ (next-lane {l = lane c k s} π) v ov sv (b , st , sl) = b , st , settled-plantᴸ π v ov sv sl
+
+  -- What unsubscribing does above a node still owed: as it was, or the
+  -- whole still owes.
+  unsub-owed : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+             → Owes u → unsub (plant π v) ≡ unsub t ⊎ Owes t
+  unsub-owed here v ow         = inj₂ ow
+  unsub-owed (in-map π) v ow   = unsub-owed π v ow
+  unsub-owed (in-scan π) v ow  = unsub-owed π v ow
+  unsub-owed (in-take π) v ow  = inj₁ refl
+  unsub-owed (in-outer π) v ow = inj₁ refl
+  unsub-owed (in-lanes π) v ow = inj₁ refl
+  unsub-owed (in-source π) v ow with unsub-owed π v ow
+  ... | inj₁ e rewrite e = inj₁ refl
+  ... | inj₂ ow′ = inj₂ ow′
+  unsub-owed (in-body π) v ow  = inj₁ refl
+  unsub-owed (in-defer π) v ow = inj₁ refl
+
+  -- A detacher is held only over what is begun, so it reads alike.
+  attached-owed : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+                → Owes u → ∀ c k → Begun k t → At.Attached H c k (unsub t) → At.Attached H c k (unsub (plant π v))
+  attached-owed H π v ow c nothing b ak = ak
+  attached-owed H π v ow c (just q) b ak with unsub-owed π v ow
+  ... | inj₁ e   = subst (At.Attached H c (just q)) (sym e) ak
+  ... | inj₂ ow′ = ⊥-elim (b ow′)
+
+  stashed-owed : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+               → Owes u → ∀ k → Begun k t → At.Stashed H k (unsub t) → At.Stashed H k (unsub (plant π v))
+  stashed-owed H π v ow nothing b sk = sk
+  stashed-owed H π v ow (just q) b sk with unsub-owed π v ow
+  ... | inj₁ e   = subst (At.Stashed H (just q)) (sym e) sk
+  ... | inj₂ ow′ = ⊥-elim (b ow′)
+
+  -- A node still owed, rewritten to one whose unsubscribe differs: no
+  -- detacher above reads the difference.
+  mutual
+    holds-owed : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+               → Owes u → (∀ {E o} → At.Holds H u E o → At.Holds H v E o) → Settled t
+               → ∀ {E o} → At.Holds H t E o → At.Holds H (plant π v) E o
+    holds-owed H here v ow hv st hs = hv hs
+    holds-owed H (in-map π) v ow hv st hs = holds-owed H π v ow hv st hs
+    holds-owed H (in-scan π) v ow hv st hs = holds-owed H π v ow hv st hs
+    holds-owed H (in-take {c = c} {k = k} π) v ow hv (b , st) (ak , hs) =
+      attached-owed H π v ow c k b ak , holds-owed H π v ow hv st hs
+    holds-owed H (in-outer {oc = oc} {k = k} π) v ow hv (b , st , _) (rf , sl , ak , hs , ac , gn , hl) =
+      rf , sl , attached-owed H π v ow oc k b ak , holds-owed H π v ow hv st hs , ac , gn , hl
+    holds-owed H (in-lanes {op = op} {f = f} {fl = fl} π) v ow hv (_ , _ , st) {E} {o} (rf , sl , ak , hs , ac , (g , ge , ga) , hl) =
+      rf , sl , ak , hs , trans ac (sym (count-plant H π v)) , (g , trans ge (sym (switches-plant H π v)) , ga)
+      , holds-owedᴸ H π v ow hv st {op = op} {f = f} {E = E} {o = o} {fl = fl} hl
+    holds-owed H (in-source {c = c} {k = k} π) v ow hv (b , _ , st , _) (ak , be , sb , hs , hb) =
+      attached-owed H π v ow c k b ak , be , sb , holds-owed H π v ow hv st hs , hb
+    holds-owed H (in-body {kb = kb} π) v ow hv (_ , bb , _ , st) (ak , be , sb , hs , hb) =
+      ak , be , stashed-owed H π v ow kb bb sb , hs , holds-owed H π v ow hv st hb
+    holds-owed H (in-defer {k = k} π) v ow hv (b , st) (sb , hs) =
+      stashed-owed H π v ow k b sb , holds-owed H π v ow hv st hs
+
+    holds-owedᴸ : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
+                → Owes u → (∀ {E o} → At.Holds H u E o → At.Holds H v E o) → SettledLanes ls
+                → ∀ {A : Set} {op} {f : A → Obs Timeline Δ B} {E o fl}
+                → At.HoldsLanes H op f E o fl ls → At.HoldsLanes H op f E o fl (plantᴸ π v)
+    holds-owedᴸ H (this-lane {c = c} {k = k} π) v ow hv (b , st , _) (ak , hs , hl) =
+      attached-owed H π v ow c k b ak , holds-owed H π v ow hv st hs , hl
+    holds-owedᴸ H (next-lane {l = lane c k s} π) v ow hv (_ , _ , st) {op = op} {f = f} {E = E} {o = o} {fl = fl} (ak , hs , hl) =
+      ak , hs , holds-owedᴸ H π v ow hv st {op = op} {f = f} {E = E} {o = o} {fl = fl} hl
 
   -- What unsubscribing reaches spent: below the planted node from the
   -- new one's, elsewhere from the old tree's.

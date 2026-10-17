@@ -208,11 +208,11 @@ by their own silent steps (`Mirror`).
   `Grown` frame, composing over several allocations), `Moved` plants the
   node, `Owning.reowned` carries `Owned` over an `Inner`. Ruled out: a
   former needing more of its planted subtree than `Inner` says; a growth
-  needing more of the step than a weakening and `compile-cong`. Found: a
-  planted node whose `unsub` differs needs an unstashed-ancestor
-  invariant (`take-holds`). Remaining: `flat-restage`,
-  `connect-restage`. Decides whether that invariant belongs in
-  `Carried`.
+  needing more of the step than a weakening and `compile-cong`. A node
+  whose `unsub` differs is planted by `holds-owed` over `Kernels.settled`
+  (no detacher held over what still `Owes`), which every kernels move
+  now carries. Remaining: `flat-restage` (a slot and a store besides
+  growth), `connect-restage` (five growths and a scope).
 - **D. THE KERNEL FOOTPRINT.** A kernel's cells allocated together and read
   only through its own node, `names` agreeing by construction. `names`
   already lists each node's cells, so this leg is CONDITIONAL: done when
@@ -469,10 +469,6 @@ by their own silent steps (`Mirror`).
   of a tree it reads of the tree weakened into a grown heap.
 - **`scan-fresh`** (Restage) — FALSITY, `NO EVIDENCE`: a scan's new
   accumulator is a name the tree did not hold.
-- **`take-holds`** (Restage) — FALSITY, `NO EVIDENCE`: a take planted over a
-  pending source leaves every ancestor's stash as it was. Needs that an
-  ancestor still owing a pending subscription stashes nothing, which no
-  field of `Carried` says.
 - **`untake`** (Restage) — FALSITY, `NO EVIDENCE`: a source heads no earlier
   than the take over it.
 - **`take-fresh`** (Restage) — FALSITY, `NO EVIDENCE`: a take's new cut is two

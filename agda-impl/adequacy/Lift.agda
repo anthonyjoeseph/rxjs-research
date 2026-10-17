@@ -234,7 +234,7 @@ module Lifting (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = Carried.tree cr ; ctlAs = runAs ks e′ Kᴬ
         ; meets = trans (torn-part cr z refl) (Carried.meets cr)
         ; owned = torn-owned hp z (Carried.owned cr)
-        ; kernels = record { holds = torn-holds cr z ; gated = torn-gated cr z }
+        ; kernels = record { holds = torn-holds cr z ; gated = torn-gated cr z ; settled = Kernels.settled (Carried.kernels cr) }
         ; meaning = record { fed = torn-fed cr z }
         ; queue = torn-queue cr z
         ; books = record { fresh = Books.fresh (Carried.books cr) ; clocked = Books.clocked (Carried.books cr)

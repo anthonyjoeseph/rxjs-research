@@ -284,6 +284,35 @@ module Strongly (R : Set) where
   unsub (joinˢ j sk l x st)                = writeRef l false skipᴬ
   unsub (deferˢ k s)                       = unsubscribeVia k
 
+  -- A subscription whose unsubscribe still reaches one not yet begun.
+  Owes : ∀ {h Δ A} → Sub h Δ A → Set
+  Owes (pendingˢ s q)                       = ⊤
+  Owes (mapˢ f s)                           = Owes s
+  Owes (scanˢ f r s)                        = Owes s
+  Owes (connectˢ S c b kb k fd rp e rt s bd) = Owes s
+  Owes _                                    = ⊥
+
+  -- NOTHING IS STASHED BEFORE IT IS BEGUN: a kernel's continuation runs
+  -- once its subscription is made, so no detacher is held over one its
+  -- unsubscribe still owes.
+  Begun : ∀ {h Δ A} → Maybe (Quiet h) → Sub h Δ A → Set
+  Begun nothing  s = ⊤
+  Begun (just _) s = ¬ Owes s
+
+  mutual
+    Settled : ∀ {h Δ A} → Sub h Δ A → Set
+    Settled (mapˢ f s)                            = Settled s
+    Settled (scanˢ f r s)                         = Settled s
+    Settled (takeWhileˢ i p c k tk s)             = Begun k s × Settled s
+    Settled (flatMapˢ op f fl oc k r pl so ls)    = Begun k so × Settled so × SettledLanes ls
+    Settled (connectˢ S c b kb k fd rp e rt s bd) = Begun k s × Begun kb bd × Settled s × Settled bd
+    Settled (deferˢ k s)                          = Begun k s × Settled s
+    Settled _                                     = ⊤
+
+    SettledLanes : ∀ {h Δ B} → List (Lane h Δ B) → Set
+    SettledLanes []                = ⊤
+    SettledLanes (lane c k s ∷ ls) = Begun k s × Settled s × SettledLanes ls
+
   ------------------------------------------------------------------------
   -- Where a node sits, and what its kernel was handed
 
@@ -947,8 +976,9 @@ module Strongly (R : Set) where
   record Kernels {h} (H : Heapᴹ h) (t : Sub h [] R) : Set₁ where
     open At H
     field
-      holds : Holds t []ᴬ rootObs
-      gated : Gated t
+      holds   : Holds t []ᴬ rootObs
+      gated   : Gated t
+      settled : Settled t
 
   -- Every live joiner holding what its feed owes it.
   record Meaning {h} (H : Heapᴹ h) (t : Sub h [] R) : Set₁ where
@@ -1302,7 +1332,7 @@ module Strongly (R : Set) where
     ; meets   = refl
     ; owned   = record { ofs = λ () ; plays = λ () ; fires = λ () ; begun = λ { here → Any.here refl } ; ends = λ () ; cuts = λ () ; feeds = λ () ; fins = λ () ; bodies = λ _ ()
                        ; placed = []ᴬ }
-    ; kernels = record { holds = _ ; gated = _ }
+    ; kernels = record { holds = _ ; gated = _ ; settled = _ }
     ; meaning = record { fed = _ }
     ; queue   = record { timed = []ᴬ , []ᴬ ; joined = []ᴬ , []ᴬ ; ordered = []ᴸ ; ahead = []ᴬ }
     ; books   = record { fresh = []ᴾ ; clocked = refl , tt ; paidUp = refl ; running = refl }

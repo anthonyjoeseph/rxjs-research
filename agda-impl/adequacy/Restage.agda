@@ -58,11 +58,11 @@ module Restaging (R : Set) where
                         ; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane
                         ; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; Leaf; of-leaf; cold-leaf; done-leaf; join-leaf
                         ; Call; emitC; kontC; Spot; spot; coldˢ; take1C; take2C; bodyC; feedC; finC; srcC; code; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; names; pendings
-                        ; seen; seenL; seen-⊕; isTaking; ∧-split; flatMapˢ; scanˢ; joinˢ; doneˢ; deferˢ; lane; CbRel; ≗-refl; newRef≗; taking; takeK; unsubscribing; rootObs; done≗; register≗; send≗; finish≗; startCold≗; stop≗; stash≗; cancel≗; eff≗; here≗; under≗; diverge≗; unfold≗; readRef≗; writeRef≗; module Canon)
+                        ; seen; seenL; seen-⊕; isTaking; ∧-split; flatMapˢ; scanˢ; joinˢ; doneˢ; deferˢ; lane; CbRel; ≗-refl; newRef≗; taking; takeK; unsubscribing; done≗; register≗; send≗; finish≗; startCold≗; stop≗; stash≗; cancel≗; eff≗; here≗; under≗; diverge≗; unfold≗; readRef≗; writeRef≗; module Canon)
                         renaming (⟦_⟧ to ⟦_⟧ᶜ; at⟦_⟧ to at⟦_⟧ᶜ)
   open Strongly.Against R using (CtlAs; StackAs; BurstAs; subAs; bottomAs; restAs; backAs; reholdAs; Held; bottomᴴ; restᴴ; playsAs; firesAs; overAs; stackJobs; SrcOf; src-of; Ticked; BurstClocked; sources; burstSpots; stackBursts; Placed; agenda)
   open Strongly.Phase R using (playing; fired)
-  open Moving R using (plant; plantᴸ; planted; plantedᴸ; pend; pendᴸ; part-plant; names-plant; holds-plant; gated-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant
+  open Moving R using (plant; plantᴸ; planted; plantedᴸ; pend; pendᴸ; part-plant; names-plant; holds-plant; holds-owed; settled-plant; gated-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant
                      ; Same; same; same-map; same-scan; same-take; same-flat; same-connect; same-defer)
   open Ghosting R using (walk-⊕; _≺_; measure; each-sub; sorted-⇝)
   open Framing R using (head-map; head-scan)
@@ -1121,7 +1121,8 @@ module Restaging (R : Set) where
     -- and are owed nothing.
     rm-kernels : (H : Heapᴹ h) → Kernels H T₀ → Kernels H t′
     rm-kernels H kn = record { holds = holds-plant H π v refl (λ hs → hs) (Kernels.holds kn)
-                             ; gated = gated-plant H π v (λ g → g) (λ d → d) (Kernels.gated kn) }
+                             ; gated = gated-plant H π v (λ g → g) (λ d → d) (Kernels.gated kn)
+                             ; settled = settled-plant π v (λ ow → ow) (λ st → st) (Kernels.settled kn) }
 
     rm-meaning : (H : Heapᴹ h) → Meaning H T₀ → Meaning H t′
     rm-meaning H mn = record { fed = fed-plant H π v (λ _ fd → fd) _ (Meaning.fed mn) }
@@ -1374,7 +1375,8 @@ module Restaging (R : Set) where
 
       rs-kernels : Kernels H′ T₁ → Kernels H′ t′
       rs-kernels kn = record { holds = holds-plant H′ π₁ v refl (λ hs → hs) (Kernels.holds kn)
-                             ; gated = gated-plant H′ π₁ v (λ g → g) (λ d → d) (Kernels.gated kn) }
+                             ; gated = gated-plant H′ π₁ v (λ g → g) (λ d → d) (Kernels.gated kn)
+                             ; settled = settled-plant π₁ v (λ ow → ow) (λ st → st) (Kernels.settled kn) }
 
       rs-meaning : Meaning H′ T₁ → Meaning H′ t′
       rs-meaning mn = record { fed = fed-plant H′ π₁ v (λ _ fd → fd) _ (Meaning.fed mn) }
@@ -1510,13 +1512,8 @@ module Restaging (R : Set) where
       -- The source heads no earlier than the take over it.
       untake     : ∀ {k} {c : U.Node Δ A} → Heads k (U.takeWhileᶜ i p c) → Heads k c
 
-    module _ (H′ : Heapᴹ h₂) (eqv : At.part H′ (pendingˢ (T.takeWhile i p s) q) ≡ At.part H′ v) where
-      postulate
-        -- The take's unsubscribe is its cut, where the pending node's
-        -- was nothing; every ancestor still owing the source's
-        -- subscription stashes nothing, so none read the difference.
-        -- No field of `Carried` says so.
-        take-holds : At.Holds H′ T₂ [] rootObs → At.Holds H′ t′ [] rootObs
+    module _ (H′ : Heapᴹ h₂) (eqv : At.part H′ (pendingˢ (T.takeWhile i p s) q) ≡ At.part H′ v)
+             (held : At.val H′ (Kit.held c₂) ≡ nothing) where
 
       rt-behind : ∀ {k} → Each H′ (Heads k) T₂ → Each H′ (Heads k) t′
       rt-behind {k} = each-plant H′ π₂ v eqv tr
@@ -1530,8 +1527,9 @@ module Restaging (R : Set) where
           tr eu = record { parts = pa eu ; pools = λ { (in-take ()) } ; rests = λ { (in-take ()) } }
 
       rt-kernels : Kernels H′ T₂ → Kernels H′ t′
-      rt-kernels kn = record { holds = take-holds (Kernels.holds kn)
-                             ; gated = gated-plant H′ π₂ v (λ g → (λ _ → lift tt) , g) (λ _ → lift tt) (Kernels.gated kn) }
+      rt-kernels kn = record { holds = holds-owed H′ π₂ v tt (λ _ → lift held , lift tt) (Kernels.settled kn) (Kernels.holds kn)
+                             ; gated = gated-plant H′ π₂ v (λ g → (λ _ → lift tt) , g) (λ _ → lift tt) (Kernels.gated kn)
+                             ; settled = settled-plant π₂ v (λ _ → tt) (λ _ → tt , tt) (Kernels.settled kn) }
 
       rt-meaning : Meaning H′ T₂ → Meaning H′ t′
       rt-meaning mn = record { fed = fed-plant H′ π₂ v (λ _ fd → fd) _ (Meaning.fed mn) }
@@ -1565,14 +1563,14 @@ module Restaging (R : Set) where
              ; meets = trans (part-plant H₂ S.π₂ S.v eqv) (trans (G₂.grow-part gr₂ S.T₁) (trans (G₁.grow-part gr₁ (Carried.tree cr)) (Carried.meets cr)))
              ; owned = Moved.Owning.reowned S.π₂ S.v H₂ eqv (in-take here) S.inner sk₂ a₂
                          (G₂.grow-owned gr₂ {cd′ = cd₂} sk₁ {a′ = a₂} (G₁.grow-owned gr₁ {cd′ = cd₁} sk {a′ = a₁} (Carried.owned cr)))
-             ; kernels = S.rt-kernels H₂ eqv (G₂.grow-kernels gr₂ (G₁.grow-kernels gr₁ (Carried.kernels cr)))
-             ; meaning = S.rt-meaning H₂ eqv (G₂.grow-meaning gr₂ (G₁.grow-meaning gr₁ (Carried.meaning cr)))
-             ; queue = S.rt-queue H₂ eqv (G₂.grow-queue gr₂ (G₁.grow-queue gr₁ (Carried.queue cr)))
+             ; kernels = S.rt-kernels H₂ eqv refl (G₂.grow-kernels gr₂ (G₁.grow-kernels gr₁ (Carried.kernels cr)))
+             ; meaning = S.rt-meaning H₂ eqv refl (G₂.grow-meaning gr₂ (G₁.grow-meaning gr₁ (Carried.meaning cr)))
+             ; queue = S.rt-queue H₂ eqv refl (G₂.grow-queue gr₂ (G₁.grow-queue gr₁ (Carried.queue cr)))
              ; books = record { fresh = S.take-fresh (Books.fresh bk)
                               ; clocked = proj₁ (Books.clocked bk) , S.reticked sk₂ a₂ (G₂.grow-ticked sk₁ (G₁.grow-ticked sk (proj₂ (Books.clocked bk))))
                               ; paidUp = cong (mapList (wkTodo new)) (cong (mapList (wkTodo new)) (Books.paidUp bk)) ; running = Books.running bk }
              ; sorted = sorted-⇝ (Carried.sorted cr) (then refl (then (cong (λ x → step (Mx x)) e₁) now))
-             ; behind = S.rt-behind H₂ eqv (G₂.grow-each gr₂ (G₁.grow-each gr₁ (Carried.behind cr))) }
+             ; behind = S.rt-behind H₂ eqv refl (G₂.grow-each gr₂ (G₁.grow-each gr₁ (Carried.behind cr))) }
     , refl , inj₁ (inj₁ S.less)
     where module S = Taken {i = i} {p = p} {s = s} π
           module G₁ = Grown S.ν₁
