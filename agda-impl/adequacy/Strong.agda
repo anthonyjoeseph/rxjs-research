@@ -368,9 +368,18 @@ module Strongly (R : Set) where
   -- takeWhile's completion and cut, or its cut; a connect's cut once its
   -- body completes; the rest of a connect's feed; a connect's source,
   -- subscribed once its body is.
+  -- A node whose kernel calls the continuation it was handed: one
+  -- beneath which nothing runs.  Every other kernel hands its
+  -- continuation on to a child, so a continuation owed is a leaf's.
+  data Leaf {h} : ∀ {Δ A} → Sub h Δ A → Set₁ where
+    of-leaf   : ∀ {Δ A p i xs} → Leaf (ofˢ {Δ = Δ} {A} p i xs)
+    cold-leaf : ∀ {Δ A s hd ph} → Leaf (coldˢ {Δ = Δ} {A} s hd ph)
+    done-leaf : ∀ {Δ A} → Leaf (doneˢ {Δ = Δ} {A})
+    join-leaf : ∀ {Δ A j s l i ns} → Leaf (joinˢ {Δ = Δ} {A} j s l i ns)
+
   data Call {h} (t : Sub h [] R) : Set₁ where
     emitC  : ∀ {Δ A} {p i xs} → Path t (ofˢ {Δ = Δ} {A} p i xs) → Call t
-    kontC  : ∀ {Δ A} {u : Sub h Δ A} → Path t u → Call t
+    kontC  : ∀ {Δ A} {u : Sub h Δ A} → Leaf u → Path t u → Call t
     take1C : ∀ {Δ A} {i p c k q n} {s : Sub h Δ A} → Path t (takeWhileˢ i p c k (ending q n) s) → Call t
     take2C : ∀ {Δ A} {i p c k} {s : Sub h Δ A} → Path t (takeWhileˢ i p c k taken s) → Call t
     bodyC  : ∀ {Δ A B} {S c b kb k fd e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} → Path t (connectˢ S c b kb k fd rp e rt s bd) → Call t
@@ -383,7 +392,7 @@ module Strongly (R : Set) where
 
   code : ∀ {h} {t : Sub h [] R} → Call t → Act h ⊤
   code (emitC {i = i} {xs} π)            = emitAll (obs (walk π top)) i xs
-  code (kontC {u = u} π)                 = kont (walk π top) same (unsubscribing (unsub u))
+  code (kontC {u = u} _ π)               = kont (walk π top) same (unsubscribing (unsub u))
   code (take1C {c = c} π)                = under last (Observer.complete (obs (walk π top))) (cut c)
   code (take2C {c = c} π)                = cut c
   code (bodyC {c = c} π)                 = cut c
@@ -801,23 +810,6 @@ module Strongly (R : Set) where
       reholdAs : ∀ {u w p bs b} {ρ : u ⊑ w} {σ : w ⊑ h} {K}
                → BurstAs b → Held K → StackAs p (ρ ⨾ σ) K bs → StackAs p σ (push rehold ρ K) (b ∷ bs)
 
-    -- THE RE-ENTRY STATES: the driver's turn with nothing held; a value
-    -- about to be recorded, the agenda its continuation; the agenda about
-    -- to run; a subscription about to begin at its pending node, compiled
-    -- in some world its subjects were weakened from; a cold's frame about
-    -- to step.
-    data CtlAs : Pos → Ctl h → List (Maybe (Playing h)) → Set₁ where
-      calmAs  : ∀ {w p} {σ : w ⊑ h} → CtlAs p (holding σ bottom) []
-      noteAs  : ∀ {w p a bs} {k : ⊤ → Act h ⊤} {σ : w ⊑ h} {K} (ks : List (Call t))
-              → k tt ≗ ⟦ ks ⟧ → StackAs p σ K bs → CtlAs p (asking (note a) k σ K) bs
-      runAs   : ∀ {w p bs} {act : Act h ⊤} {σ : w ⊑ h} {K} (ks : List (Call t))
-              → act ≗ ⟦ ks ⟧ → StackAs p σ K bs → CtlAs p (run act σ K) bs
-      subAs   : ∀ {w Δ A bs} {s : Obs Timeline Δ A} {q} {act : Act h ⊤} {σ : w ⊑ h} {K} (π : Path t (pendingˢ s q))
-              → (Σ World λ u → Σ (Env Δ u) λ E′ → Σ (u ⊑ h) λ υ → wkEnv υ E′ ≡ env (walk π top)
-                   × act ≗ compile s E′ υ (obs (walk π top)) (kont (walk π top)))
-              → StackAs q σ K bs → CtlAs q (run act σ K) bs
-      burstAs : ∀ {w p bs b} {σ : w ⊑ h} {K} → BurstAs (just b) → Held K → StackAs p σ K bs → CtlAs p (holding σ K) (just b ∷ bs)
-
     -- What is owed, gathered from the control and the stack: the calls on
     -- the agenda, at their positions; the bursts in flight; the
     -- subscriptions reached and not begun, the one under way and every
@@ -827,6 +819,29 @@ module Strongly (R : Set) where
     stackJobs (restAs {p = p} ks _ K) = at⟦ p ⟧ ks ++ stackJobs K
     stackJobs (backAs q ks _ _ K)  = at⟦ q ⟧ ks ++ stackJobs K
     stackJobs (reholdAs _ _ K)     = stackJobs K
+
+    -- A call owing a pending node's subscription: a connect's `srcC`, the
+    -- node its source.
+    data SrcOf {Δ A s q} (π : Path t (pendingˢ {Δ = Δ} {A} s q)) : Call t → Set₁ where
+      src-of : ∀ {B S c b kb k fd e rp rt} {bd : Sub h (A ∷ Δ) B} (ρ : Path t (connectˢ S c b kb k fd rp e rt (pendingˢ s q) bd))
+             → π ≡ ρ ⊕ in-source here → SrcOf π (srcC ρ)
+
+    -- THE RE-ENTRY STATES: the driver's turn with nothing held; a value
+    -- about to be recorded, the agenda its continuation; the agenda about
+    -- to run; a subscription about to begin at its pending node, compiled
+    -- in some world its subjects were weakened from, and owed by no call
+    -- on the stack; a cold's frame about to step.
+    data CtlAs : Pos → Ctl h → List (Maybe (Playing h)) → Set₁ where
+      calmAs  : ∀ {w p} {σ : w ⊑ h} → CtlAs p (holding σ bottom) []
+      noteAs  : ∀ {w p a bs} {k : ⊤ → Act h ⊤} {σ : w ⊑ h} {K} (ks : List (Call t))
+              → k tt ≗ ⟦ ks ⟧ → StackAs p σ K bs → CtlAs p (asking (note a) k σ K) bs
+      runAs   : ∀ {w p bs} {act : Act h ⊤} {σ : w ⊑ h} {K} (ks : List (Call t))
+              → act ≗ ⟦ ks ⟧ → StackAs p σ K bs → CtlAs p (run act σ K) bs
+      subAs   : ∀ {w Δ A bs} {s : Obs Timeline Δ A} {q} {act : Act h ⊤} {σ : w ⊑ h} {K} (π : Path t (pendingˢ s q))
+              → (Σ World λ u → Σ (Env Δ u) λ E′ → Σ (u ⊑ h) λ υ → wkEnv υ E′ ≡ env (walk π top)
+                   × act ≗ compile s E′ υ (obs (walk π top)) (kont (walk π top)))
+              → (sk : StackAs q σ K bs) → All (λ j → ¬ SrcOf π (proj₂ j)) (stackJobs sk) → CtlAs q (run act σ K) bs
+      burstAs : ∀ {w p bs b} {σ : w ⊑ h} {K} → BurstAs (just b) → Held K → StackAs p σ K bs → CtlAs p (holding σ K) (just b ∷ bs)
 
     burstSpots : ∀ {b} → BurstAs b → List (Spot t)
     burstSpots (playsAs π) = spot π ∷ []
@@ -843,14 +858,14 @@ module Strongly (R : Set) where
     agenda calmAs                  = []
     agenda (noteAs {p = p} ks _ K) = at⟦ p ⟧ ks ++ stackJobs K
     agenda (runAs {p = p} ks _ K)  = at⟦ p ⟧ ks ++ stackJobs K
-    agenda (subAs _ _ K)           = stackJobs K
+    agenda (subAs _ _ K _)         = stackJobs K
     agenda (burstAs _ _ K)         = stackJobs K
 
     bursts : ∀ {p c bs} → CtlAs p c bs → List (Spot t)
     bursts calmAs         = []
     bursts (noteAs _ _ K) = stackBursts K
     bursts (runAs _ _ K)  = stackBursts K
-    bursts (subAs _ _ K)  = stackBursts K
+    bursts (subAs _ _ K _) = stackBursts K
     bursts (burstAs b _ K) = burstSpots b ++ stackBursts K
 
     sources : List (Job t) → List (Spot t)
@@ -859,7 +874,7 @@ module Strongly (R : Set) where
     sources (_ ∷ js)            = sources js
 
     begins : ∀ {p c bs} → CtlAs p c bs → List (Spot t)
-    begins ca@(subAs π _ _) = spot π ∷ sources (agenda ca)
+    begins ca@(subAs π _ _ _) = spot π ∷ sources (agenda ca)
     begins ca               = sources (agenda ca)
 
     -- Each call runs where its node says: an `of`'s rest at the `of`, a
@@ -893,7 +908,7 @@ module Strongly (R : Set) where
     Clocked n calmAs              = ⊤
     Clocked {p} n (noteAs _ _ K)  = n ≡ tick p × Ticked n K
     Clocked {p} n (runAs _ _ K)   = n ≡ tick p × Ticked n K
-    Clocked {p} n (subAs _ _ K)   = n ≡ tick p × Ticked n K
+    Clocked {p} n (subAs _ _ K _) = n ≡ tick p × Ticked n K
     Clocked n (burstAs b _ K)     = BurstClocked n b × Ticked n K
 
   ------------------------------------------------------------------------
@@ -1283,7 +1298,7 @@ module Strongly (R : Set) where
     { sane    = sane-subscribe o root (λ ())
     ; placed  = placed-subscribe o
     ; tree    = pendingˢ o root
-    ; ctlAs   = Against.subAs here ([] , []ᴬ , same , refl , ≗-refl _) Against.bottomAs
+    ; ctlAs   = Against.subAs here ([] , []ᴬ , same , refl , ≗-refl _) Against.bottomAs []ᴬ
     ; meets   = refl
     ; owned   = record { ofs = λ () ; plays = λ () ; fires = λ () ; begun = λ { here → Any.here refl } ; ends = λ () ; cuts = λ () ; feeds = λ () ; fins = λ () ; bodies = λ _ ()
                        ; placed = []ᴬ }

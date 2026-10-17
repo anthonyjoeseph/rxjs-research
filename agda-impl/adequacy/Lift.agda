@@ -40,6 +40,7 @@ open import operation.AbstractObservable using (module Heap; module Run) renamin
 open import Data.Bool using (Bool; true; false; _∧_; _∨_)
 open import Data.Bool.Properties using (∧-zeroʳ)
 open import adequacy.Ghost using (module Ghosting)
+open import adequacy.Restage using (module Restaging)
 
 open Events∞
 
@@ -49,7 +50,7 @@ module Lifting (R : Set) where
   open Heap using (_⊑_)
   open Sorting R using (Beyond)
   open Run (Pureᴾ R) using (Act; module Kit; module FlatKit)
-  open Strongly R using (Strong; Carried; Books; carried; Sub; pendingˢ; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; emitC; kontC; feedC; srcC; taking; taken; feeding; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _≗_; Each; Heads; rootObs; seen; seenL) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
+  open Strongly R using (Strong; Carried; Books; carried; Sub; pendingˢ; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; emitC; kontC; Leaf; feedC; srcC; taking; taken; feeding; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _≗_; Each; Heads; rootObs; seen; seenL) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (CtlAs; calmAs; noteAs; runAs; subAs; burstAs; bursts)
   open Moving R using (plant; true≢false)
   open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each)
@@ -57,12 +58,8 @@ module Lifting (R : Set) where
   open Locality R using (site-holds; site-gated)
   open Lowering R using (site-lowers; queue-lowers; torn-owned; fed-lowers)
   open Ghosting R using (module Far; module Calling; Has; residual; _⊏_; ⊏-trans; _≺_; measure; load; loadOf; passed; lowered; showing; Hopped; Hops; opening; firstCall; SourceFirst; BodyFirst; OuterFirst; PoolBehind; RestBehind; LaneFirst; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; Far; Off; Opt; Clear; ClearL; OneLane; opened; Calling; sends; Rises; Called; Aloft; hop-sorted)
+  open Restaging R using (subOf; map-restage)
   open Read
-
-  -- The program a subscription about to begin begins.
-  subOf : ∀ {h} {t : Sub h [] R} {p c bs} → CtlAs t p c bs → Maybe (Σ (List Set) λ Δ → Σ Set λ A → T.Obs Timeline Δ A)
-  subOf (subAs {s = s} _ _ _) = just (_ , _ , s)
-  subOf _                     = nothing
 
   postulate
     -- The turn, nothing held and no timer queued: the ghost shows
@@ -77,10 +74,6 @@ module Lifting (R : Set) where
     sub-cold    : ∀ {g m} (cr : Carried g m) {Δ A} {c : Timeline A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.cold c) → Hops cr
     sub-empty   : ∀ {g m} (cr : Carried g m) {Δ A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.empty) → Hops cr
     sub-of      : ∀ {g m} (cr : Carried g m) {Δ A} {xs : List A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.of xs) → Hops cr
-    -- A map begun runs nothing of its own: its source begins under the
-    -- mapped observer, the map restaged over it.
-    map-restage : ∀ {g m} (cr : Carried g m) {Δ A B} {f : A → B} {s : T.Obs Timeline Δ A} → subOf (Carried.ctlAs cr) ≡ just (Δ , B , T.map f s)
-                → Σ (Carried g m) λ cr′ → subOf (Carried.ctlAs cr′) ≡ just (Δ , A , s) × measure (carried cr′) ≺ measure (carried cr)
     sub-scan    : ∀ {g m} (cr : Carried g m) {Δ A B} {f : B → A → B} {z} {s : T.Obs Timeline Δ A}
                 → subOf (Carried.ctlAs cr) ≡ just (Δ , B , T.scan f z s) → Hops cr
     sub-take    : ∀ {g m} (cr : Carried g m) {Δ A i} {p : A → Bool} {s : T.Obs Timeline Δ A}
@@ -157,8 +150,8 @@ module Lifting (R : Set) where
 
     -- A subscription's continuation handed its unsubscribe, which it
     -- stashes: the ghost alike, a call fewer.
-    kont-onward : ∀ {g m} (cr : Carried g m) {Δ A} {u : Sub _ Δ A} (π : Path (Carried.tree cr) u)
-                → firstCall (Carried.ctlAs cr) ≡ just (kontC π) → Hops cr
+    kont-onward : ∀ {g m} (cr : Carried g m) {Δ A} {u : Sub _ Δ A} (lf : Leaf u) (π : Path (Carried.tree cr) u)
+                → firstCall (Carried.ctlAs cr) ≡ just (kontC lf π) → Hops cr
 
     -- The rest of a connect's feed of a value: each subscriber left
     -- shows it or skips it.
@@ -665,7 +658,7 @@ module Lifting (R : Set) where
   sub-by cr (T.defer l)         e eq = sub-defer cr e eq
 
   sub-onward : ∀ {g m} (cr : Carried g m) → opening (Carried.ctlAs cr) ≡ true → Hops cr
-  sub-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = subAs {s = s} _ _ _ } _ = sub-by cr s refl
+  sub-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = subAs {s = s} _ _ _ _ } _ = sub-by cr s refl
   sub-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = calmAs } ()
   sub-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = noteAs _ _ _ } ()
   sub-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs _ _ _ } ()

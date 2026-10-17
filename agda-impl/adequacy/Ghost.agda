@@ -277,7 +277,7 @@ module Ghosting (R : Set) where
   weight calmAs          = 0
   weight (noteAs ks _ K) = suc (length ks + work K)
   weight (runAs ks _ K)  = suc (length ks + work K)
-  weight (subAs _ _ K)   = suc (work K)
+  weight (subAs _ _ K _) = suc (work K)
   weight (burstAs _ _ K) = work K
 
   -- The values the tree's `of`s have still to emit.  A connect's source
@@ -386,7 +386,7 @@ module Ghosting (R : Set) where
   -- What the control is about to run: a subscription begun, or the
   -- agenda's first call.
   opening : ∀ {h} {t : Sub h [] R} {p c bs} → CtlAs t p c bs → Bool
-  opening (subAs _ _ _) = true
+  opening (subAs _ _ _ _) = true
   opening _             = false
 
   firstCall : ∀ {h} {t : Sub h [] R} {p c bs} → CtlAs t p c bs → Maybe (Call t)

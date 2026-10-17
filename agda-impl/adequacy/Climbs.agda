@@ -9,6 +9,7 @@ open import Data.List.Properties using (++-assoc)
 open import Data.List.Relation.Unary.Any using (Any; here; there)
 import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥-elim)
+open import Relation.Nullary using (¬_)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred; m<n⇒m<1+n; +-monoʳ-<; +-monoˡ-<)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; map) renaming (lookup to lookupᴬ)
@@ -46,6 +47,7 @@ open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Lift using (module Lifting)
 open import adequacy.Frame using (module Framing)
 open import adequacy.Grow using (module Growing)
+open import adequacy.Restage using (module Restaging)
 open import adequacy.Local using (module Locality)
 
 open Events∞
@@ -57,12 +59,13 @@ module Ascending (R : Set) where
   open Sorting R using (WellMach)
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
   open Strongly R using (Strong; Carried; Books; carried; closing; Sub; pendingˢ; Name; names; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; Meets; Each; Heads; seen; ∧-split; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
-  open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots) renaming (Placed to Placedᴬ)
+  open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
   open Moving R using (takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; holds-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
   open Tearing R using (fresh-path; takeSite; bodySite; look-store)
   open Unsubbing R using (_⇝_; ⇝-trans; now; then; ≗-trans; wk≗; wk-same; bind≗)
   open Sequencing R using (seq-assoc; seq-done)
+  open Restaging R using (walk-planted)
   open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
   open Lifting R using (sub-onward; emit-shut; emit-void; emit-run; spread-past; behind-fire; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
   open Locality R using (stored-at)
@@ -272,26 +275,6 @@ module Ascending (R : Set) where
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
       ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; kept = inj₁ refl })
-
-  -- A path to a planted node walks as the path it replaced: a walk reads
-  -- no node's children.
-  mutual
-    walk-planted : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {x : Sub h Δ′ A′} (ρ : Path t x) (v : Sub h Δ′ A′) (H : Here h Δ A)
-                 → walk (planted ρ v) H ≡ walk ρ H
-    walk-planted here         v H = refl
-    walk-planted (in-map ρ)   v H = walk-planted ρ v _
-    walk-planted (in-scan ρ)  v H = walk-planted ρ v _
-    walk-planted (in-take ρ)  v H = walk-planted ρ v _
-    walk-planted (in-outer ρ) v H = walk-planted ρ v _
-    walk-planted (in-lanes {op = op} {f} {fl} ρ) v H = walk-plantedᴸ op f fl H ρ v
-    walk-planted (in-source ρ) v H = walk-planted ρ v _
-    walk-planted (in-body ρ)  v H = walk-planted ρ v _
-    walk-planted (in-defer ρ) v H = walk-planted ρ v _
-
-    walk-plantedᴸ : ∀ {h Δ A B Δ′ A′} {ls : List (Lane h Δ B)} {x : Sub h Δ′ A′} op (f : A → T.Obs Timeline Δ B) fl (H : Here h Δ B)
-                    (ρ : PathLanes ls x) (v : Sub h Δ′ A′) → walkLanes op f fl H (plantedᴸ ρ v) ≡ walkLanes op f fl H ρ
-    walk-plantedᴸ op f fl H (this-lane ρ) v = walk-planted ρ v _
-    walk-plantedᴸ op f fl H (next-lane ρ) v = walk-plantedᴸ op f fl H ρ v
 
   -- A plant counting fewer stages than what it replaced counts fewer.
   mutual
@@ -914,8 +897,12 @@ module Ascending (R : Set) where
     stk′ : StackAs T q ϑ K bs → StackAs T′ (q ++ [ ix 1 ]) same⊑ (push (back q back′) ϑ′ K) bs′
     stk′ sk = backAs q [] (<ᵖ-below q []) (≗-trans (wk-same back′) rests′) (bg-stack sk)
 
+    postulate
+      -- The new lane sits in a pool, never under a connect's source.
+      bg-alone : (sk : StackAs T q ϑ K bs) → All (λ j → ¬ SrcOf T′ π′ (proj₂ j)) (stackJobs T′ (stk′ sk))
+
     ca′ : StackAs T q ϑ K bs → CtlAs T′ (q ++ [ ix 1 ]) (run act′ same⊑ (push (back q back′) ϑ′ K)) bs′
-    ca′ sk = subAs π′ bg-code (stk′ sk)
+    ca′ sk = subAs π′ bg-code (stk′ sk) (bg-alone sk)
 
     postulate
       bg-ticked  : (sk : StackAs T q ϑ K bs) → Ticked T clk sk → Ticked T′ clk (bg-stack sk)
@@ -1737,7 +1724,7 @@ module Ascending (R : Set) where
   run-meets (runAs [] _ _)      ()
   run-meets calmAs              ()
   run-meets (noteAs _ _ _)      ()
-  run-meets (subAs _ _ _)       ()
+  run-meets (subAs _ _ _ _)     ()
   run-meets (burstAs _ _ _)     ()
 
   -- The agenda's first call an `of` at `p`: the run is at `p`.
@@ -1747,7 +1734,7 @@ module Ascending (R : Set) where
   run-at (runAs [] _ _)      ()
   run-at calmAs              ()
   run-at (noteAs _ _ _)      ()
-  run-at (subAs _ _ _)       ()
+  run-at (subAs _ _ _ _)     ()
   run-at (burstAs _ _ _)     ()
 
   -- The agenda's first call an open `of` the ghost holds: every sibling
@@ -1805,9 +1792,9 @@ module Ascending (R : Set) where
   -- burst held, the turn.  The ghost alike, the control's work less.
   run-onward : ∀ {g m w act K} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ run {B = ⊤} act σ K
              → Hops cr
-  run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = subAs _ _ _ } refl eq = sub-onward cr refl eq
+  run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = subAs _ _ _ _ } refl eq = sub-onward cr refl eq
   run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (emitC π ∷ _) _ _ } refl eq = emit-onward cr π refl eq
-  run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (kontC π ∷ _) _ _ } refl eq = kont-onward cr π refl eq
+  run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (kontC lf π ∷ _) _ _ } refl eq = kont-onward cr lf π refl eq
   run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (take1C π ∷ _) _ _ } refl eq = take1-onward cr π refl eq
   run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (take2C π ∷ _) _ _ } refl eq = cut-onward cr (takeSite π) refl eq
   run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (bodyC π ∷ _) _ _ } refl eq = cut-onward cr (bodySite π) refl eq

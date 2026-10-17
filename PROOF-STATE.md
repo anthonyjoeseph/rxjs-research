@@ -203,12 +203,14 @@ by their own silent steps (`Mirror`).
   `scan-defined`, `scan-owned`, `scan-meaning`, `scan-sees`; `up-outer`
   and `up-lanes` by a flatMap head bound; then `fr-*`, `dq-*`, `bg-*` and
   `close-outer`'s `sd-*` the same way, in the form C consumes.
-- **THE RESTAGE FRAME.** Every `sub-*` leaf, `bg-stack` and `pool-stack`
-  carry a stack across a node restaged. Only `kontC`'s code reads its
-  target's subtree (`unsub`); every other call reads its node's fields. So
-  a stack crosses a pending node restaged once no continuation is owed at
-  its ancestors. Decides whether that is a fact of `subAs`, which
-  `map-restage` would then discharge as a body, or needs a field.
+- **THE RESTAGE FRAME.** `map-restage` is a body: the stack carried by
+  `Moved.restack`, each call's walk by `fork`. Ruled out: the stack
+  needing more than `subAs`'s owed-by-no-call field; `kontC` is
+  leaf-only, so no call reads a restaged subtree. `Kernels`,
+  `Meaning`, `Queue` by the `*-plant` lemmas. Remaining: `rm-owned`,
+  `rm-behind`, paths back across the plant by `unplant`, then the same `Moved` over
+  `Growing.wkTree` for `sub-scan`, `sub-take`, `sub-flat`, `sub-connect`.
+  Decides whether one plant-alike lemma per field serves every former.
 - **D. THE KERNEL FOOTPRINT.** A kernel's cells allocated together and read
   only through its own node, `names` agreeing by construction. `names`
   already lists each node's cells, so this leg is CONDITIONAL: done when
@@ -241,6 +243,8 @@ by their own silent steps (`Mirror`).
   inner compiled at the lane's env.
 - **`bg-stack`** (Climbs) — FALSITY, `NO EVIDENCE`: a stack against the tree
   stands against the grown tree with a lane begun.
+- **`bg-alone`** (Climbs) — FALSITY, `NO EVIDENCE`: a begun lane's subscription
+  is owed by no call on the stack: it sits in a pool, not under a source.
 - **`bg-ticked`** (Climbs) — FALSITY, `NO EVIDENCE`: the stack ticks as it did
   with a lane begun.
 - **`bg-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds in the grown
@@ -255,8 +259,8 @@ by their own silent steps (`Mirror`).
   than the run one level down.
 - **`bg-fresh`** (Climbs) — FALSITY, `NO EVIDENCE`: the books stay fresh with a
   lane begun.
-- **`lanes-counted`** (Climbs) — FALSITY, `NO EVIDENCE`: a climbing outer
-  value reads the count as the live lanes; a fact of the call, not a kernel.
+- **`lanes-counted`** (Climbs) — FALSITY, `NO EVIDENCE`: a climbing outer value
+  reads the count as the live lanes; a fact of the call, not a kernel.
 - **`outer-switch`** (Climbs) — FALSITY, `NO EVIDENCE`: a switch kills its
   lanes, their rests the pool's, and begins one.
 - **`outer-queued`** (Climbs) — FALSITY, `NO EVIDENCE`: a full bounded merge
@@ -271,8 +275,8 @@ by their own silent steps (`Mirror`).
   across a flatMap's pool restaged.
 - **`pool-stack`** (Climbs) — FALSITY, `NO EVIDENCE`: a stack against the tree
   stands against it with a flatMap's pool restaged.
-- **`pool-ticked`** (Climbs) — FALSITY, `NO EVIDENCE`: the stack ticks as it did
-  with a flatMap's pool restaged.
+- **`pool-ticked`** (Climbs) — FALSITY, `NO EVIDENCE`: the stack ticks as it
+  did with a flatMap's pool restaged.
 - **`pool-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds with a
   flatMap's pool restaged.
 - **`pool-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: `Kernels` survives a
@@ -285,10 +289,10 @@ by their own silent steps (`Mirror`).
   sooner than the run with a flatMap's pool restaged.
 - **`sd-active`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
   flag leaves its count.
-- **`sd-fifo`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done flag
-  leaves its queue.
-- **`sd-part`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done flag
-  leaves every part.
+- **`sd-fifo`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
+  flag leaves its queue.
+- **`sd-part`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
+  flag leaves every part.
 - **`sd-lifts`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
   flag leaves every lift.
 - **`sd-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
@@ -301,24 +305,42 @@ by their own silent steps (`Mirror`).
   flag leaves `Queue`.
 - **`sd-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
   flag leaves every part's head.
-- **`fr-part`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end with its part gone leaves every part.
-- **`fr-lanes`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves the lanes beside it as the ghost's.
-- **`fr-lifts`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves the lift to its flatMap.
-- **`fr-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves `Owned`.
-- **`fr-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves `Kernels`.
-- **`fr-meaning`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves `Meaning`.
-- **`fr-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves `Queue`.
-- **`fr-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves every part's head.
-- **`fr-opened`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves its flatMap's path open as it was.
-- **`dq-part`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves the outer's part.
-- **`dq-lanes`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves the lanes' parts.
-- **`dq-opened`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves its flatMap's path open as it was.
-- **`dq-lifts`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves the lift to its flatMap.
-- **`dq-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves `Owned`.
-- **`dq-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves `Kernels`.
-- **`dq-meaning`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves `Meaning`.
-- **`dq-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves `Queue`.
-- **`dq-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves every part's head.
+- **`fr-part`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end with its part
+  gone leaves every part.
+- **`fr-lanes`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves the
+  lanes beside it as the ghost's.
+- **`fr-lifts`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves the
+  lift to its flatMap.
+- **`fr-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves
+  `Owned`.
+- **`fr-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves
+  `Kernels`.
+- **`fr-meaning`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves
+  `Meaning`.
+- **`fr-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves
+  `Queue`.
+- **`fr-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves every
+  part's head.
+- **`fr-opened`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves its
+  flatMap's path open as it was.
+- **`dq-part`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves the
+  outer's part.
+- **`dq-lanes`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves the
+  lanes' parts.
+- **`dq-opened`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves its
+  flatMap's path open as it was.
+- **`dq-lifts`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves the
+  lift to its flatMap.
+- **`dq-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves
+  `Owned`.
+- **`dq-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves
+  `Kernels`.
+- **`dq-meaning`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves
+  `Meaning`.
+- **`dq-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves
+  `Queue`.
+- **`dq-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves every
+  part's head.
 - **`take1-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a takeWhile's completion
   begun under its failing value, its cut the frame's rest.
 - **`last-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a spent `of`'s completion
@@ -425,19 +447,28 @@ by their own silent steps (`Mirror`).
   sooner than the run with a connect's finish staged.
 - **`emit-shut`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` whose observer path
   is closed skips its value.
-- **`sub-cold`** (Lift) — FALSITY, `NO EVIDENCE`: a cold begun registers its sink and starts its timeline.
-- **`sub-empty`** (Lift) — FALSITY, `NO EVIDENCE`: an empty begun completes under `last`.
-- **`sub-of`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` begun reaches its burst's first call.
-- **`map-restage`** (Lift) — FALSITY, `NO EVIDENCE`: a map begun runs nothing of its own: the
-  map restaged over its source's subscription, the load lower.
-- **`sub-scan`** (Lift) — FALSITY, `NO EVIDENCE`: a scan begun allocates its accumulator and begins its source.
-- **`sub-take`** (Lift) — FALSITY, `NO EVIDENCE`: a takeWhile begun allocates its cut and begins its source.
-- **`sub-flat`** (Lift) — FALSITY, `NO EVIDENCE`: a flatMap begun allocates its kit and cut, registers its refill and
-  begins its outer.
-- **`sub-connect`** (Lift) — FALSITY, `NO EVIDENCE`: a connect begun allocates its subject and begins its body under
-  `ix 0`.
-- **`sub-joined`** (Lift) — FALSITY, `NO EVIDENCE`: a joiner begun registers on its subject, or completes on a closed one.
-- **`sub-defer`** (Lift) — FALSITY, `NO EVIDENCE`: a defer begun begins its body one level down, the ghost past its skip.
+- **`sub-cold`** (Lift) — FALSITY, `NO EVIDENCE`: a cold begun registers its
+  sink and starts its timeline.
+- **`sub-empty`** (Lift) — FALSITY, `NO EVIDENCE`: an empty begun completes
+  under `last`.
+- **`sub-of`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` begun reaches its
+  burst's first call.
+- **`rm-owned`** (Restage) — FALSITY, `NO EVIDENCE`: `Owned` holds with a
+  pending map restaged over its source.
+- **`rm-behind`** (Restage) — FALSITY, `NO EVIDENCE`: every part heads as it
+  did with a map restaged.
+- **`sub-scan`** (Lift) — FALSITY, `NO EVIDENCE`: a scan begun allocates its
+  accumulator and begins its source.
+- **`sub-take`** (Lift) — FALSITY, `NO EVIDENCE`: a takeWhile begun allocates
+  its cut and begins its source.
+- **`sub-flat`** (Lift) — FALSITY, `NO EVIDENCE`: a flatMap begun allocates its
+  kit and cut, registers its refill and begins its outer.
+- **`sub-connect`** (Lift) — FALSITY, `NO EVIDENCE`: a connect begun allocates
+  its subject and begins its body under `ix 0`.
+- **`sub-joined`** (Lift) — FALSITY, `NO EVIDENCE`: a joiner begun registers on
+  its subject, or completes on a closed one.
+- **`sub-defer`** (Lift) — FALSITY, `NO EVIDENCE`: a defer begun begins its
+  body one level down, the ghost past its skip.
 - **`feed-onward`** (Lift) — FALSITY, `NO EVIDENCE`: the rest of a connect's
   feed of a value, each subscriber showing or skipping it.
 - **`src-onward`** (Lift) — FALSITY, `NO EVIDENCE`: a connect's source

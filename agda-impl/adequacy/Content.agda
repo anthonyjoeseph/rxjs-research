@@ -101,7 +101,7 @@ module Honesty (R : Set) where
   strong-hop {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr)
     with Carried.ctlAs cr | Carried.meets cr | Books.paidUp (Carried.books cr) | Books.clocked (Carried.books cr)
        | Books.running (Carried.books cr)
-  ... | subAs π x K | _ | refl | _ | _ = silentᴴ refl (run-onward {g = g} cr refl refl)
+  ... | subAs π x K _ | _ | refl | _ | _ = silentᴴ refl (run-onward {g = g} cr refl refl)
   ... | runAs ks x K | _ | refl | _ | _ = silentᴴ refl (run-onward {g = g} cr refl refl)
   strong-hop {g = g} {m = mach ⟨ hp , p , c ⟩ clk ts bs td lg en mk} (carried cr)
     | noteAs ks x K | g′ , _ , st | refl | ck | refl =
