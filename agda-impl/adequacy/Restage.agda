@@ -16,8 +16,8 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁻ to all-++⁻)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.Maybe using (Maybe; just; nothing; is-just)
-open import Data.Nat using (_<_)
+open import Data.Maybe using (Maybe; just; nothing; is-just) renaming (map to mapMaybe)
+open import Data.Nat using (_<_; _+_)
 open import Data.Nat.Properties using (≤-refl; +-monoʳ-<; +-monoˡ-<)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
@@ -25,6 +25,7 @@ open import Data.Unit using (⊤)
 open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁; tt to tt₁)
 open import Data.Bool using (Bool; _∧_; _∨_; true; false)
 open import Relation.Nullary using (¬_)
+open import Level using (lift)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import denotation.MonotonicList using (Timeline; Frame; From; Pos)
@@ -38,25 +39,32 @@ open import adequacy.Moves using (module Moving)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Frame using (module Framing)
 open import adequacy.Unsub using (module Unsubbing)
+open import adequacy.Grow using (module Growing)
+open import adequacy.Seq using (module Sequencing)
+open import operation.AbstractObservable using (base)
+open import operation.PureObservable using (module Pure)
 
 module Restaging (R : Set) where
-  open Machine R using (Mach; mach; step; silent)
-  open Unsubbing R using (_⇝_)
-  open Shared Timeline (Out R) using (Heapᴹ; ⟨_,_,_⟩; Stack)
-  open Heap using (World; _⊑_)
-  open Run (Pureᴾ R) using (_>>ᴬ_; compile; Env; wkEnv; wkAct; module Kit)
+  open Machine R using (Mach; mach; step; silent; Playing; wkPlaying; wkTodo)
+  open Unsubbing R using (_⇝_; now; then; ≗-trans; wk≗)
+  open Growing R using (wkTree; wkLanes; wkPath)
+  open Sequencing R using (wkEnv-wk)
+  open Pure R using (Timer; wkTimer; mapList)
+  open Shared Timeline (Out R) using (Heapᴹ; ⟨_,_,_⟩; Stack; run; Val; extend; look; cbs; wkVal)
+  open Heap using (World; _⊑_; _⨾_; new; wk∋; cell; slot; Sink; Quiet; Handle) renaming (here to hereʳ)
+  open Run (Pureᴾ R) using (_>>ᴬ_; compile; Env; wkEnv; wkAct; module Kit; Ref; wkR; wkEl; Observer; Kont; wkObs; wkKont)
   open Strongly R using (Carried; Books; carried; Sub; pendingˢ; ofˢ; mapˢ; takeWhileˢ; connectˢ; Lane; ending; taken; feeding; finishing
                         ; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane
                         ; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; Leaf; of-leaf; cold-leaf; done-leaf; join-leaf
                         ; Call; emitC; kontC; Spot; spot; coldˢ; take1C; take2C; bodyC; feedC; finC; srcC; code; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; names; pendings
-                        ; seen; seenL; seen-⊕; isTaking; ∧-split; flatMapˢ)
+                        ; seen; seenL; seen-⊕; isTaking; ∧-split; flatMapˢ; scanˢ; joinˢ; doneˢ; deferˢ; lane; CbRel; ≗-refl; newRef≗; readRef≗; writeRef≗; module Canon)
                         renaming (⟦_⟧ to ⟦_⟧ᶜ; at⟦_⟧ to at⟦_⟧ᶜ)
   open Strongly.Against R using (CtlAs; StackAs; BurstAs; subAs; bottomAs; restAs; backAs; reholdAs; Held; bottomᴴ; restᴴ; playsAs; firesAs; overAs; stackJobs; SrcOf; src-of; Ticked; BurstClocked; sources; burstSpots; stackBursts; Placed; agenda)
   open Strongly.Phase R using (playing; fired)
   open Moving R using (plant; plantᴸ; planted; plantedᴸ; pend; pendᴸ; part-plant; names-plant; holds-plant; gated-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant
                      ; Same; same; same-map; same-scan; same-take; same-flat; same-connect; same-defer)
-  open Ghosting R using (walk-⊕; _≺_; measure; each-sub)
-  open Framing R using (head-map)
+  open Ghosting R using (walk-⊕; _≺_; measure; each-sub; sorted-⇝)
+  open Framing R using (head-map; head-scan)
 
   -- The program a subscription about to begin begins.
   subOf : ∀ {h} {t : Sub h [] R} {p c bs} → CtlAs t p c bs → Maybe (Σ (List Set) λ Δ → Σ Set λ A → T.Obs Timeline Δ A)
@@ -1026,6 +1034,55 @@ module Restaging (R : Set) where
       where next-inj : ∀ {x y} → next-lane x ≡ next-lane y → x ≡ y
             next-inj refl = refl
 
+  -- A path ending under a scan ends under no connect's source.
+  mutual
+    scan-not-src : ∀ {h Δ A Δ₀ A₀ B₀ C₀} {t : Sub h Δ A} {f : B₀ → A₀ → B₀} {r} {s : T.Obs Timeline Δ₀ A₀} {q} {S c b kb k fd e rp rt} {bd : Sub h (A₀ ∷ Δ₀) C₀}
+                  (α : Path t (scanˢ f r (pendingˢ s q))) (β : Path t (connectˢ S c b kb k fd rp e rt (pendingˢ s q) bd))
+                → α ⊕ in-scan here ≢ β ⊕ in-source here
+    scan-not-src here         (in-scan ())   _
+    scan-not-src (in-map α)   (in-map β)    eq = scan-not-src α β (in-map-inj eq)
+      where in-map-inj : ∀ {x y} → in-map x ≡ in-map y → x ≡ y
+            in-map-inj refl = refl
+    scan-not-src (in-scan α)  (in-scan β)   eq = scan-not-src α β (in-scan-inj eq)
+      where in-scan-inj : ∀ {x y} → in-scan x ≡ in-scan y → x ≡ y
+            in-scan-inj refl = refl
+    scan-not-src (in-take α)  (in-take β)   eq = scan-not-src α β (in-take-inj eq)
+      where in-take-inj : ∀ {x y} → in-take x ≡ in-take y → x ≡ y
+            in-take-inj refl = refl
+    scan-not-src (in-outer α) (in-outer β)  eq = scan-not-src α β (in-outer-inj eq)
+      where in-outer-inj : ∀ {x y} → in-outer x ≡ in-outer y → x ≡ y
+            in-outer-inj refl = refl
+    scan-not-src (in-outer α) (in-lanes β)  ()
+    scan-not-src (in-lanes α) (in-outer β)  ()
+    scan-not-src (in-lanes α) (in-lanes β)  eq = scan-not-srcᴸ α β (in-lanes-inj eq)
+      where in-lanes-inj : ∀ {x y} → in-lanes x ≡ in-lanes y → x ≡ y
+            in-lanes-inj refl = refl
+    scan-not-src (in-source ()) here        _
+    scan-not-src (in-source α) (in-source β) eq = scan-not-src α β (in-source-inj eq)
+      where in-source-inj : ∀ {x y} → in-source x ≡ in-source y → x ≡ y
+            in-source-inj refl = refl
+    scan-not-src (in-source α) (in-body β)  ()
+    scan-not-src (in-body α)  here          ()
+    scan-not-src (in-body α)  (in-source β) ()
+    scan-not-src (in-body α)  (in-body β)   eq = scan-not-src α β (in-body-inj eq)
+      where in-body-inj : ∀ {x y} → in-body x ≡ in-body y → x ≡ y
+            in-body-inj refl = refl
+    scan-not-src (in-defer α) (in-defer β)  eq = scan-not-src α β (in-defer-inj eq)
+      where in-defer-inj : ∀ {x y} → in-defer x ≡ in-defer y → x ≡ y
+            in-defer-inj refl = refl
+
+    scan-not-srcᴸ : ∀ {h Δ B Δ₀ A₀ B₀ C₀} {ls : List (Lane h Δ B)} {f : B₀ → A₀ → B₀} {r} {s : T.Obs Timeline Δ₀ A₀} {q} {S c b kb k fd e rp rt} {bd : Sub h (A₀ ∷ Δ₀) C₀}
+                   (α : PathLanes ls (scanˢ f r (pendingˢ s q))) (β : PathLanes ls (connectˢ S c b kb k fd rp e rt (pendingˢ s q) bd))
+                 → α ⊕ᴸ in-scan here ≢ β ⊕ᴸ in-source here
+    scan-not-srcᴸ (this-lane α) (this-lane β) eq = scan-not-src α β (this-inj eq)
+      where this-inj : ∀ {x y} → this-lane x ≡ this-lane y → x ≡ y
+            this-inj refl = refl
+    scan-not-srcᴸ (this-lane α) (next-lane β) ()
+    scan-not-srcᴸ (next-lane α) (this-lane β) ()
+    scan-not-srcᴸ (next-lane α) (next-lane β) eq = scan-not-srcᴸ α β (next-inj eq)
+      where next-inj : ∀ {x y} → next-lane x ≡ next-lane y → x ≡ y
+            next-inj refl = refl
+
   module Mapped {h} {T₀ : Sub h [] R} {Δ A B} {f : A → B} {s : T.Obs Timeline Δ A} {q} (π : Path T₀ (pendingˢ (T.map f s) q)) where
     v : Sub h Δ B
     v = mapˢ f (pendingˢ s q)
@@ -1133,9 +1190,6 @@ module Restaging (R : Set) where
                                   → subOf (Carried.ctlAs cr′) ≡ just (Δ , A , s) × measure (carried cr′) ≺ measure (carried cr)
 
   postulate
-    -- A scan allocates its accumulator and begins its source.
-    scan-restage    : ∀ {g m} (cr : Carried g m) {Δ A B} {f : B → A → B} {z} {s : T.Obs Timeline Δ A}
-                    → subOf (Carried.ctlAs cr) ≡ just (Δ , B , T.scan f z s) → Restages cr s
     -- A takeWhile allocates its cut and begins its source.
     take-restage    : ∀ {g m} (cr : Carried g m) {Δ A i} {p : A → Bool} {s : T.Obs Timeline Δ A}
                     → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.takeWhile i p s) → Restages cr s
@@ -1146,3 +1200,207 @@ module Restaging (R : Set) where
     -- body under `ix 0`.
     connect-restage : ∀ {g m} (cr : Carried g m) {Δ A B} {s : T.Obs Timeline Δ A} {b : T.Obs Timeline (A ∷ Δ) B}
                     → subOf (Carried.ctlAs cr) ≡ just (Δ , B , T.connect s b) → Restages cr b
+
+  -- A WORLD GROWN BY ALLOCATION: every name the old heap held reads as it
+  -- did, weakened.
+  record Grows {h v} (τ : h ⊑ v) (H : Heapᴹ h) (H′ : Heapᴹ v) : Set₁ where
+    field
+      cells   : ∀ {t} (x : Ref h t) → At.val H′ (wkR τ x) ≡ wkEl t τ (At.val H x)
+      slots   : ∀ {X} (s : Sink h X) → CbRel (cbs H′ (wk∋ τ s)) (wkVal (slot X) τ (cbs H s))
+      stashes : ∀ (u : Quiet h) → look H′ (wk∋ τ u) ≗ wkAct τ (look H u)
+      handles : ∀ (hd : Handle h) → At.spentʰ H′ (wk∋ τ hd) ≡ At.spentʰ H hd
+
+  -- Two observers, part for part; two continuations, pointwise.
+  ObsRel : ∀ {A w} → Observer A w → Observer A w → Set₁
+  ObsRel o o′ = (∀ a → Observer.next o a ≗ Observer.next o′ a) × Observer.complete o ≗ Observer.complete o′ × Observer.closed o ≗ Observer.closed o′
+
+  KontRel : ∀ {w} → Kont w → Kont w → Set₁
+  KontRel {w} k k′ = ∀ {v} (σ : w ⊑ v) sub → k σ sub ≗ k′ σ sub
+
+  -- A tree weakened owes what it did.
+  mutual
+    pend-grow : ∀ {h v Δ A} (τ : h ⊑ v) (t : Sub h Δ A) → pend (wkTree τ t) ≡ pend t
+    pend-grow τ (pendingˢ s q)                       = refl
+    pend-grow τ (coldˢ s hd ph)                      = refl
+    pend-grow τ (ofˢ p i xs)                         = refl
+    pend-grow τ doneˢ                                = refl
+    pend-grow τ (mapˢ f t)                           = pend-grow τ t
+    pend-grow τ (scanˢ f r t)                        = pend-grow τ t
+    pend-grow τ (takeWhileˢ i p c k tk t)            = pend-grow τ t
+    pend-grow τ (flatMapˢ op f fl oc k r pl t ls)    = cong₂ _+_ (pend-grow τ t) (pend-growᴸ τ ls)
+    pend-grow τ (connectˢ S c b kb k fd q e rt s bd) = cong₂ _+_ (pend-grow τ s) (pend-grow τ bd)
+    pend-grow τ (joinˢ j s fl x m)                   = refl
+    pend-grow τ (deferˢ k t)                         = pend-grow τ t
+
+    pend-growᴸ : ∀ {h v Δ B} (τ : h ⊑ v) (ls : List (Lane h Δ B)) → pendᴸ (wkLanes τ ls) ≡ pendᴸ ls
+    pend-growᴸ τ []                 = refl
+    pend-growᴸ τ (lane c k t ∷ ls) = cong₂ _+_ (pend-grow τ t) (pend-growᴸ τ ls)
+
+  module Grown {h v} (τ : h ⊑ v) where
+    postulate
+      -- The stack, its calls aimed along the weakened tree.
+      grow-stack  : ∀ {t : Sub h [] R} {p w} {σ : w ⊑ h} {K bs} → StackAs t p σ K bs
+                  → StackAs (wkTree τ t) p (σ ⨾ τ) K (mapList (mapMaybe (wkPlaying τ)) bs)
+      grow-alone  : ∀ {t : Sub h [] R} {p w} {σ : w ⊑ h} {K bs} {Δ A s q} (π : Path t (pendingˢ {Δ = Δ} {A} s q)) (sk : StackAs t p σ K bs)
+                  → All (λ j → ¬ SrcOf t π (proj₂ j)) (stackJobs t sk) → All (λ j → ¬ SrcOf (wkTree τ t) (wkPath τ π) (proj₂ j)) (stackJobs (wkTree τ t) (grow-stack sk))
+      grow-ticked : ∀ {t : Sub h [] R} {n p w} {σ : w ⊑ h} {K bs} (sk : StackAs t p σ K bs) → Ticked t n sk → Ticked (wkTree τ t) n (grow-stack sk)
+      -- A walk along the weakened path hands the weakened observer and
+      -- continuation, up to `_≗_`, and the weakened subjects.
+      walk-grow   : ∀ {Δ A} {t : Sub h [] R} {u : Sub h Δ A} (π : Path t u)
+                  → ObsRel (wkObs τ (Here.obs (walk π top))) (Here.obs (walk (wkPath τ π) top))
+                  × KontRel (wkKont τ (Here.kont (walk π top))) (Here.kont (walk (wkPath τ π) top))
+                  × wkEnv τ (Here.env (walk π top)) ≡ Here.env (walk (wkPath τ π) top)
+
+    module _ {H : Heapᴹ h} {H′ : Heapᴹ v} (gr : Grows τ H H′) where
+      postulate
+        grow-part    : ∀ {Δ A} (u : Sub h Δ A) → At.part H′ (wkTree τ u) ≡ At.part H u
+        grow-owned   : ∀ {t : Sub h [] R} {w} {σ : w ⊑ h} {K bs} {Δ A s q} {π : Path t (pendingˢ {Δ = Δ} {A} s q)} {act act′ cd cd′}
+                         (sk : StackAs t q σ K bs) {a a′}
+                     → Owned H t (subAs {act = act} π cd sk a) → Owned H′ (wkTree τ t) (subAs {act = act′} (wkPath τ π) cd′ (grow-stack sk) a′)
+        grow-kernels : ∀ {t : Sub h [] R} → Kernels H t → Kernels H′ (wkTree τ t)
+        grow-meaning : ∀ {t : Sub h [] R} → Meaning H t → Meaning H′ (wkTree τ t)
+        grow-queue   : ∀ {t : Sub h [] R} {p clk ts} → Queue H p clk ts t → Queue H′ p clk (mapList (wkTimer τ) ts) (wkTree τ t)
+        grow-each    : ∀ {t : Sub h [] R} {P : ∀ {Γ A} → U.Node Γ A → Set} → Each H P t → Each H′ P (wkTree τ t)
+
+  postulate
+    -- An allocation grows the world and moves nothing.
+    grows-extend : ∀ {h k} (H : Heapᴹ h) (x : Val (k ∷ h) k) → Grows new H (extend H x)
+
+    -- A compiled subscription read alike under alike observers and
+    -- continuations.
+    compile-cong : ∀ {Γ A u w} (s : T.Obs Timeline Γ A) (E : Env Γ u) (υ : u ⊑ w) {o o′ : Observer A w} {k k′ : Kont w}
+                 → ObsRel o o′ → KontRel k k′ → compile s E υ o k ≗ compile s E υ o′ k′
+
+  -- A scan's observer over alike observers.
+  scanO-cong : ∀ {h A B} (f : B → A → B) (r : Ref h (base B)) {o o′ : Observer B h} → ObsRel o o′ → ObsRel (Canon.scanO f r o) (Canon.scanO f r o′)
+  scanO-cong f r (n , c , x) = (λ a → readRef≗ refl λ σ b → wk≗ σ (writeRef≗ refl refl (n (f b a)))) , c , x
+
+  -- A SCAN RESTAGED IN THE GROWN WORLD: its accumulator the newest cell,
+  -- its source pending beneath it.
+  module Scanned {h} {T₀ : Sub h [] R} {Δ A B} {f : B → A → B} {z : B} {s : T.Obs Timeline Δ A} {q} (π : Path T₀ (pendingˢ (T.scan f z s) q)) where
+    h′ : World
+    h′ = cell (base B) ∷ h
+
+    T₁ : Sub h′ [] R
+    T₁ = wkTree new T₀
+
+    π₁ : Path T₁ (pendingˢ (T.scan f z s) q)
+    π₁ = wkPath new π
+
+    v : Sub h′ Δ B
+    v = scanˢ f hereʳ (pendingˢ s q)
+
+    open Moved π₁ v using (t′; restack; Alone; reticked) public
+
+    π′ : Path t′ (pendingˢ s q)
+    π′ = planted π₁ v ⊕ in-scan here
+
+    walk′ : walk π′ top ≡ walk (in-scan {f = f} {r = hereʳ} {t = pendingˢ s q} here) (walk π₁ top)
+    walk′ = trans (walk-⊕ (planted π₁ v) (in-scan here) top) (cong (λ W → walk (in-scan {f = f} {r = hereʳ} {t = pendingˢ s q} {u = pendingˢ s q} here) W) (walk-planted π₁ v top))
+
+    ν : h ⊑ h′
+    ν = new
+
+    wg = Grown.walk-grow ν π
+
+    env₁ : ∀ {u} (E′ : Env Δ u) (υ : u ⊑ h) → wkEnv υ E′ ≡ Here.env (walk π top) → wkEnv (υ ⨾ new) E′ ≡ Here.env (walk π₁ top)
+    env₁ E′ υ e = trans (sym (wkEnv-wk υ new E′)) (trans (cong (wkEnv new) e) (proj₂ (proj₂ wg)))
+
+    -- The scan, still pending, along the weakened path.
+    code₁ : ∀ {u} (E′ : Env Δ u) (υ : u ⊑ h) → wkEnv υ E′ ≡ Here.env (walk π top)
+          → Σ World λ u′ → Σ (Env Δ u′) λ E″ → Σ (u′ ⊑ h′) λ υ′ → wkEnv υ′ E″ ≡ Here.env (walk π₁ top)
+                         × compile (T.scan f z s) E′ (υ ⨾ new) (Here.obs (walk π₁ top)) (Here.kont (walk π₁ top))
+                           ≗ compile (T.scan f z s) E″ υ′ (Here.obs (walk π₁ top)) (Here.kont (walk π₁ top))
+    code₁ {u} E′ υ e = u , E′ , υ ⨾ new , env₁ E′ υ e , ≗-refl _
+
+    -- The source compiles as the scan's body did, under the scan's
+    -- observer over the grown walk.
+    code′ : ∀ {u} (E′ : Env Δ u) (υ : u ⊑ h) {act} → wkEnv υ E′ ≡ Here.env (walk π top)
+          → act ≗ compile s E′ (υ ⨾ new) (Canon.scanO f hereʳ (wkObs new (Here.obs (walk π top)))) (wkKont new (Here.kont (walk π top)))
+          → Σ World λ u′ → Σ (Env Δ u′) λ E″ → Σ (u′ ⊑ h′) λ υ′ → wkEnv υ′ E″ ≡ Here.env (walk π′ top)
+                         × act ≗ compile s E″ υ′ (Here.obs (walk π′ top)) (Here.kont (walk π′ top))
+    code′ {u} E′ υ {act} e c = u , E′ , υ ⨾ new
+      , subst (λ W → wkEnv (υ ⨾ new) E′ ≡ Here.env W) (sym walk′) (env₁ E′ υ e)
+      , subst (λ W → act ≗ compile s E′ (υ ⨾ new) (Here.obs W) (Here.kont W)) (sym walk′)
+          (≗-trans c (compile-cong s E′ (υ ⨾ new) (scanO-cong f hereʳ (proj₁ wg)) (proj₁ (proj₂ wg))))
+
+    alone : ∀ {k} → ¬ SrcOf t′ π′ k
+    alone (src-of ρ e) = scan-not-src (planted π₁ v) ρ e
+
+    alones : ∀ (js : List (Job t′)) → All (λ j → ¬ SrcOf t′ π′ (proj₂ j)) js
+    alones _ = tabulateᴬ (λ _ → alone)
+
+    less : pend t′ < pend T₀
+    less = subst (pend t′ <_) (pend-grow new T₀) (pend-less π₁ v ≤-refl)
+
+    -- A scan over a pending source holds nothing a call is owed at, and
+    -- one pending node: its source.
+    inner : Moved.Inner π₁ v (in-scan here)
+    inner = record { no-of = λ { (in-scan ()) } ; no-cold = λ { (in-scan ()) } ; one-pend = λ { (in-scan here) → refl }
+                   ; no-end = λ { (in-scan ()) } ; no-cut = λ { (in-scan ()) } ; no-feed = λ { (in-scan ()) } ; no-fin = λ { (in-scan ()) }
+                   ; not-self = λ _ () }
+
+    postulate
+      -- The accumulator is a name the tree did not hold.
+      scan-fresh : AllPairs _≢_ (names T₀) → AllPairs _≢_ (names t′)
+
+    module _ (H′ : Heapᴹ h′) (eqv : At.part H′ (pendingˢ (T.scan f z s) q) ≡ At.part H′ v) where
+      -- The scan's heads are its source's.
+      rs-behind : ∀ {p} → Each H′ (Heads p) T₁ → Each H′ (Heads p) t′
+      rs-behind {p} = each-plant H′ π₁ v eqv tr
+        where
+          unscan : ∀ {c : U.Node Δ A} {z′} → Heads p (U.scanᶜ f z′ c) → Heads p c
+          unscan {c} {z′} hd e = hd (trans (head-scan f z′ (U.step c)) e)
+
+          pa : ∀ {Δ′ A′} {w : Sub h′ Δ′ A′} → Each H′ (Heads p) (pendingˢ (T.scan f z s) q) → (ψ : Path v w) → seen H′ ψ ≡ true
+             → ∀ {c} → At.part H′ w ≡ just c → Heads p c
+          pa eu here            _ pw   = Each.parts eu here refl (trans eqv pw)
+          pa eu (in-scan here)  _ refl = unscan {U.subscribe s q} (Each.parts eu here refl refl)
+
+          tr : Each H′ (Heads p) (pendingˢ (T.scan f z s) q) → Each H′ (Heads p) v
+          tr eu = record { parts = pa eu ; pools = λ { (in-scan ()) } ; rests = λ { (in-scan ()) } }
+
+      rs-kernels : Kernels H′ T₁ → Kernels H′ t′
+      rs-kernels kn = record { holds = holds-plant H′ π₁ v refl (λ hs → hs) (Kernels.holds kn)
+                             ; gated = gated-plant H′ π₁ v (λ g → g) (λ d → d) (Kernels.gated kn) }
+
+      rs-meaning : Meaning H′ T₁ → Meaning H′ t′
+      rs-meaning mn = record { fed = fed-plant H′ π₁ v (λ _ fd → fd) _ (Meaning.fed mn) }
+
+      pendings′ : pendings t′ ≡ pendings T₁
+      pendings′ with pendings-plant π₁ v
+      ... | _ , _ , e , e′ = trans e′ (sym e)
+
+      rs-queue : ∀ {p clk ts} → Queue H′ p clk ts T₁ → Queue H′ p clk ts t′
+      rs-queue {ts = ts} qu =
+        record { timed   = subst (At.Timed H′ ts) (sym pendings′) (Queue.timed qu)
+               ; joined  = subst₂ (At.Joined H′) (sym (subjects-plant π₁ v refl)) (sym (joiners-plant π₁ v (λ _ → refl) [])) (Queue.joined qu)
+               ; ordered = Queue.ordered qu ; ahead = Queue.ahead qu }
+
+  -- A scan begun allocates its accumulator, holding the seed, and begins
+  -- its source under the scan's observer, one subscription fewer owed.
+  scan-restage : ∀ {g m} (cr : Carried g m) {Δ A B} {f : B → A → B} {z : B} {s : T.Obs Timeline Δ A}
+               → subOf (Carried.ctlAs cr) ≡ just (Δ , B , T.scan f z s) → Restages cr s
+  scan-restage {m = mach ⟨ H , _ , run _ _ _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = subAs {s = T.scan f z s} π (u , E′ , υ , e , newRef≗ refl kk) sk a } refl refl =
+    _ , now
+    , record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = S.t′
+             ; ctlAs = subAs S.π′ (S.code′ E′ υ e (kk new hereʳ)) (S.restack sk₁ a₁) (S.alones _)
+             ; meets = trans (part-plant H′ S.π₁ S.v eqv) (trans (G.grow-part gr (Carried.tree cr)) (Carried.meets cr))
+             ; owned = Moved.Owning.reowned S.π₁ S.v H′ eqv (in-scan here) S.inner {cd = S.code₁ E′ υ e} sk₁ a₁ (G.grow-owned gr sk (Carried.owned cr))
+             ; kernels = S.rs-kernels H′ eqv (G.grow-kernels gr (Carried.kernels cr))
+             ; meaning = S.rs-meaning H′ eqv (G.grow-meaning gr (Carried.meaning cr))
+             ; queue = S.rs-queue H′ eqv (G.grow-queue gr (Carried.queue cr))
+             ; books = record { fresh = S.scan-fresh (Books.fresh bk)
+                              ; clocked = proj₁ (Books.clocked bk) , S.reticked sk₁ a₁ (G.grow-ticked sk (proj₂ (Books.clocked bk)))
+                              ; paidUp = cong (mapList (wkTodo new)) (Books.paidUp bk) ; running = Books.running bk }
+             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl now) ; behind = S.rs-behind H′ eqv (G.grow-each gr (Carried.behind cr)) }
+    , refl , inj₁ (inj₁ S.less)
+    where module S = Scanned {f = f} {z = z} {s = s} π
+          module G = Grown S.ν
+          H′ = extend H (lift z)
+          gr = grows-extend H (lift z)
+          sk₁ = G.grow-stack sk
+          a₁ = G.grow-alone π sk a
+          eqv : At.part H′ (pendingˢ (T.scan f z s) _) ≡ At.part H′ S.v
+          eqv = refl
+          bk = Carried.books cr

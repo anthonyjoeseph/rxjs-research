@@ -210,10 +210,12 @@ by their own silent steps (`Mirror`).
   `Meaning`, `Queue` by the `*-plant` lemmas; `Owned` by
   `Owning.reowned` over an `Inner` of the planted subtree, `Each` by
   `each-plant` over a local transfer. Ruled out: a former needing more
-  of its planted subtree than `Inner` says. Remaining: the same
-  `Moved` over `Growing.wkTree` for `scan-restage`, `take-restage`,
-  `flat-restage`, `connect-restage`. Decides whether a growth carries
-  `Owned` as a plant does.
+  of its planted subtree than `Inner` says. `scan-restage` is a body:
+  the `Grown` frame weakens the tree into the allocated heap, then the
+  same `Moved` plants. Ruled out: a growth needing more of the step than
+  a weakening and `compile-cong`. Remaining: `take-restage`,
+  `flat-restage`, `connect-restage` over the same frame, composed over
+  several allocations. Decides whether the frame composes.
 - **D. THE KERNEL FOOTPRINT.** A kernel's cells allocated together and read
   only through its own node, `names` agreeing by construction. `names`
   already lists each node's cells, so this leg is CONDITIONAL: done when
@@ -456,8 +458,20 @@ by their own silent steps (`Mirror`).
   under `last`.
 - **`sub-of`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` begun reaches its
   burst's first call.
-- **`scan-restage`** (Restage) — FALSITY, `NO EVIDENCE`: a scan begun
-  allocates its accumulator and is carried at its source, less owed.
+- **`grows-extend`** (Restage) — FALSITY, `NO EVIDENCE`: an allocation grows
+  the heap and reads every old name as it did.
+- **`walk-grow`** (Restage) — FALSITY, `NO EVIDENCE`: a walk along a weakened
+  path hands the weakened observer, continuation and subjects.
+- **`compile-cong`** (Restage) — FALSITY, `NO EVIDENCE`: a compiled
+  subscription reads alike under alike observers and continuations.
+- **`grow-stack`, `grow-alone`, `grow-ticked`** (Restage) — FALSITY,
+  `NO EVIDENCE`: the stack, its sources and its ticks carried across a
+  weakening.
+- **`grow-part`, `grow-owned`, `grow-kernels`, `grow-meaning`, `grow-queue`,
+  `grow-each`** (Restage) — FALSITY, `NO EVIDENCE`: what the relation reads
+  of a tree it reads of the tree weakened into a grown heap.
+- **`scan-fresh`** (Restage) — FALSITY, `NO EVIDENCE`: a scan's new
+  accumulator is a name the tree did not hold.
 - **`take-restage`** (Restage) — FALSITY, `NO EVIDENCE`: a takeWhile begun
   allocates its cut and is carried at its source, less owed.
 - **`flat-restage`** (Restage) — FALSITY, `NO EVIDENCE`: a flatMap begun
