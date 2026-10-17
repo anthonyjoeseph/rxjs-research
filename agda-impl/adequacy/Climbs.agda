@@ -50,6 +50,7 @@ open import adequacy.Frame using (module Framing)
 open import adequacy.Grow using (module Growing)
 open import adequacy.Restage using (module Restaging)
 open import adequacy.Local using (module Locality)
+open import adequacy.Retag using (module Retagging; at-here)
 
 open Events∞
 
@@ -59,7 +60,7 @@ module Ascending (R : Set) where
   open Heap using (World; _⊑_; _⨾_; Handle; Sink; Quiet; wk∋; slot) renaming (same to same⊑)
   open Sorting R using (WellMach)
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
-  open Strongly R using (Strong; Carried; Books; carried; closing; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; Meets; Each; Heads; seen; ∧-split; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
+  open Strongly R using (Strong; Carried; Books; carried; closing; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; Meets; Each; Heads; seen; ∧-split; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
   open Moving R using (pairs-r; pairs-split; takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; holds-plant; settled-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
@@ -71,6 +72,7 @@ module Ascending (R : Set) where
   open Lifting R using (sub-onward; emit-shut; emit-void; emit-run; spread-past; behind-fire; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
   open Locality R using (stored-at; flatReads; cuts; cut-in; module Heaps)
   open Growing R using (wkTree; wkLanes; wkPath)
+  open Retagging R using (module Body; fed-owed; envP; joiners-path)
   open Framing R using (scan-part; scan-owned; scan-kernels; scan-meaning; scan-queue; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike)
   open Read
 
@@ -1716,7 +1718,9 @@ module Ascending (R : Set) where
   -- the ghost past the source's skip.
   module Feeds {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B Sj c b kb k rp e rt} {u : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
                (ρ : Path T (connectˢ Sj c b kb k idle rp e rt u bd)) (y : A) (q : Pos) where
-    v  = connectˢ Sj c b kb k (feeding y q (At.val H (Subject.subscribers Sj))) rp e rt u bd
+    fd′ = feeding y q (At.val H (Subject.subscribers Sj))
+    module Bd = Body H Sj c b kb k idle fd′ rp e rt u (at-here (At.owing H fd′)) bd
+    v  = Bd.w₂
     T′ = plant ρ v
 
     postulate
@@ -1734,24 +1738,30 @@ module Ascending (R : Set) where
               → Σ (U.Node [] R) λ g″ → At.part H T′ ≡ just g″ × Sane [] g″ × Placed g″ []
                 × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
 
-    -- The feed read by the body's meaning alone: the subscribers the feed
-    -- read held what it owes them.
     w₀ = connectˢ Sj c b kb k idle rp e rt u bd
 
+    -- Every part heads no sooner than the run, the feed restaged.
     postulate
-      fed-joins : ∀ ν → At.Fed H w₀ ν → At.Fed H v ν
       fed-behind : Each H (Heads q) T → Each H (Heads q) T′
 
-    fed-kernels : Kernels H T → Kernels H T′
-    fed-kernels kn = record { holds   = holds-plant H {t = T} ρ v refl (λ hs → hs) (Kernels.holds kn)
-                            ; gated   = gated-plant H {t = T} ρ v (λ g → g) (λ d → d) (Kernels.gated kn)
-                            ; settled = settled-plant {t = T} ρ v (λ ow → ow) (λ st → st) (Kernels.settled kn) }
+    -- The feed read by the connect's own joiners alone, each a subscriber
+    -- the feed read.
+    --
+    -- REFUTED: 26b032ed of the feed restaged with each joiner left holding what it held, by a connect of an `of` whose body is a joined subscription
+    fed-joins : At.Joined H (subjects T) (joiners T []) → ∀ ν → At.Fed H w₀ ν → At.Fed H v ν
+    fed-joins jn = fed-owed H Sj c b kb k fd′ rp e rt u bd (envP ρ [])
+                     (λ m → lookupᴬ (proj₂ jn) (joiners-path ρ [] (++⁺ʳ (joiners u (envP ρ [])) m)))
 
-    fed-meaning : Meaning H T → Meaning H T′
-    fed-meaning mn = record { fed = fed-plant H {t = T} ρ v fed-joins _ (Meaning.fed mn) }
+    fed-kernels : Kernels H T → Kernels H T′
+    fed-kernels kn = record { holds   = holds-plant H {t = T} ρ v refl (λ {E} {o} → Bd.body-holds {E} {o}) (Kernels.holds kn)
+                            ; gated   = gated-plant H {t = T} ρ v Bd.body-gated Bd.body-spent (Kernels.gated kn)
+                            ; settled = settled-plant {t = T} ρ v Bd.body-owes Bd.body-settled (Kernels.settled kn) }
+
+    fed-meaning : At.Joined H (subjects T) (joiners T []) → Meaning H T → Meaning H T′
+    fed-meaning jn mn = record { fed = fed-plant H {t = T} ρ v (fed-joins jn) _ (Meaning.fed mn) }
 
     fed-queue : ∀ {clk ts} → Queue H q clk ts T → Queue H q clk ts T′
-    fed-queue = plant-queue H ρ v refl refl (λ _ → refl)
+    fed-queue = plant-queue H ρ v Bd.body-pendings Bd.body-subjects Bd.body-joiners
 
   -- A connect's source signals its subject only with no feed under way:
   -- the subject's subscribers are fed before the source runs again.
@@ -1781,14 +1791,14 @@ module Ascending (R : Set) where
         ; ctlAs = runAs (feedC (planted ρ v) ∷ []) (≗-trans (f same⊑ ss) (seq-done _)) (Feeds.fed-stack hp ρ y q sk)
         ; meets = pg
         ; owned = Feeds.fed-owned hp ρ y q sk (≗-trans (f same⊑ ss) (seq-done _)) ow
-        ; kernels = Feeds.fed-kernels hp ρ y q kn ; meaning = Feeds.fed-meaning hp ρ y q mn ; queue = Feeds.fed-queue hp ρ y q qu
-        ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs
+        ; kernels = Feeds.fed-kernels hp ρ y q kn ; meaning = Feeds.fed-meaning hp ρ y q (Queue.joined qu) mn ; queue = Feeds.fed-queue hp ρ y q qu
+        ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Feeds.Bd.body-names hp ρ y q))) fs
                          ; clocked = proj₁ ck , Feeds.fed-ticked hp ρ y q clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
         ; sorted = sorted-⇝ so (then refl now) ; behind = Feeds.fed-behind hp ρ y q bh })
       , passed ag pp)
     where
       ss = At.val hp (Subject.subscribers Sj)
-      v  = connectˢ Sj c b kb k (feeding y q ss) rp e rt u bd
+      v  = Feeds.v hp ρ y q
 
   -- A CONNECT FINISHING: its subject closed, the feed restaged from `idle`
   -- to the source's end at the run's position, owed to the subscribers
@@ -1797,7 +1807,9 @@ module Ascending (R : Set) where
   module Fins {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B Sj c b kb k rp e rt} {u : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
               (ρ : Path T (connectˢ Sj c b kb k idle rp e rt u bd)) (q : Pos) where
     H′ = store H (Subject.closed Sj) (lift true)
-    v  = connectˢ Sj c b kb k (finishing q (At.val H′ (Subject.subscribers Sj))) rp e rt u bd
+    fd′ = finishing q (At.val H′ (Subject.subscribers Sj))
+    module Bd = Body H′ Sj c b kb k idle fd′ rp e rt u (at-here (At.owing H′ fd′)) bd
+    v  = Bd.w₂
     T′ = plant ρ v
 
     postulate
@@ -1832,16 +1844,28 @@ module Ascending (R : Set) where
       fin-spent : AllPairs _≢_ (names w₀) → At.Spent H w₀ → At.Spent H′ w₀
       fin-fed   : AllPairs _≢_ (names w₀) → ∀ ν → At.Fed H w₀ ν → At.Fed H′ w₀ ν
       fin-queue : ∀ {clk ts} → Queue H q clk ts T → Queue H′ q clk ts T′
-      fin-joins : ∀ ν → At.Fed H′ w₀ ν → At.Fed H′ v ν
+
+    -- The finish read by the connect's own joiners alone, each a
+    -- subscriber the finish read, the closed flag apart from the list.
+    --
+    -- REFUTED: 26b032ed of the finish staged with each joiner left holding what it held, by a connect of an `of` whose body is a joined subscription
+    fin-joins : AllPairs _≢_ (names T) → At.Joined H (subjects T) (joiners T []) → ∀ ν → At.Fed H′ w₀ ν → At.Fed H′ v ν
+    fin-joins fs jn = fed-owed H′ Sj c b kb k fd′ rp e rt u bd (envP ρ [])
+                        (λ m → subst (λ z → _ ∈ᴸ z) (sym (cong lower (look-store H (Subject.closed Sj) (Subject.subscribers Sj) (λ eq → apart (sym eq)))))
+                                     (lookupᴬ (proj₂ jn) (joiners-path ρ [] (++⁺ʳ (joiners u (envP ρ [])) m))))
+      where
+        apart : _≢_ {A = Name h} (_ , Subject.subscribers Sj) (_ , Subject.closed Sj)
+        apart with fresh-path ρ fs
+        ... | a₀ ∷ _ = lookupᴬ a₀ (here refl)
 
     fin-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels H′ T′
-    fin-kernels fs kn = record { holds   = holds-plant H′ {t = T} ρ v refl (λ hs → hs) (Kernels.holds kn′)
-                               ; gated   = gated-plant H′ {t = T} ρ v (λ g → g) (λ d → d) (Kernels.gated kn′)
-                               ; settled = settled-plant {t = T} ρ v (λ ow → ow) (λ st → st) (Kernels.settled kn′) }
+    fin-kernels fs kn = record { holds   = holds-plant H′ {t = T} ρ v refl (λ {E} {o} → Bd.body-holds {E} {o}) (Kernels.holds kn′)
+                               ; gated   = gated-plant H′ {t = T} ρ v Bd.body-gated Bd.body-spent (Kernels.gated kn′)
+                               ; settled = settled-plant {t = T} ρ v Bd.body-owes Bd.body-settled (Kernels.settled kn′) }
       where kn′ = Wr.wr-kernels fs (λ {E} {o} → fin-holds (fresh-path ρ fs) {E} {o}) (fin-gated (fresh-path ρ fs)) (fin-spent (fresh-path ρ fs)) kn
 
-    fin-meaning : AllPairs _≢_ (names T) → Meaning H T → Meaning H′ T′
-    fin-meaning fs mn = record { fed = fed-plant H′ {t = T} ρ v fin-joins _ (Meaning.fed (Wr.wr-meaning fs (fin-fed (fresh-path ρ fs)) mn)) }
+    fin-meaning : AllPairs _≢_ (names T) → At.Joined H (subjects T) (joiners T []) → Meaning H T → Meaning H′ T′
+    fin-meaning fs jn mn = record { fed = fed-plant H′ {t = T} ρ v (fin-joins fs jn) _ (Meaning.fed (Wr.wr-meaning fs (fin-fed (fresh-path ρ fs)) mn)) }
 
   -- A connect's source ended: its subject closed, the subscribers read,
   -- their finish owed ahead of the calls the end owed.
@@ -1864,15 +1888,15 @@ module Ascending (R : Set) where
         ; ctlAs = runAs (finC (planted ρ v) ∷ proj₁ (Fins.fin-calls hp ρ q ks)) ec (Fins.fin-stack hp ρ q sk)
         ; meets = pg
         ; owned = Fins.fin-owned hp ρ q sk ks ec ow
-        ; kernels = Fins.fin-kernels hp ρ q fs kn ; meaning = Fins.fin-meaning hp ρ q fs mn ; queue = Fins.fin-queue hp ρ q qu
-        ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs
+        ; kernels = Fins.fin-kernels hp ρ q fs kn ; meaning = Fins.fin-meaning hp ρ q fs (Queue.joined qu) mn ; queue = Fins.fin-queue hp ρ q qu
+        ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Fins.Bd.body-names hp ρ q))) fs
                          ; clocked = proj₁ ck , Fins.fin-ticked hp ρ q clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
         ; sorted = sorted-⇝ so path ; behind = Fins.fin-behind hp ρ q bh })
       , passed ag pp)
     where
       path = ⇝-trans path₁ path₂
       ss = At.val (Fins.H′ hp ρ q) (Subject.subscribers Sj)
-      v  = connectˢ Sj c b kb k (finishing q ss) rp e rt u bd
+      v  = Fins.v hp ρ q
       ec = ≗-trans (f same⊑ ss) (bind≗ (≗-refl (Strongly.code R (finC (planted ρ v)))) λ _ → ≗-trans (wk-same ⟦ ks ⟧ᶜ) (proj₂ (Fins.fin-calls hp ρ q ks)))
 
   -- A signal reaching a connect's subject.

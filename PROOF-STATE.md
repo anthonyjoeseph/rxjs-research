@@ -375,8 +375,6 @@ by their own silent steps (`Mirror`).
   with a connect's feed restaged.
 - **`fed-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds with a feed
   restaged, the feed the one call owed.
-- **`fed-joins`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's feed restaged,
-  its body's joiners hold what the feed owes them.
 - **`fed-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
   sooner than the run with a connect's feed restaged.
 - **`fin-calls`** (Climbs) — FALSITY, `NO EVIDENCE`: the calls owed carry
@@ -399,8 +397,6 @@ by their own silent steps (`Mirror`).
   its subject's closed flag nowhere.
 - **`fin-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: `Queue` survives a
   connect's subject closed and its finish staged.
-- **`fin-joins`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's finish staged,
-  its body's joiners hold what the finish owes them.
 - **`fin-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
   sooner than the run with a connect's finish staged.
 - **`emit-shut`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` whose observer path
