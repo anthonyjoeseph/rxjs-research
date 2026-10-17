@@ -1784,7 +1784,7 @@ module Restaging (R : Set) where
         kr ζ sub = ≗-trans (⊑≗ (λ z → Kt z sub) (N ζ) (ν₅ ⨾ ζ)) (Grew.kontR G₅ ζ sub)
 
         kR : KontRel (srcK c₅ hereʳ (λ ζ → Kt (N ζ))) (srcK c₅ hereʳ (Here.kont W₅))
-        kR ψ sub = bind≗ (≗-refl _) λ _ → readRef≗ refl λ ψ′ mb → kr (ψ ⨾ ψ′) _
+        kR ψ sub = bind≗ (≗-refl (Kit.attach (Kit.wkCut ψ c₅) sub)) λ _ → readRef≗ refl λ ψ′ mb → kr (ψ ⨾ ψ′) _
 
     alone : ∀ {k} → ¬ SrcOf t′ π′ k
     alone (src-of ρ e) = not-src wrap-body ρc ρ e
