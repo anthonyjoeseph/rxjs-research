@@ -379,8 +379,6 @@ by their own silent steps (`Mirror`).
   a rest's shape (idle, rest, union, bursting, under).
 - **`rest-land`** (Lift) — FALSITY, `NO EVIDENCE`: the rest's pin lifted is the
   ghost's step: the rest a pin on, the ghost past it.
-- **`void-gone`** (Lift) — FALSITY, `NO EVIDENCE`: a hidden step with the
-  root's part gone: the ghost alike, the `of` a value fewer.
 - **`close-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: an outer's end, its
   pool taking the outer's last ghost rested, keeps every tie.
 - **`settle-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end, its

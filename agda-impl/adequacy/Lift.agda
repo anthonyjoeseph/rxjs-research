@@ -183,8 +183,8 @@ module Lifting (R : Set) where
   -- (`Carried.lingers`) runs over the hidden `of`.  A flatMap's pool took
   -- the ended lane's or outer's rest; an ended source's rest is its
   -- connect's.  Each shows the source's steps inside its subscription as
-  -- `burstingᶜ` pins.  Or the root has no part left, and the ghost shows
-  -- nothing more.  No takeWhile is a site: one completes and is cut
+  -- `burstingᶜ` pins.  Never the root gone: a first call's run meets
+  -- the ghost (`run-meets`).  No takeWhile is a site: one completes and is cut
   -- inside its failing value's call (`takeWhileᴷ`), before its source's
   -- burst runs on, and its `ending` part steps to its end, never a pin.
   data VoidSite {g m} (cr : Carried g m) {Δ A} {v : Sub (Conf.world (Mach.conf m)) Δ A} (π : Path (Carried.tree cr) v) : Set₁ where
@@ -197,7 +197,6 @@ module Lifting (R : Set) where
             → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {n} → At.part (Conf.heap (Mach.conf m)) (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
             → At.part (Conf.heap (Mach.conf m)) src ≡ nothing → ∀ {c₀} → e ≡ just c₀
             → VoidSite cr π
-    no-root : At.part (Conf.heap (Mach.conf m)) (Carried.tree cr) ≡ nothing → VoidSite cr π
 
   -- At an open `of` the ghost holds, its whole path.
   spread-past : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
@@ -392,12 +391,6 @@ module Lifting (R : Set) where
               → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {n} → At.part (Conf.heap (Mach.conf m)) (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
               → At.part (Conf.heap (Mach.conf m)) src ≡ nothing → ∀ {c₀} → e ≡ just c₀
               → ∀ {q n′} → U.step n ≡ U.skipˢ q n′ → Lifts (Conf.heap (Mach.conf m)) ψ (U.skipˢ q n′) (U.step g)
-              → Hops cr
-
-    -- The root's part gone: the ghost alike, the `of` a value fewer.
-    void-gone : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
-              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
-              → seen (Conf.heap (Mach.conf m)) π ≡ false → At.part (Conf.heap (Mach.conf m)) (Carried.tree cr) ≡ nothing
               → Hops cr
 
   ----------------------------------------------------------------------
@@ -1038,7 +1031,6 @@ module Lifting (R : Set) where
   emit-void cr π fc op sn with void-site cr π fc op sn
   ... | in-pool ψ σ e se pt         = void-pool cr π fc op sn ψ σ e se pt
   ... | in-rest ψ σ e se pt ps ee   = void-rest cr π fc op sn ψ σ e se pt ps ee
-  ... | no-root pg                  = void-gone cr π fc op sn pg
 
   ≺-trans : ∀ {a b c} → a ≺ b → b ≺ c → a ≺ c
   ≺-trans (inj₁ ab)          (inj₁ bc)          = inj₁ (⊏-trans ab bc)
