@@ -1694,7 +1694,8 @@ module Restaging (R : Set) where
   module Connected {h₀} {H₀ : Heapᴹ h₀} {T₀ : Sub h₀ [] R} {Δ A B} {s : T.Obs Timeline Δ A} {b : T.Obs Timeline (A ∷ Δ) B} {q}
                    {π₀ : Path T₀ (pendingˢ (T.connect s b) q)} {u} {E′ : Env Δ u} {υ : u ⊑ h₀} {w} {σ : w ⊑ h₀} {K : Stack w ⊤} {clk}
                    {H₅ : Heapᴹ (connectWorld h₀ A)} {bs ts}
-                   (G₅ : Grew H₀ π₀ E′ υ σ K clk connectGrown H₅ bs ts) where
+                   (G₅ : Grew H₀ π₀ E′ υ σ K clk connectGrown H₅ bs ts)
+                   (held₅ : At.val H₅ (Kit.held (Kit.wkCut new (wkR new hereʳ , hereʳ))) ≡ nothing) (body₅ : At.val H₅ hereʳ ≡ nothing) where
     h₅ : World
     h₅ = connectWorld h₀ A
 
@@ -1797,7 +1798,7 @@ module Restaging (R : Set) where
     -- A connect over its pending source and body registers nothing, is
     -- owed nothing and holds nothing a feed is owed.
     rc-kernels : Kernels H₅ T₅ → Kernels H₅ t′
-    rc-kernels kn = record { holds = holds-owed H₅ π₅ v tt (λ _ → lift refl , refl , lift tt , lift tt , lift tt) (Kernels.settled kn) (Kernels.holds kn)
+    rc-kernels kn = record { holds = holds-owed H₅ π₅ v tt (λ _ → lift held₅ , body₅ , lift tt , lift tt , lift tt) (Kernels.settled kn) (Kernels.holds kn)
                            ; gated = gated-plant H₅ π₅ v (λ _ → (λ _ → lift tt) , lift tt , lift tt) (λ _ → lift tt , lift tt) (Kernels.gated kn)
                            ; settled = settled-plant π₅ v (λ _ → tt) (λ _ → tt , tt , tt , tt) (Kernels.settled kn) }
 
@@ -1864,7 +1865,7 @@ module Restaging (R : Set) where
                       ; meaning = Carried.meaning cr ; queue = Carried.queue cr ; behind = Carried.behind cr ; pends = refl }
           G₅ = grew-step {k = cell (maybe quiet)} (lift nothing) (grew-step {k = cell (maybe quiet)} (lift nothing)
                  (grew-step {k = cell (base Bool)} (lift true) (grew-step {k = cell (base Bool)} (lift false) (grew-step {k = cell (joins A)} (lift []) G₀))))
-          module C = Connected G₅
+          module C = Connected G₅ refl refl
           sk₅ = Grew.stack G₅
           a₅ = Grew.alone G₅
           eY = C.src-owed (λ ζ → new ⨾ (new ⨾ ((new ⨾ new) ⨾ (new ⨾ ζ)))) ey
