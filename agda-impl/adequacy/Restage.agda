@@ -23,7 +23,7 @@ open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁; tt to tt₁)
-open import Data.Bool using (_∧_; _∨_; true; false)
+open import Data.Bool using (Bool; _∧_; _∨_; true; false)
 open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
@@ -37,9 +37,11 @@ open import adequacy.Strong using (module Strongly)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Frame using (module Framing)
+open import adequacy.Unsub using (module Unsubbing)
 
 module Restaging (R : Set) where
-  open Machine R using (Mach; mach)
+  open Machine R using (Mach; mach; step; silent)
+  open Unsubbing R using (_⇝_)
   open Shared Timeline (Out R) using (Heapᴹ; ⟨_,_,_⟩; Stack)
   open Heap using (World; _⊑_)
   open Run (Pureᴾ R) using (_>>ᴬ_; compile; Env; wkEnv; wkAct; module Kit)
@@ -1122,3 +1124,25 @@ module Restaging (R : Set) where
     where module M = Mapped π
           module N = Moved π M.v
           bk = Carried.books cr
+
+  -- A KERNEL BEGUN BY ALLOCATING: its cells allocated, its node planted
+  -- in the grown world, the run at the subscription the kernel begins
+  -- next, carried, one subscription fewer owed.
+  Restages : ∀ {g m} → Carried g m → ∀ {Δ A} → T.Obs Timeline Δ A → Set₁
+  Restages {g} {m} cr {Δ} {A} s = ∀ {m′} → step m ≡ silent m′ → Σ Mach λ m₀ → m′ ⇝ m₀ × Σ (Carried g m₀) λ cr′
+                                  → subOf (Carried.ctlAs cr′) ≡ just (Δ , A , s) × measure (carried cr′) ≺ measure (carried cr)
+
+  postulate
+    -- A scan allocates its accumulator and begins its source.
+    scan-restage    : ∀ {g m} (cr : Carried g m) {Δ A B} {f : B → A → B} {z} {s : T.Obs Timeline Δ A}
+                    → subOf (Carried.ctlAs cr) ≡ just (Δ , B , T.scan f z s) → Restages cr s
+    -- A takeWhile allocates its cut and begins its source.
+    take-restage    : ∀ {g m} (cr : Carried g m) {Δ A i} {p : A → Bool} {s : T.Obs Timeline Δ A}
+                    → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.takeWhile i p s) → Restages cr s
+    -- A flatMap allocates its pool and begins its outer.
+    flat-restage    : ∀ {g m} (cr : Carried g m) {Δ A B op} {f : A → T.Obs Timeline Δ B} {s : T.Obs Timeline Δ A}
+                    → subOf (Carried.ctlAs cr) ≡ just (Δ , B , T.flatMap op f s) → Restages cr s
+    -- A connect allocates its subject, flag, cut and stash and begins its
+    -- body under `ix 0`.
+    connect-restage : ∀ {g m} (cr : Carried g m) {Δ A B} {s : T.Obs Timeline Δ A} {b : T.Obs Timeline (A ∷ Δ) B}
+                    → subOf (Carried.ctlAs cr) ≡ just (Δ , B , T.connect s b) → Restages cr b

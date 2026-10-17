@@ -211,8 +211,9 @@ by their own silent steps (`Mirror`).
   `Owning.reowned` over an `Inner` of the planted subtree, `Each` by
   `each-plant` over a local transfer. Ruled out: a former needing more
   of its planted subtree than `Inner` says. Remaining: the same
-  `Moved` over `Growing.wkTree` for `sub-scan`, `sub-take`, `sub-flat`,
-  `sub-connect`. Decides whether a growth carries `Owned` as a plant does.
+  `Moved` over `Growing.wkTree` for `scan-restage`, `take-restage`,
+  `flat-restage`, `connect-restage`. Decides whether a growth carries
+  `Owned` as a plant does.
 - **D. THE KERNEL FOOTPRINT.** A kernel's cells allocated together and read
   only through its own node, `names` agreeing by construction. `names`
   already lists each node's cells, so this leg is CONDITIONAL: done when
@@ -455,14 +456,14 @@ by their own silent steps (`Mirror`).
   under `last`.
 - **`sub-of`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` begun reaches its
   burst's first call.
-- **`sub-scan`** (Lift) — FALSITY, `NO EVIDENCE`: a scan begun allocates its
-  accumulator and begins its source.
-- **`sub-take`** (Lift) — FALSITY, `NO EVIDENCE`: a takeWhile begun allocates
-  its cut and begins its source.
-- **`sub-flat`** (Lift) — FALSITY, `NO EVIDENCE`: a flatMap begun allocates its
-  kit and cut, registers its refill and begins its outer.
-- **`sub-connect`** (Lift) — FALSITY, `NO EVIDENCE`: a connect begun allocates
-  its subject and begins its body under `ix 0`.
+- **`scan-restage`** (Restage) — FALSITY, `NO EVIDENCE`: a scan begun
+  allocates its accumulator and is carried at its source, less owed.
+- **`take-restage`** (Restage) — FALSITY, `NO EVIDENCE`: a takeWhile begun
+  allocates its cut and is carried at its source, less owed.
+- **`flat-restage`** (Restage) — FALSITY, `NO EVIDENCE`: a flatMap begun
+  allocates its kit and cut and is carried at its outer, less owed.
+- **`connect-restage`** (Restage) — FALSITY, `NO EVIDENCE`: a connect begun
+  allocates its subject and is carried at its body under `ix 0`, less owed.
 - **`sub-joined`** (Lift) — FALSITY, `NO EVIDENCE`: a joiner begun registers on
   its subject, or completes on a closed one.
 - **`sub-defer`** (Lift) — FALSITY, `NO EVIDENCE`: a defer begun begins its
