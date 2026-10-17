@@ -187,8 +187,8 @@ by their own silent steps (`Mirror`).
   end and settle. Guards open by `calling-open`. `lane-settles` is a
   fact of the call no field carries: the done flag lags the outer's
   part while the outer's end climbs. A start is one leaf,
-  `lane-begin`. Remaining: `lane-next` over it, then the strong tree's
-  transport along `_⊑_` that `lane-begin` and `sub-onward` owe.
+  `lane-begin`, an admit's and a dequeue's alike. Remaining: the strong
+  tree's transport along `_⊑_` that `lane-begin` and `sub-onward` owe.
 - **UP-ENDED.** `up-ended` is a body: the rest's skips by `Each.rests`,
   the shut body by `shut-heads` over what it tells. Ruled out: the end
   signal's fields carrying it; the non-local residue is `tells-past`,
@@ -200,7 +200,7 @@ by their own silent steps (`Mirror`).
   `Off`. Ruled out for the scan: a write needs no non-local leaf but
   `tells-past`. Remaining: an own-cell apartness fold carrying
   `scan-defined`, `scan-owned`, `scan-meaning`, `scan-sees`; `up-outer`
-  and `up-lanes` by a flatMap head bound; then `fr-*` and
+  and `up-lanes` by a flatMap head bound; then `fr-*`, `dq-*` and
   `close-outer`'s `sd-*` the same way, in the form C consumes.
 - **D. THE KERNEL FOOTPRINT.** A kernel's cells allocated together and read
   only through its own node, `names` agreeing by construction. `names`
@@ -222,8 +222,6 @@ by their own silent steps (`Mirror`).
   tests the ghost's lane end: done flag the outer gone, count the lanes.
 - **`lane-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane ended short of its
   flatMap's end: the pool takes its rest, the ghost past the lane's skip.
-- **`lane-next`** (Climbs) — FALSITY, `NO EVIDENCE`: a freed slot with a value
-  queued takes it and begins its lane; allocates, as `lane-begin` does.
 - **`calling-open`** (Climbs) — FALSITY, `NO EVIDENCE`: a climbing signal's
   path reads open.
 - **`lane-begin`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane begun: counted,
@@ -283,6 +281,16 @@ by their own silent steps (`Mirror`).
 - **`fr-meaning`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves `Meaning`.
 - **`fr-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves `Queue`.
 - **`fr-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves every part's head.
+- **`fr-opened`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves its flatMap's path open as it was.
+- **`dq-part`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves the outer's part.
+- **`dq-lanes`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves the lanes' parts.
+- **`dq-opened`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves its flatMap's path open as it was.
+- **`dq-lifts`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves the lift to its flatMap.
+- **`dq-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves `Owned`.
+- **`dq-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves `Kernels`.
+- **`dq-meaning`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves `Meaning`.
+- **`dq-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves `Queue`.
+- **`dq-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves every part's head.
 - **`take1-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a takeWhile's completion
   begun under its failing value, its cut the frame's rest.
 - **`last-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a spent `of`'s completion

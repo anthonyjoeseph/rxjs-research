@@ -71,7 +71,7 @@ module Lifting (R : Set) where
     --
     -- A kernel allocates its cells, so the tree is owed in the grown
     -- world: no transport of a strong tree along `_⊑_` exists yet, and
-    -- `outer-start` owes the same one.
+    -- `lane-begin` owes the same one.
     sub-onward : ∀ {g m} (cr : Carried g m) → opening (Carried.ctlAs cr) ≡ true → Hops cr
 
     -- An `of` reading its observer closed: its burst over, nothing
