@@ -54,7 +54,7 @@ module Restaging (R : Set) where
   open Pure R using (Timer; wkTimer; mapList)
   open Shared Timeline (Out R) using (Heapᴹ; ⟨_,_,_⟩; Stack; run; Val; extend; look; cbs; wkVal)
   open Heap using (World; _⊑_; _⨾_; new; grow; wk∋; cell; slot; Sink; Quiet; Handle) renaming (here to hereʳ; same to same⊑)
-  open Run (Pureᴾ R) using (Act; newRef; under; readRef; _>>ᴬ_; compile; Env; wkEnv; wkAct; module Kit; Ref; wkR; wkEl; Observer; Kont; wkObs; wkKont; Subject)
+  open Run (Pureᴾ R) using (Act; newRef; under; readRef; _>>ᴬ_; compile; Env; wkEnv; wkAct; module Kit; Ref; wkR; wkEl; Observer; Kont; wkObs; wkKont; Subject; Subscription; wkSubn)
   open Run.Kit (Pureᴾ R) using (skipᴬ)
   open Strongly R using (Carried; Books; carried; Sub; pendingˢ; ofˢ; mapˢ; takeWhileˢ; connectˢ; Lane; ending; taken; idle; feeding; finishing; bodyK; srcK
                         ; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane
@@ -1784,7 +1784,7 @@ module Restaging (R : Set) where
         kr ζ sub = ≗-trans (⊑≗ (λ z → Kt z sub) (N ζ) (ν₅ ⨾ ζ)) (Grew.kontR G₅ ζ sub)
 
         kR : KontRel (srcK c₅ hereʳ (λ ζ → Kt (N ζ))) (srcK c₅ hereʳ (Here.kont W₅))
-        kR ψ sub = bind≗ (≗-refl (Kit.attach (Kit.wkCut ψ c₅) sub)) λ _ → readRef≗ refl λ ψ′ mb → kr (ψ ⨾ ψ′) _
+        kR ψ sub = bind≗ (≗-refl (Kit.attach (Kit.wkCut ψ c₅) sub)) λ _ → readRef≗ refl λ ψ′ mb → kr (ψ ⨾ ψ′) (unsubscribing (Subscription.unsubscribe (wkSubn ψ′ sub) >>ᴬ Kit.unsubscribeVia mb))
 
     alone : ∀ {k} → ¬ SrcOf t′ π′ k
     alone (src-of ρ e) = not-src wrap-body ρc ρ e
