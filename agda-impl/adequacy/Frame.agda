@@ -479,7 +479,7 @@ module Framing (R : Set) where
         (lifts-next (liftsL-off H H′ πL (pairs-r (names s₀) P) off LL))
       where
         P  = pairs-r (quietName k) (pairs-r (cutNames c) ps)
-        el = lane1-alike H H′ (Heaps.keep H H′ off (λ m → there (++⁺ʳ (quietName k) (++⁺ʳ (names s₀) (lanes-path πL m)))) (Kit.live c) nl)
+        el = lane1-alike H H′ {c = c} {k} {s₀} (Heaps.keep H H′ off (λ m → there (++⁺ʳ (quietName k) (++⁺ʳ (names s₀) (lanes-path πL m)))) (Kit.live c) nl)
                               (part-alike H H′ s₀ (Heaps.keeps H H′ off (lanes-path πL) (apart-r (names s₀) P)))
 
   module Wrote {h} (H H′ : Heapᴹ h) {T : Sub h [] R} {Δ A} {u : Sub h Δ A} (ρ : Path T u)

@@ -301,8 +301,6 @@ by their own silent steps (`Mirror`).
   lanes beside it as the ghost's.
 - **`fr-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves
   `Owned`.
-- **`fr-mine`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's cut and its
-  flatMap's count are the flatMap's names.
 - **`fr-holds`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's kernel holds
   with a lane ended and the count down.
 - **`fr-gated`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's gate holds with
