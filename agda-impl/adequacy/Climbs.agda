@@ -685,13 +685,16 @@ module Ascending (R : Set) where
       sd-spent : AllPairs _≢_ (names w₀) → At.Spent H w₀ → At.Spent H′ w₀
       sd-fed   : AllPairs _≢_ (names w₀) → ∀ ν → At.Fed H w₀ ν → At.Fed H′ w₀ ν
       sd-queue : ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
-      sd-behind : ∀ {q} → Each H (Heads q) T → Each H′ (Heads q) T
+      sd-heads : AllPairs _≢_ (names w₀) → ∀ {q} → Each H (Heads q) w₀ → Each H′ (Heads q) w₀
 
     sd-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels H′ T
     sd-kernels fs = Wr.wr-kernels fs (λ {E} {o} → sd-holds (fresh-path ρ fs) {E} {o}) (sd-gated (fresh-path ρ fs)) (sd-spent (fresh-path ρ fs))
 
     sd-meaning : AllPairs _≢_ (names T) → Meaning H T → Meaning H′ T
     sd-meaning fs = Wr.wr-meaning fs (sd-fed (fresh-path ρ fs))
+
+    sd-behind : AllPairs _≢_ (names T) → ∀ {q} → Each H (Heads q) T → Each H′ (Heads q) T
+    sd-behind fs = Wr.wr-behind fs (sd-part w₀) (sd-heads (fresh-path ρ fs))
 
     settle-eq : Kernels H T → ((At.val H′ (FlatKit.Flat.active fl) ≡ᵇ 0) ∧ null (At.val H′ (FlatKit.Flat.queue fl)))
                               ≡ (null (At.partLanes H ls) ∧ null (At.val H (FlatKit.Flat.queue fl)))
@@ -752,7 +755,7 @@ module Ascending (R : Set) where
                                                (proj₁ nl) (proj₂ nl) Lρ) , sg
       ; owned = Settles.sd-owned hp ρ ow ; kernels = Settles.sd-kernels hp ρ fs kn ; meaning = Settles.sd-meaning hp ρ fs mn
       ; queue = Settles.sd-queue hp ρ qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
-      ; sorted = sorted-⇝ so path ; behind = Settles.sd-behind hp ρ bh ; kept = inj₁ refl }))
+      ; sorted = sorted-⇝ so path ; behind = Settles.sd-behind hp ρ fs bh ; kept = inj₁ refl }))
     where
       o    = Here.obs (walk ρ top)
       b    = (At.val (Settles.H′ hp ρ) (FlatKit.Flat.active fl) ≡ᵇ 0) ∧ null (At.val (Settles.H′ hp ρ) (FlatKit.Flat.queue fl))
@@ -775,7 +778,7 @@ module Ascending (R : Set) where
         ; queue = Restaged.pool-queue (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) (Settles.sd-queue hp ρ qu)
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs
                          ; clocked = proj₁ ck , Restaged.pool-ticked (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
-        ; sorted = sorted-⇝ so path ; behind = Restaged.pool-behind (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) (Settles.sd-behind hp ρ bh) })
+        ; sorted = sorted-⇝ so path ; behind = Restaged.pool-behind (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) (Settles.sd-behind hp ρ fs bh) })
       , passed ag pp)
     where
       o    = Here.obs (walk ρ top)
@@ -1289,7 +1292,7 @@ module Ascending (R : Set) where
       fr-queue : ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
 
     module Wr (fs : AllPairs _≢_ (names T)) =
-      Wrote H H′ ρ (off-++ ((_ , Kit.live (laneOf o)) ∷ []) (off-store H (Kit.live (laneOf o))) (off-store (unlive H (laneOf o)) (FlatKit.Flat.active fl)))
+      Wrote H H′ ρ (off-++ {H₁ = unlive H (laneOf o)} ((_ , Kit.live (laneOf o)) ∷ []) (off-store H (Kit.live (laneOf o))) (off-store (unlive H (laneOf o)) (FlatKit.Flat.active fl)))
             fr-mine fs
 
     fr-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels H′ T
@@ -1914,7 +1917,7 @@ module Ascending (R : Set) where
   -- burst held, the turn.  The ghost alike, the control's work less.
   run-onward : ∀ {g m w act K} {σ : w ⊑ Conf.world (Mach.conf m)} (cr : Carried g m) → Conf.ctl (Mach.conf m) ≡ run {B = ⊤} act σ K
              → Hops cr
-  run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = subAs _ _ _ _ } refl eq = sub-onward cr refl eq
+  run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = subAs _ _ _ _ } refl eq = sub-onward (λ {g} {m} → emit-onward {g} {m}) cr refl eq
   run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (emitC π ∷ _) _ _ } refl eq = emit-onward cr π refl eq
   run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (kontC lf π ∷ _) _ _ } refl eq = kont-onward cr lf π refl eq
   run-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (take1C π ∷ _) _ _ } refl eq = take1-onward cr π refl eq

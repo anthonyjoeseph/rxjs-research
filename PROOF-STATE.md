@@ -188,8 +188,9 @@ by their own silent steps (`Mirror`).
   fact of the call no field carries: the done flag lags the outer's
   part while the outer's end climbs. A start is `lane-begin`, an
   admit's and a dequeue's alike: `begin-path`, then the tree weakened by
-  `Growing.wkTree` with the lane planted, `bg-*` its frame. Remaining:
-  `sub-onward`'s leaves over the same growth, one per former.
+  `Growing.wkTree` with the lane planted, `bg-*` its frame. An `of`
+  or `empty` begun is `offer-restage`. Remaining:
+  `sub-cold`, `sub-joined`, `sub-defer` over the same growth.
 - **UP-ENDED.** `up-ended` is a body: the rest's skips by `Each.rests`,
   the shut body by `shut-heads` over what it tells. Ruled out: the end
   signal's fields carrying it; the non-local residue is `tells-past`,
@@ -201,9 +202,11 @@ by their own silent steps (`Mirror`).
   lemmas, `plant-queue`) and a write at one node's own names (`Wrote`,
   over `holds-path`, `gated-path`, `fed-path`), each premise a leaf
   reading only the node. Ruled out: a write or restage whose kernel,
-  spent or feed reads a cell outside its node. Remaining: `Queue` and
-  `behind` across a write, whose frames walk the queue's timers and every
-  seen path; `owned`, stack and ticks per move, the same way.
+  spent or feed reads a cell outside its node. `behind` across a write
+  that leaves every part is `Wrote.wr-behind` over the node's heads.
+  Ruled out: `Queue` framed by the node alone (a silenced flag is any
+  name). Remaining: `behind` where the node's part moves (a dequeue, a
+  lane's end), `Queue` per move; `owned`, stack and ticks per move.
 - **THE RESTAGE FRAME.** `map-restage`, `scan-restage`, `take-restage`
   are bodies: a growth weakens the tree into the allocated heap (the
   `Grown` frame, composing over several allocations), `Moved` plants the
@@ -302,8 +305,8 @@ by their own silent steps (`Mirror`).
   done flag nowhere.
 - **`sd-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
   flag leaves `Queue`.
-- **`sd-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
-  flag leaves every part's head.
+- **`sd-heads`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
+  flag leaves every head below it.
 - **`fr-part`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end with its part
   gone leaves every part.
 - **`fr-lanes`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves the
@@ -458,10 +461,8 @@ by their own silent steps (`Mirror`).
   is closed skips its value.
 - **`sub-cold`** (Lift) — FALSITY, `NO EVIDENCE`: a cold begun registers its
   sink and starts its timeline.
-- **`sub-empty`** (Lift) — FALSITY, `NO EVIDENCE`: an empty begun completes
-  under `last`.
-- **`sub-of`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` begun reaches its
-  burst's first call.
+- **`of-owned`** (Restage) — FALSITY, `NO EVIDENCE`: an `of` planted where it
+  was pending (an `empty` a spent one) owes its values and continuation as the agenda's calls.
 - **`grows-extend`** (Restage) — FALSITY, `NO EVIDENCE`: an allocation grows
   the heap and reads every old name as it did.
 - **`walk-grow`** (Restage) — FALSITY, `NO EVIDENCE`: a walk along a weakened

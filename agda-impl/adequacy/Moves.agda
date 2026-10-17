@@ -9,7 +9,7 @@ module adequacy.Moves where
 
 open import Data.List using (List; []; _∷_; _++_)
 open import Data.Bool using (true; false)
-open import Data.Nat using (ℕ; suc; _+_)
+open import Data.Nat using (ℕ; suc; _+_; _<_; s≤s; z≤n)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
@@ -98,6 +98,19 @@ module Moving (R : Set) where
   syn (T.connect s b)     = suc (syn s + syn b)
   syn (T.connected i)     = 1
   syn (T.defer l)         = 1
+
+  -- Every operator reached owes at least itself.
+  syn-pos : ∀ {Δ A} (s : Obs Timeline Δ A) → 0 < syn s
+  syn-pos (T.cold c)          = s≤s z≤n
+  syn-pos T.empty             = s≤s z≤n
+  syn-pos (T.of xs)           = s≤s z≤n
+  syn-pos (T.map f s)         = s≤s z≤n
+  syn-pos (T.scan f z s)      = s≤s z≤n
+  syn-pos (T.takeWhile i q s) = s≤s z≤n
+  syn-pos (T.flatMap op f s)  = s≤s z≤n
+  syn-pos (T.connect s b)     = s≤s z≤n
+  syn-pos (T.connected i)     = s≤s z≤n
+  syn-pos (T.defer l)         = s≤s z≤n
 
   mutual
     pend : ∀ {h Δ A} → Sub h Δ A → ℕ

@@ -49,11 +49,11 @@ module Restaging (R : Set) where
   open Machine R using (Mach; mach; step; silent; Playing; wkPlaying; wkTodo)
   open Unsubbing R using (_⇝_; now; then; ≗-trans; wk≗; bind≗; wk-same; wkEnv-same; from-same)
   open Growing R using (wkTree; wkLanes; wkPath)
-  open Sequencing R using (wkEnv-wk; wk-wk; from-⨾; seq-done; wk∋-wk; wkEl-wk)
+  open Sequencing R using (wkEnv-wk; wk-wk; from-⨾; seq-done; seq-assoc; wk∋-wk; wkEl-wk)
   open Pure R using (Timer; wkTimer; mapList)
   open Shared Timeline (Out R) using (Heapᴹ; ⟨_,_,_⟩; Stack; run; Val; extend; look; cbs; wkVal; store; Callbacks)
   open Heap using (World; _⊑_; _⨾_; _∋_; new; grow; wk∋; cell; slot; Sink; Quiet; Handle) renaming (here to hereʳ; same to same⊑)
-  open Run (Pureᴾ R) using (Act; done; newRef; under; readRef; writeRef; register; _>>ᴬ_; compile; Env; wkEnv; wkAct; module Kit; module FlatKit; Ref; wkR; wkEl; Observer; Kont; wkObs; wkKont; Subject; Subscription; wkSubn; Subscribe; wkSub)
+  open Run (Pureᴾ R) using (Act; emitAll; done; newRef; under; readRef; writeRef; register; _>>ᴬ_; compile; Env; wkEnv; wkAct; module Kit; module FlatKit; Ref; wkR; wkEl; Observer; Kont; wkObs; wkKont; Subject; Subscription; wkSubn; Subscribe; wkSub)
   open Run.Kit (Pureᴾ R) using (skipᴬ)
   open Strongly R using (Carried; Books; carried; Sub; pendingˢ; ofˢ; mapˢ; takeWhileˢ; connectˢ; Lane; ending; taken; idle; feeding; finishing; bodyK; srcK
                         ; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane
@@ -61,11 +61,11 @@ module Restaging (R : Set) where
                         ; Call; emitC; kontC; Spot; spot; coldˢ; take1C; take2C; bodyC; feedC; finC; srcC; code; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; names; pendings
                         ; seen; seenL; seen-⊕; isTaking; ∧-split; flatMapˢ; killAllᶜ; flatK; scanˢ; joinˢ; doneˢ; deferˢ; lane; CbRel; ≗-refl; newRef≗; taking; takeK; unsubscribing; done≗; register≗; send≗; finish≗; startCold≗; stop≗; stash≗; cancel≗; eff≗; here≗; under≗; diverge≗; unfold≗; readRef≗; writeRef≗; module Canon)
                         renaming (⟦_⟧ to ⟦_⟧ᶜ; at⟦_⟧ to at⟦_⟧ᶜ)
-  open Strongly.Against R using (CtlAs; StackAs; BurstAs; subAs; bottomAs; restAs; backAs; reholdAs; Held; bottomᴴ; restᴴ; playsAs; firesAs; overAs; stackJobs; SrcOf; src-of; Ticked; BurstClocked; sources; burstSpots; stackBursts; Placed; agenda)
+  open Strongly.Against R using (CtlAs; StackAs; BurstAs; subAs; runAs; bottomAs; restAs; backAs; reholdAs; Held; bottomᴴ; restᴴ; playsAs; firesAs; overAs; stackJobs; SrcOf; src-of; Ticked; BurstClocked; sources; burstSpots; stackBursts; Placed; agenda)
   open Strongly.Phase R using (playing; fired)
-  open Moving R using (plant; plantᴸ; planted; plantedᴸ; pend; pendᴸ; part-plant; names-plant; holds-plant; holds-owed; settled-plant; gated-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant
+  open Moving R using (plant; plantᴸ; planted; plantedᴸ; pend; pendᴸ; syn-pos; part-plant; names-plant; holds-plant; holds-owed; settled-plant; gated-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant
                      ; Same; same; same-map; same-scan; same-take; same-flat; same-connect; same-defer; head-map; head-scan)
-  open Ghosting R using (walk-⊕; _≺_; measure; each-sub; sorted-⇝)
+  open Ghosting R using (walk-⊕; _≺_; measure; firstCall; each-sub; sorted-⇝)
 
   -- The program a subscription about to begin begins.
   subOf : ∀ {h} {t : Sub h [] R} {p c bs} → CtlAs t p c bs → Maybe (Σ (List Set) λ Δ → Σ Set λ A → T.Obs Timeline Δ A)
@@ -1164,6 +1164,97 @@ module Restaging (R : Set) where
     where module M = Mapped π
           module N = Moved π M.v
           bk = Carried.books cr
+
+  -- WHAT AN `of` RUNS: its values, then its continuation.
+  Offering : ∀ {Δ A} → T.Obs Timeline Δ A → List A → Set₁
+  Offering {Δ} {A} s xs = ∀ {w u} (E′ : Env Δ u) (υ : u ⊑ w) (W : Here w Δ A)
+                        → compile s E′ υ (Here.obs W) (Here.kont W) ≗ (emitAll (Here.obs W) 0 xs >>ᴬ (Here.kont W same⊑ (unsubscribing skipᴬ) >>ᴬ done tt))
+
+  -- AN `of` BEGUN: planted where it was pending, its values and then its
+  -- continuation the agenda's calls, one subscription fewer owed.  An
+  -- `empty` begins as a spent one.
+  module Offered {h} {T₀ : Sub h [] R} {Δ A} {s : T.Obs Timeline Δ A} {xs : List A} {q} (π : Path T₀ (pendingˢ s q))
+                 (sp : U.subscribe s q ≡ U.ofᶜ q 0 xs) (cs : Offering s xs) where
+    v : Sub h Δ A
+    v = ofˢ q 0 xs
+
+    open Moved π v using (t′; restack; Alone; reticked)
+
+    π′ : Path t′ v
+    π′ = planted π v
+
+    ks : List (Call t′)
+    ks = emitC π′ ∷ kontC of-leaf π′ ∷ []
+
+    -- The `of`'s code its values then its continuation, the two calls.
+    code′ : ∀ {act} → (Σ World λ u → Σ (Env Δ u) λ E′ → Σ (u ⊑ h) λ υ → wkEnv υ E′ ≡ Here.env (walk π top)
+                         × act ≗ compile s E′ υ (Here.obs (walk π top)) (Here.kont (walk π top)))
+          → act ≗ ⟦ ks ⟧ᶜ
+    code′ (_ , E′ , υ , _ , c) =
+      ≗-trans c (subst (λ W → _ ≗ (emitAll (Here.obs W) 0 xs >>ᴬ (Here.kont W same⊑ (unsubscribing skipᴬ) >>ᴬ done tt)))
+                       (sym (walk-planted π v top)) (cs E′ υ (walk π top)))
+
+    eqp : ∀ (H : Heapᴹ h) → At.part H (pendingˢ s q) ≡ At.part H v
+    eqp H = cong just sp
+
+    less : pend t′ < pend T₀
+    less = pend-less π v (syn-pos s)
+
+    postulate
+      of-owned : ∀ {w bs act} {σ : w ⊑ h} {K} {cd} (H : Heapᴹ h) (sk : StackAs T₀ q σ K bs) (a : Alone sk) (e : act ≗ ⟦ ks ⟧ᶜ)
+               → Owned H T₀ (subAs {act = act} π cd sk a) → Owned H t′ (runAs ks e (restack sk a))
+
+    -- An `of` registers nothing, queues nothing and is owed nothing.
+    of-kernels : (H : Heapᴹ h) → Kernels H T₀ → Kernels H t′
+    of-kernels H kn = record { holds = holds-plant H π v refl (λ hs → hs) (Kernels.holds kn)
+                             ; gated = gated-plant H π v (λ g → g) (λ d → d) (Kernels.gated kn)
+                             ; settled = settled-plant π v (λ ()) (λ st → st) (Kernels.settled kn) }
+
+    of-meaning : (H : Heapᴹ h) → Meaning H T₀ → Meaning H t′
+    of-meaning H mn = record { fed = fed-plant H π v (λ _ fd → fd) _ (Meaning.fed mn) }
+
+    pendings′ : pendings t′ ≡ pendings T₀
+    pendings′ with pendings-plant π v
+    ... | _ , _ , e , e′ = trans e′ (sym e)
+
+    of-queue : ∀ (H : Heapᴹ h) {p clk ts} → Queue H p clk ts T₀ → Queue H p clk ts t′
+    of-queue H {ts = ts} qu =
+      record { timed   = subst (At.Timed H ts) (sym pendings′) (Queue.timed qu)
+             ; joined  = subst₂ (At.Joined H) (sym (subjects-plant π v refl)) (sym (joiners-plant π v (λ _ → refl) [])) (Queue.joined qu)
+             ; ordered = Queue.ordered qu ; ahead = Queue.ahead qu }
+
+    -- The `of`'s heads are the subscription's.
+    of-behind : ∀ (H : Heapᴹ h) {p} → Each H (Heads p) T₀ → Each H (Heads p) t′
+    of-behind H {p} = each-plant H π v (eqp H) tr
+      where
+        tr : Each H (Heads p) (pendingˢ s q) → Each H (Heads p) v
+        tr eu = record { parts = λ { here _ pw → Each.parts eu here refl (trans (eqp H) pw) } ; pools = λ () ; rests = λ () }
+
+  -- The configuration an `of` planted makes: its first call its values.
+  Offers : ∀ {g m} → Carried g m → ∀ {Δ A} → List A → Set₁
+  Offers {g} {m} cr {Δ} {A} xs = Σ (Carried g m) λ cr′ → Σ Pos λ p → Σ (Path (Carried.tree cr′) (ofˢ {Δ = Δ} {A} p 0 xs)) λ π′
+                                 → firstCall (Carried.ctlAs cr′) ≡ just (emitC π′) × measure (carried cr′) ≺ measure (carried cr)
+
+  offer-restage : ∀ {g m} (cr : Carried g m) {Δ A} {s : T.Obs Timeline Δ A} {xs : List A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , s)
+                → (∀ q → U.subscribe s q ≡ U.ofᶜ q 0 xs) → Offering s xs → Offers cr xs
+  offer-restage {m = mach ⟨ H , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = subAs {q = q} π cd sk a } refl sp cs =
+    record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = N.t′ ; ctlAs = runAs O.ks (O.code′ cd) (N.restack sk a)
+           ; meets = trans (part-plant H π O.v (O.eqp H)) (Carried.meets cr) ; owned = O.of-owned H sk a (O.code′ cd) (Carried.owned cr)
+           ; kernels = O.of-kernels H (Carried.kernels cr) ; meaning = O.of-meaning H (Carried.meaning cr) ; queue = O.of-queue H (Carried.queue cr)
+           ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant π O.v refl)) (Books.fresh bk)
+                            ; clocked = proj₁ (Books.clocked bk) , N.reticked sk a (proj₂ (Books.clocked bk))
+                            ; paidUp = Books.paidUp bk ; running = Books.running bk }
+           ; sorted = Carried.sorted cr ; behind = O.of-behind H (Carried.behind cr) }
+    , q , O.π′ , refl , inj₁ (inj₁ O.less)
+    where module O = Offered π (sp q) cs
+          module N = Moved π O.v
+          bk = Carried.books cr
+
+  of-restage : ∀ {g m} (cr : Carried g m) {Δ A} {xs : List A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.of xs) → Offers cr xs
+  of-restage cr e = offer-restage cr e (λ _ → refl) (λ _ _ _ → ≗-trans (seq-done _) (seq-assoc _ _ _))
+
+  empty-restage : ∀ {g m} (cr : Carried g m) {Δ A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.empty) → Offers cr {Δ} {A} []
+  empty-restage cr e = offer-restage cr e (λ _ → refl) (λ _ _ _ → under≗ (≗-refl _) (seq-done _))
 
   -- A KERNEL BEGUN BY ALLOCATING: its cells allocated, its node planted
   -- in the grown world, the run at the subscription the kernel begins

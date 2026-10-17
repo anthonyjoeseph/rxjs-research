@@ -74,7 +74,6 @@ mutual
   data Node : List Set → Set → Set₁ where
     framesᶜ    : ∀ {Γ A t} → Time → Pos → From A t → Node Γ A
     burstᶜ     : ∀ {Γ A t} → Time → Pos → ℕ → Frame A t → Node Γ A
-    endᶜ       : ∀ {Γ A} → Pos → Node Γ A
     ofᶜ        : ∀ {Γ A} → Pos → ℕ → List A → Node Γ A
     mapᶜ       : ∀ {Γ A B} → (A → B) → Node Γ A → Node Γ B
     scanᶜ      : ∀ {Γ A B} → (B → A → B) → B → Node Γ A → Node Γ B
@@ -122,7 +121,7 @@ startᶜ p m             = framesᶜ (tick p) (p ++ [ last ]) m
 
 subscribe : ∀ {Γ A} → Obs Timeline Γ A → Pos → Node Γ A
 subscribe (cold c)          p = startᶜ p (lower c)
-subscribe empty             p = endᶜ (p ++ [ last ])
+subscribe empty             p = ofᶜ p 0 []
 subscribe (of xs)           p = ofᶜ p 0 xs
 subscribe (map f s)         p = mapᶜ f (subscribe s p)
 subscribe (scan f z s)      p = scanᶜ f z (subscribe s p)
@@ -441,7 +440,6 @@ mutual
   step : ∀ {Γ A} → Node Γ A → Step Γ A
   step (framesᶜ τ e m)            = framesˢ τ e m
   step (burstᶜ τ r i b)           = burstˢ τ r i b
-  step (endᶜ p)                   = endˢ p
   step (ofᶜ p i xs)               = ofˢ p i xs
   step (mapᶜ f c)                 = mapˢ f (step c)
   step (scanᶜ f z c)              = scanˢ f z (step c)
@@ -545,7 +543,6 @@ mutual
   meaning : ∀ {Γ A} → Node Γ A → NEnv Γ → Events A
   meaning (framesᶜ τ e m)             ρ = M.frames τ e m
   meaning (burstᶜ τ r i b)            ρ = M.burst τ r i b
-  meaning (endᶜ p)                    ρ = end p
   meaning (ofᶜ p i xs)                ρ = M.ofᴱ p i xs
   meaning (mapᶜ f c)                  ρ = M.mapᴱ f (meaning c ρ)
   meaning (scanᶜ f z c)               ρ = M.scanᴱ f z (meaning c ρ)

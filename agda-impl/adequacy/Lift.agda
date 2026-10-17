@@ -58,7 +58,7 @@ module Lifting (R : Set) where
   open Locality R using (site-holds; site-gated)
   open Lowering R using (site-lowers; queue-lowers; torn-owned; fed-lowers)
   open Ghosting R using (module Far; module Calling; Has; residual; _⊏_; ⊏-trans; _≺_; measure; load; loadOf; passed; lowered; showing; Hopped; Hops; opening; firstCall; SourceFirst; BodyFirst; OuterFirst; PoolBehind; RestBehind; LaneFirst; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; Far; Off; Opt; Clear; ClearL; OneLane; opened; Calling; sends; Rises; Called; Aloft; hop-sorted)
-  open Restaging R using (subOf; map-restage; Restages; scan-restage; take-restage; flat-restage; connect-restage)
+  open Restaging R using (subOf; Offers; of-restage; empty-restage; map-restage; Restages; scan-restage; take-restage; flat-restage; connect-restage)
   open Read
 
   postulate
@@ -71,8 +71,6 @@ module Lifting (R : Set) where
     -- kernel run to the next re-entry state, its program smaller by what
     -- was begun, or past a defer's skip.
     sub-cold    : ∀ {g m} (cr : Carried g m) {Δ A} {c : Timeline A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.cold c) → Hops cr
-    sub-empty   : ∀ {g m} (cr : Carried g m) {Δ A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.empty) → Hops cr
-    sub-of      : ∀ {g m} (cr : Carried g m) {Δ A} {xs : List A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.of xs) → Hops cr
     sub-joined  : ∀ {g m} (cr : Carried g m) {Δ A} {i : A ∈ᴸ Δ} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.connected i) → Hops cr
     sub-defer   : ∀ {g m} (cr : Carried g m) {Δ A} {l : T.Later Timeline Δ A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.defer l) → Hops cr
 
@@ -640,23 +638,32 @@ module Lifting (R : Set) where
   regrown cr rs st with rs st
   ... | m₀ , p , cr′ , _ , lt = _ , m₀ , p , carried cr′ , lowered (λ n → agree-refl n _) lt
 
-  -- A subscription begun, by its program.
-  sub-by : ∀ {g m} (cr : Carried g m) {Δ A} (s : T.Obs Timeline Δ A) → subOf (Carried.ctlAs cr) ≡ just (Δ , A , s) → Hops cr
-  sub-by cr (T.cold c)          e eq = sub-cold cr e eq
-  sub-by cr T.empty             e eq = sub-empty cr e eq
-  sub-by cr (T.of xs)           e eq = sub-of cr e eq
-  sub-by cr (T.map f s)         e eq with map-restage cr e
-  ... | cr′ , e′ , lt = hopped-below lt (sub-by cr′ s e′ eq)
-  sub-by cr (T.scan f z s)      e eq = regrown cr (scan-restage cr e) eq
-  sub-by cr (T.takeWhile i p s) e eq = regrown cr (take-restage cr e) eq
-  sub-by cr (T.flatMap op f s)  e eq = regrown cr (flat-restage cr e) eq
-  sub-by cr (T.connect s b)     e eq = regrown cr (connect-restage cr e) eq
-  sub-by cr (T.connected i)     e eq = sub-joined cr e eq
-  sub-by cr (T.defer l)         e eq = sub-defer cr e eq
+  -- What an `of`'s first call hops to.
+  Emits : Set₁
+  Emits = ∀ {g m} (cr : Carried g m) {Δ A p i xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i xs))
+        → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → Hops cr
 
-  sub-onward : ∀ {g m} (cr : Carried g m) → opening (Carried.ctlAs cr) ≡ true → Hops cr
-  sub-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = subAs {s = s} _ _ _ _ } _ = sub-by cr s refl
-  sub-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = calmAs } ()
-  sub-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = noteAs _ _ _ } ()
-  sub-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs _ _ _ } ()
-  sub-onward {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = burstAs _ _ _ } ()
+  -- An `of` planted, its first call taken by `eo`.
+  offered : Emits → ∀ {g m} {cr : Carried g m} {Δ A} {xs : List A} → Offers cr {Δ} {A} xs → Hops cr
+  offered eo (cr′ , _ , π′ , fc , lt) eq = hopped-below lt (eo cr′ π′ fc eq)
+
+  -- A subscription begun, by its program, an `of`'s first call by `eo`.
+  sub-by : Emits → ∀ {g m} (cr : Carried g m) {Δ A} (s : T.Obs Timeline Δ A) → subOf (Carried.ctlAs cr) ≡ just (Δ , A , s) → Hops cr
+  sub-by eo cr (T.cold c)          e eq = sub-cold cr e eq
+  sub-by eo cr T.empty             e eq = offered eo (empty-restage cr e) eq
+  sub-by eo cr (T.of xs)           e eq = offered eo (of-restage cr e) eq
+  sub-by eo cr (T.map f s)         e eq with map-restage cr e
+  ... | cr′ , e′ , lt = hopped-below lt (sub-by eo cr′ s e′ eq)
+  sub-by eo cr (T.scan f z s)      e eq = regrown cr (scan-restage cr e) eq
+  sub-by eo cr (T.takeWhile i p s) e eq = regrown cr (take-restage cr e) eq
+  sub-by eo cr (T.flatMap op f s)  e eq = regrown cr (flat-restage cr e) eq
+  sub-by eo cr (T.connect s b)     e eq = regrown cr (connect-restage cr e) eq
+  sub-by eo cr (T.connected i)     e eq = sub-joined cr e eq
+  sub-by eo cr (T.defer l)         e eq = sub-defer cr e eq
+
+  sub-onward : Emits → ∀ {g m} (cr : Carried g m) → opening (Carried.ctlAs cr) ≡ true → Hops cr
+  sub-onward eo {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = subAs {s = s} _ _ _ _ } _ = sub-by eo cr s refl
+  sub-onward eo {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = calmAs } ()
+  sub-onward eo {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = noteAs _ _ _ } ()
+  sub-onward eo {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs _ _ _ } ()
+  sub-onward eo {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = burstAs _ _ _ } ()

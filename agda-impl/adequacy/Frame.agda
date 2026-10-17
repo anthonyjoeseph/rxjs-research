@@ -45,7 +45,7 @@ module Framing (R : Set) where
                          mapˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; PathLanes; this-lane; next-lane; in-map; in-take; in-outer; in-lanes; in-body; in-defer; seen-join;
                          Taking; taking; taken; cutNames; quietName; subjectNames; Name; pendings; subjects; joiners) renaming (ending to endingᵀ)
   open Strongly.Against R using (CtlAs)
-  open Tearing R using (Alike; Off; part-alike; look-store; get-put-same; fresh-path; names-path; apart-r; apart-l; ≢-flip)
+  open Tearing R using (Alike; Off; part-alike; module Seeing; look-store; get-put-same; fresh-path; names-path; apart-r; apart-l; ≢-flip)
   open Moving R using (pairs-r; plant; pendings-plant; subjects-plant; joiners-plant; head-map; head-scan)
   open Locality R using (module Heaps)
   open Ghosting R using (module Calling; Lifts; Calling; sends)
@@ -432,6 +432,9 @@ module Framing (R : Set) where
 
     wr-meaning : (∀ ν → At.Fed H u ν → At.Fed H′ u ν) → Meaning H T → Meaning H′ T
     wr-meaning fv mn = record { fed = Heaps.fed-path H H′ ρ fs offU fv _ (Meaning.fed mn) }
+
+    wr-behind : At.part H′ u ≡ At.part H u → ∀ {q} → (Each H (Heads q) u → Each H′ (Heads q) u) → Each H (Heads q) T → Each H′ (Heads q) T
+    wr-behind eq tr = Seeing.each-write H H′ {w = u} offU eq fs ρ tr
 
   -- A WRITE AT A SCAN'S ACCUMULATOR, ITS NODE'S CLAUSES: the source's
   -- names apart from the accumulator, so its kernels and feeds read

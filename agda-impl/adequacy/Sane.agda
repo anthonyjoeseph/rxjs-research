@@ -153,7 +153,6 @@ mutual
   weaken : ∀ {Γ A} {μ ν : All (λ _ → Mode) Γ} → Below μ ν → (c : U.Node Γ A) → Sane μ c → Sane ν c
   weaken b (U.framesᶜ τ e m)            s = tt
   weaken b (U.burstᶜ τ r i f)           s = tt
-  weaken b (U.endᶜ p)                   s = tt
   weaken b (U.ofᶜ p i xs)               s = tt
   weaken b (U.mapᶜ f c)                 s = weaken b c s
   weaken b (U.scanᶜ f z c)              s = weaken b c s
@@ -187,7 +186,6 @@ mutual
   feed-sane : ∀ {Γ : List Set} {A B : Set} {ν : All (λ _ → Mode) Γ} (i : A ∈ Γ) q a (c : U.Node Γ B) → Sane ν c → Sane ν (U.feed i q a c)
   feed-sane i q a (U.framesᶜ τ e m)            s = tt
   feed-sane i q a (U.burstᶜ τ r k f)           s = tt
-  feed-sane i q a (U.endᶜ p)                   s = tt
   feed-sane i q a (U.ofᶜ p k xs)               s = tt
   feed-sane i q a (U.mapᶜ f c)                 s = feed-sane i q a c s
   feed-sane i q a (U.scanᶜ f z c)              s = feed-sane i q a c s
@@ -236,7 +234,6 @@ mutual
   shut-sane : ∀ {Γ : List Set} {A B : Set} {μ : All (λ _ → Mode) Γ} (i : A ∈ Γ) c (n : U.Node Γ B) → Sane μ n → Sane (setₘ μ i) (U.shut i c n)
   shut-sane i c (U.framesᶜ τ e m)            s = tt
   shut-sane i c (U.burstᶜ τ r k f)           s = tt
-  shut-sane i c (U.endᶜ p)                   s = tt
   shut-sane i c (U.ofᶜ p k xs)               s = tt
   shut-sane i c (U.mapᶜ f n)                 s = shut-sane i c n s
   shut-sane i c (U.scanᶜ f z n)              s = shut-sane i c n s
@@ -290,7 +287,6 @@ mutual
   rest-sane : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (c : U.Node Γ A) → SaneS {A = B} ν (U.restˢ c)
   rest-sane (U.framesᶜ τ e m)           = tt
   rest-sane (U.burstᶜ τ r i f)          = tt
-  rest-sane (U.endᶜ p)                  = tt
   rest-sane (U.ofᶜ p i xs)              = tt
   rest-sane (U.mapᶜ f c)                = rest-sane c
   rest-sane (U.scanᶜ f z c)             = rest-sane c
@@ -482,7 +478,6 @@ mutual
   step-sane : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (c : U.Node Γ A) → Sane ν c → SaneS (loosen ν) (U.step c)
   step-sane (U.framesᶜ τ e m)            s = frames-sane τ e m
   step-sane (U.burstᶜ τ r i f)           s = burst-sane τ r i f
-  step-sane (U.endᶜ p)                   s = tt
   step-sane (U.ofᶜ p i xs)               s = of-sane p i xs
   step-sane (U.mapᶜ f c)                 s = map-sane f (U.step c) (step-sane c s)
   step-sane (U.scanᶜ f z c)              s = scan-sane f z (U.step c) (step-sane c s)
