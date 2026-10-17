@@ -207,10 +207,12 @@ by their own silent steps (`Mirror`).
   `Moved.restack`, each call's walk by `fork`. Ruled out: the stack
   needing more than `subAs`'s owed-by-no-call field; `kontC` is
   leaf-only, so no call reads a restaged subtree. `Kernels`,
-  `Meaning`, `Queue` by the `*-plant` lemmas. Remaining: `rm-owned`,
-  `rm-behind`, paths back across the plant by `unplant`, then the same `Moved` over
-  `Growing.wkTree` for `sub-scan`, `sub-take`, `sub-flat`, `sub-connect`.
-  Decides whether one plant-alike lemma per field serves every former.
+  `Meaning`, `Queue` by the `*-plant` lemmas; `Owned` by
+  `Owning.reowned` over an `Inner` of the planted subtree, `Each` by
+  `each-plant` over a local transfer. Ruled out: a former needing more
+  of its planted subtree than `Inner` says. Remaining: the same
+  `Moved` over `Growing.wkTree` for `sub-scan`, `sub-take`, `sub-flat`,
+  `sub-connect`. Decides whether a growth carries `Owned` as a plant does.
 - **D. THE KERNEL FOOTPRINT.** A kernel's cells allocated together and read
   only through its own node, `names` agreeing by construction. `names`
   already lists each node's cells, so this leg is CONDITIONAL: done when
@@ -453,10 +455,6 @@ by their own silent steps (`Mirror`).
   under `last`.
 - **`sub-of`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` begun reaches its
   burst's first call.
-- **`rm-owned`** (Restage) — FALSITY, `NO EVIDENCE`: `Owned` holds with a
-  pending map restaged over its source.
-- **`rm-behind`** (Restage) — FALSITY, `NO EVIDENCE`: every part heads as it
-  did with a map restaged.
 - **`sub-scan`** (Lift) — FALSITY, `NO EVIDENCE`: a scan begun allocates its
   accumulator and begins its source.
 - **`sub-take`** (Lift) — FALSITY, `NO EVIDENCE`: a takeWhile begun allocates
