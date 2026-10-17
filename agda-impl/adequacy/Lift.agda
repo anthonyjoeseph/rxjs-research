@@ -352,16 +352,32 @@ module Lifting (R : Set) where
               → ∀ {q c′} → U.step c ≡ U.skipˢ q c′ → Lifts (Conf.heap (Mach.conf m)) ψ (U.skipˢ q c′) (U.step g)
               → Hops cr
 
-    -- At an ended source's rest: the connect's next event that rest's
-    -- pin under the run.
-    rest-pin : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+    -- An ended source's rest runs as rests do.
+    rest-restful : ∀ {g m} (cr : Carried g m) {Δ′ A′ B′ S c b kb k fd rp e rt} {src : Sub (Conf.world (Mach.conf m)) Δ′ A′}
+                     {bd : Sub (Conf.world (Mach.conf m)) (A′ ∷ Δ′) B′}
+                 → Path (Carried.tree cr) (connectˢ S c b kb k fd rp e rt src bd) → ∀ {c₀} → e ≡ just c₀ → Restful rt
+
+    -- At an ended source over a hidden `of`: what the source left
+    -- running pins next under the run, the hidden part's burst's next.
+    left-pin : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
               → seen (Conf.heap (Mach.conf m)) π ≡ false
               → ∀ {Δ′ A′ B′ S c b kb k fd rp e rt} {src : Sub (Conf.world (Mach.conf m)) Δ′ A′} {bd : Sub (Conf.world (Mach.conf m)) (A′ ∷ Δ′) B′}
                   (ψ : Path (Carried.tree cr) (connectˢ S c b kb k fd rp e rt src bd)) (σ : Path src _) → ψ ⊕ in-source σ ≡ π
               → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {n} → At.part (Conf.heap (Mach.conf m)) (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
               → At.part (Conf.heap (Mach.conf m)) src ≡ nothing → ∀ {c₀} → e ≡ just c₀
-              → Σ Pos λ q → Σ (U.Node Δ′ B′) λ n′ → U.step n ≡ U.skipˢ q n′ × Under p q
+              → Σ Pos λ q → Σ (U.Node Δ′ ⊤) λ y′ → U.restˢ {B = ⊤} (At.leftover (Conf.heap (Mach.conf m)) {B = ⊤} src) ≡ U.skipˢ q y′ × Under p q
+
+    -- There, the body shut at the source's end steps after that pin.
+    rest-body : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+              → seen (Conf.heap (Mach.conf m)) π ≡ false
+              → ∀ {Δ′ A′ B′ S c b kb k fd rp e rt} {src : Sub (Conf.world (Mach.conf m)) Δ′ A′} {bd : Sub (Conf.world (Mach.conf m)) (A′ ∷ Δ′) B′}
+                  (ψ : Path (Carried.tree cr) (connectˢ S c b kb k fd rp e rt src bd)) (σ : Path src _) → ψ ⊕ in-source σ ≡ π
+              → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {n} → At.part (Conf.heap (Mach.conf m)) (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
+              → At.part (Conf.heap (Mach.conf m)) src ≡ nothing → ∀ {c₀} → e ≡ just c₀
+              → ∀ {bo} → At.part (Conf.heap (Mach.conf m)) bd ≡ just bo → ∀ {q} → Under p q
+              → U.beforeˢ (q ++ [ ix 0 ]) (U.step (U.shut (Any.here refl) c₀ bo)) ≡ true
 
     -- At an ended source's rest, the ghost's step its pin lifted: the rest
     -- a pin on, the ghost past it.
@@ -870,6 +886,45 @@ module Lifting (R : Set) where
   ... | q , y′ , ey , u with tied-skip {x = pl} {y = At.pooled (Conf.heap (Mach.conf m)) fl so ls} (Ties.pools (Lingers.rooted (Carried.lingers cr)) ψ se pt) ey
   ... | _ , ex with pinned-skip (pinned-trans (restful-pinned (pool-restful cr ψ)) (rest-pinned pl)) ex
   ... | pl′ , es = q , pl′ , es , u
+
+  under-snoc : ∀ {p q} j → Under p q → Under p (q ++ [ j ])
+  under-snoc {p} j (y , refl) = y ++ [ j ] , ++-assoc p y [ j ]
+
+  -- A held connect past its source's end: its body shut there.
+  ended-just : ∀ {h H Δ A B} r c t (mb : Maybe (U.Node (A ∷ Δ) B)) {n} → At.connected {h} H r (just c) t nothing mb ≡ just n
+             → Σ (U.Node (A ∷ Δ) B) λ bo → mb ≡ just bo × U.connectᶜ r (U.shut (Any.here refl) c bo) (U.ended c t) ≡ n
+  ended-just r c t nothing  ()
+  ended-just r c t (just bo) refl = bo , refl , refl
+
+  -- Its rest's skip ahead of the body: the connect's next event.
+  ended-skip : ∀ {Γ A B} r (bo : U.Node (A ∷ Γ) B) c (t : U.Node Γ A) {k t′} → U.step t ≡ U.skipˢ k t′ → U.beforeˢ (k ++ [ ix 0 ]) (U.step bo) ≡ true
+             → U.endedˢ r bo (U.step bo) c t (U.step t) ≡ U.skipˢ (k ++ [ ix 0 ]) (U.connectᶜ r bo (U.ended c t′))
+  ended-skip r bo c t et bb rewrite et | bb = refl
+
+  -- At an ended source over a hidden `of`: the connect's next event its
+  -- rest's pin under the run, as the rest is tied to what the source
+  -- left running.
+  rest-pin : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+            → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+            → seen (Conf.heap (Mach.conf m)) π ≡ false
+            → ∀ {Δ′ A′ B′ S c b kb k fd rp e rt} {src : Sub (Conf.world (Mach.conf m)) Δ′ A′} {bd : Sub (Conf.world (Mach.conf m)) (A′ ∷ Δ′) B′}
+                (ψ : Path (Carried.tree cr) (connectˢ S c b kb k fd rp e rt src bd)) (σ : Path src _) → ψ ⊕ in-source σ ≡ π
+            → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {n} → At.part (Conf.heap (Mach.conf m)) (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
+            → At.part (Conf.heap (Mach.conf m)) src ≡ nothing → ∀ {c₀} → e ≡ just c₀
+            → Σ Pos λ q → Σ (U.Node Δ′ B′) λ n′ → U.step n ≡ U.skipˢ q n′ × Under p q
+  rest-pin {m = m} cr π fc op sn {rp = rp} {rt = rt} {src = src} {bd = bd} ψ σ eq se {n} pt ps {c₀} refl
+    with left-pin cr π fc op sn ψ σ eq se pt ps refl
+  ... | q , y′ , ey , u
+    with tied-skip {x = rt} {y = At.leftover (Conf.heap (Mach.conf m)) {B = ⊤} src} (Ties.rests (Lingers.rooted (Carried.lingers cr)) ψ se pt ps refl) ey
+  ... | _ , ex
+    with pinned-skip (pinned-trans (restful-pinned (rest-restful cr ψ refl)) (rest-pinned rt)) ex
+  ... | rt′ , er
+    with ended-just {H = Conf.heap (Mach.conf m)} rp c₀ rt (At.part (Conf.heap (Mach.conf m)) bd)
+           (subst (λ s → At.connected (Conf.heap (Mach.conf m)) rp (just c₀) rt s (At.part (Conf.heap (Mach.conf m)) bd) ≡ just n) ps pt)
+  ... | bo , pb , en =
+    q ++ [ ix 0 ] , _ ,
+    trans (cong U.step (sym en)) (ended-skip rp (U.shut (Any.here refl) c₀ bo) c₀ rt er (rest-body cr π fc op sn ψ σ eq se pt ps refl pb u)) ,
+    under-snoc (ix 0) u
 
   -- A held flatMap's part is its merge.
   merged-just : ∀ {h H Δ A B} op (g : A → Pos → U.Node Δ B) o ls qs pl {c} → At.merged {h} H op g o ls qs pl ≡ just c → U.flatMapᶜ op g o ls qs pl ≡ c

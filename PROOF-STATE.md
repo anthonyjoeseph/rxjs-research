@@ -187,7 +187,7 @@ by their own silent steps (`Mirror`).
   by `lift-up`, from any held node, and the rest site alike (`void-up`);
   ruled out: an `ending` take as a site (it completes inside its failing
   value's call). Remaining: each site's pin (`pooled-pin`,
-  `pool-restful`, `pool-off`, `rest-pin`) and landing, then `sub-defer` over the sites;
+  `pool-restful`, `pool-off`, `left-pin`, `rest-body`, `rest-restful`) and landing, then `sub-defer` over the sites;
   whether a part's last ghost rests to its leftover (`close-lingers`,
   `settle-lingers`).
 - **C. THE CALLBACK RELATION.** `Calling` is one record over the signal
@@ -370,8 +370,13 @@ by their own silent steps (`Mirror`).
   hidden `of`, no sibling its path passes heads under the run.
 - **`pool-land`** (Lift) — FALSITY, `NO EVIDENCE`: the pool's pin lifted is the
   ghost's step: the run dies at its guard, the ghost past that pin.
-- **`rest-pin`** (Lift) — FALSITY, `NO EVIDENCE`: a held connect over a hidden
-  `of` in its ended source steps next as its rest's skip under the run.
+- **`left-pin`** (Lift) — FALSITY, `NO EVIDENCE`: at a held connect over a
+  hidden `of` in its ended source, what the source left running pins next
+  under the run.
+- **`rest-body`** (Lift) — FALSITY, `NO EVIDENCE`: there, the body shut at the
+  source's end steps after that pin.
+- **`rest-restful`** (Lift) — FALSITY, `NO EVIDENCE`: an ended source's rest is
+  a rest's shape (idle, rest, union, bursting, under).
 - **`rest-land`** (Lift) — FALSITY, `NO EVIDENCE`: the rest's pin lifted is the
   ghost's step: the rest a pin on, the ghost past it.
 - **`void-gone`** (Lift) — FALSITY, `NO EVIDENCE`: a hidden step with the
