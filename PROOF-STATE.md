@@ -211,8 +211,9 @@ by their own silent steps (`Mirror`).
   needing more of the step than a weakening and `compile-cong`. A node
   whose `unsub` differs is planted by `holds-owed` over `Kernels.settled`
   (no detacher held over what still `Owes`), which every kernels move
-  now carries. Remaining: `flat-restage` (a slot and a store besides
-  growth), `connect-restage` (five growths and a scope).
+  now carries. `connect-restage` is a body over five growths (`Grew`),
+  its frame leaves postulated like a take's `ending`. Remaining:
+  `flat-restage` (a slot and a store besides growth).
 - **D. THE KERNEL FOOTPRINT.** A kernel's cells allocated together and read
   only through its own node, `names` agreeing by construction. `names`
   already lists each node's cells, so this leg is CONDITIONAL: done when
@@ -475,8 +476,17 @@ by their own silent steps (`Mirror`).
   names the tree did not hold.
 - **`flat-restage`** (Restage) — FALSITY, `NO EVIDENCE`: a flatMap begun
   allocates its kit and cut and is carried at its outer, less owed.
-- **`connect-restage`** (Restage) — FALSITY, `NO EVIDENCE`: a connect begun
-  allocates its subject and is carried at its body under `ix 0`, less owed.
+- **`compile-env`** (Restage) — FALSITY, `NO EVIDENCE`: a compiled
+  subscription reads alike with a weakening moved from its frame into its
+  environment.
+- **`connect-fresh`** (Restage) — FALSITY, `NO EVIDENCE`: a connect's five new
+  cells are names the tree did not hold.
+- **`connect-owned`** (Restage) — FALSITY, `NO EVIDENCE`: `Owned` holds of a
+  connect planted at its body, its source owed under `ix 1`.
+- **`connect-queue`** (Restage) — FALSITY, `NO EVIDENCE`: `Queue` survives a
+  connect planted at its body under `ix 0`.
+- **`connect-behind`** (Restage) — FALSITY, `NO EVIDENCE`: every part heads no
+  sooner than the run with a connect planted at its body.
 - **`sub-joined`** (Lift) — FALSITY, `NO EVIDENCE`: a joiner begun registers on
   its subject, or completes on a closed one.
 - **`sub-defer`** (Lift) — FALSITY, `NO EVIDENCE`: a defer begun begins its

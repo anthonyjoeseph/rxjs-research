@@ -65,7 +65,7 @@ module Ascending (R : Set) where
   open Tearing R using (fresh-path; takeSite; bodySite; look-store)
   open Unsubbing R using (_⇝_; ⇝-trans; now; then; ≗-trans; wk≗; wk-same; bind≗)
   open Sequencing R using (seq-assoc; seq-done)
-  open Restaging R using (walk-planted)
+  open Restaging R using (walk-planted; tick-ix0)
   open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
   open Lifting R using (sub-onward; emit-shut; emit-void; emit-run; spread-past; behind-fire; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
   open Locality R using (stored-at)
@@ -337,13 +337,6 @@ module Ascending (R : Set) where
                     → heightL (plantedᴸ πL v) ≡ heightL πL
     heightL-planted (this-lane ρ)  v = cong suc (height-planted ρ v)
     heightL-planted (next-lane πL) v = heightL-planted πL v
-
-  -- A value under a position keeps its tick.
-  tick-ix0 : ∀ r → tick (r ++ [ ix 0 ]) ≡ tick r
-  tick-ix0 []           = refl
-  tick-ix0 (ix _ ∷ _)   = refl
-  tick-ix0 (subᴾ _ ∷ _) = refl
-  tick-ix0 (last ∷ _)   = refl
 
   -- Under any label off the root, likewise.
   tick-under : ∀ r i → r ≢ [] → tick (r ++ [ ix i ]) ≡ tick r
