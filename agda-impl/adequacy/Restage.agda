@@ -59,6 +59,7 @@ module Restaging (R : Set) where
                         ; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane
                         ; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; Leaf; of-leaf; cold-leaf; done-leaf; join-leaf
                         ; Call; emitC; kontC; Spot; spot; coldˢ; take1C; take2C; bodyC; feedC; finC; srcC; code; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; names; pendings
+                        ; Pinned; unpinned; pinned-trans; pinned-sym; union-pinned; under-pinned; under-moved; bursts-pinned; bursts-moved; rest-pinned; Restful; rf-idle; rf-rest; rf-union; restful-pinned; Tied
                         ; seen; seenL; seen-⊕; isTaking; ∧-split; flatMapˢ; killAllᶜ; flatK; scanˢ; joinˢ; doneˢ; deferˢ; lane; CbRel; ≗-refl; newRef≗; taking; takeK; unsubscribing; done≗; register≗; send≗; finish≗; startCold≗; stop≗; stash≗; cancel≗; eff≗; here≗; under≗; diverge≗; unfold≗; readRef≗; writeRef≗; module Canon)
                         renaming (⟦_⟧ to ⟦_⟧ᶜ; at⟦_⟧ to at⟦_⟧ᶜ)
   open Strongly.Against R using (CtlAs; StackAs; BurstAs; subAs; runAs; bottomAs; restAs; backAs; reholdAs; Held; bottomᴴ; restᴴ; playsAs; firesAs; overAs; stackJobs; SrcOf; src-of; Ticked; BurstClocked; sources; burstSpots; stackBursts; Placed; agenda)
@@ -602,6 +603,125 @@ module Restaging (R : Set) where
         re ψ s pn ps pe′ | inj₂ (_ , ψ₀ , same , se , pe , _ , _)          = Each.rests ev ψ₀ (trans se s) (trans pe pn) ps pe′
         re ψ s pn ps pe′ | inj₂ (_ , ψ₀ , same-connect , se , pe , so , _) = Each.rests ev ψ₀ (trans se s) (trans pe pn) (trans so ps) pe′
 
+    -- What a node leaves running steps as it rests.
+    leftover-restful : ∀ {Δ A B} (s : Sub h Δ A) → Restful (At.leftover H {B = B} s)
+    leftover-restful (pendingˢ s q)                          = rf-rest
+    leftover-restful (coldˢ s hd ph)                         = rf-idle
+    leftover-restful (ofˢ p i xs)                            = rf-idle
+    leftover-restful doneˢ                                   = rf-idle
+    leftover-restful (mapˢ f s)                              = leftover-restful s
+    leftover-restful (scanˢ f r s)                           = leftover-restful s
+    leftover-restful (takeWhileˢ i p c k tk s)               = leftover-restful s
+    leftover-restful (flatMapˢ op f fl oc k r pl so ls)      = rf-union
+    leftover-restful (connectˢ S c b kb k fd rp e rt src bd) = rf-union
+    leftover-restful (joinˢ j sk l x st)                     = rf-idle
+    leftover-restful (deferˢ k s)                            = leftover-restful s
+
+    if-pinned : ∀ {Γ A} b {x x′ y y′ : U.Node Γ A} → Pinned (U.restˢ {B = ⊤} x) (U.restˢ {B = ⊤} x′) → Pinned (U.restˢ {B = ⊤} y) (U.restˢ {B = ⊤} y′)
+              → Pinned (U.restˢ {B = ⊤} (if b then x else y)) (U.restˢ {B = ⊤} (if b then x′ else y′))
+    if-pinned true  p _ = p
+    if-pinned false _ q = q
+
+    -- A node planted whose leftover pins as the pending one's: every
+    -- leftover above it pins alike.
+    mutual
+      leftover-plant : ∀ {Δ A Δ₀ A₀ s₀ q₀ B} {t : Sub h Δ A} (π : Path t (pendingˢ {Δ = Δ₀} {A₀} s₀ q₀)) (v : Sub h Δ₀ A₀) → At.part H (pendingˢ s₀ q₀) ≡ At.part H v
+                     → (∀ {C} → Pinned (U.restˢ {B = ⊤} (At.leftover H {B = C} (pendingˢ s₀ q₀))) (U.restˢ {B = ⊤} (At.leftover H {B = C} v)))
+                     → Pinned (U.restˢ {B = ⊤} (At.leftover H {B = B} t)) (U.restˢ {B = ⊤} (At.leftover H {B = B} (plant π v)))
+      leftover-plant here v eq lv                            = lv
+      leftover-plant (in-map π) v eq lv                      = leftover-plant π v eq lv
+      leftover-plant (in-scan π) v eq lv                     = leftover-plant π v eq lv
+      leftover-plant (in-take π) v eq lv                     = leftover-plant π v eq lv
+      leftover-plant (in-defer π) v eq lv                    = leftover-plant π v eq lv
+      leftover-plant (in-outer {ls = ls} π) v eq lv          = union-pinned (leftover-plant π v eq lv) (rest-pinned (At.leftoverL H ls))
+      leftover-plant (in-lanes {t = so} π) v eq lv           = union-pinned (rest-pinned (At.leftover H so)) (leftoverL-plant π v eq lv)
+      leftover-plant (in-body {rp = rp} {t = src} π) v eq lv =
+        union-pinned (bursts-pinned rp n (U.step n)) (under-moved (U.live n) (U.live n) (leftover-plant π v eq lv))
+        where n = At.sourced H (At.part H src) (At.leftover H src)
+      leftover-plant (in-source {rp = rp} {t = src} {bd = bd} π) v eq lv rewrite part-plant H π v eq with At.part H src
+      ... | just s  = union-pinned (bursts-pinned rp s (U.step s)) (under-pinned (U.live s) (U.restˢ {B = ⊤} (At.leftover H {B = ⊤} bd)))
+      ... | nothing =
+        union-pinned (bursts-moved rp stepped (leftover-plant π v eq lv)) (under-moved (U.live n) (U.live n′) (rest-pinned (At.leftover H {B = ⊤} bd)))
+        where
+          n  = At.leftover H src
+          n′ = At.leftover H (plant π v)
+          stepped : Pinned (U.step n) (U.step n′)
+          stepped = pinned-trans (restful-pinned (leftover-restful src))
+                      (pinned-trans (rest-pinned n) (pinned-trans (leftover-plant π v eq lv)
+                        (pinned-trans (rest-pinned n′) (pinned-sym (restful-pinned (leftover-restful (plant π v)))))))
+
+      leftoverL-plant : ∀ {Δ A Δ₀ A₀ s₀ q₀ B} {ls : List (Lane h Δ A)} (π : PathLanes ls (pendingˢ {Δ = Δ₀} {A₀} s₀ q₀)) (v : Sub h Δ₀ A₀) → At.part H (pendingˢ s₀ q₀) ≡ At.part H v
+                      → (∀ {C} → Pinned (U.restˢ {B = ⊤} (At.leftover H {B = C} (pendingˢ s₀ q₀))) (U.restˢ {B = ⊤} (At.leftover H {B = C} v)))
+                      → Pinned (U.restˢ {B = ⊤} (At.leftoverL H {B = B} ls)) (U.restˢ {B = ⊤} (At.leftoverL H {B = B} (plantᴸ π v)))
+      leftoverL-plant (this-lane {ls = ls} π) v eq lv          = union-pinned (leftover-plant π v eq lv) (rest-pinned (At.leftoverL H ls))
+      leftoverL-plant (next-lane {l = lane c k s} π) v eq lv   = union-pinned (rest-pinned (At.leftover H s)) (leftoverL-plant π v eq lv)
+
+    -- A pool over a planted outer or lane: what its ended parts left pins
+    -- alike.
+    pooled-outer : ∀ {Δ A B Δ₀ A₀ s₀ q₀} {fl} {so : Sub h Δ A} {ls : List (Lane h Δ B)} (π : Path so (pendingˢ {Δ = Δ₀} {A₀} s₀ q₀)) (v : Sub h Δ₀ A₀)
+                 → At.part H (pendingˢ s₀ q₀) ≡ At.part H v
+                 → (∀ {C} → Pinned (U.restˢ {B = ⊤} (At.leftover H {B = C} (pendingˢ s₀ q₀))) (U.restˢ {B = ⊤} (At.leftover H {B = C} v)))
+                 → Pinned (U.restˢ {B = ⊤} (At.pooled H fl so ls)) (U.restˢ {B = ⊤} (At.pooled H fl (plant π v) ls))
+    pooled-outer {fl = fl} {ls = ls} π v eq lv =
+      union-pinned (if-pinned (At.val H (FlatKit.Flat.outerDone fl)) (leftover-plant π v eq lv) unpinned) (rest-pinned (At.pooledL H ls))
+
+    pooled-lanes : ∀ {Δ B Δ₀ A₀ s₀ q₀} {ls : List (Lane h Δ B)} (π : PathLanes ls (pendingˢ {Δ = Δ₀} {A₀} s₀ q₀)) (v : Sub h Δ₀ A₀)
+                 → At.part H (pendingˢ s₀ q₀) ≡ At.part H v
+                 → (∀ {C} → Pinned (U.restˢ {B = ⊤} (At.leftover H {B = C} (pendingˢ s₀ q₀))) (U.restˢ {B = ⊤} (At.leftover H {B = C} v)))
+                 → Pinned (U.restˢ {B = ⊤} (At.pooledL H {B = B} ls)) (U.restˢ {B = ⊤} (At.pooledL H {B = B} (plantᴸ π v)))
+    pooled-lanes (this-lane {c = c} {ls = ls} π) v eq lv =
+      if-pinned (At.val H (Kit.live c)) (rest-pinned (At.pooledL H ls)) (union-pinned (leftover-plant π v eq lv) (rest-pinned (At.pooledL H ls)))
+    pooled-lanes (next-lane {l = lane c k s} π) v eq lv =
+      if-pinned (At.val H (Kit.live c)) (pooled-lanes π v eq lv) (union-pinned (rest-pinned (At.leftover H s)) (pooled-lanes π v eq lv))
+
+    -- A pool whose outer has not ended and holds no lane runs nothing.
+    pooled-fresh : ∀ {Δ A B C} {fl : FlatKit.Flat A h} {so : Sub h Δ A} → At.val H (FlatKit.Flat.outerDone fl) ≡ false → Pinned (U.hushˢ {A = C}) (U.restˢ {B = ⊤} (At.pooled H {B = B} fl so []))
+    pooled-fresh d rewrite d = unpinned
+
+    -- What a node planted leaves running pins as the pending node's: each
+    -- held pool and ended source above it keeps its pin.
+    lingers-plant : ∀ {Δ A Δ₀ A₀ s₀ q₀} {t : Sub h Δ A} (π : Path t (pendingˢ {Δ = Δ₀} {A₀} s₀ q₀)) (v : Sub h Δ₀ A₀) → At.part H (pendingˢ s₀ q₀) ≡ At.part H v
+                  → (∀ {C} → Pinned (U.restˢ {B = ⊤} (At.leftover H {B = C} (pendingˢ s₀ q₀))) (U.restˢ {B = ⊤} (At.leftover H {B = C} v)))
+                  → Lingers H v → Lingers H t → Lingers H (plant π v)
+    lingers-plant {t = t} π v eq lv lgv lg = record { pools = po ; rests = re }
+      where
+        inside : ∀ {Δ″ A″} {w : Sub h Δ″ A″} {ψ : Path (plant π v) w} (ρ : Path v w) → ψ ≡ planted π v ⊕ ρ → seen H ψ ≡ true → seen H ρ ≡ true
+        inside ρ refl s = proj₂ (∧-split (seen H (planted π v)) (trans (sym (seen-⊕ H (planted π v) ρ)) s))
+
+        pool-lands : ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so so′ : Sub h Δ′ A′} {ls ls′ : List (Lane h Δ′ B′)}
+                       {ψ₀ : Path t (flatMapˢ op f fl oc k r pl so ls)} {ψ′ : Path (plant π v) (flatMapˢ op f fl oc k r pl so′ ls′)}
+                   → Lands (fork π v ψ₀) ψ′ → Pinned (U.restˢ {B = ⊤} (At.pooled H fl so ls)) (U.restˢ {B = ⊤} (At.pooled H fl so′ ls′))
+        pool-lands {fl = fl} {so = so} {ls = ls} {ψ₀ = ψ₀} ld with fork π v ψ₀ | ld
+        ... | apart _ _                | lands-apart = rest-pinned (At.pooled H fl so ls)
+        ... | below (in-outer ρ) _ _ _ | lands-below = pooled-outer {fl = fl} {ls = ls} ρ v eq lv
+        ... | below (in-lanes ρ) _ _ _ | lands-below = union-pinned (rest-pinned (if At.val H (FlatKit.Flat.outerDone fl) then At.leftover H so else U.idleᶜ)) (pooled-lanes ρ v eq lv)
+
+        rest-lands : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src src′ : Sub h Δ′ A′} {bd bd′ : Sub h (A′ ∷ Δ′) B′}
+                       {ψ₀ : Path t (connectˢ S c b kb k fd rp e rt src bd)} {ψ′ : Path (plant π v) (connectˢ S c b kb k fd rp e rt src′ bd′)}
+                   → Lands (fork π v ψ₀) ψ′ → Pinned (U.restˢ {B = ⊤} (At.leftover H {B = ⊤} src)) (U.restˢ {B = ⊤} (At.leftover H {B = ⊤} src′))
+        rest-lands {src = src} {ψ₀ = ψ₀} ld with fork π v ψ₀ | ld
+        ... | apart _ _                 | lands-apart = rest-pinned (At.leftover H {B = ⊤} src)
+        ... | below (in-source ρ) _ _ _ | lands-below = leftover-plant ρ v eq lv
+        ... | below (in-body ρ) _ _ _   | lands-below = rest-pinned (At.leftover H {B = ⊤} src)
+
+        po : ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+           → (ψ : Path (plant π v) (flatMapˢ op f fl oc k r pl so ls)) → seen H ψ ≡ true
+           → ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Tied pl (At.pooled H fl so ls)
+        po ψ s pw with keep π v eq ψ
+        ... | inj₁ (ρ , e)                                  = Lingers.pools lgv ρ (inside ρ e s) pw
+        ... | inj₂ (_ , ψ₀ , same , se , pe , _ , _)        = Lingers.pools lg ψ₀ (trans se s) (trans pe pw)
+        ... | inj₂ (_ , ψ₀ , same-flat , se , pe , _ , ld)  = pinned-trans (Lingers.pools lg ψ₀ (trans se s) (trans pe pw)) (pool-lands ld)
+
+        re : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+           → (ψ : Path (plant π v) (connectˢ S c b kb k fd rp e rt src bd)) → seen H ψ ≡ true
+           → ∀ {n} → At.part H (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
+           → At.part H src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Tied rt (At.leftover H {B = ⊤} src)
+        re ψ s pn ps pe′ with keep π v eq ψ
+        ... | inj₁ (ρ , e)                                     = Lingers.rests lgv ρ (inside ρ e s) pn ps pe′
+        ... | inj₂ (_ , ψ₀ , same , se , pe , _ , _)           = Lingers.rests lg ψ₀ (trans se s) (trans pe pn) ps pe′
+        ... | inj₂ (_ , ψ₀ , same-connect , se , pe , so , ld) =
+          pinned-trans (Lingers.rests lg ψ₀ (trans se s) (trans pe pn) (trans so ps) pe′) (rest-lands ld)
+
   ------------------------------------------------------------------------
   -- The run's calls, carried across
 
@@ -1130,8 +1250,8 @@ module Restaging (R : Set) where
 
     -- A map runs what its source runs, and its source what it was
     -- pending to.
-    postulate
-      rm-lingers : ∀ (H : Heapᴹ h) → Lingers H T₀ → Lingers H t′
+    rm-lingers : ∀ (H : Heapᴹ h) → Lingers H T₀ → Lingers H t′
+    rm-lingers H = lingers-plant H π v refl (λ {C} → rest-pinned (U.restᶜ {B = C} (U.subscribe s q))) (record { pools = λ { (in-map ()) } ; rests = λ { (in-map ()) } })
 
     -- A pending node and a map over one register nothing, queue nothing
     -- and are owed nothing.
@@ -1236,8 +1356,8 @@ module Restaging (R : Set) where
         tr eu = record { parts = λ { here _ pw → Each.parts eu here refl (trans (eqp H) pw) } ; pools = λ () ; rests = λ () }
 
     -- An `of` runs nothing past its end, nor did it pending.
-    postulate
-      of-lingers : ∀ (H : Heapᴹ h) → Lingers H T₀ → Lingers H t′
+    of-lingers : ∀ (H : Heapᴹ h) → Lingers H T₀ → Lingers H t′
+    of-lingers H = lingers-plant H π v (eqp H) (subst (λ c → Pinned (U.restˢ {B = ⊤} c) U.hushˢ) (sym sp) unpinned) (record { pools = λ () ; rests = λ () })
 
   -- The configuration an `of` planted makes: its first call its values.
   Offers : ∀ {g m} → Carried g m → ∀ {Δ A} → List A → Set₁
@@ -1514,8 +1634,8 @@ module Restaging (R : Set) where
           tr eu = record { parts = pa eu ; pools = λ { (in-scan ()) } ; rests = λ { (in-scan ()) } }
 
       -- A scan runs what its source runs.
-      postulate
-        rs-lingers : Lingers H′ T₁ → Lingers H′ t′
+      rs-lingers : Lingers H′ T₁ → Lingers H′ t′
+      rs-lingers = lingers-plant H′ π₁ v eqv (λ {C} → rest-pinned (U.restᶜ {B = C} (U.subscribe s q))) (record { pools = λ { (in-scan ()) } ; rests = λ { (in-scan ()) } })
 
       rs-kernels : Kernels H′ T₁ → Kernels H′ t′
       rs-kernels kn = record { holds = holds-plant H′ π₁ v refl (λ hs → hs) (Kernels.holds kn)
@@ -1677,8 +1797,8 @@ module Restaging (R : Set) where
                              ; settled = settled-plant π₂ v (λ _ → tt) (λ _ → tt , tt) (Kernels.settled kn) }
 
       -- A take runs what its source runs.
-      postulate
-        rt-lingers : Lingers H′ T₂ → Lingers H′ t′
+      rt-lingers : Lingers H′ T₂ → Lingers H′ t′
+      rt-lingers = lingers-plant H′ π₂ v eqv (λ {C} → rest-pinned (U.restᶜ {B = C} (U.subscribe s q))) (record { pools = λ { (in-take ()) } ; rests = λ { (in-take ()) } })
 
       rt-meaning : Meaning H′ T₂ → Meaning H′ t′
       rt-meaning mn = record { fed = fed-plant H′ π₂ v (λ _ fd → fd) _ (Meaning.fed mn) }
@@ -1965,8 +2085,14 @@ module Restaging (R : Set) where
       connect-queue  : Queue H₅ q clk ts T₅ → Queue H₅ (q ++ [ ix 0 ]) clk ts t′
       -- Every head no earlier than the run one level down.
       connect-behind : Each H₅ (Heads q) T₅ → Each H₅ (Heads (q ++ [ ix 0 ])) t′
-      -- A connect pending its source runs what it was pending to.
-      connect-lingers : Lingers H₅ T₅ → Lingers H₅ t′
+
+    -- A connect pending its source runs what it was pending to, its
+    -- source not yet ended.
+    connect-lingers : Lingers H₅ T₅ → Lingers H₅ t′
+    connect-lingers = lingers-plant H₅ π₅ v refl
+      (union-pinned (bursts-pinned (q ++ [ ix 1 ]) (U.subscribe s (q ++ [ ix 1 ])) (U.step (U.subscribe s (q ++ [ ix 1 ]))))
+                    (under-moved (U.live (U.subscribe s (q ++ [ ix 1 ]))) (U.live (U.subscribe s (q ++ [ ix 1 ]))) (rest-pinned (U.subscribe b (q ++ [ ix 0 ])))))
+      (record { pools = λ { (in-source ()) ; (in-body ()) } ; rests = λ { here _ _ _ () ; (in-source ()) ; (in-body ()) } })
 
   -- A connect begun allocates its subject, flag, cut and stash, begins
   -- its body under `ix 0` and owes its source back where it began, one
@@ -2223,7 +2349,7 @@ module Restaging (R : Set) where
     module _ (eqv : At.part H₉ (pendingˢ (T.flatMap op f s) q) ≡ At.part H₉ v)
              (refill₉ : At.val H₉ (FlatKit.Flat.refill fl₈) ≡ just hereʳ) (slot₉ : CbRel (look H₉ hereʳ) kcb)
              (held₉ : At.val H₉ (Kit.held oc₈) ≡ nothing) (active₉ : At.val H₉ (FlatKit.Flat.active fl₈) ≡ 0)
-             (lanes₉ : At.val H₉ (FlatKit.Flat.lanes fl₈) ≡ []) where
+             (lanes₉ : At.val H₉ (FlatKit.Flat.lanes fl₈) ≡ []) (done₉ : At.val H₉ (FlatKit.Flat.outerDone fl₈) ≡ false) where
 
       slotR : CbRel (look H₉ hereʳ) (Canon.Flat′.refillCb op f E₈ O₈ fl₈)
       slotR = (λ a → ≗-trans (proj₁ slot₉ a) (proj₂ (proj₂ flat-wk-here))) , proj₁ (proj₂ slot₉) , proj₂ (proj₂ slot₉)
@@ -2266,8 +2392,9 @@ module Restaging (R : Set) where
 
       -- A flatMap pending its outer, its pool idle and no lane, runs what
       -- it was pending to.
-      postulate
-        rf-lingers : Lingers H₉ T₈ → Lingers H₉ t′
+      rf-lingers : Lingers H₉ T₈ → Lingers H₉ t′
+      rf-lingers = lingers-plant H₉ π₈ v eqv (union-pinned (rest-pinned (U.subscribe s q)) unpinned)
+        (record { pools = λ { here _ _ → pooled-fresh H₉ {fl = fl₈} {so = pendingˢ s q} done₉ ; (in-outer ()) ; (in-lanes ()) } ; rests = λ { (in-outer ()) ; (in-lanes ()) } })
 
   -- A flatMap begun allocates its pool and its outer's cut, registers its
   -- refill slot and stores it, and begins its outer under the flatMap's
@@ -2288,16 +2415,16 @@ module Restaging (R : Set) where
     , record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = F.t′
              ; ctlAs = subAs F.π′ (F.code′ ex₉) (F.restack sk₉ a₉) (F.alones _)
              ; meets = trans (part-plant H₉ F.π₈ F.v refl) (trans (Grew.meets G₉) (Carried.meets cr))
-             ; owned = F.rf-owned refl refl slot₉ refl refl refl (Grew.owned G₉)
-             ; kernels = F.rf-kernels refl refl slot₉ refl refl refl (Grew.kernels G₉)
-             ; meaning = F.rf-meaning refl refl slot₉ refl refl refl (Grew.meaning G₉)
-             ; queue = F.rf-queue refl refl slot₉ refl refl refl (Grew.queue G₉)
+             ; owned = F.rf-owned refl refl slot₉ refl refl refl refl (Grew.owned G₉)
+             ; kernels = F.rf-kernels refl refl slot₉ refl refl refl refl (Grew.kernels G₉)
+             ; meaning = F.rf-meaning refl refl slot₉ refl refl refl refl (Grew.meaning G₉)
+             ; queue = F.rf-queue refl refl slot₉ refl refl refl refl (Grew.queue G₉)
              ; books = record { fresh = F.flat-fresh (Books.fresh bk)
                               ; clocked = proj₁ (Books.clocked bk) , F.reticked sk₉ a₉ (Grew.ticked G₉)
                               ; paidUp = cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (Books.paidUp bk))))))))
                               ; running = Books.running bk }
-             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind = F.rf-behind refl refl slot₉ refl refl refl (Grew.behind G₉)
-             ; lingers = F.rf-lingers refl refl slot₉ refl refl refl (Grew.lingers G₉) }
+             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind = F.rf-behind refl refl slot₉ refl refl refl refl (Grew.behind G₉)
+             ; lingers = F.rf-lingers refl refl slot₉ refl refl refl refl (Grew.lingers G₉) }
     , refl , inj₁ (inj₁ (subst (pend F.t′ <_) (Grew.pends G₉) F.less))
     where bk = Carried.books cr
           wd : ∀ {k w′} → List (Machine.Todo R w′) → List (Machine.Todo R (k ∷ w′))

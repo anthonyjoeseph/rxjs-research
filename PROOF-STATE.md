@@ -47,7 +47,43 @@ code.
   greps or it errors.
 - **THE BIG PICTURE TIER ROADMAP IS WHAT YOU FOLLOW; THE ROWS ARE THE LEDGER
   IT IS DRAWN FROM (Anthony).** Every tier opens with a
-  `### Big picture tier roadmap` ... `### The ledger` carrying
+  `### Big picture tier roadmap
+
+- **EVERY NODE, FOLDED.** A `Carried` field is a property of the whole
+  tree, so every move rebuilds every field and each move×field pair
+  became a postulate; a new move grows a new row. Restate each field as
+  `Every P`, a per-node fact folded over the tree, with ONE plant lemma:
+  planting at π keeps `Every P`, given the new node passes `P` and keeps
+  the summary its ancestors read (`At.part`, `At.leftover`).
+  `lingers-plant` re-derives as its instance. Decides whether one summary
+  serves every field.
+- **QUEUE, LOCAL OR NOT.** `Queue` framed by the node alone is ruled out.
+  Restate it per node (each node's timers on the agenda) or name exactly
+  what it reads beyond the node. Decides whether every `Carried` field
+  fits the shape; if `Queue` does not, it, `stack` and `ticked` need their
+  own route.
+- **A WRITE IS A REPLANT.** The cells that write rather than plant (a
+  lane's or outer's end, a feed, a finish, a done flag, a fire, a
+  teardown, a scan's accumulator) as a replant of the written node, so
+  the one plant lemma covers them and no field needs a write frame.
+  Decides whether a write at a node's own names changes the summary its
+  ancestors read only as the replant says.
+- **COLUMNS DELETED.** Each field over `Every`, `lingers`, `behind`,
+  `owned` first: a column's cells deleted at once, a move's remainder one
+  obligation per node KIND, shared by every move rewriting that kind
+  (map, scan, take and `of` already share `rest-pinned`). Decides how
+  many kind obligations are left, and which are FALSITY.
+- **GROWTH.** `map-restage`, `scan-restage`, `take-restage` are bodies over
+  the `Grown` frame. Next: its leaves `grows-extend`, `walk-grow`,
+  `compile-cong`, `names-wk` as bodies, then every `grow-*` cell over
+  them. Decides whether a growth needs more of the step than a weakening.
+- **HIDDEN RUNS.** `emit-void` is a body over `void-site`: a site's pin
+  lifts by `void-up`; a pool's and a rest's by `pinned-skip` on their
+  tie. Ruled out: the ghost alike past a hidden step; an `ending` take as
+  a site. The core: `pooled-pin`, `left-pin`, `pool-off`, `spread-held`,
+  one fact: nothing but the `of` heads under the run.
+
+### The ledger` carrying
   the rows. A leg is a GROUP: several postulates sharing a currency, a
   statement together with the sites that consume it, one shelf of mechanical
   rows. Group where the grouping is real and fall back on the risk classes
@@ -364,8 +400,6 @@ by their own silent steps (`Mirror`).
   root has no part.
 - **`pooled-pin`** (Lift) — FALSITY, `NO EVIDENCE`: at a pool over a hidden
   `of`, what the flatMap's ended parts left running pins next under the run.
-- **`pool-restful`** (Lift) — FALSITY, `NO EVIDENCE`: every flatMap's pool is a
-  rest's shape (idle, rest, union, bursting, under).
 - **`pool-off`** (Lift) — FALSITY, `DEAD ROUTE`: at a pool over a hidden `of`,
   neither the flatMap's outer nor any lane it holds heads under the run.
 - **`pool-land`** (Lift) — FALSITY, `NO EVIDENCE`: the pool's pin lifted is the
@@ -375,8 +409,6 @@ by their own silent steps (`Mirror`).
   the run.
 - **`rest-body`** (Lift) — FALSITY, `NO EVIDENCE`: there, the body shut at the
   source's end steps after that pin.
-- **`rest-restful`** (Lift) — FALSITY, `NO EVIDENCE`: an ended source's rest is
-  a rest's shape (idle, rest, union, bursting, under).
 - **`rest-land`** (Lift) — FALSITY, `NO EVIDENCE`: the rest's pin lifted is the
   ghost's step: the rest a pin on, the ghost past it.
 - **`close-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: an outer's end, its
@@ -405,18 +437,6 @@ by their own silent steps (`Mirror`).
   keeps every tie.
 - **`scan-lingers`** (Frame) — FALSITY, `NO EVIDENCE`: a write at a scan's
   accumulator keeps every tie.
-- **`rm-lingers`** (Restage) — FALSITY, `NO EVIDENCE`: a map restaged over its
-  pending source keeps every tie.
-- **`of-lingers`** (Restage) — FALSITY, `NO EVIDENCE`: an `of` restaged keeps
-  every tie.
-- **`rs-lingers`** (Restage) — FALSITY, `NO EVIDENCE`: a scan restaged keeps
-  every tie.
-- **`rt-lingers`** (Restage) — FALSITY, `NO EVIDENCE`: a take restaged keeps
-  every tie.
-- **`connect-lingers`** (Restage) — FALSITY, `NO EVIDENCE`: a connect restaged
-  keeps every tie.
-- **`rf-lingers`** (Restage) — FALSITY, `NO EVIDENCE`: a flatMap restaged keeps
-  every tie.
 - **`grow-lingers`** (Restage) — FALSITY, `NO EVIDENCE`: a growth keeps every
   tie, weakened.
 - **`up-lanes`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap above a written
