@@ -541,7 +541,7 @@ comments-selftest:
 # ~13 minutes — so there is no reason to spend the 13 minutes only to fail on
 # something a textual pass already knew.  Fail fast, then typecheck.
 roadmap-check:
-	@scripts/check-roadmap.py
+	@scripts/check-roadmap.py --prune
 
 # PROVES roadmap-check IS LOAD-BEARING, against fixtures outside PROOF-STATE.md.
 # Same reason dup-selftest exists: the real file is (and should stay) SORTED, so
@@ -676,6 +676,16 @@ roadmap-selftest:
 	  done; \
 	  echo "$$stl" | grep -q "  a-live$$" \
 	    && { echo "SELFTEST FAIL: a still-live postulate was reported stale"; fail=1; }; \
+	  prn=$$(mktemp); cp scripts/roadmap-selftest/stale.md $$prn; \
+	  scripts/check-roadmap.py --file $$prn --prune \
+	       --ledger scripts/roadmap-selftest/ledger-stale.txt --census scripts/roadmap-selftest/census.txt \
+	       --src-names scripts/roadmap-selftest/src-names-stale.txt 2>&1 | grep -q "STALE ROWS" \
+	    && { echo "SELFTEST FAIL: --prune left a row naming nothing live failing the check"; fail=1; }; \
+	  for n in b-discharged c-vanished d-gone-parent; do \
+	    grep -q "$$n" $$prn && { echo "SELFTEST FAIL: --prune kept $$n"; fail=1; }; \
+	  done; \
+	  grep -q "a-live" $$prn || { echo "SELFTEST FAIL: --prune deleted a live row"; fail=1; }; \
+	  rm -f $$prn; \
 	  cln=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
 	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt \
 	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \

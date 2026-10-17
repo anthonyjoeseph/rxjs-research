@@ -783,6 +783,28 @@ def fix_evidence(path, tiers, cen):
     return changed
 
 
+def prune_stale(path, tiers, live, srcnames):
+    """Delete every row whose head names nothing live. -> n deleted."""
+    stale = {lineno: name for rows in check_stale(tiers, live, srcnames)
+             for _tier, lineno, _label, name in rows}
+    dead = []
+    for _tier, rows, _pre, _legs in tiers:
+        for label, _cls, lineno, _cost in rows:
+            if lineno in stale and all(
+                    not any(any(covered(l, {g}) for l in live) for g in group)
+                    for group in head_groups(label)):
+                dead.append((lineno, stale[lineno]))
+    if not dead:
+        return 0
+    lines = path.read_text().splitlines()
+    for lineno, _name in sorted(dead, reverse=True):
+        start, end = row_span(lines, lineno)
+        del lines[start:end]
+    path.write_text("\n".join(lines) + "\n")
+    print(f"roadmap-check: pruned {len(dead)} row(s) naming nothing live: "
+          + ", ".join(name for _l, name in sorted(dead)))
+    return len(dead)
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -799,6 +821,9 @@ def main():
     ap.add_argument("--fix-evidence", action="store_true",
                     help="rewrite every classed row's evidence field from the "
                          "source headers, then exit (make roadmap-evidence)")
+    ap.add_argument("--prune", action="store_true",
+                    help="delete every row naming nothing live, before checking "
+                         "(make roadmap-check)")
     ap.add_argument("--dates-only", action="append", default=None, metavar="PATH",
                     help="also refuse dates in PATH (date check only, no rows). "
                          "Defaults to CLAUDE.md; repeatable; selftest passes fixtures.")
@@ -833,6 +858,18 @@ def main():
     # open-questions check, which also needs it, is inside that loop.
     live = (live_postulates(root, args.ledger)
             if (args.ledger or not args.file) else None)
+
+    # DELETING A POSTULATE COSTS NOTHING HERE (Anthony).  A row whose every
+    # name is no longer live is the roadmap lagging a deletion or discharge,
+    # and the repair is always the same — delete the row — so `--prune` does
+    # it instead of failing.  A row with a live name left keeps its failure:
+    # which part of the hook still holds is a human's call.
+    if args.prune and live is not None:
+        srcnames = (set(pathlib.Path(args.src_names).read_text().split())
+                    if args.src_names else src_decl_names(root))
+        n = prune_stale(path, tiers, set(live), srcnames)
+        if n:
+            tiers = parse(path)
 
     failures = []
     unclassified = []
