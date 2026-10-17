@@ -23,9 +23,10 @@ open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁; tt to tt₁)
-open import Data.Bool using (Bool; _∧_; _∨_; true; false)
+open import Data.Bool using (Bool; _∧_; _∨_; true; false; if_then_else_)
 open import Relation.Nullary using (¬_)
 open import Level using (lift)
+open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import denotation.MonotonicList using (Timeline; Frame; From; Pos)
@@ -41,23 +42,23 @@ open import adequacy.Frame using (module Framing)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Grow using (module Growing)
 open import adequacy.Seq using (module Sequencing)
-open import operation.AbstractObservable using (base)
+open import operation.AbstractObservable using (base; maybe; quiet)
 open import operation.PureObservable using (module Pure)
 
 module Restaging (R : Set) where
   open Machine R using (Mach; mach; step; silent; Playing; wkPlaying; wkTodo)
-  open Unsubbing R using (_⇝_; now; then; ≗-trans; wk≗)
+  open Unsubbing R using (_⇝_; now; then; ≗-trans; wk≗; bind≗)
   open Growing R using (wkTree; wkLanes; wkPath)
-  open Sequencing R using (wkEnv-wk)
+  open Sequencing R using (wkEnv-wk; wk-wk; from-⨾)
   open Pure R using (Timer; wkTimer; mapList)
   open Shared Timeline (Out R) using (Heapᴹ; ⟨_,_,_⟩; Stack; run; Val; extend; look; cbs; wkVal)
   open Heap using (World; _⊑_; _⨾_; new; wk∋; cell; slot; Sink; Quiet; Handle) renaming (here to hereʳ)
-  open Run (Pureᴾ R) using (_>>ᴬ_; compile; Env; wkEnv; wkAct; module Kit; Ref; wkR; wkEl; Observer; Kont; wkObs; wkKont)
+  open Run (Pureᴾ R) using (Act; newRef; _>>ᴬ_; compile; Env; wkEnv; wkAct; module Kit; Ref; wkR; wkEl; Observer; Kont; wkObs; wkKont)
   open Strongly R using (Carried; Books; carried; Sub; pendingˢ; ofˢ; mapˢ; takeWhileˢ; connectˢ; Lane; ending; taken; feeding; finishing
                         ; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane
                         ; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; Leaf; of-leaf; cold-leaf; done-leaf; join-leaf
                         ; Call; emitC; kontC; Spot; spot; coldˢ; take1C; take2C; bodyC; feedC; finC; srcC; code; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; names; pendings
-                        ; seen; seenL; seen-⊕; isTaking; ∧-split; flatMapˢ; scanˢ; joinˢ; doneˢ; deferˢ; lane; CbRel; ≗-refl; newRef≗; readRef≗; writeRef≗; module Canon)
+                        ; seen; seenL; seen-⊕; isTaking; ∧-split; flatMapˢ; scanˢ; joinˢ; doneˢ; deferˢ; lane; CbRel; ≗-refl; newRef≗; taking; takeK; unsubscribing; rootObs; done≗; register≗; send≗; finish≗; startCold≗; stop≗; stash≗; cancel≗; eff≗; here≗; under≗; diverge≗; unfold≗; readRef≗; writeRef≗; module Canon)
                         renaming (⟦_⟧ to ⟦_⟧ᶜ; at⟦_⟧ to at⟦_⟧ᶜ)
   open Strongly.Against R using (CtlAs; StackAs; BurstAs; subAs; bottomAs; restAs; backAs; reholdAs; Held; bottomᴴ; restᴴ; playsAs; firesAs; overAs; stackJobs; SrcOf; src-of; Ticked; BurstClocked; sources; burstSpots; stackBursts; Placed; agenda)
   open Strongly.Phase R using (playing; fired)
@@ -985,101 +986,71 @@ module Restaging (R : Set) where
   ------------------------------------------------------------------------
   -- A map restaged: its source pending beneath it
 
-  -- A path ending under a map ends under no connect's source.
+  -- A source wrapped one step by a node that is no connect.
+  data Wrap {h Δ A} {s : T.Obs Timeline Δ A} {q} : ∀ {B} {u : Sub h Δ B} → Path u (pendingˢ s q) → Set₁ where
+    wrap-map  : ∀ {B} {f : A → B} → Wrap (in-map {f = f} here)
+    wrap-scan : ∀ {B} {f : B → A → B} {r} → Wrap (in-scan {f = f} {r} here)
+    wrap-take : ∀ {i p c k tk} → Wrap (in-take {i = i} {p} {c} {k} {tk} here)
+
+  wrap-here : ∀ {h Δ A B C} {s : T.Obs Timeline Δ A} {q} {u : Sub h Δ B} {ι : Path u (pendingˢ s q)} → Wrap ι
+            → ∀ {S c b kb k fd e rp rt} {bd : Sub h (A ∷ Δ) C} (β : Path u (connectˢ S c b kb k fd rp e rt (pendingˢ s q) bd)) → ι ≢ β ⊕ in-source here
+  wrap-here wrap-map  (in-map ())
+  wrap-here wrap-scan (in-scan ())
+  wrap-here wrap-take (in-take ())
+
+  wrap-src : ∀ {h Δ A B} {s : T.Obs Timeline Δ A} {q} {u : Sub h Δ B} {ι : Path u (pendingˢ s q)} → Wrap ι → Path (pendingˢ s q) u → ⊥
+  wrap-src wrap-map  ()
+  wrap-src wrap-scan ()
+  wrap-src wrap-take ()
+
+  -- A path ending under a wrapped source ends under no connect's source.
   mutual
-    map-not-src : ∀ {h Δ A Δ₀ A₀ B₀ C₀} {t : Sub h Δ A} {f : A₀ → B₀} {s : T.Obs Timeline Δ₀ A₀} {q} {S c b kb k fd e rp rt} {bd : Sub h (A₀ ∷ Δ₀) C₀}
-                  (α : Path t (mapˢ f (pendingˢ s q))) (β : Path t (connectˢ S c b kb k fd rp e rt (pendingˢ s q) bd))
-                → α ⊕ in-map here ≢ β ⊕ in-source here
-    map-not-src here         (in-map ())   _
-    map-not-src (in-map α)   (in-map β)    eq = map-not-src α β (in-map-inj eq)
+    not-src : ∀ {h Δ A Δ₀ A₀ B₀ C₀} {t : Sub h Δ A} {s : T.Obs Timeline Δ₀ A₀} {q} {u : Sub h Δ₀ B₀} {ι : Path u (pendingˢ s q)} → Wrap ι
+            → ∀ {S c b kb k fd e rp rt} {bd : Sub h (A₀ ∷ Δ₀) C₀}
+              (α : Path t u) (β : Path t (connectˢ S c b kb k fd rp e rt (pendingˢ s q) bd))
+            → α ⊕ ι ≢ β ⊕ in-source here
+    not-src w here         β             eq = wrap-here w β eq
+    not-src w (in-map α)   (in-map β)    eq = not-src w α β (in-map-inj eq)
       where in-map-inj : ∀ {x y} → in-map x ≡ in-map y → x ≡ y
             in-map-inj refl = refl
-    map-not-src (in-scan α)  (in-scan β)   eq = map-not-src α β (in-scan-inj eq)
+    not-src w (in-scan α)  (in-scan β)   eq = not-src w α β (in-scan-inj eq)
       where in-scan-inj : ∀ {x y} → in-scan x ≡ in-scan y → x ≡ y
             in-scan-inj refl = refl
-    map-not-src (in-take α)  (in-take β)   eq = map-not-src α β (in-take-inj eq)
+    not-src w (in-take α)  (in-take β)   eq = not-src w α β (in-take-inj eq)
       where in-take-inj : ∀ {x y} → in-take x ≡ in-take y → x ≡ y
             in-take-inj refl = refl
-    map-not-src (in-outer α) (in-outer β)  eq = map-not-src α β (in-outer-inj eq)
+    not-src w (in-outer α) (in-outer β)  eq = not-src w α β (in-outer-inj eq)
       where in-outer-inj : ∀ {x y} → in-outer x ≡ in-outer y → x ≡ y
             in-outer-inj refl = refl
-    map-not-src (in-outer α) (in-lanes β)  ()
-    map-not-src (in-lanes α) (in-outer β)  ()
-    map-not-src (in-lanes α) (in-lanes β)  eq = map-not-srcᴸ α β (in-lanes-inj eq)
+    not-src w (in-outer α) (in-lanes β)  ()
+    not-src w (in-lanes α) (in-outer β)  ()
+    not-src w (in-lanes α) (in-lanes β)  eq = not-srcᴸ w α β (in-lanes-inj eq)
       where in-lanes-inj : ∀ {x y} → in-lanes x ≡ in-lanes y → x ≡ y
             in-lanes-inj refl = refl
-    map-not-src (in-source ()) here        _
-    map-not-src (in-source α) (in-source β) eq = map-not-src α β (in-source-inj eq)
+    not-src w (in-source α) here         _  = wrap-src w α
+    not-src w (in-source α) (in-source β) eq = not-src w α β (in-source-inj eq)
       where in-source-inj : ∀ {x y} → in-source x ≡ in-source y → x ≡ y
             in-source-inj refl = refl
-    map-not-src (in-source α) (in-body β)  ()
-    map-not-src (in-body α)  here          ()
-    map-not-src (in-body α)  (in-source β) ()
-    map-not-src (in-body α)  (in-body β)   eq = map-not-src α β (in-body-inj eq)
+    not-src w (in-source α) (in-body β)  ()
+    not-src w (in-body α)  here          ()
+    not-src w (in-body α)  (in-source β) ()
+    not-src w (in-body α)  (in-body β)   eq = not-src w α β (in-body-inj eq)
       where in-body-inj : ∀ {x y} → in-body x ≡ in-body y → x ≡ y
             in-body-inj refl = refl
-    map-not-src (in-defer α) (in-defer β)  eq = map-not-src α β (in-defer-inj eq)
+    not-src w (in-defer α) (in-defer β)  eq = not-src w α β (in-defer-inj eq)
       where in-defer-inj : ∀ {x y} → in-defer x ≡ in-defer y → x ≡ y
             in-defer-inj refl = refl
 
-    map-not-srcᴸ : ∀ {h Δ B Δ₀ A₀ B₀ C₀} {ls : List (Lane h Δ B)} {f : A₀ → B₀} {s : T.Obs Timeline Δ₀ A₀} {q} {S c b kb k fd e rp rt} {bd : Sub h (A₀ ∷ Δ₀) C₀}
-                   (α : PathLanes ls (mapˢ f (pendingˢ s q))) (β : PathLanes ls (connectˢ S c b kb k fd rp e rt (pendingˢ s q) bd))
-                 → α ⊕ᴸ in-map here ≢ β ⊕ᴸ in-source here
-    map-not-srcᴸ (this-lane α) (this-lane β) eq = map-not-src α β (this-inj eq)
+    not-srcᴸ : ∀ {h Δ B Δ₀ A₀ B₀ C₀} {ls : List (Lane h Δ B)} {s : T.Obs Timeline Δ₀ A₀} {q} {u : Sub h Δ₀ B₀} {ι : Path u (pendingˢ s q)} → Wrap ι
+             → ∀ {S c b kb k fd e rp rt} {bd : Sub h (A₀ ∷ Δ₀) C₀}
+               (α : PathLanes ls u) (β : PathLanes ls (connectˢ S c b kb k fd rp e rt (pendingˢ s q) bd))
+             → α ⊕ᴸ ι ≢ β ⊕ᴸ in-source here
+    not-srcᴸ w (this-lane α) (this-lane β) eq = not-src w α β (this-inj eq)
       where this-inj : ∀ {x y} → this-lane x ≡ this-lane y → x ≡ y
             this-inj refl = refl
-    map-not-srcᴸ (this-lane α) (next-lane β) ()
-    map-not-srcᴸ (next-lane α) (this-lane β) ()
-    map-not-srcᴸ (next-lane α) (next-lane β) eq = map-not-srcᴸ α β (next-inj eq)
-      where next-inj : ∀ {x y} → next-lane x ≡ next-lane y → x ≡ y
-            next-inj refl = refl
-
-  -- A path ending under a scan ends under no connect's source.
-  mutual
-    scan-not-src : ∀ {h Δ A Δ₀ A₀ B₀ C₀} {t : Sub h Δ A} {f : B₀ → A₀ → B₀} {r} {s : T.Obs Timeline Δ₀ A₀} {q} {S c b kb k fd e rp rt} {bd : Sub h (A₀ ∷ Δ₀) C₀}
-                  (α : Path t (scanˢ f r (pendingˢ s q))) (β : Path t (connectˢ S c b kb k fd rp e rt (pendingˢ s q) bd))
-                → α ⊕ in-scan here ≢ β ⊕ in-source here
-    scan-not-src here         (in-scan ())   _
-    scan-not-src (in-map α)   (in-map β)    eq = scan-not-src α β (in-map-inj eq)
-      where in-map-inj : ∀ {x y} → in-map x ≡ in-map y → x ≡ y
-            in-map-inj refl = refl
-    scan-not-src (in-scan α)  (in-scan β)   eq = scan-not-src α β (in-scan-inj eq)
-      where in-scan-inj : ∀ {x y} → in-scan x ≡ in-scan y → x ≡ y
-            in-scan-inj refl = refl
-    scan-not-src (in-take α)  (in-take β)   eq = scan-not-src α β (in-take-inj eq)
-      where in-take-inj : ∀ {x y} → in-take x ≡ in-take y → x ≡ y
-            in-take-inj refl = refl
-    scan-not-src (in-outer α) (in-outer β)  eq = scan-not-src α β (in-outer-inj eq)
-      where in-outer-inj : ∀ {x y} → in-outer x ≡ in-outer y → x ≡ y
-            in-outer-inj refl = refl
-    scan-not-src (in-outer α) (in-lanes β)  ()
-    scan-not-src (in-lanes α) (in-outer β)  ()
-    scan-not-src (in-lanes α) (in-lanes β)  eq = scan-not-srcᴸ α β (in-lanes-inj eq)
-      where in-lanes-inj : ∀ {x y} → in-lanes x ≡ in-lanes y → x ≡ y
-            in-lanes-inj refl = refl
-    scan-not-src (in-source ()) here        _
-    scan-not-src (in-source α) (in-source β) eq = scan-not-src α β (in-source-inj eq)
-      where in-source-inj : ∀ {x y} → in-source x ≡ in-source y → x ≡ y
-            in-source-inj refl = refl
-    scan-not-src (in-source α) (in-body β)  ()
-    scan-not-src (in-body α)  here          ()
-    scan-not-src (in-body α)  (in-source β) ()
-    scan-not-src (in-body α)  (in-body β)   eq = scan-not-src α β (in-body-inj eq)
-      where in-body-inj : ∀ {x y} → in-body x ≡ in-body y → x ≡ y
-            in-body-inj refl = refl
-    scan-not-src (in-defer α) (in-defer β)  eq = scan-not-src α β (in-defer-inj eq)
-      where in-defer-inj : ∀ {x y} → in-defer x ≡ in-defer y → x ≡ y
-            in-defer-inj refl = refl
-
-    scan-not-srcᴸ : ∀ {h Δ B Δ₀ A₀ B₀ C₀} {ls : List (Lane h Δ B)} {f : B₀ → A₀ → B₀} {r} {s : T.Obs Timeline Δ₀ A₀} {q} {S c b kb k fd e rp rt} {bd : Sub h (A₀ ∷ Δ₀) C₀}
-                   (α : PathLanes ls (scanˢ f r (pendingˢ s q))) (β : PathLanes ls (connectˢ S c b kb k fd rp e rt (pendingˢ s q) bd))
-                 → α ⊕ᴸ in-scan here ≢ β ⊕ᴸ in-source here
-    scan-not-srcᴸ (this-lane α) (this-lane β) eq = scan-not-src α β (this-inj eq)
-      where this-inj : ∀ {x y} → this-lane x ≡ this-lane y → x ≡ y
-            this-inj refl = refl
-    scan-not-srcᴸ (this-lane α) (next-lane β) ()
-    scan-not-srcᴸ (next-lane α) (this-lane β) ()
-    scan-not-srcᴸ (next-lane α) (next-lane β) eq = scan-not-srcᴸ α β (next-inj eq)
+    not-srcᴸ w (this-lane α) (next-lane β) ()
+    not-srcᴸ w (next-lane α) (this-lane β) ()
+    not-srcᴸ w (next-lane α) (next-lane β) eq = not-srcᴸ w α β (next-inj eq)
       where next-inj : ∀ {x y} → next-lane x ≡ next-lane y → x ≡ y
             next-inj refl = refl
 
@@ -1104,7 +1075,7 @@ module Restaging (R : Set) where
       u , E′ , υ , subst (λ W → wkEnv υ E′ ≡ Here.env W) (sym walk′) e , subst (λ W → act ≗ compile s E′ υ (Here.obs W) (Here.kont W)) (sym walk′) c
 
     alone : ∀ {k} → ¬ SrcOf t′ π′ k
-    alone (src-of ρ e) = map-not-src (planted π v) ρ e
+    alone (src-of ρ e) = not-src wrap-map (planted π v) ρ e
 
     alones : ∀ (js : List (Job t′)) → All (λ j → ¬ SrcOf t′ π′ (proj₂ j)) js
     alones _ = tabulateᴬ (λ _ → alone)
@@ -1190,9 +1161,6 @@ module Restaging (R : Set) where
                                   → subOf (Carried.ctlAs cr′) ≡ just (Δ , A , s) × measure (carried cr′) ≺ measure (carried cr)
 
   postulate
-    -- A takeWhile allocates its cut and begins its source.
-    take-restage    : ∀ {g m} (cr : Carried g m) {Δ A i} {p : A → Bool} {s : T.Obs Timeline Δ A}
-                    → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.takeWhile i p s) → Restages cr s
     -- A flatMap allocates its pool and begins its outer.
     flat-restage    : ∀ {g m} (cr : Carried g m) {Δ A B op} {f : A → T.Obs Timeline Δ B} {s : T.Obs Timeline Δ A}
                     → subOf (Carried.ctlAs cr) ≡ just (Δ , B , T.flatMap op f s) → Restages cr s
@@ -1251,6 +1219,18 @@ module Restaging (R : Set) where
                   × KontRel (wkKont τ (Here.kont (walk π top))) (Here.kont (walk (wkPath τ π) top))
                   × wkEnv τ (Here.env (walk π top)) ≡ Here.env (walk (wkPath τ π) top)
 
+    env-grow : ∀ {t : Sub h [] R} {Δ A} {u′ : Sub h Δ A} (π : Path t u′) {u} (E′ : Env Δ u) (υ : u ⊑ h)
+             → wkEnv υ E′ ≡ Here.env (walk π top) → wkEnv (υ ⨾ τ) E′ ≡ Here.env (walk (wkPath τ π) top)
+    env-grow π E′ υ e = trans (sym (wkEnv-wk υ τ E′)) (trans (cong (wkEnv τ) e) (proj₂ (proj₂ (walk-grow π))))
+
+    -- A subscription still pending, along the weakened path.
+    code-grow : ∀ {t : Sub h [] R} {Δ A} {s : T.Obs Timeline Δ A} {q} (π : Path t (pendingˢ s q)) {u} (E′ : Env Δ u) (υ : u ⊑ h)
+              → wkEnv υ E′ ≡ Here.env (walk π top)
+              → Σ World λ u′ → Σ (Env Δ u′) λ E″ → Σ (u′ ⊑ v) λ υ′ → wkEnv υ′ E″ ≡ Here.env (walk (wkPath τ π) top)
+                  × compile s E′ (υ ⨾ τ) (Here.obs (walk (wkPath τ π) top)) (Here.kont (walk (wkPath τ π) top))
+                    ≗ compile s E″ υ′ (Here.obs (walk (wkPath τ π) top)) (Here.kont (walk (wkPath τ π) top))
+    code-grow π {u} E′ υ e = u , E′ , υ ⨾ τ , env-grow π E′ υ e , ≗-refl _
+
     module _ {H : Heapᴹ h} {H′ : Heapᴹ v} (gr : Grows τ H H′) where
       postulate
         grow-part    : ∀ {Δ A} (u : Sub h Δ A) → At.part H′ (wkTree τ u) ≡ At.part H u
@@ -1274,6 +1254,47 @@ module Restaging (R : Set) where
   -- A scan's observer over alike observers.
   scanO-cong : ∀ {h A B} (f : B → A → B) (r : Ref h (base B)) {o o′ : Observer B h} → ObsRel o o′ → ObsRel (Canon.scanO f r o) (Canon.scanO f r o′)
   scanO-cong f r (n , c , x) = (λ a → readRef≗ refl λ σ b → wk≗ σ (writeRef≗ refl refl (n (f b a)))) , c , x
+
+  ≗-sym : ∀ {w B} {m m′ : Act w B} → m ≗ m′ → m′ ≗ m
+  ≗-sym (done≗ e)                = done≗ (sym e)
+  ≗-sym (newRef≗ e f)            = newRef≗ (sym e) λ σ r → ≗-sym (f σ r)
+  ≗-sym (readRef≗ refl f)        = readRef≗ refl λ σ x → ≗-sym (f σ x)
+  ≗-sym (writeRef≗ refl e k)     = writeRef≗ refl (sym e) (≗-sym k)
+  ≗-sym (register≗ n c x k)      = register≗ (λ a → ≗-sym (n a)) (≗-sym c) (≗-sym x) λ σ s → ≗-sym (k σ s)
+  ≗-sym (send≗ refl k)           = send≗ refl (≗-sym k)
+  ≗-sym (finish≗ refl k)         = finish≗ refl (≗-sym k)
+  ≗-sym (startCold≗ refl f)      = startCold≗ refl λ σ hd → ≗-sym (f σ hd)
+  ≗-sym (stop≗ refl k)           = stop≗ refl (≗-sym k)
+  ≗-sym (stash≗ m f)             = stash≗ (≗-sym m) λ σ q → ≗-sym (f σ q)
+  ≗-sym (cancel≗ refl k)         = cancel≗ refl (≗-sym k)
+  ≗-sym (eff≗ f)                 = eff≗ λ a → ≗-sym (f a)
+  ≗-sym (here≗ f)                = here≗ λ p → ≗-sym (f p)
+  ≗-sym (under≗ m k)             = under≗ (≗-sym m) (≗-sym k)
+  ≗-sym diverge≗                 = diverge≗
+  ≗-sym (unfold≗ refl n c x k m) = unfold≗ refl (λ a → ≗-sym (n a)) (≗-sym c) (≗-sym x) (λ σ q → ≗-sym (k σ q)) (≗-sym m)
+
+  obs-trans : ∀ {A w} {o₁ o₂ o₃ : Observer A w} → ObsRel o₁ o₂ → ObsRel o₂ o₃ → ObsRel o₁ o₃
+  obs-trans (n , c , x) (n′ , c′ , x′) = (λ a → ≗-trans (n a) (n′ a)) , ≗-trans c c′ , ≗-trans x x′
+
+  obs-wk : ∀ {A w v} (ρ : w ⊑ v) {o o′ : Observer A w} → ObsRel o o′ → ObsRel (wkObs ρ o) (wkObs ρ o′)
+  obs-wk ρ (n , c , x) = (λ a → wk≗ ρ (n a)) , wk≗ ρ c , wk≗ ρ x
+
+  -- An observer weakened along a composite, as weakened twice.
+  obs-⨾ : ∀ {A u v w} (σ : u ⊑ v) (τ : v ⊑ w) (o : Observer A u) → ObsRel (wkObs (σ ⨾ τ) o) (wkObs τ (wkObs σ o))
+  obs-⨾ σ τ o = (λ a → ≗-sym (wk-wk σ τ _)) , ≗-sym (wk-wk σ τ _) , ≗-sym (wk-wk σ τ _)
+
+  if≗ : ∀ {w B} b {x x′ y y′ : Act w B} → x ≗ x′ → y ≗ y′ → (if b then x else y) ≗ (if b then x′ else y′)
+  if≗ true  e _ = e
+  if≗ false _ e = e
+
+  -- A takeWhile's observer over alike observers.
+  takeO-cong : ∀ {h A} i (p : A → Bool) (c : Kit.Cut h) {o o′ : Observer A h} → ObsRel o o′ → ObsRel (Canon.takeWhileO i p c o) (Canon.takeWhileO i p c o′)
+  takeO-cong i p c (n , cm , x) =
+      (λ a → guard≗ (if≗ (p a) (n a) (bind≗ (if≗ i (under≗ (n a) (≗-refl _)) (≗-refl _)) λ _ → under≗ cm (≗-refl _))))
+    , guard≗ cm
+    , readRef≗ refl λ σ b → wk≗ σ (if≗ b x (≗-refl _))
+    where guard≗ : ∀ {m m′} → m ≗ m′ → Kit.guard c m ≗ Kit.guard c m′
+          guard≗ e = readRef≗ refl λ σ b → wk≗ σ (if≗ b e (≗-refl _))
 
   -- A SCAN RESTAGED IN THE GROWN WORLD: its accumulator the newest cell,
   -- its source pending beneath it.
@@ -1303,15 +1324,6 @@ module Restaging (R : Set) where
 
     wg = Grown.walk-grow ν π
 
-    env₁ : ∀ {u} (E′ : Env Δ u) (υ : u ⊑ h) → wkEnv υ E′ ≡ Here.env (walk π top) → wkEnv (υ ⨾ new) E′ ≡ Here.env (walk π₁ top)
-    env₁ E′ υ e = trans (sym (wkEnv-wk υ new E′)) (trans (cong (wkEnv new) e) (proj₂ (proj₂ wg)))
-
-    -- The scan, still pending, along the weakened path.
-    code₁ : ∀ {u} (E′ : Env Δ u) (υ : u ⊑ h) → wkEnv υ E′ ≡ Here.env (walk π top)
-          → Σ World λ u′ → Σ (Env Δ u′) λ E″ → Σ (u′ ⊑ h′) λ υ′ → wkEnv υ′ E″ ≡ Here.env (walk π₁ top)
-                         × compile (T.scan f z s) E′ (υ ⨾ new) (Here.obs (walk π₁ top)) (Here.kont (walk π₁ top))
-                           ≗ compile (T.scan f z s) E″ υ′ (Here.obs (walk π₁ top)) (Here.kont (walk π₁ top))
-    code₁ {u} E′ υ e = u , E′ , υ ⨾ new , env₁ E′ υ e , ≗-refl _
 
     -- The source compiles as the scan's body did, under the scan's
     -- observer over the grown walk.
@@ -1320,12 +1332,12 @@ module Restaging (R : Set) where
           → Σ World λ u′ → Σ (Env Δ u′) λ E″ → Σ (u′ ⊑ h′) λ υ′ → wkEnv υ′ E″ ≡ Here.env (walk π′ top)
                          × act ≗ compile s E″ υ′ (Here.obs (walk π′ top)) (Here.kont (walk π′ top))
     code′ {u} E′ υ {act} e c = u , E′ , υ ⨾ new
-      , subst (λ W → wkEnv (υ ⨾ new) E′ ≡ Here.env W) (sym walk′) (env₁ E′ υ e)
+      , subst (λ W → wkEnv (υ ⨾ new) E′ ≡ Here.env W) (sym walk′) (Grown.env-grow ν π E′ υ e)
       , subst (λ W → act ≗ compile s E′ (υ ⨾ new) (Here.obs W) (Here.kont W)) (sym walk′)
           (≗-trans c (compile-cong s E′ (υ ⨾ new) (scanO-cong f hereʳ (proj₁ wg)) (proj₁ (proj₂ wg))))
 
     alone : ∀ {k} → ¬ SrcOf t′ π′ k
-    alone (src-of ρ e) = scan-not-src (planted π₁ v) ρ e
+    alone (src-of ρ e) = not-src wrap-scan (planted π₁ v) ρ e
 
     alones : ∀ (js : List (Job t′)) → All (λ j → ¬ SrcOf t′ π′ (proj₂ j)) js
     alones _ = tabulateᴬ (λ _ → alone)
@@ -1386,7 +1398,7 @@ module Restaging (R : Set) where
     , record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = S.t′
              ; ctlAs = subAs S.π′ (S.code′ E′ υ e (kk new hereʳ)) (S.restack sk₁ a₁) (S.alones _)
              ; meets = trans (part-plant H′ S.π₁ S.v eqv) (trans (G.grow-part gr (Carried.tree cr)) (Carried.meets cr))
-             ; owned = Moved.Owning.reowned S.π₁ S.v H′ eqv (in-scan here) S.inner {cd = S.code₁ E′ υ e} sk₁ a₁ (G.grow-owned gr sk (Carried.owned cr))
+             ; owned = Moved.Owning.reowned S.π₁ S.v H′ eqv (in-scan here) S.inner {cd = Grown.code-grow S.ν π E′ υ e} sk₁ a₁ (G.grow-owned gr sk (Carried.owned cr))
              ; kernels = S.rs-kernels H′ eqv (G.grow-kernels gr (Carried.kernels cr))
              ; meaning = S.rs-meaning H′ eqv (G.grow-meaning gr (Carried.meaning cr))
              ; queue = S.rs-queue H′ eqv (G.grow-queue gr (Carried.queue cr))
@@ -1402,5 +1414,182 @@ module Restaging (R : Set) where
           sk₁ = G.grow-stack sk
           a₁ = G.grow-alone π sk a
           eqv : At.part H′ (pendingˢ (T.scan f z s) _) ≡ At.part H′ S.v
+          eqv = refl
+          bk = Carried.books cr
+
+  -- A TAKEWHILE RESTAGED IN THE WORLD GROWN TWICE: its cut the two
+  -- newest cells, live and holding nothing, its source pending beneath
+  -- it.
+  module Taken {h} {T₀ : Sub h [] R} {Δ A} {i} {p : A → Bool} {s : T.Obs Timeline Δ A} {q} (π : Path T₀ (pendingˢ (T.takeWhile i p s) q)) where
+    h₁ h₂ : World
+    h₁ = cell (base Bool) ∷ h
+    h₂ = cell (maybe quiet) ∷ h₁
+
+    ν₁ : h ⊑ h₁
+    ν₁ = new
+
+    ν₂ : h₁ ⊑ h₂
+    ν₂ = new
+
+    T₁ : Sub h₁ [] R
+    T₁ = wkTree ν₁ T₀
+
+    π₁ : Path T₁ (pendingˢ (T.takeWhile i p s) q)
+    π₁ = wkPath ν₁ π
+
+    T₂ : Sub h₂ [] R
+    T₂ = wkTree ν₂ T₁
+
+    π₂ : Path T₂ (pendingˢ (T.takeWhile i p s) q)
+    π₂ = wkPath ν₂ π₁
+
+    c₂ : Kit.Cut h₂
+    c₂ = wkR ν₂ hereʳ , hereʳ
+
+    v : Sub h₂ Δ A
+    v = takeWhileˢ i p c₂ nothing taking (pendingˢ s q)
+
+    open Moved π₂ v using (t′; restack; Alone; reticked) public
+
+    π′ : Path t′ (pendingˢ s q)
+    π′ = planted π₂ v ⊕ in-take here
+
+    walk′ : walk π′ top ≡ walk (in-take {i = i} {p} {c₂} {nothing} {taking} {t = pendingˢ s q} here) (walk π₂ top)
+    walk′ = trans (walk-⊕ (planted π₂ v) (in-take here) top)
+                  (cong (λ W → walk (in-take {i = i} {p} {c₂} {nothing} {taking} {t = pendingˢ s q} {u = pendingˢ s q} here) W) (walk-planted π₂ v top))
+
+    wg₁ = Grown.walk-grow ν₁ π
+    wg₂ = Grown.walk-grow ν₂ π₁
+
+    obs₂ : ObsRel (wkObs (ν₁ ⨾ ν₂) (Here.obs (walk π top))) (Here.obs (walk π₂ top))
+    obs₂ = obs-trans (obs-trans (obs-⨾ ν₁ ν₂ _) (obs-wk ν₂ (proj₁ wg₁))) (proj₁ wg₂)
+
+    -- The kernel's continuation, the take's over the twice-grown walk.
+    kontₖ : Kont h₂
+    kontₖ τ sub = Kit.attach (Kit.wkCut τ c₂) sub >>ᴬ Here.kont (walk π top) ((ν₁ ⨾ ν₂) ⨾ τ) (unsubscribing (Kit.cut (Kit.wkCut τ c₂)))
+
+    kont₂ : KontRel kontₖ (takeK c₂ (Here.kont (walk π₂ top)))
+    kont₂ τ sub = bind≗ (≗-refl (Kit.attach (Kit.wkCut τ c₂) sub)) λ _ →
+      ≗-trans (≗-sym (from-⨾ (λ ζ → Here.kont (walk π top) ζ R′) ν₁ ν₂ τ)) (≗-trans (proj₁ (proj₂ wg₁) (ν₂ ⨾ τ) R′) (proj₁ (proj₂ wg₂) τ R′))
+      where R′ = unsubscribing (Kit.cut (Kit.wkCut τ c₂))
+
+    env₂ : ∀ {u} (E′ : Env Δ u) (υ : u ⊑ h) → wkEnv υ E′ ≡ Here.env (walk π top) → wkEnv (υ ⨾ (ν₁ ⨾ ν₂)) E′ ≡ Here.env (walk π₂ top)
+    env₂ E′ υ e = trans (sym (wkEnv-wk υ (ν₁ ⨾ ν₂) E′)) (trans (cong (wkEnv (ν₁ ⨾ ν₂)) e) (trans (sym (wkEnv-wk ν₁ ν₂ _))
+                    (trans (cong (wkEnv ν₂) (proj₂ (proj₂ wg₁))) (proj₂ (proj₂ wg₂)))))
+
+    -- The source compiles as the take's body did, under the take's
+    -- observer and continuation over the twice-grown walk.
+    code′ : ∀ {u} (E′ : Env Δ u) (υ : u ⊑ h) {act} → wkEnv υ E′ ≡ Here.env (walk π top)
+          → act ≗ compile s E′ (υ ⨾ (ν₁ ⨾ ν₂)) (Canon.takeWhileO i p c₂ (wkObs (ν₁ ⨾ ν₂) (Here.obs (walk π top)))) kontₖ
+          → Σ World λ u′ → Σ (Env Δ u′) λ E″ → Σ (u′ ⊑ h₂) λ υ′ → wkEnv υ′ E″ ≡ Here.env (walk π′ top)
+                         × act ≗ compile s E″ υ′ (Here.obs (walk π′ top)) (Here.kont (walk π′ top))
+    code′ {u} E′ υ {act} e c = u , E′ , υ ⨾ (ν₁ ⨾ ν₂)
+      , subst (λ W → wkEnv (υ ⨾ (ν₁ ⨾ ν₂)) E′ ≡ Here.env W) (sym walk′) (env₂ E′ υ e)
+      , subst (λ W → act ≗ compile s E′ (υ ⨾ (ν₁ ⨾ ν₂)) (Here.obs W) (Here.kont W)) (sym walk′)
+          (≗-trans c (compile-cong s E′ (υ ⨾ (ν₁ ⨾ ν₂)) (takeO-cong i p c₂ obs₂) kont₂))
+
+    alone : ∀ {k} → ¬ SrcOf t′ π′ k
+    alone (src-of ρ e) = not-src wrap-take (planted π₂ v) ρ e
+
+    alones : ∀ (js : List (Job t′)) → All (λ j → ¬ SrcOf t′ π′ (proj₂ j)) js
+    alones _ = tabulateᴬ (λ _ → alone)
+
+    less : pend t′ < pend T₀
+    less = subst (pend t′ <_) (trans (pend-grow ν₂ T₁) (pend-grow ν₁ T₀)) (pend-less π₂ v ≤-refl)
+
+    -- A live take over a pending source holds nothing a call is owed
+    -- at, and one pending node: its source.
+    inner : Moved.Inner π₂ v (in-take here)
+    inner = record { no-of = λ { (in-take ()) } ; no-cold = λ { (in-take ()) } ; one-pend = λ { (in-take here) → refl }
+                   ; no-end = λ { (in-take ()) } ; no-cut = λ { (in-take ()) } ; no-feed = λ { (in-take ()) } ; no-fin = λ { (in-take ()) }
+                   ; not-self = λ _ () }
+
+    postulate
+      -- The cut's cells are names the tree did not hold.
+      take-fresh : AllPairs _≢_ (names T₀) → AllPairs _≢_ (names t′)
+      -- The source heads no earlier than the take over it.
+      untake     : ∀ {k} {c : U.Node Δ A} → Heads k (U.takeWhileᶜ i p c) → Heads k c
+
+    module _ (H′ : Heapᴹ h₂) (eqv : At.part H′ (pendingˢ (T.takeWhile i p s) q) ≡ At.part H′ v) where
+      postulate
+        -- The take's unsubscribe is its cut, where the pending node's
+        -- was nothing; every ancestor still owing the source's
+        -- subscription stashes nothing, so none read the difference.
+        -- No field of `Carried` says so.
+        take-holds : At.Holds H′ T₂ [] rootObs → At.Holds H′ t′ [] rootObs
+
+      rt-behind : ∀ {k} → Each H′ (Heads k) T₂ → Each H′ (Heads k) t′
+      rt-behind {k} = each-plant H′ π₂ v eqv tr
+        where
+          pa : ∀ {Δ′ A′} {w : Sub h₂ Δ′ A′} → Each H′ (Heads k) (pendingˢ (T.takeWhile i p s) q) → (ψ : Path v w) → seen H′ ψ ≡ true
+             → ∀ {c} → At.part H′ w ≡ just c → Heads k c
+          pa eu here            _ pw   = Each.parts eu here refl (trans eqv pw)
+          pa eu (in-take here)  _ refl = untake {c = U.subscribe s q} (Each.parts eu here refl refl)
+
+          tr : Each H′ (Heads k) (pendingˢ (T.takeWhile i p s) q) → Each H′ (Heads k) v
+          tr eu = record { parts = pa eu ; pools = λ { (in-take ()) } ; rests = λ { (in-take ()) } }
+
+      rt-kernels : Kernels H′ T₂ → Kernels H′ t′
+      rt-kernels kn = record { holds = take-holds (Kernels.holds kn)
+                             ; gated = gated-plant H′ π₂ v (λ g → (λ _ → lift tt) , g) (λ _ → lift tt) (Kernels.gated kn) }
+
+      rt-meaning : Meaning H′ T₂ → Meaning H′ t′
+      rt-meaning mn = record { fed = fed-plant H′ π₂ v (λ _ fd → fd) _ (Meaning.fed mn) }
+
+      pendings′ : pendings t′ ≡ pendings T₂
+      pendings′ with pendings-plant π₂ v
+      ... | _ , _ , e , e′ = trans e′ (sym e)
+
+      rt-queue : ∀ {k clk ts} → Queue H′ k clk ts T₂ → Queue H′ k clk ts t′
+      rt-queue {ts = ts} qu =
+        record { timed   = subst (At.Timed H′ ts) (sym pendings′) (Queue.timed qu)
+               ; joined  = subst₂ (At.Joined H′) (sym (subjects-plant π₂ v refl)) (sym (joiners-plant π₂ v (λ _ → refl) [])) (Queue.joined qu)
+               ; ordered = Queue.ordered qu ; ahead = Queue.ahead qu }
+
+  -- An allocation's continuation, as a function.
+  allocates : ∀ {w B t a} {k′ : ∀ {v} → w ⊑ v → Ref v t → Act v B} {m : Act w B} → m ≗ newRef t a k′
+            → Σ (∀ {v} → w ⊑ v → Ref v t → Act v B) λ k₁ → m ≡ newRef t a k₁ × (∀ {v} (σ : w ⊑ v) r → k₁ σ r ≗ k′ σ r)
+  allocates (newRef≗ refl f) = _ , refl , f
+
+  -- A takeWhile begun allocates its cut, live and holding nothing, and
+  -- begins its source under the take's observer, one subscription fewer
+  -- owed.
+  take-restage : ∀ {g m} (cr : Carried g m) {Δ A i} {p : A → Bool} {s : T.Obs Timeline Δ A}
+               → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.takeWhile i p s) → Restages cr s
+  take-restage {m = m₀@(mach ⟨ H , q₀ , run _ σ K ⟩ _ _ _ _ _ _ _)} cr@record { ctlAs = subAs {s = T.takeWhile i p s} π (u , E′ , υ , e , newRef≗ refl kk) sk a } refl refl
+    with allocates (kk new hereʳ)
+  ... | k₁ , e₁ , kk₂ =
+    _ , then (cong (λ x → step (Mx x)) e₁) now
+    , record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = S.t′
+             ; ctlAs = subAs S.π′ (S.code′ E′ υ e (kk₂ new hereʳ)) (S.restack sk₂ a₂) (S.alones _)
+             ; meets = trans (part-plant H₂ S.π₂ S.v eqv) (trans (G₂.grow-part gr₂ S.T₁) (trans (G₁.grow-part gr₁ (Carried.tree cr)) (Carried.meets cr)))
+             ; owned = Moved.Owning.reowned S.π₂ S.v H₂ eqv (in-take here) S.inner sk₂ a₂
+                         (G₂.grow-owned gr₂ {cd′ = cd₂} sk₁ {a′ = a₂} (G₁.grow-owned gr₁ {cd′ = cd₁} sk {a′ = a₁} (Carried.owned cr)))
+             ; kernels = S.rt-kernels H₂ eqv (G₂.grow-kernels gr₂ (G₁.grow-kernels gr₁ (Carried.kernels cr)))
+             ; meaning = S.rt-meaning H₂ eqv (G₂.grow-meaning gr₂ (G₁.grow-meaning gr₁ (Carried.meaning cr)))
+             ; queue = S.rt-queue H₂ eqv (G₂.grow-queue gr₂ (G₁.grow-queue gr₁ (Carried.queue cr)))
+             ; books = record { fresh = S.take-fresh (Books.fresh bk)
+                              ; clocked = proj₁ (Books.clocked bk) , S.reticked sk₂ a₂ (G₂.grow-ticked sk₁ (G₁.grow-ticked sk (proj₂ (Books.clocked bk))))
+                              ; paidUp = cong (mapList (wkTodo new)) (cong (mapList (wkTodo new)) (Books.paidUp bk)) ; running = Books.running bk }
+             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl (then (cong (λ x → step (Mx x)) e₁) now))
+             ; behind = S.rt-behind H₂ eqv (G₂.grow-each gr₂ (G₁.grow-each gr₁ (Carried.behind cr))) }
+    , refl , inj₁ (inj₁ S.less)
+    where module S = Taken {i = i} {p = p} {s = s} π
+          module G₁ = Grown S.ν₁
+          module G₂ = Grown S.ν₂
+          H₁ = extend H (lift true)
+          H₂ = extend H₁ (lift nothing)
+          Mx : Act (cell (base Bool) ∷ _) ⊤ → Mach
+          Mx x = record m₀ { conf = ⟨ H₁ , q₀ , run x (σ ⨾ new) K ⟩ ; timers = mapList (wkTimer new) (Mach.timers m₀)
+                           ; bursts = mapList (mapMaybe (wkPlaying new)) (Mach.bursts m₀) ; todo = mapList (wkTodo new) (Mach.todo m₀) }
+          gr₁ = grows-extend H (lift true)
+          gr₂ = grows-extend H₁ (lift nothing)
+          sk₁ = G₁.grow-stack sk
+          sk₂ = G₂.grow-stack sk₁
+          a₁ = G₁.grow-alone π sk a
+          a₂ = G₂.grow-alone S.π₁ sk₁ a₁
+          cd₁ = Grown.code-grow S.ν₁ π E′ υ e
+          cd₂ = Grown.code-grow S.ν₂ S.π₁ E′ (υ ⨾ S.ν₁) (Grown.env-grow S.ν₁ π E′ υ e)
+          eqv : At.part H₂ (pendingˢ (T.takeWhile i p s) _) ≡ At.part H₂ S.v
           eqv = refl
           bk = Carried.books cr

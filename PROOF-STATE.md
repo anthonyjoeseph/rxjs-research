@@ -203,19 +203,16 @@ by their own silent steps (`Mirror`).
   `scan-defined`, `scan-owned`, `scan-meaning`, `scan-sees`; `up-outer`
   and `up-lanes` by a flatMap head bound; then `fr-*`, `dq-*`, `bg-*` and
   `close-outer`'s `sd-*` the same way, in the form C consumes.
-- **THE RESTAGE FRAME.** `map-restage` is a body: the stack carried by
-  `Moved.restack`, each call's walk by `fork`. Ruled out: the stack
-  needing more than `subAs`'s owed-by-no-call field; `kontC` is
-  leaf-only, so no call reads a restaged subtree. `Kernels`,
-  `Meaning`, `Queue` by the `*-plant` lemmas; `Owned` by
-  `Owning.reowned` over an `Inner` of the planted subtree, `Each` by
-  `each-plant` over a local transfer. Ruled out: a former needing more
-  of its planted subtree than `Inner` says. `scan-restage` is a body:
-  the `Grown` frame weakens the tree into the allocated heap, then the
-  same `Moved` plants. Ruled out: a growth needing more of the step than
-  a weakening and `compile-cong`. Remaining: `take-restage`,
-  `flat-restage`, `connect-restage` over the same frame, composed over
-  several allocations. Decides whether the frame composes.
+- **THE RESTAGE FRAME.** `map-restage`, `scan-restage`, `take-restage`
+  are bodies: a growth weakens the tree into the allocated heap (the
+  `Grown` frame, composing over several allocations), `Moved` plants the
+  node, `Owning.reowned` carries `Owned` over an `Inner`. Ruled out: a
+  former needing more of its planted subtree than `Inner` says; a growth
+  needing more of the step than a weakening and `compile-cong`. Found: a
+  planted node whose `unsub` differs needs an unstashed-ancestor
+  invariant (`take-holds`). Remaining: `flat-restage`,
+  `connect-restage`. Decides whether that invariant belongs in
+  `Carried`.
 - **D. THE KERNEL FOOTPRINT.** A kernel's cells allocated together and read
   only through its own node, `names` agreeing by construction. `names`
   already lists each node's cells, so this leg is CONDITIONAL: done when
@@ -472,8 +469,14 @@ by their own silent steps (`Mirror`).
   of a tree it reads of the tree weakened into a grown heap.
 - **`scan-fresh`** (Restage) — FALSITY, `NO EVIDENCE`: a scan's new
   accumulator is a name the tree did not hold.
-- **`take-restage`** (Restage) — FALSITY, `NO EVIDENCE`: a takeWhile begun
-  allocates its cut and is carried at its source, less owed.
+- **`take-holds`** (Restage) — FALSITY, `NO EVIDENCE`: a take planted over a
+  pending source leaves every ancestor's stash as it was. Needs that an
+  ancestor still owing a pending subscription stashes nothing, which no
+  field of `Carried` says.
+- **`untake`** (Restage) — FALSITY, `NO EVIDENCE`: a source heads no earlier
+  than the take over it.
+- **`take-fresh`** (Restage) — FALSITY, `NO EVIDENCE`: a take's new cut is two
+  names the tree did not hold.
 - **`flat-restage`** (Restage) — FALSITY, `NO EVIDENCE`: a flatMap begun
   allocates its kit and cut and is carried at its outer, less owed.
 - **`connect-restage`** (Restage) — FALSITY, `NO EVIDENCE`: a connect begun
