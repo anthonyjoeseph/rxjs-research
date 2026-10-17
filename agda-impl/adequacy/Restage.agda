@@ -1251,7 +1251,7 @@ module Restaging (R : Set) where
           bk = Carried.books cr
 
   of-restage : ∀ {g m} (cr : Carried g m) {Δ A} {xs : List A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.of xs) → Offers cr xs
-  of-restage cr e = offer-restage cr e (λ _ → refl) (λ _ _ _ → bind≗ (≗-refl _) λ _ → seq-done _)
+  of-restage cr {xs = xs} e = offer-restage cr e (λ _ → refl) (λ _ _ W → bind≗ (≗-refl (emitAll (Here.obs W) 0 xs)) λ _ → seq-done _)
 
   empty-restage : ∀ {g m} (cr : Carried g m) {Δ A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , T.empty) → Offers cr {Δ} {A} []
   empty-restage cr e = offer-restage cr e (λ _ → refl) (λ _ _ _ → under≗ (≗-refl _) (seq-done _))
