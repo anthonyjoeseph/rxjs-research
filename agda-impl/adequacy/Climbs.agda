@@ -1309,7 +1309,7 @@ module Ascending (R : Set) where
       fr-queue : ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
 
     module Wr (fs : AllPairs _≢_ (names T)) =
-      Wrote H H′ ρ (off-++ {H₁ = unlive H (laneOf o)} ((_ , Kit.live (laneOf o)) ∷ []) (off-store H (Kit.live (laneOf o))) (off-store (unlive H (laneOf o)) (FlatKit.Flat.active fl)))
+      Wrote H H′ ρ (off-++ {H = H} {H₁ = unlive H (laneOf o)} {H₂ = H′} ((_ , Kit.live (laneOf o)) ∷ []) (off-store H (Kit.live (laneOf o))) (off-store (unlive H (laneOf o)) (FlatKit.Flat.active fl)))
             fr-mine fs
 
     fr-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels H′ T
