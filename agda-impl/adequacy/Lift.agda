@@ -178,9 +178,11 @@ module Lifting (R : Set) where
   -- Where the ghost shows that run: the held node whose tie
   -- (`Carried.lingers`) runs over the hidden `of`.  A flatMap's pool took
   -- the ended lane's or outer's rest; an ended source's rest is its
-  -- connect's; an `ending` take's rest is its own.  Each shows the
-  -- source's steps inside its subscription as `burstingᶜ` pins.  Or the
-  -- root has no part left, and the ghost shows nothing more.
+  -- connect's.  Each shows the source's steps inside its subscription as
+  -- `burstingᶜ` pins.  Or the root has no part left, and the ghost shows
+  -- nothing more.  No takeWhile is a site: one completes and is cut
+  -- inside its failing value's call (`takeWhileᴷ`), before its source's
+  -- burst runs on, and its `ending` part steps to its end, never a pin.
   data VoidSite {g m} (cr : Carried g m) {Δ A} {v : Sub (Conf.world (Mach.conf m)) Δ A} (π : Path (Carried.tree cr) v) : Set₁ where
     in-pool : ∀ {Δ′ A′ B′ op f fl oc k r pl} {so : Sub (Conf.world (Mach.conf m)) Δ′ A′} {ls : List (Lane (Conf.world (Mach.conf m)) Δ′ B′)}
                 (ψ : Path (Carried.tree cr) (flatMapˢ op f fl oc k r pl so ls)) (σ : Path (flatMapˢ op f fl oc k r pl so ls) v) → ψ ⊕ σ ≡ π
@@ -190,10 +192,6 @@ module Lifting (R : Set) where
                 (ψ : Path (Carried.tree cr) (connectˢ S c b kb k fd rp e rt src bd)) (σ : Path src v) → ψ ⊕ in-source σ ≡ π
             → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {n} → At.part (Conf.heap (Mach.conf m)) (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
             → At.part (Conf.heap (Mach.conf m)) src ≡ nothing → ∀ {c₀} → e ≡ just c₀
-            → VoidSite cr π
-    in-end  : ∀ {Δ′ A′ i p c k k′ n} {s : Sub (Conf.world (Mach.conf m)) Δ′ A′}
-                (ψ : Path (Carried.tree cr) (takeWhileˢ i p c k (endingᵗ k′ n) s)) (σ : Path s v) → ψ ⊕ in-take σ ≡ π
-            → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {x} → At.part (Conf.heap (Mach.conf m)) (takeWhileˢ i p c k (endingᵗ k′ n) s) ≡ just x
             → VoidSite cr π
     no-root : At.part (Conf.heap (Mach.conf m)) (Carried.tree cr) ≡ nothing → VoidSite cr π
 
@@ -375,26 +373,6 @@ module Lifting (R : Set) where
               → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {n} → At.part (Conf.heap (Mach.conf m)) (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
               → At.part (Conf.heap (Mach.conf m)) src ≡ nothing → ∀ {c₀} → e ≡ just c₀
               → ∀ {q n′} → U.step n ≡ U.skipˢ q n′ → Lifts (Conf.heap (Mach.conf m)) ψ (U.skipˢ q n′) (U.step g)
-              → Hops cr
-
-    -- At an `ending` take: its next event its rest's pin under the run.
-    end-pin : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
-              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
-              → seen (Conf.heap (Mach.conf m)) π ≡ false
-              → ∀ {Δ′ A′ i′ p′ c k k′ n} {s : Sub (Conf.world (Mach.conf m)) Δ′ A′}
-                  (ψ : Path (Carried.tree cr) (takeWhileˢ i′ p′ c k (endingᵗ k′ n) s)) (σ : Path s _) → ψ ⊕ in-take σ ≡ π
-              → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {y} → At.part (Conf.heap (Mach.conf m)) (takeWhileˢ i′ p′ c k (endingᵗ k′ n) s) ≡ just y
-              → Σ Pos λ q → Σ (U.Node Δ′ A′) λ y′ → U.step y ≡ U.skipˢ q y′ × Under p q
-
-    -- At an `ending` take, the ghost's step its pin lifted: its rest a
-    -- pin on, the ghost past it.
-    end-land : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
-              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
-              → seen (Conf.heap (Mach.conf m)) π ≡ false
-              → ∀ {Δ′ A′ i′ p′ c k k′ n} {s : Sub (Conf.world (Mach.conf m)) Δ′ A′}
-                  (ψ : Path (Carried.tree cr) (takeWhileˢ i′ p′ c k (endingᵗ k′ n) s)) (σ : Path s _) → ψ ⊕ in-take σ ≡ π
-              → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {y} → At.part (Conf.heap (Mach.conf m)) (takeWhileˢ i′ p′ c k (endingᵗ k′ n) s) ≡ just y
-              → ∀ {q y′} → U.step y ≡ U.skipˢ q y′ → Lifts (Conf.heap (Mach.conf m)) ψ (U.skipˢ q y′) (U.step g)
               → Hops cr
 
     -- The root's part gone: the ghost alike, the `of` a value fewer.
@@ -996,24 +974,12 @@ module Lifting (R : Set) where
   void-rest cr π fc op sn ψ σ e se pt ps ee with rest-pin cr π fc op sn ψ σ e se pt ps ee
   ... | q , n′ , pn , un = rest-land cr π fc op sn ψ σ e se pt ps ee pn (void-up cr π fc op sn ψ (in-source σ) e se pt pn un)
 
-  -- At an `ending` take: its rest's pin lifted.
-  void-end : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
-            → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
-            → seen (Conf.heap (Mach.conf m)) π ≡ false
-            → ∀ {Δ′ A′ i′ p′ c k k′ n} {s : Sub (Conf.world (Mach.conf m)) Δ′ A′}
-                (ψ : Path (Carried.tree cr) (takeWhileˢ i′ p′ c k (endingᵗ k′ n) s)) (σ : Path s _) → ψ ⊕ in-take σ ≡ π
-            → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {y} → At.part (Conf.heap (Mach.conf m)) (takeWhileˢ i′ p′ c k (endingᵗ k′ n) s) ≡ just y
-            → Hops cr
-  void-end cr π fc op sn ψ σ e se pt with end-pin cr π fc op sn ψ σ e se pt
-  ... | q , y′ , py , un = end-land cr π fc op sn ψ σ e se pt py (void-up cr π fc op sn ψ (in-take σ) e se pt py un)
-
   emit-void : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
             → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
             → seen (Conf.heap (Mach.conf m)) π ≡ false → Hops cr
   emit-void cr π fc op sn with void-site cr π fc op sn
   ... | in-pool ψ σ e se pt         = void-pool cr π fc op sn ψ σ e se pt
   ... | in-rest ψ σ e se pt ps ee   = void-rest cr π fc op sn ψ σ e se pt ps ee
-  ... | in-end ψ σ e se pt          = void-end cr π fc op sn ψ σ e se pt
   ... | no-root pg                  = void-gone cr π fc op sn pg
 
   ≺-trans : ∀ {a b c} → a ≺ b → b ≺ c → a ≺ c
