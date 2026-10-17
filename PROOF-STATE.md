@@ -184,9 +184,9 @@ by their own silent steps (`Mirror`).
   subscribe burst; every move carries it by a `*-lingers` leaf. Ruled
   out: the ghost alike past a hidden step. `emit-void` is a body over
   its site (`void-site`); at a pool the pin lifts through the ancestors
-  by `lift-up`, from any held node. Remaining: the pool's pin
-  (`pool-pin`) and its landing, then the rest and `ending` sites alike,
-  then `sub-defer` over the same sites;
+  by `lift-up`, from any held node, and the rest and `ending` sites
+  alike (`void-up`). Remaining: each site's pin (`pool-pin`,
+  `rest-pin`, `end-pin`) and landing, then `sub-defer` over the sites;
   whether a part's last ghost rests to its leftover (`close-lingers`,
   `settle-lingers`).
 - **C. THE CALLBACK RELATION.** `Calling` is one record over the signal
@@ -361,14 +361,18 @@ by their own silent steps (`Mirror`).
   root has no part.
 - **`pool-pin`** (Lift) — FALSITY, `NO EVIDENCE`: a held pool over a hidden
   `of` steps next as a skip at a pin under the run.
-- **`void-spread`** (Lift) — FALSITY, `NO EVIDENCE`: at a pool over a hidden
-  `of`, no sibling its path passes heads under the run.
+- **`void-spread`** (Lift) — FALSITY, `NO EVIDENCE`: at any held part over a
+  hidden `of`, no sibling its path passes heads under the run.
 - **`pool-land`** (Lift) — FALSITY, `NO EVIDENCE`: the pool's pin lifted is the
   ghost's step: the run dies at its guard, the ghost past that pin.
-- **`void-rest`** (Lift) — FALSITY, `NO EVIDENCE`: a hidden step under an ended
-  source's rest: the rest a pin on, the ghost past it.
-- **`void-end`** (Lift) — FALSITY, `NO EVIDENCE`: a hidden step under an
-  `ending` take: its rest a pin on, the ghost past it.
+- **`rest-pin`** (Lift) — FALSITY, `NO EVIDENCE`: a held connect over a hidden
+  `of` in its ended source steps next as its rest's skip under the run.
+- **`rest-land`** (Lift) — FALSITY, `NO EVIDENCE`: the rest's pin lifted is the
+  ghost's step: the rest a pin on, the ghost past it.
+- **`end-pin`** (Lift) — FALSITY, `NO EVIDENCE`: a held `ending` take over a
+  hidden `of` steps next as its rest's skip under the run.
+- **`end-land`** (Lift) — FALSITY, `NO EVIDENCE`: the take's pin lifted is the
+  ghost's step: its rest a pin on, the ghost past it.
 - **`void-gone`** (Lift) — FALSITY, `NO EVIDENCE`: a hidden step with the
   root's part gone: the ghost alike, the `of` a value fewer.
 - **`close-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: an outer's end, its

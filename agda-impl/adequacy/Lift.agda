@@ -219,15 +219,15 @@ module Lifting (R : Set) where
               → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {c} → At.part (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl so ls) ≡ just c
               → Σ Pos λ q → Σ (U.Node Δ′ B′) λ c′ → U.step c ≡ U.skipˢ q c′ × Under p q
 
-    -- At a pool: no sibling its path passes heads under the run, as at
-    -- an `of` the ghost holds (`spread-past`).
+    -- Over a hidden `of`, at a part the ghost holds: no sibling its path
+    -- passes heads under the run, as at an `of` the ghost holds
+    -- (`spread-past`).
     void-spread : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
               → seen (Conf.heap (Mach.conf m)) π ≡ false
-              → ∀ {Δ′ A′ B′ op f fl oc k r pl} {so : Sub (Conf.world (Mach.conf m)) Δ′ A′} {ls : List (Lane (Conf.world (Mach.conf m)) Δ′ B′)}
-                  (ψ : Path (Carried.tree cr) (flatMapˢ op f fl oc k r pl so ls)) (σ : Path (flatMapˢ op f fl oc k r pl so ls) _) → ψ ⊕ σ ≡ π
-              → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {c} → At.part (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl so ls) ≡ just c
-              → Clear (Conf.heap (Mach.conf m)) (Off p) ψ
+              → ∀ {Δ′ A′} {v : Sub (Conf.world (Mach.conf m)) Δ′ A′} (ψ : Path (Carried.tree cr) v) (τ : Path v (ofˢ {Δ = Δ} {A} p i (x ∷ xs))) → ψ ⊕ τ ≡ π
+              → seen (Conf.heap (Mach.conf m)) ψ ≡ true
+              → is-just (At.part (Conf.heap (Mach.conf m)) v) ≡ true → Clear (Conf.heap (Mach.conf m)) (Off p) ψ
 
     -- At a pool, the ghost's step its pin lifted: the run climbs to its
     -- guard and dies, the pool a pin on, the ghost past that pin.
@@ -244,23 +244,47 @@ module Lifting (R : Set) where
               → ∀ {q c′} → U.step c ≡ U.skipˢ q c′ → Lifts (Conf.heap (Mach.conf m)) ψ (U.skipˢ q c′) (U.step g)
               → Hops cr
 
-    -- At an ended source's rest: that rest a pin on, the ghost past it.
-    void-rest : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+    -- At an ended source's rest: the connect's next event that rest's
+    -- pin under the run.
+    rest-pin : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
               → seen (Conf.heap (Mach.conf m)) π ≡ false
               → ∀ {Δ′ A′ B′ S c b kb k fd rp e rt} {src : Sub (Conf.world (Mach.conf m)) Δ′ A′} {bd : Sub (Conf.world (Mach.conf m)) (A′ ∷ Δ′) B′}
                   (ψ : Path (Carried.tree cr) (connectˢ S c b kb k fd rp e rt src bd)) (σ : Path src _) → ψ ⊕ in-source σ ≡ π
               → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {n} → At.part (Conf.heap (Mach.conf m)) (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
               → At.part (Conf.heap (Mach.conf m)) src ≡ nothing → ∀ {c₀} → e ≡ just c₀
+              → Σ Pos λ q → Σ (U.Node Δ′ B′) λ n′ → U.step n ≡ U.skipˢ q n′ × Under p q
+
+    -- At an ended source's rest, the ghost's step its pin lifted: the rest
+    -- a pin on, the ghost past it.
+    rest-land : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+              → seen (Conf.heap (Mach.conf m)) π ≡ false
+              → ∀ {Δ′ A′ B′ S c b kb k fd rp e rt} {src : Sub (Conf.world (Mach.conf m)) Δ′ A′} {bd : Sub (Conf.world (Mach.conf m)) (A′ ∷ Δ′) B′}
+                  (ψ : Path (Carried.tree cr) (connectˢ S c b kb k fd rp e rt src bd)) (σ : Path src _) → ψ ⊕ in-source σ ≡ π
+              → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {n} → At.part (Conf.heap (Mach.conf m)) (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
+              → At.part (Conf.heap (Mach.conf m)) src ≡ nothing → ∀ {c₀} → e ≡ just c₀
+              → ∀ {q n′} → U.step n ≡ U.skipˢ q n′ → Lifts (Conf.heap (Mach.conf m)) ψ (U.skipˢ q n′) (U.step g)
               → Hops cr
 
-    -- At an `ending` take: its rest a pin on, the ghost past it.
-    void-end  : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+    -- At an `ending` take: its next event its rest's pin under the run.
+    end-pin : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
               → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
               → seen (Conf.heap (Mach.conf m)) π ≡ false
               → ∀ {Δ′ A′ i′ p′ c k k′ n} {s : Sub (Conf.world (Mach.conf m)) Δ′ A′}
                   (ψ : Path (Carried.tree cr) (takeWhileˢ i′ p′ c k (endingᵗ k′ n) s)) (σ : Path s _) → ψ ⊕ in-take σ ≡ π
               → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {y} → At.part (Conf.heap (Mach.conf m)) (takeWhileˢ i′ p′ c k (endingᵗ k′ n) s) ≡ just y
+              → Σ Pos λ q → Σ (U.Node Δ′ A′) λ y′ → U.step y ≡ U.skipˢ q y′ × Under p q
+
+    -- At an `ending` take, the ghost's step its pin lifted: its rest a
+    -- pin on, the ghost past it.
+    end-land : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+              → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+              → seen (Conf.heap (Mach.conf m)) π ≡ false
+              → ∀ {Δ′ A′ i′ p′ c k k′ n} {s : Sub (Conf.world (Mach.conf m)) Δ′ A′}
+                  (ψ : Path (Carried.tree cr) (takeWhileˢ i′ p′ c k (endingᵗ k′ n) s)) (σ : Path s _) → ψ ⊕ in-take σ ≡ π
+              → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {y} → At.part (Conf.heap (Mach.conf m)) (takeWhileˢ i′ p′ c k (endingᵗ k′ n) s) ≡ just y
+              → ∀ {q y′} → U.step y ≡ U.skipˢ q y′ → Lifts (Conf.heap (Mach.conf m)) ψ (U.skipˢ q y′) (U.step g)
               → Hops cr
 
     -- The root's part gone: the ghost alike, the `of` a value fewer.
@@ -745,8 +769,25 @@ module Lifting (R : Set) where
   run-at (subAs _ _ _ _)     ()
   run-at (burstAs _ _ _)     ()
 
-  -- At a pool: the pool's pin lifted through its ancestors, every
-  -- sibling of which waits.
+  -- Over a hidden `of`, a held part's pin lifted through its ancestors,
+  -- every sibling of which waits.
+  void-up : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+            → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+            → seen (Conf.heap (Mach.conf m)) π ≡ false
+            → ∀ {Δ′ A′} {v : Sub (Conf.world (Mach.conf m)) Δ′ A′} (ψ : Path (Carried.tree cr) v) (τ : Path v (ofˢ {Δ = Δ} {A} p i (x ∷ xs))) → ψ ⊕ τ ≡ π
+            → seen (Conf.heap (Mach.conf m)) ψ ≡ true
+            → ∀ {c} → At.part (Conf.heap (Mach.conf m)) v ≡ just c → ∀ {q c′} → U.step c ≡ U.skipˢ q c′ → Under p q
+            → Lifts (Conf.heap (Mach.conf m)) ψ (U.skipˢ q c′) (U.step g)
+  void-up {m = m} cr {p = p} π fc op sn ψ τ e se pt ps un
+    with lift-up cr here ψ τ pt (below (cong U.headˢ ps) un) se
+           (clear-zip {P = Heads p} {Q = Off p} {R′ = Far p} (λ {Γ} {A} {c} → far-apart {p} {Γ} {A} {c}) ψ
+              (clear-each (subst (λ q′ → Each (Conf.heap (Mach.conf m)) (Heads q′) (Carried.tree cr))
+                                 (run-at (Carried.ctlAs cr) fc (Owned.placed (Carried.owned cr))) (Carried.behind cr)) ψ se (cong is-just pt))
+              (void-spread cr π fc op sn ψ τ e se (cong is-just pt)))
+  ... | c₁ , pc , L , _ =
+    subst₂ (λ s c″ → Lifts (Conf.heap (Mach.conf m)) ψ s (U.step c″)) ps (just-injective (trans (sym pc) (run-meets (Carried.ctlAs cr) fc (Carried.meets cr)))) L
+
+  -- At a pool: the pool's pin lifted.
   void-pool : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
             → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
             → seen (Conf.heap (Mach.conf m)) π ≡ false
@@ -754,16 +795,31 @@ module Lifting (R : Set) where
                 (ψ : Path (Carried.tree cr) (flatMapˢ op f fl oc k r pl so ls)) (σ : Path (flatMapˢ op f fl oc k r pl so ls) _) → ψ ⊕ σ ≡ π
             → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {c} → At.part (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl so ls) ≡ just c
             → Hops cr
-  void-pool {m = m} cr {p = p} π fc op sn ψ σ e se pt with pool-pin cr π fc op sn ψ σ e se pt
-  ... | q , c′ , ps , un
-    with lift-up cr here ψ σ pt (below (cong U.headˢ ps) un) se
-           (clear-zip {P = Heads p} {Q = Off p} {R′ = Far p} (λ {Γ} {A} {c} → far-apart {p} {Γ} {A} {c}) ψ
-              (clear-each (subst (λ q′ → Each (Conf.heap (Mach.conf m)) (Heads q′) (Carried.tree cr))
-                                 (run-at (Carried.ctlAs cr) fc (Owned.placed (Carried.owned cr))) (Carried.behind cr)) ψ se (cong is-just pt))
-              (void-spread cr π fc op sn ψ σ e se pt))
-  ...   | c₁ , pc , L , _ =
-    pool-land cr π fc op sn ψ σ e se pt ps
-      (subst₂ (λ s c″ → Lifts (Conf.heap (Mach.conf m)) ψ s (U.step c″)) ps (just-injective (trans (sym pc) (run-meets (Carried.ctlAs cr) fc (Carried.meets cr)))) L)
+  void-pool cr π fc op sn ψ σ e se pt with pool-pin cr π fc op sn ψ σ e se pt
+  ... | q , c′ , ps , un = pool-land cr π fc op sn ψ σ e se pt ps (void-up cr π fc op sn ψ σ e se pt ps un)
+
+  -- At an ended source's rest: the rest's pin lifted.
+  void-rest : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+            → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+            → seen (Conf.heap (Mach.conf m)) π ≡ false
+            → ∀ {Δ′ A′ B′ S c b kb k fd rp e rt} {src : Sub (Conf.world (Mach.conf m)) Δ′ A′} {bd : Sub (Conf.world (Mach.conf m)) (A′ ∷ Δ′) B′}
+                (ψ : Path (Carried.tree cr) (connectˢ S c b kb k fd rp e rt src bd)) (σ : Path src _) → ψ ⊕ in-source σ ≡ π
+            → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {n} → At.part (Conf.heap (Mach.conf m)) (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
+            → At.part (Conf.heap (Mach.conf m)) src ≡ nothing → ∀ {c₀} → e ≡ just c₀
+            → Hops cr
+  void-rest cr π fc op sn ψ σ e se pt ps ee with rest-pin cr π fc op sn ψ σ e se pt ps ee
+  ... | q , n′ , pn , un = rest-land cr π fc op sn ψ σ e se pt ps ee pn (void-up cr π fc op sn ψ (in-source σ) e se pt pn un)
+
+  -- At an `ending` take: its rest's pin lifted.
+  void-end : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
+            → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
+            → seen (Conf.heap (Mach.conf m)) π ≡ false
+            → ∀ {Δ′ A′ i′ p′ c k k′ n} {s : Sub (Conf.world (Mach.conf m)) Δ′ A′}
+                (ψ : Path (Carried.tree cr) (takeWhileˢ i′ p′ c k (endingᵗ k′ n) s)) (σ : Path s _) → ψ ⊕ in-take σ ≡ π
+            → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {y} → At.part (Conf.heap (Mach.conf m)) (takeWhileˢ i′ p′ c k (endingᵗ k′ n) s) ≡ just y
+            → Hops cr
+  void-end cr π fc op sn ψ σ e se pt with end-pin cr π fc op sn ψ σ e se pt
+  ... | q , y′ , py , un = end-land cr π fc op sn ψ σ e se pt py (void-up cr π fc op sn ψ (in-take σ) e se pt py un)
 
   emit-void : ∀ {g m} (cr : Carried g m) {Δ A p i x xs} (π : Path (Carried.tree cr) (ofˢ {Δ = Δ} {A} p i (x ∷ xs)))
             → firstCall (Carried.ctlAs cr) ≡ just (emitC π) → opened (Conf.heap (Mach.conf m)) true π ≡ true
