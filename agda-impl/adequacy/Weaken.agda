@@ -904,6 +904,18 @@ module Weakening (R : Set) where
               → At.val H′ (Kit.live (Kit.wkCut τ c)) ≡ false → At.Cut↓ H′ (mapMaybe (wk∋ τ) k) (wkTree τ u)
       cut-off c k u g e = grow-cut↓ k u (g (trans (sym (cells (Kit.live c))) e))
 
+      -- A switch listed is listed weakened.
+      listed-wk : ∀ {c} (xs : List (Kit.Cut h)) → c ∈ xs → Kit.wkCut τ c ∈ wkEl (list Kit.cutTy) τ xs
+      listed-wk (x ∷ xs) (hereᴬ refl) = hereᴬ refl
+      listed-wk (x ∷ xs) (thereᴬ m)   = thereᴬ (listed-wk xs m)
+
+      -- A lane's gate read through the weakening.
+      cut-offᴸ : ∀ {Δ A} {X : List (Kit.Cut h)} (c : Kit.Cut h) (k : Maybe (Quiet h)) (u : Sub h Δ A) → (At.val H (Kit.live c) ≡ false → c ∈ X ⊎ At.Cut↓ H k u)
+               → At.val H′ (Kit.live (Kit.wkCut τ c)) ≡ false → Kit.wkCut τ c ∈ wkEl (list Kit.cutTy) τ X ⊎ At.Cut↓ H′ (mapMaybe (wk∋ τ) k) (wkTree τ u)
+      cut-offᴸ c k u g e with g (trans (sym (cells (Kit.live c))) e)
+      ... | inj₁ m = inj₁ (listed-wk _ m)
+      ... | inj₂ x = inj₂ (grow-cut↓ k u x)
+
       mutual
         grow-gated : ∀ {Δ A} (u : Sub h Δ A) → At.Gated H u → At.Gated H′ (wkTree τ u)
         grow-gated (pendingˢ s q)                          _           = lift tt
@@ -913,14 +925,15 @@ module Weakening (R : Set) where
         grow-gated (mapˢ f s)                              x           = grow-gated s x
         grow-gated (scanˢ f r s)                           x           = grow-gated s x
         grow-gated (takeWhileˢ i p c k tk s)               (g , x)     = cut-off c k s g , grow-gated s x
-        grow-gated (flatMapˢ op f fl oc k r pl so ls)      (x , y)     = grow-gated so x , grow-gatedᴸ ls y
+        grow-gated (flatMapˢ op f fl oc k r pl so ls)      (x , y)     =
+          grow-gated so x , subst (λ X → At.GatedLanes H′ X (wkLanes τ ls)) (sym (cells (FlatKit.Flat.lanes fl))) (grow-gatedᴸ ls y)
         grow-gated (connectˢ S c b kb k fd rp e rt src bd) (g , x , y) = cut-off c k src g , grow-gated src x , grow-gated bd y
         grow-gated (joinˢ j sk l x st)                     _           = lift tt
         grow-gated (deferˢ k s)                            x           = grow-gated s x
 
-        grow-gatedᴸ : ∀ {Δ B} (ls : List (Lane h Δ B)) → At.GatedLanes H ls → At.GatedLanes H′ (wkLanes τ ls)
+        grow-gatedᴸ : ∀ {Δ B X} (ls : List (Lane h Δ B)) → At.GatedLanes H X ls → At.GatedLanes H′ (wkEl (list Kit.cutTy) τ X) (wkLanes τ ls)
         grow-gatedᴸ []                _           = lift tt
-        grow-gatedᴸ (lane c k s ∷ ls) (g , x , y) = cut-off c k s g , grow-gated s x , grow-gatedᴸ ls y
+        grow-gatedᴸ (lane c k s ∷ ls) (g , x , y) = cut-offᴸ c k s g , grow-gated s x , grow-gatedᴸ ls y
 
       -- Every registered callback reads, along the growth, as the
       -- weakened kernel registered it.

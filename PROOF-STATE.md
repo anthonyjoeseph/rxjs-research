@@ -182,11 +182,6 @@ by their own silent steps (`Mirror`).
   `compile-grow`/`kont-grow`, the code's own naturality, by operator over
   the `-wk` toolkit; then the splice leaves `bg-owns`/`heads`/`lingered`
   and `bg-ghosted` over `ghost-lift`, which reads the names fresh.
-- **THE OWED CUT.** The freed move folds over its frame; it leaves only
-  `fr-cut`, false as stated: an inner takeWhile completes before it cuts
-  its source, so a freed lane's quiet still runs. Ruled out: any frame
-  repair. Decides whether `Gated`'s lane clause excuses a cut its own
-  completion still owes. Second refutation in that clause: a third stops.
 - **DEEP ORDER.** `gapped-past` holds only where every node under a rest is
   in order, which `Placed` does not see (`stepped-deep` reads it from
   nothing). Decides whether `Deep` is a field `Carried` keeps, each move
@@ -247,8 +242,6 @@ by their own silent steps (`Mirror`).
   value, the ghost past the skip.
 - **`active-lanes`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's count reads
   zero exactly when no lane is live.
-- **`fr-cut`** (Climbs) — FALSITY, `NO EVIDENCE`: a gated flatMap's freed lane
-  has its quiet cut.
 - **`take1-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a held takeWhile's
   completion begun under its failing value, its cut the frame's rest.
 - **`take1-void`** (Climbs) — FALSITY, `NO EVIDENCE`: a hidden takeWhile's

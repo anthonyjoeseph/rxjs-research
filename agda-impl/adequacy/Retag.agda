@@ -7,6 +7,7 @@
 module adequacy.Retag where
 
 open import Data.List using (List; []; _∷_)
+import Data.Sum as Sum
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ)
@@ -262,9 +263,9 @@ module Retagging (R : Set) where
       gated-retag g (joinˢ j sk l x st)                     gt = gt
       gated-retag g (deferˢ k s)                            gt = gated-retag g s gt
 
-      gated-retagᴸ : ∀ {Δ B} (g : Retag Δ) (ls : List (Lane h Δ B)) → GatedLanes ls → GatedLanes (retagᴸ g ls)
+      gated-retagᴸ : ∀ {Δ B X} (g : Retag Δ) (ls : List (Lane h Δ B)) → GatedLanes X ls → GatedLanes X (retagᴸ g ls)
       gated-retagᴸ g []                gl             = gl
-      gated-retagᴸ g (lane c k s ∷ ls) (f₁ , gt , gl) = (λ e₁ → cut-retag g k s (f₁ e₁)) , gated-retag g s gt , gated-retagᴸ g ls gl
+      gated-retagᴸ g (lane c k s ∷ ls) (f₁ , gt , gl) = (λ e₁ → Sum.map₂ (cut-retag g k s) (f₁ e₁)) , gated-retag g s gt , gated-retagᴸ g ls gl
 
     ----------------------------------------------------------------------
     -- The feed: each joiner the retag moves, fed as its `Fed` clause asks

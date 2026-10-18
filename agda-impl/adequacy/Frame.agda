@@ -46,7 +46,7 @@ module Framing (R : Set) where
                          Taking; taking; taken; cutNames; quietName; subjectNames; flatNames; laneNames; Name; pendings; subjects; joiners) renaming (ending to endingᵀ)
   open Tearing R using (Alike; Off; part-alike; partLanes-alike; lanes-path; module Seeing; look-store; get-put-same; fresh-path; names-path; apart-r; apart-l; ≢-flip)
   open Moving R using (pairs-r; pairs-split; plant; pendings-plant; subjects-plant; joiners-plant; head-map; head-scan)
-  open Locality R using (module Heaps)
+  open Locality R using (module Heaps; holds-at)
   open Ghosting R using (module Calling; Lifts; LiftsLane; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source;
                          lifts-body; lifts-shut; lifts-defer; lifts-this; lifts-next; OuterFirst; PoolBehind; LaneFirst; Calling; sends; opened; openedL)
   open Read
@@ -530,11 +530,11 @@ module Framing (R : Set) where
     private
       offU : Off H H′ (names u)
       offU j a = off j (map (lookupᴬ a) mine)
-    wr-kernels : (∀ {E o} → At.Holds H u E o → At.Holds H′ u E o) → (At.Gated H u → At.Gated H′ u) → (At.Spent H u → At.Spent H′ u)
+    wr-kernels : (∀ {E o} → At.Holds H u E o → At.Holds H′ u E o) → (∀ {E o} → At.Holds H u E o → At.Gated H u → At.Gated H′ u) → (At.Spent H u → At.Spent H′ u)
                → Kernels H T → Kernels H′ T
     wr-kernels hv gv sv kn = record
       { holds   = Heaps.holds-same H H′ ρ fs offU hv (Kernels.holds kn)
-      ; gated   = Heaps.gated-same H H′ ρ fs offU gv sv (Kernels.gated kn)
+      ; gated   = Heaps.gated-same H H′ ρ fs offU (gv (proj₂ (proj₂ (holds-at ρ (Kernels.holds kn))))) sv (Kernels.gated kn)
       ; settled = Kernels.settled kn }
 
     wr-meaning : (∀ ν → At.Fed H u ν → At.Fed H′ u ν) → Meaning H T → Meaning H′ T
@@ -582,7 +582,7 @@ module Framing (R : Set) where
       module Wr z = Wrote H (store H r (lift z)) ρ (off-store H r) (here refl ∷ []) fs
 
     scan-kernels : ∀ z → Kernels H T → Kernels (store H r (lift z)) T
-    scan-kernels z = Wr.wr-kernels z (λ {E} {o} → scan-holds H {f = f} {u = u} fr z {E} {o}) (scan-gated H {f = f} {u = u} fr z) (scan-spent H {f = f} {u = u} fr z)
+    scan-kernels z = Wr.wr-kernels z (λ {E} {o} → scan-holds H {f = f} {u = u} fr z {E} {o}) (λ _ → scan-gated H {f = f} {u = u} fr z) (scan-spent H {f = f} {u = u} fr z)
 
     scan-meaning : ∀ z → Meaning H T → Meaning (store H r (lift z)) T
     scan-meaning z = Wr.wr-meaning z (scan-fed H {f = f} {u = u} fr z)

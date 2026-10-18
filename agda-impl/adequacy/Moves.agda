@@ -24,6 +24,7 @@ open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈�
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁻; ++⁺ˡ; ++⁺ʳ)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
+import Data.Sum as Sum
 open import Data.Maybe using (just; nothing)
 open import Data.Unit using (tt)
 
@@ -859,9 +860,9 @@ module Moving (R : Set) where
 
     gated-plantᴸ : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
                  → (At.Gated H u → At.Gated H v) → (At.Spent H u → At.Spent H v)
-                 → At.GatedLanes H ls → At.GatedLanes H (plantᴸ π v)
+                 → ∀ {X} → At.GatedLanes H X ls → At.GatedLanes H X (plantᴸ π v)
     gated-plantᴸ H (this-lane {k = k} π) v gv dv (cg , g , gl) =
-      (λ l → cut-plant H π v dv k (cg l)) , gated-plant H π v gv dv g , gl
+      (λ l → Sum.map₂ (cut-plant H π v dv k) (cg l)) , gated-plant H π v gv dv g , gl
     gated-plantᴸ H (next-lane {l = lane c k s} π) v gv dv (cg , g , gl) = cg , g , gated-plantᴸ H π v gv dv gl
 
   mutual

@@ -11,10 +11,11 @@
 module adequacy.Local where
 
 open import Data.List using (List; []; _∷_; _++_; length; drop)
-open import Data.List.Properties using (∷-injectiveʳ)
+open import Data.List.Properties using (∷-injectiveˡ; ∷-injectiveʳ)
 open import Data.Bool using (true; false)
 open import Data.Nat using (ℕ; zero; suc)
-open import Data.Empty using (⊥-elim)
+open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Sum using (inj₂; [_,_]′) renaming (map₂ to sum-map₂)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
@@ -120,7 +121,7 @@ module Locality (R : Set) where
     gated-at (in-body π)   (_ , _ , g)   = gated-at π g
     gated-at (in-defer π)  g             = gated-at π g
 
-    gatedL-at : ∀ {h} {H : Heapᴹ h} {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} → PathLanes ls u → At.GatedLanes H ls → At.Gated H u
+    gatedL-at : ∀ {h} {H : Heapᴹ h} {Δ B Δ′ A′} {X} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} → PathLanes ls u → At.GatedLanes H X ls → At.Gated H u
     gatedL-at (this-lane π) (_ , g , _) = gated-at π g
     gatedL-at (next-lane π) (_ , _ , gl) = gatedL-at π gl
 
@@ -419,7 +420,8 @@ module Locality (R : Set) where
           agS j m = ag j (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) m))
       gated-alike (flatMapˢ op f fl oc k r pl so ls) ag (g₁ , g₂) =
         gated-alike so (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ m)))))) g₁
-        , gatedL-alike ls (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) m)))))) g₂
+        , subst (λ X → At.GatedLanes H′ X ls) (cong lower (sym (ag (FlatKit.Flat.lanes fl) (there (there (there (here refl)))))))
+            (gatedL-alike ls (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) m)))))) g₂)
       gated-alike (connectˢ S c b kb k fd rp e rt src bd) ag = gated-conn {S = S} {c} {b} {kb} {k} {fd} {rp} {e} {rt} src bd (λ j m → ag j (++⁺ʳ (subjectNames S) m))
       gated-alike (joinˢ j sk l x st) ag g = g
       gated-alike (deferˢ k s) ag g = gated-alike s (λ j m → ag j (++⁺ʳ (quietName k) m)) g
@@ -435,10 +437,10 @@ module Locality (R : Set) where
           agS : Alike H H′ (names src)
           agS j m = ag j (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m)))))
 
-      gatedL-alike : ∀ {Δ B} (ls : List (Lane h Δ B)) → Alike H H′ (laneNames ls) → At.GatedLanes H ls → At.GatedLanes H′ ls
+      gatedL-alike : ∀ {Δ B X} (ls : List (Lane h Δ B)) → Alike H H′ (laneNames ls) → At.GatedLanes H X ls → At.GatedLanes H′ X ls
       gatedL-alike []                ag g = g
       gatedL-alike (lane c k s ∷ ls) ag (g₁ , g₂ , g₃) =
-        (λ e → cut-alike k s agS (thrown-alike c (ag (Kit.live c) (here refl)) g₁ e)) , gated-alike s agS g₂
+        (λ e → sum-map₂ (cut-alike k s agS) (thrown-alike c (ag (Kit.live c) (here refl)) g₁ e)) , gated-alike s agS g₂
         , gatedL-alike ls (λ j m → ag j (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ʳ (names s) m)))) g₃
         where
           agS : Alike H H′ (names s)
@@ -456,11 +458,19 @@ module Locality (R : Set) where
           P = pairs-r (quietName k) (pairs-r (cutNames c) ps)
           lc = keep off (λ m → ++⁺ʳ (quietName k) (names-path (planted π v) m)) (Kit.live c) (apart-r (cutNames c) ps (here refl))
       gated-path (in-outer {fl = fl} {oc} {k} {r} {t = so} {ls} π) v ps off hg hs (g₁ , g₂) =
-        gated-path π v (proj₁ (pairs-split (names (plant π v)) P)) off hg hs g₁ , gatedL-alike ls (keeps off (names-path (planted π v)) (apart-l (names (plant π v)) P)) g₂
-        where P = pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps)))
+        gated-path π v (proj₁ (pairs-split (names (plant π v)) P)) off hg hs g₁
+        , subst (λ X → At.GatedLanes H′ X ls) (cong lower (sym lc)) (gatedL-alike ls (keeps off (names-path (planted π v)) (apart-l (names (plant π v)) P)) g₂)
+        where
+          P = pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps)))
+          lc = keep off (λ m → ++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ (names-path (planted π v) m))))) (FlatKit.Flat.lanes fl)
+                 (apart-r (flatNames fl) ps (there (there (there (here refl)))))
       gated-path (in-lanes {fl = fl} {oc} {k} {r} {t = so} {ls} π) v ps off hg hs (g₁ , g₂) =
-        gated-alike so (keeps off (lanes-path (plantedᴸ π v)) (apart-r (names so) P)) g₁ , gatedL-path π v (pairs-r (names so) P) off hg hs g₂
-        where P = pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps)))
+        gated-alike so (keeps off (lanes-path (plantedᴸ π v)) (apart-r (names so) P)) g₁
+        , subst (λ X → At.GatedLanes H′ X _) (cong lower (sym lc)) (gatedL-path π v (pairs-r (names so) P) off hg hs g₂)
+        where
+          P = pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps)))
+          lc = keep off (λ m → ++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) (lanes-path (plantedᴸ π v) m))))) (FlatKit.Flat.lanes fl)
+                 (apart-r (flatNames fl) ps (there (there (there (here refl)))))
       gated-path (in-source {S = S} {c} {b} {kb} {k} {t = src} {bd} π) v ps off hg hs (g₁ , g₂ , g₃) =
         (λ e → cut-path k π v Ps off hs (thrown-alike c lc g₁ e)) , gated-path π v Ps off hg hs g₂
         , gated-alike bd (keeps off (names-path (planted π v)) (apart-l (names (plant π v)) Q₄)) g₃
@@ -478,17 +488,17 @@ module Locality (R : Set) where
           lc = keep off (λ m → there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names src) (names-path (planted π v) m))))) (Kit.live c) (apart-r (cutNames c) Q₀ (here refl))
       gated-path (in-defer {k = k} π) v ps off hg hs g = gated-path π v (pairs-r (quietName k) ps) off hg hs g
 
-      gatedL-path : ∀ {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′) → AllPairs _≢_ (laneNames (plantᴸ π v)) → Off H H′ (names v)
-                  → (At.Gated H u → At.Gated H′ v) → (At.Spent H u → At.Spent H′ v) → At.GatedLanes H ls → At.GatedLanes H′ (plantᴸ π v)
+      gatedL-path : ∀ {Δ B Δ′ A′ X} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′) → AllPairs _≢_ (laneNames (plantᴸ π v)) → Off H H′ (names v)
+                  → (At.Gated H u → At.Gated H′ v) → (At.Spent H u → At.Spent H′ v) → At.GatedLanes H X ls → At.GatedLanes H′ X (plantᴸ π v)
       gatedL-path (this-lane {c = c} {k} {t = s} {ls} π) v ps off hg hs (g₁ , g₂ , g₃) =
-        (λ e → cut-path k π v Ps off hs (thrown-alike c lc g₁ e)) , gated-path π v Ps off hg hs g₂
+        (λ e → sum-map₂ (cut-path k π v Ps off hs) (thrown-alike c lc g₁ e)) , gated-path π v Ps off hg hs g₂
         , gatedL-alike ls (keeps off (names-path (planted π v)) (apart-l (names (plant π v)) P)) g₃
         where
           P = pairs-r (quietName k) (pairs-r (cutNames c) ps)
           Ps = proj₁ (pairs-split (names (plant π v)) P)
           lc = keep off (λ m → ++⁺ʳ (quietName k) (++⁺ˡ (names-path (planted π v) m))) (Kit.live c) (apart-r (cutNames c) ps (here refl))
       gatedL-path (next-lane {l = lane c k s} π) v ps off hg hs (g₁ , g₂ , g₃) =
-        (λ e → cut-alike k s agS (thrown-alike c lc g₁ e)) , gated-alike s agS g₂ , gatedL-path π v (pairs-r (names s) P) off hg hs g₃
+        (λ e → sum-map₂ (cut-alike k s agS) (thrown-alike c lc g₁ e)) , gated-alike s agS g₂ , gatedL-path π v (pairs-r (names s) P) off hg hs g₃
         where
           P = pairs-r (quietName k) (pairs-r (cutNames c) ps)
           agS = keeps off (lanes-path (plantedᴸ π v)) (apart-r (names s) P)
@@ -538,7 +548,8 @@ module Locality (R : Set) where
     gated-flat : ∀ {Δ A B op f fl oc k r pl} (so : Sub h Δ A) (ls : List (Lane h Δ B)) → Alike H H′ (flatReads fl oc k r so ls)
                → At.Gated H (flatMapˢ op f fl oc k r pl so ls) → At.Gated H′ (flatMapˢ op f fl oc k r pl so ls)
     gated-flat {fl = fl} {oc} {k} {r} so ls ag (g₁ , g₂) =
-      gated-alike so (flat-so {fl = fl} {oc} {k} {r} {so} {ls} ag) g₁ , gatedL-alike ls (flat-ls {fl = fl} {oc} {k} {r} {so} {ls} ag) g₂
+      gated-alike so (flat-so {fl = fl} {oc} {k} {r} {so} {ls} ag) g₁
+      , subst (λ X → At.GatedLanes H′ X ls) (cong lower (sym (ag (FlatKit.Flat.lanes fl) (there (here refl))))) (gatedL-alike ls (flat-ls {fl = fl} {oc} {k} {r} {so} {ls} ag) g₂)
 
     spent-flat : ∀ {Δ A B op f fl oc k r pl} (so : Sub h Δ A) (ls : List (Lane h Δ B)) → Alike H H′ (flatReads fl oc k r so ls)
                → At.Spent H (flatMapˢ op f fl oc k r pl so ls) → At.Spent H′ (flatMapˢ op f fl oc k r pl so ls)
@@ -639,11 +650,27 @@ module Locality (R : Set) where
   count-dead H []                d       = refl
   count-dead H (lane c k s ∷ ls) (e ∷ d) rewrite e = count-dead H ls d
 
-  -- A lane whose switch reads thrown is cut, by its gate.
-  spentL-dead : ∀ {h} (H : Heapᴹ h) {Δ B} (ls : List (Lane h Δ B)) → All (λ c → At.val H (Kit.live c) ≡ false) (cuts ls)
-              → At.GatedLanes H ls → At.SpentLanes H ls
-  spentL-dead H []                d       g             = lift tt
-  spentL-dead H (lane c k s ∷ ls) (e ∷ d) (g₁ , _ , g₃) = g₁ e , spentL-dead H ls d g₃
+  -- A gone lane is not among those its flatMap still lists.
+  listed-apart : ∀ {h Δ B} (ls : List (Lane h Δ B)) → AllPairs _≢_ (laneNames ls)
+               → ∀ xs {gone} → xs ++ gone ≡ cuts ls → ∀ {c} → c ∈ᴸ gone → c ∈ᴸ xs → ⊥
+  listed-apart ls                ps []       eq g ()
+  listed-apart []                ps (x ∷ xs) () g m
+  listed-apart (lane c k s ∷ ls) ps (x ∷ xs) eq g (here refl) =
+    lookupᴬ (apart-r (cutNames c) ps (here refl))
+      (++⁺ʳ (quietName k) (++⁺ʳ (names s) (cut-in ls (subst (λ y → y ∈ᴸ cuts ls) (∷-injectiveˡ eq) (subst (_ ∈ᴸ_) (∷-injectiveʳ eq) (++⁺ʳ xs g)))))) refl
+  listed-apart (lane c k s ∷ ls) ps (x ∷ xs) eq g (there m) =
+    listed-apart ls (pairs-r (names s) (pairs-r (quietName k) (pairs-r (cutNames c) ps))) xs (∷-injectiveʳ eq) g m
+
+  -- A lane whose switch reads thrown and that is not listed is cut, by its gate.
+  spentL-dead : ∀ {h} (H : Heapᴹ h) {Δ B} (X : List (Kit.Cut h)) (ls : List (Lane h Δ B)) → All (λ c → At.val H (Kit.live c) ≡ false) (cuts ls)
+              → All (λ c → c ∈ᴸ X → ⊥) (cuts ls) → At.GatedLanes H X ls → At.SpentLanes H ls
+  spentL-dead H X []                d       n        g             = lift tt
+  spentL-dead H X (lane c k s ∷ ls) (e ∷ d) (n ∷ ns) (g₁ , _ , g₃) = [ (λ m → ⊥-elim (n m)) , (λ x → x) ]′ (g₁ e) , spentL-dead H X ls d ns g₃
+
+  -- Lanes spent are gated against any listing.
+  gatedL-spent : ∀ {h} {H : Heapᴹ h} {Δ B} {X Y : List (Kit.Cut h)} (ls : List (Lane h Δ B)) → At.SpentLanes H ls → At.GatedLanes H X ls → At.GatedLanes H Y ls
+  gatedL-spent []                sp        g             = lift tt
+  gatedL-spent (lane c k s ∷ ls) (c₁ , sp) (_ , g₂ , g₃) = (λ _ → inj₂ c₁) , g₂ , gatedL-spent ls sp g₃
 
   cut-of : ∀ {h} {H : Heapᴹ h} (k : Maybe (Quiet h)) {Δ A} {s : Sub h Δ A} → At.Spent H s → At.Cut↓ H k s
   cut-of nothing  sp = lift tt
@@ -841,7 +868,8 @@ module Locality (R : Set) where
       where module T = Throw H c k s (λ m → m) ps
     spent-torn H (flatMapˢ op f fl oc k r pl so ls) ps {E} {o} (_ , _ , _ , hs , _ , gn , hl) (g₁ , g₂) =
       Heaps.cut-alike F.H′ F.Ht k so F.agS (via-cut F.T.H₀ k so F.PS (Heaps.holds-alike H F.T.H₀ so F.T.ag₀ hs) (Heaps.gated-alike H F.T.H₀ so F.T.ag₀ g₁))
-      , spentL-torn F.H₂ F.xs (proj₁ gn) ls (F.split gn) (F.gone₂ gn) F.PL {op = op} {f = f} {E = E} {o = o} {fl = fl}
+      , spentL-torn F.H₂ F.xs (proj₁ gn) ls (F.split gn) (F.gone₂ gn) F.PL
+                    (tabulateᴬ (listed-apart ls F.PL (At.val H (FlatKit.Flat.lanes fl)) (trans (proj₁ (proj₂ gn)) (cuts-switches H ls)))) {op = op} {f = f} {E = E} {o = o} {fl = fl}
                     (Heaps.holdsL-alike H F.H₂ ls F.agL {op = op} {f = f} {E = E} {o = o} {fl = fl} hl) (Heaps.gatedL-alike H F.H₂ ls F.agL g₂)
       where module F = FlatTear H {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {so = so} {ls = ls} ps
     spent-torn H (connectˢ S c b kb k fd rp e rt src bd) ps (_ , _ , _ , hs , hb) (_ , g₂ , g₃) =
@@ -852,14 +880,15 @@ module Locality (R : Set) where
     spent-torn H (deferˢ k s)        ps (_ , hs) g = via-cut H k s (pairs-r (quietName k) ps) hs g
 
     spentL-torn : ∀ {h} (H : Heapᴹ h) (xs gone : List (Kit.Cut h)) {Δ B} (ls : List (Lane h Δ B)) → xs ++ gone ≡ cuts ls
-                → All (λ c → At.val H (Kit.live c) ≡ false) gone → AllPairs _≢_ (laneNames ls)
-                → ∀ {A : Set} {op f E o fl} → At.HoldsLanes H {A = A} op f E o fl ls → At.GatedLanes H ls → At.SpentLanes (thrownLanes H (length xs) ls) ls
-    spentL-torn H []       gone ls eq ga ps hl gl = spentL-dead H ls (subst (All (λ c → At.val H (Kit.live c) ≡ false)) eq ga) gl
-    spentL-torn H (x ∷ xs) gone [] () ga ps hl gl
-    spentL-torn H (x ∷ xs) gone (lane c k s ∷ ls) eq ga ps {op = op} {f} {E} {o} {fl} (_ , hs , hl) (_ , g , gl) =
+                → All (λ c → At.val H (Kit.live c) ≡ false) gone → AllPairs _≢_ (laneNames ls) → ∀ {X} → All (λ c → c ∈ᴸ X → ⊥) gone
+                → ∀ {A : Set} {op f E o fl} → At.HoldsLanes H {A = A} op f E o fl ls → At.GatedLanes H X ls → At.SpentLanes (thrownLanes H (length xs) ls) ls
+    spentL-torn H []       gone ls eq ga ps {X} nx hl gl =
+      spentL-dead H X ls (subst (All (λ c → At.val H (Kit.live c) ≡ false)) eq ga) (subst (All (λ c → c ∈ᴸ X → ⊥)) eq nx) gl
+    spentL-torn H (x ∷ xs) gone [] () ga ps nx hl gl
+    spentL-torn H (x ∷ xs) gone (lane c k s ∷ ls) eq ga ps nx {op = op} {f} {E} {o} {fl} (_ , hs , hl) (_ , g , gl) =
       Heaps.cut-alike H₁ (thrownLanes H₁ (length xs) ls) k s (λ j m → thrownLanes-off H₁ (length xs) ls j (apart-r (names s) P m))
         (via-cut T.H₀ k s (proj₁ (pairs-split (names s) P)) (Heaps.holds-alike H T.H₀ s T.ag₀ hs) (Heaps.gated-alike H T.H₀ s T.ag₀ g))
-      , spentL-torn H₁ xs gone ls (∷-injectiveʳ eq) (mapᴬ (λ {c′} e → lowers (thrown-lowers H c k s) (Kit.live c′) e) ga) (pairs-r (names s) P) {op = op} {f = f} {E = E} {o = o} {fl = fl}
+      , spentL-torn H₁ xs gone ls (∷-injectiveʳ eq) (mapᴬ (λ {c′} e → lowers (thrown-lowers H c k s) (Kit.live c′) e) ga) (pairs-r (names s) P) nx {op = op} {f = f} {E = E} {o = o} {fl = fl}
                     (Heaps.holdsL-alike H H₁ ls (laneAlike H c k s {ls} ps) {op = op} {f = f} {E = E} {o = o} {fl = fl} hl)
                     (Heaps.gatedL-alike H H₁ ls (laneAlike H c k s {ls} ps) gl)
       where
@@ -885,9 +914,10 @@ module Locality (R : Set) where
       (λ _ → spent-torn H (takeWhileˢ i p c k tk s) ps (a , hs) (g₁ , g))
       , via-gated T.H₀ k s (pairs-r (quietName k) (pairs-r (cutNames c) ps)) (Heaps.holds-alike H T.H₀ s T.ag₀ hs) (Heaps.gated-alike H T.H₀ s T.ag₀ g)
       where module T = Throw H c k s (λ m → m) ps
-    gated-torn H (flatMapˢ op f fl oc k r pl so ls) ps {E} {o} (_ , _ , _ , hs , _ , _ , hl) (g₁ , g₂) =
+    gated-torn H (flatMapˢ op f fl oc k r pl so ls) ps {E} {o} hz@(_ , _ , _ , hs , _ , _ , hl) gz@(g₁ , g₂) =
       Heaps.gated-alike F.H′ F.Ht so F.agS (via-gated F.T.H₀ k so F.PS (Heaps.holds-alike H F.T.H₀ so F.T.ag₀ hs) (Heaps.gated-alike H F.T.H₀ so F.T.ag₀ g₁))
-      , gatedL-torn F.H₂ (length F.xs) ls F.PL {op = op} {f = f} {E = E} {o = o} {fl = fl} (Heaps.holdsL-alike H F.H₂ ls F.agL {op = op} {f = f} {E = E} {o = o} {fl = fl} hl) (Heaps.gatedL-alike H F.H₂ ls F.agL g₂)
+      , gatedL-spent ls (proj₂ (spent-torn H (flatMapˢ op f fl oc k r pl so ls) ps {E} {o} hz gz))
+          (gatedL-torn F.H₂ (length F.xs) ls F.PL {op = op} {f = f} {E = E} {o = o} {fl = fl} (Heaps.holdsL-alike H F.H₂ ls F.agL {op = op} {f = f} {E = E} {o = o} {fl = fl} hl) (Heaps.gatedL-alike H F.H₂ ls F.agL g₂))
       where module F = FlatTear H {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {so = so} {ls = ls} ps
     gated-torn H (connectˢ S c b kb k fd rp e rt src bd) ps {E} {o} hs@(_ , _ , _ , hsrc , hb) g@(_ , g₂ , g₃) =
       (λ _ → proj₁ (spent-torn H (connectˢ S c b kb k fd rp e rt src bd) ps {E} {o} hs g))
@@ -898,11 +928,11 @@ module Locality (R : Set) where
     gated-torn H (deferˢ k s)        ps (_ , hs) g = via-gated H k s (pairs-r (quietName k) ps) hs g
 
     gatedL-torn : ∀ {h} (H : Heapᴹ h) (n : ℕ) {Δ B} (ls : List (Lane h Δ B)) → AllPairs _≢_ (laneNames ls)
-                → ∀ {A : Set} {op f E o fl} → At.HoldsLanes H {A = A} op f E o fl ls → At.GatedLanes H ls → At.GatedLanes (thrownLanes H n ls) ls
+                → ∀ {A : Set} {op f E o fl} {X} → At.HoldsLanes H {A = A} op f E o fl ls → At.GatedLanes H X ls → At.GatedLanes (thrownLanes H n ls) X ls
     gatedL-torn H zero    ls ps hl gl = gl
     gatedL-torn H (suc n) []  ps hl gl = gl
     gatedL-torn H (suc n) (lane c k s ∷ ls) ps {op = op} {f} {E} {o} {fl} (_ , hs , hl) (_ , g , gl) =
-      (λ _ → Heaps.cut-alike H₁ Ht k s agt (via-cut T.H₀ k s Ps hs₀ g₀))
+      (λ _ → inj₂ (Heaps.cut-alike H₁ Ht k s agt (via-cut T.H₀ k s Ps hs₀ g₀)))
       , Heaps.gated-alike H₁ Ht s agt (via-gated T.H₀ k s Ps hs₀ g₀)
       , gatedL-torn H₁ n ls (pairs-r (names s) P) {op = op} {f = f} {E = E} {o = o} {fl = fl} (Heaps.holdsL-alike H H₁ ls (laneAlike H c k s {ls} ps) {op = op} {f = f} {E = E} {o = o} {fl = fl} hl)
                     (Heaps.gatedL-alike H H₁ ls (laneAlike H c k s {ls} ps) gl)

@@ -752,6 +752,11 @@ module Strongly (R : Set) where
     -- body ending does not tear its source: the source stays live until
     -- the switch is thrown, and a note can fall in between.
     --
+    -- A dead lane its flatMap still lists is excused: the teardown cuts
+    -- it again.  A lane's completion runs before the cut it owes, as an
+    -- inner takeWhile's or a connect body's does, so its slot frees with
+    -- what it subscribed to still live.
+    --
     -- REFUTED: c0bd1892 of a connect's source torn once its body's part is gone, by a concat whose next lane emits from inside the body's completion
     mutual
       Gated : ∀ {Δ A} → Sub h Δ A → Set₁
@@ -759,14 +764,14 @@ module Strongly (R : Set) where
       Gated (mapˢ f s)                        = Gated s
       Gated (scanˢ f r s)                     = Gated s
       Gated (takeWhileˢ i p c k tk s)         = (val (Kit.live c) ≡ false → Cut↓ k s) × Gated s
-      Gated (flatMapˢ op f fl oc k r pl so ls)   = Gated so × GatedLanes ls
+      Gated (flatMapˢ op f fl oc k r pl so ls)   = Gated so × GatedLanes (val (Flat.lanes fl)) ls
       Gated (connectˢ S c b kb k fd rp e rt src bd) = (val (Kit.live c) ≡ false → Cut↓ k src) × Gated src × Gated bd
       Gated (deferˢ k s)                      = Gated s
       Gated _                                 = Lift _ ⊤
 
-      GatedLanes : ∀ {Δ B} → List (Lane h Δ B) → Set₁
-      GatedLanes []                = Lift _ ⊤
-      GatedLanes (lane c k s ∷ ls) = (val (Kit.live c) ≡ false → Cut↓ k s) × Gated s × GatedLanes ls
+      GatedLanes : ∀ {Δ B} → List (Cut h) → List (Lane h Δ B) → Set₁
+      GatedLanes xs []                = Lift _ ⊤
+      GatedLanes xs (lane c k s ∷ ls) = (val (Kit.live c) ≡ false → c ∈ᴸ xs ⊎ Cut↓ k s) × Gated s × GatedLanes xs ls
 
     ----------------------------------------------------------------------
     -- Every subscription against its kernel

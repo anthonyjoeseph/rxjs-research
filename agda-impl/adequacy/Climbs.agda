@@ -11,7 +11,8 @@ open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ)
 import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥; ⊥-elim)
 open import Relation.Nullary using (¬_)
-open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′) renaming (map₂ to sum-map₂)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred; m<n⇒m<1+n; +-monoʳ-<; +-monoˡ-<)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; map) renaming (lookup to lookupᴬ; tabulate to tabulateᴬ)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to all-++⁺)
@@ -1003,7 +1004,7 @@ module Ascending (R : Set) where
     sd-lifts fs = Wr.wr-lifts fs
 
     sd-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels H′ T
-    sd-kernels fs = Wr.wr-kernels fs (λ {E} {o} → sd-holds (fresh-path ρ fs) {E} {o}) (sd-gated (fresh-path ρ fs)) (sd-spent (fresh-path ρ fs))
+    sd-kernels fs = Wr.wr-kernels fs (λ {E} {o} → sd-holds (fresh-path ρ fs) {E} {o}) (λ _ → sd-gated (fresh-path ρ fs)) (sd-spent (fresh-path ρ fs))
 
     sd-meaning : AllPairs _≢_ (names T) → Meaning H T → Meaning H′ T
     sd-meaning fs = Wr.wr-meaning fs (sd-fed (fresh-path ρ fs))
@@ -1052,8 +1053,7 @@ module Ascending (R : Set) where
                   → Lingers (Settles.H′ (Conf.heap (Mach.conf m₁)) ρ) (Restaged.T′ (Settles.H′ (Conf.heap (Mach.conf m₁)) ρ) ρ (U.unionᶜ pl (U.restᶜ o₀)))
 
     -- Likewise the pool's heads: what the outer still runs heads where
-    -- the outer's did.  May be false in its told half: the pool gains
-    -- `o₀`'s untold joiners while the heap's part has dropped the outer.
+    -- the outer's did.
     -- DEAD ROUTE: a frame, as `close-lingers`: `o₀` is free.
     close-heading : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
                     {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
@@ -1644,11 +1644,6 @@ module Ascending (R : Set) where
   laneOf-in one-this     = here refl
   laneOf-in (one-next o) = there (laneOf-in o)
 
-  -- The lane's own subscription's quiet.
-  quietOf : ∀ {h Δ B} {ls : List (Lane h Δ B)} {u : Sub h Δ B} {πL : PathLanes ls u} → OneLane πL → Maybe (Quiet h)
-  quietOf (one-this {k = k}) = k
-  quietOf (one-next o)       = quietOf o
-
   -- The observer a one-step lane path walks to: the lane's.
   walk-lane : ∀ {h Δ A B} {ls : List (Lane h Δ B)} {u : Sub h Δ B} {πL : PathLanes ls u} (o : OneLane πL) op (f : A → _) fl (W : Here h Δ B)
             → Here.obs (walkLanes op f fl W πL) ≡ Canon.Flat′.laneO op f (Here.env W) (Here.obs W) fl (laneOf o)
@@ -1790,13 +1785,13 @@ module Ascending (R : Set) where
     if-suc (cong lower (look-store H (Kit.live (laneOf o)) (Kit.live c) (λ eq → lookupᴬ nl (there (++⁺ʳ (quietName k) (++⁺ʳ (names s₀) (cut-in ls′ (laneOf-in o))))) (sym eq))))
            (count-unlive H o (pairs-r (names s₀) (pairs-r (quietName k) (pairs-r (cutNames c) ps))) e)
 
-  -- A lane ended: every other lane's gate as it was, its own owed its cut.
+  -- A lane ended: every other lane's gate as it was, its own listed.
   gatedL-freed : ∀ {h} (H : Heapᴹ h) {A Δ B} (fl : FlatKit.Flat A h) {ls : List (Lane h Δ B)} {u : Sub h Δ B} {πL : PathLanes ls u} (o : OneLane πL)
                → AllPairs _≢_ (laneNames ls) → All (_≢_ {A = Name h} (_ , FlatKit.Flat.active fl)) (laneNames ls)
-               → At.Cut↓ (freed H (laneOf o) fl) (quietOf o) u
-               → At.GatedLanes H ls → At.GatedLanes (freed H (laneOf o) fl) ls
+               → ∀ {X} → laneOf o ∈ᴸ X
+               → At.GatedLanes H X ls → At.GatedLanes (freed H (laneOf o) fl) X ls
   gatedL-freed H fl (one-this {c = c} {k} {t = s₀} {ls′}) (nl ∷ _) (na ∷ nas) cu (_ , g₂ , g₃) =
-    (λ _ → cu)
+    (λ _ → inj₁ cu)
     , Heaps.gated-alike H (freed H c fl) s₀ (λ j m →
         trans (look-store (unlive H c) (FlatKit.Flat.active fl) j (lookupᴬ nas (there (++⁺ʳ (quietName k) (++⁺ˡ m)))))
               (look-store H (Kit.live c) j (lookupᴬ nl (there (++⁺ʳ (quietName k) (++⁺ˡ m)))))) g₂
@@ -1804,7 +1799,7 @@ module Ascending (R : Set) where
         trans (look-store (unlive H c) (FlatKit.Flat.active fl) j (lookupᴬ nas (there (++⁺ʳ (quietName k) (++⁺ʳ (names s₀) m)))))
               (look-store H (Kit.live c) j (lookupᴬ nl (there (++⁺ʳ (quietName k) (++⁺ʳ (names s₀) m)))))) g₃
   gatedL-freed H fl (one-next {l = lane c k s₀} {ls = ls′} o) ps@(nl ∷ _) nas cu (g₁ , g₂ , g₃) =
-    (λ e → Heaps.cut-alike H (freed H (laneOf o) fl) k s₀ ag (g₁ (trans (sym ec) e)))
+    (λ e → sum-map₂ (Heaps.cut-alike H (freed H (laneOf o) fl) k s₀ ag) (g₁ (trans (sym ec) e)))
     , Heaps.gated-alike H (freed H (laneOf o) fl) s₀ ag g₂
     , gatedL-freed H fl o (pairs-r (names s₀) P) (tabulateᴬ λ m → lookupᴬ nas (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ʳ (names s₀) m)))) cu g₃
     where
@@ -1932,18 +1927,6 @@ module Ascending (R : Set) where
     ns : List (Name h)
     ns = (_ , Kit.live (laneOf o)) ∷ (_ , FlatKit.Flat.active fl) ∷ []
 
-    postulate
-      -- The ended lane's gate, now shut: what it subscribed to spent.
-      -- FALSE as stated.  A lane ends through its observer's completion,
-      -- and an inner takeWhile delivers that completion BEFORE it cuts its
-      -- own source: `mergeMap(_ => interval(10).pipe(takeWhile(x => x < 2)))`
-      -- frees its slot with the interval still running, the lane's quiet
-      -- held and its takeWhile's too.  The cut is owed, on the stack, not
-      -- done; the gate's clause reads as if a dropped switch were a cut
-      -- already run.  Repair is in the gate, not here: a clause that
-      -- excuses a cut its own completion still owes.
-      fr-cut : AllPairs _≢_ (names w₀) → At.Gated H w₀ → At.Cut↓ H′ (quietOf o) u
-
     fr-mine : All (_∈ᴸ names w₀) ns
     fr-mine = ++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names t) (cut-in ls (laneOf-in o))))))
               ∷ here refl ∷ []
@@ -2032,12 +2015,18 @@ module Ascending (R : Set) where
           , Heaps.holds-alike H H′ s (fr-lane fr (em (this-lane here))) hs′
           , holdsL ls′ (λ π → em (next-lane π)) hl′
 
-    -- The ended lane's gate now shut, owed its cut; every other gate as it
+    -- The ended lane's gate now shut, its cut still owed: it was live, so
+    -- not among the gone, so its flatMap lists it.  Every other gate as it
     -- was.
-    fr-gated : AllPairs _≢_ (names w₀) → At.Gated H w₀ → At.Gated H′ w₀
-    fr-gated fr g@(g₁ , g₂) =
+    fr-gated : AllPairs _≢_ (names w₀) → At.val H (Kit.live (laneOf o)) ≡ true → ∀ {E o′} → At.Holds H w₀ E o′ → At.Gated H w₀ → At.Gated H′ w₀
+    fr-gated fr lv (_ , _ , _ , _ , _ , (gone , eq , ga) , _) (g₁ , g₂) =
       Heaps.gated-alike H H′ t (fr-so fr) g₁
-      , gatedL-freed H fl o (fr-lanes-apart fr) (tabulateᴬ (fr-count-apart fr)) (fr-cut fr g) g₂
+      , subst (λ X → At.GatedLanes H′ X ls) (cong lower (sym (fr-off (FlatKit.Flat.lanes fl) ((λ ()) ∷ (λ ()) ∷ []))))
+          (gatedL-freed H fl o (fr-lanes-apart fr) (tabulateᴬ (fr-count-apart fr)) listed g₂)
+      where
+        listed : laneOf o ∈ᴸ At.val H (FlatKit.Flat.lanes fl)
+        listed = [ (λ m → m) , (λ m → ⊥-elim (true≢false (trans (sym lv) (lookupᴬ ga m)))) ]′
+                   (∈-++⁻ (At.val H (FlatKit.Flat.lanes fl)) (subst (laneOf o ∈ᴸ_) (sym (trans eq (cuts-switches H ls))) (laneOf-in o)))
 
     -- What lies under the flatMap untouched.
     fr-spent : AllPairs _≢_ (names w₀) → At.Spent H w₀ → At.Spent H′ w₀
@@ -2185,7 +2174,7 @@ module Ascending (R : Set) where
     fr-behind fs {q} ut en bh = subst (λ t′ → Each H′ (Heads q) t′) (plant-self ρ) (Sh.shift-behind fs w₀ ut en (fr-heading (fresh-path ρ fs)) bh)
 
     fr-kernels : AllPairs _≢_ (names T) → At.val H (Kit.live (laneOf o)) ≡ true → Kernels H T → Kernels H′ T
-    fr-kernels fs lv = Wr.wr-kernels fs (λ {E} {o′} → fr-holds (fresh-path ρ fs) lv {E} {o′}) (fr-gated (fresh-path ρ fs)) (fr-spent (fresh-path ρ fs))
+    fr-kernels fs lv = Wr.wr-kernels fs (λ {E} {o′} → fr-holds (fresh-path ρ fs) lv {E} {o′}) (λ {E} {o′} → fr-gated (fresh-path ρ fs) lv {E} {o′}) (fr-spent (fresh-path ρ fs))
 
     fr-meaning : AllPairs _≢_ (names T) → Meaning H T → Meaning H′ T
     fr-meaning fs = Wr.wr-meaning fs (fr-fed (fresh-path ρ fs))
@@ -2262,7 +2251,7 @@ module Ascending (R : Set) where
     dq-lifts fs = Wr.wr-lifts fs
 
     dq-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels H′ T
-    dq-kernels fs = Wr.wr-kernels fs (λ {E} {o} → dq-holds (fresh-path ρ fs) {E} {o}) (dq-gated (fresh-path ρ fs)) (dq-spent (fresh-path ρ fs))
+    dq-kernels fs = Wr.wr-kernels fs (λ {E} {o} → dq-holds (fresh-path ρ fs) {E} {o}) (λ _ → dq-gated (fresh-path ρ fs)) (dq-spent (fresh-path ρ fs))
 
     dq-meaning : AllPairs _≢_ (names T) → Meaning H T → Meaning H′ T
     dq-meaning fs = Wr.wr-meaning fs (dq-fed (fresh-path ρ fs))
@@ -2858,7 +2847,7 @@ module Ascending (R : Set) where
     fin-kernels fs kn = record { holds   = holds-plant H′ {t = T} ρ v refl (λ {E} {o} → Bd.body-holds {E} {o}) (Kernels.holds kn′)
                                ; gated   = gated-plant H′ {t = T} ρ v Bd.body-gated Bd.body-spent (Kernels.gated kn′)
                                ; settled = settled-plant {t = T} ρ v Bd.body-owes Bd.body-settled (Kernels.settled kn′) }
-      where kn′ = Wr.wr-kernels fs (λ {E} {o} → fin-holds (fresh-path ρ fs) {E} {o}) (fin-gated (fresh-path ρ fs)) (fin-spent (fresh-path ρ fs)) kn
+      where kn′ = Wr.wr-kernels fs (λ {E} {o} → fin-holds (fresh-path ρ fs) {E} {o}) (λ _ → fin-gated (fresh-path ρ fs)) (fin-spent (fresh-path ρ fs)) kn
 
     fin-meaning : AllPairs _≢_ (names T) → At.Joined H (subjects T) (joiners T []) → Meaning H T → Meaning H′ T′
     fin-meaning fs jn mn = record { fed = fed-plant H′ {t = T} ρ v (fin-joins fs jn) _ (Meaning.fed (Wr.wr-meaning fs (fin-fed (fresh-path ρ fs)) mn)) }
