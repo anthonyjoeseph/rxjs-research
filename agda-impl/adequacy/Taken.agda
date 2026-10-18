@@ -50,6 +50,7 @@ open import adequacy.Moved using (module Planting)
 open import adequacy.Restages using (module Staging)
 open import adequacy.Weaken using (module Weakening)
 open import adequacy.Names using (module Naming)
+open import adequacy.Alike using (module Aliking)
 
 module Taking (R : Set) where
   open Machine R using (Mach; mach; step; wkPlaying; wkTodo)
@@ -68,8 +69,9 @@ module Taking (R : Set) where
   open Keeping R using (each-plant; lingers-plant)
   open Planting R using (module Moved)
   open Staging R using (Restages; not-src; wrap-take)
-  open Weakening R using (KontRel; ObsRel; module Grown; pend-grow)
-  open Naming R using (Img; compile-cong; fresh-new; fresh-plant; grows-extend; obs-trans; obs-wk; obs-⨾; pending-↭; takeO-cong; to-img; wk-img; wk-pairs; wkN; ≗-sym)
+  open Weakening R using (module Grown; pend-grow)
+  open Naming R using (Img; fresh-new; fresh-plant; grows-extend; pending-↭; to-img; wk-img; wk-pairs; wkN)
+  open Aliking R using (KontRel; ObsRel; compile-cong; obs-trans; obs-wk; obs-⨾; takeO-cong; walk-grow; ≗-sym)
 
   -- A TAKEWHILE RESTAGED IN THE WORLD GROWN TWICE: its cut the two
   -- newest cells, live and holding nothing, its source pending beneath
@@ -112,8 +114,8 @@ module Taking (R : Set) where
     walk′ = trans (walk-⊕ (planted π₂ v) (in-take here) top)
                   (cong (λ W → walk (in-take {i = i} {p} {c₂} {nothing} {taking} {t = pendingˢ s q} {u = pendingˢ s q} here) W) (walk-planted π₂ v top))
 
-    wg₁ = Grown.walk-grow ν₁ π
-    wg₂ = Grown.walk-grow ν₂ π₁
+    wg₁ = walk-grow ν₁ π
+    wg₂ = walk-grow ν₂ π₁
 
     obs₂ : ObsRel (wkObs (ν₁ ⨾ ν₂) (Here.obs (walk π top))) (Here.obs (walk π₂ top))
     obs₂ = obs-trans (obs-trans (obs-⨾ ν₁ ν₂ _) (obs-wk ν₂ (proj₁ wg₁))) (proj₁ wg₂)

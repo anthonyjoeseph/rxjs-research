@@ -530,16 +530,15 @@ module Framing (R : Set) where
     private
       offU : Off H H′ (names u)
       offU j a = off j (map (lookupᴬ a) mine)
-
     wr-kernels : (∀ {E o} → At.Holds H u E o → At.Holds H′ u E o) → (At.Gated H u → At.Gated H′ u) → (At.Spent H u → At.Spent H′ u)
                → Kernels H T → Kernels H′ T
     wr-kernels hv gv sv kn = record
-      { holds   = Heaps.holds-path H H′ ρ fs offU hv (Kernels.holds kn)
-      ; gated   = Heaps.gated-path H H′ ρ fs offU gv sv (Kernels.gated kn)
+      { holds   = Heaps.holds-same H H′ ρ fs offU hv (Kernels.holds kn)
+      ; gated   = Heaps.gated-same H H′ ρ fs offU gv sv (Kernels.gated kn)
       ; settled = Kernels.settled kn }
 
     wr-meaning : (∀ ν → At.Fed H u ν → At.Fed H′ u ν) → Meaning H T → Meaning H′ T
-    wr-meaning fv mn = record { fed = Heaps.fed-path H H′ ρ fs offU fv _ (Meaning.fed mn) }
+    wr-meaning fv mn = record { fed = Heaps.fed-same H H′ ρ fs offU fv _ (Meaning.fed mn) }
 
     wr-lifts : ∀ {s S} → Lifts H ρ s S → Lifts H′ ρ s S
     wr-lifts = lifts-off H H′ ρ fs offU

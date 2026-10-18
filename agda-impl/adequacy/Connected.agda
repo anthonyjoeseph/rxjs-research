@@ -8,15 +8,15 @@ open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (tabula
 open import Data.List.Relation.Unary.Any using () renaming (here to hereᴬ; there to thereᴬ)
 open import Data.List.Relation.Unary.Any.Properties using () renaming (++⁻ to any-++⁻; ++⁺ˡ to any-++⁺ˡ; ++⁺ʳ to any-++⁺ʳ)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.All.Properties using () renaming (++⁻ to all-++⁻)
+open import Data.List.Relation.Unary.All.Properties using () renaming (++⁻ to all-++⁻; ++⁺ to all-++⁺)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; []; _∷_) renaming (map to pairs-map)
-open import Data.List.Relation.Unary.Linked using ([]; _∷_)
+open import Data.List.Relation.Unary.Linked using (Linked; []; _∷_)
 open import Data.List.Relation.Unary.AllPairs.Properties using () renaming (map⁺ to pairs-map⁺; ++⁺ to pairs-++⁺)
 open import Data.List.Relation.Binary.Permutation.Propositional using (_↭_; ↭-sym; ↭-trans; ↭-reflexive) renaming (refl to ↭-refl′; prep to ↭-prep′; swap to ↭-swap′; trans to ↭-trans′)
 open import Data.List.Relation.Binary.Permutation.Propositional.Properties using (All-resp-↭; shifts) renaming (++⁺ˡ to ↭-++⁺ˡ; ++⁺ʳ to ↭-++⁺ʳ)
 open import Data.List.Properties using (map-++; ++-assoc) renaming (++-identityʳ to ++-idʳ)
 open import Data.Maybe using (Maybe; just; nothing; is-just) renaming (map to mapMaybe)
-open import Data.Nat using (ℕ; _<_)
+open import Data.Nat using (ℕ; _<_; z≤n)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Sum using (inj₁)
@@ -49,7 +49,9 @@ open import adequacy.Moved using (module Planting)
 open import adequacy.Restages using (module Staging)
 open import adequacy.Weaken using (module Weakening)
 open import adequacy.Names using (module Naming)
+open import adequacy.Alike using (module Aliking)
 open import adequacy.Taken using (module Taking)
+open import adequacy.Replant using (module Replanting)
 
 module Connecting (R : Set) where
   open Machine R using (Mach; mach; step; Playing; wkPlaying; wkTodo)
@@ -61,18 +63,20 @@ module Connecting (R : Set) where
   open Heap using (World; _⊑_; _⨾_; _∋_; there; new; grow; wk∋; cell) renaming (here to hereʳ; same to same⊑)
   open Run (Pureᴾ R) using (Act; done; under; _>>ᴬ_; compile; Env; wkEnv; wkAct; module Kit; Ref; wkR; Observer; Kont; wkObs; wkKont; Subject; Subscription; wkSubn)
   open Run.Kit (Pureᴾ R) using (skipᴬ)
-  open Strongly R using (Carried; Books; Sub; pendingˢ; connectˢ; idle; bodyK; srcK; Path; here; in-source; in-body; _⊕_; Here; walk; top; srcC; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; names; Phase; union-pinned; under-moved; bursts-pinned; rest-pinned; ≗-refl; newRef≗; unsubscribing; under≗; readRef≗; module Canon)
+  open Strongly R using (Carried; Books; Sub; pendingˢ; connectˢ; idle; bodyK; srcK; Path; here; in-source; in-body; _⊕_; Here; walk; top; srcC; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-defer; subjects; laneSubjects; Lane; lane; Heads; Lingers; names; Phase; union-pinned; under-moved; bursts-pinned; rest-pinned; ≗-refl; newRef≗; unsubscribing; under≗; readRef≗; module Canon)
                         renaming (⟦_⟧ to ⟦_⟧ᶜ; at⟦_⟧ to at⟦_⟧ᶜ)
   open Strongly.Against R using (StackAs; subAs; backAs; stackJobs; SrcOf; src-of; Ticked)
-  open Moving R using (planted; pend; part-plant; holds-owed; settled-plant; gated-plant; fed-plant)
+  open Moving R using (planted; pend; part-plant; holds-owed; settled-plant; gated-plant; fed-plant; plant; plantᴸ; Splice; spliced-l; spliced-r; pendings-plant; joiners-plant)
   open Ghosting R using (walk-⊕; sorted-⇝)
   open Forking R using (pend-less; subOf; walk-planted)
   open Keeping R using (lingers-plant)
   open Planting R using (module Moved)
   open Staging R using (Restages; not-src; wrap-body)
-  open Weakening R using (KontRel; ObsRel; module Grown; pend-grow)
-  open Naming R using (compile-cong; compile-env; fresh-new; fresh-plant; grows-extend; names-wk; obs-trans; obs-wk; obs-⨾; pending-↭; wk-pairs; ≗-sym)
+  open Weakening R using (module Grown; pend-grow)
+  open Naming R using (fresh-new; fresh-plant; grows-extend; names-wk; pending-↭; wk-pairs)
+  open Aliking R using (KontRel; ObsRel; compile-cong; compile-env; obs-trans; obs-wk; obs-⨾; walk-grow; ≗-sym)
   open Taking R using (allocates; recode; tick-ix0; unders; ⊑≗)
+  open Replanting R using (ahead-under)
 
   -- A RUN AT A PENDING NODE, THE WORLD GROWN: what the relation reads of
   -- the run at its subscription, along the weakened tree and against the
@@ -122,7 +126,26 @@ module Connecting (R : Set) where
     where open Grew
           module Gw = Grown (new {k} {h})
           gr = grows-extend H x
-          wg = Gw.walk-grow (path G)
+          wg = walk-grow new (path G)
+
+  -- The subjects, the node's own replaced in place.
+  mutual
+    subjects-splice : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+                    → Splice (subjects t) (subjects u) (subjects (plant π v)) (subjects v)
+    subjects-splice {u = u} here v                     = [] , [] , sym (++-idʳ (subjects u)) , sym (++-idʳ (subjects v))
+    subjects-splice (in-map π) v                       = subjects-splice π v
+    subjects-splice (in-scan π) v                      = subjects-splice π v
+    subjects-splice (in-take π) v                      = subjects-splice π v
+    subjects-splice (in-outer {ls = ls} π) v           = spliced-r (laneSubjects ls) (subjects-splice π v)
+    subjects-splice (in-lanes {t = so} π) v            = spliced-l (subjects so) (subjects-spliceᴸ π v)
+    subjects-splice (in-source {S = S} {bd = bd} π) v  = spliced-l ((_ , S) ∷ []) (spliced-r (subjects bd) (subjects-splice π v))
+    subjects-splice (in-body {S = S} {t = src} π) v    = spliced-l ((_ , S) ∷ subjects src) (subjects-splice π v)
+    subjects-splice (in-defer π) v                     = subjects-splice π v
+
+    subjects-spliceᴸ : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
+                     → Splice (laneSubjects ls) (subjects u) (laneSubjects (plantᴸ π v)) (subjects v)
+    subjects-spliceᴸ (this-lane {ls = ls} π) v        = spliced-r (laneSubjects ls) (subjects-splice π v)
+    subjects-spliceᴸ (next-lane {l = lane c k s} π) v = spliced-l (subjects s) (subjects-spliceᴸ π v)
 
   -- The world a connect's kernel allocates: its subject's joiners and
   -- closed flag, its cut's flag and stash, the stash of its body's
@@ -140,7 +163,8 @@ module Connecting (R : Set) where
                    {π₀ : Path T₀ (pendingˢ (T.connect s b) q)} {u} {E′ : Env Δ u} {υ : u ⊑ h₀} {w} {σ : w ⊑ h₀} {K : Stack w ⊤} {clk}
                    {H₅ : Heapᴹ (connectWorld h₀ A)} {bs ts}
                    (G₅ : Grew H₀ π₀ E′ υ σ K clk connectGrown H₅ bs ts)
-                   (held₅ : At.val H₅ (Kit.held (Kit.wkCut new (wkR new hereʳ , hereʳ))) ≡ nothing) (body₅ : At.val H₅ hereʳ ≡ nothing) where
+                   (held₅ : At.val H₅ (Kit.held (Kit.wkCut new (wkR new hereʳ , hereʳ))) ≡ nothing) (body₅ : At.val H₅ hereʳ ≡ nothing)
+                   (joins₅ : At.val H₅ (wkR (grow (grow (grow (grow same⊑)))) hereʳ) ≡ []) where
     h₅ : World
     h₅ = connectWorld h₀ A
 
@@ -264,10 +288,25 @@ module Connecting (R : Set) where
                        (e : wkAct same⊑ m ≗ ⟦ srcC ρc ∷ [] ⟧ᶜ)
                      → Owned H₅ T₅ (subAs {act = act} π₅ cd sk a)
                      → Owned H₅ t′ (subAs {act = act′} π′ cd′ (backAs q {ρ = σ′} {σ = same⊑} (srcC ρc ∷ []) (<ᵖ-below q []) e (restack sk a)) a′)
-      -- The queue, the run one level down, a new subject joined by none.
-      connect-queue  : Queue H₅ q clk ts T₅ → Queue H₅ (q ++ [ ix 0 ]) clk ts t′
       -- Every head no earlier than the run one level down.
       connect-behind : Each H₅ (Heads q) T₅ → Each H₅ (Heads (q ++ [ ix 0 ])) t′
+
+    -- The queue, the run one level down, a new subject joined by none.
+    connect-queue : Queue H₅ q clk ts T₅ → Queue H₅ (q ++ [ ix 0 ]) clk ts t′
+    connect-queue qu = record
+      { timed   = subst (At.Timed H₅ ts) (sym pnd) (Queue.timed qu)
+      ; joined  = subst (λ ss → At.Joined H₅ ss (Strongly.joiners R t′ [])) (sym (proj₂ (proj₂ (proj₂ sj))))
+                    (all-++⁺ (proj₁ al) (nil joins₅ ∷ proj₂ al) , proj₂ jd)
+      ; ordered = Queue.ordered qu ; ahead = ahead-under q 0 (λ _ → z≤n) (Queue.ahead qu) }
+      where
+        pnd : Strongly.pendings R t′ ≡ Strongly.pendings R T₅
+        pnd with pendings-plant π₅ v
+        ... | _ , _ , e , e′ = trans e′ (sym e)
+        sj = subjects-splice π₅ v
+        jd = subst (At.Joined H₅ (subjects T₅)) (sym (joiners-plant π₅ v (λ _ → refl) [])) (Queue.joined qu)
+        al = all-++⁻ (proj₁ sj) (subst (All _) (proj₁ (proj₂ (proj₂ sj))) (proj₁ jd))
+        nil : ∀ {X : Set} {Q : X → Set₁} {L : X → X → Set} {xs : List X} → xs ≡ [] → All Q xs × Linked L xs
+        nil refl = [] , []
 
     -- A connect pending its source runs what it was pending to, its
     -- source not yet ended.
@@ -322,7 +361,7 @@ module Connecting (R : Set) where
                       ; named = λ {_} {j} _ → j , refl ; distinct = λ fs → fs }
           G₅ = grew-step {k = cell (maybe quiet)} (lift nothing) (grew-step {k = cell (maybe quiet)} (lift nothing)
                  (grew-step {k = cell (base Bool)} (lift true) (grew-step {k = cell (base Bool)} (lift false) (grew-step {k = cell (joins A)} (lift []) G₀))))
-          module C = Connected G₅ refl refl
+          module C = Connected G₅ refl refl refl
           sk₅ = Grew.stack G₅
           a₅ = Grew.alone G₅
           eY = C.src-owed (λ ζ → new ⨾ (new ⨾ ((new ⨾ new) ⨾ (new ⨾ ζ)))) ey

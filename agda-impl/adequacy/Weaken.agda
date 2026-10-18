@@ -40,6 +40,7 @@ open import adequacy.Moves using (module Moving)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Grow using (module Growing)
 open import adequacy.Seq using (module Sequencing)
+open import adequacy.Alike using (module Aliking)
 open import operation.PureObservable using (module Pure)
 
 module Weakening (R : Set) where
@@ -47,6 +48,7 @@ module Weakening (R : Set) where
   open Unsubbing R using (then)
   open Growing R using (wkTree; wkLanes; wkPath; wkFeed)
   open Sequencing R using (wkEnv-wk)
+  open Aliking R using (walk-grow)
   open Pure R using (Timer; wkTimer; mapList; cascade)
   open Shared Timeline (Out R) using (Heapᴹ; ⟨_,_,_⟩; look; cbs; wkVal)
   open Heap using (World; _⊑_; _⨾_; _∋_; there; grow; wk∋; slot; Sink; Quiet; Handle) renaming (same to same⊑)
@@ -64,13 +66,6 @@ module Weakening (R : Set) where
       slots   : ∀ {X} (s : Sink h X) → CbRel (cbs H′ (wk∋ τ s)) (wkVal (slot X) τ (cbs H s))
       stashes : ∀ (u : Quiet h) → look H′ (wk∋ τ u) ≗ wkAct τ (look H u)
       handles : ∀ (hd : Handle h) → At.spentʰ H′ (wk∋ τ hd) ≡ At.spentʰ H hd
-
-  -- Two observers, part for part; two continuations, pointwise.
-  ObsRel : ∀ {A w} → Observer A w → Observer A w → Set₁
-  ObsRel o o′ = (∀ a → Observer.next o a ≗ Observer.next o′ a) × Observer.complete o ≗ Observer.complete o′ × Observer.closed o ≗ Observer.closed o′
-
-  KontRel : ∀ {w} → Kont w → Kont w → Set₁
-  KontRel {w} k k′ = ∀ {v} (σ : w ⊑ v) sub → k σ sub ≗ k′ σ sub
 
   -- A tree weakened owes what it did.
   mutual
@@ -99,16 +94,10 @@ module Weakening (R : Set) where
       grow-alone  : ∀ {t : Sub h [] R} {p w} {σ : w ⊑ h} {K bs} {Δ A s q} (π : Path t (pendingˢ {Δ = Δ} {A} s q)) (sk : StackAs t p σ K bs)
                   → All (λ j → ¬ SrcOf t π (proj₂ j)) (stackJobs t sk) → All (λ j → ¬ SrcOf (wkTree τ t) (wkPath τ π) (proj₂ j)) (stackJobs (wkTree τ t) (grow-stack sk))
       grow-ticked : ∀ {t : Sub h [] R} {n p w} {σ : w ⊑ h} {K bs} (sk : StackAs t p σ K bs) → Ticked t n sk → Ticked (wkTree τ t) n (grow-stack sk)
-      -- A walk along the weakened path hands the weakened observer and
-      -- continuation, up to `_≗_`, and the weakened subjects.
-      walk-grow   : ∀ {Δ A} {t : Sub h [] R} {u : Sub h Δ A} (π : Path t u)
-                  → ObsRel (wkObs τ (Here.obs (walk π top))) (Here.obs (walk (wkPath τ π) top))
-                  × KontRel (wkKont τ (Here.kont (walk π top))) (Here.kont (walk (wkPath τ π) top))
-                  × wkEnv τ (Here.env (walk π top)) ≡ Here.env (walk (wkPath τ π) top)
 
     env-grow : ∀ {t : Sub h [] R} {Δ A} {u′ : Sub h Δ A} (π : Path t u′) {u} (E′ : Env Δ u) (υ : u ⊑ h)
              → wkEnv υ E′ ≡ Here.env (walk π top) → wkEnv (υ ⨾ τ) E′ ≡ Here.env (walk (wkPath τ π) top)
-    env-grow π E′ υ e = trans (sym (wkEnv-wk υ τ E′)) (trans (cong (wkEnv τ) e) (proj₂ (proj₂ (walk-grow π))))
+    env-grow π E′ υ e = trans (sym (wkEnv-wk υ τ E′)) (trans (cong (wkEnv τ) e) (proj₂ (proj₂ (walk-grow τ π))))
 
     -- A subscription still pending, along the weakened path.
     code-grow : ∀ {t : Sub h [] R} {Δ A} {s : T.Obs Timeline Δ A} {q} (π : Path t (pendingˢ s q)) {u} (E′ : Env Δ u) (υ : u ⊑ h)

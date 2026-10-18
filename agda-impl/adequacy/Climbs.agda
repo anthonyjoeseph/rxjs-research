@@ -22,7 +22,7 @@ open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈�
 open import Level using (lift; lower)
 open import Data.Maybe using (Maybe; just; nothing; is-nothing; is-just) renaming (map to mapMaybe)
 open import Data.Maybe.Properties using (just-injective)
-open import Data.Nat using (ℕ; zero; suc; pred; _<_; _≤_; _≡ᵇ_; _<ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; pred; _<_; _≤_; z≤n; _≡ᵇ_; _<ᵇ_)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
@@ -69,10 +69,10 @@ module Ascending (R : Set) where
   open Heap using (World; _⊑_; _⨾_; _∋_; Handle; Sink; Quiet; wk∋; slot) renaming (same to same⊑)
   open Sorting R using (WellMach)
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
-  open Strongly R using (Strong; Carried; Books; carried; closing; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; Meets; Each; Heads; Lingers; seen; seenL; pinned-trans; ∧-split; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
+  open Strongly R using (Strong; Carried; Books; carried; closing; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; Meets; Each; Heads; Lingers; unsub; Owes; Settled; seen; seenL; pinned-trans; ∧-split; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf; src-of) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
-  open Moving R using (pairs-r; pairs-split; takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; holds-plant; settled-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
+  open Moving R using (pairs-r; pairs-split; plant-self; takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; holds-plant; settled-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
   open Tearing R using (fresh-path; takeSite; bodySite; look-store; look-either; Alike; part-alike; partLanes-alike; part-flat; apart-r; each-same; seen-alike; seenL-alike; names-path; lanes-path) renaming (Off to Offʰ)
   open Unsubbing R using (_⇝_; ⇝-trans; now; then; ≗-trans; wk≗; wk-same; bind≗)
   open Sequencing R using (seq-assoc; seq-done)
@@ -81,7 +81,7 @@ module Ascending (R : Set) where
   open Naming R using (pre; fresh-plant; fresh-new; wk-pairs; wk-img; to-img)
   open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
   open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed; stepped-deep)
-  open Lowering R using (queue-keeps; store-keeps; keeps-trans)
+  open Lowering R using (Keeps; queue-keeps; store-keeps; keeps-trans)
   open Lifting R using (sub-onward; emit-shut; emit-void; run-meets; run-at; emit-run; spread-past; behind-fire; fire-lingers; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
   open Locality R using (stored-at; stored-hit; live-apart; flatReads; cuts; cut-in; module Heaps)
   open Growing R using (wkTree; wkLanes; wkPath)
@@ -90,8 +90,8 @@ module Ascending (R : Set) where
   open Framing R using (Untold; untold; scan-part; scan-defined; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike)
     renaming (Ended to Ends)
   open Staging R using (not-src; wrap-lane)
-  open Weakening R using () renaming (module Grown to Weakened)
-  open Replanting R using (Kin; kin-end; kin-pool; kin-feed; kin-fin; kin-lane; rehomes; rehomes-code; restack; reticked; owned-run; plant-self; module Shift; Heading; Lingering; Gone; store-held; Lives; lives-off; ahead-under)
+  open Weakening R using (Grows) renaming (module Grown to Weakened)
+  open Replanting R using (Kin; kin-end; kin-pool; kin-feed; kin-fin; kin-lane; rehomes; rehomes-code; restack; reticked; owned-run; module Shift; Heading; Lingering; Gone; store-held; Lives; lives-off; ahead-under)
   open Read
 
   handleOf : ∀ {h} {t : Sub h [] R} → Spot t → Maybe (Handle h)
@@ -501,7 +501,7 @@ module Ascending (R : Set) where
 
     out-queue : ∀ {clk ts} → Queue H q clk ts T → Queue H (q ++ [ ix 0 ]) clk ts T′
     out-queue qu = record { timed = Queue.timed (end-queue qu) ; joined = Queue.joined (end-queue qu)
-                          ; ordered = Queue.ordered qu ; ahead = ahead-under q 0 (Queue.ahead qu) }
+                          ; ordered = Queue.ordered qu ; ahead = ahead-under q 0 (λ _ → z≤n) (Queue.ahead qu) }
 
   -- A value an exclusive takeWhile fails on: its guard read, the take
   -- ended, its completion the agenda's call.
@@ -1195,21 +1195,50 @@ module Ascending (R : Set) where
       behind  : Each (Conf.heap (Mach.conf m)) (Heads (Conf.pos (Mach.conf m))) T
       lingers : Lingers (Conf.heap (Mach.conf m)) (Restaged.T′ (Conf.heap (Mach.conf m)) ρ pl′)
 
-  -- A WORLD GROWN BY A LANE'S START: every name the old heap held where it
-  -- was, weakened, but the count up and the cut listed; the cut live and
-  -- holding nothing.
+  -- The two cells a lane's start writes past its world's growth: the
+  -- count and the list.
+  wrote : ∀ {h v A} → h ⊑ v → FlatKit.Flat A h → List (Name v)
+  wrote τ fl = (_ , wkR τ (FlatKit.Flat.active fl)) ∷ (_ , wkR τ (FlatKit.Flat.lanes fl)) ∷ []
+
+  -- Neither is a cell the queue reads.
+  wrote-keeps : ∀ {h v A} {τ : h ⊑ v} {fl : FlatKit.Flat A h} {H H′ : Heapᴹ v} → Offʰ H H′ (wrote τ fl) → Keeps H H′
+  wrote-keeps off = record
+    { spends = λ hd e → trans (cong lower (off hd ((λ ()) ∷ (λ ()) ∷ []))) e
+    ; gates  = λ l e → trans (cong lower (off l ((λ ()) ∷ (λ ()) ∷ []))) e
+    ; slots  = λ s → off s ((λ ()) ∷ (λ ()) ∷ [])
+    ; subs   = λ r → off r ((λ ()) ∷ (λ ()) ∷ []) }
+
+  -- A WORLD GROWN BY A LANE'S START: the old heap weakened into `base`,
+  -- then the count raised and the cut listed, nothing else written; the
+  -- cut live past the old names, holding nothing.
   record Grown {h v} (τ : h ⊑ v) (H : Heapᴹ h) (H′ : Heapᴹ v) {A} (fl : FlatKit.Flat A h) (c : Kit.Cut v) : Set₁ where
     field
+      base    : Heapᴹ v
+      grows   : Grows τ H base
+      moved   : Offʰ base H′ (wrote τ fl)
       count   : At.val H′ (wkR τ (FlatKit.Flat.active fl)) ≡ suc (At.val H (FlatKit.Flat.active fl))
       listed  : At.val H′ (wkR τ (FlatKit.Flat.lanes fl)) ≡ c ∷ wkEl (list Kit.cutTy) τ (At.val H (FlatKit.Flat.lanes fl))
       live    : At.val H′ (Kit.live c) ≡ true
       unheld  : At.val H′ (Kit.held c) ≡ nothing
-      cells   : ∀ {t} (x : Ref h t) → _≢_ {A = Name h} (_ , x) (_ , FlatKit.Flat.active fl) → _≢_ {A = Name h} (_ , x) (_ , FlatKit.Flat.lanes fl)
-              → At.val H′ (wkR τ x) ≡ wkEl t τ (At.val H x)
-      slots   : ∀ {X} (s : Sink h X) → CbRel (cbs H′ (wk∋ τ s)) (wkVal (slot X) τ (cbs H s))
-      stashes : ∀ (u : Quiet h) → look H′ (wk∋ τ u) ≗ wkAct τ (look H u)
-      handles : ∀ (hd : Handle h) → At.spentʰ H′ (wk∋ τ hd) ≡ At.spentʰ H hd
       outside : ∀ {k} (i : h ∋ k) → All (λ n → _≢_ {A = Name v} (k , wk∋ τ i) n) (cutNames c)
+
+  -- A NODE SPLICED: the heap moved only at the new node's names and the
+  -- node replanted, its own clauses carried across both moves.  Every
+  -- clause above it reads its own names, apart from the new node's, and
+  -- the new node unsubscribes as the old did.
+  module Spliced {h} (H H′ : Heapᴹ h) {T : Sub h [] R} {Δ A} {u : Sub h Δ A} (ρ : Path T u) (v : Sub h Δ A)
+                 {ns : List (Name h)} (off : Offʰ H H′ ns) (mine : All (_∈ᴸ names v) ns) (fs : AllPairs _≢_ (names (plant ρ v))) where
+    private
+      offV : Offʰ H H′ (names v)
+      offV = Heaps.keep H H′ off (lookupᴬ mine)
+
+    sp-kernels : unsub u ≡ unsub v → (Owes v → Owes u) → (Settled u → Settled v) → (∀ {E o} → At.Holds H u E o → At.Holds H′ v E o)
+               → (At.Gated H u → At.Gated H′ v) → (At.Spent H u → At.Spent H′ v) → Kernels H T → Kernels H′ (plant ρ v)
+    sp-kernels ue ov sv hv gv dv kn = record { holds   = Heaps.holds-path H H′ ρ v fs offV ue hv (Kernels.holds kn) ; gated = Heaps.gated-path H H′ ρ v fs offV gv dv (Kernels.gated kn)
+                                             ; settled = settled-plant ρ v ov sv (Kernels.settled kn) }
+
+    sp-meaning : (∀ ν → At.Fed H u ν → At.Fed H′ v ν) → Meaning H T → Meaning H′ (plant ρ v)
+    sp-meaning fv mn = record { fed = Heaps.fed-path H H′ ρ v fs offV fv _ (Meaning.fed mn) }
 
   -- A LANE'S START RUN: the observer read open, the count up, the cut
   -- allocated and listed, the run at the lane's subscription under `ix 1`,
@@ -1236,6 +1265,7 @@ module Ascending (R : Set) where
       bursts′ : bs′ ≡ mapList (mapMaybe (wkPlaying grow)) bs
       todo′   : td′ ≡ mapList (wkTodo grow) td
       grown   : Grown grow H heap′ fl cut′
+      deep    : q ≢ []
       code′   : act′ ≗ compile (f y) (Here.env (walk ρ top)) grow
                   (Kit.guarded cut′ (Canon.Flat′.lane op f (Here.env (walk ρ top)) (Here.obs (walk ρ top)) fl grow cut′)) (λ σ → Kit.attach (Kit.wkCut σ cut′))
       rests′  : back′ ≗ done tt
@@ -1247,11 +1277,6 @@ module Ascending (R : Set) where
     begin-path : ∀ {g ℓ h} {H : Heapᴹ h} {q w} {ϑ : w ⊑ h} {K : Stack w ⊤} {clk ts bs td lg en mk} {a : Act h ⊤} {T : Sub h [] R} {Δ A B op f fl oc k r pl}
                    {t : Sub h Δ A} {ls : List (Lane h Δ B)} {ρ : Path T (flatMapˢ op f fl oc k r pl t ls)} {y : A} {pl′}
                → Begins g ℓ (mach ⟨ H , q , run a ϑ K ⟩ clk ts bs td lg en mk) ρ y pl′ → Started H q ϑ K clk ts bs td lg en mk ρ y a
-
-    -- A lane begins off the root: an outer's value is sent under a label.
-    begin-deep : ∀ {g ℓ h} {H : Heapᴹ h} {q w} {ϑ : w ⊑ h} {K : Stack w ⊤} {clk ts bs td lg en mk} {a : Act h ⊤} {T : Sub h [] R} {Δ A B op f fl oc k r pl}
-                   {t : Sub h Δ A} {ls : List (Lane h Δ B)} {ρ : Path T (flatMapˢ op f fl oc k r pl t ls)} {y : A} {pl′}
-               → Begins g ℓ (mach ⟨ H , q , run a ϑ K ⟩ clk ts bs td lg en mk) ρ y pl′ → q ≢ []
 
   -- A stack read at a frame and bursts equal to its own.
   stack-cast : ∀ {h} {t : Sub h [] R} {p w} {ϑ₁ ϑ₂ : w ⊑ h} {K : Stack w ⊤} {xs₁ xs₂}
@@ -1316,11 +1341,29 @@ module Ascending (R : Set) where
 
     postulate
       bg-owned   : (sk : StackAs T q ϑ K bs) → Owned H T (runAs [] (≗-refl _) sk) → Owned heap′ T′ (ca′ sk)
-      bg-kernels : Kernels H T → Kernels heap′ T′
-      bg-meaning : Meaning H T → Meaning heap′ T′
-      bg-queue   : Queue H q clk ts T → Queue heap′ (q ++ [ ix 1 ]) clk ts′ T′
       bg-behind  : Each H (Heads q) T → Each heap′ (Heads (q ++ [ ix 1 ])) T′
       bg-lingers : Lingers H (Restaged.T′ H ρ pl′) → Lingers heap′ T′
+
+    open Grown grown using (base; grows; moved)
+
+    -- The flatMap before the start, in the grown world.
+    u₀ : Sub v Δ B
+    u₀ = wkTree grow (flatMapˢ op f fl oc k r pl t ls)
+
+    -- The flatMap's own clauses across the start: the new lane pending,
+    -- counted and listed, holding nothing.
+    postulate
+      bg-holds : ∀ {E o} → At.Holds base u₀ E o → At.Holds heap′ v′ E o
+      bg-gated : At.Gated base u₀ → At.Gated heap′ v′
+      bg-spent : At.Spent base u₀ → At.Spent heap′ v′
+      bg-fed   : ∀ ν → At.Fed base u₀ ν → At.Fed heap′ v′ ν
+
+    bg-settled : Settled u₀ → Settled v′
+    bg-settled (b , st , sl) = b , st , tt , tt , sl
+
+    -- The count and the list, both the flatMap's own.
+    bg-mine : All (_∈ᴸ names v′) (wrote grow fl)
+    bg-mine = here refl ∷ there (there (there (here refl))) ∷ []
 
     -- The new lane's cut: the only names the start adds.
     bg-names : names v′ ↭ cutNames cut′ ++ names (wkTree grow (flatMapˢ op f fl oc k r pl t ls))
@@ -1332,6 +1375,23 @@ module Ascending (R : Set) where
       (fresh-new grow (λ m∈ → let (_ , _ , e) = wk-img grow T m∈ in to-img grow e)
         ((λ { {_ , _} (i , refl) e → lookupᴬ (Grown.outside grown i) (here refl) (sym e) })
          ∷ (λ { {_ , _} (i , refl) e → lookupᴬ (Grown.outside grown i) (there (here refl)) (sym e) }) ∷ []))
+
+    module Sp (fs : AllPairs _≢_ (names T)) = Spliced base heap′ (wkPath grow ρ) v′ moved bg-mine (bg-fresh fs)
+
+    -- The tree grown, then spliced.
+    bg-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels heap′ T′
+    bg-kernels fs kn = Sp.sp-kernels fs refl (λ ()) bg-settled (λ {E} {o} → bg-holds {E} {o}) (λ g → bg-gated g) (λ d → bg-spent d) (Wk.grow-kernels grows kn)
+
+    bg-meaning : AllPairs _≢_ (names T) → Meaning H T → Meaning heap′ T′
+    bg-meaning fs mn = Sp.sp-meaning fs bg-fed (Wk.grow-meaning grows mn)
+
+    -- The tree grown, the count and list written, the lane planted: the
+    -- run one level down, past the start's own position.
+    bg-queue : Queue H q clk ts T → Queue heap′ (q ++ [ ix 1 ]) clk ts′ T′
+    bg-queue qu = subst (λ ts″ → Queue heap′ (q ++ [ ix 1 ]) clk ts″ T′) (trans (pure-map (wkTimer grow) ts) (sym timers′))
+                    (record { timed = Queue.timed qu′ ; joined = Queue.joined qu′ ; ordered = Queue.ordered qu′
+                            ; ahead = ahead-under q 1 (λ e → ⊥-elim (deep e)) (Queue.ahead qu′) })
+      where qu′ = plant-queue heap′ (wkPath grow ρ) v′ refl refl (λ _ → refl) (queue-keeps (wrote-keeps {τ = grow} {fl = fl} moved) (Wk.grow-queue grows qu))
 
   -- The ghost's admit with room: the lane first, nothing dropped.
   admit-room : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) q a (ls : List (U.Node Γ B)) qs d → roomy op (length ls) ≡ true
@@ -1377,10 +1437,10 @@ module Ascending (R : Set) where
     g″ , _ , Started.runs sr
     , carried (record
       { sane = sn″ ; placed = pd″ ; tree = Begun.T′ sr pl′ ; ctlAs = Begun.ca′ sr pl′ sk ; meets = pg
-      ; owned = Begun.bg-owned sr pl′ sk ow ; kernels = Begun.bg-kernels sr pl′ kn ; meaning = Begun.bg-meaning sr pl′ mn
+      ; owned = Begun.bg-owned sr pl′ sk ow ; kernels = Begun.bg-kernels sr pl′ fs kn ; meaning = Begun.bg-meaning sr pl′ fs mn
       ; queue = subst (λ ts″ → Queue (Started.heap′ sr) (q ++ [ ix 1 ]) clk ts″ (Begun.T′ sr pl′)) refl (Begun.bg-queue sr pl′ qu)
       ; books = record { fresh = Begun.bg-fresh sr pl′ fs
-                       ; clocked = trans (proj₁ ck) (sym (tick-under q 1 (begin-deep b))) , proj₁ ck , Begun.bg-ticked sr pl′ sk (proj₂ ck)
+                       ; clocked = trans (proj₁ ck) (sym (tick-under q 1 (Started.deep sr))) , proj₁ ck , Begun.bg-ticked sr pl′ sk (proj₂ ck)
                        ; paidUp = trans (Started.todo′ sr) (cong (mapList (wkTodo (Started.grow sr))) pu) ; running = rn }
       ; sorted = sorted-⇝ so (Started.runs sr) ; behind = Begun.bg-behind sr pl′ bh ; lingers = Begun.bg-lingers sr pl′ lgr })
     , passed ag pp

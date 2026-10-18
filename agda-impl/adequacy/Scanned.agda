@@ -45,6 +45,7 @@ open import adequacy.Moved using (module Planting)
 open import adequacy.Restages using (module Staging)
 open import adequacy.Weaken using (module Weakening)
 open import adequacy.Names using (module Naming)
+open import adequacy.Alike using (module Aliking)
 
 module Scanning (R : Set) where
   open Machine R using (mach; step; wkTodo)
@@ -63,7 +64,8 @@ module Scanning (R : Set) where
   open Planting R using (module Moved)
   open Staging R using (Restages; not-src; wrap-scan)
   open Weakening R using (module Grown; pend-grow)
-  open Naming R using (compile-cong; fresh-new; fresh-plant; grows-extend; pending-↭; scanO-cong; to-img; wk-img; wk-pairs)
+  open Naming R using (fresh-new; fresh-plant; grows-extend; pending-↭; to-img; wk-img; wk-pairs)
+  open Aliking R using (compile-cong; scanO-cong; walk-grow)
 
   -- A SCAN RESTAGED IN THE GROWN WORLD: its accumulator the newest cell,
   -- its source pending beneath it.
@@ -91,7 +93,7 @@ module Scanning (R : Set) where
     ν : h ⊑ h′
     ν = new
 
-    wg = Grown.walk-grow ν π
+    wg = walk-grow ν π
 
 
     -- The source compiles as the scan's body did, under the scan's

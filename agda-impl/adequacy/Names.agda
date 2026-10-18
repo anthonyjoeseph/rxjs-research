@@ -4,7 +4,7 @@
 -- part for part.
 module adequacy.Names where
 
-open import Data.List using (List; []; _∷_; _++_; [_]; length) renaming (map to mapᴸ)
+open import Data.List using (List; []; _∷_; _++_; [_]; length; null) renaming (map to mapᴸ)
 open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (tabulate to tabulateᴬ; lookup to lookupᴬ; map to all-map)
 open import Data.List.Relation.Unary.Any using () renaming (here to hereᴬ; there to thereᴬ)
 open import Data.List.Relation.Unary.Any.Properties using () renaming (++⁻ to any-++⁻; ++⁺ˡ to any-++⁺ˡ; ++⁺ʳ to any-++⁺ʳ)
@@ -18,11 +18,9 @@ open import Data.List.Relation.Binary.Permutation.Propositional.Properties using
 open import Data.List.Properties using (map-++; ++-assoc) renaming (++-identityʳ to ++-idʳ)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁻)
 open import Data.Maybe using (Maybe; just; nothing; is-just) renaming (map to mapMaybe)
-open import Data.Nat using (ℕ)
 open import Data.Product using (_×_; _,_; Σ)
-open import Data.Unit using (⊤)
 open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁; tt to tt₁)
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (if_then_else_)
 open import Level using (lower)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst)
 
@@ -31,37 +29,28 @@ open import denotation.MonotonicList using () renaming (sub to subᴾ)
 import Tree as T
 import denotation.Unfold as U
 open import operation.PureObservable using (Out; Pureᴾ)
-open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
+open import operation.AbstractObservable using (module Heap; module Run; Prims) renaming (module Machine to Shared)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Grow using (module Growing)
 open import adequacy.Seq using (module Sequencing)
-open import operation.AbstractObservable using (base; maybe; sink; list; fifo)
 open import adequacy.Weaken using (module Weakening)
+open import adequacy.Alike using (module Aliking)
 
 module Naming (R : Set) where
   open Unsubbing R using (then; ≗-trans; wk≗; bind≗)
   open Growing R using (wkTree; wkLanes)
-  open Sequencing R using (wk-wk; wk∋-wk; wkEl-wk)
+  open Sequencing R using (wk-wk; wk∋-wk; wkEl-wk; wkEnv-wk)
   open Shared Timeline (Out R) using (Heapᴹ; ⟨_,_,_⟩; Val; extend; look; cbs; wkVal; Callbacks; Stored; stored; get; wkAll)
   open Heap using (_⊑_; _⨾_; _∋_; there; new; grow; wk∋; cell; slot; Quiet) renaming (here to hereʳ; same to same⊑)
-  open Run (Pureᴾ R) using (Act; done; compile; Env; wkEnv; wkAct; module Kit; module FlatKit; Ref; Observer; Kont; wkObs; Subscription)
+  open Run (Pureᴾ R) using (Act; done; compile; Env; wkEnv; wkAct; module Kit; module FlatKit; Ref; Observer; Kont; wkObs; Subscription; Subscribe; emitAll; Subject; wkSubject; wkR; wkSubn; writeRef; _>>ᴬ_)
   open Strongly R using (Sub; pendingˢ; ofˢ; mapˢ; takeWhileˢ; connectˢ; Lane; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; Here; walk; top; coldˢ; _≗_; names; laneNames; Phase; Name; quietName; cutNames; flatNames; subjectNames; flatMapˢ; killAllᶜ; scanˢ; joinˢ; doneˢ; deferˢ; lane; CbRel; ≗-refl; newRef≗; done≗; register≗; send≗; finish≗; startCold≗; stop≗; stash≗; cancel≗; eff≗; here≗; under≗; diverge≗; unfold≗; readRef≗; writeRef≗; module Canon)
   open Moving R using (plant; plantᴸ)
-  open Weakening R using (Grows; KontRel; ObsRel)
+  open Weakening R using (Grows)
+  open Aliking R using (≗-sym)
 
   postulate
-    -- A compiled subscription read alike under alike observers and
-    -- continuations.
-    compile-cong : ∀ {Γ A u w} (s : T.Obs Timeline Γ A) (E : Env Γ u) (υ : u ⊑ w) {o o′ : Observer A w} {k k′ : Kont w}
-                 → ObsRel o o′ → KontRel k k′ → compile s E υ o k ≗ compile s E υ o′ k′
-
-    -- A compiled subscription reads its subjects weakened to the world it
-    -- runs at, whichever stretch of the weakening they were carried along.
-    compile-env : ∀ {Γ A u v w} (s : T.Obs Timeline Γ A) (E : Env Γ u) (υ : u ⊑ v) (ρ : v ⊑ w) {o : Observer A w} {k : Kont w}
-                → compile s E (υ ⨾ ρ) o k ≗ compile s (wkEnv υ E) ρ o k
-
     -- A walk's continuation reads its subscription's unsubscribe only.
     walk-kont-sub : ∀ {h Δ A} {t : Sub h [] R} {x : Sub h Δ A} (π : Path t x) {v} (τ : h ⊑ v) {U U′ : Subscription v}
                   → Subscription.unsubscribe U ≗ Subscription.unsubscribe U′ → Here.kont (walk π top) τ U ≗ Here.kont (walk π top) τ U′
@@ -193,38 +182,6 @@ module Naming (R : Set) where
             → All (λ n → ∀ {m} → Img ν m → n ≢ m) ns → All (λ n → All (n ≢_) ms) ns
   fresh-new ν im = all-map (λ f → tabulateᴬ λ m∈ → f (im m∈))
 
-  -- A scan's observer over alike observers.
-  scanO-cong : ∀ {h A B} (f : B → A → B) (r : Ref h (base B)) {o o′ : Observer B h} → ObsRel o o′ → ObsRel (Canon.scanO f r o) (Canon.scanO f r o′)
-  scanO-cong f r (n , c , x) = (λ a → readRef≗ refl λ σ b → wk≗ σ (writeRef≗ refl refl (n (f b a)))) , c , x
-
-  ≗-sym : ∀ {w B} {m m′ : Act w B} → m ≗ m′ → m′ ≗ m
-  ≗-sym (done≗ e)                = done≗ (sym e)
-  ≗-sym (newRef≗ e f)            = newRef≗ (sym e) λ σ r → ≗-sym (f σ r)
-  ≗-sym (readRef≗ refl f)        = readRef≗ refl λ σ x → ≗-sym (f σ x)
-  ≗-sym (writeRef≗ refl e k)     = writeRef≗ refl (sym e) (≗-sym k)
-  ≗-sym (register≗ n c x k)      = register≗ (λ a → ≗-sym (n a)) (≗-sym c) (≗-sym x) λ σ s → ≗-sym (k σ s)
-  ≗-sym (send≗ refl k)           = send≗ refl (≗-sym k)
-  ≗-sym (finish≗ refl k)         = finish≗ refl (≗-sym k)
-  ≗-sym (startCold≗ refl f)      = startCold≗ refl λ σ hd → ≗-sym (f σ hd)
-  ≗-sym (stop≗ refl k)           = stop≗ refl (≗-sym k)
-  ≗-sym (stash≗ m f)             = stash≗ (≗-sym m) λ σ q → ≗-sym (f σ q)
-  ≗-sym (cancel≗ refl k)         = cancel≗ refl (≗-sym k)
-  ≗-sym (eff≗ f)                 = eff≗ λ a → ≗-sym (f a)
-  ≗-sym (here≗ f)                = here≗ λ p → ≗-sym (f p)
-  ≗-sym (under≗ m k)             = under≗ (≗-sym m) (≗-sym k)
-  ≗-sym diverge≗                 = diverge≗
-  ≗-sym (unfold≗ refl n c x k m) = unfold≗ refl (λ a → ≗-sym (n a)) (≗-sym c) (≗-sym x) (λ σ q → ≗-sym (k σ q)) (≗-sym m)
-
-  obs-trans : ∀ {A w} {o₁ o₂ o₃ : Observer A w} → ObsRel o₁ o₂ → ObsRel o₂ o₃ → ObsRel o₁ o₃
-  obs-trans (n , c , x) (n′ , c′ , x′) = (λ a → ≗-trans (n a) (n′ a)) , ≗-trans c c′ , ≗-trans x x′
-
-  obs-wk : ∀ {A w v} (ρ : w ⊑ v) {o o′ : Observer A w} → ObsRel o o′ → ObsRel (wkObs ρ o) (wkObs ρ o′)
-  obs-wk ρ (n , c , x) = (λ a → wk≗ ρ (n a)) , wk≗ ρ c , wk≗ ρ x
-
-  -- An observer weakened along a composite, as weakened twice.
-  obs-⨾ : ∀ {A u v w} (σ : u ⊑ v) (τ : v ⊑ w) (o : Observer A u) → ObsRel (wkObs (σ ⨾ τ) o) (wkObs τ (wkObs σ o))
-  obs-⨾ σ τ o = (λ a → ≗-sym (wk-wk σ τ _)) , ≗-sym (wk-wk σ τ _) , ≗-sym (wk-wk σ τ _)
-
   -- An entry of a weakened heap: the entry, its inclusion carried on.
   get-wk : ∀ {h v w k} (ρ : h ⊑ v) (xs : All (Stored h) w) (i : w ∋ k) → get (wkAll ρ xs) i ≡ stored (Stored.val (get xs i)) (Stored.into (get xs i) ⨾ ρ)
   get-wk ρ (stored x σ ∷ xs) hereʳ     = refl
@@ -244,39 +201,3 @@ module Naming (R : Set) where
                   , ≗-sym (wk-wk (Stored.into (get H s)) new (Callbacks.isClosed (Stored.val (get H s)))) )
     ; stashes = λ u → subst (λ m → m ≗ wkAct new (look H u)) (sym (look-ext H x u)) (≗-sym (wk-wk (Stored.into (get H u)) new (Stored.val (get H u))))
     ; handles = λ hd → cong lower (look-ext H x hd) }
-
-  if≗ : ∀ {w B} b {x x′ y y′ : Act w B} → x ≗ x′ → y ≗ y′ → (if b then x else y) ≗ (if b then x′ else y′)
-  if≗ true  e _ = e
-  if≗ false _ e = e
-
-  -- A takeWhile's observer over alike observers.
-  takeO-cong : ∀ {h A} i (p : A → Bool) (c : Kit.Cut h) {o o′ : Observer A h} → ObsRel o o′ → ObsRel (Canon.takeWhileO i p c o) (Canon.takeWhileO i p c o′)
-  takeO-cong i p c (n , cm , x) =
-      (λ a → guard≗ (if≗ (p a) (n a) (bind≗ (if≗ i (under≗ (n a) (≗-refl _)) (≗-refl _)) λ _ → under≗ cm (≗-refl _))))
-    , guard≗ cm
-    , readRef≗ refl λ σ b → wk≗ σ (if≗ b x (≗-refl _))
-    where guard≗ : ∀ {m m′} → m ≗ m′ → Kit.guard c m ≗ Kit.guard c m′
-          guard≗ e = readRef≗ refl λ σ b → wk≗ σ (if≗ b e (≗-refl _))
-
-  obs-sym : ∀ {A w} {o o′ : Observer A w} → ObsRel o o′ → ObsRel o′ o
-  obs-sym (n , c , x) = (λ a → ≗-sym (n a)) , ≗-sym c , ≗-sym x
-
-  -- A guarded observer over alike observers.
-  guarded-cong : ∀ {h A} (c : Kit.Cut h) {o o′ : Observer A h} → ObsRel o o′ → ObsRel (Kit.guarded c o) (Kit.guarded c o′)
-  guarded-cong c (n , cm , x) = (λ a → gd (n a)) , gd cm , readRef≗ refl λ σ b → wk≗ σ (if≗ b x (≗-refl _))
-    where gd : ∀ {m m′} → m ≗ m′ → Kit.guard c m ≗ Kit.guard c m′
-          gd e = readRef≗ refl λ σ b → wk≗ σ (if≗ b e (≗-refl _))
-
-  -- A pool weakened twice, as weakened once.
-  wkFlat-wk : ∀ {A u v w} (σ : u ⊑ v) (τ : v ⊑ w) (st : FlatKit.Flat A u) → FlatKit.wkFlat τ (FlatKit.wkFlat σ st) ≡ FlatKit.wkFlat (σ ⨾ τ) st
-  wkFlat-wk σ τ st = flat≡ (wk∋-wk σ τ _) (wk∋-wk σ τ _) (wk∋-wk σ τ _) (wk∋-wk σ τ _) (wk∋-wk σ τ _)
-    where flat≡ : ∀ {A w} {a a′ : Ref w (base ℕ)} {d d′ : Ref w (base Bool)} {q q′ : Ref w (fifo A)} {l l′ : Ref w (list Kit.cutTy)} {r r′ : Ref w (maybe (sink ⊤))}
-                → a ≡ a′ → d ≡ d′ → q ≡ q′ → l ≡ l′ → r ≡ r′
-                → _≡_ {A = FlatKit.Flat A w} (record { active = a ; outerDone = d ; queue = q ; lanes = l ; refill = r })
-                                             (record { active = a′ ; outerDone = d′ ; queue = q′ ; lanes = l′ ; refill = r′ })
-          flat≡ refl refl refl refl refl = refl
-
-  -- Cutting every lane, weakened, cuts every lane of the weakened pool.
-  killAll-wk : ∀ {A w v} (ρ : w ⊑ v) (st : FlatKit.Flat A w) → wkAct ρ (killAllᶜ st) ≗ killAllᶜ (FlatKit.wkFlat ρ st)
-  killAll-wk ρ st = readRef≗ refl λ σ cs → writeRef≗ (sym (wk∋-wk ρ σ (FlatKit.Flat.lanes st))) refl
-                      (writeRef≗ (sym (wk∋-wk ρ σ (FlatKit.Flat.active st))) refl (≗-refl _))

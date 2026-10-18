@@ -13,7 +13,8 @@ open import Data.List.Relation.Unary.All using (All; map) renaming (lookup to lo
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Data.Maybe using (Maybe; just; nothing; is-just)
-open import Data.Nat using (_≤_)
+open import Data.Nat using (_≤_; zero; suc; z≤n; s≤s)
+open import Data.Nat.Properties using (≤-trans)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤)
 open import Data.Empty using (⊥)
@@ -22,7 +23,7 @@ open import Data.Bool using (true)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst)
 open import Level using (lower)
 
-open import denotation.MonotonicList using (Timeline; Pos; ix; _<ᵖ_)
+open import denotation.MonotonicList using (Timeline; Pos; Label; ix; sub; _<ᵖ_; <ᵖ-irrefl; <ᵖ-apart)
 import denotation.Unfold as U
 open import operation.PureObservable using (Out; Pureᴾ; module Pure)
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
@@ -43,7 +44,7 @@ module Replanting (R : Set) where
                          Owned; Each; Heads; Lingers; Pinned; Name; names; laneNames; cutNames; quietName; subjectNames; flatNames; module At; _≗_) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (StackAs; BurstAs; Held; bottomAs; restAs; backAs; reholdAs; playsAs; firesAs; overAs; bottomᴴ; restᴴ;
                                  BurstClocked; Ticked; CtlAs; runAs)
-  open Moving R using (plant; plantᴸ; planted; pairs-r; pairs-split)
+  open Moving R using (plant; plantᴸ; planted; plant-self; pairs-r; pairs-split)
   open Retagging R using (retag)
   open Tearing R using (Off; look-either; fresh-path; part-alike; names-path; lanes-path; apart-r; apart-l; narrow)
   open Framing R using (Untold; Ended; untold)
@@ -140,23 +141,6 @@ module Replanting (R : Set) where
                 {w p bs} {σ : w ⊑ h} {K : Stack w ⊤} (sk : StackAs T p σ K bs) (ks : List (Call T)) {act act′ : Act h ⊤} {e : act ≗ ⟦ ks ⟧ᶜ}
                 (e′ : act′ ≗ ⟦ owed kn ρ ++ rehomes kn ρ ks ⟧ᶜ) → Owing kn p
               → Owned H T (runAs ks e sk) → Owned H (plant ρ v) (runAs (owed kn ρ ++ rehomes kn ρ ks) e′ (restack kn ρ sk))
-
-  -- A path planted with the node it ends at is the tree.
-  mutual
-    plant-self : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) → plant π u ≡ t
-    plant-self here          = refl
-    plant-self (in-map π)    rewrite plant-self π = refl
-    plant-self (in-scan π)   rewrite plant-self π = refl
-    plant-self (in-take π)   rewrite plant-self π = refl
-    plant-self (in-outer π)  rewrite plant-self π = refl
-    plant-self (in-lanes π)  rewrite plantᴸ-self π = refl
-    plant-self (in-source π) rewrite plant-self π = refl
-    plant-self (in-body π)   rewrite plant-self π = refl
-    plant-self (in-defer π)  rewrite plant-self π = refl
-
-    plantᴸ-self : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) → plantᴸ π u ≡ ls
-    plantᴸ-self (this-lane π) rewrite plant-self π = refl
-    plantᴸ-self (next-lane π) rewrite plantᴸ-self π = refl
 
   -- TWO NODES OF ONE TREE: one beneath the other, or no name shared.
   data Fork {h Δ A Δ′ A′} (u : Sub h Δ A) (x : Sub h Δ′ A′) : Set₁ where
@@ -300,7 +284,26 @@ module Replanting (R : Set) where
     shift-lingers v en lg l =
       Walk.Ties.shiftLg H H′ {u = u} v offU (Lingering.ling-revive lg) (Lingering.ling-rested lg) (Lingering.ling-below lg) ρ fs l en
 
+  -- A cascade's root lies two labels down, a tick then a creation: past
+  -- a position, it is past any of that position's children, unless the
+  -- position is the run's top and the child a later tick's.
+  private
+    ix-le : ∀ {i d e} → i ≤ d → (ix i ∷ []) <ᵖ (ix d ∷ sub e ∷ []) ≡ true
+    ix-le {d = zero}  z≤n     = refl
+    ix-le {d = suc d} z≤n     = refl
+    ix-le {e = e}     (s≤s le) = ix-le {e = e} le
+
+    unrooted : ∀ {x y : Label} {d e} (q ys : Pos) → (x ∷ y ∷ q) <ᵖ (ix d ∷ sub e ∷ []) ≡ true → ix d ∷ sub e ∷ [] ≡ x ∷ y ∷ q ++ ys → ⊥
+    unrooted {d = d} {e} [] [] lt refl with () ← trans (sym lt) (<ᵖ-irrefl (ix d ∷ sub e ∷ []))
+    unrooted []      (_ ∷ _) lt ()
+    unrooted (_ ∷ _) ys      lt ()
+
+    under-root : ∀ q i d e → (q ≡ [] → i ≤ d) → q <ᵖ (ix d ∷ sub e ∷ []) ≡ true → (q ++ [ ix i ]) <ᵖ (ix d ∷ sub e ∷ []) ≡ true
+    under-root []          i d e le lt = ix-le {e = e} (le refl)
+    under-root (x ∷ [])    i d e le lt = lt
+    under-root (x ∷ y ∷ q) i d e le lt = <ᵖ-apart (x ∷ y ∷ q) (ix d ∷ sub e ∷ []) [ ix i ] lt (λ ys → unrooted q ys lt)
+
   -- Every timer past a position past one of its children at `ix i`.
-  postulate
-    ahead-under : ∀ {h} q i {clk} {ts : List (Timer h)} → All (λ tm → clk ≤ Timer.due tm × q <ᵖ cascade tm ≡ true) ts
-                → All (λ tm → clk ≤ Timer.due tm × (q ++ [ ix i ]) <ᵖ cascade tm ≡ true) ts
+  ahead-under : ∀ {h} q i {clk} {ts : List (Timer h)} → (q ≡ [] → i ≤ clk) → All (λ tm → clk ≤ Timer.due tm × q <ᵖ cascade tm ≡ true) ts
+              → All (λ tm → clk ≤ Timer.due tm × (q ++ [ ix i ]) <ᵖ cascade tm ≡ true) ts
+  ahead-under q i top = map λ { (le , lt) → le , under-root q i _ _ (λ e → ≤-trans (top e) le) lt }

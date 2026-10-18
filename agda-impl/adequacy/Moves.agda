@@ -665,6 +665,23 @@ module Moving (R : Set) where
   switches-plant H (this-lane π) v                = refl
   switches-plant H (next-lane {l = lane c k s} π) v = cong (c ∷_) (switches-plant H π v)
 
+  -- A path planted with the node it ends at is the tree.
+  mutual
+    plant-self : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) → plant π u ≡ t
+    plant-self here          = refl
+    plant-self (in-map π)    rewrite plant-self π = refl
+    plant-self (in-scan π)   rewrite plant-self π = refl
+    plant-self (in-take π)   rewrite plant-self π = refl
+    plant-self (in-outer π)  rewrite plant-self π = refl
+    plant-self (in-lanes π)  rewrite plantᴸ-self π = refl
+    plant-self (in-source π) rewrite plant-self π = refl
+    plant-self (in-body π)   rewrite plant-self π = refl
+    plant-self (in-defer π)  rewrite plant-self π = refl
+
+    plantᴸ-self : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) → plantᴸ π u ≡ ls
+    plantᴸ-self (this-lane π) rewrite plant-self π = refl
+    plantᴸ-self (next-lane π) rewrite plantᴸ-self π = refl
+
   mutual
     holds-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
                 → unsub u ≡ unsub v → (∀ {E o} → At.Holds H u E o → At.Holds H v E o)
