@@ -177,11 +177,14 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **GHOSTS.** A ghost lifted past a source's skip is the part's past
-  skips (`Past` over `Fewer`), the part gapped (`Gapped`); `fed-ghost` is a
-  body over `fed-part`. Left: `gapped-past`, skip-inertness through every
-  operator, a factory guarded past `κ`; then `fin-ghost`, its rest `Tied`
-  only, and `end-ghost`, an end, not a skip.
+- **DEEP ORDER.** `gapped-past` holds only where every node under a rest is
+  in order, which `Placed` does not see (`stepped-deep` reads it from
+  nothing). Decides whether `Deep` is a field `Carried` keeps, each move
+  framing it, or `Placed` itself descends; then `gapped-past` by operator.
+- **THE FREE SOURCE.** `lifts-source` leaves the source node free, and an
+  end lifted through a connect's source reads it: `fin-ghost` and
+  `end-ghost` need it tied to the heap's leftover, beyond `Tied`'s first
+  pin, before either is a lift.
 - **THE LANE START, GROWN.** First the growth frame's own cells:
   `grow-stack`/`alone`/`ticked` and `grow-owned`/`holds`/`joined` are one
   naturality, the kernels' code under weakening (`walk-grow`,
@@ -208,8 +211,10 @@ by their own silent steps (`Mirror`).
   stepped node's.
 - **`within-step`** (Stepper) — FALSITY, `REFUTED×2`, `X`: a sane, placed root
   ghost's step leaves its parts placed.
-- **`gapped-past`** (Gapped) — FALSITY, `NO EVIDENCE`: a placed node's meaning
-  is a gapped one's past skips.
+- **`gapped-past`** (Gapped) — FALSITY, `REFUTED`: a node in order under every
+  rest has a gapped one's meaning past its skips.
+- **`stepped-deep`** (Gapped) — FALSITY, `NO EVIDENCE`: what a sane, placed
+  root ghost skips to is in order under every rest; reads what neither holds.
 - **`gapped-sane`** (Gapped) — FALSITY, `NO EVIDENCE`: a node gapped from a
   sane one is sane.
 - **`gapped-placed`** (Gapped) — FALSITY, `NO EVIDENCE`: a node gapped from a
@@ -276,7 +281,7 @@ by their own silent steps (`Mirror`).
   end, an `of` in its body: the body shut steps as it does, shut after.
 - **`emit-run`** (Lift) — FALSITY, `NO EVIDENCE`: an open `of`'s value handed
   on under its scope, the climb starts aloft.
-- **`end-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: the tree with a take
+- **`end-ghost`** (Climbs) — FALSITY, `DEAD ROUTE`: the tree with a take
   restaged `ending` has a sane, placed part meaning what the ghost did.
 - **`out-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
   sooner than the run under `ix 0` with a take restaged `ending`.
@@ -327,7 +332,7 @@ by their own silent steps (`Mirror`).
   its subject only with no feed under way.
 - **`fed-part`** (Climbs) — FALSITY, `NO EVIDENCE`: the retagged body is the
   body's part fed the value, gapped up to the feed.
-- **`fin-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: the tree with a finish
+- **`fin-ghost`** (Climbs) — FALSITY, `DEAD ROUTE`: the tree with a finish
   staged has a sane, placed part, the ghost past the source's skip.
 - **`emit-shut`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` whose observer path
   is closed skips its value or its end.

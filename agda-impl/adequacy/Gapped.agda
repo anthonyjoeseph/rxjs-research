@@ -15,17 +15,18 @@ open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.Any using (there)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.All using ([])
+open import Data.List.Relation.Unary.All using ([]; _∷_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_)
 open import Data.Unit using (⊤)
-open import Relation.Binary.PropositionalEquality using (refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import denotation.MonotonicList using (Pos; _<ᵖ_)
+open import denotation.MonotonicList using (Pos; _<ᵖ_; ix; end)
 import denotation.Unfold as U
+open import denotation.Unfold using (NEnv)
 open import adequacy.Sorted using (_≤ᵖ_)
 open import adequacy.Sane using (Sane; allLive)
-open import adequacy.Placed using (Placed)
+open import adequacy.Placed using (Placed; Ordered; Reaches; Headed; Sorted; Alienᴱ)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Ghost using (module Ghosting)
 
@@ -157,13 +158,56 @@ module Gapping (R : Set) where
     feedˢ-gapped i q (U.live s)    = gap-live (feed-gapped i q s)
     feedˢ-gapped i q (U.ended c t) = gap-ended (feed-gapped i q t)
 
+  -- Every node in order, rests and their sources included: `Placed`
+  -- looks at no node under a rest, a union, a burst or an ended source.
+  mutual
+    Deep : ∀ {Γ A} → U.Node Γ A → NEnv Γ → Set
+    Deep c ρ = Ordered (U.meaning c ρ) × Deeps c ρ
+
+    Deeps : ∀ {Γ A} → U.Node Γ A → NEnv Γ → Set
+    Deeps (U.mapᶜ f c)                    ρ = Deep c ρ
+    Deeps (U.scanᶜ f z c)                 ρ = Deep c ρ
+    Deeps (U.takeWhileᶜ i p c)            ρ = Deep c ρ
+    Deeps (U.flatMapᶜ op g o ls qs pl)    ρ = Deepᴹ o ρ × Deepᴸ ls ρ × Deep pl ρ
+      × (∀ a x → Reaches (x ++ [ ix 0 ]) (U.meaning (U.flatMapᶜ op g o ls qs pl) ρ) → Deep (g a (x ++ [ ix 1 ])) ρ)
+    Deeps (U.connectᶜ r b (U.live s))    ρ = Deep b (U.meaning s ρ ∷ ρ) × Deep s ρ
+    Deeps (U.connectᶜ r b (U.ended c t)) ρ = Deep b (end c ∷ ρ) × Deep t ρ
+    Deeps (U.deferᶜ l p ns)               ρ = Headed p × Sorted (U.replay ns ρ) × Alienᴱ p (U.replay ns ρ)
+    Deeps (U.endingᶜ p n)                 ρ = Deep n ρ
+    Deeps (U.restᶜ n)                     ρ = Deep n ρ
+    Deeps (U.unionᶜ x y)                  ρ = Deep x ρ × Deep y ρ
+    Deeps (U.burstingᶜ r t)               ρ = Deep t ρ
+    Deeps (U.underᶜ (U.live s) b)         ρ = Deep s ρ × Deep b (U.meaning s ρ ∷ ρ)
+    Deeps (U.underᶜ (U.ended c t) b)      ρ = Deep t ρ × Deep b (end c ∷ ρ)
+    Deeps _                               ρ = ⊤
+
+    Deepᴹ : ∀ {Γ A} → Maybe (U.Node Γ A) → NEnv Γ → Set
+    Deepᴹ nothing  ρ = ⊤
+    Deepᴹ (just c) ρ = Deep c ρ
+
+    Deepᴸ : ∀ {Γ A} → List (U.Node Γ A) → NEnv Γ → Set
+    Deepᴸ []       ρ = ⊤
+    Deepᴸ (c ∷ cs) ρ = Deep c ρ × Deepᴸ cs ρ
+
   -- A gap holds nothing: the stepped node's meaning is the part's with
-  -- skips more; and a gap is no joiner's end, nor any position's.
+  -- skips more.  Over an outer whose events run out of order a factory's
+  -- lane before `κ` would be reached, and a guarded factory's gap not
+  -- hold: the meaning in order, under every rest too.  A joiner's skip
+  -- ahead of its rejoined source, under a burst, stops the burst the part
+  -- runs on.
   --
-  -- Over an outer whose events run out of order a factory's lane before
-  -- `κ` would be reached, and a guarded factory's gap not hold: the
-  -- meaning placed.
+  -- REFUTED: 190d13be of the meaning merely `Placed`, by a joiner holding a skip before its source's value, under a burst
   postulate
-    gapped-past   : ∀ {κ} {g′ g″ : U.Node [] R} → Gapped κ g′ g″ → Placed g′ [] → Past (residual g′) (residual g″)
+    gapped-past   : ∀ {κ} {g′ g″ : U.Node [] R} → Gapped κ g′ g″ → Deep g′ [] → Past (residual g′) (residual g″)
+
+  -- A gap is no joiner's end, nor any position's.
+  postulate
     gapped-sane   : ∀ {κ} {g′ g″ : U.Node [] R} → Gapped κ g′ g″ → Sane [] g′ → Sane [] g″
     gapped-placed : ∀ {κ} {g′ g″ : U.Node [] R} → Gapped κ g′ g″ → Placed g′ [] → Placed g″ []
+
+  -- What a skip steps to, in order under every rest.  `Placed` and
+  -- `Sane` say nothing under a rest, so this reads what neither holds:
+  -- the order a run's rests keep belongs in the invariant the machine
+  -- carries, beside `Placed`.
+  postulate
+    stepped-deep : ∀ {g : U.Node [] R} {k g′} → Sane [] g → Placed g [] → U.step g ≡ U.skipˢ k g′ → Deep g′ []

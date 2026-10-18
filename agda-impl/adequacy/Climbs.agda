@@ -80,7 +80,7 @@ module Ascending (R : Set) where
   open Taking R using (tick-ix0)
   open Naming R using (pre; fresh-plant; fresh-new; wk-pairs; wk-img; to-img)
   open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
-  open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed)
+  open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed; stepped-deep)
   open Lowering R using (queue-keeps; store-keeps; keeps-trans)
   open Lifting R using (sub-onward; emit-shut; emit-void; run-meets; run-at; emit-run; spread-past; behind-fire; fire-lingers; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
   open Locality R using (stored-at; stored-hit; live-apart; flatReads; cuts; cut-in; module Heaps)
@@ -431,7 +431,10 @@ module Ascending (R : Set) where
     postulate
       out-behind  : Each H (Heads q) T → Each H (Heads (q ++ [ ix 0 ])) T′
 
-
+      -- The ghost alike the planted tree's part: both step to the take's
+      -- end, the part through its `ending`.
+      --
+      -- DEAD ROUTE: a body over `ghost-lift`.  The take's end lifts to the root as an end wherever no flatMap or connect above turns it into a skip, so there is no skip to lift past; and where it crosses a connect's source, `U.sourceˢ` reads the source node `lifts-source` leaves free.
       end-ghost : ∀ {g S} → Sane [] g → Placed g [] → At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′
               → Lifts H ρ (U.endˢ (q ++ [ last ])) S → U.step g ≡ S
               → Σ (U.Node [] R) λ g″ → At.part H T′ ≡ just g″ × Sane [] g″ × Placed g″ [] × (∀ n → Agree n (residual g) (residual g″))
@@ -873,7 +876,7 @@ module Ascending (R : Set) where
   ... | k′ , g′ , g″ , refl , pg , gp =
     g″ , pg , gapped-sane gp (subst (SaneS []) sg (step-sane g sn)) , gapped-placed gp pd′
        , k′ , U.stateᴺ g′ [] , (λ n → subst (λ s → Agree n (residual g) (afterᴱ [] s)) sg (_≃_.agreeing (step-skips g sn pd) n))
-       , gapped-past gp pd′
+       , gapped-past gp (stepped-deep sn pd sg)
     where pd′ = proj₂ (subst (Placedˢ []) sg (placed-after g sn pd))
 
   -- An outer ended with lanes or a queue left skips to the pool.
@@ -2401,6 +2404,10 @@ module Ascending (R : Set) where
     v  = Bd.w₂
     T′ = plant ρ v
 
+    -- The ghost past the source's end: the connect shut, its source ended
+    -- on what the source left running.
+    --
+    -- DEAD ROUTE: a body over `ghost-lift`.  The end lifts to a skip whose node ends its source on `restᶜ c₀`, `c₀` the source node `lifts-source` leaves free and `Passed` ties to nothing on the heap once its part is gone; and the heap's rest is `Tied` to the leftover only at its first step.
     postulate
       fin-ghost   : ∀ {g S} → Sane [] g → Placed g [] → At.part H u ≡ nothing
               → Lifts H (ρ ⊕ in-source here) (U.endˢ q) S → U.step g ≡ S
