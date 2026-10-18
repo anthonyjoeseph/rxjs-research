@@ -177,21 +177,21 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **FRAMES, RISKIEST FIRST.** Until every column is folded, no move gets
-  a new body and no cell is proven on its own: only frames and cell
-  rewrites. A field is a fold of a per-node fact, kept by one frame per
-  move kind (plant, write, deepen, grow), given a fact about the node
-  rewritten. State the frames of `owned` (path-keyed), `queue` (orphaned
-  subscribers named in the invariant) and `gated` (`Spent` reads a whole
-  subtree) first, and check each cell of their columns gets its node
-  fact from what its call site holds. Decides whether the fold serves
-  every field.
+- **ONE FRAME, NOT THREE.** Until every column is folded, no move gets a
+  new body and no cell is proven on its own: only frames and cell
+  rewrites. The frames exist but each serves one move: `keep`/`Fork`
+  plant over a PENDING node only (the restages), `Above` walks up from a
+  written SCAN only, `Wrote` frames kernels and meaning only. Every
+  Climbs move changes its node's part, so none reaches it. Generalise to
+  one replant frame at any node, whose premise is the summary its
+  ancestors read: part defined alike, seen alike, `untold` alike,
+  leftover pinned. Decides whether that summary suffices per field.
 - **EVERY CELL A FRAME.** Every move×field cell (`owned`, `lingers`,
-  `behind`, `queue`, `ticked`, `fresh`, `kernels`, `meaning`, a flatMap's
-  `holds`, `gated`, `spent`, `fed`) rewritten as a body: its frame applied
-  to a node fact shared by every move rewriting that node kind. One pass,
-  then one gate. Decides how many node facts are left, and which are
-  FALSITY.
+  `behind`, `queue`, `ticked`, `stack`, `fresh`) a body: the replant
+  frame applied to node facts shared by every move rewriting that node
+  kind. Kernels, meaning and gated already are (`gated-plant`,
+  `Wrote.wr-kernels`). `queue` needs the orphaned subscribers named in
+  the invariant first. One pass, then one gate.
 - **GHOSTS AND STACKS.** The `*-ghost`, `*-stack` and `*-alone` cells
   are columns too; fold them the same way once the first two land.
 - **NODE FACTS, FALSITY FIRST.** Only now discharge: the node facts the
