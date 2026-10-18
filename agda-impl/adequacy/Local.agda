@@ -568,6 +568,9 @@ module Locality (R : Set) where
   stored-at : ∀ {h k} (H : Heapᴹ h) (i : h ∋ k) (x : Val h k) → look (store H i x) i ≡ wkVal k same x
   stored-at H i x rewrite get-put-same H i {y = stored x same} = refl
 
+  stored-hit : ∀ {h k} (H : Heapᴹ h) (i j : h ∋ k) {x : Val h k} → _≡_ {A = Name h} (k , i) (k , j) → look (store H i x) j ≡ wkVal k same x
+  stored-hit H i .i {x} refl = stored-at H i x
+
   -- A switch thrown: what it holds read alike, beside the switch itself.
   module Throw {h} (H : Heapᴹ h) (c : Kit.Cut h) (k : Maybe (Quiet h)) {Δ A} (s : Sub h Δ A) {ns : List (Name h)}
                (sub : ∀ {y} → y ∈ᴸ names s → y ∈ᴸ ns) (ps : AllPairs _≢_ (cutNames c ++ quietName k ++ ns)) where

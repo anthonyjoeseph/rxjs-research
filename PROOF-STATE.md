@@ -414,12 +414,8 @@ by their own silent steps (`Mirror`).
   idle one ties what it tied.
 - **`close-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: an outer closed, the
   pool's heads where the outer's were.
-- **`fr-gone`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's cut and the count
-  revive no part and no take.
 - **`fr-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane freed keeps the
   flatMap's heads.
-- **`fr-lingering`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane freed as its
-  flatMap ends keeps its ties.
 - **`settle-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: the pool taking what
   a lane ran heads where the lane did.
 - **`next-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: the queue's head taken
@@ -428,8 +424,6 @@ by their own silent steps (`Mirror`).
   restaged keeps its own heads, the joiners retold.
 - **`fed-lingering`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's feed
   restaged keeps its own ties.
-- **`fin-gone`** (Climbs) — FALSITY, `NO EVIDENCE`: a subject's closed flag
-  revives no part and no take.
 - **`fin-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's finish
   staged keeps its own heads.
 - **`fin-lingering`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's finish

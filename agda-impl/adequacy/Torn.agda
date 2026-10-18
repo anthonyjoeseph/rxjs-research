@@ -109,6 +109,21 @@ module Tearing (R : Set) where
              → look (store H i x) j ≡ look H j
   look-store H i j {x} ne rewrite get-put H i j {y = stored x same} ne = refl
 
+  -- A read through a write: the written cell, or as it was.
+  put-either : ∀ {ℓ} {P : Kind → Set ℓ} {w k k′} (xs : All P w) (i : w ∋ k) (j : w ∋ k′) {y : P k}
+             → _≡_ {A = Name w} (k , i) (k′ , j) ⊎ get (put xs i y) j ≡ get xs j
+  put-either (x ∷ xs) hereʰ      hereʰ      = inj₁ refl
+  put-either (x ∷ xs) hereʰ      (thereʰ j) = inj₂ refl
+  put-either (x ∷ xs) (thereʰ i) hereʰ      = inj₂ refl
+  put-either (x ∷ xs) (thereʰ i) (thereʰ j) with put-either xs i j
+  ... | inj₁ e = inj₁ (there-≡ e)
+  ... | inj₂ e = inj₂ e
+
+  look-either : ∀ {h k k′} (H : Heapᴹ h) (i : h ∋ k) (j : h ∋ k′) {x} → _≡_ {A = Name h} (k , i) (k′ , j) ⊎ look (store H i x) j ≡ look H j
+  look-either H i j {x} with put-either H i j {y = stored x same}
+  ... | inj₁ e = inj₁ e
+  ... | inj₂ e rewrite e = inj₂ refl
+
   get-put-same : ∀ {ℓ} {P : Kind → Set ℓ} {w k} (xs : All P w) (i : w ∋ k) {y : P k} → get (put xs i y) i ≡ y
   get-put-same (x ∷ xs) hereʰ      = refl
   get-put-same (x ∷ xs) (thereʰ i) = get-put-same xs i

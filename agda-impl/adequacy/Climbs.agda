@@ -5,7 +5,7 @@
 module adequacy.Climbs where
 
 open import Data.List using (List; []; _∷_; _++_; [_]; null; length) renaming (map to mapList)
-open import Data.List.Properties using (++-assoc)
+open import Data.List.Properties using (++-assoc; ++-conicalˡ; ++-conicalʳ)
 open import Data.List.Relation.Unary.Any using (Any; here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ)
 import Data.List.Relation.Unary.Any as Any
@@ -63,20 +63,20 @@ module Ascending (R : Set) where
   open Heap using (World; _⊑_; _⨾_; _∋_; Handle; Sink; Quiet; wk∋; slot) renaming (same to same⊑)
   open Sorting R using (WellMach)
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
-  open Strongly R using (Strong; Carried; Books; carried; closing; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; Meets; Each; Heads; Lingers; seen; ∧-split; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
+  open Strongly R using (Strong; Carried; Books; carried; closing; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; Meets; Each; Heads; Lingers; seen; seenL; pinned-trans; ∧-split; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
   open Moving R using (pairs-r; pairs-split; takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; holds-plant; settled-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
-  open Tearing R using (fresh-path; takeSite; bodySite; look-store; Alike; part-alike; partLanes-alike; part-flat; apart-r; each-same; seen-alike; seenL-alike; names-path; lanes-path)
+  open Tearing R using (fresh-path; takeSite; bodySite; look-store; look-either; Alike; part-alike; partLanes-alike; part-flat; apart-r; each-same; seen-alike; seenL-alike; names-path; lanes-path)
   open Unsubbing R using (_⇝_; ⇝-trans; now; then; ≗-trans; wk≗; wk-same; bind≗)
   open Sequencing R using (seq-assoc; seq-done)
   open Restaging R using (walk-planted; tick-ix0; pre; fresh-plant; fresh-new; wk-pairs; wk-img; to-img)
   open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
   open Lifting R using (sub-onward; emit-shut; emit-void; run-meets; run-at; emit-run; spread-past; behind-fire; fire-lingers; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
-  open Locality R using (stored-at; flatReads; cuts; cut-in; module Heaps)
+  open Locality R using (stored-at; stored-hit; live-apart; flatReads; cuts; cut-in; module Heaps)
   open Growing R using (wkTree; wkLanes; wkPath)
   open Retagging R using (module Body; fed-owed; envP; joiners-path)
-  open Shifting R using (lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; pin-alike; lingers-sub; lingersL-of; module Linger; module Build)
+  open Shifting R using (LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; lingers-sub; lingersL-of; module Linger; module Build)
   open Framing R using (untold; scan-part; scan-defined; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike)
     renaming (Ended to Ends)
   open Replanting R using (Kin; kin-end; kin-pool; kin-feed; kin-fin; rehomes; rehomes-code; restack; reticked; owned-run; plant-self; module Shift; Heading; Lingering; Gone; Lives; lives-off; ahead-under)
@@ -376,6 +376,22 @@ module Ascending (R : Set) where
   merged-queued G op g nothing  []      pl ()
   merged-queued G op g nothing  (_ ∷ _) pl ()
   merged-queued G op g (just _) L       pl ()
+
+  -- A flatMap stays shut with its lanes still shut.
+  merged-kept : ∀ {h} (G G′ : Heapᴹ h) {Δ A B} op (g : A → Pos → U.Node Δ B) o L Q pl {L′} → (L ≡ [] → L′ ≡ [])
+              → At.merged G op g o L Q pl ≡ nothing → At.merged G′ op g o L′ Q pl ≡ nothing
+  merged-kept G G′ op g nothing  []      []      pl f e rewrite f refl = refl
+  merged-kept G G′ op g nothing  []      (_ ∷ _) pl f ()
+  merged-kept G G′ op g nothing  (_ ∷ _) Q       pl f ()
+  merged-kept G G′ op g (just _) L       Q       pl f ()
+
+  -- A connect stays shut.
+  conn-kept : ∀ {h} (G G′ : Heapᴹ h) {Δ A B} r (e : Maybe Pos) (t : U.Node Δ A) s (b : Maybe (U.Node (A ∷ Δ) B))
+            → At.connected G r e t s b ≡ nothing → At.connected G′ r e t s b ≡ nothing
+  conn-kept G G′ r e        t s        nothing  _ = refl
+  conn-kept G G′ r nothing  t nothing  (just _) _ = refl
+  conn-kept G G′ r (just _) t nothing  (just _) ()
+  conn-kept G G′ r e        t (just _) (just _) ()
 
   -- A map's part held exactly where what it maps is.
   map-just : ∀ {h} (G : Heapᴹ h) {X Y : Set₁} (g : X → Y) m → is-just (At.mapᴹ G g m) ≡ is-just m
@@ -1472,6 +1488,14 @@ module Ascending (R : Set) where
   freed : ∀ {h A} → Heapᴹ h → Kit.Cut h → FlatKit.Flat A h → Heapᴹ h
   freed H c fl = store (unlive H c) (FlatKit.Flat.active fl) (lift (pred (At.val (unlive H c) (FlatKit.Flat.active fl))))
 
+  -- A switch dropped turns none on.
+  drop-true : ∀ {h} (H : Heapᴹ h) (d c : Kit.Cut h) → At.val (unlive H d) (Kit.live c) ≡ true → At.val H (Kit.live c) ≡ true
+  drop-true H d c e with look-either H (Kit.live d) (Kit.live c) {lift false}
+  ... | inj₁ n = ⊥-elim (f≢t (trans (sym (cong lower (stored-hit H (Kit.live d) (Kit.live c) n))) e))
+    where f≢t : false ≢ true
+          f≢t ()
+  ... | inj₂ q = trans (cong lower (sym q)) e
+
   -- A freed slot's refill read: the sink, handed on.
   refillAt : ∀ {h} {T : Sub h [] R} {Δ A B op f fl oc k r pl} {u : Sub h Δ A} {ls : List (Lane h Δ B)}
            → Path T (flatMapˢ op f fl oc k r pl u ls) → Act h ⊤
@@ -1532,6 +1556,47 @@ module Ascending (R : Set) where
                trans (look-store (unlive H (laneOf o)) (FlatKit.Flat.active fl) j (lookupᴬ nas (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ˡ m)))))
                      (look-store H (Kit.live (laneOf o)) j (λ eq → lookupᴬ (apart-r (names s₀) P m) d∈ (sym eq))))
 
+  -- A lane ended revives no lane's part.
+  lanes-none : ∀ {h} (H : Heapᴹ h) {A Δ B} (fl : FlatKit.Flat A h) {ls : List (Lane h Δ B)} {u : Sub h Δ B} {πL : PathLanes ls u} (o : OneLane πL)
+             → AllPairs _≢_ (laneNames ls) → All (_≢_ {A = Name h} (_ , FlatKit.Flat.active fl)) (laneNames ls)
+             → At.partLanes H ls ≡ [] → At.partLanes (freed H (laneOf o) fl) ls ≡ []
+  lanes-none H fl (one-this {c = c} {k} {t = s₀} {ls′}) (nl ∷ _) (na ∷ nas) e =
+    trans (lanes-one (freed H c fl) (lane c k s₀) ls′)
+          (trans (cong (_++ At.partLanes (freed H c fl) ls′)
+                       (lane-dead (freed H c fl) {c = c} {k} {s₀} (trans (look-store (unlive H c) (FlatKit.Flat.active fl) (Kit.live c) na) (stored-at H (Kit.live c) (lift false)))))
+          (trans (partLanes-alike H (freed H c fl) ls′ λ j m →
+                    trans (look-store (unlive H c) (FlatKit.Flat.active fl) j (lookupᴬ nas (there (++⁺ʳ (quietName k) (++⁺ʳ (names s₀) m)))))
+                          (look-store H (Kit.live c) j (lookupᴬ nl (there (++⁺ʳ (quietName k) (++⁺ʳ (names s₀) m))))))
+                 (++-conicalʳ (At.partLanes H (lane c k s₀ ∷ [])) _ (trans (sym (lanes-one H (lane c k s₀) ls′)) e))))
+  lanes-none H fl (one-next {l = lane c k s₀} {ls = ls′} o) ps@(nl ∷ _) nas e =
+    trans (lanes-one (freed H (laneOf o) fl) (lane c k s₀) ls′)
+          (cong₂ _++_ (trans el (++-conicalˡ (At.partLanes H (lane c k s₀ ∷ [])) _ e′))
+                      (lanes-none H fl o (pairs-r (names s₀) P) (tabulateᴬ λ m → lookupᴬ nas (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ʳ (names s₀) m))))
+                                  (++-conicalʳ (At.partLanes H (lane c k s₀ ∷ [])) _ e′)))
+    where
+      e′ = trans (sym (lanes-one H (lane c k s₀) ls′)) e
+      P  = pairs-r (quietName k) (pairs-r (cutNames c) ps)
+      d∈ = cut-in ls′ (laneOf-in o)
+      el = lane1-alike H (freed H (laneOf o) fl) {c = c} {k} {s₀}
+             (trans (look-store (unlive H (laneOf o)) (FlatKit.Flat.active fl) (Kit.live c) (lookupᴬ nas (here refl)))
+                    (look-store H (Kit.live (laneOf o)) (Kit.live c) (λ eq → lookupᴬ nl (there (++⁺ʳ (quietName k) (++⁺ʳ (names s₀) d∈))) (sym eq))))
+             (part-alike H (freed H (laneOf o) fl) s₀ λ j m →
+               trans (look-store (unlive H (laneOf o)) (FlatKit.Flat.active fl) j (lookupᴬ nas (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ˡ m)))))
+                     (look-store H (Kit.live (laneOf o)) j (λ eq → lookupᴬ (apart-r (names s₀) P m) d∈ (sym eq))))
+
+  -- A lane path seen past a lane's end only if seen before it: a switch
+  -- dropped turns none on, and beneath each lane the heap alike.
+  seenL-drop : ∀ {h} (H : Heapᴹ h) {A} (d : Kit.Cut h) (fl : FlatKit.Flat A h) {Δ B} {ls : List (Lane h Δ B)}
+             → All (_≢_ {A = Name h} (_ , FlatKit.Flat.active fl)) (laneNames ls)
+             → (∀ {Δ′ A′} {x : Sub h Δ′ A′} → PathLanes ls x → Alike H (freed H d fl) (names x))
+             → ∀ {Δ′ A′} {x : Sub h Δ′ A′} (πL : PathLanes ls x) → seenL (freed H d fl) πL ≡ true → seenL H πL ≡ true
+  seenL-drop H d fl (na ∷ _) al (this-lane {c = c} ψ) sn =
+    cong₂ _∧_ (drop-true H d c (trans (sym (cong lower (look-store (unlive H d) (FlatKit.Flat.active fl) (Kit.live c) na))) (proj₁ sp)))
+              (trans (sym (seen-alike H (freed H d fl) ψ (al (this-lane here)))) (proj₂ sp))
+    where sp = ∧-split (At.val (freed H d fl) (Kit.live c)) sn
+  seenL-drop H d fl nas al (next-lane {l = lane c k s} πL) sn =
+    seenL-drop H d fl (tabulateᴬ λ m → lookupᴬ nas (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ʳ (names s) m)))) (λ π → al (next-lane π)) πL sn
+
   -- A LANE ENDED AND ITS SLOT FREED: its cut dropped and the count down,
   -- nothing else of the heap or the tree moved.  Parts hold only with
   -- the lane's own part gone: a live lane's part is its flatMap's.
@@ -1553,11 +1618,8 @@ module Ascending (R : Set) where
       fr-spent : AllPairs _≢_ (names w₀) → At.Spent H w₀ → At.Spent H′ w₀
       fr-fed   : AllPairs _≢_ (names w₀) → ∀ ν → At.Fed H w₀ ν → At.Fed H′ w₀ ν
 
-      -- The lane's cut and the count, at the flatMap: no part revived,
-      -- its heads and ties kept.
-      fr-gone      : AllPairs _≢_ (names w₀) → Gone H H′ w₀
+      -- The lane's cut and the count, at the flatMap: its heads kept.
       fr-heading   : ∀ {q} → Heading H H′ q w₀ w₀
-      fr-lingering : At.part H′ w₀ ≡ nothing → Lingering H H′ w₀ w₀
 
     fr-mine : All (_∈ᴸ names w₀) ns
     fr-mine = ++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names t) (cut-in ls (laneOf-in o))))))
@@ -1565,6 +1627,71 @@ module Ascending (R : Set) where
 
     fr-off : Off H H′ ns
     fr-off = off-++ {H = H} {H₁ = unlive H (laneOf o)} {H₂ = H′} ((_ , Kit.live (laneOf o)) ∷ []) (off-store H (Kit.live (laneOf o))) (off-store (unlive H (laneOf o)) (FlatKit.Flat.active fl))
+
+    -- The outer's names apart from the lane's cut and the count.
+    fr-apart : AllPairs _≢_ (names w₀) → ∀ {x} → x ∈ᴸ names t → All (x ≢_) ns
+    fr-apart fr@(a₀ ∷ _) m =
+      lookupᴬ (apart-r (names t) P m) (cut-in ls (laneOf-in o))
+      ∷ (λ eq → lookupᴬ a₀ (there (there (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ m)))))))) (sym eq)) ∷ []
+      where P = pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) fr)))
+
+    fr-part : AllPairs _≢_ (names w₀) → At.part H′ t ≡ At.part H t
+    fr-part fr = part-alike H H′ t (Heaps.keeps H H′ fr-off (λ m → m) (fr-apart fr))
+
+    fr-lanes-apart : AllPairs _≢_ (names w₀) → AllPairs _≢_ (laneNames ls)
+    fr-lanes-apart fr = pairs-r (names t) (pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) fr))))
+
+    fr-count-apart : AllPairs _≢_ (names w₀) → ∀ {n} → n ∈ᴸ laneNames ls → _≢_ {A = Name h} (_ , FlatKit.Flat.active fl) n
+    fr-count-apart (a₀ ∷ _) m = lookupᴬ a₀ (there (there (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names t) m)))))))))
+
+    -- Beneath a lane, apart from the lane's cut and the count.
+    fr-under : AllPairs _≢_ (names w₀) → ∀ {Δ′ A′} {x : Sub h Δ′ A′} → PathLanes ls x → ∀ {n} → n ∈ᴸ names x → All (n ≢_) ns
+    fr-under fr ψ m = (λ eq → lookupᴬ (live-apart ψ (fr-lanes-apart fr) (laneOf-in o)) m (sym eq)) ∷ (λ eq → fr-count-apart fr (lanes-path ψ m) (sym eq)) ∷ []
+
+    -- No part revived: the outer's and the queue as they were, the lanes'
+    -- parts only fewer, and no switch beneath turned on.
+    fr-gone : AllPairs _≢_ (names w₀) → Gone H H′ w₀
+    fr-gone fr@(a₀ ∷ _) = record { gone-part = gp ; gone-live = lv }
+      where
+        gp : ∀ {Δ′ A′} {x : Sub h Δ′ A′} → Path w₀ x → At.part H x ≡ nothing → At.part H′ x ≡ nothing
+        gp here e =
+          subst₂ (λ o′ Q → At.merged H′ op (λ a j → U.subscribe (f a) j) o′ (At.partLanes H′ ls) Q pl ≡ nothing) (sym (fr-part fr)) (sym (queue-freed H (laneOf o) fl))
+                 (merged-kept H H′ op (λ a j → U.subscribe (f a) j) (At.part H t) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl
+                              (lanes-none H fl o (fr-lanes-apart fr) (tabulateᴬ (fr-count-apart fr))) e)
+        gp {x = x} (in-outer ψ) e = trans (part-alike H H′ x (Heaps.keeps H H′ fr-off (λ m → m) (λ m → fr-apart fr (names-path ψ m)))) e
+        gp {x = x} (in-lanes ψ) e = trans (part-alike H H′ x (Heaps.keeps H H′ fr-off (λ m → m) (fr-under fr ψ))) e
+        na : ∀ {Δ′ A′ i p c k′ tk} {s : Sub h Δ′ A′} → Path w₀ (takeWhileˢ i p c k′ tk s) → _≢_ {A = Name h} (_ , FlatKit.Flat.active fl) (_ , Kit.live c)
+        na (in-outer ψ) = lookupᴬ a₀ (there (there (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ (names-path ψ (++⁺ˡ (here refl)))))))))))
+        na (in-lanes ψ) = fr-count-apart fr (lanes-path ψ (++⁺ˡ (here refl)))
+        lv : Lives H H′ w₀
+        lv {c = c} ψ e = drop-true H (laneOf o) c (trans (sym (cong lower (look-store (unlive H (laneOf o)) (FlatKit.Flat.active fl) (Kit.live c) (na ψ)))) e)
+
+    -- No part left: what the flatMap leaves running alike beneath it, and a
+    -- lane's ties seen only through lanes still on.
+    fr-lingering : AllPairs _≢_ (names w₀) → At.part H′ w₀ ≡ nothing → Lingering H H′ w₀ w₀
+    fr-lingering fr gn = record
+      { ling-revive = λ j → ⊥-elim (true≢false (trans (sym j) (cong is-just gn)))
+      ; ling-rested = λ {C} → pin-alike (cong₂ U.unionᶜ (leftover-alike H H′ {B = C} t so-al) (leftL ls (λ π → π)))
+      ; ling-below  = λ lg → Linger.lg-flat H′ (λ e → ⊥-elim (true≢false (trans (sym (cong is-just e)) (cong is-just gn))))
+                                (lingers-alike H H′ so-al (lingers-sub H lg (in-outer here) refl))
+                                (lanes-lg (lingersL-of H lg)) }
+      where
+        so-al = Heaps.keeps H H′ fr-off (λ m → m) (fr-apart fr)
+        under : ∀ {Δ′ A′} {x : Sub h Δ′ A′} → PathLanes ls x → Alike H H′ (names x)
+        under πL = Heaps.keeps H H′ fr-off (λ m → m) (fr-under fr πL)
+        pt : ∀ {Δ′ A′} {x : Sub h Δ′ A′} → PathLanes ls x → At.part H′ x ≡ At.part H x
+        pt {x = x} πL = part-alike H H′ x (under πL)
+        seL : ∀ {Δ′ A′} {x : Sub h Δ′ A′} (πL : PathLanes ls x) → seenL H′ πL ≡ true → seenL H πL ≡ true
+        seL = seenL-drop H (laneOf o) fl (tabulateᴬ (fr-count-apart fr)) under
+        leftL : ∀ {C} (ls′ : List (Lane h Δ B)) → (∀ {Δ′ A′} {x : Sub h Δ′ A′} → PathLanes ls′ x → PathLanes ls x)
+              → At.leftoverL H′ {B = C} ls′ ≡ At.leftoverL H {B = C} ls′
+        leftL []                   em = refl
+        leftL (lane c′ k′ s ∷ ls′) em = cong₂ U.unionᶜ (leftover-alike H H′ s (under (em (this-lane here)))) (leftL ls′ (λ π → em (next-lane π)))
+        lanes-lg : LingersL H ls → LingersL H′ ls
+        lanes-lg lL = record
+          { poolsL = λ πL sn e → pinned-trans (LingersL.poolsL lL πL (seL πL sn) (trans (sym (pt πL)) e)) (pin-alike (pooled-from H H′ (λ m → m) (under πL)))
+          ; restsL = λ πL sn e pn pe → pinned-trans (LingersL.restsL lL πL (seL πL sn) (trans (sym (pt πL)) e) (trans (sym (pt (πL ⊕ᴸ in-source here))) pn) pe)
+                                                    (pin-alike (leftover-from H H′ {B = ⊤} (λ m → m) (under (πL ⊕ᴸ in-source here)))) }
 
     module Wr (fs : AllPairs _≢_ (names T)) = Wrote H H′ ρ fr-off fr-mine fs
     module Sh (fs : AllPairs _≢_ (names T)) = Shift H H′ ρ fr-off fr-mine fs
@@ -1579,7 +1706,7 @@ module Ascending (R : Set) where
     fr-behind fs {q} ut en bh = subst (λ t′ → Each H′ (Heads q) t′) (plant-self ρ) (Sh.shift-behind fs w₀ ut en fr-heading bh)
 
     fr-lingers : AllPairs _≢_ (names T) → At.part H′ w₀ ≡ nothing → Ends H T → Lingers H T → Lingers H′ T
-    fr-lingers fs gn en lg = subst (λ t′ → Lingers H′ t′) (plant-self ρ) (Sh.shift-lingers fs w₀ en (fr-lingering gn) lg)
+    fr-lingers fs gn en lg = subst (λ t′ → Lingers H′ t′) (plant-self ρ) (Sh.shift-lingers fs w₀ en (fr-lingering (fresh-path ρ fs) gn) lg)
 
     fr-lifts : AllPairs _≢_ (names T) → ∀ {s S} → Lifts H ρ s S → Lifts H′ ρ s S
     fr-lifts fs = Wr.wr-lifts fs
@@ -1592,18 +1719,6 @@ module Ascending (R : Set) where
       lanes-freed H fl o (pairs-r (names t) P)
                   (tabulateᴬ λ m → lookupᴬ a₀ (there (there (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names t) m)))))))))
       where P = pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) fr)))
-
-    -- The outer's names apart from the lane's cut and the count.
-    fr-part : AllPairs _≢_ (names w₀) → At.part H′ t ≡ At.part H t
-    fr-part fr@(a₀ ∷ _) =
-      part-alike H H′ t (Heaps.keeps H H′ (off-++ {H = H} {H₁ = unlive H (laneOf o)} {H₂ = H′} ((_ , Kit.live (laneOf o)) ∷ []) (off-store H (Kit.live (laneOf o)))
-                                                   (off-store (unlive H (laneOf o)) (FlatKit.Flat.active fl)))
-                                          (λ m → m) ap)
-      where
-        P = pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) fr)))
-        ap : ∀ {x} → x ∈ᴸ names t → All (x ≢_) ns
-        ap m = lookupᴬ (apart-r (names t) P m) (cut-in ls (laneOf-in o))
-             ∷ (λ eq → lookupᴬ a₀ (there (there (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ m)))))))) (sym eq)) ∷ []
 
     fr-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels H′ T
     fr-kernels fs = Wr.wr-kernels fs (λ {E} {o} → fr-holds (fresh-path ρ fs) {E} {o}) (fr-gated (fresh-path ρ fs)) (fr-spent (fresh-path ρ fs))
@@ -2135,13 +2250,31 @@ module Ascending (R : Set) where
       fin-spent : AllPairs _≢_ (names w₀) → At.Spent H w₀ → At.Spent H′ w₀
       fin-fed   : AllPairs _≢_ (names w₀) → ∀ ν → At.Fed H w₀ ν → At.Fed H′ w₀ ν
 
-      -- The closed flag revives no part, and the connect's own heads and
-      -- ties, the finish restaged, as the feed's.
-      fin-gone      : AllPairs _≢_ (names w₀) → Gone H H′ w₀
+      -- The connect's own heads and ties, the finish restaged, as the
+      -- feed's.
       fin-heading   : Heading H H′ q w₀ v
       fin-lingering : Lingering H H′ w₀ v
 
     module Sh (fs : AllPairs _≢_ (names T)) = Shift H H′ ρ (off-store H (Subject.closed Sj)) mine fs
+
+    -- The closed flag read by no part: the connect's own clause reads its
+    -- children's parts alone, theirs names apart from the flag.
+    fin-gone : AllPairs _≢_ (names w₀) → Gone H H′ w₀
+    fin-gone (_ ∷ a₁ ∷ _) = record { gone-part = gp ; gone-live = lives-off (off-store H (Subject.closed Sj)) nl }
+      where
+        gp : ∀ {Δ′ A′} {x : Sub h Δ′ A′} → Path w₀ x → At.part H x ≡ nothing → At.part H′ x ≡ nothing
+        gp here z =
+          subst₂ (λ s′ b′ → At.connected H′ rp e rt s′ b′ ≡ nothing) (sym (part-alike H H′ u au)) (sym (part-alike H H′ bd ab))
+                 (conn-kept H H′ rp e rt (At.part H u) (At.part H bd) z)
+        gp {x = x} (in-source ψ) z = trans (part-alike H H′ x (λ j m → au j (names-path ψ m))) z
+        gp {x = x} (in-body ψ)   z = trans (part-alike H H′ x (λ j m → ab j (names-path ψ m))) z
+        nl : ∀ {Δ′ A′ i p c′ k′ tk} {s : Sub h Δ′ A′} → Path w₀ (takeWhileˢ i p c′ k′ tk s) → All (_≢_ (_ , Kit.live c′)) ns
+        nl (in-source ψ) = (λ eq → lookupᴬ a₁ (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ (names-path ψ (++⁺ˡ (here refl)))))))) (sym eq)) ∷ []
+        nl (in-body ψ)   = (λ eq → lookupᴬ a₁ (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names u) (names-path ψ (++⁺ˡ (here refl))))))))) (sym eq)) ∷ []
+        au : Alike H H′ (names u)
+        au j m = look-store H (Subject.closed Sj) j (λ eq → lookupᴬ a₁ (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m))))) eq)
+        ab : Alike H H′ (names bd)
+        ab j m = look-store H (Subject.closed Sj) j (λ eq → lookupᴬ a₁ (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names u) m))))) eq)
 
     kin : Kin w₀ v
     kin = kin-fin {g = at-here (At.owing H′ fd′)}
