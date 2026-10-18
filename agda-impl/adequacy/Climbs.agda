@@ -447,7 +447,7 @@ module Ascending (R : Set) where
     end-lingering : At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′ → Lingering H H w₀ v
     end-lingering lv pv = record
       { ling-revive = λ _ → cong is-just (take-live lv pv)
-      ; ling-rested = pin-alike refl
+      ; ling-rested = pin-alike {x = At.leftover H u} refl
       ; ling-below  = λ _ → Linger.lg-take H (λ ok → ⊥-elim (and-false (At.val H (Kit.live c)) ok)) }
 
     end-ticked : ∀ {w p′ bs} {ϑ : w ⊑ h} {K : Stack w ⊤} n (sk : StackAs T p′ ϑ K bs) → Ticked T n sk → Ticked T′ n (end-stack sk)
@@ -2033,7 +2033,7 @@ module Ascending (R : Set) where
       ; books = record { fresh = fs ; clocked = proj₁ ck , proj₁ ck , proj₂ ck ; paidUp = pu ; running = rn }
       ; sorted = sorted-⇝ so (⇝-trans p p′)
       ; behind = subst (λ t′ → Each H₃ (Heads q) t′) (plant-self ρ)
-                   (Shift.shift-behind hp H₃ ρ (off-++ (Freed.ns hp ρ o) (Freed.fr-off hp ρ o) (off-store H₂ (FlatKit.Flat.queue fl)))
+                   (Shift.shift-behind hp H₃ ρ (off-++ {H = hp} {H₁ = H₂} {H₂ = H₃} (Freed.ns hp ρ o) (Freed.fr-off hp ρ o) (off-store H₂ (FlatKit.Flat.queue fl)))
                                        (all-++⁺ (Freed.fr-mine hp ρ o) (Dequeued.mine H₂ ρ ys)) fs w₀ (tells-past cl) (ended-past cl) (next-heading ρ πL o ys cl Lρ sg) bh)
       ; lingers = next-lingers ρ πL o ys cl Lρ sg }))
     where
