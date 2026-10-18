@@ -47,43 +47,7 @@ code.
   greps or it errors.
 - **THE BIG PICTURE TIER ROADMAP IS WHAT YOU FOLLOW; THE ROWS ARE THE LEDGER
   IT IS DRAWN FROM (Anthony).** Every tier opens with a
-  `### Big picture tier roadmap
-
-- **EVERY NODE, FOLDED.** A `Carried` field is a property of the whole
-  tree, so every move rebuilds every field and each move×field pair
-  became a postulate; a new move grows a new row. Restate each field as
-  `Every P`, a per-node fact folded over the tree, with ONE plant lemma:
-  planting at π keeps `Every P`, given the new node passes `P` and keeps
-  the summary its ancestors read (`At.part`, `At.leftover`).
-  `lingers-plant` re-derives as its instance. Decides whether one summary
-  serves every field.
-- **QUEUE, LOCAL OR NOT.** `Queue` framed by the node alone is ruled out.
-  Restate it per node (each node's timers on the agenda) or name exactly
-  what it reads beyond the node. Decides whether every `Carried` field
-  fits the shape; if `Queue` does not, it, `stack` and `ticked` need their
-  own route.
-- **A WRITE IS A REPLANT.** The cells that write rather than plant (a
-  lane's or outer's end, a feed, a finish, a done flag, a fire, a
-  teardown, a scan's accumulator) as a replant of the written node, so
-  the one plant lemma covers them and no field needs a write frame.
-  Decides whether a write at a node's own names changes the summary its
-  ancestors read only as the replant says.
-- **COLUMNS DELETED.** Each field over `Every`, `lingers`, `behind`,
-  `owned` first: a column's cells deleted at once, a move's remainder one
-  obligation per node KIND, shared by every move rewriting that kind
-  (map, scan, take and `of` already share `rest-pinned`). Decides how
-  many kind obligations are left, and which are FALSITY.
-- **GROWTH.** `map-restage`, `scan-restage`, `take-restage` are bodies over
-  the `Grown` frame. Next: its leaves `grows-extend`, `walk-grow`,
-  `compile-cong`, `names-wk` as bodies, then every `grow-*` cell over
-  them. Decides whether a growth needs more of the step than a weakening.
-- **HIDDEN RUNS.** `emit-void` is a body over `void-site`: a site's pin
-  lifts by `void-up`; a pool's and a rest's by `pinned-skip` on their
-  tie. Ruled out: the ghost alike past a hidden step; an `ending` take as
-  a site. The core: `pooled-pin`, `left-pin`, `pool-off`, `spread-held`,
-  one fact: nothing but the `of` heads under the run.
-
-### The ledger` carrying
+  `### Big picture tier roadmap` ... `### The ledger` carrying
   the rows. A leg is a GROUP: several postulates sharing a currency, a
   statement together with the sites that consume it, one shelf of mechanical
   rows. Group where the grouping is real and fall back on the risk classes
@@ -213,61 +177,31 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **HIDDEN RUNS.** `Carried.lingers` ties each held pool and ended
-  source's rest to what its hidden subtree still runs (`At.leftover`,
-  `At.pooled`). `emit-void` is a body over its site (`void-site`): a
-  site's pin lifts by `void-up`; a pool's and a rest's pin read their
-  tie (`tied-skip`, `restful-pinned`). Ruled out: the ghost alike past a
-  hidden step; an `ending` take as a site; one `Clear` through a pool
-  site. The core left: `pooled-pin`, `left-pin`, `pool-off`,
-  `spread-held`, one fact: nothing but the `of` heads under the run
-  (`Carried.behind` bounds only at its `p`). Then landings, a hidden
-  end or completion (`last-void`, `take1-void`), `sub-defer`,
-  `close-lingers`, `settle-lingers`.
-- **C. THE CALLBACK RELATION.** `Calling` is one record over the signal
-  climbing, a value or an end with its calls owed, `call` its one
-  recursion by `call-step`. Ruled out: a third mid-call state.
-  An operator's call is reads, writes and a RESTAGE of its node,
-  node-local but for carrying stack, calls and agenda across it: a
-  take's stage, a connect's feed, a flatMap's pool, its admit, a lane's
-  end and settle. Guards open by `calling-open`. `lane-settles` is a
-  fact of the call no field carries: the done flag lags the outer's
-  part while the outer's end climbs. A start is `lane-begin`, an
-  admit's and a dequeue's alike: `begin-path`, then the tree weakened by
-  `Growing.wkTree` with the lane planted, `bg-*` its frame. An `of`
-  or `empty` begun is `offer-restage`. Remaining:
-  `sub-cold`, `sub-joined` over the same growth; `sub-defer` after
-  HIDDEN RUNS.
-- **UP-ENDED.** `up-ended` is a body: the rest's skips by `Each.rests`,
-  the shut body by `shut-heads` over what it tells. Ruled out: the end
-  signal's fields carrying it; the non-local residue is `tells-past`,
-  which `shut-step` reads too. Decides whether `tells-past` is a field
-  `Carried` owes, every producer framing it, or follows from `Owned`'s
-  finishes and the agenda's placement.
-- **B. THE LOCAL INVARIANT.** Every move's `Kernels` and `Meaning` are
-  bodies over two proven frames: a plant (the `Moving` plant lemmas,
-  `plant-queue`) and a write at one node's own names (`Wrote`), each
-  premise a leaf reading only the node. `behind` across a write leaving
-  every part is `Wrote.wr-behind`; a lane's end drops its own lane alone
-  (`lanes-freed`). Ruled out: a kernel, spent or feed reading outside its
-  node; `Queue` framed by the node alone; a ghost move closed by an
-  equality leaf (`fed-ghost`'s route). Remaining: `behind` where the
-  node's part moves, `Queue` per move; `owned` per move, a connect's
-  body read whole; stack and ticks per move.
-- **THE RESTAGE FRAME.** `map-restage`, `scan-restage`, `take-restage`
-  are bodies: a growth weakens the tree into the allocated heap (the
-  `Grown` frame, composing over several allocations), `Moved` plants the
-  node, `Owning.reowned` carries `Owned` over an `Inner`. Ruled out: a
-  former needing more of its planted subtree than `Inner` says; a growth
-  needing more of the step than a weakening and `compile-cong`. A node
-  whose `unsub` differs is planted by `holds-owed` over `Kernels.settled`
-  (no detacher held over what still `Owes`), which every kernels move
-  now carries. `connect-restage` and `flat-restage` are bodies over
-  `Grew` (a register a growth like any, a store by `grew-store`), their
-  frame leaves postulated like a take's `ending`. Ruled out: a refill
-  slot needing more than the walk's own observer (`holds-owed` reads it
-  there). Remaining: the growth leaves `grows-extend`, `walk-grow`,
-  `compile-cong`, `names-wk` themselves.
+- **FRAMES, RISKIEST FIRST.** Until every column is folded, no move gets
+  a new body and no cell is proven on its own: only frames and cell
+  rewrites. A field is a fold of a per-node fact, kept by one frame per
+  move kind (plant, write, deepen, grow), given a fact about the node
+  rewritten. State the frames of `owned` (path-keyed), `queue` (orphaned
+  subscribers named in the invariant) and `gated` (`Spent` reads a whole
+  subtree) first, and check each cell of their columns gets its node
+  fact from what its call site holds. Decides whether the fold serves
+  every field.
+- **EVERY CELL A FRAME.** Every move×field cell (`owned`, `lingers`,
+  `behind`, `queue`, `ticked`, `fresh`, `kernels`, `meaning`, a flatMap's
+  `holds`, `gated`, `spent`, `fed`) rewritten as a body: its frame applied
+  to a node fact shared by every move rewriting that node kind. One pass,
+  then one gate. Decides how many node facts are left, and which are
+  FALSITY.
+- **GHOSTS AND STACKS.** The `*-ghost`, `*-stack` and `*-alone` cells
+  are columns too; fold them the same way once the first two land.
+- **NODE FACTS, FALSITY FIRST.** Only now discharge: the node facts the
+  fold left, riskiest first, then the per-move facts no column holds.
+- **HIDDEN RUNS.** Parked behind the fold. The core: `pooled-pin`,
+  `left-pin`, `pool-off`, `spread-held`, one fact: nothing but the `of`
+  heads under the run (`Carried.behind` bounds only at its `p`).
+- **UP-ENDED.** Parked behind the fold. Decides whether `tells-past` is a
+  field `Carried` owes, every producer framing it, or follows from
+  `Owned`'s finishes and the agenda's placement.
 
 ### The ledger
 
