@@ -79,7 +79,7 @@ module Ascending (R : Set) where
   open Shifting R using (LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; lingers-sub; lingersL-of; module Linger; module Build)
   open Framing R using (untold; scan-part; scan-defined; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike)
     renaming (Ended to Ends)
-  open Replanting R using (Kin; kin-end; kin-pool; kin-feed; kin-fin; rehomes; rehomes-code; restack; reticked; owned-run; plant-self; module Shift; Heading; Lingering; Gone; Lives; lives-off; ahead-under)
+  open Replanting R using (Kin; kin-end; kin-pool; kin-feed; kin-fin; rehomes; rehomes-code; restack; reticked; owned-run; plant-self; module Shift; Heading; Lingering; Gone; store-held; Lives; lives-off; ahead-under)
   open Read
 
   handleOf : ∀ {h} {t : Sub h [] R} → Spot t → Maybe (Handle h)
@@ -637,7 +637,7 @@ module Ascending (R : Set) where
       ; ling-below  = λ lg → Linger.lg-scan H′ (lingers-alike H H′ scan-alike (lingers-sub H lg (in-scan here) refl)) }
 
     scan-owned : ∀ {p ctl bs} {ca : CtlAs T p ctl bs} → Owned H T ca → Owned H′ T ca
-    scan-owned = Sh.wr-owned record { gone-part = λ ψ e → none-of (trans (scan-defined H ρ fs z (ρ ⊕ ψ)) (cong is-just e)) ; gone-live = scan-live }
+    scan-owned = Sh.wr-owned record { gone-part = λ ψ e → none-of (trans (scan-defined H ρ fs z (ρ ⊕ ψ)) (cong is-just e)) ; gone-live = scan-live ; gone-held = store-held H r }
       where
         -- No take beneath the scan switched by its accumulator.
         scan-live : Lives H H′ (scanˢ f r u)
@@ -857,7 +857,7 @@ module Ascending (R : Set) where
     sd-same fr {v = v} (in-lanes ψ) = part-alike H H′ v (λ j m → Heaps.flat-ls H H′ {fl = fl} {oc} {k} {r} {u} {ls} (sd-alike fr) j (lanes-path ψ m))
 
     sd-owned : AllPairs _≢_ (names T) → ∀ {p ctl bs} {ca : CtlAs T p ctl bs} → Owned H T ca → Owned H′ T ca
-    sd-owned fs = Sh.wr-owned fs record { gone-part = λ ψ e → trans (sd-same (fresh-path ρ fs) ψ) e ; gone-live = sd-live (fresh-path ρ fs) }
+    sd-owned fs = Sh.wr-owned fs record { gone-part = λ ψ e → trans (sd-same (fresh-path ρ fs) ψ) e ; gone-live = sd-live (fresh-path ρ fs) ; gone-held = store-held H (FlatKit.Flat.outerDone fl) }
 
     -- No take beneath the flatMap switched by its done flag.
     sd-live : AllPairs _≢_ (names w₀) → Lives H H′ w₀
@@ -1651,7 +1651,7 @@ module Ascending (R : Set) where
     -- No part revived: the outer's and the queue as they were, the lanes'
     -- parts only fewer, and no switch beneath turned on.
     fr-gone : AllPairs _≢_ (names w₀) → Gone H H′ w₀
-    fr-gone fr@(a₀ ∷ _) = record { gone-part = gp ; gone-live = lv }
+    fr-gone fr@(a₀ ∷ _) = record { gone-part = gp ; gone-live = lv ; gone-held = λ hd → trans (store-held (unlive H (laneOf o)) (FlatKit.Flat.active fl) hd) (store-held H (Kit.live (laneOf o)) hd) }
       where
         gp : ∀ {Δ′ A′} {x : Sub h Δ′ A′} → Path w₀ x → At.part H x ≡ nothing → At.part H′ x ≡ nothing
         gp here e =
@@ -1756,7 +1756,7 @@ module Ascending (R : Set) where
     -- A queue's head taken off revives no part: the flatMap's part
     -- stood on the queue, its children's on names the queue is not.
     dq-gone : AllPairs _≢_ (names w₀) → ∀ {y ys′} → At.val H (FlatKit.Flat.queue fl) ≡ y ∷ ys′ → Gone H H′ w₀
-    dq-gone fr@(_ ∷ _ ∷ a₂ ∷ _) {y} {ys′} nq = record { gone-part = gp ; gone-live = lives-off (off-store H (FlatKit.Flat.queue fl)) nl }
+    dq-gone fr@(_ ∷ _ ∷ a₂ ∷ _) {y} {ys′} nq = record { gone-part = gp ; gone-live = lives-off (off-store H (FlatKit.Flat.queue fl)) nl ; gone-held = store-held H (FlatKit.Flat.queue fl) }
       where
         gp : ∀ {Δ′ A′} {x : Sub h Δ′ A′} → Path w₀ x → At.part H x ≡ nothing → At.part H′ x ≡ nothing
         gp here         e = ⊥-elim (merged-queued H op (λ a j → U.subscribe (f a) j) (At.part H t) (At.partLanes H ls) pl
@@ -2271,7 +2271,7 @@ module Ascending (R : Set) where
     -- The closed flag read by no part: the connect's own clause reads its
     -- children's parts alone, theirs names apart from the flag.
     fin-gone : AllPairs _≢_ (names w₀) → Gone H H′ w₀
-    fin-gone (_ ∷ a₁ ∷ _) = record { gone-part = gp ; gone-live = lives-off (off-store H (Subject.closed Sj)) nl }
+    fin-gone (_ ∷ a₁ ∷ _) = record { gone-part = gp ; gone-live = lives-off (off-store H (Subject.closed Sj)) nl ; gone-held = store-held H (Subject.closed Sj) }
       where
         gp : ∀ {Δ′ A′} {x : Sub h Δ′ A′} → Path w₀ x → At.part H x ≡ nothing → At.part H′ x ≡ nothing
         gp here z =

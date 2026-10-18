@@ -16,6 +16,7 @@ open import Data.Maybe using (Maybe; just; nothing; is-just)
 open import Data.Nat using (_≤_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Bool using (true)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst)
 open import Level using (lower)
@@ -32,8 +33,8 @@ open import adequacy.Frame using (module Framing)
 open import adequacy.Shift using (module Shifting)
 
 module Replanting (R : Set) where
-  open Shared Timeline (Out R) using (Heapᴹ; Stack)
-  open Heap using (_⊑_)
+  open Shared Timeline (Out R) using (Heapᴹ; Stack; store)
+  open Heap using (_⊑_; _∋_; Handle; cell)
   open Run (Pureᴾ R) using (Act; wkAct; _>>ᴬ_; module Kit)
   open Pure R using (Timer; cascade)
   open Strongly R using (Sub; Path; PathLanes; _⊕_; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane;
@@ -43,7 +44,7 @@ module Replanting (R : Set) where
                                  BurstClocked; Ticked; CtlAs; runAs)
   open Moving R using (plant; plantᴸ; planted; pairs-r; pairs-split)
   open Retagging R using (retag)
-  open Tearing R using (Off; fresh-path; part-alike; names-path; lanes-path; apart-r; apart-l; narrow)
+  open Tearing R using (Off; look-either; fresh-path; part-alike; names-path; lanes-path; apart-r; apart-l; narrow)
   open Framing R using (Untold; Ended; untold)
   open Shifting R using (module Walk)
 
@@ -205,6 +206,13 @@ module Replanting (R : Set) where
     field
       gone-part : ∀ {Δ′ A′} {x : Sub h Δ′ A′} → Path u x → At.part H x ≡ nothing → At.part H′ x ≡ nothing
       gone-live : Lives H H′ u
+      gone-held : ∀ (hd : Handle h) → At.spentʰ H′ hd ≡ At.spentʰ H hd
+
+  -- A cell written leaves every handle as it was.
+  store-held : ∀ {h t} (H : Heapᴹ h) (i : h ∋ cell t) {x} (hd : Handle h) → At.spentʰ (store H i x) hd ≡ At.spentʰ H hd
+  store-held H i hd with look-either H i hd
+  ... | inj₁ ()
+  ... | inj₂ e = cong lower e
 
   -- THE NODE'S HEADS, MOVED: no part revived, no joiner left untold that
   -- was told, and below it every part heading no sooner than `q`.
@@ -273,8 +281,8 @@ module Replanting (R : Set) where
     wr-owned : Gone H H′ u → ∀ {p ctl bs} {ca : CtlAs T p ctl bs} → Owned H T ca → Owned H′ T ca
     wr-owned gn ow = record
       { ofs    = Owned.ofs ow
-      ; plays  = Owned.plays ow
-      ; fires  = Owned.fires ow
+      ; plays  = λ {hd = hd} π sp → Owned.plays ow π (trans (sym (Gone.gone-held gn hd)) sp)
+      ; fires  = λ {hd = hd} π sp → Owned.fires ow π (trans (sym (Gone.gone-held gn hd)) sp)
       ; begun  = Owned.begun ow
       ; ends   = λ π lv → Owned.ends ow π (live-kept gn π lv)
       ; cuts   = λ π lv → Owned.cuts ow π (live-kept gn π lv)
