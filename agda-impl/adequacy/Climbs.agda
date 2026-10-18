@@ -370,6 +370,12 @@ module Ascending (R : Set) where
   and-false true  ()
   and-false false ()
 
+  -- A queue left: the flatMap open.
+  merged-queued : ∀ {h} (G : Heapᴹ h) {Δ A B} op (g : A → Pos → U.Node Δ B) o L pl {y ys} → At.merged G op g o L (y ∷ ys) pl ≡ nothing → ⊥
+  merged-queued G op g nothing  []      pl ()
+  merged-queued G op g nothing  (_ ∷ _) pl ()
+  merged-queued G op g (just _) L       pl ()
+
   -- A map's part held exactly where what it maps is.
   map-just : ∀ {h} (G : Heapᴹ h) {X Y : Set₁} (g : X → Y) m → is-just (At.mapᴹ G g m) ≡ is-just m
   map-just G g nothing  = refl
@@ -1612,15 +1618,6 @@ module Ascending (R : Set) where
     module Wr (fs : AllPairs _≢_ (names T)) = Wrote H H′ ρ (off-store H (FlatKit.Flat.queue fl)) mine fs
     module Sh (fs : AllPairs _≢_ (names T)) = Shift H H′ ρ (off-store H (FlatKit.Flat.queue fl)) mine fs
 
-    -- A queue's head taken off revives no part: the flatMap's part
-    -- stands on its outer, its lanes or a queue left.
-    postulate
-      dq-gone : ∀ {y ys′} → At.val H (FlatKit.Flat.queue fl) ≡ y ∷ ys′ → Gone H H′ w₀
-
-    dq-owned : AllPairs _≢_ (names T) → ∀ {y ys′} → At.val H (FlatKit.Flat.queue fl) ≡ y ∷ ys′
-             → ∀ {p ctl bs} {ca : CtlAs T p ctl bs} → Owned H T ca → Owned H′ T ca
-    dq-owned fs nq = Sh.wr-owned fs (dq-gone nq)
-
     dq-queue : AllPairs _≢_ (names T) → ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
     dq-queue fs = Sh.wr-queue fs
 
@@ -1628,6 +1625,26 @@ module Ascending (R : Set) where
     dq-alike : AllPairs _≢_ (names w₀) → Alike H H′ (flatReads fl oc k r t ls)
     dq-alike (a₀ ∷ _ ∷ a₂ ∷ _) j (here e)  = look-store H (FlatKit.Flat.queue fl) j (λ eq → lookupᴬ a₀ (there (here refl)) (sym (trans eq e)))
     dq-alike (a₀ ∷ _ ∷ a₂ ∷ _) j (there m) = look-store H (FlatKit.Flat.queue fl) j (lookupᴬ a₂ m)
+
+    -- A queue's head taken off revives no part: the flatMap's part
+    -- stood on the queue, its children's on names the queue is not.
+    dq-gone : AllPairs _≢_ (names w₀) → ∀ {y ys′} → At.val H (FlatKit.Flat.queue fl) ≡ y ∷ ys′ → Gone H H′ w₀
+    dq-gone fr@(_ ∷ _ ∷ a₂ ∷ _) {y} {ys′} nq = record { gone-part = gp ; gone-live = lives-off (off-store H (FlatKit.Flat.queue fl)) nl }
+      where
+        gp : ∀ {Δ′ A′} {x : Sub h Δ′ A′} → Path w₀ x → At.part H x ≡ nothing → At.part H′ x ≡ nothing
+        gp here         e = ⊥-elim (merged-queued H op (λ a j → U.subscribe (f a) j) (At.part H t) (At.partLanes H ls) pl
+                              (subst (λ qs → At.merged H op (λ a j → U.subscribe (f a) j) (At.part H t) (At.partLanes H ls) qs pl ≡ nothing) nq e))
+        gp {x = x} (in-outer ψ) e = trans (part-alike H H′ x (λ j m → Heaps.flat-so H H′ {fl = fl} {oc} {k} {r} {t} {ls} (dq-alike fr) j (names-path ψ m))) e
+        gp {x = x} (in-lanes ψ) e = trans (part-alike H H′ x (λ j m → Heaps.flat-ls H H′ {fl = fl} {oc} {k} {r} {t} {ls} (dq-alike fr) j (lanes-path ψ m))) e
+        nl : ∀ {Δ′ A′ i p c k′ tk} {s : Sub h Δ′ A′} → Path w₀ (takeWhileˢ i p c k′ tk s) → All (_≢_ (_ , Kit.live c)) ns
+        nl (in-outer ψ) =
+          (λ eq → lookupᴬ a₂ (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ (names-path ψ (++⁺ˡ (here refl))))))))) (sym eq)) ∷ []
+        nl (in-lanes ψ) =
+          (λ eq → lookupᴬ a₂ (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names t) (lanes-path ψ (++⁺ˡ (here refl))))))))) (sym eq)) ∷ []
+
+    dq-owned : AllPairs _≢_ (names T) → ∀ {y ys′} → At.val H (FlatKit.Flat.queue fl) ≡ y ∷ ys′
+             → ∀ {p ctl bs} {ca : CtlAs T p ctl bs} → Owned H T ca → Owned H′ T ca
+    dq-owned fs nq = Sh.wr-owned fs (dq-gone (fresh-path ρ fs) nq)
 
     dq-part : AllPairs _≢_ (names w₀) → At.part H′ t ≡ At.part H t
     dq-part fr = part-alike H H′ t (Heaps.flat-so H H′ {fl = fl} {oc} {k} {r} {t} {ls} (dq-alike fr))

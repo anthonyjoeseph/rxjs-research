@@ -427,8 +427,6 @@ by their own silent steps (`Mirror`).
   idle one ties what it tied.
 - **`close-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: an outer closed, the
   pool's heads where the outer's were.
-- **`dq-gone`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue's head taken off
-  revives no part and no take.
 - **`fr-gone`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's cut and the count
   revive no part and no take.
 - **`fr-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane freed keeps the
