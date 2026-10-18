@@ -306,16 +306,7 @@ module Flatting (R : Set) where
   -- observer, one subscription fewer owed.
   flat-restage : ∀ {g m} (cr : Carried g m) {Δ A B op} {f : A → T.Obs Timeline Δ B} {s : T.Obs Timeline Δ A}
                → subOf (Carried.ctlAs cr) ≡ just (Δ , B , T.flatMap op f s) → Restages cr s
-  flat-restage {m = m₀@(mach ⟨ H , q₀ , run _ σ K ⟩ _ _ _ _ _ _ _)} cr@record { ctlAs = subAs {s = T.flatMap {A = A} op f s} π (u , E′ , υ , e , newRef≗ refl kk) sk a } refl refl
-    with allocates (kk new hereʳ)
-  ... | k₁ , e₁ , kk₁ with allocates (kk₁ new hereʳ)
-  ... | k₂ , e₂ , kk₂ with allocates (kk₂ new hereʳ)
-  ... | k₃ , e₃ , kk₃ with allocates (kk₃ new hereʳ)
-  ... | k₄ , e₄ , kk₄ with allocates (kk₄ new hereʳ)
-  ... | k₅ , e₅ , kk₅ with allocates (kk₅ new hereʳ)
-  ... | k₆ , e₆ , kk₆ with registers (kk₆ new hereʳ)
-  ... | n₇ , c₇ , x₇ , k₇ , e₇ , en , ec , ex , ek with writes (ek new hereʳ)
-  ... | x₉ , e₈ , ex₉ =
+  flat-restage {m = m₀@(mach ⟨ H , q₀ , run _ σ K ⟩ _ _ _ _ _ _ _)} cr@record { ctlAs = subAs {s = T.flatMap {A = A} op f s} π (u , E′ , υ , e , newRef≗ refl kk) sk a } refl refl =
     _ , path
     , record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = F.t′
              ; ctlAs = subAs F.π′ (F.code′ ex₉) (F.restack sk₉ a₉) (F.alones _)
@@ -332,6 +323,32 @@ module Flatting (R : Set) where
              ; lingers = F.rf-lingers refl refl slot₉ refl refl refl refl (Grew.lingers G₉) }
     , refl , inj₁ (inj₁ (subst (pend F.t′ <_) (Grew.pends G₉) F.less))
     where bk = Carried.books cr
+          -- The kernel's allocations after its first, its registration and
+          -- its store, peeled by projection: the goal mentions none of them.
+          A₁ = allocates (kk new hereʳ)
+          A₂ = allocates (proj₂ (proj₂ A₁) new hereʳ)
+          A₃ = allocates (proj₂ (proj₂ A₂) new hereʳ)
+          A₄ = allocates (proj₂ (proj₂ A₃) new hereʳ)
+          A₅ = allocates (proj₂ (proj₂ A₄) new hereʳ)
+          A₆ = allocates (proj₂ (proj₂ A₅) new hereʳ)
+          R₇ = registers (proj₂ (proj₂ A₆) new hereʳ)
+          n₇ = proj₁ R₇
+          c₇ = proj₁ (proj₂ R₇)
+          x₇ = proj₁ (proj₂ (proj₂ R₇))
+          P₇ = proj₂ (proj₂ (proj₂ (proj₂ R₇)))
+          en = proj₁ (proj₂ P₇)
+          ec = proj₁ (proj₂ (proj₂ P₇))
+          ex = proj₁ (proj₂ (proj₂ (proj₂ P₇)))
+          W₈ = writes (proj₂ (proj₂ (proj₂ (proj₂ P₇))) new hereʳ)
+          ex₉ = proj₂ (proj₂ W₈)
+          e₁ = proj₁ (proj₂ A₁)
+          e₂ = proj₁ (proj₂ A₂)
+          e₃ = proj₁ (proj₂ A₃)
+          e₄ = proj₁ (proj₂ A₄)
+          e₅ = proj₁ (proj₂ A₅)
+          e₆ = proj₁ (proj₂ A₆)
+          e₇ = proj₁ P₇
+          e₈ = proj₁ (proj₂ W₈)
           wd : ∀ {k w′} → List (Machine.Todo R w′) → List (Machine.Todo R (k ∷ w′))
           wd = mapList (wkTodo new)
           H₁ : Heapᴹ (cell (base ℕ) ∷ _)
