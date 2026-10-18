@@ -41,10 +41,9 @@ module Framing (R : Set) where
   open Run (Pureᴾ R) using (Ref; Subject; module Kit; module FlatKit)
   open Shared Timeline (Out R) using (Conf; Heapᴹ; store; stored; look)
   open Heap using (_∋_) renaming (same to same⊑)
-  open Strongly R using (Strong; Sub; scanˢ; here; module At; Queue; Kernels; Meaning; Owned; Path; in-scan; in-source; _⊕_; names; Each; Heads; Lingers; seen; Books;
+  open Strongly R using (Strong; Sub; scanˢ; here; module At; Queue; Kernels; Meaning; Path; in-scan; in-source; _⊕_; names; Each; Heads; seen; Books;
                          mapˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; PathLanes; this-lane; next-lane; in-map; in-take; in-outer; in-lanes; in-body; in-defer; seen-join;
                          Taking; taking; taken; cutNames; quietName; subjectNames; flatNames; laneNames; Name; pendings; subjects; joiners) renaming (ending to endingᵀ)
-  open Strongly.Against R using (CtlAs)
   open Tearing R using (Alike; Off; part-alike; partLanes-alike; lanes-path; module Seeing; look-store; get-put-same; fresh-path; names-path; apart-r; apart-l; ≢-flip)
   open Moving R using (pairs-r; pairs-split; plant; pendings-plant; subjects-plant; joiners-plant; head-map; head-scan)
   open Locality R using (module Heaps)
@@ -61,13 +60,10 @@ module Framing (R : Set) where
           | part-alike H (store H r (lift z)) u (λ j m → look-store H r j (lookupᴬ nr m)) | pu = refl
 
   -- A WRITE AT A SCAN'S ACCUMULATOR, FRAMED: nothing the relation holds
-  -- reads an accumulator but the parts above it.
+  -- reads an accumulator but the parts above it.  A path the write leaves
+  -- seen it saw before, to a node that reads alike or sits above the
+  -- scan.
   postulate
-    scan-owned   : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
-                 → ∀ {p ctl bs} {ca : CtlAs T p ctl bs} z → Owned H T ca → Owned (store H r (lift z)) T ca
-
-    -- A path the write leaves seen it saw before, to a node that reads
-    -- alike or sits above the scan.
     scan-sees    : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
                  → ∀ z {Δ′ A′} {x : Sub h Δ′ A′} (ψ : Path T x) → seen (store H r (lift z)) ψ ≡ true
                  → seen H ψ ≡ true × (Alike H (store H r (lift z)) (names x) ⊎ Path x (scanˢ f r u))
@@ -201,6 +197,12 @@ module Framing (R : Set) where
   Untold {h} H q t = ∀ {Δ′ A′ B′} {S c b kb k fd rp c₀ rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
                    → (ψ : Path t (connectˢ S c b kb k fd rp (just c₀) rt src bd)) → seen H ψ ≡ true → At.part H src ≡ nothing
                    → ∀ {b₀} → At.part H bd ≡ just b₀ → Tells q c₀ (untold (here refl) b₀)
+
+  -- A connect still held past its source's end holds no source.
+  Ended : ∀ {h} (H : Heapᴹ h) {Δ A} (t : Sub h Δ A) → Set₁
+  Ended {h} H t = ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+                → (ψ : Path t (connectˢ S c b kb k fd rp e rt src bd)) → seen H ψ ≡ true
+                → ∀ {n} → At.part H (connectˢ S c b kb k fd rp e rt src bd) ≡ just n → ∀ {c₀} → e ≡ just c₀ → At.part H src ≡ nothing
 
   -- THE PARTS ABOVE A WRITTEN SCAN, walked down to it: a map's, a scan's
   -- and a defer's head is their child's; a take's, a flatMap's and a
@@ -354,6 +356,11 @@ module Framing (R : Set) where
     tells-past : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v} {sg}
                → Calling g ℓ m₁ σ sg → Untold (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) T
 
+    -- A call under way: every connect the ghost holds past its source's
+    -- end holds no source.
+    ended-past : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v} {sg}
+               → Calling g ℓ m₁ σ sg → Ended (Conf.heap (Mach.conf m₁)) T
+
   -- The scan and every part above it still head no sooner than where
   -- the run is.
   scan-above : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
@@ -370,12 +377,6 @@ module Framing (R : Set) where
 
   none-of : ∀ {ℓ} {X : Set ℓ} {m : Maybe X} → is-just m ≡ false → m ≡ nothing
   none-of {m = nothing} _ = refl
-
-  -- A scan's store moves no tie: no tie reads its accumulator.
-  postulate
-    scan-lingers : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
-                   (ρ : Path T (scanˢ f r u)) {y : A} → Calling g ℓ m₁ (ρ ⊕ in-scan here) (sends y)
-                 → Lingers (store (Conf.heap (Mach.conf m₁)) r (lift (f (At.val (Conf.heap (Mach.conf m₁)) r) y))) T
 
   -- The parts above the scan move with it; every other part reads alike.
   scan-behind : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
@@ -571,10 +572,6 @@ module Framing (R : Set) where
   scan-fed : ∀ {h} (H : Heapᴹ h) {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → AllPairs _≢_ (names (scanˢ f r u))
            → ∀ z ν → At.Fed H (scanˢ f r u) ν → At.Fed (store H r (lift z)) (scanˢ f r u) ν
   scan-fed H {r = r} {u} (nr ∷ _) z = Heaps.fed-alike H (store H r (lift z)) u (λ j m → look-store H r j (lookupᴬ nr m))
-
-  postulate
-    scan-queue : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
-               → ∀ {p clk ts} z → Queue H p clk ts T → Queue (store H r (lift z)) p clk ts T
 
   -- A WRITE AT A SCAN'S ACCUMULATOR, FRAMED: the node's own clauses, the
   -- rest of the tree by the frame.

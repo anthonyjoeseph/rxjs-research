@@ -177,21 +177,18 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **ONE FRAME, NOT THREE.** Until every column is folded, no move gets a
-  new body and no cell is proven on its own: only frames and cell
-  rewrites. The frames exist but each serves one move: `keep`/`Fork`
-  plant over a PENDING node only (the restages), `Above` walks up from a
-  written SCAN only, `Wrote` frames kernels and meaning only. Every
-  Climbs move changes its node's part, so none reaches it. Generalise to
-  one replant frame at any node, whose premise is the summary its
-  ancestors read: part defined alike, seen alike, `untold` alike,
-  leftover pinned. Decides whether that summary suffices per field.
-- **EVERY CELL A FRAME.** Every move×field cell (`owned`, `lingers`,
-  `behind`, `queue`, `ticked`, `stack`, `fresh`) a body: the replant
-  frame applied to node facts shared by every move rewriting that node
-  kind. Kernels, meaning and gated already are (`gated-plant`,
-  `Wrote.wr-kernels`). `queue` needs the orphaned subscribers named in
-  the invariant first. One pass, then one gate.
+- **ONE FRAME, CHECKED.** The replant frame is written, unchecked:
+  `Walk` in Shift walks a node replanted at any depth up to the root,
+  `revive`, `told`, `Behind` and `Ties` over it, and Replant's `owned`,
+  `behind` and `lingers` are bodies over it with `Fork` for the rest of
+  the tree. Gate it. Decides whether the premise its ancestors read
+  (part revived, `untold` kept, leftover pinned, `Ended`) suffices, or
+  which ancestor needs more: the new leaves `heads-flat`, `untold-shut`,
+  `rest-sourced`, `ended-past` are where it said not.
+- **EVERY CELL A FRAME.** `queue` is the last column not folded:
+  `wr-queue` is stated bare, because `Joined`'s `Silenced` clause reads
+  every flag cell and no premise of the node's names that. Name the
+  orphaned subscribers in the invariant, then frame it as `owned` is.
 - **GHOSTS AND STACKS.** The `*-ghost`, `*-stack` and `*-alone` cells
   are columns too; fold them the same way once the first two land.
 - **NODE FACTS, FALSITY FIRST.** Only now discharge: the node facts the
@@ -256,22 +253,6 @@ by their own silent steps (`Mirror`).
   zero exactly when no lane is live.
 - **`pool-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: an outer ended with lanes
   or a queue left: the pool restaged, the ghost past the outer's skip.
-- **`pool-calls`** (Climbs) — FALSITY, `NO EVIDENCE`: the calls owed carry
-  across a flatMap's pool restaged.
-- **`pool-stack`** (Climbs) — FALSITY, `NO EVIDENCE`: a stack against the tree
-  stands against it with a flatMap's pool restaged.
-- **`pool-ticked`** (Climbs) — FALSITY, `NO EVIDENCE`: the stack ticks as it
-  did with a flatMap's pool restaged.
-- **`pool-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds with a
-  flatMap's pool restaged.
-- **`pool-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
-  sooner than the run with a flatMap's pool restaged.
-- **`sd-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
-  flag leaves `Owned`.
-- **`sd-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: writing a flatMap's done
-  flag leaves `Queue`.
-- **`fr-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves
-  `Owned`.
 - **`fr-holds`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's kernel holds
   with a lane ended and the count down.
 - **`fr-gated`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's gate holds with
@@ -280,16 +261,6 @@ by their own silent steps (`Mirror`).
   lane ended.
 - **`fr-spent`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's spent holds
   with a lane's cut and the count written.
-- **`fr-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves
-  `Queue`.
-- **`fr-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end leaves every
-  part's head.
-- **`dq-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves
-  `Owned`.
-- **`dq-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves
-  `Queue`.
-- **`dq-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue write leaves every
-  part's head.
 - **`take1-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a held takeWhile's
   completion begun under its failing value, its cut the frame's rest.
 - **`take1-void`** (Climbs) — FALSITY, `NO EVIDENCE`: a hidden takeWhile's
@@ -312,21 +283,8 @@ by their own silent steps (`Mirror`).
   end, an `of` in its body: the body shut steps as it does, shut after.
 - **`emit-run`** (Lift) — FALSITY, `NO EVIDENCE`: an open `of`'s value handed
   on under its scope, the climb starts aloft.
-- **`end-stack`** (Climbs) — FALSITY, `NO EVIDENCE`: a stack against the tree
-  stands against it with a take restaged `ending`.
-- **`end-ticked`** (Climbs) — FALSITY, `NO EVIDENCE`: the restaged stack ticks
-  as the stack did.
-- **`end-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds of the take
-  restaged `ending`, its completion the one call owed.
-- **`end-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
-  sooner than the run with a take restaged `ending`.
 - **`end-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: the tree with a take
   restaged `ending` has a sane, placed part meaning what the ghost did.
-- **`out-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds of the take
-  restaged `ending`, its completion owed in the frame its failing value runs
-  under.
-- **`out-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: `Queue` survives a take
-  restaged `ending`, the run gone under `ix 0`.
 - **`out-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
   sooner than the run under `ix 0` with a take restaged `ending`.
 - **`void-site`** (Lift) — FALSITY, `DEAD ROUTE`: an `of` the ghost does not
@@ -351,26 +309,12 @@ by their own silent steps (`Mirror`).
   pool taking the lane's last ghost rested, keeps every tie.
 - **`next-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end with a
   value queued, the queue's head taken, keeps every tie.
-- **`end-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a take restaged `ending`
-  over its source's part keeps every tie.
-- **`sd-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's done flag
-  written as it ends keeps every tie.
-- **`pool-idle`** (Climbs) — FALSITY, `NO EVIDENCE`: a pool joined with idle
-  keeps every tie.
 - **`bg-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane begun in the grown
   world keeps every tie.
-- **`fr-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane freed as its
-  flatMap ends keeps every tie.
-- **`fed-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's feed
-  restaged keeps every tie.
-- **`fin-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's finish
-  staged keeps every tie.
 - **`fire-lingers`** (Lift) — FALSITY, `NO EVIDENCE`: a timer fired keeps every
   tie.
 - **`torn-lingers`** (Lift) — FALSITY, `NO EVIDENCE`: what a teardown reached
   keeps every tie.
-- **`scan-lingers`** (Frame) — FALSITY, `NO EVIDENCE`: a write at a scan's
-  accumulator keeps every tie.
 - **`grow-lingers`** (Restage) — FALSITY, `NO EVIDENCE`: a growth keeps every
   tie, weakened.
 - **`up-lanes`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap above a written
@@ -388,32 +332,12 @@ by their own silent steps (`Mirror`).
   was seen before, to a node alike or above the scan.
 - **`scan-defined`** (Frame) — FALSITY, `NO EVIDENCE`: whether a node has a
   part never reads an accumulator.
-- **`scan-owned`** (Frame) — FALSITY, `NO EVIDENCE`: `Owned` survives a write
-  at a scan's accumulator.
-- **`scan-queue`** (Frame) — FALSITY, `NO EVIDENCE`: `Queue` survives a write
-  at a scan's accumulator.
 - **`src-idle`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's source signals
   its subject only with no feed under way.
 - **`fed-ghost`** (Climbs) — FALSITY, `DEAD ROUTE`: the tree with a feed
   restaged has a sane, placed part, the ghost past the source's skip.
-- **`fed-stack`** (Climbs) — FALSITY, `NO EVIDENCE`: a stack against the tree
-  stands against it with a connect's feed restaged.
-- **`fed-ticked`** (Climbs) — FALSITY, `NO EVIDENCE`: the stack ticks as it did
-  with a connect's feed restaged.
-- **`fed-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds with a feed
-  restaged, the feed the one call owed.
-- **`fed-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
-  sooner than the run with a connect's feed restaged.
-- **`fin-calls`** (Climbs) — FALSITY, `NO EVIDENCE`: the calls owed carry
-  across a connect's subject closed and its finish staged.
 - **`fin-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: the tree with a finish
   staged has a sane, placed part, the ghost past the source's skip.
-- **`fin-stack`** (Climbs) — FALSITY, `NO EVIDENCE`: a stack against the tree
-  stands against it with a connect's finish staged.
-- **`fin-ticked`** (Climbs) — FALSITY, `NO EVIDENCE`: the stack ticks as it did
-  with a connect's finish staged.
-- **`fin-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds with a
-  finish staged, the finish ahead of the calls owed.
 - **`fin-holds`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's kernel reads
   its subject's closed flag nowhere.
 - **`fin-gated`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's gate reads its
@@ -422,10 +346,6 @@ by their own silent steps (`Mirror`).
   subject's closed flag nowhere.
 - **`fin-spent`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's spent reads
   its subject's closed flag nowhere.
-- **`fin-queue`** (Climbs) — FALSITY, `NO EVIDENCE`: `Queue` survives a
-  connect's subject closed and its finish staged.
-- **`fin-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no
-  sooner than the run with a connect's finish staged.
 - **`emit-shut`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` whose observer path
   is closed skips its value or its end.
 - **`sub-cold`** (Lift) — FALSITY, `NO EVIDENCE`: a cold begun registers its
@@ -487,6 +407,58 @@ by their own silent steps (`Mirror`).
   open to play or closed and dropped.
 - **`burst-play`** (Lift) — FALSITY, `NO EVIDENCE`: a polled burst's frame
   played, a value run on, a stall passed, a close scheduled.
+- **`ended-past`** (Frame) — FALSITY, `NO EVIDENCE`: a connect held past its
+  source's end holds no source part, at every call under way.
+- **`heads-flat`** (Shift) — FALSITY, `NO EVIDENCE`: a flatMap's merged part
+  heads no sooner than `q` whenever its outer's and its lanes' do.
+- **`untold-shut`** (Shift) — FALSITY, `NO EVIDENCE`: shutting a body's head
+  input leaves what it has not told every other input.
+- **`rest-sourced`** (Shift) — FALSITY, `NO EVIDENCE`: a connect's leftover over
+  a source running on either side, pinned as its source's.
+- **`wr-queue`** (Replant) — FALSITY, `NO EVIDENCE`: a write at a node's own
+  names leaves `Queue`.
+- **`rehome`** (Replant) — FALSITY, `NO EVIDENCE`: a call aimed anywhere in the
+  tree aimed alike after a kin replanted.
+- **`recold`** (Replant) — FALSITY, `NO EVIDENCE`: a cold reached in the tree
+  reached alike after a kin replanted.
+- **`owned-run`** (Replant) — FALSITY, `NO EVIDENCE`: the kin's own call ahead
+  of the run's carries `Owned` across the replant.
+- **`ahead-under`** (Replant) — FALSITY, `NO EVIDENCE`: every timer past a
+  position past one of its children.
+- **`end-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: a take ended keeps its
+  own heads, its part the source's.
+- **`end-lingering`** (Climbs) — FALSITY, `NO EVIDENCE`: a take ended keeps its
+  own ties, `ending` owing what the source left.
+- **`pool-idling`** (Climbs) — FALSITY, `NO EVIDENCE`: a pool joined with an
+  idle one ties what it tied.
+- **`sd-lingering`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap gone holds no
+  pool of it.
+- **`close-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: an outer closed, the
+  pool's heads where the outer's were.
+- **`dq-gone`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue's head taken off
+  revives no part and no take.
+- **`fr-gone`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's cut and the count
+  revive no part and no take.
+- **`fr-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane freed keeps the
+  flatMap's heads.
+- **`fr-lingering`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane freed as its
+  flatMap ends keeps its ties.
+- **`settle-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: the pool taking what
+  a lane ran heads where the lane did.
+- **`next-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: the queue's head taken
+  off, the flatMap heads as it did.
+- **`fed-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's feed
+  restaged keeps its own heads, the joiners retold.
+- **`fed-lingering`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's feed
+  restaged keeps its own ties.
+- **`fin-gone`** (Climbs) — FALSITY, `NO EVIDENCE`: a subject's closed flag
+  revives no part and no take.
+- **`fin-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's finish
+  staged keeps its own heads.
+- **`fin-lingering`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's finish
+  staged keeps its own ties.
+- **`scan-lingering`** (Climbs) — FALSITY, `NO EVIDENCE`: a write at a scan's
+  accumulator keeps the scan's ties.
 - **`placing`** (Adequacy) — FALSITY, `NO EVIDENCE`: an ascending record alike
   a program's events as a set is placed against them.
 - **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never

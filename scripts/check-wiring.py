@@ -1158,12 +1158,15 @@ def eta_target(inner):
 
 def is_module_app(tokens):
     """`module V = M …` or, parameterised, `module V (x : T) = M …`: an
-    `=` on the header line before any `where`."""
+    `=` on the header line before any `where`, outside every bracket: a
+    named implicit in a parameter's type (`(p : P {B = ⊤} x)`) is not one."""
+    depth = 0
     for t in tokens[2:]:
-        if t == "where":
+        if depth == 0 and t == "where":
             return False
-        if t == "=":
+        if depth == 0 and t == "=":
             return True
+        depth += t.count("(") + t.count("{") - t.count(")") - t.count("}")
     return False
 
 
