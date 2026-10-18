@@ -1455,17 +1455,213 @@ module Restaging (R : Set) where
                     ≗ compile s E″ υ′ (Here.obs (walk (wkPath τ π) top)) (Here.kont (walk (wkPath τ π) top))
     code-grow π {u} E′ υ e = u , E′ , υ ⨾ τ , env-grow π E′ υ e , ≗-refl _
 
+    -- A node of the grown tree held where it is a flatMap, or a
+    -- connect: the weakening of one, which the old tree held.
+    data FlatBack {Δ′ B′} : Sub v Δ′ B′ → Sub h Δ′ B′ → Set₁ where
+      flat-back : ∀ {A′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+                → FlatBack (wkTree τ (flatMapˢ op f fl oc k r pl so ls)) (flatMapˢ op f fl oc k r pl so ls)
+
+    data ConnBack {Δ′ B′} : Sub v Δ′ B′ → Sub h Δ′ B′ → Set₁ where
+      conn-back : ∀ {A′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+                → ConnBack (wkTree τ (connectˢ S c b kb k fd rp e rt src bd)) (connectˢ S c b kb k fd rp e rt src bd)
+
+    flat-inv : ∀ {Δ′ A′ B′} {op f fl′ oc′ k′ r′ pl} {so′ : Sub v Δ′ A′} {ls′ : List (Lane v Δ′ B′)} (x : Sub h Δ′ B′)
+             → flatMapˢ op f fl′ oc′ k′ r′ pl so′ ls′ ≡ wkTree τ x → FlatBack (flatMapˢ op f fl′ oc′ k′ r′ pl so′ ls′) x
+    flat-inv (flatMapˢ op f fl oc k r pl so ls)     refl = flat-back
+    flat-inv (pendingˢ s q)                         ()
+    flat-inv (coldˢ s hd ph)                        ()
+    flat-inv (ofˢ p i xs)                           ()
+    flat-inv doneˢ                                  ()
+    flat-inv (mapˢ f s)                             ()
+    flat-inv (scanˢ f r s)                          ()
+    flat-inv (takeWhileˢ i p c k tk s)              ()
+    flat-inv (connectˢ S c b kb k fd rp e rt src bd) ()
+    flat-inv (joinˢ j sk l x st)                    ()
+    flat-inv (deferˢ k s)                           ()
+
+    conn-inv : ∀ {Δ′ A′ B′} {S′ c′ b′ kb′ k′ fd′ rp e rt} {src′ : Sub v Δ′ A′} {bd′ : Sub v (A′ ∷ Δ′) B′} (x : Sub h Δ′ B′)
+             → connectˢ S′ c′ b′ kb′ k′ fd′ rp e rt src′ bd′ ≡ wkTree τ x → ConnBack (connectˢ S′ c′ b′ kb′ k′ fd′ rp e rt src′ bd′) x
+    conn-inv (connectˢ S c b kb k fd rp e rt src bd) refl = conn-back
+    conn-inv (pendingˢ s q)                         ()
+    conn-inv (coldˢ s hd ph)                        ()
+    conn-inv (ofˢ p i xs)                           ()
+    conn-inv doneˢ                                  ()
+    conn-inv (mapˢ f s)                             ()
+    conn-inv (scanˢ f r s)                          ()
+    conn-inv (takeWhileˢ i p c k tk s)              ()
+    conn-inv (flatMapˢ op f fl oc k r pl so ls)     ()
+    conn-inv (joinˢ j sk l x st)                    ()
+    conn-inv (deferˢ k s)                           ()
+
     module _ {H : Heapᴹ h} {H′ : Heapᴹ v} (gr : Grows τ H H′) where
+      private
+        cells : ∀ {t} (x : Ref h t) → At.val H′ (wkR τ x) ≡ wkEl t τ (At.val H x)
+        cells = Grows.cells gr
+
+        -- The heap-free combinators read alike from either heap.
+        mapᴹ-≡ : ∀ {X Y : Set₁} (f : X → Y) m → At.mapᴹ H′ f m ≡ At.mapᴹ H f m
+        mapᴹ-≡ f nothing  = refl
+        mapᴹ-≡ f (just _) = refl
+
+        consᴹ-≡ : ∀ {X : Set₁} (m : Maybe X) xs → At.consᴹ H′ m xs ≡ At.consᴹ H m xs
+        consᴹ-≡ nothing  xs = refl
+        consᴹ-≡ (just _) xs = refl
+
+        merged-≡ : ∀ {Δ A B} op (g : A → Pos → U.Node Δ B) o L Q pl → At.merged H′ op g o L Q pl ≡ At.merged H op g o L Q pl
+        merged-≡ op g nothing  []      []      pl = refl
+        merged-≡ op g nothing  []      (_ ∷ _) pl = refl
+        merged-≡ op g nothing  (_ ∷ _) Q       pl = refl
+        merged-≡ op g (just _) L       Q       pl = refl
+
+        connected-≡ : ∀ {Δ A B} r (e : Maybe Pos) (t : U.Node Δ A) s (mb : Maybe (U.Node (A ∷ Δ) B))
+                    → At.connected H′ r e t s mb ≡ At.connected H r e t s mb
+        connected-≡ r e        t s        nothing  = refl
+        connected-≡ r e        t (just _) (just _) = refl
+        connected-≡ r (just _) t nothing  (just _) = refl
+        connected-≡ r nothing  t nothing  (just _) = refl
+
+        joinedᶜ-≡ : ∀ {Δ A} (x : A ∈ Δ) j st → At.joinedᶜ H′ x j st ≡ At.joinedᶜ H x j st
+        joinedᶜ-≡ x j nothing  = refl
+        joinedᶜ-≡ x j (just _) = refl
+
+        taking?-≡ : ∀ {Δ A} i p tk (s : Maybe (U.Node Δ A)) → At.taking? H′ i p tk s ≡ At.taking? H i p tk s
+        taking?-≡ i p taking       s = mapᴹ-≡ (U.takeWhileᶜ i p) s
+        taking?-≡ i p (ending k c) s = refl
+        taking?-≡ i p taken        s = refl
+
+        sourced-≡ : ∀ {Δ A} (s : Maybe (U.Node Δ A)) t → At.sourced H′ s t ≡ At.sourced H s t
+        sourced-≡ (just _) t = refl
+        sourced-≡ nothing  t = refl
+
+      -- The open part, read through the weakening.
+      mutual
+        grow-part : ∀ {Δ A} (u : Sub h Δ A) → At.part H′ (wkTree τ u) ≡ At.part H u
+        grow-part (pendingˢ s q)                 = refl
+        grow-part (coldˢ s hd ph)                = cong (λ b → if b then nothing else _) (Grows.handles gr hd)
+        grow-part (ofˢ p i xs)                   = refl
+        grow-part doneˢ                          = refl
+        grow-part (mapˢ f s)                     = trans (cong (At.mapᴹ H′ (U.mapᶜ f)) (grow-part s)) (mapᴹ-≡ (U.mapᶜ f) (At.part H s))
+        grow-part (scanˢ f r s)                  =
+          trans (cong₂ (λ a m → At.mapᴹ H′ (U.scanᶜ f a) m) (cells r) (grow-part s)) (mapᴹ-≡ (U.scanᶜ f (At.val H r)) (At.part H s))
+        grow-part (takeWhileˢ i p c k tk s)      =
+          trans (cong₂ (λ b m → if b then At.taking? H′ i p tk m else nothing) (cells (Kit.live c)) (grow-part s))
+                (cong (λ m → if At.val H (Kit.live c) then m else nothing) (taking?-≡ i p tk (At.part H s)))
+        grow-part (flatMapˢ op f fl oc k r pl so ls) =
+          trans (cong₂ (λ o L → At.merged H′ op (λ a q → U.subscribe (f a) q) o L (At.val H′ (wkR τ (FlatKit.Flat.queue fl))) pl) (grow-part so) (grow-partᴸ ls))
+                (trans (cong (λ Q → At.merged H′ op (λ a q → U.subscribe (f a) q) (At.part H so) (At.partLanes H ls) Q pl) (cells (FlatKit.Flat.queue fl)))
+                       (merged-≡ op (λ a q → U.subscribe (f a) q) (At.part H so) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl))
+        grow-part (connectˢ S c b kb k fd rp e rt src bd) =
+          trans (cong₂ (At.connected H′ rp e rt) (grow-part src) (grow-part bd)) (connected-≡ rp e rt (At.part H src) (At.part H bd))
+        grow-part (joinˢ j sk l x st)            =
+          trans (cong (λ b → if b then At.joinedᶜ H′ x j st else nothing) (cells l)) (cong (λ m → if At.val H l then m else nothing) (joinedᶜ-≡ x j st))
+        grow-part (deferˢ k s)                   = grow-part s
+
+        grow-partᴸ : ∀ {Δ B} (ls : List (Lane h Δ B)) → At.partLanes H′ (wkLanes τ ls) ≡ At.partLanes H ls
+        grow-partᴸ []                = refl
+        grow-partᴸ (lane c k s ∷ ls) =
+          trans (cong₂ (λ b L → if b then At.consᴹ H′ (At.part H′ (wkTree τ s)) L else L) (cells (Kit.live c)) (grow-partᴸ ls))
+                (cong (λ m → if At.val H (Kit.live c) then m else At.partLanes H ls)
+                      (trans (cong (λ m → At.consᴹ H′ m (At.partLanes H ls)) (grow-part s)) (consᴹ-≡ (At.part H s) (At.partLanes H ls))))
+
+      -- What the weakened tree leaves running, and what its pools run.
+      mutual
+        leftover-wk : ∀ {Δ A B} (u : Sub h Δ A) → At.leftover H′ {B = B} (wkTree τ u) ≡ At.leftover H {B = B} u
+        leftover-wk (pendingˢ s q)                     = refl
+        leftover-wk (coldˢ s hd ph)                    = refl
+        leftover-wk (ofˢ p i xs)                       = refl
+        leftover-wk doneˢ                              = refl
+        leftover-wk (mapˢ f s)                         = leftover-wk s
+        leftover-wk (scanˢ f r s)                      = leftover-wk s
+        leftover-wk (takeWhileˢ i p c k tk s)          = leftover-wk s
+        leftover-wk (flatMapˢ op f fl oc k r pl so ls) = cong₂ U.unionᶜ (leftover-wk so) (leftover-wkᴸ ls)
+        leftover-wk (connectˢ S c b kb k fd rp e rt src bd) =
+          cong₂ (λ n l → U.unionᶜ (U.burstingᶜ rp n) (U.underᶜ (U.live n) l))
+                (trans (cong₂ (At.sourced H′) (grow-part src) (leftover-wk src)) (sourced-≡ (At.part H src) (At.leftover H src)))
+                (leftover-wk {B = ⊤} bd)
+        leftover-wk (joinˢ j sk l x st)                = refl
+        leftover-wk (deferˢ k s)                       = leftover-wk s
+
+        leftover-wkᴸ : ∀ {Δ A B} (ls : List (Lane h Δ A)) → At.leftoverL H′ {B = B} (wkLanes τ ls) ≡ At.leftoverL H {B = B} ls
+        leftover-wkᴸ []                = refl
+        leftover-wkᴸ (lane c k s ∷ ls) = cong₂ U.unionᶜ (leftover-wk s) (leftover-wkᴸ ls)
+
+      pooled-wkᴸ : ∀ {Δ A B} (ls : List (Lane h Δ A)) → At.pooledL H′ {B = B} (wkLanes τ ls) ≡ At.pooledL H {B = B} ls
+      pooled-wkᴸ []                = refl
+      pooled-wkᴸ (lane c k s ∷ ls) =
+        trans (cong₂ (λ b P → if b then P else U.unionᶜ (At.leftover H′ (wkTree τ s)) P) (cells (Kit.live c)) (pooled-wkᴸ ls))
+              (cong (λ x → if At.val H (Kit.live c) then At.pooledL H ls else U.unionᶜ x (At.pooledL H ls)) (leftover-wk s))
+
+      pooled-wk : ∀ {Δ A B} (fl : FlatKit.Flat A h) (so : Sub h Δ A) (ls : List (Lane h Δ B))
+                → At.pooled H′ (FlatKit.wkFlat τ fl) (wkTree τ so) (wkLanes τ ls) ≡ At.pooled H fl so ls
+      pooled-wk fl so ls =
+        cong₂ U.unionᶜ (trans (cong (λ b → if b then At.leftover H′ (wkTree τ so) else U.idleᶜ) (cells (FlatKit.Flat.outerDone fl)))
+                              (cong (λ x → if At.val H (FlatKit.Flat.outerDone fl) then x else U.idleᶜ) (leftover-wk so)))
+                       (pooled-wkᴸ ls)
+
+      -- A path through the weakened tree is the weakening of one through
+      -- the old, seen alike.
+      mutual
+        unwk : ∀ {Δ A Δ′ A′} (t : Sub h Δ A) {x′ : Sub v Δ′ A′} (ψ′ : Path (wkTree τ t) x′)
+             → Σ (Sub h Δ′ A′) λ x → Σ (Path t x) λ ψ → x′ ≡ wkTree τ x × seen H′ ψ′ ≡ seen H ψ
+        unwk (pendingˢ s q)                     here = _ , here , refl , refl
+        unwk (coldˢ s hd ph)                    here = _ , here , refl , refl
+        unwk (ofˢ p i xs)                       here = _ , here , refl , refl
+        unwk doneˢ                              here = _ , here , refl , refl
+        unwk (joinˢ j sk l x st)                here = _ , here , refl , refl
+        unwk (mapˢ f s)                         here = _ , here , refl , refl
+        unwk (mapˢ f s)                         (in-map ψ′) = let x , ψ , e , sn = unwk s ψ′ in x , in-map ψ , e , sn
+        unwk (scanˢ f r s)                      here = _ , here , refl , refl
+        unwk (scanˢ f r s)                      (in-scan ψ′) = let x , ψ , e , sn = unwk s ψ′ in x , in-scan ψ , e , sn
+        unwk (takeWhileˢ i p c k tk s)          here = _ , here , refl , refl
+        unwk (takeWhileˢ i p c k tk s)          (in-take ψ′) =
+          let x , ψ , e , sn = unwk s ψ′ in x , in-take ψ , e , cong₂ _∧_ (cells (Kit.live c)) (cong (isTaking tk ∧_) sn)
+        unwk (flatMapˢ op f fl oc k r pl so ls) here = _ , here , refl , refl
+        unwk (flatMapˢ op f fl oc k r pl so ls) (in-outer ψ′) = let x , ψ , e , sn = unwk so ψ′ in x , in-outer ψ , e , sn
+        unwk (flatMapˢ op f fl oc k r pl so ls) (in-lanes ψ′) = let x , ψ , e , sn = unwkᴸ ls ψ′ in x , in-lanes ψ , e , sn
+        unwk (connectˢ S c b kb k fd rp e rt src bd) here = _ , here , refl , refl
+        unwk (connectˢ S c b kb k fd rp e rt src bd) (in-source ψ′) =
+          let x , ψ , eq , sn = unwk src ψ′ in x , in-source ψ , eq , cong₂ _∧_ (cong is-just (grow-part bd)) sn
+        unwk (connectˢ S c b kb k fd rp e rt src bd) (in-body ψ′) =
+          let x , ψ , eq , sn = unwk bd ψ′ in x , in-body ψ , eq , cong₂ _∧_ (cong (λ z → is-just z ∨ is-just e) (grow-part src)) sn
+        unwk (deferˢ k s)                       here = _ , here , refl , refl
+        unwk (deferˢ k s)                       (in-defer ψ′) = let x , ψ , e , sn = unwk s ψ′ in x , in-defer ψ , e , sn
+
+        unwkᴸ : ∀ {Δ B Δ′ A′} (ls : List (Lane h Δ B)) {x′ : Sub v Δ′ A′} (ψ′ : PathLanes (wkLanes τ ls) x′)
+              → Σ (Sub h Δ′ A′) λ x → Σ (PathLanes ls x) λ ψ → x′ ≡ wkTree τ x × seenL H′ ψ′ ≡ seenL H ψ
+        unwkᴸ (lane c k s ∷ ls) (this-lane ψ′) = let x , ψ , e , sn = unwk s ψ′ in x , this-lane ψ , e , cong₂ _∧_ (cells (Kit.live c)) sn
+        unwkᴸ (lane c k s ∷ ls) (next-lane ψ′) = let x , ψ , e , sn = unwkᴸ ls ψ′ in x , next-lane ψ , e , sn
+
+      grow-each : ∀ {t : Sub h [] R} {P : ∀ {Γ A} → U.Node Γ A → Set} → Each H P t → Each H′ P (wkTree τ t)
+      Each.parts (grow-each {t = t} E) ψ′ sn {c} eq =
+        let x , ψ , e , s = unwk t ψ′ in
+        Each.parts E ψ (trans (sym s) sn) (trans (sym (grow-part x)) (subst (λ z → At.part H′ z ≡ just c) e eq))
+      Each.pools (grow-each {t = t} E) {op = op} {f = f} {pl = pl} ψ′ sn eq with unwk t ψ′
+      ... | x , ψ , e , s with flat-inv x e
+      ... | flat-back {fl = fl} {oc = oc} {k = k} {r = r} {so = so} {ls = ls} =
+        Each.pools E ψ (trans (sym s) sn) (trans (sym (grow-part (flatMapˢ op f fl oc k r pl so ls))) eq)
+      Each.rests (grow-each {t = t} E) {rp = rp} {e = e₀} {rt = rt} ψ′ sn eq pn ec with unwk t ψ′
+      ... | x , ψ , e , s with conn-inv x e
+      ... | conn-back {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {src = src} {bd = bd} =
+        Each.rests E ψ (trans (sym s) sn) (trans (sym (grow-part (connectˢ S c b kb k fd rp e₀ rt src bd))) eq) (trans (sym (grow-part src)) pn) ec
+
+      grow-lingers : ∀ {t : Sub h [] R} → Lingers H t → Lingers H′ (wkTree τ t)
+      Lingers.pools (grow-lingers {t = t} L) {op = op} {f = f} {pl = pl} ψ′ sn eq with unwk t ψ′
+      ... | x , ψ , e , s with flat-inv x e
+      ... | flat-back {fl = fl} {oc = oc} {k = k} {r = r} {so = so} {ls = ls} =
+        subst (Tied pl) (sym (pooled-wk fl so ls)) (Lingers.pools L ψ (trans (sym s) sn) (trans (sym (grow-part (flatMapˢ op f fl oc k r pl so ls))) eq))
+      Lingers.rests (grow-lingers {t = t} L) {rp = rp} {e = e₀} {rt = rt} ψ′ sn eq pn ec with unwk t ψ′
+      ... | x , ψ , e , s with conn-inv x e
+      ... | conn-back {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {src = src} {bd = bd} =
+        subst (Tied rt) (sym (leftover-wk {B = ⊤} src))
+              (Lingers.rests L ψ (trans (sym s) sn) (trans (sym (grow-part (connectˢ S c b kb k fd rp e₀ rt src bd))) eq) (trans (sym (grow-part src)) pn) ec)
+
       postulate
-        grow-part    : ∀ {Δ A} (u : Sub h Δ A) → At.part H′ (wkTree τ u) ≡ At.part H u
         grow-owned   : ∀ {t : Sub h [] R} {w} {σ : w ⊑ h} {K bs} {Δ A s q} {π : Path t (pendingˢ {Δ = Δ} {A} s q)} {act act′ cd cd′}
                          (sk : StackAs t q σ K bs) {a a′}
                      → Owned H t (subAs {act = act} π cd sk a) → Owned H′ (wkTree τ t) (subAs {act = act′} (wkPath τ π) cd′ (grow-stack sk) a′)
         grow-kernels : ∀ {t : Sub h [] R} → Kernels H t → Kernels H′ (wkTree τ t)
         grow-meaning : ∀ {t : Sub h [] R} → Meaning H t → Meaning H′ (wkTree τ t)
         grow-queue   : ∀ {t : Sub h [] R} {p clk ts} → Queue H p clk ts t → Queue H′ p clk (mapList (wkTimer τ) ts) (wkTree τ t)
-        grow-each    : ∀ {t : Sub h [] R} {P : ∀ {Γ A} → U.Node Γ A → Set} → Each H P t → Each H′ P (wkTree τ t)
-        grow-lingers : ∀ {t : Sub h [] R} → Lingers H t → Lingers H′ (wkTree τ t)
 
   postulate
     -- An allocation grows the world and moves nothing.

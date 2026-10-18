@@ -181,7 +181,8 @@ by their own silent steps (`Mirror`).
   `Walk` in Shift walks a node replanted at any depth up to the root,
   `revive`, `told`, `Behind` and `Ties` over it, and Replant's `owned`,
   `behind` and `lingers` are bodies over it with `Fork` for the rest of
-  the tree. Gate it. Decides whether the premise its ancestors read
+  the tree; the growth frame's `part`, `each` and `lingers` are bodies by
+  `unwk`, a path through the weakened tree read back. Gate both. Decides whether the premise its ancestors read
   (part revived, `untold` kept, leftover pinned, `Ended`) suffices, or
   which ancestor needs more: the new leaves `heads-flat`, `untold-shut`,
   `rest-sourced`, `ended-past` are where it said not.
@@ -315,8 +316,6 @@ by their own silent steps (`Mirror`).
   tie.
 - **`torn-lingers`** (Lift) — FALSITY, `NO EVIDENCE`: what a teardown reached
   keeps every tie.
-- **`grow-lingers`** (Restage) — FALSITY, `NO EVIDENCE`: a growth keeps every
-  tie, weakened.
 - **`up-lanes`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap above a written
   scan in one of its lanes heads no sooner than that lane's part.
 - **`up-outer`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap above a written
@@ -362,8 +361,7 @@ by their own silent steps (`Mirror`).
 - **`grow-stack`, `grow-alone`, `grow-ticked`** (Restage) — FALSITY,
   `NO EVIDENCE`: the stack, its sources and its ticks carried across a
   weakening.
-- **`grow-part`, `grow-owned`, `grow-kernels`, `grow-meaning`, `grow-queue`,
-  `grow-each`** (Restage) — FALSITY, `NO EVIDENCE`: what the relation reads of
+- **`grow-owned`, `grow-kernels`, `grow-meaning`, `grow-queue`** (Restage) — FALSITY, `NO EVIDENCE`: what the relation reads of
   a tree it reads of the tree weakened into a grown heap.
 - **`scan-fresh`** (Restage) — FALSITY, `NO EVIDENCE`: a scan's new accumulator
   is a name the tree did not hold.
