@@ -50,7 +50,7 @@ module Planting (R : Set) where
   open Strongly.Against R using (CtlAs; StackAs; BurstAs; subAs; bottomAs; restAs; backAs; reholdAs; Held; bottomᴴ; restᴴ; playsAs; firesAs; overAs; stackJobs; SrcOf; src-of; Ticked; BurstClocked; sources; burstSpots; stackBursts; Placed; agenda)
   open Strongly.Phase R using (playing; fired)
   open Moving R using (plant; planted; part-plant; same; same-take; same-connect)
-  open Forking R using (ExtS; Lands; SrcAt; apart; below; emit-code; exts; exts-apart; fork; kont-code; lands-apart; lands-below; lands-planted; lands-unique; leaf-below; sources-mem; src-at; src-code; src-mem; src-spot; take1-code)
+  open Forking R using (ExtS; Lands; SrcAt; apart; below; emit-code; exts; exts-apart; exts-body; exts-src; fork; kont-code; lands-apart; lands-below; lands-planted; lands-unique; leaf-below; sources-mem; src-at; src-code; src-mem; src-spot; take1-code)
   open Keeping R using (keep)
 
   ------------------------------------------------------------------------
