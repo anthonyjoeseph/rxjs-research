@@ -1689,9 +1689,9 @@ module Ascending (R : Set) where
         leftL (lane c′ k′ s ∷ ls′) em = cong₂ U.unionᶜ (leftover-alike H H′ s (under (em (this-lane here)))) (leftL ls′ (λ π → em (next-lane π)))
         lanes-lg : LingersL H ls → LingersL H′ ls
         lanes-lg lL = record
-          { poolsL = λ πL sn e → pinned-trans (LingersL.poolsL lL πL (seL πL sn) (trans (sym (pt πL)) e)) (pin-alike (pooled-from H H′ (λ m → m) (under πL)))
-          ; restsL = λ πL sn e pn pe → pinned-trans (LingersL.restsL lL πL (seL πL sn) (trans (sym (pt πL)) e) (trans (sym (pt (πL ⊕ᴸ in-source here))) pn) pe)
-                                                    (pin-alike (leftover-from H H′ {B = ⊤} (λ m → m) (under (πL ⊕ᴸ in-source here)))) }
+          { poolsL = λ {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} πL sn e → pinned-trans (LingersL.poolsL lL πL (seL πL sn) (trans (sym (pt πL)) e)) (pin-alike (pooled-from H H′ {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} (λ m → m) (under πL)))
+          ; restsL = λ {src = src₀} πL sn e pn pe → pinned-trans (LingersL.restsL lL πL (seL πL sn) (trans (sym (pt πL)) e) (trans (sym (pt (πL ⊕ᴸ in-source here))) pn) pe)
+                                                    (pin-alike (leftover-from H H′ {x = src₀} {B = ⊤} (λ m → m) (under (πL ⊕ᴸ in-source here)))) }
 
     module Wr (fs : AllPairs _≢_ (names T)) = Wrote H H′ ρ fr-off fr-mine fs
     module Sh (fs : AllPairs _≢_ (names T)) = Shift H H′ ρ fr-off fr-mine fs

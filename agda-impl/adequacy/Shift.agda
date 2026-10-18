@@ -331,18 +331,18 @@ module Shifting (R : Set) where
 
     lingers-alike : ∀ {Δ A} {t : Sub h Δ A} → Alike H H′ (names t) → Lingers H t → Lingers H′ t
     lingers-alike {t = t} al lg = record
-      { pools = λ ψ sn e → pinned-trans (Lingers.pools lg ψ (se ψ sn) (trans (sym (part-at ψ al)) e)) (pin-alike (pooled-from (λ m → names-path ψ m) al))
-      ; rests = λ ψ sn e pn pe → pinned-trans (Lingers.rests lg ψ (se ψ sn) (trans (sym (part-at ψ al)) e) (trans (sym (part-at (ψ ⊕ in-source here) al)) pn) pe)
-                                              (pin-alike (leftover-from {B = ⊤} (λ m → names-path (ψ ⊕ in-source here) m) al)) }
+      { pools = λ {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} ψ sn e → pinned-trans (Lingers.pools lg ψ (se ψ sn) (trans (sym (part-at ψ al)) e)) (pin-alike (pooled-from {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} (λ m → names-path ψ m) al))
+      ; rests = λ {src = src₀} ψ sn e pn pe → pinned-trans (Lingers.rests lg ψ (se ψ sn) (trans (sym (part-at ψ al)) e) (trans (sym (part-at (ψ ⊕ in-source here) al)) pn) pe)
+                                              (pin-alike (leftover-from {x = src₀} {B = ⊤} (λ m → names-path (ψ ⊕ in-source here) m) al)) }
       where
         se : ∀ {Δ′ A′} {x : Sub h Δ′ A′} (ψ : Path t x) → seen H′ ψ ≡ true → seen H ψ ≡ true
         se ψ sn = trans (sym (seen-alike H H′ ψ al)) sn
 
     lingersL-alike : ∀ {Δ B} {ls : List (Lane h Δ B)} → Alike H H′ (laneNames ls) → LingersL H ls → LingersL H′ ls
     lingersL-alike {ls = ls} al lL = record
-      { poolsL = λ πL sn e → pinned-trans (LingersL.poolsL lL πL (se πL sn) (trans (sym (partL-at πL al)) e)) (pin-alike (pooled-from (λ m → lanes-path πL m) al))
-      ; restsL = λ πL sn e pn pe → pinned-trans (LingersL.restsL lL πL (se πL sn) (trans (sym (partL-at πL al)) e) (trans (sym (partL-at (πL ⊕ᴸ in-source here) al)) pn) pe)
-                                               (pin-alike (leftover-from {B = ⊤} (λ m → lanes-path (πL ⊕ᴸ in-source here) m) al)) }
+      { poolsL = λ {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} πL sn e → pinned-trans (LingersL.poolsL lL πL (se πL sn) (trans (sym (partL-at πL al)) e)) (pin-alike (pooled-from {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} (λ m → lanes-path πL m) al))
+      ; restsL = λ {src = src₀} πL sn e pn pe → pinned-trans (LingersL.restsL lL πL (se πL sn) (trans (sym (partL-at πL al)) e) (trans (sym (partL-at (πL ⊕ᴸ in-source here) al)) pn) pe)
+                                               (pin-alike (leftover-from {x = src₀} {B = ⊤} (λ m → lanes-path (πL ⊕ᴸ in-source here) m) al)) }
       where
         se : ∀ {Δ′ A′} {x : Sub h Δ′ A′} (πL : PathLanes ls x) → seenL H′ πL ≡ true → seenL H πL ≡ true
         se πL sn = trans (sym (seenL-alike H H′ πL al)) sn
