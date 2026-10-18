@@ -350,8 +350,6 @@ by their own silent steps (`Mirror`).
 - **`of-owned`** (Restage) — FALSITY, `NO EVIDENCE`: an `of` planted where it
   was pending (an `empty` a spent one) owes its values and continuation as the
   agenda's calls.
-- **`grows-extend`** (Restage) — FALSITY, `NO EVIDENCE`: an allocation grows
-  the heap and reads every old name as it did.
 - **`walk-grow`** (Restage) — FALSITY, `NO EVIDENCE`: a walk along a weakened
   path hands the weakened observer, continuation and subjects.
 - **`compile-cong`** (Restage) — FALSITY, `NO EVIDENCE`: a compiled
@@ -359,8 +357,9 @@ by their own silent steps (`Mirror`).
 - **`grow-stack`, `grow-alone`, `grow-ticked`** (Restage) — FALSITY,
   `NO EVIDENCE`: the stack, its sources and its ticks carried across a
   weakening.
-- **`grow-owned`, `grow-kernels`, `grow-meaning`, `grow-queue`** (Restage) — FALSITY, `NO EVIDENCE`: what the relation reads of
-  a tree it reads of the tree weakened into a grown heap.
+- **`grow-owned`, `grow-holds`, `grow-joined`** (Restage) — FALSITY, `NO EVIDENCE`: the calls, the registered
+  callbacks and the silenced subscribers read along a growth as the
+  weakened kernels' — the kernels' code natural in the world.
 - **`untake`** (Restage) — FALSITY, `NO EVIDENCE`: a source heads no earlier
   than the take over it.
 - **`grew-store`** (Restage) — FALSITY, `NO EVIDENCE`: a store into a cell the

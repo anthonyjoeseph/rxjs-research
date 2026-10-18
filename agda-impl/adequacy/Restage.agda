@@ -15,6 +15,7 @@ open import Data.List.Relation.Unary.Any.Properties using () renaming (++⁻ to 
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁻ to all-++⁻)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; []; _∷_) renaming (map to pairs-map)
+open import Data.List.Relation.Unary.Linked using (Linked; []; [-]; _∷_)
 open import Data.List.Relation.Unary.AllPairs.Properties using () renaming (map⁺ to pairs-map⁺; ++⁺ to pairs-++⁺)
 open import Data.List.Relation.Binary.Permutation.Propositional using (_↭_; ↭-sym; ↭-trans; ↭-reflexive) renaming (refl to ↭-refl′; prep to ↭-prep′; swap to ↭-swap′; trans to ↭-trans′)
 open import Data.List.Relation.Binary.Permutation.Propositional.Properties using (All-resp-↭; shifts) renaming (++⁺ˡ to ↭-++⁺ˡ; ++⁺ʳ to ↭-++⁺ʳ)
@@ -30,11 +31,11 @@ open import Data.Unit using (⊤)
 open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁; tt to tt₁)
 open import Data.Bool using (Bool; _∧_; _∨_; true; false; if_then_else_)
 open import Relation.Nullary using (¬_)
-open import Level using (lift)
+open import Level using (Lift; lift; lower)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import denotation.MonotonicList using (Timeline; Frame; From; Pos; ix; last; tick; <ᵖ-below)
+open import denotation.MonotonicList using (Timeline; Frame; From; Pos; ix; last; tick; at; _<ᵖ_; <ᵖ-below) renaming (done to doneᶠᵐ; quiet to quietᶠᵐ)
 open import denotation.MonotonicList using () renaming (sub to subᴾ)
 import Tree as T
 import denotation.Unfold as U
@@ -53,23 +54,24 @@ open import operation.PureObservable using (module Pure)
 module Restaging (R : Set) where
   open Machine R using (Mach; mach; step; silent; Playing; wkPlaying; wkTodo)
   open Unsubbing R using (_⇝_; now; then; ≗-trans; wk≗; bind≗; wk-same; wkEnv-same; from-same)
-  open Growing R using (wkTree; wkLanes; wkPath)
+  open Growing R using (wkTree; wkLanes; wkPath; wkFeed)
   open Sequencing R using (wkEnv-wk; wk-wk; from-⨾; seq-done; wk∋-wk; wkEl-wk)
-  open Pure R using (Timer; wkTimer; mapList)
-  open Shared Timeline (Out R) using (Heapᴹ; ⟨_,_,_⟩; Stack; run; Val; extend; look; cbs; wkVal; store; Callbacks)
+  open Pure R using (Timer; wkTimer; mapList; cascade)
+  open Shared Timeline (Out R) using (Heapᴹ; ⟨_,_,_⟩; Stack; run; Val; extend; look; cbs; wkVal; store; Callbacks; Stored; stored; get; wkAll)
   open Heap using (World; _⊑_; _⨾_; _∋_; there; new; grow; wk∋; cell; slot; Sink; Quiet; Handle) renaming (here to hereʳ; same to same⊑)
   open Run (Pureᴾ R) using (Act; emitAll; done; newRef; under; readRef; writeRef; register; _>>ᴬ_; compile; Env; wkEnv; wkAct; module Kit; module FlatKit; Ref; wkR; wkEl; Observer; Kont; wkObs; wkKont; Subject; Subscription; wkSubn; Subscribe; wkSub)
   open Run.Kit (Pureᴾ R) using (skipᴬ)
   open Strongly R using (Carried; Books; carried; Sub; pendingˢ; ofˢ; mapˢ; takeWhileˢ; connectˢ; Lane; ending; taken; idle; feeding; finishing; bodyK; srcK
                         ; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane
                         ; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; Leaf; of-leaf; cold-leaf; done-leaf; join-leaf
-                        ; Call; emitC; kontC; Spot; spot; coldˢ; take1C; take2C; bodyC; feedC; finC; srcC; code; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; names; laneNames; pendings
+                        ; Call; emitC; kontC; Spot; spot; coldˢ; take1C; take2C; bodyC; feedC; finC; srcC; code; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; names; laneNames; pendings; rootObs
+                        ; Owes; Begun; Settled; SettledLanes; Feed; Phase; timerOf; lanePendings; subjects; joiners
                         ; Name; quietName; cutNames; flatNames; subjectNames
                         ; Pinned; unpinned; pinned-trans; pinned-sym; union-pinned; under-pinned; under-moved; bursts-pinned; bursts-moved; rest-pinned; Restful; rf-idle; rf-rest; rf-union; restful-pinned; Tied
                         ; seen; seenL; seen-⊕; isTaking; ∧-split; flatMapˢ; killAllᶜ; flatK; scanˢ; joinˢ; doneˢ; deferˢ; lane; CbRel; ≗-refl; newRef≗; taking; takeK; unsubscribing; done≗; register≗; send≗; finish≗; startCold≗; stop≗; stash≗; cancel≗; eff≗; here≗; under≗; diverge≗; unfold≗; readRef≗; writeRef≗; module Canon)
                         renaming (⟦_⟧ to ⟦_⟧ᶜ; at⟦_⟧ to at⟦_⟧ᶜ)
   open Strongly.Against R using (CtlAs; StackAs; BurstAs; subAs; runAs; bottomAs; restAs; backAs; reholdAs; Held; bottomᴴ; restᴴ; playsAs; firesAs; overAs; stackJobs; SrcOf; src-of; Ticked; BurstClocked; sources; burstSpots; stackBursts; Placed; agenda)
-  open Strongly.Phase R using (playing; fired)
+  open Strongly.Phase R using (waiting; playing; fired)
   open Moving R using (plant; plantᴸ; planted; plantedᴸ; pend; pendᴸ; syn-pos; part-plant; names-plant; holds-plant; holds-owed; settled-plant; gated-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant
                      ; Same; same; same-map; same-scan; same-take; same-flat; same-connect; same-defer; head-map; head-scan)
   open Ghosting R using (walk-⊕; _≺_; measure; firstCall; each-sub; sorted-⇝)
@@ -1499,6 +1501,90 @@ module Restaging (R : Set) where
     conn-inv (joinˢ j sk l x st)                    ()
     conn-inv (deferˢ k s)                           ()
 
+    -- What a weakened tree owes, and what it has begun.
+    owes-wk : ∀ {Δ A} (u : Sub h Δ A) → Owes (wkTree τ u) → Owes u
+    owes-wk (pendingˢ s q)                          o = o
+    owes-wk (mapˢ f s)                              o = owes-wk s o
+    owes-wk (scanˢ f r s)                           o = owes-wk s o
+    owes-wk (connectˢ S c b kb k fd rp e rt src bd) o = owes-wk src o
+    owes-wk (coldˢ s hd ph)                         ()
+    owes-wk (ofˢ p i xs)                            ()
+    owes-wk doneˢ                                   ()
+    owes-wk (takeWhileˢ i p c k tk s)               ()
+    owes-wk (flatMapˢ op f fl oc k r pl so ls)      ()
+    owes-wk (joinˢ j sk l x st)                     ()
+    owes-wk (deferˢ k s)                            ()
+
+    begun-wk : ∀ {Δ A} (k : Maybe (Quiet h)) (u : Sub h Δ A) → Begun k u → Begun (mapMaybe (wk∋ τ) k) (wkTree τ u)
+    begun-wk nothing  u _ = tt
+    begun-wk (just _) u b = λ o → b (owes-wk u o)
+
+    mutual
+      settled-wk : ∀ {Δ A} (u : Sub h Δ A) → Settled u → Settled (wkTree τ u)
+      settled-wk (pendingˢ s q)                          _                 = tt
+      settled-wk (coldˢ s hd ph)                         _                 = tt
+      settled-wk (ofˢ p i xs)                            _                 = tt
+      settled-wk doneˢ                                   _                 = tt
+      settled-wk (mapˢ f s)                              x                 = settled-wk s x
+      settled-wk (scanˢ f r s)                           x                 = settled-wk s x
+      settled-wk (takeWhileˢ i p c k tk s)               (b , x)           = begun-wk k s b , settled-wk s x
+      settled-wk (flatMapˢ op f fl oc k r pl so ls)      (b , x , y)       = begun-wk k so b , settled-wk so x , settled-wkᴸ ls y
+      settled-wk (connectˢ S c b kb k fd rp e rt src bd) (b₁ , b₂ , x , y) = begun-wk k src b₁ , begun-wk kb bd b₂ , settled-wk src x , settled-wk bd y
+      settled-wk (joinˢ j sk l x st)                     _                 = tt
+      settled-wk (deferˢ k s)                            (b , x)           = begun-wk k s b , settled-wk s x
+
+      settled-wkᴸ : ∀ {Δ B} (ls : List (Lane h Δ B)) → SettledLanes ls → SettledLanes (wkLanes τ ls)
+      settled-wkᴸ []                _           = tt
+      settled-wkᴸ (lane c k s ∷ ls) (b , x , y) = begun-wk k s b , settled-wk s x , settled-wkᴸ ls y
+
+    -- The pending frames' timers, weakened.
+    timerOf-wk : ∀ {A} (s : Sink h A) (hd : Handle h) (ph : Phase A) → timerOf (wk∋ τ s) (wk∋ τ hd) ph ≡ mapList (wkTimer τ) (timerOf s hd ph)
+    timerOf-wk s hd (waiting τ′ e (at t le b)) = refl
+    timerOf-wk s hd (waiting τ′ e doneᶠᵐ)      = refl
+    timerOf-wk s hd (waiting τ′ e quietᶠᵐ)     = refl
+    timerOf-wk s hd (fired _ _ _)              = refl
+    timerOf-wk s hd (playing _ _ _ _)          = refl
+
+    mapL-++ : ∀ {a b} {X : Set a} {Y : Set b} (f : X → Y) (xs ys : List X) → mapList f (xs ++ ys) ≡ mapList f xs ++ mapList f ys
+    mapL-++ f []       ys = refl
+    mapL-++ f (x ∷ xs) ys = cong (f x ∷_) (mapL-++ f xs ys)
+
+    ∈-mapL : ∀ {a b} {X : Set a} {Y : Set b} (f : X → Y) {x xs} → x ∈ xs → f x ∈ mapList f xs
+    ∈-mapL f (hereᴬ refl) = hereᴬ refl
+    ∈-mapL f (thereᴬ m)   = thereᴬ (∈-mapL f m)
+
+    all-mapL : ∀ {a b p q} {X : Set a} {Y : Set b} {P : X → Set p} {Q : Y → Set q} (f : X → Y) → (∀ {x} → P x → Q (f x))
+             → ∀ {xs} → All P xs → All Q (mapList f xs)
+    all-mapL f g []         = []
+    all-mapL f g (px ∷ pxs) = g px ∷ all-mapL f g pxs
+
+    linked-mapL : ∀ {ts : List (Timer h)} → Linked (λ x y → cascade x <ᵖ cascade y ≡ true) ts
+                → Linked (λ x y → cascade x <ᵖ cascade y ≡ true) (mapList (wkTimer τ) ts)
+    linked-mapL []      = []
+    linked-mapL [-]     = [-]
+    linked-mapL (r ∷ l) = r ∷ linked-mapL l
+
+    mutual
+      pendings-wk : ∀ {Δ A} (u : Sub h Δ A) → pendings (wkTree τ u) ≡ mapList (wkTimer τ) (pendings u)
+      pendings-wk (pendingˢ s q)                          = refl
+      pendings-wk (coldˢ s hd ph)                         = timerOf-wk s hd ph
+      pendings-wk (ofˢ p i xs)                            = refl
+      pendings-wk doneˢ                                   = refl
+      pendings-wk (mapˢ f s)                              = pendings-wk s
+      pendings-wk (scanˢ f r s)                           = pendings-wk s
+      pendings-wk (takeWhileˢ i p c k tk s)               = pendings-wk s
+      pendings-wk (flatMapˢ op f fl oc k r pl so ls)      =
+        trans (cong₂ _++_ (pendings-wk so) (pendings-wkᴸ ls)) (sym (mapL-++ (wkTimer τ) (pendings so) (lanePendings ls)))
+      pendings-wk (connectˢ S c b kb k fd rp e rt src bd) =
+        trans (cong₂ _++_ (pendings-wk src) (pendings-wk bd)) (sym (mapL-++ (wkTimer τ) (pendings src) (pendings bd)))
+      pendings-wk (joinˢ j sk l x st)                     = refl
+      pendings-wk (deferˢ k s)                            = pendings-wk s
+
+      pendings-wkᴸ : ∀ {Δ B} (ls : List (Lane h Δ B)) → lanePendings (wkLanes τ ls) ≡ mapList (wkTimer τ) (lanePendings ls)
+      pendings-wkᴸ []                = refl
+      pendings-wkᴸ (lane c k s ∷ ls) =
+        trans (cong₂ _++_ (pendings-wk s) (pendings-wkᴸ ls)) (sym (mapL-++ (wkTimer τ) (pendings s) (lanePendings ls)))
+
     module _ {H : Heapᴹ h} {H′ : Heapᴹ v} (gr : Grows τ H H′) where
       private
         cells : ∀ {t} (x : Ref h t) → At.val H′ (wkR τ x) ≡ wkEl t τ (At.val H x)
@@ -1661,18 +1747,167 @@ module Restaging (R : Set) where
         subst (Tied rt) (sym (leftover-wk {B = ⊤} src))
               (Lingers.rests L ψ (trans (sym s) sn) (trans (sym (grow-part (connectˢ S c b kb k fd rp e₀ rt src bd))) eq) (trans (sym (grow-part src)) pn) ec)
 
+      -- What unsubscribing reaches, and the gates, read through the
+      -- weakening.
+      mutual
+        grow-spent : ∀ {Δ A} (u : Sub h Δ A) → At.Spent H u → At.Spent H′ (wkTree τ u)
+        grow-spent (pendingˢ s q)                          _         = lift tt
+        grow-spent (coldˢ s hd ph)                         (lift e)  = lift (trans (Grows.handles gr hd) e)
+        grow-spent (ofˢ p i xs)                            _         = lift tt
+        grow-spent doneˢ                                   _         = lift tt
+        grow-spent (mapˢ f s)                              x         = grow-spent s x
+        grow-spent (scanˢ f r s)                           x         = grow-spent s x
+        grow-spent (takeWhileˢ i p c k tk s)               x         = grow-cut↓ k s x
+        grow-spent (flatMapˢ op f fl oc k r pl so ls)      (x , y)   = grow-cut↓ k so x , grow-spentᴸ ls y
+        grow-spent (connectˢ S c b kb k fd rp e rt src bd) (x , y)   = grow-cut↓ k src x , grow-cut↓ kb bd y
+        grow-spent (joinˢ j sk l x st)                     _         = lift tt
+        grow-spent (deferˢ k s)                            x         = grow-cut↓ k s x
+
+        grow-spentᴸ : ∀ {Δ B} (ls : List (Lane h Δ B)) → At.SpentLanes H ls → At.SpentLanes H′ (wkLanes τ ls)
+        grow-spentᴸ []                _       = lift tt
+        grow-spentᴸ (lane c k s ∷ ls) (x , y) = grow-cut↓ k s x , grow-spentᴸ ls y
+
+        grow-cut↓ : ∀ {Δ A} (k : Maybe (Quiet h)) (u : Sub h Δ A) → At.Cut↓ H k u → At.Cut↓ H′ (mapMaybe (wk∋ τ) k) (wkTree τ u)
+        grow-cut↓ nothing  u _ = lift tt
+        grow-cut↓ (just _) u x = grow-spent u x
+
+      -- A cut read false through the weakening was false.
+      cut-off : ∀ {Δ A} (c : Kit.Cut h) (k : Maybe (Quiet h)) (u : Sub h Δ A) → (At.val H (Kit.live c) ≡ false → At.Cut↓ H k u)
+              → At.val H′ (Kit.live (Kit.wkCut τ c)) ≡ false → At.Cut↓ H′ (mapMaybe (wk∋ τ) k) (wkTree τ u)
+      cut-off c k u g e = grow-cut↓ k u (g (trans (sym (cells (Kit.live c))) e))
+
+      mutual
+        grow-gated : ∀ {Δ A} (u : Sub h Δ A) → At.Gated H u → At.Gated H′ (wkTree τ u)
+        grow-gated (pendingˢ s q)                          _           = lift tt
+        grow-gated (coldˢ s hd ph)                         (lift g)    = lift (λ e → g (trans (sym (Grows.handles gr hd)) e))
+        grow-gated (ofˢ p i xs)                            _           = lift tt
+        grow-gated doneˢ                                   _           = lift tt
+        grow-gated (mapˢ f s)                              x           = grow-gated s x
+        grow-gated (scanˢ f r s)                           x           = grow-gated s x
+        grow-gated (takeWhileˢ i p c k tk s)               (g , x)     = cut-off c k s g , grow-gated s x
+        grow-gated (flatMapˢ op f fl oc k r pl so ls)      (x , y)     = grow-gated so x , grow-gatedᴸ ls y
+        grow-gated (connectˢ S c b kb k fd rp e rt src bd) (g , x , y) = cut-off c k src g , grow-gated src x , grow-gated bd y
+        grow-gated (joinˢ j sk l x st)                     _           = lift tt
+        grow-gated (deferˢ k s)                            x           = grow-gated s x
+
+        grow-gatedᴸ : ∀ {Δ B} (ls : List (Lane h Δ B)) → At.GatedLanes H ls → At.GatedLanes H′ (wkLanes τ ls)
+        grow-gatedᴸ []                _           = lift tt
+        grow-gatedᴸ (lane c k s ∷ ls) (g , x , y) = cut-off c k s g , grow-gated s x , grow-gatedᴸ ls y
+
+      postulate
+        -- Every registered callback reads, along the growth, as the
+        -- weakened kernel registered it.
+        grow-holds : ∀ (t : Sub h [] R) → At.Holds H t [] rootObs → At.Holds H′ (wkTree τ t) [] rootObs
+
+      grow-kernels : ∀ {t : Sub h [] R} → Kernels H t → Kernels H′ (wkTree τ t)
+      grow-kernels {t} kn = record { holds = grow-holds t (Kernels.holds kn) ; gated = grow-gated t (Kernels.gated kn) ; settled = settled-wk t (Kernels.settled kn) }
+
+      -- A feed weakened owes whom it owed, and what.
+      private
+        ∋-inj : ∀ {u w k} (ρ : u ⊑ w) {i j : u ∋ k} → wk∋ ρ i ≡ wk∋ ρ j → i ≡ j
+        ∋-inj same⊑    e = e
+        ∋-inj (grow ρ) e = ∋-inj ρ (there-inj′ e)
+          where
+            there-inj′ : ∀ {j w k} {a b : w ∋ k} → _≡_ {A = (j ∷ w) ∋ k} (there a) (there b) → a ≡ b
+            there-inj′ refl = refl
+
+        pair-back : ∀ {A} {sk s : Sink h A} {j i : Pos} → _≡_ {A = Sink v A × Pos} (wk∋ τ sk , j) (wk∋ τ s , i) → (sk , j) ≡ (s , i)
+        pair-back e with ∋-inj τ (cong proj₁ e) | cong proj₂ e
+        ... | refl | refl = refl
+
+      owed-back : ∀ {A} (fd : Feed A h) {sk : Sink h A} {j} → At.Owed H′ (wkFeed τ fd) (wk∋ τ sk) j → At.Owed H fd sk j
+      owed-back idle                           ()
+      owed-back (feeding a q [])               ()
+      owed-back (feeding a q ((s , i) ∷ ss))   (hereᴬ e)  = hereᴬ (pair-back e)
+      owed-back (feeding a q (_ ∷ ss))         (thereᴬ m) = thereᴬ (owed-back (feeding a q ss) m)
+      owed-back (finishing q [])               ()
+      owed-back (finishing q ((s , i) ∷ ss))   (hereᴬ e)  = hereᴬ (pair-back e)
+      owed-back (finishing q (_ ∷ ss))         (thereᴬ m) = thereᴬ (owed-back (finishing q ss) m)
+
+      owed-fwd : ∀ {A} (fd : Feed A h) {sk : Sink h A} {j} → At.Owed H fd sk j → At.Owed H′ (wkFeed τ fd) (wk∋ τ sk) j
+      owed-fwd idle                   ()
+      owed-fwd (feeding a q [])       ()
+      owed-fwd (feeding a q (_ ∷ ss)) (hereᴬ refl) = hereᴬ refl
+      owed-fwd (feeding a q (_ ∷ ss)) (thereᴬ m)   = thereᴬ (owed-fwd (feeding a q ss) m)
+      owed-fwd (finishing q [])       ()
+      owed-fwd (finishing q (_ ∷ ss)) (hereᴬ refl) = hereᴬ refl
+      owed-fwd (finishing q (_ ∷ ss)) (thereᴬ m)   = thereᴬ (owed-fwd (finishing q ss) m)
+
+      owing-wk : ∀ {A} (fd : Feed A h) j → At.owing H′ (wkFeed τ fd) j ≡ At.owing H fd j
+      owing-wk idle             j = refl
+      owing-wk (feeding a q ss) j = refl
+      owing-wk (finishing q ss) j = refl
+
+      owingNone-≡ : ∀ {A : Set} (e : Maybe Pos) → At.owingNone H′ {A} e ≡ At.owingNone H e
+      owingNone-≡ nothing  = refl
+      owingNone-≡ (just _) = refl
+
+      wkNow : ∀ {Δ} → At.Now H Δ → At.Now H′ Δ
+      wkNow []             = []
+      wkNow ((fd , e) ∷ ν) = (wkFeed τ fd , e) ∷ wkNow ν
+
+      lookup-wk : ∀ {Δ A} (ν : At.Now H Δ) (x : A ∈ Δ) → lookupᴬ (wkNow ν) x ≡ (wkFeed τ (proj₁ (lookupᴬ ν x)) , proj₂ (lookupᴬ ν x))
+      lookup-wk (_ ∷ ν) (hereᴬ refl) = refl
+      lookup-wk (_ ∷ ν) (thereᴬ x)   = lookup-wk ν x
+
+      -- Every live joiner held what its feed owed it, read through the
+      -- weakening.
+      mutual
+        fed-wk : ∀ {Δ A} (u : Sub h Δ A) (ν : At.Now H Δ) → At.Fed H u ν → At.Fed H′ (wkTree τ u) (wkNow ν)
+        fed-wk (pendingˢ s q)                          ν _       = lift tt
+        fed-wk (coldˢ s hd ph)                         ν _       = lift tt
+        fed-wk (ofˢ p i xs)                            ν _       = lift tt
+        fed-wk doneˢ                                   ν _       = lift tt
+        fed-wk (mapˢ f s)                              ν x       = fed-wk s ν x
+        fed-wk (scanˢ f r s)                           ν x       = fed-wk s ν x
+        fed-wk (takeWhileˢ i p c k tk s)               ν x       = fed-wk s ν x
+        fed-wk (flatMapˢ op f fl oc k r pl so ls)      ν (x , y) = fed-wk so ν x , fed-wkᴸ ls ν y
+        fed-wk (connectˢ S c b kb k fd rp e rt src bd) ν (x , y) = fed-wk src ν x , fed-wk bd ((fd , e) ∷ ν) y
+        fed-wk (joinˢ j sk l x st)                     ν (lift f) =
+          subst (λ p → Lift _ (At.val H′ (wkR τ l) ≡ true → (At.Owed H′ (proj₁ p) (wk∋ τ sk) j → st ≡ At.owing H′ (proj₁ p) j)
+                                                         × (¬ At.Owed H′ (proj₁ p) (wk∋ τ sk) j → st ≡ At.owingNone H′ (proj₂ p))))
+                (sym (lookup-wk ν x))
+                (lift λ on → let (o , n) = f (trans (sym (cells l)) on) in
+                  (λ m → trans (o (owed-back (proj₁ (lookupᴬ ν x)) m)) (sym (owing-wk (proj₁ (lookupᴬ ν x)) j)))
+                  , (λ ¬m → trans (n (λ m → ¬m (owed-fwd (proj₁ (lookupᴬ ν x)) m))) (sym (owingNone-≡ (proj₂ (lookupᴬ ν x))))))
+        fed-wk (deferˢ k s)                            ν x       = fed-wk s ν x
+
+        fed-wkᴸ : ∀ {Δ B} (ls : List (Lane h Δ B)) (ν : At.Now H Δ) → At.FedLanes H ls ν → At.FedLanes H′ (wkLanes τ ls) (wkNow ν)
+        fed-wkᴸ []                ν _       = lift tt
+        fed-wkᴸ (lane c k s ∷ ls) ν (x , y) = fed-wk s ν x , fed-wkᴸ ls ν y
+
+      grow-meaning : ∀ {t : Sub h [] R} → Meaning H t → Meaning H′ (wkTree τ t)
+      grow-meaning {t} mn = record { fed = fed-wk t [] (Meaning.fed mn) }
+
+      -- Every live timer a pending frame's, read through the weakening.
+      grow-timed : ∀ {ts : List (Timer h)} (t : Sub h [] R) → At.Timed H ts (pendings t) → At.Timed H′ (mapList (wkTimer τ) ts) (pendings (wkTree τ t))
+      grow-timed {ts} t (a , b) =
+        all-mapL (wkTimer τ) one a , subst (All (λ tm → At.spentʰ H′ (Timer.handle tm) ≡ false → tm ∈ mapList (wkTimer τ) ts)) (sym (pendings-wk t)) (all-mapL (wkTimer τ) two b)
+        where
+          one : ∀ {tm} → At.spentʰ H (Timer.handle tm) ≡ true ⊎ tm ∈ pendings t
+              → At.spentʰ H′ (Timer.handle (wkTimer τ tm)) ≡ true ⊎ wkTimer τ tm ∈ pendings (wkTree τ t)
+          one {tm} (inj₁ e) = inj₁ (trans (Grows.handles gr (Timer.handle tm)) e)
+          one      (inj₂ m) = inj₂ (subst (_ ∈_) (sym (pendings-wk t)) (∈-mapL (wkTimer τ) m))
+
+          two : ∀ {tm} → (At.spentʰ H (Timer.handle tm) ≡ false → tm ∈ ts)
+              → At.spentʰ H′ (Timer.handle (wkTimer τ tm)) ≡ false → wkTimer τ tm ∈ mapList (wkTimer τ) ts
+          two {tm} g e = ∈-mapL (wkTimer τ) (g (trans (sym (Grows.handles gr (Timer.handle tm))) e))
+
+      postulate
+        -- Every subject's subscribers its joiners, or silenced, read
+        -- through the weakening.
+        grow-joined : ∀ (t : Sub h [] R) → At.Joined H (subjects t) (joiners t []) → At.Joined H′ (subjects (wkTree τ t)) (joiners (wkTree τ t) [])
+
+      grow-queue : ∀ {t : Sub h [] R} {p clk ts} → Queue H p clk ts t → Queue H′ p clk (mapList (wkTimer τ) ts) (wkTree τ t)
+      grow-queue {t} qu = record { timed = grow-timed t (Queue.timed qu) ; joined = grow-joined t (Queue.joined qu)
+                                 ; ordered = linked-mapL (Queue.ordered qu) ; ahead = all-mapL (wkTimer τ) (λ x → x) (Queue.ahead qu) }
+
       postulate
         grow-owned   : ∀ {t : Sub h [] R} {w} {σ : w ⊑ h} {K bs} {Δ A s q} {π : Path t (pendingˢ {Δ = Δ} {A} s q)} {act act′ cd cd′}
                          (sk : StackAs t q σ K bs) {a a′}
                      → Owned H t (subAs {act = act} π cd sk a) → Owned H′ (wkTree τ t) (subAs {act = act′} (wkPath τ π) cd′ (grow-stack sk) a′)
-        grow-kernels : ∀ {t : Sub h [] R} → Kernels H t → Kernels H′ (wkTree τ t)
-        grow-meaning : ∀ {t : Sub h [] R} → Meaning H t → Meaning H′ (wkTree τ t)
-        grow-queue   : ∀ {t : Sub h [] R} {p clk ts} → Queue H p clk ts t → Queue H′ p clk (mapList (wkTimer τ) ts) (wkTree τ t)
 
   postulate
-    -- An allocation grows the world and moves nothing.
-    grows-extend : ∀ {h k} (H : Heapᴹ h) (x : Val (k ∷ h) k) → Grows new H (extend H x)
-
     -- A compiled subscription read alike under alike observers and
     -- continuations.
     compile-cong : ∀ {Γ A u w} (s : T.Obs Timeline Γ A) (E : Env Γ u) (υ : u ⊑ w) {o o′ : Observer A w} {k k′ : Kont w}
@@ -1845,6 +2080,26 @@ module Restaging (R : Set) where
   -- An observer weakened along a composite, as weakened twice.
   obs-⨾ : ∀ {A u v w} (σ : u ⊑ v) (τ : v ⊑ w) (o : Observer A u) → ObsRel (wkObs (σ ⨾ τ) o) (wkObs τ (wkObs σ o))
   obs-⨾ σ τ o = (λ a → ≗-sym (wk-wk σ τ _)) , ≗-sym (wk-wk σ τ _) , ≗-sym (wk-wk σ τ _)
+
+  -- An entry of a weakened heap: the entry, its inclusion carried on.
+  get-wk : ∀ {h v w k} (ρ : h ⊑ v) (xs : All (Stored h) w) (i : w ∋ k) → get (wkAll ρ xs) i ≡ stored (Stored.val (get xs i)) (Stored.into (get xs i) ⨾ ρ)
+  get-wk ρ (stored x σ ∷ xs) hereʳ     = refl
+  get-wk ρ (stored x σ ∷ xs) (there i) = get-wk ρ xs i
+
+  look-ext : ∀ {h j k} (H : Heapᴹ h) (x : Val (j ∷ h) j) (i : h ∋ k)
+           → look (extend H x) (there i) ≡ wkVal k (Stored.into (get H i) ⨾ new) (Stored.val (get H i))
+  look-ext {k = k} H x i = cong (λ e → wkVal k (Stored.into e) (Stored.val e)) (get-wk new H i)
+
+  -- An allocation grows the world and moves nothing.
+  grows-extend : ∀ {h k} (H : Heapᴹ h) (x : Val (k ∷ h) k) → Grows new H (extend H x)
+  grows-extend H x = record
+    { cells   = λ {t} r → trans (cong lower (look-ext H x r)) (sym (wkEl-wk t (Stored.into (get H r)) new (lower (Stored.val (get H r)))))
+    ; slots   = λ {X} s → subst (λ c → CbRel c (wkVal (slot X) new (cbs H s))) (sym (look-ext H x s))
+                  ( (λ a → ≗-sym (wk-wk (Stored.into (get H s)) new (Callbacks.onNext (Stored.val (get H s)) a)))
+                  , ≗-sym (wk-wk (Stored.into (get H s)) new (Callbacks.onComplete (Stored.val (get H s))))
+                  , ≗-sym (wk-wk (Stored.into (get H s)) new (Callbacks.isClosed (Stored.val (get H s)))) )
+    ; stashes = λ u → subst (λ m → m ≗ wkAct new (look H u)) (sym (look-ext H x u)) (≗-sym (wk-wk (Stored.into (get H u)) new (Stored.val (get H u))))
+    ; handles = λ hd → cong lower (look-ext H x hd) }
 
   if≗ : ∀ {w B} b {x x′ y y′ : Act w B} → x ≗ x′ → y ≗ y′ → (if b then x else y) ≗ (if b then x′ else y′)
   if≗ true  e _ = e
