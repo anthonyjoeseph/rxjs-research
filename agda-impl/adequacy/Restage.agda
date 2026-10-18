@@ -2893,13 +2893,13 @@ module Restaging (R : Set) where
     outer-rel = guarded-cong oc₈ ((λ a → proj₁ flat-wk-here op a) , writeRef≗ refl refl (proj₁ (proj₂ flat-wk-here)) , proj₂ (proj₂ o-rel))
 
     kont-rel : KontRel KK (flatK oc₈ fl₈ K₈)
-    kont-rel τ sub = bind≗ at λ _ → ≗-trans (⊑≗ (λ z → Kt z U₁) (ν₇ ⨾ (new ⨾ τ)) (ν₈ ⨾ τ)) (≗-trans (Grew.kontR G₉ τ U₁) (walk-kont-sub π₈ τ ue))
+    kont-rel τ sub = bind≗ att λ _ → ≗-trans (⊑≗ (λ z → Kt z U₁) (ν₇ ⨾ (new ⨾ τ)) (ν₈ ⨾ τ)) (≗-trans (Grew.kontR G₉ τ U₁) (walk-kont-sub π₈ τ ue))
       where
         U₁ = unsubscribing (Kit.cut (Kit.wkCut (new ⨾ τ) oc₇) >>ᴬ wkAct (new ⨾ τ) FM₇.killAll)
         cw : Kit.wkCut (new ⨾ τ) oc₇ ≡ Kit.wkCut τ oc₈
         cw = sym (wkEl-wk Kit.cutTy new τ oc₇)
-        at : Kit.attach (Kit.wkCut (new ⨾ τ) oc₇) sub ≗ Kit.attach (Kit.wkCut τ oc₈) sub
-        at = subst (λ c → Kit.attach (Kit.wkCut (new ⨾ τ) oc₇) sub ≗ Kit.attach c sub) cw (≗-refl _)
+        att : Kit.attach (Kit.wkCut (new ⨾ τ) oc₇) sub ≗ Kit.attach (Kit.wkCut τ oc₈) sub
+        att = subst (λ c → Kit.attach (Kit.wkCut (new ⨾ τ) oc₇) sub ≗ Kit.attach c sub) cw (≗-refl _)
         ue : Subscription.unsubscribe U₁ ≗ (Kit.cut (Kit.wkCut τ oc₈) >>ᴬ killAllᶜ (FlatKit.wkFlat τ fl₈))
         ue = bind≗ (subst (λ c → Kit.cut (Kit.wkCut (new ⨾ τ) oc₇) ≗ Kit.cut c) cw (≗-refl _)) λ _ →
              subst (λ st → wkAct (new ⨾ τ) FM₇.killAll ≗ killAllᶜ st) (sym (wkFlat-wk new τ st₇)) (killAll-wk (new ⨾ τ) st₇)
