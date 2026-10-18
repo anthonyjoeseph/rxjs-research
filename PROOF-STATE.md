@@ -423,14 +423,8 @@ by their own silent steps (`Mirror`).
   of the run's carries `Owned` across the replant.
 - **`ahead-under`** (Replant) — FALSITY, `NO EVIDENCE`: every timer past a
   position past one of its children.
-- **`end-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: a take ended keeps its
-  own heads, its part the source's.
-- **`end-lingering`** (Climbs) — FALSITY, `NO EVIDENCE`: a take ended keeps its
-  own ties, `ending` owing what the source left.
 - **`pool-idling`** (Climbs) — FALSITY, `NO EVIDENCE`: a pool joined with an
   idle one ties what it tied.
-- **`sd-lingering`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap gone holds no
-  pool of it.
 - **`close-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: an outer closed, the
   pool's heads where the outer's were.
 - **`dq-gone`** (Climbs) — FALSITY, `NO EVIDENCE`: a queue's head taken off
@@ -455,8 +449,6 @@ by their own silent steps (`Mirror`).
   staged keeps its own heads.
 - **`fin-lingering`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's finish
   staged keeps its own ties.
-- **`scan-lingering`** (Climbs) — FALSITY, `NO EVIDENCE`: a write at a scan's
-  accumulator keeps the scan's ties.
 - **`placing`** (Adequacy) — FALSITY, `NO EVIDENCE`: an ascending record alike
   a program's events as a set is placed against them.
 - **`ticks-up`** (Adequacy) — FALSITY, `RECOVERY`: the meaning's ticks never

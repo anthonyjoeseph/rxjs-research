@@ -9,7 +9,7 @@ open import Data.List.Properties using (++-assoc)
 open import Data.List.Relation.Unary.Any using (Any; here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ)
 import Data.List.Relation.Unary.Any as Any
-open import Data.Empty using (⊥-elim)
+open import Data.Empty using (⊥; ⊥-elim)
 open import Relation.Nullary using (¬_)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred; m<n⇒m<1+n; +-monoʳ-<; +-monoˡ-<)
@@ -29,7 +29,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym
 open import denotation.MonotonicList using (Events∞; skip; Pos; Timeline; Agree; agree-refl; at; last; ix; tick; _<ᵖ_; <ᵖ-tick; <ᵖ-trans; <ᵖ-below)
 import denotation.Unfold as U
 open import denotation.MonotonicList using () renaming (sub to subᴾ)
-open import adequacy.Sorted using (module Sorting)
+open import adequacy.Sorted using (module Sorting; _≤ᵖ_; ≤ᵖ-child)
 open import operation.Machine using (module Machine)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Moves using (module Moving)
@@ -52,6 +52,7 @@ open import adequacy.Restage using (module Restaging)
 open import adequacy.Local using (module Locality)
 open import adequacy.Retag using (module Retagging; at-here)
 open import adequacy.Replant using (module Replanting)
+open import adequacy.Shift using (module Shifting)
 
 open Events∞
 
@@ -74,7 +75,8 @@ module Ascending (R : Set) where
   open Locality R using (stored-at; flatReads; cuts; cut-in; module Heaps)
   open Growing R using (wkTree; wkLanes; wkPath)
   open Retagging R using (module Body; fed-owed; envP; joiners-path)
-  open Framing R using (scan-part; scan-defined; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike)
+  open Shifting R using (lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; pin-alike; lingers-sub; lingersL-of; module Linger; module Build)
+  open Framing R using (untold; scan-part; scan-defined; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike)
     renaming (Ended to Ends)
   open Replanting R using (Kin; kin-end; kin-pool; kin-feed; kin-fin; rehomes; rehomes-code; restack; reticked; owned-run; plant-self; module Shift; Heading; Lingering; Gone; Lives; lives-off; ahead-under)
   open Read
@@ -363,6 +365,16 @@ module Ascending (R : Set) where
   out-code : ∀ {w} {b q : Bool} {m M N : Act w ⊤} → b ≡ true → q ≡ false → Kit.when b (if q then m else under (ix 0) M N) ≗ under (ix 0) M N
   out-code refl refl = ≗-refl _
 
+  -- A switch read beside a stage that is not taking.
+  and-false : ∀ b → b ∧ false ≡ true → ⊥
+  and-false true  ()
+  and-false false ()
+
+  -- A map's part held exactly where what it maps is.
+  map-just : ∀ {h} (G : Heapᴹ h) {X Y : Set₁} (g : X → Y) m → is-just (At.mapᴹ G g m) ≡ is-just m
+  map-just G g nothing  = refl
+  map-just G g (just _) = refl
+
   -- A live take ending shows its end owed.
   ending-part : ∀ {h} (H : Heapᴹ h) {Δ A} {i p c k} {u : Sub h Δ A} {q c′} → At.val H (Kit.live c) ≡ true
               → At.part H (takeWhileˢ i p c k (Strongly.ending q c′) u) ≡ just (U.endingᶜ (q ++ [ last ]) c′)
@@ -384,10 +396,6 @@ module Ascending (R : Set) where
     postulate
       out-behind  : Each H (Heads q) T → Each H (Heads (q ++ [ ix 0 ])) T′
 
-      -- The take's own heads and ties, ended: its part the source's,
-      -- `ending` owing what the source left.
-      end-heading   : At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′ → Heading H H q w₀ v
-      end-lingering : At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′ → Lingering H H w₀ v
 
       end-ghost : ∀ {g S} → Sane [] g → Placed g [] → At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′
               → Lifts H ρ (U.endˢ (q ++ [ last ])) S → U.step g ≡ S
@@ -395,6 +403,29 @@ module Ascending (R : Set) where
 
     end-stack : ∀ {w p′ bs} {ϑ : w ⊑ h} {K : Stack w ⊤} → StackAs T p′ ϑ K bs → StackAs T′ p′ ϑ K bs
     end-stack = restack kin ρ
+
+    -- A live take over its source's part.
+    take-live : At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′ → At.part H w₀ ≡ just (U.takeWhileᶜ i p c′)
+    take-live lv pv rewrite lv | pv = refl
+
+    -- The take's own heads and ties, ended: its part the source's,
+    -- `ending` owing what the source left, nothing below it seen.
+    end-heading : At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′ → Heading H H q w₀ v
+    end-heading lv pv = record
+      { head-revive = λ _ → cong is-just (take-live lv pv)
+      ; head-told   = λ j e₀ e′ m →
+          subst (λ b → _ ∈ᴸ untold j b) (just-injective (trans (sym (take-live lv pv)) e₀))
+                (subst (λ b → _ ∈ᴸ untold j b) (sym (just-injective (trans (sym (ending-part H {i = i} {p} {c} {k} {u} {q} {c′} lv)) e′))) m)
+      ; head-below  = λ _ → Build.each-take H (Heads q)
+          (λ e hk → subst (Heads q) (just-injective (trans (sym (ending-part H {i = i} {p} {c} {k} {u} {q} {c′} lv)) e))
+                          (λ hk′ → subst (q ≤ᵖ_) (just-injective hk′) (≤ᵖ-child q (inj₁ refl))) hk)
+          (λ ok → ⊥-elim (and-false (At.val H (Kit.live c)) ok)) }
+
+    end-lingering : At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′ → Lingering H H w₀ v
+    end-lingering lv pv = record
+      { ling-revive = λ _ → cong is-just (take-live lv pv)
+      ; ling-rested = pin-alike refl
+      ; ling-below  = λ _ → Linger.lg-take H (λ ok → ⊥-elim (and-false (At.val H (Kit.live c)) ok)) }
 
     end-ticked : ∀ {w p′ bs} {ϑ : w ⊑ h} {K : Stack w ⊤} n (sk : StackAs T p′ ϑ K bs) → Ticked T n sk → Ticked T′ n (end-stack sk)
     end-ticked n sk = reticked kin ρ {n = n} sk
@@ -567,8 +598,20 @@ module Ascending (R : Set) where
 
     module Sh = Shift H H′ ρ (off-store H r) (here refl ∷ []) fs
 
-    postulate
-      scan-lingering : Lingering H H′ (scanˢ f r u) (scanˢ f r u)
+    -- The scan's source, apart from its accumulator.
+    scan-alike : Alike H H′ (names u)
+    scan-alike j m with fresh-path ρ fs
+    ... | a ∷ _ = look-store H r j (lookupᴬ a m)
+
+    -- The accumulator read by the scan's part alone: held as it was, its
+    -- source's leftover and ties alike.
+    scan-lingering : Lingering H H′ (scanˢ f r u) (scanˢ f r u)
+    scan-lingering = record
+      { ling-revive = λ j → trans (map-just H (U.scanᶜ f (At.val H r)) (At.part H u))
+                                  (trans (cong is-just (sym (part-alike H H′ u scan-alike)))
+                                         (trans (sym (map-just H′ (U.scanᶜ f (At.val H′ r)) (At.part H′ u))) j))
+      ; ling-rested = λ {C} → pin-alike (leftover-alike H H′ {B = C} u scan-alike)
+      ; ling-below  = λ lg → Linger.lg-scan H′ (lingers-alike H H′ scan-alike (lingers-sub H lg (in-scan here) refl)) }
 
     scan-owned : ∀ {p ctl bs} {ca : CtlAs T p ctl bs} → Owned H T ca → Owned H′ T ca
     scan-owned = Sh.wr-owned record { gone-part = λ ψ e → none-of (trans (scan-defined H ρ fs z (ρ ⊕ ψ)) (cong is-just e)) ; gone-live = scan-live }
@@ -806,12 +849,21 @@ module Ascending (R : Set) where
     sd-queue : AllPairs _≢_ (names T) → ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
     sd-queue fs = Sh.wr-queue fs
 
-    -- Nothing left: the flatMap gone, no pool of it held.
-    postulate
-      sd-lingering : At.part H′ w₀ ≡ nothing → Lingering H H′ w₀ w₀
+    -- Nothing left: the flatMap gone, no pool of it held; its children's
+    -- leftovers and ties alike.
+    sd-lingering : AllPairs _≢_ (names w₀) → At.part H′ w₀ ≡ nothing → Lingering H H′ w₀ w₀
+    sd-lingering fr gn = record
+      { ling-revive = λ j → ⊥-elim (true≢false (trans (sym j) (cong is-just gn)))
+      ; ling-rested = λ {C} → pin-alike (cong₂ U.unionᶜ (leftover-alike H H′ {B = C} u so-al) (leftoverL-alike H H′ {B = C} ls ls-al))
+      ; ling-below  = λ lg → Linger.lg-flat H′ (λ e → ⊥-elim (true≢false (trans (sym (cong is-just e)) (cong is-just gn))))
+                                (lingers-alike H H′ so-al (lingers-sub H lg (in-outer here) refl))
+                                (lingersL-alike H H′ ls-al (lingersL-of H lg)) }
+      where
+        so-al = Heaps.flat-so H H′ {fl = fl} {oc} {k} {r} {u} {ls} (sd-alike fr)
+        ls-al = Heaps.flat-ls H H′ {fl = fl} {oc} {k} {r} {u} {ls} (sd-alike fr)
 
     sd-lingers : AllPairs _≢_ (names T) → At.part H′ w₀ ≡ nothing → Ends H T → Lingers H T → Lingers H′ T
-    sd-lingers fs gn en lg = subst (λ t → Lingers H′ t) (plant-self ρ) (Sh.shift-lingers fs w₀ en (sd-lingering gn) lg)
+    sd-lingers fs gn en lg = subst (λ t → Lingers H′ t) (plant-self ρ) (Sh.shift-lingers fs w₀ en (sd-lingering (fresh-path ρ fs) gn) lg)
 
     -- Below the flatMap, what the done flag is not; at it, its part.
     sd-heads : AllPairs _≢_ (names w₀) → ∀ {q} → Each H (Heads q) w₀ → Each H′ (Heads q) w₀
