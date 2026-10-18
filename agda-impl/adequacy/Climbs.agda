@@ -1677,21 +1677,21 @@ module Ascending (R : Set) where
                                 (lanes-lg (lingersL-of H lg)) }
       where
         so-al = Heaps.keeps H H′ fr-off (λ m → m) (fr-apart fr)
-        under : ∀ {Δ′ A′} {x : Sub h Δ′ A′} → PathLanes ls x → Alike H H′ (names x)
-        under πL = Heaps.keeps H H′ fr-off (λ m → m) (fr-under fr πL)
+        lane-al : ∀ {Δ′ A′} {x : Sub h Δ′ A′} → PathLanes ls x → Alike H H′ (names x)
+        lane-al πL = Heaps.keeps H H′ fr-off (λ m → m) (fr-lane-al fr πL)
         pt : ∀ {Δ′ A′} {x : Sub h Δ′ A′} → PathLanes ls x → At.part H′ x ≡ At.part H x
-        pt {x = x} πL = part-alike H H′ x (under πL)
+        pt {x = x} πL = part-alike H H′ x (lane-al πL)
         seL : ∀ {Δ′ A′} {x : Sub h Δ′ A′} (πL : PathLanes ls x) → seenL H′ πL ≡ true → seenL H πL ≡ true
-        seL = seenL-drop H (laneOf o) fl (tabulateᴬ (fr-count-apart fr)) under
+        seL = seenL-drop H (laneOf o) fl (tabulateᴬ (fr-count-apart fr)) lane-al
         leftL : ∀ {C} (ls′ : List (Lane h Δ B)) → (∀ {Δ′ A′} {x : Sub h Δ′ A′} → PathLanes ls′ x → PathLanes ls x)
               → At.leftoverL H′ {B = C} ls′ ≡ At.leftoverL H {B = C} ls′
         leftL []                   em = refl
-        leftL (lane c′ k′ s ∷ ls′) em = cong₂ U.unionᶜ (leftover-alike H H′ s (under (em (this-lane here)))) (leftL ls′ (λ π → em (next-lane π)))
+        leftL (lane c′ k′ s ∷ ls′) em = cong₂ U.unionᶜ (leftover-alike H H′ s (lane-al (em (this-lane here)))) (leftL ls′ (λ π → em (next-lane π)))
         lanes-lg : LingersL H ls → LingersL H′ ls
         lanes-lg lL = record
-          { poolsL = λ {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls′ = ls₀} πL sn e → pinned-trans (LingersL.poolsL lL πL (seL πL sn) (trans (sym (pt πL)) e)) (pin-alike (pooled-from H H′ {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} (λ m → m) (under πL)))
+          { poolsL = λ {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls′ = ls₀} πL sn e → pinned-trans (LingersL.poolsL lL πL (seL πL sn) (trans (sym (pt πL)) e)) (pin-alike (pooled-from H H′ {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} (λ m → m) (lane-al πL)))
           ; restsL = λ {src = src₀} πL sn e pn pe → pinned-trans (LingersL.restsL lL πL (seL πL sn) (trans (sym (pt πL)) e) (trans (sym (pt (πL ⊕ᴸ in-source here))) pn) pe)
-                                                    (pin-alike (leftover-from H H′ {B = ⊤} {x = src₀} (λ m → m) (under (πL ⊕ᴸ in-source here)))) }
+                                                    (pin-alike (leftover-from H H′ {B = ⊤} {x = src₀} (λ m → m) (lane-al (πL ⊕ᴸ in-source here)))) }
 
     module Wr (fs : AllPairs _≢_ (names T)) = Wrote H H′ ρ fr-off fr-mine fs
     module Sh (fs : AllPairs _≢_ (names T)) = Shift H H′ ρ fr-off fr-mine fs
