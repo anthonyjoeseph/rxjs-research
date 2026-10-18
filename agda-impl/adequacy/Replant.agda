@@ -265,7 +265,7 @@ module Replanting (R : Set) where
     ... | above ρ′ =
       gone-just (subst (λ y → is-just (At.part H′ y) ≡ true → is-just (At.part H x) ≡ true) (plant-self ρ′)
                        (Walk.revive H H′ {u = u} u offU (just-back (Gone.gone-part gn here)) ρ′ (fresh-path ψ fs))) e
-    ... | beside dj = trans (part-alike H H′ _ (λ j m → offU j (dj m))) e
+    ... | beside dj = trans (part-alike H H′ x (λ j m → offU j (dj m))) e
 
     -- No take anywhere in the tree revived.
     live-kept : Gone H H′ u → Lives H H′ T
@@ -274,7 +274,7 @@ module Replanting (R : Set) where
     ... | above here = Gone.gone-live gn here e
     ... | above (in-take ρ″) =
       trans (sym (cong lower (offU (Kit.live c) (narrow (λ m → ++⁺ʳ (quietName k) (names-path ρ″ m)) (apart-r (cutNames c) (fresh-path ψ fs) (here refl)))))) e
-    ... | beside dj = trans (sym (cong lower (offU (Kit.live c) (dj (++⁺ˡ (here refl)))))) e
+    ... | beside dj = trans (sym (cong lower (offU (Kit.live c) (dj (here refl))))) e
 
     -- WHAT IS OWED, KEPT: the agenda is the tree's, and the heap is read
     -- only for a take's switch and a body's part.
