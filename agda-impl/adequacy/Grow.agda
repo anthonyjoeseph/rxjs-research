@@ -8,13 +8,13 @@ module adequacy.Grow where
 
 open import Data.List using (List; []; _∷_) renaming (map to mapList)
 open import Data.Maybe using () renaming (map to mapMaybe)
-open import Data.Product using (_,_)
+open import Data.Product using (_×_; _,_)
 open import operation.AbstractObservable using (module Heap; module Run)
 open import operation.PureObservable using (Pureᴾ)
 open import adequacy.Strong using (module Strongly)
 
 module Growing (R : Set) where
-  open Heap using (_⊑_; wk∋)
+  open Heap using (_⊑_; _∋_; wk∋)
   open Run (Pureᴾ R) using (wkR; wkSubject; module Kit; module FlatKit)
   open Kit using (wkCut)
   open FlatKit using (wkFlat)
@@ -22,10 +22,13 @@ module Growing (R : Set) where
                         ; connectˢ; joinˢ; deferˢ; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer
                         ; this-lane; next-lane)
 
+  wkPair : ∀ {h v k} {X : Set} → h ⊑ v → h ∋ k × X → v ∋ k × X
+  wkPair τ (s , j) = wk∋ τ s , j
+
   wkFeed : ∀ {A h v} → h ⊑ v → Feed A h → Feed A v
   wkFeed τ idle             = idle
-  wkFeed τ (feeding a q ss) = feeding a q (mapList (λ { (s , j) → wk∋ τ s , j }) ss)
-  wkFeed τ (finishing q ss) = finishing q (mapList (λ { (s , j) → wk∋ τ s , j }) ss)
+  wkFeed τ (feeding a q ss) = feeding a q (mapList (wkPair τ) ss)
+  wkFeed τ (finishing q ss) = finishing q (mapList (wkPair τ) ss)
 
   mutual
     wkTree : ∀ {h v Δ A} → h ⊑ v → Sub h Δ A → Sub v Δ A

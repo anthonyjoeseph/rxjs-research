@@ -177,11 +177,11 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **THE LANE START, GROWN.** The growth frame's own cells:
-  `grow-stack`/`alone`/`ticked` and `grow-owned`/`holds`/`joined` are the
-  kernels' code natural in the world, over `walk-grow` and the `-wk`
-  toolkit (Alike). Then route the rest of the `bg-*` row, `bg-ghost`
-  included, through the frame.
+- **THE LANE START, SPLICED.** The growth is settled: every kernel cell
+  reads alike along it, so a lane's start is a splice in one world. Owed:
+  `compile-grow`/`kont-grow`, the code's own naturality, by operator over
+  the `-wk` toolkit; then the splice leaves `bg-owns`/`heads`/`lingered`
+  and `bg-ghosted` over `ghost-lift`, which reads the names fresh.
 - **RESTAGE AND KERNEL CELLS.** The restage `heading`/`lingering` cells
   and `fr-holds`/`gated`/`spent`/`fed`: fold over the frames that exist.
 - **DEEP ORDER.** `gapped-past` holds only where every node under a rest is
@@ -224,17 +224,14 @@ by their own silent steps (`Mirror`).
   path reads open.
 - **`begin-path`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane begun runs to its
   inner subscribed under `ix 1`: counted, cut, listed, the rest weakened.
-- **`bg-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane begun: the ghost's
-  admit, the lane planted pending in the grown tree.
-- **`bg-code`** (Climbs) — FALSITY, `NO EVIDENCE`: a begun lane's run is its
-  inner compiled at the lane's env.
-- **`bg-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds in the grown
-  tree with a lane begun.
+- **`bg-ghosted`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane begun, its lift
+  read in the grown world: the ghost's admit, the lane planted pending.
+- **`bg-owns`, `bg-heads`, `bg-lingered`** (Climbs) — FALSITY, `NO EVIDENCE`:
+  what is owed, the heads and the ties, carried from the grown tree to the lane
+  planted pending.
 - **`bg-holds`, `bg-gated`, `bg-spent`, `bg-fed`** (Climbs) — FALSITY,
   `NO EVIDENCE`: the begun flatMap's own clauses, the count and list written,
   its lane pending.
-- **`bg-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no sooner
-  than the run one level down.
 - **`lanes-counted`** (Climbs) — FALSITY, `NO EVIDENCE`: a climbing outer value
   reads the count as the live lanes; a fact of the call, not a kernel.
 - **`outer-switch`** (Climbs) — FALSITY, `NO EVIDENCE`: a switch kills its
@@ -301,8 +298,6 @@ by their own silent steps (`Mirror`).
   pool taking the lane's last ghost rested, keeps every tie.
 - **`next-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end with a
   value queued, the queue's head taken, keeps every tie.
-- **`bg-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane begun in the grown
-  world keeps every tie.
 - **`fire-lingers`** (Lift) — FALSITY, `NO EVIDENCE`: a timer fired keeps every
   tie.
 - **`torn-lingers`** (Lift) — FALSITY, `NO EVIDENCE`: what a teardown reached
@@ -335,13 +330,9 @@ by their own silent steps (`Mirror`).
 - **`of-owned`** (Restages) — FALSITY, `NO EVIDENCE`: an `of` planted where it
   was pending (an `empty` a spent one) owes its values and continuation as the
   agenda's calls.
-- **`grow-stack`, `grow-alone`, `grow-ticked`** (Weaken) — FALSITY,
-  `NO EVIDENCE`: the stack, its sources and its ticks carried across a
-  weakening.
-- **`grow-owned`, `grow-holds`, `grow-joined`** (Weaken) — FALSITY,
-  `NO EVIDENCE`: the calls, the registered callbacks and the silenced
-  subscribers read along a growth as the weakened kernels' — the kernels' code
-  natural in the world.
+- **`kont-grow`, `compile-grow`** (Weaken) — FALSITY, `NO EVIDENCE`: a leaf's
+  continuation and a compiled subscription read alike along a growth: the
+  code's own naturality.
 - **`untake`** (Taken) — FALSITY, `NO EVIDENCE`: a source heads no earlier than
   the take over it.
 - **`grew-store`** (Connected) — FALSITY, `NO EVIDENCE`: a store into a cell

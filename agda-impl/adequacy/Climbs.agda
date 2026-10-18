@@ -59,6 +59,7 @@ open import adequacy.Retag using (module Retagging; at-here)
 open import adequacy.Replant using (module Replanting)
 open import adequacy.Restages using (module Staging)
 open import adequacy.Weaken using (module Weakening)
+open import adequacy.Alike using (module Aliking)
 open import adequacy.Shift using (module Shifting)
 
 open Events∞
@@ -77,6 +78,7 @@ module Ascending (R : Set) where
   open Unsubbing R using (_⇝_; ⇝-trans; now; then; ≗-trans; wk≗; wk-same; bind≗)
   open Sequencing R using (seq-assoc; seq-done)
   open Forking R using (walk-planted)
+  open Aliking R using (walk-grow; compile-cong; laneAt-wk; ObsRel)
   open Taking R using (tick-ix0)
   open Naming R using (pre; fresh-plant; fresh-new; wk-pairs; wk-img; to-img)
   open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
@@ -84,13 +86,13 @@ module Ascending (R : Set) where
   open Lowering R using (Keeps; queue-keeps; store-keeps; keeps-trans)
   open Lifting R using (sub-onward; emit-shut; emit-void; run-meets; run-at; emit-run; spread-past; behind-fire; fire-lingers; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
   open Locality R using (stored-at; stored-hit; live-apart; flatReads; cuts; cut-in; module Heaps)
-  open Growing R using (wkTree; wkLanes; wkPath)
+  open Growing R using (wkTree; wkLanes; wkPath; wkPathᴸ)
   open Retagging R using (module Body; fed-owed; envP; joiners-path)
   open Shifting R using (LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; lingers-sub; lingersL-of; module Linger; module Build)
   open Framing R using (Untold; untold; scan-part; scan-defined; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike)
     renaming (Ended to Ends)
   open Staging R using (not-src; wrap-lane)
-  open Weakening R using (Grows) renaming (module Grown to Weakened)
+  open Weakening R using (Grows; pure-map) renaming (module Grown to Weakened)
   open Replanting R using (Kin; kin-end; kin-pool; kin-feed; kin-fin; kin-lane; rehomes; rehomes-code; restack; reticked; owned-run; module Shift; Heading; Lingering; Gone; store-held; Lives; lives-off; ahead-under)
   open Read
 
@@ -1287,10 +1289,37 @@ module Ascending (R : Set) where
                 {sk : StackAs t p ϑ₁ K xs₁} → Ticked t n sk → Ticked t n (stack-cast e e′ sk)
   ticked-cast refl refl tk = tk
 
-  -- The runtime's own map is the library's.
-  pure-map : ∀ {a b} {X : Set a} {Y : Set b} (f : X → Y) (xs : List X) → Pure.mapList R f xs ≡ mapList f xs
-  pure-map f []       = refl
-  pure-map f (x ∷ xs) = cong (f x ∷_) (pure-map f xs)
+  -- A LIFT READ THROUGH THE WEAKENING: every part along the path reads as
+  -- it did, so the step lifts alike.
+  module Lifted {h v} {τ : h ⊑ v} {H : Heapᴹ h} {H′ : Heapᴹ v} (gr : Grows τ H H′) where
+    open Weakened τ using (grow-part; grow-partᴸ)
+
+    mutual
+      lifts-grow : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} {ρ : Path t u} {s S} → Lifts H ρ s S → Lifts H′ (wkPath τ ρ) s S
+      lifts-grow lifts-here = lifts-here
+      lifts-grow (lifts-map L) = lifts-map (lifts-grow L)
+      lifts-grow (lifts-scan {f = f} {r = r} {s = s} {S = S} L) =
+        subst (λ a → Lifts H′ _ s (U.scanˢ f a S)) (Grows.cells gr r) (lifts-scan (lifts-grow L))
+      lifts-grow (lifts-take {c = c} lv L) = lifts-take (trans (Grows.cells gr (Kit.live c)) lv) (lifts-grow L)
+      lifts-grow (lifts-outer {op = op} {f = f} {fl = fl} {pl = pl} {ls = ls} {s = s} {S = S} {o₀ = o₀} of pb L) =
+        subst₂ (λ L′ Q → Lifts H′ _ s (U.outerˢ op (λ a q → U.subscribe (f a) q) o₀ S L′ Q pl)) (grow-partᴸ gr ls) (Grows.cells gr (FlatKit.Flat.queue fl))
+          (lifts-outer (subst (OuterFirst S) (sym (grow-partᴸ gr ls)) of)
+                       (subst (λ L′ → PoolBehind pl (U.outerOf (just o₀)) (U.earliest L′)) (sym (grow-partᴸ gr ls)) pb) (lifts-grow L))
+      lifts-grow (lifts-lanes {op = op} {f = f} {fl = fl} {pl = pl} {t = t} {s = s} {bs = bs} {l = l} {S = S} {as = as} {q = q} LL e lf pb) =
+        subst₂ (λ x Q → Lifts H′ _ s (U.laneˢ op (λ a q → U.subscribe (f a) q) x bs l S as Q pl)) (grow-part gr t) (Grows.cells gr (FlatKit.Flat.queue fl))
+          (lifts-lanes (liftsLane-grow LL) e (subst (λ x → LaneFirst x q) (sym (grow-part gr t)) lf)
+                       (subst (λ x → PoolBehind pl (U.outerOf x) (U.found q bs l S as)) (sym (grow-part gr t)) pb))
+      lifts-grow (lifts-source {bd = bd} pb sf L) = lifts-source (trans (grow-part gr bd) pb) sf (lifts-grow L)
+      lifts-grow (lifts-body {t = t} pt bf L) = lifts-body (trans (grow-part gr t) pt) bf (lifts-grow L)
+      lifts-grow (lifts-shut {t = t} pt e rb L) = lifts-shut (trans (grow-part gr t) pt) e rb (lifts-grow L)
+      lifts-grow (lifts-defer L) = lifts-defer (lifts-grow L)
+
+      liftsLane-grow : ∀ {Δ B Δ′ C} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} {πL : PathLanes ls u} {s bs S as}
+                     → LiftsLane H πL s bs S as → LiftsLane H′ (wkPathᴸ τ πL) s bs S as
+      liftsLane-grow (lifts-this {c = c} {ls = ls} {s = s} {S = S} lv L) =
+        subst (LiftsLane H′ _ s [] S) (grow-partᴸ gr ls) (lifts-this (trans (Grows.cells gr (Kit.live c)) lv) (lifts-grow L))
+      liftsLane-grow (lifts-next {l = l} {s = s} {bs = bs} {S = S} {as = as} LL) =
+        subst (λ X → LiftsLane H′ _ s (X ++ bs) S as) (grow-partᴸ gr (l ∷ [])) (lifts-next (liftsLane-grow LL))
 
   -- A LANE BEGUN, IN THE GROWN WORLD: the tree weakened along the growth,
   -- the flatMap its pool `pl′` and the new lane first, pending where it
@@ -1307,20 +1336,51 @@ module Ascending (R : Set) where
     T′ : Sub v [] R
     T′ = plant (wkPath grow ρ) v′
 
-    π′ : Path T′ (pendingˢ (f y) (q ++ [ ix 1 ]))
-    π′ = planted (wkPath grow ρ) v′ ⊕ in-lanes (this-lane here)
+    ι : Path v′ (pendingˢ (f y) (q ++ [ ix 1 ]))
+    ι = in-lanes (this-lane here)
 
-    postulate
-      bg-ghost : ∀ {g S} → Sane [] g → Placed g []
-               → Lifts H ρ (U.skipˢ (q ++ [ ix 0 ]) (U.flatMapᶜ op (λ a j → U.subscribe (f a) j) (At.part H t)
-                             (U.subscribe (f y) (q ++ [ ix 1 ]) ∷ At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl′)) S
-               → U.step g ≡ S
-               → Σ (U.Node [] R) λ g″ → At.part heap′ T′ ≡ just g″ × Sane [] g″ × Placed g″ []
-                 × Σ Pos λ k′ → Σ (Events∞ R) λ r′ → (∀ n → Agree n (residual g) (skip k′ r′)) × Past (Events∞.force r′) (residual g″)
-      bg-code  : Σ World λ u → Σ (Env Δ u) λ E′ → Σ (u ⊑ v) λ υ → wkEnv υ E′ ≡ Here.env (walk π′ top)
-                 × act′ ≗ compile (f y) E′ υ (Here.obs (walk π′ top)) (Here.kont (walk π′ top))
+    π′ : Path T′ (pendingˢ (f y) (q ++ [ ix 1 ]))
+    π′ = planted (wkPath grow ρ) v′ ⊕ ι
+
+    open Grown grown using (base; grows; moved)
 
     module Wk = Weakened grow
+
+    -- The flatMap's skip as the grown world reads it.
+    skipped : U.Step Δ B
+    skipped = U.skipˢ (q ++ [ ix 0 ]) (U.flatMapᶜ op (λ a j → U.subscribe (f a) j) (At.part base (wkTree grow t))
+                (U.subscribe (f y) (q ++ [ ix 1 ]) ∷ At.partLanes base (wkLanes grow ls)) (At.val base (wkR grow (FlatKit.Flat.queue fl))) pl′)
+
+    skipped-grow : skipped ≡ U.skipˢ (q ++ [ ix 0 ]) (U.flatMapᶜ op (λ a j → U.subscribe (f a) j) (At.part H t)
+                     (U.subscribe (f y) (q ++ [ ix 1 ]) ∷ At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl′)
+    skipped-grow = trans (cong₂ (λ o L → sk o L (At.val base (wkR grow (FlatKit.Flat.queue fl)))) (Wk.grow-part grows t) (Wk.grow-partᴸ grows ls))
+                         (cong (sk (At.part H t) (At.partLanes H ls)) (Grows.cells grows (FlatKit.Flat.queue fl)))
+      where sk = λ o L Q → U.skipˢ (q ++ [ ix 0 ]) (U.flatMapᶜ op (λ a j → U.subscribe (f a) j) o (U.subscribe (f y) (q ++ [ ix 1 ]) ∷ L) Q pl′)
+
+    postulate
+      -- The ghost past the flatMap's skip, the lift read in the grown
+      -- world: the splice alone.  `ghost-lift` gives it once the names
+      -- are fresh, which the leaf does not carry.
+      bg-ghosted : ∀ {g S} → Sane [] g → Placed g [] → Lifts base (wkPath grow ρ) skipped S → U.step g ≡ S
+                 → Σ (U.Node [] R) λ g″ → At.part heap′ T′ ≡ just g″ × Sane [] g″ × Placed g″ []
+                   × Σ Pos λ k′ → Σ (Events∞ R) λ r′ → (∀ n → Agree n (residual g) (skip k′ r′)) × Past (Events∞.force r′) (residual g″)
+
+    -- The lane's run compiled where it begins: the env and observer
+    -- the growth carried along the path, the lane's observer read in
+    -- either world.
+    bg-code : Σ World λ u → Σ (Env Δ u) λ E′ → Σ (u ⊑ v) λ υ → wkEnv υ E′ ≡ Here.env (walk π′ top)
+              × act′ ≗ compile (f y) E′ υ (Here.obs (walk π′ top)) (Here.kont (walk π′ top))
+    bg-code = subst (λ X → Σ World λ u → Σ (Env Δ u) λ E′ → Σ (u ⊑ v) λ υ → wkEnv υ E′ ≡ Here.env X × act′ ≗ compile (f y) E′ υ (Here.obs X) (Here.kont X))
+                (sym walkL)
+                (_ , Here.env (walk ρ top) , grow , eR
+                 , ≗-trans code′ (compile-cong (f y) (Here.env (walk ρ top)) grow (laneAt-wk grow op f fl cut′ eR oR) (λ _ _ → ≗-refl _)))
+      where
+        oR : ObsRel (wkObs grow (Here.obs (walk ρ top))) (Here.obs (walk (wkPath grow ρ) top))
+        oR = proj₁ (walk-grow grow ρ)
+        eR : wkEnv grow (Here.env (walk ρ top)) ≡ Here.env (walk (wkPath grow ρ) top)
+        eR = proj₂ (proj₂ (walk-grow grow ρ))
+        walkL : walk π′ top ≡ walk ι (walk (wkPath grow ρ) top)
+        walkL = trans (walk-⊕ (planted (wkPath grow ρ) v′) ι top) (cong (walk ι) (walk-planted (wkPath grow ρ) v′ top))
 
     -- The stack grown, then the lane planted: every frame where it was.
     bg-stack : StackAs T q ϑ K bs → StackAs T′ q ϑ′ K bs′
@@ -1339,12 +1399,29 @@ module Ascending (R : Set) where
     bg-ticked : (sk : StackAs T q ϑ K bs) → Ticked T clk sk → Ticked T′ clk (bg-stack sk)
     bg-ticked sk tk = ticked-cast seq′ (trans bursts′ (sym (pure-map _ bs))) (reticked {v = v′} kin-lane (wkPath grow ρ) (Wk.grow-stack sk) (Wk.grow-ticked sk tk))
 
+    -- The splice alone, each in the grown world.
     postulate
-      bg-owned   : (sk : StackAs T q ϑ K bs) → Owned H T (runAs [] (≗-refl _) sk) → Owned heap′ T′ (ca′ sk)
-      bg-behind  : Each H (Heads q) T → Each heap′ (Heads (q ++ [ ix 1 ])) T′
-      bg-lingers : Lingers H (Restaged.T′ H ρ pl′) → Lingers heap′ T′
+      bg-owns     : (sk : StackAs T q ϑ K bs) → Owned base (wkTree grow T) (runAs [] (≗-refl _) (Wk.grow-stack sk)) → Owned heap′ T′ (ca′ sk)
+      bg-heads    : Each base (Heads q) (wkTree grow T) → Each heap′ (Heads (q ++ [ ix 1 ])) T′
+      bg-lingered : Lingers base (wkTree grow (Restaged.T′ H ρ pl′)) → Lingers heap′ T′
 
-    open Grown grown using (base; grows; moved)
+    -- The growth, then the splice.
+    bg-ghost : ∀ {g S} → Sane [] g → Placed g []
+             → Lifts H ρ (U.skipˢ (q ++ [ ix 0 ]) (U.flatMapᶜ op (λ a j → U.subscribe (f a) j) (At.part H t)
+                           (U.subscribe (f y) (q ++ [ ix 1 ]) ∷ At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl′)) S
+             → U.step g ≡ S
+             → Σ (U.Node [] R) λ g″ → At.part heap′ T′ ≡ just g″ × Sane [] g″ × Placed g″ []
+               × Σ Pos λ k′ → Σ (Events∞ R) λ r′ → (∀ n → Agree n (residual g) (skip k′ r′)) × Past (Events∞.force r′) (residual g″)
+    bg-ghost {S = S} sn pd L sg = bg-ghosted sn pd (subst (λ x → Lifts base (wkPath grow ρ) x S) (sym skipped-grow) (Lifted.lifts-grow grows L)) sg
+
+    bg-owned : (sk : StackAs T q ϑ K bs) → Owned H T (runAs [] (≗-refl _) sk) → Owned heap′ T′ (ca′ sk)
+    bg-owned sk ow = bg-owns sk (Wk.grow-run grows sk ow)
+
+    bg-behind : Each H (Heads q) T → Each heap′ (Heads (q ++ [ ix 1 ])) T′
+    bg-behind bh = bg-heads (Wk.grow-each grows bh)
+
+    bg-lingers : Lingers H (Restaged.T′ H ρ pl′) → Lingers heap′ T′
+    bg-lingers lg = bg-lingered (Wk.grow-lingers grows lg)
 
     -- The flatMap before the start, in the grown world.
     u₀ : Sub v Δ B

@@ -29,21 +29,22 @@ open import denotation.MonotonicList using (Timeline; Frame; From; Pos; ix; last
 open import denotation.MonotonicList using () renaming (sub to subᴾ)
 import Tree as T
 import denotation.Unfold as U
-open import operation.PureObservable using (Pureᴾ)
+open import operation.PureObservable using (Out; Pureᴾ)
 open import operation.AbstractObservable using (module Heap; module Run; Prims) renaming (module Machine to Shared)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Grow using (module Growing)
 open import adequacy.Seq using (module Sequencing)
-open import operation.AbstractObservable using (base; maybe; sink; list; fifo; quiet)
+open import operation.AbstractObservable using (base; maybe; sink; list; fifo; quiet; gate)
 
 module Aliking (R : Set) where
   open Unsubbing R using (≗-trans; wk≗; bind≗; wk-same; same-⨾)
   open Growing R using (wkPath; wkPathᴸ)
   open Sequencing R using (wk-wk; wk∋-wk; wkEl-wk; wkEnv-wk; seq-wk; ⨾-assoc)
+  open Shared Timeline (Out R) using (wkVal)
   open Heap using (_⊑_; _⨾_; _∋_; there; new; grow; wk∋; cell; slot; Quiet) renaming (here to hereʳ; same to same⊑)
   open Run (Pureᴾ R) using (Act; done; compile; Env; wkEnv; wkAct; module Kit; module FlatKit; Ref; Observer; Kont; wkObs; wkKont; Subscription; Subscribe; emitAll; Subject; wkSubject; wkR; wkSubn; readRef; writeRef; stash; cancel; _>>ᴬ_; _>>=ᴬ_; newRef; register; send; finish; startCold; stop; eff; under; diverge; unfold) renaming (here to atᴬ)
-  open Strongly R using (Sub; Lane; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; Here; ctx; walk; walkLanes; top; rootObs; takeK; flatK; laneK; bodyK; srcK; deferK; unsubscribing; _≗_; killAllᶜ; ≗-refl; newRef≗; done≗; register≗; send≗; finish≗; startCold≗; stop≗; stash≗; cancel≗; eff≗; here≗; under≗; diverge≗; unfold≗; readRef≗; writeRef≗; module Canon)
+  open Strongly R using (Sub; Lane; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; Here; ctx; walk; walkLanes; top; rootObs; takeK; flatK; laneK; bodyK; srcK; deferK; unsubscribing; _≗_; CbRel; killAllᶜ; ≗-refl; newRef≗; done≗; register≗; send≗; finish≗; startCold≗; stop≗; stash≗; cancel≗; eff≗; here≗; under≗; diverge≗; unfold≗; readRef≗; writeRef≗; module Canon)
 
   -- Two observers, part for part; two continuations, pointwise.
   ObsRel : ∀ {A w} → Observer A w → Observer A w → Set₁
@@ -297,6 +298,13 @@ module Aliking (R : Set) where
   when-wk τ true  e = e
   when-wk τ false e = ≗-refl _
 
+  emit-wk : ∀ {w v A} (τ : w ⊑ v) (o : Observer A w) (o′ : Observer A v) → ObsRel (wkObs τ o) o′ → ∀ i xs → wkAct τ (emitAll o i xs) ≗ emitAll o′ i xs
+  emit-wk τ o o′ (n , cm , x) i []       = under≗ cm (≗-refl _)
+  emit-wk τ o o′ oR@(n , cm , x) i (y ∷ ys) =
+    ≗-trans (bind-wk τ (Observer.closed o) (λ c → Kit.when (not c) (under (ix i) (Observer.next o y) (emitAll o (suc i) ys))))
+      (bind≗ {m = wkAct τ (Observer.closed o)} {f = λ c → wkAct τ (Kit.when (not c) (under (ix i) (Observer.next o y) (emitAll o (suc i) ys)))} x λ c →
+        when-wk τ (not c) (under≗ (n y) (emit-wk τ o o′ oR (suc i) ys)))
+
   if-wk : ∀ {w v B} (τ : w ⊑ v) b {x y : Act w B} {x′ y′} → wkAct τ x ≗ x′ → wkAct τ y ≗ y′ → wkAct τ (if b then x else y) ≗ (if b then x′ else y′)
   if-wk τ true  e _ = e
   if-wk τ false _ e = e
@@ -398,6 +406,12 @@ module Aliking (R : Set) where
     admit-wk T.switchᶠ           a = seq-wk≗ τ M.killAll (M.start (f a)) (killAll-wk τ st) (start-wk {f a} {f′ a} (fW a))
     admit-wk T.exhaustᶠ          a = readB-wk τ (FlatKit.Flat.active st) λ c → when-wk τ (c ≡ᵇ 0) (start-wk {f a} {f′ a} (fW a))
 
+    dequeue-wk : wkAct τ M.dequeue ≗ M′.dequeue
+    dequeue-wk = readRef≗ refl λ where
+      σ []       → ≗-trans (≗-sym (wk-wk τ σ M.settle)) (wk≗ σ settle-wk)
+      σ (a ∷ as) → writeRef≗ (sym (wk∋-wk τ σ (FlatKit.Flat.queue st))) refl
+                     (≗-trans (≗-sym (wk-wk τ σ (M.start (f a)))) (wk≗ σ (start-wk {f a} {f′ a} (fW a))))
+
   ----------------------------------------------------------------------
   -- The observers and continuations a walk builds, weakened
 
@@ -448,6 +462,37 @@ module Aliking (R : Set) where
       module M′ = FlatKit.FlatMap op (λ a → compile (f a) E′) o′ (FlatKit.wkFlat τ fl)
       module F = FlatWk τ op (λ a → compile (f a) E) (λ a → compile (f a) E′) o o′ fl
                    (λ a σ pR kR → ≗-trans (compile-at (f a) E E′ (τ ⨾ σ) σ (env-step σ)) (compile-cong (f a) E′ σ pR kR)) oR
+
+  -- A lane begun past a growth: its observer read at the growth over the
+  -- old cells, or in the grown world over the weakened ones.
+  laneAt-wk : ∀ {w v Δ A B} (τ : w ⊑ v) (op : T.FlatOp) (f : A → T.Obs Timeline Δ B) {E : Env Δ w} {E′} {o : Observer B w} {o′}
+              (fl : FlatKit.Flat A w) (c : Kit.Cut v) → wkEnv τ E ≡ E′ → ObsRel (wkObs τ o) o′
+            → ObsRel (Kit.guarded c (Canon.Flat′.lane op f E o fl τ c)) (Canon.Flat′.laneO op f E′ o′ (FlatKit.wkFlat τ fl) c)
+  laneAt-wk τ op f {E} {E′} {o} {o′} fl c e oR = guarded-cong c (F.lane-wk same⊑ c)
+    where
+      env-step : ∀ {x} (σ : _ ⊑ x) → wkEnv (τ ⨾ σ) E ≡ wkEnv σ E′
+      env-step σ = trans (sym (wkEnv-wk τ σ E)) (cong (wkEnv σ) e)
+      module F = FlatWk τ op (λ a → compile (f a) E) (λ a → compile (f a) E′) o o′ fl
+                   (λ a σ pR kR → ≗-trans (compile-at (f a) E E′ (τ ⨾ σ) σ (env-step σ)) (compile-cong (f a) E′ σ pR kR)) oR
+
+  refill-wk : ∀ {w v Δ A B} (τ : w ⊑ v) (op : T.FlatOp) (f : A → T.Obs Timeline Δ B) {E : Env Δ w} {E′} {o : Observer B w} {o′}
+              (fl : FlatKit.Flat A w) → wkEnv τ E ≡ E′ → ObsRel (wkObs τ o) o′
+            → CbRel (wkVal (slot ⊤) τ (Canon.Flat′.refillCb op f E o fl)) (Canon.Flat′.refillCb op f E′ o′ (FlatKit.wkFlat τ fl))
+  refill-wk τ op f {E} {E′} {o} {o′} fl e oR = (λ _ → F.dequeue-wk) , ≗-refl _ , ≗-refl _
+    where
+      env-step : ∀ {x} (σ : _ ⊑ x) → wkEnv (τ ⨾ σ) E ≡ wkEnv σ E′
+      env-step σ = trans (sym (wkEnv-wk τ σ E)) (cong (wkEnv σ) e)
+      module F = FlatWk τ op (λ a → compile (f a) E) (λ a → compile (f a) E′) o o′ fl
+                   (λ a σ pR kR → ≗-trans (compile-at (f a) E E′ (τ ⨾ σ) σ (env-step σ)) (compile-cong (f a) E′ σ pR kR)) oR
+
+  readG-wk : ∀ {w v B} (τ : w ⊑ v) (r : Ref w gate) {k : Bool → Act w B} {k′ : Bool → Act v B} → (∀ x → wkAct τ (k x) ≗ k′ x)
+           → wkAct τ (Kit.readG r k) ≗ Kit.readG (wkR τ r) k′
+  readG-wk τ r {k} f = readRef≗ refl λ σ x → ≗-trans (≗-sym (wk-wk τ σ (k x))) (wk≗ σ (f x))
+
+  joiner-wk : ∀ {w v A} (τ : w ⊑ v) (l : Ref w gate) {o : Observer A w} {o′} → ObsRel (wkObs τ o) o′
+            → CbRel (wkVal (slot A) τ (Canon.joinerCb l o)) (Canon.joinerCb (wkR τ l) o′)
+  joiner-wk τ l (n , cm , x) =
+    (λ a → readG-wk τ l λ b → when-wk τ b (n a)) , readG-wk τ l (λ b → when-wk τ b cm) , readG-wk τ l (λ b → if-wk τ b x (≗-refl _))
 
   take-k : ∀ {w v} (τ : w ⊑ v) (c : Kit.Cut w) {k : Kont w} {k′ : Kont v} → KontRel (wkKont τ k) k′ → KontRel (wkKont τ (takeK c k)) (takeK (Kit.wkCut τ c) k′)
   take-k τ c {k} {k′} kR σ sub =
