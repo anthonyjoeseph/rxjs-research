@@ -177,16 +177,17 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **GHOSTS AND STACKS.** Attempt `ghost-lift`, the one leaf the skip
-  ghosts now call: decides whether a planted node's meaning tracks the
-  lifted skip through every ancestor. The source ghosts (`fed-ghost`,
-  `fin-ghost`) lift a node that differs from the tree's part, and
-  `end-ghost` an end, not a skip: each needs its own leaf beside it.
-- **THE LANE START, GROWN.** The `bg-*` row is one start: route it
-  through the growth frame as the restage modules' starts are, so its cells become
-  the growth cells plus the new lane's. Decides whether `ahead` survives a
-  run moved one level down (`bg-queue`, `connect-queue`), the queue's one
-  premise no kind carries.
+- **GHOSTS.** `ghost-lift` holds exactly off every source; what is left
+  is `source-lift`: the lifted node feeds the body a gap no joiner's part
+  holds. Decide first whether the gap is ever more than a leading skip.
+  Then `fed-ghost` as `ghost-lift` over one node fact, the retagged body
+  read as `U.feed`, which needs the joiners' states, so `Meaning`.
+- **THE LANE START, GROWN.** First the growth frame's own cells:
+  `grow-stack`/`alone`/`ticked` and `grow-owned`/`holds`/`joined` are one
+  naturality, the kernels' code under weakening (`walk-grow`,
+  `compile-cong`). Then route the rest of the `bg-*` row, `bg-ghost`
+  included, through the frame. Decides whether `ahead` survives a run
+  moved one level down (`bg-queue`, `connect-queue`).
 - **RESTAGE AND KERNEL CELLS.** The restage `heading`/`lingering` cells
   and `fr-holds`/`gated`/`spent`/`fed`: fold over the frames that exist.
 - **NODE FACTS, FALSITY FIRST.** Only now discharge: the node facts the
@@ -207,8 +208,8 @@ by their own silent steps (`Mirror`).
   stepped node's.
 - **`within-step`** (Stepper) — FALSITY, `REFUTED×2`, `X`: a sane, placed root
   ghost's step leaves its parts placed.
-- **`ghost-lift`** (Climbs) — FALSITY, `NO EVIDENCE`: a skip lifted to the
-  root, the node planted at its path a sane, placed part, the ghost past it.
+- **`source-lift`** (Climbs) — FALSITY, `NO EVIDENCE`: a skip lifted through a
+  connect's source, the planted part's meaning the lifted node's past a skip.
 - **`lane-settles`** (Climbs) — FALSITY, `NO EVIDENCE`: a freed slot's settle
   tests the ghost's lane end: done flag the outer gone, count the lanes.
 - **`calling-open`** (Climbs) — FALSITY, `NO EVIDENCE`: a climbing signal's

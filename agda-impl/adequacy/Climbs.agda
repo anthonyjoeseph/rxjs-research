@@ -37,9 +37,9 @@ open import adequacy.Moves using (module Moving)
 open import adequacy.Torn using (module Tearing)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Seq using (module Sequencing)
-open import adequacy.Sane using (Sane; sane-out)
+open import adequacy.Sane using (Sane; SaneS; sane-out; step-sane)
 open import adequacy.Placed using (Placed)
-open import adequacy.Stepper using (placed-after; Placedˢ)
+open import adequacy.Stepper using (placed-after; Placedˢ; step-skips; afterᴱ; _≃_)
 open import denotation.Denote using (⟦_⟧)
 import Tree as T
 open import operation.PureObservable using (Out; note; Pureᴾ; module Pure)
@@ -807,19 +807,124 @@ module Ascending (R : Set) where
     pool-queue : ∀ {q clk ts} → Queue H q clk ts T → Queue H q clk ts T′
     pool-queue = plant-queue H ρ v refl refl (λ _ → refl)
 
-  -- A SKIP CLIMBING TO THE ROOT: the step at the path's end skips to the
-  -- node the restaged child reads as, a write the path's own node holds;
-  -- the ghost past the root's skip, the grown tree's part what it left.
-  -- No ancestor's part reads its path child's except through the child's
-  -- step, but a connect's source skip feeds its body a gap no tree part
-  -- holds, so above a source only the meanings can agree.
+  -- A path through a connect's source.
+  mutual
+    Sourced : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Path t u → Set
+    Sourced here          = ⊥
+    Sourced (in-map ρ)    = Sourced ρ
+    Sourced (in-scan ρ)   = Sourced ρ
+    Sourced (in-take ρ)   = Sourced ρ
+    Sourced (in-outer ρ)  = Sourced ρ
+    Sourced (in-lanes πL) = SourcedL πL
+    Sourced (in-source ρ) = ⊤
+    Sourced (in-body ρ)   = Sourced ρ
+    Sourced (in-defer ρ)  = Sourced ρ
+
+    SourcedL : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} → PathLanes ls u → Set
+    SourcedL (this-lane ρ)  = Sourced ρ
+    SourcedL (next-lane πL) = SourcedL πL
+
+  mutual
+    sourced-planted : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {x : Sub h Δ′ A′} (ρ : Path t x) (v : Sub h Δ′ A′) → Sourced (planted ρ v) → Sourced ρ
+    sourced-planted (in-map ρ)    v s = sourced-planted ρ v s
+    sourced-planted (in-scan ρ)   v s = sourced-planted ρ v s
+    sourced-planted (in-take ρ)   v s = sourced-planted ρ v s
+    sourced-planted (in-outer ρ)  v s = sourced-planted ρ v s
+    sourced-planted (in-lanes πL) v s = sourcedL-planted πL v s
+    sourced-planted (in-source ρ) v s = tt
+    sourced-planted (in-body ρ)   v s = sourced-planted ρ v s
+    sourced-planted (in-defer ρ)  v s = sourced-planted ρ v s
+
+    sourcedL-planted : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {x : Sub h Δ′ A′} (πL : PathLanes ls x) (v : Sub h Δ′ A′)
+                     → SourcedL (plantedᴸ πL v) → SourcedL πL
+    sourcedL-planted (this-lane ρ)  v s = sourced-planted ρ v s
+    sourcedL-planted (next-lane πL) v s = sourcedL-planted πL v s
+
+  -- A lane's parts, the first apart.
+  lanes-one : ∀ {h} (H : Heapᴹ h) {Δ B} (l : Lane h Δ B) ls → At.partLanes H (l ∷ ls) ≡ At.partLanes H (l ∷ []) ++ At.partLanes H ls
+  lanes-one H (lane c k s) ls with At.val H (Kit.live c) | At.part H s
+  ... | true  | just _  = refl
+  ... | true  | nothing = refl
+  ... | false | _       = refl
+
+  -- A lane in the list, the flatMap open.
+  merged-cons : ∀ {h} (H : Heapᴹ h) {Δ A B} op (g : A → Pos → U.Node Δ B) (o : Maybe (U.Node Δ A)) bs c as qs pl
+              → At.merged H op g o (bs ++ c ∷ as) qs pl ≡ just (U.flatMapᶜ op g o (bs ++ c ∷ as) qs pl)
+  merged-cons H op g nothing  []      c as qs pl = refl
+  merged-cons H op g nothing  (_ ∷ _) c as qs pl = refl
+  merged-cons H op g (just _) bs      c as qs pl = refl
+
+  -- A SKIP LIFTED OFF EVERY SOURCE: each ancestor skips to the node its
+  -- own part reads, the child's part the node the child skipped to.
+  mutual
+    skip-lift : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) {k c S}
+              → Lifts H π (U.skipˢ k c) S → At.part H u ≡ just c
+              → Sourced π ⊎ Σ Pos λ k′ → Σ (U.Node Δ A) λ g′ → S ≡ U.skipˢ k′ g′ × At.part H t ≡ just g′
+    skip-lift H here lifts-here pc = inj₂ (_ , _ , refl , pc)
+    skip-lift H (in-map π) (lifts-map L) pc with skip-lift H π L pc
+    ... | inj₁ sc = inj₁ sc
+    ... | inj₂ (k′ , g′ , refl , pg) rewrite pg = inj₂ (k′ , _ , refl , refl)
+    skip-lift H (in-scan π) (lifts-scan L) pc with skip-lift H π L pc
+    ... | inj₁ sc = inj₁ sc
+    ... | inj₂ (k′ , g′ , refl , pg) rewrite pg = inj₂ (k′ , _ , refl , refl)
+    skip-lift H (in-take π) (lifts-take lv L) pc with skip-lift H π L pc
+    ... | inj₁ sc = inj₁ sc
+    ... | inj₂ (k′ , g′ , refl , pg) rewrite lv | pg = inj₂ (k′ , _ , refl , refl)
+    skip-lift H (in-outer π) (lifts-outer _ _ L) pc with skip-lift H π L pc
+    ... | inj₁ sc = inj₁ sc
+    ... | inj₂ (k′ , g′ , refl , pg) rewrite pg = inj₂ (k′ , _ , refl , refl)
+    skip-lift H (in-lanes {op = op} {f} {fl} {pl = pl} {t = so} πL) (lifts-lanes {bs = bs} {as = as} LL _ _ _) pc with skip-liftL H πL LL pc
+    ... | inj₁ sc = inj₁ sc
+    ... | inj₂ (k′ , c′ , refl , eq) rewrite eq =
+      inj₂ (k′ , _ , refl , merged-cons H op (λ a q → U.subscribe (f a) q) (At.part H so) bs c′ as (At.val H (FlatKit.Flat.queue fl)) pl)
+    skip-lift H (in-source π) (lifts-source _ _ _) pc = inj₁ tt
+    skip-lift H (in-body π) (lifts-body pt _ L) pc with skip-lift H π L pc
+    ... | inj₁ sc = inj₁ sc
+    ... | inj₂ (k′ , g′ , refl , pg) rewrite pt | pg = inj₂ (k′ , _ , refl , refl)
+    skip-lift H (in-body π) (lifts-shut pt refl _ L) pc with skip-lift H π L pc
+    ... | inj₁ sc = inj₁ sc
+    ... | inj₂ (k′ , g′ , refl , pg) rewrite pt | pg = inj₂ (k′ , _ , refl , refl)
+    skip-lift H (in-defer π) (lifts-defer L) pc = skip-lift H π L pc
+
+    skip-liftL : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (πL : PathLanes ls u) {k c bs S as}
+               → LiftsLane H πL (U.skipˢ k c) bs S as → At.part H u ≡ just c
+               → SourcedL πL ⊎ Σ Pos λ k′ → Σ (U.Node Δ B) λ c′ → S ≡ U.skipˢ k′ c′ × At.partLanes H ls ≡ bs ++ c′ ∷ as
+    skip-liftL H (this-lane π) (lifts-this lv L) pc with skip-lift H π L pc
+    ... | inj₁ sc = inj₁ sc
+    ... | inj₂ (k′ , c′ , refl , pg) rewrite lv | pg = inj₂ (k′ , c′ , refl , refl)
+    skip-liftL H (next-lane {l = l} {ls} πL) (lifts-next L) pc with skip-liftL H πL L pc
+    ... | inj₁ sc = inj₁ sc
+    ... | inj₂ (k′ , c′ , refl , eq) =
+      inj₂ (k′ , c′ , refl , trans (lanes-one H l ls) (trans (cong (At.partLanes H (l ∷ []) ++_) eq) (sym (++-assoc (At.partLanes H (l ∷ [])) _ _))))
+
+  -- A SKIP CLIMBING THROUGH A SOURCE: the source's skip feeds its body a
+  -- gap, so the node lifted holds a body fed what the tree's part, read
+  -- off the heap, was never fed; the two meanings differ by that gap in
+  -- every joiner the body holds, and agree only where it is a leading
+  -- skip or no joiner reads it.
   postulate
-    ghost-lift : ∀ {h} (H H′ : Heapᴹ h) {T : Sub h [] R} {Δ A} {w₀ : Sub h Δ A} (ρ : Path T w₀) (v : Sub h Δ A)
-               → AllPairs _≢_ (names T) → ∀ {ns} → Offʰ H H′ ns → All (_∈ᴸ names w₀) ns
-               → ∀ {k c S g} → Lifts H ρ (U.skipˢ k c) S → At.part H′ v ≡ just c
-               → Sane [] g → Placed g [] → U.step g ≡ S
-               → Σ (U.Node [] R) λ g″ → At.part H′ (plant ρ v) ≡ just g″ × Sane [] g″ × Placed g″ []
-                 × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
+    source-lift : ∀ {h} (H H′ : Heapᴹ h) {T : Sub h [] R} {Δ A} {w₀ : Sub h Δ A} (ρ : Path T w₀) (v : Sub h Δ A)
+                → AllPairs _≢_ (names T) → ∀ {ns} → Offʰ H H′ ns → All (_∈ᴸ names w₀) ns
+                → ∀ {k c S g} → Lifts H ρ (U.skipˢ k c) S → At.part H′ v ≡ just c
+                → Sane [] g → Placed g [] → U.step g ≡ S → Sourced ρ
+                → Σ (U.Node [] R) λ g″ → At.part H′ (plant ρ v) ≡ just g″ × Sane [] g″ × Placed g″ []
+                  × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
+
+  -- A SKIP CLIMBING TO THE ROOT: the ghost past the root's skip, the
+  -- planted tree's part what it skipped to.
+  ghost-lift : ∀ {h} (H H′ : Heapᴹ h) {T : Sub h [] R} {Δ A} {w₀ : Sub h Δ A} (ρ : Path T w₀) (v : Sub h Δ A)
+             → AllPairs _≢_ (names T) → ∀ {ns} → Offʰ H H′ ns → All (_∈ᴸ names w₀) ns
+             → ∀ {k c S g} → Lifts H ρ (U.skipˢ k c) S → At.part H′ v ≡ just c
+             → Sane [] g → Placed g [] → U.step g ≡ S
+             → Σ (U.Node [] R) λ g″ → At.part H′ (plant ρ v) ≡ just g″ × Sane [] g″ × Placed g″ []
+               × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
+  ghost-lift H H′ ρ v fs off mine {g = g} L pv sn pd sg
+    with skip-lift H′ (planted ρ v) (lifts-planted ρ v (Wrote.wr-lifts H H′ ρ off mine fs L)) pv
+  ... | inj₁ sc = source-lift H H′ ρ v fs off mine L pv sn pd sg (sourced-planted ρ v sc)
+  ... | inj₂ (k′ , g′ , refl , pg) =
+    g′ , pg , subst (SaneS []) sg (step-sane g sn) , proj₂ (subst (Placedˢ []) sg (placed-after g sn pd))
+       , k′ , U.stateᴺ g′ [] , (λ n → subst (λ s → Agree n (residual g) (afterᴱ [] s)) sg (_≃_.agreeing (step-skips g sn pd) n))
+       , agrees (λ n → agree-refl n (residual g′))
 
   -- An outer ended with lanes or a queue left skips to the pool.
   outer-end : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) (o : U.Node Γ A) q (ls : List (U.Node Γ B)) (qs : List A) p
@@ -1461,13 +1566,6 @@ module Ascending (R : Set) where
             → ∀ {s bs S as} → LiftsLane H πL s bs S as → S ≡ s
   lane-step one-this     (lifts-this _ lifts-here) = refl
   lane-step (one-next o) (lifts-next L)            = lane-step o L
-
-  -- A lane's parts, the first apart.
-  lanes-one : ∀ {h} (H : Heapᴹ h) {Δ B} (l : Lane h Δ B) ls → At.partLanes H (l ∷ ls) ≡ At.partLanes H (l ∷ []) ++ At.partLanes H ls
-  lanes-one H (lane c k s) ls with At.val H (Kit.live c) | At.part H s
-  ... | true  | just _  = refl
-  ... | true  | nothing = refl
-  ... | false | _       = refl
 
   -- The parts of the lanes a one-step path lifts through: those it
   -- passes, the lane's, those after.
