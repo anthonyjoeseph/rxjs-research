@@ -2014,23 +2014,23 @@ module Restaging (R : Set) where
     names-plant-↭ : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′) {X}
                   → names v ↭ X ++ names u → names (plant π v) ↭ X ++ names t
     names-plant-↭ here v e = e
-    names-plant-↭ (in-map π) v e = names-plant-↭ π v e
-    names-plant-↭ (in-scan π) v e = pre (_ ∷ []) (names-plant-↭ π v e)
-    names-plant-↭ (in-take {c = c} {k} π) v e = pre (cutNames c) (pre (quietName k) (names-plant-↭ π v e))
-    names-plant-↭ (in-outer {fl = fl} {oc} {k} {ls = ls} π) v e =
-      pre (flatNames fl) (pre (cutNames oc) (pre (quietName k) (pre (_ ∷ []) (post (laneNames ls) (names-plant-↭ π v e)))))
-    names-plant-↭ (in-lanes {fl = fl} {oc} {k} {t = so} π) v e =
-      pre (flatNames fl) (pre (cutNames oc) (pre (quietName k) (pre (_ ∷ []) (pre (names so) (names-plant-↭ᴸ π v e)))))
-    names-plant-↭ (in-source {S = S} {c} {kb = kb} {k} {bd = bd} π) v e =
-      pre (subjectNames S) (pre (cutNames c) (pre (_ ∷ []) (pre (quietName kb) (pre (quietName k) (post (names bd) (names-plant-↭ π v e))))))
-    names-plant-↭ (in-body {S = S} {c} {kb = kb} {k} {t = src} π) v e =
-      pre (subjectNames S) (pre (cutNames c) (pre (_ ∷ []) (pre (quietName kb) (pre (quietName k) (pre (names src) (names-plant-↭ π v e))))))
-    names-plant-↭ (in-defer {k = k} π) v e = pre (quietName k) (names-plant-↭ π v e)
+    names-plant-↭ (in-map π) v {X} e = names-plant-↭ π v {X} e
+    names-plant-↭ (in-scan π) v {X} e = pre (_ ∷ []) {X} (names-plant-↭ π v {X} e)
+    names-plant-↭ (in-take {c = c} {k} π) v {X} e = pre (cutNames c) {X} (pre (quietName k) {X} (names-plant-↭ π v {X} e))
+    names-plant-↭ (in-outer {fl = fl} {oc} {k} {ls = ls} π) v {X} e =
+      pre (flatNames fl) {X} (pre (cutNames oc) {X} (pre (quietName k) {X} (pre (_ ∷ []) {X} (post (laneNames ls) {X} (names-plant-↭ π v {X} e)))))
+    names-plant-↭ (in-lanes {fl = fl} {oc} {k} {t = so} π) v {X} e =
+      pre (flatNames fl) {X} (pre (cutNames oc) {X} (pre (quietName k) {X} (pre (_ ∷ []) {X} (pre (names so) {X} (names-plant-↭ᴸ π v {X} e)))))
+    names-plant-↭ (in-source {S = S} {c} {kb = kb} {k} {bd = bd} π) v {X} e =
+      pre (subjectNames S) {X} (pre (cutNames c) {X} (pre (_ ∷ []) {X} (pre (quietName kb) {X} (pre (quietName k) {X} (post (names bd) {X} (names-plant-↭ π v {X} e))))))
+    names-plant-↭ (in-body {S = S} {c} {kb = kb} {k} {t = src} π) v {X} e =
+      pre (subjectNames S) {X} (pre (cutNames c) {X} (pre (_ ∷ []) {X} (pre (quietName kb) {X} (pre (quietName k) {X} (pre (names src) {X} (names-plant-↭ π v {X} e))))))
+    names-plant-↭ (in-defer {k = k} π) v {X} e = pre (quietName k) {X} (names-plant-↭ π v {X} e)
 
     names-plant-↭ᴸ : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′) {X}
                    → names v ↭ X ++ names u → laneNames (plantᴸ π v) ↭ X ++ laneNames ls
-    names-plant-↭ᴸ (this-lane {c = c} {k} {ls = ls} π) v e = pre (cutNames c) (pre (quietName k) (post (laneNames ls) (names-plant-↭ π v e)))
-    names-plant-↭ᴸ (next-lane {l = lane c k s} π) v e = pre (cutNames c) (pre (quietName k) (pre (names s) (names-plant-↭ᴸ π v e)))
+    names-plant-↭ᴸ (this-lane {c = c} {k} {ls = ls} π) v {X} e = pre (cutNames c) {X} (pre (quietName k) {X} (post (laneNames ls) {X} (names-plant-↭ π v {X} e)))
+    names-plant-↭ᴸ (next-lane {l = lane c k s} π) v {X} e = pre (cutNames c) {X} (pre (quietName k) {X} (pre (names s) {X} (names-plant-↭ᴸ π v {X} e)))
 
   -- THE FRESH FRAME: a node replanted naming `X` more, `X` apart from
   -- itself and from every name the tree held, leaves the tree's names

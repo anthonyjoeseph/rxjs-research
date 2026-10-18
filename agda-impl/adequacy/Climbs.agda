@@ -1195,8 +1195,8 @@ module Ascending (R : Set) where
 
     -- The new lane's cut: the only names the start adds.
     bg-names : names v′ ↭ cutNames cut′ ++ names (wkTree grow (flatMapˢ op f fl oc k r pl t ls))
-    bg-names = pre (flatNames (FlatKit.wkFlat grow fl)) (pre (cutNames (Kit.wkCut grow oc)) (pre (quietName (mapMaybe (wk∋ grow) k))
-                 (pre (_ ∷ []) (pre (names (wkTree grow t)) ↭-refl′))))
+    bg-names = pre (flatNames (FlatKit.wkFlat grow fl)) {cutNames cut′} (pre (cutNames (Kit.wkCut grow oc)) {cutNames cut′} (pre (quietName (mapMaybe (wk∋ grow) k)) {cutNames cut′}
+                 (pre (_ ∷ []) {cutNames cut′} (pre (names (wkTree grow t)) {cutNames cut′} ↭-refl′))))
 
     bg-fresh : AllPairs _≢_ (names T) → AllPairs _≢_ (names T′)
     bg-fresh fs = fresh-plant (wkPath grow ρ) v′ bg-names ((λ ()) ∷ [] ∷ []) (wk-pairs grow T fs)
