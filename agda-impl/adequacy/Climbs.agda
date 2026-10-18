@@ -1199,7 +1199,7 @@ module Ascending (R : Set) where
                  (pre (_ ∷ []) {cutNames cut′} (pre (names (wkTree grow t)) {cutNames cut′} ↭-refl′))))
 
     bg-fresh : AllPairs _≢_ (names T) → AllPairs _≢_ (names T′)
-    bg-fresh fs = fresh-plant (wkPath grow ρ) v′ bg-names ((λ ()) ∷ [] ∷ []) (wk-pairs grow T fs)
+    bg-fresh fs = fresh-plant (wkPath grow ρ) v′ bg-names (((λ ()) ∷ []) ∷ [] ∷ []) (wk-pairs grow T fs)
       (fresh-new grow (λ m∈ → let (_ , _ , e) = wk-img grow T m∈ in to-img grow e)
         ((λ { {_ , _} (i , refl) e → lookupᴬ (Grown.outside grown i) (here refl) (sym e) })
          ∷ (λ { {_ , _} (i , refl) e → lookupᴬ (Grown.outside grown i) (there (here refl)) (sym e) }) ∷ []))
