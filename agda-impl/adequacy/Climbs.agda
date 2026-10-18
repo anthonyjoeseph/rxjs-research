@@ -56,6 +56,8 @@ open import adequacy.Names using (module Naming)
 open import adequacy.Local using (module Locality)
 open import adequacy.Retag using (module Retagging; at-here)
 open import adequacy.Replant using (module Replanting)
+open import adequacy.Restages using (module Staging)
+open import adequacy.Weaken using (module Weakening)
 open import adequacy.Shift using (module Shifting)
 
 open Events∞
@@ -67,7 +69,7 @@ module Ascending (R : Set) where
   open Sorting R using (WellMach)
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
   open Strongly R using (Strong; Carried; Books; carried; closing; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; Meets; Each; Heads; Lingers; seen; seenL; pinned-trans; ∧-split; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
-  open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf) renaming (Placed to Placedᴬ)
+  open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf; src-of) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
   open Moving R using (pairs-r; pairs-split; takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; holds-plant; settled-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
   open Tearing R using (fresh-path; takeSite; bodySite; look-store; look-either; Alike; part-alike; partLanes-alike; part-flat; apart-r; each-same; seen-alike; seenL-alike; names-path; lanes-path) renaming (Off to Offʰ)
@@ -85,7 +87,9 @@ module Ascending (R : Set) where
   open Shifting R using (LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; lingers-sub; lingersL-of; module Linger; module Build)
   open Framing R using (Untold; untold; scan-part; scan-defined; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike)
     renaming (Ended to Ends)
-  open Replanting R using (Kin; kin-end; kin-pool; kin-feed; kin-fin; rehomes; rehomes-code; restack; reticked; owned-run; plant-self; module Shift; Heading; Lingering; Gone; store-held; Lives; lives-off; ahead-under)
+  open Staging R using (not-src; wrap-lane)
+  open Weakening R using () renaming (module Grown to Weakened)
+  open Replanting R using (Kin; kin-end; kin-pool; kin-feed; kin-fin; kin-lane; rehomes; rehomes-code; restack; reticked; owned-run; plant-self; module Shift; Heading; Lingering; Gone; store-held; Lives; lives-off; ahead-under)
   open Read
 
   handleOf : ∀ {h} {t : Sub h [] R} → Spot t → Maybe (Handle h)
@@ -803,6 +807,35 @@ module Ascending (R : Set) where
     pool-queue : ∀ {q clk ts} → Queue H q clk ts T → Queue H q clk ts T′
     pool-queue = plant-queue H ρ v refl refl (λ _ → refl)
 
+  -- A SKIP CLIMBING TO THE ROOT: the step at the path's end skips to the
+  -- node the restaged child reads as, a write the path's own node holds;
+  -- the ghost past the root's skip, the grown tree's part what it left.
+  -- No ancestor's part reads its path child's except through the child's
+  -- step, but a connect's source skip feeds its body a gap no tree part
+  -- holds, so above a source only the meanings can agree.
+  postulate
+    ghost-lift : ∀ {h} (H H′ : Heapᴹ h) {T : Sub h [] R} {Δ A} {w₀ : Sub h Δ A} (ρ : Path T w₀) (v : Sub h Δ A)
+               → AllPairs _≢_ (names T) → ∀ {ns} → Offʰ H H′ ns → All (_∈ᴸ names w₀) ns
+               → ∀ {k c S g} → Lifts H ρ (U.skipˢ k c) S → At.part H′ v ≡ just c
+               → Sane [] g → Placed g [] → U.step g ≡ S
+               → Σ (U.Node [] R) λ g″ → At.part H′ (plant ρ v) ≡ just g″ × Sane [] g″ × Placed g″ []
+                 × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
+
+  -- An outer ended with lanes or a queue left skips to the pool.
+  outer-end : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) (o : U.Node Γ A) q (ls : List (U.Node Γ B)) (qs : List A) p
+            → (null ls ∧ null qs) ≡ false → U.outerˢ op g o (U.endˢ q) ls qs p ≡ U.skipˢ q (U.flatMapᶜ op g nothing ls qs (U.unionᶜ p (U.restᶜ o)))
+  outer-end op g o q []      []      p ()
+  outer-end op g o q []      (_ ∷ _) p _ = refl
+  outer-end op g o q (_ ∷ _) []      p _ = refl
+  outer-end op g o q (_ ∷ _) (_ ∷ _) p _ = refl
+
+  merged-open : ∀ {h} (G : Heapᴹ h) {Δ A B} op (g : A → Pos → U.Node Δ B) (ls : List (U.Node Δ B)) (qs : List A) pl
+              → (null ls ∧ null qs) ≡ false → At.merged G op g nothing ls qs pl ≡ just (U.flatMapᶜ op g nothing ls qs pl)
+  merged-open G op g []      []      pl ()
+  merged-open G op g []      (_ ∷ _) pl _ = refl
+  merged-open G op g (_ ∷ _) []      pl _ = refl
+  merged-open G op g (_ ∷ _) (_ ∷ _) pl _ = refl
+
   -- A FLATMAP'S OUTER ENDED: its done flag written, nothing else of the
   -- heap or the tree moved; settled, the count read as the live lanes.
   module Settles {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B op f fl oc k r pl} {u : Sub h Δ A} {ls : List (Lane h Δ B)}
@@ -833,10 +866,13 @@ module Ascending (R : Set) where
     sd-alike (a₀ ∷ a₁ ∷ _) j (here e)  = look-store H (FlatKit.Flat.outerDone fl) j (λ eq → lookupᴬ a₀ (here refl) (sym (trans eq e)))
     sd-alike (a₀ ∷ a₁ ∷ _) j (there m) = look-store H (FlatKit.Flat.outerDone fl) j (lookupᴬ a₁ (there m))
 
-    sd-part : AllPairs _≢_ (names w₀) → At.part H′ w₀ ≡ At.part H w₀
-    sd-part fr@(_ ∷ a₁ ∷ _) =
-      part-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} u ls (look-store H (FlatKit.Flat.outerDone fl) (FlatKit.Flat.queue fl) (lookupᴬ a₁ (here refl)))
+    sd-part-at : ∀ pl′ → AllPairs _≢_ (names w₀) → At.part H′ (flatMapˢ op f fl oc k r pl′ u ls) ≡ At.part H (flatMapˢ op f fl oc k r pl′ u ls)
+    sd-part-at pl′ fr@(_ ∷ a₁ ∷ _) =
+      part-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl′} u ls (look-store H (FlatKit.Flat.outerDone fl) (FlatKit.Flat.queue fl) (lookupᴬ a₁ (here refl)))
                 (Heaps.flat-so H H′ {fl = fl} {oc} {k} {r} {u} {ls} (sd-alike fr)) (Heaps.flat-ls H H′ {fl = fl} {oc} {k} {r} {u} {ls} (sd-alike fr))
+
+    sd-part : AllPairs _≢_ (names w₀) → At.part H′ w₀ ≡ At.part H w₀
+    sd-part = sd-part-at pl
 
     sd-active : AllPairs _≢_ (names w₀) → At.val H′ (FlatKit.Flat.active fl) ≡ At.val H (FlatKit.Flat.active fl)
     sd-active (a₀ ∷ _) = cong lower (look-store H (FlatKit.Flat.outerDone fl) (FlatKit.Flat.active fl) (λ eq → lookupᴬ a₀ (here refl) (sym eq)))
@@ -923,14 +959,22 @@ module Ascending (R : Set) where
 
     -- Lanes or a queue left: the pool takes what the outer left running,
     -- the ghost past the outer's skip.
-    postulate
-      pool-ghost : ∀ (o₀ : U.Node Δ A) {g q S} → Sane [] g → Placed g [] → At.part H u ≡ nothing
-                 → (null (At.partLanes H ls) ∧ null (At.val H (FlatKit.Flat.queue fl))) ≡ false
-                 → OuterFirst {A = A} (U.endˢ q) (At.partLanes H ls) → PoolBehind pl (U.outerOf (just o₀)) (U.earliest (At.partLanes H ls))
-                 → Lifts H ρ (U.outerˢ op (λ a j → U.subscribe (f a) j) o₀ (U.endˢ q) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl) S
-                 → U.step g ≡ S
-                 → Σ (U.Node [] R) λ g″ → At.part H′ (Restaged.T′ H′ ρ (U.unionᶜ pl (U.restᶜ o₀))) ≡ just g″ × Sane [] g″ × Placed g″ []
-                   × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
+    pool-ghost : AllPairs _≢_ (names T) → ∀ (o₀ : U.Node Δ A) {g q S} → Sane [] g → Placed g [] → At.part H u ≡ nothing
+               → (null (At.partLanes H ls) ∧ null (At.val H (FlatKit.Flat.queue fl))) ≡ false
+               → Lifts H ρ (U.outerˢ op (λ a j → U.subscribe (f a) j) o₀ (U.endˢ q) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl) S
+               → U.step g ≡ S
+               → Σ (U.Node [] R) λ g″ → At.part H′ (Restaged.T′ H′ ρ (U.unionᶜ pl (U.restᶜ o₀))) ≡ just g″ × Sane [] g″ × Placed g″ []
+                 × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
+    pool-ghost fs o₀ {q = q} sn pd gn nl L sg =
+      ghost-lift H H′ ρ (flatMapˢ op f fl oc k r pl′ u ls) fs (off-store H (FlatKit.Flat.outerDone fl)) mine
+        (subst (λ s → Lifts H ρ s _) (outer-end op G o₀ q (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl nl) L)
+        (trans (sd-part-at pl′ (fresh-path ρ fs))
+               (trans (cong (λ x → At.merged H op G x (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl′) gn)
+                      (merged-open H op G (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl′ nl)))
+        sn pd sg
+      where
+        G   = λ a j → U.subscribe (f a) j
+        pl′ = U.unionᶜ pl (U.restᶜ o₀)
 
   -- Lanes or a queue left: the pool takes the outer's last ghost
   -- rested, which is what the outer still runs.
@@ -970,7 +1014,7 @@ module Ascending (R : Set) where
               ; behind = bh ; lingers = lgr ; kept = kp }
     with lifts-split ρ (in-outer here) L
        | reads (subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-outer here) top) cd)
-  ... | _ , lifts-outer {o₀ = o₀} of pb lifts-here , Lρ | k₁ , f₁ , p₁
+  ... | _ , lifts-outer {o₀ = o₀} _ _ lifts-here , Lρ | k₁ , f₁ , p₁
     with writes (≗-trans (f₁ same⊑ (At.val hp (Kit.live oc)))
                    (bind≗ (≗-trans (wk-same (Kit.when (At.val hp (Kit.live oc))
                                               (writeRef (FlatKit.Flat.outerDone fl) true (settleᵒ (Here.obs (walk ρ top)) fl))))
@@ -1009,7 +1053,7 @@ module Ascending (R : Set) where
                                          (At.val (Settles.H′ hp ρ) (FlatKit.Flat.queue fl)))) λ _ → wk-same ⟦ ks ⟧ᶜ)
       nl   = nulls (At.partLanes hp ls) (At.val hp (FlatKit.Flat.queue fl)) (trans (sym (Settles.settle-eq hp ρ (fresh-path ρ fs) kn)) eq)
   ...           | false
-    with Settles.pool-ghost hp ρ o₀ sn pd gn (trans (sym (Settles.settle-eq hp ρ (fresh-path ρ fs) kn)) eq) of pb Lρ sg
+    with Settles.pool-ghost hp ρ fs o₀ sn pd gn (trans (sym (Settles.settle-eq hp ρ (fresh-path ρ fs) kn)) eq) Lρ sg
   ...             | g″ , pg , sn″ , pd″ , k″ , r″ , ag , pp =
     landed (g″ , _ , path
       , carried (record
@@ -1151,6 +1195,20 @@ module Ascending (R : Set) where
                    {t : Sub h Δ A} {ls : List (Lane h Δ B)} {ρ : Path T (flatMapˢ op f fl oc k r pl t ls)} {y : A} {pl′}
                → Begins g ℓ (mach ⟨ H , q , run a ϑ K ⟩ clk ts bs td lg en mk) ρ y pl′ → q ≢ []
 
+  -- A stack read at a frame and bursts equal to its own.
+  stack-cast : ∀ {h} {t : Sub h [] R} {p w} {ϑ₁ ϑ₂ : w ⊑ h} {K : Stack w ⊤} {xs₁ xs₂}
+             → ϑ₂ ≡ ϑ₁ → xs₂ ≡ xs₁ → StackAs t p ϑ₁ K xs₁ → StackAs t p ϑ₂ K xs₂
+  stack-cast refl refl sk = sk
+
+  ticked-cast : ∀ {h} {t : Sub h [] R} {n p w} {ϑ₁ ϑ₂ : w ⊑ h} {K : Stack w ⊤} {xs₁ xs₂} (e : ϑ₂ ≡ ϑ₁) (e′ : xs₂ ≡ xs₁)
+                {sk : StackAs t p ϑ₁ K xs₁} → Ticked t n sk → Ticked t n (stack-cast e e′ sk)
+  ticked-cast refl refl tk = tk
+
+  -- The runtime's own map is the library's.
+  pure-map : ∀ {a b} {X : Set a} {Y : Set b} (f : X → Y) (xs : List X) → Pure.mapList R f xs ≡ mapList f xs
+  pure-map f []       = refl
+  pure-map f (x ∷ xs) = cong (f x ∷_) (pure-map f xs)
+
   -- A LANE BEGUN, IN THE GROWN WORLD: the tree weakened along the growth,
   -- the flatMap its pool `pl′` and the new lane first, pending where it
   -- subscribes.
@@ -1178,20 +1236,27 @@ module Ascending (R : Set) where
                  × Σ Pos λ k′ → Σ (Events∞ R) λ r′ → (∀ n → Agree n (residual g) (skip k′ r′)) × Past (Events∞.force r′) (residual g″)
       bg-code  : Σ World λ u → Σ (Env Δ u) λ E′ → Σ (u ⊑ v) λ υ → wkEnv υ E′ ≡ Here.env (walk π′ top)
                  × act′ ≗ compile (f y) E′ υ (Here.obs (walk π′ top)) (Here.kont (walk π′ top))
-      bg-stack : StackAs T q ϑ K bs → StackAs T′ q ϑ′ K bs′
+
+    module Wk = Weakened grow
+
+    -- The stack grown, then the lane planted: every frame where it was.
+    bg-stack : StackAs T q ϑ K bs → StackAs T′ q ϑ′ K bs′
+    bg-stack sk = stack-cast seq′ (trans bursts′ (sym (pure-map _ bs))) (restack {v = v′} kin-lane (wkPath grow ρ) (Wk.grow-stack sk))
 
     stk′ : StackAs T q ϑ K bs → StackAs T′ (q ++ [ ix 1 ]) same⊑ (push (back q back′) ϑ′ K) bs′
     stk′ sk = backAs q [] (<ᵖ-below q []) (≗-trans (wk-same back′) rests′) (bg-stack sk)
 
-    postulate
-      -- The new lane sits in a pool, never under a connect's source.
-      bg-alone : (sk : StackAs T q ϑ K bs) → All (λ j → ¬ SrcOf T′ π′ (proj₂ j)) (stackJobs T′ (stk′ sk))
+    -- The new lane sits in a pool, never under a connect's source.
+    bg-alone : (sk : StackAs T q ϑ K bs) → All (λ j → ¬ SrcOf T′ π′ (proj₂ j)) (stackJobs T′ (stk′ sk))
+    bg-alone _ = tabulateᴬ λ _ → λ { (src-of β e) → not-src wrap-lane (planted (wkPath grow ρ) v′) β e }
 
     ca′ : StackAs T q ϑ K bs → CtlAs T′ (q ++ [ ix 1 ]) (run act′ same⊑ (push (back q back′) ϑ′ K)) bs′
     ca′ sk = subAs π′ bg-code (stk′ sk) (bg-alone sk)
 
+    bg-ticked : (sk : StackAs T q ϑ K bs) → Ticked T clk sk → Ticked T′ clk (bg-stack sk)
+    bg-ticked sk tk = ticked-cast seq′ (trans bursts′ (sym (pure-map _ bs))) (reticked {v = v′} kin-lane (wkPath grow ρ) (Wk.grow-stack sk) (Wk.grow-ticked sk tk))
+
     postulate
-      bg-ticked  : (sk : StackAs T q ϑ K bs) → Ticked T clk sk → Ticked T′ clk (bg-stack sk)
       bg-owned   : (sk : StackAs T q ϑ K bs) → Owned H T (runAs [] (≗-refl _) sk) → Owned heap′ T′ (ca′ sk)
       bg-kernels : Kernels H T → Kernels heap′ T′
       bg-meaning : Meaning H T → Meaning heap′ T′
@@ -1721,6 +1786,13 @@ module Ascending (R : Set) where
     fr-opened : AllPairs _≢_ (names T) → ∀ b → opened H′ b ρ ≡ opened H b ρ
     fr-opened fs = Wr.wr-opened fs
 
+    fr-fifo : AllPairs _≢_ (names w₀) → At.val H′ (FlatKit.Flat.queue fl) ≡ At.val H (FlatKit.Flat.queue fl)
+    fr-fifo (a₀ ∷ _ ∷ a₂ ∷ _) = cong lower (Heaps.keeps H H′ fr-off (λ m → m) ap (FlatKit.Flat.queue fl) (here refl))
+      where
+        ap : ∀ {x} → x ∈ᴸ (_ , FlatKit.Flat.queue fl) ∷ [] → All (x ≢_) ns
+        ap (here refl) = lookupᴬ a₂ (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names t) (cut-in ls (laneOf-in o))))))))
+                       ∷ (λ eq → lookupᴬ a₀ (there (here refl)) (sym eq)) ∷ []
+
     fr-lanes : AllPairs _≢_ (names w₀) → ∀ {s bs S as} → LiftsLane H πL s bs S as → At.partLanes H′ ls ≡ bs ++ as
     fr-lanes fr@(a₀ ∷ _) =
       lanes-freed H fl o (pairs-r (names t) P)
@@ -1855,6 +1927,26 @@ module Ascending (R : Set) where
            → U.laneˢ op g o bs l (U.endˢ c) as qs pl ≡ U.endˢ c
   lane-end op g l c pl refl refl refl refl = refl
 
+  -- A lane's end with the outer or a lane beside it, nothing queued: the
+  -- pool takes the lane's rest.
+  lane-open : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) (o : Maybe (U.Node Γ A)) bs l c as pl → settledᵍ o bs as [] ≡ false
+            → U.laneˢ op g o bs l (U.endˢ c) as [] pl ≡ U.skipˢ c (U.flatMapᶜ op g o (bs ++ as) [] (U.unionᶜ pl (U.restᶜ l)))
+  lane-open op g nothing  []      l c []      pl ()
+  lane-open op g nothing  []      l c (_ ∷ _) pl _ = refl
+  lane-open op g nothing  (_ ∷ _) l c []      pl _ = refl
+  lane-open op g nothing  (_ ∷ _) l c (_ ∷ _) pl _ = refl
+  lane-open op g (just _) []      l c []      pl _ = refl
+  lane-open op g (just _) []      l c (_ ∷ _) pl _ = refl
+  lane-open op g (just _) (_ ∷ _) l c []      pl _ = refl
+  lane-open op g (just _) (_ ∷ _) l c (_ ∷ _) pl _ = refl
+
+  merged-live : ∀ {h} (G : Heapᴹ h) {Δ A B} op (g : A → Pos → U.Node Δ B) (o : Maybe (U.Node Δ A)) bs as pl → settledᵍ o bs as [] ≡ false
+              → At.merged G op g o (bs ++ as) [] pl ≡ just (U.flatMapᶜ op g o (bs ++ as) [] pl)
+  merged-live G op g nothing  []      []      pl ()
+  merged-live G op g nothing  []      (_ ∷ _) pl _ = refl
+  merged-live G op g nothing  (_ ∷ _) as      pl _ = refl
+  merged-live G op g (just _) bs      as      pl _ = refl
+
   postulate
     -- A freed slot's settle tests what the ghost's lane end tests: the
     -- done flag, the outer's part gone; the count, the lanes beside it.
@@ -1870,20 +1962,39 @@ module Ascending (R : Set) where
                  → settleᵇ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) fl
                    ≡ settledᵍ (At.part (Conf.heap (Mach.conf m₁)) t) bs as (At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.queue fl))
 
-    -- A freed slot settling short of the end, the outer or a lane left:
-    -- the pool takes the lane's rest, the ghost past the lane's skip.
-    lane-ghost : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B op f fl oc k r pl} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ B}
-                 (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) {πL : PathLanes ls u} (o : OneLane πL)
-               → ∀ {g q S bs l S₁ as j} → Sane [] g → Placed g [] → At.part H u ≡ nothing
-               → LiftsLane H πL (U.endˢ q) bs S₁ as
-               → settledᵍ (At.part H t) bs as (At.val H (FlatKit.Flat.queue fl)) ≡ false
-               → U.earliest (bs ++ l ∷ as) ≡ U.found j bs l S₁ as → LaneFirst (At.part H t) j
-               → PoolBehind pl (U.outerOf (At.part H t)) (U.found j bs l S₁ as)
-               → Lifts H ρ (U.laneˢ op (λ a i → U.subscribe (f a) i) (At.part H t) bs l S₁ as (At.val H (FlatKit.Flat.queue fl)) pl) S
-               → U.step g ≡ S
-               → Σ (U.Node [] R) λ g″ → At.part (freed H (laneOf o) fl) (Restaged.T′ (freed H (laneOf o) fl) ρ (U.unionᶜ pl (U.restᶜ l))) ≡ just g″
-                 × Sane [] g″ × Placed g″ []
-                 × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
+  -- A freed slot settling short of the end, the outer or a lane left,
+  -- nothing queued: the pool takes the lane's rest, the ghost past the
+  -- lane's skip.
+  lane-ghost : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B op f fl oc k r pl} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ B}
+               (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) {πL : PathLanes ls u} (o : OneLane πL) → AllPairs _≢_ (names T)
+             → ∀ {g q S bs l S₁ as} → Sane [] g → Placed g []
+             → LiftsLane H πL (U.endˢ q) bs S₁ as
+             → settledᵍ (At.part H t) bs as (At.val H (FlatKit.Flat.queue fl)) ≡ false
+             → At.val (freed H (laneOf o) fl) (FlatKit.Flat.queue fl) ≡ []
+             → Lifts H ρ (U.laneˢ op (λ a i → U.subscribe (f a) i) (At.part H t) bs l S₁ as (At.val H (FlatKit.Flat.queue fl)) pl) S
+             → U.step g ≡ S
+             → Σ (U.Node [] R) λ g″ → At.part (freed H (laneOf o) fl) (Restaged.T′ (freed H (laneOf o) fl) ρ (U.unionᶜ pl (U.restᶜ l))) ≡ just g″
+               × Sane [] g″ × Placed g″ []
+               × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
+  lane-ghost H {op = op} {f} {fl} {oc} {k} {r} {pl} {t} {ls} ρ o fs {q = q} {bs = bs} {l} {S₁} {as} sn pd LL st e₀ L sg =
+    ghost-lift H H₂ ρ (flatMapˢ op f fl oc k r pl′ t ls) fs (Freed.fr-off H ρ o) (Freed.fr-mine H ρ o)
+      (subst (λ s → Lifts H ρ s _) lane-eq L) node sn pd sg
+    where
+      H₂  = freed H (laneOf o) fl
+      G   = λ a i → U.subscribe (f a) i
+      pl′ = U.unionᶜ pl (U.restᶜ l)
+      fr  = fresh-path ρ fs
+      eH  : At.val H (FlatKit.Flat.queue fl) ≡ []
+      eH  = trans (sym (Freed.fr-fifo H ρ o fr)) e₀
+      st′ : settledᵍ (At.part H t) bs as [] ≡ false
+      st′ = subst (λ qs → settledᵍ (At.part H t) bs as qs ≡ false) eH st
+      lane-eq : U.laneˢ op G (At.part H t) bs l S₁ as (At.val H (FlatKit.Flat.queue fl)) pl ≡ U.skipˢ q (U.flatMapᶜ op G (At.part H t) (bs ++ as) [] pl′)
+      lane-eq = trans (cong₂ (λ S′ qs → U.laneˢ op G (At.part H t) bs l S′ as qs pl) (lane-step o LL) eH)
+                      (lane-open op G (At.part H t) bs l q as pl st′)
+      node : At.part H₂ (flatMapˢ op f fl oc k r pl′ t ls) ≡ just (U.flatMapᶜ op G (At.part H t) (bs ++ as) [] pl′)
+      node = trans (cong₂ (λ x ys → At.merged H₂ op G x ys (At.val H₂ (FlatKit.Flat.queue fl)) pl′) (Freed.fr-part H ρ o fr) (Freed.fr-lanes H ρ o fr LL))
+                   (trans (cong (λ qs → At.merged H₂ op G (At.part H t) (bs ++ as) qs pl′) e₀)
+                          (merged-live H₂ op G (At.part H t) bs as pl′ st′))
 
   -- A lane's end, its pool taking the lane's last ghost rested, which is
   -- what the lane still runs: with nothing queued, and with the queue's
@@ -1940,11 +2051,11 @@ module Ascending (R : Set) where
               → ∀ {a n} → m₁ ⇝ resend m₁ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (Calling.ϑ cl) (Calling.K cl) a n
               → a ≗ dequeueOf ρ [] → n ≗ ⟦ ks ⟧ᶜ → Called st m₁ (ρ ⊕ in-lanes πL)
   lane-settle st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {op = op} {f} {fl} {oc} {k} {r} {po} {t = t} {ls} ρ πL o {ks}
-    cl@record { sane = sn ; placed = pd ; ctl = refl ; stack = sk ; lifted = gn , S , L , sg ; owned = ow
+    cl@record { sane = sn ; placed = pd ; ctl = refl ; stack = sk ; lifted = _ , S , L , sg ; owned = ow
               ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
               ; behind = bh ; lingers = lgr ; kept = kp } eq₀ {n = n} p ea eks
     with lifts-split ρ (in-lanes πL) L | reads {hp = freed hp (laneOf o) fl} ea
-  ... | _ , lifts-lanes {bs = bs′} {l = l} {as = as′} LL ee lf pb , Lρ | k₁ , f₁ , p₁
+  ... | _ , lifts-lanes {bs = bs′} {l = l} {as = as′} LL _ _ _ , Lρ | k₁ , f₁ , p₁
     with reads {hp = freed hp (laneOf o) fl}
            (≗-trans (f₁ same⊑ (At.val (freed hp (laneOf o) fl) (FlatKit.Flat.outerDone fl)))
                     (wk-same (settleᵒ₁ (Here.obs (walk ρ top)) fl (At.val (freed hp (laneOf o) fl) (FlatKit.Flat.outerDone fl)))))
@@ -1985,7 +2096,7 @@ module Ascending (R : Set) where
       eas  = proj₁ (proj₂ (proj₂ nl))
       eqs  = proj₂ (proj₂ (proj₂ nl))
   ...       | false
-    with lane-ghost hp ρ o sn pd gn LL (trans (sym (lane-settles ρ o cl LL)) eq) ee lf pb Lρ sg
+    with lane-ghost hp ρ o fs sn pd LL (trans (sym (lane-settles ρ o cl LL)) eq) eq₀ Lρ sg
   ...         | g″ , pg , sn″ , pd″ , k″ , r″ , ag , pp =
     landed (g″ , _ , path
       , carried (record

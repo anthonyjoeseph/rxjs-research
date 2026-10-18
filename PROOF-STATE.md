@@ -177,10 +177,11 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **GHOSTS AND STACKS.** The `*-ghost`, `*-stack` and `*-alone` cells
-  are columns too; fold them as `owned` is. A column may need no frame at
-  all: `queue` reads only kinds no frame writes (`Keeps`), so decide per
-  column whether its premise is names or kinds before writing a frame.
+- **GHOSTS AND STACKS.** Attempt `ghost-lift`, the one leaf the skip
+  ghosts now call: decides whether a planted node's meaning tracks the
+  lifted skip through every ancestor. The source ghosts (`fed-ghost`,
+  `fin-ghost`) lift a node that differs from the tree's part, and
+  `end-ghost` an end, not a skip: each needs its own leaf beside it.
 - **THE LANE START, GROWN.** The `bg-*` row is one start: route it
   through the growth frame as the restage modules' starts are, so its cells become
   the growth cells plus the new lane's. Decides whether `ahead` survives a
@@ -206,10 +207,10 @@ by their own silent steps (`Mirror`).
   stepped node's.
 - **`within-step`** (Stepper) — FALSITY, `REFUTED×2`, `X`: a sane, placed root
   ghost's step leaves its parts placed.
+- **`ghost-lift`** (Climbs) — FALSITY, `NO EVIDENCE`: a skip lifted to the
+  root, the node planted at its path a sane, placed part, the ghost past it.
 - **`lane-settles`** (Climbs) — FALSITY, `NO EVIDENCE`: a freed slot's settle
   tests the ghost's lane end: done flag the outer gone, count the lanes.
-- **`lane-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane ended short of its
-  flatMap's end: the pool takes its rest, the ghost past the lane's skip.
 - **`calling-open`** (Climbs) — FALSITY, `NO EVIDENCE`: a climbing signal's
   path reads open.
 - **`begin-path`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane begun runs to its
@@ -220,12 +221,6 @@ by their own silent steps (`Mirror`).
   admit, the lane planted pending in the grown tree.
 - **`bg-code`** (Climbs) — FALSITY, `NO EVIDENCE`: a begun lane's run is its
   inner compiled at the lane's env.
-- **`bg-stack`** (Climbs) — FALSITY, `NO EVIDENCE`: a stack against the tree
-  stands against the grown tree with a lane begun.
-- **`bg-alone`** (Climbs) — FALSITY, `NO EVIDENCE`: a begun lane's subscription
-  is owed by no call on the stack: it sits in a pool, not under a source.
-- **`bg-ticked`** (Climbs) — FALSITY, `NO EVIDENCE`: the stack ticks as it did
-  with a lane begun.
 - **`bg-owned`** (Climbs) — FALSITY, `NO EVIDENCE`: `Owned` holds in the grown
   tree with a lane begun.
 - **`bg-kernels`** (Climbs) — FALSITY, `NO EVIDENCE`: `Kernels` survives a lane
@@ -246,8 +241,6 @@ by their own silent steps (`Mirror`).
   value, the ghost past the skip.
 - **`active-lanes`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's count reads
   zero exactly when no lane is live.
-- **`pool-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: an outer ended with lanes
-  or a queue left: the pool restaged, the ghost past the outer's skip.
 - **`fr-holds`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's kernel holds
   with a lane ended and the count down.
 - **`fr-gated`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's gate holds with

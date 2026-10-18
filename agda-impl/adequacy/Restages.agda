@@ -74,6 +74,8 @@ module Staging (R : Set) where
                → Wrap (in-outer {op = op} {f} {fl} {oc} {k} {r} {pl} {t = pendingˢ s q} {ls} here)
     wrap-body : ∀ {Δ A B} {s : T.Obs Timeline (A ∷ Δ) B} {q} {S c b kb k fd e rp rt} {src : Sub h Δ A}
               → Wrap (in-body {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = src} {bd = pendingˢ s q} here)
+    wrap-lane : ∀ {Δ A B} {s : T.Obs Timeline Δ B} {q} {op fl oc k r pl c kl} {f : A → T.Obs Timeline Δ B} {t : Sub h Δ A} {ls : List (Lane h Δ B)}
+              → Wrap (in-lanes {op = op} {f} {fl} {oc} {k} {r} {pl} {t = t} (this-lane {c = c} {kl} {t = pendingˢ s q} {ls} here))
 
   wrap-here : ∀ {h Δ A Δ₁ B C} {s : T.Obs Timeline Δ A} {q} {u : Sub h Δ₁ B} {ι : Path u (pendingˢ s q)} → Wrap ι
             → ∀ {S c b kb k fd e rp rt} {bd : Sub h (A ∷ Δ) C} (β : Path u (connectˢ S c b kb k fd rp e rt (pendingˢ s q) bd)) → ι ≢ β ⊕ in-source here
@@ -84,6 +86,9 @@ module Staging (R : Set) where
   wrap-here wrap-outer (in-lanes _) ()
   wrap-here wrap-body (in-source _) ()
   wrap-here wrap-body (in-body ())
+  wrap-here wrap-lane (in-outer _) ()
+  wrap-here wrap-lane (in-lanes (this-lane ()))
+  wrap-here wrap-lane (in-lanes (next-lane _)) ()
 
   wrap-src : ∀ {h Δ A Δ₁ B} {s : T.Obs Timeline Δ A} {q} {u : Sub h Δ₁ B} {ι : Path u (pendingˢ s q)} → Wrap ι → Path (pendingˢ s q) u → ⊥
   wrap-src wrap-map  ()
@@ -91,6 +96,7 @@ module Staging (R : Set) where
   wrap-src wrap-take ()
   wrap-src wrap-outer ()
   wrap-src wrap-body ()
+  wrap-src wrap-lane ()
 
   -- A path ending under a wrapped source ends under no connect's source.
   mutual

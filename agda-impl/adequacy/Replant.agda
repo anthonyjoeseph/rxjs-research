@@ -16,6 +16,7 @@ open import Data.Maybe using (Maybe; just; nothing; is-just)
 open import Data.Nat using (_≤_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤)
+open import Data.Empty using (⊥)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Bool using (true)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst)
@@ -50,9 +51,9 @@ module Replanting (R : Set) where
 
   -- A NODE'S KIN: what a move rewrites it to.  A take ended; a pool
   -- restaged; a connect's feed restaged from `idle`, its body's joiners
-  -- retold.  Every kin keeps the node's names, its cells and every
-  -- child's shape, so a call or a burst aimed anywhere in the tree aims
-  -- at the same fields after.
+  -- retold; a flatMap given a lane ahead of its own and a pool.  Every
+  -- kin keeps the node's cells and every child, so a call or a burst
+  -- aimed anywhere in the tree aims at the same fields after.
   data Kin {h} : ∀ {Δ A} → Sub h Δ A → Sub h Δ A → Set₁ where
     kin-end  : ∀ {Δ A i p c k q n} {s : Sub h Δ A} → Kin (takeWhileˢ i p c k taking s) (takeWhileˢ i p c k (ending q n) s)
     kin-pool : ∀ {Δ A B op f fl oc k r pl pl′} {s : Sub h Δ A} {ls : List (Lane h Δ B)}
@@ -61,19 +62,25 @@ module Replanting (R : Set) where
              → Kin (connectˢ S c b kb k idle rp e rt s bd) (connectˢ S c b kb k (feeding x q ss) rp e rt s (retag g bd))
     kin-fin  : ∀ {Δ A B S c b kb k q ss rp e rt} {g : Retag (A ∷ Δ)} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
              → Kin (connectˢ S c b kb k idle rp e rt s bd) (connectˢ S c b kb k (finishing q ss) rp e rt s (retag g bd))
+    kin-lane : ∀ {Δ A B op f fl oc k r pl pl′} {l : Lane h Δ B} {s : Sub h Δ A} {ls : List (Lane h Δ B)}
+             → Kin (flatMapˢ op f fl oc k r pl s ls) (flatMapˢ op f fl oc k r pl′ s (l ∷ ls))
 
   -- What the kin owes the agenda: an ended take its completion, a feed or
-  -- a finish its delivery; a pool nothing.
+  -- a finish its delivery; a pool nothing, nor a lane, whose subscription
+  -- the control owes.
   owed : ∀ {h Δ A} {T : Sub h [] R} {u v : Sub h Δ A} → Kin u v → (ρ : Path T u) → List (Call (plant ρ v))
   owed {v = v} kin-end  ρ = take1C (planted ρ v) ∷ []
   owed         kin-pool ρ = []
+  owed         kin-lane ρ = []
   owed {v = v} kin-feed ρ = feedC (planted ρ v) ∷ []
   owed {v = v} kin-fin  ρ = finC (planted ρ v) ∷ []
 
-  -- Where what is owed runs: the position the kin was made at.
+  -- Where what is owed runs: the position the kin was made at.  A lane's
+  -- is no run's.
   Owing : ∀ {h Δ A} {u v : Sub h Δ A} → Kin u v → Pos → Set
   Owing (kin-end {q = q})  p = p ≡ q
   Owing kin-pool           p = ⊤
+  Owing kin-lane           p = ⊥
   Owing (kin-feed {q = q}) p = p ≡ q
   Owing (kin-fin {q = q})  p = p ≡ q
 
