@@ -182,8 +182,11 @@ by their own silent steps (`Mirror`).
   `compile-grow`/`kont-grow`, the code's own naturality, by operator over
   the `-wk` toolkit; then the splice leaves `bg-owns`/`heads`/`lingered`
   and `bg-ghosted` over `ghost-lift`, which reads the names fresh.
-- **RESTAGE AND KERNEL CELLS.** The restage `heading`/`lingering` cells
-  and `fr-holds`/`gated`/`spent`/`fed`: fold over the frames that exist.
+- **THE OWED CUT.** The freed move folds over its frame; it leaves only
+  `fr-cut`, false as stated: an inner takeWhile completes before it cuts
+  its source, so a freed lane's quiet still runs. Ruled out: any frame
+  repair. Decides whether `Gated`'s lane clause excuses a cut its own
+  completion still owes. Second refutation in that clause: a third stops.
 - **DEEP ORDER.** `gapped-past` holds only where every node under a rest is
   in order, which `Placed` does not see (`stepped-deep` reads it from
   nothing). Decides whether `Deep` is a field `Carried` keeps, each move
@@ -191,7 +194,9 @@ by their own silent steps (`Mirror`).
 - **THE FREE SOURCE.** `lifts-source` leaves the source node free, and an
   end lifted through a connect's source reads it: `fin-ghost` and
   `end-ghost` need it tied to the heap's leftover, beyond `Tied`'s first
-  pin, before either is a lift.
+  pin, before either is a lift. The restage cells are the same question:
+  close/settle/next pool `lifts-outer`'s and `lifts-lanes`' free node, so
+  no frame reaches their `heading`/`lingering`; `fed`/`fin` read a body.
 - **NODE FACTS, FALSITY FIRST.** Only now discharge: the node facts the
   fold left, riskiest first, then the per-move facts no column holds.
 - **HIDDEN RUNS.** Parked behind the fold. The core: `pooled-pin`,
@@ -242,14 +247,8 @@ by their own silent steps (`Mirror`).
   value, the ghost past the skip.
 - **`active-lanes`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's count reads
   zero exactly when no lane is live.
-- **`fr-holds`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's kernel holds
-  with a lane ended and the count down.
-- **`fr-gated`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's gate holds with
-  a lane ended.
-- **`fr-fed`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's feeds hold with a
-  lane ended.
-- **`fr-spent`** (Climbs) — FALSITY, `NO EVIDENCE`: a flatMap's spent holds
-  with a lane's cut and the count written.
+- **`fr-cut`** (Climbs) — FALSITY, `NO EVIDENCE`: a gated flatMap's freed lane
+  has its quiet cut.
 - **`take1-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a held takeWhile's
   completion begun under its failing value, its cut the frame's rest.
 - **`take1-void`** (Climbs) — FALSITY, `NO EVIDENCE`: a hidden takeWhile's
@@ -292,11 +291,11 @@ by their own silent steps (`Mirror`).
   source's end steps after that pin.
 - **`rest-land`** (Lift) — FALSITY, `NO EVIDENCE`: the rest's pin lifted is the
   ghost's step: the rest a pin on, the ghost past it.
-- **`close-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: an outer's end, its
+- **`close-lingers`** (Climbs) — FALSITY, `DEAD ROUTE`: an outer's end, its
   pool taking the outer's last ghost rested, keeps every tie.
-- **`settle-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end, its
-  pool taking the lane's last ghost rested, keeps every tie.
-- **`next-lingers`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane's end with a
+- **`settle-lingers`** (Climbs) — FALSITY, `DEAD ROUTE`: a lane's end, its pool
+  taking the lane's last ghost rested, keeps every tie.
+- **`next-lingers`** (Climbs) — FALSITY, `DEAD ROUTE`: a lane's end with a
   value queued, the queue's head taken, keeps every tie.
 - **`fire-lingers`** (Lift) — FALSITY, `NO EVIDENCE`: a timer fired keeps every
   tie.
@@ -377,21 +376,19 @@ by their own silent steps (`Mirror`).
   of the run's carries `Owned` across the replant.
 - **`pool-idling`** (Climbs) — FALSITY, `NO EVIDENCE`: a pool joined with an
   idle one ties what it tied.
-- **`close-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: an outer closed, the
+- **`close-heading`** (Climbs) — FALSITY, `DEAD ROUTE`: an outer closed, the
   pool's heads where the outer's were.
-- **`fr-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane freed keeps the
-  flatMap's heads.
-- **`settle-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: the pool taking what
-  a lane ran heads where the lane did.
-- **`next-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: the queue's head taken
+- **`settle-heading`** (Climbs) — FALSITY, `DEAD ROUTE`: the pool taking what a
+  lane ran heads where the lane did.
+- **`next-heading`** (Climbs) — FALSITY, `DEAD ROUTE`: the queue's head taken
   off, the flatMap heads as it did.
-- **`fed-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's feed
-  restaged keeps its own heads, the joiners retold.
-- **`fed-lingering`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's feed
+- **`fed-heading`** (Climbs) — FALSITY, `DEAD ROUTE`: a connect's feed restaged
+  keeps its own heads, the joiners retold.
+- **`fed-lingering`** (Climbs) — FALSITY, `DEAD ROUTE`: a connect's feed
   restaged keeps its own ties.
-- **`fin-heading`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's finish
-  staged keeps its own heads.
-- **`fin-lingering`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's finish
+- **`fin-heading`** (Climbs) — FALSITY, `DEAD ROUTE`: a connect's finish staged
+  keeps its own heads.
+- **`fin-lingering`** (Climbs) — FALSITY, `DEAD ROUTE`: a connect's finish
   staged keeps its own ties.
 - **`placing`** (Adequacy) — FALSITY, `NO EVIDENCE`: an ascending record alike
   a program's events as a set is placed against them.
