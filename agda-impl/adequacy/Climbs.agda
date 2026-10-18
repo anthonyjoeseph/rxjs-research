@@ -47,6 +47,7 @@ open import operation.AbstractObservable using (module Heap; module Run; fifo; l
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Lift using (module Lifting)
+open import adequacy.Lowers using (module Lowering)
 open import adequacy.Frame using (module Framing)
 open import adequacy.Grow using (module Growing)
 open import adequacy.Restage using (module Restaging)
@@ -72,6 +73,7 @@ module Ascending (R : Set) where
   open Sequencing R using (seq-assoc; seq-done)
   open Restaging R using (walk-planted; tick-ix0; pre; fresh-plant; fresh-new; wk-pairs; wk-img; to-img)
   open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
+  open Lowering R using (queue-keeps; store-keeps; keeps-trans)
   open Lifting R using (sub-onward; emit-shut; emit-void; run-meets; run-at; emit-run; spread-past; behind-fire; fire-lingers; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
   open Locality R using (stored-at; stored-hit; live-apart; flatReads; cuts; cut-in; module Heaps)
   open Growing R using (wkTree; wkLanes; wkPath)
@@ -648,7 +650,7 @@ module Ascending (R : Set) where
             nl (in-scan ψ) = (λ eq → lookupᴬ a (names-path ψ (here refl)) (sym eq)) ∷ []
 
     scan-queue : ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
-    scan-queue = Sh.wr-queue
+    scan-queue = queue-keeps (store-keeps H r _ (λ ()) (λ ()) (λ ()) (λ ()))
 
     scan-lingers : Ends H T → Lingers H T → Lingers H′ T
     scan-lingers en lg = subst (λ t → Lingers H′ t) (plant-self ρ) (Sh.shift-lingers (scanˢ f r u) en scan-lingering lg)
@@ -870,7 +872,7 @@ module Ascending (R : Set) where
     sd-owned fs = Sh.wr-owned fs record { gone-part = λ ψ e → trans (sd-same (fresh-path ρ fs) ψ) e ; gone-live = sd-live (fresh-path ρ fs) ; gone-held = store-held H (FlatKit.Flat.outerDone fl) }
 
     sd-queue : AllPairs _≢_ (names T) → ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
-    sd-queue fs = Sh.wr-queue fs
+    sd-queue _ = queue-keeps (store-keeps H (FlatKit.Flat.outerDone fl) _ (λ ()) (λ ()) (λ ()) (λ ()))
 
     -- Nothing left: the flatMap gone, no pool of it held; its children's
     -- leftovers and ties alike.
@@ -1700,7 +1702,8 @@ module Ascending (R : Set) where
     fr-owned fs = Sh.wr-owned fs (fr-gone (fresh-path ρ fs))
 
     fr-queue : AllPairs _≢_ (names T) → ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
-    fr-queue fs = Sh.wr-queue fs
+    fr-queue _ = queue-keeps (keeps-trans (store-keeps H (Kit.live (laneOf o)) _ (λ ()) (λ ()) (λ ()) (λ ()))
+                                           (store-keeps (unlive H (laneOf o)) (FlatKit.Flat.active fl) _ (λ ()) (λ ()) (λ ()) (λ ())))
 
     fr-behind : AllPairs _≢_ (names T) → ∀ {q} → Untold H q T → Ends H T → Each H (Heads q) T → Each H′ (Heads q) T
     fr-behind fs {q} ut en bh = subst (λ t′ → Each H′ (Heads q) t′) (plant-self ρ) (Sh.shift-behind fs w₀ ut en fr-heading bh)
@@ -1746,7 +1749,7 @@ module Ascending (R : Set) where
     module Sh (fs : AllPairs _≢_ (names T)) = Shift H H′ ρ (off-store H (FlatKit.Flat.queue fl)) mine fs
 
     dq-queue : AllPairs _≢_ (names T) → ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
-    dq-queue fs = Sh.wr-queue fs
+    dq-queue _ = queue-keeps (store-keeps H (FlatKit.Flat.queue fl) _ (λ ()) (λ ()) (λ ()) (λ ()))
 
     -- The queue no read of the node's own clauses.
     dq-alike : AllPairs _≢_ (names w₀) → Alike H H′ (flatReads fl oc k r t ls)
@@ -2308,7 +2311,7 @@ module Ascending (R : Set) where
     fin-owned fs sk ks e ow = owned-run kin ρ sk ks e refl (Sh.wr-owned fs (fin-gone (fresh-path ρ fs)) ow)
 
     fin-queue : AllPairs _≢_ (names T) → ∀ {clk ts} → Queue H q clk ts T → Queue H′ q clk ts T′
-    fin-queue fs qu = plant-queue H′ ρ v Bd.body-pendings Bd.body-subjects Bd.body-joiners (Sh.wr-queue fs qu)
+    fin-queue _ qu = plant-queue H′ ρ v Bd.body-pendings Bd.body-subjects Bd.body-joiners (queue-keeps (store-keeps H (Subject.closed Sj) _ (λ ()) (λ ()) (λ ()) (λ ())) qu)
 
     fin-behind : AllPairs _≢_ (names T) → Untold H q T → Ends H T → Each H (Heads q) T → Each H′ (Heads q) T′
     fin-behind fs ut en = Sh.shift-behind fs v ut en fin-heading

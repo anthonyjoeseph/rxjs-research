@@ -57,7 +57,7 @@ module Lifting (R : Set) where
   open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each)
   open Unsubbing R using (_⇝_; site-tears)
   open Locality R using (site-holds; site-gated)
-  open Lowering R using (site-lowers; queue-lowers; torn-owned; fed-lowers)
+  open Lowering R using (site-lowers; queue-keeps; module Lowers; torn-owned; fed-lowers)
   open Ghosting R using (module Far; module Calling; Has; residual; _⊏_; ⊏-trans; _≺_; measure; load; loadOf; passed; lowered; showing; Hopped; Hops; opening; firstCall; SourceFirst; BodyFirst; OuterFirst; PoolBehind; RestBehind; LaneFirst; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; Far; Off; Opt; Clear; ClearL; clear-zip; clear-each; far-apart; opt-zip; all-zip; opt-each; each-lanes; each-sub; OneLane; opened; Calling; sends; Rises; Called; Aloft; hop-sorted)
   open Restaging R using (subOf; Offers; of-restage; empty-restage; map-restage; Restages; scan-restage; take-restage; flat-restage; connect-restage)
   open Read
@@ -320,7 +320,7 @@ module Lifting (R : Set) where
   -- The queue as it was: a teardown only spends, lowers and silences.
   torn-queue : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
              → Queue (siteHeap (Conf.heap (Mach.conf m)) z) (Conf.pos (Mach.conf m)) (Mach.clock m) (Mach.timers m) (Carried.tree cr)
-  torn-queue cr z = queue-lowers (site-lowers _ z) (Carried.queue cr)
+  torn-queue cr z = queue-keeps (Lowers.keeps (site-lowers _ z)) (Carried.queue cr)
 
   -- A site holds no part, a body's by `Owned.bodies`, so the tree's
   -- part is the same once its switch is thrown.

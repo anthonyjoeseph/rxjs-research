@@ -13,7 +13,7 @@ open import Data.Maybe using (just; nothing)
 open import Data.Product using (_,_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂; subst)
 
-open import operation.AbstractObservable using (module Heap; module Run; base; ref; sink; quiet; list; maybe; _⊗_; joins; fifo)
+open import operation.AbstractObservable using (module Heap; module Run; base; ref; sink; quiet; list; maybe; _⊗_; joins; fifo; gate)
 open import operation.PureObservable using (Pureᴾ)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Unsub using (module Unsubbing)
@@ -47,6 +47,7 @@ module Sequencing (R : Set) where
   wkEl-wk (joins A) σ τ []             = refl
   wkEl-wk (joins A) σ τ ((s , j) ∷ xs) = cong₂ (λ a b → (a , j) ∷ b) (wk∋-wk σ τ s) (wkEl-wk (joins A) σ τ xs)
   wkEl-wk (fifo X)  σ τ xs             = refl
+  wkEl-wk gate      σ τ b              = refl
 
   subject≡ : ∀ {A w} {s s′ : Subject A w} → Subject.subscribers s ≡ Subject.subscribers s′ → Subject.closed s ≡ Subject.closed s′ → s ≡ s′
   subject≡ refl refl = refl

@@ -39,7 +39,7 @@ module Replanting (R : Set) where
   open Pure R using (Timer; cascade)
   open Strongly R using (Sub; Path; PathLanes; _⊕_; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane;
                          Lane; lane; Call; take1C; feedC; finC; code; coldˢ; takeWhileˢ; flatMapˢ; connectˢ; taking; ending; idle; feeding; finishing;
-                         Owned; Queue; Each; Heads; Lingers; Pinned; Name; names; laneNames; cutNames; quietName; subjectNames; flatNames; module At; _≗_) renaming (⟦_⟧ to ⟦_⟧ᶜ)
+                         Owned; Each; Heads; Lingers; Pinned; Name; names; laneNames; cutNames; quietName; subjectNames; flatNames; module At; _≗_) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (StackAs; BurstAs; Held; bottomAs; restAs; backAs; reholdAs; playsAs; firesAs; overAs; bottomᴴ; restᴴ;
                                  BurstClocked; Ticked; CtlAs; runAs)
   open Moving R using (plant; plantᴸ; planted; pairs-r; pairs-split)
@@ -234,15 +234,8 @@ module Replanting (R : Set) where
   -- `v`.  No ancestor reads its path child's cells, only its part, its
   -- heads and its leftover, which the node's premises carry; every part
   -- beside the path reads alike.
-  --
-  -- `wr-queue` is stated bare: `Joined` reads the subjects' subscribers,
-  -- and its `Silenced` clause quantifies over every flag cell, so a write
-  -- of one the node owns reaches a clause no premise of the node's names.
   module Shift {h} (H H′ : Heapᴹ h) {T : Sub h [] R} {Δ A} {u : Sub h Δ A} (ρ : Path T u)
                {ns : List (Name h)} (off : Off H H′ ns) (mine : All (_∈ᴸ names u) ns) (fs : AllPairs _≢_ (names T)) where
-    postulate
-      wr-queue      : ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
-
     private
       offU : Off H H′ (names u)
       offU j a = off j (map (λ m → lookupᴬ a m) mine)

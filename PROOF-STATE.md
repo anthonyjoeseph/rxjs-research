@@ -177,21 +177,17 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **ONE FRAME, CHECKED.** The replant frame is written, unchecked:
-  `Walk` in Shift walks a node replanted at any depth up to the root,
-  `revive`, `told`, `Behind` and `Ties` over it, and Replant's `owned`,
-  `behind` and `lingers` are bodies over it with `Fork` for the rest of
-  the tree; the growth frame's `part`, `each` and `lingers` are bodies by
-  `unwk`, a path through the weakened tree read back. Gate both. Decides whether the premise its ancestors read
-  (part revived, `untold` kept, leftover pinned, `Ended`) suffices, or
-  which ancestor needs more: the new leaves `heads-flat`, `untold-shut`,
-  `rest-sourced`, `ended-past` are where it said not.
-- **EVERY CELL A FRAME.** `queue` is the last column not folded:
-  `wr-queue` is stated bare, because `Joined`'s `Silenced` clause reads
-  every flag cell and no premise of the node's names that. Name the
-  orphaned subscribers in the invariant, then frame it as `owned` is.
 - **GHOSTS AND STACKS.** The `*-ghost`, `*-stack` and `*-alone` cells
-  are columns too; fold them the same way once the first two land.
+  are columns too; fold them as `owned` is. A column may need no frame at
+  all: `queue` reads only kinds no frame writes (`Keeps`), so decide per
+  column whether its premise is names or kinds before writing a frame.
+- **THE LANE START, GROWN.** The `bg-*` row is one start: route it
+  through the growth frame as Restage's starts are, so its cells become
+  the growth cells plus the new lane's. Decides whether `ahead` survives a
+  run moved one level down (`bg-queue`, `connect-queue`), the queue's one
+  premise no kind carries.
+- **RESTAGE AND KERNEL CELLS.** The restage `heading`/`lingering` cells
+  and `fr-holds`/`gated`/`spent`/`fed`: fold over the frames that exist.
 - **NODE FACTS, FALSITY FIRST.** Only now discharge: the node facts the
   fold left, riskiest first, then the per-move facts no column holds.
 - **HIDDEN RUNS.** Parked behind the fold. The core: `pooled-pin`,
@@ -392,8 +388,6 @@ by their own silent steps (`Mirror`).
   input leaves what it has not told every other input.
 - **`rest-sourced`** (Shift) — FALSITY, `NO EVIDENCE`: a connect's leftover over
   a source running on either side, pinned as its source's.
-- **`wr-queue`** (Replant) — FALSITY, `NO EVIDENCE`: a write at a node's own
-  names leaves `Queue`.
 - **`rehome`** (Replant) — FALSITY, `NO EVIDENCE`: a call aimed anywhere in the
   tree aimed alike after a kin replanted.
 - **`recold`** (Replant) — FALSITY, `NO EVIDENCE`: a cold reached in the tree

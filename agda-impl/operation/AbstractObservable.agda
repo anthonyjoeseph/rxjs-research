@@ -51,6 +51,9 @@ data Ty : Set₁ where
   -- A flatMap's queue of waiting values: the user's, as `base` holds,
   -- but its own code, so no count a teardown resets is read as one.
   fifo  : Set → Ty
+  -- A joiner's switch: a Bool, but its own code, so no write of an
+  -- operator's own Bool reaches it.
+  gate  : Ty
 
 -- A runtime's names live in a WORLD — what has been allocated — and stay
 -- valid in every larger one (`_⊑_`).  IO has one world; the pure heap's
@@ -142,6 +145,7 @@ module Run (P : Prims) where
   El w (s ⊗ t)   = El w s × El w t
   El w (joins A) = List (Sink w A × Pos)
   El w (fifo X)  = List X
+  El w gate      = Bool
 
   Ref : World → Ty → Set
   Ref w t = El w (ref t)
@@ -159,6 +163,7 @@ module Run (P : Prims) where
   wkEl (joins A) ρ []             = []
   wkEl (joins A) ρ ((s , j) ∷ xs) = (wkSink ρ s , j) ∷ wkEl (joins A) ρ xs
   wkEl (fifo X)  ρ xs             = xs
+  wkEl gate      ρ b              = b
 
   wkR : ∀ {w v t} → w ⊑ v → Ref w t → Ref v t
   wkR {t = t} = wkEl (ref t)
@@ -346,6 +351,13 @@ module Run (P : Prims) where
 
     modifyF : ∀ {w X} → Ref w (fifo X) → (List X → List X) → Act w ⊤
     modifyF r f = modify r λ _ → f
+
+    -- A joiner's switch, made and read as a base cell's.
+    newG : ∀ {w B} → Bool → (∀ {v} → w ⊑ v → Ref v gate → Act v B) → Act w B
+    newG = newRef gate
+
+    readG : ∀ {w B} → Ref w gate → (Bool → Act w B) → Act w B
+    readG r k = readRef r λ σ x → wkAct σ (k x)
 
     when : ∀ {w} → Bool → Act w ⊤ → Act w ⊤
     when b m = if b then m else skipᴬ
@@ -552,9 +564,9 @@ module Run (P : Prims) where
   joinᴷ : ∀ {A w} → Subject A w → Subscribe A w
   joinᴷ st ρ o k = here λ j → readB (Subject.closed (wkSubject ρ st)) λ where
     true  → under last (Observer.complete o) (k ⊑-refl noSub)
-    false → newB true λ σ l → let o′ = wkObs σ o in
-      register (λ a → readB l λ b → when b (Observer.next o′ a)) (readB l λ b → when b (Observer.complete o′))
-               (readB l λ b → if b then Observer.closed o′ else done true) λ τ sk →
+    false → newG true λ σ l → let o′ = wkObs σ o in
+      register (λ a → readG l λ b → when b (Observer.next o′ a)) (readG l λ b → when b (Observer.complete o′))
+               (readG l λ b → if b then Observer.closed o′ else done true) λ τ sk →
       modify (Subject.subscribers (wkSubject (ρ ⨾ σ ⨾ τ) st)) (λ π ss → ss ++ [ (wkSink π sk , j) ]) >>ᴬ
       k (σ ⨾ τ) (record { unsubscribe = writeRef (wkR τ l) false skipᴬ })
 

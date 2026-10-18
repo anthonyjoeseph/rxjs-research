@@ -36,7 +36,7 @@ open import Data.List.Relation.Unary.AllPairs using (AllPairs) renaming ([] to [
 import Tree as T
 open import Tree using (Obs; Later)
 open import denotation.MonotonicList using (inside; Time; Pos; From; Frame; Timeline; at; emit; stall; close; ix; last; tick; root; _<ᵖ_) renaming (done to doneᶠ; quiet to quietᶠ) renaming (sub to subᴾ)
-open import operation.AbstractObservable using (base; maybe; quiet; module Run; module Heap) renaming (module Machine to Shared)
+open import operation.AbstractObservable using (base; maybe; quiet; gate; module Run; module Heap) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; Out; note; fin; module Pure)
 open import operation.Machine using (module Machine)
 import denotation.Unfold as U
@@ -146,10 +146,10 @@ module Strongly (R : Set) where
       ; closed = readB (Subject.closed S) done }
 
     -- What a join registers, silenced once its flag drops.
-    joinerCb : ∀ {A} → Ref h (base Bool) → Observer A h → Callbacks A h
-    joinerCb l o = record { onNext = λ a → readB l λ b → when b (Observer.next o a)
-                          ; onComplete = readB l λ b → when b (Observer.complete o)
-                          ; isClosed = readB l λ b → if b then Observer.closed o else done true }
+    joinerCb : ∀ {A} → Ref h gate → Observer A h → Callbacks A h
+    joinerCb l o = record { onNext = λ a → readG l λ b → when b (Observer.next o a)
+                          ; onComplete = readG l λ b → when b (Observer.complete o)
+                          ; isClosed = readG l λ b → if b then Observer.closed o else done true }
 
     -- A flatMap's, over its cells.
     module Flat′ {Δ A B} (op : T.FlatOp) (f : A → Obs Timeline Δ B) (E : Env Δ h) (o : Observer B h) (fl : Flat A h) where
@@ -256,7 +256,7 @@ module Strongly (R : Set) where
       -- Joined at `j`: the registered sink and its flag, and what the
       -- meaning has fed it and not yet shown, with where it ends once
       -- told; gone once its completion is delivered.
-      joinˢ      : ∀ {Δ A} → Pos → Sink h A → Ref h (base Bool) → A ∈ Δ → Maybe (List (Pos × Maybe A) × Maybe Pos) → Sub h Δ A
+      joinˢ      : ∀ {Δ A} → Pos → Sink h A → Ref h gate → A ∈ Δ → Maybe (List (Pos × Maybe A) × Maybe Pos) → Sub h Δ A
       -- A `defer` reached: the unsubscribe it stashed once its body's
       -- subscription exists, its body.
       deferˢ     : ∀ {Δ A} → Maybe (Quiet h) → Sub h Δ A → Sub h Δ A
@@ -805,7 +805,7 @@ module Strongly (R : Set) where
 
     -- A subscriber no joiner the tree holds: silenced for good.
     Silenced : ∀ {A} → Sink h A × Pos → Set₁
-    Silenced {A} (sk , j) = Σ (Ref h (base Bool)) λ l → Σ (Observer A h) λ o → val l ≡ false × slotIs sk (joinerCb l o)
+    Silenced {A} (sk , j) = Σ (Ref h gate) λ l → Σ (Observer A h) λ o → val l ≡ false × slotIs sk (joinerCb l o)
 
     -- Every subject's subscribers are its joiners, in the order they
     -- joined, and those the tree no longer holds, silenced.

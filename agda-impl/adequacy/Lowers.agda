@@ -22,7 +22,7 @@ open import Data.List.Relation.Unary.Linked using (Linked)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 
 open import denotation.MonotonicList using (Timeline; Pos)
-open import operation.AbstractObservable using (module Heap; module Run; base; list; joins; fifo) renaming (module Machine to Shared)
+open import operation.AbstractObservable using (module Heap; module Run; base; list; joins; fifo; gate) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; Out)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Torn using (module Tearing)
@@ -60,23 +60,67 @@ module Lowering (R : Set) where
   ----------------------------------------------------------------------
   -- One heap lowered to another
 
-  record Lowers {h} (H H′ : Heapᴹ h) : Set₁ where
+  -- What the queue reads off the heap, kept: a spent handle spent, a
+  -- joiner's lowered switch lowered, every slot and subject's subscribers
+  -- as they were.
+  record Keeps {h} (H H′ : Heapᴹ h) : Set₁ where
     field
       spends : (hd : h ∋ play) → lower (look H hd) ≡ true → lower (look H′ hd) ≡ true
-      lowers : (l : h ∋ cell (base Bool)) → lower (look H l) ≡ false → lower (look H′ l) ≡ false
+      gates  : (l : h ∋ cell gate) → lower (look H l) ≡ false → lower (look H′ l) ≡ false
       slots  : ∀ {A} (s : h ∋ slot A) → look H′ s ≡ look H s
       subs   : ∀ {A} (r : h ∋ cell (joins A)) → look H′ r ≡ look H r
+
+  open Keeps
+
+  keeps-refl : ∀ {h} (H : Heapᴹ h) → Keeps H H
+  keeps-refl H = record { spends = λ _ e → e ; gates = λ _ e → e ; slots = λ _ → refl ; subs = λ _ → refl }
+
+  keeps-trans : ∀ {h} {H H₁ H₂ : Heapᴹ h} → Keeps H H₁ → Keeps H₁ H₂ → Keeps H H₂
+  keeps-trans a b = record
+    { spends = λ hd e → spends b hd (spends a hd e) ; gates = λ l e → gates b l (gates a l e)
+    ; slots = λ s → trans (slots b s) (slots a s) ; subs = λ r → trans (subs b r) (subs a r) }
+
+  -- A store at a kind the queue never reads.
+  store-keeps : ∀ {h k} (H : Heapᴹ h) (i : h ∋ k) x → k ≢ play → k ≢ cell gate
+              → (∀ {A} → k ≢ slot A) → (∀ {A} → k ≢ cell (joins A)) → Keeps H (store H i x)
+  store-keeps H i x np ng ns nj = record
+    { spends = λ hd e → trans (cong lower (look-store H i hd (λ q → np (cong proj₁ q)))) e
+    ; gates  = λ l e → trans (cong lower (look-store H i l (λ q → ng (cong proj₁ q)))) e
+    ; slots  = λ s → look-store H i s (λ q → ns (cong proj₁ q))
+    ; subs   = λ r → look-store H i r (λ q → nj (cong proj₁ q)) }
+
+  -- The queue, kept.
+  unspent : ∀ {b b′} → (b ≡ true → b′ ≡ true) → b′ ≡ false → b ≡ false
+  unspent {false} f e = refl
+  unspent {true}  f e = trans (sym (f refl)) e
+
+  queue-keeps : ∀ {h} {H H′ : Heapᴹ h} → Keeps H H′ → ∀ {p clk ts} {t : Sub h [] R} → Queue H p clk ts t → Queue H′ p clk ts t
+  queue-keeps {H = H} {H′} kp q = record
+    { timed   = mapᴬ (λ { (inj₁ e) → inj₁ (spends kp _ e) ; (inj₂ m) → inj₂ m }) (proj₁ (Queue.timed q))
+              , mapᴬ (λ f e → f (unspent (spends kp _) e)) (proj₂ (Queue.timed q))
+    ; joined  = mapᴬ (λ { {A , S} (al , lk) → subst (λ xs → All _ xs × Linked _ xs) (sym (cong lower (subs kp (Subject.subscribers S))))
+                                                     (mapᴬ (λ { (inj₁ m) → inj₁ m ; (inj₂ (l , o , e , sl)) → inj₂ (l , o , gates kp l e , subst (λ z → CbRel z (Canon.joinerCb l o)) (sym (slots kp _)) sl) }) al , lk) })
+                     (proj₁ (Queue.joined q))
+              , mapᴬ (λ { {joiner S sk j} m → subst ((sk , j) ∈ᴸ_) (sym (cong lower (subs kp (Subject.subscribers S)))) m }) (proj₂ (Queue.joined q))
+    ; ordered = Queue.ordered q
+    ; ahead   = Queue.ahead q }
+
+  -- One heap lowered to another: what the queue reads kept, and every
+  -- switch lowered stays lowered, every queue as it was.
+  record Lowers {h} (H H′ : Heapᴹ h) : Set₁ where
+    field
+      keeps  : Keeps H H′
+      lowers : (l : h ∋ cell (base Bool)) → lower (look H l) ≡ false → lower (look H′ l) ≡ false
       queues : ∀ {A} (q : h ∋ cell (fifo A)) → look H′ q ≡ look H q
 
   open Lowers
 
   lowers-refl : ∀ {h} (H : Heapᴹ h) → Lowers H H
-  lowers-refl H = record { spends = λ _ e → e ; lowers = λ _ e → e ; slots = λ _ → refl ; subs = λ _ → refl ; queues = λ _ → refl }
+  lowers-refl H = record { keeps = keeps-refl H ; lowers = λ _ e → e ; queues = λ _ → refl }
 
   lowers-trans : ∀ {h} {H H₁ H₂ : Heapᴹ h} → Lowers H H₁ → Lowers H₁ H₂ → Lowers H H₂
   lowers-trans a b = record
-    { spends = λ hd e → spends b hd (spends a hd e) ; lowers = λ l e → lowers b l (lowers a l e)
-    ; slots = λ s → trans (slots b s) (slots a s) ; subs = λ r → trans (subs b r) (subs a r) ; queues = λ q → trans (queues b q) (queues a q) }
+    { keeps = keeps-trans (keeps a) (keeps b) ; lowers = λ l e → lowers b l (lowers a l e) ; queues = λ q → trans (queues b q) (queues a q) }
 
   -- Two names of one kind: the same, or apart.
   decide : ∀ {w k} (i j : w ∋ k) → i ≡ j ⊎ i ≢ j
@@ -90,22 +134,22 @@ module Lowering (R : Set) where
   apart : ∀ {w k} {i j : w ∋ k} → i ≢ j → _≢_ {A = Name w} (k , i) (k , j)
   apart ne refl = ne refl
 
-  -- A store at a kind the queue never reads.
-  store-apart : ∀ {h k} (H : Heapᴹ h) (i : h ∋ k) x → k ≢ play → k ≢ cell (base Bool)
+  -- A store at a kind no teardown reads.
+  store-apart : ∀ {h k} (H : Heapᴹ h) (i : h ∋ k) x → k ≢ play → k ≢ cell (base Bool) → k ≢ cell gate
               → (∀ {A} → k ≢ slot A) → (∀ {A} → k ≢ cell (joins A)) → (∀ {A} → k ≢ cell (fifo A)) → Lowers H (store H i x)
-  store-apart H i x np nb ns nj nq = record
-    { spends = λ hd e → trans (cong lower (look-store H i hd (λ q → np (cong proj₁ q)))) e
+  store-apart H i x np nb ng ns nj nq = record
+    { keeps  = store-keeps H i x np ng ns nj
     ; lowers = λ l e → trans (cong lower (look-store H i l (λ q → nb (cong proj₁ q)))) e
-    ; slots  = λ s → look-store H i s (λ q → ns (cong proj₁ q))
-    ; subs   = λ r → look-store H i r (λ q → nj (cong proj₁ q))
     ; queues = λ r → look-store H i r (λ q → nq (cong proj₁ q)) }
 
   spend-lowers : ∀ {h} (H : Heapᴹ h) (hd : h ∋ play) → Lowers H (store H hd (lift true))
   spend-lowers H hd = record
-    { spends = sp
+    { keeps  = record
+      { spends = sp
+      ; gates  = λ l e → trans (cong lower (look-store H hd l λ ())) e
+      ; slots  = λ s → look-store H hd s λ ()
+      ; subs   = λ r → look-store H hd r λ () }
     ; lowers = λ l e → trans (cong lower (look-store H hd l λ ())) e
-    ; slots  = λ s → look-store H hd s λ ()
-    ; subs   = λ r → look-store H hd r λ ()
     ; queues = λ r → look-store H hd r λ () }
     where
       sp : (hd′ : _ ∋ play) → lower (look H hd′) ≡ true → lower (look (store H hd (lift true)) hd′) ≡ true
@@ -115,14 +159,28 @@ module Lowering (R : Set) where
 
   drop-lowers : ∀ {h} (H : Heapᴹ h) (l : h ∋ cell (base Bool)) → Lowers H (store H l (lift false))
   drop-lowers H l = record
-    { spends = λ hd e → trans (cong lower (look-store H l hd λ ())) e
+    { keeps  = store-keeps H l _ (λ ()) (λ ()) (λ ()) (λ ())
     ; lowers = lw
-    ; slots  = λ s → look-store H l s λ ()
-    ; subs   = λ r → look-store H l r λ ()
     ; queues = λ r → look-store H l r λ () }
     where
       lw : (l′ : _ ∋ cell (base Bool)) → lower (look H l′) ≡ false → lower (look (store H l (lift false)) l′) ≡ false
       lw l′ e with decide l l′
+      ... | inj₁ refl rewrite get-put-same H l {y = stored (lift false) same} = refl
+      ... | inj₂ ne   = trans (cong lower (look-store H l l′ (apart ne))) e
+
+  -- A joiner silenced: its switch lowered.
+  shut-lowers : ∀ {h} (H : Heapᴹ h) (l : h ∋ cell gate) → Lowers H (store H l (lift false))
+  shut-lowers H l = record
+    { keeps  = record
+      { spends = λ hd e → trans (cong lower (look-store H l hd λ ())) e
+      ; gates  = gt
+      ; slots  = λ s → look-store H l s λ ()
+      ; subs   = λ r → look-store H l r λ () }
+    ; lowers = λ l′ e → trans (cong lower (look-store H l l′ λ ())) e
+    ; queues = λ r → look-store H l r λ () }
+    where
+      gt : (l′ : _ ∋ cell gate) → lower (look H l′) ≡ false → lower (look (store H l (lift false)) l′) ≡ false
+      gt l′ e with decide l l′
       ... | inj₁ refl rewrite get-put-same H l {y = stored (lift false) same} = refl
       ... | inj₂ ne   = trans (cong lower (look-store H l l′ (apart ne))) e
 
@@ -143,11 +201,11 @@ module Lowering (R : Set) where
           H₁ = store H′ (FlatKit.Flat.lanes fl) (lift [])
           H₂ = store H₁ (FlatKit.Flat.active fl) (lift 0) in
       lowers-trans (thrown-lowers H oc k so)
-        (lowers-trans (store-apart H′ (FlatKit.Flat.lanes fl) (lift []) (λ ()) (λ ()) (λ ()) (λ ()) (λ ()))
-          (lowers-trans (store-apart H₁ (FlatKit.Flat.active fl) (lift 0) (λ ()) (λ e → ℕ≢Bool (cong baseOf e)) (λ ()) (λ ()) (λ ()))
+        (lowers-trans (store-apart H′ (FlatKit.Flat.lanes fl) (lift []) (λ ()) (λ ()) (λ ()) (λ ()) (λ ()) (λ ()))
+          (lowers-trans (store-apart H₁ (FlatKit.Flat.active fl) (lift 0) (λ ()) (λ e → ℕ≢Bool (cong baseOf e)) (λ ()) (λ ()) (λ ()) (λ ()))
             (lanes-lowers H₂ (length (lower (look H′ (FlatKit.Flat.lanes fl)))) ls)))
     torn-lowers H (connectˢ S c b kb k fd rp e rt src bd) = lowers-trans (torn-lowers H src) (via-lowers (torn H src) kb bd)
-    torn-lowers H (joinˢ j sk l x st)                     = drop-lowers H l
+    torn-lowers H (joinˢ j sk l x st)                     = shut-lowers H l
     torn-lowers H (deferˢ k s)                            = via-lowers H k s
 
     via-lowers : ∀ {h} (H : Heapᴹ h) k {Δ A} (s : Sub h Δ A) → Lowers H (tornVia H k s)
@@ -167,24 +225,6 @@ module Lowering (R : Set) where
   site-lowers H (bodySite {c = c} {k = k} {s = s} π) = thrown-lowers H c k s
 
   ----------------------------------------------------------------------
-  -- The queue, lowered
-
-  unspent : ∀ {b b′} → (b ≡ true → b′ ≡ true) → b′ ≡ false → b ≡ false
-  unspent {false} f e = refl
-  unspent {true}  f e = trans (sym (f refl)) e
-
-  queue-lowers : ∀ {h} {H H′ : Heapᴹ h} → Lowers H H′ → ∀ {p clk ts} {t : Sub h [] R} → Queue H p clk ts t → Queue H′ p clk ts t
-  queue-lowers {H = H} {H′} lw q = record
-    { timed   = mapᴬ (λ { (inj₁ e) → inj₁ (spends lw _ e) ; (inj₂ m) → inj₂ m }) (proj₁ (Queue.timed q))
-              , mapᴬ (λ f e → f (unspent (spends lw _) e)) (proj₂ (Queue.timed q))
-    ; joined  = mapᴬ (λ { {A , S} (al , lk) → subst (λ xs → All _ xs × Linked _ xs) (sym (cong lower (subs lw (Subject.subscribers S))))
-                                                     (mapᴬ (λ { (inj₁ m) → inj₁ m ; (inj₂ (l , o , e , sl)) → inj₂ (l , o , lowers lw l e , subst (λ z → CbRel z (Canon.joinerCb l o)) (sym (slots lw _)) sl) }) al , lk) })
-                     (proj₁ (Queue.joined q))
-              , mapᴬ (λ { {joiner S sk j} m → subst ((sk , j) ∈ᴸ_) (sym (cong lower (subs lw (Subject.subscribers S)))) m }) (proj₂ (Queue.joined q))
-    ; ordered = Queue.ordered q
-    ; ahead   = Queue.ahead q }
-
-  ----------------------------------------------------------------------
   -- What is owed, a cut run
 
   false≢true : false ≢ true
@@ -202,6 +242,11 @@ module Lowering (R : Set) where
   raised {H = H} lw l e with lower (look H l) in eq
   ... | true  = refl
   ... | false = ⊥-elim (false≢true (trans (sym (lowers lw l eq)) e))
+
+  raisedᵍ : ∀ {h} {H H′ : Heapᴹ h} → Lowers H H′ → (l : h ∋ cell gate) → lower (look H′ l) ≡ true → lower (look H l) ≡ true
+  raisedᵍ {H = H} lw l e with lower (look H l) in eq
+  ... | true  = refl
+  ... | false = ⊥-elim (false≢true (trans (sym (gates (keeps lw) l eq)) e))
 
   -- The calls a cut is.
   cutLike : ∀ {h} {t : Sub h [] R} → Call t → Bool
@@ -243,7 +288,7 @@ module Lowering (R : Set) where
     fed-lowers lw (takeWhileˢ i p c k tk s) f = fed-lowers lw s f
     fed-lowers lw (flatMapˢ op g fl oc k r pl so ls) (f₁ , f₂) = fed-lowers lw so f₁ , fedL-lowers lw ls f₂
     fed-lowers lw (connectˢ S c b kb k fd rp e rt src bd) (f₁ , f₂) = fed-lowers lw src f₁ , fed-lowers lw bd f₂
-    fed-lowers lw (joinˢ j sk l x st) f = lift (λ r → lower f (raised lw l r))
+    fed-lowers lw (joinˢ j sk l x st) f = lift (λ r → lower f (raisedᵍ lw l r))
     fed-lowers lw (deferˢ k s) f = fed-lowers lw s f
 
     fedL-lowers : ∀ {h} {H H′ : Heapᴹ h} → Lowers H H′ → ∀ {Δ B} (ls : List (Lane h Δ B)) {ν} → At.FedLanes H ls ν → At.FedLanes H′ ls ν
@@ -309,7 +354,7 @@ module Lowering (R : Set) where
     mutual
       part-gone : ∀ {Δ A} (s : Sub h Δ A) → At.part H s ≡ nothing → At.part H′ s ≡ nothing
       part-gone (pendingˢ s q)                          ()
-      part-gone (coldˢ s hd ph)                         e = gone-spent (spends lw hd) e
+      part-gone (coldˢ s hd ph)                         e = gone-spent (spends (keeps lw) hd) e
       part-gone (ofˢ p i xs)                            ()
       part-gone doneˢ                                   e = refl
       part-gone (mapˢ f s)                              e = gone-map (At.part H s) (part-gone s) e
@@ -322,7 +367,7 @@ module Lowering (R : Set) where
       part-gone (connectˢ S c b kb k fd rp e rt src bd) g with gone-connected rp e rt (At.part H src) (At.part H bd) g
       ... | inj₁ nb         rewrite part-gone bd nb = refl
       ... | inj₂ (ns , refl) rewrite part-gone src ns = connected-none rp rt (At.part H′ bd)
-      part-gone (joinˢ j sk l x st)                     e = gone-if (raised lw l) (λ n → n) e
+      part-gone (joinˢ j sk l x st)                     e = gone-if (raisedᵍ lw l) (λ n → n) e
       part-gone (deferˢ k s)                            e = part-gone s e
 
       lanes-gone : ∀ {Δ B} (ls : List (Lane h Δ B)) → At.partLanes H ls ≡ [] → At.partLanes H′ ls ≡ []
@@ -343,8 +388,8 @@ module Lowering (R : Set) where
                {Kᴬ : Against.StackAs t p σ K bs} → Owned H t (Against.runAs (siteCall z ∷ ks) e Kᴬ) → Owned (siteHeap H z) t (Against.runAs ks e′ Kᴬ)
   torn-owned H {t} z ow = record
     { ofs    = λ π → past z refl (Owned.ofs ow π)
-    ; plays  = λ {hd = hd} π nsp → Owned.plays ow π (unspent (spends lw hd) nsp)
-    ; fires  = λ {hd = hd} π nsp → Owned.fires ow π (unspent (spends lw hd) nsp)
+    ; plays  = λ {hd = hd} π nsp → Owned.plays ow π (unspent (spends (keeps lw) hd) nsp)
+    ; fires  = λ {hd = hd} π nsp → Owned.fires ow π (unspent (spends (keeps lw) hd) nsp)
     ; begun  = λ π → subst (λ xs → _ ∈ᴸ xs) (sources-past z) (Owned.begun ow π)
     ; ends   = λ {c = c} π l → past z refl (Owned.ends ow π (raised lw (Kit.live c) l))
     ; cuts   = λ {c = c} π l → proj₁ (Owned.cuts ow π (raised lw (Kit.live c) l)) , cut-gone H z π l (proj₂ (Owned.cuts ow π (raised lw (Kit.live c) l)))

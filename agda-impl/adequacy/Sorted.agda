@@ -35,7 +35,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 import Tree as T
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.MonotonicList using (Pos; From; done; quiet; at; emit; stall; close; From∞; ix; last; root; _<ᵖ_; <ᵖ-trans; <ᵖ-below; <ᵖ-part; <ᵖ-sub; <ᵖ-ix; Timeline) renaming (sub to subᴾ)
-open import operation.AbstractObservable using (Ty; _⊗_; joins; fifo; module Run; module Heap)
+open import operation.AbstractObservable using (Ty; _⊗_; joins; fifo; gate; module Run; module Heap)
   renaming (base to baseᵗ; ref to refᵗ; sink to sinkᵗ; quiet to quietᵗ; list to listᵗ; maybe to maybeᵗ) renaming (module Machine to Shared)
 open import operation.PureObservable using (PureObs; Pureᴾ; Out; note; fin; module Pure)
 open Heap using (World; _⊑_; _⨾_; _∋_; here; there; new; wk∋; cell; slot; hush; play; same; Sink; Quiet; Handle)
@@ -152,6 +152,7 @@ module Sorting (R : Set) where
   Fits lo (maybeᵗ t) _  = ⊤
   Fits lo (s ⊗ t)   _  = ⊤
   Fits lo (fifo X)   _  = ⊤
+  Fits lo gate       _  = ⊤
 
   joined-wk : ∀ {w v A} (ρ : w ⊑ v) (ss : El w (joins A)) → joined (wkEl (joins A) ρ ss) ≡ joined ss
   joined-wk ρ []             = refl
@@ -167,6 +168,7 @@ module Sorting (R : Set) where
   fits-wk lo (maybeᵗ t) ρ a  f = tt
   fits-wk lo (s ⊗ t)   ρ a  f = tt
   fits-wk lo (fifo X)   ρ a  f = tt
+  fits-wk lo gate       ρ a  f = tt
 
   -- Still: delivers nothing and moves nothing — cells read, written so
   -- they fit wherever the last is, cancelled and stopped.  Asking whether
@@ -328,6 +330,11 @@ module Sorting (R : Set) where
     σ true  _ → wk-well σ w
     σ false _ → doneʷ
 
+  whenG-well : ∀ {w p lo} (r : Ref w gate) {m : Act w ⊤} → Well p lo m → Well p lo (Kit.readG r λ b → when b m)
+  whenG-well r w = readRefʷ λ where
+    σ true  _ → wk-well σ w
+    σ false _ → doneʷ
+
   guard-well : ∀ {w p lo} (c : Cut w) {m : Act w ⊤} → Well p lo m → Well p lo (guard c m)
   guard-well c = when-well (Kit.live c)
 
@@ -448,8 +455,8 @@ module Sorting (R : Set) where
   joinᴷ-well st ρ o k p lo le (wn , wc , wx) wk = hereʷ (readRefʷ λ where
     σ true  _ → underʷ (wk-well σ (wc (p ++ [ last ]) lo (≤ᵖ-child p le))) λ lo′ _ → wk-well σ (wk Heap.same _ doneˢ p lo′)
     σ false _ → newRefʷ tt λ σ′ l →
-      registerʷ ((λ a q lo′ le′ → when-well l (wk-well (σ ⨾ σ′) (wn a q lo′ le′)))
-                , (λ q lo′ le′ → when-well l (wk-well (σ ⨾ σ′) (wc q lo′ le′)))
+      registerʷ ((λ a q lo′ le′ → whenG-well l (wk-well (σ ⨾ σ′) (wn a q lo′ le′)))
+                , (λ q lo′ le′ → whenG-well l (wk-well (σ ⨾ σ′) (wc q lo′ le′)))
                 , readRefˢ λ where
                      τ true  → wk-still τ (wk-still (σ ⨾ σ′) wx)
                      τ false → doneˢ)
@@ -794,6 +801,7 @@ module Sorting (R : Set) where
   fits-up (maybeᵗ t) le f = tt
   fits-up (s ⊗ t)   le f = tt
   fits-up (fifo X)   le f = tt
+  fits-up gate       le f = tt
 
   heap-up : ∀ {h lo lo′} {hp : Heapᴹ h} → lo ≤ᵖ lo′ → WellHeap lo hp → WellHeap lo′ hp
   heap-up le wh = heapʷ λ where
