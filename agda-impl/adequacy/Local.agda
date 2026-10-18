@@ -184,7 +184,7 @@ module Locality (R : Set) where
           rd (there (there (here e))) = there (there (there (there (here e))))
           rd (there (there (there m))) = there (there (there (there (there m))))
 
-      holds-alike (connectˢ S c b kb k fd rp e rt src bd) ag = holds-conn {S = S} {c} {b} {kb} {k} {fd} {rp} {e} {rt} src bd (λ j m → ag j (++⁺ʳ (subjectNames S) m))
+      holds-alike (connectˢ S c b kb k fd rp e rt src bd) ag {E} {o} = holds-conn {S = S} {c} {b} {kb} {k} {fd} {rp} {e} {rt} src bd (λ j m → ag j (++⁺ʳ (subjectNames S) m)) {E} {o}
       holds-alike (joinˢ j sk l x st) ag hs = slot-alike sk (ag sk (here refl)) hs
       holds-alike (deferˢ k s) ag (st , hs) =
         stashed-alike k (λ j m → ag j (++⁺ˡ m)) st , holds-alike s (λ j m → ag j (++⁺ʳ (quietName k) m)) hs
