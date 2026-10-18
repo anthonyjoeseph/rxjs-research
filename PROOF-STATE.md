@@ -182,7 +182,7 @@ by their own silent steps (`Mirror`).
   all: `queue` reads only kinds no frame writes (`Keeps`), so decide per
   column whether its premise is names or kinds before writing a frame.
 - **THE LANE START, GROWN.** The `bg-*` row is one start: route it
-  through the growth frame as Restage's starts are, so its cells become
+  through the growth frame as the restage modules' starts are, so its cells become
   the growth cells plus the new lane's. Decides whether `ahead` survives a
   run moved one level down (`bg-queue`, `connect-queue`), the queue's one
   premise no kind carries.
@@ -335,36 +335,36 @@ by their own silent steps (`Mirror`).
   is closed skips its value or its end.
 - **`sub-cold`** (Lift) — FALSITY, `NO EVIDENCE`: a cold begun registers its
   sink and starts its timeline.
-- **`of-owned`** (Restage) — FALSITY, `NO EVIDENCE`: an `of` planted where it
+- **`of-owned`** (Restages) — FALSITY, `NO EVIDENCE`: an `of` planted where it
   was pending (an `empty` a spent one) owes its values and continuation as the
   agenda's calls.
-- **`walk-grow`** (Restage) — FALSITY, `NO EVIDENCE`: a walk along a weakened
+- **`walk-grow`** (Weaken) — FALSITY, `NO EVIDENCE`: a walk along a weakened
   path hands the weakened observer, continuation and subjects.
-- **`compile-cong`** (Restage) — FALSITY, `NO EVIDENCE`: a compiled
+- **`compile-cong`** (Names) — FALSITY, `NO EVIDENCE`: a compiled
   subscription reads alike under alike observers and continuations.
-- **`grow-stack`, `grow-alone`, `grow-ticked`** (Restage) — FALSITY,
+- **`grow-stack`, `grow-alone`, `grow-ticked`** (Weaken) — FALSITY,
   `NO EVIDENCE`: the stack, its sources and its ticks carried across a
   weakening.
-- **`grow-owned`, `grow-holds`, `grow-joined`** (Restage) — FALSITY, `NO EVIDENCE`: the calls, the registered
+- **`grow-owned`, `grow-holds`, `grow-joined`** (Weaken) — FALSITY, `NO EVIDENCE`: the calls, the registered
   callbacks and the silenced subscribers read along a growth as the
   weakened kernels' — the kernels' code natural in the world.
-- **`untake`** (Restage) — FALSITY, `NO EVIDENCE`: a source heads no earlier
+- **`untake`** (Taken) — FALSITY, `NO EVIDENCE`: a source heads no earlier
   than the take over it.
-- **`grew-store`** (Restage) — FALSITY, `NO EVIDENCE`: a store into a cell the
+- **`grew-store`** (Connected) — FALSITY, `NO EVIDENCE`: a store into a cell the
   growth made past its old names keeps the run as it read.
-- **`walk-kont-sub`** (Restage) — FALSITY, `NO EVIDENCE`: a walk's continuation
+- **`walk-kont-sub`** (Names) — FALSITY, `NO EVIDENCE`: a walk's continuation
   reads alike on alike subscriptions.
-- **`flat-wk-here`** (Restage) — FALSITY, `RECOVERY`: a flatMap kit's admit,
+- **`flat-wk-here`** (Flatted) — FALSITY, `RECOVERY`: a flatMap kit's admit,
   settle and dequeue weakened read as the node's over its compiled inners.
-- **`unflat`** (Restage) — FALSITY, `NO EVIDENCE`: an outer heads no earlier
+- **`unflat`** (Flatted) — FALSITY, `NO EVIDENCE`: an outer heads no earlier
   than the flatMap over it, no lane begun.
-- **`compile-env`** (Restage) — FALSITY, `NO EVIDENCE`: a compiled subscription
+- **`compile-env`** (Names) — FALSITY, `NO EVIDENCE`: a compiled subscription
   reads alike with a weakening moved from its frame into its environment.
-- **`connect-owned`** (Restage) — FALSITY, `NO EVIDENCE`: `Owned` holds of a
+- **`connect-owned`** (Connected) — FALSITY, `NO EVIDENCE`: `Owned` holds of a
   connect planted at its body, its source owed under `ix 1`.
-- **`connect-queue`** (Restage) — FALSITY, `NO EVIDENCE`: `Queue` survives a
+- **`connect-queue`** (Connected) — FALSITY, `NO EVIDENCE`: `Queue` survives a
   connect planted at its body under `ix 0`.
-- **`connect-behind`** (Restage) — FALSITY, `NO EVIDENCE`: every part heads no
+- **`connect-behind`** (Connected) — FALSITY, `NO EVIDENCE`: every part heads no
   sooner than the run with a connect planted at its body.
 - **`sub-joined`** (Lift) — FALSITY, `NO EVIDENCE`: a joiner begun registers on
   its subject, or completes on a closed one.

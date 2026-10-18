@@ -41,7 +41,12 @@ open import operation.AbstractObservable using (module Heap; module Run) renamin
 open import Data.Bool using (Bool; true; false; _∧_; _∨_)
 open import Data.Bool.Properties using (∧-zeroʳ)
 open import adequacy.Ghost using (module Ghosting)
-open import adequacy.Restage using (module Restaging)
+open import adequacy.Fork using (module Forking)
+open import adequacy.Restages using (module Staging)
+open import adequacy.Scanned using (module Scanning)
+open import adequacy.Taken using (module Taking)
+open import adequacy.Connected using (module Connecting)
+open import adequacy.Flatted using (module Flatting)
 
 open Events∞
 
@@ -59,7 +64,12 @@ module Lifting (R : Set) where
   open Locality R using (site-holds; site-gated)
   open Lowering R using (site-lowers; queue-keeps; module Lowers; torn-owned; fed-lowers)
   open Ghosting R using (module Far; module Calling; Has; residual; _⊏_; ⊏-trans; _≺_; measure; load; loadOf; passed; lowered; showing; Hopped; Hops; opening; firstCall; SourceFirst; BodyFirst; OuterFirst; PoolBehind; RestBehind; LaneFirst; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; Far; Off; Opt; Clear; ClearL; clear-zip; clear-each; far-apart; opt-zip; all-zip; opt-each; each-lanes; each-sub; OneLane; opened; Calling; sends; Rises; Called; Aloft; hop-sorted)
-  open Restaging R using (subOf; Offers; of-restage; empty-restage; map-restage; Restages; scan-restage; take-restage; flat-restage; connect-restage)
+  open Forking R using (subOf)
+  open Staging R using (Offers; of-restage; empty-restage; map-restage; Restages)
+  open Scanning R using (scan-restage)
+  open Taking R using (take-restage)
+  open Connecting R using (connect-restage)
+  open Flatting R using (flat-restage)
   open Read
 
   postulate

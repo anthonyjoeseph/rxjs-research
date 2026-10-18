@@ -30,7 +30,7 @@ open import adequacy.Moves using (module Moving)
 open import adequacy.Local using (module Locality)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Frame using (module Framing)
-open import adequacy.Restage using (module Restaging)
+open import adequacy.Kept using (module Keeping)
 
 module Shifting (R : Set) where
   open Heap using (Sink; Quiet; slot; cell)
@@ -47,7 +47,7 @@ module Shifting (R : Set) where
   open Locality R using (module Heaps)
   open Ghosting R using (each-sub; each-lanes)
   open Framing R using (Untold; Ended; Tells; untold; untoldᴹ; untoldᴸ; heads-map; heads-scan; heads-take; heads-source; ended-head; shut-heads; just-of)
-  open Restaging R using (leftover-restful)
+  open Keeping R using (leftover-restful)
 
   ----------------------------------------------------------------------
   -- Lists, booleans, pins
