@@ -8,7 +8,7 @@ module adequacy.Replant where
 
 open import Data.List using (List; []; _∷_; _++_; [_]) renaming (map to mapList)
 open import Data.List.Relation.Unary.Any using (here)
-open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ)
+open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ)
 open import Data.List.Relation.Unary.All using (All; map) renaming (lookup to lookupᴬ)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
