@@ -1083,14 +1083,14 @@ module Shifting (R : Set) where
             module O = Outer fl oc k r ls π ps
             pool : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl (plant π v) ls) ≡ just n → Tied pl (At.pooled H′ fl (plant π v) ls)
             pool x = held (in-outer {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {ls = ls} π) ps x (λ x₀ → pinned-trans (Lingers.pools lg here refl x₀)
-                       (union-pinned (if-moved (cong lower O.done) (restedUp π O.fresh) (pin-alike refl)) (pin-alike (pooledL-alike H H′ ls O.lanesA))))
+                       (union-pinned (if-moved (cong lower O.done) (restedUp π O.fresh) (pin-alike {x = U.idleᶜ} {x′ = U.idleᶜ} refl)) (pin-alike (pooledL-alike H H′ ls O.lanesA))))
         shiftLg (in-lanes {op = op} {f} {fl} {oc} {k} {r} {pl} {t = so} {ls} πL) ps lg en =
           LG.lg-flat pool (lingers-alike H H′ Ln.soA (lingers-sub H lg (in-outer here) refl)) (shiftLgL πL Ln.fresh (lingersL-of H lg) (enL-of H en))
           where
             module Ln = Lanes fl oc k r so πL ps
             pool : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl so (plantᴸ πL v)) ≡ just n → Tied pl (At.pooled H′ fl so (plantᴸ πL v))
             pool x = held (in-lanes {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} πL) ps x (λ x₀ → pinned-trans (Lingers.pools lg here refl x₀)
-                       (union-pinned (if-moved (cong lower Ln.done) (pin-alike (leftover-alike H H′ so Ln.soA)) (pin-alike refl)) (pooledUpL πL Ln.fresh)))
+                       (union-pinned (if-moved (cong lower Ln.done) (pin-alike (leftover-alike H H′ so Ln.soA)) (pin-alike {x = U.idleᶜ} {x′ = U.idleᶜ} refl)) (pooledUpL πL Ln.fresh)))
         shiftLg (in-source {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = src} {bd} π) ps lg en =
           LG.lg-connect rest ls lb
           where
