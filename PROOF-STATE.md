@@ -335,14 +335,6 @@ by their own silent steps (`Mirror`).
   restaged has a sane, placed part, the ghost past the source's skip.
 - **`fin-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: the tree with a finish
   staged has a sane, placed part, the ghost past the source's skip.
-- **`fin-holds`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's kernel reads
-  its subject's closed flag nowhere.
-- **`fin-gated`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's gate reads its
-  subject's closed flag nowhere.
-- **`fin-fed`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's feeds read its
-  subject's closed flag nowhere.
-- **`fin-spent`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's spent reads
-  its subject's closed flag nowhere.
 - **`emit-shut`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` whose observer path
   is closed skips its value or its end.
 - **`sub-cold`** (Lift) — FALSITY, `NO EVIDENCE`: a cold begun registers its

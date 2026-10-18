@@ -10,7 +10,7 @@
 -- the heap moved under.
 module adequacy.Local where
 
-open import Data.List using (List; []; _∷_; _++_; length)
+open import Data.List using (List; []; _∷_; _++_; length; drop)
 open import Data.List.Properties using (∷-injectiveʳ)
 open import Data.Bool using (true; false)
 open import Data.Nat using (ℕ; zero; suc)
@@ -184,16 +184,22 @@ module Locality (R : Set) where
           rd (there (there (here e))) = there (there (there (there (here e))))
           rd (there (there (there m))) = there (there (there (there (there m))))
 
-      holds-alike (connectˢ S c b kb k fd rp e rt src bd) ag (a , be , st , hs , hb) =
-        attached-alike c k (ag (Kit.held c) (++⁺ʳ (subjectNames S) (there (here refl))))
-                           (λ j m → ag j (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ˡ m)))))) a
-        , trans (cong lower (ag b (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (here refl))))) be
-        , stashed-alike kb (λ j m → ag j (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ˡ m))))) st
-        , holds-alike src (λ j m → ag j (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m))))))) hs
-        , holds-alike bd (λ j m → ag j (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names src) m))))))) hb
+      holds-alike (connectˢ S c b kb k fd rp e rt src bd) ag = holds-conn {S = S} {c} {b} {kb} {k} {fd} {rp} {e} {rt} src bd (λ j m → ag j (++⁺ʳ (subjectNames S) m))
       holds-alike (joinˢ j sk l x st) ag hs = slot-alike sk (ag sk (here refl)) hs
       holds-alike (deferˢ k s) ag (st , hs) =
         stashed-alike k (λ j m → ag j (++⁺ˡ m)) st , holds-alike s (λ j m → ag j (++⁺ʳ (quietName k) m)) hs
+
+      -- A connect's kernel reads none of its subject's cells.
+      holds-conn : ∀ {Δ A B S c b kb k fd rp e rt} (src : Sub h Δ A) (bd : Sub h (A ∷ Δ) B)
+                 → Alike H H′ (drop 2 (names (connectˢ S c b kb k fd rp e rt src bd)))
+                 → ∀ {E o} → At.Holds H (connectˢ S c b kb k fd rp e rt src bd) E o → At.Holds H′ (connectˢ S c b kb k fd rp e rt src bd) E o
+      holds-conn {c = c} {b} {kb} {k} src bd ag (a , be , st , hs , hb) =
+        attached-alike c k (ag (Kit.held c) (there (here refl)))
+                           (λ j m → ag j (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ˡ m))))) a
+        , trans (cong lower (ag b (++⁺ʳ (cutNames c) (here refl)))) be
+        , stashed-alike kb (λ j m → ag j (++⁺ʳ (cutNames c) (there (++⁺ˡ m)))) st
+        , holds-alike src (λ j m → ag j (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m)))))) hs
+        , holds-alike bd (λ j m → ag j (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names src) m)))))) hb
 
       -- A flatMap's kernel reads its count, its lanes, its refill flag
       -- and what lies under its head cells: never its done flag or its
@@ -332,11 +338,16 @@ module Locality (R : Set) where
       spent-alike (flatMapˢ op f fl oc k r pl so ls) ag (c₁ , c₂) =
         cut-alike k so (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ m)))))) c₁
         , spentL-alike ls (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) m)))))) c₂
-      spent-alike (connectˢ S c b kb k fd rp e rt src bd) ag (c₁ , c₂) =
-        cut-alike k src (λ j m → ag j (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m))))))) c₁
-        , cut-alike kb bd (λ j m → ag j (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names src) m))))))) c₂
+      spent-alike (connectˢ S c b kb k fd rp e rt src bd) ag = spent-conn {S = S} {c} {b} {kb} {k} {fd} {rp} {e} {rt} src bd (λ j m → ag j (++⁺ʳ (subjectNames S) m))
       spent-alike (joinˢ j sk l x st) ag sp = sp
       spent-alike (deferˢ k s) ag sp = cut-alike k s (λ j m → ag j (++⁺ʳ (quietName k) m)) sp
+
+      spent-conn : ∀ {Δ A B S c b kb k fd rp e rt} (src : Sub h Δ A) (bd : Sub h (A ∷ Δ) B)
+                 → Alike H H′ (drop 2 (names (connectˢ S c b kb k fd rp e rt src bd)))
+                 → At.Spent H (connectˢ S c b kb k fd rp e rt src bd) → At.Spent H′ (connectˢ S c b kb k fd rp e rt src bd)
+      spent-conn {c = c} {b} {kb} {k} src bd ag (c₁ , c₂) =
+        cut-alike k src (λ j m → ag j (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m)))))) c₁
+        , cut-alike kb bd (λ j m → ag j (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names src) m)))))) c₂
 
       spentL-alike : ∀ {Δ B} (ls : List (Lane h Δ B)) → Alike H H′ (laneNames ls) → At.SpentLanes H ls → At.SpentLanes H′ ls
       spentL-alike []                ag sp = sp
@@ -407,15 +418,20 @@ module Locality (R : Set) where
       gated-alike (flatMapˢ op f fl oc k r pl so ls) ag (g₁ , g₂) =
         gated-alike so (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ m)))))) g₁
         , gatedL-alike ls (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) m)))))) g₂
-      gated-alike (connectˢ S c b kb k fd rp e rt src bd) ag (g₁ , g₂ , g₃) =
-        (λ e → cut-alike k src agS (thrown-alike c (ag (Kit.live c) (++⁺ʳ (subjectNames S) (here refl))) g₁ e))
-        , gated-alike src agS g₂
-        , gated-alike bd (λ j m → ag j (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names src) m))))))) g₃
-        where
-          agS : Alike H H′ (names src)
-          agS j m = ag j (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m))))))
+      gated-alike (connectˢ S c b kb k fd rp e rt src bd) ag = gated-conn {S = S} {c} {b} {kb} {k} {fd} {rp} {e} {rt} src bd (λ j m → ag j (++⁺ʳ (subjectNames S) m))
       gated-alike (joinˢ j sk l x st) ag g = g
       gated-alike (deferˢ k s) ag g = gated-alike s (λ j m → ag j (++⁺ʳ (quietName k) m)) g
+
+      gated-conn : ∀ {Δ A B S c b kb k fd rp e rt} (src : Sub h Δ A) (bd : Sub h (A ∷ Δ) B)
+                 → Alike H H′ (drop 2 (names (connectˢ S c b kb k fd rp e rt src bd)))
+                 → At.Gated H (connectˢ S c b kb k fd rp e rt src bd) → At.Gated H′ (connectˢ S c b kb k fd rp e rt src bd)
+      gated-conn {c = c} {b} {kb} {k} src bd ag (g₁ , g₂ , g₃) =
+        (λ e → cut-alike k src agS (thrown-alike c (ag (Kit.live c) (here refl)) g₁ e))
+        , gated-alike src agS g₂
+        , gated-alike bd (λ j m → ag j (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names src) m)))))) g₃
+        where
+          agS : Alike H H′ (names src)
+          agS j m = ag j (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m)))))
 
       gatedL-alike : ∀ {Δ B} (ls : List (Lane h Δ B)) → Alike H H′ (laneNames ls) → At.GatedLanes H ls → At.GatedLanes H′ ls
       gatedL-alike []                ag g = g
@@ -491,11 +507,16 @@ module Locality (R : Set) where
       fed-alike (flatMapˢ op f fl oc k r pl so ls) ag ν (f₁ , f₂) =
         fed-alike so (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ m)))))) ν f₁
         , fedL-alike ls (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) m)))))) ν f₂
-      fed-alike (connectˢ S c b kb k fd rp e rt src bd) ag ν (f₁ , f₂) =
-        fed-alike src (λ j m → ag j (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m))))))) ν f₁
-        , fed-alike bd (λ j m → ag j (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names src) m))))))) _ f₂
+      fed-alike (connectˢ S c b kb k fd rp e rt src bd) ag = fed-conn {S = S} {c} {b} {kb} {k} {fd} {rp} {e} {rt} src bd (λ j m → ag j (++⁺ʳ (subjectNames S) m))
       fed-alike (joinˢ j sk l x st) ag ν (lift g) = lift (λ e → g (trans (cong lower (sym (ag l (there (here refl))))) e))
       fed-alike (deferˢ k s) ag ν fd = fed-alike s (λ j m → ag j (++⁺ʳ (quietName k) m)) ν fd
+
+      fed-conn : ∀ {Δ A B S c b kb k fd rp e rt} (src : Sub h Δ A) (bd : Sub h (A ∷ Δ) B)
+               → Alike H H′ (drop 2 (names (connectˢ S c b kb k fd rp e rt src bd)))
+               → ∀ ν → At.Fed H (connectˢ S c b kb k fd rp e rt src bd) ν → At.Fed H′ (connectˢ S c b kb k fd rp e rt src bd) ν
+      fed-conn {c = c} {b} {kb} {k} src bd ag ν (f₁ , f₂) =
+        fed-alike src (λ j m → ag j (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m)))))) ν f₁
+        , fed-alike bd (λ j m → ag j (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names src) m)))))) _ f₂
 
       fedL-alike : ∀ {Δ B} (ls : List (Lane h Δ B)) → Alike H H′ (laneNames ls) → ∀ ν → At.FedLanes H ls ν → At.FedLanes H′ ls ν
       fedL-alike []                ag ν fl = fl

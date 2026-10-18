@@ -4,7 +4,7 @@
 -- operator's callback one rise; and the close, its teardown.
 module adequacy.Climbs where
 
-open import Data.List using (List; []; _∷_; _++_; [_]; null; length) renaming (map to mapList)
+open import Data.List using (List; []; _∷_; _++_; [_]; null; length; drop) renaming (map to mapList)
 open import Data.List.Properties using (++-assoc; ++-conicalˡ; ++-conicalʳ)
 open import Data.List.Relation.Unary.Any using (Any; here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ)
@@ -2244,12 +2244,23 @@ module Ascending (R : Set) where
 
     module Wr (fs : AllPairs _≢_ (names T)) = Wrote H H′ ρ (off-store H (Subject.closed Sj)) mine fs
 
-    postulate
-      fin-holds : AllPairs _≢_ (names w₀) → ∀ {E o} → At.Holds H w₀ E o → At.Holds H′ w₀ E o
-      fin-gated : AllPairs _≢_ (names w₀) → At.Gated H w₀ → At.Gated H′ w₀
-      fin-spent : AllPairs _≢_ (names w₀) → At.Spent H w₀ → At.Spent H′ w₀
-      fin-fed   : AllPairs _≢_ (names w₀) → ∀ ν → At.Fed H w₀ ν → At.Fed H′ w₀ ν
+    -- The connect's kernel reads none of its subject's cells.
+    fin-rest : AllPairs _≢_ (names w₀) → Alike H H′ (drop 2 (names w₀))
+    fin-rest (_ ∷ a₁ ∷ _) j m = look-store H (Subject.closed Sj) j (lookupᴬ a₁ m)
 
+    fin-holds : AllPairs _≢_ (names w₀) → ∀ {E o} → At.Holds H w₀ E o → At.Holds H′ w₀ E o
+    fin-holds fr = Heaps.holds-conn H H′ {S = Sj} {c} {b} {kb} {k} {idle} {rp} {e} {rt} u bd (fin-rest fr)
+
+    fin-gated : AllPairs _≢_ (names w₀) → At.Gated H w₀ → At.Gated H′ w₀
+    fin-gated fr = Heaps.gated-conn H H′ {S = Sj} {c} {b} {kb} {k} {idle} {rp} {e} {rt} u bd (fin-rest fr)
+
+    fin-spent : AllPairs _≢_ (names w₀) → At.Spent H w₀ → At.Spent H′ w₀
+    fin-spent fr = Heaps.spent-conn H H′ {S = Sj} {c} {b} {kb} {k} {idle} {rp} {e} {rt} u bd (fin-rest fr)
+
+    fin-fed : AllPairs _≢_ (names w₀) → ∀ ν → At.Fed H w₀ ν → At.Fed H′ w₀ ν
+    fin-fed fr = Heaps.fed-conn H H′ {S = Sj} {c} {b} {kb} {k} {idle} {rp} {e} {rt} u bd (fin-rest fr)
+
+    postulate
       -- The connect's own heads and ties, the finish restaged, as the
       -- feed's.
       fin-heading   : Heading H H′ q w₀ v
