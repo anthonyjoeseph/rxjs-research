@@ -77,7 +77,7 @@ module Ascending (R : Set) where
   open Growing R using (wkTree; wkLanes; wkPath)
   open Retagging R using (module Body; fed-owed; envP; joiners-path)
   open Shifting R using (LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; lingers-sub; lingersL-of; module Linger; module Build)
-  open Framing R using (untold; scan-part; scan-defined; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike)
+  open Framing R using (Untold; untold; scan-part; scan-defined; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike)
     renaming (Ended to Ends)
   open Replanting R using (Kin; kin-end; kin-pool; kin-feed; kin-fin; rehomes; rehomes-code; restack; reticked; owned-run; plant-self; module Shift; Heading; Lingering; Gone; store-held; Lives; lives-off; ahead-under)
   open Read
