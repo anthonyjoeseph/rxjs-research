@@ -1678,7 +1678,7 @@ module Ascending (R : Set) where
       where
         so-al = Heaps.keeps H H′ fr-off (λ m → m) (fr-apart fr)
         lane-al : ∀ {Δ′ A′} {x : Sub h Δ′ A′} → PathLanes ls x → Alike H H′ (names x)
-        lane-al πL = Heaps.keeps H H′ fr-off (λ m → m) (fr-lane-al fr πL)
+        lane-al πL = Heaps.keeps H H′ fr-off (λ m → m) (fr-under fr πL)
         pt : ∀ {Δ′ A′} {x : Sub h Δ′ A′} → PathLanes ls x → At.part H′ x ≡ At.part H x
         pt {x = x} πL = part-alike H H′ x (lane-al πL)
         seL : ∀ {Δ′ A′} {x : Sub h Δ′ A′} (πL : PathLanes ls x) → seenL H′ πL ≡ true → seenL H πL ≡ true
