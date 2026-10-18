@@ -2273,6 +2273,10 @@ module Ascending (R : Set) where
     fin-gone : AllPairs _≢_ (names w₀) → Gone H H′ w₀
     fin-gone (_ ∷ a₁ ∷ _) = record { gone-part = gp ; gone-live = lives-off (off-store H (Subject.closed Sj)) nl ; gone-held = store-held H (Subject.closed Sj) }
       where
+        au : Alike H H′ (names u)
+        au j m = look-store H (Subject.closed Sj) j (λ eq → lookupᴬ a₁ (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m))))) eq)
+        ab : Alike H H′ (names bd)
+        ab j m = look-store H (Subject.closed Sj) j (λ eq → lookupᴬ a₁ (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names u) m))))) eq)
         gp : ∀ {Δ′ A′} {x : Sub h Δ′ A′} → Path w₀ x → At.part H x ≡ nothing → At.part H′ x ≡ nothing
         gp here z =
           subst₂ (λ s′ b′ → At.connected H′ rp e rt s′ b′ ≡ nothing) (sym (part-alike H H′ u au)) (sym (part-alike H H′ bd ab))
@@ -2282,10 +2286,6 @@ module Ascending (R : Set) where
         nl : ∀ {Δ′ A′ i p c′ k′ tk} {s : Sub h Δ′ A′} → Path w₀ (takeWhileˢ i p c′ k′ tk s) → All (_≢_ (_ , Kit.live c′)) ns
         nl (in-source ψ) = (λ eq → lookupᴬ a₁ (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ (names-path ψ (here refl))))))) (sym eq)) ∷ []
         nl (in-body ψ)   = (λ eq → lookupᴬ a₁ (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names u) (names-path ψ (here refl))))))) (sym eq)) ∷ []
-        au : Alike H H′ (names u)
-        au j m = look-store H (Subject.closed Sj) j (λ eq → lookupᴬ a₁ (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m))))) eq)
-        ab : Alike H H′ (names bd)
-        ab j m = look-store H (Subject.closed Sj) j (λ eq → lookupᴬ a₁ (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names u) m))))) eq)
 
     kin : Kin w₀ v
     kin = kin-fin {g = at-here (At.owing H′ fd′)}
