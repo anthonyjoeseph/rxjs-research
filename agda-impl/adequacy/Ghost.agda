@@ -11,7 +11,7 @@ open import Data.List.Relation.Unary.Any using (Any; here)
 import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
-open import Data.Nat.Properties using (≤-refl; m<m+n; <-trans)
+open import Data.Nat.Properties using (≤-refl; m<m+n; <-trans; ≤-reflexive; ≤-trans; m≤n⇒m≤1+n)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; map) renaming (lookup to lookupᴬ)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to all-++⁺)
 open import Data.List.Relation.Unary.AllPairs using (_∷_)
@@ -19,7 +19,7 @@ open import Data.List.Relation.Unary.Linked using (_∷_)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Level using (Lift; lift)
 open import Data.Maybe using (Maybe; just; nothing; is-just)
-open import Data.Nat using (ℕ; suc; _<_; _+_)
+open import Data.Nat using (ℕ; suc; _<_; _+_; _≤_; z≤n)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Induction.WellFounded using (WellFounded)
 open import Data.Product.Relation.Binary.Lex.Strict using (×-Lex; ×-wellFounded)
@@ -28,8 +28,9 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst)
 
 open import denotation.MonotonicList using (Events; Events∞; Pos; Time; Timeline; tick; out; skip; end; hush; observe; root; Agree; out⁼;
-  skip⁼; end⁼; agree; agree-sym; agree-trans; ix; _<ᵖ_; <ᵖ-trans; <ᵖ-apart)
+  skip⁼; end⁼; hush⁼; agree; agree-sym; ix; _<ᵖ_; <ᵖ-trans; <ᵖ-apart)
 import denotation.Unfold as U
+open import operation.Placed using (Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ)
 open import denotation.MonotonicList using () renaming (sub to subᴾ)
 open import denotation.Compositional using ([]ᵉ)
 open import adequacy.Sorted using (_≤ᵖ_; Under; module Sorting)
@@ -243,23 +244,62 @@ module Ghosting (R : Set) where
     where no : ∀ {q b} → Has hush q b → ⊥
           no ()
 
-  -- `y` is `x` past none or more of its leading skips, alike at every
-  -- depth at each stage.  As sets the two are the same; as a measure a
-  -- skip dropped is progress, which `≋` cannot see.
-  data Past : Events R → Events R → Set where
-    agrees  : ∀ {x y} → (∀ n → Agree n x y) → Past x y
-    skipped : ∀ {x y k r} → (∀ n → Agree n x (skip k r)) → Past (force r) y → Past x y
+  -- How far into the events an item lies.
+  depth : ∀ {e : Events R} {k} → Ahead e k → ℕ
+  depth none      = 0
+  depth (outᵃ a)  = suc (depth a)
+  depth (skipᵃ a) = suc (depth a)
+  depth endᵃ      = 0
+  depth hushᵃ     = 0
+
+  ahead-agree : ∀ {x y k} → (∀ n → Agree n x y) → (a : Ahead x k) → Σ (Ahead y k) λ b → depth b ≡ depth a
+  ahead-agree ag none = none , refl
+  ahead-agree ag (outᵃ a) with ag 1
+  ... | out⁼ _ _ with ahead-agree (λ n → tail-out (ag (suc n))) a
+  ...   | b , eq = outᵃ b , cong suc eq
+  ahead-agree ag (skipᵃ a) with ag 1
+  ... | skip⁼ _ _ with ahead-agree (λ n → tail-skip (ag (suc n))) a
+  ...   | b , eq = skipᵃ b , cong suc eq
+  ahead-agree ag endᵃ with ag 1
+  ... | end⁼ = endᵃ , refl
+  ahead-agree ag hushᵃ with ag 1
+  ... | hush⁼ = hushᵃ , refl
+
+  -- Every item `x` reaches, `y` reaches no deeper.
+  Fewer : Events R → Events R → Set
+  Fewer x y = ∀ {k} (a : Ahead x k) → Σ (Ahead y k) λ b → depth b ≤ depth a
+
+  -- `y` is `x` with none or more of its skips gone.  As sets the two are
+  -- the same; as a measure a skip dropped is progress, which `≋` cannot
+  -- see.
+  record Past (x y : Events R) : Set where
+    field
+      same  : x ≋ y
+      fewer : Fewer x y
 
   skip-same : ∀ {k r} → skip k r ≋ force r
   skip-same = (λ { (pastSkip h) → h }) , pastSkip
 
   past-same : ∀ {x y} → Past x y → x ≋ y
-  past-same (agrees ag)    = same-agree ag
-  past-same (skipped ag p) = ≋-trans (same-agree ag) (≋-trans skip-same (past-same p))
+  past-same = Past.same
+
+  agrees : ∀ {x y} → (∀ n → Agree n x y) → Past x y
+  agrees ag = record { same = same-agree ag ; fewer = λ a → proj₁ (ahead-agree ag a) , ≤-reflexive (proj₂ (ahead-agree ag a)) }
+
+  skipped : ∀ {x y k r} → (∀ n → Agree n x (skip k r)) → Past (force r) y → Past x y
+  skipped {x} {y} {k} {r} ag p = record { same = ≋-trans (same-agree ag) (≋-trans skip-same (Past.same p)) ; fewer = fewer }
+    where fewer : Fewer x y
+          fewer a with ahead-agree ag a
+          ... | none     , _  = none , z≤n
+          ... | skipᵃ a′ , de with Past.fewer p a′
+          ...   | b , le = b , ≤-trans (m≤n⇒m≤1+n le) (≤-reflexive de)
 
   past-pre : ∀ {x y z} → (∀ n → Agree n x y) → Past y z → Past x z
-  past-pre ag (agrees ag′)    = agrees λ n → agree-trans (ag n) (ag′ n)
-  past-pre ag (skipped ag′ p) = skipped (λ n → agree-trans (ag n) (ag′ n)) p
+  past-pre {x} {y} {z} ag p = record { same = ≋-trans (same-agree ag) (Past.same p) ; fewer = fewer }
+    where fewer : Fewer x z
+          fewer a with ahead-agree ag a
+          ... | b , de with Past.fewer p b
+          ...   | c , le = c , ≤-trans le (≤-reflexive de)
 
   ----------------------------------------------------------------------
   -- WHAT IS LEFT BEFORE THE GHOST MOVES

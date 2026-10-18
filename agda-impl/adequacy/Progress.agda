@@ -14,13 +14,13 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using ([]; length)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤-refl; ≤-reflexive; m≤n⇒m≤1+n; ≤-trans)
+open import Data.Nat.Properties using (≤-refl; ≤-trans)
 open import Data.Product using (Σ; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst)
+open import Data.Sum using ([_,_]′)
+open import Relation.Binary.PropositionalEquality using (_≢_; sym; trans; subst)
 open import Induction.WellFounded using (Acc; acc)
 
-open import denotation.MonotonicList using (Events; Events∞; out; skip; end; Agree; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agree-trans; observe; root)
+open import denotation.MonotonicList using (Events∞; out; skip; end; Agree; agree-refl; agree-trans; observe; root)
 open import denotation.Denote using (⟦_⟧)
 import denotation.Unfold as U
 open import operation.Machine using (module Machine)
@@ -38,7 +38,7 @@ module Progressing (R : Set) where
     renaming (out to outᵗ; end to endᵗ)
   open Unsubbing R using (_⇝_; now; then)
   open Ghosting R using (Has; atOut; pastSkip; residual; begun; Past; agrees; skipped; past-pre; passed; lowered; showing; tail-out; tail-skip;
-    has-agree; after; _≺_; ≺-wf; measure)
+    has-agree; after; _≺_; ≺-wf; measure; depth; ahead-agree)
   open Honesty R using (Hop; valueᴴ; completeᴴ; drainedᴴ; silentᴴ; strong-hop; strong-agrees)
   open Strongly R using (Strong; strong-begin)
   open Read
@@ -68,37 +68,6 @@ module Progressing (R : Set) where
   walk : ∀ {m m₀ k} → m ⇝ m₀ → Gets (trace m₀) k → Gets (trace m) k
   walk now           g = g
   walk (then eq path) g = subst (λ s → Gets (shown s) _) (sym eq) (tauᵍ (walk path g))
-
-  ----------------------------------------------------------------------
-  -- How far into the events an item lies
-
-  depth : ∀ {e : Events R} {k} → Ahead e k → ℕ
-  depth none      = 0
-  depth (outᵃ a)  = suc (depth a)
-  depth (skipᵃ a) = suc (depth a)
-  depth endᵃ      = 0
-  depth hushᵃ     = 0
-
-  ahead-agree : ∀ {x y k} → (∀ n → Agree n x y) → (a : Ahead x k) → Σ (Ahead y k) λ b → depth b ≡ depth a
-  ahead-agree ag none = none , refl
-  ahead-agree ag (outᵃ a) with ag 1
-  ... | out⁼ _ _ with ahead-agree (λ n → tail-out (ag (suc n))) a
-  ...   | b , eq = outᵃ b , cong suc eq
-  ahead-agree ag (skipᵃ a) with ag 1
-  ... | skip⁼ _ _ with ahead-agree (λ n → tail-skip (ag (suc n))) a
-  ...   | b , eq = skipᵃ b , cong suc eq
-  ahead-agree ag endᵃ with ag 1
-  ... | end⁼ = endᵃ , refl
-  ahead-agree ag hushᵃ with ag 1
-  ... | hush⁼ = hushᵃ , refl
-
-  -- Past a skip an item lies no deeper.
-  ahead-past : ∀ {x y k} → Past x y → (a : Ahead x k) → Σ (Ahead y k) λ b → depth b ≤ depth a
-  ahead-past (agrees ag) a = proj₁ (ahead-agree ag a) , ≤-reflexive (proj₂ (ahead-agree ag a))
-  ahead-past (skipped ag p) a with ahead-agree ag a
-  ... | none , eq = none , z≤n
-  ... | skipᵃ a′ , eq with ahead-past p a′
-  ...   | b , le = b , subst (depth b ≤_) eq (m≤n⇒m≤1+n le)
 
   -- Events with nothing in them reach their silence at most.
   ahead-none : ∀ {e k} → (∀ {q b} → Has e q b → ⊥) → Ahead e k → k ≤ 1
@@ -132,15 +101,8 @@ module Progressing (R : Set) where
   skipped-split : ∀ {f e q r y k} → (∀ n → Agree n e (skip q r)) → Past (force r) y → (a : Ahead e (suc k)) → depth a ≤ f
                 → Σ (Ahead y (suc k)) λ b → depth b < f
   skipped-split {f} ag p a le with ahead-agree ag a
-  ... | skipᵃ a′ , de with ahead-past p a′
+  ... | skipᵃ a′ , de with Past.fewer p a′
   ...   | b , le′ = b , ≤-trans (s≤s le′) (subst (_≤ f) (sym de) le)
-
-  -- A ghost past `e` shows it alike, or past a skip, an item lying
-  -- shallower.
-  past-split : ∀ {f e y k} → Past e y → (a : Ahead e (suc k)) → depth a ≤ f
-             → (∀ n → Agree n e y) ⊎ Σ (Ahead y (suc k)) λ b → depth b < f
-  past-split (agrees ag)    a le = inj₁ ag
-  past-split (skipped ag p) a le = inj₂ (skipped-split ag p a le)
 
   value≢silent : ∀ {t p a m′ m″} → value t p a m′ ≢ silent m″
   value≢silent ()
@@ -171,10 +133,9 @@ module Progressing (R : Set) where
         (tauᵍ (walk path (reentry f (proj₁ b) (proj₂ b) st₀ (λ n → agree-refl n _) (≺-wf _) (strong-hop st₀))))
       where b = skipped-split (λ n → agree-trans (ag n) (ag₁ n)) p a lt
     reentry (suc f) {k = suc k} a (s≤s lt) st ag ac (silentᴴ eq (g″ , m₀ , path , st₀ , showing p ns)) =
-      subst (λ s → Gets (shown s) (suc k)) (sym eq) (tauᵍ (walk path
-        ([ (λ ag″ → shown-gets (suc f) a (s≤s lt) st₀ ag″ (strong-hop st₀) ns)
-         , (λ b → reentry f (proj₁ b) (proj₂ b) st₀ (λ n → agree-refl n _) (≺-wf _) (strong-hop st₀)) ]′
-         (past-split (past-pre ag p) a lt))))
+      subst (λ s → Gets (shown s) (suc k)) (sym eq)
+        (tauᵍ (walk path (shown-gets (suc f) (proj₁ b) (s≤s (≤-trans (proj₂ b) lt)) st₀ (λ n → agree-refl n _) (strong-hop st₀) ns)))
+      where b = Past.fewer (past-pre ag p) a
 
     -- A re-entry configuration whose step shows something.
     shown-gets : ∀ f {e g m k} (a : Ahead e k) → depth a < f → (st : Strong g m) → (∀ n → Agree n e (residual g)) → Hop st

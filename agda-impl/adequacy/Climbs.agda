@@ -46,6 +46,7 @@ open import operation.PureObservable using (Out; note; Pureᴾ; module Pure)
 open import operation.AbstractObservable using (module Heap; module Run; fifo; list) renaming (module Machine to Shared)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
 open import adequacy.Ghost using (module Ghosting)
+open import adequacy.Gapped using (module Gapping)
 open import adequacy.Lift using (module Lifting)
 open import adequacy.Lowers using (module Lowering)
 open import adequacy.Frame using (module Framing)
@@ -79,6 +80,7 @@ module Ascending (R : Set) where
   open Taking R using (tick-ix0)
   open Naming R using (pre; fresh-plant; fresh-new; wk-pairs; wk-img; to-img)
   open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
+  open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed)
   open Lowering R using (queue-keeps; store-keeps; keeps-trans)
   open Lifting R using (sub-onward; emit-shut; emit-void; run-meets; run-at; emit-run; spread-past; behind-fire; fire-lingers; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
   open Locality R using (stored-at; stored-hit; live-apart; flatReads; cuts; cut-in; module Heaps)
@@ -807,39 +809,6 @@ module Ascending (R : Set) where
     pool-queue : ∀ {q clk ts} → Queue H q clk ts T → Queue H q clk ts T′
     pool-queue = plant-queue H ρ v refl refl (λ _ → refl)
 
-  -- A path through a connect's source.
-  mutual
-    Sourced : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Path t u → Set
-    Sourced here          = ⊥
-    Sourced (in-map ρ)    = Sourced ρ
-    Sourced (in-scan ρ)   = Sourced ρ
-    Sourced (in-take ρ)   = Sourced ρ
-    Sourced (in-outer ρ)  = Sourced ρ
-    Sourced (in-lanes πL) = SourcedL πL
-    Sourced (in-source ρ) = ⊤
-    Sourced (in-body ρ)   = Sourced ρ
-    Sourced (in-defer ρ)  = Sourced ρ
-
-    SourcedL : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} → PathLanes ls u → Set
-    SourcedL (this-lane ρ)  = Sourced ρ
-    SourcedL (next-lane πL) = SourcedL πL
-
-  mutual
-    sourced-planted : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {x : Sub h Δ′ A′} (ρ : Path t x) (v : Sub h Δ′ A′) → Sourced (planted ρ v) → Sourced ρ
-    sourced-planted (in-map ρ)    v s = sourced-planted ρ v s
-    sourced-planted (in-scan ρ)   v s = sourced-planted ρ v s
-    sourced-planted (in-take ρ)   v s = sourced-planted ρ v s
-    sourced-planted (in-outer ρ)  v s = sourced-planted ρ v s
-    sourced-planted (in-lanes πL) v s = sourcedL-planted πL v s
-    sourced-planted (in-source ρ) v s = tt
-    sourced-planted (in-body ρ)   v s = sourced-planted ρ v s
-    sourced-planted (in-defer ρ)  v s = sourced-planted ρ v s
-
-    sourcedL-planted : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {x : Sub h Δ′ A′} (πL : PathLanes ls x) (v : Sub h Δ′ A′)
-                     → SourcedL (plantedᴸ πL v) → SourcedL πL
-    sourcedL-planted (this-lane ρ)  v s = sourced-planted ρ v s
-    sourcedL-planted (next-lane πL) v s = sourcedL-planted πL v s
-
   -- A lane's parts, the first apart.
   lanes-one : ∀ {h} (H : Heapᴹ h) {Δ B} (l : Lane h Δ B) ls → At.partLanes H (l ∷ ls) ≡ At.partLanes H (l ∷ []) ++ At.partLanes H ls
   lanes-one H (lane c k s) ls with At.val H (Kit.live c) | At.part H s
@@ -854,77 +823,58 @@ module Ascending (R : Set) where
   merged-cons H op g nothing  (_ ∷ _) c as qs pl = refl
   merged-cons H op g (just _) bs      c as qs pl = refl
 
-  -- A SKIP LIFTED OFF EVERY SOURCE: each ancestor skips to the node its
-  -- own part reads, the child's part the node the child skipped to.
+  -- A SKIP LIFTED: each ancestor skips to a node its own part reads but
+  -- for the gaps the sources it climbed through fed their bodies.
   mutual
-    skip-lift : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) {k c S}
-              → Lifts H π (U.skipˢ k c) S → At.part H u ≡ just c
-              → Sourced π ⊎ Σ Pos λ k′ → Σ (U.Node Δ A) λ g′ → S ≡ U.skipˢ k′ g′ × At.part H t ≡ just g′
-    skip-lift H here lifts-here pc = inj₂ (_ , _ , refl , pc)
-    skip-lift H (in-map π) (lifts-map L) pc with skip-lift H π L pc
-    ... | inj₁ sc = inj₁ sc
-    ... | inj₂ (k′ , g′ , refl , pg) rewrite pg = inj₂ (k′ , _ , refl , refl)
-    skip-lift H (in-scan π) (lifts-scan L) pc with skip-lift H π L pc
-    ... | inj₁ sc = inj₁ sc
-    ... | inj₂ (k′ , g′ , refl , pg) rewrite pg = inj₂ (k′ , _ , refl , refl)
-    skip-lift H (in-take π) (lifts-take lv L) pc with skip-lift H π L pc
-    ... | inj₁ sc = inj₁ sc
-    ... | inj₂ (k′ , g′ , refl , pg) rewrite lv | pg = inj₂ (k′ , _ , refl , refl)
-    skip-lift H (in-outer π) (lifts-outer _ _ L) pc with skip-lift H π L pc
-    ... | inj₁ sc = inj₁ sc
-    ... | inj₂ (k′ , g′ , refl , pg) rewrite pg = inj₂ (k′ , _ , refl , refl)
-    skip-lift H (in-lanes {op = op} {f} {fl} {pl = pl} {t = so} πL) (lifts-lanes {bs = bs} {as = as} LL _ _ _) pc with skip-liftL H πL LL pc
-    ... | inj₁ sc = inj₁ sc
-    ... | inj₂ (k′ , c′ , refl , eq) rewrite eq =
-      inj₂ (k′ , _ , refl , merged-cons H op (λ a q → U.subscribe (f a) q) (At.part H so) bs c′ as (At.val H (FlatKit.Flat.queue fl)) pl)
-    skip-lift H (in-source π) (lifts-source _ _ _) pc = inj₁ tt
-    skip-lift H (in-body π) (lifts-body pt _ L) pc with skip-lift H π L pc
-    ... | inj₁ sc = inj₁ sc
-    ... | inj₂ (k′ , g′ , refl , pg) rewrite pt | pg = inj₂ (k′ , _ , refl , refl)
-    skip-lift H (in-body π) (lifts-shut pt refl _ L) pc with skip-lift H π L pc
-    ... | inj₁ sc = inj₁ sc
-    ... | inj₂ (k′ , g′ , refl , pg) rewrite pt | pg = inj₂ (k′ , _ , refl , refl)
-    skip-lift H (in-defer π) (lifts-defer L) pc = skip-lift H π L pc
+    skip-lift : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) {κ k c c₀ S}
+              → Lifts H π (U.skipˢ k c) S → At.part H u ≡ just c₀ → Gapped κ c c₀
+              → Σ Pos λ k′ → Σ (U.Node Δ A) λ g′ → Σ (U.Node Δ A) λ g″ → S ≡ U.skipˢ k′ g′ × At.part H t ≡ just g″ × Gapped κ g′ g″
+    skip-lift H here lifts-here pc gc = _ , _ , _ , refl , pc , gc
+    skip-lift H (in-map π) (lifts-map L) pc gc with skip-lift H π L pc gc
+    ... | k′ , g′ , g″ , refl , pg , gp rewrite pg = k′ , _ , _ , refl , refl , gap-map gp
+    skip-lift H (in-scan π) (lifts-scan L) pc gc with skip-lift H π L pc gc
+    ... | k′ , g′ , g″ , refl , pg , gp rewrite pg = k′ , _ , _ , refl , refl , gap-scan gp
+    skip-lift H (in-take π) (lifts-take lv L) pc gc with skip-lift H π L pc gc
+    ... | k′ , g′ , g″ , refl , pg , gp rewrite lv | pg = k′ , _ , _ , refl , refl , gap-take gp
+    skip-lift H (in-outer {fl = fl} {ls = ls} π) (lifts-outer _ _ L) pc gc with skip-lift H π L pc gc
+    ... | k′ , g′ , g″ , refl , pg , gp rewrite pg =
+      k′ , _ , _ , refl , refl , gap-flat (λ _ _ → alike) (gap-just gp) (gapL-refl (At.partLanes H ls)) alike
+    skip-lift H (in-lanes {op = op} {f} {fl} {pl = pl} {t = so} πL) (lifts-lanes {bs = bs} {as = as} LL _ _ _) pc gc with skip-liftL H πL LL pc gc
+    ... | k′ , c′ , c″ , refl , eq , gp rewrite eq =
+      k′ , _ , _ , refl , merged-cons H op (λ a q → U.subscribe (f a) q) (At.part H so) bs c″ as (At.val H (FlatKit.Flat.queue fl)) pl
+         , gap-flat (λ _ _ → alike) (gapM-refl (At.part H so)) (gapL-mid bs as gp) alike
+    skip-lift H (in-source π) (lifts-source {b₀ = b₀} pb sf L) pc gc with skip-lift H π L pc gc
+    ... | k′ , g′ , g″ , refl , pg , gp rewrite sf | pg | pb = _ , _ , _ , refl , refl , gap-connect (feed-gapped (here refl) k′ b₀) (gap-live gp)
+    skip-lift H (in-body π) (lifts-body pt _ L) pc gc with skip-lift H π L pc gc
+    ... | k′ , g′ , g″ , refl , pg , gp rewrite pt | pg = k′ , _ , _ , refl , refl , gap-connect gp (gap-live alike)
+    skip-lift H (in-body π) (lifts-shut pt refl _ L) pc gc with skip-lift H π L pc gc
+    ... | k′ , g′ , g″ , refl , pg , gp rewrite pt | pg = k′ , _ , _ , refl , refl , gap-connect (gap-shut gp) (gap-ended alike)
+    skip-lift H (in-defer π) (lifts-defer L) pc gc = skip-lift H π L pc gc
 
-    skip-liftL : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (πL : PathLanes ls u) {k c bs S as}
-               → LiftsLane H πL (U.skipˢ k c) bs S as → At.part H u ≡ just c
-               → SourcedL πL ⊎ Σ Pos λ k′ → Σ (U.Node Δ B) λ c′ → S ≡ U.skipˢ k′ c′ × At.partLanes H ls ≡ bs ++ c′ ∷ as
-    skip-liftL H (this-lane π) (lifts-this lv L) pc with skip-lift H π L pc
-    ... | inj₁ sc = inj₁ sc
-    ... | inj₂ (k′ , c′ , refl , pg) rewrite lv | pg = inj₂ (k′ , c′ , refl , refl)
-    skip-liftL H (next-lane {l = l} {ls} πL) (lifts-next L) pc with skip-liftL H πL L pc
-    ... | inj₁ sc = inj₁ sc
-    ... | inj₂ (k′ , c′ , refl , eq) =
-      inj₂ (k′ , c′ , refl , trans (lanes-one H l ls) (trans (cong (At.partLanes H (l ∷ []) ++_) eq) (sym (++-assoc (At.partLanes H (l ∷ [])) _ _))))
-
-  -- A SKIP CLIMBING THROUGH A SOURCE: the source's skip feeds its body a
-  -- gap, so the node lifted holds a body fed what the tree's part, read
-  -- off the heap, was never fed; the two meanings differ by that gap in
-  -- every joiner the body holds, and agree only where it is a leading
-  -- skip or no joiner reads it.
-  postulate
-    source-lift : ∀ {h} (H H′ : Heapᴹ h) {T : Sub h [] R} {Δ A} {w₀ : Sub h Δ A} (ρ : Path T w₀) (v : Sub h Δ A)
-                → AllPairs _≢_ (names T) → ∀ {ns} → Offʰ H H′ ns → All (_∈ᴸ names w₀) ns
-                → ∀ {k c S g} → Lifts H ρ (U.skipˢ k c) S → At.part H′ v ≡ just c
-                → Sane [] g → Placed g [] → U.step g ≡ S → Sourced ρ
-                → Σ (U.Node [] R) λ g″ → At.part H′ (plant ρ v) ≡ just g″ × Sane [] g″ × Placed g″ []
-                  × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
+    skip-liftL : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (πL : PathLanes ls u) {κ k c c₀ bs S as}
+               → LiftsLane H πL (U.skipˢ k c) bs S as → At.part H u ≡ just c₀ → Gapped κ c c₀
+               → Σ Pos λ k′ → Σ (U.Node Δ B) λ c′ → Σ (U.Node Δ B) λ c″ → S ≡ U.skipˢ k′ c′ × At.partLanes H ls ≡ bs ++ c″ ∷ as × Gapped κ c′ c″
+    skip-liftL H (this-lane π) (lifts-this lv L) pc gc with skip-lift H π L pc gc
+    ... | k′ , c′ , c″ , refl , pg , gp rewrite lv | pg = k′ , c′ , c″ , refl , refl , gp
+    skip-liftL H (next-lane {l = l} {ls} πL) (lifts-next L) pc gc with skip-liftL H πL L pc gc
+    ... | k′ , c′ , c″ , refl , eq , gp =
+      k′ , c′ , c″ , refl , trans (lanes-one H l ls) (trans (cong (At.partLanes H (l ∷ []) ++_) eq) (sym (++-assoc (At.partLanes H (l ∷ [])) _ _))) , gp
 
   -- A SKIP CLIMBING TO THE ROOT: the ghost past the root's skip, the
-  -- planted tree's part what it skipped to.
+  -- planted tree's part what it skipped to, but for gaps.
   ghost-lift : ∀ {h} (H H′ : Heapᴹ h) {T : Sub h [] R} {Δ A} {w₀ : Sub h Δ A} (ρ : Path T w₀) (v : Sub h Δ A)
              → AllPairs _≢_ (names T) → ∀ {ns} → Offʰ H H′ ns → All (_∈ᴸ names w₀) ns
-             → ∀ {k c S g} → Lifts H ρ (U.skipˢ k c) S → At.part H′ v ≡ just c
+             → ∀ {κ k c c₀ S g} → Lifts H ρ (U.skipˢ k c) S → At.part H′ v ≡ just c₀ → Gapped κ c c₀
              → Sane [] g → Placed g [] → U.step g ≡ S
              → Σ (U.Node [] R) λ g″ → At.part H′ (plant ρ v) ≡ just g″ × Sane [] g″ × Placed g″ []
                × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
-  ghost-lift H H′ ρ v fs off mine {g = g} L pv sn pd sg
-    with skip-lift H′ (planted ρ v) (lifts-planted ρ v (Wrote.wr-lifts H H′ ρ off mine fs L)) pv
-  ... | inj₁ sc = source-lift H H′ ρ v fs off mine L pv sn pd sg (sourced-planted ρ v sc)
-  ... | inj₂ (k′ , g′ , refl , pg) =
-    g′ , pg , subst (SaneS []) sg (step-sane g sn) , proj₂ (subst (Placedˢ []) sg (placed-after g sn pd))
+  ghost-lift H H′ ρ v fs off mine {g = g} L pv gv sn pd sg
+    with skip-lift H′ (planted ρ v) (lifts-planted ρ v (Wrote.wr-lifts H H′ ρ off mine fs L)) pv gv
+  ... | k′ , g′ , g″ , refl , pg , gp =
+    g″ , pg , gapped-sane gp (subst (SaneS []) sg (step-sane g sn)) , gapped-placed gp pd′
        , k′ , U.stateᴺ g′ [] , (λ n → subst (λ s → Agree n (residual g) (afterᴱ [] s)) sg (_≃_.agreeing (step-skips g sn pd) n))
-       , agrees (λ n → agree-refl n (residual g′))
+       , gapped-past gp pd′
+    where pd′ = proj₂ (subst (Placedˢ []) sg (placed-after g sn pd))
 
   -- An outer ended with lanes or a queue left skips to the pool.
   outer-end : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) (o : U.Node Γ A) q (ls : List (U.Node Γ B)) (qs : List A) p
@@ -1071,12 +1021,12 @@ module Ascending (R : Set) where
                → Σ (U.Node [] R) λ g″ → At.part H′ (Restaged.T′ H′ ρ (U.unionᶜ pl (U.restᶜ o₀))) ≡ just g″ × Sane [] g″ × Placed g″ []
                  × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
     pool-ghost fs o₀ {q = q} sn pd gn nl L sg =
-      ghost-lift H H′ ρ (flatMapˢ op f fl oc k r pl′ u ls) fs (off-store H (FlatKit.Flat.outerDone fl)) mine
+      ghost-lift H H′ ρ (flatMapˢ op f fl oc k r pl′ u ls) fs (off-store H (FlatKit.Flat.outerDone fl)) mine {κ = []}
         (subst (λ s → Lifts H ρ s _) (outer-end op G o₀ q (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl nl) L)
         (trans (sd-part-at pl′ (fresh-path ρ fs))
                (trans (cong (λ x → At.merged H op G x (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl′) gn)
                       (merged-open H op G (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl′ nl)))
-        sn pd sg
+        alike sn pd sg
       where
         G   = λ a j → U.subscribe (f a) j
         pl′ = U.unionᶜ pl (U.restᶜ o₀)
@@ -2075,8 +2025,8 @@ module Ascending (R : Set) where
                × Sane [] g″ × Placed g″ []
                × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
   lane-ghost H {op = op} {f} {fl} {oc} {k} {r} {pl} {t} {ls} ρ o fs {q = q} {bs = bs} {l} {S₁} {as} sn pd LL st e₀ L sg =
-    ghost-lift H H₂ ρ (flatMapˢ op f fl oc k r pl′ t ls) fs (Freed.fr-off H ρ o) (Freed.fr-mine H ρ o)
-      (subst (λ s → Lifts H ρ s _) lane-eq L) node sn pd sg
+    ghost-lift H H₂ ρ (flatMapˢ op f fl oc k r pl′ t ls) fs (Freed.fr-off H ρ o) (Freed.fr-mine H ρ o) {κ = []}
+      (subst (λ s → Lifts H ρ s _) lane-eq L) node alike sn pd sg
     where
       H₂  = freed H (laneOf o) fl
       G   = λ a i → U.subscribe (f a) i
@@ -2339,16 +2289,26 @@ module Ascending (R : Set) where
     kin : Kin w₀ v
     kin = kin-feed {g = at-here (At.owing H fd′)}
 
+    -- The connect's part, the feed restaged: its body's part fed the
+    -- source's value, but for gaps.  The subscribers the feed read hold
+    -- the value as the meaning feeds it (`Meaning`, `At.Joined`); every
+    -- other joiner, and every lane or deferred node reached no sooner
+    -- than `q` (`Heads`), holds it as a skip no part holds.
     postulate
-      -- DEAD ROUTE: the root step a skip whose node is the planted tree's
-      --   part, closed by `step-skips`.  A skip climbing through an
-      --   enclosing connect's source feeds that connect's body `nothing`
-      --   (`U.sourceˢ`), an entry no joiner's part holds; under any nested
-      --   connect the two nodes differ and only their meanings can agree.
-      fed-ghost   : ∀ {g S c′} → Sane [] g → Placed g [] → At.part H u ≡ just c′
+      fed-part : ∀ {b₀ c′} → At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T
+               → At.part H bd ≡ just b₀ → At.part H u ≡ just c′
+               → Σ (U.Node (A ∷ Δ) B) λ b₁ → At.part H v ≡ just (U.connectᶜ rp b₁ (U.live c′)) × Gapped q (U.feed (here refl) q (just y) b₀) b₁
+
+    -- The ghost past the source's skip: the connect's part what it
+    -- skipped to, but for gaps, and the heap untouched.
+    fed-ghost : AllPairs _≢_ (names T) → At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T
+              → ∀ {g S c′} → Sane [] g → Placed g [] → At.part H u ≡ just c′
               → Lifts H (ρ ⊕ in-source here) (U.outˢ q y c′) S → U.step g ≡ S
               → Σ (U.Node [] R) λ g″ → At.part H T′ ≡ just g″ × Sane [] g″ × Placed g″ []
                 × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
+    fed-ghost fs jn mn bh sn pd pv L sg with lifts-split ρ (in-source here) L
+    ... | _ , lifts-source pb sf lifts-here , Lρ with fed-part jn mn bh pb pv
+    ...   | b₁ , pv′ , gp rewrite sf = ghost-lift H H ρ v fs (λ _ _ → refl) [] {κ = q} Lρ pv′ (gap-connect gp (gap-live alike)) sn pd sg
 
     -- The connect's own heads and ties, the feed restaged: the body's
     -- joiners retold what the feed owes them.
@@ -2412,7 +2372,7 @@ module Ascending (R : Set) where
               ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
               ; behind = bh ; lingers = lgr } | refl
     with subst (λ W → _ ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-source here) top) cd
-  ... | readRef≗ refl f with Feeds.fed-ghost hp ρ y q sn pl pv L sg
+  ... | readRef≗ refl f with Feeds.fed-ghost hp ρ y q fs (Queue.joined qu) mn bh sn pl pv L sg
   ...   | g″ , pg , sn″ , pl″ , k′ , r , ag , pp =
     landed (g″ , _ , then refl now
       , carried (record

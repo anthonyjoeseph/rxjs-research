@@ -177,11 +177,11 @@ by their own silent steps (`Mirror`).
 
 ### Big picture tier roadmap
 
-- **GHOSTS.** `ghost-lift` holds exactly off every source; what is left
-  is `source-lift`: the lifted node feeds the body a gap no joiner's part
-  holds. Decide first whether the gap is ever more than a leading skip.
-  Then `fed-ghost` as `ghost-lift` over one node fact, the retagged body
-  read as `U.feed`, which needs the joiners' states, so `Meaning`.
+- **GHOSTS.** A ghost lifted past a source's skip is the part's past
+  skips (`Past` over `Fewer`), the part gapped (`Gapped`); `fed-ghost` is a
+  body over `fed-part`. Left: `gapped-past`, skip-inertness through every
+  operator, a factory guarded past `κ`; then `fin-ghost`, its rest `Tied`
+  only, and `end-ghost`, an end, not a skip.
 - **THE LANE START, GROWN.** First the growth frame's own cells:
   `grow-stack`/`alone`/`ticked` and `grow-owned`/`holds`/`joined` are one
   naturality, the kernels' code under weakening (`walk-grow`,
@@ -208,8 +208,12 @@ by their own silent steps (`Mirror`).
   stepped node's.
 - **`within-step`** (Stepper) — FALSITY, `REFUTED×2`, `X`: a sane, placed root
   ghost's step leaves its parts placed.
-- **`source-lift`** (Climbs) — FALSITY, `NO EVIDENCE`: a skip lifted through a
-  connect's source, the planted part's meaning the lifted node's past a skip.
+- **`gapped-past`** (Gapped) — FALSITY, `NO EVIDENCE`: a placed node's meaning
+  is a gapped one's past skips.
+- **`gapped-sane`** (Gapped) — FALSITY, `NO EVIDENCE`: a node gapped from a
+  sane one is sane.
+- **`gapped-placed`** (Gapped) — FALSITY, `NO EVIDENCE`: a node gapped from a
+  placed one is placed.
 - **`lane-settles`** (Climbs) — FALSITY, `NO EVIDENCE`: a freed slot's settle
   tests the ghost's lane end: done flag the outer gone, count the lanes.
 - **`calling-open`** (Climbs) — FALSITY, `NO EVIDENCE`: a climbing signal's
@@ -321,8 +325,8 @@ by their own silent steps (`Mirror`).
   part never reads an accumulator.
 - **`src-idle`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's source signals
   its subject only with no feed under way.
-- **`fed-ghost`** (Climbs) — FALSITY, `DEAD ROUTE`: the tree with a feed
-  restaged has a sane, placed part, the ghost past the source's skip.
+- **`fed-part`** (Climbs) — FALSITY, `NO EVIDENCE`: the retagged body is the
+  body's part fed the value, gapped up to the feed.
 - **`fin-ghost`** (Climbs) — FALSITY, `NO EVIDENCE`: the tree with a finish
   staged has a sane, placed part, the ghost past the source's skip.
 - **`emit-shut`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` whose observer path
@@ -334,18 +338,19 @@ by their own silent steps (`Mirror`).
   agenda's calls.
 - **`walk-grow`** (Weaken) — FALSITY, `NO EVIDENCE`: a walk along a weakened
   path hands the weakened observer, continuation and subjects.
-- **`compile-cong`** (Names) — FALSITY, `NO EVIDENCE`: a compiled
-  subscription reads alike under alike observers and continuations.
+- **`compile-cong`** (Names) — FALSITY, `NO EVIDENCE`: a compiled subscription
+  reads alike under alike observers and continuations.
 - **`grow-stack`, `grow-alone`, `grow-ticked`** (Weaken) — FALSITY,
   `NO EVIDENCE`: the stack, its sources and its ticks carried across a
   weakening.
-- **`grow-owned`, `grow-holds`, `grow-joined`** (Weaken) — FALSITY, `NO EVIDENCE`: the calls, the registered
-  callbacks and the silenced subscribers read along a growth as the
-  weakened kernels' — the kernels' code natural in the world.
-- **`untake`** (Taken) — FALSITY, `NO EVIDENCE`: a source heads no earlier
-  than the take over it.
-- **`grew-store`** (Connected) — FALSITY, `NO EVIDENCE`: a store into a cell the
-  growth made past its old names keeps the run as it read.
+- **`grow-owned`, `grow-holds`, `grow-joined`** (Weaken) — FALSITY,
+  `NO EVIDENCE`: the calls, the registered callbacks and the silenced
+  subscribers read along a growth as the weakened kernels' — the kernels' code
+  natural in the world.
+- **`untake`** (Taken) — FALSITY, `NO EVIDENCE`: a source heads no earlier than
+  the take over it.
+- **`grew-store`** (Connected) — FALSITY, `NO EVIDENCE`: a store into a cell
+  the growth made past its old names keeps the run as it read.
 - **`walk-kont-sub`** (Names) — FALSITY, `NO EVIDENCE`: a walk's continuation
   reads alike on alike subscriptions.
 - **`flat-wk-here`** (Flatted) — FALSITY, `RECOVERY`: a flatMap kit's admit,
@@ -358,8 +363,8 @@ by their own silent steps (`Mirror`).
   connect planted at its body, its source owed under `ix 1`.
 - **`connect-queue`** (Connected) — FALSITY, `NO EVIDENCE`: `Queue` survives a
   connect planted at its body under `ix 0`.
-- **`connect-behind`** (Connected) — FALSITY, `NO EVIDENCE`: every part heads no
-  sooner than the run with a connect planted at its body.
+- **`connect-behind`** (Connected) — FALSITY, `NO EVIDENCE`: every part heads
+  no sooner than the run with a connect planted at its body.
 - **`sub-joined`** (Lift) — FALSITY, `NO EVIDENCE`: a joiner begun registers on
   its subject, or completes on a closed one.
 - **`sub-defer`** (Lift) — FALSITY, `NO EVIDENCE`: a defer begun begins its
@@ -380,8 +385,8 @@ by their own silent steps (`Mirror`).
   heads no sooner than `q` whenever its outer's and its lanes' do.
 - **`untold-shut`** (Shift) — FALSITY, `NO EVIDENCE`: shutting a body's head
   input leaves what it has not told every other input.
-- **`rest-sourced`** (Shift) — FALSITY, `NO EVIDENCE`: a connect's leftover over
-  a source running on either side, pinned as its source's.
+- **`rest-sourced`** (Shift) — FALSITY, `NO EVIDENCE`: a connect's leftover
+  over a source running on either side, pinned as its source's.
 - **`rehome`** (Replant) — FALSITY, `NO EVIDENCE`: a call aimed anywhere in the
   tree aimed alike after a kin replanted.
 - **`recold`** (Replant) — FALSITY, `NO EVIDENCE`: a cold reached in the tree
