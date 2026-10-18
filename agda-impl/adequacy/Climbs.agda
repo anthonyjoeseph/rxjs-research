@@ -15,7 +15,8 @@ open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred; m<n⇒m<1+n; +-monoʳ-<; +-monoˡ-<)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; map) renaming (lookup to lookupᴬ; tabulate to tabulateᴬ)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to all-++⁺)
-open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
+open import Data.List.Relation.Unary.AllPairs using (AllPairs; []; _∷_)
+open import Data.List.Relation.Binary.Permutation.Propositional using (_↭_) renaming (refl to ↭-refl′)
 open import Data.List.Relation.Unary.Linked using (Linked; _∷_; tail)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Level using (lift; lower)
@@ -59,7 +60,7 @@ open Events∞
 module Ascending (R : Set) where
   open Machine R using (Mach; mach; Playing; Step; silent; value; complete; step; Read; feed; Todo; wkPlaying; wkTodo)
   open Shared Timeline (Out R) using (Conf; Heapᴹ; Stack; ⟨_,_,_⟩; held; run; asking; bottom; push; back; rest; spent?; store; Callbacks; cbs; look; wkVal) renaming (go to goᴵ)
-  open Heap using (World; _⊑_; _⨾_; Handle; Sink; Quiet; wk∋; slot) renaming (same to same⊑)
+  open Heap using (World; _⊑_; _⨾_; _∋_; Handle; Sink; Quiet; wk∋; slot) renaming (same to same⊑)
   open Sorting R using (WellMach)
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
   open Strongly R using (Strong; Carried; Books; carried; closing; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; Meets; Each; Heads; Lingers; seen; ∧-split; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
@@ -69,7 +70,7 @@ module Ascending (R : Set) where
   open Tearing R using (fresh-path; takeSite; bodySite; look-store; Alike; part-alike; partLanes-alike; part-flat; apart-r; each-same; seen-alike; seenL-alike; names-path; lanes-path)
   open Unsubbing R using (_⇝_; ⇝-trans; now; then; ≗-trans; wk≗; wk-same; bind≗)
   open Sequencing R using (seq-assoc; seq-done)
-  open Restaging R using (walk-planted; tick-ix0)
+  open Restaging R using (walk-planted; tick-ix0; pre; fresh-plant; fresh-new; wk-pairs; wk-img; to-img)
   open Ghosting R using (module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
   open Lifting R using (sub-onward; emit-shut; emit-void; run-meets; run-at; emit-run; spread-past; behind-fire; fire-lingers; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
   open Locality R using (stored-at; flatReads; cuts; cut-in; module Heaps)
@@ -1084,6 +1085,7 @@ module Ascending (R : Set) where
       slots   : ∀ {X} (s : Sink h X) → CbRel (cbs H′ (wk∋ τ s)) (wkVal (slot X) τ (cbs H s))
       stashes : ∀ (u : Quiet h) → look H′ (wk∋ τ u) ≗ wkAct τ (look H u)
       handles : ∀ (hd : Handle h) → At.spentʰ H′ (wk∋ τ hd) ≡ At.spentʰ H hd
+      outside : ∀ {k} (i : h ∋ k) → All (λ n → _≢_ {A = Name v} (k , wk∋ τ i) n) (cutNames c)
 
   -- A LANE'S START RUN: the observer read open, the count up, the cut
   -- allocated and listed, the run at the lane's subscription under `ix 1`,
@@ -1174,7 +1176,17 @@ module Ascending (R : Set) where
       bg-queue   : Queue H q clk ts T → Queue heap′ (q ++ [ ix 1 ]) clk ts′ T′
       bg-behind  : Each H (Heads q) T → Each heap′ (Heads (q ++ [ ix 1 ])) T′
       bg-lingers : Lingers H (Restaged.T′ H ρ pl′) → Lingers heap′ T′
-      bg-fresh   : AllPairs _≢_ (names T) → AllPairs _≢_ (names T′)
+
+    -- The new lane's cut: the only names the start adds.
+    bg-names : names v′ ↭ cutNames cut′ ++ names (wkTree grow (flatMapˢ op f fl oc k r pl t ls))
+    bg-names = pre (flatNames (FlatKit.wkFlat grow fl)) (pre (cutNames (Kit.wkCut grow oc)) (pre (quietName (mapMaybe (wk∋ grow) k))
+                 (pre (_ ∷ []) (pre (names (wkTree grow t)) ↭-refl′))))
+
+    bg-fresh : AllPairs _≢_ (names T) → AllPairs _≢_ (names T′)
+    bg-fresh fs = fresh-plant (wkPath grow ρ) v′ bg-names ((λ ()) ∷ [] ∷ []) (wk-pairs grow T fs)
+      (fresh-new grow (λ m∈ → let (_ , _ , e) = wk-img grow T m∈ in to-img grow e)
+        ((λ { {_ , _} (i , refl) e → lookupᴬ (Grown.outside grown i) (here refl) (sym e) })
+         ∷ (λ { {_ , _} (i , refl) e → lookupᴬ (Grown.outside grown i) (there (here refl)) (sym e) }) ∷ []))
 
   -- The ghost's admit with room: the lane first, nothing dropped.
   admit-room : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) q a (ls : List (U.Node Γ B)) qs d → roomy op (length ls) ≡ true

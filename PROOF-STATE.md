@@ -240,8 +240,6 @@ by their own silent steps (`Mirror`).
   begun, the run one level down.
 - **`bg-behind`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads no sooner
   than the run one level down.
-- **`bg-fresh`** (Climbs) — FALSITY, `NO EVIDENCE`: the books stay fresh with a
-  lane begun.
 - **`lanes-counted`** (Climbs) — FALSITY, `NO EVIDENCE`: a climbing outer value
   reads the count as the live lanes; a fact of the call, not a kernel.
 - **`outer-switch`** (Climbs) — FALSITY, `NO EVIDENCE`: a switch kills its
@@ -363,28 +361,18 @@ by their own silent steps (`Mirror`).
   weakening.
 - **`grow-owned`, `grow-kernels`, `grow-meaning`, `grow-queue`** (Restage) — FALSITY, `NO EVIDENCE`: what the relation reads of
   a tree it reads of the tree weakened into a grown heap.
-- **`scan-fresh`** (Restage) — FALSITY, `NO EVIDENCE`: a scan's new accumulator
-  is a name the tree did not hold.
 - **`untake`** (Restage) — FALSITY, `NO EVIDENCE`: a source heads no earlier
   than the take over it.
-- **`take-fresh`** (Restage) — FALSITY, `NO EVIDENCE`: a take's new cut is two
-  names the tree did not hold.
 - **`grew-store`** (Restage) — FALSITY, `NO EVIDENCE`: a store into a cell the
   growth made past its old names keeps the run as it read.
-- **`names-wk`** (Restage) — FALSITY, `NO EVIDENCE`: a weakened tree's names
-  are its names weakened.
 - **`walk-kont-sub`** (Restage) — FALSITY, `NO EVIDENCE`: a walk's continuation
   reads alike on alike subscriptions.
 - **`flat-wk-here`** (Restage) — FALSITY, `RECOVERY`: a flatMap kit's admit,
   settle and dequeue weakened read as the node's over its compiled inners.
-- **`flat-fresh`** (Restage) — FALSITY, `NO EVIDENCE`: a flatMap's pool, cut
-  and slot are names the tree did not hold.
 - **`unflat`** (Restage) — FALSITY, `NO EVIDENCE`: an outer heads no earlier
   than the flatMap over it, no lane begun.
 - **`compile-env`** (Restage) — FALSITY, `NO EVIDENCE`: a compiled subscription
   reads alike with a weakening moved from its frame into its environment.
-- **`connect-fresh`** (Restage) — FALSITY, `NO EVIDENCE`: a connect's five new
-  cells are names the tree did not hold.
 - **`connect-owned`** (Restage) — FALSITY, `NO EVIDENCE`: `Owned` holds of a
   connect planted at its body, its source owed under `ix 1`.
 - **`connect-queue`** (Restage) — FALSITY, `NO EVIDENCE`: `Queue` survives a

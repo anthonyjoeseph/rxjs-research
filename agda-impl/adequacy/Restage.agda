@@ -8,13 +8,18 @@
 -- source, which the control rules out.
 module adequacy.Restage where
 
-open import Data.List using (List; []; _∷_; _++_; [_]; length)
-open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (tabulate to tabulateᴬ; lookup to lookupᴬ)
+open import Data.List using (List; []; _∷_; _++_; [_]; length) renaming (map to mapᴸ)
+open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (tabulate to tabulateᴬ; lookup to lookupᴬ; map to all-map)
 open import Data.List.Relation.Unary.Any using () renaming (here to hereᴬ; there to thereᴬ)
 open import Data.List.Relation.Unary.Any.Properties using () renaming (++⁻ to any-++⁻; ++⁺ˡ to any-++⁺ˡ; ++⁺ʳ to any-++⁺ʳ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁻ to all-++⁻)
-open import Data.List.Relation.Unary.AllPairs using (AllPairs)
+open import Data.List.Relation.Unary.AllPairs using (AllPairs; []; _∷_) renaming (map to pairs-map)
+open import Data.List.Relation.Unary.AllPairs.Properties using () renaming (map⁺ to pairs-map⁺; ++⁺ to pairs-++⁺)
+open import Data.List.Relation.Binary.Permutation.Propositional using (_↭_; ↭-sym; ↭-trans; ↭-reflexive) renaming (refl to ↭-refl′; prep to ↭-prep′; swap to ↭-swap′; trans to ↭-trans′)
+open import Data.List.Relation.Binary.Permutation.Propositional.Properties using (All-resp-↭; shifts) renaming (++⁺ˡ to ↭-++⁺ˡ; ++⁺ʳ to ↭-++⁺ʳ)
+open import Data.List.Properties using (map-++; ++-assoc) renaming (++-identityʳ to ++-idʳ)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁻)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Maybe using (Maybe; just; nothing; is-just) renaming (map to mapMaybe)
 open import Data.Nat using (ℕ; _<_; _≤_; _+_; s≤s)
@@ -52,13 +57,14 @@ module Restaging (R : Set) where
   open Sequencing R using (wkEnv-wk; wk-wk; from-⨾; seq-done; wk∋-wk; wkEl-wk)
   open Pure R using (Timer; wkTimer; mapList)
   open Shared Timeline (Out R) using (Heapᴹ; ⟨_,_,_⟩; Stack; run; Val; extend; look; cbs; wkVal; store; Callbacks)
-  open Heap using (World; _⊑_; _⨾_; _∋_; new; grow; wk∋; cell; slot; Sink; Quiet; Handle) renaming (here to hereʳ; same to same⊑)
+  open Heap using (World; _⊑_; _⨾_; _∋_; there; new; grow; wk∋; cell; slot; Sink; Quiet; Handle) renaming (here to hereʳ; same to same⊑)
   open Run (Pureᴾ R) using (Act; emitAll; done; newRef; under; readRef; writeRef; register; _>>ᴬ_; compile; Env; wkEnv; wkAct; module Kit; module FlatKit; Ref; wkR; wkEl; Observer; Kont; wkObs; wkKont; Subject; Subscription; wkSubn; Subscribe; wkSub)
   open Run.Kit (Pureᴾ R) using (skipᴬ)
   open Strongly R using (Carried; Books; carried; Sub; pendingˢ; ofˢ; mapˢ; takeWhileˢ; connectˢ; Lane; ending; taken; idle; feeding; finishing; bodyK; srcK
                         ; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane
                         ; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; Leaf; of-leaf; cold-leaf; done-leaf; join-leaf
-                        ; Call; emitC; kontC; Spot; spot; coldˢ; take1C; take2C; bodyC; feedC; finC; srcC; code; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; names; pendings
+                        ; Call; emitC; kontC; Spot; spot; coldˢ; take1C; take2C; bodyC; feedC; finC; srcC; code; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; names; laneNames; pendings
+                        ; Name; quietName; cutNames; flatNames; subjectNames
                         ; Pinned; unpinned; pinned-trans; pinned-sym; union-pinned; under-pinned; under-moved; bursts-pinned; bursts-moved; rest-pinned; Restful; rf-idle; rf-rest; rf-union; restful-pinned; Tied
                         ; seen; seenL; seen-⊕; isTaking; ∧-split; flatMapˢ; killAllᶜ; flatK; scanˢ; joinˢ; doneˢ; deferˢ; lane; CbRel; ≗-refl; newRef≗; taking; takeK; unsubscribing; done≗; register≗; send≗; finish≗; startCold≗; stop≗; stash≗; cancel≗; eff≗; here≗; under≗; diverge≗; unfold≗; readRef≗; writeRef≗; module Canon)
                         renaming (⟦_⟧ to ⟦_⟧ᶜ; at⟦_⟧ to at⟦_⟧ᶜ)
@@ -1677,13 +1683,136 @@ module Restaging (R : Set) where
     compile-env : ∀ {Γ A u v w} (s : T.Obs Timeline Γ A) (E : Env Γ u) (υ : u ⊑ v) (ρ : v ⊑ w) {o : Observer A w} {k : Kont w}
                 → compile s E (υ ⨾ ρ) o k ≗ compile s (wkEnv υ E) ρ o k
 
-    -- A weakened tree names only what the tree named, weakened.
-    names-wk : ∀ {h v Δ A} (τ : h ⊑ v) (t : Sub h Δ A) {k} (j : v ∋ k) → (k , j) ∈ names (wkTree τ t)
-             → Σ (h ∋ k) λ i → wk∋ τ i ≡ j × (k , i) ∈ names t
-
     -- A walk's continuation reads its subscription's unsubscribe only.
     walk-kont-sub : ∀ {h Δ A} {t : Sub h [] R} {x : Sub h Δ A} (π : Path t x) {v} (τ : h ⊑ v) {U U′ : Subscription v}
                   → Subscription.unsubscribe U ≗ Subscription.unsubscribe U′ → Here.kont (walk π top) τ U ≗ Here.kont (walk π top) τ U′
+
+  ----------------------------------------------------------------------
+  -- Names, weakened and planted
+
+  -- A name carried along a growth.
+  wkN : ∀ {h v} → h ⊑ v → Name h → Name v
+  wkN τ (k , i) = k , wk∋ τ i
+
+  -- A name some growth made: what the old world named, carried along.
+  Img : ∀ {h₀ h} → h₀ ⊑ h → Name h → Set
+  Img {h₀} ν (k , j) = Σ (h₀ ∋ k) λ i → wk∋ ν i ≡ j
+
+  to-img : ∀ {h₀ h} (ν : h₀ ⊑ h) {x m} → wkN ν x ≡ m → Img ν m
+  to-img ν {_ , i} refl = i , refl
+
+  there-inj : ∀ {w j k k′} {i : w ∋ k} {i′ : w ∋ k′} → _≡_ {A = Name (j ∷ w)} (k , there i) (k′ , there i′) → _≡_ {A = Name w} (k , i) (k′ , i′)
+  there-inj refl = refl
+
+  wkN-inj : ∀ {h v} (τ : h ⊑ v) {x y : Name h} → wkN τ x ≡ wkN τ y → x ≡ y
+  wkN-inj same⊑    e = e
+  wkN-inj (grow τ) e = wkN-inj τ (there-inj e)
+
+  quiet-wk : ∀ {h v} (τ : h ⊑ v) (k : Maybe (Quiet h)) → quietName (mapMaybe (wk∋ τ) k) ≡ mapᴸ (wkN τ) (quietName k)
+  quiet-wk τ nothing  = refl
+  quiet-wk τ (just _) = refl
+
+  wk++ : ∀ {h v} (τ : h ⊑ v) xs ys {xs′ ys′ : List (Name v)} → xs′ ≡ mapᴸ (wkN τ) xs → ys′ ≡ mapᴸ (wkN τ) ys → xs′ ++ ys′ ≡ mapᴸ (wkN τ) (xs ++ ys)
+  wk++ τ xs ys e₁ e₂ = trans (cong₂ _++_ e₁ e₂) (sym (map-++ (wkN τ) xs ys))
+
+  -- A weakened tree names what the tree named, each weakened.
+  mutual
+    names-wkTree : ∀ {h v Δ A} (τ : h ⊑ v) (t : Sub h Δ A) → names (wkTree τ t) ≡ mapᴸ (wkN τ) (names t)
+    names-wkTree τ (pendingˢ s q)                      = refl
+    names-wkTree τ (coldˢ s hd ph)                     = refl
+    names-wkTree τ (ofˢ p i xs)                        = refl
+    names-wkTree τ doneˢ                               = refl
+    names-wkTree τ (mapˢ f t)                          = names-wkTree τ t
+    names-wkTree τ (scanˢ f r t)                       = cong (_ ∷_) (names-wkTree τ t)
+    names-wkTree τ (takeWhileˢ i p c k tk t)           =
+      wk++ τ (cutNames c) (quietName k ++ names t) refl (wk++ τ (quietName k) (names t) (quiet-wk τ k) (names-wkTree τ t))
+    names-wkTree τ (flatMapˢ op f fl oc k r pl t ls)   =
+      wk++ τ (flatNames fl) (cutNames oc ++ quietName k ++ (slot _ , r) ∷ names t ++ laneNames ls) refl
+        (wk++ τ (cutNames oc) (quietName k ++ (slot _ , r) ∷ names t ++ laneNames ls) refl
+          (wk++ τ (quietName k) ((slot _ , r) ∷ names t ++ laneNames ls) (quiet-wk τ k)
+            (cong (_ ∷_) (wk++ τ (names t) (laneNames ls) (names-wkTree τ t) (names-wkLanes τ ls)))))
+    names-wkTree τ (connectˢ S c b kb k fd q e rt s bd) =
+      wk++ τ (subjectNames S) (cutNames c ++ (cell _ , b) ∷ quietName kb ++ quietName k ++ names s ++ names bd) refl
+        (wk++ τ (cutNames c) ((cell _ , b) ∷ quietName kb ++ quietName k ++ names s ++ names bd) refl
+          (cong (_ ∷_) (wk++ τ (quietName kb) (quietName k ++ names s ++ names bd) (quiet-wk τ kb)
+            (wk++ τ (quietName k) (names s ++ names bd) (quiet-wk τ k) (wk++ τ (names s) (names bd) (names-wkTree τ s) (names-wkTree τ bd))))))
+    names-wkTree τ (joinˢ j s fl x m)                  = refl
+    names-wkTree τ (deferˢ k t)                        = wk++ τ (quietName k) (names t) (quiet-wk τ k) (names-wkTree τ t)
+
+    names-wkLanes : ∀ {h v Δ B} (τ : h ⊑ v) (ls : List (Lane h Δ B)) → laneNames (wkLanes τ ls) ≡ mapᴸ (wkN τ) (laneNames ls)
+    names-wkLanes τ []                = refl
+    names-wkLanes τ (lane c k t ∷ ls) =
+      wk++ τ (cutNames c) (quietName k ++ names t ++ laneNames ls) refl
+        (wk++ τ (quietName k) (names t ++ laneNames ls) (quiet-wk τ k) (wk++ τ (names t) (laneNames ls) (names-wkTree τ t) (names-wkLanes τ ls)))
+
+  -- A weakened tree's names are apart where the tree's were.
+  wk-pairs : ∀ {h v Δ A} (τ : h ⊑ v) (t : Sub h Δ A) → AllPairs _≢_ (names t) → AllPairs _≢_ (names (wkTree τ t))
+  wk-pairs τ t ap = subst (AllPairs _≢_) (sym (names-wkTree τ t)) (pairs-map⁺ (pairs-map (λ ne e → ne (wkN-inj τ e)) ap))
+
+  -- Each name of a weakened tree a name of the tree, weakened.
+  wk-img : ∀ {h v Δ A} (τ : h ⊑ v) (t : Sub h Δ A) {m} → m ∈ names (wkTree τ t) → Σ (Name h) λ x → x ∈ names t × wkN τ x ≡ m
+  wk-img τ t {m} m∈ with ∈-map⁻ (wkN τ) (subst (m ∈_) (names-wkTree τ t) m∈)
+  ... | x , x∈ , e = x , x∈ , sym e
+
+  names-wk : ∀ {h v Δ A} (τ : h ⊑ v) (t : Sub h Δ A) {k} (j : v ∋ k) → (k , j) ∈ names (wkTree τ t)
+           → Σ (h ∋ k) λ i → wk∋ τ i ≡ j × (k , i) ∈ names t
+  names-wk τ t j m with wk-img τ t m
+  ... | (_ , i) , m′ , refl = i , refl , m′
+
+  -- A permutation keeps names apart.
+  pairs-↭ : ∀ {h} {xs ys : List (Name h)} → xs ↭ ys → AllPairs _≢_ xs → AllPairs _≢_ ys
+  pairs-↭ ↭-refl′           ap                      = ap
+  pairs-↭ (↭-prep′ x p)     (a ∷ ap)                = All-resp-↭ p a ∷ pairs-↭ p ap
+  pairs-↭ (↭-swap′ x y p)   ((xy ∷ ax) ∷ ay ∷ ap)   = ((λ e → xy (sym e)) ∷ All-resp-↭ p ay) ∷ All-resp-↭ p ax ∷ pairs-↭ p ap
+  pairs-↭ (↭-trans′ p q)    ap                      = pairs-↭ q (pairs-↭ p ap)
+
+  -- Names put in front of a stretch, or behind it.
+  pre : ∀ {h} (X : List (Name h)) {ys s s′ : List (Name h)} → s′ ↭ ys ++ s → X ++ s′ ↭ ys ++ X ++ s
+  pre X {ys} p = ↭-trans (↭-++⁺ˡ X p) (shifts X ys)
+
+  post : ∀ {h} (Q : List (Name h)) {ys s s′ : List (Name h)} → s′ ↭ ys ++ s → s′ ++ Q ↭ ys ++ s ++ Q
+  post Q {ys} {s} p = ↭-trans (↭-++⁺ʳ Q p) (↭-reflexive (++-assoc ys s Q))
+
+  -- A node replanted naming `X` more than the one it replaced: the tree
+  -- names `X` more.
+  mutual
+    names-plant-↭ : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′) {X}
+                  → names v ↭ X ++ names u → names (plant π v) ↭ X ++ names t
+    names-plant-↭ here v e = e
+    names-plant-↭ (in-map π) v e = names-plant-↭ π v e
+    names-plant-↭ (in-scan π) v e = pre (_ ∷ []) (names-plant-↭ π v e)
+    names-plant-↭ (in-take {c = c} {k} π) v e = pre (cutNames c) (pre (quietName k) (names-plant-↭ π v e))
+    names-plant-↭ (in-outer {fl = fl} {oc} {k} {ls = ls} π) v e =
+      pre (flatNames fl) (pre (cutNames oc) (pre (quietName k) (pre (_ ∷ []) (post (laneNames ls) (names-plant-↭ π v e)))))
+    names-plant-↭ (in-lanes {fl = fl} {oc} {k} {t = so} π) v e =
+      pre (flatNames fl) (pre (cutNames oc) (pre (quietName k) (pre (_ ∷ []) (pre (names so) (names-plant-↭ᴸ π v e)))))
+    names-plant-↭ (in-source {S = S} {c} {kb = kb} {k} {bd = bd} π) v e =
+      pre (subjectNames S) (pre (cutNames c) (pre (_ ∷ []) (pre (quietName kb) (pre (quietName k) (post (names bd) (names-plant-↭ π v e))))))
+    names-plant-↭ (in-body {S = S} {c} {kb = kb} {k} {t = src} π) v e =
+      pre (subjectNames S) (pre (cutNames c) (pre (_ ∷ []) (pre (quietName kb) (pre (quietName k) (pre (names src) (names-plant-↭ π v e))))))
+    names-plant-↭ (in-defer {k = k} π) v e = pre (quietName k) (names-plant-↭ π v e)
+
+    names-plant-↭ᴸ : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′) {X}
+                   → names v ↭ X ++ names u → laneNames (plantᴸ π v) ↭ X ++ laneNames ls
+    names-plant-↭ᴸ (this-lane {c = c} {k} {ls = ls} π) v e = pre (cutNames c) (pre (quietName k) (post (laneNames ls) (names-plant-↭ π v e)))
+    names-plant-↭ᴸ (next-lane {l = lane c k s} π) v e = pre (cutNames c) (pre (quietName k) (pre (names s) (names-plant-↭ᴸ π v e)))
+
+  -- THE FRESH FRAME: a node replanted naming `X` more, `X` apart from
+  -- itself and from every name the tree held, leaves the tree's names
+  -- apart.
+  fresh-plant : ∀ {h Δ A} {t : Sub h [] R} {u : Sub h Δ A} (π : Path t u) (v : Sub h Δ A) {X}
+              → names v ↭ X ++ names u → AllPairs _≢_ X → AllPairs _≢_ (names t) → All (λ n → All (n ≢_) (names t)) X
+              → AllPairs _≢_ (names (plant π v))
+  fresh-plant π v e px pt dj = pairs-↭ (↭-sym (names-plant-↭ π v e)) (pairs-++⁺ px pt dj)
+
+  -- A pending node replaced: every name the new node holds is more.
+  pending-↭ : ∀ {h Δ A} {s : T.Obs Timeline Δ A} {q} (v : Sub h Δ A) → names v ↭ names v ++ names (pendingˢ {h = h} s q)
+  pending-↭ v = ↭-reflexive (sym (++-idʳ (names v)))
+
+  -- Names no growth made, apart from every name one did.
+  fresh-new : ∀ {h₀ h} (ν : h₀ ⊑ h) {ns ms : List (Name h)} → (∀ {m} → m ∈ ms → Img ν m)
+            → All (λ n → ∀ {m} → Img ν m → n ≢ m) ns → All (λ n → All (n ≢_) ms) ns
+  fresh-new ν im = all-map (λ f → tabulateᴬ λ m∈ → f (im m∈))
 
   -- A scan's observer over alike observers.
   scanO-cong : ∀ {h A B} (f : B → A → B) (r : Ref h (base B)) {o o′ : Observer B h} → ObsRel o o′ → ObsRel (Canon.scanO f r o) (Canon.scanO f r o′)
@@ -1809,9 +1938,10 @@ module Restaging (R : Set) where
                    ; no-end = λ { (in-scan ()) } ; no-cut = λ { (in-scan ()) } ; no-feed = λ { (in-scan ()) } ; no-fin = λ { (in-scan ()) }
                    ; not-self = λ _ () }
 
-    postulate
-      -- The accumulator is a name the tree did not hold.
-      scan-fresh : AllPairs _≢_ (names T₀) → AllPairs _≢_ (names t′)
+    -- The accumulator is a name the tree did not hold.
+    scan-fresh : AllPairs _≢_ (names T₀) → AllPairs _≢_ (names t′)
+    scan-fresh fs = fresh-plant π₁ v (pending-↭ v) ([] ∷ []) (wk-pairs new T₀ fs)
+      (fresh-new new (λ m∈ → let (_ , _ , e) = wk-img new T₀ m∈ in to-img new e) ((λ { {_ , _} (_ , refl) () }) ∷ []))
 
     module _ (H′ : Heapᴹ h′) (eqv : At.part H′ (pendingˢ (T.scan f z s) q) ≡ At.part H′ v) where
       -- The scan's heads are its source's.
@@ -1967,9 +2097,15 @@ module Restaging (R : Set) where
                    ; no-end = λ { (in-take ()) } ; no-cut = λ { (in-take ()) } ; no-feed = λ { (in-take ()) } ; no-fin = λ { (in-take ()) }
                    ; not-self = λ _ () }
 
+    -- The cut's cells are names the tree did not hold.
+    take-fresh : AllPairs _≢_ (names T₀) → AllPairs _≢_ (names t′)
+    take-fresh fs = fresh-plant π₂ v (pending-↭ v) (((λ ()) ∷ []) ∷ [] ∷ []) (wk-pairs ν₂ T₁ (wk-pairs ν₁ T₀ fs))
+      (fresh-new (ν₁ ⨾ ν₂) im ((λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ []))
+      where
+        im : ∀ {m} → m ∈ names T₂ → Img (ν₁ ⨾ ν₂) m
+        im m∈ = let (_ , x∈ , e₁) = wk-img ν₂ T₁ m∈ ; (_ , _ , e₀) = wk-img ν₁ T₀ x∈ in to-img (ν₁ ⨾ ν₂) (trans (cong (wkN ν₂) e₀) e₁)
+
     postulate
-      -- The cut's cells are names the tree did not hold.
-      take-fresh : AllPairs _≢_ (names T₀) → AllPairs _≢_ (names t′)
       -- The source heads no earlier than the take over it.
       untake     : ∀ {k} {c : U.Node Δ A} → Heads k (U.takeWhileᶜ i p c) → Heads k c
 
@@ -2116,6 +2252,7 @@ module Restaging (R : Set) where
       lingers : Lingers H tree
       pends   : pend tree ≡ pend T₀
       named   : ∀ {k} {j : h ∋ k} → (k , j) ∈ names tree → Σ (h₀ ∋ k) λ i → wk∋ ν i ≡ j
+      distinct : AllPairs _≢_ (names T₀) → AllPairs _≢_ (names tree)
 
   -- One cell more.
   grew-step : ∀ {h₀} {H₀ : Heapᴹ h₀} {T₀ : Sub h₀ [] R} {Δ A} {s : T.Obs Timeline Δ A} {q} {π₀ : Path T₀ (pendingˢ s q)}
@@ -2134,7 +2271,8 @@ module Restaging (R : Set) where
     ; kernels = Gw.grow-kernels gr (kernels G) ; meaning = Gw.grow-meaning gr (meaning G) ; queue = Gw.grow-queue gr (queue G)
     ; behind = Gw.grow-each gr (behind G) ; lingers = Gw.grow-lingers gr (lingers G) ; pends = trans (pend-grow new (tree G)) (pends G)
     ; named = λ {_} {j} m → let (i′ , e′ , m′) = names-wk new (tree G) j m ; (i , e) = named G m′
-                            in i , trans (sym (wk∋-wk ν new i)) (trans (cong (wk∋ new) e) e′) }
+                            in i , trans (sym (wk∋-wk ν new i)) (trans (cong (wk∋ new) e) e′)
+    ; distinct = λ fs → wk-pairs new (tree G) (distinct G fs) }
     where open Grew
           module Gw = Grown (new {k} {h})
           gr = grows-extend H x
@@ -2266,10 +2404,13 @@ module Restaging (R : Set) where
     rc-meaning : Meaning H₅ T₅ → Meaning H₅ t′
     rc-meaning mn = record { fed = fed-plant H₅ π₅ v (λ _ _ → lift tt , lift tt) _ (Meaning.fed mn) }
 
+    -- The subject's, flag's, cut's and stash's cells are names the tree
+    -- did not hold.
+    connect-fresh : AllPairs _≢_ (names T₀) → AllPairs _≢_ (names t′)
+    connect-fresh fs = fresh-plant π₅ v (pending-↭ v) (((λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ (λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ []) ∷ ([]) ∷ []) (Grew.distinct G₅ fs)
+      (fresh-new ν₅ (λ { {_ , _} m∈ → Grew.named G₅ m∈ }) ((λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ []))
+
     postulate
-      -- The subject's, flag's, cut's and stash's cells are names the tree
-      -- did not hold.
-      connect-fresh  : AllPairs _≢_ (names T₀) → AllPairs _≢_ (names t′)
       -- Owed across the restage: each node beside the connect or above it
       -- owed as it was, the body the subscription the run begins, the
       -- source the call owed back where the connect began.
@@ -2332,7 +2473,7 @@ module Restaging (R : Set) where
                       ; obsR = (λ _ → wk-same _) , wk-same _ , wk-same _ ; kontR = λ τ sub → from-same (λ ζ → Here.kont (walk π top) ζ sub) τ
                       ; envR = e ; meets = refl ; owned = recode (Carried.owned cr) ; kernels = Carried.kernels cr
                       ; meaning = Carried.meaning cr ; queue = Carried.queue cr ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; pends = refl
-                      ; named = λ {_} {j} _ → j , refl }
+                      ; named = λ {_} {j} _ → j , refl ; distinct = λ fs → fs }
           G₅ = grew-step {k = cell (maybe quiet)} (lift nothing) (grew-step {k = cell (maybe quiet)} (lift nothing)
                  (grew-step {k = cell (base Bool)} (lift true) (grew-step {k = cell (base Bool)} (lift false) (grew-step {k = cell (joins A)} (lift []) G₀))))
           module C = Connected G₅ refl refl
@@ -2536,9 +2677,12 @@ module Restaging (R : Set) where
                    ; no-feed = λ { (in-outer ()) ; (in-lanes ()) } ; no-fin = λ { (in-outer ()) ; (in-lanes ()) }
                    ; not-self = λ _ () }
 
+    -- The pool's, cut's and slot's names are names the tree did not hold.
+    flat-fresh : AllPairs _≢_ (names T₀) → AllPairs _≢_ (names t′)
+    flat-fresh fs = fresh-plant π₈ v (pending-↭ v) (((λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ (λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ []) ∷ ([]) ∷ [])
+      (Grew.distinct G₉ fs) (fresh-new ν₈ (λ { {_ , _} m∈ → Grew.named G₉ m∈ }) ((λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ []))
+
     postulate
-      -- The pool's, cut's and slot's names are names the tree did not hold.
-      flat-fresh : AllPairs _≢_ (names T₀) → AllPairs _≢_ (names t′)
       -- The outer heads no earlier than the flatMap over it, no lane begun.
       unflat     : ∀ {k} {c : U.Node Δ A} → Heads k (U.flatMapᶜ op (λ a p → U.subscribe (f a) p) (just c) [] [] U.idleᶜ) → Heads k c
 
@@ -2647,7 +2791,7 @@ module Restaging (R : Set) where
                       ; obsR = (λ _ → wk-same _) , wk-same _ , wk-same _ ; kontR = λ τ sub → from-same (λ ζ → Here.kont (walk π top) ζ sub) τ
                       ; envR = e ; meets = refl ; owned = recode (Carried.owned cr) ; kernels = Carried.kernels cr
                       ; meaning = Carried.meaning cr ; queue = Carried.queue cr ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; pends = refl
-                      ; named = λ {_} {j} _ → j , refl }
+                      ; named = λ {_} {j} _ → j , refl ; distinct = λ fs → fs }
           G₈ = grew-step {k = slot ⊤} (record { onNext = λ a → wkAct new (n₇ a) ; onComplete = wkAct new c₇ ; isClosed = wkAct new x₇ })
                  (grew-step {k = cell (maybe quiet)} (lift nothing) (grew-step {k = cell (base Bool)} (lift true)
                  (grew-step {k = cell (maybe (sink ⊤))} (lift nothing) (grew-step {k = cell (list Kit.cutTy)} (lift [])
