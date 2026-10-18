@@ -259,10 +259,10 @@ module Shifting (R : Set) where
     part-from {x = x} sub al = part-alike H H′ x (λ j m → al j (sub m))
 
     part-at : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {x : Sub h Δ′ A′} (ψ : Path t x) → Alike H H′ (names t) → At.part H′ x ≡ At.part H x
-    part-at ψ = part-from (λ m → names-path ψ m)
+    part-at {x = x} ψ = part-from {x = x} (λ m → names-path ψ m)
 
     partL-at : ∀ {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {x : Sub h Δ′ A′} (πL : PathLanes ls x) → Alike H H′ (laneNames ls) → At.part H′ x ≡ At.part H x
-    partL-at πL = part-from (λ m → lanes-path πL m)
+    partL-at {x = x} πL = part-from {x = x} (λ m → lanes-path πL m)
 
     mutual
       leftover-alike : ∀ {Δ A B} (s : Sub h Δ A) → Alike H H′ (names s) → At.leftover H′ {B = B} s ≡ At.leftover H {B = B} s
@@ -824,7 +824,7 @@ module Shifting (R : Set) where
               → (b ∧ isTaking tk ≡ true → ∀ {c} → m′ ≡ just c → P c)
               → ∀ {c} → (if b′ then At.taking? H′ ib p tk m′ else nothing) ≡ just c → P c
       take-up ib p tk           m m′        {b = false} refl old up ()
-      take-up ib p taking       m (just c′) {b = true}  refl old up refl = heads-take ib p (up refl refl)
+      take-up ib p taking       m (just c′) {b = true}  refl old up refl = heads-take ib p {c′} (up refl refl)
       take-up ib p taking       m nothing   {b = true}  refl old up ()
       take-up ib p (ending _ _) m m′        {b = true}  refl old up refl = old refl
       take-up ib p taken        m m′        {b = true}  refl old up ()
@@ -849,7 +849,7 @@ module Shifting (R : Set) where
              → ((is-just s ∨ is-just e) ≡ true → ∀ {c} → mb ≡ just c → P c)
              → ∀ {c} → At.connected H′ rp e rt s′ mb ≡ just c → P c
       src-up rp e        rt s        s′        nothing  old en rv hs hb ()
-      src-up rp e        rt s        (just c′) (just b) old en rv hs hb refl = heads-source rp (hs refl refl) (hb (∨-l (rv refl)) refl)
+      src-up rp e        rt s        (just c′) (just b) old en rv hs hb refl = heads-source rp {b} {c′} (hs refl refl) (hb (∨-l (rv refl)) refl)
       src-up rp (just x) rt (just c) nothing   (just b) old en rv hs hb _    = just≢ (en refl refl)
       src-up rp (just x) rt nothing  nothing   (just b) old en rv hs hb refl = old refl
       src-up rp nothing  rt s        nothing   (just b) old en rv hs hb ()
@@ -865,7 +865,7 @@ module Shifting (R : Set) where
               → (∀ {n} → At.connected H rp e rt s mb ≡ just n → s ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt)
               → ∀ {c} → At.connected H′ rp e rt s mb′ ≡ just c → P c
       body-up rp e         rt s        mb        nothing   rv hs hb tl ut hr ()
-      body-up rp e         rt (just c) mb        (just b′) rv hs hb tl ut hr refl = heads-source rp (hs (rv refl) refl) (hb refl refl)
+      body-up rp e         rt (just c) mb        (just b′) rv hs hb tl ut hr refl = heads-source rp {b′} {c} (hs (rv refl) refl) (hb refl refl)
       body-up rp (just c₀) rt nothing  nothing   (just b′) rv hs hb tl ut hr _    = false≢ (rv refl)
       body-up rp (just c₀) rt nothing  (just b₀) (just b′) rv hs hb tl ut hr refl =
         ended-head rp c₀ (U.shut (here refl) c₀ b′) rt (U.step rt)
@@ -905,10 +905,10 @@ module Shifting (R : Set) where
             eL : EachL H′ P ls
             eL = eachL-alike H H′ O.lanesA (eachL-of H ev)
             pool : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl (plant π v) ls) ≡ just n → P pl
-            pool x = held (in-outer π) ps x (Each.pools ev here refl)
+            pool x = held (in-outer {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {ls = ls} π) ps x (Each.pools ev here refl)
             root : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl (plant π v) ls) ≡ just n → P n
             root = root-flat op (λ a q′ → U.subscribe (f a) q′) (At.part H so) (At.part H′ (plant π v)) (At.partLanes H ls) (At.partLanes H′ ls)
-                     (At.val H (Flat.queue fl)) (At.val H′ (Flat.queue fl)) pl (cong lower O.queue) (Each.parts ev here refl) (revive (in-outer π) ps)
+                     (At.val H (Flat.queue fl)) (At.val H′ (Flat.queue fl)) pl (cong lower O.queue) (Each.parts ev here refl) (revive (in-outer {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {ls = ls} π) ps)
                      (Each.parts eo here refl) (each-lanes {H = H′} {P = P} ls (λ πL sn e → EachL.partsL eL πL sn e))
         shiftE (in-lanes {op = op} {f} {fl} {oc} {k} {r} {pl} {t = so} {ls} πL) ps ev ut en =
           BH.each-flat root pool eo eL
@@ -919,10 +919,10 @@ module Shifting (R : Set) where
             eL : EachL H′ P (plantᴸ πL v)
             eL = shiftL πL Ln.fresh (eachL-of H ev) (utL-of H ut) (enL-of H en)
             pool : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl so (plantᴸ πL v)) ≡ just n → P pl
-            pool x = held (in-lanes πL) ps x (Each.pools ev here refl)
+            pool x = held (in-lanes {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} πL) ps x (Each.pools ev here refl)
             root : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl so (plantᴸ πL v)) ≡ just n → P n
             root = root-flat op (λ a q′ → U.subscribe (f a) q′) (At.part H so) (At.part H′ so) (At.partLanes H ls) (At.partLanes H′ (plantᴸ πL v))
-                     (At.val H (Flat.queue fl)) (At.val H′ (Flat.queue fl)) pl (cong lower Ln.queue) (Each.parts ev here refl) (revive (in-lanes πL) ps)
+                     (At.val H (Flat.queue fl)) (At.val H′ (Flat.queue fl)) pl (cong lower Ln.queue) (Each.parts ev here refl) (revive (in-lanes {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} πL) ps)
                      (Each.parts eo here refl) (each-lanes {H = H′} {P = P} (plantᴸ πL v) (λ πL′ sn e → EachL.partsL eL πL′ sn e))
         shiftE (in-source {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = src} {bd} π) ps ev ut en =
           BH.each-connect root rest es eb
@@ -936,7 +936,7 @@ module Shifting (R : Set) where
             eb : (is-just (At.part H′ (plant π v)) ∨ is-just e) ≡ true → Each H′ P bd
             eb js = each-alike H H′ Sr.bdA (each-sub ev (in-body here) (∧-join (∨-mono (is-just e) (revive π Sr.fresh) js) refl))
             rest : ∀ {n} → At.part H′ (connectˢ S c b kb k fd rp e rt (plant π v) bd) ≡ just n → At.part H′ (plant π v) ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt
-            rest x _ pe = held (in-source π) ps x (λ x₀ → Each.rests ev here refl x₀ (en here refl x₀ pe) pe)
+            rest x _ pe = held (in-source {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {e = e} {rp = rp} {rt = rt} {bd = bd} π) ps x (λ x₀ → Each.rests ev here refl x₀ (en here refl x₀ pe) pe)
             root : ∀ {n} → At.part H′ (connectˢ S c b kb k fd rp e rt (plant π v) bd) ≡ just n → P n
             root {n} x =
               src-up rp e rt (At.part H src) (At.part H′ (plant π v)) (At.part H bd) (Each.parts ev here refl) (en here refl) (revive π Sr.fresh)
@@ -956,7 +956,7 @@ module Shifting (R : Set) where
             es : is-just (At.part H′ (plant π v)) ≡ true → Each H′ P src
             es jb = each-alike H H′ Bd.srcA (each-sub ev (in-source here) (∧-join (revive π Bd.fresh jb) refl))
             rest : ∀ {n} → At.part H′ (connectˢ S c b kb k fd rp e rt src (plant π v)) ≡ just n → At.part H′ src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt
-            rest x pn pe = held (in-body π) ps x (λ x₀ → Each.rests ev here refl x₀ (trans (sym Bd.source) pn) pe)
+            rest x pn pe = held (in-body {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {e = e} {rp = rp} {rt = rt} {t = src} π) ps x (λ x₀ → Each.rests ev here refl x₀ (trans (sym Bd.source) pn) pe)
             root : ∀ {n} → At.part H′ (connectˢ S c b kb k fd rp e rt src (plant π v)) ≡ just n → P n
             root {n} x =
               body-up rp e rt (At.part H src) (At.part H bd) (At.part H′ (plant π v)) (revive π Bd.fresh)
@@ -1082,14 +1082,14 @@ module Shifting (R : Set) where
           where
             module O = Outer fl oc k r ls π ps
             pool : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl (plant π v) ls) ≡ just n → Tied pl (At.pooled H′ fl (plant π v) ls)
-            pool x = held (in-outer π) ps x (λ x₀ → pinned-trans (Lingers.pools lg here refl x₀)
+            pool x = held (in-outer {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {ls = ls} π) ps x (λ x₀ → pinned-trans (Lingers.pools lg here refl x₀)
                        (union-pinned (if-moved (cong lower O.done) (restedUp π O.fresh) (pin-alike refl)) (pin-alike (pooledL-alike H H′ ls O.lanesA))))
         shiftLg (in-lanes {op = op} {f} {fl} {oc} {k} {r} {pl} {t = so} {ls} πL) ps lg en =
           LG.lg-flat pool (lingers-alike H H′ Ln.soA (lingers-sub H lg (in-outer here) refl)) (shiftLgL πL Ln.fresh (lingersL-of H lg) (enL-of H en))
           where
             module Ln = Lanes fl oc k r so πL ps
             pool : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl so (plantᴸ πL v)) ≡ just n → Tied pl (At.pooled H′ fl so (plantᴸ πL v))
-            pool x = held (in-lanes πL) ps x (λ x₀ → pinned-trans (Lingers.pools lg here refl x₀)
+            pool x = held (in-lanes {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} πL) ps x (λ x₀ → pinned-trans (Lingers.pools lg here refl x₀)
                        (union-pinned (if-moved (cong lower Ln.done) (pin-alike (leftover-alike H H′ so Ln.soA)) (pin-alike refl)) (pooledUpL πL Ln.fresh)))
         shiftLg (in-source {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = src} {bd} π) ps lg en =
           LG.lg-connect rest ls lb
@@ -1104,7 +1104,7 @@ module Shifting (R : Set) where
             lb js = lingers-alike H H′ Sr.bdA (lingers-sub H lg (in-body here) (∧-join (∨-mono (is-just e) (revive π Sr.fresh) js) refl))
             rest : ∀ {n} → At.part H′ (connectˢ S c b kb k fd rp e rt (plant π v) bd) ≡ just n → At.part H′ (plant π v) ≡ nothing
                  → ∀ {c₀} → e ≡ just c₀ → Tied rt (At.leftover H′ {B = ⊤} (plant π v))
-            rest x _ pe = held (in-source π) ps x (λ x₀ → pinned-trans (Lingers.rests lg here refl x₀ (en here refl x₀ pe) pe) (restedUp π Sr.fresh))
+            rest x _ pe = held (in-source {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {e = e} {rp = rp} {rt = rt} {bd = bd} π) ps x (λ x₀ → pinned-trans (Lingers.rests lg here refl x₀ (en here refl x₀ pe) pe) (restedUp π Sr.fresh))
         shiftLg (in-body {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = src} {bd} π) ps lg en =
           LG.lg-connect rest ls lb
           where
@@ -1118,7 +1118,7 @@ module Shifting (R : Set) where
                 sb = ∧-join (∨-mono (is-just e) (via-≡ is-just Bd.source) js) refl
             rest : ∀ {n} → At.part H′ (connectˢ S c b kb k fd rp e rt src (plant π v)) ≡ just n → At.part H′ src ≡ nothing
                  → ∀ {c₀} → e ≡ just c₀ → Tied rt (At.leftover H′ {B = ⊤} src)
-            rest x pn pe = held (in-body π) ps x (λ x₀ → pinned-trans (Lingers.rests lg here refl x₀ (trans (sym Bd.source) pn) pe)
+            rest x pn pe = held (in-body {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {e = e} {rp = rp} {rt = rt} {t = src} π) ps x (λ x₀ → pinned-trans (Lingers.rests lg here refl x₀ (trans (sym Bd.source) pn) pe)
                              (pin-alike (leftover-alike H H′ src Bd.srcA)))
         shiftLg (in-defer {k = k} π) ps lg en =
           LG.lg-defer (shiftLg π (pairs-r (quietName k) ps) (lingers-sub H lg (in-defer here) refl) (en-sub H en (in-defer here) refl))
