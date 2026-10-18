@@ -642,7 +642,7 @@ module Ascending (R : Set) where
         -- No take beneath the scan switched by its accumulator.
         scan-live : Lives H H′ (scanˢ f r u)
         scan-live with fresh-path ρ fs
-        ... | a ∷ _ = lives-off (off-store H r) nl
+        ... | a ∷ _ = lives-off {H = H} {H′ = H′} (off-store H r) nl
           where
             nl : ∀ {Δ′ A′ i p c k tk} {s : Sub h Δ′ A′} → Path (scanˢ f r u) (takeWhileˢ i p c k tk s) → All (_≢_ (_ , Kit.live c)) ((_ , r) ∷ [])
             nl (in-scan ψ) = (λ eq → lookupᴬ a (names-path ψ (here refl)) (sym eq)) ∷ []
@@ -858,7 +858,7 @@ module Ascending (R : Set) where
 
     -- No take beneath the flatMap switched by its done flag.
     sd-live : AllPairs _≢_ (names w₀) → Lives H H′ w₀
-    sd-live (_ ∷ a₁ ∷ _) = lives-off (off-store H (FlatKit.Flat.outerDone fl)) nl
+    sd-live (_ ∷ a₁ ∷ _) = lives-off {H = H} {H′ = H′} (off-store H (FlatKit.Flat.outerDone fl)) nl
       where
         nl : ∀ {Δ′ A′ i p c k′ tk} {s : Sub h Δ′ A′} → Path w₀ (takeWhileˢ i p c k′ tk s) → All (_≢_ (_ , Kit.live c)) ns
         nl (in-outer ψ) =
@@ -1756,7 +1756,7 @@ module Ascending (R : Set) where
     -- A queue's head taken off revives no part: the flatMap's part
     -- stood on the queue, its children's on names the queue is not.
     dq-gone : AllPairs _≢_ (names w₀) → ∀ {y ys′} → At.val H (FlatKit.Flat.queue fl) ≡ y ∷ ys′ → Gone H H′ w₀
-    dq-gone fr@(_ ∷ _ ∷ a₂ ∷ _) {y} {ys′} nq = record { gone-part = gp ; gone-live = lives-off (off-store H (FlatKit.Flat.queue fl)) nl ; gone-held = store-held H (FlatKit.Flat.queue fl) }
+    dq-gone fr@(_ ∷ _ ∷ a₂ ∷ _) {y} {ys′} nq = record { gone-part = gp ; gone-live = lives-off {H = H} {H′ = H′} (off-store H (FlatKit.Flat.queue fl)) nl ; gone-held = store-held H (FlatKit.Flat.queue fl) }
       where
         gp : ∀ {Δ′ A′} {x : Sub h Δ′ A′} → Path w₀ x → At.part H x ≡ nothing → At.part H′ x ≡ nothing
         gp here         e = ⊥-elim (merged-queued H op (λ a j → U.subscribe (f a) j) (At.part H t) (At.partLanes H ls) pl
@@ -2271,7 +2271,7 @@ module Ascending (R : Set) where
     -- The closed flag read by no part: the connect's own clause reads its
     -- children's parts alone, theirs names apart from the flag.
     fin-gone : AllPairs _≢_ (names w₀) → Gone H H′ w₀
-    fin-gone (_ ∷ a₁ ∷ _) = record { gone-part = gp ; gone-live = lives-off (off-store H (Subject.closed Sj)) nl ; gone-held = store-held H (Subject.closed Sj) }
+    fin-gone (_ ∷ a₁ ∷ _) = record { gone-part = gp ; gone-live = lives-off {H = H} {H′ = H′} (off-store H (Subject.closed Sj)) nl ; gone-held = store-held H (Subject.closed Sj) }
       where
         au : Alike H H′ (names u)
         au j m = look-store H (Subject.closed Sj) j (λ eq → lookupᴬ a₁ (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m))))) eq)
