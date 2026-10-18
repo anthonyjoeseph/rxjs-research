@@ -67,7 +67,7 @@ module Ascending (R : Set) where
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
   open Moving R using (pairs-r; pairs-split; takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; holds-plant; settled-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
-  open Tearing R using (fresh-path; takeSite; bodySite; look-store; look-either; Alike; part-alike; partLanes-alike; part-flat; apart-r; each-same; seen-alike; seenL-alike; names-path; lanes-path)
+  open Tearing R using (fresh-path; takeSite; bodySite; look-store; look-either; Alike; part-alike; partLanes-alike; part-flat; apart-r; each-same; seen-alike; seenL-alike; names-path; lanes-path) renaming (Off to Offʰ)
   open Unsubbing R using (_⇝_; ⇝-trans; now; then; ≗-trans; wk≗; wk-same; bind≗)
   open Sequencing R using (seq-assoc; seq-done)
   open Restaging R using (walk-planted; tick-ix0; pre; fresh-plant; fresh-new; wk-pairs; wk-img; to-img)
@@ -1625,7 +1625,7 @@ module Ascending (R : Set) where
     fr-mine = ++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names t) (cut-in ls (laneOf-in o))))))
               ∷ here refl ∷ []
 
-    fr-off : Off H H′ ns
+    fr-off : Offʰ H H′ ns
     fr-off = off-++ {H = H} {H₁ = unlive H (laneOf o)} {H₂ = H′} ((_ , Kit.live (laneOf o)) ∷ []) (off-store H (Kit.live (laneOf o))) (off-store (unlive H (laneOf o)) (FlatKit.Flat.active fl))
 
     -- The outer's names apart from the lane's cut and the count.
