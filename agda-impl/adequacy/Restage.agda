@@ -2041,7 +2041,7 @@ module Restaging (R : Set) where
   fresh-plant π v e px pt dj = pairs-↭ (↭-sym (names-plant-↭ π v e)) (pairs-++⁺ px pt dj)
 
   -- A pending node replaced: every name the new node holds is more.
-  pending-↭ : ∀ {h Δ A} {s : T.Obs Timeline Δ A} {q} (v : Sub h Δ A) → names v ↭ names v ++ names (pendingˢ {h = h} s q)
+  pending-↭ : ∀ {h Δ A} (v : Sub h Δ A) → names v ↭ names v ++ []
   pending-↭ v = ↭-reflexive (sym (++-idʳ (names v)))
 
   -- Names no growth made, apart from every name one did.
