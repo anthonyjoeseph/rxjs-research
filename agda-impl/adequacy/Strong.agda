@@ -800,6 +800,11 @@ module Strongly (R : Set) where
     owingNone nothing  = just ([] , nothing)
     owingNone (just c) = nothing
 
+    -- Where a connect's source ended, read only once its subject is
+    -- closed: the end climbs to the connect before any joiner is told.
+    told : ∀ {A} → Subject A h → Maybe Pos → Maybe Pos
+    told S e = if val (Subject.closed S) then e else nothing
+
     -- Each connect in scope: its feed, and where its source ended.
     Now : List Set → Set₁
     Now = All (λ A → Feed A h × Maybe Pos)
@@ -817,7 +822,7 @@ module Strongly (R : Set) where
     Alg.scanᶜ FedAlg = λ _ _ _ X → X
     Alg.takeᶜ FedAlg = λ _ _ _ _ _ _ X → X
     Alg.flatᶜ FedAlg = λ _ _ _ _ _ _ _ _ _ X L ν → X ν × L ν
-    Alg.connᶜ FedAlg = λ _ _ _ _ _ fd _ e _ _ _ X Y ν → X ν × Y ((fd , e) ∷ᴬ ν)
+    Alg.connᶜ FedAlg = λ S _ _ _ _ fd _ e _ _ _ X Y ν → X ν × Y ((fd , told S e) ∷ᴬ ν)
     Alg.joinᶜ FedAlg = λ j sk l x st ν → let (fd , e) = lookup ν x in
                    Lift _ (val l ≡ true → (Owed fd sk j → st ≡ owing fd j) × (¬ Owed fd sk j → st ≡ owingNone e))
     Alg.deferᶜ FedAlg = λ _ _ X → X

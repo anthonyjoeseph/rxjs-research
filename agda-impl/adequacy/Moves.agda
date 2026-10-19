@@ -729,7 +729,7 @@ module Moving (R : Set) where
     fed-plant H (in-outer π) v fv ν (f , fl)              = fed-plant H π v fv ν f , fl
     fed-plant H (in-lanes π) v fv ν (f , fl)              = f , fed-plantᴸ H π v fv ν fl
     fed-plant H (in-source π) v fv ν (f , fb)             = fed-plant H π v fv ν f , fb
-    fed-plant H (in-body {fd = fd} {e = e} π) v fv ν (f , fb) = f , fed-plant H π v fv ((fd , e) ∷ ν) fb
+    fed-plant H (in-body {S = S} {fd = fd} {e = e} π) v fv ν (f , fb) = f , fed-plant H π v fv ((fd , At.told H S e) ∷ ν) fb
     fed-plant H (in-defer π) v fv ν f                     = fed-plant H π v fv ν f
 
     fed-plantᴸ : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)

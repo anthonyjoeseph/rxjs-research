@@ -970,7 +970,8 @@ module Weakening (R : Set) where
         fed-wk (scanˢ f r s)                           ν x       = fed-wk s ν x
         fed-wk (takeWhileˢ i p c k tk s)               ν x       = fed-wk s ν x
         fed-wk (flatMapˢ op f fl oc k r pl so ls)      ν (x , y) = fed-wk so ν x , fed-wkᴸ ls ν y
-        fed-wk (connectˢ S c b kb k fd rp e rt src bd) ν (x , y) = fed-wk src ν x , fed-wk bd ((fd , e) ∷ ν) y
+        fed-wk (connectˢ S c b kb k fd rp e rt src bd) ν (x , y) =
+          fed-wk src ν x , subst (λ z → At.Fed H′ (wkTree τ bd) ((wkFeed τ fd , (if z then e else nothing)) ∷ wkNow ν)) (sym (cells (Subject.closed S))) (fed-wk bd ((fd , At.told H S e) ∷ ν) y)
         fed-wk (joinˢ j sk l x st)                     ν (lift f) =
           subst (λ p → Lift _ (At.val H′ (wkR τ l) ≡ true → (At.Owed H′ (proj₁ p) (wk∋ τ sk) j → st ≡ At.owing H′ (proj₁ p) j)
                                                          × (¬ At.Owed H′ (proj₁ p) (wk∋ τ sk) j → st ≡ At.owingNone H′ (proj₂ p))))

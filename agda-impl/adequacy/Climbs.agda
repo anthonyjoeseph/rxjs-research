@@ -74,7 +74,7 @@ module Ascending (R : Set) where
   open Heap using (World; _⊑_; _⨾_; _∋_; Handle; Sink; Quiet; wk∋; slot; cell) renaming (same to same⊑)
   open Sorting R using (WellMach)
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
-  open Strongly R using (Strong; Carried; Books; Feed; carried; closing; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; ending; taken; ∧-join; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; Meets; Each; Heads; Lingers; DoneBy; outers; outersL; outers-⊕; Tied; unsub; Owes; Settled; seen; seenL; pinned-trans; ∧-split; false≢; module Canon; owned-to; module Eaching; module Lingering) renaming (⟦_⟧ to ⟦_⟧ᶜ)
+  open Strongly R using (Strong; Carried; Books; Feed; carried; closing; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; joiner; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; ending; taken; ∧-join; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; Meets; Each; Heads; Lingers; DoneBy; outers; outersL; outers-⊕; Tied; unsub; Owes; Settled; seen; seenL; pinned-trans; ∧-split; false≢; module Canon; owned-to; module Eaching; module Lingering) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf; src-of) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
   open Moving R using (pairs-r; pairs-split; plant-self; takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
@@ -93,11 +93,11 @@ module Ascending (R : Set) where
   open Lifting R using (sub-onward; emit-shut; emit-void; run-meets; run-at; emit-run; spread-past; behind-fire; fire-lingers; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
   open Locality R using (stored-at; stored-hit; live-apart; flatReads; cut-in; module Heaps)
   open Growing R using (wkTree; wkLanes; wkPath; wkPathᴸ)
-  open Retagging R using (module Body; fed-owed; envP; joiners-path; retag; unsub-retag; begun-retag)
+  open Retagging R using (module Body; fed-owed; fed-retag; envP; joiners-path; retag; unsub-retag; begun-retag; names-retag)
   open Everywhere.Spending R using (spent-retag)
   open Everywhere.Holding R using (holds-alike; holds-path; holds-plant; holds-retag)
   open Keeping R using (seen-planted)
-  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; let-go; grip; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take)
+  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; let-go; grip; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Keeps; nowAt; fed-at; flags-retag)
   open Framing R using (merged-eq; heads-flat; Untold; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off)
     renaming (Ended to Ends)
   open Staging R using (not-src; wrap-lane)
@@ -3532,9 +3532,6 @@ module Ascending (R : Set) where
     fin-spent : AllPairs _≢_ (names w₀) → At.Spent H w₀ → At.Spent H′ w₀
     fin-spent fr = Heaps.spent-conn H H′ {S = Sj} {c} {b} {kb} {k} {idle} {rp} {e} {rt} u bd (fin-rest fr)
 
-    fin-fed : AllPairs _≢_ (names w₀) → ∀ ν → At.Fed H w₀ ν → At.Fed H′ w₀ ν
-    fin-fed fr = Heaps.fed-conn H H′ {S = Sj} {c} {b} {kb} {k} {idle} {rp} {e} {rt} u bd (fin-rest fr)
-
     -- The closed flag read by no part: the node's heads and ties as they
     -- were.
     fin-au : AllPairs _≢_ (names w₀) → Alike H H′ (names u)
@@ -3642,17 +3639,27 @@ module Ascending (R : Set) where
     fin-lingers fs en = Sh.shift-lingers fs v en (fin-lingering (fresh-path ρ fs))
 
     -- The finish read by the connect's own joiners alone, each a
-    -- subscriber the finish read, the closed flag apart from the list.
+    -- subscriber the finish read, the closed flag apart from the list:
+    -- whatever each held before the subject closed, it is told its end.
     --
     -- REFUTED: 26b032ed of the finish staged with each joiner left holding what it held, by a connect of an `of` whose body is a joined subscription
-    fin-joins : AllPairs _≢_ (names T) → At.Joined H (subjects T) (joiners T []) → ∀ ν → At.Fed H′ w₀ ν → At.Fed H′ v ν
-    fin-joins fs jn = fed-owed H′ Sj c b kb k fd′ rp e rt u bd (envP ρ [])
-                        (λ m → subst (λ z → _ ∈ᴸ z) (sym (cong lower (look-store H (Subject.closed Sj) (Subject.subscribers Sj) (λ eq → apart (sym eq)))))
-                                     (lookupᴬ (proj₂ jn) (joiners-path ρ [] (++⁺ʳ (joiners u (envP ρ [])) m))))
+    fin-joins : AllPairs _≢_ (names T) → At.Joined H (subjects T) (joiners T []) → ∀ ν → At.Fed H w₀ ν → At.Fed H′ v ν
+    fin-joins fs jn ν (f₁ , f₂) =
+      Heaps.fed-alike H H′ u (fin-au fr) ν f₁
+      , fed-retag H′ (at-here (At.owing H′ fd′)) bd (Sj ∷ envP ρ []) hy (Heaps.fed-alike H H′ bd (fin-ab fr) _ f₂)
       where
+        fr = fresh-path ρ fs
         apart : _≢_ {A = Name h} (_ , Subject.subscribers Sj) (_ , Subject.closed Sj)
-        apart with fresh-path ρ fs
+        apart with fr
         ... | a₀ ∷ _ = lookupᴬ a₀ (here refl)
+        ow : ∀ {sk j} → joiner Sj sk j ∈ᴸ joiners bd (Sj ∷ envP ρ []) → At.Owed H′ fd′ sk j
+        ow m = subst (λ z → _ ∈ᴸ z) (sym (cong lower (look-store H (Subject.closed Sj) (Subject.subscribers Sj) (λ eq → apart (sym eq)))))
+                     (lookupᴬ (proj₂ jn) (joiners-path ρ [] (++⁺ʳ (joiners u (envP ρ [])) m)))
+        hy : ∀ {C} (x : C ∈ᴸ A ∷ Δ) {j sk l st} → joiner (lookupᴬ (Sj ∷ envP ρ []) x) sk j ∈ᴸ joiners bd (Sj ∷ envP ρ [])
+           → At.Fed H′ (joinˢ j sk l x st) ((idle , At.told H Sj e) ∷ ν)
+           → At.Fed H′ (joinˢ j sk l x (at-here (At.owing H′ fd′) x j st)) ((fd′ , At.told H′ Sj e) ∷ ν)
+        hy (here refl) m _ = lift λ _ → (λ _ → refl) , λ no → ⊥-elim (no (ow m))
+        hy (there x)   m f = f
 
     fin-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels H′ T′
     fin-kernels fs kn = record { holds   = holds-plant H′ {t = T} ρ v refl (λ {E} {o} → body-holds H′ {S = Sj} {c = c} {b = b} {kb = kb} {k = k} {fd₁ = idle} {fd₂ = fd′} {rp = rp} {e = e} {rt = rt} {src = u} (at-here (At.owing H′ fd′)) bd {E} {o}) (Kernels.holds kn′)
@@ -3661,7 +3668,8 @@ module Ascending (R : Set) where
       where kn′ = Wr.wr-kernels fs (λ {E} {o} → fin-holds (fresh-path ρ fs) {E} {o}) (λ _ → fin-gated (fresh-path ρ fs)) (fin-spent (fresh-path ρ fs)) kn
 
     fin-meaning : AllPairs _≢_ (names T) → At.Joined H (subjects T) (joiners T []) → Meaning H T → Meaning H′ T′
-    fin-meaning fs jn mn = record { fed = fed-plant H′ {t = T} ρ v (fin-joins fs jn) _ (Meaning.fed (Wr.wr-meaning fs (fin-fed (fresh-path ρ fs)) mn)) }
+    fin-meaning fs jn mn = record { fed = Heaps.fed-path H H′ ρ v (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v Bd.body-names)) fs)
+                                            (subst (Offʰ H H′) Bd.body-names (Heaps.keep H H′ (off-store H (Subject.closed Sj)) (lookupᴬ mine))) (fin-joins fs jn) _ (Meaning.fed mn) }
 
   -- A connect's source ended: its subject closed, the subscribers read,
   -- their finish owed ahead of the calls the end owed.
@@ -3709,8 +3717,22 @@ module Ascending (R : Set) where
       fb : DoneBy hp w₀ (outers ρ ++ []) → DoneBy H′ v (outers ρ)
       fb d = Flag.db-connect H′
         (λ jb → flags-alike hp H′ au (Flag.db-sub hp d′ (in-source here) (cong (λ z → z ∧ true) (trans (cong is-just (sym (part-alike hp H′ bd ab))) jb))))
-        (λ js → flags-alike hp H′ ab (Flag.db-sub hp d′ (in-body here) (cong (λ z → z ∧ true) (trans (cong (λ x → is-just x ∨ is-just e) (sym (part-alike hp H′ u au))) js))))
+        (λ js → flags-alike hp H′ (subst (Alike hp H′) (sym (names-retag g bd)) ab)
+                  (flags-retag hp g bd kh (proj₂ (fed-at hp ρ (Meaning.fed mn)))
+                    (Flag.db-sub hp d′ (in-body here) (cong (λ z → z ∧ true) (trans (cong (λ x → is-just x ∨ is-just e) (sym (part-alike hp H′ u au))) js)))))
         where d′ = subst (DoneBy hp w₀) (++-identityʳ (outers ρ)) d
+      g = at-here (At.owing H′ (Fins.fd′ hp ρ q))
+      -- The subject still open as the end reaches it: every live joiner
+      -- of the body waiting, open before the restage and after.
+      cf : At.val hp (Subject.closed Sj) ≡ false
+      cf with At.val hp (Subject.closed Sj) | trans (sym (opened-⊕ hp true ρ (in-source here))) (calling-open (ρ ⊕ in-source here) cl)
+      ... | false | _  = refl
+      ... | true  | ()
+      kh : Keeps hp g ((idle , At.told hp Sj e) ∷ nowAt hp ρ [])
+      kh (here refl) {l = l} (lift f) with At.val hp l in lv
+      ... | false = refl
+      ... | true rewrite proj₂ (f lv) (λ ()) | cf = refl
+      kh (there x) f = refl
       -- The connect stands: its source gone, its end staged, its body on.
       ju : is-just (At.part H′ v) ≡ true
       ju = subst₂ (λ s′ b′ → is-just (At.connected H′ rp e rt s′ b′) ≡ true)

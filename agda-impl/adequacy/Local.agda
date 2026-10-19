@@ -12,7 +12,7 @@ module adequacy.Local where
 
 open import Data.List using (List; []; _∷_; _++_; length; drop)
 open import Data.List.Properties using (∷-injectiveˡ; ∷-injectiveʳ)
-open import Data.Bool using (true; false)
+open import Data.Bool using (true; false; if_then_else_)
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (inj₂; [_,_]′) renaming (map₂ to sum-map₂)
@@ -234,13 +234,15 @@ module Locality (R : Set) where
       fed-alike (flatMapˢ op f fl oc k r pl so ls) ag ν (f₁ , f₂) =
         fed-alike so (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ m)))))) ν f₁
         , fedL-alike ls (λ j m → ag j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) m)))))) ν f₂
-      fed-alike (connectˢ S c b kb k fd rp e rt src bd) ag = fed-conn {S = S} {c} {b} {kb} {k} {fd} {rp} {e} {rt} src bd (λ j m → ag j (++⁺ʳ (subjectNames S) m))
+      fed-alike (connectˢ S c b kb k fd rp e rt src bd) ag ν (f₁ , f₂) =
+        fed-conn {S = S} {c} {b} {kb} {k} {fd} {rp} {e} {rt} src bd (λ j m → ag j (++⁺ʳ (subjectNames S) m)) ν
+          (f₁ , subst (λ z → At.Fed H bd ((fd , (if z then e else nothing)) ∷ᴬ ν)) (cong lower (sym (ag (Subject.closed S) (there (here refl))))) f₂)
       fed-alike (joinˢ j sk l x st) ag ν (lift g) = lift (λ e → g (trans (cong lower (sym (ag l (there (here refl))))) e))
       fed-alike (deferˢ k s) ag ν fd = fed-alike s (λ j m → ag j (++⁺ʳ (quietName k) m)) ν fd
 
       fed-conn : ∀ {Δ A B S c b kb k fd rp e rt} (src : Sub h Δ A) (bd : Sub h (A ∷ Δ) B)
                → Alike H H′ (drop 2 (names (connectˢ S c b kb k fd rp e rt src bd)))
-               → ∀ ν → At.Fed H (connectˢ S c b kb k fd rp e rt src bd) ν → At.Fed H′ (connectˢ S c b kb k fd rp e rt src bd) ν
+               → ∀ ν → At.Fed H src ν × At.Fed H bd ((fd , At.told H′ S e) ∷ᴬ ν) → At.Fed H′ (connectˢ S c b kb k fd rp e rt src bd) ν
       fed-conn {c = c} {b} {kb} {k} src bd ag ν (f₁ , f₂) =
         fed-alike src (λ j m → ag j (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m)))))) ν f₁
         , fed-alike bd (λ j m → ag j (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names src) m)))))) _ f₂

@@ -10,7 +10,7 @@ open import Data.List using (List; []; _∷_; _++_)
 open import Data.List.Properties using (++-identityʳ)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ; ++⁻)
-open import Data.List.Relation.Unary.All using (All) renaming (lookup to lookupᴬ)
+open import Data.List.Relation.Unary.All using (All) renaming (lookup to lookupᴬ; _∷_ to _∷ᴬ_)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Level using (lower)
@@ -33,6 +33,7 @@ open import adequacy.Local using (module Locality)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Frame using (module Framing)
 open import adequacy.Kept using (module Keeping)
+open import adequacy.Retag using (Retag; keep; module Retagging)
 
 module Shifting (R : Set) where
   open Heap using (Sink; Quiet; slot; cell)
@@ -43,13 +44,14 @@ module Shifting (R : Set) where
                          pendingˢ; coldˢ; ofˢ; doneˢ; joinˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; lane; Taking; taking; ending; taken; isTaking;
                          names; laneNames; cutNames; quietName; subjectNames; flatNames; module At; seen; seenL; seen-join; seen-up; Name; DoneBy; Flagged; outers; outersL;
                          Each; Lingers; Heads; Pinned; unpinned; Tied; rest-pinned; bursts-pinned; bursts-moved; under-moved; union-pinned;
-                         pinned-trans; pinned-sym; restful-pinned; ∧-split; ∧-join; false≢)
+                         pinned-trans; pinned-sym; restful-pinned; ∧-split; ∧-join; false≢; Feed)
   open Tearing R using (Alike; Off; part-alike; partLanes-alike; seen-alike; seenL-alike; names-path; lanes-path; apart-r; apart-l; narrow; each-same)
   open Moving R using (plant; plantᴸ; planted; plantedᴸ; pairs-r; pairs-split)
   open Locality R using (module Heaps)
   open Ghosting R using (each-sub; each-lanes)
   open Framing R using (Untold; Ended; Tells; untold; untoldᴹ; untoldᴸ; heads-map; heads-scan; heads-take; heads-source; ended-head; shut-heads; just-of; untold-shut; merged-eq; heads-flat)
   open Keeping R using (leftover-restful)
+  open Retagging R using (retag; retagᴸ)
 
   ----------------------------------------------------------------------
   -- Lists, booleans, pins
@@ -541,6 +543,145 @@ module Shifting (R : Set) where
     flagsL-alike : ∀ {ns Δ B} {ls : List (Lane h Δ B)} → Alike H H′ (laneNames ls) → DoneByL H ls ns → DoneByL H′ ls ns
     flagsL-alike al dL {fl = fl} {so = so} πL sn =
       flagged-moved {fl = fl} {so = so} (cong lower (al (Flat.outerDone fl) (flag-inL πL))) (partL-at H H′ (πL ⊕ᴸ in-outer {t = so} here) al) (dL πL (trans (sym (seenL-alike H H′ πL al)) sn))
+
+  -- A RETAG KEEPS EVERY FLAG: it rewrites only what joiners hold, and
+  -- a flag reads parts only for whether they are open, so a retag whose
+  -- joiners stay open exactly where they were moves no flag.
+  module _ {h} (G : Heapᴹ h) where
+    open At G using (part; partLanes; Fed; FedLanes; Now; told; mapᴹ; consᴹ; merged; connected)
+
+    -- Each connect's feed, read down the path.
+    mutual
+      nowAt : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Path t u → Now Δ → Now Δ′
+      nowAt here          ν = ν
+      nowAt (in-map p)    ν = nowAt p ν
+      nowAt (in-scan p)   ν = nowAt p ν
+      nowAt (in-take p)   ν = nowAt p ν
+      nowAt (in-outer p)  ν = nowAt p ν
+      nowAt (in-lanes p)  ν = nowAtL p ν
+      nowAt (in-source p) ν = nowAt p ν
+      nowAt (in-body {S = S} {fd = fd} {e = e} p) ν = nowAt p ((fd , told S e) ∷ᴬ ν)
+      nowAt (in-defer p)  ν = nowAt p ν
+
+      nowAtL : ∀ {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} → PathLanes ls u → Now Δ → Now Δ′
+      nowAtL (this-lane p) ν = nowAt p ν
+      nowAtL (next-lane p) ν = nowAtL p ν
+
+    mutual
+      fed-at : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) {ν} → Fed t ν → Fed u (nowAt π ν)
+      fed-at here          f        = f
+      fed-at (in-map p)    f        = fed-at p f
+      fed-at (in-scan p)   f        = fed-at p f
+      fed-at (in-take p)   f        = fed-at p f
+      fed-at (in-outer p)  (f , _)  = fed-at p f
+      fed-at (in-lanes p)  (_ , fl) = fed-atL p fl
+      fed-at (in-source p) (f , _)  = fed-at p f
+      fed-at (in-body p)   (_ , fb) = fed-at p fb
+      fed-at (in-defer p)  f        = fed-at p f
+
+      fed-atL : ∀ {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) {ν} → FedLanes ls ν → Fed u (nowAtL π ν)
+      fed-atL (this-lane p) (f , _)  = fed-at p f
+      fed-atL (next-lane p) (_ , fl) = fed-atL p fl
+
+    -- Every joiner fed as `ν` says stays open exactly where it was.
+    Keeps : ∀ {Δ} → Retag Δ → Now Δ → Set₁
+    Keeps {Δ} g ν = ∀ {B} (x : B ∈ᴸ Δ) {j sk l st} → Fed (joinˢ j sk l x st) ν
+                  → is-just (part (joinˢ j sk l x (g x j st))) ≡ is-just (part (joinˢ j sk l x st))
+
+    keeps-keep : ∀ {Δ A} {g : Retag Δ} {ν} {fe : Feed A h × Maybe Pos} → Keeps g ν → Keeps (keep g) (fe ∷ᴬ ν)
+    keeps-keep hy (here refl) f = refl
+    keeps-keep hy (there x)   f = hy x f
+
+    just-map : ∀ {X Y : Set₁} (F : X → Y) {m m′ : Maybe X} → is-just m ≡ is-just m′ → is-just (mapᴹ F m) ≡ is-just (mapᴹ F m′)
+    just-map F {just _}  {just _}  _ = refl
+    just-map F {nothing} {nothing} _ = refl
+    just-map F {just _}  {nothing} ()
+    just-map F {nothing} {just _}  ()
+
+    just-nothing : ∀ {X : Set₁} {m m′ : Maybe X} → is-just m ≡ is-just m′ → is-nothing m ≡ is-nothing m′
+    just-nothing {m = just _}  {just _}  _ = refl
+    just-nothing {m = nothing} {nothing} _ = refl
+    just-nothing {m = just _}  {nothing} ()
+    just-nothing {m = nothing} {just _}  ()
+
+    just-cons : ∀ {X : Set₁} {m m′ : Maybe X} {xs ys : List X} → is-just m ≡ is-just m′ → filled xs ≡ filled ys → filled (consᴹ m xs) ≡ filled (consᴹ m′ ys)
+    just-cons {m = just _}  {just _}  _ _ = refl
+    just-cons {m = nothing} {nothing} _ p = p
+    just-cons {m = just _}  {nothing} ()
+    just-cons {m = nothing} {just _}  ()
+
+    just-merged : ∀ {Δ A B} op (F : A → Pos → U.Node Δ B) (o : Maybe (U.Node Δ A)) ls qs pl
+                → is-just (merged op F o ls qs pl) ≡ (is-just o ∨ filled ls ∨ filled qs)
+    just-merged op F nothing  []      []      pl = refl
+    just-merged op F nothing  []      (_ ∷ _) pl = refl
+    just-merged op F nothing  (_ ∷ _) qs      pl = refl
+    just-merged op F (just _) ls      qs      pl = refl
+
+    just-connected : ∀ {Δ A B} r e (t : U.Node Δ A) {s s′ : Maybe (U.Node Δ A)} {b b′ : Maybe (U.Node (A ∷ Δ) B)}
+                   → is-just s ≡ is-just s′ → is-just b ≡ is-just b′ → is-just (connected r e t s b) ≡ is-just (connected r e t s′ b′)
+    just-connected r e t {b = nothing} {nothing} _ _ = refl
+    just-connected r e t {just _} {just _} {just _} {just _} _ _ = refl
+    just-connected r (just _) t {nothing} {nothing} {just _} {just _} _ _ = refl
+    just-connected r nothing  t {nothing} {nothing} {just _} {just _} _ _ = refl
+    just-connected r e t {just _} {nothing} {just _} {just _} () _
+    just-connected r e t {nothing} {just _} {just _} {just _} () _
+    just-connected r e t {b = just _} {nothing} _ ()
+    just-connected r e t {b = nothing} {just _} _ ()
+
+    mutual
+      part-retag : ∀ {Δ A} (g : Retag Δ) (s : Sub h Δ A) {ν} → Keeps g ν → Fed s ν → is-just (part (retag g s)) ≡ is-just (part s)
+      part-retag g (pendingˢ s q)                          hy f = refl
+      part-retag g (coldˢ s hd ph)                         hy f = refl
+      part-retag g (ofˢ p i xs)                            hy f = refl
+      part-retag g doneˢ                                   hy f = refl
+      part-retag g (mapˢ f₀ s)                             hy f = just-map _ (part-retag g s hy f)
+      part-retag g (scanˢ f₀ r s)                          hy f = just-map _ (part-retag g s hy f)
+      part-retag g (takeWhileˢ i p c k tk s)               hy f with At.val G (Kit.live c)
+      ... | false = refl
+      ... | true  = taking-retag tk (part-retag g s hy f)
+        where
+          taking-retag : ∀ tk′ {m m′} → is-just m ≡ is-just m′ → is-just (At.taking? G i p tk′ m) ≡ is-just (At.taking? G i p tk′ m′)
+          taking-retag taking       e = just-map _ e
+          taking-retag (ending _ _) e = refl
+          taking-retag taken        e = refl
+      part-retag g (flatMapˢ op f₀ fl oc k r pl so ls)     hy (fs , fl′) =
+        trans (just-merged op _ _ _ _ pl)
+              (trans (cong₂ (λ x y → x ∨ y ∨ filled (At.val G (Flat.queue fl))) (part-retag g so hy fs) (lanes-retag g ls hy fl′))
+                     (sym (just-merged op _ _ _ _ pl)))
+      part-retag g (connectˢ S c b kb k fd rp e rt src bd) hy (fs , fb) =
+        just-connected rp e rt (part-retag g src hy fs) (part-retag (keep g) bd (keeps-keep hy) fb)
+      part-retag g (joinˢ j sk l x st)                     hy f = hy x f
+      part-retag g (deferˢ k s)                            hy f = part-retag g s hy f
+
+      lanes-retag : ∀ {Δ B} (g : Retag Δ) (ls : List (Lane h Δ B)) {ν} → Keeps g ν → FedLanes ls ν → filled (partLanes (retagᴸ g ls)) ≡ filled (partLanes ls)
+      lanes-retag g []                hy _          = refl
+      lanes-retag g (lane c k s ∷ ls) hy (fs , fl′) with At.val G (Kit.live c)
+      ... | true  = just-cons (part-retag g s hy fs) (lanes-retag g ls hy fl′)
+      ... | false = lanes-retag g ls hy fl′
+
+    mutual
+      flags-retag : ∀ {ns Δ A} (g : Retag Δ) (s : Sub h Δ A) {ν} → Keeps g ν → Fed s ν → DoneBy G s ns → DoneBy G (retag g s) ns
+      flags-retag g (pendingˢ s q)                          hy f d = d
+      flags-retag g (coldˢ s hd ph)                         hy f d = d
+      flags-retag g (ofˢ p i xs)                            hy f d = d
+      flags-retag g doneˢ                                   hy f d = d
+      flags-retag g (mapˢ f₀ s)                             hy f d = Flag.db-map G (flags-retag g s hy f (λ ψ sn → d (in-map ψ) sn))
+      flags-retag g (scanˢ f₀ r s)                          hy f d = Flag.db-scan G (flags-retag g s hy f (λ ψ sn → d (in-scan ψ) sn))
+      flags-retag g (takeWhileˢ i p c k tk s)               hy f d =
+        Flag.db-take G (λ ok → flags-retag g s hy f (λ ψ sn → d (in-take ψ) (thru (At.val G (Kit.live c)) ok (λ a b′ → ∧-join a (∧-join b′ sn)))))
+      flags-retag g (flatMapˢ op f₀ fl oc k r pl so ls)     hy (fs , fl′) d =
+        Flag.db-flat G (proj₁ (d here refl) , λ m̸ → trans (proj₂ (d here refl) m̸) (just-nothing (sym (part-retag g so hy fs))))
+          (flags-retag g so hy fs (λ ψ sn → d (in-outer ψ) sn)) (flagsL-retag g ls hy fl′ (λ πL sn → d (in-lanes πL) sn))
+      flags-retag g (connectˢ S c b kb k fd rp e rt src bd) hy (fs , fb) d =
+        Flag.db-connect G (λ jb → flags-retag g src hy fs (λ ψ sn → d (in-source ψ) (∧-join (trans (sym (part-retag (keep g) bd (keeps-keep hy) fb)) jb) sn)))
+          (λ js → flags-retag (keep g) bd (keeps-keep hy) fb (λ ψ sn → d (in-body ψ) (∧-join (trans (cong (λ z → z ∨ is-just e) (sym (part-retag g src hy fs))) js) sn)))
+      flags-retag g (joinˢ j sk l x st)                     hy f d ()
+      flags-retag g (deferˢ k s)                            hy f d = Flag.db-defer G (flags-retag g s hy f (λ ψ sn → d (in-defer ψ) sn))
+
+      flagsL-retag : ∀ {ns Δ B} (g : Retag Δ) (ls : List (Lane h Δ B)) {ν} → Keeps g ν → FedLanes ls ν → DoneByL G ls ns → DoneByL G (retagᴸ g ls) ns
+      flagsL-retag g []                hy _          dL ()
+      flagsL-retag g (lane c k s ∷ ls) hy (fs , fl′) dL =
+        Flag.dbL-cons G (λ lv → flags-retag g s hy fs (λ ψ sn → dL (this-lane ψ) (∧-join lv sn))) (flagsL-retag g ls hy fl′ (λ πL sn → dL (next-lane πL) sn))
 
   -- Every flag named on the way down lies in the tree.
   mutual

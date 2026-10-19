@@ -172,7 +172,7 @@ module Retagging (R : Set) where
   -- The feed: each joiner the retag moves, fed as its `Fed` clause asks
 
   module _ {h} (H : Heapᴹ h) where
-    open At H using (Fed; FedLanes; Now)
+    open At H using (Fed; FedLanes; Now; told)
 
     mutual
       fed-retag : ∀ {Δ A} (g : Retag Δ) (s : Sub h Δ A) (E : Env Δ h) {ν ν′ : Now Δ}
@@ -194,7 +194,7 @@ module Retagging (R : Set) where
         , fed-retag (keep g) bd (S ∷ᴬ E) hb fb
         where
           hb : ∀ {B} (x : B ∈ A₀ ∷ Δ₀) {j sk l st} → joiner (lookup (S ∷ᴬ E) x) sk j ∈ joiners bd (S ∷ᴬ E)
-             → Fed (joinˢ j sk l x st) ((fd , e) ∷ᴬ ν) → Fed (joinˢ j sk l x (keep g x j st)) ((fd , e) ∷ᴬ ν′)
+             → Fed (joinˢ j sk l x st) ((fd , told S e) ∷ᴬ ν) → Fed (joinˢ j sk l x (keep g x j st)) ((fd , told S e) ∷ᴬ ν′)
           hb (here refl) m f′ = f′
           hb (there x) {j} {sk} {l} {st} m f′ = hy x {j} {sk} {l} {st} (++⁺ʳ (joiners src E) m) f′
       fed-retag g (joinˢ j sk l x st)                     E hy f = hy x {j} {sk} {l} {st} (here refl) f
@@ -243,7 +243,7 @@ module Retagging (R : Set) where
   fed-owed H {Δ} {A} S c b kb k fd rp e rt src bd E ow ν (fs , fb) = fs , fed-retag H (at-here (At.owing H fd)) bd (S ∷ᴬ E) hy fb
     where
       hy : ∀ {C} (x : C ∈ A ∷ Δ) {j sk l st} → joiner (lookup (S ∷ᴬ E) x) sk j ∈ joiners bd (S ∷ᴬ E)
-         → At.Fed H (joinˢ j sk l x st) ((idle , e) ∷ᴬ ν) → At.Fed H (joinˢ j sk l x (at-here (At.owing H fd) x j st)) ((fd , e) ∷ᴬ ν)
+         → At.Fed H (joinˢ j sk l x st) ((idle , At.told H S e) ∷ᴬ ν) → At.Fed H (joinˢ j sk l x (at-here (At.owing H fd) x j st)) ((fd , At.told H S e) ∷ᴬ ν)
       hy (here refl) m _ = lift λ _ → (λ _ → refl) , λ no → ⊥-elim (no (ow m))
       hy (there x)   m f = f
 
