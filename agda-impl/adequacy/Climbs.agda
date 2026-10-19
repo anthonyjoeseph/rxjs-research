@@ -97,7 +97,7 @@ module Ascending (R : Set) where
   open Everywhere.Spending R using (spent-retag)
   open Everywhere.Holding R using (holds-alike; holds-path; holds-plant; holds-retag)
   open Keeping R using (seen-planted)
-  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; let-go; grip; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; flags-retag)
+  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; let-go; grip; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag)
   open Framing R using (merged-eq; heads-flat; Untold; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off)
     renaming (Ended to Ends)
   open Staging R using (not-src; wrap-lane)
@@ -3735,9 +3735,9 @@ module Ascending (R : Set) where
         where d′ = subst (DoneBy hp w₀) (++-identityʳ (outers ρ)) d
       -- The connect stands: its source gone, its end staged, its body on.
       ju : is-just (At.part H′ v) ≡ true
-      ju = subst₂ (λ s′ b′ → is-just (At.connected H′ rp e rt s′ b′) ≡ true)
-                  (sym (trans (part-alike hp H′ u au) gn)) (sym (trans (part-alike hp H′ bd ab) pb))
-                  (subst (λ e′ → is-just (At.connected H′ rp e′ rt nothing (just b₀)) ≡ true) (sym (healed-end ρ hl gn)) refl)
+      ju = trans (just-connected H′ rp _ rt (cong is-just (trans (part-alike hp H′ u au) gn))
+                                            (trans (cong is-just (part-alike hp H′ (retag g bd) ab′)) (trans (part-retag hp g bd kh fbd) (cong is-just pb))))
+                 (subst (λ e′ → is-just (At.connected H′ rp e′ rt nothing (just b₀)) ≡ true) (sym (healed-end ρ hl gn)) refl)
       ec = ≗-trans (f same⊑ ss) (bind≗ (≗-refl (Strongly.code R (finC (planted ρ v)))) λ _ → ≗-trans (wk-same ⟦ ks ⟧ᶜ) (Fins.fin-code hp ρ q ks))
 
   -- A signal reaching a connect's subject.
