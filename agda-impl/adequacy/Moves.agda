@@ -26,7 +26,6 @@ open import Data.List.Relation.Unary.Any.Properties using (++⁻; ++⁺ˡ; ++⁺
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 import Data.Sum as Sum
 open import Data.Maybe using (just; nothing)
-open import Data.Unit using (tt)
 
 open import Tree using (Obs)
 import Tree as T
@@ -626,19 +625,6 @@ module Moving (R : Set) where
     joiners-plantᴸ (this-lane π) v eq E                rewrite joiners-plant π v eq E = refl
     joiners-plantᴸ (next-lane {l = lane c k s} π) v eq E rewrite joiners-plantᴸ π v eq E = refl
 
-  -- What unsubscribing does: a node's own, or its source's.
-  unsub-plant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-              → unsub u ≡ unsub v → unsub (plant π v) ≡ unsub t
-  unsub-plant here v eq          = sym eq
-  unsub-plant (in-map π) v eq    = unsub-plant π v eq
-  unsub-plant (in-scan π) v eq   = unsub-plant π v eq
-  unsub-plant (in-take π) v eq   = refl
-  unsub-plant (in-outer π) v eq  = refl
-  unsub-plant (in-lanes π) v eq  = refl
-  unsub-plant (in-source π) v eq rewrite unsub-plant π v eq = refl
-  unsub-plant (in-body π) v eq   = refl
-  unsub-plant (in-defer π) v eq  = refl
-
   -- A lane's switch is kept: the live count and the switches.
   count-plant : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
               → At.count H (plantᴸ π v) ≡ At.count H ls
@@ -666,73 +652,6 @@ module Moving (R : Set) where
     plantᴸ-self : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) → plantᴸ π u ≡ ls
     plantᴸ-self (this-lane π) rewrite plant-self π = refl
     plantᴸ-self (next-lane π) rewrite plantᴸ-self π = refl
-
-  mutual
-    holds-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-                → unsub u ≡ unsub v → (∀ {E o} → At.Holds H u E o → At.Holds H v E o)
-                → ∀ {E o} → At.Holds H t E o → At.Holds H (plant π v) E o
-    holds-plant H here v ue hv hs = hv hs
-    holds-plant H (in-map π) v ue hv hs = holds-plant H π v ue hv hs
-    holds-plant H (in-scan π) v ue hv hs = holds-plant H π v ue hv hs
-    holds-plant H (in-take {c = c} {k = k} π) v ue hv (ak , hs) =
-      subst (At.Attached H c k) (sym (unsub-plant π v ue)) ak , holds-plant H π v ue hv hs
-    holds-plant H (in-outer {oc = oc} {k = k} π) v ue hv (rf , sl , ak , hs , ac , gn , hl) =
-      rf , sl , subst (At.Attached H oc k) (sym (unsub-plant π v ue)) ak , holds-plant H π v ue hv hs , ac , gn , hl
-    holds-plant H (in-lanes {op = op} {f = f} {fl = fl} π) v ue hv {E} {o} (rf , sl , ak , hs , ac , (g , ge , ga) , hl) =
-      rf , sl , ak , hs , trans ac (sym (count-plant H π v)) , (g , trans ge (sym (switches-plant H π v)) , ga)
-      , holds-plantᴸ H π v ue hv {op = op} {f = f} {E = E} {o = o} {fl = fl} hl
-    holds-plant H (in-source {c = c} {k = k} π) v ue hv (ak , be , st , hs , hb) =
-      subst (At.Attached H c k) (sym (unsub-plant π v ue)) ak , be , st , holds-plant H π v ue hv hs , hb
-    holds-plant H (in-body {kb = kb} π) v ue hv (ak , be , st , hs , hb) =
-      ak , be , subst (At.Stashed H kb) (sym (unsub-plant π v ue)) st , hs , holds-plant H π v ue hv hb
-    holds-plant H (in-defer {k = k} π) v ue hv (st , hs) =
-      subst (At.Stashed H k) (sym (unsub-plant π v ue)) st , holds-plant H π v ue hv hs
-
-    holds-plantᴸ : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
-                 → unsub u ≡ unsub v → (∀ {E o} → At.Holds H u E o → At.Holds H v E o)
-                 → ∀ {A : Set} {op} {f : A → Obs Timeline Δ B} {E o fl}
-                 → At.HoldsLanes H op f E o fl ls → At.HoldsLanes H op f E o fl (plantᴸ π v)
-    holds-plantᴸ H (this-lane {c = c} {k = k} π) v ue hv (ak , hs , hl) =
-      subst (At.Attached H c k) (sym (unsub-plant π v ue)) ak , holds-plant H π v ue hv hs , hl
-    holds-plantᴸ H (next-lane {l = lane c k s} π) v ue hv {op = op} {f = f} {E = E} {o = o} {fl = fl} (ak , hs , hl) =
-      ak , hs , holds-plantᴸ H π v ue hv {op = op} {f = f} {E = E} {o = o} {fl = fl} hl
-
-  -- A node owing no more than the one it replaced: nothing above it owes
-  -- more.
-  owes-plant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-             → (Owes v → Owes u) → Owes (plant π v) → Owes t
-  owes-plant here v ov ow        = ov ow
-  owes-plant (in-map π) v ov ow  = owes-plant π v ov ow
-  owes-plant (in-scan π) v ov ow = owes-plant π v ov ow
-  owes-plant (in-take π) v ov ()
-  owes-plant (in-outer π) v ov ()
-  owes-plant (in-lanes π) v ov ()
-  owes-plant (in-source π) v ov ow = owes-plant π v ov ow
-  owes-plant (in-body π) v ov ow   = ow
-  owes-plant (in-defer π) v ov ()
-
-  begun-plant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-              → (Owes v → Owes u) → ∀ k → Begun k t → Begun k (plant π v)
-  begun-plant π v ov nothing  b = tt
-  begun-plant π v ov (just _) b = λ ow → b (owes-plant π v ov ow)
-
-  mutual
-    settled-plant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-                  → (Owes v → Owes u) → (Settled u → Settled v) → Settled t → Settled (plant π v)
-    settled-plant here v ov sv st                                = sv st
-    settled-plant (in-map π) v ov sv st                          = settled-plant π v ov sv st
-    settled-plant (in-scan π) v ov sv st                         = settled-plant π v ov sv st
-    settled-plant (in-take {k = k} π) v ov sv (b , st)           = begun-plant π v ov k b , settled-plant π v ov sv st
-    settled-plant (in-outer {k = k} π) v ov sv (b , st , sl)     = begun-plant π v ov k b , settled-plant π v ov sv st , sl
-    settled-plant (in-lanes π) v ov sv (b , st , sl)             = b , st , settled-plantᴸ π v ov sv sl
-    settled-plant (in-source {k = k} π) v ov sv (b , bb , st , sb) = begun-plant π v ov k b , bb , settled-plant π v ov sv st , sb
-    settled-plant (in-body {kb = kb} π) v ov sv (b , bb , st , sb) = b , begun-plant π v ov kb bb , st , settled-plant π v ov sv sb
-    settled-plant (in-defer {k = k} π) v ov sv (b , st)          = begun-plant π v ov k b , settled-plant π v ov sv st
-
-    settled-plantᴸ : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
-                   → (Owes v → Owes u) → (Settled u → Settled v) → SettledLanes ls → SettledLanes (plantᴸ π v)
-    settled-plantᴸ (this-lane {k = k} π) v ov sv (b , st , sl)       = begun-plant π v ov k b , settled-plant π v ov sv st , sl
-    settled-plantᴸ (next-lane {l = lane c k s} π) v ov sv (b , st , sl) = b , st , settled-plantᴸ π v ov sv sl
 
   -- What unsubscribing does above a node still owed: as it was, or the
   -- whole still owes.
@@ -799,55 +718,6 @@ module Moving (R : Set) where
       attached-owed H π v ow c kc b ak , holds-owed H π v ow _ hv st hs , hl
     holds-owedᴸ H (next-lane {l = lane c kc s} π) v ow {op = op} {f = f} {E = E} {o = o} {fl = fl} k hv (_ , _ , st) (ak , hs , hl) =
       ak , hs , holds-owedᴸ H π v ow {op = op} {f = f} {E = E} {o = o} {fl = fl} k hv st hl
-
-  -- What unsubscribing reaches spent: below the planted node from the
-  -- new one's, elsewhere from the old tree's.
-  mutual
-    spent-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-                → (At.Spent H u → At.Spent H v) → At.Spent H t → At.Spent H (plant π v)
-    spent-plant H here v sv s                                    = sv s
-    spent-plant H (in-map π) v sv s                              = spent-plant H π v sv s
-    spent-plant H (in-scan π) v sv s                             = spent-plant H π v sv s
-    spent-plant H (in-take {k = k} π) v sv s                     = cut-plant H π v sv k s
-    spent-plant H (in-outer {k = k} π) v sv (s , sl)             = cut-plant H π v sv k s , sl
-    spent-plant H (in-lanes π) v sv (s , sl)                     = s , spent-plantᴸ H π v sv sl
-    spent-plant H (in-source {k = k} π) v sv (s , sb)            = cut-plant H π v sv k s , sb
-    spent-plant H (in-body {kb = kb} π) v sv (s , sb)            = s , cut-plant H π v sv kb sb
-    spent-plant H (in-defer {k = k} π) v sv s                    = cut-plant H π v sv k s
-
-    spent-plantᴸ : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
-                 → (At.Spent H u → At.Spent H v) → At.SpentLanes H ls → At.SpentLanes H (plantᴸ π v)
-    spent-plantᴸ H (this-lane {k = k} π) v sv (s , sl)           = cut-plant H π v sv k s , sl
-    spent-plantᴸ H (next-lane {l = lane c k s} π) v sv (s′ , sl) = s′ , spent-plantᴸ H π v sv sl
-
-    cut-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-              → (At.Spent H u → At.Spent H v) → ∀ k → At.Cut↓ H k t → At.Cut↓ H k (plant π v)
-    cut-plant H π v sv nothing  c = c
-    cut-plant H π v sv (just _) s = spent-plant H π v sv s
-
-  mutual
-    gated-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
-                → (At.Gated H u → At.Gated H v) → (At.Spent H u → At.Spent H v)
-                → At.Gated H t → At.Gated H (plant π v)
-    gated-plant H here v gv dv g = gv g
-    gated-plant H (in-map π) v gv dv g = gated-plant H π v gv dv g
-    gated-plant H (in-scan π) v gv dv g = gated-plant H π v gv dv g
-    gated-plant H (in-take {k = k} π) v gv dv (cg , g) =
-      (λ l → cut-plant H π v dv k (cg l)) , gated-plant H π v gv dv g
-    gated-plant H (in-outer π) v gv dv (g , gl) = gated-plant H π v gv dv g , gl
-    gated-plant H (in-lanes π) v gv dv (g , gl) = g , gated-plantᴸ H π v gv dv gl
-    gated-plant H (in-source {k = k} π) v gv dv (cg , g , gb) =
-      (λ n → cut-plant H π v dv k (cg n)) , gated-plant H π v gv dv g , gb
-    gated-plant H (in-body π) v gv dv (cg , g , gb) =
-      cg , g , gated-plant H π v gv dv gb
-    gated-plant H (in-defer π) v gv dv g = gated-plant H π v gv dv g
-
-    gated-plantᴸ : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
-                 → (At.Gated H u → At.Gated H v) → (At.Spent H u → At.Spent H v)
-                 → ∀ {X} → At.GatedLanes H X ls → At.GatedLanes H X (plantᴸ π v)
-    gated-plantᴸ H (this-lane {k = k} π) v gv dv (cg , g , gl) =
-      (λ l → Sum.map₂ (cut-plant H π v dv k) (cg l)) , gated-plant H π v gv dv g , gl
-    gated-plantᴸ H (next-lane {l = lane c k s} π) v gv dv (cg , g , gl) = cg , g , gated-plantᴸ H π v gv dv gl
 
   mutual
     fed-plant : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)

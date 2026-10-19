@@ -36,7 +36,7 @@ module Tearing (R : Set) where
   open Shared Timeline (Out R) using (Heapᴹ; store; look; get; put; stored)
   open Strongly R
   open Moving R using (pairs-split; pairs-r)
-  open Run (Pureᴾ R) using (module Kit; module FlatKit)
+  open Run (Pureᴾ R) using (Env; Observer; module Kit; module FlatKit)
 
   ----------------------------------------------------------------------
   -- The heap an unsubscribe leaves
@@ -642,3 +642,47 @@ module Tearing (R : Set) where
     Seeing.each-seen H _ (body-off H {Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} (fresh-path π ps) none)
                          (body-eq H {Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} (fresh-path π ps) none)
                          (body-dead H {Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} (fresh-path π ps) none) ps π
+
+  ----------------------------------------------------------------------
+  -- A flatMap's lanes: their switches
+
+  cuts : ∀ {h Δ B} → List (Lane h Δ B) → List (Kit.Cut h)
+  cuts []                = []
+  cuts (lane c _ _ ∷ ls) = c ∷ cuts ls
+
+  cuts-switches : ∀ {h} (H : Heapᴹ h) {Δ B} (ls : List (Lane h Δ B)) → At.switches H ls ≡ cuts ls
+  cuts-switches H []                = refl
+  cuts-switches H (lane c _ _ ∷ ls) = cong (c ∷_) (cuts-switches H ls)
+
+  ----------------------------------------------------------------------
+  -- A kernel's own reads
+
+  attached-alike : ∀ {h} {H H′ : Heapᴹ h} (c : Kit.Cut h) (k : Maybe (Quiet h)) {u}
+                 → look H′ (Kit.held c) ≡ look H (Kit.held c) → Alike H H′ (quietName k) → At.Attached H c k u → At.Attached H′ c k u
+  attached-alike c nothing  eh agk (lift e) = lift (trans (cong lower eh) e)
+  attached-alike c (just q) eh agk (e , st) = trans (cong lower eh) e , subst (_≗ _) (sym (agk q (here refl))) st
+
+  stashed-alike : ∀ {h} {H H′ : Heapᴹ h} (k : Maybe (Quiet h)) {u} → Alike H H′ (quietName k) → At.Stashed H k u → At.Stashed H′ k u
+  stashed-alike nothing  ag st = st
+  stashed-alike (just q) ag st = subst (_≗ _) (sym (ag q (here refl))) st
+
+  -- Every subscription below a path against its kernel.
+  mutual
+    holds-at : ∀ {h} {H : Heapᴹ h} {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} {E o} → Path t u → At.Holds H t E o
+             → Σ (Env Δ′ h) λ E′ → Σ (Observer A′ h) λ o′ → At.Holds H u E′ o′
+    holds-at here          hs                          = _ , _ , hs
+    holds-at (in-map π)    hs                          = holds-at π hs
+    holds-at (in-scan π)   hs                          = holds-at π hs
+    holds-at (in-take π)   (_ , hs)                    = holds-at π hs
+    holds-at (in-outer π)  (_ , _ , _ , hso , _)       = holds-at π hso
+    holds-at {t = flatMapˢ op f fl _ _ _ _ _ _} {E = E} {o = o} (in-lanes π) (_ , _ , _ , _ , _ , _ , hl) =
+      holdsL-at {op = op} {f = f} {E = E} {o = o} {fl = fl} π hl
+    holds-at (in-source π) (_ , _ , _ , hsrc , _)      = holds-at π hsrc
+    holds-at (in-body π)   (_ , _ , _ , _ , hbd)       = holds-at π hbd
+    holds-at (in-defer π)  (_ , hs)                    = holds-at π hs
+
+    holdsL-at : ∀ {h} {H : Heapᴹ h} {Δ A B Δ′ A′ op f E o fl} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} → PathLanes ls u
+              → At.HoldsLanes H {A = A} op f E o fl ls → Σ (Env Δ′ h) λ E′ → Σ (Observer A′ h) λ o′ → At.Holds H u E′ o′
+    holdsL-at (this-lane π) (_ , hs , _) = holds-at π hs
+    holdsL-at {op = op} {f = f} {E = E} {o = o} {fl = fl} (next-lane π) (_ , _ , hl) = holdsL-at {op = op} {f = f} {E = E} {o = o} {fl = fl} π hl
+

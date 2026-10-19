@@ -403,24 +403,6 @@ module Weakening (R : Set) where
     begun-wk nothing  u _ = tt
     begun-wk (just _) u b = λ o → b (owes-wk u o)
 
-    mutual
-      settled-wk : ∀ {Δ A} (u : Sub h Δ A) → Settled u → Settled (wkTree τ u)
-      settled-wk (pendingˢ s q)                          _                 = tt
-      settled-wk (coldˢ s hd ph)                         _                 = tt
-      settled-wk (ofˢ p i xs)                            _                 = tt
-      settled-wk doneˢ                                   _                 = tt
-      settled-wk (mapˢ f s)                              x                 = settled-wk s x
-      settled-wk (scanˢ f r s)                           x                 = settled-wk s x
-      settled-wk (takeWhileˢ i p c k tk s)               (b , x)           = begun-wk k s b , settled-wk s x
-      settled-wk (flatMapˢ op f fl oc k r pl so ls)      (b , x , y)       = begun-wk k so b , settled-wk so x , settled-wkᴸ ls y
-      settled-wk (connectˢ S c b kb k fd rp e rt src bd) (b₁ , b₂ , x , y) = begun-wk k src b₁ , begun-wk kb bd b₂ , settled-wk src x , settled-wk bd y
-      settled-wk (joinˢ j sk l x st)                     _                 = tt
-      settled-wk (deferˢ k s)                            (b , x)           = begun-wk k s b , settled-wk s x
-
-      settled-wkᴸ : ∀ {Δ B} (ls : List (Lane h Δ B)) → SettledLanes ls → SettledLanes (wkLanes τ ls)
-      settled-wkᴸ []                _           = tt
-      settled-wkᴸ (lane c k s ∷ ls) (b , x , y) = begun-wk k s b , settled-wk s x , settled-wkᴸ ls y
-
     -- The pending frames' timers, weakened.
     timerOf-wk : ∀ {A} (s : Sink h A) (hd : Handle h) (ph : Phase A) → timerOf (wk∋ τ s) (wk∋ τ hd) ph ≡ mapList (wkTimer τ) (timerOf s hd ph)
     timerOf-wk s hd (waiting τ′ e (at t le b)) = refl
@@ -875,145 +857,52 @@ module Weakening (R : Set) where
         subst (Tied rt) (sym (leftover-wk {B = ⊤} src))
               (Lingers.rests L ψ (trans (sym s) sn) (trans (sym (grow-part (connectˢ S c b kb k fd rp e₀ rt src bd))) eq) (trans (sym (grow-part src)) pn) ec)
 
-      -- What unsubscribing reaches, and the gates, read through the
-      -- weakening.
-      mutual
-        grow-spent : ∀ {Δ A} (u : Sub h Δ A) → At.Spent H u → At.Spent H′ (wkTree τ u)
-        grow-spent (pendingˢ s q)                          _         = lift tt
-        grow-spent (coldˢ s hd ph)                         (lift e)  = lift (trans (Grows.handles gr hd) e)
-        grow-spent (ofˢ p i xs)                            _         = lift tt
-        grow-spent doneˢ                                   _         = lift tt
-        grow-spent (mapˢ f s)                              x         = grow-spent s x
-        grow-spent (scanˢ f r s)                           x         = grow-spent s x
-        grow-spent (takeWhileˢ i p c k tk s)               x         = grow-cut↓ k s x
-        grow-spent (flatMapˢ op f fl oc k r pl so ls)      (x , y)   = grow-cut↓ k so x , grow-spentᴸ ls y
-        grow-spent (connectˢ S c b kb k fd rp e rt src bd) (x , y)   = grow-cut↓ k src x , grow-cut↓ kb bd y
-        grow-spent (joinˢ j sk l x st)                     _         = lift tt
-        grow-spent (deferˢ k s)                            x         = grow-cut↓ k s x
-
-        grow-spentᴸ : ∀ {Δ B} (ls : List (Lane h Δ B)) → At.SpentLanes H ls → At.SpentLanes H′ (wkLanes τ ls)
-        grow-spentᴸ []                _       = lift tt
-        grow-spentᴸ (lane c k s ∷ ls) (x , y) = grow-cut↓ k s x , grow-spentᴸ ls y
-
-        grow-cut↓ : ∀ {Δ A} (k : Maybe (Quiet h)) (u : Sub h Δ A) → At.Cut↓ H k u → At.Cut↓ H′ (mapMaybe (wk∋ τ) k) (wkTree τ u)
-        grow-cut↓ nothing  u _ = lift tt
-        grow-cut↓ (just _) u x = grow-spent u x
-
-      -- A cut read false through the weakening was false.
-      cut-off : ∀ {Δ A} (c : Kit.Cut h) (k : Maybe (Quiet h)) (u : Sub h Δ A) → (At.val H (Kit.live c) ≡ false → At.Cut↓ H k u)
-              → At.val H′ (Kit.live (Kit.wkCut τ c)) ≡ false → At.Cut↓ H′ (mapMaybe (wk∋ τ) k) (wkTree τ u)
-      cut-off c k u g e = grow-cut↓ k u (g (trans (sym (cells (Kit.live c))) e))
-
       -- A switch listed is listed weakened.
       listed-wk : ∀ {c} (xs : List (Kit.Cut h)) → c ∈ xs → Kit.wkCut τ c ∈ wkEl (list Kit.cutTy) τ xs
       listed-wk (x ∷ xs) (hereᴬ refl) = hereᴬ refl
       listed-wk (x ∷ xs) (thereᴬ m)   = thereᴬ (listed-wk xs m)
 
-      -- A lane's gate read through the weakening.
-      cut-offᴸ : ∀ {Δ A} {X : List (Kit.Cut h)} (c : Kit.Cut h) (k : Maybe (Quiet h)) (u : Sub h Δ A) → (At.val H (Kit.live c) ≡ false → c ∈ X ⊎ At.Cut↓ H k u)
-               → At.val H′ (Kit.live (Kit.wkCut τ c)) ≡ false → Kit.wkCut τ c ∈ wkEl (list Kit.cutTy) τ X ⊎ At.Cut↓ H′ (mapMaybe (wk∋ τ) k) (wkTree τ u)
-      cut-offᴸ c k u g e with g (trans (sym (cells (Kit.live c))) e)
-      ... | inj₁ m = inj₁ (listed-wk _ m)
-      ... | inj₂ x = inj₂ (grow-cut↓ k u x)
-
-      mutual
-        grow-gated : ∀ {Δ A} (u : Sub h Δ A) → At.Gated H u → At.Gated H′ (wkTree τ u)
-        grow-gated (pendingˢ s q)                          _           = lift tt
-        grow-gated (coldˢ s hd ph)                         (lift g)    = lift (λ e → g (trans (sym (Grows.handles gr hd)) e))
-        grow-gated (ofˢ p i xs)                            _           = lift tt
-        grow-gated doneˢ                                   _           = lift tt
-        grow-gated (mapˢ f s)                              x           = grow-gated s x
-        grow-gated (scanˢ f r s)                           x           = grow-gated s x
-        grow-gated (takeWhileˢ i p c k tk s)               (g , x)     = cut-off c k s g , grow-gated s x
-        grow-gated (flatMapˢ op f fl oc k r pl so ls)      (x , y)     =
-          grow-gated so x , subst (λ X → At.GatedLanes H′ X (wkLanes τ ls)) (sym (cells (FlatKit.Flat.lanes fl))) (grow-gatedᴸ ls y)
-        grow-gated (connectˢ S c b kb k fd rp e rt src bd) (g , x , y) = cut-off c k src g , grow-gated src x , grow-gated bd y
-        grow-gated (joinˢ j sk l x st)                     _           = lift tt
-        grow-gated (deferˢ k s)                            x           = grow-gated s x
-
-        grow-gatedᴸ : ∀ {Δ B X} (ls : List (Lane h Δ B)) → At.GatedLanes H X ls → At.GatedLanes H′ (wkEl (list Kit.cutTy) τ X) (wkLanes τ ls)
-        grow-gatedᴸ []                _           = lift tt
-        grow-gatedᴸ (lane c k s ∷ ls) (g , x , y) = cut-offᴸ c k s g , grow-gated s x , grow-gatedᴸ ls y
-
       -- Every registered callback reads, along the growth, as the
       -- weakened kernel registered it.
-      private
-        cb-trans : ∀ {A} {c₁ c₂ c₃ : Callbacks A v} → CbRel c₁ c₂ → CbRel c₂ c₃ → CbRel c₁ c₃
-        cb-trans (n , c , x) (n′ , c′ , x′) = (λ a → ≗-trans (n a) (n′ a)) , ≗-trans c c′ , ≗-trans x x′
+      cb-trans : ∀ {A} {c₁ c₂ c₃ : Callbacks A v} → CbRel c₁ c₂ → CbRel c₂ c₃ → CbRel c₁ c₃
+      cb-trans (n , c , x) (n′ , c′ , x′) = (λ a → ≗-trans (n a) (n′ a)) , ≗-trans c c′ , ≗-trans x x′
 
-        slot-grow : ∀ {X} (s : Sink h X) {c : Callbacks X h} {c′ : Callbacks X v} → At.slotIs H s c → CbRel (wkVal (slot X) τ c) c′
-                  → At.slotIs H′ (wk∋ τ s) c′
-        slot-grow s (n , c , x) r = cb-trans (Grows.slots gr s) (cb-trans ((λ a → wk≗ τ (n a)) , wk≗ τ c , wk≗ τ x) r)
+      slot-grow : ∀ {X} (s : Sink h X) {c : Callbacks X h} {c′ : Callbacks X v} → At.slotIs H s c → CbRel (wkVal (slot X) τ c) c′
+                → At.slotIs H′ (wk∋ τ s) c′
+      slot-grow s (n , c , x) r = cb-trans (Grows.slots gr s) (cb-trans ((λ a → wk≗ τ (n a)) , wk≗ τ c , wk≗ τ x) r)
 
-        quiet-wk : (m : Maybe (Quiet h)) → wkEl (maybe quiet) τ m ≡ mapMaybe (wk∋ τ) m
-        quiet-wk nothing  = refl
-        quiet-wk (just q) = refl
+      quiet-wk : (m : Maybe (Quiet h)) → wkEl (maybe quiet) τ m ≡ mapMaybe (wk∋ τ) m
+      quiet-wk nothing  = refl
+      quiet-wk (just q) = refl
 
-        stash-grow : (q : Quiet h) {u : Act h ⊤} {u′ : Act v ⊤} → At.stashIs H q u → wkAct τ u ≗ u′ → At.stashIs H′ (wk∋ τ q) u′
-        stash-grow q st r = ≗-trans (Grows.stashes gr q) (≗-trans (wk≗ τ st) r)
+      stash-grow : (q : Quiet h) {u : Act h ⊤} {u′ : Act v ⊤} → At.stashIs H q u → wkAct τ u ≗ u′ → At.stashIs H′ (wk∋ τ q) u′
+      stash-grow q st r = ≗-trans (Grows.stashes gr q) (≗-trans (wk≗ τ st) r)
 
-        attached-grow : ∀ (c : Kit.Cut h) k {Δ A} (s : Sub h Δ A) → At.Attached H c k (unsub s)
-                      → At.Attached H′ (Kit.wkCut τ c) (mapMaybe (wk∋ τ) k) (unsub (wkTree τ s))
-        attached-grow c nothing  s (lift e) = lift (trans (cells (Kit.held c)) (cong (wkEl (maybe quiet) τ) e))
-        attached-grow c (just q) s (e , st) = trans (cells (Kit.held c)) (cong (wkEl (maybe quiet) τ) e) , stash-grow q st (unsub-wk s)
+      attached-grow : ∀ (c : Kit.Cut h) k {Δ A} (s : Sub h Δ A) → At.Attached H c k (unsub s)
+                    → At.Attached H′ (Kit.wkCut τ c) (mapMaybe (wk∋ τ) k) (unsub (wkTree τ s))
+      attached-grow c nothing  s (lift e) = lift (trans (cells (Kit.held c)) (cong (wkEl (maybe quiet) τ) e))
+      attached-grow c (just q) s (e , st) = trans (cells (Kit.held c)) (cong (wkEl (maybe quiet) τ) e) , stash-grow q st (unsub-wk s)
 
-        stashed-grow : ∀ k {Δ A} (s : Sub h Δ A) → At.Stashed H k (unsub s) → At.Stashed H′ (mapMaybe (wk∋ τ) k) (unsub (wkTree τ s))
-        stashed-grow nothing  s _  = lift tt
-        stashed-grow (just q) s st = stash-grow q st (unsub-wk s)
+      stashed-grow : ∀ k {Δ A} (s : Sub h Δ A) → At.Stashed H k (unsub s) → At.Stashed H′ (mapMaybe (wk∋ τ) k) (unsub (wkTree τ s))
+      stashed-grow nothing  s _  = lift tt
+      stashed-grow (just q) s st = stash-grow q st (unsub-wk s)
 
-        count-grow : ∀ {Δ B} (ls : List (Lane h Δ B)) → At.count H′ (wkLanes τ ls) ≡ At.count H ls
-        count-grow []                = refl
-        count-grow (lane c k s ∷ ls) = cong₂ (λ b n → if b then suc n else n) (cells (Kit.live c)) (count-grow ls)
+      count-grow : ∀ {Δ B} (ls : List (Lane h Δ B)) → At.count H′ (wkLanes τ ls) ≡ At.count H ls
+      count-grow []                = refl
+      count-grow (lane c k s ∷ ls) = cong₂ (λ b n → if b then suc n else n) (cells (Kit.live c)) (count-grow ls)
 
-        switches-grow : ∀ {Δ B} (ls : List (Lane h Δ B)) → At.switches H′ (wkLanes τ ls) ≡ wkEl (list Kit.cutTy) τ (At.switches H ls)
-        switches-grow []                = refl
-        switches-grow (lane c k s ∷ ls) = cong (Kit.wkCut τ c ∷_) (switches-grow ls)
+      switches-grow : ∀ {Δ B} (ls : List (Lane h Δ B)) → At.switches H′ (wkLanes τ ls) ≡ wkEl (list Kit.cutTy) τ (At.switches H ls)
+      switches-grow []                = refl
+      switches-grow (lane c k s ∷ ls) = cong (Kit.wkCut τ c ∷_) (switches-grow ls)
 
-        wkEl-++ : ∀ {t} (xs ys : List (El h t)) → wkEl (list t) τ (xs ++ ys) ≡ wkEl (list t) τ xs ++ wkEl (list t) τ ys
-        wkEl-++ []       ys = refl
-        wkEl-++ {t} (x ∷ xs) ys = cong (wkEl t τ x ∷_) (wkEl-++ {t} xs ys)
+      wkEl-++ : ∀ {t} (xs ys : List (El h t)) → wkEl (list t) τ (xs ++ ys) ≡ wkEl (list t) τ xs ++ wkEl (list t) τ ys
+      wkEl-++ []       ys = refl
+      wkEl-++ {t} (x ∷ xs) ys = cong (wkEl t τ x ∷_) (wkEl-++ {t} xs ys)
 
-        dead-grow : ∀ (cs : List (Kit.Cut h)) → All (λ c → At.val H (Kit.live c) ≡ false) cs
-                  → All (λ c → At.val H′ (Kit.live c) ≡ false) (wkEl (list Kit.cutTy) τ cs)
-        dead-grow []       []       = []
-        dead-grow (c ∷ cs) (d ∷ ds) = trans (cells (Kit.live c)) d ∷ dead-grow cs ds
-
-      mutual
-        holds-grow : ∀ {Δ A} (u : Sub h Δ A) {E : Env Δ h} {E′ : Env Δ v} {o : Observer A h} {o′ : Observer A v}
-                   → wkEnv τ E ≡ E′ → ObsRel (wkObs τ o) o′ → At.Holds H u E o → At.Holds H′ (wkTree τ u) E′ o′
-        holds-grow (pendingˢ s q)                          e oR _ = lift tt
-        holds-grow (coldˢ s hd ph)                         e oR x = slot-grow s x oR
-        holds-grow (ofˢ p i xs)                            e oR _ = lift tt
-        holds-grow doneˢ                                   e oR _ = lift tt
-        holds-grow (mapˢ f s)                              e (n , cm , x) hs = holds-grow s e ((λ a → n (f a)) , cm , x) hs
-        holds-grow (scanˢ f r s)                           e oR hs = holds-grow s e (scan-wk τ f r oR) hs
-        holds-grow (takeWhileˢ i p c k tk s)               e oR (a , hs) = attached-grow c k s a , holds-grow s e (take-wk τ i p c oR) hs
-        holds-grow (flatMapˢ op f fl oc k r pl so ls)      e oR (rf , rs , a , hs , ac , (gone , sw , dead) , hl) =
-            trans (cells (FlatKit.Flat.refill fl)) (cong (wkEl (maybe (sink ⊤)) τ) rf)
-          , slot-grow r rs (refill-wk τ op f fl e oR)
-          , attached-grow oc k so a
-          , holds-grow so e (outer-wk τ op f fl oc e oR) hs
-          , trans (cells (FlatKit.Flat.active fl)) (trans ac (sym (count-grow ls)))
-          , ( wkEl (list Kit.cutTy) τ gone
-            , trans (cong (_++ wkEl (list Kit.cutTy) τ gone) (cells (FlatKit.Flat.lanes fl)))
-                (trans (sym (wkEl-++ {Kit.cutTy} (At.val H (FlatKit.Flat.lanes fl)) gone)) (trans (cong (wkEl (list Kit.cutTy) τ) sw) (sym (switches-grow ls))))
-            , dead-grow gone dead )
-          , holdsLanes-grow op f fl ls e oR hl
-        holds-grow (connectˢ S c b kb k fd rp e₀ rt src bd) e oR (a , eb , st , hs , hb) =
-            attached-grow c k src a , trans (cells b) (trans (cong (wkEl (maybe quiet) τ) eb) (quiet-wk kb)) , stashed-grow kb bd st
-          , holds-grow src e (feeder-wk τ S) hs , holds-grow bd (cong (wkSubject τ S ∷_) e) (body-wk τ c oR) hb
-        holds-grow (joinˢ j sk l x st)                     e oR hs = slot-grow sk hs (joiner-wk τ l oR)
-        holds-grow (deferˢ k s)                            e oR (st , hs) = stashed-grow k s st , holds-grow s e oR hs
-
-        holdsLanes-grow : ∀ {Δ A B} op (f : A → T.Obs Timeline Δ B) (fl : FlatKit.Flat A h) (ls : List (Lane h Δ B))
-                          {E : Env Δ h} {E′ : Env Δ v} {o : Observer B h} {o′ : Observer B v} → wkEnv τ E ≡ E′ → ObsRel (wkObs τ o) o′
-                        → At.HoldsLanes H op f E o fl ls → At.HoldsLanes H′ op f E′ o′ (FlatKit.wkFlat τ fl) (wkLanes τ ls)
-        holdsLanes-grow op f fl []                e oR _            = lift tt
-        holdsLanes-grow op f fl (lane c k s ∷ ls) e oR (a , hs , hl) =
-          attached-grow c k s a , holds-grow s e (laneO-wk τ op f fl c e oR) hs , holdsLanes-grow op f fl ls e oR hl
-
-      grow-kernels : ∀ {t : Sub h [] R} → Kernels H t → Kernels H′ (wkTree τ t)
-      grow-kernels {t} kn = record { holds = holds-grow t refl ((λ _ → ≗-refl _) , ≗-refl _ , ≗-refl _) (Kernels.holds kn) ; gated = grow-gated t (Kernels.gated kn) ; settled = settled-wk t (Kernels.settled kn) }
+      dead-grow : ∀ (cs : List (Kit.Cut h)) → All (λ c → At.val H (Kit.live c) ≡ false) cs
+                → All (λ c → At.val H′ (Kit.live c) ≡ false) (wkEl (list Kit.cutTy) τ cs)
+      dead-grow []       []       = []
+      dead-grow (c ∷ cs) (d ∷ ds) = trans (cells (Kit.live c)) d ∷ dead-grow cs ds
 
       -- A feed weakened owes whom it owed, and what.
       private

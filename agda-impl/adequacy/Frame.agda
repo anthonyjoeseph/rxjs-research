@@ -33,6 +33,7 @@ open import operation.AbstractObservable using (base; module Heap; module Run) r
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Local using (module Locality)
+open import adequacy.Every using (module Everywhere)
 
 open Events∞
 
@@ -44,9 +45,12 @@ module Framing (R : Set) where
   open Strongly R using (Strong; Sub; scanˢ; here; module At; Queue; Kernels; Meaning; Path; in-scan; in-source; _⊕_; names; Each; Heads; seen; Books;
                          mapˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; PathLanes; this-lane; next-lane; in-map; in-take; in-outer; in-lanes; in-body; in-defer; seen-join;
                          Taking; taking; taken; cutNames; quietName; subjectNames; flatNames; laneNames; Name; pendings; subjects; joiners) renaming (ending to endingᵀ)
-  open Tearing R using (Alike; Off; part-alike; partLanes-alike; lanes-path; module Seeing; look-store; get-put-same; fresh-path; names-path; apart-r; apart-l; ≢-flip)
+  open Tearing R using (holds-at; Alike; Off; part-alike; partLanes-alike; lanes-path; module Seeing; look-store; get-put-same; fresh-path; names-path; apart-r; apart-l; ≢-flip)
   open Moving R using (pairs-r; pairs-split; plant; pendings-plant; subjects-plant; joiners-plant; head-map; head-scan)
-  open Locality R using (module Heaps; holds-at)
+  open Locality R using (module Heaps)
+  open Everywhere.Holding R using (holds-alike)
+  open Everywhere.Spending R using (spent-alike)
+  open Everywhere.Gating R using (gated-alike)
   open Ghosting R using (module Calling; Lifts; LiftsLane; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source;
                          lifts-body; lifts-shut; lifts-defer; lifts-this; lifts-next; OuterFirst; PoolBehind; LaneFirst; Calling; sends; opened; openedL)
   open Read
@@ -558,15 +562,15 @@ module Framing (R : Set) where
 
   scan-holds : ∀ {h} (H : Heapᴹ h) {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → AllPairs _≢_ (names (scanˢ f r u))
              → ∀ z {E o} → At.Holds H (scanˢ f r u) E o → At.Holds (store H r (lift z)) (scanˢ f r u) E o
-  scan-holds H {r = r} {u} (nr ∷ _) z = Heaps.holds-alike H (store H r (lift z)) u (λ j m → look-store H r j (lookupᴬ nr m))
+  scan-holds H {r = r} {u} (nr ∷ _) z = holds-alike u (λ j m → look-store H r j (lookupᴬ nr m))
 
   scan-gated : ∀ {h} (H : Heapᴹ h) {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → AllPairs _≢_ (names (scanˢ f r u))
              → ∀ z → At.Gated H (scanˢ f r u) → At.Gated (store H r (lift z)) (scanˢ f r u)
-  scan-gated H {r = r} {u} (nr ∷ _) z = Heaps.gated-alike H (store H r (lift z)) u (λ j m → look-store H r j (lookupᴬ nr m))
+  scan-gated H {r = r} {u} (nr ∷ _) z = gated-alike u (λ j m → look-store H r j (lookupᴬ nr m))
 
   scan-spent : ∀ {h} (H : Heapᴹ h) {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → AllPairs _≢_ (names (scanˢ f r u))
              → ∀ z → At.Spent H (scanˢ f r u) → At.Spent (store H r (lift z)) (scanˢ f r u)
-  scan-spent H {r = r} {u} (nr ∷ _) z = Heaps.spent-alike H (store H r (lift z)) u (λ j m → look-store H r j (lookupᴬ nr m))
+  scan-spent H {r = r} {u} (nr ∷ _) z = spent-alike u (λ j m → look-store H r j (lookupᴬ nr m))
 
   scan-fed : ∀ {h} (H : Heapᴹ h) {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → AllPairs _≢_ (names (scanˢ f r u))
            → ∀ z ν → At.Fed H (scanˢ f r u) ν → At.Fed (store H r (lift z)) (scanˢ f r u) ν

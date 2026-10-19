@@ -36,6 +36,7 @@ open import operation.PureObservable using (Out; Pureᴾ)
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Moves using (module Moving)
+open import adequacy.Every using (module Everywhere)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Seq using (module Sequencing)
@@ -61,7 +62,9 @@ module Flatting (R : Set) where
   open Run.Kit (Pureᴾ R) using (skipᴬ)
   open Strongly R using (Carried; Books; Sub; pendingˢ; Path; here; in-outer; in-lanes; _⊕_; Here; walk; top; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; names; pendings; Phase; unpinned; union-pinned; rest-pinned; seen; flatMapˢ; killAllᶜ; flatK; CbRel; ≗-refl; newRef≗; unsubscribing; register≗; writeRef≗; module Canon; owned-to; module Eaching; module Lingering)
   open Strongly.Against R using (subAs; SrcOf; src-of)
-  open Moving R using (planted; pend; part-plant; holds-owed; settled-plant; gated-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant)
+  open Moving R using (planted; pend; part-plant; holds-owed; fed-plant; pendings-plant; subjects-plant; joiners-plant)
+  open Everywhere.Settling R using (settled-plant)
+  open Everywhere.Gating R using (gated-plant)
   open Ghosting R using (walk-⊕; sorted-⇝)
   open Forking R using (pend-less; subOf; walk-planted)
   open Keeping R using (each-plant; lingers-plant; pooled-fresh)
@@ -264,7 +267,7 @@ module Flatting (R : Set) where
                                          (λ _ → refill₉ , slotR , lift held₉ , lift tt , active₉ , ([] , cong (_++ []) lanes₉ , []) , lift tt)
                                          (Kernels.settled kn) (Kernels.holds kn)
                              ; gated = gated-plant H₉ π₈ v (λ _ → lift tt , lift tt) (λ _ → lift tt , lift tt) (Kernels.gated kn)
-                             ; settled = settled-plant π₈ v (λ _ → tt) (λ _ → tt , tt , tt) (Kernels.settled kn) }
+                             ; settled = settled-plant H₉ π₈ v (λ _ → tt) (λ _ → tt , tt , tt) (Kernels.settled kn) }
 
       rf-meaning : Meaning H₉ T₈ → Meaning H₉ t′
       rf-meaning mn = record { fed = fed-plant H₉ π₈ v (λ _ _ → lift tt , lift tt) _ (Meaning.fed mn) }

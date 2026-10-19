@@ -16,7 +16,7 @@ open import Data.Maybe using (Maybe; nothing; just)
 open import Data.Product using (_×_; _,_)
 open import Data.Empty using (⊥-elim)
 open import Level using (lift)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import denotation.MonotonicList using (Timeline; Pos)
 import denotation.Unfold as U
@@ -168,107 +168,11 @@ module Retagging (R : Set) where
   begun-retag g nothing  s b = b
   begun-retag g (just _) s b = λ ow → b (owes-retag g s ow)
 
-  mutual
-    settled-retag : ∀ {h Δ A} (g : Retag Δ) (s : Sub h Δ A) → Settled s → Settled (retag g s)
-    settled-retag g (pendingˢ s q)                          st = st
-    settled-retag g (coldˢ s hd ph)                         st = st
-    settled-retag g (ofˢ p i xs)                            st = st
-    settled-retag g doneˢ                                   st = st
-    settled-retag g (mapˢ f s)                              st = settled-retag g s st
-    settled-retag g (scanˢ f r s)                           st = settled-retag g s st
-    settled-retag g (takeWhileˢ i p c k tk s)               (b₁ , st) = begun-retag g k s b₁ , settled-retag g s st
-    settled-retag g (flatMapˢ op f fl oc k r pl so ls)      (b₁ , st , sl) = begun-retag g k so b₁ , settled-retag g so st , settled-retagᴸ g ls sl
-    settled-retag g (connectˢ S c b kb k fd rp e rt src bd) (b₁ , b₂ , s₁ , s₂) =
-      begun-retag g k src b₁ , begun-retag (keep g) kb bd b₂ , settled-retag g src s₁ , settled-retag (keep g) bd s₂
-    settled-retag g (joinˢ j sk l x st)                     s′ = s′
-    settled-retag g (deferˢ k s)                            (b₁ , st) = begun-retag g k s b₁ , settled-retag g s st
-
-    settled-retagᴸ : ∀ {h Δ B} (g : Retag Δ) (ls : List (Lane h Δ B)) → SettledLanes ls → SettledLanes (retagᴸ g ls)
-    settled-retagᴸ g []                sl             = sl
-    settled-retagᴸ g (lane c k s ∷ ls) (b₁ , st , sl) = begun-retag g k s b₁ , settled-retag g s st , settled-retagᴸ g ls sl
-
   ----------------------------------------------------------------------
-  -- What reads the heap and no joiner's feed
+  -- The feed: each joiner the retag moves, fed as its `Fed` clause asks
 
   module _ {h} (H : Heapᴹ h) where
-    open At H using (Attached; Stashed; Holds; HoldsLanes; Spent; SpentLanes; Cut↓; Gated; GatedLanes; Fed; FedLanes; Now; count; switches)
-
-    count-retag : ∀ {Δ B} (g : Retag Δ) (ls : List (Lane h Δ B)) → count (retagᴸ g ls) ≡ count ls
-    count-retag g []                = refl
-    count-retag g (lane c k s ∷ ls) rewrite count-retag g ls = refl
-
-    switches-retag : ∀ {Δ B} (g : Retag Δ) (ls : List (Lane h Δ B)) → switches (retagᴸ g ls) ≡ switches ls
-    switches-retag g []                = refl
-    switches-retag g (lane c k s ∷ ls) rewrite switches-retag g ls = refl
-
-    mutual
-      holds-retag : ∀ {Δ A} (g : Retag Δ) (s : Sub h Δ A) {E o} → Holds s E o → Holds (retag g s) E o
-      holds-retag g (pendingˢ s q)                          hs = hs
-      holds-retag g (coldˢ s hd ph)                         hs = hs
-      holds-retag g (ofˢ p i xs)                            hs = hs
-      holds-retag g doneˢ                                   hs = hs
-      holds-retag g (mapˢ f s)                              hs = holds-retag g s hs
-      holds-retag g (scanˢ f r s)                           hs = holds-retag g s hs
-      holds-retag g (takeWhileˢ i p c k tk s)               (at , hs) =
-        subst (Attached c k) (sym (unsub-retag g s)) at , holds-retag g s hs
-      holds-retag g (flatMapˢ op f fl oc k r pl so ls) {E} {o} (rf , sl , at , hs , ac , (gone , ge , ga) , hl) =
-        rf , sl , subst (Attached oc k) (sym (unsub-retag g so)) at , holds-retag g so hs , trans ac (sym (count-retag g ls))
-        , (gone , trans ge (sym (switches-retag g ls)) , ga) , holds-retagᴸ op f E o fl g ls hl
-      holds-retag g (connectˢ S c b kb k fd rp e rt src bd) (at , vb , sb , hs , hb) =
-        subst (Attached c k) (sym (unsub-retag g src)) at , vb , subst (Stashed kb) (sym (unsub-retag (keep g) bd)) sb
-        , holds-retag g src hs , holds-retag (keep g) bd hb
-      holds-retag g (joinˢ j sk l x st)                     hs = hs
-      holds-retag g (deferˢ k s)                            (sb , hs) = subst (Stashed k) (sym (unsub-retag g s)) sb , holds-retag g s hs
-
-      holds-retagᴸ : ∀ {Δ A B} op (f : A → _) E o fl (g : Retag Δ) (ls : List (Lane h Δ B))
-                   → HoldsLanes op f E o fl ls → HoldsLanes op f E o fl (retagᴸ g ls)
-      holds-retagᴸ op f E o fl g []                hl            = hl
-      holds-retagᴸ op f E o fl g (lane c k s ∷ ls) (at , hs , hl) =
-        subst (Attached c k) (sym (unsub-retag g s)) at , holds-retag g s hs , holds-retagᴸ op f E o fl g ls hl
-
-    mutual
-      spent-retag : ∀ {Δ A} (g : Retag Δ) (s : Sub h Δ A) → Spent s → Spent (retag g s)
-      spent-retag g (pendingˢ s q)                          sp = sp
-      spent-retag g (coldˢ s hd ph)                         sp = sp
-      spent-retag g (ofˢ p i xs)                            sp = sp
-      spent-retag g doneˢ                                   sp = sp
-      spent-retag g (mapˢ f s)                              sp = spent-retag g s sp
-      spent-retag g (scanˢ f r s)                           sp = spent-retag g s sp
-      spent-retag g (takeWhileˢ i p c k tk s)               sp = cut-retag g k s sp
-      spent-retag g (flatMapˢ op f fl oc k r pl so ls)      (c₁ , sl) = cut-retag g k so c₁ , spent-retagᴸ g ls sl
-      spent-retag g (connectˢ S c b kb k fd rp e rt src bd) (c₁ , c₂) = cut-retag g k src c₁ , cut-retag (keep g) kb bd c₂
-      spent-retag g (joinˢ j sk l x st)                     sp = sp
-      spent-retag g (deferˢ k s)                            sp = cut-retag g k s sp
-
-      spent-retagᴸ : ∀ {Δ B} (g : Retag Δ) (ls : List (Lane h Δ B)) → SpentLanes ls → SpentLanes (retagᴸ g ls)
-      spent-retagᴸ g []                sl        = sl
-      spent-retagᴸ g (lane c k s ∷ ls) (c₁ , sl) = cut-retag g k s c₁ , spent-retagᴸ g ls sl
-
-      cut-retag : ∀ {Δ A} (g : Retag Δ) k (s : Sub h Δ A) → Cut↓ k s → Cut↓ k (retag g s)
-      cut-retag g nothing  s c₁ = c₁
-      cut-retag g (just _) s c₁ = spent-retag g s c₁
-
-    mutual
-      gated-retag : ∀ {Δ A} (g : Retag Δ) (s : Sub h Δ A) → Gated s → Gated (retag g s)
-      gated-retag g (pendingˢ s q)                          gt = gt
-      gated-retag g (coldˢ s hd ph)                         gt = gt
-      gated-retag g (ofˢ p i xs)                            gt = gt
-      gated-retag g doneˢ                                   gt = gt
-      gated-retag g (mapˢ f s)                              gt = gated-retag g s gt
-      gated-retag g (scanˢ f r s)                           gt = gated-retag g s gt
-      gated-retag g (takeWhileˢ i p c k tk s)               (f₁ , gt) = (λ e₁ → cut-retag g k s (f₁ e₁)) , gated-retag g s gt
-      gated-retag g (flatMapˢ op f fl oc k r pl so ls)      (gt , gl) = gated-retag g so gt , gated-retagᴸ g ls gl
-      gated-retag g (connectˢ S c b kb k fd rp e rt src bd) (f₁ , gs , gb) =
-        (λ e₁ → cut-retag g k src (f₁ e₁)) , gated-retag g src gs , gated-retag (keep g) bd gb
-      gated-retag g (joinˢ j sk l x st)                     gt = gt
-      gated-retag g (deferˢ k s)                            gt = gated-retag g s gt
-
-      gated-retagᴸ : ∀ {Δ B X} (g : Retag Δ) (ls : List (Lane h Δ B)) → GatedLanes X ls → GatedLanes X (retagᴸ g ls)
-      gated-retagᴸ g []                gl             = gl
-      gated-retagᴸ g (lane c k s ∷ ls) (f₁ , gt , gl) = (λ e₁ → Sum.map₂ (cut-retag g k s) (f₁ e₁)) , gated-retag g s gt , gated-retagᴸ g ls gl
-
-    ----------------------------------------------------------------------
-    -- The feed: each joiner the retag moves, fed as its `Fed` clause asks
+    open At H using (Fed; FedLanes; Now)
 
     mutual
       fed-retag : ∀ {Δ A} (g : Retag Δ) (s : Sub h Δ A) (E : Env Δ h) {ν ν′ : Now Δ}
@@ -311,8 +215,6 @@ module Retagging (R : Set) where
 
   module Body {h} (H : Heapᴹ h) {Δ A B} (S : Subject A h) (c : Kit.Cut h) (b : Ref h (maybe quiet)) (kb k : Maybe (Quiet h))
               (fd₁ fd₂ : Feed A h) (rp : Pos) (e : Maybe Pos) (rt : U.Node Δ A) (src : Sub h Δ A) (g : Retag (A ∷ Δ)) (bd : Sub h (A ∷ Δ) B) where
-    open At H using (Stashed; Holds; Gated; Spent)
-
     w₁ w₂ : Sub h Δ B
     w₁ = connectˢ S c b kb k fd₁ rp e rt src bd
     w₂ = connectˢ S c b kb k fd₂ rp e rt src (retag g bd)
@@ -329,20 +231,8 @@ module Retagging (R : Set) where
     body-pendings : pendings w₁ ≡ pendings w₂
     body-pendings rewrite pendings-retag g bd = refl
 
-    body-settled : Settled w₁ → Settled w₂
-    body-settled (b₁ , b₂ , s₁ , s₂) = b₁ , begun-retag g kb bd b₂ , s₁ , settled-retag g bd s₂
-
     body-owes : Owes w₂ → Owes w₁
     body-owes ow = ow
-
-    body-holds : ∀ {E o} → Holds w₁ E o → Holds w₂ E o
-    body-holds (at , vb , sb , hs , hb) = at , vb , subst (Stashed kb) (sym (unsub-retag g bd)) sb , hs , holds-retag H g bd hb
-
-    body-gated : Gated w₁ → Gated w₂
-    body-gated (f₁ , gs , gb) = f₁ , gs , gated-retag H g bd gb
-
-    body-spent : Spent w₁ → Spent w₂
-    body-spent (c₁ , c₂) = c₁ , cut-retag H g kb bd c₂
 
   -- A feed restaged from `idle`: each of the connect's own joiners owed
   -- it is told what it is owed.

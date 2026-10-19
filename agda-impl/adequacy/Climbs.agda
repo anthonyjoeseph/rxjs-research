@@ -56,10 +56,11 @@ open import adequacy.Fork using (module Forking)
 open import adequacy.Taken using (module Taking)
 open import adequacy.Names using (module Naming)
 open import adequacy.Local using (module Locality)
-open import adequacy.Retag using (module Retagging; at-here)
+open import adequacy.Retag using (Retag; module Retagging; at-here)
 open import adequacy.Replant using (module Replanting)
 open import adequacy.Restages using (module Staging)
 open import adequacy.Weaken using (module Weakening)
+open import adequacy.Every using (module Everywhere)
 open import adequacy.Alike using (module Aliking)
 open import adequacy.Shift using (module Shifting)
 
@@ -74,8 +75,10 @@ module Ascending (R : Set) where
   open Strongly R using (Strong; Carried; Books; carried; closing; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; Meets; Each; Heads; Lingers; unsub; Owes; Settled; seen; seenL; pinned-trans; ∧-split; module Canon; owned-to; module Eaching; module Lingering) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf; src-of) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
-  open Moving R using (pairs-r; pairs-split; plant-self; takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; holds-plant; settled-plant; gated-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
-  open Tearing R using (fresh-path; takeSite; bodySite; look-store; look-either; Alike; part-alike; partLanes-alike; part-flat; apart-r; each-same; seen-alike; seenL-alike; names-path; lanes-path) renaming (Off to Offʰ)
+  open Moving R using (pairs-r; pairs-split; plant-self; takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
+  open Everywhere.Settling R using (settled-plant; settled-retag)
+  open Everywhere.Gating R using (gated-alike; gated-path; gated-plant; gated-retag)
+  open Tearing R using (cuts; attached-alike; cuts-switches; fresh-path; takeSite; bodySite; look-store; look-either; Alike; part-alike; partLanes-alike; part-flat; apart-r; each-same; seen-alike; seenL-alike; names-path; lanes-path) renaming (Off to Offʰ)
   open Unsubbing R using (_⇝_; ⇝-trans; now; then; ≗-trans; wk≗; wk-same; bind≗)
   open Sequencing R using (seq-assoc; seq-done)
   open Forking R using (walk-planted)
@@ -86,14 +89,17 @@ module Ascending (R : Set) where
   open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed; stepped-deep)
   open Lowering R using (Keeps; queue-keeps; store-keeps; keeps-trans)
   open Lifting R using (sub-onward; emit-shut; emit-void; run-meets; run-at; emit-run; spread-past; behind-fire; fire-lingers; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
-  open Locality R using (stored-at; stored-hit; live-apart; flatReads; cuts; cut-in; attached-alike; cuts-switches; module Heaps)
+  open Locality R using (stored-at; stored-hit; live-apart; flatReads; cut-in; module Heaps)
   open Growing R using (wkTree; wkLanes; wkPath; wkPathᴸ)
-  open Retagging R using (module Body; fed-owed; envP; joiners-path)
+  open Retagging R using (module Body; fed-owed; envP; joiners-path; retag; unsub-retag; begun-retag)
+  open Everywhere.Spending R using (spent-retag)
+  open Everywhere.Holding R using (holds-alike; holds-path; holds-plant; holds-retag)
   open Shifting R using (merged-eq; heads-flat; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; lingers-sub; lingersL-of; module Linger; module Build)
   open Framing R using (Untold; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike)
     renaming (Ended to Ends)
   open Staging R using (not-src; wrap-lane)
   open Weakening R using (Grows; pure-map) renaming (module Grown to Weakened)
+  open Everywhere R using (module Growths)
   open Replanting R using (Kin; kin-end; kin-pool; kin-feed; kin-fin; kin-lane; rehomes; rehomes-code; restack; reticked; owned-run; module Shift; Heading; Lingering; Gone; store-held; Lives; lives-off; ahead-under)
   open Read
 
@@ -494,7 +500,7 @@ module Ascending (R : Set) where
     end-kernels : Kernels H T → Kernels H T′
     end-kernels kn = record { holds   = holds-plant H {t = T} ρ v refl (λ hs → hs) (Kernels.holds kn)
                             ; gated   = gated-plant H {t = T} ρ v (λ g → g) (λ d → d) (Kernels.gated kn)
-                            ; settled = settled-plant {t = T} ρ v (λ ow → ow) (λ st → st) (Kernels.settled kn) }
+                            ; settled = settled-plant H {t = T} ρ v (λ ow → ow) (λ st → st) (Kernels.settled kn) }
 
     end-meaning : Meaning H T → Meaning H T′
     end-meaning mn = record { fed = fed-plant H {t = T} ρ v (λ _ fd → fd) _ (Meaning.fed mn) }
@@ -807,7 +813,7 @@ module Ascending (R : Set) where
     pool-kernels : Kernels H T → Kernels H T′
     pool-kernels kn = record { holds   = holds-plant H {t = T} ρ v refl (λ hs → hs) (Kernels.holds kn)
                              ; gated   = gated-plant H {t = T} ρ v (λ g → g) (λ d → d) (Kernels.gated kn)
-                             ; settled = settled-plant {t = T} ρ v (λ ow → ow) (λ st → st) (Kernels.settled kn) }
+                             ; settled = settled-plant H {t = T} ρ v (λ ow → ow) (λ st → st) (Kernels.settled kn) }
 
     pool-meaning : Meaning H T → Meaning H T′
     pool-meaning mn = record { fed = fed-plant H {t = T} ρ v (λ _ fd → fd) _ (Meaning.fed mn) }
@@ -1241,8 +1247,8 @@ module Ascending (R : Set) where
 
     sp-kernels : unsub u ≡ unsub v → (Owes v → Owes u) → (Settled u → Settled v) → (∀ {E o} → At.Holds H u E o → At.Holds H′ v E o)
                → (At.Gated H u → At.Gated H′ v) → (At.Spent H u → At.Spent H′ v) → Kernels H T → Kernels H′ (plant ρ v)
-    sp-kernels ue ov sv hv gv dv kn = record { holds   = Heaps.holds-path H H′ ρ v fs offV ue hv (Kernels.holds kn) ; gated = Heaps.gated-path H H′ ρ v fs offV gv dv (Kernels.gated kn)
-                                             ; settled = settled-plant ρ v ov sv (Kernels.settled kn) }
+    sp-kernels ue ov sv hv gv dv kn = record { holds   = holds-path ρ v fs offV ue hv (Kernels.holds kn) ; gated = gated-path ρ v fs offV gv dv (Kernels.gated kn)
+                                             ; settled = settled-plant H′ ρ v ov sv (Kernels.settled kn) }
 
     sp-meaning : (∀ ν → At.Fed H u ν → At.Fed H′ v ν) → Meaning H T → Meaning H′ (plant ρ v)
     sp-meaning fv mn = record { fed = Heaps.fed-path H H′ ρ v fs offV fv _ (Meaning.fed mn) }
@@ -1462,7 +1468,7 @@ module Ascending (R : Set) where
 
     -- The tree grown, then spliced.
     bg-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels heap′ T′
-    bg-kernels fs kn = Sp.sp-kernels fs refl (λ ()) bg-settled (λ {E} {o} → bg-holds {E} {o}) (λ g → bg-gated g) (λ d → bg-spent d) (Wk.grow-kernels grows kn)
+    bg-kernels fs kn = Sp.sp-kernels fs refl (λ ()) bg-settled (λ {E} {o} → bg-holds {E} {o}) (λ g → bg-gated g) (λ d → bg-spent d) (Growths.kernels-grow grow grows kn)
 
     bg-meaning : AllPairs _≢_ (names T) → Meaning H T → Meaning heap′ T′
     bg-meaning fs mn = Sp.sp-meaning fs bg-fed (Wk.grow-meaning grows mn)
@@ -1792,7 +1798,7 @@ module Ascending (R : Set) where
                → At.GatedLanes H X ls → At.GatedLanes (freed H (laneOf o) fl) X ls
   gatedL-freed H fl (one-this {c = c} {k} {t = s₀} {ls′}) (nl ∷ _) (na ∷ nas) cu (_ , g₂ , g₃) =
     (λ _ → inj₁ cu)
-    , Heaps.gated-alike H (freed H c fl) s₀ (λ j m →
+    , gated-alike s₀ (λ j m →
         trans (look-store (unlive H c) (FlatKit.Flat.active fl) j (lookupᴬ nas (there (++⁺ʳ (quietName k) (++⁺ˡ m)))))
               (look-store H (Kit.live c) j (lookupᴬ nl (there (++⁺ʳ (quietName k) (++⁺ˡ m)))))) g₂
     , Heaps.gatedL-alike H (freed H c fl) ls′ (λ j m →
@@ -1800,7 +1806,7 @@ module Ascending (R : Set) where
               (look-store H (Kit.live c) j (lookupᴬ nl (there (++⁺ʳ (quietName k) (++⁺ʳ (names s₀) m)))))) g₃
   gatedL-freed H fl (one-next {l = lane c k s₀} {ls = ls′} o) ps@(nl ∷ _) nas cu (g₁ , g₂ , g₃) =
     (λ e → sum-map₂ (Heaps.cut-alike H (freed H (laneOf o) fl) k s₀ ag) (g₁ (trans (sym ec) e)))
-    , Heaps.gated-alike H (freed H (laneOf o) fl) s₀ ag g₂
+    , gated-alike s₀ ag g₂
     , gatedL-freed H fl o (pairs-r (names s₀) P) (tabulateᴬ λ m → lookupᴬ nas (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ʳ (names s₀) m)))) cu g₃
     where
       P  = pairs-r (quietName k) (pairs-r (cutNames c) ps)
@@ -1992,7 +1998,7 @@ module Ascending (R : Set) where
       trans (refill-freed H (laneOf o) fl) rf
       , Heaps.slot-alike H H′ r (slot-freed H (laneOf o) fl r) sl
       , attached-alike oc k (fr-held oc) (fr-quiet k) a
-      , Heaps.holds-alike H H′ t (fr-so fr) hs
+      , holds-alike t (fr-so fr) hs
       , trans (cong lower (stored-at (unlive H (laneOf o)) (FlatKit.Flat.active fl) _))
               (trans (cong pred (trans (cong lower (look-store H (Kit.live (laneOf o)) (FlatKit.Flat.active fl) (λ e → fr-count-apart fr d∈ (sym e))))
                                        (trans ac (sym (count-unlive H o (fr-lanes-apart fr) lv)))))
@@ -2012,7 +2018,7 @@ module Ascending (R : Set) where
         holdsL []                   em hl′ = hl′
         holdsL (lane c′ k′ s ∷ ls′) em (a′ , hs′ , hl′) =
           attached-alike c′ k′ (fr-held c′) (fr-quiet k′) a′
-          , Heaps.holds-alike H H′ s (fr-lane fr (em (this-lane here))) hs′
+          , holds-alike s (fr-lane fr (em (this-lane here))) hs′
           , holdsL ls′ (λ π → em (next-lane π)) hl′
 
     -- The ended lane's gate now shut, its cut still owed: it was live, so
@@ -2020,7 +2026,7 @@ module Ascending (R : Set) where
     -- was.
     fr-gated : AllPairs _≢_ (names w₀) → At.val H (Kit.live (laneOf o)) ≡ true → ∀ {E o′} → At.Holds H w₀ E o′ → At.Gated H w₀ → At.Gated H′ w₀
     fr-gated fr lv (_ , _ , _ , _ , _ , (gone , eq , ga) , _) (g₁ , g₂) =
-      Heaps.gated-alike H H′ t (fr-so fr) g₁
+      gated-alike t (fr-so fr) g₁
       , subst (λ X → At.GatedLanes H′ X ls) (cong lower (sym (fr-off (FlatKit.Flat.lanes fl) ((λ ()) ∷ (λ ()) ∷ []))))
           (gatedL-freed H fl o (fr-lanes-apart fr) (tabulateᴬ (fr-count-apart fr)) listed g₂)
       where
@@ -2606,6 +2612,25 @@ module Ascending (R : Set) where
   call-lanes st ρ πL o {sends _}  cl = climb-lanes st ρ πL o cl
   call-lanes st ρ πL o {closes _} cl = close-lanes st ρ πL o cl
 
+  -- A connect's body retagged, its feed restaged: the kernels read it
+  -- alike.
+  body-holds : ∀ {h} (H : Heapᴹ h) {Δ A B S c b kb k fd₁ fd₂ rp e rt} {src : Sub h Δ A} (g : Retag (A ∷ Δ)) (bd : Sub h (A ∷ Δ) B) {E o}
+             → At.Holds H (connectˢ S c b kb k fd₁ rp e rt src bd) E o → At.Holds H (connectˢ S c b kb k fd₂ rp e rt src (retag g bd)) E o
+  body-holds H {kb = kb} g bd (a , vb , sb , hs , hb) = a , vb , subst (At.Stashed H kb) (sym (unsub-retag g bd)) sb , hs , holds-retag H g bd hb
+
+  body-gated : ∀ {h} (H : Heapᴹ h) {Δ A B S c b kb k fd₁ fd₂ rp e rt} {src : Sub h Δ A} (g : Retag (A ∷ Δ)) (bd : Sub h (A ∷ Δ) B)
+             → At.Gated H (connectˢ S c b kb k fd₁ rp e rt src bd) → At.Gated H (connectˢ S c b kb k fd₂ rp e rt src (retag g bd))
+  body-gated H g bd (f₁ , gs , gb) = f₁ , gs , gated-retag H g bd gb
+
+  body-spent : ∀ {h} (H : Heapᴹ h) {Δ A B S c b kb k fd₁ fd₂ rp e rt} {src : Sub h Δ A} (g : Retag (A ∷ Δ)) (bd : Sub h (A ∷ Δ) B)
+             → At.Spent H (connectˢ S c b kb k fd₁ rp e rt src bd) → At.Spent H (connectˢ S c b kb k fd₂ rp e rt src (retag g bd))
+  body-spent H {kb = nothing} g bd (c₁ , c₂) = c₁ , c₂
+  body-spent H {kb = just _}  g bd (c₁ , c₂) = c₁ , spent-retag H g bd c₂
+
+  body-settled : ∀ {h} (H : Heapᴹ h) {Δ A B S c b kb k fd₁ fd₂ rp e rt} {src : Sub h Δ A} (g : Retag (A ∷ Δ)) (bd : Sub h (A ∷ Δ) B)
+               → Settled (connectˢ S c b kb k fd₁ rp e rt src bd) → Settled (connectˢ S c b kb k fd₂ rp e rt src (retag g bd))
+  body-settled H {kb = kb} g bd (b₁ , b₂ , s₁ , s₂) = b₁ , begun-retag g kb bd b₂ , s₁ , settled-retag H g bd s₂
+
   -- A CONNECT FEEDING: the feed restaged from `idle` to the source's
   -- value at the run's position, owed to the subscribers the feed read,
   -- the ghost past the source's skip.
@@ -2675,9 +2700,9 @@ module Ascending (R : Set) where
                      (λ m → lookupᴬ (proj₂ jn) (joiners-path ρ [] (++⁺ʳ (joiners u (envP ρ [])) m)))
 
     fed-kernels : Kernels H T → Kernels H T′
-    fed-kernels kn = record { holds   = holds-plant H {t = T} ρ v refl (λ {E} {o} → Bd.body-holds {E} {o}) (Kernels.holds kn)
-                            ; gated   = gated-plant H {t = T} ρ v Bd.body-gated Bd.body-spent (Kernels.gated kn)
-                            ; settled = settled-plant {t = T} ρ v Bd.body-owes Bd.body-settled (Kernels.settled kn) }
+    fed-kernels kn = record { holds   = holds-plant H {t = T} ρ v refl (λ {E} {o} → body-holds H {S = Sj} {c = c} {b = b} {kb = kb} {k = k} {fd₁ = idle} {fd₂ = fd′} {rp = rp} {e = e} {rt = rt} {src = u} (at-here (At.owing H fd′)) bd {E} {o}) (Kernels.holds kn)
+                            ; gated   = gated-plant H {t = T} ρ v (body-gated H {S = Sj} {c = c} {b = b} {kb = kb} {k = k} {fd₁ = idle} {fd₂ = fd′} {rp = rp} {e = e} {rt = rt} {src = u} (at-here (At.owing H fd′)) bd) (body-spent H {S = Sj} {c = c} {b = b} {kb = kb} {k = k} {fd₁ = idle} {fd₂ = fd′} {rp = rp} {e = e} {rt = rt} {src = u} (at-here (At.owing H fd′)) bd) (Kernels.gated kn)
+                            ; settled = settled-plant H {t = T} ρ v Bd.body-owes (body-settled H {S = Sj} {c = c} {b = b} {kb = kb} {k = k} {fd₁ = idle} {fd₂ = fd′} {rp = rp} {e = e} {rt = rt} {src = u} (at-here (At.owing H fd′)) bd) (Kernels.settled kn) }
 
     fed-meaning : At.Joined H (subjects T) (joiners T []) → Meaning H T → Meaning H T′
     fed-meaning jn mn = record { fed = fed-plant H {t = T} ρ v (fed-joins jn) _ (Meaning.fed mn) }
@@ -2844,9 +2869,9 @@ module Ascending (R : Set) where
         ... | a₀ ∷ _ = lookupᴬ a₀ (here refl)
 
     fin-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels H′ T′
-    fin-kernels fs kn = record { holds   = holds-plant H′ {t = T} ρ v refl (λ {E} {o} → Bd.body-holds {E} {o}) (Kernels.holds kn′)
-                               ; gated   = gated-plant H′ {t = T} ρ v Bd.body-gated Bd.body-spent (Kernels.gated kn′)
-                               ; settled = settled-plant {t = T} ρ v Bd.body-owes Bd.body-settled (Kernels.settled kn′) }
+    fin-kernels fs kn = record { holds   = holds-plant H′ {t = T} ρ v refl (λ {E} {o} → body-holds H′ {S = Sj} {c = c} {b = b} {kb = kb} {k = k} {fd₁ = idle} {fd₂ = fd′} {rp = rp} {e = e} {rt = rt} {src = u} (at-here (At.owing H′ fd′)) bd {E} {o}) (Kernels.holds kn′)
+                               ; gated   = gated-plant H′ {t = T} ρ v (body-gated H′ {S = Sj} {c = c} {b = b} {kb = kb} {k = k} {fd₁ = idle} {fd₂ = fd′} {rp = rp} {e = e} {rt = rt} {src = u} (at-here (At.owing H′ fd′)) bd) (body-spent H′ {S = Sj} {c = c} {b = b} {kb = kb} {k = k} {fd₁ = idle} {fd₂ = fd′} {rp = rp} {e = e} {rt = rt} {src = u} (at-here (At.owing H′ fd′)) bd) (Kernels.gated kn′)
+                               ; settled = settled-plant H′ {t = T} ρ v Bd.body-owes (body-settled H′ {S = Sj} {c = c} {b = b} {kb = kb} {k = k} {fd₁ = idle} {fd₂ = fd′} {rp = rp} {e = e} {rt = rt} {src = u} (at-here (At.owing H′ fd′)) bd) (Kernels.settled kn′) }
       where kn′ = Wr.wr-kernels fs (λ {E} {o} → fin-holds (fresh-path ρ fs) {E} {o}) (λ _ → fin-gated (fresh-path ρ fs)) (fin-spent (fresh-path ρ fs)) kn
 
     fin-meaning : AllPairs _≢_ (names T) → At.Joined H (subjects T) (joiners T []) → Meaning H T → Meaning H′ T′
@@ -3208,7 +3233,7 @@ module Ascending (R : Set) where
         ; owned′ = owned-to (owned-pop hp {t = t} π (Carried.owned cr))
         ; kernels = record { holds = holds-plant hp {t = t} π v refl (λ h → h) (Kernels.holds kn)
                            ; gated = gated-plant hp {t = t} π v (λ _ → lift (λ _ → refl)) (λ s → s) (Kernels.gated kn)
-                           ; settled = settled-plant {t = t} π v (λ ()) (λ s → s) (Kernels.settled kn) }
+                           ; settled = settled-plant hp {t = t} π v (λ ()) (λ s → s) (Kernels.settled kn) }
         ; meaning = record { fed = fed-plant hp {t = t} π v (λ _ f → f) _ (Meaning.fed mn) }
         ; queue = record { timed = timed-pop hp {t = t} π (Queue.timed q) (Queue.ordered q) fs
                          ; joined = subst₂ (At.Joined hp) (sym (subjects-plant {t = t} π v refl)) (sym (joiners-plant {t = t} π v (λ _ → refl) _)) (Queue.joined q)

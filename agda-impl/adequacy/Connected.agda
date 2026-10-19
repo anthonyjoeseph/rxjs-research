@@ -48,6 +48,7 @@ open import adequacy.Kept using (module Keeping)
 open import adequacy.Moved using (module Planting)
 open import adequacy.Restages using (module Staging)
 open import adequacy.Weaken using (module Weakening)
+open import adequacy.Every using (module Everywhere)
 open import adequacy.Names using (module Naming)
 open import adequacy.Alike using (module Aliking)
 open import adequacy.Taken using (module Taking)
@@ -66,13 +67,16 @@ module Connecting (R : Set) where
   open Strongly R using (Carried; Books; Sub; pendingˢ; connectˢ; idle; bodyK; srcK; Path; here; in-source; in-body; _⊕_; Here; walk; top; srcC; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-defer; subjects; laneSubjects; Lane; lane; Heads; Lingers; names; Phase; union-pinned; under-moved; bursts-pinned; rest-pinned; ≗-refl; newRef≗; unsubscribing; under≗; readRef≗; module Canon; owned-to; module Eaching; module Lingering)
                         renaming (⟦_⟧ to ⟦_⟧ᶜ; at⟦_⟧ to at⟦_⟧ᶜ)
   open Strongly.Against R using (StackAs; subAs; backAs; stackJobs; SrcOf; src-of; Ticked)
-  open Moving R using (planted; pend; part-plant; holds-owed; settled-plant; gated-plant; fed-plant; plant; plantᴸ; Splice; spliced-l; spliced-r; pendings-plant; joiners-plant)
+  open Moving R using (planted; pend; part-plant; holds-owed; fed-plant; plant; plantᴸ; Splice; spliced-l; spliced-r; pendings-plant; joiners-plant)
+  open Everywhere.Settling R using (settled-plant)
+  open Everywhere.Gating R using (gated-plant)
   open Ghosting R using (walk-⊕; sorted-⇝)
   open Forking R using (pend-less; subOf; walk-planted)
   open Keeping R using (lingers-plant)
   open Planting R using (module Moved)
   open Staging R using (Restages; not-src; wrap-body)
   open Weakening R using (module Grown; pend-grow)
+  open Everywhere R using (module Growths)
   open Naming R using (fresh-new; fresh-plant; grows-extend; names-wk; pending-↭; wk-pairs)
   open Aliking R using (KontRel; ObsRel; compile-cong; compile-env; obs-trans; obs-wk; obs-⨾; walk-grow; ≗-sym)
   open Taking R using (allocates; recode; tick-ix0; unders; ⊑≗)
@@ -118,7 +122,7 @@ module Connecting (R : Set) where
     ; envR = Gw.env-grow (path G) E′ (υ ⨾ ν) (envR G)
     ; meets = trans (Gw.grow-part gr (tree G)) (meets G)
     ; owned = Gw.grow-owned gr (stack G) (owned G)
-    ; kernels = Gw.grow-kernels gr (kernels G) ; meaning = Gw.grow-meaning gr (meaning G) ; queue = Gw.grow-queue gr (queue G)
+    ; kernels = Growths.kernels-grow (new {k} {h}) gr (kernels G) ; meaning = Gw.grow-meaning gr (meaning G) ; queue = Gw.grow-queue gr (queue G)
     ; behind = Gw.grow-each gr (behind G) ; lingers = Gw.grow-lingers gr (lingers G) ; pends = trans (pend-grow new (tree G)) (pends G)
     ; named = λ {_} {j} m → let (i′ , e′ , m′) = names-wk new (tree G) j m ; (i , e) = named G m′
                             in i , trans (sym (wk∋-wk ν new i)) (trans (cong (wk∋ new) e) e′)
@@ -269,7 +273,7 @@ module Connecting (R : Set) where
     rc-kernels : Kernels H₅ T₅ → Kernels H₅ t′
     rc-kernels kn = record { holds = holds-owed H₅ π₅ v tt (Here.kont top) (λ _ → lift held₅ , body₅ , lift tt , lift tt , lift tt) (Kernels.settled kn) (Kernels.holds kn)
                            ; gated = gated-plant H₅ π₅ v (λ _ → (λ _ → lift tt) , lift tt , lift tt) (λ _ → lift tt , lift tt) (Kernels.gated kn)
-                           ; settled = settled-plant π₅ v (λ _ → tt) (λ _ → tt , tt , tt , tt) (Kernels.settled kn) }
+                           ; settled = settled-plant H₅ π₅ v (λ _ → tt) (λ _ → tt , tt , tt , tt) (Kernels.settled kn) }
 
     rc-meaning : Meaning H₅ T₅ → Meaning H₅ t′
     rc-meaning mn = record { fed = fed-plant H₅ π₅ v (λ _ _ → lift tt , lift tt) _ (Meaning.fed mn) }

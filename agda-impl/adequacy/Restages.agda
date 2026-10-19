@@ -37,6 +37,7 @@ open import operation.PureObservable using (Out; Pureᴾ)
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Moves using (module Moving)
+open import adequacy.Every using (module Everywhere)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Seq using (module Sequencing)
@@ -55,7 +56,10 @@ module Staging (R : Set) where
   open Strongly R using (Carried; Books; carried; Sub; pendingˢ; ofˢ; mapˢ; connectˢ; Lane; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_; Here; walk; top; of-leaf; Call; emitC; kontC; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; names; pendings; Phase; Pinned; unpinned; rest-pinned; seen; ≗-refl; unsubscribing; under≗; owned-to; module Eaching; module Lingering)
                         renaming (⟦_⟧ to ⟦_⟧ᶜ; at⟦_⟧ to at⟦_⟧ᶜ)
   open Strongly.Against R using (StackAs; subAs; runAs; SrcOf; src-of)
-  open Moving R using (planted; pend; syn-pos; part-plant; names-plant; holds-plant; settled-plant; gated-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant; head-map)
+  open Moving R using (planted; pend; syn-pos; part-plant; names-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant; head-map)
+  open Everywhere.Holding R using (holds-plant)
+  open Everywhere.Settling R using (settled-plant)
+  open Everywhere.Gating R using (gated-plant)
   open Ghosting R using (walk-⊕; _≺_; measure; firstCall)
   open Forking R using (pend-less; subOf; walk-planted)
   open Keeping R using (each-plant; lingers-plant)
@@ -222,7 +226,7 @@ module Staging (R : Set) where
     rm-kernels : (H : Heapᴹ h) → Kernels H T₀ → Kernels H t′
     rm-kernels H kn = record { holds = holds-plant H π v refl (λ hs → hs) (Kernels.holds kn)
                              ; gated = gated-plant H π v (λ g → g) (λ d → d) (Kernels.gated kn)
-                             ; settled = settled-plant π v (λ ow → ow) (λ st → st) (Kernels.settled kn) }
+                             ; settled = settled-plant H π v (λ ow → ow) (λ st → st) (Kernels.settled kn) }
 
     rm-meaning : (H : Heapᴹ h) → Meaning H T₀ → Meaning H t′
     rm-meaning H mn = record { fed = fed-plant H π v (λ _ fd → fd) _ (Meaning.fed mn) }
@@ -297,7 +301,7 @@ module Staging (R : Set) where
     of-kernels : (H : Heapᴹ h) → Kernels H T₀ → Kernels H t′
     of-kernels H kn = record { holds = holds-plant H π v refl (λ hs → hs) (Kernels.holds kn)
                              ; gated = gated-plant H π v (λ g → g) (λ d → d) (Kernels.gated kn)
-                             ; settled = settled-plant π v (λ ()) (λ st → st) (Kernels.settled kn) }
+                             ; settled = settled-plant H π v (λ ()) (λ st → st) (Kernels.settled kn) }
 
     of-meaning : (H : Heapᴹ h) → Meaning H T₀ → Meaning H t′
     of-meaning H mn = record { fed = fed-plant H π v (λ _ fd → fd) _ (Meaning.fed mn) }

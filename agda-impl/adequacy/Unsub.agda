@@ -35,7 +35,6 @@ open import operation.Machine using (module Machine)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Torn using (module Tearing)
-open import adequacy.Local using (module Locality)
 
 module Unsubbing (R : Set) where
   open Heap using (World; Quiet; _⊑_; same; grow; _⨾_)
@@ -46,7 +45,6 @@ module Unsubbing (R : Set) where
   open Strongly R
   open Moving R using (pairs-r; pairs-split)
   open Tearing R
-  open Locality R using (cuts; cuts-switches; attached-alike; stashed-alike; holds-at)
 
   ----------------------------------------------------------------------
   -- `m` runs silently to `m′`

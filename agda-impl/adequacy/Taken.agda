@@ -49,6 +49,7 @@ open import adequacy.Kept using (module Keeping)
 open import adequacy.Moved using (module Planting)
 open import adequacy.Restages using (module Staging)
 open import adequacy.Weaken using (module Weakening)
+open import adequacy.Every using (module Everywhere)
 open import adequacy.Names using (module Naming)
 open import adequacy.Alike using (module Aliking)
 
@@ -63,13 +64,16 @@ module Taking (R : Set) where
   open Run (Pureᴾ R) using (Act; done; newRef; under; _>>ᴬ_; compile; Env; wkEnv; module Kit; Ref; wkR; Kont; wkObs)
   open Strongly R using (Carried; Books; Sub; pendingˢ; takeWhileˢ; Path; here; in-take; _⊕_; Here; walk; top; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; names; pendings; Phase; rest-pinned; seen; ≗-refl; newRef≗; taking; takeK; unsubscribing; under≗; module Canon; owned-to; module Eaching; module Lingering)
   open Strongly.Against R using (StackAs; subAs; SrcOf; src-of)
-  open Moving R using (planted; pend; part-plant; holds-owed; settled-plant; gated-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant)
+  open Moving R using (planted; pend; part-plant; holds-owed; fed-plant; pendings-plant; subjects-plant; joiners-plant)
+  open Everywhere.Settling R using (settled-plant)
+  open Everywhere.Gating R using (gated-plant)
   open Ghosting R using (walk-⊕; sorted-⇝)
   open Forking R using (pend-less; subOf; walk-planted)
   open Keeping R using (each-plant; lingers-plant)
   open Planting R using (module Moved)
   open Staging R using (Restages; not-src; wrap-take)
   open Weakening R using (module Grown; pend-grow)
+  open Everywhere R using (module Growths)
   open Naming R using (Img; fresh-new; fresh-plant; grows-extend; pending-↭; to-img; wk-img; wk-pairs; wkN)
   open Aliking R using (KontRel; ObsRel; compile-cong; obs-trans; obs-wk; obs-⨾; takeO-cong; walk-grow; ≗-sym)
 
@@ -189,7 +193,7 @@ module Taking (R : Set) where
       rt-kernels : Kernels H′ T₂ → Kernels H′ t′
       rt-kernels kn = record { holds = holds-owed H′ π₂ v tt (Here.kont top) (λ _ → lift held , lift tt) (Kernels.settled kn) (Kernels.holds kn)
                              ; gated = gated-plant H′ π₂ v (λ g → (λ _ → lift tt) , g) (λ _ → lift tt) (Kernels.gated kn)
-                             ; settled = settled-plant π₂ v (λ _ → tt) (λ _ → tt , tt) (Kernels.settled kn) }
+                             ; settled = settled-plant H′ π₂ v (λ _ → tt) (λ _ → tt , tt) (Kernels.settled kn) }
 
       -- A take runs what its source runs.
       rt-lingers : Lingers H′ T₂ → Lingers H′ t′
@@ -227,7 +231,7 @@ module Taking (R : Set) where
              ; meets = trans (part-plant H₂ S.π₂ S.v eqv) (trans (G₂.grow-part gr₂ S.T₁) (trans (G₁.grow-part gr₁ (Carried.tree cr)) (Carried.meets cr)))
              ; owned′ = owned-to (Moved.Owning.reowned S.π₂ S.v H₂ eqv (in-take here) S.inner sk₂ a₂
                          (G₂.grow-owned gr₂ {cd′ = cd₂} sk₁ {a′ = a₂} (G₁.grow-owned gr₁ {cd′ = cd₁} sk {a′ = a₁} (Carried.owned cr))))
-             ; kernels = S.rt-kernels H₂ eqv refl (G₂.grow-kernels gr₂ (G₁.grow-kernels gr₁ (Carried.kernels cr)))
+             ; kernels = S.rt-kernels H₂ eqv refl (Growths.kernels-grow S.ν₂ gr₂ (Growths.kernels-grow S.ν₁ gr₁ (Carried.kernels cr)))
              ; meaning = S.rt-meaning H₂ eqv refl (G₂.grow-meaning gr₂ (G₁.grow-meaning gr₁ (Carried.meaning cr)))
              ; queue = S.rt-queue H₂ eqv refl (G₂.grow-queue gr₂ (G₁.grow-queue gr₁ (Carried.queue cr)))
              ; books = record { fresh = S.take-fresh (Books.fresh bk)

@@ -44,6 +44,7 @@ open import adequacy.Kept using (module Keeping)
 open import adequacy.Moved using (module Planting)
 open import adequacy.Restages using (module Staging)
 open import adequacy.Weaken using (module Weakening)
+open import adequacy.Every using (module Everywhere)
 open import adequacy.Names using (module Naming)
 open import adequacy.Alike using (module Aliking)
 
@@ -57,13 +58,17 @@ module Scanning (R : Set) where
   open Run (Pureᴾ R) using (done; compile; Env; wkEnv; wkObs; wkKont)
   open Strongly R using (Carried; Books; Sub; pendingˢ; Path; here; in-scan; _⊕_; Here; walk; top; Job; _≗_; module At; Kernels; Meaning; Queue; Each; Heads; Lingers; names; pendings; Phase; rest-pinned; seen; scanˢ; newRef≗; module Canon; owned-to; module Eaching; module Lingering)
   open Strongly.Against R using (subAs; SrcOf; src-of)
-  open Moving R using (planted; pend; part-plant; holds-plant; settled-plant; gated-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant; head-scan)
+  open Moving R using (planted; pend; part-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant; head-scan)
+  open Everywhere.Holding R using (holds-plant)
+  open Everywhere.Settling R using (settled-plant)
+  open Everywhere.Gating R using (gated-plant)
   open Ghosting R using (walk-⊕; sorted-⇝)
   open Forking R using (pend-less; subOf; walk-planted)
   open Keeping R using (each-plant; lingers-plant)
   open Planting R using (module Moved)
   open Staging R using (Restages; not-src; wrap-scan)
   open Weakening R using (module Grown; pend-grow)
+  open Everywhere R using (module Growths)
   open Naming R using (fresh-new; fresh-plant; grows-extend; pending-↭; to-img; wk-img; wk-pairs)
   open Aliking R using (compile-cong; scanO-cong; walk-grow)
 
@@ -151,7 +156,7 @@ module Scanning (R : Set) where
       rs-kernels : Kernels H′ T₁ → Kernels H′ t′
       rs-kernels kn = record { holds = holds-plant H′ π₁ v refl (λ hs → hs) (Kernels.holds kn)
                              ; gated = gated-plant H′ π₁ v (λ g → g) (λ d → d) (Kernels.gated kn)
-                             ; settled = settled-plant π₁ v (λ ow → ow) (λ st → st) (Kernels.settled kn) }
+                             ; settled = settled-plant H′ π₁ v (λ ow → ow) (λ st → st) (Kernels.settled kn) }
 
       rs-meaning : Meaning H′ T₁ → Meaning H′ t′
       rs-meaning mn = record { fed = fed-plant H′ π₁ v (λ _ fd → fd) _ (Meaning.fed mn) }
@@ -176,7 +181,7 @@ module Scanning (R : Set) where
              ; ctlAs = subAs S.π′ (S.code′ E′ υ e (kk new hereʳ)) (S.restack sk₁ a₁) (S.alones _)
              ; meets = trans (part-plant H′ S.π₁ S.v eqv) (trans (G.grow-part gr (Carried.tree cr)) (Carried.meets cr))
              ; owned′ = owned-to (Moved.Owning.reowned S.π₁ S.v H′ eqv (in-scan here) S.inner {cd = Grown.code-grow S.ν π E′ υ e} sk₁ a₁ (G.grow-owned gr sk (Carried.owned cr)))
-             ; kernels = S.rs-kernels H′ eqv (G.grow-kernels gr (Carried.kernels cr))
+             ; kernels = S.rs-kernels H′ eqv (Growths.kernels-grow S.ν gr (Carried.kernels cr))
              ; meaning = S.rs-meaning H′ eqv (G.grow-meaning gr (Carried.meaning cr))
              ; queue = S.rs-queue H′ eqv (G.grow-queue gr (Carried.queue cr))
              ; books = record { fresh = S.scan-fresh (Books.fresh bk)
