@@ -334,7 +334,7 @@ module Shifting (R : Set) where
       { parts = λ {u = u} ψ sn e → subst (λ y → Leaves _ y) (sym (leftover-from {B = ⊤} {x = u} (λ m → names-path ψ m) al))
                                      (Leaving.parts lv ψ (se ψ sn) (trans (sym (part-at ψ al)) e))
       ; pools = λ {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} ψ sn e →
-                  subst (λ y → Leaves _ y) (sym (pooled-from {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} (λ m → names-path ψ m) al))
+                  subst (λ y → Leaves pl₀ y) (sym (pooled-from {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} (λ m → names-path ψ m) al))
                     (Leaving.pools lv ψ (se ψ sn) (trans (sym (part-at ψ al)) e))
       ; rests = λ {src = src₀} ψ sn e pn pe → subst (λ y → Leaves _ y) (sym (leftover-from {B = ⊤} {x = src₀} (λ m → names-path (ψ ⊕ in-source here) m) al))
                                                 (Leaving.rests lv ψ (se ψ sn) (trans (sym (part-at ψ al)) e) (trans (sym (part-at (ψ ⊕ in-source here) al)) pn) pe) }
