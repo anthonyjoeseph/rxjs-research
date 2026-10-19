@@ -101,6 +101,9 @@ def exports(body):
         kind, nm = None, None
         if first in KW and len(w) == 1:
             kind = first
+        elif first == 'field' and ctx == 'record':
+            # `field x : T` opens a field block too: the names under it are fields
+            kind = 'field'
         elif first == 'interleaved' and 'mutual' in w:
             kind = 'mutual'
         elif first == 'module' and len(w) > 1 and w[1] == '_':
