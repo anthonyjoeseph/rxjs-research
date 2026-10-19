@@ -277,26 +277,6 @@ module Lowering (R : Set) where
   sources-past (takeSite _) = refl
   sources-past (bodySite _) = refl
 
-  -- A joiner reads only its switch, and only once raised: what a lowered
-  -- heap owes it was owed before.
-  mutual
-    fed-lowers : ∀ {h} {H H′ : Heapᴹ h} → Lowers H H′ → ∀ {Δ A} (s : Sub h Δ A) {ν} → At.Fed H s ν → At.Fed H′ s ν
-    fed-lowers lw (pendingˢ s q)  f = f
-    fed-lowers lw (coldˢ s hd ph) f = f
-    fed-lowers lw (ofˢ p i xs)    f = f
-    fed-lowers lw doneˢ           f = f
-    fed-lowers lw (mapˢ g s)      f = fed-lowers lw s f
-    fed-lowers lw (scanˢ g r s)   f = fed-lowers lw s f
-    fed-lowers lw (takeWhileˢ i p c k tk s) f = fed-lowers lw s f
-    fed-lowers lw (flatMapˢ op g fl oc k r pl so ls) (f₁ , f₂) = fed-lowers lw so f₁ , fedL-lowers lw ls f₂
-    fed-lowers lw (connectˢ S c b kb k fd rp e rt src bd) (f₁ , f₂) = fed-lowers lw src f₁ , fed-lowers lw bd f₂
-    fed-lowers lw (joinˢ j sk l x st) f = lift (λ r → lower f (raisedᵍ lw l r))
-    fed-lowers lw (deferˢ k s) f = fed-lowers lw s f
-
-    fedL-lowers : ∀ {h} {H H′ : Heapᴹ h} → Lowers H H′ → ∀ {Δ B} (ls : List (Lane h Δ B)) {ν} → At.FedLanes H ls ν → At.FedLanes H′ ls ν
-    fedL-lowers lw []                f          = f
-    fedL-lowers lw (lane c k s ∷ ls) (f₁ , f₂) = fed-lowers lw s f₁ , fedL-lowers lw ls f₂
-
   -- A part gone stays gone once a heap is lowered: every `if` `part`
   -- reads goes to `nothing` or stays, and the one cell it reads past a
   -- switch, a flatMap's queue, is of a kind nothing lowering writes.

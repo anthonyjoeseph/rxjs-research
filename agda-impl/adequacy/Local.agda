@@ -752,3 +752,74 @@ module Locality (R : Set) where
   ... | _ , _ , (_ , _ , _ , hu , _) | (_ , gu , _) =
     Heaps.gated-same H (thrown H c k s) π ps B.off (B.gated hu gu) (B.spent hu gu) g
     where module B = BodySite H {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {e = e} {rp = rp} {rt = rt} {s = s} {bd = bd} (fresh-path π ps)
+
+  -- What a teardown leaves fed: a joiner it silences owes nothing, and
+  -- it writes no subject's closed flag, so every other joiner reads its
+  -- connect's end as before.
+  mutual
+    fed-torn : ∀ {h} (H : Heapᴹ h) {Δ A} (s : Sub h Δ A) → AllPairs _≢_ (names s)
+             → ∀ {ν} → At.Fed H s ν → At.Fed (torn H s) s ν
+    fed-torn H (pendingˢ s q)  ps       f = f
+    fed-torn H (coldˢ s hd ph) ps       f = f
+    fed-torn H (ofˢ p i xs)    ps       f = f
+    fed-torn H doneˢ           ps       f = f
+    fed-torn H (mapˢ f₀ s)     ps       f = fed-torn H s ps f
+    fed-torn H (scanˢ f₀ r s)  (_ ∷ ps) f = fed-torn H s ps f
+    fed-torn H (takeWhileˢ i p c k tk s) ps {ν} f =
+      via-fed T.H₀ k s (pairs-r (quietName k) (pairs-r (cutNames c) ps)) (Heaps.fed-alike H T.H₀ s T.ag₀ ν f)
+      where module T = Throw H c k s (λ m → m) ps
+    fed-torn H (flatMapˢ op f₀ fl oc k r pl so ls) ps {ν} (f₁ , f₂) =
+      Heaps.fed-alike F.H′ F.Ht so F.agS ν (via-fed F.T.H₀ k so F.PS (Heaps.fed-alike H F.T.H₀ so F.T.ag₀ ν f₁))
+      , fedL-torn F.H₂ (length F.xs) ls F.PL (Heaps.fedL-alike H F.H₂ ls F.agL ν f₂)
+      where module F = FlatTear H {op = op} {f = f₀} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {so = so} {ls = ls} ps
+    fed-torn H (connectˢ S c b kb k fd rp e rt src bd) ps {ν} (f₁ , f₂) =
+      Heaps.fed-alike C.H₁ C.H₂ src C.agS ν (fed-torn H src C.Ps f₁)
+      , subst (λ z → At.Fed C.H₂ bd ((fd , (if z then e else nothing)) ∷ᴬ ν)) (cong lower (sym ec))
+              (via-fed C.H₁ kb bd C.Pb (Heaps.fed-alike H C.H₁ bd C.agB _ f₂))
+      where
+        module C = ConnTear H {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {e = e} {rp = rp} {rt = rt} {src = src} {bd = bd} ps
+        ec : look C.H₂ (Subject.closed S) ≡ look H (Subject.closed S)
+        ec = C.past (Subject.closed S) (narrow (λ m → ++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) m))))
+                                               (apart-r (subjectNames S) ps (there (here refl))))
+    fed-torn H (joinˢ j sk l x st) ps f = lift λ r → false≢ (trans (sym (cong lower (stored-at H l (lift false)))) r)
+    fed-torn H (deferˢ k s) ps f = via-fed H k s (pairs-r (quietName k) ps) f
+
+    fedL-torn : ∀ {h} (H : Heapᴹ h) (n : ℕ) {Δ B} (ls : List (Lane h Δ B)) → AllPairs _≢_ (laneNames ls)
+              → ∀ {ν} → At.FedLanes H ls ν → At.FedLanes (thrownLanes H n ls) ls ν
+    fedL-torn H zero    ls ps fl = fl
+    fedL-torn H (suc n) []  ps fl = fl
+    fedL-torn {h} H (suc n) (lane c k s ∷ ls) ps {ν} (f₁ , f₂) =
+      Heaps.fed-alike H₁ (thrownLanes H₁ n ls) s (λ j m → thrownLanes-off H₁ n ls j (apart-r (names s) P m)) ν
+                      (via-fed T.H₀ k s (proj₁ (pairs-split (names s) P)) (Heaps.fed-alike H T.H₀ s T.ag₀ ν f₁))
+      , fedL-torn H₁ n ls (pairs-r (names s) P) (Heaps.fedL-alike H H₁ ls (laneAlike H c k s {ls} ps) ν f₂)
+      where
+        module T = Throw H c k s (λ m → ++⁺ˡ m) ps
+        H₁ = thrown H c k s
+        P = pairs-r (quietName k) (pairs-r (cutNames c) ps)
+
+    via-fed : ∀ {h} (H : Heapᴹ h) (k : Maybe (Quiet h)) {Δ A} (s : Sub h Δ A) → AllPairs _≢_ (names s)
+            → ∀ {ν} → At.Fed H s ν → At.Fed (tornVia H k s) s ν
+    via-fed H nothing  s ps f = f
+    via-fed H (just _) s ps f = fed-torn H s ps f
+
+  -- The heap a cut leaves, fed as before.
+  site-fed : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} → AllPairs _≢_ (names t) → (z : Site t)
+           → At.Fed H t []ᴬ → At.Fed (siteHeap H z) t []ᴬ
+  site-fed H {t} ps (takeSite {i = i} {q} {c} {k} {s} π) f =
+    subst (λ x → At.Fed (thrown H c k s) x []ᴬ) (plant-self π)
+      (Heaps.fed-path H (thrown H c k s) π (takeWhileˢ i q c k taken s) (subst (λ x → AllPairs _≢_ (names x)) (sym (plant-self π)) ps)
+         (takeOff H c k s {i = i} {q = q} {tk = taken}) (λ ν fu → fed-torn H (takeWhileˢ i q c k taken s) (fresh-path π ps) fu) []ᴬ f)
+  site-fed H {t} ps (bodySite {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} π) f =
+    subst (λ x → At.Fed (thrown H c k s) x []ᴬ) (plant-self π)
+      (Heaps.fed-path H (thrown H c k s) π (connectˢ S c b kb k fd rp e rt s bd) (subst (λ x → AllPairs _≢_ (names x)) (sym (plant-self π)) ps)
+         B.off inner []ᴬ f)
+    where
+      module B = BodySite H {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {e = e} {rp = rp} {rt = rt} {s = s} {bd = bd} (fresh-path π ps)
+      ps₀ = fresh-path π ps
+      ec : look B.H′ (Subject.closed S) ≡ look H (Subject.closed S)
+      ec = thrown-off H c k s (Subject.closed S) (lookupᴬ (apart-r (subjectNames S) ps₀ (there (here refl))) (here refl))
+                      (narrow (λ m → ++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m))))) (apart-r (subjectNames S) ps₀ (there (here refl))))
+      inner : ∀ ν → At.Fed H (connectˢ S c b kb k fd rp e rt s bd) ν → At.Fed B.H′ (connectˢ S c b kb k fd rp e rt s bd) ν
+      inner ν (f₁ , f₂) =
+        via-fed B.H₁ k s B.P (Heaps.fed-alike H B.H₁ s B.ag₁ ν f₁)
+        , subst (λ z → At.Fed B.H′ bd ((fd , (if z then e else nothing)) ∷ᴬ ν)) (cong lower (sym ec)) (Heaps.fed-alike H B.H′ bd B.agbd _ f₂)

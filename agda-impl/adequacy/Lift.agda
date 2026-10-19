@@ -64,8 +64,8 @@ module Lifting (R : Set) where
   open Moving R using (plant; true≢false)
   open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each; torn-take-lingers; torn-body-lingers; torn-take-flags)
   open Unsubbing R using (_⇝_; site-tears)
-  open Locality R using (site-holds; site-gated)
-  open Lowering R using (site-lowers; queue-keeps; module Lowers; torn-owned; fed-lowers; torn-body-flags)
+  open Locality R using (site-holds; site-gated; site-fed)
+  open Lowering R using (site-lowers; queue-keeps; module Lowers; torn-owned; torn-body-flags)
   open Ghosting R using (module Far; module Calling; Has; residual; _⊏_; ⊏-trans; _≺_; measure; load; loadOf; passed; lowered; showing; Hopped; Hops; opening; firstCall; SourceFirst; BodyFirst; OuterFirst; PoolBehind; RestBehind; LaneFirst; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; Far; Off; Opt; Clear; ClearL; clear-zip; clear-each; far-apart; opt-zip; all-zip; opt-each; each-lanes; each-sub; OneLane; opened; Calling; sends; Rises; Called; Aloft; hop-sorted)
   open Forking R using (subOf)
   open Staging R using (Offers; of-restage; empty-restage; map-restage; Restages)
@@ -339,7 +339,7 @@ module Lifting (R : Set) where
   -- A joiner silenced owes nothing; every other as it was.
   torn-fed : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
            → At.Fed (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr) []
-  torn-fed cr z = fed-lowers (site-lowers _ z) (Carried.tree cr) (Meaning.fed (Carried.meaning cr))
+  torn-fed cr z = site-fed _ (Books.fresh (Carried.books cr)) z (Meaning.fed (Carried.meaning cr))
 
   -- Every subscription still against its kernel, and every gate: the
   -- cut moves only the node it runs from.
