@@ -628,6 +628,56 @@ module Tearing (R : Set) where
       ; pools = λ ρ sρ e → ⊥-elim (dead ρ sρ (cong is-just e))
       ; rests = λ ρ sρ e _ _ → ⊥-elim (dead ρ sρ (cong is-just e)) }
 
+    -- What every pool and rest held was tied to, likewise: a pool or a
+    -- leftover apart from the site or above it reads as it did.
+    lingers-write : ∀ {Δ₀ A₀} {t : Sub h Δ₀ A₀} → AllPairs _≢_ (names t) → Path t w
+                  → (∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+                     → AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl so ls)) → Same H H′ w (flatMapˢ op f fl oc k r pl so ls)
+                     → At.pooled H′ fl so ls ≡ At.pooled H fl so ls)
+                  → (∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+                     → AllPairs _≢_ (names (connectˢ S c b kb k fd rp e rt src bd)) → Same H H′ w (connectˢ S c b kb k fd rp e rt src bd)
+                     → At.leftover H′ {B = ⊤} src ≡ At.leftover H {B = ⊤} src)
+                  → (Lingers H w → Lingers H′ w) → Lingers H t → Lingers H′ t
+    lingers-write {t = t} ps π pe le inner lg = record { pools = po ; rests = re }
+      where
+        sub : seen H π ≡ true → Lingers H w
+        sub sπ = record
+          { pools = λ ρ sρ → Lingers.pools lg (π ⊕ ρ) (seen-join H π ρ sπ sρ)
+          ; rests = λ ρ sρ → Lingers.rests lg (π ⊕ ρ) (seen-join H π ρ sπ sρ) }
+
+        po : ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+           → (ψ : Path t (flatMapˢ op f fl oc k r pl so ls)) → seen H′ ψ ≡ true
+           → ∀ {c} → At.part H′ (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Tied pl (At.pooled H′ fl so ls)
+        po {pl = pl} ψ sn e with vis ps π ψ sn
+        ... | inj₁ (s , sm)        = subst (Tied pl) (sym (pe (fresh-path ψ ps) sm))
+                                       (Lingers.pools lg ψ s (trans (sym (same-part (fresh-path ψ ps) sm)) e))
+        ... | inj₂ (sπ , ρ , sρ) = Lingers.pools (inner (sub sπ)) ρ sρ e
+
+        re : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+           → (ψ : Path t (connectˢ S c b kb k fd rp e rt src bd)) → seen H′ ψ ≡ true
+           → ∀ {n} → At.part H′ (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
+           → At.part H′ src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Tied rt (At.leftover H′ {B = ⊤} src)
+        re {rt = rt} ψ sn e none ej with vis ps π ψ sn
+        ... | inj₁ (s , sm)        = subst (Tied rt) (sym (le (fresh-path ψ ps) sm))
+                                       (Lingers.rests lg ψ s (trans (sym (same-part (fresh-path ψ ps) sm)) e)
+                                         (trans (sym (same-src (fresh-path ψ ps) sm)) none) ej)
+        ... | inj₂ (sπ , ρ , sρ) = Lingers.rests (inner (sub sπ)) ρ sρ e none ej
+
+    -- Past a teardown, likewise: nothing seen below the site holds a part.
+    lingers-seen : ∀ {Δ₀ A₀} {t : Sub h Δ₀ A₀}
+                 → (∀ {Δ′ A′} {u : Sub h Δ′ A′} (ψ : Path w u) → seen H′ ψ ≡ true → is-just (At.part H′ u) ≡ true → ⊥)
+                 → AllPairs _≢_ (names t) → Path t w
+                 → (∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+                    → AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl so ls)) → Same H H′ w (flatMapˢ op f fl oc k r pl so ls)
+                    → At.pooled H′ fl so ls ≡ At.pooled H fl so ls)
+                 → (∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+                    → AllPairs _≢_ (names (connectˢ S c b kb k fd rp e rt src bd)) → Same H H′ w (connectˢ S c b kb k fd rp e rt src bd)
+                    → At.leftover H′ {B = ⊤} src ≡ At.leftover H {B = ⊤} src)
+                 → Lingers H t → Lingers H′ t
+    lingers-seen dead ps π pe le = lingers-write ps π pe le λ _ → record
+      { pools = λ ρ sρ e → ⊥-elim (dead ρ sρ (cong is-just e))
+      ; rests = λ ρ sρ e _ _ → ⊥-elim (dead ρ sρ (cong is-just e)) }
+
   -- Every part held heads as it did: a site's teardown leaves what it
   -- reached unseen, and the rest reads alike.
   torn-take-each : ∀ {h} (H : Heapᴹ h) {P : ∀ {Γ A} → U.Node Γ A → Set} {t : Sub h [] R} {Δ A i q c k} {s : Sub h Δ A}
@@ -642,6 +692,46 @@ module Tearing (R : Set) where
     Seeing.each-seen H _ (body-off H {Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} (fresh-path π ps) none)
                          (body-eq H {Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} (fresh-path π ps) none)
                          (body-dead H {Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} (fresh-path π ps) none) ps π
+
+  -- A teardown's site, against a pool or a leftover apart from it or
+  -- above it: read alike.  Above it, the site holds no part before
+  -- (taken, or a body unheld) and none after.
+  postulate
+    take-pooled : ∀ {h} (H : Heapᴹ h) {Δ A i q c k} {s : Sub h Δ A} → AllPairs _≢_ (names (takeWhileˢ i q c k taken s))
+                → ∀ {Δ′ A′ B′} {op f fl oc k′ r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+                → AllPairs _≢_ (names (flatMapˢ op f fl oc k′ r pl so ls)) → Same H (thrown H c k s) (takeWhileˢ i q c k taken s) (flatMapˢ op f fl oc k′ r pl so ls)
+                → At.pooled (thrown H c k s) fl so ls ≡ At.pooled H fl so ls
+    take-leftover : ∀ {h} (H : Heapᴹ h) {Δ A i q c k} {s : Sub h Δ A} → AllPairs _≢_ (names (takeWhileˢ i q c k taken s))
+                  → ∀ {Δ′ A′ B′} {S c′ b kb k′ fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+                  → AllPairs _≢_ (names (connectˢ S c′ b kb k′ fd rp e rt src bd)) → Same H (thrown H c k s) (takeWhileˢ i q c k taken s) (connectˢ S c′ b kb k′ fd rp e rt src bd)
+                  → At.leftover (thrown H c k s) {B = ⊤} src ≡ At.leftover H {B = ⊤} src
+    body-pooled : ∀ {h} (H : Heapᴹ h) {Δ A B S c b kb k fd e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
+                → AllPairs _≢_ (names (connectˢ S c b kb k fd rp e rt s bd)) → At.part H bd ≡ nothing
+                → ∀ {Δ′ A′ B′} {op f fl oc k′ r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+                → AllPairs _≢_ (names (flatMapˢ op f fl oc k′ r pl so ls)) → Same H (thrown H c k s) (connectˢ S c b kb k fd rp e rt s bd) (flatMapˢ op f fl oc k′ r pl so ls)
+                → At.pooled (thrown H c k s) fl so ls ≡ At.pooled H fl so ls
+    body-leftover : ∀ {h} (H : Heapᴹ h) {Δ A B S c b kb k fd e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
+                  → AllPairs _≢_ (names (connectˢ S c b kb k fd rp e rt s bd)) → At.part H bd ≡ nothing
+                  → ∀ {Δ′ A′ B′} {S′ c′ b′ kb′ k′ fd′ rp′ e′ rt′} {src : Sub h Δ′ A′} {bd′ : Sub h (A′ ∷ Δ′) B′}
+                  → AllPairs _≢_ (names (connectˢ S′ c′ b′ kb′ k′ fd′ rp′ e′ rt′ src bd′))
+                  → Same H (thrown H c k s) (connectˢ S c b kb k fd rp e rt s bd) (connectˢ S′ c′ b′ kb′ k′ fd′ rp′ e′ rt′ src bd′)
+                  → At.leftover (thrown H c k s) {B = ⊤} src ≡ At.leftover H {B = ⊤} src
+
+  torn-take-lingers : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} {Δ A i q c k} {s : Sub h Δ A}
+                      (π : Path t (takeWhileˢ i q c k taken s)) → AllPairs _≢_ (names t) → Lingers H t → Lingers (thrown H c k s) t
+  torn-take-lingers H {Δ = Δ} {A} {i} {q} {c} {k} {s} π ps =
+    Seeing.lingers-seen H _ (take-off H {Δ} {A} {i} {q} {c} {k} {s} (fresh-path π ps)) (take-eq H {Δ} {A} {i} {q} {c} {k} {s} (fresh-path π ps))
+                            (take-dead H {Δ} {A} {i} {q} {c} {k} {s} (fresh-path π ps)) ps π
+                            (take-pooled H {Δ} {A} {i} {q} {c} {k} {s} (fresh-path π ps)) (take-leftover H {Δ} {A} {i} {q} {c} {k} {s} (fresh-path π ps))
+
+  torn-body-lingers : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} {Δ A B S c b kb k fd e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
+                      (π : Path t (connectˢ S c b kb k fd rp e rt s bd)) → AllPairs _≢_ (names t) → At.part H bd ≡ nothing → Lingers H t → Lingers (thrown H c k s) t
+  torn-body-lingers H {Δ = Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} π ps none =
+    Seeing.lingers-seen H _ (body-off H {Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} (fresh-path π ps) none)
+                            (body-eq H {Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} (fresh-path π ps) none)
+                            (body-dead H {Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} (fresh-path π ps) none) ps π
+                            (body-pooled H {Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} (fresh-path π ps) none)
+                            (body-leftover H {Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} (fresh-path π ps) none)
 
   ----------------------------------------------------------------------
   -- A flatMap's lanes: their switches

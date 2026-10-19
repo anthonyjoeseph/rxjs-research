@@ -15,7 +15,7 @@ open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈�
 open import Level using (lift; lower)
 open import Data.Maybe using (Maybe; just; nothing; is-just)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
-open import Data.Sum using (_⊎_; [_,_]′)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ)
@@ -41,9 +41,9 @@ module Framing (R : Set) where
   open Machine R using (Mach; Read)
   open Run (Pureᴾ R) using (Ref; Subject; module Kit; module FlatKit)
   open Shared Timeline (Out R) using (Conf; Heapᴹ; store; stored; look)
-  open Heap using (_∋_) renaming (same to same⊑)
+  open Heap using (_∋_; cell; slot) renaming (same to same⊑)
   open Strongly R using (Strong; Sub; scanˢ; here; module At; Queue; Kernels; Meaning; Path; in-scan; in-source; _⊕_; names; Each; Heads; seen; Books;
-                         mapˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; PathLanes; this-lane; next-lane; in-map; in-take; in-outer; in-lanes; in-body; in-defer; seen-join;
+                         mapˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; lane; PathLanes; this-lane; next-lane; in-map; in-take; in-outer; in-lanes; in-body; in-defer; seen-join;
                          Taking; taking; taken; cutNames; quietName; subjectNames; flatNames; laneNames; Name; pendings; subjects; joiners) renaming (ending to endingᵀ)
   open Tearing R using (holds-at; Alike; Off; part-alike; partLanes-alike; lanes-path; module Seeing; look-store; get-put-same; fresh-path; names-path; apart-r; apart-l; ≢-flip)
   open Moving R using (pairs-r; pairs-split; plant; pendings-plant; subjects-plant; joiners-plant; head-map; head-scan)
@@ -63,18 +63,60 @@ module Framing (R : Set) where
     rewrite get-put-same H r {y = stored (lift z) same⊑}
           | part-alike H (store H r (lift z)) u (λ j m → look-store H r j (lookupᴬ nr m)) | pu = refl
 
+  -- A node's names, its scans' accumulators left out.
+  mutual
+    gates : ∀ {h Δ A} → Sub h Δ A → List (Name h)
+    gates (mapˢ f s)                            = gates s
+    gates (scanˢ f r s)                         = gates s
+    gates (takeWhileˢ i p c k tk s)             = cutNames c ++ quietName k ++ gates s
+    gates (flatMapˢ op f fl oc k r pl so ls)    = flatNames fl ++ cutNames oc ++ quietName k ++ (slot _ , r) ∷ gates so ++ gatesL ls
+    gates (connectˢ S c b kb k fd rp e rt src bd) =
+      subjectNames S ++ cutNames c ++ (cell _ , b) ∷ quietName kb ++ quietName k ++ gates src ++ gates bd
+    gates (deferˢ k s)                          = quietName k ++ gates s
+    gates u                                     = names u
+
+    gatesL : ∀ {h Δ B} → List (Lane h Δ B) → List (Name h)
+    gatesL []                = []
+    gatesL (lane c k s ∷ ls) = cutNames c ++ quietName k ++ gates s ++ gatesL ls
+
   -- A WRITE AT A SCAN'S ACCUMULATOR, FRAMED: nothing the relation holds
   -- reads an accumulator but the parts above it.  A path the write leaves
   -- seen it saw before, to a node that reads alike or sits above the
   -- scan.
   postulate
-    scan-sees    : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
-                 → ∀ z {Δ′ A′} {x : Sub h Δ′ A′} (ψ : Path T x) → seen (store H r (lift z)) ψ ≡ true
-                 → seen H ψ ≡ true × (Alike H (store H r (lift z)) (names x) ⊎ Path x (scanˢ f r u))
+    -- Whether a node has a part reads no accumulator.
+    defined-alike : ∀ {h} (H H′ : Heapᴹ h) {Δ A} (u : Sub h Δ A) → Alike H H′ (gates u) → is-just (At.part H′ u) ≡ is-just (At.part H u)
 
-    -- Whether a node has a part never reads an accumulator.
-    scan-defined : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
-                 → ∀ z {Δ′ A′} {x : Sub h Δ′ A′} → Path T x → is-just (At.part (store H r (lift z)) x) ≡ is-just (At.part H x)
+    -- Whether a path is seen reads no accumulator.
+    seen-gates : ∀ {h} (H H′ : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (ψ : Path t u) → Alike H H′ (gates t) → seen H′ ψ ≡ seen H ψ
+
+    -- A scan's accumulator is no other node's name but an accumulator.
+    gates-apart : ∀ {h} {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
+                → ∀ {Δ′ A′} {x : Sub h Δ′ A′} → Path T x → All (_≢_ {A = Name h} (cell _ , r)) (gates x)
+
+    -- A node either sits above the scan or names nothing of its accumulator.
+    scan-apart : ∀ {h} {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
+               → ∀ {Δ′ A′} {x : Sub h Δ′ A′} → Path T x → All (_≢_ {A = Name h} (cell _ , r)) (names x) ⊎ Path x (scanˢ f r u)
+
+  -- Apart from a write's name, a heap reads as before the write.
+  store-alike : ∀ {h} (H : Heapᴹ h) {k} (i : h ∋ k) {x} {ns : List (Name h)} → All (_≢_ {A = Name h} (k , i)) ns → Alike H (store H i x) ns
+  store-alike H i ap j m = look-store H i j (lookupᴬ ap m)
+
+  scan-defined : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
+               → ∀ z {Δ′ A′} {x : Sub h Δ′ A′} → Path T x → is-just (At.part (store H r (lift z)) x) ≡ is-just (At.part H x)
+  scan-defined H {r = r} ρ fs z {x = x} ψ = defined-alike H (store H r (lift z)) x (store-alike H r {lift z} (gates-apart ρ fs ψ))
+
+  scan-sees : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → Path T (scanˢ f r u) → AllPairs _≢_ (names T)
+            → ∀ z {Δ′ A′} {x : Sub h Δ′ A′} (ψ : Path T x) → seen (store H r (lift z)) ψ ≡ true
+            → seen H ψ ≡ true × (Alike H (store H r (lift z)) (names x) ⊎ Path x (scanˢ f r u))
+  scan-sees H {r = r} ρ fs z ψ e =
+    trans (sym (seen-gates H (store H r (lift z)) ψ (store-alike H r {lift z} (gates-apart ρ fs here)))) e
+    , side (scan-apart ρ fs ψ)
+    where
+      side : ∀ {Δ′ A′} {x : Sub _ Δ′ A′} → All (_≢_ {A = Name _} (cell _ , r)) (names x) ⊎ Path x (scanˢ _ r _)
+           → Alike H (store H r (lift z)) (names x) ⊎ Path x (scanˢ _ r _)
+      side (inj₁ ap) = inj₁ (store-alike H r {lift z} ap)
+      side (inj₂ π)  = inj₂ π
 
 
   heads-map : ∀ {Γ A B q} (g : A → B) {c : U.Node Γ A} → Heads q c → Heads q (U.mapᶜ g c)

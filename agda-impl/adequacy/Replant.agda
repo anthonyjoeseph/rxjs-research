@@ -17,35 +17,37 @@ open import Data.Nat using (_≤_; zero; suc; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤)
-open import Data.Empty using (⊥)
+open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Bool using (true)
+open import Data.Bool using (true; false)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst)
 open import Level using (lower)
 
-open import denotation.MonotonicList using (Timeline; Pos; Label; ix; sub; _<ᵖ_; <ᵖ-irrefl; <ᵖ-apart)
+open import denotation.MonotonicList using (Timeline; Pos; Label; ix; sub; last; Frame; From; _<ᵖ_; <ᵖ-irrefl; <ᵖ-apart)
 import denotation.Unfold as U
 open import operation.PureObservable using (Out; Pureᴾ; module Pure)
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Moves using (module Moving)
-open import adequacy.Retag using (Retag; module Retagging)
+open import adequacy.Retag using (Retag; keep; module Retagging)
 open import adequacy.Torn using (module Tearing)
 open import adequacy.Frame using (module Framing)
 open import adequacy.Shift using (module Shifting)
 
 module Replanting (R : Set) where
   open Shared Timeline (Out R) using (Heapᴹ; Stack; store)
-  open Heap using (_⊑_; _∋_; Handle; cell)
-  open Run (Pureᴾ R) using (Act; wkAct; _>>ᴬ_; module Kit)
+  open Heap using (_⊑_; _∋_; Handle; cell) renaming (same to sameʰ)
+  open Run (Pureᴾ R) using (Act; wkAct; _>>ᴬ_; module Kit; emitAll; under; module Observer)
   open Pure R using (Timer; cascade)
   open Strongly R using (Sub; Path; PathLanes; _⊕_; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane;
-                         Lane; lane; Call; take1C; feedC; finC; code; coldˢ; takeWhileˢ; flatMapˢ; connectˢ; taking; ending; idle; feeding; finishing;
+                         Lane; lane; Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; code; Leaf; of-leaf; cold-leaf; done-leaf; join-leaf;
+                         walk; walkLanes; top; module Here; unsub; unsubscribing; spot; playing; fired; taken;
+                         pendingˢ; ofˢ; doneˢ; mapˢ; scanˢ; joinˢ; deferˢ; coldˢ; takeWhileˢ; flatMapˢ; connectˢ; taking; ending; idle; feeding; finishing;
                          Owned; Each; Heads; Lingers; Pinned; Name; names; laneNames; cutNames; quietName; subjectNames; flatNames; module At; _≗_) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (StackAs; BurstAs; Held; bottomAs; restAs; backAs; reholdAs; playsAs; firesAs; overAs; bottomᴴ; restᴴ;
                                  BurstClocked; Ticked; CtlAs; runAs)
-  open Moving R using (plant; plantᴸ; planted; plant-self; pairs-r; pairs-split)
-  open Retagging R using (retag)
+  open Moving R using (plant; plantᴸ; planted; plant-self; pairs-r; pairs-split; Same; same; same-map; same-scan; same-take; same-flat; same-connect; same-defer)
+  open Retagging R using (retag; retagᴸ)
   open Tearing R using (Off; look-either; fresh-path; part-alike; names-path; lanes-path; apart-r; apart-l; narrow)
   open Framing R using (Untold; Ended; untold)
   open Shifting R using (module Walk)
@@ -85,13 +87,176 @@ module Replanting (R : Set) where
   Owing (kin-feed {q = q}) p = p ≡ q
   Owing (kin-fin {q = q})  p = p ≡ q
 
+  -- A node and what it is after a kin is planted: the same but for its
+  -- children, the kin itself, or a joiner retold.
+  data Twin {h} : ∀ {Δ A} → Sub h Δ A → Sub h Δ A → Set₁ where
+    twin-same : ∀ {Δ A} {x x′ : Sub h Δ A} → Same x x′ → Twin x x′
+    twin-kin  : ∀ {Δ A} {x x′ : Sub h Δ A} → Kin x x′ → Twin x x′
+    twin-join : ∀ {Δ A j sk l i st st′} → Twin (joinˢ {Δ = Δ} {A} j sk l i st) (joinˢ j sk l i st′)
+
+  -- A path carried into a rewritten tree: to the node's twin, walked
+  -- alike.
+  Carry : ∀ {h Δ₀ A₀ Δ′ A′} {t : Sub h Δ₀ A₀} {x : Sub h Δ′ A′} (t′ : Sub h Δ₀ A₀) → Path t x → Set₁
+  Carry {x = x} t′ ψ = Σ _ λ x′ → Σ (Path t′ x′) λ ψ′ → Twin x x′ × (∀ H → walk ψ′ H ≡ walk ψ H)
+
+  CarryL : ∀ {h Δ₀ B Δ′ A′} {ls : List (Lane h Δ₀ B)} {x : Sub h Δ′ A′} (ls′ : List (Lane h Δ₀ B)) → PathLanes ls x → Set₁
+  CarryL {x = x} ls′ ψ =
+    Σ _ λ x′ → Σ (PathLanes ls′ x′) λ ψ′ → Twin x x′ × (∀ {A} op (f : A → _) fl H → walkLanes op f fl H ψ′ ≡ walkLanes op f fl H ψ)
+
+  -- A retag moves no field a walk reads, and every node it moves is a
+  -- twin.
+  retag-twin : ∀ {h Δ A} (g : Retag Δ) (s : Sub h Δ A) → Twin s (retag g s)
+  retag-twin g (pendingˢ s q)                          = twin-same same
+  retag-twin g (coldˢ s hd ph)                         = twin-same same
+  retag-twin g (ofˢ p i xs)                            = twin-same same
+  retag-twin g doneˢ                                   = twin-same same
+  retag-twin g (mapˢ f s)                              = twin-same same-map
+  retag-twin g (scanˢ f r s)                           = twin-same same-scan
+  retag-twin g (takeWhileˢ i p c k tk s)               = twin-same same-take
+  retag-twin g (flatMapˢ op f fl oc k r pl so ls)      = twin-same same-flat
+  retag-twin g (connectˢ S c b kb k fd rp e rt src bd) = twin-same same-connect
+  retag-twin g (joinˢ j sk l x st)                     = twin-join
+  retag-twin g (deferˢ k s)                            = twin-same same-defer
+
+  mutual
+    retag-carry : ∀ {h Δ A Δ′ A′} (g : Retag Δ) {s : Sub h Δ A} {x : Sub h Δ′ A′} (ψ : Path s x) → Carry (retag g s) ψ
+    retag-carry g {s} here = _ , here , retag-twin g s , λ H → refl
+    retag-carry g (in-map ψ) with retag-carry g ψ
+    ... | _ , ψ′ , tw , we = _ , in-map ψ′ , tw , λ H → we _
+    retag-carry g (in-scan ψ) with retag-carry g ψ
+    ... | _ , ψ′ , tw , we = _ , in-scan ψ′ , tw , λ H → we _
+    retag-carry g (in-take ψ) with retag-carry g ψ
+    ... | _ , ψ′ , tw , we = _ , in-take ψ′ , tw , λ H → we _
+    retag-carry g (in-outer ψ) with retag-carry g ψ
+    ... | _ , ψ′ , tw , we = _ , in-outer ψ′ , tw , λ H → we _
+    retag-carry g (in-lanes {op = op} {f = f} {fl = fl} ψ) with retag-carryᴸ g ψ
+    ... | _ , ψ′ , tw , we = _ , in-lanes ψ′ , tw , λ H → we op f fl H
+    retag-carry g (in-source ψ) with retag-carry g ψ
+    ... | _ , ψ′ , tw , we = _ , in-source ψ′ , tw , λ H → we _
+    retag-carry g (in-body ψ) with retag-carry (keep g) ψ
+    ... | _ , ψ′ , tw , we = _ , in-body ψ′ , tw , λ H → we _
+    retag-carry g (in-defer ψ) with retag-carry g ψ
+    ... | _ , ψ′ , tw , we = _ , in-defer ψ′ , tw , λ H → we _
+
+    retag-carryᴸ : ∀ {h Δ B Δ′ A′} (g : Retag Δ) {ls : List (Lane h Δ B)} {x : Sub h Δ′ A′} (ψ : PathLanes ls x) → CarryL (retagᴸ g ls) ψ
+    retag-carryᴸ g (this-lane ψ) with retag-carry g ψ
+    ... | _ , ψ′ , tw , we = _ , this-lane ψ′ , tw , λ op f fl H → we _
+    retag-carryᴸ g (next-lane ψ) with retag-carryᴸ g ψ
+    ... | _ , ψ′ , tw , we = _ , next-lane ψ′ , tw , we
+
+  -- Beneath the kin: every child kept, a lane shifted one along, a body
+  -- retagged.
+  kin-carry : ∀ {h Δ A Δ′ A′} {u v : Sub h Δ A} {x : Sub h Δ′ A′} → Kin u v → (ψ : Path u x) → Carry v ψ
+  kin-carry kn here                       = _ , here , twin-kin kn , λ H → refl
+  kin-carry kin-end (in-take ψ)           = _ , in-take ψ , twin-same same , λ H → refl
+  kin-carry kin-pool (in-outer ψ)         = _ , in-outer ψ , twin-same same , λ H → refl
+  kin-carry kin-pool (in-lanes ψ)         = _ , in-lanes ψ , twin-same same , λ H → refl
+  kin-carry kin-lane (in-outer ψ)         = _ , in-outer ψ , twin-same same , λ H → refl
+  kin-carry kin-lane (in-lanes ψ)         = _ , in-lanes (next-lane ψ) , twin-same same , λ H → refl
+  kin-carry kin-feed (in-source ψ)        = _ , in-source ψ , twin-same same , λ H → refl
+  kin-carry (kin-feed {g = g}) (in-body ψ) with retag-carry g ψ
+  ... | _ , ψ′ , tw , we = _ , in-body ψ′ , tw , λ H → we _
+  kin-carry kin-fin (in-source ψ)         = _ , in-source ψ , twin-same same , λ H → refl
+  kin-carry (kin-fin {g = g}) (in-body ψ) with retag-carry g ψ
+  ... | _ , ψ′ , tw , we = _ , in-body ψ′ , tw , λ H → we _
+
+  -- Anywhere in the tree: off the kin's path, the same node; on it, the
+  -- same node but for the child the path takes.
+  mutual
+    carry : ∀ {h Δ₀ A₀ Δ A Δ′ A′} {t : Sub h Δ₀ A₀} {u v : Sub h Δ A} {x : Sub h Δ′ A′} → Kin u v → (ρ : Path t u) → (ψ : Path t x) → Carry (plant ρ v) ψ
+    carry kn here ψ = kin-carry kn ψ
+    carry kn (in-map ρ) here = _ , here , twin-same same-map , λ H → refl
+    carry kn (in-map ρ) (in-map ψ) with carry kn ρ ψ
+    ... | _ , ψ′ , tw , we = _ , in-map ψ′ , tw , λ H → we _
+    carry kn (in-scan ρ) here = _ , here , twin-same same-scan , λ H → refl
+    carry kn (in-scan ρ) (in-scan ψ) with carry kn ρ ψ
+    ... | _ , ψ′ , tw , we = _ , in-scan ψ′ , tw , λ H → we _
+    carry kn (in-take ρ) here = _ , here , twin-same same-take , λ H → refl
+    carry kn (in-take ρ) (in-take ψ) with carry kn ρ ψ
+    ... | _ , ψ′ , tw , we = _ , in-take ψ′ , tw , λ H → we _
+    carry kn (in-outer ρ) here = _ , here , twin-same same-flat , λ H → refl
+    carry kn (in-outer ρ) (in-outer ψ) with carry kn ρ ψ
+    ... | _ , ψ′ , tw , we = _ , in-outer ψ′ , tw , λ H → we _
+    carry kn (in-outer ρ) (in-lanes ψ) = _ , in-lanes ψ , twin-same same , λ H → refl
+    carry kn (in-lanes ρ) here = _ , here , twin-same same-flat , λ H → refl
+    carry kn (in-lanes ρ) (in-outer ψ) = _ , in-outer ψ , twin-same same , λ H → refl
+    carry kn (in-lanes ρ) (in-lanes {op = op} {f = f} {fl = fl} ψ) with carryᴸ kn ρ ψ
+    ... | _ , ψ′ , tw , we = _ , in-lanes ψ′ , tw , λ H → we op f fl H
+    carry kn (in-source ρ) here = _ , here , twin-same same-connect , λ H → refl
+    carry kn (in-source ρ) (in-source ψ) with carry kn ρ ψ
+    ... | _ , ψ′ , tw , we = _ , in-source ψ′ , tw , λ H → we _
+    carry kn (in-source ρ) (in-body ψ) = _ , in-body ψ , twin-same same , λ H → refl
+    carry kn (in-body ρ) here = _ , here , twin-same same-connect , λ H → refl
+    carry kn (in-body ρ) (in-source ψ) = _ , in-source ψ , twin-same same , λ H → refl
+    carry kn (in-body ρ) (in-body ψ) with carry kn ρ ψ
+    ... | _ , ψ′ , tw , we = _ , in-body ψ′ , tw , λ H → we _
+    carry kn (in-defer ρ) here = _ , here , twin-same same-defer , λ H → refl
+    carry kn (in-defer ρ) (in-defer ψ) with carry kn ρ ψ
+    ... | _ , ψ′ , tw , we = _ , in-defer ψ′ , tw , λ H → we _
+
+    carryᴸ : ∀ {h Δ₀ B Δ A Δ′ A′} {ls : List (Lane h Δ₀ B)} {u v : Sub h Δ A} {x : Sub h Δ′ A′} → Kin u v → (ρ : PathLanes ls u) → (ψ : PathLanes ls x)
+           → CarryL (plantᴸ ρ v) ψ
+    carryᴸ kn (this-lane ρ) (this-lane ψ) with carry kn ρ ψ
+    ... | _ , ψ′ , tw , we = _ , this-lane ψ′ , tw , λ op f fl H → we _
+    carryᴸ kn (this-lane ρ) (next-lane ψ) = _ , next-lane ψ , twin-same same , λ op f fl H → refl
+    carryᴸ kn (next-lane ρ) (this-lane ψ) = _ , this-lane ψ , twin-same same , λ op f fl H → refl
+    carryᴸ kn (next-lane ρ) (next-lane ψ) with carryᴸ kn ρ ψ
+    ... | _ , ψ′ , tw , we = _ , next-lane ψ′ , tw , we
+
+  -- A leaf is no kin's.
+  leaf-kin : ∀ {h Δ A} {x x′ : Sub h Δ A} → Leaf x → Kin x x′ → ⊥
+  leaf-kin of-leaf   ()
+  leaf-kin cold-leaf ()
+  leaf-kin done-leaf ()
+  leaf-kin join-leaf ()
+
+  -- A connect's source subscribed: the kin is never a pending, so the
+  -- source is still one after.
+  postulate
+    rehome-src : ∀ {h Δ A} {T : Sub h [] R} {u v : Sub h Δ A} → Kin u v → (ρ : Path T u)
+               → ∀ {Δ′ A′ B} {S c b kb k fd e s₁ q rp rt} {bd : Sub h (A′ ∷ Δ′) B}
+               → (π : Path T (connectˢ S c b kb k fd rp e rt (pendingˢ {Δ = Δ′} s₁ q) bd))
+               → Σ (Call (plant ρ v)) λ k′ → code k′ ≡ code (srcC π)
+
   -- A call aimed anywhere in the tree, aimed alike after: its code reads
   -- its node's fields and the walk to it, and a kin moves neither.  A
   -- cold likewise.
-  postulate
-    rehome : ∀ {h Δ A} {T : Sub h [] R} {u v : Sub h Δ A} → Kin u v → (ρ : Path T u) → (k : Call T) → Σ (Call (plant ρ v)) λ k′ → code k′ ≡ code k
-    recold : ∀ {h Δ A} {T : Sub h [] R} {u v : Sub h Δ A} → Kin u v → (ρ : Path T u)
-           → ∀ {Δ′ A′ s hd ph} → Path T (coldˢ {Δ = Δ′} {A′} s hd ph) → Path (plant ρ v) (coldˢ {Δ = Δ′} {A′} s hd ph)
+  rehome : ∀ {h Δ A} {T : Sub h [] R} {u v : Sub h Δ A} → Kin u v → (ρ : Path T u) → (k : Call T) → Σ (Call (plant ρ v)) λ k′ → code k′ ≡ code k
+  rehome kn ρ (emitC {i = i} {xs} π) with carry kn ρ π
+  ... | _ , π′ , twin-same same , we = emitC π′ , cong (λ W → emitAll (Here.obs W) i xs) (we top)
+  ... | _ , π′ , twin-kin () , we
+  rehome kn ρ (kontC {u = x} lf π) with carry kn ρ π
+  ... | _ , π′ , twin-same same , we = kontC lf π′ , cong (λ W → Here.kont W sameʰ (unsubscribing (unsub x))) (we top)
+  ... | _ , π′ , twin-kin kn′ , we = ⊥-elim (leaf-kin lf kn′)
+  ... | _ , π′ , twin-join , we = kontC join-leaf π′ , cong (λ W → Here.kont W sameʰ (unsubscribing (unsub x))) (we top)
+  rehome kn ρ (take1C {c = c} π) with carry kn ρ π
+  ... | _ , π′ , twin-same same , we      = take1C π′ , cong (λ W → under last (Observer.complete (Here.obs W)) (Kit.cut c)) (we top)
+  ... | _ , π′ , twin-same same-take , we = take1C π′ , cong (λ W → under last (Observer.complete (Here.obs W)) (Kit.cut c)) (we top)
+  ... | _ , π′ , twin-kin () , we
+  rehome kn ρ (take2C π) with carry kn ρ π
+  ... | _ , π′ , twin-same same , we      = take2C π′ , refl
+  ... | _ , π′ , twin-same same-take , we = take2C π′ , refl
+  ... | _ , π′ , twin-kin () , we
+  rehome kn ρ (bodyC π) with carry kn ρ π
+  ... | _ , π′ , twin-same same , we         = bodyC π′ , refl
+  ... | _ , π′ , twin-same same-connect , we = bodyC π′ , refl
+  ... | _ , π′ , twin-kin kin-feed , we      = bodyC π′ , refl
+  ... | _ , π′ , twin-kin kin-fin , we       = bodyC π′ , refl
+  rehome kn ρ (feedC π) with carry kn ρ π
+  ... | _ , π′ , twin-same same , we         = feedC π′ , refl
+  ... | _ , π′ , twin-same same-connect , we = feedC π′ , refl
+  ... | _ , π′ , twin-kin () , we
+  rehome kn ρ (finC π) with carry kn ρ π
+  ... | _ , π′ , twin-same same , we         = finC π′ , refl
+  ... | _ , π′ , twin-same same-connect , we = finC π′ , refl
+  ... | _ , π′ , twin-kin () , we
+  rehome kn ρ (srcC π) = rehome-src kn ρ π
+
+  recold : ∀ {h Δ A} {T : Sub h [] R} {u v : Sub h Δ A} → Kin u v → (ρ : Path T u)
+         → ∀ {Δ′ A′ s hd ph} → Path T (coldˢ {Δ = Δ′} {A′} s hd ph) → Path (plant ρ v) (coldˢ {Δ = Δ′} {A′} s hd ph)
+  recold kn ρ ψ with carry kn ρ ψ
+  ... | _ , ψ′ , twin-same same , _ = ψ′
+  ... | _ , ψ′ , twin-kin () , _
 
   rehomes : ∀ {h Δ A} {T : Sub h [] R} {u v : Sub h Δ A} → Kin u v → (ρ : Path T u) → List (Call T) → List (Call (plant ρ v))
   rehomes kn ρ = mapList (λ k → proj₁ (rehome kn ρ k))
@@ -136,11 +301,54 @@ module Replanting (R : Set) where
 
   -- WHAT IS OWED, CARRIED: the kin's own call ahead of the run's, rehomed;
   -- every other clause aimed at a node the kin keeps.
-  postulate
-    owned-run : ∀ {h} {H : Heapᴹ h} {T : Sub h [] R} {Δ A} {u v : Sub h Δ A} (kn : Kin u v) (ρ : Path T u)
-                {w p bs} {σ : w ⊑ h} {K : Stack w ⊤} (sk : StackAs T p σ K bs) (ks : List (Call T)) {act act′ : Act h ⊤} {e : act ≗ ⟦ ks ⟧ᶜ}
-                (e′ : act′ ≗ ⟦ owed kn ρ ++ rehomes kn ρ ks ⟧ᶜ) → Owing kn p
-              → Owned H T (runAs ks e sk) → Owned H (plant ρ v) (runAs (owed kn ρ ++ rehomes kn ρ ks) e′ (restack kn ρ sk))
+  -- One clause per field: a node of the planted tree is the kin, beneath
+  -- it, or an old node but for its children (`unplant`); the old
+  -- clause's call, rehomed, is the new one's.
+  module Rerun {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A} {u v : Sub h Δ A} (kn : Kin u v) (ρ : Path T u)
+               {w p bs} {σ : w ⊑ h} {K : Stack w ⊤} (sk : StackAs T p σ K bs) (ks : List (Call T)) {act act′ : Act h ⊤} {e : act ≗ ⟦ ks ⟧ᶜ}
+               (e′ : act′ ≗ ⟦ owed kn ρ ++ rehomes kn ρ ks ⟧ᶜ) (ow : Owing kn p) (old : Owned H T (runAs ks e sk)) where
+    open At H
+    T′ = plant ρ v
+    ca′ = runAs (owed kn ρ ++ rehomes kn ρ ks) e′ (restack kn ρ sk)
+    open Strongly.Against R T′ using (agenda; bursts; begins; Placed)
+
+    postulate
+      run-ofs    : ∀ {Δ′ A′ q i xs} (π : Path T′ (ofˢ {Δ = Δ′} {A′} q i xs)) → (q , emitC π) ∈ᴸ agenda ca′
+      run-plays  : ∀ {Δ′ A′ s hd τ r i u′} {b : Frame A′ u′} (π : Path T′ (coldˢ {Δ = Δ′} s hd (playing τ r i b)))
+                 → spentʰ hd ≡ false → spot π ∈ᴸ bursts ca′
+      run-fires  : ∀ {Δ′ A′ s hd τ e₁ u′} {m : From A′ u′} (π : Path T′ (coldˢ {Δ = Δ′} s hd (fired τ e₁ m)))
+                 → spentʰ hd ≡ false → spot π ∈ᴸ bursts ca′
+      run-begun  : ∀ {Δ′ A′ s q} (π : Path T′ (pendingˢ {Δ = Δ′} {A′} s q)) → spot π ∈ᴸ begins ca′
+      run-ends   : ∀ {Δ′ A′ i p′ c k q n} {s : Sub h Δ′ A′} (π : Path T′ (takeWhileˢ i p′ c k (ending q n) s))
+                 → val (Kit.live c) ≡ true → (q , take1C π) ∈ᴸ agenda ca′
+      run-cuts   : ∀ {Δ′ A′ i p′ c k} {s : Sub h Δ′ A′} (π : Path T′ (takeWhileˢ i p′ c k taken s))
+                 → val (Kit.live c) ≡ true → Σ Pos λ q → (q , take2C π) ∈ᴸ agenda ca′
+      run-feeds  : ∀ {Δ′ A′ B S c b kb k x q ss e₁ rp rt} {s : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B}
+                 → (π : Path T′ (connectˢ S c b kb k (feeding x q ss) rp e₁ rt s bd)) → (q , feedC π) ∈ᴸ agenda ca′
+      run-fins   : ∀ {Δ′ A′ B S c b kb k q ss e₁ rp rt} {s : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B}
+                 → (π : Path T′ (connectˢ S c b kb k (finishing q ss) rp e₁ rt s bd)) → (q , finC π) ∈ᴸ agenda ca′
+      run-bodies : ∀ {Δ′ A′ B S c b kb k fd e₁ rp rt q} {s : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B}
+                 → (π : Path T′ (connectˢ S c b kb k fd rp e₁ rt s bd)) → (q , bodyC π) ∈ᴸ agenda ca′ → part bd ≡ nothing
+      run-placed : All Placed (agenda ca′)
+
+  -- WHAT IS OWED, CARRIED: the kin's own call ahead of the run's, rehomed;
+  -- every other clause aimed at a node the kin keeps.
+  owned-run : ∀ {h} {H : Heapᴹ h} {T : Sub h [] R} {Δ A} {u v : Sub h Δ A} (kn : Kin u v) (ρ : Path T u)
+              {w p bs} {σ : w ⊑ h} {K : Stack w ⊤} (sk : StackAs T p σ K bs) (ks : List (Call T)) {act act′ : Act h ⊤} {e : act ≗ ⟦ ks ⟧ᶜ}
+              (e′ : act′ ≗ ⟦ owed kn ρ ++ rehomes kn ρ ks ⟧ᶜ) → Owing kn p
+            → Owned H T (runAs ks e sk) → Owned H (plant ρ v) (runAs (owed kn ρ ++ rehomes kn ρ ks) e′ (restack kn ρ sk))
+  owned-run {H = H} kn ρ sk ks {e = e} e′ ow old = record
+    { ofs    = Rr.run-ofs
+    ; plays  = Rr.run-plays
+    ; fires  = Rr.run-fires
+    ; begun  = Rr.run-begun
+    ; ends   = Rr.run-ends
+    ; cuts   = Rr.run-cuts
+    ; feeds  = Rr.run-feeds
+    ; fins   = Rr.run-fins
+    ; bodies = Rr.run-bodies
+    ; placed = Rr.run-placed }
+    where module Rr = Rerun H kn ρ sk ks {e = e} e′ ow old
 
   -- TWO NODES OF ONE TREE: one beneath the other, or no name shared.
   data Fork {h Δ A Δ′ A′} (u : Sub h Δ A) (x : Sub h Δ′ A′) : Set₁ where

@@ -53,6 +53,10 @@ open import adequacy.Names using (module Naming)
 open import adequacy.Alike using (module Aliking)
 open import adequacy.Taken using (module Taking)
 open import adequacy.Replant using (module Replanting)
+open import adequacy.Torn using (module Tearing)
+open import adequacy.Local using (module Locality)
+open import adequacy.Shift using (module Shifting)
+open import Data.Empty using (⊥)
 
 module Connecting (R : Set) where
   open Machine R using (Mach; mach; step; Playing; wkPlaying; wkTodo)
@@ -64,12 +68,12 @@ module Connecting (R : Set) where
   open Heap using (World; _⊑_; _⨾_; _∋_; there; new; grow; wk∋; cell) renaming (here to hereʳ; same to same⊑)
   open Run (Pureᴾ R) using (Act; done; under; _>>ᴬ_; compile; Env; wkEnv; wkAct; module Kit; Ref; wkR; Observer; Kont; wkObs; wkKont; Subject; Subscription; wkSubn)
   open Run.Kit (Pureᴾ R) using (skipᴬ)
-  open Strongly R using (Carried; Books; Sub; pendingˢ; connectˢ; idle; bodyK; srcK; Path; here; in-source; in-body; _⊕_; Here; walk; top; srcC; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-defer; subjects; laneSubjects; Lane; lane; Heads; Lingers; names; Phase; union-pinned; under-moved; bursts-pinned; rest-pinned; ≗-refl; newRef≗; unsubscribing; under≗; readRef≗; module Canon; owned-to; module Eaching; module Lingering)
+  open Strongly R using (Carried; Books; Sub; pendingˢ; connectˢ; idle; bodyK; srcK; Path; here; in-source; in-body; _⊕_; Here; walk; top; srcC; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Name; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-defer; subjects; laneSubjects; Lane; lane; Heads; Lingers; names; Phase; union-pinned; under-moved; bursts-pinned; rest-pinned; ≗-refl; newRef≗; unsubscribing; under≗; readRef≗; module Canon; owned-to; module Eaching; module Lingering)
                         renaming (⟦_⟧ to ⟦_⟧ᶜ; at⟦_⟧ to at⟦_⟧ᶜ)
-  open Strongly.Against R using (StackAs; subAs; backAs; stackJobs; SrcOf; src-of; Ticked)
+  open Strongly.Against R using (StackAs; CtlAs; subAs; backAs; stackJobs; SrcOf; src-of; Ticked)
   open Moving R using (planted; pend; part-plant; holds-owed; fed-plant; plant; plantᴸ; Splice; spliced-l; spliced-r; pendings-plant; joiners-plant)
   open Everywhere.Settling R using (settled-plant)
-  open Everywhere.Gating R using (gated-plant)
+  open Everywhere.Gating R using (gated-plant; gated-alike)
   open Ghosting R using (walk-⊕; sorted-⇝)
   open Forking R using (pend-less; subOf; walk-planted)
   open Keeping R using (lingers-plant)
@@ -81,6 +85,10 @@ module Connecting (R : Set) where
   open Aliking R using (KontRel; ObsRel; compile-cong; compile-env; obs-trans; obs-wk; obs-⨾; walk-grow; ≗-sym)
   open Taking R using (allocates; recode; tick-ix0; unders; ⊑≗)
   open Replanting R using (ahead-under)
+  open Tearing R using (Alike; part-alike; look-store)
+  open Locality R using (module Heaps)
+  open Everywhere.Holding R using (holds-alike)
+  open Shifting R using (each-alike; lingers-alike)
 
   -- A RUN AT A PENDING NODE, THE WORLD GROWN: what the relation reads of
   -- the run at its subscription, along the weakened tree and against the
@@ -389,9 +397,36 @@ module Connecting (R : Set) where
 
   -- A cell the grown world made past its old names, stored to: the run
   -- reads as it did, the tree naming only what the world held before.
-  postulate
-    grew-store : ∀ {h₀} {H₀ : Heapᴹ h₀} {T₀ : Sub h₀ [] R} {Δ A} {s : T.Obs Timeline Δ A} {q} {π₀ : Path T₀ (pendingˢ s q)}
-                   {u} {E′ : Env Δ u} {υ : u ⊑ h₀} {w} {σ : w ⊑ h₀} {K : Stack w ⊤} {clk}
-                   {h} {ν : h₀ ⊑ h} {H : Heapᴹ h} {bs ts} {t} (i : Ref h t) (x : Run.El (Pureᴾ R) h t)
-               → (∀ (j : Ref h₀ t) → wkR ν j ≢ i)
-               → Grew H₀ π₀ E′ υ σ K clk ν H bs ts → Grew H₀ π₀ E′ υ σ K clk ν (store H i (lift x)) bs ts
+  module Stored {h} (H : Heapᴹ h) {t} (i : Ref h t) (x : Run.El (Pureᴾ R) h t) where
+    H′ : Heapᴹ h
+    H′ = store H i (lift x)
+
+    postulate
+      -- The queue and what the run is owed read no cell outside the tree's names.
+      store-queue : ∀ {T : Sub h [] R} {q clk ts} → Alike H H′ (names T) → Queue H q clk ts T → Queue H′ q clk ts T
+      store-owned : ∀ {T : Sub h [] R} {q ctl bs} {ca : CtlAs T q ctl bs} → Alike H H′ (names T) → Owned H T ca → Owned H′ T ca
+
+  grew-store : ∀ {h₀} {H₀ : Heapᴹ h₀} {T₀ : Sub h₀ [] R} {Δ A} {s : T.Obs Timeline Δ A} {q} {π₀ : Path T₀ (pendingˢ s q)}
+                 {u} {E′ : Env Δ u} {υ : u ⊑ h₀} {w} {σ : w ⊑ h₀} {K : Stack w ⊤} {clk}
+                 {h} {ν : h₀ ⊑ h} {H : Heapᴹ h} {bs ts} {t} (i : Ref h t) (x : Run.El (Pureᴾ R) h t)
+             → (∀ (j : Ref h₀ t) → wkR ν j ≢ i)
+             → Grew H₀ π₀ E′ υ σ K clk ν H bs ts → Grew H₀ π₀ E′ υ σ K clk ν (store H i (lift x)) bs ts
+  grew-store {ν = ν} {H = H} i x ap G = record
+    { tree = tree G ; path = path G ; stack = stack G ; alone = alone G ; ticked = ticked G
+    ; obsR = obsR G ; kontR = kontR G ; envR = envR G ; pends = pends G ; named = named G ; distinct = distinct G
+    ; meets   = trans (part-alike H S.H′ (tree G) al) (meets G)
+    ; owned   = S.store-owned al (owned G)
+    ; kernels = record { holds   = holds-alike (tree G) al (Kernels.holds (kernels G))
+                       ; gated   = gated-alike (tree G) al (Kernels.gated (kernels G))
+                       ; settled = Kernels.settled (kernels G) }
+    ; meaning = record { fed = Heaps.fed-alike H S.H′ (tree G) al _ (Meaning.fed (meaning G)) }
+    ; queue   = S.store-queue al (queue G)
+    ; behind  = each-alike H S.H′ al (behind G)
+    ; lingers = lingers-alike H S.H′ al (lingers G) }
+    where
+      open Grew
+      module S = Stored H i x
+      al : Alike H S.H′ (names (tree G))
+      al j m = look-store H i j (λ e → apart e m)
+        where apart : ∀ {k} {j′ : _ ∋ k} → _≡_ {A = Name _} (cell _ , i) (k , j′) → (k , j′) ∈ names (tree G) → ⊥
+              apart refl m′ = ap (proj₁ (named G m′)) (proj₂ (named G m′))
