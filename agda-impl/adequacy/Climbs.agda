@@ -1509,10 +1509,10 @@ module Ascending (R : Set) where
     pending-flags () _
 
     -- A flatMap open by a live lane, or by a queued value.
-    lane-open : ∀ {Δ A B} op (g : A → Pos → U.Node Δ B) (o : Maybe (U.Node Δ A)) b (x : U.Node Δ B) (xs : List (U.Node Δ B)) qs pl
+    lane-opens : ∀ {Δ A B} op (g : A → Pos → U.Node Δ B) (o : Maybe (U.Node Δ A)) b (x : U.Node Δ B) (xs : List (U.Node Δ B)) qs pl
               → b ≡ true → is-just (At.merged H op g o (if b then x ∷ xs else xs) qs pl) ≡ true
-    lane-open op g nothing  b x xs qs pl refl = refl
-    lane-open op g (just _) b x xs qs pl refl = refl
+    lane-opens op g nothing  b x xs qs pl refl = refl
+    lane-opens op g (just _) b x xs qs pl refl = refl
 
     queue-open : ∀ {Δ A B} op (g : A → Pos → U.Node Δ B) (o : Maybe (U.Node Δ A)) (ls : List (U.Node Δ B)) y ys pl
                → is-just (At.merged H op g o ls (y ∷ ys) pl) ≡ true
@@ -1953,7 +1953,7 @@ module Ascending (R : Set) where
         sw₀ : seen base ρw ≡ true
         sw₀ = lifts-seen (Lifted.lifts-grow grows L)
         alive : ∀ G′ → At.val G′ (Kit.live cut′) ≡ true → is-just (At.part G′ v′) ≡ true
-        alive G′ lv = lane-open G′ op G (At.part G′ t′) (At.val G′ (Kit.live cut′)) (U.subscribe (f y) (q ++ [ ix 1 ])) (At.partLanes G′ ls′)
+        alive G′ lv = lane-opens G′ op G (At.part G′ t′) (At.val G′ (Kit.live cut′)) (U.subscribe (f y) (q ++ [ ix 1 ])) (At.partLanes G′ ls′)
                         (At.val G′ (FlatKit.Flat.queue fl′)) pl′ lv
         lvb : At.val base (Kit.live cut′) ≡ true
         lvb = trans (sym (cong lower (moved (Kit.live cut′) ((λ e → lookupᴬ (Grown.outside grown (FlatKit.Flat.active fl)) (here refl) (sym e))
