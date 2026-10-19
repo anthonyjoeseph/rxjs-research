@@ -508,7 +508,7 @@ module Lifting (R : Set) where
     with tear-cut cr z {ks} e eq
   ... | act′ , e′ , path = g , _ , path
     , carried (record
-        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = Carried.tree cr ; ctlAs = runAs ks e′ Kᴬ
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = Carried.tree cr ; ctlAs = runAs ks e′ Kᴬ
         ; meets = trans (torn-part cr z refl) (Carried.meets cr)
         ; owned′ = owned-to (torn-owned hp z (Carried.owned cr))
         ; kernels = record { holds = torn-holds cr z ; gated = torn-gated cr z ; settled = Kernels.settled (Carried.kernels cr) }

@@ -241,7 +241,7 @@ module Taking (R : Set) where
     with allocates (kk new hereʳ)
   ... | k₁ , e₁ , kk₂ =
     _ , then (cong (λ x → step (Mx x)) e₁) now
-    , record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = S.t′
+    , record { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = S.t′
              ; ctlAs = subAs S.π′ (S.code′ E′ υ e (kk₂ new hereʳ)) (S.restack sk₂ a₂) (S.alones _)
              ; meets = trans (part-plant H₂ S.π₂ S.v eqv) (trans (G₂′.grow-part gr₂ S.T₁) (trans (G₁′.grow-part gr₁ (Carried.tree cr)) (Carried.meets cr)))
              ; owned′ = owned-to (Moved.Owning.reowned S.π₂ S.v H₂ eqv (in-take here) S.inner sk₂ a₂

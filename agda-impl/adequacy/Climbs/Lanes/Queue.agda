@@ -36,6 +36,7 @@ open import adequacy.Torn using (module Tearing)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Seq using (module Sequencing)
 open import adequacy.Sane using (Sane)
+open import adequacy.Deep using (Deep)
 open import adequacy.Placed.Order using (Placed)
 open import denotation.Denote using (⟦_⟧)
 import Tree as T
@@ -98,7 +99,7 @@ module ClimbLanesQueue (R : Set) where
   open Naming R using (pre; pairs-↭; names-plant-↭; fresh-plant; fresh-new; wk-pairs; wk-img; to-img)
   open Ghosting R using (residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; passed; Past)
   open GhostingPaths R using (each-sub; each-lanes; module Far; module Calling; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; done-up; Healed; HealedL; healed-split; healed-end; lifts-seen; Rises; rises; Called; landed; rose; Aloft; aloft; hop-sorted; each-back; hopped-pre)
-  open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed; stepped-deep)
+  open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed; gapped-deep)
   open Lowering R using (Keeps; queue-keeps; store-keeps; keeps-trans)
   open Lifting R using (emit-shut; emit-run; spread-past; behind-fire; fire-lingers; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward)
   open LiftingOrder R using (sub-onward; emit-void; run-meets; run-at; heads-lift)
@@ -329,18 +330,18 @@ module ClimbLanesQueue (R : Set) where
   -- lane's skip.
   lane-ghost : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B op f fl oc k r pl} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ B}
                (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) {πL : PathLanes ls u} (o : OneLane πL) → AllPairs _≢_ (names T)
-             → ∀ {g q S bs l S₁ as} → Sane [] g → Placed g []
+             → ∀ {g q S bs l S₁ as} → Sane [] g → Placed g [] → Deep g []
              → LiftsLane H πL (U.endˢ q) bs S₁ as
              → settledᵍ (At.part H t) bs as (At.val H (FlatKit.Flat.queue fl)) ≡ false
              → At.val (freed H (laneOf o) fl) (FlatKit.Flat.queue fl) ≡ []
              → Lifts H ρ (U.laneˢ op (λ a i → U.subscribe (f a) i) (At.part H t) bs l S₁ as (At.val H (FlatKit.Flat.queue fl)) pl) S
              → U.step g ≡ S
              → Σ (U.Node [] R) λ g″ → At.part (freed H (laneOf o) fl) (Restaged.T′ (freed H (laneOf o) fl) ρ (U.unionᶜ pl (U.restᶜ l))) ≡ just g″
-               × Sane [] g″ × Placed g″ []
+               × Sane [] g″ × Placed g″ [] × Deep g″ []
                × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
-  lane-ghost H {op = op} {f} {fl} {oc} {k} {r} {pl} {t} {ls} ρ o fs {q = q} {bs = bs} {l} {S₁} {as} sn pd LL st e₀ L sg =
+  lane-ghost H {op = op} {f} {fl} {oc} {k} {r} {pl} {t} {ls} ρ o fs {q = q} {bs = bs} {l} {S₁} {as} sn pd dp LL st e₀ L sg =
     ghost-lift H H₂ ρ (flatMapˢ op f fl oc k r pl′ t ls) fs (Freed.fr-off H ρ o) (Freed.fr-mine H ρ o) {κ = []}
-      (subst (λ s → Lifts H ρ s _) lane-eq L) node alike sn pd sg
+      (subst (λ s → Lifts H ρ s _) lane-eq L) node alike sn pd dp sg
     where
       H₂  = freed H (laneOf o) fl
       G   = λ a i → U.subscribe (f a) i
@@ -416,7 +417,7 @@ module ClimbLanesQueue (R : Set) where
               → ∀ {a n} → m₁ ⇝ resend m₁ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (Calling.ϑ cl) (Calling.K cl) a n
               → a ≗ dequeueOf ρ [] → n ≗ ⟦ ks ⟧ᶜ → Called st m₁ (ρ ⊕ in-lanes πL)
   lane-settle st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {op = op} {f} {fl} {oc} {k} {r} {po} {t = t} {ls} ρ πL o {ks}
-    cl@record { sane = sn ; placed = pd ; ctl = refl ; stack = sk ; lifted = gu , S , L , sg , hl ; owned = ow
+    cl@record { sane = sn ; placed = pd ; deep = dp ; ctl = refl ; stack = sk ; lifted = gu , S , L , sg , hl ; owned = ow
               ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
               ; behind = bh ; lingers = lgr ; kept = kp } eq₀ {n = n} p ea eks
     with lifts-split ρ (in-lanes πL) L | reads {hp = freed hp (laneOf o) fl} ea
@@ -433,7 +434,7 @@ module ClimbLanesQueue (R : Set) where
     with settleᵇ (freed hp (laneOf o) fl) fl in eq
   ...       | true =
     rise kp (rises {sg′ = closes []} path (one-lower ρ (one-lanes o)) (record
-      { sane = sn ; placed = pd ; ctl = refl
+      { sane = sn ; placed = pd ; deep = dp ; ctl = refl
       ; code = ≗-trans e₃ (≗-trans (open-code {m = Observer.complete O} eq) (seq-done _))
       ; stack = stk
       ; lifted = flat-gone H₂ {op = op} {f} {fl} {oc} {k} {r} {po} {u = t} {ls} (trans (Freed.fr-part hp ρ o (fresh-path ρ fs)) eo)
@@ -469,11 +470,11 @@ module ClimbLanesQueue (R : Set) where
       eas  = proj₁ (proj₂ (proj₂ nl))
       eqs  = proj₂ (proj₂ (proj₂ nl))
   ...       | false
-    with lane-ghost hp ρ o fs sn pd LL (trans (sym (lane-settles ρ o cl LL)) eq) eq₀ Lρ sg
-  ...         | g″ , pg , sn″ , pd″ , k″ , r″ , ag , pp =
+    with lane-ghost hp ρ o fs sn pd dp LL (trans (sym (lane-settles ρ o cl LL)) eq) eq₀ Lρ sg
+  ...         | g″ , pg , sn″ , pd″ , dp″ , k″ , r″ , ag , pp =
     landed (g″ , _ , path
       , carried (record
-        { sane = sn″ ; placed = pd″ ; tree = Restaged.T′ H₂ ρ pl′
+        { sane = sn″ ; placed = pd″ ; deep = dp″ ; tree = Restaged.T′ H₂ ρ pl′
         ; ctlAs = runAs (Restaged.pool-calls H₂ ρ pl′ []) ec (Restaged.pool-stack H₂ ρ pl′ stk)
         ; meets = pg
         ; owned′ = owned-to (Restaged.pool-owned H₂ ρ pl′ stk [] ec (owned-move H₂ (runAs [] (≗-refl _) stk) refl refl refl (Freed.Sh.wr-owned hp ρ o fs (Freed.fr-gone hp ρ o (fresh-path ρ fs)) ow)))
@@ -515,13 +516,13 @@ module ClimbLanesQueue (R : Set) where
             → ∀ {a n} → m₁ ⇝ resend m₁ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (Calling.ϑ cl) (Calling.K cl) a n
             → a ≗ dequeueOf ρ (y ∷ ys) → n ≗ ⟦ ks ⟧ᶜ → Hopped st m₁
   lane-next st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {op = op} {f} {fl} {oc} {k} {r} {po} {t = t} {ls} ρ πL o {ks}
-    cl@record { sane = sn ; placed = pd ; ctl = refl ; stack = sk ; lifted = gn , S , L , sg , _ ; owned = ow
+    cl@record { sane = sn ; placed = pd ; deep = dp ; ctl = refl ; stack = sk ; lifted = gn , S , L , sg , _ ; owned = ow
               ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
               ; behind = bh ; lingers = lgr ; kept = kp } {y} {ys} eq₀ {n = n} p ea eks
     with lifts-split ρ (in-lanes πL) L | writes {hp = freed hp (laneOf o) fl} ea
   ... | _ , lifts-lanes {bs = bs′} {l = l} {as = as′} LL ee lf pb , Lρ | n′ , e′ , p′ =
     hopped-pre (⇝-trans p p′) (lane-begin st (record
-      { sane = sn ; placed = pd ; ctl = refl ; code = e′
+      { sane = sn ; placed = pd ; deep = dp ; ctl = refl ; code = e′
       ; opens = trans (Dequeued.Fr.wr-opened H₂ ρ ys fs true)
                   (trans (Freed.Wr.wr-opened hp ρ o fs true) (one-open hp o (trans (sym (opened-⊕ hp true ρ (in-lanes πL))) (calling-open (ρ ⊕ in-lanes πL) cl))))
       ; stack = stk

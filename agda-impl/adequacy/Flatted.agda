@@ -321,7 +321,7 @@ module Flatting (R : Set) where
                → subOf (Carried.ctlAs cr) ≡ just (Δ , B , T.flatMap op f s) → Restages cr s
   flat-restage {m = m₀@(mach ⟨ H , q₀ , run _ σ K ⟩ _ _ _ _ _ _ _)} cr@record { ctlAs = subAs {s = T.flatMap {A = A} op f s} π (u , E′ , υ , e , newRef≗ refl kk) sk a } refl refl =
     _ , path
-    , record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = F.t′
+    , record { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = F.t′
              ; ctlAs = subAs F.π′ (F.code′ ex₉) (F.restack sk₉ a₉) (F.alones _)
              ; meets = trans (part-plant H₉ F.π₈ F.v refl) (trans (Grew.meets G₉) (Carried.meets cr))
              ; owned′ = owned-to (F.rf-owned refl refl slot₉ refl refl refl refl (Grew.owned G₉))

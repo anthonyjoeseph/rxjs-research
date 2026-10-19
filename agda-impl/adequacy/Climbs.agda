@@ -39,7 +39,8 @@ open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Seq using (module Sequencing)
 open import adequacy.Sane using (sane-out)
 open import adequacy.Placed.Order using (Placed)
-open import adequacy.Stepper using (placed-after; Placedˢ)
+open import adequacy.Stepper using (placed-after; Placedˢ; step-deep)
+open import adequacy.Deep using (Deepˢ)
 open import denotation.Denote using (⟦_⟧)
 import Tree as T
 open import operation.PureObservable using (Out; note; Pureᴾ; module Pure)
@@ -102,7 +103,7 @@ module Ascending (R : Set) where
   open Naming R using (pre; pairs-↭; names-plant-↭; fresh-plant; fresh-new; wk-pairs; wk-img; to-img)
   open Ghosting R using (residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; passed; Past)
   open GhostingPaths R using (each-sub; each-lanes; module Far; module Calling; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; done-up; Healed; HealedL; healed-split; healed-end; lifts-seen; Rises; rises; Called; landed; rose; Aloft; aloft; hop-sorted; each-back; hopped-pre)
-  open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed; stepped-deep)
+  open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed; gapped-deep)
   open Lowering R using (Keeps; queue-keeps; store-keeps; keeps-trans)
   open Lifting R using (emit-shut; emit-run; spread-past; behind-fire; fire-lingers; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward)
   open LiftingOrder R using (sub-onward; emit-void; run-meets; run-at; heads-lift)
@@ -133,11 +134,11 @@ module Ascending (R : Set) where
   -- step its end.
   call-root : ∀ {g m} (st : Strong g m) {ℓ m₁} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {sg : Signal T R} → Calling g ℓ m₁ {T = T} here sg → Hopped st m₁
   call-root {g} st {m₁ = mach ⟨ hp , p , _ ⟩ clk ts bs td lg en mk} {T} {sends y}
-    record { sane = sn ; placed = pl ; ctl = refl ; code = eff≗ ke ; stack = sk ; lifted = c′ , pv , _ , lifts-here , sg ; owned = ow
+    record { sane = sn ; placed = pl ; deep = dp ; ctl = refl ; code = eff≗ ke ; stack = sk ; lifted = c′ , pv , _ , lifts-here , sg ; owned = ow
            ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = refl } ; sorted = so ; behind = bh ; lingers = lgr ; flags = dn } =
     g , _ , then refl now
     , carried (record
-        { sane = sn ; placed = pl ; tree = T ; ctlAs = noteAs [] (ke tt) sk ; meets = c′ , pv , sg
+        { sane = sn ; placed = pl ; deep = dp ; tree = T ; ctlAs = noteAs [] (ke tt) sk ; meets = c′ , pv , sg
         ; owned′ = owned-to (owned-move hp (noteAs [] (ke tt) sk) refl refl refl ow) ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = refl } 
         ; sorted = sorted-⇝ so (then refl now) ; behind′ = Eaching.each-to _ _ bh ; lingers′ = Lingering.lingers-to _ lgr ; flags = dn })
@@ -293,7 +294,7 @@ module Ascending (R : Set) where
               ; books = record { fresh = fs ; paidUp = refl ; running = rn } } refl refl =
     g , _ , then refl now
     , carried (record
-        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = calmAs ; meets = mt
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = t ; ctlAs = calmAs ; meets = mt
         ; owned′ = owned-to (owned-move hp calmAs refl refl refl (Carried.owned cr)) ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr refl (then refl now) ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; flags = Carried.flags cr })
@@ -303,7 +304,7 @@ module Ascending (R : Set) where
               ; books = record { fresh = fs ; clocked = ck ; paidUp = refl ; running = rn } } refl refl =
     g , _ , then refl now
     , carried (record
-        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = runAs ks e K″ ; meets = mt
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = t ; ctlAs = runAs ks e K″ ; meets = mt
         ; owned′ = owned-to (owned-move hp (runAs ks e K″) refl refl refl (Carried.owned cr)) ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr refl (then refl now) ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; flags = Carried.flags cr })
@@ -313,7 +314,7 @@ module Ascending (R : Set) where
               ; books = record { fresh = fs ; clocked = ck ; paidUp = refl ; running = rn } } refl refl =
     g , _ , then refl now
     , carried (record
-        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = runAs ks e K″ ; meets = mt
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = t ; ctlAs = runAs ks e K″ ; meets = mt
         ; owned′ = owned-to (owned-move hp (runAs ks e K″) refl refl refl (Carried.owned cr)) ; kernels = kn ; meaning = mn
         ; queue = record { timed = Queue.timed qu ; joined = Queue.joined qu ; ordered = Queue.ordered qu
                          ; ahead = map (λ { (c , a) → c , <ᵖ-trans q p _ qp a }) (Queue.ahead qu) }
@@ -325,7 +326,7 @@ module Ascending (R : Set) where
               ; books = record { fresh = fs ; clocked = ck ; paidUp = refl ; running = rn } } refl refl =
     g , _ , then refl now
     , carried (record
-        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = burstAs (playsAs π) hᴷ K″ ; meets = mt
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = t ; ctlAs = burstAs (playsAs π) hᴷ K″ ; meets = mt
         ; owned′ = owned-to (owned-move hp (burstAs (playsAs π) hᴷ K″) refl refl refl (Carried.owned cr)) ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr refl (then refl now) ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; flags = Carried.flags cr })
@@ -335,7 +336,7 @@ module Ascending (R : Set) where
               ; books = record { fresh = fs ; clocked = ck ; paidUp = refl ; running = rn } } refl refl =
     g , _ , then refl now
     , carried (record
-        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = burstAs (firesAs π) hᴷ K″ ; meets = mt
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = t ; ctlAs = burstAs (firesAs π) hᴷ K″ ; meets = mt
         ; owned′ = owned-to (owned-move hp (burstAs (firesAs π) hᴷ K″) refl refl refl (Carried.owned cr)) ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr refl (then refl now) ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; flags = Carried.flags cr })
@@ -345,7 +346,7 @@ module Ascending (R : Set) where
               ; books = record { fresh = fs ; paidUp = refl ; running = rn } } refl refl =
     g , _ , then refl (then refl now)
     , carried (record
-        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = calmAs ; meets = mt
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = t ; ctlAs = calmAs ; meets = mt
         ; owned′ = owned-to (owned-move hp calmAs refl refl refl (Carried.owned cr)) ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr refl (then refl (then refl now)) ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; flags = Carried.flags cr })
@@ -355,7 +356,7 @@ module Ascending (R : Set) where
               ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = refl ; running = rn } } refl refl =
     g , _ , then refl (then refl now)
     , carried (record
-        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = runAs ks e K‴ ; meets = mt
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = t ; ctlAs = runAs ks e K‴ ; meets = mt
         ; owned′ = owned-to (owned-move hp (runAs ks e K‴) refl refl refl (Carried.owned cr)) ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = proj₂ (proj₂ ck) ; paidUp = refl ; running = rn } 
         ; sorted = hop-sorted cr refl (then refl (then refl now)) ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; flags = Carried.flags cr })
@@ -372,6 +373,7 @@ module Ascending (R : Set) where
   ... | refl = _ , now , carried (record
         { sane = sane-out {g = g} (Carried.sane cr) stp
         ; placed = proj₂ (subst (Placedˢ []) stp (placed-after g (Carried.sane cr) (Carried.placed cr)))
+        ; deep = subst (Deepˢ []) stp (step-deep g (Carried.sane cr) (Carried.placed cr) (Carried.deep cr))
         ; tree = t ; ctlAs = runAs ks ke K ; meets = pe
         ; owned′ = owned-to (record { ofs = Owned.ofs (Carried.owned cr) ; plays = Owned.plays (Carried.owned cr) ; fires = Owned.fires (Carried.owned cr) ; begun = Owned.begun (Carried.owned cr)
                          ; ends = Owned.ends (Carried.owned cr) ; cuts = Owned.cuts (Carried.owned cr) ; feeds = Owned.feeds (Carried.owned cr) ; fins = Owned.fins (Carried.owned cr) ; bodies = Owned.bodies (Carried.owned cr)
@@ -425,7 +427,7 @@ module Ascending (R : Set) where
   ... | true =
     g , mach ⟨ hp , p , held σ bottom ⟩ (Timer.due tm) ts [] [] lg en mk , then (drop-spent tm sp) now
     , carried (record
-        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = t ; ctlAs = calmAs ; meets = mt ; owned′ = Carried.owned′ cr
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = t ; ctlAs = calmAs ; meets = mt ; owned′ = Carried.owned′ cr
         ; kernels = kn ; meaning = mn
         ; queue = record { timed = timed-spent {H = hp} sp (Queue.timed q) ; joined = Queue.joined q
                          ; ordered = tail (Queue.ordered q) ; ahead = ahead-pop {p = p} (Queue.ordered q) (Queue.ahead q) }
@@ -438,7 +440,7 @@ module Ascending (R : Set) where
   ...     | waits {τ = τ} {e = e} {u = u} {x = x} {sk = sk} {hd = hd} {fr = fr} π =
     g , _ , now
     , carried (record
-        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = plant π v
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = plant π v
         ; ctlAs = burstAs (firesAs (planted π v)) bottomᴴ bottomAs
         ; meets = trans (part-plant hp {t = t} π v refl) mt
         ; owned′ = owned-to (owned-pop hp {t = t} π (Carried.owned cr))

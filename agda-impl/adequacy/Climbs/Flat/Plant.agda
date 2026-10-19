@@ -37,6 +37,7 @@ open import adequacy.Torn using (module Tearing)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Seq using (module Sequencing)
 open import adequacy.Sane using (Sane)
+open import adequacy.Deep using (Deep)
 open import adequacy.Placed.Order using (Placed)
 open import denotation.Denote using (⟦_⟧)
 import Tree as T
@@ -96,7 +97,7 @@ module ClimbFlatPlant (R : Set) where
   open Naming R using (pre; pairs-↭; names-plant-↭; fresh-plant; fresh-new; wk-pairs; wk-img; to-img)
   open Ghosting R using (residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; passed; Past)
   open GhostingPaths R using (each-sub; each-lanes; module Far; module Calling; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; done-up; Healed; HealedL; healed-split; healed-end; lifts-seen; Rises; rises; Called; landed; rose; Aloft; aloft; hop-sorted; each-back; hopped-pre)
-  open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed; stepped-deep)
+  open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed; gapped-deep)
   open Lowering R using (Keeps; queue-keeps; store-keeps; keeps-trans)
   open Lifting R using (emit-shut; emit-run; spread-past; behind-fire; fire-lingers; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward)
   open LiftingOrder R using (sub-onward; emit-void; run-meets; run-at; heads-lift)
@@ -301,6 +302,7 @@ module ClimbFlatPlant (R : Set) where
     field
       sane    : Sane [] g
       placed  : Placed g []
+      deep    : Deep g []
       {w}     : World
       {ϑ}     : w ⊑ Conf.world (Mach.conf m)
       {act}   : Act (Conf.world (Mach.conf m)) ⊤
@@ -494,8 +496,8 @@ module ClimbFlatPlant (R : Set) where
       -- The ghost past the flatMap's skip, the lift read in the grown
       -- world: the splice alone.  `ghost-lift` gives it once the names
       -- are fresh, which the leaf does not carry.
-      bg-ghosted : ∀ {g S} → Sane [] g → Placed g [] → Lifts base (wkPath grow ρ) skipped S → U.step g ≡ S
-                 → Σ (U.Node [] R) λ g″ → At.part heap′ T′ ≡ just g″ × Sane [] g″ × Placed g″ []
+      bg-ghosted : ∀ {g S} → Sane [] g → Placed g [] → Deep g [] → Lifts base (wkPath grow ρ) skipped S → U.step g ≡ S
+                 → Σ (U.Node [] R) λ g″ → At.part heap′ T′ ≡ just g″ × Sane [] g″ × Placed g″ [] × Deep g″ []
                    × Σ Pos λ k′ → Σ (Events∞ R) λ r′ → (∀ n → Agree n (residual g) (skip k′ r′)) × Past (Events∞.force r′) (residual g″)
 
     -- The lane's run compiled where it begins: the env and observer
@@ -539,13 +541,13 @@ module ClimbFlatPlant (R : Set) where
       bg-lingered : Lingers base (wkTree grow (Restaged.T′ H ρ pl′)) → Lingers heap′ T′
 
     -- The growth, then the splice.
-    bg-ghost : ∀ {g S} → Sane [] g → Placed g []
+    bg-ghost : ∀ {g S} → Sane [] g → Placed g [] → Deep g []
              → Lifts H ρ (U.skipˢ (q ++ [ ix 0 ]) (U.flatMapᶜ op (λ a j → U.subscribe (f a) j) (At.part H t)
                            (U.subscribe (f y) (q ++ [ ix 1 ]) ∷ At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl′)) S
              → U.step g ≡ S
-             → Σ (U.Node [] R) λ g″ → At.part heap′ T′ ≡ just g″ × Sane [] g″ × Placed g″ []
+             → Σ (U.Node [] R) λ g″ → At.part heap′ T′ ≡ just g″ × Sane [] g″ × Placed g″ [] × Deep g″ []
                × Σ Pos λ k′ → Σ (Events∞ R) λ r′ → (∀ n → Agree n (residual g) (skip k′ r′)) × Past (Events∞.force r′) (residual g″)
-    bg-ghost {S = S} sn pd L sg = bg-ghosted sn pd (subst (λ x → Lifts base (wkPath grow ρ) x S) (sym skipped-grow) (Lifted.lifts-grow grows L)) sg
+    bg-ghost {S = S} sn pd dp L sg = bg-ghosted sn pd dp (subst (λ x → Lifts base (wkPath grow ρ) x S) (sym skipped-grow) (Lifted.lifts-grow grows L)) sg
 
     bg-owned : (sk : StackAs T q ϑ K bs) → Owned H T (runAs [] (≗-refl _) sk) → Owned heap′ T′ (ca′ sk)
     bg-owned sk ow = bg-owns sk (Wk′.grow-run grows sk ow)
@@ -757,15 +759,15 @@ module ClimbFlatPlant (R : Set) where
                {ρ : Path T (flatMapˢ op f fl oc k r pl t ls)} {y : A} {pl′}
              → Begins g (loadOf st) m₀ ρ y pl′ → Hopped st m₀
   lane-begin st {m₀ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {pl′ = pl′}
-    b@record { sane = sn ; placed = pd ; ctl = refl ; stack = sk ; lifted = S , L , sg ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
+    b@record { sane = sn ; placed = pd ; deep = dp ; ctl = refl ; stack = sk ; lifted = S , L , sg ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
              ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so ; behind = bh ; lingers = lgr
              ; flags = dF ; inner = dI }
     with begin-path b
-  ... | sr with Begun.bg-ghost sr pl′ sn pd L sg
-  ...   | g″ , pg , sn″ , pd″ , k″ , r″ , ag , pp =
+  ... | sr with Begun.bg-ghost sr pl′ sn pd dp L sg
+  ...   | g″ , pg , sn″ , pd″ , dp″ , k″ , r″ , ag , pp =
     g″ , _ , Started.runs sr
     , carried (record
-      { sane = sn″ ; placed = pd″ ; tree = Begun.T′ sr pl′ ; ctlAs = Begun.ca′ sr pl′ sk ; meets = pg
+      { sane = sn″ ; placed = pd″ ; deep = dp″ ; tree = Begun.T′ sr pl′ ; ctlAs = Begun.ca′ sr pl′ sk ; meets = pg
       ; owned′ = owned-to (Begun.bg-owned sr pl′ sk ow) ; kernels = Begun.bg-kernels sr pl′ fs kn ; meaning = Begun.bg-meaning sr pl′ fs mn
       ; queue = subst (λ ts″ → Queue (Started.heap′ sr) (q ++ [ ix 1 ]) clk ts″ (Begun.T′ sr pl′)) refl (Begun.bg-queue sr pl′ qu)
       ; books = record { fresh = Begun.bg-fresh sr pl′ fs
@@ -783,11 +785,11 @@ module ClimbFlatPlant (R : Set) where
               → roomy op (At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.active fl)) ≡ true
               → ∀ {a} → m₁ ⇝ rerun m₁ (Calling.ϑ cl) (Calling.K cl) a → a ≗ startAt ρ y → Hopped st (rerun m₁ (Calling.ϑ cl) (Calling.K cl) a)
   outer-start st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} ρ {y}
-    cl@record { sane = sn ; placed = pd ; ctl = refl ; stack = sk ; lifted = c′ , pv , S , L , sg ; owned = ow ; kernels = kn ; meaning = mn
+    cl@record { sane = sn ; placed = pd ; deep = dp ; ctl = refl ; stack = sk ; lifted = c′ , pv , S , L , sg ; owned = ow ; kernels = kn ; meaning = mn
               ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so ; behind = bh ; lingers = lgr ; kept = kp } rm p c
     with lifts-split ρ (in-outer here) L
   ... | _ , lifts-outer {o₀ = o₀} _ _ lifts-here , Lρ = lane-begin st (record
-      { sane = sn ; placed = pd ; ctl = refl ; code = c
+      { sane = sn ; placed = pd ; deep = dp ; ctl = refl ; code = c
       ; opens = proj₂ (∧-split _ (trans (sym (opened-⊕ hp true ρ (in-outer here))) (calling-open (ρ ⊕ in-outer here) cl)))
       ; stack = sk
       ; lifted = S , subst (λ o → Lifts hp ρ (U.skipˢ (q ++ [ ix 0 ]) (U.flatMapᶜ op G o (U.subscribe (f y) (q ++ [ ix 1 ]) ∷ LS) QS (U.unionᶜ po U.idleᶜ))) S)

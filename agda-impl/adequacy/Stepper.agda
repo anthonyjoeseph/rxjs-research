@@ -19,6 +19,7 @@ open import denotation.Unfold using (NEnv)
 open import adequacy.Sane using (Sane)
 open import adequacy.Placed.Order using (Atop; Ordered; ordered; Placed; Within)
 open import adequacy.Placed.Keys using (ordered-≈)
+open import adequacy.Deep using (Deep; Deepˢ)
 
 ------------------------------------------------------------------------
 -- Alike: the same events at the same positions, skips and what a cut
@@ -82,6 +83,11 @@ postulate
   -- REFUTED: d2d13661 without the step coming first, by a merge whose joiner lane shows its source's earlier event
   -- REFUTED: c8c55884 over a placing with each live joiner joined before its source, by a lane admitted past its source's next event
   within-step : ∀ {A} (g : U.Node [] A) → Sane []ᴬ g → Placed g []ᴬ → Withinˢ []ᴬ (U.step g)
+
+  -- What a sane, placed ghost in order to every depth steps to is in
+  -- order to every depth: the stepped node runs what the meaning runs
+  -- past the step, and a rest the step opens is a part it held.
+  step-deep : ∀ {A} (g : U.Node [] A) → Sane []ᴬ g → Placed g []ᴬ → Deep g []ᴬ → Deepˢ []ᴬ (U.step g)
 
 -- A STEP KEEPS THE GHOST PLACED: atop what the step shows.
 placed-after : ∀ {A} (g : U.Node [] A) → Sane []ᴬ g → Placed g []ᴬ → Placedˢ []ᴬ (U.step g)

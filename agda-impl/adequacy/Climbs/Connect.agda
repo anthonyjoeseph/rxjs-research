@@ -37,6 +37,7 @@ open import adequacy.Torn using (module Tearing)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Seq using (module Sequencing)
 open import adequacy.Sane using (Sane)
+open import adequacy.Deep using (Deep)
 open import adequacy.Placed.Order using (Placed)
 open import denotation.Denote using (⟦_⟧)
 import Tree as T
@@ -97,7 +98,7 @@ module ClimbConnect (R : Set) where
   open Naming R using (pre; pairs-↭; names-plant-↭; fresh-plant; fresh-new; wk-pairs; wk-img; to-img)
   open Ghosting R using (residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; passed; Past)
   open GhostingPaths R using (each-sub; each-lanes; module Far; module Calling; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; done-up; Healed; HealedL; healed-split; healed-end; lifts-seen; Rises; rises; Called; landed; rose; Aloft; aloft; hop-sorted; each-back; hopped-pre)
-  open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed; stepped-deep)
+  open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed; gapped-deep)
   open Lowering R using (Keeps; queue-keeps; store-keeps; keeps-trans)
   open Lifting R using (emit-shut; emit-run; spread-past; behind-fire; fire-lingers; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward)
   open LiftingOrder R using (sub-onward; emit-void; run-meets; run-at; heads-lift)
@@ -239,13 +240,13 @@ module ClimbConnect (R : Set) where
     -- The ghost past the source's skip: the connect's part what it
     -- skipped to, but for gaps, and the heap untouched.
     fed-ghost : AllPairs _≢_ (names T) → At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T
-              → ∀ {g S c′} → Sane [] g → Placed g [] → At.part H u ≡ just c′
+              → ∀ {g S c′} → Sane [] g → Placed g [] → Deep g [] → At.part H u ≡ just c′
               → Lifts H (ρ ⊕ in-source here) (U.outˢ q y c′) S → U.step g ≡ S
-              → Σ (U.Node [] R) λ g″ → At.part H T′ ≡ just g″ × Sane [] g″ × Placed g″ []
+              → Σ (U.Node [] R) λ g″ → At.part H T′ ≡ just g″ × Sane [] g″ × Placed g″ [] × Deep g″ []
                 × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
-    fed-ghost fs jn mn bh sn pd pv L sg with lifts-split ρ (in-source here) L
+    fed-ghost fs jn mn bh sn pd dp pv L sg with lifts-split ρ (in-source here) L
     ... | _ , lifts-source pb sf lifts-here , Lρ with fed-part jn mn bh pb pv
-    ...   | b₁ , pv′ , gp rewrite sf = ghost-lift H H ρ v fs (λ _ _ → refl) [] {κ = q} Lρ pv′ (gap-connect gp (gap-live alike)) sn pd sg
+    ...   | b₁ , pv′ , gp rewrite sf = ghost-lift H H ρ v fs (λ _ _ → refl) [] {κ = q} Lρ pv′ (gap-connect gp (gap-live alike)) sn pd dp sg
 
     -- The connect's own heads and ties, the feed restaged: the body's
     -- joiners retold what the feed owes them.
@@ -311,16 +312,16 @@ module ClimbConnect (R : Set) where
                → Calling g (loadOf st) m₁ (ρ ⊕ in-source here) (sends y) → Called st m₁ (ρ ⊕ in-source here)
   climb-source st ρ cl with src-idle ρ cl
   climb-source st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {Sj} {c} {b} {kb} {k} {e = e} {rp} {rt} {u = u} {bd} ρ {y}
-    cl@record { sane = sn ; placed = pl ; ctl = refl ; code = cd ; stack = sk ; lifted = c′ , pv , S , L , sg ; owned = ow
+    cl@record { sane = sn ; placed = pl ; deep = dp ; ctl = refl ; code = cd ; stack = sk ; lifted = c′ , pv , S , L , sg ; owned = ow
               ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
               ; behind = bh ; lingers = lgr } | refl
     with subst (λ W → _ ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-source here) top) cd
-  ... | readRef≗ refl f with Feeds.fed-ghost hp ρ y q fs (Queue.joined qu) mn bh sn pl pv L sg
-  ...   | g″ , pg , sn″ , pl″ , k′ , r , ag , pp with lifts-split ρ (in-source here) L
+  ... | readRef≗ refl f with Feeds.fed-ghost hp ρ y q fs (Queue.joined qu) mn bh sn pl dp pv L sg
+  ...   | g″ , pg , sn″ , pl″ , dp″ , k′ , r , ag , pp with lifts-split ρ (in-source here) L
   ...     | _ , lifts-source pb _ _ , Lρ =
     landed (g″ , _ , then refl now
       , carried (record
-        { sane = sn″ ; placed = pl″ ; tree = Feeds.T′ hp ρ y q
+        { sane = sn″ ; placed = pl″ ; deep = dp″ ; tree = Feeds.T′ hp ρ y q
         ; ctlAs = runAs (feedC (planted ρ v) ∷ []) (≗-trans (f same⊑ ss) (seq-done _)) (Feeds.fed-stack hp ρ y q sk)
         ; meets = pg
         ; owned′ = owned-to (Feeds.fed-owned hp ρ y q sk (≗-trans (f same⊑ ss) (seq-done _)) ow)
@@ -383,9 +384,9 @@ module ClimbConnect (R : Set) where
     --
     -- DEAD ROUTE: a body over `ghost-lift`.  The end lifts to a skip whose node ends its source on `restᶜ c₀`, `c₀` the source node `lifts-source` leaves free and `Passed` ties to nothing on the heap once its part is gone; and the heap's rest is `Tied` to the leftover only at its first step.
     postulate
-      fin-ghost   : ∀ {g S} → Sane [] g → Placed g [] → At.part H u ≡ nothing → e ≡ just q
+      fin-ghost   : ∀ {g S} → Sane [] g → Placed g [] → Deep g [] → At.part H u ≡ nothing → e ≡ just q
               → Lifts H (ρ ⊕ in-source here) (U.endˢ q) S → U.step g ≡ S
-              → Σ (U.Node [] R) λ g″ → At.part H′ T′ ≡ just g″ × Sane [] g″ × Placed g″ []
+              → Σ (U.Node [] R) λ g″ → At.part H′ T′ ≡ just g″ × Sane [] g″ × Placed g″ [] × Deep g″ []
                 × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
 
     -- The subject's closed flag the connect's own cell, its node's clauses
@@ -554,17 +555,17 @@ module ClimbConnect (R : Set) where
                → Calling g (loadOf st) m₁ (ρ ⊕ in-source here) (closes ks) → Called st m₁ (ρ ⊕ in-source here)
   close-source st ρ cl with src-idle ρ cl
   close-source st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {Sj} {c} {b} {kb} {k} {e = e} {rp} {rt} {u = u} {bd} ρ {ks}
-    cl@record { sane = sn ; placed = pl ; ctl = refl ; code = cd ; stack = sk ; lifted = gn , S , L , sg , hl ; owned = ow
+    cl@record { sane = sn ; placed = pl ; deep = dp ; ctl = refl ; code = cd ; stack = sk ; lifted = gn , S , L , sg , hl ; owned = ow
               ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
               ; behind = bh ; lingers = lgr } | refl
     with writes (subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-source here) top) cd)
   ... | n′ , en , path₁ with reads {hp = Fins.H′ hp ρ q} en
-  ...   | k′ , f , path₂ with Fins.fin-ghost hp ρ q sn pl gn (healed-end ρ hl gn) L sg
-  ...     | g″ , pg , sn″ , pl″ , k″ , r , ag , pp with lifts-split ρ (in-source here) L
+  ...   | k′ , f , path₂ with Fins.fin-ghost hp ρ q sn pl dp gn (healed-end ρ hl gn) L sg
+  ...     | g″ , pg , sn″ , pl″ , dp″ , k″ , r , ag , pp with lifts-split ρ (in-source here) L
   ...       | _ , lifts-source {b₀ = b₀} pb _ _ , Lρ =
     landed (g″ , _ , path
       , carried (record
-        { sane = sn″ ; placed = pl″ ; tree = Fins.T′ hp ρ q
+        { sane = sn″ ; placed = pl″ ; deep = dp″ ; tree = Fins.T′ hp ρ q
         ; ctlAs = runAs (finC (planted ρ v) ∷ Fins.fin-calls hp ρ q ks) ec (Fins.fin-stack hp ρ q sk)
         ; meets = pg
         ; owned′ = owned-to (Fins.fin-owned hp ρ q fs sk ks ec ow)

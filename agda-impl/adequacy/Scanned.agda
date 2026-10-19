@@ -188,7 +188,7 @@ module Scanning (R : Set) where
                → subOf (Carried.ctlAs cr) ≡ just (Δ , B , T.scan f z s) → Restages cr s
   scan-restage {m = mach ⟨ H , _ , run _ _ _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = subAs {s = T.scan f z s} π (u , E′ , υ , e , newRef≗ refl kk) sk a } refl refl =
     _ , now
-    , record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = S.t′
+    , record { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = S.t′
              ; ctlAs = subAs S.π′ (S.code′ E′ υ e (kk new hereʳ)) (S.restack sk₁ a₁) (S.alones _)
              ; meets = trans (part-plant H′ S.π₁ S.v eqv) (trans (G′.grow-part gr (Carried.tree cr)) (Carried.meets cr))
              ; owned′ = owned-to (Moved.Owning.reowned S.π₁ S.v H′ eqv (in-scan here) S.inner {cd = Grown.code-grow S.ν π E′ υ e} sk₁ a₁ (G′.grow-owned gr sk (Carried.owned cr)))

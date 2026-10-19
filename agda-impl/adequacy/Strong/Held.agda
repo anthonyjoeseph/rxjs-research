@@ -28,6 +28,7 @@ import denotation.Unfold as U
 open import adequacy.Sane using (Sane; sane-subscribe)
 open import adequacy.Placed.Order using () renaming (Placed to Placedᵍ)
 open import adequacy.Placed using (placed-subscribe)
+open import adequacy.Deep using (Deep; deep-subscribe)
 open import adequacy.Sorted using (_≤ᵖ_)
 open import adequacy.Sorted.Walk using (module SortingWalk)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
@@ -277,6 +278,7 @@ module StrongHeld (R : Set) where
     field
       sane    : Sane []ᴬ g
       placed  : Placedᵍ g []ᴬ
+      deep    : Deep g []ᴬ
       tree    : Sub (Conf.world (Mach.conf m)) [] R
       ctlAs   : Against.CtlAs tree (Conf.pos (Mach.conf m)) (Conf.ctl (Mach.conf m)) (Mach.bursts m)
       meets   : Meets ctlAs (At.part H tree) g
@@ -436,6 +438,7 @@ module StrongHeld (R : Set) where
   strong-begin o = carried record
     { sane    = sane-subscribe o root (λ ())
     ; placed  = placed-subscribe o
+    ; deep    = deep-subscribe o
     ; tree    = pendingˢ o root
     ; ctlAs   = Against.subAs here ([] , []ᴬ , same , refl , ≗-refl _) Against.bottomAs []ᴬ
     ; meets   = refl

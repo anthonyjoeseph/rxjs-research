@@ -251,7 +251,7 @@ module Staging (R : Set) where
   map-restage : ∀ {g m} (cr : Carried g m) {Δ A B} {f : A → B} {s : T.Obs Timeline Δ A} → subOf (Carried.ctlAs cr) ≡ just (Δ , B , T.map f s)
               → Σ (Carried g m) λ cr′ → subOf (Carried.ctlAs cr′) ≡ just (Δ , A , s) × measure (carried cr′) ≺ measure (carried cr)
   map-restage {m = mach ⟨ H , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = subAs π cd sk a } refl =
-    record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = N.t′ ; ctlAs = subAs M.π′ (M.code′ cd) (N.restack sk a) (M.alones _)
+    record { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = N.t′ ; ctlAs = subAs M.π′ (M.code′ cd) (N.restack sk a) (M.alones _)
            ; meets = trans (M.part′ H) (Carried.meets cr) ; owned′ = owned-to (M.rm-owned H sk a (Carried.owned cr))
            ; kernels = M.rm-kernels H (Carried.kernels cr) ; meaning = M.rm-meaning H (Carried.meaning cr) ; queue = M.rm-queue H (Carried.queue cr)
            ; books = record { fresh = subst (AllPairs _≢_) (sym M.names′) (Books.fresh bk)
@@ -341,7 +341,7 @@ module Staging (R : Set) where
   offer-restage : ∀ {g m} (cr : Carried g m) {Δ A} {s : T.Obs Timeline Δ A} {xs : List A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , s)
                 → (∀ q → U.subscribe s q ≡ U.ofᶜ q 0 xs) → Offering s xs → Offers cr {Δ} {A} xs
   offer-restage {m = mach ⟨ H , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = subAs {q = q} π cd sk a } refl sp cs =
-    record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = N.t′ ; ctlAs = runAs O.ks (O.code′ cd) (N.restack sk a)
+    record { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = N.t′ ; ctlAs = runAs O.ks (O.code′ cd) (N.restack sk a)
            ; meets = trans (part-plant H π O.v (O.eqp H)) (Carried.meets cr) ; owned′ = owned-to (O.of-owned H sk a (O.code′ cd) (Carried.owned cr))
            ; kernels = O.of-kernels H (Carried.kernels cr) ; meaning = O.of-meaning H (Carried.meaning cr) ; queue = O.of-queue H (Carried.queue cr)
            ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant π O.v refl)) (Books.fresh bk)

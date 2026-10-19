@@ -39,7 +39,8 @@ open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Seq using (module Sequencing)
 open import adequacy.Sane using (Sane; SaneS; step-sane)
 open import adequacy.Placed.Order using (Placed)
-open import adequacy.Stepper using (placed-after; Placedˢ; step-skips; afterᴱ; _≃_)
+open import adequacy.Stepper using (placed-after; Placedˢ; step-skips; step-deep; afterᴱ; _≃_)
+open import adequacy.Deep using (Deep; Deepˢ)
 open import denotation.Denote using (⟦_⟧)
 import Tree as T
 open import operation.PureObservable using (Out; Pureᴾ; module Pure)
@@ -99,7 +100,7 @@ module ClimbFlat (R : Set) where
   open Naming R using (pre; pairs-↭; names-plant-↭; fresh-plant; fresh-new; wk-pairs; wk-img; to-img)
   open Ghosting R using (residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; passed; Past)
   open GhostingPaths R using (each-sub; each-lanes; module Far; module Calling; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; done-up; Healed; HealedL; healed-split; healed-end; lifts-seen; Rises; rises; Called; landed; rose; Aloft; aloft; hop-sorted; each-back; hopped-pre)
-  open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed; stepped-deep)
+  open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed; gapped-deep)
   open Lowering R using (Keeps; queue-keeps; store-keeps; keeps-trans)
   open Lifting R using (emit-shut; emit-run; spread-past; behind-fire; fire-lingers; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward)
   open LiftingOrder R using (sub-onward; emit-void; run-meets; run-at; heads-lift)
@@ -363,16 +364,17 @@ module ClimbFlat (R : Set) where
   ghost-lift : ∀ {h} (H H′ : Heapᴹ h) {T : Sub h [] R} {Δ A} {w₀ : Sub h Δ A} (ρ : Path T w₀) (v : Sub h Δ A)
              → AllPairs _≢_ (names T) → ∀ {ns} → Offʰ H H′ ns → All (_∈ᴸ names w₀) ns
              → ∀ {κ k c c₀ S g} → Lifts H ρ (U.skipˢ k c) S → At.part H′ v ≡ just c₀ → Gapped κ c c₀
-             → Sane [] g → Placed g [] → U.step g ≡ S
-             → Σ (U.Node [] R) λ g″ → At.part H′ (plant ρ v) ≡ just g″ × Sane [] g″ × Placed g″ []
+             → Sane [] g → Placed g [] → Deep g [] → U.step g ≡ S
+             → Σ (U.Node [] R) λ g″ → At.part H′ (plant ρ v) ≡ just g″ × Sane [] g″ × Placed g″ [] × Deep g″ []
                × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
-  ghost-lift H H′ ρ v fs off mine {g = g} L pv gv sn pd sg
+  ghost-lift H H′ ρ v fs off mine {g = g} L pv gv sn pd dp sg
     with skip-lift H′ (planted ρ v) (lifts-planted ρ v (Wrote.wr-lifts H H′ ρ off mine fs L)) pv gv
   ... | k′ , g′ , g″ , refl , pg , gp =
-    g″ , pg , gapped-sane gp (subst (SaneS []) sg (step-sane g sn)) , gapped-placed gp pd′
+    g″ , pg , gapped-sane gp (subst (SaneS []) sg (step-sane g sn)) , gapped-placed gp pd′ , gapped-deep gp dp′
        , k′ , U.stateᴺ g′ [] , (λ n → subst (λ s → Agree n (residual g) (afterᴱ [] s)) sg (_≃_.agreeing (step-skips g sn pd) n))
-       , gapped-past gp (stepped-deep sn pd sg)
+       , gapped-past gp dp′
     where pd′ = proj₂ (subst (Placedˢ []) sg (placed-after g sn pd))
+          dp′ = subst (Deepˢ []) sg (step-deep g sn pd dp)
 
   -- An outer ended with lanes or a queue left skips to the pool.
   outer-end : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) (o : U.Node Γ A) q (ls : List (U.Node Γ B)) (qs : List A) p
@@ -621,19 +623,19 @@ module ClimbFlat (R : Set) where
 
     -- Lanes or a queue left: the pool takes what the outer left running,
     -- the ghost past the outer's skip.
-    pool-ghost : AllPairs _≢_ (names T) → ∀ (o₀ : U.Node Δ A) {g q S} → Sane [] g → Placed g [] → At.part H u ≡ nothing
+    pool-ghost : AllPairs _≢_ (names T) → ∀ (o₀ : U.Node Δ A) {g q S} → Sane [] g → Placed g [] → Deep g [] → At.part H u ≡ nothing
                → (null (At.partLanes H ls) ∧ null (At.val H (FlatKit.Flat.queue fl))) ≡ false
                → Lifts H ρ (U.outerˢ op (λ a j → U.subscribe (f a) j) o₀ (U.endˢ q) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl) S
                → U.step g ≡ S
-               → Σ (U.Node [] R) λ g″ → At.part H′ (Restaged.T′ H′ ρ (U.unionᶜ pl (U.restᶜ o₀))) ≡ just g″ × Sane [] g″ × Placed g″ []
+               → Σ (U.Node [] R) λ g″ → At.part H′ (Restaged.T′ H′ ρ (U.unionᶜ pl (U.restᶜ o₀))) ≡ just g″ × Sane [] g″ × Placed g″ [] × Deep g″ []
                  × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
-    pool-ghost fs o₀ {q = q} sn pd gn nl L sg =
+    pool-ghost fs o₀ {q = q} sn pd dp gn nl L sg =
       ghost-lift H H′ ρ (flatMapˢ op f fl oc k r pl′ u ls) fs (off-store H (FlatKit.Flat.outerDone fl)) mine {κ = []}
         (subst (λ s → Lifts H ρ s _) (outer-end op G o₀ q (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl nl) L)
         (trans (sd-part-at pl′ (fresh-path ρ fs))
                (trans (cong (λ x → At.merged H op G x (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl′) gn)
                       (merged-open H op G (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl′ nl)))
-        alike sn pd sg
+        alike sn pd dp sg
       where
         G   = λ a j → U.subscribe (f a) j
         pl′ = U.unionᶜ pl (U.restᶜ o₀)
@@ -679,7 +681,7 @@ module ClimbFlat (R : Set) where
                 (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {ks}
               → Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (closes ks) → Called st m₁ (ρ ⊕ in-outer here)
   close-outer st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} ρ {ks}
-    cl@record { sane = sn ; placed = pd ; ctl = refl ; code = cd ; stack = sk ; lifted = gn , S , L , sg , hl ; owned = ow
+    cl@record { sane = sn ; placed = pd ; deep = dp ; ctl = refl ; code = cd ; stack = sk ; lifted = gn , S , L , sg , hl ; owned = ow
               ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
               ; behind = bh ; lingers = lgr ; flags = dn ; kept = kp }
     with lifts-split ρ (in-outer here) L
@@ -704,7 +706,7 @@ module ClimbFlat (R : Set) where
     with (At.val (Settles.H′ hp ρ) (FlatKit.Flat.active fl) ≡ᵇ 0) ∧ null (At.val (Settles.H′ hp ρ) (FlatKit.Flat.queue fl)) in eq
   ...           | true =
     rise kp (rises {sg′ = closes ks} path (one-lower ρ one-outer) (record
-      { sane = sn ; placed = pd ; ctl = refl
+      { sane = sn ; placed = pd ; deep = dp ; ctl = refl
       ; code = ≗-trans e₅ (bind≗ (open-code {m = Observer.complete o} (trans (cong (λ x → x ∧ b) (Settles.done-read hp ρ)) eq)) λ _ → ≗-refl ⟦ ks ⟧ᶜ)
       ; stack = sk
       ; lifted = trans (Settles.sd-part hp ρ (fresh-path ρ fs)) (flat-gone hp {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} gn (proj₁ nl) (proj₂ nl)) , S
@@ -725,11 +727,11 @@ module ClimbFlat (R : Set) where
                                          (At.val (Settles.H′ hp ρ) (FlatKit.Flat.queue fl)))) λ _ → wk-same ⟦ ks ⟧ᶜ)
       nl   = nulls (At.partLanes hp ls) (At.val hp (FlatKit.Flat.queue fl)) (trans (sym (Settles.settle-eq hp ρ (fresh-path ρ fs) kn)) eq)
   ...           | false
-    with Settles.pool-ghost hp ρ fs o₀ sn pd gn (trans (sym (Settles.settle-eq hp ρ (fresh-path ρ fs) kn)) eq) Lρ sg
-  ...             | g″ , pg , sn″ , pd″ , k″ , r″ , ag , pp =
+    with Settles.pool-ghost hp ρ fs o₀ sn pd dp gn (trans (sym (Settles.settle-eq hp ρ (fresh-path ρ fs) kn)) eq) Lρ sg
+  ...             | g″ , pg , sn″ , pd″ , dp″ , k″ , r″ , ag , pp =
     landed (g″ , _ , path
       , carried (record
-        { sane = sn″ ; placed = pd″ ; tree = Restaged.T′ (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀))
+        { sane = sn″ ; placed = pd″ ; deep = dp″ ; tree = Restaged.T′ (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀))
         ; ctlAs = runAs (Restaged.pool-calls (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) ks) ec (Restaged.pool-stack (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) sk)
         ; meets = pg
         ; owned′ = owned-to (Restaged.pool-owned (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) sk ks ec (Settles.Fr.wr-owned hp ρ fs (Settles.sd-gone hp ρ (fresh-path ρ fs)) ow))

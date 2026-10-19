@@ -33,6 +33,7 @@ open import adequacy.Strong.Held using (module StrongHeld)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Sane using (Sane)
+open import adequacy.Deep using (Deep)
 open import adequacy.Placed.Order using (Placed)
 open import denotation.Denote using (⟦_⟧)
 import Tree as T
@@ -502,6 +503,7 @@ module GhostingPaths (R : Set) where
     field
       sane    : Sane [] g
       placed  : Placed g []
+      deep    : Deep g []
       {w}     : World
       {ϑ}     : w ⊑ Conf.world (Mach.conf m₁)
       {act}   : Act (Conf.world (Mach.conf m₁)) ⊤
@@ -535,7 +537,7 @@ module GhostingPaths (R : Set) where
          → DoneBy (Conf.heap (Mach.conf m₁)) T (outers σ′)
          → Calling g ℓ m₁ σ′ sg′
   recall {m₁ = m₁} {T = T} cl ow cd lf dn = record
-    { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = Calling.ctl cl ; code = cd ; stack = Calling.stack cl ; lifted = lf
+    { sane = Calling.sane cl ; placed = Calling.placed cl ; deep = Calling.deep cl ; ctl = Calling.ctl cl ; code = cd ; stack = Calling.stack cl ; lifted = lf
     ; owned = subst (λ ks → Owned (Conf.heap (Mach.conf m₁)) T (runAs ks (≗-refl _) (Calling.stack cl))) (sym ow) (Calling.owned cl)
     ; kernels = Calling.kernels cl ; meaning = Calling.meaning cl ; queue = Calling.queue cl
     ; books = subst (λ ks → Books T (runAs ks (≗-refl _) (Calling.stack cl)) m₁) (sym ow) (Calling.books cl)
@@ -545,7 +547,7 @@ module GhostingPaths (R : Set) where
   relevel : ∀ {g ℓ ℓ′ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v} {sg : Signal T A}
           → Calling g ℓ′ m₁ σ sg → ℓ′ ≼ ℓ → Calling g ℓ m₁ σ sg
   relevel cl le = record
-    { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = Calling.ctl cl ; code = Calling.code cl ; stack = Calling.stack cl
+    { sane = Calling.sane cl ; placed = Calling.placed cl ; deep = Calling.deep cl ; ctl = Calling.ctl cl ; code = Calling.code cl ; stack = Calling.stack cl
     ; lifted = Calling.lifted cl ; owned = Calling.owned cl ; kernels = Calling.kernels cl ; meaning = Calling.meaning cl
     ; queue = Calling.queue cl ; books = Calling.books cl ; sorted = Calling.sorted cl ; behind = Calling.behind cl ; lingers = Calling.lingers cl
     ; flags = Calling.flags cl

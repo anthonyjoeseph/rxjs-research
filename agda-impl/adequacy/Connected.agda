@@ -353,7 +353,7 @@ module Connecting (R : Set) where
   ... | k₄ , e₄ , kk₄ with unders (kk₄ new hereʳ)
   ... | x′ , y′ , e₅ , ex , ey =
     _ , path
-    , record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = C.t′
+    , record { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = C.t′
              ; ctlAs = subAs C.π′ (C.body-code ex) (backAs q₀ (srcC C.ρc ∷ []) (<ᵖ-below q₀ []) eY (C.restack sk₅ a₅)) (C.alones _)
              ; meets = trans (part-plant H₅ C.π₅ C.v refl) (trans (Grew.meets G₅) (Carried.meets cr))
              ; owned′ = owned-to (C.connect-owned sk₅ a₅ eY (Grew.owned G₅))
