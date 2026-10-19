@@ -104,7 +104,7 @@ module ClimbLanes (R : Set) where
   open Everywhere R using (module Growths)
   open Replanting R using (Kin; kin-end; kin-pool; kin-feed; kin-fin; kin-lane; rehomes; rehomes-code; restack; reticked; owned-run; module Shift; Heading; Lingering; Gone; store-held; Lives; lives-off; ahead-under)
   open Read
-  open ClimbBase R using (lifts-planted; merged-queued; merged-kept; healed-off)
+  open ClimbBase R using (lifts-planted; merged-queued; merged-kept; healed-off; module Framed; flat-stays)
   open ClimbTake R using (rise; open-code; writes; reads)
   open ClimbFlat R using (calling-open; opened-⊕; shut-code; settledᵒ; settleᵒ₂; settleᵒ₁; flat-gone; merged-pool; heading-∘; lanes-one; ghost-lift; startAt; pending-flags; queue-open; apart-unplant; lane-begin; module Restaged; module Settles)
   -- A lane's cut, the one its path passes.
@@ -428,7 +428,7 @@ module ClimbLanes (R : Set) where
       ∷ (λ eq → lookupᴬ a₀ (there (there (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ m)))))))) (sym eq)) ∷ []
       where P = pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) fr)))
 
-    fr-part : AllPairs _≢_ (names w₀) → At.part H′ t ≡ At.part H t
+    fr-part : AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl t ls)) → At.part (freed H (laneOf o) fl) t ≡ At.part H t
     fr-part fr = part-alike H H′ t (Heaps.keeps H H′ fr-off (λ m → m) (fr-apart fr))
 
     fr-lanes-apart : AllPairs _≢_ (names w₀) → AllPairs _≢_ (laneNames ls)
@@ -443,7 +443,7 @@ module ClimbLanes (R : Set) where
 
     -- No part revived: the outer's and the queue as they were, the lanes'
     -- parts only fewer, and no switch beneath turned on.
-    fr-gone : AllPairs _≢_ (names w₀) → Gone H H′ w₀
+    fr-gone : AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl t ls)) → Gone H (freed H (laneOf o) fl) (flatMapˢ op f fl oc k r pl t ls)
     fr-gone fr@(a₀ ∷ _) = record { gone-part = gp ; gone-live = lv ; gone-held = λ hd → trans (store-held (unlive H (laneOf o)) (FlatKit.Flat.active fl) hd) (store-held H (Kit.live (laneOf o)) hd) }
       where
         gp : ∀ {Δ′ A′} {x : Sub h Δ′ A′} → Path w₀ x → At.part H x ≡ nothing → At.part H′ x ≡ nothing
@@ -459,7 +459,7 @@ module ClimbLanes (R : Set) where
         lv : Lives H H′ w₀
         lv {c = c} ψ e = drop-true H (laneOf o) c (trans (sym (cong lower (look-store (unlive H (laneOf o)) (FlatKit.Flat.active fl) (Kit.live c) (na ψ)))) e)
 
-    fr-done : AllPairs _≢_ (names w₀) → At.val H′ (FlatKit.Flat.outerDone fl) ≡ At.val H (FlatKit.Flat.outerDone fl)
+    fr-done : AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl t ls)) → At.val (freed H (laneOf o) fl) (FlatKit.Flat.outerDone fl) ≡ At.val H (FlatKit.Flat.outerDone fl)
     fr-done (a₀ ∷ a₁ ∷ _) =
       trans (cong lower (look-store (unlive H (laneOf o)) (FlatKit.Flat.active fl) (FlatKit.Flat.outerDone fl) (lookupᴬ a₀ (here refl))))
             (cong lower (look-store H (Kit.live (laneOf o)) (FlatKit.Flat.outerDone fl)
@@ -542,14 +542,14 @@ module ClimbLanes (R : Set) where
     fr-seL : AllPairs _≢_ (names w₀) → ∀ {Δ′ A′} {x : Sub h Δ′ A′} (πL : PathLanes ls x) → seenL H′ πL ≡ true → seenL H πL ≡ true
     fr-seL fr = seenL-drop H (laneOf o) fl (tabulateᴬ (fr-count-apart fr)) (fr-lane fr)
 
-    fr-revive : AllPairs _≢_ (names w₀) → is-just (At.part H′ w₀) ≡ true → is-just (At.part H w₀) ≡ true
+    fr-revive : AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl t ls)) → is-just (At.part (freed H (laneOf o) fl) (flatMapˢ op f fl oc k r pl t ls)) ≡ true → is-just (At.part H (flatMapˢ op f fl oc k r pl t ls)) ≡ true
     fr-revive fr j with At.part H w₀ in e
     ... | just _  = refl
     ... | nothing = ⊥-elim (true≢false (trans (sym j) (cong is-just (Gone.gone-part (fr-gone fr) here e))))
 
     -- No part left: what the flatMap leaves running alike beneath it, and a
     -- lane's ties seen only through lanes still on.
-    fr-lingering : AllPairs _≢_ (names w₀) → At.part H′ w₀ ≡ nothing → Lingering H H′ w₀ w₀
+    fr-lingering : AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl t ls)) → At.part (freed H (laneOf o) fl) (flatMapˢ op f fl oc k r pl t ls) ≡ nothing → Lingering H (freed H (laneOf o) fl) (flatMapˢ op f fl oc k r pl t ls) (flatMapˢ op f fl oc k r pl t ls)
     fr-lingering fr gn = record
       { ling-revive = λ j → ⊥-elim (true≢false (trans (sym j) (cong is-just gn)))
       ; ling-rested = λ {C} → pin-alike (cong₂ U.unionᶜ (leftover-alike H H′ {B = C} t so-al) (leftL ls (λ π → π)))
@@ -576,20 +576,16 @@ module ClimbLanes (R : Set) where
 
     module Wr (fs : AllPairs _≢_ (names T)) = Wrote H H′ ρ fr-off fr-mine fs
     module Sh (fs : AllPairs _≢_ (names T)) = Shift H H′ ρ fr-off fr-mine fs
-
-    fr-owned : AllPairs _≢_ (names T) → ∀ {p ctl bs} {ca : CtlAs T p ctl bs} → Owned H T ca → Owned H′ T ca
-    fr-owned fs = Sh.wr-owned fs (fr-gone (fresh-path ρ fs))
-
-    fr-queue : AllPairs _≢_ (names T) → ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
-    fr-queue _ = queue-keeps (keeps-trans (store-keeps H (Kit.live (laneOf o)) _ (λ ()) (λ ()) (λ ()) (λ ()))
-                                           (store-keeps (unlive H (laneOf o)) (FlatKit.Flat.active fl) _ (λ ()) (λ ()) (λ ()) (λ ())))
-
-    fr-lingers : AllPairs _≢_ (names T) → At.part H′ w₀ ≡ nothing → Ends H T → Lingers H T → Lingers H′ T
-    fr-lingers fs gn en lg = subst (λ t′ → Lingers H′ t′) (plant-self ρ) (Sh.shift-lingers fs w₀ en (fr-lingering (fresh-path ρ fs) gn) lg)
+    module Fr (fs : AllPairs _≢_ (names T)) (lv : At.val H (Kit.live (laneOf o)) ≡ true) =
+      Framed H H′ ρ fr-off fr-mine fs
+        (record { holds = λ {E} {o′} → fr-holds (fresh-path ρ fs) lv {E} {o′} ; gated = λ {E} {o′} → fr-gated (fresh-path ρ fs) lv {E} {o′} ; spent = fr-spent (fresh-path ρ fs) })
+        (fr-fed (fresh-path ρ fs))
+        (keeps-trans (store-keeps H (Kit.live (laneOf o)) _ (λ ()) (λ ()) (λ ()) (λ ()))
+                     (store-keeps (unlive H (laneOf o)) (FlatKit.Flat.active fl) _ (λ ()) (λ ()) (λ ()) (λ ())))
 
     -- No flag moved: the done flag and the outer alike, a lane seen
     -- after only if before, every cell beneath a lane alike.
-    fr-flags₀ : AllPairs _≢_ (names w₀) → ∀ {xs} → DoneBy H w₀ xs → DoneBy H′ w₀ xs
+    fr-flags₀ : AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl t ls)) → ∀ {xs} → DoneBy H (flatMapˢ op f fl oc k r pl t ls) xs → DoneBy (freed H (laneOf o) fl) (flatMapˢ op f fl oc k r pl t ls) xs
     fr-flags₀ fr {xs} d =
       Flag.db-flat H′ {ns = xs} (flagged-moved H H′ {fl = fl} {so = t} (fr-done fr) (fr-part fr) (d here refl))
         (flags-alike H H′ (fr-so fr) (Flag.db-sub H d (in-outer here) refl))
@@ -610,13 +606,7 @@ module ClimbLanes (R : Set) where
     fr-flags : AllPairs _≢_ (names T) → DoneBy H T (outers ρ) → DoneBy H′ T (outers ρ)
     fr-flags fs d = subst (λ t′ → DoneBy H′ t′ (outers ρ)) (plant-self ρ) (fr-shift fs pl (fr-revive (fresh-path ρ fs)) d)
 
-    fr-lifts : AllPairs _≢_ (names T) → ∀ {s S} → Lifts H ρ s S → Lifts H′ ρ s S
-    fr-lifts fs = Wr.wr-lifts fs
-
-    fr-opened : AllPairs _≢_ (names T) → ∀ b → opened H′ b ρ ≡ opened H b ρ
-    fr-opened fs = Wr.wr-opened fs
-
-    fr-fifo : AllPairs _≢_ (names w₀) → At.val H′ (FlatKit.Flat.queue fl) ≡ At.val H (FlatKit.Flat.queue fl)
+    fr-fifo : AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl t ls)) → At.val (freed H (laneOf o) fl) (FlatKit.Flat.queue fl) ≡ At.val H (FlatKit.Flat.queue fl)
     fr-fifo (a₀ ∷ _ ∷ a₂ ∷ _) = cong lower (Heaps.keeps H H′ fr-off (λ m → m) ap (FlatKit.Flat.queue fl) (here refl))
       where
         ap : ∀ {x} → x ∈ᴸ (_ , FlatKit.Flat.queue fl) ∷ [] → All (x ≢_) ns
@@ -689,12 +679,6 @@ module ClimbLanes (R : Set) where
     fr-behind : AllPairs _≢_ (names T) → ∀ {q} → Untold H q T → Ends H T → Each H (Heads q) T → Each H′ (Heads q) T
     fr-behind fs {q} ut en bh = subst (λ t′ → Each H′ (Heads q) t′) (plant-self ρ) (Sh.shift-behind fs w₀ ut en (fr-heading (fresh-path ρ fs)) bh)
 
-    fr-kernels : AllPairs _≢_ (names T) → At.val H (Kit.live (laneOf o)) ≡ true → Kernels H T → Kernels H′ T
-    fr-kernels fs lv = Wr.wr-kernels fs (λ {E} {o′} → fr-holds (fresh-path ρ fs) lv {E} {o′}) (λ {E} {o′} → fr-gated (fresh-path ρ fs) lv {E} {o′}) (fr-spent (fresh-path ρ fs))
-
-    fr-meaning : AllPairs _≢_ (names T) → Meaning H T → Meaning H′ T
-    fr-meaning fs = Wr.wr-meaning fs (fr-fed (fresh-path ρ fs))
-
   -- A FLATMAP'S QUEUE WRITTEN: its own cell, read by its node alone;
   -- its children's parts and everything above it as they were.
   module Dequeued {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B op f fl oc k r pl} {t : Sub h Δ A} {ls : List (Lane h Δ B)}
@@ -711,16 +695,16 @@ module ClimbLanes (R : Set) where
     mine : All (_∈ᴸ names w₀) ns
     mine = there (there (here refl)) ∷ []
 
-    module Wr (fs : AllPairs _≢_ (names T)) = Wrote H H′ ρ (off-store H (FlatKit.Flat.queue fl)) mine fs
-    module Sh (fs : AllPairs _≢_ (names T)) = Shift H H′ ρ (off-store H (FlatKit.Flat.queue fl)) mine fs
-
-    dq-queue : AllPairs _≢_ (names T) → ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
-    dq-queue _ = queue-keeps (store-keeps H (FlatKit.Flat.queue fl) _ (λ ()) (λ ()) (λ ()) (λ ()))
-
     -- The queue no read of the node's own clauses.
     dq-alike : AllPairs _≢_ (names w₀) → Alike H H′ (flatReads fl oc k r t ls)
     dq-alike (a₀ ∷ _ ∷ a₂ ∷ _) j (here e)  = look-store H (FlatKit.Flat.queue fl) j (λ eq → lookupᴬ a₀ (there (here refl)) (sym (trans eq e)))
     dq-alike (a₀ ∷ _ ∷ a₂ ∷ _) j (there m) = look-store H (FlatKit.Flat.queue fl) j (lookupᴬ a₂ m)
+
+    module Fr (fs : AllPairs _≢_ (names T)) =
+      Framed H H′ ρ (off-store H (FlatKit.Flat.queue fl)) mine fs
+        (flat-stays H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} t ls (dq-alike (fresh-path ρ fs)))
+        (Heaps.fed-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} t ls (dq-alike (fresh-path ρ fs)))
+        (store-keeps H (FlatKit.Flat.queue fl) _ (λ ()) (λ ()) (λ ()) (λ ()))
 
     -- A queue's head taken off revives no part: the flatMap's part
     -- stood on the queue, its children's on names the queue is not.
@@ -738,22 +722,18 @@ module ClimbLanes (R : Set) where
         nl (in-lanes ψ) =
           (λ eq → lookupᴬ a₂ (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names t) (lanes-path ψ (here refl)))))))) (sym eq)) ∷ []
 
-    dq-owned : AllPairs _≢_ (names T) → ∀ {y ys′} → At.val H (FlatKit.Flat.queue fl) ≡ y ∷ ys′
-             → ∀ {p ctl bs} {ca : CtlAs T p ctl bs} → Owned H T ca → Owned H′ T ca
-    dq-owned fs nq = Sh.wr-owned fs (dq-gone (fresh-path ρ fs) nq)
-
-    dq-part : AllPairs _≢_ (names w₀) → At.part H′ t ≡ At.part H t
+    dq-part : AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl t ls)) → At.part (store H (FlatKit.Flat.queue fl) (lift ys)) t ≡ At.part H t
     dq-part fr = part-alike H H′ t (Heaps.flat-so H H′ {fl = fl} {oc} {k} {r} {t} {ls} (dq-alike fr))
 
     dq-lanes : AllPairs _≢_ (names w₀) → At.partLanes H′ ls ≡ At.partLanes H ls
     dq-lanes fr = partLanes-alike H H′ ls (Heaps.flat-ls H H′ {fl = fl} {oc} {k} {r} {t} {ls} (dq-alike fr))
 
-    dq-done : AllPairs _≢_ (names w₀) → At.val H′ (FlatKit.Flat.outerDone fl) ≡ At.val H (FlatKit.Flat.outerDone fl)
+    dq-done : AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl t ls)) → At.val (store H (FlatKit.Flat.queue fl) (lift ys)) (FlatKit.Flat.outerDone fl) ≡ At.val H (FlatKit.Flat.outerDone fl)
     dq-done (_ ∷ a₁ ∷ _) = cong lower (look-store H (FlatKit.Flat.queue fl) (FlatKit.Flat.outerDone fl) (λ eq → lookupᴬ a₁ (here refl) (sym eq)))
 
     -- No flag of the node's moved: the done flag, the outer and the
     -- lanes alike.
-    dq-flags₀ : AllPairs _≢_ (names w₀) → ∀ {xs} → DoneBy H w₀ xs → DoneBy H′ w₀ xs
+    dq-flags₀ : AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl t ls)) → ∀ {xs} → DoneBy H (flatMapˢ op f fl oc k r pl t ls) xs → DoneBy (store H (FlatKit.Flat.queue fl) (lift ys)) (flatMapˢ op f fl oc k r pl t ls) xs
     dq-flags₀ fr {xs} d =
       Flag.db-flat H′ {ns = xs} (flagged-moved H H′ {fl = fl} {so = t} (dq-done fr) (dq-part fr) (d here refl))
         (flags-alike H H′ (Heaps.flat-so H H′ {fl = fl} {oc} {k} {r} {t} {ls} (dq-alike fr)) (Flag.db-sub H d (in-outer here) refl))
@@ -785,30 +765,6 @@ module ClimbLanes (R : Set) where
         ls-al = Heaps.flat-ls H H′ {fl = fl} {oc} {k} {r} {t} {ls} (dq-alike fr)
         j₀ : ∀ {c} → At.part H′ w₀ ≡ just c → Σ (U.Node Δ B) λ b → At.part H w₀ ≡ just b
         j₀ x = just-of (dq-revive fr nq (cong is-just x))
-
-    dq-holds : AllPairs _≢_ (names w₀) → ∀ {E o} → At.Holds H w₀ E o → At.Holds H′ w₀ E o
-    dq-holds fr {E} {o} = Heaps.holds-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} t ls (dq-alike fr) {E} {o}
-
-    dq-gated : AllPairs _≢_ (names w₀) → At.Gated H w₀ → At.Gated H′ w₀
-    dq-gated fr = Heaps.gated-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} t ls (dq-alike fr)
-
-    dq-spent : AllPairs _≢_ (names w₀) → At.Spent H w₀ → At.Spent H′ w₀
-    dq-spent fr = Heaps.spent-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} t ls (dq-alike fr)
-
-    dq-fed : AllPairs _≢_ (names w₀) → ∀ ν → At.Fed H w₀ ν → At.Fed H′ w₀ ν
-    dq-fed fr = Heaps.fed-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} t ls (dq-alike fr)
-
-    dq-opened : AllPairs _≢_ (names T) → ∀ b → opened H′ b ρ ≡ opened H b ρ
-    dq-opened fs = Wr.wr-opened fs
-
-    dq-lifts : AllPairs _≢_ (names T) → ∀ {s S} → Lifts H ρ s S → Lifts H′ ρ s S
-    dq-lifts fs = Wr.wr-lifts fs
-
-    dq-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels H′ T
-    dq-kernels fs = Wr.wr-kernels fs (λ {E} {o} → dq-holds (fresh-path ρ fs) {E} {o}) (λ _ → dq-gated (fresh-path ρ fs)) (dq-spent (fresh-path ρ fs))
-
-    dq-meaning : AllPairs _≢_ (names T) → Meaning H T → Meaning H′ T
-    dq-meaning fs = Wr.wr-meaning fs (dq-fed (fresh-path ρ fs))
 
   -- The machine at a new heap running a callback, the call's rest owed
   -- past it.
@@ -920,7 +876,7 @@ module ClimbLanes (R : Set) where
       H₂ = freed hp (laneOf o) fl
       fs = Books.fresh (Calling.books cl)
       beside : (At.val H₂ (FlatKit.Flat.active fl) ≡ᵇ 0) ≡ null bs ∧ null as
-      beside = trans (Settles.active-lanes H₂ ρ (Freed.fr-kernels hp ρ o fs (lane-live o LL) (Calling.kernels cl)))
+      beside = trans (Settles.active-lanes H₂ ρ (Freed.Fr.kernels hp ρ o fs (lane-live o LL) (Calling.kernels cl)))
                      (trans (cong null (Freed.fr-lanes hp ρ o (fresh-path ρ fs) LL)) (null-++ bs as))
 
   -- A freed slot settling short of the end, the outer or a lane left,
@@ -1037,7 +993,7 @@ module ClimbLanes (R : Set) where
       ; stack = stk
       ; lifted = flat-gone H₂ {op = op} {f} {fl} {oc} {k} {r} {po} {u = t} {ls} (trans (Freed.fr-part hp ρ o (fresh-path ρ fs)) eo)
                            (trans (Freed.fr-lanes hp ρ o (fresh-path ρ fs) LL) (cong₂ _++_ ebs eas)) eq₀
-               , S , Freed.fr-lifts hp ρ o fs (subst (λ s′ → Lifts hp ρ s′ S) (lane-end op G l q po eo ebs eas eqs)
+               , S , Freed.Wr.wr-lifts hp ρ o fs (subst (λ s′ → Lifts hp ρ s′ S) (lane-end op G l q po eo ebs eas eqs)
                                               (subst (λ S′ → Lifts hp ρ (U.laneˢ op G (At.part hp t) bs′ l S′ as′ (At.val hp (FlatKit.Flat.queue fl)) po) S)
                                                      (lane-step o LL) Lρ)) , sg
                , healed-off hp H₂ ρ fs (Heaps.keep hp H₂ (Freed.fr-off hp ρ o) (lookupᴬ (Freed.fr-mine hp ρ o)))
@@ -1045,12 +1001,14 @@ module ClimbLanes (R : Set) where
                                           (trans (Freed.fr-lanes hp ρ o (fresh-path ρ fs) LL) (sym (lanes-gone hp o LL gu))))
                                    (cong (λ Q → At.merged hp op G (At.part hp t) (At.partLanes hp ls) Q po) (queue-freed hp (laneOf o) fl)))
                             (healed-split ρ (in-lanes πL) hl)
-      ; owned = owned-move H₂ (runAs [] (≗-refl _) stk) refl refl refl (Freed.fr-owned hp ρ o fs ow)
-      ; kernels = Freed.fr-kernels hp ρ o fs (lane-live o LL) kn ; meaning = Freed.fr-meaning hp ρ o fs mn ; queue = Freed.fr-queue hp ρ o fs qu
+      ; owned = owned-move H₂ (runAs [] (≗-refl _) stk) refl refl refl (Freed.Sh.wr-owned hp ρ o fs (Freed.fr-gone hp ρ o (fresh-path ρ fs)) ow)
+      ; kernels = Freed.Fr.kernels hp ρ o fs (lane-live o LL) kn ; meaning = Freed.Fr.meaning hp ρ o fs (lane-live o LL) mn ; queue = Freed.Fr.queue hp ρ o fs (lane-live o LL) qu
       ; books = record { fresh = fs ; clocked = proj₁ ck , proj₁ ck , proj₂ ck ; paidUp = pu ; running = rn }
       ; sorted = sorted-⇝ so path ; behind = Freed.fr-behind hp ρ o fs (tells-past cl) (ended-past cl) bh
-      ; lingers = Freed.fr-lingers hp ρ o fs (flat-gone H₂ {op = op} {f} {fl} {oc} {k} {r} {po} {u = t} {ls} (trans (Freed.fr-part hp ρ o (fresh-path ρ fs)) eo)
-                                             (trans (Freed.fr-lanes hp ρ o (fresh-path ρ fs) LL) (cong₂ _++_ ebs eas)) eq₀) (ended-past cl) lgr
+      ; lingers = Freed.Fr.lingers hp ρ o fs (lane-live o LL) (ended-past cl)
+                    (Freed.fr-lingering hp ρ o (fresh-path ρ fs)
+                      (flat-gone H₂ {op = op} {f} {fl} {oc} {k} {r} {po} {u = t} {ls} (trans (Freed.fr-part hp ρ o (fresh-path ρ fs)) eo)
+                                 (trans (Freed.fr-lanes hp ρ o (fresh-path ρ fs) LL) (cong₂ _++_ ebs eas)) eq₀)) lgr
       ; flags = Freed.fr-flags hp ρ o fs (done-up ρ (in-lanes πL) (one-outers o) (Calling.flags cl)) ; kept = inj₁ refl }))
     where
       H₂   = freed hp (laneOf o) fl
@@ -1073,15 +1031,15 @@ module ClimbLanes (R : Set) where
         { sane = sn″ ; placed = pd″ ; tree = Restaged.T′ H₂ ρ pl′
         ; ctlAs = runAs (Restaged.pool-calls H₂ ρ pl′ []) ec (Restaged.pool-stack H₂ ρ pl′ stk)
         ; meets = pg
-        ; owned′ = owned-to (Restaged.pool-owned H₂ ρ pl′ stk [] ec (owned-move H₂ (runAs [] (≗-refl _) stk) refl refl refl (Freed.fr-owned hp ρ o fs ow)))
-        ; kernels = Restaged.pool-kernels H₂ ρ pl′ (Freed.fr-kernels hp ρ o fs (lane-live o LL) kn)
-        ; meaning = Restaged.pool-meaning H₂ ρ pl′ (Freed.fr-meaning hp ρ o fs mn)
-        ; queue = Restaged.pool-queue H₂ ρ pl′ (Freed.fr-queue hp ρ o fs qu)
+        ; owned′ = owned-to (Restaged.pool-owned H₂ ρ pl′ stk [] ec (owned-move H₂ (runAs [] (≗-refl _) stk) refl refl refl (Freed.Sh.wr-owned hp ρ o fs (Freed.fr-gone hp ρ o (fresh-path ρ fs)) ow)))
+        ; kernels = Restaged.pool-kernels H₂ ρ pl′ (Freed.Fr.kernels hp ρ o fs (lane-live o LL) kn)
+        ; meaning = Restaged.pool-meaning H₂ ρ pl′ (Freed.Fr.meaning hp ρ o fs (lane-live o LL) mn)
+        ; queue = Restaged.pool-queue H₂ ρ pl′ (Freed.Fr.queue hp ρ o fs (lane-live o LL) qu)
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs
                          ; clocked = proj₁ ck , Restaged.pool-ticked H₂ ρ pl′ clk stk (proj₁ ck , proj₂ ck) ; paidUp = pu ; running = rn }
         ; sorted = sorted-⇝ so path ; behind′ = Eaching.each-to _ _ (Freed.Sh.shift-behind hp ρ o fs v (tells-past cl) (ended-past cl) (Settling.settle-heading ρ πL o cl Lρ sg) bh)
         ; lingers′ = Lingering.lingers-to _ (Settling.settle-lingers ρ πL o cl Lρ sg)
-        ; flags = let-go H₂ (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs) (lifts-seen (lifts-planted ρ v (Freed.fr-lifts hp ρ o fs Lρ))) ju
+        ; flags = let-go H₂ (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs) (lifts-seen (lifts-planted ρ v (Freed.Wr.wr-lifts hp ρ o fs Lρ))) ju
                     (subst (DoneBy H₂ (plant ρ v)) (sym (outers-planted ρ v)) (Freed.fr-shift hp ρ o fs pl′ rv (done-up ρ (in-lanes πL) (one-outers o) (Calling.flags cl)))) })
       , passed ag pp)
     where
@@ -1119,14 +1077,14 @@ module ClimbLanes (R : Set) where
   ... | _ , lifts-lanes {bs = bs′} {l = l} {as = as′} LL ee lf pb , Lρ | n′ , e′ , p′ =
     hopped-pre (⇝-trans p p′) (lane-begin st (record
       { sane = sn ; placed = pd ; ctl = refl ; code = e′
-      ; opens = trans (Dequeued.dq-opened H₂ ρ ys fs true)
-                  (trans (Freed.fr-opened hp ρ o fs true) (one-open hp o (trans (sym (opened-⊕ hp true ρ (in-lanes πL))) (calling-open (ρ ⊕ in-lanes πL) cl))))
+      ; opens = trans (Dequeued.Fr.wr-opened H₂ ρ ys fs true)
+                  (trans (Freed.Wr.wr-opened hp ρ o fs true) (one-open hp o (trans (sym (opened-⊕ hp true ρ (in-lanes πL))) (calling-open (ρ ⊕ in-lanes πL) cl))))
       ; stack = stk
       ; lifted = S , L₇ , sg
-      ; owned = Dequeued.dq-owned H₂ ρ ys fs eq₀ (owned-move H₂ (runAs [] (≗-refl _) stk) refl refl refl (Freed.fr-owned hp ρ o fs ow))
-      ; kernels = Dequeued.dq-kernels H₂ ρ ys fs (Freed.fr-kernels hp ρ o fs (lane-live o LL) kn)
-      ; meaning = Dequeued.dq-meaning H₂ ρ ys fs (Freed.fr-meaning hp ρ o fs mn)
-      ; queue = Dequeued.dq-queue H₂ ρ ys fs (Freed.fr-queue hp ρ o fs qu)
+      ; owned = Dequeued.Fr.wr-owned H₂ ρ ys fs (Dequeued.dq-gone H₂ ρ ys (fresh-path ρ fs) eq₀) (owned-move H₂ (runAs [] (≗-refl _) stk) refl refl refl (Freed.Sh.wr-owned hp ρ o fs (Freed.fr-gone hp ρ o (fresh-path ρ fs)) ow))
+      ; kernels = Dequeued.Fr.kernels H₂ ρ ys fs (Freed.Fr.kernels hp ρ o fs (lane-live o LL) kn)
+      ; meaning = Dequeued.Fr.meaning H₂ ρ ys fs (Freed.Fr.meaning hp ρ o fs (lane-live o LL) mn)
+      ; queue = Dequeued.Fr.queue H₂ ρ ys fs (Freed.Fr.queue hp ρ o fs (lane-live o LL) qu)
       ; books = record { fresh = fs ; clocked = proj₁ ck , proj₁ ck , proj₂ ck ; paidUp = pu ; running = rn }
       ; sorted = sorted-⇝ so (⇝-trans p p′)
       ; behind = subst (λ t′ → Each H₃ (Heads q) t′) (plant-self ρ)
@@ -1135,7 +1093,7 @@ module ClimbLanes (R : Set) where
       ; lingers = Settling.next-lingers ρ πL o cl Lρ sg ys
       ; flags = let-go H₃ (planted ρ P₀) (pairs-r (names w₀) (apart-unplant ρ fs)) (trans (seen-planted H₃ ρ P₀) (lifts-seen L₇)) refl
                   (subst (DoneBy H₃ (plant ρ P₀)) (sym (outers-planted ρ P₀))
-                    (Dequeued.Sh.shift-flags H₂ ρ ys fs P₀ {ns₀ = []} (λ ()) (λ _ → ju₂) (λ _ → pending-flags H₃) (subst (DoneBy H₂ _) (sym (++-identityʳ (outers ρ))) d₂)))
+                    (Dequeued.Fr.shift-flags H₂ ρ ys fs P₀ {ns₀ = []} (λ ()) (λ _ → ju₂) (λ _ → pending-flags H₃) (subst (DoneBy H₂ _) (sym (++-identityʳ (outers ρ))) d₂)))
       ; inner = Dequeued.dq-flags₀ H₂ ρ ys (fresh-path ρ fs) (Flag.db-sub H₂ (let-go H₂ ρ fs s₂ ju₂ d₂) ρ s₂) }))
     where
       H₂  = freed hp (laneOf o) fl
@@ -1148,13 +1106,13 @@ module ClimbLanes (R : Set) where
       L₁  = subst (λ qs → Lifts hp ρ (U.laneˢ op G (At.part hp t) bs′ l (U.endˢ q) as′ qs po) S)
                   (trans (sym (queue-freed hp (laneOf o) fl)) eq₀)
                   (subst (λ S′ → Lifts hp ρ (U.laneˢ op G (At.part hp t) bs′ l S′ as′ (At.val hp (FlatKit.Flat.queue fl)) po) S) (lane-step o LL) Lρ)
-      L₄  = Dequeued.dq-lifts H₂ ρ ys fs (Freed.fr-lifts hp ρ o fs L₁)
+      L₄  = Dequeued.Fr.wr-lifts H₂ ρ ys fs (Freed.Wr.wr-lifts hp ρ o fs L₁)
       L₅  = subst (λ x → Lifts H₃ ρ (F x (bs′ ++ as′) ys) S) (sym (trans (Dequeued.dq-part H₂ ρ ys (fresh-path ρ fs)) (Freed.fr-part hp ρ o (fresh-path ρ fs)))) L₄
       L₆  = subst (λ zs → Lifts H₃ ρ (F (At.part H₃ t) zs ys) S) (sym (trans (Dequeued.dq-lanes H₂ ρ ys (fresh-path ρ fs)) (Freed.fr-lanes hp ρ o (fresh-path ρ fs) LL))) L₅
       L₇  = subst (λ qs → Lifts H₃ ρ (F (At.part H₃ t) (At.partLanes H₃ ls) qs) S) (sym (queue-stored H₂ fl ys)) L₆
       P₀  = pendingˢ (f y) (q ++ [ ix 1 ])
       d₂  = Freed.fr-flags hp ρ o fs (done-up ρ (in-lanes πL) (one-outers o) (Calling.flags cl))
-      s₂  = lifts-seen (Freed.fr-lifts hp ρ o fs L₁)
+      s₂  = lifts-seen (Freed.Wr.wr-lifts hp ρ o fs L₁)
       ju₂ = subst (λ Q → is-just (At.merged H₂ op G (At.part H₂ t) (At.partLanes H₂ ls) Q po) ≡ true) (sym eq₀)
                   (queue-open H₂ op G (At.part H₂ t) (At.partLanes H₂ ls) y ys po)
 

@@ -104,7 +104,7 @@ module ClimbFlat (R : Set) where
   open Everywhere R using (module Growths)
   open Replanting R using (Kin; kin-end; kin-pool; kin-feed; kin-fin; kin-lane; rehomes; rehomes-code; restack; reticked; owned-run; module Shift; Heading; Lingering; Gone; store-held; Lives; lives-off; ahead-under)
   open Read
-  open ClimbBase R using (lifts-planted; tick-under; healed-off)
+  open ClimbBase R using (lifts-planted; tick-under; healed-off; module Framed; flat-stays)
   open ClimbTake R using (rise; open-code; writes; reads)
   -- A climbing signal's path reads open: an emitter whose observer path
   -- is closed skips, each operator it passes guarded it on the way up,
@@ -403,39 +403,30 @@ module ClimbFlat (R : Set) where
     sd-off : Offʰ H H′ (names w₀)
     sd-off = Heaps.keep H H′ (off-store H (FlatKit.Flat.outerDone fl)) (lookupᴬ mine)
 
-    module Wr (fs : AllPairs _≢_ (names T)) = Wrote H H′ ρ (off-store H (FlatKit.Flat.outerDone fl)) mine fs
-    module Sh (fs : AllPairs _≢_ (names T)) = Shift H H′ ρ (off-store H (FlatKit.Flat.outerDone fl)) mine fs
-
     -- The done flag no read of the node's own clauses.
     sd-alike : AllPairs _≢_ (names w₀) → Alike H H′ (flatReads fl oc k r u ls)
     sd-alike (a₀ ∷ a₁ ∷ _) j (here e)  = look-store H (FlatKit.Flat.outerDone fl) j (λ eq → lookupᴬ a₀ (here refl) (sym (trans eq e)))
     sd-alike (a₀ ∷ a₁ ∷ _) j (there m) = look-store H (FlatKit.Flat.outerDone fl) j (lookupᴬ a₁ (there m))
+
+    module Fr (fs : AllPairs _≢_ (names T)) =
+      Framed H H′ ρ (off-store H (FlatKit.Flat.outerDone fl)) mine fs
+        (flat-stays H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} u ls (sd-alike (fresh-path ρ fs)))
+        (Heaps.fed-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} u ls (sd-alike (fresh-path ρ fs)))
+        (store-keeps H (FlatKit.Flat.outerDone fl) _ (λ ()) (λ ()) (λ ()) (λ ()))
 
     sd-part-at : ∀ pl′ → AllPairs _≢_ (names w₀) → At.part H′ (flatMapˢ op f fl oc k r pl′ u ls) ≡ At.part H (flatMapˢ op f fl oc k r pl′ u ls)
     sd-part-at pl′ fr@(_ ∷ a₁ ∷ _) =
       part-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl′} u ls (look-store H (FlatKit.Flat.outerDone fl) (FlatKit.Flat.queue fl) (lookupᴬ a₁ (here refl)))
                 (Heaps.flat-so H H′ {fl = fl} {oc} {k} {r} {u} {ls} (sd-alike fr)) (Heaps.flat-ls H H′ {fl = fl} {oc} {k} {r} {u} {ls} (sd-alike fr))
 
-    sd-part : AllPairs _≢_ (names w₀) → At.part H′ w₀ ≡ At.part H w₀
+    sd-part : AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl u ls)) → At.part (store H (FlatKit.Flat.outerDone fl) (lift true)) (flatMapˢ op f fl oc k r pl u ls) ≡ At.part H (flatMapˢ op f fl oc k r pl u ls)
     sd-part = sd-part-at pl
 
     sd-active : AllPairs _≢_ (names w₀) → At.val H′ (FlatKit.Flat.active fl) ≡ At.val H (FlatKit.Flat.active fl)
     sd-active (a₀ ∷ _) = cong lower (look-store H (FlatKit.Flat.outerDone fl) (FlatKit.Flat.active fl) (λ eq → lookupᴬ a₀ (here refl) (sym eq)))
 
-    sd-fifo : AllPairs _≢_ (names w₀) → At.val H′ (FlatKit.Flat.queue fl) ≡ At.val H (FlatKit.Flat.queue fl)
+    sd-fifo : AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl u ls)) → At.val (store H (FlatKit.Flat.outerDone fl) (lift true)) (FlatKit.Flat.queue fl) ≡ At.val H (FlatKit.Flat.queue fl)
     sd-fifo (_ ∷ a₁ ∷ _) = cong lower (look-store H (FlatKit.Flat.outerDone fl) (FlatKit.Flat.queue fl) (lookupᴬ a₁ (here refl)))
-
-    sd-holds : AllPairs _≢_ (names w₀) → ∀ {E o} → At.Holds H w₀ E o → At.Holds H′ w₀ E o
-    sd-holds fr {E} {o} = Heaps.holds-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} u ls (sd-alike fr) {E} {o}
-
-    sd-gated : AllPairs _≢_ (names w₀) → At.Gated H w₀ → At.Gated H′ w₀
-    sd-gated fr = Heaps.gated-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} u ls (sd-alike fr)
-
-    sd-spent : AllPairs _≢_ (names w₀) → At.Spent H w₀ → At.Spent H′ w₀
-    sd-spent fr = Heaps.spent-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} u ls (sd-alike fr)
-
-    sd-fed : AllPairs _≢_ (names w₀) → ∀ ν → At.Fed H w₀ ν → At.Fed H′ w₀ ν
-    sd-fed fr = Heaps.fed-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} u ls (sd-alike fr)
 
     -- At the flatMap and below it, every part as it was.
     sd-same : AllPairs _≢_ (names w₀) → ∀ {Δ′ A′} {v : Sub h Δ′ A′} (ψ : Path w₀ v) → At.part H′ v ≡ At.part H v
@@ -453,15 +444,12 @@ module ClimbFlat (R : Set) where
         nl (in-lanes ψ) =
           (λ eq → lookupᴬ a₁ (there (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names u) (lanes-path ψ (here refl))))))))) (sym eq)) ∷ []
 
-    sd-owned : AllPairs _≢_ (names T) → ∀ {p ctl bs} {ca : CtlAs T p ctl bs} → Owned H T ca → Owned H′ T ca
-    sd-owned fs = Sh.wr-owned fs record { gone-part = λ ψ e → trans (sd-same (fresh-path ρ fs) ψ) e ; gone-live = sd-live (fresh-path ρ fs) ; gone-held = store-held H (FlatKit.Flat.outerDone fl) }
-
-    sd-queue : AllPairs _≢_ (names T) → ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
-    sd-queue _ = queue-keeps (store-keeps H (FlatKit.Flat.outerDone fl) _ (λ ()) (λ ()) (λ ()) (λ ()))
+    sd-gone : AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl u ls)) → Gone H (store H (FlatKit.Flat.outerDone fl) (lift true)) (flatMapˢ op f fl oc k r pl u ls)
+    sd-gone fr = record { gone-part = λ ψ e → trans (sd-same fr ψ) e ; gone-live = sd-live fr ; gone-held = store-held H (FlatKit.Flat.outerDone fl) }
 
     -- Nothing left: the flatMap gone, no pool of it held; its children's
     -- leftovers and ties alike.
-    sd-lingering : AllPairs _≢_ (names w₀) → At.part H′ w₀ ≡ nothing → Lingering H H′ w₀ w₀
+    sd-lingering : AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl u ls)) → At.part (store H (FlatKit.Flat.outerDone fl) (lift true)) (flatMapˢ op f fl oc k r pl u ls) ≡ nothing → Lingering H (store H (FlatKit.Flat.outerDone fl) (lift true)) (flatMapˢ op f fl oc k r pl u ls) (flatMapˢ op f fl oc k r pl u ls)
     sd-lingering fr gn = record
       { ling-revive = λ j → ⊥-elim (true≢false (trans (sym j) (cong is-just gn)))
       ; ling-rested = λ {C} → pin-alike (cong₂ U.unionᶜ (leftover-alike H H′ {B = C} u so-al) (leftoverL-alike H H′ {B = C} ls ls-al))
@@ -471,9 +459,6 @@ module ClimbFlat (R : Set) where
       where
         so-al = Heaps.flat-so H H′ {fl = fl} {oc} {k} {r} {u} {ls} (sd-alike fr)
         ls-al = Heaps.flat-ls H H′ {fl = fl} {oc} {k} {r} {u} {ls} (sd-alike fr)
-
-    sd-lingers : AllPairs _≢_ (names T) → At.part H′ w₀ ≡ nothing → Ends H T → Lingers H T → Lingers H′ T
-    sd-lingers fs gn en lg = subst (λ t → Lingers H′ t) (plant-self ρ) (Sh.shift-lingers fs w₀ en (sd-lingering (fresh-path ρ fs) gn) lg)
 
     -- Below the flatMap, what the done flag is not; at it, its part.
     sd-heads : AllPairs _≢_ (names w₀) → ∀ {q} → Each H (Heads q) w₀ → Each H′ (Heads q) w₀
@@ -541,17 +526,8 @@ module ClimbFlat (R : Set) where
                 (pool ev x))
             where e₀ = proj₂ (just-of (revive (cong is-just x)))
 
-    sd-lifts : AllPairs _≢_ (names T) → ∀ {s S} → Lifts H ρ s S → Lifts H′ ρ s S
-    sd-lifts fs = Wr.wr-lifts fs
-
-    sd-kernels : AllPairs _≢_ (names T) → Kernels H T → Kernels H′ T
-    sd-kernels fs = Wr.wr-kernels fs (λ {E} {o} → sd-holds (fresh-path ρ fs) {E} {o}) (λ _ → sd-gated (fresh-path ρ fs)) (sd-spent (fresh-path ρ fs))
-
-    sd-meaning : AllPairs _≢_ (names T) → Meaning H T → Meaning H′ T
-    sd-meaning fs = Wr.wr-meaning fs (sd-fed (fresh-path ρ fs))
-
     sd-behind : AllPairs _≢_ (names T) → ∀ {q} → Each H (Heads q) T → Each H′ (Heads q) T
-    sd-behind fs = Wr.wr-behind fs (sd-part (fresh-path ρ fs)) (sd-heads (fresh-path ρ fs))
+    sd-behind fs = Fr.wr-behind fs (sd-part (fresh-path ρ fs)) (sd-heads (fresh-path ρ fs))
 
     settle-eq : AllPairs _≢_ (names w₀) → Kernels H T → ((At.val H′ (FlatKit.Flat.active fl) ≡ᵇ 0) ∧ null (At.val H′ (FlatKit.Flat.queue fl)))
                               ≡ (null (At.partLanes H ls) ∧ null (At.val H (FlatKit.Flat.queue fl)))
@@ -582,7 +558,7 @@ module ClimbFlat (R : Set) where
     sd-shift : AllPairs _≢_ (names T) → ∀ pl′ → (is-just (At.part H′ (flatMapˢ op f fl oc k r pl′ u ls)) ≡ true → is-just (At.part H w₀) ≡ true)
              → At.part H u ≡ nothing → DoneBy H T (outers (ρ ⊕ in-outer here)) → DoneBy H′ (plant ρ (flatMapˢ op f fl oc k r pl′ u ls)) (outers ρ)
     sd-shift fs pl′ rv gn d =
-      Sh.shift-flags fs (flatMapˢ op f fl oc k r pl′ u ls) (lookupᴬ mine) rv
+      Fr.shift-flags fs (flatMapˢ op f fl oc k r pl′ u ls) (lookupᴬ mine) rv
         (sd-flags₀ pl′ (fresh-path ρ fs) (λ m → outers-apart ρ fs m (there (here refl))) gn) (subst (DoneBy H T) (outers-⊕ ρ (in-outer here)) d)
 
     sd-flags : AllPairs _≢_ (names T) → At.part H u ≡ nothing → DoneBy H T (outers (ρ ⊕ in-outer here)) → DoneBy H′ T (outers ρ)
@@ -593,7 +569,7 @@ module ClimbFlat (R : Set) where
     sd-landed : AllPairs _≢_ (names T) → ∀ pl′ → At.part H u ≡ nothing → (null (At.partLanes H ls) ∧ null (At.val H (FlatKit.Flat.queue fl))) ≡ false
               → ∀ {s S} → Lifts H ρ s S → DoneBy H T (outers (ρ ⊕ in-outer here)) → DoneBy H′ (plant ρ (flatMapˢ op f fl oc k r pl′ u ls)) []
     sd-landed fs pl′ gn nl L d =
-      let-go H′ (planted ρ v′) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v′ refl)) fs) (lifts-seen (lifts-planted ρ v′ (sd-lifts fs L))) (cong is-just open′)
+      let-go H′ (planted ρ v′) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v′ refl)) fs) (lifts-seen (lifts-planted ρ v′ (Fr.wr-lifts fs L))) (cong is-just open′)
         (subst (DoneBy H′ (plant ρ v′)) (sym (outers-planted ρ v′)) (sd-shift fs pl′ (λ _ → cong is-just open₀) gn d))
       where
         G    = λ a j → U.subscribe (f a) j
@@ -655,7 +631,7 @@ module ClimbFlat (R : Set) where
     close-heading = P.heading (λ {A′} i {b₀} → close-told {A′} i {b₀}) close-heads
 
     close-lingers : Lingers (Settles.H′ H ρ) (Restaged.T′ (Settles.H′ H ρ) ρ pl′)
-    close-lingers = Settles.Sh.shift-lingers H ρ fs (Restaged.v (Settles.H′ H ρ) ρ pl′) (ended-past cl) (P.lingering close-tied) (Calling.lingers cl)
+    close-lingers = Settles.Fr.shift-lingers H ρ fs (Restaged.v (Settles.H′ H ρ) ρ pl′) (ended-past cl) (P.lingering close-tied) (Calling.lingers cl)
 
   -- A flatMap's outer ended: its guard read open, its done flag written,
   -- its count and queue read.  Nothing left: the flatMap's end one
@@ -695,13 +671,13 @@ module ClimbFlat (R : Set) where
       ; code = ≗-trans e₅ (bind≗ (open-code {m = Observer.complete o} (trans (cong (λ x → x ∧ b) (Settles.done-read hp ρ)) eq)) λ _ → ≗-refl ⟦ ks ⟧ᶜ)
       ; stack = sk
       ; lifted = trans (Settles.sd-part hp ρ (fresh-path ρ fs)) (flat-gone hp {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} gn (proj₁ nl) (proj₂ nl)) , S
-               , Settles.sd-lifts hp ρ fs (subst₂ (λ ls′ qs′ → Lifts hp ρ (U.outerˢ op (λ a j → U.subscribe (f a) j) o₀ (U.endˢ q) ls′ qs′ po) S)
+               , Settles.Fr.wr-lifts hp ρ fs (subst₂ (λ ls′ qs′ → Lifts hp ρ (U.outerˢ op (λ a j → U.subscribe (f a) j) o₀ (U.endˢ q) ls′ qs′ po) S)
                                                (proj₁ nl) (proj₂ nl) Lρ) , sg
                , healed-off hp (Settles.H′ hp ρ) ρ fs (Settles.sd-off hp ρ) (Settles.sd-part hp ρ (fresh-path ρ fs)) (healed-split ρ (in-outer here) hl)
-      ; owned = Settles.sd-owned hp ρ fs ow ; kernels = Settles.sd-kernels hp ρ fs kn ; meaning = Settles.sd-meaning hp ρ fs mn
-      ; queue = Settles.sd-queue hp ρ fs qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
+      ; owned = Settles.Fr.wr-owned hp ρ fs (Settles.sd-gone hp ρ (fresh-path ρ fs)) ow ; kernels = Settles.Fr.kernels hp ρ fs kn ; meaning = Settles.Fr.meaning hp ρ fs mn
+      ; queue = Settles.Fr.queue hp ρ fs qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
       ; sorted = sorted-⇝ so path ; behind = Settles.sd-behind hp ρ fs bh
-      ; lingers = Settles.sd-lingers hp ρ fs (trans (Settles.sd-part hp ρ (fresh-path ρ fs)) (flat-gone hp {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} gn (proj₁ nl) (proj₂ nl))) (ended-past cl) lgr
+      ; lingers = Settles.Fr.lingers hp ρ fs (ended-past cl) (Settles.sd-lingering hp ρ (fresh-path ρ fs) (trans (Settles.sd-part hp ρ (fresh-path ρ fs)) (flat-gone hp {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} gn (proj₁ nl) (proj₂ nl)))) lgr
       ; flags = Settles.sd-flags hp ρ fs gn dn ; kept = inj₁ refl }))
     where
       o    = Here.obs (walk ρ top)
@@ -719,14 +695,14 @@ module ClimbFlat (R : Set) where
         { sane = sn″ ; placed = pd″ ; tree = Restaged.T′ (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀))
         ; ctlAs = runAs (Restaged.pool-calls (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) ks) ec (Restaged.pool-stack (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) sk)
         ; meets = pg
-        ; owned′ = owned-to (Restaged.pool-owned (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) sk ks ec (Settles.sd-owned hp ρ fs ow))
-        ; kernels = Restaged.pool-kernels (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) (Settles.sd-kernels hp ρ fs kn)
-        ; meaning = Restaged.pool-meaning (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) (Settles.sd-meaning hp ρ fs mn)
-        ; queue = Restaged.pool-queue (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) (Settles.sd-queue hp ρ fs qu)
+        ; owned′ = owned-to (Restaged.pool-owned (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) sk ks ec (Settles.Fr.wr-owned hp ρ fs (Settles.sd-gone hp ρ (fresh-path ρ fs)) ow))
+        ; kernels = Restaged.pool-kernels (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) (Settles.Fr.kernels hp ρ fs kn)
+        ; meaning = Restaged.pool-meaning (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) (Settles.Fr.meaning hp ρ fs mn)
+        ; queue = Restaged.pool-queue (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) (Settles.Fr.queue hp ρ fs qu)
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs
                          ; clocked = proj₁ ck , Restaged.pool-ticked (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
         ; sorted = sorted-⇝ so path
-        ; behind′ = Eaching.each-to _ _ (Settles.Sh.shift-behind hp ρ fs (Restaged.v (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀))) (tells-past cl) (ended-past cl) (Closing.close-heading ρ o₀ cl Lρ sg) bh)
+        ; behind′ = Eaching.each-to _ _ (Settles.Fr.shift-behind hp ρ fs (Restaged.v (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀))) (tells-past cl) (ended-past cl) (Closing.close-heading ρ o₀ cl Lρ sg) bh)
         ; lingers′ = Lingering.lingers-to _ (Closing.close-lingers ρ o₀ cl Lρ sg)
         ; flags = Settles.sd-landed hp ρ fs (U.unionᶜ po (U.restᶜ o₀)) gn (trans (sym (Settles.settle-eq hp ρ (fresh-path ρ fs) kn)) eq) Lρ dn })
       , passed ag pp)

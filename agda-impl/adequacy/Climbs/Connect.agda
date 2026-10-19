@@ -102,7 +102,7 @@ module ClimbConnect (R : Set) where
   open Everywhere R using (module Growths)
   open Replanting R using (Kin; kin-end; kin-pool; kin-feed; kin-fin; kin-lane; rehomes; rehomes-code; restack; reticked; owned-run; module Shift; Heading; Lingering; Gone; store-held; Lives; lives-off; ahead-under)
   open Read
-  open ClimbBase R using (conn-kept)
+  open ClimbBase R using (conn-kept; module Stays; conn-stays)
   open ClimbTake R using (writes; reads)
   open ClimbFlat R using (calling-open; opened-⊕; heading-∘; lingering-∘; ghost-lift)
   -- A connect's body retagged, its feed restaged: the kernels read it
@@ -364,15 +364,6 @@ module ClimbConnect (R : Set) where
     fin-rest : AllPairs _≢_ (names w₀) → Alike H H′ (drop 2 (names w₀))
     fin-rest (_ ∷ a₁ ∷ _) j m = look-store H (Subject.closed Sj) j (lookupᴬ a₁ m)
 
-    fin-holds : AllPairs _≢_ (names w₀) → ∀ {E o} → At.Holds H w₀ E o → At.Holds H′ w₀ E o
-    fin-holds fr {E} {o} = Heaps.holds-conn H H′ {S = Sj} {c} {b} {kb} {k} {idle} {rp} {e} {rt} u bd (fin-rest fr) {E} {o}
-
-    fin-gated : AllPairs _≢_ (names w₀) → At.Gated H w₀ → At.Gated H′ w₀
-    fin-gated fr = Heaps.gated-conn H H′ {S = Sj} {c} {b} {kb} {k} {idle} {rp} {e} {rt} u bd (fin-rest fr)
-
-    fin-spent : AllPairs _≢_ (names w₀) → At.Spent H w₀ → At.Spent H′ w₀
-    fin-spent fr = Heaps.spent-conn H H′ {S = Sj} {c} {b} {kb} {k} {idle} {rp} {e} {rt} u bd (fin-rest fr)
-
     -- The closed flag read by no part: the node's heads and ties as they
     -- were.
     fin-au : AllPairs _≢_ (names w₀) → Alike H H′ (names u)
@@ -381,11 +372,11 @@ module ClimbConnect (R : Set) where
     fin-ab : AllPairs _≢_ (names w₀) → Alike H H′ (names bd)
     fin-ab (_ ∷ a₁ ∷ _) j m = look-store H (Subject.closed Sj) j (λ eq → lookupᴬ a₁ (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names u) m))))) eq)
 
-    fin-part : AllPairs _≢_ (names w₀) → At.part H′ w₀ ≡ At.part H w₀
+    fin-part : AllPairs _≢_ (names (connectˢ Sj c b kb k idle rp e rt u bd)) → At.part (store H (Subject.closed Sj) (lift true)) (connectˢ Sj c b kb k idle rp e rt u bd) ≡ At.part H (connectˢ Sj c b kb k idle rp e rt u bd)
     fin-part fr = trans (cong₂ (At.connected H′ rp e rt) (part-alike H H′ u (fin-au fr)) (part-alike H H′ bd (fin-ab fr)))
                         (conn-≡ H H′ rp e rt (At.part H u) (At.part H bd))
 
-    fin-revive : AllPairs _≢_ (names w₀) → is-just (At.part H′ w₀) ≡ true → is-just (At.part H w₀) ≡ true
+    fin-revive : AllPairs _≢_ (names (connectˢ Sj c b kb k idle rp e rt u bd)) → is-just (At.part (store H (Subject.closed Sj) (lift true)) (connectˢ Sj c b kb k idle rp e rt u bd)) ≡ true → is-just (At.part H (connectˢ Sj c b kb k idle rp e rt u bd)) ≡ true
     fin-revive fr j = trans (cong is-just (sym (fin-part fr))) j
 
     fin-kept : AllPairs _≢_ (names w₀) → Heading H H′ q w₀ w₀
@@ -433,7 +424,7 @@ module ClimbConnect (R : Set) where
 
     -- The closed flag read by no part: the connect's own clause reads its
     -- children's parts alone, theirs names apart from the flag.
-    fin-gone : AllPairs _≢_ (names w₀) → Gone H H′ w₀
+    fin-gone : AllPairs _≢_ (names (connectˢ Sj c b kb k idle rp e rt u bd)) → Gone H (store H (Subject.closed Sj) (lift true)) (connectˢ Sj c b kb k idle rp e rt u bd)
     fin-gone (_ ∷ a₁ ∷ _) = record { gone-part = gp ; gone-live = lives-off {H = H} {H′ = H′} (off-store H (Subject.closed Sj)) nl ; gone-held = store-held H (Subject.closed Sj) }
       where
         au : Alike H H′ (names u)
@@ -506,7 +497,9 @@ module ClimbConnect (R : Set) where
     fin-kernels fs kn = record { holds   = holds-plant H′ {t = T} ρ v refl (λ {E} {o} → body-holds H′ {S = Sj} {c = c} {b = b} {kb = kb} {k = k} {fd₁ = idle} {fd₂ = fd′} {rp = rp} {e = e} {rt = rt} {src = u} (at-here (At.owing H′ fd′)) bd {E} {o}) (Kernels.holds kn′)
                                ; gated   = gated-plant H′ {t = T} ρ v (body-gated H′ {S = Sj} {c = c} {b = b} {kb = kb} {k = k} {fd₁ = idle} {fd₂ = fd′} {rp = rp} {e = e} {rt = rt} {src = u} (at-here (At.owing H′ fd′)) bd) (body-spent H′ {S = Sj} {c = c} {b = b} {kb = kb} {k = k} {fd₁ = idle} {fd₂ = fd′} {rp = rp} {e = e} {rt = rt} {src = u} (at-here (At.owing H′ fd′)) bd) (Kernels.gated kn′)
                                ; settled = settled-plant H′ {t = T} ρ v Bd.body-owes (body-settled H′ {S = Sj} {c = c} {b = b} {kb = kb} {k = k} {fd₁ = idle} {fd₂ = fd′} {rp = rp} {e = e} {rt = rt} {src = u} (at-here (At.owing H′ fd′)) bd) (Kernels.settled kn′) }
-      where kn′ = Wr.wr-kernels fs (λ {E} {o} → fin-holds (fresh-path ρ fs) {E} {o}) (λ _ → fin-gated (fresh-path ρ fs)) (fin-spent (fresh-path ρ fs)) kn
+      where
+        st = conn-stays H H′ {S = Sj} {c} {b} {kb} {k} {idle} {rp} {e} {rt} u bd (fin-rest (fresh-path ρ fs))
+        kn′ = Wr.wr-kernels fs (λ {E} {o} → Stays.holds st {E} {o}) (λ {E} {o} → Stays.gated st {E} {o}) (Stays.spent st) kn
 
     fin-meaning : AllPairs _≢_ (names T) → At.Joined H (subjects T) (joiners T []) → Meaning H T → Meaning H′ T′
     fin-meaning fs jn mn = record { fed = Heaps.fed-path H H′ ρ v (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v Bd.body-names)) fs)

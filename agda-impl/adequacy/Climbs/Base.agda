@@ -443,3 +443,46 @@ module ClimbBase (R : Set) where
   ending-part : ∀ {h} (H : Heapᴹ h) {Δ A} {i p c k} {u : Sub h Δ A} {q c′} → At.val H (Kit.live c) ≡ true
               → At.part H (takeWhileˢ i p c k (Strongly.ending q c′) u) ≡ just (U.endingᶜ (q ++ [ last ]) c′)
   ending-part H lv rewrite lv = refl
+
+  -- A WRITE NO READ OF A NODE'S KERNEL SEES: its holds, gates and spent
+  -- alike.
+  record Stays {h} (H H′ : Heapᴹ h) {Δ A} (u : Sub h Δ A) : Set₁ where
+    field
+      holds : ∀ {E o} → At.Holds H u E o → At.Holds H′ u E o
+      gated : ∀ {E o} → At.Holds H u E o → At.Gated H u → At.Gated H′ u
+      spent : At.Spent H u → At.Spent H′ u
+
+  flat-stays : ∀ {h} (H H′ : Heapᴹ h) {Δ A B op f fl oc k r pl} (so : Sub h Δ A) (ls : List (Lane h Δ B))
+             → Alike H H′ (flatReads fl oc k r so ls) → Stays H H′ (flatMapˢ op f fl oc k r pl so ls)
+  flat-stays H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} so ls ag = record
+    { holds = λ {E} {o} → Heaps.holds-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} so ls ag {E} {o}
+    ; gated = λ _ → Heaps.gated-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} so ls ag
+    ; spent = Heaps.spent-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} so ls ag }
+
+  conn-stays : ∀ {h} (H H′ : Heapᴹ h) {Δ A B S c b kb k fd rp e rt} (src : Sub h Δ A) (bd : Sub h (A ∷ Δ) B)
+             → Alike H H′ (drop 2 (names (connectˢ S c b kb k fd rp e rt src bd))) → Stays H H′ (connectˢ S c b kb k fd rp e rt src bd)
+  conn-stays H H′ {S = S} {c} {b} {kb} {k} {fd} {rp} {e} {rt} src bd ag = record
+    { holds = λ {E} {o} → Heaps.holds-conn H H′ {S = S} {c} {b} {kb} {k} {fd} {rp} {e} {rt} src bd ag {E} {o}
+    ; gated = λ _ → Heaps.gated-conn H H′ {S = S} {c} {b} {kb} {k} {fd} {rp} {e} {rt} src bd ag
+    ; spent = Heaps.spent-conn H H′ {S = S} {c} {b} {kb} {k} {fd} {rp} {e} {rt} src bd ag }
+
+  -- A WRITE AT A NODE, FRAMED: its kernel, its feeds and the queue alike,
+  -- so every record of the tree carried across.
+  module Framed {h} (H H′ : Heapᴹ h) {T : Sub h [] R} {Δ A} {u : Sub h Δ A} (ρ : Path T u)
+                {ns : List (Name h)} (off : Offʰ H H′ ns) (mine : All (_∈ᴸ names u) ns) (fs : AllPairs _≢_ (names T))
+                (st : Stays H H′ u) (fv : ∀ ν → At.Fed H u ν → At.Fed H′ u ν) (kp : Keeps H H′) where
+    open Wrote H H′ ρ off mine fs public
+    open Shift H H′ ρ off mine fs public
+
+    kernels : Kernels H T → Kernels H′ T
+    kernels = wr-kernels (λ {E} {o} → Stays.holds st {E} {o}) (λ {E} {o} → Stays.gated st {E} {o}) (Stays.spent st)
+
+    meaning : Meaning H T → Meaning H′ T
+    meaning = wr-meaning fv
+
+    queue : ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
+    queue = queue-keeps kp
+
+    -- Nothing left at the node: its ties as they were.
+    lingers : Ends H T → Lingering H H′ u u → Lingers H T → Lingers H′ T
+    lingers en lg l = subst (Lingers H′) (plant-self ρ) (shift-lingers u en lg l)

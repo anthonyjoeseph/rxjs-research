@@ -278,54 +278,6 @@ def declarations(path):
     return out
 
 
-def scopes(path):
-    """(first, last, locals) per `module … where` body in one file.
-
-    A parameterised module's own definitions (`w₀ = …`, `H′ = …`) are
-    different objects in every module that defines them, so two frame
-    modules stating `At.part H′ w₀ ≡ At.part H w₀` share TEXT and not a
-    subject.  A statement naming one of its module's locals is only
-    comparable inside that module; `scope_of` tags it with the module."""
-    src = io.open(path, encoding="utf-8").read().split("\n")
-    ind = lambda l: len(l) - len(l.lstrip())
-    live = lambda l: l.strip() and not l.strip().startswith("--")
-    out = []
-    for i, line in enumerate(src):
-        if not re.match(r"\s*module\s", line):
-            continue
-        j = i
-        while j < len(src) and not re.search(r"(^|\s)where\s*$", src[j]):
-            if j > i and live(src[j]) and ind(src[j]) <= ind(line):
-                break
-            j += 1
-        if j >= len(src) or not re.search(r"(^|\s)where\s*$", src[j]):
-            continue
-        k = j + 1
-        while k < len(src) and not live(src[k]):
-            k += 1
-        if k >= len(src) or ind(src[k]) <= ind(line):
-            continue
-        body, end, names = ind(src[k]), k, set()
-        while end < len(src) and (not live(src[end]) or ind(src[end]) > ind(line)):
-            m = re.match(r"^(\s*)([^\s(){}@;.\"]+)\s*[:=]", src[end])
-            if m and len(m.group(1)) == body and m.group(2) not in KEYWORDS:
-                names.add(m.group(2))
-            end += 1
-        out.append((i + 1, end, names))
-    return out
-
-
-def scope_of(scs, line, ty):
-    """The innermost enclosing module whose locals `ty` names, or None."""
-    toks = set(re.split(r"[\s(){}\[\]]+", ty))
-    hit = None
-    for first, last, names in scs:
-        if first < line <= last and toks & names:
-            if hit is None or first > hit:
-                hit = first
-    return hit
-
-
 def alpha(ty):
     """Canonicalise bound-variable names in order of first appearance, so
     `∀ {m} (f : Fin m → ℕ) …` and `∀ {n} (f : Fin n → ℕ) …` agree."""
@@ -435,17 +387,14 @@ def main():
     loosely = collections.defaultdict(list)
     scanned = 0
     for path in paths:
-        scs = scopes(path)
         for name, line, ty in declarations(path):
             if not RELATION.search(ty) or len(ty) < MIN_TYPE_LEN:
                 continue
             scanned += 1
-            sc = scope_of(scs, line, ty)
-            tag = "" if sc is None else "%s:%d\x00" % (os.path.relpath(path, root), sc)
             ty = expand(ty, syns)
             where = (name, os.path.relpath(path, root), line)
-            strict[tag + alpha(ty)].append(where)
-            loosely[tag + loose(ty)].append(where)
+            strict[alpha(ty)].append(where)
+            loosely[loose(ty)].append(where)
 
     s_find = collisions(strict)
     seen = {frozenset(d[0] for d in ds) for _, ds in s_find}
