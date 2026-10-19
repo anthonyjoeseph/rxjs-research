@@ -68,7 +68,7 @@ module Connecting (R : Set) where
   open Heap using (World; _⊑_; _⨾_; _∋_; there; new; grow; wk∋; cell) renaming (here to hereʳ; same to same⊑)
   open Run (Pureᴾ R) using (Act; done; under; _>>ᴬ_; compile; Env; wkEnv; wkAct; module Kit; Ref; wkR; Observer; Kont; wkObs; wkKont; Subject; Subscription; wkSubn)
   open Run.Kit (Pureᴾ R) using (skipᴬ)
-  open Strongly R using (Carried; Books; Sub; pendingˢ; connectˢ; idle; bodyK; srcK; Path; here; in-source; in-body; _⊕_; Here; walk; top; srcC; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Name; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-defer; subjects; laneSubjects; Lane; lane; Heads; Lingers; names; Phase; union-pinned; under-moved; bursts-pinned; rest-pinned; ≗-refl; newRef≗; unsubscribing; under≗; readRef≗; module Canon; owned-to; module Eaching; module Lingering)
+  open Strongly R using (Carried; Books; Sub; pendingˢ; connectˢ; idle; bodyK; srcK; Path; here; in-source; in-body; _⊕_; Here; walk; top; srcC; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Name; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-defer; subjects; laneSubjects; Lane; lane; Heads; Lingers; DoneBy; names; Phase; union-pinned; under-moved; bursts-pinned; rest-pinned; ≗-refl; newRef≗; unsubscribing; under≗; readRef≗; module Canon; owned-to; module Eaching; module Lingering)
                         renaming (⟦_⟧ to ⟦_⟧ᶜ; at⟦_⟧ to at⟦_⟧ᶜ)
   open Strongly.Against R using (StackAs; CtlAs; subAs; backAs; stackJobs; SrcOf; src-of; Ticked)
   open Moving R using (planted; pend; part-plant; holds-owed; fed-plant; plant; plantᴸ; Splice; spliced-l; spliced-r; pendings-plant; joiners-plant)
@@ -76,7 +76,7 @@ module Connecting (R : Set) where
   open Everywhere.Gating R using (gated-plant; gated-alike)
   open Ghosting R using (walk-⊕; sorted-⇝)
   open Forking R using (pend-less; subOf; walk-planted)
-  open Keeping R using (lingers-plant)
+  open Keeping R using (lingers-plant; flags-plant)
   open Planting R using (module Moved)
   open Staging R using (Restages; not-src; wrap-body)
   open Weakening R using (module Grown; pend-grow)
@@ -88,7 +88,7 @@ module Connecting (R : Set) where
   open Tearing R using (Alike; part-alike; look-store)
   open Locality R using (module Heaps)
   open Everywhere.Holding R using (holds-alike)
-  open Shifting R using (each-alike; lingers-alike)
+  open Shifting R using (each-alike; lingers-alike; flags-alike)
 
   -- A RUN AT A PENDING NODE, THE WORLD GROWN: what the relation reads of
   -- the run at its subscription, along the weakened tree and against the
@@ -112,6 +112,7 @@ module Connecting (R : Set) where
       queue   : Queue H q clk ts tree
       behind  : Each H (Heads q) tree
       lingers : Lingers H tree
+      flags   : DoneBy H tree []
       pends   : pend tree ≡ pend T₀
       named   : ∀ {k} {j : h ∋ k} → (k , j) ∈ names tree → Σ (h₀ ∋ k) λ i → wk∋ ν i ≡ j
       distinct : AllPairs _≢_ (names T₀) → AllPairs _≢_ (names tree)
@@ -131,7 +132,7 @@ module Connecting (R : Set) where
     ; meets = trans (Gw.grow-part gr (tree G)) (meets G)
     ; owned = Gw.grow-owned gr (stack G) (owned G)
     ; kernels = Growths.kernels-grow (new {k} {h}) gr (kernels G) ; meaning = Gw.grow-meaning gr (meaning G) ; queue = Gw.grow-queue gr (queue G)
-    ; behind = Gw.grow-each gr (behind G) ; lingers = Gw.grow-lingers gr (lingers G) ; pends = trans (pend-grow new (tree G)) (pends G)
+    ; behind = Gw.grow-each gr (behind G) ; lingers = Gw.grow-lingers gr (lingers G) ; flags = Gw.grow-flags gr (flags G) ; pends = trans (pend-grow new (tree G)) (pends G)
     ; named = λ {_} {j} m → let (i′ , e′ , m′) = names-wk new (tree G) j m ; (i , e) = named G m′
                             in i , trans (sym (wk∋-wk ν new i)) (trans (cong (wk∋ new) e) e′)
     ; distinct = λ fs → wk-pairs new (tree G) (distinct G fs) }
@@ -328,6 +329,9 @@ module Connecting (R : Set) where
                     (under-moved (U.live (U.subscribe s (q ++ [ ix 1 ]))) (U.live (U.subscribe s (q ++ [ ix 1 ]))) (rest-pinned (U.subscribe b (q ++ [ ix 0 ])))))
       (record { pools = λ { (in-source ()) ; (in-body ()) } ; rests = λ { here _ _ _ () ; (in-source ()) ; (in-body ()) } })
 
+    connect-flags : DoneBy H₅ T₅ [] → DoneBy H₅ t′ []
+    connect-flags = flags-plant H₅ π₅ v refl (λ { (in-source ()) ; (in-body ()) })
+
   -- A connect begun allocates its subject, flag, cut and stash, begins
   -- its body under `ix 0` and owes its source back where it began, one
   -- subscription fewer owed.
@@ -349,7 +353,8 @@ module Connecting (R : Set) where
              ; books = record { fresh = C.connect-fresh (Books.fresh bk)
                               ; clocked = trans ck (sym (tick-ix0 q₀)) , ck , C.reticked sk₅ a₅ (Grew.ticked G₅)
                               ; paidUp = cong wd (cong wd (cong wd (cong wd (cong wd (Books.paidUp bk))))) ; running = Books.running bk }
-             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind′ = Eaching.each-to _ _ (C.connect-behind (Grew.behind G₅)) ; lingers′ = Lingering.lingers-to _ (C.connect-lingers (Grew.lingers G₅)) }
+             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind′ = Eaching.each-to _ _ (C.connect-behind (Grew.behind G₅)) ; lingers′ = Lingering.lingers-to _ (C.connect-lingers (Grew.lingers G₅))
+             ; flags = C.connect-flags (Grew.flags G₅) }
     , refl , inj₁ (inj₁ (subst (pend C.t′ <_) (Grew.pends G₅) C.less))
     where bk = Carried.books cr
           ck = proj₁ (Books.clocked bk)
@@ -369,7 +374,7 @@ module Connecting (R : Set) where
           G₀ = record { tree = Carried.tree cr ; path = π ; stack = sk ; alone = a ; ticked = proj₂ (Books.clocked bk)
                       ; obsR = (λ _ → wk-same _) , wk-same _ , wk-same _ ; kontR = λ τ sub → from-same (λ ζ → Here.kont (walk π top) ζ sub) τ
                       ; envR = e ; meets = refl ; owned = recode (Carried.owned cr) ; kernels = Carried.kernels cr
-                      ; meaning = Carried.meaning cr ; queue = Carried.queue cr ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; pends = refl
+                      ; meaning = Carried.meaning cr ; queue = Carried.queue cr ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; flags = Carried.flags cr ; pends = refl
                       ; named = λ {_} {j} _ → j , refl ; distinct = λ fs → fs }
           G₅ = grew-step {k = cell (maybe quiet)} (lift nothing) (grew-step {k = cell (maybe quiet)} (lift nothing)
                  (grew-step {k = cell (base Bool)} (lift true) (grew-step {k = cell (base Bool)} (lift false) (grew-step {k = cell (joins A)} (lift []) G₀))))
@@ -422,7 +427,8 @@ module Connecting (R : Set) where
     ; meaning = record { fed = Heaps.fed-alike H S.H′ (tree G) al _ (Meaning.fed (meaning G)) }
     ; queue   = S.store-queue al (queue G)
     ; behind  = each-alike H S.H′ al (behind G)
-    ; lingers = lingers-alike H S.H′ al (lingers G) }
+    ; lingers = lingers-alike H S.H′ al (lingers G)
+    ; flags   = flags-alike H S.H′ al (flags G) }
     where
       open Grew
       module S = Stored H i x

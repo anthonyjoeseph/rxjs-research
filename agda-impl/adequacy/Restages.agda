@@ -62,7 +62,7 @@ module Staging (R : Set) where
   open Everywhere.Gating R using (gated-plant)
   open Ghosting R using (walk-⊕; _≺_; measure; firstCall)
   open Forking R using (pend-less; subOf; walk-planted)
-  open Keeping R using (each-plant; lingers-plant)
+  open Keeping R using (each-plant; lingers-plant; flags-plant)
   open Planting R using (module Moved)
 
   ------------------------------------------------------------------------
@@ -252,7 +252,8 @@ module Staging (R : Set) where
            ; books = record { fresh = subst (AllPairs _≢_) (sym M.names′) (Books.fresh bk)
                             ; clocked = proj₁ (Books.clocked bk) , N.reticked sk a (proj₂ (Books.clocked bk))
                             ; paidUp = Books.paidUp bk ; running = Books.running bk }
-           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (M.rm-behind H (Carried.behind cr)) ; lingers′ = Lingering.lingers-to _ (M.rm-lingers H (Carried.lingers cr)) }
+           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (M.rm-behind H (Carried.behind cr)) ; lingers′ = Lingering.lingers-to _ (M.rm-lingers H (Carried.lingers cr))
+           ; flags = flags-plant H π M.v refl (λ { (in-map ()) }) (Carried.flags cr) }
     , refl , inj₁ (inj₁ M.less)
     where module M = Mapped π
           module N = Moved π M.v
@@ -341,7 +342,8 @@ module Staging (R : Set) where
            ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant π O.v refl)) (Books.fresh bk)
                             ; clocked = proj₁ (Books.clocked bk) , N.reticked sk a (proj₂ (Books.clocked bk))
                             ; paidUp = Books.paidUp bk ; running = Books.running bk }
-           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (O.of-behind H (Carried.behind cr)) ; lingers′ = Lingering.lingers-to _ (O.of-lingers H (Carried.lingers cr)) }
+           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (O.of-behind H (Carried.behind cr)) ; lingers′ = Lingering.lingers-to _ (O.of-lingers H (Carried.lingers cr))
+           ; flags = flags-plant H π O.v (O.eqp H) (λ ()) (Carried.flags cr) }
     , q , O.π′ , refl , inj₁ (inj₁ O.less)
     where module O = Offered π (sp q) cs
           module N = Moved π O.v

@@ -46,6 +46,7 @@ import Tree as T
 open import operation.PureObservable using (PureObs; Out; Pureᴾ; module Pure)
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
+open import Data.Bool.Properties using (∨-zeroʳ)
 
 open Events∞
 
@@ -560,6 +561,25 @@ module Ghosting (R : Set) where
     ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-this lv Lρ
     liftsL-split (next-lane πL) τ (lifts-next L)    with liftsL-split πL τ L
     ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-next Lρ
+
+  -- What lifts along a path, the path sees.
+  mutual
+    lifts-seen : ∀ {h} {H : Heapᴹ h} {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} {ρ : Path t u} {s S} → Lifts H ρ s S → seen H ρ ≡ true
+    lifts-seen lifts-here = refl
+    lifts-seen (lifts-map L) = lifts-seen L
+    lifts-seen (lifts-scan L) = lifts-seen L
+    lifts-seen (lifts-take lv L) = ∧-join lv (∧-join refl (lifts-seen L))
+    lifts-seen (lifts-outer _ _ L) = lifts-seen L
+    lifts-seen (lifts-lanes L _ _ _) = liftsL-seen L
+    lifts-seen (lifts-source pb _ L) = ∧-join (cong is-just pb) (lifts-seen L)
+    lifts-seen (lifts-body {e = e} pt _ L) = ∧-join (cong (λ z → is-just z ∨ is-just e) pt) (lifts-seen L)
+    lifts-seen {H = H} (lifts-shut {t = t} _ e _ L) = ∧-join (trans (cong (λ z → is-just (At.part H t) ∨ is-just z) e) (∨-zeroʳ _)) (lifts-seen L)
+    lifts-seen (lifts-defer L) = lifts-seen L
+
+    liftsL-seen : ∀ {h} {H : Heapᴹ h} {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} {πL : PathLanes ls u} {s bs S as}
+                → LiftsLane H πL s bs S as → seenL H πL ≡ true
+    liftsL-seen (lifts-this lv L) = ∧-join lv (lifts-seen L)
+    liftsL-seen (lifts-next L) = liftsL-seen L
 
   -- A node whose next event is past `p` and everything under it.
   record Far {Γ A} (p : Pos) (c : U.Node Γ A) : Set where

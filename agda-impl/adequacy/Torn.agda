@@ -10,7 +10,7 @@ open import Data.List using (List; []; _∷_; _++_; length)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∨_; _∧_)
 open import Data.Bool.Properties using (∧-assoc)
 open import Data.Nat using (ℕ; zero; suc)
-open import Data.Maybe using (Maybe; just; nothing; is-just)
+open import Data.Maybe using (Maybe; just; nothing; is-just; is-nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Unit using (⊤; tt)
@@ -369,14 +369,14 @@ module Tearing (R : Set) where
     ... | _ , a₃ with all-++⁻ (quietName k) a₃
     ... | _ , a₄ = thrown-off H c k s j nl (proj₁ (all-++⁻ (names s) a₄))
 
+    body-alike : Alike H H′ (names bd)
+    body-alike j m = thrown-off H c k s j
+      (≢-flip (lookupᴬ (apart-r (cutNames c) (pairs-r (subjectNames S) ps) (here refl))
+                       (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names s) m))))))
+      (apart-l (names s) ps₅ m)
+
     body-none : At.part H′ bd ≡ nothing
-    body-none = trans (part-alike H H′ bd alike) none
-      where
-        alike : Alike H H′ (names bd)
-        alike j m = thrown-off H c k s j
-          (≢-flip (lookupᴬ (apart-r (cutNames c) (pairs-r (subjectNames S) ps) (here refl))
-                           (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names s) m))))))
-          (apart-l (names s) ps₅ m)
+    body-none = trans (part-alike H H′ bd body-alike) none
 
     body-eq : At.part H′ (connectˢ S c b kb k fd rp e rt s bd) ≡ At.part H (connectˢ S c b kb k fd rp e rt s bd)
     body-eq rewrite body-none | none = refl
@@ -678,6 +678,35 @@ module Tearing (R : Set) where
       { pools = λ ρ sρ e → ⊥-elim (dead ρ sρ (cong is-just e))
       ; rests = λ ρ sρ e _ _ → ⊥-elim (dead ρ sρ (cong is-just e)) }
 
+    -- And every flag: a flatMap apart from the site or above it reads its
+    -- flag and its outer as it did; one below it is the caller's.
+    flags-write : ∀ {Δ₀ A₀} {t : Sub h Δ₀ A₀} → AllPairs _≢_ (names t) → (π : Path t w)
+                → (∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)} (ρ : Path w (flatMapˢ op f fl oc k r pl so ls))
+                   → seen H π ≡ true → seen H′ ρ ≡ true → Flagged H′ [] fl so)
+                → DoneBy H t [] → DoneBy H′ t []
+    flags-write {t = t} ps π below d ψ sn with vis ps π ψ sn
+    ... | inj₂ (sπ , ρ , sρ) = below ρ sπ sρ
+    ... | inj₁ (s , sm) = (λ ()) , λ _ → trans (flag-same (fresh-path ψ ps) sm) (trans (proj₂ (d ψ s) (λ ())) (cong is-nothing (sym (outer-same (fresh-path ψ ps) sm))))
+      where
+        flag-same : ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+                  → AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl so ls)) → Same H H′ w (flatMapˢ op f fl oc k r pl so ls)
+                  → At.val H′ (FlatKit.Flat.outerDone fl) ≡ At.val H (FlatKit.Flat.outerDone fl)
+        flag-same {fl = fl} ps′ (inj₁ al) = cong lower (al (FlatKit.Flat.outerDone fl) (++⁺ˡ {xs = flatNames fl} (there (here refl))))
+        flag-same {fl = fl} {oc} {k} ps′ (inj₂ (in-outer ρ , _)) =
+          cong lower (off (FlatKit.Flat.outerDone fl) (narrow (λ m → ++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ (names-path ρ m))))) (apart-r (flatNames fl) ps′ (there (here refl)))))
+        flag-same {fl = fl} {oc} {k} {so = so} ps′ (inj₂ (in-lanes ρL , _)) =
+          cong lower (off (FlatKit.Flat.outerDone fl) (narrow (λ m → ++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) (lanes-path ρL m))))) (apart-r (flatNames fl) ps′ (there (here refl)))))
+
+        outer-same : ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+                   → AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl so ls)) → Same H H′ w (flatMapˢ op f fl oc k r pl so ls)
+                   → At.part H′ so ≡ At.part H so
+        outer-same {fl = fl} {oc} {k} {so = so} ps′ (inj₁ al) =
+          part-alike H H′ so (λ j m → al j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ m))))))
+        outer-same {fl = fl} {oc} {k} {r} {so = so} ps′ (inj₂ (in-outer ρ , _)) =
+          part-path H H′ ρ (proj₁ (pairs-split (names so) (pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps′)))))) off eqw
+        outer-same {fl = fl} {oc} {k} {r} {so = so} ps′ (inj₂ (in-lanes ρL , _)) =
+          part-alike H H′ so (λ j m → off j (narrow (lanes-path ρL) (apart-r (names so) (pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps′)))) m)))
+
   -- Every part held heads as it did: a site's teardown leaves what it
   -- reached unseen, and the rest reads alike.
   torn-take-each : ∀ {h} (H : Heapᴹ h) {P : ∀ {Γ A} → U.Node Γ A → Set} {t : Sub h [] R} {Δ A i q c k} {s : Sub h Δ A}
@@ -723,6 +752,13 @@ module Tearing (R : Set) where
     Seeing.lingers-seen H _ (take-off H {Δ} {A} {i} {q} {c} {k} {s} (fresh-path π ps)) (take-eq H {Δ} {A} {i} {q} {c} {k} {s} (fresh-path π ps))
                             (take-dead H {Δ} {A} {i} {q} {c} {k} {s} (fresh-path π ps)) ps π
                             (take-pooled H {Δ} {A} {i} {q} {c} {k} {s} (fresh-path π ps)) (take-leftover H {Δ} {A} {i} {q} {c} {k} {s} (fresh-path π ps))
+
+  -- Past a taken take thrown, nothing below it is seen.
+  torn-take-flags : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} {Δ A i q c k} {s : Sub h Δ A}
+                    (π : Path t (takeWhileˢ i q c k taken s)) → AllPairs _≢_ (names t) → DoneBy H t [] → DoneBy (thrown H c k s) t []
+  torn-take-flags H {Δ = Δ} {A} {i} {q} {c} {k} {s} π ps =
+    Seeing.flags-write H _ (take-off H {Δ} {A} {i} {q} {c} {k} {s} (fresh-path π ps)) (take-eq H {Δ} {A} {i} {q} {c} {k} {s} (fresh-path π ps)) ps π
+      (λ { (in-take ρ) _ sρ → false≢ (proj₂ (∧-split (At.val (thrown H c k s) (Kit.live c)) sρ)) })
 
   torn-body-lingers : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} {Δ A B S c b kb k fd e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
                       (π : Path t (connectˢ S c b kb k fd rp e rt s bd)) → AllPairs _≢_ (names t) → At.part H bd ≡ nothing → Lingers H t → Lingers (thrown H c k s) t

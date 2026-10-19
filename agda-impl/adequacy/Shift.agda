@@ -7,6 +7,7 @@
 module adequacy.Shift where
 
 open import Data.List using (List; []; _∷_; _++_)
+open import Data.List.Properties using (++-identityʳ)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ; ++⁻)
 open import Data.List.Relation.Unary.All using (All) renaming (lookup to lookupᴬ)
@@ -535,11 +536,11 @@ module Shifting (R : Set) where
 
     flags-alike : ∀ {ns Δ A} {t : Sub h Δ A} → Alike H H′ (names t) → DoneBy H t ns → DoneBy H′ t ns
     flags-alike al d {fl = fl} {so = so} ψ sn =
-      flagged-moved (cong lower (al (Flat.outerDone fl) (flag-in ψ))) (part-at H H′ (ψ ⊕ in-outer {t = so} here) al) (d ψ (trans (sym (seen-alike H H′ ψ al)) sn))
+      flagged-moved {fl = fl} {so = so} (cong lower (al (Flat.outerDone fl) (flag-in ψ))) (part-at H H′ (ψ ⊕ in-outer {t = so} here) al) (d ψ (trans (sym (seen-alike H H′ ψ al)) sn))
 
     flagsL-alike : ∀ {ns Δ B} {ls : List (Lane h Δ B)} → Alike H H′ (laneNames ls) → DoneByL H ls ns → DoneByL H′ ls ns
     flagsL-alike al dL {fl = fl} {so = so} πL sn =
-      flagged-moved (cong lower (al (Flat.outerDone fl) (flag-inL πL))) (partL-at H H′ (πL ⊕ᴸ in-outer {t = so} here) al) (dL πL (trans (sym (seenL-alike H H′ πL al)) sn))
+      flagged-moved {fl = fl} {so = so} (cong lower (al (Flat.outerDone fl) (flag-inL πL))) (partL-at H H′ (πL ⊕ᴸ in-outer {t = so} here) al) (dL πL (trans (sym (seenL-alike H H′ πL al)) sn))
 
   -- Every flag named on the way down lies in the tree.
   mutual
@@ -562,17 +563,53 @@ module Shifting (R : Set) where
     outersL-in (this-lane {c = c} {k} π) m = ++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ˡ (outers-in π m)))
     outersL-in (next-lane {l = lane c k s} πL) m = ++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ʳ (names s) (outersL-in πL m)))
 
+  -- No flag named on the way down lies below.
+  mutual
+    outers-apart : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) → AllPairs _≢_ (names t) → ∀ {n} → n ∈ᴸ outers π → n ∈ᴸ names u → ⊥
+    outers-apart here ps () mu
+    outers-apart (in-map π) ps o mu = outers-apart π ps o mu
+    outers-apart (in-scan π) ps o mu = outers-apart π (pairs-tl ps) o mu
+    outers-apart (in-take {c = c} {k} π) ps o mu = outers-apart π (pairs-r (quietName k) (pairs-r (cutNames c) ps)) o mu
+    outers-apart (in-outer {fl = fl} {oc} {k} π) ps (here refl) mu =
+      lookupᴬ (apart-r (flatNames fl) ps (there (here refl))) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ (names-path π mu))))) refl
+    outers-apart (in-outer {fl = fl} {oc} {k} {t = so} π) ps (there o) mu =
+      outers-apart π (proj₁ (pairs-split (names so) (pairs-tl (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps)))))) o mu
+    outers-apart (in-lanes {fl = fl} {oc} {k} {t = so} πL) ps o mu =
+      outersL-apart πL (pairs-r (names so) (pairs-tl (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps))))) o mu
+    outers-apart (in-source {S = S} {c} {kb = kb} {k} {t = src} π) ps o mu =
+      outers-apart π (proj₁ (pairs-split (names src) (pairs-r (quietName k) (pairs-r (quietName kb) (pairs-tl (pairs-r (cutNames c) (pairs-r (subjectNames S) ps))))))) o mu
+    outers-apart (in-body {S = S} {c} {kb = kb} {k} {t = src} π) ps o mu =
+      outers-apart π (pairs-r (names src) (pairs-r (quietName k) (pairs-r (quietName kb) (pairs-tl (pairs-r (cutNames c) (pairs-r (subjectNames S) ps)))))) o mu
+    outers-apart (in-defer {k = k} π) ps o mu = outers-apart π (pairs-r (quietName k) ps) o mu
+
+    outersL-apart : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (πL : PathLanes ls u) → AllPairs _≢_ (laneNames ls)
+                  → ∀ {n} → n ∈ᴸ outersL πL → n ∈ᴸ names u → ⊥
+    outersL-apart (this-lane {c = c} {k} {t = s} π) ps o mu = outers-apart π (proj₁ (pairs-split (names s) (pairs-r (quietName k) (pairs-r (cutNames c) ps)))) o mu
+    outersL-apart (next-lane {l = lane c k s} πL) ps o mu = outersL-apart πL (pairs-r (names s) (pairs-r (quietName k) (pairs-r (cutNames c) ps))) o mu
+
   -- THE FLAGS LET GO: below a live node, every outer on the way down
   -- live too, so its flag, still unset, reads its outer as the rest do.
   module Alive {h} (H : Heapᴹ h) {Δ₀ A₀} {u : Sub h Δ₀ A₀} (ju : is-just (At.part H u) ≡ true) {ns : List (Name h)} where
     module FG = Flag H {ns}
 
     private
-      unlist : ∀ {xs Δ A} {t : Sub h Δ A} → (∀ {n} → n ∈ᴸ names t → n ∈ᴸ xs → ⊥) → DoneBy H t (xs ++ ns) → DoneBy H t ns
-      unlist {xs} {t = t} D = Flag.relist H {t = t} (λ _ m → ++⁺ʳ xs m) (λ mt m → [ (λ o → ⊥-elim (D mt o)) , (λ b → b) ]′ (++⁻ xs m))
+      unlist : ∀ {xs ys Δ A} {t : Sub h Δ A} → (∀ {n} → n ∈ᴸ names t → n ∈ᴸ xs → ⊥) → DoneBy H t (xs ++ ys) → DoneBy H t ys
+      unlist {xs} {ys} {t = t} D = Flag.relist H {ns = xs ++ ys} {t = t} (λ _ m → ++⁺ʳ xs m) (λ mt m → [ (λ o → ⊥-elim (D mt o)) , (λ b → b) ]′ (++⁻ xs m))
 
-      unlistL : ∀ {xs Δ B} {ls : List (Lane h Δ B)} → (∀ {n} → n ∈ᴸ laneNames ls → n ∈ᴸ xs → ⊥) → DoneByL H ls (xs ++ ns) → DoneByL H ls ns
-      unlistL {xs} {ls = ls} D = Flag.relistL H {ls = ls} (λ _ m → ++⁺ʳ xs m) (λ ml m → [ (λ o → ⊥-elim (D ml o)) , (λ b → b) ]′ (++⁻ xs m))
+      unlistL : ∀ {xs ys Δ B} {ls : List (Lane h Δ B)} → (∀ {n} → n ∈ᴸ laneNames ls → n ∈ᴸ xs → ⊥) → DoneByL H ls (xs ++ ys) → DoneByL H ls ys
+      unlistL {xs} {ys} {ls = ls} D = Flag.relistL H {ns = xs ++ ys} {ls = ls} (λ _ m → ++⁺ʳ xs m) (λ ml m → [ (λ o → ⊥-elim (D ml o)) , (λ b → b) ]′ (++⁻ xs m))
+
+      enlist : ∀ {xs ys Δ A} {t : Sub h Δ A} → (∀ {n} → n ∈ᴸ names t → n ∈ᴸ xs → ⊥) → DoneBy H t ys → DoneBy H t (xs ++ ys)
+      enlist {xs} {ys} {t = t} D = Flag.relist H {ns = ys} {ns′ = xs ++ ys} {t = t} (λ mt m → [ (λ o → ⊥-elim (D mt o)) , (λ b → b) ]′ (++⁻ xs m)) (λ _ m → ++⁺ʳ xs m)
+
+      enlistL : ∀ {xs ys Δ B} {ls : List (Lane h Δ B)} → (∀ {n} → n ∈ᴸ laneNames ls → n ∈ᴸ xs → ⊥) → DoneByL H ls ys → DoneByL H ls (xs ++ ys)
+      enlistL {xs} {ys} {ls = ls} D = Flag.relistL H {ns = ys} {ns′ = xs ++ ys} {ls = ls} (λ ml m → [ (λ o → ⊥-elim (D ml o)) , (λ b → b) ]′ (++⁻ xs m)) (λ _ m → ++⁺ʳ xs m)
+
+      both-false : ∀ {a} {P : Set a} (b : Bool) → (P → b ≡ false) → ((P → ⊥) → b ≡ false) → b ≡ false
+      both-false false _ _ = refl
+      both-false true  y n = n (λ p → absurd (y p))
+        where absurd : true ≡ false → ⊥
+              absurd ()
 
     mutual
       release : ∀ {Δ A} {t : Sub h Δ A} (π : Path t u) → AllPairs _≢_ (names t) → seen H π ≡ true → DoneBy H t (outers π ++ ns) → DoneBy H t ns
@@ -584,8 +621,8 @@ module Shifting (R : Set) where
           FG.db-take (λ _ → release π (pairs-r (quietName k) (pairs-r (cutNames c) ps)) s′ (Flag.db-sub H d (in-take here) (seen-take (At.val H (Kit.live c)) ok))))
       release (in-outer {fl = fl} {oc} {k} {t = so} {ls} π) ps sπ d =
         FG.db-flat ((λ _ → off₀) , (λ _ → trans off₀ (sym (cong not (seen-up H π sπ ju)))))
-                   (release π (proj₁ (pairs-split (names so) P′)) sπ (unlist {xs = F ∷ []} (λ { m (here refl) → doneS m }) (Flag.db-sub H d (in-outer here) refl)))
-                   (unlistL {xs = F ∷ outers π} (λ { ml (here refl) → doneL ml ; ml (there o) → lookupᴬ (apart-l (names so) P′ ml) (outers-in π o) refl }) (Flag.dbL-of H d))
+                   (release π (proj₁ (pairs-split (names so) P′)) sπ (unlist {xs = F ∷ []} {ys = outers π ++ ns} (λ { m (here refl) → doneS m }) (Flag.db-sub H d (in-outer here) refl)))
+                   (unlistL {xs = F ∷ outers π} {ys = ns} (λ { ml (here refl) → doneL ml ; ml (there o) → lookupᴬ (apart-l (names so) P′ ml) (outers-in π o) refl }) (Flag.dbL-of H d))
         where
           F = (cell _ , Flat.outerDone fl)
           P′ = pairs-tl (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps)))
@@ -597,7 +634,7 @@ module Shifting (R : Set) where
       release (in-lanes {fl = fl} {oc} {k} {t = so} {ls} πL) ps sπ d =
         FG.db-flat ((λ m → proj₁ (d here refl) (++⁺ʳ (outersL πL) m))
                    , (λ m̸ → proj₂ (d here refl) (λ m → [ (λ o → doneL (outersL-in πL o)) , m̸ ]′ (++⁻ (outersL πL) m))))
-                   (unlist {xs = outersL πL} (λ ms o → lookupᴬ (apart-r (names so) P′ ms) (outersL-in πL o) refl) (Flag.db-sub H d (in-outer here) refl))
+                   (unlist {xs = outersL πL} {ys = ns} (λ ms o → lookupᴬ (apart-r (names so) P′ ms) (outersL-in πL o) refl) (Flag.db-sub H d (in-outer here) refl))
                    (releaseL πL (pairs-r (names so) P′) sπ (Flag.dbL-of H d))
         where
           F = (cell _ , Flat.outerDone fl)
@@ -607,12 +644,12 @@ module Shifting (R : Set) where
       release (in-source {S = S} {c} {kb = kb} {k} {t = src} {bd} π) ps sπ d =
         thru (is-just (At.part H bd)) sπ (λ _ s′ →
           FG.db-connect (λ jb′ → release π (proj₁ (pairs-split (names src) Q)) s′ (Flag.db-sub H d (in-source here) (∧-join jb′ refl)))
-                        (λ js → unlist {xs = outers π} (λ mb o → lookupᴬ (apart-l (names src) Q mb) (outers-in π o) refl) (Flag.db-sub H d (in-body here) (∧-join js refl))))
+                        (λ js → unlist {xs = outers π} {ys = ns} (λ mb o → lookupᴬ (apart-l (names src) Q mb) (outers-in π o) refl) (Flag.db-sub H d (in-body here) (∧-join js refl))))
         where
           Q = pairs-r (quietName k) (pairs-r (quietName kb) (pairs-tl (pairs-r (cutNames c) (pairs-r (subjectNames S) ps))))
       release (in-body {S = S} {c} {kb = kb} {k} {e = e} {t = src} π) ps sπ d =
         thru (is-just (At.part H src) ∨ is-just e) sπ (λ _ s′ →
-          FG.db-connect (λ jb → unlist {xs = outers π} (λ ms o → lookupᴬ (apart-r (names src) Q ms) (outers-in π o) refl) (Flag.db-sub H d (in-source here) (∧-join jb refl)))
+          FG.db-connect (λ jb → unlist {xs = outers π} {ys = ns} (λ ms o → lookupᴬ (apart-r (names src) Q ms) (outers-in π o) refl) (Flag.db-sub H d (in-source here) (∧-join jb refl)))
                         (λ js′ → release π (pairs-r (names src) Q) s′ (Flag.db-sub H d (in-body here) (∧-join js′ refl))))
         where
           Q = pairs-r (quietName k) (pairs-r (quietName kb) (pairs-tl (pairs-r (cutNames c) (pairs-r (subjectNames S) ps))))
@@ -623,14 +660,84 @@ module Shifting (R : Set) where
       releaseL (this-lane {c = c} {k} {t = s} {ls} π) ps sπ dL =
         thru (At.val H (Kit.live c)) sπ (λ _ s′ →
           FG.dbL-cons (λ lv → release π (proj₁ (pairs-split (names s) Q)) s′ (Flag.dbL-head H dL lv))
-                      (unlistL {xs = outers π} (λ ml o → lookupᴬ (apart-l (names s) Q ml) (outers-in π o) refl) (Flag.dbL-tail H dL)))
+                      (unlistL {xs = outers π} {ys = ns} (λ ml o → lookupᴬ (apart-l (names s) Q ml) (outers-in π o) refl) (Flag.dbL-tail H dL)))
         where
           Q = pairs-r (quietName k) (pairs-r (cutNames c) ps)
       releaseL (next-lane {l = lane c k s} {ls} πL) ps sπ dL =
-        FG.dbL-cons (λ lv → unlist {xs = outersL πL} (λ ms o → lookupᴬ (apart-r (names s) Q ms) (outersL-in πL o) refl) (Flag.dbL-head H dL lv))
+        FG.dbL-cons (λ lv → unlist {xs = outersL πL} {ys = ns} (λ ms o → lookupᴬ (apart-r (names s) Q ms) (outersL-in πL o) refl) (Flag.dbL-head H dL lv))
                     (releaseL πL (pairs-r (names s) Q) sπ (Flag.dbL-tail H dL))
         where
           Q = pairs-r (quietName k) (pairs-r (cutNames c) ps)
+
+    -- The other way: every outer on the way down live, its flag unset.
+    mutual
+      hold : ∀ {Δ A} {t : Sub h Δ A} (π : Path t u) → AllPairs _≢_ (names t) → seen H π ≡ true → DoneBy H t ns → DoneBy H t (outers π ++ ns)
+      hold here ps sπ d = d
+      hold (in-map π) ps sπ d = Flag.db-map H (hold π ps sπ (Flag.db-sub H d (in-map here) refl))
+      hold (in-scan π) ps sπ d = Flag.db-scan H (hold π (pairs-tl ps) sπ (Flag.db-sub H d (in-scan here) refl))
+      hold (in-take {c = c} {k} {tk} π) ps sπ d =
+        thru₂ (At.val H (Kit.live c)) (isTaking tk) sπ (λ ok s′ →
+          Flag.db-take H (λ _ → hold π (pairs-r (quietName k) (pairs-r (cutNames c) ps)) s′ (Flag.db-sub H d (in-take here) (seen-take (At.val H (Kit.live c)) ok))))
+      hold (in-outer {fl = fl} {oc} {k} {t = so} {ls} π) ps sπ d =
+        Flag.db-flat H {ns = F ∷ outers π ++ ns} ((λ _ → off₀) , (λ m̸ → ⊥-elim (m̸ (here refl))))
+          (enlist {xs = F ∷ []} {ys = outers π ++ ns} (λ { m (here refl) → doneS m }) (hold π (proj₁ (pairs-split (names so) P′)) sπ (Flag.db-sub H d (in-outer here) refl)))
+          (enlistL {xs = F ∷ outers π} {ys = ns} (λ { ml (here refl) → doneL ml ; ml (there o) → lookupᴬ (apart-l (names so) P′ ml) (outers-in π o) refl }) (Flag.dbL-of H d))
+        where
+          F = (cell _ , Flat.outerDone fl)
+          P′ = pairs-tl (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps)))
+          off₀ = both-false (At.val H (Flat.outerDone fl)) (proj₁ (d here refl)) (λ m̸ → trans (proj₂ (d here refl) m̸) (cong not (seen-up H π sπ ju)))
+          doneS : F ∈ᴸ names so → ⊥
+          doneS m = lookupᴬ (apart-r (flatNames fl) ps (there (here refl))) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ m)))) refl
+          doneL : F ∈ᴸ laneNames ls → ⊥
+          doneL m = lookupᴬ (apart-r (flatNames fl) ps (there (here refl))) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) m)))) refl
+      hold (in-lanes {fl = fl} {oc} {k} {t = so} {ls} πL) ps sπ d =
+        Flag.db-flat H {ns = outersL πL ++ ns}
+                   ((λ m → [ (λ o → ⊥-elim (doneL (outersL-in πL o))) , proj₁ (d here refl) ]′ (++⁻ (outersL πL) m))
+                   , (λ m̸ → proj₂ (d here refl) (λ m → m̸ (++⁺ʳ (outersL πL) m))))
+                   (enlist {xs = outersL πL} {ys = ns} (λ ms o → lookupᴬ (apart-r (names so) P′ ms) (outersL-in πL o) refl) (Flag.db-sub H d (in-outer here) refl))
+                   (holdL πL (pairs-r (names so) P′) sπ (Flag.dbL-of H d))
+        where
+          F = (cell _ , Flat.outerDone fl)
+          P′ = pairs-tl (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps)))
+          doneL : F ∈ᴸ laneNames ls → ⊥
+          doneL m = lookupᴬ (apart-r (flatNames fl) ps (there (here refl))) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) m)))) refl
+      hold (in-source {S = S} {c} {kb = kb} {k} {t = src} {bd} π) ps sπ d =
+        thru (is-just (At.part H bd)) sπ (λ _ s′ →
+          Flag.db-connect H (λ jb′ → hold π (proj₁ (pairs-split (names src) Q)) s′ (Flag.db-sub H d (in-source here) (∧-join jb′ refl)))
+                            (λ js → enlist {xs = outers π} {ys = ns} (λ mb o → lookupᴬ (apart-l (names src) Q mb) (outers-in π o) refl) (Flag.db-sub H d (in-body here) (∧-join js refl))))
+        where
+          Q = pairs-r (quietName k) (pairs-r (quietName kb) (pairs-tl (pairs-r (cutNames c) (pairs-r (subjectNames S) ps))))
+      hold (in-body {S = S} {c} {kb = kb} {k} {e = e} {t = src} π) ps sπ d =
+        thru (is-just (At.part H src) ∨ is-just e) sπ (λ _ s′ →
+          Flag.db-connect H (λ jb → enlist {xs = outers π} {ys = ns} (λ ms o → lookupᴬ (apart-r (names src) Q ms) (outers-in π o) refl) (Flag.db-sub H d (in-source here) (∧-join jb refl)))
+                            (λ js′ → hold π (pairs-r (names src) Q) s′ (Flag.db-sub H d (in-body here) (∧-join js′ refl))))
+        where
+          Q = pairs-r (quietName k) (pairs-r (quietName kb) (pairs-tl (pairs-r (cutNames c) (pairs-r (subjectNames S) ps))))
+      hold (in-defer {k = k} π) ps sπ d = Flag.db-defer H (hold π (pairs-r (quietName k) ps) sπ (Flag.db-sub H d (in-defer here) refl))
+
+      holdL : ∀ {Δ B} {ls : List (Lane h Δ B)} (πL : PathLanes ls u) → AllPairs _≢_ (laneNames ls) → seenL H πL ≡ true
+            → DoneByL H ls ns → DoneByL H ls (outersL πL ++ ns)
+      holdL (this-lane {c = c} {k} {t = s} {ls} π) ps sπ dL =
+        thru (At.val H (Kit.live c)) sπ (λ _ s′ →
+          Flag.dbL-cons H (λ lv → hold π (proj₁ (pairs-split (names s) Q)) s′ (Flag.dbL-head H dL lv))
+                          (enlistL {xs = outers π} {ys = ns} (λ ml o → lookupᴬ (apart-l (names s) Q ml) (outers-in π o) refl) (Flag.dbL-tail H dL)))
+        where
+          Q = pairs-r (quietName k) (pairs-r (cutNames c) ps)
+      holdL (next-lane {l = lane c k s} {ls} πL) ps sπ dL =
+        Flag.dbL-cons H (λ lv → enlist {xs = outersL πL} {ys = ns} (λ ms o → lookupᴬ (apart-r (names s) Q ms) (outersL-in πL o) refl) (Flag.dbL-head H dL lv))
+                        (holdL πL (pairs-r (names s) Q) sπ (Flag.dbL-tail H dL))
+        where
+          Q = pairs-r (quietName k) (pairs-r (cutNames c) ps)
+
+  -- Below a live node the path sees, no flag held unset.
+  let-go : ∀ {h} (H : Heapᴹ h) {Δ₀ A₀ Δ A} {t : Sub h Δ₀ A₀} {u : Sub h Δ A} (π : Path t u) → AllPairs _≢_ (names t) → seen H π ≡ true
+         → is-just (At.part H u) ≡ true → DoneBy H t (outers π) → DoneBy H t []
+  let-go H {t = t} π fs sπ ju d = Alive.release H ju {ns = []} π fs sπ (subst (DoneBy H t) (sym (++-identityʳ (outers π))) d)
+
+  -- And back: every outer on the way down still unset.
+  grip : ∀ {h} (H : Heapᴹ h) {Δ₀ A₀ Δ A} {t : Sub h Δ₀ A₀} {u : Sub h Δ A} (π : Path t u) → AllPairs _≢_ (names t) → seen H π ≡ true
+       → is-just (At.part H u) ≡ true → DoneBy H t [] → DoneBy H t (outers π)
+  grip H {t = t} π fs sπ ju d = subst (DoneBy H t) (++-identityʳ (outers π)) (Alive.hold H ju {ns = []} π fs sπ d)
 
   ----------------------------------------------------------------------
   -- THE WALK: `u` replanted to `v`, the heaps moved only at `u`'s names.

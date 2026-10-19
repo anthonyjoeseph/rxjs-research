@@ -56,7 +56,7 @@ module Scanning (R : Set) where
   open Shared Timeline (Out R) using (Heapᴹ; ⟨_,_,_⟩; run; extend)
   open Heap using (World; _⊑_; _⨾_; there; new; cell) renaming (here to hereʳ)
   open Run (Pureᴾ R) using (done; compile; Env; wkEnv; wkObs; wkKont)
-  open Strongly R using (Carried; Books; Sub; pendingˢ; Path; here; in-scan; _⊕_; Here; walk; top; Job; _≗_; module At; Kernels; Meaning; Queue; Each; Heads; Lingers; names; pendings; Phase; rest-pinned; seen; scanˢ; newRef≗; module Canon; owned-to; module Eaching; module Lingering)
+  open Strongly R using (Carried; Books; Sub; pendingˢ; Path; here; in-scan; _⊕_; Here; walk; top; Job; _≗_; module At; Kernels; Meaning; Queue; Each; Heads; Lingers; DoneBy; names; pendings; Phase; rest-pinned; seen; scanˢ; newRef≗; module Canon; owned-to; module Eaching; module Lingering)
   open Strongly.Against R using (subAs; SrcOf; src-of)
   open Moving R using (planted; pend; part-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant; head-scan)
   open Everywhere.Holding R using (holds-plant)
@@ -64,7 +64,7 @@ module Scanning (R : Set) where
   open Everywhere.Gating R using (gated-plant)
   open Ghosting R using (walk-⊕; sorted-⇝)
   open Forking R using (pend-less; subOf; walk-planted)
-  open Keeping R using (each-plant; lingers-plant)
+  open Keeping R using (each-plant; lingers-plant; flags-plant)
   open Planting R using (module Moved)
   open Staging R using (Restages; not-src; wrap-scan)
   open Weakening R using (module Grown; pend-grow)
@@ -153,6 +153,9 @@ module Scanning (R : Set) where
       rs-lingers : Lingers H′ T₁ → Lingers H′ t′
       rs-lingers = lingers-plant H′ π₁ v eqv (λ {C} → rest-pinned (U.restᶜ {B = C} (U.subscribe s q))) (record { pools = λ { (in-scan ()) } ; rests = λ { (in-scan ()) } })
 
+      rs-flags : DoneBy H′ T₁ [] → DoneBy H′ t′ []
+      rs-flags = flags-plant H′ π₁ v eqv (λ { (in-scan ()) })
+
       rs-kernels : Kernels H′ T₁ → Kernels H′ t′
       rs-kernels kn = record { holds = holds-plant H′ π₁ v refl (λ hs → hs) (Kernels.holds kn)
                              ; gated = gated-plant H′ π₁ v (λ g → g) (λ d → d) (Kernels.gated kn)
@@ -188,7 +191,8 @@ module Scanning (R : Set) where
                               ; clocked = proj₁ (Books.clocked bk) , S.reticked sk₁ a₁ (G.grow-ticked sk (proj₂ (Books.clocked bk)))
                               ; paidUp = cong (mapList (wkTodo new)) (Books.paidUp bk) ; running = Books.running bk }
              ; sorted = sorted-⇝ (Carried.sorted cr) (then refl now) ; behind′ = Eaching.each-to _ _ (S.rs-behind H′ eqv (G.grow-each gr (Carried.behind cr)))
-             ; lingers′ = Lingering.lingers-to _ (S.rs-lingers H′ eqv (G.grow-lingers gr (Carried.lingers cr))) }
+             ; lingers′ = Lingering.lingers-to _ (S.rs-lingers H′ eqv (G.grow-lingers gr (Carried.lingers cr)))
+             ; flags = S.rs-flags H′ eqv (G.grow-flags gr (Carried.flags cr)) }
     , refl , inj₁ (inj₁ S.less)
     where module S = Scanned {f = f} {z = z} {s = s} π
           module G = Grown S.ν

@@ -59,13 +59,13 @@ module Lifting (R : Set) where
   open Heap using (_⊑_)
   open Sorting R using (Beyond)
   open Run (Pureᴾ R) using (Act; module Kit; module FlatKit)
-  open Strongly R using (Strong; Carried; Books; carried; Sub; pendingˢ; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; emitC; kontC; Leaf; feedC; srcC; taking; taken; feeding; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _≗_; Each; Heads; Lingers; Meets; pinned-skip; rootObs; seen; seenL; ⊕-here; owned-to; module Eaching; module Lingering) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
+  open Strongly R using (Strong; Carried; Books; carried; Sub; pendingˢ; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; emitC; kontC; Leaf; feedC; srcC; taking; taken; feeding; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _≗_; Each; Heads; Lingers; DoneBy; Meets; pinned-skip; rootObs; seen; seenL; ⊕-here; owned-to; module Eaching; module Lingering) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (CtlAs; calmAs; noteAs; runAs; subAs; burstAs; bursts; agenda) renaming (Placed to Placedᴬ)
   open Moving R using (plant; true≢false)
-  open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each; torn-take-lingers; torn-body-lingers)
+  open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each; torn-take-lingers; torn-body-lingers; torn-take-flags)
   open Unsubbing R using (_⇝_; site-tears)
   open Locality R using (site-holds; site-gated)
-  open Lowering R using (site-lowers; queue-keeps; module Lowers; torn-owned; fed-lowers)
+  open Lowering R using (site-lowers; queue-keeps; module Lowers; torn-owned; fed-lowers; torn-body-flags)
   open Ghosting R using (module Far; module Calling; Has; residual; _⊏_; ⊏-trans; _≺_; measure; load; loadOf; passed; lowered; showing; Hopped; Hops; opening; firstCall; SourceFirst; BodyFirst; OuterFirst; PoolBehind; RestBehind; LaneFirst; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; Far; Off; Opt; Clear; ClearL; clear-zip; clear-each; far-apart; opt-zip; all-zip; opt-each; each-lanes; each-sub; OneLane; opened; Calling; sends; Rises; Called; Aloft; hop-sorted)
   open Forking R using (subOf)
   open Staging R using (Offers; of-restage; empty-restage; map-restage; Restages)
@@ -419,6 +419,15 @@ module Lifting (R : Set) where
   torn-lingers {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (_ ∷ _) _ _ } (bodySite π) refl =
     torn-body-lingers _ π (Books.fresh (Carried.books cr)) (Owned.bodies (Carried.owned cr) π (here refl)) (Carried.lingers cr)
 
+  -- And every flag reads its outer: below the site nothing is seen that
+  -- was not seen before.
+  torn-flags : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
+             → firstCall (Carried.ctlAs cr) ≡ just (siteCall z)
+             → DoneBy (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr) []
+  torn-flags cr (takeSite π) _ = torn-take-flags _ π (Books.fresh (Carried.books cr)) (Carried.flags cr)
+  torn-flags {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (_ ∷ _) _ _ } (bodySite π) refl =
+    torn-body-flags _ π (Books.fresh (Carried.books cr)) (Owned.bodies (Carried.owned cr) π (here refl)) (Carried.flags cr)
+
   -- A cut: its kill switch thrown, what it holds unsubscribed; the ghost
   -- alike, a call fewer.
   cut-onward : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
@@ -435,7 +444,8 @@ module Lifting (R : Set) where
         ; queue = torn-queue cr z
         ; books = record { fresh = Books.fresh (Carried.books cr) ; clocked = Books.clocked (Carried.books cr)
                          ; paidUp = Books.paidUp (Carried.books cr) ; running = Books.running (Carried.books cr) }
-        ; sorted = hop-sorted cr eq path ; behind′ = Eaching.each-to _ _ (torn-behind cr z refl) ; lingers′ = Lingering.lingers-to _ (torn-lingers cr z refl) })
+        ; sorted = hop-sorted cr eq path ; behind′ = Eaching.each-to _ _ (torn-behind cr z refl) ; lingers′ = Lingering.lingers-to _ (torn-lingers cr z refl)
+        ; flags = torn-flags cr z refl })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , ≤-refl))
 
   ----------------------------------------------------------------------

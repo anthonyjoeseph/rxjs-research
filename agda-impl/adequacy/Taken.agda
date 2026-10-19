@@ -62,14 +62,14 @@ module Taking (R : Set) where
   open Shared Timeline (Out R) using (Heapᴹ; ⟨_,_,_⟩; run; extend)
   open Heap using (World; _⊑_; _⨾_; there; new; grow; cell) renaming (here to hereʳ; same to same⊑)
   open Run (Pureᴾ R) using (Act; done; newRef; under; _>>ᴬ_; compile; Env; wkEnv; module Kit; Ref; wkR; Kont; wkObs)
-  open Strongly R using (Carried; Books; Sub; pendingˢ; takeWhileˢ; Path; here; in-take; _⊕_; Here; walk; top; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; names; pendings; Phase; rest-pinned; seen; ≗-refl; newRef≗; taking; takeK; unsubscribing; under≗; module Canon; owned-to; module Eaching; module Lingering)
+  open Strongly R using (Carried; Books; Sub; pendingˢ; takeWhileˢ; Path; here; in-take; _⊕_; Here; walk; top; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; DoneBy; names; pendings; Phase; rest-pinned; seen; ≗-refl; newRef≗; taking; takeK; unsubscribing; under≗; module Canon; owned-to; module Eaching; module Lingering)
   open Strongly.Against R using (StackAs; subAs; SrcOf; src-of)
   open Moving R using (planted; pend; part-plant; holds-owed; fed-plant; pendings-plant; subjects-plant; joiners-plant)
   open Everywhere.Settling R using (settled-plant)
   open Everywhere.Gating R using (gated-plant)
   open Ghosting R using (walk-⊕; sorted-⇝)
   open Forking R using (pend-less; subOf; walk-planted)
-  open Keeping R using (each-plant; lingers-plant)
+  open Keeping R using (each-plant; lingers-plant; flags-plant)
   open Planting R using (module Moved)
   open Staging R using (Restages; not-src; wrap-take)
   open Weakening R using (module Grown; pend-grow)
@@ -199,6 +199,9 @@ module Taking (R : Set) where
       rt-lingers : Lingers H′ T₂ → Lingers H′ t′
       rt-lingers = lingers-plant H′ π₂ v eqv (λ {C} → rest-pinned (U.restᶜ {B = C} (U.subscribe s q))) (record { pools = λ { (in-take ()) } ; rests = λ { (in-take ()) } })
 
+      rt-flags : DoneBy H′ T₂ [] → DoneBy H′ t′ []
+      rt-flags = flags-plant H′ π₂ v eqv (λ { (in-take ()) })
+
       rt-meaning : Meaning H′ T₂ → Meaning H′ t′
       rt-meaning mn = record { fed = fed-plant H′ π₂ v (λ _ fd → fd) _ (Meaning.fed mn) }
 
@@ -239,7 +242,8 @@ module Taking (R : Set) where
                               ; paidUp = cong (mapList (wkTodo new)) (cong (mapList (wkTodo new)) (Books.paidUp bk)) ; running = Books.running bk }
              ; sorted = sorted-⇝ (Carried.sorted cr) (then refl (then (cong (λ x → step (Mx x)) e₁) now))
              ; behind′ = Eaching.each-to _ _ (S.rt-behind H₂ eqv refl (G₂.grow-each gr₂ (G₁.grow-each gr₁ (Carried.behind cr))))
-             ; lingers′ = Lingering.lingers-to _ (S.rt-lingers H₂ eqv refl (G₂.grow-lingers gr₂ (G₁.grow-lingers gr₁ (Carried.lingers cr)))) }
+             ; lingers′ = Lingering.lingers-to _ (S.rt-lingers H₂ eqv refl (G₂.grow-lingers gr₂ (G₁.grow-lingers gr₁ (Carried.lingers cr))))
+             ; flags = S.rt-flags H₂ eqv refl (G₂.grow-flags gr₂ (G₁.grow-flags gr₁ (Carried.flags cr))) }
     , refl , inj₁ (inj₁ S.less)
     where module S = Taken {i = i} {p = p} {s = s} π
           module G₁ = Grown S.ν₁

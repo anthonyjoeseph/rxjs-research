@@ -17,7 +17,7 @@ open import Data.List.Relation.Unary.AllPairs.Properties using () renaming (map�
 open import Data.List.Relation.Binary.Permutation.Propositional using (_↭_; ↭-sym; ↭-trans; ↭-reflexive) renaming (refl to ↭-refl′; prep to ↭-prep′; swap to ↭-swap′; trans to ↭-trans′)
 open import Data.List.Relation.Binary.Permutation.Propositional.Properties using (All-resp-↭; shifts) renaming (++⁺ˡ to ↭-++⁺ˡ; ++⁺ʳ to ↭-++⁺ʳ)
 open import Data.List.Properties using (map-++; ++-assoc) renaming (++-identityʳ to ++-idʳ)
-open import Data.Maybe using (Maybe; just; nothing; is-just) renaming (map to mapMaybe)
+open import Data.Maybe using (Maybe; just; nothing; is-just; is-nothing) renaming (map to mapMaybe)
 open import Data.Nat using (_+_; suc)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
@@ -54,7 +54,7 @@ module Weakening (R : Set) where
   open Shared Timeline (Out R) using (Heapᴹ; ⟨_,_,_⟩; look; cbs; wkVal; Callbacks)
   open Heap using (World; _⊑_; _⨾_; _∋_; there; grow; wk∋; slot; Sink; Quiet; Handle) renaming (same to same⊑)
   open Run (Pureᴾ R) using (Act; El; Subject; wkSubject; send; finish; under; done; compile; Env; wkEnv; wkAct; module Kit; module FlatKit; Ref; wkR; wkEl; Observer; Kont; wkObs; wkKont)
-  open Strongly R using (Sub; pendingˢ; ofˢ; mapˢ; takeWhileˢ; connectˢ; Lane; ending; taken; idle; feeding; finishing; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; Here; walk; top; coldˢ; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Lingers; pendings; rootObs; Owes; Begun; Settled; SettledLanes; Feed; Phase; timerOf; lanePendings; subjects; joiners; Tied; seen; seenL; isTaking; flatMapˢ; scanˢ; joinˢ; doneˢ; deferˢ; lane; CbRel; ≗-refl; taking; Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; code; ⟦_⟧; Leaf; of-leaf; cold-leaf; done-leaf; join-leaf; _⊕_; _⊕ᴸ_; at⟦_⟧; under≗; unsub; killAllᶜ; Spot; spot; Job; Joiner; joiner; laneSubjects; laneJoiners)
+  open Strongly R using (Sub; pendingˢ; ofˢ; mapˢ; takeWhileˢ; connectˢ; Lane; ending; taken; idle; feeding; finishing; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; Here; walk; top; coldˢ; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Lingers; DoneBy; pendings; rootObs; Owes; Begun; Settled; SettledLanes; Feed; Phase; timerOf; lanePendings; subjects; joiners; Tied; seen; seenL; isTaking; flatMapˢ; scanˢ; joinˢ; doneˢ; deferˢ; lane; CbRel; ≗-refl; taking; Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; code; ⟦_⟧; Leaf; of-leaf; cold-leaf; done-leaf; join-leaf; _⊕_; _⊕ᴸ_; at⟦_⟧; under≗; unsub; killAllᶜ; Spot; spot; Job; Joiner; joiner; laneSubjects; laneJoiners)
   open Strongly.Against R using (StackAs; subAs; runAs; CtlAs; agenda; bursts; begins; stackJobs; SrcOf; Ticked; stackBursts; sources; Placed; restAs; backAs; reholdAs; bottomAs; BurstAs; playsAs; firesAs; overAs; Held; bottomᴴ; restᴴ; BurstClocked; src-of)
   open Strongly.Phase R using (waiting; playing; fired)
   open Moving R using (pend; pendᴸ)
@@ -856,6 +856,12 @@ module Weakening (R : Set) where
       ... | conn-back {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {src = src} {bd = bd} =
         subst (Tied rt) (sym (leftover-wk {B = ⊤} src))
               (Lingers.rests L ψ (trans (sym s) sn) (trans (sym (grow-part (connectˢ S c b kb k fd rp e₀ rt src bd))) eq) (trans (sym (grow-part src)) pn) ec)
+
+      grow-flags : ∀ {t : Sub h [] R} → DoneBy H t [] → DoneBy H′ (wkTree τ t) []
+      grow-flags {t = t} d ψ′ sn with unwk t ψ′
+      ... | x , ψ , e , s with flat-inv x e
+      ... | flat-back {fl = fl} {so = so} =
+        (λ ()) , λ _ → trans (cells (FlatKit.Flat.outerDone fl)) (trans (proj₂ (d ψ (trans (sym s) sn)) (λ ())) (cong is-nothing (sym (grow-part so))))
 
       -- A switch listed is listed weakened.
       listed-wk : ∀ {c} (xs : List (Kit.Cut h)) → c ∈ xs → Kit.wkCut τ c ∈ wkEl (list Kit.cutTy) τ xs

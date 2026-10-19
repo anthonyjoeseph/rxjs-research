@@ -43,7 +43,7 @@ module Replanting (R : Set) where
                          Lane; lane; Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; code; Leaf; of-leaf; cold-leaf; done-leaf; join-leaf;
                          walk; walkLanes; top; module Here; unsub; unsubscribing; spot; playing; fired; taken;
                          pendingˢ; ofˢ; doneˢ; mapˢ; scanˢ; joinˢ; deferˢ; coldˢ; takeWhileˢ; flatMapˢ; connectˢ; taking; ending; idle; feeding; finishing;
-                         Owned; Each; Heads; Lingers; Pinned; Name; names; laneNames; cutNames; quietName; subjectNames; flatNames; module At; _≗_) renaming (⟦_⟧ to ⟦_⟧ᶜ)
+                         Owned; Each; Heads; Lingers; DoneBy; outers; Pinned; Name; names; laneNames; cutNames; quietName; subjectNames; flatNames; module At; _≗_) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (StackAs; BurstAs; Held; bottomAs; restAs; backAs; reholdAs; playsAs; firesAs; overAs; bottomᴴ; restᴴ;
                                  BurstClocked; Ticked; CtlAs; runAs)
   open Moving R using (plant; plantᴸ; planted; plant-self; pairs-r; pairs-split; Same; same; same-map; same-scan; same-take; same-flat; same-connect; same-defer)
@@ -487,6 +487,13 @@ module Replanting (R : Set) where
     shift-behind : (v : Sub h Δ A) → ∀ {q} → Untold H q T → Ended H T → Heading H H′ q u v → Each H (Heads q) T → Each H′ (Heads q) (plant ρ v)
     shift-behind v {q} ut en hd ev =
       Walk.Behind.shiftE H H′ {u = u} v offU (Heading.head-revive hd) (λ i e₀ e′ → Heading.head-told hd i e₀ e′) q (Heading.head-below hd) ρ fs ev ut en
+
+    -- Every flag named above the node still unset, every other reading
+    -- its outer as before; the names the write let go, below the node.
+    shift-flags : (v : Sub h Δ A) {ns₀ : List (Name h)} → (∀ {n} → n ∈ᴸ ns₀ → n ∈ᴸ names u)
+                → (is-just (At.part H′ v) ≡ true → is-just (At.part H u) ≡ true)
+                → (DoneBy H u (outers ρ ++ ns₀) → DoneBy H′ v (outers ρ)) → DoneBy H T (outers ρ ++ ns₀) → DoneBy H′ (plant ρ v) (outers ρ)
+    shift-flags v {ns₀} nu rv fb d = Walk.Flags.shiftF H H′ {u = u} v offU rv (outers ρ) ns₀ nu fb ρ fs (λ m → m) d
 
     shift-lingers : (v : Sub h Δ A) → Ended H T → Lingering H H′ u v → Lingers H T → Lingers H′ (plant ρ v)
     shift-lingers v en lg l =
