@@ -422,7 +422,7 @@ module Ascending (R : Set) where
   mutual
     healed-off : ∀ {h} (H H′ : Heapᴹ h) {q} {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) → AllPairs _≢_ (names t)
                → Offʰ H H′ (names u) → At.part H′ u ≡ At.part H u → Healed H q π → Healed H′ q π
-    healed-off H H′ here ps off eq _ = tt
+    healed-off H H′ here ps off eq _ = lift tt
     healed-off H H′ (in-map π) ps off eq hl = healed-off H H′ π (fresh-path (in-map here) ps) off eq hl
     healed-off H H′ (in-scan π) ps off eq hl = healed-off H H′ π (fresh-path (in-scan here) ps) off eq hl
     healed-off H H′ (in-take π) ps off eq hl = healed-off H H′ π (fresh-path (in-take here) ps) off eq hl
