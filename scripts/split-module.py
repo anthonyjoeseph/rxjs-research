@@ -430,8 +430,8 @@ def main():
         inner_imps, file_imps, rec_opens = [], [], []
         for j in range(k):
             q = parts[j]
-            # a bare `open R` of an earlier part's record brings its fields here too
-            recs = [l.split()[1] for l in q['flat'] if re.match(r'open \S+$', l) and l.split()[1] in q['out']]
+            # a bare `open R` in an earlier part brings R's fields here too
+            recs = [l.split()[1] for l in q['flat'] if re.match(r'open \S+$', l)]
             rec_opens += [f'open {r}' for r in recs if f'open {r}' not in rec_opens]
             names = sorted(uses(used | set(recs), q['out']))
             for b in sorted(uses(used, q['priv'])):
