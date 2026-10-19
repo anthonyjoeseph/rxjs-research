@@ -423,16 +423,17 @@ module Ascending (R : Set) where
     healed-off : ∀ {h} (H H′ : Heapᴹ h) {q} {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) → AllPairs _≢_ (names t)
                → Offʰ H H′ (names u) → At.part H′ u ≡ At.part H u → Healed H q π → Healed H′ q π
     healed-off H H′ here ps off eq _ = lift tt
-    healed-off H H′ (in-map π) ps off eq hl = healed-off H H′ π (fresh-path (in-map here) ps) off eq hl
-    healed-off H H′ (in-scan π) ps off eq hl = healed-off H H′ π (fresh-path (in-scan here) ps) off eq hl
-    healed-off H H′ (in-take π) ps off eq hl = healed-off H H′ π (fresh-path (in-take here) ps) off eq hl
-    healed-off H H′ (in-outer π) ps off eq hl = healed-off H H′ π (fresh-path (in-outer here) ps) off eq hl
+    healed-off H H′ (in-map {t = s} π) ps off eq hl = healed-off H H′ π (fresh-path (in-map {t = s} here) ps) off eq hl
+    healed-off H H′ (in-scan {t = s} π) ps off eq hl = healed-off H H′ π (fresh-path (in-scan {t = s} here) ps) off eq hl
+    healed-off H H′ (in-take {c = c} {k} {t = s} π) ps off eq hl = healed-off H H′ π (fresh-path (in-take {c = c} {k} {t = s} here) ps) off eq hl
+    healed-off H H′ (in-outer {fl = fl} {oc} {k} {r} {t = s} {ls} π) ps off eq hl = healed-off H H′ π (fresh-path (in-outer {fl = fl} {oc} {k} {r} {t = s} {ls} here) ps) off eq hl
     healed-off H H′ (in-lanes {fl = fl} {oc} {k} {r} {t = so} π) ps off eq hl =
       healedL-off H H′ π (pairs-r (names so) (pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps))))) off eq hl
-    healed-off H H′ (in-source π) ps off eq (x , hl) =
-      (λ z → x (trans (sym (part-path H H′ π (fresh-path (in-source here) ps) off eq)) z)) , healed-off H H′ π (fresh-path (in-source here) ps) off eq hl
-    healed-off H H′ (in-body π) ps off eq hl = healed-off H H′ π (fresh-path (in-body here) ps) off eq hl
-    healed-off H H′ (in-defer π) ps off eq hl = healed-off H H′ π (fresh-path (in-defer here) ps) off eq hl
+    healed-off H H′ (in-source {S = S} {c} {b} {kb} {k} {t = src} {bd} π) ps off eq (x , hl) =
+      (λ z → x (trans (sym (part-path H H′ π fp off eq)) z)) , healed-off H H′ π fp off eq hl
+      where fp = fresh-path (in-source {S = S} {c} {b} {kb} {k} {t = src} {bd} here) ps
+    healed-off H H′ (in-body {S = S} {c} {b} {kb} {k} {t = src} {bd} π) ps off eq hl = healed-off H H′ π (fresh-path (in-body {S = S} {c} {b} {kb} {k} {t = src} {bd} here) ps) off eq hl
+    healed-off H H′ (in-defer {k = k} {t = s} π) ps off eq hl = healed-off H H′ π (fresh-path (in-defer {k = k} {t = s} here) ps) off eq hl
 
     healedL-off : ∀ {h} (H H′ : Heapᴹ h) {q} {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) → AllPairs _≢_ (laneNames ls)
                 → Offʰ H H′ (names u) → At.part H′ u ≡ At.part H u → HealedL H q π → HealedL H′ q π
