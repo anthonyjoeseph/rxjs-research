@@ -4,7 +4,7 @@
 -- relation holds of the rest of the tree.
 module adequacy.Frame where
 
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; _++_; [_]; null)
 open import Data.List.Relation.Unary.Any using (Any; here; there)
 import Data.List.Relation.Unary.Any as Any
 open import Data.List.Relation.Unary.All using (All; []; _∷_; map) renaming (lookup to lookupᴬ)
@@ -43,7 +43,7 @@ module Framing (R : Set) where
   open Shared Timeline (Out R) using (Conf; Heapᴹ; store; stored; look)
   open Heap using (_∋_; cell; slot) renaming (same to same⊑)
   open Strongly R using (Strong; Sub; scanˢ; here; module At; Queue; Kernels; Meaning; Path; in-scan; in-source; _⊕_; names; Each; Heads; seen; Books;
-                         mapˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; lane; PathLanes; this-lane; next-lane; in-map; in-take; in-outer; in-lanes; in-body; in-defer; seen-join;
+                         mapˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; lane; PathLanes; this-lane; next-lane; _⊕ᴸ_; seenL; in-map; in-take; in-outer; in-lanes; in-body; in-defer; seen-join;
                          Taking; taking; taken; cutNames; quietName; subjectNames; flatNames; laneNames; Name; pendings; subjects; joiners) renaming (ending to endingᵀ)
   open Tearing R using (holds-at; Alike; Off; part-alike; partLanes-alike; lanes-path; module Seeing; look-store; get-put-same; fresh-path; names-path; apart-r; apart-l; ≢-flip)
   open Moving R using (pairs-r; pairs-split; plant; pendings-plant; subjects-plant; joiners-plant; head-map; head-scan)
@@ -51,7 +51,7 @@ module Framing (R : Set) where
   open Everywhere.Holding R using (holds-alike)
   open Everywhere.Spending R using (spent-alike)
   open Everywhere.Gating R using (gated-alike)
-  open Ghosting R using (module Calling; Lifts; LiftsLane; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source;
+  open Ghosting R using (each-lanes; module Calling; Lifts; LiftsLane; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source;
                          lifts-body; lifts-shut; lifts-defer; lifts-this; lifts-next; OuterFirst; PoolBehind; LaneFirst; Calling; sends; opened; openedL)
   open Read
 
@@ -212,6 +212,63 @@ module Framing (R : Set) where
     untoldˢ i (U.live s)    = untold i s
     untoldˢ i (U.ended e t) = untold i t
 
+  -- Two connects' indices, distinct.
+  data Apart : ∀ {Γ : List Set} {A C : Set} → A ∈ᴸ Γ → C ∈ᴸ Γ → Set₁ where
+    here-there  : ∀ {Γ A C} {i : C ∈ᴸ Γ} → Apart {A ∷ Γ} (here refl) (there i)
+    there-here  : ∀ {Γ A C} {k : A ∈ᴸ Γ} → Apart {C ∷ Γ} (there k) (here refl)
+    there-there : ∀ {Γ X A C} {k : A ∈ᴸ Γ} {i : C ∈ᴸ Γ} → Apart k i → Apart {X ∷ Γ} (there k) (there i)
+
+  untoldᴶ-none : ∀ {A B : Set} p e → untoldᴶ {A} {B} p e nothing ≡ []
+  untoldᴶ-none p nothing  = refl
+  untoldᴶ-none p (just _) = refl
+
+  untold-told : ∀ {Γ A C B} {k : A ∈ᴸ Γ} {i : C ∈ᴸ Γ} → Apart k i → ∀ c (j : B ∈ᴸ Γ) p e
+              → untoldᴶ p (U.told k c j p e (U.same? k j)) (U.same? i j) ≡ untoldᴶ p e (U.same? i j)
+  untold-told here-there      c (here refl) p e        = trans (untoldᴶ-none p _) (sym (untoldᴶ-none p e))
+  untold-told here-there      c (there j)   p nothing  = refl
+  untold-told here-there      c (there j)   p (just _) = refl
+  untold-told there-here      c (here refl) p nothing  = refl
+  untold-told there-here      c (here refl) p (just _) = refl
+  untold-told there-here      c (there j)   p e        = trans (untoldᴶ-none p _) (sym (untoldᴶ-none p e))
+  untold-told (there-there a) c (here refl) p e        = trans (untoldᴶ-none p _) (sym (untoldᴶ-none p e))
+  untold-told (there-there a) c (there j)   p e        = untold-told a c j p e
+
+  -- A shut tells only the joiners of the connect it ends.
+  mutual
+    untold-apart : ∀ {Γ A C B} {k : A ∈ᴸ Γ} {i : C ∈ᴸ Γ} → Apart k i → ∀ c (n : U.Node Γ B) → untold i (U.shut k c n) ≡ untold i n
+    untold-apart a c (U.mapᶜ f n)                 = untold-apart a c n
+    untold-apart a c (U.scanᶜ f z n)              = untold-apart a c n
+    untold-apart a c (U.takeWhileᶜ b p n)         = untold-apart a c n
+    untold-apart a c (U.flatMapᶜ op g o ls qs pl) =
+      cong₂ _++_ (untold-apartᴹ a c o) (cong₂ _++_ (untold-apartᴸ a c ls) (untold-apart a c pl))
+    untold-apart a c (U.joinᶜ j p xs e)           = untold-told a c j p e
+    untold-apart a c (U.connectᶜ r b s)           = cong₂ _++_ (untold-apart (there-there a) c b) (untold-apartˢ a c s)
+    untold-apart a c (U.endingᶜ p n)              = untold-apart a c n
+    untold-apart a c (U.restᶜ n)                  = untold-apart a c n
+    untold-apart a c (U.unionᶜ x y)               = cong₂ _++_ (untold-apart a c x) (untold-apart a c y)
+    untold-apart a c (U.burstingᶜ r t)            = untold-apart a c t
+    untold-apart a c (U.underᶜ s b)               = cong₂ _++_ (untold-apartˢ a c s) (untold-apart (there-there a) c b)
+    untold-apart a c (U.framesᶜ _ _ _)            = refl
+    untold-apart a c (U.burstᶜ _ _ _ _)           = refl
+    untold-apart a c (U.ofᶜ _ _ _)                = refl
+    untold-apart a c (U.deferᶜ _ _ _)             = refl
+    untold-apart a c U.idleᶜ                      = refl
+
+    untold-apartᴹ : ∀ {Γ A C B} {k : A ∈ᴸ Γ} {i : C ∈ᴸ Γ} → Apart k i → ∀ c (m : Maybe (U.Node Γ B)) → untoldᴹ i (U.shutᴹ k c m) ≡ untoldᴹ i m
+    untold-apartᴹ a c nothing  = refl
+    untold-apartᴹ a c (just n) = untold-apart a c n
+
+    untold-apartᴸ : ∀ {Γ A C B} {k : A ∈ᴸ Γ} {i : C ∈ᴸ Γ} → Apart k i → ∀ c (ns : List (U.Node Γ B)) → untoldᴸ i (U.shutᴸ k c ns) ≡ untoldᴸ i ns
+    untold-apartᴸ a c []       = refl
+    untold-apartᴸ a c (n ∷ ns) = cong₂ _++_ (untold-apart a c n) (untold-apartᴸ a c ns)
+
+    untold-apartˢ : ∀ {Γ A C B} {k : A ∈ᴸ Γ} {i : C ∈ᴸ Γ} → Apart k i → ∀ c (s : U.Source Γ B) → untoldˢ i (U.shutˢ k c s) ≡ untoldˢ i s
+    untold-apartˢ a c (U.live s)    = untold-apart a c s
+    untold-apartˢ a c (U.ended e t) = untold-apart a c t
+
+  untold-shut : ∀ {Γ A B C} (i : C ∈ᴸ Γ) c (b : U.Node (A ∷ Γ) B) → untold (there i) (U.shut (here refl) c b) ≡ untold (there i) b
+  untold-shut i c b = untold-apart here-there c b
+
   -- Every end a shut at `c` tells comes no sooner than `q`.
   Tells : Pos → Pos → List Pos → Set
   Tells q c = All (λ p → q ≤ᵖ (if p <ᵖ c then c ++ [ subᴾ p ] else p ++ [ last ]))
@@ -225,6 +282,22 @@ module Framing (R : Set) where
   shut-heads-step r c t (U.skipˢ _ _)  hs = hs
   shut-heads-step r c t (U.endˢ _)     hs = hs
   shut-heads-step r c t U.hushˢ        hs = hs
+
+  just-of : ∀ {ℓ} {X : Set ℓ} {m : Maybe X} → is-just m ≡ true → Σ X λ c → m ≡ just c
+  just-of {m = just c} _ = c , refl
+
+  merged-eq : ∀ {h} (G : Heapᴹ h) {Δ A B} op (g : A → Pos → U.Node Δ B) o L Q pl {b} → At.merged G op g o L Q pl ≡ just b → U.flatMapᶜ op g o L Q pl ≡ b
+  merged-eq G op g (just _) L       Q       pl refl = refl
+  merged-eq G op g nothing  (_ ∷ _) Q       pl refl = refl
+  merged-eq G op g nothing  []      (_ ∷ _) pl refl = refl
+  merged-eq G op g nothing  []      []      pl ()
+
+  postulate
+    -- A flatMap's head moved by its outer and lanes alone, each heading
+    -- no sooner than `q`.
+    heads-flat : ∀ {Δ A B q} op (g : A → Pos → U.Node Δ B) (o o′ : Maybe (U.Node Δ A)) (L L′ : List (U.Node Δ B)) Q pl
+               → Heads q (U.flatMapᶜ op g o L Q pl) → (∀ {c} → o′ ≡ just c → Heads q c) → All (Heads q) L′
+               → Heads q (U.flatMapᶜ op g o′ L′ Q pl)
 
   -- A connect past its source's end: its body's head, or a rest's skip
   -- under where the source would have skipped.
@@ -264,15 +337,211 @@ module Framing (R : Set) where
     via (here refl) = this-lane here
     via (there m)   = next-lane (via m)
 
-    postulate
-      up-outer  : ∀ {Δ′ A′ B′} {op g fl oc k rf pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
-                  (ψ : Path T (flatMapˢ op g fl oc k rf pl so ls)) → Path so (scanˢ f r u) → Up (ψ ⊕ in-outer here) → Up ψ
-      up-lanes  : ∀ {Δ′ A′ B′} {op g fl oc k rf pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
-                  (ψ : Path T (flatMapˢ op g fl oc k rf pl so ls)) {c k′} {t : Sub h Δ′ B′} (m : lane c k′ t ∈ᴸ ls)
-                → Path t (scanˢ f r u) → Up (ψ ⊕ in-lanes (via m)) → Up ψ
-      -- A written scan's part tells its joiners what it did.
-      up-untold : ∀ {Δ′ B′} {x : Sub h Δ′ B′} → Path T x → Path x (scanˢ f r u)
-                → ∀ {A′} (i : A′ ∈ᴸ Δ′) {b₀ b′} → At.part H x ≡ just b₀ → At.part H′ x ≡ just b′ → untold i b′ ≡ untold i b₀
+    -- A connect's source and body, apart.
+    sides : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+          → Path T (connectˢ S c b kb k fd rp e rt src bd) → AllPairs _≢_ (names src ++ names bd)
+    sides {S = S} {c} {b} {kb} {k} ψ =
+      pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) (fresh-path ψ fs)))))
+
+    -- Two parts alike but for accumulators: as defined, telling alike.
+    Same : ∀ {Δ′ B′} → Maybe (U.Node Δ′ B′) → Maybe (U.Node Δ′ B′) → Set₁
+    Same {Δ′} m′ m = is-just m′ ≡ is-just m × (∀ {C} (i : C ∈ᴸ Δ′) → untoldᴹ i m′ ≡ untoldᴹ i m)
+
+    SameL : ∀ {Δ′ B′} → List (U.Node Δ′ B′) → List (U.Node Δ′ B′) → Set₁
+    SameL {Δ′} L′ L = null L′ ≡ null L × (∀ {C} (i : C ∈ᴸ Δ′) → untoldᴸ i L′ ≡ untoldᴸ i L)
+
+    same-≡ : ∀ {Δ′ B′} {m′ m : Maybe (U.Node Δ′ B′)} → m′ ≡ m → Same m′ m
+    same-≡ refl = refl , λ _ → refl
+
+    sameL-≡ : ∀ {Δ′ B′} {L′ L : List (U.Node Δ′ B′)} → L′ ≡ L → SameL L′ L
+    sameL-≡ refl = refl , λ _ → refl
+
+    same-map : ∀ {Δ′ A′ B′} (F′ F : U.Node Δ′ A′ → U.Node Δ′ B′) → (∀ {C} (i : C ∈ᴸ Δ′) n → untold i (F′ n) ≡ untold i n)
+             → (∀ {C} (i : C ∈ᴸ Δ′) n → untold i (F n) ≡ untold i n) → ∀ {m′ m} → Same m′ m → Same (At.mapᴹ H′ F′ m′) (At.mapᴹ H F m)
+    same-map F′ F e′ e {nothing} {nothing} _       = refl , λ _ → refl
+    same-map F′ F e′ e {just n′} {just n}  (_ , t) = refl , λ i → trans (e′ i n′) (trans (t i) (sym (e i n)))
+    same-map F′ F e′ e {nothing} {just _}  (() , _)
+    same-map F′ F e′ e {just _}  {nothing} (() , _)
+
+    same-take : ∀ {Δ′ A′} ib (p : A′ → Bool) (tk : Taking Δ′ A′) b′ b → b′ ≡ b → ∀ {m′ m} → Same m′ m
+              → Same (if b′ then At.taking? H′ ib p tk m′ else nothing) (if b then At.taking? H ib p tk m else nothing)
+    same-take ib p tk          false .false refl s = refl , λ _ → refl
+    same-take ib p taking      true  .true  refl s = same-map (U.takeWhileᶜ ib p) (U.takeWhileᶜ ib p) (λ _ _ → refl) (λ _ _ → refl) s
+    same-take ib p (endingᵀ k c) true .true refl s = refl , λ _ → refl
+    same-take ib p taken       true  .true  refl s = refl , λ _ → refl
+
+    same-cons : ∀ {Δ′ B′} {m′ m : Maybe (U.Node Δ′ B′)} {L′ L} → Same m′ m → SameL L′ L → SameL (At.consᴹ H′ m′ L′) (At.consᴹ H m L)
+    same-cons {m′ = nothing} {nothing} _ sl            = sl
+    same-cons {m′ = just _}  {just _}  (_ , t) (_ , tl) = refl , λ i → cong₂ _++_ (t i) (tl i)
+    same-cons {m′ = nothing} {just _}  (() , _) _
+    same-cons {m′ = just _}  {nothing} (() , _) _
+
+    same-lane : ∀ {Δ′ B′} b′ b → b′ ≡ b → {m′ m : Maybe (U.Node Δ′ B′)} {L′ L : List (U.Node Δ′ B′)} → Same m′ m → SameL L′ L
+              → SameL (if b′ then At.consᴹ H′ m′ L′ else L′) (if b then At.consᴹ H m L else L)
+    same-lane false .false refl s sl = sl
+    same-lane true  .true  refl s sl = same-cons s sl
+
+    same-merged : ∀ {Δ′ A′ B′} op (g : A′ → Pos → U.Node Δ′ B′) {o′ o L′ L} Q pl → Same o′ o → SameL L′ L
+                → Same (At.merged H′ op g o′ L′ Q pl) (At.merged H op g o L Q pl)
+    same-merged op g {just _}  {just _}            Q       pl (_ , t) (_ , tl) = refl , λ i → cong₂ _++_ (t i) (cong₂ _++_ (tl i) refl)
+    same-merged op g {nothing} {nothing} {[]} {[]} []      pl _ _               = refl , λ _ → refl
+    same-merged op g {nothing} {nothing} {[]} {[]} (_ ∷ _) pl _ _               = refl , λ _ → refl
+    same-merged op g {nothing} {nothing} {_ ∷ _} {_ ∷ _} Q pl _ (_ , tl)        = refl , λ i → cong₂ _++_ (tl i) refl
+    same-merged op g {nothing} {nothing} {[]} {_ ∷ _} Q pl _ (() , _)
+    same-merged op g {nothing} {nothing} {_ ∷ _} {[]} Q pl _ (() , _)
+    same-merged op g {nothing} {just _}  Q pl (() , _) _
+    same-merged op g {just _}  {nothing} Q pl (() , _) _
+
+    same-connected : ∀ {Δ′ A′ B′} rp e (rt : U.Node Δ′ A′) {ms′ ms : Maybe (U.Node Δ′ A′)} {mb′ mb : Maybe (U.Node (A′ ∷ Δ′) B′)}
+                   → Same ms′ ms → Same mb′ mb → Same (At.connected H′ rp e rt ms′ mb′) (At.connected H rp e rt ms mb)
+    same-connected rp e rt {mb′ = nothing} {nothing} _ _ = refl , λ _ → refl
+    same-connected rp e rt {just _} {just _} {just _} {just _} (_ , ts) (_ , tb) = refl , λ i → cong₂ _++_ (tb (there i)) (ts i)
+    same-connected rp (just c) rt {nothing} {nothing} {just b′} {just b} _ (_ , tb) =
+      refl , λ i → cong (_++ untold i rt) (trans (untold-shut i c b′) (trans (tb (there i)) (sym (untold-shut i c b))))
+    same-connected rp nothing rt {nothing} {nothing} {just _} {just _} _ _ = refl , λ _ → refl
+    same-connected rp e rt {nothing} {just _} {just _} {just _} (() , _) _
+    same-connected rp e rt {just _} {nothing} {just _} {just _} (() , _) _
+    same-connected rp e rt {mb′ = nothing} {just _} _ (() , _)
+    same-connected rp e rt {mb′ = just _} {nothing} _ (() , _)
+
+    -- Apart from the accumulator, a cell reads as before the write.
+    kept : ∀ {t} (j : Ref h t) → _≢_ {A = Name h} (_ , j) (cell _ , r) → At.val H′ j ≡ At.val H j
+    kept j ne = cong lower (look-store H r j (≢-flip ne))
+
+    off : ∀ {ns : List (Name h)} → All (_≢_ {A = Name h} (cell _ , r)) ns → Alike H H′ ns
+    off = store-alike H r
+
+    -- A flatMap's outer and lanes, apart.
+    outer-lanes : ∀ {Δ′ A′ B′} {op g fl oc k rf pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+                → Path T (flatMapˢ op g fl oc k rf pl so ls) → AllPairs _≢_ (names so ++ laneNames ls)
+    outer-lanes {fl = fl} {oc} {k} {rf} ψ = pairs-r ((_ , rf) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) (fresh-path ψ fs))))
+
+    -- The accumulator beneath a flatMap's outer or lanes: its queue kept.
+    queue-kept : ∀ {Δ′ A′ B′} {op g fl oc k rf pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+               → Path T (flatMapˢ op g fl oc k rf pl so ls) → (cell _ , r) ∈ᴸ names so ++ laneNames ls
+               → At.val H′ (FlatKit.Flat.queue fl) ≡ At.val H (FlatKit.Flat.queue fl)
+    queue-kept {fl = fl} {oc} {k} ψ m with fresh-path ψ fs
+    ... | _ ∷ _ ∷ a₂ ∷ _ = kept (FlatKit.Flat.queue fl) (lookupᴬ a₂ (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there m))))))
+
+    mutual
+      -- A written scan's parts above it, alike but for accumulators.
+      untold-up : ∀ {Δ′ B′} {x : Sub h Δ′ B′} → Path T x → Path x (scanˢ f r u) → Same (At.part H′ x) (At.part H x)
+      untold-up ψ here with fresh-path ψ fs
+      ... | nr ∷ _ = same-map (U.scanᶜ f (At.val H′ r)) (U.scanᶜ f (At.val H r)) (λ _ _ → refl) (λ _ _ → refl)
+                       (same-≡ (part-alike H H′ u (off nr)))
+      untold-up ψ (in-map {f = g} π)        = same-map (U.mapᶜ g) (U.mapᶜ g) (λ _ _ → refl) (λ _ _ → refl) (untold-up (ψ ⊕ in-map here) π)
+      untold-up ψ (in-scan {f = g} {r = r′} π) =
+        same-map (U.scanᶜ g (At.val H′ r′)) (U.scanᶜ g (At.val H r′)) (λ _ _ → refl) (λ _ _ → refl) (untold-up (ψ ⊕ in-scan here) π)
+      untold-up ψ (in-defer π)              = untold-up (ψ ⊕ in-defer here) π
+      untold-up ψ (in-take {i = ib} {p} {c} {k} {tk} π) =
+        same-take ib p tk _ _ (kept (Kit.live c) (lookupᴬ (apart-r (cutNames c) (fresh-path ψ fs) (here refl)) (++⁺ʳ (quietName k) (names-path π (here refl)))))
+          (untold-up (ψ ⊕ in-take here) π)
+      untold-up ψ (in-outer {op = op} {f = g} {fl = fl} {pl = pl} {t = so} {ls = ls} π) =
+        subst (λ Q → Same (At.merged H′ op (λ a q → U.subscribe (g a) q) (At.part H′ so) (At.partLanes H′ ls) Q pl)
+                          (At.merged H op (λ a q → U.subscribe (g a) q) (At.part H so) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl))
+              (sym (queue-kept ψ (++⁺ˡ m)))
+              (same-merged op _ _ pl (untold-up (ψ ⊕ in-outer here) π)
+                (sameL-≡ (partLanes-alike H H′ ls (off (apart-r (names so) (outer-lanes ψ) m)))))
+        where m = names-path π (here refl)
+      untold-up ψ (in-lanes {op = op} {f = g} {fl = fl} {pl = pl} {t = so} {ls = ls} πL) =
+        subst (λ Q → Same (At.merged H′ op (λ a q → U.subscribe (g a) q) (At.part H′ so) (At.partLanes H′ ls) Q pl)
+                          (At.merged H op (λ a q → U.subscribe (g a) q) (At.part H so) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl))
+              (sym (queue-kept ψ (++⁺ʳ (names so) m)))
+              (same-merged op _ _ pl (same-≡ (part-alike H H′ so (off (apart-l (names so) (outer-lanes ψ) m))))
+                (untold-lanes (λ π′ → ψ ⊕ in-lanes π′) (pairs-r (names so) (outer-lanes ψ)) πL))
+        where m = lanes-path πL (here refl)
+      untold-up ψ (in-source {S = Sj} {c = c} {b = b} {kb = kb} {k = k} {e = e} {rp = rp} {rt = rt} {t = src} {bd = bd} π) =
+        same-connected rp e rt (untold-up (ψ ⊕ in-source here) π)
+          (same-≡ (part-alike H H′ bd (off (apart-r (names src) (sides ψ) (names-path π (here refl))))))
+      untold-up ψ (in-body {S = Sj} {c = c} {b = b} {kb = kb} {k = k} {e = e} {rp = rp} {rt = rt} {t = src} {bd = bd} π) =
+        same-connected rp e rt (same-≡ (part-alike H H′ src (off (apart-l (names src) (sides ψ) (names-path π (here refl))))))
+          (untold-up (ψ ⊕ in-body here) π)
+
+      untold-lanes : ∀ {Δ′ B′} {ls : List (Lane h Δ′ B′)} → (∀ {Δ″ A″} {x : Sub h Δ″ A″} → PathLanes ls x → Path T x)
+                   → AllPairs _≢_ (laneNames ls) → PathLanes ls (scanˢ f r u) → SameL (At.partLanes H′ ls) (At.partLanes H ls)
+      untold-lanes {ls = lane c k s ∷ ls} κ P (this-lane π) =
+        same-lane _ _ (kept (Kit.live c) (lookupᴬ (apart-r (cutNames c) P (here refl)) (++⁺ʳ (quietName k) (++⁺ˡ m))))
+          (untold-up (κ (this-lane here)) π)
+          (sameL-≡ (partLanes-alike H H′ ls (off (apart-r (names s) (pairs-r (quietName k) (pairs-r (cutNames c) P)) m))))
+        where m = names-path π (here refl)
+      untold-lanes {ls = lane c k s ∷ ls} κ P (next-lane πL) =
+        same-lane _ _ (kept (Kit.live c) (lookupᴬ (apart-r (cutNames c) P (here refl)) (++⁺ʳ (quietName k) (++⁺ʳ (names s) m))))
+          (same-≡ (part-alike H H′ s (off (apart-l (names s) P′ m))))
+          (untold-lanes (λ π′ → κ (next-lane π′)) (pairs-r (names s) P′) πL)
+        where
+          m  = lanes-path πL (here refl)
+          P′ = pairs-r (quietName k) (pairs-r (cutNames c) P)
+
+    -- A written scan's part tells its joiners what it did.
+    up-untold : ∀ {Δ′ B′} {x : Sub h Δ′ B′} → Path T x → Path x (scanˢ f r u)
+              → ∀ {A′} (i : A′ ∈ᴸ Δ′) {b₀ b′} → At.part H x ≡ just b₀ → At.part H′ x ≡ just b′ → untold i b′ ≡ untold i b₀
+    up-untold ψ π i pb pb′ = trans (cong (untoldᴹ i) (sym pb′)) (trans (proj₂ (untold-up ψ π) i) (cong (untoldᴹ i) pb))
+
+    -- A flatMap above the write, defined as before: its head moved by its
+    -- outer and lanes alone.
+    flat-up : ∀ {Δ′ A′ B′} {op g fl oc k rf pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+              (ψ : Path T (flatMapˢ op g fl oc k rf pl so ls)) → seen H ψ ≡ true
+            → Same (At.part H′ (flatMapˢ op g fl oc k rf pl so ls)) (At.part H (flatMapˢ op g fl oc k rf pl so ls))
+            → At.val H′ (FlatKit.Flat.queue fl) ≡ At.val H (FlatKit.Flat.queue fl)
+            → (∀ {c} → At.part H′ so ≡ just c → Heads q c) → All (Heads q) (At.partLanes H′ ls) → Up ψ
+    flat-up {op = op} {g} {fl} {pl = pl} {so} {ls} ψ sn sm qe ho hL _ {c} x with just-of (trans (sym (proj₁ sm)) (cong is-just x))
+    ... | _ , x₀ =
+      subst (Heads q) (trans (cong (λ Q → U.flatMapᶜ op G (At.part H′ so) (At.partLanes H′ ls) Q pl) (sym qe))
+                             (merged-eq H′ op G (At.part H′ so) (At.partLanes H′ ls) (At.val H′ (FlatKit.Flat.queue fl)) pl x))
+        (heads-flat op G (At.part H so) (At.part H′ so) (At.partLanes H ls) (At.partLanes H′ ls) (At.val H (FlatKit.Flat.queue fl)) pl
+          (subst (Heads q) (sym (merged-eq H op G (At.part H so) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl x₀)) (Each.parts bh ψ sn x₀))
+          ho hL)
+      where G = λ a j → U.subscribe (g a) j
+
+    heads-if : ∀ {Δ′ B′} b {m : Maybe (U.Node Δ′ B′)} {L} → (b ≡ true → ∀ {c} → m ≡ just c → Heads q c) → All (Heads q) L
+             → All (Heads q) (if b then At.consᴹ H′ m L else L)
+    heads-if false          hm hL = hL
+    heads-if true {nothing} hm hL = hL
+    heads-if true {just _}  hm hL = hm refl refl ∷ hL
+
+    -- Every lane beside the write heads as before; the written one, as
+    -- its part above the write does.
+    lanes-heads : ∀ {Δ′ B′} {ls : List (Lane h Δ′ B′)} (κ : ∀ {Δ″ A″} {x : Sub h Δ″ A″} → PathLanes ls x → Path T x)
+                → (∀ {Δ″ A″} {x : Sub h Δ″ A″} (πL : PathLanes ls x) → seenL H πL ≡ true → seen H (κ πL) ≡ true)
+                → AllPairs _≢_ (laneNames ls) → ∀ {c k′} {t : Sub h Δ′ B′} (m : lane c k′ t ∈ᴸ ls) → Path t (scanˢ f r u) → Up (κ (via m))
+                → All (Heads q) (At.partLanes H′ ls)
+    lanes-heads {ls = lane c k′ t ∷ ls} κ sκ P (here refl) π up =
+      subst (λ b → All (Heads q) (if b then At.consᴹ H′ (At.part H′ t) (At.partLanes H′ ls) else At.partLanes H′ ls))
+            (sym (kept (Kit.live c) (lookupᴬ (apart-r (cutNames c) P (here refl)) (++⁺ʳ (quietName k′) (++⁺ˡ mr)))))
+            (heads-if (At.val H (Kit.live c)) (λ e → up (sκ (this-lane here) (cong (_∧ true) e)))
+              (subst (All (Heads q)) (sym (partLanes-alike H H′ ls (off (apart-r (names t) (pairs-r (quietName k′) (pairs-r (cutNames c) P)) mr))))
+                (each-lanes {H = H} {P = Heads q} ls (λ πL sL e → Each.parts bh (κ (next-lane πL)) (sκ (next-lane πL) sL) e))))
+      where mr = names-path π (here refl)
+    lanes-heads {ls = lane c k₂ s₂ ∷ ls} κ sκ P (there m) π up =
+      subst (λ b → All (Heads q) (if b then At.consᴹ H′ (At.part H′ s₂) (At.partLanes H′ ls) else At.partLanes H′ ls))
+            (sym (kept (Kit.live c) (lookupᴬ (apart-r (cutNames c) P (here refl)) (++⁺ʳ (quietName k₂) (++⁺ʳ (names s₂) mr)))))
+            (heads-if (At.val H (Kit.live c))
+              (λ e x → Each.parts bh (κ (this-lane here)) (sκ (this-lane here) (cong (_∧ true) e))
+                         (trans (sym (part-alike H H′ s₂ (off (apart-l (names s₂) P′ mr)))) x))
+              (lanes-heads (λ π′ → κ (next-lane π′)) (λ π′ → sκ (next-lane π′)) (pairs-r (names s₂) P′) m π up))
+      where
+        mr = lanes-path (via m) (names-path π (here refl))
+        P′ = pairs-r (quietName k₂) (pairs-r (cutNames c) P)
+
+    up-outer : ∀ {Δ′ A′ B′} {op g fl oc k rf pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+               (ψ : Path T (flatMapˢ op g fl oc k rf pl so ls)) → Path so (scanˢ f r u) → Up (ψ ⊕ in-outer here) → Up ψ
+    up-outer {so = so} {ls} ψ π up sn =
+      flat-up ψ sn (untold-up ψ (in-outer π)) (queue-kept ψ (++⁺ˡ m)) (up (seen-join H ψ (in-outer here) sn refl))
+        (subst (All (Heads q)) (sym (partLanes-alike H H′ ls (off (apart-r (names so) (outer-lanes ψ) m))))
+          (each-lanes {H = H} {P = Heads q} ls (λ πL sL e → Each.parts bh (ψ ⊕ in-lanes πL) (seen-join H ψ (in-lanes πL) sn sL) e)))
+        sn
+      where m = names-path π (here refl)
+
+    up-lanes : ∀ {Δ′ A′ B′} {op g fl oc k rf pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+               (ψ : Path T (flatMapˢ op g fl oc k rf pl so ls)) {c k′} {t : Sub h Δ′ B′} (m : lane c k′ t ∈ᴸ ls)
+             → Path t (scanˢ f r u) → Up (ψ ⊕ in-lanes (via m)) → Up ψ
+    up-lanes {so = so} {ls} ψ m π up sn =
+      flat-up ψ sn (untold-up ψ (in-lanes (via m ⊕ᴸ π))) (queue-kept ψ (++⁺ʳ (names so) mr))
+        (λ e → Each.parts bh (ψ ⊕ in-outer here) (seen-join H ψ (in-outer here) sn refl)
+                 (trans (sym (part-alike H H′ so (off (apart-l (names so) (outer-lanes ψ) mr)))) e))
+        (lanes-heads (λ π′ → ψ ⊕ in-lanes π′) (λ π′ s → seen-join H ψ (in-lanes π′) sn s) (pairs-r (names so) (outer-lanes ψ)) m π up)
+        sn
+      where mr = lanes-path (via m) (names-path π (here refl))
 
     -- A connect past its source's end, the scan in its body: the body
     -- shut at the source's end.
@@ -320,12 +589,6 @@ module Framing (R : Set) where
             → Up (ψ ⊕ in-take here) → Up ψ
     up-take {i = i} {p} {c} {tk = tk} {s} ψ π up sn {c′} e =
       take-go ψ up sn (At.val H (Kit.live c)) refl (subst (λ b → (if b then At.taking? H′ i p tk (At.part H′ s) else nothing) ≡ just c′) (live-apart ψ π) e)
-
-    -- A connect's source and body, apart.
-    sides : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
-          → Path T (connectˢ S c b kb k fd rp e rt src bd) → AllPairs _≢_ (names src ++ names bd)
-    sides {S = S} {c} {b} {kb} {k} ψ =
-      pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) (fresh-path ψ fs)))))
 
     src-go : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
              (ψ : Path T (connectˢ S c b kb k fd rp e rt src bd)) → Up (ψ ⊕ in-source here) → seen H ψ ≡ true
@@ -417,9 +680,6 @@ module Framing (R : Set) where
   scan-above {m₁ = m₁} {f = f} {r} {u} ρ {y} cl =
     Above.above H f r u (Books.fresh (Calling.books cl)) (f (At.val H r) y) (Conf.pos (Mach.conf m₁)) (Calling.behind cl) (tells-past cl)
     where H = Conf.heap (Mach.conf m₁)
-
-  just-of : ∀ {ℓ} {X : Set ℓ} {m : Maybe X} → is-just m ≡ true → Σ X λ c → m ≡ just c
-  just-of {m = just c} _ = c , refl
 
   none-of : ∀ {ℓ} {X : Set ℓ} {m : Maybe X} → is-just m ≡ false → m ≡ nothing
   none-of {m = nothing} _ = refl

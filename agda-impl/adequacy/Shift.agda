@@ -46,7 +46,7 @@ module Shifting (R : Set) where
   open Moving R using (plant; plantᴸ; pairs-r; pairs-split)
   open Locality R using (module Heaps)
   open Ghosting R using (each-sub; each-lanes)
-  open Framing R using (Untold; Ended; Tells; untold; untoldᴹ; untoldᴸ; heads-map; heads-scan; heads-take; heads-source; ended-head; shut-heads; just-of)
+  open Framing R using (Untold; Ended; Tells; untold; untoldᴹ; untoldᴸ; heads-map; heads-scan; heads-take; heads-source; ended-head; shut-heads; just-of; untold-shut; merged-eq; heads-flat)
   open Keeping R using (leftover-restful)
 
   ----------------------------------------------------------------------
@@ -128,12 +128,6 @@ module Shifting (R : Set) where
   map-back G g (just _) _ = refl
   map-back G g nothing  ()
 
-  merged-eq : ∀ {h} (G : Heapᴹ h) {Δ A B} op (g : A → Pos → U.Node Δ B) o L Q pl {b} → At.merged G op g o L Q pl ≡ just b → U.flatMapᶜ op g o L Q pl ≡ b
-  merged-eq G op g (just _) L       Q       pl refl = refl
-  merged-eq G op g nothing  (_ ∷ _) Q       pl refl = refl
-  merged-eq G op g nothing  []      (_ ∷ _) pl refl = refl
-  merged-eq G op g nothing  []      []      pl ()
-
   cons-untold : ∀ {h} (G : Heapᴹ h) {Γ A B} (i : A ∈ᴸ Γ) (m : Maybe (U.Node Γ B)) L → untoldᴸ i (At.consᴹ G m L) ≡ untoldᴹ i m ++ untoldᴸ i L
   cons-untold G i nothing  L = refl
   cons-untold G i (just _) L = refl
@@ -147,15 +141,6 @@ module Shifting (R : Set) where
   ----------------------------------------------------------------------
   -- THE LEAVES
 
-  postulate
-    -- A flatMap's head moved by its outer and lanes alone, each heading
-    -- no sooner than `q`.
-    heads-flat : ∀ {Δ A B q} op (g : A → Pos → U.Node Δ B) (o o′ : Maybe (U.Node Δ A)) (L L′ : List (U.Node Δ B)) Q pl
-               → Heads q (U.flatMapᶜ op g o L Q pl) → (∀ {c} → o′ ≡ just c → Heads q c) → All (Heads q) L′
-               → Heads q (U.flatMapᶜ op g o′ L′ Q pl)
-
-    -- A shut tells only the joiners of the connect it ends.
-    untold-shut : ∀ {Γ A B C} (i : C ∈ᴸ Γ) c (b : U.Node (A ∷ Γ) B) → untold (there i) (U.shut (here refl) c b) ≡ untold (there i) b
 
   ----------------------------------------------------------------------
   -- Every node below a run of lanes

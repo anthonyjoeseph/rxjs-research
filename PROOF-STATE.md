@@ -279,17 +279,11 @@ by their own silent steps (`Mirror`).
   source's end steps after that pin.
 - **`rest-land`** (Lift) — FALSITY, `NO EVIDENCE`: the rest's pin lifted is the
   ghost's step: the rest a pin on, the ghost past it.
-- **`up-lanes`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap above a written
-  scan in one of its lanes heads no sooner than that lane's part.
-- **`up-outer`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap above a written
-  scan in its outer heads no sooner than the outer's part.
 - **`tells-past`** (Frame) — FALSITY, `NO EVIDENCE`: a call under way, a
   connect past its source's end tells its body's untold joiners no sooner than
   the run.
 - **`shut-heads`** (Frame) — FALSITY, `NO EVIDENCE`: a shut heads where its
   node did, or at an end it tells.
-- **`up-untold`** (Frame) — FALSITY, `NO EVIDENCE`: a write at a scan's
-  accumulator leaves which joiners are untold alike.
 - **`src-idle`** (Climbs) — FALSITY, `NO EVIDENCE`: a connect's source signals
   its subject only with no feed under way.
 - **`fed-part`** (Climbs) — FALSITY, `NO EVIDENCE`: the retagged body is the
@@ -334,10 +328,8 @@ by their own silent steps (`Mirror`).
   played, a value run on, a stall passed, a close scheduled.
 - **`ended-past`** (Frame) — FALSITY, `NO EVIDENCE`: a connect held past its
   source's end holds no source part, at every call under way.
-- **`heads-flat`** (Shift) — FALSITY, `NO EVIDENCE`: a flatMap's merged part
+- **`heads-flat`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap's merged part
   heads no sooner than `q` whenever its outer's and its lanes' do.
-- **`untold-shut`** (Shift) — FALSITY, `NO EVIDENCE`: shutting a body's head
-  input leaves what it has not told every other input.
 - **`rest-sourced`** (Shift) — FALSITY, `NO EVIDENCE`: a connect's leftover
   over a source running on either side, pinned as its source's.
 - **`out-deeper`** (Climbs) — FALSITY, `NO EVIDENCE`: every part heads past the
