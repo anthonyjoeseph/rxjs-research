@@ -3729,10 +3729,8 @@ module Ascending (R : Set) where
       ... | false | _  = refl
       ... | true  | ()
       kh : Keeps hp g ((idle , At.told hp Sj e) ∷ nowAt hp ρ [])
-      kh (here refl) {l = l} (lift f) with At.val hp l in lv
-      ... | false = refl
-      ... | true rewrite proj₂ (f lv) (λ ()) | cf = refl
-      kh (there x) f = refl
+      kh (here refl) (lift f) lv rewrite proj₂ (f lv) (λ ()) | cf = refl
+      kh (there x) f lv = refl
       -- The connect stands: its source gone, its end staged, its body on.
       ju : is-just (At.part H′ v) ≡ true
       ju = subst₂ (λ s′ b′ → is-just (At.connected H′ rp e rt s′ b′) ≡ true)

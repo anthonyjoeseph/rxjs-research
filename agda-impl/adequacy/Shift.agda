@@ -17,7 +17,7 @@ open import Level using (lower)
 open import Data.Maybe using (Maybe; just; nothing; is-just; is-nothing)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst)
 open import Data.Sum using ([_,_]′)
-open import Data.Product using (_,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
 open import Data.Unit using (⊤)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -33,7 +33,7 @@ open import adequacy.Local using (module Locality)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Frame using (module Framing)
 open import adequacy.Kept using (module Keeping)
-open import adequacy.Retag using (Retag; keep; module Retagging)
+open import adequacy.Retag using (Retag; module Retagging) renaming (keep to keepᴿ)
 
 module Shifting (R : Set) where
   open Heap using (Sink; Quiet; slot; cell)
@@ -586,11 +586,11 @@ module Shifting (R : Set) where
     -- Every joiner fed as `ν` says stays open exactly where it was.
     Keeps : ∀ {Δ} → Retag Δ → Now Δ → Set₁
     Keeps {Δ} g ν = ∀ {B} (x : B ∈ᴸ Δ) {j sk l st} → Fed (joinˢ j sk l x st) ν
-                  → is-just (part (joinˢ j sk l x (g x j st))) ≡ is-just (part (joinˢ j sk l x st))
+                  → At.val G l ≡ true → is-just (g x j st) ≡ is-just st
 
-    keeps-keep : ∀ {Δ A} {g : Retag Δ} {ν} {fe : Feed A h × Maybe Pos} → Keeps g ν → Keeps (keep g) (fe ∷ᴬ ν)
-    keeps-keep hy (here refl) f = refl
-    keeps-keep hy (there x)   f = hy x f
+    keeps-keep : ∀ {Δ A} {g : Retag Δ} {ν} {fe : Feed A h × Maybe Pos} → Keeps g ν → Keeps (keepᴿ g) (fe ∷ᴬ ν)
+    keeps-keep hy (here refl) f lv = refl
+    keeps-keep hy (there x)   f lv = hy x f lv
 
     just-map : ∀ {X Y : Set₁} (F : X → Y) {m m′ : Maybe X} → is-just m ≡ is-just m′ → is-just (mapᴹ F m) ≡ is-just (mapᴹ F m′)
     just-map F {just _}  {just _}  _ = refl
@@ -649,8 +649,15 @@ module Shifting (R : Set) where
               (trans (cong₂ (λ x y → x ∨ y ∨ filled (At.val G (Flat.queue fl))) (part-retag g so hy fs) (lanes-retag g ls hy fl′))
                      (sym (just-merged op _ _ _ _ pl)))
       part-retag g (connectˢ S c b kb k fd rp e rt src bd) hy (fs , fb) =
-        just-connected rp e rt (part-retag g src hy fs) (part-retag (keep g) bd (keeps-keep hy) fb)
-      part-retag g (joinˢ j sk l x st)                     hy f = hy x f
+        just-connected rp e rt (part-retag g src hy fs) (part-retag (keepᴿ g) bd (keeps-keep hy) fb)
+      part-retag g (joinˢ j sk l x st)                     hy f = pj (At.val G l) refl
+        where
+          just-joined : ∀ m m′ → is-just m ≡ is-just m′ → is-just (At.joinedᶜ G x j m) ≡ is-just (At.joinedᶜ G x j m′)
+          just-joined (just _) (just _) _ = refl
+          just-joined nothing  nothing  _ = refl
+          pj : ∀ b → At.val G l ≡ b → is-just (if b then At.joinedᶜ G x j (g x j st) else nothing) ≡ is-just (if b then At.joinedᶜ G x j st else nothing)
+          pj false _  = refl
+          pj true  lv = just-joined (g x j st) st (hy x f lv)
       part-retag g (deferˢ k s)                            hy f = part-retag g s hy f
 
       lanes-retag : ∀ {Δ B} (g : Retag Δ) (ls : List (Lane h Δ B)) {ν} → Keeps g ν → FedLanes ls ν → filled (partLanes (retagᴸ g ls)) ≡ filled (partLanes ls)
@@ -673,8 +680,8 @@ module Shifting (R : Set) where
         Flag.db-flat G (proj₁ (d here refl) , λ m̸ → trans (proj₂ (d here refl) m̸) (just-nothing (sym (part-retag g so hy fs))))
           (flags-retag g so hy fs (λ ψ sn → d (in-outer ψ) sn)) (flagsL-retag g ls hy fl′ (λ πL sn → d (in-lanes πL) sn))
       flags-retag g (connectˢ S c b kb k fd rp e rt src bd) hy (fs , fb) d =
-        Flag.db-connect G (λ jb → flags-retag g src hy fs (λ ψ sn → d (in-source ψ) (∧-join (trans (sym (part-retag (keep g) bd (keeps-keep hy) fb)) jb) sn)))
-          (λ js → flags-retag (keep g) bd (keeps-keep hy) fb (λ ψ sn → d (in-body ψ) (∧-join (trans (cong (λ z → z ∨ is-just e) (sym (part-retag g src hy fs))) js) sn)))
+        Flag.db-connect G (λ jb → flags-retag g src hy fs (λ ψ sn → d (in-source ψ) (∧-join (trans (sym (part-retag (keepᴿ g) bd (keeps-keep hy) fb)) jb) sn)))
+          (λ js → flags-retag (keepᴿ g) bd (keeps-keep hy) fb (λ ψ sn → d (in-body ψ) (∧-join (trans (cong (λ z → z ∨ is-just e) (sym (part-retag g src hy fs))) js) sn)))
       flags-retag g (joinˢ j sk l x st)                     hy f d ()
       flags-retag g (deferˢ k s)                            hy f d = Flag.db-defer G (flags-retag g s hy f (λ ψ sn → d (in-defer ψ) sn))
 
