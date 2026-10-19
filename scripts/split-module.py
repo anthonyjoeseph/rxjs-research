@@ -186,7 +186,8 @@ def split_items(rest):
     rm = re.search(r'renaming \(([^)]*)\)', rest)
     other = re.sub(r'using \([^)]*\)|renaming \([^)]*\)', '', rest).strip()
     us = [x.strip() for x in um.group(1).split(';') if x.strip()] if um else []
-    rs = [x.strip() for x in rm.group(1).split(';') if x.strip()] if rm else []
+    # Agda allows several `renaming (…)` groups on one clause
+    rs = [x.strip() for g in re.findall(r'renaming \(([^)]*)\)', rest) for x in g.split(';') if x.strip()]
     return um, rm, other, us, rs
 
 
