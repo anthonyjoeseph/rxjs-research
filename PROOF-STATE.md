@@ -299,14 +299,12 @@ by their own silent steps (`Mirror`).
 - **`kont-grow`, `compile-grow`** (Weaken) — FALSITY, `NO EVIDENCE`: a leaf's
   continuation and a compiled subscription read alike along a growth: the
   code's own naturality.
-- **`untake`** (Taken) — FALSITY, `NO EVIDENCE`: a source heads no earlier than
-  the take over it.
+- **`pos-headed`** (Taken) — FALSITY, `NO EVIDENCE`: the run's position leads
+  with a tick, the root's or a timer's.
 - **`walk-kont-sub`** (Names) — FALSITY, `NO EVIDENCE`: a walk's continuation
   reads alike on alike subscriptions.
 - **`flat-wk-here`** (Flatted) — FALSITY, `RECOVERY`: a flatMap kit's admit,
   settle and dequeue weakened read as the node's over its compiled inners.
-- **`unflat`** (Flatted) — FALSITY, `NO EVIDENCE`: an outer heads no earlier
-  than the flatMap over it, no lane begun.
 - **`connect-owned`** (Connected) — FALSITY, `NO EVIDENCE`: `Owned` holds of a
   connect planted at its body, its source owed under `ix 1`.
 - **`connect-behind`** (Connected) — FALSITY, `NO EVIDENCE`: every part heads
@@ -327,8 +325,6 @@ by their own silent steps (`Mirror`).
   played, a value run on, a stall passed, a close scheduled.
 - **`ended-past`** (Frame) — FALSITY, `NO EVIDENCE`: a connect held past its
   source's end holds no source part, at every call under way.
-- **`heads-flat`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap's merged part
-  heads no sooner than `q` whenever its outer's and its lanes' do.
 - **`rest-sourced`** (Shift) — FALSITY, `NO EVIDENCE`: a connect's leftover
   over a source running on either side, pinned as its source's.
 - **`out-deeper`** (Climbs.Take) — FALSITY, `NO EVIDENCE`: every part heads past the

@@ -19,9 +19,14 @@ open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ)
-open import adequacy.Sorted using (_≤ᵖ_; ≤ᵖ-child)
+open import adequacy.Sorted using (_≤ᵖ_; ≤ᵖ-child; ≤ᵖ-trans)
+open import adequacy.Placed using (Headed; headed-snoc; tick-past)
+open import Data.Nat using (zero; suc; _+_; s≤s; z≤n)
+open import Data.Unit using (⊤; tt)
+open import Data.Nat.Properties using (m<m+n)
 
-open import denotation.MonotonicList using (Events∞; Timeline; Pos; ix; last; _<ᵖ_)
+open import denotation.MonotonicList using (Events∞; Timeline; Pos; ix; last; _<ᵖ_; From)
+open import denotation.MonotonicList using () renaming (done to doneᶠ; quiet to quietᶠ; at to atᶠ; emit to emitᶠ; stall to stallᶠ; close to closeᶠ)
 import denotation.Unfold as U
 open import denotation.MonotonicList using () renaming (sub to subᴾ)
 open import operation.Machine using (module Machine)
@@ -179,6 +184,51 @@ module Framing (R : Set) where
   heads-source : ∀ {Γ A B q} r {b : U.Node (A ∷ Γ) B} {s : U.Node Γ A} → Heads q s → Heads q b → Heads q (U.connectᶜ r b (U.live s))
   heads-source r {b} {s} hs hb = source-head r b (U.step b) s (U.step s) hb hs
 
+  -- A timer frame past the tick it was subscribed at heads past a
+  -- position that leads with that tick.
+  timer-after : ∀ a q′ t e → (ix a ∷ q′) ≤ᵖ (ix (a + suc t) ∷ subᴾ e ∷ ix 0 ∷ [])
+  timer-after a q′ t e = inj₂ (proj₁ (tick-past q′ (subᴾ e ∷ ix 0 ∷ []) (m<m+n a (s≤s z≤n))))
+
+  -- A cold begun at a headed position heads no sooner than it: its
+  -- first frame under it, its end under it, or a later tick.
+  start-heads : ∀ {Γ A} q → Headed q → (m : From A 0) → Heads q (U.startᶜ {Γ} q m)
+  start-heads q hq (atᶠ zero _ (emitᶠ x k)) refl = ≤ᵖ-child q (inj₁ refl)
+  start-heads q hq (atᶠ zero _ (stallᶠ k))  refl = ≤ᵖ-child q (inj₁ refl)
+  start-heads q hq (atᶠ zero _ (closeᶠ k))  refl = ≤ᵖ-child q (inj₁ refl)
+  start-heads q hq doneᶠ                    refl = ≤ᵖ-child q (inj₁ refl)
+  start-heads q hq quietᶠ                   ()
+  start-heads (ix a ∷ q′) hq (atᶠ (suc t) _ (emitᶠ x k)) refl = timer-after a q′ t _
+  start-heads (ix a ∷ q′) hq (atᶠ (suc t) _ (stallᶠ k))  refl = timer-after a q′ t _
+  start-heads (ix a ∷ q′) hq (atᶠ (suc t) _ (closeᶠ k))  refl = timer-after a q′ t _
+  start-heads []          () (atᶠ (suc t) _ b)
+  start-heads (subᴾ _ ∷ _) () (atᶠ (suc t) _ b)
+  start-heads (last ∷ _)  () (atᶠ (suc t) _ b)
+
+  -- A flatMap begun: its outer's step, no lane, no pool.
+  outer-heads : ∀ {Δ A B q} op (g : A → Pos → U.Node Δ B) (o : U.Node Δ A) (so : U.Step Δ A) → HeadsS q so
+              → HeadsS q (U.outerˢ op g o so [] [] U.idleᶜ)
+  outer-heads op g o (U.outˢ k a o′) hs refl = ≤ᵖ-child k (hs refl)
+  outer-heads op g o (U.skipˢ k o′)  hs refl = hs refl
+  outer-heads op g o (U.endˢ c)      hs refl = hs refl
+  outer-heads op g o U.hushˢ         hs ()
+
+  -- A subscription at a headed position heads no sooner than it.
+  sub-heads : ∀ {Γ A} (s : T.Obs Timeline Γ A) q → Headed q → Heads q (U.subscribe s q)
+  sub-heads (T.cold c)          q hq      = start-heads q hq (lower c)
+  sub-heads T.empty             q hq refl = ≤ᵖ-child q (inj₁ refl)
+  sub-heads (T.of [])           q hq refl = ≤ᵖ-child q (inj₁ refl)
+  sub-heads (T.of (x ∷ xs))     q hq refl = ≤ᵖ-child q (inj₁ refl)
+  sub-heads (T.map f s)         q hq      = heads-map f {U.subscribe s q} (sub-heads s q hq)
+  sub-heads (T.scan f z s)      q hq      = heads-scan f z {U.subscribe s q} (sub-heads s q hq)
+  sub-heads (T.takeWhile i p s) q hq      = heads-take i p {U.subscribe s q} (sub-heads s q hq)
+  sub-heads (T.flatMap op f s)  q hq      = outer-heads op (λ a j → U.subscribe (f a) j) (U.subscribe s q) (U.step (U.subscribe s q)) (sub-heads s q hq)
+  sub-heads (T.connect s b)     q hq      =
+    heads-source (q ++ [ ix 1 ]) {U.subscribe b (q ++ [ ix 0 ])} {U.subscribe s (q ++ [ ix 1 ])}
+      (λ e → ≤ᵖ-trans (≤ᵖ-child q (inj₁ refl)) (sub-heads s (q ++ [ ix 1 ]) (headed-snoc q hq) e))
+      (λ e → ≤ᵖ-trans (≤ᵖ-child q (inj₁ refl)) (sub-heads b (q ++ [ ix 0 ]) (headed-snoc q hq) e))
+  sub-heads (T.connected i)     q hq      ()
+  sub-heads (T.defer l)         q hq refl = ≤ᵖ-child q (inj₁ refl)
+
   -- Where a shut at `i` tells a joiner its end, the joiners untold:
   -- each one's subscription.
   untoldᴶ : ∀ {A B : Set} → Pos → Maybe Pos → Maybe (A ≡ B) → List Pos
@@ -292,12 +342,93 @@ module Framing (R : Set) where
   merged-eq G op g nothing  []      (_ ∷ _) pl refl = refl
   merged-eq G op g nothing  []      []      pl ()
 
-  postulate
-    -- A flatMap's head moved by its outer and lanes alone, each heading
-    -- no sooner than `q`.
-    heads-flat : ∀ {Δ A B q} op (g : A → Pos → U.Node Δ B) (o o′ : Maybe (U.Node Δ A)) (L L′ : List (U.Node Δ B)) Q pl
-               → Heads q (U.flatMapᶜ op g o L Q pl) → (∀ {c} → o′ ≡ just c → Heads q c) → All (Heads q) L′
-               → Heads q (U.flatMapᶜ op g o′ L′ Q pl)
+  -- A FLATMAP'S HEAD: its pool's skip, its outer's step or its
+  -- earliest lane's, each moved at most a child down.  So it heads no
+  -- sooner than `q` whenever its pool, its outer and its lanes do.
+  outerˢ-heads : ∀ {Δ A B q} op (g : A → Pos → U.Node Δ B) (o : U.Node Δ A) (so : U.Step Δ A) ls qs p → HeadsS q so
+               → HeadsS q (U.outerˢ op g o so ls qs p)
+  outerˢ-heads op g o (U.outˢ k a o′) ls      qs      p hs refl = ≤ᵖ-child k (hs refl)
+  outerˢ-heads op g o (U.skipˢ k o′)  ls      qs      p hs refl = hs refl
+  outerˢ-heads op g o (U.endˢ c)      []      []      p hs refl = hs refl
+  outerˢ-heads op g o (U.endˢ c)      []      (_ ∷ _) p hs refl = hs refl
+  outerˢ-heads op g o (U.endˢ c)      (_ ∷ _) qs      p hs refl = hs refl
+  outerˢ-heads op g o U.hushˢ         ls      qs      p hs ()
+
+  laneˢ-heads : ∀ {Δ A B q} op (g : A → Pos → U.Node Δ B) (o : Maybe (U.Node Δ A)) bs l (s : U.Step Δ B) as qs p → HeadsS q s
+              → HeadsS q (U.laneˢ op g o bs l s as qs p)
+  laneˢ-heads op g o bs l (U.outˢ k b c) as qs p hs refl = hs refl
+  laneˢ-heads op g o bs l (U.skipˢ k c)  as qs p hs refl = hs refl
+  laneˢ-heads op g nothing  []      l (U.endˢ c) []      (a ∷ qs) p hs refl = ≤ᵖ-child c (hs refl)
+  laneˢ-heads op g nothing  []      l (U.endˢ c) []      []       p hs refl = hs refl
+  laneˢ-heads op g nothing  []      l (U.endˢ c) (_ ∷ _) (a ∷ qs) p hs refl = ≤ᵖ-child c (hs refl)
+  laneˢ-heads op g nothing  []      l (U.endˢ c) (_ ∷ _) []       p hs refl = hs refl
+  laneˢ-heads op g nothing  (_ ∷ _) l (U.endˢ c) []      (a ∷ qs) p hs refl = ≤ᵖ-child c (hs refl)
+  laneˢ-heads op g nothing  (_ ∷ _) l (U.endˢ c) []      []       p hs refl = hs refl
+  laneˢ-heads op g nothing  (_ ∷ _) l (U.endˢ c) (_ ∷ _) (a ∷ qs) p hs refl = ≤ᵖ-child c (hs refl)
+  laneˢ-heads op g nothing  (_ ∷ _) l (U.endˢ c) (_ ∷ _) []       p hs refl = hs refl
+  laneˢ-heads op g (just o) []      l (U.endˢ c) []      (a ∷ qs) p hs refl = ≤ᵖ-child c (hs refl)
+  laneˢ-heads op g (just o) []      l (U.endˢ c) []      []       p hs refl = hs refl
+  laneˢ-heads op g (just o) []      l (U.endˢ c) (_ ∷ _) (a ∷ qs) p hs refl = ≤ᵖ-child c (hs refl)
+  laneˢ-heads op g (just o) []      l (U.endˢ c) (_ ∷ _) []       p hs refl = hs refl
+  laneˢ-heads op g (just o) (_ ∷ _) l (U.endˢ c) []      (a ∷ qs) p hs refl = ≤ᵖ-child c (hs refl)
+  laneˢ-heads op g (just o) (_ ∷ _) l (U.endˢ c) []      []       p hs refl = hs refl
+  laneˢ-heads op g (just o) (_ ∷ _) l (U.endˢ c) (_ ∷ _) (a ∷ qs) p hs refl = ≤ᵖ-child c (hs refl)
+  laneˢ-heads op g (just o) (_ ∷ _) l (U.endˢ c) (_ ∷ _) []       p hs refl = hs refl
+  laneˢ-heads op g o bs l U.hushˢ        as qs p hs ()
+
+  OuterHeads : ∀ {Δ A} → Pos → U.Outer Δ A → Set
+  OuterHeads q U.doneᵒ      = ⊤
+  OuterHeads q (U.runᵒ o s) = HeadsS q s
+
+  EarliestHeads : ∀ {Δ B} → Pos → U.Earliest Δ B → Set
+  EarliestHeads q U.none                = ⊤
+  EarliestHeads q (U.found k bs l s as) = HeadsS q s
+
+  pick-heads : ∀ {Δ B q} (l : U.Node Δ B) (s : U.Step Δ B) ls m (E : U.Earliest Δ B) → HeadsS q s → EarliestHeads q E
+             → EarliestHeads q (U.pick l s ls m E)
+  pick-heads l s ls nothing  U.none                  hs he = tt
+  pick-heads l s ls nothing  (U.found k bs c sc as)  hs he = he
+  pick-heads l s ls (just k) U.none                  hs he = hs
+  pick-heads l s ls (just k) (U.found k′ bs c sc as) hs he with k <ᵖ k′
+  ... | true  = hs
+  ... | false = he
+
+  earliest-heads : ∀ {Δ B q} (ls : List (U.Node Δ B)) → All (Heads q) ls → EarliestHeads q (U.earliest ls)
+  earliest-heads []       []        = tt
+  earliest-heads (l ∷ ls) (hl ∷ hL) = pick-heads l (U.step l) ls (U.headˢ (U.step l)) (U.earliest ls) hl (earliest-heads ls hL)
+
+  race-heads : ∀ {Δ A B q} op (g : A → Pos → U.Node Δ B) o (so : U.Step Δ A) mk k bs l (s : U.Step Δ B) as qs p → HeadsS q so → HeadsS q s
+             → HeadsS q (U.raceˢ op g o so mk k bs l s as qs p)
+  race-heads op g o so nothing   k bs l s as qs p ho hs = laneˢ-heads op g (just o) bs l s as qs p hs
+  race-heads op g o so (just k′) k bs l s as qs p ho hs =
+    if-head (k′ <ᵖ k) (U.outerˢ op g o so (bs ++ l ∷ as) qs p) (U.laneˢ op g (just o) bs l s as qs p)
+      (outerˢ-heads op g o so (bs ++ l ∷ as) qs p ho) (laneˢ-heads op g (just o) bs l s as qs p hs)
+
+  go-heads : ∀ {Δ A B q} op (g : A → Pos → U.Node Δ B) (o : U.Outer Δ A) ls qs p (E : U.Earliest Δ B) → OuterHeads q o → EarliestHeads q E
+           → HeadsS q (U.goˢ op g o ls qs p E)
+  go-heads op g U.doneᵒ       ls qs p U.none                ho he ()
+  go-heads op g (U.runᵒ o so) ls qs p U.none                ho he = outerˢ-heads op g o so ls qs p ho
+  go-heads op g U.doneᵒ       ls qs p (U.found k bs l s as) ho he = laneˢ-heads op g nothing bs l s as qs p he
+  go-heads op g (U.runᵒ o so) ls qs p (U.found k bs l s as) ho he = race-heads op g o so (U.headˢ so) k bs l s as qs p ho he
+
+  flatˢ-heads : ∀ {Δ A B q} op (g : A → Pos → U.Node Δ B) (o : U.Outer Δ A) ls qs p (sp : U.Step Δ B) (E : U.Earliest Δ B)
+              → HeadsS q sp → OuterHeads q o → EarliestHeads q E → HeadsS q (U.flatˢ op g o ls qs p sp E)
+  flatˢ-heads op g o ls qs p (U.skipˢ k p′) E hp ho he =
+    if-head (U.aheadˢ k o E) (U.skipˢ k (U.flatMapᶜ op g (U.nodeᵒ o) ls qs p′)) (U.goˢ op g o ls qs p E) hp (go-heads op g o ls qs p E ho he)
+  flatˢ-heads op g o ls qs p (U.outˢ k b p′) E hp ho he = go-heads op g o ls qs p E ho he
+  flatˢ-heads op g o ls qs p (U.endˢ k)      E hp ho he = go-heads op g o ls qs p E ho he
+  flatˢ-heads op g o ls qs p U.hushˢ         E hp ho he = go-heads op g o ls qs p E ho he
+
+  outer-of : ∀ {Δ A q} (o : Maybe (U.Node Δ A)) → (∀ {c} → o ≡ just c → Heads q c) → OuterHeads q (U.outerOf o)
+  outer-of nothing  ho = tt
+  outer-of (just c) ho = ho refl
+
+  -- DEAD ROUTE: the flatMap's old head in place of its pool's.  A pool
+  --   skip at the outer's out position, the flatMap a child under it,
+  --   is first once the outer is done.
+  heads-flat : ∀ {Δ A B q} op (g : A → Pos → U.Node Δ B) (o : Maybe (U.Node Δ A)) (L : List (U.Node Δ B)) Q pl
+             → Heads q pl → (∀ {c} → o ≡ just c → Heads q c) → All (Heads q) L → Heads q (U.flatMapᶜ op g o L Q pl)
+  heads-flat op g o L Q pl hp ho hL = flatˢ-heads op g (U.outerOf o) L Q pl (U.step pl) (U.earliest L) hp (outer-of o ho) (earliest-heads L hL)
 
   -- A connect past its source's end: its body's head, or a rest's skip
   -- under where the source would have skipped.
@@ -488,9 +619,7 @@ module Framing (R : Set) where
     ... | _ , x₀ =
       subst (Heads q) (trans (cong (λ Q → U.flatMapᶜ op G (At.part H′ so) (At.partLanes H′ ls) Q pl) (sym qe))
                              (merged-eq H′ op G (At.part H′ so) (At.partLanes H′ ls) (At.val H′ (FlatKit.Flat.queue fl)) pl x))
-        (heads-flat op G (At.part H so) (At.part H′ so) (At.partLanes H ls) (At.partLanes H′ ls) (At.val H (FlatKit.Flat.queue fl)) pl
-          (subst (Heads q) (sym (merged-eq H op G (At.part H so) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl x₀)) (Each.parts bh ψ sn x₀))
-          ho hL)
+        (heads-flat op G (At.part H′ so) (At.partLanes H′ ls) (At.val H (FlatKit.Flat.queue fl)) pl (Each.pools bh ψ sn x₀) ho hL)
       where G = λ a j → U.subscribe (g a) j
 
     heads-if : ∀ {Δ′ B′} b {m : Maybe (U.Node Δ′ B′)} {L} → (b ≡ true → ∀ {c} → m ≡ just c → Heads q c) → All (Heads q) L

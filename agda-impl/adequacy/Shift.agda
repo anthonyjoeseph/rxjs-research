@@ -1344,15 +1344,10 @@ module Shifting (R : Set) where
       take-up ib p (ending _ _) m m′        {b = true}  refl old up refl = old refl
       take-up ib p taken        m m′        {b = true}  refl old up ()
 
-      root-flat : ∀ {Δ A B} op (g : A → Pos → U.Node Δ B) (o o′ : Maybe (U.Node Δ A)) (L L′ : List (U.Node Δ B)) (Q Q′ : List A) pl → Q′ ≡ Q
-                → (∀ {c} → At.merged H op g o L Q pl ≡ just c → P c)
-                → (is-just (At.merged H′ op g o′ L′ Q′ pl) ≡ true → is-just (At.merged H op g o L Q pl) ≡ true)
-                → (∀ {c} → o′ ≡ just c → P c) → All P L′
-                → ∀ {c} → At.merged H′ op g o′ L′ Q′ pl ≡ just c → P c
-      root-flat op g o o′ L L′ Q _ pl refl old rv ho hL {c} x = go (proj₂ (just-of (rv (cong is-just x))))
-        where
-          go : ∀ {b₀} → At.merged H op g o L Q pl ≡ just b₀ → P c
-          go x₀ = subst P (merged-eq H′ op g o′ L′ Q pl x) (heads-flat op g o o′ L L′ Q pl (subst P (sym (merged-eq H op g o L Q pl x₀)) (old x₀)) ho hL)
+      root-flat : ∀ {Δ A B} op (g : A → Pos → U.Node Δ B) (o′ : Maybe (U.Node Δ A)) (L′ : List (U.Node Δ B)) (Q : List A) pl
+                → P pl → (∀ {c} → o′ ≡ just c → P c) → All P L′
+                → ∀ {c} → At.merged H′ op g o′ L′ Q pl ≡ just c → P c
+      root-flat op g o′ L′ Q pl hp ho hL x = subst P (merged-eq H′ op g o′ L′ Q pl x) (heads-flat op g o′ L′ Q pl hp ho hL)
 
       -- The source replanted: a source running on either side heads
       -- the connect beside its body; past the end, nothing moved.
@@ -1422,9 +1417,8 @@ module Shifting (R : Set) where
             pool : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl (plant π v) ls) ≡ just n → P pl
             pool x = held (in-outer {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {ls = ls} π) ps x (Each.pools ev here refl)
             root : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl (plant π v) ls) ≡ just n → P n
-            root = root-flat op (λ a q′ → U.subscribe (f a) q′) (At.part H so) (At.part H′ (plant π v)) (At.partLanes H ls) (At.partLanes H′ ls)
-                     (At.val H (Flat.queue fl)) (At.val H′ (Flat.queue fl)) pl (cong lower O.queue) (Each.parts ev here refl) (revive (in-outer {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {ls = ls} π) ps)
-                     (Each.parts eo here refl) (each-lanes {H = H′} {P = P} ls (λ πL sn e → EachL.partsL eL πL sn e))
+            root x = root-flat op (λ a q′ → U.subscribe (f a) q′) (At.part H′ (plant π v)) (At.partLanes H′ ls) (At.val H′ (Flat.queue fl)) pl (pool x)
+                       (Each.parts eo here refl) (each-lanes {H = H′} {P = P} ls (λ πL sn e → EachL.partsL eL πL sn e)) x
         shiftE (in-lanes {op = op} {f} {fl} {oc} {k} {r} {pl} {t = so} {ls} πL) ps ev ut en =
           BH.each-flat root pool eo eL
           where
@@ -1436,9 +1430,8 @@ module Shifting (R : Set) where
             pool : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl so (plantᴸ πL v)) ≡ just n → P pl
             pool x = held (in-lanes {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} πL) ps x (Each.pools ev here refl)
             root : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl so (plantᴸ πL v)) ≡ just n → P n
-            root = root-flat op (λ a q′ → U.subscribe (f a) q′) (At.part H so) (At.part H′ so) (At.partLanes H ls) (At.partLanes H′ (plantᴸ πL v))
-                     (At.val H (Flat.queue fl)) (At.val H′ (Flat.queue fl)) pl (cong lower Ln.queue) (Each.parts ev here refl) (revive (in-lanes {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} πL) ps)
-                     (Each.parts eo here refl) (each-lanes {H = H′} {P = P} (plantᴸ πL v) (λ πL′ sn e → EachL.partsL eL πL′ sn e))
+            root x = root-flat op (λ a q′ → U.subscribe (f a) q′) (At.part H′ so) (At.partLanes H′ (plantᴸ πL v)) (At.val H′ (Flat.queue fl)) pl (pool x)
+                       (Each.parts eo here refl) (each-lanes {H = H′} {P = P} (plantᴸ πL v) (λ πL′ sn e → EachL.partsL eL πL′ sn e)) x
         shiftE (in-source {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = src} {bd} π) ps ev ut en =
           BH.each-connect root rest es eb
           where

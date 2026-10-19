@@ -52,6 +52,8 @@ open import adequacy.Weaken using (module Weakening)
 open import adequacy.Every using (module Everywhere)
 open import adequacy.Names using (module Naming)
 open import adequacy.Alike using (module Aliking)
+open import adequacy.Frame using (module Framing)
+open import adequacy.Placed using (Headed)
 
 module Taking (R : Set) where
   open Machine R using (Mach; mach; step; wkPlaying; wkTodo)
@@ -59,7 +61,7 @@ module Taking (R : Set) where
   open Growing R using (wkTree; wkPath)
   open Sequencing R using (wkEnv-wk; from-⨾)
   open Pure R using (wkTimer; mapList)
-  open Shared Timeline (Out R) using (Heapᴹ; ⟨_,_,_⟩; run; extend)
+  open Shared Timeline (Out R) using (Heapᴹ; Conf; ⟨_,_,_⟩; run; extend)
   open Heap using (World; _⊑_; _⨾_; there; new; grow; cell) renaming (here to hereʳ; same to same⊑)
   open Run (Pureᴾ R) using (Act; done; newRef; under; _>>ᴬ_; compile; Env; wkEnv; module Kit; Ref; wkR; Kont; wkObs)
   open Strongly R using (Carried; Books; Sub; pendingˢ; takeWhileˢ; Path; here; in-take; _⊕_; Here; walk; top; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; DoneBy; names; pendings; Phase; rest-pinned; seen; ≗-refl; newRef≗; taking; takeK; unsubscribing; under≗; module Canon; owned-to; module Eaching; module Lingering)
@@ -76,6 +78,11 @@ module Taking (R : Set) where
   open Everywhere R using (module Growths)
   open Naming R using (Img; fresh-new; fresh-plant; grows-extend; pending-↭; to-img; wk-img; wk-pairs; wkN)
   open Aliking R using (KontRel; ObsRel; compile-cong; obs-trans; obs-wk; obs-⨾; takeO-cong; walk-grow; ≗-sym)
+  open Framing R using (sub-heads)
+
+  -- The run's position leads with a tick: the root's, or a timer's.
+  postulate
+    pos-headed : ∀ {g m} → Carried g m → Headed (Conf.pos (Mach.conf m))
 
   -- A TAKEWHILE RESTAGED IN THE WORLD GROWN TWICE: its cut the two
   -- newest cells, live and holding nothing, its source pending beneath
@@ -172,22 +179,19 @@ module Taking (R : Set) where
         im : ∀ {m} → m ∈ names T₂ → Img (ν₁ ⨾ ν₂) m
         im m∈ = let (_ , x∈ , e₁) = wk-img ν₂ T₁ m∈ ; (_ , _ , e₀) = wk-img ν₁ T₀ x∈ in to-img (ν₁ ⨾ ν₂) (trans (cong (wkN ν₂) e₀) e₁)
 
-    postulate
-      -- The source heads no earlier than the take over it.
-      untake     : ∀ {k} {c : U.Node Δ A} → Heads k (U.takeWhileᶜ i p c) → Heads k c
-
     module _ (H′ : Heapᴹ h₂) (eqv : At.part H′ (pendingˢ (T.takeWhile i p s) q) ≡ At.part H′ v)
              (held : At.val H′ (Kit.held c₂) ≡ nothing) where
 
-      rt-behind : ∀ {k} → Each H′ (Heads k) T₂ → Each H′ (Heads k) t′
-      rt-behind {k} = each-plant H′ π₂ v eqv tr
+      -- At the run's own position, which the take's source is begun at.
+      rt-behind : Headed q → Each H′ (Heads q) T₂ → Each H′ (Heads q) t′
+      rt-behind hq = each-plant H′ π₂ v eqv tr
         where
-          pa : ∀ {Δ′ A′} {w : Sub h₂ Δ′ A′} → Each H′ (Heads k) (pendingˢ (T.takeWhile i p s) q) → (ψ : Path v w) → seen H′ ψ ≡ true
-             → ∀ {c} → At.part H′ w ≡ just c → Heads k c
+          pa : ∀ {Δ′ A′} {w : Sub h₂ Δ′ A′} → Each H′ (Heads q) (pendingˢ (T.takeWhile i p s) q) → (ψ : Path v w) → seen H′ ψ ≡ true
+             → ∀ {c} → At.part H′ w ≡ just c → Heads q c
           pa eu here            _ pw   = Each.parts eu here refl (trans eqv pw)
-          pa eu (in-take here)  _ refl = untake {c = U.subscribe s q} (Each.parts eu here refl refl)
+          pa eu (in-take here)  _ refl = sub-heads s q hq
 
-          tr : Each H′ (Heads k) (pendingˢ (T.takeWhile i p s) q) → Each H′ (Heads k) v
+          tr : Each H′ (Heads q) (pendingˢ (T.takeWhile i p s) q) → Each H′ (Heads q) v
           tr eu = record { parts = pa eu ; pools = λ { (in-take ()) } ; rests = λ { (in-take ()) } }
 
       rt-kernels : Kernels H′ T₂ → Kernels H′ t′
@@ -241,7 +245,7 @@ module Taking (R : Set) where
                               ; clocked = proj₁ (Books.clocked bk) , S.reticked sk₂ a₂ (G₂.grow-ticked sk₁ (G₁.grow-ticked sk (proj₂ (Books.clocked bk))))
                               ; paidUp = cong (mapList (wkTodo new)) (cong (mapList (wkTodo new)) (Books.paidUp bk)) ; running = Books.running bk }
              ; sorted = sorted-⇝ (Carried.sorted cr) (then refl (then (cong (λ x → step (Mx x)) e₁) now))
-             ; behind′ = Eaching.each-to _ _ (S.rt-behind H₂ eqv refl (G₂.grow-each gr₂ (G₁.grow-each gr₁ (Carried.behind cr))))
+             ; behind′ = Eaching.each-to _ _ (S.rt-behind H₂ eqv refl (pos-headed cr) (G₂.grow-each gr₂ (G₁.grow-each gr₁ (Carried.behind cr))))
              ; lingers′ = Lingering.lingers-to _ (S.rt-lingers H₂ eqv refl (G₂.grow-lingers gr₂ (G₁.grow-lingers gr₁ (Carried.lingers cr))))
              ; flags = S.rt-flags H₂ eqv refl (G₂.grow-flags gr₂ (G₁.grow-flags gr₁ (Carried.flags cr))) }
     , refl , inj₁ (inj₁ S.less)

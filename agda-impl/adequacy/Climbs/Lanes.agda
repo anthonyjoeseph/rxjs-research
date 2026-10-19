@@ -661,8 +661,7 @@ module ClimbLanes (R : Set) where
         root ev x =
           subst (Heads q) (trans (cong (λ Q → U.flatMapᶜ op G (At.part H′ t) (At.partLanes H′ ls) Q pl) (sym (fr-fifo fr)))
                                  (merged-eq H′ op G (At.part H′ t) (At.partLanes H′ ls) (At.val H′ (FlatKit.Flat.queue fl)) pl x))
-            (heads-flat op G (At.part H t) (At.part H′ t) (At.partLanes H ls) (At.partLanes H′ ls) (At.val H (FlatKit.Flat.queue fl)) pl
-              (subst (Heads q) (sym (merged-eq H op G (At.part H t) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl e₀)) (Each.parts ev here refl e₀))
+            (heads-flat op G (At.part H′ t) (At.partLanes H′ ls) (At.val H (FlatKit.Flat.queue fl)) pl (Each.pools ev here refl e₀)
               (λ e → Each.parts ev (in-outer here) refl (trans (sym (fr-part fr)) e))
               (each-lanes {H = H′} {P = Heads q} ls (λ {_} {_} {x} πL sL e → Each.parts ev (in-lanes πL) (fr-seL fr πL sL) (trans (sym (part-alike H H′ x (fr-lane fr πL))) e))))
           where e₀ = proj₂ (just-of (fr-revive fr (cong is-just x)))

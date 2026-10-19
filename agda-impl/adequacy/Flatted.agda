@@ -49,6 +49,8 @@ open import adequacy.Restages using (module Staging)
 open import adequacy.Names using (module Naming)
 open import adequacy.Alike using (module Aliking)
 open import adequacy.Taken using (module Taking)
+open import adequacy.Frame using (module Framing)
+open import adequacy.Placed using (Headed)
 open import adequacy.Connected using (module Connecting)
 
 module Flatting (R : Set) where
@@ -72,7 +74,8 @@ module Flatting (R : Set) where
   open Staging R using (Restages; not-src; wrap-outer)
   open Naming R using (fresh-new; fresh-plant; pending-↭; walk-kont-sub)
   open Aliking R using (KontRel; ObsRel; compile-cong; guarded-cong; killAll-wk; obs-sym; obs-trans; obs-⨾; wkFlat-wk)
-  open Taking R using (allocates; recode; ⊑≗)
+  open Taking R using (allocates; recode; ⊑≗; pos-headed)
+  open Framing R using (sub-heads)
   open Connecting R using (Grew; grew-step; grew-store)
 
   -- The world a flatMap's kernel allocates: its count, outer flag, queue,
@@ -250,10 +253,6 @@ module Flatting (R : Set) where
     flat-fresh fs = fresh-plant π₈ v (pending-↭ v) (((λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ (λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ []) ∷ ([]) ∷ [])
       (Grew.distinct G₉ fs) (fresh-new ν₈ (λ { {_ , _} m∈ → Grew.named G₉ m∈ }) ((λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ []))
 
-    postulate
-      -- The outer heads no earlier than the flatMap over it, no lane begun.
-      unflat     : ∀ {k} {c : U.Node Δ A} → Heads k (U.flatMapᶜ op (λ a p → U.subscribe (f a) p) (just c) [] [] U.idleᶜ) → Heads k c
-
     module _ (eqv : At.part H₉ (pendingˢ (T.flatMap op f s) q) ≡ At.part H₉ v)
              (refill₉ : At.val H₉ (FlatKit.Flat.refill fl₈) ≡ just hereʳ) (slot₉ : CbRel (look H₉ hereʳ) kcb)
              (held₉ : At.val H₉ (Kit.held oc₈) ≡ nothing) (active₉ : At.val H₉ (FlatKit.Flat.active fl₈) ≡ 0)
@@ -282,16 +281,17 @@ module Flatting (R : Set) where
                ; joined  = subst₂ (At.Joined H₉) (sym (subjects-plant π₈ v refl)) (sym (joiners-plant π₈ v (λ _ → refl) [])) (Queue.joined qu)
                ; ordered = Queue.ordered qu ; ahead = Queue.ahead qu }
 
-      rf-behind : ∀ {k} → Each H₉ (Heads k) T₈ → Each H₉ (Heads k) t′
-      rf-behind {k} = each-plant H₉ π₈ v eqv tr
+      -- At the run's own position, which the flatMap's outer is begun at.
+      rf-behind : Headed q → Each H₉ (Heads q) T₈ → Each H₉ (Heads q) t′
+      rf-behind hq = each-plant H₉ π₈ v eqv tr
         where
-          pa : ∀ {Δ′ A′} {x : Sub h₈ Δ′ A′} → Each H₉ (Heads k) (pendingˢ (T.flatMap op f s) q) → (ψ : Path v x) → seen H₉ ψ ≡ true
-             → ∀ {c} → At.part H₉ x ≡ just c → Heads k c
+          pa : ∀ {Δ′ A′} {x : Sub h₈ Δ′ A′} → Each H₉ (Heads q) (pendingˢ (T.flatMap op f s) q) → (ψ : Path v x) → seen H₉ ψ ≡ true
+             → ∀ {c} → At.part H₉ x ≡ just c → Heads q c
           pa eu here             _ pw   = Each.parts eu here refl (trans eqv pw)
-          pa eu (in-outer here)  _ refl = unflat {c = U.subscribe s q} (Each.parts eu here refl refl)
+          pa eu (in-outer here)  _ refl = sub-heads s q hq
           pa eu (in-lanes ())
 
-          tr : Each H₉ (Heads k) (pendingˢ (T.flatMap op f s) q) → Each H₉ (Heads k) v
+          tr : Each H₉ (Heads q) (pendingˢ (T.flatMap op f s) q) → Each H₉ (Heads q) v
           tr eu = record { parts = pa eu ; pools = λ { here _ _ () ; (in-outer ()) ; (in-lanes ()) } ; rests = λ { (in-outer ()) ; (in-lanes ()) } }
 
       rf-owned : ∀ {act act′} {cd cd′} {a′} → Owned H₉ T₈ (subAs {act = act} π₈ cd (Grew.stack G₉) (Grew.alone G₉))
@@ -326,7 +326,7 @@ module Flatting (R : Set) where
                               ; clocked = proj₁ (Books.clocked bk) , F.reticked sk₉ a₉ (Grew.ticked G₉)
                               ; paidUp = cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (Books.paidUp bk))))))))
                               ; running = Books.running bk }
-             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind′ = Eaching.each-to _ _ (F.rf-behind refl refl slot₉ refl refl refl refl (Grew.behind G₉))
+             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind′ = Eaching.each-to _ _ (F.rf-behind refl refl slot₉ refl refl refl refl (pos-headed cr) (Grew.behind G₉))
              ; lingers′ = Lingering.lingers-to _ (F.rf-lingers refl refl slot₉ refl refl refl refl (Grew.lingers G₉))
              ; flags = F.rf-flags refl refl slot₉ refl refl refl refl (Grew.flags G₉) }
     , refl , inj₁ (inj₁ (subst (pend F.t′ <_) (Grew.pends G₉) F.less))
