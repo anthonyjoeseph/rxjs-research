@@ -3728,7 +3728,7 @@ module Ascending (R : Set) where
       -- Below the connect: its source's flags and its body's, read alike.
       fb : DoneBy hp w₀ (outers ρ ++ []) → DoneBy H′ v (outers ρ)
       fb d = Flag.db-connect H′
-        (λ jb → flags-alike hp H′ au (Flag.db-sub hp d′ (in-source here) (cong (λ z → z ∧ true) (trans (sym (part-retag hp g bd kh fbd)) (trans (cong is-just (part-alike hp H′ (retag g bd) ab′)) jb)))))
+        (λ jb → flags-alike hp H′ au (Flag.db-sub hp d′ (in-source here) (cong (λ z → z ∧ true) (trans (sym (part-retag hp g bd kh fbd)) (trans (cong is-just (sym (part-alike hp H′ (retag g bd) ab′))) jb)))))
         (λ js → flags-alike hp H′ ab′
                   (flags-retag hp g bd kh fbd
                     (Flag.db-sub hp d′ (in-body here) (cong (λ z → z ∧ true) (trans (cong (λ x → is-just x ∨ is-just e) (sym (part-alike hp H′ u au))) js)))))
