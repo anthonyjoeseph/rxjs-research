@@ -235,8 +235,8 @@ by their own silent steps (`Mirror`).
   queues the value, the ghost past the skip.
 - **`outer-drop`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a busy exhaust drops the
   value, the ghost past the skip.
-- **`active-lanes`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a flatMap's count reads
-  zero exactly when no lane is live.
+- **`live-parted`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a live lane has a part;
+  suspect a missing `Carried` field.
 - **`take1-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a held takeWhile's
   completion begun under its failing value, its cut the frame's rest.
 - **`take1-void`** (Climbs) — FALSITY, `NO EVIDENCE`: a hidden takeWhile's
@@ -255,8 +255,8 @@ by their own silent steps (`Mirror`).
   an open `of`'s path to a held part passes heads under its base.
 - **`shut-late`** (Lift) — FALSITY, `NO EVIDENCE`: an ended connect's body, an
   `of` in it: its first event strictly before every end the shut tells.
-- **`step-shut`** (Lift) — FALSITY, `NO EVIDENCE`: a body whose first event
-  precedes every told end steps shut as it does, shut after.
+- **`step-late`** (Lift) — FALSITY, `NO EVIDENCE`: a node whose head precedes every
+  told end steps shut as it does, its continuation shut after.
 - **`emit-run`** (Lift) — FALSITY, `NO EVIDENCE`: an open `of`'s value handed
   on under its scope, the climb starts aloft.
 - **`end-ghost`** (Climbs.Take) — FALSITY, `DEAD ROUTE`: the tree with a take
@@ -280,12 +280,18 @@ by their own silent steps (`Mirror`).
 - **`tells-past`** (Frame) — FALSITY, `NO EVIDENCE`: a call under way, a
   connect past its source's end tells its body's untold joiners no sooner than
   the run.
-- **`shut-heads`** (Frame) — FALSITY, `NO EVIDENCE`: a shut heads where its
-  node did, or at an end it tells.
+- **`union-down`, `source-down`, `ended-down`** (Frame) — FALSITY, `NO EVIDENCE`:
+  a shut node's step twins the old or both head past the shutting end.
+- **`bursts-down`** (Frame) — FALSITY, `NO EVIDENCE`: the same for bursts; suspect,
+  a rest-fallback head is not past the step's.
+- **`flat-down`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap's step down when its
+  outer, lanes and pool each are.
 - **`src-idle`** (Climbs.Connect) — FALSITY, `NO EVIDENCE`: a connect's source signals
   its subject only with no feed under way.
-- **`fed-part`** (Climbs.Connect) — FALSITY, `NO EVIDENCE`: the retagged body is the
-  body's part fed the value, gapped up to the feed.
+- **`retag-parted`** (Climbs.Connect) — FALSITY, `NO EVIDENCE`: the retagged body
+  keeps a part; `part-retag` wants `Steady`, held only at the call site.
+- **`retag-fed`** (Climbs.Connect) — FALSITY, `NO EVIDENCE`: the retagged body's part
+  is the body's part fed the value, gapped up to the feed.
 - **`fin-ghost`** (Climbs.Connect) — FALSITY, `DEAD ROUTE`: the tree with a finish
   staged, its end staged on the way up, has a sane, placed part, the ghost
   past the source's skip.
@@ -326,13 +332,12 @@ by their own silent steps (`Mirror`).
 - **`ended-past`** (Frame) — FALSITY, `NO EVIDENCE`: a connect held past its
   source's end holds no source part, at every call under way.
 - **`rest-sourced`** (Shift) — FALSITY, `NO EVIDENCE`: a connect's leftover
-  over a source running on either side, pinned as its source's.
+  over a source running on either side, pinned as its source's; suspect, nothing
+  ties the two source parts.
 - **`out-deeper`** (Climbs.Take) — FALSITY, `NO EVIDENCE`: every part heads past the
   take's own position once it ends; the `q` to `q ++ [ix 0]` shift.
 - **`idle-tied`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a pool idled ties as it
   did; suspect where the pool is not restful.
-- **`heads-repool`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a flatMap repooled
-  heads no sooner than its old part and new pool.
 - **`close-tied`, `close-told`, `close-heads`** (Climbs.Flat) — FALSITY,
   `DEAD ROUTE×3`: an outer's close repools its rest: tied, told and headed as
   before.

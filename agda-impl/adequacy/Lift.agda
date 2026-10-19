@@ -130,11 +130,6 @@ module Lifting (R : Set) where
               → At.part (Conf.heap (Mach.conf m)) src ≡ nothing → ∀ {c₁} → e ≡ just c₁ → ∀ {b₀} → At.part (Conf.heap (Mach.conf m)) bd ≡ just b₀
               → Σ Pos λ q → U.headˢ (U.step b₀) ≡ just q × Late q c₁ (untold (Any.here refl) b₀)
 
-    -- A body shut steps as the body does, shut after, when its first
-    -- event comes strictly before every end the shut tells.
-    step-shut : ∀ {Γ A B} r c (t : U.Node Γ A) (b : U.Node (A ∷ Γ) B) {q} → U.headˢ (U.step b) ≡ just q → Late q c (untold (Any.here refl) b)
-              → U.shutˢᵗ r c t (U.step (U.shut (Any.here refl) c b)) ≡ U.shutˢᵗ r c t (U.step b)
-
     -- The agenda's first call an open `of`, held or hidden: no sibling
     -- the path to a part the ghost holds passes heads under the `of`'s
     -- base.  A value under it the ghost still holds is the `of`'s own;
@@ -188,6 +183,73 @@ module Lifting (R : Set) where
     note-least : ∀ {g g′ m w a k K} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m
                → Conf.ctl (Mach.conf m) ≡ asking {B = ⊤} (note a) k σ K → U.step g ≡ U.outˢ (Conf.pos (Mach.conf m)) a g′
                → ∀ {q b} → Has (residual g′) q b → q ≤ᵖ Conf.pos (Mach.conf m) → ⊥
+
+  -- A shut tells each joiner once: shutting again tells nothing.
+  told-idem : ∀ {Γ A B} (i : A ∈ᴸ Γ) c (j : B ∈ᴸ Γ) p e m → U.told i c j p (U.told i c j p e m) m ≡ U.told i c j p e m
+  told-idem i c j p (just x) m           = refl
+  told-idem i c j p nothing  (just refl) = refl
+  told-idem i c j p nothing  nothing     = refl
+
+  mutual
+    shut-idem : ∀ {Γ A B} (i : A ∈ᴸ Γ) c (n : U.Node Γ B) → U.shut i c (U.shut i c n) ≡ U.shut i c n
+    shut-idem i c (U.framesᶜ τ e m)            = refl
+    shut-idem i c (U.burstᶜ τ r k b)           = refl
+    shut-idem i c (U.ofᶜ p k xs)               = refl
+    shut-idem i c (U.mapᶜ f n)                 = cong (U.mapᶜ f) (shut-idem i c n)
+    shut-idem i c (U.scanᶜ f z n)              = cong (U.scanᶜ f z) (shut-idem i c n)
+    shut-idem i c (U.takeWhileᶜ b p n)         = cong (U.takeWhileᶜ b p) (shut-idem i c n)
+    shut-idem i c (U.flatMapᶜ op g o ls qs pl) rewrite shut-idemᴹ i c o | shut-idemᴸ i c ls | shut-idem i c pl = refl
+    shut-idem i c (U.joinᶜ j p xs e)           = cong (U.joinᶜ j p xs) (told-idem i c j p e (U.same? i j))
+    shut-idem i c (U.connectᶜ r b s)           rewrite shut-idem (Any.there i) c b | shut-idemˢ i c s = refl
+    shut-idem i c (U.deferᶜ l p ns)            = refl
+    shut-idem i c (U.endingᶜ p n)              = cong (U.endingᶜ p) (shut-idem i c n)
+    shut-idem i c (U.restᶜ n)                  = cong U.restᶜ (shut-idem i c n)
+    shut-idem i c U.idleᶜ                      = refl
+    shut-idem i c (U.unionᶜ x y)               rewrite shut-idem i c x | shut-idem i c y = refl
+    shut-idem i c (U.burstingᶜ r t)            = cong (U.burstingᶜ r) (shut-idem i c t)
+    shut-idem i c (U.underᶜ s b)               rewrite shut-idemˢ i c s | shut-idem (Any.there i) c b = refl
+
+    shut-idemᴹ : ∀ {Γ A B} (i : A ∈ᴸ Γ) c (o : Maybe (U.Node Γ B)) → U.shutᴹ i c (U.shutᴹ i c o) ≡ U.shutᴹ i c o
+    shut-idemᴹ i c nothing  = refl
+    shut-idemᴹ i c (just n) = cong just (shut-idem i c n)
+
+    shut-idemᴸ : ∀ {Γ A B} (i : A ∈ᴸ Γ) c (ls : List (U.Node Γ B)) → U.shutᴸ i c (U.shutᴸ i c ls) ≡ U.shutᴸ i c ls
+    shut-idemᴸ i c []       = refl
+    shut-idemᴸ i c (n ∷ ns) = cong₂ _∷_ (shut-idem i c n) (shut-idemᴸ i c ns)
+
+    shut-idemˢ : ∀ {Γ A B} (i : A ∈ᴸ Γ) c (s : U.Source Γ B) → U.shutˢ i c (U.shutˢ i c s) ≡ U.shutˢ i c s
+    shut-idemˢ i c (U.live s)    = cong U.live (shut-idem i c s)
+    shut-idemˢ i c (U.ended e t) = cong (U.ended e) (shut-idem i c t)
+
+  -- A step, what follows it shut.
+  shutᵗ : ∀ {Γ A B} → A ∈ᴸ Γ → Pos → U.Step Γ B → U.Step Γ B
+  shutᵗ i c (U.outˢ k a n) = U.outˢ k a (U.shut i c n)
+  shutᵗ i c (U.skipˢ k n)  = U.skipˢ k (U.shut i c n)
+  shutᵗ i c (U.endˢ k)     = U.endˢ k
+  shutᵗ i c U.hushˢ        = U.hushˢ
+
+  shutˢᵗ-idem : ∀ {Γ A B} r c (t : U.Node Γ A) (S : U.Step (A ∷ Γ) B) → U.shutˢᵗ r c t (shutᵗ (Any.here refl) c S) ≡ U.shutˢᵗ r c t S
+  shutˢᵗ-idem r c t (U.outˢ k a b) = cong (λ n → U.outˢ k a (U.connectᶜ r n (U.ended c t))) (shut-idem (Any.here refl) c b)
+  shutˢᵗ-idem r c t (U.skipˢ k b)  = cong (λ n → U.skipˢ k (U.connectᶜ r n (U.ended c t))) (shut-idem (Any.here refl) c b)
+  shutˢᵗ-idem r c t (U.endˢ e)     = refl
+  shutˢᵗ-idem r c t U.hushˢ        = refl
+
+  -- A node shut steps as it did, up to shutting what follows, when its
+  -- first event comes strictly before every end the shut tells: each end
+  -- told lands where nothing it could displace stands.  What follows
+  -- differs by what a step builds fresh (a lane begun, a source's feed
+  -- or end under an inner connect), which the shut after reaches alike.
+  postulate
+    step-late : ∀ {Γ A B} (i : A ∈ᴸ Γ) c (b : U.Node Γ B) {q} → U.headˢ (U.step b) ≡ just q → Late q c (untold i b)
+              → shutᵗ i c (U.step (U.shut i c b)) ≡ shutᵗ i c (U.step b)
+
+  -- A body shut steps as the body does, shut after, when its first
+  -- event comes strictly before every end the shut tells.
+  step-shut : ∀ {Γ A B} r c (t : U.Node Γ A) (b : U.Node (A ∷ Γ) B) {q} → U.headˢ (U.step b) ≡ just q → Late q c (untold (Any.here refl) b)
+            → U.shutˢᵗ r c t (U.step (U.shut (Any.here refl) c b)) ≡ U.shutˢᵗ r c t (U.step b)
+  step-shut r c t b hq lt =
+    trans (sym (shutˢᵗ-idem r c t (U.step (U.shut (Any.here refl) c b))))
+      (trans (cong (U.shutˢᵗ r c t) (step-late (Any.here refl) c b hq lt)) (shutˢᵗ-idem r c t (U.step b)))
 
   -- A connect whose source has ended, holding an `of` in its body: the
   -- body shut steps as the body does, shut after.

@@ -185,15 +185,37 @@ module ClimbConnect (R : Set) where
     kin : Kin w₀ v
     kin = kin-feed {g = at-here (At.owing H fd′)}
 
-    -- The connect's part, the feed restaged: its body's part fed the
-    -- source's value, but for gaps.  The subscribers the feed read hold
-    -- the value as the meaning feeds it (`Meaning`, `At.Joined`); every
-    -- other joiner, and every lane or deferred node reached no sooner
-    -- than `q` (`Heads`), holds it as a skip no part holds.
+    g₀ = at-here (At.owing H fd′)
+
+    part-v : At.part H v ≡ At.connected H rp e rt (At.part H u) (At.part H (retag g₀ bd))
+    part-v = refl
+
+    -- The body retagged keeps a part.  `part-retag` gives it from a
+    -- `Steady` retag, which needs the subject open: the call site has
+    -- that from `Calling`, these hypotheses do not.
     postulate
-      fed-part : ∀ {b₀ c′} → At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T
-               → At.part H bd ≡ just b₀ → At.part H u ≡ just c′
-               → Σ (U.Node (A ∷ Δ) B) λ b₁ → At.part H v ≡ just (U.connectᶜ rp b₁ (U.live c′)) × Gapped q (U.feed (here refl) q (just y) b₀) b₁
+      retag-parted : ∀ {b₀} → At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T
+                   → At.part H bd ≡ just b₀ → is-just (At.part H (retag g₀ bd)) ≡ true
+
+    -- The body's part retagged is its part fed the source's value, but
+    -- for gaps.  The subscribers the feed read hold the value as the
+    -- meaning feeds it (`Meaning`, `At.Joined`); every other joiner, and
+    -- every lane or deferred node reached no sooner than `q` (`Heads`),
+    -- holds it as a skip no part holds.
+    postulate
+      retag-fed : ∀ {b₀ b₁} → At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T
+                → At.part H bd ≡ just b₀ → At.part H (retag g₀ bd) ≡ just b₁ → Gapped q (U.feed (here refl) q (just y) b₀) b₁
+
+    -- The connect's part, the feed restaged: its body's part fed the
+    -- source's value, but for gaps.
+    fed-part : ∀ {b₀ c′} → At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T
+             → At.part H bd ≡ just b₀ → At.part H u ≡ just c′
+             → Σ (U.Node (A ∷ Δ) B) λ b₁ → At.part H v ≡ just (U.connectᶜ rp b₁ (U.live c′)) × Gapped q (U.feed (here refl) q (just y) b₀) b₁
+    fed-part {c′ = c′} jn mn bh pb pv with At.part H (retag g₀ bd) in eb | retag-parted jn mn bh pb
+    ... | just b₁ | _ =
+      b₁ , trans part-v (trans (cong (λ s → At.connected H rp e rt s (At.part H (retag g₀ bd))) pv) (cong (At.connected H rp e rt (just c′)) eb))
+         , retag-fed jn mn bh pb eb
+    ... | nothing | ()
 
     -- The ghost past the source's skip: the connect's part what it
     -- skipped to, but for gaps, and the heap untouched.

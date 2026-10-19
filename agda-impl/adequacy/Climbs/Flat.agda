@@ -79,7 +79,7 @@ module ClimbFlat (R : Set) where
   open Moving R using (pairs-r; pairs-split; plant-self; takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
   open Everywhere.Settling R using (settled-plant; settled-retag)
   open Everywhere.Gating R using (gated-alike; gated-path; gated-plant; gated-retag)
-  open Tearing R using (cuts; attached-alike; cuts-switches; fresh-path; fresh-lanes; part-path; takeSite; bodySite; look-store; look-either; Alike; part-alike; partLanes-alike; part-flat; apart-r; apart-l; each-same; seen-alike; seenL-alike; names-path; lanes-path) renaming (Off to Offʰ)
+  open Tearing R using (holds-at; cuts; attached-alike; cuts-switches; fresh-path; fresh-lanes; part-path; takeSite; bodySite; look-store; look-either; Alike; part-alike; partLanes-alike; part-flat; apart-r; apart-l; each-same; seen-alike; seenL-alike; names-path; lanes-path) renaming (Off to Offʰ)
   open Unsubbing R using (_⇝_; ⇝-trans; now; then; ≗-trans; wk≗; wk-same; bind≗)
   open Sequencing R using (seq-assoc; seq-done)
   open Forking R using (walk-planted)
@@ -97,7 +97,7 @@ module ClimbFlat (R : Set) where
   open Everywhere.Holding R using (holds-alike; holds-path; holds-plant; holds-retag)
   open Keeping R using (seen-planted)
   open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; let-go; grip; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag)
-  open Framing R using (merged-eq; heads-flat; Untold; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off)
+  open Framing R using (merged-eq; heads-flat; heads-repool; Untold; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off)
     renaming (Ended to Ends)
   open Staging R using (not-src; wrap-lane)
   open Weakening R using (Grows; pure-map) renaming (module Grown to Weakened)
@@ -201,11 +201,6 @@ module ClimbFlat (R : Set) where
   -- An untold list split at its pool.
   told-split : ∀ (xs ys zs : List Pos) {ws} → xs ⊆ᴾ ws → ys ⊆ᴾ ws → zs ⊆ᴾ ws → (xs ++ ys ++ zs) ⊆ᴾ ws
   told-split xs ys zs sx sy sz m = [ sx , (λ m′ → [ sy , sz ]′ (∈-++⁻ ys m′)) ]′ (∈-++⁻ xs m)
-
-  -- A flatMap whose pool heads no sooner heads no sooner with it.
-  postulate
-    heads-repool : ∀ {Δ A B q} op (g : A → Pos → U.Node Δ B) o L Q (pl pl′ : U.Node Δ B)
-                 → Heads q (U.flatMapᶜ op g o L Q pl) → Heads q pl′ → Heads q (U.flatMapᶜ op g o L Q pl′)
 
   -- A FLATMAP'S POOL RESTAGED: the node at the path's end with a new
   -- pool, the calls, the stack and every field carried across.
@@ -387,8 +382,34 @@ module ClimbFlat (R : Set) where
     done-read : At.val H′ (FlatKit.Flat.outerDone fl) ≡ true
     done-read = cong lower (stored-at H (FlatKit.Flat.outerDone fl) (lift true))
 
+    -- A lane, live, holds a part.
+    Parted : ∀ {Δ′ B′} → Lane h Δ′ B′ → Set
+    Parted (lane c _ s) = At.val H (Kit.live c) ≡ true → is-just (At.part H s) ≡ true
+
+    -- SUSPECT: `Kernels` records the count, not the parts; a lane whose
+    -- body has completed and not yet dropped its live flag would be live
+    -- with no part.  The fact may need its own field.
     postulate
-      active-lanes : Kernels H T → (At.val H (FlatKit.Flat.active fl) ≡ᵇ 0) ≡ null (At.partLanes H ls)
+      live-parted : Kernels H T → All Parted ls
+
+    parted-null : ∀ {X : Set₁} (m : Maybe X) (xs : List X) → is-just m ≡ true → false ≡ null (At.consᴹ H m xs)
+    parted-null (just x) xs _  = refl
+    parted-null nothing  xs ()
+
+    -- With every live lane parted, the count is zero exactly when no
+    -- part is.
+    count-null : ∀ {Δ′ B′} (ls′ : List (Lane h Δ′ B′)) → All Parted ls′ → (At.count H ls′ ≡ᵇ 0) ≡ null (At.partLanes H ls′)
+    count-null []                 []       = refl
+    count-null (lane c k s ∷ ls′) (p ∷ ps) with At.val H (Kit.live c) | p
+    ... | true  | p′ = parted-null (At.part H s) (At.partLanes H ls′) (p′ refl)
+    ... | false | _  = count-null ls′ ps
+
+    active-count : Kernels H T → At.val H (FlatKit.Flat.active fl) ≡ At.count H ls
+    active-count kn with holds-at ρ (Kernels.holds kn)
+    ... | _ , _ , (_ , _ , _ , _ , ac , _) = ac
+
+    active-lanes : Kernels H T → (At.val H (FlatKit.Flat.active fl) ≡ᵇ 0) ≡ null (At.partLanes H ls)
+    active-lanes kn = trans (cong (_≡ᵇ 0) (active-count kn)) (count-null ls (live-parted kn))
 
     -- The done flag the flatMap's own cell: its node's clauses read
     -- alike, the rest of the tree by the frame.

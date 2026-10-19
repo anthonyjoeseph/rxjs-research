@@ -25,7 +25,9 @@ open import Data.Nat using (zero; suc; _+_; s≤s; z≤n)
 open import Data.Unit using (⊤; tt)
 open import Data.Nat.Properties using (m<m+n)
 
-open import denotation.MonotonicList using (Events∞; Timeline; Pos; ix; last; _<ᵖ_; From)
+open import denotation.MonotonicList using (Events∞; Timeline; Pos; ix; last; _<ᵖ_; From; inside)
+import Data.Maybe.Relation.Binary.Pointwise as MP
+import Data.List.Relation.Binary.Pointwise as LP
 open import denotation.MonotonicList using () renaming (done to doneᶠ; quiet to quietᶠ; at to atᶠ; emit to emitᶠ; stall to stallᶠ; close to closeᶠ)
 import denotation.Unfold as U
 open import denotation.MonotonicList using () renaming (sub to subᴾ)
@@ -323,9 +325,278 @@ module Framing (R : Set) where
   Tells : Pos → Pos → List Pos → Set
   Tells q c = All (λ p → q ≤ᵖ (if p <ᵖ c then c ++ [ subᴾ p ] else p ++ [ last ]))
 
-  -- A shut heads where the node did, or at an end it tells.
+  -- Two steps alike but for their continuations.
+  data Twin {Γ : List Set} {A : Set} : U.Step Γ A → U.Step Γ A → Set₁ where
+    outᵗ  : ∀ {k a c c′} → Twin (U.outˢ k a c) (U.outˢ k a c′)
+    skipᵗ : ∀ {k c c′}   → Twin (U.skipˢ k c) (U.skipˢ k c′)
+    endᵗ  : ∀ {k}        → Twin (U.endˢ k) (U.endˢ k)
+    hushᵗ :                Twin U.hushˢ U.hushˢ
+
+  twin-refl : ∀ {Γ A} (s : U.Step Γ A) → Twin s s
+  twin-refl (U.outˢ k a c) = outᵗ
+  twin-refl (U.skipˢ k c)  = skipᵗ
+  twin-refl (U.endˢ k)     = endᵗ
+  twin-refl U.hushˢ        = hushᵗ
+
+  twin-head : ∀ {Γ A} {s s′ : U.Step Γ A} → Twin s s′ → U.headˢ s ≡ U.headˢ s′
+  twin-head outᵗ  = refl
+  twin-head skipᵗ = refl
+  twin-head endᵗ  = refl
+  twin-head hushᵗ = refl
+
+  -- A shut steps as its node did, or neither heads before `q`: an end it
+  -- tells came first, so what that end beat came no sooner either.
+  Down : ∀ {Γ A} → Pos → U.Step Γ A → U.Step Γ A → Set₁
+  Down q s s′ = Twin s s′ ⊎ (HeadsS q s × HeadsS q s′)
+
+  -- A rest's step: a skip, or nothing.
+  data Hushed {Γ : List Set} {A : Set} : U.Step Γ A → Set₁ where
+    skipʰ : ∀ {k c} → Hushed (U.skipˢ k c)
+    hushʰ : Hushed U.hushˢ
+
+  if-hushed : ∀ {Γ A} b {s₁ s₂ : U.Step Γ A} → Hushed s₁ → Hushed s₂ → Hushed (if b then s₁ else s₂)
+  if-hushed true  h₁ h₂ = h₁
+  if-hushed false h₁ h₂ = h₂
+
+  union-hushed : ∀ {Γ B} (x : U.Node Γ B) sx y sy → Hushed sy → Hushed (U.unionˢ x sx y sy)
+  union-hushed x (U.skipˢ k x′) y (U.skipˢ k′ y′) h = if-hushed (k <ᵖ k′) skipʰ skipʰ
+  union-hushed x (U.skipˢ k x′) y (U.outˢ _ _ _)  h = skipʰ
+  union-hushed x (U.skipˢ k x′) y (U.endˢ _)      h = skipʰ
+  union-hushed x (U.skipˢ k x′) y U.hushˢ         h = skipʰ
+  union-hushed x (U.outˢ _ _ _) y sy              h = h
+  union-hushed x (U.endˢ _)     y sy              h = h
+  union-hushed x U.hushˢ        y sy              h = h
+
+  under-hushed : ∀ {Γ A B C} (s : U.Source Γ A) (sb : U.Step (A ∷ Γ) C) → Hushed {Γ} {B} (U.underˢ s sb)
+  under-hushed s (U.skipˢ k b)  = skipʰ
+  under-hushed s (U.outˢ _ _ _) = hushʰ
+  under-hushed s (U.endˢ _)     = hushʰ
+  under-hushed s U.hushˢ        = hushʰ
+
+  bursts-hushed : ∀ {Γ A B} r (t : U.Node Γ A) (st : U.Step Γ A) → Hushed (U.restˢ {B = B} t) → Hushed {Γ} {B} (U.burstsˢ r t st)
+  bursts-hushed r t (U.outˢ k _ _) h = if-hushed (inside r k) skipʰ h
+  bursts-hushed r t (U.skipˢ k _)  h = if-hushed (inside r k) skipʰ h
+  bursts-hushed r t (U.endˢ _)     h = h
+  bursts-hushed r t U.hushˢ        h = h
+
+  mutual
+    rest-hushed : ∀ {Γ A B} (n : U.Node Γ A) → Hushed (U.restˢ {B = B} n)
+    rest-hushed (U.framesᶜ τ e m)           = hushʰ
+    rest-hushed (U.burstᶜ τ r k b)          = hushʰ
+    rest-hushed (U.ofᶜ p k xs)              = hushʰ
+    rest-hushed (U.mapᶜ f c)                = rest-hushed c
+    rest-hushed (U.scanᶜ f z c)             = rest-hushed c
+    rest-hushed (U.takeWhileᶜ i p c)        = rest-hushed c
+    rest-hushed (U.flatMapᶜ op g o ls qs p) =
+      union-hushed (U.outerᶜ o) (U.restᴹ o) (U.unionᶜ (U.restsᶜ ls) (U.restᶜ p)) (U.unionˢ (U.restsᶜ ls) (U.restsˢ ls) (U.restᶜ p) (U.restˢ p))
+        (union-hushed (U.restsᶜ ls) (U.restsˢ ls) (U.restᶜ p) (U.restˢ p) (rest-hushed p))
+    rest-hushed (U.joinᶜ i p xs e)          = hushʰ
+    rest-hushed (U.connectᶜ {B = C} r b (U.live s)) =
+      union-hushed (U.burstingᶜ r s) (U.burstsˢ r s (U.step s)) (U.underᶜ (U.live s) b) (U.underˢ (U.live s) (U.restˢ {B = C} b))
+        (under-hushed (U.live s) (U.restˢ {B = C} b))
+    rest-hushed (U.connectᶜ {B = C} r b (U.ended c t)) =
+      union-hushed (U.burstingᶜ r t) (U.burstsˢ r t (U.step t)) (U.underᶜ (U.ended c t) b) (U.underˢ (U.ended c t) (U.restˢ {B = C} b))
+        (under-hushed (U.ended c t) (U.restˢ {B = C} b))
+    rest-hushed (U.deferᶜ l p ns)           = hushʰ
+    rest-hushed (U.endingᶜ p n)             = rest-hushed n
+    rest-hushed (U.restᶜ n)                 = rest-hushed n
+    rest-hushed U.idleᶜ                     = hushʰ
+    rest-hushed (U.unionᶜ x y)              = union-hushed (U.restᶜ x) (U.restˢ x) (U.restᶜ y) (U.restˢ y) (rest-hushed y)
+    rest-hushed (U.burstingᶜ r t)           = bursts-hushed r t (U.step t) (rest-hushed t)
+    rest-hushed (U.underᶜ {C = C} s b)      = under-hushed s (U.restˢ {B = C} b)
+
+  rests-hushed : ∀ {Γ A B} (ls : List (U.Node Γ A)) → Hushed (U.restsˢ {B = B} ls)
+  rests-hushed []       = hushʰ
+  rests-hushed (l ∷ ls) = union-hushed (U.restᶜ l) (U.restˢ l) (U.restsᶜ ls) (U.restsˢ ls) (rests-hushed ls)
+
+  map-down : ∀ {Γ A B q} (f : A → B) (s s′ : U.Step Γ A) → Down q s s′ → Down q (U.mapˢ f s) (U.mapˢ f s′)
+  map-down f _ _ (inj₁ outᵗ)  = inj₁ outᵗ
+  map-down f _ _ (inj₁ skipᵗ) = inj₁ skipᵗ
+  map-down f _ _ (inj₁ endᵗ)  = inj₁ endᵗ
+  map-down f _ _ (inj₁ hushᵗ) = inj₁ hushᵗ
+  map-down f s s′ (inj₂ (h , h′)) = inj₂ ((λ e → h (trans (sym (head-map f s)) e)) , (λ e → h′ (trans (sym (head-map f s′)) e)))
+
+  scan-down : ∀ {Γ A B q} (f : B → A → B) z (s s′ : U.Step Γ A) → Down q s s′ → Down q (U.scanˢ f z s) (U.scanˢ f z s′)
+  scan-down f z _ _ (inj₁ outᵗ)  = inj₁ outᵗ
+  scan-down f z _ _ (inj₁ skipᵗ) = inj₁ skipᵗ
+  scan-down f z _ _ (inj₁ endᵗ)  = inj₁ endᵗ
+  scan-down f z _ _ (inj₁ hushᵗ) = inj₁ hushᵗ
+  scan-down f z s s′ (inj₂ (h , h′)) = inj₂ ((λ e → h (trans (sym (head-scan f z s)) e)) , (λ e → h′ (trans (sym (head-scan f z s′)) e)))
+
+  taking-twin : ∀ {Γ A} i (p : A → Bool) k a (c c′ : U.Node Γ A) b → Twin (U.taking i p k a c b) (U.taking i p k a c′ b)
+  taking-twin i     p k a c c′ true  = outᵗ
+  taking-twin true  p k a c c′ false = outᵗ
+  taking-twin false p k a c c′ false = endᵗ
+
+  take-down : ∀ {Γ A q} i (p : A → Bool) (s s′ : U.Step Γ A) → Down q s s′ → Down q (U.takeWhileˢ i p s) (U.takeWhileˢ i p s′)
+  take-down i p _ _ (inj₁ (outᵗ {k} {a} {c} {c′})) = inj₁ (taking-twin i p k a c c′ (p a))
+  take-down i p _ _ (inj₁ skipᵗ) = inj₁ skipᵗ
+  take-down i p _ _ (inj₁ endᵗ)  = inj₁ endᵗ
+  take-down i p _ _ (inj₁ hushᵗ) = inj₁ hushᵗ
+  take-down i p s s′ (inj₂ (h , h′)) = inj₂ (take-head i p s h , take-head i p s′ h′)
+
+  under-heads : ∀ {Γ A B C q} (s : U.Source Γ A) (sb : U.Step (A ∷ Γ) C) → HeadsS q sb → HeadsS {Γ} {B} q (U.underˢ s sb)
+  under-heads s (U.skipˢ k b)  h = h
+  under-heads s (U.outˢ _ _ _) h ()
+  under-heads s (U.endˢ _)     h ()
+  under-heads s U.hushˢ        h ()
+
+  under-down : ∀ {Γ A B C q} (s s′ : U.Source Γ A) (sb sb′ : U.Step (A ∷ Γ) C) → Down q sb sb′ → Down {Γ} {B} q (U.underˢ s sb) (U.underˢ s′ sb′)
+  under-down s s′ _ _ (inj₁ outᵗ)  = inj₁ hushᵗ
+  under-down s s′ _ _ (inj₁ skipᵗ) = inj₁ skipᵗ
+  under-down s s′ _ _ (inj₁ endᵗ)  = inj₁ hushᵗ
+  under-down s s′ _ _ (inj₁ hushᵗ) = inj₁ hushᵗ
+  under-down s s′ sb sb′ (inj₂ (h , h′)) = inj₂ (under-heads s sb h , under-heads s′ sb′ h′)
+
+  told-end : ∀ {Γ A q c p} → Tells q c [ p ] → Down {Γ} {A} q U.hushˢ (U.endˢ (if p <ᵖ c then c ++ [ subᴾ p ] else p ++ [ last ]))
+  told-end (h ∷ []) = inj₂ ((λ ()) , λ { refl → h })
+
+  DownN : ∀ {Γ A} → Pos → U.Node Γ A → U.Node Γ A → Set₁
+  DownN q n n′ = Down q (U.step n) (U.step n′)
+
+  -- THE STEP FUNCTIONS KEEP `Down`: each picks among its parts' steps by
+  -- position, so a part shut to a told end leads only where that end
+  -- comes first, and what it displaced came no sooner.
+
+  -- A union's right side must be a rest's step: a non-skip there is
+  -- dropped whole, so an end before `q` would vanish under a new left skip.
   postulate
-    shut-heads : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (b : U.Node Γ B) → Heads q b → Tells q c (untold i b) → Heads q (U.shut i c b)
+    union-down : ∀ {Γ B q} (x x′ y y′ : U.Node Γ B) sx sx′ sy sy′ → Hushed sy → Hushed sy′ → Down q sx sx′ → Down q sy sy′
+               → Down q (U.unionˢ x sx y sy) (U.unionˢ x′ sx′ y′ sy′)
+
+  -- SUSPECT: a step that leaves `r` falls back to the rest, whose own
+  -- head need not be past the step's; a shut moving the step inside `r`
+  -- pins a skip the rest did not lead with.
+  postulate
+    bursts-down : ∀ {Γ A B q} r (t t′ : U.Node Γ A) (st st′ : U.Step Γ A) → Down q st st′ → Down q (U.restˢ {B = B} t) (U.restˢ {B = B} t′)
+                → Down {Γ} {B} q (U.burstsˢ r t st) (U.burstsˢ r t′ st′)
+
+  postulate
+    source-down : ∀ {Γ A B q} r (b b′ : U.Node (A ∷ Γ) B) (s s′ : U.Node Γ A) sb sb′ ss ss′ → Down q sb sb′ → Down q ss ss′
+                → Down q (U.sourceˢ r b sb s ss) (U.sourceˢ r b′ sb′ s′ ss′)
+
+  postulate
+    ended-down : ∀ {Γ A B q} r c (b b′ : U.Node (A ∷ Γ) B) (t t′ : U.Node Γ A) sb sb′ st st′ → Down q sb sb′ → Down q st st′
+               → Down q (U.endedˢ r b sb c t st) (U.endedˢ r b′ sb′ c t′ st′)
+
+  -- The lists keep their lengths and the outer its presence: the
+  -- outer's and lanes' ends with nothing left are read off them.
+  postulate
+    flat-down : ∀ {Δ A B q} op (g : A → Pos → U.Node Δ B) (o o′ : Maybe (U.Node Δ A)) (ls ls′ : List (U.Node Δ B)) qs (pl pl′ : U.Node Δ B)
+              → MP.Pointwise (DownN q) o o′ → LP.Pointwise (DownN q) ls ls′ → DownN q pl pl′
+              → DownN q (U.flatMapᶜ op g o ls qs pl) (U.flatMapᶜ op g o′ ls′ qs pl′)
+
+  mutual
+    shut-down : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (b : U.Node Γ B) → Tells q c (untold i b) → DownN q b (U.shut i c b)
+    shut-down i c (U.framesᶜ τ e m)            tl = inj₁ (twin-refl _)
+    shut-down i c (U.burstᶜ τ r k b)           tl = inj₁ (twin-refl _)
+    shut-down i c (U.ofᶜ p k xs)               tl = inj₁ (twin-refl _)
+    shut-down i c (U.mapᶜ f n)                 tl = map-down f (U.step n) (U.step (U.shut i c n)) (shut-down i c n tl)
+    shut-down i c (U.scanᶜ f z n)              tl = scan-down f z (U.step n) (U.step (U.shut i c n)) (shut-down i c n tl)
+    shut-down i c (U.takeWhileᶜ t p n)         tl = take-down t p (U.step n) (U.step (U.shut i c n)) (shut-down i c n tl)
+    shut-down i c (U.flatMapᶜ op g o ls qs pl) tl =
+      flat-down op g o (U.shutᴹ i c o) ls (U.shutᴸ i c ls) qs pl (U.shut i c pl)
+        (shut-downᴹ i c o (++⁻ˡ (untoldᴹ i o) tl))
+        (shut-downᴸ i c ls (++⁻ˡ (untoldᴸ i ls) (++⁻ʳ (untoldᴹ i o) tl)))
+        (shut-down i c pl (++⁻ʳ (untoldᴸ i ls) (++⁻ʳ (untoldᴹ i o) tl)))
+    shut-down i c (U.joinᶜ j p ((_ , just a) ∷ xs) e)  tl = inj₁ outᵗ
+    shut-down i c (U.joinᶜ j p ((_ , nothing) ∷ xs) e) tl = inj₁ skipᵗ
+    shut-down i c (U.joinᶜ j p [] (just e))            tl = inj₁ endᵗ
+    shut-down i c (U.joinᶜ j p [] nothing)             tl with U.same? i j
+    ... | nothing   = inj₁ hushᵗ
+    ... | just refl = told-end tl
+    shut-down i c (U.connectᶜ r b (U.live s))  tl =
+      source-down r b (U.shut (there i) c b) s (U.shut i c s) (U.step b) (U.step (U.shut (there i) c b)) (U.step s) (U.step (U.shut i c s))
+        (shut-down (there i) c b (++⁻ˡ (untold (there i) b) tl)) (shut-down i c s (++⁻ʳ (untold (there i) b) tl))
+    shut-down i c (U.connectᶜ r b (U.ended e t)) tl =
+      ended-down r e b (U.shut (there i) c b) t (U.shut i c t) (U.step b) (U.step (U.shut (there i) c b)) (U.step t) (U.step (U.shut i c t))
+        (shut-down (there i) c b (++⁻ˡ (untold (there i) b) tl)) (shut-down i c t (++⁻ʳ (untold (there i) b) tl))
+    shut-down i c (U.deferᶜ l p ns)            tl = inj₁ (twin-refl _)
+    shut-down i c (U.endingᶜ p n)              tl = inj₁ endᵗ
+    shut-down i c (U.restᶜ n)                  tl = rest-down i c n tl
+    shut-down i c U.idleᶜ                      tl = inj₁ hushᵗ
+    shut-down i c (U.unionᶜ x y)               tl =
+      union-down x (U.shut i c x) y (U.shut i c y) (U.restˢ x) (U.restˢ (U.shut i c x)) (U.restˢ y) (U.restˢ (U.shut i c y))
+        (rest-hushed y) (rest-hushed (U.shut i c y)) (rest-down i c x (++⁻ˡ (untold i x) tl)) (rest-down i c y (++⁻ʳ (untold i x) tl))
+    shut-down i c (U.burstingᶜ r t)            tl = bursts-down r t (U.shut i c t) (U.step t) (U.step (U.shut i c t)) (shut-down i c t tl) (rest-down i c t tl)
+    shut-down i c (U.underᶜ {C = C} s b)       tl =
+      under-down s (U.shutˢ i c s) (U.restˢ {B = C} b) (U.restˢ {B = C} (U.shut (there i) c b)) (rest-down (there i) c b (++⁻ʳ (untoldˢ i s) tl))
+
+    shut-downᴹ : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (o : Maybe (U.Node Γ B)) → Tells q c (untoldᴹ i o) → MP.Pointwise (DownN q) o (U.shutᴹ i c o)
+    shut-downᴹ i c nothing  tl = MP.nothing
+    shut-downᴹ i c (just n) tl = MP.just (shut-down i c n tl)
+
+    shut-downᴸ : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (ls : List (U.Node Γ B)) → Tells q c (untoldᴸ i ls) → LP.Pointwise (DownN q) ls (U.shutᴸ i c ls)
+    shut-downᴸ i c []       tl = LP.[]
+    shut-downᴸ i c (n ∷ ns) tl = shut-down i c n (++⁻ˡ (untold i n) tl) LP.∷ shut-downᴸ i c ns (++⁻ʳ (untold i n) tl)
+
+    rest-down : ∀ {Γ A B C q} (i : A ∈ᴸ Γ) c (n : U.Node Γ B) → Tells q c (untold i n) → Down q (U.restˢ {B = C} n) (U.restˢ {B = C} (U.shut i c n))
+    rest-down i c (U.framesᶜ τ e m)            tl = inj₁ hushᵗ
+    rest-down i c (U.burstᶜ τ r k b)           tl = inj₁ hushᵗ
+    rest-down i c (U.ofᶜ p k xs)               tl = inj₁ hushᵗ
+    rest-down i c (U.mapᶜ f n)                 tl = rest-down i c n tl
+    rest-down i c (U.scanᶜ f z n)              tl = rest-down i c n tl
+    rest-down i c (U.takeWhileᶜ t p n)         tl = rest-down i c n tl
+    rest-down i c (U.flatMapᶜ op g o ls qs pl) tl =
+      union-down (U.outerᶜ o) (U.outerᶜ o′) (U.unionᶜ (U.restsᶜ ls) (U.restᶜ pl)) (U.unionᶜ (U.restsᶜ ls′) (U.restᶜ pl′))
+        (U.restᴹ o) (U.restᴹ o′) (U.unionˢ (U.restsᶜ ls) (U.restsˢ ls) (U.restᶜ pl) (U.restˢ pl)) (U.unionˢ (U.restsᶜ ls′) (U.restsˢ ls′) (U.restᶜ pl′) (U.restˢ pl′))
+        (union-hushed (U.restsᶜ ls) (U.restsˢ ls) (U.restᶜ pl) (U.restˢ pl) (rest-hushed pl))
+        (union-hushed (U.restsᶜ ls′) (U.restsˢ ls′) (U.restᶜ pl′) (U.restˢ pl′) (rest-hushed pl′))
+        (rest-downᴹ i c o (++⁻ˡ (untoldᴹ i o) tl))
+        (union-down (U.restsᶜ ls) (U.restsᶜ ls′) (U.restᶜ pl) (U.restᶜ pl′) (U.restsˢ ls) (U.restsˢ ls′) (U.restˢ pl) (U.restˢ pl′)
+          (rest-hushed pl) (rest-hushed pl′)
+          (rests-down i c ls (++⁻ˡ (untoldᴸ i ls) (++⁻ʳ (untoldᴹ i o) tl)))
+          (rest-down i c pl (++⁻ʳ (untoldᴸ i ls) (++⁻ʳ (untoldᴹ i o) tl))))
+      where o′ = U.shutᴹ i c o
+            ls′ = U.shutᴸ i c ls
+            pl′ = U.shut i c pl
+    rest-down i c (U.joinᶜ j p xs e)           tl = inj₁ hushᵗ
+    rest-down i c (U.connectᶜ {B = C} r b (U.live s)) tl =
+      union-down (U.burstingᶜ r s) (U.burstingᶜ r s′) (U.underᶜ (U.live s) b) (U.underᶜ (U.live s′) b′)
+        (U.burstsˢ r s (U.step s)) (U.burstsˢ r s′ (U.step s′)) (U.underˢ (U.live s) (U.restˢ {B = C} b)) (U.underˢ (U.live s′) (U.restˢ {B = C} b′))
+        (under-hushed (U.live s) (U.restˢ {B = C} b)) (under-hushed (U.live s′) (U.restˢ {B = C} b′))
+        (bursts-down r s s′ (U.step s) (U.step s′) (shut-down i c s tlₛ) (rest-down i c s tlₛ))
+        (under-down (U.live s) (U.live s′) (U.restˢ {B = C} b) (U.restˢ {B = C} b′) (rest-down (there i) c b (++⁻ˡ (untold (there i) b) tl)))
+      where s′ = U.shut i c s
+            b′ = U.shut (there i) c b
+            tlₛ = ++⁻ʳ (untold (there i) b) tl
+    rest-down i c (U.connectᶜ {B = C} r b (U.ended e t)) tl =
+      union-down (U.burstingᶜ r t) (U.burstingᶜ r t′) (U.underᶜ (U.ended e t) b) (U.underᶜ (U.ended e t′) b′)
+        (U.burstsˢ r t (U.step t)) (U.burstsˢ r t′ (U.step t′)) (U.underˢ (U.ended e t) (U.restˢ {B = C} b)) (U.underˢ (U.ended e t′) (U.restˢ {B = C} b′))
+        (under-hushed (U.ended e t) (U.restˢ {B = C} b)) (under-hushed (U.ended e t′) (U.restˢ {B = C} b′))
+        (bursts-down r t t′ (U.step t) (U.step t′) (shut-down i c t tlₜ) (rest-down i c t tlₜ))
+        (under-down (U.ended e t) (U.ended e t′) (U.restˢ {B = C} b) (U.restˢ {B = C} b′) (rest-down (there i) c b (++⁻ˡ (untold (there i) b) tl)))
+      where t′ = U.shut i c t
+            b′ = U.shut (there i) c b
+            tlₜ = ++⁻ʳ (untold (there i) b) tl
+    rest-down i c (U.deferᶜ l p ns)            tl = inj₁ hushᵗ
+    rest-down i c (U.endingᶜ p n)              tl = rest-down i c n tl
+    rest-down i c (U.restᶜ n)                  tl = rest-down i c n tl
+    rest-down i c U.idleᶜ                      tl = inj₁ hushᵗ
+    rest-down i c (U.unionᶜ x y)               tl =
+      union-down (U.restᶜ x) (U.restᶜ (U.shut i c x)) (U.restᶜ y) (U.restᶜ (U.shut i c y))
+        (U.restˢ x) (U.restˢ (U.shut i c x)) (U.restˢ y) (U.restˢ (U.shut i c y))
+        (rest-hushed y) (rest-hushed (U.shut i c y)) (rest-down i c x (++⁻ˡ (untold i x) tl)) (rest-down i c y (++⁻ʳ (untold i x) tl))
+    rest-down i c (U.burstingᶜ r t)            tl = bursts-down r t (U.shut i c t) (U.step t) (U.step (U.shut i c t)) (shut-down i c t tl) (rest-down i c t tl)
+    rest-down i c (U.underᶜ {C = C} s b)       tl =
+      under-down s (U.shutˢ i c s) (U.restˢ {B = C} b) (U.restˢ {B = C} (U.shut (there i) c b)) (rest-down (there i) c b (++⁻ʳ (untoldˢ i s) tl))
+
+    rest-downᴹ : ∀ {Γ A B C q} (i : A ∈ᴸ Γ) c (o : Maybe (U.Node Γ B)) → Tells q c (untoldᴹ i o) → Down q (U.restᴹ {B = C} o) (U.restᴹ {B = C} (U.shutᴹ i c o))
+    rest-downᴹ i c nothing  tl = inj₁ hushᵗ
+    rest-downᴹ i c (just n) tl = rest-down i c n tl
+
+    rests-down : ∀ {Γ A B C q} (i : A ∈ᴸ Γ) c (ls : List (U.Node Γ B)) → Tells q c (untoldᴸ i ls) → Down q (U.restsˢ {B = C} ls) (U.restsˢ {B = C} (U.shutᴸ i c ls))
+    rests-down i c []       tl = inj₁ hushᵗ
+    rests-down i c (l ∷ ls) tl =
+      union-down (U.restᶜ l) (U.restᶜ (U.shut i c l)) (U.restsᶜ ls) (U.restsᶜ (U.shutᴸ i c ls))
+        (U.restˢ l) (U.restˢ (U.shut i c l)) (U.restsˢ ls) (U.restsˢ (U.shutᴸ i c ls))
+        (rests-hushed ls) (rests-hushed (U.shutᴸ i c ls)) (rest-down i c l (++⁻ˡ (untold i l) tl)) (rests-down i c ls (++⁻ʳ (untold i l) tl))
+
+  -- A shut heads where the node did, or at an end it tells.
+  shut-heads : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (b : U.Node Γ B) → Heads q b → Tells q c (untold i b) → Heads q (U.shut i c b)
+  shut-heads i c b hb tl e with shut-down i c b tl
+  ... | inj₁ tw       = hb (trans (twin-head tw) e)
+  ... | inj₂ (_ , h′) = h′ e
 
   shut-heads-step : ∀ {Γ A B q} r c (t : U.Node Γ A) (S : U.Step (A ∷ Γ) B) → HeadsS q S → HeadsS q (U.shutˢᵗ r c t S)
   shut-heads-step r c t (U.outˢ _ _ _) hs = hs
@@ -429,6 +700,117 @@ module Framing (R : Set) where
   heads-flat : ∀ {Δ A B q} op (g : A → Pos → U.Node Δ B) (o : Maybe (U.Node Δ A)) (L : List (U.Node Δ B)) Q pl
              → Heads q pl → (∀ {c} → o ≡ just c → Heads q c) → All (Heads q) L → Heads q (U.flatMapᶜ op g o L Q pl)
   heads-flat op g o L Q pl hp ho hL = flatˢ-heads op g (U.outerOf o) L Q pl (U.step pl) (U.earliest L) hp (outer-of o ho) (earliest-heads L hL)
+
+  -- A FLATMAP REPOOLED: its merge heads where it did whatever its pool,
+  -- and a pool skip ahead of the merge leads it.
+  outerˢ-pool : ∀ {Δ A B} op (g : A → Pos → U.Node Δ B) (o : U.Node Δ A) (so : U.Step Δ A) ls qs (p p′ : U.Node Δ B)
+              → U.headˢ (U.outerˢ op g o so ls qs p) ≡ U.headˢ (U.outerˢ op g o so ls qs p′)
+  outerˢ-pool op g o (U.outˢ k a o′) ls      qs      p p′ = refl
+  outerˢ-pool op g o (U.skipˢ k o′)  ls      qs      p p′ = refl
+  outerˢ-pool op g o (U.endˢ c)      []      []      p p′ = refl
+  outerˢ-pool op g o (U.endˢ c)      []      (_ ∷ _) p p′ = refl
+  outerˢ-pool op g o (U.endˢ c)      (_ ∷ _) qs      p p′ = refl
+  outerˢ-pool op g o U.hushˢ         ls      qs      p p′ = refl
+
+  laneˢ-pool : ∀ {Δ A B} op (g : A → Pos → U.Node Δ B) (o : Maybe (U.Node Δ A)) bs l (s : U.Step Δ B) as qs (p p′ : U.Node Δ B)
+             → U.headˢ (U.laneˢ op g o bs l s as qs p) ≡ U.headˢ (U.laneˢ op g o bs l s as qs p′)
+  laneˢ-pool op g o bs l (U.outˢ k b c) as qs p p′ = refl
+  laneˢ-pool op g o bs l (U.skipˢ k c)  as qs p p′ = refl
+  laneˢ-pool op g nothing  []      l (U.endˢ c) []      (a ∷ qs) p p′ = refl
+  laneˢ-pool op g nothing  []      l (U.endˢ c) []      []       p p′ = refl
+  laneˢ-pool op g nothing  []      l (U.endˢ c) (_ ∷ _) (a ∷ qs) p p′ = refl
+  laneˢ-pool op g nothing  []      l (U.endˢ c) (_ ∷ _) []       p p′ = refl
+  laneˢ-pool op g nothing  (_ ∷ _) l (U.endˢ c) []      (a ∷ qs) p p′ = refl
+  laneˢ-pool op g nothing  (_ ∷ _) l (U.endˢ c) []      []       p p′ = refl
+  laneˢ-pool op g nothing  (_ ∷ _) l (U.endˢ c) (_ ∷ _) (a ∷ qs) p p′ = refl
+  laneˢ-pool op g nothing  (_ ∷ _) l (U.endˢ c) (_ ∷ _) []       p p′ = refl
+  laneˢ-pool op g (just o) []      l (U.endˢ c) []      (a ∷ qs) p p′ = refl
+  laneˢ-pool op g (just o) []      l (U.endˢ c) []      []       p p′ = refl
+  laneˢ-pool op g (just o) []      l (U.endˢ c) (_ ∷ _) (a ∷ qs) p p′ = refl
+  laneˢ-pool op g (just o) []      l (U.endˢ c) (_ ∷ _) []       p p′ = refl
+  laneˢ-pool op g (just o) (_ ∷ _) l (U.endˢ c) []      (a ∷ qs) p p′ = refl
+  laneˢ-pool op g (just o) (_ ∷ _) l (U.endˢ c) []      []       p p′ = refl
+  laneˢ-pool op g (just o) (_ ∷ _) l (U.endˢ c) (_ ∷ _) (a ∷ qs) p p′ = refl
+  laneˢ-pool op g (just o) (_ ∷ _) l (U.endˢ c) (_ ∷ _) []       p p′ = refl
+  laneˢ-pool op g o bs l U.hushˢ        as qs p p′ = refl
+
+  race-pool : ∀ {Δ A B} op (g : A → Pos → U.Node Δ B) o (so : U.Step Δ A) mk k bs l (s : U.Step Δ B) as qs (p p′ : U.Node Δ B)
+            → U.headˢ (U.raceˢ op g o so mk k bs l s as qs p) ≡ U.headˢ (U.raceˢ op g o so mk k bs l s as qs p′)
+  race-pool op g o so nothing   k bs l s as qs p p′ = laneˢ-pool op g (just o) bs l s as qs p p′
+  race-pool op g o so (just k′) k bs l s as qs p p′ with k′ <ᵖ k
+  ... | true  = outerˢ-pool op g o so (bs ++ l ∷ as) qs p p′
+  ... | false = laneˢ-pool op g (just o) bs l s as qs p p′
+
+  go-pool : ∀ {Δ A B} op (g : A → Pos → U.Node Δ B) (o : U.Outer Δ A) ls qs (p p′ : U.Node Δ B) (E : U.Earliest Δ B)
+          → U.headˢ (U.goˢ op g o ls qs p E) ≡ U.headˢ (U.goˢ op g o ls qs p′ E)
+  go-pool op g U.doneᵒ       ls qs p p′ U.none                = refl
+  go-pool op g (U.runᵒ o so) ls qs p p′ U.none                = outerˢ-pool op g o so ls qs p p′
+  go-pool op g U.doneᵒ       ls qs p p′ (U.found k bs l s as) = laneˢ-pool op g nothing bs l s as qs p p′
+  go-pool op g (U.runᵒ o so) ls qs p p′ (U.found k bs l s as) = race-pool op g o so (U.headˢ so) k bs l s as qs p p′
+
+  -- The earliest lane's key is its step's head.
+  Key : ∀ {Δ B} → U.Earliest Δ B → Set
+  Key U.none                = ⊤
+  Key (U.found k bs l s as) = U.headˢ s ≡ just k
+
+  pick-key : ∀ {Δ B} (l : U.Node Δ B) (s : U.Step Δ B) ls m (E : U.Earliest Δ B) → m ≡ U.headˢ s → Key E → Key (U.pick l s ls m E)
+  pick-key l s ls nothing  U.none                  e kE = tt
+  pick-key l s ls nothing  (U.found k bs c sc as)  e kE = kE
+  pick-key l s ls (just k) U.none                  e kE = sym e
+  pick-key l s ls (just k) (U.found k′ bs c sc as) e kE with k <ᵖ k′
+  ... | true  = sym e
+  ... | false = kE
+
+  earliest-key : ∀ {Δ B} (ls : List (U.Node Δ B)) → Key (U.earliest ls)
+  earliest-key []       = tt
+  earliest-key (l ∷ ls) = pick-key l (U.step l) ls (U.headˢ (U.step l)) (U.earliest ls) refl (earliest-key ls)
+
+  clear-heads : ∀ {Γ A} k (s : U.Step Γ A) → U.clearˢ k (U.headˢ s) ≡ true → HeadsS k s
+  clear-heads k (U.outˢ k′ a c) e refl = inj₂ e
+  clear-heads k (U.skipˢ k′ c)  e refl = inj₂ e
+  clear-heads k (U.endˢ k′)     e refl = inj₂ e
+  clear-heads k U.hushˢ         () _
+
+  key-heads : ∀ {Γ A} k {s : U.Step Γ A} {k′} → U.headˢ s ≡ just k′ → k <ᵖ k′ ≡ true → HeadsS k s
+  key-heads k hs lt e with trans (sym hs) e
+  ... | refl = inj₂ lt
+
+  and-split : ∀ a b → a ∧ b ≡ true → a ≡ true × b ≡ true
+  and-split true  true  refl = refl , refl
+  and-split true  false ()
+  and-split false b     ()
+
+  ahead-go : ∀ {Δ A B} op (g : A → Pos → U.Node Δ B) (o : U.Outer Δ A) ls qs p (E : U.Earliest Δ B) k → Key E
+           → U.aheadˢ k o E ≡ true → HeadsS k (U.goˢ op g o ls qs p E)
+  ahead-go op g U.doneᵒ       ls qs p U.none                 k kE a ()
+  ahead-go op g (U.runᵒ o so) ls qs p U.none                 k kE a = outerˢ-heads op g o so ls qs p (clear-heads k so a)
+  ahead-go op g U.doneᵒ       ls qs p (U.found k′ bs l s as) k kE a = laneˢ-heads op g nothing bs l s as qs p (key-heads k kE a)
+  ahead-go op g (U.runᵒ o so) ls qs p (U.found k′ bs l s as) k kE a with and-split (U.clearˢ k (U.headˢ so)) (k <ᵖ k′) a
+  ... | a₁ , a₂ = race-heads op g o so (U.headˢ so) k′ bs l s as qs p (clear-heads k so a₁) (key-heads k kE a₂)
+
+  repool-go : ∀ {Δ A B q} op (g : A → Pos → U.Node Δ B) (o : U.Outer Δ A) ls qs (p : U.Node Δ B) (sp : U.Step Δ B) (E : U.Earliest Δ B) → Key E
+            → HeadsS q (U.flatˢ op g o ls qs p sp E) → ∀ p′ → HeadsS q (U.goˢ op g o ls qs p′ E)
+  repool-go op g o ls qs p (U.skipˢ k p₁) E kE hd p′ with U.aheadˢ k o E in a | hd
+  ... | true  | hd′ = λ e → ≤ᵖ-trans (hd′ refl) (ahead-go op g o ls qs p′ E k kE a e)
+  ... | false | hd′ = λ e → hd′ (trans (go-pool op g o ls qs p p′ E) e)
+  repool-go op g o ls qs p (U.outˢ k b p₁) E kE hd p′ e = hd (trans (go-pool op g o ls qs p p′ E) e)
+  repool-go op g o ls qs p (U.endˢ k)      E kE hd p′ e = hd (trans (go-pool op g o ls qs p p′ E) e)
+  repool-go op g o ls qs p U.hushˢ         E kE hd p′ e = hd (trans (go-pool op g o ls qs p p′ E) e)
+
+  repool-flat : ∀ {Δ A B q} op (g : A → Pos → U.Node Δ B) (o : U.Outer Δ A) ls qs (p′ : U.Node Δ B) (sp′ : U.Step Δ B) (E : U.Earliest Δ B)
+              → HeadsS q sp′ → HeadsS q (U.goˢ op g o ls qs p′ E) → HeadsS q (U.flatˢ op g o ls qs p′ sp′ E)
+  repool-flat op g o ls qs p′ (U.skipˢ k p₁) E hp hg =
+    if-head (U.aheadˢ k o E) (U.skipˢ k (U.flatMapᶜ op g (U.nodeᵒ o) ls qs p₁)) (U.goˢ op g o ls qs p′ E) hp hg
+  repool-flat op g o ls qs p′ (U.outˢ k b p₁) E hp hg = hg
+  repool-flat op g o ls qs p′ (U.endˢ k)      E hp hg = hg
+  repool-flat op g o ls qs p′ U.hushˢ         E hp hg = hg
+
+  -- A flatMap whose pool heads no sooner heads no sooner with it.
+  heads-repool : ∀ {Δ A B q} op (g : A → Pos → U.Node Δ B) o L Q (pl pl′ : U.Node Δ B)
+               → Heads q (U.flatMapᶜ op g o L Q pl) → Heads q pl′ → Heads q (U.flatMapᶜ op g o L Q pl′)
+  heads-repool op g o L Q pl pl′ hd hp′ =
+    repool-flat op g (U.outerOf o) L Q pl′ (U.step pl′) (U.earliest L) hp′
+      (repool-go op g (U.outerOf o) L Q pl (U.step pl) (U.earliest L) (earliest-key L) hd pl′)
 
   -- A connect past its source's end: its body's head, or a rest's skip
   -- under where the source would have skipped.

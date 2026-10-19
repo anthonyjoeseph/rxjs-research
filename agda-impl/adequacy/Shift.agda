@@ -1500,6 +1500,13 @@ module Shifting (R : Set) where
 
       -- A connect's leftover over a source running on either side: the
       -- source's own leftover pinned alike, the body's leftover alike.
+
+      -- SUSPECT: running, `sourced` reads the source's PART, and nothing
+      -- `Ties` holds relates the part of `u` to that of `v`: `rs₀` pins
+      -- leftovers only.  With `src` at `u`, a part stepping a skip under
+      -- `rp` written to one that hushes, both leftovers idle, pins a
+      -- skip against a hush.  A route needs the parts' burst rests
+      -- pinned through the write, a parameter beside `rs₀`.
       postulate
         rest-sourced : ∀ {Δ A B} {src : Sub h Δ A} (π : Path src u) rp {x x′ : U.Node (A ∷ Δ) ⊤}
                      → (is-just (At.part H src) ∨ is-just (At.part H′ (plant π v))) ≡ true
