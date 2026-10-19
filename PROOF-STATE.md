@@ -287,7 +287,8 @@ by their own silent steps (`Mirror`).
 - **`fed-part`** (Climbs) — FALSITY, `NO EVIDENCE`: the retagged body is the
   body's part fed the value, gapped up to the feed.
 - **`fin-ghost`** (Climbs) — FALSITY, `DEAD ROUTE`: the tree with a finish
-  staged has a sane, placed part, the ghost past the source's skip.
+  staged, its end staged on the way up, has a sane, placed part, the ghost
+  past the source's skip.
 - **`emit-shut`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` whose observer path
   is closed skips its value or its end.
 - **`sub-cold`** (Lift) — FALSITY, `NO EVIDENCE`: a cold begun registers its

@@ -899,14 +899,71 @@ module Ghosting (R : Set) where
   said o (sends y)   = Observer.next o y
   said o (closes ks) = Observer.complete o >>ᴬ ⟦ ks ⟧ᶜ
 
+  -- AN END ON ITS WAY UP HAS ALREADY REACHED EVERY CONNECT IT KILLS: a
+  -- connect the path enters by its source, that source's part gone, has
+  -- its end staged at the run's position.  The end climbs at one
+  -- instant, so the connect's part never reads gone while its body runs.
+  mutual
+    Healed : ∀ {h} (H : Heapᴹ h) (q : Pos) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Path t u → Set₁
+    Healed H q here                            = Lift _ ⊤
+    Healed H q (in-map p)                      = Healed H q p
+    Healed H q (in-scan p)                     = Healed H q p
+    Healed H q (in-take p)                     = Healed H q p
+    Healed H q (in-outer p)                    = Healed H q p
+    Healed H q (in-lanes p)                    = HealedL H q p
+    Healed H q (in-source {e = e} {t = s} p)   = (At.part H s ≡ nothing → e ≡ just q) × Healed H q p
+    Healed H q (in-body p)                     = Healed H q p
+    Healed H q (in-defer p)                    = Healed H q p
+
+    HealedL : ∀ {h} (H : Heapᴹ h) (q : Pos) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} → PathLanes ls u → Set₁
+    HealedL H q (this-lane p) = Healed H q p
+    HealedL H q (next-lane p) = HealedL H q p
+
+  mutual
+    healed-split : ∀ {h} {H : Heapᴹ h} {q} {Δ A Δ′ A′ Δ″ A″} {t : Sub h Δ A} {u : Sub h Δ′ A′} {v : Sub h Δ″ A″} (ρ : Path t u) (τ : Path u v)
+                 → Healed H q (ρ ⊕ τ) → Healed H q ρ
+    healed-split here          τ _       = lift tt
+    healed-split (in-map ρ)    τ hl      = healed-split ρ τ hl
+    healed-split (in-scan ρ)   τ hl      = healed-split ρ τ hl
+    healed-split (in-take ρ)   τ hl      = healed-split ρ τ hl
+    healed-split (in-outer ρ)  τ hl      = healed-split ρ τ hl
+    healed-split (in-lanes πL) τ hl      = healedL-split πL τ hl
+    healed-split (in-source ρ) τ (x , hl) = x , healed-split ρ τ hl
+    healed-split (in-body ρ)   τ hl      = healed-split ρ τ hl
+    healed-split (in-defer ρ)  τ hl      = healed-split ρ τ hl
+
+    healedL-split : ∀ {h} {H : Heapᴹ h} {q} {Δ B Δ′ A′ Δ″ A″} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} {v : Sub h Δ″ A″} (πL : PathLanes ls u) (τ : Path u v)
+                  → HealedL H q (πL ⊕ᴸ τ) → HealedL H q πL
+    healedL-split (this-lane ρ)  τ hl = healed-split ρ τ hl
+    healedL-split (next-lane πL) τ hl = healedL-split πL τ hl
+
+  -- An end reaching a connect's source: the connect's own end staged.
+  mutual
+    healed-end : ∀ {h} {H : Heapᴹ h} {q} {Δ A Δ′ A′ B′ Sj c b kb k fd e rp rt} {t : Sub h Δ A} {s : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+                 (ρ : Path t (connectˢ Sj c b kb k fd rp e rt s bd)) → Healed H q (ρ ⊕ in-source here) → At.part H s ≡ nothing → e ≡ just q
+    healed-end here          (x , _) = x
+    healed-end (in-map ρ)    hl      = healed-end ρ hl
+    healed-end (in-scan ρ)   hl      = healed-end ρ hl
+    healed-end (in-take ρ)   hl      = healed-end ρ hl
+    healed-end (in-outer ρ)  hl      = healed-end ρ hl
+    healed-end (in-lanes πL) hl      = healedL-end πL hl
+    healed-end (in-source ρ) (_ , hl) = healed-end ρ hl
+    healed-end (in-body ρ)   hl      = healed-end ρ hl
+    healed-end (in-defer ρ)  hl      = healed-end ρ hl
+
+    healedL-end : ∀ {h} {H : Heapᴹ h} {q} {Δ B Δ′ A′ B′ Sj c b kb k fd e rp rt} {ls : List (Lane h Δ B)} {s : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+                  (πL : PathLanes ls (connectˢ Sj c b kb k fd rp e rt s bd)) → HealedL H q (πL ⊕ᴸ in-source here) → At.part H s ≡ nothing → e ≡ just q
+    healedL-end (this-lane ρ)  hl = healed-end ρ hl
+    healedL-end (next-lane πL) hl = healedL-end πL hl
+
   -- The node a signal reaches already past it, and the ghost's step the
   -- signal lifted along the path: a value leaves the node standing, an
-  -- end leaves it gone.
+  -- end leaves it gone, every connect it killed on the way ended.
   Passed : ∀ {h} (H : Heapᴹ h) (q : Pos) (g : U.Node [] R) {T : Sub h [] R} {Δ A} {v : Sub h Δ A} → Path T v → Signal T A → Set₁
   Passed H q g {Δ = Δ} {A} {v} σ (sends y) =
     Σ (U.Node Δ A) λ c′ → At.part H v ≡ just c′ × Σ (U.Step [] R) λ S → Lifts H σ (U.outˢ q y c′) S × U.step g ≡ S
   Passed H q g {v = v} σ (closes _) =
-    At.part H v ≡ nothing × Σ (U.Step [] R) λ S → Lifts H σ (U.endˢ q) S × U.step g ≡ S
+    At.part H v ≡ nothing × Σ (U.Step [] R) λ S → Lifts H σ (U.endˢ q) S × U.step g ≡ S × Healed H q σ
 
   -- A SIGNAL ON ITS WAY UP: `sg` about to be told to the observer the
   -- path walks to, the agenda empty above the stack but for the calls

@@ -80,14 +80,14 @@ module Ascending (R : Set) where
   open Moving R using (pairs-r; pairs-split; plant-self; takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
   open Everywhere.Settling R using (settled-plant; settled-retag)
   open Everywhere.Gating R using (gated-alike; gated-path; gated-plant; gated-retag)
-  open Tearing R using (cuts; attached-alike; cuts-switches; fresh-path; takeSite; bodySite; look-store; look-either; Alike; part-alike; partLanes-alike; part-flat; apart-r; apart-l; each-same; seen-alike; seenL-alike; names-path; lanes-path) renaming (Off to Offʰ)
+  open Tearing R using (cuts; attached-alike; cuts-switches; fresh-path; fresh-lanes; part-path; takeSite; bodySite; look-store; look-either; Alike; part-alike; partLanes-alike; part-flat; apart-r; apart-l; each-same; seen-alike; seenL-alike; names-path; lanes-path) renaming (Off to Offʰ)
   open Unsubbing R using (_⇝_; ⇝-trans; now; then; ≗-trans; wk≗; wk-same; bind≗)
   open Sequencing R using (seq-assoc; seq-done)
   open Forking R using (walk-planted)
   open Aliking R using (walk-grow; compile-cong; laneAt-wk; ObsRel)
   open Taking R using (tick-ix0)
   open Naming R using (pre; pairs-↭; names-plant-↭; fresh-plant; fresh-new; wk-pairs; wk-img; to-img)
-  open Ghosting R using (each-sub; each-lanes; module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; done-up; lifts-seen; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
+  open Ghosting R using (each-sub; each-lanes; module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; done-up; Healed; HealedL; healed-split; healed-end; lifts-seen; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
   open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed; stepped-deep)
   open Lowering R using (Keeps; queue-keeps; store-keeps; keeps-trans)
   open Lifting R using (sub-onward; emit-shut; emit-void; run-meets; run-at; emit-run; spread-past; behind-fire; fire-lingers; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward; heads-lift)
@@ -98,7 +98,7 @@ module Ascending (R : Set) where
   open Everywhere.Holding R using (holds-alike; holds-path; holds-plant; holds-retag)
   open Keeping R using (seen-planted)
   open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; let-go; grip; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take)
-  open Framing R using (merged-eq; heads-flat; Untold; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike)
+  open Framing R using (merged-eq; heads-flat; Untold; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off)
     renaming (Ended to Ends)
   open Staging R using (not-src; wrap-lane)
   open Weakening R using (Grows; pure-map) renaming (module Grown to Weakened)
@@ -194,10 +194,10 @@ module Ascending (R : Set) where
     (subst (λ W → Calling.act cl ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-map here) top) (Calling.code cl))
     (U.mapᶜ f c′ , cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.mapᶜ f)) pv , S , Lρ , sg) (done-up ρ (in-map here) refl (Calling.flags cl))
   call-map {m₁ = m₁} {f = f} ρ {closes ks} cl with Calling.lifted cl
-  ... | gn , S , L , sg with lifts-split ρ (in-map here) L
+  ... | gn , S , L , sg , hl with lifts-split ρ (in-map here) L
   ...   | _ , lifts-map lifts-here , Lρ = recall cl refl
     (subst (λ W → Calling.act cl ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-map here) top) (Calling.code cl))
-    (cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.mapᶜ f)) gn , S , Lρ , sg) (done-up ρ (in-map here) refl (Calling.flags cl))
+    (cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.mapᶜ f)) gn , S , Lρ , sg , healed-split ρ (in-map here) hl) (done-up ρ (in-map here) refl (Calling.flags cl))
 
   -- A signal through a defer, as it is.
   call-defer : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {k} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
@@ -208,10 +208,10 @@ module Ascending (R : Set) where
     (subst (λ W → Calling.act cl ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-defer here) top) (Calling.code cl))
     (c′ , pv , S , Lρ , sg) (done-up ρ (in-defer here) refl (Calling.flags cl))
   call-defer ρ {closes ks} cl with Calling.lifted cl
-  ... | gn , S , L , sg with lifts-split ρ (in-defer here) L
+  ... | gn , S , L , sg , hl with lifts-split ρ (in-defer here) L
   ...   | _ , lifts-defer lifts-here , Lρ = recall cl refl
     (subst (λ W → Calling.act cl ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-defer here) top) (Calling.code cl))
-    (gn , S , Lρ , sg) (done-up ρ (in-defer here) refl (Calling.flags cl))
+    (gn , S , Lρ , sg , healed-split ρ (in-defer here) hl) (done-up ρ (in-defer here) refl (Calling.flags cl))
 
   -- A body's cut owed ahead of the agenda, its body gone.
   owned-body : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} {p c bs p₀ c₀ bs₀} {ca : CtlAs t p c bs} (ca₀ : CtlAs t p₀ c₀ bs₀)
@@ -265,7 +265,7 @@ module Ascending (R : Set) where
     (subst (λ W → Calling.act cl ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-body here) top) (Calling.code cl))
     (_ , cong₂ (At.connected (Conf.heap (Mach.conf m₁)) rp e rt) pt pv , S , Lρ , sg) (done-up ρ (in-body here) refl (Calling.flags cl)))
   call-body st {m₁ = m₁} {T = T} {Sj} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = t} {u} ρ {closes ks}
-    record { sane = sn ; placed = pl ; ctl = cx ; code = cd ; stack = sk ; lifted = gn , S , L , sg ; owned = ow
+    record { sane = sn ; placed = pl ; ctl = cx ; code = cd ; stack = sk ; lifted = gn , S , L , sg , hl ; owned = ow
            ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
            ; behind = bh ; lingers = lgr ; flags = dn ; kept = kp }
     with lifts-split ρ (in-body here) L
@@ -274,7 +274,7 @@ module Ascending (R : Set) where
       ; code = ≗-trans (subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-body here) top) cd) (seq-assoc (Observer.complete (Here.obs (walk ρ top))) (Kit.cut c) ⟦ ks ⟧ᶜ)
       ; stack = sk
       ; lifted = gone-connect (Conf.heap (Mach.conf m₁)) {Sj = Sj} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {e = e} {rp = rp} {rt = rt} {t = t} {u = u} gn
-               , S , subst (λ s → Lifts (Conf.heap (Mach.conf m₁)) ρ s S) (body-end Lb) Lρ , sg
+               , S , subst (λ s → Lifts (Conf.heap (Mach.conf m₁)) ρ s S) (body-end Lb) Lρ , sg , healed-split ρ (in-body here) hl
       ; owned = owned-body (Conf.heap (Mach.conf m₁)) (runAs (bodyC ρ ∷ ks) (≗-refl ⟦ bodyC ρ ∷ ks ⟧ᶜ) sk) ρ refl refl refl gn ow
       ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
@@ -416,6 +416,28 @@ module Ascending (R : Set) where
   conn-kept G G′ r nothing  t nothing  (just _) _ = refl
   conn-kept G G′ r (just _) t nothing  (just _) ()
   conn-kept G G′ r e        t (just _) (just _) ()
+
+  -- A write within a node its part unmoved: every connect above that
+  -- reads its source gone, as before.
+  mutual
+    healed-off : ∀ {h} (H H′ : Heapᴹ h) {q} {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) → AllPairs _≢_ (names t)
+               → Offʰ H H′ (names u) → At.part H′ u ≡ At.part H u → Healed H q π → Healed H′ q π
+    healed-off H H′ here ps off eq _ = tt
+    healed-off H H′ (in-map π) ps off eq hl = healed-off H H′ π (fresh-path (in-map here) ps) off eq hl
+    healed-off H H′ (in-scan π) ps off eq hl = healed-off H H′ π (fresh-path (in-scan here) ps) off eq hl
+    healed-off H H′ (in-take π) ps off eq hl = healed-off H H′ π (fresh-path (in-take here) ps) off eq hl
+    healed-off H H′ (in-outer π) ps off eq hl = healed-off H H′ π (fresh-path (in-outer here) ps) off eq hl
+    healed-off H H′ (in-lanes {fl = fl} {oc} {k} {r} {t = so} π) ps off eq hl =
+      healedL-off H H′ π (pairs-r (names so) (pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps))))) off eq hl
+    healed-off H H′ (in-source π) ps off eq (x , hl) =
+      (λ z → x (trans (sym (part-path H H′ π (fresh-path (in-source here) ps) off eq)) z)) , healed-off H H′ π (fresh-path (in-source here) ps) off eq hl
+    healed-off H H′ (in-body π) ps off eq hl = healed-off H H′ π (fresh-path (in-body here) ps) off eq hl
+    healed-off H H′ (in-defer π) ps off eq hl = healed-off H H′ π (fresh-path (in-defer here) ps) off eq hl
+
+    healedL-off : ∀ {h} (H H′ : Heapᴹ h) {q} {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) → AllPairs _≢_ (laneNames ls)
+                → Offʰ H H′ (names u) → At.part H′ u ≡ At.part H u → HealedL H q π → HealedL H′ q π
+    healedL-off H H′ (this-lane π) ps off eq hl = healed-off H H′ π (fresh-lanes (this-lane here) ps) off eq hl
+    healedL-off H H′ (next-lane {l = lane c k s} π) ps off eq hl = healedL-off H H′ π (pairs-r (names s) (pairs-r (quietName k) (pairs-r (cutNames c) ps))) off eq hl
 
   -- A map's part held exactly where what it maps is.
   map-just : ∀ {h} (G : Heapᴹ h) {X Y : Set₁} (g : X → Y) m → is-just (At.mapᴹ G g m) ≡ is-just m
@@ -628,7 +650,7 @@ module Ascending (R : Set) where
   ...     | false | false with take-end ρ py cl
   ...       | g″ , m₀ , path , cr , ag , lt = landed (g″ , m₀ , path , carried cr , lowered ag (inj₁ (⊏-≼ lt (Calling.kept cl))))
   call-take st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {i = i} {p = p} {c = c} {k = k} {u = u} ρ {closes ks}
-    record { sane = sn ; placed = pl ; ctl = refl ; code = cd ; stack = sk ; lifted = gn , S , L , sg ; owned = ow
+    record { sane = sn ; placed = pl ; ctl = refl ; code = cd ; stack = sk ; lifted = gn , S , L , sg , hl ; owned = ow
            ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
            ; behind = bh ; lingers = lgr ; flags = dn ; kept = kp }
     with lifts-split ρ (in-take here) L | subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-take here) top) cd
@@ -637,7 +659,7 @@ module Ascending (R : Set) where
       { sane = sn ; placed = pl ; ctl = refl
       ; code = ≗-trans (f same⊑ _) (bind≗ (≗-trans (wk-same _) (open-code lv)) λ _ → wk-same _)
       ; stack = sk
-      ; lifted = gone-take hp {i = i} {p = p} {c = c} {k = k} {u = u} lv gn , S , Lρ , sg
+      ; lifted = gone-take hp {i = i} {p = p} {c = c} {k = k} {u = u} lv gn , S , Lρ , sg , healed-split ρ (in-take here) hl
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
       ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; lingers = lgr ; flags = done-up ρ (in-take here) refl dn ; kept = kp })
@@ -734,10 +756,10 @@ module Ascending (R : Set) where
             → Calling g (loadOf st) m₁ (ρ ⊕ in-scan here) sg → Called st m₁ (ρ ⊕ in-scan here)
   call-scan st ρ {sends y} cl = rise (Calling.kept cl) (scan-pass ρ cl)
   call-scan st {m₁ = m₁} {f = f} {r} ρ {closes ks} cl with Calling.lifted cl
-  ... | gn , S , L , sg with lifts-split ρ (in-scan here) L
+  ... | gn , S , L , sg , hl with lifts-split ρ (in-scan here) L
   ...   | _ , lifts-scan lifts-here , Lρ = rose now (one-lower ρ one-scan) (recall cl {sg′ = closes ks} refl
     (subst (λ W → Calling.act cl ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-scan here) top) (Calling.code cl))
-    (cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.scanᶜ f (At.val (Conf.heap (Mach.conf m₁)) r))) gn , S , Lρ , sg) (done-up ρ (in-scan here) refl (Calling.flags cl)))
+    (cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.scanᶜ f (At.val (Conf.heap (Mach.conf m₁)) r))) gn , S , Lρ , sg , healed-split ρ (in-scan here) hl) (done-up ρ (in-scan here) refl (Calling.flags cl)))
 
   -- A climbing signal's path reads open: an emitter whose observer path
   -- is closed skips, each operator it passes guarded it on the way up,
@@ -1033,6 +1055,9 @@ module Ascending (R : Set) where
     mine : All (_∈ᴸ names w₀) ns
     mine = there (here refl) ∷ []
 
+    sd-off : Offʰ H H′ (names w₀)
+    sd-off = Heaps.keep H H′ (off-store H (FlatKit.Flat.outerDone fl)) (lookupᴬ mine)
+
     module Wr (fs : AllPairs _≢_ (names T)) = Wrote H H′ ρ (off-store H (FlatKit.Flat.outerDone fl)) mine fs
     module Sh (fs : AllPairs _≢_ (names T)) = Shift H H′ ρ (off-store H (FlatKit.Flat.outerDone fl)) mine fs
 
@@ -1296,7 +1321,7 @@ module Ascending (R : Set) where
                 (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {ks}
               → Calling g (loadOf st) m₁ (ρ ⊕ in-outer here) (closes ks) → Called st m₁ (ρ ⊕ in-outer here)
   close-outer st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} ρ {ks}
-    cl@record { sane = sn ; placed = pd ; ctl = refl ; code = cd ; stack = sk ; lifted = gn , S , L , sg ; owned = ow
+    cl@record { sane = sn ; placed = pd ; ctl = refl ; code = cd ; stack = sk ; lifted = gn , S , L , sg , hl ; owned = ow
               ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
               ; behind = bh ; lingers = lgr ; flags = dn ; kept = kp }
     with lifts-split ρ (in-outer here) L
@@ -1327,6 +1352,7 @@ module Ascending (R : Set) where
       ; lifted = trans (Settles.sd-part hp ρ (fresh-path ρ fs)) (flat-gone hp {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} gn (proj₁ nl) (proj₂ nl)) , S
                , Settles.sd-lifts hp ρ fs (subst₂ (λ ls′ qs′ → Lifts hp ρ (U.outerˢ op (λ a j → U.subscribe (f a) j) o₀ (U.endˢ q) ls′ qs′ po) S)
                                                (proj₁ nl) (proj₂ nl) Lρ) , sg
+               , healed-off hp (Settles.H′ hp ρ) ρ fs (Settles.sd-off hp ρ) (Settles.sd-part hp ρ (fresh-path ρ fs)) (healed-split ρ (in-outer here) hl)
       ; owned = Settles.sd-owned hp ρ fs ow ; kernels = Settles.sd-kernels hp ρ fs kn ; meaning = Settles.sd-meaning hp ρ fs mn
       ; queue = Settles.sd-queue hp ρ fs qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
       ; sorted = sorted-⇝ so path ; behind = Settles.sd-behind hp ρ fs bh
@@ -2191,6 +2217,13 @@ module Ascending (R : Set) where
   lanes-at H one-this (lifts-this lv _) pu rewrite lv | pu = refl
   lanes-at H (one-next {l = l} {ls = ls} o) (lifts-next {bs = bs} {as = as} L) {c′} pu =
     trans (lanes-one H l ls) (trans (cong (At.partLanes H (l ∷ []) ++_) (lanes-at H o L pu)) (sym (++-assoc (At.partLanes H (l ∷ [])) bs (c′ ∷ as))))
+
+  -- The same, the lane's own part gone: it shows nothing.
+  lanes-gone : ∀ {h} (H : Heapᴹ h) {Δ B} {ls : List (Lane h Δ B)} {u : Sub h Δ B} {πL : PathLanes ls u} → OneLane πL
+             → ∀ {s bs S as} → LiftsLane H πL s bs S as → At.part H u ≡ nothing → At.partLanes H ls ≡ bs ++ as
+  lanes-gone H one-this (lifts-this lv _) pu rewrite lv | pu = refl
+  lanes-gone H (one-next {l = l} {ls = ls} o) (lifts-next {bs = bs} {as = as} L) pu =
+    trans (lanes-one H l ls) (trans (cong (At.partLanes H (l ∷ []) ++_) (lanes-gone H o L pu)) (sym (++-assoc (At.partLanes H (l ∷ [])) bs as)))
 
   -- A flatMap holding a lane is open.
   merged-on : ∀ {h} (H : Heapᴹ h) {Δ A B} op (g : A → Pos → U.Node Δ B) (o : Maybe (U.Node Δ A)) (bs : List (U.Node Δ B)) c as qs pl
@@ -3058,7 +3091,7 @@ module Ascending (R : Set) where
               → ∀ {a n} → m₁ ⇝ resend m₁ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (Calling.ϑ cl) (Calling.K cl) a n
               → a ≗ dequeueOf ρ [] → n ≗ ⟦ ks ⟧ᶜ → Called st m₁ (ρ ⊕ in-lanes πL)
   lane-settle st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {op = op} {f} {fl} {oc} {k} {r} {po} {t = t} {ls} ρ πL o {ks}
-    cl@record { sane = sn ; placed = pd ; ctl = refl ; stack = sk ; lifted = _ , S , L , sg ; owned = ow
+    cl@record { sane = sn ; placed = pd ; ctl = refl ; stack = sk ; lifted = gu , S , L , sg , hl ; owned = ow
               ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
               ; behind = bh ; lingers = lgr ; kept = kp } eq₀ {n = n} p ea eks
     with lifts-split ρ (in-lanes πL) L | reads {hp = freed hp (laneOf o) fl} ea
@@ -3083,6 +3116,11 @@ module Ascending (R : Set) where
                , S , Freed.fr-lifts hp ρ o fs (subst (λ s′ → Lifts hp ρ s′ S) (lane-end op G l q po eo ebs eas eqs)
                                               (subst (λ S′ → Lifts hp ρ (U.laneˢ op G (At.part hp t) bs′ l S′ as′ (At.val hp (FlatKit.Flat.queue fl)) po) S)
                                                      (lane-step o LL) Lρ)) , sg
+               , healed-off hp H₂ ρ fs (Heaps.keep hp H₂ (Freed.fr-off hp ρ o) (lookupᴬ (Freed.fr-mine hp ρ o)))
+                            (trans (cong₂ (λ o′ L′ → At.merged hp op G o′ L′ (At.val H₂ (FlatKit.Flat.queue fl)) po) (Freed.fr-part hp ρ o (fresh-path ρ fs))
+                                          (trans (Freed.fr-lanes hp ρ o (fresh-path ρ fs) LL) (sym (lanes-gone hp o LL gu))))
+                                   (cong (λ Q → At.merged hp op G (At.part hp t) (At.partLanes hp ls) Q po) (queue-freed hp (laneOf o) fl)))
+                            (healed-split ρ (in-lanes πL) hl)
       ; owned = owned-move H₂ (runAs [] (≗-refl _) stk) refl refl refl (Freed.fr-owned hp ρ o fs ow)
       ; kernels = Freed.fr-kernels hp ρ o fs (lane-live o LL) kn ; meaning = Freed.fr-meaning hp ρ o fs mn ; queue = Freed.fr-queue hp ρ o fs qu
       ; books = record { fresh = fs ; clocked = proj₁ ck , proj₁ ck , proj₂ ck ; paidUp = pu ; running = rn }
@@ -3150,7 +3188,7 @@ module Ascending (R : Set) where
             → ∀ {a n} → m₁ ⇝ resend m₁ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) (Calling.ϑ cl) (Calling.K cl) a n
             → a ≗ dequeueOf ρ (y ∷ ys) → n ≗ ⟦ ks ⟧ᶜ → Hopped st m₁
   lane-next st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {op = op} {f} {fl} {oc} {k} {r} {po} {t = t} {ls} ρ πL o {ks}
-    cl@record { sane = sn ; placed = pd ; ctl = refl ; stack = sk ; lifted = gn , S , L , sg ; owned = ow
+    cl@record { sane = sn ; placed = pd ; ctl = refl ; stack = sk ; lifted = gn , S , L , sg , _ ; owned = ow
               ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
               ; behind = bh ; lingers = lgr ; kept = kp } {y} {ys} eq₀ {n = n} p ea eks
     with lifts-split ρ (in-lanes πL) L | writes {hp = freed hp (laneOf o) fl} ea
@@ -3457,15 +3495,13 @@ module Ascending (R : Set) where
     -- The ghost past the source's end: the connect shut, its source ended
     -- on what the source left running.
     --
-    -- With `e` staged `nothing` the first conjunct fails for a root connect:
-    -- `connected` reads `nothing` past a dead source, and nothing ever
-    -- stages `e` as `just`.  Staging `e = just q` here revives the connect's
-    -- part, which `fin-kept`, `fin-lkept` and `fin-gone` deny, and its rest
-    -- then needs `Tied rt` to the leftover beyond `Tied`'s first pin.
+    -- Read at `e = just q`, which the end staged on its way up: with `e`
+    -- `nothing` the first conjunct fails for a root connect, `connected`
+    -- reading `nothing` past a dead source.
     --
     -- DEAD ROUTE: a body over `ghost-lift`.  The end lifts to a skip whose node ends its source on `restᶜ c₀`, `c₀` the source node `lifts-source` leaves free and `Passed` ties to nothing on the heap once its part is gone; and the heap's rest is `Tied` to the leftover only at its first step.
     postulate
-      fin-ghost   : ∀ {g S} → Sane [] g → Placed g [] → At.part H u ≡ nothing
+      fin-ghost   : ∀ {g S} → Sane [] g → Placed g [] → At.part H u ≡ nothing → e ≡ just q
               → Lifts H (ρ ⊕ in-source here) (U.endˢ q) S → U.step g ≡ S
               → Σ (U.Node [] R) λ g″ → At.part H′ T′ ≡ just g″ × Sane [] g″ × Placed g″ []
                 × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
@@ -3635,13 +3671,14 @@ module Ascending (R : Set) where
                → Calling g (loadOf st) m₁ (ρ ⊕ in-source here) (closes ks) → Called st m₁ (ρ ⊕ in-source here)
   close-source st ρ cl with src-idle ρ cl
   close-source st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {Sj} {c} {b} {kb} {k} {e = e} {rp} {rt} {u = u} {bd} ρ {ks}
-    cl@record { sane = sn ; placed = pl ; ctl = refl ; code = cd ; stack = sk ; lifted = gn , S , L , sg ; owned = ow
+    cl@record { sane = sn ; placed = pl ; ctl = refl ; code = cd ; stack = sk ; lifted = gn , S , L , sg , hl ; owned = ow
               ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
               ; behind = bh ; lingers = lgr } | refl
     with writes (subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-source here) top) cd)
   ... | n′ , en , path₁ with reads {hp = Fins.H′ hp ρ q} en
-  ...   | k′ , f , path₂ with Fins.fin-ghost hp ρ q sn pl gn L sg
-  ...     | g″ , pg , sn″ , pl″ , k″ , r , ag , pp =
+  ...   | k′ , f , path₂ with Fins.fin-ghost hp ρ q sn pl gn (healed-end ρ hl gn) L sg
+  ...     | g″ , pg , sn″ , pl″ , k″ , r , ag , pp with lifts-split ρ (in-source here) L
+  ...       | _ , lifts-source {b₀ = b₀} pb _ _ , Lρ =
     landed (g″ , _ , path
       , carried (record
         { sane = sn″ ; placed = pl″ ; tree = Fins.T′ hp ρ q
@@ -3651,12 +3688,34 @@ module Ascending (R : Set) where
         ; kernels = Fins.fin-kernels hp ρ q fs kn ; meaning = Fins.fin-meaning hp ρ q fs (Queue.joined qu) mn ; queue = Fins.fin-queue hp ρ q fs qu
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Fins.Bd.body-names hp ρ q))) fs
                          ; clocked = proj₁ ck , Fins.fin-ticked hp ρ q clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
-        ; sorted = sorted-⇝ so path ; behind′ = Eaching.each-to _ _ (Fins.fin-behind hp ρ q fs (tells-past cl) (ended-past cl) bh) ; lingers′ = Lingering.lingers-to _ (Fins.fin-lingers hp ρ q fs (ended-past cl) lgr) })
+        ; sorted = sorted-⇝ so path ; behind′ = Eaching.each-to _ _ (Fins.fin-behind hp ρ q fs (tells-past cl) (ended-past cl) bh) ; lingers′ = Lingering.lingers-to _ (Fins.fin-lingers hp ρ q fs (ended-past cl) lgr)
+        ; flags = let-go H′ (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Fins.Bd.body-names hp ρ q))) fs)
+                    (trans (seen-planted H′ ρ v) (lifts-seen (lifts-off hp H′ ρ fs off₀ Lρ))) ju
+                    (subst (DoneBy H′ (plant ρ v)) (sym (outers-planted ρ v))
+                           (Fins.Sh.shift-flags hp ρ q fs v {ns₀ = []} (λ ()) (Fins.fin-revive hp ρ q fr) fb (subst (DoneBy hp T) (sym (++-identityʳ (outers ρ))) d₀))) })
       , passed ag pp)
     where
       path = ⇝-trans path₁ path₂
       ss = At.val (Fins.H′ hp ρ q) (Subject.subscribers Sj)
       v  = Fins.v hp ρ q
+      H′ = Fins.H′ hp ρ q
+      fr = fresh-path ρ fs
+      w₀ = connectˢ Sj c b kb k idle rp e rt u bd
+      au = Fins.fin-au hp ρ q fr
+      ab = Fins.fin-ab hp ρ q fr
+      off₀ = Heaps.keep hp H′ (off-store hp (Subject.closed Sj)) (lookupᴬ (Fins.mine hp ρ q))
+      d₀ = done-up ρ (in-source here) refl (Calling.flags cl)
+      -- Below the connect: its source's flags and its body's, read alike.
+      fb : DoneBy hp w₀ (outers ρ ++ []) → DoneBy H′ v (outers ρ)
+      fb d = Flag.db-connect H′
+        (λ jb → flags-alike hp H′ au (Flag.db-sub hp d′ (in-source here) (cong (λ z → z ∧ true) (trans (cong is-just (sym (part-alike hp H′ bd ab))) jb))))
+        (λ js → flags-alike hp H′ ab (Flag.db-sub hp d′ (in-body here) (cong (λ z → z ∧ true) (trans (cong (λ x → is-just x ∨ is-just e) (sym (part-alike hp H′ u au))) js))))
+        where d′ = subst (DoneBy hp w₀) (++-identityʳ (outers ρ)) d
+      -- The connect stands: its source gone, its end staged, its body on.
+      ju : is-just (At.part H′ v) ≡ true
+      ju = subst₂ (λ s′ b′ → is-just (At.connected H′ rp e rt s′ b′) ≡ true)
+                  (sym (trans (part-alike hp H′ u au) gn)) (sym (trans (part-alike hp H′ bd ab) pb))
+                  (subst (λ e′ → is-just (At.connected H′ rp e′ rt nothing (just b₀)) ≡ true) (sym (healed-end ρ hl gn)) refl)
       ec = ≗-trans (f same⊑ ss) (bind≗ (≗-refl (Strongly.code R (finC (planted ρ v)))) λ _ → ≗-trans (wk-same ⟦ ks ⟧ᶜ) (Fins.fin-code hp ρ q ks))
 
   -- A signal reaching a connect's subject.
@@ -3682,7 +3741,7 @@ module Ascending (R : Set) where
         ; sorted = sorted-⇝ so (then refl now) ; behind′ = Eaching.each-to _ _ bh ; lingers′ = Lingering.lingers-to _ lgr ; flags = dn })
     , showing (agrees (λ n → agree-refl n _)) (λ ())
   call-root {g} st {m₁ = mach ⟨ hp , p , _ ⟩ clk ts bs td lg en mk} {sg = closes _}
-    record { sane = sn ; placed = pl ; ctl = refl ; code = eff≗ _ ; lifted = _ , _ , lifts-here , sg ; books = record { running = refl } } =
+    record { sane = sn ; placed = pl ; ctl = refl ; code = eff≗ _ ; lifted = _ , _ , lifts-here , sg , _ ; books = record { running = refl } } =
     g , _ , then refl now , closing refl refl sg sn pl , showing (agrees (λ n → agree-refl n _)) (λ ())
 
   -- One operator called, by the operator.
