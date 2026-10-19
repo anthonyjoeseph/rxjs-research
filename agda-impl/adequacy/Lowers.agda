@@ -23,10 +23,12 @@ open import Data.Empty using (⊥-elim)
 open import Data.List.Relation.Unary.Linked using (Linked)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 
-open import denotation.MonotonicList using (Timeline; Pos)
+open import denotation.MonotonicList.Events using (Timeline; Pos)
 open import operation.AbstractObservable using (module Heap; module Run; base; list; joins; fifo; gate) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; Out)
 open import adequacy.Strong using (module Strongly)
+open import adequacy.Strong.Against using (module StrongAgainst)
+open import adequacy.Strong.Held using (module StrongHeld)
 open import adequacy.Torn using (module Tearing)
 import denotation.Unfold as U
 
@@ -34,6 +36,8 @@ module Lowering (R : Set) where
   open Heap using (Kind; cell; slot; play; _∋_; same) renaming (here to hereʰ; there to thereʰ)
   open Shared Timeline (Out R) using (Heapᴹ; store; look; stored)
   open Strongly R
+  open StrongAgainst R
+  open StrongHeld R
   open Tearing R using (torn; tornVia; thrown; thrownLanes; look-store; get-put-same; Site; takeSite; bodySite; siteHeap; siteCall; module Seeing; body-off; body-eq; body-none; body-alike; fresh-path; names-path; seen-alike; part-alike; Alike)
   open Run (Pureᴾ R) using (Act; module Kit; module FlatKit; module Subject)
   open Heap using (_⊑_)

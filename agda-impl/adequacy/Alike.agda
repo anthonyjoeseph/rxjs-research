@@ -25,8 +25,8 @@ open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁; tt to tt₁)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; not)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
 
-open import denotation.MonotonicList using (Timeline; Frame; From; Pos; ix; last; tick; at; _<ᵖ_; <ᵖ-below) renaming (done to doneᶠᵐ; quiet to quietᶠᵐ)
-open import denotation.MonotonicList using () renaming (sub to subᴾ)
+open import denotation.MonotonicList.Events using (Timeline; Frame; From; Pos; ix; last; tick; at; _<ᵖ_; <ᵖ-below) renaming (done to doneᶠᵐ; quiet to quietᶠᵐ)
+open import denotation.MonotonicList.Events using () renaming (sub to subᴾ)
 import Tree as T
 import denotation.Unfold as U
 open import operation.PureObservable using (Out; Pureᴾ)

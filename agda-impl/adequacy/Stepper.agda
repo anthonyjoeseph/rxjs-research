@@ -12,11 +12,13 @@ open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 
-open import denotation.MonotonicList using (Events; out; skip; end; hush; Agree)
+open import denotation.MonotonicList.Events using (Events; out; skip; end; hush)
+open import denotation.MonotonicList using (Agree)
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import adequacy.Sane using (Sane)
-open import adequacy.Placed using (Atop; Ordered; ordered; ordered-≈; Placed; Within)
+open import adequacy.Placed.Order using (Atop; Ordered; ordered; Placed; Within)
+open import adequacy.Placed.Keys using (ordered-≈)
 
 ------------------------------------------------------------------------
 -- Alike: the same events at the same positions, skips and what a cut

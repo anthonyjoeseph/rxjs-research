@@ -23,16 +23,18 @@ open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁; tt to tt₁)
 open import Data.Bool using (_∧_; _∨_; true; false; if_then_else_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
 
-open import denotation.MonotonicList using (Timeline; Frame; From; Pos; ix; last; tick; at; _<ᵖ_; <ᵖ-below) renaming (done to doneᶠᵐ; quiet to quietᶠᵐ)
-open import denotation.MonotonicList using () renaming (sub to subᴾ)
+open import denotation.MonotonicList.Events using (Timeline; Frame; From; Pos; ix; last; tick; at; _<ᵖ_; <ᵖ-below) renaming (done to doneᶠᵐ; quiet to quietᶠᵐ)
+open import denotation.MonotonicList.Events using () renaming (sub to subᴾ)
 import Tree as T
 import denotation.Unfold as U
 open import operation.Machine using (module Machine)
 open import operation.PureObservable using (Out; Pureᴾ)
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
 open import adequacy.Strong using (module Strongly)
+open import adequacy.Strong.Against using (module StrongAgainst)
+open import adequacy.Strong.Held using (module StrongHeld)
 open import adequacy.Moves using (module Moving)
-open import adequacy.Ghost using (module Ghosting)
+open import adequacy.Ghost.Paths using (module GhostingPaths)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Fork using (module Forking)
 
@@ -42,9 +44,11 @@ module Keeping (R : Set) where
   open Shared Timeline (Out R) using (Heapᴹ; ⟨_,_,_⟩)
   open Heap using (there)
   open Run (Pureᴾ R) using (done; module Kit; module FlatKit)
-  open Strongly R using (Sub; pendingˢ; ofˢ; mapˢ; takeWhileˢ; connectˢ; Lane; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_; coldˢ; module At; Each; Lingers; DoneBy; Phase; Pinned; unpinned; pinned-trans; pinned-sym; union-pinned; under-pinned; under-moved; bursts-pinned; bursts-moved; rest-pinned; Restful; rf-idle; rf-rest; rf-union; restful-pinned; Tied; seen; seenL; seen-⊕; isTaking; ∧-split; flatMapˢ; scanˢ; joinˢ; doneˢ; deferˢ; lane)
+  open Strongly R using (Sub; pendingˢ; ofˢ; mapˢ; takeWhileˢ; connectˢ; Lane; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_; coldˢ; module At; Phase; flatMapˢ; scanˢ; joinˢ; doneˢ; deferˢ; lane)
+  open StrongAgainst R using (Each; Lingers; Pinned; unpinned; pinned-trans; pinned-sym; union-pinned; under-pinned; under-moved; bursts-pinned; bursts-moved; rest-pinned; Restful; rf-idle; rf-rest; rf-union; restful-pinned; Tied; seen; seenL; seen-⊕; isTaking; ∧-split)
+  open StrongHeld R using (DoneBy)
   open Moving R using (plant; plantᴸ; planted; plantedᴸ; part-plant; Same; same; same-map; same-scan; same-take; same-flat; same-connect; same-defer)
-  open Ghosting R using (each-sub)
+  open GhostingPaths R using (each-sub)
   open Forking R using (Lands; LandsL; apart; below; fork; forkᴸ; land-body; land-defer; land-lanes; land-map; land-next; land-outer; land-scan; land-source; land-take; land-this; lands-apart; lands-below; landsᴸ-apart)
 
   ------------------------------------------------------------------------

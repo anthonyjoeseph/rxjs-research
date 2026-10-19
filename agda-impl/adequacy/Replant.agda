@@ -23,34 +23,35 @@ open import Data.Bool using (true; false)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst)
 open import Level using (lower)
 
-open import denotation.MonotonicList using (Timeline; Pos; Label; ix; sub; last; Frame; From; _<ᵖ_; <ᵖ-irrefl; <ᵖ-apart)
+open import denotation.MonotonicList.Events using (Timeline; Pos; Label; ix; sub; last; Frame; From; _<ᵖ_; <ᵖ-irrefl; <ᵖ-apart)
 import denotation.Unfold as U
 open import operation.PureObservable using (Out; Pureᴾ; module Pure)
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
 open import adequacy.Strong using (module Strongly)
+open import adequacy.Strong.Against using (module StrongAgainst)
+open import adequacy.Strong.Held using (module StrongHeld)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Retag using (Retag; keep; module Retagging)
 open import adequacy.Torn using (module Tearing)
 open import adequacy.Frame using (module Framing)
-open import adequacy.Shift using (module Shifting)
+open import adequacy.Frame.Repool using (module FramingRepool)
+open import adequacy.Shift.Walk using (module ShiftWalk)
 
 module Replanting (R : Set) where
   open Shared Timeline (Out R) using (Heapᴹ; Stack; store)
   open Heap using (_⊑_; _∋_; Handle; cell) renaming (same to sameʰ)
   open Run (Pureᴾ R) using (Act; wkAct; _>>ᴬ_; module Kit; emitAll; under; module Observer)
   open Pure R using (Timer; cascade)
-  open Strongly R using (Sub; Path; PathLanes; _⊕_; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane;
-                         Lane; lane; Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; code; Leaf; of-leaf; cold-leaf; done-leaf; join-leaf;
-                         walk; walkLanes; top; module Here; unsub; unsubscribing; spot; playing; fired; taken;
-                         pendingˢ; ofˢ; doneˢ; mapˢ; scanˢ; joinˢ; deferˢ; coldˢ; takeWhileˢ; flatMapˢ; connectˢ; taking; ending; idle; feeding; finishing;
-                         Owned; Each; Heads; Lingers; DoneBy; outers; Pinned; Name; names; laneNames; cutNames; quietName; subjectNames; flatNames; module At; _≗_) renaming (⟦_⟧ to ⟦_⟧ᶜ)
-  open Strongly.Against R using (StackAs; BurstAs; Held; bottomAs; restAs; backAs; reholdAs; playsAs; firesAs; overAs; bottomᴴ; restᴴ;
-                                 BurstClocked; Ticked; CtlAs; runAs)
+  open Strongly R using (Sub; Path; PathLanes; _⊕_; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; Lane; lane; Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; code; Leaf; of-leaf; cold-leaf; done-leaf; join-leaf; walk; walkLanes; top; module Here; unsub; unsubscribing; playing; fired; taken; pendingˢ; ofˢ; doneˢ; mapˢ; scanˢ; joinˢ; deferˢ; coldˢ; takeWhileˢ; flatMapˢ; connectˢ; taking; ending; idle; feeding; finishing; outers; Name; names; laneNames; cutNames; quietName; subjectNames; flatNames; module At; _≗_) renaming (⟦_⟧ to ⟦_⟧ᶜ)
+  open StrongAgainst R using (spot; Owned; Each; Lingers; Pinned)
+  open StrongHeld R using (Heads; DoneBy)
+  open StrongAgainst.Against R using (StackAs; BurstAs; Held; bottomAs; restAs; backAs; reholdAs; playsAs; firesAs; overAs; bottomᴴ; restᴴ; BurstClocked; Ticked; CtlAs; runAs)
   open Moving R using (plant; plantᴸ; planted; plant-self; pairs-r; pairs-split; Same; same; same-map; same-scan; same-take; same-flat; same-connect; same-defer)
   open Retagging R using (retag; retagᴸ)
   open Tearing R using (Off; look-either; fresh-path; part-alike; names-path; lanes-path; apart-r; apart-l; narrow)
-  open Framing R using (Untold; Ended; untold)
-  open Shifting R using (module Walk)
+  open Framing R using (untold)
+  open FramingRepool R using (Untold; Ended)
+  open ShiftWalk R using (module Walk)
 
   -- A NODE'S KIN: what a move rewrites it to.  A take ended; a pool
   -- restaged; a connect's feed restaged from `idle`, its body's joiners
@@ -310,7 +311,7 @@ module Replanting (R : Set) where
     open At H
     T′ = plant ρ v
     ca′ = runAs (owed kn ρ ++ rehomes kn ρ ks) e′ (restack kn ρ sk)
-    open Strongly.Against R T′ using (agenda; bursts; begins; Placed)
+    open StrongAgainst.Against R T′ using (agenda; bursts; begins; Placed)
 
     postulate
       run-ofs    : ∀ {Δ′ A′ q i xs} (π : Path T′ (ofˢ {Δ = Δ′} {A′} q i xs)) → (q , emitC π) ∈ᴸ agenda ca′

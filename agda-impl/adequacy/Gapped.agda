@@ -21,17 +21,17 @@ open import Data.Product using (_×_; _,_)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import denotation.MonotonicList using (Pos; _<ᵖ_; ix; end)
+open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; ix; end)
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import adequacy.Sorted using (_≤ᵖ_)
 open import adequacy.Sane using (Sane; allLive)
-open import adequacy.Placed using (Placed; Ordered; Reaches; Headed; Sorted; Alienᴱ)
-open import adequacy.Strong using (module Strongly)
+open import adequacy.Placed.Order using (Placed; Ordered; Reaches; Headed; Sorted; Alienᴱ)
+open import adequacy.Strong.Held using (module StrongHeld)
 open import adequacy.Ghost using (module Ghosting)
 
 module Gapping (R : Set) where
-  open Strongly R using (Heads)
+  open StrongHeld R using (Heads)
   open Ghosting R using (Past; residual)
 
   -- A joiner's entries, skips dropped.

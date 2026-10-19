@@ -14,13 +14,8 @@ open import Data.Nat using (ℕ; zero; suc; _<ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂)
 
-open import denotation.MonotonicList using (MonotonicList; Events; Events∞; Tail; Tail∞; idle; out; skip; end; hush; Agree; Agreeᵀ;
-  stopᵀ; pin⁼; idle⁼; agreeᵀ-refl; agreeᵀ-pred; agree-refl; agree-pred; stop; out⁼; skip⁼;
-  end⁼; hush⁼; _≈[_]_; agrees; agree; agreeᵀ; ≈ₖ-pred; enter; mapᴰ; scanᴰ; takeWhileᴰ; mapᴱ;
-  scanᴱ; takeWhileᴱ; taking; hot; rejoin; _∪_; first; sooner; burstOn; runOn; inside; tailᴱ;
-  onward∞; beside; side; ahead; body; before; connectᴰ; ix; _<ᵖ_; FlatOp; mergeᶠ; switchᶠ;
-  exhaustᶠ; head; Earliest; none; found; earliest; admit; cuts; whole; clear; headᴼ; clears;
-  ahead-of; go; left; parts; viaOuter; race; outer; lane; flatMapᴰ)
+open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Tail∞; idle; out; skip; end; hush; _∪_; first; sooner; inside; ix; _<ᵖ_)
+open import denotation.MonotonicList using (MonotonicList; Agree; Agreeᵀ; stopᵀ; pin⁼; idle⁼; agreeᵀ-refl; agreeᵀ-pred; agree-refl; agree-pred; stop; out⁼; skip⁼; end⁼; hush⁼; _≈[_]_; agrees; agree; agreeᵀ; ≈ₖ-pred; enter; mapᴰ; scanᴰ; takeWhileᴰ; mapᴱ; scanᴱ; takeWhileᴱ; taking; hot; rejoin; burstOn; runOn; tailᴱ; onward∞; beside; side; ahead; body; before; connectᴰ; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; head; Earliest; none; found; earliest; admit; cuts; whole; clear; headᴼ; clears; ahead-of; go; left; parts; viaOuter; race; outer; lane; flatMapᴰ)
 open Events∞
 open Tail∞
 

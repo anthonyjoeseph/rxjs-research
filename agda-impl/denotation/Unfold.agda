@@ -47,12 +47,10 @@ import Data.List as L
 
 import Tree as T
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList using (MonotonicList; Events; Events∞; out; skip; end; hush; Time; Pos; ix; last; tick; _<ᵖ_;
-  inside; Tail; pin; idle; Tail∞; _∪_; tailᴱ;
-  Timeline; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close) renaming (sub to subᴾ; cold to coldᴹ)
-import denotation.MonotonicList as M
-open import denotation.MonotonicList using (Agree; agree-refl; agreeᵀ-refl; agree-trans; agreeᵀ-trans; _≈[_]_; agrees; agree; agreeᵀ;
-  ≈ₖ-sym; ≈ₖ-trans; ≈ₖ-pred; hot; deferᴰ)
+open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush; Time; Pos; ix; last; tick; _<ᵖ_; inside; Tail; pin; idle; Tail∞; _∪_; Timeline; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close) renaming (sub to subᴾ)
+open import denotation.MonotonicList using (MonotonicList; tailᴱ) renaming (cold to coldᴹ)
+import denotation.MonotonicList as M′
+open import denotation.MonotonicList using (Agree; agree-refl; agreeᵀ-refl; agree-trans; agreeᵀ-trans; _≈[_]_; agrees; agree; agreeᵀ; ≈ₖ-sym; ≈ₖ-trans; ≈ₖ-pred; hot; deferᴰ)
 open import denotation.Denote using (DenEnv; flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
 open import denotation.Compositional using (EnvAgree; _∷ᵉ_; lookup-agree; deferᴰ-contractive; approx-ne; from; toward; Compositional; compositional)
 module C = Compositional compositional
@@ -534,30 +532,30 @@ fedᴺ ((q , a) ∷ xs) e = put q a (fedᴺ xs e)
 -- A joiner after its feed: told its end, or the source's run, rejoined.
 joined : ∀ {Γ A} → A ∈ Γ → Pos → Maybe Pos → NEnv Γ → Events A
 joined i p (just c) ρ = end c
-joined i p nothing  ρ = M.rejoin p (lookup ρ i)
+joined i p nothing  ρ = M′.rejoin p (lookup ρ i)
 
 -- A node's meaning, each read by its operator's own stream function, a
 -- `defer` by the fold's meaning of the program it defers; a rest, its
 -- tail run.
 mutual
   meaning : ∀ {Γ A} → Node Γ A → NEnv Γ → Events A
-  meaning (framesᶜ τ e m)             ρ = M.frames τ e m
-  meaning (burstᶜ τ r i b)            ρ = M.burst τ r i b
-  meaning (ofᶜ p i xs)                ρ = M.ofᴱ p i xs
-  meaning (mapᶜ f c)                  ρ = M.mapᴱ f (meaning c ρ)
-  meaning (scanᶜ f z c)               ρ = M.scanᴱ f z (meaning c ρ)
-  meaning (takeWhileᶜ i p c)          ρ = M.takeWhileᴱ i p (meaning c ρ)
+  meaning (framesᶜ τ e m)             ρ = M′.frames τ e m
+  meaning (burstᶜ τ r i b)            ρ = M′.burst τ r i b
+  meaning (ofᶜ p i xs)                ρ = M′.ofᴱ p i xs
+  meaning (mapᶜ f c)                  ρ = M′.mapᴱ f (meaning c ρ)
+  meaning (scanᶜ f z c)               ρ = M′.scanᴱ f z (meaning c ρ)
+  meaning (takeWhileᶜ i p c)          ρ = M′.takeWhileᴱ i p (meaning c ρ)
   meaning (flatMapᶜ op g o ls qs pl)  ρ =
-    M.go (flatOp op) (outerᴺ g o ρ) (states ls ρ) (L.map (λ a → coldᴹ λ q → stateᴺ (g a q) ρ) qs) (cutᴺ pl ρ)
+    M′.go (flatOp op) (outerᴺ g o ρ) (states ls ρ) (L.map (λ a → coldᴹ λ q → stateᴺ (g a q) ρ) qs) (cutᴺ pl ρ)
   meaning (joinᶜ i p xs e)            ρ = fedᴺ xs (joined i p e ρ)
-  meaning (connectᶜ r b (live s))     ρ = M.beside r (stateᴺ b (meaning s ρ ∷ᴬ ρ)) (stateᴺ s ρ)
-  meaning (connectᶜ r b (ended c t))  ρ = M.beside r (stateᴺ b (end c ∷ᴬ ρ)) (stateᴺ t ρ)
-  meaning (deferᶜ l p ns)             ρ = M.observe (deferᴰ (⟦ Later.force l ⟧ᴰ (hots (replay ns ρ)))) p
+  meaning (connectᶜ r b (live s))     ρ = M′.beside r (stateᴺ b (meaning s ρ ∷ᴬ ρ)) (stateᴺ s ρ)
+  meaning (connectᶜ r b (ended c t))  ρ = M′.beside r (stateᴺ b (end c ∷ᴬ ρ)) (stateᴺ t ρ)
+  meaning (deferᶜ l p ns)             ρ = M′.observe (deferᴰ (⟦ Later.force l ⟧ᴰ (hots (replay ns ρ)))) p
   meaning (endingᶜ p n)               ρ = end p
   meaning (restᶜ n)                   ρ = tailᴱ (cutᴺ n ρ)
   meaning idleᶜ                       ρ = hush
   meaning (unionᶜ x y)                ρ = tailᴱ (cutᴺ x ρ ∪ cutᴺ y ρ)
-  meaning (burstingᶜ r t)             ρ = tailᴱ (M.burstOn r (stateᴺ t ρ))
+  meaning (burstingᶜ r t)             ρ = tailᴱ (M′.burstOn r (stateᴺ t ρ))
   meaning (underᶜ (live s) b)         ρ = tailᴱ (cutᴺ b (meaning s ρ ∷ᴬ ρ))
   meaning (underᶜ (ended c t) b)      ρ = tailᴱ (cutᴺ b (end c ∷ᴬ ρ))
 
@@ -566,13 +564,13 @@ mutual
   cutᴺ (mapᶜ f c)                 ρ = cutᴺ c ρ
   cutᴺ (scanᶜ f z c)              ρ = cutᴺ c ρ
   cutᴺ (takeWhileᶜ i p c)         ρ = cutᴺ c ρ
-  cutᴺ (flatMapᶜ op g o ls qs pl) ρ = M.whole (outerᴺ g o ρ) (states ls ρ) (cutᴺ pl ρ)
-  cutᴺ (connectᶜ r b (live s))    ρ = M.burstOn r (stateᴺ s ρ) ∪ cutᴺ b (meaning s ρ ∷ᴬ ρ)
-  cutᴺ (connectᶜ r b (ended c t)) ρ = M.burstOn r (stateᴺ t ρ) ∪ cutᴺ b (end c ∷ᴬ ρ)
+  cutᴺ (flatMapᶜ op g o ls qs pl) ρ = M′.whole (outerᴺ g o ρ) (states ls ρ) (cutᴺ pl ρ)
+  cutᴺ (connectᶜ r b (live s))    ρ = M′.burstOn r (stateᴺ s ρ) ∪ cutᴺ b (meaning s ρ ∷ᴬ ρ)
+  cutᴺ (connectᶜ r b (ended c t)) ρ = M′.burstOn r (stateᴺ t ρ) ∪ cutᴺ b (end c ∷ᴬ ρ)
   cutᴺ (endingᶜ p n)              ρ = cutᴺ n ρ
   cutᴺ (restᶜ n)                  ρ = cutᴺ n ρ
   cutᴺ (unionᶜ x y)               ρ = cutᴺ x ρ ∪ cutᴺ y ρ
-  cutᴺ (burstingᶜ r t)            ρ = M.burstOn r (stateᴺ t ρ)
+  cutᴺ (burstingᶜ r t)            ρ = M′.burstOn r (stateᴺ t ρ)
   cutᴺ (underᶜ (live s) b)        ρ = cutᴺ b (meaning s ρ ∷ᴬ ρ)
   cutᴺ (underᶜ (ended c t) b)     ρ = cutᴺ b (end c ∷ᴬ ρ)
   cutᴺ _                          ρ = idle
@@ -583,7 +581,7 @@ mutual
 
   -- The outer, each element made the lane it opens.
   outer∞ : ∀ {Γ A B} → (A → Pos → Node Γ B) → Node Γ A → NEnv Γ → Events∞ (MonotonicList B)
-  outer∞ g o ρ .force = M.mapᴱ (λ a → coldᴹ λ q → stateᴺ (g a q) ρ) (meaning o ρ)
+  outer∞ g o ρ .force = M′.mapᴱ (λ a → coldᴹ λ q → stateᴺ (g a q) ρ) (meaning o ρ)
   outer∞ g o ρ .cut   = cutᴺ o ρ
 
   outerᴺ : ∀ {Γ A B} → (A → Pos → Node Γ B) → Maybe (Node Γ A) → NEnv Γ → Maybe (Events∞ (MonotonicList B))
@@ -601,7 +599,7 @@ nodeᴹ o ρ = coldᴹ λ p → stateᴺ (subscribe o p) ρ
 ------------------------------------------------------------------------
 -- The meaning is the fold's
 
-start-meaning : ∀ {Γ A} p (m : From A 0) (ρ : NEnv Γ) → meaning (startᶜ p m) ρ ≡ M.start p m
+start-meaning : ∀ {Γ A} p (m : From A 0) (ρ : NEnv Γ) → meaning (startᶜ p m) ρ ≡ M′.start p m
 start-meaning p (at zero _ b)    ρ = refl
 start-meaning p (at (suc _) _ b) ρ = refl
 start-meaning p done             ρ = refl
@@ -621,9 +619,9 @@ start-cut p quiet            ρ = refl
 -- environments agree.  Each operator's state is its fold's field by
 -- field, so each clause re-reads the fold's agreement at its own.
 subscribed : ∀ {Γ A k} (o : Obs Timeline Γ A) {ρ : NEnv Γ} {σ : DenEnv Γ} → EnvAgree k (hots ρ) σ → nodeᴹ o ρ ≈[ k ] ⟦ o ⟧ᴰ σ
-subscribed {k = k} (cold c) {ρ} {σ} e = ≈ₖ-trans {y = M.coldᴰ (lower c)} (agrees
-  (λ p → subst (λ x → M.Agreeᵀ _ x idle) (sym (start-cut p (lower c) ρ)) (agreeᵀ-refl _ _))
-  (λ p → subst (λ x → Agree _ x (M.start p (lower c))) (sym (start-meaning p (lower c) ρ)) (agree-refl _ _)))
+subscribed {k = k} (cold c) {ρ} {σ} e = ≈ₖ-trans {y = M′.coldᴰ (lower c)} (agrees
+  (λ p → subst (λ x → M′.Agreeᵀ _ x idle) (sym (start-cut p (lower c) ρ)) (agreeᵀ-refl _ _))
+  (λ p → subst (λ x → Agree _ x (M′.start p (lower c))) (sym (start-meaning p (lower c) ρ)) (agree-refl _ _)))
   (≈ₖ-sym (C.coldᶜ c σ k))
 subscribed {k = k} empty             {σ = σ} e = agrees (agreeᵀ h) (agree h)
   where h = ≈ₖ-sym (C.emptyᶜ σ k)
@@ -641,10 +639,10 @@ subscribed {k = k} (flatMap op f s)  {ρ} {σ} e = agrees
   where
     F = λ a → nodeᴹ (f a) ρ
     h = ≈ₖ-trans (flatMapᴰ-ne (flatOp op) {f = F} (subscribed s e) λ a → subscribed (f a) e) (≈ₖ-sym (C.flatMapᶜ op f s σ k))
-    alike = λ p → liveᴼ {e = outer∞ (λ a q → subscribe (f a) q) (subscribe s p) ρ} {M.enter (M.mapᴰ F (nodeᴹ s ρ)) p}
+    alike = λ p → liveᴼ {e = outer∞ (λ a q → subscribe (f a) q) (subscribe s p) ρ} {M′.enter (M′.mapᴰ F (nodeᴹ s ρ)) p}
       (agreeᵀ-refl _ _) (mapᴱ-neᴹ (λ a → agrees (λ q → agreeᵀ-refl _ _) (λ q → agree-refl _ _)) (agree-refl _ _))
 subscribed {k = k} (connect s b)     {ρ} {σ} e = ≈ₖ-trans (agrees
-  (λ p → ∪-ne (burstOn-ne (p ++ [ ix 1 ]) {stateᴺ (subscribe s (p ++ [ ix 1 ])) ρ} {M.enter (⟦ s ⟧ᴰ σ) (p ++ [ ix 1 ])}
+  (λ p → ∪-ne (burstOn-ne (p ++ [ ix 1 ]) {stateᴺ (subscribe s (p ++ [ ix 1 ])) ρ} {M′.enter (⟦ s ⟧ᴰ σ) (p ++ [ ix 1 ])}
                 (entered src (p ++ [ ix 1 ])))
               (Agreeˢ.cutˢ (bodies p)))
   (λ p → beside-ne (p ++ [ ix 1 ]) (bodies p) (entered src (p ++ [ ix 1 ]))))

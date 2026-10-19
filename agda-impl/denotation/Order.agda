@@ -22,7 +22,7 @@ open import Data.Product using (_×_; _,_; ∃)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
-open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time)
+open import denotation.MonotonicList.Events using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time)
 
 ------------------------------------------------------------------------
 -- What a reader sees

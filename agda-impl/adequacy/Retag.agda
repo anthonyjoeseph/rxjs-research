@@ -18,11 +18,13 @@ open import Data.Empty using (⊥-elim)
 open import Level using (lift)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import denotation.MonotonicList using (Timeline; Pos)
+open import denotation.MonotonicList.Events using (Timeline; Pos)
 import denotation.Unfold as U
 open import operation.AbstractObservable using (module Run; module Heap; maybe; quiet) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; Out)
 open import adequacy.Strong using (module Strongly)
+open import adequacy.Strong.Against using (module StrongAgainst)
+open import adequacy.Strong.Held using (module StrongHeld)
 
 -- What a joiner at `x`, joined at `j`, holds, rewritten.
 Retag : List Set → Set₁
@@ -42,6 +44,8 @@ at-here o (there x)   j st = st
 module Retagging (R : Set) where
   open Shared Timeline (Out R) using (Heapᴹ)
   open Strongly R
+  open StrongAgainst R
+  open StrongHeld R
   open Heap using (Quiet)
   open Run (Pureᴾ R) using (Env; Ref; Subject; module Kit)
 

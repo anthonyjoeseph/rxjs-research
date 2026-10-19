@@ -29,16 +29,19 @@ open import Level using (lift)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst; subst₂)
 
-open import denotation.MonotonicList using (Timeline; Frame; From; Pos; ix; last; tick; at; _<ᵖ_; <ᵖ-below) renaming (done to doneᶠᵐ; quiet to quietᶠᵐ)
-open import denotation.MonotonicList using () renaming (sub to subᴾ)
+open import denotation.MonotonicList.Events using (Timeline; Frame; From; Pos; ix; last; tick; at; _<ᵖ_; <ᵖ-below) renaming (done to doneᶠᵐ; quiet to quietᶠᵐ)
+open import denotation.MonotonicList.Events using () renaming (sub to subᴾ)
 import Tree as T
 import denotation.Unfold as U
 open import operation.Machine using (module Machine)
 open import operation.PureObservable using (Out; Pureᴾ)
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
 open import adequacy.Strong using (module Strongly)
+open import adequacy.Strong.Against using (module StrongAgainst)
+open import adequacy.Strong.Held using (module StrongHeld)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Ghost using (module Ghosting)
+open import adequacy.Ghost.Paths using (module GhostingPaths)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Grow using (module Growing)
 open import adequacy.Seq using (module Sequencing)
@@ -49,11 +52,12 @@ open import adequacy.Kept using (module Keeping)
 open import adequacy.Moved using (module Planting)
 open import adequacy.Restages using (module Staging)
 open import adequacy.Weaken using (module Weakening)
-open import adequacy.Every using (module Everywhere)
+open import adequacy.Weaken.Heaps using (module WeakeningHeaps)
+open import adequacy.Every.Gating using (module EverywhereGated)
 open import adequacy.Names using (module Naming)
 open import adequacy.Alike using (module Aliking)
 open import adequacy.Frame using (module Framing)
-open import adequacy.Placed using (Headed)
+open import adequacy.Placed.Order using (Headed)
 
 module Taking (R : Set) where
   open Machine R using (Mach; mach; step; wkPlaying; wkTodo)
@@ -64,18 +68,22 @@ module Taking (R : Set) where
   open Shared Timeline (Out R) using (Heapᴹ; Conf; ⟨_,_,_⟩; run; extend)
   open Heap using (World; _⊑_; _⨾_; there; new; grow; cell) renaming (here to hereʳ; same to same⊑)
   open Run (Pureᴾ R) using (Act; done; newRef; under; _>>ᴬ_; compile; Env; wkEnv; module Kit; Ref; wkR; Kont; wkObs)
-  open Strongly R using (Carried; Books; Sub; pendingˢ; takeWhileˢ; Path; here; in-take; _⊕_; Here; walk; top; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; DoneBy; names; pendings; Phase; rest-pinned; seen; ≗-refl; newRef≗; taking; takeK; unsubscribing; under≗; module Canon; owned-to; module Eaching; module Lingering)
-  open Strongly.Against R using (StackAs; subAs; SrcOf; src-of)
+  open Strongly R using (Sub; pendingˢ; takeWhileˢ; Path; here; in-take; _⊕_; Here; walk; top; _≗_; module At; names; pendings; Phase; ≗-refl; newRef≗; taking; takeK; unsubscribing; under≗; module Canon)
+  open StrongAgainst R using (Books; Job; Owned; Kernels; Meaning; Queue; Each; Lingers; rest-pinned; seen; owned-to)
+  open StrongHeld R using (Carried; Heads; DoneBy; module Eaching; module Lingering)
+  open StrongAgainst.Against R using (StackAs; subAs; SrcOf; src-of)
   open Moving R using (planted; pend; part-plant; holds-owed; fed-plant; pendings-plant; subjects-plant; joiners-plant)
-  open Everywhere.Settling R using (settled-plant)
-  open Everywhere.Gating R using (gated-plant)
-  open Ghosting R using (walk-⊕; sorted-⇝)
+  open EverywhereGated.Settling R using (settled-plant)
+  open EverywhereGated.Gating R using (gated-plant)
+  open Ghosting R using (sorted-⇝)
+  open GhostingPaths R using (walk-⊕)
   open Forking R using (pend-less; subOf; walk-planted)
   open Keeping R using (each-plant; lingers-plant; flags-plant)
   open Planting R using (module Moved)
   open Staging R using (Restages; not-src; wrap-take)
   open Weakening R using (module Grown; pend-grow)
-  open Everywhere R using (module Growths)
+  open WeakeningHeaps R using (module GrownHeaps)
+  open EverywhereGated R using (module Growths)
   open Naming R using (Img; fresh-new; fresh-plant; grows-extend; pending-↭; to-img; wk-img; wk-pairs; wkN)
   open Aliking R using (KontRel; ObsRel; compile-cong; obs-trans; obs-wk; obs-⨾; takeO-cong; walk-grow; ≗-sym)
   open Framing R using (sub-heads)
@@ -235,23 +243,25 @@ module Taking (R : Set) where
     _ , then (cong (λ x → step (Mx x)) e₁) now
     , record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = S.t′
              ; ctlAs = subAs S.π′ (S.code′ E′ υ e (kk₂ new hereʳ)) (S.restack sk₂ a₂) (S.alones _)
-             ; meets = trans (part-plant H₂ S.π₂ S.v eqv) (trans (G₂.grow-part gr₂ S.T₁) (trans (G₁.grow-part gr₁ (Carried.tree cr)) (Carried.meets cr)))
+             ; meets = trans (part-plant H₂ S.π₂ S.v eqv) (trans (G₂′.grow-part gr₂ S.T₁) (trans (G₁′.grow-part gr₁ (Carried.tree cr)) (Carried.meets cr)))
              ; owned′ = owned-to (Moved.Owning.reowned S.π₂ S.v H₂ eqv (in-take here) S.inner sk₂ a₂
-                         (G₂.grow-owned gr₂ {cd′ = cd₂} sk₁ {a′ = a₂} (G₁.grow-owned gr₁ {cd′ = cd₁} sk {a′ = a₁} (Carried.owned cr))))
+                         (G₂′.grow-owned gr₂ {cd′ = cd₂} sk₁ {a′ = a₂} (G₁′.grow-owned gr₁ {cd′ = cd₁} sk {a′ = a₁} (Carried.owned cr))))
              ; kernels = S.rt-kernels H₂ eqv refl (Growths.kernels-grow S.ν₂ gr₂ (Growths.kernels-grow S.ν₁ gr₁ (Carried.kernels cr)))
-             ; meaning = S.rt-meaning H₂ eqv refl (G₂.grow-meaning gr₂ (G₁.grow-meaning gr₁ (Carried.meaning cr)))
-             ; queue = S.rt-queue H₂ eqv refl (G₂.grow-queue gr₂ (G₁.grow-queue gr₁ (Carried.queue cr)))
+             ; meaning = S.rt-meaning H₂ eqv refl (G₂′.grow-meaning gr₂ (G₁′.grow-meaning gr₁ (Carried.meaning cr)))
+             ; queue = S.rt-queue H₂ eqv refl (G₂′.grow-queue gr₂ (G₁′.grow-queue gr₁ (Carried.queue cr)))
              ; books = record { fresh = S.take-fresh (Books.fresh bk)
                               ; clocked = proj₁ (Books.clocked bk) , S.reticked sk₂ a₂ (G₂.grow-ticked sk₁ (G₁.grow-ticked sk (proj₂ (Books.clocked bk))))
                               ; paidUp = cong (mapList (wkTodo new)) (cong (mapList (wkTodo new)) (Books.paidUp bk)) ; running = Books.running bk }
              ; sorted = sorted-⇝ (Carried.sorted cr) (then refl (then (cong (λ x → step (Mx x)) e₁) now))
-             ; behind′ = Eaching.each-to _ _ (S.rt-behind H₂ eqv refl (pos-headed cr) (G₂.grow-each gr₂ (G₁.grow-each gr₁ (Carried.behind cr))))
-             ; lingers′ = Lingering.lingers-to _ (S.rt-lingers H₂ eqv refl (G₂.grow-lingers gr₂ (G₁.grow-lingers gr₁ (Carried.lingers cr))))
-             ; flags = S.rt-flags H₂ eqv refl (G₂.grow-flags gr₂ (G₁.grow-flags gr₁ (Carried.flags cr))) }
+             ; behind′ = Eaching.each-to _ _ (S.rt-behind H₂ eqv refl (pos-headed cr) (G₂′.grow-each gr₂ (G₁′.grow-each gr₁ (Carried.behind cr))))
+             ; lingers′ = Lingering.lingers-to _ (S.rt-lingers H₂ eqv refl (G₂′.grow-lingers gr₂ (G₁′.grow-lingers gr₁ (Carried.lingers cr))))
+             ; flags = S.rt-flags H₂ eqv refl (G₂′.grow-flags gr₂ (G₁′.grow-flags gr₁ (Carried.flags cr))) }
     , refl , inj₁ (inj₁ S.less)
     where module S = Taken {i = i} {p = p} {s = s} π
           module G₁ = Grown S.ν₁
+          module G₁′ = GrownHeaps S.ν₁
           module G₂ = Grown S.ν₂
+          module G₂′ = GrownHeaps S.ν₂
           H₁ = extend H (lift true)
           H₂ = extend H₁ (lift nothing)
           Mx : Act (cell (base Bool) ∷ _) ⊤ → Mach

@@ -28,28 +28,33 @@ open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈�
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ)
 
-open import denotation.MonotonicList using (Timeline)
+open import denotation.MonotonicList.Events using (Timeline)
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; Out)
 open import adequacy.Strong using (module Strongly)
+open import adequacy.Strong.Against using (module StrongAgainst)
+open import adequacy.Strong.Held using (module StrongHeld)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Torn using (module Tearing)
 open import adequacy.Lowers using (module Lowering)
 open import adequacy.Every using (module Everywhere)
+open import adequacy.Every.Gating using (module EverywhereGated)
 
 module Locality (R : Set) where
   open Heap using (Quiet; Sink; _∋_; same; cell; slot)
   open Shared Timeline (Out R) using (Heapᴹ; look; store; stored; Val; wkVal)
   open Strongly R
+  open StrongAgainst R
+  open StrongHeld R
   open Moving R using (pairs-split; pairs-r; plant; plant-self; plantᴸ; planted; plantedᴸ; count-plant; switches-plant)
   open Tearing R using (Off; Alike; cuts; cuts-switches; attached-alike; stashed-alike; holds-at; holdsL-at; names-path; lanes-path; fresh-path; narrow; apart-r; apart-l; ≢-flip; look-store; torn; tornVia; thrown; thrown-off;
     thrownLanes; thrownLanes-off; torn-off; tornVia-off; get-put-same; Site; takeSite; bodySite; siteHeap)
   open Run (Pureᴾ R) using (Env; Observer; Subject; module Kit; module FlatKit)
   open Lowering R using (module Lowers; via-lowers; thrown-lowers; lanes-lowers; dropped; false≢true)
   open Lowers using (lowers)
-  open Everywhere.Holding R using (holds-alike; holds-path)
+  open EverywhereGated.Holding R using (holds-alike; holds-path)
   open Everywhere.Spending R using (spent-alike)
-  open Everywhere.Gating R using (gated-alike; gated-path)
+  open EverywhereGated.Gating R using (gated-alike; gated-path)
 
   ----------------------------------------------------------------------
   -- A flatMap's lanes: their switches, those gone
