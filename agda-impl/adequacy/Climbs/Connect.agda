@@ -185,6 +185,7 @@ module ClimbConnect (R : Set) where
     kin : Kin w₀ v
     kin = kin-feed {g = at-here (At.owing H fd′)}
 
+    g₀ : Retag (A ∷ Δ)
     g₀ = at-here (At.owing H fd′)
 
     part-v : At.part H v ≡ At.connected H rp e rt (At.part H u) (At.part H (retag g₀ bd))
