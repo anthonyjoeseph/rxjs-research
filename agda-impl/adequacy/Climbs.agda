@@ -3700,7 +3700,7 @@ module Ascending (R : Set) where
         ; flags = let-go H′ (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Fins.Bd.body-names hp ρ q))) fs)
                     (trans (seen-planted H′ ρ v) (lifts-seen (lifts-off hp H′ ρ fs off₀ Lρ))) ju
                     (subst (DoneBy H′ (plant ρ v)) (sym (outers-planted ρ v))
-                           (Fins.Sh.shift-flags hp ρ q fs v {ns₀ = []} (λ ()) (Fins.fin-revive hp ρ q fr) fb (subst (DoneBy hp T) (sym (++-identityʳ (outers ρ))) d₀))) })
+                           (Fins.Sh.shift-flags hp ρ q fs v {ns₀ = []} (λ ()) rv fb (subst (DoneBy hp T) (sym (++-identityʳ (outers ρ))) d₀))) })
       , passed ag pp)
     where
       path = ⇝-trans path₁ path₂
@@ -3738,6 +3738,11 @@ module Ascending (R : Set) where
       ju = trans (just-connected H′ rp _ rt (cong is-just (trans (part-alike hp H′ u au) gn))
                                             (trans (cong is-just (part-alike hp H′ (retag g bd) ab′)) (trans (part-retag hp g bd kh fbd) (cong is-just pb))))
                  (subst (λ e′ → is-just (At.connected H′ rp e′ rt nothing (just b₀)) ≡ true) (sym (healed-end ρ hl gn)) refl)
+      -- Open after, open before: the retag keeps every live joiner open.
+      rv : is-just (At.part H′ v) ≡ true → is-just (At.part hp w₀) ≡ true
+      rv j = trans (cong is-just (sym (conn-≡ hp H′ rp e rt (At.part hp u) (At.part hp bd))))
+                   (trans (sym (just-connected H′ rp e rt (cong is-just (part-alike hp H′ u au))
+                                                         (trans (cong is-just (part-alike hp H′ (retag g bd) ab′)) (part-retag hp g bd kh fbd)))) j)
       ec = ≗-trans (f same⊑ ss) (bind≗ (≗-refl (Strongly.code R (finC (planted ρ v)))) λ _ → ≗-trans (wk-same ⟦ ks ⟧ᶜ) (Fins.fin-code hp ρ q ks))
 
   -- A signal reaching a connect's subject.
