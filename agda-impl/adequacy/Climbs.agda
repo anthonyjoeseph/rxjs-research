@@ -2578,7 +2578,13 @@ module Ascending (R : Set) where
     --
     -- Not a fact of the kernels: an outer's part is gone before its done
     -- flag is written, while its own end climbs to `close-outer`.  No
-    -- lane ends in between, and no field of the call says so.
+    -- lane ends in between, and no field of the call says so.  Owed: a
+    -- field of `Carried` and of `Calling` tying the flag to the outer's
+    -- part at every seen flatMap but one the call climbs through.
+    --
+    -- DEAD ROUTE: the ghost reading the outer through the done flag, an
+    --   end in flight until it is set.  That node needs the end's position,
+    --   which no cell holds and no kernel can (the TypeScript has none).
     lane-done : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
                 {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
                 (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) {πL : PathLanes ls u} (o : OneLane πL) {ks}

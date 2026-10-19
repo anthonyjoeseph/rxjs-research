@@ -218,8 +218,9 @@ by their own silent steps (`Mirror`).
   sane one is sane.
 - **`gapped-placed`** (Gapped) — FALSITY, `NO EVIDENCE`: a node gapped from a
   placed one is placed.
-- **`lane-done`** (Climbs) — FALSITY, `NO EVIDENCE`: at a lane's close the done
-  flag reads the outer's part gone; no field says the outer's end climb is over.
+- **`lane-done`** (Climbs) — FALSITY, `DEAD ROUTE`: at a lane's close the done
+  flag reads the outer's part gone; no field says the outer's end climb is
+  over.
 - **`calling-open`** (Climbs) — FALSITY, `NO EVIDENCE`: a climbing signal's
   path reads open.
 - **`begin-path`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane begun runs to its
@@ -255,8 +256,8 @@ by their own silent steps (`Mirror`).
   queued, the ghost shows nothing.
 - **`spread-held`** (Lift) — FALSITY, `NO EVIDENCE`: held or hidden, no sibling
   an open `of`'s path to a held part passes heads under its base.
-- **`shut-late`** (Lift) — FALSITY, `NO EVIDENCE`: an ended connect's body,
-  an `of` in it: its first event strictly before every end the shut tells.
+- **`shut-late`** (Lift) — FALSITY, `NO EVIDENCE`: an ended connect's body, an
+  `of` in it: its first event strictly before every end the shut tells.
 - **`step-shut`** (Lift) — FALSITY, `NO EVIDENCE`: a body whose first event
   precedes every told end steps shut as it does, shut after.
 - **`emit-run`** (Lift) — FALSITY, `NO EVIDENCE`: an open `of`'s value handed
