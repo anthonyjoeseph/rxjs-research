@@ -769,7 +769,7 @@ module Framing (R : Set) where
   clear-heads k (U.outˢ k′ a c) e refl = inj₂ e
   clear-heads k (U.skipˢ k′ c)  e refl = inj₂ e
   clear-heads k (U.endˢ k′)     e refl = inj₂ e
-  clear-heads k U.hushˢ         () _
+  clear-heads k U.hushˢ         _ ()
 
   key-heads : ∀ {Γ A} k {s : U.Step Γ A} {k′} → U.headˢ s ≡ just k′ → k <ᵖ k′ ≡ true → HeadsS k s
   key-heads k hs lt e with trans (sym hs) e

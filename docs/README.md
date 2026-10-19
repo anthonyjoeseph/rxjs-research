@@ -46,4 +46,5 @@ Beside the gate, in its own CI job: `bug-cache` — [bug-cache.md](bug-cache.md)
 | [imports-check.md](imports-check.md) | `make imports-check` / `imports-fix` — dead imports, blanket imports, the claim root, the orphan guard |
 | [agda-traps.md](agda-traps.md) | language and stdlib traps, each of which reports against the wrong thing |
 | [delegation.md](delegation.md) | worker model pinning and directives |
+| [split.md](split.md) | `make split` — cut a long module into parts and retarget its consumers |
 | [notify.md](notify.md) | `make notify` — the ntfy.sh push a gate sends on the way out |

@@ -96,6 +96,7 @@ Every PROOF-STATE.md tier discharged: no postulates, everything typechecks. "Pas
 ### Module granularity
 
 - **Cut at mutual-SCC boundaries.** A mutual block is an indivisible checking unit. **Never restructure genuine mutuality to shrink a module** — proof shape wins over check time.
+- **Over 1000 lines is too long (Anthony).** `make split` cuts one and retargets its consumers → [docs/split.md](docs/split.md).
 - **A new fact goes in the SHALLOWEST module reaching its consumers, not the deepest that could host it (Anthony).** A four-line lemma near the bottom invalidates that module's whole cone. Check the cone before placing it. Does not contradict `dup-check`'s "move the fact DOWN", which is about a fact that already exists twice.
 
 ## Agda traps

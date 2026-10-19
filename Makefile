@@ -2,7 +2,7 @@
         wiring wiring-gate wiring-selftest unsafe-check dup-check dup-selftest \
         imports-check imports-fix imports-selftest comments-check comments-selftest \
         roadmap-check roadmap-selftest roadmap-evidence roadmap-moved roadmap-moved-selftest \
-        roadmap-order roadmap-order-selftest find find-prose postulates notify \
+        roadmap-order roadmap-order-selftest find find-prose postulates notify split \
         ts-check ts-lint ts-format-check ts-gate
 
 # UTF-8 locale for em-dashes and special characters in Agda output
@@ -50,6 +50,8 @@ help:
 	@echo "  find-prose    search comment blocks and docs for a finding:  make find-prose Q='dead route'"
 	@echo "  wiring        the wiring report (wiring-gate: the same, exiting 1)"
 	@echo "  imports-fix   delete unused imports and names"
+	@echo "  split         cut a long module:  make split F=<file> (lists cuts);  make split F=<file> P='Mod Mod.B@120'"
+	@echo "                a nested one, in place:  make split F=<file> SUB='Inner Inner2@300'"
 	@echo "  roadmap-evidence  rewrite PROOF-STATE's derived evidence fields"
 	@echo "  bg / bg-check / bg-wait   run a long target detached; read its verdict"
 	@echo "  ts-gate       tsc, eslint, prettier over typescript/"
@@ -835,6 +837,12 @@ roadmap-order-selftest:
 #   make find Q='⊑ lub'      make find Q='Rel connectᴷ'
 find:
 	@scripts/find-lemma.py "$(Q)"
+
+# SPLIT A LONG MODULE into contiguous parts, consumers retargeted.  Without P
+# it lists where the file may be cut.  Textual: finish with imports-fix and a
+# build.  docs/split.md
+split:
+	@scripts/split-module.py $(F) $(if $(DRY),--dry) $(if $(SUB),--sub $(SUB),$(if $(P),$(P),--cuts))
 
 # THE SAME SEARCH OVER PROSE, because a FINDING is not a type.  `find` cannot
 # see a dead route, a coverage boundary, a ruling or a measured trap -- those
