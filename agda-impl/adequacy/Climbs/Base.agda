@@ -415,21 +415,23 @@ module ClimbBase (R : Set) where
     healed-off : ∀ {h} (H H′ : Heapᴹ h) {q} {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) → AllPairs _≢_ (names t)
                → Offʰ H H′ (names u) → At.part H′ u ≡ At.part H u → Healed H q π → Healed H′ q π
     healed-off H H′ here ps off eq _ = lift tt
-    healed-off H H′ (in-map {t = s} π) ps off eq hl = healed-off H H′ π (fresh-path (in-map {t = s} here) ps) off eq hl
-    healed-off H H′ (in-scan {t = s} π) ps off eq hl = healed-off H H′ π (fresh-path (in-scan {t = s} here) ps) off eq hl
-    healed-off H H′ (in-take {c = c} {k} {t = s} π) ps off eq hl = healed-off H H′ π (fresh-path (in-take {c = c} {k} {t = s} here) ps) off eq hl
-    healed-off H H′ (in-outer {fl = fl} {oc} {k} {r} {t = s} {ls} π) ps off eq hl = healed-off H H′ π (fresh-path (in-outer {fl = fl} {oc} {k} {r} {t = s} {ls} here) ps) off eq hl
+    healed-off H H′ (in-map {f = f} {t = s} π) ps off eq hl = healed-off H H′ π (fresh-path (in-map {f = f} {t = s} here) ps) off eq hl
+    healed-off H H′ (in-scan {f = f} {r} {t = s} π) ps off eq hl = healed-off H H′ π (fresh-path (in-scan {f = f} {r} {t = s} here) ps) off eq hl
+    healed-off H H′ (in-take {i = i} {p} {c} {k} {tk} {t = s} π) ps off eq hl = healed-off H H′ π (fresh-path (in-take {i = i} {p} {c} {k} {tk} {t = s} here) ps) off eq hl
+    healed-off H H′ (in-outer {op = op} {f} {fl} {oc} {k} {r} {pl} {t = s} {ls} π) ps off eq hl =
+      healed-off H H′ π (fresh-path (in-outer {op = op} {f} {fl} {oc} {k} {r} {pl} {t = s} {ls} here) ps) off eq hl
     healed-off H H′ (in-lanes {fl = fl} {oc} {k} {r} {t = so} π) ps off eq hl =
       healedL-off H H′ π (pairs-r (names so) (pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps))))) off eq hl
-    healed-off H H′ (in-source {S = S} {c} {b} {kb} {k} {t = src} {bd} π) ps off eq (x , hl) =
+    healed-off H H′ (in-source {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = src} {bd} π) ps off eq (x , hl) =
       (λ z → x (trans (sym (part-path H H′ π fp off eq)) z)) , healed-off H H′ π fp off eq hl
-      where fp = fresh-path (in-source {S = S} {c} {b} {kb} {k} {t = src} {bd} here) ps
-    healed-off H H′ (in-body {S = S} {c} {b} {kb} {k} {t = src} {bd} π) ps off eq hl = healed-off H H′ π (fresh-path (in-body {S = S} {c} {b} {kb} {k} {t = src} {bd} here) ps) off eq hl
+      where fp = fresh-path (in-source {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = src} {bd} here) ps
+    healed-off H H′ (in-body {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = src} {bd} π) ps off eq hl =
+      healed-off H H′ π (fresh-path (in-body {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = src} {bd} here) ps) off eq hl
     healed-off H H′ (in-defer {k = k} {t = s} π) ps off eq hl = healed-off H H′ π (fresh-path (in-defer {k = k} {t = s} here) ps) off eq hl
 
     healedL-off : ∀ {h} (H H′ : Heapᴹ h) {q} {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) → AllPairs _≢_ (laneNames ls)
                 → Offʰ H H′ (names u) → At.part H′ u ≡ At.part H u → HealedL H q π → HealedL H′ q π
-    healedL-off H H′ (this-lane π) ps off eq hl = healed-off H H′ π (fresh-lanes (this-lane here) ps) off eq hl
+    healedL-off H H′ (this-lane {c = c} {k} {t = s} {ls} π) ps off eq hl = healed-off H H′ π (fresh-lanes (this-lane {c = c} {k} {t = s} {ls} here) ps) off eq hl
     healedL-off H H′ (next-lane {l = lane c k s} π) ps off eq hl = healedL-off H H′ π (pairs-r (names s) (pairs-r (quietName k) (pairs-r (cutNames c) ps))) off eq hl
 
   -- A map's part held exactly where what it maps is.
