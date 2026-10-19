@@ -231,11 +231,12 @@ by their own silent steps (`Mirror`).
 - **`lefts-planted`** (Climbs.Base), **`lefts-grow`** (Climbs.Flat) — FALSITY,
   `NO EVIDENCE`: a plant at a lift's end, and the growth, keep each tie.
 - **`grow-leaving`** (Weaken.Heaps), **`bg-left`** (Climbs.Flat) — FALSITY,
-  `NO EVIDENCE`: the leftover ties `Leaving` keeps, grown, then the lane spliced.
+  `NO EVIDENCE`: the leftover ties `Leaving` keeps, grown, then the lane
+  spliced.
 - **`rs-leaving`, `rt-leaving`, `rf-leaving`, `connect-leaving`, `rm-leaving`,
   `of-leaving`, `scan-leaving`, `settle-leaving`, `next-leaving`,
   `end-leaving`, `pool-leaving`, `close-leaving`, `leaving`, `fed-leaving`,
-  `fin-leaving`, `fire-leaving`, `torn-leaving`** — FALSITY, `NO EVIDENCE`:
+  `fin-leaving`, `fire-leaving`, `torn-leaving`** — FALSITY, `DEAD ROUTE×3`:
   each move keeps `Leaving`, mirroring its `Lingers` cell.
 - **`calling-open`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a climbing
   signal's path reads open.
