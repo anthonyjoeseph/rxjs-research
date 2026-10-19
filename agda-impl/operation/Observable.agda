@@ -44,7 +44,7 @@ open import Level using (Lift; lift; lower; 0ℓ) renaming (suc to lsuc)
 
 open import Tree using (Obs)
 open import operation.AbstractObservable using (Prims; prims; module Heap; module Run; module Machine)
-open import denotation.MonotonicList using (From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Timeline)
+open import denotation.MonotonicList.Events using (From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Timeline)
 
 ------------------------------------------------------------------------
 -- Haskell's refs

@@ -18,7 +18,7 @@ open import Data.Unit using (⊤; tt)
 
 open import Tree using (Obs)
 open import operation.AbstractObservable using (Prims; prims; module Heap; module Run)
-open import denotation.MonotonicList using (ML; Burst; Burst∞; ML∞; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Timeline; Pos; ix; last; root) renaming (sub to subᴾ)
+open import denotation.MonotonicList.Events using (ML; Burst; Burst∞; ML∞; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Timeline; Pos; ix; last; root) renaming (sub to subᴾ)
 
 -- THE ROOT'S RECORD, kept by the runtime rather than in the heap: no
 -- `Act` can name it, so whatever runs, it only grows — a value is added

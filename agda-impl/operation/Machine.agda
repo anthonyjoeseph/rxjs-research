@@ -22,7 +22,7 @@ open import Level using (lower)
 
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; PureObs; Out; note; fin; module Pure)
-open import denotation.MonotonicList using (ML; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Timeline; Pos; ix; last)
+open import denotation.MonotonicList.Events using (ML; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Timeline; Pos; ix; last)
 
 module Machine (R : Set) where
   open Heap using (World; _⊑_; _∋_; wk∋; Sink; Handle; same)

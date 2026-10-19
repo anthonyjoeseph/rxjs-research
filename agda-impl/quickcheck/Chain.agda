@@ -13,7 +13,8 @@ open import Data.List using (List; []; _∷_; filterᵇ; upTo; length) renaming 
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ; zero; suc; _+_; _≡ᵇ_)
 
-open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; Pos; _<ᵖ_; observe; root)
+open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush; Pos; _<ᵖ_; root)
+open import denotation.MonotonicList using (observe)
 open import denotation.Denote using (⟦_⟧[_])
 open import quickcheck.Code using (Prog; toObs; timeline)
 open import quickcheck.Oracle using (depth)

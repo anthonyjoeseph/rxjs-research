@@ -26,7 +26,7 @@ open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Level using (Lift; lift; lower)
 
-open import denotation.MonotonicList using (Pos; Label; ix; last; root) renaming (sub to subᴾ)
+open import denotation.MonotonicList.Events using (Pos; Label; ix; last; root) renaming (sub to subᴾ)
 open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; Later)
 
 ------------------------------------------------------------------------

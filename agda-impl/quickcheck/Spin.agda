@@ -28,7 +28,8 @@ open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Tree using (Obs; Later; of; map; takeWhile; flatMap; connect; connected; defer; merge; ones; mergeᶠ; switchᶠ; exhaustᶠ)
 import Tree as T
-open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; Pos; _<ᵖ_; observe; root; Timeline)
+open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush; Pos; _<ᵖ_; root; Timeline)
+open import denotation.MonotonicList using (observe)
 open import denotation.Unfold using (⟦_⟧ˢ; [])
 open import operation.Machine using (module Machine)
 open import quickcheck.Code using (script; timeline)
