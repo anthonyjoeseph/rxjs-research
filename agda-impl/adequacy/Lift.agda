@@ -23,7 +23,7 @@ open import Data.Product using (_×_; _,_; Σ)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import denotation.MonotonicList using (Events∞; Pos; Timeline; agree-refl; at; ix; _<ᵖ_; <ᵖ-trans; <ᵖ-asym; <ᵖ-below)
+open import denotation.MonotonicList using (Events∞; Pos; Timeline; agree-refl; at; ix; last; _<ᵖ_; <ᵖ-trans; <ᵖ-asym; <ᵖ-below)
 import denotation.Unfold as U
 open import denotation.MonotonicList using () renaming (sub to subᴾ)
 open import adequacy.Sorted using (_≤ᵖ_; Under; module Sorting)
@@ -38,7 +38,7 @@ open import denotation.Denote using (⟦_⟧)
 import Tree as T
 open import operation.PureObservable using (Out; note; Pureᴾ)
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
-open import Data.Bool using (Bool; true; false; _∧_; _∨_)
+open import Data.Bool using (Bool; true; false; _∧_; _∨_; if_then_else_)
 open import Data.Bool.Properties using (∧-zeroʳ)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Fork using (module Forking)
@@ -78,6 +78,10 @@ module Lifting (R : Set) where
   open Flatting R using (flat-restage)
   open Read
 
+  -- Every end a shut at `c` tells comes strictly after `q`.
+  Late : Pos → Pos → List Pos → Set
+  Late q c = All (λ p → q <ᵖ (if p <ᵖ c then c ++ [ subᴾ p ] else p ++ [ last ]) ≡ true)
+
   postulate
     -- The turn, nothing held and no timer queued: the ghost shows
     -- nothing.
@@ -112,17 +116,24 @@ module Lifting (R : Set) where
              → ∀ {m′} → step m ≡ silent m′ → Σ Mach λ m₁ → m′ ⇝ m₁ × Aloft g (load m (Carried.tree cr)) m₁
 
     -- A connect whose source has ended, holding an `of` in its body: the
-    -- body shut steps as the body does, shut after.  What the body holds
-    -- the shut can tell is a joiner owed a value (a feed under way past
-    -- the source's end, `Fed`'s `feeding` beside an `e`), or a joiner
-    -- not yet subscribed (a pending `connected`, its end told where it
-    -- would subscribe).  The first must not exist, the second must end
-    -- past every event the body steps to first.
-    shut-step : ∀ {g m} (cr : Carried g m) {Δ A B Sj c b kb k fd rp e rt} {src : Sub (Conf.world (Mach.conf m)) Δ A}
+    -- body's first event comes strictly before every end the shut would
+    -- tell.  What the body holds the shut can tell is a joiner owed a
+    -- value (a feed under way past the source's end, `Fed`'s `feeding`
+    -- beside an `e`), or a joiner not yet subscribed (a pending
+    -- `connected`, its end told where it would subscribe).  The first
+    -- must not exist, the second must end past the body's first event.
+    -- `turn-told` bounds every told end below by the run's position, not
+    -- strictly by the body's head.
+    shut-late : ∀ {g m} (cr : Carried g m) {Δ A B Sj c b kb k fd rp e rt} {src : Sub (Conf.world (Mach.conf m)) Δ A}
                 {bd : Sub (Conf.world (Mach.conf m)) (A ∷ Δ) B} (ρ : Path (Carried.tree cr) (connectˢ Sj c b kb k fd rp e rt src bd))
                 {Δ′ A′ p i x xs} (π : Path bd (ofˢ {Δ = Δ′} {A′} p i (x ∷ xs)))
               → At.part (Conf.heap (Mach.conf m)) src ≡ nothing → ∀ {c₁} → e ≡ just c₁ → ∀ {b₀} → At.part (Conf.heap (Mach.conf m)) bd ≡ just b₀
-              → U.shutˢᵗ rp c₁ rt (U.step (U.shut (Any.here refl) c₁ b₀)) ≡ U.shutˢᵗ rp c₁ rt (U.step b₀)
+              → Σ Pos λ q → U.headˢ (U.step b₀) ≡ just q × Late q c₁ (untold (Any.here refl) b₀)
+
+    -- A body shut steps as the body does, shut after, when its first
+    -- event comes strictly before every end the shut tells.
+    step-shut : ∀ {Γ A B} r c (t : U.Node Γ A) (b : U.Node (A ∷ Γ) B) {q} → U.headˢ (U.step b) ≡ just q → Late q c (untold (Any.here refl) b)
+              → U.shutˢᵗ r c t (U.step (U.shut (Any.here refl) c b)) ≡ U.shutˢᵗ r c t (U.step b)
 
     -- The agenda's first call an open `of`, held or hidden: no sibling
     -- the path to a part the ghost holds passes heads under the `of`'s
@@ -177,6 +188,16 @@ module Lifting (R : Set) where
     note-least : ∀ {g g′ m w a k K} {σ : w ⊑ Conf.world (Mach.conf m)} → Carried g m
                → Conf.ctl (Mach.conf m) ≡ asking {B = ⊤} (note a) k σ K → U.step g ≡ U.outˢ (Conf.pos (Mach.conf m)) a g′
                → ∀ {q b} → Has (residual g′) q b → q ≤ᵖ Conf.pos (Mach.conf m) → ⊥
+
+  -- A connect whose source has ended, holding an `of` in its body: the
+  -- body shut steps as the body does, shut after.
+  shut-step : ∀ {g m} (cr : Carried g m) {Δ A B Sj c b kb k fd rp e rt} {src : Sub (Conf.world (Mach.conf m)) Δ A}
+              {bd : Sub (Conf.world (Mach.conf m)) (A ∷ Δ) B} (ρ : Path (Carried.tree cr) (connectˢ Sj c b kb k fd rp e rt src bd))
+              {Δ′ A′ p i x xs} (π : Path bd (ofˢ {Δ = Δ′} {A′} p i (x ∷ xs)))
+            → At.part (Conf.heap (Mach.conf m)) src ≡ nothing → ∀ {c₁} → e ≡ just c₁ → ∀ {b₀} → At.part (Conf.heap (Mach.conf m)) bd ≡ just b₀
+            → U.shutˢᵗ rp c₁ rt (U.step (U.shut (Any.here refl) c₁ b₀)) ≡ U.shutˢᵗ rp c₁ rt (U.step b₀)
+  shut-step cr {rp = rp} {rt = rt} ρ π ps {c₁} ec {b₀} pb with shut-late cr ρ π ps ec pb
+  ... | q , hq , lt = step-shut rp c₁ rt b₀ hq lt
 
   ----------------------------------------------------------------------
   -- A HIDDEN STEP: AN `of` READING ITS OBSERVER OPEN WHERE THE GHOST DOES

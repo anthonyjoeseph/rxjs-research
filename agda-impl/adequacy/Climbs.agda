@@ -46,6 +46,7 @@ import Tree as T
 open import operation.PureObservable using (Out; note; Pureᴾ; module Pure)
 open import operation.AbstractObservable using (module Heap; module Run; fifo; list) renaming (module Machine to Shared)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_)
+open import Data.Bool.Properties using (∧-assoc)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Gapped using (module Gapping)
 open import adequacy.Lift using (module Lifting)
@@ -2190,6 +2191,12 @@ module Ascending (R : Set) where
         lv : Lives H H′ w₀
         lv {c = c} ψ e = drop-true H (laneOf o) c (trans (sym (cong lower (look-store (unlive H (laneOf o)) (FlatKit.Flat.active fl) (Kit.live c) (na ψ)))) e)
 
+    fr-done : AllPairs _≢_ (names w₀) → At.val H′ (FlatKit.Flat.outerDone fl) ≡ At.val H (FlatKit.Flat.outerDone fl)
+    fr-done (_ ∷ a₁ ∷ _) =
+      trans (cong lower (look-store (unlive H (laneOf o)) (FlatKit.Flat.active fl) (FlatKit.Flat.outerDone fl) (λ ())))
+            (cong lower (look-store H (Kit.live (laneOf o)) (FlatKit.Flat.outerDone fl)
+              (λ eq → lookupᴬ a₁ (there (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names t) (cut-in ls (laneOf-in o))))))))) (sym eq))))
+
     fr-held : ∀ (c : Kit.Cut h) → look H′ (Kit.held c) ≡ look H (Kit.held c)
     fr-held c = fr-off (Kit.held c) ((λ ()) ∷ (λ ()) ∷ [])
 
@@ -2567,19 +2574,40 @@ module Ascending (R : Set) where
   merged-live G op g (just _) bs      as      pl _ = refl
 
   postulate
-    -- A freed slot's settle tests what the ghost's lane end tests: the
-    -- done flag, the outer's part gone; the count, the lanes beside it.
+    -- At a lane's close, the done flag reads the outer's part gone.
     --
     -- Not a fact of the kernels: an outer's part is gone before its done
     -- flag is written, while its own end climbs to `close-outer`.  No
     -- lane ends in between, and no field of the call says so.
-    lane-settles : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
-                   {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
-                   (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) {πL : PathLanes ls u} (o : OneLane πL) {ks}
-                 → Calling g ℓ m₁ (ρ ⊕ in-lanes πL) (closes ks)
-                 → ∀ {s bs S as} → LiftsLane (Conf.heap (Mach.conf m₁)) πL s bs S as
-                 → settleᵇ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) fl
-                   ≡ settledᵍ (At.part (Conf.heap (Mach.conf m₁)) t) bs as (At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.queue fl))
+    lane-done : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+                {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
+                (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) {πL : PathLanes ls u} (o : OneLane πL) {ks}
+              → Calling g ℓ m₁ (ρ ⊕ in-lanes πL) (closes ks)
+              → At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.outerDone fl) ≡ is-nothing (At.part (Conf.heap (Mach.conf m₁)) t)
+
+  null-++ : ∀ {a} {X : Set a} (xs ys : List X) → null (xs ++ ys) ≡ null xs ∧ null ys
+  null-++ []      ys = refl
+  null-++ (_ ∷ _) ys = refl
+
+  -- A freed slot's settle tests what the ghost's lane end tests: the
+  -- done flag, the outer's part gone; the count, the lanes beside it.
+  lane-settles : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+                 {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
+                 (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) {πL : PathLanes ls u} (o : OneLane πL) {ks}
+               → Calling g ℓ m₁ (ρ ⊕ in-lanes πL) (closes ks)
+               → ∀ {s bs S as} → LiftsLane (Conf.heap (Mach.conf m₁)) πL s bs S as
+               → settleᵇ (freed (Conf.heap (Mach.conf m₁)) (laneOf o) fl) fl
+                 ≡ settledᵍ (At.part (Conf.heap (Mach.conf m₁)) t) bs as (At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.queue fl))
+  lane-settles {m₁ = m₁} {T = T} {fl = fl} {t = t} {ls = ls} ρ o cl {bs = bs} {as = as} LL =
+    cong₂ _∧_ (trans (Freed.fr-done hp ρ o (fresh-path ρ fs)) (lane-done ρ o cl))
+      (trans (cong₂ _∧_ beside (cong null (queue-freed hp (laneOf o) fl))) (∧-assoc (null bs) (null as) _))
+    where
+      hp = Conf.heap (Mach.conf m₁)
+      H₂ = freed hp (laneOf o) fl
+      fs = Books.fresh (Calling.books cl)
+      beside : (At.val H₂ (FlatKit.Flat.active fl) ≡ᵇ 0) ≡ null bs ∧ null as
+      beside = trans (Settles.active-lanes H₂ ρ (Freed.fr-kernels hp ρ o fs (lane-live o LL) (Calling.kernels cl)))
+                     (trans (cong null (Freed.fr-lanes hp ρ o (fresh-path ρ fs) LL)) (null-++ bs as))
 
   -- A freed slot settling short of the end, the outer or a lane left,
   -- nothing queued: the pool takes the lane's rest, the ghost past the
