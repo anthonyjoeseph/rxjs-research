@@ -17,7 +17,7 @@ open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred; m<n⇒m<1+
 open import Data.List.Relation.Unary.All using (All; []; _∷_; map) renaming (lookup to lookupᴬ; tabulate to tabulateᴬ)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to all-++⁺)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; []; _∷_)
-open import Data.List.Relation.Binary.Permutation.Propositional using (_↭_) renaming (refl to ↭-refl′)
+open import Data.List.Relation.Binary.Permutation.Propositional using (_↭_; ↭-reflexive) renaming (refl to ↭-refl′)
 open import Data.List.Relation.Unary.Linked using (Linked; _∷_; tail)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Level using (lift; lower)
@@ -64,6 +64,7 @@ open import adequacy.Weaken using (module Weakening)
 open import adequacy.Every using (module Everywhere)
 open import adequacy.Alike using (module Aliking)
 open import adequacy.Shift using (module Shifting)
+open import adequacy.Kept using (module Keeping)
 
 open Events∞
 
@@ -73,19 +74,19 @@ module Ascending (R : Set) where
   open Heap using (World; _⊑_; _⨾_; _∋_; Handle; Sink; Quiet; wk∋; slot; cell) renaming (same to same⊑)
   open Sorting R using (WellMach)
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
-  open Strongly R using (Strong; Carried; Books; Feed; carried; closing; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; Meets; Each; Heads; Lingers; DoneBy; outers; outersL; outers-⊕; Tied; unsub; Owes; Settled; seen; seenL; pinned-trans; ∧-split; false≢; module Canon; owned-to; module Eaching; module Lingering) renaming (⟦_⟧ to ⟦_⟧ᶜ)
+  open Strongly R using (Strong; Carried; Books; Feed; carried; closing; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; here; module At; Queue; Kernels; Meaning; fired; Owned; Path; Spot; spot; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; Taking; taking; ending; taken; ∧-join; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; Meets; Each; Heads; Lingers; DoneBy; outers; outersL; outers-⊕; Tied; unsub; Owes; Settled; seen; seenL; pinned-trans; ∧-split; false≢; module Canon; owned-to; module Eaching; module Lingering) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf; src-of) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
   open Moving R using (pairs-r; pairs-split; plant-self; takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
   open Everywhere.Settling R using (settled-plant; settled-retag)
   open Everywhere.Gating R using (gated-alike; gated-path; gated-plant; gated-retag)
-  open Tearing R using (cuts; attached-alike; cuts-switches; fresh-path; takeSite; bodySite; look-store; look-either; Alike; part-alike; partLanes-alike; part-flat; apart-r; each-same; seen-alike; seenL-alike; names-path; lanes-path) renaming (Off to Offʰ)
+  open Tearing R using (cuts; attached-alike; cuts-switches; fresh-path; takeSite; bodySite; look-store; look-either; Alike; part-alike; partLanes-alike; part-flat; apart-r; apart-l; each-same; seen-alike; seenL-alike; names-path; lanes-path) renaming (Off to Offʰ)
   open Unsubbing R using (_⇝_; ⇝-trans; now; then; ≗-trans; wk≗; wk-same; bind≗)
   open Sequencing R using (seq-assoc; seq-done)
   open Forking R using (walk-planted)
   open Aliking R using (walk-grow; compile-cong; laneAt-wk; ObsRel)
   open Taking R using (tick-ix0)
-  open Naming R using (pre; fresh-plant; fresh-new; wk-pairs; wk-img; to-img)
+  open Naming R using (pre; pairs-↭; names-plant-↭; fresh-plant; fresh-new; wk-pairs; wk-img; to-img)
   open Ghosting R using (each-sub; each-lanes; module Far; module Calling; residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; done-up; lifts-seen; Rises; rises; Called; landed; rose; passed; Past; Aloft; aloft; hop-sorted; each-back; hopped-pre)
   open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed; stepped-deep)
   open Lowering R using (Keeps; queue-keeps; store-keeps; keeps-trans)
@@ -95,7 +96,8 @@ module Ascending (R : Set) where
   open Retagging R using (module Body; fed-owed; envP; joiners-path; retag; unsub-retag; begun-retag)
   open Everywhere.Spending R using (spent-retag)
   open Everywhere.Holding R using (holds-alike; holds-path; holds-plant; holds-retag)
-  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; let-go; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build)
+  open Keeping R using (seen-planted)
+  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; let-go; grip; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take)
   open Framing R using (merged-eq; heads-flat; Untold; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike)
     renaming (Ended to Ends)
   open Staging R using (not-src; wrap-lane)
@@ -1390,6 +1392,177 @@ module Ascending (R : Set) where
   roomy T.switchᶠ           _ = false
   roomy T.exhaustᶠ          c = c ≡ᵇ 0
 
+  -- A PLANT AS OPEN AS WHAT IT REPLACES: every gate above reads only
+  -- whether a node is open, so the parts above open as before, and every
+  -- flag above reads as before.
+  module _ {h} (H : Heapᴹ h) where
+    private
+      jmap : ∀ {X Y : Set₁} (g : X → Y) (m m′ : Maybe X) → is-just m ≡ is-just m′ → is-just (At.mapᴹ H g m) ≡ is-just (At.mapᴹ H g m′)
+      jmap g nothing  nothing  _ = refl
+      jmap g (just _) (just _) _ = refl
+      jmap g nothing  (just _) ()
+      jmap g (just _) nothing  ()
+
+      jtake : ∀ {Δ A} i (p : A → Bool) (tk : Taking Δ A) (m m′ : Maybe (U.Node Δ A)) → is-just m ≡ is-just m′
+            → is-just (At.taking? H i p tk m) ≡ is-just (At.taking? H i p tk m′)
+      jtake i p taking       m m′ e = jmap (U.takeWhileᶜ i p) m m′ e
+      jtake i p (ending _ _) m m′ e = refl
+      jtake i p taken        m m′ e = refl
+
+      jif : ∀ b {X : Set₁} {m m′ : Maybe X} → is-just m ≡ is-just m′ → is-just (if b then m else nothing) ≡ is-just (if b then m′ else nothing)
+      jif true  e = e
+      jif false e = refl
+
+      jmerged : ∀ {Δ A B} op (g : A → Pos → U.Node Δ B) (o o′ : Maybe (U.Node Δ A)) (ls ls′ : List (U.Node Δ B)) qs pl
+              → is-just o ≡ is-just o′ → null ls ≡ null ls′ → is-just (At.merged H op g o ls qs pl) ≡ is-just (At.merged H op g o′ ls′ qs pl)
+      jmerged op g nothing  nothing  []      []      qs pl _ _ = refl
+      jmerged op g nothing  nothing  []      (_ ∷ _) qs pl _ ()
+      jmerged op g nothing  nothing  (_ ∷ _) []      qs pl _ ()
+      jmerged op g nothing  nothing  (_ ∷ _) (_ ∷ _) qs pl _ _ = refl
+      jmerged op g nothing  (just _) ls      ls′     qs pl () _
+      jmerged op g (just _) nothing  ls      ls′     qs pl () _
+      jmerged op g (just _) (just _) ls      ls′     qs pl _ _ = refl
+
+      jconn : ∀ {Δ A B} r e (t : U.Node Δ A) (s s′ : Maybe (U.Node Δ A)) (b b′ : Maybe (U.Node (A ∷ Δ) B))
+            → is-just s ≡ is-just s′ → is-just b ≡ is-just b′ → is-just (At.connected H r e t s b) ≡ is-just (At.connected H r e t s′ b′)
+      jconn r e        t s        s′       nothing  nothing  _  _  = refl
+      jconn r e        t s        s′       nothing  (just _) _  ()
+      jconn r e        t s        s′       (just _) nothing  _  ()
+      jconn r e        t (just _) (just _) (just _) (just _) _  _  = refl
+      jconn r e        t (just _) nothing  (just _) (just _) () _
+      jconn r e        t nothing  (just _) (just _) (just _) () _
+      jconn r (just _) t nothing  nothing  (just _) (just _) _  _  = refl
+      jconn r nothing  t nothing  nothing  (just _) (just _) _  _  = refl
+
+      fcons : ∀ {X : Set₁} (m m′ : Maybe X) (xs xs′ : List X) → is-just m ≡ is-just m′ → null xs ≡ null xs′ → null (At.consᴹ H m xs) ≡ null (At.consᴹ H m′ xs′)
+      fcons nothing  nothing  xs xs′ _ e = e
+      fcons (just _) (just _) xs xs′ _ _ = refl
+      fcons nothing  (just _) xs xs′ () _
+      fcons (just _) nothing  xs xs′ () _
+
+      fif : ∀ b {X : Set₁} {xs xs′ ys ys′ : List X} → null xs ≡ null xs′ → null ys ≡ null ys′ → null (if b then xs else ys) ≡ null (if b then xs′ else ys′)
+      fif true  e _ = e
+      fif false _ e = e
+
+    jnot : ∀ {X : Set₁} (m m′ : Maybe X) → is-just m ≡ is-just m′ → is-nothing m ≡ is-nothing m′
+    jnot nothing  nothing  _ = refl
+    jnot (just _) (just _) _ = refl
+    jnot nothing  (just _) ()
+    jnot (just _) nothing  ()
+
+    mutual
+      part-just-plant : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+                      → is-just (At.part H v) ≡ is-just (At.part H u) → is-just (At.part H (plant π v)) ≡ is-just (At.part H t)
+      part-just-plant here v j = j
+      part-just-plant (in-map {f = f} {t = s} π) v j = jmap (U.mapᶜ f) (At.part H (plant π v)) (At.part H s) (part-just-plant π v j)
+      part-just-plant (in-scan {f = f} {r} {t = s} π) v j = jmap (U.scanᶜ f (At.val H r)) (At.part H (plant π v)) (At.part H s) (part-just-plant π v j)
+      part-just-plant (in-take {i = i} {p} {c} {tk = tk} {t = s} π) v j =
+        jif (At.val H (Kit.live c)) (jtake i p tk (At.part H (plant π v)) (At.part H s) (part-just-plant π v j))
+      part-just-plant (in-outer {op = op} {f} {fl} {pl = pl} {t = so} {ls} π) v j =
+        jmerged op (λ a q → U.subscribe (f a) q) (At.part H (plant π v)) (At.part H so) (At.partLanes H ls) (At.partLanes H ls)
+          (At.val H (FlatKit.Flat.queue fl)) pl (part-just-plant π v j) refl
+      part-just-plant (in-lanes {op = op} {f} {fl} {pl = pl} {t = so} {ls} πL) v j =
+        jmerged op (λ a q → U.subscribe (f a) q) (At.part H so) (At.part H so) (At.partLanes H (plantᴸ πL v)) (At.partLanes H ls)
+          (At.val H (FlatKit.Flat.queue fl)) pl refl (lanes-just-plant πL v j)
+      part-just-plant (in-source {e = e} {rp} {rt} {t = s} {bd} π) v j =
+        jconn rp e rt (At.part H (plant π v)) (At.part H s) (At.part H bd) (At.part H bd) (part-just-plant π v j) refl
+      part-just-plant (in-body {e = e} {rp} {rt} {t = s} {bd} π) v j =
+        jconn rp e rt (At.part H s) (At.part H s) (At.part H (plant π v)) (At.part H bd) refl (part-just-plant π v j)
+      part-just-plant (in-defer π) v j = part-just-plant π v j
+
+      lanes-just-plant : ∀ {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (πL : PathLanes ls u) (v : Sub h Δ′ A′)
+                       → is-just (At.part H v) ≡ is-just (At.part H u) → null (At.partLanes H (plantᴸ πL v)) ≡ null (At.partLanes H ls)
+      lanes-just-plant (this-lane {c = c} {t = s} {ls} π) v j =
+        fif (At.val H (Kit.live c)) (fcons (At.part H (plant π v)) (At.part H s) (At.partLanes H ls) (At.partLanes H ls) (part-just-plant π v j) refl) refl
+      lanes-just-plant (next-lane {l = lane c k s} {ls} πL) v j =
+        fif (At.val H (Kit.live c)) (fcons (At.part H s) (At.part H s) (At.partLanes H (plantᴸ πL v)) (At.partLanes H ls) refl (lanes-just-plant πL v j))
+            (lanes-just-plant πL v j)
+
+    mutual
+      flags-swap : ∀ {ns Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′)
+                 → is-just (At.part H v) ≡ is-just (At.part H u) → DoneBy H v ns → DoneBy H t ns → DoneBy H (plant π v) ns
+      flags-swap here v j dv d = dv
+      flags-swap {ns} (in-map π) v j dv d = Flag.db-map H {ns = ns} (flags-swap π v j dv (Flag.db-sub H d (in-map here) refl))
+      flags-swap {ns} (in-scan π) v j dv d = Flag.db-scan H {ns = ns} (flags-swap π v j dv (Flag.db-sub H d (in-scan here) refl))
+      flags-swap {ns} (in-take {c = c} π) v j dv d =
+        Flag.db-take H {ns = ns} (λ ok → flags-swap π v j dv (Flag.db-sub H d (in-take here) (seen-take (At.val H (Kit.live c)) ok)))
+      flags-swap {ns} (in-outer {t = so} π) v j dv d =
+        Flag.db-flat H {ns = ns} (proj₁ (d here refl) , λ m̸ → trans (proj₂ (d here refl) m̸) (jnot (At.part H so) (At.part H (plant π v)) (sym (part-just-plant π v j))))
+          (flags-swap π v j dv (Flag.db-sub H d (in-outer here) refl)) (Flag.dbL-of H d)
+      flags-swap {ns} (in-lanes πL) v j dv d =
+        Flag.db-flat H {ns = ns} (d here refl) (Flag.db-sub H d (in-outer here) refl) (flags-swapL πL v j dv (Flag.dbL-of H d))
+      flags-swap {ns} (in-source {e = e} π) v j dv d =
+        Flag.db-connect H {ns = ns} (λ jb → flags-swap π v j dv (Flag.db-sub H d (in-source here) (∧-join jb refl)))
+          (λ js → Flag.db-sub H d (in-body here) (∧-join (subst (λ z → (z ∨ is-just e) ≡ true) (part-just-plant π v j) js) refl))
+      flags-swap {ns} (in-body π) v j dv d =
+        Flag.db-connect H {ns = ns} (λ jb → Flag.db-sub H d (in-source here) (∧-join (trans (sym (part-just-plant π v j)) jb) refl))
+          (λ js → flags-swap π v j dv (Flag.db-sub H d (in-body here) (∧-join js refl)))
+      flags-swap {ns} (in-defer π) v j dv d = Flag.db-defer H {ns = ns} (flags-swap π v j dv (Flag.db-sub H d (in-defer here) refl))
+
+      flags-swapL : ∀ {ns Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (πL : PathLanes ls u) (v : Sub h Δ′ A′)
+                  → is-just (At.part H v) ≡ is-just (At.part H u) → DoneBy H v ns → DoneByL H ls ns → DoneByL H (plantᴸ πL v) ns
+      flags-swapL {ns} (this-lane π) v j dv dL = Flag.dbL-cons H {ns = ns} (λ lv → flags-swap π v j dv (Flag.dbL-head H dL lv)) (Flag.dbL-tail H dL)
+      flags-swapL {ns} (next-lane {l = lane c k s} πL) v j dv dL = Flag.dbL-cons H {ns = ns} (Flag.dbL-head H dL) (flags-swapL πL v j dv (Flag.dbL-tail H dL))
+
+    -- A pending node holds no flatMap.
+    pending-flags : ∀ {ns Δ A} {s : T.Obs Timeline Δ A} {q} → DoneBy H (pendingˢ s q) ns
+    pending-flags () _
+
+    -- A flatMap open by a live lane, or by a queued value.
+    lane-open : ∀ {Δ A B} op (g : A → Pos → U.Node Δ B) (o : Maybe (U.Node Δ A)) b (x : U.Node Δ B) (xs : List (U.Node Δ B)) qs pl
+              → b ≡ true → is-just (At.merged H op g o (if b then x ∷ xs else xs) qs pl) ≡ true
+    lane-open op g nothing  b x xs qs pl refl = refl
+    lane-open op g (just _) b x xs qs pl refl = refl
+
+    queue-open : ∀ {Δ A B} op (g : A → Pos → U.Node Δ B) (o : Maybe (U.Node Δ A)) (ls : List (U.Node Δ B)) y ys pl
+               → is-just (At.merged H op g o ls (y ∷ ys) pl) ≡ true
+    queue-open op g nothing  []      y ys pl = refl
+    queue-open op g nothing  (_ ∷ _) y ys pl = refl
+    queue-open op g (just _) ls      y ys pl = refl
+
+  -- A plant over a plant: the outer one alone.
+  mutual
+    plant-planted : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v w : Sub h Δ′ A′) → plant (planted π v) w ≡ plant π w
+    plant-planted here          v w = refl
+    plant-planted (in-map π)    v w rewrite plant-planted π v w = refl
+    plant-planted (in-scan π)   v w rewrite plant-planted π v w = refl
+    plant-planted (in-take π)   v w rewrite plant-planted π v w = refl
+    plant-planted (in-outer π)  v w rewrite plant-planted π v w = refl
+    plant-planted (in-lanes π)  v w rewrite plantᴸ-planted π v w = refl
+    plant-planted (in-source π) v w rewrite plant-planted π v w = refl
+    plant-planted (in-body π)   v w rewrite plant-planted π v w = refl
+    plant-planted (in-defer π)  v w rewrite plant-planted π v w = refl
+
+    plantᴸ-planted : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v w : Sub h Δ′ A′) → plantᴸ (plantedᴸ π v) w ≡ plantᴸ π w
+    plantᴸ-planted (this-lane π) v w rewrite plant-planted π v w = refl
+    plantᴸ-planted (next-lane π) v w rewrite plantᴸ-planted π v w = refl
+
+  -- A plant weakened: the weakened node planted down the weakened path.
+  mutual
+    wk-plant : ∀ {h g Δ A Δ′ A′} (τ : h ⊑ g) {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′) → wkTree τ (plant π v) ≡ plant (wkPath τ π) (wkTree τ v)
+    wk-plant τ here          v = refl
+    wk-plant τ (in-map π)    v rewrite wk-plant τ π v = refl
+    wk-plant τ (in-scan π)   v rewrite wk-plant τ π v = refl
+    wk-plant τ (in-take π)   v rewrite wk-plant τ π v = refl
+    wk-plant τ (in-outer π)  v rewrite wk-plant τ π v = refl
+    wk-plant τ (in-lanes π)  v rewrite wk-plantᴸ τ π v = refl
+    wk-plant τ (in-source π) v rewrite wk-plant τ π v = refl
+    wk-plant τ (in-body π)   v rewrite wk-plant τ π v = refl
+    wk-plant τ (in-defer π)  v rewrite wk-plant τ π v = refl
+
+    wk-plantᴸ : ∀ {h g Δ B Δ′ A′} (τ : h ⊑ g) {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)
+              → wkLanes τ (plantᴸ π v) ≡ plantᴸ (wkPathᴸ τ π) (wkTree τ v)
+    wk-plantᴸ τ (this-lane π) v rewrite wk-plant τ π v = refl
+    wk-plantᴸ τ (next-lane π) v rewrite wk-plantᴸ τ π v = refl
+
+  -- A node replaced by a pending one: what it named apart from all the
+  -- tree names besides.
+  apart-unplant : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) {s q} → AllPairs _≢_ (names t)
+                → AllPairs _≢_ (names u ++ names (plant π (pendingˢ s q)))
+  apart-unplant {t = t} {u} π {s} {q} fs =
+    pairs-↭ (subst (λ x → names x ↭ names u ++ names (plant π (pendingˢ s q))) (trans (plant-planted π (pendingˢ s q) u) (plant-self π))
+                   (names-plant-↭ (planted π (pendingˢ s q)) u (↭-reflexive (sym (++-identityʳ (names u)))))) fs
+
   -- A LANE ABOUT TO BEGIN: the flatMap at the path's end starting a lane
   -- for `y` where the run is, its path open; the ghost's step the
   -- flatMap's skip, the lane subscribed under the run's `ix 1`, the pool
@@ -1423,6 +1596,10 @@ module Ascending (R : Set) where
       sorted  : Σ Pos λ lo → WellMach lo m
       behind  : Each (Conf.heap (Mach.conf m)) (Heads (Conf.pos (Mach.conf m))) T
       lingers : Lingers (Conf.heap (Mach.conf m)) (Restaged.T′ (Conf.heap (Mach.conf m)) ρ pl′)
+      -- The flags as the lane, still pending, will read them; and the
+      -- flatMap's own.
+      flags   : DoneBy (Conf.heap (Mach.conf m)) (plant ρ (pendingˢ (f y) (Conf.pos (Mach.conf m) ++ [ ix 1 ]))) []
+      inner   : DoneBy (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl t ls) []
 
   -- The two cells a lane's start writes past its world's growth: the
   -- count and the list.
@@ -1763,6 +1940,58 @@ module Ascending (R : Set) where
                             ; ahead = ahead-under q 1 (λ e → ⊥-elim (deep e)) (Queue.ahead qu′) })
       where qu′ = plant-queue heap′ (wkPath grow ρ) v′ refl refl (λ _ → refl) (queue-keeps (wrote-keeps {τ = grow} {fl = fl} moved) (Wk.grow-queue grows qu))
 
+    -- The flags across the start: the lane swapped in for its pending
+    -- node in the grown world, then the count and list written.
+    bg-flags : AllPairs _≢_ (names T) → ∀ {s S} → Lifts H ρ s S → DoneBy H (plant ρ (pendingˢ (f y) (q ++ [ ix 1 ]))) []
+             → DoneBy H (flatMapˢ op f fl oc k r pl t ls) [] → DoneBy heap′ T′ []
+    bg-flags fs L dF dI = let-go heap′ (planted ρw v′) (bg-fresh fs) sh (alive heap′ (Grown.live grown)) r₂
+      where
+        open Reading fs
+        ρw = wkPath grow ρ
+        P₀ = pendingˢ (f y) (q ++ [ ix 1 ])
+        G  = λ a j → U.subscribe (f a) j
+        sw₀ : seen base ρw ≡ true
+        sw₀ = lifts-seen (Lifted.lifts-grow grows L)
+        alive : ∀ G′ → At.val G′ (Kit.live cut′) ≡ true → is-just (At.part G′ v′) ≡ true
+        alive G′ lv = lane-open G′ op G (At.part G′ t′) (At.val G′ (Kit.live cut′)) (U.subscribe (f y) (q ++ [ ix 1 ])) (At.partLanes G′ ls′)
+                        (At.val G′ (FlatKit.Flat.queue fl′)) pl′ lv
+        lvb : At.val base (Kit.live cut′) ≡ true
+        lvb = trans (sym (cong lower (moved (Kit.live cut′) ((λ e → lookupᴬ (Grown.outside grown (FlatKit.Flat.active fl)) (here refl) (sym e))
+                                                           ∷ (λ e → lookupᴬ (Grown.outside grown (FlatKit.Flat.lanes fl)) (here refl) (sym e)) ∷ []))))
+                    (Grown.live grown)
+        i₁ : DoneBy base u₀ []
+        i₁ = Wk.grow-flags grows dI
+        c₁ : DoneBy base (plant ρw P₀) []
+        c₁ = subst (λ x → DoneBy base x []) (wk-plant grow ρ P₀) (Wk.grow-flags grows dF)
+        v₁ : DoneBy base v′ []
+        v₁ = Flag.db-flat base {ns = []} (i₁ here refl) (Flag.db-sub base i₁ (in-outer here) refl)
+               (Flag.dbL-cons base {ns = []} (λ _ → pending-flags base) (Flag.dbL-of base i₁))
+        sw : DoneBy base T′ []
+        sw = subst (λ x → DoneBy base x []) (plant-planted ρw P₀ v′) (flags-swap base (planted ρw P₀) v′ (alive base lvb) v₁ c₁)
+        g₁ : DoneBy base T′ (outers (planted ρw v′))
+        g₁ = grip base (planted ρw v′) (bg-fresh fs) (trans (seen-planted base ρw v′) sw₀) (alive base lvb) sw
+        X = outers (planted ρw v′)
+        fv = fresh-path (planted ρw v′) (bg-fresh fs)
+        vd : AllPairs _≢_ (names v′) → At.val heap′ (FlatKit.Flat.outerDone fl′) ≡ At.val base (FlatKit.Flat.outerDone fl′)
+        vd (a₀ ∷ a₁ ∷ _) = cong lower (moved (FlatKit.Flat.outerDone fl′) ((λ e → lookupᴬ a₀ (here refl) (sym e)) ∷ (λ e → lookupᴬ a₁ (there (here refl)) e) ∷ []))
+        fb : DoneBy base v′ (X ++ []) → DoneBy heap′ v′ X
+        fb d₀ = Flag.db-flat heap′ {ns = X} (flagged-moved base heap′ {fl = fl′} {so = t′} (vd fv) (part-alike base heap′ t′ agT) (d here refl))
+                  (flags-alike base heap′ agT (Flag.db-sub base d (in-outer here) refl))
+                  (Flag.dbL-cons heap′ {ns = X} (λ _ → pending-flags heap′) (flagsL-alike base heap′ agL (Flag.dbL-tail base (Flag.dbL-of base d))))
+          where d = subst (DoneBy base v′) (++-identityʳ X) d₀
+        r₁ : DoneBy heap′ (plant (planted ρw v′) v′) X
+        r₁ = Shift.shift-flags base heap′ {T = T′} {u = v′} (planted ρw v′) moved bg-mine (bg-fresh fs) v′ {ns₀ = []} (λ ()) (λ _ → alive base lvb) fb
+               (subst (DoneBy base T′) (sym (++-identityʳ X)) g₁)
+        r₂ : DoneBy heap′ T′ X
+        r₂ = subst (λ x → DoneBy heap′ x X) (plant-planted ρw v′ v′) r₁
+        pw : AllPairs _≢_ (names u₀ ++ names (plant ρw P₀))
+        pw = apart-unplant ρw (wk-pairs grow T fs)
+        al : Alike base heap′ (names (plant ρw P₀))
+        al j m = moved j (let A′ = apart-l (names u₀) pw m in lookupᴬ A′ (here refl) ∷ lookupᴬ A′ (there (there (there (here refl)))) ∷ [])
+        sh : seen heap′ (planted ρw v′) ≡ true
+        sh = trans (seen-planted heap′ ρw v′) (trans (sym (seen-planted heap′ ρw P₀))
+               (trans (seen-alike base heap′ (planted ρw P₀) al) (trans (seen-planted base ρw P₀) sw₀)))
+
   -- The ghost's admit with room: the lane first, nothing dropped.
   admit-room : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) q a (ls : List (U.Node Γ B)) qs d → roomy op (length ls) ≡ true
              → U.admit op g q a ls qs d ≡ (g a q ∷ ls , qs , U.idleᶜ)
@@ -1800,7 +2029,8 @@ module Ascending (R : Set) where
              → Begins g (loadOf st) m₀ ρ y pl′ → Hopped st m₀
   lane-begin st {m₀ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {pl′ = pl′}
     b@record { sane = sn ; placed = pd ; ctl = refl ; stack = sk ; lifted = S , L , sg ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
-             ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so ; behind = bh ; lingers = lgr }
+             ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so ; behind = bh ; lingers = lgr
+             ; flags = dF ; inner = dI }
     with begin-path b
   ... | sr with Begun.bg-ghost sr pl′ sn pd L sg
   ...   | g″ , pg , sn″ , pd″ , k″ , r″ , ag , pp =
@@ -1812,7 +2042,8 @@ module Ascending (R : Set) where
       ; books = record { fresh = Begun.bg-fresh sr pl′ fs
                        ; clocked = trans (proj₁ ck) (sym (tick-under q 1 (Started.deep sr))) , proj₁ ck , Begun.bg-ticked sr pl′ sk (proj₂ ck)
                        ; paidUp = trans (Started.todo′ sr) (cong (mapList (wkTodo (Started.grow sr))) pu) ; running = rn }
-      ; sorted = sorted-⇝ so (Started.runs sr) ; behind′ = Eaching.each-to _ _ (Begun.bg-behind sr pl′ bh) ; lingers′ = Lingering.lingers-to _ (Begun.bg-lingers sr pl′ lgr) })
+      ; sorted = sorted-⇝ so (Started.runs sr) ; behind′ = Eaching.each-to _ _ (Begun.bg-behind sr pl′ bh) ; lingers′ = Lingering.lingers-to _ (Begun.bg-lingers sr pl′ lgr)
+      ; flags = Begun.bg-flags sr pl′ fs L dF dI })
     , passed ag pp
 
   -- An admitted value with room: its lane begun where the value is, the
@@ -1839,11 +2070,14 @@ module Ascending (R : Set) where
                  , sg
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
-      ; sorted = sorted-⇝ so p ; behind = bh ; lingers = Restaged.pool-idle hp ρ (U.unionᶜ po U.idleᶜ) fs refl (ended-past cl) lgr })
+      ; sorted = sorted-⇝ so p ; behind = bh ; lingers = Restaged.pool-idle hp ρ (U.unionᶜ po U.idleᶜ) fs refl (ended-past cl) lgr
+      ; flags = flags-swap hp ρ (pendingˢ (f y) (q ++ [ ix 1 ])) (sym (cong (λ o′ → is-just (At.merged hp op G o′ LS QS po)) pv)) (pending-flags hp) d₀
+      ; inner = Flag.db-sub hp d₀ ρ (lifts-seen Lρ) })
     where
       G  = λ a j → U.subscribe (f a) j
       LS = At.partLanes hp ls
       QS = At.val hp (FlatKit.Flat.queue fl)
+      d₀ = let-go hp (ρ ⊕ in-outer here) fs (lifts-seen L) (cong is-just pv) (Calling.flags cl)
 
   postulate
     -- A bounded merge full: the value queued, the ghost past the outer's
@@ -2557,6 +2791,17 @@ module Ascending (R : Set) where
     dq-lanes : AllPairs _≢_ (names w₀) → At.partLanes H′ ls ≡ At.partLanes H ls
     dq-lanes fr = partLanes-alike H H′ ls (Heaps.flat-ls H H′ {fl = fl} {oc} {k} {r} {t} {ls} (dq-alike fr))
 
+    dq-done : AllPairs _≢_ (names w₀) → At.val H′ (FlatKit.Flat.outerDone fl) ≡ At.val H (FlatKit.Flat.outerDone fl)
+    dq-done (_ ∷ a₁ ∷ _) = cong lower (look-store H (FlatKit.Flat.queue fl) (FlatKit.Flat.outerDone fl) (λ eq → lookupᴬ a₁ (here refl) (sym eq)))
+
+    -- No flag of the node's moved: the done flag, the outer and the
+    -- lanes alike.
+    dq-flags₀ : AllPairs _≢_ (names w₀) → ∀ {xs} → DoneBy H w₀ xs → DoneBy H′ w₀ xs
+    dq-flags₀ fr {xs} d =
+      Flag.db-flat H′ {ns = xs} (flagged-moved H H′ {fl = fl} {so = t} (dq-done fr) (dq-part fr) (d here refl))
+        (flags-alike H H′ (Heaps.flat-so H H′ {fl = fl} {oc} {k} {r} {t} {ls} (dq-alike fr)) (Flag.db-sub H d (in-outer here) refl))
+        (flagsL-alike H H′ (Heaps.flat-ls H H′ {fl = fl} {oc} {k} {r} {t} {ls} (dq-alike fr)) (Flag.dbL-of H d))
+
     -- A queue's head taken off: the node's parts and ties alike, its
     -- heads by what the queue is owed.
     dq-revive : AllPairs _≢_ (names w₀) → ∀ {y ys′} → At.val H (FlatKit.Flat.queue fl) ≡ y ∷ ys′ → is-just (At.part H′ w₀) ≡ true → is-just (At.part H w₀) ≡ true
@@ -2925,7 +3170,11 @@ module Ascending (R : Set) where
       ; behind = subst (λ t′ → Each H₃ (Heads q) t′) (plant-self ρ)
                    (Shift.shift-behind hp H₃ ρ (off-++ {H = hp} {H₁ = H₂} {H₂ = H₃} (Freed.ns hp ρ o) (Freed.fr-off hp ρ o) (off-store H₂ (FlatKit.Flat.queue fl)))
                                        (all-++⁺ (Freed.fr-mine hp ρ o) (Dequeued.mine H₂ ρ ys)) fs w₀ (tells-past cl) (ended-past cl) (Settling.next-heading ρ πL o cl Lρ sg ys eq₀) bh)
-      ; lingers = Settling.next-lingers ρ πL o cl Lρ sg ys }))
+      ; lingers = Settling.next-lingers ρ πL o cl Lρ sg ys
+      ; flags = let-go H₃ (planted ρ P₀) (pairs-r (names w₀) (apart-unplant ρ fs)) (trans (seen-planted H₃ ρ P₀) (lifts-seen L₇)) refl
+                  (subst (DoneBy H₃ (plant ρ P₀)) (sym (outers-planted ρ P₀))
+                    (Dequeued.Sh.shift-flags H₂ ρ ys fs P₀ {ns₀ = []} (λ ()) (λ _ → ju₂) (λ _ → pending-flags H₃) (subst (DoneBy H₂ T) (sym (++-identityʳ (outers ρ))) d₂)))
+      ; inner = Dequeued.dq-flags₀ H₂ ρ ys (fresh-path ρ fs) (Flag.db-sub H₂ (let-go H₂ ρ fs s₂ ju₂ d₂) ρ s₂) }))
     where
       H₂  = freed hp (laneOf o) fl
       H₃  = Dequeued.H′ H₂ ρ ys
@@ -2941,6 +3190,11 @@ module Ascending (R : Set) where
       L₅  = subst (λ x → Lifts H₃ ρ (F x (bs′ ++ as′) ys) S) (sym (trans (Dequeued.dq-part H₂ ρ ys (fresh-path ρ fs)) (Freed.fr-part hp ρ o (fresh-path ρ fs)))) L₄
       L₆  = subst (λ zs → Lifts H₃ ρ (F (At.part H₃ t) zs ys) S) (sym (trans (Dequeued.dq-lanes H₂ ρ ys (fresh-path ρ fs)) (Freed.fr-lanes hp ρ o (fresh-path ρ fs) LL))) L₅
       L₇  = subst (λ qs → Lifts H₃ ρ (F (At.part H₃ t) (At.partLanes H₃ ls) qs) S) (sym (queue-stored H₂ fl ys)) L₆
+      P₀  = pendingˢ (f y) (q ++ [ ix 1 ])
+      d₂  = Freed.fr-flags hp ρ o fs (done-up ρ (in-lanes πL) (one-outers o) (Calling.flags cl))
+      s₂  = lifts-seen (Freed.fr-lifts hp ρ o fs L₁)
+      ju₂ = subst (λ Q → is-just (At.merged H₂ op G (At.part H₂ t) (At.partLanes H₂ ls) Q po) ≡ true) (sym eq₀)
+                  (queue-open H₂ op G (At.part H₂ t) (At.partLanes H₂ ls) y ys po)
 
   -- A freed slot's queue read, by what it holds.
   lane-queue : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
