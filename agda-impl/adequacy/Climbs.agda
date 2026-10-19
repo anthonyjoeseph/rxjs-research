@@ -3173,7 +3173,7 @@ module Ascending (R : Set) where
       ; lingers = Settling.next-lingers ρ πL o cl Lρ sg ys
       ; flags = let-go H₃ (planted ρ P₀) (pairs-r (names w₀) (apart-unplant ρ fs)) (trans (seen-planted H₃ ρ P₀) (lifts-seen L₇)) refl
                   (subst (DoneBy H₃ (plant ρ P₀)) (sym (outers-planted ρ P₀))
-                    (Dequeued.Sh.shift-flags H₂ ρ ys fs P₀ {ns₀ = []} (λ ()) (λ _ → ju₂) (λ _ → pending-flags H₃) (subst (DoneBy H₂ T) (sym (++-identityʳ (outers ρ))) d₂)))
+                    (Dequeued.Sh.shift-flags H₂ ρ ys fs P₀ {ns₀ = []} (λ ()) (λ _ → ju₂) (λ _ → pending-flags H₃) (subst (DoneBy H₂ _) (sym (++-identityʳ (outers ρ))) d₂)))
       ; inner = Dequeued.dq-flags₀ H₂ ρ ys (fresh-path ρ fs) (Flag.db-sub H₂ (let-go H₂ ρ fs s₂ ju₂ d₂) ρ s₂) }))
     where
       H₂  = freed hp (laneOf o) fl
