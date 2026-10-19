@@ -584,11 +584,11 @@ module Shifting (R : Set) where
       fed-atL (next-lane p) (_ , fl) = fed-atL p fl
 
     -- Every joiner fed as `ν` says stays open exactly where it was.
-    Keeps : ∀ {Δ} → Retag Δ → Now Δ → Set₁
-    Keeps {Δ} g ν = ∀ {B} (x : B ∈ᴸ Δ) {j sk l st} → Fed (joinˢ j sk l x st) ν
+    Steady : ∀ {Δ} → Retag Δ → Now Δ → Set₁
+    Steady {Δ} g ν = ∀ {B} (x : B ∈ᴸ Δ) {j sk l st} → Fed (joinˢ j sk l x st) ν
                   → At.val G l ≡ true → is-just (g x j st) ≡ is-just st
 
-    keeps-keep : ∀ {Δ A} {g : Retag Δ} {ν} {fe : Feed A h × Maybe Pos} → Keeps g ν → Keeps (keepᴿ g) (fe ∷ᴬ ν)
+    keeps-keep : ∀ {Δ A} {g : Retag Δ} {ν} {fe : Feed A h × Maybe Pos} → Steady g ν → Steady (keepᴿ g) (fe ∷ᴬ ν)
     keeps-keep hy (here refl) f lv = refl
     keeps-keep hy (there x)   f lv = hy x f lv
 
@@ -629,7 +629,7 @@ module Shifting (R : Set) where
     just-connected r e t {b = nothing} {just _} _ ()
 
     mutual
-      part-retag : ∀ {Δ A} (g : Retag Δ) (s : Sub h Δ A) {ν} → Keeps g ν → Fed s ν → is-just (part (retag g s)) ≡ is-just (part s)
+      part-retag : ∀ {Δ A} (g : Retag Δ) (s : Sub h Δ A) {ν} → Steady g ν → Fed s ν → is-just (part (retag g s)) ≡ is-just (part s)
       part-retag g (pendingˢ s q)                          hy f = refl
       part-retag g (coldˢ s hd ph)                         hy f = refl
       part-retag g (ofˢ p i xs)                            hy f = refl
@@ -660,14 +660,14 @@ module Shifting (R : Set) where
           pj true  lv = just-joined (g x j st) st (hy x f lv)
       part-retag g (deferˢ k s)                            hy f = part-retag g s hy f
 
-      lanes-retag : ∀ {Δ B} (g : Retag Δ) (ls : List (Lane h Δ B)) {ν} → Keeps g ν → FedLanes ls ν → filled (partLanes (retagᴸ g ls)) ≡ filled (partLanes ls)
+      lanes-retag : ∀ {Δ B} (g : Retag Δ) (ls : List (Lane h Δ B)) {ν} → Steady g ν → FedLanes ls ν → filled (partLanes (retagᴸ g ls)) ≡ filled (partLanes ls)
       lanes-retag g []                hy _          = refl
       lanes-retag g (lane c k s ∷ ls) hy (fs , fl′) with At.val G (Kit.live c)
       ... | true  = just-cons (part-retag g s hy fs) (lanes-retag g ls hy fl′)
       ... | false = lanes-retag g ls hy fl′
 
     mutual
-      flags-retag : ∀ {ns Δ A} (g : Retag Δ) (s : Sub h Δ A) {ν} → Keeps g ν → Fed s ν → DoneBy G s ns → DoneBy G (retag g s) ns
+      flags-retag : ∀ {ns Δ A} (g : Retag Δ) (s : Sub h Δ A) {ν} → Steady g ν → Fed s ν → DoneBy G s ns → DoneBy G (retag g s) ns
       flags-retag g (pendingˢ s q)                          hy f d = d
       flags-retag g (coldˢ s hd ph)                         hy f d = d
       flags-retag g (ofˢ p i xs)                            hy f d = d
@@ -685,7 +685,7 @@ module Shifting (R : Set) where
       flags-retag g (joinˢ j sk l x st)                     hy f d ()
       flags-retag g (deferˢ k s)                            hy f d = Flag.db-defer G (flags-retag g s hy f (λ ψ sn → d (in-defer ψ) sn))
 
-      flagsL-retag : ∀ {ns Δ B} (g : Retag Δ) (ls : List (Lane h Δ B)) {ν} → Keeps g ν → FedLanes ls ν → DoneByL G ls ns → DoneByL G (retagᴸ g ls) ns
+      flagsL-retag : ∀ {ns Δ B} (g : Retag Δ) (ls : List (Lane h Δ B)) {ν} → Steady g ν → FedLanes ls ν → DoneByL G ls ns → DoneByL G (retagᴸ g ls) ns
       flagsL-retag g []                hy _          dL ()
       flagsL-retag g (lane c k s ∷ ls) hy (fs , fl′) dL =
         Flag.dbL-cons G (λ lv → flags-retag g s hy fs (λ ψ sn → dL (this-lane ψ) (∧-join lv sn))) (flagsL-retag g ls hy fl′ (λ πL sn → dL (next-lane πL) sn))
