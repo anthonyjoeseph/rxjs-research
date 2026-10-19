@@ -275,7 +275,8 @@ module ClimbConnect (R : Set) where
               ; behind = bh ; lingers = lgr } | refl
     with subst (λ W → _ ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-source here) top) cd
   ... | readRef≗ refl f with Feeds.fed-ghost hp ρ y q fs (Queue.joined qu) mn bh sn pl pv L sg
-  ...   | g″ , pg , sn″ , pl″ , k′ , r , ag , pp =
+  ...   | g″ , pg , sn″ , pl″ , k′ , r , ag , pp with lifts-split ρ (in-source here) L
+  ...     | _ , lifts-source pb _ _ , Lρ =
     landed (g″ , _ , then refl now
       , carried (record
         { sane = sn″ ; placed = pl″ ; tree = Feeds.T′ hp ρ y q
@@ -285,11 +286,40 @@ module ClimbConnect (R : Set) where
         ; kernels = Feeds.fed-kernels hp ρ y q kn ; meaning = Feeds.fed-meaning hp ρ y q (Queue.joined qu) mn ; queue = Feeds.fed-queue hp ρ y q qu
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Feeds.Bd.body-names hp ρ y q))) fs
                          ; clocked = proj₁ ck , Feeds.fed-ticked hp ρ y q clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
-        ; sorted = sorted-⇝ so (then refl now) ; behind′ = Eaching.each-to _ _ (Feeds.fed-behind hp ρ y q fs (tells-past cl) (ended-past cl) bh) ; lingers′ = Lingering.lingers-to _ (Feeds.fed-lingers hp ρ y q fs (ended-past cl) lgr) })
+        ; sorted = sorted-⇝ so (then refl now) ; behind′ = Eaching.each-to _ _ (Feeds.fed-behind hp ρ y q fs (tells-past cl) (ended-past cl) bh) ; lingers′ = Lingering.lingers-to _ (Feeds.fed-lingers hp ρ y q fs (ended-past cl) lgr)
+        ; flags = let-go hp (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Feeds.Bd.body-names hp ρ y q))) fs)
+                    (trans (seen-planted hp ρ v) (lifts-seen Lρ)) ju
+                    (subst (DoneBy hp (plant ρ v)) (sym (outers-planted ρ v))
+                           (Shift.shift-flags hp hp ρ (λ j _ → refl) [] fs v {ns₀ = []} (λ ()) rv fb (subst (DoneBy hp T) (sym (++-identityʳ (outers ρ))) d₀))) })
       , passed ag pp)
     where
       ss = At.val hp (Subject.subscribers Sj)
       v  = Feeds.v hp ρ y q
+      w₀ = connectˢ Sj c b kb k idle rp e rt u bd
+      d₀ = done-up ρ (in-source here) refl (Calling.flags cl)
+      g = at-here (At.owing hp (Feeds.fd′ hp ρ y q))
+      -- The subject open as the value reaches it: every live joiner of
+      -- the body waiting, the feed's retag keeping it so.
+      cf : At.val hp (Subject.closed Sj) ≡ false
+      cf with At.val hp (Subject.closed Sj) | trans (sym (opened-⊕ hp true ρ (in-source here))) (calling-open (ρ ⊕ in-source here) cl)
+      ... | false | _  = refl
+      ... | true  | ()
+      kh : Steady hp g ((idle , At.told hp Sj e) ∷ nowAt hp ρ [])
+      kh (here refl) (lift f) lv rewrite proj₂ (f lv) (λ ()) | cf = refl
+      kh (there x) f lv = refl
+      fbd = proj₂ (fed-at hp ρ (Meaning.fed mn))
+      -- Below the connect: its source's flags as they were, its body's
+      -- through the retag.
+      fb : DoneBy hp w₀ (outers ρ ++ []) → DoneBy hp v (outers ρ)
+      fb d = Flag.db-connect hp
+        (λ jb → Flag.db-sub hp d′ (in-source here) (cong (λ z → z ∧ true) (trans (sym (part-retag hp g bd kh fbd)) jb)))
+        (λ js → flags-retag hp g bd kh fbd (Flag.db-sub hp d′ (in-body here) (cong (λ z → z ∧ true) js)))
+        where d′ = subst (DoneBy hp w₀) (++-identityʳ (outers ρ)) d
+      -- The connect stands, its body fed.
+      ju : is-just (At.part hp v) ≡ true
+      ju = cong is-just (proj₁ (proj₂ (Feeds.fed-part hp ρ y q (Queue.joined qu) mn bh pb pv)))
+      rv : is-just (At.part hp v) ≡ true → is-just (At.part hp w₀) ≡ true
+      rv j = trans (sym (just-connected hp rp e rt refl (part-retag hp g bd kh fbd))) j
 
   -- A CONNECT FINISHING: its subject closed, the feed restaged from `idle`
   -- to the source's end at the run's position, owed to the subscribers

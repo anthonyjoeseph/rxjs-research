@@ -110,7 +110,7 @@ module Ascending (R : Set) where
   open ClimbBase R using (call-map; call-defer; call-body)
   open ClimbTake R using (call-take)
   open ClimbScan R using (call-scan)
-  open ClimbFlat R using (call-outer)
+  open ClimbFlat R using (call-outer; flags-swap)
   open ClimbLanes R using (call-lanes)
   open ClimbConnect R using (call-source)
   -- A signal at the root: a value recorded next, the ghost's step
@@ -435,7 +435,8 @@ module Ascending (R : Set) where
                          ; joined = subst₂ (At.Joined hp) (sym (subjects-plant {t = t} π v refl)) (sym (joiners-plant {t = t} π v (λ _ → refl) _)) (Queue.joined q)
                          ; ordered = tail (Queue.ordered q) ; ahead = ahead-pop {p = p} (Queue.ordered q) (Queue.ahead q) }
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = t} π v refl)) fs ; clocked = refl , tt ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr refl now ; behind′ = Eaching.each-to _ _ (behind-fire cr π) ; lingers′ = Lingering.lingers-to _ (fire-lingers cr π) })
+        ; sorted = hop-sorted cr refl now ; behind′ = Eaching.each-to _ _ (behind-fire cr π) ; lingers′ = Lingering.lingers-to _ (fire-lingers cr π)
+        ; flags = flags-swap hp π v refl (λ ()) (Carried.flags cr) })
     , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (pend-plant {t = t} π v refl , inj₂ (takes-plant {t = t} π v refl , inj₁ ≤-refl))))
     where v = coldˢ sk hd (fired τ e (at u x fr))
 
