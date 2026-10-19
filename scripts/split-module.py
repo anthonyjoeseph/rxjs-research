@@ -16,7 +16,7 @@ import os
 import re
 import sys
 
-ROOT = os.environ.get('SPLIT_ROOT') or os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'agda-impl')
+ROOT = os.path.abspath(os.environ.get('SPLIT_ROOT') or os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'agda-impl'))
 KW = {'mutual', 'postulate', 'abstract', 'instance', 'private', 'field', 'opaque'}
 TOK = re.compile(r'[\s(){};"@]+')
 
@@ -108,7 +108,7 @@ def exports(body):
         elif first in ('data', 'record', 'module') and len(w) > 1:
             nm = w[1]
             kind = first if (first == 'module' or s.endswith('where')) else None
-        elif s.endswith(' where') or s == 'where':
+        elif s.endswith(' where') or first == 'where':
             kind = 'opaque'
         rec = [n for (_, k, n) in stack if k == 'record']
         if not hidden:
@@ -128,7 +128,7 @@ def exports(body):
                     fields.setdefault(rec[-1], set()).update(m.group(1).split())
             elif ctx in ('top', 'mutual', 'postulate', 'abstract', 'instance', 'private', 'data', 'anon'):
                 m = re.match(r'(.+?)\s+:(\s|$)', s)
-                if m and not s.startswith(('open', 'import', 'infix', '{-#', 'syntax', '...', '|')):
+                if m and first not in ('open', 'import', 'syntax', '...', '|', 'where') and not first.startswith(('infix', '{-#')):
                     names = m.group(1).split()
                     if all(re.match(r'^[^\s(){}.;]+$', x) for x in names):
                         tgt.update(names)
@@ -147,6 +147,12 @@ def tokens(lines):
                 t.add(w)
                 t.update(p for p in w.split('.') if p)
     return t
+
+
+def uses(toks, names):
+    """The names a token set mentions; a mixfix `_<ᵖ_` by all its parts."""
+    return {n for n in names
+            if n in toks or ('_' in n and all(x in toks for x in n.split('_') if x) and any(n.split('_')))}
 
 
 def mod_names(body):
@@ -416,12 +422,18 @@ def main():
     files = {}
     for k, pt in enumerate(parts):
         used = tokens(pt['body']) - pt['out'] - pt['priv']
-        lines = (header_comment if k == 0 else []) + [f'module {pt["mod"]} where'] + header_imports
-        inner_imps, file_imps = [], []
+        options = [l for l in header_comment if l.startswith('{-# OPTIONS')]
+        # the header's prose stays with the original name, else the first part
+        keeps = pt['mod'] == orig if any(q['mod'] == orig for q in parts) else k == 0
+        lines = (header_comment if keeps else options + ([''] if options else [])) + [f'module {pt["mod"]} where'] + header_imports
+        inner_imps, file_imps, rec_opens = [], [], []
         for j in range(k):
             q = parts[j]
-            names = sorted(used & q['out'])
-            for b in sorted(used & q['priv']):
+            # a bare `open R` of an earlier part's record brings its fields here too
+            recs = [l.split()[1] for l in q['flat'] if re.match(r'open \S+$', l) and l.split()[1] in q['out']]
+            rec_opens += [f'open {r}' for r in recs if f'open {r}' not in rec_opens]
+            names = sorted(uses(used | set(recs), q['out']))
+            for b in sorted(uses(used, q['priv'])):
                 problems.append(f'{pt["mod"]} uses `{b}`, private in {q["mod"]}')
             if not names:
                 continue
@@ -432,7 +444,7 @@ def main():
             else:
                 file_imps.append((q['mod'], items))
         if inner and k > 0:
-            pn = sorted((tokens(pt['body']) | tokens(inner_pre)) & pexp)
+            pn = sorted(uses(tokens(pt['body']) | tokens(inner_pre), pexp))
             if pn:
                 file_imps.insert(0, (parts[0]['mod'], pn))
         merged = {}
@@ -444,9 +456,9 @@ def main():
         if inner:
             lines += local_opens + [''] + (prelude_defs if k == 0 else [])
             lines.append(f'module {pt["wrap"]} {params} where'.replace('  ', ' '))
-            lines += inner_pre + inner_imps + ['']
+            lines += inner_pre + inner_imps + ['  ' + o for o in rec_opens] + ['']
         else:
-            lines.append('')
+            lines += [''] + rec_opens + ([''] if rec_opens else [])
         lines += pt['body']
         files[path_of(pt['mod'])] = '\n'.join(lines).rstrip('\n') + '\n'
 
@@ -549,6 +561,26 @@ def main():
                 head = clause.split()[0]
                 m = re.match(r'^(open import|import) \S+\s*(.*)$', clause)
                 um, rm, other, us, rs = split_items(m.group(2))
+                am = re.match(r'as (\S+)$', other)
+                if head == 'import' and am and not (um or rm):
+                    # qualified: part k gets alias Q, Q′, Q″…; each `Q.name` follows its owner
+                    q = am.group(1)
+                    alias = lambda k: q + '′' * k
+                    seen = set()
+
+                    def requal(mm):
+                        hs = owner_mod(mm.group(1))
+                        if len(hs) != 1:
+                            problems.append(f'{rel}: cannot place `{q}.{mm.group(1)}`')
+                            return mm.group(0)
+                        seen.add(hs[0])
+                        return f'{alias(hs[0])}.{mm.group(1)}'
+                    qq = re.compile(r'(?<![\w.])' + re.escape(q) + r'\.([^\s(){};.]+)')
+                    txt[j:] = [qq.sub(requal, l) for l in txt[j:]]
+                    out += [f'import {parts[k]["mod"]} as {alias(k)}' for k in sorted(seen)]
+                    changed = True
+                    i = j
+                    continue
                 if head != 'open' or other or not (um or rm):
                     problems.append(f'{rel}: cannot retarget `{clause}`')
                     out += txt[i:j]

@@ -45,20 +45,28 @@ consumers that only use that part.
 
 ## What it does
 
-- Each part gets the original header's imports (imports-fix prunes them) and
-  an `open import … using (…)` of the names it takes from earlier parts.
+- Each part gets the original header's imports (imports-fix prunes them),
+  its `OPTIONS` pragma, an `open import … using (…)` of the names it takes
+  from earlier parts, and any bare `open R` of an earlier part's record. The
+  header's prose stays with the part keeping the original name.
 - Every consumer's `open import M using (…)` / `renaming (…)` is partitioned
   across the parts by who defines each name. For a wrapper: `open W args
   using (…)` the same way, a blanket `open W args` or `hiding (…)` becomes
   one per part, and a qualified `W.name` is renamed to its part's wrapper.
+- An `import M as Q` becomes one import per part used, aliased `Q`, `Q′`,
+  `Q″`…, and each `Q.name` follows its definer.
 
 ## What it leaves for you (reported as PROBLEM lines)
 
 - a private name a later part uses — make it public or move it;
 - a consumer's `module X = W args` alias — its `X.name` uses are untouched;
-- `import M as Q` and anything else it cannot parse;
+- anything it cannot parse;
 - a name it cannot find a definer for: usually a field brought out by an
   `open R public` it missed, or a `syntax`/operator form.
+
+`dup-check` can fire after a split on pairs it never reported in the
+whole file — its `where`-block filter reads a fresh file differently. They
+are real duplicates: move the fact down as usual.
 
 It also over-approximates what a part uses (any token that matches an
 earlier part's export, local binders included), so expect `imports-fix` to
