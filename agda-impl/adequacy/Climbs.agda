@@ -97,7 +97,7 @@ module Ascending (R : Set) where
   open Everywhere.Spending R using (spent-retag)
   open Everywhere.Holding R using (holds-alike; holds-path; holds-plant; holds-retag)
   open Keeping R using (seen-planted)
-  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; let-go; grip; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; flags-retag)
+  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; let-go; grip; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; flags-retag)
   open Framing R using (merged-eq; heads-flat; Untold; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off)
     renaming (Ended to Ends)
   open Staging R using (not-src; wrap-lane)
@@ -3723,12 +3723,14 @@ module Ascending (R : Set) where
       kh : Steady hp g ((idle , At.told hp Sj e) ∷ nowAt hp ρ [])
       kh (here refl) (lift f) lv rewrite proj₂ (f lv) (λ ()) | cf = refl
       kh (there x) f lv = refl
+      ab′ = subst (Alike hp H′) (sym (names-retag g bd)) ab
+      fbd = proj₂ (fed-at hp ρ (Meaning.fed mn))
       -- Below the connect: its source's flags and its body's, read alike.
       fb : DoneBy hp w₀ (outers ρ ++ []) → DoneBy H′ v (outers ρ)
       fb d = Flag.db-connect H′
-        (λ jb → flags-alike hp H′ au (Flag.db-sub hp d′ (in-source here) (cong (λ z → z ∧ true) (trans (cong is-just (sym (part-alike hp H′ bd ab))) jb))))
-        (λ js → flags-alike hp H′ (subst (Alike hp H′) (sym (names-retag g bd)) ab)
-                  (flags-retag hp g bd kh (proj₂ (fed-at hp ρ (Meaning.fed mn)))
+        (λ jb → flags-alike hp H′ au (Flag.db-sub hp d′ (in-source here) (cong (λ z → z ∧ true) (trans (sym (part-retag hp g bd kh fbd)) (trans (cong is-just (part-alike hp H′ (retag g bd) ab′)) jb)))))
+        (λ js → flags-alike hp H′ ab′
+                  (flags-retag hp g bd kh fbd
                     (Flag.db-sub hp d′ (in-body here) (cong (λ z → z ∧ true) (trans (cong (λ x → is-just x ∨ is-just e) (sym (part-alike hp H′ u au))) js)))))
         where d′ = subst (DoneBy hp w₀) (++-identityʳ (outers ρ)) d
       -- The connect stands: its source gone, its end staged, its body on.
