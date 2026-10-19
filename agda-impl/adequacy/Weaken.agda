@@ -857,7 +857,7 @@ module Weakening (R : Set) where
         subst (Tied rt) (sym (leftover-wk {B = ⊤} src))
               (Lingers.rests L ψ (trans (sym s) sn) (trans (sym (grow-part (connectˢ S c b kb k fd rp e₀ rt src bd))) eq) (trans (sym (grow-part src)) pn) ec)
 
-      grow-flags : ∀ {t : Sub h [] R} → DoneBy H t [] → DoneBy H′ (wkTree τ t) []
+      grow-flags : ∀ {Δ A} {t : Sub h Δ A} → DoneBy H t [] → DoneBy H′ (wkTree τ t) []
       grow-flags {t = t} d ψ′ sn with unwk t ψ′
       ... | x , ψ , e , s with flat-inv x e
       ... | flat-back {fl = fl} {so = so} =
