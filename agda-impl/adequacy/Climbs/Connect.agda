@@ -94,7 +94,7 @@ module ClimbConnect (R : Set) where
   open Everywhere.Spending R using (spent-retag)
   open Everywhere.Holding R using (holds-alike; holds-path; holds-plant; holds-retag)
   open Keeping R using (seen-planted)
-  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; let-go; grip; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag)
+  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; let-go; grip; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; sourced-heap)
   open Framing R using (merged-eq; heads-flat; Untold; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off)
     renaming (Ended to Ends)
   open Staging R using (not-src; wrap-lane)
@@ -132,9 +132,6 @@ module ClimbConnect (R : Set) where
   conn-≡ G G′ r (just _) t nothing  (just _) = refl
   conn-≡ G G′ r nothing  t nothing  (just _) = refl
 
-  src-≡ : ∀ {h} (G G′ : Heapᴹ h) {Δ A} (s : Maybe (U.Node Δ A)) t → At.sourced G′ s t ≡ At.sourced G s t
-  src-≡ G G′ (just _) t = refl
-  src-≡ G G′ nothing  t = refl
 
   -- A CONNECT'S FEED RESTAGED IN PLACE: the source alike, the body
   -- retagged by what the feed owes it.
@@ -390,7 +387,7 @@ module ClimbConnect (R : Set) where
       where
         src-eq : At.sourced H′ (At.part H′ u) (At.leftover H′ u) ≡ At.sourced H (At.part H u) (At.leftover H u)
         src-eq = trans (cong₂ (At.sourced H′) (part-alike H H′ u (fin-au fr)) (leftover-alike H H′ u (fin-au fr)))
-                       (src-≡ H H′ (At.part H u) (At.leftover H u))
+                       (sourced-heap H H′ (At.part H u) (At.leftover H u))
 
     -- The connect's own heads and ties, the finish restaged, as the
     -- feed's.

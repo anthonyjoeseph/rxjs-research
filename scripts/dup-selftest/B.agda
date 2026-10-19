@@ -45,3 +45,25 @@ outer n = helper
 module _ (k : ℕ) where
   postulate
     nested-mul-comm : ∀ (x y : ℕ) → x * y ≡ y * x
+
+-- MUST NOT FIRE: each frame module's `w` is its OWN definition, so the
+-- shared text names two different subjects.
+module F1 (k : ℕ) where
+  w = k + 1
+
+  postulate
+    frame-a : ∀ (x : ℕ) → x + w ≡ w + x
+
+module F2 (k : ℕ) where
+  w = k * 2
+
+  postulate
+    frame-b : ∀ (x : ℕ) → x + w ≡ w + x
+
+-- MUST FIRE (exact): one module's local, stated twice inside it.
+module F3 (k : ℕ) where
+  w = k + 3
+
+  postulate
+    local-twin-a : ∀ (x : ℕ) → x * w ≡ w * x
+    local-twin-b : ∀ (x : ℕ) → x * w ≡ w * x
