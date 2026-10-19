@@ -212,11 +212,14 @@ module ClimbConnect (R : Set) where
     fed-part : ∀ {b₀ c′} → At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T
              → At.part H bd ≡ just b₀ → At.part H u ≡ just c′
              → Σ (U.Node (A ∷ Δ) B) λ b₁ → At.part H v ≡ just (U.connectᶜ rp b₁ (U.live c′)) × Gapped q (U.feed (here refl) q (just y) b₀) b₁
-    fed-part {c′ = c′} jn mn bh pb pv with At.part H (retag g₀ bd) in eb | retag-parted jn mn bh pb
-    ... | just b₁ | _ =
-      b₁ , trans part-v (trans (cong (λ s → At.connected H rp e rt s (At.part H (retag g₀ bd))) pv) (cong (At.connected H rp e rt (just c′)) eb))
-         , retag-fed jn mn bh pb eb
-    ... | nothing | ()
+    fed-part {b₀} {c′} jn mn bh pb pv = go (At.part H (retag g₀ bd)) refl
+      where
+        go : ∀ m → At.part H (retag g₀ bd) ≡ m
+           → Σ (U.Node (A ∷ Δ) B) λ b₁ → At.part H v ≡ just (U.connectᶜ rp b₁ (U.live c′)) × Gapped q (U.feed (here refl) q (just y) b₀) b₁
+        go (just b₁) eb =
+          b₁ , trans part-v (trans (cong (λ s → At.connected H rp e rt s (At.part H (retag g₀ bd))) pv) (cong (At.connected H rp e rt (just c′)) eb))
+             , retag-fed jn mn bh pb eb
+        go nothing eb with () ← trans (sym (retag-parted jn mn bh pb)) (cong is-just eb)
 
     -- The ghost past the source's skip: the connect's part what it
     -- skipped to, but for gaps, and the heap untouched.
