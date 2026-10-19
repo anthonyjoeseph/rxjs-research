@@ -95,7 +95,7 @@ module Connecting (R : Set) where
   open Tearing R using (Alike; part-alike; look-store)
   open Locality R using (module Heaps)
   open EverywhereGated.Holding R using (holds-alike)
-  open Shifting R using (each-alike; lingers-alike; flags-alike)
+  open Shifting R using (each-alike; lingers-alike; leaving-alike; flags-alike)
 
   -- A RUN AT A PENDING NODE, THE WORLD GROWN: what the relation reads of
   -- the run at its subscription, along the weakened tree and against the
