@@ -52,7 +52,7 @@ module Staging (R : Set) where
   open Heap using (World; _⊑_; there) renaming (same to same⊑)
   open Run (Pureᴾ R) using (emitAll; done; _>>ᴬ_; compile; Env; wkEnv; module Kit)
   open Run.Kit (Pureᴾ R) using (skipᴬ)
-  open Strongly R using (Carried; Books; carried; Sub; pendingˢ; ofˢ; mapˢ; connectˢ; Lane; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_; Here; walk; top; of-leaf; Call; emitC; kontC; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; names; pendings; Phase; Pinned; unpinned; rest-pinned; seen; ≗-refl; unsubscribing; under≗)
+  open Strongly R using (Carried; Books; carried; Sub; pendingˢ; ofˢ; mapˢ; connectˢ; Lane; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_; Here; walk; top; of-leaf; Call; emitC; kontC; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; names; pendings; Phase; Pinned; unpinned; rest-pinned; seen; ≗-refl; unsubscribing; under≗; owned-to; module Eaching; module Lingering)
                         renaming (⟦_⟧ to ⟦_⟧ᶜ; at⟦_⟧ to at⟦_⟧ᶜ)
   open Strongly.Against R using (StackAs; subAs; runAs; SrcOf; src-of)
   open Moving R using (planted; pend; syn-pos; part-plant; names-plant; holds-plant; settled-plant; gated-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant; head-map)
@@ -243,12 +243,12 @@ module Staging (R : Set) where
               → Σ (Carried g m) λ cr′ → subOf (Carried.ctlAs cr′) ≡ just (Δ , A , s) × measure (carried cr′) ≺ measure (carried cr)
   map-restage {m = mach ⟨ H , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = subAs π cd sk a } refl =
     record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = N.t′ ; ctlAs = subAs M.π′ (M.code′ cd) (N.restack sk a) (M.alones _)
-           ; meets = trans (M.part′ H) (Carried.meets cr) ; owned = M.rm-owned H sk a (Carried.owned cr)
+           ; meets = trans (M.part′ H) (Carried.meets cr) ; owned′ = owned-to (M.rm-owned H sk a (Carried.owned cr))
            ; kernels = M.rm-kernels H (Carried.kernels cr) ; meaning = M.rm-meaning H (Carried.meaning cr) ; queue = M.rm-queue H (Carried.queue cr)
            ; books = record { fresh = subst (AllPairs _≢_) (sym M.names′) (Books.fresh bk)
                             ; clocked = proj₁ (Books.clocked bk) , N.reticked sk a (proj₂ (Books.clocked bk))
                             ; paidUp = Books.paidUp bk ; running = Books.running bk }
-           ; sorted = Carried.sorted cr ; behind = M.rm-behind H (Carried.behind cr) ; lingers = M.rm-lingers H (Carried.lingers cr) }
+           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (M.rm-behind H (Carried.behind cr)) ; lingers′ = Lingering.lingers-to _ (M.rm-lingers H (Carried.lingers cr)) }
     , refl , inj₁ (inj₁ M.less)
     where module M = Mapped π
           module N = Moved π M.v
@@ -332,12 +332,12 @@ module Staging (R : Set) where
                 → (∀ q → U.subscribe s q ≡ U.ofᶜ q 0 xs) → Offering s xs → Offers cr {Δ} {A} xs
   offer-restage {m = mach ⟨ H , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = subAs {q = q} π cd sk a } refl sp cs =
     record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = N.t′ ; ctlAs = runAs O.ks (O.code′ cd) (N.restack sk a)
-           ; meets = trans (part-plant H π O.v (O.eqp H)) (Carried.meets cr) ; owned = O.of-owned H sk a (O.code′ cd) (Carried.owned cr)
+           ; meets = trans (part-plant H π O.v (O.eqp H)) (Carried.meets cr) ; owned′ = owned-to (O.of-owned H sk a (O.code′ cd) (Carried.owned cr))
            ; kernels = O.of-kernels H (Carried.kernels cr) ; meaning = O.of-meaning H (Carried.meaning cr) ; queue = O.of-queue H (Carried.queue cr)
            ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant π O.v refl)) (Books.fresh bk)
                             ; clocked = proj₁ (Books.clocked bk) , N.reticked sk a (proj₂ (Books.clocked bk))
                             ; paidUp = Books.paidUp bk ; running = Books.running bk }
-           ; sorted = Carried.sorted cr ; behind = O.of-behind H (Carried.behind cr) ; lingers = O.of-lingers H (Carried.lingers cr) }
+           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (O.of-behind H (Carried.behind cr)) ; lingers′ = Lingering.lingers-to _ (O.of-lingers H (Carried.lingers cr)) }
     , q , O.π′ , refl , inj₁ (inj₁ O.less)
     where module O = Offered π (sp q) cs
           module N = Moved π O.v

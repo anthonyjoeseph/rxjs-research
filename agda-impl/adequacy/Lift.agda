@@ -56,9 +56,9 @@ module Lifting (R : Set) where
   open Heap using (_⊑_)
   open Sorting R using (Beyond)
   open Run (Pureᴾ R) using (Act; module Kit; module FlatKit)
-  open Strongly R using (Strong; Carried; Books; carried; Sub; pendingˢ; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; emitC; kontC; Leaf; feedC; srcC; taking; taken; feeding; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _≗_; Each; Heads; Lingers; Meets; pinned-skip; rootObs; seen; seenL) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
+  open Strongly R using (Strong; Carried; Books; carried; Sub; pendingˢ; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; fired; waiting; Owned; Path; emitC; kontC; Leaf; feedC; srcC; taking; taken; feeding; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _≗_; Each; Heads; Lingers; Meets; pinned-skip; rootObs; seen; seenL; ⊕-here; owned-to; module Eaching; module Lingering) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (CtlAs; calmAs; noteAs; runAs; subAs; burstAs; bursts; agenda) renaming (Placed to Placedᴬ)
-  open Moving R using (plant; true≢false; ⊕-here)
+  open Moving R using (plant; true≢false)
   open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each)
   open Unsubbing R using (_⇝_; site-tears)
   open Locality R using (site-holds; site-gated)
@@ -367,13 +367,13 @@ module Lifting (R : Set) where
     , carried (record
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = Carried.tree cr ; ctlAs = runAs ks e′ Kᴬ
         ; meets = trans (torn-part cr z refl) (Carried.meets cr)
-        ; owned = torn-owned hp z (Carried.owned cr)
+        ; owned′ = owned-to (torn-owned hp z (Carried.owned cr))
         ; kernels = record { holds = torn-holds cr z ; gated = torn-gated cr z ; settled = Kernels.settled (Carried.kernels cr) }
         ; meaning = record { fed = torn-fed cr z }
         ; queue = torn-queue cr z
         ; books = record { fresh = Books.fresh (Carried.books cr) ; clocked = Books.clocked (Carried.books cr)
                          ; paidUp = Books.paidUp (Carried.books cr) ; running = Books.running (Carried.books cr) }
-        ; sorted = hop-sorted cr eq path ; behind = torn-behind cr z refl ; lingers = torn-lingers cr z refl })
+        ; sorted = hop-sorted cr eq path ; behind′ = Eaching.each-to _ _ (torn-behind cr z refl) ; lingers′ = Lingering.lingers-to _ (torn-lingers cr z refl) })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , ≤-refl))
 
   ----------------------------------------------------------------------

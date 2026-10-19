@@ -466,7 +466,7 @@ module Locality (R : Set) where
                  (apart-r (flatNames fl) ps (there (there (there (here refl)))))
       gated-path (in-lanes {fl = fl} {oc} {k} {r} {t = so} {ls} π) v ps off hg hs (g₁ , g₂) =
         gated-alike so (keeps off (lanes-path (plantedᴸ π v)) (apart-r (names so) P)) g₁
-        , subst (λ X → At.GatedLanes H′ X _) (cong lower (sym lc)) (gatedL-path π v (pairs-r (names so) P) off hg hs g₂)
+        , subst (λ X → At.GatedLanes H′ X (plantᴸ π v)) (cong lower (sym lc)) (gatedL-path π v (pairs-r (names so) P) off hg hs g₂)
         where
           P = pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps)))
           lc = keep off (λ m → ++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) (lanes-path (plantedᴸ π v) m))))) (FlatKit.Flat.lanes fl)
@@ -873,7 +873,7 @@ module Locality (R : Set) where
                     (Heaps.holdsL-alike H F.H₂ ls F.agL {op = op} {f = f} {E = E} {o = o} {fl = fl} hl) (Heaps.gatedL-alike H F.H₂ ls F.agL g₂)
       where module F = FlatTear H {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {so = so} {ls = ls} ps
     spent-torn H (connectˢ S c b kb k fd rp e rt src bd) ps (_ , _ , _ , hs , hb) (_ , g₂ , g₃) =
-      Heaps.cut-alike C.H₁ C.H₂ k src C.agS (cut-of k (spent-torn H src C.Ps hs g₂))
+      Heaps.cut-alike C.H₁ C.H₂ k src C.agS (cut-of {H = C.H₁} k {s = src} (spent-torn H src C.Ps hs g₂))
       , via-cut C.H₁ kb bd C.Pb (Heaps.holds-alike H C.H₁ bd C.agB hb) (Heaps.gated-alike H C.H₁ bd C.agB g₃)
       where module C = ConnTear H {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {e = e} {rp = rp} {rt = rt} {src = src} {bd = bd} ps
     spent-torn H (joinˢ j sk l x st) ps hs       g = lift tt

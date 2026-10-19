@@ -55,7 +55,7 @@ module Scanning (R : Set) where
   open Shared Timeline (Out R) using (Heapᴹ; ⟨_,_,_⟩; run; extend)
   open Heap using (World; _⊑_; _⨾_; there; new; cell) renaming (here to hereʳ)
   open Run (Pureᴾ R) using (done; compile; Env; wkEnv; wkObs; wkKont)
-  open Strongly R using (Carried; Books; Sub; pendingˢ; Path; here; in-scan; _⊕_; Here; walk; top; Job; _≗_; module At; Kernels; Meaning; Queue; Each; Heads; Lingers; names; pendings; Phase; rest-pinned; seen; scanˢ; newRef≗; module Canon)
+  open Strongly R using (Carried; Books; Sub; pendingˢ; Path; here; in-scan; _⊕_; Here; walk; top; Job; _≗_; module At; Kernels; Meaning; Queue; Each; Heads; Lingers; names; pendings; Phase; rest-pinned; seen; scanˢ; newRef≗; module Canon; owned-to; module Eaching; module Lingering)
   open Strongly.Against R using (subAs; SrcOf; src-of)
   open Moving R using (planted; pend; part-plant; holds-plant; settled-plant; gated-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant; head-scan)
   open Ghosting R using (walk-⊕; sorted-⇝)
@@ -175,15 +175,15 @@ module Scanning (R : Set) where
     , record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = S.t′
              ; ctlAs = subAs S.π′ (S.code′ E′ υ e (kk new hereʳ)) (S.restack sk₁ a₁) (S.alones _)
              ; meets = trans (part-plant H′ S.π₁ S.v eqv) (trans (G.grow-part gr (Carried.tree cr)) (Carried.meets cr))
-             ; owned = Moved.Owning.reowned S.π₁ S.v H′ eqv (in-scan here) S.inner {cd = Grown.code-grow S.ν π E′ υ e} sk₁ a₁ (G.grow-owned gr sk (Carried.owned cr))
+             ; owned′ = owned-to (Moved.Owning.reowned S.π₁ S.v H′ eqv (in-scan here) S.inner {cd = Grown.code-grow S.ν π E′ υ e} sk₁ a₁ (G.grow-owned gr sk (Carried.owned cr)))
              ; kernels = S.rs-kernels H′ eqv (G.grow-kernels gr (Carried.kernels cr))
              ; meaning = S.rs-meaning H′ eqv (G.grow-meaning gr (Carried.meaning cr))
              ; queue = S.rs-queue H′ eqv (G.grow-queue gr (Carried.queue cr))
              ; books = record { fresh = S.scan-fresh (Books.fresh bk)
                               ; clocked = proj₁ (Books.clocked bk) , S.reticked sk₁ a₁ (G.grow-ticked sk (proj₂ (Books.clocked bk)))
                               ; paidUp = cong (mapList (wkTodo new)) (Books.paidUp bk) ; running = Books.running bk }
-             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl now) ; behind = S.rs-behind H′ eqv (G.grow-each gr (Carried.behind cr))
-             ; lingers = S.rs-lingers H′ eqv (G.grow-lingers gr (Carried.lingers cr)) }
+             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl now) ; behind′ = Eaching.each-to _ _ (S.rs-behind H′ eqv (G.grow-each gr (Carried.behind cr)))
+             ; lingers′ = Lingering.lingers-to _ (S.rs-lingers H′ eqv (G.grow-lingers gr (Carried.lingers cr))) }
     , refl , inj₁ (inj₁ S.less)
     where module S = Scanned {f = f} {z = z} {s = s} π
           module G = Grown S.ν

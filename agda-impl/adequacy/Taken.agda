@@ -61,7 +61,7 @@ module Taking (R : Set) where
   open Shared Timeline (Out R) using (Heapᴹ; ⟨_,_,_⟩; run; extend)
   open Heap using (World; _⊑_; _⨾_; there; new; grow; cell) renaming (here to hereʳ; same to same⊑)
   open Run (Pureᴾ R) using (Act; done; newRef; under; _>>ᴬ_; compile; Env; wkEnv; module Kit; Ref; wkR; Kont; wkObs)
-  open Strongly R using (Carried; Books; Sub; pendingˢ; takeWhileˢ; Path; here; in-take; _⊕_; Here; walk; top; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; names; pendings; Phase; rest-pinned; seen; ≗-refl; newRef≗; taking; takeK; unsubscribing; under≗; module Canon)
+  open Strongly R using (Carried; Books; Sub; pendingˢ; takeWhileˢ; Path; here; in-take; _⊕_; Here; walk; top; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; names; pendings; Phase; rest-pinned; seen; ≗-refl; newRef≗; taking; takeK; unsubscribing; under≗; module Canon; owned-to; module Eaching; module Lingering)
   open Strongly.Against R using (StackAs; subAs; SrcOf; src-of)
   open Moving R using (planted; pend; part-plant; holds-owed; settled-plant; gated-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant)
   open Ghosting R using (walk-⊕; sorted-⇝)
@@ -225,8 +225,8 @@ module Taking (R : Set) where
     , record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = S.t′
              ; ctlAs = subAs S.π′ (S.code′ E′ υ e (kk₂ new hereʳ)) (S.restack sk₂ a₂) (S.alones _)
              ; meets = trans (part-plant H₂ S.π₂ S.v eqv) (trans (G₂.grow-part gr₂ S.T₁) (trans (G₁.grow-part gr₁ (Carried.tree cr)) (Carried.meets cr)))
-             ; owned = Moved.Owning.reowned S.π₂ S.v H₂ eqv (in-take here) S.inner sk₂ a₂
-                         (G₂.grow-owned gr₂ {cd′ = cd₂} sk₁ {a′ = a₂} (G₁.grow-owned gr₁ {cd′ = cd₁} sk {a′ = a₁} (Carried.owned cr)))
+             ; owned′ = owned-to (Moved.Owning.reowned S.π₂ S.v H₂ eqv (in-take here) S.inner sk₂ a₂
+                         (G₂.grow-owned gr₂ {cd′ = cd₂} sk₁ {a′ = a₂} (G₁.grow-owned gr₁ {cd′ = cd₁} sk {a′ = a₁} (Carried.owned cr))))
              ; kernels = S.rt-kernels H₂ eqv refl (G₂.grow-kernels gr₂ (G₁.grow-kernels gr₁ (Carried.kernels cr)))
              ; meaning = S.rt-meaning H₂ eqv refl (G₂.grow-meaning gr₂ (G₁.grow-meaning gr₁ (Carried.meaning cr)))
              ; queue = S.rt-queue H₂ eqv refl (G₂.grow-queue gr₂ (G₁.grow-queue gr₁ (Carried.queue cr)))
@@ -234,8 +234,8 @@ module Taking (R : Set) where
                               ; clocked = proj₁ (Books.clocked bk) , S.reticked sk₂ a₂ (G₂.grow-ticked sk₁ (G₁.grow-ticked sk (proj₂ (Books.clocked bk))))
                               ; paidUp = cong (mapList (wkTodo new)) (cong (mapList (wkTodo new)) (Books.paidUp bk)) ; running = Books.running bk }
              ; sorted = sorted-⇝ (Carried.sorted cr) (then refl (then (cong (λ x → step (Mx x)) e₁) now))
-             ; behind = S.rt-behind H₂ eqv refl (G₂.grow-each gr₂ (G₁.grow-each gr₁ (Carried.behind cr)))
-             ; lingers = S.rt-lingers H₂ eqv refl (G₂.grow-lingers gr₂ (G₁.grow-lingers gr₁ (Carried.lingers cr))) }
+             ; behind′ = Eaching.each-to _ _ (S.rt-behind H₂ eqv refl (G₂.grow-each gr₂ (G₁.grow-each gr₁ (Carried.behind cr))))
+             ; lingers′ = Lingering.lingers-to _ (S.rt-lingers H₂ eqv refl (G₂.grow-lingers gr₂ (G₁.grow-lingers gr₁ (Carried.lingers cr)))) }
     , refl , inj₁ (inj₁ S.less)
     where module S = Taken {i = i} {p = p} {s = s} π
           module G₁ = Grown S.ν₁

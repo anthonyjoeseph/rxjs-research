@@ -408,6 +408,18 @@ def extract_definitions(src_dir, files):
     BLOCK_OPENERS = {"postulate", "mutual", "abstract", "opaque", "private",
                      "instance", "variable"}
 
+    # A COPATTERN CLAUSE BELONGS TO THE VALUE IT DEFINES.  `Alg.coldᶜ
+    # OwnedAlg … = coldOwed …` is a clause of `OwnedAlg`: its head is the
+    # projection, qualified, and the value is the token after it.  Read as a
+    # definition of `Alg.coldᶜ` it has no consumer, and every name its body
+    # uses loses its route home.
+    def copattern_owner(tokens):
+        head = tokens[0]
+        if (len(tokens) > 1 and "." in head.strip(".") and "=" in tokens
+                and tokens[1] in defs):
+            return tokens[1]
+        return None
+
     def register(name, relpath, lineno, kind):
         def_lines[name].add((relpath, lineno))
         if name not in defs:
@@ -588,7 +600,7 @@ def extract_definitions(src_dir, files):
             # clauses; reattributing it would wrongly hand hasAtLeast-pad's
             # own signature line to `_hasAtLeast_` and, worse, leave it
             # unmasked when counting hasAtLeast-pad's OWN consumers.
-            owner = None if ":" in tokens else find_mixfix_owner(tokens)
+            owner = None if ":" in tokens else (find_mixfix_owner(tokens) or copattern_owner(tokens))
             if owner is not None:
                 def_lines[owner].add((relpath, i + 1))
             else:
@@ -758,7 +770,7 @@ def extract_definitions(src_dir, files):
             # clauses; reattributing it would wrongly hand hasAtLeast-pad's
             # own signature line to `_hasAtLeast_` and, worse, leave it
             # unmasked when counting hasAtLeast-pad's OWN consumers.
-            owner = None if ":" in tokens else find_mixfix_owner(tokens)
+            owner = None if ":" in tokens else (find_mixfix_owner(tokens) or copattern_owner(tokens))
             if owner is not None:
                 def_lines[owner].add((relpath, i + 1))
                 i += 1

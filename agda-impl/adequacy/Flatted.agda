@@ -59,7 +59,7 @@ module Flatting (R : Set) where
   open Heap using (World; _⊑_; _⨾_; there; new; grow; cell; slot; Sink) renaming (here to hereʳ; same to same⊑)
   open Run (Pureᴾ R) using (Act; done; writeRef; register; _>>ᴬ_; compile; Env; wkEnv; wkAct; module Kit; module FlatKit; Ref; wkR; Observer; Kont; wkObs; Subscription; Subscribe; wkSub)
   open Run.Kit (Pureᴾ R) using (skipᴬ)
-  open Strongly R using (Carried; Books; Sub; pendingˢ; Path; here; in-outer; in-lanes; _⊕_; Here; walk; top; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; names; pendings; Phase; unpinned; union-pinned; rest-pinned; seen; flatMapˢ; killAllᶜ; flatK; CbRel; ≗-refl; newRef≗; unsubscribing; register≗; writeRef≗; module Canon)
+  open Strongly R using (Carried; Books; Sub; pendingˢ; Path; here; in-outer; in-lanes; _⊕_; Here; walk; top; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; names; pendings; Phase; unpinned; union-pinned; rest-pinned; seen; flatMapˢ; killAllᶜ; flatK; CbRel; ≗-refl; newRef≗; unsubscribing; register≗; writeRef≗; module Canon; owned-to; module Eaching; module Lingering)
   open Strongly.Against R using (subAs; SrcOf; src-of)
   open Moving R using (planted; pend; part-plant; holds-owed; settled-plant; gated-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant)
   open Ghosting R using (walk-⊕; sorted-⇝)
@@ -311,7 +311,7 @@ module Flatting (R : Set) where
     , record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = F.t′
              ; ctlAs = subAs F.π′ (F.code′ ex₉) (F.restack sk₉ a₉) (F.alones _)
              ; meets = trans (part-plant H₉ F.π₈ F.v refl) (trans (Grew.meets G₉) (Carried.meets cr))
-             ; owned = F.rf-owned refl refl slot₉ refl refl refl refl (Grew.owned G₉)
+             ; owned′ = owned-to (F.rf-owned refl refl slot₉ refl refl refl refl (Grew.owned G₉))
              ; kernels = F.rf-kernels refl refl slot₉ refl refl refl refl (Grew.kernels G₉)
              ; meaning = F.rf-meaning refl refl slot₉ refl refl refl refl (Grew.meaning G₉)
              ; queue = F.rf-queue refl refl slot₉ refl refl refl refl (Grew.queue G₉)
@@ -319,8 +319,8 @@ module Flatting (R : Set) where
                               ; clocked = proj₁ (Books.clocked bk) , F.reticked sk₉ a₉ (Grew.ticked G₉)
                               ; paidUp = cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (Books.paidUp bk))))))))
                               ; running = Books.running bk }
-             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind = F.rf-behind refl refl slot₉ refl refl refl refl (Grew.behind G₉)
-             ; lingers = F.rf-lingers refl refl slot₉ refl refl refl refl (Grew.lingers G₉) }
+             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind′ = Eaching.each-to _ _ (F.rf-behind refl refl slot₉ refl refl refl refl (Grew.behind G₉))
+             ; lingers′ = Lingering.lingers-to _ (F.rf-lingers refl refl slot₉ refl refl refl refl (Grew.lingers G₉)) }
     , refl , inj₁ (inj₁ (subst (pend F.t′ <_) (Grew.pends G₉) F.less))
     where bk = Carried.books cr
           -- The kernel's allocations after its first, its registration and

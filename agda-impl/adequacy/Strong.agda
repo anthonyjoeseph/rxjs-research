@@ -23,14 +23,14 @@ open import Data.Maybe using (Maybe; just; nothing; is-just)
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤_)
 open import Data.Empty using (⊥)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Level using (Lift; lower)
+open import Level using (Level; Lift; lift; lower) renaming (suc to lsuc; zero to lzero)
 open import Relation.Nullary using (¬_)
 open import Data.List.Relation.Unary.Linked using (Linked) renaming ([] to []ᴸ)
 import Data.List.Relation.Unary.Any as Any
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs) renaming ([] to []ᴾ)
 
 import Tree as T
@@ -269,6 +269,56 @@ module Strongly (R : Set) where
         detacher : Maybe (Quiet h)
         inner    : Sub h Δ B
 
+  ------------------------------------------------------------------------
+  -- A PART OF THE RELATION: one clause per node over its children's
+  -- parts, each handed what its parent inherits it.
+
+  record Alg {ℓ : Level} (h : World) : Set (lsuc ℓ) where
+    no-eta-equality
+    field
+      Inh    : ∀ {Δ A} → Sub h Δ A → Set ℓ
+      InhL   : ∀ {Δ B} → List (Lane h Δ B) → Set ℓ
+      pendᶜ  : ∀ {Δ A} (s : Obs Timeline Δ A) q → Inh (pendingˢ s q) → Set ℓ
+      coldᶜ  : ∀ {Δ A} (s : Sink h A) hd ph → Inh (coldˢ {Δ = Δ} s hd ph) → Set ℓ
+      ofᶜ    : ∀ {Δ} {A : Set} p i (xs : List A) → Inh (ofˢ {Δ = Δ} p i xs) → Set ℓ
+      doneᶜ  : ∀ {Δ A} → Inh (doneˢ {h} {Δ} {A}) → Set ℓ
+      mapᶜ   : ∀ {Δ A} {B : Set} (f : A → B) (s : Sub h Δ A) → (Inh s → Set ℓ) → Inh (mapˢ f s) → Set ℓ
+      scanᶜ  : ∀ {Δ A B} (f : B → A → B) r (s : Sub h Δ A) → (Inh s → Set ℓ) → Inh (scanˢ f r s) → Set ℓ
+      takeᶜ  : ∀ {Δ A} i p c k tk (s : Sub h Δ A) → (Inh s → Set ℓ) → Inh (takeWhileˢ i p c k tk s) → Set ℓ
+      flatᶜ  : ∀ {Δ A B} op f fl oc k r pl (so : Sub h Δ A) (ls : List (Lane h Δ B))
+             → (Inh so → Set ℓ) → (InhL ls → Set ℓ) → Inh (flatMapˢ op f fl oc k r pl so ls) → Set ℓ
+      connᶜ  : ∀ {Δ A B} S c b kb k fd rp e rt (src : Sub h Δ A) (bd : Sub h (A ∷ Δ) B)
+             → (Inh src → Set ℓ) → (Inh bd → Set ℓ) → Inh (connectˢ S c b kb k fd rp e rt src bd) → Set ℓ
+      joinᶜ  : ∀ {Δ A} j sk l (x : A ∈ Δ) st → Inh (joinˢ j sk l x st) → Set ℓ
+      deferᶜ : ∀ {Δ A} k (s : Sub h Δ A) → (Inh s → Set ℓ) → Inh (deferˢ k s) → Set ℓ
+      nilᶜ   : ∀ {Δ B} → InhL {Δ} {B} [] → Set ℓ
+      consᶜ  : ∀ {Δ B} c k (s : Sub h Δ B) (ls : List (Lane h Δ B)) → (Inh s → Set ℓ) → (InhL ls → Set ℓ) → InhL (lane c k s ∷ ls) → Set ℓ
+
+  module Fold {ℓ} {h} (a : Alg {ℓ} h) where
+    open Alg a
+    mutual
+      fold : ∀ {Δ A} (u : Sub h Δ A) → Inh u → Set ℓ
+      fold (pendingˢ s q)                          = pendᶜ s q
+      fold (coldˢ s hd ph)                         = coldᶜ s hd ph
+      fold (ofˢ p i xs)                            = ofᶜ p i xs
+      fold doneˢ                                   = doneᶜ
+      fold (mapˢ f s)                              = mapᶜ f s (fold s)
+      fold (scanˢ f r s)                           = scanᶜ f r s (fold s)
+      fold (takeWhileˢ i p c k tk s)               = takeᶜ i p c k tk s (fold s)
+      fold (flatMapˢ op f fl oc k r pl so ls)      = flatᶜ op f fl oc k r pl so ls (fold so) (foldL ls)
+      fold (connectˢ S c b kb k fd rp e rt src bd) = connᶜ S c b kb k fd rp e rt src bd (fold src) (fold bd)
+      fold (joinˢ j sk l x st)                     = joinᶜ j sk l x st
+      fold (deferˢ k s)                            = deferᶜ k s (fold s)
+
+      foldL : ∀ {Δ B} (ls : List (Lane h Δ B)) → InhL ls → Set ℓ
+      foldL []                = nilᶜ
+      foldL (lane c k s ∷ ls) = consᶜ c k s ls (fold s) (foldL ls)
+
+  -- Once a subscription is attached.
+  Once : ∀ {ℓ h} → Maybe (Quiet h) → Set ℓ → Set ℓ
+  Once nothing  X = Lift _ ⊤
+  Once (just _) X = X
+
   -- WHAT UNSUBSCRIBING DOES, as each kernel's subscription says.  A
   -- subscription not yet made has nothing to undo.
   unsub : ∀ {h Δ A} → Sub h Δ A → Act h ⊤
@@ -299,19 +349,29 @@ module Strongly (R : Set) where
   Begun nothing  s = ⊤
   Begun (just _) s = ¬ Owes s
 
-  mutual
-    Settled : ∀ {h Δ A} → Sub h Δ A → Set
-    Settled (mapˢ f s)                            = Settled s
-    Settled (scanˢ f r s)                         = Settled s
-    Settled (takeWhileˢ i p c k tk s)             = Begun k s × Settled s
-    Settled (flatMapˢ op f fl oc k r pl so ls)    = Begun k so × Settled so × SettledLanes ls
-    Settled (connectˢ S c b kb k fd rp e rt s bd) = Begun k s × Begun kb bd × Settled s × Settled bd
-    Settled (deferˢ k s)                          = Begun k s × Settled s
-    Settled _                                     = ⊤
+  SettledAlg : ∀ {h} → Alg h
+  SettledAlg = record
+    { Inh    = λ _ → ⊤
+    ; InhL   = λ _ → ⊤
+    ; pendᶜ  = λ _ _ _ → ⊤
+    ; coldᶜ  = λ _ _ _ _ → ⊤
+    ; ofᶜ    = λ _ _ _ _ → ⊤
+    ; doneᶜ  = λ _ → ⊤
+    ; mapᶜ   = λ _ _ X → X
+    ; scanᶜ  = λ _ _ _ X → X
+    ; takeᶜ  = λ _ _ _ k _ s X i → Begun k s × X i
+    ; flatᶜ  = λ _ _ _ _ k _ _ so _ X L i → Begun k so × X i × L tt
+    ; connᶜ  = λ _ _ _ kb k _ _ _ _ s bd X Y i → Begun k s × Begun kb bd × X i × Y tt
+    ; joinᶜ  = λ _ _ _ _ _ _ → ⊤
+    ; deferᶜ = λ k s X i → Begun k s × X i
+    ; nilᶜ   = λ _ → ⊤
+    ; consᶜ  = λ _ k s _ X L i → Begun k s × X tt × L i }
 
-    SettledLanes : ∀ {h Δ B} → List (Lane h Δ B) → Set
-    SettledLanes []                = ⊤
-    SettledLanes (lane c k s ∷ ls) = Begun k s × Settled s × SettledLanes ls
+  Settled : ∀ {h Δ A} → Sub h Δ A → Set
+  Settled u = Fold.fold SettledAlg u tt
+
+  SettledLanes : ∀ {h Δ B} → List (Lane h Δ B) → Set
+  SettledLanes ls = Fold.foldL SettledAlg ls tt
 
   ------------------------------------------------------------------------
   -- Where a node sits, and what its kernel was handed
@@ -353,6 +413,23 @@ module Strongly (R : Set) where
     _⊕ᴸ_ : ∀ {h Δ B Δ′ A′ Δ″ A″} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} {v : Sub h Δ″ A″} → PathLanes ls u → Path u v → PathLanes ls v
     this-lane p ⊕ᴸ q = this-lane (p ⊕ q)
     next-lane p ⊕ᴸ q = next-lane (p ⊕ᴸ q)
+
+  -- A path, then nothing.
+  mutual
+    ⊕-here : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) → π ⊕ here ≡ π
+    ⊕-here here          = refl
+    ⊕-here (in-map π)    = cong in-map (⊕-here π)
+    ⊕-here (in-scan π)   = cong in-scan (⊕-here π)
+    ⊕-here (in-take π)   = cong in-take (⊕-here π)
+    ⊕-here (in-outer π)  = cong in-outer (⊕-here π)
+    ⊕-here (in-lanes π)  = cong in-lanes (⊕-hereᴸ π)
+    ⊕-here (in-source π) = cong in-source (⊕-here π)
+    ⊕-here (in-body π)   = cong in-body (⊕-here π)
+    ⊕-here (in-defer π)  = cong in-defer (⊕-here π)
+
+    ⊕-hereᴸ : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) → π ⊕ᴸ here ≡ π
+    ⊕-hereᴸ (this-lane π) = cong this-lane (⊕-here π)
+    ⊕-hereᴸ (next-lane π) = cong next-lane (⊕-hereᴸ π)
 
   -- What a kernel at a node was handed: its observer, its continuation,
   -- the subjects in scope.
@@ -694,21 +771,29 @@ module Strongly (R : Set) where
 
     -- EVERY LIVE JOINER HOLDS WHAT THE RUN OWES IT: the value or the
     -- completion its feed has still to deliver it, and nothing else.
-    mutual
-      Fed : ∀ {Δ A} → Sub h Δ A → Now Δ → Set₁
-      Fed (mapˢ f s)                        ν = Fed s ν
-      Fed (scanˢ f r s)                     ν = Fed s ν
-      Fed (takeWhileˢ i p c k tk s)         ν = Fed s ν
-      Fed (flatMapˢ op f fl oc k r pl so ls)   ν = Fed so ν × FedLanes ls ν
-      Fed (connectˢ S c b kb k fd rp e rt src bd) ν = Fed src ν × Fed bd ((fd , e) ∷ᴬ ν)
-      Fed (joinˢ j sk l x st)               ν = let (fd , e) = lookup ν x in
-        Lift _ (val l ≡ true → (Owed fd sk j → st ≡ owing fd j) × (¬ Owed fd sk j → st ≡ owingNone e))
-      Fed (deferˢ k s)                      ν = Fed s ν
-      Fed _                                 ν = Lift _ ⊤
+    FedAlg : Alg {lsuc lzero} h
+    Alg.Inh FedAlg {Δ} _ = Now Δ
+    Alg.InhL FedAlg {Δ} _ = Now Δ
+    Alg.pendᶜ FedAlg = λ _ _ _ → Lift _ ⊤
+    Alg.coldᶜ FedAlg = λ _ _ _ _ → Lift _ ⊤
+    Alg.ofᶜ FedAlg = λ _ _ _ _ → Lift _ ⊤
+    Alg.doneᶜ FedAlg = λ _ → Lift _ ⊤
+    Alg.mapᶜ FedAlg = λ _ _ X → X
+    Alg.scanᶜ FedAlg = λ _ _ _ X → X
+    Alg.takeᶜ FedAlg = λ _ _ _ _ _ _ X → X
+    Alg.flatᶜ FedAlg = λ _ _ _ _ _ _ _ _ _ X L ν → X ν × L ν
+    Alg.connᶜ FedAlg = λ _ _ _ _ _ fd _ e _ _ _ X Y ν → X ν × Y ((fd , e) ∷ᴬ ν)
+    Alg.joinᶜ FedAlg = λ j sk l x st ν → let (fd , e) = lookup ν x in
+                   Lift _ (val l ≡ true → (Owed fd sk j → st ≡ owing fd j) × (¬ Owed fd sk j → st ≡ owingNone e))
+    Alg.deferᶜ FedAlg = λ _ _ X → X
+    Alg.nilᶜ FedAlg = λ _ → Lift _ ⊤
+    Alg.consᶜ FedAlg = λ _ _ _ _ X L ν → X ν × L ν
 
-      FedLanes : ∀ {Δ B} → List (Lane h Δ B) → Now Δ → Set₁
-      FedLanes []                ν = Lift _ ⊤
-      FedLanes (lane c k s ∷ ls) ν = Fed s ν × FedLanes ls ν
+    Fed : ∀ {Δ A} → Sub h Δ A → Now Δ → Set₁
+    Fed = Fold.fold FedAlg
+
+    FedLanes : ∀ {Δ B} → List (Lane h Δ B) → Now Δ → Set₁
+    FedLanes = Fold.foldL FedAlg
 
     ----------------------------------------------------------------------
     -- The gates
@@ -721,26 +806,33 @@ module Strongly (R : Set) where
     -- subscriber closed, until the attach unsubscribes them.
     --
     -- REFUTED: 00dd1c06 of every cold below a cut switch, by a lane whose cold plays its first burst into a takeWhile that fails and cuts
-    mutual
-      Spent : ∀ {Δ A} → Sub h Δ A → Set₁
-      Spent (coldˢ s hd ph)                         = Lift _ (spentʰ hd ≡ true)
-      Spent (mapˢ f s)                              = Spent s
-      Spent (scanˢ f r s)                           = Spent s
-      Spent (takeWhileˢ i p c k tk s)               = Cut↓ k s
-      Spent (flatMapˢ op f fl oc k r pl so ls)      = Cut↓ k so × SpentLanes ls
-      Spent (connectˢ S c b kb k fd rp e rt src bd) = Cut↓ k src × Cut↓ kb bd
-      Spent (deferˢ k s)                            = Cut↓ k s
-      Spent _                                       = Lift _ ⊤
+    SpentAlg : Alg {lsuc lzero} h
+    Alg.Inh SpentAlg = λ _ → Lift _ ⊤
+    Alg.InhL SpentAlg = λ _ → Lift _ ⊤
+    Alg.pendᶜ SpentAlg = λ _ _ _ → Lift _ ⊤
+    Alg.coldᶜ SpentAlg = λ _ hd _ _ → Lift _ (spentʰ hd ≡ true)
+    Alg.ofᶜ SpentAlg = λ _ _ _ _ → Lift _ ⊤
+    Alg.doneᶜ SpentAlg = λ _ → Lift _ ⊤
+    Alg.mapᶜ SpentAlg = λ _ _ X → X
+    Alg.scanᶜ SpentAlg = λ _ _ _ X → X
+    Alg.takeᶜ SpentAlg = λ _ _ _ k _ _ X i → Once k (X i)
+    Alg.flatᶜ SpentAlg = λ _ _ _ _ k _ _ _ _ X L i → Once k (X i) × L (lift tt)
+    Alg.connᶜ SpentAlg = λ _ _ _ kb k _ _ _ _ _ _ X Y i → Once k (X i) × Once kb (Y (lift tt))
+    Alg.joinᶜ SpentAlg = λ _ _ _ _ _ _ → Lift _ ⊤
+    Alg.deferᶜ SpentAlg = λ k _ X i → Once k (X i)
+    Alg.nilᶜ SpentAlg = λ _ → Lift _ ⊤
+    Alg.consᶜ SpentAlg = λ _ k _ _ X L i → Once k (X (lift tt)) × L i
 
-      SpentLanes : ∀ {Δ B} → List (Lane h Δ B) → Set₁
-      SpentLanes []                = Lift _ ⊤
-      SpentLanes (lane c k s ∷ ls) = Cut↓ k s × SpentLanes ls
+    Spent : ∀ {Δ A} → Sub h Δ A → Set₁
+    Spent u = Fold.fold SpentAlg u (lift tt)
 
-      -- Below a subscription once attached, what unsubscribing reaches
-      -- spent.
-      Cut↓ : ∀ {Δ A} → Maybe (Quiet h) → Sub h Δ A → Set₁
-      Cut↓ nothing  s = Lift _ ⊤
-      Cut↓ (just _) s = Spent s
+    SpentLanes : ∀ {Δ B} → List (Lane h Δ B) → Set₁
+    SpentLanes ls = Fold.foldL SpentAlg ls (lift tt)
+
+    -- Below a subscription once attached, what unsubscribing reaches
+    -- spent.
+    Cut↓ : ∀ {Δ A} → Maybe (Quiet h) → Sub h Δ A → Set₁
+    Cut↓ k s = Once k (Spent s)
 
     unended : ∀ {A} → Phase A → Bool
     unended (waiting _ _ doneᶠ) = false
@@ -758,46 +850,73 @@ module Strongly (R : Set) where
     -- what it subscribed to still live.
     --
     -- REFUTED: c0bd1892 of a connect's source torn once its body's part is gone, by a concat whose next lane emits from inside the body's completion
-    mutual
-      Gated : ∀ {Δ A} → Sub h Δ A → Set₁
-      Gated (coldˢ s hd ph)                   = Lift _ (spentʰ hd ≡ false → unended ph ≡ true)
-      Gated (mapˢ f s)                        = Gated s
-      Gated (scanˢ f r s)                     = Gated s
-      Gated (takeWhileˢ i p c k tk s)         = (val (Kit.live c) ≡ false → Cut↓ k s) × Gated s
-      Gated (flatMapˢ op f fl oc k r pl so ls)   = Gated so × GatedLanes (val (Flat.lanes fl)) ls
-      Gated (connectˢ S c b kb k fd rp e rt src bd) = (val (Kit.live c) ≡ false → Cut↓ k src) × Gated src × Gated bd
-      Gated (deferˢ k s)                      = Gated s
-      Gated _                                 = Lift _ ⊤
+    GatedAlg : Alg {lsuc lzero} h
+    Alg.Inh GatedAlg = λ _ → Lift _ ⊤
+    Alg.InhL GatedAlg = λ _ → Lift _ (List (Cut h))
+    Alg.pendᶜ GatedAlg = λ _ _ _ → Lift _ ⊤
+    Alg.coldᶜ GatedAlg = λ _ hd ph _ → Lift _ (spentʰ hd ≡ false → unended ph ≡ true)
+    Alg.ofᶜ GatedAlg = λ _ _ _ _ → Lift _ ⊤
+    Alg.doneᶜ GatedAlg = λ _ → Lift _ ⊤
+    Alg.mapᶜ GatedAlg = λ _ _ X → X
+    Alg.scanᶜ GatedAlg = λ _ _ _ X → X
+    Alg.takeᶜ GatedAlg = λ _ _ c k _ s X i → (val (Kit.live c) ≡ false → Cut↓ k s) × X i
+    Alg.flatᶜ GatedAlg = λ _ _ fl _ _ _ _ _ _ X L i → X i × L (lift (val (Flat.lanes fl)))
+    Alg.connᶜ GatedAlg = λ _ c _ _ k _ _ _ _ src _ X Y i → (val (Kit.live c) ≡ false → Cut↓ k src) × X i × Y (lift tt)
+    Alg.joinᶜ GatedAlg = λ _ _ _ _ _ _ → Lift _ ⊤
+    Alg.deferᶜ GatedAlg = λ _ _ X → X
+    Alg.nilᶜ GatedAlg = λ _ → Lift _ ⊤
+    Alg.consᶜ GatedAlg = λ c k s _ X L xs → (val (Kit.live c) ≡ false → c ∈ᴸ lower xs ⊎ Cut↓ k s) × X (lift tt) × L xs
 
-      GatedLanes : ∀ {Δ B} → List (Cut h) → List (Lane h Δ B) → Set₁
-      GatedLanes xs []                = Lift _ ⊤
-      GatedLanes xs (lane c k s ∷ ls) = (val (Kit.live c) ≡ false → c ∈ᴸ xs ⊎ Cut↓ k s) × Gated s × GatedLanes xs ls
+    Gated : ∀ {Δ A} → Sub h Δ A → Set₁
+    Gated u = Fold.fold GatedAlg u (lift tt)
+
+    GatedLanes : ∀ {Δ B} → List (Cut h) → List (Lane h Δ B) → Set₁
+    GatedLanes xs ls = Fold.foldL GatedAlg ls (lift xs)
 
     ----------------------------------------------------------------------
     -- Every subscription against its kernel
 
-    mutual
-      Holds : ∀ {Δ A} → Sub h Δ A → Env Δ h → Observer A h → Set₁
-      Holds (coldˢ s hd p)                    E o = slotIs s (cbOf o)
-      Holds (mapˢ f s)                        E o = Holds s E (mapO f o)
-      Holds (scanˢ f r s)                     E o = Holds s E (scanO f r o)
-      Holds (takeWhileˢ i p c k tk s)         E o = Attached c k (unsub s) × Holds s E (takeWhileO i p c o)
-      Holds (flatMapˢ op f fl oc k r pl so ls)   E o =
-        val (Flat.refill fl) ≡ just r × slotIs r (Flat′.refillCb op f E o fl)
-        × Attached oc k (unsub so) × Holds so E (Flat′.outerO op f E o fl oc)
-        × val (Flat.active fl) ≡ count ls
-        × Σ (List (Cut h)) (λ gone → val (Flat.lanes fl) ++ gone ≡ switches ls × All (λ c → val (Kit.live c) ≡ false) gone)
-        × HoldsLanes op f E o fl ls
-      Holds (connectˢ S c b kb k fd rp e rt src bd) E o =
-        Attached c k (unsub src) × val b ≡ kb × Stashed kb (unsub bd)
-        × Holds src E (feeder S) × Holds bd (S ∷ᴬ E) (bodyO c o)
-      Holds (joinˢ j sk l x st)               E o = slotIs sk (joinerCb l o)
-      Holds (deferˢ k s)                      E o = Stashed k (unsub s) × Holds s E o
-      Holds _                                 E o = Lift _ ⊤
+    -- What a flatMap hands its lanes.
+    record Lanes (Δ : List Set) (B : Set) : Set₁ where
+      constructor lanesAt
+      field
+        {A} : Set
+        op  : T.FlatOp
+        f   : A → Obs Timeline Δ B
+        E   : Env Δ h
+        o   : Observer B h
+        fl  : Flat A h
 
-      HoldsLanes : ∀ {Δ A B} → T.FlatOp → (A → Obs Timeline Δ B) → Env Δ h → Observer B h → Flat A h → List (Lane h Δ B) → Set₁
-      HoldsLanes op f E o fl []                = Lift _ ⊤
-      HoldsLanes op f E o fl (lane c k s ∷ ls) = Attached c k (unsub s) × Holds s E (Flat′.laneO op f E o fl c) × HoldsLanes op f E o fl ls
+    HoldsAlg : Alg {lsuc lzero} h
+    Alg.Inh HoldsAlg {Δ} {A} _ = Env Δ h × Observer A h
+    Alg.InhL HoldsAlg {Δ} {B} _ = Lanes Δ B
+    Alg.pendᶜ HoldsAlg = λ _ _ _ → Lift _ ⊤
+    Alg.coldᶜ HoldsAlg = λ s _ _ i → slotIs s (cbOf (proj₂ i))
+    Alg.ofᶜ HoldsAlg = λ _ _ _ _ → Lift _ ⊤
+    Alg.doneᶜ HoldsAlg = λ _ → Lift _ ⊤
+    Alg.mapᶜ HoldsAlg = λ f _ X i → X (proj₁ i , mapO f (proj₂ i))
+    Alg.scanᶜ HoldsAlg = λ f r _ X i → X (proj₁ i , scanO f r (proj₂ i))
+    Alg.takeᶜ HoldsAlg = λ i p c k _ s X e → Attached c k (unsub s) × X (proj₁ e , takeWhileO i p c (proj₂ e))
+    Alg.flatᶜ HoldsAlg = λ op f fl oc k r _ so ls X L i →
+          val (Flat.refill fl) ≡ just r × slotIs r (Flat′.refillCb op f (proj₁ i) (proj₂ i) fl)
+          × Attached oc k (unsub so) × X (proj₁ i , Flat′.outerO op f (proj₁ i) (proj₂ i) fl oc)
+          × val (Flat.active fl) ≡ count ls
+          × Σ (List (Cut h)) (λ gone → val (Flat.lanes fl) ++ gone ≡ switches ls × All (λ c → val (Kit.live c) ≡ false) gone)
+          × L (lanesAt op f (proj₁ i) (proj₂ i) fl)
+    Alg.connᶜ HoldsAlg = λ S c b kb k _ _ _ _ src bd X Y i →
+          Attached c k (unsub src) × val b ≡ kb × Stashed kb (unsub bd)
+          × X (proj₁ i , feeder S) × Y (S ∷ᴬ proj₁ i , bodyO c (proj₂ i))
+    Alg.joinᶜ HoldsAlg = λ _ sk l _ _ i → slotIs sk (joinerCb l (proj₂ i))
+    Alg.deferᶜ HoldsAlg = λ k s X i → Stashed k (unsub s) × X i
+    Alg.nilᶜ HoldsAlg = λ _ → Lift _ ⊤
+    Alg.consᶜ HoldsAlg = λ c k s _ X L la → Attached c k (unsub s)
+          × X (Lanes.E la , Flat′.laneO (Lanes.op la) (Lanes.f la) (Lanes.E la) (Lanes.o la) (Lanes.fl la) c) × L la
+
+    Holds : ∀ {Δ A} → Sub h Δ A → Env Δ h → Observer A h → Set₁
+    Holds u E o = Fold.fold HoldsAlg u (E , o)
+
+    HoldsLanes : ∀ {Δ A B} → T.FlatOp → (A → Obs Timeline Δ B) → Env Δ h → Observer B h → Flat A h → List (Lane h Δ B) → Set₁
+    HoldsLanes op f E o fl ls = Fold.foldL HoldsAlg ls (lanesAt op f E o fl)
 
     ----------------------------------------------------------------------
     -- The queue, the subjects
@@ -1016,6 +1135,128 @@ module Strongly (R : Set) where
       bodies : ∀ {Δ A B S c b kb k fd e rp rt q} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
              → (π : Path t (connectˢ S c b kb k fd rp e rt s bd)) → (q , bodyC π) ∈ agenda ca → part bd ≡ nothing
       placed : All Placed (agenda ca)
+
+  -- `Owned`, node by node: each node handed the path to it from the
+  -- root, as a context closing any path below it.
+  module Owning {h} (H : Heapᴹ h) (t : Sub h [] R) (Ag : Job t → Set₁) (Bu Be : Spot t → Set₁) where
+    open At H
+
+    Ctx : ∀ {Δ A} → Sub h Δ A → Set₁
+    Ctx u = ∀ {Δ′ A′} {w : Sub h Δ′ A′} → Path u w → Path t w
+
+    CtxL : ∀ {Δ B} → List (Lane h Δ B) → Set₁
+    CtxL ls = ∀ {Δ′ A′} {w : Sub h Δ′ A′} → PathLanes ls w → Path t w
+
+    coldOwed : ∀ {Δ A} {s : Sink h A} {hd} (ph : Phase A) → Path t (coldˢ {Δ = Δ} s hd ph) → Set₁
+    coldOwed         (waiting _ _ _)   π = Lift _ ⊤
+    coldOwed {hd = hd} (fired _ _ _)   π = spentʰ hd ≡ false → Bu (spot π)
+    coldOwed {hd = hd} (playing _ _ _ _) π = spentʰ hd ≡ false → Bu (spot π)
+
+    takeOwed : ∀ {Δ A i p c k} (tk : Taking Δ A) {s : Sub h Δ A} → Path t (takeWhileˢ i p c k tk s) → Set₁
+    takeOwed         taking       π = Lift _ ⊤
+    takeOwed {c = c} (ending q n) π = val (Kit.live c) ≡ true → Ag (q , take1C π)
+    takeOwed {c = c} taken        π = val (Kit.live c) ≡ true → Σ Pos λ q → Ag (q , take2C π)
+
+    feedOwed : ∀ {Δ A B S c b kb k rp e rt} (fd : Feed A h) {src : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
+             → Path t (connectˢ S c b kb k fd rp e rt src bd) → Set₁
+    feedOwed idle             π = Lift _ ⊤
+    feedOwed (feeding x q ss) π = Ag (q , feedC π)
+    feedOwed (finishing q ss) π = Ag (q , finC π)
+
+    OwnedAlg : Alg {lsuc lzero} h
+    Alg.Inh    OwnedAlg u = Ctx u
+    Alg.InhL   OwnedAlg ls = CtxL ls
+    Alg.pendᶜ  OwnedAlg s q κ = Be (spot (κ here))
+    Alg.coldᶜ  OwnedAlg s hd ph κ = coldOwed ph (κ here)
+    Alg.ofᶜ    OwnedAlg p i xs κ = Ag (p , emitC (κ here))
+    Alg.doneᶜ  OwnedAlg κ = Lift _ ⊤
+    Alg.mapᶜ   OwnedAlg f s X κ = X (λ ψ → κ (in-map ψ))
+    Alg.scanᶜ  OwnedAlg f r s X κ = X (λ ψ → κ (in-scan ψ))
+    Alg.takeᶜ  OwnedAlg i p c k tk s X κ = takeOwed tk (κ here) × X (λ ψ → κ (in-take ψ))
+    Alg.flatᶜ  OwnedAlg op f fl oc k r pl so ls X L κ = X (λ ψ → κ (in-outer ψ)) × L (λ ψ → κ (in-lanes ψ))
+    Alg.connᶜ  OwnedAlg S c b kb k fd rp e rt src bd X Y κ =
+      feedOwed fd (κ here) × (∀ {q} → Ag (q , bodyC (κ here)) → part bd ≡ nothing) × X (λ ψ → κ (in-source ψ)) × Y (λ ψ → κ (in-body ψ))
+    Alg.joinᶜ  OwnedAlg j sk l x st κ = Lift _ ⊤
+    Alg.deferᶜ OwnedAlg k s X κ = X (λ ψ → κ (in-defer ψ))
+    Alg.nilᶜ   OwnedAlg κ = Lift _ ⊤
+    Alg.consᶜ  OwnedAlg c k s ls X L κ = X (λ ψ → κ (this-lane ψ)) × L (λ ψ → κ (next-lane ψ))
+
+    -- The fold, followed down a path.
+    mutual
+      reach : ∀ {Δ A Δ′ A′} {u : Sub h Δ A} {w : Sub h Δ′ A′} (κ : Ctx u) → Fold.fold OwnedAlg u κ
+            → (ψ : Path u w) → Fold.fold OwnedAlg w (λ ρ → κ (ψ ⊕ ρ))
+      reach κ f here          = f
+      reach κ f (in-map ψ)    = reach (λ ρ → κ (in-map ρ)) f ψ
+      reach κ f (in-scan ψ)   = reach (λ ρ → κ (in-scan ρ)) f ψ
+      reach κ f (in-take ψ)   = reach (λ ρ → κ (in-take ρ)) (proj₂ f) ψ
+      reach κ f (in-outer ψ)  = reach (λ ρ → κ (in-outer ρ)) (proj₁ f) ψ
+      reach κ f (in-lanes ψ)  = reachL (λ ρ → κ (in-lanes ρ)) (proj₂ f) ψ
+      reach κ f (in-source ψ) = reach (λ ρ → κ (in-source ρ)) (proj₁ (proj₂ (proj₂ f))) ψ
+      reach κ f (in-body ψ)   = reach (λ ρ → κ (in-body ρ)) (proj₂ (proj₂ (proj₂ f))) ψ
+      reach κ f (in-defer ψ)  = reach (λ ρ → κ (in-defer ρ)) f ψ
+
+      reachL : ∀ {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {w : Sub h Δ′ A′} (κ : CtxL ls) → Fold.foldL OwnedAlg ls κ
+             → (ψ : PathLanes ls w) → Fold.fold OwnedAlg w (λ ρ → κ (ψ ⊕ᴸ ρ))
+      reachL κ f (this-lane ψ) = reach (λ ρ → κ (this-lane ρ)) (proj₁ f) ψ
+      reachL κ f (next-lane ψ) = reachL (λ ρ → κ (next-lane ρ)) (proj₂ f) ψ
+
+  record OwnedF {h} (H : Heapᴹ h) (t : Sub h [] R) {p ctl bs} (ca : Against.CtlAs t p ctl bs) : Set₁ where
+    constructor _,ᴼ_
+    field
+      ownedᶠ  : Fold.fold (Owning.OwnedAlg H t (_∈ Against.agenda t ca) (_∈ Against.bursts t ca) (_∈ Against.begins t ca)) t (λ π → π)
+      placedᶠ : All (Against.Placed t) (Against.agenda t ca)
+
+  module _ {h} {H : Heapᴹ h} {t : Sub h [] R} {p ctl bs} {ca : Against.CtlAs t p ctl bs} where
+    open At H
+    open Against t
+    private module O = Owning H t (_∈ agenda ca) (_∈ bursts ca) (_∈ begins ca)
+
+    owned-from : OwnedF H t ca → Owned H t ca
+    owned-from (f ,ᴼ pl) = record
+      { ofs    = λ {q = q} π → subst (λ π′ → (q , emitC π′) ∈ agenda ca) (⊕-here π) (down π)
+      ; plays  = λ π sp → subst (λ π′ → spot π′ ∈ bursts ca) (⊕-here π) (down π sp)
+      ; fires  = λ π sp → subst (λ π′ → spot π′ ∈ bursts ca) (⊕-here π) (down π sp)
+      ; begun  = λ π → subst (λ π′ → spot π′ ∈ begins ca) (⊕-here π) (down π)
+      ; ends   = λ {q = q} π lv → subst (λ π′ → (q , take1C π′) ∈ agenda ca) (⊕-here π) (proj₁ (down π) lv)
+      ; cuts   = λ π lv → let (q , m) = proj₁ (down π) lv in q , subst (λ π′ → (q , take2C π′) ∈ agenda ca) (⊕-here π) m
+      ; feeds  = λ {q = q} π → subst (λ π′ → (q , feedC π′) ∈ agenda ca) (⊕-here π) (proj₁ (down π))
+      ; fins   = λ {q = q} π → subst (λ π′ → (q , finC π′) ∈ agenda ca) (⊕-here π) (proj₁ (down π))
+      ; bodies = λ {q = q} π m → proj₁ (proj₂ (down π)) (subst (λ π′ → (q , bodyC π′) ∈ agenda ca) (sym (⊕-here π)) m)
+      ; placed = pl }
+      where
+        down : ∀ {Δ A} {u : Sub h Δ A} (π : Path t u) → Fold.fold O.OwnedAlg u (λ ρ → π ⊕ ρ)
+        down π = O.reach (λ ρ → ρ) f π
+
+    mutual
+      owned-at : Owned H t ca → ∀ {Δ A} (u : Sub h Δ A) (κ : O.Ctx u) → Fold.fold O.OwnedAlg u κ
+      owned-at ow (pendingˢ s q)                     κ = Owned.begun ow (κ here)
+      owned-at ow (coldˢ s hd (waiting _ _ _))       κ = lift tt
+      owned-at ow (coldˢ s hd (fired _ _ _))         κ = Owned.fires ow (κ here)
+      owned-at ow (coldˢ s hd (playing _ _ _ _))     κ = Owned.plays ow (κ here)
+      owned-at ow (ofˢ p i xs)                       κ = Owned.ofs ow (κ here)
+      owned-at ow doneˢ                              κ = lift tt
+      owned-at ow (mapˢ f s)                         κ = owned-at ow s (λ ψ → κ (in-map ψ))
+      owned-at ow (scanˢ f r s)                      κ = owned-at ow s (λ ψ → κ (in-scan ψ))
+      owned-at ow (takeWhileˢ i p c k taking s)      κ = lift tt , owned-at ow s (λ ψ → κ (in-take ψ))
+      owned-at ow (takeWhileˢ i p c k (ending q n) s) κ = Owned.ends ow (κ here) , owned-at ow s (λ ψ → κ (in-take ψ))
+      owned-at ow (takeWhileˢ i p c k taken s)       κ = Owned.cuts ow (κ here) , owned-at ow s (λ ψ → κ (in-take ψ))
+      owned-at ow (flatMapˢ op f fl oc k r pl so ls) κ = owned-at ow so (λ ψ → κ (in-outer ψ)) , owned-atL ow ls (λ ψ → κ (in-lanes ψ))
+      owned-at ow (connectˢ S c b kb k fd rp e rt src bd) κ =
+        feed fd (κ here) , (λ {q} → Owned.bodies ow {q = q} (κ here)) , owned-at ow src (λ ψ → κ (in-source ψ)) , owned-at ow bd (λ ψ → κ (in-body ψ))
+        where
+          feed : ∀ (fd′ : Feed _ h) (π : Path t (connectˢ S c b kb k fd′ rp e rt src bd)) → O.feedOwed fd′ π
+          feed idle             π = lift tt
+          feed (feeding x q ss) π = Owned.feeds ow π
+          feed (finishing q ss) π = Owned.fins ow π
+      owned-at ow (joinˢ j sk l x st)                κ = lift tt
+      owned-at ow (deferˢ k s)                       κ = owned-at ow s (λ ψ → κ (in-defer ψ))
+
+      owned-atL : Owned H t ca → ∀ {Δ B} (ls : List (Lane h Δ B)) (κ : O.CtxL ls) → Fold.foldL O.OwnedAlg ls κ
+      owned-atL ow []                κ = lift tt
+      owned-atL ow (lane c k s ∷ ls) κ = owned-at ow s (λ ψ → κ (this-lane ψ)) , owned-atL ow ls (λ ψ → κ (next-lane ψ))
+
+    owned-to : Owned H t ca → OwnedF H t ca
+    owned-to ow = owned-at ow t (λ π → π) ,ᴼ Owned.placed ow
 
   -- Every subscription against what its kernel registered; below a closed
   -- gate, every cold unsubscribing reaches spent.
@@ -1323,6 +1564,208 @@ module Strongly (R : Set) where
             → ∀ {n} → At.part H (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
             → At.part H src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Tied rt (At.leftover H {B = ⊤} src)
 
+  -- WHAT HOLDS BELOW A HELD NODE, NODE BY NODE: each node's obligation
+  -- once it is held, each child held as its parent is and its step
+  -- holds; a held flatMap's pool and a held connect's rest besides.
+  module Held {h} (H : Heapᴹ h) (Nd Pl Rs : ∀ {Δ A} → Sub h Δ A → Set₁) where
+    open At H
+
+    If : Bool → Set₁ → Set₁
+    If b X = b ≡ true → X
+
+    HeldAlg : Alg {lsuc lzero} h
+    Alg.Inh    HeldAlg _ = Lift _ Bool
+    Alg.InhL   HeldAlg _ = Lift _ Bool
+    Alg.pendᶜ  HeldAlg s q hb = If (lower hb) (Nd (pendingˢ s q))
+    Alg.coldᶜ  HeldAlg {Δ} s hd ph hb = If (lower hb) (Nd (coldˢ {Δ = Δ} s hd ph))
+    Alg.ofᶜ    HeldAlg {Δ} p i xs hb = If (lower hb) (Nd (ofˢ {Δ = Δ} p i xs))
+    Alg.doneᶜ  HeldAlg {Δ} {A} hb = If (lower hb) (Nd (doneˢ {h} {Δ} {A}))
+    Alg.mapᶜ   HeldAlg f s X hb = If (lower hb) (Nd (mapˢ f s)) × X hb
+    Alg.scanᶜ  HeldAlg f r s X hb = If (lower hb) (Nd (scanˢ f r s)) × X hb
+    Alg.takeᶜ  HeldAlg i p c k tk s X hb =
+      If (lower hb) (Nd (takeWhileˢ i p c k tk s)) × X (lift (lower hb ∧ val (Kit.live c) ∧ isTaking tk))
+    Alg.flatᶜ  HeldAlg op f fl oc k r pl so ls X L hb =
+      If (lower hb) (Nd (flatMapˢ op f fl oc k r pl so ls)) × If (lower hb) (Pl (flatMapˢ op f fl oc k r pl so ls)) × X hb × L hb
+    Alg.connᶜ  HeldAlg S c b kb k fd rp e rt src bd X Y hb =
+      If (lower hb) (Nd (connectˢ S c b kb k fd rp e rt src bd)) × If (lower hb) (Rs (connectˢ S c b kb k fd rp e rt src bd))
+      × X (lift (lower hb ∧ is-just (part bd))) × Y (lift (lower hb ∧ (is-just (part src) ∨ is-just e)))
+    Alg.joinᶜ  HeldAlg j sk l x st hb = If (lower hb) (Nd (joinˢ j sk l x st))
+    Alg.deferᶜ HeldAlg k s X hb = If (lower hb) (Nd (deferˢ k s)) × X hb
+    Alg.nilᶜ   HeldAlg _ = Lift _ ⊤
+    Alg.consᶜ  HeldAlg c k s ls X L hb = X (lift (lower hb ∧ val (Kit.live c))) × L hb
+
+    Below : ∀ {Δ A} → Sub h Δ A → Set₁
+    Below t = Fold.fold HeldAlg t (lift true)
+
+    -- The same, read along every held path.
+    record Over {Δ A} (t : Sub h Δ A) : Set₁ where
+      field
+        nodes : ∀ {Δ′ A′} {u : Sub h Δ′ A′} (ψ : Path t u) → seen H ψ ≡ true → Nd u
+        pools : ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+              → (ψ : Path t (flatMapˢ op f fl oc k r pl so ls)) → seen H ψ ≡ true → Pl (flatMapˢ op f fl oc k r pl so ls)
+        rests : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+              → (ψ : Path t (connectˢ S c b kb k fd rp e rt src bd)) → seen H ψ ≡ true → Rs (connectˢ S c b kb k fd rp e rt src bd)
+
+    record OverL {Δ B} (ls : List (Lane h Δ B)) : Set₁ where
+      field
+        nodes : ∀ {Δ′ A′} {u : Sub h Δ′ A′} (ψ : PathLanes ls u) → seenL H ψ ≡ true → Nd u
+        pools : ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls′ : List (Lane h Δ′ B′)}
+              → (ψ : PathLanes ls (flatMapˢ op f fl oc k r pl so ls′)) → seenL H ψ ≡ true → Pl (flatMapˢ op f fl oc k r pl so ls′)
+        rests : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+              → (ψ : PathLanes ls (connectˢ S c b kb k fd rp e rt src bd)) → seenL H ψ ≡ true → Rs (connectˢ S c b kb k fd rp e rt src bd)
+
+    restrict : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Over t → (ρ : Path t u) → seen H ρ ≡ true → Over u
+    restrict O ρ sρ = record
+      { nodes = λ ψ s → Over.nodes O (ρ ⊕ ψ) (seen-join H ρ ψ sρ s)
+      ; pools = λ ψ s → Over.pools O (ρ ⊕ ψ) (seen-join H ρ ψ sρ s)
+      ; rests = λ ψ s → Over.rests O (ρ ⊕ ψ) (seen-join H ρ ψ sρ s) }
+
+    private
+      lanesOf : ∀ {Δ A B op f fl oc k r pl} {so : Sub h Δ A} {ls : List (Lane h Δ B)} → Over (flatMapˢ op f fl oc k r pl so ls) → OverL ls
+      lanesOf O = record
+        { nodes = λ ψ s → Over.nodes O (in-lanes ψ) s
+        ; pools = λ ψ s → Over.pools O (in-lanes ψ) s
+        ; rests = λ ψ s → Over.rests O (in-lanes ψ) s }
+
+      thisOf : ∀ {Δ B c k} {s : Sub h Δ B} {ls} → OverL (lane c k s ∷ ls) → val (Kit.live c) ≡ true → Over s
+      thisOf O v = record
+        { nodes = λ ψ s → OverL.nodes O (this-lane ψ) (∧-join v s)
+        ; pools = λ ψ s → OverL.pools O (this-lane ψ) (∧-join v s)
+        ; rests = λ ψ s → OverL.rests O (this-lane ψ) (∧-join v s) }
+
+      nextOf : ∀ {Δ B} {l : Lane h Δ B} {ls} → OverL (l ∷ ls) → OverL ls
+      nextOf O = record
+        { nodes = λ ψ s → OverL.nodes O (next-lane ψ) s
+        ; pools = λ ψ s → OverL.pools O (next-lane ψ) s
+        ; rests = λ ψ s → OverL.rests O (next-lane ψ) s }
+
+      nd : ∀ {Δ A} {t : Sub h Δ A} {hb} → (hb ≡ true → Over t) → If hb (Nd t)
+      nd O e = Over.nodes (O e) here refl
+
+    mutual
+      below : ∀ {Δ A} (t : Sub h Δ A) hb → (hb ≡ true → Over t) → Fold.fold HeldAlg t (lift hb)
+      below (pendingˢ s q)                          hb O = nd O
+      below (coldˢ s hd ph)                         hb O = nd O
+      below (ofˢ p i xs)                            hb O = nd O
+      below doneˢ                                   hb O = nd O
+      below (mapˢ f s)                              hb O = nd O , below s hb (λ e → restrict (O e) (in-map here) refl)
+      below (scanˢ f r s)                           hb O = nd O , below s hb (λ e → restrict (O e) (in-scan here) refl)
+      below (takeWhileˢ i p c k tk s)               hb O =
+        nd O , below s _ (λ e → let (e₁ , e₂) = ∧-split hb e ; (e₃ , e₄) = ∧-split (val (Kit.live c)) e₂
+                                 in restrict (O e₁) (in-take here) (∧-join e₃ (∧-join e₄ refl)))
+      below (flatMapˢ op f fl oc k r pl so ls)      hb O =
+        nd O , (λ e → Over.pools (O e) here refl) , below so hb (λ e → restrict (O e) (in-outer here) refl) , belowL ls hb (λ e → lanesOf (O e))
+      below (connectˢ S c b kb k fd rp e rt src bd) hb O =
+        nd O , (λ x → Over.rests (O x) here refl)
+        , below src _ (λ x → let (x₁ , x₂) = ∧-split hb x in restrict (O x₁) (in-source here) (∧-join x₂ refl))
+        , below bd _ (λ x → let (x₁ , x₂) = ∧-split hb x in restrict (O x₁) (in-body here) (∧-join x₂ refl))
+      below (joinˢ j sk l x st)                     hb O = nd O
+      below (deferˢ k s)                            hb O = nd O , below s hb (λ e → restrict (O e) (in-defer here) refl)
+
+      belowL : ∀ {Δ B} (ls : List (Lane h Δ B)) hb → (hb ≡ true → OverL ls) → Fold.foldL HeldAlg ls (lift hb)
+      belowL []                hb O = lift tt
+      belowL (lane c k s ∷ ls) hb O =
+        below s _ (λ e → let (e₁ , e₂) = ∧-split hb e in thisOf (O e₁) e₂) , belowL ls hb (λ e → nextOf (O e))
+
+    mutual
+      reach : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} {hb} → Fold.fold HeldAlg t (lift hb) → hb ≡ true
+            → (ψ : Path t u) → seen H ψ ≡ true → Fold.fold HeldAlg u (lift true)
+      reach f refl here           _ = f
+      reach f refl (in-map ψ)     s = reach (proj₂ f) refl ψ s
+      reach f refl (in-scan ψ)    s = reach (proj₂ f) refl ψ s
+      reach f refl (in-take {c = c} {tk = tk} ψ) s =
+        let (e₁ , e₂) = ∧-split (val (Kit.live c)) s ; (e₃ , e₄) = ∧-split (isTaking tk) e₂ in reach (proj₂ f) (∧-join e₁ e₃) ψ e₄
+      reach f refl (in-outer ψ)   s = reach (proj₁ (proj₂ (proj₂ f))) refl ψ s
+      reach f refl (in-lanes ψ)   s = reachL (proj₂ (proj₂ (proj₂ f))) refl ψ s
+      reach f refl (in-source {bd = bd} ψ) s =
+        let (e₁ , e₂) = ∧-split (is-just (part bd)) s in reach (proj₁ (proj₂ (proj₂ f))) e₁ ψ e₂
+      reach f refl (in-body {e = e} {t = src} ψ) s =
+        let (e₁ , e₂) = ∧-split (is-just (part src) ∨ is-just e) s in reach (proj₂ (proj₂ (proj₂ f))) e₁ ψ e₂
+      reach f refl (in-defer ψ)   s = reach (proj₂ f) refl ψ s
+
+      reachL : ∀ {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} {hb} → Fold.foldL HeldAlg ls (lift hb) → hb ≡ true
+             → (ψ : PathLanes ls u) → seenL H ψ ≡ true → Fold.fold HeldAlg u (lift true)
+      reachL f refl (this-lane {c = c} ψ) s = let (e₁ , e₂) = ∧-split (val (Kit.live c)) s in reach (proj₁ f) e₁ ψ e₂
+      reachL f refl (next-lane ψ)         s = reachL (proj₂ f) refl ψ s
+
+    private
+      node : ∀ {Δ A} (u : Sub h Δ A) → Below u → Nd u
+      node (pendingˢ s q)                          f = f refl
+      node (coldˢ s hd ph)                         f = f refl
+      node (ofˢ p i xs)                            f = f refl
+      node doneˢ                                   f = f refl
+      node (mapˢ g s)                              f = proj₁ f refl
+      node (scanˢ g r s)                           f = proj₁ f refl
+      node (takeWhileˢ i p c k tk s)               f = proj₁ f refl
+      node (flatMapˢ op g fl oc k r pl so ls)      f = proj₁ f refl
+      node (connectˢ S c b kb k fd rp e rt src bd) f = proj₁ f refl
+      node (joinˢ j sk l x st)                     f = f refl
+      node (deferˢ k s)                            f = proj₁ f refl
+
+    held-from : ∀ {Δ A} {t : Sub h Δ A} → Below t → Over t
+    held-from f = record
+      { nodes = λ ψ s → node _ (reach f refl ψ s)
+      ; pools = λ ψ s → proj₁ (proj₂ (reach f refl ψ s)) refl
+      ; rests = λ ψ s → proj₁ (proj₂ (reach f refl ψ s)) refl }
+
+    held-to : ∀ {Δ A} {t : Sub h Δ A} → Over t → Below t
+    held-to {t = t} O = below t true (λ _ → O)
+
+  -- `Each`, node by node.
+  module Eaching {h} (H : Heapᴹ h) (P : ∀ {Γ A} → U.Node Γ A → Set) where
+    open At H
+
+    Part : ∀ {Δ A} → Sub h Δ A → Set₁
+    Part u = ∀ {c} → part u ≡ just c → P c
+
+    Pool : ∀ {Δ A} → Sub h Δ A → Set₁
+    Pool (flatMapˢ op f fl oc k r pl so ls) = ∀ {c} → part (flatMapˢ op f fl oc k r pl so ls) ≡ just c → P pl
+    Pool _                                   = Lift _ ⊤
+
+    Rest : ∀ {Δ A} → Sub h Δ A → Set₁
+    Rest (connectˢ S c b kb k fd rp e rt src bd) =
+      ∀ {n} → part (connectˢ S c b kb k fd rp e rt src bd) ≡ just n → part src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt
+    Rest _ = Lift _ ⊤
+
+    open Held H Part Pool Rest using (Over; held-from; held-to) renaming (Below to Folded)
+
+    record Below {Δ A} (t : Sub h Δ A) : Set₁ where
+      constructor eaching
+      field folded : Folded t
+
+    each-from : ∀ {Δ A} {t : Sub h Δ A} → Below t → Each H P t
+    each-from (eaching f) = record { parts = Over.nodes O ; pools = Over.pools O ; rests = Over.rests O }
+      where O = held-from f
+
+    each-to : ∀ {Δ A} {t : Sub h Δ A} → Each H P t → Below t
+    each-to E = eaching (held-to (record { nodes = Each.parts E ; pools = Each.pools E ; rests = Each.rests E }))
+
+  -- `Lingers`, node by node.
+  module Lingering {h} (H : Heapᴹ h) where
+    open At H
+
+    Pool : ∀ {Δ A} → Sub h Δ A → Set₁
+    Pool (flatMapˢ op f fl oc k r pl so ls) = ∀ {c} → part (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Tied pl (pooled fl so ls)
+    Pool _                                   = Lift _ ⊤
+
+    Rest : ∀ {Δ A} → Sub h Δ A → Set₁
+    Rest (connectˢ S c b kb k fd rp e rt src bd) =
+      ∀ {n} → part (connectˢ S c b kb k fd rp e rt src bd) ≡ just n → part src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Tied rt (leftover {B = ⊤} src)
+    Rest _ = Lift _ ⊤
+
+    open Held H (λ _ → Lift _ ⊤) Pool Rest using (Over; held-from; held-to) renaming (Below to Folded)
+
+    record Below {Δ A} (t : Sub h Δ A) : Set₁ where
+      constructor lingering
+      field folded : Folded t
+
+    lingers-from : ∀ {Δ A} {t : Sub h Δ A} → Below t → Lingers H t
+    lingers-from (lingering f) = record { pools = Over.pools O ; rests = Over.rests O }
+      where O = held-from f
+
+    lingers-to : ∀ {Δ A} {t : Sub h Δ A} → Lingers H t → Below t
+    lingers-to L = lingering (held-to (record { nodes = λ _ _ → lift tt ; pools = Lingers.pools L ; rests = Lingers.rests L }))
+
   -- Its next event no earlier than `q`.
   Heads : ∀ {Γ A} → Pos → U.Node Γ A → Set
   Heads q c = ∀ {k} → U.headˢ (U.step c) ≡ just k → q ≤ᵖ k
@@ -1345,14 +1788,23 @@ module Strongly (R : Set) where
       tree    : Sub (Conf.world (Mach.conf m)) [] R
       ctlAs   : Against.CtlAs tree (Conf.pos (Mach.conf m)) (Conf.ctl (Mach.conf m)) (Mach.bursts m)
       meets   : Meets ctlAs (At.part H tree) g
-      owned   : Owned H tree ctlAs
+      owned′  : OwnedF H tree ctlAs
       kernels : Kernels H tree
       meaning : Meaning H tree
       queue   : Queue H (Conf.pos (Mach.conf m)) (Mach.clock m) (Mach.timers m) tree
       books   : Books tree ctlAs m
       sorted  : Σ Pos λ lo → WellMach lo m
-      behind  : Each H (Heads (Conf.pos (Mach.conf m))) tree
-      lingers : Lingers H tree
+      behind′ : Eaching.Below H (Heads (Conf.pos (Mach.conf m))) tree
+      lingers′ : Lingering.Below H tree
+
+    owned : Owned H tree ctlAs
+    owned = owned-from {H = H} {t = tree} {ca = ctlAs} owned′
+
+    behind : Each H (Heads (Conf.pos (Mach.conf m))) tree
+    behind = Eaching.each-from H (Heads (Conf.pos (Mach.conf m))) behind′
+
+    lingers : Lingers H tree
+    lingers = Lingering.lingers-from H lingers′
 
   -- A RE-ENTRY CONFIGURATION AGAINST THE GHOST: carried, or the root's
   -- completion about to be shown where the ghost ends.
@@ -1494,12 +1946,11 @@ module Strongly (R : Set) where
     ; tree    = pendingˢ o root
     ; ctlAs   = Against.subAs here ([] , []ᴬ , same , refl , ≗-refl _) Against.bottomAs []ᴬ
     ; meets   = refl
-    ; owned   = record { ofs = λ () ; plays = λ () ; fires = λ () ; begun = λ { here → Any.here refl } ; ends = λ () ; cuts = λ () ; feeds = λ () ; fins = λ () ; bodies = λ _ ()
-                       ; placed = []ᴬ }
+    ; owned′   = Any.here refl ,ᴼ []ᴬ
     ; kernels = record { holds = _ ; gated = _ ; settled = _ }
     ; meaning = record { fed = _ }
     ; queue   = record { timed = []ᴬ , []ᴬ ; joined = []ᴬ , []ᴬ ; ordered = []ᴸ ; ahead = []ᴬ }
     ; books   = record { fresh = []ᴾ ; clocked = refl , tt ; paidUp = refl ; running = refl }
     ; sorted  = root , begin-well o
-    ; behind  = record { parts = λ { here _ refl → heads-begin o } ; pools = λ () ; rests = λ () }
-    ; lingers = record { pools = λ () ; rests = λ () } }
+    ; behind′  = Eaching.eaching (λ { _ refl → heads-begin o })
+    ; lingers′ = Lingering.lingering (λ _ → lift tt) }

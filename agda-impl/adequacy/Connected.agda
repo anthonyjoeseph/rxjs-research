@@ -63,7 +63,7 @@ module Connecting (R : Set) where
   open Heap using (World; _⊑_; _⨾_; _∋_; there; new; grow; wk∋; cell) renaming (here to hereʳ; same to same⊑)
   open Run (Pureᴾ R) using (Act; done; under; _>>ᴬ_; compile; Env; wkEnv; wkAct; module Kit; Ref; wkR; Observer; Kont; wkObs; wkKont; Subject; Subscription; wkSubn)
   open Run.Kit (Pureᴾ R) using (skipᴬ)
-  open Strongly R using (Carried; Books; Sub; pendingˢ; connectˢ; idle; bodyK; srcK; Path; here; in-source; in-body; _⊕_; Here; walk; top; srcC; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-defer; subjects; laneSubjects; Lane; lane; Heads; Lingers; names; Phase; union-pinned; under-moved; bursts-pinned; rest-pinned; ≗-refl; newRef≗; unsubscribing; under≗; readRef≗; module Canon)
+  open Strongly R using (Carried; Books; Sub; pendingˢ; connectˢ; idle; bodyK; srcK; Path; here; in-source; in-body; _⊕_; Here; walk; top; srcC; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-defer; subjects; laneSubjects; Lane; lane; Heads; Lingers; names; Phase; union-pinned; under-moved; bursts-pinned; rest-pinned; ≗-refl; newRef≗; unsubscribing; under≗; readRef≗; module Canon; owned-to; module Eaching; module Lingering)
                         renaming (⟦_⟧ to ⟦_⟧ᶜ; at⟦_⟧ to at⟦_⟧ᶜ)
   open Strongly.Against R using (StackAs; subAs; backAs; stackJobs; SrcOf; src-of; Ticked)
   open Moving R using (planted; pend; part-plant; holds-owed; settled-plant; gated-plant; fed-plant; plant; plantᴸ; Splice; spliced-l; spliced-r; pendings-plant; joiners-plant)
@@ -332,12 +332,12 @@ module Connecting (R : Set) where
     , record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = C.t′
              ; ctlAs = subAs C.π′ (C.body-code ex) (backAs q₀ (srcC C.ρc ∷ []) (<ᵖ-below q₀ []) eY (C.restack sk₅ a₅)) (C.alones _)
              ; meets = trans (part-plant H₅ C.π₅ C.v refl) (trans (Grew.meets G₅) (Carried.meets cr))
-             ; owned = C.connect-owned sk₅ a₅ eY (Grew.owned G₅)
+             ; owned′ = owned-to (C.connect-owned sk₅ a₅ eY (Grew.owned G₅))
              ; kernels = C.rc-kernels (Grew.kernels G₅) ; meaning = C.rc-meaning (Grew.meaning G₅) ; queue = C.connect-queue (Grew.queue G₅)
              ; books = record { fresh = C.connect-fresh (Books.fresh bk)
                               ; clocked = trans ck (sym (tick-ix0 q₀)) , ck , C.reticked sk₅ a₅ (Grew.ticked G₅)
                               ; paidUp = cong wd (cong wd (cong wd (cong wd (cong wd (Books.paidUp bk))))) ; running = Books.running bk }
-             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind = C.connect-behind (Grew.behind G₅) ; lingers = C.connect-lingers (Grew.lingers G₅) }
+             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind′ = Eaching.each-to _ _ (C.connect-behind (Grew.behind G₅)) ; lingers′ = Lingering.lingers-to _ (C.connect-lingers (Grew.lingers G₅)) }
     , refl , inj₁ (inj₁ (subst (pend C.t′ <_) (Grew.pends G₅) C.less))
     where bk = Carried.books cr
           ck = proj₁ (Books.clocked bk)

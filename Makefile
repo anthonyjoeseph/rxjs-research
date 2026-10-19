@@ -195,10 +195,11 @@ wiring-selftest:
 	  echo "$$out" | grep -q "    deep-dead$$" || { echo "SELFTEST FAIL: deep-dead not reported — a module nested in a module is invisible again"; fail=1; }; \
 	  for n in good-lemma nested computed other top-line via-top via-mod both-mods run deep-live \
 	           consume with-only via-with nested-with-only via-nested-with \
-	           import-arg via-import-arg apply; do \
+	           import-arg via-import-arg apply cop-helper cop-pair; do \
 	    echo "$$out" | grep -q "    $$n$$" && { echo "SELFTEST FAIL: $$n reported, but it is legitimately wired"; fail=1; }; \
 	  done; \
-	  echo "$$out" | grep -q "^    \.\.\." && { echo "SELFTEST FAIL: a bare \`...\` node surfaced as a definition — with-arm owners must be per-site and exempt"; fail=1; }; \
+	  echo "$$out" | grep -q "^    Pair\.fst$$" && { echo "SELFTEST FAIL: a copattern clause surfaced as a definition of its projection"; fail=1; }; \
+  echo "$$out" | grep -q "^    \.\.\." && { echo "SELFTEST FAIL: a bare \`...\` node surfaced as a definition — with-arm owners must be per-site and exempt"; fail=1; }; \
 	  echo "$$out" | grep -q "^    #-}$$" && { echo "SELFTEST FAIL: a nested pragma's outer \`#-}\` surfaced as a definition — block comments must nest"; fail=1; }; \
 	  led=$$(scripts/check-wiring.py --postulates --src scripts/wiring-selftest 2>&1); \
 	  echo "$$led" | grep -q "^sealed-gap " || { echo "SELFTEST FAIL: sealed-gap missing from the ledger — a nested block opener is being sliced off the RAW line, so members of a postulate block inside a seal are invisible"; fail=1; }; \

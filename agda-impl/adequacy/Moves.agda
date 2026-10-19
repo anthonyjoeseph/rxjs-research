@@ -367,22 +367,6 @@ module Moving (R : Set) where
   ----------------------------------------------------------------------
   -- A path in the rewritten tree, back in the old one.
 
-  mutual
-    ⊕-here : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) → π ⊕ here ≡ π
-    ⊕-here here          = refl
-    ⊕-here (in-map π)    = cong in-map (⊕-here π)
-    ⊕-here (in-scan π)   = cong in-scan (⊕-here π)
-    ⊕-here (in-take π)   = cong in-take (⊕-here π)
-    ⊕-here (in-outer π)  = cong in-outer (⊕-here π)
-    ⊕-here (in-lanes π)  = cong in-lanes (⊕-hereᴸ π)
-    ⊕-here (in-source π) = cong in-source (⊕-here π)
-    ⊕-here (in-body π)   = cong in-body (⊕-here π)
-    ⊕-here (in-defer π)  = cong in-defer (⊕-here π)
-
-    ⊕-hereᴸ : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) → π ⊕ᴸ here ≡ π
-    ⊕-hereᴸ (this-lane π) = cong this-lane (⊕-here π)
-    ⊕-hereᴸ (next-lane π) = cong next-lane (⊕-hereᴸ π)
-
   -- Two nodes alike but for their children.
   data Same {h} : ∀ {Δ A} → Sub h Δ A → Sub h Δ A → Set₁ where
     same         : ∀ {Δ A} {s : Sub h Δ A} → Same s s
