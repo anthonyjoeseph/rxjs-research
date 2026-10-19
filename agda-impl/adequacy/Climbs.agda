@@ -1962,7 +1962,7 @@ module Ascending (R : Set) where
         i₁ : DoneBy base u₀ []
         i₁ = Wk.grow-flags grows dI
         c₁ : DoneBy base (plant ρw P₀) []
-        c₁ = subst (λ x → DoneBy base x []) (wk-plant grow ρ P₀) (Wk.grow-flags grows dF)
+        c₁ = subst (λ x → DoneBy base x []) (wk-plant grow ρ (pendingˢ (f y) (q ++ [ ix 1 ]))) (Wk.grow-flags grows dF)
         v₁ : DoneBy base v′ []
         v₁ = Flag.db-flat base {ns = []} (i₁ here refl) (Flag.db-sub base i₁ (in-outer here) refl)
                (Flag.dbL-cons base {ns = []} (λ _ → pending-flags base) (Flag.dbL-of base i₁))
