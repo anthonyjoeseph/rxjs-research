@@ -3713,14 +3713,6 @@ module Ascending (R : Set) where
       ab = Fins.fin-ab hp ρ q fr
       off₀ = Heaps.keep hp H′ (off-store hp (Subject.closed Sj)) (lookupᴬ (Fins.mine hp ρ q))
       d₀ = done-up ρ (in-source here) refl (Calling.flags cl)
-      -- Below the connect: its source's flags and its body's, read alike.
-      fb : DoneBy hp w₀ (outers ρ ++ []) → DoneBy H′ v (outers ρ)
-      fb d = Flag.db-connect H′
-        (λ jb → flags-alike hp H′ au (Flag.db-sub hp d′ (in-source here) (cong (λ z → z ∧ true) (trans (cong is-just (sym (part-alike hp H′ bd ab))) jb))))
-        (λ js → flags-alike hp H′ (subst (Alike hp H′) (sym (names-retag g bd)) ab)
-                  (flags-retag hp g bd kh (proj₂ (fed-at hp ρ (Meaning.fed mn)))
-                    (Flag.db-sub hp d′ (in-body here) (cong (λ z → z ∧ true) (trans (cong (λ x → is-just x ∨ is-just e) (sym (part-alike hp H′ u au))) js)))))
-        where d′ = subst (DoneBy hp w₀) (++-identityʳ (outers ρ)) d
       g = at-here (At.owing H′ (Fins.fd′ hp ρ q))
       -- The subject still open as the end reaches it: every live joiner
       -- of the body waiting, open before the restage and after.
@@ -3731,6 +3723,14 @@ module Ascending (R : Set) where
       kh : Steady hp g ((idle , At.told hp Sj e) ∷ nowAt hp ρ [])
       kh (here refl) (lift f) lv rewrite proj₂ (f lv) (λ ()) | cf = refl
       kh (there x) f lv = refl
+      -- Below the connect: its source's flags and its body's, read alike.
+      fb : DoneBy hp w₀ (outers ρ ++ []) → DoneBy H′ v (outers ρ)
+      fb d = Flag.db-connect H′
+        (λ jb → flags-alike hp H′ au (Flag.db-sub hp d′ (in-source here) (cong (λ z → z ∧ true) (trans (cong is-just (sym (part-alike hp H′ bd ab))) jb))))
+        (λ js → flags-alike hp H′ (subst (Alike hp H′) (sym (names-retag g bd)) ab)
+                  (flags-retag hp g bd kh (proj₂ (fed-at hp ρ (Meaning.fed mn)))
+                    (Flag.db-sub hp d′ (in-body here) (cong (λ z → z ∧ true) (trans (cong (λ x → is-just x ∨ is-just e) (sym (part-alike hp H′ u au))) js)))))
+        where d′ = subst (DoneBy hp w₀) (++-identityʳ (outers ρ)) d
       -- The connect stands: its source gone, its end staged, its body on.
       ju : is-just (At.part H′ v) ≡ true
       ju = subst₂ (λ s′ b′ → is-just (At.connected H′ rp e rt s′ b′) ≡ true)
