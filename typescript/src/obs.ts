@@ -11,6 +11,7 @@ import {
   map,
   mergeMap,
   of,
+  repeat,
   scan,
   switchMap,
   takeWhile,
@@ -23,9 +24,10 @@ import {
 // counted from the innermost binder.
 
 // `quickcheck.Ty`'s values: unit is null, a pair an array, a sum a
-// one-key object.
+// one-key object.  A natural is exact, as Agda's `ℕ` is: a literal reads
+// as a number, and arithmetic makes a bigint.
 export type Value =
-  null | boolean | number | Value[] | { l: Value } | { r: Value };
+  null | boolean | number | bigint | Value[] | { l: Value } | { r: Value };
 
 export type Tm =
   | ["var", number]
@@ -47,7 +49,7 @@ export type Tm =
 export type FlatOp = ["merge"] | ["merge", number] | ["switch"] | ["exhaust"];
 
 export type Code =
-  | ["cold", [number, Value[]][], boolean]
+  | ["cold", [number, Value[]][], boolean, boolean]
   | ["empty"]
   | ["of", Tm[]]
   | ["map", Tm, Code]
@@ -60,7 +62,7 @@ export type Code =
   | ["var", number]
   | ["defer", Code];
 
-const nat = (v: Value): number => v as number;
+const nat = (v: Value): bigint => BigInt(v as number | bigint);
 const pair = (v: Value): Value[] => v as Value[];
 
 export const evalTm = (tm: Tm, th: Value[]): Value => {
@@ -105,20 +107,33 @@ export const evalTm = (tm: Tm, th: Value[]): Value => {
 // A scripted cold: frames at offsets from subscription.  Frame 0 is
 // synchronous; each later one is a timer set where the frame before it
 // ends, as `operation.Observable.fromTimeline` plays it.
+// One play of the frames. A replay starts a tick after the last frame,
+// as `quickcheck.Code.scriptML` restarts, so it is never synchronous.
+const play = (
+  sch: SchedulerLike,
+  frames: [number, Value[]][],
+  replay: boolean,
+): Observable<Value> =>
+  concat(
+    ...frames.map(([t, xs], i) => {
+      const gap = i === 0 ? (replay ? t + 1 : t) : t - frames[i - 1][0];
+      return i === 0 && !replay && t === 0
+        ? from(xs)
+        : timer(Math.max(gap, 0), sch).pipe(mergeMap(() => from(xs)));
+    }),
+  );
+
 const cold = (
   sch: SchedulerLike,
   frames: [number, Value[]][],
   completes: boolean,
+  loops: boolean,
 ): Observable<Value> =>
-  concat(
-    ...frames.map(([t, xs], i) => {
-      const gap = t - (i === 0 ? 0 : frames[i - 1][0]);
-      return i === 0 && t === 0
-        ? from(xs)
-        : timer(Math.max(gap, 0), sch).pipe(mergeMap(() => from(xs)));
-    }),
-    completes ? EMPTY : NEVER,
-  );
+  loops
+    ? frames.length === 0
+      ? NEVER
+      : concat(play(sch, frames, false), play(sch, frames, true).pipe(repeat()))
+    : concat(play(sch, frames, false), completes ? EMPTY : NEVER);
 
 const flatMapOf = (
   op: FlatOp,
@@ -160,7 +175,7 @@ const knot =
 export const compile = (s: Scope, code: Code): Observable<Value> => {
   switch (code[0]) {
     case "cold":
-      return cold(s.sch, code[1], code[2]);
+      return cold(s.sch, code[1], code[2], code[3]);
     case "empty":
       return EMPTY;
     case "of":

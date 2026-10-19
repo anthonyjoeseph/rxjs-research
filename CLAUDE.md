@@ -1,6 +1,20 @@
 # Working methodology
 
-Agda model (`agda-impl/`) + TypeScript impl (`typescript/`). Agda is gospel; TS conforms. **`agda/` is reference only** — never edited, to be deleted.
+Agda model (`agda-impl/`) + TypeScript impl (`typescript/`). **`agda/` is reference only** — never edited, to be deleted.
+
+## The point of this repo (Anthony)
+
+The point of this repo is to be able to write proofs about actual executable programs written with Observable.
+
+There will always be gaps, because IO is non deterministic. That's why it's important to share as much code as possible between the pure operational semantics (PureObservable) and the io operational semantics (Observable). This shared engine is called AbstractObservable.
+
+A denotation is much easier to write proofs with than operational semantics - it's able to look at all emissions at once, rather than one at a time, and proofs written over top of it are compositional. The MonotonicList is this clairvoyant data structure.
+
+The point of "adequacy" is to link these two worlds, and give us what we want - simple, compositional proofs that have meaning on the IO side - the "real world" that can actually be executed.
+
+The Obs tree represents a minimal list of primitive operators that more complex operators can be built on top of. It's useful for proofs. It has three interpretations - denotational, pure-operational and io-operational. They all share a tree to facilitate this central idea.
+
+As we try to prove adequacy, it's important that we be able to change the implementations of MonotonicList and AbstractObservable, in order to make our job easier. But we always want to preserve four things - compositionality of the denotation, clairvoyance of MonotonicList, as much shared by PureObservable and Observable as possible, and all of these semantics must match the behavior of real rxjs exactly.
 
 ## This file
 
@@ -27,25 +41,25 @@ Every `*-selftest` proves its checker still fires; they are not findings, they a
 | `unsafe-check` | `TERMINATING` / `NO_POSITIVITY_CHECK` / `REWRITE` / `--type-in-type` on the proof path. The build is not `--safe`, so this is the only thing stopping a soundness hole | [docs/unsafe-check.md](docs/unsafe-check.md) |
 | `dup-check` | two declarations proving one fact, up to binder spelling and type synonyms | [docs/find.md](docs/find.md) |
 | `imports-check` | an unused import, or an unused name in a surviving clause | [docs/imports-check.md](docs/imports-check.md) |
-| `roadmap-check` | PROOF-STATE unsorted, missing a live postulate or naming a dead one, over the row/preamble budget, dated, fewer than 3 or more than 7 legs, a leg over budget, or a wrong DERIVED evidence field. `make roadmap-evidence` writes the field | [docs/roadmap-check.md](docs/roadmap-check.md) |
+| `roadmap-check` | PROOF-STATE unsorted, missing a live postulate, over the row/preamble budget, dated, fewer than 3 or more than 7 legs, a leg over budget, or a wrong DERIVED evidence field. **A row naming nothing live is DELETED, not failed — deleting a postulate is free (Anthony).** `make roadmap-evidence` writes the field | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-order` | discharging a GRINDABLE row while its tier holds an open FALSITY. Only DISCHARGE is held — delete, rename, split, restate, reclassify stay free; a PREREQUISITE the risky statement names is exempt | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-moved` | a branch landing proof work with PROOF-STATE byte-identical to **main**. Baseline is the merge-base, so fix-ups inside a branch cost nothing | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `comments-check` | a date, a historical marker or a LINE NUMBER in `agda-impl`; evidence not last and in order; a DOUBLED marker (`-- -- RECOVERY:`); a `TWIN`/`REFUTED`/`RECOVERY` that doesn't resolve. `DEAD ROUTE` is unvalidated — it names nothing | [docs/comments-check.md](docs/comments-check.md) |
 | `agda` | anything that does not typecheck from Main — **a warning is a failure** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
 
-Also: `make imports-fix`, `make postulates` (the complete remaining-work ledger, by name), `make find`, `make find-prose`, `make bug-cache`.
+Also: `make imports-fix`, `make postulates` (the complete remaining-work ledger, by name), `make find`, `make find-prose`.
 
 ## Autonomy
 
-Standing approval for any change that **does not alter the spec** — impl edits, protocol changes, new operators, refactors, experiments. Don't ask; go. Throw a lot at the wall, keep what passes QuickCheck/oracle, revert what doesn't.
+Standing approval for any change — impl edits, protocol changes, new operators, refactors, experiments. Don't ask; go. Throw a lot at the wall, keep what passes QuickCheck/oracle, revert what doesn't.
 
-**The `Obs` tree (`Tree.agda`) is FIXED, and the engine is not (Anthony).** Its formers are not the spec, so the standing approval above reads as licensing a new one — it does not. Engine internals are free: the kernels, the runtimes, the relation, whatever makes it work and provable. A change that needs a new `Obs` former, or re-types an existing one, is a question instead.
+**The `Obs` tree (`Tree.agda`) is FIXED, and the engine is not (Anthony).** Its formers are not the batchSimultaneous spec, so the standing approval above reads as licensing a new one — it does not. Engine internals are free: the kernels, the runtimes, the relation, whatever makes it work and provable. A change that needs a new `Obs` former, or re-types an existing one, is a question instead.
 
 **The stop conditions are exhaustive — nothing else is one (Anthony: "never stop working until you hit a stop condition").** All three are questions only Anthony can answer:
 
-- **The semantics must move** — the denotation disagrees with real rxjs in a way that is not a bug in either, or the spec's statement needs restating. A question, never a patch.
+- **The semantics must move** — the denotation disagrees with real rxjs in a way that is not a bug in either, or the batchSimultaneous spec's statement needs restating. A question, never a patch.
 - **The proof is SPIRALLING** — the same region producing FALSITY across three successive subdivisions. Reconsider the mechanism, don't subdivide a fourth time.
-- **The impossibility pair** — two programs whose primitives produce byte-identical emit streams (same provenances, init/close, values, order) but that genuinely batch differently in real rxjs. **STOP and tell Anthony; do not act on it.** Not the same as "impl disagrees with spec", which is just a bug to fix in the impl.
+- **The impossibility pair** — two programs whose primitives produce byte-identical emit streams (same provenances, init/close, values, order) but that genuinely batch differently in real rxjs. **STOP and tell Anthony; do not act on it.** Not the same as "the batchSimultaneous impl disagrees with the batchSimultaneous spec", which is just a bug to fix in the impl.
 
 ## The goal
 
@@ -67,7 +81,7 @@ Every PROOF-STATE.md tier discharged: no postulates, everything typechecks. "Pas
 ## Agda builds
 
 - **`make gate` is the merge gate:** `gate-cheap`, then `make agda` (`agda-impl/Main.agda`).
-- **The bug cache runs locally and in its own CI job (Anthony).** `make bug-cache`, through `make bg`. Checked by GHC and the FFI — never a proof's dependency.
+- **The harness never runs locally — only in CI, in the background (Anthony).** Bug cache, oracle, every `quickcheck/` binary (placing, ghosts, exact, hand, spin): never built or run in a session, so it never blocks real work. Checked by GHC and the FFI — never a proof's dependency.
 - **A warning is a build failure.** Every invocation goes through the Makefile's `AGDA` (carries `-W error`). Never call bare `agda` in the Makefile. Never silence a warning to get green — a warning you believe is wrong is a finding. → [docs/agda-build.md](docs/agda-build.md)
 - **Two commands: `make bg T=<target>` as a BACKGROUND tool call, then `make bg-check T=<target>`.** `bg` blocks, logs, appends `EXIT=<code>`. `bg-check` reports GREEN / RED-with-tail / STILL-RUNNING. `bg-wait` is for a human. A `sleep N; tail` or `until` loop is the apparatus re-implemented worse. `make bg` always exits non-zero by design, so **a completion notification is never a result — `bg-check` is.**
 - **"Detached" means the Bash tool's background flag, never shell syntax (Anthony).** Type the command bare. No `&` (backgrounds a wrapper the harness already manages), no `>/dev/null 2>&1` (throws away WHERE the log is), **and never a pipe — a pipeline exits with the LAST command's status, so `make gate | tail` reports the tail's success over a RED build.** A foreground call is capped at 600 s and a build that outruns it is KILLED. **One build at a time.** → [docs/bg.md](docs/bg.md)
@@ -156,6 +170,8 @@ Every live postulate carries one. PROOF-STATE assigns; this file defines.
 **`make roadmap-order` enforces it.** The pull is structural, not careless: `roadmap-moved` requires every commit to move the roadmap, a risky leg routinely ends in a FINDING rather than a discharge, and a finding-only commit reads as unfinished — so a mechanical row gets closed alongside it to make the commit feel whole. **Settle risk near the trunk:** work proven under an open FALSITY is not delayed but FORFEIT if that statement is refuted.
 
 **Only BANKING is held (Anthony).** Deleting, renaming, splitting, restating and reclassifying a row are all free. The one held move is a name leaving the postulate ledger while still declared in `agda-impl`.
+
+**Never attempted is the riskiest state (Anthony).** A postulate whose body has never been tried knows nothing about its own shape, and everything built since it was stated is a bet on that shape. Among rows of one class, an untried row outranks a probed one, and the longer the tree has moved around it, the more. Silence on a row is not safety.
 
 ### Tier order is law (Anthony)
 

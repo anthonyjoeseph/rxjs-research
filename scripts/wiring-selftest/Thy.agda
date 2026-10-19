@@ -67,11 +67,22 @@ via-with : Nat → Nat
 via-with x with decide x
 ... | d = consume d (with-only x)
 
+-- COPATTERNS.  `Pair.fst cop-pair = …` is a clause OF `cop-pair`, not a
+-- definition of `Pair.fst`: its body's uses are `cop-pair`'s.
+record Pair : Set where
+  field fst : Nat → Nat
+
+cop-helper : Nat → Nat
+cop-helper x = x
+
+cop-pair : Pair
+Pair.fst cop-pair = cop-helper
+
 top-line : Nat → Nat
-top-line z = other (parent-core bad-lemma
+top-line z = Pair.fst cop-pair (other (parent-core bad-lemma
                      (nested (both-mods
                        (eta-parent (λ w → eta-lemma w)
-                                   (λ w → computed (nested w)) z))))
+                                   (λ w → computed (nested w)) z)))))
 
 -- MODULE APPLICATIONS.  `module M = F args` is a BINDING, not a scope: the
 -- names on its right are real uses, and a scanner that skips the line hands

@@ -408,6 +408,18 @@ def extract_definitions(src_dir, files):
     BLOCK_OPENERS = {"postulate", "mutual", "abstract", "opaque", "private",
                      "instance", "variable"}
 
+    # A COPATTERN CLAUSE BELONGS TO THE VALUE IT DEFINES.  `Alg.coldᶜ
+    # OwnedAlg … = coldOwed …` is a clause of `OwnedAlg`: its head is the
+    # projection, qualified, and the value is the token after it.  Read as a
+    # definition of `Alg.coldᶜ` it has no consumer, and every name its body
+    # uses loses its route home.
+    def copattern_owner(tokens):
+        head = tokens[0]
+        if (len(tokens) > 1 and "." in head.strip(".") and "=" in tokens
+                and tokens[1] in defs):
+            return tokens[1]
+        return None
+
     def register(name, relpath, lineno, kind):
         def_lines[name].add((relpath, lineno))
         if name not in defs:
@@ -461,7 +473,7 @@ def extract_definitions(src_dir, files):
             # `where` search, which scans ahead and would otherwise mistake a
             # LATER `module … where` for this line's header.
             if (tok0 == "module" and len(tokens) > 2
-                    and tokens[1] != "_" and tokens[2] == "="):
+                    and tokens[1] != "_" and is_module_app(tokens)):
                 register(tokens[1], relpath, i + 1, "module-app")
                 i += 1
                 continue
@@ -588,7 +600,7 @@ def extract_definitions(src_dir, files):
             # clauses; reattributing it would wrongly hand hasAtLeast-pad's
             # own signature line to `_hasAtLeast_` and, worse, leave it
             # unmasked when counting hasAtLeast-pad's OWN consumers.
-            owner = None if ":" in tokens else find_mixfix_owner(tokens)
+            owner = None if ":" in tokens else (find_mixfix_owner(tokens) or copattern_owner(tokens))
             if owner is not None:
                 def_lines[owner].add((relpath, i + 1))
             else:
@@ -645,7 +657,7 @@ def extract_definitions(src_dir, files):
             # `module V = Walk … burstH` is a member of `module BurstWalk …
             # where`, so it is THIS loop that has to see it (2026-08-18).
             if (tok0 == "module" and len(tokens) > 2
-                    and tokens[1] != "_" and tokens[2] == "="):
+                    and tokens[1] != "_" and is_module_app(tokens)):
                 register(tokens[1], relpath, i + 1, "module-app")
                 i += 1
                 continue
@@ -758,7 +770,7 @@ def extract_definitions(src_dir, files):
             # clauses; reattributing it would wrongly hand hasAtLeast-pad's
             # own signature line to `_hasAtLeast_` and, worse, leave it
             # unmasked when counting hasAtLeast-pad's OWN consumers.
-            owner = None if ":" in tokens else find_mixfix_owner(tokens)
+            owner = None if ":" in tokens else (find_mixfix_owner(tokens) or copattern_owner(tokens))
             if owner is not None:
                 def_lines[owner].add((relpath, i + 1))
                 i += 1
@@ -1156,6 +1168,25 @@ def eta_target(inner):
     return head.group(0)
 
 
+def is_module_app(tokens):
+    """`module V = M …` or, parameterised, `module V (x : T) = M …`: an
+    `=` on the header line before any `where`, outside every bracket: a
+    named implicit in a parameter's type (`(p : P {B = ⊤} x)`) is not one."""
+    depth = 0
+    for t in tokens[2:]:
+        if depth == 0 and t == "where":
+            return False
+        if depth == 0 and t == "=":
+            return True
+        depth += t.count("(") + t.count("{") - t.count(")") - t.count("}")
+    return False
+
+
+# Tokens that end an application: what follows is not an argument of the
+# postulate but the rest of a chain (`readIORef r >>= λ x → f x`) or a branch.
+_APP_END = {">>=", ">>", "$", "\u2192", "\u03bb", "\\", "then", "else", "in", "let", "where", "with", "|"}
+
+
 def postulate_arg_sites(src_dir, files, defs, def_lines, postulate_names):
     """R2's suppression set: (file, line) -> {names passed as BARE arguments
     to an applied postulate}.
@@ -1237,8 +1268,8 @@ def postulate_arg_sites(src_dir, files, defs, def_lines, postulate_names):
                             k = k2
                             continue
                         mm = re.match(r"[^\s(){}\[\],;]+", expr[k:])
-                        if not mm:
-                            break
+                        if not mm or mm.group(0) in _APP_END:
+                            break                     # an infix bind, a lambda, a branch
                         for (ln, _t) in span:
                             suppressed[(relpath, ln)].add(mm.group(0))
                         k += mm.end()

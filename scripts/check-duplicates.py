@@ -85,6 +85,15 @@ DELIBERATE = {
     # exemption for `→ Set` formers would be worse than these two
     # entries, since two modules genuinely restating one invariant is a
     # shape this check is meant to catch.
+    # NOT TWO PROOFS OF ONE FACT — one obligation per restaged operator.
+    # `t′` and `T₀` are each restage module's OWN tree and parameter, so
+    # the text is shared and the trees are not.
+    frozenset(("connect-fresh", "flat-fresh", "scan-fresh", "take-fresh")):
+        "each restage module's own new tree `t′` against its parameter "
+        "`T₀`; the text matches, the trees differ.",
+    frozenset(("less",)):
+        "each restage module's own new tree `t′` against its parameter "
+        "`T₀`; the text matches, the trees differ.",
     frozenset(("ShareFits", "ShareHop")):
         "certificate and obligation over one telescope, both `Set`-"
         "valued; the shared `<` is the fan-out's accessibility argument.",
