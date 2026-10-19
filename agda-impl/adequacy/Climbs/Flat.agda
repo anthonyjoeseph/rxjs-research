@@ -727,13 +727,13 @@ module ClimbFlat (R : Set) where
       ; flags = Settles.sd-flags hp ρ fs gn dn ; kept = inj₁ refl }))
     where
       o    = Here.obs (walk ρ top)
+      nl   = nulls (At.partLanes hp ls) (At.val hp (FlatKit.Flat.queue fl)) (trans (sym (Settles.settle-eq hp ρ (fresh-path ρ fs) kn)) eq)
       Lo   = subst₂ (λ ls′ qs′ → Lifts hp ρ (U.outerˢ op (λ a j → U.subscribe (f a) j) o₀ (U.endˢ q) ls′ qs′ po) S) (proj₁ nl) (proj₂ nl) Lρ
       b    = (At.val (Settles.H′ hp ρ) (FlatKit.Flat.active fl) ≡ᵇ 0) ∧ null (At.val (Settles.H′ hp ρ) (FlatKit.Flat.queue fl))
       path = ⇝-trans p₁ (⇝-trans p₂ (⇝-trans p₃ (⇝-trans p₄ p₅)))
       e₅   = ≗-trans (f₅ same⊑ (At.val (Settles.H′ hp ρ) (FlatKit.Flat.queue fl)))
                (bind≗ (wk-same (settledᵒ o (At.val (Settles.H′ hp ρ) (FlatKit.Flat.outerDone fl)) (At.val (Settles.H′ hp ρ) (FlatKit.Flat.active fl))
                                          (At.val (Settles.H′ hp ρ) (FlatKit.Flat.queue fl)))) λ _ → wk-same ⟦ ks ⟧ᶜ)
-      nl   = nulls (At.partLanes hp ls) (At.val hp (FlatKit.Flat.queue fl)) (trans (sym (Settles.settle-eq hp ρ (fresh-path ρ fs) kn)) eq)
   ...           | false
     with Settles.pool-ghost hp ρ fs o₀ sn pd dp gn (trans (sym (Settles.settle-eq hp ρ (fresh-path ρ fs) kn)) eq) Lρ sg
   ...             | g″ , pg , sn″ , pd″ , dp″ , k″ , r″ , ag , pp =
