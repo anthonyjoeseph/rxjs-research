@@ -2192,8 +2192,8 @@ module Ascending (R : Set) where
         lv {c = c} ψ e = drop-true H (laneOf o) c (trans (sym (cong lower (look-store (unlive H (laneOf o)) (FlatKit.Flat.active fl) (Kit.live c) (na ψ)))) e)
 
     fr-done : AllPairs _≢_ (names w₀) → At.val H′ (FlatKit.Flat.outerDone fl) ≡ At.val H (FlatKit.Flat.outerDone fl)
-    fr-done (_ ∷ a₁ ∷ _) =
-      trans (cong lower (look-store (unlive H (laneOf o)) (FlatKit.Flat.active fl) (FlatKit.Flat.outerDone fl) (λ ())))
+    fr-done (a₀ ∷ a₁ ∷ _) =
+      trans (cong lower (look-store (unlive H (laneOf o)) (FlatKit.Flat.active fl) (FlatKit.Flat.outerDone fl) (lookupᴬ a₀ (here refl))))
             (cong lower (look-store H (Kit.live (laneOf o)) (FlatKit.Flat.outerDone fl)
               (λ eq → lookupᴬ a₁ (there (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names t) (cut-in ls (laneOf-in o))))))))) (sym eq))))
 
