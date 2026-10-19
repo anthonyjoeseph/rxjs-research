@@ -2403,7 +2403,7 @@ module Ascending (R : Set) where
       Flag.db-flat H′ {ns = xs} (flagged-moved H H′ {fl = fl} {so = t} (fr-done fr) (fr-part fr) (d here refl))
         (flags-alike H H′ (fr-so fr) (Flag.db-sub H d (in-outer here) refl))
         (λ {Δ′} {A′} {B′} {op′} {f′} {fl′} {oc′} {k′} {r′} {pl′} {so′} {ls′} πL′ sn → flagged-moved H H′ {fl = fl′} {so = so′} (cong lower (fr-lane fr {x = flatMapˢ op′ f′ fl′ oc′ k′ r′ pl′ so′ ls′} πL′ (FlatKit.Flat.outerDone fl′) (flag-in {t = flatMapˢ op′ f′ fl′ oc′ k′ r′ pl′ so′ ls′} here)))
-                                            (part-at H H′ (in-outer {t = so′} here) (fr-lane fr πL′)) (Flag.dbL-of H d πL′ (fr-seL fr πL′ sn)))
+                                            (part-at H H′ {t = flatMapˢ op′ f′ fl′ oc′ k′ r′ pl′ so′ ls′} (in-outer here) (fr-lane fr {x = flatMapˢ op′ f′ fl′ oc′ k′ r′ pl′ so′ ls′} πL′)) (Flag.dbL-of H d πL′ (fr-seL fr πL′ sn)))
 
     -- Through the frame, the flatMap repooled or not.
     fr-shift : AllPairs _≢_ (names T) → ∀ pl′ → (is-just (At.part H′ (flatMapˢ op f fl oc k r pl′ t ls)) ≡ true → is-just (At.part H w₀) ≡ true)
