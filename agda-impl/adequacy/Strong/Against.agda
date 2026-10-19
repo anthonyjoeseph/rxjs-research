@@ -672,8 +672,9 @@ module StrongAgainst (R : Set) where
 
   -- Two nodes leaving alike: what each still runs past an unsubscribe,
   -- under every environment, the same at every depth.
-  Leaves : ∀ {Γ A B} → U.Node Γ A → U.Node Γ B → Set₁
-  Leaves {Γ} x y = ∀ (ρ : U.NEnv Γ) n → Agree n (U.meaning (U.restᶜ {B = ⊤} x) ρ) (U.meaning (U.restᶜ {B = ⊤} y) ρ)
+  record Leaves {Γ A B} (x : U.Node Γ A) (y : U.Node Γ B) : Set₁ where
+    constructor leaves
+    field agree : ∀ (ρ : U.NEnv Γ) n → Agree n (U.meaning (U.restᶜ {B = ⊤} x) ρ) (U.meaning (U.restᶜ {B = ⊤} y) ρ)
 
   -- WHAT THE GHOST HOLDS LEAVES WHAT THE HEAP WOULD: below `t`, each seen
   -- part, a held flatMap's pool and a held connect's ended source's rest

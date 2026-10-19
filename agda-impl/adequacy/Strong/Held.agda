@@ -46,7 +46,7 @@ module StrongHeld (R : Set) where
   open Machine R using (Mach; Playing; begin)
   open SortingWalk R using (WellMach; begin-well)
   open Strongly R using (Alg; module At; module Canon; module Fold; Here; Lane; Name; Path; PathLanes; Sub; _⊕_; coldˢ; connectˢ; deferˢ; doneˢ; flatMapˢ; here; in-body; in-defer; in-lanes; in-map; in-outer; in-scan; in-source; in-take; joinˢ; lane; mapˢ; next-lane; ofˢ; pendingˢ; scanˢ; takeWhileˢ; taking; this-lane; ≗-refl)
-  open StrongAgainst R using (module Against; Books; Each; Kernels; Leaving; Lingers; Meaning; Owned; OwnedF; Queue; Tied; _,ᴼ_; isTaking; owned-from; seen; seen-join; seenL; ∧-join; ∧-split)
+  open StrongAgainst R using (module Against; Books; Each; Kernels; Leaving; leaves; Lingers; Meaning; Owned; OwnedF; Queue; Tied; _,ᴼ_; isTaking; owned-from; seen; seen-join; seenL; ∧-join; ∧-split)
   open Canon
   open Here
 
@@ -452,5 +452,5 @@ module StrongHeld (R : Set) where
     ; sorted  = root , begin-well o
     ; behind′  = Eaching.eaching (λ { _ refl → heads-begin o })
     ; lingers′ = Lingering.lingering (λ _ → lift tt)
-    ; leaving = record { parts = λ { here _ refl ρ n → agree-refl n _ } ; pools = λ () ; rests = λ () }
+    ; leaving = record { parts = λ { here _ refl → leaves (λ ρ n → agree-refl n _) } ; pools = λ () ; rests = λ () }
     ; flags   = λ () }

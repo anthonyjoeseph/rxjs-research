@@ -130,10 +130,6 @@ module GhostingPaths (R : Set) where
              {L : Lifts H (ρ ⊕ τ) s S} {S′} {Lτ : Lifts H τ s S′} {Lρ : Lifts H ρ S′ S} → lifts-split ρ τ L ≡ (S′ , Lτ , Lρ) → Lefts H L → Lefts H Lρ
   lefts-up {H = H} ρ τ {L = L} eq lt = subst (λ w → Lefts H (proj₂ (proj₂ w))) eq (proj₂ (lefts-split ρ τ L lt))
 
-  lefts-down : ∀ {h} {H : Heapᴹ h} {Δ A Δ′ A′ Δ″ A″} {t : Sub h Δ A} {u : Sub h Δ′ A′} {v : Sub h Δ″ A″} (ρ : Path t u) (τ : Path u v) {s S}
-               {L : Lifts H (ρ ⊕ τ) s S} {S′} {Lτ : Lifts H τ s S′} {Lρ : Lifts H ρ S′ S} → lifts-split ρ τ L ≡ (S′ , Lτ , Lρ) → Lefts H L → Lefts H Lτ
-  lefts-down {H = H} ρ τ {L = L} eq lt = subst (λ w → Lefts H (proj₁ (proj₂ w))) eq (proj₁ (lefts-split ρ τ L lt))
-
   -- A source rewritten in place: the free nodes are the derivation's.
   lefts-subst : ∀ {h} {H : Heapᴹ h} {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} {ρ : Path t u} {ℓ} {X : Set ℓ} (f : X → U.Step Δ′ A′) {S x y}
                 (e : x ≡ y) {L : Lifts H ρ (f x) S} → Lefts H L → Lefts H (subst (λ z → Lifts H ρ (f z) S) e L)
