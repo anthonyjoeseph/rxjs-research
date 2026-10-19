@@ -57,7 +57,7 @@ module Staging (R : Set) where
   open Run (Pureᴾ R) using (emitAll; done; _>>ᴬ_; compile; Env; wkEnv; module Kit)
   open Run.Kit (Pureᴾ R) using (skipᴬ)
   open Strongly R using (Sub; pendingˢ; ofˢ; mapˢ; connectˢ; Lane; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_; Here; walk; top; of-leaf; Call; emitC; kontC; _≗_; module At; names; pendings; Phase; ≗-refl; unsubscribing; under≗) renaming (⟦_⟧ to ⟦_⟧ᶜ)
-  open StrongAgainst R using (Books; Job; Owned; Kernels; Meaning; Queue; Each; Lingers; Pinned; unpinned; rest-pinned; seen; owned-to) renaming (at⟦_⟧ to at⟦_⟧ᶜ)
+  open StrongAgainst R using (Leaving; Books; Job; Owned; Kernels; Meaning; Queue; Each; Lingers; Pinned; unpinned; rest-pinned; seen; owned-to) renaming (at⟦_⟧ to at⟦_⟧ᶜ)
   open StrongHeld R using (Carried; carried; Heads; module Eaching; module Lingering)
   open StrongAgainst.Against R using (StackAs; subAs; runAs; SrcOf; src-of)
   open Moving R using (planted; pend; syn-pos; part-plant; names-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant; head-map)
@@ -226,6 +226,9 @@ module Staging (R : Set) where
     rm-lingers : ∀ (H : Heapᴹ h) → Lingers H T₀ → Lingers H t′
     rm-lingers H = lingers-plant H π v refl (λ {C} → rest-pinned (U.restᶜ {B = C} (U.subscribe s q))) (record { pools = λ { (in-map ()) } ; rests = λ { (in-map ()) } })
 
+    postulate
+      rm-leaving : ∀ (H : Heapᴹ h) → Leaving H T₀ → Leaving H t′
+
     -- A pending node and a map over one register nothing, queue nothing
     -- and are owed nothing.
     rm-kernels : (H : Heapᴹ h) → Kernels H T₀ → Kernels H t′
@@ -257,7 +260,7 @@ module Staging (R : Set) where
            ; books = record { fresh = subst (AllPairs _≢_) (sym M.names′) (Books.fresh bk)
                             ; clocked = proj₁ (Books.clocked bk) , N.reticked sk a (proj₂ (Books.clocked bk))
                             ; paidUp = Books.paidUp bk ; running = Books.running bk }
-           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (M.rm-behind H (Carried.behind cr)) ; lingers′ = Lingering.lingers-to _ (M.rm-lingers H (Carried.lingers cr))
+           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (M.rm-behind H (Carried.behind cr)) ; lingers′ = Lingering.lingers-to _ (M.rm-lingers H (Carried.lingers cr)) ; leaving = M.rm-leaving H (Carried.leaving cr)
            ; flags = flags-plant H π M.v refl (λ { (in-map ()) }) (Carried.flags cr) }
     , refl , inj₁ (inj₁ M.less)
     where module M = Mapped π
@@ -333,6 +336,9 @@ module Staging (R : Set) where
     of-lingers : ∀ (H : Heapᴹ h) → Lingers H T₀ → Lingers H t′
     of-lingers H = lingers-plant H π v (eqp H) (subst (λ c → Pinned (U.restˢ {B = ⊤} c) U.hushˢ) (sym sp) unpinned) (record { pools = λ () ; rests = λ () })
 
+    postulate
+      of-leaving : ∀ (H : Heapᴹ h) → Leaving H T₀ → Leaving H t′
+
   -- The configuration an `of` planted makes: its first call its values.
   Offers : ∀ {g m} → Carried g m → ∀ {Δ A} → List A → Set₁
   Offers {g} {m} cr {Δ} {A} xs = Σ (Carried g m) λ cr′ → Σ Pos λ p → Σ (Path (Carried.tree cr′) (ofˢ {Δ = Δ} {A} p 0 xs)) λ π′
@@ -347,7 +353,7 @@ module Staging (R : Set) where
            ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant π O.v refl)) (Books.fresh bk)
                             ; clocked = proj₁ (Books.clocked bk) , N.reticked sk a (proj₂ (Books.clocked bk))
                             ; paidUp = Books.paidUp bk ; running = Books.running bk }
-           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (O.of-behind H (Carried.behind cr)) ; lingers′ = Lingering.lingers-to _ (O.of-lingers H (Carried.lingers cr))
+           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (O.of-behind H (Carried.behind cr)) ; lingers′ = Lingering.lingers-to _ (O.of-lingers H (Carried.lingers cr)) ; leaving = O.of-leaving H (Carried.leaving cr)
            ; flags = flags-plant H π O.v (O.eqp H) (λ ()) (Carried.flags cr) }
     , q , O.π′ , refl , inj₁ (inj₁ O.less)
     where module O = Offered π (sp q) cs

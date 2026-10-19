@@ -23,6 +23,7 @@ open import Induction.WellFounded using (WellFounded)
 open import Data.Product.Relation.Binary.Lex.Strict using (×-Lex; ×-wellFounded)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤)
+open import Level using (Lift)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; cong; subst)
 
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Time; Timeline; tick; out; skip; end; hush; root; ix; _<ᵖ_)
@@ -57,7 +58,7 @@ module Ghosting (R : Set) where
   open SortingWalk R using (WellMach; WellStep; silentʷ; valueʷ; preserve; Beyond)
   open Run (Pureᴾ R) using (Act; Observer; _>>ᴬ_; Subject; module Kit; module FlatKit)
   open Strongly R using (Sub; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; lane; here; module At; Path; done≗; Call; taking; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; outers; outers-⊕; ≗-refl) renaming (⟦_⟧ to ⟦_⟧ᶜ)
-  open StrongAgainst R using (Books; Queue; Kernels; Meaning; Owned; Each; Lingers; seen; seenL; isTaking; seen-up; seen-join; ∧-split; ∧-join)
+  open StrongAgainst R using (Books; Queue; Kernels; Meaning; Owned; Each; Lingers; Leaves; seen; seenL; isTaking; seen-up; seen-join; ∧-split; ∧-join)
   open StrongHeld R using (Strong; strong-begin; Carried; carried; closing; Heads; DoneBy)
   open StrongAgainst.Against R using (calmAs; noteAs; runAs; subAs; burstAs; bottomAs; restAs; backAs; reholdAs; StackAs; CtlAs; agenda; bursts; begins) renaming (Placed to Placedᴬ)
   open Pure R using (End; finished; dry; cutOff)
@@ -530,3 +531,25 @@ module Ghosting (R : Set) where
                  → At.val H (Kit.live c) ≡ true → Lifts H ρ s S → LiftsLane H (this-lane {c = c} {k} {ls = ls} ρ) s [] S (At.partLanes H ls)
       lifts-next : ∀ {Δ B Δ′ C} {l} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} {πL : PathLanes ls u} {s bs S as}
                  → LiftsLane H πL s bs S as → LiftsLane H (next-lane {l = l} πL) s (At.partLanes H (l ∷ []) ++ bs) S as
+
+  -- WHAT A LIFT LEAVES FREE LEAVES WHAT THE HEAP WOULD: the node a
+  -- connect's source, a flatMap's outer or a lane stands for on the way
+  -- up leaves alike the leftover the witness reads there.  The lift
+  -- itself reads no part on its path; this is what ties its free nodes.
+  mutual
+    Lefts : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} {ρ : Path t u} {s S} → Lifts H ρ s S → Set₁
+    Lefts H lifts-here                               = Lift _ ⊤
+    Lefts H (lifts-map L)                            = Lefts H L
+    Lefts H (lifts-scan L)                           = Lefts H L
+    Lefts H (lifts-take _ L)                         = Lefts H L
+    Lefts H (lifts-outer {t = t} {o₀ = o₀} _ _ L)    = Leaves o₀ (At.leftover H {B = ⊤} t) × Lefts H L
+    Lefts H (lifts-lanes {l = l} L _ _ _)            = LeftsL H l L
+    Lefts H (lifts-source {t = t} {c₀ = c₀} _ _ L)   = Leaves c₀ (At.leftover H {B = ⊤} t) × Lefts H L
+    Lefts H (lifts-body _ _ L)                       = Lefts H L
+    Lefts H (lifts-shut _ _ _ L)                     = Lefts H L
+    Lefts H (lifts-defer L)                          = Lefts H L
+
+    LeftsL : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ C} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} {πL : PathLanes ls u} {s bs S as}
+           → U.Node Δ B → LiftsLane H πL s bs S as → Set₁
+    LeftsL H l (lifts-this {t = t} _ L) = Leaves l (At.leftover H {B = ⊤} t) × Lefts H L
+    LeftsL H l (lifts-next L)           = LeftsL H l L

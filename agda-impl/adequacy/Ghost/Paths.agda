@@ -17,9 +17,9 @@ open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈�
 open import Level using (Lift; lift)
 open import Data.Maybe using (Maybe; just; nothing; is-just)
 open import Data.Nat using (ℕ; suc; _<_; _+_)
-open import Data.Product using (_×_; _,_; Σ)
+open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
 
 open import denotation.MonotonicList.Events using (Events∞; Pos; Timeline; _<ᵖ_; <ᵖ-trans; <ᵖ-apart)
 import denotation.Unfold as U
@@ -51,14 +51,14 @@ module GhostingPaths (R : Set) where
   open SortingWalk R using (WellMach; WellStep; silentʷ; valueʷ; preserve; Beyond)
   open Run (Pureᴾ R) using (Act; Observer; _>>ᴬ_; Subject; module Kit; module FlatKit)
   open Strongly R using (Sub; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; lane; here; module At; Path; done≗; Call; taking; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; outers; outers-⊕; ≗-refl) renaming (⟦_⟧ to ⟦_⟧ᶜ)
-  open StrongAgainst R using (Books; Queue; Kernels; Meaning; Owned; Each; Lingers; seen; seenL; isTaking; seen-up; seen-join; ∧-split; ∧-join)
+  open StrongAgainst R using (Books; Queue; Kernels; Meaning; Owned; Each; Lingers; Leaving; seen; seenL; isTaking; seen-up; seen-join; ∧-split; ∧-join)
   open StrongHeld R using (Strong; strong-begin; Carried; carried; closing; Heads; DoneBy)
   open StrongAgainst.Against R using (calmAs; noteAs; runAs; subAs; burstAs; bottomAs; restAs; backAs; reholdAs; StackAs; CtlAs; agenda; bursts; begins) renaming (Placed to Placedᴬ)
   open Pure R using (End; finished; dry; cutOff)
   open Moving R using (pend; takes)
   open Unsubbing R using (_⇝_; now; then; ⇝-trans)
   open Read
-  open Ghosting R using (Hopped; Lifts; LiftsLane; Load; _≼_; lifts-body; lifts-defer; lifts-here; lifts-lanes; lifts-map; lifts-next; lifts-outer; lifts-scan; lifts-shut; lifts-source; lifts-take; lifts-this; load; loadOf; sorted-⇝; ≼-trans)
+  open Ghosting R using (Hopped; Lefts; LeftsL; Lifts; LiftsLane; Load; _≼_; lifts-body; lifts-defer; lifts-here; lifts-lanes; lifts-map; lifts-next; lifts-outer; lifts-scan; lifts-shut; lifts-source; lifts-take; lifts-this; load; loadOf; sorted-⇝; ≼-trans)
 
   -- Lifting along two paths is lifting along each.
   mutual
@@ -91,6 +91,57 @@ module GhostingPaths (R : Set) where
     ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-this lv Lρ
     liftsL-split (next-lane πL) τ (lifts-next L)    with liftsL-split πL τ L
     ... | S′ , Lτ , Lρ = S′ , Lτ , lifts-next Lρ
+
+  -- What a lift leaves free, each half of it leaves free.
+  mutual
+    lefts-split : ∀ {h} {H : Heapᴹ h} {Δ A Δ′ A′ Δ″ A″} {t : Sub h Δ A} {u : Sub h Δ′ A′} {v : Sub h Δ″ A″} (ρ : Path t u) (τ : Path u v) {s S}
+                  (L : Lifts H (ρ ⊕ τ) s S) → Lefts H L
+                → Lefts H (proj₁ (proj₂ (lifts-split ρ τ L))) × Lefts H (proj₂ (proj₂ (lifts-split ρ τ L)))
+    lefts-split here          τ L                          lt        = lt , lift tt
+    lefts-split (in-map ρ)    τ (lifts-map L)              lt        with lifts-split ρ τ L | lefts-split ρ τ L lt
+    ... | _ , _ , _ | lτ , lρ = lτ , lρ
+    lefts-split (in-scan ρ)   τ (lifts-scan L)             lt        with lifts-split ρ τ L | lefts-split ρ τ L lt
+    ... | _ , _ , _ | lτ , lρ = lτ , lρ
+    lefts-split (in-take ρ)   τ (lifts-take lv L)          lt        with lifts-split ρ τ L | lefts-split ρ τ L lt
+    ... | _ , _ , _ | lτ , lρ = lτ , lρ
+    lefts-split (in-outer ρ)  τ (lifts-outer of pb L)      (lo , lt) with lifts-split ρ τ L | lefts-split ρ τ L lt
+    ... | _ , _ , _ | lτ , lρ = lτ , (lo , lρ)
+    lefts-split (in-lanes πL) τ (lifts-lanes {l = l} L ea lf pb) lt  with liftsL-split πL τ L | leftsL-split πL τ {l = l} L lt
+    ... | _ , _ , _ | lτ , lρ = lτ , lρ
+    lefts-split (in-source ρ) τ (lifts-source pb sf L)     (lc , lt) with lifts-split ρ τ L | lefts-split ρ τ L lt
+    ... | _ , _ , _ | lτ , lρ = lτ , (lc , lρ)
+    lefts-split (in-body ρ)   τ (lifts-body pt bf L)       lt        with lifts-split ρ τ L | lefts-split ρ τ L lt
+    ... | _ , _ , _ | lτ , lρ = lτ , lρ
+    lefts-split (in-body ρ)   τ (lifts-shut pt e rb L)     lt        with lifts-split ρ τ L | lefts-split ρ τ L lt
+    ... | _ , _ , _ | lτ , lρ = lτ , lρ
+    lefts-split (in-defer ρ)  τ (lifts-defer L)            lt        with lifts-split ρ τ L | lefts-split ρ τ L lt
+    ... | _ , _ , _ | lτ , lρ = lτ , lρ
+
+    leftsL-split : ∀ {h} {H : Heapᴹ h} {Δ B Δ′ A′ Δ″ A″} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} {v : Sub h Δ″ A″}
+                   (πL : PathLanes ls u) (τ : Path u v) {s bs S as l} (L : LiftsLane H (πL ⊕ᴸ τ) s bs S as) → LeftsL H l L
+                 → Lefts H (proj₁ (proj₂ (liftsL-split πL τ L))) × LeftsL H l (proj₂ (proj₂ (liftsL-split πL τ L)))
+    leftsL-split (this-lane ρ)  τ (lifts-this lv L) (ll , lt) with lifts-split ρ τ L | lefts-split ρ τ L lt
+    ... | _ , _ , _ | lτ , lρ = lτ , (ll , lρ)
+    leftsL-split (next-lane πL) τ {l = l} (lifts-next L) lt   with liftsL-split πL τ L | leftsL-split πL τ {l = l} L lt
+    ... | _ , _ , _ | lτ , lρ = lτ , lρ
+
+  -- Read off a split named by its outcome.
+  lefts-up : ∀ {h} {H : Heapᴹ h} {Δ A Δ′ A′ Δ″ A″} {t : Sub h Δ A} {u : Sub h Δ′ A′} {v : Sub h Δ″ A″} (ρ : Path t u) (τ : Path u v) {s S}
+             {L : Lifts H (ρ ⊕ τ) s S} {S′} {Lτ : Lifts H τ s S′} {Lρ : Lifts H ρ S′ S} → lifts-split ρ τ L ≡ (S′ , Lτ , Lρ) → Lefts H L → Lefts H Lρ
+  lefts-up {H = H} ρ τ {L = L} eq lt = subst (λ w → Lefts H (proj₂ (proj₂ w))) eq (proj₂ (lefts-split ρ τ L lt))
+
+  lefts-down : ∀ {h} {H : Heapᴹ h} {Δ A Δ′ A′ Δ″ A″} {t : Sub h Δ A} {u : Sub h Δ′ A′} {v : Sub h Δ″ A″} (ρ : Path t u) (τ : Path u v) {s S}
+               {L : Lifts H (ρ ⊕ τ) s S} {S′} {Lτ : Lifts H τ s S′} {Lρ : Lifts H ρ S′ S} → lifts-split ρ τ L ≡ (S′ , Lτ , Lρ) → Lefts H L → Lefts H Lτ
+  lefts-down {H = H} ρ τ {L = L} eq lt = subst (λ w → Lefts H (proj₁ (proj₂ w))) eq (proj₁ (lefts-split ρ τ L lt))
+
+  -- A source rewritten in place: the free nodes are the derivation's.
+  lefts-subst : ∀ {h} {H : Heapᴹ h} {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} {ρ : Path t u} {ℓ} {X : Set ℓ} (f : X → U.Step Δ′ A′) {S x y}
+                (e : x ≡ y) {L : Lifts H ρ (f x) S} → Lefts H L → Lefts H (subst (λ z → Lifts H ρ (f z) S) e L)
+  lefts-subst f refl lt = lt
+
+  lefts-subst₂ : ∀ {h} {H : Heapᴹ h} {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} {ρ : Path t u} {ℓ ℓ′} {X : Set ℓ} {Y : Set ℓ′} (f : X → Y → U.Step Δ′ A′) {S x₁ x₂ y₁ y₂}
+                 (e₁ : x₁ ≡ x₂) (e₂ : y₁ ≡ y₂) {L : Lifts H ρ (f x₁ y₁) S} → Lefts H L → Lefts H (subst₂ (λ x y → Lifts H ρ (f x y) S) e₁ e₂ L)
+  lefts-subst₂ f refl refl lt = lt
 
   -- What lifts along a path, the path sees.
   mutual
@@ -495,6 +546,11 @@ module GhostingPaths (R : Set) where
   Passed H q g {v = v} σ (closes _) =
     At.part H v ≡ nothing × Σ (U.Step [] R) λ S → Lifts H σ (U.endˢ q) S × U.step g ≡ S × Healed H q σ
 
+  -- What the climbing signal's lift leaves free, left alike.
+  LeftsOf : ∀ {h} (H : Heapᴹ h) (q : Pos) (g : U.Node [] R) {T : Sub h [] R} {Δ A} {v : Sub h Δ A} (σ : Path T v) (sg : Signal T A) → Passed H q g σ sg → Set₁
+  LeftsOf H q g σ (sends y)  (_ , _ , _ , L , _) = Lefts H L
+  LeftsOf H q g σ (closes _) (_ , _ , L , _)     = Lefts H L
+
   -- A SIGNAL ON ITS WAY UP: `sg` about to be told to the observer the
   -- path walks to, the agenda empty above the stack but for the calls
   -- the signal owes.
@@ -512,6 +568,7 @@ module GhostingPaths (R : Set) where
       code    : act ≗ said (Here.obs (walk σ top)) sg
       stack   : StackAs T (Conf.pos (Mach.conf m₁)) ϑ K (Mach.bursts m₁)
       lifted  : Passed (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) g σ sg
+      lefts   : LeftsOf (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) g σ sg lifted
       owned   : Owned (Conf.heap (Mach.conf m₁)) T (runAs (owed sg) (≗-refl _) stack)
       kernels : Kernels (Conf.heap (Mach.conf m₁)) T
       meaning : Meaning (Conf.heap (Mach.conf m₁)) T
@@ -520,6 +577,7 @@ module GhostingPaths (R : Set) where
       sorted  : Σ Pos λ lo → WellMach lo m₁
       behind  : Each (Conf.heap (Mach.conf m₁)) (Heads (Conf.pos (Mach.conf m₁))) T
       lingers : Lingers (Conf.heap (Mach.conf m₁)) T
+      leaving : Leaving (Conf.heap (Mach.conf m₁)) T
       flags   : DoneBy (Conf.heap (Mach.conf m₁)) T (outers σ)
       kept    : load m₁ T ≼ ℓ
 
@@ -533,23 +591,24 @@ module GhostingPaths (R : Set) where
              {v′ : Sub (Conf.world (Mach.conf m₁)) Δ′ A′} {σ : Path T v} {sg : Signal T A} (cl : Calling g ℓ m₁ σ sg) {σ′ : Path T v′} {sg′ : Signal T A′}
          → owed sg′ ≡ owed sg
          → Calling.act cl ≗ said (Here.obs (walk σ′ top)) sg′
-         → Passed (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) g σ′ sg′
+         → (lf : Passed (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) g σ′ sg′)
+         → LeftsOf (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) g σ′ sg′ lf
          → DoneBy (Conf.heap (Mach.conf m₁)) T (outers σ′)
          → Calling g ℓ m₁ σ′ sg′
-  recall {m₁ = m₁} {T = T} cl ow cd lf dn = record
-    { sane = Calling.sane cl ; placed = Calling.placed cl ; deep = Calling.deep cl ; ctl = Calling.ctl cl ; code = cd ; stack = Calling.stack cl ; lifted = lf
+  recall {m₁ = m₁} {T = T} cl ow cd lf lt dn = record
+    { sane = Calling.sane cl ; placed = Calling.placed cl ; deep = Calling.deep cl ; ctl = Calling.ctl cl ; code = cd ; stack = Calling.stack cl ; lifted = lf ; lefts = lt
     ; owned = subst (λ ks → Owned (Conf.heap (Mach.conf m₁)) T (runAs ks (≗-refl _) (Calling.stack cl))) (sym ow) (Calling.owned cl)
     ; kernels = Calling.kernels cl ; meaning = Calling.meaning cl ; queue = Calling.queue cl
     ; books = subst (λ ks → Books T (runAs ks (≗-refl _) (Calling.stack cl)) m₁) (sym ow) (Calling.books cl)
-    ; sorted = Calling.sorted cl ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; flags = dn ; kept = Calling.kept cl }
+    ; sorted = Calling.sorted cl ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; leaving = Calling.leaving cl ; flags = dn ; kept = Calling.kept cl }
 
   -- The same call, held to a load no lighter.
   relevel : ∀ {g ℓ ℓ′ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v} {sg : Signal T A}
           → Calling g ℓ′ m₁ σ sg → ℓ′ ≼ ℓ → Calling g ℓ m₁ σ sg
   relevel cl le = record
     { sane = Calling.sane cl ; placed = Calling.placed cl ; deep = Calling.deep cl ; ctl = Calling.ctl cl ; code = Calling.code cl ; stack = Calling.stack cl
-    ; lifted = Calling.lifted cl ; owned = Calling.owned cl ; kernels = Calling.kernels cl ; meaning = Calling.meaning cl
-    ; queue = Calling.queue cl ; books = Calling.books cl ; sorted = Calling.sorted cl ; behind = Calling.behind cl ; lingers = Calling.lingers cl
+    ; lifted = Calling.lifted cl ; lefts = Calling.lefts cl ; owned = Calling.owned cl ; kernels = Calling.kernels cl ; meaning = Calling.meaning cl
+    ; queue = Calling.queue cl ; books = Calling.books cl ; sorted = Calling.sorted cl ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; leaving = Calling.leaving cl
     ; flags = Calling.flags cl
     ; kept = ≼-trans (Calling.kept cl) le }
 

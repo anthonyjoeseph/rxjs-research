@@ -16,6 +16,7 @@ import Data.List.Relation.Unary.Any as Any
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
+open import denotation.MonotonicList using (Agree)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs) renaming ([] to []ᴾ)
 
@@ -668,6 +669,26 @@ module StrongAgainst (R : Set) where
             → (ψ : Path t (connectˢ S c b kb k fd rp e rt src bd)) → seen H ψ ≡ true
             → ∀ {n} → At.part H (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
             → At.part H src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Tied rt (At.leftover H {B = ⊤} src)
+
+  -- Two nodes leaving alike: what each still runs past an unsubscribe,
+  -- under every environment, the same at every depth.
+  Leaves : ∀ {Γ A B} → U.Node Γ A → U.Node Γ B → Set₁
+  Leaves {Γ} x y = ∀ (ρ : U.NEnv Γ) n → Agree n (U.meaning (U.restᶜ {B = ⊤} x) ρ) (U.meaning (U.restᶜ {B = ⊤} y) ρ)
+
+  -- WHAT THE GHOST HOLDS LEAVES WHAT THE HEAP WOULD: below `t`, each seen
+  -- part, a held flatMap's pool and a held connect's ended source's rest
+  -- each leave what the witness reads off as their leftover, to every
+  -- depth, where `Lingers` pins only the next step.
+  record Leaving {h} (H : Heapᴹ h) {Δ A} (t : Sub h Δ A) : Set₁ where
+    field
+      parts : ∀ {Δ′ A′} {u : Sub h Δ′ A′} (ψ : Path t u) → seen H ψ ≡ true → ∀ {c} → At.part H u ≡ just c → Leaves c (At.leftover H {B = ⊤} u)
+      pools : ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+            → (ψ : Path t (flatMapˢ op f fl oc k r pl so ls)) → seen H ψ ≡ true
+            → ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Leaves pl (At.pooled H fl so ls)
+      rests : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+            → (ψ : Path t (connectˢ S c b kb k fd rp e rt src bd)) → seen H ψ ≡ true
+            → ∀ {n} → At.part H (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
+            → At.part H src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Leaves rt (At.leftover H {B = ⊤} src)
 
   -- WHAT HOLDS BELOW A HELD NODE, NODE BY NODE: each node's obligation
   -- once it is held, each child held as its parent is and its step

@@ -187,12 +187,15 @@ by their own silent steps (`Mirror`).
   `step-deep` past a step, `gapped-deep` past a gap. Decides whether the
   order lemmas `Placed` is built on reach every depth; then `gapped-past`
   by operator.
-- **THE FREE SOURCE.** `lifts-source` leaves the source node free, and an
-  end lifted through a connect's source reads it: `fin-ghost` and
-  `end-ghost` need it tied to the heap's leftover, beyond `Tied`'s first
-  pin, before either is a lift. The restage cells are the same question:
-  close/settle/next pool `lifts-outer`'s and `lifts-lanes`' free node, so
-  no frame reaches their `heading`/`lingering`; `fed`/`fin` read a body.
+- **THE FREE SOURCE.** The tie is stated: `Lefts` holds each free node of
+  a lift (`lifts-source`'s, `lifts-outer`'s, a lane's) to its node's
+  leftover in meaning at every depth, and `Leaving` each part, pool and
+  rest; `Calling`, `Begins` and `Carried` keep them, and `fin-ghost`,
+  `end-ghost`, `bg-ghosted` and `void-site` take them. Owed: the
+  transports, `lefts-off` first, since a leftover reads below the write;
+  then whether the tie makes either ghost a lift. The restage cells are
+  the same question: close/settle/next pool the free node `Lefts` now
+  ties.
 - **NODE FACTS, FALSITY FIRST.** Only now discharge: the node facts the
   fold left, riskiest first, then the per-move facts no column holds.
 - **HIDDEN RUNS.** Parked behind the fold. The core: `pooled-pin`,
@@ -223,6 +226,17 @@ by their own silent steps (`Mirror`).
   ghost's step leaves a deep node.
 - **`gapped-deep`** (Gapped) — FALSITY, `NO EVIDENCE`: a node gapped from a
   deep one is deep.
+- **`lefts-off`** (Frame) — FALSITY, `NO EVIDENCE`: a write inside a lift's end
+  leaves each free node tied to its leftover; suspect, a leftover reads below.
+- **`lefts-planted`** (Climbs.Base), **`lefts-grow`** (Climbs.Flat) — FALSITY,
+  `NO EVIDENCE`: a plant at a lift's end, and the growth, keep each tie.
+- **`grow-leaving`** (Weaken.Heaps), **`bg-left`** (Climbs.Flat) — FALSITY,
+  `NO EVIDENCE`: the leftover ties `Leaving` keeps, grown, then the lane spliced.
+- **`rs-leaving`, `rt-leaving`, `rf-leaving`, `connect-leaving`, `rm-leaving`,
+  `of-leaving`, `scan-leaving`, `settle-leaving`, `next-leaving`,
+  `end-leaving`, `pool-leaving`, `close-leaving`, `leaving`, `fed-leaving`,
+  `fin-leaving`, `fire-leaving`, `torn-leaving`** — FALSITY, `NO EVIDENCE`:
+  each move keeps `Leaving`, mirroring its `Lingers` cell.
 - **`calling-open`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a climbing
   signal's path reads open.
 - **`begin-path`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a lane begun runs to

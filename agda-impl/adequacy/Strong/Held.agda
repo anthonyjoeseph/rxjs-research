@@ -20,6 +20,7 @@ open import Data.List.Relation.Unary.AllPairs using (AllPairs) renaming ([] to [
 
 import Tree as T
 open import Tree using (Obs)
+open import denotation.MonotonicList using (agree-refl)
 open import denotation.MonotonicList.Events using (inside; Time; Pos; From; Frame; Timeline; at; emit; stall; close; ix; last; tick; root; _<ᵖ_) renaming (done to doneᶠ; quiet to quietᶠ; sub to subᴾ)
 open import operation.AbstractObservable using (base; maybe; quiet; gate; module Run; module Heap) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; Out; fin; module Pure)
@@ -45,7 +46,7 @@ module StrongHeld (R : Set) where
   open Machine R using (Mach; Playing; begin)
   open SortingWalk R using (WellMach; begin-well)
   open Strongly R using (Alg; module At; module Canon; module Fold; Here; Lane; Name; Path; PathLanes; Sub; _⊕_; coldˢ; connectˢ; deferˢ; doneˢ; flatMapˢ; here; in-body; in-defer; in-lanes; in-map; in-outer; in-scan; in-source; in-take; joinˢ; lane; mapˢ; next-lane; ofˢ; pendingˢ; scanˢ; takeWhileˢ; taking; this-lane; ≗-refl)
-  open StrongAgainst R using (module Against; Books; Each; Kernels; Lingers; Meaning; Owned; OwnedF; Queue; Tied; _,ᴼ_; isTaking; owned-from; seen; seen-join; seenL; ∧-join; ∧-split)
+  open StrongAgainst R using (module Against; Books; Each; Kernels; Leaving; Lingers; Meaning; Owned; OwnedF; Queue; Tied; _,ᴼ_; isTaking; owned-from; seen; seen-join; seenL; ∧-join; ∧-split)
   open Canon
   open Here
 
@@ -290,6 +291,7 @@ module StrongHeld (R : Set) where
       sorted  : Σ Pos λ lo → WellMach lo m
       behind′ : Eaching.Below H (Heads (Conf.pos (Mach.conf m))) tree
       lingers′ : Lingering.Below H tree
+      leaving : Leaving H tree
       flags   : DoneBy H tree []
 
     owned : Owned H tree ctlAs
@@ -450,4 +452,5 @@ module StrongHeld (R : Set) where
     ; sorted  = root , begin-well o
     ; behind′  = Eaching.eaching (λ { _ refl → heads-begin o })
     ; lingers′ = Lingering.lingering (λ _ → lift tt)
+    ; leaving = record { parts = λ { here _ refl ρ n → agree-refl n _ } ; pools = λ () ; rests = λ () }
     ; flags   = λ () }
