@@ -95,7 +95,7 @@ module Ascending (R : Set) where
   open Retagging R using (module Body; fed-owed; envP; joiners-path; retag; unsub-retag; begun-retag)
   open Everywhere.Spending R using (spent-retag)
   open Everywhere.Holding R using (holds-alike; holds-path; holds-plant; holds-retag)
-  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; let-go; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build)
+  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; let-go; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build)
   open Framing R using (merged-eq; heads-flat; Untold; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike)
     renaming (Ended to Ends)
   open Staging R using (not-src; wrap-lane)
@@ -2642,23 +2642,20 @@ module Ascending (R : Set) where
   merged-live G op g nothing  (_ ∷ _) as      pl _ = refl
   merged-live G op g (just _) bs      as      pl _ = refl
 
-  postulate
-    -- At a lane's close, the done flag reads the outer's part gone.
-    --
-    -- Not a fact of the kernels: an outer's part is gone before its done
-    -- flag is written, while its own end climbs to `close-outer`.  No
-    -- lane ends in between, and no field of the call says so.  Owed: a
-    -- field of `Carried` and of `Calling` tying the flag to the outer's
-    -- part at every seen flatMap but one the call climbs through.
-    --
-    -- DEAD ROUTE: the ghost reading the outer through the done flag, an
-    --   end in flight until it is set.  That node needs the end's position,
-    --   which no cell holds and no kernel can (the TypeScript has none).
-    lane-done : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
-                {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
-                (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) {πL : PathLanes ls u} (o : OneLane πL) {ks}
-              → Calling g ℓ m₁ (ρ ⊕ in-lanes πL) (closes ks)
-              → At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.outerDone fl) ≡ is-nothing (At.part (Conf.heap (Mach.conf m₁)) t)
+  -- At a lane's close, the done flag reads the outer's part gone: the
+  -- call leaves unset only flags above the flatMap and inside the lane.
+  lane-done : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+              {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
+              (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) {πL : PathLanes ls u} (o : OneLane πL) {ks}
+            → Calling g ℓ m₁ (ρ ⊕ in-lanes πL) (closes ks)
+            → At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.outerDone fl) ≡ is-nothing (At.part (Conf.heap (Mach.conf m₁)) t)
+  lane-done {m₁ = m₁} {T = T} {fl = fl} {oc} {k} {t = t} ρ {πL} _ cl with Calling.lifted cl
+  ... | _ , _ , L , _ with lifts-split ρ (in-lanes πL) L
+  ...   | _ , _ , Lρ =
+    proj₂ (subst (DoneBy (Conf.heap (Mach.conf m₁)) T) (outers-⊕ ρ (in-lanes πL)) (Calling.flags cl) ρ (lifts-seen Lρ))
+          (λ m → [ (λ a → outers-apart ρ fs a (there (here refl))) , (λ b → lookupᴬ (apart-r (flatNames fl) (fresh-path ρ fs) (there (here refl)))
+                     (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names t) (outersL-in πL b))))) refl) ]′ (++⁻ (outers ρ) m))
+    where fs = Books.fresh (Calling.books cl)
 
   null-++ : ∀ {a} {X : Set a} (xs ys : List X) → null (xs ++ ys) ≡ null xs ∧ null ys
   null-++ []      ys = refl

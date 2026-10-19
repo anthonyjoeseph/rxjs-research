@@ -218,9 +218,6 @@ by their own silent steps (`Mirror`).
   sane one is sane.
 - **`gapped-placed`** (Gapped) — FALSITY, `NO EVIDENCE`: a node gapped from a
   placed one is placed.
-- **`lane-done`** (Climbs) — FALSITY, `DEAD ROUTE`: at a lane's close the done
-  flag reads the outer's part gone; no field says the outer's end climb is
-  over.
 - **`calling-open`** (Climbs) — FALSITY, `NO EVIDENCE`: a climbing signal's
   path reads open.
 - **`begin-path`** (Climbs) — FALSITY, `NO EVIDENCE`: a lane begun runs to its
