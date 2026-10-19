@@ -9,16 +9,17 @@ module adequacy.Shift where
 open import Data.List using (List; []; _∷_; _++_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ; ++⁻)
-open import Data.List.Relation.Unary.All using (All)
+open import Data.List.Relation.Unary.All using (All) renaming (lookup to lookupᴬ)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Level using (lower)
-open import Data.Maybe using (Maybe; just; nothing; is-just)
+open import Data.Maybe using (Maybe; just; nothing; is-just; is-nothing)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst)
 open import Data.Sum using ([_,_]′)
 open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_)
 open import Data.Unit using (⊤)
+open import Data.Empty using (⊥; ⊥-elim)
 
 open import denotation.MonotonicList using (Timeline; Pos)
 import denotation.Unfold as U
@@ -39,11 +40,11 @@ module Shifting (R : Set) where
   open Shared Timeline (Out R) using (Heapᴹ; look)
   open Strongly R using (Sub; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_;
                          pendingˢ; coldˢ; ofˢ; doneˢ; joinˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; lane; Taking; taking; ending; taken; isTaking;
-                         names; laneNames; cutNames; quietName; subjectNames; flatNames; module At; seen; seenL; seen-join;
+                         names; laneNames; cutNames; quietName; subjectNames; flatNames; module At; seen; seenL; seen-join; Name; DoneBy; Flagged; outers; outersL;
                          Each; Lingers; Heads; Pinned; unpinned; Tied; rest-pinned; bursts-pinned; bursts-moved; under-moved; union-pinned;
                          pinned-trans; pinned-sym; restful-pinned; ∧-split; ∧-join; false≢)
   open Tearing R using (Alike; Off; part-alike; partLanes-alike; seen-alike; seenL-alike; names-path; lanes-path; apart-r; apart-l; narrow; each-same)
-  open Moving R using (plant; plantᴸ; pairs-r; pairs-split)
+  open Moving R using (plant; plantᴸ; planted; plantedᴸ; pairs-r; pairs-split)
   open Locality R using (module Heaps)
   open Ghosting R using (each-sub; each-lanes)
   open Framing R using (Untold; Ended; Tells; untold; untoldᴹ; untoldᴸ; heads-map; heads-scan; heads-take; heads-source; ended-head; shut-heads; just-of; untold-shut; merged-eq; heads-flat)
@@ -445,6 +446,102 @@ module Shifting (R : Set) where
                    ; (next-lane πL) sn x pn pe → LingersL.restsL lL πL sn x pn pe } }
 
   ----------------------------------------------------------------------
+  -- Done flags: below a node, beside it, and across heaps alike
+
+  DoneByL : ∀ {h} (G : Heapᴹ h) {Δ B} (ls : List (Lane h Δ B)) → List (Name h) → Set₁
+  DoneByL {h} G ls ns = ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls′ : List (Lane h Δ′ B′)}
+                      → (ψ : PathLanes ls (flatMapˢ op f fl oc k r pl so ls′)) → seenL G ψ ≡ true → Flagged G ns fl so
+
+  -- A flatMap's done flag is among the names above it.
+  flag-in : ∀ {h Δ A Δ′ A′ B′} {t : Sub h Δ A} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+          → Path t (flatMapˢ op f fl oc k r pl so ls) → (cell _ , Flat.outerDone fl) ∈ᴸ names t
+  flag-in ψ = names-path ψ (++⁺ˡ (there (here refl)))
+
+  flag-inL : ∀ {h Δ B Δ′ A′ B′} {ls : List (Lane h Δ B)} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls′ : List (Lane h Δ′ B′)}
+           → PathLanes ls (flatMapˢ op f fl oc k r pl so ls′) → (cell _ , Flat.outerDone fl) ∈ᴸ laneNames ls
+  flag-inL πL = lanes-path πL (++⁺ˡ (there (here refl)))
+
+  -- Replanting keeps the outers a path enters.
+  mutual
+    outers-planted : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (π : Path t u) (v : Sub h Δ′ A′) → outers (planted π v) ≡ outers π
+    outers-planted here         v = refl
+    outers-planted (in-map π)    v = outers-planted π v
+    outers-planted (in-scan π)   v = outers-planted π v
+    outers-planted (in-take π)   v = outers-planted π v
+    outers-planted (in-outer π)  v = cong (_ ∷_) (outers-planted π v)
+    outers-planted (in-lanes π)  v = outersL-planted π v
+    outers-planted (in-source π) v = outers-planted π v
+    outers-planted (in-body π)   v = outers-planted π v
+    outers-planted (in-defer π)  v = outers-planted π v
+
+    outersL-planted : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′) → outersL (plantedᴸ π v) ≡ outersL π
+    outersL-planted (this-lane π) v = outers-planted π v
+    outersL-planted (next-lane π) v = outersL-planted π v
+
+  module Flag {h} (G : Heapᴹ h) {ns : List (Name h)} where
+    db-map : ∀ {Δ A B} {f : A → B} {s : Sub h Δ A} → DoneBy G s ns → DoneBy G (mapˢ f s) ns
+    db-map d (in-map ψ) sn = d ψ sn
+
+    db-scan : ∀ {Δ A B} {f : B → A → B} {r} {s : Sub h Δ A} → DoneBy G s ns → DoneBy G (scanˢ f r s) ns
+    db-scan d (in-scan ψ) sn = d ψ sn
+
+    db-defer : ∀ {Δ A k} {s : Sub h Δ A} → DoneBy G s ns → DoneBy G (deferˢ k s) ns
+    db-defer d (in-defer ψ) sn = d ψ sn
+
+    db-take : ∀ {Δ A i p c k tk} {s : Sub h Δ A} → (At.val G (Kit.live c) ∧ isTaking tk ≡ true → DoneBy G s ns) → DoneBy G (takeWhileˢ i p c k tk s) ns
+    db-take {c = c} {tk = tk} d (in-take ψ) sn = thru₂ (At.val G (Kit.live c)) (isTaking tk) sn (λ ok sψ → d ok ψ sψ)
+
+    db-flat : ∀ {Δ A B op f fl oc k r pl} {so : Sub h Δ A} {ls : List (Lane h Δ B)}
+            → Flagged G ns fl so → DoneBy G so ns → DoneByL G ls ns → DoneBy G (flatMapˢ op f fl oc k r pl so ls) ns
+    db-flat fg d dL here          _  = fg
+    db-flat fg d dL (in-outer ψ)  sn = d ψ sn
+    db-flat fg d dL (in-lanes πL) sn = dL πL sn
+
+    db-connect : ∀ {Δ A B S c b kb k fd rp e rt} {src : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
+               → (is-just (At.part G bd) ≡ true → DoneBy G src ns) → ((is-just (At.part G src) ∨ is-just e) ≡ true → DoneBy G bd ns)
+               → DoneBy G (connectˢ S c b kb k fd rp e rt src bd) ns
+    db-connect {src = src} {bd} ds db (in-source ψ) sn = thru (is-just (At.part G bd)) sn (λ jb sψ → ds jb ψ sψ)
+    db-connect {e = e} {src = src} ds db (in-body ψ) sn = thru (is-just (At.part G src) ∨ is-just e) sn (λ js sψ → db js ψ sψ)
+
+    dbL-cons : ∀ {Δ B} {c : Kit.Cut h} {k} {s : Sub h Δ B} {ls} → (At.val G (Kit.live c) ≡ true → DoneBy G s ns) → DoneByL G ls ns → DoneByL G (lane c k s ∷ ls) ns
+    dbL-cons {c = c} d dL (this-lane ψ) sn = thru (At.val G (Kit.live c)) sn (λ lv sψ → d lv ψ sψ)
+    dbL-cons d dL (next-lane πL) sn = dL πL sn
+
+    db-sub : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {x : Sub h Δ′ A′} → DoneBy G t ns → (ρ : Path t x) → seen G ρ ≡ true → DoneBy G x ns
+    db-sub d ρ sρ ψ sψ = d (ρ ⊕ ψ) (seen-join G ρ ψ sρ sψ)
+
+    dbL-of : ∀ {Δ A B op f fl oc k r pl} {so : Sub h Δ A} {ls : List (Lane h Δ B)} → DoneBy G (flatMapˢ op f fl oc k r pl so ls) ns → DoneByL G ls ns
+    dbL-of d πL = d (in-lanes πL)
+
+    dbL-head : ∀ {Δ B} {c : Kit.Cut h} {k} {s : Sub h Δ B} {ls} → DoneByL G (lane c k s ∷ ls) ns → At.val G (Kit.live c) ≡ true → DoneBy G s ns
+    dbL-head dL lv ψ sn = dL (this-lane ψ) (∧-join lv sn)
+
+    dbL-tail : ∀ {Δ B} {l : Lane h Δ B} {ls} → DoneByL G (l ∷ ls) ns → DoneByL G ls ns
+    dbL-tail dL πL = dL (next-lane πL)
+
+    -- The names listed changed only where no flag below reads them.
+    relist : ∀ {ns′ Δ A} {t : Sub h Δ A} → (∀ {n} → n ∈ᴸ names t → n ∈ᴸ ns′ → n ∈ᴸ ns) → (∀ {n} → n ∈ᴸ names t → n ∈ᴸ ns → n ∈ᴸ ns′)
+           → DoneBy G t ns → DoneBy G t ns′
+    relist to fro d ψ sn = (λ m → proj₁ (d ψ sn) (to (flag-in ψ) m)) , (λ m̸ → proj₂ (d ψ sn) (λ m → m̸ (fro (flag-in ψ) m)))
+
+    relistL : ∀ {ns′ Δ B} {ls : List (Lane h Δ B)} → (∀ {n} → n ∈ᴸ laneNames ls → n ∈ᴸ ns′ → n ∈ᴸ ns) → (∀ {n} → n ∈ᴸ laneNames ls → n ∈ᴸ ns → n ∈ᴸ ns′)
+            → DoneByL G ls ns → DoneByL G ls ns′
+    relistL to fro dL πL sn = (λ m → proj₁ (dL πL sn) (to (flag-inL πL) m)) , (λ m̸ → proj₂ (dL πL sn) (λ m → m̸ (fro (flag-inL πL) m)))
+
+  module _ {h} (H H′ : Heapᴹ h) where
+    flagged-moved : ∀ {ns Δ A} {fl : Flat A h} {so : Sub h Δ A} → At.val H′ (Flat.outerDone fl) ≡ At.val H (Flat.outerDone fl) → At.part H′ so ≡ At.part H so
+                  → Flagged H ns fl so → Flagged H′ ns fl so
+    flagged-moved vd pd (f₁ , f₂) = (λ m → trans vd (f₁ m)) , (λ m̸ → trans vd (trans (f₂ m̸) (cong is-nothing (sym pd))))
+
+    flags-alike : ∀ {ns Δ A} {t : Sub h Δ A} → Alike H H′ (names t) → DoneBy H t ns → DoneBy H′ t ns
+    flags-alike al d {fl = fl} ψ sn =
+      flagged-moved (cong lower (al (Flat.outerDone fl) (flag-in ψ))) (part-at H H′ (ψ ⊕ in-outer here) al) (d ψ (trans (sym (seen-alike H H′ ψ al)) sn))
+
+    flagsL-alike : ∀ {ns Δ B} {ls : List (Lane h Δ B)} → Alike H H′ (laneNames ls) → DoneByL H ls ns → DoneByL H′ ls ns
+    flagsL-alike al dL {fl = fl} πL sn =
+      flagged-moved (cong lower (al (Flat.outerDone fl) (flag-inL πL))) (partL-at H H′ (πL ⊕ᴸ in-outer here) al) (dL πL (trans (sym (seenL-alike H H′ πL al)) sn))
+
+  ----------------------------------------------------------------------
   -- THE WALK: `u` replanted to `v`, the heaps moved only at `u`'s names.
   -- Every node above `u` on the path: its own cells, and every child
   -- beside the path, read alike.
@@ -477,6 +574,9 @@ module Shifting (R : Set) where
       lanesA : Alike H H′ (laneNames ls)
       lanesA = keeps off (λ m → names-path π m) (λ m → apart-l (names so) P′ m)
 
+      lanesD : ∀ {n} → n ∈ᴸ laneNames ls → n ∈ᴸ names u → ⊥
+      lanesD m m′ = lookupᴬ (apart-l (names so) P′ m) (names-path π m′) refl
+
       lanes : At.partLanes H′ ls ≡ At.partLanes H ls
       lanes = partLanes-alike H H′ ls lanesA
 
@@ -485,6 +585,9 @@ module Shifting (R : Set) where
 
       done : look H′ (Flat.outerDone fl) ≡ look H (Flat.outerDone fl)
       done = keep off rest (Flat.outerDone fl) (apart-r (flatNames fl) ps (there (here refl)))
+
+      doneD : (cell _ , Flat.outerDone fl) ∈ᴸ names u → ⊥
+      doneD m = lookupᴬ (apart-r (flatNames fl) ps (there (here refl))) (rest m) refl
 
     module Lanes {Δ A B} (fl : Flat A h) (oc : Kit.Cut h) (k : Maybe (Quiet h)) (r : Sink h ⊤) (so : Sub h Δ A) {ls : List (Lane h Δ B)} (πL : PathLanes ls u)
                  (ps : AllPairs _≢_ (flatNames fl ++ cutNames oc ++ quietName k ++ (slot _ , r) ∷ names so ++ laneNames ls)) where
@@ -501,6 +604,9 @@ module Shifting (R : Set) where
       soA : Alike H H′ (names so)
       soA = keeps off (λ m → lanes-path πL m) (λ m → apart-r (names so) P′ m)
 
+      soD : ∀ {n} → n ∈ᴸ names so → n ∈ᴸ names u → ⊥
+      soD m m′ = lookupᴬ (apart-r (names so) P′ m) (lanes-path πL m′) refl
+
       outer : At.part H′ so ≡ At.part H so
       outer = part-alike H H′ so soA
 
@@ -509,6 +615,9 @@ module Shifting (R : Set) where
 
       done : look H′ (Flat.outerDone fl) ≡ look H (Flat.outerDone fl)
       done = keep off rest (Flat.outerDone fl) (apart-r (flatNames fl) ps (there (here refl)))
+
+      doneD : (cell _ , Flat.outerDone fl) ∈ᴸ names u → ⊥
+      doneD m = lookupᴬ (apart-r (flatNames fl) ps (there (here refl))) (rest m) refl
 
     module Source {Δ A B} (S : Subject A h) (c : Kit.Cut h) (b : Ref h (maybe quiet)) (kb k : Maybe (Quiet h)) {src : Sub h Δ A} (bd : Sub h (A ∷ Δ) B)
                   (π : Path src u) (ps : AllPairs _≢_ (subjectNames S ++ cutNames c ++ (cell _ , b) ∷ quietName kb ++ quietName k ++ names src ++ names bd)) where
@@ -521,6 +630,9 @@ module Shifting (R : Set) where
 
       bdA : Alike H H′ (names bd)
       bdA = keeps off (λ m → names-path π m) (λ m → apart-l (names src) Q m)
+
+      bdD : ∀ {n} → n ∈ᴸ names bd → n ∈ᴸ names u → ⊥
+      bdD m m′ = lookupᴬ (apart-l (names src) Q m) (names-path π m′) refl
 
       body : At.part H′ bd ≡ At.part H bd
       body = part-alike H H′ bd bdA
@@ -537,6 +649,9 @@ module Shifting (R : Set) where
       srcA : Alike H H′ (names src)
       srcA = keeps off (λ m → names-path π m) (λ m → apart-r (names src) Q m)
 
+      srcD : ∀ {n} → n ∈ᴸ names src → n ∈ᴸ names u → ⊥
+      srcD m m′ = lookupᴬ (apart-r (names src) Q m) (names-path π m′) refl
+
       source : At.part H′ src ≡ At.part H src
       source = part-alike H H′ src srcA
 
@@ -551,6 +666,9 @@ module Shifting (R : Set) where
 
       restA : Alike H H′ (laneNames ls)
       restA = keeps off (λ m → names-path π m) (λ m → apart-l (names s) Q m)
+
+      restD : ∀ {n} → n ∈ᴸ laneNames ls → n ∈ᴸ names u → ⊥
+      restD m m′ = lookupᴬ (apart-l (names s) Q m) (names-path π m′) refl
 
       rest : At.partLanes H′ ls ≡ At.partLanes H ls
       rest = partLanes-alike H H′ ls restA
@@ -572,6 +690,9 @@ module Shifting (R : Set) where
 
       headA : Alike H H′ (names s)
       headA = keeps off (λ m → lanes-path πL m) (λ m → apart-r (names s) Q m)
+
+      headD : ∀ {n} → n ∈ᴸ names s → n ∈ᴸ names u → ⊥
+      headD m m′ = lookupᴬ (apart-r (names s) Q m) (lanes-path πL m′) refl
 
       head : At.part H′ s ≡ At.part H s
       head = part-alike H H′ s headA
@@ -663,6 +784,69 @@ module Shifting (R : Set) where
     held : ∀ {ℓ} {X : Set ℓ} {Δ A} {t : Sub h Δ A} (π : Path t u) → AllPairs _≢_ (names t)
          → ∀ {n} → At.part H′ (plant π v) ≡ just n → (∀ {n₀} → At.part H t ≡ just n₀ → X) → X
     held π ps x k = k (proj₂ (just-of (revive π ps (cong is-just x))))
+
+    --------------------------------------------------------------------
+    -- DONE FLAGS, KEPT: every flag named above the write still unset, and
+    -- every other reading its outer as before, the names below `u` let go.
+
+    module Flags (X ns₀ : List (Name h)) (nu : ∀ {n} → n ∈ᴸ ns₀ → n ∈ᴸ names u) (fb₀ : DoneBy H u (X ++ ns₀) → DoneBy H′ v X) where
+      module FG = Flag H′
+
+      private
+        drop : ∀ {Δ A} {x : Sub h Δ A} → (∀ {n} → n ∈ᴸ names x → n ∈ᴸ names u → ⊥) → ∀ {n} → n ∈ᴸ names x → n ∈ᴸ X ++ ns₀ → n ∈ᴸ X
+        drop D m m′ = [ (λ a → a) , (λ b → ⊥-elim (D m (nu b))) ]′ (++⁻ X m′)
+
+        dropL : ∀ {Δ B} {ls : List (Lane h Δ B)} → (∀ {n} → n ∈ᴸ laneNames ls → n ∈ᴸ names u → ⊥) → ∀ {n} → n ∈ᴸ laneNames ls → n ∈ᴸ X ++ ns₀ → n ∈ᴸ X
+        dropL D m m′ = [ (λ a → a) , (λ b → ⊥-elim (D m (nu b))) ]′ (++⁻ X m′)
+
+        beside : ∀ {Δ A} {x : Sub h Δ A} → (∀ {n} → n ∈ᴸ names x → n ∈ᴸ names u → ⊥) → Alike H H′ (names x) → DoneBy H x (X ++ ns₀) → DoneBy H′ x X
+        beside D al d = flags-alike H H′ al (Flag.relist H (λ _ m → ++⁺ˡ m) (drop D) d)
+
+        besideL : ∀ {Δ B} {ls : List (Lane h Δ B)} → (∀ {n} → n ∈ᴸ laneNames ls → n ∈ᴸ names u → ⊥) → Alike H H′ (laneNames ls)
+                → DoneByL H ls (X ++ ns₀) → DoneByL H′ ls X
+        besideL D al dL = flagsL-alike H H′ al (Flag.relistL H (λ _ m → ++⁺ˡ m) (dropL D) dL)
+
+        unnamed : ∀ {n} → (n ∈ᴸ names u → ⊥) → (n ∈ᴸ X → ⊥) → n ∈ᴸ X ++ ns₀ → ⊥
+        unnamed D x m = [ x , (λ b → D (nu b)) ]′ (++⁻ X m)
+
+      mutual
+        shiftF : ∀ {Δ A} {t : Sub h Δ A} (π : Path t u) → AllPairs _≢_ (names t) → (∀ {n} → n ∈ᴸ outers π → n ∈ᴸ X)
+               → DoneBy H t (X ++ ns₀) → DoneBy H′ (plant π v) X
+        shiftF here ps ox d = fb₀ d
+        shiftF (in-map π) ps ox d = FG.db-map (shiftF π ps ox (Flag.db-sub H d (in-map here) refl))
+        shiftF (in-scan π) ps ox d = FG.db-scan (shiftF π (pairs-tl ps) ox (Flag.db-sub H d (in-scan here) refl))
+        shiftF (in-take {c = c} {k} {tk} π) ps ox d =
+          FG.db-take (λ ok → shiftF π Tk.fresh ox (Flag.db-sub H d (in-take here) (seen-take (At.val H (Kit.live c)) (via-≡ (λ z → z ∧ isTaking tk) Tk.live′ ok))))
+          where module Tk = Take c k π ps
+        shiftF (in-outer {fl = fl} {oc} {k} {r} {t = so} {ls} π) ps ox d =
+          FG.db-flat ((λ m → trans (cong lower O.done) (proj₁ (d here refl) (++⁺ˡ m))) , (λ m̸ → ⊥-elim (m̸ (ox (here refl)))))
+                     (shiftF π O.fresh (λ m → ox (there m)) (Flag.db-sub H d (in-outer here) refl))
+                     (besideL O.lanesD O.lanesA (Flag.dbL-of H d))
+          where module O = Outer fl oc k r ls π ps
+        shiftF (in-lanes {fl = fl} {oc} {k} {r} {t = so} πL) ps ox d =
+          FG.db-flat ((λ m → trans (cong lower Ln.done) (proj₁ (d here refl) (++⁺ˡ m)))
+                     , (λ m̸ → trans (cong lower Ln.done) (trans (proj₂ (d here refl) (unnamed Ln.doneD m̸)) (cong is-nothing (sym Ln.outer)))))
+                     (beside Ln.soD Ln.soA (Flag.db-sub H d (in-outer here) refl))
+                     (shiftFL πL Ln.fresh ox (Flag.dbL-of H d))
+          where module Ln = Lanes fl oc k r so πL ps
+        shiftF (in-source {S = S} {c} {b} {kb} {k} {e = e} {t = src} {bd} π) ps ox d =
+          FG.db-connect (λ jb → shiftF π Sr.fresh ox (Flag.db-sub H d (in-source here) (∧-join (via-≡ is-just Sr.body jb) refl)))
+                        (λ js → beside Sr.bdD Sr.bdA (Flag.db-sub H d (in-body here) (∧-join (∨-mono (is-just e) (revive π Sr.fresh) js) refl)))
+          where module Sr = Source S c b kb k bd π ps
+        shiftF (in-body {S = S} {c} {b} {kb} {k} {e = e} {t = src} {bd} π) ps ox d =
+          FG.db-connect (λ jb → beside Bd.srcD Bd.srcA (Flag.db-sub H d (in-source here) (∧-join (revive π Bd.fresh jb) refl)))
+                        (λ js → shiftF π Bd.fresh ox (Flag.db-sub H d (in-body here) (∧-join (∨-mono (is-just e) (via-≡ is-just Bd.source) js) refl)))
+          where module Bd = Body S c b kb k src π ps
+        shiftF (in-defer {k = k} π) ps ox d = FG.db-defer (shiftF π (pairs-r (quietName k) ps) ox (Flag.db-sub H d (in-defer here) refl))
+
+        shiftFL : ∀ {Δ B} {ls : List (Lane h Δ B)} (πL : PathLanes ls u) → AllPairs _≢_ (laneNames ls) → (∀ {n} → n ∈ᴸ outersL πL → n ∈ᴸ X)
+                → DoneByL H ls (X ++ ns₀) → DoneByL H′ (plantᴸ πL v) X
+        shiftFL (this-lane {c = c} {k} {t = s} {ls} π) ps ox dL =
+          FG.dbL-cons (λ lv → shiftF π Th.fresh ox (Flag.dbL-head H dL (Th.on lv))) (besideL Th.restD Th.restA (Flag.dbL-tail H dL))
+          where module Th = This c k ls π ps
+        shiftFL (next-lane {l = lane c k s} {ls} πL) ps ox dL =
+          FG.dbL-cons (λ lv → beside Nx.headD Nx.headA (Flag.dbL-head H dL (Nx.on lv))) (shiftFL πL Nx.fresh ox (Flag.dbL-tail H dL))
+          where module Nx = Next c k s πL ps
 
     --------------------------------------------------------------------
     -- NO JOINER NEWLY UNTOLD: what a node above leaves untold its

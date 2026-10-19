@@ -19,7 +19,7 @@ open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_)
 open import Data.Bool.Properties using (∧-assoc)
 open import Data.List using (List; []; _∷_; _++_; [_]; foldr)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.Maybe using (Maybe; just; nothing; is-just)
+open import Data.Maybe using (Maybe; just; nothing; is-just; is-nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤_)
 open import Data.Empty using (⊥)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
@@ -614,6 +614,41 @@ module Strongly (R : Set) where
     laneNames : ∀ {h Δ B} → List (Lane h Δ B) → List (Name h)
     laneNames []                = []
     laneNames (lane c k s ∷ ls) = cutNames c ++ quietName k ++ names s ++ laneNames ls
+
+  -- The done flag of every flatMap a path enters through its outer.
+  mutual
+    outers : ∀ {h Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Path t u → List (Name h)
+    outers here                   = []
+    outers (in-map p)             = outers p
+    outers (in-scan p)            = outers p
+    outers (in-take p)            = outers p
+    outers (in-outer {fl = fl} p) = (cell _ , Flat.outerDone fl) ∷ outers p
+    outers (in-lanes p)           = outersL p
+    outers (in-source p)          = outers p
+    outers (in-body p)            = outers p
+    outers (in-defer p)           = outers p
+
+    outersL : ∀ {h Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} → PathLanes ls u → List (Name h)
+    outersL (this-lane p) = outers p
+    outersL (next-lane p) = outersL p
+
+  mutual
+    outers-⊕ : ∀ {h Δ A Δ′ A′ Δ″ A″} {t : Sub h Δ A} {u : Sub h Δ′ A′} {v : Sub h Δ″ A″} (π : Path t u) (τ : Path u v)
+             → outers (π ⊕ τ) ≡ outers π ++ outers τ
+    outers-⊕ here          τ = refl
+    outers-⊕ (in-map π)    τ = outers-⊕ π τ
+    outers-⊕ (in-scan π)   τ = outers-⊕ π τ
+    outers-⊕ (in-take π)   τ = outers-⊕ π τ
+    outers-⊕ (in-outer π)  τ = cong (_ ∷_) (outers-⊕ π τ)
+    outers-⊕ (in-lanes π)  τ = outersL-⊕ π τ
+    outers-⊕ (in-source π) τ = outers-⊕ π τ
+    outers-⊕ (in-body π)   τ = outers-⊕ π τ
+    outers-⊕ (in-defer π)  τ = outers-⊕ π τ
+
+    outersL-⊕ : ∀ {h Δ B Δ′ A′ Δ″ A″} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} {v : Sub h Δ″ A″} (π : PathLanes ls u) (τ : Path u v)
+              → outersL (π ⊕ᴸ τ) ≡ outersL π ++ outers τ
+    outersL-⊕ (this-lane π) τ = outers-⊕ π τ
+    outersL-⊕ (next-lane π) τ = outersL-⊕ π τ
 
   module At {h : World} (H : Heapᴹ h) where
     val : ∀ {t} → Ref h t → El h t
@@ -1766,6 +1801,17 @@ module Strongly (R : Set) where
     lingers-to : ∀ {Δ A} {t : Sub h Δ A} → Lingers H t → Below t
     lingers-to L = lingering (held-to (record { nodes = λ _ _ → lift tt ; pools = Lingers.pools L ; rests = Lingers.rests L }))
 
+  -- EVERY SEEN FLATMAP'S DONE FLAG READS ITS OUTER GONE, but the flags
+  -- named, which read unset: an outer ends at its leaf, its flag set
+  -- only once the end has climbed to the flatMap.
+  Flagged : ∀ {h} (H : Heapᴹ h) → List (Name h) → ∀ {Δ A} → Flat A h → Sub h Δ A → Set₁
+  Flagged H ns fl so = ((cell _ , Flat.outerDone fl) ∈ᴸ ns → At.val H (Flat.outerDone fl) ≡ false)
+                     × (¬ ((cell _ , Flat.outerDone fl) ∈ᴸ ns) → At.val H (Flat.outerDone fl) ≡ is-nothing (At.part H so))
+
+  DoneBy : ∀ {h} (H : Heapᴹ h) {Δ A} (t : Sub h Δ A) → List (Name h) → Set₁
+  DoneBy {h} H t ns = ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+                    → (ψ : Path t (flatMapˢ op f fl oc k r pl so ls)) → seen H ψ ≡ true → Flagged H ns fl so
+
   -- Its next event no earlier than `q`.
   Heads : ∀ {Γ A} → Pos → U.Node Γ A → Set
   Heads q c = ∀ {k} → U.headˢ (U.step c) ≡ just k → q ≤ᵖ k
@@ -1796,6 +1842,7 @@ module Strongly (R : Set) where
       sorted  : Σ Pos λ lo → WellMach lo m
       behind′ : Eaching.Below H (Heads (Conf.pos (Mach.conf m))) tree
       lingers′ : Lingering.Below H tree
+      flags   : DoneBy H tree []
 
     owned : Owned H tree ctlAs
     owned = owned-from {H = H} {t = tree} {ca = ctlAs} owned′
@@ -1953,4 +2000,5 @@ module Strongly (R : Set) where
     ; books   = record { fresh = []ᴾ ; clocked = refl , tt ; paidUp = refl ; running = refl }
     ; sorted  = root , begin-well o
     ; behind′  = Eaching.eaching (λ { _ refl → heads-begin o })
-    ; lingers′ = Lingering.lingering (λ _ → lift tt) }
+    ; lingers′ = Lingering.lingering (λ _ → lift tt)
+    ; flags   = λ () }

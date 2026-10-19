@@ -55,7 +55,7 @@ module Ghosting (R : Set) where
   open Heap using (World; _⊑_)
   open Sorting R using (WellMach; WellStep; silentʷ; valueʷ; preserve; Beyond)
   open Run (Pureᴾ R) using (Act; Observer; _>>ᴬ_; Subject; module Kit; module FlatKit)
-  open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; Owned; Path; done≗; Call; taking; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; Each; Heads; Lingers; seen; seenL; isTaking; seen-up; seen-join; ∧-split; ∧-join; ≗-refl) renaming (⟦_⟧ to ⟦_⟧ᶜ)
+  open Strongly R using (Strong; strong-begin; Carried; Books; carried; closing; Sub; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; lane; here; module At; Queue; Kernels; Meaning; Owned; Path; done≗; Call; taking; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; Each; Heads; Lingers; DoneBy; outers; outers-⊕; seen; seenL; isTaking; seen-up; seen-join; ∧-split; ∧-join; ≗-refl) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open Strongly.Against R using (calmAs; noteAs; runAs; subAs; burstAs; bottomAs; restAs; backAs; reholdAs; StackAs; CtlAs; agenda; bursts; begins) renaming (Placed to Placedᴬ)
   open Pure R using (End; finished; dry; cutOff)
   open Moving R using (pend; takes)
@@ -912,7 +912,13 @@ module Ghosting (R : Set) where
       sorted  : Σ Pos λ lo → WellMach lo m₁
       behind  : Each (Conf.heap (Mach.conf m₁)) (Heads (Conf.pos (Mach.conf m₁))) T
       lingers : Lingers (Conf.heap (Mach.conf m₁)) T
+      flags   : DoneBy (Conf.heap (Mach.conf m₁)) T (outers σ)
       kept    : load m₁ T ≼ ℓ
+
+  -- Done flags read as they were, one step up a path entering no outer.
+  done-up : ∀ {h} {H : Heapᴹ h} {T : Sub h [] R} {Δ A Δ′ A′} {x : Sub h Δ A} {v : Sub h Δ′ A′} (ρ : Path T x) (c : Path x v)
+          → outers c ≡ [] → DoneBy H T (outers (ρ ⊕ c)) → DoneBy H T (outers ρ)
+  done-up {H = H} {T = T} ρ c e d = subst (DoneBy H T) (trans (outers-⊕ ρ c) (trans (cong (outers ρ ++_) e) (++-identityʳ (outers ρ)))) d
 
   -- The same call, the signal restated at another path, owing as much.
   recall : ∀ {g ℓ m₁ Δ A Δ′ A′} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
@@ -920,13 +926,14 @@ module Ghosting (R : Set) where
          → owed sg′ ≡ owed sg
          → Calling.act cl ≗ said (Here.obs (walk σ′ top)) sg′
          → Passed (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) g σ′ sg′
+         → DoneBy (Conf.heap (Mach.conf m₁)) T (outers σ′)
          → Calling g ℓ m₁ σ′ sg′
-  recall {m₁ = m₁} {T = T} cl ow cd lf = record
+  recall {m₁ = m₁} {T = T} cl ow cd lf dn = record
     { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = Calling.ctl cl ; code = cd ; stack = Calling.stack cl ; lifted = lf
     ; owned = subst (λ ks → Owned (Conf.heap (Mach.conf m₁)) T (runAs ks (≗-refl _) (Calling.stack cl))) (sym ow) (Calling.owned cl)
     ; kernels = Calling.kernels cl ; meaning = Calling.meaning cl ; queue = Calling.queue cl
     ; books = subst (λ ks → Books T (runAs ks (≗-refl _) (Calling.stack cl)) m₁) (sym ow) (Calling.books cl)
-    ; sorted = Calling.sorted cl ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; kept = Calling.kept cl }
+    ; sorted = Calling.sorted cl ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; flags = dn ; kept = Calling.kept cl }
 
   -- The same call, held to a load no lighter.
   relevel : ∀ {g ℓ ℓ′ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v} {sg : Signal T A}
@@ -935,6 +942,7 @@ module Ghosting (R : Set) where
     { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = Calling.ctl cl ; code = Calling.code cl ; stack = Calling.stack cl
     ; lifted = Calling.lifted cl ; owned = Calling.owned cl ; kernels = Calling.kernels cl ; meaning = Calling.meaning cl
     ; queue = Calling.queue cl ; books = Calling.books cl ; sorted = Calling.sorted cl ; behind = Calling.behind cl ; lingers = Calling.lingers cl
+    ; flags = Calling.flags cl
     ; kept = ≼-trans (Calling.kept cl) le }
 
   -- A signal one operator higher, the path shorter, the load at most `ℓ`.
