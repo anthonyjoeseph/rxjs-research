@@ -182,10 +182,11 @@ by their own silent steps (`Mirror`).
   `compile-grow`/`kont-grow`, the code's own naturality, by operator over
   the `-wk` toolkit; then the splice leaves `bg-owns`/`heads`/`lingered`
   and `bg-ghosted` over `ghost-lift`, which reads the names fresh.
-- **DEEP ORDER.** `gapped-past` holds only where every node under a rest is
-  in order, which `Placed` does not see (`stepped-deep` reads it from
-  nothing). Decides whether `Deep` is a field `Carried` keeps, each move
-  framing it, or `Placed` itself descends; then `gapped-past` by operator.
+- **DEEP ORDER.** `Deep` is a field `Carried`, `Begins` and `Calling` keep;
+  what it costs is three leaves: `deep-subscribe` at the launch,
+  `step-deep` past a step, `gapped-deep` past a gap. Decides whether the
+  order lemmas `Placed` is built on reach every depth; then `gapped-past`
+  by operator.
 - **THE FREE SOURCE.** `lifts-source` leaves the source node free, and an
   end lifted through a connect's source reads it: `fin-ghost` and
   `end-ghost` need it tied to the heap's leftover, beyond `Tied`'s first
@@ -212,31 +213,35 @@ by their own silent steps (`Mirror`).
   ghost's step leaves its parts placed.
 - **`gapped-past`** (Gapped) — FALSITY, `REFUTED`: a node in order under every
   rest has a gapped one's meaning past its skips.
-- **`stepped-deep`** (Gapped) — FALSITY, `NO EVIDENCE`: what a sane, placed
-  root ghost skips to is in order under every rest; reads what neither holds.
 - **`gapped-sane`** (Gapped) — FALSITY, `NO EVIDENCE`: a node gapped from a
   sane one is sane.
 - **`gapped-placed`** (Gapped) — FALSITY, `NO EVIDENCE`: a node gapped from a
   placed one is placed.
-- **`calling-open`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a climbing signal's
-  path reads open.
-- **`begin-path`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a lane begun runs to its
-  inner subscribed under `ix 1`: counted, cut, listed, the rest weakened.
-- **`bg-ghosted`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a lane begun, its lift
-  read in the grown world: the ghost's admit, the lane planted pending.
-- **`bg-owns`, `bg-heads`, `bg-lingered`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`:
-  what is owed, the heads and the ties, carried from the grown tree to the lane
-  planted pending.
-- **`lanes-counted`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a climbing outer value
-  reads the count as the live lanes; a fact of the call, not a kernel.
+- **`deep-subscribe`** (Deep) — FALSITY, `NO EVIDENCE`: a program subscribed at
+  the root is in order to every depth.
+- **`step-deep`** (Stepper) — FALSITY, `NO EVIDENCE`: a sane, placed, deep root
+  ghost's step leaves a deep node.
+- **`gapped-deep`** (Gapped) — FALSITY, `NO EVIDENCE`: a node gapped from a
+  deep one is deep.
+- **`calling-open`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a climbing
+  signal's path reads open.
+- **`begin-path`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a lane begun runs to
+  its inner subscribed under `ix 1`: counted, cut, listed, the rest weakened.
+- **`bg-ghosted`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a lane begun, its
+  lift read in the grown world: the ghost's admit, the lane planted pending.
+- **`bg-owns`, `bg-heads`, `bg-lingered`** (Climbs.Flat) — FALSITY,
+  `NO EVIDENCE`: what is owed, the heads and the ties, carried from the grown
+  tree to the lane planted pending.
+- **`lanes-counted`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a climbing outer
+  value reads the count as the live lanes; a fact of the call, not a kernel.
 - **`outer-switch`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a switch kills its
   lanes, their rests the pool's, and begins one.
-- **`outer-queued`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a full bounded merge
-  queues the value, the ghost past the skip.
-- **`outer-drop`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a busy exhaust drops the
-  value, the ghost past the skip.
-- **`live-parted`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a live lane has a part;
-  suspect a missing `Carried` field.
+- **`outer-queued`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a full bounded
+  merge queues the value, the ghost past the skip.
+- **`outer-drop`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a busy exhaust drops
+  the value, the ghost past the skip.
+- **`live-parted`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a live lane has a
+  part; suspect a missing `Carried` field.
 - **`take1-enter`** (Climbs) — FALSITY, `NO EVIDENCE`: a held takeWhile's
   completion begun under its failing value, its cut the frame's rest.
 - **`take1-void`** (Climbs) — FALSITY, `NO EVIDENCE`: a hidden takeWhile's
@@ -255,8 +260,8 @@ by their own silent steps (`Mirror`).
   an open `of`'s path to a held part passes heads under its base.
 - **`shut-late`** (Lift) — FALSITY, `NO EVIDENCE`: an ended connect's body, an
   `of` in it: its first event strictly before every end the shut tells.
-- **`step-late`** (Lift) — FALSITY, `NO EVIDENCE`: a node whose head precedes every
-  told end steps shut as it does, its continuation shut after.
+- **`step-late`** (Lift) — FALSITY, `NO EVIDENCE`: a node whose head precedes
+  every told end steps shut as it does, its continuation shut after.
 - **`emit-run`** (Lift) — FALSITY, `NO EVIDENCE`: an open `of`'s value handed
   on under its scope, the climb starts aloft.
 - **`end-ghost`** (Climbs.Take) — FALSITY, `DEAD ROUTE`: the tree with a take
@@ -280,21 +285,22 @@ by their own silent steps (`Mirror`).
 - **`tells-past`** (Frame) — FALSITY, `NO EVIDENCE`: a call under way, a
   connect past its source's end tells its body's untold joiners no sooner than
   the run.
-- **`union-down`, `source-down`, `ended-down`** (Frame) — FALSITY, `NO EVIDENCE`:
-  a shut node's step twins the old or both head past the shutting end.
-- **`bursts-down`** (Frame) — FALSITY, `NO EVIDENCE`: the same for bursts; suspect,
-  a rest-fallback head is not past the step's.
-- **`flat-down`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap's step down when its
-  outer, lanes and pool each are.
-- **`src-idle`** (Climbs.Connect) — FALSITY, `NO EVIDENCE`: a connect's source signals
-  its subject only with no feed under way.
-- **`retag-parted`** (Climbs.Connect) — FALSITY, `NO EVIDENCE`: the retagged body
-  keeps a part; `part-retag` wants `Steady`, held only at the call site.
-- **`retag-fed`** (Climbs.Connect) — FALSITY, `NO EVIDENCE`: the retagged body's part
-  is the body's part fed the value, gapped up to the feed.
-- **`fin-ghost`** (Climbs.Connect) — FALSITY, `DEAD ROUTE`: the tree with a finish
-  staged, its end staged on the way up, has a sane, placed part, the ghost
-  past the source's skip.
+- **`union-down`, `source-down`, `ended-down`** (Frame) — FALSITY,
+  `NO EVIDENCE`: a shut node's step twins the old or both head past the
+  shutting end.
+- **`bursts-down`** (Frame) — FALSITY, `NO EVIDENCE`: the same for bursts;
+  suspect, a rest-fallback head is not past the step's.
+- **`flat-down`** (Frame) — FALSITY, `NO EVIDENCE`: a flatMap's step down when
+  its outer, lanes and pool each are.
+- **`src-idle`** (Climbs.Connect) — FALSITY, `NO EVIDENCE`: a connect's source
+  signals its subject only with no feed under way.
+- **`retag-parted`** (Climbs.Connect) — FALSITY, `NO EVIDENCE`: the retagged
+  body keeps a part; `part-retag` wants `Steady`, held only at the call site.
+- **`retag-fed`** (Climbs.Connect) — FALSITY, `NO EVIDENCE`: the retagged
+  body's part is the body's part fed the value, gapped up to the feed.
+- **`fin-ghost`** (Climbs.Connect) — FALSITY, `DEAD ROUTE`: the tree with a
+  finish staged, its end staged on the way up, has a sane, placed part, the
+  ghost past the source's skip.
 - **`emit-shut`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` whose observer path
   is closed skips its value or its end.
 - **`sub-cold`** (Lift) — FALSITY, `NO EVIDENCE`: a cold begun registers its
@@ -332,24 +338,24 @@ by their own silent steps (`Mirror`).
 - **`ended-past`** (Frame) — FALSITY, `NO EVIDENCE`: a connect held past its
   source's end holds no source part, at every call under way.
 - **`rest-sourced`** (Shift) — FALSITY, `NO EVIDENCE`: a connect's leftover
-  over a source running on either side, pinned as its source's; suspect, nothing
-  ties the two source parts.
-- **`out-deeper`** (Climbs.Take) — FALSITY, `NO EVIDENCE`: every part heads past the
-  take's own position once it ends; the `q` to `q ++ [ix 0]` shift.
-- **`idle-tied`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a pool idled ties as it
-  did; suspect where the pool is not restful.
+  over a source running on either side, pinned as its source's; suspect,
+  nothing ties the two source parts.
+- **`out-deeper`** (Climbs.Take) — FALSITY, `NO EVIDENCE`: every part heads
+  past the take's own position once it ends; the `q` to `q ++ [ix 0]` shift.
+- **`idle-tied`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a pool idled ties as
+  it did; suspect where the pool is not restful.
 - **`close-tied`, `close-told`, `close-heads`** (Climbs.Flat) — FALSITY,
   `DEAD ROUTE×3`: an outer's close repools its rest: tied, told and headed as
   before.
-- **`settle-told`, `settle-heads`, `settle-lingering`** (Climbs.Lanes) — FALSITY,
-  `DEAD ROUTE×6`: a lane's settle repools its rest the same way.
-- **`next-heads`, `next-lingering`** (Climbs.Lanes) — FALSITY, `DEAD ROUTE×4`: a
-  queued value dequeued: the node's heads and ties after the next lane.
+- **`settle-told`, `settle-heads`, `settle-lingering`** (Climbs.Lanes) —
+  FALSITY, `DEAD ROUTE×6`: a lane's settle repools its rest the same way.
+- **`next-heads`, `next-lingering`** (Climbs.Lanes) — FALSITY, `DEAD ROUTE×4`:
+  a queued value dequeued: the node's heads and ties after the next lane.
 - **`re-revive`, `re-told`, `re-root`, `re-just`, `re-heads`, `re-lingers`,
-  `re-leftover`** (Climbs.Connect) — FALSITY, `NO EVIDENCE`: a connect refed: its body
-  retagged keeps each tree field.
-- **`bg-apart`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a flatMap's reads past its
-  count and list are apart from both.
+  `re-leftover`** (Climbs.Connect) — FALSITY, `NO EVIDENCE`: a connect refed:
+  its body retagged keeps each tree field.
+- **`bg-apart`** (Climbs.Flat) — FALSITY, `NO EVIDENCE`: a flatMap's reads past
+  its count and list are apart from both.
 - **`rehome-src`** (Replant) — FALSITY, `NO EVIDENCE`: a source call moved
   across a plant stays a source call.
 - **`run-ofs`, `run-begun`, `run-bodies`, `run-cuts`, `run-ends`, `run-feeds`,
