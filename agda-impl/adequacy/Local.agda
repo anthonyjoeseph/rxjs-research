@@ -44,7 +44,7 @@ module Locality (R : Set) where
   open Moving R using (pairs-split; pairs-r; plant; plant-self; plantᴸ; planted; plantedᴸ; count-plant; switches-plant)
   open Tearing R using (Off; Alike; cuts; cuts-switches; attached-alike; stashed-alike; holds-at; holdsL-at; names-path; lanes-path; fresh-path; narrow; apart-r; apart-l; ≢-flip; look-store; torn; tornVia; thrown; thrown-off;
     thrownLanes; thrownLanes-off; torn-off; tornVia-off; get-put-same; Site; takeSite; bodySite; siteHeap)
-  open Run (Pureᴾ R) using (Env; Observer; module Kit; module FlatKit)
+  open Run (Pureᴾ R) using (Env; Observer; Subject; module Kit; module FlatKit)
   open Lowering R using (module Lowers; via-lowers; thrown-lowers; lanes-lowers; dropped; false≢true)
   open Lowers using (lowers)
   open Everywhere.Holding R using (holds-alike; holds-path)
@@ -291,12 +291,19 @@ module Locality (R : Set) where
       fed-path (in-lanes {fl = fl} {oc} {k} {r} {t = so} {ls} π) v ps off hv ν (f₁ , f₂) =
         fed-alike so (keeps off (lanes-path (plantedᴸ π v)) (apart-r (names so) P)) ν f₁ , fedL-path π v (pairs-r (names so) P) off hv ν f₂
         where P = pairs-r ((_ , r) ∷ []) (pairs-r (quietName k) (pairs-r (cutNames oc) (pairs-r (flatNames fl) ps)))
-      fed-path (in-source {S = S} {c} {b} {kb} {k} {t = src} {bd} π) v ps off hv ν (f₁ , f₂) =
-        fed-path π v (proj₁ (pairs-split (names (plant π v)) Q₄)) off hv ν f₁ , fed-alike bd (keeps off (names-path (planted π v)) (apart-l (names (plant π v)) Q₄)) _ f₂
+      fed-path (in-source {S = S} {c} {b} {kb} {k} {fd} {e} {t = src} {bd} π) v ps off hv ν (f₁ , f₂) =
+        fed-path π v (proj₁ (pairs-split (names (plant π v)) Q₄)) off hv ν f₁
+        , subst (λ z → At.Fed H′ bd ((fd , (if z then e else nothing)) ∷ ν)) (cong lower (sym ec))
+                (fed-alike bd (keeps off (names-path (planted π v)) (apart-l (names (plant π v)) Q₄)) _ f₂)
         where Q₄ = pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) ps))))
-      fed-path (in-body {S = S} {c} {b} {kb} {k} {t = src} {bd} π) v ps off hv ν (f₁ , f₂) =
-        fed-alike src (keeps off (names-path (planted π v)) (apart-r (names src) Q₄)) ν f₁ , fed-path π v (pairs-r (names src) Q₄) off hv _ f₂
+              ec = off (Subject.closed S) (narrow (λ m → ++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ (names-path (planted π v) m))))))
+                                                  (apart-r (subjectNames S) ps (there (here refl))))
+      fed-path (in-body {S = S} {c} {b} {kb} {k} {fd} {e} {t = src} {bd} π) v ps off hv ν (f₁ , f₂) =
+        fed-alike src (keeps off (names-path (planted π v)) (apart-r (names src) Q₄)) ν f₁
+        , subst (λ z → At.Fed H′ (plant π v) ((fd , (if z then e else nothing)) ∷ ν)) (cong lower (sym ec)) (fed-path π v (pairs-r (names src) Q₄) off hv _ f₂)
         where Q₄ = pairs-r (quietName k) (pairs-r (quietName kb) (pairs-r ((_ , b) ∷ []) (pairs-r (cutNames c) (pairs-r (subjectNames S) ps))))
+              ec = off (Subject.closed S) (narrow (λ m → ++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names src) (names-path (planted π v) m))))))
+                                                  (apart-r (subjectNames S) ps (there (here refl))))
       fed-path (in-defer {k = k} π) v ps off hv ν fd = fed-path π v (pairs-r (quietName k) ps) off hv ν fd
 
       fedL-path : ∀ {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′) → AllPairs _≢_ (laneNames (plantᴸ π v)) → Off H H′ (names v)
