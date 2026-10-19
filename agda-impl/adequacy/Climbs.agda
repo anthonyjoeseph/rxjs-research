@@ -1221,16 +1221,16 @@ module Ascending (R : Set) where
     sd-landed : AllPairs _≢_ (names T) → ∀ pl′ → At.part H u ≡ nothing → (null (At.partLanes H ls) ∧ null (At.val H (FlatKit.Flat.queue fl))) ≡ false
               → ∀ {s S} → Lifts H ρ s S → DoneBy H T (outers (ρ ⊕ in-outer here)) → DoneBy H′ (plant ρ (flatMapˢ op f fl oc k r pl′ u ls)) []
     sd-landed fs pl′ gn nl L d =
-      let-go H′ (planted ρ v′) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v′ refl)) fs) (lifts-seen (lifts-planted ρ v′ (sd-lifts fs L))) (cong is-just held′)
-        (subst (DoneBy H′ (plant ρ v′)) (sym (outers-planted ρ v′)) (sd-shift fs pl′ (λ _ → cong is-just held) gn d))
+      let-go H′ (planted ρ v′) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v′ refl)) fs) (lifts-seen (lifts-planted ρ v′ (sd-lifts fs L))) (cong is-just open′)
+        (subst (DoneBy H′ (plant ρ v′)) (sym (outers-planted ρ v′)) (sd-shift fs pl′ (λ _ → cong is-just open₀) gn d))
       where
         G    = λ a j → U.subscribe (f a) j
         v′   = flatMapˢ op f fl oc k r pl′ u ls
-        held : At.part H w₀ ≡ just (U.flatMapᶜ op G nothing (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl)
-        held = trans (cong (λ x → At.merged H op G x (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl) gn)
+        open₀ : At.part H w₀ ≡ just (U.flatMapᶜ op G nothing (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl)
+        open₀ = trans (cong (λ x → At.merged H op G x (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl) gn)
                      (merged-open H op G (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl nl)
-        held′ : At.part H′ v′ ≡ just (U.flatMapᶜ op G nothing (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl′)
-        held′ = trans (sd-part-at pl′ (fresh-path ρ fs))
+        open′ : At.part H′ v′ ≡ just (U.flatMapᶜ op G nothing (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl′)
+        open′ = trans (sd-part-at pl′ (fresh-path ρ fs))
                       (trans (cong (λ x → At.merged H op G x (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl′) gn)
                              (merged-open H op G (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl′ nl))
 
@@ -1965,6 +1965,11 @@ module Ascending (R : Set) where
   merged-on H op g nothing  []      c as qs pl = refl
   merged-on H op g nothing  (_ ∷ _) c as qs pl = refl
 
+  -- A lane's own sub names no outer above it.
+  one-outers : ∀ {h Δ B} {ls : List (Lane h Δ B)} {u : Sub h Δ B} {πL : PathLanes ls u} → OneLane πL → outersL πL ≡ []
+  one-outers one-this    = refl
+  one-outers (one-next o) = one-outers o
+
   -- A value out of a lane: its guard read open, one operator up, the
   -- flatMap showing the lane past it.
   climb-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
@@ -2206,11 +2211,6 @@ module Ascending (R : Set) where
   -- A LANE ENDED AND ITS SLOT FREED: its cut dropped and the count down,
   -- nothing else of the heap or the tree moved.  Parts hold only with
   -- the lane's own part gone: a live lane's part is its flatMap's.
-  -- A lane's own sub names no outer above it.
-  one-outers : ∀ {h Δ B} {ls : List (Lane h Δ B)} {u : Sub h Δ B} {πL : PathLanes ls u} → OneLane πL → outersL πL ≡ []
-  one-outers one-this    = refl
-  one-outers (one-next o) = one-outers o
-
   module Freed {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B op f fl oc k r pl} {t : Sub h Δ A} {ls : List (Lane h Δ B)} {u : Sub h Δ B}
                (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) {πL : PathLanes ls u} (o : OneLane πL) where
     H′ = freed H (laneOf o) fl
@@ -3202,6 +3202,12 @@ module Ascending (R : Set) where
 
     -- The ghost past the source's end: the connect shut, its source ended
     -- on what the source left running.
+    --
+    -- With `e` staged `nothing` the first conjunct fails for a root connect:
+    -- `connected` reads `nothing` past a dead source, and nothing ever
+    -- stages `e` as `just`.  Staging `e = just q` here revives the connect's
+    -- part, which `fin-kept`, `fin-lkept` and `fin-gone` deny, and its rest
+    -- then needs `Tied rt` to the leftover beyond `Tied`'s first pin.
     --
     -- DEAD ROUTE: a body over `ghost-lift`.  The end lifts to a skip whose node ends its source on `restᶜ c₀`, `c₀` the source node `lifts-source` leaves free and `Passed` ties to nothing on the heap once its part is gone; and the heap's rest is `Tied` to the leftover only at its first step.
     postulate
