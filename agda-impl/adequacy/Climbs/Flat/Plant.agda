@@ -816,7 +816,6 @@ module ClimbFlatPlant (R : Set) where
       G  = λ a j → U.subscribe (f a) j
       LS = At.partLanes hp ls
       QS = At.val hp (FlatKit.Flat.queue fl)
-      sk = λ o → U.skipˢ (q ++ [ ix 0 ]) (U.flatMapᶜ op G o (U.subscribe (f y) (q ++ [ ix 1 ]) ∷ LS) QS (U.unionᶜ po U.idleᶜ))
       adm = outer-admit op G o₀ q y c′ LS QS po
               (admit-room op G (q ++ [ ix 1 ]) y LS QS (U.restsᶜ LS) (subst (λ n → roomy op n ≡ true) (lanes-counted ρ cl) rm))
       d₀ = let-go hp (ρ ⊕ in-outer here) fs (lifts-seen L) (cong is-just pv) (Calling.flags cl)
