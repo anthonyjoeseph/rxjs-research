@@ -651,18 +651,18 @@ module Tearing (R : Set) where
 
         po : ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
            → (ψ : Path t (flatMapˢ op f fl oc k r pl so ls)) → seen H′ ψ ≡ true
-           → ∀ {c} → At.part H′ (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Tied pl (At.pooled H′ fl so ls)
+           → ∀ {c} → At.part H′ (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Leaves pl (At.pooled H′ fl so ls) × Restful pl
         po {pl = pl} ψ sn e with vis ps π ψ sn
-        ... | inj₁ (s , sm)        = subst (Tied pl) (sym (pe (fresh-path ψ ps) sm))
+        ... | inj₁ (s , sm)        = subst (λ x → Leaves pl x × Restful pl) (sym (pe (fresh-path ψ ps) sm))
                                        (Lingers.pools lg ψ s (trans (sym (same-part (fresh-path ψ ps) sm)) e))
         ... | inj₂ (sπ , ρ , sρ) = Lingers.pools (inner (sub sπ)) ρ sρ e
 
         re : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
            → (ψ : Path t (connectˢ S c b kb k fd rp e rt src bd)) → seen H′ ψ ≡ true
            → ∀ {n} → At.part H′ (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
-           → At.part H′ src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Tied rt (At.leftover H′ {B = ⊤} src)
+           → At.part H′ src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Twin rt (At.leftover H′ {B = ⊤} src) × Restful rt
         re {rt = rt} ψ sn e none ej with vis ps π ψ sn
-        ... | inj₁ (s , sm)        = subst (Tied rt) (sym (le (fresh-path ψ ps) sm))
+        ... | inj₁ (s , sm)        = subst (λ x → Twin rt x × Restful rt) (sym (le (fresh-path ψ ps) sm))
                                        (Lingers.rests lg ψ s (trans (sym (same-part (fresh-path ψ ps) sm)) e)
                                          (trans (sym (same-src (fresh-path ψ ps) sm)) none) ej)
         ... | inj₂ (sπ , ρ , sρ) = Lingers.rests (inner (sub sπ)) ρ sρ e none ej

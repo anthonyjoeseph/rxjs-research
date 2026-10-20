@@ -43,7 +43,7 @@ module Replanting (R : Set) where
   open Run (Pureᴾ R) using (Act; wkAct; _>>ᴬ_; module Kit; emitAll; under; module Observer)
   open Pure R using (Timer; cascade)
   open Strongly R using (Sub; Path; PathLanes; _⊕_; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; Lane; lane; Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; code; Leaf; of-leaf; cold-leaf; done-leaf; join-leaf; walk; walkLanes; top; module Here; unsub; unsubscribing; playing; fired; taken; pendingˢ; ofˢ; doneˢ; mapˢ; scanˢ; joinˢ; deferˢ; coldˢ; takeWhileˢ; flatMapˢ; connectˢ; taking; ending; idle; feeding; finishing; outers; Name; names; laneNames; cutNames; quietName; subjectNames; flatNames; module At; _≗_) renaming (⟦_⟧ to ⟦_⟧ᶜ)
-  open StrongAgainst R using (spot; Owned; Each; Lingers; Pinned)
+  open StrongAgainst R using (spot; Owned; Each; Lingers; Pinned) renaming (Twin to Twinᴺ)
   open StrongHeld R using (Heads; DoneBy)
   open StrongAgainst.Against R using (StackAs; BurstAs; Held; bottomAs; restAs; backAs; reholdAs; playsAs; firesAs; overAs; bottomᴴ; restᴴ; BurstClocked; Ticked; CtlAs; runAs)
   open Moving R using (plant; plantᴸ; planted; plant-self; pairs-r; pairs-split; Same; same; same-map; same-scan; same-take; same-flat; same-connect; same-defer)
@@ -423,11 +423,11 @@ module Replanting (R : Set) where
       head-below  : Each H (Heads q) u → Each H′ (Heads q) v
 
   -- THE NODE'S TIES, MOVED: no part revived, what it leaves running
-  -- pinned as before, and below it every tie kept.
+  -- twinned as before, and below it every tie kept.
   record Lingering {h} (H H′ : Heapᴹ h) {Δ A} (u v : Sub h Δ A) : Set₁ where
     field
       ling-revive : is-just (At.part H′ v) ≡ true → is-just (At.part H u) ≡ true
-      ling-rested : ∀ {C} → Pinned (U.restˢ {B = ⊤} (At.leftover H {B = C} u)) (U.restˢ {B = ⊤} (At.leftover H′ {B = C} v))
+      ling-rested : ∀ {C} → Twinᴺ (At.leftover H {B = C} u) (At.leftover H′ {B = C} v)
       ling-below  : Lingers H u → Lingers H′ v
 
   -- THE FRAME: a write at the node's own names, its node replanted to

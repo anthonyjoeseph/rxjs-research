@@ -14,7 +14,7 @@ open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Level using (lower)
 open import Data.Maybe using (Maybe; just; nothing; is-just; is-nothing)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂)
 open import Data.Sum using ([_,_]′)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
@@ -44,7 +44,7 @@ module Shifting (R : Set) where
   open FlatKit using (Flat)
   open Shared Timeline (Out R) using (Heapᴹ; look)
   open Strongly R using (Sub; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_; pendingˢ; coldˢ; ofˢ; doneˢ; joinˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; lane; Taking; taking; ending; taken; names; laneNames; cutNames; quietName; subjectNames; flatNames; module At; Name; outers; outersL; Feed)
-  open StrongAgainst R using (isTaking; seen; seenL; seen-join; seen-up; Each; Leaves; Leaving; Restful; Lingers; Pinned; unpinned; Tied; rest-pinned; bursts-pinned; bursts-moved; under-moved; union-pinned; pinned-trans; pinned-sym; restful-pinned; ∧-split; ∧-join; false≢)
+  open StrongAgainst R using (isTaking; seen; seenL; seen-join; seen-up; Each; Leaves; Twin; tw-refl; tw-if; tw-union; tw-under; lv-tie; tw-tie; Restful; Lingers; Pinned; unpinned; rest-pinned; bursts-pinned; bursts-moved; under-moved; union-pinned; pinned-trans; pinned-sym; restful-pinned; ∧-split; ∧-join; false≢)
   open StrongHeld R using (DoneBy; Flagged; Heads)
   open Tearing R using (Alike; Off; part-alike; partLanes-alike; seen-alike; seenL-alike; names-path; lanes-path; apart-r; apart-l; narrow; each-same)
   open Moving R using (plant; plantᴸ; planted; plantedᴸ; pairs-r; pairs-split)
@@ -100,20 +100,15 @@ module Shifting (R : Set) where
   pairs-tl : ∀ {a r} {X : Set a} {Rl : X → X → Set r} {x xs} → AllPairs Rl (x ∷ xs) → AllPairs Rl xs
   pairs-tl (_ ∷ p) = p
 
-  if-moved : ∀ {Γ A} {b b′ : Bool} {x x′ y y′ : U.Node Γ A} → b′ ≡ b
-           → Pinned (U.restˢ {B = ⊤} x) (U.restˢ {B = ⊤} x′) → Pinned (U.restˢ {B = ⊤} y) (U.restˢ {B = ⊤} y′)
-           → Pinned (U.restˢ {B = ⊤} (if b then x else y)) (U.restˢ {B = ⊤} (if b′ then x′ else y′))
-  if-moved {b = true}  refl p _ = p
-  if-moved {b = false} refl _ q = q
+  tw-alike : ∀ {Γ A} {x x′ : U.Node Γ A} → x′ ≡ x → Twin x x′
+  tw-alike {x = x} refl = tw-refl x
 
-  pin-alike : ∀ {Γ A} {x x′ : U.Node Γ A} → x′ ≡ x → Pinned (U.restˢ {B = ⊤} x) (U.restˢ {B = ⊤} x′)
-  pin-alike {x = x} refl = rest-pinned x
+  tw-if-moved : ∀ {Γ A} {b b′ : Bool} {x x′ y y′ : U.Node Γ A} → b′ ≡ b → Twin x x′ → Twin y y′ → Twin (if b then x else y) (if b′ then x′ else y′)
+  tw-if-moved {b = b} refl = tw-if b
 
-  -- A connect's leftover over a source run alike and a body pinned alike.
-  conn-pin : ∀ {Γ A B} rp (N N′ : U.Node Γ A) {x x′ : U.Node (A ∷ Γ) ⊤} → N′ ≡ N → Pinned (U.restˢ {B = ⊤} x) (U.restˢ {B = ⊤} x′)
-           → Pinned (U.restˢ {B = ⊤} (U.unionᶜ {B = B} (U.burstingᶜ rp N) (U.underᶜ (U.live N) x)))
-                    (U.restˢ {B = ⊤} (U.unionᶜ {B = B} (U.burstingᶜ rp N′) (U.underᶜ (U.live N′) x′)))
-  conn-pin rp N N′ refl lp = union-pinned (bursts-pinned rp N (U.step N)) (under-moved (U.live N) (U.live N) lp)
+  conn-tw : ∀ {Γ A B} rp (N N′ : U.Node Γ A) {x x′ : U.Node (A ∷ Γ) ⊤} → N′ ≡ N → Twin x x′
+          → Twin (U.unionᶜ {B = B} (U.burstingᶜ rp N) (U.underᶜ (U.live N) x)) (U.unionᶜ {B = B} (U.burstingᶜ rp N′) (U.underᶜ (U.live N′) x′))
+  conn-tw rp N N′ refl t = tw-union (tw-refl (U.burstingᶜ rp N)) (tw-under (U.live N) t)
 
   conn-left : ∀ {Γ A B} rp {n n′ : U.Node Γ A} {x x′ : U.Node (A ∷ Γ) ⊤} → n′ ≡ n → x′ ≡ x
             → U.unionᶜ {B = B} (U.burstingᶜ rp n′) (U.underᶜ (U.live n′) x′) ≡ U.unionᶜ (U.burstingᶜ rp n) (U.underᶜ (U.live n) x)
@@ -166,11 +161,11 @@ module Shifting (R : Set) where
     field
       poolsL : ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls′ : List (Lane h Δ′ B′)}
              → (ψ : PathLanes ls (flatMapˢ op f fl oc k r pl so ls′)) → seenL G ψ ≡ true
-             → ∀ {c} → At.part G (flatMapˢ op f fl oc k r pl so ls′) ≡ just c → Tied pl (At.pooled G fl so ls′)
+             → ∀ {c} → At.part G (flatMapˢ op f fl oc k r pl so ls′) ≡ just c → Leaves pl (At.pooled G fl so ls′) × Restful pl
       restsL : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
              → (ψ : PathLanes ls (connectˢ S c b kb k fd rp e rt src bd)) → seenL G ψ ≡ true
              → ∀ {n} → At.part G (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
-             → At.part G src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Tied rt (At.leftover G {B = ⊤} src)
+             → At.part G src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Twin rt (At.leftover G {B = ⊤} src) × Restful rt
 
   UntoldL : ∀ {h} (G : Heapᴹ h) (q : Pos) {Δ B} (ls : List (Lane h Δ B)) → Set₁
   UntoldL {h} G q ls = ∀ {Δ′ A′ B′} {S c b kb k fd rp c₀ rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
@@ -322,31 +317,18 @@ module Shifting (R : Set) where
 
     lingers-alike : ∀ {Δ A} {t : Sub h Δ A} → Alike H H′ (names t) → Lingers H t → Lingers H′ t
     lingers-alike {t = t} al lg = record
-      { pools = λ {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} ψ sn e → pinned-trans (Lingers.pools lg ψ (se ψ sn) (trans (sym (part-at ψ al)) e)) (pin-alike (pooled-from {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} (λ m → names-path ψ m) al))
-      ; rests = λ {src = src₀} ψ sn e pn pe → pinned-trans (Lingers.rests lg ψ (se ψ sn) (trans (sym (part-at ψ al)) e) (trans (sym (part-at (ψ ⊕ in-source here) al)) pn) pe)
-                                              (pin-alike (leftover-from {B = ⊤} {x = src₀} (λ m → names-path (ψ ⊕ in-source here) m) al)) }
-      where
-        se : ∀ {Δ′ A′} {x : Sub h Δ′ A′} (ψ : Path t x) → seen H′ ψ ≡ true → seen H ψ ≡ true
-        se ψ sn = trans (sym (seen-alike H H′ ψ al)) sn
-
-    leaving-alike : ∀ {Δ A} {t : Sub h Δ A} → Alike H H′ (names t) → Leaving H t → Leaving H′ t
-    leaving-alike {t = t} al lv = record
-      { parts = λ {u = u} ψ sn e → subst (λ y → Leaves _ y) (sym (leftover-from {B = ⊤} {x = u} (λ m → names-path ψ m) al))
-                                     (Leaving.parts lv ψ (se ψ sn) (trans (sym (part-at ψ al)) e))
-      ; pools = λ {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} ψ sn e →
-                  subst (λ y → Leaves pl₀ y) (sym (pooled-from {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} (λ m → names-path ψ m) al))
-                    (Leaving.pools lv ψ (se ψ sn) (trans (sym (part-at ψ al)) e))
-      ; rests = λ {rt = rt₀} {src = src₀} ψ sn e pn pe → subst (λ y → Leaves rt₀ y × Restful rt₀) (sym (leftover-from {B = ⊤} {x = src₀} (λ m → names-path (ψ ⊕ in-source here) m) al))
-                                                (Leaving.rests lv ψ (se ψ sn) (trans (sym (part-at ψ al)) e) (trans (sym (part-at (ψ ⊕ in-source here) al)) pn) pe) }
+      { pools = λ {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} ψ sn e → lv-tie (Lingers.pools lg ψ (se ψ sn) (trans (sym (part-at ψ al)) e)) (proj₁ (tw-alike (pooled-from {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} (λ m → names-path ψ m) al)))
+      ; rests = λ {src = src₀} ψ sn e pn pe → tw-tie (Lingers.rests lg ψ (se ψ sn) (trans (sym (part-at ψ al)) e) (trans (sym (part-at (ψ ⊕ in-source here) al)) pn) pe)
+                                              (tw-alike (leftover-from {B = ⊤} {x = src₀} (λ m → names-path (ψ ⊕ in-source here) m) al)) }
       where
         se : ∀ {Δ′ A′} {x : Sub h Δ′ A′} (ψ : Path t x) → seen H′ ψ ≡ true → seen H ψ ≡ true
         se ψ sn = trans (sym (seen-alike H H′ ψ al)) sn
 
     lingersL-alike : ∀ {Δ B} {ls : List (Lane h Δ B)} → Alike H H′ (laneNames ls) → LingersL H ls → LingersL H′ ls
     lingersL-alike {ls = ls} al lL = record
-      { poolsL = λ {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls′ = ls₀} πL sn e → pinned-trans (LingersL.poolsL lL πL (se πL sn) (trans (sym (partL-at πL al)) e)) (pin-alike (pooled-from {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} (λ m → lanes-path πL m) al))
-      ; restsL = λ {src = src₀} πL sn e pn pe → pinned-trans (LingersL.restsL lL πL (se πL sn) (trans (sym (partL-at πL al)) e) (trans (sym (partL-at (πL ⊕ᴸ in-source here) al)) pn) pe)
-                                               (pin-alike (leftover-from {B = ⊤} {x = src₀} (λ m → lanes-path (πL ⊕ᴸ in-source here) m) al)) }
+      { poolsL = λ {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls′ = ls₀} πL sn e → lv-tie (LingersL.poolsL lL πL (se πL sn) (trans (sym (partL-at πL al)) e)) (proj₁ (tw-alike (pooled-from {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} (λ m → lanes-path πL m) al)))
+      ; restsL = λ {src = src₀} πL sn e pn pe → tw-tie (LingersL.restsL lL πL (se πL sn) (trans (sym (partL-at πL al)) e) (trans (sym (partL-at (πL ⊕ᴸ in-source here) al)) pn) pe)
+                                               (tw-alike (leftover-from {B = ⊤} {x = src₀} (λ m → lanes-path (πL ⊕ᴸ in-source here) m) al)) }
       where
         se : ∀ {Δ′ A′} {x : Sub h Δ′ A′} (πL : PathLanes ls x) → seenL H′ πL ≡ true → seenL H πL ≡ true
         se πL sn = trans (sym (seenL-alike H H′ πL al)) sn
@@ -438,7 +420,7 @@ module Shifting (R : Set) where
       ; rests = λ { (in-take ψ) sn x pn pe → thru₂ (At.val G (Kit.live c)) (isTaking tk) sn (λ ok sψ → Lingers.rests (ls ok) ψ sψ x pn pe) } }
 
     lg-flat : ∀ {Δ A B op f fl oc k r pl} {so : Sub h Δ A} {ls : List (Lane h Δ B)}
-            → (∀ {c} → At.part G (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Tied pl (At.pooled G fl so ls))
+            → (∀ {c} → At.part G (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Leaves pl (At.pooled G fl so ls) × Restful pl)
             → Lingers G so → LingersL G ls → Lingers G (flatMapˢ op f fl oc k r pl so ls)
     lg-flat pool lo lL = record
       { pools = λ { here _ x → pool x ; (in-outer ψ) sn x → Lingers.pools lo ψ sn x ; (in-lanes πL) sn x → LingersL.poolsL lL πL sn x }
@@ -446,7 +428,7 @@ module Shifting (R : Set) where
 
     lg-connect : ∀ {Δ A B S c b kb k fd rp e rt} {src : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
                → (∀ {n} → At.part G (connectˢ S c b kb k fd rp e rt src bd) ≡ just n → At.part G src ≡ nothing → ∀ {c₀} → e ≡ just c₀
-                  → Tied rt (At.leftover G {B = ⊤} src))
+                  → Twin rt (At.leftover G {B = ⊤} src) × Restful rt)
                → (is-just (At.part G bd) ≡ true → Lingers G src) → ((is-just (At.part G src) ∨ is-just e) ≡ true → Lingers G bd)
                → Lingers G (connectˢ S c b kb k fd rp e rt src bd)
     lg-connect {e = e} {src = src} {bd} rest ls lb = record

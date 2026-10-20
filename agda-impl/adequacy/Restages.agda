@@ -21,7 +21,6 @@ open import Data.Nat using (_<_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Sum using (inj₁)
-open import Data.Unit using (⊤)
 open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁; tt to tt₁)
 open import Data.Bool using (true; if_then_else_)
 open import Relation.Nullary using (¬_)
@@ -35,6 +34,7 @@ import denotation.Unfold as U
 open import operation.Machine using (module Machine)
 open import operation.PureObservable using (Out; Pureᴾ)
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
+open import denotation.MonotonicList using (agree-refl)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Strong.Against using (module StrongAgainst)
 open import adequacy.Strong.Held using (module StrongHeld)
@@ -57,7 +57,7 @@ module Staging (R : Set) where
   open Run (Pureᴾ R) using (emitAll; done; _>>ᴬ_; compile; Env; wkEnv; module Kit)
   open Run.Kit (Pureᴾ R) using (skipᴬ)
   open Strongly R using (Sub; pendingˢ; ofˢ; mapˢ; connectˢ; Lane; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_; Here; walk; top; of-leaf; Call; emitC; kontC; _≗_; module At; names; pendings; Phase; ≗-refl; unsubscribing; under≗) renaming (⟦_⟧ to ⟦_⟧ᶜ)
-  open StrongAgainst R using (Leaving; Books; Job; Owned; Kernels; Meaning; Queue; Each; Lingers; Pinned; unpinned; rest-pinned; seen; owned-to) renaming (at⟦_⟧ to at⟦_⟧ᶜ)
+  open StrongAgainst R using (Twin; tw-refl; leaves; Books; Job; Owned; Kernels; Meaning; Queue; Each; Lingers; Pinned; unpinned; rest-pinned; seen; owned-to) renaming (at⟦_⟧ to at⟦_⟧ᶜ)
   open StrongHeld R using (Carried; carried; Heads; module Eaching; module Lingering)
   open StrongAgainst.Against R using (StackAs; subAs; runAs; SrcOf; src-of)
   open Moving R using (planted; pend; syn-pos; part-plant; names-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant; head-map)
@@ -224,10 +224,7 @@ module Staging (R : Set) where
     -- A map runs what its source runs, and its source what it was
     -- pending to.
     rm-lingers : ∀ (H : Heapᴹ h) → Lingers H T₀ → Lingers H t′
-    rm-lingers H = lingers-plant H π v refl (λ {C} → rest-pinned (U.restᶜ {B = C} (U.subscribe s q))) (record { pools = λ { (in-map ()) } ; rests = λ { (in-map ()) } })
-
-    postulate
-      rm-leaving : ∀ (H : Heapᴹ h) → Leaving H T₀ → Leaving H t′
+    rm-lingers H = lingers-plant H π v refl (λ {C} → leaves (λ ρ _ k → agree-refl k _) (λ ρ d → d) (rest-pinned (U.subscribe s q)) , λ ρ d → d) (record { pools = λ { (in-map ()) } ; rests = λ { (in-map ()) } })
 
     -- A pending node and a map over one register nothing, queue nothing
     -- and are owed nothing.
@@ -260,8 +257,7 @@ module Staging (R : Set) where
            ; books = record { fresh = subst (AllPairs _≢_) (sym M.names′) (Books.fresh bk)
                             ; clocked = proj₁ (Books.clocked bk) , N.reticked sk a (proj₂ (Books.clocked bk))
                             ; paidUp = Books.paidUp bk ; running = Books.running bk }
-           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (M.rm-behind H (Carried.behind cr)) ; lingers′ = Lingering.lingers-to _ (M.rm-lingers H (Carried.lingers cr)) ; leaving = M.rm-leaving H (Carried.leaving cr)
-           ; flags = flags-plant H π M.v refl (λ { (in-map ()) }) (Carried.flags cr) }
+           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (M.rm-behind H (Carried.behind cr)) ; lingers′ = Lingering.lingers-to _ (M.rm-lingers H (Carried.lingers cr)) ; flags = flags-plant H π M.v refl (λ { (in-map ()) }) (Carried.flags cr) }
     , refl , inj₁ (inj₁ M.less)
     where module M = Mapped π
           module N = Moved π M.v
@@ -334,10 +330,10 @@ module Staging (R : Set) where
 
     -- An `of` runs nothing past its end, nor did it pending.
     of-lingers : ∀ (H : Heapᴹ h) → Lingers H T₀ → Lingers H t′
-    of-lingers H = lingers-plant H π v (eqp H) (subst (λ c → Pinned (U.restˢ {B = ⊤} c) U.hushˢ) (sym sp) unpinned) (record { pools = λ () ; rests = λ () })
-
-    postulate
-      of-leaving : ∀ (H : Heapᴹ h) → Leaving H T₀ → Leaving H t′
+    of-lingers H = lingers-plant H π v (eqp H) (λ {C} → subst (λ c → Twin (U.restᶜ {B = C} c) U.idleᶜ) (sym sp) of-idle) (record { pools = λ () ; rests = λ () })
+      where
+        of-idle : ∀ {C} → Twin (U.restᶜ {B = C} (U.ofᶜ q 0 xs)) U.idleᶜ
+        of-idle = leaves (λ ρ _ n → agree-refl n _) (λ ρ d → d) unpinned , λ ρ d → d
 
   -- The configuration an `of` planted makes: its first call its values.
   Offers : ∀ {g m} → Carried g m → ∀ {Δ A} → List A → Set₁
@@ -353,8 +349,7 @@ module Staging (R : Set) where
            ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant π O.v refl)) (Books.fresh bk)
                             ; clocked = proj₁ (Books.clocked bk) , N.reticked sk a (proj₂ (Books.clocked bk))
                             ; paidUp = Books.paidUp bk ; running = Books.running bk }
-           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (O.of-behind H (Carried.behind cr)) ; lingers′ = Lingering.lingers-to _ (O.of-lingers H (Carried.lingers cr)) ; leaving = O.of-leaving H (Carried.leaving cr)
-           ; flags = flags-plant H π O.v (O.eqp H) (λ ()) (Carried.flags cr) }
+           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (O.of-behind H (Carried.behind cr)) ; lingers′ = Lingering.lingers-to _ (O.of-lingers H (Carried.lingers cr)) ; flags = flags-plant H π O.v (O.eqp H) (λ ()) (Carried.flags cr) }
     , q , O.π′ , refl , inj₁ (inj₁ O.less)
     where module O = Offered π (sp q) cs
           module N = Moved π O.v

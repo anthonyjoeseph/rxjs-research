@@ -78,7 +78,7 @@ module ClimbBase (R : Set) where
   open SortingWalk R using (WellMach)
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
   open Strongly R using (Feed; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; joiner; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; here; module At; fired; Path; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; ending; taken; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; outers; outersL; outers-⊕; unsub; Owes; Settled; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
-  open StrongAgainst R using (Leaving; Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
+  open StrongAgainst R using (Leaves; Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
   open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering)
   open StrongAgainst.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf; src-of) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
@@ -92,7 +92,7 @@ module ClimbBase (R : Set) where
   open Aliking R using (walk-grow; compile-cong; laneAt-wk; ObsRel)
   open Taking R using (tick-ix0)
   open Naming R using (pre; pairs-↭; names-plant-↭; fresh-plant; fresh-new; wk-pairs; wk-img; to-img)
-  open Ghosting R using (residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; passed; Past; Lefts)
+  open Ghosting R using (residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; passed; Past; Lefts; LeftsL)
   open GhostingPaths R using (each-sub; each-lanes; module Far; module Calling; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; done-up; Healed; HealedL; healed-split; healed-end; lifts-seen; Rises; rises; Called; landed; rose; Aloft; aloft; hop-sorted; each-back; hopped-pre; lefts-up; lefts-subst; lefts-subst₂)
   open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed; gapped-deep)
   open Lowering R using (Keeps; queue-keeps; store-keeps; keeps-trans)
@@ -104,11 +104,11 @@ module ClimbBase (R : Set) where
   open Everywhere.Spending R using (spent-retag)
   open EverywhereGated.Holding R using (holds-alike; holds-path; holds-plant; holds-retag)
   open Keeping R using (seen-planted)
-  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; sourced-heap; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag)
+  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; conn-left; sourced-heap; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag)
   open ShiftWalk R using (let-go; grip)
   open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined)
   open FramingRepool R using (Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
-  open FramingLefts R using (lefts-off)
+  open FramingLefts R using (lefts-off; on-end; sourceless; NoSource; NoSourceL)
   open Staging R using (not-src; wrap-lane)
   open Weakening R using (Grows; pure-map) renaming (module Grown to Weakened)
   open WeakeningHeaps R using () renaming (module GrownHeaps to Weakened′)
@@ -167,7 +167,7 @@ module ClimbBase (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = t ; ctlAs = calmAs ; meets = mt
         ; owned′ = owned-to (owned-spent hp calmAs sp refl refl refl (Carried.owned cr)) ; kernels = kn ; meaning = mn ; queue = q
         ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr eq now ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; leaving = Carried.leaving cr ; flags = Carried.flags cr })
+        ; sorted = hop-sorted cr eq now ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; flags = Carried.flags cr })
     , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (refl , inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))))
   burst-spent {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk} {K = K} {b = b} {bs = bs} {σ = σ}
     cr@record { tree = t ; ctlAs = burstAs x restᴴ (restAs ks e K″) ; meets = mt ; kernels = kn ; meaning = mn ; queue = q
@@ -179,7 +179,7 @@ module ClimbBase (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = t ; ctlAs = runAs ks e K″ ; meets = mt
         ; owned′ = owned-to (owned-spent hp (runAs ks e K″) sp refl refl refl (Carried.owned cr)) ; kernels = kn ; meaning = mn ; queue = q
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr eq now ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; leaving = Carried.leaving cr ; flags = Carried.flags cr })
+        ; sorted = hop-sorted cr eq now ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; flags = Carried.flags cr })
     , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (refl , inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))))
 
   -- A burst's frame stepped: found spent, polled, or played.
@@ -277,7 +277,7 @@ module ClimbBase (R : Set) where
   call-body st {m₁ = m₁} {T = T} {Sj} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = t} {u} ρ {closes ks}
     record { sane = sn ; placed = pl ; deep = dp ; ctl = cx ; code = cd ; stack = sk ; lifted = gn , S , L , sg , hl ; owned = ow
            ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
-           ; behind = bh ; lingers = lgr ; leaving = lvg ; lefts = lt ; flags = dn ; kept = kp }
+           ; behind = bh ; lingers = lgr ; lefts = lt ; flags = dn ; kept = kp }
     with lifts-split ρ (in-body here) L in eqB
   ... | _ , Lb , Lρ = rose {sg′ = closes (bodyC ρ ∷ ks)} now (one-lower ρ one-body) (record
       { sane = sn ; placed = pl ; deep = dp ; ctl = cx
@@ -289,7 +289,7 @@ module ClimbBase (R : Set) where
       ; owned = owned-body (Conf.heap (Mach.conf m₁)) (runAs (bodyC ρ ∷ ks) (≗-refl ⟦ bodyC ρ ∷ ks ⟧ᶜ) sk) ρ refl refl refl gn ow
       ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
-      ; sorted = so ; behind = bh ; lingers = lgr ; leaving = lvg ; flags = done-up ρ (in-body here) refl dn ; kept = kp })
+      ; sorted = so ; behind = bh ; lingers = lgr ; flags = done-up ρ (in-body here) refl dn ; kept = kp })
 
   -- A live take's part, its source's lifted.
   take-part : ∀ {h} (H : Heapᴹ h) {Δ A} {i p c k} {u : Sub h Δ A} {c′} → At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′
@@ -308,7 +308,7 @@ module ClimbBase (R : Set) where
   take-pass {g} {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {i = i} {p = p} {c = c} {k = k} {u = u} ρ {y} py
     record { sane = sn ; placed = pl ; deep = dp ; ctl = refl ; code = cd ; stack = sk ; lifted = c′ , pv , S , L , sg ; owned = ow
            ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
-           ; behind = bh ; lingers = lgr ; leaving = lvg ; lefts = lt ; flags = dn ; kept = kp }
+           ; behind = bh ; lingers = lgr ; lefts = lt ; flags = dn ; kept = kp }
     with lifts-split ρ (in-take here) L in eqT | subst (λ W → _ ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-take here) top) cd
   ... | _ , lifts-take lv lifts-here , Lρ | readRef≗ refl f =
     rises {sg′ = sends y} (then refl now) (one-lower ρ one-take) (record
@@ -319,7 +319,7 @@ module ClimbBase (R : Set) where
       ; lefts = lefts-subst (λ s → s) (cong (U.taking i p q y c′) py) (lefts-up ρ (in-take here) eqT lt)
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
-      ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; lingers = lgr ; leaving = lvg ; flags = done-up ρ (in-take here) refl dn ; kept = inj₁ refl })
+      ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; lingers = lgr ; flags = done-up ρ (in-take here) refl dn ; kept = inj₁ refl })
 
   -- A plant counting fewer stages than what it replaced counts fewer.
   mutual
@@ -365,11 +365,56 @@ module ClimbBase (R : Set) where
     liftsL-planted (this-lane ρ) v (lifts-this lv L) = lifts-this lv (lifts-planted ρ v L)
     liftsL-planted (next-lane πL) v (lifts-next L)   = lifts-next (liftsL-planted πL v L)
 
-  -- A plant at the path's end, left: every free node the lift carries
-  -- still ties to its node's leftover, each node now over the plant.
-  postulate
-    lefts-planted : ∀ {h} {H : Heapᴹ h} {Δ A Δ′ A′} {t : Sub h Δ A} {x : Sub h Δ′ A′} (ρ : Path t x) (v : Sub h Δ′ A′) {s S}
-                    (L : Lifts H ρ s S) → Lefts H L → Lefts H (lifts-planted ρ v L)
+  -- A plant leaving its node's leftover leaves every leftover above it on
+  -- a sourceless path: no ancestor reads the plant's part.
+  mutual
+    leftover-planted : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {x : Sub h Δ′ A′} (ρ : Path t x) (v : Sub h Δ′ A′) → NoSource ρ
+                     → (∀ {B} → At.leftover H {B = B} v ≡ At.leftover H {B = B} x) → ∀ {B} → At.leftover H {B = B} (plant ρ v) ≡ At.leftover H {B = B} t
+    leftover-planted H here          v ns lb = lb
+    leftover-planted H (in-map ρ)    v ns lb = leftover-planted H ρ v ns lb
+    leftover-planted H (in-scan ρ)   v ns lb = leftover-planted H ρ v ns lb
+    leftover-planted H (in-take ρ)   v ns lb = leftover-planted H ρ v ns lb
+    leftover-planted H (in-outer {ls = ls} ρ) v ns lb = cong (λ z → U.unionᶜ z (At.leftoverL H ls)) (leftover-planted H ρ v ns lb)
+    leftover-planted H (in-lanes {t = so} πL) v ns lb = cong (U.unionᶜ (At.leftover H so)) (leftoverL-planted H πL v ns lb)
+    leftover-planted H (in-source ρ) v () lb
+    leftover-planted H (in-body {rp = rp} {t = src} ρ) v ns lb =
+      cong (λ z → U.unionᶜ (U.burstingᶜ rp n) (U.underᶜ (U.live n) z)) (leftover-planted H ρ v ns lb {B = ⊤})
+      where n = At.sourced H (At.part H src) (At.leftover H src)
+    leftover-planted H (in-defer ρ)  v ns lb = leftover-planted H ρ v ns lb
+
+    leftoverL-planted : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {x : Sub h Δ′ A′} (πL : PathLanes ls x) (v : Sub h Δ′ A′) → NoSourceL πL
+                      → (∀ {B′} → At.leftover H {B = B′} v ≡ At.leftover H {B = B′} x) → ∀ {B′} → At.leftoverL H {B = B′} (plantᴸ πL v) ≡ At.leftoverL H {B = B′} ls
+    leftoverL-planted H (this-lane {ls = ls} ρ) v ns lb = cong (λ z → U.unionᶜ z (At.leftoverL H ls)) (leftover-planted H ρ v ns lb)
+    leftoverL-planted H (next-lane {l = lane c k s₀} πL) v ns lb = cong (U.unionᶜ (At.leftover H s₀)) (leftoverL-planted H πL v ns lb)
+
+  -- A plant at the path's end leaving its node's leftover, left: every
+  -- free node the lift carries still ties to its node's leftover, each
+  -- node now over the plant.  Any `v` is false: through `in-outer here`
+  -- the tie would read `v`'s leftover, which nothing relates to the
+  -- free node.
+  mutual
+    lefts-planted : ∀ {h} {H : Heapᴹ h} {Δ A Δ′ A′} {t : Sub h Δ A} {x : Sub h Δ′ A′} (ρ : Path t x) (v : Sub h Δ′ A′)
+                  → (∀ {B} → At.leftover H {B = B} v ≡ At.leftover H {B = B} x)
+                  → ∀ {s S} (L : Lifts H ρ s S) → Lefts H L → Lefts H (lifts-planted ρ v L)
+    lefts-planted here          v lb lifts-here            lt = lt
+    lefts-planted (in-map ρ)    v lb (lifts-map L)         lt = lefts-planted ρ v lb L lt
+    lefts-planted (in-scan ρ)   v lb (lifts-scan L)        lt = lefts-planted ρ v lb L lt
+    lefts-planted (in-take ρ)   v lb (lifts-take _ L)      lt = lefts-planted ρ v lb L lt
+    lefts-planted {H = H} (in-outer ρ) v lb (lifts-outer {S = S} {o₀ = o₀} _ _ L) (lo , lt) =
+      on-end S (λ ne → subst (Leaves o₀) (sym (leftover-planted H ρ v (sourceless L ne) lb))) lo , lefts-planted ρ v lb L lt
+    lefts-planted (in-lanes πL) v lb (lifts-lanes LL _ _ _) lt = leftsL-planted πL v lb LL lt
+    lefts-planted {H = H} (in-source ρ) v lb (lifts-source {S = S} {c₀ = c₀} _ _ L) (lc , lt) =
+      on-end S (λ ne → subst (Leaves c₀) (sym (leftover-planted H ρ v (sourceless L ne) lb))) lc , lefts-planted ρ v lb L lt
+    lefts-planted (in-body ρ)   v lb (lifts-body _ _ L)    lt = lefts-planted ρ v lb L lt
+    lefts-planted (in-body ρ)   v lb (lifts-shut _ _ _ L)  lt = lefts-planted ρ v lb L lt
+    lefts-planted (in-defer ρ)  v lb (lifts-defer L)       lt = lefts-planted ρ v lb L lt
+
+    leftsL-planted : ∀ {h} {H : Heapᴹ h} {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {x : Sub h Δ′ A′} (πL : PathLanes ls x) (v : Sub h Δ′ A′)
+                   → (∀ {B′} → At.leftover H {B = B′} v ≡ At.leftover H {B = B′} x)
+                   → ∀ {s bs S as l} (LL : LiftsLane H πL s bs S as) → LeftsL H l LL → LeftsL H l (liftsL-planted πL v LL)
+    leftsL-planted {H = H} (this-lane ρ) v lb {l = l} (lifts-this {S = S} _ L) (ll , lt) =
+      on-end S (λ ne → subst (Leaves l) (sym (leftover-planted H ρ v (sourceless L ne) lb))) ll , lefts-planted ρ v lb L lt
+    leftsL-planted (next-lane πL) v lb (lifts-next LL) lt = leftsL-planted πL v lb LL lt
 
   -- A plant is as high as the path it replaced.
   mutual
@@ -525,6 +570,3 @@ module ClimbBase (R : Set) where
     -- Nothing left at the node: its ties as they were.
     lingers : Ends H T → Lingering H H′ u u → Lingers H T → Lingers H′ T
     lingers en lg l = subst (Lingers H′) (plant-self ρ) (shift-lingers u en lg l)
-
-    postulate
-      leaving : Ends H T → Lingering H H′ u u → Leaving H T → Leaving H′ T

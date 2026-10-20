@@ -20,8 +20,7 @@ open import Level using (lift; lower)
 open import Data.Maybe using (Maybe; just; nothing; is-nothing; is-just) renaming (map to mapMaybe)
 open import Data.Maybe.Properties using (just-injective)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
-open import Data.Unit using (⊤; tt)
-open import Data.Nat using (zero; suc)
+open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import denotation.MonotonicList.Events using (Events∞; skip; Pos; Timeline)
@@ -41,8 +40,8 @@ open import adequacy.Torn using (module Tearing)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Seq using (module Sequencing)
 open import adequacy.Sane using (Sane)
-open import adequacy.Deep using (Deep)
-open import adequacy.Placed.Order using (Placed; Atop; Ordered; ordered)
+open import adequacy.Deep using (Deep; deep-rest; ordered-retyped)
+open import adequacy.Placed.Order using (Placed)
 open import denotation.Denote using (⟦_⟧)
 import Tree as T
 open import operation.PureObservable using (Out; Pureᴾ; module Pure)
@@ -86,7 +85,7 @@ module ClimbConnect (R : Set) where
   open SortingWalk R using (WellMach)
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
   open Strongly R using (Feed; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; joiner; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; here; module At; fired; Path; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; ending; taken; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; outers; outersL; outers-⊕; unsub; Owes; Settled; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
-  open StrongAgainst R using (Leaving; Leaves; Restful; rf-rest; rf-idle; rf-union; rf-burst; rf-under; Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
+  open StrongAgainst R using (Leaves; Twin; Restful; rf-rest; rf-idle; rf-union; rf-burst; rf-under; tail-agreeᵀ; restful-meaning; restful-deep; Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
   open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering)
   open StrongAgainst.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf; src-of) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
@@ -112,7 +111,7 @@ module ClimbConnect (R : Set) where
   open Everywhere.Spending R using (spent-retag)
   open EverywhereGated.Holding R using (holds-alike; holds-path; holds-plant; holds-retag)
   open Keeping R using (seen-planted)
-  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; sourced-heap)
+  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; sourced-heap; tw-alike)
   open ShiftWalk R using (let-go; grip)
   open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined)
   open FramingRepool R using (Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
@@ -152,33 +151,6 @@ module ClimbConnect (R : Set) where
   conn-≡ G G′ r (just _) t nothing  (just _) = refl
   conn-≡ G G′ r nothing  t nothing  (just _) = refl
 
-  -- Two tails run alike are alike.
-  tail-agreeᵀ : ∀ {A m} (t t′ : Ev.Tail) → ML.Agree {A} m (ML.tailᴱ t) (ML.tailᴱ t′) → ML.Agreeᵀ m t t′
-  tail-agreeᵀ {m = zero}  t            t′             _              = ML.stopᵀ
-  tail-agreeᵀ {m = suc _} (Ev.pin k r) (Ev.pin .k r′) (ML.skip⁼ a _) = ML.pin⁼ a
-  tail-agreeᵀ {m = suc _} (Ev.pin _ _) Ev.idle        ()
-  tail-agreeᵀ {m = suc _} Ev.idle      (Ev.pin _ _)   ()
-  tail-agreeᵀ {m = suc _} Ev.idle      Ev.idle        ML.hush⁼       = ML.idle⁼
-
-  -- A tail runs in order whatever it is read as.
-  atop-tail : ∀ {A B} k (t : Ev.Tail) → Atop k (ML.tailᴱ {A} t) → Atop k (ML.tailᴱ {B} t)
-  atop-tail k (Ev.pin _ _) a = a
-  atop-tail k Ev.idle      a = a
-
-  ordered-retyped : ∀ {A B} (t : Ev.Tail) → Ordered (ML.tailᴱ {A} t) → Ordered (ML.tailᴱ {B} t)
-  ordered-retyped (Ev.pin k r) o .ordered = atop-tail k (Ev.Tail∞.later r) (proj₁ (ordered o)) , ordered-retyped (Ev.Tail∞.later r) (proj₂ (ordered o))
-  ordered-retyped Ev.idle      o .ordered = tt
-
-  -- A restful node's meaning is its cut's tail.
-  restful-meaning : ∀ {Γ A} {t : U.Node Γ A} → Restful t → ∀ ρ → U.meaning t ρ ≡ ML.tailᴱ (U.cutᴺ t ρ)
-  restful-meaning rf-rest                     ρ = refl
-  restful-meaning rf-idle                     ρ = refl
-  restful-meaning rf-union                    ρ = refl
-  restful-meaning rf-burst                    ρ = refl
-  restful-meaning (rf-under {s = U.live _})   ρ = refl
-  restful-meaning (rf-under {s = U.ended _ _}) ρ = refl
-
-
   -- A CONNECT'S FEED RESTAGED IN PLACE: the source alike, the body
   -- retagged by what the feed owes it.
   module Refed {h} (G : Heapᴹ h) {Δ A B Sj c b kb k rp e rt} {u : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} (fd′ : Feed A h) (q : Pos) where
@@ -211,7 +183,7 @@ module ClimbConnect (R : Set) where
     lingering : Lingering G G w₀ v
     lingering = record
       { ling-revive = re-revive
-      ; ling-rested = λ {C} → pin-alike (conn-left {B = C} rp {n = At.sourced G (At.part G u) (At.leftover G u)} refl re-leftover)
+      ; ling-rested = λ {C} → tw-alike (conn-left {B = C} rp {n = At.sourced G (At.part G u) (At.leftover G u)} refl re-leftover)
       ; ling-below  = λ lg → Linger.lg-connect G
           (λ x pn pe → Lingers.rests lg here refl (proj₂ (just-of (re-revive (cong is-just x)))) pn pe)
           (λ jb → lingers-sub G lg (in-source here) (cong (λ z → z ∧ true) (trans (sym re-just) jb)))
@@ -307,9 +279,6 @@ module ClimbConnect (R : Set) where
     fed-lingers : AllPairs _≢_ (names T) → Ends H T → Lingers H T → Lingers H T′
     fed-lingers fs en = Shift.shift-lingers H H ρ (λ j _ → refl) [] fs v en fed-lingering
 
-    postulate
-      fed-leaving : AllPairs _≢_ (names T) → Ends H T → Leaving H T → Leaving H T′
-
     -- The feed read by the connect's own joiners alone, each a subscriber
     -- the feed read.
     --
@@ -347,7 +316,7 @@ module ClimbConnect (R : Set) where
   climb-source st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {Sj} {c} {b} {kb} {k} {e = e} {rp} {rt} {u = u} {bd} ρ {y}
     cl@record { sane = sn ; placed = pl ; deep = dp ; ctl = refl ; code = cd ; stack = sk ; lifted = c′ , pv , S , L , sg ; owned = ow
               ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
-              ; behind = bh ; lingers = lgr ; leaving = lvg } | refl
+              ; behind = bh ; lingers = lgr } | refl
     with subst (λ W → _ ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-source here) top) cd
   ... | readRef≗ refl f with Feeds.fed-ghost hp ρ y q fs (Queue.joined qu) mn bh sn pl dp pv L sg
   ...   | g″ , pg , sn″ , pl″ , dp″ , k′ , r , ag , pp with lifts-split ρ (in-source here) L
@@ -361,8 +330,7 @@ module ClimbConnect (R : Set) where
         ; kernels = Feeds.fed-kernels hp ρ y q kn ; meaning = Feeds.fed-meaning hp ρ y q (Queue.joined qu) mn ; queue = Feeds.fed-queue hp ρ y q qu
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Feeds.Bd.body-names hp ρ y q))) fs
                          ; clocked = proj₁ ck , Feeds.fed-ticked hp ρ y q clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
-        ; sorted = sorted-⇝ so (then refl now) ; behind′ = Eaching.each-to _ _ (Feeds.fed-behind hp ρ y q fs (tells-past cl) (ended-past cl) bh) ; lingers′ = Lingering.lingers-to _ (Feeds.fed-lingers hp ρ y q fs (ended-past cl) lgr) ; leaving = Feeds.fed-leaving hp ρ y q fs (ended-past cl) lvg
-        ; flags = let-go hp (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Feeds.Bd.body-names hp ρ y q))) fs)
+        ; sorted = sorted-⇝ so (then refl now) ; behind′ = Eaching.each-to _ _ (Feeds.fed-behind hp ρ y q fs (tells-past cl) (ended-past cl) bh) ; lingers′ = Lingering.lingers-to _ (Feeds.fed-lingers hp ρ y q fs (ended-past cl) lgr) ; flags = let-go hp (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Feeds.Bd.body-names hp ρ y q))) fs)
                     (trans (seen-planted hp ρ v) (lifts-seen Lρ)) ju
                     (subst (DoneBy hp (plant ρ v)) (sym (outers-planted ρ v))
                            (Shift.shift-flags hp hp ρ (λ j _ → refl) [] fs v {ns₀ = []} (λ ()) rv fb (subst (DoneBy hp T) (sym (++-identityʳ (outers ρ))) d₀))) })
@@ -447,13 +415,13 @@ module ClimbConnect (R : Set) where
     -- end staged on its way up: with `e` `nothing` the heap reads no part
     -- past a dead source.  The ghost's rest and the heap's are tied in
     -- meaning through the source's leftover, `Lefts` on one side and
-    -- `Leaving` on the other, never in form.
-    fin-ghost : AllPairs _≢_ (names T) → Leaving H T
+    -- `Lingers` on the other, never in form.
+    fin-ghost : AllPairs _≢_ (names T) → Lingers H T
               → ∀ {g S} → Sane [] g → Placed g [] → Deep g [] → At.part H u ≡ nothing → e ≡ just q
               → (L : Lifts H (ρ ⊕ in-source here) (U.endˢ q) S) → Lefts H L → U.step g ≡ S
               → Σ (U.Node [] R) λ g″ → At.part H′ T′ ≡ just g″ × Sane [] g″ × Placed g″ [] × Deep g″ []
                 × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
-    fin-ghost fs lv sn pd dp pu eq L lt sg with lifts-split ρ (in-source here) L | lefts-split ρ (in-source here) L lt
+    fin-ghost fs lg sn pd dp pu eq L lt sg with lifts-split ρ (in-source here) L | lefts-split ρ (in-source here) L lt
     ... | _ , lifts-source {c₀ = c₀} {b₀ = b₀} pb sf lifts-here , Lρ | (lc , _) , _ with fin-shut pb
     ...   | b₁ , pb′ , gb rewrite sf =
       ghost-lift H H′ ρ v fs (off-store H (Subject.closed Sj)) mine {κ = q} Lρ pv′ (gap-connect gb (gap-tied ag cs dt)) sn pd dp sg
@@ -463,13 +431,16 @@ module ClimbConnect (R : Set) where
                     (cong (λ x → At.connected H′ rp x rt nothing (just b₁)) eq)
         pw : At.part H w₀ ≡ just (U.connectᶜ rp (U.shut (here refl) q b₀) (U.ended q rt))
         pw = trans (cong₂ (At.connected H rp e rt) pu pb) (cong (λ x → At.connected H rp x rt nothing (just b₀)) eq)
-        lr = Leaving.rests lv ρ (lifts-seen Lρ) pw pu eq
-        cs : ∀ ρ′ n → ML.Agreeᵀ n (U.cutᴺ c₀ ρ′) (U.cutᴺ rt ρ′)
-        cs ρ′ n = tail-agreeᵀ (U.cutᴺ c₀ ρ′) (U.cutᴺ rt ρ′) (ML.agree-trans (Leaves.agree lc ρ′ n) (ML.agree-sym (Leaves.agree (proj₁ lr) ρ′ n)))
-        ag : ∀ ρ′ n → Agree n (U.meaning (U.restᶜ c₀) ρ′) (U.meaning rt ρ′)
-        ag ρ′ n = subst (Agree n (ML.tailᴱ (U.cutᴺ c₀ ρ′))) (sym (restful-meaning (proj₂ lr) ρ′)) (tailᴱ-ne (cs ρ′ n))
+        lr = Lingers.rests lg ρ (lifts-seen Lρ) pw pu eq
+        d⊤ : ∀ ρ′ → Deep (U.restᶜ c₀) ρ′ → Deep (U.restᶜ {B = ⊤} c₀) ρ′
+        d⊤ ρ′ d = ordered-retyped (U.cutᴺ c₀ ρ′) (proj₁ d) , proj₂ d
         dt : ∀ ρ′ → Deep (U.restᶜ c₀) ρ′ → Deep rt ρ′
-        dt ρ′ d = proj₂ (Leaves.deep⁻ (proj₁ lr) ρ′ (Leaves.deep lc ρ′ (ordered-retyped (U.cutᴺ c₀ ρ′) (proj₁ d) , proj₂ d)))
+        dt ρ′ d = restful-deep (proj₂ lr) (proj₂ (proj₂ (proj₁ lr) ρ′ (Leaves.deep lc ρ′ (d⊤ ρ′ d))))
+        cs : ∀ ρ′ → Deep (U.restᶜ c₀) ρ′ → ∀ n → ML.Agreeᵀ n (U.cutᴺ c₀ ρ′) (U.cutᴺ rt ρ′)
+        cs ρ′ d n = tail-agreeᵀ (U.cutᴺ c₀ ρ′) (U.cutᴺ rt ρ′)
+                      (ML.agree-trans (Leaves.agree lc ρ′ (d⊤ ρ′ d) n) (ML.agree-sym (Leaves.agree (proj₁ (proj₁ lr)) ρ′ (deep-rest {c = rt} (dt ρ′ d)) n)))
+        ag : ∀ ρ′ → Deep (U.restᶜ c₀) ρ′ → ∀ n → Agree n (U.meaning (U.restᶜ c₀) ρ′) (U.meaning rt ρ′)
+        ag ρ′ d n = subst (Agree n (ML.tailᴱ (U.cutᴺ c₀ ρ′))) (sym (restful-meaning (proj₂ lr) ρ′)) (tailᴱ-ne (cs ρ′ d n))
 
     fin-part : AllPairs _≢_ (names (connectˢ Sj c b kb k idle rp e rt u bd)) → At.part (store H (Subject.closed Sj) (lift true)) (connectˢ Sj c b kb k idle rp e rt u bd) ≡ At.part H (connectˢ Sj c b kb k idle rp e rt u bd)
     fin-part fr = trans (cong₂ (At.connected H′ rp e rt) (part-alike H H′ u (fin-au fr)) (part-alike H H′ bd (fin-ab fr)))
@@ -496,9 +467,9 @@ module ClimbConnect (R : Set) where
     fin-lkept : AllPairs _≢_ (names w₀) → Lingering H H′ w₀ w₀
     fin-lkept fr = record
       { ling-revive = fin-revive fr
-      ; ling-rested = λ {C} → pin-alike (conn-left {B = C} rp src-eq (leftover-alike H H′ {B = ⊤} bd (fin-ab fr)))
+      ; ling-rested = λ {C} → tw-alike (conn-left {B = C} rp src-eq (leftover-alike H H′ {B = ⊤} bd (fin-ab fr)))
       ; ling-below  = λ lg → Linger.lg-connect H′
-          (λ x pn pe → subst (Tied rt) (sym (leftover-alike H H′ {B = ⊤} u (fin-au fr)))
+          (λ x pn pe → subst (λ z → Twin rt z × Restful rt) (sym (leftover-alike H H′ {B = ⊤} u (fin-au fr)))
                          (Lingers.rests lg here refl (trans (sym (fin-part fr)) x) (trans (sym (part-alike H H′ u (fin-au fr))) pn) pe))
           (λ jb → lingers-alike H H′ (fin-au fr) (lingers-sub H lg (in-source here)
                     (cong (λ z → z ∧ true) (trans (cong is-just (sym (part-alike H H′ bd (fin-ab fr)))) jb))))
@@ -569,9 +540,6 @@ module ClimbConnect (R : Set) where
     fin-lingers : AllPairs _≢_ (names T) → Ends H T → Lingers H T → Lingers H′ T′
     fin-lingers fs en = Sh.shift-lingers fs v en (fin-lingering (fresh-path ρ fs))
 
-    postulate
-      fin-leaving : AllPairs _≢_ (names T) → Ends H T → Leaving H T → Leaving H′ T′
-
     -- The finish read by the connect's own joiners alone, each a
     -- subscriber the finish read, the closed flag apart from the list:
     -- whatever each held before the subject closed, it is told its end.
@@ -617,10 +585,10 @@ module ClimbConnect (R : Set) where
   close-source st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {Sj} {c} {b} {kb} {k} {e = e} {rp} {rt} {u = u} {bd} ρ {ks}
     cl@record { sane = sn ; placed = pl ; deep = dp ; ctl = refl ; code = cd ; stack = sk ; lifted = gn , S , L , sg , hl ; owned = ow
               ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
-              ; behind = bh ; lingers = lgr ; leaving = lvg ; lefts = lt } | refl
+              ; behind = bh ; lingers = lgr ; lefts = lt } | refl
     with writes (subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-source here) top) cd)
   ... | n′ , en , path₁ with reads {hp = Fins.H′ hp ρ q} en
-  ...   | k′ , f , path₂ with Fins.fin-ghost hp ρ q fs lvg sn pl dp gn (healed-end ρ hl gn) L lt sg
+  ...   | k′ , f , path₂ with Fins.fin-ghost hp ρ q fs lgr sn pl dp gn (healed-end ρ hl gn) L lt sg
   ...     | g″ , pg , sn″ , pl″ , dp″ , k″ , r , ag , pp with lifts-split ρ (in-source here) L
   ...       | _ , lifts-source {b₀ = b₀} pb _ _ , Lρ =
     landed (g″ , _ , path
@@ -632,8 +600,7 @@ module ClimbConnect (R : Set) where
         ; kernels = Fins.fin-kernels hp ρ q fs kn ; meaning = Fins.fin-meaning hp ρ q fs (Queue.joined qu) mn ; queue = Fins.fin-queue hp ρ q fs qu
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Fins.Bd.body-names hp ρ q))) fs
                          ; clocked = proj₁ ck , Fins.fin-ticked hp ρ q clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
-        ; sorted = sorted-⇝ so path ; behind′ = Eaching.each-to _ _ (Fins.fin-behind hp ρ q fs (tells-past cl) (ended-past cl) bh) ; lingers′ = Lingering.lingers-to _ (Fins.fin-lingers hp ρ q fs (ended-past cl) lgr) ; leaving = Fins.fin-leaving hp ρ q fs (ended-past cl) lvg
-        ; flags = let-go H′ (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Fins.Bd.body-names hp ρ q))) fs)
+        ; sorted = sorted-⇝ so path ; behind′ = Eaching.each-to _ _ (Fins.fin-behind hp ρ q fs (tells-past cl) (ended-past cl) bh) ; lingers′ = Lingering.lingers-to _ (Fins.fin-lingers hp ρ q fs (ended-past cl) lgr) ; flags = let-go H′ (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Fins.Bd.body-names hp ρ q))) fs)
                     (trans (seen-planted H′ ρ v) (lifts-seen (lifts-off hp H′ ρ fs off₀ Lρ))) ju
                     (subst (DoneBy H′ (plant ρ v)) (sym (outers-planted ρ v))
                            (Fins.Sh.shift-flags hp ρ q fs v {ns₀ = []} (λ ()) rv fb (subst (DoneBy hp T) (sym (++-identityʳ (outers ρ))) d₀))) })

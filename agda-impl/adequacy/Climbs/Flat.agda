@@ -83,8 +83,8 @@ module ClimbFlat (R : Set) where
   open Heap using (World; _⊑_; _⨾_; _∋_; Handle; Sink; Quiet; wk∋; slot; cell) renaming (same to same⊑)
   open SortingWalk R using (WellMach)
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
-  open Strongly R using (Feed; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; joiner; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; here; module At; fired; Path; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; ending; taken; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; outers; outersL; outers-⊕; unsub; Owes; Settled; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
-  open StrongAgainst R using (Leaving; Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
+  open Strongly R using (Feed; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; joiner; CbRel; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; here; module At; fired; Path; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; ending; taken; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; outers; outersL; outers-⊕; unsub; Owes; Settled; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
+  open StrongAgainst R using (Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Leaves; Lingers; Tied; Pinned; pinned; unpinned; Restful; rf-idle; rf-rest; rf-union; restful-pinned; pinned-sym; rest-pinned; union-pinned; bursts-pinned; under-pinned; seen; seenL; pinned-trans; ∧-split; false≢; owned-to; tw-trans; Twin; lv-swap; lv-trans; tw-bursting; tw-idle; tw-idleʳ; tw-idleˡ; tw-refl; tw-rest; tw-restᵀ; tw-sym; tw-under; tw-union)
   open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering)
   open StrongAgainst.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf; src-of) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
@@ -99,7 +99,7 @@ module ClimbFlat (R : Set) where
   open Taking R using (tick-ix0)
   open Naming R using (pre; pairs-↭; names-plant-↭; fresh-plant; fresh-new; wk-pairs; wk-img; to-img)
   open Ghosting R using (residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; passed; Past; Lefts)
-  open GhostingPaths R using (each-sub; each-lanes; module Far; module Calling; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; done-up; Healed; HealedL; healed-split; healed-end; lifts-seen; Rises; rises; Called; landed; rose; Aloft; aloft; hop-sorted; each-back; hopped-pre; lefts-up; lefts-subst; lefts-subst₂)
+  open GhostingPaths R using (each-sub; each-lanes; module Far; module Calling; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; done-up; Healed; HealedL; healed-split; healed-end; lifts-seen; lefts-split; Rises; rises; Called; landed; rose; Aloft; aloft; hop-sorted; each-back; hopped-pre; lefts-up; lefts-subst; lefts-subst₂)
   open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed; gapped-deep)
   open Lowering R using (Keeps; queue-keeps; store-keeps; keeps-trans)
   open Lifting R using (emit-shut; emit-run; spread-past; behind-fire; fire-lingers; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward)
@@ -110,7 +110,7 @@ module ClimbFlat (R : Set) where
   open Everywhere.Spending R using (spent-retag)
   open EverywhereGated.Holding R using (holds-alike; holds-path; holds-plant; holds-retag)
   open Keeping R using (seen-planted)
-  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag)
+  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; pooledL-alike; leftover-from; pooled-from; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; tw-alike)
   open ShiftWalk R using (let-go; grip)
   open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined)
   open FramingRepool R using (heads-repool; Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
@@ -212,8 +212,29 @@ module ClimbFlat (R : Set) where
   lingering-∘ : ∀ {h} {H₁ H₂ H₃ : Heapᴹ h} {Δ A} {u v w : Sub h Δ A} → Lingering H₁ H₂ u v → Lingering H₂ H₃ v w → Lingering H₁ H₃ u w
   lingering-∘ record { ling-revive = r₁ ; ling-rested = p₁ ; ling-below = b₁ } record { ling-revive = r₂ ; ling-rested = p₂ ; ling-below = b₂ } = record
     { ling-revive = λ j → r₁ (r₂ j)
-    ; ling-rested = λ {C} → pinned-trans (p₁ {C}) (p₂ {C})
+    ; ling-rested = λ {C} → tw-trans (p₁ {C}) (p₂ {C})
     ; ling-below  = λ lg → b₂ (b₁ lg) }
+
+  -- A leftover read at another type leaves as it did.
+  mutual
+    tw-leftover : ∀ {h} (H : Heapᴹ h) {Δ A B C} (s : Sub h Δ A) → Twin (At.leftover H {B = B} s) (At.leftover H {B = C} s)
+    tw-leftover H (pendingˢ s q)                     = tw-restᵀ (U.subscribe s q)
+    tw-leftover H (coldˢ s hd ph)                    = tw-idle
+    tw-leftover H (ofˢ p i xs)                       = tw-idle
+    tw-leftover H doneˢ                              = tw-idle
+    tw-leftover H (mapˢ f s)                         = tw-leftover H s
+    tw-leftover H (scanˢ f r s)                      = tw-leftover H s
+    tw-leftover H (takeWhileˢ i p c k tk s)          = tw-leftover H s
+    tw-leftover H (flatMapˢ op f fl oc k r pl so ls) = tw-union (tw-leftover H so) (tw-leftoverL H ls)
+    tw-leftover H (connectˢ S c b kb k fd rp e rt src bd) =
+      tw-union (tw-bursting rp n) (tw-under (U.live n) (tw-refl (At.leftover H {B = ⊤} bd)))
+      where n = At.sourced H (At.part H src) (At.leftover H src)
+    tw-leftover H (joinˢ j sk l x st)                = tw-idle
+    tw-leftover H (deferˢ k s)                       = tw-leftover H s
+
+    tw-leftoverL : ∀ {h} (H : Heapᴹ h) {Δ A B C} (ls : List (Lane h Δ A)) → Twin (At.leftoverL H {B = B} ls) (At.leftoverL H {B = C} ls)
+    tw-leftoverL H []                = tw-idle
+    tw-leftoverL H (lane c k s ∷ ls) = tw-union (tw-leftover H s) (tw-leftoverL H ls)
 
   -- An untold list split at its pool.
   told-split : ∀ (xs ys zs : List Pos) {ws} → xs ⊆ᴾ ws → ys ⊆ᴾ ws → zs ⊆ᴾ ws → (xs ++ ys ++ zs) ⊆ᴾ ws
@@ -230,22 +251,16 @@ module ClimbFlat (R : Set) where
     kin : Kin w₀ v
     kin = kin-pool
 
-    -- A pool joined with an idle one ties what it tied.
-    -- SUSPECT: `step (unionᶜ p idleᶜ)` reads `restˢ p`, not `step p`; for
-    --   a pool not `Restful` (a `framesᶜ` stepping to a skip) the two part.
-    postulate
-      idle-tied : ∀ {Γ A B} {p : U.Node Γ A} {x : U.Node Γ B} → Tied p x → Tied (U.unionᶜ p U.idleᶜ) x
-
     pool-idling : pl′ ≡ U.unionᶜ pl U.idleᶜ → Lingering H H w₀ v
     pool-idling e = record
       { ling-revive = λ j → trans (sym (merged-pool H op _ (At.part H u) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl pl′)) j
-      ; ling-rested = λ {C} → pin-alike {Γ = Δ} {A = C} {x = At.leftover H {B = C} w₀} refl
+      ; ling-rested = λ {C} → tw-alike {Γ = Δ} {A = C} {x = At.leftover H {B = C} w₀} refl
       ; ling-below  = λ lg → Linger.lg-flat H (pool lg) (lingers-sub H lg (in-outer here) refl) (lingersL-of H lg) }
       where
-        pool : Lingers H w₀ → ∀ {c} → At.part H v ≡ just c → Tied pl′ (At.pooled H fl u ls)
-        pool lg x = subst (λ p → Tied p (At.pooled H fl u ls)) (sym e)
-          (idle-tied {p = pl} {x = At.pooled H fl u ls} (Lingers.pools lg here refl
-            (proj₂ (just-of (trans (sym (merged-pool H op _ (At.part H u) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl pl′)) (cong is-just x))))))
+        pool : Lingers H w₀ → ∀ {c} → At.part H v ≡ just c → Leaves pl′ (At.pooled H fl u ls) × Restful pl′
+        pool lg x with Lingers.pools lg here refl
+                         (proj₂ (just-of (trans (sym (merged-pool H op _ (At.part H u) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl pl′)) (cong is-just x))))
+        ... | t , rf = subst (λ p → Leaves p (At.pooled H fl u ls) × Restful p) (sym e) (lv-trans (proj₁ (tw-sym (tw-idleʳ pl))) t , rf-union rf rf-idle)
 
     -- The pool moved in place: every clause but the pool's alike.
     repool-heading : ∀ {q} → (∀ {A′} (i : A′ ∈ᴸ Δ) {b₀} → At.part H w₀ ≡ just b₀ → untold i pl′ ⊆ᴾ untold i b₀)
@@ -294,9 +309,6 @@ module ClimbFlat (R : Set) where
 
     pool-idle : AllPairs _≢_ (names T) → pl′ ≡ U.unionᶜ pl U.idleᶜ → Ends H T → Lingers H T → Lingers H T′
     pool-idle fs e en = Shift.shift-lingers H H ρ (λ j _ → refl) [] fs v en (pool-idling e)
-
-    postulate
-      pool-leaving : AllPairs _≢_ (names T) → pl′ ≡ U.unionᶜ pl U.idleᶜ → Ends H T → Leaving H T → Leaving H T′
 
     -- The pool read by its part alone: no kernel, feed or queue clause
     -- moves.
@@ -494,7 +506,7 @@ module ClimbFlat (R : Set) where
     sd-lingering : AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl u ls)) → At.part (store H (FlatKit.Flat.outerDone fl) (lift true)) (flatMapˢ op f fl oc k r pl u ls) ≡ nothing → Lingering H (store H (FlatKit.Flat.outerDone fl) (lift true)) (flatMapˢ op f fl oc k r pl u ls) (flatMapˢ op f fl oc k r pl u ls)
     sd-lingering fr gn = record
       { ling-revive = λ j → ⊥-elim (true≢false (trans (sym j) (cong is-just gn)))
-      ; ling-rested = λ {C} → pin-alike (cong₂ U.unionᶜ (leftover-alike H H′ {B = C} u so-al) (leftoverL-alike H H′ {B = C} ls ls-al))
+      ; ling-rested = λ {C} → tw-alike (cong₂ U.unionᶜ (leftover-alike H H′ {B = C} u so-al) (leftoverL-alike H H′ {B = C} ls ls-al))
       ; ling-below  = λ lg → Linger.lg-flat H′ (λ e → ⊥-elim (true≢false (trans (sym (cong is-just e)) (cong is-just gn))))
                                 (lingers-alike H H′ so-al (lingers-sub H lg (in-outer here) refl))
                                 (lingersL-alike H H′ ls-al (lingersL-of H lg)) }
@@ -529,15 +541,15 @@ module ClimbFlat (R : Set) where
       flat-eq = trans (cong₂ (λ o L → U.flatMapᶜ op G o L (At.val H′ (FlatKit.Flat.queue fl)) pl′) (part-alike H H′ u so-al) (partLanes-alike H H′ ls ls-al))
                       (cong (λ Q → U.flatMapᶜ op G (At.part H u) (At.partLanes H ls) Q pl′) (sd-fifo fr))
 
-      lingering : (∀ {c} → At.part H w₀ ≡ just c → Tied pl (At.pooled H fl u ls) → Tied pl′ (At.pooled H′ fl u ls)) → Lingering H H′ w₀ v
+      lingering : (∀ {c} → At.part H w₀ ≡ just c → Leaves pl (At.pooled H fl u ls) × Restful pl → Leaves pl′ (At.pooled H′ fl u ls) × Restful pl′) → Lingering H H′ w₀ v
       lingering tie = record
         { ling-revive = revive
-        ; ling-rested = λ {C} → pin-alike (cong₂ U.unionᶜ (leftover-alike H H′ {B = C} u so-al) (leftoverL-alike H H′ {B = C} ls ls-al))
+        ; ling-rested = λ {C} → tw-alike (cong₂ U.unionᶜ (leftover-alike H H′ {B = C} u so-al) (leftoverL-alike H H′ {B = C} ls ls-al))
         ; ling-below  = λ lg → Linger.lg-flat H′ (pool lg)
                                  (lingers-alike H H′ so-al (lingers-sub H lg (in-outer here) refl))
                                  (lingersL-alike H H′ ls-al (lingersL-of H lg)) }
         where
-          pool : Lingers H w₀ → ∀ {c} → At.part H′ v ≡ just c → Tied pl′ (At.pooled H′ fl u ls)
+          pool : Lingers H w₀ → ∀ {c} → At.part H′ v ≡ just c → Leaves pl′ (At.pooled H′ fl u ls) × Restful pl′
           pool lg x = tie e₀ (Lingers.pools lg here refl e₀)
             where e₀ = proj₂ (just-of (revive (cong is-just x)))
 
@@ -655,7 +667,7 @@ module ClimbFlat (R : Set) where
                  (cl : Calling g ℓ m₁ (ρ ⊕ in-outer here) (closes ks))
                  (L : Lifts (Conf.heap (Mach.conf m₁)) ρ (U.outerˢ op (λ a j → U.subscribe (f a) j) o₀ (U.endˢ (Conf.pos (Mach.conf m₁)))
                             (At.partLanes (Conf.heap (Mach.conf m₁)) ls) (At.val (Conf.heap (Mach.conf m₁)) (FlatKit.Flat.queue fl)) pl) S)
-                 (sg : U.step g ≡ S) where
+                 (sg : U.step g ≡ S) (lo : Leaves o₀ (At.leftover (Conf.heap (Mach.conf m₁)) {B = ⊤} u)) where
     H   = Conf.heap (Mach.conf m₁)
     q   = Conf.pos (Mach.conf m₁)
     pl′ = U.unionᶜ pl (U.restᶜ o₀)
@@ -663,9 +675,23 @@ module ClimbFlat (R : Set) where
 
     module P = Settles.Repool H ρ (fresh-path ρ fs) pl′
 
+    -- The done flag reads unset until the end climbs to the flatMap.
+    unset : At.val H (FlatKit.Flat.outerDone fl) ≡ false
+    unset = proj₁ (Calling.flags cl ρ (lifts-seen L)) (subst (_ ∈ᴸ_) (sym (outers-⊕ ρ (in-outer here))) (++⁺ʳ (outers ρ) (here refl)))
+
+    -- The pool leaves as the lanes' rests while the flag is unset; the
+    -- outer's rest as its leftover, which the flag now pools beside them.
+    close-tied : ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just c
+               → Leaves pl (At.pooled H fl u ls) → Leaves pl′ (At.pooled (Settles.H′ H ρ) fl u ls)
+    close-tied _ t =
+      subst (λ d → Leaves pl′ (U.unionᶜ (if d then At.leftover (Settles.H′ H ρ) u else U.idleᶜ) (At.pooledL (Settles.H′ H ρ) ls))) (sym (Settles.done-read H ρ))
+        (lv-swap
+          (lv-trans (subst (λ d → Leaves pl (U.unionᶜ (if d then At.leftover H u else U.idleᶜ) (At.pooledL H ls))) unset t)
+            (lv-trans (proj₁ (tw-idleˡ (At.pooledL H ls))) (proj₁ (tw-alike (pooledL-alike H (Settles.H′ H ρ) ls P.ls-al)))))
+          (lv-trans (proj₁ (tw-rest o₀))
+            (lv-trans lo (proj₁ (tw-trans (tw-leftover H u) (tw-alike (leftover-alike H (Settles.H′ H ρ) u P.so-al)))))))
+
     postulate
-      close-tied  : ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just c
-                  → Tied pl (At.pooled H fl u ls) → Tied pl′ (At.pooled (Settles.H′ H ρ) fl u ls)
       close-told  : ∀ {A′} (i : A′ ∈ᴸ Δ) {b₀} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just b₀ → untold i pl′ ⊆ᴾ untold i b₀
       close-heads : ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just c → Heads q pl → Heads q pl′
 
@@ -673,10 +699,7 @@ module ClimbFlat (R : Set) where
     close-heading = P.heading (λ {A′} i {b₀} → close-told {A′} i {b₀}) close-heads
 
     close-lingers : Lingers (Settles.H′ H ρ) (Restaged.T′ (Settles.H′ H ρ) ρ pl′)
-    close-lingers = Settles.Fr.shift-lingers H ρ fs (Restaged.v (Settles.H′ H ρ) ρ pl′) (ended-past cl) (P.lingering close-tied) (Calling.lingers cl)
-
-    postulate
-      close-leaving : Leaving (Settles.H′ H ρ) (Restaged.T′ (Settles.H′ H ρ) ρ pl′)
+    close-lingers = Settles.Fr.shift-lingers H ρ fs (Restaged.v (Settles.H′ H ρ) ρ pl′) (ended-past cl) (P.lingering (λ e₀ tr → close-tied e₀ (proj₁ tr) , rf-union (proj₂ tr) rf-rest)) (Calling.lingers cl)
 
   -- A flatMap's outer ended: its guard read open, its done flag written,
   -- its count and queue read.  Nothing left: the flatMap's end one
@@ -689,7 +712,7 @@ module ClimbFlat (R : Set) where
   close-outer st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} ρ {ks}
     cl@record { sane = sn ; placed = pd ; deep = dp ; ctl = refl ; code = cd ; stack = sk ; lifted = gn , S , L , sg , hl ; owned = ow
               ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
-              ; behind = bh ; lingers = lgr ; leaving = lvg ; lefts = lt ; flags = dn ; kept = kp }
+              ; behind = bh ; lingers = lgr ; lefts = lt ; flags = dn ; kept = kp }
     with lifts-split ρ (in-outer here) L in eqF
        | reads (subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-outer here) top) cd)
   ... | _ , lifts-outer {o₀ = o₀} _ _ lifts-here , Lρ | k₁ , f₁ , p₁
@@ -721,8 +744,7 @@ module ClimbFlat (R : Set) where
       ; owned = Settles.Fr.wr-owned hp ρ fs (Settles.sd-gone hp ρ (fresh-path ρ fs)) ow ; kernels = Settles.Fr.kernels hp ρ fs kn ; meaning = Settles.Fr.meaning hp ρ fs mn
       ; queue = Settles.Fr.queue hp ρ fs qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
       ; sorted = sorted-⇝ so path ; behind = Settles.sd-behind hp ρ fs bh
-      ; lingers = Settles.Fr.lingers hp ρ fs (ended-past cl) (Settles.sd-lingering hp ρ (fresh-path ρ fs) (trans (Settles.sd-part hp ρ (fresh-path ρ fs)) (flat-gone hp {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} gn (proj₁ nl) (proj₂ nl)))) lgr ; leaving = Settles.Fr.leaving hp ρ fs (ended-past cl) (Settles.sd-lingering hp ρ (fresh-path ρ fs) (trans (Settles.sd-part hp ρ (fresh-path ρ fs)) (flat-gone hp {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} gn (proj₁ nl) (proj₂ nl)))) lvg
-      ; lefts = Settles.Fr.wr-lefts hp ρ fs Lo
+      ; lingers = Settles.Fr.lingers hp ρ fs (ended-past cl) (Settles.sd-lingering hp ρ (fresh-path ρ fs) (trans (Settles.sd-part hp ρ (fresh-path ρ fs)) (flat-gone hp {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} gn (proj₁ nl) (proj₂ nl)))) lgr ; lefts = Settles.Fr.wr-lefts hp ρ fs Lo
                   (lefts-subst₂ (λ ls′ qs′ → U.outerˢ op (λ a j → U.subscribe (f a) j) o₀ (U.endˢ q) ls′ qs′ po) (proj₁ nl) (proj₂ nl) (lefts-up ρ (in-outer here) eqF lt))
       ; flags = Settles.sd-flags hp ρ fs gn dn ; kept = inj₁ refl }))
     where
@@ -749,14 +771,14 @@ module ClimbFlat (R : Set) where
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs
                          ; clocked = proj₁ ck , Restaged.pool-ticked (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
         ; sorted = sorted-⇝ so path
-        ; behind′ = Eaching.each-to _ _ (Settles.Fr.shift-behind hp ρ fs (Restaged.v (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀))) (tells-past cl) (ended-past cl) (Closing.close-heading ρ o₀ cl Lρ sg) bh)
-        ; lingers′ = Lingering.lingers-to _ (Closing.close-lingers ρ o₀ cl Lρ sg) ; leaving = Closing.close-leaving ρ o₀ cl Lρ sg
-        ; flags = Settles.sd-landed hp ρ fs (U.unionᶜ po (U.restᶜ o₀)) gn (trans (sym (Settles.settle-eq hp ρ (fresh-path ρ fs) kn)) eq) Lρ dn })
+        ; behind′ = Eaching.each-to _ _ (Settles.Fr.shift-behind hp ρ fs (Restaged.v (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀))) (tells-past cl) (ended-past cl) (Closing.close-heading ρ o₀ cl Lρ sg lo) bh)
+        ; lingers′ = Lingering.lingers-to _ (Closing.close-lingers ρ o₀ cl Lρ sg lo) ; flags = Settles.sd-landed hp ρ fs (U.unionᶜ po (U.restᶜ o₀)) gn (trans (sym (Settles.settle-eq hp ρ (fresh-path ρ fs) kn)) eq) Lρ dn })
       , passed ag pp)
     where
       o    = Here.obs (walk ρ top)
       b    = (At.val (Settles.H′ hp ρ) (FlatKit.Flat.active fl) ≡ᵇ 0) ∧ null (At.val (Settles.H′ hp ρ) (FlatKit.Flat.queue fl))
       v    = flatMapˢ op f fl oc k r (U.unionᶜ po (U.restᶜ o₀)) u ls
+      lo   = proj₁ (subst (λ w → Lefts hp (proj₁ (proj₂ w))) eqF (proj₁ (lefts-split ρ (in-outer here) L lt)))
       path = ⇝-trans p₁ (⇝-trans p₂ (⇝-trans p₃ (⇝-trans p₄ p₅)))
       e₅   = ≗-trans (f₅ same⊑ (At.val (Settles.H′ hp ρ) (FlatKit.Flat.queue fl)))
                (bind≗ (wk-same (settledᵒ o (At.val (Settles.H′ hp ρ) (FlatKit.Flat.outerDone fl)) (At.val (Settles.H′ hp ρ) (FlatKit.Flat.active fl))
