@@ -10,13 +10,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE REST'S TIES
 
-An ended part's rest stays twinned with what the heap keeps, its order read
-back both ways. Open: whether a body reads its source's run only as far as it
-has run, its cut and its rest's order alike. Settled when `cut-env` and
-`deepR-env` are bodies by induction on the node, or refuted and the twin
-restated.
+An ended part's rest stays twinned with what the heap keeps. Open: whether a
+settle, a close, a finish and a retag keep the parts' heads, untold sources and
+leftover, read off the old part alone. Settled when `settle-lingering` and
+`fin-shut` are bodies, or refuted and the twin restated.
 
-Members: `cut-env`, `deepR-env`, `fin-shut`, `rest-sourced`, `close-heads`,
+Members: `fin-shut`, `rest-sourced`, `close-heads`,
 `close-told`, `settle-heads`, `settle-lingering`, `settle-told`, `next-heads`,
 `next-lingering`, `take-leftover`, `body-leftover`, `re-leftover`.
 

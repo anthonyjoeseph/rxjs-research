@@ -15,17 +15,20 @@ open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong; subst)
 
-open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Tail; Tail∞; pin; idle; out; skip; end; inside; _<ᵖ_; _∪_; first;
-  <ᵖ-asym; <ᵖ-split; <ᵖ-irrefl)
-open import denotation.MonotonicList using (Agree; Agreeᵀ; tailᴱ; agree-refl; agree-sym; agree-trans; agreeᵀ-refl; agreeᵀ-sym; agreeᵀ-trans; stopᵀ; pin⁼; idle⁼; out⁼; skip⁼; end⁼; hush⁼)
+open import denotation.MonotonicList.Events using (Events∞; Pos; Tail; Tail∞; pin; idle; end; inside; _<ᵖ_; _∪_; first; <ᵖ-asym; <ᵖ-split;
+  <ᵖ-irrefl)
+open import denotation.MonotonicList using (Agree; Agreeᵀ; tailᴱ; agree-refl; agree-sym; agree-trans; agreeᵀ-refl; agreeᵀ-sym;
+  agreeᵀ-trans; stopᵀ; pin⁼; idle⁼; skip⁼; hush⁼)
 open import denotation.NonExpansive using (tailᴱ-ne; ∪-ne; burstOn-ne; _,ˢ_)
 import denotation.MonotonicList as M′
 import denotation.Unfold as U
-open import adequacy.Placed.Order using (Ordered; Atop; ordered)
+open import adequacy.Placed.Order using (Ordered)
 open import adequacy.Placed.Rising using (AtopT)
 open import adequacy.Placed.Trail using (SortedT; sortedᵀ)
 open import adequacy.Placed.Burst using (ordered-tail)
 open import adequacy.Deep using (Deep; Deeps; DeepR; deep-rest; deepR-rest; deep-cutR; ordered-retyped)
+open import adequacy.Env using (cut-ne; nagree-refl; deepR-same)
+open import adequacy.Placed.Keys using (ordered-≈)
 
 open Events∞
 open Tail∞
@@ -161,29 +164,6 @@ tail-agreeᵀ {m = suc _} (pin _ _) idle        ()
 tail-agreeᵀ {m = suc _} idle      (pin _ _)   ()
 tail-agreeᵀ {m = suc _} idle      idle        hush⁼       = idle⁼
 
--- A run alike at every depth is in order when the other is.
-atop-agree : ∀ {A k m} {e e′ : Events A} → Agree (suc m) e e′ → Atop k e → Atop k e′
-atop-agree (out⁼ _ _)  a = a
-atop-agree (skip⁼ _ _) a = a
-atop-agree end⁼        a = a
-atop-agree hush⁼       a = a
-
-private
-  out-next : ∀ {A k x} {l r : Events∞ A} → (∀ m → Agree m (out k x l) (out k x r)) → ∀ m → Agree m (force l) (force r)
-  out-next ag m with ag (suc m)
-  ... | out⁼ _ a = a
-
-  skip-next : ∀ {A k} {l r : Events∞ A} → (∀ m → Agree m (skip k l) (skip k r)) → ∀ m → Agree m (force l) (force r)
-  skip-next ag m with ag (suc m)
-  ... | skip⁼ _ a = a
-
-ordered-agree : ∀ {A} {e e′ : Events A} → (∀ m → Agree m e e′) → Ordered e → Ordered e′
-ordered-agree ag o .ordered with ag 1 | ordered o
-... | out⁼ _ _  | a , o′ = atop-agree (out-next ag 1) a , ordered-agree (out-next ag) o′
-... | skip⁼ _ _ | a , o′ = atop-agree (skip-next ag 1) a , ordered-agree (skip-next ag) o′
-... | end⁼      | _      = tt
-... | hush⁼     | _      = tt
-
 ------------------------------------------------------------------------
 -- Rests alike, composed
 
@@ -218,14 +198,6 @@ restful-step : ∀ {Γ A B} {n : U.Node Γ A} {n′ : U.Node Γ B} → Restful n
              → Pinned (U.restˢ {B = ⊤} n) (U.restˢ {B = ⊤} n′) → Pinned (U.step n) (U.step n′)
 restful-step {n = n} {n′} rf rf′ p =
   pinned-trans (restful-pinned rf) (pinned-trans (rest-pinned n) (pinned-trans p (pinned-trans (rest-pinned n′) (pinned-sym (restful-pinned rf′)))))
-
--- A body reads its source's run through the environment, and no
--- further than it has run: two runs alike for `m` steps leave the
--- body's cut alike for as many, and alike at every depth leave it in
--- order alike as a rest.
-postulate
-  cut-env   : ∀ {Γ A C} (b : U.Node (A ∷ Γ) C) (ρ : U.NEnv Γ) {m} {e e′ : Events A} → Agree m e e′ → Agreeᵀ m (U.cutᴺ b (e ∷ᴬ ρ)) (U.cutᴺ b (e′ ∷ᴬ ρ))
-  deepR-env : ∀ {Γ A C} (b : U.Node (A ∷ Γ) C) (ρ : U.NEnv Γ) {e e′ : Events A} → (∀ m → Agree m e e′) → DeepR b (e ∷ᴬ ρ) → DeepR b (e′ ∷ᴬ ρ)
 
 lv-refl : ∀ {Γ A} (x : U.Node Γ A) → Leaves x x
 lv-refl x = leaves (λ ρ _ n → agree-refl n _) (λ ρ d → d) (rest-pinned x)
@@ -266,15 +238,15 @@ lv-burst {B = B} {B′} r {n} {n′} rf rf′ l@(leaves a d p) = leaves (λ ρ e
     bo ρ dn m = burstOn-ne r {U.stateᴺ n ρ} {U.stateᴺ n′ ρ} (tail-agreeᵀ (U.cutᴺ n ρ) (U.cutᴺ n′ ρ) (a ρ (deep-rest {c = n} dn) m) ,ˢ restful-agree rf rf′ l ρ (deep-rest {c = n} dn) m)
     dp : ∀ ρ → Deep (U.restᶜ {B = ⊤} (U.burstingᶜ {B = B} r n)) ρ → Deep (U.restᶜ {B = ⊤} (U.burstingᶜ {B = B′} r n′)) ρ
     dp ρ (o , _ , dn) = o′ , ordered-retyped (M′.burstOn r (U.stateᴺ n′ ρ)) o′ , restful-deep rf′ (proj₂ (d ρ (deep-rest {c = n} dn)))
-      where o′ = ordered-agree (λ m → tailᴱ-ne (bo ρ dn m)) o
+      where o′ = ordered-≈ _ _ (λ m → tailᴱ-ne (bo ρ dn m)) o
 
 -- A body's rest under a restful source moved.
 lv-shift : ∀ {Γ A C B B′} {n n′ : U.Node Γ A} (b : U.Node (A ∷ Γ) C) → Restful n → Restful n′ → Leaves n n′
          → Leaves (U.underᶜ {B = B} (U.live n) b) (U.underᶜ {B = B′} (U.live n′) b)
-lv-shift {B = B} {B′} {n} {n′} b rf rf′ l = leaves (λ ρ e m → tailᴱ-ne (cut-env b ρ (restful-agree rf rf′ l ρ (deep-rest {c = n} (proj₁ (proj₂ e))) m))) dp (under-moved (U.live n) (U.live n′) (rest-pinned b))
+lv-shift {B = B} {B′} {n} {n′} b rf rf′ l = leaves (λ ρ e m → tailᴱ-ne (cut-ne b (restful-agree rf rf′ l ρ (deep-rest {c = n} (proj₁ (proj₂ e))) m , nagree-refl m ρ))) dp (under-moved (U.live n) (U.live n′) (rest-pinned b))
   where
     dp : ∀ ρ → Deep (U.restᶜ {B = ⊤} (U.underᶜ {B = B} (U.live n) b)) ρ → Deep (U.restᶜ {B = ⊤} (U.underᶜ {B = B′} (U.live n′) b)) ρ
-    dp ρ (_ , dn , db) = deepR-rest {c = U.underᶜ {B = B′} (U.live n′) b} (restful-deep rf′ (proj₂ (Leaves.deep l ρ (deep-rest {c = n} dn))) , deepR-env b ρ (restful-agree rf rf′ l ρ (deep-rest {c = n} dn)) db)
+    dp ρ (_ , dn , db) = deepR-rest {c = U.underᶜ {B = B′} (U.live n′) b} (restful-deep rf′ (proj₂ (Leaves.deep l ρ (deep-rest {c = n} dn))) , deepR-same b (λ m → restful-agree rf rf′ l ρ (deep-rest {c = n} dn) m , nagree-refl m ρ) db)
 
 ------------------------------------------------------------------------
 -- Twins: leaving alike both ways
