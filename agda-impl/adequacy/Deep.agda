@@ -166,10 +166,6 @@ mutual
   deepRᴸ-of []       d        = tt
   deepRᴸ-of (c ∷ cs) (d , ds) = deepR-of c d , deepRᴸ-of cs ds
 
--- A node in order to every depth leaves its cut in order.
-deep-cut : ∀ {Γ A} (c : U.Node Γ A) {ρ} → Deep c ρ → SortedT (U.cutᴺ c ρ)
-deep-cut c d = deep-cutR c (deepR-of c d)
-
 -- A rest whose parts run in order is in order.
 deepR-rest : ∀ {Γ A B} {c : U.Node Γ A} {ρ} → DeepR c ρ → Deep (U.restᶜ {B = B} c) ρ
 deepR-rest {c = c} d = ordered-tail _ (deep-cutR c d) , d
@@ -177,10 +173,6 @@ deepR-rest {c = c} d = ordered-tail _ (deep-cutR c d) , d
 -- So a node in order leaves its rest in order.
 deep-rest : ∀ {Γ A B} {c : U.Node Γ A} {ρ} → Deep c ρ → Deep (U.restᶜ {B = B} c) ρ
 deep-rest {c = c} d = deepR-rest {c = c} (deepR-of c d)
-
--- Two nodes in order, their union in order.
-deep-∪ : ∀ {Γ B} {x y : U.Node Γ B} {ρ} → Deep x ρ → Deep y ρ → Deep (U.unionᶜ x y) ρ
-deep-∪ {x = x} {y} dx dy = ordered-tail _ (sortedT-∪ _ _ (deep-cut x dx) (deep-cut y dy)) , dx , dy
 
 -- A program subscribed at the root is in order to every depth: each
 -- operator's meaning is, by the order lemmas `Placed` is built on, at

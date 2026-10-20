@@ -53,7 +53,6 @@ open import adequacy.Flatted using (module Flatting)
 open import adequacy.Replant using (module Replanting)
 open import adequacy.Frame using (module Framing)
 open import adequacy.Frame.Repool using (module FramingRepool)
-open import adequacy.Shift using (module Shifting)
 open import adequacy.Lift using (module Lifting)
 open Events∞
 
@@ -80,7 +79,6 @@ module LiftingOrder (R : Set) where
   open Replanting R using (module Shift; Heading; Lingering)
   open Framing R using (untold)
   open FramingRepool R using (Untold; Ended)
-  open Shifting R using (pin-alike)
   open Taking R using (take-restage)
   open Connecting R using (connect-restage)
   open Flatting R using (flat-restage)

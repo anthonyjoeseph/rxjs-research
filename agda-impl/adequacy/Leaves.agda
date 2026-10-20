@@ -15,7 +15,8 @@ open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong; subst)
 
-open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Tail; Tail∞; pin; idle; out; skip; end; hush; inside; _<ᵖ_; _∪_; first; <ᵖ-asym; <ᵖ-split; <ᵖ-irrefl)
+open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Tail; Tail∞; pin; idle; out; skip; end; inside; _<ᵖ_; _∪_; first;
+  <ᵖ-asym; <ᵖ-split; <ᵖ-irrefl)
 open import denotation.MonotonicList using (Agree; Agreeᵀ; tailᴱ; agree-refl; agree-sym; agree-trans; agreeᵀ-refl; agreeᵀ-sym; agreeᵀ-trans; stopᵀ; pin⁼; idle⁼; out⁼; skip⁼; end⁼; hush⁼)
 open import denotation.NonExpansive using (tailᴱ-ne; ∪-ne; burstOn-ne; _,ˢ_)
 import denotation.MonotonicList as M′
@@ -24,7 +25,7 @@ open import adequacy.Placed.Order using (Ordered; Atop; ordered)
 open import adequacy.Placed.Rising using (AtopT)
 open import adequacy.Placed.Trail using (SortedT; sortedᵀ)
 open import adequacy.Placed.Burst using (ordered-tail)
-open import adequacy.Deep using (Deep; Deeps; DeepR; deep-rest; deepR-rest; deep-∪; deep-cut; deep-cutR; atop-tail; ordered-retyped)
+open import adequacy.Deep using (Deep; Deeps; DeepR; deep-rest; deepR-rest; deep-cutR; ordered-retyped)
 
 open Events∞
 open Tail∞
@@ -131,10 +132,6 @@ bursts-moved r unpinned rp = rp
 -- parts steps as they would rest.
 Tied : ∀ {Γ A B} → U.Node Γ A → U.Node Γ B → Set₁
 Tied x y = Pinned (U.step x) (U.restˢ {B = ⊤} y)
-
--- A restful pool's tie carried along a pin.
-tie-trans : ∀ {Γ A C D} {p : U.Node Γ A} {a : U.Step Γ C} {b : U.Step Γ D} → Pinned (U.step p) a × Restful p → Pinned a b → Pinned (U.step p) b × Restful p
-tie-trans (t , rf) q = pinned-trans t q , rf
 
 -- Two nodes leaving alike: what each still runs past an unsubscribe,
 -- under every environment the first is in order at, the same at every
@@ -288,9 +285,6 @@ Twin x y = Leaves x y × Back x y
 tw-refl : ∀ {Γ A} (x : U.Node Γ A) → Twin x x
 tw-refl x = lv-refl x , λ ρ d → d
 
-tw-≡ : ∀ {Γ A} {x y : U.Node Γ A} → x ≡ y → Twin x y
-tw-≡ {x = x} refl = tw-refl x
-
 tw-trans : ∀ {Γ A B C} {x : U.Node Γ A} {y : U.Node Γ B} {z : U.Node Γ C} → Twin x y → Twin y z → Twin x z
 tw-trans (l , b) (l′ , b′) = lv-trans l l′ , λ ρ d → b ρ (b′ ρ d)
 
@@ -431,9 +425,6 @@ lv-swap {x = x} {y} {x′} {y′} lx@(leaves ax dx px) ly@(leaves ay dy py) = le
       (∪-comm n (U.cutᴺ x′ ρ) (U.cutᴺ y′ ρ) (deep-cutR x′ (dx′ ρ e)) (deep-cutR y′ (dy′ ρ e))))
     dp : ∀ ρ → Deep (U.restᶜ {B = ⊤} (U.unionᶜ x y)) ρ → Deep (U.restᶜ {B = ⊤} (U.unionᶜ y′ x′)) ρ
     dp ρ e = deepR-rest {c = U.unionᶜ y′ x′} (dy′ ρ e , dx′ ρ e)
-
-tw-swap : ∀ {Γ A B} {x y : U.Node Γ A} {x′ y′ : U.Node Γ B} → Twin x x′ → Twin y y′ → Twin (U.unionᶜ x y) (U.unionᶜ y′ x′)
-tw-swap tx ty = lv-swap (proj₁ tx) (proj₁ ty) , Leaves.deep (lv-swap (proj₁ (tw-sym ty)) (proj₁ (tw-sym tx)))
 
 ------------------------------------------------------------------------
 -- A restful node's leaving, carried along

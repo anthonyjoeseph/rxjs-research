@@ -14,7 +14,7 @@ open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Level using (lower)
 open import Data.Maybe using (Maybe; just; nothing; is-just; is-nothing)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂)
 open import Data.Sum using ([_,_]′)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
@@ -100,26 +100,11 @@ module Shifting (R : Set) where
   pairs-tl : ∀ {a r} {X : Set a} {Rl : X → X → Set r} {x xs} → AllPairs Rl (x ∷ xs) → AllPairs Rl xs
   pairs-tl (_ ∷ p) = p
 
-  if-moved : ∀ {Γ A} {b b′ : Bool} {x x′ y y′ : U.Node Γ A} → b′ ≡ b
-           → Pinned (U.restˢ {B = ⊤} x) (U.restˢ {B = ⊤} x′) → Pinned (U.restˢ {B = ⊤} y) (U.restˢ {B = ⊤} y′)
-           → Pinned (U.restˢ {B = ⊤} (if b then x else y)) (U.restˢ {B = ⊤} (if b′ then x′ else y′))
-  if-moved {b = true}  refl p _ = p
-  if-moved {b = false} refl _ q = q
-
-  pin-alike : ∀ {Γ A} {x x′ : U.Node Γ A} → x′ ≡ x → Pinned (U.restˢ {B = ⊤} x) (U.restˢ {B = ⊤} x′)
-  pin-alike {x = x} refl = rest-pinned x
-
   tw-alike : ∀ {Γ A} {x x′ : U.Node Γ A} → x′ ≡ x → Twin x x′
   tw-alike {x = x} refl = tw-refl x
 
   tw-if-moved : ∀ {Γ A} {b b′ : Bool} {x x′ y y′ : U.Node Γ A} → b′ ≡ b → Twin x x′ → Twin y y′ → Twin (if b then x else y) (if b′ then x′ else y′)
   tw-if-moved {b = b} refl = tw-if b
-
-  -- A connect's leftover over a source run alike and a body pinned alike.
-  conn-pin : ∀ {Γ A B} rp (N N′ : U.Node Γ A) {x x′ : U.Node (A ∷ Γ) ⊤} → N′ ≡ N → Pinned (U.restˢ {B = ⊤} x) (U.restˢ {B = ⊤} x′)
-           → Pinned (U.restˢ {B = ⊤} (U.unionᶜ {B = B} (U.burstingᶜ rp N) (U.underᶜ (U.live N) x)))
-                    (U.restˢ {B = ⊤} (U.unionᶜ {B = B} (U.burstingᶜ rp N′) (U.underᶜ (U.live N′) x′)))
-  conn-pin rp N N′ refl lp = union-pinned (bursts-pinned rp N (U.step N)) (under-moved (U.live N) (U.live N) lp)
 
   conn-tw : ∀ {Γ A B} rp (N N′ : U.Node Γ A) {x x′ : U.Node (A ∷ Γ) ⊤} → N′ ≡ N → Twin x x′
           → Twin (U.unionᶜ {B = B} (U.burstingᶜ rp N) (U.underᶜ (U.live N) x)) (U.unionᶜ {B = B} (U.burstingᶜ rp N′) (U.underᶜ (U.live N′) x′))

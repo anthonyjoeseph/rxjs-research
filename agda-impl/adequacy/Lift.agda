@@ -82,7 +82,7 @@ module Lifting (R : Set) where
   open Replanting R using (module Shift; Heading; Lingering)
   open Framing R using (untold)
   open FramingRepool R using (Untold; Ended)
-  open Shifting R using (pin-alike; tw-alike)
+  open Shifting R using (tw-alike)
   open Taking R using (take-restage)
   open Connecting R using (connect-restage)
   open Flatting R using (flat-restage)

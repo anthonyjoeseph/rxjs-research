@@ -45,7 +45,7 @@ module Keeping (R : Set) where
   open Heap using (there)
   open Run (Pureᴾ R) using (done; module Kit; module FlatKit)
   open Strongly R using (Sub; pendingˢ; ofˢ; mapˢ; takeWhileˢ; connectˢ; Lane; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_; coldˢ; module At; Phase; flatMapˢ; scanˢ; joinˢ; doneˢ; deferˢ; lane)
-  open StrongAgainst R using (Each; Lingers; Leaves; Twin; tw-refl; tw-union; tw-under; tw-burst; tw-shift; tw-if; tw-idleʳ; lv-tie; tw-tie; Pinned; unpinned; pinned-trans; pinned-sym; union-pinned; under-pinned; under-moved; bursts-pinned; bursts-moved; rest-pinned; Restful; rf-idle; rf-rest; rf-union; rf-burst; rf-under; restful-pinned; Tied; tie-trans; seen; seenL; seen-⊕; isTaking; ∧-split)
+  open StrongAgainst R using (Each; Lingers; Leaves; Twin; tw-refl; tw-union; tw-under; tw-burst; tw-shift; tw-if; tw-idleʳ; lv-tie; tw-tie; Pinned; unpinned; pinned-trans; pinned-sym; union-pinned; under-pinned; under-moved; bursts-pinned; bursts-moved; rest-pinned; Restful; rf-idle; rf-rest; rf-union; rf-burst; rf-under; restful-pinned; Tied; seen; seenL; seen-⊕; isTaking; ∧-split)
   open StrongHeld R using (DoneBy)
   open Moving R using (plant; plantᴸ; planted; plantedᴸ; part-plant; Same; same; same-map; same-scan; same-take; same-flat; same-connect; same-defer)
   open GhostingPaths R using (each-sub)

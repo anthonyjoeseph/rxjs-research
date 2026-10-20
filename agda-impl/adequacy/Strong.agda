@@ -18,7 +18,7 @@ module adequacy.Strong where
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_; [_]; foldr)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.Maybe using (Maybe; just; nothing; is-just)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; suc; _+_)
 open import Data.Empty using (⊥)
 open import Data.Sum using (_⊎_)

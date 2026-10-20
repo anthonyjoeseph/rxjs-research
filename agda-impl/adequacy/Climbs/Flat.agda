@@ -24,7 +24,7 @@ open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import denotation.MonotonicList.Events using (Events∞; skip; Pos; Timeline; _<ᵖ_; <ᵖ-asym; <ᵖ-split)
+open import denotation.MonotonicList.Events using (Events∞; skip; Pos; Timeline)
 open import denotation.MonotonicList using (Agree)
 import denotation.Unfold as U
 open import denotation.MonotonicList.Events using () renaming (sub to subᴾ)
@@ -110,7 +110,7 @@ module ClimbFlat (R : Set) where
   open Everywhere.Spending R using (spent-retag)
   open EverywhereGated.Holding R using (holds-alike; holds-path; holds-plant; holds-retag)
   open Keeping R using (seen-planted)
-  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; pooledL-alike; leftover-from; pooled-from; pin-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; tw-alike)
+  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; pooledL-alike; leftover-from; pooled-from; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; tw-alike)
   open ShiftWalk R using (let-go; grip)
   open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined)
   open FramingRepool R using (heads-repool; Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
