@@ -187,15 +187,13 @@ by their own silent steps (`Mirror`).
   `step-deep` past a step, `gapped-deep` past a gap. Decides whether the
   order lemmas `Placed` is built on reach every depth; then `gapped-past`
   by operator.
-- **THE FREE SOURCE.** The tie is stated: `Lefts` holds each free node of
-  a lift (`lifts-source`'s, `lifts-outer`'s, a lane's) to its node's
-  leftover in meaning at every depth, and `Leaving` each part, pool and
-  rest; `Calling`, `Begins` and `Carried` keep them, and `fin-ghost`,
-  `end-ghost`, `bg-ghosted` and `void-site` take them. Owed: the
-  transports, `lefts-off` first, since a leftover reads below the write;
-  then whether the tie makes either ghost a lift. The restage cells are
-  the same question: close/settle/next pool the free node `Lefts` now
-  ties.
+- **THE FREE SOURCE.** `Lefts` ties each free node of a lift to its
+  node's leftover once its child's step ends, the only step a free node
+  reaches the ghost through; an end climbs no source, so a write the end's
+  leftover keeps (`Stays.left`) keeps every tie. Owed: `lefts-planted`
+  and `lefts-grow` the same way, over a plant's leftover; then whether the
+  tie makes `fin-ghost` a lift. The restage cells are the same question:
+  close/settle/next pool the free node `Lefts` ties.
 - **NODE FACTS, FALSITY FIRST.** Only now discharge: the node facts the
   fold left, riskiest first, then the per-move facts no column holds.
 - **HIDDEN RUNS.** Parked behind the fold. The core: `pooled-pin`,
@@ -226,8 +224,6 @@ by their own silent steps (`Mirror`).
   ghost's step leaves a deep node.
 - **`gapped-deep`** (Gapped) — FALSITY, `NO EVIDENCE`: a node gapped from a
   deep one is deep.
-- **`lefts-off`** (Frame) — FALSITY, `NO EVIDENCE`: a write inside a lift's end
-  leaves each free node tied to its leftover; suspect, a leftover reads below.
 - **`lefts-planted`** (Climbs.Base), **`lefts-grow`** (Climbs.Flat) — FALSITY,
   `NO EVIDENCE`: a plant at a lift's end, and the growth, keep each tie.
 - **`grow-leaving`** (Weaken.Heaps), **`bg-left`** (Climbs.Flat) — FALSITY,

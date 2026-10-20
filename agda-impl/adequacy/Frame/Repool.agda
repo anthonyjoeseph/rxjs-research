@@ -57,7 +57,7 @@ module FramingRepool (R : Set) where
   open EverywhereGated.Holding R using (holds-alike)
   open Everywhere.Spending R using (spent-alike)
   open EverywhereGated.Gating R using (gated-alike)
-  open Ghosting R using (Lifts; Lefts; LiftsLane; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; lifts-this; lifts-next; OuterFirst; PoolBehind; LaneFirst)
+  open Ghosting R using (Lifts; LiftsLane; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; lifts-this; lifts-next; OuterFirst; PoolBehind; LaneFirst)
   open GhostingPaths R using (each-lanes; module Calling; Calling; sends; opened; openedL)
   open Read
   open Framing R using (HeadsS; Tells; child-skip; heads-flat; heads-map; heads-rescan; heads-scan; heads-source; heads-take; if-head; just-of; laneˢ-heads; merged-eq; outerˢ-heads; race-heads; scan-defined; scan-sees; shut-heads; shut-heads-step; store-alike; untold; untold-shut; untoldᴸ; untoldᴹ)
@@ -667,14 +667,6 @@ module FramingRepool (R : Set) where
         el = lane1-alike H H′ {c = c} {k} {s₀} (Heaps.keep H H′ off (λ m → there (++⁺ʳ (quietName k) (++⁺ʳ (names s₀) (lanes-path πL m)))) (Kit.live c) nl)
                               (part-alike H H′ s₀ (Heaps.keeps H H′ off (lanes-path πL) (apart-r (names s₀) P)))
 
-  -- A WRITE INSIDE THE PATH'S END, LEFT: every free node the lift
-  -- carries still ties to its node's leftover.  An ancestor's leftover
-  -- reads its whole subtree, the end's names among them, so the write is
-  -- not off what it reads.
-  postulate
-    lefts-off : ∀ {h} (H H′ : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} (ρ : Path t u) (ps : AllPairs _≢_ (names t))
-                (off : Off H H′ (names u)) {s S} (L : Lifts H ρ s S) → Lefts H L → Lefts H′ (lifts-off H H′ ρ ps off L)
-
   -- A WRITE INSIDE THE PATH'S END, OPENED: the path opens through its
   -- ancestors' cuts and subjects, none of them the end's.
   mutual
@@ -713,9 +705,8 @@ module FramingRepool (R : Set) where
 
   module Wrote {h} (H H′ : Heapᴹ h) {T : Sub h [] R} {Δ A} {u : Sub h Δ A} (ρ : Path T u)
                {ns : List (Name h)} (off : Off H H′ ns) (mine : All (_∈ᴸ names u) ns) (fs : AllPairs _≢_ (names T)) where
-    private
-      offU : Off H H′ (names u)
-      offU j a = off j (map (lookupᴬ a) mine)
+    offU : Off H H′ (names u)
+    offU j a = off j (map (lookupᴬ a) mine)
     wr-kernels : (∀ {E o} → At.Holds H u E o → At.Holds H′ u E o) → (∀ {E o} → At.Holds H u E o → At.Gated H u → At.Gated H′ u) → (At.Spent H u → At.Spent H′ u)
                → Kernels H T → Kernels H′ T
     wr-kernels hv gv sv kn = record
@@ -729,9 +720,6 @@ module FramingRepool (R : Set) where
     wr-lifts : ∀ {s S} → Lifts H ρ s S → Lifts H′ ρ s S
     wr-lifts = lifts-off H H′ ρ fs offU
 
-    wr-lefts : ∀ {s S} (L : Lifts H ρ s S) → Lefts H L → Lefts H′ (wr-lifts L)
-    wr-lefts = lefts-off H H′ ρ fs offU
-
     wr-opened : ∀ o → opened H′ o ρ ≡ opened H o ρ
     wr-opened = opened-off H H′ ρ fs offU
 
@@ -744,10 +732,6 @@ module FramingRepool (R : Set) where
   scan-lifts : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} (ρ : Path T (scanˢ f r u)) → AllPairs _≢_ (names T)
              → ∀ {s S} z → Lifts H ρ s S → Lifts (store H r (lift z)) ρ s S
   scan-lifts H {r = r} ρ fs z = Wrote.wr-lifts H (store H r (lift z)) ρ (off-store H r) (here refl ∷ []) fs
-
-  scan-lefts : ∀ {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} (ρ : Path T (scanˢ f r u)) (fs : AllPairs _≢_ (names T))
-             → ∀ {s S} z (L : Lifts H ρ s S) → Lefts H L → Lefts (store H r (lift z)) (scan-lifts H ρ fs z L)
-  scan-lefts H {r = r} ρ fs z = Wrote.wr-lefts H (store H r (lift z)) ρ (off-store H r) (here refl ∷ []) fs
 
   scan-holds : ∀ {h} (H : Heapᴹ h) {Δ A B} {f : B → A → B} {r} {u : Sub h Δ A} → AllPairs _≢_ (names (scanˢ f r u))
              → ∀ z {E o} → At.Holds H (scanˢ f r u) E o → At.Holds (store H r (lift z)) (scanˢ f r u) E o

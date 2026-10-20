@@ -111,7 +111,7 @@ module ClimbLanes (R : Set) where
   open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag)
   open ShiftWalk R using (let-go; grip)
   open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined)
-  open FramingRepool R using (Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off; scan-lefts) renaming (Ended to Ends)
+  open FramingRepool R using (Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
   open Staging R using (not-src; wrap-lane)
   open Weakening R using (Grows; pure-map) renaming (module Grown to Weakened)
   open WeakeningHeaps R using () renaming (module GrownHeaps to Weakened′)
@@ -565,12 +565,22 @@ module ClimbLanes (R : Set) where
     ... | just _  = refl
     ... | nothing = ⊥-elim (true≢false (trans (sym j) (cong is-just (Gone.gone-part (fr-gone fr) here e))))
 
+    -- What the flatMap leaves running alike: its outer's names and every
+    -- lane's beneath its cut apart from the write.
+    fr-left : AllPairs _≢_ (names w₀) → ∀ {C} → At.leftover H′ {B = C} w₀ ≡ At.leftover H {B = C} w₀
+    fr-left fr = cong₂ U.unionᶜ (leftover-alike H H′ t (fr-so fr)) (leftL ls (λ π → π))
+      where
+        leftL : ∀ {C} (ls′ : List (Lane h Δ B)) → (∀ {Δ′ A′} {x : Sub h Δ′ A′} → PathLanes ls′ x → PathLanes ls x)
+              → At.leftoverL H′ {B = C} ls′ ≡ At.leftoverL H {B = C} ls′
+        leftL []                   em = refl
+        leftL (lane c′ k′ s ∷ ls′) em = cong₂ U.unionᶜ (leftover-alike H H′ s (fr-lane fr (em (this-lane here)))) (leftL ls′ (λ π → em (next-lane π)))
+
     -- No part left: what the flatMap leaves running alike beneath it, and a
     -- lane's ties seen only through lanes still on.
     fr-lingering : AllPairs _≢_ (names (flatMapˢ op f fl oc k r pl t ls)) → At.part (freed H (laneOf o) fl) (flatMapˢ op f fl oc k r pl t ls) ≡ nothing → Lingering H (freed H (laneOf o) fl) (flatMapˢ op f fl oc k r pl t ls) (flatMapˢ op f fl oc k r pl t ls)
     fr-lingering fr gn = record
       { ling-revive = λ j → ⊥-elim (true≢false (trans (sym j) (cong is-just gn)))
-      ; ling-rested = λ {C} → pin-alike (cong₂ U.unionᶜ (leftover-alike H H′ {B = C} t so-al) (leftL ls (λ π → π)))
+      ; ling-rested = λ {C} → pin-alike (fr-left fr {C})
       ; ling-below  = λ lg → Linger.lg-flat H′ (λ e → ⊥-elim (true≢false (trans (sym (cong is-just e)) (cong is-just gn))))
                                 (lingers-alike H H′ so-al (lingers-sub H lg (in-outer here) refl))
                                 (lanes-lg (lingersL-of H lg)) }
@@ -582,10 +592,6 @@ module ClimbLanes (R : Set) where
         pt {x = x} πL = part-alike H H′ x (lane-al πL)
         seL : ∀ {Δ′ A′} {x : Sub h Δ′ A′} (πL : PathLanes ls x) → seenL H′ πL ≡ true → seenL H πL ≡ true
         seL = fr-seL fr
-        leftL : ∀ {C} (ls′ : List (Lane h Δ B)) → (∀ {Δ′ A′} {x : Sub h Δ′ A′} → PathLanes ls′ x → PathLanes ls x)
-              → At.leftoverL H′ {B = C} ls′ ≡ At.leftoverL H {B = C} ls′
-        leftL []                   em = refl
-        leftL (lane c′ k′ s ∷ ls′) em = cong₂ U.unionᶜ (leftover-alike H H′ s (lane-al (em (this-lane here)))) (leftL ls′ (λ π → em (next-lane π)))
         lanes-lg : LingersL H ls → LingersL H′ ls
         lanes-lg lL = record
           { poolsL = λ {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls′ = ls₀} πL sn e → pinned-trans (LingersL.poolsL lL πL (seL πL sn) (trans (sym (pt πL)) e)) (pin-alike (pooled-from H H′ {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} (λ m → m) (lane-al πL)))
@@ -596,7 +602,7 @@ module ClimbLanes (R : Set) where
     module Sh (fs : AllPairs _≢_ (names T)) = Shift H H′ ρ fr-off fr-mine fs
     module Fr (fs : AllPairs _≢_ (names T)) (lv : At.val H (Kit.live (laneOf o)) ≡ true) =
       Framed H H′ ρ fr-off fr-mine fs
-        (record { holds = λ {E} {o′} → fr-holds (fresh-path ρ fs) lv {E} {o′} ; gated = λ {E} {o′} → fr-gated (fresh-path ρ fs) lv {E} {o′} ; spent = fr-spent (fresh-path ρ fs) })
+        (record { holds = λ {E} {o′} → fr-holds (fresh-path ρ fs) lv {E} {o′} ; gated = λ {E} {o′} → fr-gated (fresh-path ρ fs) lv {E} {o′} ; spent = fr-spent (fresh-path ρ fs) ; left = fr-left (fresh-path ρ fs) })
         (fr-fed (fresh-path ρ fs))
         (keeps-trans (store-keeps H (Kit.live (laneOf o)) _ (λ ()) (λ ()) (λ ()) (λ ()))
                      (store-keeps (unlive H (laneOf o)) (FlatKit.Flat.active fl) _ (λ ()) (λ ()) (λ ()) (λ ())))

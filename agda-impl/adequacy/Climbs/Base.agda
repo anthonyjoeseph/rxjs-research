@@ -5,6 +5,7 @@ module adequacy.Climbs.Base where
 
 open import Data.List using (List; []; _∷_; _++_; [_]; null; length; drop) renaming (map to mapList)
 open import Data.List.Relation.Unary.Any using (Any; here; there)
+open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ)
 import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′) renaming (map₂ to sum-map₂)
@@ -50,6 +51,7 @@ open import adequacy.Lift.Order using (module LiftingOrder)
 open import adequacy.Lowers using (module Lowering)
 open import adequacy.Frame using (module Framing)
 open import adequacy.Frame.Repool using (module FramingRepool)
+open import adequacy.Frame.Lefts using (module FramingLefts)
 open import adequacy.Grow using (module Growing)
 open import adequacy.Fork using (module Forking)
 open import adequacy.Taken using (module Taking)
@@ -102,10 +104,11 @@ module ClimbBase (R : Set) where
   open Everywhere.Spending R using (spent-retag)
   open EverywhereGated.Holding R using (holds-alike; holds-path; holds-plant; holds-retag)
   open Keeping R using (seen-planted)
-  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag)
+  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; sourced-heap; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag)
   open ShiftWalk R using (let-go; grip)
   open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined)
-  open FramingRepool R using (Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off; scan-lefts) renaming (Ended to Ends)
+  open FramingRepool R using (Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
+  open FramingLefts R using (lefts-off)
   open Staging R using (not-src; wrap-lane)
   open Weakening R using (Grows; pure-map) renaming (module Grown to Weakened)
   open WeakeningHeaps R using () renaming (module GrownHeaps to Weakened′)
@@ -474,20 +477,30 @@ module ClimbBase (R : Set) where
       holds : ∀ {E o} → At.Holds H u E o → At.Holds H′ u E o
       gated : ∀ {E o} → At.Holds H u E o → At.Gated H u → At.Gated H′ u
       spent : At.Spent H u → At.Spent H′ u
+      left  : ∀ {C} → At.leftover H′ {B = C} u ≡ At.leftover H {B = C} u
 
   flat-stays : ∀ {h} (H H′ : Heapᴹ h) {Δ A B op f fl oc k r pl} (so : Sub h Δ A) (ls : List (Lane h Δ B))
              → Alike H H′ (flatReads fl oc k r so ls) → Stays H H′ (flatMapˢ op f fl oc k r pl so ls)
   flat-stays H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} so ls ag = record
     { holds = λ {E} {o} → Heaps.holds-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} so ls ag {E} {o}
     ; gated = λ _ → Heaps.gated-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} so ls ag
-    ; spent = Heaps.spent-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} so ls ag }
+    ; spent = Heaps.spent-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} so ls ag
+    ; left  = cong₂ U.unionᶜ (leftover-alike H H′ so (λ j m → ag j (there (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ m)))))))))
+                             (leftoverL-alike H H′ ls (λ j m → ag j (there (there (there (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) m))))))))) }
 
   conn-stays : ∀ {h} (H H′ : Heapᴹ h) {Δ A B S c b kb k fd rp e rt} (src : Sub h Δ A) (bd : Sub h (A ∷ Δ) B)
              → Alike H H′ (drop 2 (names (connectˢ S c b kb k fd rp e rt src bd))) → Stays H H′ (connectˢ S c b kb k fd rp e rt src bd)
   conn-stays H H′ {S = S} {c} {b} {kb} {k} {fd} {rp} {e} {rt} src bd ag = record
     { holds = λ {E} {o} → Heaps.holds-conn H H′ {S = S} {c} {b} {kb} {k} {fd} {rp} {e} {rt} src bd ag {E} {o}
     ; gated = λ _ → Heaps.gated-conn H H′ {S = S} {c} {b} {kb} {k} {fd} {rp} {e} {rt} src bd ag
-    ; spent = Heaps.spent-conn H H′ {S = S} {c} {b} {kb} {k} {fd} {rp} {e} {rt} src bd ag }
+    ; spent = Heaps.spent-conn H H′ {S = S} {c} {b} {kb} {k} {fd} {rp} {e} {rt} src bd ag
+    ; left  = conn-left rp (trans (sourced-heap H H′ (At.part H′ src) (At.leftover H′ src)) (cong₂ (At.sourced H) (part-alike H H′ src a₁) (leftover-alike H H′ src a₁)))
+                        (leftover-alike H H′ bd a₂) }
+    where
+      a₁ : Alike H H′ (names src)
+      a₁ j m = ag j (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m)))))
+      a₂ : Alike H H′ (names bd)
+      a₂ j m = ag j (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names src) m)))))
 
   -- A WRITE AT A NODE, FRAMED: its kernel, its feeds and the queue alike,
   -- so every record of the tree carried across.
@@ -505,6 +518,9 @@ module ClimbBase (R : Set) where
 
     queue : ∀ {q clk ts} → Queue H q clk ts T → Queue H′ q clk ts T
     queue = queue-keeps kp
+
+    wr-lefts : ∀ {s S} (L : Lifts H ρ s S) → Lefts H L → Lefts H′ (wr-lifts L)
+    wr-lefts = lefts-off H H′ ρ fs offU (Stays.left st)
 
     -- Nothing left at the node: its ties as they were.
     lingers : Ends H T → Lingering H H′ u u → Lingers H T → Lingers H′ T

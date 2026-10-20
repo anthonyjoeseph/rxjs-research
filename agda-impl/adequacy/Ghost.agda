@@ -532,24 +532,31 @@ module Ghosting (R : Set) where
       lifts-next : ∀ {Δ B Δ′ C} {l} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} {πL : PathLanes ls u} {s bs S as}
                  → LiftsLane H πL s bs S as → LiftsLane H (next-lane {l = l} πL) s (At.partLanes H (l ∷ []) ++ bs) S as
 
+  -- What holds once a step ends, and nothing before.
+  OnEnd : ∀ {Γ A} → U.Step Γ A → Set₁ → Set₁
+  OnEnd (U.endˢ _) P = P
+  OnEnd _          P = Lift _ ⊤
+
   -- WHAT A LIFT LEAVES FREE LEAVES WHAT THE HEAP WOULD: the node a
   -- connect's source, a flatMap's outer or a lane stands for on the way
-  -- up leaves alike the leftover the witness reads there.  The lift
-  -- itself reads no part on its path; this is what ties its free nodes.
+  -- up leaves alike the leftover the witness reads there, once its own
+  -- step ends.  The lift itself reads no part on its path; this is what
+  -- ties its free nodes, and a free node reaches the ghost only through
+  -- an end: a skip or a value carries the step's own continuation.
   mutual
     Lefts : ∀ {h} (H : Heapᴹ h) {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} {ρ : Path t u} {s S} → Lifts H ρ s S → Set₁
     Lefts H lifts-here                               = Lift _ ⊤
     Lefts H (lifts-map L)                            = Lefts H L
     Lefts H (lifts-scan L)                           = Lefts H L
     Lefts H (lifts-take _ L)                         = Lefts H L
-    Lefts H (lifts-outer {t = t} {o₀ = o₀} _ _ L)    = Leaves o₀ (At.leftover H {B = ⊤} t) × Lefts H L
+    Lefts H (lifts-outer {t = t} {S = S} {o₀ = o₀} _ _ L) = OnEnd S (Leaves o₀ (At.leftover H {B = ⊤} t)) × Lefts H L
     Lefts H (lifts-lanes {l = l} L _ _ _)            = LeftsL H l L
-    Lefts H (lifts-source {t = t} {c₀ = c₀} _ _ L)   = Leaves c₀ (At.leftover H {B = ⊤} t) × Lefts H L
+    Lefts H (lifts-source {t = t} {S = S} {c₀ = c₀} _ _ L) = OnEnd S (Leaves c₀ (At.leftover H {B = ⊤} t)) × Lefts H L
     Lefts H (lifts-body _ _ L)                       = Lefts H L
     Lefts H (lifts-shut _ _ _ L)                     = Lefts H L
     Lefts H (lifts-defer L)                          = Lefts H L
 
     LeftsL : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ C} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} {πL : PathLanes ls u} {s bs S as}
            → U.Node Δ B → LiftsLane H πL s bs S as → Set₁
-    LeftsL H l (lifts-this {t = t} _ L) = Leaves l (At.leftover H {B = ⊤} t) × Lefts H L
+    LeftsL H l (lifts-this {t = t} {S = S} _ L) = OnEnd S (Leaves l (At.leftover H {B = ⊤} t)) × Lefts H L
     LeftsL H l (lifts-next L)           = LeftsL H l L

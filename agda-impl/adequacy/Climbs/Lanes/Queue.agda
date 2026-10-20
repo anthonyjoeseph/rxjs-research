@@ -112,7 +112,7 @@ module ClimbLanesQueue (R : Set) where
   open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pin-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag)
   open ShiftWalk R using (let-go; grip)
   open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined)
-  open FramingRepool R using (Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off; scan-lefts) renaming (Ended to Ends)
+  open FramingRepool R using (Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
   open Staging R using (not-src; wrap-lane)
   open Weakening R using (Grows; pure-map) renaming (module Grown to Weakened)
   open WeakeningHeaps R using () renaming (module GrownHeaps to Weakened′)
@@ -462,7 +462,7 @@ module ClimbLanesQueue (R : Set) where
                     (Freed.fr-lingering hp ρ o (fresh-path ρ fs)
                       (flat-gone H₂ {op = op} {f} {fl} {oc} {k} {r} {po} {u = t} {ls} (trans (Freed.fr-part hp ρ o (fresh-path ρ fs)) eo)
                                  (trans (Freed.fr-lanes hp ρ o (fresh-path ρ fs) LL) (cong₂ _++_ ebs eas)) eq₀)) lvg
-      ; lefts = Freed.Wr.wr-lefts hp ρ o fs Lq
+      ; lefts = Freed.Fr.wr-lefts hp ρ o fs (lane-live o LL) Lq
                   (lefts-subst (λ s′ → s′) (lane-end op G l q po eo ebs eas eqs)
                     (lefts-subst (λ S′ → U.laneˢ op G (At.part hp t) bs′ l S′ as′ (At.val hp (FlatKit.Flat.queue fl)) po) (lane-step o LL) (lefts-up ρ (in-lanes πL) eqQ lt)))
       ; flags = Freed.fr-flags hp ρ o fs (done-up ρ (in-lanes πL) (one-outers o) (Calling.flags cl)) ; kept = inj₁ refl }))
@@ -470,8 +470,6 @@ module ClimbLanesQueue (R : Set) where
       H₂   = freed hp (laneOf o) fl
       O    = Here.obs (walk ρ top)
       G    = λ a j → U.subscribe (f a) j
-      Lq   = subst (λ s′ → Lifts hp ρ s′ S) (lane-end op G l q po eo ebs eas eqs)
-               (subst (λ S′ → Lifts hp ρ (U.laneˢ op G (At.part hp t) bs′ l S′ as′ (At.val hp (FlatKit.Flat.queue fl)) po) S) (lane-step o LL) Lρ)
       path = ⇝-trans p (⇝-trans p₁ (⇝-trans p₂ p₃))
       e₃   = ≗-trans (f₃ same⊑ (At.val H₂ (FlatKit.Flat.queue fl)))
                (wk-same (settledᵒ O (At.val H₂ (FlatKit.Flat.outerDone fl)) (At.val H₂ (FlatKit.Flat.active fl)) (At.val H₂ (FlatKit.Flat.queue fl))))
@@ -481,6 +479,8 @@ module ClimbLanesQueue (R : Set) where
       ebs  = proj₁ (proj₂ nl)
       eas  = proj₁ (proj₂ (proj₂ nl))
       eqs  = proj₂ (proj₂ (proj₂ nl))
+      Lq   = subst (λ s′ → Lifts hp ρ s′ S) (lane-end op G l q po eo ebs eas eqs)
+               (subst (λ S′ → Lifts hp ρ (U.laneˢ op G (At.part hp t) bs′ l S′ as′ (At.val hp (FlatKit.Flat.queue fl)) po) S) (lane-step o LL) Lρ)
   ...       | false
     with lane-ghost hp ρ o fs sn pd dp LL (trans (sym (lane-settles ρ o cl LL)) eq) eq₀ Lρ sg
   ...         | g″ , pg , sn″ , pd″ , dp″ , k″ , r″ , ag , pp =
@@ -571,7 +571,7 @@ module ClimbLanesQueue (R : Set) where
       L₇  = subst (λ qs → Lifts H₃ ρ (F (At.part H₃ t) (At.partLanes H₃ ls) qs) S) (sym (queue-stored H₂ fl ys)) L₆
       lt₁ = lefts-subst (λ qs → U.laneˢ op G (At.part hp t) bs′ l (U.endˢ q) as′ qs po) (trans (sym (queue-freed hp (laneOf o) fl)) eq₀)
               (lefts-subst (λ S′ → U.laneˢ op G (At.part hp t) bs′ l S′ as′ (At.val hp (FlatKit.Flat.queue fl)) po) (lane-step o LL) (lefts-up ρ (in-lanes πL) eqN lt))
-      lt₄ = Dequeued.Fr.wr-lefts H₂ ρ ys fs (Freed.Wr.wr-lifts hp ρ o fs L₁) (Freed.Wr.wr-lefts hp ρ o fs L₁ lt₁)
+      lt₄ = Dequeued.Fr.wr-lefts H₂ ρ ys fs (Freed.Wr.wr-lifts hp ρ o fs L₁) (Freed.Fr.wr-lefts hp ρ o fs (lane-live o LL) L₁ lt₁)
       lt₅ = lefts-subst (λ x → F x (bs′ ++ as′) ys) (sym (trans (Dequeued.dq-part H₂ ρ ys (fresh-path ρ fs)) (Freed.fr-part hp ρ o (fresh-path ρ fs)))) lt₄
       lt₆ = lefts-subst (λ zs → F (At.part H₃ t) zs ys) (sym (trans (Dequeued.dq-lanes H₂ ρ ys (fresh-path ρ fs)) (Freed.fr-lanes hp ρ o (fresh-path ρ fs) LL))) lt₅
       lt₇ = lefts-subst (λ qs → F (At.part H₃ t) (At.partLanes H₃ ls) qs) (sym (queue-stored H₂ fl ys)) lt₆
