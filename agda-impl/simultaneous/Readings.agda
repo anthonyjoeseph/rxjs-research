@@ -14,16 +14,27 @@ module simultaneous.Readings where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; _++_; map)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (_×_; _,_; proj₂)
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≢_)
 
-open import denotation.MonotonicList.Events using (Events; Events∞; Pos; ix; sub; root; out; skip; end; hush)
+open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Label; ix; sub; last; root; out; skip; end; hush)
 open import simultaneous.InstEmit using (InstEmit; Provenance; valuesOf)
 
 open Events∞ using (force)
 open InstEmit using (instant)
+
+-- Every position lies under one of the two: the subscribe frame, whose
+-- first step is never a `sub`, or a timer cascade, never at tick 0.
+-- This is what makes `instantOf` read the instant, and nothing else does.
+data NotSub : Label → Set where
+  ix-ns   : ∀ {i} → NotSub (ix i)
+  last-ns : NotSub last
+
+data Rooted : Pos → Set where
+  in-frame   : ∀ {l p} → NotSub l → Rooted (ix 0 ∷ l ∷ p)
+  in-cascade : ∀ {t e p} → Rooted (ix (suc t) ∷ sub e ∷ p)
 
 instantOf : Pos → Pos
 instantOf (ix t ∷ sub e ∷ _) = ix t ∷ sub e ∷ []
@@ -44,6 +55,19 @@ outs (suc n) (out p a k) = (p , a) ∷ outs n (force k)
 outs (suc n) (skip _ k)  = outs n (force k)
 outs (suc n) (end _)     = []
 outs (suc n) hush        = []
+
+-- The values among the first n events.
+values : ∀ {A} → ℕ → Events A → List A
+values n e = map proj₂ (outs n e)
+
+-- Where each of the first n events sits, its silent steps and its
+-- completion too.
+positions : ∀ {A} → ℕ → Events A → List Pos
+positions zero    _           = []
+positions (suc n) (out p _ k) = p ∷ positions n (force k)
+positions (suc n) (skip p k)  = p ∷ positions n (force k)
+positions (suc n) (end c)     = c ∷ []
+positions (suc n) hush        = []
 
 -- Whether the first n events reach the run's end: its completion, or
 -- the silence that never completes.  Either way no instant is left open.
@@ -82,16 +106,9 @@ FiniteInstants e = ∀ n → Settles (after n e)
 -- InstEmit streams
 
 -- Each value an emit carries, with the emit's provenance.
-stamped : ∀ {A} → List (Pos × InstEmit A) → List (Provenance × A)
-stamped []             = []
-stamped ((_ , x) ∷ xs) = map (λ a → instant x , a) (valuesOf x) ++ stamped xs
-
--- The emits carrying a value: where each sits, and its provenance.
-valued : ∀ {A} → List (Pos × InstEmit A) → List (Pos × Provenance)
-valued []             = []
-valued ((p , x) ∷ xs) with valuesOf x
-... | []    = valued xs
-... | _ ∷ _ = (p , instant x) ∷ valued xs
+stamped : ∀ {A} → List (InstEmit A) → List (Provenance × A)
+stamped []       = []
+stamped (x ∷ xs) = map (λ a → instant x , a) (valuesOf x) ++ stamped xs
 
 -- A grouping read off a prefix, its last group kept only once the run is
 -- over: until then that instant may still be running.

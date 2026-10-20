@@ -141,6 +141,14 @@ against the TypeScript.
 
 Members: `elaborate`, `batchSimultaneous`.
 
+#### THE INSTANTS
+
+Whether every position the fold builds lies under the subscribe frame or a
+timer cascade, as `instantOf` reads it. Settled when `positioned` is a body
+by induction over the fold.
+
+Members: `positioned`.
+
 ## Tier 3 — the simultaneous spec, proven
 
 **The proof:** Tier 2's statements, discharged over `adequacy`.
@@ -153,3 +161,10 @@ Untried: batches joined are the plain values, provenance tracks the
 instant, batches are the spec's grouping. Settled when all three are bodies.
 
 Members: `left-to-right`, `coherent`, `batchable`.
+
+#### THE READING
+
+A reader's prefix of `ticks e` and the first n events of `e` read alike:
+same values, ended alike. Settled when both directions are bodies.
+
+Members: `shown-read`, `read-shown`.
