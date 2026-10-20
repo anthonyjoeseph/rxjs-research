@@ -135,11 +135,12 @@ Members: `placing`, `ticks-up`.
 #### THE ELABORATION
 
 The statements are about srxjs only once srxjs is a program: each
-primitive rebuilt over InstEmits, and the batcher built from primitives.
-Settled when `elaborate` and `batchSimultaneous` are bodies, oracle-checked
-against the TypeScript.
+primitive rebuilt over InstEmits with `fresh` names, and the batcher built
+from primitives. Settled when each is a body, oracle-checked against the
+TypeScript.
 
-Members: `elaborate`, `batchSimultaneous`.
+Members: `coldˢ`, `emptyˢ`, `ofˢ`, `mapˢ`, `scanˢ`, `takeWhileˢ`,
+`flatMapˢ`, `connectˢ`, `batchSimultaneous`.
 
 #### THE INSTANTS
 
@@ -157,14 +158,33 @@ Members: `positioned`.
 
 #### THE SPEC
 
-Untried: batches joined are the plain values, provenance tracks the
-instant, batches are the spec's grouping. Settled when all three are bodies.
+Untried, and the batcher's liveness half waits on the elaboration: batches
+joined are the plain values, batches are the spec's grouping, at every site
+and related environment. Settled when both are bodies.
 
-Members: `left-to-right`, `coherent`, `batchable`.
+Members: `left-to-rightˢ`, `batchableˢ`.
+
+#### SOUND NAMES
+
+Whether `Sound` (names lie in their instant, one name per instant) is kept
+by each elaborated primitive and survives limits. Settled when the
+per-operator facts are bodies over the elaborations.
+
+Members: `coldˢ-sound`, `emptyˢ-sound`, `ofˢ-sound`, `mapˢ-sound`,
+`scanˢ-sound`, `takeWhileˢ-sound`, `flatMapˢ-sound`, `connectˢ-sound`,
+`defer-sound`, `sound-admissible`, `batched-sound`.
+
+#### THE FRESH RUNTIME
+
+The pure runtime has no `fresh` leaf: names as positions in the meaning,
+as a counter in the run, alike up to renaming. Settled when `runˢ` is the
+pure runtime over the leaf and `adequacyˢ` follows from `adequacy`.
+
+Members: `runˢ`, `adequacyˢ`.
 
 #### THE READING
 
 A reader's prefix of `ticks e` and the first n events of `e` read alike:
-same values, ended alike. Settled when both directions are bodies.
+same values, ended alike. Settled when all three are bodies.
 
-Members: `shown-read`, `read-shown`.
+Members: `shown-read`, `read-shown`, `agree-shows`.

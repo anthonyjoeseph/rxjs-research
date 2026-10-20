@@ -22,8 +22,9 @@ open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList.Events using (Timeline; ix; idle)
-open import denotation.MonotonicList using (MonotonicList; coldᴰ; skip⁼; stop; stopᵀ; agreeᵀ-refl; _≈[_]_; agrees; agree; agreeᵀ; _≈_; Settling; Contractive; lub-limit; ≈ₖ-refl; ≈ₖ-sym; ≈ₖ-trans; ≈ₖ-pred; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flatMapᴰ; connectᴰ; deferᴰ)
-open import denotation.Denote using (DenEnv; flatOp; approx; ⟦_⟧)
+open import denotation.MonotonicList using (MonotonicList; coldᴰ; skip⁼; stop; stopᵀ; agreeᵀ-refl; _≈[_]_; agrees; agree; agreeᵀ; _≈_; Settling; Contractive; lub; lub-limit; ≈ₖ-refl; ≈ₖ-sym; ≈ₖ-trans; ≈ₖ-pred; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flatMapᴰ; connectᴰ; deferᴰ)
+open import denotation.Denote using (DenEnv; flatOp)
+import denotation.Denote as D
 open import denotation.NonExpansive using (mapᴰ-ne; scanᴰ-ne; takeWhileᴰ-ne; flatMapᴰ-ne; connectᴰ-ne)
 
 -- A `defer` shows a skip before its body, so it settles one step more.
@@ -46,81 +47,102 @@ lookup-agree : ∀ {k Γ A} {ρ σ : DenEnv Γ} → EnvAgree k ρ σ → (i : A 
 lookup-agree (a ∷ᵉ _) (here refl) = a
 lookup-agree (_ ∷ᵉ e) (there i)   = lookup-agree e i
 
--- An approximant reads its environment non-expansively.  Lexicographic
--- on (n , tree), as `approx` is.
-approx-ne : ∀ {Γ A k} n (o : Obs Timeline Γ A) {ρ σ : DenEnv Γ} → EnvAgree k ρ σ → approx n o ρ ≈[ k ] approx n o σ
-approx-ne n       (cold c)          e = ≈ₖ-refl _
-approx-ne n       empty             e = ≈ₖ-refl _
-approx-ne n       (of xs)           e = ≈ₖ-refl _
-approx-ne n       (map f s)         e = mapᴰ-ne f (approx-ne n s e)
-approx-ne n       (scan f z s)      e = scanᴰ-ne f z (approx-ne n s e)
-approx-ne n       (takeWhile i p s) e = takeWhileᴰ-ne i p (approx-ne n s e)
-approx-ne n       (flatMap op f s)  e = flatMapᴰ-ne (flatOp op) (approx-ne n s e) λ a → approx-ne n (f a) e
-approx-ne n       (connect s b)     e = connectᴰ-ne (approx-ne n s e) λ rr → approx-ne n b (rr ∷ᵉ e)
-approx-ne n       (connected i)     e = lookup-agree e i
-approx-ne zero    (defer l)         e = ≈ₖ-refl _
-approx-ne (suc n) (defer l)         e = ≈ₖ-pred (deferᴰ-contractive (approx-ne n (Later.force l) e))
+-- A property survives a settling limit: what holds of every element of
+-- a chain whose elements agree ever longer holds of its limit.  Any
+-- property read off finitely many events of each subscription does.
+Admissible : ∀ {A} → (MonotonicList A → Set) → Set
+Admissible {A} P = ∀ {c : ℕ → MonotonicList A} → Settling c → (∀ n → P (c n)) → P (lub c)
 
--- Approximant n agrees with the next for n steps: every cut sits under
--- n `defer`s, each a skip before it.
-settle : ∀ {Γ A} n (o : Obs Timeline Γ A) (ρ : DenEnv Γ) → approx n o ρ ≈[ n ] approx (suc n) o ρ
-settle n       (cold c)          ρ = ≈ₖ-refl _
-settle n       empty             ρ = ≈ₖ-refl _
-settle n       (of xs)           ρ = ≈ₖ-refl _
-settle n       (map f s)         ρ = mapᴰ-ne f (settle n s ρ)
-settle n       (scan f z s)      ρ = scanᴰ-ne f z (settle n s ρ)
-settle n       (takeWhile i p s) ρ = takeWhileᴰ-ne i p (settle n s ρ)
-settle n       (flatMap op f s)  ρ = flatMapᴰ-ne (flatOp op) (settle n s ρ) λ a → settle n (f a) ρ
-settle n       (connect s b)     ρ = connectᴰ-ne (settle n s ρ) λ {r} {r′} rr →
-  ≈ₖ-trans (approx-ne n b (rr ∷ᵉ env-refl ρ)) (settle n b (r′ ∷ ρ))
-settle n       (connected i)     ρ = ≈ₖ-refl _
-settle zero    (defer l)         ρ = agrees (λ p → stopᵀ) λ p → stop
-settle (suc n) (defer l)         ρ = deferᴰ-contractive (settle n (Later.force l) ρ)
+-- Generic in the leaf, as the meaning is.
+module Over {C : Set → Set₁} (leaf : ∀ {A} → C A → MonotonicList A) where
 
-settles : ∀ {Γ A} (o : Obs Timeline Γ A) (ρ : DenEnv Γ) → Settling (λ n → approx n o ρ)
-settles o ρ n = settle n o ρ
+  open D.Over leaf using (approx; ⟦_⟧)
 
--- Approximant k is the meaning for k steps.
-toward : ∀ {Γ A} k (o : Obs Timeline Γ A) (ρ : DenEnv Γ) → approx k o ρ ≈[ k ] ⟦ o ⟧ ρ
-toward k o ρ = lub-limit (settles o ρ) k
+  -- An approximant reads its environment non-expansively.  Lexicographic
+  -- on (n , tree), as `approx` is.
+  approx-ne : ∀ {Γ A k} n (o : Obs C Γ A) {ρ σ : DenEnv Γ} → EnvAgree k ρ σ → approx n o ρ ≈[ k ] approx n o σ
+  approx-ne n       (cold c)          e = ≈ₖ-refl _
+  approx-ne n       empty             e = ≈ₖ-refl _
+  approx-ne n       (of xs)           e = ≈ₖ-refl _
+  approx-ne n       (map f s)         e = mapᴰ-ne f (approx-ne n s e)
+  approx-ne n       (scan f z s)      e = scanᴰ-ne f z (approx-ne n s e)
+  approx-ne n       (takeWhile i p s) e = takeWhileᴰ-ne i p (approx-ne n s e)
+  approx-ne n       (flatMap op f s)  e = flatMapᴰ-ne (flatOp op) (approx-ne n s e) λ a → approx-ne n (f a) e
+  approx-ne n       (connect s b)     e = connectᴰ-ne (approx-ne n s e) λ rr → approx-ne n b (rr ∷ᵉ e)
+  approx-ne n       (connected i)     e = lookup-agree e i
+  approx-ne zero    (defer l)         e = ≈ₖ-refl _
+  approx-ne (suc n) (defer l)         e = ≈ₖ-pred (deferᴰ-contractive (approx-ne n (Later.force l) e))
 
--- The meaning is approximant k for k steps.
-from : ∀ {Γ A} k (o : Obs Timeline Γ A) (ρ : DenEnv Γ) → ⟦ o ⟧ ρ ≈[ k ] approx k o ρ
-from k o ρ = ≈ₖ-sym (toward k o ρ)
+  -- Approximant n agrees with the next for n steps: every cut sits under
+  -- n `defer`s, each a skip before it.
+  settle : ∀ {Γ A} n (o : Obs C Γ A) (ρ : DenEnv Γ) → approx n o ρ ≈[ n ] approx (suc n) o ρ
+  settle n       (cold c)          ρ = ≈ₖ-refl _
+  settle n       empty             ρ = ≈ₖ-refl _
+  settle n       (of xs)           ρ = ≈ₖ-refl _
+  settle n       (map f s)         ρ = mapᴰ-ne f (settle n s ρ)
+  settle n       (scan f z s)      ρ = scanᴰ-ne f z (settle n s ρ)
+  settle n       (takeWhile i p s) ρ = takeWhileᴰ-ne i p (settle n s ρ)
+  settle n       (flatMap op f s)  ρ = flatMapᴰ-ne (flatOp op) (settle n s ρ) λ a → settle n (f a) ρ
+  settle n       (connect s b)     ρ = connectᴰ-ne (settle n s ρ) λ {r} {r′} rr →
+    ≈ₖ-trans (approx-ne n b (rr ∷ᵉ env-refl ρ)) (settle n b (r′ ∷ ρ))
+  settle n       (connected i)     ρ = ≈ₖ-refl _
+  settle zero    (defer l)         ρ = agrees (λ p → stopᵀ) λ p → stop
+  settle (suc n) (defer l)         ρ = deferᴰ-contractive (settle n (Later.force l) ρ)
 
-------------------------------------------------------------------------
--- THE THEOREM: each node's meaning is its operator's `MonotonicList`
--- function applied to its children's meanings.
+  settles : ∀ {Γ A} (o : Obs C Γ A) (ρ : DenEnv Γ) → Settling (λ n → approx n o ρ)
+  settles o ρ n = settle n o ρ
 
-record Compositional : Set₁ where
-  field
-    coldᶜ      : ∀ {Γ A} (c : Timeline A) (ρ : DenEnv Γ) → ⟦ cold c ⟧ ρ ≈ coldᴰ (lower c)
-    emptyᶜ     : ∀ {Γ A} (ρ : DenEnv Γ) → ⟦ empty {Γ = Γ} {A = A} ⟧ ρ ≈ emptyᴰ
-    ofᶜ        : ∀ {Γ A} (xs : List A) (ρ : DenEnv Γ) → ⟦ of xs ⟧ ρ ≈ ofᴰ xs
-    mapᶜ       : ∀ {Γ A B} (f : A → B) (s : Obs Timeline Γ A) ρ → ⟦ map f s ⟧ ρ ≈ mapᴰ f (⟦ s ⟧ ρ)
-    scanᶜ      : ∀ {Γ A B} (f : B → A → B) z (s : Obs Timeline Γ A) ρ → ⟦ scan f z s ⟧ ρ ≈ scanᴰ f z (⟦ s ⟧ ρ)
-    takeWhileᶜ : ∀ {Γ A} i p (s : Obs Timeline Γ A) ρ → ⟦ takeWhile i p s ⟧ ρ ≈ takeWhileᴰ i p (⟦ s ⟧ ρ)
-    flatMapᶜ   : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) ρ
-               → ⟦ flatMap op f s ⟧ ρ ≈ flatMapᴰ (flatOp op) (λ a → ⟦ f a ⟧ ρ) (⟦ s ⟧ ρ)
-    connectᶜ   : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) ρ
-               → ⟦ connect s b ⟧ ρ ≈ connectᴰ (⟦ s ⟧ ρ) (λ r → ⟦ b ⟧ (r ∷ ρ))
-    connectedᶜ : ∀ {Γ A} (i : A ∈ Γ) (ρ : DenEnv Γ) → ⟦ connected i ⟧ ρ ≈ lookup ρ i
-    deferᶜ     : ∀ {Γ A} (l : Later Timeline Γ A) ρ → ⟦ defer l ⟧ ρ ≈ deferᴰ (⟦ Later.force l ⟧ ρ)
+  -- Approximant k is the meaning for k steps.
+  toward : ∀ {Γ A} k (o : Obs C Γ A) (ρ : DenEnv Γ) → approx k o ρ ≈[ k ] ⟦ o ⟧ ρ
+  toward k o ρ = lub-limit (settles o ρ) k
 
-compositional : Compositional
-compositional = record
-  { coldᶜ      = λ c ρ k → from k (cold c) ρ
-  ; emptyᶜ     = λ ρ k → from k empty ρ
-  ; ofᶜ        = λ xs ρ k → from k (of xs) ρ
-  ; mapᶜ       = λ f s ρ k → ≈ₖ-trans (from k (map f s) ρ) (mapᴰ-ne f (toward k s ρ))
-  ; scanᶜ      = λ f z s ρ k → ≈ₖ-trans (from k (scan f z s) ρ) (scanᴰ-ne f z (toward k s ρ))
-  ; takeWhileᶜ = λ i p s ρ k → ≈ₖ-trans (from k (takeWhile i p s) ρ) (takeWhileᴰ-ne i p (toward k s ρ))
-  ; flatMapᶜ   = λ op f s ρ k → ≈ₖ-trans (from k (flatMap op f s) ρ)
-                   (flatMapᴰ-ne (flatOp op) (toward k s ρ) λ a → toward k (f a) ρ)
-  ; connectᶜ   = λ s b ρ k → ≈ₖ-trans (from k (connect s b) ρ)
-                   (connectᴰ-ne (toward k s ρ) λ {r} {r′} rr →
-                     ≈ₖ-trans (approx-ne k b (rr ∷ᵉ env-refl ρ)) (toward k b (r′ ∷ ρ)))
-  ; connectedᶜ = λ i ρ k → from k (connected i) ρ
-  ; deferᶜ     = λ l ρ k → ≈ₖ-pred (≈ₖ-trans (from (suc k) (defer l) ρ)
-                   (deferᴰ-contractive (toward k (Later.force l) ρ)))
-  }
+  -- THROUGH THE LIMIT: what holds of every approximant, and survives a
+  -- settling limit, holds of the meaning.  This is what carries a fact
+  -- proven one approximant at a time, by induction on (n , tree), past
+  -- `defer` and recursion.
+  through-limit : ∀ {Γ A} {P : MonotonicList A → Set} → Admissible P → (o : Obs C Γ A) (ρ : DenEnv Γ)
+                → (∀ n → P (approx n o ρ)) → P (⟦ o ⟧ ρ)
+  through-limit adm o ρ h = adm (settles o ρ) h
+
+  -- The meaning is approximant k for k steps.
+  from : ∀ {Γ A} k (o : Obs C Γ A) (ρ : DenEnv Γ) → ⟦ o ⟧ ρ ≈[ k ] approx k o ρ
+  from k o ρ = ≈ₖ-sym (toward k o ρ)
+
+  ------------------------------------------------------------------------
+  -- THE THEOREM: each node's meaning is its operator's `MonotonicList`
+  -- function applied to its children's meanings.
+
+  record Compositional : Set₁ where
+    field
+      coldᶜ      : ∀ {Γ A} (c : C A) (ρ : DenEnv Γ) → ⟦ cold c ⟧ ρ ≈ leaf c
+      emptyᶜ     : ∀ {Γ A} (ρ : DenEnv Γ) → ⟦ empty {Γ = Γ} {A = A} ⟧ ρ ≈ emptyᴰ
+      ofᶜ        : ∀ {Γ A} (xs : List A) (ρ : DenEnv Γ) → ⟦ of xs ⟧ ρ ≈ ofᴰ xs
+      mapᶜ       : ∀ {Γ A B} (f : A → B) (s : Obs C Γ A) ρ → ⟦ map f s ⟧ ρ ≈ mapᴰ f (⟦ s ⟧ ρ)
+      scanᶜ      : ∀ {Γ A B} (f : B → A → B) z (s : Obs C Γ A) ρ → ⟦ scan f z s ⟧ ρ ≈ scanᴰ f z (⟦ s ⟧ ρ)
+      takeWhileᶜ : ∀ {Γ A} i p (s : Obs C Γ A) ρ → ⟦ takeWhile i p s ⟧ ρ ≈ takeWhileᴰ i p (⟦ s ⟧ ρ)
+      flatMapᶜ   : ∀ {Γ A B} op (f : A → Obs C Γ B) (s : Obs C Γ A) ρ
+                 → ⟦ flatMap op f s ⟧ ρ ≈ flatMapᴰ (flatOp op) (λ a → ⟦ f a ⟧ ρ) (⟦ s ⟧ ρ)
+      connectᶜ   : ∀ {Γ A B} (s : Obs C Γ A) (b : Obs C (A ∷ Γ) B) ρ
+                 → ⟦ connect s b ⟧ ρ ≈ connectᴰ (⟦ s ⟧ ρ) (λ r → ⟦ b ⟧ (r ∷ ρ))
+      connectedᶜ : ∀ {Γ A} (i : A ∈ Γ) (ρ : DenEnv Γ) → ⟦ connected i ⟧ ρ ≈ lookup ρ i
+      deferᶜ     : ∀ {Γ A} (l : Later C Γ A) ρ → ⟦ defer l ⟧ ρ ≈ deferᴰ (⟦ Later.force l ⟧ ρ)
+
+  compositional : Compositional
+  compositional = record
+    { coldᶜ      = λ c ρ k → from k (cold c) ρ
+    ; emptyᶜ     = λ ρ k → from k empty ρ
+    ; ofᶜ        = λ xs ρ k → from k (of xs) ρ
+    ; mapᶜ       = λ f s ρ k → ≈ₖ-trans (from k (map f s) ρ) (mapᴰ-ne f (toward k s ρ))
+    ; scanᶜ      = λ f z s ρ k → ≈ₖ-trans (from k (scan f z s) ρ) (scanᴰ-ne f z (toward k s ρ))
+    ; takeWhileᶜ = λ i p s ρ k → ≈ₖ-trans (from k (takeWhile i p s) ρ) (takeWhileᴰ-ne i p (toward k s ρ))
+    ; flatMapᶜ   = λ op f s ρ k → ≈ₖ-trans (from k (flatMap op f s) ρ)
+                     (flatMapᴰ-ne (flatOp op) (toward k s ρ) λ a → toward k (f a) ρ)
+    ; connectᶜ   = λ s b ρ k → ≈ₖ-trans (from k (connect s b) ρ)
+                     (connectᴰ-ne (toward k s ρ) λ {r} {r′} rr →
+                       ≈ₖ-trans (approx-ne k b (rr ∷ᵉ env-refl ρ)) (toward k b (r′ ∷ ρ)))
+    ; connectedᶜ = λ i ρ k → from k (connected i) ρ
+    ; deferᶜ     = λ l ρ k → ≈ₖ-pred (≈ₖ-trans (from (suc k) (defer l) ρ)
+                     (deferᴰ-contractive (toward k (Later.force l) ρ)))
+    }
+
+open Over (λ c → coldᴰ (lower c)) public

@@ -6,6 +6,11 @@
 -- construction, and clairvoyant as `MonotonicList` is: an operator reads
 -- its inputs' whole runs.  `folded` pins both, and `Main` imports it, so
 -- a stepper put in the fold's place breaks the top line.
+--
+-- GENERIC IN THE LEAF.  The meaning reads a leaf only through `leaf`, so
+-- a program whose leaves are not timelines (an elaborated program's
+-- `fresh`) means something by the same fold.  The timeline instance is
+-- what every runtime-facing proof reads.
 module denotation.Denote where
 
 open import Data.List using (List; _∷_)
@@ -30,12 +35,13 @@ flatOp (T.mergeᶠ k) = mergeᶠ k
 flatOp T.switchᶠ    = switchᶠ
 flatOp T.exhaustᶠ   = exhaustᶠ
 
--- APPROXIMANT n: the meaning with every path of more than n nested
--- `defer`s cut off at ⊥ᴰ — `iterate`, for a tree.  Lexicographic on
--- (n , tree): `defer` drops n, everything else is structural.
-mutual
-  approx : ∀ {Γ A} → ℕ → Obs Timeline Γ A → DenEnv Γ → MonotonicList A
-  approx n       (cold c)         ρ = coldᴰ (lower c)
+module Over {C : Set → Set₁} (leaf : ∀ {A} → C A → MonotonicList A) where
+
+  -- APPROXIMANT n: the meaning with every path of more than n nested
+  -- `defer`s cut off at ⊥ᴰ — `iterate`, for a tree.  Lexicographic on
+  -- (n , tree): `defer` drops n, everything else is structural.
+  approx : ∀ {Γ A} → ℕ → Obs C Γ A → DenEnv Γ → MonotonicList A
+  approx n       (cold c)         ρ = leaf c
   approx n       empty            ρ = emptyᴰ
   approx n       (of xs)          ρ = ofᴰ xs
   approx n       (map f s)        ρ = mapᴰ f (approx n s ρ)
@@ -47,12 +53,14 @@ mutual
   approx zero    (defer l)        ρ = ⊥ᴰ
   approx (suc n) (defer l)        ρ = deferᴰ (approx n (Later.force l) ρ)
 
-⟦_⟧[_] : ∀ {Γ A} → Obs Timeline Γ A → ℕ → DenEnv Γ → MonotonicList A
-⟦ o ⟧[ n ] = approx n o
+  ⟦_⟧[_] : ∀ {Γ A} → Obs C Γ A → ℕ → DenEnv Γ → MonotonicList A
+  ⟦ o ⟧[ n ] = approx n o
 
--- THE MEANING: the limit of the approximants.
-⟦_⟧ : ∀ {Γ A} → Obs Timeline Γ A → DenEnv Γ → MonotonicList A
-⟦ o ⟧ ρ = lub λ n → approx n o ρ
+  -- THE MEANING: the limit of the approximants.
+  ⟦_⟧ : ∀ {Γ A} → Obs C Γ A → DenEnv Γ → MonotonicList A
+  ⟦ o ⟧ ρ = lub λ n → approx n o ρ
+
+open Over (λ c → coldᴰ (lower c)) public
 
 -- The meaning is a fold: the limit of approximants, each an operator's
 -- `MonotonicList` function applied to its children's approximants.

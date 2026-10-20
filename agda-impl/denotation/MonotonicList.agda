@@ -461,11 +461,10 @@ flatMapᴰ op f s = cold λ p → λ where
 -- No information yet: a subscription that spins and never closes.  The
 -- bottom of the approximation order, and also the honest meaning of a
 -- silent synchronous loop — the two coincide, as in any domain.
-private
-  spin : ∀ {A} → Pos → ℕ → Events A
-  spin p i = skip (p ++ [ ix i ]) λ where
-    .force → spin p (suc i)
-    .cut   → idle
+spin : ∀ {A} → Pos → ℕ → Events A
+spin p i = skip (p ++ [ ix i ]) λ where
+  .force → spin p (suc i)
+  .cut   → idle
 
 ⊥ᴰ : ∀ {A} → MonotonicList A
 ⊥ᴰ = cold λ p → λ where

@@ -6,23 +6,22 @@
 -- an InstEmit stream.
 --
 -- The spec asks one question of an instant, whether it is the last one
--- again, so it reads the provenance's equality and nothing else.
-module simultaneous.Spec where
+-- again, so it is generic in the names and reads their equality alone.
+open import Relation.Binary.Definitions using (DecidableEquality)
+
+module simultaneous.Spec {N : Set} (_≟_ : DecidableEquality N) where
 
 open import Data.List using (List; []; _∷_; _∷ʳ_)
-open import Data.Nat using (_≟_)
 open import Data.Product using (_×_; _,_)
 open import Relation.Nullary using (yes; no)
 
-open import simultaneous.InstEmit using (Provenance)
-
 -- the batch open at instant `i`, holding `vs` so far
-batchFrom : ∀ {A : Set} → Provenance → List A → List (Provenance × A) → List (Provenance × List A)
+batchFrom : ∀ {A : Set} → N → List A → List (N × A) → List (N × List A)
 batchFrom i vs []             = (i , vs) ∷ []
 batchFrom i vs ((j , v) ∷ xs) with i ≟ j
 ... | yes _ = batchFrom i (vs ∷ʳ v) xs
 ... | no  _ = (i , vs) ∷ batchFrom j (v ∷ []) xs
 
-batchSimultaneousᴰ : ∀ {A : Set} → List (Provenance × A) → List (Provenance × List A)
+batchSimultaneousᴰ : ∀ {A : Set} → List (N × A) → List (N × List A)
 batchSimultaneousᴰ []             = []
 batchSimultaneousᴰ ((i , v) ∷ xs) = batchFrom i (v ∷ []) xs

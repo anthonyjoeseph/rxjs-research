@@ -4,12 +4,14 @@
 -- never end, so every claim is read off its first n events and quantified
 -- over n.
 --
--- AN INSTANT IS A CASCADE'S ROOT, READ OFF THE POSITION.  The subscribe
--- frame sits under `root`; a timer cascade at tick t sits under
--- `ix t ∷ sub e ∷ []`, `e` where its timer was created, and its tick is
--- never 0.  The tick alone is too coarse, since two timers firing at one
--- tick are two cascades; the whole position is too fine, since every
--- event of one cascade has its own.
+-- AN INSTANT IS A FRAME, READ OFF THE POSITION.  The subscribe frame
+-- sits under `root`.  After it, a cold's every async emission is a frame
+-- of its own, with everything it causes synchronously: a timer firing at
+-- tick t sits under `ix t ∷ sub e ∷ []`, `e` where its timer was created,
+-- its tick never 0, and its i-th emission under `ix i` below that, its
+-- completion under `last`.  The tick alone is too coarse, since two
+-- timers firing at one tick are two frames; the whole position is too
+-- fine, since every event of one frame has its own.
 module simultaneous.Readings where
 
 open import Data.Bool using (Bool; true; false)
@@ -20,25 +22,31 @@ open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≢_)
 
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Label; ix; sub; last; root; out; skip; end; hush)
-open import simultaneous.InstEmit using (InstEmit; Provenance; valuesOf)
+open import simultaneous.InstEmit using (InstEmit; valuesOf)
 
 open Events∞ using (force)
 open InstEmit using (instant)
 
 -- Every position lies under one of the two: the subscribe frame, whose
--- first step is never a `sub`, or a timer cascade, never at tick 0.
--- This is what makes `instantOf` read the instant, and nothing else does.
+-- first step is never a `sub`, or one step of a timer cascade, never at
+-- tick 0.  This is what makes `instantOf` read the instant, and nothing
+-- else does.
 data NotSub : Label → Set where
   ix-ns   : ∀ {i} → NotSub (ix i)
   last-ns : NotSub last
 
 data Rooted : Pos → Set where
   in-frame   : ∀ {l p} → NotSub l → Rooted (ix 0 ∷ l ∷ p)
-  in-cascade : ∀ {t e p} → Rooted (ix (suc t) ∷ sub e ∷ p)
+  in-cascade : ∀ {t e l p} → Rooted (ix (suc t) ∷ sub e ∷ l ∷ p)
 
 instantOf : Pos → Pos
-instantOf (ix t ∷ sub e ∷ _) = ix t ∷ sub e ∷ []
-instantOf _                  = root
+instantOf (ix t ∷ sub e ∷ l ∷ _) = ix t ∷ sub e ∷ l ∷ []
+instantOf _                      = root
+
+-- Where a subscription can be made: the root, or where an event sits.
+data Site : Pos → Set where
+  at-root : Site root
+  under   : ∀ {p} → Rooted p → Site p
 
 -- The run past its first n events.
 after : ∀ {A} → ℕ → Events A → Events A
@@ -106,7 +114,7 @@ FiniteInstants e = ∀ n → Settles (after n e)
 -- InstEmit streams
 
 -- Each value an emit carries, with the emit's provenance.
-stamped : ∀ {A} → List (InstEmit A) → List (Provenance × A)
+stamped : ∀ {N A} → List (InstEmit N A) → List (N × A)
 stamped []       = []
 stamped (x ∷ xs) = map (λ a → instant x , a) (valuesOf x) ++ stamped xs
 
