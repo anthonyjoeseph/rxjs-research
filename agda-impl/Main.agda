@@ -19,6 +19,10 @@ open import denotation.Denote using (folded)
 -- to its children's meanings, so proofs over it go one operator at a time.
 open import denotation.Compositional using (compositional)
 
+-- MAP FUSES: `map (f ∘ g)` and `map f ∘ map g` mean the same, and so,
+-- through adequacy, run the same.
+open import denotation.Laws using (map-fusion; map-fusionᴾ)
+
 -- THE SIMULTANEOUS SPEC: an author's program, elaborated with
 -- `batchSimultaneous` on top, groups what plain rxjs delivers by instant,
 -- in order, releasing each batch the moment its instant is over.
