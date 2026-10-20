@@ -119,6 +119,15 @@ module Shifting (R : Set) where
             → U.unionᶜ {B = B} (U.burstingᶜ rp n′) (U.underᶜ (U.live n′) x′) ≡ U.unionᶜ (U.burstingᶜ rp n) (U.underᶜ (U.live n) x)
   conn-left rp refl refl = refl
 
+  -- A flatMap's outer kept, and a lane's, read by their flags and parts.
+  outer-gate : ∀ {Γ B} {d d′ j j′ : Bool} {x x′ y y′ : U.Node Γ B} → d′ ≡ d → x′ ≡ x → j′ ≡ j → y′ ≡ y
+             → (if d′ then x′ else if j′ then y′ else U.idleᶜ) ≡ (if d then x else if j then y else U.idleᶜ)
+  outer-gate refl refl refl refl = refl
+
+  lane-gate : ∀ {Γ B} {v v′ j j′ : Bool} {x x′ y y′ : U.Node Γ B} → v′ ≡ v → j′ ≡ j → y′ ≡ y → x′ ≡ x
+            → (if v′ then (if j′ then y′ else U.idleᶜ) else x′) ≡ (if v then (if j then y else U.idleᶜ) else x)
+  lane-gate refl refl refl refl = refl
+
   ----------------------------------------------------------------------
   -- What a node's part reads, at either heap
 
@@ -290,6 +299,48 @@ module Shifting (R : Set) where
     leftover-from : ∀ {ns Δ′ A′ B} {x : Sub h Δ′ A′} → (∀ {n} → n ∈ᴸ names x → n ∈ᴸ ns) → Alike H H′ ns → At.leftover H′ {B = B} x ≡ At.leftover H x
     leftover-from {x = x} sub al = leftover-alike x (λ j m → al j (sub m))
 
+    mutual
+      kept-alike : ∀ {Δ A B} (s : Sub h Δ A) → Alike H H′ (names s) → At.kept H′ {B = B} s ≡ At.kept H {B = B} s
+      kept-alike (pendingˢ s q) al = refl
+      kept-alike (coldˢ s hd ph) al = refl
+      kept-alike (ofˢ p i xs) al = refl
+      kept-alike doneˢ al = refl
+      kept-alike (mapˢ f s) al = kept-alike s al
+      kept-alike (scanˢ f r s) al = kept-alike s (λ j m → al j (there m))
+      kept-alike (takeWhileˢ i p c k tk s) al = kept-alike s (λ j m → al j (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) m)))
+      kept-alike (flatMapˢ op f fl oc k r pl so ls) al =
+        cong₂ U.unionᶜ (outer-gate (cong lower (al (Flat.outerDone fl) (there (here refl)))) (leftover-alike so a₁) (cong is-just (part-alike H H′ so a₁)) (kept-alike so a₁))
+                       (keptL-alike ls a₂)
+        where
+          a₁ : Alike H H′ (names so)
+          a₁ j m = al j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ˡ m)))))
+          a₂ : Alike H H′ (laneNames ls)
+          a₂ j m = al j (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k) (there (++⁺ʳ (names so) m)))))
+      kept-alike (connectˢ S c b kb k fd rp e rt src bd) al =
+        conn-left rp (trans (sourced-heap H H′ (At.part H′ src) (At.leftover H′ src)) (cong₂ (At.sourced H) (part-alike H H′ src a₁) (leftover-alike src a₁)))
+          (kept-alike bd a₂)
+        where
+          a₁ : Alike H H′ (names src)
+          a₁ j m = al j (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ˡ m))))))
+          a₂ : Alike H H′ (names bd)
+          a₂ j m = al j (++⁺ʳ (subjectNames S) (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names src) m))))))
+      kept-alike (joinˢ j sk l x st) al = refl
+      kept-alike (deferˢ k s) al = kept-alike s (λ j m → al j (++⁺ʳ (quietName k) m))
+
+      keptL-alike : ∀ {Δ A B} (ls : List (Lane h Δ A)) → Alike H H′ (laneNames ls) → At.keptL H′ {B = B} ls ≡ At.keptL H {B = B} ls
+      keptL-alike []                al = refl
+      keptL-alike (lane c k s ∷ ls) al =
+        cong₂ U.unionᶜ (lane-gate (cong lower (al (Kit.live c) (here refl))) (cong is-just (part-alike H H′ s a)) (kept-alike s a) (leftover-alike s a))
+                       (keptL-alike ls a′)
+        where
+          a : Alike H H′ (names s)
+          a j m = al j (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ˡ m)))
+          a′ : Alike H H′ (laneNames ls)
+          a′ j m = al j (++⁺ʳ (cutNames c) (++⁺ʳ (quietName k) (++⁺ʳ (names s) m)))
+
+    kept-from : ∀ {ns Δ′ A′ B} {x : Sub h Δ′ A′} → (∀ {n} → n ∈ᴸ names x → n ∈ᴸ ns) → Alike H H′ ns → At.kept H′ {B = B} x ≡ At.kept H x
+    kept-from {x = x} sub al = kept-alike x (λ j m → al j (sub m))
+
     pooledL-alike : ∀ {Δ A B} (ls : List (Lane h Δ A)) → Alike H H′ (laneNames ls) → At.pooledL H′ {B = B} ls ≡ At.pooledL H {B = B} ls
     pooledL-alike [] al = refl
     pooledL-alike {B = B} (lane c k s ∷ ls) al
@@ -331,7 +382,7 @@ module Shifting (R : Set) where
 
     leaving-alike : ∀ {Δ A} {t : Sub h Δ A} → Alike H H′ (names t) → Leaving H t → Leaving H′ t
     leaving-alike {t = t} al lv = record
-      { parts = λ {u = u} ψ sn e → subst (λ y → Leaves _ y) (sym (leftover-from {B = ⊤} {x = u} (λ m → names-path ψ m) al))
+      { parts = λ {u = u} ψ sn e → subst (λ y → Leaves _ y) (sym (kept-from {B = ⊤} {x = u} (λ m → names-path ψ m) al))
                                      (Leaving.parts lv ψ (se ψ sn) (trans (sym (part-at ψ al)) e))
       ; pools = λ {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} ψ sn e →
                   subst (λ y → Leaves pl₀ y) (sym (pooled-from {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} (λ m → names-path ψ m) al))

@@ -688,12 +688,13 @@ module StrongAgainst (R : Set) where
           pin   : Pinned (U.restˢ {B = ⊤} x) (U.restˢ {B = ⊤} y)
 
   -- WHAT THE GHOST HOLDS LEAVES WHAT THE HEAP WOULD: below `t`, each seen
-  -- part, a held flatMap's pool and a held connect's ended source's rest
-  -- each leave what the witness reads off as their leftover, to every
-  -- depth, where `Lingers` pins only the next step.
+  -- part leaves what the witness reads off as kept, a held flatMap's pool
+  -- and a held connect's ended source's rest what it reads off as their
+  -- leftover, to every depth, where `Lingers` pins only the next step.
+  -- REFUTED: e52e45a6 of a part leaving its whole leftover, by a flatMap whose outer has ended and not yet closed
   record Leaving {h} (H : Heapᴹ h) {Δ A} (t : Sub h Δ A) : Set₁ where
     field
-      parts : ∀ {Δ′ A′} {u : Sub h Δ′ A′} (ψ : Path t u) → seen H ψ ≡ true → ∀ {c} → At.part H u ≡ just c → Leaves c (At.leftover H {B = ⊤} u)
+      parts : ∀ {Δ′ A′} {u : Sub h Δ′ A′} (ψ : Path t u) → seen H ψ ≡ true → ∀ {c} → At.part H u ≡ just c → Leaves c (At.kept H {B = ⊤} u)
       pools : ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
             → (ψ : Path t (flatMapˢ op f fl oc k r pl so ls)) → seen H ψ ≡ true
             → ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Leaves pl (At.pooled H fl so ls)

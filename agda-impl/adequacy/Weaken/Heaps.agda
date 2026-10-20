@@ -157,6 +157,29 @@ module WeakeningHeaps (R : Set) where
         leftover-wkᴸ []                = refl
         leftover-wkᴸ (lane c k s ∷ ls) = cong₂ U.unionᶜ (leftover-wk s) (leftover-wkᴸ ls)
 
+      mutual
+        kept-wk : ∀ {Δ A B} (u : Sub h Δ A) → At.kept H′ {B = B} (wkTree τ u) ≡ At.kept H {B = B} u
+        kept-wk (pendingˢ s q)                     = refl
+        kept-wk (coldˢ s hd ph)                    = refl
+        kept-wk (ofˢ p i xs)                       = refl
+        kept-wk doneˢ                              = refl
+        kept-wk (mapˢ f s)                         = kept-wk s
+        kept-wk (scanˢ f r s)                      = kept-wk s
+        kept-wk (takeWhileˢ i p c k tk s)          = kept-wk s
+        kept-wk {B = B} (flatMapˢ op f fl oc k r pl so ls)
+          rewrite cells (FlatKit.Flat.outerDone fl) | leftover-wk {B = B} so | grow-part so | kept-wk {B = B} so | kept-wkᴸ {B = B} ls = refl
+        kept-wk (connectˢ S c b kb k fd rp e rt src bd) =
+          cong₂ (λ n l → U.unionᶜ (U.burstingᶜ rp n) (U.underᶜ (U.live n) l))
+                (trans (cong₂ (At.sourced H′) (grow-part src) (leftover-wk src)) (sourced-≡ (At.part H src) (At.leftover H src)))
+                (kept-wk {B = ⊤} bd)
+        kept-wk (joinˢ j sk l x st)                = refl
+        kept-wk (deferˢ k s)                       = kept-wk s
+
+        kept-wkᴸ : ∀ {Δ A B} (ls : List (Lane h Δ A)) → At.keptL H′ {B = B} (wkLanes τ ls) ≡ At.keptL H {B = B} ls
+        kept-wkᴸ []                = refl
+        kept-wkᴸ {B = B} (lane c k s ∷ ls)
+          rewrite cells (Kit.live c) | grow-part s | kept-wk {B = B} s | leftover-wk {B = B} s | kept-wkᴸ {B = B} ls = refl
+
       pooled-wkᴸ : ∀ {Δ A B} (ls : List (Lane h Δ A)) → At.pooledL H′ {B = B} (wkLanes τ ls) ≡ At.pooledL H {B = B} ls
       pooled-wkᴸ []                = refl
       pooled-wkᴸ (lane c k s ∷ ls) =
@@ -221,8 +244,8 @@ module WeakeningHeaps (R : Set) where
       grow-leaving : ∀ {t : Sub h [] R} → Leaving H t → Leaving H′ (wkTree τ t)
       Leaving.parts (grow-leaving {t = t} L) ψ′ sn {c} eq =
         let x , ψ , e , s = unwk t ψ′ in
-        subst (λ z → Leaves c (At.leftover H′ {B = ⊤} z)) (sym e)
-          (subst (Leaves c) (sym (leftover-wk {B = ⊤} x))
+        subst (λ z → Leaves c (At.kept H′ {B = ⊤} z)) (sym e)
+          (subst (Leaves c) (sym (kept-wk {B = ⊤} x))
             (Leaving.parts L ψ (trans (sym s) sn) (trans (sym (grow-part x)) (subst (λ z → At.part H′ z ≡ just c) e eq))))
       Leaving.pools (grow-leaving {t = t} L) {op = op} {f = f} {pl = pl} ψ′ sn eq with unwk t ψ′
       ... | x , ψ , e , s with flat-inv x e
