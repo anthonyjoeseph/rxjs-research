@@ -185,6 +185,6 @@ Members: `runˢ`, `adequacyˢ`.
 #### THE READING
 
 A reader's prefix of `ticks e` and the first n events of `e` read alike:
-same values, ended alike. Settled when all three are bodies.
+same values, ended alike. Settled when both directions are bodies.
 
-Members: `shown-read`, `read-shown`, `agree-shows`.
+Members: `shown-read`, `read-shown`.
