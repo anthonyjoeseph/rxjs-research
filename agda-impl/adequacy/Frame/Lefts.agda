@@ -266,6 +266,7 @@ module FramingLefts (R : Set) where
       where
         P  = pairs-r (quietName k) (pairs-r (cutNames c) ps)
         el = lane1-alike H H′ {c = c} {k} {s₀} (Heaps.keep H H′ off (λ m → there (++⁺ʳ (quietName k) (++⁺ʳ (names s₀) (lanes-path πL m)))) (Kit.live c) nl)
+                              (part-alike H H′ s₀ (Heaps.keeps H H′ off (lanes-path πL) (apart-r (names s₀) P)))
 
   -- A write at a scan's accumulator, left: the scan's leftover its
   -- source's, which reads no accumulator.
