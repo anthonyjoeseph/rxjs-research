@@ -1,3 +1,0 @@
-glob-family
-nonpostulate-parent
-f-grindable

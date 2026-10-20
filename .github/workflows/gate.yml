@@ -54,7 +54,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # `roadmap-moved` diffs PROOF-STATE against the merge-base with main
+          # `comments-check` resolves REFUTED/RECOVERY shas against full history
           fetch-depth: 0
 
       - name: Set up Node

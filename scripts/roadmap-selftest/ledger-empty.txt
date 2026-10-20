@@ -1,0 +1,4 @@
+alpha-one  A.agda:1
+alpha-two  A.agda:2
+beta-x  B.agda:1
+beta-y  B.agda:2

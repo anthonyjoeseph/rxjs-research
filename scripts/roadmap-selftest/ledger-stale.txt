@@ -1,1 +1,5 @@
-a-live  Fixture/One.agda:1
+alpha-one  A.agda:1
+beta-x  B.agda:1
+beta-y  B.agda:2
+gamma-p  C.agda:1
+gamma-q  C.agda:2

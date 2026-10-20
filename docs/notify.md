@@ -26,54 +26,24 @@ app and add the topic there.
 ```
 Title:  gate GREEN - about to commit
 
-Tier 1 is the lowest open — 2 falsity, 21 difficulty
-across 2 falsity, 16 difficulty on the roadmap
-standing on 11 refutations, 4 dead routes, 3 twins, 21 probes, 3 recoveries
+Tier 1 is the lowest open — top group THE REST'S TIES
 
-- **the first leg** — … the tier's big picture roadmap, verbatim,
-  all three legs and the prose under each.
-- **the second leg** — …
-- **the third leg** — …
+- … the tier's progress section, verbatim.
 
-  tier 1: 14 difficulty, 2 grindable
-    evidence: 10 refutations, 1 dead route, 3 twins, 7 probes, 1 recovery
-  tier 2: 2 falsity, 4 shape, 19 difficulty
-    evidence: 1 refutation, 1 dead route, 1 probe
-  tier 3: 2 vacuity, 1 difficulty
-    evidence: no evidence
+  tier 1: THE REST'S TIES — 35 postulate(s)
+  tier 1: THE ROOT STEP — 3 postulate(s)
+  …
 
-87 live postulate(s) across the tree — … on the roadmap
-evidence standing under them: 11 refutations, 2 dead routes, 3 twins, 8 probes, 1 recovery
+132 live postulate(s) across the tree
 3 file(s) uncommitted on main
 HEAD <sha> <subject>
 ```
 
-The lowest open tier leads, and it leads with the whole of what a session
-would open the roadmap to read: the tier's POSTULATE census by risk class, and
-then its big picture roadmap in full.
+The lowest open tier leads, with its top group and the progress made toward
+settling it — what a session would open PROOF-STATE to read. Below it, every
+group with its count of live members, riskiest first.
 
-**The postulate count and the row count are different censuses, and both are
-printed.** One row routinely heads a family, so counting rows reads the tier as
-smaller than the ledger it stands for; counting postulates says how much is
-actually open. The class is the ROW's, since a class is declared on a row, and
-a name is counted once however many rows reach it.
-
-**The roadmap goes out verbatim rather than as three titles.** The titles say
-which groups are next and none of why, and the why is the part that decides
-whether the plan still fits what the last run found. The per-tier breakdown
-below it says how far each tier has to go.
-
-**The evidence line is the other half of a risk class, and it is why the two
-are printed together.** A tier of fourteen FALSITY rows standing on ten
-refutations is a tier whose statements have been tested; the same fourteen rows
-with `no evidence` under them is a tier whose classes are opinions. Markers
-count with multiplicity — a row carrying `REFUTED×4` contributes four — because
-four refutations pinning one statement's shape is four findings, not one.
-
-**They are summed from the postulates' own headers, not from the roadmap's
-evidence fields**, by the same reader `make roadmap-check` uses. The two agree
-today only because that check fails when they do not, and reading the headers
-is what makes the agreement a fact rather than an assumption. A red gate sends the same body at high priority with the failing stage in
+A red gate sends the same body at high priority with the failing stage in
 the title (`RED (cheap checks)`, `RED (agda)`), so a build that dies while
 nobody is watching still reports.
 
@@ -82,12 +52,12 @@ nobody is watching still reports.
 PROOF-STATE.md deliberately carries **no aggregates** — a hand-typed total is
 true when written and silently wrong later, with nothing checking it, which is
 the failure `roadmap-check` exists to prevent. Every number here is derived at
-send time from the roadmap and the postulate ledger, and nothing is written
-back, so the notification can carry counts without the roadmap acquiring any.
+send time from the groups' members and the postulate ledger, and nothing is
+written back, so the notification can carry counts without the file acquiring any.
 
 The parse is `check-roadmap.py`'s own, imported rather than re-implemented: a
-second reader of the roadmap's row syntax would drift from the checker's, and
-then the notification and the gate would disagree about what a row is.
+second reader would drift from the checker's, and then the notification and the
+gate would disagree about what a group is.
 
 ## Where it is wired
 

@@ -25,9 +25,7 @@ evidence behind a rule come here.
 | `imports-selftest` | [imports-check.md](imports-check.md) | ship an import checker that has stopped firing |
 | `imports-check` | [imports-check.md](imports-check.md) | leave an import no name in the file spends, or one that names nothing it takes |
 | `roadmap-selftest` | [roadmap-check.md](roadmap-check.md) | ship a roadmap checker that has stopped firing |
-| `roadmap-check` | [roadmap-check.md](roadmap-check.md) | leave PROOF-STATE stale, unsorted, verbose, or dated — or date CLAUDE.md |
-| `roadmap-moved` | [roadmap-check.md](roadmap-check.md) | land proof work on a branch without moving PROOF-STATE |
-| `roadmap-order` | [roadmap-check.md](roadmap-check.md) | discharge a GRINDABLE row while its tier holds an open FALSITY |
+| `roadmap-check` | [roadmap-check.md](roadmap-check.md) | leave a postulate out of PROOF-STATE's groups, overrun a budget, or date PROOF-STATE, CLAUDE.md or docs |
 | `comments-selftest` | [comments-check.md](comments-check.md) | ship a comment checker that has stopped firing |
 | `comments-check` | [comments-check.md](comments-check.md) | date a source comment, record what happened to a declaration, bury the evidence mid-paragraph, cite a twin that is not there |
 | `ts-gate` | — | land TypeScript that does not typecheck or lint |
