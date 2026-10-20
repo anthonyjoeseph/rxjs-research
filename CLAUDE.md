@@ -65,7 +65,7 @@ Every PROOF-STATE.md tier discharged: no postulates, everything typechecks. "Pas
 ## Delegation — the design session directs, Sonnet workers grind
 
 - **Workers run Sonnet 4.6, and `model: "sonnet"` does NOT get you there** — that alias resolves to Sonnet 5 here. Both levers apply only at session start, so a running session cannot change or verify its workers' model; say so plainly. → [docs/delegation.md](docs/delegation.md)
-- **Workers never babysit long builds.** Hand `make gate` back to the design session.
+- **Workers never babysit long builds;** the full gate is CI's.
 - **A worker must kill any detached build before reporting**, and say nothing is running. Agda doesn't lock interfaces — two processes on one `.agdai` is a corrupt cache or a spurious failure.
 - **Delegation has a FIXED context cost — amortise it or do it yourself (Anthony).** Delegate on BREADTH (several independent items, concurrently), REPETITION (one context, many similar obligations), or NARROWNESS (a small nameable slice). **Keep DEPTH:** one hard thing in a file already loaded is cheaper to do than to delegate.
 - **The tell, and it is reliable: if writing the directive required you to do the analysis, you have already done the expensive part.**
@@ -77,7 +77,7 @@ Every PROOF-STATE.md tier discharged: no postulates, everything typechecks. "Pas
 
 ## Agda builds
 
-- **`make gate` is the merge gate, run in reconciliation:** `gate-cheap`, then `make agda` (`agda-impl/Main.agda`).
+- **CI runs `make gate`; a session does not (Anthony).** Locally: `make gate-cheap`, then `make check F=<file>` on each module touched. A PR is merge-ready when CI's gate is green on its head. Run `make agda` locally only to diagnose a CI failure.
 - **The harness never runs locally — only in CI, in the background (Anthony).** Bug cache, oracle, every `quickcheck/` binary (placing, ghosts, exact, hand, spin): never built or run in a session, so it never blocks real work. Checked by GHC and the FFI — never a proof's dependency.
 - **A warning is a build failure.** Every invocation goes through the Makefile's `AGDA` (carries `-W error`). Never call bare `agda` in the Makefile. Never silence a warning to get green — a warning you believe is wrong is a finding. → [docs/agda-build.md](docs/agda-build.md)
 - **Two commands: `make bg T=<target>` as a BACKGROUND tool call, then `make bg-check T=<target>`.** `bg` blocks, logs, appends `EXIT=<code>`. `bg-check` reports GREEN / RED-with-tail / STILL-RUNNING. `bg-wait` is for a human. A `sleep N; tail` or `until` loop is the apparatus re-implemented worse. `make bg` always exits non-zero by design, so **a completion notification is never a result — `bg-check` is.**
