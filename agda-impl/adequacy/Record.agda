@@ -47,7 +47,7 @@ module Recording (R : Set) where
   asked-keeps : ∀ m os → Fed m (asked m os)
   asked-keeps m []                  = (refl , refl) , refl
   asked-keeps m (perform _ ∷ _)     = (refl , refl) , refl
-  asked-keeps m (start c s hd ∷ _)  = starting-keeps m s hd (timelineAt c (pos m))
+  asked-keeps m (start c s hd ∷ _)  = starting-keeps m s hd (timelineAt c (Conf.pos (Mach.conf m)))
   asked-keeps m (stopped _ ∷ _)     = (refl , refl) , refl
   asked-keeps m (closedIs false ∷ _) = (refl , refl) , refl
   asked-keeps m (closedIs true ∷ _) with Mach.bursts m
