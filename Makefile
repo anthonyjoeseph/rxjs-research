@@ -1,8 +1,7 @@
 .PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain ghosts placing placing-count stepping bg bg-check bg-wait \
         wiring wiring-gate wiring-selftest unsafe-check dup-check dup-selftest \
         imports-check imports-fix imports-selftest comments-check comments-selftest \
-        roadmap-check roadmap-selftest roadmap-evidence roadmap-moved roadmap-moved-selftest \
-        roadmap-order roadmap-order-selftest find find-prose postulates notify \
+        roadmap-check roadmap-selftest find find-prose postulates notify split \
         ts-check ts-lint ts-format-check ts-gate
 
 # UTF-8 locale for em-dashes and special characters in Agda output
@@ -50,7 +49,8 @@ help:
 	@echo "  find-prose    search comment blocks and docs for a finding:  make find-prose Q='dead route'"
 	@echo "  wiring        the wiring report (wiring-gate: the same, exiting 1)"
 	@echo "  imports-fix   delete unused imports and names"
-	@echo "  roadmap-evidence  rewrite PROOF-STATE's derived evidence fields"
+	@echo "  split         cut a long module:  make split F=<file> (lists cuts);  make split F=<file> P='Mod Mod.B@120'"
+	@echo "                a nested one, in place:  make split F=<file> SUB='Inner Inner2@300'"
 	@echo "  bg / bg-check / bg-wait   run a long target detached; read its verdict"
 	@echo "  ts-gate       tsc, eslint, prettier over typescript/"
 
@@ -64,8 +64,6 @@ GATE_CHEAP = wiring-selftest wiring-gate \
              unsafe-check dup-selftest dup-check \
              imports-selftest imports-check \
              roadmap-selftest roadmap-check \
-             roadmap-moved-selftest roadmap-moved \
-             roadmap-order-selftest roadmap-order \
              comments-selftest comments-check \
              ts-gate
 
@@ -431,14 +429,7 @@ comments-check:
 # is not an explanation.  `sha` pins that last one as load-bearing rather than
 # decorative: its raw comment total is well OVER budget and its charged total
 # well under, so dropping the exemption turns it red.
-#
-# THE POSTULATE-TWIN ASSERTION IS GENERATED, and deliberately: the highest-value
-# thing this checker does is refuse a `TWIN` naming a statement that is ITSELF
-# STILL A POSTULATE, because that is a row whose GRINDABLE class was never
-# earned.  A fixture naming a postulate by hand would go stale the day that
-# postulate is discharged -- and it WOULD be discharged, since the whole point
-# of the campaign is to discharge them -- and it would then pass while reporting
-# the check as dead.  So the name is read from the live ledger at run time.
+
 comments-selftest:
 	@fail=0; \
 	  for d in clean sha echo-ok; do \
@@ -493,48 +484,23 @@ comments-selftest:
 	    || { echo "SELFTEST FAIL: a marker doubled into the comment text was not reported -- the form no other check in this repo can see"; fail=1; }; \
 	  echo "$$ob" | grep -q 'RECOVERY' \
 	    || { echo "SELFTEST FAIL: the obscured marker was reported without naming which marker it was"; fail=1; }; \
-	  tn=$$(scripts/check-comments.py --sample-proven 2>/dev/null); \
-	  if [ -z "$$tn" ]; then \
-	    echo "SELFTEST FAIL: no proven definition to build the passing fixture from — the reference assertion cannot run"; fail=1; \
-	  else \
-	    rd=$$(mktemp -d); \
-	    { echo 'module RefOk where'; echo; \
-	      echo '-- WHAT THIS LEAF OWES.  Every reference below resolves, and each is'; \
-	      echo '-- written BACKTICKED or DOTTED, which is what makes it read as a'; \
-	      echo '-- reference at all.'; \
-	      echo '--'; \
-	      echo '-- REFUTED: the unconditional form is killed at git show 919f115 — the'; \
-	      echo '--   sha form, which is what a marker carries once `src` can no longer'; \
-	      echo '--   STATE the route and the witness has correctly been deleted.'; \
-	      printf -- '-- TWIN: `%s` is the proven counterpart whose clauses correspond.\n' "$$tn"; \
-	      echo '-- RECOVERY: git show 2984f1e575d8699e8ce78975e23c530d803fc911 restores the predecessor and its whole cone.'; \
-	      echo 'postulate leaf : Set'; } > $$rd/RefOk.agda; \
-	    scripts/check-comments.py --dir $$rd > /dev/null 2>&1 \
-	      || { echo "SELFTEST FAIL: a TWIN naming the PROVEN definition $$tn, a REFUTED naming a real refutation and a RECOVERY carrying a real sha were REJECTED"; fail=1; }; \
-	    rm -rf $$rd; \
-	  fi; \
+	  rd=$$(mktemp -d); \
+	  { echo 'module RefOk where'; echo; \
+	    echo '-- WHAT THIS LEAF OWES.  Every reference below resolves.'; \
+	    echo '--'; \
+	    echo '-- REFUTED: the unconditional form is killed at git show 919f115.'; \
+	    echo '-- RECOVERY: git show 2984f1e575d8699e8ce78975e23c530d803fc911 restores the predecessor and its whole cone.'; \
+	    echo 'postulate leaf : Set'; } > $$rd/RefOk.agda; \
+	  scripts/check-comments.py --dir $$rd > /dev/null 2>&1 \
+	    || { echo "SELFTEST FAIL: a REFUTED naming a real refutation and a RECOVERY carrying a real sha were REJECTED"; fail=1; }; \
+	  rm -rf $$rd; \
 	  out=$$(scripts/check-comments.py --dir scripts/comments-selftest/ref-bad 2>&1); \
 	  if scripts/check-comments.py --dir scripts/comments-selftest/ref-bad > /dev/null 2>&1; then \
 	    echo "SELFTEST FAIL: references naming nothing PASSED — the resolution check is dead"; fail=1; \
 	  fi; \
-	  echo "$$out" | grep -q 'TWIN names nothing' \
-	    || { echo "SELFTEST FAIL: an unresolvable TWIN was not reported"; fail=1; }; \
 	  echo "$$out" | grep -q 'RECOVERY carries no sha' \
 	    || { echo "SELFTEST FAIL: a bogus sha was not reported"; fail=1; }; \
-	  pn=$$(scripts/check-wiring.py --postulates 2>/dev/null | grep '\.agda:' | head -1 | awk '{print $$1}'); \
-	  if [ -z "$$pn" ]; then \
-	    echo "SELFTEST FAIL: the postulate ledger is unreadable — the postulate-TWIN assertion cannot run"; fail=1; \
-	  else \
-	    d=$$(mktemp -d); printf 'module Gen where\n\n-- WHAT THIS LEAF OWES.\n-- TWIN: `%s` is claimed as the proven counterpart.\npostulate leaf : Set\n' "$$pn" > $$d/Gen.agda; \
-	    g=$$(scripts/check-comments.py --dir $$d 2>&1); \
-	    if scripts/check-comments.py --dir $$d > /dev/null 2>&1; then \
-	      echo "SELFTEST FAIL: a TWIN naming the live postulate $$pn PASSED — an unearned GRINDABLE class would go unnoticed"; fail=1; \
-	    fi; \
-	    echo "$$g" | grep -q 'STILL A POSTULATE' \
-	      || { echo "SELFTEST FAIL: a TWIN naming live postulate $$pn was not reported as one"; fail=1; }; \
-	    rm -rf $$d; \
-	  fi; \
-	  if [ $$fail -eq 0 ]; then echo "comments-selftest: PASS (all checks fire, including a TWIN naming a live postulate read from the ledger and a marker doubled into the comment text; an indented marker, an undated SEALED, a sha pointer, a bare numeral, an approximate QUANTITY carrying its unit and a resolving reference do not)"; \
+	  if [ $$fail -eq 0 ]; then echo "comments-selftest: PASS (all checks fire, including a marker doubled into the comment text; an indented marker, an undated SEALED, a sha pointer, a bare numeral, an approximate QUANTITY carrying its unit and a resolving reference do not)"; \
 	  else exit 1; fi
 
 # THE ACCEPTANCE TEST, cheap checks FIRST.  Ordering is the point: an orphan
@@ -544,284 +510,43 @@ comments-selftest:
 roadmap-check:
 	@scripts/check-roadmap.py --prune
 
-# PROVES roadmap-check IS LOAD-BEARING, against fixtures outside PROOF-STATE.md.
-# Same reason dup-selftest exists: the real file is (and should stay) SORTED, so
-# the failing path never runs on it and would rot untested.  The MUST-NOT row is
-# the one that matters — a row whose prose MENTIONS a better class later must
-# still be read at its declared class, or every "the FALSITY raise is WITHDRAWN,
-# this is DIFFICULTY" row in the real file would be misclassified.
+# PROVES roadmap-check IS LOAD-BEARING, against fixtures outside PROOF-STATE.md:
+# the real file is (and should stay) green, so its failing paths never run on it.
+# Every failing fixture must FAIL and name its check; the prune path runs on a
+# copy and must leave a green file with the dead member, or the empty group, gone.
 roadmap-selftest:
-	@fail=0; \
-	  scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	      --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt --src-names scripts/roadmap-selftest/src-names.txt > /dev/null \
-	    || { echo "SELFTEST FAIL: a correctly sorted, fully covered roadmap was rejected"; fail=1; }; \
-	  out=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/unsorted.md 2>&1); \
-	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/unsorted.md > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: an out-of-order roadmap PASSED — the sort check is dead"; fail=1; \
-	  fi; \
-	  for n in b-falsity d-falsity; do \
-	    echo "$$out" | grep -q "$$n" \
-	      || { echo "SELFTEST FAIL: $$n not reported — a real sort violation stopped firing"; fail=1; }; \
+	@fail=0; S=scripts/roadmap-selftest; R=scripts/check-roadmap.py; \
+	  $$R --file $$S/good.md --ledger $$S/ledger.txt --dates-only $$S/good.md > /dev/null \
+	    || { echo "SELFTEST FAIL: a well-formed, fully covered ledger was rejected"; fail=1; }; \
+	  for c in "twice.md ledger.txt TWICE" "nomembers.md ledger.txt SHAPE" \
+	           "noprogress.md ledger.txt SHAPE" "fatgroup.md ledger.txt OVER.BUDGET" \
+	           "fatprogress.md ledger.txt OVER.BUDGET" "fatpre.md ledger.txt OVER.BUDGET" \
+	           "fatfile.md ledger.txt OVER.BUDGET" "dated.md ledger.txt DATED" \
+	           "good.md ledger-gap.txt UNCOVERED" "good.md ledger-stale.txt STALE"; do \
+	    set -- $$c; \
+	    out=$$($$R --file $$S/$$1 --ledger $$S/$$2 --dates-only $$S/good.md 2>&1); \
+	    if $$R --file $$S/$$1 --ledger $$S/$$2 --dates-only $$S/good.md > /dev/null 2>&1; then \
+	      echo "SELFTEST FAIL: $$1 against $$2 PASSED — the $$3 check is dead"; fail=1; \
+	    elif ! echo "$$out" | grep -q "^$$3"; then \
+	      echo "SELFTEST FAIL: $$1 against $$2 failed without reporting $$3"; fail=1; fi; \
 	  done; \
-	  echo "$$out" | grep -q "a-grindable is" \
-	    && { echo "SELFTEST FAIL: the row a violation sits below was itself reported"; fail=1; }; \
-	  gap=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	           --ledger scripts/roadmap-selftest/ledger-gap.txt --census scripts/roadmap-selftest/census.txt --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
-	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	       --ledger scripts/roadmap-selftest/ledger-gap.txt --census scripts/roadmap-selftest/census.txt --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: an unscheduled postulate PASSED — the coverage check is dead"; fail=1; \
-	  fi; \
-	  echo "$$gap" | grep -q never-scheduled \
-	    || { echo "SELFTEST FAIL: never-scheduled not reported by the coverage check"; fail=1; }; \
-	  for n in fam-alpha fam-beta glob-one glob-two suf-nodry-nestRec; do \
-	    echo "$$gap" | grep -q "^  $$n$$" \
-	      && { echo "SELFTEST FAIL: $$n reported — roadmap shorthand stopped counting as naming"; fail=1; }; \
-	  done; \
-	  long=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/overlong.md 2>&1); \
-	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/overlong.md > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: a leaked-header row PASSED — the length check is dead"; fail=1; \
-	  fi; \
-	  echo "$$long" | grep -q leaked-header \
-	    || { echo "SELFTEST FAIL: leaked-header not reported by the length check"; fail=1; }; \
-	  echo "$$long" | grep -q short-row \
-	    && { echo "SELFTEST FAIL: a within-budget row was reported over budget"; fail=1; }; \
-	  echo "$$out" | grep -q "OVER BUDGET" \
-	    && { echo "SELFTEST FAIL: the length check fired on the sort fixture"; fail=1; }; \
-	  lgc=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/legs-count.md 2>&1); \
-	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/legs-count.md > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: a tier planning TWO legs where it has rows for three PASSED — the leg count is dead"; fail=1; \
-	  fi; \
-	  echo "$$lgc" | grep -q "^  Tier 0  legs-count.md  names 2 leg(s), wants at least 3" \
-	    || { echo "SELFTEST FAIL: the short-count tier was not NAMED with its found and wanted counts"; fail=1; }; \
-	  echo "$$lgc" | grep -q "^  Tier 1  legs-count.md  names" \
-	    && { echo "SELFTEST FAIL: a correctly-planned tier was reported — the count is not being read per tier"; fail=1; }; \
-	  echo "$$lgc" | grep -q "OVER BUDGET" \
-	    && { echo "SELFTEST FAIL: a budget check fired on legs-count.md, so it does not isolate the COUNT"; fail=1; }; \
-	  lgm=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/legs-many.md 2>&1); \
-	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/legs-many.md > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: a tier planning EIGHT legs PASSED — the leg ceiling is dead"; fail=1; \
-	  fi; \
-	  echo "$$lgm" | grep -q "^  Tier 0  legs-many.md  names 8 leg(s), wants at most 7" \
-	    || { echo "SELFTEST FAIL: the over-count tier was not NAMED with its found and wanted counts"; fail=1; }; \
-	  echo "$$lgm" | grep -q "^  Tier 1  legs-many.md  names" \
-	    && { echo "SELFTEST FAIL: a tier planning SEVEN legs was reported — the ceiling is off by one"; fail=1; }; \
-	  lgf=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/legs-fat.md 2>&1); \
-	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/legs-fat.md > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: a leg carrying its own proof PASSED — the leg budget is dead"; fail=1; \
-	  fi; \
-	  echo "$$lgf" | grep -q "ROADMAP LEGS OVER BUDGET" \
-	    || { echo "SELFTEST FAIL: the over-budget leg was not reported"; fail=1; }; \
-	  echo "$$lgf" | grep -q "ROWS OVER BUDGET" \
-	    && { echo "SELFTEST FAIL: the ROW budget fired on legs-fat.md, so it does not prove a leg is charged on its own budget"; fail=1; }; \
-	  echo "$$lgf" | grep -q "BIG PICTURE TIER ROADMAP" \
-	    && { echo "SELFTEST FAIL: the leg COUNT fired on legs-fat.md, so it does not isolate the budget"; fail=1; }; \
-	  echo "$$out" | grep -q "BIG PICTURE TIER ROADMAP" \
-	    && { echo "SELFTEST FAIL: the leg count fired on the sort fixture"; fail=1; }; \
-	  echo "$$out" | grep -q "ROADMAP LEGS OVER BUDGET" \
-	    && { echo "SELFTEST FAIL: the leg budget fired on the sort fixture"; fail=1; }; \
-	  pre=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/fatpre.md 2>&1); \
-	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/fatpre.md > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: a tier whose PREAMBLE holds a leaked header PASSED — the preamble budget is dead"; fail=1; \
-	  fi; \
-	  echo "$$pre" | grep -q "TIER PREAMBLES OVER BUDGET" \
-	    || { echo "SELFTEST FAIL: the fat preamble was not reported"; fail=1; }; \
-	  echo "$$pre" | grep -q "^  Tier 0  fatpre.md" \
-	    || { echo "SELFTEST FAIL: the over-budget tier was not NAMED with its first preamble line"; fail=1; }; \
-	  echo "$$pre" | grep -q "^  Tier 1  fatpre.md" \
-	    && { echo "SELFTEST FAIL: a within-budget preamble was reported — three near-budget WRAPPED rows are being charged to their section, which is the bug this fixture exists for"; fail=1; }; \
-	  echo "$$pre" | grep -q "ROWS OVER BUDGET" \
-	    && { echo "SELFTEST FAIL: the row budget fired on fatpre.md, so it does not prove the preamble check catches what the row check cannot"; fail=1; }; \
-	  echo "$$out" | grep -q "TIER PREAMBLES" \
-	    && { echo "SELFTEST FAIL: the preamble check fired on the sort fixture"; fail=1; }; \
-	  scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	      --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt --src-names scripts/roadmap-selftest/src-names.txt 2>&1 \
-	    | grep -q names-are-free \
-	    && { echo "SELFTEST FAIL: a nine-name row was charged for its names — shortening a row would mean dropping a name"; fail=1; }; \
-	  dat=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/dated.md 2>&1); \
-	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/dated.md > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: a roadmap naming calendar dates PASSED — the date check is dead"; fail=1; \
-	  fi; \
-	  for d in "2026-08-20" "2026-07-31" "Aug 18 2026"; do \
-	    echo "$$dat" | grep -q "$$d" \
-	      || { echo "SELFTEST FAIL: $$d not reported — the date check missed an attribution, a receipt or a spelled-out date"; fail=1; }; \
-	  done; \
-	  echo "$$dat" | grep -q "3 line(s) naming" \
-	    || { echo "SELFTEST FAIL: the date check did not report exactly the 3 dated lines — a bare year, a bare month-day or a version number was counted as a date"; fail=1; }; \
-	  echo "$$out" | grep -q "DATED NARRATIVE" \
-	    && { echo "SELFTEST FAIL: the date check fired on the sort fixture"; fail=1; }; \
-	  rul=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt --src-names scripts/roadmap-selftest/src-names.txt \
-	           --dates-only scripts/roadmap-selftest/dated-rules.md 2>&1); \
-	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	       --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt --src-names scripts/roadmap-selftest/src-names.txt \
-	       --dates-only scripts/roadmap-selftest/dated-rules.md > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: a dated RULES file PASSED beside a clean roadmap — the CLAUDE.md half of the date check is dead"; fail=1; \
-	  fi; \
-	  echo "$$rul" | grep -q "dated-rules.md:" \
-	    || { echo "SELFTEST FAIL: the rules file was not named in the date report — a rowless file is being skipped"; fail=1; }; \
-	  scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	      --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt --src-names scripts/roadmap-selftest/src-names.txt \
-	      --dates-only /dev/null > /dev/null 2>&1 \
-	    || { echo "SELFTEST FAIL: a dateless extra file was rejected"; fail=1; }; \
-	  stl=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/stale.md \
-	           --ledger scripts/roadmap-selftest/ledger-stale.txt --census scripts/roadmap-selftest/census.txt \
-	           --src-names scripts/roadmap-selftest/src-names-stale.txt 2>&1); \
-	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/stale.md \
-	       --ledger scripts/roadmap-selftest/ledger-stale.txt --census scripts/roadmap-selftest/census.txt \
-	       --src-names scripts/roadmap-selftest/src-names-stale.txt > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: a roadmap naming discharged postulates PASSED — the staleness check is dead"; fail=1; \
-	  fi; \
-	  for n in b-discharged c-vanished d-gone-parent; do \
-	    echo "$$stl" | grep -q "$$n" \
-	      || { echo "SELFTEST FAIL: $$n not reported — one arm of the staleness check stopped firing"; fail=1; }; \
-	  done; \
-	  echo "$$stl" | grep -q "  a-live$$" \
-	    && { echo "SELFTEST FAIL: a still-live postulate was reported stale"; fail=1; }; \
-	  prn=$$(mktemp); cp scripts/roadmap-selftest/stale.md $$prn; \
-	  scripts/check-roadmap.py --file $$prn --prune \
-	       --ledger scripts/roadmap-selftest/ledger-stale.txt --census scripts/roadmap-selftest/census.txt \
-	       --src-names scripts/roadmap-selftest/src-names-stale.txt 2>&1 | grep -q "STALE ROWS" \
-	    && { echo "SELFTEST FAIL: --prune left a row naming nothing live failing the check"; fail=1; }; \
-	  for n in b-discharged c-vanished d-gone-parent; do \
-	    grep -q "$$n" $$prn && { echo "SELFTEST FAIL: --prune kept $$n"; fail=1; }; \
-	  done; \
-	  grep -q "a-live" $$prn || { echo "SELFTEST FAIL: --prune deleted a live row"; fail=1; }; \
-	  rm -f $$prn; \
-	  cln=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt \
-	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
-	  echo "$$cln" | grep -q "STALE ROWS" \
-	    && { echo "SELFTEST FAIL: the staleness check fired on a clean roadmap — a CITED precedent or a descriptive head is being read as a claim, and earning GRINDABLE requires naming a proven precedent"; fail=1; }; \
-	  mis=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-missing.md \
-	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt \
-	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
-	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-missing.md \
-	       --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt \
-	       --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: a row with NO evidence field PASSED — the field is optional again, which is the one thing it must not be"; fail=1; \
-	  else \
-	    echo "$$mis" | grep -q "NO EVIDENCE FIELD" \
-	      || { echo "SELFTEST FAIL: a missing evidence field was rejected for the wrong reason"; fail=1; }; \
-	  fi; \
-	  stl2=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-stale.md \
-	            --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt \
-	            --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
-	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-stale.md \
-	       --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt \
-	       --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: an evidence field disagreeing with the headers PASSED — the field can rot, which is the whole reason it is derived"; fail=1; \
-	  else \
-	    echo "$$stl2" | grep -q "EVIDENCE FIELD IS STALE" \
-	      || { echo "SELFTEST FAIL: a stale evidence field was rejected for the wrong reason"; fail=1; }; \
-	  fi; \
-	  une=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-unearned.md \
-	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-notwin.txt \
-	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
-	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-unearned.md \
-	       --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-notwin.txt \
-	       --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: a GRINDABLE row naming no proven twin PASSED — the class is a parking space again"; fail=1; \
-	  else \
-	    echo "$$une" | grep -q "NAME NO PROVEN TWIN" \
-	      || { echo "SELFTEST FAIL: an unearned GRINDABLE was rejected for the wrong reason"; fail=1; }; \
-	  fi; \
-	  if [ $$fail -eq 0 ]; then echo "roadmap-selftest: OK"; else exit 1; fi
-
-# WRITES the evidence field on every classed row, from the postulates' own
-# headers.  The field is DERIVED -- which is the whole reason it may be
-# mandatory without producing filler.  A hand-typed census is the failure this
-# repo already paid for once: true when written, silently wrong later, read by
-# nobody who could tell.  `roadmap-check` recomputes it and fails on a
-# mismatch, so the roadmap cannot drift from the headers it summarises.
-roadmap-evidence:
-	@scripts/check-roadmap.py --fix-evidence
-
-# THE ROADMAP MUST MOVE IN EVERY COMMIT, BECAUSE A LEG IS ONE COMMIT.  Either the
-# leg landed -- retire it, promote the other two, write a new third -- or the
-# session could not finish it, in which case the FIRST leg is rewritten as the
-# work that remains.  Neither leaves the file untouched.  The check is
-# deliberately dumb (did it change against HEAD) because what it defends cannot
-# be resolved by a machine: `roadmap-check` verifies that a row's NAME exists,
-# and nothing can verify that the plan a leg describes is still the plan.
-# See docs/roadmap-check.md.
-roadmap-moved:
-	@scripts/check-roadmap-moved.py
-
-# PROVES roadmap-moved IS LOAD-BEARING, in BOTH directions -- and the third
-# fixture is the one that matters: a trailing-whitespace edit is the cheapest
-# way to satisfy a did-it-change check, so it must NOT satisfy this one.
-roadmap-moved-selftest:
-	@fail=0; \
-	  scripts/check-roadmap-moved.py --file scripts/roadmap-selftest/moved-diff.md \
-	      --baseline-file scripts/roadmap-selftest/moved-same.md > /dev/null \
-	    || { echo "SELFTEST FAIL: a genuinely changed roadmap was rejected"; fail=1; }; \
-	  if scripts/check-roadmap-moved.py --file scripts/roadmap-selftest/moved-same.md \
-	       --baseline-file scripts/roadmap-selftest/moved-same.md > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: an UNCHANGED roadmap PASSED — the check is dead"; fail=1; \
-	  fi; \
-	  if scripts/check-roadmap-moved.py --file scripts/roadmap-selftest/moved-space.md \
-	       --baseline-file scripts/roadmap-selftest/moved-same.md > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: a trailing-whitespace edit PASSED as movement — the check can be satisfied by saying nothing"; fail=1; \
-	  fi; \
-	  if [ $$fail -eq 0 ]; then echo "roadmap-moved-selftest: OK"; else exit 1; fi
-	@scripts/roadmap-moved-git-selftest
-
-# SETTLE RISK NEAR THE TRUNK: while a tier holds an open FALSITY row,
-# a commit may not BANK a GRINDABLE row of that tier.  The pull
-# it resists is structural rather than careless -- a risky leg often ends in a
-# finding, a finding-only commit reads as unfinished, and a mechanical row gets
-# closed alongside it to make the commit whole.  See docs/roadmap-check.md.
-roadmap-order:
-	@scripts/check-roadmap-order.py
-
-# PROVES roadmap-order IS LOAD-BEARING, and -- the harder half -- that it stays
-# QUIET on the four shapes the proof must remain free to take.  A check that
-# fired on a deletion or a reclassification would stop the proof changing shape,
-# which is a worse failure than the one it prevents.
-roadmap-order-selftest:
-	@fail=0; S=scripts/roadmap-selftest; \
-	  if scripts/check-roadmap-order.py --file $$S/order-banked.md \
-	       --baseline-file $$S/sorted.md --ledger $$S/order-ledger-banked.txt \
-	       --src-names $$S/order-src-names.txt --headers $$S/order-headers-none.txt \
-	       > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: a GRINDABLE row banked under an open FALSITY PASSED — the check is dead"; fail=1; \
-	  fi; \
-	  scripts/check-roadmap-order.py --file $$S/sorted.md --baseline-file $$S/sorted.md \
-	      --ledger $$S/ledger.txt --src-names $$S/src-names.txt \
-	      --headers $$S/order-headers-none.txt > /dev/null \
-	    || { echo "SELFTEST FAIL: a roadmap that banked nothing was rejected"; fail=1; }; \
-	  scripts/check-roadmap-order.py --file $$S/order-banked.md --baseline-file $$S/sorted.md \
-	      --ledger $$S/order-ledger-banked.txt --src-names $$S/src-names.txt \
-	      --headers $$S/order-headers-none.txt > /dev/null \
-	    || { echo "SELFTEST FAIL: a row DELETED from the tree was read as discharged — the proof cannot drop a statement"; fail=1; }; \
-	  scripts/check-roadmap-order.py --file $$S/order-reclass.md --baseline-file $$S/sorted.md \
-	      --ledger $$S/ledger.txt --src-names $$S/order-src-names.txt \
-	      --headers $$S/order-headers-none.txt > /dev/null \
-	    || { echo "SELFTEST FAIL: a RECLASSIFIED row was read as discharged — the proof cannot re-rank its own risk"; fail=1; }; \
-	  scripts/check-roadmap-order.py --file $$S/order-banked-t1.md --baseline-file $$S/sorted.md \
-	      --ledger $$S/order-ledger-t1.txt --src-names $$S/order-src-t1.txt \
-	      --headers $$S/order-headers-none.txt > /dev/null \
-	    || { echo "SELFTEST FAIL: ANOTHER tier's open FALSITY blocked a discharge — the law is per-tier"; fail=1; }; \
-	  scripts/check-roadmap-order.py --file $$S/order-renumbered.md --baseline-file $$S/sorted.md \
-	      --ledger $$S/order-ledger-retired.txt --src-names $$S/order-src-names.txt \
-	      --headers $$S/order-headers-none.txt > /dev/null \
-	    || { echo "SELFTEST FAIL: a RETIRED tier's discharge was charged to the tier that took its number — a tier is its rows"; fail=1; }; \
-	  scripts/check-roadmap-order.py --file $$S/order-banked.md --baseline-file $$S/sorted.md \
-	      --ledger $$S/order-ledger-banked.txt --src-names $$S/order-src-names.txt \
-	      --headers $$S/order-headers-prereq.txt > /dev/null \
-	    || { echo "SELFTEST FAIL: a NAMED prerequisite was refused — the carve-out is dead"; fail=1; }; \
-	  scripts/check-roadmap-order.py --file $$S/order-banked.md --baseline-file $$S/sorted.md \
-	      --ledger $$S/order-ledger-banked.txt --src-names $$S/order-src-names.txt \
-	      --headers $$S/order-headers-none.txt \
-	      --definitions $$S/order-defs-conversion.txt > /dev/null \
-	    || { echo "SELFTEST FAIL: a CONVERSION was read as a discharge — the repo's central move cannot be held"; fail=1; }; \
-	  if scripts/check-roadmap-order.py --file $$S/order-banked.md --baseline-file $$S/sorted.md \
-	       --ledger $$S/order-ledger-banked.txt --src-names $$S/order-src-names.txt \
-	       --headers $$S/order-headers-none.txt \
-	       --definitions $$S/order-defs-none.txt > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: a body standing on NOTHING open was excused as a conversion — the exemption is blanket"; fail=1; \
-	  fi; \
-	  if [ $$fail -eq 0 ]; then echo "roadmap-order-selftest: PASS (banking fires, and so does a body standing on nothing open; deleting, reclassifying, another tier's risk, a retired tier's number, a named prerequisite and a conversion do not)"; else exit 1; fi
+	  out=$$($$R --file $$S/good.md --ledger $$S/ledger.txt --dates-only $$S/dated-rules.md 2>&1); \
+	  echo "$$out" | grep -q '^DATED' \
+	    || { echo "SELFTEST FAIL: a dated rules file was not reported"; fail=1; }; \
+	  d=$$(mktemp -d); cp $$S/good.md $$d/p.md; \
+	  $$R --prune --file $$d/p.md --ledger $$S/ledger-stale.txt --dates-only $$S/good.md > /dev/null \
+	    || { echo "SELFTEST FAIL: pruning a discharged member left a red ledger"; fail=1; }; \
+	  grep -q 'alpha-two' $$d/p.md \
+	    && { echo "SELFTEST FAIL: --prune kept a member naming nothing live"; fail=1; }; \
+	  cp $$S/good.md $$d/p.md; \
+	  $$R --prune --file $$d/p.md --ledger $$S/ledger-empty.txt --dates-only $$S/good.md > /dev/null \
+	    || { echo "SELFTEST FAIL: pruning an emptied group left a red ledger"; fail=1; }; \
+	  grep -q 'SECOND GROUP' $$d/p.md \
+	    && { echo "SELFTEST FAIL: --prune kept a group naming nothing live"; fail=1; }; \
+	  grep -q 'FIRST GROUP' $$d/p.md \
+	    || { echo "SELFTEST FAIL: --prune deleted a live group"; fail=1; }; \
+	  rm -rf $$d; \
+	  if [ $$fail -eq 0 ]; then echo "roadmap-selftest: PASS (coverage, one group, staleness, shape, four budgets and dates all fire; prune drops a dead member and an emptied group)"; else exit 1; fi
 
 # SEARCH FIRST, made cheap and impossible to scope wrong: search the declared
 # TYPE of every statement in the tree.  dup-check catches a duplicate only once
@@ -835,6 +560,12 @@ roadmap-order-selftest:
 #   make find Q='⊑ lub'      make find Q='Rel connectᴷ'
 find:
 	@scripts/find-lemma.py "$(Q)"
+
+# SPLIT A LONG MODULE into contiguous parts, consumers retargeted.  Without P
+# it lists where the file may be cut.  Textual: finish with imports-fix and a
+# build.  docs/split.md
+split:
+	@scripts/split-module.py $(F) $(if $(DRY),--dry) $(if $(SUB),--sub $(SUB),$(if $(P),$(P),--cuts))
 
 # THE SAME SEARCH OVER PROSE, because a FINDING is not a type.  `find` cannot
 # see a dead route, a coverage boundary, a ruling or a measured trap -- those

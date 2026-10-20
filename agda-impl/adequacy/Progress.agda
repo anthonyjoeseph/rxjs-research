@@ -20,7 +20,8 @@ open import Data.Sum using ([_,_]′)
 open import Relation.Binary.PropositionalEquality using (_≢_; sym; trans; subst)
 open import Induction.WellFounded using (Acc; acc)
 
-open import denotation.MonotonicList using (Events∞; out; skip; end; Agree; agree-refl; agree-trans; observe; root)
+open import denotation.MonotonicList.Events using (Events∞; out; skip; end; root)
+open import denotation.MonotonicList using (Agree; agree-refl; agree-trans; observe)
 open import denotation.Denote using (⟦_⟧)
 import denotation.Unfold as U
 open import operation.Machine using (module Machine)
@@ -29,7 +30,7 @@ open import operation.PureObservable using (PureObs)
 open import adequacy.Content using (module Honesty)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Unsub using (module Unsubbing)
-open import adequacy.Strong using (module Strongly)
+open import adequacy.Strong.Held using (module StrongHeld)
 
 open Events∞
 
@@ -40,7 +41,7 @@ module Progressing (R : Set) where
   open Ghosting R using (Has; atOut; pastSkip; residual; begun; Past; agrees; skipped; past-pre; passed; lowered; showing; tail-out; tail-skip;
     has-agree; after; _≺_; ≺-wf; measure; depth; ahead-agree)
   open Honesty R using (Hop; valueᴴ; completeᴴ; drainedᴴ; silentᴴ; strong-hop; strong-agrees)
-  open Strongly R using (Strong; strong-begin)
+  open StrongHeld R using (Strong; strong-begin)
   open Read
 
   ----------------------------------------------------------------------

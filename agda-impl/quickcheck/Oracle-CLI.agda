@@ -56,7 +56,7 @@ open import quickcheck.Ghost using (ghosts; exact; settled; ghostFails; exactFai
 open import quickcheck.Adversary using (cases)
 import quickcheck.Spin as Spin
 open import Tree using (Obs)
-open import denotation.MonotonicList using (Timeline)
+open import denotation.MonotonicList.Events using (Timeline)
 open import quickcheck.Placing using (placing; placingParts)
 open import quickcheck.Stepping using (steppingFails)
 

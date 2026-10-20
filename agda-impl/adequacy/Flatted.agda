@@ -27,17 +27,20 @@ open import Level using (lift)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst; subst₂)
 
-open import denotation.MonotonicList using (Timeline; Frame; From; Pos; ix; last; tick; at; _<ᵖ_; <ᵖ-below) renaming (done to doneᶠᵐ; quiet to quietᶠᵐ)
-open import denotation.MonotonicList using () renaming (sub to subᴾ)
+open import denotation.MonotonicList.Events using (Timeline; Frame; From; Pos; ix; last; tick; at; _<ᵖ_; <ᵖ-below) renaming (done to doneᶠᵐ; quiet to quietᶠᵐ)
+open import denotation.MonotonicList.Events using () renaming (sub to subᴾ)
 import Tree as T
 import denotation.Unfold as U
 open import operation.Machine using (module Machine)
 open import operation.PureObservable using (Out; Pureᴾ)
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
 open import adequacy.Strong using (module Strongly)
+open import adequacy.Strong.Against using (module StrongAgainst)
+open import adequacy.Strong.Held using (module StrongHeld)
 open import adequacy.Moves using (module Moving)
-open import adequacy.Every using (module Everywhere)
+open import adequacy.Every.Gating using (module EverywhereGated)
 open import adequacy.Ghost using (module Ghosting)
+open import adequacy.Ghost.Paths using (module GhostingPaths)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Seq using (module Sequencing)
 open import operation.AbstractObservable using (base; maybe; quiet; sink; list; fifo)
@@ -49,6 +52,8 @@ open import adequacy.Restages using (module Staging)
 open import adequacy.Names using (module Naming)
 open import adequacy.Alike using (module Aliking)
 open import adequacy.Taken using (module Taking)
+open import adequacy.Frame using (module Framing)
+open import adequacy.Placed.Order using (Headed)
 open import adequacy.Connected using (module Connecting)
 
 module Flatting (R : Set) where
@@ -60,19 +65,23 @@ module Flatting (R : Set) where
   open Heap using (World; _⊑_; _⨾_; there; new; grow; cell; slot; Sink) renaming (here to hereʳ; same to same⊑)
   open Run (Pureᴾ R) using (Act; done; writeRef; register; _>>ᴬ_; compile; Env; wkEnv; wkAct; module Kit; module FlatKit; Ref; wkR; Observer; Kont; wkObs; Subscription; Subscribe; wkSub)
   open Run.Kit (Pureᴾ R) using (skipᴬ)
-  open Strongly R using (Carried; Books; Sub; pendingˢ; Path; here; in-outer; in-lanes; _⊕_; Here; walk; top; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; names; pendings; Phase; unpinned; union-pinned; rest-pinned; seen; flatMapˢ; killAllᶜ; flatK; CbRel; ≗-refl; newRef≗; unsubscribing; register≗; writeRef≗; module Canon; owned-to; module Eaching; module Lingering)
-  open Strongly.Against R using (subAs; SrcOf; src-of)
+  open Strongly R using (Sub; pendingˢ; Path; here; in-outer; in-lanes; _⊕_; Here; walk; top; _≗_; module At; names; pendings; Phase; flatMapˢ; killAllᶜ; flatK; CbRel; ≗-refl; newRef≗; unsubscribing; register≗; writeRef≗; module Canon)
+  open StrongAgainst R using (Leaving; Books; Job; Owned; Kernels; Meaning; Queue; Each; Lingers; unpinned; union-pinned; rest-pinned; seen; owned-to)
+  open StrongHeld R using (Carried; Heads; DoneBy; module Eaching; module Lingering)
+  open StrongAgainst.Against R using (subAs; SrcOf; src-of)
   open Moving R using (planted; pend; part-plant; holds-owed; fed-plant; pendings-plant; subjects-plant; joiners-plant)
-  open Everywhere.Settling R using (settled-plant)
-  open Everywhere.Gating R using (gated-plant)
-  open Ghosting R using (walk-⊕; sorted-⇝)
+  open EverywhereGated.Settling R using (settled-plant)
+  open EverywhereGated.Gating R using (gated-plant)
+  open Ghosting R using (sorted-⇝)
+  open GhostingPaths R using (walk-⊕)
   open Forking R using (pend-less; subOf; walk-planted)
-  open Keeping R using (each-plant; lingers-plant; pooled-fresh)
+  open Keeping R using (each-plant; lingers-plant; flags-plant; pooled-fresh)
   open Planting R using (module Moved)
   open Staging R using (Restages; not-src; wrap-outer)
   open Naming R using (fresh-new; fresh-plant; pending-↭; walk-kont-sub)
   open Aliking R using (KontRel; ObsRel; compile-cong; guarded-cong; killAll-wk; obs-sym; obs-trans; obs-⨾; wkFlat-wk)
-  open Taking R using (allocates; recode; ⊑≗)
+  open Taking R using (allocates; recode; ⊑≗; pos-headed)
+  open Framing R using (sub-heads)
   open Connecting R using (Grew; grew-step; grew-store)
 
   -- The world a flatMap's kernel allocates: its count, outer flag, queue,
@@ -250,10 +259,6 @@ module Flatting (R : Set) where
     flat-fresh fs = fresh-plant π₈ v (pending-↭ v) (((λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ (λ ()) ∷ (λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ (λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ (λ ()) ∷ []) ∷ ((λ ()) ∷ []) ∷ ([]) ∷ [])
       (Grew.distinct G₉ fs) (fresh-new ν₈ (λ { {_ , _} m∈ → Grew.named G₉ m∈ }) ((λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ (λ { {_ , _} (_ , refl) () }) ∷ []))
 
-    postulate
-      -- The outer heads no earlier than the flatMap over it, no lane begun.
-      unflat     : ∀ {k} {c : U.Node Δ A} → Heads k (U.flatMapᶜ op (λ a p → U.subscribe (f a) p) (just c) [] [] U.idleᶜ) → Heads k c
-
     module _ (eqv : At.part H₉ (pendingˢ (T.flatMap op f s) q) ≡ At.part H₉ v)
              (refill₉ : At.val H₉ (FlatKit.Flat.refill fl₈) ≡ just hereʳ) (slot₉ : CbRel (look H₉ hereʳ) kcb)
              (held₉ : At.val H₉ (Kit.held oc₈) ≡ nothing) (active₉ : At.val H₉ (FlatKit.Flat.active fl₈) ≡ 0)
@@ -282,16 +287,17 @@ module Flatting (R : Set) where
                ; joined  = subst₂ (At.Joined H₉) (sym (subjects-plant π₈ v refl)) (sym (joiners-plant π₈ v (λ _ → refl) [])) (Queue.joined qu)
                ; ordered = Queue.ordered qu ; ahead = Queue.ahead qu }
 
-      rf-behind : ∀ {k} → Each H₉ (Heads k) T₈ → Each H₉ (Heads k) t′
-      rf-behind {k} = each-plant H₉ π₈ v eqv tr
+      -- At the run's own position, which the flatMap's outer is begun at.
+      rf-behind : Headed q → Each H₉ (Heads q) T₈ → Each H₉ (Heads q) t′
+      rf-behind hq = each-plant H₉ π₈ v eqv tr
         where
-          pa : ∀ {Δ′ A′} {x : Sub h₈ Δ′ A′} → Each H₉ (Heads k) (pendingˢ (T.flatMap op f s) q) → (ψ : Path v x) → seen H₉ ψ ≡ true
-             → ∀ {c} → At.part H₉ x ≡ just c → Heads k c
+          pa : ∀ {Δ′ A′} {x : Sub h₈ Δ′ A′} → Each H₉ (Heads q) (pendingˢ (T.flatMap op f s) q) → (ψ : Path v x) → seen H₉ ψ ≡ true
+             → ∀ {c} → At.part H₉ x ≡ just c → Heads q c
           pa eu here             _ pw   = Each.parts eu here refl (trans eqv pw)
-          pa eu (in-outer here)  _ refl = unflat {c = U.subscribe s q} (Each.parts eu here refl refl)
+          pa eu (in-outer here)  _ refl = sub-heads s q hq
           pa eu (in-lanes ())
 
-          tr : Each H₉ (Heads k) (pendingˢ (T.flatMap op f s) q) → Each H₉ (Heads k) v
+          tr : Each H₉ (Heads q) (pendingˢ (T.flatMap op f s) q) → Each H₉ (Heads q) v
           tr eu = record { parts = pa eu ; pools = λ { here _ _ () ; (in-outer ()) ; (in-lanes ()) } ; rests = λ { (in-outer ()) ; (in-lanes ()) } }
 
       rf-owned : ∀ {act act′} {cd cd′} {a′} → Owned H₉ T₈ (subAs {act = act} π₈ cd (Grew.stack G₉) (Grew.alone G₉))
@@ -304,6 +310,13 @@ module Flatting (R : Set) where
       rf-lingers = lingers-plant H₉ π₈ v eqv (union-pinned (rest-pinned (U.subscribe s q)) unpinned)
         (record { pools = λ { here _ _ → pooled-fresh H₉ {fl = fl₈} {so = pendingˢ s q} done₉ ; (in-outer ()) ; (in-lanes ()) } ; rests = λ { (in-outer ()) ; (in-lanes ()) } })
 
+      postulate
+        rf-leaving : Leaving H₉ T₈ → Leaving H₉ t′
+
+      -- Its outer pending, its flag reads it running.
+      rf-flags : DoneBy H₉ T₈ [] → DoneBy H₉ t′ []
+      rf-flags = flags-plant H₉ π₈ v eqv (λ { here _ → (λ ()) , (λ _ → done₉) ; (in-outer ()) ; (in-lanes ()) })
+
   -- A flatMap begun allocates its pool and its outer's cut, registers its
   -- refill slot and stores it, and begins its outer under the flatMap's
   -- observer, one subscription fewer owed.
@@ -311,7 +324,7 @@ module Flatting (R : Set) where
                → subOf (Carried.ctlAs cr) ≡ just (Δ , B , T.flatMap op f s) → Restages cr s
   flat-restage {m = m₀@(mach ⟨ H , q₀ , run _ σ K ⟩ _ _ _ _ _ _ _)} cr@record { ctlAs = subAs {s = T.flatMap {A = A} op f s} π (u , E′ , υ , e , newRef≗ refl kk) sk a } refl refl =
     _ , path
-    , record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = F.t′
+    , record { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = F.t′
              ; ctlAs = subAs F.π′ (F.code′ ex₉) (F.restack sk₉ a₉) (F.alones _)
              ; meets = trans (part-plant H₉ F.π₈ F.v refl) (trans (Grew.meets G₉) (Carried.meets cr))
              ; owned′ = owned-to (F.rf-owned refl refl slot₉ refl refl refl refl (Grew.owned G₉))
@@ -322,8 +335,9 @@ module Flatting (R : Set) where
                               ; clocked = proj₁ (Books.clocked bk) , F.reticked sk₉ a₉ (Grew.ticked G₉)
                               ; paidUp = cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (Books.paidUp bk))))))))
                               ; running = Books.running bk }
-             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind′ = Eaching.each-to _ _ (F.rf-behind refl refl slot₉ refl refl refl refl (Grew.behind G₉))
-             ; lingers′ = Lingering.lingers-to _ (F.rf-lingers refl refl slot₉ refl refl refl refl (Grew.lingers G₉)) }
+             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind′ = Eaching.each-to _ _ (F.rf-behind refl refl slot₉ refl refl refl refl (pos-headed cr) (Grew.behind G₉))
+             ; lingers′ = Lingering.lingers-to _ (F.rf-lingers refl refl slot₉ refl refl refl refl (Grew.lingers G₉)) ; leaving = F.rf-leaving refl refl slot₉ refl refl refl refl (Grew.leaving G₉)
+             ; flags = F.rf-flags refl refl slot₉ refl refl refl refl (Grew.flags G₉) }
     , refl , inj₁ (inj₁ (subst (pend F.t′ <_) (Grew.pends G₉) F.less))
     where bk = Carried.books cr
           -- The kernel's allocations after its first, its registration and
@@ -375,7 +389,7 @@ module Flatting (R : Set) where
           G₀ = record { tree = Carried.tree cr ; path = π ; stack = sk ; alone = a ; ticked = proj₂ (Books.clocked bk)
                       ; obsR = (λ _ → wk-same _) , wk-same _ , wk-same _ ; kontR = λ τ sub → from-same (λ ζ → Here.kont (walk π top) ζ sub) τ
                       ; envR = e ; meets = refl ; owned = recode (Carried.owned cr) ; kernels = Carried.kernels cr
-                      ; meaning = Carried.meaning cr ; queue = Carried.queue cr ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; pends = refl
+                      ; meaning = Carried.meaning cr ; queue = Carried.queue cr ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; leaving = Carried.leaving cr ; flags = Carried.flags cr ; pends = refl
                       ; named = λ {_} {j} _ → j , refl ; distinct = λ fs → fs }
           G₈ = grew-step {k = slot ⊤} (record { onNext = λ a → wkAct new (n₇ a) ; onComplete = wkAct new c₇ ; isClosed = wkAct new x₇ })
                  (grew-step {k = cell (maybe quiet)} (lift nothing) (grew-step {k = cell (base Bool)} (lift true)

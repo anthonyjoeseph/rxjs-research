@@ -56,7 +56,7 @@ BY DEFINITION, whatever follows them: a statement was restated, a `-core` was
 converted, apparatus was deleted, a wall-clock was measured.
 
 THIRD CHECK — SHAPE: the evidence sections of a block sit at its END, in the
-order REFUTED / DEAD ROUTE / TWIN, then RECOVERY.  This is the check that
+order REFUTED / DEAD ROUTE, then RECOVERY.  This is the check that
 actually makes a long header readable, and it is nearly free — measured at the
 sweep that introduced it, 31 blocks of 2357 violated it, and they were the same
 blocks the rule exists for: the 480-, 241- and 163-line essays.  A reader
@@ -137,13 +137,12 @@ DATE_RE = re.compile(
 # The three markers whose subject is the STATEMENT.  Order here IS the mandated
 # order in a block's tail; `DEAD ROUTE` shares a rank with `REFUTED` because
 # both answer "what has been ruled out".
-# Rank 0 answers "what is ruled out, and what is the route" — a refutation, a
-# route that cannot work, a proven counterpart whose clauses correspond.  Rank 1
+# Rank 0 answers "what is ruled out" — a refutation, a route that cannot
+# work.  Rank 1
 # is where deleted apparatus went.
-DURABLE = [("REFUTED", 0), ("DEAD ROUTE", 0), ("TWIN", 0),
-           ("RECOVERY", 1)]
+DURABLE = [("REFUTED", 0), ("DEAD ROUTE", 0), ("RECOVERY", 1)]
 DURABLE_RE = re.compile(
-    r"^(?:⚠\s*)?(REFUTED|DEAD ROUTE|TWIN|RECOVERY)\b(?!-)"
+    r"^(?:⚠\s*)?(REFUTED|DEAD ROUTE|RECOVERY)\b(?!-)"
 )
 
 # AN OBSCURED MARKER — `-- -- RECOVERY:` — IS A MARKER NO CHECK IN THIS REPO CAN
@@ -158,23 +157,15 @@ DURABLE_RE = re.compile(
 # marker's job is to be the one shape a reader and a machine agree on.  A near
 # miss is reported so the author writes the canonical line.
 OBSCURED_RE = re.compile(
-    r"^(?:--\s*)+(?:⚠\s*)?(REFUTED|DEAD ROUTE|TWIN|RECOVERY)\b"
+    r"^(?:--\s*)+(?:⚠\s*)?(REFUTED|DEAD ROUTE|RECOVERY)\b"
 )
 
 # The markers whose text names something that can STOP EXISTING.  `DEAD ROUTE`
 # is deliberately absent and unvalidated: it has no referent by construction --
 # it records that a way of proving something cannot work, and there is no object
 # to resolve.  That is exactly why it got a prose convention instead of a check.
-VALIDATED = ("TWIN", "REFUTED", "RECOVERY")
+VALIDATED = ("REFUTED", "RECOVERY")
 
-# A reference is BACKTICKED or DOTTED, never a bare word, and that is a rule
-# about how the line is written rather than a parsing convenience: English prose
-# is full of words that happen to be declared names in this tree (`all`, `map`,
-# `init`), so a scan over bare words would resolve by accident and report a
-# healthy reference where there is none.  Both forms are already how the repo
-# writes them.
-BACKTICKED = re.compile(r"`([^`]+)`")
-DOTTED = re.compile(r"\b((?:[A-Z][A-Za-z0-9-]*\.)+[A-Za-z][A-Za-z0-9'_-]*)")
 SHA_TOKEN = re.compile(r"\b[0-9a-f]{7,40}\b")
 
 # A rule line is STRUCTURE, not prose: it separates, it says nothing, and it
@@ -230,25 +221,9 @@ GITLOG = re.compile(r"git log[^`\n]*agda(?:-impl)?/")
 ECHO = {
     "REFUTED":    re.compile(r"\brefut(?:ed|es|ation|ations)\b", re.I),
     "DEAD ROUTE": re.compile(r"\bdead (?:route|end)s?\b", re.I),
-    "TWIN":       re.compile(r"\btwins?\b", re.I),
     "RECOVERY":   re.compile(r"\bgit show\b", re.I),
 }
 
-
-def ref_tokens(text):
-    """-> the names a section REFERS to: backticked spans and dotted paths."""
-    out = set()
-    for m in BACKTICKED.finditer(text):
-        inner = m.group(1).strip()
-        out.add(inner)
-        out.add(inner.split(".")[-1])
-        for w in re.findall(r"[A-Za-z][^\s,;:()]*", inner):
-            out.add(w)
-            out.add(w.split(".")[-1])
-    for m in DOTTED.finditer(text):
-        out.add(m.group(1))
-        out.add(m.group(1).split(".")[-1])
-    return {t for t in out if len(t) > 2}
 
 # Markers whose subject is what HAPPENED TO THIS DECLARATION.  Refused in
 # marker position only.  `ROUTE` is here bare and absent above as `DEAD ROUTE`,
@@ -279,46 +254,6 @@ SHA_RE = re.compile(r"\b[0-9a-f]{7,40}\b")
 # it and the first thing to break is that front matter, which is the one kind of
 # long comment nobody has ever complained about.
 EXPL_BUDGET = 3000
-
-
-# Deliberately generous, and copied in spirit from the roadmap checker's: its
-# only job is to tell a name that EXISTS from one that does not, so erring
-# toward finding a declaration errs toward silence rather than a false report.
-DECL_RE = re.compile(r"^\s*([^\s:(){}@]+)\s*:(?:\s|$)")
-DECL_KW_RE = re.compile(r"\b(?:data|record|module)\s+([^\s({]+)")
-
-
-def declared_names(tree):
-    """-> every name `tree` declares, plus every module path it defines."""
-    out = set()
-    for f in pathlib.Path(tree).rglob("*.agda"):
-        rel = f.relative_to(tree).with_suffix("")
-        out.add(str(rel).replace("/", "."))
-        for line in f.read_text().splitlines():
-            if line.strip().startswith("--"):
-                continue
-            m = DECL_RE.match(line)
-            if m:
-                out.add(m.group(1))
-            m = DECL_KW_RE.search(line)
-            if m:
-                out.add(m.group(1).split(".")[-1])
-                out.add(m.group(1))
-    return out
-
-
-def live_postulates(root):
-    """-> the live-postulate names, or None if the ledger cannot be read."""
-    import subprocess
-    try:
-        r = subprocess.run(["scripts/check-wiring.py", "--postulates"],
-                           cwd=root, capture_output=True, text=True, timeout=180)
-    except Exception:
-        return None
-    if r.returncode != 0:
-        return None
-    names = [ln.split()[0] for ln in r.stdout.splitlines() if ".agda:" in ln]
-    return set(names) or None
 
 
 def real_shas(root, candidates):
@@ -390,24 +325,12 @@ def check_refs(refs, root):
     """-> [(file, lineno, kind, why)] for every reference that resolves to
     nothing.  A marker naming something that can STOP EXISTING is only worth
     the line it costs if its disappearance is a build failure."""
-    src = declared_names(root / "agda-impl")
-    post = live_postulates(root) or set()
     shas = real_shas(root, {t for _, _, _, text in refs
                             for t in SHA_TOKEN.findall(text)})
 
     bad = []
     for f, lineno, kind, text in refs:
-        toks = ref_tokens(text)
-        if kind == "TWIN":
-            hits = toks & src
-            still = hits & post
-            if not hits:
-                bad.append((f, lineno, kind, "names nothing declared in `agda-impl`"))
-            elif hits <= still:
-                bad.append((f, lineno, kind,
-                            "names `" + sorted(still)[0] + "`, which is STILL A "
-                            "POSTULATE — a twin that is not proven earns no class"))
-        elif kind == "REFUTED":
+        if kind == "REFUTED":
             # A refutation dies when `src` can no longer STATE it, and deleting
             # it then is CORRECT.  The receipt is all that survives, so a sha
             # is sufficient.
@@ -498,28 +421,10 @@ def main():
     ap.add_argument("--no-refs", action="store_true",
                     help="skip reference resolution (it reads the real trees, so "
                          "a fixture outside them cannot be judged by it)")
-    ap.add_argument("--sample-proven", action="store_true",
-                    help="print one name a TWIN may legally carry -- declared in "
-                         "agda-impl and not on the live postulate ledger -- so the "
-                         "selftest's passing fixture is GENERATED rather than "
-                         "naming a definition by hand, which rots the day that "
-                         "definition is deleted")
     args = ap.parse_args()
 
     root = pathlib.Path(__file__).resolve().parent.parent
 
-    if args.sample_proven:
-        # The same two sets the TWIN rule itself consults, so the fixture can
-        # only go stale by the rule changing -- never by the tree moving.
-        live = live_postulates(root) or set()
-        # Length filters out the single letters a type telescope binds, which
-        # resolve but read as nothing a header would ever claim as a twin.
-        ok = sorted(n for n in declared_names(root / "agda-impl")
-                    if n not in live and n.isidentifier() and len(n) >= 8)
-        if not ok:
-            return 1
-        print(ok[0])
-        return 0
     dirs = [pathlib.Path(d) for d in (args.dir or [root / d for d in DEFAULT_DIRS])]
     files = sorted(p for d in dirs for p in pathlib.Path(d).rglob("*.agda"))
     if not files:
@@ -556,7 +461,7 @@ def main():
         print(f"\nEVIDENCE OUT OF PLACE — {len(shape)} block(s):")
         for f, lineno, why in shape:
             print(f"  {f}:{lineno}  {why}")
-        print("\nA block reads: explanation, then REFUTED / DEAD ROUTE / TWIN, then RECOVERY.")
+        print("\nA block reads: explanation, then REFUTED / DEAD ROUTE, then RECOVERY.")
         print("Prose stranded behind the evidence has no landmark in")
         print("front of it, which is what makes a long header unskimmable.  And a")
         print("marker is a LEDGER ENTRY — to mention a refutation mid-paragraph, name")
@@ -578,12 +483,8 @@ def main():
         for f, lineno, kind, why in dangling:
             print(f"  {f}:{lineno}  {kind} {why}")
         print("\nA marker naming something that can STOP EXISTING is only worth its")
-        print("line if the disappearance is a build failure — the same law")
-        print("\nWrite the reference BACKTICKED or DOTTED — a bare word is not read as")
-        print("one, because English is full of words this tree happens to declare. A")
-        print("`TWIN` names a PROVEN definition, which is what earns a GRINDABLE row")
-        print("its class; if the twin is still a postulate the class is wrong. A")
-        print("`REFUTED` names the sha holding the refutation tree.")
+        print("line if the disappearance is a build failure.")
+        print("A `REFUTED` names the sha holding the refutation tree.")
         print("A `RECOVERY` names a sha git can resolve.")
 
     if echo:

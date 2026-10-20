@@ -21,9 +21,8 @@ open import Level using (lower)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList using (MonotonicList; Timeline; coldᴰ; ix; skip⁼; stop; stopᵀ; idle; agreeᵀ-refl; _≈[_]_; agrees; agree; agreeᵀ; _≈_; Settling;
-  Contractive; lub-limit; ≈ₖ-refl; ≈ₖ-sym; ≈ₖ-trans; ≈ₖ-pred; emptyᴰ; ofᴰ; mapᴰ; scanᴰ;
-  takeWhileᴰ; flatMapᴰ; connectᴰ; deferᴰ)
+open import denotation.MonotonicList.Events using (Timeline; ix; idle)
+open import denotation.MonotonicList using (MonotonicList; coldᴰ; skip⁼; stop; stopᵀ; agreeᵀ-refl; _≈[_]_; agrees; agree; agreeᵀ; _≈_; Settling; Contractive; lub-limit; ≈ₖ-refl; ≈ₖ-sym; ≈ₖ-trans; ≈ₖ-pred; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flatMapᴰ; connectᴰ; deferᴰ)
 open import denotation.Denote using (DenEnv; flatOp; approx; ⟦_⟧)
 open import denotation.NonExpansive using (mapᴰ-ne; scanᴰ-ne; takeWhileᴰ-ne; flatMapᴰ-ne; connectᴰ-ne)
 

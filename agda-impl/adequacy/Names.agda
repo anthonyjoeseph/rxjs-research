@@ -24,8 +24,8 @@ open import Data.Bool using (if_then_else_)
 open import Level using (lower)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst)
 
-open import denotation.MonotonicList using (Timeline; Frame; From; Pos; ix; last; tick; at; _<ᵖ_; <ᵖ-below) renaming (done to doneᶠᵐ; quiet to quietᶠᵐ)
-open import denotation.MonotonicList using () renaming (sub to subᴾ)
+open import denotation.MonotonicList.Events using (Timeline; Frame; From; Pos; ix; last; tick; at; _<ᵖ_; <ᵖ-below) renaming (done to doneᶠᵐ; quiet to quietᶠᵐ)
+open import denotation.MonotonicList.Events using () renaming (sub to subᴾ)
 import Tree as T
 import denotation.Unfold as U
 open import operation.PureObservable using (Out; Pureᴾ)

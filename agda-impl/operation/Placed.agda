@@ -20,8 +20,8 @@ open import Data.Nat.Properties using (≤-antisym; ≡ᵇ⇒≡; <ᵇ⇒<)
 open import Data.Product using (_×_; _,_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import denotation.MonotonicList using (emit; stall; close; Time; Pos; tick; Events; Events∞; out; skip; end; hush; ticks; inFrame;
-  within)
+open import denotation.MonotonicList.Events using (emit; stall; close; Time; Pos; tick; Events; Events∞; out; skip; end; hush)
+open import denotation.MonotonicList using (ticks; inFrame; within)
 open import denotation.Order using (Item; val; fin; silent; Shows; ShowsIn; nil; done⁺; quiet⁺; at⁺; emit⁺; stall⁺; close⁺; _⊑_; shows-≼)
   renaming (_≼_ to _≼ˡ_; []≼ to []≼ˡ; ∷≼ to ∷≼ˡ)
 open import operation.PureObservable using (module Pure)

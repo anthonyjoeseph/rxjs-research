@@ -61,8 +61,7 @@ gate and a historical receipt for a probe is doubly stale. Do not re-admit the
 spelling; delete any such receipt.
 
 **3 — Shape.** A block's evidence sits at its end, in the order `REFUTED` /
-`DEAD ROUTE` / `TWIN`, then `RECOVERY`. Rank one is *what is ruled out and what
-the route is*, rank two *where deleted apparatus went*. Past the first marker a
+`DEAD ROUTE`, then `RECOVERY`. Rank one is *what is ruled out*, rank two *where deleted apparatus went*. Past the first marker a
 line may be another marker, a blank, or an indented continuation; flush-left
 prose down there is an explanation stranded behind the ledger with no landmark
 in front of it.
@@ -87,23 +86,11 @@ pointer that names a deleted sha was the common failure before this check, and
 
 | section | referent | resolved against |
 | --- | --- | --- |
-| `TWIN:` | a **proven** definition | declared in `agda-impl` **and not in the postulate ledger** |
 | `REFUTED:` | a refutation, live or spent | declared in the evidence tree, **or a git sha** |
 | `RECOVERY:` | a commit | `git cat-file`, or a `git log … agda/…` form |
 | `DEAD ROUTE:` | *nothing* | not validated |
 
-**A reference is BACKTICKED or DOTTED, and that is a rule about writing the
-line rather than a parsing convenience.** English prose is full of words this
-tree happens to declare — `all`, `map`, `init` — so a scan over bare words
-resolves by accident and reports a healthy reference where there is none.
-
-`TWIN:` is the sharp one. CLAUDE.md's *"EARNING THE CLASS: NAME THE
-PRECEDENT"* demanded a GRINDABLE row name its worked instance, and nothing
-checked it. **A twin that is itself still a postulate means the class is
-wrong** — the route has not been walked, so the row is FALSITY. That is a
-mis-classification caught mechanically.
-
-`REFUTED:` takes a sha for the same reason, and the reason is a rule rather
+`REFUTED:` takes a sha, and the reason is a rule rather
 than a convenience: a refutation dies when the tree can no longer STATE it, and
 deleting it then is *correct* — the tree must not keep machinery alive whose only
 purpose is making a dead route expressible. Demanding a live declaration would

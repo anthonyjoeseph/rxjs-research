@@ -28,11 +28,13 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 
-open import denotation.MonotonicList using (Timeline)
+open import denotation.MonotonicList.Events using (Timeline)
 open import operation.AbstractObservable using (module Heap; module Run; base; ref; sink; quiet; list; maybe; _⊗_; joins; fifo; gate) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; Out)
 open import operation.Machine using (module Machine)
 open import adequacy.Strong using (module Strongly)
+open import adequacy.Strong.Against using (module StrongAgainst)
+open import adequacy.Strong.Held using (module StrongHeld)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Torn using (module Tearing)
 
@@ -43,6 +45,8 @@ module Unsubbing (R : Set) where
   open Run (Pureᴾ R) using (Act; done; newRef; readRef; writeRef; register; send; finish; startCold; stop; stash; cancel; eff; under; diverge;
     unfold; wkAct; _>>=ᴬ_; _>>ᴬ_; El; wkEl; Env; wkEnv; Observer; module Kit; module FlatKit) renaming (here to hereᴬ)
   open Strongly R
+  open StrongAgainst R
+  open StrongHeld R
   open Moving R using (pairs-r; pairs-split)
   open Tearing R
 

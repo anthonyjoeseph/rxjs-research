@@ -29,17 +29,21 @@ open import Data.Maybe using (just; nothing)
 
 open import Tree using (Obs)
 import Tree as T
-open import denotation.MonotonicList using (Timeline; From; Frame; at; _<ᵖ_; <ᵖ-trans; <ᵖ-irrefl) renaming (done to doneᶠ; quiet to quietᶠ)
+open import denotation.MonotonicList.Events using (Timeline; From; Frame; at; _<ᵖ_; <ᵖ-trans; <ᵖ-irrefl) renaming (done to doneᶠ; quiet to quietᶠ)
 import denotation.Unfold as U
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; Out; module Pure)
 open import adequacy.Strong using (module Strongly)
+open import adequacy.Strong.Against using (module StrongAgainst)
+open import adequacy.Strong.Held using (module StrongHeld)
 
 module Moving (R : Set) where
   open Heap using (World; Sink; Handle; _⊑_; play; slot; cell)
   open Shared Timeline (Out R) using (Heapᴹ)
   open Pure R using (Timer; cascade)
   open Strongly R
+  open StrongAgainst R
+  open StrongHeld R
   open Run (Pureᴾ R) using (module Kit; Kont)
 
   true≢false : true ≢ false
@@ -729,7 +733,7 @@ module Moving (R : Set) where
     fed-plant H (in-outer π) v fv ν (f , fl)              = fed-plant H π v fv ν f , fl
     fed-plant H (in-lanes π) v fv ν (f , fl)              = f , fed-plantᴸ H π v fv ν fl
     fed-plant H (in-source π) v fv ν (f , fb)             = fed-plant H π v fv ν f , fb
-    fed-plant H (in-body {fd = fd} {e = e} π) v fv ν (f , fb) = f , fed-plant H π v fv ((fd , e) ∷ ν) fb
+    fed-plant H (in-body {S = S} {fd = fd} {e = e} π) v fv ν (f , fb) = f , fed-plant H π v fv ((fd , At.told H S e) ∷ ν) fb
     fed-plant H (in-defer π) v fv ν f                     = fed-plant H π v fv ν f
 
     fed-plantᴸ : ∀ {h} (H : Heapᴹ h) {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) (v : Sub h Δ′ A′)

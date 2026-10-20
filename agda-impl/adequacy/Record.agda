@@ -17,7 +17,7 @@ open import Data.Empty using (⊥)
 
 open import operation.AbstractObservable using (module Heap) renaming (module Machine to Shared)
 open import operation.PureObservable using (Out; note; fin)
-open import denotation.MonotonicList using (done; quiet; at; emit; stall; close; Timeline; Frame∞; From∞; ix; last)
+open import denotation.MonotonicList.Events using (done; quiet; at; emit; stall; close; Timeline; Frame∞; From∞; ix; last)
 open import operation.Machine using (module Machine)
 
 module Recording (R : Set) where

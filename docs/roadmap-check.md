@@ -1,348 +1,47 @@
 # `make roadmap-check` — the gate on PROOF-STATE.md (and CLAUDE.md's dates)
 
-`make gate` is necessary, not sufficient: the roadmap is the file every session reads
-FIRST, so a stale row misdirects the next session's whole leg. One already did, naming
-two postulates that had become real definitions. This target makes the parts a machine
-can see into build failures.
+`scripts/check-roadmap.py --prune`. The rules PROOF-STATE lives by are CLAUDE.md's
+("PROOF-STATE.md — the risk ledger"); this is the half a machine can see.
 
-## Seventeen checks
+## The file's shape
 
-1. **Sort** — each tier is ordered riskiest-class-first (FALSITY, GRINDABLE). Priority
-   that lives only in prose gets spent on whatever is nearest.
-2. **Coverage** — every live postulate in `agda-impl` is named by some row. A branch of
-   the proof cannot hide from the roadmap.
-3. **Staleness** — coverage run BACKWARDS: no row head names a postulate that is no
-   longer live. This is the direction that has actually bitten — the two rows in the
-   paragraph above. A row naming NOTHING live is deleted by the check itself
-   (`--prune`, which `make roadmap-check` passes), because deleting a postulate must
-   cost nothing (Anthony) and the repair is always the same. Only a row with a live
-   name left still fails: which part of its hook holds is a human's call.
-4. **Row budget** — each row's PROSE is within `ROW_BUDGET` characters (names are
-   free). Research belongs in the postulate's own source header, where it sits in front
-   of the next person to pick the row up; a roadmap row is a hook.
-5. **Tier-preamble budget** — the same charge applied to a tier's section text, within
-   `TIER_BUDGET`. It exists because check 4 has an escape hatch and the hatch was used:
-   with every bullet inside 280, one tier's preamble reached 4387 characters of
-   refutation history, a deletion story, and research already written into the source
-   header it belonged in. A check that only reads bullets cannot see that.
-6. **No calendar dates** — anywhere in PROOF-STATE.md, and anywhere in the files listed
-   in `DATE_ONLY_FILES` (CLAUDE.md and `docs/*.md`), which get this check only.
-7. **The evidence field** — every classed row carries a backticked field directly after
-   its risk class, naming the durable markers its postulates' own headers carry, and
-   matching them. `make roadmap-evidence` writes it; nobody types it.
-8. **An unearned GRINDABLE** — a GRINDABLE row whose postulates carry no `TWIN` fails.
-   The class means "here is the worked instance"; absent one the row is FALSITY.
+```
+## Tier N — <name>
+<preamble: what the tier exports>
+### Progress
+<what is established toward settling the top group>
+### Ledger
+#### <GROUP NAME>
+<the shared design issue; what would settle it>
+Members: `name`, `name-{a,b}`, `family-*`.
+```
 
-9. **The leg count** — each tier opens with a `### Big picture tier roadmap` naming
-    at least three legs and at most seven, the floor dropping only when the tier has
-    fewer live postulates than that to plan over.
-10. **The leg budget** — each leg's prose is within `LEG_BUDGET`, which is several times
-    `ROW_BUDGET`.
+Groups are ranked riskiest first. The order is a judgement, so it is not checked.
 
-11. **A question naming too few postulates** — under `QUESTION_NAMES_MIN`, it is one
-    row given a heading, and that row's research already has a home.
-12. **A stale relevant list** — every name a question names is still a live postulate,
-    is a row of that same tier, and is still FALSITY.
+## Checks
 
-## The roadmap is the schedule; the rows are the ledger
+1. **Coverage** — every live postulate (`scripts/check-wiring.py --postulates`) is a
+   member of some group. No postulate can be added and not filed.
+2. **One group** — no live postulate is a member of two groups. A group is one design
+   issue; a postulate in two has its risk counted twice.
+3. **Staleness, pruned** — a member naming nothing live is REMOVED from its `Members:`
+   line, and a group left with no members is DELETED, heading and all. Deleting or
+   discharging a postulate costs nothing (Anthony). The check reports what it pruned.
+4. **Shape** — every group has a `Members:` line and sits under a `### Ledger`; a tier
+   with groups has a `### Progress`.
+5. **Budgets** — prose characters, backticked names free: the file's preamble
+   (`FILE_BUDGET`), a tier's preamble (`TIER_BUDGET`), a tier's progress
+   (`PROGRESS_BUDGET`), a group's block (`GROUP_BUDGET`). Research that outgrows its
+   budget belongs in a source header.
+6. **No dates** — in PROOF-STATE.md, CLAUDE.md and `docs/*.md`. PROOF-STATE must be
+   current and the rules timeless; a date is history arriving with its timestamp.
 
-Checks 10 and 11 are the newest and they change what the file IS. A tier now has two
-subsections: the roadmap, naming the next three units of work, and the ledger under
-`### The ledger`, carrying one row per postulate. A leg is a GROUP aggregated across the
-whole ledger — statements sharing a currency, a claim together with the sites that
-consume it, one shelf of mechanical obligations — and legs are ranked riskiest-first
-without being bound to the class order as tightly as rows are. Where a grouping is not
-real, a leg falls back on the classes and may name one row.
-
-The legs do NOT partition the tier. They are the next three units of work; coverage of
-the ledger is the rows' job, and check 2 already enforces it. What lies past the third
-leg is left unnamed on purpose — it gets re-grouped by whatever the first three find.
-
-The count is fixed rather than bounded because both failures are real. Fewer than three
-is a tier planning one leg ahead, which is what reading down the ledger already does.
-More than three is a backlog, and the rows already are the backlog — a roadmap that
-grows without limit stops being a decision and becomes a second copy of the ledger,
-which is what "there is no second roadmap" rules out.
-
-The budget is several times a row's for a reason the row budget does not have: a row
-sends its research to the postulate's own header, and a GROUP has no header. So a leg is
-allowed to carry its own reasoning — why these postulates are one unit, what risk the leg
-retires, why it is above the next. Past the budget it has stopped saying that and started
-proving something, and the proof has a home.
-
-Parsing: any `###` heading opens a subsection, and only the roadmap heading makes the
-bullets under it legs. That is why the ledger heading closes the roadmap by starting,
-and why the roadmap can sit at the top of the tier, where a schedule belongs.
-
-## What the preamble check charges, and the one bug it was written after
-
-A tier's preamble is every line in the section that is not row text — so it is collected
-by the SAME loop that parses rows, not by an independent scan. That is not tidiness: a
-wrapped row's continuation lines are indented and carry no bullet, so any scan that does
-not already know where rows end reads them as section text and reports a preamble at
-several times its real size. The fixture pins this from both sides — one tier whose
-preamble is genuinely fat while every row is inside the row budget (so a passing row
-check proves nothing), and one tier whose short preamble sits under three near-budget
-wrapped rows that would push it over if they were ever mischarged.
-
-What a preamble is FOR is the tier's shape: the one statement it exports, the doors in
-and out of its tree, and what orders its rows. Everything else is a finding, and a
-finding has a home — the header of the postulate or definition it is about.
-
-## Why staleness is checked over ROW HEADS and not every name
-
-The roadmap CITES far more names than it CLAIMS, and it must: a row earns GRINDABLE by
-naming the proven twin that makes it mechanical, so its prose is full of definitions,
-record fields and module names that are legitimately not postulates. A reverse check
-over every backticked token would fire on all of them.
-
-So the head's own syntax says which kind it is. A head that is **nothing but names** —
-backticks and separators — CLAIMS them, and each must be a live postulate. A head
-carrying **prose** ("`X`'s residue", "the `glob-*` family") names a PARENT, so its
-names need only still exist in `agda-impl`; that is the failure a descriptive head can
-have. A claim head's dead names are split by what became of them, because the repair
-differs: still declared in `agda-impl` means DISCHARGED, absent means deleted or
-misspelled.
-
-**The boundary, and it is a real gap.** A family row schedules its siblings in the
-HOOK, and a sibling discharged out from under such a row is NOT caught. It cannot be
-without marking claims apart from citations in the prose, and the coverage check needs
-those hook names to keep counting — narrowing the forward token set to heads would
-leave dozens of live postulates unscheduled. **The way to bring a name under this check
-is to give it a head of its own.**
-
-## Why the date check covers two kinds of file
-
-The reasons are neighbouring, not identical: **PROOF-STATE must be CURRENT; CLAUDE.md
-and the docs must be TIMELESS.** A ruling in the file of record is in force whatever
-its age, which is what "file of record" means; and a tool doc describes the tool as it
-is.
-
-It is the half a machine can see with no judgement, and **it catches most of the rest
-by proxy**: history arrives WITH a timestamp attached, because the writer knows the
-reader will want to know when.
-
-Source headers do NOT carry dates — a receipt's content is its coverage statement,
-and coverage is re-runnable, so the date adds nothing a reader can act on;
-`make comments-check` bans them there for the same reason this check bans them here.
+Member shorthand: `{a,b}` brace expansion (live if ANY alternative is live) and `*`
+globs. Names only — a collective phrase in prose names nothing the check can see.
 
 ## `make roadmap-selftest`
 
-Also in the gate. It pins every check against fixtures under
-`scripts/roadmap-selftest/`, including a **rowless** rules-file fixture — so the date
-scan is proven to fire on a file the row parser cannot read, which is exactly
-CLAUDE.md's shape — and a **stale** fixture exercising all three arms of the staleness
-check, beside a clean fixture whose rows deliberately cite a proven precedent and carry
-a descriptive head, so the two exemptions are pinned as load-bearing rather than
-assumed. Two further fixtures pin the evidence field in both of its failing directions —
-a row with no field at all, and a row whose field disagrees with the census — against a
-`--census` fixture standing in for a scan of `agda-impl`. A third pins the unearned
-GRINDABLE, against a second census in which the fixture's twin is absent. Two more
-pin the legs, and each is built to isolate ONE of them: `legs-count.md` plans two legs in
-a tier with the rows for three while every leg is inside budget, and `legs-fat.md` names
-three legs of which one carries an argument instead of a reason, with the ROW budget
-silent — so neither can pass by tripping the other's check. A third, `legs-many.md`,
-pins the CEILING in both directions at once: a tier of eight legs must fire and its
-sibling of seven must stay quiet, since a ceiling off by one reads exactly like a
-ceiling that works.
-
-## The evidence field, and why a derived field may be mandatory
-
-A row reads `— FALSITY, `REFUTED`:` or `— FALSITY, `NO EVIDENCE`:`. The field lists
-`REFUTED`, `DEAD ROUTE`, `TWIN`, `RECOVERY` in that order — the same vocabulary and
-the same rank order `make comments-check` validates — with `×N` when a header carries
-a marker more than once.
-
-**Write it with `make roadmap-evidence`.** The field is derived from the headers, and
-`roadmap-check` recomputes it and fails on any disagreement, so a hand-typed one is
-merely a slower way to reach the same answer or a wrong one.
-
-Two design points worth keeping straight, because they look like contradictions of
-rules stated elsewhere:
-
-- **A source header's `TWIN:` is optional-when-absent; this field is mandatory.** The
-  optionality argument is about AUTHORED sections, where a required field produces
-  filler and a filler `TWIN:` earns a class the row has not earned. A derived field
-  cannot be filled with anything. The blank is the product: `NO EVIDENCE` on a FALSITY
-  row is a statement nobody has instantiated or refuted a route through, which was
-  previously invisible because absence had no marker to be absent.
-- **A count is not a copy.** Moving receipts themselves into the roadmap would
-  duplicate content, and duplicated content drifts. A count is a function of the
-  headers, so the two cannot disagree without the gate saying so.
-
-The field is also what makes check 8 possible. A precedent named in a row's PROSE
-resolves nowhere, so GRINDABLE drifted into the place rows nobody wants to think about
-get parked — ten of twelve carried no `TWIN` at all when the check was added, and were
-demoted to FALSITY. Re-earning the class means putting a `TWIN:` section in the
-postulate's own header, where `comments-check` refuses a twin that is itself still a
-postulate.
-
-There are deliberately **no aggregates** — no per-tier or whole-file totals. The
-per-row blank carries the signal; a total is a number someone has to keep true for no
-decision it changes.
-
-Which markers a block reaches is decided by indentation: a header associates with every
-declaration under it until the next comment run or the next construct at **column 0**.
-That is why splitting a refuted postulate out of a shared `postulate` block into its own
-is what gives it its own markers, and why siblings in one block share a header's `TWIN`.
-
-## The hygiene rules a machine cannot check
-
-They live in PROOF-STATE.md's own header and are also part of the gate, by review: one
-line per item (name + risk class + hook), NO numbering of any kind (list indices,
-conjunct positions, source sections, timings), research in source headers rather than
-here, completed items DELETED rather than marked done, no dated narrative. Re-read that
-header when you touch the file; every one of those rules exists because it was
-violated.
-
-## Why the class check is a law read from one end
-
-Check 8 polices the sentence — a class is a property of EVIDENCE, not of confidence —
-at the one class that makes a positive claim. GRINDABLE says the shape is already known,
-so it owes a worked instance and nothing else will do: `TWIN`.
-
-FALSITY is exempt, and that is not leniency. FALSITY asserts nothing about the statement
-being right, so `NO EVIDENCE` is the honest reading of a row nobody has instantiated,
-and a check demanding evidence there would demand it precisely where there is none to
-have.
-
-What the check cannot see is whether a marker is evidence about THIS row. A row naming
-several postulates merges their markers, so one marked sibling covers a family — which
-is correct where the row really is one statement and wrong where it is a bag. When the
-census answers a family row with a single marker, the question to ask is whether the row
-should be SPLIT, and the answer is usually yes.
-
-## `make roadmap-moved` — the roadmap cannot stay the same across a branch
-
-`scripts/check-roadmap-moved.py` compares the working tree's `PROOF-STATE.md`
-against its content at **the merge-base with main** and fails when they are the
-same. One reading covers both contexts, which is why the baseline is not HEAD:
-the merge-base is not HEAD, so the same comparison is correct mid-work (disk
-carries the pending edit) and at a CI checkout (disk equals HEAD and is still
-divergent from the base). It is also what makes a fix-up COMMIT free — a
-repaired reassembly or a missing import inside a branch that has already said
-its piece — while a whole branch that lands proof work silently still fails.
-
-`origin/main` is tried before the bare `main`, so a CI checkout with the remote
-ref and a local clone with only a tracking branch both resolve; a stale
-`origin/main` merely widens the range, making the check EASIER to satisfy, which
-is the right direction to fail in for a check whose false positives are the
-complaint. When the merge-base IS HEAD — on main itself, or a branch that has
-not diverged — there is nothing to compare, and the script falls back to the
-older per-commit reading: if this file matches its ref *and* the whole tree is
-clean (not merely this file, since a dirty tree that just hasn't touched the
-roadmap YET must still fail), it compares HEAD against HEAD~1, so a direct
-landing on main is still held. Five details:
-
-- **Normalisation.** Trailing whitespace on each line, and trailing blank lines,
-  are stripped before comparing — so the cheapest way to satisfy the check is to
-  say something rather than to add a space. `roadmap-moved-selftest` pins that
-  arm specifically, since it is the one an author reaches for under pressure.
-- **`--baseline-file F`** replaces the git lookup with a plain file, which is how
-  the selftest drives both directions without touching the repo's history.
-  `--ref R` compares against another commit; `--file F` picks another roadmap.
-  The merge-base reading, the HEAD~1 fallback and the exemption below only apply
-  at the default `--ref` — an explicit one is a deliberate comparison point and
-  is read literally.
-- **No `PROOF-STATE.md` at the ref** (a first commit, an orphan branch) passes,
-  because there is nothing to have moved away from.
-- **Infra-only exemption.** An unchanged roadmap is only a finding when there
-  was proof work to report: if nothing under `agda/` changed either (over the
-  same two endpoints the movement comparison used — merge-base-vs-disk on a
-  branch, HEAD-vs-HEAD~1 where there is no divergence), there was no leg to
-  retire or restate,
-  and the check prints SKIP rather than FAIL. "Changed" means changed once
-  full-line comments are stripped before comparing — a comment-only edit is
-  invisible to Agda. A file with a block comment, or one that was added or
-  deleted, is conservatively treated as changed, since comment-only-ness
-  cannot be established. Any edit that survives stripping gets no pass,
-  however small.
-- **`make gate` runs from a clean CI checkout**, so in practice it is almost
-  always the HEAD~1 branch that fires there; the disk-vs-ref branch is what
-  the local dev loop exercises before a commit exists to fall back to.
-
-**Why a dumb check is the right one here.** A **leg is one commit of work** —
-that is what the unit means — so every commit either retires a leg (promote the
-other two, write a new third) or fails to finish one (rewrite the first leg as
-the remainder). Both write to the file. What a machine cannot check is the part
-that matters: `check-roadmap.py` resolves a row's NAME against the ledger, and
-nothing resolves whether the plan a leg describes is still the plan. Forcing the
-file to change is the only hold available, and it works by making the author
-read the legs before each commit — which is when the question "is this
-still what we are doing?" actually gets asked.
-
-
-## `make roadmap-order` — settle risk near the trunk
-
-**The law.** While a tier holds an open FALSITY row, a commit may not DISCHARGE a
-GRINDABLE row of that tier. It is the machine behind CLAUDE.md's ordering rule,
-which was prose and was obeyed unevenly for a reason worth stating: the pull against it
-is structural, not careless.
-
-`roadmap-moved` requires every commit to move the roadmap. A risky leg routinely
-ends in a FINDING rather than a discharge. A finding-only commit reads as
-unfinished — the ledger it leaves behind holds the same rows in the same classes,
-so nothing in the file registers that a risky region got smaller. Closing a
-mechanical row alongside the finding is what converts that into a legible unit of
-work, and it is exactly the move that spends effort on ground the open FALSITY
-may still move.
-
-**Why a prohibition and not an obligation.** The natural first shape is a
-disjunction — a commit must write evidence OR discharge something risky. It does
-not work. The commit this exists to stop *already writes evidence*: the finding
-is the evidence. So the disjunction is satisfied by precisely the commit it was
-drawn against, and the mechanical row rides along untouched. It would also fire
-on almost nothing, since nearly every commit here moves a row or touches a
-header, and it would push against every open row's receipt budget at once. The
-negative form has none of those problems: it names the forbidden move.
-
-**What counts as a discharge — the whole precision of the check.** A row may be
-DELETED, RENAMED, SPLIT, RESTATED or RECLASSIFIED at any time. Those are the
-proof changing shape, and a check that held them would be a worse failure than
-the one it prevents: it would stop the statement of the theorem from moving. The
-one move held is the one that BANKS a claim — the name is no longer a live
-postulate **and is still declared in `agda-impl`**, i.e. the postulate became a
-proven definition. That is the same split `check-roadmap.py`'s staleness check
-draws between a discharged row and a vanished one, read here for a different
-purpose: a name that left `agda-impl` entirely was deleted and is free; a name
-still on the postulate ledger under another class was reclassified and is free.
-
-**The carve-out is validated, not asserted.** A mechanical row the risky row
-actually consumes is fair game — grinding it *is* working the top leg. But
-"adjacent", "same family" and "same module" are not that, and the near miss is
-the common case, since a candidate unblocking a SIBLING of the risky row reads
-exactly like one unblocking the risky row. So the risky postulate's own header or
-statement must NAME the discharged one. The two halves are read differently
-because they name things differently: in the comment half only a BACKTICKED token
-counts, this repo's own rule for a reference, because English is full of words
-this tree happens to declare and an accidental match must not buy the exemption;
-in the statement half a bare token is the real thing, since Agda has no backticks
-and a name in a type is a dependency the typechecker enforces.
-
-**A tier is its rows, not its number.** Tiers are renumbered as the lowest is
-retired, so the number a row sat under on the baseline can name an unrelated tier
-today — and reading it by number charged a discharge in a retired tier to the
-open rows of the tier that took its number. The baseline tier's successors are
-the current tiers sharing a claimed row with it. A risky row still live is still
-listed, since `roadmap-check` holds every live postulate to a row, so a baseline
-tier whose risky rows are open always has a successor holding them; a baseline
-tier with no successor has had every row leave the ledger, and holds nothing.
-
-**Endpoints.** The check compares the same two roadmap versions `roadmap-moved`
-does, through the same `resolve_endpoints` — the merge-base with main against
-disk on a branch, HEAD against HEAD~1 where there is no divergence. That is a
-shared function rather than two copies on purpose: the baseline resolution is
-the subtle part, and a drifted copy would ask CI's question at a local checkout
-or the reverse, which is the one wrong answer that raises nothing and looks
-right. It also means the banking rule is scoped to the BRANCH exactly as the
-movement rule is: what may not be banked under an open FALSITY row is what the
-whole PR banks, not what its latest commit happens to.
-
-**`make roadmap-order-selftest`** pins its directions. One is that the check
-FIRES on a banked row. The others are that it stays QUIET: on a roadmap that
-banked nothing, on a row DELETED from `agda-impl`, on a RECLASSIFIED row, on a
-discharge in a tier whose own risky rows are closed while another tier's are
-open, on a discharge in a RETIRED tier whose number another tier now carries,
-and on a prerequisite the risky header names. The five matter more than the
-one — an over-firing check here would hold the proof's shape hostage, and the
-quiet directions are the only thing standing between this rule and that.
+Fixtures in `scripts/roadmap-selftest/`, against fixture ledgers rather than the real
+one. `good.md` must pass; each failing fixture must fail AND name its check; the prune
+path runs on a copy and must leave a green file with the dead member, and the emptied
+group, gone — and the live group kept.

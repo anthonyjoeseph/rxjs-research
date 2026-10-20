@@ -11,7 +11,7 @@ open import Data.List using (List; filterᵇ; upTo) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Nat using (ℕ; zero; suc; _+_; _≡ᵇ_)
 
-open import denotation.MonotonicList using (Events; Events∞; out; skip; end; hush; Pos; _<ᵖ_; root)
+open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush; Pos; _<ᵖ_; root)
 open import denotation.Unfold using (subscribe; unfold; meaning)
 open import quickcheck.Code using (Prog; toObs; timeline)
 open import quickcheck.Ty using (natᵗ)

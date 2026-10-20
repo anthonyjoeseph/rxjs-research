@@ -17,7 +17,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 
 import Tree as T
 open import Tree using (Obs)
-open import denotation.MonotonicList using (Pos; From; Frame; Timeline; at; emit; stall; close; ix; _<ᵖ_; inside) renaming (done to doneᶠ; quiet to quietᶠ)
+open import denotation.MonotonicList.Events using (Pos; From; Frame; Timeline; at; emit; stall; close; ix; _<ᵖ_; inside) renaming (done to doneᶠ; quiet to quietᶠ)
 import denotation.Unfold as U
 
 -- Per connect in scope: its source runs, it has ended and its joiners

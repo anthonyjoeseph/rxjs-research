@@ -28,17 +28,20 @@ open import Relation.Nullary using (¬_)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst; subst₂)
 
-open import denotation.MonotonicList using (Timeline; Frame; From; Pos; ix; last; tick; at; _<ᵖ_; <ᵖ-below) renaming (done to doneᶠᵐ; quiet to quietᶠᵐ)
-open import denotation.MonotonicList using () renaming (sub to subᴾ)
+open import denotation.MonotonicList.Events using (Timeline; Frame; From; Pos; ix; last; tick; at; _<ᵖ_; <ᵖ-below) renaming (done to doneᶠᵐ; quiet to quietᶠᵐ)
+open import denotation.MonotonicList.Events using () renaming (sub to subᴾ)
 import Tree as T
 import denotation.Unfold as U
 open import operation.Machine using (module Machine)
 open import operation.PureObservable using (Out; Pureᴾ)
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
 open import adequacy.Strong using (module Strongly)
+open import adequacy.Strong.Against using (module StrongAgainst)
+open import adequacy.Strong.Held using (module StrongHeld)
 open import adequacy.Moves using (module Moving)
-open import adequacy.Every using (module Everywhere)
+open import adequacy.Every.Gating using (module EverywhereGated)
 open import adequacy.Ghost using (module Ghosting)
+open import adequacy.Ghost.Paths using (module GhostingPaths)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Seq using (module Sequencing)
 open import adequacy.Fork using (module Forking)
@@ -53,16 +56,18 @@ module Staging (R : Set) where
   open Heap using (World; _⊑_; there) renaming (same to same⊑)
   open Run (Pureᴾ R) using (emitAll; done; _>>ᴬ_; compile; Env; wkEnv; module Kit)
   open Run.Kit (Pureᴾ R) using (skipᴬ)
-  open Strongly R using (Carried; Books; carried; Sub; pendingˢ; ofˢ; mapˢ; connectˢ; Lane; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_; Here; walk; top; of-leaf; Call; emitC; kontC; Job; _≗_; module At; Owned; Kernels; Meaning; Queue; Each; Heads; Lingers; names; pendings; Phase; Pinned; unpinned; rest-pinned; seen; ≗-refl; unsubscribing; under≗; owned-to; module Eaching; module Lingering)
-                        renaming (⟦_⟧ to ⟦_⟧ᶜ; at⟦_⟧ to at⟦_⟧ᶜ)
-  open Strongly.Against R using (StackAs; subAs; runAs; SrcOf; src-of)
+  open Strongly R using (Sub; pendingˢ; ofˢ; mapˢ; connectˢ; Lane; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_; Here; walk; top; of-leaf; Call; emitC; kontC; _≗_; module At; names; pendings; Phase; ≗-refl; unsubscribing; under≗) renaming (⟦_⟧ to ⟦_⟧ᶜ)
+  open StrongAgainst R using (Leaving; Books; Job; Owned; Kernels; Meaning; Queue; Each; Lingers; Pinned; unpinned; rest-pinned; seen; owned-to) renaming (at⟦_⟧ to at⟦_⟧ᶜ)
+  open StrongHeld R using (Carried; carried; Heads; module Eaching; module Lingering)
+  open StrongAgainst.Against R using (StackAs; subAs; runAs; SrcOf; src-of)
   open Moving R using (planted; pend; syn-pos; part-plant; names-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant; head-map)
-  open Everywhere.Holding R using (holds-plant)
-  open Everywhere.Settling R using (settled-plant)
-  open Everywhere.Gating R using (gated-plant)
-  open Ghosting R using (walk-⊕; _≺_; measure; firstCall)
+  open EverywhereGated.Holding R using (holds-plant)
+  open EverywhereGated.Settling R using (settled-plant)
+  open EverywhereGated.Gating R using (gated-plant)
+  open Ghosting R using (_≺_; measure; firstCall)
+  open GhostingPaths R using (walk-⊕)
   open Forking R using (pend-less; subOf; walk-planted)
-  open Keeping R using (each-plant; lingers-plant)
+  open Keeping R using (each-plant; lingers-plant; flags-plant)
   open Planting R using (module Moved)
 
   ------------------------------------------------------------------------
@@ -221,6 +226,9 @@ module Staging (R : Set) where
     rm-lingers : ∀ (H : Heapᴹ h) → Lingers H T₀ → Lingers H t′
     rm-lingers H = lingers-plant H π v refl (λ {C} → rest-pinned (U.restᶜ {B = C} (U.subscribe s q))) (record { pools = λ { (in-map ()) } ; rests = λ { (in-map ()) } })
 
+    postulate
+      rm-leaving : ∀ (H : Heapᴹ h) → Leaving H T₀ → Leaving H t′
+
     -- A pending node and a map over one register nothing, queue nothing
     -- and are owed nothing.
     rm-kernels : (H : Heapᴹ h) → Kernels H T₀ → Kernels H t′
@@ -246,13 +254,14 @@ module Staging (R : Set) where
   map-restage : ∀ {g m} (cr : Carried g m) {Δ A B} {f : A → B} {s : T.Obs Timeline Δ A} → subOf (Carried.ctlAs cr) ≡ just (Δ , B , T.map f s)
               → Σ (Carried g m) λ cr′ → subOf (Carried.ctlAs cr′) ≡ just (Δ , A , s) × measure (carried cr′) ≺ measure (carried cr)
   map-restage {m = mach ⟨ H , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = subAs π cd sk a } refl =
-    record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = N.t′ ; ctlAs = subAs M.π′ (M.code′ cd) (N.restack sk a) (M.alones _)
+    record { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = N.t′ ; ctlAs = subAs M.π′ (M.code′ cd) (N.restack sk a) (M.alones _)
            ; meets = trans (M.part′ H) (Carried.meets cr) ; owned′ = owned-to (M.rm-owned H sk a (Carried.owned cr))
            ; kernels = M.rm-kernels H (Carried.kernels cr) ; meaning = M.rm-meaning H (Carried.meaning cr) ; queue = M.rm-queue H (Carried.queue cr)
            ; books = record { fresh = subst (AllPairs _≢_) (sym M.names′) (Books.fresh bk)
                             ; clocked = proj₁ (Books.clocked bk) , N.reticked sk a (proj₂ (Books.clocked bk))
                             ; paidUp = Books.paidUp bk ; running = Books.running bk }
-           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (M.rm-behind H (Carried.behind cr)) ; lingers′ = Lingering.lingers-to _ (M.rm-lingers H (Carried.lingers cr)) }
+           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (M.rm-behind H (Carried.behind cr)) ; lingers′ = Lingering.lingers-to _ (M.rm-lingers H (Carried.lingers cr)) ; leaving = M.rm-leaving H (Carried.leaving cr)
+           ; flags = flags-plant H π M.v refl (λ { (in-map ()) }) (Carried.flags cr) }
     , refl , inj₁ (inj₁ M.less)
     where module M = Mapped π
           module N = Moved π M.v
@@ -327,6 +336,9 @@ module Staging (R : Set) where
     of-lingers : ∀ (H : Heapᴹ h) → Lingers H T₀ → Lingers H t′
     of-lingers H = lingers-plant H π v (eqp H) (subst (λ c → Pinned (U.restˢ {B = ⊤} c) U.hushˢ) (sym sp) unpinned) (record { pools = λ () ; rests = λ () })
 
+    postulate
+      of-leaving : ∀ (H : Heapᴹ h) → Leaving H T₀ → Leaving H t′
+
   -- The configuration an `of` planted makes: its first call its values.
   Offers : ∀ {g m} → Carried g m → ∀ {Δ A} → List A → Set₁
   Offers {g} {m} cr {Δ} {A} xs = Σ (Carried g m) λ cr′ → Σ Pos λ p → Σ (Path (Carried.tree cr′) (ofˢ {Δ = Δ} {A} p 0 xs)) λ π′
@@ -335,13 +347,14 @@ module Staging (R : Set) where
   offer-restage : ∀ {g m} (cr : Carried g m) {Δ A} {s : T.Obs Timeline Δ A} {xs : List A} → subOf (Carried.ctlAs cr) ≡ just (Δ , A , s)
                 → (∀ q → U.subscribe s q ≡ U.ofᶜ q 0 xs) → Offering s xs → Offers cr {Δ} {A} xs
   offer-restage {m = mach ⟨ H , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = subAs {q = q} π cd sk a } refl sp cs =
-    record { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = N.t′ ; ctlAs = runAs O.ks (O.code′ cd) (N.restack sk a)
+    record { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = N.t′ ; ctlAs = runAs O.ks (O.code′ cd) (N.restack sk a)
            ; meets = trans (part-plant H π O.v (O.eqp H)) (Carried.meets cr) ; owned′ = owned-to (O.of-owned H sk a (O.code′ cd) (Carried.owned cr))
            ; kernels = O.of-kernels H (Carried.kernels cr) ; meaning = O.of-meaning H (Carried.meaning cr) ; queue = O.of-queue H (Carried.queue cr)
            ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant π O.v refl)) (Books.fresh bk)
                             ; clocked = proj₁ (Books.clocked bk) , N.reticked sk a (proj₂ (Books.clocked bk))
                             ; paidUp = Books.paidUp bk ; running = Books.running bk }
-           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (O.of-behind H (Carried.behind cr)) ; lingers′ = Lingering.lingers-to _ (O.of-lingers H (Carried.lingers cr)) }
+           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (O.of-behind H (Carried.behind cr)) ; lingers′ = Lingering.lingers-to _ (O.of-lingers H (Carried.lingers cr)) ; leaving = O.of-leaving H (Carried.leaving cr)
+           ; flags = flags-plant H π O.v (O.eqp H) (λ ()) (Carried.flags cr) }
     , q , O.π′ , refl , inj₁ (inj₁ O.less)
     where module O = Offered π (sp q) cs
           module N = Moved π O.v

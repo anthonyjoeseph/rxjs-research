@@ -25,9 +25,7 @@ evidence behind a rule come here.
 | `imports-selftest` | [imports-check.md](imports-check.md) | ship an import checker that has stopped firing |
 | `imports-check` | [imports-check.md](imports-check.md) | leave an import no name in the file spends, or one that names nothing it takes |
 | `roadmap-selftest` | [roadmap-check.md](roadmap-check.md) | ship a roadmap checker that has stopped firing |
-| `roadmap-check` | [roadmap-check.md](roadmap-check.md) | leave PROOF-STATE stale, unsorted, verbose, or dated — or date CLAUDE.md |
-| `roadmap-moved` | [roadmap-check.md](roadmap-check.md) | land proof work on a branch without moving PROOF-STATE |
-| `roadmap-order` | [roadmap-check.md](roadmap-check.md) | discharge a GRINDABLE row while its tier holds an open FALSITY |
+| `roadmap-check` | [roadmap-check.md](roadmap-check.md) | leave a postulate out of PROOF-STATE's groups, overrun a budget, or date PROOF-STATE, CLAUDE.md or docs |
 | `comments-selftest` | [comments-check.md](comments-check.md) | ship a comment checker that has stopped firing |
 | `comments-check` | [comments-check.md](comments-check.md) | date a source comment, record what happened to a declaration, bury the evidence mid-paragraph, cite a twin that is not there |
 | `ts-gate` | — | land TypeScript that does not typecheck or lint |
@@ -46,4 +44,5 @@ Beside the gate, in its own CI job: `bug-cache` — [bug-cache.md](bug-cache.md)
 | [imports-check.md](imports-check.md) | `make imports-check` / `imports-fix` — dead imports, blanket imports, the claim root, the orphan guard |
 | [agda-traps.md](agda-traps.md) | language and stdlib traps, each of which reports against the wrong thing |
 | [delegation.md](delegation.md) | worker model pinning and directives |
+| [split.md](split.md) | `make split` — cut a long module into parts and retarget its consumers |
 | [notify.md](notify.md) | `make notify` — the ntfy.sh push a gate sends on the way out |

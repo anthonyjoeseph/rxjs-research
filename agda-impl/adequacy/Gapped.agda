@@ -19,19 +19,20 @@ open import Data.List.Relation.Unary.All using ([]; _∷_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_)
 open import Data.Unit using (⊤)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (refl)
 
-open import denotation.MonotonicList using (Pos; _<ᵖ_; ix; end)
+open import denotation.MonotonicList.Events using (Pos; _<ᵖ_)
 import denotation.Unfold as U
-open import denotation.Unfold using (NEnv)
+open import denotation.MonotonicList using (Agree; Agreeᵀ)
 open import adequacy.Sorted using (_≤ᵖ_)
 open import adequacy.Sane using (Sane; allLive)
-open import adequacy.Placed using (Placed; Ordered; Reaches; Headed; Sorted; Alienᴱ)
-open import adequacy.Strong using (module Strongly)
+open import adequacy.Deep using (Deep)
+open import adequacy.Placed.Order using (Placed)
+open import adequacy.Strong.Held using (module StrongHeld)
 open import adequacy.Ghost using (module Ghosting)
 
 module Gapping (R : Set) where
-  open Strongly R using (Heads)
+  open StrongHeld R using (Heads)
   open Ghosting R using (Past; residual)
 
   -- A joiner's entries, skips dropped.
@@ -91,6 +92,9 @@ module Gapping (R : Set) where
     data GappedS (κ : Pos) {Δ A} : U.Source Δ A → U.Source Δ A → Set₁ where
       gap-live  : ∀ {s s′} → Gapped κ s s′ → GappedS κ (U.live s) (U.live s′)
       gap-ended : ∀ {c t t′} → Gapped κ t t′ → GappedS κ (U.ended c t) (U.ended c t′)
+      -- An ended source's rest tied in meaning and in order, not in form.
+      gap-tied  : ∀ {c t t′} → (∀ ρ n → Agree n (U.meaning t ρ) (U.meaning t′ ρ)) → (∀ ρ n → Agreeᵀ n (U.cutᴺ t ρ) (U.cutᴺ t′ ρ))
+                → (∀ ρ → Deep t ρ → Deep t′ ρ) → GappedS κ (U.ended c t) (U.ended c t′)
 
   gapM-refl : ∀ {κ Δ A} (o : Maybe (U.Node Δ A)) → GappedM κ o o
   gapM-refl nothing  = gap-nothing
@@ -158,37 +162,6 @@ module Gapping (R : Set) where
     feedˢ-gapped i q (U.live s)    = gap-live (feed-gapped i q s)
     feedˢ-gapped i q (U.ended c t) = gap-ended (feed-gapped i q t)
 
-  -- Every node in order, rests and their sources included: `Placed`
-  -- looks at no node under a rest, a union, a burst or an ended source.
-  mutual
-    Deep : ∀ {Γ A} → U.Node Γ A → NEnv Γ → Set
-    Deep c ρ = Ordered (U.meaning c ρ) × Deeps c ρ
-
-    Deeps : ∀ {Γ A} → U.Node Γ A → NEnv Γ → Set
-    Deeps (U.mapᶜ f c)                    ρ = Deep c ρ
-    Deeps (U.scanᶜ f z c)                 ρ = Deep c ρ
-    Deeps (U.takeWhileᶜ i p c)            ρ = Deep c ρ
-    Deeps (U.flatMapᶜ op g o ls qs pl)    ρ = Deepᴹ o ρ × Deepᴸ ls ρ × Deep pl ρ
-      × (∀ a x → Reaches (x ++ [ ix 0 ]) (U.meaning (U.flatMapᶜ op g o ls qs pl) ρ) → Deep (g a (x ++ [ ix 1 ])) ρ)
-    Deeps (U.connectᶜ r b (U.live s))    ρ = Deep b (U.meaning s ρ ∷ ρ) × Deep s ρ
-    Deeps (U.connectᶜ r b (U.ended c t)) ρ = Deep b (end c ∷ ρ) × Deep t ρ
-    Deeps (U.deferᶜ l p ns)               ρ = Headed p × Sorted (U.replay ns ρ) × Alienᴱ p (U.replay ns ρ)
-    Deeps (U.endingᶜ p n)                 ρ = Deep n ρ
-    Deeps (U.restᶜ n)                     ρ = Deep n ρ
-    Deeps (U.unionᶜ x y)                  ρ = Deep x ρ × Deep y ρ
-    Deeps (U.burstingᶜ r t)               ρ = Deep t ρ
-    Deeps (U.underᶜ (U.live s) b)         ρ = Deep s ρ × Deep b (U.meaning s ρ ∷ ρ)
-    Deeps (U.underᶜ (U.ended c t) b)      ρ = Deep t ρ × Deep b (end c ∷ ρ)
-    Deeps _                               ρ = ⊤
-
-    Deepᴹ : ∀ {Γ A} → Maybe (U.Node Γ A) → NEnv Γ → Set
-    Deepᴹ nothing  ρ = ⊤
-    Deepᴹ (just c) ρ = Deep c ρ
-
-    Deepᴸ : ∀ {Γ A} → List (U.Node Γ A) → NEnv Γ → Set
-    Deepᴸ []       ρ = ⊤
-    Deepᴸ (c ∷ cs) ρ = Deep c ρ × Deepᴸ cs ρ
-
   -- A gap holds nothing: the stepped node's meaning is the part's with
   -- skips more.  Over an outer whose events run out of order a factory's
   -- lane before `κ` would be reached, and a guarded factory's gap not
@@ -205,9 +178,7 @@ module Gapping (R : Set) where
     gapped-sane   : ∀ {κ} {g′ g″ : U.Node [] R} → Gapped κ g′ g″ → Sane [] g′ → Sane [] g″
     gapped-placed : ∀ {κ} {g′ g″ : U.Node [] R} → Gapped κ g′ g″ → Placed g′ [] → Placed g″ []
 
-  -- What a skip steps to, in order under every rest.  `Placed` and
-  -- `Sane` say nothing under a rest, so this reads what neither holds:
-  -- the order a run's rests keep belongs in the invariant the machine
-  -- carries, beside `Placed`.
+  -- A gap keeps every node in order: what it drops is skips, and what it
+  -- holds back is a lane past `κ` the factory makes in order besides.
   postulate
-    stepped-deep : ∀ {g : U.Node [] R} {k g′} → Sane [] g → Placed g [] → U.step g ≡ U.skipˢ k g′ → Deep g′ []
+    gapped-deep : ∀ {κ} {g′ g″ : U.Node [] R} → Gapped κ g′ g″ → Deep g′ [] → Deep g″ []

@@ -6,10 +6,10 @@
 -- joiner's switch and slot — holds after it if it held before.
 module adequacy.Lowers where
 
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (Bool; true; false; if_then_else_; _∨_)
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.List using (List; []; _∷_; length)
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (Maybe; just; nothing; is-just; is-nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
@@ -17,14 +17,18 @@ open import Level using (lift; lower)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst)
 open import Data.List.Relation.Unary.All using (All) renaming (map to mapᴬ; tail to tailᴬ)
 open import Data.List.Relation.Unary.Any using () renaming (here to hereᴬ; there to thereᴬ)
+open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ)
+open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.Empty using (⊥-elim)
 open import Data.List.Relation.Unary.Linked using (Linked)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 
-open import denotation.MonotonicList using (Timeline; Pos)
+open import denotation.MonotonicList.Events using (Timeline; Pos)
 open import operation.AbstractObservable using (module Heap; module Run; base; list; joins; fifo; gate) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; Out)
 open import adequacy.Strong using (module Strongly)
+open import adequacy.Strong.Against using (module StrongAgainst)
+open import adequacy.Strong.Held using (module StrongHeld)
 open import adequacy.Torn using (module Tearing)
 import denotation.Unfold as U
 
@@ -32,7 +36,9 @@ module Lowering (R : Set) where
   open Heap using (Kind; cell; slot; play; _∋_; same) renaming (here to hereʰ; there to thereʰ)
   open Shared Timeline (Out R) using (Heapᴹ; store; look; stored)
   open Strongly R
-  open Tearing R using (torn; tornVia; thrown; thrownLanes; look-store; get-put-same; Site; takeSite; bodySite; siteHeap; siteCall)
+  open StrongAgainst R
+  open StrongHeld R
+  open Tearing R using (torn; tornVia; thrown; thrownLanes; look-store; get-put-same; Site; takeSite; bodySite; siteHeap; siteCall; module Seeing; body-off; body-eq; body-none; body-alike; fresh-path; names-path; seen-alike; part-alike; Alike)
   open Run (Pureᴾ R) using (Act; module Kit; module FlatKit; module Subject)
   open Heap using (_⊑_)
 
@@ -275,26 +281,6 @@ module Lowering (R : Set) where
   sources-past (takeSite _) = refl
   sources-past (bodySite _) = refl
 
-  -- A joiner reads only its switch, and only once raised: what a lowered
-  -- heap owes it was owed before.
-  mutual
-    fed-lowers : ∀ {h} {H H′ : Heapᴹ h} → Lowers H H′ → ∀ {Δ A} (s : Sub h Δ A) {ν} → At.Fed H s ν → At.Fed H′ s ν
-    fed-lowers lw (pendingˢ s q)  f = f
-    fed-lowers lw (coldˢ s hd ph) f = f
-    fed-lowers lw (ofˢ p i xs)    f = f
-    fed-lowers lw doneˢ           f = f
-    fed-lowers lw (mapˢ g s)      f = fed-lowers lw s f
-    fed-lowers lw (scanˢ g r s)   f = fed-lowers lw s f
-    fed-lowers lw (takeWhileˢ i p c k tk s) f = fed-lowers lw s f
-    fed-lowers lw (flatMapˢ op g fl oc k r pl so ls) (f₁ , f₂) = fed-lowers lw so f₁ , fedL-lowers lw ls f₂
-    fed-lowers lw (connectˢ S c b kb k fd rp e rt src bd) (f₁ , f₂) = fed-lowers lw src f₁ , fed-lowers lw bd f₂
-    fed-lowers lw (joinˢ j sk l x st) f = lift (λ r → lower f (raisedᵍ lw l r))
-    fed-lowers lw (deferˢ k s) f = fed-lowers lw s f
-
-    fedL-lowers : ∀ {h} {H H′ : Heapᴹ h} → Lowers H H′ → ∀ {Δ B} (ls : List (Lane h Δ B)) {ν} → At.FedLanes H ls ν → At.FedLanes H′ ls ν
-    fedL-lowers lw []                f          = f
-    fedL-lowers lw (lane c k s ∷ ls) (f₁ , f₂) = fed-lowers lw s f₁ , fedL-lowers lw ls f₂
-
   -- A part gone stays gone once a heap is lowered: every `if` `part`
   -- reads goes to `nothing` or stays, and the one cell it reads past a
   -- switch, a flatMap's queue, is of a kind nothing lowering writes.
@@ -379,6 +365,36 @@ module Lowering (R : Set) where
   parted-torn : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} (z : Site t) {Δ A B S c b kb k fd e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
               → Path t (connectˢ S c b kb k fd rp e rt s bd) → At.part H bd ≡ nothing → At.part (siteHeap H z) bd ≡ nothing
   parted-torn H z {bd = bd} _ = part-gone (site-lowers H z) bd
+
+  -- A body that held no part, its source torn: a flag below it reads as
+  -- it did, the body seen only where it was seen before.
+  torn-body-flags : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} {Δ A B S c b kb k fd e rp rt} {s : Sub h Δ A} {bd : Sub h (A ∷ Δ) B}
+                    (π : Path t (connectˢ S c b kb k fd rp e rt s bd)) → AllPairs _≢_ (names t) → At.part H bd ≡ nothing
+                  → DoneBy H t [] → DoneBy (thrown H c k s) t []
+  torn-body-flags {h} H {Δ = Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} π ps none d =
+    Seeing.flags-write H H′ (body-off H {Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} pw none)
+                            (body-eq H {Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} pw none) ps π below d
+    where
+      H′ = thrown H c k s
+      pw = fresh-path π ps
+      al : Alike H H′ (names bd)
+      al = body-alike H {Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} pw none
+
+      src-seen : (is-just (At.part H′ s) ∨ is-just e) ≡ true → (is-just (At.part H s) ∨ is-just e) ≡ true
+      src-seen j with At.part H s in eq
+      ... | just _  = refl
+      ... | nothing = subst (λ z → (is-just z ∨ is-just e) ≡ true) (part-gone (thrown-lowers H c k s) s eq) j
+
+      below : ∀ {Δ′ A′ B′} {op f fl oc k′ r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
+              (ρ : Path (connectˢ S c b kb k fd rp e rt s bd) (flatMapˢ op f fl oc k′ r pl so ls))
+            → seen H π ≡ true → seen H′ ρ ≡ true → Flagged H′ [] fl so
+      below (in-source ρ) _ sρ =
+        false≢ (subst (λ z → is-just z ≡ true) (body-none H {Δ} {A} {B} {S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {s} {bd} pw none) (proj₁ (∧-split (is-just (At.part H′ bd)) sρ)))
+      below {fl = fl} {oc} {k′} {so = so} (in-body ρ) sπ sρ with ∧-split (is-just (At.part H′ s) ∨ is-just e) sρ
+      ... | js , sρ′ =
+        (λ ()) , λ _ → trans (cong lower (al (FlatKit.Flat.outerDone fl) (names-path ρ (++⁺ˡ {xs = flatNames fl} (thereᴬ (hereᴬ refl))))))
+          (trans (proj₂ (d (π ⊕ in-body ρ) (seen-join H π (in-body ρ) sπ (∧-join (src-seen js) (trans (sym (seen-alike H H′ ρ al)) sρ′)))) (λ ()))
+                 (cong is-nothing (sym (part-alike H H′ so (λ j m → al j (names-path ρ (++⁺ʳ (flatNames fl) (++⁺ʳ (cutNames oc) (++⁺ʳ (quietName k′) (thereᴬ (++⁺ˡ m)))))))))))
 
   -- A teardown only throws switches, spends colds and silences joiners:
   -- what is owed of a live switch or an unspent cold was owed before,

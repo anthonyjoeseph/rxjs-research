@@ -15,24 +15,26 @@ open import Data.List.Relation.Unary.AllPairs.Properties using () renaming (map�
 open import Data.List.Relation.Binary.Permutation.Propositional using (_↭_; ↭-sym; ↭-trans; ↭-reflexive) renaming (refl to ↭-refl′; prep to ↭-prep′; swap to ↭-swap′; trans to ↭-trans′)
 open import Data.List.Relation.Binary.Permutation.Propositional.Properties using (All-resp-↭; shifts) renaming (++⁺ˡ to ↭-++⁺ˡ; ++⁺ʳ to ↭-++⁺ʳ)
 open import Data.List.Properties using (map-++; ++-assoc) renaming (++-identityʳ to ++-idʳ)
-open import Data.Maybe using (Maybe; just; nothing; is-just) renaming (map to mapMaybe)
-open import Data.Product using (_×_; _,_; Σ; proj₂)
+open import Data.Maybe using (Maybe; just; nothing; is-just; is-nothing) renaming (map to mapMaybe)
+open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁; tt to tt₁)
 open import Data.Bool using (_∧_; _∨_; true; false; if_then_else_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
 
-open import denotation.MonotonicList using (Timeline; Frame; From; Pos; ix; last; tick; at; _<ᵖ_; <ᵖ-below) renaming (done to doneᶠᵐ; quiet to quietᶠᵐ)
-open import denotation.MonotonicList using () renaming (sub to subᴾ)
+open import denotation.MonotonicList.Events using (Timeline; Frame; From; Pos; ix; last; tick; at; _<ᵖ_; <ᵖ-below) renaming (done to doneᶠᵐ; quiet to quietᶠᵐ)
+open import denotation.MonotonicList.Events using () renaming (sub to subᴾ)
 import Tree as T
 import denotation.Unfold as U
 open import operation.Machine using (module Machine)
 open import operation.PureObservable using (Out; Pureᴾ)
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
 open import adequacy.Strong using (module Strongly)
+open import adequacy.Strong.Against using (module StrongAgainst)
+open import adequacy.Strong.Held using (module StrongHeld)
 open import adequacy.Moves using (module Moving)
-open import adequacy.Ghost using (module Ghosting)
+open import adequacy.Ghost.Paths using (module GhostingPaths)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Fork using (module Forking)
 
@@ -42,9 +44,11 @@ module Keeping (R : Set) where
   open Shared Timeline (Out R) using (Heapᴹ; ⟨_,_,_⟩)
   open Heap using (there)
   open Run (Pureᴾ R) using (done; module Kit; module FlatKit)
-  open Strongly R using (Sub; pendingˢ; ofˢ; mapˢ; takeWhileˢ; connectˢ; Lane; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_; coldˢ; module At; Each; Lingers; Phase; Pinned; unpinned; pinned-trans; pinned-sym; union-pinned; under-pinned; under-moved; bursts-pinned; bursts-moved; rest-pinned; Restful; rf-idle; rf-rest; rf-union; restful-pinned; Tied; seen; seenL; seen-⊕; isTaking; ∧-split; flatMapˢ; scanˢ; joinˢ; doneˢ; deferˢ; lane)
+  open Strongly R using (Sub; pendingˢ; ofˢ; mapˢ; takeWhileˢ; connectˢ; Lane; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_; coldˢ; module At; Phase; flatMapˢ; scanˢ; joinˢ; doneˢ; deferˢ; lane)
+  open StrongAgainst R using (Each; Lingers; Pinned; unpinned; pinned-trans; pinned-sym; union-pinned; under-pinned; under-moved; bursts-pinned; bursts-moved; rest-pinned; Restful; rf-idle; rf-rest; rf-union; restful-pinned; Tied; seen; seenL; seen-⊕; isTaking; ∧-split)
+  open StrongHeld R using (DoneBy)
   open Moving R using (plant; plantᴸ; planted; plantedᴸ; part-plant; Same; same; same-map; same-scan; same-take; same-flat; same-connect; same-defer)
-  open Ghosting R using (each-sub)
+  open GhostingPaths R using (each-sub)
   open Forking R using (Lands; LandsL; apart; below; fork; forkᴸ; land-body; land-defer; land-lanes; land-map; land-next; land-outer; land-scan; land-source; land-take; land-this; lands-apart; lands-below; landsᴸ-apart)
 
   ------------------------------------------------------------------------
@@ -251,6 +255,30 @@ module Keeping (R : Set) where
     -- A pool whose outer has not ended and holds no lane runs nothing.
     pooled-fresh : ∀ {Δ A B C} {fl : FlatKit.Flat A h} {so : Sub h Δ A} → At.val H (FlatKit.Flat.outerDone fl) ≡ false → Pinned (U.hushˢ {A = C}) (U.restˢ {B = ⊤} (At.pooled H {B = B} fl so []))
     pooled-fresh d rewrite d = unpinned
+
+    -- A node planted reading as the pending node did: every flatMap above
+    -- it reads its outer as before.
+    flags-plant : ∀ {Δ A Δ₀ A₀ s₀ q₀} {t : Sub h Δ A} (π : Path t (pendingˢ {Δ = Δ₀} {A₀} s₀ q₀)) (v : Sub h Δ₀ A₀) → At.part H (pendingˢ s₀ q₀) ≡ At.part H v
+                → DoneBy H v [] → DoneBy H t [] → DoneBy H (plant π v) []
+    flags-plant {t = t} π v eq dv d = fg
+      where
+        inside : ∀ {Δ″ A″} {w : Sub h Δ″ A″} {ψ : Path (plant π v) w} (ρ : Path v w) → ψ ≡ planted π v ⊕ ρ → seen H ψ ≡ true → seen H ρ ≡ true
+        inside ρ refl s = proj₂ (∧-split (seen H (planted π v)) (trans (sym (seen-⊕ H (planted π v) ρ)) s))
+
+        outer-lands : ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so so′ : Sub h Δ′ A′} {ls ls′ : List (Lane h Δ′ B′)}
+                        {ψ₀ : Path t (flatMapˢ op f fl oc k r pl so ls)} {ψ′ : Path (plant π v) (flatMapˢ op f fl oc k r pl so′ ls′)}
+                    → Lands (fork π v ψ₀) ψ′ → At.part H so ≡ At.part H so′
+        outer-lands {ψ₀ = ψ₀} ld with fork π v ψ₀ | ld
+        ... | apart _ _                | lands-apart = refl
+        ... | below (in-outer ρ) _ _ _ | lands-below = sym (part-plant H ρ v eq)
+        ... | below (in-lanes ρ) _ _ _ | lands-below = refl
+
+        fg : DoneBy H (plant π v) []
+        fg ψ s with keep π v eq ψ
+        ... | inj₁ (ρ , e)                                 = dv ρ (inside ρ e s)
+        ... | inj₂ (_ , ψ₀ , same , se , _ , _ , _)        = d ψ₀ (trans se s)
+        ... | inj₂ (_ , ψ₀ , same-flat , se , _ , _ , ld)  =
+          proj₁ (d ψ₀ (trans se s)) , λ m̸ → trans (proj₂ (d ψ₀ (trans se s)) m̸) (cong is-nothing (outer-lands ld))
 
     -- What a node planted leaves running pins as the pending node's: each
     -- held pool and ended source above it keeps its pin.
