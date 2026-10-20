@@ -805,8 +805,8 @@ module ClimbFlatPlant (R : Set) where
       { sane = sn ; placed = pd ; deep = dp ; ctl = refl ; code = c
       ; opens = proj₂ (∧-split _ (trans (sym (opened-⊕ hp true ρ (in-outer here))) (calling-open (ρ ⊕ in-outer here) cl)))
       ; stack = sk
-      ; lifted = S , subst (λ o → Lifts hp ρ (sk o) S) (sym pv) (subst (λ s′ → Lifts hp ρ s′ S) adm Lρ) , sg
-      ; lefts = lefts-subst sk (sym pv) (lefts-subst (λ s′ → s′) adm (lefts-up ρ (in-outer here) eqO lt))
+      ; lifted = S , subst (λ o → Lifts hp ρ (skp o) S) (sym pv) (subst (λ s′ → Lifts hp ρ s′ S) adm Lρ) , sg
+      ; lefts = lefts-subst skp (sym pv) (lefts-subst (λ s′ → s′) adm (lefts-up ρ (in-outer here) eqO lt))
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
       ; sorted = sorted-⇝ so p ; behind = bh ; lingers = Restaged.pool-idle hp ρ (U.unionᶜ po U.idleᶜ) fs refl (ended-past cl) lgr ; leaving = Restaged.pool-leaving hp ρ (U.unionᶜ po U.idleᶜ) fs refl (ended-past cl) lvg
@@ -816,6 +816,7 @@ module ClimbFlatPlant (R : Set) where
       G  = λ a j → U.subscribe (f a) j
       LS = At.partLanes hp ls
       QS = At.val hp (FlatKit.Flat.queue fl)
+      skp = λ o → U.skipˢ (q ++ [ ix 0 ]) (U.flatMapᶜ op G o (U.subscribe (f y) (q ++ [ ix 1 ]) ∷ LS) QS (U.unionᶜ po U.idleᶜ))
       adm = outer-admit op G o₀ q y c′ LS QS po
               (admit-room op G (q ++ [ ix 1 ]) y LS QS (U.restsᶜ LS) (subst (λ n → roomy op n ≡ true) (lanes-counted ρ cl) rm))
       d₀ = let-go hp (ρ ⊕ in-outer here) fs (lifts-seen L) (cong is-just pv) (Calling.flags cl)
