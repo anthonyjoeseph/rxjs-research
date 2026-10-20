@@ -677,15 +677,20 @@ module StrongAgainst (R : Set) where
             → At.part H src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Tied rt (At.leftover H {B = ⊤} src)
 
   -- Two nodes leaving alike: what each still runs past an unsubscribe,
-  -- under every environment, the same at every depth, and in order
-  -- exactly when the other is; their rests' next steps pinned alike.
+  -- under every environment, the same at every depth, the second in
+  -- order when the first is; their rests' next steps pinned alike.
   -- `restˢ` and `cutᴺ` are read apart, so the pin is its own field.
   record Leaves {Γ A B} (x : U.Node Γ A) (y : U.Node Γ B) : Set₁ where
     constructor leaves
     field agree : ∀ (ρ : U.NEnv Γ) n → Agree n (U.meaning (U.restᶜ {B = ⊤} x) ρ) (U.meaning (U.restᶜ {B = ⊤} y) ρ)
           deep  : ∀ (ρ : U.NEnv Γ) → Deep (U.restᶜ {B = ⊤} x) ρ → Deep (U.restᶜ {B = ⊤} y) ρ
-          deep⁻ : ∀ (ρ : U.NEnv Γ) → Deep (U.restᶜ {B = ⊤} y) ρ → Deep (U.restᶜ {B = ⊤} x) ρ
           pin   : Pinned (U.restˢ {B = ⊤} x) (U.restˢ {B = ⊤} y)
+
+  -- The order read back, from the witness's rest to the node's: a
+  -- flatMap's part is in order by its whole meaning, which no rest
+  -- below it holds, so only an ended source's rest carries it.
+  Back : ∀ {Γ A B} → U.Node Γ A → U.Node Γ B → Set₁
+  Back x y = ∀ (ρ : U.NEnv _) → Deep (U.restᶜ {B = ⊤} y) ρ → Deep (U.restᶜ {B = ⊤} x) ρ
 
   -- WHAT THE GHOST HOLDS LEAVES WHAT THE HEAP WOULD: below `t`, each seen
   -- part leaves what the witness reads off as kept, a held flatMap's pool
@@ -701,7 +706,7 @@ module StrongAgainst (R : Set) where
       rests : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
             → (ψ : Path t (connectˢ S c b kb k fd rp e rt src bd)) → seen H ψ ≡ true
             → ∀ {n} → At.part H (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
-            → At.part H src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Leaves rt (At.leftover H {B = ⊤} src) × Restful rt
+            → At.part H src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Leaves rt (At.leftover H {B = ⊤} src) × Back rt (At.leftover H {B = ⊤} src) × Restful rt
 
   -- WHAT HOLDS BELOW A HELD NODE, NODE BY NODE: each node's obligation
   -- once it is held, each child held as its parent is and its step

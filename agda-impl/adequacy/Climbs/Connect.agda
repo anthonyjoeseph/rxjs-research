@@ -467,9 +467,9 @@ module ClimbConnect (R : Set) where
         cs : ∀ ρ′ n → ML.Agreeᵀ n (U.cutᴺ c₀ ρ′) (U.cutᴺ rt ρ′)
         cs ρ′ n = tail-agreeᵀ (U.cutᴺ c₀ ρ′) (U.cutᴺ rt ρ′) (ML.agree-trans (Leaves.agree lc ρ′ n) (ML.agree-sym (Leaves.agree (proj₁ lr) ρ′ n)))
         ag : ∀ ρ′ n → Agree n (U.meaning (U.restᶜ c₀) ρ′) (U.meaning rt ρ′)
-        ag ρ′ n = subst (Agree n (ML.tailᴱ (U.cutᴺ c₀ ρ′))) (sym (restful-meaning (proj₂ lr) ρ′)) (tailᴱ-ne (cs ρ′ n))
+        ag ρ′ n = subst (Agree n (ML.tailᴱ (U.cutᴺ c₀ ρ′))) (sym (restful-meaning (proj₂ (proj₂ lr)) ρ′)) (tailᴱ-ne (cs ρ′ n))
         dt : ∀ ρ′ → Deep (U.restᶜ c₀) ρ′ → Deep rt ρ′
-        dt ρ′ d = proj₂ (Leaves.deep⁻ (proj₁ lr) ρ′ (Leaves.deep lc ρ′ (ordered-retyped (U.cutᴺ c₀ ρ′) (proj₁ d) , proj₂ d)))
+        dt ρ′ d = proj₂ (proj₁ (proj₂ lr) ρ′ (Leaves.deep lc ρ′ (ordered-retyped (U.cutᴺ c₀ ρ′) (proj₁ d) , proj₂ d)))
 
     fin-part : AllPairs _≢_ (names (connectˢ Sj c b kb k idle rp e rt u bd)) → At.part (store H (Subject.closed Sj) (lift true)) (connectˢ Sj c b kb k idle rp e rt u bd) ≡ At.part H (connectˢ Sj c b kb k idle rp e rt u bd)
     fin-part fr = trans (cong₂ (At.connected H′ rp e rt) (part-alike H H′ u (fin-au fr)) (part-alike H H′ bd (fin-ab fr)))

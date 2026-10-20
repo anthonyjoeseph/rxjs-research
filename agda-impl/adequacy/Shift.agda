@@ -44,7 +44,7 @@ module Shifting (R : Set) where
   open FlatKit using (Flat)
   open Shared Timeline (Out R) using (Heapᴹ; look)
   open Strongly R using (Sub; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_; pendingˢ; coldˢ; ofˢ; doneˢ; joinˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; lane; Taking; taking; ending; taken; names; laneNames; cutNames; quietName; subjectNames; flatNames; module At; Name; outers; outersL; Feed)
-  open StrongAgainst R using (isTaking; seen; seenL; seen-join; seen-up; Each; Leaves; Leaving; Restful; Lingers; Pinned; unpinned; Tied; tie-trans; rest-pinned; bursts-pinned; bursts-moved; under-moved; union-pinned; pinned-trans; pinned-sym; restful-pinned; ∧-split; ∧-join; false≢)
+  open StrongAgainst R using (isTaking; seen; seenL; seen-join; seen-up; Each; Leaves; Back; Leaving; Restful; Lingers; Pinned; unpinned; Tied; tie-trans; rest-pinned; bursts-pinned; bursts-moved; under-moved; union-pinned; pinned-trans; pinned-sym; restful-pinned; ∧-split; ∧-join; false≢)
   open StrongHeld R using (DoneBy; Flagged; Heads)
   open Tearing R using (Alike; Off; part-alike; partLanes-alike; seen-alike; seenL-alike; names-path; lanes-path; apart-r; apart-l; narrow; each-same)
   open Moving R using (plant; plantᴸ; planted; plantedᴸ; pairs-r; pairs-split)
@@ -387,7 +387,7 @@ module Shifting (R : Set) where
       ; pools = λ {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} ψ sn e →
                   subst (λ y → Leaves pl₀ y) (sym (pooled-from {op = op₀} {f = f₀} {fl = fl₀} {oc = oc₀} {k = k₀} {r = r₀} {pl = pl₀} {so = so₀} {ls = ls₀} (λ m → names-path ψ m) al))
                     (Leaving.pools lv ψ (se ψ sn) (trans (sym (part-at ψ al)) e))
-      ; rests = λ {rt = rt₀} {src = src₀} ψ sn e pn pe → subst (λ y → Leaves rt₀ y × Restful rt₀) (sym (leftover-from {B = ⊤} {x = src₀} (λ m → names-path (ψ ⊕ in-source here) m) al))
+      ; rests = λ {rt = rt₀} {src = src₀} ψ sn e pn pe → subst (λ y → Leaves rt₀ y × Back rt₀ y × Restful rt₀) (sym (leftover-from {B = ⊤} {x = src₀} (λ m → names-path (ψ ⊕ in-source here) m) al))
                                                 (Leaving.rests lv ψ (se ψ sn) (trans (sym (part-at ψ al)) e) (trans (sym (part-at (ψ ⊕ in-source here) al)) pn) pe) }
       where
         se : ∀ {Δ′ A′} {x : Sub h Δ′ A′} (ψ : Path t x) → seen H′ ψ ≡ true → seen H ψ ≡ true

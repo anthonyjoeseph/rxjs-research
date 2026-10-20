@@ -452,5 +452,5 @@ module StrongHeld (R : Set) where
     ; sorted  = root , begin-well o
     ; behind′  = Eaching.eaching (λ { _ refl → heads-begin o })
     ; lingers′ = Lingering.lingering (λ _ → lift tt)
-    ; leaving = record { parts = λ { here _ refl → leaves (λ ρ n → agree-refl n _) (λ ρ d → proj₁ d , d) (λ ρ d → proj₂ d) (rest-pinned (U.subscribe o root)) } ; pools = λ () ; rests = λ () }
+    ; leaving = record { parts = λ { here _ refl → leaves (λ ρ n → agree-refl n _) (λ ρ d → proj₁ d , d) (rest-pinned (U.subscribe o root)) } ; pools = λ () ; rests = λ () }
     ; flags   = λ () }
