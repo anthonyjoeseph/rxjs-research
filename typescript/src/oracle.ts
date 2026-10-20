@@ -33,6 +33,40 @@ const canon = (v: unknown): unknown =>
       : v !== null && typeof v === "object"
         ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, canon(x)]))
         : v;
+// A `fresh` name compares only by equality, and each runtime draws its
+// own: Agda's engines print a position or a counter, rxjs hands out a new
+// object.  So each trace's names are renamed in order of first sight.
+const isName = (v: unknown): v is { name: unknown } =>
+  v !== null && typeof v === "object" && !Array.isArray(v) && "name" in v;
+const renamed = (seen: unknown[], v: unknown): [unknown[], unknown] => {
+  if (isName(v)) {
+    const i = seen.indexOf(v.name);
+    return i >= 0
+      ? [seen, { name: i }]
+      : [[...seen, v.name], { name: seen.length }];
+  }
+  if (Array.isArray(v))
+    return v.reduce<[unknown[], unknown[]]>(
+      ([sn, out], x) => {
+        const [sn2, y] = renamed(sn, x);
+        return [sn2, [...out, y]];
+      },
+      [seen, []],
+    );
+  if (v !== null && typeof v === "object")
+    return Object.entries(v).reduce<[unknown[], Record<string, unknown>]>(
+      ([sn, out], [k, x]) => {
+        const [sn2, y] = renamed(sn, x);
+        return [sn2, { ...out, [k]: y }];
+      },
+      [seen, {}],
+    );
+  return [seen, v];
+};
+const names = (t: Trace): Trace => ({
+  ...t,
+  events: renamed([], t.events)[1] as Event[],
+});
 type End = "completed" | "silent" | "cut";
 type Trace = { events: Event[]; end: End };
 type Row = {
@@ -91,7 +125,9 @@ const prefix = (xs: Event[], ys: Event[]): boolean =>
 
 // `quickcheck.Quickcheck.agrees`: a trace the budget cut only has to
 // be a prefix of the other, and of two cut traces either may be shorter.
-const agrees = (a: Trace, b: Trace): boolean =>
+const agrees = (x: Trace, y: Trace): boolean =>
+  agreesRenamed(names(x), names(y));
+const agreesRenamed = (a: Trace, b: Trace): boolean =>
   a.end === "cut" && b.end === "cut"
     ? prefix(a.events, b.events) || prefix(b.events, a.events)
     : a.end === "cut"
@@ -121,13 +157,34 @@ const cli = (
       : { out: r.stdout };
 };
 
-const show = (t: Trace): string => JSON.stringify(canon(t));
+const show = (t: Trace): string => JSON.stringify(canon(names(t)));
 
-const check = async (row: Row): Promise<string[]> => {
+// The CLI's subcommands for one family of programs: the seed's program,
+// or its named one (`quickcheck.Quickcheck.named`).
+// `engines`: whether the CLI can run each engine's leg alone.
+type Family = {
+  label: string;
+  prog: string;
+  code: string;
+  io: string;
+  engines: boolean;
+};
+const families: Family[] = [
+  { label: "", prog: "prog", code: "code", io: "io", engines: true },
+  {
+    label: "named ",
+    prog: "named",
+    code: "named-code",
+    io: "named-io",
+    engines: false,
+  },
+];
+
+const check = async (fam: Family, row: Row): Promise<string[]> => {
   const rx = await rxjsTrace(row.prog);
   // The IO engine returns only once nothing is left to wait for, which a
   // looping program never reaches: its leg is skipped there.
-  const io = loops(row.prog) ? undefined : cli(["io", String(row.seed)]);
+  const io = loops(row.prog) ? undefined : cli([fam.io, String(row.seed)]);
   const ioTrace: Trace | undefined =
     io?.failed === undefined && io !== undefined
       ? (exactly(io.out) as Trace)
@@ -150,12 +207,15 @@ const check = async (row: Row): Promise<string[]> => {
     : [...bad, `rxjs       ${show(rx)}`].map((l) => `  ${l}`);
 };
 
-const main = async (): Promise<void> => {
-  const count = Number(process.argv[2] ?? 1000);
-  const start = Number(process.argv[3] ?? 0);
+// Whether every seed of one family agrees, its failures printed.
+const run = async (
+  fam: Family,
+  start: number,
+  count: number,
+): Promise<boolean> => {
   // The listing runs every seed's two Agda engines: one case's time each.
   const listing = cli(
-    ["prog", String(start), String(count)],
+    [fam.prog, String(start), String(count)],
     timeoutMs * Math.max(1, Math.ceil(count / 50)),
   );
   // A listing cut short is listed again a seed at a time, so a seed whose
@@ -169,13 +229,13 @@ const main = async (): Promise<void> => {
       listing.failed === undefined ||
       acc.filter(({ listed }) => listed?.failed !== undefined).length >= 5
         ? acc
-        : [...acc, { seed: s, listed: cli(["prog", String(s), "1"]) }],
+        : [...acc, { seed: s, listed: cli([fam.prog, String(s), "1"]) }],
     [],
   );
   const stuck = single.filter(({ listed }) => listed?.failed !== undefined);
   stuck.forEach(({ seed, listed }) =>
     console.log(
-      `oracle: FAIL seed ${seed}\n  prog       ${cli(["code", String(seed)]).out.trim()}\n  listing    ${listed?.failed}\n  denote     ${cli(["denote", String(seed)]).failed ?? "finishes"}\n  pure       ${cli(["pure", String(seed)]).failed ?? "finishes"}`,
+      `oracle: FAIL ${fam.label}seed ${seed}\n  prog       ${cli([fam.code, String(seed)]).out.trim()}\n  listing    ${listed?.failed}${fam.engines ? `\n  denote     ${cli(["denote", String(seed)]).failed ?? "finishes"}\n  pure       ${cli(["pure", String(seed)]).failed ?? "finishes"}` : ""}`,
     ),
   );
   const rows = (
@@ -197,18 +257,28 @@ const main = async (): Promise<void> => {
       };
     });
   const verdicts = await Promise.all(
-    rows.map(async (row) => ({ row, bad: await check(row) })),
+    rows.map(async (row) => ({ row, bad: await check(fam, row) })),
   );
   const failures = verdicts.filter(({ bad }) => bad.length > 0);
   failures.forEach(({ row, bad }) =>
     console.log(
-      `oracle: FAIL seed ${row.seed}\n  prog       ${JSON.stringify(row.prog)}\n${bad.join("\n")}`,
+      `oracle: FAIL ${fam.label}seed ${row.seed}\n  prog       ${JSON.stringify(row.prog)}\n${bad.join("\n")}`,
     ),
   );
   console.log(
-    `oracle: ${rows.length - failures.length}/${rows.length} seeds agree`,
+    `oracle: ${rows.length - failures.length}/${rows.length} ${fam.label}seeds agree`,
   );
-  process.exitCode = failures.length === 0 && rows.length === count ? 0 : 1;
+  return failures.length === 0 && rows.length === count;
+};
+
+const main = async (): Promise<void> => {
+  const count = Number(process.argv[2] ?? 1000);
+  const start = Number(process.argv[3] ?? 0);
+  const ok = await families.reduce<Promise<boolean>>(async (acc, fam) => {
+    const before = await acc;
+    return (await run(fam, start, count)) && before;
+  }, Promise.resolve(true));
+  process.exitCode = ok ? 0 : 1;
 };
 
 await main();

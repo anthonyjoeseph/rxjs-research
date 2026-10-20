@@ -26,13 +26,14 @@ open import Data.Unit using (⊤)
 open import IO.Primitive.Core using (pure; _>>=_)
 open import IO.Primitive.Finite using (putStrLn)
 
+import denotation.MonotonicList.Events as Events
 open import denotation.MonotonicList.Events using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; root)
 open import denotation.MonotonicList using (observe; ticks)
 open import denotation.Denote using (⟦_⟧[_])
 open import operation.Machine using (module Machine)
-open import operation.Observable using (subscribe; fromTimeline; newIORef; readIORef; writeIORef)
+open import operation.Observable using (IORef; IOCold; subscribe; fromTimeline; newIORef; readIORef; writeIORef)
 open import quickcheck.Ty using (⟦_⟧ᵀ; showᵀ)
-open import quickcheck.Code using (Code; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; μ; var; defer; Prog; toObs; timeline)
+open import quickcheck.Code using (Code; Leaf; cold; fresh; empty; of; map; scan; takeWhile; flatMap; connect; connected; μ; var; defer; Prog; toObs; timeline)
 
 ------------------------------------------------------------------------
 -- Traces
@@ -80,6 +81,7 @@ mutual
 -- this index never reaches `⊥ᴰ`: on a cut tree the denotation is exact.
 defers : ∀ {Γ Δᵍ Δ Θ t} → Code Γ Δᵍ Δ Θ t → ℕ
 defers (cold _)              = 0
+defers fresh                 = 0
 defers empty                 = 0
 defers (of _)                = 0
 defers (map _ s)             = defers s
@@ -151,11 +153,16 @@ private
 -- finishes never returns.
 ioTrace : ∀ {t} → ℕ → Prog t → IO (Trace ⟦ t ⟧ᵀ)
 ioTrace u p = newIORef false >>= λ fin → newIORef [] >>= λ log → newIORef 0 >>= λ names → subscribe
-  (toObs (λ s → fromTimeline names (timeline s)) u p [] [] [])
+  (toObs (leaf names) u p [] [] [])
   (λ t a → readIORef log >>= λ xs → writeIORef log ((t , a) ∷ xs))
   (writeIORef fin true) >>= λ _ →
   readIORef log >>= λ xs → readIORef fin >>= λ c →
   pure (logged nothing (reverse xs) ▸ (if c then completed else silent))
+  where
+    -- the leaves, each name drawn from the run's supply
+    leaf : IORef ℕ → Leaf IOCold
+    leaf names .Leaf.scripted s = fromTimeline names (Leaf.scripted timeline s)
+    leaf names .Leaf.named      = fromTimeline names Events.fresh
 
 ------------------------------------------------------------------------
 -- One engine's trace, printed

@@ -177,10 +177,3 @@ per-operator facts are bodies over the elaborations.
 Members: `coldˢ-sound`, `emptyˢ-sound`, `ofˢ-sound`, `mapˢ-sound`,
 `scanˢ-sound`, `takeWhileˢ-sound`, `flatMapˢ-sound`, `connectˢ-sound`,
 `defer-sound`, `sound-admissible`, `batched-sound`.
-
-#### THE READING
-
-A reader's prefix of `ticks e` and the first n events of `e` read alike:
-same values, ended alike. Settled when both directions are bodies.
-
-Members: `shown-read`, `read-shown`.

@@ -397,7 +397,7 @@ module SortingWalk (R : Set) where
     silentʷ (inj₁ refl) (wellʳ (runʷ u settled-refl (proj₁ (look-well {hp = hp} wh s) a p lo le) (restʷ u st h ws)) eb refl wh refl wq)
   runs-run {lo = lo} {hp = hp} {p = p} u st (finishʷ {s = s} le h) ws eb wh wq =
     silentʷ (inj₁ refl) (wellʳ (runʷ u settled-refl (proj₁ (proj₂ (look-well {hp = hp} wh s)) p lo le) (restʷ u st h ws)) eb refl wh refl wq)
-  runs-run {bu = bu} {p = p} u st (startColdʷ {c = c} {s = s} le h) ws eb wh wq =
+  runs-run {p = p} {bu = bu} u st (startColdʷ {c = c} {s = s} le h) ws eb wh wq =
     started-well (wk∋ new s) here (timelineAt c p) le (restʷ u st (λ lo′ st′ → h lo′ st′ new here) ws) (trans (entries-wk new bu) eb) (extend-well wh (lift tt)) (queue-wk new wq)
   runs-run u st (stopʷ {h = hd} wk) ws eb wh wq = silentʷ (inj₁ refl) (wellʳ (runʷ u st wk ws) eb refl (store-well hd wh (lift tt)) refl wq)
   runs-run {bu = bu} u st (stashʷ sm h) ws eb wh wq =
