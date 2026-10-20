@@ -13,6 +13,7 @@ open import Data.List.Relation.Unary.All using ([]; _∷_) renaming (lookup to l
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.Empty using (⊥)
 open import Data.Unit using (⊤; tt)
+open import Data.Maybe using (just)
 open import Data.Product using (_,_; proj₁)
 open import Level using (lift; lower)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
