@@ -75,7 +75,7 @@ def main():
         top = lowest.groups[0]
         lines.append(f"Tier {lowest.name} is the lowest open — top group {top.title}")
         lines.append("")
-        lines.extend(lowest.progress or ["(no progress recorded)"])
+        lines.extend(top.prose)
     else:
         lines.append("no tier has a group left")
 

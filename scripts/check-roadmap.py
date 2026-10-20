@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """`make roadmap-check` — the gate on PROOF-STATE.md (and the dates in CLAUDE.md, docs/).
 
-PROOF-STATE is a risk ledger: per tier, a `### Progress` section, then a
+PROOF-STATE is a risk ledger: per tier, a one-line description, then a
 `### Ledger` of GROUPS, each a `####` heading over one block -- the design issue
 its postulates share, what would settle it -- closed by a `Members:` list of
 backticked names.  The rules it lives by are CLAUDE.md's; this script checks the
@@ -12,10 +12,10 @@ half a machine can see:
 - STALENESS: a member naming nothing live is removed (`--prune`, which `make
   roadmap-check` passes), and a group left with no members is deleted.
   Deleting a postulate costs nothing (Anthony).
-- SHAPE: a group carries a `Members:` line and sits under a ledger; a tier with
-  groups carries a progress section.
-- BUDGETS: on the file's preamble, each tier's preamble, each tier's progress
-  and each group's prose.  Names are free.
+- SHAPE: a group carries a `Members:` line and sits under a ledger; a tier has
+  no subsection but its ledger.
+- BUDGETS: on the file's preamble, each tier's description and each group's
+  prose.  Names are free.
 - NO DATES: in PROOF-STATE, CLAUDE.md and docs/*.md.
 
 Member shorthand: `{a,b}` brace expansion and `*` globs.
@@ -32,8 +32,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 FILE_BUDGET = 300
-TIER_BUDGET = 900
-PROGRESS_BUDGET = 1500
+TIER_BUDGET = 150
 GROUP_BUDGET = 600
 
 TIER_RE = re.compile(r"^##\s+Tier\s+(\S+)")
@@ -71,7 +70,6 @@ class Tier:
     def __init__(self, name, lineno):
         self.name, self.lineno = name, lineno
         self.pre = []
-        self.progress = None     # list of lines, or None when absent
         self.in_ledger = False
         self.groups = []
 
@@ -81,7 +79,7 @@ def parse(path):
     lines = path.read_text().splitlines()
     tiers, problems, file_pre = [], [], []
     tier = group = None
-    section = None               # None | "progress" | "ledger" | "other"
+    section = None               # None | "ledger" | "other"
     in_members = False
 
     def close_group(i):
@@ -110,13 +108,12 @@ def parse(path):
         ms = SUB_RE.match(line)
         if ms and not GROUP_RE.match(line):
             close_group(i)
-            head = ms.group(1).lower()
-            section = ("progress" if head == "progress"
-                       else "ledger" if head == "ledger" else "other")
-            if section == "progress":
-                tier.progress = []
-            if section == "ledger":
+            if ms.group(1).lower() == "ledger":
+                section = "ledger"
                 tier.in_ledger = True
+            else:
+                section = "other"
+                problems.append((i + 1, f"`### {ms.group(1)}`: a tier's only subsection is its `### Ledger`"))
             in_members = False
             continue
         mg = GROUP_RE.match(line)
@@ -143,14 +140,9 @@ def parse(path):
             continue
         if not line.strip():
             continue
-        if section == "progress":
-            tier.progress.append(line)
-        elif section is None:
+        if section is None:
             tier.pre.append(line)
     close_group(len(lines))
-    for t in tiers:
-        if t.groups and t.progress is None:
-            problems.append((t.lineno, f"tier {t.name} has groups but no `### Progress`"))
     return file_pre, tiers, problems
 
 
@@ -295,9 +287,7 @@ def main():
 
     budget("the file's preamble", file_pre, FILE_BUDGET, 1)
     for t in tiers:
-        budget(f"tier {t.name}'s preamble", t.pre, TIER_BUDGET, t.lineno)
-        if t.progress is not None:
-            budget(f"tier {t.name}'s progress", t.progress, PROGRESS_BUDGET, t.lineno)
+        budget(f"tier {t.name}'s description", t.pre, TIER_BUDGET, t.lineno)
         for g in t.groups:
             budget(f"group {g.title}", g.prose, GROUP_BUDGET, g.lineno)
 

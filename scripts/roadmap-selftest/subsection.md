@@ -6,6 +6,9 @@ Rules: CLAUDE.md.
 
 **THE TIER.** What it exports.
 
+### Progress
+
+- Something established.
 
 ### Ledger
 

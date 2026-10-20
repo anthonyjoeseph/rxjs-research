@@ -7,9 +7,7 @@
 
 ```
 ## Tier N — <name>
-<preamble: what the tier exports>
-### Progress
-<what is established toward settling the top group>
+<one line: what the tier proves>
 ### Ledger
 #### <GROUP NAME>
 <the shared design issue; what would settle it>
@@ -27,11 +25,11 @@ Groups are ranked riskiest first. The order is a judgement, so it is not checked
 3. **Staleness, pruned** — a member naming nothing live is REMOVED from its `Members:`
    line, and a group left with no members is DELETED, heading and all. Deleting or
    discharging a postulate costs nothing (Anthony). The check reports what it pruned.
-4. **Shape** — every group has a `Members:` line and sits under a `### Ledger`; a tier
-   with groups has a `### Progress`.
+4. **Shape** — every group has a `Members:` line and sits under a `### Ledger`, a
+   tier's only subsection.
 5. **Budgets** — prose characters, backticked names free: the file's preamble
-   (`FILE_BUDGET`), a tier's preamble (`TIER_BUDGET`), a tier's progress
-   (`PROGRESS_BUDGET`), a group's block (`GROUP_BUDGET`). Research that outgrows its
+   (`FILE_BUDGET`), a tier's one-line description (`TIER_BUDGET`), a group's block
+   (`GROUP_BUDGET`). Research that outgrows its
    budget belongs in a source header.
 6. **No dates** — in PROOF-STATE.md, CLAUDE.md and `docs/*.md`. PROOF-STATE must be
    current and the rules timeless; a date is history arriving with its timestamp.

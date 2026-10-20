@@ -6,10 +6,6 @@ Rules: CLAUDE.md.
 
 **THE TIER.** What it exports.
 
-### Progress
-
-- Established: something about the top group.
-
 ### Ledger
 
 #### FIRST GROUP

@@ -519,8 +519,8 @@ roadmap-selftest:
 	  $$R --file $$S/good.md --ledger $$S/ledger.txt --dates-only $$S/good.md > /dev/null \
 	    || { echo "SELFTEST FAIL: a well-formed, fully covered ledger was rejected"; fail=1; }; \
 	  for c in "twice.md ledger.txt TWICE" "nomembers.md ledger.txt SHAPE" \
-	           "noprogress.md ledger.txt SHAPE" "fatgroup.md ledger.txt OVER.BUDGET" \
-	           "fatprogress.md ledger.txt OVER.BUDGET" "fatpre.md ledger.txt OVER.BUDGET" \
+	           "subsection.md ledger.txt SHAPE" "fatgroup.md ledger.txt OVER.BUDGET" \
+	           "fatpre.md ledger.txt OVER.BUDGET" \
 	           "fatfile.md ledger.txt OVER.BUDGET" "dated.md ledger.txt DATED" \
 	           "good.md ledger-gap.txt UNCOVERED" "good.md ledger-stale.txt STALE"; do \
 	    set -- $$c; \
@@ -546,7 +546,7 @@ roadmap-selftest:
 	  grep -q 'FIRST GROUP' $$d/p.md \
 	    || { echo "SELFTEST FAIL: --prune deleted a live group"; fail=1; }; \
 	  rm -rf $$d; \
-	  if [ $$fail -eq 0 ]; then echo "roadmap-selftest: PASS (coverage, one group, staleness, shape, four budgets and dates all fire; prune drops a dead member and an emptied group)"; else exit 1; fi
+	  if [ $$fail -eq 0 ]; then echo "roadmap-selftest: PASS (coverage, one group, staleness, shape, three budgets and dates all fire; prune drops a dead member and an emptied group)"; else exit 1; fi
 
 # SEARCH FIRST, made cheap and impossible to scope wrong: search the declared
 # TYPE of every statement in the tree.  dup-check catches a duplicate only once
