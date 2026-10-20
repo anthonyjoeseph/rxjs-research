@@ -12,7 +12,6 @@ open import Data.Nat using (zero; suc)
 open import Data.Product using (_×_; _,_; proj₁)
 open import Data.Maybe using (just; nothing)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-open import Level using (lower)
 open import Data.Empty using (⊥)
 
 open import operation.AbstractObservable using (module Heap) renaming (module Machine to Shared)

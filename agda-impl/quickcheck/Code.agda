@@ -24,7 +24,6 @@ open import Data.Nat.Properties using (m≤m+n)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.Product using (_×_; _,_)
 open import Data.String using (String; intersperse) renaming (_++_ to _⊕_)
-open import Level using (lift)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 import Tree as T

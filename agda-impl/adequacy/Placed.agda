@@ -19,7 +19,6 @@ open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; subst; cong)
 open import Relation.Nullary using (¬_)
-open import Level using (lower)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList.Events using (timelineAt; Events; Events∞; Pos; From; Timeline; out; skip; end; hush; ix; sub; last; tick; _<ᵖ_; root;

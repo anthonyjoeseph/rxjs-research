@@ -8,7 +8,6 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (zero; suc; _<ᵇ_)
 open import Data.Empty using (⊥)
-open import Level using (lower)
 import Data.List.Relation.Unary.Any as Any
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Product using (_×_; _,_; proj₁)

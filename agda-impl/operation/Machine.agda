@@ -18,7 +18,6 @@ open import Data.Maybe using (Maybe; just; nothing) renaming (map to mapMaybe)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-open import Level using (lower)
 
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; PureObs; Out; note; fin; module Pure)

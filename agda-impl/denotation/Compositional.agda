@@ -17,7 +17,6 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (_∷_; []; lookup)
 open import Data.Nat using (ℕ; zero; suc)
-open import Level using (lower)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)

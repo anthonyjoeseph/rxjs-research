@@ -40,7 +40,6 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_)
 open import Data.Product using (_×_; _,_)
-open import Level using (lower)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 open import Data.List.Relation.Unary.All using (All; lookup; updateAt) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 import Data.List as L

@@ -12,7 +12,7 @@ open import Data.List.Relation.Unary.All.Properties using (++⁻ˡ; ++⁻ʳ) ren
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_) renaming (head to pairs-hd)
 open import Data.List.Relation.Unary.Linked using (_∷_)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
-open import Level using (lift; lower)
+open import Level using (lift)
 open import Data.Maybe using (Maybe; just; nothing; is-just)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
