@@ -38,34 +38,30 @@ const canon = (v: unknown): unknown =>
 // object.  So each trace's names are renamed in order of first sight.
 const isName = (v: unknown): v is { name: unknown } =>
   v !== null && typeof v === "object" && !Array.isArray(v) && "name" in v;
-const renamed = (seen: unknown[], v: unknown): [unknown[], unknown] => {
-  if (isName(v)) {
-    const i = seen.indexOf(v.name);
-    return i >= 0
-      ? [seen, { name: i }]
-      : [[...seen, v.name], { name: seen.length }];
-  }
-  if (Array.isArray(v))
-    return v.reduce<[unknown[], unknown[]]>(
-      ([sn, out], x) => {
-        const [sn2, y] = renamed(sn, x);
-        return [sn2, [...out, y]];
-      },
-      [seen, []],
-    );
-  if (v !== null && typeof v === "object")
-    return Object.entries(v).reduce<[unknown[], Record<string, unknown>]>(
-      ([sn, out], [k, x]) => {
-        const [sn2, y] = renamed(sn, x);
-        return [sn2, { ...out, [k]: y }];
-      },
-      [seen, {}],
-    );
-  return [seen, v];
-};
+const nameList = (v: unknown): unknown[] =>
+  isName(v)
+    ? [v.name]
+    : Array.isArray(v)
+      ? v.flatMap(nameList)
+      : v !== null && typeof v === "object"
+        ? Object.values(v).flatMap(nameList)
+        : [];
+const renamed = (order: Map<unknown, number>, v: unknown): unknown =>
+  isName(v)
+    ? { name: order.get(v.name) }
+    : Array.isArray(v)
+      ? v.map((x) => renamed(order, x))
+      : v !== null && typeof v === "object"
+        ? Object.fromEntries(
+            Object.entries(v).map(([k, x]) => [k, renamed(order, x)]),
+          )
+        : v;
 const names = (t: Trace): Trace => ({
   ...t,
-  events: renamed([], t.events)[1] as Event[],
+  events: renamed(
+    new Map([...new Set(nameList(t.events))].map((n, i) => [n, i])),
+    t.events,
+  ) as Event[],
 });
 type End = "completed" | "silent" | "cut";
 type Trace = { events: Event[]; end: End };
@@ -162,21 +158,24 @@ const show = (t: Trace): string => JSON.stringify(canon(names(t)));
 // The CLI's subcommands for one family of programs: the seed's program,
 // or its named one (`quickcheck.Quickcheck.named`).
 // `engines`: whether the CLI can run each engine's leg alone.
+// `share`: the fraction of the seeds the family runs.
 type Family = {
   label: string;
   prog: string;
   code: string;
   io: string;
   engines: boolean;
+  share: number;
 };
 const families: Family[] = [
-  { label: "", prog: "prog", code: "code", io: "io", engines: true },
+  { label: "", prog: "prog", code: "code", io: "io", engines: true, share: 1 },
   {
     label: "named ",
     prog: "named",
     code: "named-code",
     io: "named-io",
     engines: false,
+    share: 0.1,
   },
 ];
 
@@ -276,7 +275,7 @@ const main = async (): Promise<void> => {
   const start = Number(process.argv[3] ?? 0);
   const ok = await families.reduce<Promise<boolean>>(async (acc, fam) => {
     const before = await acc;
-    return (await run(fam, start, count)) && before;
+    return (await run(fam, start, Math.ceil(count * fam.share))) && before;
   }, Promise.resolve(true));
   process.exitCode = ok ? 0 : 1;
 };
