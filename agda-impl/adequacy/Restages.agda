@@ -225,7 +225,7 @@ module Staging (R : Set) where
     -- A map runs what its source runs, and its source what it was
     -- pending to.
     rm-lingers : ∀ (H : Heapᴹ h) → Lingers H T₀ → Lingers H t′
-    rm-lingers H = lingers-plant H π v refl (λ {C} → tw-refl (U.restᶜ {B = C} (U.subscribe s q))) (record { pools = λ { (in-map ()) } ; rests = λ { (in-map ()) } })
+    rm-lingers H = lingers-plant H π v refl (λ {C} → leaves (λ ρ _ k → agree-refl k _) (λ ρ d → d) (rest-pinned (U.subscribe s q)) , λ ρ d → d) (record { pools = λ { (in-map ()) } ; rests = λ { (in-map ()) } })
 
     -- A pending node and a map over one register nothing, queue nothing
     -- and are owed nothing.
