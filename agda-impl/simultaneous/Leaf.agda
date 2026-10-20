@@ -20,9 +20,10 @@ open import Relation.Binary.Definitions using (DecidableEquality)
 open import Relation.Binary.PropositionalEquality using (refl)
 open import Relation.Nullary using (yes; no)
 
-open import denotation.MonotonicList.Events using (Timeline; Pos; Label; ix; sub; last; idle)
+open import denotation.MonotonicList.Events using (Timeline; Pos; Label; Events∞; ix; sub; last; idle)
 open import denotation.MonotonicList using (MonotonicList; cold; coldᴰ; ofᴱ)
 import denotation.Denote as D
+open Events∞
 
 -- The author's leaves, and `fresh`.
 data WithFresh (C : Set → Set₁) (N : Set) : Set → Set₁ where
