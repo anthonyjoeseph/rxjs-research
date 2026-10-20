@@ -4,11 +4,7 @@ Rules: CLAUDE.md.
 
 ## Tier 1 — a tier
 
-**THE TIER.** What it exports.
-
-### Progress
-
-- Established on 2024-01-15.
+**THE TIER.** What it exports, as of 2024-01-15.
 
 ### Ledger
 

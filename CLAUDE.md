@@ -41,7 +41,7 @@ Every `*-selftest` proves its checker still fires; they are not findings, they a
 | `unsafe-check` | `TERMINATING` / `NO_POSITIVITY_CHECK` / `REWRITE` / `--type-in-type` on the proof path. The build is not `--safe`, so this is the only thing stopping a soundness hole | [docs/unsafe-check.md](docs/unsafe-check.md) |
 | `dup-check` | two declarations proving one fact, up to binder spelling and type synonyms | [docs/find.md](docs/find.md) |
 | `imports-check` | an unused import, or an unused name in a surviving clause | [docs/imports-check.md](docs/imports-check.md) |
-| `roadmap-check` | a live postulate in no group or in two; a group member naming nothing live (pruned — deleting a postulate is free, Anthony); a group without `Members:`; a tier with groups and no progress; over a prose budget; a date | [docs/roadmap-check.md](docs/roadmap-check.md) |
+| `roadmap-check` | a live postulate in no group or in two; a group member naming nothing live (pruned — deleting a postulate is free, Anthony); a group without `Members:`; a tier subsection other than its ledger; over a prose budget; a date | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `comments-check` | a date, a historical marker or a LINE NUMBER in `agda-impl`; evidence not last and in order; a DOUBLED marker (`-- -- RECOVERY:`); a `REFUTED`/`RECOVERY` that doesn't resolve. `DEAD ROUTE` is unvalidated — it names nothing | [docs/comments-check.md](docs/comments-check.md) |
 | `agda` | anything that does not typecheck from Main — **a warning is a failure** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
 
@@ -139,11 +139,11 @@ Every definition used somewhere; only the top-level exports are exempt. No back-
 
 ## PROOF-STATE.md — the risk ledger (Anthony)
 
-Per tier: a **progress** section, then a **ledger** of GROUPS. No rules in the file — they live here.
+Per tier: a one-line description (≤150 chars), then a **ledger** of GROUPS. No rules in the file — they live here.
 
 - **A group = postulates sharing one design issue:** an undecided invariant, or a fact suspected false. Block: the issue, what would settle it, then its member names. Every live postulate in exactly one group (`make roadmap-check`).
 - **Ranked riskiest first, by judgement.** Untried outranks probed; refutations and dead routes raise risk. Re-rank freely.
-- **Progress = what is established toward settling the TOP group** — ruled out, proven, found. Not a plan. Cleared when the group settles.
+- **A group's issue says only what is still open.** As the top group narrows, rewrite its issue and settle test smaller; findings go to source headers.
 - **The only work is the top group of the lowest open tier.** Carve-out: answering a design question.
 - Names, never numbers. No history — a settled group is deleted, git holds it. Research in source headers.
 

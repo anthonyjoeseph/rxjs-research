@@ -28,7 +28,7 @@ Title:  gate GREEN - about to commit
 
 Tier 1 is the lowest open — top group THE REST'S TIES
 
-- … the tier's progress section, verbatim.
+- … the top group's issue and settle test, verbatim.
 
   tier 1: THE REST'S TIES — 35 postulate(s)
   tier 1: THE ROOT STEP — 3 postulate(s)
@@ -39,8 +39,8 @@ Tier 1 is the lowest open — top group THE REST'S TIES
 HEAD <sha> <subject>
 ```
 
-The lowest open tier leads, with its top group and the progress made toward
-settling it — what a session would open PROOF-STATE to read. Below it, every
+The lowest open tier leads, with its top group's block — what is still open
+and what would settle it, which is what a session opens PROOF-STATE to read. Below it, every
 group with its count of live members, riskiest first.
 
 A red gate sends the same body at high priority with the failing stage in

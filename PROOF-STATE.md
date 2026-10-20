@@ -4,41 +4,18 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ## Tier 1 — the adequacy theorem
 
-**THE LINK.** `adequacy`: the pure run's limit is the fold's meaning observed
-at the root, positions forgotten down to ticks. SAFETY, every prefix placed
-against the meaning's events, is a body: SORTED (`adequacy.Sorted`, the
-machine alone) and ALIKE as sets (`content`) is placed (`placing`). LIVENESS
-is by an item's depth, then the witness's `measure` (`adequacy.Progress`).
-Sortedness rides SCOPED positions: `under l m k` runs `m` at
-`pos ++ [l]` and puts `pos` back, so the run's positions are a tree's
-pre-order; each kernel is well-positioned (`Well`, unary) given its
-observer is; `preserve` is the tree walk, the timers and the loop's turn,
-a body: a turn opens an epoch at its timer's cascade, and setting a timer
-moves the last to where it was set, so same-tick timers pop in order.
-Content rides a GHOST, the meaning's own configuration, which the machine's
-runs; at the launch its residual is the events (`begun`, by `subscribed`).
-Only re-entry configurations are related to the ghost; the rest reach one
-by their own silent steps (`Mirror`).
-
-### Progress
-
-- `Leaves` ties a ghost's free node to the heap's leftover in meaning and in
-  order (`Deep`), both ways; `Leaving.rests` makes the held rest `Restful`.
-- An end keeps every tie: `lefts-off` is proven, over `Stays.left`.
-- A source's end is a lift: `fin-ghost` is a body over `ghost-lift`, owing
-  only `fin-shut`.
-- Open: whether a plant and a growth keep the ties (`lefts-planted`,
-  `lefts-grow`), and whether a repooled rest ties as a left-over one does.
+**Adequacy:** the denotation matches the operational semantics.
 
 ### Ledger
 
 #### THE REST'S TIES
 
-An ended part's rest, left over (`Leaving`, `Lefts`) or repooled
-(`Lingers`), stays tied to what the heap keeps, through every move. The
-repool cells carry the most dead routes in the tree. Settled when a plant, a
-growth and one repool move keep the tie as bodies, or one is refuted and the
-tie restated.
+An ended part's rest stays tied to what the heap keeps. An end and a
+source's end keep the tie; open: whether a plant and a growth keep a
+left-over tie (`Leaving`, `Lefts`), and whether a repooled rest (`Lingers`)
+ties as a left-over one does, where the repool cells carry the most dead
+routes in the tree. Settled when `lefts-planted`, `lefts-grow` and one repool
+move are bodies, or one is refuted and the tie restated.
 
 Members: `*-leaving`, `leaving`, `lefts-planted`, `lefts-grow`, `bg-left`,
 `fin-shut`, `rest-sourced`, `idle-tied`, `close-heads`, `close-tied`,
@@ -153,11 +130,8 @@ Members: `placing`, `ticks-up`.
 
 ## Tier 2 — the simultaneous spec
 
-**THE STATEMENT.** Define the new "simultaneous" spec over the denotation,
-adapted from the old `agda/` tree's statement modules (reference only). No
-groups until the statements exist; each lands as a postulate here.
+**The statement:** the simultaneous spec, stated over the denotation.
 
 ## Tier 3 — the simultaneous spec, proven
 
-**THE PROOF.** Discharge Tier 2's statements using the denotation and
-`adequacy`. No groups until Tier 2 states them.
+**The proof:** Tier 2's statements, discharged over `adequacy`.
