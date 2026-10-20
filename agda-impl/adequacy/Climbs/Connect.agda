@@ -23,7 +23,7 @@ open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import denotation.MonotonicList.Events using (Events∞; skip; Pos; Timeline)
+open import denotation.MonotonicList.Events using (Events∞; skip; Pos; Timeline; _<ᵖ_)
 open import denotation.MonotonicList using (Agree)
 import denotation.Unfold as U
 import denotation.MonotonicList as ML
@@ -61,6 +61,7 @@ open import adequacy.Taken using (module Taking)
 open import adequacy.Names using (module Naming)
 open import adequacy.Local using (module Locality)
 open import adequacy.Retag using (Retag; module Retagging; at-here)
+open import adequacy.Retag.Shut using (tells; module RetagShut)
 open import adequacy.Replant using (module Replanting)
 open import adequacy.Restages using (module Staging)
 open import adequacy.Weaken using (module Weakening)
@@ -108,6 +109,7 @@ module ClimbConnect (R : Set) where
   open Locality R using (stored-at; stored-hit; live-apart; flatReads; cut-in; module Heaps)
   open Growing R using (wkTree; wkLanes; wkPath; wkPathᴸ)
   open Retagging R using (module Body; fed-owed; fed-retag; envP; joiners-path; retag; unsub-retag; begun-retag; names-retag)
+  open RetagShut R using (part-shut)
   open Everywhere.Spending R using (spent-retag)
   open EverywhereGated.Holding R using (holds-alike; holds-path; holds-plant; holds-retag)
   open Keeping R using (seen-planted)
@@ -188,6 +190,27 @@ module ClimbConnect (R : Set) where
           (λ x pn pe → Lingers.rests lg here refl (proj₂ (just-of (re-revive (cong is-just x)))) pn pe)
           (λ jb → lingers-sub G lg (in-source here) (cong (λ z → z ∧ true) (trans (sym re-just) jb)))
           (λ js → re-lingers (lingers-sub G lg (in-body here) (cong (λ z → z ∧ true) js))) }
+
+  -- A call through a connect's source: its subject still open.
+  src-open : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
+             {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {bd : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
+             (ρ : Path T (connectˢ Sj c b kb k fd rp e rt u bd)) {sg : Signal T A}
+           → Calling g ℓ m₁ (ρ ⊕ in-source here) sg → At.val (Conf.heap (Mach.conf m₁)) (Subject.closed Sj) ≡ false
+  src-open {m₁ = m₁} {Sj = Sj} ρ cl
+    with At.val (Conf.heap (Mach.conf m₁)) (Subject.closed Sj)
+       | trans (sym (opened-⊕ (Conf.heap (Mach.conf m₁)) true ρ (in-source here))) (calling-open (ρ ⊕ in-source here) cl)
+  ... | false | _  = refl
+  ... | true  | ()
+
+  -- A call through a connect's source: every subscriber its subject
+  -- holds joined before where the run is.  A join is made where the run
+  -- is, by an event that reached the body, never the source's own.
+  postulate
+    joined-before : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
+                    {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {bd : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
+                    (ρ : Path T (connectˢ Sj c b kb k fd rp e rt u bd)) {sg : Signal T A}
+                  → Calling g ℓ m₁ (ρ ⊕ in-source here) sg
+                  → All (λ s → proj₂ s <ᵖ Conf.pos (Mach.conf m₁) ≡ true) (At.val (Conf.heap (Mach.conf m₁)) (Subject.subscribers Sj))
 
   -- A CONNECT FEEDING: the feed restaged from `idle` to the source's
   -- value at the run's position, owed to the subscribers the feed read,
@@ -344,9 +367,7 @@ module ClimbConnect (R : Set) where
       -- The subject open as the value reaches it: every live joiner of
       -- the body waiting, the feed's retag keeping it so.
       cf : At.val hp (Subject.closed Sj) ≡ false
-      cf with At.val hp (Subject.closed Sj) | trans (sym (opened-⊕ hp true ρ (in-source here))) (calling-open (ρ ⊕ in-source here) cl)
-      ... | false | _  = refl
-      ... | true  | ()
+      cf = src-open ρ cl
       kh : Steady hp g ((idle , At.told hp Sj e) ∷ nowAt hp ρ [])
       kh (here refl) (lift f) lv rewrite proj₂ (f lv) (λ ()) | cf = refl
       kh (there x) f lv = refl
@@ -376,15 +397,6 @@ module ClimbConnect (R : Set) where
     v  = Bd.w₂
     T′ = plant ρ v
 
-    -- The body finished is the body shut, but for gaps: retagged to what
-    -- the finish owes, its part stands, holding the end the ghost's shut
-    -- tells.  The feed's counterparts, `retag-parted` and `retag-fed`,
-    -- read `At.Joined`, `Meaning` and `Heads`; this reads none.
-    postulate
-      fin-shut : ∀ {b₀} → At.part H bd ≡ just b₀
-               → Σ (U.Node (A ∷ Δ) B) λ b₁ → At.part H′ (retag (at-here (At.owing H′ fd′)) bd) ≡ just b₁
-                 × Gapped q (U.shut (here refl) q b₀) (U.shut (here refl) q b₁)
-
     -- The subject's closed flag the connect's own cell, its node's clauses
     -- reading alike and the rest of the tree by the frame; then the feed
     -- restaged, read by the body's meaning alone.
@@ -410,19 +422,53 @@ module ClimbConnect (R : Set) where
     fin-ab : AllPairs _≢_ (names w₀) → Alike H H′ (names bd)
     fin-ab (_ ∷ a₁ ∷ _) j m = look-store H (Subject.closed Sj) j (λ eq → lookupᴬ a₁ (++⁺ʳ (cutNames c) (there (++⁺ʳ (quietName kb) (++⁺ʳ (quietName k) (++⁺ʳ (names u) m))))) eq)
 
+    -- The body finished is the body shut, but for gaps: retagged to what
+    -- the finish owes, its part stands, holding the end the ghost's shut
+    -- tells.  Each of the connect's own live joiners, the subject open,
+    -- waits holding nothing (`Meaning`), and joined before the finish:
+    -- the shut tells it under its own position, as the finish owes it.
+    --
+    -- REFUTED: 021fc08d of the body shut with no joiner's position read, by a live joiner joined at the finish's own position
+    fin-shut : AllPairs _≢_ (names T) → At.Joined H (subjects T) (joiners T []) → Meaning H T → At.val H (Subject.closed Sj) ≡ false
+             → All (λ s → proj₂ s <ᵖ q ≡ true) (At.val H (Subject.subscribers Sj))
+             → ∀ {b₀} → At.part H bd ≡ just b₀
+             → Σ (U.Node (A ∷ Δ) B) λ b₁ → At.part H′ (retag (at-here (At.owing H′ fd′)) bd) ≡ just b₁
+               × Gapped q (U.shut (here refl) q b₀) (U.shut (here refl) q b₁)
+    fin-shut fs jn mn cf bf {b₀} pb = go (At.part H (retag g₀ bd)) refl
+      where
+        g₀ = at-here (At.owing H′ fd′)
+        E = Sj ∷ envP ρ []
+        sub : ∀ {sk j} → joiner Sj sk j ∈ᴸ joiners bd E → (sk , j) ∈ᴸ At.val H (Subject.subscribers Sj)
+        sub m = lookupᴬ (proj₂ jn) (joiners-path ρ [] (++⁺ʳ (joiners u (envP ρ [])) m))
+        hy : ∀ {C} (x : C ∈ᴸ A ∷ Δ) {j sk l st} → joiner (lookupᴬ E x) sk j ∈ᴸ joiners bd E
+           → At.Fed H (joinˢ j sk l x st) ((idle , At.told H Sj e) ∷ nowAt H ρ []) → At.val H l ≡ true
+           → tells (here refl) q x j (g₀ x j st) ≡ tells (here refl) q x j st
+        hy (here refl) m (lift f) lv rewrite proj₂ (f lv) (λ ()) | cf | lookupᴬ bf (sub m) = refl
+        hy (there x)   m f        lv = refl
+        sh : U.shutᴹ (here refl) q (At.part H (retag g₀ bd)) ≡ just (U.shut (here refl) q b₀)
+        sh = trans (part-shut H (here refl) q g₀ bd E hy (proj₂ (fed-at H ρ (Meaning.fed mn)))) (cong (U.shutᴹ (here refl) q) pb)
+        al : At.part H′ (retag g₀ bd) ≡ At.part H (retag g₀ bd)
+        al = part-alike H H′ (retag g₀ bd) (subst (Alike H H′) (sym (names-retag g₀ bd)) (fin-ab (fresh-path ρ fs)))
+        go : ∀ m → At.part H (retag g₀ bd) ≡ m
+           → Σ (U.Node (A ∷ Δ) B) λ b₁ → At.part H′ (retag g₀ bd) ≡ just b₁ × Gapped q (U.shut (here refl) q b₀) (U.shut (here refl) q b₁)
+        go (just b₁) eb = b₁ , trans al eb
+          , subst (Gapped q (U.shut (here refl) q b₀)) (sym (just-injective (trans (cong (U.shutᴹ (here refl) q) (sym eb)) sh))) alike
+        go nothing eb with () ← trans (cong (U.shutᴹ (here refl) q) (sym eb)) sh
+
     -- The ghost past the source's end: the connect shut, its source ended
     -- on what the source left running.  Read at `e = just q`, which the
     -- end staged on its way up: with `e` `nothing` the heap reads no part
     -- past a dead source.  The ghost's rest and the heap's are tied in
     -- meaning through the source's leftover, `Lefts` on one side and
     -- `Lingers` on the other, never in form.
-    fin-ghost : AllPairs _≢_ (names T) → Lingers H T
+    fin-ghost : AllPairs _≢_ (names T) → Lingers H T → At.Joined H (subjects T) (joiners T []) → Meaning H T
+              → At.val H (Subject.closed Sj) ≡ false → All (λ s → proj₂ s <ᵖ q ≡ true) (At.val H (Subject.subscribers Sj))
               → ∀ {g S} → Sane [] g → Placed g [] → Deep g [] → At.part H u ≡ nothing → e ≡ just q
               → (L : Lifts H (ρ ⊕ in-source here) (U.endˢ q) S) → Lefts H L → U.step g ≡ S
               → Σ (U.Node [] R) λ g″ → At.part H′ T′ ≡ just g″ × Sane [] g″ × Placed g″ [] × Deep g″ []
                 × Σ Pos λ k′ → Σ (Events∞ R) λ r → (∀ n → Agree n (residual g) (skip k′ r)) × Past (Events∞.force r) (residual g″)
-    fin-ghost fs lg sn pd dp pu eq L lt sg with lifts-split ρ (in-source here) L | lefts-split ρ (in-source here) L lt
-    ... | _ , lifts-source {c₀ = c₀} {b₀ = b₀} pb sf lifts-here , Lρ | (lc , _) , _ with fin-shut pb
+    fin-ghost fs lg jn mn cf bf sn pd dp pu eq L lt sg with lifts-split ρ (in-source here) L | lefts-split ρ (in-source here) L lt
+    ... | _ , lifts-source {c₀ = c₀} {b₀ = b₀} pb sf lifts-here , Lρ | (lc , _) , _ with fin-shut fs jn mn cf bf pb
     ...   | b₁ , pb′ , gb rewrite sf =
       ghost-lift H H′ ρ v fs (off-store H (Subject.closed Sj)) mine {κ = q} Lρ pv′ (gap-connect gb (gap-tied ag cs dt)) sn pd dp sg
       where
@@ -588,7 +634,7 @@ module ClimbConnect (R : Set) where
               ; behind = bh ; lingers = lgr ; lefts = lt } | refl
     with writes (subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-source here) top) cd)
   ... | n′ , en , path₁ with reads {hp = Fins.H′ hp ρ q} en
-  ...   | k′ , f , path₂ with Fins.fin-ghost hp ρ q fs lgr sn pl dp gn (healed-end ρ hl gn) L lt sg
+  ...   | k′ , f , path₂ with Fins.fin-ghost hp ρ q fs lgr (Queue.joined qu) mn (src-open ρ cl) (joined-before ρ cl) sn pl dp gn (healed-end ρ hl gn) L lt sg
   ...     | g″ , pg , sn″ , pl″ , dp″ , k″ , r , ag , pp with lifts-split ρ (in-source here) L
   ...       | _ , lifts-source {b₀ = b₀} pb _ _ , Lρ =
     landed (g″ , _ , path
@@ -620,9 +666,7 @@ module ClimbConnect (R : Set) where
       -- The subject still open as the end reaches it: every live joiner
       -- of the body waiting, open before the restage and after.
       cf : At.val hp (Subject.closed Sj) ≡ false
-      cf with At.val hp (Subject.closed Sj) | trans (sym (opened-⊕ hp true ρ (in-source here))) (calling-open (ρ ⊕ in-source here) cl)
-      ... | false | _  = refl
-      ... | true  | ()
+      cf = src-open ρ cl
       kh : Steady hp g ((idle , At.told hp Sj e) ∷ nowAt hp ρ [])
       kh (here refl) (lift f) lv rewrite proj₂ (f lv) (λ ()) | cf = refl
       kh (there x) f lv = refl

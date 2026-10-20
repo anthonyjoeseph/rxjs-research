@@ -11,7 +11,7 @@ open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym)
 
-open import denotation.MonotonicList.Events using (Pos; Tail; Tail∞; pin; idle; _<ᵖ_; _∪_; <ᵖ-asym; <ᵖ-split; <ᵖ-trans; ≮-trans)
+open import denotation.MonotonicList.Events using (Tail; Tail∞; pin; idle; _<ᵖ_; _∪_; <ᵖ-asym; <ᵖ-split; <ᵖ-trans; ≮-trans)
 open import denotation.MonotonicList using (Agreeᵀ; agreeᵀ-refl; agreeᵀ-sym; agreeᵀ-trans; stopᵀ; pin⁼)
 open import denotation.NonExpansive using (tailᴱ-ne; ∪-ne)
 import denotation.Unfold as U

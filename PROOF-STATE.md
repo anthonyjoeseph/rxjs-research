@@ -11,13 +11,22 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE REST'S TIES
 
 An ended part's rest stays twinned with what the heap keeps. Open: whether a
-settle, a close, a finish and a retag keep the parts' heads, untold sources and
-leftover, read off the old part alone. Settled when `settle-lingering` and
-`fin-shut` are bodies, or refuted and the twin restated.
+settle, a close, a next and a retag keep the parts' heads, untold sources and
+leftover, read off the old part alone. Settled when `next-lingering` and
+`settle-heads` are bodies, or refuted and the twin restated.
 
-Members: `fin-shut`, `rest-sourced`, `close-heads`,
-`close-told`, `settle-heads`, `settle-told`, `next-heads`,
-`next-lingering`, `take-leftover`, `body-leftover`, `re-leftover`.
+Members: `rest-sourced`, `close-heads`, `close-told`, `settle-heads`,
+`settle-told`, `next-heads`, `next-lingering`, `take-leftover`,
+`body-leftover`, `re-leftover`.
+
+#### JOIN ORDER
+
+Whether a source's call finds every subscriber of its connect's subject joined
+before the run's position: a field `Carried` owes, every join framing it, or
+a consequence of the agenda's placement. Settled when `joined-before` is a
+body, or the field is added and framed.
+
+Members: `joined-before`.
 
 #### THE ROOT STEP
 
