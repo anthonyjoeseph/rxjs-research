@@ -439,7 +439,7 @@ module ClimbConnect (R : Set) where
         dt ρ′ d = restful-deep (proj₂ lr) (proj₂ (proj₂ (proj₁ lr) ρ′ (Leaves.deep lc ρ′ (d⊤ ρ′ d))))
         cs : ∀ ρ′ → Deep (U.restᶜ c₀) ρ′ → ∀ n → ML.Agreeᵀ n (U.cutᴺ c₀ ρ′) (U.cutᴺ rt ρ′)
         cs ρ′ d n = tail-agreeᵀ (U.cutᴺ c₀ ρ′) (U.cutᴺ rt ρ′)
-                      (ML.agree-trans (Leaves.agree lc ρ′ (d⊤ ρ′ d) n) (ML.agree-sym (Leaves.agree (proj₁ (proj₁ lr)) ρ′ (deep-rest (dt ρ′ d)) n)))
+                      (ML.agree-trans (Leaves.agree lc ρ′ (d⊤ ρ′ d) n) (ML.agree-sym (Leaves.agree (proj₁ (proj₁ lr)) ρ′ (deep-rest {c = rt} (dt ρ′ d)) n)))
         ag : ∀ ρ′ → Deep (U.restᶜ c₀) ρ′ → ∀ n → Agree n (U.meaning (U.restᶜ c₀) ρ′) (U.meaning rt ρ′)
         ag ρ′ d n = subst (Agree n (ML.tailᴱ (U.cutᴺ c₀ ρ′))) (sym (restful-meaning (proj₂ lr) ρ′)) (tailᴱ-ne (cs ρ′ d n))
 

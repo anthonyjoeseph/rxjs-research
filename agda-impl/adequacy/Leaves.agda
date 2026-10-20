@@ -238,9 +238,9 @@ lv-trans (leaves a d p) (leaves a′ d′ p′) = leaves (λ ρ e n → agree-tr
 
 lv-union : ∀ {Γ A B} {x y : U.Node Γ A} {x′ y′ : U.Node Γ B} → Leaves x x′ → Leaves y y′ → Leaves (U.unionᶜ x y) (U.unionᶜ x′ y′)
 lv-union {x = x} {y} {x′} {y′} (leaves ax dx px) (leaves ay dy py) =
-  leaves (λ ρ e n → tailᴱ-ne (∪-ne (tail-agreeᵀ (U.cutᴺ x ρ) (U.cutᴺ x′ ρ) (ax ρ (deepR-rest (proj₁ (proj₂ e))) n))
-                                    (tail-agreeᵀ (U.cutᴺ y ρ) (U.cutᴺ y′ ρ) (ay ρ (deepR-rest (proj₂ (proj₂ e))) n))))
-         (λ ρ d → deepR-rest (proj₂ (dx ρ (deepR-rest (proj₁ (proj₂ d)))) , proj₂ (dy ρ (deepR-rest (proj₂ (proj₂ d))))))
+  leaves (λ ρ e n → tailᴱ-ne (∪-ne (tail-agreeᵀ (U.cutᴺ x ρ) (U.cutᴺ x′ ρ) (ax ρ (deepR-rest {c = x} (proj₁ (proj₂ e))) n))
+                                    (tail-agreeᵀ (U.cutᴺ y ρ) (U.cutᴺ y′ ρ) (ay ρ (deepR-rest {c = y} (proj₂ (proj₂ e))) n))))
+         (λ ρ d → deepR-rest {c = U.unionᶜ x′ y′} (proj₂ (dx ρ (deepR-rest {c = x} (proj₁ (proj₂ d)))) , proj₂ (dy ρ (deepR-rest {c = y} (proj₂ (proj₂ d))))))
          (union-pinned px py)
 
 -- A body's rest under one source.
@@ -252,32 +252,32 @@ lv-under {B = B} {B′} s {b} {b′} (leaves a d p) = leaves (ag s) (dp s) (unde
     env (U.live s₀)    ρ = U.meaning s₀ ρ ∷ᴬ ρ
     env (U.ended c _)  ρ = end c ∷ᴬ ρ
     inner : ∀ s₀ ρ → Deep (U.restᶜ {B = ⊤} (U.underᶜ {B = B} s₀ b)) ρ → Deep (U.restᶜ {B = ⊤} b) (env s₀ ρ)
-    inner (U.live s₀)  ρ (_ , _ , db) = deepR-rest db
-    inner (U.ended c t) ρ (_ , _ , db) = deepR-rest db
+    inner (U.live s₀)  ρ (_ , _ , db) = deepR-rest {c = b} db
+    inner (U.ended c t) ρ (_ , _ , db) = deepR-rest {c = b} db
     ag : ∀ s₀ ρ → Deep (U.restᶜ {B = ⊤} (U.underᶜ {B = B} s₀ b)) ρ → ∀ n → Agree n (U.meaning (U.restᶜ {B = ⊤} (U.underᶜ {B = B} s₀ b)) ρ) (U.meaning (U.restᶜ {B = ⊤} (U.underᶜ {B = B′} s₀ b′)) ρ)
     ag (U.live s₀)  ρ e n = a (env (U.live s₀) ρ) (inner (U.live s₀) ρ e) n
     ag (U.ended c t) ρ e n = a (env (U.ended c t) ρ) (inner (U.ended c t) ρ e) n
     dp : ∀ s₀ ρ → Deep (U.restᶜ {B = ⊤} (U.underᶜ {B = B} s₀ b)) ρ → Deep (U.restᶜ {B = ⊤} (U.underᶜ {B = B′} s₀ b′)) ρ
-    dp (U.live s₀)  ρ e@(_ , ds , _) = deepR-rest {c = U.underᶜ (U.live s₀) b′} (ds , proj₂ (d _ (inner (U.live s₀) ρ e)))
-    dp (U.ended c t) ρ e@(_ , dt , _) = deepR-rest {c = U.underᶜ (U.ended c t) b′} (dt , proj₂ (d _ (inner (U.ended c t) ρ e)))
+    dp (U.live s₀)  ρ e@(_ , ds , _) = deepR-rest {c = U.underᶜ {B = B′} (U.live s₀) b′} (ds , proj₂ (d _ (inner (U.live s₀) ρ e)))
+    dp (U.ended c t) ρ e@(_ , dt , _) = deepR-rest {c = U.underᶜ {B = B′} (U.ended c t) b′} (dt , proj₂ (d _ (inner (U.ended c t) ρ e)))
 
 -- A restful source's burst.
 lv-burst : ∀ {Γ A B B′} r {n n′ : U.Node Γ A} → Restful n → Restful n′ → Leaves n n′ → Leaves (U.burstingᶜ {B = B} r n) (U.burstingᶜ {B = B′} r n′)
 lv-burst {B = B} {B′} r {n} {n′} rf rf′ l@(leaves a d p) = leaves (λ ρ e m → tailᴱ-ne (bo ρ (proj₂ (proj₂ e)) m)) dp (bursts-moved r (restful-step rf rf′ p) p)
   where
     bo : ∀ ρ → Deep n ρ → ∀ m → Agreeᵀ m (M′.burstOn r (U.stateᴺ n ρ)) (M′.burstOn r (U.stateᴺ n′ ρ))
-    bo ρ dn m = burstOn-ne r (tail-agreeᵀ (U.cutᴺ n ρ) (U.cutᴺ n′ ρ) (a ρ (deep-rest dn) m) ,ˢ restful-agree rf rf′ l ρ (deep-rest dn) m)
+    bo ρ dn m = burstOn-ne r {U.stateᴺ n ρ} {U.stateᴺ n′ ρ} (tail-agreeᵀ (U.cutᴺ n ρ) (U.cutᴺ n′ ρ) (a ρ (deep-rest {c = n} dn) m) ,ˢ restful-agree rf rf′ l ρ (deep-rest {c = n} dn) m)
     dp : ∀ ρ → Deep (U.restᶜ {B = ⊤} (U.burstingᶜ {B = B} r n)) ρ → Deep (U.restᶜ {B = ⊤} (U.burstingᶜ {B = B′} r n′)) ρ
-    dp ρ (o , _ , dn) = o′ , ordered-retyped (M′.burstOn r (U.stateᴺ n′ ρ)) o′ , restful-deep rf′ (proj₂ (d ρ (deep-rest dn)))
+    dp ρ (o , _ , dn) = o′ , ordered-retyped (M′.burstOn r (U.stateᴺ n′ ρ)) o′ , restful-deep rf′ (proj₂ (d ρ (deep-rest {c = n} dn)))
       where o′ = ordered-agree (λ m → tailᴱ-ne (bo ρ dn m)) o
 
 -- A body's rest under a restful source moved.
 lv-shift : ∀ {Γ A C B B′} {n n′ : U.Node Γ A} (b : U.Node (A ∷ Γ) C) → Restful n → Restful n′ → Leaves n n′
          → Leaves (U.underᶜ {B = B} (U.live n) b) (U.underᶜ {B = B′} (U.live n′) b)
-lv-shift {B = B} {B′} {n} {n′} b rf rf′ l = leaves (λ ρ e m → tailᴱ-ne (cut-env b ρ (restful-agree rf rf′ l ρ (deep-rest (proj₁ (proj₂ e))) m))) dp (under-moved (U.live n) (U.live n′) (rest-pinned b))
+lv-shift {B = B} {B′} {n} {n′} b rf rf′ l = leaves (λ ρ e m → tailᴱ-ne (cut-env b ρ (restful-agree rf rf′ l ρ (deep-rest {c = n} (proj₁ (proj₂ e))) m))) dp (under-moved (U.live n) (U.live n′) (rest-pinned b))
   where
     dp : ∀ ρ → Deep (U.restᶜ {B = ⊤} (U.underᶜ {B = B} (U.live n) b)) ρ → Deep (U.restᶜ {B = ⊤} (U.underᶜ {B = B′} (U.live n′) b)) ρ
-    dp ρ (_ , dn , db) = deepR-rest {c = U.underᶜ (U.live n′) b} (restful-deep rf′ (proj₂ (Leaves.deep l ρ (deep-rest dn))) , deepR-env b ρ (restful-agree rf rf′ l ρ (deep-rest dn)) db)
+    dp ρ (_ , dn , db) = deepR-rest {c = U.underᶜ {B = B′} (U.live n′) b} (restful-deep rf′ (proj₂ (Leaves.deep l ρ (deep-rest {c = n} dn))) , deepR-env b ρ (restful-agree rf rf′ l ρ (deep-rest {c = n} dn)) db)
 
 ------------------------------------------------------------------------
 -- Twins: leaving alike both ways
@@ -302,14 +302,14 @@ tw-union tx ty = lv-union (proj₁ tx) (proj₁ ty) , Leaves.deep (lv-union (pro
 
 tw-under : ∀ {Γ A C D B B′} (s : U.Source Γ A) {b : U.Node (A ∷ Γ) C} {b′ : U.Node (A ∷ Γ) D}
          → Twin b b′ → Twin (U.underᶜ {B = B} s b) (U.underᶜ {B = B′} s b′)
-tw-under s t = lv-under s (proj₁ t) , Leaves.deep (lv-under s (proj₁ (tw-sym t)))
+tw-under {B = B} {B′} s t = lv-under s (proj₁ t) , Leaves.deep (lv-under {B = B′} {B′ = B} s (proj₁ (tw-sym t)))
 
 tw-burst : ∀ {Γ A B B′} r {n n′ : U.Node Γ A} → Restful n → Restful n′ → Twin n n′ → Twin (U.burstingᶜ {B = B} r n) (U.burstingᶜ {B = B′} r n′)
-tw-burst r rf rf′ t = lv-burst r rf rf′ (proj₁ t) , Leaves.deep (lv-burst r rf′ rf (proj₁ (tw-sym t)))
+tw-burst {B = B} {B′} r rf rf′ t = lv-burst r rf rf′ (proj₁ t) , Leaves.deep (lv-burst {B = B′} {B′ = B} r rf′ rf (proj₁ (tw-sym t)))
 
 tw-shift : ∀ {Γ A C B B′} {n n′ : U.Node Γ A} (b : U.Node (A ∷ Γ) C) → Restful n → Restful n′ → Twin n n′
          → Twin (U.underᶜ {B = B} (U.live n) b) (U.underᶜ {B = B′} (U.live n′) b)
-tw-shift b rf rf′ t = lv-shift b rf rf′ (proj₁ t) , Leaves.deep (lv-shift b rf′ rf (proj₁ (tw-sym t)))
+tw-shift {B = B} {B′} b rf rf′ t = lv-shift b rf rf′ (proj₁ t) , Leaves.deep (lv-shift {B = B′} {B′ = B} b rf′ rf (proj₁ (tw-sym t)))
 
 tw-if : ∀ {Γ A B} (c : Bool) {x y : U.Node Γ A} {x′ y′ : U.Node Γ B} → Twin x x′ → Twin y y′ → Twin (if c then x else y) (if c then x′ else y′)
 tw-if true  t _ = t
@@ -385,10 +385,10 @@ tw-rest x = leaves (λ ρ _ n → agree-refl n _) (λ ρ d → d) (rest-pinned x
 tw-idleʳ : ∀ {Γ A} (x : U.Node Γ A) → Twin x (U.unionᶜ x U.idleᶜ)
 tw-idleʳ x = leaves (λ ρ _ n → tailᴱ-ne (∪-unit n (U.cutᴺ x ρ))) (λ ρ d → deepR-rest {c = U.unionᶜ x U.idleᶜ} (proj₂ d , tt))
                     (pinned-sym (union-hush (rest-pinned x)))
-           , λ ρ d → deepR-rest (proj₁ (proj₂ d))
+           , λ ρ d → deepR-rest {c = x} (proj₁ (proj₂ d))
 
 tw-idleˡ : ∀ {Γ A} (y : U.Node Γ A) → Twin (U.unionᶜ U.idleᶜ y) y
-tw-idleˡ y = leaves (λ ρ _ n → agree-refl n _) (λ ρ d → deepR-rest (proj₂ (proj₂ d))) (rest-pinned y)
+tw-idleˡ y = leaves (λ ρ _ n → agree-refl n _) (λ ρ d → deepR-rest {c = y} (proj₂ (proj₂ d))) (rest-pinned y)
            , λ ρ d → deepR-rest {c = U.unionᶜ U.idleᶜ y} (tt , proj₂ d)
 
 -- A node read at another type: what it emits differs, never where.
@@ -421,13 +421,13 @@ lv-swap : ∀ {Γ A B} {x y : U.Node Γ A} {x′ y′ : U.Node Γ B} → Leaves 
 lv-swap {x = x} {y} {x′} {y′} lx@(leaves ax dx px) ly@(leaves ay dy py) = leaves ag dp (union-swap px py)
   where
     dx′ : ∀ ρ → Deep (U.restᶜ {B = ⊤} (U.unionᶜ x y)) ρ → DeepR x′ ρ
-    dx′ ρ e = proj₂ (dx ρ (deepR-rest (proj₁ (proj₂ e))))
+    dx′ ρ e = proj₂ (dx ρ (deepR-rest {c = x} (proj₁ (proj₂ e))))
     dy′ : ∀ ρ → Deep (U.restᶜ {B = ⊤} (U.unionᶜ x y)) ρ → DeepR y′ ρ
-    dy′ ρ e = proj₂ (dy ρ (deepR-rest (proj₂ (proj₂ e))))
+    dy′ ρ e = proj₂ (dy ρ (deepR-rest {c = y} (proj₂ (proj₂ e))))
     ag : ∀ ρ → Deep (U.restᶜ {B = ⊤} (U.unionᶜ x y)) ρ → ∀ n → Agree n (U.meaning (U.restᶜ {B = ⊤} (U.unionᶜ x y)) ρ) (U.meaning (U.restᶜ {B = ⊤} (U.unionᶜ y′ x′)) ρ)
     ag ρ e n = tailᴱ-ne (agreeᵀ-trans
-      (∪-ne (tail-agreeᵀ (U.cutᴺ x ρ) (U.cutᴺ x′ ρ) (ax ρ (deepR-rest (proj₁ (proj₂ e))) n))
-            (tail-agreeᵀ (U.cutᴺ y ρ) (U.cutᴺ y′ ρ) (ay ρ (deepR-rest (proj₂ (proj₂ e))) n)))
+      (∪-ne (tail-agreeᵀ (U.cutᴺ x ρ) (U.cutᴺ x′ ρ) (ax ρ (deepR-rest {c = x} (proj₁ (proj₂ e))) n))
+            (tail-agreeᵀ (U.cutᴺ y ρ) (U.cutᴺ y′ ρ) (ay ρ (deepR-rest {c = y} (proj₂ (proj₂ e))) n)))
       (∪-comm n (U.cutᴺ x′ ρ) (U.cutᴺ y′ ρ) (deep-cutR x′ (dx′ ρ e)) (deep-cutR y′ (dy′ ρ e))))
     dp : ∀ ρ → Deep (U.restᶜ {B = ⊤} (U.unionᶜ x y)) ρ → Deep (U.restᶜ {B = ⊤} (U.unionᶜ y′ x′)) ρ
     dp ρ e = deepR-rest {c = U.unionᶜ y′ x′} (dy′ ρ e , dx′ ρ e)

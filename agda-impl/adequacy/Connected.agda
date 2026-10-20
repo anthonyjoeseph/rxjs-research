@@ -32,7 +32,6 @@ open import denotation.MonotonicList.Events using (Timeline; Frame; From; Pos; i
 open import denotation.MonotonicList.Events using () renaming (sub to subᴾ)
 import Tree as T
 open import denotation.MonotonicList using (agree-refl)
-open import adequacy.Deep using (deepR-rest)
 import denotation.Unfold as U
 open import operation.Machine using (module Machine)
 open import operation.PureObservable using (Out; Pureᴾ)
@@ -336,10 +335,10 @@ module Connecting (R : Set) where
     connect-lingers : Lingers H₅ T₅ → Lingers H₅ t′
     connect-lingers = lingers-plant H₅ π₅ v refl
       (λ {C} → leaves (λ ρ _ m → agree-refl m _)
-                      (λ ρ d → deepR-rest ((proj₁ (proj₂ (proj₂ d)) , proj₂ (proj₂ (proj₂ d))) , proj₂ (proj₂ (proj₂ d)) , proj₁ (proj₂ d)))
+                      (λ ρ d → proj₁ d , (proj₁ (proj₂ (proj₂ d)) , proj₂ (proj₂ (proj₂ d))) , proj₂ (proj₂ (proj₂ d)) , proj₁ (proj₂ d))
                       (union-pinned (bursts-pinned (q ++ [ ix 1 ]) (U.subscribe s (q ++ [ ix 1 ])) (U.step (U.subscribe s (q ++ [ ix 1 ]))))
                                     (under-moved (U.live (U.subscribe s (q ++ [ ix 1 ]))) (U.live (U.subscribe s (q ++ [ ix 1 ]))) (rest-pinned (U.subscribe b (q ++ [ ix 0 ])))))
-             , λ ρ d → deepR-rest (proj₂ (proj₂ (proj₂ d)) , proj₁ (proj₁ (proj₂ d)) , proj₂ (proj₁ (proj₂ d))))
+             , λ ρ d → proj₁ d , proj₂ (proj₂ (proj₂ d)) , proj₁ (proj₁ (proj₂ d)) , proj₂ (proj₁ (proj₂ d)))
       (record { pools = λ { (in-source ()) ; (in-body ()) } ; rests = λ { here _ _ _ () ; (in-source ()) ; (in-body ()) } })
 
     connect-flags : DoneBy H₅ T₅ [] → DoneBy H₅ t′ []

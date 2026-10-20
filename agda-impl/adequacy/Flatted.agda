@@ -31,7 +31,6 @@ open import denotation.MonotonicList.Events using (Timeline; Frame; From; Pos; i
 open import denotation.MonotonicList.Events using () renaming (sub to subᴾ)
 import Tree as T
 open import denotation.MonotonicList using (agree-refl)
-open import adequacy.Deep using (deepR-rest)
 import denotation.Unfold as U
 open import operation.Machine using (module Machine)
 open import operation.PureObservable using (Out; Pureᴾ)
@@ -314,8 +313,8 @@ module Flatting (R : Set) where
         where
           -- Pending its outer, the flatMap runs what its outer runs.
           tie : ∀ {C} → Twin (U.restᶜ {B = C} (U.subscribe (T.flatMap op f s) q)) (U.unionᶜ (U.restᶜ {B = C} (U.subscribe s q)) U.idleᶜ)
-          tie = leaves (λ ρ _ n → agree-refl n _) (λ ρ d → deepR-rest (proj₁ (proj₂ d) , tt)) (union-pinned (rest-pinned (U.subscribe s q)) unpinned)
-              , λ ρ d → deepR-rest (proj₁ (proj₂ d) , tt , tt)
+          tie = leaves (λ ρ _ n → agree-refl n _) (λ ρ d → proj₁ d , proj₁ (proj₂ d) , tt) (union-pinned (rest-pinned (U.subscribe s q)) unpinned)
+              , λ ρ d → proj₁ d , proj₁ (proj₂ d) , tt , tt
 
       -- Its outer pending, its flag reads it running.
       rf-flags : DoneBy H₉ T₈ [] → DoneBy H₉ t′ []
