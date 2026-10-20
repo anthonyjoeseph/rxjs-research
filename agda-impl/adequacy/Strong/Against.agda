@@ -680,14 +680,6 @@ module StrongAgainst (R : Set) where
           deep  : ∀ (ρ : U.NEnv Γ) → Deep (U.restᶜ {B = ⊤} x) ρ → Deep (U.restᶜ {B = ⊤} y) ρ
           deep⁻ : ∀ (ρ : U.NEnv Γ) → Deep (U.restᶜ {B = ⊤} y) ρ → Deep (U.restᶜ {B = ⊤} x) ρ
 
-  -- A node that runs only what it leaves: its meaning its cut's tail.
-  data Restful {Γ A} : U.Node Γ A → Set₁ where
-    rest-r  : ∀ {X} {n : U.Node Γ X} → Restful (U.restᶜ n)
-    idle-r  : Restful U.idleᶜ
-    union-r : ∀ {x y : U.Node Γ A} → Restful (U.unionᶜ x y)
-    burst-r : ∀ {X r} {t : U.Node Γ X} → Restful (U.burstingᶜ r t)
-    under-r : ∀ {X C} {s : U.Source Γ X} {b : U.Node (X ∷ Γ) C} → Restful (U.underᶜ s b)
-
   -- WHAT THE GHOST HOLDS LEAVES WHAT THE HEAP WOULD: below `t`, each seen
   -- part, a held flatMap's pool and a held connect's ended source's rest
   -- each leave what the witness reads off as their leftover, to every

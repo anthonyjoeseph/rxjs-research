@@ -85,7 +85,7 @@ module ClimbConnect (R : Set) where
   open SortingWalk R using (WellMach)
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
   open Strongly R using (Feed; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; joiner; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; here; module At; fired; Path; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; ending; taken; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; outers; outersL; outers-⊕; unsub; Owes; Settled; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
-  open StrongAgainst R using (Leaving; Leaves; Restful; rest-r; idle-r; union-r; burst-r; under-r; Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
+  open StrongAgainst R using (Leaving; Leaves; Restful; rf-rest; rf-idle; rf-union; rf-burst; rf-under; Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
   open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering)
   open StrongAgainst.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf; src-of) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
@@ -162,18 +162,18 @@ module ClimbConnect (R : Set) where
   atop-tail k (Ev.pin _ _) a = a
   atop-tail k Ev.idle      a = a
 
-  ordered-tail : ∀ {A B} (t : Ev.Tail) → Ordered (ML.tailᴱ {A} t) → Ordered (ML.tailᴱ {B} t)
-  ordered-tail (Ev.pin k r) o .ordered = atop-tail k (Ev.Tail∞.later r) (proj₁ (ordered o)) , ordered-tail (Ev.Tail∞.later r) (proj₂ (ordered o))
-  ordered-tail Ev.idle      o .ordered = tt
+  ordered-retyped : ∀ {A B} (t : Ev.Tail) → Ordered (ML.tailᴱ {A} t) → Ordered (ML.tailᴱ {B} t)
+  ordered-retyped (Ev.pin k r) o .ordered = atop-tail k (Ev.Tail∞.later r) (proj₁ (ordered o)) , ordered-retyped (Ev.Tail∞.later r) (proj₂ (ordered o))
+  ordered-retyped Ev.idle      o .ordered = tt
 
   -- A restful node's meaning is its cut's tail.
   restful-meaning : ∀ {Γ A} {t : U.Node Γ A} → Restful t → ∀ ρ → U.meaning t ρ ≡ ML.tailᴱ (U.cutᴺ t ρ)
-  restful-meaning rest-r                      ρ = refl
-  restful-meaning idle-r                      ρ = refl
-  restful-meaning union-r                     ρ = refl
-  restful-meaning burst-r                     ρ = refl
-  restful-meaning (under-r {s = U.live _})    ρ = refl
-  restful-meaning (under-r {s = U.ended _ _}) ρ = refl
+  restful-meaning rf-rest                     ρ = refl
+  restful-meaning rf-idle                     ρ = refl
+  restful-meaning rf-union                    ρ = refl
+  restful-meaning rf-burst                    ρ = refl
+  restful-meaning (rf-under {s = U.live _})   ρ = refl
+  restful-meaning (rf-under {s = U.ended _ _}) ρ = refl
 
 
   -- A CONNECT'S FEED RESTAGED IN PLACE: the source alike, the body
@@ -466,7 +466,7 @@ module ClimbConnect (R : Set) where
         ag : ∀ ρ′ n → Agree n (U.meaning (U.restᶜ c₀) ρ′) (U.meaning rt ρ′)
         ag ρ′ n = subst (Agree n (ML.tailᴱ (U.cutᴺ c₀ ρ′))) (sym (restful-meaning (proj₂ lr) ρ′)) (tailᴱ-ne (cuts ρ′ n))
         dt : ∀ ρ′ → Deep (U.restᶜ c₀) ρ′ → Deep rt ρ′
-        dt ρ′ d = proj₂ (Leaves.deep⁻ (proj₁ lr) ρ′ (Leaves.deep lc ρ′ (ordered-tail (U.cutᴺ c₀ ρ′) (proj₁ d) , proj₂ d)))
+        dt ρ′ d = proj₂ (Leaves.deep⁻ (proj₁ lr) ρ′ (Leaves.deep lc ρ′ (ordered-retyped (U.cutᴺ c₀ ρ′) (proj₁ d) , proj₂ d)))
 
     fin-part : AllPairs _≢_ (names (connectˢ Sj c b kb k idle rp e rt u bd)) → At.part (store H (Subject.closed Sj) (lift true)) (connectˢ Sj c b kb k idle rp e rt u bd) ≡ At.part H (connectˢ Sj c b kb k idle rp e rt u bd)
     fin-part fr = trans (cong₂ (At.connected H′ rp e rt) (part-alike H H′ u (fin-au fr)) (part-alike H H′ bd (fin-ab fr)))
