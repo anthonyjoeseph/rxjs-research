@@ -28,6 +28,7 @@ open import operation.PureObservable using (Pureᴾ; Out; note; module Pure)
 open import operation.Machine using (module Machine)
 import denotation.Unfold as U
 open import adequacy.Placed.Order using () renaming (Placed to Placedᵍ)
+open import adequacy.Deep using (Deep)
 open import adequacy.Sorted.Walk using (module SortingWalk)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import adequacy.Strong using (module Strongly)
@@ -671,10 +672,21 @@ module StrongAgainst (R : Set) where
             → At.part H src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Tied rt (At.leftover H {B = ⊤} src)
 
   -- Two nodes leaving alike: what each still runs past an unsubscribe,
-  -- under every environment, the same at every depth.
+  -- under every environment, the same at every depth, and in order
+  -- exactly when the other is.
   record Leaves {Γ A B} (x : U.Node Γ A) (y : U.Node Γ B) : Set₁ where
     constructor leaves
     field agree : ∀ (ρ : U.NEnv Γ) n → Agree n (U.meaning (U.restᶜ {B = ⊤} x) ρ) (U.meaning (U.restᶜ {B = ⊤} y) ρ)
+          deep  : ∀ (ρ : U.NEnv Γ) → Deep (U.restᶜ {B = ⊤} x) ρ → Deep (U.restᶜ {B = ⊤} y) ρ
+          deep⁻ : ∀ (ρ : U.NEnv Γ) → Deep (U.restᶜ {B = ⊤} y) ρ → Deep (U.restᶜ {B = ⊤} x) ρ
+
+  -- A node that runs only what it leaves: its meaning its cut's tail.
+  data Restful {Γ A} : U.Node Γ A → Set₁ where
+    rest-r  : ∀ {X} {n : U.Node Γ X} → Restful (U.restᶜ n)
+    idle-r  : Restful U.idleᶜ
+    union-r : ∀ {x y : U.Node Γ A} → Restful (U.unionᶜ x y)
+    burst-r : ∀ {X r} {t : U.Node Γ X} → Restful (U.burstingᶜ r t)
+    under-r : ∀ {X C} {s : U.Source Γ X} {b : U.Node (X ∷ Γ) C} → Restful (U.underᶜ s b)
 
   -- WHAT THE GHOST HOLDS LEAVES WHAT THE HEAP WOULD: below `t`, each seen
   -- part, a held flatMap's pool and a held connect's ended source's rest
@@ -689,7 +701,7 @@ module StrongAgainst (R : Set) where
       rests : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
             → (ψ : Path t (connectˢ S c b kb k fd rp e rt src bd)) → seen H ψ ≡ true
             → ∀ {n} → At.part H (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
-            → At.part H src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Leaves rt (At.leftover H {B = ⊤} src)
+            → At.part H src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Leaves rt (At.leftover H {B = ⊤} src) × Restful rt
 
   -- WHAT HOLDS BELOW A HELD NODE, NODE BY NODE: each node's obligation
   -- once it is held, each child held as its parent is and its step

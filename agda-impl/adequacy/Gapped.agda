@@ -23,6 +23,7 @@ open import Relation.Binary.PropositionalEquality using (refl)
 
 open import denotation.MonotonicList.Events using (Pos; _<ᵖ_)
 import denotation.Unfold as U
+open import denotation.MonotonicList using (Agree; Agreeᵀ)
 open import adequacy.Sorted using (_≤ᵖ_)
 open import adequacy.Sane using (Sane; allLive)
 open import adequacy.Deep using (Deep)
@@ -91,6 +92,9 @@ module Gapping (R : Set) where
     data GappedS (κ : Pos) {Δ A} : U.Source Δ A → U.Source Δ A → Set₁ where
       gap-live  : ∀ {s s′} → Gapped κ s s′ → GappedS κ (U.live s) (U.live s′)
       gap-ended : ∀ {c t t′} → Gapped κ t t′ → GappedS κ (U.ended c t) (U.ended c t′)
+      -- An ended source's rest tied in meaning and in order, not in form.
+      gap-tied  : ∀ {c t t′} → (∀ ρ n → Agree n (U.meaning t ρ) (U.meaning t′ ρ)) → (∀ ρ n → Agreeᵀ n (U.cutᴺ t ρ) (U.cutᴺ t′ ρ))
+                → (∀ ρ → Deep t ρ → Deep t′ ρ) → GappedS κ (U.ended c t) (U.ended c t′)
 
   gapM-refl : ∀ {κ Δ A} (o : Maybe (U.Node Δ A)) → GappedM κ o o
   gapM-refl nothing  = gap-nothing

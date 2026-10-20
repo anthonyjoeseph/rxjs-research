@@ -190,10 +190,10 @@ by their own silent steps (`Mirror`).
 - **THE FREE SOURCE.** `Lefts` ties each free node of a lift to its
   node's leftover once its child's step ends, the only step a free node
   reaches the ghost through; an end climbs no source, so a write the end's
-  leftover keeps (`Stays.left`) keeps every tie. Owed: `lefts-planted`
-  and `lefts-grow` the same way, over a plant's leftover; then whether the
-  tie makes `fin-ghost` a lift. The restage cells are the same question:
-  close/settle/next pool the free node `Lefts` ties.
+  leftover keeps (`Stays.left`) keeps every tie, and the tie, order
+  included, makes a source's end a lift up to `fin-shut`. Owed:
+  `lefts-planted` and `lefts-grow` the same way, over a plant's leftover;
+  then the restage cells, which pool the free node `Lefts` ties.
 - **NODE FACTS, FALSITY FIRST.** Only now discharge: the node facts the
   fold left, riskiest first, then the per-move facts no column holds.
 - **HIDDEN RUNS.** Parked behind the fold. The core: `pooled-pin`,
@@ -309,9 +309,8 @@ by their own silent steps (`Mirror`).
   body keeps a part; `part-retag` wants `Steady`, held only at the call site.
 - **`retag-fed`** (Climbs.Connect) — FALSITY, `NO EVIDENCE`: the retagged
   body's part is the body's part fed the value, gapped up to the feed.
-- **`fin-ghost`** (Climbs.Connect) — FALSITY, `DEAD ROUTE`: the tree with a
-  finish staged, its end staged on the way up, has a sane, placed part, the
-  ghost past the source's skip.
+- **`fin-shut`** (Climbs.Connect) — FALSITY, `NO EVIDENCE`: the body retagged
+  to the finish keeps a part, shut as the ghost's is, but for gaps.
 - **`emit-shut`** (Lift) — FALSITY, `NO EVIDENCE`: an `of` whose observer path
   is closed skips its value or its end.
 - **`sub-cold`** (Lift) — FALSITY, `NO EVIDENCE`: a cold begun registers its
