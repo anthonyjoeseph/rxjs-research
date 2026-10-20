@@ -697,7 +697,7 @@ module ShiftWalk (R : Set) where
                                          (U.underᶜ (U.live (At.sourced H (At.part H src) (At.leftover H src))) x))
                         (U.unionᶜ {B = B} (U.burstingᶜ rp (At.sourced H′ (At.part H′ (plant π v)) (At.leftover H′ (plant π v))))
                                          (U.underᶜ (U.live (At.sourced H′ (At.part H′ (plant π v)) (At.leftover H′ (plant π v)))) x′))
-      src-rested {src = src} π rp up lb nothing nothing p p′ rewrite p | p′ =
+      src-rested {src = src} π rp {x = x} up lb nothing nothing p p′ rewrite p | p′ =
         tw-union (tw-burst rp (leftover-restful H src) (leftover-restful H′ (plant π v)) up)
                  (subst (λ z → Twin (U.underᶜ (U.live (At.leftover H src)) x) (U.underᶜ (U.live (At.leftover H′ (plant π v))) z)) (sym lb)
                    (tw-shift x (leftover-restful H src) (leftover-restful H′ (plant π v)) up))
