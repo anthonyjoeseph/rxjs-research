@@ -16,7 +16,7 @@ leftover, read off the old part alone. Settled when `settle-lingering` and
 `fin-shut` are bodies, or refuted and the twin restated.
 
 Members: `fin-shut`, `rest-sourced`, `close-heads`,
-`close-told`, `settle-heads`, `settle-lingering`, `settle-told`, `next-heads`,
+`close-told`, `settle-heads`, `settle-told`, `next-heads`,
 `next-lingering`, `take-leftover`, `body-leftover`, `re-leftover`.
 
 #### THE ROOT STEP
