@@ -61,7 +61,7 @@ module Scanning (R : Set) where
   open Heap using (World; _⊑_; _⨾_; there; new; cell) renaming (here to hereʳ)
   open Run (Pureᴾ R) using (done; compile; Env; wkEnv; wkObs; wkKont)
   open Strongly R using (Sub; pendingˢ; Path; here; in-scan; _⊕_; Here; walk; top; _≗_; module At; names; pendings; Phase; scanˢ; newRef≗; module Canon)
-  open StrongAgainst R using (Leaving; Books; Job; Kernels; Meaning; Queue; Each; Lingers; rest-pinned; seen; owned-to)
+  open StrongAgainst R using (Twin; tw-refl; Books; Job; Kernels; Meaning; Queue; Each; Lingers; rest-pinned; seen; owned-to)
   open StrongHeld R using (Carried; Heads; DoneBy; module Eaching; module Lingering)
   open StrongAgainst.Against R using (subAs; SrcOf; src-of)
   open Moving R using (planted; pend; part-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant; head-scan)
@@ -159,10 +159,7 @@ module Scanning (R : Set) where
 
       -- A scan runs what its source runs.
       rs-lingers : Lingers H′ T₁ → Lingers H′ t′
-      rs-lingers = lingers-plant H′ π₁ v eqv (λ {C} → rest-pinned (U.restᶜ {B = C} (U.subscribe s q))) (record { pools = λ { (in-scan ()) } ; rests = λ { (in-scan ()) } })
-
-      postulate
-        rs-leaving : Leaving H′ T₁ → Leaving H′ t′
+      rs-lingers = lingers-plant H′ π₁ v eqv (λ {C} → tw-refl (U.restᶜ {B = C} (U.subscribe s q))) (record { pools = λ { (in-scan ()) } ; rests = λ { (in-scan ()) } })
 
       rs-flags : DoneBy H′ T₁ [] → DoneBy H′ t′ []
       rs-flags = flags-plant H′ π₁ v eqv (λ { (in-scan ()) })
@@ -202,8 +199,7 @@ module Scanning (R : Set) where
                               ; clocked = proj₁ (Books.clocked bk) , S.reticked sk₁ a₁ (G.grow-ticked sk (proj₂ (Books.clocked bk)))
                               ; paidUp = cong (mapList (wkTodo new)) (Books.paidUp bk) ; running = Books.running bk }
              ; sorted = sorted-⇝ (Carried.sorted cr) (then refl now) ; behind′ = Eaching.each-to _ _ (S.rs-behind H′ eqv (G′.grow-each gr (Carried.behind cr)))
-             ; lingers′ = Lingering.lingers-to _ (S.rs-lingers H′ eqv (G′.grow-lingers gr (Carried.lingers cr))) ; leaving = S.rs-leaving H′ eqv (G′.grow-leaving gr (Carried.leaving cr))
-             ; flags = S.rs-flags H′ eqv (G′.grow-flags gr (Carried.flags cr)) }
+             ; lingers′ = Lingering.lingers-to _ (S.rs-lingers H′ eqv (G′.grow-lingers gr (Carried.lingers cr))) ; flags = S.rs-flags H′ eqv (G′.grow-flags gr (Carried.flags cr)) }
     , refl , inj₁ (inj₁ S.less)
     where module S = Scanned {f = f} {z = z} {s = s} π
           module G = Grown S.ν

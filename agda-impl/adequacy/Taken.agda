@@ -69,7 +69,7 @@ module Taking (R : Set) where
   open Heap using (World; _⊑_; _⨾_; there; new; grow; cell) renaming (here to hereʳ; same to same⊑)
   open Run (Pureᴾ R) using (Act; done; newRef; under; _>>ᴬ_; compile; Env; wkEnv; module Kit; Ref; wkR; Kont; wkObs)
   open Strongly R using (Sub; pendingˢ; takeWhileˢ; Path; here; in-take; _⊕_; Here; walk; top; _≗_; module At; names; pendings; Phase; ≗-refl; newRef≗; taking; takeK; unsubscribing; under≗; module Canon)
-  open StrongAgainst R using (Leaving; Books; Job; Owned; Kernels; Meaning; Queue; Each; Lingers; rest-pinned; seen; owned-to)
+  open StrongAgainst R using (Twin; tw-refl; Books; Job; Owned; Kernels; Meaning; Queue; Each; Lingers; rest-pinned; seen; owned-to)
   open StrongHeld R using (Carried; Heads; DoneBy; module Eaching; module Lingering)
   open StrongAgainst.Against R using (StackAs; subAs; SrcOf; src-of)
   open Moving R using (planted; pend; part-plant; holds-owed; fed-plant; pendings-plant; subjects-plant; joiners-plant)
@@ -209,10 +209,7 @@ module Taking (R : Set) where
 
       -- A take runs what its source runs.
       rt-lingers : Lingers H′ T₂ → Lingers H′ t′
-      rt-lingers = lingers-plant H′ π₂ v eqv (λ {C} → rest-pinned (U.restᶜ {B = C} (U.subscribe s q))) (record { pools = λ { (in-take ()) } ; rests = λ { (in-take ()) } })
-
-      postulate
-        rt-leaving : Leaving H′ T₂ → Leaving H′ t′
+      rt-lingers = lingers-plant H′ π₂ v eqv (λ {C} → tw-refl (U.restᶜ {B = C} (U.subscribe s q))) (record { pools = λ { (in-take ()) } ; rests = λ { (in-take ()) } })
 
       rt-flags : DoneBy H′ T₂ [] → DoneBy H′ t′ []
       rt-flags = flags-plant H′ π₂ v eqv (λ { (in-take ()) })
@@ -257,8 +254,7 @@ module Taking (R : Set) where
                               ; paidUp = cong (mapList (wkTodo new)) (cong (mapList (wkTodo new)) (Books.paidUp bk)) ; running = Books.running bk }
              ; sorted = sorted-⇝ (Carried.sorted cr) (then refl (then (cong (λ x → step (Mx x)) e₁) now))
              ; behind′ = Eaching.each-to _ _ (S.rt-behind H₂ eqv refl (pos-headed cr) (G₂′.grow-each gr₂ (G₁′.grow-each gr₁ (Carried.behind cr))))
-             ; lingers′ = Lingering.lingers-to _ (S.rt-lingers H₂ eqv refl (G₂′.grow-lingers gr₂ (G₁′.grow-lingers gr₁ (Carried.lingers cr)))) ; leaving = S.rt-leaving H₂ eqv refl (G₂′.grow-leaving gr₂ (G₁′.grow-leaving gr₁ (Carried.leaving cr)))
-             ; flags = S.rt-flags H₂ eqv refl (G₂′.grow-flags gr₂ (G₁′.grow-flags gr₁ (Carried.flags cr))) }
+             ; lingers′ = Lingering.lingers-to _ (S.rt-lingers H₂ eqv refl (G₂′.grow-lingers gr₂ (G₁′.grow-lingers gr₁ (Carried.lingers cr)))) ; flags = S.rt-flags H₂ eqv refl (G₂′.grow-flags gr₂ (G₁′.grow-flags gr₁ (Carried.flags cr))) }
     , refl , inj₁ (inj₁ S.less)
     where module S = Taken {i = i} {p = p} {s = s} π
           module G₁ = Grown S.ν₁

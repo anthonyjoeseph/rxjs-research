@@ -87,7 +87,7 @@ module Ascending (R : Set) where
   open SortingWalk R using (WellMach)
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
   open Strongly R using (Feed; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; joiner; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; here; module At; fired; Path; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; ending; taken; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; outers; outersL; outers-⊕; unsub; Owes; Settled; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
-  open StrongAgainst R using (Leaving; Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
+  open StrongAgainst R using (Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
   open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering)
   open StrongAgainst.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf; src-of) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
@@ -105,7 +105,7 @@ module Ascending (R : Set) where
   open GhostingPaths R using (each-sub; each-lanes; module Far; module Calling; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; done-up; Healed; HealedL; healed-split; healed-end; lifts-seen; Rises; rises; Called; landed; rose; Aloft; aloft; hop-sorted; each-back; hopped-pre; lefts-up; lefts-subst; lefts-subst₂)
   open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed; gapped-deep)
   open Lowering R using (Keeps; queue-keeps; store-keeps; keeps-trans)
-  open Lifting R using (emit-shut; emit-run; spread-past; behind-fire; fire-lingers; fire-leaving; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward)
+  open Lifting R using (emit-shut; emit-run; spread-past; behind-fire; fire-lingers; kont-onward; feed-onward; src-onward; burst-poll; burst-play; cut-onward)
   open LiftingOrder R using (sub-onward; emit-void; run-meets; run-at; heads-lift)
   open Locality R using (stored-at; stored-hit; live-apart; flatReads; cut-in; module Heaps)
   open Growing R using (wkTree; wkLanes; wkPath; wkPathᴸ)
@@ -135,13 +135,13 @@ module Ascending (R : Set) where
   call-root : ∀ {g m} (st : Strong g m) {ℓ m₁} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {sg : Signal T R} → Calling g ℓ m₁ {T = T} here sg → Hopped st m₁
   call-root {g} st {m₁ = mach ⟨ hp , p , _ ⟩ clk ts bs td lg en mk} {T} {sends y}
     record { sane = sn ; placed = pl ; deep = dp ; ctl = refl ; code = eff≗ ke ; stack = sk ; lifted = c′ , pv , _ , lifts-here , sg ; owned = ow
-           ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = refl } ; sorted = so ; behind = bh ; lingers = lgr ; leaving = lvg ; flags = dn } =
+           ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = refl } ; sorted = so ; behind = bh ; lingers = lgr ; flags = dn } =
     g , _ , then refl now
     , carried (record
         { sane = sn ; placed = pl ; deep = dp ; tree = T ; ctlAs = noteAs [] (ke tt) sk ; meets = c′ , pv , sg
         ; owned′ = owned-to (owned-move hp (noteAs [] (ke tt) sk) refl refl refl ow) ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = refl } 
-        ; sorted = sorted-⇝ so (then refl now) ; behind′ = Eaching.each-to _ _ bh ; lingers′ = Lingering.lingers-to _ lgr ; leaving = lvg ; flags = dn })
+        ; sorted = sorted-⇝ so (then refl now) ; behind′ = Eaching.each-to _ _ bh ; lingers′ = Lingering.lingers-to _ lgr ; flags = dn })
     , showing (agrees (λ n → agree-refl n _)) (λ ())
   call-root {g} st {m₁ = mach ⟨ hp , p , _ ⟩ clk ts bs td lg en mk} {sg = closes _}
     record { sane = sn ; placed = pl ; ctl = refl ; code = eff≗ _ ; lifted = _ , _ , lifts-here , sg , _ ; books = record { running = refl } } =
@@ -297,7 +297,7 @@ module Ascending (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = t ; ctlAs = calmAs ; meets = mt
         ; owned′ = owned-to (owned-move hp calmAs refl refl refl (Carried.owned cr)) ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr refl (then refl now) ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; leaving = Carried.leaving cr ; flags = Carried.flags cr })
+        ; sorted = hop-sorted cr refl (then refl now) ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; flags = Carried.flags cr })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , ≤-refl))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (restAs ks e K″) ; meets = mt ; kernels = kn ; meaning = mn ; queue = qu
@@ -307,7 +307,7 @@ module Ascending (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = t ; ctlAs = runAs ks e K″ ; meets = mt
         ; owned′ = owned-to (owned-move hp (runAs ks e K″) refl refl refl (Carried.owned cr)) ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr refl (then refl now) ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; leaving = Carried.leaving cr ; flags = Carried.flags cr })
+        ; sorted = hop-sorted cr refl (then refl now) ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; flags = Carried.flags cr })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , ≤-refl))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (backAs q ks qp e K″) ; meets = mt ; kernels = kn ; meaning = mn ; queue = qu
@@ -319,7 +319,7 @@ module Ascending (R : Set) where
         ; queue = record { timed = Queue.timed qu ; joined = Queue.joined qu ; ordered = Queue.ordered qu
                          ; ahead = map (λ { (c , a) → c , <ᵖ-trans q p _ qp a }) (Queue.ahead qu) }
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr refl (then refl now) ; behind′ = Eaching.each-to _ _ (each-back qp (Carried.behind cr)) ; lingers′ = Carried.lingers′ cr ; leaving = Carried.leaving cr ; flags = Carried.flags cr })
+        ; sorted = hop-sorted cr refl (then refl now) ; behind′ = Eaching.each-to _ _ (each-back qp (Carried.behind cr)) ; lingers′ = Carried.lingers′ cr ; flags = Carried.flags cr })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , ≤-refl))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs (playsAs π) hᴷ K″) ; meets = mt ; kernels = kn ; meaning = mn ; queue = qu
@@ -329,7 +329,7 @@ module Ascending (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = t ; ctlAs = burstAs (playsAs π) hᴷ K″ ; meets = mt
         ; owned′ = owned-to (owned-move hp (burstAs (playsAs π) hᴷ K″) refl refl refl (Carried.owned cr)) ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr refl (then refl now) ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; leaving = Carried.leaving cr ; flags = Carried.flags cr })
+        ; sorted = hop-sorted cr refl (then refl now) ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; flags = Carried.flags cr })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , m<n⇒m<1+n ≤-refl))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs (firesAs π) hᴷ K″) ; meets = mt ; kernels = kn ; meaning = mn ; queue = qu
@@ -339,7 +339,7 @@ module Ascending (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = t ; ctlAs = burstAs (firesAs π) hᴷ K″ ; meets = mt
         ; owned′ = owned-to (owned-move hp (burstAs (firesAs π) hᴷ K″) refl refl refl (Carried.owned cr)) ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr refl (then refl now) ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; leaving = Carried.leaving cr ; flags = Carried.flags cr })
+        ; sorted = hop-sorted cr refl (then refl now) ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; flags = Carried.flags cr })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , m<n⇒m<1+n ≤-refl))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs overAs bottomᴴ bottomAs) ; meets = mt ; kernels = kn ; meaning = mn ; queue = qu
@@ -349,7 +349,7 @@ module Ascending (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = t ; ctlAs = calmAs ; meets = mt
         ; owned′ = owned-to (owned-move hp calmAs refl refl refl (Carried.owned cr)) ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr refl (then refl (then refl now)) ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; leaving = Carried.leaving cr ; flags = Carried.flags cr })
+        ; sorted = hop-sorted cr refl (then refl (then refl now)) ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; flags = Carried.flags cr })
     , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (refl , inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))))
   run-onward {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk}
     cr@record { tree = t ; ctlAs = runAs [] (done≗ refl) (reholdAs overAs restᴴ (restAs ks e K‴)) ; meets = mt ; kernels = kn ; meaning = mn
@@ -359,7 +359,7 @@ module Ascending (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = t ; ctlAs = runAs ks e K‴ ; meets = mt
         ; owned′ = owned-to (owned-move hp (runAs ks e K‴) refl refl refl (Carried.owned cr)) ; kernels = kn ; meaning = mn ; queue = qu
         ; books = record { fresh = fs ; clocked = proj₂ (proj₂ ck) ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr refl (then refl (then refl now)) ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; leaving = Carried.leaving cr ; flags = Carried.flags cr })
+        ; sorted = hop-sorted cr refl (then refl (then refl now)) ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; flags = Carried.flags cr })
     , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (refl , inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))))
 
   -- Past a value recorded, the run runs the stepped ghost: the record's
@@ -381,7 +381,7 @@ module Ascending (R : Set) where
         ; kernels = Carried.kernels cr ; meaning = Carried.meaning cr ; queue = Carried.queue cr
         ; books = record { fresh = Books.fresh (Carried.books cr) ; clocked = Books.clocked (Carried.books cr)
                          ; paidUp = Books.paidUp (Carried.books cr) ; running = refl } 
-        ; sorted = sorted-value (Carried.sorted cr) refl ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; leaving = Carried.leaving cr ; flags = Carried.flags cr })
+        ; sorted = sorted-value (Carried.sorted cr) refl ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; flags = Carried.flags cr })
 
   -- A popped timer's burst, spent, dropped: the turn again.
   drop-spent : ∀ {h} {hp : Heapᴹ h} {p w} {σ : w ⊑ h} {ts lg en mk} (tm : Timer h)
@@ -432,7 +432,7 @@ module Ascending (R : Set) where
         ; queue = record { timed = timed-spent {H = hp} sp (Queue.timed q) ; joined = Queue.joined q
                          ; ordered = tail (Queue.ordered q) ; ahead = ahead-pop {p = p} (Queue.ordered q) (Queue.ahead q) }
         ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr refl (then (drop-spent tm sp) now) ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; leaving = Carried.leaving cr ; flags = Carried.flags cr })
+        ; sorted = hop-sorted cr refl (then (drop-spent tm sp) now) ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; flags = Carried.flags cr })
     , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (refl , inj₂ (refl , inj₁ ≤-refl))))
   ... | false with proj₁ (Queue.timed q)
   ...   | inj₁ s ∷ _ = ⊥-elim (true≢false (trans (sym s) sp))
@@ -452,8 +452,7 @@ module Ascending (R : Set) where
                          ; joined = subst₂ (At.Joined hp) (sym (subjects-plant {t = t} π v refl)) (sym (joiners-plant {t = t} π v (λ _ → refl) _)) (Queue.joined q)
                          ; ordered = tail (Queue.ordered q) ; ahead = ahead-pop {p = p} (Queue.ordered q) (Queue.ahead q) }
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = t} π v refl)) fs ; clocked = refl , tt ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr refl now ; behind′ = Eaching.each-to _ _ (behind-fire cr π) ; lingers′ = Lingering.lingers-to _ (fire-lingers cr π) ; leaving = fire-leaving cr π
-        ; flags = flags-swap hp π v refl (λ ()) (Carried.flags cr) })
+        ; sorted = hop-sorted cr refl now ; behind′ = Eaching.each-to _ _ (behind-fire cr π) ; lingers′ = Lingering.lingers-to _ (fire-lingers cr π) ; flags = flags-swap hp π v refl (λ ()) (Carried.flags cr) })
     , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (pend-plant {t = t} π v refl , inj₂ (takes-plant {t = t} π v refl , inj₁ ≤-refl))))
     where v = coldˢ sk hd (fired τ e (at u x fr))
 

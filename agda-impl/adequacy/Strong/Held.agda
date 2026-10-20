@@ -20,7 +20,6 @@ open import Data.List.Relation.Unary.AllPairs using (AllPairs) renaming ([] to [
 
 import Tree as T
 open import Tree using (Obs)
-open import denotation.MonotonicList using (agree-refl)
 open import denotation.MonotonicList.Events using (inside; Time; Pos; From; Frame; Timeline; at; emit; stall; close; ix; last; tick; root; _<ᵖ_) renaming (done to doneᶠ; quiet to quietᶠ; sub to subᴾ)
 open import operation.AbstractObservable using (base; maybe; quiet; gate; module Run; module Heap) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; Out; fin; module Pure)
@@ -46,7 +45,7 @@ module StrongHeld (R : Set) where
   open Machine R using (Mach; Playing; begin)
   open SortingWalk R using (WellMach; begin-well)
   open Strongly R using (Alg; module At; module Canon; module Fold; Here; Lane; Name; Path; PathLanes; Sub; _⊕_; coldˢ; connectˢ; deferˢ; doneˢ; flatMapˢ; here; in-body; in-defer; in-lanes; in-map; in-outer; in-scan; in-source; in-take; joinˢ; lane; mapˢ; next-lane; ofˢ; pendingˢ; scanˢ; takeWhileˢ; taking; this-lane; ≗-refl)
-  open StrongAgainst R using (module Against; Books; Each; Kernels; Leaving; leaves; Lingers; Meaning; Owned; OwnedF; Queue; Restful; rest-pinned; Tied; _,ᴼ_; isTaking; owned-from; seen; seen-join; seenL; ∧-join; ∧-split)
+  open StrongAgainst R using (module Against; Books; Each; Kernels; Leaves; Lingers; Meaning; Owned; OwnedF; Queue; Restful; Twin; _,ᴼ_; isTaking; owned-from; seen; seen-join; seenL; ∧-join; ∧-split)
   open Canon
   open Here
 
@@ -228,12 +227,12 @@ module StrongHeld (R : Set) where
     open At H
 
     Pool : ∀ {Δ A} → Sub h Δ A → Set₁
-    Pool (flatMapˢ op f fl oc k r pl so ls) = ∀ {c} → part (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Tied pl (pooled fl so ls) × Restful pl
+    Pool (flatMapˢ op f fl oc k r pl so ls) = ∀ {c} → part (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Leaves pl (pooled fl so ls) × Restful pl
     Pool _                                   = Lift _ ⊤
 
     Rest : ∀ {Δ A} → Sub h Δ A → Set₁
     Rest (connectˢ S c b kb k fd rp e rt src bd) =
-      ∀ {n} → part (connectˢ S c b kb k fd rp e rt src bd) ≡ just n → part src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Tied rt (leftover {B = ⊤} src)
+      ∀ {n} → part (connectˢ S c b kb k fd rp e rt src bd) ≡ just n → part src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Twin rt (leftover {B = ⊤} src) × Restful rt
     Rest _ = Lift _ ⊤
 
     open Held H (λ _ → Lift _ ⊤) Pool Rest using (Over; held-from; held-to) renaming (Below to Folded)
@@ -291,7 +290,6 @@ module StrongHeld (R : Set) where
       sorted  : Σ Pos λ lo → WellMach lo m
       behind′ : Eaching.Below H (Heads (Conf.pos (Mach.conf m))) tree
       lingers′ : Lingering.Below H tree
-      leaving : Leaving H tree
       flags   : DoneBy H tree []
 
     owned : Owned H tree ctlAs
@@ -452,5 +450,4 @@ module StrongHeld (R : Set) where
     ; sorted  = root , begin-well o
     ; behind′  = Eaching.eaching (λ { _ refl → heads-begin o })
     ; lingers′ = Lingering.lingering (λ _ → lift tt)
-    ; leaving = record { parts = λ { here _ refl → leaves (λ ρ n → agree-refl n _) (λ ρ d → proj₁ d , d) (rest-pinned (U.subscribe o root)) } ; pools = λ () ; rests = λ () }
     ; flags   = λ () }

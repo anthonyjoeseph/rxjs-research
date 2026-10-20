@@ -66,7 +66,7 @@ module Lifting (R : Set) where
   open SortingWalk R using (Beyond)
   open Run (Pureᴾ R) using (Act; module Kit; module FlatKit)
   open Strongly R using (Sub; pendingˢ; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; here; module At; fired; waiting; Path; emitC; kontC; Leaf; feedC; srcC; taking; taken; feeding; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _≗_; rootObs; ⊕-here) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
-  open StrongAgainst R using (Leaving; Books; Queue; Kernels; Meaning; Owned; Each; Lingers; pinned-skip; seen; seenL; owned-to)
+  open StrongAgainst R using (Books; Queue; Kernels; Meaning; Owned; Each; Lingers; pinned-skip; seen; seenL; owned-to)
   open StrongHeld R using (Strong; Carried; carried; Heads; DoneBy; Meets; module Eaching; module Lingering)
   open StrongAgainst.Against R using (CtlAs; calmAs; noteAs; runAs; subAs; burstAs; bursts; agenda) renaming (Placed to Placedᴬ)
   open Moving R using (plant; true≢false)
@@ -82,7 +82,7 @@ module Lifting (R : Set) where
   open Replanting R using (module Shift; Heading; Lingering)
   open Framing R using (untold)
   open FramingRepool R using (Untold; Ended)
-  open Shifting R using (pin-alike)
+  open Shifting R using (pin-alike; tw-alike)
   open Taking R using (take-restage)
   open Connecting R using (connect-restage)
   open Flatting R using (flat-restage)
@@ -453,7 +453,7 @@ module Lifting (R : Set) where
     fire-lingering : Lingering H H w₀ w₁
     fire-lingering = record
       { ling-revive = λ j → j
-      ; ling-rested = λ {C} → pin-alike {Γ = Δ} {A = C} {x = U.idleᶜ} refl
+      ; ling-rested = λ {C} → tw-alike {Γ = Δ} {A = C} {x = U.idleᶜ} refl
       ; ling-below  = λ _ → record { pools = λ () ; rests = λ () } }
 
   -- A live timer popped at the turn: its cold, fired, heads past where
@@ -473,11 +473,6 @@ module Lifting (R : Set) where
     Shift.shift-lingers H H π (λ _ _ → refl) [] (Books.fresh (Carried.books cr)) _ (turn-ended cr) (fire-lingering H) (Carried.lingers cr)
     where H = Conf.heap (Mach.conf m)
 
-  postulate
-    fire-leaving : ∀ {g m} (cr : Carried g m) {Δ A τ e v u x sk hd fr}
-                   (π : Path (Carried.tree cr) (coldˢ {Δ = Δ} {A} sk hd (waiting {u = v} τ e (at u x fr))))
-                 → Leaving (Conf.heap (Mach.conf m)) (plant π (coldˢ sk hd (fired τ e (at u x fr))))
-
   -- Every part the ghost holds still heads no earlier than the run:
   -- what the teardown reached it holds no longer, the rest reads alike.
   torn-behind : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
@@ -495,11 +490,6 @@ module Lifting (R : Set) where
   torn-lingers cr (takeSite π) _ = torn-take-lingers _ π (Books.fresh (Carried.books cr)) (Carried.lingers cr)
   torn-lingers {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (_ ∷ _) _ _ } (bodySite π) refl =
     torn-body-lingers _ π (Books.fresh (Carried.books cr)) (Owned.bodies (Carried.owned cr) π (here refl)) (Carried.lingers cr)
-
-  postulate
-    torn-leaving : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
-                 → firstCall (Carried.ctlAs cr) ≡ just (siteCall z)
-                 → Leaving (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr)
 
   -- And every flag reads its outer: below the site nothing is seen that
   -- was not seen before.
@@ -526,8 +516,7 @@ module Lifting (R : Set) where
         ; queue = torn-queue cr z
         ; books = record { fresh = Books.fresh (Carried.books cr) ; clocked = Books.clocked (Carried.books cr)
                          ; paidUp = Books.paidUp (Carried.books cr) ; running = Books.running (Carried.books cr) }
-        ; sorted = hop-sorted cr eq path ; behind′ = Eaching.each-to _ _ (torn-behind cr z refl) ; lingers′ = Lingering.lingers-to _ (torn-lingers cr z refl) ; leaving = torn-leaving cr z refl
-        ; flags = torn-flags cr z refl })
+        ; sorted = hop-sorted cr eq path ; behind′ = Eaching.each-to _ _ (torn-behind cr z refl) ; lingers′ = Lingering.lingers-to _ (torn-lingers cr z refl) ; flags = torn-flags cr z refl })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , ≤-refl))
 
   ----------------------------------------------------------------------

@@ -30,6 +30,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym
 open import denotation.MonotonicList.Events using (Timeline; Frame; From; Pos; ix; last; tick; at; _<ᵖ_; <ᵖ-below) renaming (done to doneᶠᵐ; quiet to quietᶠᵐ)
 open import denotation.MonotonicList.Events using () renaming (sub to subᴾ)
 import Tree as T
+open import denotation.MonotonicList using (agree-refl)
+open import adequacy.Deep using (deepR-rest)
 import denotation.Unfold as U
 open import operation.Machine using (module Machine)
 open import operation.PureObservable using (Out; Pureᴾ)
@@ -66,7 +68,7 @@ module Flatting (R : Set) where
   open Run (Pureᴾ R) using (Act; done; writeRef; register; _>>ᴬ_; compile; Env; wkEnv; wkAct; module Kit; module FlatKit; Ref; wkR; Observer; Kont; wkObs; Subscription; Subscribe; wkSub)
   open Run.Kit (Pureᴾ R) using (skipᴬ)
   open Strongly R using (Sub; pendingˢ; Path; here; in-outer; in-lanes; _⊕_; Here; walk; top; _≗_; module At; names; pendings; Phase; flatMapˢ; killAllᶜ; flatK; CbRel; ≗-refl; newRef≗; unsubscribing; register≗; writeRef≗; module Canon)
-  open StrongAgainst R using (Leaving; Books; Job; Owned; Kernels; Meaning; Queue; Each; Lingers; rf-idle; unpinned; union-pinned; rest-pinned; seen; owned-to)
+  open StrongAgainst R using (Twin; leaves; Books; Job; Owned; Kernels; Meaning; Queue; Each; Lingers; rf-idle; unpinned; union-pinned; rest-pinned; seen; owned-to)
   open StrongHeld R using (Carried; Heads; DoneBy; module Eaching; module Lingering)
   open StrongAgainst.Against R using (subAs; SrcOf; src-of)
   open Moving R using (planted; pend; part-plant; holds-owed; fed-plant; pendings-plant; subjects-plant; joiners-plant)
@@ -307,11 +309,13 @@ module Flatting (R : Set) where
       -- A flatMap pending its outer, its pool idle and no lane, runs what
       -- it was pending to.
       rf-lingers : Lingers H₉ T₈ → Lingers H₉ t′
-      rf-lingers = lingers-plant H₉ π₈ v eqv (union-pinned (rest-pinned (U.subscribe s q)) unpinned)
+      rf-lingers = lingers-plant H₉ π₈ v eqv tie
         (record { pools = λ { here _ _ → (pooled-fresh H₉ {fl = fl₈} {so = pendingˢ s q} done₉ , rf-idle) ; (in-outer ()) ; (in-lanes ()) } ; rests = λ { (in-outer ()) ; (in-lanes ()) } })
-
-      postulate
-        rf-leaving : Leaving H₉ T₈ → Leaving H₉ t′
+        where
+          -- Pending its outer, the flatMap runs what its outer runs.
+          tie : ∀ {C} → Twin (U.restᶜ {B = C} (U.subscribe (T.flatMap op f s) q)) (U.unionᶜ (U.restᶜ {B = C} (U.subscribe s q)) U.idleᶜ)
+          tie = leaves (λ ρ _ n → agree-refl n _) (λ ρ d → deepR-rest (proj₁ (proj₂ d) , tt)) (union-pinned (rest-pinned (U.subscribe s q)) unpinned)
+              , λ ρ d → deepR-rest (proj₁ (proj₂ d) , tt , tt)
 
       -- Its outer pending, its flag reads it running.
       rf-flags : DoneBy H₉ T₈ [] → DoneBy H₉ t′ []
@@ -336,8 +340,7 @@ module Flatting (R : Set) where
                               ; paidUp = cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (Books.paidUp bk))))))))
                               ; running = Books.running bk }
              ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind′ = Eaching.each-to _ _ (F.rf-behind refl refl slot₉ refl refl refl refl (pos-headed cr) (Grew.behind G₉))
-             ; lingers′ = Lingering.lingers-to _ (F.rf-lingers refl refl slot₉ refl refl refl refl (Grew.lingers G₉)) ; leaving = F.rf-leaving refl refl slot₉ refl refl refl refl (Grew.leaving G₉)
-             ; flags = F.rf-flags refl refl slot₉ refl refl refl refl (Grew.flags G₉) }
+             ; lingers′ = Lingering.lingers-to _ (F.rf-lingers refl refl slot₉ refl refl refl refl (Grew.lingers G₉)) ; flags = F.rf-flags refl refl slot₉ refl refl refl refl (Grew.flags G₉) }
     , refl , inj₁ (inj₁ (subst (pend F.t′ <_) (Grew.pends G₉) F.less))
     where bk = Carried.books cr
           -- The kernel's allocations after its first, its registration and
@@ -389,7 +392,7 @@ module Flatting (R : Set) where
           G₀ = record { tree = Carried.tree cr ; path = π ; stack = sk ; alone = a ; ticked = proj₂ (Books.clocked bk)
                       ; obsR = (λ _ → wk-same _) , wk-same _ , wk-same _ ; kontR = λ τ sub → from-same (λ ζ → Here.kont (walk π top) ζ sub) τ
                       ; envR = e ; meets = refl ; owned = recode (Carried.owned cr) ; kernels = Carried.kernels cr
-                      ; meaning = Carried.meaning cr ; queue = Carried.queue cr ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; leaving = Carried.leaving cr ; flags = Carried.flags cr ; pends = refl
+                      ; meaning = Carried.meaning cr ; queue = Carried.queue cr ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; flags = Carried.flags cr ; pends = refl
                       ; named = λ {_} {j} _ → j , refl ; distinct = λ fs → fs }
           G₈ = grew-step {k = slot ⊤} (record { onNext = λ a → wkAct new (n₇ a) ; onComplete = wkAct new c₇ ; isClosed = wkAct new x₇ })
                  (grew-step {k = cell (maybe quiet)} (lift nothing) (grew-step {k = cell (base Bool)} (lift true)

@@ -83,7 +83,7 @@ module ClimbLanesQueue (R : Set) where
   open SortingWalk R using (WellMach)
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
   open Strongly R using (Feed; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; joiner; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; here; module At; fired; Path; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; ending; taken; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; outers; outersL; outers-⊕; unsub; Owes; Settled; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
-  open StrongAgainst R using (Leaving; Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
+  open StrongAgainst R using (Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
   open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering)
   open StrongAgainst.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf; src-of) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
@@ -398,9 +398,6 @@ module ClimbLanesQueue (R : Set) where
     settle-lingers : Lingers H₂ (Restaged.T′ H₂ ρ pl′)
     settle-lingers = Freed.Sh.shift-lingers H ρ o fs v (ended-past cl) settle-lingering (Calling.lingers cl)
 
-    postulate
-      settle-leaving : Leaving H₂ (Restaged.T′ H₂ ρ pl′)
-
     -- The queue's head taken off needs it there to take.
     next-heading : ∀ ys {y ys′} → At.val H₂ (FlatKit.Flat.queue fl) ≡ y ∷ ys′ → Heading H (Dequeued.H′ H₂ ρ ys) q w₀ w₀
     next-heading ys nq = heading-∘ (Freed.fr-heading H ρ o fr) (Dequeued.dq-heading H₂ ρ ys fr nq (next-heads ys))
@@ -408,9 +405,6 @@ module ClimbLanesQueue (R : Set) where
     next-lingers : ∀ ys → Lingers (Dequeued.H′ H₂ ρ ys) (Restaged.T′ (Dequeued.H′ H₂ ρ ys) ρ pl′)
     next-lingers ys = Shift.shift-lingers H (Dequeued.H′ H₂ ρ ys) ρ (off-++ {H = H} {H₁ = H₂} {H₂ = Dequeued.H′ H₂ ρ ys} (Freed.ns H ρ o) (Freed.fr-off H ρ o) (off-store H₂ (FlatKit.Flat.queue fl)))
                         (all-++⁺ (Freed.fr-mine H ρ o) (Dequeued.mine H₂ ρ ys)) fs v (ended-past cl) (next-lingering ys) (Calling.lingers cl)
-
-    postulate
-      next-leaving : ∀ ys → Leaving (Dequeued.H′ H₂ ρ ys) (Restaged.T′ (Dequeued.H′ H₂ ρ ys) ρ pl′)
 
   -- A freed slot with nothing queued: the flatMap's settle read.  Its
   -- outer done and no lane left, its end one operator up, the call's
@@ -425,7 +419,7 @@ module ClimbLanesQueue (R : Set) where
   lane-settle st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {op = op} {f} {fl} {oc} {k} {r} {po} {t = t} {ls} ρ πL o {ks}
     cl@record { sane = sn ; placed = pd ; deep = dp ; ctl = refl ; stack = sk ; lifted = gu , S , L , sg , hl ; owned = ow
               ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
-              ; behind = bh ; lingers = lgr ; leaving = lvg ; lefts = lt ; kept = kp } eq₀ {n = n} p ea eks
+              ; behind = bh ; lingers = lgr ; lefts = lt ; kept = kp } eq₀ {n = n} p ea eks
     with lifts-split ρ (in-lanes πL) L in eqQ | reads {hp = freed hp (laneOf o) fl} ea
   ... | _ , lifts-lanes {bs = bs′} {l = l} {as = as′} LL _ _ _ , Lρ | k₁ , f₁ , p₁
     with reads {hp = freed hp (laneOf o) fl}
@@ -458,11 +452,7 @@ module ClimbLanesQueue (R : Set) where
       ; lingers = Freed.Fr.lingers hp ρ o fs (lane-live o LL) (ended-past cl)
                     (Freed.fr-lingering hp ρ o (fresh-path ρ fs)
                       (flat-gone H₂ {op = op} {f} {fl} {oc} {k} {r} {po} {u = t} {ls} (trans (Freed.fr-part hp ρ o (fresh-path ρ fs)) eo)
-                                 (trans (Freed.fr-lanes hp ρ o (fresh-path ρ fs) LL) (cong₂ _++_ ebs eas)) eq₀)) lgr ; leaving = Freed.Fr.leaving hp ρ o fs (lane-live o LL) (ended-past cl)
-                    (Freed.fr-lingering hp ρ o (fresh-path ρ fs)
-                      (flat-gone H₂ {op = op} {f} {fl} {oc} {k} {r} {po} {u = t} {ls} (trans (Freed.fr-part hp ρ o (fresh-path ρ fs)) eo)
-                                 (trans (Freed.fr-lanes hp ρ o (fresh-path ρ fs) LL) (cong₂ _++_ ebs eas)) eq₀)) lvg
-      ; lefts = Freed.Fr.wr-lefts hp ρ o fs (lane-live o LL) Lq
+                                 (trans (Freed.fr-lanes hp ρ o (fresh-path ρ fs) LL) (cong₂ _++_ ebs eas)) eq₀)) lgr ; lefts = Freed.Fr.wr-lefts hp ρ o fs (lane-live o LL) Lq
                   (lefts-subst (λ s′ → s′) (lane-end op G l q po eo ebs eas eqs)
                     (lefts-subst (λ S′ → U.laneˢ op G (At.part hp t) bs′ l S′ as′ (At.val hp (FlatKit.Flat.queue fl)) po) (lane-step o LL) (lefts-up ρ (in-lanes πL) eqQ lt)))
       ; flags = Freed.fr-flags hp ρ o fs (done-up ρ (in-lanes πL) (one-outers o) (Calling.flags cl)) ; kept = inj₁ refl }))
@@ -496,8 +486,7 @@ module ClimbLanesQueue (R : Set) where
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs
                          ; clocked = proj₁ ck , Restaged.pool-ticked H₂ ρ pl′ clk stk (proj₁ ck , proj₂ ck) ; paidUp = pu ; running = rn }
         ; sorted = sorted-⇝ so path ; behind′ = Eaching.each-to _ _ (Freed.Sh.shift-behind hp ρ o fs v (tells-past cl) (ended-past cl) (Settling.settle-heading ρ πL o cl Lρ sg) bh)
-        ; lingers′ = Lingering.lingers-to _ (Settling.settle-lingers ρ πL o cl Lρ sg) ; leaving = Settling.settle-leaving ρ πL o cl Lρ sg
-        ; flags = let-go H₂ (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs) (lifts-seen (lifts-planted ρ v (Freed.Wr.wr-lifts hp ρ o fs Lρ))) ju
+        ; lingers′ = Lingering.lingers-to _ (Settling.settle-lingers ρ πL o cl Lρ sg) ; flags = let-go H₂ (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs) (lifts-seen (lifts-planted ρ v (Freed.Wr.wr-lifts hp ρ o fs Lρ))) ju
                     (subst (DoneBy H₂ (plant ρ v)) (sym (outers-planted ρ v)) (Freed.fr-shift hp ρ o fs pl′ rv (done-up ρ (in-lanes πL) (one-outers o) (Calling.flags cl)))) })
       , passed ag pp)
     where
@@ -530,7 +519,7 @@ module ClimbLanesQueue (R : Set) where
   lane-next st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {op = op} {f} {fl} {oc} {k} {r} {po} {t = t} {ls} ρ πL o {ks}
     cl@record { sane = sn ; placed = pd ; deep = dp ; ctl = refl ; stack = sk ; lifted = gn , S , L , sg , _ ; owned = ow
               ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
-              ; behind = bh ; lingers = lgr ; leaving = lvg ; lefts = lt ; kept = kp } {y} {ys} eq₀ {n = n} p ea eks
+              ; behind = bh ; lingers = lgr ; lefts = lt ; kept = kp } {y} {ys} eq₀ {n = n} p ea eks
     with lifts-split ρ (in-lanes πL) L in eqN | writes {hp = freed hp (laneOf o) fl} ea
   ... | _ , lifts-lanes {bs = bs′} {l = l} {as = as′} LL ee lf pb , Lρ | n′ , e′ , p′ =
     hopped-pre (⇝-trans p p′) (lane-begin st (record
@@ -549,8 +538,7 @@ module ClimbLanesQueue (R : Set) where
       ; behind = subst (λ t′ → Each H₃ (Heads q) t′) (plant-self ρ)
                    (Shift.shift-behind hp H₃ ρ (off-++ {H = hp} {H₁ = H₂} {H₂ = H₃} (Freed.ns hp ρ o) (Freed.fr-off hp ρ o) (off-store H₂ (FlatKit.Flat.queue fl)))
                                        (all-++⁺ (Freed.fr-mine hp ρ o) (Dequeued.mine H₂ ρ ys)) fs w₀ (tells-past cl) (ended-past cl) (Settling.next-heading ρ πL o cl Lρ sg ys eq₀) bh)
-      ; lingers = Settling.next-lingers ρ πL o cl Lρ sg ys ; leaving = Settling.next-leaving ρ πL o cl Lρ sg ys
-      ; flags = let-go H₃ (planted ρ P₀) (pairs-r (names w₀) (apart-unplant ρ fs)) (trans (seen-planted H₃ ρ P₀) (lifts-seen L₇)) refl
+      ; lingers = Settling.next-lingers ρ πL o cl Lρ sg ys ; flags = let-go H₃ (planted ρ P₀) (pairs-r (names w₀) (apart-unplant ρ fs)) (trans (seen-planted H₃ ρ P₀) (lifts-seen L₇)) refl
                   (subst (DoneBy H₃ (plant ρ P₀)) (sym (outers-planted ρ P₀))
                     (Dequeued.Fr.shift-flags H₂ ρ ys fs P₀ {ns₀ = []} (λ ()) (λ _ → ju₂) (λ _ → pending-flags H₃) (subst (DoneBy H₂ _) (sym (++-identityʳ (outers ρ))) d₂)))
       ; inner = Dequeued.dq-flags₀ H₂ ρ ys (fresh-path ρ fs) (Flag.db-sub H₂ (let-go H₂ ρ fs s₂ ju₂ d₂) ρ s₂) }))

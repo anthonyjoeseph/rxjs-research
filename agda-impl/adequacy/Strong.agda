@@ -777,30 +777,6 @@ module Strongly (R : Set) where
     pooled : ∀ {Δ A B} → Flat A h → Sub h Δ A → List (Lane h Δ B) → U.Node Δ B
     pooled fl so ls = U.unionᶜ (if val (Flat.outerDone fl) then leftover so else U.idleᶜ) (pooledL ls)
 
-    -- What an open part leaves running: its leftover, less an ended
-    -- outer's or lane's that its flatMap's pool has yet to take, which
-    -- the climb carries free until the pool takes it.
-    mutual
-      kept : ∀ {Δ A B} → Sub h Δ A → U.Node Δ B
-      kept (pendingˢ s q)                     = U.restᶜ (U.subscribe s q)
-      kept (coldˢ s hd ph)                    = U.idleᶜ
-      kept (ofˢ p i xs)                       = U.idleᶜ
-      kept doneˢ                              = U.idleᶜ
-      kept (mapˢ f s)                         = kept s
-      kept (scanˢ f r s)                      = kept s
-      kept (takeWhileˢ i p c k tk s)          = kept s
-      kept (flatMapˢ op f fl oc k r pl so ls) =
-        U.unionᶜ (if val (Flat.outerDone fl) then leftover so else if is-just (part so) then kept so else U.idleᶜ) (keptL ls)
-      kept (connectˢ S c b kb k fd rp e rt src bd) =
-        U.unionᶜ (U.burstingᶜ rp n) (U.underᶜ (U.live n) (kept {B = ⊤} bd))
-        where n = sourced (part src) (leftover src)
-      kept (joinˢ j sk l x st)                = U.idleᶜ
-      kept (deferˢ k s)                       = kept s
-
-      keptL : ∀ {Δ A B} → List (Lane h Δ A) → U.Node Δ B
-      keptL []                = U.idleᶜ
-      keptL (lane c k s ∷ ls) = U.unionᶜ (if val (Kit.live c) then (if is-just (part s) then kept s else U.idleᶜ) else leftover s) (keptL ls)
-
     ----------------------------------------------------------------------
     -- The joiners' feed
 

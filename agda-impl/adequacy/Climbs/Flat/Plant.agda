@@ -82,7 +82,7 @@ module ClimbFlatPlant (R : Set) where
   open SortingWalk R using (WellMach)
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
   open Strongly R using (Feed; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; joiner; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; here; module At; fired; Path; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; ending; taken; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; outers; outersL; outers-⊕; unsub; Owes; Settled; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
-  open StrongAgainst R using (Leaves; Leaving; Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
+  open StrongAgainst R using (Leaves; Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
   open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering)
   open StrongAgainst.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf; src-of) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
@@ -328,7 +328,6 @@ module ClimbFlatPlant (R : Set) where
       sorted  : Σ Pos λ lo → WellMach lo m
       behind  : Each (Conf.heap (Mach.conf m)) (Heads (Conf.pos (Mach.conf m))) T
       lingers : Lingers (Conf.heap (Mach.conf m)) (Restaged.T′ (Conf.heap (Mach.conf m)) ρ pl′)
-      leaving : Leaving (Conf.heap (Mach.conf m)) (Restaged.T′ (Conf.heap (Mach.conf m)) ρ pl′)
       lefts   : Lefts (Conf.heap (Mach.conf m)) (proj₁ (proj₂ lifted))
       -- The flags as the lane, still pending, will read them; and the
       -- flatMap's own.
@@ -577,7 +576,6 @@ module ClimbFlatPlant (R : Set) where
       bg-owns     : (sk : StackAs T q ϑ K bs) → Owned base (wkTree grow T) (runAs [] (≗-refl _) (Wk.grow-stack sk)) → Owned heap′ T′ (ca′ sk)
       bg-heads    : Each base (Heads q) (wkTree grow T) → Each heap′ (Heads (q ++ [ ix 1 ])) T′
       bg-lingered : Lingers base (wkTree grow (Restaged.T′ H ρ pl′)) → Lingers heap′ T′
-      bg-left     : Leaving base (wkTree grow (Restaged.T′ H ρ pl′)) → Leaving heap′ T′
 
     -- The growth, then the splice.
     bg-ghost : ∀ {g S} → Sane [] g → Placed g [] → Deep g []
@@ -598,8 +596,6 @@ module ClimbFlatPlant (R : Set) where
     bg-lingers : Lingers H (Restaged.T′ H ρ pl′) → Lingers heap′ T′
     bg-lingers lg = bg-lingered (Wk′.grow-lingers grows lg)
 
-    bg-leaving : Leaving H (Restaged.T′ H ρ pl′) → Leaving heap′ T′
-    bg-leaving lv = bg-left (Wk′.grow-leaving grows lv)
 
     -- The flatMap before the start, in the grown world.
     u₀ : Sub v Δ B
@@ -803,7 +799,7 @@ module ClimbFlatPlant (R : Set) where
              → Begins g (loadOf st) m₀ ρ y pl′ → Hopped st m₀
   lane-begin st {m₀ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {pl′ = pl′}
     b@record { sane = sn ; placed = pd ; deep = dp ; ctl = refl ; stack = sk ; lifted = S , L , sg ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
-             ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so ; behind = bh ; lingers = lgr ; leaving = lvg ; lefts = lt
+             ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so ; behind = bh ; lingers = lgr ; lefts = lt
              ; flags = dF ; inner = dI }
     with begin-path b
   ... | sr with Begun.bg-ghost sr pl′ sn pd dp L lt sg
@@ -816,8 +812,7 @@ module ClimbFlatPlant (R : Set) where
       ; books = record { fresh = Begun.bg-fresh sr pl′ fs
                        ; clocked = trans (proj₁ ck) (sym (tick-under q 1 (Started.deep sr))) , proj₁ ck , Begun.bg-ticked sr pl′ sk (proj₂ ck)
                        ; paidUp = trans (Started.todo′ sr) (cong (mapList (wkTodo (Started.grow sr))) pu) ; running = rn }
-      ; sorted = sorted-⇝ so (Started.runs sr) ; behind′ = Eaching.each-to _ _ (Begun.bg-behind sr pl′ bh) ; lingers′ = Lingering.lingers-to _ (Begun.bg-lingers sr pl′ lgr) ; leaving = Begun.bg-leaving sr pl′ lvg
-      ; flags = Begun.bg-flags sr pl′ fs L dF dI })
+      ; sorted = sorted-⇝ so (Started.runs sr) ; behind′ = Eaching.each-to _ _ (Begun.bg-behind sr pl′ bh) ; lingers′ = Lingering.lingers-to _ (Begun.bg-lingers sr pl′ lgr) ; flags = Begun.bg-flags sr pl′ fs L dF dI })
     , passed ag pp
 
   -- An admitted value with room: its lane begun where the value is, the
@@ -829,7 +824,7 @@ module ClimbFlatPlant (R : Set) where
               → ∀ {a} → m₁ ⇝ rerun m₁ (Calling.ϑ cl) (Calling.K cl) a → a ≗ startAt ρ y → Hopped st (rerun m₁ (Calling.ϑ cl) (Calling.K cl) a)
   outer-start st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} ρ {y}
     cl@record { sane = sn ; placed = pd ; deep = dp ; ctl = refl ; stack = sk ; lifted = c′ , pv , S , L , sg ; owned = ow ; kernels = kn ; meaning = mn
-              ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so ; behind = bh ; lingers = lgr ; leaving = lvg ; lefts = lt ; kept = kp } rm p c
+              ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so ; behind = bh ; lingers = lgr ; lefts = lt ; kept = kp } rm p c
     with lifts-split ρ (in-outer here) L in eqO
   ... | _ , lifts-outer {o₀ = o₀} _ _ lifts-here , Lρ = lane-begin st (record
       { sane = sn ; placed = pd ; deep = dp ; ctl = refl ; code = c
@@ -839,8 +834,7 @@ module ClimbFlatPlant (R : Set) where
       ; lefts = lefts-subst skp (sym pv) (lefts-subst (λ s′ → s′) adm (lefts-up ρ (in-outer here) eqO lt))
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
-      ; sorted = sorted-⇝ so p ; behind = bh ; lingers = Restaged.pool-idle hp ρ (U.unionᶜ po U.idleᶜ) fs refl (ended-past cl) lgr ; leaving = Restaged.pool-leaving hp ρ (U.unionᶜ po U.idleᶜ) fs refl (ended-past cl) lvg
-      ; flags = flags-swap hp ρ (pendingˢ (f y) (q ++ [ ix 1 ])) (sym (cong (λ o′ → is-just (At.merged hp op G o′ LS QS po)) pv)) (pending-flags hp) d₀
+      ; sorted = sorted-⇝ so p ; behind = bh ; lingers = Restaged.pool-idle hp ρ (U.unionᶜ po U.idleᶜ) fs refl (ended-past cl) lgr ; flags = flags-swap hp ρ (pendingˢ (f y) (q ++ [ ix 1 ])) (sym (cong (λ o′ → is-just (At.merged hp op G o′ LS QS po)) pv)) (pending-flags hp) d₀
       ; inner = Flag.db-sub hp d₀ ρ (lifts-seen Lρ) })
     where
       G  = λ a j → U.subscribe (f a) j

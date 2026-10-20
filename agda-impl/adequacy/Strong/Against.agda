@@ -16,7 +16,6 @@ import Data.List.Relation.Unary.Any as Any
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
-open import denotation.MonotonicList using (Agree)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs) renaming ([] to []ᴾ)
 
@@ -28,10 +27,10 @@ open import operation.PureObservable using (Pureᴾ; Out; note; module Pure)
 open import operation.Machine using (module Machine)
 import denotation.Unfold as U
 open import adequacy.Placed.Order using () renaming (Placed to Placedᵍ)
-open import adequacy.Deep using (Deep)
 open import adequacy.Sorted.Walk using (module SortingWalk)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import adequacy.Strong using (module Strongly)
+import adequacy.Leaves as Lv
 
 module StrongAgainst (R : Set) where
   open Heap using (World; Kind; cell; slot; hush; play; _⊑_; _∋_; Sink; Handle; Quiet; _⨾_; same)
@@ -45,6 +44,7 @@ module StrongAgainst (R : Set) where
   open Strongly R using (Alg; module At; Call; module Canon; Feed; module Fold; Here; Lane; Path; PathLanes; Phase; Settled; Sub; Taking; _≗_; _⊕_; _⊕ᴸ_; bodyC; coldˢ; connectˢ; deferˢ; doneˢ; emitC; ending; feedC; feeding; finC; finishing; fired; flatMapˢ; here; idle; in-body; in-defer; in-lanes; in-map; in-outer; in-scan; in-source; in-take; joiners; joinˢ; lane; mapˢ; names; next-lane; ofˢ; pendings; pendingˢ; playing; rootObs; scanˢ; srcC; subjects; take1C; take2C; takeWhileˢ; taken; taking; this-lane; top; waiting; walk; ⊕-here; ⟦_⟧)
   open Canon
   open Here
+  open Lv public
 
   ------------------------------------------------------------------------
   -- The machine's control and stack, against the witness
@@ -555,158 +555,20 @@ module StrongAgainst (R : Set) where
             → ∀ {n} → At.part H (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
             → At.part H src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt
 
-  -- Two steps alike as rests: the same pin, or none.
-  data Pinned {Γ} {B C : Set} : U.Step Γ B → U.Step Γ C → Set₁ where
-    pinned   : ∀ {k x y} → Pinned (U.skipˢ k x) (U.skipˢ k y)
-    unpinned : Pinned U.hushˢ U.hushˢ
-
-  pinned-trans : ∀ {Γ B C D} {a : U.Step Γ B} {b : U.Step Γ C} {c : U.Step Γ D} → Pinned a b → Pinned b c → Pinned a c
-  pinned-trans pinned   pinned   = pinned
-  pinned-trans unpinned unpinned = unpinned
-
-  pinned-skip : ∀ {Γ B C} {a : U.Step Γ B} {b : U.Step Γ C} {q y′} → Pinned a b → b ≡ U.skipˢ q y′ → Σ (U.Node Γ B) λ x′ → a ≡ U.skipˢ q x′
-  pinned-skip pinned refl = _ , refl
-
-  union-pinned : ∀ {Γ B C} {x y : U.Node Γ B} {sx sy} {x′ y′ : U.Node Γ C} {sx′ sy′}
-               → Pinned sx sx′ → Pinned sy sy′ → Pinned (U.unionˢ x sx y sy) (U.unionˢ x′ sx′ y′ sy′)
-  union-pinned (pinned {k}) (pinned {k′}) with k <ᵖ k′
-  ... | true  = pinned
-  ... | false = pinned
-  union-pinned pinned   unpinned = pinned
-  union-pinned unpinned q        = q
-
-  under-pinned : ∀ {Γ A D B C} (s : U.Source Γ A) (st : U.Step (A ∷ Γ) D) → Pinned (U.underˢ {B = B} s st) (U.underˢ {B = C} s st)
-  under-pinned s (U.skipˢ _ _)  = pinned
-  under-pinned s (U.outˢ _ _ _) = unpinned
-  under-pinned s (U.endˢ _)     = unpinned
-  under-pinned s U.hushˢ        = unpinned
-
-  -- A node's rest pins alike whatever it is read as.
-  mutual
-    rest-pinned : ∀ {Γ A B C} (c : U.Node Γ A) → Pinned (U.restˢ {B = B} c) (U.restˢ {B = C} c)
-    rest-pinned (U.framesᶜ _ _ _)               = unpinned
-    rest-pinned (U.burstᶜ _ _ _ _)              = unpinned
-    rest-pinned (U.ofᶜ _ _ _)                   = unpinned
-    rest-pinned (U.mapᶜ _ c)                    = rest-pinned c
-    rest-pinned (U.scanᶜ _ _ c)                 = rest-pinned c
-    rest-pinned (U.takeWhileᶜ _ _ c)            = rest-pinned c
-    rest-pinned (U.flatMapᶜ _ _ o ls _ p)       = union-pinned (restᴹ-pinned o) (union-pinned (rests-pinned ls) (rest-pinned p))
-    rest-pinned (U.joinᶜ _ _ _ _)               = unpinned
-    rest-pinned {A = A} (U.connectᶜ r b (U.live s))    = union-pinned (bursts-pinned r s (U.step s)) (under-pinned (U.live s) (U.restˢ {B = A} b))
-    rest-pinned {A = A} (U.connectᶜ r b (U.ended c t)) = union-pinned (bursts-pinned r t (U.step t)) (under-pinned (U.ended c t) (U.restˢ {B = A} b))
-    rest-pinned (U.deferᶜ _ _ _)                = unpinned
-    rest-pinned (U.endingᶜ _ n)                 = rest-pinned n
-    rest-pinned (U.restᶜ n)                     = rest-pinned n
-    rest-pinned U.idleᶜ                         = unpinned
-    rest-pinned (U.unionᶜ x y)                  = union-pinned (rest-pinned x) (rest-pinned y)
-    rest-pinned (U.burstingᶜ r t)               = bursts-pinned r t (U.step t)
-    rest-pinned (U.underᶜ {C = D} s b)          = under-pinned s (U.restˢ {B = D} b)
-
-    bursts-pinned : ∀ {Γ A B C} (r : Pos) (t : U.Node Γ A) (st : U.Step Γ A) → Pinned (U.burstsˢ {B = B} r t st) (U.burstsˢ {B = C} r t st)
-    bursts-pinned r t (U.outˢ k _ _) with inside r k
-    ... | true  = pinned
-    ... | false = rest-pinned t
-    bursts-pinned r t (U.skipˢ k _) with inside r k
-    ... | true  = pinned
-    ... | false = rest-pinned t
-    bursts-pinned r t (U.endˢ _) = rest-pinned t
-    bursts-pinned r t U.hushˢ    = rest-pinned t
-
-    restᴹ-pinned : ∀ {Γ A B C} (o : Maybe (U.Node Γ A)) → Pinned (U.restᴹ {B = B} o) (U.restᴹ {B = C} o)
-    restᴹ-pinned nothing  = unpinned
-    restᴹ-pinned (just o) = rest-pinned o
-
-    rests-pinned : ∀ {Γ A B C} (ls : List (U.Node Γ A)) → Pinned (U.restsˢ {B = B} ls) (U.restsˢ {B = C} ls)
-    rests-pinned []       = unpinned
-    rests-pinned (l ∷ ls) = union-pinned (rest-pinned l) (rests-pinned ls)
-
-  -- A rest's shape: it steps as it rests.
-  data Restful {Γ B} : U.Node Γ B → Set₁ where
-    rf-idle  : Restful U.idleᶜ
-    rf-rest  : ∀ {A} {n : U.Node Γ A} → Restful (U.restᶜ n)
-    rf-union : ∀ {x y} → Restful (U.unionᶜ x y)
-    rf-burst : ∀ {A r} {t : U.Node Γ A} → Restful (U.burstingᶜ r t)
-    rf-under : ∀ {A C} {s : U.Source Γ A} {b : U.Node (A ∷ Γ) C} → Restful (U.underᶜ s b)
-
-  restful-pinned : ∀ {Γ B} {c : U.Node Γ B} → Restful c → Pinned (U.step c) (U.restˢ {B = B} c)
-  restful-pinned rf-idle                    = unpinned
-  restful-pinned (rf-rest {n = n})          = rest-pinned n
-  restful-pinned (rf-union {x = x} {y})     = union-pinned (rest-pinned x) (rest-pinned y)
-  restful-pinned (rf-burst {r = r} {t = t}) = bursts-pinned r t (U.step t)
-  restful-pinned (rf-under {C = C} {s = s} {b = b}) = under-pinned s (U.restˢ {B = C} b)
-
-  pinned-sym : ∀ {Γ B C} {a : U.Step Γ B} {b : U.Step Γ C} → Pinned a b → Pinned b a
-  pinned-sym pinned   = pinned
-  pinned-sym unpinned = unpinned
-
-  -- A body's rest pins as its own, whatever source it carries.
-  under-moved : ∀ {Γ A D E B C} (s s′ : U.Source Γ A) {st : U.Step (A ∷ Γ) D} {st′ : U.Step (A ∷ Γ) E}
-              → Pinned st st′ → Pinned (U.underˢ {B = B} s st) (U.underˢ {B = C} s′ st′)
-  under-moved s s′ pinned   = pinned
-  under-moved s s′ unpinned = unpinned
-
-  -- A burst pins as its node's step, and past it as the node's rest.
-  bursts-moved : ∀ {Γ A A′ B C} r {t : U.Node Γ A} {t′ : U.Node Γ A′} {st : U.Step Γ A} {st′ : U.Step Γ A′}
-               → Pinned st st′ → Pinned (U.restˢ {B = B} t) (U.restˢ {B = C} t′) → Pinned (U.burstsˢ {B = B} r t st) (U.burstsˢ {B = C} r t′ st′)
-  bursts-moved r (pinned {k}) rp with inside r k
-  ... | true  = pinned
-  ... | false = rp
-  bursts-moved r unpinned rp = rp
-
-  -- A node's next pin a rest's: what a held node keeps of its ended
-  -- parts steps as they would rest.
-  Tied : ∀ {Γ A B} → U.Node Γ A → U.Node Γ B → Set₁
-  Tied x y = Pinned (U.step x) (U.restˢ {B = ⊤} y)
-
-  -- A restful pool's tie carried along a pin.
-  tie-trans : ∀ {Γ A C D} {p : U.Node Γ A} {a : U.Step Γ C} {b : U.Step Γ D} → Pinned (U.step p) a × Restful p → Pinned a b → Pinned (U.step p) b × Restful p
-  tie-trans (t , rf) q = pinned-trans t q , rf
-
-  -- WHAT A HELD NODE KEEPS OF ITS ENDED PARTS IS WHAT THEY STILL RUN.
-  -- Below `t`: a held flatMap's pool, a rest's shape, runs as its ended
-  -- parts' leftovers,
-  -- a held connect's ended source's rest as the source's.
+  -- WHAT A HELD NODE KEEPS OF ITS ENDED PARTS IS WHAT THEY STILL RUN,
+  -- to every depth: below `t`, a held flatMap's pool, a rest's shape,
+  -- leaves what the witness reads off as its ended parts' leftovers; a
+  -- held connect's ended source's rest leaves the source's, its order
+  -- read back besides.
   record Lingers {h} (H : Heapᴹ h) {Δ A} (t : Sub h Δ A) : Set₁ where
     field
       pools : ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
             → (ψ : Path t (flatMapˢ op f fl oc k r pl so ls)) → seen H ψ ≡ true
-            → ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Tied pl (At.pooled H fl so ls) × Restful pl
+            → ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Leaves pl (At.pooled H fl so ls) × Restful pl
       rests : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
             → (ψ : Path t (connectˢ S c b kb k fd rp e rt src bd)) → seen H ψ ≡ true
             → ∀ {n} → At.part H (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
-            → At.part H src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Tied rt (At.leftover H {B = ⊤} src)
-
-  -- Two nodes leaving alike: what each still runs past an unsubscribe,
-  -- under every environment, the same at every depth, the second in
-  -- order when the first is; their rests' next steps pinned alike.
-  -- `restˢ` and `cutᴺ` are read apart, so the pin is its own field.
-  record Leaves {Γ A B} (x : U.Node Γ A) (y : U.Node Γ B) : Set₁ where
-    constructor leaves
-    field agree : ∀ (ρ : U.NEnv Γ) n → Agree n (U.meaning (U.restᶜ {B = ⊤} x) ρ) (U.meaning (U.restᶜ {B = ⊤} y) ρ)
-          deep  : ∀ (ρ : U.NEnv Γ) → Deep (U.restᶜ {B = ⊤} x) ρ → Deep (U.restᶜ {B = ⊤} y) ρ
-          pin   : Pinned (U.restˢ {B = ⊤} x) (U.restˢ {B = ⊤} y)
-
-  -- The order read back, from the witness's rest to the node's: a
-  -- flatMap's part is in order by its whole meaning, which no rest
-  -- below it holds, so only an ended source's rest carries it.
-  Back : ∀ {Γ A B} → U.Node Γ A → U.Node Γ B → Set₁
-  Back x y = ∀ (ρ : U.NEnv _) → Deep (U.restᶜ {B = ⊤} y) ρ → Deep (U.restᶜ {B = ⊤} x) ρ
-
-  -- WHAT THE GHOST HOLDS LEAVES WHAT THE HEAP WOULD: below `t`, each seen
-  -- part leaves what the witness reads off as kept, a held flatMap's pool
-  -- and a held connect's ended source's rest what it reads off as their
-  -- leftover, to every depth, where `Lingers` pins only the next step.
-  -- REFUTED: e52e45a6 of a part leaving its whole leftover, by a flatMap whose outer has ended and not yet closed
-  record Leaving {h} (H : Heapᴹ h) {Δ A} (t : Sub h Δ A) : Set₁ where
-    field
-      parts : ∀ {Δ′ A′} {u : Sub h Δ′ A′} (ψ : Path t u) → seen H ψ ≡ true → ∀ {c} → At.part H u ≡ just c → Leaves c (At.kept H {B = ⊤} u)
-      pools : ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
-            → (ψ : Path t (flatMapˢ op f fl oc k r pl so ls)) → seen H ψ ≡ true
-            → ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Leaves pl (At.pooled H fl so ls)
-      rests : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
-            → (ψ : Path t (connectˢ S c b kb k fd rp e rt src bd)) → seen H ψ ≡ true
-            → ∀ {n} → At.part H (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
-            → At.part H src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Leaves rt (At.leftover H {B = ⊤} src) × Back rt (At.leftover H {B = ⊤} src) × Restful rt
+            → At.part H src ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Twin rt (At.leftover H {B = ⊤} src) × Restful rt
 
   -- WHAT HOLDS BELOW A HELD NODE, NODE BY NODE: each node's obligation
   -- once it is held, each child held as its parent is and its step

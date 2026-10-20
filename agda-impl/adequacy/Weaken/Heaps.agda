@@ -56,7 +56,7 @@ module WeakeningHeaps (R : Set) where
   open Heap using (World; _⊑_; _⨾_; _∋_; there; grow; wk∋; slot; Sink; Quiet; Handle) renaming (same to same⊑)
   open Run (Pureᴾ R) using (Act; El; Subject; wkSubject; send; finish; under; done; compile; Env; wkEnv; wkAct; module Kit; module FlatKit; Ref; wkR; wkEl; Observer; Kont; wkObs; wkKont)
   open Strongly R using (Sub; pendingˢ; ofˢ; mapˢ; takeWhileˢ; connectˢ; Lane; ending; taken; idle; feeding; finishing; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; Here; walk; top; coldˢ; _≗_; module At; pendings; rootObs; Owes; Begun; Settled; SettledLanes; Feed; Phase; timerOf; lanePendings; subjects; joiners; flatMapˢ; scanˢ; joinˢ; doneˢ; deferˢ; lane; CbRel; ≗-refl; taking; Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; code; ⟦_⟧; Leaf; of-leaf; cold-leaf; done-leaf; join-leaf; _⊕_; _⊕ᴸ_; under≗; unsub; killAllᶜ; Joiner; joiner; laneSubjects; laneJoiners)
-  open StrongAgainst R using (Owned; Kernels; Meaning; Queue; Each; Leaves; Back; Leaving; Lingers; Restful; Tied; seen; seenL; isTaking; at⟦_⟧; Spot; spot; Job)
+  open StrongAgainst R using (Owned; Kernels; Meaning; Queue; Each; Leaves; Twin; Lingers; Restful; seen; seenL; isTaking; at⟦_⟧; Spot; spot; Job)
   open StrongHeld R using (DoneBy)
   open StrongAgainst.Against R using (StackAs; subAs; runAs; CtlAs; agenda; bursts; begins; stackJobs; SrcOf; Ticked; stackBursts; sources; Placed; restAs; backAs; reholdAs; bottomAs; BurstAs; playsAs; firesAs; overAs; Held; bottomᴴ; restᴴ; BurstClocked; src-of)
   open Strongly.Phase R using (waiting; playing; fired)
@@ -157,29 +157,6 @@ module WeakeningHeaps (R : Set) where
         leftover-wkᴸ []                = refl
         leftover-wkᴸ (lane c k s ∷ ls) = cong₂ U.unionᶜ (leftover-wk s) (leftover-wkᴸ ls)
 
-      mutual
-        kept-wk : ∀ {Δ A B} (u : Sub h Δ A) → At.kept H′ {B = B} (wkTree τ u) ≡ At.kept H {B = B} u
-        kept-wk (pendingˢ s q)                     = refl
-        kept-wk (coldˢ s hd ph)                    = refl
-        kept-wk (ofˢ p i xs)                       = refl
-        kept-wk doneˢ                              = refl
-        kept-wk (mapˢ f s)                         = kept-wk s
-        kept-wk (scanˢ f r s)                      = kept-wk s
-        kept-wk (takeWhileˢ i p c k tk s)          = kept-wk s
-        kept-wk {B = B} (flatMapˢ op f fl oc k r pl so ls)
-          rewrite cells (FlatKit.Flat.outerDone fl) | leftover-wk {B = B} so | grow-part so | kept-wk {B = B} so | kept-wkᴸ {B = B} ls = refl
-        kept-wk (connectˢ S c b kb k fd rp e rt src bd) =
-          cong₂ (λ n l → U.unionᶜ (U.burstingᶜ rp n) (U.underᶜ (U.live n) l))
-                (trans (cong₂ (At.sourced H′) (grow-part src) (leftover-wk src)) (sourced-≡ (At.part H src) (At.leftover H src)))
-                (kept-wk {B = ⊤} bd)
-        kept-wk (joinˢ j sk l x st)                = refl
-        kept-wk (deferˢ k s)                       = kept-wk s
-
-        kept-wkᴸ : ∀ {Δ A B} (ls : List (Lane h Δ A)) → At.keptL H′ {B = B} (wkLanes τ ls) ≡ At.keptL H {B = B} ls
-        kept-wkᴸ []                = refl
-        kept-wkᴸ {B = B} (lane c k s ∷ ls)
-          rewrite cells (Kit.live c) | grow-part s | kept-wk {B = B} s | leftover-wk {B = B} s | kept-wkᴸ {B = B} ls = refl
-
       pooled-wkᴸ : ∀ {Δ A B} (ls : List (Lane h Δ A)) → At.pooledL H′ {B = B} (wkLanes τ ls) ≡ At.pooledL H {B = B} ls
       pooled-wkᴸ []                = refl
       pooled-wkᴸ (lane c k s ∷ ls) =
@@ -239,33 +216,15 @@ module WeakeningHeaps (R : Set) where
       ... | conn-back {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {src = src} {bd = bd} =
         Each.rests E ψ (trans (sym s) sn) (trans (sym (grow-part (connectˢ S c b kb k fd rp e₀ rt src bd))) eq) (trans (sym (grow-part src)) pn) ec
 
-      -- What the ghost holds leaves, grown as the witness grows: the
-      -- leftover read off a grown tree is the old one's.
-      grow-leaving : ∀ {t : Sub h [] R} → Leaving H t → Leaving H′ (wkTree τ t)
-      Leaving.parts (grow-leaving {t = t} L) ψ′ sn {c} eq =
-        let x , ψ , e , s = unwk t ψ′ in
-        subst (λ z → Leaves c (At.kept H′ {B = ⊤} z)) (sym e)
-          (subst (Leaves c) (sym (kept-wk {B = ⊤} x))
-            (Leaving.parts L ψ (trans (sym s) sn) (trans (sym (grow-part x)) (subst (λ z → At.part H′ z ≡ just c) e eq))))
-      Leaving.pools (grow-leaving {t = t} L) {op = op} {f = f} {pl = pl} ψ′ sn eq with unwk t ψ′
-      ... | x , ψ , e , s with flat-inv x e
-      ... | flat-back {fl = fl} {oc = oc} {k = k} {r = r} {so = so} {ls = ls} =
-        subst (Leaves pl) (sym (pooled-wk fl so ls)) (Leaving.pools L ψ (trans (sym s) sn) (trans (sym (grow-part (flatMapˢ op f fl oc k r pl so ls))) eq))
-      Leaving.rests (grow-leaving {t = t} L) {rp = rp} {e = e₀} {rt = rt} ψ′ sn eq pn ec with unwk t ψ′
-      ... | x , ψ , e , s with conn-inv x e
-      ... | conn-back {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {src = src} {bd = bd} =
-        let lv , bk , rf = Leaving.rests L ψ (trans (sym s) sn) (trans (sym (grow-part (connectˢ S c b kb k fd rp e₀ rt src bd))) eq) (trans (sym (grow-part src)) pn) ec
-        in subst (Leaves rt) (sym (leftover-wk {B = ⊤} src)) lv , subst (Back rt) (sym (leftover-wk {B = ⊤} src)) bk , rf
-
       grow-lingers : ∀ {t : Sub h [] R} → Lingers H t → Lingers H′ (wkTree τ t)
       Lingers.pools (grow-lingers {t = t} L) {op = op} {f = f} {pl = pl} ψ′ sn eq with unwk t ψ′
       ... | x , ψ , e , s with flat-inv x e
       ... | flat-back {fl = fl} {oc = oc} {k = k} {r = r} {so = so} {ls = ls} =
-        subst (λ x → Tied pl x × Restful pl) (sym (pooled-wk fl so ls)) (Lingers.pools L ψ (trans (sym s) sn) (trans (sym (grow-part (flatMapˢ op f fl oc k r pl so ls))) eq))
+        subst (λ x → Leaves pl x × Restful pl) (sym (pooled-wk fl so ls)) (Lingers.pools L ψ (trans (sym s) sn) (trans (sym (grow-part (flatMapˢ op f fl oc k r pl so ls))) eq))
       Lingers.rests (grow-lingers {t = t} L) {rp = rp} {e = e₀} {rt = rt} ψ′ sn eq pn ec with unwk t ψ′
       ... | x , ψ , e , s with conn-inv x e
       ... | conn-back {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {src = src} {bd = bd} =
-        subst (Tied rt) (sym (leftover-wk {B = ⊤} src))
+        subst (λ x → Twin rt x × Restful rt) (sym (leftover-wk {B = ⊤} src))
               (Lingers.rests L ψ (trans (sym s) sn) (trans (sym (grow-part (connectˢ S c b kb k fd rp e₀ rt src bd))) eq) (trans (sym (grow-part src)) pn) ec)
 
       grow-flags : ∀ {Δ A} {t : Sub h Δ A} → DoneBy H t [] → DoneBy H′ (wkTree τ t) []

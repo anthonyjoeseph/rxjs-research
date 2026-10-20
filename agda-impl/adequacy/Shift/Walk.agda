@@ -41,7 +41,7 @@ module ShiftWalk (R : Set) where
   open FlatKit using (Flat)
   open Shared Timeline (Out R) using (Heapᴹ; look)
   open Strongly R using (Sub; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_; pendingˢ; coldˢ; ofˢ; doneˢ; joinˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; lane; Taking; taking; ending; taken; names; laneNames; cutNames; quietName; subjectNames; flatNames; module At; Name; outers; outersL; Feed)
-  open StrongAgainst R using (isTaking; seen; seenL; seen-join; seen-up; Each; Lingers; Pinned; unpinned; Restful; Tied; tie-trans; rest-pinned; bursts-pinned; bursts-moved; under-moved; union-pinned; pinned-trans; pinned-sym; restful-pinned; ∧-split; ∧-join; false≢)
+  open StrongAgainst R using (isTaking; seen; seenL; seen-join; seen-up; Each; Lingers; Leaves; Twin; Restful; tw-refl; tw-union; tw-burst; tw-shift; lv-tie; tw-tie; ∧-split; ∧-join; false≢)
   open StrongHeld R using (DoneBy; Flagged; Heads)
   open Tearing R using (Alike; Off; part-alike; partLanes-alike; seen-alike; seenL-alike; names-path; lanes-path; apart-r; apart-l; narrow; each-same)
   open Moving R using (plant; plantᴸ; planted; plantedᴸ; pairs-r; pairs-split)
@@ -51,7 +51,7 @@ module ShiftWalk (R : Set) where
   open FramingRepool R using (Untold; Ended; ended-head)
   open Keeping R using (leftover-restful)
   open Retagging R using (retag; retagᴸ)
-  open Shifting R using (++-mono; module Alive; module Build; DoneByL; EachL; EndedL; module Flag; module Linger; LingersL; UntoldL; _⊆ᴾ_; conn-pin; cons-untold; each-alike; eachL-alike; eachL-head; eachL-of; eachL-tail; en-sub; enL-head; enL-of; enL-tail; filled; flags-alike; flagsL-alike; if-moved; just≢; leftover-alike; leftoverL-alike; lingers-alike; lingers-sub; lingersL-alike; lingersL-head; lingersL-of; lingersL-tail; map-back; map-fwd; pairs-tl; pin-alike; pooledL-alike; seen-take; sourced-heap; untold-at; ut-sub; utL-head; utL-of; utL-tail; via-≡; ∨-l; ∨-mono; ∨-r; ≡-⊆)
+  open Shifting R using (++-mono; module Alive; module Build; DoneByL; EachL; EndedL; module Flag; module Linger; LingersL; UntoldL; _⊆ᴾ_; conn-tw; cons-untold; each-alike; eachL-alike; eachL-head; eachL-of; eachL-tail; en-sub; enL-head; enL-of; enL-tail; filled; flags-alike; flagsL-alike; tw-if-moved; just≢; leftover-alike; leftoverL-alike; lingers-alike; lingers-sub; lingersL-alike; lingersL-head; lingersL-of; lingersL-tail; map-back; map-fwd; pairs-tl; tw-alike; pooledL-alike; seen-take; sourced-heap; untold-at; ut-sub; utL-head; utL-of; utL-tail; via-≡; ∨-l; ∨-mono; ∨-r; ≡-⊆)
 
   -- Below a live node the path sees, no flag held unset.
   let-go : ∀ {h} (H : Heapᴹ h) {Δ₀ A₀ Δ A} {t : Sub h Δ₀ A₀} {u : Sub h Δ A} (π : Path t u) → AllPairs _≢_ (names t) → seen H π ≡ true
@@ -667,87 +667,82 @@ module ShiftWalk (R : Set) where
     -- WHAT LINGERS, TIED: every pool and every ended source's rest above
     -- the write is tied after it as before.
 
-    module Ties (rs₀ : ∀ {C} → Pinned (U.restˢ {B = ⊤} (At.leftover H {B = C} u)) (U.restˢ {B = ⊤} (At.leftover H′ {B = C} v)))
+    module Ties (rs₀ : ∀ {C} → Twin (At.leftover H {B = C} u) (At.leftover H′ {B = C} v))
                 (lb₀ : Lingers H u → Lingers H′ v) where
       module LG = Linger H′
 
       -- A connect's leftover over a source running on either side: the
-      -- source's own leftover pinned alike, the body's leftover alike.
+      -- source's own leftover twinned, the body's leftover alike.
 
       -- SUSPECT: running, `sourced` reads the source's PART, and nothing
-      -- `Ties` holds relates the part of `u` to that of `v`: `rs₀` pins
+      -- `Ties` holds relates the part of `u` to that of `v`: `rs₀` twins
       -- leftovers only.  With `src` at `u`, a part stepping a skip under
-      -- `rp` written to one that hushes, both leftovers idle, pins a
+      -- `rp` written to one that hushes, both leftovers idle, twins a
       -- skip against a hush.  A route needs the parts' burst rests
-      -- pinned through the write, a parameter beside `rs₀`.
+      -- twinned through the write, a parameter beside `rs₀`.
       postulate
         rest-sourced : ∀ {Δ A B} {src : Sub h Δ A} (π : Path src u) rp {x x′ : U.Node (A ∷ Δ) ⊤}
                      → (is-just (At.part H src) ∨ is-just (At.part H′ (plant π v))) ≡ true
-                     → Pinned (U.restˢ {B = ⊤} (At.leftover H {B = A} src)) (U.restˢ {B = ⊤} (At.leftover H′ {B = A} (plant π v)))
+                     → Twin (At.leftover H {B = A} src) (At.leftover H′ {B = A} (plant π v))
                      → x′ ≡ x
-                     → Pinned (U.restˢ {B = ⊤} (U.unionᶜ {B = B} (U.burstingᶜ rp (At.sourced H (At.part H src) (At.leftover H src)))
-                                                                (U.underᶜ (U.live (At.sourced H (At.part H src) (At.leftover H src))) x)))
-                              (U.restˢ {B = ⊤} (U.unionᶜ {B = B} (U.burstingᶜ rp (At.sourced H′ (At.part H′ (plant π v)) (At.leftover H′ (plant π v))))
-                                                                (U.underᶜ (U.live (At.sourced H′ (At.part H′ (plant π v)) (At.leftover H′ (plant π v)))) x′)))
+                     → Twin (U.unionᶜ {B = B} (U.burstingᶜ rp (At.sourced H (At.part H src) (At.leftover H src)))
+                                             (U.underᶜ (U.live (At.sourced H (At.part H src) (At.leftover H src))) x))
+                            (U.unionᶜ {B = B} (U.burstingᶜ rp (At.sourced H′ (At.part H′ (plant π v)) (At.leftover H′ (plant π v))))
+                                             (U.underᶜ (U.live (At.sourced H′ (At.part H′ (plant π v)) (At.leftover H′ (plant π v)))) x′))
 
       src-rested : ∀ {Δ A B} {src : Sub h Δ A} (π : Path src u) rp {x x′ : U.Node (A ∷ Δ) ⊤}
-                 → Pinned (U.restˢ {B = ⊤} (At.leftover H {B = A} src)) (U.restˢ {B = ⊤} (At.leftover H′ {B = A} (plant π v)))
+                 → Twin (At.leftover H {B = A} src) (At.leftover H′ {B = A} (plant π v))
                  → x′ ≡ x → (s s′ : Maybe (U.Node Δ A)) → At.part H src ≡ s → At.part H′ (plant π v) ≡ s′
-                 → Pinned (U.restˢ {B = ⊤} (U.unionᶜ {B = B} (U.burstingᶜ rp (At.sourced H (At.part H src) (At.leftover H src)))
-                                                            (U.underᶜ (U.live (At.sourced H (At.part H src) (At.leftover H src))) x)))
-                          (U.restˢ {B = ⊤} (U.unionᶜ {B = B} (U.burstingᶜ rp (At.sourced H′ (At.part H′ (plant π v)) (At.leftover H′ (plant π v))))
-                                                            (U.underᶜ (U.live (At.sourced H′ (At.part H′ (plant π v)) (At.leftover H′ (plant π v)))) x′)))
+                 → Twin (U.unionᶜ {B = B} (U.burstingᶜ rp (At.sourced H (At.part H src) (At.leftover H src)))
+                                         (U.underᶜ (U.live (At.sourced H (At.part H src) (At.leftover H src))) x))
+                        (U.unionᶜ {B = B} (U.burstingᶜ rp (At.sourced H′ (At.part H′ (plant π v)) (At.leftover H′ (plant π v))))
+                                         (U.underᶜ (U.live (At.sourced H′ (At.part H′ (plant π v)) (At.leftover H′ (plant π v)))) x′))
       src-rested {src = src} π rp up lb nothing nothing p p′ rewrite p | p′ =
-        union-pinned (bursts-moved rp stepped up) (under-moved (U.live (At.leftover H src)) (U.live (At.leftover H′ (plant π v))) (pin-alike lb))
-        where
-          stepped : Pinned (U.step (At.leftover H src)) (U.step (At.leftover H′ (plant π v)))
-          stepped = pinned-trans (restful-pinned (leftover-restful H src))
-                      (pinned-trans (rest-pinned (At.leftover H src))
-                        (pinned-trans up
-                          (pinned-trans (rest-pinned (At.leftover H′ (plant π v)))
-                            (pinned-sym (restful-pinned (leftover-restful H′ (plant π v)))))))
+        tw-union (tw-burst rp (leftover-restful H src) (leftover-restful H′ (plant π v)) up)
+                 (subst (λ z → Twin (U.underᶜ (U.live (At.leftover H src)) x) (U.underᶜ (U.live (At.leftover H′ (plant π v))) z)) (sym lb)
+                   (tw-shift x (leftover-restful H src) (leftover-restful H′ (plant π v)) up))
       src-rested π rp up lb (just _) s′       p p′ = rest-sourced π rp (∨-l (cong is-just p)) up lb
       src-rested {src = src} π rp up lb nothing (just _) p p′ = rest-sourced π rp (∨-r (is-just (At.part H src)) (cong is-just p′)) up lb
 
       mutual
         restedUp : ∀ {Δ A} {t : Sub h Δ A} (π : Path t u) → AllPairs _≢_ (names t)
-                 → ∀ {C} → Pinned (U.restˢ {B = ⊤} (At.leftover H {B = C} t)) (U.restˢ {B = ⊤} (At.leftover H′ {B = C} (plant π v)))
+                 → ∀ {C} → Twin (At.leftover H {B = C} t) (At.leftover H′ {B = C} (plant π v))
         restedUp here ps = rs₀
         restedUp (in-map π) ps = restedUp π ps
         restedUp (in-scan π) ps = restedUp π (pairs-tl ps)
         restedUp (in-take {c = c} {k} π) ps = restedUp π (Take.fresh c k π ps)
         restedUp (in-outer {fl = fl} {oc} {k} {r} {ls = ls} π) ps =
-          union-pinned (restedUp π O.fresh) (pin-alike (leftoverL-alike H H′ ls O.lanesA))
+          tw-union (restedUp π O.fresh) (tw-alike (leftoverL-alike H H′ ls O.lanesA))
           where module O = Outer fl oc k r ls π ps
         restedUp (in-lanes {fl = fl} {oc} {k} {r} {t = so} πL) ps =
-          union-pinned (pin-alike (leftover-alike H H′ so Ln.soA)) (restedUpL πL Ln.fresh)
+          tw-union (tw-alike (leftover-alike H H′ so Ln.soA)) (restedUpL πL Ln.fresh)
           where module Ln = Lanes fl oc k r so πL ps
         restedUp (in-source {S = S} {c} {b} {kb} {k} {rp = rp} {t = src} {bd} π) ps =
           src-rested π rp (restedUp π Sr.fresh) (leftover-alike H H′ bd Sr.bdA) (At.part H src) (At.part H′ (plant π v)) refl refl
           where module Sr = Source S c b kb k bd π ps
         restedUp (in-body {S = S} {c} {b} {kb} {k} {rp = rp} {t = src} {bd} π) ps =
-          conn-pin rp (At.sourced H (At.part H src) (At.leftover H src)) (At.sourced H′ (At.part H′ src) (At.leftover H′ src))
+          conn-tw rp (At.sourced H (At.part H src) (At.leftover H src)) (At.sourced H′ (At.part H′ src) (At.leftover H′ src))
             (trans (sourced-heap H H′ (At.part H′ src) (At.leftover H′ src)) (cong₂ (At.sourced H) Bd.source (leftover-alike H H′ src Bd.srcA)))
             (restedUp π Bd.fresh)
           where module Bd = Body S c b kb k src π ps
         restedUp (in-defer {k = k} π) ps = restedUp π (pairs-r (quietName k) ps)
 
         restedUpL : ∀ {Δ B} {ls : List (Lane h Δ B)} (πL : PathLanes ls u) → AllPairs _≢_ (laneNames ls)
-                  → ∀ {C} → Pinned (U.restˢ {B = ⊤} (At.leftoverL H {B = C} ls)) (U.restˢ {B = ⊤} (At.leftoverL H′ {B = C} (plantᴸ πL v)))
+                  → ∀ {C} → Twin (At.leftoverL H {B = C} ls) (At.leftoverL H′ {B = C} (plantᴸ πL v))
         restedUpL (this-lane {c = c} {k} {t = s} {ls} π) ps =
-          union-pinned (restedUp π Th.fresh) (pin-alike (leftoverL-alike H H′ ls Th.restA))
+          tw-union (restedUp π Th.fresh) (tw-alike (leftoverL-alike H H′ ls Th.restA))
           where module Th = This c k ls π ps
         restedUpL (next-lane {l = lane c k s} {ls} πL) ps =
-          union-pinned (pin-alike (leftover-alike H H′ s Nx.headA)) (restedUpL πL Nx.fresh)
+          tw-union (tw-alike (leftover-alike H H′ s Nx.headA)) (restedUpL πL Nx.fresh)
           where module Nx = Next c k s πL ps
 
       pooledUpL : ∀ {Δ B} {ls : List (Lane h Δ B)} (πL : PathLanes ls u) → AllPairs _≢_ (laneNames ls)
-                → ∀ {C} → Pinned (U.restˢ {B = ⊤} (At.pooledL H {B = C} ls)) (U.restˢ {B = ⊤} (At.pooledL H′ {B = C} (plantᴸ πL v)))
+                → ∀ {C} → Twin (At.pooledL H {B = C} ls) (At.pooledL H′ {B = C} (plantᴸ πL v))
       pooledUpL (this-lane {c = c} {k} {t = s} {ls} π) ps =
-        if-moved Th.live′ (pin-alike (pooledL-alike H H′ ls Th.restA)) (union-pinned (restedUp π Th.fresh) (pin-alike (pooledL-alike H H′ ls Th.restA)))
+        tw-if-moved Th.live′ (tw-alike (pooledL-alike H H′ ls Th.restA)) (tw-union (restedUp π Th.fresh) (tw-alike (pooledL-alike H H′ ls Th.restA)))
         where module Th = This c k ls π ps
       pooledUpL (next-lane {l = lane c k s} {ls} πL) ps =
-        if-moved Nx.live′ (pooledUpL πL Nx.fresh) (union-pinned (pin-alike (leftover-alike H H′ s Nx.headA)) (pooledUpL πL Nx.fresh))
+        tw-if-moved Nx.live′ (pooledUpL πL Nx.fresh) (tw-union (tw-alike (leftover-alike H H′ s Nx.headA)) (pooledUpL πL Nx.fresh))
         where module Nx = Next c k s πL ps
 
       mutual
@@ -769,16 +764,16 @@ module ShiftWalk (R : Set) where
             (lingersL-alike H H′ O.lanesA (lingersL-of H lg))
           where
             module O = Outer fl oc k r ls π ps
-            pool : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl (plant π v) ls) ≡ just n → Tied pl (At.pooled H′ fl (plant π v) ls) × Restful pl
-            pool x = held (in-outer {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {ls = ls} π) ps x (λ x₀ → tie-trans (Lingers.pools lg here refl x₀)
-                       (union-pinned (if-moved {y = U.idleᶜ} {y′ = U.idleᶜ} (cong lower O.done) (restedUp π O.fresh) unpinned) (pin-alike (pooledL-alike H H′ ls O.lanesA))))
+            pool : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl (plant π v) ls) ≡ just n → Leaves pl (At.pooled H′ fl (plant π v) ls) × Restful pl
+            pool x = held (in-outer {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {ls = ls} π) ps x (λ x₀ → lv-tie (Lingers.pools lg here refl x₀)
+                       (proj₁ (tw-union (tw-if-moved {y = U.idleᶜ} {y′ = U.idleᶜ} (cong lower O.done) (restedUp π O.fresh) (tw-refl U.idleᶜ)) (tw-alike (pooledL-alike H H′ ls O.lanesA)))))
         shiftLg (in-lanes {op = op} {f} {fl} {oc} {k} {r} {pl} {t = so} {ls} πL) ps lg en =
           LG.lg-flat pool (lingers-alike H H′ Ln.soA (lingers-sub H lg (in-outer here) refl)) (shiftLgL πL Ln.fresh (lingersL-of H lg) (enL-of H en))
           where
             module Ln = Lanes fl oc k r so πL ps
-            pool : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl so (plantᴸ πL v)) ≡ just n → Tied pl (At.pooled H′ fl so (plantᴸ πL v)) × Restful pl
-            pool x = held (in-lanes {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} πL) ps x (λ x₀ → tie-trans (Lingers.pools lg here refl x₀)
-                       (union-pinned (if-moved {y = U.idleᶜ} {y′ = U.idleᶜ} (cong lower Ln.done) (pin-alike (leftover-alike H H′ so Ln.soA)) unpinned) (pooledUpL πL Ln.fresh)))
+            pool : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl so (plantᴸ πL v)) ≡ just n → Leaves pl (At.pooled H′ fl so (plantᴸ πL v)) × Restful pl
+            pool x = held (in-lanes {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} πL) ps x (λ x₀ → lv-tie (Lingers.pools lg here refl x₀)
+                       (proj₁ (tw-union (tw-if-moved {y = U.idleᶜ} {y′ = U.idleᶜ} (cong lower Ln.done) (tw-alike (leftover-alike H H′ so Ln.soA)) (tw-refl U.idleᶜ)) (pooledUpL πL Ln.fresh))))
         shiftLg (in-source {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = src} {bd} π) ps lg en =
           LG.lg-connect rest ls lb
           where
@@ -791,8 +786,8 @@ module ShiftWalk (R : Set) where
             lb : (is-just (At.part H′ (plant π v)) ∨ is-just e) ≡ true → Lingers H′ bd
             lb js = lingers-alike H H′ Sr.bdA (lingers-sub H lg (in-body here) (∧-join (∨-mono (is-just e) (revive π Sr.fresh) js) refl))
             rest : ∀ {n} → At.part H′ (connectˢ S c b kb k fd rp e rt (plant π v) bd) ≡ just n → At.part H′ (plant π v) ≡ nothing
-                 → ∀ {c₀} → e ≡ just c₀ → Tied rt (At.leftover H′ {B = ⊤} (plant π v))
-            rest x _ pe = held (in-source {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {e = e} {rp = rp} {rt = rt} {bd = bd} π) ps x (λ x₀ → pinned-trans (Lingers.rests lg here refl x₀ (en here refl x₀ pe) pe) (restedUp π Sr.fresh))
+                 → ∀ {c₀} → e ≡ just c₀ → Twin rt (At.leftover H′ {B = ⊤} (plant π v)) × Restful rt
+            rest x _ pe = held (in-source {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {e = e} {rp = rp} {rt = rt} {bd = bd} π) ps x (λ x₀ → tw-tie (Lingers.rests lg here refl x₀ (en here refl x₀ pe) pe) (restedUp π Sr.fresh))
         shiftLg (in-body {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = src} {bd} π) ps lg en =
           LG.lg-connect rest ls lb
           where
@@ -805,9 +800,9 @@ module ShiftWalk (R : Set) where
                 sb : (is-just (At.part H src) ∨ is-just e) ∧ true ≡ true
                 sb = ∧-join (∨-mono (is-just e) (via-≡ is-just Bd.source) js) refl
             rest : ∀ {n} → At.part H′ (connectˢ S c b kb k fd rp e rt src (plant π v)) ≡ just n → At.part H′ src ≡ nothing
-                 → ∀ {c₀} → e ≡ just c₀ → Tied rt (At.leftover H′ {B = ⊤} src)
-            rest x pn pe = held (in-body {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {e = e} {rp = rp} {rt = rt} {t = src} π) ps x (λ x₀ → pinned-trans (Lingers.rests lg here refl x₀ (trans (sym Bd.source) pn) pe)
-                             (pin-alike (leftover-alike H H′ src Bd.srcA)))
+                 → ∀ {c₀} → e ≡ just c₀ → Twin rt (At.leftover H′ {B = ⊤} src) × Restful rt
+            rest x pn pe = held (in-body {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {e = e} {rp = rp} {rt = rt} {t = src} π) ps x (λ x₀ → tw-tie (Lingers.rests lg here refl x₀ (trans (sym Bd.source) pn) pe)
+                             (tw-alike (leftover-alike H H′ src Bd.srcA)))
         shiftLg (in-defer {k = k} π) ps lg en =
           LG.lg-defer (shiftLg π (pairs-r (quietName k) ps) (lingers-sub H lg (in-defer here) refl) (en-sub H en (in-defer here) refl))
 
