@@ -20,6 +20,7 @@ module simultaneous.Pure where
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; concat; map)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
+open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; sym; cong; cong₂; subst₂)
@@ -33,7 +34,8 @@ open import denotation.Observe using (events)
 open import simultaneous.InstEmit using (InstEmit)
 open import simultaneous.Leaf using (WithFresh; _≟ᵖ_; ⟦_⟧ˢ)
 open import simultaneous.SObs using (SObs; module Elaborate)
-open import simultaneous.Spec _≟ᵖ_ using (batchSimultaneousᴰ)
+import simultaneous.Spec as Spec
+open Spec _≟ᵖ_ using (batchSimultaneousᴰ)
 open import simultaneous.Readings using (values; over; FiniteInstants; stamped; closed)
 open import simultaneous.Statement using (batchedObs; elaborated; batched; left-to-right; batchable)
 

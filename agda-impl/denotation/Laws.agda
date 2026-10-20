@@ -9,7 +9,8 @@ module denotation.Laws where
 
 open import Data.Bool using (true; false)
 open import Data.List using ([])
-open import Data.Nat using (ℕ; zero; suc)
+open import Data.List.Relation.Unary.All using ([])
+open import Data.Nat using (zero; suc)
 open import Data.Product using (_,_)
 open import Function using (_∘_)
 

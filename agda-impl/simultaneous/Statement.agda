@@ -49,18 +49,19 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Tree using (Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList.Events using (Events; Pos; Timeline; root)
-open import denotation.MonotonicList using (MonotonicList; observe; ⊥ᴰ; deferᴰ; spin)
+open import denotation.MonotonicList using (MonotonicList; observe; ⊥ᴰ; deferᴰ; spin; Settling; lub)
 open import denotation.Denote using (DenEnv; ⟦_⟧)
-open import denotation.Compositional using (Admissible; module Over)
+open import denotation.Compositional using (module Over)
 open import denotation.Observe using (events)
 open import simultaneous.InstEmit using (InstEmit)
 open import simultaneous.Leaf using (leafᴰ; _≟ᵖ_; approxˢ; ⟦_⟧ˢ)
 open import simultaneous.SObs using (SObs; module Elaborate)
-open import simultaneous.Spec _≟ᵖ_ using (batchSimultaneousᴰ)
+import simultaneous.Spec as Spec
+open Spec _≟ᵖ_ using (batchSimultaneousᴰ)
 open import simultaneous.Readings using (instantOf; outs; values; positions; over; FiniteInstants; Rooted; Site; at-root; stamped; closed)
 
-open Elaborate {C = Timeline} _≟ᵖ_ using (E; IE; elaborate; batchSimultaneous; coldˢ; emptyˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ)
-open Over leafᴰ using (through-limit)
+open Elaborate {C = Timeline} _≟ᵖ_ using (E; IE; elaborate; batchSimultaneous; coldˢ; emptyˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; elaborate-cold; elaborate-empty; elaborate-of; elaborate-map; elaborate-scan; elaborate-takeWhile; elaborate-flatMap; elaborate-connect; elaborate-connected; elaborate-defer)
+open Over leafᴰ using (settles)
 
 -- The program the author's stands for: elaborated, batched on top.
 batchedObs : ∀ {A} → SObs [] A → E [] (IE (List A))
@@ -194,6 +195,21 @@ spin-silent p i (suc n) = spin-silent p (suc i) n
   subst-pairs refl = []
 
 ------------------------------------------------------------------------
+-- THROUGH THE LIMIT: what holds of every approximant, and survives a
+-- settling limit, holds of the meaning.  This carries a fact proven one
+-- approximant at a time, by induction on (n , tree), past `defer`.
+
+-- What holds of every element of a chain whose elements agree ever longer
+-- holds of its limit.  Any property read off finitely many events of each
+-- subscription does.
+Admissible : ∀ {A} → (MonotonicList A → Set) → Set
+Admissible {A} P = ∀ {c : ℕ → MonotonicList A} → Settling c → (∀ n → P (c n)) → P (lub c)
+
+through-limit : ∀ {Γ A} {P : MonotonicList A → Set} → Admissible P → (o : E Γ A) (ρ : DenEnv Γ)
+              → (∀ n → P (approxˢ n o ρ)) → P (⟦ o ⟧ˢ ρ)
+through-limit adm o ρ h = adm (settles o ρ) h
+
+------------------------------------------------------------------------
 -- The leaves: each elaborated former keeps soundness, one approximant at
 -- a time, and soundness survives the limit.
 
@@ -216,24 +232,29 @@ postulate
                    → Sound (approxˢ n s ρ) → (∀ {r} → Sound r → Sound (approxˢ n b (r ∷ ρ)))
                    → Sound (approxˢ n (connectˢ s b) ρ)
 
+-- Soundness of what a program elaborates to, read across its equation.
+via : ∀ {Γ A n} {ρ : DenEnv Γ} {o e : E Γ (IE A)} → o ≡ e → Sound (approxˢ n e ρ) → Sound (approxˢ n o ρ)
+via refl s = s
+
 -- Induction on (n , program), as `approx` recurses.
 approx-sound : ∀ {Γ A} n (o : SObs Γ A) {ρ : DenEnv (L.map IE Γ)} → Sounds ρ → Sound (approxˢ n (elaborate o) ρ)
-approx-sound n       (cold c)          ss = coldˢ-sound n c
-approx-sound n       empty             ss = emptyˢ-sound n
-approx-sound n       (of xs)           ss = ofˢ-sound n xs
-approx-sound n       (map f s)         ss = mapˢ-sound n f (elaborate s) (approx-sound n s ss)
-approx-sound n       (scan f z s)      ss = scanˢ-sound n f z (elaborate s) (approx-sound n s ss)
-approx-sound n       (takeWhile i p s) ss = takeWhileˢ-sound n i p (elaborate s) (approx-sound n s ss)
-approx-sound n       (flatMap op f s)  ss =
-  flatMapˢ-sound n op (λ a → elaborate (f a)) (elaborate s) (λ a → approx-sound n (f a) ss) (approx-sound n s ss)
-approx-sound n       (connect s b)     ss =
-  connectˢ-sound n (elaborate s) (elaborate b) (approx-sound n s ss) (λ sr → approx-sound n b (sr ∷ ss))
-approx-sound n       (connected i)     ss = looked ss i
-approx-sound zero    (defer l)         ss = ⊥-sound
-approx-sound (suc n) (defer l)         ss = defer-sound (approx-sound n (Later.force l) ss)
+approx-sound n       (cold c)          ss = via (elaborate-cold c) (coldˢ-sound n c)
+approx-sound n       empty             ss = via elaborate-empty (emptyˢ-sound n)
+approx-sound n       (of xs)           ss = via (elaborate-of xs) (ofˢ-sound n xs)
+approx-sound n       (map f s)         ss = via (elaborate-map f s) (mapˢ-sound n f (elaborate s) (approx-sound n s ss))
+approx-sound n       (scan f z s)      ss = via (elaborate-scan f z s) (scanˢ-sound n f z (elaborate s) (approx-sound n s ss))
+approx-sound n       (takeWhile i p s) ss =
+  via (elaborate-takeWhile i p s) (takeWhileˢ-sound n i p (elaborate s) (approx-sound n s ss))
+approx-sound n       (flatMap op f s)  ss = via (elaborate-flatMap op f s)
+  (flatMapˢ-sound n op (λ a → elaborate (f a)) (elaborate s) (λ a → approx-sound n (f a) ss) (approx-sound n s ss))
+approx-sound n       (connect s b)     ss = via (elaborate-connect s b)
+  (connectˢ-sound n (elaborate s) (elaborate b) (approx-sound n s ss) (λ sr → approx-sound n b (sr ∷ ss)))
+approx-sound n       (connected i)     ss = via (elaborate-connected i) (looked ss i)
+approx-sound zero    (defer l)         ss = via (elaborate-defer l) ⊥-sound
+approx-sound (suc n) (defer l)         ss = via (elaborate-defer l) (defer-sound (approx-sound n (Later.force l) ss))
 
 elaborated-sound : ∀ {Γ A} (o : SObs Γ A) {ρ : DenEnv (L.map IE Γ)} → Sounds ρ → Sound (⟦ elaborate o ⟧ˢ ρ)
-elaborated-sound o {ρ} ss = through-limit sound-admissible (elaborate o) ρ λ n → approx-sound n o ss
+elaborated-sound o {ρ} ss = through-limit {P = Sound} sound-admissible (elaborate o) ρ λ n → approx-sound n o ss
 
 ------------------------------------------------------------------------
 -- At every subscription, in every environment

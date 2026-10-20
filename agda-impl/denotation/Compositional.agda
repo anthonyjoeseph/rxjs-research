@@ -21,8 +21,10 @@ open import Level using (lower)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList.Events using (Timeline; ix; idle)
-open import denotation.MonotonicList using (MonotonicList; coldᴰ; skip⁼; stop; stopᵀ; agreeᵀ-refl; _≈[_]_; agrees; agree; agreeᵀ; _≈_; Settling; Contractive; lub; lub-limit; ≈ₖ-refl; ≈ₖ-sym; ≈ₖ-trans; ≈ₖ-pred; emptyᴰ; ofᴰ; mapᴰ; scanᴰ; takeWhileᴰ; flatMapᴰ; connectᴰ; deferᴰ)
+open import denotation.MonotonicList.Events using (ix; idle)
+open import denotation.MonotonicList using (MonotonicList; coldᴰ; skip⁼; stop; stopᵀ; agreeᵀ-refl; _≈[_]_; agrees; agree; agreeᵀ; _≈_;
+  Settling; Contractive; lub-limit; ≈ₖ-refl; ≈ₖ-sym; ≈ₖ-trans; ≈ₖ-pred; emptyᴰ; ofᴰ; mapᴰ;
+  scanᴰ; takeWhileᴰ; flatMapᴰ; connectᴰ; deferᴰ)
 open import denotation.Denote using (DenEnv; flatOp)
 import denotation.Denote as D
 open import denotation.NonExpansive using (mapᴰ-ne; scanᴰ-ne; takeWhileᴰ-ne; flatMapᴰ-ne; connectᴰ-ne)
@@ -46,12 +48,6 @@ env-refl (r ∷ ρ) = ≈ₖ-refl r ∷ᵉ env-refl ρ
 lookup-agree : ∀ {k Γ A} {ρ σ : DenEnv Γ} → EnvAgree k ρ σ → (i : A ∈ Γ) → lookup ρ i ≈[ k ] lookup σ i
 lookup-agree (a ∷ᵉ _) (here refl) = a
 lookup-agree (_ ∷ᵉ e) (there i)   = lookup-agree e i
-
--- A property survives a settling limit: what holds of every element of
--- a chain whose elements agree ever longer holds of its limit.  Any
--- property read off finitely many events of each subscription does.
-Admissible : ∀ {A} → (MonotonicList A → Set) → Set
-Admissible {A} P = ∀ {c : ℕ → MonotonicList A} → Settling c → (∀ n → P (c n)) → P (lub c)
 
 -- Generic in the leaf, as the meaning is.
 module Over {C : Set → Set₁} (leaf : ∀ {A} → C A → MonotonicList A) where
@@ -96,13 +92,6 @@ module Over {C : Set → Set₁} (leaf : ∀ {A} → C A → MonotonicList A) wh
   toward : ∀ {Γ A} k (o : Obs C Γ A) (ρ : DenEnv Γ) → approx k o ρ ≈[ k ] ⟦ o ⟧ ρ
   toward k o ρ = lub-limit (settles o ρ) k
 
-  -- THROUGH THE LIMIT: what holds of every approximant, and survives a
-  -- settling limit, holds of the meaning.  This is what carries a fact
-  -- proven one approximant at a time, by induction on (n , tree), past
-  -- `defer` and recursion.
-  through-limit : ∀ {Γ A} {P : MonotonicList A → Set} → Admissible P → (o : Obs C Γ A) (ρ : DenEnv Γ)
-                → (∀ n → P (approx n o ρ)) → P (⟦ o ⟧ ρ)
-  through-limit adm o ρ h = adm (settles o ρ) h
 
   -- The meaning is approximant k for k steps.
   from : ∀ {Γ A} k (o : Obs C Γ A) (ρ : DenEnv Γ) → ⟦ o ⟧ ρ ≈[ k ] approx k o ρ

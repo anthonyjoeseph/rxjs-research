@@ -136,10 +136,14 @@ Members: `placing`, `ticks-up`.
 
 The statements are about srxjs only once srxjs is a program: each
 primitive rebuilt over InstEmits with `fresh` names, and the batcher built
-from primitives. Settled when each is a body, oracle-checked against the
-TypeScript.
+from primitives. `elaborate` must pass Agda's productivity check through
+`defer`, so each clause is constructors around the elaborated child.
+Settled when each equation holds by `refl`, oracle-checked.
 
-Members: `coldˢ`, `emptyˢ`, `ofˢ`, `mapˢ`, `scanˢ`, `takeWhileˢ`,
+Members: `elaborate`, `elaborate-cold`, `elaborate-empty`, `elaborate-of`,
+`elaborate-map`, `elaborate-scan`, `elaborate-takeWhile`,
+`elaborate-flatMap`, `elaborate-connect`, `elaborate-connected`,
+`elaborate-defer`, `coldˢ`, `emptyˢ`, `ofˢ`, `mapˢ`, `scanˢ`, `takeWhileˢ`,
 `flatMapˢ`, `connectˢ`, `batchSimultaneous`.
 
 #### THE INSTANTS

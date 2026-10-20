@@ -12,7 +12,7 @@
 -- instant it was minted in, read off by `instantOf` like any position.
 module simultaneous.Leaf where
 
-open import Data.List using (List; []; _∷_)
+open import Data.List using ([]; _∷_)
 open import Data.Nat using (ℕ)
 import Data.Nat as ℕ
 open import Level using (lower)
