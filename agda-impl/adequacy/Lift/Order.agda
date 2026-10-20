@@ -64,7 +64,7 @@ module LiftingOrder (R : Set) where
   open SortingWalk R using (Beyond)
   open Run (Pureᴾ R) using (Act; module Kit; module FlatKit)
   open Strongly R using (Sub; pendingˢ; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; here; module At; fired; waiting; Path; emitC; kontC; Leaf; feedC; srcC; taking; taken; feeding; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _≗_; rootObs; ⊕-here) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
-  open StrongAgainst R using (Books; Queue; Kernels; Meaning; Owned; Each; Lingers; pinned-skip; seen; seenL; owned-to)
+  open StrongAgainst R using (Books; Queue; Kernels; Meaning; Owned; Each; Lingers; pinned-skip; tied-of; seen; seenL; owned-to)
   open StrongHeld R using (Strong; Carried; carried; Heads; DoneBy; Meets; module Eaching; module Lingering)
   open StrongAgainst.Against R using (CtlAs; calmAs; noteAs; runAs; subAs; burstAs; bursts; agenda) renaming (Placed to Placedᴬ)
   open Moving R using (plant; true≢false)
@@ -420,7 +420,7 @@ module LiftingOrder (R : Set) where
             → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {c} → At.part (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl so ls) ≡ just c
             → Σ Pos λ q → Σ (U.Node Δ′ B′) λ pl′ → U.step pl ≡ U.skipˢ q pl′ × Under p q
   pl-pin {m = m} cr π fc op sn {fl = fl} {pl = pl} {so = so} {ls = ls} ψ σ e se pt with pooled-pin cr π fc op sn ψ σ e se pt
-  ... | q , y′ , ey , u with pinned-skip (proj₁ (Lingers.pools (Carried.lingers cr) ψ se pt)) ey
+  ... | q , y′ , ey , u with pinned-skip (tied-of (Lingers.pools (Carried.lingers cr) ψ se pt)) ey
   ... | pl′ , es = q , pl′ , es , u
 
   under-snoc : ∀ {p q} j → Under p q → Under p (q ++ [ j ])
@@ -451,7 +451,7 @@ module LiftingOrder (R : Set) where
   rest-pin {m = m} cr π fc op sn {rp = rp} {rt = rt} {src = src} {bd = bd} ψ σ eq se {n} pt ps {c₀} refl
     with left-pin cr π fc op sn ψ σ eq se pt ps refl
   ... | q , y′ , ey , u
-    with pinned-skip (Lingers.rests (Carried.lingers cr) ψ se pt ps refl) ey
+    with pinned-skip (tied-of (proj₁ (proj₁ (Lingers.rests (Carried.lingers cr) ψ se pt ps refl)) , proj₂ (Lingers.rests (Carried.lingers cr) ψ se pt ps refl))) ey
   ... | rt′ , er
     with ended-just {H = Conf.heap (Mach.conf m)} rp c₀ rt (At.part (Conf.heap (Mach.conf m)) bd)
            (subst (λ s → At.connected (Conf.heap (Mach.conf m)) rp (just c₀) rt s (At.part (Conf.heap (Mach.conf m)) bd) ≡ just n) ps pt)

@@ -6,8 +6,8 @@
 module adequacy.Leaves where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
-open import Data.List using (List; _∷_)
-open import Data.Maybe using (Maybe)
+open import Data.List using (List; []; _∷_)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (zero; suc)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
@@ -145,7 +145,7 @@ record Leaves {Γ A B} (x : U.Node Γ A) (y : U.Node Γ B) : Set₁ where
   constructor leaves
   field agree : ∀ (ρ : U.NEnv Γ) → Deep (U.restᶜ {B = ⊤} x) ρ → ∀ n → Agree n (U.meaning (U.restᶜ {B = ⊤} x) ρ) (U.meaning (U.restᶜ {B = ⊤} y) ρ)
         deep  : ∀ (ρ : U.NEnv Γ) → Deep (U.restᶜ {B = ⊤} x) ρ → Deep (U.restᶜ {B = ⊤} y) ρ
-        pin   : Pinned (U.restˢ {B = ⊤} x) (U.restˢ {B = ⊤} y)
+        pins  : Pinned (U.restˢ {B = ⊤} x) (U.restˢ {B = ⊤} y)
 
 -- The order read back, from the witness's rest to the node's: a
 -- flatMap's part is in order by its whole meaning, which no rest
@@ -246,7 +246,7 @@ lv-union {x = x} {y} {x′} {y′} (leaves ax dx px) (leaves ay dy py) =
 -- A body's rest under one source.
 lv-under : ∀ {Γ A C D B B′} (s : U.Source Γ A) {b : U.Node (A ∷ Γ) C} {b′ : U.Node (A ∷ Γ) D}
          → Leaves b b′ → Leaves (U.underᶜ {B = B} s b) (U.underᶜ {B = B′} s b′)
-lv-under {B = B} {B′} s {b} {b′} (leaves a d p) = leaves (λ ρ e n → a (env s ρ) (inner s ρ e) n) (dp s) (under-moved s s (pinned-trans (rest-pinned b) (pinned-trans p (rest-pinned b′))))
+lv-under {B = B} {B′} s {b} {b′} (leaves a d p) = leaves (ag s) (dp s) (under-moved s s (pinned-trans (rest-pinned b) (pinned-trans p (rest-pinned b′))))
   where
     env : U.Source _ _ → U.NEnv _ → U.NEnv _
     env (U.live s₀)    ρ = U.meaning s₀ ρ ∷ᴬ ρ
@@ -254,6 +254,9 @@ lv-under {B = B} {B′} s {b} {b′} (leaves a d p) = leaves (λ ρ e n → a (e
     inner : ∀ s₀ ρ → Deep (U.restᶜ {B = ⊤} (U.underᶜ {B = B} s₀ b)) ρ → Deep (U.restᶜ {B = ⊤} b) (env s₀ ρ)
     inner (U.live s₀)  ρ (_ , _ , db) = deepR-rest db
     inner (U.ended c t) ρ (_ , _ , db) = deepR-rest db
+    ag : ∀ s₀ ρ → Deep (U.restᶜ {B = ⊤} (U.underᶜ {B = B} s₀ b)) ρ → ∀ n → Agree n (U.meaning (U.restᶜ {B = ⊤} (U.underᶜ {B = B} s₀ b)) ρ) (U.meaning (U.restᶜ {B = ⊤} (U.underᶜ {B = B′} s₀ b′)) ρ)
+    ag (U.live s₀)  ρ e n = a (env (U.live s₀) ρ) (inner (U.live s₀) ρ e) n
+    ag (U.ended c t) ρ e n = a (env (U.ended c t) ρ) (inner (U.ended c t) ρ e) n
     dp : ∀ s₀ ρ → Deep (U.restᶜ {B = ⊤} (U.underᶜ {B = B} s₀ b)) ρ → Deep (U.restᶜ {B = ⊤} (U.underᶜ {B = B′} s₀ b′)) ρ
     dp (U.live s₀)  ρ e@(_ , ds , _) = deepR-rest {c = U.underᶜ (U.live s₀) b′} (ds , proj₂ (d _ (inner (U.live s₀) ρ e)))
     dp (U.ended c t) ρ e@(_ , dt , _) = deepR-rest {c = U.underᶜ (U.ended c t) b′} (dt , proj₂ (d _ (inner (U.ended c t) ρ e)))
@@ -370,15 +373,9 @@ mutual
 -- Unions moved
 
 private
-  ordered-hush : ∀ {A} → Ordered {A} hush
-  ordered-hush .ordered = tt
-
   union-hush : ∀ {Γ A C} {p y : U.Node Γ A} {sp : U.Step Γ A} {s′ : U.Step Γ C} → Pinned sp s′ → Pinned (U.unionˢ p sp y U.hushˢ) s′
   union-hush pinned   = pinned
   union-hush unpinned = unpinned
-
-deep-idle : ∀ {Γ A} {ρ : U.NEnv Γ} → Deep (U.idleᶜ {B = A}) ρ
-deep-idle = ordered-hush , tt
 
 -- A rest's rest is the rest.
 tw-rest : ∀ {Γ A B} (x : U.Node Γ A) → Twin (U.restᶜ {B = B} x) x
@@ -449,4 +446,4 @@ tw-tie (t , rf) t′ = tw-trans t t′ , rf
 
 -- A restful node leaving as another steps as the other rests.
 tied-of : ∀ {Γ A B} {x : U.Node Γ A} {y : U.Node Γ B} → Leaves x y × Restful x → Tied x y
-tied-of {x = x} (l , rf) = pinned-trans (restful-pinned rf) (pinned-trans (rest-pinned x) (Leaves.pin l))
+tied-of {x = x} (l , rf) = pinned-trans (restful-pinned rf) (pinned-trans (rest-pinned x) (Leaves.pins l))

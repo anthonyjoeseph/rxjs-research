@@ -10,14 +10,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE REST'S TIES
 
-An ended part's rest stays tied to what the heap keeps. Every move keeps the
-pool's tie but a freed lane's repool; open: whether `Leaving`, each part
-leaving what it keeps, survives each move: whether `Leaves` composes up a
-path, its `deep` fields above all. Settled when `close-leaving` is a body, or
-refuted and the tie restated.
+An ended part's rest stays twinned with what the heap keeps, its order read
+back both ways. Open: whether a body reads its source's run only as far as it
+has run, its cut and its rest's order alike. Settled when `cut-env` and
+`deepR-env` are bodies by induction on the node, or refuted and the twin
+restated.
 
-Members: `*-leaving`, `leaving`, `bg-left`,
-`fin-shut`, `rest-sourced`, `close-heads`,
+Members: `cut-env`, `deepR-env`, `fin-shut`, `rest-sourced`, `close-heads`,
 `close-told`, `settle-heads`, `settle-lingering`, `settle-told`, `next-heads`,
 `next-lingering`, `take-leftover`, `body-leftover`, `re-leftover`.
 

@@ -138,37 +138,37 @@ mutual
 
 -- A node in order to every depth leaves its rest in order.
 mutual
-  deepR-of : ∀ {Γ A} {c : U.Node Γ A} {ρ} → Deep c ρ → DeepR c ρ
-  deepR-of {c = U.framesᶜ _ _ _}              d = tt
-  deepR-of {c = U.burstᶜ _ _ _ _}             d = tt
-  deepR-of {c = U.ofᶜ _ _ _}                  d = tt
-  deepR-of {c = U.mapᶜ _ c}                   d = deepR-of (proj₂ d)
-  deepR-of {c = U.scanᶜ _ _ c}                d = deepR-of (proj₂ d)
-  deepR-of {c = U.takeWhileᶜ _ _ c}           d = deepR-of (proj₂ d)
-  deepR-of {c = U.flatMapᶜ _ g o ls _ pl}     (_ , dᵒ , dl , dp , _) = deepRᴹ-of o dᵒ , deepRᴸ-of ls dl , deepR-of dp
-  deepR-of {c = U.joinᶜ _ _ _ _}              d = tt
-  deepR-of {c = U.connectᶜ r b (U.live s)}    (_ , db , ob , ds) = deepR-of db , ob , ds
-  deepR-of {c = U.connectᶜ r b (U.ended c t)} (_ , db , ob , dt) = deepR-of db , ob , dt
-  deepR-of {c = U.deferᶜ _ _ _}               d = tt
-  deepR-of {c = U.endingᶜ _ n}                d = deepR-of (proj₂ d)
-  deepR-of {c = U.restᶜ n}                    d = proj₂ d
-  deepR-of {c = U.idleᶜ}                      d = tt
-  deepR-of {c = U.unionᶜ x y}                 (_ , dx , dy) = deepR-of dx , deepR-of dy
-  deepR-of {c = U.burstingᶜ r t}              (o , dt) = ordered-retyped (M′.burstOn r (U.stateᴺ t _)) o , dt
-  deepR-of {c = U.underᶜ (U.live s) b}        (_ , ds , db) = ds , deepR-of db
-  deepR-of {c = U.underᶜ (U.ended c t) b}     (_ , dt , db) = dt , deepR-of db
+  deepR-of : ∀ {Γ A} (c : U.Node Γ A) {ρ} → Deep c ρ → DeepR c ρ
+  deepR-of (U.framesᶜ _ _ _)              d = tt
+  deepR-of (U.burstᶜ _ _ _ _)             d = tt
+  deepR-of (U.ofᶜ _ _ _)                  d = tt
+  deepR-of (U.mapᶜ _ c)                   d = deepR-of c (proj₂ d)
+  deepR-of (U.scanᶜ _ _ c)                d = deepR-of c (proj₂ d)
+  deepR-of (U.takeWhileᶜ _ _ c)           d = deepR-of c (proj₂ d)
+  deepR-of (U.flatMapᶜ _ g o ls _ pl)     (_ , dᵒ , dl , dp , _) = deepRᴹ-of o dᵒ , deepRᴸ-of ls dl , deepR-of pl dp
+  deepR-of (U.joinᶜ _ _ _ _)              d = tt
+  deepR-of (U.connectᶜ r b (U.live s))    (_ , db , ob , ds) = deepR-of b db , ob , ds
+  deepR-of (U.connectᶜ r b (U.ended c t)) (_ , db , ob , dt) = deepR-of b db , ob , dt
+  deepR-of (U.deferᶜ _ _ _)               d = tt
+  deepR-of (U.endingᶜ _ n)                d = deepR-of n (proj₂ d)
+  deepR-of (U.restᶜ n)                    d = proj₂ d
+  deepR-of (U.idleᶜ)                      d = tt
+  deepR-of (U.unionᶜ x y)                 (_ , dx , dy) = deepR-of x dx , deepR-of y dy
+  deepR-of (U.burstingᶜ r t)              (o , dt) = ordered-retyped (M′.burstOn r (U.stateᴺ t _)) o , dt
+  deepR-of (U.underᶜ (U.live s) b)        (_ , ds , db) = ds , deepR-of b db
+  deepR-of (U.underᶜ (U.ended c t) b)     (_ , dt , db) = dt , deepR-of b db
 
   deepRᴹ-of : ∀ {Γ A} (o : Maybe (U.Node Γ A)) {ρ} → Deepᴹ o ρ → DeepRᴹ o ρ
   deepRᴹ-of nothing  d = tt
-  deepRᴹ-of (just o) d = deepR-of d
+  deepRᴹ-of (just o) d = deepR-of o d
 
   deepRᴸ-of : ∀ {Γ A} (ls : List (U.Node Γ A)) {ρ} → Deepᴸ ls ρ → DeepRᴸ ls ρ
   deepRᴸ-of []       d        = tt
-  deepRᴸ-of (c ∷ cs) (d , ds) = deepR-of d , deepRᴸ-of cs ds
+  deepRᴸ-of (c ∷ cs) (d , ds) = deepR-of c d , deepRᴸ-of cs ds
 
 -- A node in order to every depth leaves its cut in order.
 deep-cut : ∀ {Γ A} (c : U.Node Γ A) {ρ} → Deep c ρ → SortedT (U.cutᴺ c ρ)
-deep-cut c d = deep-cutR c (deepR-of d)
+deep-cut c d = deep-cutR c (deepR-of c d)
 
 -- A rest whose parts run in order is in order.
 deepR-rest : ∀ {Γ A B} {c : U.Node Γ A} {ρ} → DeepR c ρ → Deep (U.restᶜ {B = B} c) ρ
@@ -176,7 +176,7 @@ deepR-rest {c = c} d = ordered-tail _ (deep-cutR c d) , d
 
 -- So a node in order leaves its rest in order.
 deep-rest : ∀ {Γ A B} {c : U.Node Γ A} {ρ} → Deep c ρ → Deep (U.restᶜ {B = B} c) ρ
-deep-rest d = deepR-rest (deepR-of d)
+deep-rest {c = c} d = deepR-rest {c = c} (deepR-of c d)
 
 -- Two nodes in order, their union in order.
 deep-∪ : ∀ {Γ B} {x y : U.Node Γ B} {ρ} → Deep x ρ → Deep y ρ → Deep (U.unionᶜ x y) ρ
