@@ -21,6 +21,7 @@ open import Data.Maybe using (Maybe; just; nothing; is-nothing; is-just) renamin
 open import Data.Maybe.Properties using (just-injective)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
+open import Data.Nat using (zero; suc)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import denotation.MonotonicList.Events using (Events∞; skip; Pos; Timeline)
@@ -153,9 +154,11 @@ module ClimbConnect (R : Set) where
 
   -- Two tails run alike are alike.
   tail-agreeᵀ : ∀ {A m} (t t′ : Ev.Tail) → ML.Agree {A} m (ML.tailᴱ t) (ML.tailᴱ t′) → ML.Agreeᵀ m t t′
-  tail-agreeᵀ t            t′             ML.stop        = ML.stopᵀ
-  tail-agreeᵀ (Ev.pin k r) (Ev.pin .k r′) (ML.skip⁼ a _) = ML.pin⁼ a
-  tail-agreeᵀ Ev.idle      Ev.idle        ML.hush⁼       = ML.idle⁼
+  tail-agreeᵀ {m = zero}  t            t′             _              = ML.stopᵀ
+  tail-agreeᵀ {m = suc _} (Ev.pin k r) (Ev.pin .k r′) (ML.skip⁼ a _) = ML.pin⁼ a
+  tail-agreeᵀ {m = suc _} (Ev.pin _ _) Ev.idle        ()
+  tail-agreeᵀ {m = suc _} Ev.idle      (Ev.pin _ _)   ()
+  tail-agreeᵀ {m = suc _} Ev.idle      Ev.idle        ML.hush⁼       = ML.idle⁼
 
   -- A tail runs in order whatever it is read as.
   atop-tail : ∀ {A B} k (t : Ev.Tail) → Atop k (ML.tailᴱ {A} t) → Atop k (ML.tailᴱ {B} t)
