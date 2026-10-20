@@ -38,6 +38,7 @@ help:
 	@echo "  gate          WHAT YOU TYPE: every cheap check, then Agda on Main"
 	@echo "  gate-cheap    the textual checks alone (seconds, no Agda)"
 	@echo "  agda          typecheck $(SRC)/Main.agda — everything Main reaches"
+	@echo "  check         typecheck one module and what IT imports:  make check F=simultaneous/Pure.agda"
 	@echo "  bug-cache     compile the bug cache's runner and run every row"
 	@echo "  oracle        the three Agda engines against real rxjs (typescript/ drives it)"
 	@echo "  chain         the denotation's approximants form a chain (ARGS=\"FROM COUNT\")"
@@ -74,6 +75,12 @@ gate-cheap:
 
 agda:
 	@cd $(SRC) && $(AGDA) $(AGDA_PROFILE) Main.agda
+
+# THE DEV LOOP: one module and the cone BELOW it, never what consumes it.
+# Same `AGDA`, so the cache it warms is the one `make agda` reads.
+check:
+	@test -n "$(F)" || { echo "usage: make check F=<file under $(SRC)>"; exit 2; }
+	@cd $(SRC) && $(AGDA) $(AGDA_PROFILE) $(F)
 
 gate:
 	@$(MAKE) --no-print-directory gate-cheap || { scripts/notify.py "RED (cheap checks)"; exit 1; }
