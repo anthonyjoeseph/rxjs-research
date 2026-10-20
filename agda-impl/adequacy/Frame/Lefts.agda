@@ -8,7 +8,7 @@ module adequacy.Frame.Lefts where
 
 open import Data.List using (List; []; _∷_; _++_)
 open import Data.List.Relation.Unary.Any using (here)
-open import Data.List.Relation.Unary.All using (_∷_) renaming (lookup to lookupᴬ)
+open import Data.List.Relation.Unary.All using ([]; _∷_) renaming (lookup to lookupᴬ)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.Empty using (⊥)
 open import Data.Unit using (⊤; tt)
