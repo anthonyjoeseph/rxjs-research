@@ -453,7 +453,7 @@ module ClimbConnect (R : Set) where
     fin-ghost fs lv sn pd dp pu eq L lt sg with lifts-split ρ (in-source here) L | lefts-split ρ (in-source here) L lt
     ... | _ , lifts-source {c₀ = c₀} {b₀ = b₀} pb sf lifts-here , Lρ | (lc , _) , _ with fin-shut pb
     ...   | b₁ , pb′ , gb rewrite sf =
-      ghost-lift H H′ ρ v fs (off-store H (Subject.closed Sj)) mine {κ = q} Lρ pv′ (gap-connect gb (gap-tied ag cuts dt)) sn pd dp sg
+      ghost-lift H H′ ρ v fs (off-store H (Subject.closed Sj)) mine {κ = q} Lρ pv′ (gap-connect gb (gap-tied ag cs dt)) sn pd dp sg
       where
         pv′ : At.part H′ v ≡ just (U.connectᶜ rp (U.shut (here refl) q b₁) (U.ended q rt))
         pv′ = trans (cong₂ (At.connected H′ rp e rt) (trans (part-alike H H′ u (fin-au (fresh-path ρ fs))) pu) pb′)
@@ -461,10 +461,10 @@ module ClimbConnect (R : Set) where
         pw : At.part H w₀ ≡ just (U.connectᶜ rp (U.shut (here refl) q b₀) (U.ended q rt))
         pw = trans (cong₂ (At.connected H rp e rt) pu pb) (cong (λ x → At.connected H rp x rt nothing (just b₀)) eq)
         lr = Leaving.rests lv ρ (lifts-seen Lρ) pw pu eq
-        cuts : ∀ ρ′ n → ML.Agreeᵀ n (U.cutᴺ c₀ ρ′) (U.cutᴺ rt ρ′)
-        cuts ρ′ n = tail-agreeᵀ (U.cutᴺ c₀ ρ′) (U.cutᴺ rt ρ′) (ML.agree-trans (Leaves.agree lc ρ′ n) (ML.agree-sym (Leaves.agree (proj₁ lr) ρ′ n)))
+        cs : ∀ ρ′ n → ML.Agreeᵀ n (U.cutᴺ c₀ ρ′) (U.cutᴺ rt ρ′)
+        cs ρ′ n = tail-agreeᵀ (U.cutᴺ c₀ ρ′) (U.cutᴺ rt ρ′) (ML.agree-trans (Leaves.agree lc ρ′ n) (ML.agree-sym (Leaves.agree (proj₁ lr) ρ′ n)))
         ag : ∀ ρ′ n → Agree n (U.meaning (U.restᶜ c₀) ρ′) (U.meaning rt ρ′)
-        ag ρ′ n = subst (Agree n (ML.tailᴱ (U.cutᴺ c₀ ρ′))) (sym (restful-meaning (proj₂ lr) ρ′)) (tailᴱ-ne (cuts ρ′ n))
+        ag ρ′ n = subst (Agree n (ML.tailᴱ (U.cutᴺ c₀ ρ′))) (sym (restful-meaning (proj₂ lr) ρ′)) (tailᴱ-ne (cs ρ′ n))
         dt : ∀ ρ′ → Deep (U.restᶜ c₀) ρ′ → Deep rt ρ′
         dt ρ′ d = proj₂ (Leaves.deep⁻ (proj₁ lr) ρ′ (Leaves.deep lc ρ′ (ordered-retyped (U.cutᴺ c₀ ρ′) (proj₁ d) , proj₂ d)))
 
