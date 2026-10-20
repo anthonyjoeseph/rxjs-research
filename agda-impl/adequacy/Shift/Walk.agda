@@ -13,7 +13,7 @@ open import Level using (lower)
 open import Data.Maybe using (Maybe; just; nothing; is-just; is-nothing)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst)
 open import Data.Sum using ([_,_]′)
-open import Data.Product using (_,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_)
 open import Data.Unit using (⊤)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -41,7 +41,7 @@ module ShiftWalk (R : Set) where
   open FlatKit using (Flat)
   open Shared Timeline (Out R) using (Heapᴹ; look)
   open Strongly R using (Sub; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_; pendingˢ; coldˢ; ofˢ; doneˢ; joinˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; lane; Taking; taking; ending; taken; names; laneNames; cutNames; quietName; subjectNames; flatNames; module At; Name; outers; outersL; Feed)
-  open StrongAgainst R using (isTaking; seen; seenL; seen-join; seen-up; Each; Lingers; Pinned; unpinned; Tied; rest-pinned; bursts-pinned; bursts-moved; under-moved; union-pinned; pinned-trans; pinned-sym; restful-pinned; ∧-split; ∧-join; false≢)
+  open StrongAgainst R using (isTaking; seen; seenL; seen-join; seen-up; Each; Lingers; Pinned; unpinned; Restful; Tied; tie-trans; rest-pinned; bursts-pinned; bursts-moved; under-moved; union-pinned; pinned-trans; pinned-sym; restful-pinned; ∧-split; ∧-join; false≢)
   open StrongHeld R using (DoneBy; Flagged; Heads)
   open Tearing R using (Alike; Off; part-alike; partLanes-alike; seen-alike; seenL-alike; names-path; lanes-path; apart-r; apart-l; narrow; each-same)
   open Moving R using (plant; plantᴸ; planted; plantedᴸ; pairs-r; pairs-split)
@@ -769,15 +769,15 @@ module ShiftWalk (R : Set) where
             (lingersL-alike H H′ O.lanesA (lingersL-of H lg))
           where
             module O = Outer fl oc k r ls π ps
-            pool : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl (plant π v) ls) ≡ just n → Tied pl (At.pooled H′ fl (plant π v) ls)
-            pool x = held (in-outer {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {ls = ls} π) ps x (λ x₀ → pinned-trans (Lingers.pools lg here refl x₀)
+            pool : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl (plant π v) ls) ≡ just n → Tied pl (At.pooled H′ fl (plant π v) ls) × Restful pl
+            pool x = held (in-outer {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {ls = ls} π) ps x (λ x₀ → tie-trans (Lingers.pools lg here refl x₀)
                        (union-pinned (if-moved {y = U.idleᶜ} {y′ = U.idleᶜ} (cong lower O.done) (restedUp π O.fresh) unpinned) (pin-alike (pooledL-alike H H′ ls O.lanesA))))
         shiftLg (in-lanes {op = op} {f} {fl} {oc} {k} {r} {pl} {t = so} {ls} πL) ps lg en =
           LG.lg-flat pool (lingers-alike H H′ Ln.soA (lingers-sub H lg (in-outer here) refl)) (shiftLgL πL Ln.fresh (lingersL-of H lg) (enL-of H en))
           where
             module Ln = Lanes fl oc k r so πL ps
-            pool : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl so (plantᴸ πL v)) ≡ just n → Tied pl (At.pooled H′ fl so (plantᴸ πL v))
-            pool x = held (in-lanes {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} πL) ps x (λ x₀ → pinned-trans (Lingers.pools lg here refl x₀)
+            pool : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl so (plantᴸ πL v)) ≡ just n → Tied pl (At.pooled H′ fl so (plantᴸ πL v)) × Restful pl
+            pool x = held (in-lanes {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} πL) ps x (λ x₀ → tie-trans (Lingers.pools lg here refl x₀)
                        (union-pinned (if-moved {y = U.idleᶜ} {y′ = U.idleᶜ} (cong lower Ln.done) (pin-alike (leftover-alike H H′ so Ln.soA)) unpinned) (pooledUpL πL Ln.fresh)))
         shiftLg (in-source {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = src} {bd} π) ps lg en =
           LG.lg-connect rest ls lb

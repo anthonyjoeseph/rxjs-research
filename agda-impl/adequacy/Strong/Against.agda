@@ -658,14 +658,19 @@ module StrongAgainst (R : Set) where
   Tied : ∀ {Γ A B} → U.Node Γ A → U.Node Γ B → Set₁
   Tied x y = Pinned (U.step x) (U.restˢ {B = ⊤} y)
 
+  -- A restful pool's tie carried along a pin.
+  tie-trans : ∀ {Γ A C D} {p : U.Node Γ A} {a : U.Step Γ C} {b : U.Step Γ D} → Pinned (U.step p) a × Restful p → Pinned a b → Pinned (U.step p) b × Restful p
+  tie-trans (t , rf) q = pinned-trans t q , rf
+
   -- WHAT A HELD NODE KEEPS OF ITS ENDED PARTS IS WHAT THEY STILL RUN.
-  -- Below `t`: a held flatMap's pool runs as its ended parts' leftovers,
+  -- Below `t`: a held flatMap's pool, a rest's shape, runs as its ended
+  -- parts' leftovers,
   -- a held connect's ended source's rest as the source's.
   record Lingers {h} (H : Heapᴹ h) {Δ A} (t : Sub h Δ A) : Set₁ where
     field
       pools : ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
             → (ψ : Path t (flatMapˢ op f fl oc k r pl so ls)) → seen H ψ ≡ true
-            → ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Tied pl (At.pooled H fl so ls)
+            → ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Tied pl (At.pooled H fl so ls) × Restful pl
       rests : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
             → (ψ : Path t (connectˢ S c b kb k fd rp e rt src bd)) → seen H ψ ≡ true
             → ∀ {n} → At.part H (connectˢ S c b kb k fd rp e rt src bd) ≡ just n
@@ -673,12 +678,14 @@ module StrongAgainst (R : Set) where
 
   -- Two nodes leaving alike: what each still runs past an unsubscribe,
   -- under every environment, the same at every depth, and in order
-  -- exactly when the other is.
+  -- exactly when the other is; their rests' next steps pinned alike.
+  -- `restˢ` and `cutᴺ` are read apart, so the pin is its own field.
   record Leaves {Γ A B} (x : U.Node Γ A) (y : U.Node Γ B) : Set₁ where
     constructor leaves
     field agree : ∀ (ρ : U.NEnv Γ) n → Agree n (U.meaning (U.restᶜ {B = ⊤} x) ρ) (U.meaning (U.restᶜ {B = ⊤} y) ρ)
           deep  : ∀ (ρ : U.NEnv Γ) → Deep (U.restᶜ {B = ⊤} x) ρ → Deep (U.restᶜ {B = ⊤} y) ρ
           deep⁻ : ∀ (ρ : U.NEnv Γ) → Deep (U.restᶜ {B = ⊤} y) ρ → Deep (U.restᶜ {B = ⊤} x) ρ
+          pin   : Pinned (U.restˢ {B = ⊤} x) (U.restˢ {B = ⊤} y)
 
   -- WHAT THE GHOST HOLDS LEAVES WHAT THE HEAP WOULD: below `t`, each seen
   -- part, a held flatMap's pool and a held connect's ended source's rest

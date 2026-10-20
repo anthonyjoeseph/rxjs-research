@@ -45,7 +45,7 @@ module Keeping (R : Set) where
   open Heap using (there)
   open Run (Pureᴾ R) using (done; module Kit; module FlatKit)
   open Strongly R using (Sub; pendingˢ; ofˢ; mapˢ; takeWhileˢ; connectˢ; Lane; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_; coldˢ; module At; Phase; flatMapˢ; scanˢ; joinˢ; doneˢ; deferˢ; lane)
-  open StrongAgainst R using (Each; Lingers; Pinned; unpinned; pinned-trans; pinned-sym; union-pinned; under-pinned; under-moved; bursts-pinned; bursts-moved; rest-pinned; Restful; rf-idle; rf-rest; rf-union; restful-pinned; Tied; seen; seenL; seen-⊕; isTaking; ∧-split)
+  open StrongAgainst R using (Each; Lingers; Pinned; unpinned; pinned-trans; pinned-sym; union-pinned; under-pinned; under-moved; bursts-pinned; bursts-moved; rest-pinned; Restful; rf-idle; rf-rest; rf-union; restful-pinned; Tied; tie-trans; seen; seenL; seen-⊕; isTaking; ∧-split)
   open StrongHeld R using (DoneBy)
   open Moving R using (plant; plantᴸ; planted; plantedᴸ; part-plant; Same; same; same-map; same-scan; same-take; same-flat; same-connect; same-defer)
   open GhostingPaths R using (each-sub)
@@ -308,11 +308,11 @@ module Keeping (R : Set) where
 
         po : ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
            → (ψ : Path (plant π v) (flatMapˢ op f fl oc k r pl so ls)) → seen H ψ ≡ true
-           → ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Tied pl (At.pooled H fl so ls)
+           → ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Tied pl (At.pooled H fl so ls) × Restful pl
         po ψ s pw with keep π v eq ψ
         ... | inj₁ (ρ , e)                                  = Lingers.pools lgv ρ (inside ρ e s) pw
         ... | inj₂ (_ , ψ₀ , same , se , pe , _ , _)        = Lingers.pools lg ψ₀ (trans se s) (trans pe pw)
-        ... | inj₂ (_ , ψ₀ , same-flat , se , pe , _ , ld)  = pinned-trans (Lingers.pools lg ψ₀ (trans se s) (trans pe pw)) (pool-lands ld)
+        ... | inj₂ (_ , ψ₀ , same-flat , se , pe , _ , ld)  = tie-trans (Lingers.pools lg ψ₀ (trans se s) (trans pe pw)) (pool-lands ld)
 
         re : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
            → (ψ : Path (plant π v) (connectˢ S c b kb k fd rp e rt src bd)) → seen H ψ ≡ true

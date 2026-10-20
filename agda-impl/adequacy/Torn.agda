@@ -651,9 +651,9 @@ module Tearing (R : Set) where
 
         po : ∀ {Δ′ A′ B′} {op f fl oc k r pl} {so : Sub h Δ′ A′} {ls : List (Lane h Δ′ B′)}
            → (ψ : Path t (flatMapˢ op f fl oc k r pl so ls)) → seen H′ ψ ≡ true
-           → ∀ {c} → At.part H′ (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Tied pl (At.pooled H′ fl so ls)
+           → ∀ {c} → At.part H′ (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Tied pl (At.pooled H′ fl so ls) × Restful pl
         po {pl = pl} ψ sn e with vis ps π ψ sn
-        ... | inj₁ (s , sm)        = subst (Tied pl) (sym (pe (fresh-path ψ ps) sm))
+        ... | inj₁ (s , sm)        = subst (λ x → Tied pl x × Restful pl) (sym (pe (fresh-path ψ ps) sm))
                                        (Lingers.pools lg ψ s (trans (sym (same-part (fresh-path ψ ps) sm)) e))
         ... | inj₂ (sπ , ρ , sρ) = Lingers.pools (inner (sub sπ)) ρ sρ e
 

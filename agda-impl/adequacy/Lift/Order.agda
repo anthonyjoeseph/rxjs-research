@@ -17,7 +17,7 @@ open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈�
 open import Level using (Lift)
 open import Data.Maybe using (Maybe; just; nothing; is-just)
 open import Data.Maybe.Properties using (just-injective)
-open import Data.Product using (_×_; _,_; Σ)
+open import Data.Product using (_×_; _,_; Σ; proj₁)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
@@ -420,7 +420,7 @@ module LiftingOrder (R : Set) where
             → seen (Conf.heap (Mach.conf m)) ψ ≡ true → ∀ {c} → At.part (Conf.heap (Mach.conf m)) (flatMapˢ op f fl oc k r pl so ls) ≡ just c
             → Σ Pos λ q → Σ (U.Node Δ′ B′) λ pl′ → U.step pl ≡ U.skipˢ q pl′ × Under p q
   pl-pin {m = m} cr π fc op sn {fl = fl} {pl = pl} {so = so} {ls = ls} ψ σ e se pt with pooled-pin cr π fc op sn ψ σ e se pt
-  ... | q , y′ , ey , u with pinned-skip (Lingers.pools (Carried.lingers cr) ψ se pt) ey
+  ... | q , y′ , ey , u with pinned-skip (proj₁ (Lingers.pools (Carried.lingers cr) ψ se pt)) ey
   ... | pl′ , es = q , pl′ , es , u
 
   under-snoc : ∀ {p q} j → Under p q → Under p (q ++ [ j ])

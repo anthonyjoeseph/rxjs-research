@@ -281,7 +281,7 @@ module ClimbTake (R : Set) where
       ; stack = st
       ; lifted = U.endingᶜ (q ++ [ last ]) c′ , ending-part hp {i = true} {p = p} {c = c} {k = k} {u = u} lv , S
                , lifts-planted ρ v (subst (λ s → Lifts hp ρ s S) (cong (U.taking true p q y c′) py) Lρ) , sg
-      ; lefts = lefts-planted ρ v (subst (λ s → Lifts hp ρ s S) (cong (U.taking true p q y c′) py) Lρ)
+      ; lefts = lefts-planted ρ v refl (subst (λ s → Lifts hp ρ s S) (cong (U.taking true p q y c′) py) Lρ)
                   (lefts-subst (λ s → s) (cong (U.taking true p q y c′) py) (lefts-up ρ (in-take here) eqO lt))
       ; owned = Ended.out-owned hp ρ q c′ sk e ow
       ; kernels = Ended.end-kernels hp ρ q c′ kn ; meaning = Ended.end-meaning hp ρ q c′ mn ; queue = Ended.out-queue hp ρ q c′ qu

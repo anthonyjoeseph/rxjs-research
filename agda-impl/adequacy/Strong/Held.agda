@@ -46,7 +46,7 @@ module StrongHeld (R : Set) where
   open Machine R using (Mach; Playing; begin)
   open SortingWalk R using (WellMach; begin-well)
   open Strongly R using (Alg; module At; module Canon; module Fold; Here; Lane; Name; Path; PathLanes; Sub; _⊕_; coldˢ; connectˢ; deferˢ; doneˢ; flatMapˢ; here; in-body; in-defer; in-lanes; in-map; in-outer; in-scan; in-source; in-take; joinˢ; lane; mapˢ; next-lane; ofˢ; pendingˢ; scanˢ; takeWhileˢ; taking; this-lane; ≗-refl)
-  open StrongAgainst R using (module Against; Books; Each; Kernels; Leaving; leaves; Lingers; Meaning; Owned; OwnedF; Queue; Tied; _,ᴼ_; isTaking; owned-from; seen; seen-join; seenL; ∧-join; ∧-split)
+  open StrongAgainst R using (module Against; Books; Each; Kernels; Leaving; leaves; Lingers; Meaning; Owned; OwnedF; Queue; Restful; rest-pinned; Tied; _,ᴼ_; isTaking; owned-from; seen; seen-join; seenL; ∧-join; ∧-split)
   open Canon
   open Here
 
@@ -228,7 +228,7 @@ module StrongHeld (R : Set) where
     open At H
 
     Pool : ∀ {Δ A} → Sub h Δ A → Set₁
-    Pool (flatMapˢ op f fl oc k r pl so ls) = ∀ {c} → part (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Tied pl (pooled fl so ls)
+    Pool (flatMapˢ op f fl oc k r pl so ls) = ∀ {c} → part (flatMapˢ op f fl oc k r pl so ls) ≡ just c → Tied pl (pooled fl so ls) × Restful pl
     Pool _                                   = Lift _ ⊤
 
     Rest : ∀ {Δ A} → Sub h Δ A → Set₁
@@ -452,5 +452,5 @@ module StrongHeld (R : Set) where
     ; sorted  = root , begin-well o
     ; behind′  = Eaching.eaching (λ { _ refl → heads-begin o })
     ; lingers′ = Lingering.lingering (λ _ → lift tt)
-    ; leaving = record { parts = λ { here _ refl → leaves (λ ρ n → agree-refl n _) (λ ρ d → proj₁ d , d) (λ ρ d → proj₂ d) } ; pools = λ () ; rests = λ () }
+    ; leaving = record { parts = λ { here _ refl → leaves (λ ρ n → agree-refl n _) (λ ρ d → proj₁ d , d) (λ ρ d → proj₂ d) (rest-pinned (U.subscribe o root)) } ; pools = λ () ; rests = λ () }
     ; flags   = λ () }

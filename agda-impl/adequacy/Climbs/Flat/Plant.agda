@@ -52,6 +52,7 @@ open import adequacy.Lift.Order using (module LiftingOrder)
 open import adequacy.Lowers using (module Lowering)
 open import adequacy.Frame using (module Framing)
 open import adequacy.Frame.Repool using (module FramingRepool)
+open import adequacy.Frame.Lefts using (module FramingLefts)
 open import adequacy.Grow using (module Growing)
 open import adequacy.Fork using (module Forking)
 open import adequacy.Taken using (module Taking)
@@ -81,7 +82,7 @@ module ClimbFlatPlant (R : Set) where
   open SortingWalk R using (WellMach)
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
   open Strongly R using (Feed; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; joiner; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; here; module At; fired; Path; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; ending; taken; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; outers; outersL; outers-⊕; unsub; Owes; Settled; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
-  open StrongAgainst R using (Leaving; Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
+  open StrongAgainst R using (Leaves; Leaving; Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
   open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering)
   open StrongAgainst.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf; src-of) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
@@ -95,7 +96,7 @@ module ClimbFlatPlant (R : Set) where
   open Aliking R using (walk-grow; compile-cong; laneAt-wk; ObsRel)
   open Taking R using (tick-ix0)
   open Naming R using (pre; pairs-↭; names-plant-↭; fresh-plant; fresh-new; wk-pairs; wk-img; to-img)
-  open Ghosting R using (residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; passed; Past; Lefts)
+  open Ghosting R using (residual; _⊏_; begun; sorted-⇝; sorted-value; Mirror; agrees; Load; _≼_; load; ⊏-≼; loadOf; lowered; showing; Hopped; Hops; firstCall; owned-move; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; OuterFirst; LaneFirst; PoolBehind; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; LiftsLane; lifts-this; lifts-next; passed; Past; Lefts; LeftsL)
   open GhostingPaths R using (each-sub; each-lanes; module Far; module Calling; lifts-split; Far; Off; far-apart; Clear; clear-zip; clear-each; walk-⊕; One; one-map; one-scan; one-take; one-outer; one-lanes; one-source; one-body; one-defer; OneLane; one-this; one-next; whole; snoc; view; height; heightL; one-lower; opened; openedL; Calling; Signal; sends; closes; recall; relevel; done-up; Healed; HealedL; healed-split; healed-end; lifts-seen; Rises; rises; Called; landed; rose; Aloft; aloft; hop-sorted; each-back; hopped-pre; lefts-up; lefts-subst; lefts-subst₂)
   open Gapping R using (Gapped; alike; gap-map; gap-scan; gap-take; gap-flat; gap-just; gap-connect; gap-live; gap-shut; gap-ended; gapM-refl; gapL-refl; gapL-mid; feed-gapped; gapped-past; gapped-sane; gapped-placed; gapped-deep)
   open Lowering R using (Keeps; queue-keeps; store-keeps; keeps-trans)
@@ -111,6 +112,7 @@ module ClimbFlatPlant (R : Set) where
   open ShiftWalk R using (let-go; grip)
   open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined)
   open FramingRepool R using (heads-repool; Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
+  open FramingLefts R using (on-end; lefts-at; lefts-at₂; leftsL-at)
   open Staging R using (not-src; wrap-lane)
   open Weakening R using (Grows; pure-map) renaming (module Grown to Weakened)
   open WeakeningHeaps R using () renaming (module GrownHeaps to Weakened′)
@@ -428,7 +430,7 @@ module ClimbFlatPlant (R : Set) where
   -- A LIFT READ THROUGH THE WEAKENING: every part along the path reads as
   -- it did, so the step lifts alike.
   module Lifted {h v} {τ : h ⊑ v} {H : Heapᴹ h} {H′ : Heapᴹ v} (gr : Grows τ H H′) where
-    open Weakened′ τ using (grow-part; grow-partᴸ)
+    open Weakened′ τ using (grow-part; grow-partᴸ; leftover-wk)
 
     mutual
       lifts-grow : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} {ρ : Path t u} {s S} → Lifts H ρ s S → Lifts H′ (wkPath τ ρ) s S
@@ -459,8 +461,36 @@ module ClimbFlatPlant (R : Set) where
 
     -- Each free node still ties to its node's leftover, read off the
     -- grown tree.
-    postulate
+    mutual
       lefts-grow : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} {ρ : Path t u} {s S} (L : Lifts H ρ s S) → Lefts H L → Lefts H′ (lifts-grow L)
+      lefts-grow lifts-here lt = lt
+      lefts-grow (lifts-map L) lt = lefts-grow L lt
+      lefts-grow (lifts-scan {f = f} {r = r} {S = S} L) lt =
+        lefts-at {H = H′} (λ a → U.scanˢ f a S) (Grows.cells gr r) {L = lifts-scan (lifts-grow L)} (lefts-grow L lt)
+      lefts-grow (lifts-take lv L) lt = lefts-grow L lt
+      lefts-grow (lifts-outer {op = op} {f = f} {fl = fl} {pl = pl} {t = t} {ls = ls} {S = S} {o₀ = o₀} of pb L) (lo , lt) =
+        lefts-at₂ {H = H′} (λ L′ Q → U.outerˢ op (λ a q → U.subscribe (f a) q) o₀ S L′ Q pl) (grow-partᴸ gr ls) (Grows.cells gr (FlatKit.Flat.queue fl))
+          {L = lifts-outer (subst (OuterFirst S) (sym (grow-partᴸ gr ls)) of)
+                           (subst (λ L′ → PoolBehind pl (U.outerOf (just o₀)) (U.earliest L′)) (sym (grow-partᴸ gr ls)) pb) (lifts-grow L)}
+          (on-end S (λ _ → subst (Leaves o₀) (sym (leftover-wk gr {B = ⊤} t))) lo , lefts-grow L lt)
+      lefts-grow (lifts-lanes {op = op} {f = f} {fl = fl} {pl = pl} {t = t} {bs = bs} {l = l} {S = S} {as = as} {q = q} LL e lf pb) lt =
+        lefts-at₂ {H = H′} (λ x Q → U.laneˢ op (λ a q → U.subscribe (f a) q) x bs l S as Q pl) (grow-part gr t) (Grows.cells gr (FlatKit.Flat.queue fl))
+          {L = lifts-lanes (liftsLane-grow LL) e (subst (λ x → LaneFirst x q) (sym (grow-part gr t)) lf)
+                           (subst (λ x → PoolBehind pl (U.outerOf x) (U.found q bs l S as)) (sym (grow-part gr t)) pb)}
+          (leftsL-grow LL lt)
+      lefts-grow (lifts-source {t = t} {S = S} {c₀ = c₀} pb sf L) (lc , lt) =
+        on-end S (λ _ → subst (Leaves c₀) (sym (leftover-wk gr {B = ⊤} t))) lc , lefts-grow L lt
+      lefts-grow (lifts-body pt bf L) lt = lefts-grow L lt
+      lefts-grow (lifts-shut pt e rb L) lt = lefts-grow L lt
+      lefts-grow (lifts-defer L) lt = lefts-grow L lt
+
+      leftsL-grow : ∀ {Δ B Δ′ C} {ls : List (Lane h Δ B)} {u : Sub h Δ′ C} {πL : PathLanes ls u} {s bs S as l}
+                    (LL : LiftsLane H πL s bs S as) → LeftsL H l LL → LeftsL H′ l (liftsLane-grow LL)
+      leftsL-grow {l = l} (lifts-this {c = c} {t = t} {ls = ls} {S = S} lv L) (ll , lt) =
+        leftsL-at {H = H′} (λ _ → []) (λ zs → zs) (grow-partᴸ gr ls) {LL = lifts-this (trans (Grows.cells gr (Kit.live c)) lv) (lifts-grow L)}
+          (on-end S (λ _ → subst (Leaves l) (sym (leftover-wk gr {B = ⊤} t))) ll , lefts-grow L lt)
+      leftsL-grow (lifts-next {l = l₀} {bs = bs} {as = as} LL) lt =
+        leftsL-at {H = H′} (λ X → X ++ bs) (λ _ → as) (grow-partᴸ gr (l₀ ∷ [])) {LL = lifts-next (liftsLane-grow LL)} (leftsL-grow LL lt)
 
   -- A LANE BEGUN, IN THE GROWN WORLD: the tree weakened along the growth,
   -- the flatMap its pool `pl′` and the new lane first, pending where it

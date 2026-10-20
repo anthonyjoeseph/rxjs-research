@@ -10,15 +10,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE REST'S TIES
 
-An ended part's rest stays tied to what the heap keeps. An end and a
-source's end keep the tie; open: whether a plant and a growth keep a
-left-over tie (`Leaving`, `Lefts`), and whether a repooled rest (`Lingers`)
-ties as a left-over one does, where the repool cells carry the most dead
-routes in the tree. Settled when `lefts-planted`, `lefts-grow` and one repool
-move are bodies, or one is refuted and the tie restated.
+An ended part's rest stays tied to what the heap keeps. A plant, a growth,
+an end, a source's end, an idle repool and an outer's close keep the pool's
+tie, which reads the pool `Restful` and a free node's rest pinned through
+`Leaves`; open: whether `Leaving` survives each move, its new `pin` field
+included, and a freed lane's repool. Settled when `close-leaving` is a body,
+or refuted and the tie restated.
 
-Members: `*-leaving`, `leaving`, `lefts-planted`, `lefts-grow`, `bg-left`,
-`fin-shut`, `rest-sourced`, `idle-tied`, `close-heads`, `close-tied`,
+Members: `*-leaving`, `leaving`, `bg-left`,
+`fin-shut`, `rest-sourced`, `close-heads`,
 `close-told`, `settle-heads`, `settle-lingering`, `settle-told`, `next-heads`,
 `next-lingering`, `take-leftover`, `body-leftover`, `re-leftover`.
 

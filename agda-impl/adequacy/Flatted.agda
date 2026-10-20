@@ -66,7 +66,7 @@ module Flatting (R : Set) where
   open Run (Pureᴾ R) using (Act; done; writeRef; register; _>>ᴬ_; compile; Env; wkEnv; wkAct; module Kit; module FlatKit; Ref; wkR; Observer; Kont; wkObs; Subscription; Subscribe; wkSub)
   open Run.Kit (Pureᴾ R) using (skipᴬ)
   open Strongly R using (Sub; pendingˢ; Path; here; in-outer; in-lanes; _⊕_; Here; walk; top; _≗_; module At; names; pendings; Phase; flatMapˢ; killAllᶜ; flatK; CbRel; ≗-refl; newRef≗; unsubscribing; register≗; writeRef≗; module Canon)
-  open StrongAgainst R using (Leaving; Books; Job; Owned; Kernels; Meaning; Queue; Each; Lingers; unpinned; union-pinned; rest-pinned; seen; owned-to)
+  open StrongAgainst R using (Leaving; Books; Job; Owned; Kernels; Meaning; Queue; Each; Lingers; rf-idle; unpinned; union-pinned; rest-pinned; seen; owned-to)
   open StrongHeld R using (Carried; Heads; DoneBy; module Eaching; module Lingering)
   open StrongAgainst.Against R using (subAs; SrcOf; src-of)
   open Moving R using (planted; pend; part-plant; holds-owed; fed-plant; pendings-plant; subjects-plant; joiners-plant)
@@ -308,7 +308,7 @@ module Flatting (R : Set) where
       -- it was pending to.
       rf-lingers : Lingers H₉ T₈ → Lingers H₉ t′
       rf-lingers = lingers-plant H₉ π₈ v eqv (union-pinned (rest-pinned (U.subscribe s q)) unpinned)
-        (record { pools = λ { here _ _ → pooled-fresh H₉ {fl = fl₈} {so = pendingˢ s q} done₉ ; (in-outer ()) ; (in-lanes ()) } ; rests = λ { (in-outer ()) ; (in-lanes ()) } })
+        (record { pools = λ { here _ _ → (pooled-fresh H₉ {fl = fl₈} {so = pendingˢ s q} done₉ , rf-idle) ; (in-outer ()) ; (in-lanes ()) } ; rests = λ { (in-outer ()) ; (in-lanes ()) } })
 
       postulate
         rf-leaving : Leaving H₉ T₈ → Leaving H₉ t′
