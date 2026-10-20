@@ -130,6 +130,26 @@ Members: `placing`, `ticks-up`.
 
 **The statement:** the simultaneous spec, stated over the denotation.
 
+### Ledger
+
+#### THE ELABORATION
+
+The statements are about srxjs only once srxjs is a program: each
+primitive rebuilt over InstEmits, and the batcher built from primitives.
+Settled when `elaborate` and `batchSimultaneous` are bodies, oracle-checked
+against the TypeScript.
+
+Members: `elaborate`, `batchSimultaneous`.
+
 ## Tier 3 — the simultaneous spec, proven
 
 **The proof:** Tier 2's statements, discharged over `adequacy`.
+
+### Ledger
+
+#### THE SPEC
+
+Untried: batches joined are the plain values, provenance tracks the
+instant, batches are the spec's grouping. Settled when all three are bodies.
+
+Members: `left-to-right`, `coherent`, `batchable`.

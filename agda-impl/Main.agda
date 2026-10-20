@@ -19,6 +19,11 @@ open import denotation.Denote using (folded)
 -- to its children's meanings, so proofs over it go one operator at a time.
 open import denotation.Compositional using (compositional)
 
+-- THE SIMULTANEOUS SPEC: an author's program, elaborated with
+-- `batchSimultaneous` on top, groups what plain rxjs delivers by instant,
+-- in order, releasing each batch the moment its instant is over.
+open import simultaneous.Statement using (left-to-right; coherent; batchable)
+
 -- THE LIBRARY: what a user writes programs with, beyond the primitives
 -- the theorem's statement already reaches.
 open import Tree using (merge; flatMap; ones)
