@@ -14,6 +14,9 @@ open import Data.Product using (_×_; _,_)
 open import Data.String using (String; _++_; intersperse)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
+open import Relation.Nullary using (does)
+
+open import denotation.MonotonicList.Events using (Pos; Label; ix; sub; last; _≟ᵖ_)
 
 infixr 5 _×ᵗ_ _+ᵗ_
 
@@ -21,6 +24,8 @@ data Ty : Set where
   unitᵗ boolᵗ natᵗ : Ty
   _×ᵗ_ _+ᵗ_        : Ty → Ty → Ty
   listᵗ            : Ty → Ty
+  -- a `fresh` name: compared, carried, never computed with
+  nameᵗ            : Ty
 
 ⟦_⟧ᵀ : Ty → Set
 ⟦ unitᵗ ⟧ᵀ   = ⊤
@@ -29,6 +34,7 @@ data Ty : Set where
 ⟦ s ×ᵗ t ⟧ᵀ  = ⟦ s ⟧ᵀ × ⟦ t ⟧ᵀ
 ⟦ s +ᵗ t ⟧ᵀ  = ⟦ s ⟧ᵀ ⊎ ⟦ t ⟧ᵀ
 ⟦ listᵗ t ⟧ᵀ = List ⟦ t ⟧ᵀ
+⟦ nameᵗ ⟧ᵀ    = Pos
 
 eqᵀ : ∀ t → ⟦ t ⟧ᵀ → ⟦ t ⟧ᵀ → Bool
 eqᵀ unitᵗ     _        _        = true
@@ -43,6 +49,7 @@ eqᵀ (s +ᵗ t)  _        _        = false
 eqᵀ (listᵗ t) []       []       = true
 eqᵀ (listᵗ t) (a ∷ as) (b ∷ bs) = eqᵀ t a b ∧ eqᵀ (listᵗ t) as bs
 eqᵀ (listᵗ t) _        _        = false
+eqᵀ nameᵗ     p        q        = does (p ≟ᵖ q)
 
 -- JSON, the oracle's wire format.
 showᵀ : ∀ t → ⟦ t ⟧ᵀ → String
@@ -58,3 +65,16 @@ showᵀ (listᵗ t) xs       = "[" ++ intersperse "," (go xs) ++ "]"
     go : List ⟦ t ⟧ᵀ → List String
     go []       = []
     go (x ∷ xs) = showᵀ t x ∷ go xs
+showᵀ nameᵗ     p        = "{\"name\":\"" ++ showPos p ++ "\"}"
+  where
+    -- no digit follows a separator, so the oracle's number-quoting never
+    -- reaches inside a name
+    mutual
+      showPos : Pos → String
+      showPos []       = ""
+      showPos (l ∷ ls) = showLabel l ++ "." ++ showPos ls
+
+      showLabel : Label → String
+      showLabel (ix n)  = "i" ++ showℕ n
+      showLabel (sub q) = "s(" ++ showPos q ++ ")"
+      showLabel last    = "L"

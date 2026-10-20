@@ -24,13 +24,13 @@ open import Data.Nat.Properties using (m≤m+n)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.Product using (_×_; _,_)
 open import Data.String using (String; intersperse) renaming (_++_ to _⊕_)
-open import Level using (lift)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 import Tree as T
 open import Tree using (Obs; Later; renameLater)
-open import denotation.MonotonicList.Events using (From; Frame; Frame∞; From∞; done; quiet; at; emit; close; Timeline)
-open import quickcheck.Ty using (Ty; boolᵗ; listᵗ; ⟦_⟧ᵀ; showᵀ)
+open import denotation.MonotonicList.Events using (From; Frame; Frame∞; From∞; done; quiet; at; emit; close; Timeline; fixed; Pos)
+import denotation.MonotonicList.Events as Events
+open import quickcheck.Ty using (Ty; boolᵗ; listᵗ; nameᵗ; ⟦_⟧ᵀ; showᵀ)
 open import quickcheck.Tm using (Vals; Tm; ⟦_⟧ᵗ; position; showTm)
 
 -- A cold, as data: frames, each a gap of ticks after the one before (the
@@ -46,6 +46,8 @@ record Script (t : Ty) : Set where
 
 data Code (Γ Δᵍ Δ Θ : List Ty) : Ty → Set where
   cold      : ∀ {t} → Script t → Code Γ Δᵍ Δ Θ t
+  -- a new name per subscription
+  fresh     : Code Γ Δᵍ Δ Θ nameᵗ
   empty     : ∀ {t} → Code Γ Δᵍ Δ Θ t
   of        : ∀ {t} → List (Tm Θ t) → Code Γ Δᵍ Δ Θ t
   map       : ∀ {s t} → Tm (s ∷ Θ) t → Code Γ Δᵍ Δ Θ s → Code Γ Δᵍ Δ Θ t
@@ -71,9 +73,12 @@ Prog = Code [] [] [] []
 ⟦_⟧ᴳ : List Ty → List Set
 ⟦_⟧ᴳ = mapL ⟦_⟧ᵀ
 
--- How a runtime realises a scripted cold.
-Leaf : (Set → Set₁) → Set₁
-Leaf C = ∀ {t} → Script t → C ⟦ t ⟧ᵀ
+-- How a runtime realises a scripted cold, and `fresh`.
+record Leaf (C : Set → Set₁) : Set₁ where
+  field
+    scripted : ∀ {t} → Script t → C ⟦ t ⟧ᵀ
+    named    : C Pos
+open Leaf
 
 -- A recursion variable means the recursive program, not yet unfolded.
 Rec : (Set → Set₁) → List Ty → List Ty → Set₁
@@ -94,7 +99,8 @@ private
 mutual
   toObs : ∀ {C Γ Δᵍ Δ Θ t} → Leaf C → ℕ → Code Γ Δᵍ Δ Θ t
         → Rec C Γ Δᵍ → Rec C Γ Δ → Vals Θ → Obs C ⟦ Γ ⟧ᴳ ⟦ t ⟧ᵀ
-  toObs leaf n (cold c)          g d θ = T.cold (leaf c)
+  toObs leaf n (cold c)          g d θ = T.cold (scripted leaf c)
+  toObs leaf n fresh             g d θ = T.cold (named leaf)
   toObs leaf n empty           g d θ = T.empty
   toObs leaf n (of ts)           g d θ = T.of (mapL (λ x → ⟦ x ⟧ᵗ θ) ts)
   toObs leaf n (map f s)         g d θ = T.map (λ a → ⟦ f ⟧ᵗ (a ∷ θ)) (toObs leaf n s g d θ)
@@ -110,7 +116,7 @@ mutual
   -- the recursive program, unfolded only when forced
   knot : ∀ {C Γ Δᵍ Δ Θ t} → Leaf C → ℕ → Code Γ (t ∷ Δᵍ) Δ Θ t
        → Rec C Γ Δᵍ → Rec C Γ Δ → Vals Θ → Later C ⟦ Γ ⟧ᴳ ⟦ t ⟧ᵀ
-  knot leaf zero    c g d θ .Later.force = T.cold (leaf (script [] false false))
+  knot leaf zero    c g d θ .Later.force = T.cold (scripted leaf (script [] false false))
   knot leaf (suc n) c g d θ .Later.force = toObs leaf n c (knot leaf n c g d θ ∷ g) d θ
 
   later : ∀ {C Γ Δᵍ Δ Θ t} → Leaf C → ℕ → Code Γ [] (Δᵍ ++ Δ) Θ t
@@ -141,7 +147,8 @@ mutual
   burst         rs (x ∷ xs) fs c l = emit x λ where .Frame∞.force → burst rs xs fs c l
 
 timeline : Leaf Timeline
-timeline (script fs c l) = lift (scriptML 0 fs fs c l)
+timeline .scripted (script fs c l) = fixed (scriptML 0 fs fs c l)
+timeline .named                    = Events.fresh
 
 ------------------------------------------------------------------------
 -- JSON, for the oracle: a node is an array headed by its constructor,
@@ -168,6 +175,7 @@ private
 
 showCode : ∀ {Γ Δᵍ Δ Θ} t → Code Γ Δᵍ Δ Θ t → String
 showCode t (cold (script fs c l)) = "[\"cold\",[" ⊕ intersperse "," (showFrames t 0 fs) ⊕ "]," ⊕ showBool c ⊕ "," ⊕ showBool l ⊕ "]"
+showCode t fresh                = "[\"fresh\"]"
 showCode t empty                = "[\"empty\"]"
 showCode t (of xs)              = "[\"of\",[" ⊕ intersperse "," (showTms xs) ⊕ "]]"
 showCode t (map {s} f c)        = "[\"map\"," ⊕ showTm f ⊕ "," ⊕ showCode s c ⊕ "]"

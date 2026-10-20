@@ -23,7 +23,7 @@ open import Data.Product using (_,_; Σ; proj₁; proj₂)
 open import operation.Placed using (Up; Placed; Ahead; items; ahead; framed; shows; placed-⊑; frames-cut)
 open import operation.Machine using (module Machine)
 open import operation.PureObservable using (PureObs; module Pure)
-open import denotation.MonotonicList.Events using (ML; Events; root)
+open import denotation.MonotonicList.Events using (ML; root)
 open import denotation.MonotonicList using (observe; ticks)
 open import adequacy.Sorted using (module Sorting)
 open import adequacy.Sorted.Walk using (module SortingWalk)
@@ -32,14 +32,11 @@ open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Progress using (module Progressing)
 open import denotation.Order using (_⊑_; _≃_; Shows; Chain; limit; limit-ub; limit-least; shows-≼; shows-cmp; cmp-long)
 open import denotation.Denote using (⟦_⟧)
+open import denotation.Observe using (events)
 
 -- The pure run: the limit of the machine's prefixes.
 run : ∀ {A} → PureObs [] A → ML A
 run {A} o = limit λ n → Machine.prefix A n o
-
--- What a subscriber at the root is shown.
-events : ∀ {A} → PureObs [] A → Events A
-events o = observe (⟦ o ⟧ []) root
 
 module Link (R : Set) where
   open Machine R using (prefix; reading; trace; begin; launch; Read; read; Trace∞; tau; out; end; idle)

@@ -18,11 +18,10 @@ open import Data.Maybe using (Maybe; just; nothing) renaming (map to mapMaybe)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-open import Level using (lower)
 
 open import operation.AbstractObservable using (module Heap; module Run) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; PureObs; Out; note; fin; module Pure)
-open import denotation.MonotonicList.Events using (ML; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Timeline; Pos; ix; last)
+open import denotation.MonotonicList.Events using (timelineAt; ML; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Timeline; Pos; ix; last)
 
 module Machine (R : Set) where
   open Heap using (World; _⊑_; _∋_; wk∋; Sink; Handle; same)
@@ -118,7 +117,7 @@ module Machine (R : Set) where
   -- poll's answer, closed ending the burst; a teardown nothing, the heap
   -- holding it spent.  An effect waits in `asking` for `step`.
   asked : (m : Mach) → List (Output (Conf.world (Mach.conf m))) → Mach
-  asked m (start c s hd ∷ _)  = starting m s hd (lower c)
+  asked m (start c s hd ∷ _)  = starting m s hd (timelineAt c (pos m))
   asked m (closedIs true ∷ _) with Mach.bursts m
   ... | _ ∷ bs = owe (record m { bursts = bs }) resume
   ... | []     = m

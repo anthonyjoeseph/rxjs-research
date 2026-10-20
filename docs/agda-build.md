@@ -7,6 +7,13 @@ anything Main does not reach is not checked. `make gate` runs it after the cheap
 block. A cold check of the whole tree is short, but detach it anyway when
 unsure — see [bg.md](bg.md).
 
+## `make check F=<file>` is the dev loop
+
+Checks one module and what it imports, never what consumes it — so an edit
+near the top of the tree costs that module, not the adequacy cone. It is not
+the gate: a consumer broken by the edit is found only by `make agda`. Same
+`AGDA` and cache, so it warms what `make agda` reads.
+
 ## A WARNING IS A BUILD FAILURE
 
 Every Agda invocation goes through the Makefile's `AGDA` variable, which carries

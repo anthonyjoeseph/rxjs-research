@@ -32,7 +32,7 @@ open import denotation.MonotonicList.Events using (Events; Events∞; out; skip;
 open import denotation.MonotonicList using (observe)
 open import denotation.Unfold using (⟦_⟧ˢ; [])
 open import operation.Machine using (module Machine)
-open import quickcheck.Code using (script; timeline)
+open import quickcheck.Code using (script; timeline; module Leaf)
 open import quickcheck.Ghost using (showP)
 
 open Machine ℕ using (Trace; Trace∞; tau; out; end; idle; trace; begin)
@@ -100,7 +100,7 @@ private
   spin = defer λ where .Later.force → spin
 
   at : ∀ {Γ} → ℕ → ℕ → Obs Timeline Γ ℕ
-  at t v = T.cold (timeline (script ((t , v ∷ []) ∷ []) true false))
+  at t v = T.cold (Leaf.scripted timeline (script ((t , v ∷ []) ∷ []) true false))
 
   spinAt1 : ∀ {Γ} → ℕ → Obs Timeline Γ ℕ
   spinAt1 1 = spin

@@ -6,7 +6,7 @@
 -- has to be a prefix of the other side's.
 module quickcheck.Quickcheck where
 
-open import Data.Bool using (Bool; true; false; _∧_; _∨_; not)
+open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_; filterᵇ; upTo; length)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -16,9 +16,9 @@ open import Data.Product using (_×_; _,_)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import quickcheck.Ty using (boolᵗ; natᵗ; ⟦_⟧ᵀ; eqᵀ)
-open import quickcheck.Tm using (Tm; var; nat; plus; less)
-open import quickcheck.Code using (Script; script; Code; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; μ; var; defer; Prog)
+open import quickcheck.Ty using (boolᵗ; natᵗ; nameᵗ; _×ᵗ_; ⟦_⟧ᵀ; eqᵀ)
+open import quickcheck.Tm using (Tm; var; nat; plus; less; pair)
+open import quickcheck.Code using (Script; script; Code; cold; fresh; empty; of; map; scan; takeWhile; flatMap; connect; connected; μ; var; defer; Prog)
 open import quickcheck.Oracle using (Event; _▸_; tick; val; End; completed; silent; cut; Trace; denoteTrace; pureTrace)
 
 ------------------------------------------------------------------------
@@ -190,6 +190,31 @@ program : ℕ → Prog natᵗ
 program seed with gen 4 [] [] [] [] seed
 ... | p , _ = p
 
--- The seeds below k on which the two semantics disagree.
+-- NAMED: a program's values each tagged with a `fresh` name, one lane per
+-- value, so each tag names its own subscription; or that tagged program
+-- shared by `connect` with two lanes, so each name is shown twice.  Names
+-- compare only by equality, so a trace is read up to renaming them.
+private
+  tagged : ∀ {Γ Δᵍ Δ Θ} → FlatOp → Code Γ Δᵍ Δ Θ natᵗ → Code Γ Δᵍ Δ Θ (natᵗ ×ᵗ nameᵗ)
+  tagged op s = flatMap op (map (pair (var (there (here refl))) (var (here refl))) fresh) s
+
+  shared : ∀ {Γ Δᵍ Δ Θ} → FlatOp → Code Γ Δᵍ Δ Θ natᵗ → Code Γ Δᵍ Δ Θ (natᵗ ×ᵗ nameᵗ)
+  shared op s = connect (tagged op s) (flatMap (mergeᶠ nothing) (connected (here refl)) (of (nat 0 ∷ nat 1 ∷ [])))
+
+  genNamed : Gen (Prog (natᵗ ×ᵗ nameᵗ))
+  genNamed = do
+    s ← gen 4 [] [] [] []
+    op ← genOp
+    k ← roll 1
+    pure (if k ≡ᵇ 0 then tagged op s else shared op s)
+
+named : ℕ → Prog (natᵗ ×ᵗ nameᵗ)
+named seed with genNamed seed
+... | p , _ = p
+
+-- The seeds below k on which the two semantics disagree, on the seed's
+-- program or its named one.  Both read a name as its subscription's
+-- position, so here names compare exactly.
 quickcheck : ℕ → List ℕ
-quickcheck k = filterᵇ (λ seed → not (prop (program seed))) (upTo k)
+quickcheck k = filterᵇ (λ seed → not (prop (program seed) ∧ agrees t (denoteTrace 3 500 (named seed)) (pureTrace 3 500 (named seed)))) (upTo k)
+  where t = natᵗ ×ᵗ nameᵗ

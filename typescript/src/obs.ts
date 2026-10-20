@@ -25,9 +25,17 @@ import {
 
 // `quickcheck.Ty`'s values: unit is null, a pair an array, a sum a
 // one-key object.  A natural is exact, as Agda's `ℕ` is: a literal reads
-// as a number, and arithmetic makes a bigint.
+// as a number, and arithmetic makes a bigint.  A `fresh` name is an object
+// compared by identity, which is all a name can be compared by.
 export type Value =
-  null | boolean | number | bigint | Value[] | { l: Value } | { r: Value };
+  | null
+  | boolean
+  | number
+  | bigint
+  | Value[]
+  | { l: Value }
+  | { r: Value }
+  | { name: object };
 
 export type Tm =
   | ["var", number]
@@ -50,6 +58,7 @@ export type FlatOp = ["merge"] | ["merge", number] | ["switch"] | ["exhaust"];
 
 export type Code =
   | ["cold", [number, Value[]][], boolean, boolean]
+  | ["fresh"]
   | ["empty"]
   | ["of", Tm[]]
   | ["map", Tm, Code]
@@ -176,6 +185,8 @@ export const compile = (s: Scope, code: Code): Observable<Value> => {
   switch (code[0]) {
     case "cold":
       return cold(s.sch, code[1], code[2], code[3]);
+    case "fresh":
+      return defer(() => of({ name: {} }));
     case "empty":
       return EMPTY;
     case "of":

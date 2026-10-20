@@ -19,6 +19,19 @@ open import denotation.Denote using (folded)
 -- to its children's meanings, so proofs over it go one operator at a time.
 open import denotation.Compositional using (compositional)
 
+-- MAP FUSES: `map (f ∘ g)` and `map f ∘ map g` mean the same, and so,
+-- through adequacy, run the same.
+open import denotation.Laws using (map-fusion; map-fusionᴾ)
+
+-- THE SIMULTANEOUS SPEC: an author's program, elaborated with
+-- `batchSimultaneous` on top, groups what plain rxjs delivers by instant,
+-- in order, releasing each batch the moment its instant is over.
+open import simultaneous.Statement using (left-to-right; coherent; batchable; positioned)
+
+-- THE ANCHOR: the same spec, met by what a reader of the pure runtime
+-- sees, carried across `adequacy`.
+open import simultaneous.Pure using (left-to-rightᴾ; batchableᴾ)
+
 -- THE LIBRARY: what a user writes programs with, beyond the primitives
 -- the theorem's statement already reaches.
 open import Tree using (merge; flatMap; ones)

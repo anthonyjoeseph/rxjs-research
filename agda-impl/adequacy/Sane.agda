@@ -8,7 +8,6 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (zero; suc; _<ᵇ_)
 open import Data.Empty using (⊥)
-open import Level using (lower)
 import Data.List.Relation.Unary.Any as Any
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Product using (_×_; _,_; proj₁)
@@ -17,7 +16,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 
 import Tree as T
 open import Tree using (Obs)
-open import denotation.MonotonicList.Events using (Pos; From; Frame; Timeline; at; emit; stall; close; ix; _<ᵖ_; inside) renaming (done to doneᶠ; quiet to quietᶠ)
+open import denotation.MonotonicList.Events using (timelineAt; Pos; From; Frame; Timeline; at; emit; stall; close; ix; _<ᵖ_; inside) renaming (done to doneᶠ; quiet to quietᶠ)
 import denotation.Unfold as U
 
 -- Per connect in scope: its source runs, it has ended and its joiners
@@ -83,7 +82,7 @@ sane-start p quietᶠ           = tt
 -- A program subscribed while no connect in scope needs its joiners told
 -- is a run's configuration.
 sane-subscribe : ∀ {Γ : List Set} {A : Set} {ν : All (λ _ → Mode) Γ} (o : Obs Timeline Γ A) p → Running ν → Sane ν (U.subscribe o p)
-sane-subscribe (T.cold c)          p r = sane-start p (lower c)
+sane-subscribe (T.cold c)          p r = sane-start p (timelineAt c p)
 sane-subscribe T.empty             p r = tt
 sane-subscribe (T.of xs)           p r = tt
 sane-subscribe (T.map f s)         p r = sane-subscribe s p r

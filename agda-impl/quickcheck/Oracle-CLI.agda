@@ -7,6 +7,10 @@
 --   Oracle-CLI prog FROM COUNT   one line per seed: the program, the
 --                                denotation's trace and the machine's
 --   Oracle-CLI io SEED           the IO engine's trace of one seed
+--   Oracle-CLI named FROM COUNT  as `prog`, over the seed's named program
+--                                (`quickcheck.Quickcheck.named`)
+--   Oracle-CLI named-code SEED   that program
+--   Oracle-CLI named-io SEED     the IO engine's trace of it
 --   Oracle-CLI denote SEED       the denotation's trace of one seed
 --   Oracle-CLI pure SEED         the machine's trace of one seed
 --   Oracle-CLI chain FROM COUNT  the seeds whose denotation's approximants
@@ -47,10 +51,10 @@ open import IO.Primitive.Core using (pure; _>>=_)
 open import IO.Primitive.Finite using (putStrLn)
 open import System.Environment.Primitive using (getArgs)
 
-open import quickcheck.Ty using (natᵗ)
+open import quickcheck.Ty using (Ty; natᵗ; nameᵗ; _×ᵗ_)
 open import quickcheck.Code using (Prog; showCode)
 open import quickcheck.Oracle using (showTrace; denoteTrace; pureTrace; oracle; ioOp)
-open import quickcheck.Quickcheck using (program)
+open import quickcheck.Quickcheck using (program; named)
 open import quickcheck.Chain using (chainFails)
 open import quickcheck.Ghost using (ghosts; exact; settled; ghostFails; exactFails; settledFails; exactWhy; watchedCount)
 open import quickcheck.Adversary using (cases)
@@ -77,6 +81,14 @@ private
   io : ℕ → IO ⊤
   io s = oracle ioOp 3 500 (program s)
 
+  namedᵗ : Ty
+  namedᵗ = natᵗ ×ᵗ nameᵗ
+
+  namedProg : ℕ → IO ⊤
+  namedProg s = putStrLn ("{\"seed\":" ++ showℕ s ++ ",\"prog\":" ++ showCode namedᵗ (named s)
+                          ++ ",\"denote\":" ++ showTrace namedᵗ (denoteTrace 3 500 (named s))
+                          ++ ",\"pure\":" ++ showTrace namedᵗ (pureTrace 3 500 (named s)) ++ "}")
+
   hand : List (String × Prog natᵗ) → IO ⊤
   hand []             = putStrLn "hand: done"
   hand ((l , p) ∷ cs) = putStrLn ((if exact p ∧ ghosts p ∧ settled p ∧ placing p then "hand: ok   " else "hand: FAIL ") ++ l) >>= λ _ → hand cs
@@ -94,12 +106,21 @@ private
   nat = readMaybe 10
 
   usage : IO ⊤
-  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI code SEED | Oracle-CLI denote SEED | Oracle-CLI pure SEED | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI ghosts FROM COUNT | Oracle-CLI placing SEED CHECK | Oracle-CLI stepping FROM COUNT | Oracle-CLI exact FROM COUNT | Oracle-CLI settled FROM COUNT | Oracle-CLI why SEED | Oracle-CLI hand | Oracle-CLI why-hand N | Oracle-CLI spin | Oracle-CLI why-spin N K"
+  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI code SEED | Oracle-CLI named FROM COUNT | Oracle-CLI named-code SEED | Oracle-CLI named-io SEED | Oracle-CLI denote SEED | Oracle-CLI pure SEED | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI ghosts FROM COUNT | Oracle-CLI placing SEED CHECK | Oracle-CLI stepping FROM COUNT | Oracle-CLI exact FROM COUNT | Oracle-CLI settled FROM COUNT | Oracle-CLI why SEED | Oracle-CLI hand | Oracle-CLI why-hand N | Oracle-CLI spin | Oracle-CLI why-spin N K"
 
   dispatch : List String → IO ⊤
   dispatch ("prog" ∷ f ∷ c ∷ []) with nat f | nat c
   ... | just f′ | just c′ = each (mapL (f′ +_) (upTo c′)) prog
   ... | _       | _       = usage
+  dispatch ("named" ∷ f ∷ c ∷ []) with nat f | nat c
+  ... | just f′ | just c′ = each (mapL (f′ +_) (upTo c′)) namedProg
+  ... | _       | _       = usage
+  dispatch ("named-code" ∷ s ∷ []) with nat s
+  ... | just s′ = putStrLn (showCode namedᵗ (named s′))
+  ... | nothing = usage
+  dispatch ("named-io" ∷ s ∷ []) with nat s
+  ... | just s′ = oracle ioOp 3 500 (named s′)
+  ... | nothing = usage
   dispatch ("code" ∷ s ∷ []) with nat s
   ... | just s′ = putStrLn (showCode natᵗ (program s′))
   ... | nothing = usage

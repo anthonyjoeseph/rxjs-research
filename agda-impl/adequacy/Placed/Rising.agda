@@ -17,10 +17,9 @@ open import Data.Product using (_×_; _,_; proj₁; proj₂; Σ)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; subst; cong)
 open import Relation.Nullary using (¬_)
-open import Level using (lower)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList.Events using (Events; Events∞; Pos; From; Timeline; out; skip; end; hush; ix; sub; last; tick; _<ᵖ_;
+open import denotation.MonotonicList.Events using (timelineAt; Events; Events∞; Pos; From; Timeline; out; skip; end; hush; ix; sub; last; tick; _<ᵖ_;
   <ᵖ-asym; <ᵖ-split; <ᵖ-trans; <ᵖ-irrefl; <ᵖ-part; ≮-trans; <ᵖ-below; <ᵖ-tick; <ᵖ-ix; Tail;
   Tail∞; pin; idle)
 open import denotation.MonotonicList using (MonotonicList; Agree; agree; agreeᵀ; none; found)
@@ -117,8 +116,8 @@ module Reach (R : Rules) where
   reachᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ k (ρ : NEnv Γ) → S k → Everyᴱ Src ρ
          → Every∞ P (U.stateᴺ (U.subscribe o k) ρ)
   reachᶠ (cold c) (cold-f _)          k ρ sk sρ =
-    subst (Every P) (sym (U.start-meaning k (lower c) ρ)) (every-start k (lower c) sk)
-    , subst (EveryT P) (sym (U.start-cut k (lower c) ρ)) everyT-idle
+    subst (Every P) (sym (U.start-meaning k (timelineAt c k) ρ)) (every-start k (timelineAt c k) sk)
+    , subst (EveryT P) (sym (U.start-cut k (timelineAt c k) ρ)) everyT-idle
   reachᶠ empty empty-f             k ρ sk sρ = record { every = child k last last-mark sk } , everyT-idle
   reachᶠ (of xs) (of-f _)           k ρ sk sρ = every-of k 0 xs sk , everyT-idle
   reachᶠ (map f s) (map-f fs)         k ρ sk sρ = every-map f _ (proj₁ ih) , proj₂ ih
@@ -458,7 +457,7 @@ rise-start τ j′ M.quiet            = tt
 -- heads it.
 rise-sub : ∀ {Γ A} (o : Obs Timeline Γ A) j (ρ : NEnv Γ) → Headed j → Atop j (U.meaning (U.subscribe o j) ρ)
 rise-sub (cold c) (ix τ ∷ j′) ρ hj =
-  subst (Atop (ix τ ∷ j′)) (sym (U.start-meaning (ix τ ∷ j′) (lower c) ρ)) (rise-start τ j′ (lower c))
+  subst (Atop (ix τ ∷ j′)) (sym (U.start-meaning (ix τ ∷ j′) (timelineAt c (ix τ ∷ j′)) ρ)) (rise-start τ j′ (timelineAt c (ix τ ∷ j′)))
 rise-sub (cold c) []          ρ ()
 rise-sub (cold c) (sub _ ∷ _) ρ ()
 rise-sub (cold c) (last ∷ _)  ρ ()

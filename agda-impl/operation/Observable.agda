@@ -44,7 +44,7 @@ open import Level using (Lift; lift; lower; 0ℓ) renaming (suc to lsuc)
 
 open import Tree using (Obs)
 open import operation.AbstractObservable using (Prims; prims; module Heap; module Run; module Machine)
-open import denotation.MonotonicList.Events using (From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Timeline)
+open import denotation.MonotonicList.Events using (From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Timeline; fixed; fresh; timelineAt; Pos; ix)
 
 ------------------------------------------------------------------------
 -- Haskell's refs
@@ -352,11 +352,14 @@ module Drive (lp : Loop) where
 
 -- Frame 0 inline, then each later frame on a timer set where the burst
 -- before it ends.  A closed subscriber or a teardown stops the playing.
-fromTimeline : ∀ {A} → Timeline A → IOCold A
-fromTimeline {A} c = record
+-- IO knows no positions, so a `fresh` leaf's name is drawn from `names`,
+-- a supply shared by the run: a position no other draw returns, which is
+-- all a name is read for.
+fromTimeline : ∀ {A} → IORef ℕ → Timeline A → IOCold A
+fromTimeline {A} names c = record
   { Internal = IORef Bool
   ; create   = λ e → record
-      { subscription = newIORef false >>= λ off → first e off (lower c) >> pure off
+      { subscription = newIORef false >>= λ off → named c >>= λ q → first e off (timelineAt c q) >> pure off
       ; teardown     = λ off → writeIORef off true }
   }
   where
@@ -376,6 +379,10 @@ fromTimeline {A} c = record
         step self (now , _ , done)     = Emit.complete e
         step self (now , _ , quiet)    = pure tt
         step self (now , _ , at t _ b) = Emit.after e (t ∸ now) (unless off (burst e off (λ t′ m′ → self (t′ , suc t′ , m′)) t b))
+
+    named : Timeline A → IO Pos
+    named (fixed _) = pure []
+    named fresh     = readIORef names >>= λ n → writeIORef names (suc n) >> pure (ix n ∷ [])
 
     first : Emit A → IORef Bool → From A 0 → IO ⊤
     first e off (at 0 _ b) = burst e off (λ t′ m′ → play e off t′ m′) 0 b
