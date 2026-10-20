@@ -47,7 +47,7 @@ import Data.List as L
 
 import Tree as T
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush; Time; Pos; ix; last; tick; _<ᵖ_; inside; Tail; pin; idle; Tail∞; _∪_; Timeline; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close) renaming (sub to subᴾ)
+open import denotation.MonotonicList.Events using (timelineAt; Events; Events∞; out; skip; end; hush; Time; Pos; ix; last; tick; _<ᵖ_; inside; Tail; pin; idle; Tail∞; _∪_; Timeline; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close) renaming (sub to subᴾ)
 open import denotation.MonotonicList using (MonotonicList; tailᴱ) renaming (cold to coldᴹ)
 import denotation.MonotonicList as M′
 open import denotation.MonotonicList using (Agree; agree-refl; agreeᵀ-refl; agree-trans; agreeᵀ-trans; _≈[_]_; agrees; agree; agreeᵀ; ≈ₖ-sym; ≈ₖ-trans; ≈ₖ-pred; hot; deferᴰ)
@@ -118,7 +118,7 @@ startᶜ p (at zero _ b) = burstᶜ (tick p) p 0 b
 startᶜ p m             = framesᶜ (tick p) (p ++ [ last ]) m
 
 subscribe : ∀ {Γ A} → Obs Timeline Γ A → Pos → Node Γ A
-subscribe (cold c)          p = startᶜ p (lower c)
+subscribe (cold c)          p = startᶜ p (timelineAt c p)
 subscribe empty             p = ofᶜ p 0 []
 subscribe (of xs)           p = ofᶜ p 0 xs
 subscribe (map f s)         p = mapᶜ f (subscribe s p)
@@ -619,9 +619,9 @@ start-cut p quiet            ρ = refl
 -- environments agree.  Each operator's state is its fold's field by
 -- field, so each clause re-reads the fold's agreement at its own.
 subscribed : ∀ {Γ A k} (o : Obs Timeline Γ A) {ρ : NEnv Γ} {σ : DenEnv Γ} → EnvAgree k (hots ρ) σ → nodeᴹ o ρ ≈[ k ] ⟦ o ⟧ᴰ σ
-subscribed {k = k} (cold c) {ρ} {σ} e = ≈ₖ-trans {y = M′.coldᴰ (lower c)} (agrees
-  (λ p → subst (λ x → M′.Agreeᵀ _ x idle) (sym (start-cut p (lower c) ρ)) (agreeᵀ-refl _ _))
-  (λ p → subst (λ x → Agree _ x (M′.start p (lower c))) (sym (start-meaning p (lower c) ρ)) (agree-refl _ _)))
+subscribed {k = k} (cold c) {ρ} {σ} e = ≈ₖ-trans {y = M′.coldᴰ c} (agrees
+  (λ p → subst (λ x → M′.Agreeᵀ _ x idle) (sym (start-cut p (timelineAt c p) ρ)) (agreeᵀ-refl _ _))
+  (λ p → subst (λ x → Agree _ x (M′.start p (timelineAt c p))) (sym (start-meaning p (timelineAt c p) ρ)) (agree-refl _ _)))
   (≈ₖ-sym (C.coldᶜ c σ k))
 subscribed {k = k} empty             {σ = σ} e = agrees (agreeᵀ h) (agree h)
   where h = ≈ₖ-sym (C.emptyᶜ σ k)

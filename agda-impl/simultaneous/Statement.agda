@@ -48,20 +48,18 @@ open import Function using (_⇔_; mk⇔)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
 
 open import Tree using (Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList.Events using (Events; Pos; Timeline; root)
+open import denotation.MonotonicList.Events using (_≟ᵖ_; Events; Pos; Timeline; root)
 open import denotation.MonotonicList using (MonotonicList; observe; ⊥ᴰ; deferᴰ; spin; Settling; lub)
-open import denotation.Denote using (DenEnv; ⟦_⟧)
-open import denotation.Compositional using (module Over)
+open import denotation.Denote using (DenEnv; ⟦_⟧; approx)
+open import denotation.Compositional using (settles)
 open import denotation.Observe using (events)
 open import simultaneous.InstEmit using (InstEmit)
-open import simultaneous.Leaf using (leafᴰ; _≟ᵖ_; approxˢ; ⟦_⟧ˢ)
 open import simultaneous.SObs using (SObs; module Elaborate)
 import simultaneous.Spec as Spec
 open Spec _≟ᵖ_ using (batchSimultaneousᴰ)
 open import simultaneous.Readings using (instantOf; outs; values; positions; over; FiniteInstants; Rooted; Site; at-root; stamped; closed)
 
 open Elaborate {C = Timeline} _≟ᵖ_ using (E; IE; elaborate; batchSimultaneous; coldˢ; emptyˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; elaborate-cold; elaborate-empty; elaborate-of; elaborate-map; elaborate-scan; elaborate-takeWhile; elaborate-flatMap; elaborate-connect; elaborate-connected; elaborate-defer)
-open Over leafᴰ using (settles)
 
 -- The program the author's stands for: elaborated, batched on top.
 batchedObs : ∀ {A} → SObs [] A → E [] (IE (List A))
@@ -69,10 +67,10 @@ batchedObs o = batchSimultaneous (elaborate o)
 
 -- The elaborated program's run, and the batcher's on top of it.
 elaborated : ∀ {A} → SObs [] A → Events (IE A)
-elaborated o = observe (⟦ elaborate o ⟧ˢ []) root
+elaborated o = observe (⟦ elaborate o ⟧ []) root
 
 batched : ∀ {A} → SObs [] A → Events (IE (List A))
-batched o = observe (⟦ batchedObs o ⟧ˢ []) root
+batched o = observe (⟦ batchedObs o ⟧ []) root
 
 ------------------------------------------------------------------------
 -- The three relations, between runs
@@ -206,7 +204,7 @@ Admissible : ∀ {A} → (MonotonicList A → Set) → Set
 Admissible {A} P = ∀ {c : ℕ → MonotonicList A} → Settling c → (∀ n → P (c n)) → P (lub c)
 
 through-limit : ∀ {Γ A} {P : MonotonicList A → Set} → Admissible P → (o : E Γ A) (ρ : DenEnv Γ)
-              → (∀ n → P (approxˢ n o ρ)) → P (⟦ o ⟧ˢ ρ)
+              → (∀ n → P (approx n o ρ)) → P (⟦ o ⟧ ρ)
 through-limit adm o ρ h = adm (settles o ρ) h
 
 ------------------------------------------------------------------------
@@ -217,27 +215,27 @@ postulate
   sound-admissible : ∀ {A} → Admissible (Sound {A})
   defer-sound      : ∀ {A} {m : MonotonicList (IE A)} → Sound m → Sound (deferᴰ m)
 
-  coldˢ-sound      : ∀ {Γ A} n (c : Timeline A) {ρ : DenEnv Γ} → Sound (approxˢ n (coldˢ {Γ = Γ} c) ρ)
-  emptyˢ-sound     : ∀ {Γ A} n {ρ : DenEnv Γ} → Sound (approxˢ n (emptyˢ {Γ = Γ} {A = A}) ρ)
-  ofˢ-sound        : ∀ {Γ A} n (xs : List A) {ρ : DenEnv Γ} → Sound (approxˢ n (ofˢ {Γ = Γ} xs) ρ)
+  coldˢ-sound      : ∀ {Γ A} n (c : Timeline A) {ρ : DenEnv Γ} → Sound (approx n (coldˢ {Γ = Γ} c) ρ)
+  emptyˢ-sound     : ∀ {Γ A} n {ρ : DenEnv Γ} → Sound (approx n (emptyˢ {Γ = Γ} {A = A}) ρ)
+  ofˢ-sound        : ∀ {Γ A} n (xs : List A) {ρ : DenEnv Γ} → Sound (approx n (ofˢ {Γ = Γ} xs) ρ)
   mapˢ-sound       : ∀ {Γ A B} n (f : A → B) (s : E Γ (IE A)) {ρ : DenEnv Γ}
-                   → Sound (approxˢ n s ρ) → Sound (approxˢ n (mapˢ f s) ρ)
+                   → Sound (approx n s ρ) → Sound (approx n (mapˢ f s) ρ)
   scanˢ-sound      : ∀ {Γ A B} n (f : B → A → B) z (s : E Γ (IE A)) {ρ : DenEnv Γ}
-                   → Sound (approxˢ n s ρ) → Sound (approxˢ n (scanˢ f z s) ρ)
+                   → Sound (approx n s ρ) → Sound (approx n (scanˢ f z s) ρ)
   takeWhileˢ-sound : ∀ {Γ A} n i p (s : E Γ (IE A)) {ρ : DenEnv Γ}
-                   → Sound (approxˢ n s ρ) → Sound (approxˢ n (takeWhileˢ i p s) ρ)
+                   → Sound (approx n s ρ) → Sound (approx n (takeWhileˢ i p s) ρ)
   flatMapˢ-sound   : ∀ {Γ A B} n (op : FlatOp) (f : A → E Γ (IE B)) (s : E Γ (IE A)) {ρ : DenEnv Γ}
-                   → (∀ a → Sound (approxˢ n (f a) ρ)) → Sound (approxˢ n s ρ) → Sound (approxˢ n (flatMapˢ op f s) ρ)
+                   → (∀ a → Sound (approx n (f a) ρ)) → Sound (approx n s ρ) → Sound (approx n (flatMapˢ op f s) ρ)
   connectˢ-sound   : ∀ {Γ A B} n (s : E Γ (IE A)) (b : E (IE A ∷ Γ) (IE B)) {ρ : DenEnv Γ}
-                   → Sound (approxˢ n s ρ) → (∀ {r} → Sound r → Sound (approxˢ n b (r ∷ ρ)))
-                   → Sound (approxˢ n (connectˢ s b) ρ)
+                   → Sound (approx n s ρ) → (∀ {r} → Sound r → Sound (approx n b (r ∷ ρ)))
+                   → Sound (approx n (connectˢ s b) ρ)
 
 -- Soundness of what a program elaborates to, read across its equation.
-via : ∀ {Γ A n} {ρ : DenEnv Γ} {o e : E Γ (IE A)} → o ≡ e → Sound (approxˢ n e ρ) → Sound (approxˢ n o ρ)
+via : ∀ {Γ A n} {ρ : DenEnv Γ} {o e : E Γ (IE A)} → o ≡ e → Sound (approx n e ρ) → Sound (approx n o ρ)
 via refl s = s
 
 -- Induction on (n , program), as `approx` recurses.
-approx-sound : ∀ {Γ A} n (o : SObs Γ A) {ρ : DenEnv (L.map IE Γ)} → Sounds ρ → Sound (approxˢ n (elaborate o) ρ)
+approx-sound : ∀ {Γ A} n (o : SObs Γ A) {ρ : DenEnv (L.map IE Γ)} → Sounds ρ → Sound (approx n (elaborate o) ρ)
 approx-sound n       (cold c)          ss = via (elaborate-cold c) (coldˢ-sound n c)
 approx-sound n       empty             ss = via elaborate-empty (emptyˢ-sound n)
 approx-sound n       (of xs)           ss = via (elaborate-of xs) (ofˢ-sound n xs)
@@ -253,7 +251,7 @@ approx-sound n       (connected i)     ss = via (elaborate-connected i) (looked 
 approx-sound zero    (defer l)         ss = via (elaborate-defer l) ⊥-sound
 approx-sound (suc n) (defer l)         ss = via (elaborate-defer l) (defer-sound (approx-sound n (Later.force l) ss))
 
-elaborated-sound : ∀ {Γ A} (o : SObs Γ A) {ρ : DenEnv (L.map IE Γ)} → Sounds ρ → Sound (⟦ elaborate o ⟧ˢ ρ)
+elaborated-sound : ∀ {Γ A} (o : SObs Γ A) {ρ : DenEnv (L.map IE Γ)} → Sounds ρ → Sound (⟦ elaborate o ⟧ ρ)
 elaborated-sound o {ρ} ss = through-limit {P = Sound} sound-admissible (elaborate o) ρ λ n → approx-sound n o ss
 
 ------------------------------------------------------------------------
@@ -263,11 +261,11 @@ postulate
   -- The batcher on an elaborated program releases each batch in its own
   -- instant, named as the instant is.
   batched-sound  : ∀ {Γ A} (o : SObs Γ A) {ρ : DenEnv (L.map IE Γ)} → Sounds ρ
-                 → Sound (⟦ batchSimultaneous (elaborate o) ⟧ˢ ρ)
+                 → Sound (⟦ batchSimultaneous (elaborate o) ⟧ ρ)
   left-to-rightˢ : ∀ {Γ A} (o : SObs Γ A) {ρ′ : DenEnv (L.map IE Γ)} {ρ : DenEnv Γ} → Related ρ′ ρ → ∀ {p} → Site p
-                 → Joins (observe (⟦ batchSimultaneous (elaborate o) ⟧ˢ ρ′) p) (observe (⟦ o ⟧ ρ) p)
+                 → Joins (observe (⟦ batchSimultaneous (elaborate o) ⟧ ρ′) p) (observe (⟦ o ⟧ ρ) p)
   batchableˢ     : ∀ {Γ A} (o : SObs Γ A) {ρ : DenEnv (L.map IE Γ)} → Sounds ρ → ∀ {p} → Site p
-                 → Batches (observe (⟦ batchSimultaneous (elaborate o) ⟧ˢ ρ) p) (observe (⟦ elaborate o ⟧ˢ ρ) p)
+                 → Batches (observe (⟦ batchSimultaneous (elaborate o) ⟧ ρ) p) (observe (⟦ elaborate o ⟧ ρ) p)
 
 ------------------------------------------------------------------------
 -- The statements: each the root case

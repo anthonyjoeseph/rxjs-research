@@ -17,7 +17,7 @@ open import Data.Empty using (⊥)
 
 open import operation.AbstractObservable using (module Heap) renaming (module Machine to Shared)
 open import operation.PureObservable using (Out; note; fin)
-open import denotation.MonotonicList.Events using (done; quiet; at; emit; stall; close; Timeline; Frame∞; From∞; ix; last)
+open import denotation.MonotonicList.Events using (timelineAt; done; quiet; at; emit; stall; close; Timeline; Frame∞; From∞; ix; last)
 open import operation.Machine using (module Machine)
 
 module Recording (R : Set) where
@@ -47,7 +47,7 @@ module Recording (R : Set) where
   asked-keeps : ∀ m os → Fed m (asked m os)
   asked-keeps m []                  = (refl , refl) , refl
   asked-keeps m (perform _ ∷ _)     = (refl , refl) , refl
-  asked-keeps m (start c s hd ∷ _)  = starting-keeps m s hd (lower c)
+  asked-keeps m (start c s hd ∷ _)  = starting-keeps m s hd (timelineAt c (pos m))
   asked-keeps m (stopped _ ∷ _)     = (refl , refl) , refl
   asked-keeps m (closedIs false ∷ _) = (refl , refl) , refl
   asked-keeps m (closedIs true ∷ _) with Mach.bursts m

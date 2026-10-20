@@ -178,14 +178,6 @@ Members: `coldˢ-sound`, `emptyˢ-sound`, `ofˢ-sound`, `mapˢ-sound`,
 `scanˢ-sound`, `takeWhileˢ-sound`, `flatMapˢ-sound`, `connectˢ-sound`,
 `defer-sound`, `sound-admissible`, `batched-sound`.
 
-#### THE FRESH RUNTIME
-
-The pure runtime has no `fresh` leaf: names as positions in the meaning,
-as a counter in the run, alike up to renaming. Settled when `runˢ` is the
-pure runtime over the leaf and `adequacyˢ` follows from `adequacy`.
-
-Members: `runˢ`, `adequacyˢ`.
-
 #### THE READING
 
 A reader's prefix of `ticks e` and the first n events of `e` read alike:

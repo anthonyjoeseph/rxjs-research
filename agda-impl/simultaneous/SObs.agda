@@ -26,16 +26,15 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList.Events using (Timeline)
 open import simultaneous.InstEmit using (InstEmit)
-open import simultaneous.Leaf using (WithFresh)
 
 SObs : List Set → Set → Set₁
 SObs = Obs Timeline
 
 module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) where
 
-  -- What the engine runs: the author's leaves and `fresh`.
+  -- What the engine runs: the author's leaves, `fresh` among them.
   E : List Set → Set → Set₁
-  E = Obs (WithFresh C N)
+  E = Obs C
 
   IE : Set → Set
   IE = InstEmit N
@@ -54,7 +53,7 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) wh
     batchSimultaneous : ∀ {Γ A} → E Γ (IE A) → E Γ (IE (List A))
 
   -- A delayed program, for `defer`'s elaboration.
-  later : ∀ {Γ A} → E Γ A → Later (WithFresh C N) Γ A
+  later : ∀ {Γ A} → E Γ A → Later C Γ A
   later e .Later.force = e
 
   -- `elaborate`, one equation per former.  Each is to hold by `refl` once

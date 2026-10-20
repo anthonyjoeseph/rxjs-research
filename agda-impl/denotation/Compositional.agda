@@ -134,4 +134,4 @@ module Over {C : Set → Set₁} (leaf : ∀ {A} → C A → MonotonicList A) wh
                      (deferᴰ-contractive (toward k (Later.force l) ρ)))
     }
 
-open Over (λ c → coldᴰ (lower c)) public
+open Over coldᴰ public

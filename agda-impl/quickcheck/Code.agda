@@ -141,7 +141,7 @@ mutual
   burst         rs (x ∷ xs) fs c l = emit x λ where .Frame∞.force → burst rs xs fs c l
 
 timeline : Leaf Timeline
-timeline (script fs c l) = lift (scriptML 0 fs fs c l)
+timeline (script fs c l) = fixed (scriptML 0 fs fs c l)
 
 ------------------------------------------------------------------------
 -- JSON, for the oracle: a node is an array headed by its constructor,

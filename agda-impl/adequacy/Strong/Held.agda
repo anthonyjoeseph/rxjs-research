@@ -20,7 +20,7 @@ open import Data.List.Relation.Unary.AllPairs using (AllPairs) renaming ([] to [
 
 import Tree as T
 open import Tree using (Obs)
-open import denotation.MonotonicList.Events using (inside; Time; Pos; From; Frame; Timeline; at; emit; stall; close; ix; last; tick; root; _<ᵖ_) renaming (done to doneᶠ; quiet to quietᶠ; sub to subᴾ)
+open import denotation.MonotonicList.Events using (timelineAt; inside; Time; Pos; From; Frame; Timeline; at; emit; stall; close; ix; last; tick; root; _<ᵖ_) renaming (done to doneᶠ; quiet to quietᶠ; sub to subᴾ)
 open import operation.AbstractObservable using (base; maybe; quiet; gate; module Run; module Heap) renaming (module Machine to Shared)
 open import operation.PureObservable using (Pureᴾ; Out; fin; module Pure)
 open import operation.Machine using (module Machine)
@@ -406,7 +406,7 @@ module StrongHeld (R : Set) where
   opens-of p i (x ∷ xs) = opens-++ p (ix i)
 
   opens-subscribe : ∀ {Γ A} (o : Obs Timeline Γ A) p → Opens (U.headˢ (U.step (U.subscribe o p)))
-  opens-subscribe (T.cold c)          p = opens-start p (lower c)
+  opens-subscribe (T.cold c)          p = opens-start p (timelineAt c p)
   opens-subscribe T.empty             p = opens-++ p last
   opens-subscribe (T.of xs)           p = opens-of p 0 xs
   opens-subscribe (T.map f s)         p = opens-map f _ (opens-subscribe s p)

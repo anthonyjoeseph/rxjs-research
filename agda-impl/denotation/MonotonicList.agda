@@ -17,7 +17,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_)
 open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_; _≤′_; ≤′-refl; ≤′-step)
 open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
-open import denotation.MonotonicList.Events using (Burst; Burst∞; Events; Events∞; Frame; Frame∞; From; From∞; ML; ML∞; Pos; Tail; Tail∞; Time; _<ᵖ_; _∪_; at; close; done; emit; end; hush; idle; inside; ix; last; out; pin; quiet; skip; stall; sub; tick)
+open import denotation.MonotonicList.Events using (Burst; Burst∞; Timeline; timelineAt; Events; Events∞; Frame; Frame∞; From; From∞; ML; ML∞; Pos; Tail; Tail∞; Time; _<ᵖ_; _∪_; at; close; done; emit; end; hush; idle; inside; ix; last; out; pin; quiet; skip; stall; sub; tick)
 
 open Tail∞
 
@@ -110,9 +110,9 @@ start : ∀ {A} → Pos → From A 0 → Events A
 start p (at zero _ b) = burst (tick p) p 0 b
 start p m             = frames (tick p) (p ++ [ last ]) m
 
-coldᴰ : ∀ {A} → From A 0 → MonotonicList A
-coldᴰ m = cold λ p → λ where
-  .force → start p m
+coldᴰ : ∀ {A} → Timeline A → MonotonicList A
+coldᴰ c = cold λ p → λ where
+  .force → start p (timelineAt c p)
   .cut   → idle
 
 ------------------------------------------------------------------------

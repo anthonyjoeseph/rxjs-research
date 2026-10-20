@@ -8,12 +8,15 @@ open import Data.Product using (_×_; _,_; Σ)
 open import Data.Nat using (ℕ; zero; suc; _<ᵇ_)
 open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
 open import Data.Bool using (T)
-open import Data.Nat using (_<_; _≤_)
+open import Data.Nat using (_<_; _≤_; z≤n)
 open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; ≤-antisym; <-trans; n≮n; n<1+n; <⇒≤; ≤-reflexive)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
+open import Relation.Binary.Definitions using (DecidableEquality)
+open import Relation.Nullary using (yes; no)
+import Data.Nat as ℕ
 
 ------------------------------------------------------------------------
 -- Timelines: what a cold leaf says, and what a runtime reports
@@ -64,11 +67,6 @@ mutual
     coinductive
     field force : From A t
 
--- Lifted only because the leaf slot of a program tree is `Set₁` (the
--- IO leaf carries an existential).
-Timeline : Set → Set₁
-Timeline A = Lift (lsuc 0ℓ) (From A 0)
-
 ------------------------------------------------------------------------
 -- Positions
 
@@ -103,6 +101,50 @@ tick []          = 0
 tick (ix t ∷ _)  = t
 tick (sub _ ∷ _) = 0
 tick (last ∷ _)  = 0
+
+-- Positions' equality: all a name is read for.
+mutual
+  _≟ˡ_ : DecidableEquality Label
+  ix m  ≟ˡ ix n  with m ℕ.≟ n
+  ... | yes refl = yes refl
+  ... | no ne    = no λ { refl → ne refl }
+  sub p ≟ˡ sub q with p ≟ᵖ q
+  ... | yes refl = yes refl
+  ... | no ne    = no λ { refl → ne refl }
+  last  ≟ˡ last  = yes refl
+  ix _  ≟ˡ sub _ = no λ ()
+  ix _  ≟ˡ last  = no λ ()
+  sub _ ≟ˡ ix _  = no λ ()
+  sub _ ≟ˡ last  = no λ ()
+  last  ≟ˡ ix _  = no λ ()
+  last  ≟ˡ sub _ = no λ ()
+
+  _≟ᵖ_ : DecidableEquality Pos
+  []      ≟ᵖ []      = yes refl
+  []      ≟ᵖ (_ ∷ _) = no λ ()
+  (_ ∷ _) ≟ᵖ []      = no λ ()
+  (a ∷ p) ≟ᵖ (b ∷ q) with a ≟ˡ b | p ≟ᵖ q
+  ... | yes refl | yes refl = yes refl
+  ... | no ne    | _        = no λ { refl → ne refl }
+  ... | yes _    | no ne    = no λ { refl → ne refl }
+
+------------------------------------------------------------------------
+-- The cold leaf
+
+-- WHAT A COLD LEAF IS: a timeline fixed relative to its subscription, or
+-- `fresh`, which emits the position it is subscribed at and completes —
+-- a name no other subscription has.  So a leaf is a timeline read at its
+-- subscription position, and every runtime that knows the position plays
+-- the same one.  In `Set₁` because the leaf slot of a program tree is.
+data Timeline : Set → Set₁ where
+  fixed : ∀ {A} → From A 0 → Timeline A
+  fresh : Timeline Pos
+
+timelineAt : ∀ {A} → Timeline A → Pos → From A 0
+timelineAt (fixed m) p = m
+timelineAt fresh     p = at 0 z≤n (emit p λ where
+  .Frame∞.force → close λ where
+    .From∞.force → done)
 
 private
   data Cmp : Set where

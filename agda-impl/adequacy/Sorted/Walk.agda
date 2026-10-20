@@ -19,7 +19,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 import Tree as T
 open import Tree using (Obs)
-open import denotation.MonotonicList.Events using (Pos; From; done; quiet; at; emit; stall; close; From∞; ix; last; root; _<ᵖ_; <ᵖ-trans; <ᵖ-below; <ᵖ-part; <ᵖ-sub; <ᵖ-ix; Timeline) renaming (sub to subᴾ)
+open import denotation.MonotonicList.Events using (timelineAt; Pos; From; done; quiet; at; emit; stall; close; From∞; ix; last; root; _<ᵖ_; <ᵖ-trans; <ᵖ-below; <ᵖ-part; <ᵖ-sub; <ᵖ-ix; Timeline) renaming (sub to subᴾ)
 open import operation.AbstractObservable using (Ty; _⊗_; joins; fifo; gate; module Run; module Heap)
   renaming (base to baseᵗ; ref to refᵗ; sink to sinkᵗ; quiet to quietᵗ; list to listᵗ; maybe to maybeᵗ) renaming (module Machine to Shared)
 open import operation.PureObservable using (PureObs; Pureᴾ; Out; note; fin; module Pure)
@@ -397,8 +397,8 @@ module SortingWalk (R : Set) where
     silentʷ (inj₁ refl) (wellʳ (runʷ u settled-refl (proj₁ (look-well {hp = hp} wh s) a p lo le) (restʷ u st h ws)) eb refl wh refl wq)
   runs-run {lo = lo} {hp = hp} {p = p} u st (finishʷ {s = s} le h) ws eb wh wq =
     silentʷ (inj₁ refl) (wellʳ (runʷ u settled-refl (proj₁ (proj₂ (look-well {hp = hp} wh s)) p lo le) (restʷ u st h ws)) eb refl wh refl wq)
-  runs-run {bu = bu} u st (startColdʷ {c = c} {s = s} le h) ws eb wh wq =
-    started-well (wk∋ new s) here (lower c) le (restʷ u st (λ lo′ st′ → h lo′ st′ new here) ws) (trans (entries-wk new bu) eb) (extend-well wh (lift tt)) (queue-wk new wq)
+  runs-run {bu = bu} {p = p} u st (startColdʷ {c = c} {s = s} le h) ws eb wh wq =
+    started-well (wk∋ new s) here (timelineAt c p) le (restʷ u st (λ lo′ st′ → h lo′ st′ new here) ws) (trans (entries-wk new bu) eb) (extend-well wh (lift tt)) (queue-wk new wq)
   runs-run u st (stopʷ {h = hd} wk) ws eb wh wq = silentʷ (inj₁ refl) (wellʳ (runʷ u st wk ws) eb refl (store-well hd wh (lift tt)) refl wq)
   runs-run {bu = bu} u st (stashʷ sm h) ws eb wh wq =
     silentʷ (inj₁ refl) (wellʳ (runʷ u st (h new here) ws) (trans (entries-wk new bu) eb) refl (extend-well wh (wk-still new sm)) refl (queue-wk new wq))

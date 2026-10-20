@@ -150,8 +150,8 @@ private
 -- once nothing is left to wait for.  Never `cut`: a program that never
 -- finishes never returns.
 ioTrace : ∀ {t} → ℕ → Prog t → IO (Trace ⟦ t ⟧ᵀ)
-ioTrace u p = newIORef false >>= λ fin → newIORef [] >>= λ log → subscribe
-  (toObs (λ s → fromTimeline (timeline s)) u p [] [] [])
+ioTrace u p = newIORef false >>= λ fin → newIORef [] >>= λ log → newIORef 0 >>= λ names → subscribe
+  (toObs (λ s → fromTimeline names (timeline s)) u p [] [] [])
   (λ t a → readIORef log >>= λ xs → writeIORef log ((t , a) ∷ xs))
   (writeIORef fin true) >>= λ _ →
   readIORef log >>= λ xs → readIORef fin >>= λ c →

@@ -60,7 +60,7 @@ module Over {C : Set → Set₁} (leaf : ∀ {A} → C A → MonotonicList A) wh
   ⟦_⟧ : ∀ {Γ A} → Obs C Γ A → DenEnv Γ → MonotonicList A
   ⟦ o ⟧ ρ = lub λ n → approx n o ρ
 
-open Over (λ c → coldᴰ (lower c)) public
+open Over coldᴰ public
 
 -- The meaning is a fold: the limit of approximants, each an operator's
 -- `MonotonicList` function applied to its children's approximants.

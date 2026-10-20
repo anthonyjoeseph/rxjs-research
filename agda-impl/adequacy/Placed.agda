@@ -22,7 +22,7 @@ open import Relation.Nullary using (¬_)
 open import Level using (lower)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList.Events using (Events; Events∞; Pos; From; Timeline; out; skip; end; hush; ix; sub; last; tick; _<ᵖ_; root;
+open import denotation.MonotonicList.Events using (timelineAt; Events; Events∞; Pos; From; Timeline; out; skip; end; hush; ix; sub; last; tick; _<ᵖ_; root;
   <ᵖ-asym; <ᵖ-split; <ᵖ-trans; <ᵖ-irrefl; <ᵖ-below; Tail; Tail∞; pin; idle; _∪_)
 open import denotation.MonotonicList using (MonotonicList; agreeᵀ; none; found)
 import denotation.MonotonicList.Events as M
@@ -623,7 +623,7 @@ flat-calm : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A
 -- REFUTED: 42e70878 over sources stepping and then emitting at one position, a takeWhile showing the value inside the step
 steady-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
             → Steady (U.meaning (U.subscribe o p) ρ)
-steady-subᶠ (cold c) _ p ρ hp so cl = subst Steady (sym (U.start-meaning p (lower c) ρ)) (steady-start p (lower c) hp)
+steady-subᶠ (cold c) _ p ρ hp so cl = subst Steady (sym (U.start-meaning p (timelineAt c p) ρ)) (steady-start p (timelineAt c p) hp)
 steady-subᶠ empty _ p ρ hp so cl = record { steady = tt }
 steady-subᶠ (of xs) _ p ρ hp so cl = steady-of p 0 xs
 steady-subᶠ (map f s) (map-f fs) p ρ hp so cl = steady-map f _ (steady-subᶠ s fs p ρ hp so cl)
@@ -800,7 +800,7 @@ fresh-connect {Γ} {A} {B} s b fs fb p ρ hp so cl = W.cuts-fresh fs₀ , W.fr-b
       ; sr = fresh-widen p r wide (force Sᶜ) (proj₂ fS)
       }
 
-fresh-subᶠ (cold c) _ p ρ hp so cl = fresh-start p (lower c) ρ
+fresh-subᶠ (cold c) _ p ρ hp so cl = fresh-start p (timelineAt c p) ρ
 fresh-subᶠ empty _ p ρ hp so cl = everyT-idle , record { freshᴿ = tt }
 fresh-subᶠ (of xs) _ p ρ hp so cl = everyT-idle , fresh-of p p 0 xs
 fresh-subᶠ (map f s) (map-f fs) p ρ hp so cl =
@@ -816,7 +816,7 @@ fresh-subᶠ (defer l) (defer-f fl) p ρ hp so cl =
   fresh-defer l p ρ hp cl (fresh-subᶠ (Later.force l) fl (p ++ [ ix 1 ]) ρ (headed-snoc p hp) so
                              (alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl))
 
-trailing-subᶠ (cold c) _ p ρ hp so cl = trailing-start p (lower c) ρ
+trailing-subᶠ (cold c) _ p ρ hp so cl = trailing-start p (timelineAt c p) ρ
 trailing-subᶠ empty _ p ρ hp so cl = trail-idle _ tt
 trailing-subᶠ (of xs) _ p ρ hp so cl = trail-of p 0 xs
 trailing-subᶠ (map f s) (map-f fs) p ρ hp so cl = trail-map f _ _ (trailing-subᶠ s fs p ρ hp so cl)
@@ -918,7 +918,7 @@ fresh-flat {Γ} {A} {B} op f s ff fs p ρ hp so cl =
     fo = proj₁ fS , fresh-map F p _ (proj₂ fS) , values-map F _ gen , every-map F _ ko
       where fS = fresh-subᶠ s fs p ρ hp so cl
 
-ordered-subᶠ (cold c) _ p ρ hp so cl = subst Ordered (sym (U.start-meaning p (lower c) ρ)) (ordered-start p (lower c) hp)
+ordered-subᶠ (cold c) _ p ρ hp so cl = subst Ordered (sym (U.start-meaning p (timelineAt c p) ρ)) (ordered-start p (timelineAt c p) hp)
 ordered-subᶠ empty _ p ρ hp so cl = record { ordered = tt }
 ordered-subᶠ (of xs) _ p ρ hp so cl = ordered-of p 0 xs
 ordered-subᶠ (map f s) (map-f fs) p ρ hp so cl = ordered-map f _ (ordered-subᶠ s fs p ρ hp so cl)
@@ -932,7 +932,7 @@ ordered-subᶠ (defer l) (defer-f fl) p ρ hp so cl =
   ordered-defer l p ρ hp cl (ordered-subᶠ (Later.force l) fl (p ++ [ ix 1 ]) ρ (headed-snoc p hp) so
                                (alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl))
 
-spread-subᶠ (cold c) _ p ρ hp so cl = subst Spread (sym (U.start-meaning p (lower c) ρ)) (spread-start p (lower c) hp)
+spread-subᶠ (cold c) _ p ρ hp so cl = subst Spread (sym (U.start-meaning p (timelineAt c p) ρ)) (spread-start p (timelineAt c p) hp)
 spread-subᶠ empty _ p ρ hp so cl = record { spread = tt }
 spread-subᶠ (of xs) _ p ρ hp so cl = spread-of p 0 xs
 spread-subᶠ (map f s) (map-f fs) p ρ hp so cl = spread-map f _ (spread-subᶠ s fs p ρ hp so cl)
@@ -962,7 +962,7 @@ steady-sub o p ρ hp so cl =
 -- A program subscribed where a tick heads, over sorted sources alien to
 -- where it subscribes, is placed.
 placed-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ → Placed (U.subscribe o p) ρ
-placed-sub (cold c) p ρ hp so cl = ordered-sub (cold c) p ρ hp so cl , start-within p (lower c) ρ
+placed-sub (cold c) p ρ hp so cl = ordered-sub (cold c) p ρ hp so cl , start-within p (timelineAt c p) ρ
 placed-sub empty p ρ hp so cl = ordered-sub empty p ρ hp so cl , tt
 placed-sub (of xs) p ρ hp so cl = ordered-sub (of xs) p ρ hp so cl , tt
 placed-sub (map f s) p ρ hp so cl = ordered-sub (map f s) p ρ hp so cl , placed-sub s p ρ hp so cl
