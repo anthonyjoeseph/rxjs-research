@@ -738,7 +738,8 @@ module ClimbFlat (R : Set) where
     -- Why it holds: a joiner shows a part only while its guard is up, and
     -- a connect's source subscribed past the connect's end is cut as its
     -- subscribe returns, so a counted joiner is live or inside its source's
-    -- burst; a binder bound above ends at no point inside that burst.
+    -- burst; a binder bound above ends at no point inside that burst,
+    -- since its finish finds no burst open in its body (`fin-calm`).
     -- Owed: an untold measure over the ghost, kept by each step as
     -- `tells-past` keeps it over the parts.
     --
