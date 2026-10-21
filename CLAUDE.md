@@ -150,7 +150,8 @@ Per tier: a one-line description (≤150 chars), then a **ledger** of GROUPS. No
 ## Two phases, alternating (Anthony)
 
 - **Writing.** Long, manic, caution to the wind: no Agda invocation at all, no gate. Commit and push WIP; red is expected. Grind everything relevant to the top group in full — leave a new postulate only if meaningfully separate from the group's issue, filed under its own group. Ends when the top group's risk is SETTLED either way: its suspect fact proven, or refuted and restated so the route is known.
-- **Reconciliation.** All effort on green; no new proof work. Push, then keep working while CI's gate runs: `make gate-cheap`, `make check` on each module touched, every law below paid (leaf, wiring, headers, comments, imports). **A push cancels the CI run in flight, so push a batch of fixes, not each one** — a gate restarted every few minutes never finishes. Merge-ready when CI's gate is green on the head.
+- **Reconciliation.** All effort on that branch's green; no new proof work *on it*. Push, then keep working while CI's gate runs: `make gate-cheap`, `make check` on each module touched, every law below paid (leaf, wiring, headers, comments, imports). **A push cancels the CI run in flight, so push a batch of fixes, not each one** — a gate restarted every few minutes never finishes. Merge-ready when CI's gate is green on the head.
+- **Stack, don't wait (Anthony).** While a PR's gate runs, open the next against its branch; retarget it to `main` when the first merges. **At most two open PRs.** A fix to the first lands on the first, then merges forward — never on the second alone.
 - **Every reconciliation ends with a ledger pass (Anthony):** re-rank PROOF-STATE.md's groups, rewrite each touched group's issue to what is still open, delete settled groups.
 - **Laws are deferred in writing, never suspended** — whatever writing leaves, reconciliation pays.
 - Workers in both phases. Agda builds one at a time.

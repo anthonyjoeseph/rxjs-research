@@ -11,11 +11,9 @@ name: Gate
 on:
   push:
     branches: [main]
-  # A `pull_request` filter names the BASE branch, not the head.  A PR
-  # opened against any other base gets no run at all, which reads exactly
-  # like one with nothing left to wait for.
+  # Every PR, whatever its base: a stacked PR opens against the branch
+  # beneath it (CLAUDE.md, "Stack, don't wait").
   pull_request:
-    branches: [main]
   workflow_dispatch: {}
 
 # A push to a PR CANCELS the run already going on it (Anthony).  Pushes to
