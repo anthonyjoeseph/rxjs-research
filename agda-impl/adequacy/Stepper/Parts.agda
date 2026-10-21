@@ -28,7 +28,7 @@ import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import adequacy.Sane using (Sane; Mode; runs; over; loose; RestedS)
 open import adequacy.Placed.Order using (still; Placed)
-open import adequacy.Env using (Same; nagree-refl)
+open import adequacy.Env using (Same; nagree-refl; same-cons)
 
 open _≃_
 open Events∞
@@ -68,8 +68,8 @@ postulate
   -- RECOVERY: git show 43da74d9:agda-impl/adequacy/Sane.agda restores `sane-feed`, which a stepper over a meaning with no tails fed its sources' steps through
   feed-alikeⁱ : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (i : A ∈ Γ) q (a : Maybe A) (c : U.Node Γ B) {ρ ρ′ : NEnv Γ}
               → Sane ν c → lookup ν i ≡ runs → Fed q a i ρ ρ′ → ∀ d → Agreeˢ d (U.stateᴺ c ρ) (U.stateᴺ (U.feed i q a c) ρ′)
-  shut-alike : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (b : U.Node (A ∷ Γ) B) c {e : Events A} (ρ : NEnv Γ)
-             → Sane (runs ∷ᴬ ν) b → e ≃ end c → ∀ d → Agreeˢ d (U.stateᴺ b (e ∷ᴬ ρ)) (U.stateᴺ (U.shut (here refl) c b) (end c ∷ᴬ ρ))
+  shut-alikeⁱ : ∀ {Γ A B} (i : A ∈ Γ) c (n : U.Node Γ B) {ρ ρ′ : NEnv Γ}
+              → lookup ρ i ≃ end c → Same ρ ρ′ → ∀ d → Agreeˢ d (U.stateᴺ n ρ) (U.stateᴺ (U.shut i c n) ρ′)
 
   -- A defer: the meaning starts with the step's event, else past a
   -- running source's shown event.
@@ -343,3 +343,8 @@ one-shutˢ ρ env r c t U.hushˢ        hush⁼       = hush⁼
 feed-alike : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (b : U.Node (A ∷ Γ) B) q (a : Maybe A) (σ : Events∞ A) {e : Events A} (ρ : NEnv Γ)
            → Sane (runs ∷ᴬ ν) b → e ≃ shows q a σ → ∀ d → Agreeˢ d (U.stateᴺ b (e ∷ᴬ ρ)) (U.stateᴺ (U.feed (here refl) q a b) (force σ ∷ᴬ ρ))
 feed-alike b q a σ ρ sb al = feed-alikeⁱ (here refl) q a b sb refl (fed-here σ al (λ m → nagree-refl m ρ))
+
+-- A body told its source's end, alike.
+shut-alike : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (b : U.Node (A ∷ Γ) B) c {e : Events A} (ρ : NEnv Γ)
+           → Sane (runs ∷ᴬ ν) b → e ≃ end c → ∀ d → Agreeˢ d (U.stateᴺ b (e ∷ᴬ ρ)) (U.stateᴺ (U.shut (here refl) c b) (end c ∷ᴬ ρ))
+shut-alike b c ρ _ al = shut-alikeⁱ (here refl) c b al (same-cons (agreeing al) (λ m → nagree-refl m ρ))

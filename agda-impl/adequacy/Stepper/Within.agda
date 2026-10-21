@@ -21,14 +21,15 @@ open import denotation.MonotonicList.Events using (Timeline; From; Frame)
 import denotation.MonotonicList.Events as E
 open import denotation.MonotonicList.Events using (Events∞; end; Pos; ix; _<ᵖ_; <ᵖ-below)
 open import denotation.NonExpansive using (Agreeˢ)
-open import adequacy.Stepper.Past using (Clear; Placedˢ; Shy; Skips; Withinˢ; _≃_; afterᴱ; clear-lower; head-map; head-scan; placed-step; shows)
-open import adequacy.Stepper.Fed using (placed-fed)
-open import adequacy.Env using (nagree-refl)
+open import adequacy.Stepper.Past using (Clear; Placedˢ; Shy; Skips; Withinˢ; _≃_; afterᴱ; alike; clear-lower; head-map; head-scan; placed-step; shows)
+open import adequacy.Stepper.Fed using (placed-fed; placed-shut)
+open import adequacy.Env using (nagree-refl; same-cons)
 open import adequacy.Stepper.Parts using (clear-take; fed-here; head-body; head-shut)
 
 open Agreeˢ using (nowˢ)
 open import adequacy.Stepper using (skips; shy-clear; step-skips)
 import denotation.MonotonicList as M′
+open import denotation.MonotonicList using (agree-refl)
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import adequacy.Sane using (Sane; Mode; over)
@@ -179,15 +180,18 @@ fed-placed {ν = ν} r b s s′ ρ q a (sb , ss) pl es fb cl =
   placed-fed (here refl) q a b sb refl (fed-here (U.stateᴺ s′ ρ) al (λ m → nagree-refl m ρ)) (proj₁ (proj₂ pl))
   where al = shown-alike {ν = ν} s s′ ρ q a (skips {ν = ν} s ρ ss (proj₁ (proj₂ (proj₂ pl)))) es (clear-lower ν ρ (<ᵖ-below q []) cl)
 
-postulate
-  -- A body told its source's end, shown first, is placed past it.
-  shut-placed : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ) c
-              → Sane ν (U.connectᶜ r b (U.live s)) → Placed (U.connectᶜ r b (U.live s)) ρ → U.step s ≡ U.endˢ c
-              → U.beforeˢ (c ++ [ ix 0 ]) (U.step b) ≡ true → Clear ν (just (c ++ [ ix 0 ])) ρ
-              → Placed (U.shut (here refl) c b) (end c ∷ᴬ ρ)
+-- A body told its source's end, shown first, is placed past it.
+shut-placed : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ) c
+            → Sane ν (U.connectᶜ r b (U.live s)) → Placed (U.connectᶜ r b (U.live s)) ρ → U.step s ≡ U.endˢ c
+            → U.beforeˢ (c ++ [ ix 0 ]) (U.step b) ≡ true → Clear ν (just (c ++ [ ix 0 ])) ρ
+            → Placed (U.shut (here refl) c b) (end c ∷ᴬ ρ)
+shut-placed {ν = ν} r b s ρ c (sb , ss) pl es fb cl =
+  placed-shut (here refl) c b al (same-cons (agreeing al) (λ m → nagree-refl m ρ)) (proj₁ (proj₂ pl))
+  where al = forward {ν = ν} {s = s} {ρ = ρ} es (skips {ν = ν} s ρ ss (proj₁ (proj₂ (proj₂ pl)))) (clear-lower ν ρ (<ᵖ-below c []) cl)
 
-  -- A body placed past its source's end is placed told it again.
-  reshut-placed : ∀ {Γ A B} c (b : U.Node (A ∷ Γ) B) (ρ : NEnv Γ) → Placed b (end c ∷ᴬ ρ) → Placed (U.shut (here refl) c b) (end c ∷ᴬ ρ)
+-- A body placed past its source's end is placed told it again.
+reshut-placed : ∀ {Γ A B} c (b : U.Node (A ∷ Γ) B) (ρ : NEnv Γ) → Placed b (end c ∷ᴬ ρ) → Placed (U.shut (here refl) c b) (end c ∷ᴬ ρ)
+reshut-placed c b ρ pb = placed-shut (here refl) c b (alike λ d → agree-refl d _) (λ m → nagree-refl m (end c ∷ᴬ ρ)) pb
 
 -- An ended connect's body stepped first, told its source's end.
 shut-within : ∀ {Γ A B} r c (t : U.Node Γ A) (ρ : NEnv Γ) (sb : U.Step (A ∷ Γ) B) → Placedˢ (end c ∷ᴬ ρ) sb → Withinˢ ρ (U.shutˢᵗ r c t sb)
