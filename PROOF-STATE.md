@@ -12,8 +12,9 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 Undecided invariant: an ended outer's or lane's last ghost tells its joiners
 past the run at each bound binder's end, though no part holds it and its tie
-is meaning only. No untold measure is kept over the ghost. Open too: whether
-its siblings' rests head past the run, as hidden runs may not. Settled when
+is meaning only. No untold measure is kept over the ghost. Open too: the
+siblings' rests at a settle, which the pool reached only while the flatMap held
+a part. Settled when
 `outer-ghost-told` is a body over such a measure, and `others-heads` is a body.
 
 Members: `outer-ghost-told`, `lane-ghost-told`, `others-heads`,

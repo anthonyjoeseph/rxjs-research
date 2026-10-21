@@ -419,6 +419,11 @@ module ClimbLanesQueue (R : Set) where
     postulate
       -- The ended outer, and the lanes beside the ending one, leave
       -- running nothing heading before the run.
+      -- Owed: the pool's heads and its tie to the freed lanes' leftovers
+      -- as they stood before the settling lane's end; the climb keeps
+      -- neither.
+      --
+      -- DEAD ROUTE: `Calling.behind`'s pools and `Lingers.pools` reach the pool only while the flatMap holds a part, and the settling lane's end leaves it none, so neither reaches a freed lane here
       outer-ended-heads : At.part H t ≡ nothing → Heads q (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} t))
       others-heads      : OthersL H q o
 
