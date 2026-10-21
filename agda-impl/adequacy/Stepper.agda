@@ -7,15 +7,15 @@
 -- each running source's, its pool's and each ended source's rest.
 module adequacy.Stepper where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (Bool; true; false; T)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (zero; suc)
-open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂; map₁)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; subst)
@@ -30,7 +30,7 @@ import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import adequacy.Sane using (Sane; Saneᴹ; Saneᴸ; Mode; runs; over; loose; Told)
-open import adequacy.Placed.Order using (Alien; Atop; Ordered; Prefix; every; ordered; Placed; Placedᴹ; Placedᴸ; Within)
+open import adequacy.Placed.Order using (Alien; Atop; Ordered; Prefix; every; ordered; still; Placed; Placedᴹ; Placedᴸ; Within)
 open import adequacy.Placed.Keys using (ordered-≈; prefix-refl)
 open import adequacy.Deep using (Deep; Deepˢ)
 
@@ -451,12 +451,10 @@ postulate
   shut-alike : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (b : U.Node (A ∷ Γ) B) c {e : Events A} (ρ : NEnv Γ)
              → Sane (runs ∷ᴬ ν) b → e ≃ end c → ∀ d → Agreeˢ d (U.stateᴺ b (e ∷ᴬ ρ)) (U.stateᴺ (U.shut (here refl) c b) (end c ∷ᴬ ρ))
 
-  -- A flatMap, a connect live or ended, a defer: the meaning starts with
+  -- A flatMap, an ended connect, a defer: the meaning starts with
   -- the step's event, else past a running source's shown event.
   first-flat  : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} op (g : A → Pos → U.Node Γ B) o ls qs pl (ρ : NEnv Γ)
               → Sane ν (U.flatMapᶜ op g o ls qs pl) → Placed (U.flatMapᶜ op g o ls qs pl) ρ → Firsts ν (U.flatMapᶜ op g o ls qs pl) ρ
-  first-connect : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ)
-                → Sane ν (U.connectᶜ r b (U.live s)) → Placed (U.connectᶜ r b (U.live s)) ρ → Firsts ν (U.connectᶜ r b (U.live s)) ρ
   first-ended : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) c (t : U.Node Γ A) (ρ : NEnv Γ)
               → Sane ν (U.connectᶜ r b (U.ended c t)) → Placed (U.connectᶜ r b (U.ended c t)) ρ → Firsts ν (U.connectᶜ r b (U.ended c t)) ρ
   first-defer : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (l : Later Timeline Γ A) p ns (ρ : NEnv Γ) → Placed (U.deferᶜ l p ns) ρ → Firsts ν (U.deferᶜ l p ns) ρ
@@ -502,6 +500,335 @@ postulate
   bursting-skips : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (t : U.Node Γ A) (ρ : NEnv Γ) → Skips ν (U.burstingᶜ {B = B} r t) ρ
   under-skips    : ∀ {Γ A C B} {ν : All (λ _ → Mode) Γ} (s : U.Source Γ A) (b : U.Node (A ∷ Γ) C) (ρ : NEnv Γ) → Skips ν (U.underᶜ {B = B} s b) ρ
 
+-- What the body's step heads at, the connect's does.
+head-body : ∀ {Γ A B} r (src : U.Source Γ A) (t : U.Step (A ∷ Γ) B) → U.headˢ (U.bodyˢ r src t) ≡ U.headˢ t
+head-body r src (U.outˢ k a b) = refl
+head-body r src (U.skipˢ k b)  = refl
+head-body r src (U.endˢ c)     = refl
+head-body r src U.hushˢ        = refl
+
+-- Where an event sits; a hush, nowhere.
+posᴱ : ∀ {A} → Events A → Pos
+posᴱ (out q _ _) = q
+posᴱ (skip q _)  = q
+posᴱ (end c)     = c
+posᴱ hush        = []
+
+hush? : ∀ {A} (x : Events A) → x ≡ hush ⊎ x ≢ hush
+hush? (out _ _ _) = inj₂ (λ ())
+hush? (skip _ _)  = inj₂ (λ ())
+hush? (end _)     = inj₂ (λ ())
+hush? hush        = inj₁ refl
+
+hushˢ? : ∀ {Γ A} (t : U.Step Γ A) → t ≡ U.hushˢ ⊎ t ≢ U.hushˢ
+hushˢ? (U.outˢ _ _ _) = inj₂ (λ ())
+hushˢ? (U.skipˢ _ _)  = inj₂ (λ ())
+hushˢ? (U.endˢ _)     = inj₂ (λ ())
+hushˢ? U.hushˢ        = inj₁ refl
+
+-- A past event, read at where it sits.
+pastᴱ-pos : ∀ {Γ A} (ν : All (λ _ → Mode) Γ) (ρ : NEnv Γ) (t : U.Step Γ A) (x : Events A) → Pastᴱ ν ρ t x → x ≢ hush × Past ν (posᴱ x) (U.headˢ t) ρ
+pastᴱ-pos ν ρ t (out q a σ) p = (λ ()) , p
+pastᴱ-pos ν ρ t (skip q σ)  p = (λ ()) , p
+pastᴱ-pos ν ρ t (end c)     p = (λ ()) , p
+pastᴱ-pos ν ρ t hush        ()
+
+pos-pastᴱ : ∀ {Γ A} (ν : All (λ _ → Mode) Γ) (ρ : NEnv Γ) (t : U.Step Γ A) (x : Events A) → x ≢ hush → Past ν (posᴱ x) (U.headˢ t) ρ → Pastᴱ ν ρ t x
+pos-pastᴱ ν ρ t (out q a σ) nh p = p
+pos-pastᴱ ν ρ t (skip q σ)  nh p = p
+pos-pastᴱ ν ρ t (end c)     nh p = p
+pos-pastᴱ ν ρ t hush        nh p = ⊥-elim (nh refl)
+
+-- A connect's body event sits where the body's did.
+pastᴱ-body : ∀ {Γ A B} (ν : All (λ _ → Mode) Γ) (ρ : NEnv Γ) r (σ : Events∞ A) K (t : U.Step Γ B) (x : Events B) → x ≢ hush
+           → Past ν (posᴱ x) (U.headˢ t) ρ → Pastᴱ ν ρ t (M′.body r σ K x)
+pastᴱ-body ν ρ r σ K t (out q a β) nh p = p
+pastᴱ-body ν ρ r σ K t (skip q β)  nh p = p
+pastᴱ-body ν ρ r σ K t (end c)     nh p = p
+pastᴱ-body ν ρ r σ K t hush        nh p = ⊥-elim (nh refl)
+
+before-pos : ∀ {A} K (x : Events A) → x ≢ hush → M′.before K x ≡ K <ᵖ posᴱ x
+before-pos K (out q a σ) nh = refl
+before-pos K (skip q σ)  nh = refl
+before-pos K (end c)     nh = refl
+before-pos K hush        nh = ⊥-elim (nh refl)
+
+-- Something shows at or before `K`: not a hush.
+before-false : ∀ {A} K (x : Events A) → M′.before K x ≡ false → x ≢ hush
+before-false K (out q a σ) f = λ ()
+before-false K (skip q σ)  f = λ ()
+before-false K (end c)     f = λ ()
+before-false K hush        ()
+
+pos-shown : ∀ {A} (x : Events A) → x ≢ hush → posᴱ x <ᵖ M′.shownAt x ≡ true
+pos-shown (out q a σ) nh = <ᵖ-below q []
+pos-shown (skip q σ)  nh = <ᵖ-below q []
+pos-shown (end c)     nh = <ᵖ-below c []
+pos-shown hush        nh = ⊥-elim (nh refl)
+
+belowᴱ-shown : ∀ {A} (x : Events A) h m → Belowᴱ x h m → M′.shownAt x <ᵖ h ≡ true × Underᵐ m (M′.shownAt x)
+belowᴱ-shown (out q a σ) h m b = b
+belowᴱ-shown (skip q σ)  h m b = b
+belowᴱ-shown (end c)     h m b = b
+belowᴱ-shown hush        h m ()
+
+<ᵖ-either : ∀ a h k → a <ᵖ k ≡ true → a <ᵖ h ≡ true ⊎ h <ᵖ k ≡ true
+<ᵖ-either a h k ak with a <ᵖ h in ah
+... | true  = inj₁ refl
+... | false = inj₂ (<ᵖ-past h a k ah ak)
+
+-- A past witness re-read: each running source's shown event moved to the
+-- new bounds, or else `R`.
+pickᴱ : ∀ {A} {R : Set} (x : Events A) h m h′ m′ → (∀ a → a <ᵖ h ≡ true → Underᵐ m a → (a <ᵖ h′ ≡ true × Underᵐ m′ a) ⊎ R)
+      → Belowᴱ x h m → Belowᴱ x h′ m′ ⊎ R
+pickᴱ (out q a σ) h m h′ m′ f (b , u) = f _ b u
+pickᴱ (skip q σ)  h m h′ m′ f (b , u) = f _ b u
+pickᴱ (end c)     h m h′ m′ f (b , u) = f _ b u
+pickᴱ hush        h m h′ m′ f ()
+
+pick : ∀ {Γ} {R : Set} (ν : All (λ _ → Mode) Γ) (ρ : NEnv Γ) h m h′ m′ → (∀ a → a <ᵖ h ≡ true → Underᵐ m a → (a <ᵖ h′ ≡ true × Underᵐ m′ a) ⊎ R)
+     → Past ν h m ρ → Past ν h′ m′ ρ ⊎ R
+pick []ᴬ          []ᴬ      h m h′ m′ f ()
+pick (runs ∷ᴬ ν)  (e ∷ᴬ ρ) h m h′ m′ f (inj₁ b) = map₁ inj₁ (pickᴱ e h m h′ m′ f b)
+pick (runs ∷ᴬ ν)  (e ∷ᴬ ρ) h m h′ m′ f (inj₂ p) = map₁ inj₂ (pick ν ρ h m h′ m′ f p)
+pick (over ∷ᴬ ν)  (e ∷ᴬ ρ) h m h′ m′ f p        = pick ν ρ h m h′ m′ f p
+pick (loose ∷ᴬ ν) (e ∷ᴬ ρ) h m h′ m′ f (inj₁ b) = map₁ inj₁ (pickᴱ e h m h′ m′ f b)
+pick (loose ∷ᴬ ν) (e ∷ᴬ ρ) h m h′ m′ f (inj₂ p) = map₁ inj₂ (pick ν ρ h m h′ m′ f p)
+
+move : ∀ {Γ} (ν : All (λ _ → Mode) Γ) (ρ : NEnv Γ) h m h′ m′ → (∀ a → a <ᵖ h ≡ true → Underᵐ m a → a <ᵖ h′ ≡ true × Underᵐ m′ a)
+     → Past ν h m ρ → Past ν h′ m′ ρ
+move ν ρ h m h′ m′ f p with pick {R = ⊥} ν ρ h m h′ m′ (λ a b u → inj₁ (f a b u)) p
+... | inj₁ q = q
+... | inj₂ ()
+
+-- Where a step's event shows.
+shownˢ : ∀ {Γ A} → U.Step Γ A → Pos
+shownˢ (U.outˢ q _ _) = q ++ [ ix 0 ]
+shownˢ (U.skipˢ q _)  = q ++ [ ix 0 ]
+shownˢ (U.endˢ c)     = c ++ [ ix 0 ]
+shownˢ U.hushˢ        = []
+
+under-shownˢ : ∀ {Γ A} (t : U.Step Γ A) a → t ≢ U.hushˢ → Underᵐ (U.headˢ t) a → a <ᵖ shownˢ t ≡ true
+under-shownˢ (U.outˢ q x c) a nh u = <ᵖ-trans a q (q ++ [ ix 0 ]) u (<ᵖ-below q [])
+under-shownˢ (U.skipˢ q c)  a nh u = <ᵖ-trans a q (q ++ [ ix 0 ]) u (<ᵖ-below q [])
+under-shownˢ (U.endˢ q)     a nh u = <ᵖ-trans a q (q ++ [ ix 0 ]) u (<ᵖ-below q [])
+under-shownˢ U.hushˢ        a nh u = ⊥-elim (nh refl)
+
+under-before : ∀ {Γ A} (t : U.Step Γ A) k a → U.beforeˢ k t ≡ false → Underᵐ (U.headˢ t) a → a <ᵖ k ≡ true
+under-before (U.outˢ q x c) k a f u = still a q k u f
+under-before (U.skipˢ q c)  k a f u = still a q k u f
+under-before (U.endˢ q)     k a f u = still a q k u f
+under-before U.hushˢ        k a () u
+
+-- A step heading strictly before `k`.
+Overᵐ : Maybe Pos → Pos → Set
+Overᵐ nothing  k = ⊥
+Overᵐ (just j) k = j <ᵖ k ≡ true
+
+under-or : ∀ m a k → a <ᵖ k ≡ true → Underᵐ m a ⊎ Overᵐ m k
+under-or nothing  a k ak = inj₁ tt
+under-or (just j) a k ak = <ᵖ-either a j k ak
+
+over-before : ∀ {Γ A} (t : U.Step Γ A) k → Overᵐ (U.headˢ t) k → U.beforeˢ k t ≡ false
+over-before (U.outˢ q x c) k o = <ᵖ-asym q k o
+over-before (U.skipˢ q c)  k o = <ᵖ-asym q k o
+over-before (U.endˢ q)     k o = <ᵖ-asym q k o
+over-before U.hushˢ        k ()
+
+agree-shown : ∀ {Γ A} (ρ : NEnv Γ) (t : U.Step Γ A) (x : Events A) → Agree 1 x (afterᴱ ρ t) → x ≢ hush → t ≢ U.hushˢ × shownˢ t ≡ M′.shownAt x
+agree-shown ρ (U.outˢ k a c) _ (out⁼ _ _)  nh = (λ ()) , refl
+agree-shown ρ (U.skipˢ k c)  _ (skip⁼ _ _) nh = (λ ()) , refl
+agree-shown ρ (U.endˢ k)     _ end⁼        nh = (λ ()) , refl
+agree-shown ρ U.hushˢ        _ hush⁼       nh = ⊥-elim (nh refl)
+
+agree-hush : ∀ {Γ A} (ρ : NEnv Γ) (t : U.Step Γ A) → Agree 1 hush (afterᴱ ρ t) → t ≡ U.hushˢ
+agree-hush ρ (U.outˢ k a c) ()
+agree-hush ρ (U.skipˢ k c)  ()
+agree-hush ρ (U.endˢ k)     ()
+agree-hush ρ U.hushˢ        hush⁼ = refl
+
+-- A connect over a showing source: the source's step first when it
+-- shows before the body's, else the body's.
+source-split : ∀ {Γ A B} r (b : U.Node (A ∷ Γ) B) (tb : U.Step (A ∷ Γ) B) (s : U.Node Γ A) (ts : U.Step Γ A) → ts ≢ U.hushˢ
+             → (U.beforeˢ (shownˢ ts) tb ≡ true × Σ (U.Node Γ B) (λ n → U.sourceˢ r b tb s ts ≡ U.skipˢ (shownˢ ts) n))
+             ⊎ (U.beforeˢ (shownˢ ts) tb ≡ false × U.sourceˢ r b tb s ts ≡ U.bodyˢ r (U.live s) tb)
+source-split r b tb s (U.outˢ q a s′) nh with U.beforeˢ (q ++ [ ix 0 ]) tb
+... | true  = inj₁ (refl , _ , refl)
+... | false = inj₂ (refl , refl)
+source-split r b tb s (U.skipˢ q s′) nh with U.beforeˢ (q ++ [ ix 0 ]) tb
+... | true  = inj₁ (refl , _ , refl)
+... | false = inj₂ (refl , refl)
+source-split r b tb s (U.endˢ c) nh with U.beforeˢ (c ++ [ ix 0 ]) tb
+... | true  = inj₁ (refl , _ , refl)
+... | false = inj₂ (refl , refl)
+source-split r b tb s U.hushˢ nh = ⊥-elim (nh refl)
+
+side-ahead : ∀ {A B} r (β : Events∞ B) (σ : Events∞ A) (x : Events A) → x ≢ hush
+           → M′.side r β σ x ≡ M′.ahead r β σ (M′.shownAt x) (M′.before (M′.shownAt x) (force β))
+side-ahead r β σ (out q a τ) nh = refl
+side-ahead r β σ (skip q τ)  nh = refl
+side-ahead r β σ (end c)     nh = refl
+side-ahead r β σ hush        nh = ⊥-elim (nh refl)
+
+ahead-split : ∀ {A B} r (β : Events∞ B) (σ : Events∞ A) k
+            → (M′.before k (force β) ≡ true × Σ (Events∞ B) (λ τ → M′.ahead r β σ k (M′.before k (force β)) ≡ skip k τ))
+            ⊎ (M′.before k (force β) ≡ false × M′.ahead r β σ k (M′.before k (force β)) ≡ M′.body r σ k (force β))
+ahead-split r β σ k with M′.before k (force β)
+... | true  = inj₁ (refl , _ , refl)
+... | false = inj₂ (refl , refl)
+
+-- The body's first event, run beside its source.
+one-body : ∀ {Γ A B} (ρ : NEnv Γ) (env : NEnv (A ∷ Γ)) r (σ : Events∞ A) k (src : U.Source Γ A) (t : U.Step (A ∷ Γ) B) {x : Events B}
+         → Agree 1 x (afterᴱ env t) → Agree 1 (M′.body r σ k x) (afterᴱ ρ (U.bodyˢ r src t))
+one-body ρ env r σ k src (U.outˢ j a c) (out⁼ _ _)  = out⁼ stopᵀ stop
+one-body ρ env r σ k src (U.skipˢ j c)  (skip⁼ _ _) = skip⁼ stopᵀ stop
+one-body ρ env r σ k src (U.endˢ c)     end⁼        = end⁼
+one-body ρ env r σ k src U.hushˢ        hush⁼       = hush⁼
+
+one-bodyˢ : ∀ {Γ A B} (ρ : NEnv Γ) (env : NEnv (A ∷ Γ)) r (src : U.Source Γ A) (t : U.Step (A ∷ Γ) B) {x : Events B}
+          → Agree 1 x (afterᴱ env t) → Agree 1 x (afterᴱ ρ (U.bodyˢ r src t))
+one-bodyˢ ρ env r src (U.outˢ j a c) (out⁼ _ _)  = out⁼ stopᵀ stop
+one-bodyˢ ρ env r src (U.skipˢ j c)  (skip⁼ _ _) = skip⁼ stopᵀ stop
+one-bodyˢ ρ env r src (U.endˢ c)     end⁼        = end⁼
+one-bodyˢ ρ env r src U.hushˢ        hush⁼       = hush⁼
+
+-- A connect's meaning starts with its step's event, else past a running
+-- source's shown event: read off its source's first event and its body's.
+-- The body's event lies strictly past the source's shown one when it is
+-- that witness, so it never ties the connect's step.
+module ConnectFirst {Γ A B} (ν : All (λ _ → Mode) Γ) r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ) where
+
+  e : Events A
+  e = U.meaning s ρ
+
+  env : NEnv (A ∷ Γ)
+  env = e ∷ᴬ ρ
+
+  β : Events∞ B
+  β = U.stateᴺ b env
+
+  σ : Events∞ A
+  σ = U.stateᴺ s ρ
+
+  tb : U.Step (A ∷ Γ) B
+  tb = U.step b
+
+  ts : U.Step Γ A
+  ts = U.step s
+
+  mb : Events B
+  mb = U.meaning b env
+
+  K : Pos
+  K = M′.shownAt e
+
+  step : U.Step Γ B
+  step = U.sourceˢ r b tb s ts
+
+  -- The body's event is no witness past the source's when the body shows
+  -- at or before it.
+  below-false : ∀ {m} → Belowᴱ e (posᴱ mb) m → M′.before K mb ≡ false → mb ≢ hush → ⊥
+  below-false bl ff nh = ⊥-elim (subst T (trans (sym (proj₁ (belowᴱ-shown e (posᴱ mb) _ bl))) (trans (sym (before-pos K mb nh)) ff)) tt)
+
+  -- The source shown first, past a body stepping no later.
+  skip-past : U.beforeˢ K tb ≡ false → M′.before K mb ≡ true → First (runs ∷ᴬ ν) env tb mb → Past ν K (U.headˢ tb) ρ
+  skip-past bf bt (inj₁ ag) = ⊥-elim (subst T (trans (sym bt) (trans (before-agree K ag) (trans (before-after env K tb) bf))) tt)
+  skip-past bf bt (inj₂ pa) with pastᴱ-pos (runs ∷ᴬ ν) env tb mb pa
+  ... | nh , inj₁ bl = ⊥-elim (subst T (trans (sym (under-before tb K K bf (proj₂ (belowᴱ-shown e (posᴱ mb) (U.headˢ tb) bl)))) (<ᵖ-irrefl K)) tt)
+  ... | nh , inj₂ px = move ν ρ (posᴱ mb) (U.headˢ tb) K (U.headˢ tb) (λ a ab u → under-before tb K a bf u , u) px
+
+  -- The body shown first, past a source step `k` showing no earlier.
+  skip-body : ∀ k → U.beforeˢ k tb ≡ true → k <ᵖ posᴱ mb ≡ false → M′.before K mb ≡ false → First (runs ∷ᴬ ν) env tb mb
+            → Past ν (posᴱ mb) (just k) ρ
+  skip-body k bt kf ff (inj₁ ag) =
+    ⊥-elim (subst T (trans (sym bt) (trans (sym (before-after env k tb)) (trans (sym (before-agree k ag)) (trans (before-pos k mb (before-false K mb ff)) kf)))) tt)
+  skip-body k bt kf ff (inj₂ pa) with pastᴱ-pos (runs ∷ᴬ ν) env tb mb pa
+  ... | nh , inj₁ bl = ⊥-elim (below-false bl ff nh)
+  ... | nh , inj₂ px = move ν ρ (posᴱ mb) (U.headˢ tb) (posᴱ mb) (just k) (λ a ab u → ab , still a (posᴱ mb) k ab kf) px
+
+  -- The body's step taken, shown first.
+  body-body : M′.before K mb ≡ false → First (runs ∷ᴬ ν) env tb mb → First ν ρ (U.bodyˢ r (U.live s) tb) (M′.body r σ K mb)
+  body-body ff (inj₁ ag) = inj₁ (one-body ρ env r σ K (U.live s) tb ag)
+  body-body ff (inj₂ pa) with pastᴱ-pos (runs ∷ᴬ ν) env tb mb pa
+  ... | nh , inj₁ bl = ⊥-elim (below-false bl ff nh)
+  ... | nh , inj₂ px = inj₂ (pastᴱ-body ν ρ r σ K (U.bodyˢ r (U.live s) tb) mb nh (past-under ν ρ (posᴱ mb) _ _ (under-≡ (sym (head-body r (U.live s) tb))) px))
+
+  -- The body's step taken, the source shown first.
+  body-skip : ∀ {τ} → U.beforeˢ K tb ≡ false → M′.before K mb ≡ true → First (runs ∷ᴬ ν) env tb mb
+            → First ν ρ (U.bodyˢ r (U.live s) tb) (skip K τ)
+  body-skip bf bt fb = inj₂ (past-under ν ρ K _ _ (under-≡ (sym (head-body r (U.live s) tb))) (skip-past bf bt fb))
+
+  -- The source hushed: the connect is its body.
+  hushed : e ≡ hush → First ν ρ ts e → First (runs ∷ᴬ ν) env tb mb → First ν ρ step (M′.side r β σ e)
+  hushed eq fs fb = subst (λ x → First ν ρ step (M′.side r β σ x)) (sym eq) (subst (λ t → First ν ρ (U.sourceˢ r b tb s t) mb) (sym (quiet fs)) (body fb))
+    where
+      quiet : First ν ρ ts e → ts ≡ U.hushˢ
+      quiet (inj₁ ag) = agree-hush ρ ts (subst (λ x → Agree 1 x (afterᴱ ρ ts)) eq ag)
+      quiet (inj₂ pa) = ⊥-elim (proj₁ (pastᴱ-pos ν ρ ts e pa) eq)
+      past : mb ≢ hush × (Belowᴱ e (posᴱ mb) (U.headˢ tb) ⊎ Past ν (posᴱ mb) (U.headˢ tb) ρ) → First ν ρ (U.bodyˢ r (U.live s) tb) mb
+      past (nh , inj₁ bl) = ⊥-elim (subst (λ x → Belowᴱ x (posᴱ mb) (U.headˢ tb)) eq bl)
+      past (nh , inj₂ px) = inj₂ (pos-pastᴱ ν ρ _ mb nh (past-under ν ρ (posᴱ mb) _ _ (under-≡ (sym (head-body r (U.live s) tb))) px))
+      body : First (runs ∷ᴬ ν) env tb mb → First ν ρ (U.bodyˢ r (U.live s) tb) mb
+      body (inj₁ ag) = inj₁ (one-bodyˢ ρ env r (U.live s) tb ag)
+      body (inj₂ pa) = past (pastᴱ-pos (runs ∷ᴬ ν) env tb mb pa)
+
+  -- What the connect shows: the source's shown step when the body shows
+  -- past it, else the body's event.
+  Shape : Events B → Set
+  Shape M = (M′.before K mb ≡ true × Σ (Events∞ B) (λ τ → M ≡ skip K τ)) ⊎ (M′.before K mb ≡ false × M ≡ M′.body r σ K mb)
+
+  -- The source shown, its step agreeing: the connect takes whichever
+  -- step shows first.
+  told : e ≢ hush → Agree 1 e (afterᴱ ρ ts) → First (runs ∷ᴬ ν) env tb mb → ∀ {M} → Shape M → First ν ρ step M
+  told nh ag fb sp with agree-shown ρ ts e ag nh
+  ... | tnh , sh with source-split r b tb s ts tnh | sp
+  ...   | inj₁ (sbt , n , eqS) | inj₁ (bt , τ , refl) =
+            subst (λ t → First ν ρ t (skip K τ)) (sym eqS) (inj₁ (subst (λ k → Agree 1 (skip K τ) (skip k _)) (sym sh) (skip⁼ stopᵀ stop)))
+  ...   | inj₁ (sbt , n , eqS) | inj₂ (bf , refl) =
+            subst (λ t → First ν ρ t (M′.body r σ K mb)) (sym eqS)
+              (inj₂ (pastᴱ-body ν ρ r σ K _ mb (before-false K mb bf)
+                (skip-body (shownˢ ts) sbt (subst (λ k → k <ᵖ posᴱ mb ≡ false) (sym sh) (trans (sym (before-pos K mb (before-false K mb bf))) bf)) bf fb)))
+  ...   | inj₂ (sbf , eqS) | inj₁ (bt , τ , refl) =
+            subst (λ t → First ν ρ t (skip K τ)) (sym eqS) (body-skip (subst (λ k → U.beforeˢ k tb ≡ false) sh sbf) bt fb)
+  ...   | inj₂ (sbf , eqS) | inj₂ (bf , refl) =
+            subst (λ t → First ν ρ t (M′.body r σ K mb)) (sym eqS) (body-body bf fb)
+
+  -- The source preempted by a running source's witness `px`, the body's
+  -- step taken: the witness kept, or the body's when it shows first.
+  bodied : e ≢ hush → Past ν (posᴱ e) (U.headˢ ts) ρ → First (runs ∷ᴬ ν) env tb mb → ∀ {M} → Shape M → First ν ρ (U.bodyˢ r (U.live s) tb) M
+  bodied nh px fb (inj₂ (bf , refl)) = body-body bf fb
+  bodied nh px fb (inj₁ (bt , τ , refl))
+    with pick ν ρ (posᴱ e) (U.headˢ ts) K (U.headˢ tb) (λ a ab u → map₁ ((<ᵖ-trans a (posᴱ e) K ab (pos-shown e nh)) ,_) (under-or (U.headˢ tb) a K (<ᵖ-trans a (posᴱ e) K ab (pos-shown e nh)))) px
+  ... | inj₁ p = inj₂ (past-under ν ρ K _ _ (under-≡ (sym (head-body r (U.live s) tb))) p)
+  ... | inj₂ o = body-skip (over-before tb K o) bt fb
+
+  -- The source preempted, its step taken: the witness kept, or the body's
+  -- when it shows first.
+  skipped : e ≢ hush → Past ν (posᴱ e) (U.headˢ ts) ρ → First (runs ∷ᴬ ν) env tb mb → (tnh : ts ≢ U.hushˢ) → U.beforeˢ (shownˢ ts) tb ≡ true
+          → ∀ n {M} → Shape M → First ν ρ (U.skipˢ (shownˢ ts) n) M
+  skipped nh px fb tnh sbt n (inj₁ (bt , τ , refl)) =
+    inj₂ (move ν ρ (posᴱ e) (U.headˢ ts) K (just (shownˢ ts)) (λ a ab u → <ᵖ-trans a (posᴱ e) K ab (pos-shown e nh) , under-shownˢ ts a tnh u) px)
+  skipped nh px fb tnh sbt n (inj₂ (bf , refl))
+    with pick ν ρ (posᴱ e) (U.headˢ ts) (posᴱ mb) (just (shownˢ ts)) (λ a ab u → map₁ (_, under-shownˢ ts a tnh u) (<ᵖ-either a (posᴱ mb) (shownˢ ts) (under-shownˢ ts a tnh u))) px
+  ... | inj₁ p  = inj₂ (pastᴱ-body ν ρ r σ K _ mb (before-false K mb bf) p)
+  ... | inj₂ hk = inj₂ (pastᴱ-body ν ρ r σ K _ mb (before-false K mb bf) (skip-body (shownˢ ts) sbt (<ᵖ-asym (posᴱ mb) (shownˢ ts) hk) bf fb))
+
+  preempted : e ≢ hush → Past ν (posᴱ e) (U.headˢ ts) ρ → First (runs ∷ᴬ ν) env tb mb → ∀ {M} → Shape M → First ν ρ step M
+  preempted nh px fb sp with hushˢ? ts
+  ... | inj₁ eqt = subst (λ t → First ν ρ (U.sourceˢ r b tb s t) _) (sym eqt) (bodied nh px fb sp)
+  ... | inj₂ tnh with source-split r b tb s ts tnh
+  ...   | inj₂ (sbf , eqS)     = subst (λ t → First ν ρ t _) (sym eqS) (bodied nh px fb sp)
+  ...   | inj₁ (sbt , n , eqS) = subst (λ t → First ν ρ t _) (sym eqS) (skipped nh px fb tnh sbt n sp)
+
+  conn : First ν ρ ts e → First (runs ∷ᴬ ν) env tb mb → First ν ρ step (M′.side r β σ e)
+  conn fs fb = by (hush? e) fs
+    where
+      shape : Shape (M′.ahead r β σ K (M′.before K mb))
+      shape = ahead-split r β σ K
+      by : e ≡ hush ⊎ e ≢ hush → First ν ρ ts e → First ν ρ step (M′.side r β σ e)
+      by (inj₁ eq) fs′       = hushed eq fs′ fb
+      by (inj₂ nh) (inj₁ ag) = subst (First ν ρ step) (sym (side-ahead r β σ e nh)) (told nh ag fb shape)
+      by (inj₂ nh) (inj₂ pa) = subst (First ν ρ step) (sym (side-ahead r β σ e nh)) (preempted nh (proj₂ (pastᴱ-pos ν ρ ts e pa)) fb shape)
 -- A node's meaning starts with the event its step shows, else past
 -- a running source's shown event: a joiner's.
 first : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (c : U.Node Γ A) (ρ : NEnv Γ) → Sane ν c → Placed c ρ → Firsts ν c ρ
@@ -519,7 +846,7 @@ first {ν = ν} (U.takeWhileᶜ i p c) ρ sn (_ , pl) with first c ρ sn pl
 ... | inj₂ pa = inj₂ (past-take ν ρ i p (U.step c) (U.meaning c ρ) pa)
 first (U.flatMapᶜ op g o ls qs pl) ρ sn pd = first-flat op g o ls qs pl ρ sn pd
 first {ν = ν} (U.joinᶜ i p xs e) ρ sn (_ , al) = first-join ν i p xs e ρ sn al
-first (U.connectᶜ r b (U.live s))    ρ sn pd = first-connect r b s ρ sn pd
+first {ν = ν} (U.connectᶜ r b (U.live s)) ρ (sb , ss) (_ , pb , ps) = ConnectFirst.conn ν r b s ρ (first s ρ ss ps) (first b (U.meaning s ρ ∷ᴬ ρ) sb pb)
 first (U.connectᶜ r b (U.ended c t)) ρ sn pd = first-ended r b c t ρ sn pd
 first {ν = ν} (U.deferᶜ l p ns) ρ _ pd = first-defer {ν = ν} l p ns ρ pd
 first (U.endingᶜ p n)   ρ _ _ = inj₁ end⁼
@@ -614,13 +941,6 @@ module SourceFirst {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ �
       top : ∀ d → Agree d (M′.beside r β′ (as (end c))) target
       top d = subst (λ f → Agree d (M′.ahead r β′ (as (end c)) k f) target) (sym flag) (next d)
 
--- What the body's step heads at, the connect's does.
-head-body : ∀ {Γ A B} r (src : U.Source Γ A) (t : U.Step (A ∷ Γ) B) → U.headˢ (U.bodyˢ r src t) ≡ U.headˢ t
-head-body r src (U.outˢ k a b) = refl
-head-body r src (U.skipˢ k b)  = refl
-head-body r src (U.endˢ c)     = refl
-head-body r src U.hushˢ        = refl
-
 -- The body's step shown first: the connect shows it, the source carried.
 module BodyFirst {Γ A B} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ) where
 
@@ -661,15 +981,15 @@ module BodyFirst {Γ A B} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NE
   left eq hc b′ d = subst (λ x → Agreeᵀ d (U.cutᴺ b′ env) (M′.runOn r x (U.cutᴺ s ρ) ∪ U.cutᴺ b′ env)) (sym eq)
                       (agreeᵀ-sym (∪-ne (hc d) (agreeᵀ-refl d _)))
 
-  still : U.meaning s ρ ≡ hush → ∀ (b′ : U.Node (A ∷ Γ) B) d → Agree d (U.meaning b′ env) (M′.side r (U.stateᴺ b′ env) σ (U.meaning s ρ))
-  still eq b′ d = subst (λ x → Agree d (U.meaning b′ env) (M′.side r (U.stateᴺ b′ env) σ x)) (sym eq) (agree-refl d _)
+  kept-side : U.meaning s ρ ≡ hush → ∀ (b′ : U.Node (A ∷ Γ) B) d → Agree d (U.meaning b′ env) (M′.side r (U.stateᴺ b′ env) σ (U.meaning s ρ))
+  kept-side eq b′ d = subst (λ x → Agree d (U.meaning b′ env) (M′.side r (U.stateᴺ b′ env) σ x)) (sym eq) (agree-refl d _)
 
   -- The source hushed: the connect is its body, nothing left running.
   hushed : U.meaning s ρ ≡ hush → (∀ d → Agreeᵀ d (U.cutᴺ s ρ) idle)
          → ∀ t → U.meaning b env ≃ afterᴱ env t → ∀ d → Agree d (U.meaning b env) (afterᴱ ρ (U.bodyˢ r (U.live s) t))
   hushed eq hc t al zero = stop
-  hushed eq hc (U.outˢ k a b′) al (suc d) = agree-trans (agreeing al (suc d)) (out⁼ (left eq hc b′ d) (still eq b′ d))
-  hushed eq hc (U.skipˢ k b′)  al (suc d) = agree-trans (agreeing al (suc d)) (skip⁼ (left eq hc b′ d) (still eq b′ d))
+  hushed eq hc (U.outˢ k a b′) al (suc d) = agree-trans (agreeing al (suc d)) (out⁼ (left eq hc b′ d) (kept-side eq b′ d))
+  hushed eq hc (U.skipˢ k b′)  al (suc d) = agree-trans (agreeing al (suc d)) (skip⁼ (left eq hc b′ d) (kept-side eq b′ d))
   hushed eq hc (U.endˢ c)      al (suc d) = agreeing al (suc d)
   hushed eq hc U.hushˢ         al (suc d) = agreeing al (suc d)
 
