@@ -50,14 +50,16 @@ Rested _                 = ⊥
 -- THE GHOST IS A RUN'S CONFIGURATION: each joiner told its end exactly
 -- when its connect's source has ended; each lane a flatMap will
 -- subscribe, untold, as `subscribe` makes it; of a rest, nothing; an ended
--- connect's source, what its cut left running.  `ν`
+-- connect's source, and a flatMap's pool, what a cut left running.  `ν`
 -- says, per connect in scope, whether its source runs (`Mode`).
+--
+-- REFUTED: 8f59ad1a `first-flat` without its pool `Rested`, by a defer for a pool
 mutual
   Sane : ∀ {Γ A} → All (λ _ → Mode) Γ → U.Node Γ A → Set
   Sane ν (U.mapᶜ f c)              = Sane ν c
   Sane ν (U.scanᶜ f z c)           = Sane ν c
   Sane ν (U.takeWhileᶜ i p c)      = Sane ν c
-  Sane {Γ} ν (U.flatMapᶜ op g o ls qs _) = Saneᴹ ν o × Saneᴸ ν ls × (∀ a q → Sane (allLive Γ) (g a q))
+  Sane {Γ} ν (U.flatMapᶜ op g o ls qs pl) = Saneᴹ ν o × Saneᴸ ν ls × (∀ a q → Sane (allLive Γ) (g a q)) × Rested pl
   Sane ν (U.joinᶜ i p xs e)        = Told (lookup ν i) e
   Sane ν (U.connectᶜ r b (U.live s))    = Sane (runs ∷ᴬ ν) b × Sane ν s
   Sane ν (U.connectᶜ r b (U.ended c t)) = Sane (over ∷ᴬ ν) b × Rested t
@@ -98,7 +100,7 @@ sane-subscribe (T.of xs)           p r = tt
 sane-subscribe (T.map f s)         p r = sane-subscribe s p r
 sane-subscribe (T.scan f z s)      p r = sane-subscribe s p r
 sane-subscribe (T.takeWhile i q s) p r = sane-subscribe s p r
-sane-subscribe (T.flatMap op f s)  p r = sane-subscribe s p r , tt , λ a q → sane-subscribe (f a) q running-all
+sane-subscribe (T.flatMap op f s)  p r = sane-subscribe s p r , tt , (λ a q → sane-subscribe (f a) q running-all) , tt
 sane-subscribe (T.connect s b)     p r = sane-subscribe b _ (running-∷ r) , sane-subscribe s _ r
 sane-subscribe (T.connected i)     p r = r i
 sane-subscribe (T.defer l)         p r = tt
@@ -236,8 +238,8 @@ mutual
   feed-sane i q a (U.mapᶜ f c)                 s = feed-sane i q a c s
   feed-sane i q a (U.scanᶜ f z c)              s = feed-sane i q a c s
   feed-sane i q a (U.takeWhileᶜ k p c)         s = feed-sane i q a c s
-  feed-sane i q a (U.flatMapᶜ op g o ls qs pl) (so , sl , sg) =
-    feedᴹ-sane i q a o so , feedᴸ-sane i q a ls sl , λ x r → feed-sane i q a (g x r) (sg x r)
+  feed-sane i q a (U.flatMapᶜ op g o ls qs pl) (so , sl , sg , rp) =
+    feedᴹ-sane i q a o so , feedᴸ-sane i q a ls sl , (λ x r → feed-sane i q a (g x r) (sg x r)) , feed-rested i q a pl rp
   feed-sane i q a (U.joinᶜ j p xs e)           s = s
   feed-sane i q a (U.connectᶜ r b (U.live t))  (sb , st) = feed-sane (Any.there i) q a b sb , feed-sane i q a t st
   feed-sane i q a (U.connectᶜ r b (U.ended k t)) (sb , rt) = feed-sane (Any.there i) q a b sb , feed-rested i q a t rt
@@ -284,7 +286,7 @@ mutual
   shut-sane i c (U.mapᶜ f n)                 s = shut-sane i c n s
   shut-sane i c (U.scanᶜ f z n)              s = shut-sane i c n s
   shut-sane i c (U.takeWhileᶜ k p n)         s = shut-sane i c n s
-  shut-sane i c (U.flatMapᶜ op g o ls qs pl) (so , sl , sg) = shutᴹ-sane i c o so , shutᴸ-sane i c ls sl , sg
+  shut-sane i c (U.flatMapᶜ op g o ls qs pl) (so , sl , sg , rp) = shutᴹ-sane i c o so , shutᴸ-sane i c ls sl , sg , shut-rested i c pl rp
   shut-sane {μ = μ} i c (U.joinᶜ j p xs e)   s = told-set μ i j c p e s
   shut-sane i c (U.connectᶜ r b (U.live t))  (sb , st) = shut-sane (Any.there i) c b sb , shut-sane i c t st
   shut-sane i c (U.connectᶜ r b (U.ended k t)) (sb , rt) = shut-sane (Any.there i) c b sb , shut-rested i c t rt
@@ -460,51 +462,51 @@ admit-sane T.exhaustᶠ          g gν q a (l ∷ ls) qs d sl = sl
 module _ {Γ : List Set} {A B : Set} {ν : All (λ _ → Mode) Γ} (op : T.FlatOp) (g : A → Pos → U.Node Γ B)
          (gA : ∀ a q → Sane (allLive Γ) (g a q)) (gν : ∀ a q → Sane ν (g a q)) where
 
-  outer-sane : ∀ o so ls qs p → Sane ν o → SaneS ν so → Saneᴸ ν ls → SaneS ν (U.outerˢ op g o so ls qs p)
-  outer-sane o (U.outˢ q a o′) ls qs p so s′ sl
+  outer-sane : ∀ o so ls qs p → Sane ν o → SaneS ν so → Saneᴸ ν ls → Rested p → SaneS ν (U.outerˢ op g o so ls qs p)
+  outer-sane o (U.outˢ q a o′) ls qs p so s′ sl rp
     with U.admit op g (q ++ [ ix 1 ]) a ls qs (U.restsᶜ ls) | admit-sane op g gν (q ++ [ ix 1 ]) a ls qs (U.restsᶜ ls) sl
-  ... | ls′ , qs′ , d | sl′ = s′ , sl′ , gA
-  outer-sane o (U.skipˢ q o′)  ls       qs       p so s′ sl = s′ , sl , gA
-  outer-sane o (U.endˢ c)      []       []       p so s′ sl = tt
-  outer-sane o (U.endˢ c)      []       (x ∷ qs) p so s′ sl = tt , tt , gA
-  outer-sane o (U.endˢ c)      (l ∷ ls) qs       p so s′ sl = tt , sl , gA
-  outer-sane o U.hushˢ         ls       qs       p so s′ sl = tt
+  ... | ls′ , qs′ , d | sl′ = s′ , sl′ , gA , tt
+  outer-sane o (U.skipˢ q o′)  ls       qs       p so s′ sl rp = s′ , sl , gA , rp
+  outer-sane o (U.endˢ c)      []       []       p so s′ sl rp = tt
+  outer-sane o (U.endˢ c)      []       (x ∷ qs) p so s′ sl rp = tt , tt , gA , tt
+  outer-sane o (U.endˢ c)      (l ∷ ls) qs       p so s′ sl rp = tt , sl , gA , tt
+  outer-sane o U.hushˢ         ls       qs       p so s′ sl rp = tt
 
-  lane-sane : ∀ o bs l s as qs p → Saneᴹ ν o → Saneᴸ ν bs → SaneS ν s → Saneᴸ ν as → SaneS ν (U.laneˢ op g o bs l s as qs p)
-  lane-sane o        bs       l (U.outˢ k b c) as       qs       p so sb sc sa = so , saneᴸ-++ bs sb (sc , sa) , gA
-  lane-sane o        bs       l (U.skipˢ k c)  as       qs       p so sb sc sa = so , saneᴸ-++ bs sb (sc , sa) , gA
-  lane-sane o        bs       l (U.endˢ c)     as       (a ∷ qs) p so sb sc sa = so , (gν a (c ++ [ ix 1 ]) , saneᴸ-++ bs sb sa) , gA
-  lane-sane nothing  []       l (U.endˢ c)     []       []       p so sb sc sa = tt
-  lane-sane nothing  []       l (U.endˢ c)     (x ∷ as) []       p so sb sc sa = tt , sa , gA
-  lane-sane nothing  (b ∷ bs) l (U.endˢ c)     as       []       p so sb sc sa = tt , saneᴸ-++ (b ∷ bs) sb sa , gA
-  lane-sane (just o) bs       l (U.endˢ c)     as       []       p so sb sc sa = so , saneᴸ-++ bs sb sa , gA
-  lane-sane o        bs       l U.hushˢ        as       qs       p so sb sc sa = tt
+  lane-sane : ∀ o bs l s as qs p → Saneᴹ ν o → Saneᴸ ν bs → SaneS ν s → Saneᴸ ν as → Rested p → SaneS ν (U.laneˢ op g o bs l s as qs p)
+  lane-sane o        bs       l (U.outˢ k b c) as       qs       p so sb sc sa rp = so , saneᴸ-++ bs sb (sc , sa) , gA , rp
+  lane-sane o        bs       l (U.skipˢ k c)  as       qs       p so sb sc sa rp = so , saneᴸ-++ bs sb (sc , sa) , gA , rp
+  lane-sane o        bs       l (U.endˢ c)     as       (a ∷ qs) p so sb sc sa rp = so , (gν a (c ++ [ ix 1 ]) , saneᴸ-++ bs sb sa) , gA , tt
+  lane-sane nothing  []       l (U.endˢ c)     []       []       p so sb sc sa rp = tt
+  lane-sane nothing  []       l (U.endˢ c)     (x ∷ as) []       p so sb sc sa rp = tt , sa , gA , tt
+  lane-sane nothing  (b ∷ bs) l (U.endˢ c)     as       []       p so sb sc sa rp = tt , saneᴸ-++ (b ∷ bs) sb sa , gA , tt
+  lane-sane (just o) bs       l (U.endˢ c)     as       []       p so sb sc sa rp = so , saneᴸ-++ bs sb sa , gA , tt
+  lane-sane o        bs       l U.hushˢ        as       qs       p so sb sc sa rp = tt
 
   race-sane : ∀ o so h k bs l s as qs p → Sane ν o → SaneS ν so → Saneᴸ ν bs → Sane ν l → SaneS ν s → Saneᴸ ν as
-            → SaneS ν (U.raceˢ op g o so h k bs l s as qs p)
-  race-sane o so nothing   k bs l s as qs p sO sso sb sl ss sa = lane-sane (just o) bs l s as qs p sO sb ss sa
-  race-sane o so (just k′) k bs l s as qs p sO sso sb sl ss sa with k′ <ᵖ k
-  ... | true  = outer-sane o so (bs ++ l ∷ as) qs p sO sso (saneᴸ-++ bs sb (sl , sa))
-  ... | false = lane-sane (just o) bs l s as qs p sO sb ss sa
+            → Rested p → SaneS ν (U.raceˢ op g o so h k bs l s as qs p)
+  race-sane o so nothing   k bs l s as qs p sO sso sb sl ss sa rp = lane-sane (just o) bs l s as qs p sO sb ss sa rp
+  race-sane o so (just k′) k bs l s as qs p sO sso sb sl ss sa rp with k′ <ᵖ k
+  ... | true  = outer-sane o so (bs ++ l ∷ as) qs p sO sso (saneᴸ-++ bs sb (sl , sa)) rp
+  ... | false = lane-sane (just o) bs l s as qs p sO sb ss sa rp
 
-  go-sane : ∀ oo ls qs p e → OuterOk ν oo → Saneᴸ ν ls → EarlyOk ν e → SaneS ν (U.goˢ op g oo ls qs p e)
-  go-sane U.doneᵒ       ls qs p U.none                so         sl se = tt
-  go-sane (U.runᵒ o so) ls qs p U.none                (sO , sso) sl se = outer-sane o so ls qs p sO sso sl
-  go-sane U.doneᵒ       ls qs p (U.found k bs l s as) so         sl (sb , sl′ , ss , sa) = lane-sane nothing bs l s as qs p tt sb ss sa
-  go-sane (U.runᵒ o so) ls qs p (U.found k bs l s as) (sO , sso) sl (sb , sl′ , ss , sa) =
-    race-sane o so (U.headˢ so) k bs l s as qs p sO sso sb sl′ ss sa
+  go-sane : ∀ oo ls qs p e → OuterOk ν oo → Saneᴸ ν ls → EarlyOk ν e → Rested p → SaneS ν (U.goˢ op g oo ls qs p e)
+  go-sane U.doneᵒ       ls qs p U.none                so         sl se rp = tt
+  go-sane (U.runᵒ o so) ls qs p U.none                (sO , sso) sl se rp = outer-sane o so ls qs p sO sso sl rp
+  go-sane U.doneᵒ       ls qs p (U.found k bs l s as) so         sl (sb , sl′ , ss , sa) rp = lane-sane nothing bs l s as qs p tt sb ss sa rp
+  go-sane (U.runᵒ o so) ls qs p (U.found k bs l s as) (sO , sso) sl (sb , sl′ , ss , sa) rp =
+    race-sane o so (U.headˢ so) k bs l s as qs p sO sso sb sl′ ss sa rp
 
   nodeᵒ-sane : ∀ (oo : U.Outer Γ A) → OuterOk ν oo → Saneᴹ ν (U.nodeᵒ oo)
   nodeᵒ-sane U.doneᵒ       _        = tt
   nodeᵒ-sane (U.runᵒ o so) (sO , _) = sO
 
-  flat-sane : ∀ oo ls qs p sp e → OuterOk ν oo → Saneᴸ ν ls → EarlyOk ν e → SaneS ν (U.flatˢ op g oo ls qs p sp e)
-  flat-sane oo ls qs p (U.skipˢ k p′)  e so sl se with U.aheadˢ k oo e
-  ... | true  = nodeᵒ-sane oo so , sl , gA
-  ... | false = go-sane oo ls qs p e so sl se
-  flat-sane oo ls qs p (U.outˢ _ _ _) e so sl se = go-sane oo ls qs p e so sl se
-  flat-sane oo ls qs p (U.endˢ _)     e so sl se = go-sane oo ls qs p e so sl se
-  flat-sane oo ls qs p U.hushˢ        e so sl se = go-sane oo ls qs p e so sl se
+  flat-sane : ∀ oo ls qs p sp e → OuterOk ν oo → Saneᴸ ν ls → EarlyOk ν e → Rested p → RestedS sp → SaneS ν (U.flatˢ op g oo ls qs p sp e)
+  flat-sane oo ls qs p (U.skipˢ k p′)  e so sl se rp rp′ with U.aheadˢ k oo e
+  ... | true  = nodeᵒ-sane oo so , sl , gA , rp′
+  ... | false = go-sane oo ls qs p e so sl se rp
+  flat-sane oo ls qs p (U.outˢ _ _ _) e so sl se rp _ = go-sane oo ls qs p e so sl se rp
+  flat-sane oo ls qs p (U.endˢ _)     e so sl se rp _ = go-sane oo ls qs p e so sl se rp
+  flat-sane oo ls qs p U.hushˢ        e so sl se rp _ = go-sane oo ls qs p e so sl se rp
 
 pick-sane : ∀ {Γ B} {ν : All (λ _ → Mode) Γ} (l : U.Node Γ B) s ls h e → Sane ν l → SaneS ν s → Saneᴸ ν ls → EarlyOk ν e
           → EarlyOk ν (U.pick l s ls h e)
@@ -604,9 +606,9 @@ mutual
   step-sane (U.mapᶜ f c)                 s = map-sane f (U.step c) (step-sane c s)
   step-sane (U.scanᶜ f z c)              s = scan-sane f z (U.step c) (step-sane c s)
   step-sane (U.takeWhileᶜ i p c)         s = take-sane i p (U.step c) (step-sane c s)
-  step-sane {ν = ν} (U.flatMapᶜ op g o ls qs p) (so , sl , sg) =
+  step-sane {ν = ν} (U.flatMapᶜ op g o ls qs p) (so , sl , sg , rp) =
     flat-sane op g sg (λ a q → weaken (below-all ν) (g a q) (sg a q)) (U.outerOf o) ls qs p (U.step p) (U.earliest ls)
-      (outer-of o so) (weakenᴸ (below-loosen ν) ls sl) (early-sane ls sl)
+      (outer-of o so) (weakenᴸ (below-loosen ν) ls sl) (early-sane ls sl) rp (step-rested p rp)
   step-sane {ν = ν} (U.joinᶜ i p xs e)   s = join-sane i p xs e (told-pt e (lookup-pt (below-loosen ν) i) s)
   step-sane {ν = ν} (U.connectᶜ r b (U.live s)) (sb , ss) =
     source-sane r b (U.step b) s (U.step s) (weaken (tt , below-loosen ν) b sb) (step-sane b sb) (weaken (below-loosen ν) s ss) (step-sane s ss)
