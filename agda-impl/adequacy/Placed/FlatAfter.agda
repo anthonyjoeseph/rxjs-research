@@ -26,7 +26,7 @@ open import denotation.Unfold using (NEnv)
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
 open import denotation.Compositional using (env-refl)
 open import adequacy.Placed.Order using (Alienᴱ; Atop; Every; EveryT; Every∞; Ext; Headed; Ordered; Owned; Past; Prefix; Steady; Tagged; every; every-mono; everyT-idle; everyT-mono; everyT-∪; everyᵀ; every∞-mono; headed-snoc; ordered; owned-ext; prefix-++; steady; still)
-open import adequacy.Placed.Keys using (module Merge; last-mark; owned-trans; prefix-refl; tagged-lane; tagged-mark; values; values-mono)
+open import adequacy.Placed.Keys using (module Merge; ahead-quiet; last-mark; owned-trans; prefix-refl; tagged-lane; tagged-mark; values; values-mono)
 open import adequacy.Placed.Rising using (AtopT; Atopᴹ; module Deferred; Disjoint; atop-weaken; every-zip; everyT-flip; everyT-zip; prefix-split)
 open import adequacy.Placed.Trail using (Apart; Atopᴴ; Behind; FlatT; Lead; Marks; Parted; SortedT; Sp; Spread; Trail; TrailE; Trailing; ahead-atop; all-pick; all-zip; atop-just; atop-nothing; atopT-every; atopT-∪; atopᴴ; atopᴴ-nothing; behind-at; behind-atop; beyond-atop; beyond-just; beyond-step; beyond-still; cuts-every; disjoint-swap; earliest-picks; every-∀; everyT-all; everyT-∀; flatT-idle; flatT-∪; lead-hush; lead-of; marks-between; marks-past; parted-pick; past-beyond; pool-step; self-atop; shown; sortedT-idle; sortedT-∪; sortedᵀ; spread; trail; trail-≈; trailᶠ)
 open import adequacy.Placed.Calm using (At; Calm; Clean; Here; Next; Obl; PoolAt; calms; clean-of; laneAt-map; next-go; pool-apart; poolAt-map; poolAt-∪; sp-apart; sp-step; sp-under)
@@ -238,14 +238,6 @@ module FlatAfter (p : Pos) where
   quiet-lanes : ∀ {B} {ls : List (Events∞ B)} {rs} → Roots ls rs → All (λ l → M′.head (force l) ≡ nothing) ls → All (λ l → EveryT (λ _ → ⊥) (cut l)) ls
   quiet-lanes []ᴿ []ᴬ = []ᴬ
   quiet-lanes {ls = l ∷ ls} (st ∷ᴿ R) (hl ∷ᴬ hs) = quiet-one (force l) (cut l) hl (proj₁ (proj₂ (trail (Lane.trl st)))) ∷ᴬ quiet-lanes R hs
-
-  clears-quiet : ∀ {B} k (ls : List (Events∞ B)) → All (λ l → M′.head (force l) ≡ nothing) ls → M′.clears k ls ≡ true
-  clears-quiet k []       []ᴬ        = refl
-  clears-quiet k (l ∷ ls) (hl ∷ᴬ hs) rewrite hl = clears-quiet k ls hs
-
-  ahead-quiet : ∀ {B} k (o : Maybe (Events∞ (MonotonicList B))) ls → M′.headᴼ o ≡ nothing → All (λ l → M′.head (force l) ≡ nothing) ls
-              → M′.ahead-of k o ls ≡ true
-  ahead-quiet k o ls ho hs rewrite ho = clears-quiet k ls hs
 
   quiet-pool : ∀ {B} (o : Maybe (Events∞ (MonotonicList B))) ls t → M′.headᴼ o ≡ nothing → All (λ l → M′.head (force l) ≡ nothing) ls
              → Behind o ls t → EveryT (λ _ → ⊥) t

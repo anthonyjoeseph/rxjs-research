@@ -11,11 +11,11 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE ROOT STEP
 
 Whether a flatMap's meaning starts with its step's event; whether a
-connect's body never steps at or just past its source's step; whether a hushed
-flatMap leaves nothing running; the step's parts placed.
-Settled when `first-flat`, `shy-before` and `hushed-flat` are bodies or refuted.
+connect's body never steps at or just past its source's step; the step's
+parts placed.
+Settled when `first-flat` and `shy-before` are bodies or refuted.
 
-Members: `first-flat`, `shy-before`, `hushed-flat`,
+Members: `first-flat`, `shy-before`,
 `within-step`, `under-shown-connect`.
 
 #### UP-ENDED
