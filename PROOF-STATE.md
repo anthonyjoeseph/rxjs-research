@@ -10,12 +10,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ROOT STEP
 
-A sane, placed root ghost's meaning is what its step shows, then the stepped
-node's, and the step leaves its parts placed; no connect's body shows under a
-source step. Refuted four times as stated. Settled when `step-skips` and
-`within-step` are bodies over the per-node facts.
+Whether a node stepping past `k` among sources clear of `k` shows nothing
+before `k` (its joiners' events suspect); whether a connect's body never
+steps at or just past its source's step (no invariant yet carries it);
+whether a hushed node leaves nothing running; the step's parts placed.
+Settled when `floor`, `shy-before` and `hushed-cut` are bodies or refuted.
 
-Members: `step-skips`, `within-step`, `under-shown-connect`.
+Members: `floor`, `shy-before`, `hushed-cut`, `within-step`,
+`under-shown-connect`.
 
 #### UP-ENDED
 
@@ -147,6 +149,18 @@ An ascending record alike a program's events as a set is placed against
 them, and the meaning's ticks never fall. Settled when both are bodies.
 
 Members: `placing`, `ticks-up`.
+
+#### STEP PARTS
+
+Each node's step, alone, is its meaning's next event: the generators,
+map/scan/take, a flatMap, an ended connect, a body fed or shut its source's
+step, and the rest-likes. Untried; believed unfoldings. Settled when each is
+a body.
+
+Members: `after-map`, `after-scan`, `after-take`, `clear-take`,
+`frames-after`, `burst-after`, `of-after`, `flat-skips`, `ended-skips`,
+`feed-alike`, `shut-alike`, `defer-skips`, `rest-skips`, `union-skips`,
+`bursting-skips`, `under-skips`.
 
 ## Tier 2 — the simultaneous spec
 
