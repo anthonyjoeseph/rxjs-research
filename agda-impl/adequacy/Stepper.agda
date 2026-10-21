@@ -242,6 +242,12 @@ postulate
 
   -- A node whose step shows past `k`, among sources showing nothing
   -- before `k`, shows nothing before it.
+  --
+  -- Not inductive alone.  A connect stepping its source's step at `q` past
+  -- `k` has `k` at most where that step shows, so possibly `q` itself; a
+  -- take ending at `h ++ [ last ]` past `k` has a source stepping at `h`,
+  -- possibly `k`.  Either part then shows nothing before `k` only with
+  -- ties, so the induction runs this beside its non-strict twin.
   floor : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (c : U.Node Γ A) (ρ : NEnv Γ) k → Sane ν c → Placed c ρ
         → U.beforeˢ k (U.step c) ≡ true → Floor ν k ρ → M′.before k (U.meaning c ρ) ≡ true
 
