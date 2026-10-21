@@ -40,7 +40,7 @@ open import adequacy.Seq using (module Sequencing)
 open import adequacy.Sane using (sane-out)
 open import adequacy.Placed.Order using (Placed)
 open import adequacy.Stepper.Past using (Placedˢ)
-open import adequacy.Stepper using (placed-after; step-deep)
+open import adequacy.Stepper.Within using (placed-after; step-deep)
 open import adequacy.Deep using (Deepˢ)
 open import denotation.Denote using (⟦_⟧)
 import Tree as T
