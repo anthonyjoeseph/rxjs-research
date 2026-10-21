@@ -978,7 +978,7 @@ placed-sub (connect s b) p ρ hp so cl = ordered-sub (connect s b) p ρ hp so cl
         pb = placed-sub b (p ++ [ ix 0 ]) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ) (headed-snoc p hp)
                ((proj₁ ps , steady-sub s (p ++ [ ix 1 ]) ρ hs so cs) , headed-sub s (p ++ [ ix 1 ]) ρ hs so , so)
                (alien-sub s p ρ cl , alienᴱ-owned p (p ++ [ ix 0 ]) (inj₁ (prefix-++ p [ ix 0 ])) ρ cl)
-placed-sub (connected i) p ρ hp so cl = ordered-sub (connected i) p ρ hp so cl , tt
+placed-sub (connected i) p ρ hp so cl = ordered-sub (connected i) p ρ hp so cl , every-lookup (λ h → ¬ Owned p h) ρ cl i
 placed-sub (defer l) p ρ hp so cl = ordered-sub (defer l) p ρ hp so cl , hp , so , cl
 
 -- THE MEANING'S EVENTS ARE SORTED: a program subscribed at the root is

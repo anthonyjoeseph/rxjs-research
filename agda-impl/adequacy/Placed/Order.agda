@@ -256,7 +256,8 @@ Sorted (e ∷ᴬ ρ) = (Ordered e × Steady e) × Every Headed e × Sorted ρ
 -- subscribe reading its own, each where the flatMap shows a skip just
 -- before it, as it does when it admits one; a defer's sources, its
 -- notices put back, as they stood when it subscribed, headed and
--- sorted and alien to it, as its program subscribed needs them.
+-- sorted and alien to it, as its program subscribed needs them; a
+-- joiner, its source alien to where it joined.
 mutual
   Placed : ∀ {Γ A} → U.Node Γ A → NEnv Γ → Set
   Placed c ρ = Ordered (U.meaning c ρ) × Within c ρ
@@ -270,6 +271,7 @@ mutual
   Within (U.connectᶜ r b (U.live s))    ρ = Placed b (U.meaning s ρ ∷ᴬ ρ) × Placed s ρ
   Within (U.connectᶜ r b (U.ended c t)) ρ = Placed b (end c ∷ᴬ ρ)
   Within (U.deferᶜ l p ns)          ρ = Headed p × Sorted (U.replay ns ρ) × Alienᴱ p (U.replay ns ρ)
+  Within (U.joinᶜ i p xs e)         ρ = Alien p (lookup ρ i)
   Within _                          ρ = ⊤
 
   Placedᴹ : ∀ {Γ A} → Maybe (U.Node Γ A) → NEnv Γ → Set
