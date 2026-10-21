@@ -7,9 +7,9 @@
 -- each running source's, its pool's and each ended source's rest.
 module adequacy.Stepper where
 
-open import Data.Bool using (Bool)
+open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥)
-open import Data.List using (List; []; _∷_)
+open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -17,11 +17,14 @@ open import Data.Nat using (zero; suc)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
 open import Tree using (Later)
-open import denotation.MonotonicList.Events using (Events; out; skip; end; hush; Pos; Timeline; From; Frame; idle; _<ᵖ_)
-open import denotation.MonotonicList using (Agree; stop; out⁼; skip⁼; agree-refl; agreeᵀ-refl)
+open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush; Pos; Timeline; From; Frame; idle; ix; _<ᵖ_;
+  <ᵖ-trans; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-below)
+open import denotation.MonotonicList using (Agree; stop; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agreeᵀ-refl; agree-trans)
+open import denotation.NonExpansive using (Agreeˢ; _,ˢ_; beside-ne; before-agree; ∪-ne; burstOn-ne)
+open Agreeˢ using (nowˢ)
 import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
@@ -39,6 +42,7 @@ record _≃_ {A : Set} (x y : Events A) : Set where
   field agreeing : ∀ n → Agree n x y
 
 open _≃_
+open Events∞
 
 -- What a step shows, then the meaning of the node it leaves.
 afterᴱ : ∀ {Γ A} → NEnv Γ → U.Step Γ A → Events A
@@ -75,6 +79,11 @@ placed-step ρ U.hushˢ        e o w = tt
 -- its next event once each running source in scope shows its next step
 -- only past it.  A joiner reads its source only as fed, so a source step
 -- the body has not been fed would show first.
+
+-- A source step shown as an event: a value, else a skip.
+shows : ∀ {A} → Pos → Maybe A → Events∞ A → Events A
+shows q (just a) σ = out q a σ
+shows q nothing  σ = skip q σ
 
 -- A source's next step shows past `k`; of no step, the source has none.
 Clearᴱ : ∀ {A} → Maybe Pos → Events A → Set
@@ -135,6 +144,57 @@ head-scan f z (U.skipˢ k c)  = refl
 head-scan f z (U.endˢ k)     = refl
 head-scan f z U.hushˢ        = refl
 
+-- A source's next step shows at or past `k`, or it has none.
+Floorᴱ : ∀ {A} → Pos → Events A → Set
+Floorᴱ k hush         = ⊤
+Floorᴱ k (out q _ _)  = (q ++ [ ix 0 ]) <ᵖ k ≡ false
+Floorᴱ k (skip q _)   = (q ++ [ ix 0 ]) <ᵖ k ≡ false
+Floorᴱ k (end c)      = (c ++ [ ix 0 ]) <ᵖ k ≡ false
+
+Floor : ∀ {Γ} → All (λ _ → Mode) Γ → Pos → NEnv Γ → Set
+Floor []ᴬ          k []ᴬ      = ⊤
+Floor (runs ∷ᴬ ν)  k (e ∷ᴬ ρ) = Floorᴱ k e × Floor ν k ρ
+Floor (over ∷ᴬ ν)  k (e ∷ᴬ ρ) = Floor ν k ρ
+Floor (loose ∷ᴬ ν) k (e ∷ᴬ ρ) = Floorᴱ k e × Floor ν k ρ
+
+-- Clear of a step past `k′`, clear of one at `k′`'s predecessors.
+clearᴱ-lower : ∀ {A k k′} (e : Events A) → k′ <ᵖ k ≡ true → Clearᴱ (just k) e → Clearᴱ (just k′) e
+clearᴱ-lower                 hush        lt c = tt
+clearᴱ-lower {k = k} {k′} (out q a σ) lt c = <ᵖ-trans k′ k (q ++ [ ix 0 ]) lt c
+clearᴱ-lower {k = k} {k′} (skip q σ)  lt c = <ᵖ-trans k′ k (q ++ [ ix 0 ]) lt c
+clearᴱ-lower {k = k} {k′} (end c′)    lt c = <ᵖ-trans k′ k (c′ ++ [ ix 0 ]) lt c
+
+clear-lower : ∀ {Γ} (ν : All (λ _ → Mode) Γ) (ρ : NEnv Γ) {k k′} → k′ <ᵖ k ≡ true → Clear ν (just k) ρ → Clear ν (just k′) ρ
+clear-lower []ᴬ          []ᴬ      lt c        = tt
+clear-lower (runs ∷ᴬ ν)  (e ∷ᴬ ρ) lt (ce , c) = clearᴱ-lower e lt ce , clear-lower ν ρ lt c
+clear-lower (over ∷ᴬ ν)  (e ∷ᴬ ρ) lt c        = clear-lower ν ρ lt c
+clear-lower (loose ∷ᴬ ν) (e ∷ᴬ ρ) lt (ce , c) = clearᴱ-lower e lt ce , clear-lower ν ρ lt c
+
+clearᴱ-floor : ∀ {A k} (e : Events A) → Clearᴱ (just k) e → Floorᴱ k e
+clearᴱ-floor         hush        c = tt
+clearᴱ-floor {k = k} (out q a σ) c = <ᵖ-asym k (q ++ [ ix 0 ]) c
+clearᴱ-floor {k = k} (skip q σ)  c = <ᵖ-asym k (q ++ [ ix 0 ]) c
+clearᴱ-floor {k = k} (end c′)    c = <ᵖ-asym k (c′ ++ [ ix 0 ]) c
+
+clear-floor : ∀ {Γ} (ν : All (λ _ → Mode) Γ) (ρ : NEnv Γ) {k} → Clear ν (just k) ρ → Floor ν k ρ
+clear-floor []ᴬ          []ᴬ      c        = tt
+clear-floor (runs ∷ᴬ ν)  (e ∷ᴬ ρ) (ce , c) = clearᴱ-floor e ce , clear-floor ν ρ c
+clear-floor (over ∷ᴬ ν)  (e ∷ᴬ ρ) c        = clear-floor ν ρ c
+clear-floor (loose ∷ᴬ ν) (e ∷ᴬ ρ) (ce , c) = clearᴱ-floor e ce , clear-floor ν ρ c
+
+floorᴱ-agree : ∀ {A k} {e e′ : Events A} → Agree 1 e e′ → Floorᴱ k e′ → Floorᴱ k e
+floorᴱ-agree (out⁼ _ _)  f = f
+floorᴱ-agree (skip⁼ _ _) f = f
+floorᴱ-agree end⁼        f = f
+floorᴱ-agree hush⁼       f = f
+
+-- The body's step shows first: the source's, if any, not before it.
+Shy : ∀ {Δ Γ A B} → U.Step Δ B → U.Step Γ A → Set
+Shy sb (U.outˢ q _ _) = U.beforeˢ (q ++ [ ix 0 ]) sb ≡ false
+Shy sb (U.skipˢ q _)  = U.beforeˢ (q ++ [ ix 0 ]) sb ≡ false
+Shy sb (U.endˢ c)     = U.beforeˢ (c ++ [ ix 0 ]) sb ≡ false
+Shy sb U.hushˢ        = ⊤
+
 -- A joiner shows what it was fed, then its end once told it; untold and
 -- fed nothing, it shows nothing while its source is clear.
 join-skips : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (i : A ∈ Γ) p xs e (ρ : NEnv Γ) → Told (lookup ν i) e → Skips ν (U.joinᶜ i p xs e) ρ
@@ -171,8 +231,21 @@ postulate
              → Sane ν (U.flatMapᶜ op g o ls qs pl) → Placed (U.flatMapᶜ op g o ls qs pl) ρ
              → Skipsᴹ ν o ρ → Skipsᴸ ν ls ρ → Skips ν (U.flatMapᶜ op g o ls qs pl) ρ
 
-  -- A connect runs its source's step first when it shows before the
-  -- body's, the body fed it; else the body's.
+  -- A body reading its source's step at `q` runs alike fed it, the
+  -- source past it; at the source's end, alike shut.
+  --
+  -- RECOVERY: git show 43da74d9:agda-impl/adequacy/Sane.agda restores `sane-feed`, which a stepper over a meaning with no tails fed its sources' steps through
+  feed-alike : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (b : U.Node (A ∷ Γ) B) q (a : Maybe A) (σ : Events∞ A) {e : Events A} (ρ : NEnv Γ)
+             → Sane (runs ∷ᴬ ν) b → e ≃ shows q a σ → ∀ d → Agreeˢ d (U.stateᴺ b (e ∷ᴬ ρ)) (U.stateᴺ (U.feed (here refl) q a b) (force σ ∷ᴬ ρ))
+  shut-alike : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (b : U.Node (A ∷ Γ) B) c {e : Events A} (ρ : NEnv Γ)
+             → Sane (runs ∷ᴬ ν) b → e ≃ end c → ∀ d → Agreeˢ d (U.stateᴺ b (e ∷ᴬ ρ)) (U.stateᴺ (U.shut (here refl) c b) (end c ∷ᴬ ρ))
+
+  -- A node whose step shows past `k`, among sources showing nothing
+  -- before `k`, shows nothing before it.
+  floor : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (c : U.Node Γ A) (ρ : NEnv Γ) k → Sane ν c → Placed c ρ
+        → U.beforeˢ k (U.step c) ≡ true → Floor ν k ρ → M′.before k (U.meaning c ρ) ≡ true
+
+  -- A connect's body showing first: what it shows, the source carried.
   --
   -- DEAD ROUTE: exact agreement with a ghost anchored in its sources'
   --   step history.  The ghost is the witness's open part (`part`), which
@@ -180,10 +253,11 @@ postulate
   --   the residual as a set alone (`Ahead`), so no field of the witness
   --   can keep the count a lane's pre-join skips need.
   -- RECOVERY: git show 43da74d9:agda-impl/adequacy/Stepper.agda restores the stepper over a meaning with no tails, node by node
-  -- RECOVERY: git show 43da74d9:agda-impl/adequacy/Sane.agda restores `sane-feed`, which that stepper fed its sources' steps through
-  connect-skips : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ)
-                → Sane ν (U.connectᶜ r b (U.live s)) → Placed (U.connectᶜ r b (U.live s)) ρ
-                → Skips (runs ∷ᴬ ν) b (U.meaning s ρ ∷ᴬ ρ) → Skips ν s ρ → Skips ν (U.connectᶜ r b (U.live s)) ρ
+  body-skips : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ)
+             → Sane (runs ∷ᴬ ν) b → Sane ν s → Placed b (U.meaning s ρ ∷ᴬ ρ) → Placed s ρ
+             → Skips (runs ∷ᴬ ν) b (U.meaning s ρ ∷ᴬ ρ) → Shy (U.step b) (U.step s)
+             → Clear ν (U.headˢ (U.bodyˢ r (U.live s) (U.step b))) ρ
+             → U.meaning (U.connectᶜ r b (U.live s)) ρ ≃ afterᴱ ρ (U.bodyˢ r (U.live s) (U.step b))
 
   -- Past its source's end, a connect runs its source's rest's skip
   -- first when it shows before the body's; else the body's, shut.
@@ -201,6 +275,101 @@ postulate
   bursting-skips : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (t : U.Node Γ A) (ρ : NEnv Γ) → Skips ν (U.burstingᶜ {B = B} r t) ρ
   under-skips    : ∀ {Γ A C B} {ν : All (λ _ → Mode) Γ} (s : U.Source Γ A) (b : U.Node (A ∷ Γ) C) (ρ : NEnv Γ) → Skips ν (U.underᶜ {B = B} s b) ρ
 
+-- A source's step shown first: the body fed it, its next event later.
+module SourceFirst {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ)
+                   (sb : Sane (runs ∷ᴬ ν) b) (pb : Placed b (U.meaning s ρ ∷ᴬ ρ)) where
+
+  β : Events∞ B
+  β = U.stateᴺ b (U.meaning s ρ ∷ᴬ ρ)
+
+  σ : Events∞ A
+  σ = U.stateᴺ s ρ
+
+  -- What the source shows, as a state the connect can read.
+  as : Events A → Events∞ A
+  as e .force = e
+  as e .cut   = U.cutᴺ s ρ
+
+  as-alike : ∀ {e} → U.meaning s ρ ≃ e → ∀ d → Agreeˢ d σ (as e)
+  as-alike al d = agreeᵀ-refl d _ ,ˢ agreeing al d
+
+  -- The body's meaning shows after the source's shown step.
+  body-floor : ∀ {e} k → U.meaning s ρ ≃ e → Floorᴱ k e → U.beforeˢ k (U.step b) ≡ true → Clear ν (just k) ρ
+             → M′.before k (U.meaning b (U.meaning s ρ ∷ᴬ ρ)) ≡ true
+  body-floor k al fe fb cl = floor b (U.meaning s ρ ∷ᴬ ρ) k sb pb fb (floorᴱ-agree (agreeing al 1) fe , clear-floor ν ρ cl)
+
+  -- The connect reads its source's step at `q` as the source shows it.
+  side-shows : ∀ q (a : Maybe A) (β₁ : Events∞ B) σ₁ d
+             → Agree d (M′.beside r β₁ (as (shows q a σ₁))) (M′.ahead r β₁ (as (shows q a σ₁)) (q ++ [ ix 0 ]) (M′.before (q ++ [ ix 0 ]) (force β₁)))
+  side-shows q (just x) β₁ σ₁ d = agree-refl d _
+  side-shows q nothing  β₁ σ₁ d = agree-refl d _
+
+  -- Past the shown step, the connect runs on: the body as fed, the
+  -- source from its next node.
+  shown-next : ∀ q (a : Maybe A) (b″ : U.Node (A ∷ Γ) B) (s″ : U.Node Γ A) d
+             → Agree d (M′.ahead r (U.stateᴺ b″ (U.meaning s″ ρ ∷ᴬ ρ)) (as (shows q a (U.stateᴺ s″ ρ))) (q ++ [ ix 0 ]) true)
+                       (skip (q ++ [ ix 0 ]) (U.stateᴺ (U.connectᶜ r b″ (U.live s″)) ρ))
+  shown-next q a        b″ s″ zero    = stop
+  shown-next q (just x) b″ s″ (suc d) = skip⁼ (agreeᵀ-refl d _) (agree-refl d _)
+  shown-next q nothing  b″ s″ (suc d) = skip⁼ (agreeᵀ-refl d _) (agree-refl d _)
+
+  fed-first : ∀ q (a : Maybe A) (s′ : U.Node Γ A) → U.meaning s ρ ≃ shows q a (U.stateᴺ s′ ρ)
+            → U.beforeˢ (q ++ [ ix 0 ]) (U.step b) ≡ true → Clear ν (just (q ++ [ ix 0 ])) ρ
+            → U.meaning (U.connectᶜ r b (U.live s)) ρ ≃ skip (q ++ [ ix 0 ]) (U.stateᴺ (U.connectᶜ r (U.feed (here refl) q a b) (U.live s′)) ρ)
+  fed-first q a s′ al fb cl = alike λ d → agree-trans (beside-ne r (fa d) (as-alike al d)) (top d)
+    where
+      σ′ = U.stateᴺ s′ ρ
+      b′ = U.feed (here refl) q a b
+      β′ = U.stateᴺ b′ (U.meaning s′ ρ ∷ᴬ ρ)
+      k  = q ++ [ ix 0 ]
+      fa = feed-alike b q a σ′ ρ sb al
+      flag : M′.before k (U.meaning b′ (U.meaning s′ ρ ∷ᴬ ρ)) ≡ true
+      flag = trans (sym (before-agree k (nowˢ (fa 1)))) (body-floor k al (shown a) fb cl)
+        where shown : ∀ a → Floorᴱ k (shows q a σ′)
+              shown (just _) = <ᵖ-irrefl k
+              shown nothing  = <ᵖ-irrefl k
+      target = skip k (U.stateᴺ (U.connectᶜ r b′ (U.live s′)) ρ)
+      top : ∀ d → Agree d (M′.beside r β′ (as (shows q a σ′))) target
+      top d = agree-trans (side-shows q a β′ σ′ d) (subst (λ f → Agree d (M′.ahead r β′ (as (shows q a σ′)) k f) target) (sym flag) (shown-next q a b′ s′ d))
+
+  shut-first : ∀ c → U.meaning s ρ ≃ end c → U.beforeˢ (c ++ [ ix 0 ]) (U.step b) ≡ true → Clear ν (just (c ++ [ ix 0 ])) ρ
+             → U.meaning (U.connectᶜ r b (U.live s)) ρ ≃ skip (c ++ [ ix 0 ]) (U.stateᴺ (U.connectᶜ r (U.shut (here refl) c b) (U.ended c (U.restᶜ s))) ρ)
+  shut-first c al fb cl = alike λ d → agree-trans (beside-ne r (sa d) (as-alike al d)) (top d)
+    where
+      b′ = U.shut (here refl) c b
+      β′ = U.stateᴺ b′ (end c ∷ᴬ ρ)
+      k  = c ++ [ ix 0 ]
+      sa = shut-alike b c ρ sb al
+      flag : M′.before k (U.meaning b′ (end c ∷ᴬ ρ)) ≡ true
+      flag = trans (sym (before-agree k (nowˢ (sa 1)))) (body-floor k al (<ᵖ-irrefl k) fb cl)
+      target = skip k (U.stateᴺ (U.connectᶜ r b′ (U.ended c (U.restᶜ s))) ρ)
+      -- Past its end the source runs on as its rest.
+      next : ∀ d → Agree d (M′.ahead r β′ (as (end c)) k true) target
+      rest : ∀ d → Agreeˢ d (M′.onward∞ (as (end c)) (end c)) (U.stateᴺ (U.restᶜ s) ρ)
+      rest d = agreeᵀ-refl d _ ,ˢ agree-refl d _
+      next zero    = stop
+      next (suc d) = skip⁼ (∪-ne (burstOn-ne r (rest d)) (agreeᵀ-refl d _)) (beside-ne r (agreeᵀ-refl d _ ,ˢ agree-refl d _) (rest d))
+      top : ∀ d → Agree d (M′.beside r β′ (as (end c))) target
+      top d = subst (λ f → Agree d (M′.ahead r β′ (as (end c)) k f) target) (sym flag) (next d)
+
+-- A connect runs its source's step first when it shows before the
+-- body's, the body fed it; else the body's.
+connect-skips : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ)
+              → Sane ν (U.connectᶜ r b (U.live s)) → Placed (U.connectᶜ r b (U.live s)) ρ
+              → Skips (runs ∷ᴬ ν) b (U.meaning s ρ ∷ᴬ ρ) → Skips ν s ρ → Skips ν (U.connectᶜ r b (U.live s)) ρ
+connect-skips {ν = ν} r b s ρ (sb , ss) pl skb sks cl with U.step s in es
+... | U.outˢ q a s′ with U.beforeˢ (q ++ [ ix 0 ]) (U.step b) in fb
+...   | true  = SourceFirst.fed-first r b s ρ sb (proj₁ (proj₂ pl)) q (just a) s′ (sks (clear-lower ν ρ (<ᵖ-below q []) cl)) fb cl
+...   | false = body-skips r b s ρ sb ss (proj₁ (proj₂ pl)) (proj₂ (proj₂ pl)) skb (subst (Shy (U.step b)) (sym es) fb) cl
+connect-skips {ν = ν} r b s ρ (sb , ss) pl skb sks cl | U.skipˢ q s′ with U.beforeˢ (q ++ [ ix 0 ]) (U.step b) in fb
+...   | true  = SourceFirst.fed-first r b s ρ sb (proj₁ (proj₂ pl)) q nothing s′ (sks (clear-lower ν ρ (<ᵖ-below q []) cl)) fb cl
+...   | false = body-skips r b s ρ sb ss (proj₁ (proj₂ pl)) (proj₂ (proj₂ pl)) skb (subst (Shy (U.step b)) (sym es) fb) cl
+connect-skips {ν = ν} r b s ρ (sb , ss) pl skb sks cl | U.endˢ c with U.beforeˢ (c ++ [ ix 0 ]) (U.step b) in fb
+...   | true  = SourceFirst.shut-first r b s ρ sb (proj₁ (proj₂ pl)) c (sks (clear-lower ν ρ (<ᵖ-below c []) cl)) fb cl
+...   | false = body-skips r b s ρ sb ss (proj₁ (proj₂ pl)) (proj₂ (proj₂ pl)) skb (subst (Shy (U.step b)) (sym es) fb) cl
+connect-skips {ν = ν} r b s ρ (sb , ss) pl skb sks cl | U.hushˢ =
+  body-skips r b s ρ sb ss (proj₁ (proj₂ pl)) (proj₂ (proj₂ pl)) skb (subst (Shy (U.step b)) (sym es) tt) cl
+
 -- Node by node, each part stepping as it does alone.
 --
 -- REFUTED: 3e2af71f stated of every node, by a told joiner under a live source
@@ -214,20 +383,20 @@ mutual
     after-map ρ f (U.step c) (skips c ρ sn pl (subst (λ h → Clear ν h ρ) (head-map f (U.step c)) cl))
   skips {ν = ν} (U.scanᶜ f z c) ρ sn (_ , pl) cl =
     after-scan ρ f z (U.step c) (skips c ρ sn pl (subst (λ h → Clear ν h ρ) (head-scan f z (U.step c)) cl))
-  skips (U.takeWhileᶜ i p c) ρ sn (_ , pl) cl = after-take ρ i p (U.step c) (skips c ρ sn pl (clear-take i p (U.step c) cl))
+  skips {ν = ν} (U.takeWhileᶜ i p c) ρ sn (_ , pl) cl = after-take ρ i p (U.step c) (skips c ρ sn pl (clear-take {ν = ν} {ρ = ρ} i p (U.step c) cl))
   skips (U.flatMapᶜ op g o ls qs pl) ρ sn@(so , sl , _) pd@(_ , po , pls , _) cl =
     flat-skips op g o ls qs pl ρ sn pd (skipsᴹ o ρ so po) (skipsᴸ ls ρ sl pls) cl
-  skips (U.joinᶜ i p xs e) ρ sn _ cl = join-skips i p xs e ρ sn cl
+  skips {ν = ν} (U.joinᶜ i p xs e) ρ sn _ cl = join-skips {ν = ν} i p xs e ρ sn cl
   skips (U.connectᶜ r b (U.live s)) ρ sn@(sb , ss) pd@(_ , pb , ps) cl =
     connect-skips r b s ρ sn pd (skips b (U.meaning s ρ ∷ᴬ ρ) sb pb) (skips s ρ ss ps) cl
   skips (U.connectᶜ r b (U.ended c t)) ρ sb pd@(_ , pb) cl = ended-skips r b c t ρ sb pd (skips b (end c ∷ᴬ ρ) sb pb) cl
-  skips (U.deferᶜ l p ns) ρ _ pd cl = defer-skips l p ns ρ pd cl
+  skips {ν = ν} (U.deferᶜ l p ns) ρ _ pd cl = defer-skips {ν = ν} l p ns ρ pd cl
   skips (U.endingᶜ p n)   ρ _ _ _  = alike λ d → agree-refl d (end p)
-  skips (U.restᶜ n)       ρ _ _ cl = rest-skips n ρ cl
+  skips {ν = ν} (U.restᶜ n)       ρ _ _ cl = rest-skips {ν = ν} n ρ cl
   skips U.idleᶜ           ρ _ _ _  = alike λ d → agree-refl d hush
-  skips (U.unionᶜ x y)    ρ _ _ cl = union-skips x y ρ cl
-  skips (U.burstingᶜ r t) ρ _ _ cl = bursting-skips r t ρ cl
-  skips (U.underᶜ s b)    ρ _ _ cl = under-skips s b ρ cl
+  skips {ν = ν} (U.unionᶜ x y)    ρ _ _ cl = union-skips {ν = ν} x y ρ cl
+  skips {ν = ν} (U.burstingᶜ r t) ρ _ _ cl = bursting-skips {ν = ν} r t ρ cl
+  skips {ν = ν} (U.underᶜ s b)    ρ _ _ cl = under-skips {ν = ν} s b ρ cl
 
   skipsᴹ : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (o : Maybe (U.Node Γ A)) (ρ : NEnv Γ) → Saneᴹ ν o → Placedᴹ o ρ → Skipsᴹ ν o ρ
   skipsᴹ nothing  ρ _ _ = tt

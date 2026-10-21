@@ -19,12 +19,13 @@ Members: `tells-past`, `ended-past`, `bursts-down`, `flat-down`.
 
 #### THE ROOT STEP
 
-A sane, placed root ghost's meaning is what its step shows, then the stepped
-node's, and the step leaves its parts placed; no connect's body shows under a
-source step. Refuted four times as stated. Settled when `step-skips` and
-`within-step` are bodies over the per-node facts.
+A connect's body showing first shows what the meaning shows, the source
+carried, though no witness field counts the source's steps; a node stepping
+past `k` among sources clear of `k` shows nothing before `k`; the step leaves
+its parts placed; no connect's body shows under a source step. Settled when
+`body-skips` and `floor` are bodies or refuted with the route known.
 
-Members: `step-skips`, `within-step`, `under-shown-connect`.
+Members: `body-skips`, `floor`, `within-step`, `under-shown-connect`.
 
 #### THE REST'S TIES
 
@@ -144,6 +145,18 @@ An ascending record alike a program's events as a set is placed against
 them, and the meaning's ticks never fall. Settled when both are bodies.
 
 Members: `placing`, `ticks-up`.
+
+#### STEP PARTS
+
+Each node's step, alone, is its meaning's next event: the generators,
+map/scan/take, a flatMap, an ended connect, a body fed or shut its source's
+step, and the rest-likes. Untried; believed unfoldings. Settled when each is
+a body.
+
+Members: `after-map`, `after-scan`, `after-take`, `clear-take`,
+`frames-after`, `burst-after`, `of-after`, `flat-skips`, `ended-skips`,
+`feed-alike`, `shut-alike`, `defer-skips`, `rest-skips`, `union-skips`,
+`bursting-skips`, `under-skips`.
 
 ## Tier 2 — the simultaneous spec
 
