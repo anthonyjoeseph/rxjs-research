@@ -324,8 +324,8 @@ module ClimbConnect (R : Set) where
     fed-behind fs ut en = Shift.shift-behind H H ρ (λ j _ → refl) [] fs v ut en fed-heading
 
     postulate
-      fed-told  : AllPairs _≢_ (names T) → ∀ {q′} → Untold H q′ T → Ended H T → Untold H q′ T′
-      fed-ended : AllPairs _≢_ (names T) → Ended H T → Ended H T′
+      fed-told  : AllPairs _≢_ (names T) → ∀ {q′} → Untold H q′ T → Ends H T → Untold H q′ T′
+      fed-ended : AllPairs _≢_ (names T) → Ends H T → Ends H T′
 
     fed-lingers : AllPairs _≢_ (names T) → Ends H T → At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T
                 → Lingers H T → Lingers H T′
@@ -625,8 +625,8 @@ module ClimbConnect (R : Set) where
     fin-behind fs ut en = Sh.shift-behind fs v ut en (fin-heading (fresh-path ρ fs))
 
     postulate
-      fin-told  : AllPairs _≢_ (names T) → ∀ {q′} → Untold H q′ T → Ended H T → Untold H′ q′ T′
-      fin-ended : AllPairs _≢_ (names T) → Ended H T → Ended H′ T′
+      fin-told  : AllPairs _≢_ (names T) → ∀ {q′} → Untold H q′ T → Ends H T → Untold H′ q′ T′
+      fin-ended : AllPairs _≢_ (names T) → Ends H T → Ends H′ T′
 
     fin-lingers : AllPairs _≢_ (names T) → Ends H T → At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T
                 → Lingers H T → Lingers H′ T′
