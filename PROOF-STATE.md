@@ -10,11 +10,11 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ROOT STEP
 
-Whether a flatMap's meaning starts with its step's event; whether a
-step keeps its parts placed and `Sides`.
-Settled when `first-flat` is a body or refuted.
+Whether a flatMap's meaning starts with its step's event when each of
+its parts' does; whether a step keeps its parts placed and `Sides`.
+Settled when `flat-first` is a body or refuted.
 
-Members: `first-flat`, `within-step`, `under-shown-connect`.
+Members: `flat-first`, `within-step`, `under-shown-connect`.
 
 #### UP-ENDED
 

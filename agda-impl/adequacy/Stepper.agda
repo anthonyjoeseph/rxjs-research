@@ -222,6 +222,14 @@ First ν ρ t x = Agree 1 x (afterᴱ ρ t) ⊎ Pastᴱ ν ρ t x
 Firsts : ∀ {Γ A} → All (λ _ → Mode) Γ → U.Node Γ A → NEnv Γ → Set
 Firsts ν c ρ = First ν ρ (U.step c) (U.meaning c ρ)
 
+Firstᴹ : ∀ {Γ A} → All (λ _ → Mode) Γ → Maybe (U.Node Γ A) → NEnv Γ → Set
+Firstᴹ ν nothing  ρ = ⊤
+Firstᴹ ν (just c) ρ = Firsts ν c ρ
+
+Firstᴸ : ∀ {Γ A} → All (λ _ → Mode) Γ → List (U.Node Γ A) → NEnv Γ → Set
+Firstᴸ ν []       ρ = ⊤
+Firstᴸ ν (c ∷ cs) ρ = Firsts ν c ρ × Firstᴸ ν cs ρ
+
 -- At or past `s`, then past `h`: past `k` once past `s`.
 <ᵖ-past : ∀ k s h → s <ᵖ k ≡ false → s <ᵖ h ≡ true → k <ᵖ h ≡ true
 <ᵖ-past k s h f b with <ᵖ-split k s f
@@ -451,10 +459,15 @@ postulate
   shut-alike : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (b : U.Node (A ∷ Γ) B) c {e : Events A} (ρ : NEnv Γ)
              → Sane (runs ∷ᴬ ν) b → e ≃ end c → ∀ d → Agreeˢ d (U.stateᴺ b (e ∷ᴬ ρ)) (U.stateᴺ (U.shut (here refl) c b) (end c ∷ᴬ ρ))
 
-  -- A flatMap, a defer: the meaning starts with
-  -- the step's event, else past a running source's shown event.
-  first-flat  : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} op (g : A → Pos → U.Node Γ B) o ls qs pl (ρ : NEnv Γ)
-              → Sane ν (U.flatMapᶜ op g o ls qs pl) → Placed (U.flatMapᶜ op g o ls qs pl) ρ → Firsts ν (U.flatMapᶜ op g o ls qs pl) ρ
+  -- A flatMap's meaning starts with its step's event, else past a
+  -- running source's shown event, when its outer's, each lane's and its
+  -- rested pool's does: a part starting past a source lends it the
+  -- source, the earliest such where several do.
+  flat-first : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} op (g : A → Pos → U.Node Γ B) o ls qs pl (ρ : NEnv Γ)
+             → Firstᴹ ν o ρ → Firstᴸ ν ls ρ → Rested pl → Firsts ν pl ρ → Firsts ν (U.flatMapᶜ op g o ls qs pl) ρ
+
+  -- A defer: the meaning starts with the step's event, else past a
+  -- running source's shown event.
   first-defer : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (l : Later Timeline Γ A) p ns (ρ : NEnv Γ) → Placed (U.deferᶜ l p ns) ρ → Firsts ν (U.deferᶜ l p ns) ρ
 
   -- A rest-like's meaning starts with its step's event, else past a
@@ -865,6 +878,8 @@ first-rested ν (U.underᶜ s b)    ρ _ = first-under {ν = ν} s b ρ
 -- A node's meaning starts with the event its step shows, else past
 -- a running source's shown event: a joiner's.
 first : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (c : U.Node Γ A) (ρ : NEnv Γ) → Sane ν c → Placed c ρ → Firsts ν c ρ
+firstᴹ : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (o : Maybe (U.Node Γ A)) (ρ : NEnv Γ) → Saneᴹ ν o → Placedᴹ o ρ → Firstᴹ ν o ρ
+firstᴸ : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (ls : List (U.Node Γ A)) (ρ : NEnv Γ) → Saneᴸ ν ls → Placedᴸ ls ρ → Firstᴸ ν ls ρ
 first (U.framesᶜ τ e m)  ρ _ _ = inj₁ (agreeing (frames-after ρ τ e m) 1)
 first (U.burstᶜ τ r i b) ρ _ _ = inj₁ (agreeing (burst-after ρ τ r i b) 1)
 first (U.ofᶜ p i xs)     ρ _ _ = inj₁ (agreeing (of-after ρ p i xs) 1)
@@ -877,7 +892,8 @@ first {ν = ν} (U.scanᶜ f z c) ρ sn (_ , pl) with first c ρ sn pl
 first {ν = ν} (U.takeWhileᶜ i p c) ρ sn (_ , pl) with first c ρ sn pl
 ... | inj₁ ag = inj₁ (one-take ρ i p (U.step c) ag)
 ... | inj₂ pa = inj₂ (past-take ν ρ i p (U.step c) (U.meaning c ρ) pa)
-first (U.flatMapᶜ op g o ls qs pl) ρ sn pd = first-flat op g o ls qs pl ρ sn pd
+first {ν = ν} (U.flatMapᶜ op g o ls qs pl) ρ (so , sl , _ , rp) (_ , po , pls , _) =
+  flat-first op g o ls qs pl ρ (firstᴹ o ρ so po) (firstᴸ ls ρ sl pls) rp (first-rested ν pl ρ rp)
 first {ν = ν} (U.joinᶜ i p xs e) ρ sn (_ , al) = first-join ν i p xs e ρ sn al
 first {ν = ν} (U.connectᶜ r b (U.live s)) ρ (sb , ss) (_ , pb , ps , _) =
   Beside.conn ν runs r ρ (U.meaning s ρ) (U.meaning s ρ) (U.stateᴺ s ρ) (U.step s) (U.stateᴺ b (U.meaning s ρ ∷ᴬ ρ)) (U.step b)
@@ -898,6 +914,12 @@ first U.idleᶜ           ρ _ _ = inj₁ hush⁼
 first {ν = ν} (U.unionᶜ x y)    ρ _ _ = first-union {ν = ν} x y ρ
 first {ν = ν} (U.burstingᶜ r t) ρ _ _ = first-bursting {ν = ν} r t ρ
 first {ν = ν} (U.underᶜ s b)    ρ _ _ = first-under {ν = ν} s b ρ
+
+firstᴹ nothing  ρ _  _  = tt
+firstᴹ (just c) ρ sc pc = first c ρ sc pc
+
+firstᴸ []       ρ _          _          = tt
+firstᴸ (c ∷ cs) ρ (sc , ss) (pc , ps) = first c ρ sc pc , firstᴸ cs ρ ss ps
 
 -- A node whose step shows past `k`, among sources showing nothing
 -- before `k`, shows nothing before it.
