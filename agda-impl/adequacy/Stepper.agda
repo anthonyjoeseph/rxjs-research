@@ -19,6 +19,10 @@ open import Data.Unit using (tt)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; subst; cong)
 
+open import Tree using (Later)
+open import Data.List.Membership.Propositional using (_∈_)
+open import denotation.MonotonicList.Events using (Timeline; From; Frame)
+import denotation.MonotonicList.Events as E
 open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush; Pos; idle; ix; _<ᵖ_; _∪_; Tail; pin; <ᵖ-trans;
   <ᵖ-irrefl; <ᵖ-asym; <ᵖ-below; <ᵖ-split; <ᵖ-step)
 open import denotation.MonotonicList using (Agree; Agreeᵀ; stop; stopᵀ; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agreeᵀ-refl; agreeᵀ-sym; agree-trans)
@@ -32,7 +36,7 @@ import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import adequacy.Sane using (Sane; Saneᴹ; Saneᴸ; Mode; runs; over; Rested; step-rested)
-open import adequacy.Placed.Order using (still; Placed; Placedᴹ; Placedᴸ; Sides)
+open import adequacy.Placed.Order using (still; Placed; Placedᴹ; Placedᴸ; Sides; Within)
 open import adequacy.Placed.Keys using (ahead-quiet)
 open import adequacy.Deep using (Deep; Deepˢ)
 
@@ -696,18 +700,164 @@ mutual
 step-skips : ∀ {A} (g : U.Node [] A) → Sane []ᴬ g → Placed g []ᴬ → U.meaning g []ᴬ ≃ afterᴱ []ᴬ (U.step g)
 step-skips g sn pl = skips g []ᴬ sn pl tt
 
+-- A value changed, a running total or a take keeps its source's stepped
+-- node placed within it.
+map-within : ∀ {Γ A B} (ρ : NEnv Γ) (f : A → B) (s : U.Step Γ A) → Placedˢ ρ s → Withinˢ ρ (U.mapˢ f s)
+map-within ρ f (U.outˢ k a c) (_ , p) = p
+map-within ρ f (U.skipˢ k c)  (_ , p) = p
+map-within ρ f (U.endˢ k)     _       = tt
+map-within ρ f U.hushˢ        _       = tt
+
+scan-within : ∀ {Γ A B} (ρ : NEnv Γ) (f : B → A → B) z (s : U.Step Γ A) → Placedˢ ρ s → Withinˢ ρ (U.scanˢ f z s)
+scan-within ρ f z (U.outˢ k a c) (_ , p) = p
+scan-within ρ f z (U.skipˢ k c)  (_ , p) = p
+scan-within ρ f z (U.endˢ k)     _       = tt
+scan-within ρ f z U.hushˢ        _       = tt
+
+take-within : ∀ {Γ A} (ρ : NEnv Γ) i (p : A → Bool) (s : U.Step Γ A) → Placedˢ ρ s → Withinˢ ρ (U.takeWhileˢ i p s)
+take-within ρ i p (U.outˢ k a c) (_ , pc) = taking i (p a)
+  where
+    taking : ∀ j b → Withinˢ ρ (U.taking j p k a c b)
+    taking j     true  = pc
+    taking true  false = tt
+    taking false false = tt
+take-within ρ i p (U.skipˢ k c)  (_ , pc) = pc
+take-within ρ i p (U.endˢ k)     _        = tt
+take-within ρ i p U.hushˢ        _        = tt
+
+-- A generator steps to a generator, a joiner to itself.
+burst-within : ∀ {Γ A t} (ρ : NEnv Γ) τ r i (b : Frame A t) → Withinˢ ρ (U.burstˢ τ r i b)
+burst-within ρ τ r i (E.emit a k) = tt
+burst-within ρ τ r i (E.stall k)  = tt
+burst-within ρ τ r i (E.close k)  = tt
+
+frames-within : ∀ {Γ A t} (ρ : NEnv Γ) τ e (m : From A t) → Withinˢ ρ (U.framesˢ τ e m)
+frames-within ρ τ e E.done     = tt
+frames-within ρ τ e E.quiet    = tt
+frames-within ρ τ e (E.at t _ b) = burst-within ρ τ _ 0 b
+
+of-within : ∀ {Γ A} (ρ : NEnv Γ) p i (xs : List A) → Withinˢ ρ (U.ofˢ p i xs)
+of-within ρ p i []       = tt
+of-within ρ p i (x ∷ xs) = tt
+
+join-within : ∀ {Γ A} (ρ : NEnv Γ) (i : A ∈ Γ) p xs e → Within (U.joinᶜ i p xs e) ρ → Withinˢ ρ (U.joinˢ i p xs e)
+join-within ρ i p ((q , just a) ∷ xs) e        w = w
+join-within ρ i p ((q , nothing) ∷ xs) e       w = w
+join-within ρ i p []                   (just c) w = tt
+join-within ρ i p []                   nothing  w = tt
+
 postulate
-  -- What a sane, placed ghost's step leaves holds its parts placed.
+  -- What a sane, placed flatMap's step leaves holds its parts placed,
+  -- when its sources are clear of the step.
+  --
+  -- REFUTED: c8c55884 over a placing with each live joiner joined before its source, by a lane admitted past its source's next event
+  flat-within : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} op (g : A → Pos → U.Node Γ B) o ls qs pl (ρ : NEnv Γ)
+              → Sane ν (U.flatMapᶜ op g o ls qs pl) → Placed (U.flatMapᶜ op g o ls qs pl) ρ
+              → Clear ν (U.headˢ (U.step (U.flatMapᶜ op g o ls qs pl))) ρ → Withinˢ ρ (U.step (U.flatMapᶜ op g o ls qs pl))
+
+  -- A connect's step leaves its body and source placed and apart, when
+  -- its sources are clear of the step.
   --
   -- REFUTED: d2d13661 without the step coming first, by a merge whose joiner lane shows its source's earlier event
-  -- REFUTED: c8c55884 over a placing with each live joiner joined before its source, by a lane admitted past its source's next event
   -- DEAD ROUTE: exact agreement with a ghost anchored in its sources'
   --   step history.  The ghost is the witness's open part (`part`), which
   --   keeps no count of a source's steps, and a silent run is matched by
   --   the residual as a set alone (`Ahead`), so no field of the witness
   --   can keep the count a lane's pre-join skips need.
-  within-step : ∀ {A} (g : U.Node [] A) → Sane []ᴬ g → Placed g []ᴬ → Withinˢ []ᴬ (U.step g)
+  connect-within : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ)
+                 → Sane ν (U.connectᶜ r b (U.live s)) → Placed (U.connectᶜ r b (U.live s)) ρ
+                 → Clear ν (U.headˢ (U.step (U.connectᶜ r b (U.live s)))) ρ → Withinˢ ρ (U.step (U.connectᶜ r b (U.live s)))
+  ended-within : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) c t (ρ : NEnv Γ)
+               → Sane ν (U.connectᶜ r b (U.ended c t)) → Placed (U.connectᶜ r b (U.ended c t)) ρ
+               → Clear ν (U.headˢ (U.step (U.connectᶜ r b (U.ended c t)))) ρ → Withinˢ ρ (U.step (U.connectᶜ r b (U.ended c t)))
 
+  -- A defer's program subscribed, its notices fed, is placed.
+  defer-within : ∀ {Γ A} (l : Later Timeline Γ A) p ns (ρ : NEnv Γ) → Placed (U.deferᶜ l p ns) ρ → Withinˢ ρ (U.step (U.deferᶜ l p ns))
+
+-- A rest-like steps to a rest-like.
+union-within : ∀ {Γ B} (ρ : NEnv Γ) (x : U.Node Γ B) sx y sy → Withinˢ ρ sy → Withinˢ ρ (U.unionˢ x sx y sy)
+union-within ρ x (U.skipˢ k x′) y (U.skipˢ k′ y′) _ with k <ᵖ k′
+... | true  = tt
+... | false = tt
+union-within ρ x (U.skipˢ k x′) y (U.outˢ _ _ _) _ = tt
+union-within ρ x (U.skipˢ k x′) y (U.endˢ _)     _ = tt
+union-within ρ x (U.skipˢ k x′) y U.hushˢ        _ = tt
+union-within ρ x (U.outˢ _ _ _) y sy w = w
+union-within ρ x (U.endˢ _)     y sy w = w
+union-within ρ x U.hushˢ        y sy w = w
+
+under-within : ∀ {Γ A B C} (ρ : NEnv Γ) (s : U.Source Γ A) (b : U.Step (A ∷ Γ) C) → Withinˢ ρ (U.underˢ {B = B} s b)
+under-within ρ s (U.skipˢ k b)  = tt
+under-within ρ s (U.outˢ _ _ _) = tt
+under-within ρ s (U.endˢ _)     = tt
+under-within ρ s U.hushˢ        = tt
+
+mutual
+  rest-within : ∀ {Γ A B} (ρ : NEnv Γ) (n : U.Node Γ A) → Withinˢ ρ (U.restˢ {B = B} n)
+  rest-within ρ (U.mapᶜ f c)         = rest-within ρ c
+  rest-within ρ (U.scanᶜ f z c)      = rest-within ρ c
+  rest-within ρ (U.takeWhileᶜ i p c) = rest-within ρ c
+  rest-within ρ (U.flatMapᶜ op g o ls qs p) =
+    union-within ρ (U.outerᶜ o) (U.restᴹ o) _ _ (union-within ρ (U.restsᶜ ls) (U.restsˢ ls) (U.restᶜ p) (U.restˢ p) (rest-within ρ p))
+  rest-within ρ (U.connectᶜ {B = C} r b (U.live s))    = union-within ρ _ (U.burstsˢ r s (U.step s)) _ _ (under-within ρ (U.live s) (U.restˢ {B = C} b))
+  rest-within ρ (U.connectᶜ {B = C} r b (U.ended c t)) = union-within ρ _ (U.burstsˢ r t (U.step t)) _ _ (under-within ρ (U.ended c t) (U.restˢ {B = C} b))
+  rest-within ρ (U.endingᶜ p n)      = rest-within ρ n
+  rest-within ρ (U.restᶜ n)          = rest-within ρ n
+  rest-within ρ (U.unionᶜ x y)       = union-within ρ (U.restᶜ x) (U.restˢ x) (U.restᶜ y) (U.restˢ y) (rest-within ρ y)
+  rest-within ρ (U.burstingᶜ r t)    = bursts-within ρ r t (U.step t)
+  rest-within ρ (U.underᶜ {C = C} s b) = under-within ρ s (U.restˢ {B = C} b)
+  rest-within ρ (U.framesᶜ τ e m)    = tt
+  rest-within ρ (U.burstᶜ τ r i b)   = tt
+  rest-within ρ (U.ofᶜ p i xs)       = tt
+  rest-within ρ (U.joinᶜ i p xs e)   = tt
+  rest-within ρ (U.deferᶜ l p ns)    = tt
+  rest-within ρ U.idleᶜ              = tt
+
+  bursts-within : ∀ {Γ A B} (ρ : NEnv Γ) r (t : U.Node Γ A) st → Withinˢ ρ (U.burstsˢ {B = B} r t st)
+  bursts-within ρ r t (U.outˢ k _ t′) with E.inside r k
+  ... | true  = tt
+  ... | false = rest-within ρ t
+  bursts-within ρ r t (U.skipˢ k t′) with E.inside r k
+  ... | true  = tt
+  ... | false = rest-within ρ t
+  bursts-within ρ r t (U.endˢ _) = rest-within ρ t
+  bursts-within ρ r t U.hushˢ    = rest-within ρ t
+
+-- WHAT A STEP LEAVES IS PLACED WITHIN, when its sources are clear of it.
+mutual
+  withins : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (c : U.Node Γ A) (ρ : NEnv Γ) → Sane ν c → Placed c ρ
+          → Clear ν (U.headˢ (U.step c)) ρ → Withinˢ ρ (U.step c)
+  withins (U.framesᶜ τ e m)  ρ _ _ _ = frames-within ρ τ e m
+  withins (U.burstᶜ τ r i b) ρ _ _ _ = burst-within ρ τ r i b
+  withins (U.ofᶜ p i xs)     ρ _ _ _ = of-within ρ p i xs
+  withins {ν = ν} (U.mapᶜ f c) ρ sn (_ , pl) cl =
+    map-within ρ f (U.step c) (placeds c ρ sn pl (subst (λ h → Clear ν h ρ) (head-map f (U.step c)) cl))
+  withins {ν = ν} (U.scanᶜ f z c) ρ sn (_ , pl) cl =
+    scan-within ρ f z (U.step c) (placeds c ρ sn pl (subst (λ h → Clear ν h ρ) (head-scan f z (U.step c)) cl))
+  withins {ν = ν} (U.takeWhileᶜ i p c) ρ sn (_ , pl) cl =
+    take-within ρ i p (U.step c) (placeds c ρ sn pl (clear-take {ν = ν} {ρ = ρ} i p (U.step c) cl))
+  withins (U.flatMapᶜ op g o ls qs pl) ρ sn pd cl = flat-within op g o ls qs pl ρ sn pd cl
+  withins (U.joinᶜ i p xs e) ρ _ (_ , w) _ = join-within ρ i p xs e w
+  withins (U.connectᶜ r b (U.live s))    ρ sn pd cl = connect-within r b s ρ sn pd cl
+  withins (U.connectᶜ r b (U.ended c t)) ρ sn pd cl = ended-within r b c t ρ sn pd cl
+  withins (U.deferᶜ l p ns)  ρ _ pd _ = defer-within l p ns ρ pd
+  withins (U.endingᶜ p n)    ρ _ _ _  = tt
+  withins (U.restᶜ n)        ρ _ _ _  = rest-within ρ n
+  withins U.idleᶜ            ρ _ _ _  = tt
+  withins (U.unionᶜ x y)     ρ _ _ _  = union-within ρ x (U.restˢ x) y (U.restˢ y) (rest-within ρ y)
+  withins (U.burstingᶜ r t)  ρ _ _ _  = bursts-within ρ r t (U.step t)
+  withins (U.underᶜ {C = C} s b) ρ _ _ _ = under-within ρ s (U.restˢ {B = C} b)
+
+  placeds : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (c : U.Node Γ A) (ρ : NEnv Γ) → Sane ν c → Placed c ρ
+          → Clear ν (U.headˢ (U.step c)) ρ → Placedˢ ρ (U.step c)
+  placeds c ρ sn pl cl = placed-step ρ (U.step c) (skips c ρ sn pl cl) (proj₁ pl) (withins c ρ sn pl cl)
+
+-- What a sane, placed ghost's step leaves holds its parts placed: at the
+-- root no source is in scope.
+within-step : ∀ {A} (g : U.Node [] A) → Sane []ᴬ g → Placed g []ᴬ → Withinˢ []ᴬ (U.step g)
+within-step g sn pl = withins g []ᴬ sn pl tt
+
+postulate
   -- What a sane, placed ghost in order to every depth steps to is in
   -- order to every depth: the stepped node runs what the meaning runs
   -- past the step, and a rest the step opens is a part it held.
