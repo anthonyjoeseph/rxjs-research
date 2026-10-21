@@ -443,7 +443,7 @@ module ShiftWalk (R : Set) where
 
       mutual
         told : ∀ {Δ A} {t : Sub h Δ A} (π : Path t u) → AllPairs _≢_ (names t) → Ended H t
-             → ∀ {K} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → Binds H π K j c → E j c)
+             → ∀ {K : Pred Δ} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → Binds H π K j c → E j c)
              → ∀ {C} (i : C ∈ᴸ Δ) → K i ω → ∀ {b₀ b′} → At.part H t ≡ just b₀ → At.part H′ (plant π v) ≡ just b′ → untold i b′ ⊑[ q / ω ] untold i b₀
         told here ps en κ i wk e₀ e′ = tl₀ i (κ i wk) e₀ e′
         told (in-map {f = f} {t = s} π) ps en κ i wk e₀ e′ =
@@ -480,7 +480,7 @@ module ShiftWalk (R : Set) where
         told (in-defer {k = k} π) ps en κ i wk e₀ e′ = told π (pairs-r (quietName k) ps) (en-sub H en (in-defer here) refl) κ i wk e₀ e′
 
         toldL : ∀ {Δ B} {ls : List (Lane h Δ B)} (πL : PathLanes ls u) → AllPairs _≢_ (laneNames ls) → EndedL H ls
-              → ∀ {K} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → BindsL H πL K j c → E j c)
+              → ∀ {K : Pred Δ} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → BindsL H πL K j c → E j c)
               → ∀ {C} (i : C ∈ᴸ Δ) → K i ω → untoldᴸ i (At.partLanes H′ (plantᴸ πL v)) ⊑[ q / ω ] untoldᴸ i (At.partLanes H ls)
         toldL (this-lane {c = c} {k} {t = s} {ls} π) ps en κ i wk =
           lane-told i Th.live′ (At.part H s) (At.part H′ (plant π v)) (At.partLanes H ls) (At.partLanes H′ ls)
@@ -560,7 +560,7 @@ module ShiftWalk (R : Set) where
 
       mutual
         shiftE : ∀ {Δ A} {t : Sub h Δ A} (π : Path t u) → AllPairs _≢_ (names t) → Each H P t → Untold H q t → Ended H t
-               → ∀ {K} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → Binds H π K j c → E j c) → Each H′ P (plant π v)
+               → ∀ {K : Pred Δ} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → Binds H π K j c → E j c) → Each H′ P (plant π v)
         shiftE here ps ev ut en κ = bl₀ ev
         shiftE (in-map {f = f} {t = s} π) ps ev ut en κ =
           BH.each-map (lift-ᴹ H′ (U.mapᶜ f) (At.part H′ (plant π v)) (λ c → heads-map f {c}) (Each.parts es here refl)) es
@@ -657,7 +657,7 @@ module ShiftWalk (R : Set) where
             es = shiftE π (pairs-r (quietName k) ps) (each-sub ev (in-defer here) refl) (ut-sub H ut (in-defer here) refl) (en-sub H en (in-defer here) refl) κ
 
         shiftL : ∀ {Δ B} {ls : List (Lane h Δ B)} (πL : PathLanes ls u) → AllPairs _≢_ (laneNames ls) → EachL H P ls → UntoldL H q ls → EndedL H ls
-               → ∀ {K} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → BindsL H πL K j c → E j c) → EachL H′ P (plantᴸ πL v)
+               → ∀ {K : Pred Δ} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → BindsL H πL K j c → E j c) → EachL H′ P (plantᴸ πL v)
         shiftL (this-lane {c = c} {k} {t = s} {ls} π) ps eL ut en κ =
           BH.eachL-cons (λ lv → shiftE π Th.fresh (eachL-head H eL (Th.on lv)) (utL-head H ut (Th.on lv)) (enL-head H en (Th.on lv)) κ)
                         (eachL-alike H H′ Th.restA (eachL-tail H eL))
