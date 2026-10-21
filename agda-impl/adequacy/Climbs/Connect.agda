@@ -153,6 +153,12 @@ module ClimbConnect (R : Set) where
   conn-≡ G G′ r (just _) t nothing  (just _) = refl
   conn-≡ G G′ r nothing  t nothing  (just _) = refl
 
+  -- No connect under `s` still in its subscribe burst at `q`: each
+  -- subscribed its source before `q`, and `q` lies outside it.
+  Shut : ∀ {h Δ A} → Pos → Sub h Δ A → Set₁
+  Shut {h} q s = ∀ {Δ′ A′ B′ S′ c′ b′ kb′ k′ fd rp′ e′ rt′} {src : Sub h Δ′ A′} {bd′ : Sub h (A′ ∷ Δ′) B′}
+               → Path s (connectˢ S′ c′ b′ kb′ k′ fd rp′ e′ rt′ src bd′) → rp′ <ᵖ q ≡ true × Ev.inside rp′ q ≡ false
+
   -- A CONNECT'S FEED RESTAGED IN PLACE: the source alike, the body
   -- retagged by what the feed owes it.
   module Refed {h} (G : Heapᴹ h) {Δ A B Sj c b kb k rp e rt} {u : Sub h Δ A} {bd : Sub h (A ∷ Δ) B} (fd′ : Feed A h) (q : Pos) where
@@ -284,12 +290,20 @@ module ClimbConnect (R : Set) where
     fed-heading : Heading H H q w₀ v
     fed-heading = Re.heading
 
-    -- What the connect leaves, the feed restaged: its source still
-    -- holds the value, so a joiner reached through a nested source's
-    -- burst reads it from the source before and holds it after.
+    -- What the connect leaves, the feed restaged.  A joiner is read in a
+    -- leftover only through a nested connect's burst, where the fed one
+    -- shows the value `put` prepends and the unfed one only what its
+    -- source's part still holds.  Both sides cut to idle where the fed
+    -- position `q ++ [ sub j ]`
+    -- lies outside every burst in the body (`Shut`), which no `Calling`
+    -- field states yet.
     postulate
-      fed-rested : At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T
-                 → ∀ {C} → Twin (At.leftover H {B = C} w₀) (At.leftover H {B = C} v)
+      fed-calm    : At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T → Shut q bd
+      fed-calm-tw : Shut q bd → ∀ {C} → Twin (At.leftover H {B = C} w₀) (At.leftover H {B = C} v)
+
+    fed-rested : At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T
+               → ∀ {C} → Twin (At.leftover H {B = C} w₀) (At.leftover H {B = C} v)
+    fed-rested jn mn bh {C} = fed-calm-tw (fed-calm jn mn bh) {C}
 
     fed-lingering : At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T → Lingering H H w₀ v
     fed-lingering jn mn bh = Re.lingering (λ {C} → fed-rested jn mn bh {C})
@@ -543,12 +557,15 @@ module ClimbConnect (R : Set) where
     fin-heading : AllPairs _≢_ (names w₀) → Heading H H′ q w₀ v
     fin-heading fr = heading-∘ (fin-kept fr) Re.heading
 
-    -- What the connect leaves, the finish restaged: the source's end
-    -- read by a joiner through a nested source's burst before, held
-    -- after.
+    -- What the connect leaves, the finish restaged, as the feed's: a
+    -- joiner told its end differs only inside a nested connect's burst.
     postulate
-      fin-rested : At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T
-                 → ∀ {C} → Twin (At.leftover H′ {B = C} w₀) (At.leftover H′ {B = C} v)
+      fin-calm    : At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T → Shut q bd
+      fin-calm-tw : Shut q bd → ∀ {C} → Twin (At.leftover H′ {B = C} w₀) (At.leftover H′ {B = C} v)
+
+    fin-rested : At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T
+               → ∀ {C} → Twin (At.leftover H′ {B = C} w₀) (At.leftover H′ {B = C} v)
+    fin-rested jn mn bh {C} = fin-calm-tw (fin-calm jn mn bh) {C}
 
     fin-lingering : AllPairs _≢_ (names w₀) → At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T → Lingering H H′ w₀ v
     fin-lingering fr jn mn bh = lingering-∘ (fin-lkept fr) (Re.lingering (λ {C} → fin-rested jn mn bh {C}))
