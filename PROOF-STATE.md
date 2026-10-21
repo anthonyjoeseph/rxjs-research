@@ -10,13 +10,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ROOT STEP
 
-Whether a node stepping past `k` among sources clear of `k` shows nothing
-before `k` (inductive only beside a non-strict twin, unstated); whether a connect's body never
+Whether a node's meaning starts with its step's event, else past a running
+source's shown event (a take turns on a tied value); whether a connect's body never
 steps at or just past its source's step (no invariant yet carries it);
 whether a hushed node leaves nothing running; the step's parts placed.
-Settled when `floor`, `shy-before` and `hushed-cut` are bodies or refuted.
+Settled when `first`, `shy-before` and `hushed-cut` are bodies or refuted.
 
-Members: `floor`, `shy-before`, `hushed-cut`, `within-step`,
+Members: `first`, `shy-before`, `hushed-cut`, `within-step`,
 `under-shown-connect`.
 
 #### UP-ENDED
