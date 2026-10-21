@@ -240,6 +240,13 @@ module ClimbFlat (R : Set) where
   told-split : ∀ (xs ys zs : List Pos) {ws} → xs ⊆ᴾ ws → ys ⊆ᴾ ws → zs ⊆ᴾ ws → (xs ++ ys ++ zs) ⊆ᴾ ws
   told-split xs ys zs sx sy sz m = [ sx , (λ m′ → [ sy , sz ]′ (∈-++⁻ ys m′)) ]′ (∈-++⁻ xs m)
 
+  -- A pool taking a rest beside it leaves untold what the flatMap's part
+  -- did, when the rest does.
+  rest-pool-told : ∀ {h} (G : Heapᴹ h) {Δ A B C D} op (g : A → Pos → U.Node Δ B) o L Q pl (l : U.Node Δ D) (i : C ∈ᴸ Δ) {b₀}
+                 → At.merged G op g o L Q pl ≡ just b₀ → untold i l ⊆ᴾ untold i b₀ → untold i (U.unionᶜ pl (U.restᶜ l)) ⊆ᴾ untold i b₀
+  rest-pool-told G op g o L Q pl l i e sl m =
+    [ (λ m′ → ≡-⊆ (cong (untold i) (merged-eq G op g o L Q pl e)) (++⁺ʳ (untoldᴹ i o) (++⁺ʳ (untoldᴸ i L) m′))) , sl ]′ (∈-++⁻ (untold i pl) m)
+
   -- A FLATMAP'S POOL RESTAGED: the node at the path's end with a new
   -- pool, the calls, the stack and every field carried across.
   module Restaged {h} (H : Heapᴹ h) {T : Sub h [] R} {Δ A B op f fl oc k r pl} {u : Sub h Δ A} {ls : List (Lane h Δ B)}
@@ -726,8 +733,16 @@ module ClimbFlat (R : Set) where
           (lv-trans (proj₁ (tw-rest o₀))
             (lv-trans lo (proj₁ (tw-trans (tw-leftover H u) (tw-alike (leftover-alike H (Settles.H′ H ρ) u P.so-al)))))))
 
+    -- The outer's rest leaves untold only joiners the flatMap's part still
+    -- holds untold.  Suspect: the outer has ended, so its part holds
+    -- nothing, and `o₀` is tied only by `lo`; a connect in the outer whose
+    -- body ended with its source still pending leaves that source's joiner
+    -- in `o₀`'s rest, in no part beside it.
     postulate
-      close-told  : ∀ {A′} (i : A′ ∈ᴸ Δ) {b₀} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just b₀ → untold i pl′ ⊆ᴾ untold i b₀
+      close-rest-told : ∀ {A′} (i : A′ ∈ᴸ Δ) {b₀} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just b₀ → untold i o₀ ⊆ᴾ untold i b₀
+
+    close-told : ∀ {A′} (i : A′ ∈ᴸ Δ) {b₀} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just b₀ → untold i pl′ ⊆ᴾ untold i b₀
+    close-told i e = rest-pool-told H op (λ a j → U.subscribe (f a) j) (At.part H u) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl o₀ i e (close-rest-told i e)
 
     close-heads : ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just c → Heads q pl → Heads q pl′
     close-heads e₀ = pool-heads o₀ (proj₂ (Lingers.pools (Calling.lingers cl) ρ (lifts-seen L) e₀)) lo (Calling.rest-heads cl)

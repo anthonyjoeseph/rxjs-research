@@ -121,7 +121,7 @@ module ClimbLanesQueue (R : Set) where
   open Read
   open ClimbBase R using (lifts-planted; lefts-planted; merged-queued; merged-kept; healed-off; module Framed; flat-stays; heads-union)
   open ClimbTake R using (rise; open-code; writes; reads)
-  open ClimbFlat R using (calling-open; opened-⊕; shut-code; settledᵒ; settleᵒ₂; settleᵒ₁; flat-gone; merged-pool; heading-∘; lingering-∘; pool-heads; lanes-one; ghost-lift; startAt; module Restaged; module Settles)
+  open ClimbFlat R using (rest-pool-told; calling-open; opened-⊕; shut-code; settledᵒ; settleᵒ₂; settleᵒ₁; flat-gone; merged-pool; heading-∘; lingering-∘; pool-heads; lanes-one; ghost-lift; startAt; module Restaged; module Settles)
   open ClimbFlatPlant R using (pending-flags; queue-open; apart-unplant; lane-begin)
   open ClimbLanes R using (module Freed; at-val; climb-lanes; dequeueAt; freed; holds-walk; lane-live; lane-lefts; lane-step; laneEnd; laneOf; lanes-gone; one-open; one-outers; queue-freed; queue-stored; refill-freed; refillAt; sendStep; slot-freed; unlive; walk-lane)
 
@@ -450,8 +450,16 @@ module ClimbLanesQueue (R : Set) where
     fs  = Books.fresh (Calling.books cl)
     fr  = fresh-path ρ fs
 
+    -- The ended lane's rest leaves untold only joiners the flatMap's part
+    -- still holds untold.  Suspect: the freed lane is in no part, and `l`
+    -- is tied only by `ll`; a connect in the lane whose body ended with
+    -- its source still pending leaves that source's joiner in `l`'s rest,
+    -- in no part beside it.
     postulate
-      settle-told     : ∀ {A′} (i : A′ ∈ᴸ Δ) {b₀} → At.part H₂ w₀ ≡ just b₀ → untold i pl′ ⊆ᴾ untold i b₀
+      settle-rest-told : ∀ {A′} (i : A′ ∈ᴸ Δ) {b₀} → At.part H₂ w₀ ≡ just b₀ → untold i l ⊆ᴾ untold i b₀
+
+    settle-told : ∀ {A′} (i : A′ ∈ᴸ Δ) {b₀} → At.part H₂ w₀ ≡ just b₀ → untold i pl′ ⊆ᴾ untold i b₀
+    settle-told i e = rest-pool-told H₂ op (λ a j → U.subscribe (f a) j) (At.part H₂ t) (At.partLanes H₂ ls) (At.val H₂ (FlatKit.Flat.queue fl)) pl l i e (settle-rest-told i e)
 
     settle-lingering : Lingering H H₂ w₀ v
     settle-lingering = Freed.fr-settled H ρ o fr l (lane-lefts o LL ll) (lane-live o LL)

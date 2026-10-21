@@ -10,15 +10,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE REST'S TIES
 
-An ended part's rest stays twinned with what the heap keeps. Open: whether
-what an ended part's siblings leave running heads past the run (an ended
-outer, the other lanes, a connect's burst), as hidden runs may not, and
-whether a pool's untold sources follow, though `Lifts` leaves the closed node
-free and only its rest is tied. Settled when `others-heads` and
-`settle-told` are bodies, or one is refuted.
+Suspect fact: an ended outer's or lane's rest leaves untold only joiners
+the flatMap's part still holds, though the ended sub is in no part; a
+connect whose body ends before its pending source subscribes leaves the
+joiner only in the rest. Open too: whether its siblings' rests head past the
+run, as hidden runs may not. Settled when `settle-rest-told` is a body or
+refuted with a witness, and `others-heads` is a body.
 
-Members: `others-heads`, `outer-ended-heads`, `lanes-rest-heads`,
-`body-burst-heads`, `rest-sourced`, `close-told`, `settle-told`,
+Members: `settle-rest-told`, `close-rest-told`, `others-heads`,
+`outer-ended-heads`, `lanes-rest-heads`, `body-burst-heads`, `rest-sourced`,
 `take-leftover`, `body-leftover`.
 
 #### SOURCE-CALL POSITIONS
