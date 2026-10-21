@@ -831,7 +831,6 @@ module ClimbFlatPlant (R : Set) where
       ; opens = proj₂ (∧-split _ (trans (sym (opened-⊕ hp true ρ (in-outer here))) (calling-open (ρ ⊕ in-outer here) cl)))
       ; stack = sk
       ; lifted = S , subst (λ o → Lifts hp ρ (skp o) S) (sym pv) (subst (λ s′ → Lifts hp ρ s′ S) adm Lρ) , sg
-      ; rest-heads = tt
       ; lefts = lefts-subst skp (sym pv) (lefts-subst (λ s′ → s′) adm (lefts-up ρ (in-outer here) eqO lt))
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
