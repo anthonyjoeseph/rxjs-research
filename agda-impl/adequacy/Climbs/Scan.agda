@@ -17,6 +17,7 @@ open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈�
 open import Level using (lift)
 open import Data.Maybe using (Maybe; just; nothing; is-nothing; is-just) renaming (map to mapMaybe)
 open import Data.Product using (_,_; proj₁; proj₂)
+open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst)
 
 open import denotation.MonotonicList.Events using (Events∞; Timeline)

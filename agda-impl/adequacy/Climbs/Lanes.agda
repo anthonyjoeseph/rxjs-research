@@ -21,7 +21,7 @@ open import Level using (lift; lower)
 open import Data.Maybe using (Maybe; just; nothing; is-nothing; is-just) renaming (map to mapMaybe)
 open import Data.Nat using (suc; pred)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
-open import Data.Unit using (⊤)
+open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import denotation.MonotonicList.Events using (Events∞; Pos; Timeline)
