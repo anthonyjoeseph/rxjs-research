@@ -245,8 +245,9 @@ postulate
   floor : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (c : U.Node Γ A) (ρ : NEnv Γ) k → Sane ν c → Placed c ρ
         → U.beforeˢ k (U.step c) ≡ true → Floor ν k ρ → M′.before k (U.meaning c ρ) ≡ true
 
-  -- A connect's body stepping no later than its source's step, among
-  -- sources clear of the body's step: the source's meaning shows past it.
+  -- A connect's body stepping no later than its source's step steps
+  -- strictly before it: no body event lies at the source's step or where
+  -- it shows.
   --
   -- DEAD ROUTE: exact agreement with a ghost anchored in its sources'
   --   step history.  The ghost is the witness's open part (`part`), which
@@ -254,9 +255,9 @@ postulate
   --   the residual as a set alone (`Ahead`), so no field of the witness
   --   can keep the count a lane's pre-join skips need.
   -- RECOVERY: git show 43da74d9:agda-impl/adequacy/Stepper.agda restores the stepper over a meaning with no tails, node by node
-  shy-clear : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ)
-            → Sane (runs ∷ᴬ ν) b → Sane ν s → Placed b (U.meaning s ρ ∷ᴬ ρ) → Placed s ρ → Shy (U.step b) (U.step s)
-            → Clear ν (U.headˢ (U.step b)) ρ → Clearᴱ (U.headˢ (U.step b)) (U.meaning s ρ)
+  shy-before : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ)
+             → Sane (runs ∷ᴬ ν) b → Sane ν s → Placed b (U.meaning s ρ ∷ᴬ ρ) → Placed s ρ → Shy (U.step b) (U.step s)
+             → ∀ k → U.headˢ (U.step b) ≡ just k → U.beforeˢ k (U.step s) ≡ true
 
   -- A node that never shows again leaves nothing running when cut.
   hushed-cut : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (s : U.Node Γ A) (ρ : NEnv Γ) → Sane ν s → Placed s ρ
@@ -432,16 +433,53 @@ module BodyFirst {Γ A B} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NE
   main t@(U.endˢ k) (skip q τ) eq al ce hc d = shown eq (q ++ [ ix 0 ]) (λ _ → refl) t al (trans (before-agree (q ++ [ ix 0 ]) (agreeing al 1)) (<ᵖ-asym k (q ++ [ ix 0 ]) ce)) d
   main t@(U.endˢ k) (end q) eq al ce hc d = shown eq (q ++ [ ix 0 ]) (λ _ → refl) t al (trans (before-agree (q ++ [ ix 0 ]) (agreeing al 1)) (<ᵖ-asym k (q ++ [ ix 0 ]) ce)) d
 
+-- Of no step, a step hushed.
+head-none : ∀ {Γ A} (t : U.Step Γ A) → U.headˢ t ≡ nothing → t ≡ U.hushˢ
+head-none U.hushˢ refl = refl
+
+-- A meaning showing nothing before `k` shows past `k`.
+shown-past : ∀ {A} k (e : Events A) → M′.before k e ≡ true → Clearᴱ (just k) e
+shown-past k hush        h = tt
+shown-past k (out q a σ) h = <ᵖ-trans k q (q ++ [ ix 0 ]) h (<ᵖ-below q [])
+shown-past k (skip q σ)  h = <ᵖ-trans k q (q ++ [ ix 0 ]) h (<ᵖ-below q [])
+shown-past k (end c)     h = <ᵖ-trans k c (c ++ [ ix 0 ]) h (<ᵖ-below c [])
+
+-- A hushed body beside a source whose step is hushed too.
+quiet : ∀ {Δ Γ A C} {ν : All (λ _ → Mode) Γ} (s : U.Node Γ A) (ρ : NEnv Γ) → Skips ν s ρ → Clear ν nothing ρ
+      → ∀ t → U.step s ≡ t → Shy {Δ = Δ} {B = C} U.hushˢ t → Clearᴱ nothing (U.meaning s ρ)
+quiet {ν = ν} s ρ sks cl U.hushˢ es _ =
+  subst (Clearᴱ nothing) (sym (agreed (agreeing (sks (subst (λ t → Clear ν (U.headˢ t) ρ) (sym es) cl)) 1) es)) tt
+  where agreed : ∀ {x} → Agree 1 x (afterᴱ ρ (U.step s)) → U.step s ≡ U.hushˢ → x ≡ hush
+        agreed a e with U.step s | e
+        agreed hush⁼ e | .U.hushˢ | refl = refl
+quiet s ρ sks cl (U.outˢ q a s′) es ()
+quiet s ρ sks cl (U.skipˢ q s′)  es ()
+quiet s ρ sks cl (U.endˢ c)      es ()
+
+-- A connect's body stepping no later than its source's step, among
+-- sources clear of the body's step: the source's meaning shows past it.
+shy-clear : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ)
+          → Sane (runs ∷ᴬ ν) b → Sane ν s → Placed b (U.meaning s ρ ∷ᴬ ρ) → Placed s ρ → Skips ν s ρ → Shy (U.step b) (U.step s)
+          → Clear ν (U.headˢ (U.step b)) ρ → Clearᴱ (U.headˢ (U.step b)) (U.meaning s ρ)
+shy-clear {ν = ν} b s ρ sb ss pb ps sks shy cl with U.headˢ (U.step b) in hb
+... | just k  = shown-past k (U.meaning s ρ) (floor s ρ k ss ps (shy-before b s ρ sb ss pb ps shy k hb) (clear-floor ν ρ cl))
+... | nothing = quiet {ν = ν} s ρ sks cl (U.step s) refl (subst (λ t → Shy t (U.step s)) (head-none (U.step b) hb) shy)
+
 -- A connect's body showing first: what it shows, the source carried.
 body-skips : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ)
            → Sane (runs ∷ᴬ ν) b → Sane ν s → Placed b (U.meaning s ρ ∷ᴬ ρ) → Placed s ρ
-           → Skips (runs ∷ᴬ ν) b (U.meaning s ρ ∷ᴬ ρ) → Shy (U.step b) (U.step s)
+           → Skips (runs ∷ᴬ ν) b (U.meaning s ρ ∷ᴬ ρ) → Skips ν s ρ → Shy (U.step b) (U.step s)
            → Clear ν (U.headˢ (U.bodyˢ r (U.live s) (U.step b))) ρ
            → U.meaning (U.connectᶜ r b (U.live s)) ρ ≃ afterᴱ ρ (U.bodyˢ r (U.live s) (U.step b))
-body-skips {ν = ν} r b s ρ sb ss pb ps skb shy cl =
+body-skips {ν = ν} r b s ρ sb ss pb ps skb sks shy cl =
   alike (BodyFirst.main r b s ρ (U.step b) (U.meaning s ρ) refl (skb (ce , cl′)) ce (λ eq → hushed-cut s ρ ss ps eq))
   where cl′ = subst (λ h → Clear ν h ρ) (head-body r (U.live s) (U.step b)) cl
-        ce  = shy-clear b s ρ sb ss pb ps shy cl′
+        ce  = shy-clear b s ρ sb ss pb ps sks shy cl′
+
+-- A node's skips, read off its step.
+back : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} {s : U.Node Γ A} {ρ : NEnv Γ} {t} → U.step s ≡ t
+     → (Clear ν (U.headˢ t) ρ → U.meaning s ρ ≃ afterᴱ ρ t) → Skips ν s ρ
+back refl k = k
 
 -- A connect runs its source's step first when it shows before the
 -- body's, the body fed it; else the body's.
@@ -451,15 +489,15 @@ connect-skips : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ 
 connect-skips {ν = ν} r b s ρ (sb , ss) pl skb sks cl with U.step s in es
 ... | U.outˢ q a s′ with U.beforeˢ (q ++ [ ix 0 ]) (U.step b) in fb
 ...   | true  = SourceFirst.fed-first r b s ρ sb (proj₁ (proj₂ pl)) q (just a) s′ (sks (clear-lower ν ρ (<ᵖ-below q []) cl)) fb cl
-...   | false = body-skips r b s ρ sb ss (proj₁ (proj₂ pl)) (proj₂ (proj₂ pl)) skb (subst (Shy (U.step b)) (sym es) fb) cl
+...   | false = body-skips r b s ρ sb ss (proj₁ (proj₂ pl)) (proj₂ (proj₂ pl)) skb (back {ν = ν} {s = s} {ρ = ρ} es sks) (subst (Shy (U.step b)) (sym es) fb) cl
 connect-skips {ν = ν} r b s ρ (sb , ss) pl skb sks cl | U.skipˢ q s′ with U.beforeˢ (q ++ [ ix 0 ]) (U.step b) in fb
 ...   | true  = SourceFirst.fed-first r b s ρ sb (proj₁ (proj₂ pl)) q nothing s′ (sks (clear-lower ν ρ (<ᵖ-below q []) cl)) fb cl
-...   | false = body-skips r b s ρ sb ss (proj₁ (proj₂ pl)) (proj₂ (proj₂ pl)) skb (subst (Shy (U.step b)) (sym es) fb) cl
+...   | false = body-skips r b s ρ sb ss (proj₁ (proj₂ pl)) (proj₂ (proj₂ pl)) skb (back {ν = ν} {s = s} {ρ = ρ} es sks) (subst (Shy (U.step b)) (sym es) fb) cl
 connect-skips {ν = ν} r b s ρ (sb , ss) pl skb sks cl | U.endˢ c with U.beforeˢ (c ++ [ ix 0 ]) (U.step b) in fb
 ...   | true  = SourceFirst.shut-first r b s ρ sb (proj₁ (proj₂ pl)) c (sks (clear-lower ν ρ (<ᵖ-below c []) cl)) fb cl
-...   | false = body-skips r b s ρ sb ss (proj₁ (proj₂ pl)) (proj₂ (proj₂ pl)) skb (subst (Shy (U.step b)) (sym es) fb) cl
+...   | false = body-skips r b s ρ sb ss (proj₁ (proj₂ pl)) (proj₂ (proj₂ pl)) skb (back {ν = ν} {s = s} {ρ = ρ} es sks) (subst (Shy (U.step b)) (sym es) fb) cl
 connect-skips {ν = ν} r b s ρ (sb , ss) pl skb sks cl | U.hushˢ =
-  body-skips r b s ρ sb ss (proj₁ (proj₂ pl)) (proj₂ (proj₂ pl)) skb (subst (Shy (U.step b)) (sym es) tt) cl
+  body-skips r b s ρ sb ss (proj₁ (proj₂ pl)) (proj₂ (proj₂ pl)) skb (back {ν = ν} {s = s} {ρ = ρ} es sks) (subst (Shy (U.step b)) (sym es) tt) cl
 
 -- Node by node, each part stepping as it does alone.
 --
