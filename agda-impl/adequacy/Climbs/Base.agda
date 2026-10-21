@@ -302,7 +302,7 @@ module ClimbBase (R : Set) where
     body-rest-heads : Heads (Conf.pos (Mach.conf m₁)) (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} (connectˢ Sj c b kb k fd rp e rt t u)))
     body-rest-heads =
       heads-union (U.restᶜ {B = ⊤} (U.burstingᶜ {B = ⊤} rp n)) (U.restˢ (U.burstingᶜ {B = ⊤} rp n))
-                  (U.restᶜ {B = ⊤} (U.underᶜ {C = ⊤} (U.live n) (At.leftover H {B = ⊤} u))) (U.restˢ (U.underᶜ {C = ⊤} (U.live n) (At.leftover H {B = ⊤} u)))
+                  (U.restᶜ {B = ⊤} (U.underᶜ {B = ⊤} {C = ⊤} (U.live n) (At.leftover H {B = ⊤} u))) (U.restˢ (U.underᶜ {B = ⊤} {C = ⊤} (U.live n) (At.leftover H {B = ⊤} u)))
                   body-burst-heads (heads-under (U.live n) (U.restˢ {B = ⊤} (At.leftover H {B = ⊤} u)) (Calling.rest-heads cl))
 
   -- A signal out of a connect's body.  A value as it is: beside its
