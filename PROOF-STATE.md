@@ -11,11 +11,11 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE REST'S TIES
 
 Undecided invariant: an ended outer's or lane's rest tells its joiners past
-the run wherever the flatMap's part does, though the ended sub is in no part.
-True only if a pending source never outlives the run that subscribed its
-connect. Open too: whether its siblings' rests head past the run, as hidden
-runs may not. Settled when `settle-rest-told` is a body or refuted with a
-witness, and `others-heads` is a body.
+the run at each ended binder's end wherever the flatMap's part does, though
+the ended sub is in no part. True only if a pending source never outlives the
+run that subscribed its connect. Open too: whether its siblings' rests head
+past the run, as hidden runs may not. Settled when `settle-rest-told` is a
+body or refuted with a witness, and `others-heads` is a body.
 
 Members: `settle-rest-told`, `close-rest-told`, `others-heads`,
 `outer-ended-heads`, `lanes-rest-heads`, `body-burst-heads`, `rest-sourced`,

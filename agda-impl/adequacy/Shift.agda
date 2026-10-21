@@ -68,18 +68,25 @@ module Shifting (R : Set) where
   ++-mono : ∀ xs xs′ {ys ys′} → xs′ ⊆ᴾ xs → ys′ ⊆ᴾ ys → (xs′ ++ ys′) ⊆ᴾ (xs ++ ys)
   ++-mono xs xs′ {ys} sx sy m = [ (λ a → ++⁺ˡ {xs = xs} {ys = ys} (sx a)) , (λ b → ++⁺ʳ xs (sy b)) ]′ (++⁻ xs′ m)
 
-  -- Joiners that tell past `q` at every end `ys`'s joiners do.
-  _⊑[_]_ : List Pos → Pos → List Pos → Set
-  xs ⊑[ q ] ys = ∀ {c} → Tells q c ys → Tells q c xs
+  -- Joiners that tell past `q` at the end `c` if `ys`'s joiners do.
+  _⊑[_/_]_ : List Pos → Pos → Pos → List Pos → Set
+  xs ⊑[ q / c ] ys = Tells q c ys → Tells q c xs
 
-  ⊆-⊑ : ∀ {q xs ys} → xs ⊆ᴾ ys → xs ⊑[ q ] ys
+  ⊆-⊑ : ∀ {q c xs ys} → xs ⊆ᴾ ys → xs ⊑[ q / c ] ys
   ⊆-⊑ s t = narrow s t
 
-  ≡-⊑ : ∀ {q xs ys} → xs ≡ ys → xs ⊑[ q ] ys
+  ≡-⊑ : ∀ {q c xs ys} → xs ≡ ys → xs ⊑[ q / c ] ys
   ≡-⊑ refl t = t
 
-  ++-⊑ : ∀ {q} xs xs′ {ys ys′} → xs′ ⊑[ q ] xs → ys′ ⊑[ q ] ys → (xs′ ++ ys′) ⊑[ q ] (xs ++ ys)
+  ++-⊑ : ∀ {q c} xs xs′ {ys ys′} → xs′ ⊑[ q / c ] xs → ys′ ⊑[ q / c ] ys → (xs′ ++ ys′) ⊑[ q / c ] (xs ++ ys)
   ++-⊑ xs xs′ sx sy t = ++⁺ᴬ (sx (++⁻ˡᴬ xs t)) (sy (++⁻ʳᴬ xs t))
+
+  -- A claim about each binder in scope and an end.
+  Pred : List Set → Set₂
+  Pred Δ = ∀ {C} → C ∈ᴸ Δ → Pos → Set₁
+
+  none : Pred []
+  none () _
 
   via-≡ : ∀ {a} {X : Set a} (f : X → Bool) {x x′ : X} → x′ ≡ x → f x′ ≡ true → f x ≡ true
   via-≡ f refl p = p
@@ -593,6 +600,34 @@ module Shifting (R : Set) where
       fed-atL : ∀ {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} (π : PathLanes ls u) {ν} → FedLanes ls ν → Fed u (nowAtL π ν)
       fed-atL (this-lane p) (f , _)  = fed-at p f
       fed-atL (next-lane p) (_ , fl) = fed-atL p fl
+
+    -- A connect's own binder, ended at `c` with its source gone.
+    gone : ∀ {Δ A} → Maybe Pos → Sub h Δ A → Pred Δ → Pred (A ∷ Δ)
+    gone e src K (here _)  c = e ≡ just c × part src ≡ nothing
+    gone e src K (there i) c = K i c
+
+    -- Each binder's claim, read down the path: the connects it passes
+    -- bind theirs as ended.
+    mutual
+      Binds : ∀ {Δ A Δ′ A′} {t : Sub h Δ A} {u : Sub h Δ′ A′} → Path t u → Pred Δ → Pred Δ′
+      Binds here          K = K
+      Binds (in-map p)    K = Binds p K
+      Binds (in-scan p)   K = Binds p K
+      Binds (in-take p)   K = Binds p K
+      Binds (in-outer p)  K = Binds p K
+      Binds (in-lanes p)  K = BindsL p K
+      Binds (in-source p) K = Binds p K
+      Binds (in-body {e = e} {t = src} p) K = Binds p (gone e src K)
+      Binds (in-defer p)  K = Binds p K
+
+      BindsL : ∀ {Δ B Δ′ A′} {ls : List (Lane h Δ B)} {u : Sub h Δ′ A′} → PathLanes ls u → Pred Δ → Pred Δ′
+      BindsL (this-lane p) K = Binds p K
+      BindsL (next-lane p) K = BindsL p K
+
+    -- Every binder above the node, from the root: each one a connect
+    -- ended at `c` with its source gone.
+    Bound : ∀ {Δ A} {T : Sub h [] R} {u : Sub h Δ A} → Path T u → Pred Δ
+    Bound ρ = Binds ρ none
 
     -- Every joiner fed as `ν` says stays open exactly where it was.
     Steady : ∀ {Δ} → Retag Δ → Now Δ → Set₁

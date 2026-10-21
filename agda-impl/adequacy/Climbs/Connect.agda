@@ -113,7 +113,7 @@ module ClimbConnect (R : Set) where
   open Everywhere.Spending R using (spent-retag)
   open EverywhereGated.Holding R using (holds-alike; holds-path; holds-plant; holds-retag)
   open Keeping R using (seen-planted)
-  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; ⊆-⊑; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; sourced-heap; tw-alike)
+  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; ⊆-⊑; Pred; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; sourced-heap; tw-alike)
   open ShiftWalk R using (let-go; grip)
   open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined)
   open FramingRepool R using (Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
@@ -180,10 +180,10 @@ module ClimbConnect (R : Set) where
       re-heads    : Each G (Heads q) bd → Each G (Heads q) (retag g bd)
       re-lingers  : Lingers G bd → Lingers G (retag g bd)
 
-    heading : Heading G G q w₀ v
+    heading : ∀ {E : Pred _} → Heading G G q E w₀ v
     heading = record
       { head-revive = re-revive
-      ; head-told   = λ i e₀ e′ → ⊆-⊑ (re-told i e₀ e′)
+      ; head-told   = λ i _ e₀ e′ → ⊆-⊑ (re-told i e₀ e′)
       ; head-below  = λ ev → Build.each-connect G (Heads q)
           (re-root ev)
           (λ x pn pe → Each.rests ev here refl (proj₂ (just-of (re-revive (cong is-just x)))) pn pe)
@@ -287,7 +287,7 @@ module ClimbConnect (R : Set) where
     --   no `Alike` relates it; a node fact over `fed-part`'s `Gapped`.
     module Re = Refed H {Sj = Sj} {c = c} {b = b} {kb = kb} {k = k} {rp = rp} {e = e} {rt = rt} {u = u} {bd = bd} fd′ q
 
-    fed-heading : Heading H H q w₀ v
+    fed-heading : ∀ {E : Pred _} → Heading H H q E w₀ v
     fed-heading = Re.heading
 
     -- What the connect leaves, the feed restaged.  A joiner is read in a
@@ -519,10 +519,10 @@ module ClimbConnect (R : Set) where
     fin-revive : AllPairs _≢_ (names (connectˢ Sj c b kb k idle rp e rt u bd)) → is-just (At.part (store H (Subject.closed Sj) (lift true)) (connectˢ Sj c b kb k idle rp e rt u bd)) ≡ true → is-just (At.part H (connectˢ Sj c b kb k idle rp e rt u bd)) ≡ true
     fin-revive fr j = trans (cong is-just (sym (fin-part fr))) j
 
-    fin-kept : AllPairs _≢_ (names w₀) → Heading H H′ q w₀ w₀
+    fin-kept : AllPairs _≢_ (names w₀) → ∀ {E : Pred _} → Heading H H′ q E w₀ w₀
     fin-kept fr = record
       { head-revive = fin-revive fr
-      ; head-told   = λ i e₀ e′ → ⊆-⊑ λ m → ≡-⊆ (cong (untold i) (just-injective (trans (sym e′) (trans (fin-part fr) e₀)))) m
+      ; head-told   = λ i _ e₀ e′ → ⊆-⊑ λ m → ≡-⊆ (cong (untold i) (just-injective (trans (sym e′) (trans (fin-part fr) e₀)))) m
       ; head-below  = each-same H H′ se same }
       where
         se : ∀ {Δ′ A′} {x : Sub h Δ′ A′} (ψ : Path w₀ x) → seen H′ ψ ≡ seen H ψ
@@ -554,7 +554,7 @@ module ClimbConnect (R : Set) where
     -- feed's.
     module Re = Refed H′ {Sj = Sj} {c = c} {b = b} {kb = kb} {k = k} {rp = rp} {e = e} {rt = rt} {u = u} {bd = bd} fd′ q
 
-    fin-heading : AllPairs _≢_ (names w₀) → Heading H H′ q w₀ v
+    fin-heading : AllPairs _≢_ (names w₀) → ∀ {E : Pred _} → Heading H H′ q E w₀ v
     fin-heading fr = heading-∘ (fin-kept fr) Re.heading
 
     -- What the connect leaves, the finish restaged, as the feed's: a
