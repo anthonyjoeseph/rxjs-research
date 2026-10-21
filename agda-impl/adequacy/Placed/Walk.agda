@@ -20,9 +20,9 @@ import denotation.MonotonicList.Events as M
 import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
-open import adequacy.Placed.Order using (Atop; Away; Clear; Every; EveryT; Every∞; Ext; Headed; Ordered; Owned; Past; Prefix; Steady; clear-away; every; every-mono; every-onward; everyT-burstOn; everyT-mono; everyT-∪; everyᵀ; every∞-mono; ext-eq; ordered; owned-ext; past-away; prefix-++; prefix-trans; steady; still; under-ext)
+open import adequacy.Placed.Order using (Atop; Away; Clear; Disjoint; Every; EveryT; Every∞; Ext; Headed; Ordered; Owned; Past; Prefix; Steady; clear-away; every; every-mono; every-onward; everyT-burstOn; everyT-mono; everyT-∪; everyᵀ; every∞-mono; ext-eq; ordered; owned-ext; past-away; prefix-++; prefix-trans; steady; still; under-ext)
 open import adequacy.Placed.Keys using (beneath-owned; every-ahead; ix-mark; owned-snoc; owned-tick; owned-trans; snoc-inj; tagged-lane; tagged-mark)
-open import adequacy.Placed.Rising using (Disjoint; Rise; apart-mark; atop-ahead; before-atop; below-under; everyT-zip; every∞-zip; prefix-lt; prefix-rest; prefix-split)
+open import adequacy.Placed.Rising using (Rise; apart-mark; atop-ahead; before-atop; below-under; everyT-zip; every∞-zip; prefix-lt; prefix-rest; prefix-split)
 open import adequacy.Placed.Trail using (Apart; FlatT; Marked; SortedT; Sp; Spread; Trail; TrailE; Trailing; flatT-∪; inside-under; marked-cue; marks-alien; marks-mid; marks-past; shown; sortedT-∪; spread; trail; trailᶠ; t≢f)
 open import adequacy.Placed.Calm using (At; sp-of; sp-step)
 open import adequacy.Placed.FlatAfter using (Going; Head; disjoint-snoc; take-ahead)

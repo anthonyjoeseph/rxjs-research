@@ -24,9 +24,9 @@ import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
-open import adequacy.Placed.Order using (Atop; Clear; Every; EveryT; Every∞; Ext; Ordered; Owned; Past; Prefix; Steady; Tagged; every; everyT-idle; everyT-mono; everyᵀ; ext; ext-irrefl; ordered; prefix-++; steady)
+open import adequacy.Placed.Order using (Atop; Clear; Disjoint; Every; EveryT; Every∞; Ext; Ordered; Owned; Past; Prefix; Steady; Tagged; every; everyT-idle; everyT-mono; everyᵀ; ext; ext-irrefl; ordered; prefix-++; steady)
 open import adequacy.Placed.Keys using (Mark; everyT-≈; ix-mark; last-mark; owned-trans; owned-weigh; prefix-refl; rest-agree; snoc-inj; tagged-prefix; tagged-sub; tagged-weigh; weigh; weighˡ)
-open import adequacy.Placed.Rising using (AtopT; Disjoint; below-under)
+open import adequacy.Placed.Rising using (AtopT; below-under)
 open import adequacy.Placed.Trail using (FlatT; Marked; SortedT; Trail; Trailing; atopT-every; ext-prefix; flatT-idle; flatᵀ; inside-prefix; marked-cue; marks-past; marks-prefix; marks-under; past-noext; reshown; shown; sortedT-idle; sortedᵀ; trail; trailᶠ)
 open import adequacy.Placed.FlatAfter using (Going; Head; take-ahead)
 

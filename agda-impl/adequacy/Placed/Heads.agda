@@ -1,15 +1,13 @@
 {-# OPTIONS --guardedness #-}
 
--- WHERE A NODE CAN STEP, AS A KEY ON THE CONFIGURATION.  `Keyed Q`
--- holds of a node when every position it holds, to step at or to
--- subscribe under, satisfies `Q`; a `Closed` `Q` is kept one mark on, at
+-- KEYS KEPT BY A STEP.  A `Closed` `Q` is kept one mark on, at
 -- a frame tagged with it, and at a fed or told joiner's tag.  A step of
 -- a keyed node shows where `Q` holds and leaves a keyed node; a feed
 -- whose tag `Q` admits leaves one too.
 --
 -- A connect's body subscribes where every position it holds is owned by
--- its subscription, and its source where every one is disjoint from it;
--- both keys are closed, so `Sided` follows by coinduction.
+-- its subscription, and its source where every one is disjoint from it:
+-- `Apart`, each key kept by a step and the body's by a feed.
 module adequacy.Placed.Heads where
 
 open import Data.Bool using (true; false)
@@ -31,9 +29,11 @@ open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatM
 open import denotation.MonotonicList.Events using (timelineAt; Pos; From; Timeline; ix; sub; last; _<ᵖ_; inside)
 import denotation.MonotonicList.Events as M
 import denotation.Unfold as U
-open import adequacy.Placed.Order using (Headed; Owned; Prefix; Sided; fed; onward; prefix-++; sides)
+open import adequacy.Placed.Order using (Alienᴱ; Apart; Disjoint; Headed; Owned; Prefix; Sides; every-monoᴱ; prefix-++)
+open import adequacy.Placed.Keyed using (Admitted; Fit; Keyed; KeyedEarliest; KeyedOuter; KeyedStep; Keyedᴸ; Keyedᴹ; Keyedˢ; Noted; Qᴹ; keyed-head)
+open import denotation.Unfold using (NEnv)
 open import adequacy.Placed.Keys using (Mark; ix-mark; last-mark; owned-tagged; owned-trans; prefix-refl; sibling; tagged-sub)
-open import adequacy.Placed.Rising using (Disjoint; apart-join; apart-mark)
+open import adequacy.Placed.Rising using (apart-join; apart-mark)
 
 -- Kept one mark on, at a frame tagged with it, and at a joiner's tag.
 record Closed (Q : Pos → Set) : Set where
@@ -42,73 +42,6 @@ record Closed (Q : Pos → Set) : Set where
     frame : ∀ t r → Q r → Q (ix t ∷ sub r ∷ [])
     tag   : ∀ q j → Q q → Q j → Q (q ++ [ sub j ])
 open Closed
-
-module _ (Q : Pos → Set) where
-  Qᴹ : Maybe Pos → Set
-  Qᴹ nothing  = ⊤
-  Qᴹ (just c) = Q c
-
-  -- A source's step at `q` lands, fed or told, where `Q` holds.
-  Fit : Pos → Set
-  Fit q = ∀ j → Q j → Q (q ++ [ sub j ])
-
-  Noted : ∀ {Γ} → List (U.Notice Γ) → Set
-  Noted []                    = ⊤
-  Noted (U.notice i q a ∷ ns) = Fit q × Noted ns
-
-  mutual
-    Keyed : ∀ {Γ A} → U.Node Γ A → Set
-    Keyed (U.framesᶜ τ e m)            = Q e
-    Keyed (U.burstᶜ τ r i b)           = Q r
-    Keyed (U.ofᶜ p i xs)               = Q p
-    Keyed (U.mapᶜ f c)                 = Keyed c
-    Keyed (U.scanᶜ f z c)              = Keyed c
-    Keyed (U.takeWhileᶜ i f c)         = Keyed c
-    Keyed (U.flatMapᶜ op g o ls qs pl) = (∀ a q → Q q → Keyed (g a q)) × Keyedᴹ o × Keyedᴸ ls × Keyed pl
-    Keyed (U.joinᶜ i p xs e)           = Q p × All (λ x → Q (proj₁ x)) xs × Qᴹ e
-    Keyed (U.connectᶜ r b s)           = Keyed b × Keyedˢ s
-    Keyed (U.deferᶜ l p ns)            = Q p × Noted ns
-    Keyed (U.endingᶜ p n)              = Q p × Keyed n
-    Keyed (U.restᶜ n)                  = Keyed n
-    Keyed U.idleᶜ                      = ⊤
-    Keyed (U.unionᶜ x y)               = Keyed x × Keyed y
-    Keyed (U.burstingᶜ r t)            = Keyed t
-    Keyed (U.underᶜ s b)               = Keyedˢ s × Keyed b
-
-    Keyedᴹ : ∀ {Γ A} → Maybe (U.Node Γ A) → Set
-    Keyedᴹ nothing  = ⊤
-    Keyedᴹ (just c) = Keyed c
-
-    Keyedᴸ : ∀ {Γ A} → List (U.Node Γ A) → Set
-    Keyedᴸ []       = ⊤
-    Keyedᴸ (c ∷ cs) = Keyed c × Keyedᴸ cs
-
-    Keyedˢ : ∀ {Γ A} → U.Source Γ A → Set
-    Keyedˢ (U.live s)    = Keyed s
-    Keyedˢ (U.ended c t) = Q c × Keyed t
-
-  KeyedStep : ∀ {Γ A} → U.Step Γ A → Set
-  KeyedStep (U.outˢ k a c) = Q k × Keyed c
-  KeyedStep (U.skipˢ k c)  = Q k × Keyed c
-  KeyedStep (U.endˢ k)     = Q k
-  KeyedStep U.hushˢ        = ⊤
-
-  KeyedOuter : ∀ {Γ A} → U.Outer Γ A → Set
-  KeyedOuter U.doneᵒ       = ⊤
-  KeyedOuter (U.runᵒ o so) = Keyed o × KeyedStep so
-
-  KeyedEarliest : ∀ {Γ B} → U.Earliest Γ B → Set
-  KeyedEarliest U.none                = ⊤
-  KeyedEarliest (U.found k bs l s as) = Keyedᴸ bs × Keyed l × KeyedStep s × Keyedᴸ as
-
-  Admitted : ∀ {Γ} {A B : Set} → List (U.Node Γ B) × List A × U.Node Γ B → Set
-  Admitted (ls , qs , d) = Keyedᴸ ls × Keyed d
-
-  keyed-head : ∀ {Γ A} (t : U.Step Γ A) → KeyedStep t → ∀ k → U.headˢ t ≡ just k → Q k
-  keyed-head (U.outˢ k a c) (qk , _) _ refl = qk
-  keyed-head (U.skipˢ k c)  (qk , _) _ refl = qk
-  keyed-head (U.endˢ k)     qk       _ refl = qk
-  keyed-head U.hushˢ        _        _ ()
 
 keyed-start : ∀ {Q} → Closed Q → ∀ {Γ A} p (m : From A 0) → Q p → Keyed Q (U.startᶜ {Γ} p m)
 keyed-start cq p (M.at zero _ b)    qp = qp
@@ -531,29 +464,48 @@ tag   (apart-closed p hp) q j dq dj = apart-join (p ++ [ ix 0 ]) q j (proj₁ dq
 sides-of : ∀ P k q → Owned P k → Disjoint P q → k ≢ q × k ≢ q ++ [ ix 0 ]
 sides-of P k q o d = (λ { refl → proj₁ d o }) , (λ { refl → proj₁ (apart-mark P q (ix 0) (ix-mark 0) d) o })
 
--- A body keyed under `P` and a source keyed apart from it stay apart.
-sided-keys : ∀ P → Closed (Disjoint P) → ∀ {Γ A B} (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A)
-           → Keyed (Owned P) b → Keyed (Disjoint P) s → Sided b s
-sides (sided-keys P cd b s kb ks) k q hk hq =
-  sides-of P k q (keyed-head (Owned P) (U.step b) (step-keyed (owned-closed P) b kb) k hk)
-                 (keyed-head (Disjoint P) (U.step s) (step-keyed cd s ks) q hq)
-onward (sided-keys P cd b s kb ks) with U.step b | step-keyed (owned-closed P) b kb
-... | U.outˢ k a b′ | _ , kb′ = sided-keys P cd b′ s kb′ ks
-... | U.skipˢ k b′  | _ , kb′ = sided-keys P cd b′ s kb′ ks
+-- A connect's body and source, just subscribed, apart.
+apart-sub : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → Headed p → Alienᴱ p ρ
+          → Apart (p ++ [ ix 1 ]) (U.subscribe b (p ++ [ ix 0 ])) (U.subscribe s (p ++ [ ix 1 ])) ρ
+apart-sub s b p ρ hp al =
+    p , refl , hp
+  , keyed-sub (owned-closed (p ++ [ ix 0 ])) b (p ++ [ ix 0 ]) (inj₁ (prefix-refl (p ++ [ ix 0 ])))
+  , keyed-sub (apart-closed p hp) s (p ++ [ ix 1 ]) (sibling p (ix-mark 1) (λ ()) , sibling p (ix-mark 0) (λ ()))
+  , every-monoᴱ (λ h n o → n (owned-trans p (p ++ [ ix 0 ]) h (inj₁ (prefix-++ p [ ix 0 ])) o)) ρ al
+
+-- Apart, the two step apart now.
+apart-sides : ∀ {Γ A B} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ) → Apart r b s ρ → Sides (U.step b) (U.step s)
+apart-sides r b s ρ (p , _ , hp , kb , ks , _) k q hk hq =
+  sides-of (p ++ [ ix 0 ]) k q (keyed-head (Owned (p ++ [ ix 0 ])) (U.step b) (step-keyed (owned-closed (p ++ [ ix 0 ])) b kb) k hk)
+                               (keyed-head (Disjoint (p ++ [ ix 0 ])) (U.step s) (step-keyed (apart-closed p hp) s ks) q hq)
+
+-- What a connect's body leaves stepping alone, apart from its source.
+ApartNext : ∀ {Γ A B} → Pos → U.Step (A ∷ Γ) B → U.Node Γ A → NEnv Γ → Set
+ApartNext r (U.outˢ k a b′) s ρ = Apart r b′ s ρ
+ApartNext r (U.skipˢ k b′)  s ρ = Apart r b′ s ρ
+ApartNext r (U.endˢ k)      s ρ = ⊤
+ApartNext r U.hushˢ         s ρ = ⊤
+
+apart-next : ∀ {Γ A B} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ) → Apart r b s ρ → ApartNext r (U.step b) s ρ
+apart-next r b s ρ (p , er , hp , kb , ks , al) with U.step b | step-keyed (owned-closed (p ++ [ ix 0 ])) b kb
+... | U.outˢ k a b′ | _ , kb′ = p , er , hp , kb′ , ks , al
+... | U.skipˢ k b′  | _ , kb′ = p , er , hp , kb′ , ks , al
 ... | U.endˢ k      | _       = tt
 ... | U.hushˢ       | _       = tt
-fed (sided-keys P cd b s kb ks) with U.step s | step-keyed cd s ks
+
+-- A connect's body fed its source's step, apart from what the source
+-- leaves.
+ApartFed : ∀ {Γ A B} → Pos → U.Node (A ∷ Γ) B → U.Step Γ A → NEnv Γ → Set
+ApartFed r b (U.outˢ q a s′) ρ = Apart r (U.feed (here refl) q (just a) b) s′ ρ
+ApartFed r b (U.skipˢ q s′)  ρ = Apart r (U.feed (here refl) q nothing b) s′ ρ
+ApartFed r b (U.endˢ c)      ρ = ⊤
+ApartFed r b U.hushˢ         ρ = ⊤
+
+apart-fed : ∀ {Γ A B} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ) → Apart r b s ρ → ApartFed r b (U.step s) ρ
+apart-fed r b s ρ (p , er , hp , kb , ks , al) with U.step s | step-keyed (apart-closed p hp) s ks
 ... | U.outˢ q a s′ | _ , ks′ =
-  sided-keys P cd (U.feed (here refl) q (just a) b) s′ (feed-keyed (owned-closed P) (here refl) q (just a) b (owned-fit P q) kb) ks′
+  p , er , hp , feed-keyed (owned-closed (p ++ [ ix 0 ])) (here refl) q (just a) b (owned-fit (p ++ [ ix 0 ]) q) kb , ks′ , al
 ... | U.skipˢ q s′  | _ , ks′ =
-  sided-keys P cd (U.feed (here refl) q nothing b) s′ (feed-keyed (owned-closed P) (here refl) q nothing b (owned-fit P q) kb) ks′
+  p , er , hp , feed-keyed (owned-closed (p ++ [ ix 0 ])) (here refl) q nothing b (owned-fit (p ++ [ ix 0 ]) q) kb , ks′ , al
 ... | U.endˢ c      | _       = tt
 ... | U.hushˢ       | _       = tt
-
--- A connect's body and source, just subscribed, kept apart.
-sided-sub : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p → Headed p
-          → Sided (U.subscribe b (p ++ [ ix 0 ])) (U.subscribe s (p ++ [ ix 1 ]))
-sided-sub s b p hp =
-  sided-keys (p ++ [ ix 0 ]) (apart-closed p hp) (U.subscribe b (p ++ [ ix 0 ])) (U.subscribe s (p ++ [ ix 1 ]))
-    (keyed-sub (owned-closed (p ++ [ ix 0 ])) b (p ++ [ ix 0 ]) (inj₁ (prefix-refl (p ++ [ ix 0 ]))))
-    (keyed-sub (apart-closed p hp) s (p ++ [ ix 1 ]) (sibling p (ix-mark 1) (λ ()) , sibling p (ix-mark 0) (λ ())))

@@ -30,7 +30,8 @@ import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import adequacy.Sane using (Sane; Mode; over)
-open import adequacy.Placed.Order using (Placed; SidedFed; SidedNext; Within; fed; onward; sides)
+open import adequacy.Placed.Order using (Placed; Within)
+open import adequacy.Placed.Heads using (ApartFed; ApartNext; apart-fed; apart-next; apart-sides)
 open import adequacy.Deep using (Deep; Deepˢ)
 
 open _≃_
@@ -150,7 +151,7 @@ showsˢ q nothing  s′ = U.skipˢ q s′
 
 -- The body stepped first, its source carried.
 body-within : ∀ {Γ A B} r (s : U.Node Γ A) (ρ : NEnv Γ) (sb : U.Step (A ∷ Γ) B)
-            → Placedˢ (U.meaning s ρ ∷ᴬ ρ) sb → Placed s ρ → SidedNext sb s → Withinˢ ρ (U.bodyˢ r (U.live s) sb)
+            → Placedˢ (U.meaning s ρ ∷ᴬ ρ) sb → Placed s ρ → ApartNext r sb s ρ → Withinˢ ρ (U.bodyˢ r (U.live s) sb)
 body-within r s ρ (U.outˢ k a b′) (_ , pb) ps sd = pb , ps , sd
 body-within r s ρ (U.skipˢ k b′)  (_ , pb) ps sd = pb , ps , sd
 body-within r s ρ (U.endˢ k)      _        ps sd = tt
@@ -219,11 +220,11 @@ mutual
   connect-within {ν = ν} r b s ρ sn@(sb , ss) pl cl with U.step s in es
   ... | U.outˢ q a s′ with U.beforeˢ (q ++ [ ix 0 ]) (U.step b) in fb
   ...   | true  = fed-placed r b s s′ ρ q (just a) sn pl es fb cl , proj₂ (source-next r b s ρ sn pl es (clear-lower ν ρ (<ᵖ-below q []) cl))
-                , subst (SidedFed b) es (fed (proj₂ (proj₂ (proj₂ pl))))
+                , subst (λ t → ApartFed r b t ρ) es (apart-fed r b s ρ (proj₂ (proj₂ (proj₂ pl))))
   ...   | false = body-first r b s ρ sn pl (subst (Shy (U.step b)) (sym es) fb) cl
   connect-within {ν = ν} r b s ρ sn@(sb , ss) pl cl | U.skipˢ q s′ with U.beforeˢ (q ++ [ ix 0 ]) (U.step b) in fb
   ...   | true  = fed-placed r b s s′ ρ q nothing sn pl es fb cl , proj₂ (source-next r b s ρ sn pl es (clear-lower ν ρ (<ᵖ-below q []) cl))
-                , subst (SidedFed b) es (fed (proj₂ (proj₂ (proj₂ pl))))
+                , subst (λ t → ApartFed r b t ρ) es (apart-fed r b s ρ (proj₂ (proj₂ (proj₂ pl))))
   ...   | false = body-first r b s ρ sn pl (subst (Shy (U.step b)) (sym es) fb) cl
   connect-within {ν = ν} r b s ρ sn@(sb , ss) pl cl | U.endˢ c with U.beforeˢ (c ++ [ ix 0 ]) (U.step b) in fb
   ...   | true  = shut-placed r b s ρ c sn pl es fb cl
@@ -241,9 +242,9 @@ mutual
              → Shy (U.step b) (U.step s) → Clear ν (U.headˢ (U.bodyˢ r (U.live s) (U.step b))) ρ
              → Withinˢ ρ (U.bodyˢ r (U.live s) (U.step b))
   body-first {ν = ν} r b s ρ sn@(sb , ss) pl@(_ , pb , ps , sd) shy cl =
-    body-within r s ρ (U.step b) (placeds b (U.meaning s ρ ∷ᴬ ρ) sb pb (ce , cl′)) ps (onward sd)
+    body-within r s ρ (U.step b) (placeds b (U.meaning s ρ ∷ᴬ ρ) sb pb (ce , cl′)) ps (apart-next r b s ρ sd)
     where cl′ = subst (λ h → Clear ν h ρ) (head-body r (U.live s) (U.step b)) cl
-          ce  = shy-clear b s ρ ss ps (sides sd) (skips s ρ ss ps) shy cl′
+          ce  = shy-clear b s ρ ss ps (apart-sides r b s ρ sd) (skips s ρ ss ps) shy cl′
 
   -- An ended connect: its rest's skip first, else the body's, told the end.
   ended-within : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) c t (ρ : NEnv Γ)
