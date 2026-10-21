@@ -19,7 +19,9 @@ module simultaneous.SObs where
 open import Data.Bool using (Bool)
 open import Data.List using (List; _∷_)
 import Data.List as L
+open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
+open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList.Events using (Timeline)
@@ -50,22 +52,35 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) wh
 
     batchSimultaneous : ∀ {Γ A} → E Γ (IE A) → E Γ (IE (List A))
 
-  -- `elaborate`, one clause per former.  Structural on the inductive
-  -- formers, whatever the srxjs operator around the call; corecursive only
-  -- through `defer`, under `Later.force`'s copattern, as `Tree.rename` is.
-  mutual
+  -- A delayed program, for `defer`'s elaboration.
+  later : ∀ {Γ A} → E Γ A → Later C Γ A
+  later e .Later.force = e
+
+  -- `elaborate`, one equation per former.  Each is to hold by `refl` once
+  -- the clause is written as constructors around the elaborated child:
+  -- that is the only shape Agda's productivity check accepts through
+  -- `defer`, and every srxjs operator, being primitives around its child,
+  -- has it.  An operator may stay a named definition marked `INLINE`,
+  -- which the check sees through, nested too.  An opaque one around any
+  -- recursive call sinks the whole mutual block, and so does a
+  -- pattern-matching lambda whose arm holds the child: Agda lifts it out
+  -- as a definition of its own.
+  --
+  -- DEAD ROUTE: postulated operators around the calls.  Measured: a
+  --   postulate, or a definition without `INLINE`, in place of any
+  --   constructor fails termination at every clause, `connect`'s included.
+  postulate
     elaborate : ∀ {Γ A} → Obs C Γ A → E (L.map IE Γ) (IE A)
-    elaborate (cold c)          = coldˢ c
-    elaborate empty             = emptyˢ
-    elaborate (of xs)           = ofˢ xs
-    elaborate (map f s)         = mapˢ f (elaborate s)
-    elaborate (scan f z s)      = scanˢ f z (elaborate s)
-    elaborate (takeWhile i p s) = takeWhileˢ i p (elaborate s)
-    elaborate (flatMap op f s)  = flatMapˢ op (λ a → elaborate (f a)) (elaborate s)
-    elaborate (connect s b)     = connectˢ (elaborate s) (elaborate b)
-    elaborate (connected i)     = connected (∈-map⁺ IE i)
-    elaborate (defer l)         = defer (elaborateˡ l)
 
-    elaborateˡ : ∀ {Γ A} → Later C Γ A → Later C (L.map IE Γ) (IE A)
-    elaborateˡ l .Later.force = elaborate (Later.force l)
-
+    elaborate-cold      : ∀ {Γ A} (c : C A) → elaborate {Γ} (cold c) ≡ coldˢ c
+    elaborate-empty     : ∀ {Γ A} → elaborate (empty {Γ = Γ} {A = A}) ≡ emptyˢ
+    elaborate-of        : ∀ {Γ A} (xs : List A) → elaborate {Γ} (of xs) ≡ ofˢ xs
+    elaborate-map       : ∀ {Γ A B} (f : A → B) (s : Obs C Γ A) → elaborate (map f s) ≡ mapˢ f (elaborate s)
+    elaborate-scan      : ∀ {Γ A B} (f : B → A → B) z (s : Obs C Γ A) → elaborate (scan f z s) ≡ scanˢ f z (elaborate s)
+    elaborate-takeWhile : ∀ {Γ A} i p (s : Obs C Γ A) → elaborate (takeWhile i p s) ≡ takeWhileˢ i p (elaborate s)
+    elaborate-flatMap   : ∀ {Γ A B} op (f : A → Obs C Γ B) (s : Obs C Γ A)
+                        → elaborate (flatMap op f s) ≡ flatMapˢ op (λ a → elaborate (f a)) (elaborate s)
+    elaborate-connect   : ∀ {Γ A B} (s : Obs C Γ A) (b : Obs C (A ∷ Γ) B)
+                        → elaborate (connect s b) ≡ connectˢ (elaborate s) (elaborate b)
+    elaborate-connected : ∀ {Γ A} (i : A ∈ Γ) → elaborate (connected i) ≡ connected (∈-map⁺ IE i)
+    elaborate-defer     : ∀ {Γ A} (l : Later C Γ A) → elaborate (defer l) ≡ defer (later (elaborate (Later.force l)))
