@@ -15,7 +15,7 @@ open import Tree using (Obs; cold; empty; of; map; scan; takeWhile; flatMap; con
 open import denotation.MonotonicList.Events using (timelineAt; Pos; From; Timeline; ix; sub; last; tick)
 import denotation.MonotonicList.Events as M
 import denotation.Unfold as U
-open import adequacy.Placed.Order using (Headed; Owned; Prefix; Sides; prefix-++)
+open import adequacy.Placed.Order using (Headed; Owned; Prefix; Sided; SidedFed; SidedNext; Sides; fed; onward; prefix-++; sides)
 open import adequacy.Placed.Keys using (Mark; ix-mark; last-mark; owned-trans; prefix-refl; sibling)
 open import adequacy.Placed.Rising using (Disjoint; apart-mark)
 
@@ -154,3 +154,24 @@ sides-of P k q o d = (λ { refl → proj₁ d o }) , (λ { refl → proj₁ (apa
 sides-sub : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p → Headed p
           → Sides (U.step (U.subscribe b (p ++ [ ix 0 ]))) (U.step (U.subscribe s (p ++ [ ix 1 ])))
 sides-sub s b p hp k q hk hq = sides-of (p ++ [ ix 0 ]) k q (head-sub b (p ++ [ ix 0 ]) k hk) (head-sub-apart s p q hp hq)
+
+postulate
+  -- A connect's body, just subscribed, steps alone apart from its
+  -- source for good.
+  --
+  -- Unwritten route: a key on nodes, every position a body holds owned
+  -- by where it subscribed and every one its source holds disjoint from
+  -- it, kept by a step and a feed; `Sided` then follows by coinduction.
+  sub-onward : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p → Headed p
+             → SidedNext (U.step (U.subscribe b (p ++ [ ix 0 ]))) (U.subscribe s (p ++ [ ix 1 ]))
+
+  -- And fed its source's first step, apart from it for good.
+  sub-fed : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p → Headed p
+          → SidedFed (U.subscribe b (p ++ [ ix 0 ])) (U.step (U.subscribe s (p ++ [ ix 1 ])))
+
+-- A connect's body and source, just subscribed, kept apart.
+sided-sub : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p → Headed p
+          → Sided (U.subscribe b (p ++ [ ix 0 ])) (U.subscribe s (p ++ [ ix 1 ]))
+sides  (sided-sub s b p hp) = sides-sub s b p hp
+onward (sided-sub s b p hp) = sub-onward s b p hp
+fed    (sided-sub s b p hp) = sub-fed s b p hp

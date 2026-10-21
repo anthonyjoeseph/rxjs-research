@@ -45,7 +45,7 @@ open import adequacy.Placed.FlatOrder using (module FlatOrder)
 open import adequacy.Placed.FlatAfter using (module FlatAfter; trail-defer; trail-take)
 open import adequacy.Placed.Burst using (module Bursting; Fresh; FreshRun; Fresh∞; fresh-map; fresh-of; fresh-past; fresh-rejoin; fresh-scan; fresh-start; fresh-take; fresh-under; fresh-up; fresh-widen; fresh-≈; freshᴿ; heavy; longer; mark-sub; owned-drop; snoc-ne; sub-owned; sub-tagged)
 open import adequacy.Placed.Walk using (module Walk)
-open import adequacy.Placed.Heads using (sides-sub)
+open import adequacy.Placed.Heads using (sided-sub)
 
 open Events∞
 open Tail∞
@@ -976,7 +976,7 @@ placed-sub (flatMap op f s) p ρ hp so cl =
   ordered-sub (flatMap op f s) p ρ hp so cl , placed-sub s p ρ hp so cl , tt
   , λ a x r → placed-sub (f a) (x ++ [ ix 1 ]) ρ (headed-lane x (every-reach _ (x ++ [ ix 0 ]) (headed-sub (flatMap op f s) p ρ hp so) r))
                 so (alien-shown op f s p ρ cl x r)
-placed-sub (connect s b) p ρ hp so cl = ordered-sub (connect s b) p ρ hp so cl , pb , ps , sides-sub s b p hp
+placed-sub (connect s b) p ρ hp so cl = ordered-sub (connect s b) p ρ hp so cl , pb , ps , sided-sub s b p hp
   where hs = headed-snoc p hp
         cs = alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl
         ps = placed-sub s (p ++ [ ix 1 ]) ρ hs so cs

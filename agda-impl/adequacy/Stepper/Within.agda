@@ -10,8 +10,8 @@ open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Sum using ([_,_])
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Unit using (⊤; tt)
+open import Data.Product using (_,_; proj₁; proj₂)
+open import Data.Unit using (tt)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
@@ -30,7 +30,7 @@ import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import adequacy.Sane using (Sane; Mode; over)
-open import adequacy.Placed.Order using (Ordered; Placed; Sides; Within)
+open import adequacy.Placed.Order using (Placed; SidedFed; SidedNext; Within; fed; onward; sides)
 open import adequacy.Deep using (Deep; Deepˢ)
 
 open _≃_
@@ -148,31 +148,17 @@ showsˢ : ∀ {Γ A} → Pos → Maybe A → U.Node Γ A → U.Step Γ A
 showsˢ q (just a) s′ = U.outˢ q a s′
 showsˢ q nothing  s′ = U.skipˢ q s′
 
--- What the body's step leaves, apart from its source.
-SidesNext : ∀ {Γ A B} → U.Step (A ∷ Γ) B → U.Step Γ A → Set
-SidesNext (U.outˢ k a b′) ss = Sides (U.step b′) ss
-SidesNext (U.skipˢ k b′)  ss = Sides (U.step b′) ss
-SidesNext (U.endˢ k)      ss = ⊤
-SidesNext U.hushˢ         ss = ⊤
-
 -- The body stepped first, its source carried.
 body-within : ∀ {Γ A B} r (s : U.Node Γ A) (ρ : NEnv Γ) (sb : U.Step (A ∷ Γ) B)
-            → Placedˢ (U.meaning s ρ ∷ᴬ ρ) sb → Placed s ρ → SidesNext sb (U.step s) → Withinˢ ρ (U.bodyˢ r (U.live s) sb)
+            → Placedˢ (U.meaning s ρ ∷ᴬ ρ) sb → Placed s ρ → SidedNext sb s → Withinˢ ρ (U.bodyˢ r (U.live s) sb)
 body-within r s ρ (U.outˢ k a b′) (_ , pb) ps sd = pb , ps , sd
 body-within r s ρ (U.skipˢ k b′)  (_ , pb) ps sd = pb , ps , sd
 body-within r s ρ (U.endˢ k)      _        ps sd = tt
 body-within r s ρ U.hushˢ         _        ps sd = tt
 
 postulate
-  -- A connect's body stepping first leaves a body apart from its source.
-  --
-  -- REFUTED: d2d13661 without the step coming first, by a merge whose joiner lane shows its source's earlier event
-  body-sides : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ)
-             → Sane ν (U.connectᶜ r b (U.live s)) → Placed (U.connectᶜ r b (U.live s)) ρ
-             → Shy (U.step b) (U.step s) → Clear ν (U.headˢ (U.step b)) ρ → SidesNext (U.step b) (U.step s)
-
   -- A body fed its source's step, shown first, is placed in the source's
-  -- next meaning, and apart from its next step.
+  -- next meaning.
   --
   -- DEAD ROUTE: exact agreement with a ghost anchored in its sources'
   --   step history.  The ghost is the witness's open part (`part`), which
@@ -183,10 +169,6 @@ postulate
              → Sane ν (U.connectᶜ r b (U.live s)) → Placed (U.connectᶜ r b (U.live s)) ρ → U.step s ≡ showsˢ q a s′
              → U.beforeˢ (q ++ [ ix 0 ]) (U.step b) ≡ true → Clear ν (just (q ++ [ ix 0 ])) ρ
              → Placed (U.feed (here refl) q a b) (U.meaning s′ ρ ∷ᴬ ρ)
-  fed-sides : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) (s s′ : U.Node Γ A) (ρ : NEnv Γ) q (a : Maybe A)
-            → Sane ν (U.connectᶜ r b (U.live s)) → Placed (U.connectᶜ r b (U.live s)) ρ → U.step s ≡ showsˢ q a s′
-            → U.beforeˢ (q ++ [ ix 0 ]) (U.step b) ≡ true → Clear ν (just (q ++ [ ix 0 ])) ρ
-            → Sides (U.step (U.feed (here refl) q a b)) (U.step s′)
 
   -- A body told its source's end, shown first, is placed past it.
   shut-placed : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ) c
@@ -203,12 +185,6 @@ shut-within r c t ρ (U.outˢ k a b′) (_ , pb) = reshut-placed c b′ ρ pb
 shut-within r c t ρ (U.skipˢ k b′)  (_ , pb) = reshut-placed c b′ ρ pb
 shut-within r c t ρ (U.endˢ k)      _        = tt
 shut-within r c t ρ U.hushˢ         _        = tt
-
--- A connect placed, its source's step read off.
-resides : ∀ {Γ A B} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ) {t} → U.step s ≡ t
-        → Ordered (U.meaning (U.connectᶜ r b (U.live s)) ρ) × Placed b (U.meaning s ρ ∷ᴬ ρ) × Placed s ρ × Sides (U.step b) t
-        → Placed (U.connectᶜ r b (U.live s)) ρ
-resides r b s ρ refl p = p
 
 -- WHAT A STEP LEAVES IS PLACED WITHIN, when its sources are clear of it.
 mutual
@@ -242,17 +218,17 @@ mutual
                  → Clear ν (U.headˢ (U.step (U.connectᶜ r b (U.live s)))) ρ → Withinˢ ρ (U.step (U.connectᶜ r b (U.live s)))
   connect-within {ν = ν} r b s ρ sn@(sb , ss) pl cl with U.step s in es
   ... | U.outˢ q a s′ with U.beforeˢ (q ++ [ ix 0 ]) (U.step b) in fb
-  ...   | true  = fed-placed r b s s′ ρ q (just a) sn (resides r b s ρ es pl) es fb cl , proj₂ (source-next r b s ρ sn (resides r b s ρ es pl) es (clear-lower ν ρ (<ᵖ-below q []) cl))
-                , fed-sides r b s s′ ρ q (just a) sn (resides r b s ρ es pl) es fb cl
-  ...   | false = body-first r b s ρ sn (resides r b s ρ es pl) (subst (Shy (U.step b)) (sym es) fb) cl
+  ...   | true  = fed-placed r b s s′ ρ q (just a) sn pl es fb cl , proj₂ (source-next r b s ρ sn pl es (clear-lower ν ρ (<ᵖ-below q []) cl))
+                , subst (SidedFed b) es (fed (proj₂ (proj₂ (proj₂ pl))))
+  ...   | false = body-first r b s ρ sn pl (subst (Shy (U.step b)) (sym es) fb) cl
   connect-within {ν = ν} r b s ρ sn@(sb , ss) pl cl | U.skipˢ q s′ with U.beforeˢ (q ++ [ ix 0 ]) (U.step b) in fb
-  ...   | true  = fed-placed r b s s′ ρ q nothing sn (resides r b s ρ es pl) es fb cl , proj₂ (source-next r b s ρ sn (resides r b s ρ es pl) es (clear-lower ν ρ (<ᵖ-below q []) cl))
-                , fed-sides r b s s′ ρ q nothing sn (resides r b s ρ es pl) es fb cl
-  ...   | false = body-first r b s ρ sn (resides r b s ρ es pl) (subst (Shy (U.step b)) (sym es) fb) cl
+  ...   | true  = fed-placed r b s s′ ρ q nothing sn pl es fb cl , proj₂ (source-next r b s ρ sn pl es (clear-lower ν ρ (<ᵖ-below q []) cl))
+                , subst (SidedFed b) es (fed (proj₂ (proj₂ (proj₂ pl))))
+  ...   | false = body-first r b s ρ sn pl (subst (Shy (U.step b)) (sym es) fb) cl
   connect-within {ν = ν} r b s ρ sn@(sb , ss) pl cl | U.endˢ c with U.beforeˢ (c ++ [ ix 0 ]) (U.step b) in fb
-  ...   | true  = shut-placed r b s ρ c sn (resides r b s ρ es pl) es fb cl
-  ...   | false = body-first r b s ρ sn (resides r b s ρ es pl) (subst (Shy (U.step b)) (sym es) fb) cl
-  connect-within {ν = ν} r b s ρ sn@(sb , ss) pl cl | U.hushˢ = body-first r b s ρ sn (resides r b s ρ es pl) (subst (Shy (U.step b)) (sym es) tt) cl
+  ...   | true  = shut-placed r b s ρ c sn pl es fb cl
+  ...   | false = body-first r b s ρ sn pl (subst (Shy (U.step b)) (sym es) fb) cl
+  connect-within {ν = ν} r b s ρ sn@(sb , ss) pl cl | U.hushˢ = body-first r b s ρ sn pl (subst (Shy (U.step b)) (sym es) tt) cl
 
   -- The source's next node, placed.
   source-next : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ)
@@ -265,9 +241,9 @@ mutual
              → Shy (U.step b) (U.step s) → Clear ν (U.headˢ (U.bodyˢ r (U.live s) (U.step b))) ρ
              → Withinˢ ρ (U.bodyˢ r (U.live s) (U.step b))
   body-first {ν = ν} r b s ρ sn@(sb , ss) pl@(_ , pb , ps , sd) shy cl =
-    body-within r s ρ (U.step b) (placeds b (U.meaning s ρ ∷ᴬ ρ) sb pb (ce , cl′)) ps (body-sides r b s ρ sn pl shy cl′)
+    body-within r s ρ (U.step b) (placeds b (U.meaning s ρ ∷ᴬ ρ) sb pb (ce , cl′)) ps (onward sd)
     where cl′ = subst (λ h → Clear ν h ρ) (head-body r (U.live s) (U.step b)) cl
-          ce  = shy-clear b s ρ ss ps sd (skips s ρ ss ps) shy cl′
+          ce  = shy-clear b s ρ ss ps (sides sd) (skips s ρ ss ps) shy cl′
 
   -- An ended connect: its rest's skip first, else the body's, told the end.
   ended-within : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) c t (ρ : NEnv Γ)

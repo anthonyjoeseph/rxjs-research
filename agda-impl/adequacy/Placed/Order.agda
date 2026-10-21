@@ -258,6 +258,33 @@ Sorted (e ∷ᴬ ρ) = (Ordered e × Steady e) × Every Headed e × Sorted ρ
 Sides : ∀ {Δ Γ A B} → U.Step Δ B → U.Step Γ A → Set
 Sides sb ss = ∀ k q → U.headˢ sb ≡ just k → U.headˢ ss ≡ just q → k ≢ q × k ≢ q ++ [ ix 0 ]
 
+-- A connect's body and source step apart now, and again once the body
+-- steps alone or the source's step is fed to the body: what the two
+-- keep, subscribed apart, through the steps the connect takes.
+--
+-- REFUTED: 535eabb2 as `Sides` of the step now alone, by a body `of` whose second value lands where its source's first does
+mutual
+  record Sided {Γ A B} (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) : Set where
+    coinductive
+    field
+      sides  : Sides (U.step b) (U.step s)
+      onward : SidedNext (U.step b) s
+      fed    : SidedFed b (U.step s)
+
+  SidedNext : ∀ {Γ A B} → U.Step (A ∷ Γ) B → U.Node Γ A → Set
+  SidedNext (U.outˢ k a b′) s = Sided b′ s
+  SidedNext (U.skipˢ k b′)  s = Sided b′ s
+  SidedNext (U.endˢ k)      s = ⊤
+  SidedNext U.hushˢ         s = ⊤
+
+  SidedFed : ∀ {Γ A B} → U.Node (A ∷ Γ) B → U.Step Γ A → Set
+  SidedFed b (U.outˢ q a s′) = Sided (U.feed (here refl) q (just a) b) s′
+  SidedFed b (U.skipˢ q s′)  = Sided (U.feed (here refl) q nothing b) s′
+  SidedFed b (U.endˢ c)      = ⊤
+  SidedFed b U.hushˢ         = ⊤
+
+open Sided public
+
 -- Every node's meaning in order, read in its own environment: a
 -- connect's body reading its source's, stepping apart from it; a flatMap's lanes yet to
 -- subscribe reading its own, each where the flatMap shows a skip just
@@ -275,7 +302,7 @@ mutual
   Within (U.takeWhileᶜ i p c)       ρ = Placed c ρ
   Within (U.flatMapᶜ op g o ls qs pl)  ρ = Placedᴹ o ρ × Placedᴸ ls ρ
     × (∀ a x → Reaches (x ++ [ ix 0 ]) (U.meaning (U.flatMapᶜ op g o ls qs pl) ρ) → Placed (g a (x ++ [ ix 1 ])) ρ)
-  Within (U.connectᶜ r b (U.live s))    ρ = Placed b (U.meaning s ρ ∷ᴬ ρ) × Placed s ρ × Sides (U.step b) (U.step s)
+  Within (U.connectᶜ r b (U.live s))    ρ = Placed b (U.meaning s ρ ∷ᴬ ρ) × Placed s ρ × Sided b s
   Within (U.connectᶜ r b (U.ended c t)) ρ = Placed b (end c ∷ᴬ ρ)
   Within (U.deferᶜ l p ns)          ρ = Headed p × Sorted (U.replay ns ρ) × Alienᴱ p (U.replay ns ρ)
   Within (U.joinᶜ i p xs e)         ρ = Alien p (lookup ρ i)

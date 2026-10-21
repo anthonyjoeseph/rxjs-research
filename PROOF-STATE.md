@@ -10,13 +10,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ROOT STEP
 
-Whether a step, its sources clear of it, keeps its parts placed: a connect's
-body stepped or fed still `Sides` its source, a fed or told body placed; a
-flatMap's admitted lanes; a defer's program. Nothing in `Placed` keys a body's
-positions apart from its source's later steps. Settled when `body-sides` and
-`fed-sides` are bodies or refuted.
+Whether a step, its sources clear of it, keeps its parts placed: a fed or
+told body placed; a flatMap's admitted lanes; a defer's program; and a
+subscribed connect's body `Sided` from its source for good, which no node key
+yet carries. Settled when `sub-onward` and `fed-placed` are bodies or refuted.
 
-Members: `body-sides`, `fed-sides`, `fed-placed`, `shut-placed`,
+Members: `sub-onward`, `sub-fed`, `fed-placed`, `shut-placed`,
 `reshut-placed`, `flat-within`, `defer-within`, `under-shown-connect`.
 
 #### UP-ENDED
