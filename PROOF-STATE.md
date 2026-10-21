@@ -118,8 +118,7 @@ part heading past the take's own position. Settled when one held and one
 hidden completion are bodies.
 
 Members: `take1-enter`, `take1-void`, `last-enter`, `last-void`, `fin-enter`,
-`end-ghost`, `out-deeper`, `take-pooled`, `body-pooled`, `turn-told`,
-`turn-ended`.
+`end-ghost`, `out-deeper`, `take-pooled`, `body-pooled`.
 
 #### AGENDA CALLS
 
