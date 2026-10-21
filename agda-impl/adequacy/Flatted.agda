@@ -68,7 +68,7 @@ module Flatting (R : Set) where
   open Run.Kit (Pureᴾ R) using (skipᴬ)
   open Strongly R using (Sub; pendingˢ; Path; here; in-outer; in-lanes; _⊕_; Here; walk; top; _≗_; module At; names; pendings; Phase; flatMapˢ; killAllᶜ; flatK; CbRel; ≗-refl; newRef≗; unsubscribing; register≗; writeRef≗; module Canon)
   open StrongAgainst R using (Twin; leaves; Books; Job; Owned; Kernels; Meaning; Queue; Each; Lingers; rf-idle; unpinned; union-pinned; rest-pinned; seen; owned-to)
-  open StrongHeld R using (Carried; Heads; DoneBy; module Eaching; module Lingering)
+  open StrongHeld R using (Carried; Heads; DoneBy; module Eaching; module Lingering; Untold; Ended)
   open StrongAgainst.Against R using (subAs; SrcOf; src-of)
   open Moving R using (planted; pend; part-plant; holds-owed; fed-plant; pendings-plant; subjects-plant; joiners-plant)
   open EverywhereGated.Settling R using (settled-plant)
@@ -320,6 +320,10 @@ module Flatting (R : Set) where
       rf-flags : DoneBy H₉ T₈ [] → DoneBy H₉ t′ []
       rf-flags = flags-plant H₉ π₈ v eqv (λ { here _ → (λ ()) , (λ _ → done₉) ; (in-outer ()) ; (in-lanes ()) })
 
+      postulate
+        rf-told  : ∀ {q′} → Untold H₉ q′ t′
+        rf-ended : Ended H₉ t′
+
   -- A flatMap begun allocates its pool and its outer's cut, registers its
   -- refill slot and stores it, and begins its outer under the flatMap's
   -- observer, one subscription fewer owed.
@@ -339,7 +343,8 @@ module Flatting (R : Set) where
                               ; paidUp = cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (cong wd (Books.paidUp bk))))))))
                               ; running = Books.running bk }
              ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind′ = Eaching.each-to _ _ (F.rf-behind refl refl slot₉ refl refl refl refl (pos-headed cr) (Grew.behind G₉))
-             ; lingers′ = Lingering.lingers-to _ (F.rf-lingers refl refl slot₉ refl refl refl refl (Grew.lingers G₉)) ; flags = F.rf-flags refl refl slot₉ refl refl refl refl (Grew.flags G₉) }
+             ; lingers′ = Lingering.lingers-to _ (F.rf-lingers refl refl slot₉ refl refl refl refl (Grew.lingers G₉)) ; flags = F.rf-flags refl refl slot₉ refl refl refl refl (Grew.flags G₉)
+             ; told = F.rf-told refl refl slot₉ refl refl refl refl ; ended = F.rf-ended refl refl slot₉ refl refl refl refl }
     , refl , inj₁ (inj₁ (subst (pend F.t′ <_) (Grew.pends G₉) F.less))
     where bk = Carried.books cr
           -- The kernel's allocations after its first, its registration and

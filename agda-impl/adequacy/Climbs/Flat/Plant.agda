@@ -51,7 +51,6 @@ open import adequacy.Lift using (module Lifting)
 open import adequacy.Lift.Order using (module LiftingOrder)
 open import adequacy.Lowers using (module Lowering)
 open import adequacy.Frame using (module Framing)
-open import adequacy.Told using (untold; untoldᴹ; untoldᴸ)
 open import adequacy.Frame.Repool using (module FramingRepool)
 open import adequacy.Frame.Lefts using (module FramingLefts)
 open import adequacy.Grow using (module Growing)
@@ -597,6 +596,9 @@ module ClimbFlatPlant (R : Set) where
     bg-lingers : Lingers H (Restaged.T′ H ρ pl′) → Lingers heap′ T′
     bg-lingers lg = bg-lingered (Wk′.grow-lingers grows lg)
 
+    postulate
+      bg-told  : Untold heap′ (q ++ [ ix 1 ]) T′
+      bg-ended : Ends heap′ T′
 
     -- The flatMap before the start, in the grown world.
     u₀ : Sub v Δ B
@@ -813,7 +815,8 @@ module ClimbFlatPlant (R : Set) where
       ; books = record { fresh = Begun.bg-fresh sr pl′ fs
                        ; clocked = trans (proj₁ ck) (sym (tick-under q 1 (Started.deep sr))) , proj₁ ck , Begun.bg-ticked sr pl′ sk (proj₂ ck)
                        ; paidUp = trans (Started.todo′ sr) (cong (mapList (wkTodo (Started.grow sr))) pu) ; running = rn }
-      ; sorted = sorted-⇝ so (Started.runs sr) ; behind′ = Eaching.each-to _ _ (Begun.bg-behind sr pl′ bh) ; lingers′ = Lingering.lingers-to _ (Begun.bg-lingers sr pl′ lgr) ; flags = Begun.bg-flags sr pl′ fs L dF dI })
+      ; sorted = sorted-⇝ so (Started.runs sr) ; behind′ = Eaching.each-to _ _ (Begun.bg-behind sr pl′ bh) ; lingers′ = Lingering.lingers-to _ (Begun.bg-lingers sr pl′ lgr) ; flags = Begun.bg-flags sr pl′ fs L dF dI
+      ; told = Begun.bg-told sr pl′ ; ended = Begun.bg-ended sr pl′ })
     , passed ag pp
 
   -- An admitted value with room: its lane begun where the value is, the

@@ -551,6 +551,14 @@ module FramingRepool (R : Set) where
       sees = scan-sees H ρ fs (f (At.val H r) y)
       def  = scan-defined H ρ fs (f (At.val H r) y)
 
+  postulate
+    scan-told : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
+                (ρ : Path T (scanˢ f r u)) {y : A} → Calling g ℓ m₁ (ρ ⊕ in-scan here) (sends y)
+              → Untold (store (Conf.heap (Mach.conf m₁)) r (lift (f (At.val (Conf.heap (Mach.conf m₁)) r) y))) (Conf.pos (Mach.conf m₁)) T
+    scan-ended : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
+                 (ρ : Path T (scanˢ f r u)) {y : A} → Calling g ℓ m₁ (ρ ⊕ in-scan here) (sends y)
+               → Ended (store (Conf.heap (Mach.conf m₁)) r (lift (f (At.val (Conf.heap (Mach.conf m₁)) r) y))) T
+
   -- One store leaves every other name alike; two in turn, every name
   -- neither wrote.
   off-store : ∀ {h k} (H : Heapᴹ h) (i : h ∋ k) {x} → Off H (store H i x) ((k , i) ∷ [])

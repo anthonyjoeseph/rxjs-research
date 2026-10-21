@@ -54,7 +54,7 @@ open import adequacy.Lift using (module Lifting)
 open import adequacy.Lift.Order using (module LiftingOrder)
 open import adequacy.Lowers using (module Lowering)
 open import adequacy.Frame using (module Framing)
-open import adequacy.Told using (untold; untoldᴹ; untoldᴸ)
+open import adequacy.Told using (untold)
 open import adequacy.Frame.Repool using (module FramingRepool)
 open import adequacy.Grow using (module Growing)
 open import adequacy.Fork using (module Forking)
@@ -323,6 +323,10 @@ module ClimbConnect (R : Set) where
     fed-behind : AllPairs _≢_ (names T) → Untold H q T → Ends H T → Each H (Heads q) T → Each H (Heads q) T′
     fed-behind fs ut en = Shift.shift-behind H H ρ (λ j _ → refl) [] fs v ut en fed-heading
 
+    postulate
+      fed-told  : AllPairs _≢_ (names T) → ∀ {q′} → Untold H q′ T → Ended H T → Untold H q′ T′
+      fed-ended : AllPairs _≢_ (names T) → Ended H T → Ended H T′
+
     fed-lingers : AllPairs _≢_ (names T) → Ends H T → At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T
                 → Lingers H T → Lingers H T′
     fed-lingers fs en jn mn bh = Shift.shift-lingers H H ρ (λ j _ → refl) [] fs v en (fed-lingering jn mn bh)
@@ -381,7 +385,9 @@ module ClimbConnect (R : Set) where
         ; sorted = sorted-⇝ so (then refl now) ; behind′ = Eaching.each-to _ _ (Feeds.fed-behind hp ρ y q fs (Calling.told cl) (Calling.ended cl) bh) ; lingers′ = Lingering.lingers-to _ (Feeds.fed-lingers hp ρ y q fs (Calling.ended cl) (Queue.joined qu) mn bh lgr) ; flags = let-go hp (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Feeds.Bd.body-names hp ρ y q))) fs)
                     (trans (seen-planted hp ρ v) (lifts-seen Lρ)) ju
                     (subst (DoneBy hp (plant ρ v)) (sym (outers-planted ρ v))
-                           (Shift.shift-flags hp hp ρ (λ j _ → refl) [] fs v {ns₀ = []} (λ ()) rv fb (subst (DoneBy hp T) (sym (++-identityʳ (outers ρ))) d₀))) })
+                           (Shift.shift-flags hp hp ρ (λ j _ → refl) [] fs v {ns₀ = []} (λ ()) rv fb (subst (DoneBy hp T) (sym (++-identityʳ (outers ρ))) d₀)))
+        ; told = Feeds.fed-told hp ρ y q fs (Calling.told cl) (Calling.ended cl)
+        ; ended = Feeds.fed-ended hp ρ y q fs (Calling.ended cl) })
       , passed ag pp)
     where
       ss = At.val hp (Subject.subscribers Sj)
@@ -618,6 +624,10 @@ module ClimbConnect (R : Set) where
     fin-behind : AllPairs _≢_ (names T) → Untold H q T → Ends H T → Each H (Heads q) T → Each H′ (Heads q) T′
     fin-behind fs ut en = Sh.shift-behind fs v ut en (fin-heading (fresh-path ρ fs))
 
+    postulate
+      fin-told  : AllPairs _≢_ (names T) → ∀ {q′} → Untold H q′ T → Ended H T → Untold H′ q′ T′
+      fin-ended : AllPairs _≢_ (names T) → Ended H T → Ended H′ T′
+
     fin-lingers : AllPairs _≢_ (names T) → Ends H T → At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T
                 → Lingers H T → Lingers H′ T′
     fin-lingers fs en jn mn bh = Sh.shift-lingers fs v en (fin-lingering (fresh-path ρ fs) jn mn bh)
@@ -685,7 +695,9 @@ module ClimbConnect (R : Set) where
         ; sorted = sorted-⇝ so path ; behind′ = Eaching.each-to _ _ (Fins.fin-behind hp ρ q fs (Calling.told cl) (Calling.ended cl) bh) ; lingers′ = Lingering.lingers-to _ (Fins.fin-lingers hp ρ q fs (Calling.ended cl) (Queue.joined qu) mn bh lgr) ; flags = let-go H′ (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Fins.Bd.body-names hp ρ q))) fs)
                     (trans (seen-planted H′ ρ v) (lifts-seen (lifts-off hp H′ ρ fs off₀ Lρ))) ju
                     (subst (DoneBy H′ (plant ρ v)) (sym (outers-planted ρ v))
-                           (Fins.Sh.shift-flags hp ρ q fs v {ns₀ = []} (λ ()) rv fb (subst (DoneBy hp T) (sym (++-identityʳ (outers ρ))) d₀))) })
+                           (Fins.Sh.shift-flags hp ρ q fs v {ns₀ = []} (λ ()) rv fb (subst (DoneBy hp T) (sym (++-identityʳ (outers ρ))) d₀)))
+        ; told = Fins.fin-told hp ρ q fs (Calling.told cl) (Calling.ended cl)
+        ; ended = Fins.fin-ended hp ρ q fs (Calling.ended cl) })
       , passed ag pp)
     where
       path = ⇝-trans path₁ path₂

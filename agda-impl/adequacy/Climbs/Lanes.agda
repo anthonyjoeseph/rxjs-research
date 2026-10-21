@@ -784,3 +784,9 @@ module ClimbLanes (R : Set) where
 
     fr-behind : AllPairs _≢_ (names T) → ∀ {q} → Untold H q T → Ends H T → Each H (Heads q) T → Each H′ (Heads q) T
     fr-behind fs {q} ut en bh = subst (λ t′ → Each H′ (Heads q) t′) (plant-self ρ) (Sh.shift-behind fs w₀ ut en (fr-heading (fresh-path ρ fs)) bh)
+
+    fr-told : AllPairs _≢_ (names T) → ∀ {q} → Untold H q T → Ends H T → Untold H′ q T
+    fr-told fs {q} ut en = subst (λ t′ → Untold H′ q t′) (plant-self ρ) (Sh.shift-told fs w₀ ut en (fr-heading (fresh-path ρ fs)))
+
+    postulate
+      fr-ended : AllPairs _≢_ (names T) → Ends H T → Ends H′ T

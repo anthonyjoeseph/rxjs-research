@@ -51,7 +51,6 @@ open import adequacy.Taken using (module Taking)
 open import adequacy.Connected using (module Connecting)
 open import adequacy.Flatted using (module Flatting)
 open import adequacy.Replant using (module Replanting)
-open import adequacy.Told using (untold)
 open import adequacy.Frame.Repool using (module FramingRepool)
 open import adequacy.Lift using (module Lifting)
 open Events∞

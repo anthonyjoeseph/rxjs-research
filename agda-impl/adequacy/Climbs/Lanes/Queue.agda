@@ -547,7 +547,8 @@ module ClimbLanesQueue (R : Set) where
                   (lefts-subst (λ s′ → s′) (lane-end op G l q po eo ebs eas eqs)
                     (lefts-subst (λ S′ → U.laneˢ op G (At.part hp t) bs′ l S′ as′ (At.val hp (FlatKit.Flat.queue fl)) po) (lane-step o LL) (lefts-up ρ (in-lanes πL) eqQ lt)))
       ; rest-heads = subst (λ x → Heads q (U.restᶜ {B = ⊤} x)) (sym (Freed.fr-left hp ρ o (fresh-path ρ fs))) (LaneRest.lane-rest-heads ρ o cl eo)
-      ; flags = Freed.fr-flags hp ρ o fs (done-up ρ (in-lanes πL) (one-outers o) (Calling.flags cl)) ; kept = inj₁ refl }))
+      ; flags = Freed.fr-flags hp ρ o fs (done-up ρ (in-lanes πL) (one-outers o) (Calling.flags cl)) ; kept = inj₁ refl
+      ; told = Freed.fr-told hp ρ o fs (Calling.told cl) (Calling.ended cl) ; ended = Freed.fr-ended hp ρ o fs (Calling.ended cl) }))
     where
       H₂   = freed hp (laneOf o) fl
       O    = Here.obs (walk ρ top)
@@ -579,7 +580,9 @@ module ClimbLanesQueue (R : Set) where
                          ; clocked = proj₁ ck , Restaged.pool-ticked H₂ ρ pl′ clk stk (proj₁ ck , proj₂ ck) ; paidUp = pu ; running = rn }
         ; sorted = sorted-⇝ so path ; behind′ = Eaching.each-to _ _ (Freed.Sh.shift-behind hp ρ o fs v (Calling.told cl) (Calling.ended cl) (Settling.settle-heading ρ πL o cl Lρ sg LL ll) bh)
         ; lingers′ = Lingering.lingers-to _ (Settling.settle-lingers ρ πL o cl Lρ sg LL ll) ; flags = let-go H₂ (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs) (lifts-seen (lifts-planted ρ v (Freed.Wr.wr-lifts hp ρ o fs Lρ))) ju
-                    (subst (DoneBy H₂ (plant ρ v)) (sym (outers-planted ρ v)) (Freed.fr-shift hp ρ o fs pl′ rv (done-up ρ (in-lanes πL) (one-outers o) (Calling.flags cl)))) })
+                    (subst (DoneBy H₂ (plant ρ v)) (sym (outers-planted ρ v)) (Freed.fr-shift hp ρ o fs pl′ rv (done-up ρ (in-lanes πL) (one-outers o) (Calling.flags cl))))
+        ; told = Freed.Sh.shift-told hp ρ o fs v (Calling.told cl) (Calling.ended cl) (Settling.settle-heading ρ πL o cl Lρ sg LL ll)
+        ; ended = Freed.Sh.shift-ended hp ρ o fs v (Calling.ended cl) (Settling.settle-lingering ρ πL o cl Lρ sg LL ll) })
       , passed ag pp)
     where
       H₂   = freed hp (laneOf o) fl
