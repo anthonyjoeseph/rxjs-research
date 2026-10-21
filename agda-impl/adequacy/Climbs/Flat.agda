@@ -10,9 +10,8 @@ open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ; ++�
 import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′) renaming (map₂ to sum-map₂)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; map) renaming (lookup to lookupᴬ; tabulate to tabulateᴬ)
-open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to all-++⁺)
+open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to all-++⁺; ++⁻ˡ to all-++⁻ˡ; ++⁻ʳ to all-++⁻ʳ)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; []; _∷_)
 open import Data.List.Relation.Binary.Permutation.Propositional using (_↭_; ↭-reflexive) renaming (refl to ↭-refl′)
 open import Data.List.Relation.Unary.Linked using (_∷_)
@@ -110,7 +109,7 @@ module ClimbFlat (R : Set) where
   open Everywhere.Spending R using (spent-retag)
   open EverywhereGated.Holding R using (holds-alike; holds-path; holds-plant; holds-retag)
   open Keeping R using (seen-planted)
-  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; pooledL-alike; leftover-from; pooled-from; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; tw-alike)
+  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; _⊑[_]_; ≡-⊑; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; pooledL-alike; leftover-from; pooled-from; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; tw-alike)
   open ShiftWalk R using (let-go; grip)
   open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined)
   open FramingRepool R using (heads-repool; Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
@@ -206,7 +205,7 @@ module ClimbFlat (R : Set) where
   heading-∘ : ∀ {h} {H₁ H₂ H₃ : Heapᴹ h} {q Δ A} {u v w : Sub h Δ A} → Heading H₁ H₂ q u v → Heading H₂ H₃ q v w → Heading H₁ H₃ q u w
   heading-∘ record { head-revive = r₁ ; head-told = t₁ ; head-below = b₁ } record { head-revive = r₂ ; head-told = t₂ ; head-below = b₂ } = record
     { head-revive = λ j → r₁ (r₂ j)
-    ; head-told   = λ i e₀ e₂ m → t₁ i e₀ (proj₂ (just-of (r₂ (cong is-just e₂)))) (t₂ i (proj₂ (just-of (r₂ (cong is-just e₂)))) e₂ m)
+    ; head-told   = λ i e₀ e₂ t → t₂ i (proj₂ (just-of (r₂ (cong is-just e₂)))) e₂ (t₁ i e₀ (proj₂ (just-of (r₂ (cong is-just e₂)))) t)
     ; head-below  = λ ev → b₂ (b₁ ev) }
 
   lingering-∘ : ∀ {h} {H₁ H₂ H₃ : Heapᴹ h} {Δ A} {u v w : Sub h Δ A} → Lingering H₁ H₂ u v → Lingering H₂ H₃ v w → Lingering H₁ H₃ u w
@@ -236,16 +235,24 @@ module ClimbFlat (R : Set) where
     tw-leftoverL H []                = tw-idle
     tw-leftoverL H (lane c k s ∷ ls) = tw-union (tw-leftover H s) (tw-leftoverL H ls)
 
-  -- An untold list split at its pool.
-  told-split : ∀ (xs ys zs : List Pos) {ws} → xs ⊆ᴾ ws → ys ⊆ᴾ ws → zs ⊆ᴾ ws → (xs ++ ys ++ zs) ⊆ᴾ ws
-  told-split xs ys zs sx sy sz m = [ sx , (λ m′ → [ sy , sz ]′ (∈-++⁻ ys m′)) ]′ (∈-++⁻ xs m)
+  -- A flatMap's pool replaced, its outer and lanes untold alike: its
+  -- joiners tell past `q` wherever they did, when the new pool's do.
+  repool-⊑ : ∀ {h} (G G′ : Heapᴹ h) {q Δ A B C} (i : C ∈ᴸ Δ) op (g : A → Pos → U.Node Δ B) o o′ L L′ Q Q′ (pl pl′ : U.Node Δ B) {b₀ b′}
+           → untoldᴹ i o′ ≡ untoldᴹ i o → untoldᴸ i L′ ≡ untoldᴸ i L
+           → At.merged G op g o L Q pl ≡ just b₀ → At.merged G′ op g o′ L′ Q′ pl′ ≡ just b′
+           → untold i pl′ ⊑[ q ] untold i b₀ → untold i b′ ⊑[ q ] untold i b₀
+  repool-⊑ G G′ i op g o o′ L L′ Q Q′ pl pl′ eo eL e₀ e′ sp t =
+    ≡-⊑ (cong (untold i) (sym (merged-eq G′ op g o′ L′ Q′ pl′ e′)))
+      (all-++⁺ (≡-⊑ eo (all-++⁻ˡ (untoldᴹ i o) (≡-⊑ (cong (untold i) (merged-eq G op g o L Q pl e₀)) t)))
+        (all-++⁺ (≡-⊑ eL (all-++⁻ˡ (untoldᴸ i L) (all-++⁻ʳ (untoldᴹ i o) (≡-⊑ (cong (untold i) (merged-eq G op g o L Q pl e₀)) t))))
+          (sp t)))
 
-  -- A pool taking a rest beside it leaves untold what the flatMap's part
-  -- did, when the rest does.
-  rest-pool-told : ∀ {h} (G : Heapᴹ h) {Δ A B C D} op (g : A → Pos → U.Node Δ B) o L Q pl (l : U.Node Δ D) (i : C ∈ᴸ Δ) {b₀}
-                 → At.merged G op g o L Q pl ≡ just b₀ → untold i l ⊆ᴾ untold i b₀ → untold i (U.unionᶜ pl (U.restᶜ l)) ⊆ᴾ untold i b₀
-  rest-pool-told G op g o L Q pl l i e sl m =
-    [ (λ m′ → ≡-⊆ (cong (untold i) (merged-eq G op g o L Q pl e)) (++⁺ʳ (untoldᴹ i o) (++⁺ʳ (untoldᴸ i L) m′))) , sl ]′ (∈-++⁻ (untold i pl) m)
+  -- A pool taking a rest beside it: its joiners tell past `q` wherever
+  -- the flatMap's did, when the rest's do.
+  rest-pool-⊑ : ∀ {h} (G : Heapᴹ h) {q Δ A B C D} op (g : A → Pos → U.Node Δ B) o L Q pl (l : U.Node Δ D) (i : C ∈ᴸ Δ) {b₀}
+              → At.merged G op g o L Q pl ≡ just b₀ → untold i l ⊑[ q ] untold i b₀ → untold i (U.unionᶜ pl (U.restᶜ l)) ⊑[ q ] untold i b₀
+  rest-pool-⊑ G op g o L Q pl l i e sl t =
+    all-++⁺ (all-++⁻ʳ (untoldᴸ i L) (all-++⁻ʳ (untoldᴹ i o) (≡-⊑ (cong (untold i) (merged-eq G op g o L Q pl e)) t))) (sl t)
 
   -- A FLATMAP'S POOL RESTAGED: the node at the path's end with a new
   -- pool, the calls, the stack and every field carried across.
@@ -270,16 +277,12 @@ module ClimbFlat (R : Set) where
         ... | t , rf = subst (λ p → Leaves p (At.pooled H fl u ls) × Restful p) (sym e) (lv-trans (proj₁ (tw-sym (tw-idleʳ pl))) t , rf-union rf rf-idle)
 
     -- The pool moved in place: every clause but the pool's alike.
-    repool-heading : ∀ {q} → (∀ {A′} (i : A′ ∈ᴸ Δ) {b₀} → At.part H w₀ ≡ just b₀ → untold i pl′ ⊆ᴾ untold i b₀)
+    repool-heading : ∀ {q} → (∀ {A′} (i : A′ ∈ᴸ Δ) {b₀} → At.part H w₀ ≡ just b₀ → untold i pl′ ⊑[ q ] untold i b₀)
                    → (∀ {c} → At.part H w₀ ≡ just c → Heads q pl → Heads q pl′) → Heading H H q w₀ v
     repool-heading {q} told hp = record
       { head-revive = revive
-      ; head-told   = λ i {b₀} e₀ e′ m →
-          told-split (untoldᴹ i (At.part H u)) (untoldᴸ i (At.partLanes H ls)) (untold i pl′)
-            (λ m′ → ≡-⊆ (cong (untold i) (merged-eq H op G (At.part H u) (At.partLanes H ls) Q pl e₀)) (++⁺ˡ m′))
-            (λ m′ → ≡-⊆ (cong (untold i) (merged-eq H op G (At.part H u) (At.partLanes H ls) Q pl e₀)) (++⁺ʳ (untoldᴹ i (At.part H u)) (++⁺ˡ m′)))
-            (told i e₀)
-            (≡-⊆ (cong (untold i) (sym (merged-eq H op G (At.part H u) (At.partLanes H ls) Q pl′ e′))) m)
+      ; head-told   = λ i e₀ e′ →
+          repool-⊑ H H i op G (At.part H u) (At.part H u) (At.partLanes H ls) (At.partLanes H ls) Q Q pl pl′ refl refl e₀ e′ (told i e₀)
       ; head-below  = λ ev → Build.each-flat H (Heads q) {op = op} {f} {fl} {oc} {k} {r} {pl′} {so = u} {ls}
                                (root ev) (pool ev) (each-sub ev (in-outer here) refl) (eachL-of H ev) }
       where
@@ -566,18 +569,14 @@ module ClimbFlat (R : Set) where
           pool lg x = tie e₀ (Lingers.pools lg here refl e₀)
             where e₀ = proj₂ (just-of (revive (cong is-just x)))
 
-      heading : ∀ {q} → (∀ {A′} (i : A′ ∈ᴸ Δ) {b₀} → At.part H w₀ ≡ just b₀ → untold i pl′ ⊆ᴾ untold i b₀)
+      heading : ∀ {q} → (∀ {A′} (i : A′ ∈ᴸ Δ) {b₀} → At.part H w₀ ≡ just b₀ → untold i pl′ ⊑[ q ] untold i b₀)
               → (∀ {c} → At.part H w₀ ≡ just c → Heads q pl → Heads q pl′) → Heading H H′ q w₀ v
       heading {q} told hp = record
         { head-revive = revive
-        ; head-told   = λ i {b₀} e₀ e′ m →
-            told-split (untoldᴹ i (At.part H′ u)) (untoldᴸ i (At.partLanes H′ ls)) (untold i pl′)
-              (λ m′ → ≡-⊆ (cong (untold i) (merged-eq H op G (At.part H u) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl e₀))
-                          (++⁺ˡ (≡-⊆ (cong (untoldᴹ i) (part-alike H H′ u so-al)) m′)))
-              (λ m′ → ≡-⊆ (cong (untold i) (merged-eq H op G (At.part H u) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl e₀))
-                          (++⁺ʳ (untoldᴹ i (At.part H u)) (++⁺ˡ (≡-⊆ (cong (untoldᴸ i) (partLanes-alike H H′ ls ls-al)) m′))))
-              (told i e₀)
-              (≡-⊆ (cong (untold i) (sym (merged-eq H′ op G (At.part H′ u) (At.partLanes H′ ls) (At.val H′ (FlatKit.Flat.queue fl)) pl′ e′))) m)
+        ; head-told   = λ i e₀ e′ →
+            repool-⊑ H H′ i op G (At.part H u) (At.part H′ u) (At.partLanes H ls) (At.partLanes H′ ls)
+              (At.val H (FlatKit.Flat.queue fl)) (At.val H′ (FlatKit.Flat.queue fl)) pl pl′
+              (cong (untoldᴹ i) (part-alike H H′ u so-al)) (cong (untoldᴸ i) (partLanes-alike H H′ ls ls-al)) e₀ e′ (told i e₀)
         ; head-below  = λ ev → Build.each-flat H′ (Heads q) {op = op} {f} {fl} {oc} {k} {r} {pl′} {so = u} {ls}
                                  (root ev) (pool ev)
                                  (each-sub (sd-heads fr ev) (in-outer here) refl) (eachL-of H′ (sd-heads fr ev)) }
@@ -733,16 +732,16 @@ module ClimbFlat (R : Set) where
           (lv-trans (proj₁ (tw-rest o₀))
             (lv-trans lo (proj₁ (tw-trans (tw-leftover H u) (tw-alike (leftover-alike H (Settles.H′ H ρ) u P.so-al)))))))
 
-    -- The outer's rest leaves untold only joiners the flatMap's part still
-    -- holds untold.  Suspect: the outer has ended, so its part holds
-    -- nothing, and `o₀` is tied only by `lo`; a connect in the outer whose
-    -- body ended with its source still pending leaves that source's joiner
-    -- in `o₀`'s rest, in no part beside it.
+    -- The outer's rest tells its joiners past `q` wherever the flatMap's
+    -- part does.  The outer has ended, so its part holds nothing; `o₀` is
+    -- tied only by `lo`.
+    --
+    -- DEAD ROUTE: `o₀`'s joiners as a sublist of the part's: a connect in the outer whose body ended with its source still pending leaves that source's joiner in `o₀`'s rest and in no part
     postulate
-      close-rest-told : ∀ {A′} (i : A′ ∈ᴸ Δ) {b₀} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just b₀ → untold i o₀ ⊆ᴾ untold i b₀
+      close-rest-told : ∀ {A′} (i : A′ ∈ᴸ Δ) {b₀} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just b₀ → untold i o₀ ⊑[ q ] untold i b₀
 
-    close-told : ∀ {A′} (i : A′ ∈ᴸ Δ) {b₀} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just b₀ → untold i pl′ ⊆ᴾ untold i b₀
-    close-told i e = rest-pool-told H op (λ a j → U.subscribe (f a) j) (At.part H u) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl o₀ i e (close-rest-told i e)
+    close-told : ∀ {A′} (i : A′ ∈ᴸ Δ) {b₀} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just b₀ → untold i pl′ ⊑[ q ] untold i b₀
+    close-told i e = rest-pool-⊑ H op (λ a j → U.subscribe (f a) j) (At.part H u) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl o₀ i e (close-rest-told i e)
 
     close-heads : ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just c → Heads q pl → Heads q pl′
     close-heads e₀ = pool-heads o₀ (proj₂ (Lingers.pools (Calling.lingers cl) ρ (lifts-seen L) e₀)) lo (Calling.rest-heads cl)

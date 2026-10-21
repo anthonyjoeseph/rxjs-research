@@ -10,6 +10,7 @@ open import Data.List using (List; []; _∷_; _++_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ; ++⁻)
 open import Data.List.Relation.Unary.All using (All) renaming (lookup to lookupᴬ; _∷_ to _∷ᴬ_)
+open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to ++⁺ᴬ; ++⁻ˡ to ++⁻ˡᴬ; ++⁻ʳ to ++⁻ʳᴬ)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Level using (lower)
@@ -66,6 +67,19 @@ module Shifting (R : Set) where
 
   ++-mono : ∀ xs xs′ {ys ys′} → xs′ ⊆ᴾ xs → ys′ ⊆ᴾ ys → (xs′ ++ ys′) ⊆ᴾ (xs ++ ys)
   ++-mono xs xs′ {ys} sx sy m = [ (λ a → ++⁺ˡ {xs = xs} {ys = ys} (sx a)) , (λ b → ++⁺ʳ xs (sy b)) ]′ (++⁻ xs′ m)
+
+  -- Joiners that tell past `q` at every end `ys`'s joiners do.
+  _⊑[_]_ : List Pos → Pos → List Pos → Set
+  xs ⊑[ q ] ys = ∀ {c} → Tells q c ys → Tells q c xs
+
+  ⊆-⊑ : ∀ {q xs ys} → xs ⊆ᴾ ys → xs ⊑[ q ] ys
+  ⊆-⊑ s t = narrow s t
+
+  ≡-⊑ : ∀ {q xs ys} → xs ≡ ys → xs ⊑[ q ] ys
+  ≡-⊑ refl t = t
+
+  ++-⊑ : ∀ {q} xs xs′ {ys ys′} → xs′ ⊑[ q ] xs → ys′ ⊑[ q ] ys → (xs′ ++ ys′) ⊑[ q ] (xs ++ ys)
+  ++-⊑ xs xs′ sx sy t = ++⁺ᴬ (sx (++⁻ˡᴬ xs t)) (sy (++⁻ʳᴬ xs t))
 
   via-≡ : ∀ {a} {X : Set a} (f : X → Bool) {x x′ : X} → x′ ≡ x → f x′ ≡ true → f x ≡ true
   via-≡ f refl p = p
