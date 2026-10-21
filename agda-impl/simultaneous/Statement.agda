@@ -232,9 +232,9 @@ postulate
 
 -- Induction on (n , program), as `approx` recurses.
 approx-sound : ∀ {Γ A} n (o : SObs Γ A) {ρ : DenEnv (L.map IE Γ)} → Sounds ρ → Sound (approx n (elaborate o) ρ)
-approx-sound n       (cold c)          ss = coldˢ-sound n c
-approx-sound n       empty             ss = emptyˢ-sound n
-approx-sound n       (of xs)           ss = ofˢ-sound n xs
+approx-sound {Γ} n   (cold c)     {ρ} ss = coldˢ-sound {Γ = L.map IE Γ} n c {ρ}
+approx-sound {Γ} {A} n empty      {ρ} ss = emptyˢ-sound {Γ = L.map IE Γ} {A = A} n {ρ}
+approx-sound {Γ} n   (of xs)      {ρ} ss = ofˢ-sound {Γ = L.map IE Γ} n xs {ρ}
 approx-sound n       (map f s)         ss = mapˢ-sound n f (elaborate s) (approx-sound n s ss)
 approx-sound n       (scan f z s)      ss = scanˢ-sound n f z (elaborate s) (approx-sound n s ss)
 approx-sound n       (takeWhile i p s) ss = takeWhileˢ-sound n i p (elaborate s) (approx-sound n s ss)
