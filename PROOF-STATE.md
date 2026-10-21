@@ -12,10 +12,10 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 Whether a flatMap's meaning starts with its step's event; whether a
 connect's body never steps at or just past its source's step; whether a hushed
-node leaves nothing running; the step's parts placed.
-Settled when `first-flat`, `shy-before` and `hushed-cut` are bodies or refuted.
+flatMap leaves nothing running; the step's parts placed.
+Settled when `first-flat`, `shy-before` and `hushed-flat` are bodies or refuted.
 
-Members: `first-flat`, `shy-before`, `hushed-cut`,
+Members: `first-flat`, `shy-before`, `hushed-flat`,
 `within-step`, `under-shown-connect`.
 
 #### UP-ENDED

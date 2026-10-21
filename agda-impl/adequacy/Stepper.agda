@@ -21,7 +21,7 @@ open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []�
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; subst)
 
 open import Tree using (Later)
-open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush; Pos; Timeline; From; Frame; idle; ix; sub; last; _<ᵖ_; _∪_;
+open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush; Pos; Timeline; From; Frame; idle; ix; sub; last; _<ᵖ_; _∪_; Tail; pin;
   <ᵖ-trans; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-below; <ᵖ-split; <ᵖ-step; <ᵖ-part)
 open import denotation.MonotonicList using (Agree; Agreeᵀ; stop; stopᵀ; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agreeᵀ-refl; agreeᵀ-sym; agree-trans)
 open import denotation.NonExpansive using (Agreeˢ; _,ˢ_; beside-ne; body-ne; before-agree; ∪-ne; burstOn-ne)
@@ -478,9 +478,10 @@ postulate
              → Sane (runs ∷ᴬ ν) b → Sane ν s → Placed b (U.meaning s ρ ∷ᴬ ρ) → Placed s ρ → Shy (U.step b) (U.step s)
              → ∀ k → U.headˢ (U.step b) ≡ just k → U.beforeˢ k (U.step s) ≡ true
 
-  -- A node that never shows again leaves nothing running when cut.
-  hushed-cut : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (s : U.Node Γ A) (ρ : NEnv Γ) → Sane ν s → Placed s ρ
-             → U.meaning s ρ ≡ hush → ∀ d → Agreeᵀ d (U.cutᴺ s ρ) idle
+  -- A flatMap that never shows again leaves nothing running when cut.
+  hushed-flat : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} op (g : A → Pos → U.Node Γ B) o ls qs pl (ρ : NEnv Γ)
+              → Sane ν (U.flatMapᶜ op g o ls qs pl) → Placed (U.flatMapᶜ op g o ls qs pl) ρ
+              → U.meaning (U.flatMapᶜ op g o ls qs pl) ρ ≡ hush → U.cutᴺ (U.flatMapᶜ op g o ls qs pl) ρ ≡ idle
 
   -- Past its source's end, a connect runs its source's rest's skip
   -- first when it shows before the body's; else the body's, shut.
@@ -1101,6 +1102,104 @@ shy-clear : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (b : U.Node (A ∷ Γ) B)
 shy-clear {ν = ν} b s ρ sb ss pb ps sks shy cl with U.headˢ (U.step b) in hb
 ... | just k  = shown-past k (U.meaning s ρ) (floor s ρ k ss ps (shy-before b s ρ sb ss pb ps shy k hb) (clear-floor ν ρ cl))
 ... | nothing = quiet {ν = ν} s ρ sks cl (U.step s) refl (subst (λ t → Shy t (U.step s)) (head-none (U.step b) hb) shy)
+
+-- A tail run silent is idle.
+tail-hush : ∀ {A} (t : Tail) → M′.tailᴱ {A} t ≡ hush → t ≡ idle
+tail-hush (pin k r) ()
+tail-hush idle      _ = refl
+
+map-hush : ∀ {A B} (f : A → B) (x : Events A) → M′.mapᴱ f x ≡ hush → x ≡ hush
+map-hush f (out k a r) ()
+map-hush f (skip k r)  ()
+map-hush f (end k)     ()
+map-hush f hush        _ = refl
+
+scan-hush : ∀ {A B} (f : B → A → B) z (x : Events A) → M′.scanᴱ f z x ≡ hush → x ≡ hush
+scan-hush f z (out k a r) ()
+scan-hush f z (skip k r)  ()
+scan-hush f z (end k)     ()
+scan-hush f z hush        _ = refl
+
+taking-loud : ∀ {A} i (p : A → Bool) k a b r → M′.taking i p k a b r ≢ hush
+taking-loud i     p k a true  r ()
+taking-loud true  p k a false r ()
+taking-loud false p k a false r ()
+
+take-hush : ∀ {A} i (p : A → Bool) (x : Events A) → M′.takeWhileᴱ i p x ≡ hush → x ≡ hush
+take-hush i p (out k a r) eq = ⊥-elim (taking-loud i p k a (p a) r eq)
+take-hush i p (skip k r)  ()
+take-hush i p (end k)     ()
+take-hush i p hush        _ = refl
+
+body-loud : ∀ {A B} r (σ : Events∞ A) q (y : Events B) → y ≢ hush → M′.body r σ q y ≢ hush
+body-loud r σ q (out k a β) nh ()
+body-loud r σ q (skip k β)  nh ()
+body-loud r σ q (end c)     nh ()
+body-loud r σ q hush        nh _ = nh refl
+
+skip-loud : ∀ {A} k (τ : Events∞ A) → skip k τ ≢ hush
+skip-loud k τ ()
+
+-- A connect silent: its source silent, and its body.
+side-hush : ∀ {A B} r (β : Events∞ B) (σ : Events∞ A) (x : Events A) → M′.side r β σ x ≡ hush → x ≡ hush × force β ≡ hush
+side-hush r β σ x eq with hush? x
+... | inj₁ ex = ex , subst (λ y → M′.side r β σ y ≡ hush) ex eq
+... | inj₂ nx with ahead-split r β σ (M′.shownAt x)
+...   | inj₁ (bt , τ , ea) = ⊥-elim (skip-loud _ τ (trans (sym ea) (trans (sym (side-ahead r β σ x nx)) eq)))
+...   | inj₂ (bf , ea)     = ⊥-elim (body-loud r σ _ (force β) (before-false _ (force β) bf) (trans (sym ea) (trans (sym (side-ahead r β σ x nx)) eq)))
+
+run-hush : ∀ {A} r (x : Events A) t → x ≡ hush → M′.runOn r x t ≡ t
+run-hush r .hush t refl = refl
+
+idle-∪ : ∀ {t u} → t ≡ idle → u ≡ idle → t ∪ u ≡ idle
+idle-∪ refl refl = refl
+
+-- A rest-like that never shows again leaves nothing running.
+rested-idle : ∀ {Γ A} (t : U.Node Γ A) (ρ : NEnv Γ) → Rested t → U.meaning t ρ ≡ hush → U.cutᴺ t ρ ≡ idle
+rested-idle (U.restᶜ n)               ρ _ eq = tail-hush _ eq
+rested-idle U.idleᶜ                   ρ _ _  = refl
+rested-idle (U.unionᶜ x y)            ρ _ eq = tail-hush _ eq
+rested-idle (U.burstingᶜ r t)         ρ _ eq = tail-hush _ eq
+rested-idle (U.underᶜ (U.live s) b)   ρ _ eq = tail-hush _ eq
+rested-idle (U.underᶜ (U.ended c t) b) ρ _ eq = tail-hush _ eq
+rested-idle (U.framesᶜ τ e m)            ρ () _
+rested-idle (U.burstᶜ τ r k f)           ρ () _
+rested-idle (U.ofᶜ p k xs)               ρ () _
+rested-idle (U.mapᶜ f c)                 ρ () _
+rested-idle (U.scanᶜ f z c)              ρ () _
+rested-idle (U.takeWhileᶜ k p c)         ρ () _
+rested-idle (U.flatMapᶜ op g o ls qs pl) ρ () _
+rested-idle (U.joinᶜ j p xs e)           ρ () _
+rested-idle (U.connectᶜ r b s)           ρ () _
+rested-idle (U.deferᶜ l p ns)            ρ () _
+rested-idle (U.endingᶜ p n)              ρ () _
+
+-- A node that never shows again leaves nothing running when cut.
+cut-idle : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (s : U.Node Γ A) (ρ : NEnv Γ) → Sane ν s → Placed s ρ
+         → U.meaning s ρ ≡ hush → U.cutᴺ s ρ ≡ idle
+cut-idle (U.framesᶜ τ e m)  ρ _ _ _ = refl
+cut-idle (U.burstᶜ τ r i b) ρ _ _ _ = refl
+cut-idle (U.ofᶜ p i xs)     ρ _ _ _ = refl
+cut-idle (U.mapᶜ f c)         ρ sn (_ , pl) eq = cut-idle c ρ sn pl (map-hush f _ eq)
+cut-idle (U.scanᶜ f z c)      ρ sn (_ , pl) eq = cut-idle c ρ sn pl (scan-hush f z _ eq)
+cut-idle (U.takeWhileᶜ i p c) ρ sn (_ , pl) eq = cut-idle c ρ sn pl (take-hush i p _ eq)
+cut-idle (U.flatMapᶜ op g o ls qs pl) ρ sn pd eq = hushed-flat op g o ls qs pl ρ sn pd eq
+cut-idle (U.joinᶜ i p xs e) ρ _ _ _ = refl
+cut-idle (U.connectᶜ r b (U.live s)) ρ (sb , ss) (_ , pb , ps) eq with side-hush r (U.stateᴺ b (U.meaning s ρ ∷ᴬ ρ)) (U.stateᴺ s ρ) (U.meaning s ρ) eq
+... | es , eb = idle-∪ (trans (run-hush r _ _ es) (cut-idle s ρ ss ps es)) (cut-idle b _ sb pb eb)
+cut-idle (U.connectᶜ r b (U.ended c t)) ρ (sb , rt) (_ , pb) eq with side-hush r (U.stateᴺ b (end c ∷ᴬ ρ)) (U.stateᴺ t ρ) (U.meaning t ρ) eq
+... | et , eb = idle-∪ (trans (run-hush r _ _ et) (rested-idle t ρ rt et)) (cut-idle b _ sb pb eb)
+cut-idle (U.deferᶜ l p ns)  ρ _ _ _ = refl
+cut-idle (U.endingᶜ p n)    ρ _ _ ()
+cut-idle (U.restᶜ n)        ρ _ _ eq = rested-idle (U.restᶜ n) ρ tt eq
+cut-idle U.idleᶜ            ρ _ _ _  = refl
+cut-idle (U.unionᶜ x y)     ρ _ _ eq = rested-idle (U.unionᶜ x y) ρ tt eq
+cut-idle (U.burstingᶜ r t)  ρ _ _ eq = rested-idle (U.burstingᶜ r t) ρ tt eq
+cut-idle (U.underᶜ s b)     ρ _ _ eq = rested-idle (U.underᶜ s b) ρ tt eq
+
+hushed-cut : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (s : U.Node Γ A) (ρ : NEnv Γ) → Sane ν s → Placed s ρ
+           → U.meaning s ρ ≡ hush → ∀ d → Agreeᵀ d (U.cutᴺ s ρ) idle
+hushed-cut s ρ ss ps eq d = subst (λ t → Agreeᵀ d t idle) (sym (cut-idle s ρ ss ps eq)) (agreeᵀ-refl d idle)
 
 -- A connect's body showing first: what it shows, the source carried.
 body-skips : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ)
