@@ -24,12 +24,11 @@ open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import denotation.MonotonicList.Events using (Events∞; skip; Pos; Timeline; _<ᵖ_)
+open import denotation.MonotonicList.Events using (Events∞; skip; Pos; Timeline)
 open import denotation.MonotonicList using (Agree)
 import denotation.Unfold as U
 open import denotation.MonotonicList.Events using () renaming (sub to subᴾ)
 open import adequacy.Sorted.Walk using (module SortingWalk)
-open import adequacy.Sorted using (_≤ᵖ_)
 open import operation.Machine using (module Machine)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Strong.Against using (module StrongAgainst)
@@ -121,7 +120,7 @@ module ClimbFlat (R : Set) where
   open EverywhereGated R using (module Growths)
   open Replanting R using (Kin; kin-end; kin-pool; kin-feed; kin-fin; kin-lane; rehomes; rehomes-code; restack; reticked; owned-run; module Shift; Heading; Lingering; Gone; store-held; Lives; lives-off; ahead-under)
   open Read
-  open ClimbBase R using (lifts-planted; lefts-planted; tick-under; healed-off; module Framed; flat-stays)
+  open ClimbBase R using (lifts-planted; lefts-planted; tick-under; healed-off; module Framed; flat-stays; heads-pinned; heads-union)
   open ClimbTake R using (rise; open-code; writes; reads)
 
   -- A climbing signal's path reads open: an emitter whose observer path
@@ -469,6 +468,12 @@ module ClimbFlat (R : Set) where
         (Heaps.fed-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl} u ls (sd-alike (fresh-path ρ fs)))
         (store-keeps H (FlatKit.Flat.outerDone fl) _ (λ ()) (λ ()) (λ ()) (λ ()))
 
+    -- The done flag no read of what the flatMap leaves running.
+    sd-left : AllPairs _≢_ (names w₀) → ∀ {C} → At.leftover H {B = C} w₀ ≡ At.leftover H′ {B = C} w₀
+    sd-left fr {C} =
+      cong₂ U.unionᶜ (leftover-alike H H′ {B = C} u (Heaps.flat-so H H′ {fl = fl} {oc} {k} {r} {u} {ls} (sd-alike fr)))
+                     (leftoverL-alike H H′ {B = C} ls (Heaps.flat-ls H H′ {fl = fl} {oc} {k} {r} {u} {ls} (sd-alike fr)))
+
     sd-part-at : ∀ pl′ → AllPairs _≢_ (names w₀) → At.part H′ (flatMapˢ op f fl oc k r pl′ u ls) ≡ At.part H (flatMapˢ op f fl oc k r pl′ u ls)
     sd-part-at pl′ fr@(_ ∷ a₁ ∷ _) =
       part-flat H H′ {op = op} {f} {fl} {oc} {k} {r} {pl′} u ls (look-store H (FlatKit.Flat.outerDone fl) (FlatKit.Flat.queue fl) (lookupᴬ a₁ (here refl)))
@@ -656,31 +661,25 @@ module ClimbFlat (R : Set) where
         G   = λ a j → U.subscribe (f a) j
         pl′ = U.unionᶜ pl (U.restᶜ o₀)
 
-  -- Heads read off a step pinned alike.
-  heads-pinned : ∀ {Γ A B q} {st : U.Step Γ A} {st′ : U.Step Γ B} → Pinned st st′
-               → (∀ {k} → U.headˢ st′ ≡ just k → q ≤ᵖ k) → ∀ {k} → U.headˢ st ≡ just k → q ≤ᵖ k
-  heads-pinned pinned   h e = h e
-  heads-pinned unpinned h ()
+  -- An outer's end with no lane part left: what the flatMap leaves
+  -- running heads where its outer's and its lanes' leftovers do.
+  module OuterRest {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+                   {u : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)}
+                   (ρ : Path T (flatMapˢ op f fl oc k r pl u ls)) {ks} (cl : Calling g ℓ m₁ (ρ ⊕ in-outer here) (closes ks))
+                   (nl : At.partLanes (Conf.heap (Mach.conf m₁)) ls ≡ []) where
+    private
+      H = Conf.heap (Mach.conf m₁)
 
-  -- Two rests side by side head where either does.
-  heads-union : ∀ {Γ B q} (x : U.Node Γ B) sx y sy → (∀ {k} → U.headˢ sx ≡ just k → q ≤ᵖ k) → (∀ {k} → U.headˢ sy ≡ just k → q ≤ᵖ k)
-              → ∀ {k} → U.headˢ (U.unionˢ x sx y sy) ≡ just k → q ≤ᵖ k
-  heads-union x (U.skipˢ k x′) y (U.skipˢ k′ y′) hx hy e with k <ᵖ k′
-  ... | true  = hx e
-  ... | false = hy e
-  heads-union x (U.skipˢ _ _)   y (U.outˢ _ _ _) hx hy e = hx e
-  heads-union x (U.skipˢ _ _)   y (U.endˢ _)     hx hy e = hx e
-  heads-union x (U.skipˢ _ _)   y U.hushˢ        hx hy e = hx e
-  heads-union x (U.outˢ _ _ _)  y sy             hx hy e = hy e
-  heads-union x (U.endˢ _)      y sy             hx hy e = hy e
-  heads-union x U.hushˢ         y sy             hx hy e = hy e
+    postulate
+      -- Lanes none of which holds a part: what they leave running heads
+      -- no earlier than the run.
+      lanes-rest-heads : Heads (Conf.pos (Mach.conf m₁)) (U.restᶜ {B = ⊤} (At.leftoverL H {B = ⊤} ls))
 
-  -- A sub whose close the run calls: what it leaves running heads no
-  -- earlier than the run.
-  postulate
-    closed-rest-heads : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
-                          (σ : Path T v) {ks} → Calling g ℓ m₁ σ (closes ks)
-                        → Heads (Conf.pos (Mach.conf m₁)) (U.restᶜ {B = ⊤} (At.leftover (Conf.heap (Mach.conf m₁)) {B = ⊤} v))
+    outer-rest-heads : Heads (Conf.pos (Mach.conf m₁)) (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} (flatMapˢ op f fl oc k r pl u ls)))
+    outer-rest-heads =
+      heads-union (U.restᶜ (At.leftover H {B = ⊤} u)) (U.restˢ (At.leftover H {B = ⊤} u))
+                  (U.restᶜ (At.leftoverL H {B = ⊤} ls)) (U.restˢ (At.leftoverL H {B = ⊤} ls))
+                  (Calling.rest-heads cl) lanes-rest-heads
 
   -- The pool taking a closed node's rest heads where the pool did and
   -- the closed sub's leftover does.
@@ -731,7 +730,7 @@ module ClimbFlat (R : Set) where
       close-told  : ∀ {A′} (i : A′ ∈ᴸ Δ) {b₀} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just b₀ → untold i pl′ ⊆ᴾ untold i b₀
 
     close-heads : ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just c → Heads q pl → Heads q pl′
-    close-heads e₀ = pool-heads o₀ (proj₂ (Lingers.pools (Calling.lingers cl) ρ (lifts-seen L) e₀)) lo (closed-rest-heads (ρ ⊕ in-outer here) cl)
+    close-heads e₀ = pool-heads o₀ (proj₂ (Lingers.pools (Calling.lingers cl) ρ (lifts-seen L) e₀)) lo (Calling.rest-heads cl)
 
     close-heading : Heading H (Settles.H′ H ρ) q (flatMapˢ op f fl oc k r pl u ls) (flatMapˢ op f fl oc k r pl′ u ls)
     close-heading = P.heading (λ {A′} i {b₀} → close-told {A′} i {b₀}) close-heads
@@ -782,6 +781,7 @@ module ClimbFlat (R : Set) where
       ; owned = Settles.Fr.wr-owned hp ρ fs (Settles.sd-gone hp ρ (fresh-path ρ fs)) ow ; kernels = Settles.Fr.kernels hp ρ fs kn ; meaning = Settles.Fr.meaning hp ρ fs mn
       ; queue = Settles.Fr.queue hp ρ fs qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
       ; sorted = sorted-⇝ so path ; behind = Settles.sd-behind hp ρ fs bh
+      ; rest-heads = subst (λ x → Heads q (U.restᶜ {B = ⊤} x)) (Settles.sd-left hp ρ (fresh-path ρ fs)) (OuterRest.outer-rest-heads ρ cl (proj₁ nl))
       ; lingers = Settles.Fr.lingers hp ρ fs (ended-past cl) (Settles.sd-lingering hp ρ (fresh-path ρ fs) (trans (Settles.sd-part hp ρ (fresh-path ρ fs)) (flat-gone hp {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} gn (proj₁ nl) (proj₂ nl)))) lgr ; lefts = Settles.Fr.wr-lefts hp ρ fs Lo
                   (lefts-subst₂ (λ ls′ qs′ → U.outerˢ op (λ a j → U.subscribe (f a) j) o₀ (U.endˢ q) ls′ qs′ po) (proj₁ nl) (proj₂ nl) (lefts-up ρ (in-outer here) eqF lt))
       ; flags = Settles.sd-flags hp ρ fs gn dn ; kept = inj₁ refl }))

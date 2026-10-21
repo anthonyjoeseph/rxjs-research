@@ -178,7 +178,7 @@ module ClimbScan (R : Set) where
     rises {sg′ = sends z} (then refl (proj₂ (proj₂ wr))) (one-lower ρ one-scan) (record
       { sane = sn ; placed = pl ; deep = dp ; ctl = refl ; code = proj₁ (proj₂ wr) ; stack = sk
       ; lifted = U.scanᶜ f z c′ , scan-part hp {f = f} {r = r} {u = u} (fresh-path ρ fs) z pv , S , scan-lifts hp ρ fs z Lρ , sg
-      ; lefts = scan-lefts hp ρ fs z Lρ (lefts-up ρ (in-scan here) eqS lt)
+      ; lefts = scan-lefts hp ρ fs z Lρ (lefts-up ρ (in-scan here) eqS lt) ; rest-heads = tt
       ; owned = Scanned.scan-owned hp ρ fs z ow ; kernels = scan-kernels hp ρ fs z kn ; meaning = scan-meaning hp ρ fs z mn ; queue = Scanned.scan-queue hp ρ fs z qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
       ; sorted = sorted-⇝ so (then refl (proj₂ (proj₂ wr))) ; behind = scan-behind ρ cl ; lingers = Scanned.scan-lingers hp ρ fs z (ended-past cl) lgr ; flags = Scanned.scan-flags hp ρ fs z (done-up ρ (in-scan here) refl dn) ; kept = inj₁ refl })
@@ -195,4 +195,4 @@ module ClimbScan (R : Set) where
   ... | gn , S , L , sg , hl | lt with lifts-split ρ (in-scan here) L in eqS
   ...   | _ , lifts-scan lifts-here , Lρ = rose now (one-lower ρ one-scan) (recall cl {sg′ = closes ks} refl
     (subst (λ W → Calling.act cl ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-scan here) top) (Calling.code cl))
-    (cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.scanᶜ f (At.val (Conf.heap (Mach.conf m₁)) r))) gn , S , Lρ , sg , healed-split ρ (in-scan here) hl) (lefts-up ρ (in-scan here) eqS lt) (done-up ρ (in-scan here) refl (Calling.flags cl)))
+    (cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.scanᶜ f (At.val (Conf.heap (Mach.conf m₁)) r))) gn , S , Lρ , sg , healed-split ρ (in-scan here) hl) (lefts-up ρ (in-scan here) eqS lt) (Calling.rest-heads cl) (done-up ρ (in-scan here) refl (Calling.flags cl)))

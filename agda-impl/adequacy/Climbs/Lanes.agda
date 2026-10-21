@@ -205,6 +205,7 @@ module ClimbLanes (R : Set) where
       ; lifted = _ , pm
                  , S , subst (λ S′ → Lifts hp ρ (U.laneˢ op (λ a j → U.subscribe (f a) j) (At.part hp t) bs′ l S′ as′ (At.val hp (FlatKit.Flat.queue fl)) po) S)
                              (lane-step o LL) Lρ , sg
+      ; rest-heads = tt
       ; lefts = lefts-subst (λ S′ → U.laneˢ op (λ a j → U.subscribe (f a) j) (At.part hp t) bs′ l S′ as′ (At.val hp (FlatKit.Flat.queue fl)) po)
                             (lane-step o LL) (lefts-up ρ (in-lanes πL) eqL lt)
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = sorted-⇝ so p₁ ; behind = bh ; lingers = lgr ; flags = done-up ρ (in-lanes πL) (one-outers o) (Calling.flags cl) ; kept = inj₁ refl }))
