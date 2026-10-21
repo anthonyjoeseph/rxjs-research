@@ -53,6 +53,7 @@ open import adequacy.Lift using (module Lifting)
 open import adequacy.Lift.Order using (module LiftingOrder)
 open import adequacy.Lowers using (module Lowering)
 open import adequacy.Frame using (module Framing)
+open import adequacy.Told using (untold)
 open import adequacy.Frame.Repool using (module FramingRepool)
 open import adequacy.Grow using (module Growing)
 open import adequacy.Fork using (module Forking)
@@ -83,7 +84,7 @@ module ClimbTake (R : Set) where
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
   open Strongly R using (Feed; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; joiner; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; here; module At; fired; Path; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; ending; taken; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; outers; outersL; outers-⊕; unsub; Owes; Settled; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open StrongAgainst R using (Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
-  open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering)
+  open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering; Untold) renaming (Ended to Ends)
   open StrongAgainst.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf; src-of) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
   open Moving R using (pairs-r; pairs-split; plant-self; takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
@@ -110,8 +111,8 @@ module ClimbTake (R : Set) where
   open Keeping R using (seen-planted)
   open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ⊆-⊑; Pred; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; tw-alike)
   open ShiftWalk R using (let-go; grip)
-  open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined)
-  open FramingRepool R using (Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
+  open Framing R using (merged-eq; heads-flat; just-of; scan-part; scan-defined)
+  open FramingRepool R using (none-of; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off)
   open Staging R using (not-src; wrap-lane)
   open Weakening R using (Grows; pure-map) renaming (module Grown to Weakened)
   open WeakeningHeaps R using () renaming (module GrownHeaps to Weakened′)
@@ -193,6 +194,12 @@ module ClimbTake (R : Set) where
                → Each H (Heads q) T → Each H (Heads q) T′
     end-behind fs ut en lv pv = Shift.shift-behind H H ρ (λ j _ → refl) [] fs v ut en (end-heading lv pv)
 
+    end-told : AllPairs _≢_ (names T) → Untold H q T → Ends H T → At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′ → Untold H q T′
+    end-told fs ut en lv pv = Shift.shift-told H H ρ (λ j _ → refl) [] fs v ut en (end-heading lv pv)
+
+    end-ended : AllPairs _≢_ (names T) → Ends H T → At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′ → Ends H T′
+    end-ended fs en lv pv = Shift.shift-ended H H ρ (λ j _ → refl) [] fs v en (end-lingering lv pv)
+
     end-flags : AllPairs _≢_ (names T) → At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′ → DoneBy H T (outers ρ) → DoneBy H T′ (outers (planted ρ v))
     end-flags fs lv pv d =
       subst (DoneBy H T′) (sym (outers-planted ρ v))
@@ -205,6 +212,10 @@ module ClimbTake (R : Set) where
     out-behind : AllPairs _≢_ (names T) → Untold H q T → Ends H T → At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′
                → Each H (Heads q) T → Each H (Heads (q ++ [ ix 0 ])) T′
     out-behind fs ut en lv pv bh = out-deeper (end-behind fs ut en lv pv bh)
+
+    -- The untold and ended invariants after a failing take.
+    postulate
+      out-told : AllPairs _≢_ (names T) → Untold H q T → Ends H T → At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′ → Untold H (q ++ [ ix 0 ]) T′
 
     -- The take's stage read by its part alone: no kernel, feed or queue
     -- clause moves.
@@ -248,7 +259,7 @@ module ClimbTake (R : Set) where
         ; kernels = Ended.end-kernels hp ρ q c′ kn ; meaning = Ended.end-meaning hp ρ q c′ mn ; queue = Ended.end-queue hp ρ q c′ qu
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs
                          ; clocked = proj₁ ck , Ended.end-ticked hp ρ q c′ clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
-        ; sorted = sorted-⇝ so (then refl now) ; behind′ = Eaching.each-to _ _ (Ended.end-behind hp ρ q c′ fs (tells-past cl) (ended-past cl) lv pv bh) ; lingers′ = Lingering.lingers-to _ (Ended.end-lingers hp ρ q c′ fs (ended-past cl) lv pv lgr) ; flags = let-go hp (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs) (lifts-seen (lifts-planted ρ v Lρ))
+        ; sorted = sorted-⇝ so (then refl now) ; behind′ = Eaching.each-to _ _ (Ended.end-behind hp ρ q c′ fs (Calling.told cl) (Calling.ended cl) lv pv bh) ; told = Ended.end-told hp ρ q c′ fs (Calling.told cl) (Calling.ended cl) lv pv ; ended = Ended.end-ended hp ρ q c′ fs (Calling.ended cl) lv pv ; lingers′ = Lingering.lingers-to _ (Ended.end-lingers hp ρ q c′ fs (Calling.ended cl) lv pv lgr) ; flags = let-go hp (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs) (lifts-seen (lifts-planted ρ v Lρ))
                          (cong is-just (ending-part hp {i = false} {p = p} {c = c} {k = k} {u = u} lv)) (Ended.end-flags hp ρ q c′ fs lv pv (done-up ρ (in-take here) refl dn)) }
     , ag , inj₂ (pend-plant {t = T} ρ v refl , inj₁ (takes-less ρ v ≤-refl))
     where
@@ -285,7 +296,7 @@ module ClimbTake (R : Set) where
       ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs
                        ; clocked = trans (proj₁ ck) (sym (tick-ix0 q)) , proj₁ ck , Ended.end-ticked hp ρ q c′ clk sk (proj₂ ck)
                        ; paidUp = pu ; running = rn }
-      ; sorted = sorted-⇝ so (then refl path) ; behind = Ended.out-behind hp ρ q c′ fs (tells-past cl) (ended-past cl) lv pv bh ; lingers = Ended.end-lingers hp ρ q c′ fs (ended-past cl) lv pv lgr ; flags = Ended.end-flags hp ρ q c′ fs lv pv (done-up ρ (in-take here) refl dn)
+      ; sorted = sorted-⇝ so (then refl path) ; behind = Ended.out-behind hp ρ q c′ fs (Calling.told cl) (Calling.ended cl) lv pv bh ; told = Ended.out-told hp ρ q c′ fs (Calling.told cl) (Calling.ended cl) lv pv ; ended = Ended.end-ended hp ρ q c′ fs (Calling.ended cl) lv pv ; lingers = Ended.end-lingers hp ρ q c′ fs (Calling.ended cl) lv pv lgr ; flags = Ended.end-flags hp ρ q c′ fs lv pv (done-up ρ (in-take here) refl dn)
       ; kept = inj₂ (inj₂ (pend-plant {t = T} ρ v refl , inj₁ (takes-less ρ v ≤-refl))) })
     where
       v = takeWhileˢ true p c k (Strongly.ending q c′) u
@@ -327,7 +338,7 @@ module ClimbTake (R : Set) where
   call-take st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {i = i} {p = p} {c = c} {k = k} {u = u} ρ {closes ks}
     record { sane = sn ; placed = pl ; deep = dp ; ctl = refl ; code = cd ; stack = sk ; lifted = gn , S , L , sg , hl ; owned = ow
            ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
-           ; behind = bh ; lingers = lgr ; lefts = lt ; rest-heads = rh ; flags = dn ; kept = kp }
+           ; behind = bh ; lingers = lgr ; told = tl ; ended = ed ; lefts = lt ; rest-heads = rh ; flags = dn ; kept = kp }
     with lifts-split ρ (in-take here) L in eqC | subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-take here) top) cd
   ... | _ , lifts-take lv lifts-here , Lρ | readRef≗ refl f =
     rose {sg′ = closes ks} (then refl now) (one-lower ρ one-take) (record
@@ -338,7 +349,7 @@ module ClimbTake (R : Set) where
       ; lefts = lefts-up ρ (in-take here) eqC lt ; rest-heads = rh
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
-      ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; lingers = lgr ; flags = done-up ρ (in-take here) refl dn ; kept = kp })
+      ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; lingers = lgr ; told = tl ; ended = ed ; flags = done-up ρ (in-take here) refl dn ; kept = kp })
 
   -- A write, one step: the cell stored, what follows it run.
   writes : ∀ {h} {hp : Heapᴹ h} {q w} {σ : w ⊑ h} {K : Stack w ⊤} {clk ts bs td lg en mk} {a : Act h ⊤} {t} {r : Ref h t} {z} {n : Act h ⊤}

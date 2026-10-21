@@ -58,7 +58,7 @@ module Staging (R : Set) where
   open Run.Kit (Pureᴾ R) using (skipᴬ)
   open Strongly R using (Sub; pendingˢ; ofˢ; mapˢ; connectˢ; Lane; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_; Here; walk; top; of-leaf; Call; emitC; kontC; _≗_; module At; names; pendings; Phase; ≗-refl; unsubscribing; under≗) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open StrongAgainst R using (Twin; tw-refl; leaves; Books; Job; Owned; Kernels; Meaning; Queue; Each; Lingers; Pinned; unpinned; rest-pinned; seen; owned-to) renaming (at⟦_⟧ to at⟦_⟧ᶜ)
-  open StrongHeld R using (Carried; carried; Heads; module Eaching; module Lingering)
+  open StrongHeld R using (Carried; carried; Heads; module Eaching; module Lingering; Untold; Ended)
   open StrongAgainst.Against R using (StackAs; subAs; runAs; SrcOf; src-of)
   open Moving R using (planted; pend; syn-pos; part-plant; names-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant; head-map)
   open EverywhereGated.Holding R using (holds-plant)
@@ -206,6 +206,11 @@ module Staging (R : Set) where
                → Owned H T₀ (subAs {act = act} π cd sk a) → Owned H t′ (subAs {act = act} π′ cd′ (restack sk a) a′)
     rm-owned H sk a ow = Moved.Owning.reowned π v H refl (in-map here) inner sk a ow
 
+    -- The untold and ended invariants persist across a map restage.
+    postulate
+      rm-told : ∀ (H : Heapᴹ h) {p} → Untold H p T₀ → Untold H p t′
+      rm-ended : ∀ (H : Heapᴹ h) → Ended H T₀ → Ended H t′
+
     -- The map's heads are its source's.
     rm-behind : ∀ (H : Heapᴹ h) {p} → Each H (Heads p) T₀ → Each H (Heads p) t′
     rm-behind H {p} = each-plant H π v refl tr
@@ -257,7 +262,7 @@ module Staging (R : Set) where
            ; books = record { fresh = subst (AllPairs _≢_) (sym M.names′) (Books.fresh bk)
                             ; clocked = proj₁ (Books.clocked bk) , N.reticked sk a (proj₂ (Books.clocked bk))
                             ; paidUp = Books.paidUp bk ; running = Books.running bk }
-           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (M.rm-behind H (Carried.behind cr)) ; lingers′ = Lingering.lingers-to _ (M.rm-lingers H (Carried.lingers cr)) ; flags = flags-plant H π M.v refl (λ { (in-map ()) }) (Carried.flags cr) }
+           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (M.rm-behind H (Carried.behind cr)) ; told = M.rm-told H (Carried.told cr) ; ended = M.rm-ended H (Carried.ended cr) ; lingers′ = Lingering.lingers-to _ (M.rm-lingers H (Carried.lingers cr)) ; flags = flags-plant H π M.v refl (λ { (in-map ()) }) (Carried.flags cr) }
     , refl , inj₁ (inj₁ M.less)
     where module M = Mapped π
           module N = Moved π M.v
@@ -321,6 +326,11 @@ module Staging (R : Set) where
              ; joined  = subst₂ (At.Joined H) (sym (subjects-plant π v refl)) (sym (joiners-plant π v (λ _ → refl) [])) (Queue.joined qu)
              ; ordered = Queue.ordered qu ; ahead = Queue.ahead qu }
 
+    -- The untold and ended invariants persist across an of restage.
+    postulate
+      of-told : ∀ (H : Heapᴹ h) {p} → Untold H p T₀ → Untold H p t′
+      of-ended : ∀ (H : Heapᴹ h) → Ended H T₀ → Ended H t′
+
     -- The `of`'s heads are the subscription's.
     of-behind : ∀ (H : Heapᴹ h) {p} → Each H (Heads p) T₀ → Each H (Heads p) t′
     of-behind H {p} = each-plant H π v (eqp H) tr
@@ -349,7 +359,7 @@ module Staging (R : Set) where
            ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant π O.v refl)) (Books.fresh bk)
                             ; clocked = proj₁ (Books.clocked bk) , N.reticked sk a (proj₂ (Books.clocked bk))
                             ; paidUp = Books.paidUp bk ; running = Books.running bk }
-           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (O.of-behind H (Carried.behind cr)) ; lingers′ = Lingering.lingers-to _ (O.of-lingers H (Carried.lingers cr)) ; flags = flags-plant H π O.v (O.eqp H) (λ ()) (Carried.flags cr) }
+           ; sorted = Carried.sorted cr ; behind′ = Eaching.each-to _ _ (O.of-behind H (Carried.behind cr)) ; told = O.of-told H (Carried.told cr) ; ended = O.of-ended H (Carried.ended cr) ; lingers′ = Lingering.lingers-to _ (O.of-lingers H (Carried.lingers cr)) ; flags = flags-plant H π O.v (O.eqp H) (λ ()) (Carried.flags cr) }
     , q , O.π′ , refl , inj₁ (inj₁ O.less)
     where module O = Offered π (sp q) cs
           module N = Moved π O.v

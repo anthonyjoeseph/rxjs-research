@@ -63,7 +63,7 @@ module Scanning (R : Set) where
   open Run (Pureᴾ R) using (done; compile; Env; wkEnv; wkObs; wkKont)
   open Strongly R using (Sub; pendingˢ; Path; here; in-scan; _⊕_; Here; walk; top; _≗_; module At; names; pendings; Phase; scanˢ; newRef≗; module Canon)
   open StrongAgainst R using (Twin; tw-refl; leaves; Books; Job; Kernels; Meaning; Queue; Each; Lingers; rest-pinned; seen; owned-to)
-  open StrongHeld R using (Carried; Heads; DoneBy; module Eaching; module Lingering)
+  open StrongHeld R using (Carried; Heads; DoneBy; module Eaching; module Lingering; Untold; Ended)
   open StrongAgainst.Against R using (subAs; SrcOf; src-of)
   open Moving R using (planted; pend; part-plant; fed-plant; pendings-plant; subjects-plant; joiners-plant; head-scan)
   open EverywhereGated.Holding R using (holds-plant)
@@ -158,6 +158,11 @@ module Scanning (R : Set) where
           tr : Each H′ (Heads p) (pendingˢ (T.scan f z s) q) → Each H′ (Heads p) v
           tr eu = record { parts = pa eu ; pools = λ { (in-scan ()) } ; rests = λ { (in-scan ()) } }
 
+      -- The untold and ended invariants survive the scan restage.
+      postulate
+        rs-told : ∀ {p} → Untold H′ p T₁ → Untold H′ p t′
+        rs-ended : Ended H′ T₁ → Ended H′ t′
+
       -- A scan runs what its source runs.
       rs-lingers : Lingers H′ T₁ → Lingers H′ t′
       rs-lingers = lingers-plant H′ π₁ v eqv (λ {C} → leaves (λ ρ _ k → agree-refl k _) (λ ρ d → d) (rest-pinned (U.subscribe s q)) , λ ρ d → d) (record { pools = λ { (in-scan ()) } ; rests = λ { (in-scan ()) } })
@@ -200,7 +205,10 @@ module Scanning (R : Set) where
                               ; clocked = proj₁ (Books.clocked bk) , S.reticked sk₁ a₁ (G.grow-ticked sk (proj₂ (Books.clocked bk)))
                               ; paidUp = cong (mapList (wkTodo new)) (Books.paidUp bk) ; running = Books.running bk }
              ; sorted = sorted-⇝ (Carried.sorted cr) (then refl now) ; behind′ = Eaching.each-to _ _ (S.rs-behind H′ eqv (G′.grow-each gr (Carried.behind cr)))
-             ; lingers′ = Lingering.lingers-to _ (S.rs-lingers H′ eqv (G′.grow-lingers gr (Carried.lingers cr))) ; flags = S.rs-flags H′ eqv (G′.grow-flags gr (Carried.flags cr)) }
+             ; lingers′ = Lingering.lingers-to _ (S.rs-lingers H′ eqv (G′.grow-lingers gr (Carried.lingers cr)))
+             ; told = S.rs-told H′ eqv (G′.grow-told gr (Carried.told cr))
+             ; ended = S.rs-ended H′ eqv (G′.grow-ended gr (Carried.ended cr))
+             ; flags = S.rs-flags H′ eqv (G′.grow-flags gr (Carried.flags cr)) }
     , refl , inj₁ (inj₁ S.less)
     where module S = Scanned {f = f} {z = z} {s = s} π
           module G = Grown S.ν

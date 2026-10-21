@@ -33,7 +33,7 @@ open import adequacy.Strong.Held using (module StrongHeld)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Retag using (Retag; keep; module Retagging)
 open import adequacy.Torn using (module Tearing)
-open import adequacy.Frame using (module Framing)
+open import adequacy.Told using (untold)
 open import adequacy.Frame.Repool using (module FramingRepool)
 open import adequacy.Shift using (module Shifting)
 open import adequacy.Shift.Walk using (module ShiftWalk)
@@ -45,13 +45,12 @@ module Replanting (R : Set) where
   open Pure R using (Timer; cascade)
   open Strongly R using (Sub; Path; PathLanes; _⊕_; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; Lane; lane; Call; emitC; kontC; take1C; take2C; bodyC; feedC; finC; srcC; code; Leaf; of-leaf; cold-leaf; done-leaf; join-leaf; walk; walkLanes; top; module Here; unsub; unsubscribing; playing; fired; taken; pendingˢ; ofˢ; doneˢ; mapˢ; scanˢ; joinˢ; deferˢ; coldˢ; takeWhileˢ; flatMapˢ; connectˢ; taking; ending; idle; feeding; finishing; outers; Name; names; laneNames; cutNames; quietName; subjectNames; flatNames; module At; _≗_) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open StrongAgainst R using (spot; Owned; Each; Lingers; Pinned) renaming (Twin to Twinᴺ)
-  open StrongHeld R using (Heads; DoneBy)
+  open StrongHeld R using (Heads; DoneBy; Untold; Ended)
   open StrongAgainst.Against R using (StackAs; BurstAs; Held; bottomAs; restAs; backAs; reholdAs; playsAs; firesAs; overAs; bottomᴴ; restᴴ; BurstClocked; Ticked; CtlAs; runAs)
   open Moving R using (plant; plantᴸ; planted; plant-self; pairs-r; pairs-split; Same; same; same-map; same-scan; same-take; same-flat; same-connect; same-defer)
   open Retagging R using (retag; retagᴸ)
   open Tearing R using (Off; look-either; fresh-path; part-alike; names-path; lanes-path; apart-r; apart-l; narrow)
-  open Framing R using (untold)
-  open FramingRepool R using (Untold; Ended)
+  open FramingRepool R using ()
   open Shifting R using (_⊑[_/_]_; Pred; Bound)
   open ShiftWalk R using (module Walk)
 
@@ -491,6 +490,11 @@ module Replanting (R : Set) where
     shift-behind : (v : Sub h Δ A) → ∀ {q} → Untold H q T → Ended H T → Heading H H′ q (Bound H ρ) u v → Each H (Heads q) T → Each H′ (Heads q) (plant ρ v)
     shift-behind v {q} ut en hd ev =
       Walk.Behind.shiftE H H′ {u = u} v offU (Heading.head-revive hd) q (Bound H ρ) (λ i b e₀ e′ → Heading.head-told hd i b e₀ e′) (Heading.head-below hd) ρ fs ev ut en (λ j b → b)
+
+    -- The untold and ended invariants shift to the replanted tree.
+    postulate
+      shift-told : (v : Sub h Δ A) → ∀ {q} → Untold H q T → Ended H T → Heading H H′ q (Bound H ρ) u v → Untold H′ q (plant ρ v)
+      shift-ended : (v : Sub h Δ A) → Ended H T → Lingering H H′ u v → Ended H′ (plant ρ v)
 
     -- Every flag named above the node still unset, every other reading
     -- its outer as before; the names the write let go, below the node.

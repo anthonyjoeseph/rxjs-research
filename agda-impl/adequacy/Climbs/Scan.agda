@@ -77,7 +77,7 @@ module ClimbScan (R : Set) where
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
   open Strongly R using (Feed; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; joiner; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; here; module At; fired; Path; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; ending; taken; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; outers; outersL; outers-⊕; unsub; Owes; Settled; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open StrongAgainst R using (Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
-  open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering)
+  open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering; Untold) renaming (Ended to Ends)
   open StrongAgainst.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf; src-of) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
   open Moving R using (pairs-r; pairs-split; plant-self; takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
@@ -104,8 +104,8 @@ module ClimbScan (R : Set) where
   open Keeping R using (seen-planted)
   open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; tw-alike)
   open ShiftWalk R using (let-go; grip)
-  open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined)
-  open FramingRepool R using (Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
+  open Framing R using (merged-eq; heads-flat; just-of; scan-part; scan-defined)
+  open FramingRepool R using (none-of; scan-kernels; scan-meaning; scan-lifts; scan-behind; scan-told; scan-ended; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off)
   open FramingLefts R using (scan-lefts)
   open Staging R using (not-src; wrap-lane)
   open Weakening R using (Grows; pure-map) renaming (module Grown to Weakened)
@@ -182,7 +182,8 @@ module ClimbScan (R : Set) where
       ; lefts = scan-lefts hp ρ fs z Lρ (lefts-up ρ (in-scan here) eqS lt) ; rest-heads = tt
       ; owned = Scanned.scan-owned hp ρ fs z ow ; kernels = scan-kernels hp ρ fs z kn ; meaning = scan-meaning hp ρ fs z mn ; queue = Scanned.scan-queue hp ρ fs z qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
-      ; sorted = sorted-⇝ so (then refl (proj₂ (proj₂ wr))) ; behind = scan-behind ρ cl ; lingers = Scanned.scan-lingers hp ρ fs z (ended-past cl) lgr ; flags = Scanned.scan-flags hp ρ fs z (done-up ρ (in-scan here) refl dn) ; kept = inj₁ refl })
+      ; sorted = sorted-⇝ so (then refl (proj₂ (proj₂ wr))) ; behind = scan-behind ρ cl ; lingers = Scanned.scan-lingers hp ρ fs z (Calling.ended cl) lgr ; flags = Scanned.scan-flags hp ρ fs z (done-up ρ (in-scan here) refl dn) ; kept = inj₁ refl
+      ; told = scan-told ρ cl ; ended = scan-ended ρ cl })
     where z = f (At.val hp r) y
           wr = writes {σ = ϑ} {K = K} {clk = clk} {ts} {bs} {td} {lg} {en} {mk} (≗-trans (k same⊑ (At.val hp r)) (wk-same _))
 

@@ -49,6 +49,7 @@ open import adequacy.Lift using (module Lifting)
 open import adequacy.Lift.Order using (module LiftingOrder)
 open import adequacy.Lowers using (module Lowering)
 open import adequacy.Frame using (module Framing)
+open import adequacy.Told using (untold; untoldᴹ; untoldᴸ)
 open import adequacy.Frame.Repool using (module FramingRepool)
 open import adequacy.Grow using (module Growing)
 open import adequacy.Fork using (module Forking)
@@ -84,7 +85,7 @@ module ClimbLanes (R : Set) where
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
   open Strongly R using (Feed; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; joiner; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; here; module At; fired; Path; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; ending; taken; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; outers; outersL; outers-⊕; unsub; Owes; Settled; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open StrongAgainst R using (Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to; lv-tie; tw-tie; Twin; tw-union; tw-trans; tw-sym; tw-refl; Leaves; Restful; lv-trans; lv-union; lv-refl; tw-rest; tw-if; rf-union; rf-rest)
-  open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering)
+  open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering; Untold) renaming (Ended to Ends)
   open StrongAgainst.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf; src-of) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
   open Moving R using (pairs-r; pairs-split; plant-self; takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
@@ -111,8 +112,8 @@ module ClimbLanes (R : Set) where
   open Keeping R using (seen-planted)
   open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; ⊆-⊑; Pred; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pooledL-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; tw-alike)
   open ShiftWalk R using (let-go; grip)
-  open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined)
-  open FramingRepool R using (Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
+  open Framing R using (merged-eq; heads-flat; just-of; scan-part; scan-defined)
+  open FramingRepool R using (none-of; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off)
   open Staging R using (not-src; wrap-lane)
   open Weakening R using (Grows; pure-map) renaming (module Grown to Weakened)
   open WeakeningHeaps R using () renaming (module GrownHeaps to Weakened′)
@@ -192,7 +193,7 @@ module ClimbLanes (R : Set) where
             → Calling g (loadOf st) m₁ (ρ ⊕ in-lanes πL) (sends y) → Called st m₁ (ρ ⊕ in-lanes πL)
   climb-lanes st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {op = op} {f} {fl} {oc} {k} {r} {po} {t = t} {ls} ρ πL o {y}
     cl@record { sane = sn ; placed = pd ; deep = dp ; ctl = refl ; code = cd ; stack = sk ; lifted = c′ , pv , S , L , sg ; owned = ow
-              ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so ; behind = bh ; lingers = lgr ; lefts = lt ; kept = kp }
+              ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so ; behind = bh ; told = tld ; ended = end ; lingers = lgr ; lefts = lt ; kept = kp }
     with lifts-split ρ (in-lanes πL) L in eqL
        | reads (subst (λ W → _ ≗ Observer.next W y) (trans (cong Here.obs (walk-⊕ ρ (in-lanes πL) top)) (walk-lane o op f fl (walk ρ top))) cd)
   ... | _ , lifts-lanes {bs = bs′} {l = l} {S = S₁} {as = as′} LL _ _ _ , Lρ | k₁ , f₁ , p₁ =
@@ -208,7 +209,7 @@ module ClimbLanes (R : Set) where
       ; rest-heads = tt
       ; lefts = lefts-subst (λ S′ → U.laneˢ op (λ a j → U.subscribe (f a) j) (At.part hp t) bs′ l S′ as′ (At.val hp (FlatKit.Flat.queue fl)) po)
                             (lane-step o LL) (lefts-up ρ (in-lanes πL) eqL lt)
-      ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = sorted-⇝ so p₁ ; behind = bh ; lingers = lgr ; flags = done-up ρ (in-lanes πL) (one-outers o) (Calling.flags cl) ; kept = inj₁ refl }))
+      ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = sorted-⇝ so p₁ ; behind = bh ; told = tld ; ended = end ; lingers = lgr ; flags = done-up ρ (in-lanes πL) (one-outers o) (Calling.flags cl) ; kept = inj₁ refl }))
     where
       pm = trans (cong (λ ls′ → At.merged hp op (λ a j → U.subscribe (f a) j) (At.part hp t) ls′ (At.val hp (FlatKit.Flat.queue fl)) po)
                        (lanes-at hp o LL pv))
@@ -783,3 +784,9 @@ module ClimbLanes (R : Set) where
 
     fr-behind : AllPairs _≢_ (names T) → ∀ {q} → Untold H q T → Ends H T → Each H (Heads q) T → Each H′ (Heads q) T
     fr-behind fs {q} ut en bh = subst (λ t′ → Each H′ (Heads q) t′) (plant-self ρ) (Sh.shift-behind fs w₀ ut en (fr-heading (fresh-path ρ fs)) bh)
+
+    fr-told : AllPairs _≢_ (names T) → ∀ {q} → Untold H q T → Ends H T → Untold H′ q T
+    fr-told fs {q} ut en = subst (λ t′ → Untold H′ q t′) (plant-self ρ) (Sh.shift-told fs w₀ ut en (fr-heading (fresh-path ρ fs)))
+
+    postulate
+      fr-ended : AllPairs _≢_ (names T) → Ends H T → Ends H′ T

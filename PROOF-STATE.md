@@ -8,15 +8,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### UP-ENDED
-
-Whether `tells-past` is a field `Carried` owes, every producer framing it, or
-follows from `Owned`'s finishes and the agenda's placement; the shut nodes'
-steps heading past the shutting end ride on the answer. Settled by deriving
-`tells-past`, or by adding the field and framing it.
-
-Members: `tells-past`, `ended-past`, `bursts-down`, `flat-down`.
-
 #### THE ROOT STEP
 
 A sane, placed root ghost's meaning is what its step shows, then the stepped
@@ -25,6 +16,19 @@ source step. Refuted four times as stated. Settled when `step-skips` and
 `within-step` are bodies over the per-node facts.
 
 Members: `step-skips`, `within-step`, `under-shown-connect`.
+
+#### UP-ENDED
+
+Whether every step keeps `Untold` and `Ended`, now fields of `Carried` and
+`Calling`, and whether the shut nodes' steps head past the shutting end.
+Settled when each step's framing leaf and `bursts-down` are bodies.
+
+Members: `back-told`, `bg-ended`, `bg-told`, `connect-ended`, `connect-told`,
+`fed-ended`, `fed-told`, `fin-ended`, `fin-told`, `fire-ended`, `fire-told`,
+`fr-ended`, `grow-ended`, `grow-told`, `of-ended`, `of-told`, `out-told`,
+`rf-ended`, `rf-told`, `rm-ended`, `rm-told`, `rs-ended`, `rs-told`, `rt-ended`,
+`rt-told`, `scan-ended`, `scan-told`, `shift-ended`, `shift-told`, `torn-ended`,
+`torn-told`, `wr-ended`, `wr-told`, `bursts-down`, `flat-down`.
 
 #### THE REST'S TIES
 
@@ -118,8 +122,7 @@ part heading past the take's own position. Settled when one held and one
 hidden completion are bodies.
 
 Members: `take1-enter`, `take1-void`, `last-enter`, `last-void`, `fin-enter`,
-`end-ghost`, `out-deeper`, `take-pooled`, `body-pooled`, `turn-told`,
-`turn-ended`.
+`end-ghost`, `out-deeper`, `take-pooled`, `body-pooled`.
 
 #### AGENDA CALLS
 

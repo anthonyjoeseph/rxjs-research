@@ -71,7 +71,7 @@ module Taking (R : Set) where
   open Run (Pureᴾ R) using (Act; done; newRef; under; _>>ᴬ_; compile; Env; wkEnv; module Kit; Ref; wkR; Kont; wkObs)
   open Strongly R using (Sub; pendingˢ; takeWhileˢ; Path; here; in-take; _⊕_; Here; walk; top; _≗_; module At; names; pendings; Phase; ≗-refl; newRef≗; taking; takeK; unsubscribing; under≗; module Canon)
   open StrongAgainst R using (Twin; tw-refl; leaves; Books; Job; Owned; Kernels; Meaning; Queue; Each; Lingers; rest-pinned; seen; owned-to)
-  open StrongHeld R using (Carried; Heads; DoneBy; module Eaching; module Lingering)
+  open StrongHeld R using (Carried; Heads; DoneBy; module Eaching; module Lingering; Untold; Ended)
   open StrongAgainst.Against R using (StackAs; subAs; SrcOf; src-of)
   open Moving R using (planted; pend; part-plant; holds-owed; fed-plant; pendings-plant; subjects-plant; joiners-plant)
   open EverywhereGated.Settling R using (settled-plant)
@@ -228,6 +228,10 @@ module Taking (R : Set) where
                ; joined  = subst₂ (At.Joined H′) (sym (subjects-plant π₂ v refl)) (sym (joiners-plant π₂ v (λ _ → refl) [])) (Queue.joined qu)
                ; ordered = Queue.ordered qu ; ahead = Queue.ahead qu }
 
+      postulate
+        rt-told  : ∀ {q′} → Untold H′ q′ T₂ → Untold H′ q′ t′
+        rt-ended : Ended H′ T₂ → Ended H′ t′
+
   -- An allocation's continuation, as a function.
   allocates : ∀ {w B t a} {k′ : ∀ {v} → w ⊑ v → Ref v t → Act v B} {m : Act w B} → m ≗ newRef t a k′
             → Σ (∀ {v} → w ⊑ v → Ref v t → Act v B) λ k₁ → m ≡ newRef t a k₁ × (∀ {v} (σ : w ⊑ v) r → k₁ σ r ≗ k′ σ r)
@@ -255,7 +259,9 @@ module Taking (R : Set) where
                               ; paidUp = cong (mapList (wkTodo new)) (cong (mapList (wkTodo new)) (Books.paidUp bk)) ; running = Books.running bk }
              ; sorted = sorted-⇝ (Carried.sorted cr) (then refl (then (cong (λ x → step (Mx x)) e₁) now))
              ; behind′ = Eaching.each-to _ _ (S.rt-behind H₂ eqv refl (pos-headed cr) (G₂′.grow-each gr₂ (G₁′.grow-each gr₁ (Carried.behind cr))))
-             ; lingers′ = Lingering.lingers-to _ (S.rt-lingers H₂ eqv refl (G₂′.grow-lingers gr₂ (G₁′.grow-lingers gr₁ (Carried.lingers cr)))) ; flags = S.rt-flags H₂ eqv refl (G₂′.grow-flags gr₂ (G₁′.grow-flags gr₁ (Carried.flags cr))) }
+             ; lingers′ = Lingering.lingers-to _ (S.rt-lingers H₂ eqv refl (G₂′.grow-lingers gr₂ (G₁′.grow-lingers gr₁ (Carried.lingers cr)))) ; flags = S.rt-flags H₂ eqv refl (G₂′.grow-flags gr₂ (G₁′.grow-flags gr₁ (Carried.flags cr)))
+             ; told = S.rt-told H₂ eqv refl (G₂′.grow-told gr₂ (G₁′.grow-told gr₁ (Carried.told cr)))
+             ; ended = S.rt-ended H₂ eqv refl (G₂′.grow-ended gr₂ (G₁′.grow-ended gr₁ (Carried.ended cr))) }
     , refl , inj₁ (inj₁ S.less)
     where module S = Taken {i = i} {p = p} {s = s} π
           module G₁ = Grown S.ν₁
