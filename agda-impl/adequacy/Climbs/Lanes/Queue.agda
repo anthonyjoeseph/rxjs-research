@@ -119,9 +119,9 @@ module ClimbLanesQueue (R : Set) where
   open EverywhereGated R using (module Growths)
   open Replanting R using (Kin; kin-end; kin-pool; kin-feed; kin-fin; kin-lane; rehomes; rehomes-code; restack; reticked; owned-run; module Shift; Heading; Lingering; Gone; store-held; Lives; lives-off; ahead-under)
   open Read
-  open ClimbBase R using (lifts-planted; lefts-planted; merged-queued; merged-kept; healed-off; module Framed; flat-stays)
+  open ClimbBase R using (lifts-planted; lefts-planted; merged-queued; merged-kept; healed-off; module Framed; flat-stays; heads-union)
   open ClimbTake R using (rise; open-code; writes; reads)
-  open ClimbFlat R using (calling-open; opened-⊕; shut-code; settledᵒ; settleᵒ₂; settleᵒ₁; flat-gone; merged-pool; heading-∘; lingering-∘; pool-heads; closed-rest-heads; lanes-one; ghost-lift; startAt; module Restaged; module Settles)
+  open ClimbFlat R using (calling-open; opened-⊕; shut-code; settledᵒ; settleᵒ₂; settleᵒ₁; flat-gone; merged-pool; heading-∘; lingering-∘; pool-heads; lanes-one; ghost-lift; startAt; module Restaged; module Settles)
   open ClimbFlatPlant R using (pending-flags; queue-open; apart-unplant; lane-begin)
   open ClimbLanes R using (module Freed; at-val; climb-lanes; dequeueAt; freed; holds-walk; lane-live; lane-lefts; lane-step; laneEnd; laneOf; lanes-gone; one-open; one-outers; queue-freed; queue-stored; refill-freed; refillAt; sendStep; slot-freed; unlive; walk-lane)
 
@@ -381,6 +381,53 @@ module ClimbLanesQueue (R : Set) where
                    (trans (cong (λ qs → At.merged H₂ op G (At.part H t) (bs ++ as) qs pl′) e₀)
                           (merged-live H₂ op G (At.part H t) bs as pl′ st′))
 
+  -- Every lane's rest heads no earlier than q.
+  RestL : ∀ {h} (H : Heapᴹ h) (q : Pos) {Δ B} → List (Lane h Δ B) → Set
+  RestL H q []                = ⊤
+  RestL H q (lane _ _ s ∷ ls) = Heads q (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} s)) × RestL H q ls
+
+  -- Every lane's rest but the one a path picks heads no earlier than q.
+  OthersL : ∀ {h} (H : Heapᴹ h) (q : Pos) {Δ B} {ls : List (Lane h Δ B)} {u : Sub h Δ B} {πL : PathLanes ls u} → OneLane πL → Set
+  OthersL H q (one-this {ls = ls})       = RestL H q ls
+  OthersL H q (one-next {l = lane _ _ s} o) = Heads q (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} s)) × OthersL H q o
+
+  rest-headsL : ∀ {h} (H : Heapᴹ h) (q : Pos) {Δ B} (ls : List (Lane h Δ B)) → RestL H q ls → Heads q (U.restᶜ {B = ⊤} (At.leftoverL H {B = ⊤} ls))
+  rest-headsL H q []                _        ()
+  rest-headsL H q (lane _ _ s ∷ ls) (h , hs) =
+    heads-union (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} s)) (U.restˢ (At.leftover H {B = ⊤} s))
+                (U.restᶜ {B = ⊤} (At.leftoverL H {B = ⊤} ls)) (U.restˢ (At.leftoverL H {B = ⊤} ls)) h (rest-headsL H q ls hs)
+
+  rest-headsO : ∀ {h} (H : Heapᴹ h) (q : Pos) {Δ B} {ls : List (Lane h Δ B)} {u : Sub h Δ B} {πL : PathLanes ls u} (o : OneLane πL)
+              → Heads q (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} u)) → OthersL H q o → Heads q (U.restᶜ {B = ⊤} (At.leftoverL H {B = ⊤} ls))
+  rest-headsO H q (one-this {t = t} {ls}) hu hs =
+    heads-union (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} t)) (U.restˢ (At.leftover H {B = ⊤} t))
+                (U.restᶜ {B = ⊤} (At.leftoverL H {B = ⊤} ls)) (U.restˢ (At.leftoverL H {B = ⊤} ls)) hu (rest-headsL H q ls hs)
+  rest-headsO H q (one-next {l = lane _ _ s} {ls} o) hu (h , hs) =
+    heads-union (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} s)) (U.restˢ (At.leftover H {B = ⊤} s))
+                (U.restᶜ {B = ⊤} (At.leftoverL H {B = ⊤} ls)) (U.restˢ (At.leftoverL H {B = ⊤} ls)) h (rest-headsO H q o hu hs)
+
+  -- A lane's end that settles the flatMap: what the flatMap leaves running
+  -- is its ended outer's rest, the lane's own and every other lane's.
+  module LaneRest {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {op f fl oc k r pl}
+                  {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {ls : List (Lane (Conf.world (Mach.conf m₁)) Δ B)} {u : Sub (Conf.world (Mach.conf m₁)) Δ B}
+                  (ρ : Path T (flatMapˢ op f fl oc k r pl t ls)) {πL : PathLanes ls u} (o : OneLane πL) {ks}
+                  (cl : Calling g ℓ m₁ (ρ ⊕ in-lanes πL) (closes ks)) where
+    private
+      H = Conf.heap (Mach.conf m₁)
+      q = Conf.pos (Mach.conf m₁)
+
+    postulate
+      -- The ended outer, and the lanes beside the ending one, leave
+      -- running nothing heading before the run.
+      outer-ended-heads : At.part H t ≡ nothing → Heads q (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} t))
+      others-heads      : OthersL H q o
+
+    lane-rest-heads : At.part H t ≡ nothing → Heads q (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} (flatMapˢ op f fl oc k r pl t ls)))
+    lane-rest-heads eo =
+      heads-union (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} t)) (U.restˢ (At.leftover H {B = ⊤} t))
+                  (U.restᶜ {B = ⊤} (At.leftoverL H {B = ⊤} ls)) (U.restˢ (At.leftoverL H {B = ⊤} ls))
+                  (outer-ended-heads eo) (rest-headsO H q o (Calling.rest-heads cl) others-heads)
+
   -- A lane's end, its pool taking the lane's last ghost rested, which is
   -- what the lane still runs: with nothing queued, and with the queue's
   -- head taken off.  The heads: the pool taking what the lane ran heads
@@ -412,7 +459,7 @@ module ClimbLanesQueue (R : Set) where
 
     settle-heads : ∀ {c} → At.part H₂ w₀ ≡ just c → Heads q pl → Heads q pl′
     settle-heads e = pool-heads l (proj₂ (Lingers.pools (Calling.lingers cl) ρ (lifts-seen L) (proj₂ (just-of (Freed.fr-revive H ρ o fr (cong is-just e))))))
-                       (lane-lefts o LL ll) (closed-rest-heads (ρ ⊕ in-lanes πL) cl)
+                       (lane-lefts o LL ll) (Calling.rest-heads cl)
 
     next-lingering : ∀ ys {y ys′} → At.val H₂ (FlatKit.Flat.queue fl) ≡ y ∷ ys′ → Lingering H (Dequeued.H′ H₂ ρ ys) w₀ v
     next-lingering ys nq = lingering-∘ settle-lingering (Dequeued.dq-lingering H₂ (planted ρ v) ys fr nq)
@@ -480,6 +527,7 @@ module ClimbLanesQueue (R : Set) where
                                  (trans (Freed.fr-lanes hp ρ o (fresh-path ρ fs) LL) (cong₂ _++_ ebs eas)) eq₀)) lgr ; lefts = Freed.Fr.wr-lefts hp ρ o fs (lane-live o LL) Lq
                   (lefts-subst (λ s′ → s′) (lane-end op G l q po eo ebs eas eqs)
                     (lefts-subst (λ S′ → U.laneˢ op G (At.part hp t) bs′ l S′ as′ (At.val hp (FlatKit.Flat.queue fl)) po) (lane-step o LL) (lefts-up ρ (in-lanes πL) eqQ lt)))
+      ; rest-heads = subst (λ x → Heads q (U.restᶜ {B = ⊤} x)) (sym (Freed.fr-left hp ρ o (fresh-path ρ fs))) (LaneRest.lane-rest-heads ρ o cl eo)
       ; flags = Freed.fr-flags hp ρ o fs (done-up ρ (in-lanes πL) (one-outers o) (Calling.flags cl)) ; kept = inj₁ refl }))
     where
       H₂   = freed hp (laneOf o) fl

@@ -279,6 +279,7 @@ module ClimbTake (R : Set) where
                , lifts-planted ρ v (subst (λ s → Lifts hp ρ s S) (cong (U.taking true p q y c′) py) Lρ) , sg
       ; lefts = lefts-planted ρ v refl (subst (λ s → Lifts hp ρ s S) (cong (U.taking true p q y c′) py) Lρ)
                   (lefts-subst (λ s → s) (cong (U.taking true p q y c′) py) (lefts-up ρ (in-take here) eqO lt))
+      ; rest-heads = tt
       ; owned = Ended.out-owned hp ρ q c′ sk e ow
       ; kernels = Ended.end-kernels hp ρ q c′ kn ; meaning = Ended.end-meaning hp ρ q c′ mn ; queue = Ended.out-queue hp ρ q c′ qu
       ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs
@@ -326,7 +327,7 @@ module ClimbTake (R : Set) where
   call-take st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {i = i} {p = p} {c = c} {k = k} {u = u} ρ {closes ks}
     record { sane = sn ; placed = pl ; deep = dp ; ctl = refl ; code = cd ; stack = sk ; lifted = gn , S , L , sg , hl ; owned = ow
            ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
-           ; behind = bh ; lingers = lgr ; lefts = lt ; flags = dn ; kept = kp }
+           ; behind = bh ; lingers = lgr ; lefts = lt ; rest-heads = rh ; flags = dn ; kept = kp }
     with lifts-split ρ (in-take here) L in eqC | subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-take here) top) cd
   ... | _ , lifts-take lv lifts-here , Lρ | readRef≗ refl f =
     rose {sg′ = closes ks} (then refl now) (one-lower ρ one-take) (record
@@ -334,7 +335,7 @@ module ClimbTake (R : Set) where
       ; code = ≗-trans (f same⊑ _) (bind≗ (≗-trans (wk-same _) (open-code lv)) λ _ → wk-same _)
       ; stack = sk
       ; lifted = gone-take hp {i = i} {p = p} {c = c} {k = k} {u = u} lv gn , S , Lρ , sg , healed-split ρ (in-take here) hl
-      ; lefts = lefts-up ρ (in-take here) eqC lt
+      ; lefts = lefts-up ρ (in-take here) eqC lt ; rest-heads = rh
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
       ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; lingers = lgr ; flags = done-up ρ (in-take here) refl dn ; kept = kp })

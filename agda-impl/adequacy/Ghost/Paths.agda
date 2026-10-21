@@ -542,6 +542,11 @@ module GhostingPaths (R : Set) where
   Passed H q g {v = v} σ (closes _) =
     At.part H v ≡ nothing × Σ (U.Step [] R) λ S → Lifts H σ (U.endˢ q) S × U.step g ≡ S × Healed H q σ
 
+  -- What a closed sub leaves running heads no earlier than the run.
+  ClosedHeads : ∀ {h} (H : Heapᴹ h) (q : Pos) {T : Sub h [] R} {Δ A} {v : Sub h Δ A} → Path T v → Signal T A → Set
+  ClosedHeads H q σ (sends _)          = ⊤
+  ClosedHeads H q {v = v} σ (closes _) = Heads q (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} v))
+
   -- What the climbing signal's lift leaves free, left alike.
   LeftsOf : ∀ {h} (H : Heapᴹ h) (q : Pos) (g : U.Node [] R) {T : Sub h [] R} {Δ A} {v : Sub h Δ A} (σ : Path T v) (sg : Signal T A) → Passed H q g σ sg → Set₁
   LeftsOf H q g σ (sends y)  (_ , _ , _ , L , _) = Lefts H L
@@ -565,6 +570,7 @@ module GhostingPaths (R : Set) where
       stack   : StackAs T (Conf.pos (Mach.conf m₁)) ϑ K (Mach.bursts m₁)
       lifted  : Passed (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) g σ sg
       lefts   : LeftsOf (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) g σ sg lifted
+      rest-heads : ClosedHeads (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) σ sg
       owned   : Owned (Conf.heap (Mach.conf m₁)) T (runAs (owed sg) (≗-refl _) stack)
       kernels : Kernels (Conf.heap (Mach.conf m₁)) T
       meaning : Meaning (Conf.heap (Mach.conf m₁)) T
@@ -588,10 +594,11 @@ module GhostingPaths (R : Set) where
          → Calling.act cl ≗ said (Here.obs (walk σ′ top)) sg′
          → (lf : Passed (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) g σ′ sg′)
          → LeftsOf (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) g σ′ sg′ lf
+         → ClosedHeads (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) σ′ sg′
          → DoneBy (Conf.heap (Mach.conf m₁)) T (outers σ′)
          → Calling g ℓ m₁ σ′ sg′
-  recall {m₁ = m₁} {T = T} cl ow cd lf lt dn = record
-    { sane = Calling.sane cl ; placed = Calling.placed cl ; deep = Calling.deep cl ; ctl = Calling.ctl cl ; code = cd ; stack = Calling.stack cl ; lifted = lf ; lefts = lt
+  recall {m₁ = m₁} {T = T} cl ow cd lf lt es dn = record
+    { sane = Calling.sane cl ; placed = Calling.placed cl ; deep = Calling.deep cl ; ctl = Calling.ctl cl ; code = cd ; stack = Calling.stack cl ; lifted = lf ; lefts = lt ; rest-heads = es
     ; owned = subst (λ ks → Owned (Conf.heap (Mach.conf m₁)) T (runAs ks (≗-refl _) (Calling.stack cl))) (sym ow) (Calling.owned cl)
     ; kernels = Calling.kernels cl ; meaning = Calling.meaning cl ; queue = Calling.queue cl
     ; books = subst (λ ks → Books T (runAs ks (≗-refl _) (Calling.stack cl)) m₁) (sym ow) (Calling.books cl)
@@ -602,7 +609,7 @@ module GhostingPaths (R : Set) where
           → Calling g ℓ′ m₁ σ sg → ℓ′ ≼ ℓ → Calling g ℓ m₁ σ sg
   relevel cl le = record
     { sane = Calling.sane cl ; placed = Calling.placed cl ; deep = Calling.deep cl ; ctl = Calling.ctl cl ; code = Calling.code cl ; stack = Calling.stack cl
-    ; lifted = Calling.lifted cl ; lefts = Calling.lefts cl ; owned = Calling.owned cl ; kernels = Calling.kernels cl ; meaning = Calling.meaning cl
+    ; lifted = Calling.lifted cl ; lefts = Calling.lefts cl ; rest-heads = Calling.rest-heads cl ; owned = Calling.owned cl ; kernels = Calling.kernels cl ; meaning = Calling.meaning cl
     ; queue = Calling.queue cl ; books = Calling.books cl ; sorted = Calling.sorted cl ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; flags = Calling.flags cl
     ; kept = ≼-trans (Calling.kept cl) le }
 

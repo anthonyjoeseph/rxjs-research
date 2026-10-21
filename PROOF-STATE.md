@@ -11,12 +11,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE REST'S TIES
 
 An ended part's rest stays twinned with what the heap keeps. Open: whether
-what a closed sub leaves running heads past the run, as hidden runs may not,
-and whether a pool's untold sources follow, though `Lifts` leaves the closed
-node free and only its rest is tied. Settled when
-`closed-rest-heads` and `settle-told` are bodies, or one is refuted.
+what an ended part's siblings leave running heads past the run (an ended
+outer, the other lanes, a connect's burst), as hidden runs may not, and
+whether a pool's untold sources follow, though `Lifts` leaves the closed node
+free and only its rest is tied. Settled when `others-heads` and
+`settle-told` are bodies, or one is refuted.
 
-Members: `closed-rest-heads`, `rest-sourced`, `close-told`, `settle-told`,
+Members: `others-heads`, `outer-ended-heads`, `lanes-rest-heads`,
+`body-burst-heads`, `rest-sourced`, `close-told`, `settle-told`,
 `take-leftover`, `body-leftover`.
 
 #### SOURCE-CALL POSITIONS

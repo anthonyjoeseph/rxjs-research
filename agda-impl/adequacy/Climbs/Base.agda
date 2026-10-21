@@ -24,10 +24,11 @@ open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst)
 
-open import denotation.MonotonicList.Events using (Events∞; Pos; Timeline; last; ix; tick)
+open import denotation.MonotonicList.Events using (Events∞; Pos; Timeline; _<ᵖ_; last; ix; tick)
 open import denotation.MonotonicList using (agree-refl)
 import denotation.Unfold as U
 open import denotation.MonotonicList.Events using () renaming (sub to subᴾ)
+open import adequacy.Sorted using (_≤ᵖ_)
 open import adequacy.Sorted.Walk using (module SortingWalk)
 open import operation.Machine using (module Machine)
 open import adequacy.Strong using (module Strongly)
@@ -78,7 +79,7 @@ module ClimbBase (R : Set) where
   open SortingWalk R using (WellMach)
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
   open Strongly R using (Feed; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; joiner; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; here; module At; fired; Path; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; ending; taken; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; outers; outersL; outers-⊕; unsub; Owes; Settled; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
-  open StrongAgainst R using (Leaves; Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
+  open StrongAgainst R using (Pinned; pinned; unpinned; Leaves; Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
   open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering)
   open StrongAgainst.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf; src-of) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
@@ -202,12 +203,12 @@ module ClimbBase (R : Set) where
   ... | c′ , pv , S , L , sg | lt with lifts-split ρ (in-map here) L in eqR
   ...   | _ , lifts-map lifts-here , Lρ = recall cl refl
     (subst (λ W → Calling.act cl ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-map here) top) (Calling.code cl))
-    (U.mapᶜ f c′ , cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.mapᶜ f)) pv , S , Lρ , sg) (lefts-up ρ (in-map here) eqR lt) (done-up ρ (in-map here) refl (Calling.flags cl))
+    (U.mapᶜ f c′ , cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.mapᶜ f)) pv , S , Lρ , sg) (lefts-up ρ (in-map here) eqR lt) tt (done-up ρ (in-map here) refl (Calling.flags cl))
   call-map {m₁ = m₁} {f = f} ρ {closes ks} cl with Calling.lifted cl | Calling.lefts cl
   ... | gn , S , L , sg , hl | lt with lifts-split ρ (in-map here) L in eqR
   ...   | _ , lifts-map lifts-here , Lρ = recall cl refl
     (subst (λ W → Calling.act cl ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-map here) top) (Calling.code cl))
-    (cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.mapᶜ f)) gn , S , Lρ , sg , healed-split ρ (in-map here) hl) (lefts-up ρ (in-map here) eqR lt) (done-up ρ (in-map here) refl (Calling.flags cl))
+    (cong (At.mapᴹ (Conf.heap (Mach.conf m₁)) (U.mapᶜ f)) gn , S , Lρ , sg , healed-split ρ (in-map here) hl) (lefts-up ρ (in-map here) eqR lt) (Calling.rest-heads cl) (done-up ρ (in-map here) refl (Calling.flags cl))
 
   -- A signal through a defer, as it is.
   call-defer : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {k} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
@@ -216,12 +217,12 @@ module ClimbBase (R : Set) where
   ... | c′ , pv , S , L , sg | lt with lifts-split ρ (in-defer here) L in eqR
   ...   | _ , lifts-defer lifts-here , Lρ = recall cl refl
     (subst (λ W → Calling.act cl ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-defer here) top) (Calling.code cl))
-    (c′ , pv , S , Lρ , sg) (lefts-up ρ (in-defer here) eqR lt) (done-up ρ (in-defer here) refl (Calling.flags cl))
+    (c′ , pv , S , Lρ , sg) (lefts-up ρ (in-defer here) eqR lt) tt (done-up ρ (in-defer here) refl (Calling.flags cl))
   call-defer ρ {closes ks} cl with Calling.lifted cl | Calling.lefts cl
   ... | gn , S , L , sg , hl | lt with lifts-split ρ (in-defer here) L in eqR
   ...   | _ , lifts-defer lifts-here , Lρ = recall cl refl
     (subst (λ W → Calling.act cl ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-defer here) top) (Calling.code cl))
-    (gn , S , Lρ , sg , healed-split ρ (in-defer here) hl) (lefts-up ρ (in-defer here) eqR lt) (done-up ρ (in-defer here) refl (Calling.flags cl))
+    (gn , S , Lρ , sg , healed-split ρ (in-defer here) hl) (lefts-up ρ (in-defer here) eqR lt) (Calling.rest-heads cl) (done-up ρ (in-defer here) refl (Calling.flags cl))
 
   -- A body's cut owed ahead of the agenda, its body gone.
   owned-body : ∀ {h} (H : Heapᴹ h) {t : Sub h [] R} {p c bs p₀ c₀ bs₀} {ca : CtlAs t p c bs} (ca₀ : CtlAs t p₀ c₀ bs₀)
@@ -258,6 +259,52 @@ module ClimbBase (R : Set) where
   body-end (lifts-body _ _ lifts-here)   = refl
   body-end (lifts-shut _ _ _ lifts-here) = refl
 
+  -- Heads read off a step pinned alike.
+  heads-pinned : ∀ {Γ A B q} {st : U.Step Γ A} {st′ : U.Step Γ B} → Pinned st st′
+               → (∀ {k} → U.headˢ st′ ≡ just k → q ≤ᵖ k) → ∀ {k} → U.headˢ st ≡ just k → q ≤ᵖ k
+  heads-pinned pinned   h e = h e
+  heads-pinned unpinned h ()
+
+  -- Two rests side by side head where either does.
+  heads-union : ∀ {Γ B q} (x : U.Node Γ B) sx y sy → (∀ {k} → U.headˢ sx ≡ just k → q ≤ᵖ k) → (∀ {k} → U.headˢ sy ≡ just k → q ≤ᵖ k)
+              → ∀ {k} → U.headˢ (U.unionˢ x sx y sy) ≡ just k → q ≤ᵖ k
+  heads-union x (U.skipˢ k x′) y (U.skipˢ k′ y′) hx hy e with k <ᵖ k′
+  ... | true  = hx e
+  ... | false = hy e
+  heads-union x (U.skipˢ _ _)   y (U.outˢ _ _ _) hx hy e = hx e
+  heads-union x (U.skipˢ _ _)   y (U.endˢ _)     hx hy e = hx e
+  heads-union x (U.skipˢ _ _)   y U.hushˢ        hx hy e = hx e
+  heads-union x (U.outˢ _ _ _)  y sy             hx hy e = hy e
+  heads-union x (U.endˢ _)      y sy             hx hy e = hy e
+  heads-union x U.hushˢ         y sy             hx hy e = hy e
+
+  -- A body's rest under its source heads where the body's does.
+  heads-under : ∀ {Γ A B C q} (s : U.Source Γ A) (st : U.Step (A ∷ Γ) C) → (∀ {k} → U.headˢ st ≡ just k → q ≤ᵖ k)
+              → ∀ {k} → U.headˢ (U.underˢ {B = B} s st) ≡ just k → q ≤ᵖ k
+  heads-under s (U.skipˢ _ _)  h e  = h e
+  heads-under s (U.outˢ _ _ _) h ()
+  heads-under s (U.endˢ _)     h ()
+  heads-under s U.hushˢ        h ()
+
+  -- A connect whose body ends: what it leaves running heads where its
+  -- source's burst and its body's rest do.
+  module BodyRest {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {Sj c b kb k fd e rp rt}
+                  {t : Sub (Conf.world (Mach.conf m₁)) Δ A} {u : Sub (Conf.world (Mach.conf m₁)) (A ∷ Δ) B}
+                  (ρ : Path T (connectˢ Sj c b kb k fd rp e rt t u)) {ks} (cl : Calling g ℓ m₁ (ρ ⊕ in-body here) (closes ks)) where
+    private
+      H = Conf.heap (Mach.conf m₁)
+      n = At.sourced H (At.part H t) (At.leftover H t)
+
+    postulate
+      -- Its source's subscribe burst heads no earlier than the run.
+      body-burst-heads : Heads (Conf.pos (Mach.conf m₁)) (U.restᶜ {B = ⊤} (U.burstingᶜ {B = ⊤} rp n))
+
+    body-rest-heads : Heads (Conf.pos (Mach.conf m₁)) (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} (connectˢ Sj c b kb k fd rp e rt t u)))
+    body-rest-heads =
+      heads-union (U.restᶜ {B = ⊤} (U.burstingᶜ {B = ⊤} rp n)) (U.restˢ (U.burstingᶜ {B = ⊤} rp n))
+                  (U.restᶜ {B = ⊤} (U.underᶜ {C = ⊤} {B = ⊤} (U.live n) (At.leftover H {B = ⊤} u))) (U.restˢ (U.underᶜ {C = ⊤} {B = ⊤} (U.live n) (At.leftover H {B = ⊤} u)))
+                  body-burst-heads (heads-under (U.live n) (U.restˢ {B = ⊤} (At.leftover H {B = ⊤} u)) (Calling.rest-heads cl))
+
   -- A signal out of a connect's body.  A value as it is: beside its
   -- source, or past its source's end.  An end the connect's completion
   -- delivered, its cut owed after it, the body gone as a `bodyC` owed
@@ -270,12 +317,12 @@ module ClimbBase (R : Set) where
   ... | c′ , pv , S , L , sg | lt with lifts-split ρ (in-body here) L in eqR
   ...   | _ , lifts-body pt _ lifts-here , Lρ = rose now (one-lower ρ one-body) (recall cl {sg′ = sends y} refl
     (subst (λ W → Calling.act cl ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-body here) top) (Calling.code cl))
-    (_ , cong₂ (At.connected (Conf.heap (Mach.conf m₁)) rp e rt) pt pv , S , Lρ , sg) (lefts-up ρ (in-body here) eqR lt) (done-up ρ (in-body here) refl (Calling.flags cl)))
+    (_ , cong₂ (At.connected (Conf.heap (Mach.conf m₁)) rp e rt) pt pv , S , Lρ , sg) (lefts-up ρ (in-body here) eqR lt) tt (done-up ρ (in-body here) refl (Calling.flags cl)))
   ...   | _ , lifts-shut pt refl _ lifts-here , Lρ = rose now (one-lower ρ one-body) (recall cl {sg′ = sends y} refl
     (subst (λ W → Calling.act cl ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-body here) top) (Calling.code cl))
-    (_ , cong₂ (At.connected (Conf.heap (Mach.conf m₁)) rp e rt) pt pv , S , Lρ , sg) (lefts-up ρ (in-body here) eqR lt) (done-up ρ (in-body here) refl (Calling.flags cl)))
+    (_ , cong₂ (At.connected (Conf.heap (Mach.conf m₁)) rp e rt) pt pv , S , Lρ , sg) (lefts-up ρ (in-body here) eqR lt) tt (done-up ρ (in-body here) refl (Calling.flags cl)))
   call-body st {m₁ = m₁} {T = T} {Sj} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = t} {u} ρ {closes ks}
-    record { sane = sn ; placed = pl ; deep = dp ; ctl = cx ; code = cd ; stack = sk ; lifted = gn , S , L , sg , hl ; owned = ow
+    cl@record { sane = sn ; placed = pl ; deep = dp ; ctl = cx ; code = cd ; stack = sk ; lifted = gn , S , L , sg , hl ; owned = ow
            ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
            ; behind = bh ; lingers = lgr ; lefts = lt ; flags = dn ; kept = kp }
     with lifts-split ρ (in-body here) L in eqB
@@ -285,7 +332,7 @@ module ClimbBase (R : Set) where
       ; stack = sk
       ; lifted = gone-connect (Conf.heap (Mach.conf m₁)) {Sj = Sj} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {e = e} {rp = rp} {rt = rt} {t = t} {u = u} gn
                , S , subst (λ s → Lifts (Conf.heap (Mach.conf m₁)) ρ s S) (body-end Lb) Lρ , sg , healed-split ρ (in-body here) hl
-      ; lefts = lefts-subst (λ s → s) (body-end Lb) (lefts-up ρ (in-body here) eqB lt)
+      ; lefts = lefts-subst (λ s → s) (body-end Lb) (lefts-up ρ (in-body here) eqB lt) ; rest-heads = BodyRest.body-rest-heads ρ cl
       ; owned = owned-body (Conf.heap (Mach.conf m₁)) (runAs (bodyC ρ ∷ ks) (≗-refl ⟦ bodyC ρ ∷ ks ⟧ᶜ) sk) ρ refl refl refl gn ow
       ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
@@ -316,7 +363,7 @@ module ClimbBase (R : Set) where
       ; code = ≗-trans (f same⊑ _) (≗-trans (wk-same _) (pass-code lv py))
       ; stack = sk
       ; lifted = U.takeWhileᶜ i p c′ , take-part hp {i = i} {p = p} {c = c} {k = k} {u = u} lv pv , S , subst (λ s → Lifts hp ρ s S) (cong (U.taking i p q y c′) py) Lρ , sg
-      ; lefts = lefts-subst (λ s → s) (cong (U.taking i p q y c′) py) (lefts-up ρ (in-take here) eqT lt)
+      ; lefts = lefts-subst (λ s → s) (cong (U.taking i p q y c′) py) (lefts-up ρ (in-take here) eqT lt) ; rest-heads = tt
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
       ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; lingers = lgr ; flags = done-up ρ (in-take here) refl dn ; kept = inj₁ refl })
