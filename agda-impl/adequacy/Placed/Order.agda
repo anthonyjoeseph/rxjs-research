@@ -14,7 +14,7 @@ open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to 
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂; ∃₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans)
 open import Relation.Nullary using (¬_)
 
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; out; skip; end; hush; ix; sub; last; _<ᵖ_; <ᵖ-asym; <ᵖ-down; <ᵖ-next;
@@ -251,8 +251,15 @@ Sorted : ∀ {Γ} → NEnv Γ → Set
 Sorted []ᴬ      = ⊤
 Sorted (e ∷ᴬ ρ) = (Ordered e × Steady e) × Every Headed e × Sorted ρ
 
+-- A connect's body steps neither where its source steps nor where that
+-- shows: the two subscribed apart.
+--
+-- REFUTED: 32416645 as a consequence of the rest of `Placed`, by a body and its source ending at one position
+Sides : ∀ {Δ Γ A B} → U.Step Δ B → U.Step Γ A → Set
+Sides sb ss = ∀ k q → U.headˢ sb ≡ just k → U.headˢ ss ≡ just q → k ≢ q × k ≢ q ++ [ ix 0 ]
+
 -- Every node's meaning in order, read in its own environment: a
--- connect's body reading its source's, a flatMap's lanes yet to
+-- connect's body reading its source's, stepping apart from it; a flatMap's lanes yet to
 -- subscribe reading its own, each where the flatMap shows a skip just
 -- before it, as it does when it admits one; a defer's sources, its
 -- notices put back, as they stood when it subscribed, headed and
@@ -268,7 +275,7 @@ mutual
   Within (U.takeWhileᶜ i p c)       ρ = Placed c ρ
   Within (U.flatMapᶜ op g o ls qs pl)  ρ = Placedᴹ o ρ × Placedᴸ ls ρ
     × (∀ a x → Reaches (x ++ [ ix 0 ]) (U.meaning (U.flatMapᶜ op g o ls qs pl) ρ) → Placed (g a (x ++ [ ix 1 ])) ρ)
-  Within (U.connectᶜ r b (U.live s))    ρ = Placed b (U.meaning s ρ ∷ᴬ ρ) × Placed s ρ
+  Within (U.connectᶜ r b (U.live s))    ρ = Placed b (U.meaning s ρ ∷ᴬ ρ) × Placed s ρ × Sides (U.step b) (U.step s)
   Within (U.connectᶜ r b (U.ended c t)) ρ = Placed b (end c ∷ᴬ ρ)
   Within (U.deferᶜ l p ns)          ρ = Headed p × Sorted (U.replay ns ρ) × Alienᴱ p (U.replay ns ρ)
   Within (U.joinᶜ i p xs e)         ρ = Alien p (lookup ρ i)
