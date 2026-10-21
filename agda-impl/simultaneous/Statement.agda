@@ -59,7 +59,7 @@ import simultaneous.Spec as Spec
 open Spec _≟ᵖ_ using (batchSimultaneousᴰ)
 open import simultaneous.Readings using (instantOf; outs; values; positions; over; FiniteInstants; Rooted; Site; at-root; stamped; closed)
 
-open Elaborate {C = Timeline} _≟ᵖ_ using (E; IE; elaborate; batchSimultaneous; coldˢ; emptyˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; elaborate-cold; elaborate-empty; elaborate-of; elaborate-map; elaborate-scan; elaborate-takeWhile; elaborate-flatMap; elaborate-connect; elaborate-connected; elaborate-defer)
+open Elaborate {C = Timeline} _≟ᵖ_ root using (E; IE; elaborate; batchSimultaneous; coldˢ; emptyˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ)
 
 -- The program the author's stands for: elaborated, batched on top.
 batchedObs : ∀ {A} → SObs [] A → E [] (IE (List A))
@@ -230,26 +230,21 @@ postulate
                    → Sound (approx n s ρ) → (∀ {r} → Sound r → Sound (approx n b (r ∷ ρ)))
                    → Sound (approx n (connectˢ s b) ρ)
 
--- Soundness of what a program elaborates to, read across its equation.
-via : ∀ {Γ A n} {ρ : DenEnv Γ} {o e : E Γ (IE A)} → o ≡ e → Sound (approx n e ρ) → Sound (approx n o ρ)
-via refl s = s
-
 -- Induction on (n , program), as `approx` recurses.
 approx-sound : ∀ {Γ A} n (o : SObs Γ A) {ρ : DenEnv (L.map IE Γ)} → Sounds ρ → Sound (approx n (elaborate o) ρ)
-approx-sound n       (cold c)          ss = via (elaborate-cold c) (coldˢ-sound n c)
-approx-sound n       empty             ss = via elaborate-empty (emptyˢ-sound n)
-approx-sound n       (of xs)           ss = via (elaborate-of xs) (ofˢ-sound n xs)
-approx-sound n       (map f s)         ss = via (elaborate-map f s) (mapˢ-sound n f (elaborate s) (approx-sound n s ss))
-approx-sound n       (scan f z s)      ss = via (elaborate-scan f z s) (scanˢ-sound n f z (elaborate s) (approx-sound n s ss))
-approx-sound n       (takeWhile i p s) ss =
-  via (elaborate-takeWhile i p s) (takeWhileˢ-sound n i p (elaborate s) (approx-sound n s ss))
-approx-sound n       (flatMap op f s)  ss = via (elaborate-flatMap op f s)
-  (flatMapˢ-sound n op (λ a → elaborate (f a)) (elaborate s) (λ a → approx-sound n (f a) ss) (approx-sound n s ss))
-approx-sound n       (connect s b)     ss = via (elaborate-connect s b)
-  (connectˢ-sound n (elaborate s) (elaborate b) (approx-sound n s ss) (λ sr → approx-sound n b (sr ∷ ss)))
-approx-sound n       (connected i)     ss = via (elaborate-connected i) (looked ss i)
-approx-sound zero    (defer l)         ss = via (elaborate-defer l) ⊥-sound
-approx-sound (suc n) (defer l)         ss = via (elaborate-defer l) (defer-sound (approx-sound n (Later.force l) ss))
+approx-sound n       (cold c)          ss = coldˢ-sound n c
+approx-sound n       empty             ss = emptyˢ-sound n
+approx-sound n       (of xs)           ss = ofˢ-sound n xs
+approx-sound n       (map f s)         ss = mapˢ-sound n f (elaborate s) (approx-sound n s ss)
+approx-sound n       (scan f z s)      ss = scanˢ-sound n f z (elaborate s) (approx-sound n s ss)
+approx-sound n       (takeWhile i p s) ss = takeWhileˢ-sound n i p (elaborate s) (approx-sound n s ss)
+approx-sound n       (flatMap op f s)  ss =
+  flatMapˢ-sound n op (λ a → elaborate (f a)) (elaborate s) (λ a → approx-sound n (f a) ss) (approx-sound n s ss)
+approx-sound n       (connect s b)     ss =
+  connectˢ-sound n (elaborate s) (elaborate b) (approx-sound n s ss) (λ sr → approx-sound n b (sr ∷ ss))
+approx-sound n       (connected i)     ss = looked ss i
+approx-sound zero    (defer l)         ss = ⊥-sound
+approx-sound (suc n) (defer l)         ss = defer-sound (approx-sound n (Later.force l) ss)
 
 elaborated-sound : ∀ {Γ A} (o : SObs Γ A) {ρ : DenEnv (L.map IE Γ)} → Sounds ρ → Sound (⟦ elaborate o ⟧ ρ)
 elaborated-sound o {ρ} ss = through-limit {P = Sound} sound-admissible (elaborate o) ρ λ n → approx-sound n o ss
