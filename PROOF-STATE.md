@@ -8,16 +8,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE FED LEFTOVER
-
-Whether a connect's leftover is kept, as a twin, when a feed or a finish
-restages it. A fed joiner differs only inside a nested connect's burst, so
-it holds if no burst in the body is open at the call (`Shut`), a fact
-`Calling` does not yet carry. Settled when `fed-calm` and `fed-calm-tw` are
-bodies, or a reachable open burst is found.
-
-Members: `fed-calm`, `fed-calm-tw`, `fin-calm`, `fin-calm-tw`.
-
 #### THE REST'S TIES
 
 An ended part's rest stays twinned with what the heap keeps. Open: whether
@@ -29,14 +19,24 @@ node free and only its rest is tied. Settled when
 Members: `closed-rest-heads`, `rest-sourced`, `close-told`, `settle-told`,
 `take-leftover`, `body-leftover`.
 
-#### JOIN ORDER
+#### SOURCE-CALL POSITIONS
 
-Whether a source's call finds every subscriber of its connect's subject joined
-before the run's position: a field `Carried` owes, every join framing it, or
-a consequence of the agenda's placement. Settled when `joined-before` is a
-body, or the field is added and framed.
+Which position facts a source's call finds, a field `Carried` owes or the
+agenda's placement gives: every subscriber of its subject joined before the
+run, and no connect's burst in its body open at the run. Untried; a source
+re-entering itself would refute both. Settled when `joined-before` and
+`fed-calm` are bodies, or the field is added and framed.
 
-Members: `joined-before`.
+Members: `joined-before`, `fed-calm`, `fin-calm`.
+
+#### THE FED LEFTOVER
+
+Whether a connect's leftover is kept, as a twin, when a feed or a finish
+restages it with no burst in its body open (`Shut`): a fed joiner differs
+only inside a nested connect's burst. Settled when `fed-calm-tw` is a body
+by the leftover's clauses, or a witness under `Shut`.
+
+Members: `fed-calm-tw`, `fin-calm-tw`.
 
 #### THE ROOT STEP
 
