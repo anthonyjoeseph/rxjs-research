@@ -32,7 +32,11 @@ open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
 open import denotation.Compositional using (env-refl)
 open import adequacy.Finite using (Finite; map-f; scan-f; takeWhile-f; flatMap-f; connect-f; defer-f; trunc; finite-trunc;
   trunc-agree)
-open import adequacy.Placed.Order using (Alien; Alienᴱ; Atop; Every; EveryT; Everyᴱ; Every∞; Headed; Ordered; Owned; Placed; Prefix; Sides; Sorted; Steady; atop-map; every; every-lookup; every-mono; every-monoᴱ; everyT-idle; everyT-mono; everyT-∪; everyᵀ; every∞-mono; headed-snoc; ordered; ordered-map; ordered-rejoin; ordered-scan; prefix-++; prefix-trans; sorted-headed; sorted-lookup; steady; steady-map; steady-rejoin; steady-scan)
+open import adequacy.Placed.Order using (Alien; Alienᴱ; Atop; Every; EveryT; Everyᴱ; Every∞; Headed; Ordered; Owned; Placed; Prefix;
+  Sorted; Steady; atop-map; every; every-lookup; every-mono; every-monoᴱ; everyT-idle;
+  everyT-mono; everyT-∪; everyᵀ; every∞-mono; headed-snoc; ordered; ordered-map;
+  ordered-rejoin; ordered-scan; prefix-++; prefix-trans; sorted-headed; sorted-lookup; steady;
+  steady-map; steady-rejoin; steady-scan)
 open import adequacy.Placed.Keys using (Mark; Values; alienᴱ-owned; beneath-owned; earliest-all; every-map; every-reach; everyT-≈; ix-mark; last-mark; no-tick; ordered-lim; owned-tagged; owned-trans; owned-weigh; prefix-refl; prefix-weigh; sibling; snoc-inj; steady-lim; tagged-lane; tagged-mark; tagged-weigh; values; values-map; weigh; weighˡ)
 open import adequacy.Placed.Rising using (Beyond; module Deferred; Disjoint; module Reach; Rise; alien-shown; alien-sub; apart-mark; apartRules; atop-go; below-lane; every-zip; everyT-zip; headed-lane; headed-sub; headedRules; keyedRules; next-ix; ordered-defer; ordered-of; ordered-start; ordered-take; prefix-split; rise-env; rise-owned; rise-sub; risingRules; start-within; steady-defer; steady-of; steady-start; steady-take; tagged-split)
 open import adequacy.Placed.Trail using (Sp; Spread; Trail; Trailing; disjoint-swap; flatT-idle; past-beyond; shown; sortedT-idle; spread; spread-defer; spread-map; spread-scan; tick-beneath; trail; trail-idle; trail-map; trail-of; trail-rejoin; trail-scan; trailing-start)
@@ -41,6 +45,7 @@ open import adequacy.Placed.FlatOrder using (module FlatOrder)
 open import adequacy.Placed.FlatAfter using (module FlatAfter; trail-defer; trail-take)
 open import adequacy.Placed.Burst using (module Bursting; Fresh; FreshRun; Fresh∞; fresh-map; fresh-of; fresh-past; fresh-rejoin; fresh-scan; fresh-start; fresh-take; fresh-under; fresh-up; fresh-widen; fresh-≈; freshᴿ; heavy; longer; mark-sub; owned-drop; snoc-ne; sub-owned; sub-tagged)
 open import adequacy.Placed.Walk using (module Walk)
+open import adequacy.Placed.Heads using (sides-sub)
 
 open Events∞
 open Tail∞
@@ -647,24 +652,6 @@ postulate
                       → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
                       → Every∞ (λ k → Every∞ (λ q → ¬ Prefix (q ++ [ ix 0 ]) k) (U.stateᴺ (U.subscribe s (p ++ [ ix 1 ])) ρ))
                                (U.stateᴺ (U.subscribe b (p ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ))
-
-  -- A program just subscribed steps first under where it subscribed.
-  head-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p k → Headed p → U.headˢ (U.step (U.subscribe o p)) ≡ just k → Owned p k
-
-  -- A connect's source, just subscribed, steps first apart from where
-  -- its body subscribed.
-  head-sub-apart : ∀ {Γ A} (o : Obs Timeline Γ A) p k → Headed p → U.headˢ (U.step (U.subscribe o (p ++ [ ix 1 ]))) ≡ just k
-                 → Disjoint (p ++ [ ix 0 ]) k
-
--- Under a region, apart from what lies apart from it and from just past
--- that.
-sides-of : ∀ P k q → Owned P k → Disjoint P q → k ≢ q × k ≢ q ++ [ ix 0 ]
-sides-of P k q o d = (λ { refl → proj₁ d o }) , (λ { refl → proj₁ (apart-mark P q (ix 0) (ix-mark 0) d) o })
-
--- A connect's body and source, just subscribed, step apart.
-sides-sub : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p → Headed p
-          → Sides (U.step (U.subscribe b (p ++ [ ix 0 ]))) (U.step (U.subscribe s (p ++ [ ix 1 ])))
-sides-sub s b p hp k q hk hq = sides-of (p ++ [ ix 0 ]) k q (head-sub b (p ++ [ ix 0 ]) k (headed-snoc p hp) hk) (head-sub-apart s p q hp hq)
 
 connect-side : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b → ∀ p (ρ : NEnv Γ) (hp : Headed p) → Sorted ρ
              → Alienᴱ p ρ → Walk.Side p hp (U.stateᴺ (U.subscribe b (p ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ))
