@@ -470,9 +470,9 @@ module ClimbFlat (R : Set) where
 
     -- The done flag no read of what the flatMap leaves running.
     sd-left : AllPairs _≢_ (names w₀) → ∀ {C} → At.leftover H {B = C} w₀ ≡ At.leftover H′ {B = C} w₀
-    sd-left fr {C} =
-      cong₂ U.unionᶜ (leftover-alike H H′ {B = C} u (Heaps.flat-so H H′ {fl = fl} {oc} {k} {r} {u} {ls} (sd-alike fr)))
-                     (leftoverL-alike H H′ {B = C} ls (Heaps.flat-ls H H′ {fl = fl} {oc} {k} {r} {u} {ls} (sd-alike fr)))
+    sd-left fr {C} = sym
+      (cong₂ U.unionᶜ (leftover-alike H H′ {B = C} u (Heaps.flat-so H H′ {fl = fl} {oc} {k} {r} {u} {ls} (sd-alike fr)))
+                      (leftoverL-alike H H′ {B = C} ls (Heaps.flat-ls H H′ {fl = fl} {oc} {k} {r} {u} {ls} (sd-alike fr))))
 
     sd-part-at : ∀ pl′ → AllPairs _≢_ (names w₀) → At.part H′ (flatMapˢ op f fl oc k r pl′ u ls) ≡ At.part H (flatMapˢ op f fl oc k r pl′ u ls)
     sd-part-at pl′ fr@(_ ∷ a₁ ∷ _) =
