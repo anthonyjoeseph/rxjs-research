@@ -38,9 +38,19 @@ allLive : ∀ (Γ : List Set) → All (λ _ → Mode) Γ
 allLive []      = []ᴬ
 allLive (_ ∷ Γ) = runs ∷ᴬ allLive Γ
 
+-- What a cut leaves running: a node whose meaning is its tail.
+Rested : ∀ {Γ A} → U.Node Γ A → Set
+Rested (U.restᶜ n)       = ⊤
+Rested U.idleᶜ           = ⊤
+Rested (U.unionᶜ x y)    = ⊤
+Rested (U.burstingᶜ r t) = ⊤
+Rested (U.underᶜ s b)    = ⊤
+Rested _                 = ⊥
+
 -- THE GHOST IS A RUN'S CONFIGURATION: each joiner told its end exactly
 -- when its connect's source has ended; each lane a flatMap will
--- subscribe, untold, as `subscribe` makes it; of a rest, nothing.  `ν`
+-- subscribe, untold, as `subscribe` makes it; of a rest, nothing; an ended
+-- connect's source, what its cut left running.  `ν`
 -- says, per connect in scope, whether its source runs (`Mode`).
 mutual
   Sane : ∀ {Γ A} → All (λ _ → Mode) Γ → U.Node Γ A → Set
@@ -50,7 +60,7 @@ mutual
   Sane {Γ} ν (U.flatMapᶜ op g o ls qs _) = Saneᴹ ν o × Saneᴸ ν ls × (∀ a q → Sane (allLive Γ) (g a q))
   Sane ν (U.joinᶜ i p xs e)        = Told (lookup ν i) e
   Sane ν (U.connectᶜ r b (U.live s))    = Sane (runs ∷ᴬ ν) b × Sane ν s
-  Sane ν (U.connectᶜ r b (U.ended c t)) = Sane (over ∷ᴬ ν) b
+  Sane ν (U.connectᶜ r b (U.ended c t)) = Sane (over ∷ᴬ ν) b × Rested t
   Sane ν _                         = ⊤
 
   Saneᴹ : ∀ {Γ A} → All (λ _ → Mode) Γ → Maybe (U.Node Γ A) → Set
@@ -159,7 +169,7 @@ mutual
   weaken b (U.flatMapᶜ op g o ls qs pl) (so , sl , sg) = weakenᴹ b o so , weakenᴸ b ls sl , sg
   weaken b (U.joinᶜ i p xs e)           s = told-pt e (lookup-pt b i) s
   weaken b (U.connectᶜ r c (U.live t))  (sc , st) = weaken (tt , b) c sc , weaken b t st
-  weaken b (U.connectᶜ r c (U.ended k t)) s = weaken (tt , b) c s
+  weaken b (U.connectᶜ r c (U.ended k t)) (sc , rt) = weaken (tt , b) c sc , rt
   weaken b (U.deferᶜ l p ns)            s = tt
   weaken b (U.endingᶜ p n)              s = tt
   weaken b (U.restᶜ n)                  s = tt
@@ -180,6 +190,43 @@ saneᴸ-++ : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (bs : List (U.Node Γ A)) 
 saneᴸ-++ []       sb        sc = sc
 saneᴸ-++ (b ∷ bs) (s , sb) sc = s , saneᴸ-++ bs sb sc
 
+-- Fed or shut, a rest stays one.
+feed-rested : ∀ {Γ : List Set} {A B : Set} (i : A ∈ Γ) q a (t : U.Node Γ B) → Rested t → Rested (U.feed i q a t)
+feed-rested i q a (U.restᶜ n)       _ = tt
+feed-rested i q a U.idleᶜ           _ = tt
+feed-rested i q a (U.unionᶜ x y)    _ = tt
+feed-rested i q a (U.burstingᶜ r t) _ = tt
+feed-rested i q a (U.underᶜ s b)    _ = tt
+feed-rested i q a (U.framesᶜ τ e m)            ()
+feed-rested i q a (U.burstᶜ τ r k f)           ()
+feed-rested i q a (U.ofᶜ p k xs)               ()
+feed-rested i q a (U.mapᶜ f c)                 ()
+feed-rested i q a (U.scanᶜ f z c)              ()
+feed-rested i q a (U.takeWhileᶜ k p c)         ()
+feed-rested i q a (U.flatMapᶜ op g o ls qs pl) ()
+feed-rested i q a (U.joinᶜ j p xs e)           ()
+feed-rested i q a (U.connectᶜ r b s)           ()
+feed-rested i q a (U.deferᶜ l p ns)            ()
+feed-rested i q a (U.endingᶜ p n)              ()
+
+shut-rested : ∀ {Γ : List Set} {A B : Set} (i : A ∈ Γ) c (t : U.Node Γ B) → Rested t → Rested (U.shut i c t)
+shut-rested i c (U.restᶜ n)       _ = tt
+shut-rested i c U.idleᶜ           _ = tt
+shut-rested i c (U.unionᶜ x y)    _ = tt
+shut-rested i c (U.burstingᶜ r t) _ = tt
+shut-rested i c (U.underᶜ s b)    _ = tt
+shut-rested i c (U.framesᶜ τ e m)            ()
+shut-rested i c (U.burstᶜ τ r k f)           ()
+shut-rested i c (U.ofᶜ p k xs)               ()
+shut-rested i c (U.mapᶜ f n)                 ()
+shut-rested i c (U.scanᶜ f z n)              ()
+shut-rested i c (U.takeWhileᶜ k p n)         ()
+shut-rested i c (U.flatMapᶜ op g o ls qs pl) ()
+shut-rested i c (U.joinᶜ j p xs e)           ()
+shut-rested i c (U.connectᶜ r b s)           ()
+shut-rested i c (U.deferᶜ l p ns)            ()
+shut-rested i c (U.endingᶜ p n)              ()
+
 -- Feeding a joiner leaves it as told as it was.
 mutual
   feed-sane : ∀ {Γ : List Set} {A B : Set} {ν : All (λ _ → Mode) Γ} (i : A ∈ Γ) q a (c : U.Node Γ B) → Sane ν c → Sane ν (U.feed i q a c)
@@ -193,7 +240,7 @@ mutual
     feedᴹ-sane i q a o so , feedᴸ-sane i q a ls sl , λ x r → feed-sane i q a (g x r) (sg x r)
   feed-sane i q a (U.joinᶜ j p xs e)           s = s
   feed-sane i q a (U.connectᶜ r b (U.live t))  (sb , st) = feed-sane (Any.there i) q a b sb , feed-sane i q a t st
-  feed-sane i q a (U.connectᶜ r b (U.ended k t)) s = feed-sane (Any.there i) q a b s
+  feed-sane i q a (U.connectᶜ r b (U.ended k t)) (sb , rt) = feed-sane (Any.there i) q a b sb , feed-rested i q a t rt
   feed-sane i q a (U.deferᶜ l p ns)            s = tt
   feed-sane i q a (U.endingᶜ p n)              s = tt
   feed-sane i q a (U.restᶜ n)                  s = tt
@@ -240,7 +287,7 @@ mutual
   shut-sane i c (U.flatMapᶜ op g o ls qs pl) (so , sl , sg) = shutᴹ-sane i c o so , shutᴸ-sane i c ls sl , sg
   shut-sane {μ = μ} i c (U.joinᶜ j p xs e)   s = told-set μ i j c p e s
   shut-sane i c (U.connectᶜ r b (U.live t))  (sb , st) = shut-sane (Any.there i) c b sb , shut-sane i c t st
-  shut-sane i c (U.connectᶜ r b (U.ended k t)) s = shut-sane (Any.there i) c b s
+  shut-sane i c (U.connectᶜ r b (U.ended k t)) (sb , rt) = shut-sane (Any.there i) c b sb , shut-rested i c t rt
   shut-sane i c (U.deferᶜ l p ns)            s = tt
   shut-sane i c (U.endingᶜ p n)              s = tt
   shut-sane i c (U.restᶜ n)                  s = tt
@@ -314,6 +361,82 @@ mutual
   ... | false = rest-sane t
   bursts-sane r t (U.endˢ _)      = rest-sane t
   bursts-sane r t U.hushˢ         = rest-sane t
+
+-- A rest's step: a skip to a rest, or nothing.
+RestedS : ∀ {Γ A} → U.Step Γ A → Set
+RestedS (U.skipˢ k c)  = Rested c
+RestedS U.hushˢ        = ⊤
+RestedS (U.outˢ k a c) = ⊥
+RestedS (U.endˢ k)     = ⊥
+
+union-rested : ∀ {Γ B} (x : U.Node Γ B) sx y sy → RestedS sy → RestedS (U.unionˢ x sx y sy)
+union-rested x (U.skipˢ k x′) y (U.skipˢ k′ y′) s with k <ᵖ k′
+... | true  = tt
+... | false = tt
+union-rested x (U.skipˢ k x′) y (U.outˢ _ _ _)  s = tt
+union-rested x (U.skipˢ k x′) y (U.endˢ _)      s = tt
+union-rested x (U.skipˢ k x′) y U.hushˢ         s = tt
+union-rested x (U.outˢ _ _ _) y sy              s = s
+union-rested x (U.endˢ _)     y sy              s = s
+union-rested x U.hushˢ        y sy              s = s
+
+under-rested : ∀ {Γ A B C} (t : U.Source Γ A) (sb : U.Step (A ∷ Γ) C) → RestedS {A = B} (U.underˢ t sb)
+under-rested t (U.outˢ _ _ _) = tt
+under-rested t (U.skipˢ k b)  = tt
+under-rested t (U.endˢ _)     = tt
+under-rested t U.hushˢ        = tt
+
+mutual
+  rest-rested : ∀ {Γ A B} (c : U.Node Γ A) → RestedS {A = B} (U.restˢ c)
+  rest-rested (U.framesᶜ τ e m)           = tt
+  rest-rested (U.burstᶜ τ r i f)          = tt
+  rest-rested (U.ofᶜ p i xs)              = tt
+  rest-rested (U.mapᶜ f c)                = rest-rested c
+  rest-rested (U.scanᶜ f z c)             = rest-rested c
+  rest-rested (U.takeWhileᶜ i p c)        = rest-rested c
+  rest-rested (U.flatMapᶜ op g o ls qs p) =
+    union-rested (U.outerᶜ o) (U.restᴹ o) (U.unionᶜ (U.restsᶜ ls) (U.restᶜ p)) (U.unionˢ (U.restsᶜ ls) (U.restsˢ ls) (U.restᶜ p) (U.restˢ p)) (union-rested (U.restsᶜ ls) (U.restsˢ ls) (U.restᶜ p) (U.restˢ p) (rest-rested p))
+  rest-rested (U.joinᶜ i p xs e)          = tt
+  rest-rested (U.connectᶜ {B = C} r b (U.live s))    =
+    union-rested (U.burstingᶜ r s) (U.burstsˢ r s (U.step s)) (U.underᶜ (U.live s) b) (U.underˢ (U.live s) (U.restˢ {B = C} b)) (under-rested (U.live s) (U.restˢ {B = C} b))
+  rest-rested (U.connectᶜ {B = C} r b (U.ended c t)) =
+    union-rested (U.burstingᶜ r t) (U.burstsˢ r t (U.step t)) (U.underᶜ (U.ended c t) b) (U.underˢ (U.ended c t) (U.restˢ {B = C} b)) (under-rested (U.ended c t) (U.restˢ {B = C} b))
+  rest-rested (U.deferᶜ l p ns)           = tt
+  rest-rested (U.endingᶜ p n)             = rest-rested n
+  rest-rested (U.restᶜ n)                 = rest-rested n
+  rest-rested U.idleᶜ                     = tt
+  rest-rested (U.unionᶜ x y)              = union-rested (U.restᶜ x) (U.restˢ x) (U.restᶜ y) (U.restˢ y) (rest-rested y)
+  rest-rested (U.burstingᶜ r t)           = bursts-rested r t (U.step t)
+  rest-rested (U.underᶜ {C = C} s b)      = under-rested s (U.restˢ {B = C} b)
+
+  bursts-rested : ∀ {Γ A B} r (t : U.Node Γ A) (st : U.Step Γ A) → RestedS {A = B} (U.burstsˢ r t st)
+  bursts-rested r t (U.outˢ k _ t′) with inside r k
+  ... | true  = tt
+  ... | false = rest-rested t
+  bursts-rested r t (U.skipˢ k t′)  with inside r k
+  ... | true  = tt
+  ... | false = rest-rested t
+  bursts-rested r t (U.endˢ _)      = rest-rested t
+  bursts-rested r t U.hushˢ         = rest-rested t
+
+-- A rest steps as one.
+step-rested : ∀ {Γ A} (t : U.Node Γ A) → Rested t → RestedS (U.step t)
+step-rested (U.restᶜ n)            _ = rest-rested n
+step-rested U.idleᶜ                _ = tt
+step-rested (U.unionᶜ x y)         _ = union-rested x (U.restˢ x) y (U.restˢ y) (rest-rested y)
+step-rested (U.burstingᶜ r t)      _ = bursts-rested r t (U.step t)
+step-rested (U.underᶜ {C = C} s b) _ = under-rested s (U.restˢ {B = C} b)
+step-rested (U.framesᶜ τ e m)            ()
+step-rested (U.burstᶜ τ r k f)           ()
+step-rested (U.ofᶜ p k xs)               ()
+step-rested (U.mapᶜ f c)                 ()
+step-rested (U.scanᶜ f z c)              ()
+step-rested (U.takeWhileᶜ k p c)         ()
+step-rested (U.flatMapᶜ op g o ls qs pl) ()
+step-rested (U.joinᶜ j p xs e)           ()
+step-rested (U.connectᶜ r b s)           ()
+step-rested (U.deferᶜ l p ns)            ()
+step-rested (U.endingᶜ p n)              ()
 
 -- The flatMap's step, part by part.
 OuterOk : ∀ {Γ A} → All (λ _ → Mode) Γ → U.Outer Γ A → Set
@@ -409,26 +532,26 @@ source-sane r b sb s (U.skipˢ q s′) sB ssb ss sst with U.beforeˢ (q ++ [ ix 
 ... | true  = feed-sane (Any.here refl) q nothing b sB , sst
 ... | false = body-sane r s sb ss ssb
 source-sane r b sb s (U.endˢ c) sB ssb ss sst with U.beforeˢ (c ++ [ ix 0 ]) sb
-... | true  = shut-sane (Any.here refl) c b sB
+... | true  = shut-sane (Any.here refl) c b sB , tt
 ... | false = body-sane r s sb ss ssb
 source-sane r b sb s U.hushˢ sB ssb ss sst = body-sane r s sb ss ssb
 
 -- Past the source's end: the stepped body shut, its new joiners told.
 shutᵗ-sane : ∀ {Γ A B} {μ : All (λ _ → Mode) Γ} r c (t : U.Node Γ A) (sb : U.Step (A ∷ Γ) B) → SaneS (loose ∷ᴬ μ) sb
-           → SaneS μ (U.shutˢᵗ r c t sb)
-shutᵗ-sane r c t (U.outˢ k a b) s = shut-sane (Any.here refl) c b s
-shutᵗ-sane r c t (U.skipˢ k b)  s = shut-sane (Any.here refl) c b s
-shutᵗ-sane r c t (U.endˢ e)     s = tt
-shutᵗ-sane r c t U.hushˢ        s = tt
+           → Rested t → SaneS μ (U.shutˢᵗ r c t sb)
+shutᵗ-sane r c t (U.outˢ k a b) s rt = shut-sane (Any.here refl) c b s , rt
+shutᵗ-sane r c t (U.skipˢ k b)  s rt = shut-sane (Any.here refl) c b s , rt
+shutᵗ-sane r c t (U.endˢ e)     s rt = tt
+shutᵗ-sane r c t U.hushˢ        s rt = tt
 
 ended-sane : ∀ {Γ A B} {μ : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) sb c (t : U.Node Γ A) st
-           → Sane (over ∷ᴬ μ) b → SaneS (loose ∷ᴬ μ) sb → SaneS μ (U.endedˢ r b sb c t st)
-ended-sane r b sb c t (U.skipˢ k t′) sB ssb with U.beforeˢ (k ++ [ ix 0 ]) sb
-... | true  = sB
-... | false = shutᵗ-sane r c t sb ssb
-ended-sane r b sb c t (U.outˢ _ _ _) sB ssb = shutᵗ-sane r c t sb ssb
-ended-sane r b sb c t (U.endˢ _)     sB ssb = shutᵗ-sane r c t sb ssb
-ended-sane r b sb c t U.hushˢ        sB ssb = shutᵗ-sane r c t sb ssb
+           → Sane (over ∷ᴬ μ) b → SaneS (loose ∷ᴬ μ) sb → Rested t → RestedS st → SaneS μ (U.endedˢ r b sb c t st)
+ended-sane r b sb c t (U.skipˢ k t′) sB ssb rt rs with U.beforeˢ (k ++ [ ix 0 ]) sb
+... | true  = sB , rs
+... | false = shutᵗ-sane r c t sb ssb rt
+ended-sane r b sb c t (U.outˢ _ _ _) sB ssb rt rs = shutᵗ-sane r c t sb ssb rt
+ended-sane r b sb c t (U.endˢ _)     sB ssb rt rs = shutᵗ-sane r c t sb ssb rt
+ended-sane r b sb c t U.hushˢ        sB ssb rt rs = shutᵗ-sane r c t sb ssb rt
 
 taking-sane : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} i (p : A → Bool) k a (c : U.Node Γ A) b → Sane ν c → SaneS ν (U.taking i p k a c b)
 taking-sane i     p k a c true  s = s
@@ -487,8 +610,8 @@ mutual
   step-sane {ν = ν} (U.joinᶜ i p xs e)   s = join-sane i p xs e (told-pt e (lookup-pt (below-loosen ν) i) s)
   step-sane {ν = ν} (U.connectᶜ r b (U.live s)) (sb , ss) =
     source-sane r b (U.step b) s (U.step s) (weaken (tt , below-loosen ν) b sb) (step-sane b sb) (weaken (below-loosen ν) s ss) (step-sane s ss)
-  step-sane {ν = ν} (U.connectᶜ r b (U.ended c t)) sb =
-    ended-sane r b (U.step b) c t (U.step t) (weaken (tt , below-loosen ν) b sb) (step-sane b sb)
+  step-sane {ν = ν} (U.connectᶜ r b (U.ended c t)) (sb , rt) =
+    ended-sane r b (U.step b) c t (U.step t) (weaken (tt , below-loosen ν) b sb) (step-sane b sb) rt (step-rested t rt)
   step-sane {ν = ν} (U.deferᶜ l p ns)    s = feeds-sane ns (U.subscribe (T.Later.force l) (p ++ [ ix 1 ])) (sane-subscribe (T.Later.force l) (p ++ [ ix 1 ]) (running-loosen ν))
   step-sane (U.endingᶜ p n)              s = tt
   step-sane (U.restᶜ n)                  s = rest-sane n
