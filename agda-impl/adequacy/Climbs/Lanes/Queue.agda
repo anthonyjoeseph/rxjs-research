@@ -453,6 +453,9 @@ module ClimbLanesQueue (R : Set) where
     -- The ended lane's rest tells its joiners past `q` at a bound binder's
     -- end wherever the flatMap's part does.  The freed lane is in no part; `l` is tied only
     -- by `ll`.
+    -- Owed: a joiner left untold here on a bound binder is told only by the
+    -- shut its connect's part applies, at the binder's end, which the run may
+    -- be past; nothing ties it to a joiner the part holds.
     --
     -- DEAD ROUTE: over `untold`, a rest's joiners counted: a connect in the lane whose body ended with its source still pending leaves that source's joiner in `l`'s rest and in no part
     -- DEAD ROUTE: at every end `c`: a connect still live keeps its running source in the rest, holding a joiner older than any the part holds, which tells past `q` at no end between it and `q`
