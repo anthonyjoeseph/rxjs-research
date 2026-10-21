@@ -10,12 +10,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ROOT STEP
 
-Whether a step, its sources clear of it, keeps its parts placed: a fed or
-told body placed; a flatMap's admitted lanes; a defer's program. Settled when
-`fed-placed` is a body or refuted.
+Whether a step, its sources clear of it, keeps its parts placed: a told
+body placed; a flatMap's admitted lanes; a defer's program, subscribed or fed.
+Settled when `shut-placed` is a body or refuted.
 
-Members: `fed-placed`, `shut-placed`, `reshut-placed`, `flat-within`,
-`defer-within`, `under-shown-connect`.
+Members: `shut-placed`, `reshut-placed`, `flat-within`, `defer-within`,
+`defer-fed`, `under-shown-connect`.
 
 #### UP-ENDED
 
@@ -151,13 +151,13 @@ Members: `placing`, `ticks-up`.
 #### STEP PARTS
 
 Each node's step, alone, is its meaning's next event: the generators,
-map/scan/take, a flatMap, an ended connect, a body fed or shut its source's
-step, and the rest-likes. Untried; believed unfoldings. Settled when each is
+map/scan/take, a flatMap, an ended connect, a node fed or a body shut its
+source's step, and the rest-likes. Untried; believed unfoldings. Settled when each is
 a body.
 
 Members: `after-map`, `after-scan`, `after-take`, `clear-take`,
 `frames-after`, `burst-after`, `of-after`, `flat-skips`, `ended-skips`,
-`feed-alike`, `shut-alike`, `defer-skips`, `rest-skips`, `union-skips`,
+`feed-alikeⁱ`, `shut-alike`, `defer-skips`, `rest-skips`, `union-skips`,
 `bursting-skips`, `under-skips`, `first-defer`, `first-rest`, `first-union`,
 `first-bursting`, `first-under`.
 

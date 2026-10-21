@@ -21,8 +21,10 @@ open import denotation.MonotonicList.Events using (Timeline; From; Frame)
 import denotation.MonotonicList.Events as E
 open import denotation.MonotonicList.Events using (Events∞; end; Pos; ix; _<ᵖ_; <ᵖ-below)
 open import denotation.NonExpansive using (Agreeˢ)
-open import adequacy.Stepper.Past using (Clear; Placedˢ; Shy; Withinˢ; _≃_; clear-lower; head-map; head-scan; placed-step)
-open import adequacy.Stepper.Parts using (clear-take; head-body; head-shut)
+open import adequacy.Stepper.Past using (Clear; Placedˢ; Shy; Skips; Withinˢ; _≃_; afterᴱ; clear-lower; head-map; head-scan; placed-step; shows)
+open import adequacy.Stepper.Fed using (placed-fed)
+open import adequacy.Env using (nagree-refl)
+open import adequacy.Stepper.Parts using (clear-take; fed-here; head-body; head-shut)
 
 open Agreeˢ using (nowˢ)
 open import adequacy.Stepper using (skips; shy-clear; step-skips)
@@ -157,20 +159,27 @@ body-within r s ρ (U.skipˢ k b′)  (_ , pb) ps sd = pb , ps , sd
 body-within r s ρ (U.endˢ k)      _        ps sd = tt
 body-within r s ρ U.hushˢ         _        ps sd = tt
 
-postulate
-  -- A body fed its source's step, shown first, is placed in the source's
-  -- next meaning.
-  --
-  -- DEAD ROUTE: exact agreement with a ghost anchored in its sources'
-  --   step history.  The ghost is the witness's open part (`part`), which
-  --   keeps no count of a source's steps, and a silent run is matched by
-  --   the residual as a set alone (`Ahead`), so no field of the witness
-  --   can keep the count a lane's pre-join skips need.
-  fed-placed : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) (s s′ : U.Node Γ A) (ρ : NEnv Γ) q (a : Maybe A)
-             → Sane ν (U.connectᶜ r b (U.live s)) → Placed (U.connectᶜ r b (U.live s)) ρ → U.step s ≡ showsˢ q a s′
-             → U.beforeˢ (q ++ [ ix 0 ]) (U.step b) ≡ true → Clear ν (just (q ++ [ ix 0 ])) ρ
-             → Placed (U.feed (here refl) q a b) (U.meaning s′ ρ ∷ᴬ ρ)
+-- A source's step, read off its skips.
+forward : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} {s : U.Node Γ A} {ρ : NEnv Γ} {t} → U.step s ≡ t → Skips ν s ρ
+        → Clear ν (U.headˢ t) ρ → U.meaning s ρ ≃ afterᴱ ρ t
+forward refl sk = sk
 
+shown-alike : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (s s′ : U.Node Γ A) (ρ : NEnv Γ) q (a : Maybe A) → Skips ν s ρ
+            → U.step s ≡ showsˢ q a s′ → Clear ν (just q) ρ → U.meaning s ρ ≃ shows q a (U.stateᴺ s′ ρ)
+shown-alike {ν = ν} s s′ ρ q (just x) sk es cl = forward {ν = ν} {s = s} {ρ = ρ} es sk cl
+shown-alike {ν = ν} s s′ ρ q nothing  sk es cl = forward {ν = ν} {s = s} {ρ = ρ} es sk cl
+
+-- A body fed its source's step, shown first, is placed in the source's
+-- next meaning.
+fed-placed : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) (s s′ : U.Node Γ A) (ρ : NEnv Γ) q (a : Maybe A)
+           → Sane ν (U.connectᶜ r b (U.live s)) → Placed (U.connectᶜ r b (U.live s)) ρ → U.step s ≡ showsˢ q a s′
+           → U.beforeˢ (q ++ [ ix 0 ]) (U.step b) ≡ true → Clear ν (just (q ++ [ ix 0 ])) ρ
+           → Placed (U.feed (here refl) q a b) (U.meaning s′ ρ ∷ᴬ ρ)
+fed-placed {ν = ν} r b s s′ ρ q a (sb , ss) pl es fb cl =
+  placed-fed (here refl) q a b sb refl (fed-here (U.stateᴺ s′ ρ) al (λ m → nagree-refl m ρ)) (proj₁ (proj₂ pl))
+  where al = shown-alike {ν = ν} s s′ ρ q a (skips {ν = ν} s ρ ss (proj₁ (proj₂ (proj₂ pl)))) es (clear-lower ν ρ (<ᵖ-below q []) cl)
+
+postulate
   -- A body told its source's end, shown first, is placed past it.
   shut-placed : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ) c
               → Sane ν (U.connectᶜ r b (U.live s)) → Placed (U.connectᶜ r b (U.live s)) ρ → U.step s ≡ U.endˢ c
