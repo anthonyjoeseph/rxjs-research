@@ -464,9 +464,8 @@ postulate
   first-bursting : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (t : U.Node Γ A) (ρ : NEnv Γ) → Firsts ν (U.burstingᶜ {B = B} r t) ρ
   first-under    : ∀ {Γ A C B} {ν : All (λ _ → Mode) Γ} (s : U.Source Γ A) (b : U.Node (A ∷ Γ) C) (ρ : NEnv Γ) → Firsts ν (U.underᶜ {B = B} s b) ρ
 
-  -- A connect's body stepping no later than its source's step steps
-  -- strictly before it: no body event lies at the source's step or where
-  -- it shows.
+  -- A connect's body stepping no later than its source's step lies
+  -- neither at that step nor where it shows.
   --
   -- DEAD ROUTE: exact agreement with a ghost anchored in its sources'
   --   step history.  The ghost is the witness's open part (`part`), which
@@ -474,9 +473,9 @@ postulate
   --   the residual as a set alone (`Ahead`), so no field of the witness
   --   can keep the count a lane's pre-join skips need.
   -- RECOVERY: git show 43da74d9:agda-impl/adequacy/Stepper.agda restores the stepper over a meaning with no tails, node by node
-  shy-before : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ)
-             → Sane (runs ∷ᴬ ν) b → Sane ν s → Placed b (U.meaning s ρ ∷ᴬ ρ) → Placed s ρ → Shy (U.step b) (U.step s)
-             → ∀ k → U.headˢ (U.step b) ≡ just k → U.beforeˢ k (U.step s) ≡ true
+  shy-apart : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ)
+            → Sane (runs ∷ᴬ ν) b → Sane ν s → Placed b (U.meaning s ρ ∷ᴬ ρ) → Placed s ρ → Shy (U.step b) (U.step s)
+            → ∀ k → U.headˢ (U.step b) ≡ just k → ∀ q → U.headˢ (U.step s) ≡ just q → k ≢ q × k ≢ q ++ [ ix 0 ]
 
 
   -- Past its source's end, a connect runs its source's rest's skip
@@ -1089,6 +1088,40 @@ quiet {ν = ν} s ρ sks cl U.hushˢ es _ =
 quiet s ρ sks cl (U.outˢ q a s′) es ()
 quiet s ρ sks cl (U.skipˢ q s′)  es ()
 quiet s ρ sks cl (U.endˢ c)      es ()
+
+-- Not past just beyond `q`, and neither `q` nor just beyond it: before
+-- `q`.
+shy-order : ∀ q k → (q ++ [ ix 0 ]) <ᵖ k ≡ false → k ≢ q → k ≢ q ++ [ ix 0 ] → k <ᵖ q ≡ true
+shy-order q k f n₀ n₁ with <ᵖ-split k (q ++ [ ix 0 ]) f
+... | inj₂ e = ⊥-elim (n₁ e)
+... | inj₁ lt with k <ᵖ q in kq
+...   | true  = refl
+...   | false with <ᵖ-split q k kq
+...     | inj₂ refl = ⊥-elim (n₀ refl)
+...     | inj₁ qk with trans (sym lt) (<ᵖ-step q k qk)
+...       | ()
+
+head-before : ∀ {Γ B} x k (sb : U.Step Γ B) → U.headˢ sb ≡ just k → U.beforeˢ x sb ≡ x <ᵖ k
+head-before x k (U.outˢ _ _ _) refl = refl
+head-before x k (U.skipˢ _ _)  refl = refl
+head-before x k (U.endˢ _)     refl = refl
+head-before x k U.hushˢ        ()
+
+-- Apart from its source's step and where that shows, a shy body steps
+-- strictly before it.
+shy-at : ∀ {Δ Γ A B} k (sb : U.Step Δ B) (t : U.Step Γ A) → U.headˢ sb ≡ just k → Shy sb t
+       → (∀ q → U.headˢ t ≡ just q → k ≢ q × k ≢ q ++ [ ix 0 ]) → U.beforeˢ k t ≡ true
+shy-at k sb (U.outˢ q _ _) hb shy ap = shy-order q k (trans (sym (head-before (q ++ [ ix 0 ]) k sb hb)) shy) (proj₁ (ap q refl)) (proj₂ (ap q refl))
+shy-at k sb (U.skipˢ q _)  hb shy ap = shy-order q k (trans (sym (head-before (q ++ [ ix 0 ]) k sb hb)) shy) (proj₁ (ap q refl)) (proj₂ (ap q refl))
+shy-at k sb (U.endˢ c)     hb shy ap = shy-order c k (trans (sym (head-before (c ++ [ ix 0 ]) k sb hb)) shy) (proj₁ (ap c refl)) (proj₂ (ap c refl))
+shy-at k sb U.hushˢ        hb shy ap = refl
+
+-- A connect's body stepping no later than its source's step steps
+-- strictly before it.
+shy-before : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ)
+           → Sane (runs ∷ᴬ ν) b → Sane ν s → Placed b (U.meaning s ρ ∷ᴬ ρ) → Placed s ρ → Shy (U.step b) (U.step s)
+           → ∀ k → U.headˢ (U.step b) ≡ just k → U.beforeˢ k (U.step s) ≡ true
+shy-before b s ρ sb ss pb ps shy k hb = shy-at k (U.step b) (U.step s) hb shy (shy-apart b s ρ sb ss pb ps shy k hb)
 
 -- A connect's body stepping no later than its source's step, among
 -- sources clear of the body's step: the source's meaning shows past it.

@@ -13,9 +13,9 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 Whether a flatMap's meaning starts with its step's event; whether a
 connect's body never steps at or just past its source's step; the step's
 parts placed.
-Settled when `first-flat` and `shy-before` are bodies or refuted.
+Settled when `first-flat` and `shy-apart` are bodies or refuted.
 
-Members: `first-flat`, `shy-before`,
+Members: `first-flat`, `shy-apart`,
 `within-step`, `under-shown-connect`.
 
 #### UP-ENDED
