@@ -251,11 +251,39 @@ module Framing (R : Set) where
     untold i (U.joinᶜ j p xs e)           = untoldᴶ p e (U.same? i j)
     untold i (U.connectᶜ r b s)           = untold (there i) b ++ untoldˢ i s
     untold i (U.endingᶜ p n)              = untold i n
-    untold i (U.restᶜ n)                  = untold i n
-    untold i (U.unionᶜ x y)               = untold i x ++ untold i y
-    untold i (U.burstingᶜ r t)            = untold i t
-    untold i (U.underᶜ s b)               = untoldˢ i s ++ untold (there i) b
+    untold i (U.restᶜ n)                  = untoldʳ i n
+    untold i (U.unionᶜ x y)               = untoldʳ i x ++ untoldʳ i y
+    untold i (U.burstingᶜ r t)            = untold i t ++ untoldʳ i t
+    untold i (U.underᶜ s b)               = untoldʳ (there i) b
     untold i n                            = []
+
+    -- What a node left as a rest could still tell: a rest steps only
+    -- through a running source's burst, so a joiner resting is hushed.
+    untoldʳ : ∀ {Γ A B} → A ∈ᴸ Γ → U.Node Γ B → List Pos
+    untoldʳ i (U.mapᶜ f n)                 = untoldʳ i n
+    untoldʳ i (U.scanᶜ f z n)              = untoldʳ i n
+    untoldʳ i (U.takeWhileᶜ b p n)         = untoldʳ i n
+    untoldʳ i (U.flatMapᶜ op g o ls qs pl) = untoldʳᴹ i o ++ untoldʳᴸ i ls ++ untoldʳ i pl
+    untoldʳ i (U.connectᶜ r b s)           = untoldʳ (there i) b ++ untoldᵇ i s
+    untoldʳ i (U.endingᶜ p n)              = untoldʳ i n
+    untoldʳ i (U.restᶜ n)                  = untoldʳ i n
+    untoldʳ i (U.unionᶜ x y)               = untoldʳ i x ++ untoldʳ i y
+    untoldʳ i (U.burstingᶜ r t)            = untold i t ++ untoldʳ i t
+    untoldʳ i (U.underᶜ s b)               = untoldʳ (there i) b
+    untoldʳ i n                            = []
+
+    untoldʳᴹ : ∀ {Γ A B} → A ∈ᴸ Γ → Maybe (U.Node Γ B) → List Pos
+    untoldʳᴹ i nothing  = []
+    untoldʳᴹ i (just n) = untoldʳ i n
+
+    untoldʳᴸ : ∀ {Γ A B} → A ∈ᴸ Γ → List (U.Node Γ B) → List Pos
+    untoldʳᴸ i []       = []
+    untoldʳᴸ i (n ∷ ns) = untoldʳ i n ++ untoldʳᴸ i ns
+
+    -- A rested connect's source, burst: its step and its own rest.
+    untoldᵇ : ∀ {Γ A B} → A ∈ᴸ Γ → U.Source Γ B → List Pos
+    untoldᵇ i (U.live s)    = untold i s ++ untoldʳ i s
+    untoldᵇ i (U.ended e t) = untold i t ++ untoldʳ i t
 
     untoldᴹ : ∀ {Γ A B} → A ∈ᴸ Γ → Maybe (U.Node Γ B) → List Pos
     untoldᴹ i nothing  = []
@@ -301,10 +329,10 @@ module Framing (R : Set) where
     untold-apart a c (U.joinᶜ j p xs e)           = untold-told a c j p e
     untold-apart a c (U.connectᶜ r b s)           = cong₂ _++_ (untold-apart (there-there a) c b) (untold-apartˢ a c s)
     untold-apart a c (U.endingᶜ p n)              = untold-apart a c n
-    untold-apart a c (U.restᶜ n)                  = untold-apart a c n
-    untold-apart a c (U.unionᶜ x y)               = cong₂ _++_ (untold-apart a c x) (untold-apart a c y)
-    untold-apart a c (U.burstingᶜ r t)            = untold-apart a c t
-    untold-apart a c (U.underᶜ s b)               = cong₂ _++_ (untold-apartˢ a c s) (untold-apart (there-there a) c b)
+    untold-apart a c (U.restᶜ n)                  = rested-apart a c n
+    untold-apart a c (U.unionᶜ x y)               = cong₂ _++_ (rested-apart a c x) (rested-apart a c y)
+    untold-apart a c (U.burstingᶜ r t)            = cong₂ _++_ (untold-apart a c t) (rested-apart a c t)
+    untold-apart a c (U.underᶜ s b)               = rested-apart (there-there a) c b
     untold-apart a c (U.framesᶜ _ _ _)            = refl
     untold-apart a c (U.burstᶜ _ _ _ _)           = refl
     untold-apart a c (U.ofᶜ _ _ _)                = refl
@@ -322,6 +350,72 @@ module Framing (R : Set) where
     untold-apartˢ : ∀ {Γ A C B} {k : A ∈ᴸ Γ} {i : C ∈ᴸ Γ} → Apart k i → ∀ c (s : U.Source Γ B) → untoldˢ i (U.shutˢ k c s) ≡ untoldˢ i s
     untold-apartˢ a c (U.live s)    = untold-apart a c s
     untold-apartˢ a c (U.ended e t) = untold-apart a c t
+
+    rested-apart : ∀ {Γ A C B} {k : A ∈ᴸ Γ} {i : C ∈ᴸ Γ} → Apart k i → ∀ c (n : U.Node Γ B) → untoldʳ i (U.shut k c n) ≡ untoldʳ i n
+    rested-apart a c (U.mapᶜ f n)                 = rested-apart a c n
+    rested-apart a c (U.scanᶜ f z n)              = rested-apart a c n
+    rested-apart a c (U.takeWhileᶜ b p n)         = rested-apart a c n
+    rested-apart a c (U.flatMapᶜ op g o ls qs pl) =
+      cong₂ _++_ (rested-apartᴹ a c o) (cong₂ _++_ (rested-apartᴸ a c ls) (rested-apart a c pl))
+    rested-apart a c (U.joinᶜ j p xs e)           = refl
+    rested-apart a c (U.connectᶜ r b s)           = cong₂ _++_ (rested-apart (there-there a) c b) (rested-apartᵇ a c s)
+    rested-apart a c (U.endingᶜ p n)              = rested-apart a c n
+    rested-apart a c (U.restᶜ n)                  = rested-apart a c n
+    rested-apart a c (U.unionᶜ x y)               = cong₂ _++_ (rested-apart a c x) (rested-apart a c y)
+    rested-apart a c (U.burstingᶜ r t)            = cong₂ _++_ (untold-apart a c t) (rested-apart a c t)
+    rested-apart a c (U.underᶜ s b)               = rested-apart (there-there a) c b
+    rested-apart a c (U.framesᶜ _ _ _)            = refl
+    rested-apart a c (U.burstᶜ _ _ _ _)           = refl
+    rested-apart a c (U.ofᶜ _ _ _)                = refl
+    rested-apart a c (U.deferᶜ _ _ _)             = refl
+    rested-apart a c U.idleᶜ                      = refl
+
+    rested-apartᴹ : ∀ {Γ A C B} {k : A ∈ᴸ Γ} {i : C ∈ᴸ Γ} → Apart k i → ∀ c (m : Maybe (U.Node Γ B)) → untoldʳᴹ i (U.shutᴹ k c m) ≡ untoldʳᴹ i m
+    rested-apartᴹ a c nothing  = refl
+    rested-apartᴹ a c (just n) = rested-apart a c n
+
+    rested-apartᴸ : ∀ {Γ A C B} {k : A ∈ᴸ Γ} {i : C ∈ᴸ Γ} → Apart k i → ∀ c (ns : List (U.Node Γ B)) → untoldʳᴸ i (U.shutᴸ k c ns) ≡ untoldʳᴸ i ns
+    rested-apartᴸ a c []       = refl
+    rested-apartᴸ a c (n ∷ ns) = cong₂ _++_ (rested-apart a c n) (rested-apartᴸ a c ns)
+
+    rested-apartᵇ : ∀ {Γ A C B} {k : A ∈ᴸ Γ} {i : C ∈ᴸ Γ} → Apart k i → ∀ c (s : U.Source Γ B) → untoldᵇ i (U.shutˢ k c s) ≡ untoldᵇ i s
+    rested-apartᵇ a c (U.live s)    = cong₂ _++_ (untold-apart a c s) (rested-apart a c s)
+    rested-apartᵇ a c (U.ended e t) = cong₂ _++_ (untold-apart a c t) (rested-apart a c t)
+
+  -- A node's rest leaves untold no joiner its step does not.
+  mutual
+    rested-all : ∀ {Γ A B} {P : Pos → Set} (i : A ∈ᴸ Γ) (n : U.Node Γ B) → All P (untold i n) → All P (untoldʳ i n)
+    rested-all i (U.mapᶜ f n)                 a = rested-all i n a
+    rested-all i (U.scanᶜ f z n)              a = rested-all i n a
+    rested-all i (U.takeWhileᶜ b p n)         a = rested-all i n a
+    rested-all i (U.flatMapᶜ op g o ls qs pl) a =
+      all-++⁺ (rested-allᴹ i o (++⁻ˡ (untoldᴹ i o) a))
+        (all-++⁺ (rested-allᴸ i ls (++⁻ˡ (untoldᴸ i ls) (++⁻ʳ (untoldᴹ i o) a))) (rested-all i pl (++⁻ʳ (untoldᴸ i ls) (++⁻ʳ (untoldᴹ i o) a))))
+    rested-all i (U.joinᶜ j p xs e)           a = []
+    rested-all i (U.connectᶜ r b (U.live s))  a =
+      all-++⁺ (rested-all (there i) b (++⁻ˡ (untold (there i) b) a)) (all-++⁺ aₛ (rested-all i s aₛ))
+      where aₛ = ++⁻ʳ (untold (there i) b) a
+    rested-all i (U.connectᶜ r b (U.ended e t)) a =
+      all-++⁺ (rested-all (there i) b (++⁻ˡ (untold (there i) b) a)) (all-++⁺ aₜ (rested-all i t aₜ))
+      where aₜ = ++⁻ʳ (untold (there i) b) a
+    rested-all i (U.endingᶜ p n)              a = rested-all i n a
+    rested-all i (U.restᶜ n)                  a = a
+    rested-all i (U.unionᶜ x y)               a = a
+    rested-all i (U.burstingᶜ r t)            a = a
+    rested-all i (U.underᶜ s b)               a = a
+    rested-all i (U.framesᶜ _ _ _)            a = []
+    rested-all i (U.burstᶜ _ _ _ _)           a = []
+    rested-all i (U.ofᶜ _ _ _)                a = []
+    rested-all i (U.deferᶜ _ _ _)             a = []
+    rested-all i U.idleᶜ                      a = []
+
+    rested-allᴹ : ∀ {Γ A B} {P : Pos → Set} (i : A ∈ᴸ Γ) (m : Maybe (U.Node Γ B)) → All P (untoldᴹ i m) → All P (untoldʳᴹ i m)
+    rested-allᴹ i nothing  a = []
+    rested-allᴹ i (just n) a = rested-all i n a
+
+    rested-allᴸ : ∀ {Γ A B} {P : Pos → Set} (i : A ∈ᴸ Γ) (ns : List (U.Node Γ B)) → All P (untoldᴸ i ns) → All P (untoldʳᴸ i ns)
+    rested-allᴸ i []       a = []
+    rested-allᴸ i (n ∷ ns) a = all-++⁺ (rested-all i n (++⁻ˡ (untold i n) a)) (rested-allᴸ i ns (++⁻ʳ (untold i n) a))
 
   untold-shut : ∀ {Γ A B C} (i : C ∈ᴸ Γ) c (b : U.Node (A ∷ Γ) B) → untold (there i) (U.shut (here refl) c b) ≡ untold (there i) b
   untold-shut i c b = untold-apart here-there c b
@@ -522,10 +616,11 @@ module Framing (R : Set) where
     shut-down i c U.idleᶜ                      tl = inj₁ hushᵗ
     shut-down i c (U.unionᶜ x y)               tl =
       union-down x (U.shut i c x) y (U.shut i c y) (U.restˢ x) (U.restˢ (U.shut i c x)) (U.restˢ y) (U.restˢ (U.shut i c y))
-        (rest-hushed y) (rest-hushed (U.shut i c y)) (rest-down i c x (++⁻ˡ (untold i x) tl)) (rest-down i c y (++⁻ʳ (untold i x) tl))
-    shut-down i c (U.burstingᶜ r t)            tl = bursts-down r t (U.shut i c t) (U.step t) (U.step (U.shut i c t)) (shut-down i c t tl) (rest-down i c t tl)
+        (rest-hushed y) (rest-hushed (U.shut i c y)) (rest-down i c x (++⁻ˡ (untoldʳ i x) tl)) (rest-down i c y (++⁻ʳ (untoldʳ i x) tl))
+    shut-down i c (U.burstingᶜ r t)            tl =
+      bursts-down r t (U.shut i c t) (U.step t) (U.step (U.shut i c t)) (shut-down i c t (++⁻ˡ (untold i t) tl)) (rest-down i c t (++⁻ʳ (untold i t) tl))
     shut-down i c (U.underᶜ {C = C} s b)       tl =
-      under-down s (U.shutˢ i c s) (U.restˢ {B = C} b) (U.restˢ {B = C} (U.shut (there i) c b)) (rest-down (there i) c b (++⁻ʳ (untoldˢ i s) tl))
+      under-down s (U.shutˢ i c s) (U.restˢ {B = C} b) (U.restˢ {B = C} (U.shut (there i) c b)) (rest-down (there i) c b tl)
 
     shut-downᴹ : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (o : Maybe (U.Node Γ B)) → Tells q c (untoldᴹ i o) → MP.Pointwise (DownN q) o (U.shutᴹ i c o)
     shut-downᴹ i c nothing  tl = MP.nothing
@@ -535,7 +630,7 @@ module Framing (R : Set) where
     shut-downᴸ i c []       tl = LP.[]
     shut-downᴸ i c (n ∷ ns) tl = shut-down i c n (++⁻ˡ (untold i n) tl) LP.∷ shut-downᴸ i c ns (++⁻ʳ (untold i n) tl)
 
-    rest-down : ∀ {Γ A B C q} (i : A ∈ᴸ Γ) c (n : U.Node Γ B) → Tells q c (untold i n) → Down q (U.restˢ {B = C} n) (U.restˢ {B = C} (U.shut i c n))
+    rest-down : ∀ {Γ A B C q} (i : A ∈ᴸ Γ) c (n : U.Node Γ B) → Tells q c (untoldʳ i n) → Down q (U.restˢ {B = C} n) (U.restˢ {B = C} (U.shut i c n))
     rest-down i c (U.framesᶜ τ e m)            tl = inj₁ hushᵗ
     rest-down i c (U.burstᶜ τ r k b)           tl = inj₁ hushᵗ
     rest-down i c (U.ofᶜ p k xs)               tl = inj₁ hushᵗ
@@ -547,11 +642,11 @@ module Framing (R : Set) where
         (U.restᴹ o) (U.restᴹ o′) (U.unionˢ (U.restsᶜ ls) (U.restsˢ ls) (U.restᶜ pl) (U.restˢ pl)) (U.unionˢ (U.restsᶜ ls′) (U.restsˢ ls′) (U.restᶜ pl′) (U.restˢ pl′))
         (union-hushed (U.restsᶜ ls) (U.restsˢ ls) (U.restᶜ pl) (U.restˢ pl) (rest-hushed pl))
         (union-hushed (U.restsᶜ ls′) (U.restsˢ ls′) (U.restᶜ pl′) (U.restˢ pl′) (rest-hushed pl′))
-        (rest-downᴹ i c o (++⁻ˡ (untoldᴹ i o) tl))
+        (rest-downᴹ i c o (++⁻ˡ (untoldʳᴹ i o) tl))
         (union-down (U.restsᶜ ls) (U.restsᶜ ls′) (U.restᶜ pl) (U.restᶜ pl′) (U.restsˢ ls) (U.restsˢ ls′) (U.restˢ pl) (U.restˢ pl′)
           (rest-hushed pl) (rest-hushed pl′)
-          (rests-down i c ls (++⁻ˡ (untoldᴸ i ls) (++⁻ʳ (untoldᴹ i o) tl)))
-          (rest-down i c pl (++⁻ʳ (untoldᴸ i ls) (++⁻ʳ (untoldᴹ i o) tl))))
+          (rests-down i c ls (++⁻ˡ (untoldʳᴸ i ls) (++⁻ʳ (untoldʳᴹ i o) tl)))
+          (rest-down i c pl (++⁻ʳ (untoldʳᴸ i ls) (++⁻ʳ (untoldʳᴹ i o) tl))))
       where o′ = U.shutᴹ i c o
             ls′ = U.shutᴸ i c ls
             pl′ = U.shut i c pl
@@ -560,20 +655,20 @@ module Framing (R : Set) where
       union-down (U.burstingᶜ r s) (U.burstingᶜ r s′) (U.underᶜ (U.live s) b) (U.underᶜ (U.live s′) b′)
         (U.burstsˢ r s (U.step s)) (U.burstsˢ r s′ (U.step s′)) (U.underˢ (U.live s) (U.restˢ {B = C} b)) (U.underˢ (U.live s′) (U.restˢ {B = C} b′))
         (under-hushed (U.live s) (U.restˢ {B = C} b)) (under-hushed (U.live s′) (U.restˢ {B = C} b′))
-        (bursts-down r s s′ (U.step s) (U.step s′) (shut-down i c s tlₛ) (rest-down i c s tlₛ))
-        (under-down (U.live s) (U.live s′) (U.restˢ {B = C} b) (U.restˢ {B = C} b′) (rest-down (there i) c b (++⁻ˡ (untold (there i) b) tl)))
+        (bursts-down r s s′ (U.step s) (U.step s′) (shut-down i c s (++⁻ˡ (untold i s) tlₛ)) (rest-down i c s (++⁻ʳ (untold i s) tlₛ)))
+        (under-down (U.live s) (U.live s′) (U.restˢ {B = C} b) (U.restˢ {B = C} b′) (rest-down (there i) c b (++⁻ˡ (untoldʳ (there i) b) tl)))
       where s′ = U.shut i c s
             b′ = U.shut (there i) c b
-            tlₛ = ++⁻ʳ (untold (there i) b) tl
+            tlₛ = ++⁻ʳ (untoldʳ (there i) b) tl
     rest-down i c (U.connectᶜ {B = C} r b (U.ended e t)) tl =
       union-down (U.burstingᶜ r t) (U.burstingᶜ r t′) (U.underᶜ (U.ended e t) b) (U.underᶜ (U.ended e t′) b′)
         (U.burstsˢ r t (U.step t)) (U.burstsˢ r t′ (U.step t′)) (U.underˢ (U.ended e t) (U.restˢ {B = C} b)) (U.underˢ (U.ended e t′) (U.restˢ {B = C} b′))
         (under-hushed (U.ended e t) (U.restˢ {B = C} b)) (under-hushed (U.ended e t′) (U.restˢ {B = C} b′))
-        (bursts-down r t t′ (U.step t) (U.step t′) (shut-down i c t tlₜ) (rest-down i c t tlₜ))
-        (under-down (U.ended e t) (U.ended e t′) (U.restˢ {B = C} b) (U.restˢ {B = C} b′) (rest-down (there i) c b (++⁻ˡ (untold (there i) b) tl)))
+        (bursts-down r t t′ (U.step t) (U.step t′) (shut-down i c t (++⁻ˡ (untold i t) tlₜ)) (rest-down i c t (++⁻ʳ (untold i t) tlₜ)))
+        (under-down (U.ended e t) (U.ended e t′) (U.restˢ {B = C} b) (U.restˢ {B = C} b′) (rest-down (there i) c b (++⁻ˡ (untoldʳ (there i) b) tl)))
       where t′ = U.shut i c t
             b′ = U.shut (there i) c b
-            tlₜ = ++⁻ʳ (untold (there i) b) tl
+            tlₜ = ++⁻ʳ (untoldʳ (there i) b) tl
     rest-down i c (U.deferᶜ l p ns)            tl = inj₁ hushᵗ
     rest-down i c (U.endingᶜ p n)              tl = rest-down i c n tl
     rest-down i c (U.restᶜ n)                  tl = rest-down i c n tl
@@ -581,21 +676,22 @@ module Framing (R : Set) where
     rest-down i c (U.unionᶜ x y)               tl =
       union-down (U.restᶜ x) (U.restᶜ (U.shut i c x)) (U.restᶜ y) (U.restᶜ (U.shut i c y))
         (U.restˢ x) (U.restˢ (U.shut i c x)) (U.restˢ y) (U.restˢ (U.shut i c y))
-        (rest-hushed y) (rest-hushed (U.shut i c y)) (rest-down i c x (++⁻ˡ (untold i x) tl)) (rest-down i c y (++⁻ʳ (untold i x) tl))
-    rest-down i c (U.burstingᶜ r t)            tl = bursts-down r t (U.shut i c t) (U.step t) (U.step (U.shut i c t)) (shut-down i c t tl) (rest-down i c t tl)
+        (rest-hushed y) (rest-hushed (U.shut i c y)) (rest-down i c x (++⁻ˡ (untoldʳ i x) tl)) (rest-down i c y (++⁻ʳ (untoldʳ i x) tl))
+    rest-down i c (U.burstingᶜ r t)            tl =
+      bursts-down r t (U.shut i c t) (U.step t) (U.step (U.shut i c t)) (shut-down i c t (++⁻ˡ (untold i t) tl)) (rest-down i c t (++⁻ʳ (untold i t) tl))
     rest-down i c (U.underᶜ {C = C} s b)       tl =
-      under-down s (U.shutˢ i c s) (U.restˢ {B = C} b) (U.restˢ {B = C} (U.shut (there i) c b)) (rest-down (there i) c b (++⁻ʳ (untoldˢ i s) tl))
+      under-down s (U.shutˢ i c s) (U.restˢ {B = C} b) (U.restˢ {B = C} (U.shut (there i) c b)) (rest-down (there i) c b tl)
 
-    rest-downᴹ : ∀ {Γ A B C q} (i : A ∈ᴸ Γ) c (o : Maybe (U.Node Γ B)) → Tells q c (untoldᴹ i o) → Down q (U.restᴹ {B = C} o) (U.restᴹ {B = C} (U.shutᴹ i c o))
+    rest-downᴹ : ∀ {Γ A B C q} (i : A ∈ᴸ Γ) c (o : Maybe (U.Node Γ B)) → Tells q c (untoldʳᴹ i o) → Down q (U.restᴹ {B = C} o) (U.restᴹ {B = C} (U.shutᴹ i c o))
     rest-downᴹ i c nothing  tl = inj₁ hushᵗ
     rest-downᴹ i c (just n) tl = rest-down i c n tl
 
-    rests-down : ∀ {Γ A B C q} (i : A ∈ᴸ Γ) c (ls : List (U.Node Γ B)) → Tells q c (untoldᴸ i ls) → Down q (U.restsˢ {B = C} ls) (U.restsˢ {B = C} (U.shutᴸ i c ls))
+    rests-down : ∀ {Γ A B C q} (i : A ∈ᴸ Γ) c (ls : List (U.Node Γ B)) → Tells q c (untoldʳᴸ i ls) → Down q (U.restsˢ {B = C} ls) (U.restsˢ {B = C} (U.shutᴸ i c ls))
     rests-down i c []       tl = inj₁ hushᵗ
     rests-down i c (l ∷ ls) tl =
       union-down (U.restᶜ l) (U.restᶜ (U.shut i c l)) (U.restsᶜ ls) (U.restsᶜ (U.shutᴸ i c ls))
         (U.restˢ l) (U.restˢ (U.shut i c l)) (U.restsˢ ls) (U.restsˢ (U.shutᴸ i c ls))
-        (rests-hushed ls) (rests-hushed (U.shutᴸ i c ls)) (rest-down i c l (++⁻ˡ (untold i l) tl)) (rests-down i c ls (++⁻ʳ (untold i l) tl))
+        (rests-hushed ls) (rests-hushed (U.shutᴸ i c ls)) (rest-down i c l (++⁻ˡ (untoldʳ i l) tl)) (rests-down i c ls (++⁻ʳ (untoldʳ i l) tl))
 
   -- A shut heads where the node did, or at an end it tells.
   shut-heads : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (b : U.Node Γ B) → Heads q b → Tells q c (untold i b) → Heads q (U.shut i c b)
