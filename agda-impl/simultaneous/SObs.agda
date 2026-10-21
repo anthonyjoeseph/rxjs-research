@@ -66,6 +66,13 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) wh
   -- pattern-matching lambda whose arm holds the child: Agda lifts it out
   -- as a definition of its own.
   --
+  -- The rule binds only the path down to a child.  Data may pass through
+  -- anything, so an operator's logic can stay opaque once it reads its
+  -- child as a `connect`'s source through `connected`, and a choice
+  -- between programs can gate each with a `takeWhile` on a one-value
+  -- `of`.  A child moved under a new binder needs `rename`, which is
+  -- opaque; elaborating under a renaming, as `rename` does, avoids it.
+  --
   -- DEAD ROUTE: postulated operators around the calls.  Measured: a
   --   postulate, or a definition without `INLINE`, in place of any
   --   constructor fails termination at every clause, `connect`'s included.
