@@ -338,7 +338,7 @@ module ClimbTake (R : Set) where
   call-take st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {i = i} {p = p} {c = c} {k = k} {u = u} ρ {closes ks}
     record { sane = sn ; placed = pl ; deep = dp ; ctl = refl ; code = cd ; stack = sk ; lifted = gn , S , L , sg , hl ; owned = ow
            ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
-           ; behind = bh ; lingers = lgr ; lefts = lt ; rest-heads = rh ; flags = dn ; kept = kp }
+           ; behind = bh ; lingers = lgr ; told = tl ; ended = ed ; lefts = lt ; rest-heads = rh ; flags = dn ; kept = kp }
     with lifts-split ρ (in-take here) L in eqC | subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-take here) top) cd
   ... | _ , lifts-take lv lifts-here , Lρ | readRef≗ refl f =
     rose {sg′ = closes ks} (then refl now) (one-lower ρ one-take) (record
@@ -349,7 +349,7 @@ module ClimbTake (R : Set) where
       ; lefts = lefts-up ρ (in-take here) eqC lt ; rest-heads = rh
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
-      ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; lingers = lgr ; flags = done-up ρ (in-take here) refl dn ; kept = kp })
+      ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; lingers = lgr ; told = tl ; ended = ed ; flags = done-up ρ (in-take here) refl dn ; kept = kp })
 
   -- A write, one step: the cell stored, what follows it run.
   writes : ∀ {h} {hp : Heapᴹ h} {q w} {σ : w ⊑ h} {K : Stack w ⊤} {clk ts bs td lg en mk} {a : Act h ⊤} {t} {r : Ref h t} {z} {n : Act h ⊤}
