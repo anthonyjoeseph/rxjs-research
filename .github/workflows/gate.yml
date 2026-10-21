@@ -148,6 +148,11 @@ jobs:
       - name: make stepping
         run: make stepping
 
+      # Every observer inside the run, completions included, at the
+      # denotation's positions: the observable half of `tells-past`.
+      - name: make ghosts
+        run: make ghosts ARGS="0 300"
+
 
   # The placing check: every drawn program's meaning is placed, rising
   # and steady.  Its own job, so its slow seeds never starve the oracle.

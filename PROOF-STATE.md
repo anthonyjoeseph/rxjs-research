@@ -8,6 +8,25 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### UP-ENDED
+
+Whether `tells-past` is a field `Carried` owes, every producer framing it, or
+follows from `Owned`'s finishes and the agenda's placement; the shut nodes'
+steps heading past the shutting end ride on the answer. Settled by deriving
+`tells-past`, or by adding the field and framing it.
+
+Members: `tells-past`, `ended-past`, `union-down`, `source-down`,
+`ended-down`, `bursts-down`, `flat-down`.
+
+#### THE ROOT STEP
+
+A sane, placed root ghost's meaning is what its step shows, then the stepped
+node's, and the step leaves its parts placed; no connect's body shows under a
+source step. Refuted four times as stated. Settled when `step-skips` and
+`within-step` are bodies over the per-node facts.
+
+Members: `step-skips`, `within-step`, `under-shown-connect`.
+
 #### THE REST'S TIES
 
 Undecided invariant: an ended outer's or lane's last ghost tells its joiners
@@ -40,15 +59,6 @@ by the leftover's clauses, or a witness under `Shut`.
 
 Members: `fed-calm-tw`, `fin-calm-tw`.
 
-#### THE ROOT STEP
-
-A sane, placed root ghost's meaning is what its step shows, then the stepped
-node's, and the step leaves its parts placed; no connect's body shows under a
-source step. Refuted four times as stated. Settled when `step-skips` and
-`within-step` are bodies over the per-node facts.
-
-Members: `step-skips`, `within-step`, `under-shown-connect`.
-
 #### DEEP ORDER
 
 Whether `Deep`, order to every depth, is the invariant a launch, a step and a
@@ -70,16 +80,6 @@ found.
 Members: `pooled-pin`, `left-pin`, `pool-off`, `pool-land`, `rest-body`,
 `rest-land`, `spread-held`, `void-site`, `shut-late`, `step-late`,
 `emit-shut`, `emit-run`, `note-least`, `turn-dry`.
-
-#### UP-ENDED
-
-Whether `tells-past` is a field `Carried` owes, every producer framing it, or
-follows from `Owned`'s finishes and the agenda's placement; the shut nodes'
-steps heading past the shutting end ride on the answer. Settled by deriving
-`tells-past`, or by adding the field and framing it.
-
-Members: `tells-past`, `ended-past`, `union-down`, `source-down`,
-`ended-down`, `bursts-down`, `flat-down`.
 
 #### THE LANE START
 
