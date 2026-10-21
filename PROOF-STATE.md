@@ -11,12 +11,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE FED LEFTOVER
 
 Whether a connect's leftover is kept, as a twin, when a feed or a finish
-restages it: a joiner reached through a nested source's burst reads the value
-from the source before and holds it after, given the call's `Meaning`, joins
-and heads. Settled when `fed-rested` is a body, or a witness under those
-hypotheses.
+restages it. A fed joiner differs only inside a nested connect's burst, so
+it holds if no burst in the body is open at the call (`Shut`), a fact
+`Calling` does not yet carry. Settled when `fed-calm` and `fed-calm-tw` are
+bodies, or a reachable open burst is found.
 
-Members: `fed-rested`, `fin-rested`.
+Members: `fed-calm`, `fed-calm-tw`, `fin-calm`, `fin-calm-tw`.
 
 #### THE REST'S TIES
 
