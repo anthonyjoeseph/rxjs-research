@@ -24,11 +24,12 @@ open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import denotation.MonotonicList.Events using (Events∞; skip; Pos; Timeline)
+open import denotation.MonotonicList.Events using (Events∞; skip; Pos; Timeline; _<ᵖ_)
 open import denotation.MonotonicList using (Agree)
 import denotation.Unfold as U
 open import denotation.MonotonicList.Events using () renaming (sub to subᴾ)
 open import adequacy.Sorted.Walk using (module SortingWalk)
+open import adequacy.Sorted using (_≤ᵖ_)
 open import operation.Machine using (module Machine)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Strong.Against using (module StrongAgainst)
@@ -655,6 +656,41 @@ module ClimbFlat (R : Set) where
         G   = λ a j → U.subscribe (f a) j
         pl′ = U.unionᶜ pl (U.restᶜ o₀)
 
+  -- Heads read off a step pinned alike.
+  heads-pinned : ∀ {Γ A B q} {st : U.Step Γ A} {st′ : U.Step Γ B} → Pinned st st′
+               → (∀ {k} → U.headˢ st′ ≡ just k → q ≤ᵖ k) → ∀ {k} → U.headˢ st ≡ just k → q ≤ᵖ k
+  heads-pinned pinned   h e = h e
+  heads-pinned unpinned h ()
+
+  -- Two rests side by side head where either does.
+  heads-union : ∀ {Γ B q} (x : U.Node Γ B) sx y sy → (∀ {k} → U.headˢ sx ≡ just k → q ≤ᵖ k) → (∀ {k} → U.headˢ sy ≡ just k → q ≤ᵖ k)
+              → ∀ {k} → U.headˢ (U.unionˢ x sx y sy) ≡ just k → q ≤ᵖ k
+  heads-union x (U.skipˢ k x′) y (U.skipˢ k′ y′) hx hy e with k <ᵖ k′
+  ... | true  = hx e
+  ... | false = hy e
+  heads-union x (U.skipˢ _ _)   y (U.outˢ _ _ _) hx hy e = hx e
+  heads-union x (U.skipˢ _ _)   y (U.endˢ _)     hx hy e = hx e
+  heads-union x (U.skipˢ _ _)   y U.hushˢ        hx hy e = hx e
+  heads-union x (U.outˢ _ _ _)  y sy             hx hy e = hy e
+  heads-union x (U.endˢ _)      y sy             hx hy e = hy e
+  heads-union x U.hushˢ         y sy             hx hy e = hy e
+
+  -- A sub whose close the run calls: what it leaves running heads no
+  -- earlier than the run.
+  postulate
+    closed-rest-heads : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A}
+                          (σ : Path T v) {ks} → Calling g ℓ m₁ σ (closes ks)
+                        → Heads (Conf.pos (Mach.conf m₁)) (U.restᶜ {B = ⊤} (At.leftover (Conf.heap (Mach.conf m₁)) {B = ⊤} v))
+
+  -- The pool taking a closed node's rest heads where the pool did and
+  -- the closed sub's leftover does.
+  pool-heads : ∀ {Δ B q} {pl : U.Node Δ B} {A′} (o₀ : U.Node Δ A′) {C} {lf : U.Node Δ C} → Restful pl → Leaves o₀ lf
+             → Heads q (U.restᶜ {B = ⊤} lf) → Heads q pl → Heads q (U.unionᶜ pl (U.restᶜ o₀))
+  pool-heads {pl = pl} o₀ rf lo hl hp =
+    heads-union pl (U.restˢ pl) (U.restᶜ o₀) (U.restˢ o₀)
+      (heads-pinned (pinned-sym (restful-pinned rf)) hp)
+      (heads-pinned (pinned-trans (rest-pinned o₀) (Leaves.pins lo)) hl)
+
   -- Lanes or a queue left: the pool takes the outer's last ghost
   -- rested, which is what the outer still runs; its heads and ties
   -- where the outer's were.
@@ -693,7 +729,9 @@ module ClimbFlat (R : Set) where
 
     postulate
       close-told  : ∀ {A′} (i : A′ ∈ᴸ Δ) {b₀} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just b₀ → untold i pl′ ⊆ᴾ untold i b₀
-      close-heads : ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just c → Heads q pl → Heads q pl′
+
+    close-heads : ∀ {c} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just c → Heads q pl → Heads q pl′
+    close-heads e₀ = pool-heads o₀ (proj₂ (Lingers.pools (Calling.lingers cl) ρ (lifts-seen L) e₀)) lo (closed-rest-heads (ρ ⊕ in-outer here) cl)
 
     close-heading : Heading H (Settles.H′ H ρ) q (flatMapˢ op f fl oc k r pl u ls) (flatMapˢ op f fl oc k r pl′ u ls)
     close-heading = P.heading (λ {A′} i {b₀} → close-told {A′} i {b₀}) close-heads
