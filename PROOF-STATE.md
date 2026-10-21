@@ -10,9 +10,9 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ROOT STEP
 
-Whether a flatMap's meaning starts with its step's event; whether a
-connect's body never steps at or just past its source's step; the step's
-parts placed.
+Whether a flatMap's meaning starts with its step's event; which region
+`Placed` must keep between a connect's body and its source, so the body
+never steps at or just past the source's step; the step's parts placed.
 Settled when `first-flat` and `shy-apart` are bodies or refuted.
 
 Members: `first-flat`, `shy-apart`,

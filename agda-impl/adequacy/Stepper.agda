@@ -467,6 +467,7 @@ postulate
   -- A connect's body stepping no later than its source's step lies
   -- neither at that step nor where it shows.
   --
+  -- REFUTED: 32416645 by a body and its source ending at one position, `Placed` keeping no region between them
   -- DEAD ROUTE: exact agreement with a ghost anchored in its sources'
   --   step history.  The ghost is the witness's open part (`part`), which
   --   keeps no count of a source's steps, and a silent run is matched by
