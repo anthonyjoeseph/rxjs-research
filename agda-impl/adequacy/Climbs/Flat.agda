@@ -321,6 +321,9 @@ module ClimbFlat (R : Set) where
     pool-idle : AllPairs _≢_ (names T) → pl′ ≡ U.unionᶜ pl U.idleᶜ → Ends H T → Lingers H T → Lingers H T′
     pool-idle fs e en = Shift.shift-lingers H H ρ (λ j _ → refl) [] fs v en (pool-idling e)
 
+    pool-ended : AllPairs _≢_ (names T) → pl′ ≡ U.unionᶜ pl U.idleᶜ → Ends H T → Ends H T′
+    pool-ended fs e en = Shift.shift-ended H H ρ (λ j _ → refl) [] fs v en (pool-idling e)
+
     -- The pool read by its part alone: no kernel, feed or queue clause
     -- moves.
     pool-kernels : Kernels H T → Kernels H T′

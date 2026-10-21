@@ -328,6 +328,14 @@ module Shifting (R : Set) where
     each-alike : ∀ {P : ∀ {Γ A} → U.Node Γ A → Set} {Δ A} {t : Sub h Δ A} → Alike H H′ (names t) → Each H P t → Each H′ P t
     each-alike al ev = each-same H H′ (λ ψ → seen-alike H H′ ψ al) (λ ψ → part-at ψ al) ev
 
+    told-alike : ∀ {q Δ A} {t : Sub h Δ A} → Alike H H′ (names t) → Untold H q t → Untold H′ q t
+    told-alike al ut ψ sn ps pb =
+      ut ψ (trans (sym (seen-alike H H′ ψ al)) sn) (trans (part-at (ψ ⊕ in-source here) al) ps) (trans (part-at (ψ ⊕ in-body here) al) pb)
+
+    ended-alike : ∀ {Δ A} {t : Sub h Δ A} → Alike H H′ (names t) → Ended H t → Ended H′ t
+    ended-alike al en ψ sn pc e =
+      trans (sym (part-at (ψ ⊕ in-source here) al)) (en ψ (trans (sym (seen-alike H H′ ψ al)) sn) (trans (part-at ψ al) pc) e)
+
     eachL-alike : ∀ {P : ∀ {Γ A} → U.Node Γ A → Set} {Δ B} {ls : List (Lane h Δ B)} → Alike H H′ (laneNames ls) → EachL H P ls → EachL H′ P ls
     eachL-alike {ls = ls} al eL = record
       { partsL = λ πL sn e → EachL.partsL eL πL (se πL sn) (trans (sym (partL-at πL al)) e)

@@ -96,7 +96,7 @@ module Connecting (R : Set) where
   open Tearing R using (Alike; part-alike; look-store)
   open Locality R using (module Heaps)
   open EverywhereGated.Holding R using (holds-alike)
-  open Shifting R using (each-alike; lingers-alike; flags-alike)
+  open Shifting R using (each-alike; lingers-alike; flags-alike; told-alike; ended-alike)
 
   -- A RUN AT A PENDING NODE, THE WORLD GROWN: what the relation reads of
   -- the run at its subscription, along the weakened tree and against the
@@ -120,6 +120,8 @@ module Connecting (R : Set) where
       queue   : Queue H q clk ts tree
       behind  : Each H (Heads q) tree
       lingers : Lingers H tree
+      told    : Untold H q tree
+      ended   : Ended H tree
       flags   : DoneBy H tree []
       pends   : pend tree ≡ pend T₀
       named   : ∀ {k} {j : h ∋ k} → (k , j) ∈ names tree → Σ (h₀ ∋ k) λ i → wk∋ ν i ≡ j
@@ -140,7 +142,8 @@ module Connecting (R : Set) where
     ; meets = trans (Gw′.grow-part gr (tree G)) (meets G)
     ; owned = Gw′.grow-owned gr (stack G) (owned G)
     ; kernels = Growths.kernels-grow (new {k} {h}) gr (kernels G) ; meaning = Gw′.grow-meaning gr (meaning G) ; queue = Gw′.grow-queue gr (queue G)
-    ; behind = Gw′.grow-each gr (behind G) ; lingers = Gw′.grow-lingers gr (lingers G) ; flags = Gw′.grow-flags gr (flags G) ; pends = trans (pend-grow new (tree G)) (pends G)
+    ; behind = Gw′.grow-each gr (behind G) ; lingers = Gw′.grow-lingers gr (lingers G)
+    ; told = Gw′.grow-told gr (told G) ; ended = Gw′.grow-ended gr (ended G) ; flags = Gw′.grow-flags gr (flags G) ; pends = trans (pend-grow new (tree G)) (pends G)
     ; named = λ {_} {j} m → let (i′ , e′ , m′) = names-wk new (tree G) j m ; (i , e) = named G m′
                             in i , trans (sym (wk∋-wk ν new i)) (trans (cong (wk∋ new) e) e′)
     ; distinct = λ fs → wk-pairs new (tree G) (distinct G fs) }
@@ -312,10 +315,11 @@ module Connecting (R : Set) where
                      → Owned H₅ t′ (subAs {act = act′} π′ cd′ (backAs q {ρ = σ′} {σ = same⊑} (srcC ρc ∷ []) (<ᵖ-below q []) e (restack sk a)) a′)
       -- Every head no earlier than the run one level down.
       connect-behind : Each H₅ (Heads q) T₅ → Each H₅ (Heads (q ++ [ ix 0 ])) t′
-      -- The untold and ended invariants survive the connect step.
-      postulate
-        connect-told : Untold H₅ (q ++ [ ix 0 ]) t′
-        connect-ended : Ended H₅ t′
+      -- Every joiner a held connect past its source's end has not told
+      -- its end is told no sooner than the run one level down.
+      connect-told : Untold H₅ q T₅ → Ended H₅ T₅ → Untold H₅ (q ++ [ ix 0 ]) t′
+      -- Every connect held past its source's end still holds no source.
+      connect-ended : Ended H₅ T₅ → Ended H₅ t′
 
     -- The queue, the run one level down, a new subject joined by none.
     connect-queue : Queue H₅ q clk ts T₅ → Queue H₅ (q ++ [ ix 0 ]) clk ts t′
@@ -369,7 +373,7 @@ module Connecting (R : Set) where
              ; books = record { fresh = C.connect-fresh (Books.fresh bk)
                               ; clocked = trans ck (sym (tick-ix0 q₀)) , ck , C.reticked sk₅ a₅ (Grew.ticked G₅)
                               ; paidUp = cong wd (cong wd (cong wd (cong wd (cong wd (Books.paidUp bk))))) ; running = Books.running bk }
-             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind′ = Eaching.each-to _ _ (C.connect-behind (Grew.behind G₅)) ; told = C.connect-told ; ended = C.connect-ended ; lingers′ = Lingering.lingers-to _ (C.connect-lingers (Grew.lingers G₅)) ; flags = C.connect-flags (Grew.flags G₅) }
+             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind′ = Eaching.each-to _ _ (C.connect-behind (Grew.behind G₅)) ; told = C.connect-told (Grew.told G₅) (Grew.ended G₅) ; ended = C.connect-ended (Grew.ended G₅) ; lingers′ = Lingering.lingers-to _ (C.connect-lingers (Grew.lingers G₅)) ; flags = C.connect-flags (Grew.flags G₅) }
     , refl , inj₁ (inj₁ (subst (pend C.t′ <_) (Grew.pends G₅) C.less))
     where bk = Carried.books cr
           ck = proj₁ (Books.clocked bk)
@@ -389,7 +393,7 @@ module Connecting (R : Set) where
           G₀ = record { tree = Carried.tree cr ; path = π ; stack = sk ; alone = a ; ticked = proj₂ (Books.clocked bk)
                       ; obsR = (λ _ → wk-same _) , wk-same _ , wk-same _ ; kontR = λ τ sub → from-same (λ ζ → Here.kont (walk π top) ζ sub) τ
                       ; envR = e ; meets = refl ; owned = recode (Carried.owned cr) ; kernels = Carried.kernels cr
-                      ; meaning = Carried.meaning cr ; queue = Carried.queue cr ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; flags = Carried.flags cr ; pends = refl
+                      ; meaning = Carried.meaning cr ; queue = Carried.queue cr ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; told = Carried.told cr ; ended = Carried.ended cr ; flags = Carried.flags cr ; pends = refl
                       ; named = λ {_} {j} _ → j , refl ; distinct = λ fs → fs }
           G₅ = grew-step {k = cell (maybe quiet)} (lift nothing) (grew-step {k = cell (maybe quiet)} (lift nothing)
                  (grew-step {k = cell (base Bool)} (lift true) (grew-step {k = cell (base Bool)} (lift false) (grew-step {k = cell (joins A)} (lift []) G₀))))
@@ -442,7 +446,8 @@ module Connecting (R : Set) where
     ; meaning = record { fed = Heaps.fed-alike H S.H′ (tree G) al _ (Meaning.fed (meaning G)) }
     ; queue   = S.store-queue al (queue G)
     ; behind  = each-alike H S.H′ al (behind G)
-    ; lingers = lingers-alike H S.H′ al (lingers G) ; flags   = flags-alike H S.H′ al (flags G) }
+    ; lingers = lingers-alike H S.H′ al (lingers G) ; flags   = flags-alike H S.H′ al (flags G)
+    ; told    = told-alike H S.H′ al (told G) ; ended = ended-alike H S.H′ al (ended G) }
     where
       open Grew
       module S = Stored H i x

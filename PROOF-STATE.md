@@ -23,7 +23,12 @@ Whether every step keeps `Untold` and `Ended`, now fields of `Carried` and
 `Calling`, and whether the shut nodes' steps head past the shutting end.
 Settled when each step's framing leaf and `bursts-down` are bodies.
 
-Members: `bursts-down`, `flat-down`.
+Members: `back-told`, `bg-ended`, `bg-told`, `connect-ended`, `connect-told`,
+`fed-ended`, `fed-told`, `fin-ended`, `fin-told`, `fire-ended`, `fire-told`,
+`fr-ended`, `grow-ended`, `grow-told`, `of-ended`, `of-told`, `out-told`,
+`rf-ended`, `rf-told`, `rm-ended`, `rm-told`, `rs-ended`, `rs-told`, `rt-ended`,
+`rt-told`, `scan-ended`, `scan-told`, `shift-ended`, `shift-told`, `torn-ended`,
+`torn-told`, `wr-ended`, `wr-told`, `bursts-down`, `flat-down`.
 
 #### THE REST'S TIES
 
@@ -135,21 +140,6 @@ A write at a scan's accumulator moves no definedness and no seen path.
 Settled when `scan-apart` is a body.
 
 Members: `defined-alike`, `seen-gates`, `gates-apart`, `scan-apart`.
-
-#### TOLD AND ENDED INVARIANTS
-
-Whether `Untold` (the timestamp bound on seen connects past their source's
-end) and `Ended` (no source cell at a connect held past its source's end)
-survive each heap and tree operation — writes, grows, plants and step
-restages. Each is a companion to its `-behind` sibling and is expected to
-follow by the same or a parallel route. Settled when every pair is a body.
-
-Members: `back-told`, `bg-ended`, `bg-told`, `connect-ended`, `connect-told`,
-`fed-ended`, `fed-told`, `fin-ended`, `fin-told`, `fire-ended`, `fire-told`,
-`fr-ended`, `grow-ended`, `grow-told`, `of-ended`, `of-told`, `out-told`,
-`rf-ended`, `rf-told`, `rm-ended`, `rm-told`, `rs-ended`, `rs-told`,
-`rt-ended`, `rt-told`, `scan-ended`, `scan-told`, `shift-ended`, `shift-told`,
-`torn-ended`, `torn-told`, `wr-ended`, `wr-told`.
 
 #### THE LINK
 

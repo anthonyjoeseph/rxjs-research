@@ -321,8 +321,8 @@ module Flatting (R : Set) where
       rf-flags = flags-plant H₉ π₈ v eqv (λ { here _ → (λ ()) , (λ _ → done₉) ; (in-outer ()) ; (in-lanes ()) })
 
       postulate
-        rf-told  : ∀ {q′} → Untold H₉ q′ t′
-        rf-ended : Ended H₉ t′
+        rf-told  : Untold H₉ q T₈ → Ended H₉ T₈ → Untold H₉ q t′
+        rf-ended : Ended H₉ T₈ → Ended H₉ t′
 
   -- A flatMap begun allocates its pool and its outer's cut, registers its
   -- refill slot and stores it, and begins its outer under the flatMap's
@@ -344,7 +344,7 @@ module Flatting (R : Set) where
                               ; running = Books.running bk }
              ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind′ = Eaching.each-to _ _ (F.rf-behind refl refl slot₉ refl refl refl refl (pos-headed cr) (Grew.behind G₉))
              ; lingers′ = Lingering.lingers-to _ (F.rf-lingers refl refl slot₉ refl refl refl refl (Grew.lingers G₉)) ; flags = F.rf-flags refl refl slot₉ refl refl refl refl (Grew.flags G₉)
-             ; told = F.rf-told refl refl slot₉ refl refl refl refl ; ended = F.rf-ended refl refl slot₉ refl refl refl refl }
+             ; told = F.rf-told refl refl slot₉ refl refl refl refl (Grew.told G₉) (Grew.ended G₉) ; ended = F.rf-ended refl refl slot₉ refl refl refl refl (Grew.ended G₉) }
     , refl , inj₁ (inj₁ (subst (pend F.t′ <_) (Grew.pends G₉) F.less))
     where bk = Carried.books cr
           -- The kernel's allocations after its first, its registration and
@@ -396,7 +396,7 @@ module Flatting (R : Set) where
           G₀ = record { tree = Carried.tree cr ; path = π ; stack = sk ; alone = a ; ticked = proj₂ (Books.clocked bk)
                       ; obsR = (λ _ → wk-same _) , wk-same _ , wk-same _ ; kontR = λ τ sub → from-same (λ ζ → Here.kont (walk π top) ζ sub) τ
                       ; envR = e ; meets = refl ; owned = recode (Carried.owned cr) ; kernels = Carried.kernels cr
-                      ; meaning = Carried.meaning cr ; queue = Carried.queue cr ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; flags = Carried.flags cr ; pends = refl
+                      ; meaning = Carried.meaning cr ; queue = Carried.queue cr ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; told = Carried.told cr ; ended = Carried.ended cr ; flags = Carried.flags cr ; pends = refl
                       ; named = λ {_} {j} _ → j , refl ; distinct = λ fs → fs }
           G₈ = grew-step {k = slot ⊤} (record { onNext = λ a → wkAct new (n₇ a) ; onComplete = wkAct new c₇ ; isClosed = wkAct new x₇ })
                  (grew-step {k = cell (maybe quiet)} (lift nothing) (grew-step {k = cell (base Bool)} (lift true)

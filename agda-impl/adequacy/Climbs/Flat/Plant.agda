@@ -328,6 +328,8 @@ module ClimbFlatPlant (R : Set) where
       sorted  : Σ Pos λ lo → WellMach lo m
       behind  : Each (Conf.heap (Mach.conf m)) (Heads (Conf.pos (Mach.conf m))) T
       lingers : Lingers (Conf.heap (Mach.conf m)) (Restaged.T′ (Conf.heap (Mach.conf m)) ρ pl′)
+      told    : Untold (Conf.heap (Mach.conf m)) (Conf.pos (Mach.conf m)) T
+      ended   : Ends (Conf.heap (Mach.conf m)) (Restaged.T′ (Conf.heap (Mach.conf m)) ρ pl′)
       lefts   : Lefts (Conf.heap (Mach.conf m)) (proj₁ (proj₂ lifted))
       -- The flags as the lane, still pending, will read them; and the
       -- flatMap's own.
@@ -597,8 +599,11 @@ module ClimbFlatPlant (R : Set) where
     bg-lingers lg = bg-lingered (Wk′.grow-lingers grows lg)
 
     postulate
-      bg-told  : Untold heap′ (q ++ [ ix 1 ]) T′
-      bg-ended : Ends heap′ T′
+      -- Every joiner a held connect past its source's end has not told
+      -- its end is told no sooner than the lane's begin.
+      bg-told  : Untold H q T → Ends H (Restaged.T′ H ρ pl′) → Untold heap′ (q ++ [ ix 1 ]) T′
+      -- Every connect held past its source's end still holds no source.
+      bg-ended : Ends H (Restaged.T′ H ρ pl′) → Ends heap′ T′
 
     -- The flatMap before the start, in the grown world.
     u₀ : Sub v Δ B
@@ -816,7 +821,7 @@ module ClimbFlatPlant (R : Set) where
                        ; clocked = trans (proj₁ ck) (sym (tick-under q 1 (Started.deep sr))) , proj₁ ck , Begun.bg-ticked sr pl′ sk (proj₂ ck)
                        ; paidUp = trans (Started.todo′ sr) (cong (mapList (wkTodo (Started.grow sr))) pu) ; running = rn }
       ; sorted = sorted-⇝ so (Started.runs sr) ; behind′ = Eaching.each-to _ _ (Begun.bg-behind sr pl′ bh) ; lingers′ = Lingering.lingers-to _ (Begun.bg-lingers sr pl′ lgr) ; flags = Begun.bg-flags sr pl′ fs L dF dI
-      ; told = Begun.bg-told sr pl′ ; ended = Begun.bg-ended sr pl′ })
+      ; told = Begun.bg-told sr pl′ (Begins.told b) (Begins.ended b) ; ended = Begun.bg-ended sr pl′ (Begins.ended b) })
     , passed ag pp
 
   -- An admitted value with room: its lane begun where the value is, the
@@ -838,7 +843,8 @@ module ClimbFlatPlant (R : Set) where
       ; lefts = lefts-subst skp (sym pv) (lefts-subst (λ s′ → s′) adm (lefts-up ρ (in-outer here) eqO lt))
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
-      ; sorted = sorted-⇝ so p ; behind = bh ; lingers = Restaged.pool-idle hp ρ (U.unionᶜ po U.idleᶜ) fs refl (Calling.ended cl) lgr ; flags = flags-swap hp ρ (pendingˢ (f y) (q ++ [ ix 1 ])) (sym (cong (λ o′ → is-just (At.merged hp op G o′ LS QS po)) pv)) (pending-flags hp) d₀
+      ; sorted = sorted-⇝ so p ; behind = bh ; lingers = Restaged.pool-idle hp ρ (U.unionᶜ po U.idleᶜ) fs refl (Calling.ended cl) lgr
+      ; told = Calling.told cl ; ended = Restaged.pool-ended hp ρ (U.unionᶜ po U.idleᶜ) fs refl (Calling.ended cl) ; flags = flags-swap hp ρ (pendingˢ (f y) (q ++ [ ix 1 ])) (sym (cong (λ o′ → is-just (At.merged hp op G o′ LS QS po)) pv)) (pending-flags hp) d₀
       ; inner = Flag.db-sub hp d₀ ρ (lifts-seen Lρ) })
     where
       G  = λ a j → U.subscribe (f a) j
