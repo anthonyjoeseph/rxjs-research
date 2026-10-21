@@ -109,7 +109,7 @@ module ClimbLanes (R : Set) where
   open Everywhere.Spending R using (spent-retag)
   open EverywhereGated.Holding R using (holds-alike; holds-path; holds-plant; holds-retag)
   open Keeping R using (seen-planted)
-  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pooledL-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; tw-alike)
+  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; ⊆-⊑; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pooledL-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; tw-alike)
   open ShiftWalk R using (let-go; grip)
   open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined)
   open FramingRepool R using (Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
@@ -752,7 +752,7 @@ module ClimbLanes (R : Set) where
     fr-heading : AllPairs _≢_ (names w₀) → ∀ {q} → Heading H H′ q w₀ w₀
     fr-heading fr {q} = record
       { head-revive = fr-revive fr
-      ; head-told   = λ i e₀ e′ m →
+      ; head-told   = λ i e₀ e′ → ⊆-⊑ λ m →
           ≡-⊆ (cong (untold i) (merged-eq H op G (At.part H t) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl e₀))
             (++-mono (untoldᴹ i (At.part H t)) (untoldᴹ i (At.part H′ t)) (≡-⊆ (cong (untoldᴹ i) (fr-part fr)))
                      (++-mono (untoldᴸ i (At.partLanes H ls)) (untoldᴸ i (At.partLanes H′ ls)) (toldL fr i ls (λ π → π) (tabulateᴬ (fr-count-apart fr))) (λ y → y))
