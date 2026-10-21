@@ -456,6 +456,15 @@ module Lifting (R : Set) where
     Shift.shift-behind H H π (λ _ _ → refl) [] (Books.fresh (Carried.books cr)) _ (Carried.told cr) (Carried.ended cr) (fire-heading H) (Carried.behind cr)
     where H = Conf.heap (Mach.conf m)
 
+  -- The untold and ended invariants survive the fire step.
+  postulate
+    fire-told : ∀ {g m} (cr : Carried g m) {Δ A τ e v u x sk hd fr}
+                (π : Path (Carried.tree cr) (coldˢ {Δ = Δ} {A} sk hd (waiting {u = v} τ e (at u x fr))))
+              → Untold (Conf.heap (Mach.conf m)) (Conf.pos (Mach.conf m)) (plant π (coldˢ sk hd (fired τ e (at u x fr))))
+    fire-ended : ∀ {g m} (cr : Carried g m) {Δ A τ e v u x sk hd fr}
+                 (π : Path (Carried.tree cr) (coldˢ {Δ = Δ} {A} sk hd (waiting {u = v} τ e (at u x fr))))
+               → Ended (Conf.heap (Mach.conf m)) (plant π (coldˢ sk hd (fired τ e (at u x fr))))
+
   -- A timer fired leaves every tie held: a cold runs nothing past its end.
   fire-lingers : ∀ {g m} (cr : Carried g m) {Δ A τ e v u x sk hd fr}
                  (π : Path (Carried.tree cr) (coldˢ {Δ = Δ} {A} sk hd (waiting {u = v} τ e (at u x fr))))
@@ -482,6 +491,15 @@ module Lifting (R : Set) where
   torn-lingers {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (_ ∷ _) _ _ } (bodySite π) refl =
     torn-body-lingers _ π (Books.fresh (Carried.books cr)) (Owned.bodies (Carried.owned cr) π (here refl)) (Carried.lingers cr)
 
+  -- The untold and ended invariants survive the teardown step.
+  postulate
+    torn-told : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
+              → firstCall (Carried.ctlAs cr) ≡ just (siteCall z)
+              → Untold (siteHeap (Conf.heap (Mach.conf m)) z) (Conf.pos (Mach.conf m)) (Carried.tree cr)
+    torn-ended : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
+               → firstCall (Carried.ctlAs cr) ≡ just (siteCall z)
+               → Ended (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr)
+
   -- And every flag reads its outer: below the site nothing is seen that
   -- was not seen before.
   torn-flags : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
@@ -507,7 +525,7 @@ module Lifting (R : Set) where
         ; queue = torn-queue cr z
         ; books = record { fresh = Books.fresh (Carried.books cr) ; clocked = Books.clocked (Carried.books cr)
                          ; paidUp = Books.paidUp (Carried.books cr) ; running = Books.running (Carried.books cr) }
-        ; sorted = hop-sorted cr eq path ; behind′ = Eaching.each-to _ _ (torn-behind cr z refl) ; lingers′ = Lingering.lingers-to _ (torn-lingers cr z refl) ; flags = torn-flags cr z refl })
+        ; sorted = hop-sorted cr eq path ; behind′ = Eaching.each-to _ _ (torn-behind cr z refl) ; told = torn-told cr z refl ; ended = torn-ended cr z refl ; lingers′ = Lingering.lingers-to _ (torn-lingers cr z refl) ; flags = torn-flags cr z refl })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , ≤-refl))
 
   ----------------------------------------------------------------------

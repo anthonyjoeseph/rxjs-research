@@ -596,6 +596,13 @@ module ClimbFlat (R : Set) where
     sd-behind : AllPairs _≢_ (names T) → ∀ {q} → Each H (Heads q) T → Each H′ (Heads q) T
     sd-behind fs = Fr.wr-behind fs (sd-part (fresh-path ρ fs)) (sd-heads (fresh-path ρ fs))
 
+    -- The untold and ended invariants persist across the done-flag write.
+    sd-told : AllPairs _≢_ (names T) → ∀ {q} → Untold H q T → Untold H′ q T
+    sd-told fs = Fr.wr-told fs
+
+    sd-ended : AllPairs _≢_ (names T) → Ends H T → Ends H′ T
+    sd-ended fs = Fr.wr-ended fs
+
     settle-eq : AllPairs _≢_ (names w₀) → Kernels H T → ((At.val H′ (FlatKit.Flat.active fl) ≡ᵇ 0) ∧ null (At.val H′ (FlatKit.Flat.queue fl)))
                               ≡ (null (At.partLanes H ls) ∧ null (At.val H (FlatKit.Flat.queue fl)))
     settle-eq fr kn = trans (cong (λ n → (n ≡ᵇ 0) ∧ null (At.val H′ (FlatKit.Flat.queue fl))) (sd-active fr))
@@ -761,8 +768,11 @@ module ClimbFlat (R : Set) where
     close-heading : Heading H (Settles.H′ H ρ) q (Bound H ρ) (flatMapˢ op f fl oc k r pl u ls) (flatMapˢ op f fl oc k r pl′ u ls)
     close-heading = P.heading (λ {A′} i {c} b {b₀} → close-told {A′} i {c} b {b₀}) close-heads
 
+    close-lingering : Lingering H (Settles.H′ H ρ) (flatMapˢ op f fl oc k r pl u ls) (flatMapˢ op f fl oc k r pl′ u ls)
+    close-lingering = P.lingering (λ e₀ tr → close-tied e₀ (proj₁ tr) , rf-union (proj₂ tr) rf-rest)
+
     close-lingers : Lingers (Settles.H′ H ρ) (Restaged.T′ (Settles.H′ H ρ) ρ pl′)
-    close-lingers = Settles.Fr.shift-lingers H ρ fs (Restaged.v (Settles.H′ H ρ) ρ pl′) (Calling.ended cl) (P.lingering (λ e₀ tr → close-tied e₀ (proj₁ tr) , rf-union (proj₂ tr) rf-rest)) (Calling.lingers cl)
+    close-lingers = Settles.Fr.shift-lingers H ρ fs (Restaged.v (Settles.H′ H ρ) ρ pl′) (Calling.ended cl) close-lingering (Calling.lingers cl)
 
   -- A flatMap's outer ended: its guard read open, its done flag written,
   -- its count and queue read.  Nothing left: the flatMap's end one
@@ -775,7 +785,7 @@ module ClimbFlat (R : Set) where
   close-outer st {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} ρ {ks}
     cl@record { sane = sn ; placed = pd ; deep = dp ; ctl = refl ; code = cd ; stack = sk ; lifted = gn , S , L , sg , hl ; owned = ow
               ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
-              ; behind = bh ; lingers = lgr ; lefts = lt ; flags = dn ; kept = kp }
+              ; behind = bh ; told = tld ; ended = end ; lingers = lgr ; lefts = lt ; flags = dn ; kept = kp }
     with lifts-split ρ (in-outer here) L in eqF
        | reads (subst (λ W → _ ≗ (Observer.complete (Here.obs W) >>ᴬ ⟦ ks ⟧ᶜ)) (walk-⊕ ρ (in-outer here) top) cd)
   ... | _ , lifts-outer {o₀ = o₀} _ _ lifts-here , Lρ | k₁ , f₁ , p₁
@@ -806,7 +816,7 @@ module ClimbFlat (R : Set) where
                , healed-off hp (Settles.H′ hp ρ) ρ fs (Settles.sd-off hp ρ) (Settles.sd-part hp ρ (fresh-path ρ fs)) (healed-split ρ (in-outer here) hl)
       ; owned = Settles.Fr.wr-owned hp ρ fs (Settles.sd-gone hp ρ (fresh-path ρ fs)) ow ; kernels = Settles.Fr.kernels hp ρ fs kn ; meaning = Settles.Fr.meaning hp ρ fs mn
       ; queue = Settles.Fr.queue hp ρ fs qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
-      ; sorted = sorted-⇝ so path ; behind = Settles.sd-behind hp ρ fs bh
+      ; sorted = sorted-⇝ so path ; behind = Settles.sd-behind hp ρ fs bh ; told = Settles.sd-told hp ρ fs tld ; ended = Settles.sd-ended hp ρ fs end
       ; rest-heads = subst (λ x → Heads q (U.restᶜ {B = ⊤} x)) (Settles.sd-left hp ρ (fresh-path ρ fs)) (OuterRest.outer-rest-heads ρ cl (proj₁ nl))
       ; lingers = Settles.Fr.lingers hp ρ fs (Calling.ended cl) (Settles.sd-lingering hp ρ (fresh-path ρ fs) (trans (Settles.sd-part hp ρ (fresh-path ρ fs)) (flat-gone hp {op = op} {f} {fl} {oc} {k} {r} {po} {u = u} {ls} gn (proj₁ nl) (proj₂ nl)))) lgr ; lefts = Settles.Fr.wr-lefts hp ρ fs Lo
                   (lefts-subst₂ (λ ls′ qs′ → U.outerˢ op (λ a j → U.subscribe (f a) j) o₀ (U.endˢ q) ls′ qs′ po) (proj₁ nl) (proj₂ nl) (lefts-up ρ (in-outer here) eqF lt))
@@ -836,6 +846,8 @@ module ClimbFlat (R : Set) where
                          ; clocked = proj₁ ck , Restaged.pool-ticked (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀)) clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
         ; sorted = sorted-⇝ so path
         ; behind′ = Eaching.each-to _ _ (Settles.Fr.shift-behind hp ρ fs (Restaged.v (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀))) (Calling.told cl) (Calling.ended cl) (Closing.close-heading ρ o₀ cl Lρ sg lo) bh)
+        ; told = Settles.Fr.shift-told hp ρ fs (Restaged.v (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀))) (Calling.told cl) (Calling.ended cl) (Closing.close-heading ρ o₀ cl Lρ sg lo)
+        ; ended = Settles.Fr.shift-ended hp ρ fs (Restaged.v (Settles.H′ hp ρ) ρ (U.unionᶜ po (U.restᶜ o₀))) (Calling.ended cl) (Closing.close-lingering ρ o₀ cl Lρ sg lo)
         ; lingers′ = Lingering.lingers-to _ (Closing.close-lingers ρ o₀ cl Lρ sg lo) ; flags = Settles.sd-landed hp ρ fs (U.unionᶜ po (U.restᶜ o₀)) gn (trans (sym (Settles.settle-eq hp ρ (fresh-path ρ fs) kn)) eq) Lρ dn })
       , passed ag pp)
     where

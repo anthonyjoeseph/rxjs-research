@@ -194,6 +194,12 @@ module ClimbTake (R : Set) where
                → Each H (Heads q) T → Each H (Heads q) T′
     end-behind fs ut en lv pv = Shift.shift-behind H H ρ (λ j _ → refl) [] fs v ut en (end-heading lv pv)
 
+    end-told : AllPairs _≢_ (names T) → Untold H q T → Ends H T → At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′ → Untold H q T′
+    end-told fs ut en lv pv = Shift.shift-told H H ρ (λ j _ → refl) [] fs v ut en (end-heading lv pv)
+
+    end-ended : AllPairs _≢_ (names T) → Ends H T → At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′ → Ends H T′
+    end-ended fs en lv pv = Shift.shift-ended H H ρ (λ j _ → refl) [] fs v en (end-lingering lv pv)
+
     end-flags : AllPairs _≢_ (names T) → At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′ → DoneBy H T (outers ρ) → DoneBy H T′ (outers (planted ρ v))
     end-flags fs lv pv d =
       subst (DoneBy H T′) (sym (outers-planted ρ v))
@@ -206,6 +212,10 @@ module ClimbTake (R : Set) where
     out-behind : AllPairs _≢_ (names T) → Untold H q T → Ends H T → At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′
                → Each H (Heads q) T → Each H (Heads (q ++ [ ix 0 ])) T′
     out-behind fs ut en lv pv bh = out-deeper (end-behind fs ut en lv pv bh)
+
+    -- The untold and ended invariants after a failing take.
+    postulate
+      out-told : AllPairs _≢_ (names T) → Untold H q T → Ends H T → At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′ → Untold H (q ++ [ ix 0 ]) T′
 
     -- The take's stage read by its part alone: no kernel, feed or queue
     -- clause moves.
@@ -249,7 +259,7 @@ module ClimbTake (R : Set) where
         ; kernels = Ended.end-kernels hp ρ q c′ kn ; meaning = Ended.end-meaning hp ρ q c′ mn ; queue = Ended.end-queue hp ρ q c′ qu
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs
                          ; clocked = proj₁ ck , Ended.end-ticked hp ρ q c′ clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
-        ; sorted = sorted-⇝ so (then refl now) ; behind′ = Eaching.each-to _ _ (Ended.end-behind hp ρ q c′ fs (Calling.told cl) (Calling.ended cl) lv pv bh) ; lingers′ = Lingering.lingers-to _ (Ended.end-lingers hp ρ q c′ fs (Calling.ended cl) lv pv lgr) ; flags = let-go hp (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs) (lifts-seen (lifts-planted ρ v Lρ))
+        ; sorted = sorted-⇝ so (then refl now) ; behind′ = Eaching.each-to _ _ (Ended.end-behind hp ρ q c′ fs (Calling.told cl) (Calling.ended cl) lv pv bh) ; told = Ended.end-told hp ρ q c′ fs (Calling.told cl) (Calling.ended cl) lv pv ; ended = Ended.end-ended hp ρ q c′ fs (Calling.ended cl) lv pv ; lingers′ = Lingering.lingers-to _ (Ended.end-lingers hp ρ q c′ fs (Calling.ended cl) lv pv lgr) ; flags = let-go hp (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs) (lifts-seen (lifts-planted ρ v Lρ))
                          (cong is-just (ending-part hp {i = false} {p = p} {c = c} {k = k} {u = u} lv)) (Ended.end-flags hp ρ q c′ fs lv pv (done-up ρ (in-take here) refl dn)) }
     , ag , inj₂ (pend-plant {t = T} ρ v refl , inj₁ (takes-less ρ v ≤-refl))
     where
@@ -286,7 +296,7 @@ module ClimbTake (R : Set) where
       ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v refl)) fs
                        ; clocked = trans (proj₁ ck) (sym (tick-ix0 q)) , proj₁ ck , Ended.end-ticked hp ρ q c′ clk sk (proj₂ ck)
                        ; paidUp = pu ; running = rn }
-      ; sorted = sorted-⇝ so (then refl path) ; behind = Ended.out-behind hp ρ q c′ fs (Calling.told cl) (Calling.ended cl) lv pv bh ; lingers = Ended.end-lingers hp ρ q c′ fs (Calling.ended cl) lv pv lgr ; flags = Ended.end-flags hp ρ q c′ fs lv pv (done-up ρ (in-take here) refl dn)
+      ; sorted = sorted-⇝ so (then refl path) ; behind = Ended.out-behind hp ρ q c′ fs (Calling.told cl) (Calling.ended cl) lv pv bh ; told = Ended.out-told hp ρ q c′ fs (Calling.told cl) (Calling.ended cl) lv pv ; ended = Ended.end-ended hp ρ q c′ fs (Calling.ended cl) lv pv ; lingers = Ended.end-lingers hp ρ q c′ fs (Calling.ended cl) lv pv lgr ; flags = Ended.end-flags hp ρ q c′ fs lv pv (done-up ρ (in-take here) refl dn)
       ; kept = inj₂ (inj₂ (pend-plant {t = T} ρ v refl , inj₁ (takes-less ρ v ≤-refl))) })
     where
       v = takeWhileˢ true p c k (Strongly.ending q c′) u

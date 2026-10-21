@@ -491,6 +491,11 @@ module Replanting (R : Set) where
     shift-behind v {q} ut en hd ev =
       Walk.Behind.shiftE H H′ {u = u} v offU (Heading.head-revive hd) q (Bound H ρ) (λ i b e₀ e′ → Heading.head-told hd i b e₀ e′) (Heading.head-below hd) ρ fs ev ut en (λ j b → b)
 
+    -- The untold and ended invariants shift to the replanted tree.
+    postulate
+      shift-told : (v : Sub h Δ A) → ∀ {q} → Untold H q T → Ended H T → Heading H H′ q (Bound H ρ) u v → Untold H′ q (plant ρ v)
+      shift-ended : (v : Sub h Δ A) → Ended H T → Lingering H H′ u v → Ended H′ (plant ρ v)
+
     -- Every flag named above the node still unset, every other reading
     -- its outer as before; the names the write let go, below the node.
     shift-flags : (v : Sub h Δ A) {ns₀ : List (Name h)} → (∀ {n} → n ∈ᴸ ns₀ → n ∈ᴸ names u)

@@ -325,7 +325,7 @@ module ClimbBase (R : Set) where
   call-body st {m₁ = m₁} {T = T} {Sj} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = t} {u} ρ {closes ks}
     cl@record { sane = sn ; placed = pl ; deep = dp ; ctl = cx ; code = cd ; stack = sk ; lifted = gn , S , L , sg , hl ; owned = ow
            ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
-           ; behind = bh ; lingers = lgr ; lefts = lt ; flags = dn ; kept = kp }
+           ; behind = bh ; told = tld ; ended = end ; lingers = lgr ; lefts = lt ; flags = dn ; kept = kp }
     with lifts-split ρ (in-body here) L in eqB
   ... | _ , Lb , Lρ = rose {sg′ = closes (bodyC ρ ∷ ks)} now (one-lower ρ one-body) (record
       { sane = sn ; placed = pl ; deep = dp ; ctl = cx
@@ -337,7 +337,7 @@ module ClimbBase (R : Set) where
       ; owned = owned-body (Conf.heap (Mach.conf m₁)) (runAs (bodyC ρ ∷ ks) (≗-refl ⟦ bodyC ρ ∷ ks ⟧ᶜ) sk) ρ refl refl refl gn ow
       ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
-      ; sorted = so ; behind = bh ; lingers = lgr ; flags = done-up ρ (in-body here) refl dn ; kept = kp })
+      ; sorted = so ; behind = bh ; told = tld ; ended = end ; lingers = lgr ; flags = done-up ρ (in-body here) refl dn ; kept = kp })
 
   -- A live take's part, its source's lifted.
   take-part : ∀ {h} (H : Heapᴹ h) {Δ A} {i p c k} {u : Sub h Δ A} {c′} → At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′
@@ -356,7 +356,7 @@ module ClimbBase (R : Set) where
   take-pass {g} {m₁ = mach ⟨ hp , q , _ ⟩ clk ts bs td lg en mk} {T = T} {i = i} {p = p} {c = c} {k = k} {u = u} ρ {y} py
     record { sane = sn ; placed = pl ; deep = dp ; ctl = refl ; code = cd ; stack = sk ; lifted = c′ , pv , S , L , sg ; owned = ow
            ; kernels = kn ; meaning = mn ; queue = qu ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn } ; sorted = so
-           ; behind = bh ; lingers = lgr ; lefts = lt ; flags = dn ; kept = kp }
+           ; behind = bh ; told = tld ; ended = end ; lingers = lgr ; lefts = lt ; flags = dn ; kept = kp }
     with lifts-split ρ (in-take here) L in eqT | subst (λ W → _ ≗ Observer.next (Here.obs W) y) (walk-⊕ ρ (in-take here) top) cd
   ... | _ , lifts-take lv lifts-here , Lρ | readRef≗ refl f =
     rises {sg′ = sends y} (then refl now) (one-lower ρ one-take) (record
@@ -367,7 +367,7 @@ module ClimbBase (R : Set) where
       ; lefts = lefts-subst (λ s → s) (cong (U.taking i p q y c′) py) (lefts-up ρ (in-take here) eqT lt) ; rest-heads = tt
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
-      ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; lingers = lgr ; flags = done-up ρ (in-take here) refl dn ; kept = inj₁ refl })
+      ; sorted = sorted-⇝ so (then refl now) ; behind = bh ; told = tld ; ended = end ; lingers = lgr ; flags = done-up ρ (in-take here) refl dn ; kept = inj₁ refl })
 
   -- A plant counting fewer stages than what it replaced counts fewer.
   mutual

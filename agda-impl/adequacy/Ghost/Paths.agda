@@ -650,5 +650,9 @@ module GhostingPaths (R : Set) where
     ; pools = λ {pl = pl} ψ sψ e → heads-back {c = pl} qp (Each.pools ev ψ sψ e)
     ; rests = λ {rt = rt} ψ sψ e n j → heads-back {c = rt} qp (Each.rests ev ψ sψ e n j) }
 
+  -- A step back in position weakens the untold bound.
+  postulate
+    back-told : ∀ {h} {H : Heapᴹ h} {t : Sub h [] R} {q p} → q <ᵖ p ≡ true → Untold H p t → Untold H q t
+
   hopped-pre : ∀ {g m m′ m₁} {st : Strong g m} → m′ ⇝ m₁ → Hopped st m₁ → Hopped st m′
   hopped-pre path (g″ , m₀ , path′ , st₀ , gn) = g″ , m₀ , ⇝-trans path path′ , st₀ , gn

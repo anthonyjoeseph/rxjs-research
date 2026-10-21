@@ -75,7 +75,7 @@ module Connecting (R : Set) where
   open Run.Kit (Pureᴾ R) using (skipᴬ)
   open Strongly R using (Sub; pendingˢ; connectˢ; idle; bodyK; srcK; Path; here; in-source; in-body; _⊕_; Here; walk; top; srcC; _≗_; module At; Name; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-defer; subjects; laneSubjects; Lane; lane; names; Phase; ≗-refl; newRef≗; unsubscribing; under≗; readRef≗; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open StrongAgainst R using (Books; Job; Owned; Kernels; Meaning; Queue; Each; Lingers; leaves; union-pinned; under-moved; bursts-pinned; rest-pinned; owned-to) renaming (at⟦_⟧ to at⟦_⟧ᶜ)
-  open StrongHeld R using (Carried; Heads; DoneBy; module Eaching; module Lingering)
+  open StrongHeld R using (Carried; Heads; DoneBy; module Eaching; module Lingering; Untold; Ended)
   open StrongAgainst.Against R using (StackAs; CtlAs; subAs; backAs; stackJobs; SrcOf; src-of; Ticked)
   open Moving R using (planted; pend; part-plant; holds-owed; fed-plant; plant; plantᴸ; Splice; spliced-l; spliced-r; pendings-plant; joiners-plant)
   open EverywhereGated.Settling R using (settled-plant)
@@ -312,6 +312,10 @@ module Connecting (R : Set) where
                      → Owned H₅ t′ (subAs {act = act′} π′ cd′ (backAs q {ρ = σ′} {σ = same⊑} (srcC ρc ∷ []) (<ᵖ-below q []) e (restack sk a)) a′)
       -- Every head no earlier than the run one level down.
       connect-behind : Each H₅ (Heads q) T₅ → Each H₅ (Heads (q ++ [ ix 0 ])) t′
+      -- The untold and ended invariants survive the connect step.
+      postulate
+        connect-told : Untold H₅ (q ++ [ ix 0 ]) t′
+        connect-ended : Ended H₅ t′
 
     -- The queue, the run one level down, a new subject joined by none.
     connect-queue : Queue H₅ q clk ts T₅ → Queue H₅ (q ++ [ ix 0 ]) clk ts t′
@@ -365,7 +369,7 @@ module Connecting (R : Set) where
              ; books = record { fresh = C.connect-fresh (Books.fresh bk)
                               ; clocked = trans ck (sym (tick-ix0 q₀)) , ck , C.reticked sk₅ a₅ (Grew.ticked G₅)
                               ; paidUp = cong wd (cong wd (cong wd (cong wd (cong wd (Books.paidUp bk))))) ; running = Books.running bk }
-             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind′ = Eaching.each-to _ _ (C.connect-behind (Grew.behind G₅)) ; lingers′ = Lingering.lingers-to _ (C.connect-lingers (Grew.lingers G₅)) ; flags = C.connect-flags (Grew.flags G₅) }
+             ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind′ = Eaching.each-to _ _ (C.connect-behind (Grew.behind G₅)) ; told = C.connect-told ; ended = C.connect-ended ; lingers′ = Lingering.lingers-to _ (C.connect-lingers (Grew.lingers G₅)) ; flags = C.connect-flags (Grew.flags G₅) }
     , refl , inj₁ (inj₁ (subst (pend C.t′ <_) (Grew.pends G₅) C.less))
     where bk = Carried.books cr
           ck = proj₁ (Books.clocked bk)

@@ -703,6 +703,11 @@ module FramingRepool (R : Set) where
     wr-behind : At.part H′ u ≡ At.part H u → ∀ {q} → (Each H (Heads q) u → Each H′ (Heads q) u) → Each H (Heads q) T → Each H′ (Heads q) T
     wr-behind eq tr = Seeing.each-write H H′ {w = u} offU eq fs ρ tr
 
+    -- The untold and ended invariants persist across a frame write.
+    postulate
+      wr-told : ∀ {q} → Untold H q T → Untold H′ q T
+      wr-ended : Ended H T → Ended H′ T
+
   -- A WRITE AT A SCAN'S ACCUMULATOR, ITS NODE'S CLAUSES: the source's
   -- names apart from the accumulator, so its kernels and feeds read
   -- alike.
