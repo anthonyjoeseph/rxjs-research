@@ -394,17 +394,17 @@ module ClimbLanesQueue (R : Set) where
   rest-headsL : ∀ {h} (H : Heapᴹ h) (q : Pos) {Δ B} (ls : List (Lane h Δ B)) → RestL H q ls → Heads q (U.restᶜ {B = ⊤} (At.leftoverL H {B = ⊤} ls))
   rest-headsL H q []                _        ()
   rest-headsL H q (lane _ _ s ∷ ls) (h , hs) =
-    heads-union (U.restᶜ (At.leftover H {B = ⊤} s)) (U.restˢ (At.leftover H {B = ⊤} s))
-                (U.restᶜ (At.leftoverL H {B = ⊤} ls)) (U.restˢ (At.leftoverL H {B = ⊤} ls)) h (rest-headsL H q ls hs)
+    heads-union (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} s)) (U.restˢ (At.leftover H {B = ⊤} s))
+                (U.restᶜ {B = ⊤} (At.leftoverL H {B = ⊤} ls)) (U.restˢ (At.leftoverL H {B = ⊤} ls)) h (rest-headsL H q ls hs)
 
   rest-headsO : ∀ {h} (H : Heapᴹ h) (q : Pos) {Δ B} {ls : List (Lane h Δ B)} {u : Sub h Δ B} {πL : PathLanes ls u} (o : OneLane πL)
               → Heads q (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} u)) → OthersL H q o → Heads q (U.restᶜ {B = ⊤} (At.leftoverL H {B = ⊤} ls))
   rest-headsO H q (one-this {t = t} {ls}) hu hs =
-    heads-union (U.restᶜ (At.leftover H {B = ⊤} t)) (U.restˢ (At.leftover H {B = ⊤} t))
-                (U.restᶜ (At.leftoverL H {B = ⊤} ls)) (U.restˢ (At.leftoverL H {B = ⊤} ls)) hu (rest-headsL H q ls hs)
+    heads-union (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} t)) (U.restˢ (At.leftover H {B = ⊤} t))
+                (U.restᶜ {B = ⊤} (At.leftoverL H {B = ⊤} ls)) (U.restˢ (At.leftoverL H {B = ⊤} ls)) hu (rest-headsL H q ls hs)
   rest-headsO H q (one-next {l = lane _ _ s} {ls} o) hu (h , hs) =
-    heads-union (U.restᶜ (At.leftover H {B = ⊤} s)) (U.restˢ (At.leftover H {B = ⊤} s))
-                (U.restᶜ (At.leftoverL H {B = ⊤} ls)) (U.restˢ (At.leftoverL H {B = ⊤} ls)) h (rest-headsO H q o hu hs)
+    heads-union (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} s)) (U.restˢ (At.leftover H {B = ⊤} s))
+                (U.restᶜ {B = ⊤} (At.leftoverL H {B = ⊤} ls)) (U.restˢ (At.leftoverL H {B = ⊤} ls)) h (rest-headsO H q o hu hs)
 
   -- A lane's end that settles the flatMap: what the flatMap leaves running
   -- is its ended outer's rest, the lane's own and every other lane's.
@@ -424,8 +424,8 @@ module ClimbLanesQueue (R : Set) where
 
     lane-rest-heads : At.part H t ≡ nothing → Heads q (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} (flatMapˢ op f fl oc k r pl t ls)))
     lane-rest-heads eo =
-      heads-union (U.restᶜ (At.leftover H {B = ⊤} t)) (U.restˢ (At.leftover H {B = ⊤} t))
-                  (U.restᶜ (At.leftoverL H {B = ⊤} ls)) (U.restˢ (At.leftoverL H {B = ⊤} ls))
+      heads-union (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} t)) (U.restˢ (At.leftover H {B = ⊤} t))
+                  (U.restᶜ {B = ⊤} (At.leftoverL H {B = ⊤} ls)) (U.restˢ (At.leftoverL H {B = ⊤} ls))
                   (outer-ended-heads eo) (rest-headsO H q o (Calling.rest-heads cl) others-heads)
 
   -- A lane's end, its pool taking the lane's last ghost rested, which is

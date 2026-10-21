@@ -677,8 +677,8 @@ module ClimbFlat (R : Set) where
 
     outer-rest-heads : Heads (Conf.pos (Mach.conf m₁)) (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} (flatMapˢ op f fl oc k r pl u ls)))
     outer-rest-heads =
-      heads-union (U.restᶜ (At.leftover H {B = ⊤} u)) (U.restˢ (At.leftover H {B = ⊤} u))
-                  (U.restᶜ (At.leftoverL H {B = ⊤} ls)) (U.restˢ (At.leftoverL H {B = ⊤} ls))
+      heads-union (U.restᶜ {B = ⊤} (At.leftover H {B = ⊤} u)) (U.restˢ (At.leftover H {B = ⊤} u))
+                  (U.restᶜ {B = ⊤} (At.leftoverL H {B = ⊤} ls)) (U.restˢ (At.leftoverL H {B = ⊤} ls))
                   (Calling.rest-heads cl) lanes-rest-heads
 
   -- The pool taking a closed node's rest heads where the pool did and
