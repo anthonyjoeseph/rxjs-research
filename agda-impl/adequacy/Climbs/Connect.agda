@@ -155,7 +155,7 @@ module ClimbConnect (R : Set) where
 
   -- No connect under `s` still in its subscribe burst at `q`: each
   -- subscribed its source before `q`, and `q` lies outside it.
-  Shut : ∀ {h Δ A} → Pos → Sub h Δ A → Set
+  Shut : ∀ {h Δ A} → Pos → Sub h Δ A → Set₁
   Shut {h} q s = ∀ {Δ′ A′ B′ S′ c′ b′ kb′ k′ fd rp′ e′ rt′} {src : Sub h Δ′ A′} {bd′ : Sub h (A′ ∷ Δ′) B′}
                → Path s (connectˢ S′ c′ b′ kb′ k′ fd rp′ e′ rt′ src bd′) → rp′ <ᵖ q ≡ true × Ev.inside rp′ q ≡ false
 
