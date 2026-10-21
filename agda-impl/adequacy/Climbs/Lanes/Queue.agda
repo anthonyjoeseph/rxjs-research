@@ -111,7 +111,7 @@ module ClimbLanesQueue (R : Set) where
   open Keeping R using (seen-planted)
   open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ⊆-⊑; _⊑[_/_]_; Bound; Pred; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pooled-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; tw-alike)
   open ShiftWalk R using (let-go; grip)
-  open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; untoldʳ; just-of; scan-part; scan-defined)
+  open Framing R using (Tells; merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; untoldʳ; rested-all; just-of; scan-part; scan-defined)
   open FramingRepool R using (Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
   open Staging R using (not-src; wrap-lane)
   open Weakening R using (Grows; pure-map) renaming (module Grown to Weakened)
@@ -450,17 +450,18 @@ module ClimbLanesQueue (R : Set) where
     fs  = Books.fresh (Calling.books cl)
     fr  = fresh-path ρ fs
 
-    -- The ended lane's rest tells its joiners past `q` at a bound binder's
-    -- end wherever the flatMap's part does.  The freed lane is in no part; `l` is tied only
-    -- by `ll`.
-    -- Owed: a joiner left untold here on a bound binder is told only by the
-    -- shut its connect's part applies, at the binder's end, which the run may
-    -- be past; nothing ties it to a joiner the part holds.
+    -- The ended lane's last ghost tells its joiners past `q` at a bound
+    -- binder's end, as the outer's does in `Climbs.Flat`: `l` was the
+    -- lane's part at this `q`, the freed lane is in no part, and `ll` ties
+    -- only its meaning.
     --
     -- DEAD ROUTE: over `untold`, a rest's joiners counted: a connect in the lane whose body ended with its source still pending leaves that source's joiner in `l`'s rest and in no part
     -- DEAD ROUTE: at every end `c`: a connect still live keeps its running source in the rest, holding a joiner older than any the part holds, which tells past `q` at no end between it and `q`
     postulate
-      settle-rest-told : ∀ {A′} (i : A′ ∈ᴸ Δ) {c} → Bound H ρ i c → ∀ {b₀} → At.part H₂ w₀ ≡ just b₀ → untoldʳ i l ⊑[ q / c ] untold i b₀
+      lane-ghost-told : ∀ {A′} (i : A′ ∈ᴸ Δ) {c} → Bound H ρ i c → Tells q c (untold i l)
+
+    settle-rest-told : ∀ {A′} (i : A′ ∈ᴸ Δ) {c} → Bound H ρ i c → ∀ {b₀} → At.part H₂ w₀ ≡ just b₀ → untoldʳ i l ⊑[ q / c ] untold i b₀
+    settle-rest-told i b _ _ = rested-all i l (lane-ghost-told i b)
 
     settle-told : ∀ {A′} (i : A′ ∈ᴸ Δ) {c} → Bound H ρ i c → ∀ {b₀} → At.part H₂ w₀ ≡ just b₀ → untold i pl′ ⊑[ q / c ] untold i b₀
     settle-told i b e = rest-pool-⊑ H₂ op (λ a j → U.subscribe (f a) j) (At.part H₂ t) (At.partLanes H₂ ls) (At.val H₂ (FlatKit.Flat.queue fl)) pl l i e (settle-rest-told i b e)

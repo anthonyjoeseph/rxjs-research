@@ -111,7 +111,7 @@ module ClimbFlat (R : Set) where
   open Keeping R using (seen-planted)
   open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; _⊑[_/_]_; ≡-⊑; Bound; Pred; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; pooledL-alike; leftover-from; pooled-from; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; tw-alike)
   open ShiftWalk R using (let-go; grip)
-  open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; untoldʳ; rested-all; just-of; scan-part; scan-defined)
+  open Framing R using (Tells; merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; untoldʳ; rested-all; just-of; scan-part; scan-defined)
   open FramingRepool R using (heads-repool; Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
   open Staging R using (not-src; wrap-lane)
   open Weakening R using (Grows; pure-map) renaming (module Grown to Weakened)
@@ -732,17 +732,23 @@ module ClimbFlat (R : Set) where
           (lv-trans (proj₁ (tw-rest o₀))
             (lv-trans lo (proj₁ (tw-trans (tw-leftover H u) (tw-alike (leftover-alike H (Settles.H′ H ρ) u P.so-al)))))))
 
-    -- The outer's rest tells its joiners past `q` at a bound binder's end
-    -- wherever the flatMap's part does.  The outer has ended, so its part
-    -- holds nothing; `o₀` is tied only by `lo`.
-    -- Owed: a joiner left untold here on a bound binder is told only by the
-    -- shut its connect's part applies, at the binder's end, which the run may
-    -- be past; nothing ties it to a joiner the part holds.
+    -- The outer's last ghost tells its joiners past `q` at a bound
+    -- binder's end.  `o₀` was the outer's part at this `q`; the outer has
+    -- ended, so no part holds it now, and `lo` ties only its meaning.
+    -- Why it holds: a joiner shows a part only while its guard is up, and
+    -- a connect's source subscribed past the connect's end is cut as its
+    -- subscribe returns, so a counted joiner is live or inside its source's
+    -- burst; a binder bound above ends at no point inside that burst.
+    -- Owed: an untold measure over the ghost, kept by each step as
+    -- `tells-past` keeps it over the parts.
     --
     -- DEAD ROUTE: over `untold`, a rest's joiners counted: a connect in the outer whose body ended with its source still pending leaves that source's joiner in `o₀`'s rest and in no part
     -- DEAD ROUTE: at every end `c`: a connect still live keeps its running source in the rest, holding a joiner older than any the part holds, which tells past `q` at no end between it and `q`
     postulate
-      close-rest-told : ∀ {A′} (i : A′ ∈ᴸ Δ) {c} → Bound H ρ i c → ∀ {b₀} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just b₀ → untoldʳ i o₀ ⊑[ q / c ] untold i b₀
+      outer-ghost-told : ∀ {A′} (i : A′ ∈ᴸ Δ) {c} → Bound H ρ i c → Tells q c (untold i o₀)
+
+    close-rest-told : ∀ {A′} (i : A′ ∈ᴸ Δ) {c} → Bound H ρ i c → ∀ {b₀} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just b₀ → untoldʳ i o₀ ⊑[ q / c ] untold i b₀
+    close-rest-told i b _ _ = rested-all i o₀ (outer-ghost-told i b)
 
     close-told : ∀ {A′} (i : A′ ∈ᴸ Δ) {c} → Bound H ρ i c → ∀ {b₀} → At.part H (flatMapˢ op f fl oc k r pl u ls) ≡ just b₀ → untold i pl′ ⊑[ q / c ] untold i b₀
     close-told i b e = rest-pool-⊑ H op (λ a j → U.subscribe (f a) j) (At.part H u) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl o₀ i e (close-rest-told i b e)
