@@ -41,7 +41,7 @@ open import adequacy.Strong.Held using (module StrongHeld)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Placed.Order using (Placed)
-open import adequacy.Stepper using (afterᴱ)
+open import adequacy.Stepper.Past using (afterᴱ)
 open import denotation.Denote using (⟦_⟧)
 import Tree as T
 open import operation.PureObservable using (PureObs; Out; Pureᴾ; module Pure)
