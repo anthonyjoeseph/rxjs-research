@@ -180,10 +180,10 @@ module ClimbConnect (R : Set) where
       re-heads    : Each G (Heads q) bd → Each G (Heads q) (retag g bd)
       re-lingers  : Lingers G bd → Lingers G (retag g bd)
 
-    heading : Heading G G q w₀ v
+    heading : ∀ {E} → Heading G G q E w₀ v
     heading = record
       { head-revive = re-revive
-      ; head-told   = λ i e₀ e′ → ⊆-⊑ (re-told i e₀ e′)
+      ; head-told   = λ i _ e₀ e′ → ⊆-⊑ (re-told i e₀ e′)
       ; head-below  = λ ev → Build.each-connect G (Heads q)
           (re-root ev)
           (λ x pn pe → Each.rests ev here refl (proj₂ (just-of (re-revive (cong is-just x)))) pn pe)
@@ -287,7 +287,7 @@ module ClimbConnect (R : Set) where
     --   no `Alike` relates it; a node fact over `fed-part`'s `Gapped`.
     module Re = Refed H {Sj = Sj} {c = c} {b = b} {kb = kb} {k = k} {rp = rp} {e = e} {rt = rt} {u = u} {bd = bd} fd′ q
 
-    fed-heading : Heading H H q w₀ v
+    fed-heading : ∀ {E} → Heading H H q E w₀ v
     fed-heading = Re.heading
 
     -- What the connect leaves, the feed restaged.  A joiner is read in a
@@ -519,10 +519,10 @@ module ClimbConnect (R : Set) where
     fin-revive : AllPairs _≢_ (names (connectˢ Sj c b kb k idle rp e rt u bd)) → is-just (At.part (store H (Subject.closed Sj) (lift true)) (connectˢ Sj c b kb k idle rp e rt u bd)) ≡ true → is-just (At.part H (connectˢ Sj c b kb k idle rp e rt u bd)) ≡ true
     fin-revive fr j = trans (cong is-just (sym (fin-part fr))) j
 
-    fin-kept : AllPairs _≢_ (names w₀) → Heading H H′ q w₀ w₀
+    fin-kept : AllPairs _≢_ (names w₀) → ∀ {E} → Heading H H′ q E w₀ w₀
     fin-kept fr = record
       { head-revive = fin-revive fr
-      ; head-told   = λ i e₀ e′ → ⊆-⊑ λ m → ≡-⊆ (cong (untold i) (just-injective (trans (sym e′) (trans (fin-part fr) e₀)))) m
+      ; head-told   = λ i _ e₀ e′ → ⊆-⊑ λ m → ≡-⊆ (cong (untold i) (just-injective (trans (sym e′) (trans (fin-part fr) e₀)))) m
       ; head-below  = each-same H H′ se same }
       where
         se : ∀ {Δ′ A′} {x : Sub h Δ′ A′} (ψ : Path w₀ x) → seen H′ ψ ≡ seen H ψ
@@ -554,7 +554,7 @@ module ClimbConnect (R : Set) where
     -- feed's.
     module Re = Refed H′ {Sj = Sj} {c = c} {b = b} {kb = kb} {k = k} {rp = rp} {e = e} {rt = rt} {u = u} {bd = bd} fd′ q
 
-    fin-heading : AllPairs _≢_ (names w₀) → Heading H H′ q w₀ v
+    fin-heading : AllPairs _≢_ (names w₀) → ∀ {E} → Heading H H′ q E w₀ v
     fin-heading fr = heading-∘ (fin-kept fr) Re.heading
 
     -- What the connect leaves, the finish restaged, as the feed's: a

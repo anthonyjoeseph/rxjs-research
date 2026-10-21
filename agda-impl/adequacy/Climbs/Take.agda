@@ -158,10 +158,10 @@ module ClimbTake (R : Set) where
 
     -- The take's own heads and ties, ended: its part the source's,
     -- `ending` owing what the source left, nothing below it seen.
-    end-heading : At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′ → Heading H H q w₀ v
+    end-heading : At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′ → ∀ {E} → Heading H H q E w₀ v
     end-heading lv pv = record
       { head-revive = λ _ → cong is-just (take-live lv pv)
-      ; head-told   = λ j e₀ e′ → ⊆-⊑ λ m →
+      ; head-told   = λ j _ e₀ e′ → ⊆-⊑ λ m →
           subst (λ b → _ ∈ᴸ untold j b) (just-injective (trans (sym (take-live lv pv)) e₀))
                 (subst (λ b → _ ∈ᴸ untold j b) (sym (just-injective (trans (sym (ending-part H {i = i} {p} {c} {k} {u} {q} {c′} lv)) e′))) m)
       ; head-below  = λ _ → Build.each-take H (Heads q)

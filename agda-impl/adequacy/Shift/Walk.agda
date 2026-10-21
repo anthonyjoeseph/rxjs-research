@@ -51,7 +51,7 @@ module ShiftWalk (R : Set) where
   open FramingRepool R using (Untold; Ended; ended-head)
   open Keeping R using (leftover-restful)
   open Retagging R using (retag; retagᴸ)
-  open Shifting R using (_⊑[_]_; ≡-⊑; ++-⊑; module Alive; module Build; DoneByL; EachL; EndedL; module Flag; module Linger; LingersL; UntoldL; conn-tw; cons-untold; each-alike; eachL-alike; eachL-head; eachL-of; eachL-tail; en-sub; enL-head; enL-of; enL-tail; filled; flags-alike; flagsL-alike; tw-if-moved; just≢; leftover-alike; leftoverL-alike; lingers-alike; lingers-sub; lingersL-alike; lingersL-head; lingersL-of; lingersL-tail; map-back; map-fwd; pairs-tl; tw-alike; pooledL-alike; seen-take; sourced-heap; untold-at; ut-sub; utL-head; utL-of; utL-tail; via-≡; ∨-l; ∨-mono; ∨-r)
+  open Shifting R using (_⊑[_/_]_; ≡-⊑; ++-⊑; Pred; Binds; BindsL; module Alive; module Build; DoneByL; EachL; EndedL; module Flag; module Linger; LingersL; UntoldL; conn-tw; cons-untold; each-alike; eachL-alike; eachL-head; eachL-of; eachL-tail; en-sub; enL-head; enL-of; enL-tail; filled; flags-alike; flagsL-alike; tw-if-moved; just≢; leftover-alike; leftoverL-alike; lingers-alike; lingers-sub; lingersL-alike; lingersL-head; lingersL-of; lingersL-tail; map-back; map-fwd; pairs-tl; tw-alike; pooledL-alike; seen-take; sourced-heap; untold-at; ut-sub; utL-head; utL-of; utL-tail; via-≡; ∨-l; ∨-mono; ∨-r)
 
   -- Below a live node the path sees, no flag held unset.
   let-go : ∀ {h} (H : Heapᴹ h) {Δ₀ A₀ Δ A} {t : Sub h Δ₀ A₀} {u : Sub h Δ A} (π : Path t u) → AllPairs _≢_ (names t) → seen H π ≡ true
@@ -369,45 +369,45 @@ module ShiftWalk (R : Set) where
 
     --------------------------------------------------------------------
     -- NO JOINER NEWLY UNTOLD PAST `q`: what a node above leaves untold
-    -- its joiners after the write tells past `q` wherever what it left
-    -- untold before did.
+    -- its joiners after the write tells past `q` at `ω` if what it left
+    -- untold before did, for each binder `E` claims at `ω`.
 
-    module Telling (q : Pos) (tl₀ : ∀ {C} (i : C ∈ᴸ Δ₀) {b₀ b′} → At.part H u ≡ just b₀ → At.part H′ v ≡ just b′ → untold i b′ ⊑[ q ] untold i b₀) where
-      untold-≡ : ∀ {Γ B C} (i : C ∈ᴸ Γ) {x x′ y y′ : U.Node Γ B} → x ≡ y → x′ ≡ y′ → untold i x′ ⊑[ q ] untold i x → untold i y′ ⊑[ q ] untold i y
+    module Telling (q : Pos) (E : Pred Δ₀) (tl₀ : ∀ {C} (i : C ∈ᴸ Δ₀) {c} → E i c → ∀ {b₀ b′} → At.part H u ≡ just b₀ → At.part H′ v ≡ just b′ → untold i b′ ⊑[ q / c ] untold i b₀) (ω : Pos) where
+      untold-≡ : ∀ {Γ B C} (i : C ∈ᴸ Γ) {x x′ y y′ : U.Node Γ B} → x ≡ y → x′ ≡ y′ → untold i x′ ⊑[ q / ω ] untold i x → untold i y′ ⊑[ q / ω ] untold i y
       untold-≡ i refl refl s = s
 
       told-ᴹ : ∀ {Δ A B C} (i : C ∈ᴸ Δ) (g g′ : U.Node Δ A → U.Node Δ B) → (∀ c → untold i (g c) ≡ untold i c) → (∀ c → untold i (g′ c) ≡ untold i c)
              → (m m′ : Maybe (U.Node Δ A)) → ∀ {b₀ b′} → At.mapᴹ H g m ≡ just b₀ → At.mapᴹ H′ g′ m′ ≡ just b′
-             → (∀ {c c′} → m ≡ just c → m′ ≡ just c′ → untold i c′ ⊑[ q ] untold i c) → untold i b′ ⊑[ q ] untold i b₀
+             → (∀ {c c′} → m ≡ just c → m′ ≡ just c′ → untold i c′ ⊑[ q / ω ] untold i c) → untold i b′ ⊑[ q / ω ] untold i b₀
       told-ᴹ i g g′ up up′ (just c) (just c′) refl refl sub = λ t → ≡-⊑ (up′ c′) (sub refl refl (≡-⊑ (sym (up c)) t))
       told-ᴹ i g g′ up up′ nothing  m′        ()   e′   sub
       told-ᴹ i g g′ up up′ (just c) nothing   e₀   ()   sub
 
       told-take : ∀ {Δ A C} (i : C ∈ᴸ Δ) ib (p : A → Bool) (tk : Taking Δ A) (m m′ : Maybe (U.Node Δ A)) {b b′} → b′ ≡ b
                 → ∀ {b₀ b₁} → (if b then At.taking? H ib p tk m else nothing) ≡ just b₀ → (if b′ then At.taking? H′ ib p tk m′ else nothing) ≡ just b₁
-                → (b ∧ isTaking tk ≡ true → ∀ {c c′} → m ≡ just c → m′ ≡ just c′ → untold i c′ ⊑[ q ] untold i c) → untold i b₁ ⊑[ q ] untold i b₀
+                → (b ∧ isTaking tk ≡ true → ∀ {c c′} → m ≡ just c → m′ ≡ just c′ → untold i c′ ⊑[ q / ω ] untold i c) → untold i b₁ ⊑[ q / ω ] untold i b₀
       told-take i ib p tk           m m′ {b = false} refl ()   e′   sub
       told-take i ib p taking       m m′ {b = true}  refl e₀   e′   sub =
         told-ᴹ i (U.takeWhileᶜ ib p) (U.takeWhileᶜ ib p) (λ _ → refl) (λ _ → refl) m m′ e₀ e′ (sub refl)
       told-take i ib p (ending _ _) m m′ {b = true}  refl refl refl sub = λ x → x
       told-take i ib p taken        m m′ {b = true}  refl ()   e′   sub
 
-      toldᴹ : ∀ {Δ B C} (i : C ∈ᴸ Δ) (m m′ : Maybe (U.Node Δ B)) → (∀ {c c′} → m ≡ just c → m′ ≡ just c′ → untold i c′ ⊑[ q ] untold i c)
-            → (is-just m′ ≡ true → is-just m ≡ true) → untoldᴹ i m′ ⊑[ q ] untoldᴹ i m
+      toldᴹ : ∀ {Δ B C} (i : C ∈ᴸ Δ) (m m′ : Maybe (U.Node Δ B)) → (∀ {c c′} → m ≡ just c → m′ ≡ just c′ → untold i c′ ⊑[ q / ω ] untold i c)
+            → (is-just m′ ≡ true → is-just m ≡ true) → untoldᴹ i m′ ⊑[ q / ω ] untoldᴹ i m
       toldᴹ i m        nothing   sub rv = λ _ → []ᴬ
       toldᴹ i (just c) (just c′) sub rv = sub refl refl
       toldᴹ i nothing  (just c′) sub rv = false≢ (rv refl)
 
       flat-told : ∀ {Δ A B C} (i : C ∈ᴸ Δ) op (g : A → Pos → U.Node Δ B) (o o′ : Maybe (U.Node Δ A)) (L L′ : List (U.Node Δ B)) (Q Q′ : List A) pl
-                → untoldᴹ i o′ ⊑[ q ] untoldᴹ i o → untoldᴸ i L′ ⊑[ q ] untoldᴸ i L → Q′ ≡ Q
-                → ∀ {b₀ b′} → At.merged H op g o L Q pl ≡ just b₀ → At.merged H′ op g o′ L′ Q′ pl ≡ just b′ → untold i b′ ⊑[ q ] untold i b₀
+                → untoldᴹ i o′ ⊑[ q / ω ] untoldᴹ i o → untoldᴸ i L′ ⊑[ q / ω ] untoldᴸ i L → Q′ ≡ Q
+                → ∀ {b₀ b′} → At.merged H op g o L Q pl ≡ just b₀ → At.merged H′ op g o′ L′ Q′ pl ≡ just b′ → untold i b′ ⊑[ q / ω ] untold i b₀
       flat-told i op g o o′ L L′ Q _ pl so sL refl e₀ e′ =
         untold-≡ i (merged-eq H op g o L Q pl e₀) (merged-eq H′ op g o′ L′ Q pl e′)
           (++-⊑ (untoldᴹ i o) (untoldᴹ i o′) so (++-⊑ (untoldᴸ i L) (untoldᴸ i L′) sL (λ m → m)))
 
       lane-told : ∀ {Δ B C} (i : C ∈ᴸ Δ) {b b′} → b′ ≡ b → (m m′ : Maybe (U.Node Δ B)) (L L′ : List (U.Node Δ B))
-                → (b ≡ true → untoldᴹ i m′ ⊑[ q ] untoldᴹ i m) → untoldᴸ i L′ ⊑[ q ] untoldᴸ i L
-                → untoldᴸ i (if b′ then At.consᴹ H′ m′ L′ else L′) ⊑[ q ] untoldᴸ i (if b then At.consᴹ H m L else L)
+                → (b ≡ true → untoldᴹ i m′ ⊑[ q / ω ] untoldᴹ i m) → untoldᴸ i L′ ⊑[ q / ω ] untoldᴸ i L
+                → untoldᴸ i (if b′ then At.consᴹ H′ m′ L′ else L′) ⊑[ q / ω ] untoldᴸ i (if b then At.consᴹ H m L else L)
       lane-told i {b = false} refl m m′ L L′ fm fL = fL
       lane-told i {b = true}  refl m m′ L L′ fm fL =
         λ t → ≡-⊑ (cons-untold H′ i m′ L′) (++-⊑ (untoldᴹ i m) (untoldᴹ i m′) (fm refl) fL (≡-⊑ (sym (cons-untold H i m L)) t))
@@ -416,9 +416,9 @@ module ShiftWalk (R : Set) where
       -- refuted by the end, and one gone on both sides tells alike.
       src-told : ∀ {Δ A B C} (i : C ∈ᴸ Δ) rp (e : Maybe Pos) (rt : U.Node Δ A) (s s′ : Maybe (U.Node Δ A)) (mb : Maybe (U.Node (A ∷ Δ) B))
                → (is-just s′ ≡ true → is-just s ≡ true)
-               → (is-just mb ≡ true → ∀ {c c′} → s ≡ just c → s′ ≡ just c′ → untold i c′ ⊑[ q ] untold i c)
+               → (is-just mb ≡ true → ∀ {c c′} → s ≡ just c → s′ ≡ just c′ → untold i c′ ⊑[ q / ω ] untold i c)
                → (∀ {n} → At.connected H rp e rt s mb ≡ just n → ∀ {c₀} → e ≡ just c₀ → s ≡ nothing)
-               → ∀ {b₀ b′} → At.connected H rp e rt s mb ≡ just b₀ → At.connected H′ rp e rt s′ mb ≡ just b′ → untold i b′ ⊑[ q ] untold i b₀
+               → ∀ {b₀ b′} → At.connected H rp e rt s mb ≡ just b₀ → At.connected H′ rp e rt s′ mb ≡ just b′ → untold i b′ ⊑[ q / ω ] untold i b₀
       src-told i rp e        rt s        s′        nothing  rv sub en ()   e′
       src-told i rp e        rt (just c) (just c′) (just b) rv sub en refl refl = ++-⊑ (untold (there i) b) (untold (there i) b) (λ m → m) (sub refl refl refl)
       src-told i rp (just x) rt (just c) nothing   (just b) rv sub en e₀   e′   = just≢ (en e₀ refl)
@@ -431,8 +431,8 @@ module ShiftWalk (R : Set) where
       -- shut when the source has ended.
       body-told : ∀ {Δ A B C} (i : C ∈ᴸ Δ) rp (e : Maybe Pos) (rt : U.Node Δ A) (s : Maybe (U.Node Δ A)) (mb mb′ : Maybe (U.Node (A ∷ Δ) B))
                 → (is-just mb′ ≡ true → is-just mb ≡ true)
-                → ((is-just s ∨ is-just e) ≡ true → ∀ {c c′} → mb ≡ just c → mb′ ≡ just c′ → untold (there i) c′ ⊑[ q ] untold (there i) c)
-                → ∀ {b₀ b′} → At.connected H rp e rt s mb ≡ just b₀ → At.connected H′ rp e rt s mb′ ≡ just b′ → untold i b′ ⊑[ q ] untold i b₀
+                → ((is-just s ∨ is-just e) ≡ true → ∀ {c c′} → mb ≡ just c → mb′ ≡ just c′ → untold (there i) c′ ⊑[ q / ω ] untold (there i) c)
+                → ∀ {b₀ b′} → At.connected H rp e rt s mb ≡ just b₀ → At.connected H′ rp e rt s mb′ ≡ just b′ → untold i b′ ⊑[ q / ω ] untold i b₀
       body-told i rp e        rt s        mb       nothing   rv sub e₀   ()
       body-told i rp e        rt s        nothing  (just b′) rv sub e₀   e′   = false≢ (rv refl)
       body-told i rp e        rt (just c) (just b) (just b′) rv sub refl refl = ++-⊑ (untold (there i) b) (untold (there i) b′) (sub refl refl refl) (λ m → m)
@@ -443,60 +443,62 @@ module ShiftWalk (R : Set) where
 
       mutual
         told : ∀ {Δ A} {t : Sub h Δ A} (π : Path t u) → AllPairs _≢_ (names t) → Ended H t
-             → ∀ {C} (i : C ∈ᴸ Δ) {b₀ b′} → At.part H t ≡ just b₀ → At.part H′ (plant π v) ≡ just b′ → untold i b′ ⊑[ q ] untold i b₀
-        told here ps en i e₀ e′ = tl₀ i e₀ e′
-        told (in-map {f = f} {t = s} π) ps en i e₀ e′ =
+             → ∀ {K} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → Binds H π K j c → E j c)
+             → ∀ {C} (i : C ∈ᴸ Δ) → K i ω → ∀ {b₀ b′} → At.part H t ≡ just b₀ → At.part H′ (plant π v) ≡ just b′ → untold i b′ ⊑[ q / ω ] untold i b₀
+        told here ps en κ i wk e₀ e′ = tl₀ i (κ i wk) e₀ e′
+        told (in-map {f = f} {t = s} π) ps en κ i wk e₀ e′ =
           told-ᴹ i (U.mapᶜ f) (U.mapᶜ f) (λ _ → refl) (λ _ → refl) (At.part H s) (At.part H′ (plant π v)) e₀ e′
-            (told π ps (en-sub H en (in-map here) refl) i)
-        told (in-scan {f = f} {r} {t = s} π) ps en i e₀ e′ =
+            (told π ps (en-sub H en (in-map here) refl) κ i wk)
+        told (in-scan {f = f} {r} {t = s} π) ps en κ i wk e₀ e′ =
           told-ᴹ i (U.scanᶜ f (At.val H r)) (U.scanᶜ f (At.val H′ r)) (λ _ → refl) (λ _ → refl) (At.part H s) (At.part H′ (plant π v)) e₀ e′
-            (told π (pairs-tl ps) (en-sub H en (in-scan here) refl) i)
-        told (in-take {i = ib} {p} {c} {k} {tk} {t = s} π) ps en i e₀ e′ =
+            (told π (pairs-tl ps) (en-sub H en (in-scan here) refl) κ i wk)
+        told (in-take {i = ib} {p} {c} {k} {tk} {t = s} π) ps en κ i wk e₀ e′ =
           told-take i ib p tk (At.part H s) (At.part H′ (plant π v)) Tk.live′ e₀ e′
-            (λ ok → told π Tk.fresh (en-sub H en (in-take here) (seen-take (At.val H (Kit.live c)) ok)) i)
+            (λ ok → told π Tk.fresh (en-sub H en (in-take here) (seen-take (At.val H (Kit.live c)) ok)) κ i wk)
           where module Tk = Take c k π ps
-        told (in-outer {op = op} {f} {fl} {oc} {k} {r} {pl} {t = so} {ls} π) ps en i e₀ e′ =
+        told (in-outer {op = op} {f} {fl} {oc} {k} {r} {pl} {t = so} {ls} π) ps en κ i wk e₀ e′ =
           flat-told i op (λ a q → U.subscribe (f a) q) (At.part H so) (At.part H′ (plant π v)) (At.partLanes H ls) (At.partLanes H′ ls)
             (At.val H (Flat.queue fl)) (At.val H′ (Flat.queue fl)) pl
-            (toldᴹ i (At.part H so) (At.part H′ (plant π v)) (told π O.fresh (en-sub H en (in-outer here) refl) i) (revive π O.fresh))
+            (toldᴹ i (At.part H so) (At.part H′ (plant π v)) (told π O.fresh (en-sub H en (in-outer here) refl) κ i wk) (revive π O.fresh))
             (≡-⊑ (cong (untoldᴸ i) O.lanes)) (cong lower O.queue) e₀ e′
           where module O = Outer fl oc k r ls π ps
-        told (in-lanes {op = op} {f} {fl} {oc} {k} {r} {pl} {t = so} {ls} πL) ps en i e₀ e′ =
+        told (in-lanes {op = op} {f} {fl} {oc} {k} {r} {pl} {t = so} {ls} πL) ps en κ i wk e₀ e′ =
           flat-told i op (λ a q → U.subscribe (f a) q) (At.part H so) (At.part H′ so) (At.partLanes H ls) (At.partLanes H′ (plantᴸ πL v))
             (At.val H (Flat.queue fl)) (At.val H′ (Flat.queue fl)) pl
-            (≡-⊑ (cong (untoldᴹ i) Ln.outer)) (toldL πL Ln.fresh (enL-of H en) i) (cong lower Ln.queue) e₀ e′
+            (≡-⊑ (cong (untoldᴹ i) Ln.outer)) (toldL πL Ln.fresh (enL-of H en) κ i wk) (cong lower Ln.queue) e₀ e′
           where module Ln = Lanes fl oc k r so πL ps
-        told (in-source {S = S} {c} {b} {kb} {k} {e = e} {rp} {rt} {t = src} {bd} π) ps en i {b′ = b′} e₀ e′ =
+        told (in-source {S = S} {c} {b} {kb} {k} {e = e} {rp} {rt} {t = src} {bd} π) ps en κ i wk {b′ = b′} e₀ e′ =
           src-told i rp e rt (At.part H src) (At.part H′ (plant π v)) (At.part H bd) (revive π Sr.fresh)
-            (λ jb → told π Sr.fresh (en-sub H en (in-source here) (∧-join jb refl)) i) (en here refl) e₀
+            (λ jb → told π Sr.fresh (en-sub H en (in-source here) (∧-join jb refl)) κ i wk) (en here refl) e₀
             (subst (λ z → At.connected H′ rp e rt (At.part H′ (plant π v)) z ≡ just b′) Sr.body e′)
           where module Sr = Source S c b kb k bd π ps
-        told (in-body {S = S} {c} {b} {kb} {k} {e = e} {rp} {rt} {t = src} {bd} π) ps en i {b′ = b′} e₀ e′ =
+        told (in-body {S = S} {c} {b} {kb} {k} {e = e} {rp} {rt} {t = src} {bd} π) ps en κ i wk {b′ = b′} e₀ e′ =
           body-told i rp e rt (At.part H src) (At.part H bd) (At.part H′ (plant π v)) (revive π Bd.fresh)
-            (λ js → told π Bd.fresh (en-sub H en (in-body here) (∧-join js refl)) (there i)) e₀
+            (λ js → told π Bd.fresh (en-sub H en (in-body here) (∧-join js refl)) κ (there i) wk) e₀
             (subst (λ z → At.connected H′ rp e rt z (At.part H′ (plant π v)) ≡ just b′) Bd.source e′)
           where module Bd = Body S c b kb k src π ps
-        told (in-defer {k = k} π) ps en i e₀ e′ = told π (pairs-r (quietName k) ps) (en-sub H en (in-defer here) refl) i e₀ e′
+        told (in-defer {k = k} π) ps en κ i wk e₀ e′ = told π (pairs-r (quietName k) ps) (en-sub H en (in-defer here) refl) κ i wk e₀ e′
 
         toldL : ∀ {Δ B} {ls : List (Lane h Δ B)} (πL : PathLanes ls u) → AllPairs _≢_ (laneNames ls) → EndedL H ls
-              → ∀ {C} (i : C ∈ᴸ Δ) → untoldᴸ i (At.partLanes H′ (plantᴸ πL v)) ⊑[ q ] untoldᴸ i (At.partLanes H ls)
-        toldL (this-lane {c = c} {k} {t = s} {ls} π) ps en i =
+              → ∀ {K} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → BindsL H πL K j c → E j c)
+              → ∀ {C} (i : C ∈ᴸ Δ) → K i ω → untoldᴸ i (At.partLanes H′ (plantᴸ πL v)) ⊑[ q / ω ] untoldᴸ i (At.partLanes H ls)
+        toldL (this-lane {c = c} {k} {t = s} {ls} π) ps en κ i wk =
           lane-told i Th.live′ (At.part H s) (At.part H′ (plant π v)) (At.partLanes H ls) (At.partLanes H′ ls)
-            (λ lv → toldᴹ i (At.part H s) (At.part H′ (plant π v)) (told π Th.fresh (enL-head H en lv) i) (revive π Th.fresh))
+            (λ lv → toldᴹ i (At.part H s) (At.part H′ (plant π v)) (told π Th.fresh (enL-head H en lv) κ i wk) (revive π Th.fresh))
             (≡-⊑ (cong (untoldᴸ i) Th.rest))
           where module Th = This c k ls π ps
-        toldL (next-lane {l = lane c k s} {ls} πL) ps en i =
+        toldL (next-lane {l = lane c k s} {ls} πL) ps en κ i wk =
           lane-told i Nx.live′ (At.part H s) (At.part H′ s) (At.partLanes H ls) (At.partLanes H′ (plantᴸ πL v))
-            (λ _ → ≡-⊑ (cong (untoldᴹ i) Nx.head)) (toldL πL Nx.fresh (enL-tail H en) i)
+            (λ _ → ≡-⊑ (cong (untoldᴹ i) Nx.head)) (toldL πL Nx.fresh (enL-tail H en) κ i wk)
           where module Nx = Next c k s πL ps
 
     --------------------------------------------------------------------
     -- NO HEAD BEFORE `q`: every node above heads no sooner after the
     -- write than before.
 
-    module Behind (q : Pos) (tl₀ : ∀ {C} (i : C ∈ᴸ Δ₀) {b₀ b′} → At.part H u ≡ just b₀ → At.part H′ v ≡ just b′ → untold i b′ ⊑[ q ] untold i b₀)
+    module Behind (q : Pos) (E : Pred Δ₀) (tl₀ : ∀ {C} (i : C ∈ᴸ Δ₀) {c} → E i c → ∀ {b₀ b′} → At.part H u ≡ just b₀ → At.part H′ v ≡ just b′ → untold i b′ ⊑[ q / c ] untold i b₀)
                   (bl₀ : Each H (Heads q) u → Each H′ (Heads q) v) where
-      open Telling q tl₀
+      open Telling q E tl₀
 
       P : ∀ {Γ A} → U.Node Γ A → Set
       P c = Heads q c
@@ -544,7 +546,7 @@ module ShiftWalk (R : Set) where
               → (is-just mb′ ≡ true → is-just mb ≡ true)
               → (is-just mb ≡ true → ∀ {c} → s ≡ just c → P c)
               → ((is-just s ∨ is-just e) ≡ true → ∀ {c} → mb′ ≡ just c → P c)
-              → ((is-just s ∨ is-just e) ≡ true → ∀ {b₀ b′} → mb ≡ just b₀ → mb′ ≡ just b′ → untold (here refl) b′ ⊑[ q ] untold (here refl) b₀)
+              → (∀ {c₀} → e ≡ just c₀ → s ≡ nothing → ∀ {b₀ b′} → mb ≡ just b₀ → mb′ ≡ just b′ → untold (here refl) b′ ⊑[ q / c₀ ] untold (here refl) b₀)
               → (∀ {c₀} → e ≡ just c₀ → s ≡ nothing → ∀ {b₀} → mb ≡ just b₀ → Tells q c₀ (untold (here refl) b₀))
               → (∀ {n} → At.connected H rp e rt s mb ≡ just n → s ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt)
               → ∀ {c} → At.connected H′ rp e rt s mb′ ≡ just c → P c
@@ -553,39 +555,40 @@ module ShiftWalk (R : Set) where
       body-up rp (just c₀) rt nothing  nothing   (just b′) rv hs hb tl ut hr _    = false≢ (rv refl)
       body-up rp (just c₀) rt nothing  (just b₀) (just b′) rv hs hb tl ut hr refl =
         ended-head rp c₀ (U.shut (here refl) c₀ b′) rt (U.step rt)
-          (shut-heads (here refl) c₀ b′ (hb refl refl) (tl refl refl refl (ut refl refl refl))) (hr refl refl refl)
+          (shut-heads (here refl) c₀ b′ (hb refl refl) (tl refl refl refl refl (ut refl refl refl))) (hr refl refl refl)
       body-up rp nothing   rt nothing  mb        (just b′) rv hs hb tl ut hr ()
 
       mutual
-        shiftE : ∀ {Δ A} {t : Sub h Δ A} (π : Path t u) → AllPairs _≢_ (names t) → Each H P t → Untold H q t → Ended H t → Each H′ P (plant π v)
-        shiftE here ps ev ut en = bl₀ ev
-        shiftE (in-map {f = f} {t = s} π) ps ev ut en =
+        shiftE : ∀ {Δ A} {t : Sub h Δ A} (π : Path t u) → AllPairs _≢_ (names t) → Each H P t → Untold H q t → Ended H t
+               → ∀ {K} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → Binds H π K j c → E j c) → Each H′ P (plant π v)
+        shiftE here ps ev ut en κ = bl₀ ev
+        shiftE (in-map {f = f} {t = s} π) ps ev ut en κ =
           BH.each-map (lift-ᴹ H′ (U.mapᶜ f) (At.part H′ (plant π v)) (λ c → heads-map f {c}) (Each.parts es here refl)) es
           where
             es : Each H′ P (plant π v)
-            es = shiftE π ps (each-sub ev (in-map here) refl) (ut-sub H ut (in-map here) refl) (en-sub H en (in-map here) refl)
-        shiftE (in-scan {f = f} {r} {t = s} π) ps ev ut en =
+            es = shiftE π ps (each-sub ev (in-map here) refl) (ut-sub H ut (in-map here) refl) (en-sub H en (in-map here) refl) κ
+        shiftE (in-scan {f = f} {r} {t = s} π) ps ev ut en κ =
           BH.each-scan (lift-ᴹ H′ (U.scanᶜ f (At.val H′ r)) (At.part H′ (plant π v)) (λ c → heads-scan f (At.val H′ r) {c}) (Each.parts es here refl)) es
           where
             es : Each H′ P (plant π v)
-            es = shiftE π (pairs-tl ps) (each-sub ev (in-scan here) refl) (ut-sub H ut (in-scan here) refl) (en-sub H en (in-scan here) refl)
-        shiftE (in-take {i = ib} {p} {c} {k} {tk} {t = s} π) ps ev ut en =
+            es = shiftE π (pairs-tl ps) (each-sub ev (in-scan here) refl) (ut-sub H ut (in-scan here) refl) (en-sub H en (in-scan here) refl) κ
+        shiftE (in-take {i = ib} {p} {c} {k} {tk} {t = s} π) ps ev ut en κ =
           BH.each-take root (λ ok → sh (via-≡ (λ z → z ∧ isTaking tk) Tk.live′ ok))
           where
             module Tk = Take c k π ps
             sh : At.val H (Kit.live c) ∧ isTaking tk ≡ true → Each H′ P (plant π v)
-            sh ok = shiftE π Tk.fresh (each-sub ev (in-take here) sk) (ut-sub H ut (in-take here) sk) (en-sub H en (in-take here) sk)
+            sh ok = shiftE π Tk.fresh (each-sub ev (in-take here) sk) (ut-sub H ut (in-take here) sk) (en-sub H en (in-take here) sk) κ
               where
                 sk : At.val H (Kit.live c) ∧ isTaking tk ∧ true ≡ true
                 sk = seen-take (At.val H (Kit.live c)) ok
             root : ∀ {n} → At.part H′ (takeWhileˢ ib p c k tk (plant π v)) ≡ just n → P n
             root = take-up ib p tk (At.part H s) (At.part H′ (plant π v)) Tk.live′ (Each.parts ev here refl) (λ ok → Each.parts (sh ok) here refl)
-        shiftE (in-outer {op = op} {f} {fl} {oc} {k} {r} {pl} {t = so} {ls} π) ps ev ut en =
+        shiftE (in-outer {op = op} {f} {fl} {oc} {k} {r} {pl} {t = so} {ls} π) ps ev ut en κ =
           BH.each-flat root pool eo eL
           where
             module O = Outer fl oc k r ls π ps
             eo : Each H′ P (plant π v)
-            eo = shiftE π O.fresh (each-sub ev (in-outer here) refl) (ut-sub H ut (in-outer here) refl) (en-sub H en (in-outer here) refl)
+            eo = shiftE π O.fresh (each-sub ev (in-outer here) refl) (ut-sub H ut (in-outer here) refl) (en-sub H en (in-outer here) refl) κ
             eL : EachL H′ P ls
             eL = eachL-alike H H′ O.lanesA (eachL-of H ev)
             pool : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl (plant π v) ls) ≡ just n → P pl
@@ -593,25 +596,25 @@ module ShiftWalk (R : Set) where
             root : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl (plant π v) ls) ≡ just n → P n
             root x = root-flat op (λ a q′ → U.subscribe (f a) q′) (At.part H′ (plant π v)) (At.partLanes H′ ls) (At.val H′ (Flat.queue fl)) pl (pool x)
                        (Each.parts eo here refl) (each-lanes {H = H′} {P = P} ls (λ πL sn e → EachL.partsL eL πL sn e)) x
-        shiftE (in-lanes {op = op} {f} {fl} {oc} {k} {r} {pl} {t = so} {ls} πL) ps ev ut en =
+        shiftE (in-lanes {op = op} {f} {fl} {oc} {k} {r} {pl} {t = so} {ls} πL) ps ev ut en κ =
           BH.each-flat root pool eo eL
           where
             module Ln = Lanes fl oc k r so πL ps
             eo : Each H′ P so
             eo = each-alike H H′ Ln.soA (each-sub ev (in-outer here) refl)
             eL : EachL H′ P (plantᴸ πL v)
-            eL = shiftL πL Ln.fresh (eachL-of H ev) (utL-of H ut) (enL-of H en)
+            eL = shiftL πL Ln.fresh (eachL-of H ev) (utL-of H ut) (enL-of H en) κ
             pool : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl so (plantᴸ πL v)) ≡ just n → P pl
             pool x = held (in-lanes {op = op} {f = f} {fl = fl} {oc = oc} {k = k} {r = r} {pl = pl} {t = so} πL) ps x (Each.pools ev here refl)
             root : ∀ {n} → At.part H′ (flatMapˢ op f fl oc k r pl so (plantᴸ πL v)) ≡ just n → P n
             root x = root-flat op (λ a q′ → U.subscribe (f a) q′) (At.part H′ so) (At.partLanes H′ (plantᴸ πL v)) (At.val H′ (Flat.queue fl)) pl (pool x)
                        (Each.parts eo here refl) (each-lanes {H = H′} {P = P} (plantᴸ πL v) (λ πL′ sn e → EachL.partsL eL πL′ sn e)) x
-        shiftE (in-source {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = src} {bd} π) ps ev ut en =
+        shiftE (in-source {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = src} {bd} π) ps ev ut en κ =
           BH.each-connect root rest es eb
           where
             module Sr = Source S c b kb k bd π ps
             es : is-just (At.part H′ bd) ≡ true → Each H′ P (plant π v)
-            es jb = shiftE π Sr.fresh (each-sub ev (in-source here) s₁) (ut-sub H ut (in-source here) s₁) (en-sub H en (in-source here) s₁)
+            es jb = shiftE π Sr.fresh (each-sub ev (in-source here) s₁) (ut-sub H ut (in-source here) s₁) (en-sub H en (in-source here) s₁) κ
               where
                 s₁ : is-just (At.part H bd) ∧ true ≡ true
                 s₁ = ∧-join (via-≡ is-just Sr.body jb) refl
@@ -624,14 +627,14 @@ module ShiftWalk (R : Set) where
               src-up rp e rt (At.part H src) (At.part H′ (plant π v)) (At.part H bd) (Each.parts ev here refl) (en here refl) (revive π Sr.fresh)
                 (λ jb → Each.parts (es (via-≡ is-just (sym Sr.body) jb)) here refl) (λ j → Each.parts ev (in-body here) (∧-join j refl))
                 (subst (λ z → At.connected H′ rp e rt (At.part H′ (plant π v)) z ≡ just n) Sr.body x)
-        shiftE (in-body {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = src} {bd} π) ps ev ut en =
+        shiftE (in-body {S = S} {c} {b} {kb} {k} {fd} {e} {rp} {rt} {t = src} {bd} π) ps ev ut en κ =
           BH.each-connect root rest es eb
           where
             module Bd = Body S c b kb k src π ps
             sb : (is-just (At.part H src) ∨ is-just e) ≡ true → (is-just (At.part H src) ∨ is-just e) ∧ true ≡ true
             sb js = ∧-join js refl
             eb : (is-just (At.part H′ src) ∨ is-just e) ≡ true → Each H′ P (plant π v)
-            eb js = shiftE π Bd.fresh (each-sub ev (in-body here) (sb js′)) (ut-sub H ut (in-body here) (sb js′)) (en-sub H en (in-body here) (sb js′))
+            eb js = shiftE π Bd.fresh (each-sub ev (in-body here) (sb js′)) (ut-sub H ut (in-body here) (sb js′)) (en-sub H en (in-body here) (sb js′)) κ
               where
                 js′ : (is-just (At.part H src) ∨ is-just e) ≡ true
                 js′ = ∨-mono (is-just e) (via-≡ is-just Bd.source) js
@@ -644,24 +647,24 @@ module ShiftWalk (R : Set) where
               body-up rp e rt (At.part H src) (At.part H bd) (At.part H′ (plant π v)) (revive π Bd.fresh)
                 (λ jb → Each.parts ev (in-source here) (∧-join jb refl))
                 (λ js → Each.parts (eb (∨-mono (is-just e) (via-≡ is-just (sym Bd.source)) js)) here refl)
-                (λ js → told π Bd.fresh (en-sub H en (in-body here) (sb js)) (here refl))
+                (λ {c₀} pe pn → told c₀ π Bd.fresh (en-sub H en (in-body here) (sb (∨-r (is-just (At.part H src)) (cong is-just pe)))) κ (here refl) (pe , pn))
                 (untold-at ut here refl) (Each.rests ev here refl)
                 (subst (λ z → At.connected H′ rp e rt z (At.part H′ (plant π v)) ≡ just n) Bd.source x)
-        shiftE (in-defer {k = k} π) ps ev ut en =
+        shiftE (in-defer {k = k} π) ps ev ut en κ =
           BH.each-defer (Each.parts es here refl) es
           where
             es : Each H′ P (plant π v)
-            es = shiftE π (pairs-r (quietName k) ps) (each-sub ev (in-defer here) refl) (ut-sub H ut (in-defer here) refl) (en-sub H en (in-defer here) refl)
+            es = shiftE π (pairs-r (quietName k) ps) (each-sub ev (in-defer here) refl) (ut-sub H ut (in-defer here) refl) (en-sub H en (in-defer here) refl) κ
 
         shiftL : ∀ {Δ B} {ls : List (Lane h Δ B)} (πL : PathLanes ls u) → AllPairs _≢_ (laneNames ls) → EachL H P ls → UntoldL H q ls → EndedL H ls
-               → EachL H′ P (plantᴸ πL v)
-        shiftL (this-lane {c = c} {k} {t = s} {ls} π) ps eL ut en =
-          BH.eachL-cons (λ lv → shiftE π Th.fresh (eachL-head H eL (Th.on lv)) (utL-head H ut (Th.on lv)) (enL-head H en (Th.on lv)))
+               → ∀ {K} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → BindsL H πL K j c → E j c) → EachL H′ P (plantᴸ πL v)
+        shiftL (this-lane {c = c} {k} {t = s} {ls} π) ps eL ut en κ =
+          BH.eachL-cons (λ lv → shiftE π Th.fresh (eachL-head H eL (Th.on lv)) (utL-head H ut (Th.on lv)) (enL-head H en (Th.on lv)) κ)
                         (eachL-alike H H′ Th.restA (eachL-tail H eL))
           where module Th = This c k ls π ps
-        shiftL (next-lane {l = lane c k s} {ls} πL) ps eL ut en =
+        shiftL (next-lane {l = lane c k s} {ls} πL) ps eL ut en κ =
           BH.eachL-cons (λ lv → each-alike H H′ Nx.headA (eachL-head H eL (Nx.on lv)))
-                        (shiftL πL Nx.fresh (eachL-tail H eL) (utL-tail H ut) (enL-tail H en))
+                        (shiftL πL Nx.fresh (eachL-tail H eL) (utL-tail H ut) (enL-tail H en) κ)
           where module Nx = Next c k s πL ps
 
     --------------------------------------------------------------------

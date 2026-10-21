@@ -749,10 +749,10 @@ module ClimbLanes (R : Set) where
     -- The lane's cut and the count, at the flatMap: no part revived, no
     -- joiner newly untold, its heads by its outer's and its lanes' still
     -- on.
-    fr-heading : AllPairs _≢_ (names w₀) → ∀ {q} → Heading H H′ q w₀ w₀
+    fr-heading : AllPairs _≢_ (names w₀) → ∀ {q E} → Heading H H′ q E w₀ w₀
     fr-heading fr {q} = record
       { head-revive = fr-revive fr
-      ; head-told   = λ i e₀ e′ → ⊆-⊑ λ m →
+      ; head-told   = λ i _ e₀ e′ → ⊆-⊑ λ m →
           ≡-⊆ (cong (untold i) (merged-eq H op G (At.part H t) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl e₀))
             (++-mono (untoldᴹ i (At.part H t)) (untoldᴹ i (At.part H′ t)) (≡-⊆ (cong (untoldᴹ i) (fr-part fr)))
                      (++-mono (untoldᴸ i (At.partLanes H ls)) (untoldᴸ i (At.partLanes H′ ls)) (toldL fr i ls (λ π → π) (tabulateᴬ (fr-count-apart fr))) (λ y → y))

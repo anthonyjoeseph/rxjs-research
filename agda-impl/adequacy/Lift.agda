@@ -444,10 +444,10 @@ module Lifting (R : Set) where
       w₀ = coldˢ {Δ = Δ} {A} sk hd (waiting {u = v} τ e (at u x fr))
       w₁ = coldˢ {Δ = Δ} {A} sk hd (fired τ e (at u x fr))
 
-    fire-heading : ∀ {q} → Heading H H q w₀ w₁
+    fire-heading : ∀ {q E} → Heading H H q E w₀ w₁
     fire-heading = record
       { head-revive = λ j → j
-      ; head-told   = λ i e₀ e′ → ⊆-⊑ λ m → subst (λ b → _ ∈ᴸ untold i b) (just-injective (trans (sym e′) e₀)) m
+      ; head-told   = λ i _ e₀ e′ → ⊆-⊑ λ m → subst (λ b → _ ∈ᴸ untold i b) (just-injective (trans (sym e′) e₀)) m
       ; head-below  = λ ev → record { parts = λ { here sn e → Each.parts ev here sn e } ; pools = λ () ; rests = λ () } }
 
     fire-lingering : Lingering H H w₀ w₁

@@ -52,7 +52,7 @@ module Replanting (R : Set) where
   open Tearing R using (Off; look-either; fresh-path; part-alike; names-path; lanes-path; apart-r; apart-l; narrow)
   open Framing R using (untold)
   open FramingRepool R using (Untold; Ended)
-  open Shifting R using (_⊑[_]_)
+  open Shifting R using (_⊑[_/_]_; Pred; Bound)
   open ShiftWalk R using (module Walk)
 
   -- A NODE'S KIN: what a move rewrites it to.  A take ended; a pool
@@ -417,12 +417,12 @@ module Replanting (R : Set) where
   ... | inj₂ e = cong lower e
 
   -- THE NODE'S HEADS, MOVED: no part revived, every joiner left untold
-  -- telling past `q` wherever those before did, and below it every part
-  -- heading no sooner than `q`.
-  record Heading {h} (H H′ : Heapᴹ h) (q : Pos) {Δ A} (u v : Sub h Δ A) : Set₁ where
+  -- telling past `q` at an end `E` claims for its binder if those before
+  -- did, and below it every part heading no sooner than `q`.
+  record Heading {h} (H H′ : Heapᴹ h) (q : Pos) {Δ A} (E : Pred Δ) (u v : Sub h Δ A) : Set₁ where
     field
       head-revive : is-just (At.part H′ v) ≡ true → is-just (At.part H u) ≡ true
-      head-told   : ∀ {A′} (i : A′ ∈ᴸ Δ) {b₀ b′} → At.part H u ≡ just b₀ → At.part H′ v ≡ just b′ → untold i b′ ⊑[ q ] untold i b₀
+      head-told   : ∀ {A′} (i : A′ ∈ᴸ Δ) {c} → E i c → ∀ {b₀ b′} → At.part H u ≡ just b₀ → At.part H′ v ≡ just b′ → untold i b′ ⊑[ q / c ] untold i b₀
       head-below  : Each H (Heads q) u → Each H′ (Heads q) v
 
   -- THE NODE'S TIES, MOVED: no part revived, what it leaves running
@@ -488,9 +488,9 @@ module Replanting (R : Set) where
       ; placed = Owned.placed ow
       }
 
-    shift-behind : (v : Sub h Δ A) → ∀ {q} → Untold H q T → Ended H T → Heading H H′ q u v → Each H (Heads q) T → Each H′ (Heads q) (plant ρ v)
+    shift-behind : (v : Sub h Δ A) → ∀ {q} → Untold H q T → Ended H T → Heading H H′ q (Bound H ρ) u v → Each H (Heads q) T → Each H′ (Heads q) (plant ρ v)
     shift-behind v {q} ut en hd ev =
-      Walk.Behind.shiftE H H′ {u = u} v offU (Heading.head-revive hd) q (λ i e₀ e′ → Heading.head-told hd i e₀ e′) (Heading.head-below hd) ρ fs ev ut en
+      Walk.Behind.shiftE H H′ {u = u} v offU (Heading.head-revive hd) q (Bound H ρ) (λ i b e₀ e′ → Heading.head-told hd i b e₀ e′) (Heading.head-below hd) ρ fs ev ut en (λ j b → b)
 
     -- Every flag named above the node still unset, every other reading
     -- its outer as before; the names the write let go, below the node.

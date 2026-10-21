@@ -109,7 +109,7 @@ module ClimbLanesQueue (R : Set) where
   open Everywhere.Spending R using (spent-retag)
   open EverywhereGated.Holding R using (holds-alike; holds-path; holds-plant; holds-retag)
   open Keeping R using (seen-planted)
-  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ⊆-⊑; _⊑[_]_; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pooled-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; tw-alike)
+  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ⊆-⊑; _⊑[_/_]_; Bound; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; pooled-alike; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; tw-alike)
   open ShiftWalk R using (let-go; grip)
   open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined)
   open FramingRepool R using (Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
@@ -192,10 +192,10 @@ module ClimbLanesQueue (R : Set) where
     ... | just _  = refl
     ... | nothing = ⊥-elim (true≢false (trans (sym j) (cong is-just (Gone.gone-part (dq-gone fr nq) here e))))
 
-    dq-heading : AllPairs _≢_ (names w₀) → ∀ {y ys′} → At.val H (FlatKit.Flat.queue fl) ≡ y ∷ ys′ → ∀ {q} → Heading H H′ q w₀ w₀
+    dq-heading : AllPairs _≢_ (names w₀) → ∀ {y ys′} → At.val H (FlatKit.Flat.queue fl) ≡ y ∷ ys′ → ∀ {q E} → Heading H H′ q E w₀ w₀
     dq-heading fr nq {q} = record
       { head-revive = dq-revive fr nq
-      ; head-told   = λ i e₀ e′ → ⊆-⊑ λ m →
+      ; head-told   = λ i _ e₀ e′ → ⊆-⊑ λ m →
           ≡-⊆ (cong (untold i) (merged-eq H op G (At.part H t) (At.partLanes H ls) (At.val H (FlatKit.Flat.queue fl)) pl e₀))
             (≡-⊆ (cong₂ (λ o L → untoldᴹ i o ++ untoldᴸ i L ++ untold i pl) (dq-part fr) (dq-lanes fr))
               (≡-⊆ (cong (untold i) (sym (merged-eq H′ op G (At.part H′ t) (At.partLanes H′ ls) (At.val H′ (FlatKit.Flat.queue fl)) pl e′))) m))
@@ -450,16 +450,17 @@ module ClimbLanesQueue (R : Set) where
     fs  = Books.fresh (Calling.books cl)
     fr  = fresh-path ρ fs
 
-    -- The ended lane's rest tells its joiners past `q` wherever the
-    -- flatMap's part does.  The freed lane is in no part; `l` is tied only
+    -- The ended lane's rest tells its joiners past `q` at a bound binder's
+    -- end wherever the flatMap's part does.  The freed lane is in no part; `l` is tied only
     -- by `ll`.
     --
     -- DEAD ROUTE: `l`'s joiners as a sublist of the part's: a connect in the lane whose body ended with its source still pending leaves that source's joiner in `l`'s rest and in no part
+    -- DEAD ROUTE: at every end `c`: a connect still live keeps its running source in the rest, holding a joiner older than any the part holds, which tells past `q` at no end between it and `q`
     postulate
-      settle-rest-told : ∀ {A′} (i : A′ ∈ᴸ Δ) {b₀} → At.part H₂ w₀ ≡ just b₀ → untold i l ⊑[ q ] untold i b₀
+      settle-rest-told : ∀ {A′} (i : A′ ∈ᴸ Δ) {c} → Bound H ρ i c → ∀ {b₀} → At.part H₂ w₀ ≡ just b₀ → untold i l ⊑[ q / c ] untold i b₀
 
-    settle-told : ∀ {A′} (i : A′ ∈ᴸ Δ) {b₀} → At.part H₂ w₀ ≡ just b₀ → untold i pl′ ⊑[ q ] untold i b₀
-    settle-told i e = rest-pool-⊑ H₂ op (λ a j → U.subscribe (f a) j) (At.part H₂ t) (At.partLanes H₂ ls) (At.val H₂ (FlatKit.Flat.queue fl)) pl l i e (settle-rest-told i e)
+    settle-told : ∀ {A′} (i : A′ ∈ᴸ Δ) {c} → Bound H ρ i c → ∀ {b₀} → At.part H₂ w₀ ≡ just b₀ → untold i pl′ ⊑[ q / c ] untold i b₀
+    settle-told i b e = rest-pool-⊑ H₂ op (λ a j → U.subscribe (f a) j) (At.part H₂ t) (At.partLanes H₂ ls) (At.val H₂ (FlatKit.Flat.queue fl)) pl l i e (settle-rest-told i b e)
 
     settle-lingering : Lingering H H₂ w₀ v
     settle-lingering = Freed.fr-settled H ρ o fr l (lane-lefts o LL ll) (lane-live o LL)
@@ -472,14 +473,14 @@ module ClimbLanesQueue (R : Set) where
     next-lingering : ∀ ys {y ys′} → At.val H₂ (FlatKit.Flat.queue fl) ≡ y ∷ ys′ → Lingering H (Dequeued.H′ H₂ ρ ys) w₀ v
     next-lingering ys nq = lingering-∘ settle-lingering (Dequeued.dq-lingering H₂ (planted ρ v) ys fr nq)
 
-    settle-heading : Heading H H₂ q w₀ v
-    settle-heading = heading-∘ (Freed.fr-heading H ρ o fr) (Restaged.repool-heading H₂ ρ pl′ (λ {A′} i {b₀} → settle-told {A′} i {b₀}) settle-heads)
+    settle-heading : Heading H H₂ q (Bound H ρ) w₀ v
+    settle-heading = heading-∘ (Freed.fr-heading H ρ o fr) (Restaged.repool-heading H₂ ρ pl′ (λ {A′} i {c} b {b₀} → settle-told {A′} i {c} b {b₀}) settle-heads)
 
     settle-lingers : Lingers H₂ (Restaged.T′ H₂ ρ pl′)
     settle-lingers = Freed.Sh.shift-lingers H ρ o fs v (ended-past cl) settle-lingering (Calling.lingers cl)
 
     -- The queue's head taken off needs it there to take.
-    next-heading : ∀ ys {y ys′} → At.val H₂ (FlatKit.Flat.queue fl) ≡ y ∷ ys′ → Heading H (Dequeued.H′ H₂ ρ ys) q w₀ w₀
+    next-heading : ∀ ys {y ys′} → At.val H₂ (FlatKit.Flat.queue fl) ≡ y ∷ ys′ → ∀ {E} → Heading H (Dequeued.H′ H₂ ρ ys) q E w₀ w₀
     next-heading ys nq = heading-∘ (Freed.fr-heading H ρ o fr) (Dequeued.dq-heading H₂ ρ ys fr nq)
 
     next-lingers : ∀ ys {y ys′} → At.val H₂ (FlatKit.Flat.queue fl) ≡ y ∷ ys′ → Lingers (Dequeued.H′ H₂ ρ ys) (Restaged.T′ (Dequeued.H′ H₂ ρ ys) ρ pl′)
