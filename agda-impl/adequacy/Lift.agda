@@ -52,7 +52,7 @@ open import adequacy.Taken using (module Taking)
 open import adequacy.Connected using (module Connecting)
 open import adequacy.Flatted using (module Flatting)
 open import adequacy.Replant using (module Replanting)
-open import adequacy.Frame using (module Framing)
+open import adequacy.Told using (untold)
 open import adequacy.Frame.Repool using (module FramingRepool)
 open import adequacy.Shift using (module Shifting)
 open Events∞
@@ -67,7 +67,7 @@ module Lifting (R : Set) where
   open Run (Pureᴾ R) using (Act; module Kit; module FlatKit)
   open Strongly R using (Sub; pendingˢ; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; Lane; lane; here; module At; fired; waiting; Path; emitC; kontC; Leaf; feedC; srcC; taking; taken; feeding; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _≗_; rootObs; ⊕-here) renaming (ending to endingᵗ; ⟦_⟧ to ⟦_⟧ᶜ)
   open StrongAgainst R using (Books; Queue; Kernels; Meaning; Owned; Each; Lingers; pinned-skip; seen; seenL; owned-to)
-  open StrongHeld R using (Strong; Carried; carried; Heads; DoneBy; Meets; module Eaching; module Lingering)
+  open StrongHeld R using (Strong; Carried; carried; Heads; DoneBy; Meets; module Eaching; module Lingering; Untold; Ended)
   open StrongAgainst.Against R using (CtlAs; calmAs; noteAs; runAs; subAs; burstAs; bursts; agenda) renaming (Placed to Placedᴬ)
   open Moving R using (plant; true≢false)
   open Tearing R using (Site; takeSite; bodySite; siteCall; siteHeap; torn-take-part; torn-body-part; torn-take-each; torn-body-each; torn-take-lingers; torn-body-lingers; torn-take-flags)
@@ -80,8 +80,7 @@ module Lifting (R : Set) where
   open Staging R using (Offers; of-restage; empty-restage; map-restage; Restages)
   open Scanning R using (scan-restage)
   open Replanting R using (module Shift; Heading; Lingering)
-  open Framing R using (untold)
-  open FramingRepool R using (Untold; Ended)
+  open FramingRepool R using ()
   open Shifting R using (tw-alike; ⊆-⊑; Pred)
   open Taking R using (take-restage)
   open Connecting R using (connect-restage)
@@ -132,8 +131,8 @@ module Lifting (R : Set) where
     -- beside an `e`), or a joiner not yet subscribed (a pending
     -- `connected`, its end told where it would subscribe).  The first
     -- must not exist, the second must end past the body's first event.
-    -- `turn-told` bounds every told end below by the run's position, not
-    -- strictly by the body's head.
+    -- `Carried.told` bounds every told end below by the run's position,
+    -- not strictly by the body's head.
     shut-late : ∀ {g m} (cr : Carried g m) {Δ A B Sj c b kb k fd rp e rt} {src : Sub (Conf.world (Mach.conf m)) Δ A}
                 {bd : Sub (Conf.world (Mach.conf m)) (A ∷ Δ) B} (ρ : Path (Carried.tree cr) (connectˢ Sj c b kb k fd rp e rt src bd))
                 {Δ′ A′ p i x xs} (π : Path bd (ofˢ {Δ = Δ′} {A′} p i (x ∷ xs)))
@@ -151,14 +150,6 @@ module Lifting (R : Set) where
                 → ∀ {Δ′ A′} {v : Sub (Conf.world (Mach.conf m)) Δ′ A′} (ψ : Path (Carried.tree cr) v) (τ : Path v (ofˢ {Δ = Δ} {A} p i (x ∷ xs))) → ψ ⊕ τ ≡ π
                 → seen (Conf.heap (Mach.conf m)) ψ ≡ true
                 → is-just (At.part (Conf.heap (Mach.conf m)) v) ≡ true → Clear (Conf.heap (Mach.conf m)) (Off p) ψ
-
-    -- At a re-entry state, every joiner a held connect past its source's
-    -- end holds is told no sooner than where the run is.
-    turn-told : ∀ {g m} (cr : Carried g m) → Untold (Conf.heap (Mach.conf m)) (Conf.pos (Mach.conf m)) (Carried.tree cr)
-
-    -- At a re-entry state, every connect held past its source's end
-    -- holds no source.
-    turn-ended : ∀ {g m} (cr : Carried g m) → Ended (Conf.heap (Mach.conf m)) (Carried.tree cr)
 
     -- A subscription's continuation handed its unsubscribe, which it
     -- stashes: the ghost alike, a call fewer.
@@ -462,15 +453,24 @@ module Lifting (R : Set) where
                 (π : Path (Carried.tree cr) (coldˢ {Δ = Δ} {A} sk hd (waiting {u = v} τ e (at u x fr))))
               → Each (Conf.heap (Mach.conf m)) (Heads (Conf.pos (Mach.conf m))) (plant π (coldˢ sk hd (fired τ e (at u x fr))))
   behind-fire {m = m} cr π =
-    Shift.shift-behind H H π (λ _ _ → refl) [] (Books.fresh (Carried.books cr)) _ (turn-told cr) (turn-ended cr) (fire-heading H) (Carried.behind cr)
+    Shift.shift-behind H H π (λ _ _ → refl) [] (Books.fresh (Carried.books cr)) _ (Carried.told cr) (Carried.ended cr) (fire-heading H) (Carried.behind cr)
     where H = Conf.heap (Mach.conf m)
+
+  -- The untold and ended invariants survive the fire step.
+  postulate
+    fire-told : ∀ {g m} (cr : Carried g m) {Δ A τ e v u x sk hd fr}
+                (π : Path (Carried.tree cr) (coldˢ {Δ = Δ} {A} sk hd (waiting {u = v} τ e (at u x fr))))
+              → Untold (Conf.heap (Mach.conf m)) (Conf.pos (Mach.conf m)) (plant π (coldˢ sk hd (fired τ e (at u x fr))))
+    fire-ended : ∀ {g m} (cr : Carried g m) {Δ A τ e v u x sk hd fr}
+                 (π : Path (Carried.tree cr) (coldˢ {Δ = Δ} {A} sk hd (waiting {u = v} τ e (at u x fr))))
+               → Ended (Conf.heap (Mach.conf m)) (plant π (coldˢ sk hd (fired τ e (at u x fr))))
 
   -- A timer fired leaves every tie held: a cold runs nothing past its end.
   fire-lingers : ∀ {g m} (cr : Carried g m) {Δ A τ e v u x sk hd fr}
                  (π : Path (Carried.tree cr) (coldˢ {Δ = Δ} {A} sk hd (waiting {u = v} τ e (at u x fr))))
                → Lingers (Conf.heap (Mach.conf m)) (plant π (coldˢ sk hd (fired τ e (at u x fr))))
   fire-lingers {m = m} cr π =
-    Shift.shift-lingers H H π (λ _ _ → refl) [] (Books.fresh (Carried.books cr)) _ (turn-ended cr) (fire-lingering H) (Carried.lingers cr)
+    Shift.shift-lingers H H π (λ _ _ → refl) [] (Books.fresh (Carried.books cr)) _ (Carried.ended cr) (fire-lingering H) (Carried.lingers cr)
     where H = Conf.heap (Mach.conf m)
 
   -- Every part the ghost holds still heads no earlier than the run:
@@ -490,6 +490,15 @@ module Lifting (R : Set) where
   torn-lingers cr (takeSite π) _ = torn-take-lingers _ π (Books.fresh (Carried.books cr)) (Carried.lingers cr)
   torn-lingers {m = mach ⟨ _ , _ , _ ⟩ _ _ _ _ _ _ _} cr@record { ctlAs = runAs (_ ∷ _) _ _ } (bodySite π) refl =
     torn-body-lingers _ π (Books.fresh (Carried.books cr)) (Owned.bodies (Carried.owned cr) π (here refl)) (Carried.lingers cr)
+
+  -- The untold and ended invariants survive the teardown step.
+  postulate
+    torn-told : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
+              → firstCall (Carried.ctlAs cr) ≡ just (siteCall z)
+              → Untold (siteHeap (Conf.heap (Mach.conf m)) z) (Conf.pos (Mach.conf m)) (Carried.tree cr)
+    torn-ended : ∀ {g m} (cr : Carried g m) (z : Site (Carried.tree cr))
+               → firstCall (Carried.ctlAs cr) ≡ just (siteCall z)
+               → Ended (siteHeap (Conf.heap (Mach.conf m)) z) (Carried.tree cr)
 
   -- And every flag reads its outer: below the site nothing is seen that
   -- was not seen before.
@@ -516,7 +525,7 @@ module Lifting (R : Set) where
         ; queue = torn-queue cr z
         ; books = record { fresh = Books.fresh (Carried.books cr) ; clocked = Books.clocked (Carried.books cr)
                          ; paidUp = Books.paidUp (Carried.books cr) ; running = Books.running (Carried.books cr) }
-        ; sorted = hop-sorted cr eq path ; behind′ = Eaching.each-to _ _ (torn-behind cr z refl) ; lingers′ = Lingering.lingers-to _ (torn-lingers cr z refl) ; flags = torn-flags cr z refl })
+        ; sorted = hop-sorted cr eq path ; behind′ = Eaching.each-to _ _ (torn-behind cr z refl) ; told = torn-told cr z refl ; ended = torn-ended cr z refl ; lingers′ = Lingering.lingers-to _ (torn-lingers cr z refl) ; flags = torn-flags cr z refl })
     , lowered (λ n → agree-refl n _) (inj₂ (refl , ≤-refl))
 
   ----------------------------------------------------------------------

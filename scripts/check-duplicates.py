@@ -131,6 +131,18 @@ DELIBERATE = {
     frozenset(("eqExp", "eqTm")):
         "decidable equality on two different sorts, `Exp` and `Tm`; the "
         "sort lives in an annotated binder the normaliser erases.",
+    # NOT TWO PROOFS OF ONE FACT — the same structural schema applied to
+    # two DIFFERENT heap transitions.  `sd-ended` is in the `Settles`
+    # module of Flat.agda where H→H′ is a single flag write
+    # (`store H (FlatKit.Flat.outerDone fl) (lift true)`).  `fr-ended`
+    # is in the `Freed` module of Lanes.agda where H→H′ is the `freed`
+    # double-write (`freed H (laneOf o) fl`).  Both modules bind their
+    # heap parameters H and H′ locally, so the normalised type texts
+    # coincide even though the transitions differ.
+    frozenset(("sd-ended", "fr-ended")):
+        "same `Ends` schema, different heap transitions: sd-ended is a "
+        "single flag write (Settles/Flat), fr-ended is the freed "
+        "double-write (Freed/Lanes); H and H′ are module-local.",
 }
 
 KEYWORDS = {"module", "open", "import", "postulate", "mutual", "opaque",

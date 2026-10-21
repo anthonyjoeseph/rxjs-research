@@ -34,6 +34,7 @@ open import adequacy.Moves using (module Moving)
 open import adequacy.Local using (module Locality)
 open import adequacy.Ghost.Paths using (module GhostingPaths)
 open import adequacy.Frame using (module Framing)
+open import adequacy.Told using (Tells; untold; untoldᴹ; untoldᴸ)
 open import adequacy.Frame.Repool using (module FramingRepool)
 open import adequacy.Kept using (module Keeping)
 open import adequacy.Retag using (Retag; module Retagging) renaming (keep to keepᴿ)
@@ -46,13 +47,13 @@ module Shifting (R : Set) where
   open Shared Timeline (Out R) using (Heapᴹ; look)
   open Strongly R using (Sub; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_; pendingˢ; coldˢ; ofˢ; doneˢ; joinˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; lane; Taking; taking; ending; taken; names; laneNames; cutNames; quietName; subjectNames; flatNames; module At; Name; outers; outersL; Feed)
   open StrongAgainst R using (isTaking; seen; seenL; seen-join; seen-up; Each; Leaves; Twin; tw-refl; tw-if; tw-union; tw-under; lv-tie; tw-tie; Restful; Lingers; Pinned; unpinned; rest-pinned; bursts-pinned; bursts-moved; under-moved; union-pinned; pinned-trans; pinned-sym; restful-pinned; ∧-split; ∧-join; false≢)
-  open StrongHeld R using (DoneBy; Flagged; Heads)
+  open StrongHeld R using (DoneBy; Flagged; Heads; Untold; Ended)
   open Tearing R using (Alike; Off; part-alike; partLanes-alike; seen-alike; seenL-alike; names-path; lanes-path; apart-r; apart-l; narrow; each-same)
   open Moving R using (plant; plantᴸ; planted; plantedᴸ; pairs-r; pairs-split)
   open Locality R using (module Heaps)
   open GhostingPaths R using (each-sub; each-lanes)
-  open Framing R using (Tells; untold; untoldᴹ; untoldᴸ; heads-map; heads-scan; heads-take; heads-source; shut-heads; just-of; untold-shut; merged-eq; heads-flat)
-  open FramingRepool R using (Untold; Ended; ended-head)
+  open Framing R using (heads-map; heads-scan; heads-take; heads-source; shut-heads; just-of; untold-shut; merged-eq; heads-flat)
+  open FramingRepool R using (ended-head)
   open Keeping R using (leftover-restful)
   open Retagging R using (retag; retagᴸ)
 
@@ -326,6 +327,14 @@ module Shifting (R : Set) where
 
     each-alike : ∀ {P : ∀ {Γ A} → U.Node Γ A → Set} {Δ A} {t : Sub h Δ A} → Alike H H′ (names t) → Each H P t → Each H′ P t
     each-alike al ev = each-same H H′ (λ ψ → seen-alike H H′ ψ al) (λ ψ → part-at ψ al) ev
+
+    told-alike : ∀ {q Δ A} {t : Sub h Δ A} → Alike H H′ (names t) → Untold H q t → Untold H′ q t
+    told-alike al ut ψ sn ps pb =
+      ut ψ (trans (sym (seen-alike H H′ ψ al)) sn) (trans (sym (part-at (ψ ⊕ in-source here) al)) ps) (trans (sym (part-at (ψ ⊕ in-body here) al)) pb)
+
+    ended-alike : ∀ {Δ A} {t : Sub h Δ A} → Alike H H′ (names t) → Ended H t → Ended H′ t
+    ended-alike al en ψ sn pc e =
+      trans (part-at (ψ ⊕ in-source here) al) (en ψ (trans (sym (seen-alike H H′ ψ al)) sn) (trans (sym (part-at ψ al)) pc) e)
 
     eachL-alike : ∀ {P : ∀ {Γ A} → U.Node Γ A → Set} {Δ B} {ls : List (Lane h Δ B)} → Alike H H′ (laneNames ls) → EachL H P ls → EachL H′ P ls
     eachL-alike {ls = ls} al eL = record

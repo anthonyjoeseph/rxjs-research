@@ -83,7 +83,7 @@ module ClimbFlatPlant (R : Set) where
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
   open Strongly R using (Feed; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; joiner; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; here; module At; fired; Path; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; ending; taken; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; outers; outersL; outers-⊕; unsub; Owes; Settled; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open StrongAgainst R using (Leaves; Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
-  open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering)
+  open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering; Untold) renaming (Ended to Ends)
   open StrongAgainst.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf; src-of) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
   open Moving R using (pairs-r; pairs-split; plant-self; takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
@@ -110,8 +110,8 @@ module ClimbFlatPlant (R : Set) where
   open Keeping R using (seen-planted)
   open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag)
   open ShiftWalk R using (let-go; grip)
-  open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined)
-  open FramingRepool R using (heads-repool; Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
+  open Framing R using (merged-eq; heads-flat; just-of; scan-part; scan-defined)
+  open FramingRepool R using (heads-repool; none-of; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off)
   open FramingLefts R using (on-end; lefts-at; lefts-at₂; leftsL-at)
   open Staging R using (not-src; wrap-lane)
   open Weakening R using (Grows; pure-map) renaming (module Grown to Weakened)
@@ -328,6 +328,8 @@ module ClimbFlatPlant (R : Set) where
       sorted  : Σ Pos λ lo → WellMach lo m
       behind  : Each (Conf.heap (Mach.conf m)) (Heads (Conf.pos (Mach.conf m))) T
       lingers : Lingers (Conf.heap (Mach.conf m)) (Restaged.T′ (Conf.heap (Mach.conf m)) ρ pl′)
+      told    : Untold (Conf.heap (Mach.conf m)) (Conf.pos (Mach.conf m)) T
+      ended   : Ends (Conf.heap (Mach.conf m)) (Restaged.T′ (Conf.heap (Mach.conf m)) ρ pl′)
       lefts   : Lefts (Conf.heap (Mach.conf m)) (proj₁ (proj₂ lifted))
       -- The flags as the lane, still pending, will read them; and the
       -- flatMap's own.
@@ -596,6 +598,12 @@ module ClimbFlatPlant (R : Set) where
     bg-lingers : Lingers H (Restaged.T′ H ρ pl′) → Lingers heap′ T′
     bg-lingers lg = bg-lingered (Wk′.grow-lingers grows lg)
 
+    postulate
+      -- Every joiner a held connect past its source's end has not told
+      -- its end is told no sooner than the lane's begin.
+      bg-told  : Untold H q T → Ends H (Restaged.T′ H ρ pl′) → Untold heap′ (q ++ [ ix 1 ]) T′
+      -- Every connect held past its source's end still holds no source.
+      bg-ended : Ends H (Restaged.T′ H ρ pl′) → Ends heap′ T′
 
     -- The flatMap before the start, in the grown world.
     u₀ : Sub v Δ B
@@ -812,7 +820,8 @@ module ClimbFlatPlant (R : Set) where
       ; books = record { fresh = Begun.bg-fresh sr pl′ fs
                        ; clocked = trans (proj₁ ck) (sym (tick-under q 1 (Started.deep sr))) , proj₁ ck , Begun.bg-ticked sr pl′ sk (proj₂ ck)
                        ; paidUp = trans (Started.todo′ sr) (cong (mapList (wkTodo (Started.grow sr))) pu) ; running = rn }
-      ; sorted = sorted-⇝ so (Started.runs sr) ; behind′ = Eaching.each-to _ _ (Begun.bg-behind sr pl′ bh) ; lingers′ = Lingering.lingers-to _ (Begun.bg-lingers sr pl′ lgr) ; flags = Begun.bg-flags sr pl′ fs L dF dI })
+      ; sorted = sorted-⇝ so (Started.runs sr) ; behind′ = Eaching.each-to _ _ (Begun.bg-behind sr pl′ bh) ; lingers′ = Lingering.lingers-to _ (Begun.bg-lingers sr pl′ lgr) ; flags = Begun.bg-flags sr pl′ fs L dF dI
+      ; told = Begun.bg-told sr pl′ (Begins.told b) (Begins.ended b) ; ended = Begun.bg-ended sr pl′ (Begins.ended b) })
     , passed ag pp
 
   -- An admitted value with room: its lane begun where the value is, the
@@ -834,7 +843,8 @@ module ClimbFlatPlant (R : Set) where
       ; lefts = lefts-subst skp (sym pv) (lefts-subst (λ s′ → s′) adm (lefts-up ρ (in-outer here) eqO lt))
       ; owned = ow ; kernels = kn ; meaning = mn ; queue = qu
       ; books = record { fresh = fs ; clocked = ck ; paidUp = pu ; running = rn }
-      ; sorted = sorted-⇝ so p ; behind = bh ; lingers = Restaged.pool-idle hp ρ (U.unionᶜ po U.idleᶜ) fs refl (ended-past cl) lgr ; flags = flags-swap hp ρ (pendingˢ (f y) (q ++ [ ix 1 ])) (sym (cong (λ o′ → is-just (At.merged hp op G o′ LS QS po)) pv)) (pending-flags hp) d₀
+      ; sorted = sorted-⇝ so p ; behind = bh ; lingers = Restaged.pool-idle hp ρ (U.unionᶜ po U.idleᶜ) fs refl (Calling.ended cl) lgr
+      ; told = Calling.told cl ; ended = Restaged.pool-ended hp ρ (U.unionᶜ po U.idleᶜ) fs refl (Calling.ended cl) ; flags = flags-swap hp ρ (pendingˢ (f y) (q ++ [ ix 1 ])) (sym (cong (λ o′ → is-just (At.merged hp op G o′ LS QS po)) pv)) (pending-flags hp) d₀
       ; inner = Flag.db-sub hp d₀ ρ (lifts-seen Lρ) })
     where
       G  = λ a j → U.subscribe (f a) j

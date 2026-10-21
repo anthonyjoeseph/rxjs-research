@@ -52,7 +52,7 @@ module GhostingPaths (R : Set) where
   open Run (Pureᴾ R) using (Act; Observer; _>>ᴬ_; Subject; module Kit; module FlatKit)
   open Strongly R using (Sub; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; lane; here; module At; Path; done≗; Call; taking; PathLanes; this-lane; next-lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; outers; outers-⊕; ≗-refl) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open StrongAgainst R using (Books; Queue; Kernels; Meaning; Owned; Each; Lingers; seen; seenL; isTaking; seen-up; seen-join; ∧-split; ∧-join)
-  open StrongHeld R using (Strong; strong-begin; Carried; carried; closing; Heads; DoneBy)
+  open StrongHeld R using (Strong; strong-begin; Carried; carried; closing; Heads; DoneBy; Untold; Ended)
   open StrongAgainst.Against R using (calmAs; noteAs; runAs; subAs; burstAs; bottomAs; restAs; backAs; reholdAs; StackAs; CtlAs; agenda; bursts; begins) renaming (Placed to Placedᴬ)
   open Pure R using (End; finished; dry; cutOff)
   open Moving R using (pend; takes)
@@ -579,6 +579,8 @@ module GhostingPaths (R : Set) where
       sorted  : Σ Pos λ lo → WellMach lo m₁
       behind  : Each (Conf.heap (Mach.conf m₁)) (Heads (Conf.pos (Mach.conf m₁))) T
       lingers : Lingers (Conf.heap (Mach.conf m₁)) T
+      told    : Untold (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) T
+      ended   : Ended (Conf.heap (Mach.conf m₁)) T
       flags   : DoneBy (Conf.heap (Mach.conf m₁)) T (outers σ)
       kept    : load m₁ T ≼ ℓ
 
@@ -602,7 +604,7 @@ module GhostingPaths (R : Set) where
     ; owned = subst (λ ks → Owned (Conf.heap (Mach.conf m₁)) T (runAs ks (≗-refl _) (Calling.stack cl))) (sym ow) (Calling.owned cl)
     ; kernels = Calling.kernels cl ; meaning = Calling.meaning cl ; queue = Calling.queue cl
     ; books = subst (λ ks → Books T (runAs ks (≗-refl _) (Calling.stack cl)) m₁) (sym ow) (Calling.books cl)
-    ; sorted = Calling.sorted cl ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; flags = dn ; kept = Calling.kept cl }
+    ; sorted = Calling.sorted cl ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl ; flags = dn ; kept = Calling.kept cl }
 
   -- The same call, held to a load no lighter.
   relevel : ∀ {g ℓ ℓ′ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v} {sg : Signal T A}
@@ -610,7 +612,7 @@ module GhostingPaths (R : Set) where
   relevel cl le = record
     { sane = Calling.sane cl ; placed = Calling.placed cl ; deep = Calling.deep cl ; ctl = Calling.ctl cl ; code = Calling.code cl ; stack = Calling.stack cl
     ; lifted = Calling.lifted cl ; lefts = Calling.lefts cl ; rest-heads = Calling.rest-heads cl ; owned = Calling.owned cl ; kernels = Calling.kernels cl ; meaning = Calling.meaning cl
-    ; queue = Calling.queue cl ; books = Calling.books cl ; sorted = Calling.sorted cl ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; flags = Calling.flags cl
+    ; queue = Calling.queue cl ; books = Calling.books cl ; sorted = Calling.sorted cl ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl ; flags = Calling.flags cl
     ; kept = ≼-trans (Calling.kept cl) le }
 
   -- A signal one operator higher, the path shorter, the load at most `ℓ`.
@@ -647,6 +649,10 @@ module GhostingPaths (R : Set) where
     { parts = λ ψ sψ {c} e → heads-back {c = c} qp (Each.parts ev ψ sψ e)
     ; pools = λ {pl = pl} ψ sψ e → heads-back {c = pl} qp (Each.pools ev ψ sψ e)
     ; rests = λ {rt = rt} ψ sψ e n j → heads-back {c = rt} qp (Each.rests ev ψ sψ e n j) }
+
+  -- A step back in position weakens the untold bound.
+  postulate
+    back-told : ∀ {h} {H : Heapᴹ h} {t : Sub h [] R} {q p} → q <ᵖ p ≡ true → Untold H p t → Untold H q t
 
   hopped-pre : ∀ {g m m′ m₁} {st : Strong g m} → m′ ⇝ m₁ → Hopped st m₁ → Hopped st m′
   hopped-pre path (g″ , m₀ , path′ , st₀ , gn) = g″ , m₀ , ⇝-trans path path′ , st₀ , gn
