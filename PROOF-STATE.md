@@ -8,16 +8,25 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE FED LEFTOVER
+
+Suspect fact: a retag keeps the body's leftover. A nested connect whose source
+holds a joiner of the fed one reads that joiner's part, so its burst and pins
+move. Settled by a witness, then restating what `Refed`'s lingering owes as
+the fed rest, or by `re-leftover` as a body.
+
+Members: `re-leftover`.
+
 #### THE REST'S TIES
 
-An ended part's rest stays twinned with what the heap keeps. Open: whether a
-settle, a close, a next and a retag keep the parts' heads, untold sources and
-leftover, read off the old part alone. Settled when `next-lingering` and
-`settle-heads` are bodies, or refuted and the twin restated.
+An ended part's rest stays twinned with what the heap keeps. Open: whether
+what a closed sub leaves running heads past the run, as hidden runs may not,
+and whether a pool's untold sources follow, though `Lifts` leaves the closed
+node free and only its rest is tied. Settled when
+`closed-rest-heads` and `settle-told` are bodies, or one is refuted.
 
-Members: `rest-sourced`, `close-heads`, `close-told`, `settle-heads`,
-`settle-told`, `next-heads`, `next-lingering`, `take-leftover`,
-`body-leftover`, `re-leftover`.
+Members: `closed-rest-heads`, `rest-sourced`, `close-told`, `settle-told`,
+`take-leftover`, `body-leftover`.
 
 #### JOIN ORDER
 
