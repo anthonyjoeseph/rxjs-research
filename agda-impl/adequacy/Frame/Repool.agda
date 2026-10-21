@@ -41,6 +41,7 @@ open import adequacy.Local using (module Locality)
 open import adequacy.Every using (module Everywhere)
 open import adequacy.Every.Gating using (module EverywhereGated)
 open import adequacy.Frame using (module Framing)
+open import adequacy.Told using (Tells; untold; untoldᴸ; untoldᴹ)
 open Events∞
 
 module FramingRepool (R : Set) where
@@ -50,7 +51,7 @@ module FramingRepool (R : Set) where
   open Heap using (_∋_; cell; slot) renaming (same to same⊑)
   open Strongly R using (Sub; scanˢ; here; module At; Path; in-scan; in-source; _⊕_; names; mapˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; lane; PathLanes; this-lane; next-lane; _⊕ᴸ_; in-map; in-take; in-outer; in-lanes; in-body; in-defer; Taking; taking; taken; cutNames; quietName; subjectNames; flatNames; laneNames; Name; pendings; subjects; joiners) renaming (ending to endingᵀ)
   open StrongAgainst R using (Queue; Kernels; Meaning; Each; seen; Books; seenL; seen-join)
-  open StrongHeld R using (Strong; Heads)
+  open StrongHeld R using (Strong; Heads; Untold; Ended)
   open Tearing R using (holds-at; Alike; Off; part-alike; partLanes-alike; lanes-path; module Seeing; look-store; get-put-same; fresh-path; names-path; apart-r; apart-l; ≢-flip)
   open Moving R using (pairs-r; pairs-split; plant; pendings-plant; subjects-plant; joiners-plant; head-map; head-scan)
   open Locality R using (module Heaps)
@@ -60,7 +61,7 @@ module FramingRepool (R : Set) where
   open Ghosting R using (Lifts; LiftsLane; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-outer; lifts-lanes; lifts-source; lifts-body; lifts-shut; lifts-defer; lifts-this; lifts-next; OuterFirst; PoolBehind; LaneFirst)
   open GhostingPaths R using (each-lanes; module Calling; Calling; sends; opened; openedL)
   open Read
-  open Framing R using (HeadsS; Tells; child-skip; heads-flat; heads-map; heads-rescan; heads-scan; heads-source; heads-take; if-head; just-of; laneˢ-heads; merged-eq; outerˢ-heads; race-heads; scan-defined; scan-sees; shut-heads; shut-heads-step; store-alike; untold; untold-shut; untoldᴸ; untoldᴹ)
+  open Framing R using (HeadsS; child-skip; heads-flat; heads-map; heads-rescan; heads-scan; heads-source; heads-take; if-head; just-of; laneˢ-heads; merged-eq; outerˢ-heads; race-heads; scan-defined; scan-sees; shut-heads; shut-heads-step; store-alike; untold-shut)
 
   -- A FLATMAP REPOOLED: its merge heads where it did whatever its pool,
   -- and a pool skip ahead of the merge leads it.
@@ -183,19 +184,6 @@ module FramingRepool (R : Set) where
   ended-head r c b t (U.outˢ _ _ _) hb ht = shut-heads-step r c t (U.step b) hb
   ended-head r c b t (U.endˢ _)     hb ht = shut-heads-step r c t (U.step b) hb
   ended-head r c b t U.hushˢ        hb ht = shut-heads-step r c t (U.step b) hb
-
-  -- What a connect past its source's end has not told its body's
-  -- joiners, it tells no sooner than `q`.
-  Untold : ∀ {h} (H : Heapᴹ h) (q : Pos) {Δ A} (t : Sub h Δ A) → Set₁
-  Untold {h} H q t = ∀ {Δ′ A′ B′} {S c b kb k fd rp c₀ rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
-                   → (ψ : Path t (connectˢ S c b kb k fd rp (just c₀) rt src bd)) → seen H ψ ≡ true → At.part H src ≡ nothing
-                   → ∀ {b₀} → At.part H bd ≡ just b₀ → Tells q c₀ (untold (here refl) b₀)
-
-  -- A connect still held past its source's end holds no source.
-  Ended : ∀ {h} (H : Heapᴹ h) {Δ A} (t : Sub h Δ A) → Set₁
-  Ended {h} H t = ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
-                → (ψ : Path t (connectˢ S c b kb k fd rp e rt src bd)) → seen H ψ ≡ true
-                → ∀ {n} → At.part H (connectˢ S c b kb k fd rp e rt src bd) ≡ just n → ∀ {c₀} → e ≡ just c₀ → At.part H src ≡ nothing
 
   -- THE PARTS ABOVE A WRITTEN SCAN, walked down to it: a map's, a scan's
   -- and a defer's head is their child's; a take's, a flatMap's and a
@@ -531,17 +519,6 @@ module FramingRepool (R : Set) where
       aboveL ψ κ (this-lane π)  = up-lanes ψ (κ (here refl)) π (above (ψ ⊕ in-lanes (via (κ (here refl)))) π)
       aboveL ψ κ (next-lane πL) = aboveL ψ (λ m → κ (there m)) πL
 
-  -- A call under way: what the ghost has not told a shut body's
-  -- joiners, it tells no sooner than where the run is.
-  postulate
-    tells-past : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v} {sg}
-               → Calling g ℓ m₁ σ sg → Untold (Conf.heap (Mach.conf m₁)) (Conf.pos (Mach.conf m₁)) T
-
-    -- A call under way: every connect the ghost holds past its source's
-    -- end holds no source.
-    ended-past : ∀ {g ℓ m₁ Δ A} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {v : Sub (Conf.world (Mach.conf m₁)) Δ A} {σ : Path T v} {sg}
-               → Calling g ℓ m₁ σ sg → Ended (Conf.heap (Mach.conf m₁)) T
-
   -- The scan and every part above it still head no sooner than where
   -- the run is.
   scan-above : ∀ {g ℓ m₁ Δ A B} {T : Sub (Conf.world (Mach.conf m₁)) [] R} {f : B → A → B} {r} {u : Sub (Conf.world (Mach.conf m₁)) Δ A}
@@ -550,7 +527,7 @@ module FramingRepool (R : Set) where
              → ∀ {c} → At.part (store (Conf.heap (Mach.conf m₁)) r (lift (f (At.val (Conf.heap (Mach.conf m₁)) r) y))) x ≡ just c
              → Heads (Conf.pos (Mach.conf m₁)) c
   scan-above {m₁ = m₁} {f = f} {r} {u} ρ {y} cl =
-    Above.above H f r u (Books.fresh (Calling.books cl)) (f (At.val H r) y) (Conf.pos (Mach.conf m₁)) (Calling.behind cl) (tells-past cl)
+    Above.above H f r u (Books.fresh (Calling.books cl)) (f (At.val H r) y) (Conf.pos (Mach.conf m₁)) (Calling.behind cl) (Calling.told cl)
     where H = Conf.heap (Mach.conf m₁)
 
   none-of : ∀ {ℓ} {X : Set ℓ} {m : Maybe X} → is-just m ≡ false → m ≡ nothing

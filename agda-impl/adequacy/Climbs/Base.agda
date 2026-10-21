@@ -51,6 +51,7 @@ open import adequacy.Lift using (module Lifting)
 open import adequacy.Lift.Order using (module LiftingOrder)
 open import adequacy.Lowers using (module Lowering)
 open import adequacy.Frame using (module Framing)
+open import adequacy.Told using (untold; untoldᴹ; untoldᴸ)
 open import adequacy.Frame.Repool using (module FramingRepool)
 open import adequacy.Frame.Lefts using (module FramingLefts)
 open import adequacy.Grow using (module Growing)
@@ -80,7 +81,7 @@ module ClimbBase (R : Set) where
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
   open Strongly R using (Feed; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; joiner; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; here; module At; fired; Path; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; ending; taken; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; outers; outersL; outers-⊕; unsub; Owes; Settled; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open StrongAgainst R using (Pinned; pinned; unpinned; Leaves; Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
-  open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering)
+  open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering; Untold) renaming (Ended to Ends)
   open StrongAgainst.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf; src-of) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
   open Moving R using (pairs-r; pairs-split; plant-self; takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
@@ -107,8 +108,8 @@ module ClimbBase (R : Set) where
   open Keeping R using (seen-planted)
   open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; conn-left; sourced-heap; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag)
   open ShiftWalk R using (let-go; grip)
-  open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined)
-  open FramingRepool R using (Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
+  open Framing R using (merged-eq; heads-flat; just-of; scan-part; scan-defined)
+  open FramingRepool R using (none-of; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off)
   open FramingLefts R using (lefts-off; on-end; sourceless; NoSource; NoSourceL)
   open Staging R using (not-src; wrap-lane)
   open Weakening R using (Grows; pure-map) renaming (module Grown to Weakened)
@@ -168,7 +169,7 @@ module ClimbBase (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = t ; ctlAs = calmAs ; meets = mt
         ; owned′ = owned-to (owned-spent hp calmAs sp refl refl refl (Carried.owned cr)) ; kernels = kn ; meaning = mn ; queue = q
         ; books = record { fresh = fs ; clocked = tt ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr eq now ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; flags = Carried.flags cr })
+        ; sorted = hop-sorted cr eq now ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; told = Carried.told cr ; ended = Carried.ended cr ; flags = Carried.flags cr })
     , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (refl , inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))))
   burst-spent {g} {mach ⟨ hp , p , _ ⟩ clk ts _ _ lg en mk} {K = K} {b = b} {bs = bs} {σ = σ}
     cr@record { tree = t ; ctlAs = burstAs x restᴴ (restAs ks e K″) ; meets = mt ; kernels = kn ; meaning = mn ; queue = q
@@ -180,7 +181,7 @@ module ClimbBase (R : Set) where
         { sane = Carried.sane cr ; placed = Carried.placed cr ; deep = Carried.deep cr ; tree = t ; ctlAs = runAs ks e K″ ; meets = mt
         ; owned′ = owned-to (owned-spent hp (runAs ks e K″) sp refl refl refl (Carried.owned cr)) ; kernels = kn ; meaning = mn ; queue = q
         ; books = record { fresh = fs ; clocked = proj₂ ck ; paidUp = refl ; running = rn } 
-        ; sorted = hop-sorted cr eq now ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; flags = Carried.flags cr })
+        ; sorted = hop-sorted cr eq now ; behind′ = Carried.behind′ cr ; lingers′ = Carried.lingers′ cr ; told = Carried.told cr ; ended = Carried.ended cr ; flags = Carried.flags cr })
     , lowered (λ n → agree-refl n _) (inj₁ (inj₂ (refl , inj₂ (refl , inj₂ (refl , inj₁ ≤-refl)))))
 
   -- A burst's frame stepped: found spent, polled, or played.

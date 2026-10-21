@@ -54,6 +54,7 @@ open import adequacy.Lift using (module Lifting)
 open import adequacy.Lift.Order using (module LiftingOrder)
 open import adequacy.Lowers using (module Lowering)
 open import adequacy.Frame using (module Framing)
+open import adequacy.Told using (untold; untoldᴹ; untoldᴸ)
 open import adequacy.Frame.Repool using (module FramingRepool)
 open import adequacy.Grow using (module Growing)
 open import adequacy.Fork using (module Forking)
@@ -87,7 +88,7 @@ module ClimbConnect (R : Set) where
   open Run (Pureᴾ R) using (Ref; Act; writeRef; readRef; send; El; Observer; _>>ᴬ_; module Kit; module FlatKit; module Subject; under; done; wkAct; wkObs; compile; wkR; wkEl; Env; wkEnv)
   open Strongly R using (Feed; Sub; flatNames; cutNames; quietName; laneNames; pendingˢ; Name; names; subjects; joiners; joiner; CbRel; coldˢ; ofˢ; mapˢ; scanˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; deferˢ; Lane; here; module At; fired; Path; done≗; Call; emitC; kontC; take1C; idle; feeding; finishing; take2C; bodyC; feedC; finC; srcC; taking; ending; taken; PathLanes; this-lane; next-lane; lane; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; _⊕_; _⊕ᴸ_; Here; walk; walkLanes; top; _≗_; eff≗; readRef≗; writeRef≗; send≗; under≗; ≗-refl; outers; outersL; outers-⊕; unsub; Owes; Settled; module Canon) renaming (⟦_⟧ to ⟦_⟧ᶜ)
   open StrongAgainst R using (Leaves; Twin; Restful; rf-rest; rf-idle; rf-union; rf-burst; rf-under; tail-agreeᵀ; restful-meaning; restful-deep; Books; Queue; Kernels; Meaning; Owned; Spot; spot; ∧-join; Each; Lingers; Tied; seen; seenL; pinned-trans; ∧-split; false≢; owned-to)
-  open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering)
+  open StrongHeld R using (Strong; Carried; carried; closing; Meets; Heads; DoneBy; module Eaching; module Lingering; Untold) renaming (Ended to Ends)
   open StrongAgainst.Against R using (calmAs; noteAs; runAs; subAs; burstAs; firesAs; playsAs; overAs; bottomAs; restAs; backAs; reholdAs; bottomᴴ; restᴴ; BurstAs; StackAs; Ticked; CtlAs; agenda; bursts; begins; sources; stackJobs; stackBursts; burstSpots; SrcOf; src-of) renaming (Placed to Placedᴬ)
   open Pure R using (Timer; cascade; wkTimer)
   open Moving R using (pairs-r; pairs-split; plant-self; takes; takesᴸ; stage; takes-plant; plant; plantᴸ; planted; plantedᴸ; waits; pendings-path; part-plant; pend-plant; names-plant; subjects-plant; joiners-plant; fed-plant; timed-pop; owned-pop; later; true≢false)
@@ -115,8 +116,8 @@ module ClimbConnect (R : Set) where
   open Keeping R using (seen-planted)
   open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; ⊆-⊑; Pred; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; leftover-from; pooled-from; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; sourced-heap; tw-alike)
   open ShiftWalk R using (let-go; grip)
-  open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined)
-  open FramingRepool R using (Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
+  open Framing R using (merged-eq; heads-flat; just-of; scan-part; scan-defined)
+  open FramingRepool R using (none-of; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off)
   open Staging R using (not-src; wrap-lane)
   open Weakening R using (Grows; pure-map) renaming (module Grown to Weakened)
   open WeakeningHeaps R using () renaming (module GrownHeaps to Weakened′)
@@ -377,7 +378,7 @@ module ClimbConnect (R : Set) where
         ; kernels = Feeds.fed-kernels hp ρ y q kn ; meaning = Feeds.fed-meaning hp ρ y q (Queue.joined qu) mn ; queue = Feeds.fed-queue hp ρ y q qu
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Feeds.Bd.body-names hp ρ y q))) fs
                          ; clocked = proj₁ ck , Feeds.fed-ticked hp ρ y q clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
-        ; sorted = sorted-⇝ so (then refl now) ; behind′ = Eaching.each-to _ _ (Feeds.fed-behind hp ρ y q fs (tells-past cl) (ended-past cl) bh) ; lingers′ = Lingering.lingers-to _ (Feeds.fed-lingers hp ρ y q fs (ended-past cl) (Queue.joined qu) mn bh lgr) ; flags = let-go hp (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Feeds.Bd.body-names hp ρ y q))) fs)
+        ; sorted = sorted-⇝ so (then refl now) ; behind′ = Eaching.each-to _ _ (Feeds.fed-behind hp ρ y q fs (Calling.told cl) (Calling.ended cl) bh) ; lingers′ = Lingering.lingers-to _ (Feeds.fed-lingers hp ρ y q fs (Calling.ended cl) (Queue.joined qu) mn bh lgr) ; flags = let-go hp (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Feeds.Bd.body-names hp ρ y q))) fs)
                     (trans (seen-planted hp ρ v) (lifts-seen Lρ)) ju
                     (subst (DoneBy hp (plant ρ v)) (sym (outers-planted ρ v))
                            (Shift.shift-flags hp hp ρ (λ j _ → refl) [] fs v {ns₀ = []} (λ ()) rv fb (subst (DoneBy hp T) (sym (++-identityʳ (outers ρ))) d₀))) })
@@ -681,7 +682,7 @@ module ClimbConnect (R : Set) where
         ; kernels = Fins.fin-kernels hp ρ q fs kn ; meaning = Fins.fin-meaning hp ρ q fs (Queue.joined qu) mn ; queue = Fins.fin-queue hp ρ q fs qu
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Fins.Bd.body-names hp ρ q))) fs
                          ; clocked = proj₁ ck , Fins.fin-ticked hp ρ q clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
-        ; sorted = sorted-⇝ so path ; behind′ = Eaching.each-to _ _ (Fins.fin-behind hp ρ q fs (tells-past cl) (ended-past cl) bh) ; lingers′ = Lingering.lingers-to _ (Fins.fin-lingers hp ρ q fs (ended-past cl) (Queue.joined qu) mn bh lgr) ; flags = let-go H′ (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Fins.Bd.body-names hp ρ q))) fs)
+        ; sorted = sorted-⇝ so path ; behind′ = Eaching.each-to _ _ (Fins.fin-behind hp ρ q fs (Calling.told cl) (Calling.ended cl) bh) ; lingers′ = Lingering.lingers-to _ (Fins.fin-lingers hp ρ q fs (Calling.ended cl) (Queue.joined qu) mn bh lgr) ; flags = let-go H′ (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Fins.Bd.body-names hp ρ q))) fs)
                     (trans (seen-planted H′ ρ v) (lifts-seen (lifts-off hp H′ ρ fs off₀ Lρ))) ju
                     (subst (DoneBy H′ (plant ρ v)) (sym (outers-planted ρ v))
                            (Fins.Sh.shift-flags hp ρ q fs v {ns₀ = []} (λ ()) rv fb (subst (DoneBy hp T) (sym (++-identityʳ (outers ρ))) d₀))) })

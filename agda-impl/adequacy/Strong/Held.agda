@@ -34,6 +34,7 @@ open import adequacy.Sorted.Walk using (module SortingWalk)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Strong.Against using (module StrongAgainst)
+open import adequacy.Told using (untold; Tells)
 
 module StrongHeld (R : Set) where
   open Heap using (World; Kind; cell; slot; hush; play; _⊑_; _∋_; Sink; Handle; Quiet; _⨾_; same)
@@ -267,6 +268,19 @@ module StrongHeld (R : Set) where
   Meets (Against.noteAs {p = p} {a} _ _ _) n g = Σ (U.Node [] R) λ g′ → n ≡ just g′ × U.step g ≡ U.outˢ p a g′
   Meets _                                  n g = n ≡ just g
 
+  -- What a connect past its source's end has not told its body's
+  -- joiners, it tells no sooner than `q`.
+  Untold : ∀ {h} (H : Heapᴹ h) (q : Pos) {Δ A} (t : Sub h Δ A) → Set₁
+  Untold {h} H q t = ∀ {Δ′ A′ B′} {S c b kb k fd rp c₀ rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+                   → (ψ : Path t (connectˢ S c b kb k fd rp (just c₀) rt src bd)) → seen H ψ ≡ true → At.part H src ≡ nothing
+                   → ∀ {b₀} → At.part H bd ≡ just b₀ → Tells q c₀ (untold (Any.here refl) b₀)
+
+  -- A connect still held past its source's end holds no source.
+  Ended : ∀ {h} (H : Heapᴹ h) {Δ A} (t : Sub h Δ A) → Set₁
+  Ended {h} H t = ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src : Sub h Δ′ A′} {bd : Sub h (A′ ∷ Δ′) B′}
+                → (ψ : Path t (connectˢ S c b kb k fd rp e rt src bd)) → seen H ψ ≡ true
+                → ∀ {n} → At.part H (connectˢ S c b kb k fd rp e rt src bd) ≡ just n → ∀ {c₀} → e ≡ just c₀ → At.part H src ≡ nothing
+
   -- THE CONFIGURATION RUNS THE GHOST FROM A RE-ENTRY STATE: a witness
   -- holding every subscription the run reaches, whose open part is the
   -- ghost, and the machine's control and stack its agenda; the machine
@@ -290,6 +304,8 @@ module StrongHeld (R : Set) where
       sorted  : Σ Pos λ lo → WellMach lo m
       behind′ : Eaching.Below H (Heads (Conf.pos (Mach.conf m))) tree
       lingers′ : Lingering.Below H tree
+      told    : Untold H (Conf.pos (Mach.conf m)) tree
+      ended   : Ended H tree
       flags   : DoneBy H tree []
 
     owned : Owned H tree ctlAs
@@ -450,4 +466,6 @@ module StrongHeld (R : Set) where
     ; sorted  = root , begin-well o
     ; behind′  = Eaching.eaching (λ { _ refl → heads-begin o })
     ; lingers′ = Lingering.lingering (λ _ → lift tt)
+    ; told    = λ ()
+    ; ended   = λ ()
     ; flags   = λ () }
