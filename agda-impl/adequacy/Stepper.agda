@@ -18,10 +18,10 @@ open import Data.Sum using (_⊎_; inj₁; inj₂; map₁; [_,_])
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂; map₂; uncurry)
 open import Data.Unit using (⊤; tt)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; subst; cong)
 
 open import Tree using (Later)
-open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush; Pos; Timeline; From; Frame; idle; ix; sub; last; _<ᵖ_; _∪_;
+open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush; Pos; Timeline; From; Frame; idle; ix; sub; last; _<ᵖ_; _∪_; Tail; pin;
   <ᵖ-trans; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-below; <ᵖ-split; <ᵖ-step; <ᵖ-part)
 open import denotation.MonotonicList using (Agree; Agreeᵀ; stop; stopᵀ; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agreeᵀ-refl; agreeᵀ-sym; agree-trans)
 open import denotation.NonExpansive using (Agreeˢ; _,ˢ_; beside-ne; body-ne; before-agree; ∪-ne; burstOn-ne)
@@ -31,7 +31,7 @@ import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import adequacy.Sane using (Sane; Saneᴹ; Saneᴸ; Mode; runs; over; loose; Told; Rested; RestedS; step-rested)
 open import adequacy.Placed.Order using (Alien; Atop; Ordered; Prefix; every; ordered; still; Placed; Placedᴹ; Placedᴸ; Within)
-open import adequacy.Placed.Keys using (ordered-≈; prefix-refl)
+open import adequacy.Placed.Keys using (ahead-quiet; ordered-≈; prefix-refl)
 open import adequacy.Deep using (Deep; Deepˢ)
 
 ------------------------------------------------------------------------
@@ -478,9 +478,6 @@ postulate
              → Sane (runs ∷ᴬ ν) b → Sane ν s → Placed b (U.meaning s ρ ∷ᴬ ρ) → Placed s ρ → Shy (U.step b) (U.step s)
              → ∀ k → U.headˢ (U.step b) ≡ just k → U.beforeˢ k (U.step s) ≡ true
 
-  -- A node that never shows again leaves nothing running when cut.
-  hushed-cut : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (s : U.Node Γ A) (ρ : NEnv Γ) → Sane ν s → Placed s ρ
-             → U.meaning s ρ ≡ hush → ∀ d → Agreeᵀ d (U.cutᴺ s ρ) idle
 
   -- Past its source's end, a connect runs its source's rest's skip
   -- first when it shows before the body's; else the body's, shut.
@@ -1101,6 +1098,196 @@ shy-clear : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (b : U.Node (A ∷ Γ) B)
 shy-clear {ν = ν} b s ρ sb ss pb ps sks shy cl with U.headˢ (U.step b) in hb
 ... | just k  = shown-past k (U.meaning s ρ) (floor s ρ k ss ps (shy-before b s ρ sb ss pb ps shy k hb) (clear-floor ν ρ cl))
 ... | nothing = quiet {ν = ν} s ρ sks cl (U.step s) refl (subst (λ t → Shy t (U.step s)) (head-none (U.step b) hb) shy)
+
+-- A tail run silent is idle.
+tail-hush : ∀ {A} (t : Tail) → M′.tailᴱ {A} t ≡ hush → t ≡ idle
+tail-hush (pin k r) ()
+tail-hush idle      _ = refl
+
+map-hush : ∀ {A B} (f : A → B) (x : Events A) → M′.mapᴱ f x ≡ hush → x ≡ hush
+map-hush f (out k a r) ()
+map-hush f (skip k r)  ()
+map-hush f (end k)     ()
+map-hush f hush        _ = refl
+
+scan-hush : ∀ {A B} (f : B → A → B) z (x : Events A) → M′.scanᴱ f z x ≡ hush → x ≡ hush
+scan-hush f z (out k a r) ()
+scan-hush f z (skip k r)  ()
+scan-hush f z (end k)     ()
+scan-hush f z hush        _ = refl
+
+taking-loud : ∀ {A} i (p : A → Bool) k a b r → M′.taking i p k a b r ≢ hush
+taking-loud i     p k a true  r ()
+taking-loud true  p k a false r ()
+taking-loud false p k a false r ()
+
+take-hush : ∀ {A} i (p : A → Bool) (x : Events A) → M′.takeWhileᴱ i p x ≡ hush → x ≡ hush
+take-hush i p (out k a r) eq = ⊥-elim (taking-loud i p k a (p a) r eq)
+take-hush i p (skip k r)  ()
+take-hush i p (end k)     ()
+take-hush i p hush        _ = refl
+
+body-loud : ∀ {A B} r (σ : Events∞ A) q (y : Events B) → y ≢ hush → M′.body r σ q y ≢ hush
+body-loud r σ q (out k a β) nh ()
+body-loud r σ q (skip k β)  nh ()
+body-loud r σ q (end c)     nh ()
+body-loud r σ q hush        nh _ = nh refl
+
+skip-loud : ∀ {A} k (τ : Events∞ A) → skip k τ ≢ hush
+skip-loud k τ ()
+
+-- A connect silent: its source silent, and its body.
+side-hush : ∀ {A B} r (β : Events∞ B) (σ : Events∞ A) (x : Events A) → M′.side r β σ x ≡ hush → x ≡ hush × force β ≡ hush
+side-hush r β σ x eq with hush? x
+... | inj₁ ex = ex , subst (λ y → M′.side r β σ y ≡ hush) ex eq
+... | inj₂ nx with ahead-split r β σ (M′.shownAt x)
+...   | inj₁ (bt , τ , ea) = ⊥-elim (skip-loud _ τ (trans (sym ea) (trans (sym (side-ahead r β σ x nx)) eq)))
+...   | inj₂ (bf , ea)     = ⊥-elim (body-loud r σ _ (force β) (before-false _ (force β) bf) (trans (sym ea) (trans (sym (side-ahead r β σ x nx)) eq)))
+
+run-hush : ∀ {A} r (x : Events A) t → x ≡ hush → M′.runOn r x t ≡ t
+run-hush r .hush t refl = refl
+
+idle-∪ : ∀ {t u} → t ≡ idle → u ≡ idle → t ∪ u ≡ idle
+idle-∪ refl refl = refl
+
+head-hush : ∀ {A} (x : Events A) → M′.head x ≡ nothing → x ≡ hush
+head-hush (out k a r) ()
+head-hush (skip k r)  ()
+head-hush (end k)     ()
+head-hush hush        _ = refl
+
+earliest-none : ∀ {B} (ls : List (Events∞ B)) → M′.earliest ls ≡ M′.none → All (λ l → M′.head (force l) ≡ nothing) ls
+earliest-none []       _ = []ᴬ
+earliest-none (l ∷ ls) with M′.head (force l) in hl | M′.earliest ls in el
+... | nothing | M′.none           = λ _ → hl ∷ᴬ earliest-none ls el
+... | nothing | M′.found _ _ _ _  = λ ()
+... | just k  | M′.none           = λ ()
+... | just k  | M′.found k′ _ _ _ with k <ᵖ k′
+...   | true  = λ ()
+...   | false = λ ()
+
+earliest-found : ∀ {B} (ls : List (Events∞ B)) {k bs l as} → M′.earliest ls ≡ M′.found k bs l as → M′.head (force l) ≡ just k
+earliest-found []        ()
+earliest-found (l₀ ∷ ls) with M′.head (force l₀) in hl | M′.earliest ls in el
+... | nothing | M′.none            = λ ()
+... | nothing | M′.found k bs c as = λ { refl → earliest-found ls el }
+... | just k  | M′.none            = λ { refl → hl }
+... | just k  | M′.found k′ bs c as with k <ᵖ k′
+...   | true  = λ { refl → hl }
+...   | false = λ { refl → earliest-found ls el }
+
+outer-hush : ∀ {B} op (e : Events∞ (M′.MonotonicList B)) ls qs t (x : Events (M′.MonotonicList B)) → M′.outer op e ls qs t x ≡ hush → x ≡ hush
+outer-hush op e ls qs t (out q m r) with M′.admit op (q ++ [ ix 1 ]) m ls qs
+... | _ , _ , _ = λ ()
+outer-hush op e ls       qs       t (skip q r) ()
+outer-hush op e []       []       t (end c)    ()
+outer-hush op e []       (m ∷ qs) t (end c)    ()
+outer-hush op e (l ∷ ls) qs       t (end c)    ()
+outer-hush op e ls       qs       t hush       _ = refl
+
+lane-hush : ∀ {B} op (o : Maybe (Events∞ (M′.MonotonicList B))) bs l as qs t (x : Events B) → M′.lane op o bs l as qs t x ≡ hush → x ≡ hush
+lane-hush op o        bs       l as       qs       t (out k b r) ()
+lane-hush op o        bs       l as       qs       t (skip k r)  ()
+lane-hush op o        bs       l as       (m ∷ qs) t (end c)     ()
+lane-hush op nothing  []       l []       []       t (end c)     ()
+lane-hush op nothing  []       l (a ∷ as) []       t (end c)     ()
+lane-hush op nothing  (b ∷ bs) l as       []       t (end c)     ()
+lane-hush op (just e) bs       l as       []       t (end c)     ()
+lane-hush op o        bs       l as       qs       t hush        _ = refl
+
+just-loud : ∀ {A} (x : Events A) {k} → M′.head x ≡ just k → x ≢ hush
+just-loud (out k a r) _ ()
+just-loud (skip k r)  _ ()
+just-loud (end k)     _ ()
+just-loud hush        () _
+
+race-loud : ∀ {B} op (o : Maybe (Events∞ (M′.MonotonicList B))) k bs (l : Events∞ B) as qs t
+          → M′.head (force l) ≡ just k → M′.race op o k bs l as qs t ≢ hush
+race-loud op nothing  k bs l as qs t hl eq = just-loud (force l) hl (lane-hush op nothing bs l as qs t (force l) eq)
+race-loud op (just e) k bs l as qs t hl with M′.head (force e) in he
+... | nothing = λ eq → just-loud (force l) hl (lane-hush op (just e) bs l as qs t (force l) eq)
+... | just k′ with k′ <ᵖ k
+...   | true  = λ eq → just-loud (force e) he (outer-hush op e (bs ++ l ∷ as) qs t (force e) eq)
+...   | false = λ eq → just-loud (force l) hl (lane-hush op (just e) bs l as qs t (force l) eq)
+
+parts-hush : ∀ {B} op (o : Maybe (Events∞ (M′.MonotonicList B))) ls qs t → M′.parts op o ls qs t ≡ hush
+           → M′.headᴼ o ≡ nothing × All (λ l → M′.head (force l) ≡ nothing) ls
+parts-hush op o ls qs t with M′.earliest ls in el
+... | M′.found k bs l as = λ eq → ⊥-elim (race-loud op o k bs l as qs t (earliest-found ls el) eq)
+... | M′.none with o
+...   | nothing = λ _ → refl , earliest-none ls el
+...   | just e  = λ eq → cong M′.head (outer-hush op e ls qs t (force e) eq) , earliest-none ls el
+
+-- A flatMap's run silent: nothing its ended parts left, its outer gone
+-- or silent, and every lane silent.
+go-hush : ∀ {B} op (o : Maybe (Events∞ (M′.MonotonicList B))) ls qs t → M′.go op o ls qs t ≡ hush
+        → t ≡ idle × M′.headᴼ o ≡ nothing × All (λ l → M′.head (force l) ≡ nothing) ls
+go-hush op o ls qs idle      eq = refl , parts-hush op o ls qs idle eq
+go-hush op o ls qs (pin k u) with M′.ahead-of k o ls in ah
+... | true  = λ ()
+... | false = λ eq → ⊥-elim (bool-split (trans (sym ah) (uncurry (ahead-quiet k o ls) (parts-hush op o ls qs (pin k u) eq))))
+  where bool-split : false ≡ true → ⊥
+        bool-split ()
+
+-- A rest-like that never shows again leaves nothing running.
+rested-idle : ∀ {Γ A} (t : U.Node Γ A) (ρ : NEnv Γ) → Rested t → U.meaning t ρ ≡ hush → U.cutᴺ t ρ ≡ idle
+rested-idle (U.restᶜ n)               ρ _ eq = tail-hush _ eq
+rested-idle U.idleᶜ                   ρ _ _  = refl
+rested-idle (U.unionᶜ x y)            ρ _ eq = tail-hush _ eq
+rested-idle (U.burstingᶜ r t)         ρ _ eq = tail-hush _ eq
+rested-idle (U.underᶜ (U.live s) b)   ρ _ eq = tail-hush _ eq
+rested-idle (U.underᶜ (U.ended c t) b) ρ _ eq = tail-hush _ eq
+rested-idle (U.framesᶜ τ e m)            ρ () _
+rested-idle (U.burstᶜ τ r k f)           ρ () _
+rested-idle (U.ofᶜ p k xs)               ρ () _
+rested-idle (U.mapᶜ f c)                 ρ () _
+rested-idle (U.scanᶜ f z c)              ρ () _
+rested-idle (U.takeWhileᶜ k p c)         ρ () _
+rested-idle (U.flatMapᶜ op g o ls qs pl) ρ () _
+rested-idle (U.joinᶜ j p xs e)           ρ () _
+rested-idle (U.connectᶜ r b s)           ρ () _
+rested-idle (U.deferᶜ l p ns)            ρ () _
+rested-idle (U.endingᶜ p n)              ρ () _
+
+-- A node that never shows again leaves nothing running when cut.
+mutual
+  cut-idle : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (s : U.Node Γ A) (ρ : NEnv Γ) → Sane ν s → Placed s ρ
+           → U.meaning s ρ ≡ hush → U.cutᴺ s ρ ≡ idle
+  cut-idle (U.framesᶜ τ e m)  ρ _ _ _ = refl
+  cut-idle (U.burstᶜ τ r i b) ρ _ _ _ = refl
+  cut-idle (U.ofᶜ p i xs)     ρ _ _ _ = refl
+  cut-idle (U.mapᶜ f c)         ρ sn (_ , pl) eq = cut-idle c ρ sn pl (map-hush f _ eq)
+  cut-idle (U.scanᶜ f z c)      ρ sn (_ , pl) eq = cut-idle c ρ sn pl (scan-hush f z _ eq)
+  cut-idle (U.takeWhileᶜ i p c) ρ sn (_ , pl) eq = cut-idle c ρ sn pl (take-hush i p _ eq)
+  cut-idle (U.flatMapᶜ op g o ls qs pl) ρ (so , sl , _) (_ , po , pls , _) eq
+    with go-hush _ (U.outerᴺ g o ρ) (U.states ls ρ) _ (U.cutᴺ pl ρ) eq
+  ... | te , ho , hl = idle-∪ (cut-idleᴼ g o ρ so po ho) (idle-∪ (cut-idleᴸ ls ρ sl pls hl) te)
+  cut-idle (U.joinᶜ i p xs e) ρ _ _ _ = refl
+  cut-idle (U.connectᶜ r b (U.live s)) ρ (sb , ss) (_ , pb , ps) eq with side-hush r (U.stateᴺ b (U.meaning s ρ ∷ᴬ ρ)) (U.stateᴺ s ρ) (U.meaning s ρ) eq
+  ... | es , eb = idle-∪ (trans (run-hush r _ _ es) (cut-idle s ρ ss ps es)) (cut-idle b _ sb pb eb)
+  cut-idle (U.connectᶜ r b (U.ended c t)) ρ (sb , rt) (_ , pb) eq with side-hush r (U.stateᴺ b (end c ∷ᴬ ρ)) (U.stateᴺ t ρ) (U.meaning t ρ) eq
+  ... | et , eb = idle-∪ (trans (run-hush r _ _ et) (rested-idle t ρ rt et)) (cut-idle b _ sb pb eb)
+  cut-idle (U.deferᶜ l p ns)  ρ _ _ _ = refl
+  cut-idle (U.endingᶜ p n)    ρ _ _ ()
+  cut-idle (U.restᶜ n)        ρ _ _ eq = rested-idle (U.restᶜ n) ρ tt eq
+  cut-idle U.idleᶜ            ρ _ _ _  = refl
+  cut-idle (U.unionᶜ x y)     ρ _ _ eq = rested-idle (U.unionᶜ x y) ρ tt eq
+  cut-idle (U.burstingᶜ r t)  ρ _ _ eq = rested-idle (U.burstingᶜ r t) ρ tt eq
+  cut-idle (U.underᶜ s b)     ρ _ _ eq = rested-idle (U.underᶜ s b) ρ tt eq
+
+  cut-idleᴼ : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (g : A → Pos → U.Node Γ B) (o : Maybe (U.Node Γ A)) (ρ : NEnv Γ) → Saneᴹ ν o → Placedᴹ o ρ
+            → M′.headᴼ (U.outerᴺ g o ρ) ≡ nothing → M′.cutᴼ (U.outerᴺ g o ρ) ≡ idle
+  cut-idleᴼ g nothing  ρ _ _ _  = refl
+  cut-idleᴼ g (just c) ρ s p ho = cut-idle c ρ s p (map-hush _ (U.meaning c ρ) (head-hush _ ho))
+
+  cut-idleᴸ : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (ls : List (U.Node Γ A)) (ρ : NEnv Γ) → Saneᴸ ν ls → Placedᴸ ls ρ
+            → All (λ l → M′.head (force l) ≡ nothing) (U.states ls ρ) → M′.cuts (U.states ls ρ) ≡ idle
+  cut-idleᴸ []       ρ _        _        _          = refl
+  cut-idleᴸ (c ∷ cs) ρ (s , ss) (p , ps) (h ∷ᴬ hs) = idle-∪ (cut-idle c ρ s p (head-hush _ h)) (cut-idleᴸ cs ρ ss ps hs)
+
+hushed-cut : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (s : U.Node Γ A) (ρ : NEnv Γ) → Sane ν s → Placed s ρ
+           → U.meaning s ρ ≡ hush → ∀ d → Agreeᵀ d (U.cutᴺ s ρ) idle
+hushed-cut s ρ ss ps eq d = subst (λ t → Agreeᵀ d t idle) (sym (cut-idle s ρ ss ps eq)) (agreeᵀ-refl d idle)
 
 -- A connect's body showing first: what it shows, the source carried.
 body-skips : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ)

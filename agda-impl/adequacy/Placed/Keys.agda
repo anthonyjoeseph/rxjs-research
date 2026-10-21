@@ -600,3 +600,12 @@ module Merge (P S : Pos → Set) (step : ∀ h → P h → P (h ++ [ ix 0 ])) (h
       every px , every-go op (just e) (bs ++ as) [] (t ∪ cut l) po (All++⁺ pb pa) pq (everyT-∪ t (cut l) pt pl)
       , everyT-whole (just e) (bs ++ as) (t ∪ cut l) po (All++⁺ pb pa) (everyT-∪ t (cut l) pt pl)
     every (every-lane op o bs l as qs t hush po pb px pl pa pq pt) = tt
+
+-- Every part silent: whatever the ended left comes ahead of them all.
+clears-quiet : ∀ {B} k (ls : List (Events∞ B)) → All (λ l → M′.head (force l) ≡ nothing) ls → M′.clears k ls ≡ true
+clears-quiet k []       []ᴬ        = refl
+clears-quiet k (l ∷ ls) (hl ∷ᴬ hs) rewrite hl = clears-quiet k ls hs
+
+ahead-quiet : ∀ {B} k (o : Maybe (Events∞ (MonotonicList B))) ls → M′.headᴼ o ≡ nothing → All (λ l → M′.head (force l) ≡ nothing) ls
+            → M′.ahead-of k o ls ≡ true
+ahead-quiet k o ls ho hs rewrite ho = clears-quiet k ls hs
