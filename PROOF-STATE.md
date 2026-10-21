@@ -152,20 +152,6 @@ Members: `placing`, `ticks-up`.
 
 ### Ledger
 
-#### THE ELABORATION
-
-The statements are about srxjs only once srxjs is a program: each
-primitive rebuilt over InstEmits with `fresh` names, and the batcher built
-from primitives. `elaborate` must pass Agda's productivity check through
-`defer`, so each clause is constructors around the elaborated child.
-Settled when each equation holds by `refl`, oracle-checked.
-
-Members: `elaborate`, `elaborate-cold`, `elaborate-empty`, `elaborate-of`,
-`elaborate-map`, `elaborate-scan`, `elaborate-takeWhile`,
-`elaborate-flatMap`, `elaborate-connect`, `elaborate-connected`,
-`elaborate-defer`, `coldˢ`, `emptyˢ`, `ofˢ`, `mapˢ`, `scanˢ`, `takeWhileˢ`,
-`flatMapˢ`, `connectˢ`, `batchSimultaneous`.
-
 #### THE INSTANTS
 
 Whether every position the fold builds lies under the subscribe frame or a
@@ -182,17 +168,18 @@ Members: `positioned`.
 
 #### THE SPEC
 
-Untried, and the batcher's liveness half waits on the elaboration: batches
-joined are the plain values, batches are the spec's grouping, at every site
-and related environment. Settled when both are bodies.
+Suspect fact: false of the placeholder elaboration, one name and no
+protocol. Batches joined are the plain values, batches are the spec's
+grouping, at every site and related environment. Settled when both are
+bodies over the real operators.
 
 Members: `left-to-rightˢ`, `batchableˢ`.
 
 #### SOUND NAMES
 
-Whether `Sound` (names lie in their instant, one name per instant) is kept
-by each elaborated primitive and survives limits. Settled when the
-per-operator facts are bodies over the elaborations.
+Suspect fact: `Sound` (names lie in their instant, one name per instant)
+is false of the placeholder's one name. Whether each real operator keeps it
+and it survives limits. Settled when the per-operator facts are bodies.
 
 Members: `coldˢ-sound`, `emptyˢ-sound`, `ofˢ-sound`, `mapˢ-sound`,
 `scanˢ-sound`, `takeWhileˢ-sound`, `flatMapˢ-sound`, `connectˢ-sound`,

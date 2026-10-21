@@ -23,7 +23,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong;
 
 open import adequacy.Adequacy using (run; adequacy)
 open import denotation.MonotonicList using (ticks; inFrame; within; sameTick)
-open import denotation.MonotonicList.Events using (_≟ᵖ_; Events; Events∞; out; skip; end; hush; tick; Pos; Timeline)
+open import denotation.MonotonicList.Events using (_≟ᵖ_; Events; Events∞; out; skip; end; hush; tick; Pos; Timeline; root)
 open import denotation.Order using (Item; val; fin; silent; Shows; ShowsIn; nil; done⁺; quiet⁺; at⁺; emit⁺; stall⁺; close⁺)
 open import denotation.Observe using (events)
 open import simultaneous.InstEmit using (InstEmit)
@@ -33,7 +33,7 @@ open Spec _≟ᵖ_ using (batchSimultaneousᴰ)
 open import simultaneous.Readings using (values; over; FiniteInstants; stamped; closed)
 open import simultaneous.Statement using (batchedObs; elaborated; batched; left-to-right; batchable)
 
-open Elaborate {C = Timeline} _≟ᵖ_ using (elaborate)
+open Elaborate {C = Timeline} _≟ᵖ_ root using (elaborate)
 open Events∞ using (force)
 
 -- A reader's prefix as the spec reads it: its values, and whether the
