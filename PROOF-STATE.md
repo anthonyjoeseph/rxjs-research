@@ -11,11 +11,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE ROOT STEP
 
 Whether a step, its sources clear of it, keeps its parts placed: a connect's
-body and source `Sides`, fed or shut; a flatMap's admitted lanes; a defer's
-program. Settled when `connect-within` is a body or refuted.
+body stepped or fed still `Sides` its source, a fed or told body placed; a
+flatMap's admitted lanes; a defer's program. Nothing in `Placed` keys a body's
+positions apart from its source's later steps. Settled when `body-sides` and
+`fed-sides` are bodies or refuted.
 
-Members: `connect-within`, `ended-within`, `flat-within`, `defer-within`,
-`under-shown-connect`.
+Members: `body-sides`, `fed-sides`, `fed-placed`, `shut-placed`,
+`reshut-placed`, `flat-within`, `defer-within`, `under-shown-connect`.
 
 #### UP-ENDED
 
