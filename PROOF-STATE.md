@@ -10,14 +10,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ROOT STEP
 
-Whether a node's meaning starts with its step's event, else past a running
-source's shown event (a take turns on a tied value); whether a connect's body never
-steps at or just past its source's step (no invariant yet carries it);
-whether a hushed node leaves nothing running; the step's parts placed.
-Settled when `first`, `shy-before` and `hushed-cut` are bodies or refuted.
+Whether a connect's meaning starts with its step's event, else strictly past
+a running source's shown event and before its step's head (planned: by cases on
+the two IHs, no new invariant); whether a connect's body never steps at or just
+past its source's step; whether a hushed node leaves nothing running; the step's
+parts placed, a joiner's source alien to where it joined.
+Settled when `first-connect`, `shy-before` and `hushed-cut` are bodies or refuted.
 
-Members: `first`, `shy-before`, `hushed-cut`, `within-step`,
-`under-shown-connect`.
+Members: `first-connect`, `first-ended`, `first-flat`, `shy-before`,
+`hushed-cut`, `within-step`, `under-shown-connect`.
 
 #### UP-ENDED
 
@@ -160,7 +161,8 @@ a body.
 Members: `after-map`, `after-scan`, `after-take`, `clear-take`,
 `frames-after`, `burst-after`, `of-after`, `flat-skips`, `ended-skips`,
 `feed-alike`, `shut-alike`, `defer-skips`, `rest-skips`, `union-skips`,
-`bursting-skips`, `under-skips`.
+`bursting-skips`, `under-skips`, `first-defer`, `first-rest`, `first-union`,
+`first-bursting`, `first-under`.
 
 ## Tier 2 — the simultaneous spec
 
