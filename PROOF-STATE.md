@@ -15,8 +15,7 @@ follows from `Owned`'s finishes and the agenda's placement; the shut nodes'
 steps heading past the shutting end ride on the answer. Settled by deriving
 `tells-past`, or by adding the field and framing it.
 
-Members: `tells-past`, `ended-past`, `union-down`, `source-down`,
-`ended-down`, `bursts-down`, `flat-down`.
+Members: `tells-past`, `ended-past`, `bursts-down`, `flat-down`.
 
 #### THE ROOT STEP
 

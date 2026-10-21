@@ -16,16 +16,16 @@ open import Level using (lift)
 open import Data.Maybe using (Maybe; just; nothing; is-just)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
-open import Data.Product using (Σ; _×_; _,_; proj₁)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Bool using (Bool; true; false; if_then_else_)
-open import adequacy.Sorted using (_≤ᵖ_; ≤ᵖ-child; ≤ᵖ-trans)
+open import adequacy.Sorted using (_≤ᵖ_; ≤ᵖ-child; ≤ᵖ-trans; module Sorting)
 open import adequacy.Placed.Order using (Headed; headed-snoc)
 open import adequacy.Placed.Rising using (tick-past)
 open import Data.Nat using (zero; suc; _+_; s≤s; z≤n)
 open import Data.Unit using (⊤; tt)
 open import Data.Nat.Properties using (m<m+n)
 
-open import denotation.MonotonicList.Events using (timelineAt; Events∞; Timeline; Pos; ix; last; _<ᵖ_; From; inside)
+open import denotation.MonotonicList.Events using (timelineAt; Events∞; Timeline; Pos; ix; last; _<ᵖ_; <ᵖ-split; <ᵖ-asym; <ᵖ-below; From; inside)
 import Data.Maybe.Relation.Binary.Pointwise as MP
 import Data.List.Relation.Binary.Pointwise as LP
 open import denotation.MonotonicList.Events using () renaming (done to doneᶠ; quiet to quietᶠ; at to atᶠ; emit to emitᶠ; stall to stallᶠ; close to closeᶠ)
@@ -57,6 +57,7 @@ module Framing (R : Set) where
   open Strongly R using (Sub; scanˢ; here; module At; Path; in-scan; in-source; _⊕_; names; mapˢ; takeWhileˢ; flatMapˢ; connectˢ; deferˢ; Lane; lane; PathLanes; this-lane; next-lane; _⊕ᴸ_; in-map; in-take; in-outer; in-lanes; in-body; in-defer; Taking; taking; taken; cutNames; quietName; subjectNames; flatNames; laneNames; Name; pendings; subjects; joiners) renaming (ending to endingᵀ)
   open StrongAgainst R using (Queue; Kernels; Meaning; Each; seen; Books; seenL; seen-join)
   open StrongHeld R using (Strong; Heads)
+  open Sorting R using (≤ᵖ-after)
   open Tearing R using (holds-at; Alike; Off; part-alike; partLanes-alike; lanes-path; module Seeing; look-store; get-put-same; fresh-path; names-path; apart-r; apart-l; ≢-flip)
   open Moving R using (pairs-r; pairs-split; plant; pendings-plant; subjects-plant; joiners-plant; head-map; head-scan)
   open Locality R using (module Heaps)
@@ -557,11 +558,122 @@ module Framing (R : Set) where
   -- position, so a part shut to a told end leads only where that end
   -- comes first, and what it displaced came no sooner.
 
+  -- Each picks by comparing positions: a part heading before `q` leads
+  -- both sides alike, or is passed over on both; past `q`, so is the pick.
+  not-< : ∀ {a b} → a <ᵖ b ≡ false → b ≤ᵖ a
+  not-< {a} {b} h with <ᵖ-split b a h
+  ... | inj₁ lt = inj₂ lt
+  ... | inj₂ eq = inj₁ eq
+
+  true≢false : ∀ {ℓ} {X : Set ℓ} → true ≡ false → X
+  true≢false ()
+
+  nothing≢just : ∀ {ℓ ℓ′} {X : Set ℓ} {Y : Set ℓ′} {k : X} → nothing ≡ just k → Y
+  nothing≢just ()
+
+  if-true : ∀ {ℓ} {X : Set ℓ} {b} {u v : X} → b ≡ true → (if b then u else v) ≡ u
+  if-true refl = refl
+
+  if-false : ∀ {ℓ} {X : Set ℓ} {b} {u v : X} → b ≡ false → (if b then u else v) ≡ v
+  if-false refl = refl
+
+  if-twin : ∀ {Γ A} {b b′} {s₁ s₂ s₁′ s₂′ : U.Step Γ A} → b ≡ b′ → Twin s₁ s₁′ → Twin s₂ s₂′ → Twin (if b then s₁ else s₂) (if b′ then s₁′ else s₂′)
+  if-twin {b = true}  refl t₁ t₂ = t₁
+  if-twin {b = false} refl t₁ t₂ = t₂
+
+  twin-via : ∀ {Γ A} {s₁ s₂ u u′ : U.Step Γ A} → s₁ ≡ u → s₂ ≡ u′ → Twin u u′ → Twin s₁ s₂
+  twin-via refl refl t = t
+
+  at-heads : ∀ {Γ A q} (s : U.Step Γ A) {k} → U.headˢ s ≡ just k → q ≤ᵖ k → HeadsS q s
+  at-heads s e le e′ with trans (sym e) e′
+  ... | refl = le
+
+  before-head : ∀ {Γ A} X (s : U.Step Γ A) {h} → U.headˢ s ≡ just h → U.beforeˢ X s ≡ X <ᵖ h
+  before-head X (U.outˢ k _ _) refl = refl
+  before-head X (U.skipˢ k _)  refl = refl
+  before-head X (U.endˢ k)     refl = refl
+  before-head X U.hushˢ        ()
+
+  before-low : ∀ {Γ A q X} (s : U.Step Γ A) → X <ᵖ q ≡ true → HeadsS q s → U.beforeˢ X s ≡ true
+  before-low {X = X} (U.outˢ k _ _) lt hs = ≤ᵖ-after {i = X} lt (hs refl)
+  before-low {X = X} (U.skipˢ k _)  lt hs = ≤ᵖ-after {i = X} lt (hs refl)
+  before-low {X = X} (U.endˢ k)     lt hs = ≤ᵖ-after {i = X} lt (hs refl)
+  before-low U.hushˢ        lt hs = refl
+
+  before-twin : ∀ {Γ A} X {s s′ : U.Step Γ A} → Twin s s′ → U.beforeˢ X s ≡ U.beforeˢ X s′
+  before-twin X outᵗ  = refl
+  before-twin X skipᵗ = refl
+  before-twin X endᵗ  = refl
+  before-twin X hushᵗ = refl
+
+  -- A child of a position past `q`, against a head before `q`.
+  past-ix : ∀ {q k h} → q ≤ᵖ k → h <ᵖ q ≡ true → (k ++ [ ix 0 ]) <ᵖ h ≡ false
+  past-ix {q} {k} {h} le lt = <ᵖ-asym h (k ++ [ ix 0 ]) (≤ᵖ-after {i = h} lt (≤ᵖ-trans le (inj₂ (<ᵖ-below k []))))
+
+  -- A twin pair either heads past `q`, or both at one head before it.
+  low-or-high : ∀ {Γ A} q {s s′ : U.Step Γ A} → Twin s s′
+              → (HeadsS q s × HeadsS q s′) ⊎ Σ Pos λ h → h <ᵖ q ≡ true × U.headˢ s ≡ just h × U.headˢ s′ ≡ just h
+  low-or-high q {s} {s′} t = go (U.headˢ s) refl
+    where
+      go : (m : Maybe Pos) → U.headˢ s ≡ m → (HeadsS q s × HeadsS q s′) ⊎ Σ Pos λ h → h <ᵖ q ≡ true × U.headˢ s ≡ just h × U.headˢ s′ ≡ just h
+      go nothing  e = inj₁ ((λ e″ → nothing≢just (trans (sym e) e″)) , (λ e″ → nothing≢just (trans (sym e) (trans (twin-head t) e″))))
+      go (just k) e with k <ᵖ q in lt
+      ... | true  = inj₂ (k , lt , e , trans (sym (twin-head t)) e)
+      ... | false = inj₁ (at-heads s e (not-< lt) , at-heads s′ (trans (sym (twin-head t)) e) (not-< lt))
+
+  union-heads : ∀ {Γ B q} (x : U.Node Γ B) sx y sy → HeadsS q sx → HeadsS q sy → HeadsS q (U.unionˢ x sx y sy)
+  union-heads x (U.skipˢ k x₁) y (U.skipˢ k′ y₁) hx hy = if-head (k <ᵖ k′) (U.skipˢ k (U.unionᶜ x₁ y)) (U.skipˢ k′ (U.unionᶜ x y₁)) hx hy
+  union-heads x (U.skipˢ k x₁) y (U.outˢ _ _ _)  hx hy = hx
+  union-heads x (U.skipˢ k x₁) y (U.endˢ _)      hx hy = hx
+  union-heads x (U.skipˢ k x₁) y U.hushˢ         hx hy = hx
+  union-heads x (U.outˢ _ _ _) y sy hx hy = hy
+  union-heads x (U.endˢ _)     y sy hx hy = hy
+  union-heads x U.hushˢ        y sy hx hy = hy
+
+  union-low-y : ∀ {Γ B q k′} (x : U.Node Γ B) sx y y₁ → k′ <ᵖ q ≡ true → HeadsS q sx
+              → Σ (U.Node Γ B) λ c → U.unionˢ x sx y (U.skipˢ k′ y₁) ≡ U.skipˢ k′ c
+  union-low-y {k′ = k′} x (U.skipˢ k x₁) y y₁ lt hx with k <ᵖ k′ in e
+  ... | true  = true≢false (trans (sym e) (<ᵖ-asym k′ k (≤ᵖ-after {i = k′} lt (hx refl))))
+  ... | false = _ , refl
+  union-low-y x (U.outˢ _ _ _) y y₁ lt hx = _ , refl
+  union-low-y x (U.endˢ _)     y y₁ lt hx = _ , refl
+  union-low-y x U.hushˢ        y y₁ lt hx = _ , refl
+
+  union-low-x : ∀ {Γ B q k} (x x₁ y : U.Node Γ B) {sy} → k <ᵖ q ≡ true → HeadsS q sy → Hushed sy
+              → Σ (U.Node Γ B) λ c → U.unionˢ x (U.skipˢ k x₁) y sy ≡ U.skipˢ k c
+  union-low-x {k = k} x x₁ y lt hy (skipʰ {k′}) with k <ᵖ k′ in e
+  ... | true  = _ , refl
+  ... | false = true≢false (trans (sym (≤ᵖ-after {i = k} lt (hy refl))) e)
+  union-low-x x x₁ y lt hy hushʰ = _ , refl
+
+  skips-down : ∀ {Γ A q k} {s s′ : U.Step Γ A} {c c′} → s ≡ U.skipˢ k c → s′ ≡ U.skipˢ k c′ → Down q s s′
+  skips-down refl refl = inj₁ skipᵗ
+
   -- A union's right side must be a rest's step: a non-skip there is
   -- dropped whole, so an end before `q` would vanish under a new left skip.
-  postulate
-    union-down : ∀ {Γ B q} (x x′ y y′ : U.Node Γ B) sx sx′ sy sy′ → Hushed sy → Hushed sy′ → Down q sx sx′ → Down q sy sy′
-               → Down q (U.unionˢ x sx y sy) (U.unionˢ x′ sx′ y′ sy′)
+  union-down : ∀ {Γ B q} (x x′ y y′ : U.Node Γ B) sx sx′ sy sy′ → Hushed sy → Hushed sy′ → Down q sx sx′ → Down q sy sy′
+             → Down q (U.unionˢ x sx y sy) (U.unionˢ x′ sx′ y′ sy′)
+  union-down x x′ y y′ _ _ _ _ hy hy′ (inj₁ outᵗ)  dy = dy
+  union-down x x′ y y′ _ _ _ _ hy hy′ (inj₁ endᵗ)  dy = dy
+  union-down x x′ y y′ _ _ _ _ hy hy′ (inj₁ hushᵗ) dy = dy
+  union-down x x′ y y′ _ _ _ _ hy hy′ (inj₁ (skipᵗ {k})) (inj₁ (skipᵗ {k′})) with k <ᵖ k′
+  ... | true  = inj₁ skipᵗ
+  ... | false = inj₁ skipᵗ
+  union-down x x′ y y′ _ _ _ _ hy hy′ (inj₁ skipᵗ) (inj₁ outᵗ)  = inj₁ skipᵗ
+  union-down x x′ y y′ _ _ _ _ hy hy′ (inj₁ skipᵗ) (inj₁ endᵗ)  = inj₁ skipᵗ
+  union-down x x′ y y′ _ _ _ _ hy hy′ (inj₁ skipᵗ) (inj₁ hushᵗ) = inj₁ skipᵗ
+  union-down {q = q} x x′ y y′ _ _ sy sy′ hy hy′ (inj₁ (skipᵗ {k} {a} {a′})) (inj₂ (h , h′)) with k <ᵖ q in e
+  ... | true  = skips-down (proj₂ (union-low-x x a y e h hy)) (proj₂ (union-low-x x′ a′ y′ e h′ hy′))
+  ... | false = inj₂ (union-heads x (U.skipˢ k a) y sy (at-heads (U.skipˢ k a) refl (not-< e)) h
+                    , union-heads x′ (U.skipˢ k a′) y′ sy′ (at-heads (U.skipˢ k a′) refl (not-< e)) h′)
+  union-down x x′ y y′ sx sx′ sy sy′ hy hy′ (inj₂ (hx , hx′)) (inj₂ (h , h′)) = inj₂ (union-heads x sx y sy hx h , union-heads x′ sx′ y′ sy′ hx′ h′)
+  union-down {q = q} x x′ y y′ sx sx′ _ _ hy hy′ (inj₂ (hx , hx′)) (inj₁ (skipᵗ {k′} {b₁} {b₁′})) with k′ <ᵖ q in e
+  ... | true  = skips-down (proj₂ (union-low-y x sx y b₁ e hx)) (proj₂ (union-low-y x′ sx′ y′ b₁′ e hx′))
+  ... | false = inj₂ (union-heads x sx y (U.skipˢ k′ b₁) hx (at-heads (U.skipˢ k′ b₁) refl (not-< e))
+                    , union-heads x′ sx′ y′ (U.skipˢ k′ b₁′) hx′ (at-heads (U.skipˢ k′ b₁′) refl (not-< e)))
+  union-down x x′ y y′ sx sx′ _ _ hy hy′ (inj₂ (hx , hx′)) (inj₁ hushᵗ) = inj₂ (union-heads x sx y U.hushˢ hx (λ ()) , union-heads x′ sx′ y′ U.hushˢ hx′ (λ ()))
+  union-down x x′ y y′ sx sx′ _ _ () hy′ (inj₂ _) (inj₁ outᵗ)
+  union-down x x′ y y′ sx sx′ _ _ () hy′ (inj₂ _) (inj₁ endᵗ)
 
   -- SUSPECT: a step that leaves `r` falls back to the rest, whose own
   -- head need not be past the step's; a shut moving the step inside `r`
@@ -570,13 +682,90 @@ module Framing (R : Set) where
     bursts-down : ∀ {Γ A B q} r (t t′ : U.Node Γ A) (st st′ : U.Step Γ A) → Down q st st′ → Down q (U.restˢ {B = B} t) (U.restˢ {B = B} t′)
                 → Down {Γ} {B} q (U.burstsˢ r t st) (U.burstsˢ r t′ st′)
 
-  postulate
-    source-down : ∀ {Γ A B q} r (b b′ : U.Node (A ∷ Γ) B) (s s′ : U.Node Γ A) sb sb′ ss ss′ → Down q sb sb′ → Down q ss ss′
-                → Down q (U.sourceˢ r b sb s ss) (U.sourceˢ r b′ sb′ s′ ss′)
+  body-twin : ∀ {Γ A B} r (s s′ : U.Source Γ A) {sb sb′ : U.Step (A ∷ Γ) B} → Twin sb sb′ → Twin (U.bodyˢ r s sb) (U.bodyˢ r s′ sb′)
+  body-twin r s s′ outᵗ  = outᵗ
+  body-twin r s s′ skipᵗ = skipᵗ
+  body-twin r s s′ endᵗ  = endᵗ
+  body-twin r s s′ hushᵗ = hushᵗ
 
-  postulate
-    ended-down : ∀ {Γ A B q} r c (b b′ : U.Node (A ∷ Γ) B) (t t′ : U.Node Γ A) sb sb′ st st′ → Down q sb sb′ → Down q st st′
-               → Down q (U.endedˢ r b sb c t st) (U.endedˢ r b′ sb′ c t′ st′)
+  shut-twin : ∀ {Γ A B} r c (t t′ : U.Node Γ A) {sb sb′ : U.Step (A ∷ Γ) B} → Twin sb sb′ → Twin (U.shutˢᵗ r c t sb) (U.shutˢᵗ r c t′ sb′)
+  shut-twin r c t t′ outᵗ  = outᵗ
+  shut-twin r c t t′ skipᵗ = skipᵗ
+  shut-twin r c t t′ endᵗ  = endᵗ
+  shut-twin r c t t′ hushᵗ = hushᵗ
+
+  -- A body heading before `q`, against a source heading past it: the body leads.
+  source-low : ∀ {Γ A B q h} r (b : U.Node (A ∷ Γ) B) sb (s : U.Node Γ A) ss → h <ᵖ q ≡ true → U.headˢ sb ≡ just h → HeadsS q ss
+             → U.sourceˢ r b sb s ss ≡ U.bodyˢ r (U.live s) sb
+  source-low r b sb s (U.outˢ k a s′) lt hd hs = if-false (trans (before-head (k ++ [ ix 0 ]) sb hd) (past-ix (hs refl) lt))
+  source-low r b sb s (U.skipˢ k s′)  lt hd hs = if-false (trans (before-head (k ++ [ ix 0 ]) sb hd) (past-ix (hs refl) lt))
+  source-low r b sb s (U.endˢ c)      lt hd hs = if-false (trans (before-head (c ++ [ ix 0 ]) sb hd) (past-ix (hs refl) lt))
+  source-low r b sb s U.hushˢ         lt hd hs = refl
+
+  source-down : ∀ {Γ A B q} r (b b′ : U.Node (A ∷ Γ) B) (s s′ : U.Node Γ A) sb sb′ ss ss′ → Down q sb sb′ → Down q ss ss′
+              → Down q (U.sourceˢ r b sb s ss) (U.sourceˢ r b′ sb′ s′ ss′)
+  source-down r b b′ s s′ sb sb′ _ _ (inj₁ tb) (inj₁ (outᵗ {k}))  = inj₁ (if-twin (before-twin (k ++ [ ix 0 ]) tb) skipᵗ (body-twin r (U.live s) (U.live s′) tb))
+  source-down r b b′ s s′ sb sb′ _ _ (inj₁ tb) (inj₁ (skipᵗ {k})) = inj₁ (if-twin (before-twin (k ++ [ ix 0 ]) tb) skipᵗ (body-twin r (U.live s) (U.live s′) tb))
+  source-down r b b′ s s′ sb sb′ _ _ (inj₁ tb) (inj₁ (endᵗ {k}))  = inj₁ (if-twin (before-twin (k ++ [ ix 0 ]) tb) skipᵗ (body-twin r (U.live s) (U.live s′) tb))
+  source-down r b b′ s s′ sb sb′ _ _ (inj₁ tb) (inj₁ hushᵗ)       = inj₁ (body-twin r (U.live s) (U.live s′) tb)
+  source-down {q = q} r b b′ s s′ sb sb′ _ _ (inj₂ (hb , hb′)) (inj₁ (outᵗ {k} {a} {c} {c′})) with (k ++ [ ix 0 ]) <ᵖ q in e
+  ... | true  = inj₁ (twin-via (if-true (before-low sb e hb)) (if-true (before-low sb′ e hb′)) skipᵗ)
+  ... | false = inj₂ ( if-head (U.beforeˢ (k ++ [ ix 0 ]) sb) (U.skipˢ (k ++ [ ix 0 ]) (U.connectᶜ r (U.feed (here refl) k (just a) b) (U.live c))) (U.bodyˢ r (U.live s) sb) (at-heads (U.skipˢ (k ++ [ ix 0 ]) (U.connectᶜ r (U.feed (here refl) k (just a) b) (U.live c))) refl (not-< e)) (body-head r (U.live s) sb hb)
+                     , if-head (U.beforeˢ (k ++ [ ix 0 ]) sb′) (U.skipˢ (k ++ [ ix 0 ]) (U.connectᶜ r (U.feed (here refl) k (just a) b′) (U.live c′))) (U.bodyˢ r (U.live s′) sb′) (at-heads (U.skipˢ (k ++ [ ix 0 ]) (U.connectᶜ r (U.feed (here refl) k (just a) b′) (U.live c′))) refl (not-< e)) (body-head r (U.live s′) sb′ hb′))
+  source-down {q = q} r b b′ s s′ sb sb′ _ _ (inj₂ (hb , hb′)) (inj₁ (skipᵗ {k} {c} {c′})) with (k ++ [ ix 0 ]) <ᵖ q in e
+  ... | true  = inj₁ (twin-via (if-true (before-low sb e hb)) (if-true (before-low sb′ e hb′)) skipᵗ)
+  ... | false = inj₂ ( if-head (U.beforeˢ (k ++ [ ix 0 ]) sb) (U.skipˢ (k ++ [ ix 0 ]) (U.connectᶜ r (U.feed (here refl) k nothing b) (U.live c))) (U.bodyˢ r (U.live s) sb) (at-heads (U.skipˢ (k ++ [ ix 0 ]) (U.connectᶜ r (U.feed (here refl) k nothing b) (U.live c))) refl (not-< e)) (body-head r (U.live s) sb hb)
+                     , if-head (U.beforeˢ (k ++ [ ix 0 ]) sb′) (U.skipˢ (k ++ [ ix 0 ]) (U.connectᶜ r (U.feed (here refl) k nothing b′) (U.live c′))) (U.bodyˢ r (U.live s′) sb′) (at-heads (U.skipˢ (k ++ [ ix 0 ]) (U.connectᶜ r (U.feed (here refl) k nothing b′) (U.live c′))) refl (not-< e)) (body-head r (U.live s′) sb′ hb′))
+  source-down {q = q} r b b′ s s′ sb sb′ _ _ (inj₂ (hb , hb′)) (inj₁ (endᵗ {k})) with (k ++ [ ix 0 ]) <ᵖ q in e
+  ... | true  = inj₁ (twin-via (if-true (before-low sb e hb)) (if-true (before-low sb′ e hb′)) skipᵗ)
+  ... | false = inj₂ ( if-head (U.beforeˢ (k ++ [ ix 0 ]) sb) (U.skipˢ (k ++ [ ix 0 ]) (U.connectᶜ r (U.shut (here refl) k b) (U.ended k (U.restᶜ s)))) (U.bodyˢ r (U.live s) sb) (at-heads (U.skipˢ (k ++ [ ix 0 ]) (U.connectᶜ r (U.shut (here refl) k b) (U.ended k (U.restᶜ s)))) refl (not-< e)) (body-head r (U.live s) sb hb)
+                     , if-head (U.beforeˢ (k ++ [ ix 0 ]) sb′) (U.skipˢ (k ++ [ ix 0 ]) (U.connectᶜ r (U.shut (here refl) k b′) (U.ended k (U.restᶜ s′)))) (U.bodyˢ r (U.live s′) sb′) (at-heads (U.skipˢ (k ++ [ ix 0 ]) (U.connectᶜ r (U.shut (here refl) k b′) (U.ended k (U.restᶜ s′)))) refl (not-< e)) (body-head r (U.live s′) sb′ hb′))
+  source-down r b b′ s s′ sb sb′ _ _ (inj₂ (hb , hb′)) (inj₁ hushᵗ) = inj₂ (body-head r (U.live s) sb hb , body-head r (U.live s′) sb′ hb′)
+  source-down r b b′ s s′ sb sb′ ss ss′ (inj₂ (hb , hb′)) (inj₂ (hs , hs′)) = inj₂ (source-head r b sb s ss hb hs , source-head r b′ sb′ s′ ss′ hb′ hs′)
+  source-down {q = q} r b b′ s s′ sb sb′ ss ss′ (inj₁ tb) (inj₂ (hs , hs′)) with low-or-high q tb
+  ... | inj₁ (hb , hb′) = inj₂ (source-head r b sb s ss hb hs , source-head r b′ sb′ s′ ss′ hb′ hs′)
+  ... | inj₂ (h , lt , e , e′) = inj₁ (twin-via (source-low r b sb s ss lt e hs) (source-low r b′ sb′ s′ ss′ lt e′ hs′) (body-twin r (U.live s) (U.live s′) tb))
+
+  shut-heads-step : ∀ {Γ A B q} r c (t : U.Node Γ A) (S : U.Step (A ∷ Γ) B) → HeadsS q S → HeadsS q (U.shutˢᵗ r c t S)
+  shut-heads-step r c t (U.outˢ _ _ _) hs = hs
+  shut-heads-step r c t (U.skipˢ _ _)  hs = hs
+  shut-heads-step r c t (U.endˢ _)     hs = hs
+  shut-heads-step r c t U.hushˢ        hs = hs
+
+  ended-heads : ∀ {Γ A B q} r c (b : U.Node (A ∷ Γ) B) sb (t : U.Node Γ A) st → HeadsS q sb → HeadsS q st → HeadsS q (U.endedˢ r b sb c t st)
+  ended-heads r c b sb t (U.skipˢ k t′) hb hs =
+    if-head (U.beforeˢ (k ++ [ ix 0 ]) sb) (U.skipˢ (k ++ [ ix 0 ]) (U.connectᶜ r b (U.ended c t′))) (U.shutˢᵗ r c t sb)
+      (child-skip k (ix 0) (U.connectᶜ r b (U.ended c t′)) hs) (shut-heads-step r c t sb hb)
+  ended-heads r c b sb t (U.outˢ _ _ _) hb hs = shut-heads-step r c t sb hb
+  ended-heads r c b sb t (U.endˢ _)     hb hs = shut-heads-step r c t sb hb
+  ended-heads r c b sb t U.hushˢ        hb hs = shut-heads-step r c t sb hb
+
+  ended-low : ∀ {Γ A B q h} r c (b : U.Node (A ∷ Γ) B) sb (t : U.Node Γ A) st → h <ᵖ q ≡ true → U.headˢ sb ≡ just h → HeadsS q st
+            → U.endedˢ r b sb c t st ≡ U.shutˢᵗ r c t sb
+  ended-low r c b sb t (U.skipˢ k t′) lt hd hs = if-false (trans (before-head (k ++ [ ix 0 ]) sb hd) (past-ix (hs refl) lt))
+  ended-low r c b sb t (U.outˢ _ _ _) lt hd hs = refl
+  ended-low r c b sb t (U.endˢ _)     lt hd hs = refl
+  ended-low r c b sb t U.hushˢ        lt hd hs = refl
+
+  ended-down : ∀ {Γ A B q} r c (b b′ : U.Node (A ∷ Γ) B) (t t′ : U.Node Γ A) sb sb′ st st′ → Down q sb sb′ → Down q st st′
+             → Down q (U.endedˢ r b sb c t st) (U.endedˢ r b′ sb′ c t′ st′)
+  ended-down r c b b′ t t′ sb sb′ _ _ (inj₁ tb) (inj₁ (skipᵗ {k})) = inj₁ (if-twin (before-twin (k ++ [ ix 0 ]) tb) skipᵗ (shut-twin r c t t′ tb))
+  ended-down r c b b′ t t′ sb sb′ _ _ (inj₁ tb) (inj₁ outᵗ)  = inj₁ (shut-twin r c t t′ tb)
+  ended-down r c b b′ t t′ sb sb′ _ _ (inj₁ tb) (inj₁ endᵗ)  = inj₁ (shut-twin r c t t′ tb)
+  ended-down r c b b′ t t′ sb sb′ _ _ (inj₁ tb) (inj₁ hushᵗ) = inj₁ (shut-twin r c t t′ tb)
+  ended-down {q = q} r c b b′ t t′ sb sb′ _ _ (inj₂ (hb , hb′)) (inj₁ (skipᵗ {k} {t₁} {t₁′})) with (k ++ [ ix 0 ]) <ᵖ q in e
+  ... | true  = inj₁ (twin-via (if-true (before-low sb e hb)) (if-true (before-low sb′ e hb′)) skipᵗ)
+  ... | false = inj₂ ( if-head (U.beforeˢ (k ++ [ ix 0 ]) sb) (U.skipˢ (k ++ [ ix 0 ]) (U.connectᶜ r b (U.ended c t₁))) (U.shutˢᵗ r c t sb)
+                         (at-heads (U.skipˢ (k ++ [ ix 0 ]) (U.connectᶜ r b (U.ended c t₁))) refl (not-< e)) (shut-heads-step r c t sb hb)
+                     , if-head (U.beforeˢ (k ++ [ ix 0 ]) sb′) (U.skipˢ (k ++ [ ix 0 ]) (U.connectᶜ r b′ (U.ended c t₁′))) (U.shutˢᵗ r c t′ sb′)
+                         (at-heads (U.skipˢ (k ++ [ ix 0 ]) (U.connectᶜ r b′ (U.ended c t₁′))) refl (not-< e)) (shut-heads-step r c t′ sb′ hb′))
+  ended-down r c b b′ t t′ sb sb′ _ _ (inj₂ (hb , hb′)) (inj₁ outᵗ)  = inj₂ (shut-heads-step r c t sb hb , shut-heads-step r c t′ sb′ hb′)
+  ended-down r c b b′ t t′ sb sb′ _ _ (inj₂ (hb , hb′)) (inj₁ endᵗ)  = inj₂ (shut-heads-step r c t sb hb , shut-heads-step r c t′ sb′ hb′)
+  ended-down r c b b′ t t′ sb sb′ _ _ (inj₂ (hb , hb′)) (inj₁ hushᵗ) = inj₂ (shut-heads-step r c t sb hb , shut-heads-step r c t′ sb′ hb′)
+  ended-down r c b b′ t t′ sb sb′ st st′ (inj₂ (hb , hb′)) (inj₂ (hs , hs′)) = inj₂ (ended-heads r c b sb t st hb hs , ended-heads r c b′ sb′ t′ st′ hb′ hs′)
+  ended-down {q = q} r c b b′ t t′ sb sb′ st st′ (inj₁ tb) (inj₂ (hs , hs′)) with low-or-high q tb
+  ... | inj₁ (hb , hb′) = inj₂ (ended-heads r c b sb t st hb hs , ended-heads r c b′ sb′ t′ st′ hb′ hs′)
+  ... | inj₂ (h , lt , e , e′) = inj₁ (twin-via (ended-low r c b sb t st lt e hs) (ended-low r c b′ sb′ t′ st′ lt e′ hs′) (shut-twin r c t t′ tb))
 
   -- The lists keep their lengths and the outer its presence: the
   -- outer's and lanes' ends with nothing left are read off them.
@@ -698,12 +887,6 @@ module Framing (R : Set) where
   shut-heads i c b hb tl e with shut-down i c b tl
   ... | inj₁ tw       = hb (trans (twin-head tw) e)
   ... | inj₂ (_ , h′) = h′ e
-
-  shut-heads-step : ∀ {Γ A B q} r c (t : U.Node Γ A) (S : U.Step (A ∷ Γ) B) → HeadsS q S → HeadsS q (U.shutˢᵗ r c t S)
-  shut-heads-step r c t (U.outˢ _ _ _) hs = hs
-  shut-heads-step r c t (U.skipˢ _ _)  hs = hs
-  shut-heads-step r c t (U.endˢ _)     hs = hs
-  shut-heads-step r c t U.hushˢ        hs = hs
 
   just-of : ∀ {ℓ} {X : Set ℓ} {m : Maybe X} → is-just m ≡ true → Σ X λ c → m ≡ just c
   just-of {m = just c} _ = c , refl
