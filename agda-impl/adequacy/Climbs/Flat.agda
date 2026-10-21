@@ -109,7 +109,7 @@ module ClimbFlat (R : Set) where
   open Everywhere.Spending R using (spent-retag)
   open EverywhereGated.Holding R using (holds-alike; holds-path; holds-plant; holds-retag)
   open Keeping R using (seen-planted)
-  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; _⊑[_/_]_; ≡-⊑; Bound; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; pooledL-alike; leftover-from; pooled-from; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; tw-alike)
+  open Shifting R using (module Flag; flags-alike; flagsL-alike; outers-planted; outers-apart; outersL-in; flag-in; flagged-moved; part-at; cons-untold; ≡-⊆; ++-mono; _⊆ᴾ_; _⊑[_/_]_; ≡-⊑; Bound; Pred; eachL-of; each-alike; eachL-alike; EachL; LingersL; lingers-alike; lingersL-alike; leftover-alike; leftoverL-alike; pooledL-alike; leftover-from; pooled-from; conn-left; lingers-sub; lingersL-of; module Linger; module Build; DoneByL; seen-take; Steady; nowAt; fed-at; part-retag; just-connected; flags-retag; tw-alike)
   open ShiftWalk R using (let-go; grip)
   open Framing R using (merged-eq; heads-flat; untold; untoldᴹ; untoldᴸ; just-of; scan-part; scan-defined)
   open FramingRepool R using (heads-repool; Untold; none-of; tells-past; ended-past; scan-kernels; scan-meaning; scan-lifts; scan-behind; module Wrote; plant-queue; off-store; off-++; lane1-alike; lifts-off) renaming (Ended to Ends)
@@ -202,7 +202,7 @@ module ClimbFlat (R : Set) where
   gatedL-mono sub (lane c k s ∷ ls) (g₁ , g₂ , g₃) = (λ e → [ (λ m → inj₁ (sub m)) , inj₂ ]′ (g₁ e)) , g₂ , gatedL-mono sub ls g₃
 
   -- Two moves at one node, one after the other.
-  heading-∘ : ∀ {h} {H₁ H₂ H₃ : Heapᴹ h} {q Δ A} {E} {u v w : Sub h Δ A} → Heading H₁ H₂ q E u v → Heading H₂ H₃ q E v w → Heading H₁ H₃ q E u w
+  heading-∘ : ∀ {h} {H₁ H₂ H₃ : Heapᴹ h} {q Δ A} {E : Pred Δ} {u v w : Sub h Δ A} → Heading H₁ H₂ q E u v → Heading H₂ H₃ q E v w → Heading H₁ H₃ q E u w
   heading-∘ record { head-revive = r₁ ; head-told = t₁ ; head-below = b₁ } record { head-revive = r₂ ; head-told = t₂ ; head-below = b₂ } = record
     { head-revive = λ j → r₁ (r₂ j)
     ; head-told   = λ i b e₀ e₂ t → t₂ i b (proj₂ (just-of (r₂ (cong is-just e₂)))) e₂ (t₁ i b e₀ (proj₂ (just-of (r₂ (cong is-just e₂)))) t)
@@ -277,7 +277,7 @@ module ClimbFlat (R : Set) where
         ... | t , rf = subst (λ p → Leaves p (At.pooled H fl u ls) × Restful p) (sym e) (lv-trans (proj₁ (tw-sym (tw-idleʳ pl))) t , rf-union rf rf-idle)
 
     -- The pool moved in place: every clause but the pool's alike.
-    repool-heading : ∀ {q E} → (∀ {A′} (i : A′ ∈ᴸ Δ) {c} → E i c → ∀ {b₀} → At.part H w₀ ≡ just b₀ → untold i pl′ ⊑[ q / c ] untold i b₀)
+    repool-heading : ∀ {q} {E : Pred Δ} → (∀ {A′} (i : A′ ∈ᴸ Δ) {c} → E i c → ∀ {b₀} → At.part H w₀ ≡ just b₀ → untold i pl′ ⊑[ q / c ] untold i b₀)
                    → (∀ {c} → At.part H w₀ ≡ just c → Heads q pl → Heads q pl′) → Heading H H q E w₀ v
     repool-heading {q} told hp = record
       { head-revive = revive
@@ -569,7 +569,7 @@ module ClimbFlat (R : Set) where
           pool lg x = tie e₀ (Lingers.pools lg here refl e₀)
             where e₀ = proj₂ (just-of (revive (cong is-just x)))
 
-      heading : ∀ {q E} → (∀ {A′} (i : A′ ∈ᴸ Δ) {c} → E i c → ∀ {b₀} → At.part H w₀ ≡ just b₀ → untold i pl′ ⊑[ q / c ] untold i b₀)
+      heading : ∀ {q} {E : Pred Δ} → (∀ {A′} (i : A′ ∈ᴸ Δ) {c} → E i c → ∀ {b₀} → At.part H w₀ ≡ just b₀ → untold i pl′ ⊑[ q / c ] untold i b₀)
               → (∀ {c} → At.part H w₀ ≡ just c → Heads q pl → Heads q pl′) → Heading H H′ q E w₀ v
       heading {q} told hp = record
         { head-revive = revive
