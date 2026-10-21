@@ -10,15 +10,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE REST'S TIES
 
-Undecided invariant: an ended outer's or lane's rest, read by `untoldʳ`,
-tells its joiners past the run at each bound binder's end wherever the
-flatMap's part does, though the ended sub is in no part. Its untold joiners on
-a bound binder are told only by the connect's part-level shut; true only if
-none was subscribed before that binder's end. Open too: whether its siblings'
-rests head past the run, as hidden runs may not. Settled when `settle-rest-told` is a
-body or refuted with a witness, and `others-heads` is a body.
+Undecided invariant: an ended outer's or lane's last ghost tells its joiners
+past the run at each bound binder's end, though no part holds it and its tie
+is meaning only. No untold measure is kept over the ghost. Open too: the
+siblings' rests at a settle, which the pool reached only while the flatMap held
+a part. Settled when
+`outer-ghost-told` is a body over such a measure, and `others-heads` is a body.
 
-Members: `settle-rest-told`, `close-rest-told`, `others-heads`,
+Members: `outer-ghost-told`, `lane-ghost-told`, `others-heads`,
 `outer-ended-heads`, `lanes-rest-heads`, `body-burst-heads`, `rest-sourced`,
 `take-leftover`, `body-leftover`.
 
