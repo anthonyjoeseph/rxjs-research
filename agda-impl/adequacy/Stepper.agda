@@ -226,6 +226,7 @@ aboveᴱ k h (skip q σ)  f b = <ᵖ-past k (q ++ [ ix 0 ]) h f b
 aboveᴱ k h (end c)     f b = <ᵖ-past k (c ++ [ ix 0 ]) h f b
 
 above : ∀ {Γ} (ν : All (λ _ → Mode) Γ) (ρ : NEnv Γ) k h → Floor ν k ρ → Past ν h ρ → k <ᵖ h ≡ true
+above []ᴬ          []ᴬ      k h f        ()
 above (runs ∷ᴬ ν)  (e ∷ᴬ ρ) k h (fe , f) (inj₁ b) = aboveᴱ k h e fe b
 above (runs ∷ᴬ ν)  (e ∷ᴬ ρ) k h (fe , f) (inj₂ p) = above ν ρ k h f p
 above (over ∷ᴬ ν)  (e ∷ᴬ ρ) k h f        p        = above ν ρ k h f p
