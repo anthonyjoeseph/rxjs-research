@@ -10,15 +10,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ROOT STEP
 
-Whether a connect's meaning starts with its step's event, else strictly past
-a running source's shown event and before its step's head (planned: by cases on
-the two IHs, no new invariant); whether a connect's body never steps at or just
-past its source's step; whether a hushed node leaves nothing running; the step's
-parts placed, a joiner's source alien to where it joined.
-Settled when `first-connect`, `shy-before` and `hushed-cut` are bodies or refuted.
+Whether an ended connect's meaning starts with its step's event (its source
+must be rest-like: no invariant yet says so); a flatMap's likewise; whether a
+connect's body never steps at or just past its source's step; whether a hushed
+node leaves nothing running; the step's parts placed.
+Settled when `first-ended`, `shy-before` and `hushed-cut` are bodies or refuted.
 
-Members: `first-connect`, `first-ended`, `first-flat`, `shy-before`,
-`hushed-cut`, `within-step`, `under-shown-connect`.
+Members: `first-ended`, `first-flat`, `shy-before`, `hushed-cut`,
+`within-step`, `under-shown-connect`.
 
 #### UP-ENDED
 
