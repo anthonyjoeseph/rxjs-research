@@ -162,7 +162,10 @@ module ClimbConnect (R : Set) where
 
     -- The connect's part a new node, the body fed: what it heads, tells
     -- and revives read off it; the body retagged, its parts as open as
-    -- before, its heads, ties and leftover kept.
+    -- before, its heads and ties kept.  Its leftover moves, so what it
+    -- leaves is the caller's.
+    --
+    -- REFUTED: 0ce00047 of the body's leftover kept, by a nested connect whose source is a live joiner of the fed one
     postulate
       re-revive   : is-just (At.part G v) ≡ true → is-just (At.part G w₀) ≡ true
       re-told     : ∀ {A′} (i : A′ ∈ᴸ Δ) {b₀ b′} → At.part G w₀ ≡ just b₀ → At.part G v ≡ just b′ → untold i b′ ⊆ᴾ untold i b₀
@@ -170,7 +173,6 @@ module ClimbConnect (R : Set) where
       re-just     : is-just (At.part G (retag g bd)) ≡ is-just (At.part G bd)
       re-heads    : Each G (Heads q) bd → Each G (Heads q) (retag g bd)
       re-lingers  : Lingers G bd → Lingers G (retag g bd)
-      re-leftover : At.leftover G {B = ⊤} (retag g bd) ≡ At.leftover G {B = ⊤} bd
 
     heading : Heading G G q w₀ v
     heading = record
@@ -182,10 +184,10 @@ module ClimbConnect (R : Set) where
           (λ j → each-sub ev (in-source here) (cong (λ z → z ∧ true) (trans (sym re-just) j)))
           (λ j → re-heads (each-sub ev (in-body here) (cong (λ z → z ∧ true) j))) }
 
-    lingering : Lingering G G w₀ v
-    lingering = record
+    lingering : (∀ {C} → Twin (At.leftover G {B = C} w₀) (At.leftover G {B = C} v)) → Lingering G G w₀ v
+    lingering rs = record
       { ling-revive = re-revive
-      ; ling-rested = λ {C} → tw-alike (conn-left {B = C} rp {n = At.sourced G (At.part G u) (At.leftover G u)} refl re-leftover)
+      ; ling-rested = rs
       ; ling-below  = λ lg → Linger.lg-connect G
           (λ x pn pe → Lingers.rests lg here refl (proj₂ (just-of (re-revive (cong is-just x)))) pn pe)
           (λ jb → lingers-sub G lg (in-source here) (cong (λ z → z ∧ true) (trans (sym re-just) jb)))
@@ -282,8 +284,15 @@ module ClimbConnect (R : Set) where
     fed-heading : Heading H H q w₀ v
     fed-heading = Re.heading
 
-    fed-lingering : Lingering H H w₀ v
-    fed-lingering = Re.lingering
+    -- What the connect leaves, the feed restaged: its source still
+    -- holds the value, so a joiner reached through a nested source's
+    -- burst reads it from the source before and holds it after.
+    postulate
+      fed-rested : At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T
+                 → ∀ {C} → Twin (At.leftover H {B = C} w₀) (At.leftover H {B = C} v)
+
+    fed-lingering : At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T → Lingering H H w₀ v
+    fed-lingering jn mn bh = Re.lingering (λ {C} → fed-rested jn mn bh {C})
 
     fed-stack : ∀ {w p′ bs} {ϑ : w ⊑ h} {K : Stack w ⊤} → StackAs T p′ ϑ K bs → StackAs T′ p′ ϑ K bs
     fed-stack = restack kin ρ
@@ -299,8 +308,9 @@ module ClimbConnect (R : Set) where
     fed-behind : AllPairs _≢_ (names T) → Untold H q T → Ends H T → Each H (Heads q) T → Each H (Heads q) T′
     fed-behind fs ut en = Shift.shift-behind H H ρ (λ j _ → refl) [] fs v ut en fed-heading
 
-    fed-lingers : AllPairs _≢_ (names T) → Ends H T → Lingers H T → Lingers H T′
-    fed-lingers fs en = Shift.shift-lingers H H ρ (λ j _ → refl) [] fs v en fed-lingering
+    fed-lingers : AllPairs _≢_ (names T) → Ends H T → At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T
+                → Lingers H T → Lingers H T′
+    fed-lingers fs en jn mn bh = Shift.shift-lingers H H ρ (λ j _ → refl) [] fs v en (fed-lingering jn mn bh)
 
     -- The feed read by the connect's own joiners alone, each a subscriber
     -- the feed read.
@@ -353,7 +363,7 @@ module ClimbConnect (R : Set) where
         ; kernels = Feeds.fed-kernels hp ρ y q kn ; meaning = Feeds.fed-meaning hp ρ y q (Queue.joined qu) mn ; queue = Feeds.fed-queue hp ρ y q qu
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Feeds.Bd.body-names hp ρ y q))) fs
                          ; clocked = proj₁ ck , Feeds.fed-ticked hp ρ y q clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
-        ; sorted = sorted-⇝ so (then refl now) ; behind′ = Eaching.each-to _ _ (Feeds.fed-behind hp ρ y q fs (tells-past cl) (ended-past cl) bh) ; lingers′ = Lingering.lingers-to _ (Feeds.fed-lingers hp ρ y q fs (ended-past cl) lgr) ; flags = let-go hp (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Feeds.Bd.body-names hp ρ y q))) fs)
+        ; sorted = sorted-⇝ so (then refl now) ; behind′ = Eaching.each-to _ _ (Feeds.fed-behind hp ρ y q fs (tells-past cl) (ended-past cl) bh) ; lingers′ = Lingering.lingers-to _ (Feeds.fed-lingers hp ρ y q fs (ended-past cl) (Queue.joined qu) mn bh lgr) ; flags = let-go hp (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Feeds.Bd.body-names hp ρ y q))) fs)
                     (trans (seen-planted hp ρ v) (lifts-seen Lρ)) ju
                     (subst (DoneBy hp (plant ρ v)) (sym (outers-planted ρ v))
                            (Shift.shift-flags hp hp ρ (λ j _ → refl) [] fs v {ns₀ = []} (λ ()) rv fb (subst (DoneBy hp T) (sym (++-identityʳ (outers ρ))) d₀))) })
@@ -533,8 +543,15 @@ module ClimbConnect (R : Set) where
     fin-heading : AllPairs _≢_ (names w₀) → Heading H H′ q w₀ v
     fin-heading fr = heading-∘ (fin-kept fr) Re.heading
 
-    fin-lingering : AllPairs _≢_ (names w₀) → Lingering H H′ w₀ v
-    fin-lingering fr = lingering-∘ (fin-lkept fr) Re.lingering
+    -- What the connect leaves, the finish restaged: the source's end
+    -- read by a joiner through a nested source's burst before, held
+    -- after.
+    postulate
+      fin-rested : At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T
+                 → ∀ {C} → Twin (At.leftover H′ {B = C} w₀) (At.leftover H′ {B = C} v)
+
+    fin-lingering : AllPairs _≢_ (names w₀) → At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T → Lingering H H′ w₀ v
+    fin-lingering fr jn mn bh = lingering-∘ (fin-lkept fr) (Re.lingering (λ {C} → fin-rested jn mn bh {C}))
 
     module Sh (fs : AllPairs _≢_ (names T)) = Shift H H′ ρ (off-store H (Subject.closed Sj)) mine fs
 
@@ -583,8 +600,9 @@ module ClimbConnect (R : Set) where
     fin-behind : AllPairs _≢_ (names T) → Untold H q T → Ends H T → Each H (Heads q) T → Each H′ (Heads q) T′
     fin-behind fs ut en = Sh.shift-behind fs v ut en (fin-heading (fresh-path ρ fs))
 
-    fin-lingers : AllPairs _≢_ (names T) → Ends H T → Lingers H T → Lingers H′ T′
-    fin-lingers fs en = Sh.shift-lingers fs v en (fin-lingering (fresh-path ρ fs))
+    fin-lingers : AllPairs _≢_ (names T) → Ends H T → At.Joined H (subjects T) (joiners T []) → Meaning H T → Each H (Heads q) T
+                → Lingers H T → Lingers H′ T′
+    fin-lingers fs en jn mn bh = Sh.shift-lingers fs v en (fin-lingering (fresh-path ρ fs) jn mn bh)
 
     -- The finish read by the connect's own joiners alone, each a
     -- subscriber the finish read, the closed flag apart from the list:
@@ -646,7 +664,7 @@ module ClimbConnect (R : Set) where
         ; kernels = Fins.fin-kernels hp ρ q fs kn ; meaning = Fins.fin-meaning hp ρ q fs (Queue.joined qu) mn ; queue = Fins.fin-queue hp ρ q fs qu
         ; books = record { fresh = subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Fins.Bd.body-names hp ρ q))) fs
                          ; clocked = proj₁ ck , Fins.fin-ticked hp ρ q clk sk (proj₂ ck) ; paidUp = pu ; running = rn }
-        ; sorted = sorted-⇝ so path ; behind′ = Eaching.each-to _ _ (Fins.fin-behind hp ρ q fs (tells-past cl) (ended-past cl) bh) ; lingers′ = Lingering.lingers-to _ (Fins.fin-lingers hp ρ q fs (ended-past cl) lgr) ; flags = let-go H′ (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Fins.Bd.body-names hp ρ q))) fs)
+        ; sorted = sorted-⇝ so path ; behind′ = Eaching.each-to _ _ (Fins.fin-behind hp ρ q fs (tells-past cl) (ended-past cl) bh) ; lingers′ = Lingering.lingers-to _ (Fins.fin-lingers hp ρ q fs (ended-past cl) (Queue.joined qu) mn bh lgr) ; flags = let-go H′ (planted ρ v) (subst (AllPairs _≢_) (sym (names-plant {t = T} ρ v (Fins.Bd.body-names hp ρ q))) fs)
                     (trans (seen-planted H′ ρ v) (lifts-seen (lifts-off hp H′ ρ fs off₀ Lρ))) ju
                     (subst (DoneBy H′ (plant ρ v)) (sym (outers-planted ρ v))
                            (Fins.Sh.shift-flags hp ρ q fs v {ns₀ = []} (λ ()) rv fb (subst (DoneBy hp T) (sym (++-identityʳ (outers ρ))) d₀))) })

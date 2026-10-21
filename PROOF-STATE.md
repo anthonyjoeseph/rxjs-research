@@ -10,12 +10,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE FED LEFTOVER
 
-Suspect fact: a retag keeps the body's leftover. A nested connect whose source
-holds a joiner of the fed one reads that joiner's part, so its burst and pins
-move. Settled by a witness, then restating what `Refed`'s lingering owes as
-the fed rest, or by `re-leftover` as a body.
+Whether a connect's leftover is kept, as a twin, when a feed or a finish
+restages it: a joiner reached through a nested source's burst reads the value
+from the source before and holds it after, given the call's `Meaning`, joins
+and heads. Settled when `fed-rested` is a body, or a witness under those
+hypotheses.
 
-Members: `re-leftover`.
+Members: `fed-rested`, `fin-rested`.
 
 #### THE REST'S TIES
 
