@@ -47,8 +47,8 @@ jobs:
 
   gate:
     runs-on: ubuntu-latest
-    # A cold interface cache rechecks the stdlib too, and runs past 20.
-    timeout-minutes: 30
+    # A cold interface cache rechecks the stdlib too, and runs past 30.
+    timeout-minutes: 55
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -72,16 +72,26 @@ jobs:
       # Keyed on the commit, restored from the newest prefix match: Agda
       # invalidates by content, so a stale interface is rechecked, never
       # trusted.  The `agda-interfaces-` prefix is what cache-prune.yml trims.
-      - name: Cache Agda interfaces
-        uses: actions/cache@v4
+      - name: Restore Agda interfaces
+        uses: actions/cache/restore@v4
         with:
           path: agda-impl/_build
           key: agda-interfaces-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
             agda-interfaces-${{ runner.os }}-
 
+      # The step times out before the job, so a run out of time still saves
+      # what it checked: otherwise a cold cache never warms.
       - name: make gate
+        timeout-minutes: 40
         run: make gate
+
+      - name: Save Agda interfaces
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: agda-impl/_build
+          key: agda-interfaces-${{ runner.os }}-${{ github.sha }}
 
   bug-cache:
     runs-on: ubuntu-latest
