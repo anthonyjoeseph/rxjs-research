@@ -8,6 +8,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE STATE-TREE LINK
+
+Untried: the state tree's run, read with marks, is sorted and alike the
+meaning's events, and reaches all of them. The heap machine's proofs are the
+guide, its heap bookkeeping not. Settled when the three are bodies over a
+ghost tree the configuration mirrors.
+
+Members: `sortedˢ`, `contentˢ`, `reachedˢ`.
+
 #### THE ROOT STEP
 
 Whether a step, its sources clear of it, keeps its parts placed: a flatMap's
@@ -159,14 +168,6 @@ Members: `after-map`, `after-scan`, `after-take`, `clear-take`,
 `feed-alikeⁱ`, `shut-alikeⁱ`, `defer-skips`, `rest-skips`, `union-skips`,
 `bursting-skips`, `under-skips`, `first-defer`, `first-rest`, `first-union`,
 `first-bursting`, `first-under`.
-
-#### THE TWO ENGINES
-
-Whether the state tree's run shows what the heap machine's does, kernel for
-kernel. Settled when `engines` is a body, or the link is reproven over the
-state tree and the heap machine deleted.
-
-Members: `engines`.
 
 ## Tier 2 — the simultaneous spec
 
