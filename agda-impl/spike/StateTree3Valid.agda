@@ -42,14 +42,14 @@ Leaf (_ ∷ _) = ⊥
 mutual
   Reach : ∀ {Γ A} → List ℕ → St Γ A → Set
   Reach p (pend o)              = Leaf p
-  Reach p (ofS q i xs)          = Leaf p
+  Reach p (ofS xs)          = Leaf p
   Reach p doneS                 = Leaf p
   Reach p (joinS j g x)         = Leaf p
   Reach p (mapS f s)            = One p s
   Reach p (scanS f z s)         = One p s
   Reach p (cutS l a s)          = One p s
   Reach p (lnS b s)             = One p s
-  Reach p (takeS i q ph s)      = One p s
+  Reach p (takeS i q s)      = One p s
   Reach p (flatS op f d n o ls) = Fl p o ls
   Reach p (connS k o b)         = Two p o b
 
@@ -79,14 +79,14 @@ Grows s s′ = ∀ p → Reach p s → Reach p s′
 
 reach-nil : ∀ {Γ A} (s : St Γ A) → Reach [] s
 reach-nil (pend o)              = tt
-reach-nil (ofS q i xs)          = tt
+reach-nil (ofS xs)          = tt
 reach-nil doneS                 = tt
 reach-nil (joinS j g x)         = tt
 reach-nil (mapS f s)            = tt
 reach-nil (scanS f z s)         = tt
 reach-nil (cutS l a s)          = tt
 reach-nil (lnS b s)             = tt
-reach-nil (takeS i q ph s)      = tt
+reach-nil (takeS i q s)      = tt
 reach-nil (flatS op f d n o ls) = tt
 reach-nil (connS k o b)         = tt
 
@@ -130,7 +130,7 @@ grows-plug (inMap f c)                     g = grows-plug c (one-grow g)
 grows-plug (inScan f z c)                  g = grows-plug c (one-grow g)
 grows-plug (inCut l a c)                   g = grows-plug c (one-grow g)
 grows-plug (inLn b c)                      g = grows-plug c (one-grow g)
-grows-plug (inTake i q ph c)               g = grows-plug c (one-grow g)
+grows-plug (inTake i q c)               g = grows-plug c (one-grow g)
 grows-plug (inOuter op f d n ls c)         g = grows-plug c (fl-grow g λ i p r → r)
 grows-plug (inLanes op f d n o pre post c) g = grows-plug c (fl-grow (λ p r → r) (growsL pre post g))
 grows-plug (inSrc k b c)                   g = grows-plug c (two-grow g λ p r → r)
@@ -147,8 +147,8 @@ reach-++ (inCut l a c)                   s q r = re (dirs c) 0 q (reach-++ c (cu
   where re = λ xs d q → subst (λ z → Reach z (plug c (cutS l a s))) (sym (++-assoc xs [ d ] q))
 reach-++ (inLn b c)                      s q r = re (dirs c) 0 q (reach-++ c (lnS b s) (0 ∷ q) r)
   where re = λ xs d q → subst (λ z → Reach z (plug c (lnS b s))) (sym (++-assoc xs [ d ] q))
-reach-++ (inTake i p ph c)               s q r = re (dirs c) 0 q (reach-++ c (takeS i p ph s) (0 ∷ q) r)
-  where re = λ xs d q → subst (λ z → Reach z (plug c (takeS i p ph s))) (sym (++-assoc xs [ d ] q))
+reach-++ (inTake i p c)               s q r = re (dirs c) 0 q (reach-++ c (takeS i p s) (0 ∷ q) r)
+  where re = λ xs d q → subst (λ z → Reach z (plug c (takeS i p s))) (sym (++-assoc xs [ d ] q))
 reach-++ (inOuter op f d n ls c)         s q r = re (dirs c) 0 q (reach-++ c (flatS op f d n s ls) (0 ∷ q) r)
   where re = λ xs e q → subst (λ z → Reach z (plug c (flatS op f d n s ls))) (sym (++-assoc xs [ e ] q))
 reach-++ (inLanes op f d n o pre post c) s q r =
@@ -174,14 +174,14 @@ joined-grow k g h js = mapᴬ (λ {j} → two-grow g h (proj₁ j)) js
 mutual
   Good : ∀ {Γ A} → St Γ A → Set
   Good (pend o)              = ⊤
-  Good (ofS q i xs)          = ⊤
+  Good (ofS xs)          = ⊤
   Good doneS                 = ⊤
   Good (joinS j g x)         = ⊤
   Good (mapS f s)            = Good s
   Good (scanS f z s)         = Good s
   Good (cutS l a s)          = Good s
   Good (lnS b s)             = Good s
-  Good (takeS i q ph s)      = Good s
+  Good (takeS i q s)      = Good s
   Good (flatS op f d n o ls) = Good o × GoodL ls
   Good (connS k o b)         = Good o × Good b × Joined k o b
 
@@ -208,7 +208,7 @@ good-plug (inMap f c)                     g h = good-plug c (one-grow g) h
 good-plug (inScan f z c)                  g h = good-plug c (one-grow g) h
 good-plug (inCut l a c)                   g h = good-plug c (one-grow g) h
 good-plug (inLn b c)                      g h = good-plug c (one-grow g) h
-good-plug (inTake i q ph c)               g h = good-plug c (one-grow g) h
+good-plug (inTake i q c)               g h = good-plug c (one-grow g) h
 good-plug (inOuter op f d n ls c)         g h = good-plug c (fl-grow g λ i p r → r) λ (g₀ , gl) → h g₀ , gl
 good-plug (inLanes op f d n o pre post c) g h = good-plug c (fl-grow (λ p r → r) (growsL pre post g)) λ (g₀ , gl) → g₀ , goodL-mid pre post h gl
 good-plug (inSrc k b c)                   g h = good-plug c (two-grow g λ p r → r) λ (g₀ , gb , jd) → h g₀ , gb , joined-grow k g (λ p r → r) jd
@@ -220,7 +220,7 @@ good-hole (inMap f c)                     s g = good-hole c (mapS f s) g
 good-hole (inScan f z c)                  s g = good-hole c (scanS f z s) g
 good-hole (inCut l a c)                   s g = good-hole c (cutS l a s) g
 good-hole (inLn b c)                      s g = good-hole c (lnS b s) g
-good-hole (inTake i q ph c)               s g = good-hole c (takeS i q ph s) g
+good-hole (inTake i q c)               s g = good-hole c (takeS i q s) g
 good-hole (inOuter op f d n ls c)         s g = proj₁ (good-hole c (flatS op f d n s ls) g)
 good-hole (inLanes op f d n o pre post c) s g = goodL-at pre post (proj₂ (good-hole c (flatS op f d n o (pre ++ s ∷ post)) g))
 good-hole (inSrc k b c)                   s g = proj₁ (good-hole c (connS k s b) g)
@@ -235,14 +235,14 @@ idk s = (λ p r → r) , λ g → g
 mutual
   unsub-ok : ∀ {Γ A} (s : St Γ A) → Grows s (unsub s) × (Good s → Good (unsub s))
   unsub-ok (pend o)              = idk (pend o)
-  unsub-ok (ofS q i xs)          = (λ p r → r) , λ g → g
+  unsub-ok (ofS xs)          = (λ p r → r) , λ g → g
   unsub-ok doneS                 = (λ p r → r) , λ g → g
   unsub-ok (cutS l a s)          = idk (cutS l a s)
   unsub-ok (lnS b s)             = idk (lnS b s)
   unsub-ok (joinS j g x)         = idk (joinS j g x)
   unsub-ok (mapS f s)            = one-grow (proj₁ (unsub-ok s)) , proj₂ (unsub-ok s)
   unsub-ok (scanS f z s)         = one-grow (proj₁ (unsub-ok s)) , proj₂ (unsub-ok s)
-  unsub-ok (takeS i q ph s)      = one-grow (proj₁ (cut-ok s)) , proj₂ (cut-ok s)
+  unsub-ok (takeS i q s)      = one-grow (proj₁ (cut-ok s)) , proj₂ (cut-ok s)
   unsub-ok (flatS op f d n o ls) =
     fl-grow (proj₁ (cut-ok o)) (proj₁ (killAll-ok ls)) , λ (g₀ , gl) → proj₂ (cut-ok o) g₀ , proj₂ (killAll-ok ls) gl
   unsub-ok (connS k o b)         =
@@ -253,13 +253,13 @@ mutual
   cut-ok (cutS l true s)       = one-grow (proj₁ (unsub-ok s)) , proj₂ (unsub-ok s)
   cut-ok (cutS l false s)      = idk (cutS l false s)
   cut-ok (pend o)              = idk (pend o)
-  cut-ok (ofS q i xs)          = (λ p r → r) , λ g → g
+  cut-ok (ofS xs)          = (λ p r → r) , λ g → g
   cut-ok doneS                 = (λ p r → r) , λ g → g
   cut-ok (joinS j g x)         = idk (joinS j g x)
   cut-ok (mapS f s)            = idk (mapS f s)
   cut-ok (scanS f z s)         = idk (scanS f z s)
   cut-ok (lnS b s)             = idk (lnS b s)
-  cut-ok (takeS i q ph s)      = idk (takeS i q ph s)
+  cut-ok (takeS i q s)      = idk (takeS i q s)
   cut-ok (flatS op f d n o ls) = idk (flatS op f d n o ls)
   cut-ok (connS k o b)         = idk (connS k o b)
 
@@ -268,13 +268,13 @@ mutual
   killAll-ok (lnS true s ∷ ls)        = head (lnS true s) (lnS false (cut s)) (one-grow (proj₁ (cut-ok s))) (proj₂ (cut-ok s)) ls (killAll-ok ls)
   killAll-ok (lnS false s ∷ ls)       = kept (lnS false s) ls (killAll-ok ls)
   killAll-ok (pend o ∷ ls)            = kept (pend o) ls (killAll-ok ls)
-  killAll-ok (ofS q i xs ∷ ls)        = kept (ofS q i xs) ls (killAll-ok ls)
+  killAll-ok (ofS xs ∷ ls)        = kept (ofS xs) ls (killAll-ok ls)
   killAll-ok (doneS ∷ ls)             = kept doneS ls (killAll-ok ls)
   killAll-ok (joinS j g x ∷ ls)       = kept (joinS j g x) ls (killAll-ok ls)
   killAll-ok (mapS f s ∷ ls)          = kept (mapS f s) ls (killAll-ok ls)
   killAll-ok (scanS f z s ∷ ls)       = kept (scanS f z s) ls (killAll-ok ls)
   killAll-ok (cutS l a s ∷ ls)        = kept (cutS l a s) ls (killAll-ok ls)
-  killAll-ok (takeS i q ph s ∷ ls)    = kept (takeS i q ph s) ls (killAll-ok ls)
+  killAll-ok (takeS i q s ∷ ls)    = kept (takeS i q s) ls (killAll-ok ls)
   killAll-ok (flatS op f d n o l ∷ ls) = kept (flatS op f d n o l) ls (killAll-ok ls)
   killAll-ok (connS k o b ∷ ls)       = kept (connS k o b) ls (killAll-ok ls)
 
@@ -292,23 +292,23 @@ mutual
 ended-ok : ∀ {Γ B} (s : St Γ B) → Grows s (ended s) × (Good s → Good (ended s))
 ended-ok (lnS b (cutS l a s))       = one-grow (λ p r → r) , λ g → g
 ended-ok (lnS b (pend o))           = idk (lnS b (pend o))
-ended-ok (lnS b (ofS q i xs))       = idk (lnS b (ofS q i xs))
+ended-ok (lnS b (ofS xs))       = idk (lnS b (ofS xs))
 ended-ok (lnS b doneS)              = idk (lnS b doneS)
 ended-ok (lnS b (joinS j g x))      = idk (lnS b (joinS j g x))
 ended-ok (lnS b (mapS f s))         = idk (lnS b (mapS f s))
 ended-ok (lnS b (scanS f z s))      = idk (lnS b (scanS f z s))
 ended-ok (lnS b (lnS b′ s))         = idk (lnS b (lnS b′ s))
-ended-ok (lnS b (takeS i q ph s))   = idk (lnS b (takeS i q ph s))
+ended-ok (lnS b (takeS i q s))   = idk (lnS b (takeS i q s))
 ended-ok (lnS b (flatS op f d n o ls)) = idk (lnS b (flatS op f d n o ls))
 ended-ok (lnS b (connS k o b′))     = idk (lnS b (connS k o b′))
 ended-ok (pend o)                   = idk (pend o)
-ended-ok (ofS q i xs)               = (λ p r → r) , λ g → g
+ended-ok (ofS xs)               = (λ p r → r) , λ g → g
 ended-ok doneS                      = (λ p r → r) , λ g → g
 ended-ok (joinS j g x)              = idk (joinS j g x)
 ended-ok (mapS f s)                 = idk (mapS f s)
 ended-ok (scanS f z s)              = idk (scanS f z s)
 ended-ok (cutS l a s)               = idk (cutS l a s)
-ended-ok (takeS i q ph s)           = idk (takeS i q ph s)
+ended-ok (takeS i q s)           = idk (takeS i q s)
 ended-ok (flatS op f d n o ls)      = idk (flatS op f d n o ls)
 ended-ok (connS k o b)              = idk (connS k o b)
 
@@ -333,21 +333,21 @@ Lands p c s nothing                  = ⊥₁
 
 down-lands : ∀ {R Γ A} i p (c : Ctx R Γ A) (s : St Γ A) → Reach (i ∷ p) s → Lands p c s (down i c s)
 down-lands i       p c (pend o)              ()
-down-lands i       p c (ofS q j xs)          ()
+down-lands i       p c (ofS xs)          ()
 down-lands i       p c doneS                 ()
 down-lands i       p c (joinS j g x)         ()
 down-lands zero    p c (mapS f s)            r = r , refl
 down-lands zero    p c (scanS f z s)         r = r , refl
 down-lands zero    p c (cutS l a s)          r = r , refl
 down-lands zero    p c (lnS b s)             r = r , refl
-down-lands zero    p c (takeS i q ph s)      r = r , refl
+down-lands zero    p c (takeS i q s)      r = r , refl
 down-lands zero    p c (flatS op f d n o ls) r = r , refl
 down-lands zero    p c (connS k o b)         r = r , refl
 down-lands (suc i) p c (mapS f s)            ()
 down-lands (suc i) p c (scanS f z s)         ()
 down-lands (suc i) p c (cutS l a s)          ()
 down-lands (suc i) p c (lnS b s)             ()
-down-lands (suc i) p c (takeS j q ph s)      ()
+down-lands (suc i) p c (takeS j q s)      ()
 down-lands (suc zero) p c (connS k o b)      r = r , refl
 down-lands (suc (suc i)) p c (connS k o b)   ()
 down-lands (suc zero) p c (flatS op f d n o ls) r with pickL zero [] ls | pick-lands zero p [] ls r
@@ -401,6 +401,9 @@ tagR-grow g go      a = tt
 tagR-grow g att     a = tt
 tagR-grow g attBody a = tt
 tagR-grow g owed    a = tt
+tagR-grow g (next i) a = tt
+tagR-grow g owedCp  a = tt
+tagR-grow g owedCut a = tt
 
 allR-grow : ∀ {R} {t t′ : St [] R} → Grows t t′ → ∀ {rs} → AllR t rs → AllR t′ rs
 allR-grow g a = mapᴬ (λ {j} (r , tr) → g (proj₁ j) r , tagR-grow g (proj₁ (proj₂ j)) tr) a
@@ -411,6 +414,9 @@ tag-of go      a = tt , a
 tag-of att     a = tt , a
 tag-of attBody a = tt , a
 tag-of owed    a = tt , a
+tag-of (next i) a = tt , a
+tag-of owedCp  a = tt , a
+tag-of owedCut a = tt , a
 
 retag : ∀ {R} {t : St [] R} tg {rs} → TagR t tg → AllR t rs → AllR t (tagJobs tg ++ rs)
 retag {t = t} (feeding js) tr a = (reach-nil t , tr) ∷ a
@@ -418,6 +424,9 @@ retag go      tr a = a
 retag att     tr a = a
 retag attBody tr a = a
 retag owed    tr a = a
+retag (next i) tr a = a
+retag owedCp  tr a = a
+retag owedCut tr a = a
 
 hole : ∀ {R Γ A} (c : Ctx R Γ A) {s s′ : St Γ A} {rs} → Grows s s′ → (Good s → Good s′) → V c s rs → V c s′ rs
 hole c g h (a , gd) = allR-grow (grows-plug c g) a , good-plug c g h gd
@@ -447,7 +456,7 @@ joinUp-ok j (inCut l a c)                   x acc s r v with joinUp j c x (0 ∷
 ... | b , c″ | w = w
 joinUp-ok j (inLn l c)                      x acc s r v with joinUp j c x (0 ∷ acc) | joinUp-ok j c x (0 ∷ acc) (lnS l s) r v
 ... | b , c″ | w = w
-joinUp-ok j (inTake i p ph c)               x acc s r v with joinUp j c x (0 ∷ acc) | joinUp-ok j c x (0 ∷ acc) (takeS i p ph s) r v
+joinUp-ok j (inTake i p c)               x acc s r v with joinUp j c x (0 ∷ acc) | joinUp-ok j c x (0 ∷ acc) (takeS i p s) r v
 ... | b , c″ | w = w
 joinUp-ok j (inOuter op f d n ls c)         x acc s r v with joinUp j c x (0 ∷ acc) | joinUp-ok j c x (0 ∷ acc) (flatS op f d n s ls) r v
 ... | b , c″ | w = w
@@ -473,11 +482,11 @@ rooted-reach c {k} {o} {b} {(q , _) ∷ js} (r ∷ a) = reach-++ c (connS k o b)
 begin-ok : ∀ {R Γ A} (c : Ctx R Γ A) (o : PObs Γ A) p rs → V c (pend o) rs → Valid (begin c o p rs)
 begin-ok c (cold x)          p rs v = leaf c _ doneS tt v
 begin-ok c empty             p rs v = leaf c _ doneS tt v
-begin-ok c (of xs)           p rs v = leaf c _ (ofS p 0 xs) tt v
+begin-ok c (of xs)           p rs v = leaf c _ (ofS xs) tt v
 begin-ok c (map f s)         p rs v = leaf c _ (mapS f (pend s)) tt v
 begin-ok c (scan f z s)      p rs v = leaf c _ (scanS f z (pend s)) tt v
 begin-ok c (takeWhile i q s) p rs v =
-  push (inCut true false (inTake i q running c)) (pend s) att p tt (leaf c _ (takeS i q running (cutS true false (pend s))) tt v)
+  push (inCut true false (inTake i q c)) (pend s) att p tt (leaf c _ (takeS i q (cutS true false (pend s))) tt v)
 begin-ok c (flatMap op f s)  p rs v =
   push (inCut true false (inOuter op f false 0 [] c)) (pend s) att p tt (leaf c _ (flatS op f false 0 (cutS true false (pend s)) []) (tt , tt) v)
 begin-ok c (connect s b)     p rs v =
@@ -524,11 +533,11 @@ rise-ok (inScan f z c)                  s cp     p rs v = v
 rise-ok (inCut true a c)                s e      p rs v = v
 rise-ok (inCut false a c)               s e      p rs v = v
 rise-ok (inLn b c)                      s e      p rs v = v
-rise-ok (inTake i q ph c)               s (nx a) p rs v with q a | i
+rise-ok (inTake i q c)               s (nx a) p rs v with q a | i
 ... | true  | _     = v
-... | false | true  = push c (takeS true q oweCp s) owed p tt (same c (λ p r → r) (λ g → g) v)
-... | false | false = push c (takeS false q oweCut s) owed p tt (same c (λ p r → r) (λ g → g) v)
-rise-ok (inTake i q ph c)               s cp     p rs v = v
+... | false | true  = push c (takeS true q s) owedCp p tt v
+... | false | false = push c (takeS false q s) owedCut p tt v
+rise-ok (inTake i q c)               s cp     p rs v = v
 rise-ok (inOuter op f d n ls c)         s (nx a) p rs v = admit-ok c op f d n s ls a p rs v
 rise-ok (inOuter op f d n ls c)         s cp     p rs v = settled {c = c} {s = flatS op f true n s ls} true n {p} {rs} (same c (λ p r → r) (λ g → g) v)
 rise-ok (inLanes op f d n o pre post c) s (nx b) p rs v = v
@@ -546,57 +555,32 @@ feedOn-ok c k o b []             p rs tr v = same c (λ p r → r) (λ g → g) 
 feedOn-ok c k o b ((q , j) ∷ js) p rs (r ∷ tr) v with downs q top (plug c (connS k o b)) | downs-lands q top (plug c (connS k o b)) r
 ... | just (_ , _ , c′ , s′) | e = moved e (push c (connS k o b) (feeding js) p tr v)
 
-resume-ok : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) t p rs → TagR (plug c s) t → V c s rs → Valid (resume c s t p rs)
-resume-ok c (ofS q i xs) go p rs tr v with closed c | xs
+resumeR-ok : ∀ {R Γ A} (c : Ctx R Γ A) {s : St Γ A} {t} (r : Res s t) p rs → TagR (plug c s) t → V c s rs → Valid (resumeR c r p rs)
+resumeR-ok c (ofR xs i) p rs tr v with closed c | xs
 ... | true  | _       = same c (λ p r → r) (λ _ → tt) v
 ... | false | []      = same c (λ p r → r) (λ _ → tt) v
-... | false | x ∷ xs′ = push c (ofS q (suc i) xs′) go p tt (same c (λ p r → r) (λ _ → tt) v)
-resume-ok c (cutS true a s)  att p rs tr v = same c (λ p r → r) (λ g → g) v
-resume-ok c (cutS false a s) att p rs tr v = hole c (one-grow (proj₁ (unsub-ok s))) (proj₂ (unsub-ok s)) v
-resume-ok c (takeS i q oweCp s) owed p rs tr v = push c (takeS i q oweCut s) owed p tt (same c (λ p r → r) (λ g → g) v)
-resume-ok c (takeS i q oweCut s) owed p rs tr v = hole c (one-grow (proj₁ (cut-ok s))) (proj₂ (cut-ok s)) v
-resume-ok c (connS k o b) (feeding js) p rs tr v = feedOn-ok c k o b js p rs tr v
-resume-ok c (connS k o b) go p rs tr v = v
-resume-ok c (connS k o b) attBody p rs tr v = push c (connS (record k { bodyAtt = true }) o b) att (p ⊕ [ ix 1 ]) tt (same c (λ p r → r) (λ g → g) v)
-resume-ok c (connS k o b) att p rs tr v with CS.srcLive k
+... | false | x ∷ xs′ = push c (ofS xs′) (next (suc i)) p tt (same c (λ p r → r) (λ _ → tt) v)
+resumeR-ok c (attR true a s)  p rs tr v = same c (λ p r → r) (λ g → g) v
+resumeR-ok c (attR false a s) p rs tr v = hole c (one-grow (proj₁ (unsub-ok s))) (proj₂ (unsub-ok s)) v
+resumeR-ok c (cpR i q s)      p rs tr v = push c (takeS i q s) owedCut p tt v
+resumeR-ok c (cutR i q s)     p rs tr v = hole c (one-grow (proj₁ (cut-ok s))) (proj₂ (cut-ok s)) v
+resumeR-ok c (feedR k o b js) p rs tr v = feedOn-ok c k o b js p rs tr v
+resumeR-ok c (bodyR k o b)    p rs tr v = push c (connS (record k { bodyAtt = true }) o b) att (p ⊕ [ ix 1 ]) tt (same c (λ p r → r) (λ g → g) v)
+resumeR-ok c (srcR k o b) p rs tr v with CS.srcLive k
 ... | true  = same c (λ p r → r) (λ g → g) v
 ... | false = hole c (two-grow (proj₁ (unsub-ok o)) (λ p r → r))
                 (λ (g₀ , gb , jd) → proj₂ (unsub-ok o) g₀ , gb , joined-grow k (proj₁ (unsub-ok o)) (λ p r → r) jd) v
-resume-ok c (connS k o b) owed p rs tr v with CS.srcAtt k
+resumeR-ok c (endR k o b) p rs tr v with CS.srcAtt k
 ... | true  = hole c (two-grow (proj₁ (unsub-ok o)) (λ p r → r))
                 (λ (g₀ , gb , jd) → proj₂ (unsub-ok o) g₀ , gb , joined-grow k (proj₁ (unsub-ok o)) (λ p r → r) jd) v
 ... | false = same c (λ p r → r) (λ g → g) v
-resume-ok c (joinS j true x) go p rs tr v with fedUp c x
+resumeR-ok c (joinR j x) p rs tr v with fedUp c x
 ... | just e  = v
 ... | nothing = v
-resume-ok c (pend o)              t p rs tr v = v
-resume-ok c doneS                 t p rs tr v = v
-resume-ok c (mapS f s)            t p rs tr v = v
-resume-ok c (scanS f z s)         t p rs tr v = v
-resume-ok c (lnS b s)             t p rs tr v = v
-resume-ok c (flatS op f d n o ls) t p rs tr v = v
-resume-ok c (ofS q i xs) att     p rs tr v = v
-resume-ok c (ofS q i xs) attBody p rs tr v = v
-resume-ok c (ofS q i xs) owed    p rs tr v = v
-resume-ok c (ofS q i xs) (feeding js) p rs tr v = v
-resume-ok c (cutS l a s) go      p rs tr v = v
-resume-ok c (cutS l a s) attBody p rs tr v = v
-resume-ok c (cutS l a s) owed    p rs tr v = v
-resume-ok c (cutS l a s) (feeding js) p rs tr v = v
-resume-ok c (takeS i q running s) t p rs tr v = v
-resume-ok c (takeS i q oweCp s) go      p rs tr v = v
-resume-ok c (takeS i q oweCp s) att     p rs tr v = v
-resume-ok c (takeS i q oweCp s) attBody p rs tr v = v
-resume-ok c (takeS i q oweCp s) (feeding js) p rs tr v = v
-resume-ok c (takeS i q oweCut s) go      p rs tr v = v
-resume-ok c (takeS i q oweCut s) att     p rs tr v = v
-resume-ok c (takeS i q oweCut s) attBody p rs tr v = v
-resume-ok c (takeS i q oweCut s) (feeding js) p rs tr v = v
-resume-ok c (joinS j true x) att     p rs tr v = v
-resume-ok c (joinS j true x) attBody p rs tr v = v
-resume-ok c (joinS j true x) owed    p rs tr v = v
-resume-ok c (joinS j true x) (feeding js) p rs tr v = v
-resume-ok c (joinS j false x) t p rs tr v = v
+resumeR-ok c idle p rs tr v = v
+
+resume-ok : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) t p rs → TagR (plug c s) t → V c s rs → Valid (resume c s t p rs)
+resume-ok c s t = resumeR-ok c (res s t)
 
 ------------------------------------------------------------------------
 -- THE INVARIANT, ACROSS EVERY STEP; and the machine's `nothing` arms
@@ -609,14 +593,14 @@ stepAt-ok : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) m p rs → V c s (modeJo
 stepAt-ok c s (resuming t) p rs (a , g) = resume-ok c s t p rs (proj₁ (tag-of t {rs} a)) (proj₂ (tag-of t {rs} a) , g)
 stepAt-ok c s (rising e)   p rs v = rise-ok c s e p rs v
 stepAt-ok c (pend o)              subscribing p rs v = begin-ok c o p rs v
-stepAt-ok c (ofS q i xs)          subscribing p rs v = v
+stepAt-ok c (ofS xs)          subscribing p rs v = v
 stepAt-ok c doneS                 subscribing p rs v = v
 stepAt-ok c (joinS j g x)         subscribing p rs v = v
 stepAt-ok c (mapS f s)            subscribing p rs v = v
 stepAt-ok c (scanS f z s)         subscribing p rs v = v
 stepAt-ok c (cutS l a s)          subscribing p rs v = v
 stepAt-ok c (lnS b s)             subscribing p rs v = v
-stepAt-ok c (takeS i q ph s)      subscribing p rs v = v
+stepAt-ok c (takeS i q s)      subscribing p rs v = v
 stepAt-ok c (flatS op f d n o ls) subscribing p rs v = v
 stepAt-ok c (connS k o b)         subscribing p rs v = v
 stepAt-ok c s absorbed p [] v = v

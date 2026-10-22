@@ -2,9 +2,11 @@
 
 -- SPIKE 3: spike 2's machine with the POSITION GHOST.  Today's kernels
 -- place by scope (`under l m k`); here a job saves the position it was
--- suspended at and gets it back when resumed, and a node that places its
--- own emissions (an `of`, a joiner) keeps where it was subscribed, as
--- `adequacy.Strong`'s `Sub` already does.
+-- suspended at and gets it back when resumed, and a joiner keeps where
+-- it joined, as `adequacy.Strong`'s `Sub` already does.  What a kernel
+-- keeps in its continuation rides on the job's tag, not on the node: an
+-- `of`'s count, a takeWhile's owed completion, a feed's joiners still to
+-- feed.
 --
 -- SPIKE 2: the state-tree machine over the real `Tree.Obs`, for every
 -- former but `cold` and a bounded merge: of, empty, map, scan,
@@ -47,11 +49,6 @@ mapEv f cp     = cp
 ------------------------------------------------------------------------
 -- States
 
--- A takeWhile's own progress: running; its failing value out, its
--- completion owed; its completion out, its cut owed.
-data Ph : Set where
-  running oweCp oweCut : Ph
-
 -- A connect's subject and its source's switch.  `feeds` is a STACK: a
 -- value fed while another feed is under way is fed first, as the
 -- kernel's nested `each` would; who is still to be fed rides on the
@@ -68,8 +65,8 @@ record CS (X : Set) : Set where
 
 data St (Γ : List Set) : Set → Set₁ where
   pend  : ∀ {A} → PObs Γ A → St Γ A
-  -- subscribed at p, i emitted
-  ofS   : ∀ {A} → Pos → ℕ → List A → St Γ A
+  -- the values still to come
+  ofS   : ∀ {A} → List A → St Γ A
   doneS : ∀ {A} → St Γ A
   mapS  : ∀ {A B} → (A → B) → St Γ A → St Γ B
   scanS : ∀ {A B} → (B → A → B) → B → St Γ A → St Γ B
@@ -78,7 +75,7 @@ data St (Γ : List Set) : Set → Set₁ where
   -- a lane, still in its flatMap's list
   lnS   : ∀ {A} → Bool → St Γ A → St Γ A
   -- the child is its source's switch
-  takeS : ∀ {A} → Bool → (A → Bool) → Ph → St Γ A → St Γ A
+  takeS : ∀ {A} → Bool → (A → Bool) → St Γ A → St Γ A
   -- outer done, lanes running, the outer's switch, every lane begun (oldest first)
   flatS : ∀ {A B} → FlatOp → (A → PObs Γ B) → Bool → ℕ → St Γ A → List (St Γ B) → St Γ B
   connS : ∀ {X B} → CS X → St Γ X → St (X ∷ Γ) B → St Γ B
@@ -93,7 +90,7 @@ data Ctx (R : Set) : List Set → Set → Set₁ where
   inScan  : ∀ {Γ A B} → (B → A → B) → B → Ctx R Γ B → Ctx R Γ A
   inCut   : ∀ {Γ A} → Bool → Bool → Ctx R Γ A → Ctx R Γ A
   inLn    : ∀ {Γ A} → Bool → Ctx R Γ A → Ctx R Γ A
-  inTake  : ∀ {Γ A} → Bool → (A → Bool) → Ph → Ctx R Γ A → Ctx R Γ A
+  inTake  : ∀ {Γ A} → Bool → (A → Bool) → Ctx R Γ A → Ctx R Γ A
   inOuter : ∀ {Γ A B} → FlatOp → (A → PObs Γ B) → Bool → ℕ → List (St Γ B) → Ctx R Γ B → Ctx R Γ A
   inLanes : ∀ {Γ A B} → FlatOp → (A → PObs Γ B) → Bool → ℕ → St Γ A → List (St Γ B) → List (St Γ B) → Ctx R Γ B → Ctx R Γ B
   inSrc   : ∀ {Γ X B} → CS X → St (X ∷ Γ) B → Ctx R Γ B → Ctx R Γ X
@@ -105,7 +102,7 @@ plug (inMap f c)                     s = plug c (mapS f s)
 plug (inScan f z c)                  s = plug c (scanS f z s)
 plug (inCut l a c)                   s = plug c (cutS l a s)
 plug (inLn b c)                      s = plug c (lnS b s)
-plug (inTake i p ph c)               s = plug c (takeS i p ph s)
+plug (inTake i p c)                  s = plug c (takeS i p s)
 plug (inOuter op f d n ls c)         s = plug c (flatS op f d n s ls)
 plug (inLanes op f d n o pre post c) s = plug c (flatS op f d n o (pre ++ s ∷ post))
 plug (inSrc k b c)                   s = plug c (connS k s b)
@@ -123,7 +120,7 @@ dirs c@(inMap f c′)                  = dirs c′ ++ [ dir c ]
 dirs c@(inScan f z c′)               = dirs c′ ++ [ dir c ]
 dirs c@(inCut l a c′)                = dirs c′ ++ [ dir c ]
 dirs c@(inLn b c′)                   = dirs c′ ++ [ dir c ]
-dirs c@(inTake i p ph c′)            = dirs c′ ++ [ dir c ]
+dirs c@(inTake i p c′)               = dirs c′ ++ [ dir c ]
 dirs c@(inOuter op f d n ls c′)      = dirs c′ ++ [ dir c ]
 dirs c@(inLanes op f d n o pre post c′) = dirs c′ ++ [ dir c ]
 dirs c@(inSrc k b c′)                = dirs c′ ++ [ dir c ]
@@ -137,7 +134,7 @@ closed (inMap f c)                     = closed c
 closed (inScan f z c)                  = closed c
 closed (inCut l a c)                   = not l ∨ closed c
 closed (inLn b c)                      = closed c
-closed (inTake i p ph c)               = closed c
+closed (inTake i p c)                  = closed c
 closed (inOuter op f d n ls c)         = closed c
 closed (inLanes op f d n o pre post c) = closed c
 closed (inSrc k b c)                   = CS.closed k
@@ -152,7 +149,7 @@ mutual
   unsub : ∀ {Γ A} → St Γ A → St Γ A
   unsub (mapS f s)             = mapS f (unsub s)
   unsub (scanS f z s)          = scanS f z (unsub s)
-  unsub (takeS i p ph s)       = takeS i p ph (cut s)
+  unsub (takeS i p s)          = takeS i p (cut s)
   unsub (flatS op f d n o ls)  = flatS op f d 0 (cut o) (killAll ls)
   unsub (connS k o b)          = connS k (unsub o) (unsub b)
   unsub (joinS j g x)          = joinS j false x
@@ -184,7 +181,7 @@ down zero          c (mapS f s)            = just (_ , _ , inMap f c , s)
 down zero          c (scanS f z s)         = just (_ , _ , inScan f z c , s)
 down zero          c (cutS l a s)          = just (_ , _ , inCut l a c , s)
 down zero          c (lnS b s)             = just (_ , _ , inLn b c , s)
-down zero          c (takeS i p ph s)      = just (_ , _ , inTake i p ph c , s)
+down zero          c (takeS i p s)         = just (_ , _ , inTake i p c , s)
 down zero          c (flatS op f d n o ls) = just (_ , _ , inOuter op f d n ls c , o)
 down zero          c (connS k o b)         = just (_ , _ , inSrc k b c , o)
 down (suc zero)    c (connS k o b)         = just (_ , _ , inBody k o c , b)
@@ -214,8 +211,8 @@ joinUp j c@(inCut l a c′)              x         acc with joinUp j c′ x (dir
 ... | b , c″ = b , inCut l a c″
 joinUp j c@(inLn l c′)                 x         acc with joinUp j c′ x (dir c ∷ acc)
 ... | b , c″ = b , inLn l c″
-joinUp j c@(inTake i p ph c′)          x         acc with joinUp j c′ x (dir c ∷ acc)
-... | b , c″ = b , inTake i p ph c″
+joinUp j c@(inTake i p c′)             x         acc with joinUp j c′ x (dir c ∷ acc)
+... | b , c″ = b , inTake i p c″
 joinUp j c@(inOuter op f d n ls c′)    x         acc with joinUp j c′ x (dir c ∷ acc)
 ... | b , c″ = b , inOuter op f d n ls c″
 joinUp j c@(inLanes op f d n o pre post c′) x    acc with joinUp j c′ x (dir c ∷ acc)
@@ -235,7 +232,7 @@ fedUp (inMap f c)                     x = fedUp c x
 fedUp (inScan f z c)                  x = fedUp c x
 fedUp (inCut l a c)                   x = fedUp c x
 fedUp (inLn b c)                      x = fedUp c x
-fedUp (inTake i p ph c)               x = fedUp c x
+fedUp (inTake i p c)                  x = fedUp c x
 fedUp (inOuter op f d n ls c)         x = fedUp c x
 fedUp (inLanes op f d n o pre post c) x = fedUp c x
 fedUp (inSrc k b c)                   x = fedUp c x
@@ -247,11 +244,15 @@ fedUp (inBody k o c)          (there x) = fedUp c x
 ------------------------------------------------------------------------
 -- The machine
 
--- What a resumed job is: the node's own burst or feed; the attach of
--- its child's subscription (a connect's body, then its source); what a
+-- What a resumed job is: a joiner's feed; the attach of its child's
+-- subscription (a connect's body, then its source); what a body's
 -- completion left owed.
 data Tag : Set where
   go att attBody owed : Tag
+  -- an of's i-th value
+  next : ℕ → Tag
+  -- a takeWhile's completion owed, then its cut
+  owedCp owedCut : Tag
   -- a feed under way: the joiners still to feed, by path from the root,
   -- and where each joined
   feeding : List (List ℕ × Pos) → Tag
@@ -295,10 +296,10 @@ drop₁ (_ ∷ xs) = xs
 begin : ∀ {R Γ A} → Ctx R Γ A → PObs Γ A → Pos → List Job → Conf R
 begin c (cold _)          p rs = ⟨ c , doneS , absorbed , p , rs ⟩      -- not in the spike
 begin c empty             p rs = ⟨ c , doneS , rising cp , p ⊕ [ last ] , rs ⟩
-begin c (of xs)           p rs = ⟨ c , ofS p 0 xs , resuming go , p , rs ⟩
+begin c (of xs)           p rs = ⟨ c , ofS xs , resuming (next 0) , p , rs ⟩
 begin c (map f s)         p rs = ⟨ inMap f c , pend s , subscribing , p , rs ⟩
 begin c (scan f z s)      p rs = ⟨ inScan f z c , pend s , subscribing , p , rs ⟩
-begin c (takeWhile i q s) p rs = let c′ = inTake i q running c in
+begin c (takeWhile i q s) p rs = let c′ = inTake i q c in
   ⟨ inCut true false c′ , pend s , subscribing , p , (dirs c′ ++ [ 0 ] , att , p) ∷ rs ⟩
 begin c (flatMap op f s)  p rs = let c′ = inOuter op f false 0 [] c in
   ⟨ inCut true false c′ , pend s , subscribing , p , (dirs c′ ++ [ 0 ] , att , p) ∷ rs ⟩
@@ -344,11 +345,11 @@ rise (inScan f z c) s (nx a) p rs = ⟨ c , scanS f (f z a) s , rising (nx (f z 
 rise (inScan f z c) s cp     p rs = ⟨ c , scanS f z s , rising cp , p , rs ⟩ , []
 rise (inCut l a c) s e p rs = ⟨ c , cutS l a s , (if l then rising e else absorbed) , p , rs ⟩ , []
 rise (inLn b c) s e p rs = ⟨ c , lnS b s , rising e , p , rs ⟩ , []
-rise (inTake i q ph c) s (nx a) p rs with q a | i
-... | true  | _     = ⟨ c , takeS i q ph s , rising (nx a) , p , rs ⟩ , []
-... | false | true  = ⟨ c , takeS i q oweCp s , rising (nx a) , p ⊕ [ ix 0 ] , (dirs c , owed , p) ∷ rs ⟩ , []
-... | false | false = ⟨ c , takeS i q oweCut s , rising cp , p ⊕ [ last ] , (dirs c , owed , p) ∷ rs ⟩ , []
-rise (inTake i q ph c) s cp p rs = ⟨ c , takeS i q ph s , rising cp , p , rs ⟩ , []
+rise (inTake i q c) s (nx a) p rs with q a | i
+... | true  | _     = ⟨ c , takeS i q s , rising (nx a) , p , rs ⟩ , []
+... | false | true  = ⟨ c , takeS i q s , rising (nx a) , p ⊕ [ ix 0 ] , (dirs c , owedCp , p) ∷ rs ⟩ , []
+... | false | false = ⟨ c , takeS i q s , rising cp , p ⊕ [ last ] , (dirs c , owedCut , p) ∷ rs ⟩ , []
+rise (inTake i q c) s cp p rs = ⟨ c , takeS i q s , rising cp , p , rs ⟩ , []
 rise (inOuter op f d n ls c) o (nx a) p rs = admit c op f d n o ls a p rs , []
 rise (inOuter op f d n ls c) o cp     p rs = ⟨ c , flatS op f true n o ls , settle true n , p , rs ⟩ , []
 rise (inLanes op f d n o pre post c) s (nx b) p rs = ⟨ c , flatS op f d n o (pre ++ s ∷ post) , rising (nx b) , p , rs ⟩ , []
@@ -366,26 +367,55 @@ feedOn c k o b ((q , j) ∷ js) p rs with downs q top (plug c (connS k o b))
 ... | just (_ , _ , c′ , s′) = ⟨ c′ , s′ , resuming go , p ⊕ [ subᴾ j ] , (dirs c , feeding js , p) ∷ rs ⟩
 ... | nothing                = ⟨ c , connS k o b , absorbed , p , rs ⟩
 
-resume : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Tag → Pos → List Job → Conf R
+-- Which job a node and a tag make: every pairing the machine resumes,
+-- and the rest idle.
+data Res {Γ : List Set} {A : Set} : St Γ A → Tag → Set₁ where
+  ofR   : ∀ xs i → Res (ofS xs) (next i)
+  attR  : ∀ l a s → Res (cutS l a s) att
+  cpR   : ∀ i q s → Res (takeS i q s) owedCp
+  cutR  : ∀ i q s → Res (takeS i q s) owedCut
+  feedR : ∀ {X} k (o : St Γ X) b js → Res (connS k o b) (feeding js)
+  bodyR : ∀ {X} k (o : St Γ X) b → Res (connS k o b) attBody
+  srcR  : ∀ {X} k (o : St Γ X) b → Res (connS k o b) att
+  endR  : ∀ {X} k (o : St Γ X) b → Res (connS k o b) owed
+  joinR : ∀ j x → Res (joinS j true x) go
+  idle  : ∀ {s t} → Res s t
+
+res : ∀ {Γ A} (s : St Γ A) t → Res s t
+res (ofS xs)         (next i)     = ofR xs i
+res (cutS l a s)     att          = attR l a s
+res (takeS i q s)    owedCp       = cpR i q s
+res (takeS i q s)    owedCut      = cutR i q s
+res (connS k o b)    (feeding js) = feedR k o b js
+res (connS k o b)    attBody      = bodyR k o b
+res (connS k o b)    att          = srcR k o b
+res (connS k o b)    owed         = endR k o b
+res (joinS j true x) go           = joinR j x
+res s                t            = idle
+
+resumeR : ∀ {R Γ A} {s : St Γ A} {t} → Ctx R Γ A → Res s t → Pos → List Job → Conf R
 -- the i-th value under `ix i`, the completion under `last`, of where the of was subscribed
-resume c (ofS q i xs) go p rs with closed c | xs
+resumeR c (ofR xs i) p rs with closed c | xs
 ... | true  | _       = ⟨ c , doneS , absorbed , p , rs ⟩
-... | false | []      = ⟨ c , doneS , rising cp , q ⊕ [ last ] , rs ⟩
-... | false | x ∷ xs′ = ⟨ c , ofS q (suc i) xs′ , rising (nx x) , q ⊕ [ ix i ] , (dirs c , go , p) ∷ rs ⟩
-resume c (cutS l a s) att p rs = ⟨ c , cutS l true (if l then s else unsub s) , absorbed , p , rs ⟩
-resume c (takeS i q oweCp s) owed p rs = ⟨ c , takeS i q oweCut s , rising cp , p ⊕ [ last ] , (dirs c , owed , p) ∷ rs ⟩
-resume c (takeS i q oweCut s) owed p rs = ⟨ c , takeS i q running (cut s) , absorbed , p , rs ⟩
-resume c (connS k o b) (feeding js) p rs = feedOn c k o b js p rs
-resume c (connS k o b) attBody p rs =
+... | false | []      = ⟨ c , doneS , rising cp , p ⊕ [ last ] , rs ⟩
+... | false | x ∷ xs′ = ⟨ c , ofS xs′ , rising (nx x) , p ⊕ [ ix i ] , (dirs c , next (suc i) , p) ∷ rs ⟩
+resumeR c (attR l a s) p rs = ⟨ c , cutS l true (if l then s else unsub s) , absorbed , p , rs ⟩
+resumeR c (cpR i q s)  p rs = ⟨ c , takeS i q s , rising cp , p ⊕ [ last ] , (dirs c , owedCut , p) ∷ rs ⟩
+resumeR c (cutR i q s) p rs = ⟨ c , takeS i q (cut s) , absorbed , p , rs ⟩
+resumeR c (feedR k o b js) p rs = feedOn c k o b js p rs
+resumeR c (bodyR k o b) p rs =
   ⟨ inSrc (record k { bodyAtt = true }) b c , o , subscribing , p ⊕ [ ix 1 ] , (dirs c , att , p ⊕ [ ix 1 ]) ∷ rs ⟩
-resume c (connS k o b) att p rs =
+resumeR c (srcR k o b) p rs =
   ⟨ c , connS (record k { srcAtt = true }) (if CS.srcLive k then o else unsub o) b , absorbed , p , rs ⟩
-resume c (connS k o b) owed p rs =
+resumeR c (endR k o b) p rs =
   ⟨ c , connS (record k { srcLive = false }) (if CS.srcAtt k then unsub o else o) b , absorbed , p , rs ⟩
-resume c (joinS j true x) go p rs with fedUp c x
+resumeR c (joinR j x) p rs with fedUp c x
 ... | just e  = ⟨ c , joinS j true x , rising e , p , rs ⟩
 ... | nothing = ⟨ c , joinS j true x , absorbed , p , rs ⟩
-resume c s _ p rs = ⟨ c , s , absorbed , p , rs ⟩
+resumeR {s = s} c idle p rs = ⟨ c , s , absorbed , p , rs ⟩
+
+resume : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Tag → Pos → List Job → Conf R
+resume c s t = resumeR c (res s t)
 
 -- By the mode first, so a fact about a step splits on the mode alone.
 stepAt : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Mode A → Pos → List Job → Conf R × Shown R
