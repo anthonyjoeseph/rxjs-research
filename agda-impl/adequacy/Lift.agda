@@ -439,13 +439,16 @@ module Lifting (R : Set) where
     fire-heading = record
       { head-revive = λ j → j
       ; head-told   = λ i _ e₀ e′ → ⊆-⊑ λ m → subst (λ b → _ ∈ᴸ untold i b) (just-injective (trans (sym e′) e₀)) m
-      ; head-below  = λ ev → record { parts = λ { here sn e → Each.parts ev here sn e } ; pools = λ () ; rests = λ () } }
+      ; head-below  = λ ev → record { parts = λ { here sn e → Each.parts ev here sn e } ; pools = λ () ; rests = λ () }
+      ; head-untold = λ _ _ ()
+      ; head-ended  = λ _ () }
 
     fire-lingering : Lingering H H w₀ w₁
     fire-lingering = record
       { ling-revive = λ j → j
       ; ling-rested = λ {C} → tw-alike {Γ = Δ} {A = C} {x = U.idleᶜ} refl
-      ; ling-below  = λ _ → record { pools = λ () ; rests = λ () } }
+      ; ling-below  = λ _ → record { pools = λ () ; rests = λ () }
+      ; ling-ended  = λ _ () }
 
   -- A live timer popped at the turn: its cold, fired, heads past where
   -- the run is, the queue's timers being past it.

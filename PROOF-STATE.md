@@ -8,18 +8,17 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### UP-ENDED
+#### HIDDEN RUNS
 
-Whether every step keeps `Untold` and `Ended`, now fields of `Carried` and
-`Calling`, and whether the shut nodes' steps head past the shutting end.
-Settled when each step's framing leaf and `bursts-down` are bodies.
+Suspect fact: nothing but the `of` heads under the run, while
+`Carried.behind` bounds only at its `p`. Every pin and landing for a hidden
+`of` under a pool, an ended source or a take rides on it. Settled when
+`pooled-pin` and `left-pin` are bodies, or a missing `Carried` field is
+found.
 
-Members: `back-told`, `bg-ended`, `bg-told`, `connect-ended`, `connect-told`,
-`fed-ended`, `fed-told`, `fin-ended`, `fin-told`, `fire-ended`, `fire-told`,
-`fr-ended`, `grow-ended`, `grow-told`, `of-ended`, `of-told`, `out-told`,
-`rf-ended`, `rf-told`, `rm-ended`, `rm-told`, `rs-ended`, `rs-told`, `rt-ended`,
-`rt-told`, `scan-ended`, `scan-told`, `shift-ended`, `shift-told`, `torn-ended`,
-`torn-told`, `wr-ended`, `wr-told`, `bursts-down`, `flat-down`.
+Members: `pooled-pin`, `left-pin`, `pool-off`, `pool-land`, `rest-body`,
+`rest-land`, `spread-held`, `void-site`, `shut-late`, `step-late`,
+`emit-shut`, `emit-run`, `note-least`, `turn-dry`.
 
 #### THE REST'S TIES
 
@@ -63,17 +62,16 @@ restated.
 Members: `deep-subscribe`, `step-deep`, `gapped-deep`, `gapped-past`,
 `gapped-sane`, `gapped-placed`.
 
-#### HIDDEN RUNS
+#### UP-ENDED
 
-Suspect fact: nothing but the `of` heads under the run, while
-`Carried.behind` bounds only at its `p`. Every pin and landing for a hidden
-`of` under a pool, an ended source or a take rides on it. Settled when
-`pooled-pin` and `left-pin` are bodies, or a missing `Carried` field is
-found.
+Whether every step keeps `Untold` and `Ended`, now fields of `Carried` and
+`Calling`, and whether the shut nodes' steps head past the shutting end.
+Settled when each step's framing leaf and `bursts-down` are bodies.
 
-Members: `pooled-pin`, `left-pin`, `pool-off`, `pool-land`, `rest-body`,
-`rest-land`, `spread-held`, `void-site`, `shut-late`, `step-late`,
-`emit-shut`, `emit-run`, `note-least`, `turn-dry`.
+Members: `bg-ended`, `bg-told`, `connect-ended`, `connect-told`, `fed-ended`,
+`fed-told`, `fin-ended`, `fin-told`, `fr-ended`, `out-told`, `scan-ended`,
+`scan-told`, `torn-ended`, `torn-told`, `wr-ended`, `wr-told`, `bursts-down`,
+`flat-down`.
 
 #### THE LANE START
 

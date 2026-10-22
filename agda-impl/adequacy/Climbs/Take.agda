@@ -168,13 +168,16 @@ module ClimbTake (R : Set) where
       ; head-below  = λ _ → Build.each-take H (Heads q)
           (λ e hk → subst (Heads q) (just-injective (trans (sym (ending-part H {i = i} {p} {c} {k} {u} {q} {c′} lv)) e))
                           (λ hk′ → subst (q ≤ᵖ_) (just-injective hk′) (≤ᵖ-child q (inj₁ refl))) hk)
-          (λ ok → ⊥-elim (and-false (At.val H (Kit.live c)) ok)) }
+          (λ ok → ⊥-elim (and-false (At.val H (Kit.live c)) ok))
+      ; head-untold = λ _ _ → λ { (in-take ψ) sn → ⊥-elim (and-false (At.val H (Kit.live c)) sn) }
+      ; head-ended  = λ _ → λ { (in-take ψ) sn → ⊥-elim (and-false (At.val H (Kit.live c)) sn) } }
 
     end-lingering : At.val H (Kit.live c) ≡ true → At.part H u ≡ just c′ → Lingering H H w₀ v
     end-lingering lv pv = record
       { ling-revive = λ _ → cong is-just (take-live lv pv)
       ; ling-rested = tw-alike {x = At.leftover H u} refl
-      ; ling-below  = λ _ → Linger.lg-take H (λ ok → ⊥-elim (and-false (At.val H (Kit.live c)) ok)) }
+      ; ling-below  = λ _ → Linger.lg-take H (λ ok → ⊥-elim (and-false (At.val H (Kit.live c)) ok))
+      ; ling-ended  = λ _ → λ { (in-take ψ) sn → ⊥-elim (and-false (At.val H (Kit.live c)) sn) } }
 
     end-ticked : ∀ {w p′ bs} {ϑ : w ⊑ h} {K : Stack w ⊤} n (sk : StackAs T p′ ϑ K bs) → Ticked T n sk → Ticked T′ n (end-stack sk)
     end-ticked n sk = reticked kin ρ {n = n} sk
