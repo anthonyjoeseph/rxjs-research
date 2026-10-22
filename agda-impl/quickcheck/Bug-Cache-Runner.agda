@@ -36,7 +36,7 @@ private
 
   report : List (String × Prog natᵗ) → IO Unit
   report []             = putStrLn ("bug-cache: done " ++ show (length cases) ++ " rows")
-  report ((l , p) ∷ rs) = verdict l (prop p ∧ placing p) (report rs)
+  report ((l , p) ∷ rs) = verdict l (prop natᵗ p ∧ placing p) (report rs)
 
 main : IO Unit
 main = report cases

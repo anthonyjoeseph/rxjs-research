@@ -70,6 +70,7 @@ type Row = {
   prog: Code;
   denote: Trace;
   pure: Trace;
+  state: Trace;
 };
 
 const bin = process.env.AGDA_CLI_BIN ?? "../agda-impl/_cli/Oracle-CLI";
@@ -191,6 +192,7 @@ const check = async (fam: Family, row: Row): Promise<string[]> => {
   const bad = [
     ...(agrees(row.denote, rx) ? [] : [`denotation ${show(row.denote)}`]),
     ...(agrees(row.pure, rx) ? [] : [`pure       ${show(row.pure)}`]),
+    ...(agrees(row.state, rx) ? [] : [`state      ${show(row.state)}`]),
     ...(io === undefined
       ? []
       : ioTrace === undefined
@@ -198,8 +200,11 @@ const check = async (fam: Family, row: Row): Promise<string[]> => {
         : agrees(ioTrace, rx)
           ? []
           : [`io         ${show(ioTrace)}`]),
-    // the QUICKCHECK leg: the two pure engines, against each other
+    // the QUICKCHECK leg: the pure engines, against the denotation
     ...(agrees(row.denote, row.pure) ? [] : ["(denotation and pure disagree)"]),
+    ...(agrees(row.denote, row.state)
+      ? []
+      : ["(denotation and state disagree)"]),
   ];
   return bad.length === 0
     ? []
@@ -234,7 +239,7 @@ const run = async (
   const stuck = single.filter(({ listed }) => listed?.failed !== undefined);
   stuck.forEach(({ seed, listed }) =>
     console.log(
-      `oracle: FAIL ${fam.label}seed ${seed}\n  prog       ${cli([fam.code, String(seed)]).out.trim()}\n  listing    ${listed?.failed}${fam.engines ? `\n  denote     ${cli(["denote", String(seed)]).failed ?? "finishes"}\n  pure       ${cli(["pure", String(seed)]).failed ?? "finishes"}` : ""}`,
+      `oracle: FAIL ${fam.label}seed ${seed}\n  prog       ${cli([fam.code, String(seed)]).out.trim()}\n  listing    ${listed?.failed}${fam.engines ? `\n  denote     ${cli(["denote", String(seed)]).failed ?? "finishes"}\n  pure       ${cli(["pure", String(seed)]).failed ?? "finishes"}\n  state      ${cli(["state", String(seed)]).failed ?? "finishes"}` : ""}`,
     ),
   );
   const rows = (
@@ -253,6 +258,7 @@ const run = async (
         ...(JSON.parse(l) as Row),
         denote: exact.denote,
         pure: exact.pure,
+        state: exact.state,
       };
     });
   const verdicts = await Promise.all(

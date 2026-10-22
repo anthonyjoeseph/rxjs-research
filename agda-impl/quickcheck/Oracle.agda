@@ -1,7 +1,7 @@
 {-# OPTIONS --guardedness #-}
 
--- ONE PROGRAM, THREE RUNTIMES.  A `Prog` is handed to the denotation, the
--- pure event loop or the IO runtime, through the same `toObs` and the same
+-- ONE PROGRAM, FOUR RUNTIMES.  A `Prog` is handed to the denotation, the
+-- pure event loop, the state-tree machine or the IO runtime, through the same `toObs` and the same
 -- unfolding budget, and the result is rendered as JSON for whoever is
 -- comparing — `Quickcheck` here, the TypeScript oracle through
 -- `Oracle-CLI`.
@@ -31,6 +31,7 @@ open import denotation.MonotonicList.Events using (ML; Burst; Burst∞; ML∞; d
 open import denotation.MonotonicList using (observe; ticks)
 open import denotation.Denote using (⟦_⟧[_])
 open import operation.Machine using (module Machine)
+open import operation.StateTree.Pure using (module Driver)
 open import operation.Observable using (IORef; IOCold; subscribe; fromTimeline; newIORef; readIORef; writeIORef)
 open import quickcheck.Ty using (⟦_⟧ᵀ; showᵀ)
 open import quickcheck.Code using (Code; Leaf; cold; fresh; empty; of; map; scan; takeWhile; flatMap; connect; connected; μ; var; defer; Prog; toObs; timeline)
@@ -124,6 +125,21 @@ pureTrace : ∀ {t} → ℕ → ℕ → Prog t → Trace ⟦ t ⟧ᵀ
 pureTrace {t} u n p = traceML n (Machine.prefix ⟦ t ⟧ᵀ (until (200 * n) (Machine.trace ⟦ t ⟧ᵀ (Machine.begin ⟦ t ⟧ᵀ o))) o)
   where o = toObs timeline u p [] [] []
 
+module _ {R : Set} where
+  open Driver R using (tau; out; end; idle)
+
+  untilˢ : ℕ → Driver.Trace R → ℕ
+  untilˢ zero    _             = zero
+  untilˢ (suc n) (tau t k)     = if horizon <ᵇ t then zero else suc (untilˢ n (Driver.Trace∞.force k))
+  untilˢ (suc n) (out t _ _ k) = if horizon <ᵇ t then zero else suc (untilˢ n (Driver.Trace∞.force k))
+  untilˢ (suc n) (end _)       = 1
+  untilˢ (suc n) idle          = 1
+
+-- The state-tree machine, read as the machine is.
+stateTrace : ∀ {t} → ℕ → ℕ → Prog t → Trace ⟦ t ⟧ᵀ
+stateTrace {t} u n p = traceML n (Driver.prefix ⟦ t ⟧ᵀ (untilˢ (200 * n) (Driver.trace ⟦ t ⟧ᵀ (Driver.begin ⟦ t ⟧ᵀ o))) o)
+  where o = toObs timeline u p [] [] []
+
 ------------------------------------------------------------------------
 -- JSON
 
@@ -168,10 +184,11 @@ ioTrace u p = newIORef false >>= λ fin → newIORef [] >>= λ log → newIORef 
 -- One engine's trace, printed
 
 data Engine : Set where
-  denotational pureOp ioOp : Engine
+  denotational pureOp stateOp ioOp : Engine
 
 -- `u` bounds each `μ`'s unfolding; `n` bounds a pure trace.
 oracle : ∀ {t} → Engine → ℕ → ℕ → Prog t → IO ⊤
 oracle {t} denotational u n p = putStrLn (showTrace t (denoteTrace u n p))
 oracle {t} pureOp       u n p = putStrLn (showTrace t (pureTrace u n p))
+oracle {t} stateOp      u n p = putStrLn (showTrace t (stateTrace u n p))
 oracle {t} ioOp         u n p = ioTrace u p >>= λ tr → putStrLn (showTrace t tr)
