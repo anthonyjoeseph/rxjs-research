@@ -8,14 +8,25 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE STRONG CARRIER
+#### THE STRONG STEP
 
-Untried: whether the heap machine's re-entry invariant has a reading on the
-state tree, whose nodes are addressed by path, not by heap cell. Settled
-when `Strong` is a ported body that `strong-hop` and `measure` go through,
-or the old body is shown not to port.
+Untried: whether each control state's step keeps `Carried` on the state
+tree — the old Climbs columns over `Sub` instead of the heap. Settled when
+the onward leaves are bodies, `run-onward` first.
 
-Members: `Strong`, `strong-begin`, `strong-sane`, `strong-hop`, `measure`.
+Members: `run-onward`, `sub-onward`, `burst-onward`, `turn-pops`,
+`note-onward`, `note-least`, `turn-dry`.
+
+#### THE CARRIER'S FIELDS
+
+Untried: whether the old held/against predicates restate over `Sub` and
+hold at subscribe. Settled when each is a ported body and its begin leaf
+goes through.
+
+Members: `Owned`, `Meaning`, `Queue`, `Books`, `Each`, `Lingers`, `Untold`,
+`Ended`, `DoneBy`, `placed-subscribe`, `owned-begin`, `meaning-begin`,
+`queue-begin`, `books-begin`, `behind-begin`, `lingers-begin`, `told-begin`,
+`ended-begin`, `flags-begin`.
 
 #### THE WALK
 

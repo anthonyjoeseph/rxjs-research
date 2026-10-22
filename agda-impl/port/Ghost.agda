@@ -8,7 +8,7 @@
 -- reached WITH the record its steps showed (`Reached`).
 module port.Ghost where
 
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.List.Relation.Unary.Any using (Any)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Empty using (⊥)
@@ -30,6 +30,7 @@ open import operation.Placed using (Ahead; none; outᵃ; skipᵃ; endᵃ; hush�
 open import denotation.Compositional using ([]ᵉ)
 open import port.Sorted using (_≤ᵖ_)
 open import port.Unsub using (module Unsubbing)
+open import port.Strong using (module Strongly)
 open import port.Stepper.Past using (afterᴱ)
 open import denotation.Denote using (⟦_⟧)
 open import operation.PureObservable using (PureObs; module Pure; module Driver)
@@ -39,6 +40,7 @@ module Ghosting (R : Set) where
   open Driver R using (Mach; Step; silent; value; complete; drained; step; begin)
   open Pure R using (End; finished; dry; cutOff)
   open Unsubbing R using (_⇝_; now)
+  open Strongly R using (Strong; carried; closing; strong-begin; Carried; Sub; CtlAs; calmAs; noteAs; runAs; subAs; burstAs; pend; takes; left)
 
   ----------------------------------------------------------------------
   -- Alike as sets
@@ -110,20 +112,6 @@ module Ghosting (R : Set) where
   -- The program subscribed at the root shows the meaning's events.
   begun : (o : PureObs [] R) → ∀ n → Agree n (observe (⟦ o ⟧ []) root) (residual (U.subscribe o root))
   begun o n = agree-sym (agree (U.subscribed {k = n} o []ᵉ) root)
-
-  postulate
-    -- A RE-ENTRY CONFIGURATION AGAINST ITS GHOST: the machine's
-    -- configuration runs the meaning's configuration `g`.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Strong/Held.agda
-    Strong : U.Node [] R → Mach → Set₁
-
-    -- The launch is a re-entry configuration against the program
-    -- subscribed at the root.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Strong/Held.agda
-    -- RECOVERY: git show 6e83e02b:agda-impl/port/Deep.agda restores `Deep` and `deep-subscribe`, the order to every depth the old body holds a launch to
-    strong-begin : (o : PureObs [] R) → Strong (U.subscribe o root) (begin o)
 
   ----------------------------------------------------------------------
   -- THE ASSEMBLY: from a launch to an alike record
@@ -293,11 +281,22 @@ module Ghosting (R : Set) where
   ≺-wf = ×-wellFounded (×-wellFounded <-wellFounded (×-wellFounded <-wellFounded (×-wellFounded <-wellFounded
            (×-wellFounded <-wellFounded <-wellFounded)))) <-wellFounded
 
-  postulate
-    -- The work a re-entry configuration has left before its ghost moves.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Ghost.agda
-    measure : ∀ {g m} → Strong g m → Measure
+  -- The work in the witness, the timers and the turns.
+  load : (m : Mach) → Sub [] R → Load
+  load m t = pend t , takes t , length (Mach.timers m) , length (Mach.turns m) , left t
+
+  -- The control's own: the jobs owed, and the one about to run.
+  weight : ∀ {m} → CtlAs m → ℕ
+  weight (calmAs _ _)              = 0
+  weight (noteAs {rs = rs} _ _)    = suc (length rs)
+  weight (runAs {rs = rs} _)       = suc (length rs)
+  weight (subAs {rs = rs} _)       = suc (length rs)
+  weight (burstAs {rs = rs} _ _ _) = length rs
+
+  -- The work a re-entry configuration has left before its ghost moves.
+  measure : ∀ {g m} → Strong g m → Measure
+  measure {m = m} (carried cr) = load m (Carried.tree cr) , weight (Carried.ctlAs cr)
+  measure (closing _ _ _ _)    = (0 , 0 , 0 , 0 , 0) , 0
 
   -- WHAT A SILENT RUN BETWEEN RE-ENTRY CONFIGURATIONS GAINS: the ghost
   -- past a skip of its residual; or the ghost alike, less work left; or
