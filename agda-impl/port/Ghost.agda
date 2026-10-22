@@ -122,6 +122,7 @@ module Ghosting (R : Set) where
     -- subscribed at the root.
     --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Strong/Held.agda
+    -- RECOVERY: git show 6e83e02b:agda-impl/port/Deep.agda restores `Deep` and `deep-subscribe`, the order to every depth the old body holds a launch to
     strong-begin : (o : PureObs [] R) → Strong (U.subscribe o root) (begin o)
 
   ----------------------------------------------------------------------

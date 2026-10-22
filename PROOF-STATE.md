@@ -8,20 +8,27 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE STRONG CARRIER
+
+Untried: whether the heap machine's re-entry invariant has a reading on the
+state tree, whose nodes are addressed by path, not by heap cell. Settled
+when `Strong` is a ported body that `strong-hop` and `measure` go through,
+or the old body is shown not to port.
+
+Members: `Strong`, `strong-begin`, `strong-sane`, `strong-hop`, `measure`.
+
+#### THE WALK
+
+Untried: whether the old well-configuration walk carries to the state tree's
+step. Settled when `WellMach` is a ported body and `preserve` goes through.
+
+Members: `WellMach`, `preserve`, `begin-well`.
+
 ## Tier 1 — the adequacy theorem
 
 **Adequacy:** the denotation matches the operational semantics.
 
 ### Ledger
-
-#### DEEP ORDER
-
-Whether `Deep`, order to every depth, is the invariant a launch, a step and a
-gap keep, so that the order lemmas `Placed` stands on reach every depth.
-Settled when `step-deep` and `gapped-deep` are bodies, or the field is
-restated.
-
-Members: `deep-subscribe`.
 
 #### THE LINK
 

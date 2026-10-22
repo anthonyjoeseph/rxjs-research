@@ -405,10 +405,6 @@ private
 ... | inj₂ (_ , ())
 <ᵖ-part (x ∷ p) ys zs h rewrite refl-label x = <ᵖ-part p ys zs h
 
--- Two subjects' subscribers part in the order they joined.
-<ᵖ-sub : ∀ i j → i <ᵖ j ≡ true → (sub i ∷ []) <ᵖ (sub j ∷ []) ≡ true
-<ᵖ-sub i j h rewrite isLt-lt h = refl
-
 -- Led by the tick.
 <ᵖ-tick : ∀ a b p q → (ix a ∷ p) <ᵖ (ix b ∷ q) ≡ true → a ≤ b
 <ᵖ-tick a b p q h with lexi-lt (cmpℕ a b) (cmpPos p q) (isLt-lt h)
@@ -474,13 +470,6 @@ inside-++ (a ∷ r) []      ys ()
 inside-++ (a ∷ r) (b ∷ k) ys i with cmpLabel a b
 ... | lt with () ← i
 ... | eq = inside-++ r k ys i
-... | gt with () ← i
-
--- Under `r`, a label at a time.
-inside-cons : ∀ a r b k → inside (a ∷ r) (b ∷ k) ≡ true → a ≡ b × inside r k ≡ true
-inside-cons a r b k i with cmpLabel a b in e
-... | lt with () ← i
-... | eq = eq-label a b e , i
 ... | gt with () ← i
 
 ------------------------------------------------------------------------

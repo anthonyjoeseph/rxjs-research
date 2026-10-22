@@ -10,7 +10,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (zero; suc)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_])
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁)
 open import Data.Unit using (⊤; tt)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; subst)
@@ -25,8 +25,8 @@ import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import port.Sane using (Mode; runs; over; loose; Told)
-open import port.Placed.Order using (Alien; Atop; Ordered; Prefix; every; ordered; Placed; Within)
-open import port.Placed.Keys using (ordered-≈; prefix-refl)
+open import port.Placed.Order using (Alien; Prefix; every)
+open import port.Placed.Keys using (prefix-refl)
 
 ------------------------------------------------------------------------
 -- Alike: the same events at the same positions, skips and what a cut
@@ -45,29 +45,6 @@ afterᴱ ρ (U.outˢ k a c′) = out k a (U.stateᴺ c′ ρ)
 afterᴱ ρ (U.skipˢ k c′)  = skip k (U.stateᴺ c′ ρ)
 afterᴱ ρ (U.endˢ k)      = end k
 afterᴱ ρ U.hushˢ         = hush
-
--- What a step shows sits atop the stepped node's meaning, and that node
--- is placed.
-Placedˢ : ∀ {Γ A} → NEnv Γ → U.Step Γ A → Set
-Placedˢ ρ (U.outˢ k a c) = Atop k (U.meaning c ρ) × Placed c ρ
-Placedˢ ρ (U.skipˢ k c)  = Atop k (U.meaning c ρ) × Placed c ρ
-Placedˢ ρ (U.endˢ k)     = ⊤
-Placedˢ ρ U.hushˢ        = ⊤
-
--- What the stepped node holds within it is placed.
-Withinˢ : ∀ {Γ A} → NEnv Γ → U.Step Γ A → Set
-Withinˢ ρ (U.outˢ k a c) = Within c ρ
-Withinˢ ρ (U.skipˢ k c)  = Within c ρ
-Withinˢ ρ (U.endˢ k)     = ⊤
-Withinˢ ρ U.hushˢ        = ⊤
-
--- A node in order showing its step leaves the stepped node in order,
--- atop what the step shows.
-placed-step : ∀ {Γ A} (ρ : NEnv Γ) (s : U.Step Γ A) {x : Events A} → x ≃ afterᴱ ρ s → Ordered x → Withinˢ ρ s → Placedˢ ρ s
-placed-step ρ (U.outˢ k a c) e o w = proj₁ (ordered (ordered-≈ _ _ (agreeing e) o)) , proj₂ (ordered (ordered-≈ _ _ (agreeing e) o)) , w
-placed-step ρ (U.skipˢ k c)  e o w = proj₁ (ordered (ordered-≈ _ _ (agreeing e) o)) , proj₂ (ordered (ordered-≈ _ _ (agreeing e) o)) , w
-placed-step ρ (U.endˢ k)     e o w = tt
-placed-step ρ U.hushˢ        e o w = tt
 
 ------------------------------------------------------------------------
 -- THE STEPPER IS THE MEANING, in any scope: what a node's step shows is

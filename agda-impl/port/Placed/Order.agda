@@ -94,12 +94,6 @@ Prefix []      h       = ⊤
 Prefix (_ ∷ _) []      = ⊥
 Prefix (a ∷ k) (b ∷ h) = a ≡ b × Prefix k h
 
-Prefix⁺ : Pos → Pos → Set
-Prefix⁺ []      []      = ⊥
-Prefix⁺ []      (_ ∷ _) = ⊤
-Prefix⁺ (_ ∷ _) []      = ⊥
-Prefix⁺ (a ∷ k) (b ∷ h) = a ≡ b × Prefix⁺ k h
-
 -- `h` keyed under `k`: inside its subtree, or tagged by a join or a
 -- timer keyed under it.  A rejoin at `p` keys a source's `q` as
 -- `q ++ [ sub p ]`, and a frame of a cold at `p` sits at
@@ -113,10 +107,6 @@ mutual
   Tagged k (ix _ ∷ h)  = Tagged k h
   Tagged k (sub j ∷ h) = Owned k j ⊎ Tagged k h
   Tagged k (last ∷ h)  = Tagged k h
-
--- Strictly keyed under `k`: anywhere but `k` itself.
-Beneath : Pos → Pos → Set
-Beneath k h = Prefix⁺ k h ⊎ Tagged k h
 
 -- Every position a tail would step at satisfies `P`.
 mutual
@@ -310,14 +300,6 @@ headed-snoc (ix _ ∷ _) h = tt
 headed-snoc []         ()
 headed-snoc (sub _ ∷ _) ()
 headed-snoc (last ∷ _) ()
-
-sorted-lookup : ∀ {Γ A} (ρ : NEnv Γ) → Sorted ρ → (i : A ∈ Γ) → Ordered (lookup ρ i) × Steady (lookup ρ i)
-sorted-lookup (e ∷ᴬ ρ) (o , _ , so) (here refl) = o
-sorted-lookup (e ∷ᴬ ρ) (o , _ , so) (there i)   = sorted-lookup ρ so i
-
-sorted-headed : ∀ {Γ} (ρ : NEnv Γ) → Sorted ρ → Everyᴱ Headed ρ
-sorted-headed []ᴬ      _            = tt
-sorted-headed (e ∷ᴬ ρ) (_ , h , so) = h , sorted-headed ρ so
 
 -- A value changed, or a running total, keeps its position.
 atop-map : ∀ {A B} (f : A → B) k (e : Events A) → Atop k e → Atop k (M′.mapᴱ f e)

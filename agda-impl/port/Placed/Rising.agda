@@ -4,16 +4,15 @@ module port.Placed.Rising where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥-elim)
-open import Data.List.Properties using (∷-injective; ∷-injectiveʳ; ++-identityʳ)
+open import Data.List.Properties using (∷-injective; ∷-injectiveʳ)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.Nat using (zero; suc; _+_; _≤_; _<_; s≤s)
-open import Data.Nat.Properties using (≤-refl; +-identityʳ; +-monoʳ-<; ≤-pred; m≤n⇒m<n∨m≡n; <⇒≢; +-suc; +-monoʳ-≤; ≤-trans; m≤m+n;
-  <-irrefl)
+open import Data.Nat.Properties using (+-identityʳ; +-monoʳ-<; ≤-pred; m≤n⇒m<n∨m≡n; <⇒≢; +-suc; +-monoʳ-≤; ≤-trans; m≤m+n; <-irrefl)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_; map to mapᴬ)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to All++⁺; ++⁻ˡ to All++⁻ˡ; ++⁻ʳ to All++⁻ʳ)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (_×_; _,_; proj₁; proj₂; Σ)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; subst; cong)
 open import Relation.Nullary using (¬_)
@@ -30,8 +29,14 @@ open import denotation.Unfold using (NEnv)
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
 open import denotation.Compositional using (env-refl)
 open import port.Finite using (Finite; cold-f; empty-f; of-f; map-f; scan-f; takeWhile-f; flatMap-f; connect-f; connected-f; defer-f; trunc; finite-trunc; trunc-agree)
-open import port.Placed.Order using (Alien; Alienᴱ; Atop; Beneath; Clear; Disjoint; Every; EveryT; Everyᴱ; Every∞; Ext; Headed; Ordered; Owned; Past; Prefix; Reaches; Sorted; Steady; Tagged; Within; atop-map; atop-scan; cons-ext; every; every-lookup; every-mono; every-monoᴱ; everyT-burstOn; everyT-idle; everyT-mono; everyT-∪; everyᵀ; every∞-mono; ext; ext-eq; ext-irrefl; headed-snoc; ordered; prefix-++; sorted-headed; steady; under-ext)
-open import port.Placed.Keys using (Mark; module Merge; alienᴱ-owned; atop-agree; beneath-owned; beneath-snoc; clear-agree; earliest-all; every-beside; every-lim; every-map; every-reach; every-scan; every-≈; everyT-≈; ix-mark; last-mark; no-tick; ordered-≈; owned-lane; owned-snoc; owned-tagged; owned-trans; prefix-refl; sibling; steady-≈; tagged-mark; tagged-sub; tick-last; values-map)
+open import port.Placed.Order using (Alien; Alienᴱ; Atop; Clear; Disjoint; Every; EveryT; Everyᴱ; Every∞; Ext; Headed; Ordered;
+  Owned; Past; Prefix; Steady; Tagged; atop-map; atop-scan; cons-ext; every; every-lookup;
+  every-mono; everyT-burstOn; everyT-idle; everyT-mono; everyT-∪; everyᵀ; every∞-mono; ext;
+  ext-eq; ext-irrefl; headed-snoc; ordered; prefix-++; steady; under-ext)
+open import port.Placed.Keys using (Mark; module Merge; alienᴱ-owned; atop-agree; clear-agree; earliest-all; every-beside;
+  every-lim; every-map; every-scan; every-≈; everyT-≈; ix-mark; last-mark; no-tick; ordered-≈;
+  owned-tagged; owned-trans; prefix-refl; sibling; steady-≈; tagged-mark; tagged-sub;
+  tick-last; values-map)
 
 open Events∞
 open Tail∞
@@ -157,45 +162,6 @@ module Reach (R : Rules) where
     every-lim (λ n → U.meaning (U.subscribe (trunc n o) k) ρ) _ (λ n → proj₁ (reachᶠ (trunc n o) (finite-trunc n o) k ρ sk sρ))
       (λ n → trunc-agree n o k ρ)
 
--- Keyed under `p`: subscribing where `p` keys, showing strictly under it.
-keyedRules : Pos → Rules
-keyedRules p = record
-  { S      = Owned p
-  ; P      = Beneath p
-  ; Src    = λ _ → ⊤
-  ; child  = λ j l _ o → owned-snoc p j l o
-  ; deeper = λ h l _ b → beneath-snoc p h l b
-  ; held   = beneath-owned p
-  ; frame  = λ n e b _ → inj₂ (inj₁ (beneath-owned p e b))
-  ; join   = λ q j _ o _ → inj₂ (owned-tagged p j (q ++ [ sub j ]) o (tagged-sub q j))
-  ; source = λ _ _ → tt
-  }
-
--- Headed: subscribing where a tick heads, over sources so headed.
-headedRules : Rules
-headedRules = record
-  { S      = Headed
-  ; P      = Headed
-  ; Src    = Headed
-  ; child  = λ j _ _ h → headed-snoc j h
-  ; deeper = λ h _ _ x → headed-snoc h x
-  ; held   = λ _ x → x
-  ; frame  = λ _ _ _ _ → tt
-  ; join   = λ q _ hq _ _ → headed-snoc q hq
-  ; source = λ _ x → x
-  }
-
--- A SUBSCRIPTION WHERE A TICK HEADS SHOWS ONLY WHERE ONE HEADS.
-headed-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Every Headed (U.meaning (U.subscribe o p) ρ)
-headed-sub o p ρ hp so = Reach.reach headedRules o p ρ hp (sorted-headed ρ so)
-
--- A lane subscribes headed just past where the step admitting it shows.
-headed-lane : ∀ x → Headed (x ++ [ ix 0 ]) → Headed (x ++ [ ix 1 ])
-headed-lane []          h = tt
-headed-lane (ix _ ∷ _)  h = tt
-headed-lane (sub _ ∷ _) ()
-headed-lane (last ∷ _)  ()
-
 prefix-split : ∀ a j l → Prefix a (j ++ [ l ]) → Prefix a j ⊎ a ≡ j ++ [ l ]
 prefix-split []          j       l _          = inj₁ tt
 prefix-split (_ ∷ [])    []      l (refl , _) = inj₂ refl
@@ -273,17 +239,6 @@ alien-apart : ∀ {Γ A} (o : Obs Timeline Γ A) a k (ρ : NEnv Γ) → Alienᴱ
             → (∀ m → a ≢ ix (suc m) ∷ []) → Alien a (U.meaning (U.subscribe o k) ρ)
 alien-apart o a k ρ al na nb nt = every-mono (λ _ → proj₁) _ (Reach.reach (apartRules a nt) o k ρ (na , nb) al)
 
--- A flatMap's sources stay out of every lane it can admit: the skip
--- before the lane is keyed under the flatMap, so the lane is.
---
--- REFUTED: f5faeaf6 of sources merely clear of the flatMap's subtree, by one tagged under its join
-alien-shown : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → Alienᴱ p ρ
-            → ∀ x → Reaches (x ++ [ ix 0 ]) (U.meaning (U.subscribe (flatMap op f s) p) ρ) → Alienᴱ (x ++ [ ix 1 ]) ρ
-alien-shown op f s p ρ al x r =
-  alienᴱ-owned p (x ++ [ ix 1 ])
-    (owned-lane p x (every-reach _ (x ++ [ ix 0 ])
-      (Reach.reach (keyedRules p) (flatMap op f s) p ρ (inj₁ (prefix-refl p)) (every-monoᴱ (λ _ _ → tt) ρ al)) r)) ρ al
-
 -- `e`'s first, if any, strictly past `k`.
 Beyond : ∀ {A} → Pos → Events A → Set
 Beyond k (out h _ _) = k <ᵖ h ≡ true
@@ -294,13 +249,6 @@ Beyond k hush        = ⊤
 -- Shown just past one no earlier is no earlier.
 snoc-atop : ∀ q l k → q <ᵖ k ≡ false → (q ++ [ l ]) <ᵖ k ≡ false
 snoc-atop q l k a = ≮-trans k q (q ++ [ l ]) a (<ᵖ-asym q (q ++ [ l ]) (<ᵖ-below q []))
-
--- Before the next step, atop it.
-before-atop : ∀ {B} q (x : Events B) → M′.before q x ≡ true → Atop q x
-before-atop q (out k _ _) b = <ᵖ-asym q k b
-before-atop q (skip k _)  b = <ᵖ-asym q k b
-before-atop q (end k)     b = <ᵖ-asym q k b
-before-atop q hush        b = tt
 
 atop-weaken : ∀ {A} k k′ (e : Events A) → k <ᵖ k′ ≡ false → Atop k e → Atop k′ e
 atop-weaken k k′ (out h _ _) kk a = ≮-trans k′ k h kk a
@@ -475,12 +423,6 @@ rise-sub (connect s b)     j ρ hj =
 rise-sub (connected i)     j ρ hj = atop-rejoin j (lookup ρ i)
 rise-sub (defer l)         j ρ hj = <ᵖ-asym j (j ++ [ ix 0 ]) (<ᵖ-below j [])
 
-start-within : ∀ {Γ A} p (m : From A 0) (ρ : NEnv Γ) → Within (U.startᶜ p m) ρ
-start-within p (M.at zero _ _)    ρ = tt
-start-within p (M.at (suc _) _ _) ρ = tt
-start-within p M.done             ρ = tt
-start-within p M.quiet            ρ = tt
-
 -- A RUN RISING: each event strictly before the next and not around
 -- it, so both in order and steady.
 mutual
@@ -540,85 +482,6 @@ tick-past {m} {n} p q l = <ᵖ-part [] {ix m} {ix n} p q (ix-< l) , apart
         ... | _ , _ , e with ∷-injective e
         ...   | refl , _ = <⇒≢ l refl
 
-prefix-rest : ∀ k h → Prefix k h → Σ Pos (λ ys → h ≡ k ++ ys)
-prefix-rest []      h       _          = h , refl
-prefix-rest (_ ∷ _) []      ()
-prefix-rest (a ∷ k) (b ∷ h) (refl , p) with prefix-rest k h p
-... | ys , refl = ys , refl
-
-prefix-lt : ∀ j n → Prefix j n → j ≡ n ⊎ j <ᵖ n ≡ true
-prefix-lt j n pr with prefix-rest j n pr
-... | []     , refl = inj₁ (sym (++-identityʳ j))
-... | l ∷ ls , refl = inj₂ (<ᵖ-below j ls)
-
--- What comes before a position under `p`, outside `p`, comes before `p`.
-below-under : ∀ p k ys → ¬ Prefix p k → k <ᵖ (p ++ ys) ≡ true → k <ᵖ p ≡ true
-below-under p k ys np h with k <ᵖ p in e
-... | true  = refl
-... | false with <ᵖ-split p k e
-...   | inj₂ refl = ⊥-elim (np (prefix-refl p))
-...   | inj₁ pk with () ← trans (sym (<ᵖ-asym (p ++ ys) k (M.<ᵖ-apart p k ys pk (λ zs q → np (subst (Prefix p) (sym q) (prefix-++ p zs)))))) h
-
--- What comes before a lane under `p`, outside `p`, comes before every
--- lane under it.
-below-lane : ∀ p k i j → ¬ Prefix p k → k <ᵖ (p ++ [ ix i ]) ≡ true → k <ᵖ (p ++ [ ix j ]) ≡ true
-below-lane p k i j np h = <ᵖ-trans k p (p ++ [ ix j ]) (below-under p k [ ix i ] np h) (<ᵖ-below p [])
-
--- RISING: whatever under `p` tags a position came before it.  A join
--- keys a source's event after where it joined, and a timer's frame
--- sits at a tick past its burst's.
-Rise : Pos → Pos → Set
-Rise p h = Headed h × (∀ k → Headed k → Owned p k → Tagged k h → k <ᵖ h ≡ true)
-
-rise-owned : ∀ p k h → Rise p h → Headed k → Owned p k → Owned k h → k ≡ h ⊎ k <ᵖ h ≡ true
-rise-owned p k h r hk ok (inj₁ pr) = prefix-lt k h pr
-rise-owned p k h r hk ok (inj₂ t)  = inj₂ (proj₂ r k hk ok t)
-
-tick-mono : ∀ k h → Headed k → Headed h → k ≡ h ⊎ k <ᵖ h ≡ true → tick k ≤ tick h
-tick-mono (ix t ∷ ks) (ix u ∷ hs) _ _ (inj₁ refl) = ≤-refl
-tick-mono (ix t ∷ ks) (ix u ∷ hs) _ _ (inj₂ lt)   = <ᵖ-tick t u ks hs lt
-tick-mono []          _           () _
-tick-mono (sub _ ∷ _) _           () _
-tick-mono (last ∷ _)  _           () _
-tick-mono (ix _ ∷ _)  []          _ ()
-tick-mono (ix _ ∷ _)  (sub _ ∷ _) _ ()
-tick-mono (ix _ ∷ _)  (last ∷ _)  _ ()
-
-rise-mark : ∀ p j l → Mark l → Rise p j → Rise p (j ++ [ l ])
-rise-mark p j l m (hj , rj) =
-  headed-snoc j hj , λ k hk ok t → <ᵖ-trans k j (j ++ [ l ]) (rj k hk ok (tagged-mark k j l m t)) (<ᵖ-below j [])
-
-rise-frame : ∀ p n e → Rise p e → tick e ≤ n → Rise p (ix (suc n) ∷ sub e ∷ [])
-rise-frame p n e re te = tt , tg
-  where tg : ∀ k → Headed k → Owned p k → Tagged k (ix (suc n) ∷ sub e ∷ []) → k <ᵖ (ix (suc n) ∷ sub e ∷ []) ≡ true
-        tg (ix t ∷ ks) hk ok (inj₁ o) =
-          proj₁ (tick-past ks (sub e ∷ []) (s≤s (≤-trans (tick-mono (ix t ∷ ks) e hk (proj₁ re) (rise-owned p _ e re hk ok o)) te)))
-        tg []          () ok _
-        tg (sub _ ∷ _) () ok _
-        tg (last ∷ _)  () ok _
-
-rise-join : ∀ p q j → Rise p q → Rise p j → j <ᵖ q ≡ true → Rise p (q ++ [ sub j ])
-rise-join p q j rq rj jq = headed-snoc q (proj₁ rq) , tg
-  where tg : ∀ k → Headed k → Owned p k → Tagged k (q ++ [ sub j ]) → k <ᵖ (q ++ [ sub j ]) ≡ true
-        tg k hk ok t with tagged-split k q j t
-        ... | inj₁ tq = <ᵖ-trans k q (q ++ [ sub j ]) (proj₂ rq k hk ok tq) (<ᵖ-below q [])
-        ... | inj₂ oj with rise-owned p k j rj hk ok oj
-        ...   | inj₁ refl = <ᵖ-trans k q (q ++ [ sub j ]) jq (<ᵖ-below q [])
-        ...   | inj₂ kj   = <ᵖ-trans k q (q ++ [ sub j ]) (<ᵖ-trans k j q kj jq) (<ᵖ-below q [])
-
-risingRules : Pos → Rules
-risingRules p = record
-  { S      = Rise p
-  ; P      = Rise p
-  ; Src    = Rise p
-  ; child  = λ j l m r → rise-mark p j l m r
-  ; deeper = λ h l m r → rise-mark p h l m r
-  ; held   = λ _ r → r
-  ; frame  = rise-frame p
-  ; join   = rise-join p
-  ; source = λ _ r → r
-  }
-
 -- A burst's first event is at its next index.
 burst-past : ∀ {A t} τ r i (b : M.Frame A t) {k} → k <ᵖ (r ++ [ ix i ]) ≡ true × ¬ Ext k (r ++ [ ix i ]) → Past k (M′.burst τ r i b)
 burst-past τ r i (M.emit _ _) h = h
@@ -643,36 +506,11 @@ mutual
   frames-past τ q i M.quiet       e    = tt
   frames-past τ q i (M.at t′ l b) refl = burst-past τ _ 0 b (tick-past (q ++ [ ix i ]) _ (+-monoʳ-< τ l))
 
--- A COLD'S RUN RISES where a tick heads it: its subscribe burst at the
--- tick's own label, every later frame at a later tick.
---
--- REFUTED: 6f6818f6 wherever no tick heads the position, a timer's frame at a bare tick sorting before the burst behind it
-rising-start : ∀ {A} p (m : From A 0) → Headed p → Rising (M′.start p m)
-rising-start (ix τ ∷ q)  (M.at zero _ b)    hp = rising-burst τ τ q 0 b (sym (+-identityʳ τ))
-rising-start []          (M.at zero _ b)    ()
-rising-start (sub _ ∷ _) (M.at zero _ b)    ()
-rising-start (last ∷ _)  (M.at zero _ b)    ()
-rising-start p           (M.at (suc t) l b) hp = rising-frames (tick p) (p ++ [ last ]) (M.at (suc t) l b)
-rising-start p           M.done             hp = rising-frames {t = 0} (tick p) (p ++ [ last ]) M.done
-rising-start p           M.quiet            hp = rising-frames {t = 0} (tick p) (p ++ [ last ]) M.quiet
-
-ordered-start : ∀ {A} p (m : From A 0) → Headed p → Ordered (M′.start p m)
-ordered-start p m hp = rising-ordered _ (rising-start p m hp)
-
-steady-start : ∀ {A} p (m : From A 0) → Headed p → Steady (M′.start p m)
-steady-start p m hp = rising-steady _ (rising-start p m hp)
-
 -- A LIST'S RUN RISES: its values at rising indices, then its end.
 rising-of : ∀ {A} p i (xs : List A) → Rising (M′.ofᴱ p i xs)
 rises (rising-of p i [])           = tt
 rises (rising-of p i (x ∷ []))     = ix-last p i , rising-of p (suc i) []
 rises (rising-of p i (x ∷ y ∷ xs)) = next-ix p i , rising-of p (suc i) (y ∷ xs)
-
-ordered-of : ∀ {A} p i (xs : List A) → Ordered (M′.ofᴱ p i xs)
-ordered-of p i xs = rising-ordered _ (rising-of p i xs)
-
-steady-of : ∀ {A} p i (xs : List A) → Steady (M′.ofᴱ p i xs)
-steady-of p i xs = rising-steady _ (rising-of p i xs)
 
 -- A position one label down from another is inside only what that one
 -- is inside or is.
@@ -744,8 +582,6 @@ mutual
   steady (steady-taking true  p h a false r _)        = ix-last h 0 , record { steady = tt }
   steady (steady-taking false p h a false r _)        = tt
 
-
-
 -- A CONNECT'S SOURCE KEYS NOTHING UNDER ITS BODY: the two are siblings.
 alien-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Alienᴱ p ρ
           → Alien (p ++ [ ix 0 ]) (U.meaning (U.subscribe o (p ++ [ ix 1 ])) ρ)
@@ -770,16 +606,6 @@ every (every-zip (skip h r)  pe qe) = (proj₁ (every pe) , proj₁ (every qe)) 
 every (every-zip (end h)     pe qe) = every pe , every qe
 every (every-zip hush        pe qe) = tt
 
-every∞-zip : ∀ {A} {P Q : Pos → Set} (r : Events∞ A) → Every∞ P r → Every∞ Q r → Every∞ (λ h → P h × Q h) r
-every∞-zip r (pe , pt) (qe , qt) = every-zip (force r) pe qe , everyT-zip (cut r) pt qt
-
--- Sources alien to `p` rise under anything `p` owns: nothing there tags them.
-rise-env : ∀ {Γ} p r → Owned p r → (ρ : NEnv Γ) → Everyᴱ Headed ρ → Alienᴱ p ρ → Everyᴱ (Rise r) ρ
-rise-env p r pr []ᴬ      _         _         = tt
-rise-env p r pr (e ∷ᴬ ρ) (he , hρ) (ae , aρ) =
-  every-mono (λ h z → proj₁ z , λ k hk ok t → ⊥-elim (proj₂ z (owned-trans p r h pr (inj₂ (owned-tagged r k h ok t))))) e (every-zip e he ae)
-  , rise-env p r pr ρ hρ aρ
-
 -- A DEFER SHOWS A SKIP, THEN ITS PROGRAM SUBSCRIBED JUST PAST IT: the
 -- fold's meaning there agrees with the program's at every depth, and
 -- nothing the program shows sorts before where it subscribes, nor keys
@@ -797,7 +623,6 @@ module Deferred {Γ A} (l : Later Timeline Γ A) p (ρ : NEnv Γ) (hp : Headed p
 
   alien : Alien (p ++ [ ix 0 ]) S
   alien = alien-sub (Later.force l) p ρ cl
-
 
 -- A DEFER'S RUN IS IN ORDER where a tick heads it, its program's being.
 --
