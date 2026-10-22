@@ -9,8 +9,9 @@
 -- that rewrites a node's flags or a subject's record moves no path.
 -- The shape only grows: a lane is marked off, never removed; a leaf
 -- becomes a subtree.  `Good` asks, of each binder, that every joiner it
--- lists or is feeding is reached from it; it is lifted through a
--- context the way growth is.
+-- lists is reached from it; it is lifted through a context the way
+-- growth is.  A feed's job carries the joiners still to feed, by path
+-- from the root, and they are reached too.
 module spike.StateTree3Valid where
 
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
@@ -18,7 +19,7 @@ open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (map to mapᴬ)
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Nat using (ℕ; zero; suc; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; pred; _≡ᵇ_)
 open import Data.Bool using (true; false)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -166,10 +167,9 @@ reach-dirs c s = subst (λ z → Reach z (plug c s)) (++-identityʳ (dirs c)) (r
 
 Joined : ∀ {Γ X B} → CS X → St Γ X → St (X ∷ Γ) B → Set
 Joined k o b = All (λ j → Two (proj₁ j) o b) (CS.subs k)
-             × All (λ f → All (λ j → Two (proj₁ j) o b) (proj₂ f)) (CS.feeds k)
 
 joined-grow : ∀ {Γ X B} (k : CS X) {o o′ : St Γ X} {b b′ : St (X ∷ Γ) B} → Grows o o′ → Grows b b′ → Joined k o b → Joined k o′ b′
-joined-grow k g h (js , fs) = mapᴬ (λ {j} → two-grow g h (proj₁ j)) js , mapᴬ (mapᴬ (λ {j} → two-grow g h (proj₁ j))) fs
+joined-grow k g h js = mapᴬ (λ {j} → two-grow g h (proj₁ j)) js
 
 mutual
   Good : ∀ {Γ A} → St Γ A → Set
@@ -369,25 +369,64 @@ downs-lands (i ∷ p) c s r with down i c s | down-lands i p c s r
     along (just _) e₁ e₂ = trans e₁ e₂
 
 ------------------------------------------------------------------------
--- The invariant: every job reached from the root, every binder good
+-- The invariant: every job reached from the root, and the joiners its
+-- feed still owes; every binder good
+
+TagR : ∀ {R} → St [] R → Tag → Set
+TagR t (feeding js) = All (λ j → Reach (proj₁ j) t) js
+TagR t _            = ⊤
 
 AllR : ∀ {R} → St [] R → List Job → Set
-AllR t rs = All (λ j → Reach (proj₁ j) t) rs
+AllR t rs = All (λ j → Reach (proj₁ j) t × TagR t (proj₁ (proj₂ j))) rs
 
 V : ∀ {R Γ A} → Ctx R Γ A → St Γ A → List Job → Set
 V c s rs = AllR (plug c s) rs × Good (plug c s)
 
+-- A feed under way in the mode, as a job at the root, so that every
+-- other mode leaves the invariant as it was.
+tagJobs : Tag → List Job
+tagJobs (feeding js) = [ ([] , feeding js , []) ]
+tagJobs _            = []
+
+modeJobs : ∀ {A} → Mode A → List Job
+modeJobs (resuming t) = tagJobs t
+modeJobs _            = []
+
 Valid : ∀ {R} → Conf R → Set
-Valid k = V (Conf.ctx k) (Conf.foc k) (Conf.rets k)
+Valid k = V (Conf.ctx k) (Conf.foc k) (modeJobs (Conf.mode k) ++ Conf.rets k)
+
+tagR-grow : ∀ {R} {t t′ : St [] R} → Grows t t′ → ∀ tg → TagR t tg → TagR t′ tg
+tagR-grow g (feeding js) a = mapᴬ (λ {j} → g (proj₁ j)) a
+tagR-grow g go      a = tt
+tagR-grow g att     a = tt
+tagR-grow g attBody a = tt
+tagR-grow g owed    a = tt
+
+allR-grow : ∀ {R} {t t′ : St [] R} → Grows t t′ → ∀ {rs} → AllR t rs → AllR t′ rs
+allR-grow g a = mapᴬ (λ {j} (r , tr) → g (proj₁ j) r , tagR-grow g (proj₁ (proj₂ j)) tr) a
+
+tag-of : ∀ {R} {t : St [] R} tg {rs} → AllR t (tagJobs tg ++ rs) → TagR t tg × AllR t rs
+tag-of (feeding js) ((_ , tr) ∷ a) = tr , a
+tag-of go      a = tt , a
+tag-of att     a = tt , a
+tag-of attBody a = tt , a
+tag-of owed    a = tt , a
+
+retag : ∀ {R} {t : St [] R} tg {rs} → TagR t tg → AllR t rs → AllR t (tagJobs tg ++ rs)
+retag {t = t} (feeding js) tr a = (reach-nil t , tr) ∷ a
+retag go      tr a = a
+retag att     tr a = a
+retag attBody tr a = a
+retag owed    tr a = a
 
 hole : ∀ {R Γ A} (c : Ctx R Γ A) {s s′ : St Γ A} {rs} → Grows s s′ → (Good s → Good s′) → V c s rs → V c s′ rs
-hole c g h (a , gd) = mapᴬ (λ {j} → grows-plug c g (proj₁ j)) a , good-plug c g h gd
+hole c g h (a , gd) = allR-grow (grows-plug c g) a , good-plug c g h gd
 
 same : ∀ {R Γ A} (c : Ctx R Γ A) {s s′ : St Γ A} {rs} → (∀ p → Reach p s → Reach p s′) → (Good s → Good s′) → V c s rs → V c s′ rs
 same = hole
 
-push : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) {rs} t p → V c s rs → V c s ((dirs c , t , p) ∷ rs)
-push c s t p (a , gd) = reach-dirs c s ∷ a , gd
+push : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) {rs} t p → TagR (plug c s) t → V c s rs → V c s ((dirs c , t , p) ∷ rs)
+push c s t p tr (a , gd) = (reach-dirs c s , tr) ∷ a , gd
 
 moved : ∀ {R} {t t′ : St [] R} {rs} → t′ ≡ t → AllR t rs × Good t → AllR t′ rs × Good t′
 moved e v = subst (λ z → AllR z _ × Good z) (sym e) v
@@ -421,10 +460,15 @@ joinUp-ok j (inBody k o c)            (there x) acc s r v with joinUp j c x (1 �
 ... | b , c″ | w = w
 joinUp-ok j (inBody k o c)          (here refl) acc s r v with CS.closed k
 ... | true  = v
-... | false = hole c (λ p r → r) (λ (g₀ , gb , js , fs) → g₀ , gb , ++⁺ js (r ∷ []) , fs) v
+... | false = hole c (λ p r → r) (λ (g₀ , gb , js) → g₀ , gb , ++⁺ js (r ∷ [])) v
 
 ------------------------------------------------------------------------
 -- Each part of a step
+
+rooted-reach : ∀ {R Γ X B} (c : Ctx R Γ B) {k : CS X} {o b} {js} → All (λ j → Two (proj₁ j) o b) js
+             → All (λ j → Reach (proj₁ j) (plug c (connS k o b))) (rooted c js)
+rooted-reach c []      = []
+rooted-reach c {k} {o} {b} {(q , _) ∷ js} (r ∷ a) = reach-++ c (connS k o b) q r ∷ rooted-reach c a
 
 begin-ok : ∀ {R Γ A} (c : Ctx R Γ A) (o : PObs Γ A) p rs → V c (pend o) rs → Valid (begin c o p rs)
 begin-ok c (cold x)          p rs v = leaf c _ doneS tt v
@@ -433,11 +477,11 @@ begin-ok c (of xs)           p rs v = leaf c _ (ofS p 0 xs) tt v
 begin-ok c (map f s)         p rs v = leaf c _ (mapS f (pend s)) tt v
 begin-ok c (scan f z s)      p rs v = leaf c _ (scanS f z (pend s)) tt v
 begin-ok c (takeWhile i q s) p rs v =
-  push (inCut true false (inTake i q running c)) (pend s) att p (leaf c _ (takeS i q running (cutS true false (pend s))) tt v)
+  push (inCut true false (inTake i q running c)) (pend s) att p tt (leaf c _ (takeS i q running (cutS true false (pend s))) tt v)
 begin-ok c (flatMap op f s)  p rs v =
-  push (inCut true false (inOuter op f false 0 [] c)) (pend s) att p (leaf c _ (flatS op f false 0 (cutS true false (pend s)) []) (tt , tt) v)
+  push (inCut true false (inOuter op f false 0 [] c)) (pend s) att p tt (leaf c _ (flatS op f false 0 (cutS true false (pend s)) []) (tt , tt) v)
 begin-ok c (connect s b)     p rs v =
-  push c (connS (cs false [] [] false true false) (pend s) (pend b)) attBody p (leaf c _ _ (tt , tt , [] , []) v)
+  push c (connS (cs false [] [] false true false) (pend s) (pend b)) attBody p tt (leaf c _ _ (tt , tt , []) v)
 begin-ok c (connected x)     p rs v
   with joinUp p c x [] | joinUp-ok p c x [] doneS tt (leaf c _ doneS tt v) | joinUp-ok p c x [] (joinS p true x) tt (leaf c _ (joinS p true x) tt v)
 ... | true  , c′ | w | _ = w
@@ -449,7 +493,7 @@ start-ok : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → PObs Γ B) d n o ls a p
 start-ok c op f d n o ls a p rs v with closed c
 ... | true  = same c (λ p r → r) (λ g → g) v
 ... | false =
-  push (inCut true false (inLn true (inLanes op f d (suc n) o ls [] c))) (pend (f a)) att (p ⊕ [ ix 1 ])
+  push (inCut true false (inLn true (inLanes op f d (suc n) o ls [] c))) (pend (f a)) att (p ⊕ [ ix 1 ]) tt
     (hole c (fl-grow (λ p r → r) (reachL-snoc ls _)) (λ (g₀ , gl) → g₀ , goodL-snoc ls gl tt) v)
 
 admit-ok : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → PObs Γ B) d n o ls a p rs → V c (flatS op f d n o ls) rs → Valid (admit c op f d n o ls a p rs)
@@ -461,83 +505,98 @@ admit-ok c exhaustᶠ          f d n o ls a p rs v with n ≡ᵇ 0
 ... | true  = start-ok c exhaustᶠ f d n o ls a p rs v
 ... | false = v
 
+-- A settle's mode is never a feed.
+settled : ∀ {R Γ A} {c : Ctx R Γ A} {s : St Γ A} d n {p rs} → V c s rs → Valid ⟨ c , s , settle d n , p , rs ⟩
+settled false n       v = v
+settled true  zero    v = v
+settled true  (suc n) v = v
+
+-- A feed begun: its joiners, the binder's, reached.
+fed : ∀ {R Γ X B} (c : Ctx R Γ B) {k : CS X} {o b} {rs} → All (λ j → Two (proj₁ j) o b) (CS.subs k) → V c (connS k o b) rs
+    → V c (connS k o b) (([] , feeding (rooted c (CS.subs k)) , []) ∷ rs)
+fed c {k} {o} {b} js (a , g) = (reach-nil (plug c (connS k o b)) , rooted-reach c js) ∷ a , g
+
 rise-ok : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) e p rs → V c s rs → Valid (proj₁ (rise c s e p rs))
 rise-ok top                             s e      p rs v = v
 rise-ok (inMap f c)                     s e      p rs v = v
 rise-ok (inScan f z c)                  s (nx a) p rs v = same c (λ p r → r) (λ g → g) v
 rise-ok (inScan f z c)                  s cp     p rs v = v
-rise-ok (inCut l a c)                   s e      p rs v = v
+rise-ok (inCut true a c)                s e      p rs v = v
+rise-ok (inCut false a c)               s e      p rs v = v
 rise-ok (inLn b c)                      s e      p rs v = v
 rise-ok (inTake i q ph c)               s (nx a) p rs v with q a | i
 ... | true  | _     = v
-... | false | true  = push c (takeS true q oweCp s) owed p (same c (λ p r → r) (λ g → g) v)
-... | false | false = push c (takeS false q oweCut s) owed p (same c (λ p r → r) (λ g → g) v)
+... | false | true  = push c (takeS true q oweCp s) owed p tt (same c (λ p r → r) (λ g → g) v)
+... | false | false = push c (takeS false q oweCut s) owed p tt (same c (λ p r → r) (λ g → g) v)
 rise-ok (inTake i q ph c)               s cp     p rs v = v
 rise-ok (inOuter op f d n ls c)         s (nx a) p rs v = admit-ok c op f d n s ls a p rs v
-rise-ok (inOuter op f d n ls c)         s cp     p rs v = same c (λ p r → r) (λ g → g) v
+rise-ok (inOuter op f d n ls c)         s cp     p rs v = settled {c = c} {s = flatS op f true n s ls} true n {p} {rs} (same c (λ p r → r) (λ g → g) v)
 rise-ok (inLanes op f d n o pre post c) s (nx b) p rs v = v
-rise-ok (inLanes op f d n o pre post c) s cp     p rs v =
-  hole c (fl-grow (λ p r → r) (growsL pre post (proj₁ (ended-ok s)))) (λ (g₀ , gl) → g₀ , goodL-mid pre post (proj₂ (ended-ok s)) gl) v
-rise-ok (inSrc k b c)                   s (nx a) p rs v = same c (λ p r → r) (λ (g₀ , gb , js , fs) → g₀ , gb , js , js ∷ fs) v
-rise-ok (inSrc k b c)                   s cp     p rs v = same c (λ p r → r) (λ (g₀ , gb , js , fs) → g₀ , gb , js , js ∷ fs) v
+rise-ok (inLanes op f d n o pre post c) s cp     p rs v = settled {c = c} {s = flatS op f d (pred n) o (pre ++ ended s ∷ post)} d (pred n) {p} {rs} (
+  hole c (fl-grow (λ p r → r) (growsL pre post (proj₁ (ended-ok s)))) (λ (g₀ , gl) → g₀ , goodL-mid pre post (proj₂ (ended-ok s)) gl) v)
+rise-ok (inSrc k b c)                   s (nx a) p rs v =
+  fed c {record k { feeds = nx a ∷ CS.feeds k }} (proj₂ (proj₂ (good-hole c (connS k s b) (proj₂ v)))) (same c {s′ = connS (record k { feeds = nx a ∷ CS.feeds k }) s b} (λ p r → r) (λ g → g) v)
+rise-ok (inSrc k b c)                   s cp     p rs v =
+  fed c {record k { closed = true ; feeds = cp ∷ CS.feeds k }} (proj₂ (proj₂ (good-hole c (connS k s b) (proj₂ v)))) (same c {s′ = connS (record k { closed = true ; feeds = cp ∷ CS.feeds k }) s b} (λ p r → r) (λ g → g) v)
 rise-ok (inBody k o c)                  s (nx b) p rs v = v
-rise-ok (inBody k o c)                  s cp     p rs v = push c (connS k o s) owed p v
+rise-ok (inBody k o c)                  s cp     p rs v = push c (connS k o s) owed p tt v
 
-feedOn-ok : ∀ {R Γ X B} (c : Ctx R Γ B) (k : CS X) o b p rs → V c (connS k o b) rs → Valid (feedOn c k o b p rs)
-feedOn-ok c k o b p rs (a , g) with good-hole c (connS k o b) g
-... | (g₀ , gb , js , fs) with CS.feeds k | fs
-...   | [] | _ = a , g
-...   | (e , []) ∷ fs′ | _ ∷ fs″ = same c (λ p r → r) (λ _ → g₀ , gb , js , fs″) (a , g)
-...   | (e , (q , j) ∷ ps) ∷ fs′ | (r ∷ rs′) ∷ fs″
-  with downs q c (connS (record k { feeds = (e , ps) ∷ fs′ }) o b) | downs-lands q c (connS (record k { feeds = (e , ps) ∷ fs′ }) o b) r
-...     | just (_ , _ , c′ , s′) | e′ =
-  moved e′ (push c (connS (record k { feeds = (e , ps) ∷ fs′ }) o b) go p (same c (λ p r → r) (λ _ → g₀ , gb , js , rs′ ∷ fs″) (a , g)))
+feedOn-ok : ∀ {R Γ X B} (c : Ctx R Γ B) (k : CS X) o b js p rs → TagR (plug c (connS k o b)) (feeding js) → V c (connS k o b) rs → Valid (feedOn c k o b js p rs)
+feedOn-ok c k o b []             p rs tr v = same c (λ p r → r) (λ g → g) v
+feedOn-ok c k o b ((q , j) ∷ js) p rs (r ∷ tr) v with downs q top (plug c (connS k o b)) | downs-lands q top (plug c (connS k o b)) r
+... | just (_ , _ , c′ , s′) | e = moved e (push c (connS k o b) (feeding js) p tr v)
 
-resume-ok : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) t p rs → V c s rs → Valid (resume c s t p rs)
-resume-ok c (ofS q i xs) go p rs v with closed c | xs
+resume-ok : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) t p rs → TagR (plug c s) t → V c s rs → Valid (resume c s t p rs)
+resume-ok c (ofS q i xs) go p rs tr v with closed c | xs
 ... | true  | _       = same c (λ p r → r) (λ _ → tt) v
 ... | false | []      = same c (λ p r → r) (λ _ → tt) v
-... | false | x ∷ xs′ = push c (ofS q (suc i) xs′) go p (same c (λ p r → r) (λ _ → tt) v)
-resume-ok c (cutS true a s)  att p rs v = same c (λ p r → r) (λ g → g) v
-resume-ok c (cutS false a s) att p rs v = hole c (one-grow (proj₁ (unsub-ok s))) (proj₂ (unsub-ok s)) v
-resume-ok c (takeS i q oweCp s) owed p rs v = push c (takeS i q oweCut s) owed p (same c (λ p r → r) (λ g → g) v)
-resume-ok c (takeS i q oweCut s) owed p rs v = hole c (one-grow (proj₁ (cut-ok s))) (proj₂ (cut-ok s)) v
-resume-ok c (connS k o b) go p rs v = feedOn-ok c k o b p rs v
-resume-ok c (connS k o b) attBody p rs v = push c (connS (record k { bodyAtt = true }) o b) att (p ⊕ [ ix 1 ]) (same c (λ p r → r) (λ g → g) v)
-resume-ok c (connS k o b) att p rs v with CS.srcLive k
+... | false | x ∷ xs′ = push c (ofS q (suc i) xs′) go p tt (same c (λ p r → r) (λ _ → tt) v)
+resume-ok c (cutS true a s)  att p rs tr v = same c (λ p r → r) (λ g → g) v
+resume-ok c (cutS false a s) att p rs tr v = hole c (one-grow (proj₁ (unsub-ok s))) (proj₂ (unsub-ok s)) v
+resume-ok c (takeS i q oweCp s) owed p rs tr v = push c (takeS i q oweCut s) owed p tt (same c (λ p r → r) (λ g → g) v)
+resume-ok c (takeS i q oweCut s) owed p rs tr v = hole c (one-grow (proj₁ (cut-ok s))) (proj₂ (cut-ok s)) v
+resume-ok c (connS k o b) (feeding js) p rs tr v = feedOn-ok c k o b js p rs tr v
+resume-ok c (connS k o b) go p rs tr v = v
+resume-ok c (connS k o b) attBody p rs tr v = push c (connS (record k { bodyAtt = true }) o b) att (p ⊕ [ ix 1 ]) tt (same c (λ p r → r) (λ g → g) v)
+resume-ok c (connS k o b) att p rs tr v with CS.srcLive k
 ... | true  = same c (λ p r → r) (λ g → g) v
 ... | false = hole c (two-grow (proj₁ (unsub-ok o)) (λ p r → r))
                 (λ (g₀ , gb , jd) → proj₂ (unsub-ok o) g₀ , gb , joined-grow k (proj₁ (unsub-ok o)) (λ p r → r) jd) v
-resume-ok c (connS k o b) owed p rs v with CS.srcAtt k
+resume-ok c (connS k o b) owed p rs tr v with CS.srcAtt k
 ... | true  = hole c (two-grow (proj₁ (unsub-ok o)) (λ p r → r))
                 (λ (g₀ , gb , jd) → proj₂ (unsub-ok o) g₀ , gb , joined-grow k (proj₁ (unsub-ok o)) (λ p r → r) jd) v
 ... | false = same c (λ p r → r) (λ g → g) v
-resume-ok c (joinS j true x) go p rs v with fedUp c x
+resume-ok c (joinS j true x) go p rs tr v with fedUp c x
 ... | just e  = v
 ... | nothing = v
-resume-ok c (pend o)              t p rs v = v
-resume-ok c doneS                 t p rs v = v
-resume-ok c (mapS f s)            t p rs v = v
-resume-ok c (scanS f z s)         t p rs v = v
-resume-ok c (lnS b s)             t p rs v = v
-resume-ok c (flatS op f d n o ls) t p rs v = v
-resume-ok c (ofS q i xs) att     p rs v = v
-resume-ok c (ofS q i xs) attBody p rs v = v
-resume-ok c (ofS q i xs) owed    p rs v = v
-resume-ok c (cutS l a s) go      p rs v = v
-resume-ok c (cutS l a s) attBody p rs v = v
-resume-ok c (cutS l a s) owed    p rs v = v
-resume-ok c (takeS i q running s) t p rs v = v
-resume-ok c (takeS i q oweCp s) go      p rs v = v
-resume-ok c (takeS i q oweCp s) att     p rs v = v
-resume-ok c (takeS i q oweCp s) attBody p rs v = v
-resume-ok c (takeS i q oweCut s) go      p rs v = v
-resume-ok c (takeS i q oweCut s) att     p rs v = v
-resume-ok c (takeS i q oweCut s) attBody p rs v = v
-resume-ok c (joinS j true x) att     p rs v = v
-resume-ok c (joinS j true x) attBody p rs v = v
-resume-ok c (joinS j true x) owed    p rs v = v
-resume-ok c (joinS j false x) t p rs v = v
+resume-ok c (pend o)              t p rs tr v = v
+resume-ok c doneS                 t p rs tr v = v
+resume-ok c (mapS f s)            t p rs tr v = v
+resume-ok c (scanS f z s)         t p rs tr v = v
+resume-ok c (lnS b s)             t p rs tr v = v
+resume-ok c (flatS op f d n o ls) t p rs tr v = v
+resume-ok c (ofS q i xs) att     p rs tr v = v
+resume-ok c (ofS q i xs) attBody p rs tr v = v
+resume-ok c (ofS q i xs) owed    p rs tr v = v
+resume-ok c (ofS q i xs) (feeding js) p rs tr v = v
+resume-ok c (cutS l a s) go      p rs tr v = v
+resume-ok c (cutS l a s) attBody p rs tr v = v
+resume-ok c (cutS l a s) owed    p rs tr v = v
+resume-ok c (cutS l a s) (feeding js) p rs tr v = v
+resume-ok c (takeS i q running s) t p rs tr v = v
+resume-ok c (takeS i q oweCp s) go      p rs tr v = v
+resume-ok c (takeS i q oweCp s) att     p rs tr v = v
+resume-ok c (takeS i q oweCp s) attBody p rs tr v = v
+resume-ok c (takeS i q oweCp s) (feeding js) p rs tr v = v
+resume-ok c (takeS i q oweCut s) go      p rs tr v = v
+resume-ok c (takeS i q oweCut s) att     p rs tr v = v
+resume-ok c (takeS i q oweCut s) attBody p rs tr v = v
+resume-ok c (takeS i q oweCut s) (feeding js) p rs tr v = v
+resume-ok c (joinS j true x) att     p rs tr v = v
+resume-ok c (joinS j true x) attBody p rs tr v = v
+resume-ok c (joinS j true x) owed    p rs tr v = v
+resume-ok c (joinS j true x) (feeding js) p rs tr v = v
+resume-ok c (joinS j false x) t p rs tr v = v
 
 ------------------------------------------------------------------------
 -- THE INVARIANT, ACROSS EVERY STEP; and the machine's `nothing` arms
@@ -546,8 +605,8 @@ resume-ok c (joinS j false x) t p rs v = v
 load-ok : ∀ {R} (o : PObs [] R) → Valid (load o)
 load-ok o = [] , tt
 
-stepAt-ok : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) m p rs → V c s rs → Valid (proj₁ (stepAt c s m p rs))
-stepAt-ok c s (resuming t) p rs v = resume-ok c s t p rs v
+stepAt-ok : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) m p rs → V c s (modeJobs m ++ rs) → Valid (proj₁ (stepAt c s m p rs))
+stepAt-ok c s (resuming t) p rs (a , g) = resume-ok c s t p rs (proj₁ (tag-of t {rs} a)) (proj₂ (tag-of t {rs} a) , g)
 stepAt-ok c s (rising e)   p rs v = rise-ok c s e p rs v
 stepAt-ok c (pend o)              subscribing p rs v = begin-ok c o p rs v
 stepAt-ok c (ofS q i xs)          subscribing p rs v = v
@@ -561,8 +620,8 @@ stepAt-ok c (takeS i q ph s)      subscribing p rs v = v
 stepAt-ok c (flatS op f d n o ls) subscribing p rs v = v
 stepAt-ok c (connS k o b)         subscribing p rs v = v
 stepAt-ok c s absorbed p [] v = v
-stepAt-ok c s absorbed p ((q , t , p′) ∷ rs) (r ∷ a , g) with downs q top (plug c s) | downs-lands q top (plug c s) r
-... | just (_ , _ , c′ , s′) | e = moved e (a , g)
+stepAt-ok c s absorbed p ((q , t , p′) ∷ rs) (r ∷ a , g) with downs q top (plug c s) | downs-lands q top (plug c s) (proj₁ r)
+... | just (_ , _ , c′ , s′) | e = moved e (retag t (proj₂ r) a , g)
 
 step-ok : ∀ {R} (k : Conf R) → Valid k → Valid (proj₁ (step k))
 step-ok ⟨ c , s , m , p , rs ⟩ v = stepAt-ok c s m p rs v
@@ -570,11 +629,9 @@ step-ok ⟨ c , s , m , p , rs ⟩ v = stepAt-ok c s m p rs v
 -- The `nothing` arm of a resume, dead.
 pop-lands : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) p q t p′ rs → Valid ⟨ c , s , absorbed , p , (q , t , p′) ∷ rs ⟩
           → Landed top (plug c s) (downs q top (plug c s))
-pop-lands c s p q t p′ rs (r ∷ _ , _) = downs-lands q top (plug c s) r
+pop-lands c s p q t p′ rs ((r , _) ∷ _ , _) = downs-lands q top (plug c s) r
 
--- The `nothing` arm of a feed, dead: a joiner a binder is feeding is reached from it.
-feed-lands : ∀ {R Γ X B} (c : Ctx R Γ B) (k : CS X) o b {rs} e q j ps fs → V c (connS k o b) rs → CS.feeds k ≡ (e , (q , j) ∷ ps) ∷ fs
-           → Landed c (connS (record k { feeds = (e , ps) ∷ fs }) o b) (downs q c (connS (record k { feeds = (e , ps) ∷ fs }) o b))
-feed-lands c k o b e q j ps fs (_ , g) eq with good-hole c (connS k o b) g
-... | (_ , _ , _ , fd) with subst (All _) eq fd
-...   | (r ∷ _) ∷ _ = downs-lands q c _ r
+-- The `nothing` arm of a feed, dead: a joiner a feed owes is reached from the root.
+feed-lands : ∀ {R Γ X B} (c : Ctx R Γ B) (k : CS X) o b q j js {p rs} → Valid ⟨ c , connS k o b , resuming (feeding ((q , j) ∷ js)) , p , rs ⟩
+           → Landed top (plug c (connS k o b)) (downs q top (plug c (connS k o b)))
+feed-lands c k o b q j js ((_ , r ∷ _) ∷ _ , _) = downs-lands q top _ r

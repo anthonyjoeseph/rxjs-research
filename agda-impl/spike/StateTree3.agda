@@ -54,13 +54,14 @@ data Ph : Set where
 
 -- A connect's subject and its source's switch.  `feeds` is a STACK: a
 -- value fed while another feed is under way is fed first, as the
--- kernel's nested `each` would.
+-- kernel's nested `each` would; who is still to be fed rides on the
+-- feed's own job, as on `each`'s continuation.
 record CS (X : Set) : Set where
   constructor cs
   field
     closed  : Bool
     subs    : List (List ℕ × Pos)               -- each joiner, by its path from the binder, and where it joined
-    feeds   : List (Ev X × List (List ℕ × Pos)) -- what is being fed, to whom still
+    feeds   : List (Ev X)                       -- what is being fed
     bodyAtt : Bool
     srcLive : Bool
     srcAtt  : Bool
@@ -239,8 +240,8 @@ fedUp (inOuter op f d n ls c)         x = fedUp c x
 fedUp (inLanes op f d n o pre post c) x = fedUp c x
 fedUp (inSrc k b c)                   x = fedUp c x
 fedUp (inBody k o c)          (here refl) with CS.feeds k
-... | (e , _) ∷ _ = just e
-... | []          = nothing
+... | e ∷ _ = just e
+... | []    = nothing
 fedUp (inBody k o c)          (there x) = fedUp c x
 
 ------------------------------------------------------------------------
@@ -251,6 +252,9 @@ fedUp (inBody k o c)          (there x) = fedUp c x
 -- completion left owed.
 data Tag : Set where
   go att attBody owed : Tag
+  -- a feed under way: the joiners still to feed, by path from the root,
+  -- and where each joined
+  feeding : List (List ℕ × Pos) → Tag
 
 -- A job: the node, by its path; what it owes; where the run resumes it.
 Job : Set
@@ -278,6 +282,15 @@ Shown R = List (Pos × Ev R)
 
 _⊕_ : Pos → Pos → Pos
 p ⊕ q = p ++ q
+
+-- The joiners, by path from the root, at the binder in `c`.
+rooted : ∀ {R Γ A} → Ctx R Γ A → List (List ℕ × Pos) → List (List ℕ × Pos)
+rooted c []             = []
+rooted c ((q , j) ∷ js) = (dirs c ++ q , j) ∷ rooted c js
+
+drop₁ : ∀ {X : Set} → List X → List X
+drop₁ []       = []
+drop₁ (_ ∷ xs) = xs
 
 begin : ∀ {R Γ A} → Ctx R Γ A → PObs Γ A → Pos → List Job → Conf R
 begin c (cold _)          p rs = ⟨ c , doneS , absorbed , p , rs ⟩      -- not in the spike
@@ -340,19 +353,18 @@ rise (inOuter op f d n ls c) o (nx a) p rs = admit c op f d n o ls a p rs , []
 rise (inOuter op f d n ls c) o cp     p rs = ⟨ c , flatS op f true n o ls , settle true n , p , rs ⟩ , []
 rise (inLanes op f d n o pre post c) s (nx b) p rs = ⟨ c , flatS op f d n o (pre ++ s ∷ post) , rising (nx b) , p , rs ⟩ , []
 rise (inLanes op f d n o pre post c) s cp     p rs = ⟨ c , flatS op f d (pred n) o (pre ++ ended s ∷ post) , settle d (pred n) , p , rs ⟩ , []
-rise (inSrc k b c) s (nx a) p rs = ⟨ c , connS (record k { feeds = (nx a , CS.subs k) ∷ CS.feeds k }) s b , resuming go , p , rs ⟩ , []
-rise (inSrc k b c) s cp     p rs = ⟨ c , connS (record k { closed = true ; feeds = (cp , CS.subs k) ∷ CS.feeds k }) s b , resuming go , p , rs ⟩ , []
+rise (inSrc k b c) s (nx a) p rs = ⟨ c , connS (record k { feeds = nx a ∷ CS.feeds k }) s b , resuming (feeding (rooted c (CS.subs k))) , p , rs ⟩ , []
+rise (inSrc k b c) s cp     p rs = ⟨ c , connS (record k { closed = true ; feeds = cp ∷ CS.feeds k }) s b , resuming (feeding (rooted c (CS.subs k))) , p , rs ⟩ , []
 rise (inBody k o c) s (nx b) p rs = ⟨ c , connS k o s , rising (nx b) , p , rs ⟩ , []
 rise (inBody k o c) s cp     p rs = ⟨ c , connS k o s , rising cp , p , (dirs c , owed , p) ∷ rs ⟩ , []
 
--- A connect's next feed: each joiner fed under `sub` of where it joined.
-feedOn : ∀ {R Γ X B} → Ctx R Γ B → CS X → St Γ X → St (X ∷ Γ) B → Pos → List Job → Conf R
-feedOn c k o b p rs with CS.feeds k
-... | [] = ⟨ c , connS k o b , absorbed , p , rs ⟩
-... | (e , []) ∷ fs = ⟨ c , connS (record k { feeds = fs }) o b , absorbed , p , rs ⟩
-... | (e , (q , j) ∷ ps) ∷ fs with downs q c (connS (record k { feeds = (e , ps) ∷ fs }) o b)
-...   | just (_ , _ , c′ , s′) = ⟨ c′ , s′ , resuming go , p ⊕ [ subᴾ j ] , (dirs c , go , p) ∷ rs ⟩
-...   | nothing                = ⟨ c , connS (record k { feeds = (e , ps) ∷ fs }) o b , absorbed , p , rs ⟩
+-- A connect's next feed: each joiner fed under `sub` of where it joined;
+-- the last fed, the value is done.
+feedOn : ∀ {R Γ X B} → Ctx R Γ B → CS X → St Γ X → St (X ∷ Γ) B → List (List ℕ × Pos) → Pos → List Job → Conf R
+feedOn c k o b [] p rs = ⟨ c , connS (record k { feeds = drop₁ (CS.feeds k) }) o b , absorbed , p , rs ⟩
+feedOn c k o b ((q , j) ∷ js) p rs with downs q top (plug c (connS k o b))
+... | just (_ , _ , c′ , s′) = ⟨ c′ , s′ , resuming go , p ⊕ [ subᴾ j ] , (dirs c , feeding js , p) ∷ rs ⟩
+... | nothing                = ⟨ c , connS k o b , absorbed , p , rs ⟩
 
 resume : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Tag → Pos → List Job → Conf R
 -- the i-th value under `ix i`, the completion under `last`, of where the of was subscribed
@@ -363,7 +375,7 @@ resume c (ofS q i xs) go p rs with closed c | xs
 resume c (cutS l a s) att p rs = ⟨ c , cutS l true (if l then s else unsub s) , absorbed , p , rs ⟩
 resume c (takeS i q oweCp s) owed p rs = ⟨ c , takeS i q oweCut s , rising cp , p ⊕ [ last ] , (dirs c , owed , p) ∷ rs ⟩
 resume c (takeS i q oweCut s) owed p rs = ⟨ c , takeS i q running (cut s) , absorbed , p , rs ⟩
-resume c (connS k o b) go p rs = feedOn c k o b p rs
+resume c (connS k o b) (feeding js) p rs = feedOn c k o b js p rs
 resume c (connS k o b) attBody p rs =
   ⟨ inSrc (record k { bodyAtt = true }) b c , o , subscribing , p ⊕ [ ix 1 ] , (dirs c , att , p ⊕ [ ix 1 ]) ∷ rs ⟩
 resume c (connS k o b) att p rs =
