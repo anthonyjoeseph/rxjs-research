@@ -423,6 +423,8 @@ module Replanting (R : Set) where
       head-revive : is-just (At.part H′ v) ≡ true → is-just (At.part H u) ≡ true
       head-told   : ∀ {A′} (i : A′ ∈ᴸ Δ) {c} → E i c → ∀ {b₀ b′} → At.part H u ≡ just b₀ → At.part H′ v ≡ just b′ → untold i b′ ⊑[ q / c ] untold i b₀
       head-below  : Each H (Heads q) u → Each H′ (Heads q) v
+      head-untold : Untold H q u → Ended H u → Untold H′ q v
+      head-ended  : Ended H u → Ended H′ v
 
   -- THE NODE'S TIES, MOVED: no part revived, what it leaves running
   -- twinned as before, and below it every tie kept.
@@ -431,6 +433,7 @@ module Replanting (R : Set) where
       ling-revive : is-just (At.part H′ v) ≡ true → is-just (At.part H u) ≡ true
       ling-rested : ∀ {C} → Twinᴺ (At.leftover H {B = C} u) (At.leftover H′ {B = C} v)
       ling-below  : Lingers H u → Lingers H′ v
+      ling-ended  : Ended H u → Ended H′ v
 
   -- THE FRAME: a write at the node's own names, its node replanted to
   -- `v`.  No ancestor reads its path child's cells, only its part, its
@@ -492,9 +495,12 @@ module Replanting (R : Set) where
       Walk.Behind.shiftE H H′ {u = u} v offU (Heading.head-revive hd) q (Bound H ρ) (λ i b e₀ e′ → Heading.head-told hd i b e₀ e′) (Heading.head-below hd) ρ fs ev ut en (λ j b → b)
 
     -- The untold and ended invariants shift to the replanted tree.
-    postulate
-      shift-told : (v : Sub h Δ A) → ∀ {q} → Untold H q T → Ended H T → Heading H H′ q (Bound H ρ) u v → Untold H′ q (plant ρ v)
-      shift-ended : (v : Sub h Δ A) → Ended H T → Lingering H H′ u v → Ended H′ (plant ρ v)
+    shift-told : (v : Sub h Δ A) → ∀ {q} → Untold H q T → Ended H T → Heading H H′ q (Bound H ρ) u v → Untold H′ q (plant ρ v)
+    shift-told v {q} ut en hd =
+      Walk.Untelling.shiftU H H′ {u = u} v offU (Heading.head-revive hd) q (Bound H ρ) (λ i b e₀ e′ → Heading.head-told hd i b e₀ e′) (Heading.head-untold hd) ρ fs ut en (λ j b → b)
+
+    shift-ended : (v : Sub h Δ A) → Ended H T → Lingering H H′ u v → Ended H′ (plant ρ v)
+    shift-ended v en lg = Walk.Ending.shiftN H H′ {u = u} v offU (Lingering.ling-revive lg) (Lingering.ling-ended lg) ρ fs en
 
     -- Every flag named above the node still unset, every other reading
     -- its outer as before; the names the write let go, below the node.

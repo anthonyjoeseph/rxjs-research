@@ -46,7 +46,7 @@ module Keeping (R : Set) where
   open Run (Pureᴾ R) using (done; module Kit; module FlatKit)
   open Strongly R using (Sub; pendingˢ; ofˢ; mapˢ; takeWhileˢ; connectˢ; Lane; Path; PathLanes; here; in-map; in-scan; in-take; in-outer; in-lanes; in-source; in-body; in-defer; this-lane; next-lane; _⊕_; _⊕ᴸ_; coldˢ; module At; Phase; flatMapˢ; scanˢ; joinˢ; doneˢ; deferˢ; lane)
   open StrongAgainst R using (Each; Lingers; Leaves; Twin; tw-refl; tw-union; tw-under; tw-burst; tw-shift; tw-if; tw-idleʳ; lv-tie; tw-tie; Pinned; unpinned; pinned-trans; pinned-sym; union-pinned; under-pinned; under-moved; bursts-pinned; bursts-moved; rest-pinned; Restful; rf-idle; rf-rest; rf-union; rf-burst; rf-under; restful-pinned; Tied; seen; seenL; seen-⊕; isTaking; ∧-split)
-  open StrongHeld R using (DoneBy)
+  open StrongHeld R using (DoneBy; Untold; Ended)
   open Moving R using (plant; plantᴸ; planted; plantedᴸ; part-plant; Same; same; same-map; same-scan; same-take; same-flat; same-connect; same-defer)
   open GhostingPaths R using (each-sub)
   open Forking R using (Lands; LandsL; apart; below; fork; forkᴸ; land-body; land-defer; land-lanes; land-map; land-next; land-outer; land-scan; land-source; land-take; land-this; lands-apart; lands-below; landsᴸ-apart)
@@ -317,3 +317,35 @@ module Keeping (R : Set) where
         ... | inj₂ (_ , ψ₀ , same , se , pe , _ , _)           = Lingers.rests lg ψ₀ (trans se s) (trans pe pn) ps pe′
         ... | inj₂ (_ , ψ₀ , same-connect , se , pe , so , ld) =
           tw-tie (Lingers.rests lg ψ₀ (trans se s) (trans pe pn) (trans so ps) pe′) (rest-lands ld)
+
+    -- A node planted untold as the pending node was: every connect above
+    -- it keeps its source's part and its body's.
+    told-plant : ∀ {q Δ A Δ₀ A₀ s₀ q₀} {t : Sub h Δ A} (π : Path t (pendingˢ {Δ = Δ₀} {A₀} s₀ q₀)) (v : Sub h Δ₀ A₀) → At.part H (pendingˢ s₀ q₀) ≡ At.part H v
+               → Untold H q v → Untold H q t → Untold H q (plant π v)
+    told-plant {q} {t = t} π v eq uv u = ut
+      where
+        inside : ∀ {Δ″ A″} {w : Sub h Δ″ A″} {ψ : Path (plant π v) w} (ρ : Path v w) → ψ ≡ planted π v ⊕ ρ → seen H ψ ≡ true → seen H ρ ≡ true
+        inside ρ refl s = proj₂ (∧-split (seen H (planted π v)) (trans (sym (seen-⊕ H (planted π v) ρ)) s))
+
+        body-lands : ∀ {Δ′ A′ B′} {S c b kb k fd rp e rt} {src src′ : Sub h Δ′ A′} {bd bd′ : Sub h (A′ ∷ Δ′) B′}
+                       {ψ₀ : Path t (connectˢ S c b kb k fd rp e rt src bd)} {ψ′ : Path (plant π v) (connectˢ S c b kb k fd rp e rt src′ bd′)}
+                   → Lands (fork π v ψ₀) ψ′ → At.part H bd ≡ At.part H bd′
+        body-lands {ψ₀ = ψ₀} ld with fork π v ψ₀ | ld
+        ... | apart _ _                 | lands-apart = refl
+        ... | below (in-source ρ) _ _ _ | lands-below = refl
+        ... | below (in-body ρ) _ _ _   | lands-below = sym (part-plant H ρ v eq)
+
+        ut : Untold H q (plant π v)
+        ut ψ s ps pb with keep π v eq ψ
+        ... | inj₁ (ρ , e)                                    = uv ρ (inside ρ e s) ps pb
+        ... | inj₂ (_ , ψ₀ , same , se , _ , _ , _)           = u ψ₀ (trans se s) ps pb
+        ... | inj₂ (_ , ψ₀ , same-connect , se , _ , so , ld) = u ψ₀ (trans se s) (trans so ps) (trans (body-lands ld) pb)
+
+    -- A node planted ended as the pending node was: every connect above
+    -- it keeps its own part and its source's.
+    ended-plant : ∀ {Δ A Δ₀ A₀ s₀ q₀} {t : Sub h Δ A} (π : Path t (pendingˢ {Δ = Δ₀} {A₀} s₀ q₀)) (v : Sub h Δ₀ A₀) → At.part H (pendingˢ s₀ q₀) ≡ At.part H v
+                → Ended H v → Ended H t → Ended H (plant π v)
+    ended-plant π v eq ev en ψ s pn pe′ with keep π v eq ψ
+    ... | inj₁ (ρ , refl) = ev ρ (proj₂ (∧-split (seen H (planted π v)) (trans (sym (seen-⊕ H (planted π v) ρ)) s))) pn pe′
+    ... | inj₂ (_ , ψ₀ , same , se , pe , _ , _)          = en ψ₀ (trans se s) (trans pe pn) pe′
+    ... | inj₂ (_ , ψ₀ , same-connect , se , pe , so , _) = trans (sym so) (en ψ₀ (trans se s) (trans pe pn) pe′)

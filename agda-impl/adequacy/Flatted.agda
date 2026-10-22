@@ -76,7 +76,7 @@ module Flatting (R : Set) where
   open Ghosting R using (sorted-⇝)
   open GhostingPaths R using (walk-⊕)
   open Forking R using (pend-less; subOf; walk-planted)
-  open Keeping R using (each-plant; lingers-plant; flags-plant; pooled-fresh)
+  open Keeping R using (each-plant; lingers-plant; flags-plant; pooled-fresh; told-plant; ended-plant)
   open Planting R using (module Moved)
   open Staging R using (Restages; not-src; wrap-outer)
   open Naming R using (fresh-new; fresh-plant; pending-↭; walk-kont-sub)
@@ -320,9 +320,12 @@ module Flatting (R : Set) where
       rf-flags : DoneBy H₉ T₈ [] → DoneBy H₉ t′ []
       rf-flags = flags-plant H₉ π₈ v eqv (λ { here _ → (λ ()) , (λ _ → done₉) ; (in-outer ()) ; (in-lanes ()) })
 
-      postulate
-        rf-told  : Untold H₉ q T₈ → Ended H₉ T₈ → Untold H₉ q t′
-        rf-ended : Ended H₉ T₈ → Ended H₉ t′
+      -- A flatMap pending its outer, holding no lane, holds no connect.
+      rf-told : Untold H₉ q T₈ → Untold H₉ q t′
+      rf-told = told-plant H₉ π₈ v eqv (λ { (in-outer ()) ; (in-lanes ()) })
+
+      rf-ended : Ended H₉ T₈ → Ended H₉ t′
+      rf-ended = ended-plant H₉ π₈ v eqv (λ { (in-outer ()) ; (in-lanes ()) })
 
   -- A flatMap begun allocates its pool and its outer's cut, registers its
   -- refill slot and stores it, and begins its outer under the flatMap's
@@ -344,7 +347,7 @@ module Flatting (R : Set) where
                               ; running = Books.running bk }
              ; sorted = sorted-⇝ (Carried.sorted cr) (then refl path) ; behind′ = Eaching.each-to _ _ (F.rf-behind refl refl slot₉ refl refl refl refl (pos-headed cr) (Grew.behind G₉))
              ; lingers′ = Lingering.lingers-to _ (F.rf-lingers refl refl slot₉ refl refl refl refl (Grew.lingers G₉)) ; flags = F.rf-flags refl refl slot₉ refl refl refl refl (Grew.flags G₉)
-             ; told = F.rf-told refl refl slot₉ refl refl refl refl (Grew.told G₉) (Grew.ended G₉) ; ended = F.rf-ended refl refl slot₉ refl refl refl refl (Grew.ended G₉) }
+             ; told = F.rf-told refl refl slot₉ refl refl refl refl (Grew.told G₉) ; ended = F.rf-ended refl refl slot₉ refl refl refl refl (Grew.ended G₉) }
     , refl , inj₁ (inj₁ (subst (pend F.t′ <_) (Grew.pends G₉) F.less))
     where bk = Carried.books cr
           -- The kernel's allocations after its first, its registration and

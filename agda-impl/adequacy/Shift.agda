@@ -328,13 +328,46 @@ module Shifting (R : Set) where
     each-alike : ∀ {P : ∀ {Γ A} → U.Node Γ A → Set} {Δ A} {t : Sub h Δ A} → Alike H H′ (names t) → Each H P t → Each H′ P t
     each-alike al ev = each-same H H′ (λ ψ → seen-alike H H′ ψ al) (λ ψ → part-at ψ al) ev
 
+    -- Every path seen and every part read alike: nothing newly untold,
+    -- nothing newly held.
+    told-same : ∀ {q Δ A} {t : Sub h Δ A} → (∀ {Δ′ A′} {x : Sub h Δ′ A′} (ψ : Path t x) → seen H′ ψ ≡ seen H ψ)
+              → (∀ {Δ′ A′} {x : Sub h Δ′ A′} → Path t x → At.part H′ x ≡ At.part H x) → Untold H q t → Untold H′ q t
+    told-same se sm ut ψ sn ps pb = ut ψ (trans (sym (se ψ)) sn) (trans (sym (sm (ψ ⊕ in-source here))) ps) (trans (sym (sm (ψ ⊕ in-body here))) pb)
+
+    ended-same : ∀ {Δ A} {t : Sub h Δ A} → (∀ {Δ′ A′} {x : Sub h Δ′ A′} (ψ : Path t x) → seen H′ ψ ≡ seen H ψ)
+               → (∀ {Δ′ A′} {x : Sub h Δ′ A′} → Path t x → At.part H′ x ≡ At.part H x) → Ended H t → Ended H′ t
+    ended-same se sm en ψ sn pc e = trans (sm (ψ ⊕ in-source here)) (en ψ (trans (sym (se ψ)) sn) (trans (sym (sm ψ)) pc) e)
+
     told-alike : ∀ {q Δ A} {t : Sub h Δ A} → Alike H H′ (names t) → Untold H q t → Untold H′ q t
-    told-alike al ut ψ sn ps pb =
-      ut ψ (trans (sym (seen-alike H H′ ψ al)) sn) (trans (sym (part-at (ψ ⊕ in-source here) al)) ps) (trans (sym (part-at (ψ ⊕ in-body here) al)) pb)
+    told-alike al = told-same (λ ψ → seen-alike H H′ ψ al) (λ ψ → part-at ψ al)
 
     ended-alike : ∀ {Δ A} {t : Sub h Δ A} → Alike H H′ (names t) → Ended H t → Ended H′ t
-    ended-alike al en ψ sn pc e =
-      trans (part-at (ψ ⊕ in-source here) al) (en ψ (trans (sym (seen-alike H H′ ψ al)) sn) (trans (sym (part-at ψ al)) pc) e)
+    ended-alike al = ended-same (λ ψ → seen-alike H H′ ψ al) (λ ψ → part-at ψ al)
+
+    -- A flatMap's outer alike and its lanes seen only if seen before and
+    -- read alike: whatever its pool, nothing newly untold or held.
+    told-flat : ∀ {q Δ A B op f fl oc k r pl pl′} {so : Sub h Δ A} {ls : List (Lane h Δ B)} → Alike H H′ (names so)
+              → (∀ {Δ′ A′} {x : Sub h Δ′ A′} (πL : PathLanes ls x) → seenL H′ πL ≡ true → seenL H πL ≡ true)
+              → (∀ {Δ′ A′} {x : Sub h Δ′ A′} → PathLanes ls x → At.part H′ x ≡ At.part H x)
+              → Untold H q (flatMapˢ op f fl oc k r pl so ls) → Untold H′ q (flatMapˢ op f fl oc k r pl′ so ls)
+    told-flat as sL pL ut (in-outer ψ) sn = told-alike as (ut-sub H ut (in-outer here) refl) ψ sn
+    told-flat as sL pL ut (in-lanes ψL) sn ps pb =
+      ut (in-lanes ψL) (sL ψL sn) (trans (sym (pL (ψL ⊕ᴸ in-source here))) ps) (trans (sym (pL (ψL ⊕ᴸ in-body here))) pb)
+
+    ended-flat : ∀ {Δ A B op f fl oc k r pl pl′} {so : Sub h Δ A} {ls : List (Lane h Δ B)} → Alike H H′ (names so)
+               → (∀ {Δ′ A′} {x : Sub h Δ′ A′} (πL : PathLanes ls x) → seenL H′ πL ≡ true → seenL H πL ≡ true)
+               → (∀ {Δ′ A′} {x : Sub h Δ′ A′} → PathLanes ls x → At.part H′ x ≡ At.part H x)
+               → Ended H (flatMapˢ op f fl oc k r pl so ls) → Ended H′ (flatMapˢ op f fl oc k r pl′ so ls)
+    ended-flat as sL pL en (in-outer ψ) sn = ended-alike as (en-sub H en (in-outer here) refl) ψ sn
+    ended-flat as sL pL en (in-lanes ψL) sn pc e = trans (pL (ψL ⊕ᴸ in-source here)) (en (in-lanes ψL) (sL ψL sn) (trans (sym (pL ψL)) pc) e)
+
+    told-flatA : ∀ {q Δ A B op f fl oc k r pl pl′} {so : Sub h Δ A} {ls : List (Lane h Δ B)} → Alike H H′ (names so) → Alike H H′ (laneNames ls)
+               → Untold H q (flatMapˢ op f fl oc k r pl so ls) → Untold H′ q (flatMapˢ op f fl oc k r pl′ so ls)
+    told-flatA as aL = told-flat as (λ ψL sn → trans (sym (seenL-alike H H′ ψL aL)) sn) (λ ψL → partL-at ψL aL)
+
+    ended-flatA : ∀ {Δ A B op f fl oc k r pl pl′} {so : Sub h Δ A} {ls : List (Lane h Δ B)} → Alike H H′ (names so) → Alike H H′ (laneNames ls)
+                → Ended H (flatMapˢ op f fl oc k r pl so ls) → Ended H′ (flatMapˢ op f fl oc k r pl′ so ls)
+    ended-flatA as aL = ended-flat as (λ ψL sn → trans (sym (seenL-alike H H′ ψL aL)) sn) (λ ψL → partL-at ψL aL)
 
     eachL-alike : ∀ {P : ∀ {Γ A} → U.Node Γ A → Set} {Δ B} {ls : List (Lane h Δ B)} → Alike H H′ (laneNames ls) → EachL H P ls → EachL H′ P ls
     eachL-alike {ls = ls} al eL = record

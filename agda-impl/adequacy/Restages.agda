@@ -67,7 +67,7 @@ module Staging (R : Set) where
   open Ghosting R using (_≺_; measure; firstCall)
   open GhostingPaths R using (walk-⊕)
   open Forking R using (pend-less; subOf; walk-planted)
-  open Keeping R using (each-plant; lingers-plant; flags-plant)
+  open Keeping R using (each-plant; lingers-plant; flags-plant; told-plant; ended-plant)
   open Planting R using (module Moved)
 
   ------------------------------------------------------------------------
@@ -206,10 +206,12 @@ module Staging (R : Set) where
                → Owned H T₀ (subAs {act = act} π cd sk a) → Owned H t′ (subAs {act = act} π′ cd′ (restack sk a) a′)
     rm-owned H sk a ow = Moved.Owning.reowned π v H refl (in-map here) inner sk a ow
 
-    -- The untold and ended invariants persist across a map restage.
-    postulate
-      rm-told : ∀ (H : Heapᴹ h) {p} → Untold H p T₀ → Untold H p t′
-      rm-ended : ∀ (H : Heapᴹ h) → Ended H T₀ → Ended H t′
+    -- A map over a pending source holds no connect.
+    rm-told : ∀ (H : Heapᴹ h) {p} → Untold H p T₀ → Untold H p t′
+    rm-told H = told-plant H π v refl (λ { (in-map ()) })
+
+    rm-ended : ∀ (H : Heapᴹ h) → Ended H T₀ → Ended H t′
+    rm-ended H = ended-plant H π v refl (λ { (in-map ()) })
 
     -- The map's heads are its source's.
     rm-behind : ∀ (H : Heapᴹ h) {p} → Each H (Heads p) T₀ → Each H (Heads p) t′
@@ -326,10 +328,12 @@ module Staging (R : Set) where
              ; joined  = subst₂ (At.Joined H) (sym (subjects-plant π v refl)) (sym (joiners-plant π v (λ _ → refl) [])) (Queue.joined qu)
              ; ordered = Queue.ordered qu ; ahead = Queue.ahead qu }
 
-    -- The untold and ended invariants persist across an of restage.
-    postulate
-      of-told : ∀ (H : Heapᴹ h) {p} → Untold H p T₀ → Untold H p t′
-      of-ended : ∀ (H : Heapᴹ h) → Ended H T₀ → Ended H t′
+    -- An `of` holds no connect.
+    of-told : ∀ (H : Heapᴹ h) {p} → Untold H p T₀ → Untold H p t′
+    of-told H = told-plant H π v (eqp H) (λ ())
+
+    of-ended : ∀ (H : Heapᴹ h) → Ended H T₀ → Ended H t′
+    of-ended H = ended-plant H π v (eqp H) (λ ())
 
     -- The `of`'s heads are the subscription's.
     of-behind : ∀ (H : Heapᴹ h) {p} → Each H (Heads p) T₀ → Each H (Heads p) t′

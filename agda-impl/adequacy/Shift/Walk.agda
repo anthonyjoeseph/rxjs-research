@@ -52,7 +52,7 @@ module ShiftWalk (R : Set) where
   open FramingRepool R using (ended-head)
   open Keeping R using (leftover-restful)
   open Retagging R using (retag; retagᴸ)
-  open Shifting R using (_⊑[_/_]_; ≡-⊑; ++-⊑; Pred; Binds; BindsL; module Alive; module Build; DoneByL; EachL; EndedL; module Flag; module Linger; LingersL; UntoldL; conn-tw; cons-untold; each-alike; eachL-alike; eachL-head; eachL-of; eachL-tail; en-sub; enL-head; enL-of; enL-tail; filled; flags-alike; flagsL-alike; tw-if-moved; just≢; leftover-alike; leftoverL-alike; lingers-alike; lingers-sub; lingersL-alike; lingersL-head; lingersL-of; lingersL-tail; map-back; map-fwd; pairs-tl; tw-alike; pooledL-alike; seen-take; sourced-heap; untold-at; ut-sub; utL-head; utL-of; utL-tail; via-≡; ∨-l; ∨-mono; ∨-r)
+  open Shifting R using (_⊑[_/_]_; ≡-⊑; ++-⊑; Pred; Binds; BindsL; part-at; partL-at; module Alive; module Build; DoneByL; EachL; EndedL; module Flag; module Linger; LingersL; UntoldL; conn-tw; cons-untold; each-alike; eachL-alike; eachL-head; eachL-of; eachL-tail; en-sub; enL-head; enL-of; enL-tail; filled; flags-alike; flagsL-alike; tw-if-moved; just≢; leftover-alike; leftoverL-alike; lingers-alike; lingers-sub; lingersL-alike; lingersL-head; lingersL-of; lingersL-tail; map-back; map-fwd; pairs-tl; tw-alike; pooledL-alike; seen-take; sourced-heap; untold-at; ut-sub; utL-head; utL-of; utL-tail; via-≡; ∨-l; ∨-mono; ∨-r)
 
   -- Below a live node the path sees, no flag held unset.
   let-go : ∀ {h} (H : Heapᴹ h) {Δ₀ A₀ Δ A} {t : Sub h Δ₀ A₀} {u : Sub h Δ A} (π : Path t u) → AllPairs _≢_ (names t) → seen H π ≡ true
@@ -666,6 +666,210 @@ module ShiftWalk (R : Set) where
         shiftL (next-lane {l = lane c k s} {ls} πL) ps eL ut en κ =
           BH.eachL-cons (λ lv → each-alike H H′ Nx.headA (eachL-head H eL (Nx.on lv)))
                         (shiftL πL Nx.fresh (eachL-tail H eL) (utL-tail H ut) (enL-tail H en) κ)
+          where module Nx = Next c k s πL ps
+
+    --------------------------------------------------------------------
+    -- NOTHING NEWLY UNTOLD: a connect past its source's end tells its
+    -- body's joiners after the write no sooner than before.
+
+    -- A connect ended holding a body is held.
+    conn-just : ∀ {Δ A B} (G : Heapᴹ h) rp c₀ (rt : U.Node Δ A) (s : Maybe (U.Node Δ A)) (b : U.Node (A ∷ Δ) B)
+              → is-just (At.connected G rp (just c₀) rt s (just b)) ≡ true
+    conn-just G rp c₀ rt (just _) b = refl
+    conn-just G rp c₀ rt nothing  b = refl
+
+    none-back : ∀ {a} {X : Set a} {x x′ : Maybe X} → (is-just x′ ≡ true → is-just x ≡ true) → x ≡ nothing → x′ ≡ nothing
+    none-back {x′ = nothing} f e    = refl
+    none-back {x′ = just _}  f refl = false≢ (f refl)
+
+    module Untelling (q : Pos) (E : Pred Δ₀) (tl₀ : ∀ {C} (i : C ∈ᴸ Δ₀) {c} → E i c → ∀ {b₀ b′} → At.part H u ≡ just b₀ → At.part H′ v ≡ just b′ → untold i b′ ⊑[ q / c ] untold i b₀)
+                     (ul₀ : Untold H q u → Ended H u → Untold H′ q v) where
+      open Telling q E tl₀
+
+      mutual
+        shiftU : ∀ {Δ A} {t : Sub h Δ A} (π : Path t u) → AllPairs _≢_ (names t) → Untold H q t → Ended H t
+               → ∀ {K : Pred Δ} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → Binds H π K j c → E j c) → Untold H′ q (plant π v)
+        shiftU here ps ut en κ = ul₀ ut en
+        shiftU (in-map π) ps ut en κ (in-map ψ) sn =
+          shiftU π ps (ut-sub H ut (in-map here) refl) (en-sub H en (in-map here) refl) κ ψ sn
+        shiftU (in-scan π) ps ut en κ (in-scan ψ) sn =
+          shiftU π (pairs-tl ps) (ut-sub H ut (in-scan here) refl) (en-sub H en (in-scan here) refl) κ ψ sn
+        shiftU (in-take {c = c} {k = k} {tk = tk} π) ps ut en κ (in-take ψ) sn =
+          shiftU π Tk.fresh (ut-sub H ut (in-take here) sk) (en-sub H en (in-take here) sk) κ ψ (proj₂ s₂)
+          where
+            module Tk = Take c k π ps
+            s₁ = ∧-split (At.val H′ (Kit.live c)) sn
+            s₂ = ∧-split (isTaking tk) (proj₂ s₁)
+            sk : At.val H (Kit.live c) ∧ isTaking tk ∧ true ≡ true
+            sk = seen-take (At.val H (Kit.live c)) (∧-join (trans (sym Tk.live′) (proj₁ s₁)) (proj₁ s₂))
+        shiftU (in-outer {fl = fl} {oc = oc} {k = k} {r = r} {ls = ls} π) ps ut en κ (in-outer ψ) sn =
+          shiftU π O.fresh (ut-sub H ut (in-outer here) refl) (en-sub H en (in-outer here) refl) κ ψ sn
+          where module O = Outer fl oc k r ls π ps
+        shiftU (in-outer {fl = fl} {oc = oc} {k = k} {r = r} {ls = ls} π) ps ut en κ (in-lanes ψL) sn pn pb =
+          ut (in-lanes ψL) (trans (sym (seenL-alike H H′ ψL O.lanesA)) sn)
+             (trans (sym (partL-at H H′ (ψL ⊕ᴸ in-source here) O.lanesA)) pn) (trans (sym (partL-at H H′ (ψL ⊕ᴸ in-body here) O.lanesA)) pb)
+          where module O = Outer fl oc k r ls π ps
+        shiftU (in-lanes {fl = fl} {oc = oc} {k = k} {r = r} {t = so} πL) ps ut en κ (in-outer ψ) sn pn pb =
+          ut (in-outer ψ) (trans (sym (seen-alike H H′ ψ Ln.soA)) sn)
+             (trans (sym (part-at H H′ (ψ ⊕ in-source here) Ln.soA)) pn) (trans (sym (part-at H H′ (ψ ⊕ in-body here) Ln.soA)) pb)
+          where module Ln = Lanes fl oc k r so πL ps
+        shiftU (in-lanes {fl = fl} {oc = oc} {k = k} {r = r} {t = so} πL) ps ut en κ (in-lanes ψL) =
+          shiftUL πL Ln.fresh (utL-of H ut) (enL-of H en) κ ψL
+          where module Ln = Lanes fl oc k r so πL ps
+        shiftU (in-source {S = S} {c} {b} {kb} {k} {rp = rp} {rt = rt} {t = src} {bd} π) ps ut en κ {c₀ = c₀} here sn pn pb =
+          ut here refl (en here refl (proj₂ (just-of held₀)) refl) pb₀
+          where
+            module Sr = Source S c b kb k bd π ps
+            pb₀ = trans (sym Sr.body) pb
+            held₀ : is-just (At.connected H rp (just c₀) rt (At.part H src) (At.part H bd)) ≡ true
+            held₀ = subst (λ z → is-just (At.connected H rp (just c₀) rt (At.part H src) z) ≡ true) (sym pb₀) (conn-just H rp c₀ rt (At.part H src) _)
+        shiftU (in-source {S = S} {c} {b} {kb} {k} {t = src} {bd} π) ps ut en κ (in-source ψ) sn =
+          shiftU π Sr.fresh (ut-sub H ut (in-source here) s₁) (en-sub H en (in-source here) s₁) κ ψ (proj₂ sp)
+          where
+            module Sr = Source S c b kb k bd π ps
+            sp = ∧-split (is-just (At.part H′ bd)) sn
+            s₁ : is-just (At.part H bd) ∧ true ≡ true
+            s₁ = ∧-join (via-≡ is-just Sr.body (proj₁ sp)) refl
+        shiftU (in-source {S = S} {c} {b} {kb} {k} {e = e} {t = src} {bd} π) ps ut en κ (in-body ψ) sn pn pb =
+          ut (in-body ψ) (∧-join (∨-mono (is-just e) (revive π Sr.fresh) (proj₁ sp)) (trans (sym (seen-alike H H′ ψ Sr.bdA)) (proj₂ sp)))
+             (trans (sym (part-at H H′ (ψ ⊕ in-source here) Sr.bdA)) pn) (trans (sym (part-at H H′ (ψ ⊕ in-body here) Sr.bdA)) pb)
+          where
+            module Sr = Source S c b kb k bd π ps
+            sp = ∧-split (is-just (At.part H′ (plant π v)) ∨ is-just e) sn
+        shiftU (in-body {S = S} {c} {b} {kb} {k} {t = src} π) ps ut en κ {c₀ = c₀} here sn pn pb =
+          held π Bd.fresh pb (λ e₀ → told c₀ π Bd.fresh (en-sub H en (in-body here) (∧-join (∨-r (is-just (At.part H src)) refl) refl)) κ (here refl) (refl , pn₀) e₀ pb
+                                       (ut here refl pn₀ e₀))
+          where
+            module Bd = Body S c b kb k src π ps
+            pn₀ = trans (sym Bd.source) pn
+        shiftU (in-body {S = S} {c} {b} {kb} {k} {t = src} π) ps ut en κ (in-source ψ) sn pn pb =
+          ut (in-source ψ) (∧-join (revive π Bd.fresh (proj₁ sp)) (trans (sym (seen-alike H H′ ψ Bd.srcA)) (proj₂ sp)))
+             (trans (sym (part-at H H′ (ψ ⊕ in-source here) Bd.srcA)) pn) (trans (sym (part-at H H′ (ψ ⊕ in-body here) Bd.srcA)) pb)
+          where
+            module Bd = Body S c b kb k src π ps
+            sp = ∧-split (is-just (At.part H′ (plant π v))) sn
+        shiftU (in-body {S = S} {c} {b} {kb} {k} {e = e} {t = src} π) ps ut en κ (in-body ψ) sn =
+          shiftU π Bd.fresh (ut-sub H ut (in-body here) s₁) (en-sub H en (in-body here) s₁) κ ψ (proj₂ sp)
+          where
+            module Bd = Body S c b kb k src π ps
+            sp = ∧-split (is-just (At.part H′ src) ∨ is-just e) sn
+            s₁ : (is-just (At.part H src) ∨ is-just e) ∧ true ≡ true
+            s₁ = ∧-join (∨-mono (is-just e) (via-≡ is-just Bd.source) (proj₁ sp)) refl
+        shiftU (in-defer {k = k} π) ps ut en κ (in-defer ψ) sn =
+          shiftU π (pairs-r (quietName k) ps) (ut-sub H ut (in-defer here) refl) (en-sub H en (in-defer here) refl) κ ψ sn
+
+        shiftUL : ∀ {Δ B} {ls : List (Lane h Δ B)} (πL : PathLanes ls u) → AllPairs _≢_ (laneNames ls) → UntoldL H q ls → EndedL H ls
+                → ∀ {K : Pred Δ} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → BindsL H πL K j c → E j c) → UntoldL H′ q (plantᴸ πL v)
+        shiftUL (this-lane {c = c} {k} {ls = ls} π) ps ut en κ (this-lane ψ) sn =
+          shiftU π Th.fresh (utL-head H ut (Th.on (proj₁ sp))) (enL-head H en (Th.on (proj₁ sp))) κ ψ (proj₂ sp)
+          where
+            module Th = This c k ls π ps
+            sp = ∧-split (At.val H′ (Kit.live c)) sn
+        shiftUL (this-lane {c = c} {k} {ls = ls} π) ps ut en κ (next-lane ψL) sn pn pb =
+          ut (next-lane ψL) (trans (sym (seenL-alike H H′ ψL Th.restA)) sn)
+             (trans (sym (partL-at H H′ (ψL ⊕ᴸ in-source here) Th.restA)) pn) (trans (sym (partL-at H H′ (ψL ⊕ᴸ in-body here) Th.restA)) pb)
+          where module Th = This c k ls π ps
+        shiftUL (next-lane {l = lane c k s} πL) ps ut en κ (this-lane ψ) sn pn pb =
+          ut (this-lane ψ) (∧-join (Nx.on (proj₁ sp)) (trans (sym (seen-alike H H′ ψ Nx.headA)) (proj₂ sp)))
+             (trans (sym (part-at H H′ (ψ ⊕ in-source here) Nx.headA)) pn) (trans (sym (part-at H H′ (ψ ⊕ in-body here) Nx.headA)) pb)
+          where
+            module Nx = Next c k s πL ps
+            sp = ∧-split (At.val H′ (Kit.live c)) sn
+        shiftUL (next-lane {l = lane c k s} πL) ps ut en κ (next-lane ψL) =
+          shiftUL πL Nx.fresh (utL-tail H ut) (enL-tail H en) κ ψL
+          where module Nx = Next c k s πL ps
+
+    --------------------------------------------------------------------
+    -- NOTHING NEWLY HELD: a connect held past its source's end holds no
+    -- source after the write.
+
+    module Ending (en₀ : Ended H u → Ended H′ v) where
+      mutual
+        shiftN : ∀ {Δ A} {t : Sub h Δ A} (π : Path t u) → AllPairs _≢_ (names t) → Ended H t → Ended H′ (plant π v)
+        shiftN here ps en = en₀ en
+        shiftN (in-map π) ps en (in-map ψ) sn = shiftN π ps (en-sub H en (in-map here) refl) ψ sn
+        shiftN (in-scan π) ps en (in-scan ψ) sn = shiftN π (pairs-tl ps) (en-sub H en (in-scan here) refl) ψ sn
+        shiftN (in-take {c = c} {k = k} {tk = tk} π) ps en (in-take ψ) sn = shiftN π Tk.fresh (en-sub H en (in-take here) sk) ψ (proj₂ s₂)
+          where
+            module Tk = Take c k π ps
+            s₁ = ∧-split (At.val H′ (Kit.live c)) sn
+            s₂ = ∧-split (isTaking tk) (proj₂ s₁)
+            sk : At.val H (Kit.live c) ∧ isTaking tk ∧ true ≡ true
+            sk = seen-take (At.val H (Kit.live c)) (∧-join (trans (sym Tk.live′) (proj₁ s₁)) (proj₁ s₂))
+        shiftN (in-outer {fl = fl} {oc = oc} {k = k} {r = r} {ls = ls} π) ps en (in-outer ψ) sn =
+          shiftN π O.fresh (en-sub H en (in-outer here) refl) ψ sn
+          where module O = Outer fl oc k r ls π ps
+        shiftN (in-outer {fl = fl} {oc = oc} {k = k} {r = r} {ls = ls} π) ps en (in-lanes ψL) sn pc pe =
+          trans (partL-at H H′ (ψL ⊕ᴸ in-source here) O.lanesA)
+                (en (in-lanes ψL) (trans (sym (seenL-alike H H′ ψL O.lanesA)) sn) (trans (sym (partL-at H H′ ψL O.lanesA)) pc) pe)
+          where module O = Outer fl oc k r ls π ps
+        shiftN (in-lanes {fl = fl} {oc = oc} {k = k} {r = r} {t = so} πL) ps en (in-outer ψ) sn pc pe =
+          trans (part-at H H′ (ψ ⊕ in-source here) Ln.soA)
+                (en (in-outer ψ) (trans (sym (seen-alike H H′ ψ Ln.soA)) sn) (trans (sym (part-at H H′ ψ Ln.soA)) pc) pe)
+          where module Ln = Lanes fl oc k r so πL ps
+        shiftN (in-lanes {fl = fl} {oc = oc} {k = k} {r = r} {t = so} πL) ps en (in-lanes ψL) =
+          shiftNL πL Ln.fresh (enL-of H en) ψL
+          where module Ln = Lanes fl oc k r so πL ps
+        shiftN (in-source {S = S} {c} {b} {kb} {k} {e = e} {rp} {rt} {t = src} {bd} π) ps en here sn pc pe =
+          none-back (revive π Sr.fresh) (en here refl (proj₂ (just-of held₀)) pe)
+          where
+            module Sr = Source S c b kb k bd π ps
+            held₀ : is-just (At.connected H rp e rt (At.part H src) (At.part H bd)) ≡ true
+            held₀ = conn-rev rp e rt (At.part H src) (At.part H′ (plant π v)) (At.part H bd) (At.part H′ bd) (revive π Sr.fresh) (via-≡ is-just Sr.body) (cong is-just pc)
+        shiftN (in-source {S = S} {c} {b} {kb} {k} {t = src} {bd} π) ps en (in-source ψ) sn =
+          shiftN π Sr.fresh (en-sub H en (in-source here) s₁) ψ (proj₂ sp)
+          where
+            module Sr = Source S c b kb k bd π ps
+            sp = ∧-split (is-just (At.part H′ bd)) sn
+            s₁ : is-just (At.part H bd) ∧ true ≡ true
+            s₁ = ∧-join (via-≡ is-just Sr.body (proj₁ sp)) refl
+        shiftN (in-source {S = S} {c} {b} {kb} {k} {e = e} {t = src} {bd} π) ps en (in-body ψ) sn pc pe =
+          trans (part-at H H′ (ψ ⊕ in-source here) Sr.bdA)
+                (en (in-body ψ) (∧-join (∨-mono (is-just e) (revive π Sr.fresh) (proj₁ sp)) (trans (sym (seen-alike H H′ ψ Sr.bdA)) (proj₂ sp)))
+                    (trans (sym (part-at H H′ ψ Sr.bdA)) pc) pe)
+          where
+            module Sr = Source S c b kb k bd π ps
+            sp = ∧-split (is-just (At.part H′ (plant π v)) ∨ is-just e) sn
+        shiftN (in-body {S = S} {c} {b} {kb} {k} {e = e} {rp} {rt} {t = src} {bd} π) ps en here sn pc pe =
+          trans Bd.source (en here refl (proj₂ (just-of held₀)) pe)
+          where
+            module Bd = Body S c b kb k src π ps
+            held₀ : is-just (At.connected H rp e rt (At.part H src) (At.part H bd)) ≡ true
+            held₀ = conn-rev rp e rt (At.part H src) (At.part H′ src) (At.part H bd) (At.part H′ (plant π v)) (via-≡ is-just Bd.source) (revive π Bd.fresh) (cong is-just pc)
+        shiftN (in-body {S = S} {c} {b} {kb} {k} {t = src} π) ps en (in-source ψ) sn pc pe =
+          trans (part-at H H′ (ψ ⊕ in-source here) Bd.srcA)
+                (en (in-source ψ) (∧-join (revive π Bd.fresh (proj₁ sp)) (trans (sym (seen-alike H H′ ψ Bd.srcA)) (proj₂ sp)))
+                    (trans (sym (part-at H H′ ψ Bd.srcA)) pc) pe)
+          where
+            module Bd = Body S c b kb k src π ps
+            sp = ∧-split (is-just (At.part H′ (plant π v))) sn
+        shiftN (in-body {S = S} {c} {b} {kb} {k} {e = e} {t = src} π) ps en (in-body ψ) sn =
+          shiftN π Bd.fresh (en-sub H en (in-body here) s₁) ψ (proj₂ sp)
+          where
+            module Bd = Body S c b kb k src π ps
+            sp = ∧-split (is-just (At.part H′ src) ∨ is-just e) sn
+            s₁ : (is-just (At.part H src) ∨ is-just e) ∧ true ≡ true
+            s₁ = ∧-join (∨-mono (is-just e) (via-≡ is-just Bd.source) (proj₁ sp)) refl
+        shiftN (in-defer {k = k} π) ps en (in-defer ψ) sn = shiftN π (pairs-r (quietName k) ps) (en-sub H en (in-defer here) refl) ψ sn
+
+        shiftNL : ∀ {Δ B} {ls : List (Lane h Δ B)} (πL : PathLanes ls u) → AllPairs _≢_ (laneNames ls) → EndedL H ls → EndedL H′ (plantᴸ πL v)
+        shiftNL (this-lane {c = c} {k} {ls = ls} π) ps en (this-lane ψ) sn =
+          shiftN π Th.fresh (enL-head H en (Th.on (proj₁ sp))) ψ (proj₂ sp)
+          where
+            module Th = This c k ls π ps
+            sp = ∧-split (At.val H′ (Kit.live c)) sn
+        shiftNL (this-lane {c = c} {k} {ls = ls} π) ps en (next-lane ψL) sn pc pe =
+          trans (partL-at H H′ (ψL ⊕ᴸ in-source here) Th.restA)
+                (en (next-lane ψL) (trans (sym (seenL-alike H H′ ψL Th.restA)) sn) (trans (sym (partL-at H H′ ψL Th.restA)) pc) pe)
+          where module Th = This c k ls π ps
+        shiftNL (next-lane {l = lane c k s} πL) ps en (this-lane ψ) sn pc pe =
+          trans (part-at H H′ (ψ ⊕ in-source here) Nx.headA)
+                (en (this-lane ψ) (∧-join (Nx.on (proj₁ sp)) (trans (sym (seen-alike H H′ ψ Nx.headA)) (proj₂ sp))) (trans (sym (part-at H H′ ψ Nx.headA)) pc) pe)
+          where
+            module Nx = Next c k s πL ps
+            sp = ∧-split (At.val H′ (Kit.live c)) sn
+        shiftNL (next-lane {l = lane c k s} πL) ps en (next-lane ψL) =
+          shiftNL πL Nx.fresh (enL-tail H en) ψL
           where module Nx = Next c k s πL ps
 
     --------------------------------------------------------------------

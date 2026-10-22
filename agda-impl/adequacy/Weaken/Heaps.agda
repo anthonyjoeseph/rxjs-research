@@ -228,9 +228,16 @@ module WeakeningHeaps (R : Set) where
               (Lingers.rests L ψ (trans (sym s) sn) (trans (sym (grow-part (connectˢ S c b kb k fd rp e₀ rt src bd))) eq) (trans (sym (grow-part src)) pn) ec)
 
       -- The untold and ended invariants persist across a heap growth.
-      postulate
-        grow-told : ∀ {t : Sub h [] R} {p} → Untold H p t → Untold H′ p (wkTree τ t)
-        grow-ended : ∀ {t : Sub h [] R} → Ended H t → Ended H′ (wkTree τ t)
+      grow-told : ∀ {t : Sub h [] R} {p} → Untold H p t → Untold H′ p (wkTree τ t)
+      grow-told {t = t} u ψ′ sn ps pb with unwk t ψ′
+      ... | x , ψ , e , s with conn-inv x e
+      ... | conn-back {src = src} {bd = bd} = u ψ (trans (sym s) sn) (trans (sym (grow-part src)) ps) (trans (sym (grow-part bd)) pb)
+
+      grow-ended : ∀ {t : Sub h [] R} → Ended H t → Ended H′ (wkTree τ t)
+      grow-ended {t = t} en {rp = rp} {e = e₀} {rt = rt} ψ′ sn eq ec with unwk t ψ′
+      ... | x , ψ , e , s with conn-inv x e
+      ... | conn-back {S = S} {c = c} {b = b} {kb = kb} {k = k} {fd = fd} {src = src} {bd = bd} =
+        trans (grow-part src) (en ψ (trans (sym s) sn) (trans (sym (grow-part (connectˢ S c b kb k fd rp e₀ rt src bd))) eq) ec)
 
       grow-flags : ∀ {Δ A} {t : Sub h Δ A} → DoneBy H t [] → DoneBy H′ (wkTree τ t) []
       grow-flags {t = t} d ψ′ sn with unwk t ψ′

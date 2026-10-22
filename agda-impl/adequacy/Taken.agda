@@ -79,7 +79,7 @@ module Taking (R : Set) where
   open Ghosting R using (sorted-⇝)
   open GhostingPaths R using (walk-⊕)
   open Forking R using (pend-less; subOf; walk-planted)
-  open Keeping R using (each-plant; lingers-plant; flags-plant)
+  open Keeping R using (each-plant; lingers-plant; flags-plant; told-plant; ended-plant)
   open Planting R using (module Moved)
   open Staging R using (Restages; not-src; wrap-take)
   open Weakening R using (module Grown; pend-grow)
@@ -228,9 +228,12 @@ module Taking (R : Set) where
                ; joined  = subst₂ (At.Joined H′) (sym (subjects-plant π₂ v refl)) (sym (joiners-plant π₂ v (λ _ → refl) [])) (Queue.joined qu)
                ; ordered = Queue.ordered qu ; ahead = Queue.ahead qu }
 
-      postulate
-        rt-told  : ∀ {q′} → Untold H′ q′ T₂ → Untold H′ q′ t′
-        rt-ended : Ended H′ T₂ → Ended H′ t′
+      -- A takeWhile over a pending source holds no connect.
+      rt-told : ∀ {q′} → Untold H′ q′ T₂ → Untold H′ q′ t′
+      rt-told = told-plant H′ π₂ v eqv (λ { (in-take ()) })
+
+      rt-ended : Ended H′ T₂ → Ended H′ t′
+      rt-ended = ended-plant H′ π₂ v eqv (λ { (in-take ()) })
 
   -- An allocation's continuation, as a function.
   allocates : ∀ {w B t a} {k′ : ∀ {v} → w ⊑ v → Ref v t → Act v B} {m : Act w B} → m ≗ newRef t a k′

@@ -457,13 +457,19 @@ module Lifting (R : Set) where
     where H = Conf.heap (Mach.conf m)
 
   -- The untold and ended invariants survive the fire step.
-  postulate
-    fire-told : ∀ {g m} (cr : Carried g m) {Δ A τ e v u x sk hd fr}
-                (π : Path (Carried.tree cr) (coldˢ {Δ = Δ} {A} sk hd (waiting {u = v} τ e (at u x fr))))
-              → Untold (Conf.heap (Mach.conf m)) (Conf.pos (Mach.conf m)) (plant π (coldˢ sk hd (fired τ e (at u x fr))))
-    fire-ended : ∀ {g m} (cr : Carried g m) {Δ A τ e v u x sk hd fr}
-                 (π : Path (Carried.tree cr) (coldˢ {Δ = Δ} {A} sk hd (waiting {u = v} τ e (at u x fr))))
-               → Ended (Conf.heap (Mach.conf m)) (plant π (coldˢ sk hd (fired τ e (at u x fr))))
+  fire-told : ∀ {g m} (cr : Carried g m) {Δ A τ e v u x sk hd fr}
+              (π : Path (Carried.tree cr) (coldˢ {Δ = Δ} {A} sk hd (waiting {u = v} τ e (at u x fr))))
+            → Untold (Conf.heap (Mach.conf m)) (Conf.pos (Mach.conf m)) (plant π (coldˢ sk hd (fired τ e (at u x fr))))
+  fire-told {m = m} cr π =
+    Shift.shift-told H H π (λ _ _ → refl) [] (Books.fresh (Carried.books cr)) _ (Carried.told cr) (Carried.ended cr) (fire-heading H)
+    where H = Conf.heap (Mach.conf m)
+
+  fire-ended : ∀ {g m} (cr : Carried g m) {Δ A τ e v u x sk hd fr}
+               (π : Path (Carried.tree cr) (coldˢ {Δ = Δ} {A} sk hd (waiting {u = v} τ e (at u x fr))))
+             → Ended (Conf.heap (Mach.conf m)) (plant π (coldˢ sk hd (fired τ e (at u x fr))))
+  fire-ended {m = m} cr π =
+    Shift.shift-ended H H π (λ _ _ → refl) [] (Books.fresh (Carried.books cr)) _ (Carried.ended cr) (fire-lingering H)
+    where H = Conf.heap (Mach.conf m)
 
   -- A timer fired leaves every tie held: a cold runs nothing past its end.
   fire-lingers : ∀ {g m} (cr : Carried g m) {Δ A τ e v u x sk hd fr}

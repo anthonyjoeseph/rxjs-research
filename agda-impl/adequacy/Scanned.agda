@@ -72,7 +72,7 @@ module Scanning (R : Set) where
   open Ghosting R using (sorted-⇝)
   open GhostingPaths R using (walk-⊕)
   open Forking R using (pend-less; subOf; walk-planted)
-  open Keeping R using (each-plant; lingers-plant; flags-plant)
+  open Keeping R using (each-plant; lingers-plant; flags-plant; told-plant; ended-plant)
   open Planting R using (module Moved)
   open Staging R using (Restages; not-src; wrap-scan)
   open Weakening R using (module Grown; pend-grow)
@@ -158,10 +158,12 @@ module Scanning (R : Set) where
           tr : Each H′ (Heads p) (pendingˢ (T.scan f z s) q) → Each H′ (Heads p) v
           tr eu = record { parts = pa eu ; pools = λ { (in-scan ()) } ; rests = λ { (in-scan ()) } }
 
-      -- The untold and ended invariants survive the scan restage.
-      postulate
-        rs-told : ∀ {p} → Untold H′ p T₁ → Untold H′ p t′
-        rs-ended : Ended H′ T₁ → Ended H′ t′
+      -- A scan over a pending source holds no connect.
+      rs-told : ∀ {p} → Untold H′ p T₁ → Untold H′ p t′
+      rs-told = told-plant H′ π₁ v eqv (λ { (in-scan ()) })
+
+      rs-ended : Ended H′ T₁ → Ended H′ t′
+      rs-ended = ended-plant H′ π₁ v eqv (λ { (in-scan ()) })
 
       -- A scan runs what its source runs.
       rs-lingers : Lingers H′ T₁ → Lingers H′ t′
