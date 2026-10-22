@@ -375,15 +375,20 @@ resume c (joinS j true x) go p rs with fedUp c x
 ... | nothing = ⟨ c , joinS j true x , absorbed , p , rs ⟩
 resume c s _ p rs = ⟨ c , s , absorbed , p , rs ⟩
 
-step : ∀ {R} → Conf R → Conf R × Shown R
-step ⟨ c , pend o , subscribing , p , rs ⟩ = begin c o p rs , []
-step ⟨ c , s , resuming t , p , rs ⟩       = resume c s t p rs , []
-step ⟨ c , s , rising e , p , rs ⟩         = rise c s e p rs
+-- By the mode first, so a fact about a step splits on the mode alone.
+stepAt : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Mode A → Pos → List Job → Conf R × Shown R
+stepAt c s (resuming t) p rs = resume c s t p rs , []
+stepAt c s (rising e)   p rs = rise c s e p rs
+stepAt c (pend o) subscribing p rs = begin c o p rs , []
+stepAt c s subscribing p rs = ⟨ c , s , subscribing , p , rs ⟩ , []
 -- a job resumed where it was suspended
-step ⟨ c , s , absorbed , p , (q , t , p′) ∷ rs ⟩ with downs q top (plug c s)
+stepAt c s absorbed p ((q , t , p′) ∷ rs) with downs q top (plug c s)
 ... | just (_ , _ , c′ , s′) = ⟨ c′ , s′ , resuming t , p′ , rs ⟩ , []
 ... | nothing                = ⟨ c , s , absorbed , p , rs ⟩ , []
-step k = k , []
+stepAt c s absorbed p [] = ⟨ c , s , absorbed , p , [] ⟩ , []
+
+step : ∀ {R} → Conf R → Conf R × Shown R
+step ⟨ c , s , m , p , rs ⟩ = stepAt c s m p rs
 
 load : ∀ {R} → PObs [] R → Conf R
 load o = ⟨ top , pend o , subscribing , root , [] ⟩
