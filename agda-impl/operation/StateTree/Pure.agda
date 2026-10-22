@@ -181,22 +181,29 @@ module Driver (R : Set) where
     shown drained         = idle
 
   -- What a reader of the first n steps has: each value at its clock, and
-  -- how the run stood — cut at the last clock seen, complete, or dry.
+  -- how the run stood — cut at the last clock seen, complete, or dry.  A
+  -- step past the horizon cuts it there: a looping program works forever,
+  -- so it is read up to a time.
   record Read : Set where
     constructor read
     field
       log    : List (Time × R)
       ending : End
-  open Read
+  open Read public
 
-  reading : ℕ → Time → Trace → Read
-  reading zero    c _             = read [] (cutOff c)
-  reading (suc n) c (tau t k)     = reading n t (force k)
-  reading (suc n) c (out t p a k) = let r = reading n t (force k) in read ((t , a) ∷ log r) (ending r)
-  reading (suc n) c (end p)       = read [] finished
-  reading (suc n) c idle          = read [] dryᴱ
+  reading : Time → ℕ → Time → Trace → Read
+  reading h zero    c _             = read [] (cutOff c)
+  reading h (suc n) c (tau t k)     = if h <ᵇ t then read [] (cutOff c) else reading h n t (force k)
+  reading h (suc n) c (out t p a k) = if h <ᵇ t then read [] (cutOff c) else
+    (let r = reading h n t (force k) in read ((t , a) ∷ log r) (ending r))
+  reading h (suc n) c (end p)       = read [] finished
+  reading h (suc n) c idle          = read [] dryᴱ
 
-  -- The first n steps of a program's run, read as a timeline.
-  prefix : ℕ → Obs Timeline [] R → ML R
-  prefix n o = frames (log r) (ending r)
-    where r = reading n 0 (trace (begin o))
+  -- The first n steps of a program's run, up to tick h, as a timeline.
+  prefix : ℕ → Time → Obs Timeline [] R → ML R
+  prefix n h o = frames (log r) (ending r)
+    where r = reading h n 0 (trace (begin o))
+
+-- THE PURE OPERATIONAL SEMANTICS: a program's first n steps up to tick h.
+run : ∀ {R} → ℕ → Time → Obs Timeline [] R → ML R
+run {R} = Driver.prefix R
