@@ -113,6 +113,18 @@ rxLockWith (RxLock m o) act = do
 {-# COMPILE GHC newLock = rxLockNew #-}
 {-# COMPILE GHC withLock = \ _ _ -> rxLockWith #-}
 
+-- A wake-up for the loop: raised any number of times, it is taken once.
+postulate
+  Signal    : Set
+  newSignal : IO Signal
+  raise     : Signal → IO ⊤
+  await     : Signal → IO ⊤
+
+{-# COMPILE GHC Signal = type Control.Concurrent.MVar.MVar () #-}
+{-# COMPILE GHC newSignal = Control.Concurrent.MVar.newEmptyMVar #-}
+{-# COMPILE GHC raise = \ s -> () <$ Control.Concurrent.MVar.tryPutMVar s () #-}
+{-# COMPILE GHC await = Control.Concurrent.MVar.takeMVar #-}
+
 private
   infixl 1 _>>_
   _>>_ : ∀ {A : Set} → IO ⊤ → IO A → IO A
@@ -200,6 +212,7 @@ record Loop (R : Set) : Set where
     clock  : IORef ℕ
     timers : IORef (List (ℕ × IO ⊤))
     lock   : Lock
+    wake   : Signal
     conf   : IORef₁ (Conf R)
 
 private
@@ -212,9 +225,11 @@ private
   insert d a []              = (d , a) ∷ []
   insert d a ((e , b) ∷ ts) = if e ≤ᵇ d then (e , b) ∷ insert d a ts else (d , a) ∷ (e , b) ∷ ts
 
+  -- A cold may set a timer from its own thread, so the queue is touched
+  -- only under the lock, and the loop is woken.
   setTimer : ∀ {R} → Loop R → ℕ → IO ⊤ → IO ⊤
-  setTimer lp d a = readIORef (Loop.clock lp) >>= λ now → readIORef (Loop.timers lp) >>= λ ts →
-                    writeIORef (Loop.timers lp) (insert (now + d) a ts)
+  setTimer lp d a = atomically lp (readIORef (Loop.clock lp) >>= λ now → readIORef (Loop.timers lp) >>= λ ts →
+                    writeIORef (Loop.timers lp) (insert (now + d) a ts)) >> raise (Loop.wake lp)
 
   runTeardown : Slot → IO ⊤
   runTeardown sl = readIORef (Slot.tearDown sl) >>= λ where
@@ -222,9 +237,9 @@ private
     (just t) → writeIORef (Slot.tearDown sl) nothing >> t
 
   nextTimer : ∀ {R} → Loop R → IO Bool
-  nextTimer lp = readIORef (Loop.timers lp) >>= λ where
+  nextTimer lp = atomically lp (readIORef (Loop.timers lp) >>= λ where
     []             → pure false
-    ((t , a) ∷ ts) → writeIORef (Loop.timers lp) ts >> writeIORef (Loop.clock lp) t >> atomically lp a >> pure true
+    ((t , a) ∷ ts) → writeIORef (Loop.timers lp) ts >> writeIORef (Loop.clock lp) t >> a >> pure true)
 
 ------------------------------------------------------------------------
 -- THE IO DRIVER: the shared machine, fed by the world
@@ -353,12 +368,29 @@ fromTimeline {A} names c = record
 ------------------------------------------------------------------------
 -- The entry point
 
--- THE ENTRY POINT: the program loaded into the machine, run until it is
--- calm, then the loop, each timer under the lock, until none is left.
--- Each value is handed the loop's time at its arrival; the last argument
--- runs on completion.
-subscribe : ∀ {A} → Observable A → (Time → A → IO ⊤) → IO ⊤ → IO ⊤
-subscribe o f c =
-  newLock >>= λ lk → newIORef 0 >>= λ cl → newIORef [] >>= λ ts → newIORef₁ (load o) >>= λ k →
-  let lp = record { clock = cl ; timers = ts ; lock = lk ; conf = k } in
-  atomically lp (Drive.drive lp f c (Drive.settling 0)) >> fixIO′ (λ again _ → nextTimer lp >>= λ more → if more then again tt else pure tt) tt
+private
+  -- The program loaded into the machine and run until it is calm; then
+  -- the loop, each timer under the lock, until none is left and `stop`
+  -- says so.  Each value is handed the loop's time at its arrival; `c`
+  -- runs on completion.
+  launch : ∀ {A} → Observable A → (Time → A → IO ⊤) → IO ⊤ → (Signal → IO Bool) → IO ⊤
+  launch o f c stop =
+    newLock >>= λ lk → newSignal >>= λ wk → newIORef 0 >>= λ cl → newIORef [] >>= λ ts → newIORef₁ (load o) >>= λ k →
+    let lp = record { clock = cl ; timers = ts ; lock = lk ; wake = wk ; conf = k } in
+    atomically lp (Drive.drive lp f (c >> raise wk) (Drive.settling 0)) >>
+    fixIO′ (λ again _ → nextTimer lp >>= λ more → if more then again tt else stop wk >>= λ s → if s then pure tt else again tt) tt
+
+-- THE ENTRY POINT, as rxjs's `subscribe()`: what the program does is done
+-- by its colds; its values are dropped.  It returns once the program has
+-- completed — until then a cold's thread may still emit or set a timer,
+-- which wakes the loop.
+subscribe : ∀ {A} → Observable A → IO ⊤
+subscribe o = newIORef false >>= λ fin →
+  launch o (λ _ _ → pure tt) (writeIORef fin true)
+    (λ wk → readIORef fin >>= λ d → if d then pure true else await wk >> pure false)
+
+-- THE HARNESS'S ENTRY POINT: each value with the loop's time, and the
+-- completion, handed out; returns once no timer is left, completed or
+-- not, so a program that goes quiet can be read.
+subscribeLogged : ∀ {A} → Observable A → (Time → A → IO ⊤) → IO ⊤ → IO ⊤
+subscribeLogged o f c = launch o f c (λ _ → pure true)

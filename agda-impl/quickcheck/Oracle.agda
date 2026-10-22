@@ -31,7 +31,7 @@ open import denotation.MonotonicList.Events using (ML; Burst; Burst∞; ML∞; d
 open import denotation.MonotonicList using (observe; ticks)
 open import denotation.Denote using (⟦_⟧[_])
 open import operation.StateTree.Pure using () renaming (run to runᴾ)
-open import operation.Observable using (IORef; IOCold; subscribe; fromTimeline; newIORef; readIORef; writeIORef)
+open import operation.Observable using (IORef; IOCold; subscribeLogged; fromTimeline; newIORef; readIORef; writeIORef)
 open import quickcheck.Ty using (⟦_⟧ᵀ; showᵀ)
 open import quickcheck.Code using (Code; Leaf; cold; fresh; empty; of; map; scan; takeWhile; flatMap; connect; connected; μ; var; defer; Prog; toObs; timeline)
 
@@ -140,7 +140,7 @@ private
 -- once nothing is left to wait for.  Never `cut`: a program that never
 -- finishes never returns.
 ioTrace : ∀ {t} → ℕ → Prog t → IO (Trace ⟦ t ⟧ᵀ)
-ioTrace u p = newIORef false >>= λ fin → newIORef [] >>= λ log → newIORef 0 >>= λ names → subscribe
+ioTrace u p = newIORef false >>= λ fin → newIORef [] >>= λ log → newIORef 0 >>= λ names → subscribeLogged
   (toObs (leaf names) u p [] [] [])
   (λ t a → readIORef log >>= λ xs → writeIORef log ((t , a) ∷ xs))
   (writeIORef fin true) >>= λ _ →
