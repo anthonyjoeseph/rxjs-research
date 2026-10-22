@@ -22,9 +22,9 @@ import denotation.MonotonicList.Events as M
 import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
-open import adequacy.Placed.Order using (Atop; Clear; Every; EveryT; Ext; Ordered; Owned; Past; Steady; every; everyᵀ; ext; ext-eq; ordered; owned-ext; prefix-++; prefix-trans; steady)
+open import adequacy.Placed.Order using (Atop; Clear; Disjoint; Every; EveryT; Ext; Ordered; Owned; Past; Steady; every; everyᵀ; ext; ext-eq; ordered; owned-ext; prefix-++; prefix-trans; steady)
 open import adequacy.Placed.Keys using (earliest-all; ix-mark; owned-trans; snoc-inj; tagged-++; tagged-mark)
-open import adequacy.Placed.Rising using (AtopT; Atopᴹ; Beyond; Disjoint; apart-mark; ext-snoc; prefix-split; snoc-atop)
+open import adequacy.Placed.Rising using (AtopT; Atopᴹ; Beyond; apart-mark; ext-snoc; prefix-split; snoc-atop)
 open import adequacy.Placed.Trail using (FlatT; SortedT; Sp; Trail; TrailE; disjoint-swap; trail; trailᶠ; t≢f)
 
 open Events∞

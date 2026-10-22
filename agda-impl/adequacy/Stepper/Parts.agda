@@ -5,7 +5,8 @@ module adequacy.Stepper.Parts where
 open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_])
-open import Data.List.Relation.Unary.Any using (here)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Sum using (_⊎_; inj₁; inj₂; map₁; [_,_])
 open import Data.Product using (Σ; _×_; _,_)
@@ -27,9 +28,16 @@ import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import adequacy.Sane using (Sane; Mode; runs; over; loose; RestedS)
 open import adequacy.Placed.Order using (still; Placed)
+open import adequacy.Env using (Same; nagree-refl; same-cons)
 
 open _≃_
 open Events∞
+
+-- `ρ′` is `ρ` past source `i`'s step at `q` showing `a`: that source
+-- runs on from what the step left, every other alike at every depth.
+data Fed {A} (q : Pos) (a : Maybe A) : ∀ {Γ} → A ∈ Γ → NEnv Γ → NEnv Γ → Set₁ where
+  fed-here  : ∀ {Γ} {e} (σ : Events∞ A) {ρ ρ′ : NEnv Γ} → e ≃ shows q a σ → Same ρ ρ′ → Fed q a (here refl) (e ∷ᴬ ρ) (force σ ∷ᴬ ρ′)
+  fed-there : ∀ {B Γ} {i : A ∈ Γ} {e e′ : Events B} {ρ ρ′ : NEnv Γ} → e ≃ e′ → Fed q a i ρ ρ′ → Fed q a (there i) (e ∷ᴬ ρ) (e′ ∷ᴬ ρ′)
 
 postulate
   -- A value changed, a running total, or a take keep what a step shows
@@ -54,14 +62,14 @@ postulate
              → Sane ν (U.flatMapᶜ op g o ls qs pl) → Placed (U.flatMapᶜ op g o ls qs pl) ρ
              → Skipsᴹ ν o ρ → Skipsᴸ ν ls ρ → Skips ν (U.flatMapᶜ op g o ls qs pl) ρ
 
-  -- A body reading its source's step at `q` runs alike fed it, the
-  -- source past it; at the source's end, alike shut.
+  -- A node reading a running source's step at `q` runs alike fed it,
+  -- the source past it; a body at its source's end, alike shut.
   --
   -- RECOVERY: git show 43da74d9:agda-impl/adequacy/Sane.agda restores `sane-feed`, which a stepper over a meaning with no tails fed its sources' steps through
-  feed-alike : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (b : U.Node (A ∷ Γ) B) q (a : Maybe A) (σ : Events∞ A) {e : Events A} (ρ : NEnv Γ)
-             → Sane (runs ∷ᴬ ν) b → e ≃ shows q a σ → ∀ d → Agreeˢ d (U.stateᴺ b (e ∷ᴬ ρ)) (U.stateᴺ (U.feed (here refl) q a b) (force σ ∷ᴬ ρ))
-  shut-alike : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (b : U.Node (A ∷ Γ) B) c {e : Events A} (ρ : NEnv Γ)
-             → Sane (runs ∷ᴬ ν) b → e ≃ end c → ∀ d → Agreeˢ d (U.stateᴺ b (e ∷ᴬ ρ)) (U.stateᴺ (U.shut (here refl) c b) (end c ∷ᴬ ρ))
+  feed-alikeⁱ : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (i : A ∈ Γ) q (a : Maybe A) (c : U.Node Γ B) {ρ ρ′ : NEnv Γ}
+              → Sane ν c → lookup ν i ≡ runs → Fed q a i ρ ρ′ → ∀ d → Agreeˢ d (U.stateᴺ c ρ) (U.stateᴺ (U.feed i q a c) ρ′)
+  shut-alikeⁱ : ∀ {Γ A B} (i : A ∈ Γ) c (n : U.Node Γ B) {ρ ρ′ : NEnv Γ}
+              → lookup ρ i ≃ end c → Same ρ ρ′ → ∀ d → Agreeˢ d (U.stateᴺ n ρ) (U.stateᴺ (U.shut i c n) ρ′)
 
   -- A defer: the meaning starts with the step's event, else past a
   -- running source's shown event.
@@ -330,3 +338,13 @@ one-shutˢ ρ env r c t U.hushˢ        hush⁼       = hush⁼
 -- that witness, so it never ties the connect's step.  Live or ended, a
 -- connect differs only in what its body's env heads with, how it takes
 -- the body's step, and how it routes its source's.
+
+-- A body fed its source's step, the source past it, alike.
+feed-alike : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (b : U.Node (A ∷ Γ) B) q (a : Maybe A) (σ : Events∞ A) {e : Events A} (ρ : NEnv Γ)
+           → Sane (runs ∷ᴬ ν) b → e ≃ shows q a σ → ∀ d → Agreeˢ d (U.stateᴺ b (e ∷ᴬ ρ)) (U.stateᴺ (U.feed (here refl) q a b) (force σ ∷ᴬ ρ))
+feed-alike b q a σ ρ sb al = feed-alikeⁱ (here refl) q a b sb refl (fed-here σ al (λ m → nagree-refl m ρ))
+
+-- A body told its source's end, alike.
+shut-alike : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} (b : U.Node (A ∷ Γ) B) c {e : Events A} (ρ : NEnv Γ)
+           → Sane (runs ∷ᴬ ν) b → e ≃ end c → ∀ d → Agreeˢ d (U.stateᴺ b (e ∷ᴬ ρ)) (U.stateᴺ (U.shut (here refl) c b) (end c ∷ᴬ ρ))
+shut-alike b c ρ _ al = shut-alikeⁱ (here refl) c b al (same-cons (agreeing al) (λ m → nagree-refl m ρ))

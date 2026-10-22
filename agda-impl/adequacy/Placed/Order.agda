@@ -12,7 +12,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_; map to mapᴬ)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to All++⁺; ++⁻ˡ to All++⁻ˡ; ++⁻ʳ to All++⁻ʳ)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (_×_; _,_; proj₁; proj₂; ∃₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂; ∃₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans)
 open import Relation.Nullary using (¬_)
@@ -25,6 +25,7 @@ import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
+open import adequacy.Placed.Keyed using (Keyed)
 
 open Events∞
 open Tail∞
@@ -258,32 +259,20 @@ Sorted (e ∷ᴬ ρ) = (Ordered e × Steady e) × Every Headed e × Sorted ρ
 Sides : ∀ {Δ Γ A B} → U.Step Δ B → U.Step Γ A → Set
 Sides sb ss = ∀ k q → U.headˢ sb ≡ just k → U.headˢ ss ≡ just q → k ≢ q × k ≢ q ++ [ ix 0 ]
 
--- A connect's body and source step apart now, and again once the body
--- steps alone or the source's step is fed to the body: what the two
--- keep, subscribed apart, through the steps the connect takes.
+-- Neither keyed under the other.
+Disjoint : Pos → Pos → Set
+Disjoint a h = ¬ Owned a h × ¬ Owned h a
+
+-- A connect's body and source subscribed apart, at `p`'s two children:
+-- every position the body holds owned by the first, every one the
+-- source holds apart from it, and no source in scope stepping under it.
+-- Each key survives a step, and the body's a feed its sources' steps
+-- reach, so the two step apart for good.
 --
 -- REFUTED: 535eabb2 as `Sides` of the step now alone, by a body `of` whose second value lands where its source's first does
-mutual
-  record Sided {Γ A B} (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) : Set where
-    coinductive
-    field
-      sides  : Sides (U.step b) (U.step s)
-      onward : SidedNext (U.step b) s
-      fed    : SidedFed b (U.step s)
-
-  SidedNext : ∀ {Γ A B} → U.Step (A ∷ Γ) B → U.Node Γ A → Set
-  SidedNext (U.outˢ k a b′) s = Sided b′ s
-  SidedNext (U.skipˢ k b′)  s = Sided b′ s
-  SidedNext (U.endˢ k)      s = ⊤
-  SidedNext U.hushˢ         s = ⊤
-
-  SidedFed : ∀ {Γ A B} → U.Node (A ∷ Γ) B → U.Step Γ A → Set
-  SidedFed b (U.outˢ q a s′) = Sided (U.feed (here refl) q (just a) b) s′
-  SidedFed b (U.skipˢ q s′)  = Sided (U.feed (here refl) q nothing b) s′
-  SidedFed b (U.endˢ c)      = ⊤
-  SidedFed b U.hushˢ         = ⊤
-
-open Sided public
+Apart : ∀ {Γ A B} → Pos → U.Node (A ∷ Γ) B → U.Node Γ A → NEnv Γ → Set
+Apart r b s ρ = Σ Pos λ p → r ≡ p ++ [ ix 1 ] × Headed p
+  × Keyed (Owned (p ++ [ ix 0 ])) b × Keyed (Disjoint (p ++ [ ix 0 ])) s × Alienᴱ (p ++ [ ix 0 ]) ρ
 
 -- Every node's meaning in order, read in its own environment: a
 -- connect's body reading its source's, stepping apart from it; a flatMap's lanes yet to
@@ -302,7 +291,7 @@ mutual
   Within (U.takeWhileᶜ i p c)       ρ = Placed c ρ
   Within (U.flatMapᶜ op g o ls qs pl)  ρ = Placedᴹ o ρ × Placedᴸ ls ρ
     × (∀ a x → Reaches (x ++ [ ix 0 ]) (U.meaning (U.flatMapᶜ op g o ls qs pl) ρ) → Placed (g a (x ++ [ ix 1 ])) ρ)
-  Within (U.connectᶜ r b (U.live s))    ρ = Placed b (U.meaning s ρ ∷ᴬ ρ) × Placed s ρ × Sided b s
+  Within (U.connectᶜ r b (U.live s))    ρ = Placed b (U.meaning s ρ ∷ᴬ ρ) × Placed s ρ × Apart r b s ρ
   Within (U.connectᶜ r b (U.ended c t)) ρ = Placed b (end c ∷ᴬ ρ)
   Within (U.deferᶜ l p ns)          ρ = Headed p × Sorted (U.replay ns ρ) × Alienᴱ p (U.replay ns ρ)
   Within (U.joinᶜ i p xs e)         ρ = Alien p (lookup ρ i)

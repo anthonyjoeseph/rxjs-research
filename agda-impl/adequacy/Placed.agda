@@ -32,20 +32,16 @@ open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
 open import denotation.Compositional using (env-refl)
 open import adequacy.Finite using (Finite; map-f; scan-f; takeWhile-f; flatMap-f; connect-f; defer-f; trunc; finite-trunc;
   trunc-agree)
-open import adequacy.Placed.Order using (Alien; Alienᴱ; Atop; Every; EveryT; Everyᴱ; Every∞; Headed; Ordered; Owned; Placed; Prefix;
-  Sorted; Steady; atop-map; every; every-lookup; every-mono; every-monoᴱ; everyT-idle;
-  everyT-mono; everyT-∪; everyᵀ; every∞-mono; headed-snoc; ordered; ordered-map;
-  ordered-rejoin; ordered-scan; prefix-++; prefix-trans; sorted-headed; sorted-lookup; steady;
-  steady-map; steady-rejoin; steady-scan)
+open import adequacy.Placed.Order using (Alien; Alienᴱ; Atop; Disjoint; Every; EveryT; Everyᴱ; Every∞; Headed; Ordered; Owned; Placed; Prefix; Sorted; Steady; atop-map; every; every-lookup; every-mono; every-monoᴱ; everyT-idle; everyT-mono; everyT-∪; everyᵀ; every∞-mono; headed-snoc; ordered; ordered-map; ordered-rejoin; ordered-scan; prefix-++; prefix-trans; sorted-headed; sorted-lookup; steady; steady-map; steady-rejoin; steady-scan)
 open import adequacy.Placed.Keys using (Mark; Values; alienᴱ-owned; beneath-owned; earliest-all; every-map; every-reach; everyT-≈; ix-mark; last-mark; no-tick; ordered-lim; owned-tagged; owned-trans; owned-weigh; prefix-refl; prefix-weigh; sibling; snoc-inj; steady-lim; tagged-lane; tagged-mark; tagged-weigh; values; values-map; weigh; weighˡ)
-open import adequacy.Placed.Rising using (Beyond; module Deferred; Disjoint; module Reach; Rise; alien-shown; alien-sub; apart-mark; apartRules; atop-go; below-lane; every-zip; everyT-zip; headed-lane; headed-sub; headedRules; keyedRules; next-ix; ordered-defer; ordered-of; ordered-start; ordered-take; prefix-split; rise-env; rise-owned; rise-sub; risingRules; start-within; steady-defer; steady-of; steady-start; steady-take; tagged-split)
+open import adequacy.Placed.Rising using (Beyond; module Deferred; module Reach; Rise; alien-shown; alien-sub; apart-mark; apartRules; atop-go; below-lane; every-zip; everyT-zip; headed-lane; headed-sub; headedRules; keyedRules; next-ix; ordered-defer; ordered-of; ordered-start; ordered-take; prefix-split; rise-env; rise-owned; rise-sub; risingRules; start-within; steady-defer; steady-of; steady-start; steady-take; tagged-split)
 open import adequacy.Placed.Trail using (Sp; Spread; Trail; Trailing; disjoint-swap; flatT-idle; past-beyond; shown; sortedT-idle; spread; spread-defer; spread-map; spread-scan; tick-beneath; trail; trail-idle; trail-map; trail-of; trail-rejoin; trail-scan; trailing-start)
 open import adequacy.Placed.Calm using (calm-steady; calm-trail)
 open import adequacy.Placed.FlatOrder using (module FlatOrder)
 open import adequacy.Placed.FlatAfter using (module FlatAfter; trail-defer; trail-take)
 open import adequacy.Placed.Burst using (module Bursting; Fresh; FreshRun; Fresh∞; fresh-map; fresh-of; fresh-past; fresh-rejoin; fresh-scan; fresh-start; fresh-take; fresh-under; fresh-up; fresh-widen; fresh-≈; freshᴿ; heavy; longer; mark-sub; owned-drop; snoc-ne; sub-owned; sub-tagged)
 open import adequacy.Placed.Walk using (module Walk)
-open import adequacy.Placed.Heads using (sided-sub)
+open import adequacy.Placed.Heads using (apart-sub)
 
 open Events∞
 open Tail∞
@@ -976,7 +972,7 @@ placed-sub (flatMap op f s) p ρ hp so cl =
   ordered-sub (flatMap op f s) p ρ hp so cl , placed-sub s p ρ hp so cl , tt
   , λ a x r → placed-sub (f a) (x ++ [ ix 1 ]) ρ (headed-lane x (every-reach _ (x ++ [ ix 0 ]) (headed-sub (flatMap op f s) p ρ hp so) r))
                 so (alien-shown op f s p ρ cl x r)
-placed-sub (connect s b) p ρ hp so cl = ordered-sub (connect s b) p ρ hp so cl , pb , ps , sided-sub s b p hp
+placed-sub (connect s b) p ρ hp so cl = ordered-sub (connect s b) p ρ hp so cl , pb , ps , apart-sub s b p ρ hp cl
   where hs = headed-snoc p hp
         cs = alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl
         ps = placed-sub s (p ++ [ ix 1 ]) ρ hs so cs

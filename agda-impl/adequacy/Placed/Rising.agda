@@ -30,7 +30,7 @@ open import denotation.Unfold using (NEnv)
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
 open import denotation.Compositional using (env-refl)
 open import adequacy.Finite using (Finite; cold-f; empty-f; of-f; map-f; scan-f; takeWhile-f; flatMap-f; connect-f; connected-f; defer-f; trunc; finite-trunc; trunc-agree)
-open import adequacy.Placed.Order using (Alien; Alienᴱ; Atop; Beneath; Clear; Every; EveryT; Everyᴱ; Every∞; Ext; Headed; Ordered; Owned; Past; Prefix; Reaches; Sorted; Steady; Tagged; Within; atop-map; atop-scan; cons-ext; every; every-lookup; every-mono; every-monoᴱ; everyT-burstOn; everyT-idle; everyT-mono; everyT-∪; everyᵀ; every∞-mono; ext; ext-eq; ext-irrefl; headed-snoc; ordered; prefix-++; sorted-headed; steady; under-ext)
+open import adequacy.Placed.Order using (Alien; Alienᴱ; Atop; Beneath; Clear; Disjoint; Every; EveryT; Everyᴱ; Every∞; Ext; Headed; Ordered; Owned; Past; Prefix; Reaches; Sorted; Steady; Tagged; Within; atop-map; atop-scan; cons-ext; every; every-lookup; every-mono; every-monoᴱ; everyT-burstOn; everyT-idle; everyT-mono; everyT-∪; everyᵀ; every∞-mono; ext; ext-eq; ext-irrefl; headed-snoc; ordered; prefix-++; sorted-headed; steady; under-ext)
 open import adequacy.Placed.Keys using (Mark; module Merge; alienᴱ-owned; atop-agree; beneath-owned; beneath-snoc; clear-agree; earliest-all; every-beside; every-lim; every-map; every-reach; every-scan; every-≈; everyT-≈; ix-mark; last-mark; no-tick; ordered-≈; owned-lane; owned-snoc; owned-tagged; owned-trans; prefix-refl; sibling; steady-≈; tagged-mark; tagged-sub; tick-last; values-map)
 
 open Events∞
@@ -215,9 +215,6 @@ tagged-split k (sub _ ∷ q) j (inj₂ t) with tagged-split k q j t
 ... | inj₂ o  = inj₂ o
 
 -- Neither keys the other.
-Disjoint : Pos → Pos → Set
-Disjoint a h = ¬ Owned a h × ¬ Owned h a
-
 apart-mark : ∀ a j l → Mark l → Disjoint a j → Disjoint a (j ++ [ l ])
 apart-mark a j l m (na , nb) = fwd , λ o → nb (owned-trans j (j ++ [ l ]) a (inj₁ (prefix-++ j [ l ])) o)
   where

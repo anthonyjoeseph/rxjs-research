@@ -36,7 +36,8 @@ import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import adequacy.Sane using (Sane; Saneᴹ; Saneᴸ; Mode; runs; over; Rested; step-rested)
-open import adequacy.Placed.Order using (still; Placed; Placedᴹ; Placedᴸ; Sides; sides)
+open import adequacy.Placed.Order using (still; Placed; Placedᴹ; Placedᴸ; Sides)
+open import adequacy.Placed.Heads using (apart-sides)
 open import adequacy.Placed.Keys using (ahead-quiet)
 
 open _≃_
@@ -648,15 +649,15 @@ connect-skips : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} r (b : U.Node (A ∷ 
 connect-skips {ν = ν} r b s ρ (sb , ss) pl skb sks cl with U.step s in es
 ... | U.outˢ q a s′ with U.beforeˢ (q ++ [ ix 0 ]) (U.step b) in fb
 ...   | true  = SourceFirst.fed-first r b s ρ sb (proj₁ (proj₂ pl)) q (just a) s′ (sks (clear-lower ν ρ (<ᵖ-below q []) cl)) fb cl
-...   | false = body-skips r b s ρ ss (proj₁ (proj₂ (proj₂ pl))) (sides (proj₂ (proj₂ (proj₂ pl)))) skb (back {ν = ν} {s = s} {ρ = ρ} es sks) (subst (Shy (U.step b)) (sym es) fb) cl
+...   | false = body-skips r b s ρ ss (proj₁ (proj₂ (proj₂ pl))) (apart-sides r b s ρ (proj₂ (proj₂ (proj₂ pl)))) skb (back {ν = ν} {s = s} {ρ = ρ} es sks) (subst (Shy (U.step b)) (sym es) fb) cl
 connect-skips {ν = ν} r b s ρ (sb , ss) pl skb sks cl | U.skipˢ q s′ with U.beforeˢ (q ++ [ ix 0 ]) (U.step b) in fb
 ...   | true  = SourceFirst.fed-first r b s ρ sb (proj₁ (proj₂ pl)) q nothing s′ (sks (clear-lower ν ρ (<ᵖ-below q []) cl)) fb cl
-...   | false = body-skips r b s ρ ss (proj₁ (proj₂ (proj₂ pl))) (sides (proj₂ (proj₂ (proj₂ pl)))) skb (back {ν = ν} {s = s} {ρ = ρ} es sks) (subst (Shy (U.step b)) (sym es) fb) cl
+...   | false = body-skips r b s ρ ss (proj₁ (proj₂ (proj₂ pl))) (apart-sides r b s ρ (proj₂ (proj₂ (proj₂ pl)))) skb (back {ν = ν} {s = s} {ρ = ρ} es sks) (subst (Shy (U.step b)) (sym es) fb) cl
 connect-skips {ν = ν} r b s ρ (sb , ss) pl skb sks cl | U.endˢ c with U.beforeˢ (c ++ [ ix 0 ]) (U.step b) in fb
 ...   | true  = SourceFirst.shut-first r b s ρ sb (proj₁ (proj₂ pl)) c (sks (clear-lower ν ρ (<ᵖ-below c []) cl)) fb cl
-...   | false = body-skips r b s ρ ss (proj₁ (proj₂ (proj₂ pl))) (sides (proj₂ (proj₂ (proj₂ pl)))) skb (back {ν = ν} {s = s} {ρ = ρ} es sks) (subst (Shy (U.step b)) (sym es) fb) cl
+...   | false = body-skips r b s ρ ss (proj₁ (proj₂ (proj₂ pl))) (apart-sides r b s ρ (proj₂ (proj₂ (proj₂ pl)))) skb (back {ν = ν} {s = s} {ρ = ρ} es sks) (subst (Shy (U.step b)) (sym es) fb) cl
 connect-skips {ν = ν} r b s ρ (sb , ss) pl skb sks cl | U.hushˢ =
-  body-skips r b s ρ ss (proj₁ (proj₂ (proj₂ pl))) (sides (proj₂ (proj₂ (proj₂ pl)))) skb (back {ν = ν} {s = s} {ρ = ρ} es sks) (subst (Shy (U.step b)) (sym es) tt) cl
+  body-skips r b s ρ ss (proj₁ (proj₂ (proj₂ pl))) (apart-sides r b s ρ (proj₂ (proj₂ (proj₂ pl)))) skb (back {ν = ν} {s = s} {ρ = ρ} es sks) (subst (Shy (U.step b)) (sym es) tt) cl
 
 -- Node by node, each part stepping as it does alone.
 --
