@@ -11,6 +11,12 @@ module Main where
 -- time 0.  The IO runtime is the same engine over a different monad.
 open import adequacy.Adequacy using (adequacy)
 
+-- THE THEOREM, ON THE STATE TREE: the pure semantics' run
+-- (`operation.StateTree.Pure`) is the denotation's, observed at time 0.
+-- The IO semantics is the same machine driven by the world
+-- (`operation.Observable`).
+open import adequacy.StateTree using (adequacyˢ)
+
 -- THE MEANING IS A FOLD: the theorem's denotation is the limit of each
 -- operator's `MonotonicList` function applied to its children's.
 open import denotation.Denote using (folded)
