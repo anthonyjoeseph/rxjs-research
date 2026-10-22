@@ -3,11 +3,13 @@
 -- that must fire and every row that must not.
 module port.Fixture where
 
+open import Engine
+
 -- MUST NOT: an old name, ported with a body.
 run : Set
 run = Set
 
--- MUST FIRE (NEW NAME): the old tower never had it.
+-- MUST FIRE (NEW NAME): a body under a name the old tower never had.
 invented : Set
 invented = Set
 
@@ -16,6 +18,9 @@ placing : Set
 placing = Set
 
 postulate
+  -- MUST NOT: a new postulate states a gap and proves nothing.
+  fresh-gap : Set
+
   -- MUST NOT: an old postulate stays one.
   ticks-up : Set
 

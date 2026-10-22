@@ -5,11 +5,13 @@ the state tree, in `agda-impl/port/`. The boundary is that the port **only
 ports**: work the old proof left undone is Tier 1's, never the port's.
 
 `scripts/check-port.py` reads the old tower at `PORT_BASE` (the Makefile) out of
-git, and checks every non-private top-level declaration under `port/`:
+git, and checks every non-private top-level declaration under `port/`. **Bodies
+and postulates answer to different rules:** a body must be an old one, carried
+over; a postulate only states a gap, so a new one is free.
 
 | Finding | Meaning |
 | --- | --- |
-| `NEW NAME` | the old tower declares no such name |
+| `NEW NAME` | a definition, data type or record the old tower has no name for |
 | `FILLED GAP` | every old declaration of the name is a postulate, the port's is not |
 | `NO OLD BODY` | the port postulates a name that had a body, and does not say where |
 | `BAD OLD BODY` | an `OLD BODY` line whose commit, path or name does not resolve to a body |
@@ -19,6 +21,11 @@ A postulated old body carries, in the comment block directly above it:
 ```
 -- OLD BODY: <sha> <path from the repo root>
 ```
+
+**The scope is `port/` and its import cone**, the old tower aside, so a body
+cannot leave the boundary by moving into a module the port imports. In a cone
+module that existed at `PORT_BASE`, only declarations it has gained since are
+checked: the engine the port runs on predates the port and is not part of it.
 
 **Matching is by name only.** A ported declaration's type changes with the
 engine under it; its name does not. Same name, same role.

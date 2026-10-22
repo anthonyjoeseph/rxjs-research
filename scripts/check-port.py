@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 """THE PORT BOUNDARY (Anthony): the port carries the old adequacy proof to
-the state tree, and nothing else.  Every non-private top-level declaration
-under the port directory is checked against the old tower, frozen at a
-commit:
+the state tree, and proves nothing else.  Checked against the old tower,
+frozen at a commit:
 
-  P1  OLD NAMES ONLY.  Its name is declared somewhere in the old tower.  A
-      name the old tower never had is new work, which is Tier 1's, not the
-      port's.
+  P1  A DEFINITION HAS AN OLD NAME.  A body under a name the old tower never
+      had is new proof, which is Tier 1's, not the port's.
   P2  A POSTULATE STAYS A POSTULATE.  If every old declaration of the name
       is a postulate, the port's is too: the port may not fill a gap the old
-      proof left.
+      proof left.  A NEW postulate is free: stating a gap proves nothing.
   P3  AN UNPORTED BODY IS POINTED AT.  A port postulate whose old name had a
       body carries `-- OLD BODY: <sha> <path>` in the comment block directly
       above it, and the sha resolves, the path exists there, and the name is
       declared there with a body.  Validated wherever it appears.
+
+THE SCOPE is the port directory and its IMPORT CONE, the old tower aside,
+so a body cannot leave the boundary by moving to a module the port imports.
+In a cone module that existed at the frozen commit, only what it has
+gained since is checked: the engine the port runs on is not the port.
 
 Helpers are free: a `private` declaration, or anything local to a clause
 (`where`), is part of the body it serves.  Constructors and fields go with
@@ -110,6 +113,40 @@ def header(lines, i):
     return out
 
 
+IMPORT_RE = re.compile(r"^\s*(?:open\s+)?import\s+([^\s;()]+)")
+
+
+def cone(src_dir, roots, skip):
+    """Every module of `src_dir` the roots reach by import, roots included,
+    not following into `skip`."""
+    seen, todo = set(), list(roots)
+    while todo:
+        f = todo.pop()
+        if f in seen:
+            continue
+        seen.add(f)
+        with open(os.path.join(src_dir, f), encoding="utf-8") as fh:
+            for line in fh:
+                m = IMPORT_RE.match(line)
+                if not m:
+                    continue
+                g = m.group(1).replace(".", "/") + ".agda"
+                if os.path.exists(os.path.join(src_dir, g)) and not skip(g):
+                    todo.append(g)
+    return sorted(seen)
+
+
+def names_at(base, path):
+    """Every name `path` declared at `base`; None when it did not exist."""
+    show = git("show", f"{base}:{path}")
+    if show.returncode != 0:
+        return None
+    with tempfile.TemporaryDirectory() as d:
+        with open(os.path.join(d, "F.agda"), "w", encoding="utf-8") as fh:
+            fh.write(show.stdout)
+        return set(kinds_by_file(d, ["F.agda"]))
+
+
 def check_old_body(sha, path, name):
     """None when `path` at `sha` declares `name` with a body; else why not."""
     if git("cat-file", "-e", f"{sha}^{{commit}}").returncode != 0:
@@ -141,16 +178,20 @@ def main():
         old = kinds_by_file(d, snapshot(a.base, a.old, d))
 
     port_dir = os.path.join(a.src, a.port)
-    files = sorted(os.path.relpath(os.path.join(r, f), a.src)
+    roots = sorted(os.path.relpath(os.path.join(r, f), a.src)
                    for r, _, fs in os.walk(port_dir) for f in fs if f.endswith(".agda"))
+    prefix = os.path.relpath(a.src, git("rev-parse", "--show-toplevel").stdout.strip() or ".")
+    tower = [p.split("/", 1)[1] for p in a.old]
+    in_tower = lambda f: any(f == t or f.startswith(t.rstrip("/") + "/") for t in tower)
     problems = []
-    checked = 0
-    for f in files:
+    checked = fresh = 0
+    for f in cone(a.src, roots, in_tower):
         with open(os.path.join(a.src, f), encoding="utf-8") as fh:
             lines = fh.read().split("\n")
+        before = None if f in roots else names_at(a.base, os.path.join(prefix, f))
         defs, _, postulate_names, order = wiring.extract_definitions(a.src, [f])[:4]
         for n in order:
-            if n.startswith("..."):
+            if n.startswith("...") or (before is not None and n in before):
                 continue
             i = defs[n].line - 1
             if is_private(lines, i):
@@ -158,10 +199,13 @@ def main():
             checked += 1
             where = f"{f}:{n}"
             olds = {k for _, k in old.get(n, set())}
-            if not olds:
-                problems.append(f"NEW NAME    {where} — the old tower declares no `{n}`")
-                continue
             new_postulate = n in postulate_names
+            if not olds:
+                if new_postulate:
+                    fresh += 1
+                else:
+                    problems.append(f"NEW NAME    {where} — the old tower declares no `{n}`; only a postulate may be new")
+                continue
             if olds == {"postulate"} and not new_postulate:
                 problems.append(f"FILLED GAP  {where} — every old `{n}` is a postulate; the port's must be too")
             refs = [m.groups() for m in map(OLD_BODY_RE.match, header(lines, i)) if m]
@@ -178,7 +222,8 @@ def main():
     if problems:
         print(f"port-check: FAIL — {len(problems)} problem(s) over {checked} declaration(s); rules in docs/port-check.md")
         sys.exit(1)
-    print(f"port-check: clean ({checked} declaration(s) under {port_dir}, all old names, no gap filled)")
+    print(f"port-check: clean ({checked} declaration(s) in {port_dir} and its cone; "
+          f"every body an old name, no gap filled, {fresh} new postulate(s))")
 
 
 if __name__ == "__main__":

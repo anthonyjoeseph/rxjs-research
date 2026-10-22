@@ -217,9 +217,9 @@ wiring-selftest:
 	  if [ $$fail -eq 0 ]; then echo "wiring-selftest: PASS (R2 fires on the passed-only lemma and on its eta-expansion, and on nothing else; module applications conduct; \`with\` arms conduct at both scopes; a postulate block nested in a seal reaches the ledger; a pragma nested in a pragma closes on its own close; a CLI postulate with a COMPILE GHC body leaves it, an unbound one or one outside CLI/ stays)"; \
 	  else echo "$$out"; exit 1; fi
 
-# THE PORT BOUNDARY (Anthony): every non-private top-level declaration under
-# $(SRC)/port/ keeps a name the old tower had at PORT_BASE; an old postulate
-# stays one; a postulated old body says where it was.  The frozen commit is
+# THE PORT BOUNDARY (Anthony): in $(SRC)/port/ and what it imports, a body
+# keeps a name the old tower had at PORT_BASE; an old postulate stays one; a
+# postulated old body says where it was; a new postulate is free.  The frozen commit is
 # what the port answers to, so it moves only by hand.  → docs/port-check.md
 PORT_BASE := 9ec3e6c62e05857feabffdd65a05929de347e532
 
@@ -227,21 +227,22 @@ port-check:
 	@scripts/check-port.py --base $(PORT_BASE)
 
 # PROVES port-check IS LOAD-BEARING: one row per way out of the boundary must
-# fire, and an old name ported, an old postulate kept, a pointed-at old body,
+# fire, a new body moved into the port's import cone included; and an old
+# name ported, a new postulate, an old postulate kept, a pointed-at old body,
 # a private helper and a where-local must not.
 port-selftest:
 	@out=$$(scripts/check-port.py --base $(PORT_BASE) --src scripts/port-selftest 2>&1); \
 	  fail=0; \
-	  for r in "NEW NAME    port/Fixture.agda:invented" "FILLED GAP  port/Fixture.agda:placing" \
+	  for r in "NEW NAME    Engine.agda:smuggled" "NEW NAME    port/Fixture.agda:invented" "FILLED GAP  port/Fixture.agda:placing" \
 	           "NO OLD BODY port/Fixture.agda:complete" "BAD OLD BODY port/Fixture.agda:reaches" \
 	           "BAD OLD BODY port/Fixture.agda:prefix-chain" "BAD OLD BODY port/Fixture.agda:reached"; do \
 	    echo "$$out" | grep -qF "$$r" || { echo "SELFTEST FAIL: \`$$r\` not reported — the boundary has a hole"; fail=1; }; \
 	  done; \
-	  for n in run ticks-up content helper read-of local; do \
-	    echo "$$out" | grep -q "Fixture.agda:$$n " && { echo "SELFTEST FAIL: $$n reported, but it is inside the boundary"; fail=1; }; \
+	  for n in run fresh-gap engine-gap ticks-up content helper read-of local; do \
+	    echo "$$out" | grep -q "\.agda:$$n " && { echo "SELFTEST FAIL: $$n reported, but it is inside the boundary"; fail=1; }; \
 	  done; \
-	  echo "$$out" | grep -q "port-check: FAIL — 6 problem" || { echo "SELFTEST FAIL: expected exactly 6 problems"; fail=1; }; \
-	  if [ $$fail -eq 0 ]; then echo "port-selftest: PASS (a new name, a filled gap, and a missing or unresolving OLD BODY each fire; ported names, kept postulates and helpers do not)"; \
+	  echo "$$out" | grep -q "port-check: FAIL — 7 problem" || { echo "SELFTEST FAIL: expected exactly 7 problems"; fail=1; }; \
+	  if [ $$fail -eq 0 ]; then echo "port-selftest: PASS (a new body, in the port or its import cone, a filled gap, and a missing or unresolving OLD BODY each fire; ported names, new and kept postulates and helpers do not)"; \
 	  else echo "$$out"; exit 1; fi
 
 # SOUNDNESS GUARD.  The build is not `--safe` — it cannot be while

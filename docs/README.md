@@ -29,7 +29,7 @@ evidence behind a rule come here.
 | `comments-selftest` | [comments-check.md](comments-check.md) | ship a comment checker that has stopped firing |
 | `comments-check` | [comments-check.md](comments-check.md) | date a source comment, record what happened to a declaration, bury the evidence mid-paragraph, cite a twin that is not there |
 | `port-selftest` | [port-check.md](port-check.md) | ship a port checker that has stopped firing |
-| `port-check` | [port-check.md](port-check.md) | give the port a name the old tower lacks, a body an old postulate lacked, or postulate an old body without pointing at it |
+| `port-check` | [port-check.md](port-check.md) | give the port, or what it imports, a body the old tower lacks, a body for an old postulate, or postulate an old body without pointing at it |
 | `ts-gate` | — | land TypeScript that does not typecheck or lint |
 | `agda` | [agda-build.md](agda-build.md) | land anything that does not typecheck from Main, warnings included |
 
