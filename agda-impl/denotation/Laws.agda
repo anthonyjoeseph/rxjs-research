@@ -22,7 +22,7 @@ open import denotation.Denote using (DenEnv; ⟦_⟧)
 open import denotation.Compositional using (compositional; module Compositional)
 open import denotation.NonExpansive using (mapᴰ-ne)
 open import operation.PureObservable using (PureObs)
-open import adequacy.Adequacy using (run; adequacy)
+open import adequacy.StateTree using (runˢ; adequacyˢ)
 open Events∞
 
 ------------------------------------------------------------------------
@@ -108,9 +108,9 @@ agree-shows : ∀ {A} {x y : Events A} → (∀ k → Agree k x y) → ticks x �
 agree-shows h = shows h , shows λ k → agree-sym (h k)
 
 map-fusionᴾ : ∀ {A B C} (f : B → C) (g : A → B) (s : PureObs [] A)
-            → run (map (f ∘ g) s) ≃ run (map f (map g s))
+            → runˢ (map (f ∘ g) s) ≃ runˢ (map f (map g s))
 map-fusionᴾ f g s =
-  let (l₁ , r₁) = adequacy (map (f ∘ g) s)
-      (l₂ , r₂) = adequacy (map f (map g s))
+  let (l₁ , r₁) = adequacyˢ (map (f ∘ g) s)
+      (l₂ , r₂) = adequacyˢ (map f (map g s))
       (l , r)   = agree-shows {x = observe (⟦ map (f ∘ g) s ⟧ []) root} λ k → agree (map-fusion f g s [] k) root
   in (λ sh → r₂ (l (l₁ sh))) , (λ sh → r₁ (r (l₂ sh)))

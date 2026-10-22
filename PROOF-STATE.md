@@ -160,6 +160,14 @@ Members: `after-map`, `after-scan`, `after-take`, `clear-take`,
 `bursting-skips`, `under-skips`, `first-defer`, `first-rest`, `first-union`,
 `first-bursting`, `first-under`.
 
+#### THE TWO ENGINES
+
+Whether the state tree's run shows what the heap machine's does, kernel for
+kernel. Settled when `engines` is a body, or the link is reproven over the
+state tree and the heap machine deleted.
+
+Members: `engines`.
+
 ## Tier 2 — the simultaneous spec
 
 **The statement:** the simultaneous spec, stated over the denotation.
