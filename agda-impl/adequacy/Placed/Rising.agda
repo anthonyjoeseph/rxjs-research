@@ -7,6 +7,8 @@ open import Data.Empty using (⊥-elim)
 open import Data.List.Properties using (∷-injective; ∷-injectiveʳ; ++-identityʳ)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (zero; suc; _+_; _≤_; _<_; s≤s)
 open import Data.Nat.Properties using (≤-refl; +-identityʳ; +-monoʳ-<; ≤-pred; m≤n⇒m<n∨m≡n; <⇒≢; +-suc; +-monoʳ-≤; ≤-trans; m≤m+n;
   <-irrefl)
@@ -30,11 +32,45 @@ open import denotation.Unfold using (NEnv)
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
 open import denotation.Compositional using (env-refl)
 open import adequacy.Finite using (Finite; cold-f; empty-f; of-f; map-f; scan-f; takeWhile-f; flatMap-f; connect-f; connected-f; defer-f; trunc; finite-trunc; trunc-agree)
-open import adequacy.Placed.Order using (Alien; Alienᴱ; Atop; Beneath; Clear; Disjoint; Every; EveryT; Everyᴱ; Every∞; Ext; Headed; Ordered; Owned; Past; Prefix; Reaches; Sorted; Steady; Tagged; Within; atop-map; atop-scan; cons-ext; every; every-lookup; every-mono; every-monoᴱ; everyT-burstOn; everyT-idle; everyT-mono; everyT-∪; everyᵀ; every∞-mono; ext; ext-eq; ext-irrefl; headed-snoc; ordered; prefix-++; sorted-headed; steady; under-ext)
+open import adequacy.Placed.Order using (Alien; Alienᴱ; Atop; Beneath; Clear; Disjoint; Every; EveryT; Everyᴱ; Every∞; Ext; Headed; Ordered; Owned; Past; Prefix; Reaches; Sorted; Steady; Tagged; Within; atop-map; atop-scan; cons-ext; every; every-mono; every-monoᴱ; everyT-burstOn; everyT-idle; everyT-mono; everyT-∪; everyᵀ; every∞-mono; ext; ext-eq; ext-irrefl; headed-snoc; ordered; prefix-++; sorted-headed; steady; under-ext)
 open import adequacy.Placed.Keys using (Mark; module Merge; alienᴱ-owned; atop-agree; beneath-owned; beneath-snoc; clear-agree; earliest-all; every-beside; every-lim; every-map; every-reach; every-scan; every-≈; everyT-≈; ix-mark; last-mark; no-tick; ordered-≈; owned-lane; owned-snoc; owned-tagged; owned-trans; prefix-refl; sibling; steady-≈; tagged-mark; tagged-sub; tick-last; values-map)
 
 open Events∞
 open Tail∞
+
+-- Every position `e` shows, its end's included, and none it leaves
+-- running: all a joiner reads of its source.
+mutual
+  Showsˢ : ∀ {A} → (Pos → Set) → Events A → Set
+  Showsˢ P (out h _ r) = P h × Shows P (force r)
+  Showsˢ P (skip h r)  = P h × Shows P (force r)
+  Showsˢ P (end h)     = P h
+  Showsˢ P hush        = ⊤
+
+  record Shows {A} (P : Pos → Set) (e : Events A) : Set where
+    coinductive
+    field shows : Showsˢ P e
+
+open Shows public
+
+-- Every source's shown positions satisfying `P`.
+Showsᴱ : ∀ {Γ} → (Pos → Set) → NEnv Γ → Set
+Showsᴱ P []ᴬ      = ⊤
+Showsᴱ P (e ∷ᴬ ρ) = Shows P e × Showsᴱ P ρ
+
+every-shows : ∀ {A} {P : Pos → Set} (e : Events A) → Every P e → Shows P e
+shows (every-shows (out h _ r) pe) = proj₁ (every pe) , every-shows (force r) (proj₁ (proj₂ (every pe)))
+shows (every-shows (skip h r)  pe) = proj₁ (every pe) , every-shows (force r) (proj₁ (proj₂ (every pe)))
+shows (every-shows (end h)     pe) = every pe
+shows (every-shows hush        pe) = tt
+
+everyᴱ-shows : ∀ {Γ} {P : Pos → Set} (ρ : NEnv Γ) → Everyᴱ P ρ → Showsᴱ P ρ
+everyᴱ-shows []ᴬ      _         = tt
+everyᴱ-shows (e ∷ᴬ ρ) (pe , pρ) = every-shows e pe , everyᴱ-shows ρ pρ
+
+shows-lookup : ∀ {Γ A} P (ρ : NEnv Γ) → Showsᴱ P ρ → (i : A ∈ Γ) → Shows P (lookup ρ i)
+shows-lookup P (e ∷ᴬ ρ) (pe , pρ) (here refl) = pe
+shows-lookup P (e ∷ᴬ ρ) (pe , pρ) (there i)   = shows-lookup P ρ pρ i
 
 record Rules : Set₁ where
   field
@@ -96,59 +132,64 @@ module Reach (R : Rules) where
 
   -- A join at `p` shows what it missed just past `p`, the rest tagged.
   mutual
-    every-rejoin : ∀ {A} p (e : Events A) → S p → Every Src e → Every P (M′.rejoin p e)
-    every (every-rejoin p (out q a k) sp se) = every (every-shown p q (just a) k (p <ᵖ q) refl sp (proj₁ (every se)) (proj₁ (proj₂ (every se))))
-    every (every-rejoin p (skip q k)  sp se) = every (every-shown p q nothing k (p <ᵖ q) refl sp (proj₁ (every se)) (proj₁ (proj₂ (every se))))
+    every-rejoin : ∀ {A} p (e : Events A) → S p → Shows Src e → Every P (M′.rejoin p e)
+    every (every-rejoin p (out q a k) sp se) = every (every-shown p q (just a) k (p <ᵖ q) refl sp (proj₁ (shows se)) (proj₂ (shows se)))
+    every (every-rejoin p (skip q k)  sp se) = every (every-shown p q nothing k (p <ᵖ q) refl sp (proj₁ (shows se)) (proj₂ (shows se)))
     every (every-rejoin p (end c)     sp se) with p <ᵖ c in pc
-    ... | true  = join c p (every se) sp pc
+    ... | true  = join c p (shows se) sp pc
     ... | false = child p last last-mark sp
     every (every-rejoin p hush        sp se) = tt
 
-    every-shown : ∀ {A} p q (a : Maybe A) (k : Events∞ A) b → p <ᵖ q ≡ b → S p → Src q → Every Src (force k) → Every P (M′.shown p q a k b)
+    every-shown : ∀ {A} p q (a : Maybe A) (k : Events∞ A) b → p <ᵖ q ≡ b → S p → Src q → Shows Src (force k) → Every P (M′.shown p q a k b)
     every (every-shown p q (just a) k true  pq sp sq sk) = join q p sq sp pq , every-rejoin p (force k) sp sk , everyT-idle
     every (every-shown p q nothing  k true  pq sp sq sk) = join q p sq sp pq , every-rejoin p (force k) sp sk , everyT-idle
     every (every-shown p q (just a) k false pq sp sq sk) = child p (ix 0) (ix-mark 0) sp , every-rejoin p (force k) sp sk , everyT-idle
     every (every-shown p q nothing  k false pq sp sq sk) = child p (ix 0) (ix-mark 0) sp , every-rejoin p (force k) sp sk , everyT-idle
 
   -- A SUBSCRIPTION IS HELD TO THE RULES: subscribed where they allow,
-  -- over sources showing what they allow, it shows and leaves running
-  -- only what they allow.
-  reachᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ k (ρ : NEnv Γ) → S k → Everyᴱ Src ρ
+  -- over sources showing only what they allow, whatever their cuts, it
+  -- shows and leaves running only what they allow.  A joiner reads its
+  -- source's run, never what the source leaves running.
+  reachˢ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ k (ρ : NEnv Γ) → S k → Showsᴱ Src ρ
          → Every∞ P (U.stateᴺ (U.subscribe o k) ρ)
-  reachᶠ (cold c) (cold-f _)          k ρ sk sρ =
+  reachˢ (cold c) (cold-f _)          k ρ sk sρ =
     subst (Every P) (sym (U.start-meaning k (timelineAt c k) ρ)) (every-start k (timelineAt c k) sk)
     , subst (EveryT P) (sym (U.start-cut k (timelineAt c k) ρ)) everyT-idle
-  reachᶠ empty empty-f             k ρ sk sρ = record { every = child k last last-mark sk } , everyT-idle
-  reachᶠ (of xs) (of-f _)           k ρ sk sρ = every-of k 0 xs sk , everyT-idle
-  reachᶠ (map f s) (map-f fs)         k ρ sk sρ = every-map f _ (proj₁ ih) , proj₂ ih
-    where ih = reachᶠ s fs k ρ sk sρ
-  reachᶠ (scan f z s) (scan-f fs)      k ρ sk sρ = every-scan f z _ (proj₁ ih) , proj₂ ih
-    where ih = reachᶠ s fs k ρ sk sρ
-  reachᶠ (takeWhile i q s) (takeWhile-f fs) k ρ sk sρ = every-take i q _ (proj₁ ih) , proj₂ ih
-    where ih = reachᶠ s fs k ρ sk sρ
-  reachᶠ (flatMap op f s) (flatMap-f ff fs)  k ρ sk sρ =
+  reachˢ empty empty-f             k ρ sk sρ = record { every = child k last last-mark sk } , everyT-idle
+  reachˢ (of xs) (of-f _)           k ρ sk sρ = every-of k 0 xs sk , everyT-idle
+  reachˢ (map f s) (map-f fs)         k ρ sk sρ = every-map f _ (proj₁ ih) , proj₂ ih
+    where ih = reachˢ s fs k ρ sk sρ
+  reachˢ (scan f z s) (scan-f fs)      k ρ sk sρ = every-scan f z _ (proj₁ ih) , proj₂ ih
+    where ih = reachˢ s fs k ρ sk sρ
+  reachˢ (takeWhile i q s) (takeWhile-f fs) k ρ sk sρ = every-take i q _ (proj₁ ih) , proj₂ ih
+    where ih = reachˢ s fs k ρ sk sρ
+  reachˢ (flatMap op f s) (flatMap-f ff fs)  k ρ sk sρ =
     every-go (flatOp op) (just O) [] [] idle po []ᴬ []ᴬ everyT-idle , everyT-whole (just O) [] idle po []ᴬ everyT-idle
     where
       O  = U.outer∞ (λ a q → U.subscribe (f a) q) (U.subscribe s k) ρ
-      ih = reachᶠ s fs k ρ sk sρ
+      ih = reachˢ s fs k ρ sk sρ
       po : Outer∞ O
-      po = outer-of _ (every-map _ _ (proj₁ ih)) (values-map _ _ (λ a j sj → reachᶠ (f a) (ff a) j ρ sj sρ)) , proj₂ ih
-  reachᶠ (connect s b) (connect-f fs fb)     k ρ sk sρ =
+      po = outer-of _ (every-map _ _ (proj₁ ih)) (values-map _ _ (λ a j sj → reachˢ (f a) (ff a) j ρ sj sρ)) , proj₂ ih
+  reachˢ (connect s b) (connect-f fs fb)     k ρ sk sρ =
     every-beside (k ++ [ ix 1 ]) Bᶜ Sᶜ ib (every∞-mono (λ q pq → pq , deeper q (ix 0) (ix-mark 0) pq) Sᶜ is)
     , everyT-∪ (M′.burstOn (k ++ [ ix 1 ]) Sᶜ) (cut Bᶜ) (everyT-burstOn (k ++ [ ix 1 ]) Sᶜ is) (proj₂ ib)
     where
       Sᶜ  = U.stateᴺ (U.subscribe s (k ++ [ ix 1 ])) ρ
       Bᶜ  = U.stateᴺ (U.subscribe b (k ++ [ ix 0 ])) (U.meaning (U.subscribe s (k ++ [ ix 1 ])) ρ ∷ᴬ ρ)
-      is = reachᶠ s fs (k ++ [ ix 1 ]) ρ (held _ (child k (ix 1) (ix-mark 1) sk)) sρ
-      ib = reachᶠ b fb (k ++ [ ix 0 ]) (U.meaning (U.subscribe s (k ++ [ ix 1 ])) ρ ∷ᴬ ρ) (held _ (child k (ix 0) (ix-mark 0) sk))
-             (every-mono source _ (proj₁ is) , sρ)
-  reachᶠ (connected i) (connected-f _)     k ρ sk sρ = every-rejoin k (lookup ρ i) sk (every-lookup Src ρ sρ i) , everyT-idle
-  reachᶠ (defer l) (defer-f fl)         k ρ sk sρ = record { every =
+      is = reachˢ s fs (k ++ [ ix 1 ]) ρ (held _ (child k (ix 1) (ix-mark 1) sk)) sρ
+      ib = reachˢ b fb (k ++ [ ix 0 ]) (U.meaning (U.subscribe s (k ++ [ ix 1 ])) ρ ∷ᴬ ρ) (held _ (child k (ix 0) (ix-mark 0) sk))
+             (every-shows _ (every-mono source _ (proj₁ is)) , sρ)
+  reachˢ (connected i) (connected-f _)     k ρ sk sρ = every-rejoin k (lookup ρ i) sk (shows-lookup Src ρ sρ i) , everyT-idle
+  reachˢ (defer l) (defer-f fl)         k ρ sk sρ = record { every =
     child k (ix 0) (ix-mark 0) sk
     , every-≈ _ _ (λ n → agree (U.subscribed (Later.force l) (env-refl (U.hots ρ))) (k ++ [ ix 1 ])) (proj₁ ih)
     , everyT-≈ _ _ (λ n → agreeᵀ (U.subscribed (Later.force l) (env-refl (U.hots ρ))) (k ++ [ ix 1 ])) (proj₂ ih) }
     , everyT-idle
-    where ih = reachᶠ (Later.force l) fl (k ++ [ ix 1 ]) ρ (held _ (child k (ix 1) (ix-mark 1) sk)) sρ
+    where ih = reachˢ (Later.force l) fl (k ++ [ ix 1 ]) ρ (held _ (child k (ix 1) (ix-mark 1) sk)) sρ
+
+  reachᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ k (ρ : NEnv Γ) → S k → Everyᴱ Src ρ
+         → Every∞ P (U.stateᴺ (U.subscribe o k) ρ)
+  reachᶠ o fo k ρ sk sρ = reachˢ o fo k ρ sk (everyᴱ-shows ρ sρ)
 
   -- A SUBSCRIPTION IS HELD TO THE RULES: its truncations are, and it
   -- agrees with each for as many steps as it is deep.

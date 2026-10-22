@@ -8,14 +8,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE ROOT STEP
-
-Whether a subscription, over sorted alien sources, shows nothing keyed under
-the position just past any step of its run, the cut at its end included.
-Settled when `shown-fresh` is a body or refuted.
-
-Members: `shown-fresh`.
-
 #### UP-ENDED
 
 Whether every step keeps `Untold` and `Ended`, now fields of `Carried` and

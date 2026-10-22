@@ -711,7 +711,7 @@ spread-connect {Γ} {A} {B} s b fs fb p ρ hp so cl =
 
 steady-connect {Γ} {A} {B} s b fs fb p ρ hp so cl =
   W.st-beside (U.stateᴺ (U.subscribe b (p ++ [ ix 0 ])) ρ′) (U.stateᴺ (U.subscribe s r) ρ) (W.Side.ts sd) (W.Side.os sd) (W.Side.ss sd) (steady-subᶠ b fb (p ++ [ ix 0 ]) ρ′ (headed-snoc p hp) so′ cl′)
-    (W.unrelated sd (under-shown-connect s b fs fb p ρ hp so cl))
+    (W.unrelated sd (under-shown-connect s b fs fb p ρ cl (W.Side.os sd) (W.Side.ss sd) (W.Side.ts sd)))
   where
     module W = Walk {A} {B} p hp
     r  = p ++ [ ix 1 ]
