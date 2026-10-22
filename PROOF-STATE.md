@@ -11,8 +11,8 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE ROOT STEP
 
 Whether a subscription, over sorted alien sources, shows nothing keyed under
-the position just past any of its steps, its tails' steps included. Settled
-when `shown-fresh` is a body or refuted.
+the position just past any step of its run, the cut at its end included.
+Settled when `shown-fresh` is a body or refuted.
 
 Members: `shown-fresh`.
 

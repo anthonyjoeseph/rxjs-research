@@ -26,6 +26,7 @@ open import adequacy.Placed.Rising using (Rise; apart-mark; atop-ahead; before-a
 open import adequacy.Placed.Trail using (Apart; FlatT; Marked; SortedT; Sp; Spread; Trail; TrailE; Trailing; flatT-∪; inside-under; marked-cue; marks-alien; marks-mid; marks-past; shown; sortedT-∪; spread; trail; trailᶠ; t≢f)
 open import adequacy.Placed.Calm using (At; sp-of; sp-step)
 open import adequacy.Placed.FlatAfter using (Going; Head; disjoint-snoc; take-ahead)
+open import adequacy.Placed.Under using (Run; Runs; every-run; run-mono; run-onward; run-zip; runs)
 open import adequacy.Placed.Burst using (module Bursting; Fresh; FreshRun; Unrelated; ext-prefixed; fresh-past; fresh-tail; fresh-under; fresh-up; fresh-widen; freshᴿ; longer; ordered-onward; steady-onward; strict; trail-hushed; trailing-onward)
 
 open Events∞
@@ -444,13 +445,13 @@ module Walk {A B} (p : Pos) (hp : Headed p) where
   clear-next n β σ q false cb nx = clear-under n σ q (force β) cb
 
   -- Where the source next shows, read off what holds just past each step.
-  head-shown : ∀ {P : Pos → Set} (σ : Events∞ A) e → force σ ≡ e → Going e → Every∞ (λ q → P (q ++ [ ix 0 ])) σ → P (M′.shownAt e)
-  head-shown {P} σ e eq g u = go e g (subst (Every (λ q → P (q ++ [ ix 0 ]))) eq (proj₁ u))
+  head-shown : ∀ {P : Pos → Set} (σ : Events∞ A) e → force σ ≡ e → Going e → Run (λ q → P (q ++ [ ix 0 ])) σ → P (M′.shownAt e)
+  head-shown {P} σ e eq g u = go e g (subst (λ x → Runs (λ q → P (q ++ [ ix 0 ])) x (cut σ)) eq u)
     where
-      go : ∀ e → Going e → Every (λ q → P (q ++ [ ix 0 ])) e → P (M′.shownAt e)
-      go (out _ _ _) g pe = proj₁ (every pe)
-      go (skip _ _)  g pe = proj₁ (every pe)
-      go (end _)     g pe = every pe
+      go : ∀ e → Going e → Runs (λ q → P (q ++ [ ix 0 ])) e (cut σ) → P (M′.shownAt e)
+      go (out _ _ _) g pe = proj₁ (runs pe)
+      go (skip _ _)  g pe = proj₁ (runs pe)
+      go (end _)     g pe = proj₁ (runs pe)
       go hush        () pe
 
   away-head : ∀ k (x : Events A) → Away k x → Head (λ h → ¬ Ext (k ++ [ ix 0 ]) (h ++ [ ix 0 ])) x
@@ -472,7 +473,7 @@ module Walk {A B} (p : Pos) (hp : Headed p) where
   next-away σ hush        () tr se
 
   UB : Events∞ B → Events∞ A → Set
-  UB β σ = Every∞ (λ k → Every∞ (λ q → Unrelated k (q ++ [ ix 0 ])) σ) β
+  UB β σ = Every∞ (λ k → Run (λ q → Unrelated k (q ++ [ ix 0 ])) σ) β
 
   mutual
     st-beside : ∀ (β : Events∞ B) (σ : Events∞ A) → Trailing σ → Ordered (force σ) → Steady (force σ) → Steady (force β) → UB β σ → Steady (M′.beside r β σ)
@@ -497,12 +498,12 @@ module Walk {A B} (p : Pos) (hp : Headed p) where
         (subst (λ z → Head (λ h → ¬ Ext q (h ++ [ ix 0 ])) (force (M′.onward∞ σ z))) (sym eq)
            (next-away σ e g (subst (λ z → Trail z (cut σ)) eq ts) (subst Steady eq ss)))
       , st-beside β σ′ (trailing-onward σ (force σ) refl ts) (ordered-onward σ (force σ) refl ts os) (steady-onward σ (force σ) refl ts ss) sb
-          (every∞-mono (λ k w → every-onward σ (force σ) (proj₁ w) (proj₂ w) (proj₁ w)) β u)
+          (every∞-mono (λ k → run-onward σ) β u)
       where q  = M′.shownAt e
             σ′ = M′.onward∞ σ (force σ)
 
     st-body : ∀ (σ : Events∞ A) → Trailing σ → Ordered (force σ) → Steady (force σ) → ∀ e → force σ ≡ e → Going e → ∀ x → Steady x
-            → Every (λ k → Every∞ (λ q → Unrelated k (q ++ [ ix 0 ])) σ) x → M′.before (M′.shownAt e) x ≡ false
+            → Every (λ k → Run (λ q → Unrelated k (q ++ [ ix 0 ])) σ) x → M′.before (M′.shownAt e) x ≡ false
             → Steady (M′.body r σ (M′.shownAt e) x)
     steady (st-body σ ts os ss e eq g (out n a β′) sx ux be) =
       past-ahead n β′ σ q (M′.before q (force β′)) (proj₁ (steady sx)) (strict n q be (proj₁ un)) (λ x → proj₁ un (ext-prefixed x))
@@ -533,10 +534,10 @@ module Walk {A B} (p : Pos) (hp : Headed p) where
 
   -- The body unrelated to the source's shown steps, given that none of
   -- its steps lies under one.
-  unrelated : ∀ {β σ} → Side β σ → Every∞ (λ k → Every∞ (λ q → ¬ Prefix (q ++ [ ix 0 ]) k) σ) β → UB β σ
+  unrelated : ∀ {β σ} → Side β σ → Every∞ (λ k → Run (λ q → ¬ Prefix (q ++ [ ix 0 ]) k) σ) β → UB β σ
   unrelated {β} {σ} sd hard =
-    every∞-mono (λ k x → every∞-mono (λ q y → easy-pt k q (proj₁ x) (proj₁ (proj₁ y)) (proj₂ (proj₁ y)) , proj₂ y) σ
-                           (every∞-zip σ (every∞-zip σ (Side.ks sd) (Side.rs sd)) (proj₂ x)))
+    every∞-mono (λ k x → run-mono (λ q y → easy-pt k q (proj₁ x) (proj₁ (proj₁ y)) (proj₂ (proj₁ y)) , proj₂ y) σ
+                           (run-zip σ (every-run σ (every∞-zip σ (Side.ks sd) (Side.rs sd))) (proj₂ x)))
       β (every∞-zip β (Side.kb sd) hard)
 
   -- Keyed with none of the connect, keyed with none of its body.
