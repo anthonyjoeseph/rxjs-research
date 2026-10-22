@@ -6,7 +6,7 @@
 -- the meaning observed at the root, with positions forgotten down to
 -- ticks.
 --
--- The halves are `adequacy.Adequacy`'s.  BELOW, safety: every prefix's
+-- Two halves, proven apart.  BELOW, safety: every prefix's
 -- record is sorted and alike the meaning's events as a set, so placed
 -- against them.  ABOVE, liveness: whatever the meaning shows, some prefix
 -- reaches.
@@ -22,12 +22,14 @@ open import Data.Product using (_,_; Σ; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; sym; subst)
 
-open import operation.Placed using (Placed; Ahead; items; ahead; framed; shows; placed-⊑; frames-cut)
+open import operation.Placed using (Up; Placed; Ahead; items; ahead; framed; shows; placed-⊑; frames-cut)
 open import operation.PureObservable using (PureObs; module Pure)
 open import operation.StateTree.Pure using (module Driver) renaming (run to prefix)
-import adequacy.Adequacy as Old
-open import adequacy.Sorted using (module Sorting)
-open import adequacy.Ghost using (module Ghosting)
+open import port.Sorted using (module Sorting)
+open import port.Sorted.Walk using (module SortingWalk)
+open import port.Content using (module Honesty)
+open import port.Ghost using (module Ghosting)
+open import port.Progress using (module Progressing)
 open import denotation.MonotonicList.Events using (ML; Time; root)
 open import denotation.MonotonicList using (observe; ticks)
 open import denotation.Order using (_⊑_; _≃_; Shows; Chain; limit; limit-ub; limit-least; shows-≼; shows-cmp; cmp-long)
@@ -42,35 +44,36 @@ run o = limit λ n → prefix n n o
 module Link (R : Set) where
   open Driver R using (Trace∞; tau; out; end; idle; trace; begin; reading; Read; read; marks; log; ending; noted)
   open Pure R using (finished; cutOff; frames)
-  open Sorting R using (Ascending)
+  open Sorting R using (Ascending; ascending)
+  open SortingWalk R using (sorted)
   open Ghosting R using (Alike)
-  open Old.Link R using (placing; ticks-up)
+  open Honesty R using (content)
+  open Progressing R using (reached)
 
   -- The first n steps up to tick h, read.
   read-of : PureObs [] R → ℕ → Time → Read
   read-of o n h = reading h n 0 (trace (begin o))
 
   postulate
-    -- A prefix's marks never fall.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Sorted/Walk.agda
-    sorted : (o : PureObs [] R) (n h : ℕ) → Ascending root (marks (read-of o n h))
-
-    -- A prefix's record is the meaning's events, as a set.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Content.agda
-    content : (o : PureObs [] R) (n h : ℕ) → Alike (ending (read-of o n h)) (marks (read-of o n h)) (log (read-of o n h)) (events o)
-
-    -- Whatever item the meaning's events reach, the run reaches within
-    -- finitely many steps up to as many ticks.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Progress.agda
-    reached : (o : PureObs [] R) → ∀ {k} → Ahead (events o) k → Σ ℕ λ n → k ≤ length (items (log (read-of o n n)) (ending (read-of o n n)))
+    -- SORTED AND ALIKE IS PLACED: a record ascending in its marks and
+    -- alike a program's events as a set is those events, in order.  No
+    -- machine: the fold's positions ascend too, so two ascending lists
+    -- with the same members agree.  Stated at a program's events, not
+    -- any events, since only the fold's are known to ascend.
+    placing : (o : PureObs [] R) → ∀ {en qs xs} → Ascending root qs → Alike en qs xs (events o) → Placed en qs xs (events o)
 
   -- SAFETY: every prefix of the run is placed against the meaning's
   -- events.
   placedᴿ : (o : PureObs [] R) (n h : ℕ) → Placed (ending (read-of o n h)) (marks (read-of o n h)) (log (read-of o n h)) (events o)
-  placedᴿ o n h = placing o (sorted o n h) (content o n h)
+  placedᴿ o n h = placing o (ascending (sorted o) n h 0) (content o n h)
+
+  postulate
+    -- The meaning's ticks never fall.
+    --
+    -- RECOVERY: `git show a2e0bb8b` restores `<ᵖ-trans`, `<ᵖ-irrefl` and
+    --   `<ᵖ-ix` in `denotation.MonotonicList`: positions strictly ordered,
+    --   and an earlier one at no later a tick.
+    ticks-up : (o : PureObs [] R) → Up 0 (events o)
 
   -- Whatever the meaning shows, some prefix shows.
   reaches : (o : PureObs [] R) → ∀ {is} → Shows (ticks (events o)) is → Σ ℕ λ n → Shows (prefix n n o) is

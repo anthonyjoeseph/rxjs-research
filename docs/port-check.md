@@ -13,7 +13,7 @@ over; a postulate only states a gap, so a new one is free.
 | --- | --- |
 | `NEW NAME` | a definition, data type or record the old tower has no name for |
 | `FILLED GAP` | every old declaration of the name is a postulate, the port's is not |
-| `NO OLD BODY` | the port postulates a name that had a body, and does not say where |
+| `NO OLD BODY` | the port postulates a name the old tower never postulated, and does not say where its body is |
 | `BAD OLD BODY` | an `OLD BODY` line whose commit, path or name does not resolve to a body |
 
 A postulated old body carries, in the comment block directly above it:

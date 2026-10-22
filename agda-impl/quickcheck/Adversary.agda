@@ -4,7 +4,7 @@
 -- joiner while a connect's source is being fed, so these do it on
 -- purpose: a joiner subscribing mid-feed, the body or a joiner
 -- completing mid-feed, a connect inside a joiner's lane, a joiner
--- bursting inline.  `Oracle-CLI hand` holds each to `quickcheck.Ghost`.
+-- bursting inline.  `Oracle-CLI hand` holds each to `quickcheck.Placing`.
 module quickcheck.Adversary where
 
 open import Data.Bool using (true; false)

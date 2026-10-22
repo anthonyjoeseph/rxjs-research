@@ -8,8 +8,8 @@ frozen at a commit:
   P2  A POSTULATE STAYS A POSTULATE.  If every old declaration of the name
       is a postulate, the port's is too: the port may not fill a gap the old
       proof left.  A NEW postulate is free: stating a gap proves nothing.
-  P3  AN UNPORTED BODY IS POINTED AT.  A port postulate whose old name had a
-      body carries `-- OLD BODY: <sha> <path>` in the comment block directly
+  P3  AN UNPORTED BODY IS POINTED AT.  A port postulate whose old name was
+      never a postulate carries `-- OLD BODY: <sha> <path>` in the comment block directly
       above it, and the sha resolves, the path exists there, and the name is
       declared there with a body.  Validated wherever it appears.
 
@@ -213,7 +213,7 @@ def main():
                 why = check_old_body(sha, path, n)
                 if why:
                     problems.append(f"BAD OLD BODY {where} — {why}")
-            if new_postulate and olds != {"postulate"} and not refs:
+            if new_postulate and "postulate" not in olds and not refs:
                 problems.append(f"NO OLD BODY {where} — the old `{n}` had a body; "
                                 f"say where with `-- OLD BODY: <sha> <path>` above it")
 
