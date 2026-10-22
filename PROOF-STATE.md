@@ -10,11 +10,11 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ROOT STEP
 
-Whether a step, its sources clear of it, keeps its parts placed: a flatMap's
-admitted lanes; a defer's program, subscribed or fed. Settled when
-`flat-within` is a body or refuted.
+Whether a defer's put-back sources stay sorted and alien past a feed, a put's
+idle cut against the fed source's own; and a connect's body under none of its
+source's steps. Settled when `defer-fed` is a body or refuted.
 
-Members: `flat-within`, `defer-within`, `defer-fed`, `under-shown-connect`.
+Members: `defer-fed`, `under-shown-connect`.
 
 #### UP-ENDED
 

@@ -13,23 +13,23 @@ module adequacy.Stepper.Fed where
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
+open import Data.List.Relation.Unary.All using (All; lookup; updateAt) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import denotation.MonotonicList.Events using (Events∞; Pos; end; ix)
+open import denotation.MonotonicList.Events using (Events; Events∞; Pos; end; out; skip; idle; ix)
 open import denotation.MonotonicList using (agree-refl; agree-sym)
 open import denotation.NonExpansive using (Agreeˢ)
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
-open import adequacy.Sane using (Sane; Saneᴹ; Saneᴸ; Mode; runs; allLive)
+open import adequacy.Sane using (Sane; Saneᴹ; Saneᴸ; Mode; runs; allLive; feed-sane)
 open import adequacy.Placed.Order using (Alienᴱ; Every; Everyᴱ; Placed; Placedᴸ; Placedᴹ; Sorted; Within; every; every-lookup)
 open import adequacy.Placed.Keys using (ordered-≈; every-≈)
 open import adequacy.Placed.Rising using (apart-join)
 open import adequacy.Placed.Heads using (apart-closed; feed-keyed; owned-closed; owned-fit; shut-keyed)
-open import adequacy.Env using (Same; everyᴱ-agree; lookup-ne; meaning-same; reaches-agree; replay-ne; same-cons; sorted-agree)
+open import adequacy.Env using (Same; everyᴱ-agree; nagree-refl; lookup-ne; meaning-same; reaches-agree; replay-ne; same-cons; sorted-agree)
 open import adequacy.Stepper.Past using (_≃_; alike; shows)
 open import adequacy.Stepper.Parts using (Fed; fed-here; fed-there; feed-alikeⁱ; shut-alikeⁱ)
 
@@ -206,3 +206,24 @@ mutual
                → Placedᴸ ns ρ → Placedᴸ (U.shutᴸ i c ns) ρ′
   placedᴸ-shut i c []       al S w          = tt
   placedᴸ-shut i c (n ∷ ns) al S (pn , pns) = placed-shut i c n al S pn , placedᴸ-shut i c ns al S pns
+
+-- What a step put back leaves.
+put-tail : ∀ {A} → Events A → Events∞ A
+put-tail (out _ _ r) = r
+put-tail (skip _ r)  = r
+put-tail e           = λ where
+  .force → e
+  .cut   → idle
+
+-- A source's step put back is fed past.
+fed-put : ∀ {Γ A} (i : A ∈ Γ) q (a : Maybe A) (ρ : NEnv Γ) → Fed q a i (updateAt i (U.put q a) ρ) ρ
+fed-put (here refl) q (just x) (e ∷ᴬ ρ) = fed-here (put-tail (U.put q (just x) e)) (alike λ d → agree-refl d _) (λ m → nagree-refl m ρ)
+fed-put (here refl) q nothing  (e ∷ᴬ ρ) = fed-here (put-tail (U.put q nothing e)) (alike λ d → agree-refl d _) (λ m → nagree-refl m ρ)
+fed-put (there i)   q a        (e ∷ᴬ ρ) = fed-there (alike λ d → agree-refl d e) (fed-put i q a ρ)
+
+-- A NODE PLACED WHERE ITS NOTICES ARE PUT BACK IS PLACED FED THEM.
+placed-feeds : ∀ {Γ B} (ns : List (U.Notice Γ)) (c : U.Node Γ B) (ρ : NEnv Γ) → Sane (allLive Γ) c → Placed c (U.replay ns ρ)
+             → Placed (U.feeds ns c) ρ
+placed-feeds []                    c ρ sn pl = pl
+placed-feeds (U.notice i q a ∷ ns) c ρ sn pl =
+  placed-feeds ns (U.feed i q a c) ρ (feed-sane i q a c sn) (placed-fed i q a c sn (lookup-live i) (fed-put i q a (U.replay ns ρ)) pl)

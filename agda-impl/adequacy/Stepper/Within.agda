@@ -6,34 +6,38 @@
 module adequacy.Stepper.Within where
 
 open import Data.Bool using (Bool; true; false)
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Sum using ([_,_])
-open import Data.Product using (_,_; proj₁; proj₂)
-open import Data.Unit using (tt)
+open import Data.Sum using ([_,_]; inj₁)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Nat using (_<ᵇ_)
+open import Data.Unit using (⊤; tt)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Tree using (Later)
+import Tree as T
 open import Data.List.Membership.Propositional using (_∈_)
 open import denotation.MonotonicList.Events using (Timeline; From; Frame)
 import denotation.MonotonicList.Events as E
-open import denotation.MonotonicList.Events using (Events∞; end; Pos; ix; _<ᵖ_; <ᵖ-below)
+open import denotation.MonotonicList.Events using (Events; Events∞; end; out; skip; Pos; ix; _<ᵖ_; <ᵖ-below)
 open import denotation.NonExpansive using (Agreeˢ)
 open import adequacy.Stepper.Past using (Clear; Placedˢ; Shy; Skips; Withinˢ; _≃_; afterᴱ; alike; clear-lower; head-map; head-scan; placed-step; shows)
-open import adequacy.Stepper.Fed using (placed-fed; placed-shut)
-open import adequacy.Env using (nagree-refl; same-cons)
+open import adequacy.Stepper.Fed using (placed-fed; placed-feeds; placed-shut)
+open import adequacy.Env using (nagree-refl; reaches-agree; same-cons)
 open import adequacy.Stepper.Parts using (clear-take; fed-here; head-body; head-shut)
 
 open Agreeˢ using (nowˢ)
 open import adequacy.Stepper using (skips; shy-clear; step-skips)
 import denotation.MonotonicList as M′
-open import denotation.MonotonicList using (agree-refl)
+open import denotation.MonotonicList using (agree-refl; agree-sym)
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
-open import adequacy.Sane using (Sane; Mode; over)
-open import adequacy.Placed.Order using (Placed; Within)
+open import adequacy.Sane using (Sane; Saneᴸ; Saneᴹ; Mode; over; running-all; sane-subscribe)
+open import adequacy.Placed using (placed-sub)
+open import adequacy.Placed.Keys using (alienᴱ-owned)
+open import adequacy.Placed.Order using (headed-snoc; prefix-++; Placed; Placedᴸ; Placedᴹ; Reaches; Within; out-there; skip-here; skip-there)
 open import adequacy.Placed.Heads using (ApartFed; ApartNext; apart-fed; apart-next; apart-sides)
 open import adequacy.Deep using (Deep; Deepˢ)
 
@@ -86,17 +90,123 @@ join-within ρ i p ((q , nothing) ∷ xs) e       w = w
 join-within ρ i p []                   (just c) w = tt
 join-within ρ i p []                   nothing  w = tt
 
-postulate
-  -- What a sane, placed flatMap's step leaves holds its parts placed,
-  -- when its sources are clear of the step.
-  --
-  -- REFUTED: c8c55884 over a placing with each live joiner joined before its source, by a lane admitted past its source's next event
-  flat-within : ∀ {Γ A B} {ν : All (λ _ → Mode) Γ} op (g : A → Pos → U.Node Γ B) o ls qs pl (ρ : NEnv Γ)
-              → Sane ν (U.flatMapᶜ op g o ls qs pl) → Placed (U.flatMapᶜ op g o ls qs pl) ρ
-              → Clear ν (U.headˢ (U.step (U.flatMapᶜ op g o ls qs pl))) ρ → Withinˢ ρ (U.step (U.flatMapᶜ op g o ls qs pl))
+-- What a step past a meaning reaches, the meaning reaches.
+skipped : ∀ {C} {M : Events C} {x k} {σ : Events∞ C} → M ≃ skip k σ → Reaches x (force σ) → Reaches x M
+skipped H r = reaches-agree (λ m → agree-sym (agreeing H m)) (skip-there r)
 
-  -- A defer's program subscribed, its notices fed, is placed.
-  defer-within : ∀ {Γ A} (l : Later Timeline Γ A) p ns (ρ : NEnv Γ) → Placed (U.deferᶜ l p ns) ρ → Withinˢ ρ (U.step (U.deferᶜ l p ns))
+outed : ∀ {C} {M : Events C} {x k a} {σ : Events∞ C} → M ≃ out k a σ → Reaches x (force σ) → Reaches x M
+outed H r = reaches-agree (λ m → agree-sym (agreeing H m)) (out-there r)
+
+landed : ∀ {C} {M : Events C} {k} {σ : Events∞ C} → M ≃ skip k σ → Reaches k M
+landed H = reaches-agree (λ m → agree-sym (agreeing H m)) skip-here
+
+-- A part placed, with what its step leaves placed once its sources are
+-- clear of the step.
+module _ {Γ} (ν : All (λ _ → Mode) Γ) (ρ : NEnv Γ) where
+  Stepped : ∀ {C} → U.Node Γ C → U.Step Γ C → Set
+  Stepped c s = Placed c ρ × (Clear ν (U.headˢ s) ρ → Placedˢ ρ s)
+
+  OuterP : ∀ {C} → U.Outer Γ C → Set
+  OuterP U.doneᵒ       = ⊤
+  OuterP (U.runᵒ o so) = Stepped o so
+
+  EarliestP : ∀ {C} → U.Earliest Γ C → Set
+  EarliestP U.none                 = ⊤
+  EarliestP (U.found k bs l s as) = Placedᴸ bs ρ × Stepped l s × Placedᴸ as ρ
+
+  outer-node : ∀ {C} (o : U.Outer Γ C) → OuterP o → Placedᴹ (U.nodeᵒ o) ρ
+  outer-node U.doneᵒ       _        = tt
+  outer-node (U.runᵒ o so) (po , _) = po
+
+  placedᴸ-++ : ∀ {C} (bs as : List (U.Node Γ C)) → Placedᴸ bs ρ → Placedᴸ as ρ → Placedᴸ (bs ++ as) ρ
+  placedᴸ-++ []       as _          pas = pas
+  placedᴸ-++ (b ∷ bs) as (pb , pbs) pas = pb , placedᴸ-++ bs as pbs pas
+
+  pick-placed : ∀ {C} (l : U.Node Γ C) s ls → Stepped l s → Placedᴸ ls ρ → ∀ h (e : U.Earliest Γ C) → EarliestP e
+              → EarliestP (U.pick l s ls h e)
+  pick-placed l s ls sl pls nothing  U.none                _                  = tt
+  pick-placed l s ls sl pls nothing  (U.found k bs c sc as) (pbs , sc′ , pas) = (proj₁ sl , pbs) , sc′ , pas
+  pick-placed l s ls sl pls (just k) U.none                _                  = tt , sl , pls
+  pick-placed l s ls sl pls (just k) (U.found k′ bs c sc as) (pbs , sc′ , pas) with k <ᵖ k′
+  ... | true  = tt , sl , pls
+  ... | false = (proj₁ sl , pbs) , sc′ , pas
+
+  -- The lanes an arrival leaves, the arrival placed.
+  admit-placed : ∀ {A B} op (g : A → Pos → U.Node Γ B) q a ls qs d → Placed (g a q) ρ → Placedᴸ ls ρ
+               → Placedᴸ (proj₁ (U.admit op g q a ls qs d)) ρ
+  admit-placed (T.mergeᶠ nothing)  g q a ls       qs d pg pls = pg , pls
+  admit-placed (T.mergeᶠ (just n)) g q a ls       qs d pg pls with length ls <ᵇ n
+  ... | true  = pg , pls
+  ... | false = pls
+  admit-placed T.switchᶠ           g q a ls       qs d pg pls = pg , tt
+  admit-placed T.exhaustᶠ          g q a []       qs d pg pls = pg , tt
+  admit-placed T.exhaustᶠ          g q a (l ∷ ls) qs d pg pls = pls
+
+-- A FLATMAP'S STEP, PART BY PART: the part it steps leaves itself
+-- placed, the others are as they were, and each lane it admits is one
+-- its meaning reaches the admission of.
+module _ {Γ A B} (ν : All (λ _ → Mode) Γ) (ρ : NEnv Γ) (op : T.FlatOp) (g : A → Pos → U.Node Γ B) {M : Events B}
+         (G : ∀ a x → Reaches (x ++ [ ix 0 ]) M → Placed (g a (x ++ [ ix 1 ])) ρ) where
+
+  outer-w : ∀ (o : U.Node Γ A) so ls qs p → Stepped ν ρ o so → Placedᴸ ls ρ → M ≃ afterᴱ ρ (U.outerˢ op g o so ls qs p)
+          → Clear ν (U.headˢ (U.outerˢ op g o so ls qs p)) ρ → Withinˢ ρ (U.outerˢ op g o so ls qs p)
+  outer-w o (U.outˢ q a o′) ls qs p (_ , qo) pls H cl =
+    proj₂ (qo (clear-lower ν ρ (<ᵖ-below q []) cl)) , admit-placed ν ρ op g (q ++ [ ix 1 ]) a ls qs (U.restsᶜ ls) (G a q (landed H)) pls , λ a′ x r → G a′ x (skipped H r)
+  outer-w o (U.skipˢ q o′) ls       qs       p (_ , qo) pls H cl = proj₂ (qo cl) , pls , λ a x r → G a x (skipped H r)
+  outer-w o (U.endˢ c)     []       []       p _ _   H cl = tt
+  outer-w o (U.endˢ c)     []       (y ∷ qs) p _ pls H cl = tt , pls , λ a x r → G a x (skipped H r)
+  outer-w o (U.endˢ c)     (l ∷ ls) qs       p _ pls H cl = tt , pls , λ a x r → G a x (skipped H r)
+  outer-w o U.hushˢ        ls       qs       p _ _   H cl = tt
+
+  lane-w : ∀ (o : Maybe (U.Node Γ A)) bs (l : U.Node Γ B) s as qs p → Placedᴹ o ρ → Placedᴸ bs ρ → Stepped ν ρ l s → Placedᴸ as ρ
+         → M ≃ afterᴱ ρ (U.laneˢ op g o bs l s as qs p) → Clear ν (U.headˢ (U.laneˢ op g o bs l s as qs p)) ρ
+         → Withinˢ ρ (U.laneˢ op g o bs l s as qs p)
+  lane-w o bs l (U.outˢ k b c) as qs p po pbs (_ , ql) pas H cl =
+    po , placedᴸ-++ ν ρ bs (c ∷ as) pbs (proj₂ (ql cl) , pas) , λ a x r → G a x (outed H r)
+  lane-w o bs l (U.skipˢ k c)  as qs p po pbs (_ , ql) pas H cl =
+    po , placedᴸ-++ ν ρ bs (c ∷ as) pbs (proj₂ (ql cl) , pas) , λ a x r → G a x (skipped H r)
+  lane-w o bs l (U.endˢ c) as (a ∷ qs) p po pbs _ pas H cl =
+    po , (G a c (landed H) , placedᴸ-++ ν ρ bs as pbs pas) , λ a′ x r → G a′ x (skipped H r)
+  lane-w nothing  []       l (U.endˢ c) []       [] p _  _   _ _   H cl = tt
+  lane-w nothing  []       l (U.endˢ c) (y ∷ as) [] p po pbs _ pas H cl = po , pas , λ a x r → G a x (skipped H r)
+  lane-w nothing  (b ∷ bs) l (U.endˢ c) as       [] p po pbs _ pas H cl =
+    po , placedᴸ-++ ν ρ (b ∷ bs) as pbs pas , λ a x r → G a x (skipped H r)
+  lane-w (just o) bs       l (U.endˢ c) as       [] p po pbs _ pas H cl =
+    po , placedᴸ-++ ν ρ bs as pbs pas , λ a x r → G a x (skipped H r)
+  lane-w o bs l U.hushˢ as qs p _ _ _ _ H cl = tt
+
+  race-w : ∀ (o : U.Node Γ A) so h k bs l s as qs p → Stepped ν ρ o so → Placedᴸ bs ρ → Stepped ν ρ l s → Placedᴸ as ρ
+         → M ≃ afterᴱ ρ (U.raceˢ op g o so h k bs l s as qs p) → Clear ν (U.headˢ (U.raceˢ op g o so h k bs l s as qs p)) ρ
+         → Withinˢ ρ (U.raceˢ op g o so h k bs l s as qs p)
+  race-w o so nothing   k bs l s as qs p so′ pbs sl pas H cl = lane-w (just o) bs l s as qs p (proj₁ so′) pbs sl pas H cl
+  race-w o so (just k′) k bs l s as qs p so′ pbs sl pas H cl with k′ <ᵖ k
+  ... | true  = outer-w o so (bs ++ l ∷ as) qs p so′ (placedᴸ-++ ν ρ bs (l ∷ as) pbs (proj₁ sl , pas)) H cl
+  ... | false = lane-w (just o) bs l s as qs p (proj₁ so′) pbs sl pas H cl
+
+  go-w : ∀ (o : U.Outer Γ A) ls qs p e → OuterP ν ρ o → Placedᴸ ls ρ → EarliestP ν ρ e
+       → M ≃ afterᴱ ρ (U.goˢ op g o ls qs p e) → Clear ν (U.headˢ (U.goˢ op g o ls qs p e)) ρ → Withinˢ ρ (U.goˢ op g o ls qs p e)
+  go-w U.doneᵒ       ls qs p U.none                _  _   _                 H cl = tt
+  go-w (U.runᵒ o so) ls qs p U.none                po pls _                 H cl = outer-w o so ls qs p po pls H cl
+  go-w U.doneᵒ       ls qs p (U.found k bs l s as) _  _   (pbs , sl , pas) H cl = lane-w nothing bs l s as qs p tt pbs sl pas H cl
+  go-w (U.runᵒ o so) ls qs p (U.found k bs l s as) po _   (pbs , sl , pas) H cl =
+    race-w o so (U.headˢ so) k bs l s as qs p po pbs sl pas H cl
+
+  flat-w : ∀ (o : U.Outer Γ A) ls qs p sp e → OuterP ν ρ o → Placedᴸ ls ρ → EarliestP ν ρ e
+         → M ≃ afterᴱ ρ (U.flatˢ op g o ls qs p sp e) → Clear ν (U.headˢ (U.flatˢ op g o ls qs p sp e)) ρ
+         → Withinˢ ρ (U.flatˢ op g o ls qs p sp e)
+  flat-w o ls qs p (U.skipˢ k p′) e po pls pe H cl with U.aheadˢ k o e
+  ... | true  = outer-node ν ρ o po , pls , λ a x r → G a x (skipped H r)
+  ... | false = go-w o ls qs p e po pls pe H cl
+  flat-w o ls qs p (U.outˢ k b p′) e po pls pe H cl = go-w o ls qs p e po pls pe H cl
+  flat-w o ls qs p (U.endˢ k)      e po pls pe H cl = go-w o ls qs p e po pls pe H cl
+  flat-w o ls qs p U.hushˢ         e po pls pe H cl = go-w o ls qs p e po pls pe H cl
+
+-- A defer's program subscribed, its notices fed, is placed.
+defer-within : ∀ {Γ A} (l : Later Timeline Γ A) p ns (ρ : NEnv Γ) → Placed (U.deferᶜ l p ns) ρ → Withinˢ ρ (U.step (U.deferᶜ l p ns))
+defer-within l p ns ρ (_ , hp , so , al) =
+  proj₂ (placed-feeds ns (U.subscribe (Later.force l) q) ρ (sane-subscribe (Later.force l) q running-all)
+          (placed-sub (Later.force l) q (U.replay ns ρ) (headed-snoc p hp) so (alienᴱ-owned p q (inj₁ (prefix-++ p [ ix 1 ])) (U.replay ns ρ) al)))
+  where q = p ++ [ ix 1 ]
 
 -- A rest-like steps to a rest-like.
 union-within : ∀ {Γ B} (ρ : NEnv Γ) (x : U.Node Γ B) sx y sy → Withinˢ ρ sy → Withinˢ ρ (U.unionˢ x sx y sy)
@@ -213,7 +323,9 @@ mutual
     scan-within ρ f z (U.step c) (placeds c ρ sn pl (subst (λ h → Clear ν h ρ) (head-scan f z (U.step c)) cl))
   withins {ν = ν} (U.takeWhileᶜ i p c) ρ sn (_ , pl) cl =
     take-within ρ i p (U.step c) (placeds c ρ sn pl (clear-take {ν = ν} {ρ = ρ} i p (U.step c) cl))
-  withins (U.flatMapᶜ op g o ls qs pl) ρ sn pd cl = flat-within op g o ls qs pl ρ sn pd cl
+  withins {ν = ν} (U.flatMapᶜ op g o ls qs pl) ρ sn@(so , sl , _) pd@(_ , po , pls , pg) cl =
+    flat-w ν ρ op g pg (U.outerOf o) ls qs pl (U.step pl) (U.earliest ls) (outers o ρ so po) pls (earliests ls ρ sl pls)
+      (skips (U.flatMapᶜ op g o ls qs pl) ρ sn pd cl) cl
   withins (U.joinᶜ i p xs e) ρ _ (_ , w) _ = join-within ρ i p xs e w
   withins (U.connectᶜ r b (U.live s))    ρ sn pd cl = connect-within r b s ρ sn pd cl
   withins (U.connectᶜ r b (U.ended c t)) ρ sn pd cl = ended-within r b c t ρ sn pd cl
@@ -276,6 +388,17 @@ mutual
          → Withinˢ ρ (U.shutˢᵗ r c t (U.step b))
   reshut {ν = ν} r b c t ρ sb pb cl =
     shut-within r c t ρ (U.step b) (placeds b (end c ∷ᴬ ρ) sb pb (subst (λ h → Clear ν h ρ) (head-shut r c t (U.step b)) cl))
+
+  -- The outer and each lane, placed with what its step leaves.
+  outers : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (o : Maybe (U.Node Γ A)) (ρ : NEnv Γ) → Saneᴹ ν o → Placedᴹ o ρ → OuterP ν ρ (U.outerOf o)
+  outers nothing  ρ _  _  = tt
+  outers (just o) ρ so po = po , placeds o ρ so po
+
+  earliests : ∀ {Γ B} {ν : All (λ _ → Mode) Γ} (ls : List (U.Node Γ B)) (ρ : NEnv Γ) → Saneᴸ ν ls → Placedᴸ ls ρ
+            → EarliestP ν ρ (U.earliest ls)
+  earliests []       ρ _          _          = tt
+  earliests {ν = ν} (l ∷ ls) ρ (sl , sls) (pl , pls) =
+    pick-placed ν ρ l (U.step l) ls (pl , placeds l ρ sl pl) pls (U.headˢ (U.step l)) (U.earliest ls) (earliests ls ρ sls pls)
 
   placeds : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (c : U.Node Γ A) (ρ : NEnv Γ) → Sane ν c → Placed c ρ
           → Clear ν (U.headˢ (U.step c)) ρ → Placedˢ ρ (U.step c)
