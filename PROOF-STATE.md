@@ -10,11 +10,11 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ROOT STEP
 
-Whether a defer's put-back sources stay sorted and alien past a feed, a put's
-idle cut against the fed source's own; and a connect's body under none of its
-source's steps. Settled when `defer-fed` is a body or refuted.
+Whether a connect's body, just subscribed, keys nothing under where its
+source's steps show (`q ++ [ix 0]`), joins of the source included. Settled
+when `under-shown-connect` is a body or refuted.
 
-Members: `defer-fed`, `under-shown-connect`.
+Members: `under-shown-connect`.
 
 #### UP-ENDED
 

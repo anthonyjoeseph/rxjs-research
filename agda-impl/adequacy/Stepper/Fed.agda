@@ -17,16 +17,17 @@ open import Data.List.Relation.Unary.All using (All; lookup; updateAt) renaming 
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; cong)
 
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; end; out; skip; idle; ix)
-open import denotation.MonotonicList using (agree-refl; agree-sym)
+open import denotation.MonotonicList using (Agree; agree-refl; agree-sym; agree-trans; stop; out⁼; skip⁼; end⁼; hush⁼; stopᵀ)
 open import denotation.NonExpansive using (Agreeˢ)
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import adequacy.Sane using (Sane; Saneᴹ; Saneᴸ; Mode; runs; allLive; feed-sane)
-open import adequacy.Placed.Order using (Alienᴱ; Every; Everyᴱ; Placed; Placedᴸ; Placedᴹ; Sorted; Within; every; every-lookup)
-open import adequacy.Placed.Keys using (ordered-≈; every-≈)
+open import adequacy.Placed.Order using (Atop; Ordered; Past; Steady; everyT-idle; ordered; steady; Alienᴱ; Every; Everyᴱ; Placed; Placedᴸ; Placedᴹ; Sorted; Within; every; every-lookup)
+open import adequacy.Placed.Keys using (ordered-≈; every-≈; steady-≈)
+open import adequacy.Placed.Order using () renaming (Clear to Clearᵉ)
 open import adequacy.Placed.Rising using (apart-join)
 open import adequacy.Placed.Heads using (apart-closed; feed-keyed; owned-closed; owned-fit; shut-keyed)
 open import adequacy.Env using (Same; everyᴱ-agree; nagree-refl; lookup-ne; meaning-same; reaches-agree; replay-ne; same-cons; sorted-agree)
@@ -64,12 +65,106 @@ lookup-live : ∀ {Γ A} (i : A ∈ Γ) → lookup (allLive Γ) i ≡ runs
 lookup-live (here refl) = refl
 lookup-live (there i)   = lookup-live i
 
-postulate
-  -- A defer's sources as it subscribed, the step put back: in order,
-  -- headed and alien to it as before.
-  defer-fed : ∀ {Γ A} {q} {a : Maybe A} {i : A ∈ Γ} {ρ ρ′ : NEnv Γ} p (ns : List (U.Notice Γ)) → Fed q a i ρ ρ′
-            → Sorted (U.replay ns ρ) → Alienᴱ p (U.replay ns ρ)
-            → Sorted (U.replay (ns ++ [ U.notice i q a ]) ρ′) × Alienᴱ p (U.replay (ns ++ [ U.notice i q a ]) ρ′)
+-- Two sources alike at their first event, the second in order, steady
+-- and keeping whatever the first keeps.  What a put leaves running is
+-- idle, so a put source keeps all its fed source keeps.
+record Kin {A} (e e′ : Events A) : Set₁ where
+  field
+    kh : Agree 1 e e′
+    ko : Ordered e → Ordered e′
+    ks : Steady e → Steady e′
+    kv : ∀ {P : Pos → Set} → Every P e → Every P e′
+
+data KinE : ∀ {Γ} → NEnv Γ → NEnv Γ → Set₁ where
+  []ᴷ  : KinE []ᴬ []ᴬ
+  _∷ᴷ_ : ∀ {Γ A} {e e′ : Events A} {ρ ρ′ : NEnv Γ} → Kin e e′ → KinE ρ ρ′ → KinE (e ∷ᴬ ρ) (e′ ∷ᴬ ρ′)
+
+atop-head : ∀ {A k} {e e′ : Events A} → Agree 1 e e′ → Atop k e → Atop k e′
+atop-head (out⁼ _ _)  t = t
+atop-head (skip⁼ _ _) t = t
+atop-head end⁼        t = t
+atop-head hush⁼       t = t
+
+past-head : ∀ {A k} {e e′ : Events A} → Agree 1 e e′ → Past k e → Past k e′
+past-head (out⁼ _ _)  t = t
+past-head (skip⁼ _ _) t = t
+past-head end⁼        t = t
+past-head hush⁼       t = t
+
+clear-head : ∀ {A k} {e e′ : Events A} → Agree 1 e e′ → Clearᵉ k e → Clearᵉ k e′
+clear-head (out⁼ _ _)  t = t
+clear-head (skip⁼ _ _) t = t
+clear-head end⁼        t = t
+clear-head hush⁼       t = t
+
+kin-same : ∀ {A} {e e′ : Events A} → (∀ m → Agree m e e′) → Kin e e′
+kin-same S = record { kh = S 1 ; ko = ordered-≈ _ _ S ; ks = steady-≈ _ _ S ; kv = every-≈ _ _ S }
+
+kin-put : ∀ {A} q (a : Maybe A) {e e′ : Events A} → Kin e e′ → Kin (U.put q a e) (U.put q a e′)
+kin-put q (just x) K = record
+  { kh = out⁼ stopᵀ stop
+  ; ko = λ o → record { ordered = atop-head (Kin.kh K) (proj₁ (ordered o)) , Kin.ko K (proj₂ (ordered o)) }
+  ; ks = λ t → record { steady = past-head (Kin.kh K) (proj₁ (steady t)) , Kin.ks K (proj₂ (steady t)) }
+  ; kv = λ v → record { every = proj₁ (every v) , Kin.kv K (proj₁ (proj₂ (every v))) , everyT-idle }
+  }
+kin-put q nothing  K = record
+  { kh = skip⁼ stopᵀ stop
+  ; ko = λ o → record { ordered = atop-head (Kin.kh K) (proj₁ (ordered o)) , Kin.ko K (proj₂ (ordered o)) }
+  ; ks = λ t → record { steady = clear-head (Kin.kh K) (proj₁ (steady t)) , Kin.ks K (proj₂ (steady t)) }
+  ; kv = λ v → record { every = proj₁ (every v) , Kin.kv K (proj₁ (proj₂ (every v))) , everyT-idle }
+  }
+
+-- A source showing a step is kin to the step put back on what follows.
+kin-shown : ∀ {A} q (a : Maybe A) {e : Events A} (σ : Events∞ A) → e ≃ shows q a σ → Kin e (U.put q a (force σ))
+kin-shown q (just x) σ al = record
+  { kh = agree-trans (agreeing al 1) (out⁼ stopᵀ stop)
+  ; ko = λ o → record { ordered = ordered (ordered-≈ _ _ (agreeing al) o) }
+  ; ks = λ t → record { steady = steady (steady-≈ _ _ (agreeing al) t) }
+  ; kv = λ v → let v′ = every-≈ _ _ (agreeing al) v in record { every = proj₁ (every v′) , proj₁ (proj₂ (every v′)) , everyT-idle }
+  }
+kin-shown q nothing  σ al = record
+  { kh = agree-trans (agreeing al 1) (skip⁼ stopᵀ stop)
+  ; ko = λ o → record { ordered = ordered (ordered-≈ _ _ (agreeing al) o) }
+  ; ks = λ t → record { steady = steady (steady-≈ _ _ (agreeing al) t) }
+  ; kv = λ v → let v′ = every-≈ _ _ (agreeing al) v in record { every = proj₁ (every v′) , proj₁ (proj₂ (every v′)) , everyT-idle }
+  }
+
+same-kin : ∀ {Γ} {ρ ρ′ : NEnv Γ} → Same ρ ρ′ → KinE ρ ρ′
+same-kin {ρ = []ᴬ}    {[]ᴬ}      S = []ᴷ
+same-kin {ρ = _ ∷ᴬ _} {_ ∷ᴬ _} S = kin-same (λ m → proj₁ (S m)) ∷ᴷ same-kin (λ m → proj₂ (S m))
+
+fed-kin : ∀ {Γ A} {q} {a : Maybe A} {i : A ∈ Γ} {ρ ρ′ : NEnv Γ} → Fed q a i ρ ρ′ → KinE ρ (updateAt i (U.put q a) ρ′)
+fed-kin {q = q} {a} (fed-here σ al S) = kin-shown q a σ al ∷ᴷ same-kin S
+fed-kin (fed-there al fd) = kin-same (agreeing al) ∷ᴷ fed-kin fd
+
+replay-kin : ∀ {Γ} (ns : List (U.Notice Γ)) {ρ ρ′ : NEnv Γ} → KinE ρ ρ′ → KinE (U.replay ns ρ) (U.replay ns ρ′)
+replay-kin []                    K = K
+replay-kin (U.notice i q a ∷ ns) K = put-at i (replay-kin ns K)
+  where
+    put-at : ∀ {Γ} (j : _ ∈ Γ) {ρ ρ′ : NEnv Γ} → KinE ρ ρ′ → KinE (updateAt j (U.put q a) ρ) (updateAt j (U.put q a) ρ′)
+    put-at (here refl) (k ∷ᴷ ks) = kin-put q a k ∷ᴷ ks
+    put-at (there j)   (k ∷ᴷ ks) = k ∷ᴷ put-at j ks
+
+sorted-kin : ∀ {Γ} {ρ ρ′ : NEnv Γ} → KinE ρ ρ′ → Sorted ρ → Sorted ρ′
+sorted-kin []ᴷ       _                 = tt
+sorted-kin (k ∷ᴷ ks) ((o , t) , h , w) = (Kin.ko k o , Kin.ks k t) , Kin.kv k h , sorted-kin ks w
+
+everyᴱ-kin : ∀ {Γ} {P : Pos → Set} {ρ ρ′ : NEnv Γ} → KinE ρ ρ′ → Everyᴱ P ρ → Everyᴱ P ρ′
+everyᴱ-kin []ᴷ       _       = tt
+everyᴱ-kin (k ∷ᴷ ks) (v , w) = Kin.kv k v , everyᴱ-kin ks w
+
+replay-snoc : ∀ {Γ} (ns : List (U.Notice Γ)) n (ρ : NEnv Γ) → U.replay (ns ++ [ n ]) ρ ≡ U.replay ns (U.replay [ n ] ρ)
+replay-snoc []                    n ρ = refl
+replay-snoc (U.notice i q a ∷ ns) n ρ = cong (updateAt i (U.put q a)) (replay-snoc ns n ρ)
+
+-- A defer's sources as it subscribed, the step put back: in order,
+-- headed and alien to it as before.
+defer-fed : ∀ {Γ A} {q} {a : Maybe A} {i : A ∈ Γ} {ρ ρ′ : NEnv Γ} p (ns : List (U.Notice Γ)) → Fed q a i ρ ρ′
+          → Sorted (U.replay ns ρ) → Alienᴱ p (U.replay ns ρ)
+          → Sorted (U.replay (ns ++ [ U.notice i q a ]) ρ′) × Alienᴱ p (U.replay (ns ++ [ U.notice i q a ]) ρ′)
+defer-fed {q = q} {a} {i} {ρ′ = ρ′} p ns fd so al =
+  subst (λ τ → Sorted τ × Alienᴱ p τ) (sym (replay-snoc ns (U.notice i q a) ρ′)) (sorted-kin K so , everyᴱ-kin K al)
+  where K = replay-kin ns (fed-kin fd)
 
 -- A FED NODE STAYS PLACED.
 mutual
