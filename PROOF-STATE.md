@@ -10,15 +10,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ROOT STEP
 
-Whether a flatMap's meaning starts with its step's event; whether a
-program just subscribed steps first under where it subscribed, a
-connect's source apart from its body's region; the step's parts placed,
-`Sides` kept.
-Settled when `first-flat`, `head-sub` and `head-sub-apart` are bodies or
-refuted.
+Whether a step, its sources clear of it, keeps its parts placed: a fed or
+told body placed; a flatMap's admitted lanes; a defer's program; and a
+subscribed connect's body `Sided` from its source for good, which no node key
+yet carries. Settled when `sub-onward` and `fed-placed` are bodies or refuted.
 
-Members: `first-flat`, `head-sub`, `head-sub-apart`,
-`within-step`, `under-shown-connect`.
+Members: `sub-onward`, `sub-fed`, `fed-placed`, `shut-placed`,
+`reshut-placed`, `flat-within`, `defer-within`, `under-shown-connect`.
 
 #### UP-ENDED
 
