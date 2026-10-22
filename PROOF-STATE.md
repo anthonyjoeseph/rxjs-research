@@ -8,6 +8,18 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE CARRIER'S FIELDS
+
+Untried: whether the old held/against predicates restate over `Sub` and
+hold at subscribe; no onward leaf can be proven against an opaque
+field. Settled when each is a ported body and its begin leaf
+goes through.
+
+Members: `Owned`, `Meaning`, `Queue`, `Books`, `Each`, `Lingers`, `Untold`,
+`Ended`, `DoneBy`, `placed-subscribe`, `owned-begin`, `meaning-begin`,
+`queue-begin`, `books-begin`, `behind-begin`, `lingers-begin`, `told-begin`,
+`ended-begin`, `flags-begin`.
+
 #### THE STRONG STEP
 
 Untried: whether each control state's step keeps `Carried` on the state
@@ -16,17 +28,6 @@ the onward leaves are bodies, `run-onward` first.
 
 Members: `run-onward`, `sub-onward`, `burst-onward`, `turn-pops`,
 `note-onward`, `note-least`, `turn-dry`.
-
-#### THE CARRIER'S FIELDS
-
-Untried: whether the old held/against predicates restate over `Sub` and
-hold at subscribe. Settled when each is a ported body and its begin leaf
-goes through.
-
-Members: `Owned`, `Meaning`, `Queue`, `Books`, `Each`, `Lingers`, `Untold`,
-`Ended`, `DoneBy`, `placed-subscribe`, `owned-begin`, `meaning-begin`,
-`queue-begin`, `books-begin`, `behind-begin`, `lingers-begin`, `told-begin`,
-`ended-begin`, `flags-begin`.
 
 #### THE WALK
 
