@@ -34,7 +34,7 @@ open import denotation.MonotonicList.Events using (Label; sub; last; Events; Eve
 open import denotation.MonotonicList using (MonotonicList; observe)
 open import denotation.Unfold using (Srcs; ⟦_⟧ˢ; subscribe; []; _∷_)
 open import quickcheck.Code using (Prog; toObs; timeline)
-open import quickcheck.Oracle using (depth; until)
+open import quickcheck.Oracle using (depth; horizon)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Ty using (natᵗ)
 
@@ -69,6 +69,15 @@ private
 module Watched where
   open Run (Pureᴾ Tag)
   open Machine Tag using (reading; trace; launch; Read)
+  module M = Machine Tag
+
+  -- How many of a run's first n steps come by tick `horizon`.
+  until : ℕ → M.Trace → ℕ
+  until zero    _               = zero
+  until (suc n) (M.tau t k)     = if horizon <ᵇ t then zero else suc (until n (M.Trace∞.force k))
+  until (suc n) (M.out t _ _ k) = if horizon <ᵇ t then zero else suc (until n (M.Trace∞.force k))
+  until (suc n) (M.end _)       = 1
+  until (suc n) M.idle          = 1
 
   -- The node's observer, recording each delivery before passing it on.
   -- `sw`: a switch's lane, dead once its outer source moves on; `par`:

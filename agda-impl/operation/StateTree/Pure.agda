@@ -31,7 +31,9 @@ data Tape (A : Set) : Set₁ where
   tape : ∀ t → Frame A t → Tape A
   over : Tape A
 
-open import operation.StateTree Timeline Tape using (Conf; Stepped; moved; starting; load; Poke; gone; leaf; poke; spot; calm; depth; nx; cp)
+import operation.StateTree
+module Machine = operation.StateTree Timeline Tape
+open Machine using (Conf; Stepped; moved; starting; load; Poke; gone; leaf; poke; spot; calm; depth; nx; cp)
   renaming (step to stepᴹ)
 
 module Driver (R : Set) where

@@ -41,7 +41,7 @@ open import Agda.Builtin.IO using (IO)
 open import Data.Bool using (Bool; true; false; not; _∧_; _∨_; if_then_else_)
 open import Data.List using (List; _∷_; []; _++_)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≤ᵇ_)
+open import Data.Nat using (ℕ; suc; _+_; _∸_; _≤ᵇ_)
 open import Data.Product using (_×_; _,_; Σ)
 open import Data.Unit using (⊤; tt)
 open import IO.Primitive.Core using (pure; _>>=_)
@@ -175,7 +175,9 @@ record Leaf (A : Set) : Set₁ where
     inbox : IORef (List (Maybe A))
     slot  : Slot
 
-open import operation.StateTree IOCold Leaf using (Conf; Stepped; moved; starting; Shown; Torn; Ev; nx; cp; load; Poke; gone; leaf; poke; spot; calm; depth)
+import operation.StateTree
+module Machine = operation.StateTree IOCold Leaf
+open Machine using (Conf; Stepped; moved; starting; Shown; Torn; Ev; nx; cp; load; Poke; gone; leaf; poke; spot; calm; depth)
   renaming (step to stepᴹ)
 
 ------------------------------------------------------------------------

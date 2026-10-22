@@ -1,20 +1,19 @@
 {-# OPTIONS --guardedness #-}
 
 -- THE ORACLE'S AGDA HALF: the generated programs, and what the three
--- engines make of them, as JSON lines for `typescript/` to replay in
+-- semantics make of them, as JSON lines for `typescript/` to replay in
 -- rxjs.  Same seeds, unfolding budget and step budget as `Quickcheck`.
 --
 --   Oracle-CLI prog FROM COUNT   one line per seed: the program, the
---                                denotation's trace, the machine's and
---                                the state-tree machine's
+--                                denotation's trace and the pure
+--                                semantics'
 --   Oracle-CLI io SEED           the IO engine's trace of one seed
 --   Oracle-CLI named FROM COUNT  as `prog`, over the seed's named program
 --                                (`quickcheck.Quickcheck.named`)
 --   Oracle-CLI named-code SEED   that program
 --   Oracle-CLI named-io SEED     the IO engine's trace of it
 --   Oracle-CLI denote SEED       the denotation's trace of one seed
---   Oracle-CLI pure SEED         the machine's trace of one seed
---   Oracle-CLI state SEED        the state-tree machine's trace of one seed
+--   Oracle-CLI pure SEED         the pure semantics' trace of one seed
 --   Oracle-CLI chain FROM COUNT  the seeds whose denotation's approximants
 --                                are no chain (`quickcheck.Chain`)
 --   Oracle-CLI placing SEED CHECK whether that seed's machine trace strays
@@ -55,7 +54,7 @@ open import System.Environment.Primitive using (getArgs)
 
 open import quickcheck.Ty using (Ty; natᵗ; nameᵗ; _×ᵗ_)
 open import quickcheck.Code using (Prog; showCode)
-open import quickcheck.Oracle using (showTrace; denoteTrace; pureTrace; stateTrace; oracle; ioOp)
+open import quickcheck.Oracle using (showTrace; denoteTrace; pureTrace; oracle; ioOp)
 open import quickcheck.Quickcheck using (program; named)
 open import quickcheck.Chain using (chainFails)
 open import quickcheck.Ghost using (ghosts; exact; settled; ghostFails; exactFails; settledFails; exactWhy; watchedCount)
@@ -78,8 +77,7 @@ private
   prog : ℕ → IO ⊤
   prog s = putStrLn ("{\"seed\":" ++ showℕ s ++ ",\"prog\":" ++ showCode natᵗ (program s)
                      ++ ",\"denote\":" ++ showTrace natᵗ (denoteTrace 3 500 (program s))
-                     ++ ",\"pure\":" ++ showTrace natᵗ (pureTrace 3 500 (program s))
-                     ++ ",\"state\":" ++ showTrace natᵗ (stateTrace 3 500 (program s)) ++ "}")
+                     ++ ",\"pure\":" ++ showTrace natᵗ (pureTrace 3 500 (program s)) ++ "}")
 
   io : ℕ → IO ⊤
   io s = oracle ioOp 3 500 (program s)
@@ -90,8 +88,7 @@ private
   namedProg : ℕ → IO ⊤
   namedProg s = putStrLn ("{\"seed\":" ++ showℕ s ++ ",\"prog\":" ++ showCode namedᵗ (named s)
                           ++ ",\"denote\":" ++ showTrace namedᵗ (denoteTrace 3 500 (named s))
-                          ++ ",\"pure\":" ++ showTrace namedᵗ (pureTrace 3 500 (named s))
-                          ++ ",\"state\":" ++ showTrace namedᵗ (stateTrace 3 500 (named s)) ++ "}")
+                          ++ ",\"pure\":" ++ showTrace namedᵗ (pureTrace 3 500 (named s)) ++ "}")
 
   hand : List (String × Prog natᵗ) → IO ⊤
   hand []             = putStrLn "hand: done"
@@ -110,7 +107,7 @@ private
   nat = readMaybe 10
 
   usage : IO ⊤
-  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI code SEED | Oracle-CLI named FROM COUNT | Oracle-CLI named-code SEED | Oracle-CLI named-io SEED | Oracle-CLI denote SEED | Oracle-CLI pure SEED | Oracle-CLI state SEED | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI ghosts FROM COUNT | Oracle-CLI placing SEED CHECK | Oracle-CLI stepping FROM COUNT | Oracle-CLI exact FROM COUNT | Oracle-CLI settled FROM COUNT | Oracle-CLI why SEED | Oracle-CLI hand | Oracle-CLI why-hand N | Oracle-CLI spin | Oracle-CLI why-spin N K"
+  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI code SEED | Oracle-CLI named FROM COUNT | Oracle-CLI named-code SEED | Oracle-CLI named-io SEED | Oracle-CLI denote SEED | Oracle-CLI pure SEED | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI ghosts FROM COUNT | Oracle-CLI placing SEED CHECK | Oracle-CLI stepping FROM COUNT | Oracle-CLI exact FROM COUNT | Oracle-CLI settled FROM COUNT | Oracle-CLI why SEED | Oracle-CLI hand | Oracle-CLI why-hand N | Oracle-CLI spin | Oracle-CLI why-spin N K"
 
   dispatch : List String → IO ⊤
   dispatch ("prog" ∷ f ∷ c ∷ []) with nat f | nat c
@@ -133,9 +130,6 @@ private
   ... | nothing = usage
   dispatch ("pure" ∷ s ∷ []) with nat s
   ... | just s′ = putStrLn (showTrace natᵗ (pureTrace 3 500 (program s′)))
-  ... | nothing = usage
-  dispatch ("state" ∷ s ∷ []) with nat s
-  ... | just s′ = putStrLn (showTrace natᵗ (stateTrace 3 500 (program s′)))
   ... | nothing = usage
   dispatch ("io" ∷ s ∷ []) with nat s
   ... | just s′ = io s′

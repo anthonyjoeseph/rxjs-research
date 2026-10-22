@@ -19,7 +19,7 @@ open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import quickcheck.Ty using (boolᵗ; natᵗ; nameᵗ; _×ᵗ_; ⟦_⟧ᵀ; eqᵀ)
 open import quickcheck.Tm using (Tm; var; nat; plus; less; pair)
 open import quickcheck.Code using (Script; script; Code; cold; fresh; empty; of; map; scan; takeWhile; flatMap; connect; connected; μ; var; defer; Prog)
-open import quickcheck.Oracle using (Event; _▸_; tick; val; End; completed; silent; cut; Trace; denoteTrace; pureTrace; stateTrace)
+open import quickcheck.Oracle using (Event; _▸_; tick; val; End; completed; silent; cut; Trace; denoteTrace; pureTrace)
 
 ------------------------------------------------------------------------
 -- The property
@@ -50,7 +50,7 @@ agrees t (xs ▸ x)   (ys ▸ y)   = prefix t xs ys ∧ prefix t ys xs ∧ eqEnd
 
 -- Each `μ` unfolds at most 3 times; each trace is read for 500 steps.
 prop : ∀ t → Prog t → Bool
-prop t p = agrees t (denoteTrace 3 500 p) (pureTrace 3 500 p) ∧ agrees t (denoteTrace 3 500 p) (stateTrace 3 500 p)
+prop t p = agrees t (denoteTrace 3 500 p) (pureTrace 3 500 p)
 
 ------------------------------------------------------------------------
 -- Generating: programs over ℕ, every context a list of `natᵗ`s
