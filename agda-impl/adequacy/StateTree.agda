@@ -12,6 +12,7 @@
 module adequacy.StateTree where
 
 open import Data.List using ([])
+open import Data.List.Relation.Unary.All using ([])
 open import Data.Product using (_,_)
 
 open import adequacy.Adequacy using (run; adequacy)
