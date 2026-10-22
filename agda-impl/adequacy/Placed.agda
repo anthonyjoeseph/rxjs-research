@@ -38,6 +38,7 @@ open import adequacy.Placed.Rising using (Beyond; module Deferred; module Reach;
 open import adequacy.Placed.Trail using (Sp; Spread; Trail; Trailing; disjoint-swap; flatT-idle; past-beyond; shown; sortedT-idle; spread; spread-defer; spread-map; spread-scan; tick-beneath; trail; trail-idle; trail-map; trail-of; trail-rejoin; trail-scan; trailing-start)
 open import adequacy.Placed.Calm using (calm-steady; calm-trail)
 open import adequacy.Placed.FlatOrder using (module FlatOrder)
+open import adequacy.Placed.Under using (under-shown-connect)
 open import adequacy.Placed.FlatAfter using (module FlatAfter; trail-defer; trail-take)
 open import adequacy.Placed.Burst using (module Bursting; Fresh; FreshRun; Fresh∞; fresh-map; fresh-of; fresh-past; fresh-rejoin; fresh-scan; fresh-start; fresh-take; fresh-under; fresh-up; fresh-widen; fresh-≈; freshᴿ; heavy; longer; mark-sub; owned-drop; snoc-ne; sub-owned; sub-tagged)
 open import adequacy.Placed.Walk using (module Walk)
@@ -638,17 +639,6 @@ steady-subᶠ (defer l) (defer-f fl) p ρ hp so cl =
                               (alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl))
 
 -- Where a connect starts: its body and its source, each just subscribed.
--- A CONNECT'S BODY LIES UNDER NONE OF ITS SOURCE'S STEPS, over sources
--- sorted and alien to it: nothing the body shows or leaves running lies
--- under where a source step shows, its run past an end included.
---
--- RECOVERY: git show 43da74d9:agda-impl/adequacy/Placed.agda restores `alien-steps`, a subscription keying nothing just past its own events, from which this was read over a merge without tails
-postulate
-  under-shown-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b
-                      → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
-                      → Every∞ (λ k → Every∞ (λ q → ¬ Prefix (q ++ [ ix 0 ]) k) (U.stateᴺ (U.subscribe s (p ++ [ ix 1 ])) ρ))
-                               (U.stateᴺ (U.subscribe b (p ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ))
-
 connect-side : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b → ∀ p (ρ : NEnv Γ) (hp : Headed p) → Sorted ρ
              → Alienᴱ p ρ → Walk.Side p hp (U.stateᴺ (U.subscribe b (p ++ [ ix 0 ])) (U.meaning (U.subscribe s (p ++ [ ix 1 ])) ρ ∷ᴬ ρ))
                                         (U.stateᴺ (U.subscribe s (p ++ [ ix 1 ])) ρ)

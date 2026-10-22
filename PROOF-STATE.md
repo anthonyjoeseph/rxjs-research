@@ -10,11 +10,11 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ROOT STEP
 
-Whether a connect's body, just subscribed, keys nothing under where its
-source's steps show (`q ++ [ix 0]`), joins of the source included. Settled
-when `under-shown-connect` is a body or refuted.
+Whether a subscription, over sorted alien sources, shows nothing keyed under
+the position just past any of its steps, its tails' steps included. Settled
+when `shown-fresh` is a body or refuted.
 
-Members: `under-shown-connect`.
+Members: `shown-fresh`.
 
 #### UP-ENDED
 
