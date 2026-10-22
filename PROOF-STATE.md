@@ -2,20 +2,24 @@
 
 Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
+## Tier 0 — the port
+
+**Port:** `adequacy.Adequacy` carried to the state tree in `port/`, old names only (`make port-check`).
+
+### Ledger
+
+#### THE PORTED LINK
+
+Untried: whether the heap machine's bodies for these carry to the state tree's
+read. Settled when each is a ported body, or its old body is shown not to port.
+
+Members: `sorted`, `content`, `reached`.
+
 ## Tier 1 — the adequacy theorem
 
 **Adequacy:** the denotation matches the operational semantics.
 
 ### Ledger
-
-#### THE STATE-TREE LINK
-
-Untried: the state tree's run, read with marks, is sorted and alike the
-meaning's events, and reaches all of them. The heap machine's proofs are the
-guide, its heap bookkeeping not. Settled when the three are bodies over a
-ghost tree the configuration mirrors.
-
-Members: `sortedˢ`, `contentˢ`, `reachedˢ`.
 
 #### THE ROOT STEP
 

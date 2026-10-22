@@ -182,24 +182,28 @@ module Driver (R : Set) where
     shown (complete p)    = end p
     shown drained         = idle
 
-  -- What a reader of the first n steps has: each value at its clock, and
-  -- how the run stood — cut at the last clock seen, complete, or dry.  A
-  -- step past the horizon cuts it there: a looping program works forever,
-  -- so it is read up to a time.
+  -- What a reader of the first n steps has: where each value was shown,
+  -- each value at its clock, and how the run stood — cut at the last clock
+  -- seen, complete, or dry.  A completion is placed too.  A step past the
+  -- horizon cuts it there: a looping program works forever, so it is read
+  -- up to a time.
   record Read : Set where
     constructor read
     field
+      marks  : List Pos
       log    : List (Time × R)
       ending : End
   open Read public
 
+  noted : Pos → Time × R → Read → Read
+  noted p x r = read (p ∷ marks r) (x ∷ log r) (ending r)
+
   reading : Time → ℕ → Time → Trace → Read
-  reading h zero    c _             = read [] (cutOff c)
-  reading h (suc n) c (tau t k)     = if h <ᵇ t then read [] (cutOff c) else reading h n t (force k)
-  reading h (suc n) c (out t p a k) = if h <ᵇ t then read [] (cutOff c) else
-    (let r = reading h n t (force k) in read ((t , a) ∷ log r) (ending r))
-  reading h (suc n) c (end p)       = read [] finished
-  reading h (suc n) c idle          = read [] dryᴱ
+  reading h zero    c _             = read [] [] (cutOff c)
+  reading h (suc n) c (tau t k)     = if h <ᵇ t then read [] [] (cutOff c) else reading h n t (force k)
+  reading h (suc n) c (out t p a k) = if h <ᵇ t then read [] [] (cutOff c) else noted p (t , a) (reading h n t (force k))
+  reading h (suc n) c (end p)       = read [ p ] [] finished
+  reading h (suc n) c idle          = read [] [] dryᴱ
 
   -- The first n steps of a program's run, up to tick h, as a timeline.
   prefix : ℕ → Time → Obs Timeline [] R → ML R

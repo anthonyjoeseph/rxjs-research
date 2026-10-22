@@ -21,7 +21,7 @@ open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; cong₂; subst₂)
 
-open import adequacy.StateTree using (runˢ; adequacyˢ)
+open import port.Adequacy using (run; adequacy)
 open import denotation.MonotonicList using (ticks; inFrame; within; sameTick)
 open import denotation.MonotonicList.Events using (_≟ᵖ_; Events; Events∞; out; skip; end; hush; tick; Pos; Timeline; root)
 open import denotation.Order using (Item; val; fin; silent; Shows; ShowsIn; nil; done⁺; quiet⁺; at⁺; emit⁺; stall⁺; close⁺)
@@ -128,46 +128,46 @@ groupedᴾ vs b = closed b (batchSimultaneousᴰ (stamped vs))
 
 Left-To-Rightᴾ : Set₁
 Left-To-Rightᴾ = ∀ {A} (o : SObs [] A) →
-  (∀ {is} → Shows (runˢ (batchedObs o)) is →
-     Σ (List (Item A)) λ js → Shows (runˢ o) js × Prefix _≡_ (joinedᴾ (valsᴵ is)) (valsᴵ js)) ×
-  (FiniteInstants (events o) → ∀ {js} → Shows (runˢ o) js →
-     Σ (List (Item (InstEmit Pos (List A)))) λ is → Shows (runˢ (batchedObs o)) is × Prefix _≡_ (valsᴵ js) (joinedᴾ (valsᴵ is)))
+  (∀ {is} → Shows (run (batchedObs o)) is →
+     Σ (List (Item A)) λ js → Shows (run o) js × Prefix _≡_ (joinedᴾ (valsᴵ is)) (valsᴵ js)) ×
+  (FiniteInstants (events o) → ∀ {js} → Shows (run o) js →
+     Σ (List (Item (InstEmit Pos (List A)))) λ is → Shows (run (batchedObs o)) is × Prefix _≡_ (valsᴵ js) (joinedᴾ (valsᴵ is)))
 
 Batchableᴾ : Set₁
 Batchableᴾ = ∀ {A} (o : SObs [] A) →
-  (∀ {is} → Shows (runˢ (batchedObs o)) is →
-     Σ (List (Item (InstEmit Pos A))) λ js → Shows (runˢ (elaborate o)) js ×
+  (∀ {is} → Shows (run (batchedObs o)) is →
+     Σ (List (Item (InstEmit Pos A))) λ js → Shows (run (elaborate o)) js ×
        Prefix _≡_ (stamped (valsᴵ is)) (groupedᴾ (valsᴵ js) (endedᴵ js))) ×
-  (∀ {js} → Shows (runˢ (elaborate o)) js →
-     Σ (List (Item (InstEmit Pos (List A)))) λ is → Shows (runˢ (batchedObs o)) is ×
+  (∀ {js} → Shows (run (elaborate o)) js →
+     Σ (List (Item (InstEmit Pos (List A)))) λ is → Shows (run (batchedObs o)) is ×
        Prefix _≡_ (groupedᴾ (valsᴵ js) (endedᴵ js)) (stamped (valsᴵ is)))
 
 left-to-rightᴾ : Left-To-Rightᴾ
 left-to-rightᴾ o = ahead , behind
   where
-  ahead : ∀ {is} → Shows (runˢ (batchedObs o)) is → Σ _ λ js → Shows (runˢ o) js × Prefix _≡_ (joinedᴾ (valsᴵ is)) (valsᴵ js)
-  ahead s with shown-read (batched o) (proj₁ (adequacyˢ (batchedObs o)) s)
+  ahead : ∀ {is} → Shows (run (batchedObs o)) is → Σ _ λ js → Shows (run o) js × Prefix _≡_ (joinedᴾ (valsᴵ is)) (valsᴵ js)
+  ahead s with shown-read (batched o) (proj₁ (adequacy (batchedObs o)) s)
   ... | n , vs , _ with proj₁ (left-to-right o) n
   ...   | m , pre with read-shown (events o) m
-  ...     | js , sj , vs′ , _ = js , proj₂ (adequacyˢ o) sj , subst₂ (Prefix _≡_) (cong joinedᴾ (sym vs)) (sym vs′) pre
+  ...     | js , sj , vs′ , _ = js , proj₂ (adequacy o) sj , subst₂ (Prefix _≡_) (cong joinedᴾ (sym vs)) (sym vs′) pre
 
-  behind : FiniteInstants (events o) → ∀ {js} → Shows (runˢ o) js → Σ _ λ is → Shows (runˢ (batchedObs o)) is × Prefix _≡_ (valsᴵ js) (joinedᴾ (valsᴵ is))
-  behind fi s with shown-read (events o) (proj₁ (adequacyˢ o) s)
+  behind : FiniteInstants (events o) → ∀ {js} → Shows (run o) js → Σ _ λ is → Shows (run (batchedObs o)) is × Prefix _≡_ (valsᴵ js) (joinedᴾ (valsᴵ is))
+  behind fi s with shown-read (events o) (proj₁ (adequacy o) s)
   ... | m , vs , _ with proj₂ (left-to-right o) fi m
   ...   | n , pre with read-shown (batched o) n
-  ...     | is , si , vs′ , _ = is , proj₂ (adequacyˢ (batchedObs o)) si , subst₂ (Prefix _≡_) (sym vs) (cong joinedᴾ (sym vs′)) pre
+  ...     | is , si , vs′ , _ = is , proj₂ (adequacy (batchedObs o)) si , subst₂ (Prefix _≡_) (sym vs) (cong joinedᴾ (sym vs′)) pre
 
 batchableᴾ : Batchableᴾ
 batchableᴾ o = ahead , behind
   where
-  ahead : ∀ {is} → Shows (runˢ (batchedObs o)) is → Σ _ λ js → Shows (runˢ (elaborate o)) js × Prefix _≡_ (stamped (valsᴵ is)) (groupedᴾ (valsᴵ js) (endedᴵ js))
-  ahead s with shown-read (batched o) (proj₁ (adequacyˢ (batchedObs o)) s)
+  ahead : ∀ {is} → Shows (run (batchedObs o)) is → Σ _ λ js → Shows (run (elaborate o)) js × Prefix _≡_ (stamped (valsᴵ is)) (groupedᴾ (valsᴵ js) (endedᴵ js))
+  ahead s with shown-read (batched o) (proj₁ (adequacy (batchedObs o)) s)
   ... | n , vs , _ with proj₁ (batchable o) n
   ...   | m , pre with read-shown (elaborated o) m
-  ...     | js , sj , vs′ , en = js , proj₂ (adequacyˢ (elaborate o)) sj , subst₂ (Prefix _≡_) (cong stamped (sym vs)) (cong₂ groupedᴾ (sym vs′) (sym en)) pre
+  ...     | js , sj , vs′ , en = js , proj₂ (adequacy (elaborate o)) sj , subst₂ (Prefix _≡_) (cong stamped (sym vs)) (cong₂ groupedᴾ (sym vs′) (sym en)) pre
 
-  behind : ∀ {js} → Shows (runˢ (elaborate o)) js → Σ _ λ is → Shows (runˢ (batchedObs o)) is × Prefix _≡_ (groupedᴾ (valsᴵ js) (endedᴵ js)) (stamped (valsᴵ is))
-  behind s with shown-read (elaborated o) (proj₁ (adequacyˢ (elaborate o)) s)
+  behind : ∀ {js} → Shows (run (elaborate o)) js → Σ _ λ is → Shows (run (batchedObs o)) is × Prefix _≡_ (groupedᴾ (valsᴵ js) (endedᴵ js)) (stamped (valsᴵ is))
+  behind s with shown-read (elaborated o) (proj₁ (adequacy (elaborate o)) s)
   ... | m , vs , en with proj₂ (batchable o) m
   ...   | n , pre with read-shown (batched o) n
-  ...     | is , si , vs′ , _ = is , proj₂ (adequacyˢ (batchedObs o)) si , subst₂ (Prefix _≡_) (cong₂ groupedᴾ (sym vs) (sym en)) (cong stamped (sym vs′)) pre
+  ...     | is , si , vs′ , _ = is , proj₂ (adequacy (batchedObs o)) si , subst₂ (Prefix _≡_) (cong₂ groupedᴾ (sym vs) (sym en)) (cong stamped (sym vs′)) pre

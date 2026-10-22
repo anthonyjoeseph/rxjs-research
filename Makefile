@@ -1,7 +1,7 @@
 .PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain ghosts placing placing-count stepping bg bg-check bg-wait \
         wiring wiring-gate wiring-selftest unsafe-check dup-check dup-selftest \
         imports-check imports-fix imports-selftest comments-check comments-selftest \
-        roadmap-check roadmap-selftest find find-prose postulates notify split \
+        roadmap-check roadmap-selftest port-check port-selftest find find-prose postulates notify split \
         ts-check ts-lint ts-format-check ts-gate
 
 # UTF-8 locale for em-dashes and special characters in Agda output
@@ -49,6 +49,7 @@ help:
 	@echo "  find          search the declared TYPE of every statement:  make find Q='⊑ lub'"
 	@echo "  find-prose    search comment blocks and docs for a finding:  make find-prose Q='dead route'"
 	@echo "  wiring        the wiring report (wiring-gate: the same, exiting 1)"
+	@echo "  port-check    the port keeps the old tower's names and postulates (PORT_BASE)"
 	@echo "  imports-fix   delete unused imports and names"
 	@echo "  split         cut a long module:  make split F=<file> (lists cuts);  make split F=<file> P='Mod Mod.B@120'"
 	@echo "                a nested one, in place:  make split F=<file> SUB='Inner Inner2@300'"
@@ -66,6 +67,7 @@ GATE_CHEAP = wiring-selftest wiring-gate \
              imports-selftest imports-check \
              roadmap-selftest roadmap-check \
              comments-selftest comments-check \
+             port-selftest port-check \
              ts-gate
 
 gate-cheap:
@@ -213,6 +215,33 @@ wiring-selftest:
 	  echo "$$led" | grep -q "^ffi-unbound " || { echo "SELFTEST FAIL: ffi-unbound missing from the ledger — the FFI exemption swallowed a CLI postulate with no binding"; fail=1; }; \
 	  echo "$$led" | grep -q "^ffi-outside " || { echo "SELFTEST FAIL: ffi-outside missing from the ledger — a binding outside CLI/ must earn nothing"; fail=1; }; \
 	  if [ $$fail -eq 0 ]; then echo "wiring-selftest: PASS (R2 fires on the passed-only lemma and on its eta-expansion, and on nothing else; module applications conduct; \`with\` arms conduct at both scopes; a postulate block nested in a seal reaches the ledger; a pragma nested in a pragma closes on its own close; a CLI postulate with a COMPILE GHC body leaves it, an unbound one or one outside CLI/ stays)"; \
+	  else echo "$$out"; exit 1; fi
+
+# THE PORT BOUNDARY (Anthony): every non-private top-level declaration under
+# $(SRC)/port/ keeps a name the old tower had at PORT_BASE; an old postulate
+# stays one; a postulated old body says where it was.  The frozen commit is
+# what the port answers to, so it moves only by hand.  → docs/port-check.md
+PORT_BASE := 9ec3e6c62e05857feabffdd65a05929de347e532
+
+port-check:
+	@scripts/check-port.py --base $(PORT_BASE)
+
+# PROVES port-check IS LOAD-BEARING: one row per way out of the boundary must
+# fire, and an old name ported, an old postulate kept, a pointed-at old body,
+# a private helper and a where-local must not.
+port-selftest:
+	@out=$$(scripts/check-port.py --base $(PORT_BASE) --src scripts/port-selftest 2>&1); \
+	  fail=0; \
+	  for r in "NEW NAME    port/Fixture.agda:invented" "FILLED GAP  port/Fixture.agda:placing" \
+	           "NO OLD BODY port/Fixture.agda:complete" "BAD OLD BODY port/Fixture.agda:reaches" \
+	           "BAD OLD BODY port/Fixture.agda:prefix-chain" "BAD OLD BODY port/Fixture.agda:reached"; do \
+	    echo "$$out" | grep -qF "$$r" || { echo "SELFTEST FAIL: \`$$r\` not reported — the boundary has a hole"; fail=1; }; \
+	  done; \
+	  for n in run ticks-up content helper read-of local; do \
+	    echo "$$out" | grep -q "Fixture.agda:$$n " && { echo "SELFTEST FAIL: $$n reported, but it is inside the boundary"; fail=1; }; \
+	  done; \
+	  echo "$$out" | grep -q "port-check: FAIL — 6 problem" || { echo "SELFTEST FAIL: expected exactly 6 problems"; fail=1; }; \
+	  if [ $$fail -eq 0 ]; then echo "port-selftest: PASS (a new name, a filled gap, and a missing or unresolving OLD BODY each fire; ported names, kept postulates and helpers do not)"; \
 	  else echo "$$out"; exit 1; fi
 
 # SOUNDNESS GUARD.  The build is not `--safe` — it cannot be while

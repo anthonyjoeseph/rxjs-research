@@ -15,7 +15,7 @@ open import adequacy.Adequacy using (adequacy)
 -- (`operation.StateTree.Pure`) is the denotation's, observed at time 0.
 -- The IO semantics is the same machine driven by the world
 -- (`operation.Observable`).
-open import adequacy.StateTree using (adequacyˢ)
+open import port.Adequacy using (adequacy)
 
 -- THE MEANING IS A FOLD: the theorem's denotation is the limit of each
 -- operator's `MonotonicList` function applied to its children's.
