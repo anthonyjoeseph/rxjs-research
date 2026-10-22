@@ -252,15 +252,7 @@ Main also defines the build's COVERAGE — **`make agda` IS the claim graph**, a
 
 As purely functional as possible: no mutable state, no direct `.subscribe()`. Delegate IO/statefulness to rxjs operators like `scan`. Two reasons — cleanliness, and keeping the primitives and `batchSimultaneous` in near-direct correspondence with the Agda.
 
-## The change workflow — engine IMPLEMENTATION only
-
-Not for proof work, tooling or documentation.
-
-1. **Agda first**, before touching TypeScript.
-2. **QuickCheck** — `quickcheck.Quickcheck`: the pure runtime against the denotation on drawn programs.
-3. **Port to TypeScript**, only once QuickCheck passes.
-4. **Oracle** — all three Agda engines against real rxjs. Every divergence becomes a bug-cache row.
-5. **Formal verification last**, in phases, committing in-between results, until there are no gaps.
+## Semantics questions
 
 **Resolving ambiguity:** naive plain rxjs — actually run the example and see. If that doesn't settle it, surface the question with a TypeScript rxjs example that **avoids the `*All()` higher-order operators where possible**.
 

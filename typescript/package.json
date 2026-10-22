@@ -8,7 +8,6 @@
   },
   "scripts": {
     "oracle": "bash scripts/run-oracle.sh",
-    "timed": "bash scripts/run-timed.sh",
     "agda:cli": "cd .. && make oracle-build",
     "typecheck": "tsc",
     "lint": "eslint src",
