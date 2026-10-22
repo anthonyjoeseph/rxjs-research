@@ -212,9 +212,13 @@ wiring-selftest:
 # postulated old body says where it was; a new postulate is free.  The frozen commit is
 # what the port answers to, so it moves only by hand.  → docs/port-check.md
 PORT_BASE := 9ec3e6c62e05857feabffdd65a05929de347e532
+# The engine's modules took the names of the ones they replaced; what they
+# declared at PORT_BASE under their old paths is not the port's.
+PORT_RENAMED := --renamed operation/AbstractObservable.agda=agda-impl/operation/StateTree.agda \
+                          operation/PureObservable.agda=agda-impl/operation/StateTree/Pure.agda
 
 port-check:
-	@scripts/check-port.py --base $(PORT_BASE)
+	@scripts/check-port.py --base $(PORT_BASE) $(PORT_RENAMED)
 
 # PROVES port-check IS LOAD-BEARING: one row per way out of the boundary must
 # fire, a new body moved into the port's import cone included; and an old

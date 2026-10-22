@@ -4,7 +4,7 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ## Tier 0 — the port
 
-**Port:** `adequacy.Adequacy` carried to the state tree in `port/`, old names only (`make port-check`).
+**Port:** the old `adequacy/` tower carried to the state tree in `port/`, old names only (`make port-check`).
 
 ### Ledger
 

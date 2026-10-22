@@ -1,9 +1,10 @@
 {-# OPTIONS --guardedness #-}
 
--- THE IO RUNTIME.  `operation.StateTree`'s machine, driven by the world:
--- user-written colds that may perform IO feed it their emissions, and
--- what it shows and tears down is done for real.  Every transition is the
--- one the pure runtime (`operation.StateTree.Pure`) takes; only the
+-- THE IO RUNTIME.  `operation.AbstractObservable`'s machine, driven by
+-- the world: user-written colds that may perform IO feed it their
+-- emissions, and what it shows and tears down is done for real.  Every
+-- transition is the one the pure runtime (`operation.PureObservable`)
+-- takes; only the
 -- driver is unproven, and it is checked against the TypeScript by the
 -- oracle.
 --
@@ -192,8 +193,8 @@ record Leaf (A : Set) : Set₁ where
     inbox : IORef (List (Maybe A))
     slot  : Slot
 
-import operation.StateTree
-module Machine = operation.StateTree IOCold Leaf
+import operation.AbstractObservable
+module Machine = operation.AbstractObservable IOCold Leaf
 open Machine using (Conf; Stepped; moved; starting; Shown; Torn; Ev; nx; cp; load; Poke; gone; leaf; poke; spot; calm; depth)
   renaming (step to stepᴹ)
 

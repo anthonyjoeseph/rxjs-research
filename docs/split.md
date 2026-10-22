@@ -8,11 +8,11 @@ design** — it gets the split most of the way, and the typechecker finishes it.
 ## The two commands
 
 ```
-make split F=agda-impl/adequacy/Strong.agda
+make split F=agda-impl/port/Content.agda
     lists every line the file may be cut at, with the gap since the last one
 
-make split F=agda-impl/adequacy/Strong.agda \
-     P='adequacy.Strong:Strongly adequacy.Strong.Against:StrongAgainst@982'
+make split F=agda-impl/port/Content.agda \
+     P='port.Content:Honesty port.Content.Hop:HonestHop@400'
     splits it; DRY=1 prints the plan and the problems without writing
 ```
 
@@ -23,7 +23,7 @@ Then `make imports-fix`, then a build (`make bg T=agda`).
 A part is `MOD@LINE`, where LINE is the **original** file's line the part
 begins at, its leading comment block included — take it straight from the
 `--cuts` listing. The first part takes no `@LINE`. A part's MOD names its
-file: `adequacy.Strong.Against` is `agda-impl/adequacy/Strong/Against.agda`,
+file: `port.Content.Hop` is `agda-impl/port/Content/Hop.agda`,
 and keeping the original name for one part (usually the first) spares the
 consumers that only use that part.
 
@@ -37,8 +37,8 @@ consumers that only use that part.
   GrownHeaps`, a `renaming (module Grown to W)` gains `W′`, an alias `module
   G = Grown τ` gains `G′ = GrownHeaps τ`, and every qualified use of a name
   that moved is renamed. Then cut the file between the two siblings.
-- **A file that is ONE parametrised module** (`module Strongly (R : Set)
-  where` wrapping everything — most of `adequacy/`) is cut inside it. Give
+- **A file that is ONE parametrised module** (`module Honesty (R : Set)
+  where` wrapping everything — most of `port/`) is cut inside it. Give
   each part a wrapper name as well, `MOD:WRAPPER@LINE`; every part gets the
   wrapper's telescope and its leading `open` lines, and opens the earlier
   parts' wrappers with the same arguments.

@@ -26,7 +26,7 @@ open import Data.Product using (_×_; _,_)
 open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush; Pos; ix; sub; _<ᵖ_; tick; root; Tail; Tail∞; pin; idle)
 open import denotation.MonotonicList using (enter)
 open import denotation.Unfold using (⟦_⟧ˢ; [])
-open import operation.StateTree.Pure using (module Driver)
+open import operation.PureObservable using (module Driver)
 open import quickcheck.Code using (Prog; toObs; timeline)
 open import quickcheck.Ty using (natᵗ)
 

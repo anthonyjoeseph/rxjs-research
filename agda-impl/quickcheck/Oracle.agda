@@ -30,7 +30,7 @@ import denotation.MonotonicList.Events as Events
 open import denotation.MonotonicList.Events using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time; root)
 open import denotation.MonotonicList using (observe; ticks)
 open import denotation.Denote using (⟦_⟧[_])
-open import operation.StateTree.Pure using () renaming (run to runᴾ)
+open import operation.PureObservable using () renaming (run to runᴾ)
 open import operation.Observable using (IORef; IOCold; Emit; Observable; subscribe; forkIO; Signal; newSignal; raise; await; newIORef; readIORef; writeIORef)
 open import quickcheck.Clock using (Clock; newClock; fire; fromTimeline)
 import Tree as T

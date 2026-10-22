@@ -31,7 +31,7 @@ import Tree as T
 open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush; Pos; Label; ix; sub; last; _<ᵖ_; root; Timeline)
 open import denotation.MonotonicList using (observe)
 open import denotation.Unfold using (⟦_⟧ˢ; [])
-open import operation.StateTree.Pure using (module Driver)
+open import operation.PureObservable using (module Driver)
 open import quickcheck.Code using (script; timeline; module Leaf)
 
 open Driver ℕ using (Trace; Trace∞; tau; out; end; idle; trace; begin)

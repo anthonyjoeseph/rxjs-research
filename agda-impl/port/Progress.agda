@@ -27,8 +27,7 @@ open import denotation.MonotonicList using (Agree; agree-refl; agree-trans; obse
 open import denotation.Denote using (⟦_⟧)
 import denotation.Unfold as U
 open import operation.Placed using (Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ; items)
-open import operation.PureObservable using (PureObs)
-open import operation.StateTree.Pure using (module Driver)
+open import operation.PureObservable using (PureObs; module Driver)
 open import port.Content using (module Honesty)
 open import port.Ghost using (module Ghosting)
 open import port.Unsub using (module Unsubbing)

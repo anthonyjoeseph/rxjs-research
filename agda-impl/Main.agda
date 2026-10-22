@@ -8,7 +8,7 @@
 module Main where
 
 -- THE THEOREM, ON THE STATE TREE: the pure semantics' run
--- (`operation.StateTree.Pure`) is the denotation's, observed at time 0.
+-- (`operation.PureObservable`) is the denotation's, observed at time 0.
 -- The IO semantics is the same machine driven by the world
 -- (`operation.Observable`).
 open import port.Adequacy using (adequacy)

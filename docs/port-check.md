@@ -27,6 +27,9 @@ cannot leave the boundary by moving into a module the port imports. In a cone
 module that existed at `PORT_BASE`, only declarations it has gained since are
 checked: the engine the port runs on predates the port and is not part of it.
 
+A cone module renamed since `PORT_BASE` (`PORT_RENAMED` in the Makefile) counts
+what it declared under its old path as well.
+
 **Matching is by name only.** A ported declaration's type changes with the
 engine under it; its name does not. Same name, same role.
 

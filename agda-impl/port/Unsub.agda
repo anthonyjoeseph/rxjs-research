@@ -6,7 +6,7 @@ module port.Unsub where
 
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import operation.StateTree.Pure using (module Driver)
+open import operation.PureObservable using (module Driver)
 
 module Unsubbing (R : Set) where
   open Driver R using (Mach; step; silent)

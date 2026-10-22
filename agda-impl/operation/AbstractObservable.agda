@@ -1,807 +1,512 @@
-{-# OPTIONS --guardedness --large-indices #-}
+{-# OPTIONS --guardedness #-}
 
--- THE ONE COPY OF THE OPERATIONAL SEMANTICS.  A program is a tree
--- (`Obs`, in `Tree`); compiling it gives `Act` programs, built from the
--- operator kernels.  Both runtimes run those same programs on the SAME
--- MACHINE (`Machine`, below): one pure transition, `conf → input → conf ×
--- outputs`, over one heap (`Heap`).  A runtime is only a DRIVER: what it
--- feeds the machine (a cold's emissions, an effect's answer) and what it
--- does with what the machine asks (start a cold, perform an effect).  The
--- pure driver plays timelines on a virtual clock (`operation.Machine`);
--- the IO driver runs real colds on a real one (`operation.Observable`).
+-- THE ABSTRACT OBSERVABLE: the engine both runtimes are.  `Tree.Obs` run
+-- as a typed zipper over a tree of operator states, one node per
+-- subscribed operator.  No heap, no worlds, no names: a node is addressed by its PATH from the root, and
+-- every path stays valid, because the tree only grows — a lane, once
+-- begun, keeps its slot in its flatMap's list after it ends.
 --
--- A `defer` compiles to an `unfold`, its body compiled only when the
--- machine reaches it, so compiling is total.
+-- Control is the zipper's focus.  A subscription begins by moving the
+-- focus down; a value rises by moving it up; a job owed later (an `of`'s
+-- next value, a subscription's attach, a takeWhile's completion, a
+-- connect's feed) is a path, a tag and the position it was suspended at,
+-- resumed once what runs now is absorbed.  A join is reached from its
+-- subject by a path relative to the binder, and reads the value it is fed
+-- from the binder above it in its own context, where the types line up by
+-- the de Bruijn index.
 --
--- The shared code is parametric in a runtime's cold and its native
--- effects, so it can neither look inside a cold nor perform IO.
-module operation.AbstractObservable where
+-- SHARED BY BOTH RUNTIMES.  Parametric in the cold leaf `C` and in `L`,
+-- what a runtime keeps at a started cold, so it can neither look inside a
+-- cold nor perform IO.  The machine never runs a cold: subscribing one
+-- STOPS the step (`starting`) and hands the runtime a continuation typed
+-- at the cold's element, which the runtime resumes with the leaf's state.
+-- A runtime then drives a leaf by its path (`poke`): it reads the leaf's
+-- state, asks whether its observer is closed, and delivers into it.  An
+-- unsubscribe reaching a started cold hands its state back (`Torn`), for
+-- the runtime to stop.
+--
+-- POSITIONS are a ghost nothing branches on: the run's position, carried
+-- so that each value is shown where `denotation.MonotonicList.Events`
+-- places it.
+module operation.AbstractObservable (C L : Set → Set₁) where
 
-open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; not)
-open import Data.List using (List; _∷_; []; _++_; [_]; null)
-open import Data.List.Relation.Unary.All using (All; _∷_; []; lookup)
+open import Data.List using (List; []; _∷_; _++_; [_]; length; null)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.Nat using (ℕ; zero; suc; pred; _≡ᵇ_; _<ᵇ_)
+open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; pred; _<ᵇ_; _≡ᵇ_)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Unit using (⊤; tt)
-open import Level using (Lift; lift; lower)
+open import Data.Product using (Σ; _×_; _,_)
+open import Relation.Binary.PropositionalEquality using (refl)
 
-open import denotation.MonotonicList.Events using (Pos; Label; ix; last; root) renaming (sub to subᴾ)
-open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; Later)
+open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+open import denotation.MonotonicList.Events using (Pos; ix; last; root) renaming (sub to subᴾ)
+
+data Ev (A : Set) : Set where
+  nx : A → Ev A
+  cp : Ev A
+
+mapEv : ∀ {A B} → (A → B) → Ev A → Ev B
+mapEv f (nx a) = nx (f a)
+mapEv f cp     = cp
 
 ------------------------------------------------------------------------
--- What a runtime supplies
+-- States
 
--- WHAT A CELL HOLDS.  A cell may hold a ref or a sink, and the pure
--- runtime's heap must say what each holds in terms it can WEAKEN as the
--- heap grows, so the operators' state is described by codes; the user's
--- own types are `base`.  A cell can then point at a cell made after it,
--- as a lane list does at each new lane.
-data Ty : Set₁ where
-  base  : Set → Ty
-  ref   : Ty → Ty
-  sink  : Set → Ty
-  quiet : Ty
-  list  : Ty → Ty
-  maybe : Ty → Ty
-  _⊗_   : Ty → Ty → Ty
-  -- A subject's subscribers, each with the position it joined at: its
-  -- own code, so a proof can say what such a list holds.
-  joins : Set → Ty
-  -- A flatMap's queue of waiting values: the user's, as `base` holds,
-  -- but its own code, so no count a teardown resets is read as one.
-  fifo  : Set → Ty
-  -- A joiner's switch: a Bool, but its own code, so no write of an
-  -- operator's own Bool reaches it.
-  gate  : Ty
-
--- A runtime's names live in a WORLD — what has been allocated — and stay
--- valid in every larger one (`_⊑_`).  IO has one world; the pure heap's
--- world is its typing.  `RefOf`'s last index is the decoded content,
--- which `wkRef` lets change with the world.
-record Prims : Set₂ where
-  infixr 5 _⨾_
+-- A connect's subject and its source's switch.  `feeds` is a STACK: a
+-- value fed while another feed is under way is fed first, as the
+-- kernel's nested `each` would; who is still to be fed rides on the
+-- feed's own job, as on `each`'s continuation.
+record CS (X : Set) : Set where
+  constructor cs
   field
-    World    : Set₁
-    _⊑_      : World → World → Set
-    ⊑-refl   : ∀ {w} → w ⊑ w
-    _⨾_      : ∀ {u v w} → u ⊑ v → v ⊑ w → u ⊑ w
-    RefOf    : World → Ty → Set → Set
-    Sink     : World → Set → Set      -- a registered observer, as a first-order name
-    Quiet    : World → Set            -- a stored unsubscribe, as a first-order name
-    Handle   : World → Set            -- a started cold, as the runtime tracks it
-    wkRef    : ∀ {w v t} (X : World → Set) → w ⊑ v → RefOf w t (X w) → RefOf v t (X v)
-    wkSink   : ∀ {w v A} → w ⊑ v → Sink w A → Sink v A
-    wkQuiet  : ∀ {w v} → w ⊑ v → Quiet w → Quiet v
-    wkHandle : ∀ {w v} → w ⊑ v → Handle w → Handle v
-    Cold     : Set → Set₁             -- the cold leaf
-    Eff      : Set → Set              -- what a top-level observer may do natively
+    closed  : Bool
+    subs    : List (List ℕ × Pos)               -- each joiner, by its path from the binder, and where it joined
+    feeds   : List (Ev X)                       -- what is being fed
+    bodyAtt : Bool
+    srcLive : Bool
+    srcAtt  : Bool
+
+data St (Γ : List Set) : Set → Set₁ where
+  pend  : ∀ {A} → Obs C Γ A → St Γ A
+  -- a started cold: live, and what the runtime keeps of it
+  coldS : ∀ {A} → Bool → L A → St Γ A
+  -- the values still to come
+  ofS   : ∀ {A} → List A → St Γ A
+  doneS : ∀ {A} → St Γ A
+  mapS  : ∀ {A B} → (A → B) → St Γ A → St Γ B
+  scanS : ∀ {A B} → (B → A → B) → B → St Γ A → St Γ B
+  -- a kill switch: live, attached
+  cutS  : ∀ {A} → Bool → Bool → St Γ A → St Γ A
+  -- a lane, still in its flatMap's list
+  lnS   : ∀ {A} → Bool → St Γ A → St Γ A
+  -- the child is its source's switch
+  takeS : ∀ {A} → Bool → (A → Bool) → St Γ A → St Γ A
+  -- outer done, lanes running, the values waiting for a slot, the
+  -- outer's switch, every lane begun (oldest first)
+  flatS : ∀ {A B} → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → St Γ B
+  connS : ∀ {X B} → CS X → St Γ X → St (X ∷ Γ) B → St Γ B
+  joinS : ∀ {A} → Pos → Bool → A ∈ Γ → St Γ A
 
 ------------------------------------------------------------------------
--- THE HEAP, shared: worlds and names
-
--- Named, not opened, so `Prims`' fields of the same names do not clash.
-module Heap where
-  -- What one heap entry is: a cell, a registered observer, a stored
-  -- unsubscribe, a started cold.
-  data Kind : Set₁ where
-    cell : Ty → Kind
-    slot : Set → Kind
-    hush : Kind
-    play : Kind
-
-  World : Set₁
-  World = List Kind
-
-  -- A name: a position in the world, newest first.
-  data _∋_ : World → Kind → Set where
-    here  : ∀ {k w} → (k ∷ w) ∋ k
-    there : ∀ {j k w} → w ∋ k → (j ∷ w) ∋ k
-
-  -- A later world: this one, with entries made since.
-  data _⊑_ : World → World → Set where
-    same : ∀ {w} → w ⊑ w
-    grow : ∀ {k w v} → w ⊑ v → w ⊑ (k ∷ v)
-
-  infixr 5 _⨾_
-  _⨾_ : ∀ {u v w} → u ⊑ v → v ⊑ w → u ⊑ w
-  ρ ⨾ same   = ρ
-  ρ ⨾ grow σ = grow (ρ ⨾ σ)
-
-  wk∋ : ∀ {w v k} → w ⊑ v → w ∋ k → v ∋ k
-  wk∋ same     i = i
-  wk∋ (grow ρ) i = there (wk∋ ρ i)
-
-  new : ∀ {k w} → w ⊑ (k ∷ w)
-  new = grow same
-
-  Sink : World → Set → Set
-  Sink w A = w ∋ slot A
-
-  Quiet : World → Set
-  Quiet w = w ∋ hush
-
-  Handle : World → Set
-  Handle w = w ∋ play
-
--- A runtime's primitives: the shared heap's names, its cold, its effects.
-prims : (Set → Set₁) → (Set → Set) → Prims
-prims C E = record
-  { World = Heap.World ; _⊑_ = Heap._⊑_ ; ⊑-refl = Heap.same ; _⨾_ = Heap._⨾_
-  ; RefOf = λ w t _ → w Heap.∋ Heap.cell t ; Sink = Heap.Sink ; Quiet = Heap.Quiet ; Handle = Heap.Handle
-  ; wkRef = λ _ → Heap.wk∋ ; wkSink = Heap.wk∋ ; wkQuiet = Heap.wk∋ ; wkHandle = Heap.wk∋
-  ; Cold = C ; Eff = E }
-
-module Run (P : Prims) where
-  open Prims P
-
-  El : World → Ty → Set
-  El w (base X)  = X
-  El w (ref t)   = RefOf w t (El w t)
-  El w (sink A)  = Sink w A
-  El w quiet     = Quiet w
-  El w (list t)  = List (El w t)
-  El w (maybe t) = Maybe (El w t)
-  El w (s ⊗ t)   = El w s × El w t
-  El w (joins A) = List (Sink w A × Pos)
-  El w (fifo X)  = List X
-  El w gate      = Bool
-
-  Ref : World → Ty → Set
-  Ref w t = El w (ref t)
-
-  wkEl : ∀ {w v} t → w ⊑ v → El w t → El v t
-  wkEl (base X)  ρ x        = x
-  wkEl (ref t)   ρ r        = wkRef (λ u → El u t) ρ r
-  wkEl (sink A)  ρ s        = wkSink ρ s
-  wkEl quiet     ρ t        = wkQuiet ρ t
-  wkEl (list t)  ρ []       = []
-  wkEl (list t)  ρ (x ∷ xs) = wkEl t ρ x ∷ wkEl (list t) ρ xs
-  wkEl (maybe t) ρ nothing  = nothing
-  wkEl (maybe t) ρ (just x) = just (wkEl t ρ x)
-  wkEl (s ⊗ t)   ρ (x , y)  = wkEl s ρ x , wkEl t ρ y
-  wkEl (joins A) ρ []             = []
-  wkEl (joins A) ρ ((s , j) ∷ xs) = (wkSink ρ s , j) ∷ wkEl (joins A) ρ xs
-  wkEl (fifo X)  ρ xs             = xs
-  wkEl gate      ρ b              = b
-
-  wkR : ∀ {w v t} → w ⊑ v → Ref w t → Ref v t
-  wkR {t = t} = wkEl (ref t)
-
-  -- A connect's subject, kept in the environment.  First-order on
-  -- purpose: its subscribers are `Sink`s, not callbacks, each with the
-  -- position it joined at, which places what it is delivered.  A sink joining
-  -- after the source has completed is completed at once, as in rxjs.
-  record Subject (A : Set) (w : World) : Set where
-    field
-      subscribers : Ref w (joins A)
-      closed      : Ref w (base Bool)
-
-  wkSubject : ∀ {A w v} → w ⊑ v → Subject A w → Subject A v
-  wkSubject ρ st = record { subscribers = wkR ρ (Subject.subscribers st) ; closed = wkR ρ (Subject.closed st) }
-
-  Env : List Set → World → Set₁
-  Env Γ w = All (λ A → Subject A w) Γ
-
-  wkEnv : ∀ {Γ w v} → w ⊑ v → Env Γ w → Env Γ v
-  wkEnv ρ []         = []
-  wkEnv ρ (st ∷ sts) = wkSubject ρ st ∷ wkEnv ρ sts
-
-  -- THE OPERATORS' LANGUAGE: the free monad over the runtime's
-  -- primitives.  The kernels are written in it once, and every runtime
-  -- runs those same programs.
-  --
-  -- A callback cannot be stored in a `Ref`: `Act` would have to quantify
-  -- over its own universe.  So an observer is registered with the
-  -- runtime and handed back as a first-order `Sink`, which is also what
-  -- lets the pure runtime be an ordinary Agda state monad — its heap
-  -- holds `Act` callbacks, never its own computations.
-  --
-  -- Every continuation that receives a name, or a cell's content, is
-  -- KRIPKE: it runs in whatever larger world the runtime has reached by
-  -- then, since a callback run in between may have allocated, and what a
-  -- cell holds may point at a cell newer than the reader.
-  data Act : World → Set → Set₁ where
-    done      : ∀ {w B} → B → Act w B
-    newRef    : ∀ {w B} t → El w t → (∀ {v} → w ⊑ v → Ref v t → Act v B) → Act w B
-    readRef   : ∀ {w B t} → Ref w t → (∀ {v} → w ⊑ v → El v t → Act v B) → Act w B
-    writeRef  : ∀ {w B t} → Ref w t → El w t → Act w B → Act w B
-    register  : ∀ {w A B} → (A → Act w ⊤) → Act w ⊤ → Act w Bool → (∀ {v} → w ⊑ v → Sink v A → Act v B) → Act w B
-    send      : ∀ {w A B} → Sink w A → A → Act w B → Act w B
-    finish    : ∀ {w A B} → Sink w A → Act w B → Act w B
-    startCold : ∀ {w A B} → Cold A → Sink w A → (∀ {v} → w ⊑ v → Handle v → Act v B) → Act w B
-    stop      : ∀ {w B} → Handle w → Act w B → Act w B
-    -- An unsubscribe, kept to run later: delivering nothing, it is not a
-    -- `Sink`, whose callbacks deliver where they are run.
-    stash     : ∀ {w B} → Act w ⊤ → (∀ {v} → w ⊑ v → Quiet v → Act v B) → Act w B
-    cancel    : ∀ {w B} → Quiet w → Act w B → Act w B
-    eff       : ∀ {w A B} → Eff A → (A → Act w B) → Act w B
-    -- WHERE THE RUN IS, as `denotation.MonotonicList` places an event: a
-    -- ghost the pure runtime keeps and the IO runtime ignores; nothing
-    -- ever branches on it.  It is SCOPED: `under l m k` runs `m` one
-    -- level down, at the position extended by `l`, and puts the position
-    -- back before `k`.  So the position is always the path of labels the
-    -- run is under, and no kernel ever names an absolute position.
-    here      : ∀ {w B} → (Pos → Act w B) → Act w B
-    under     : ∀ {w B} → Label → Act w ⊤ → Act w B → Act w B
-    -- No information: what a ghost check's unfolding cut off at its
-    -- budget does.  A compiled tree never reaches it.
-    diverge   : ∀ {w B} → Act w B
-    -- A `defer`, subscribed but not yet compiled: the tree, the connects
-    -- in scope, the observer's three parts, and what to do once the
-    -- subscription exists — its unsubscribe stashed, since an `Act`
-    -- cannot take an `Act` as an argument — then the rest.
-    unfold    : ∀ {w Γ A B} → Later Cold Γ A → Env Γ w → (A → Act w ⊤) → Act w ⊤ → Act w Bool
-              → (∀ {v} → w ⊑ v → Quiet v → Act v ⊤) → Act w B → Act w B
-
-  wkAct : ∀ {w v B} → w ⊑ v → Act w B → Act v B
-  wkAct ρ (done b)                 = done b
-  wkAct ρ (newRef t a k)           = newRef t (wkEl t ρ a) λ σ → k (ρ ⨾ σ)
-  wkAct ρ (readRef r k)            = readRef (wkR ρ r) λ σ → k (ρ ⨾ σ)
-  wkAct ρ (writeRef {t = t} r a k) = writeRef (wkR ρ r) (wkEl t ρ a) (wkAct ρ k)
-  wkAct ρ (register n c x k)       = register (λ a → wkAct ρ (n a)) (wkAct ρ c) (wkAct ρ x) λ σ → k (ρ ⨾ σ)
-  wkAct ρ (send s a k)             = send (wkSink ρ s) a (wkAct ρ k)
-  wkAct ρ (finish s k)             = finish (wkSink ρ s) (wkAct ρ k)
-  wkAct ρ (startCold c s k)        = startCold c (wkSink ρ s) λ σ → k (ρ ⨾ σ)
-  wkAct ρ (stop h k)               = stop (wkHandle ρ h) (wkAct ρ k)
-  wkAct ρ (stash m k)              = stash (wkAct ρ m) λ σ → k (ρ ⨾ σ)
-  wkAct ρ (cancel t k)             = cancel (wkQuiet ρ t) (wkAct ρ k)
-  wkAct ρ (eff e k)                = eff e λ a → wkAct ρ (k a)
-  wkAct ρ (here k)                 = here λ p → wkAct ρ (k p)
-  wkAct ρ (under l m k)            = under l (wkAct ρ m) (wkAct ρ k)
-  wkAct ρ diverge                  = diverge
-  wkAct ρ (unfold l e n c x k m)   = unfold l (wkEnv ρ e) (λ a → wkAct ρ (n a)) (wkAct ρ c) (wkAct ρ x) (λ σ → k (ρ ⨾ σ)) (wkAct ρ m)
-
-  -- `closed` is rxjs's `subscriber.closed`: a source polls it, and stops,
-  -- so a cut reaches a source still inside its own subscribe burst.
-  record Observer (A : Set) (w : World) : Set₁ where
-    field
-      next     : A → Act w ⊤
-      complete : Act w ⊤
-      closed   : Act w Bool
-
-  wkObs : ∀ {A w v} → w ⊑ v → Observer A w → Observer A v
-  wkObs ρ o = record { next = λ a → wkAct ρ (Observer.next o a) ; complete = wkAct ρ (Observer.complete o)
-                     ; closed = wkAct ρ (Observer.closed o) }
-
-  record Subscription (w : World) : Set₁ where
-    field unsubscribe : Act w ⊤
-
-  wkSubn : ∀ {w v} → w ⊑ v → Subscription w → Subscription v
-  wkSubn ρ s = record { unsubscribe = wkAct ρ (Subscription.unsubscribe s) }
-
-  -- What to do once a subscription exists.
-  Kont : World → Set₁
-  Kont w = ∀ {v} → w ⊑ v → Subscription v → Act v ⊤
-
-  -- Subscribing, in continuation-passing style: given an observer, and
-  -- what to do once the subscription exists, describe the work — in any
-  -- world reached since the subscriber was made.
-  Subscribe : Set → World → Set₁
-  Subscribe A w = ∀ {v} → w ⊑ v → Observer A v → Kont v → Act v ⊤
-
-  wkKont : ∀ {w v} → w ⊑ v → Kont w → Kont v
-  wkKont ρ k σ = k (ρ ⨾ σ)
-
-  wkSub : ∀ {A w v} → w ⊑ v → Subscribe A w → Subscribe A v
-  wkSub ρ s σ = s (ρ ⨾ σ)
-
-  -- Subscribe through the runtime: register the observer, hand the
-  -- runtime its sink, wrap the handle.
-  via : ∀ {A w} → (∀ {v} → Sink v A → (∀ {u} → v ⊑ u → Handle u → Act u ⊤) → Act v ⊤) → Subscribe A w
-  via start ρ o k = register (Observer.next o) (Observer.complete o) (Observer.closed o) λ σ s →
-                    start s λ τ h → k (σ ⨾ τ) (record { unsubscribe = stop h (done tt) })
-
-  ⊥ᴷ : ∀ {A w} → Subscribe A w
-  ⊥ᴷ ρ o k = diverge
-
-  -- One level down, where `deferᴰ` puts its body: at p ++ [ ix 1 ].
-  deeper : ∀ {A w} → Subscribe A w → Subscribe A w
-  deeper s ρ o k = under (ix 1) (s ρ o k) (done tt)
-
-  -- Sequencing, which the free monad gets by walking its continuations.
-  infixl 1 _>>=ᴬ_ _>>ᴬ_
-  _>>=ᴬ_ : ∀ {w A B} → Act w A → (A → Act w B) → Act w B
-  done b           >>=ᴬ f = f b
-  newRef t a k     >>=ᴬ f = newRef t a λ σ r → k σ r >>=ᴬ λ x → wkAct σ (f x)
-  readRef r k      >>=ᴬ f = readRef r λ σ a → k σ a >>=ᴬ λ x → wkAct σ (f x)
-  writeRef r a k   >>=ᴬ f = writeRef r a (k >>=ᴬ f)
-  register n c x k >>=ᴬ f = register n c x λ σ s → k σ s >>=ᴬ λ x → wkAct σ (f x)
-  send s a k       >>=ᴬ f = send s a (k >>=ᴬ f)
-  finish s k       >>=ᴬ f = finish s (k >>=ᴬ f)
-  startCold c s k  >>=ᴬ f = startCold c s λ σ h → k σ h >>=ᴬ λ x → wkAct σ (f x)
-  stop h k         >>=ᴬ f = stop h (k >>=ᴬ f)
-  stash m k        >>=ᴬ f = stash m λ σ t → k σ t >>=ᴬ λ x → wkAct σ (f x)
-  cancel t k       >>=ᴬ f = cancel t (k >>=ᴬ f)
-  eff e k          >>=ᴬ f = eff e λ a → k a >>=ᴬ f
-  here k           >>=ᴬ f = here λ p → k p >>=ᴬ f
-  under l m k      >>=ᴬ f = under l m (k >>=ᴬ f)
-  diverge          >>=ᴬ f = diverge
-  unfold l e n c x k m >>=ᴬ f = unfold l e n c x k (m >>=ᴬ f)
-
-  _>>ᴬ_ : ∀ {w B} → Act w ⊤ → Act w B → Act w B
-  m >>ᴬ n = m >>=ᴬ λ _ → n
-
-  -- The kernels' toolkit, named so that proofs about the kernels can
-  -- name it too.
-  module Kit where
-    skipᴬ : ∀ {w} → Act w ⊤
-    skipᴬ = done tt
-
-    each : ∀ {w} {A : Set} → List A → (A → Act w ⊤) → Act w ⊤
-    each []       f = skipᴬ
-    each (x ∷ xs) f = f x >>ᴬ each xs f
-
-    newB : ∀ {w B X} → X → (∀ {v} → w ⊑ v → Ref v (base X) → Act v B) → Act w B
-    newB = newRef (base _)
-
-    -- A read whose content is the user's, so needs no weakening.
-    readB : ∀ {w B X} → Ref w (base X) → (X → Act w B) → Act w B
-    readB r k = readRef r λ σ x → wkAct σ (k x)
-
-    modify : ∀ {w t} → Ref w t → (∀ {v} → w ⊑ v → El v t → El v t) → Act w ⊤
-    modify r f = readRef r λ σ x → writeRef (wkR σ r) (f σ x) skipᴬ
-
-    modifyB : ∀ {w X} → Ref w (base X) → (X → X) → Act w ⊤
-    modifyB r f = modify r λ _ → f
-
-    -- A queue's reads and writes, as a base cell's.
-    readF : ∀ {w B X} → Ref w (fifo X) → (List X → Act w B) → Act w B
-    readF r k = readRef r λ σ x → wkAct σ (k x)
-
-    modifyF : ∀ {w X} → Ref w (fifo X) → (List X → List X) → Act w ⊤
-    modifyF r f = modify r λ _ → f
-
-    -- A joiner's switch, made and read as a base cell's.
-    newG : ∀ {w B} → Bool → (∀ {v} → w ⊑ v → Ref v gate → Act v B) → Act w B
-    newG = newRef gate
-
-    readG : ∀ {w B} → Ref w gate → (Bool → Act w B) → Act w B
-    readG r k = readRef r λ σ x → wkAct σ (k x)
-
-    when : ∀ {w} → Bool → Act w ⊤ → Act w ⊤
-    when b m = if b then m else skipᴬ
-
-    noSub : ∀ {w} → Subscription w
-    noSub = record { unsubscribe = skipᴬ }
-
-    -- A KILL SWITCH on one subscription.  Once `cut`, nothing more passes
-    -- `guard`, and the subscription is unsubscribed — at once if it
-    -- exists, or the moment it does, since a source can be cut during its
-    -- own subscribe burst.  The unsubscribe is a callback, so it is kept
-    -- as a stashed `Quiet`, the one place a `Ref` can hold one.  A code,
-    -- not a record, because a lane list holds them.
-    cutTy : Ty
-    cutTy = ref (base Bool) ⊗ ref (maybe quiet)
-
-    Cut : World → Set
-    Cut w = El w cutTy
-
-    live : ∀ {w} → Cut w → Ref w (base Bool)
-    live = proj₁
-
-    held : ∀ {w} → Cut w → Ref w (maybe quiet)
-    held = proj₂
-
-    wkCut : ∀ {w v} → w ⊑ v → Cut w → Cut v
-    wkCut = wkEl cutTy
-
-    newCut : ∀ {w B} → (∀ {v} → w ⊑ v → Cut v → Act v B) → Act w B
-    newCut k = newB true λ σ l → newRef (maybe quiet) nothing λ τ h → k (σ ⨾ τ) (wkR τ l , h)
-
-    cut : ∀ {w} → Cut w → Act w ⊤
-    cut c = writeRef (live c) false (readRef (held c) λ _ → λ where
-      nothing   → skipᴬ
-      (just t)  → cancel t skipᴬ)
-
-    guard : ∀ {w} → Cut w → Act w ⊤ → Act w ⊤
-    guard c m = readB (live c) λ b → when b m
-
-    attach : ∀ {w} → Cut w → Subscription w → Act w ⊤
-    attach c sub = stash (Subscription.unsubscribe sub) λ σ t →
-                   writeRef (held (wkCut σ c)) (just t) (readB (live (wkCut σ c)) λ b →
-                   if b then skipᴬ else Subscription.unsubscribe (wkSubn σ sub))
-
-    guarded : ∀ {A w} → Cut w → Observer A w → Observer A w
-    guarded c o = record { next = λ a → guard c (Observer.next o a) ; complete = guard c (Observer.complete o)
-                         ; closed = readB (live c) λ b → if b then Observer.closed o else done true }
-
-    -- A subscription kept stashed, unsubscribed through it.
-    unsubscribeVia : ∀ {w} → Maybe (Quiet w) → Act w ⊤
-    unsubscribeVia nothing  = skipᴬ
-    unsubscribeVia (just t) = cancel t skipᴬ
-
-  open Kit
-
-  -- THE OPERATORS.  Each is a kernel over its children's `Subscribe`, so
-  -- each is written, and later proven, on its own.  A synchronous source
-  -- delivers its whole burst before its continuation runs, as an rxjs
-  -- `subscribe` returns only after it.
-  emptyᴷ : ∀ {A w} → Subscribe A w
-  emptyᴷ ρ o k = under last (Observer.complete o) (k ⊑-refl noSub)
-
-  -- Each value, then the completion, while the observer stays open: the
-  -- i-th of a burst sits under `ix i`, the completion under `last`.
-  emitAll : ∀ {A w} → Observer A w → ℕ → List A → Act w ⊤
-  emitAll o i []       = under last (Observer.complete o) skipᴬ
-  emitAll o i (x ∷ xs) = Observer.closed o >>=ᴬ λ c → when (not c) (under (ix i) (Observer.next o x) (emitAll o (suc i) xs))
-
-  ofᴷ : ∀ {A w} → List A → Subscribe A w
-  ofᴷ xs ρ o k = emitAll o 0 xs >>ᴬ k ⊑-refl noSub
-
-  mapᴷ : ∀ {A B w} → (A → B) → Subscribe A w → Subscribe B w
-  mapᴷ f s ρ o = s ρ (record { next = λ a → Observer.next o (f a) ; complete = Observer.complete o ; closed = Observer.closed o })
-
-  scanᴷ : ∀ {A B w} → (B → A → B) → B → Subscribe A w → Subscribe B w
-  scanᴷ f z s ρ o k = newB z λ σ r → let o′ = wkObs σ o in
-    s (ρ ⨾ σ) (record { next = λ a → readB r λ b → writeRef r (f b a) (Observer.next o′ (f b a))
-                      ; complete = Observer.complete o′ ; closed = Observer.closed o′ }) (wkKont σ k)
-
-  -- The failing value leaves only when inclusive, under `ix 0`; then the
-  -- completion under `last`, then the source is cut.  Two callbacks in
-  -- one scope each get their own label.
-  takeWhileᴷ : ∀ {A w} → Bool → (A → Bool) → Subscribe A w → Subscribe A w
-  takeWhileᴷ i p s ρ o k = newCut λ σ c → let o′ = wkObs σ o in
-    s (ρ ⨾ σ) (guarded c (record { next = λ a → if p a then Observer.next o′ a
-                                               else (when i (under (ix 0) (Observer.next o′ a) skipᴬ) >>ᴬ under last (Observer.complete o′) (cut c))
-                                 ; complete = Observer.complete o′ ; closed = Observer.closed o′ }))
-      λ τ sub → attach (wkCut τ c) sub >>ᴬ k (σ ⨾ τ) (record { unsubscribe = cut (wkCut τ c) })
-
-  -- FLATMAP.  Each element's lane is admitted.  A bounded merge queues the ELEMENT past its bound — a lane
-  -- is a callback, so a `Ref` cannot hold one — and re-reads its lane
-  -- when a running lane completes.  The whole completes once the outer
-  -- has, with no lane running and none queued.
-  --
-  -- A lane completing starts the next queued one, which completes in turn:
-  -- recursion through a callback.  The knot is tied in the heap, not in
-  -- Agda — `refill` is a registered sink whose callback dequeues — so
-  -- each runtime closes it as it closes any stored callback.
-  module FlatKit where
-    record Flat (A : Set) (w : World) : Set where
-      field
-        active    : Ref w (base ℕ)
-        outerDone : Ref w (base Bool)
-        queue     : Ref w (fifo A)
-        lanes     : Ref w (list cutTy)
-        refill    : Ref w (maybe (sink ⊤))
-
-    wkFlat : ∀ {A w v} → w ⊑ v → Flat A w → Flat A v
-    wkFlat ρ st = record { active = wkR ρ (Flat.active st) ; outerDone = wkR ρ (Flat.outerDone st) ; queue = wkR ρ (Flat.queue st)
-                         ; lanes = wkR ρ (Flat.lanes st) ; refill = wkR ρ (Flat.refill st) }
-
-    newFlat : ∀ {A w B} → (∀ {v} → w ⊑ v → Flat A v → Act v B) → Act w B
-    newFlat k = newB 0 λ σ₁ a → newB false λ σ₂ d → newRef (fifo _) [] λ σ₃ q → newRef (list cutTy) [] λ σ₄ ls → newRef (maybe (sink ⊤)) nothing λ σ₅ r →
-      k (σ₁ ⨾ σ₂ ⨾ σ₃ ⨾ σ₄ ⨾ σ₅) (record { active = wkR (σ₂ ⨾ σ₃ ⨾ σ₄ ⨾ σ₅) a ; outerDone = wkR (σ₃ ⨾ σ₄ ⨾ σ₅) d
-                                       ; queue = wkR (σ₄ ⨾ σ₅) q ; lanes = wkR σ₅ ls ; refill = r })
-
-    module FlatMap {A B : Set} {w} (op : FlatOp) (f : A → Subscribe B w) (o : Observer B w) (st : Flat A w) where
-      open Flat st
-
-      settle : Act w ⊤
-      settle = readB outerDone λ d → readB active λ n → readF queue λ q →
-               when (d ∧ (n ≡ᵇ 0) ∧ null q) (Observer.complete o)
-
-      killAll : Act w ⊤
-      killAll = readRef lanes λ σ cs → writeRef (wkR σ lanes) [] (writeRef (wkR σ active) 0 (each cs cut))
-
-      -- No lane is started for a closed subscriber: that is what stops a
-      -- synchronous recursion once its output is cut.
-      -- A freed slot goes to the refill sink once it exists, else settles.
-      handOn : ∀ {v} → w ⊑ v → Maybe (Sink v ⊤) → Act v ⊤
-      handOn σ nothing  = wkAct σ settle
-      handOn σ (just r) = send r tt skipᴬ
-
-      -- A lane's observer: its completion frees its slot, and hands it on.
-      lane : ∀ {v} → w ⊑ v → Cut v → Observer B v
-      lane σ c = let st′ = wkFlat σ st ; o′ = wkObs σ o in
-        record { next = Observer.next o′
-               ; complete = writeRef (live c) false (modifyB (Flat.active st′) pred >>ᴬ readRef (Flat.refill st′) λ τ → handOn (σ ⨾ τ))
-               ; closed = Observer.closed o′ }
-
-      start : Subscribe B w → Act w ⊤
-      -- A lane started where the run is is subscribed under `ix 1`.
-      start l = Observer.closed o >>=ᴬ λ cl → when (not cl) (modifyB active suc >>ᴬ newCut λ σ c →
-        modify (Flat.lanes (wkFlat σ st)) (λ τ cs → wkCut τ c ∷ cs) >>ᴬ under (ix 1) (l σ (guarded c (lane σ c)) λ τ → attach (wkCut τ c)) skipᴬ)
-
-      dequeue : Act w ⊤
-      dequeue = readF queue λ where
-        []       → settle
-        (a ∷ as) → writeRef queue as (start (f a))
-
-      admit : FlatOp → A → Act w ⊤
-      admit (mergeᶠ nothing)  a = start (f a)
-      admit (mergeᶠ (just n)) a = readB active λ c → if c <ᵇ n then start (f a) else modifyF queue (_++ [ a ])
-      admit switchᶠ           a = killAll >>ᴬ start (f a)
-      admit exhaustᶠ          a = readB active λ c → when (c ≡ᵇ 0) (start (f a))
-
-      run : Cut w → Subscribe A w → Kont w → Act w ⊤
-      run oc s k = register (λ _ → dequeue) skipᴬ (done false) λ σ r → writeRef (Flat.refill (wkFlat σ st)) (just r) (
-        s σ (guarded (wkCut σ oc) (record { next = λ a → wkAct σ (admit op a) ; complete = writeRef (Flat.outerDone (wkFlat σ st)) true (wkAct σ settle)
-                                          ; closed = Observer.closed (wkObs σ o) }))
-          λ τ sub → attach (wkCut (σ ⨾ τ) oc) sub >>ᴬ k (σ ⨾ τ) (record { unsubscribe = cut (wkCut (σ ⨾ τ) oc) >>ᴬ wkAct (σ ⨾ τ) killAll }))
-
-  open FlatKit
-
-  flatMapᴷ : ∀ {A B w} → FlatOp → (A → Subscribe B w) → Subscribe A w → Subscribe B w
-  flatMapᴷ op f s ρ o k = newFlat λ σ st → newCut λ τ oc →
-    FlatMap.run op (λ a → wkSub (ρ ⨾ σ ⨾ τ) (f a)) (wkObs (σ ⨾ τ) o) (wkFlat τ st) oc (wkSub (ρ ⨾ σ ⨾ τ) s) (wkKont (σ ⨾ τ) k)
-
-  -- Allocates the subject, subscribes the body over it, THEN the source
-  -- into it — body first, so the source's synchronous burst reaches
-  -- whatever the body joined synchronously.  The body's completion cuts
-  -- the source, as an rxjs subscriber's completion tears down what it
-  -- holds — a source subscribed after that runs its burst, then is cut,
-  -- and a source still in its burst runs it out.  Each value goes to the
-  -- subscribers the subject had when that value arrived, as an rxjs
-  -- Subject's `next` does.  Allocated per subscription of the `connect`
-  -- node, so one bound outside a `defer` is the SAME subject on every
-  -- re-subscription of the deferred body.
-  connectᴷ : ∀ {A B w} → Subscribe A w → (∀ {v} → w ⊑ v → Subject A v → Subscribe B v) → Subscribe B w
-  --
-  -- The body runs under `ix 0` and the source under `ix 1`, one after the
-  -- other: the source is NOT subscribed from the body's continuation,
-  -- which runs inside the body's scope.  The body's subscription is kept
-  -- in a cell until the source's exists.  A `Kont` never moves the
-  -- position, so a continuation run inside a scope places nothing.
-  connectᴷ {A} s b ρ o k = newRef (joins A) [] λ σ subs → newB false λ τ cl → newCut λ υ c →
-    newRef (maybe quiet) nothing λ υ′ bodyRef →
-    let st = record { subscribers = wkR (τ ⨾ υ ⨾ υ′) subs ; closed = wkR (υ ⨾ υ′) cl } ; o′ = wkObs (σ ⨾ τ ⨾ υ ⨾ υ′) o
-        c′ = wkCut υ′ c in
-    under (ix 0) (b (ρ ⨾ σ ⨾ τ ⨾ υ ⨾ υ′) st ⊑-refl (record { next = Observer.next o′ ; complete = Observer.complete o′ >>ᴬ cut c′ ; closed = Observer.closed o′ })
-      λ π body → stash (Subscription.unsubscribe body) λ π′ t → writeRef (wkR (π ⨾ π′) bodyRef) (just t) skipᴬ)
-    (under (ix 1) (s (ρ ⨾ σ ⨾ τ ⨾ υ ⨾ υ′) (record
-      { next = λ a → readRef (Subject.subscribers st) λ _ ss → each ss λ j → under (subᴾ (proj₂ j)) (send (proj₁ j) a skipᴬ) skipᴬ
-      ; complete = writeRef (Subject.closed st) true (readRef (Subject.subscribers st) λ _ ss →
-                   each ss λ j → under (subᴾ (proj₂ j)) (finish (proj₁ j) skipᴬ) skipᴬ)
-      ; closed = readB (Subject.closed st) done })
-      λ ψ src → attach (wkCut ψ c′) src >>ᴬ readRef (wkR ψ bodyRef) λ ψ′ mb →
-        k (σ ⨾ τ ⨾ υ ⨾ υ′ ⨾ ψ ⨾ ψ′) (record { unsubscribe = Subscription.unsubscribe (wkSubn ψ′ src) >>ᴬ unsubscribeVia mb }))
-     skipᴬ)
-
-  -- Adds the sink, guarded so that unsubscribing silences it.  Nothing
-  -- else: the source is already running.  Joining a completed subject
-  -- completes at once.
-  joinᴷ : ∀ {A w} → Subject A w → Subscribe A w
-  joinᴷ st ρ o k = here λ j → readB (Subject.closed (wkSubject ρ st)) λ where
-    true  → under last (Observer.complete o) (k ⊑-refl noSub)
-    false → newG true λ σ l → let o′ = wkObs σ o in
-      register (λ a → readG l λ b → when b (Observer.next o′ a)) (readG l λ b → when b (Observer.complete o′))
-               (readG l λ b → if b then Observer.closed o′ else done true) λ τ sk →
-      modify (Subject.subscribers (wkSubject (ρ ⨾ σ ⨾ τ) st)) (λ π ss → ss ++ [ (wkSink π sk , j) ]) >>ᴬ
-      k (σ ⨾ τ) (record { unsubscribe = writeRef (wkR τ l) false skipᴬ })
-
-  -- THE TREE, COMPILED.  Structural everywhere except `defer`, which
-  -- becomes an `unfold`: its body is compiled only when the runtime
-  -- reaches it, so this is total whatever recursion the tree holds, and
-  -- that recursion is the runtime's.
-  compile : ∀ {Γ A w} → Obs Cold Γ A → Env Γ w → Subscribe A w
-  compile (cold c)          ρ = via (startCold c)
-  compile empty             ρ = emptyᴷ
-  compile (of xs)           ρ = ofᴷ xs
-  compile (map f s)         ρ = mapᴷ f (compile s ρ)
-  compile (scan f z s)      ρ = scanᴷ f z (compile s ρ)
-  compile (takeWhile i p s) ρ = takeWhileᴷ i p (compile s ρ)
-  compile (flatMap op f s)  ρ = flatMapᴷ op (λ a → compile (f a) ρ) (compile s ρ)
-  compile (connect s b)     ρ = connectᴷ (compile s ρ) λ σ st → compile b (st ∷ wkEnv σ ρ)
-  compile (connected i)     ρ = joinᴷ (lookup ρ i)
-  compile (defer l)         ρ σ o k = unfold l (wkEnv σ ρ) (Observer.next o) (Observer.complete o) (Observer.closed o)
-                                        (λ τ t → k τ (record { unsubscribe = cancel t (done tt) })) (done tt)
-
-
+-- Contexts: one hole, at scope Γ and type A, in a root at [] and R.
+
+data Ctx (R : Set) : List Set → Set → Set₁ where
+  top     : Ctx R [] R
+  inMap   : ∀ {Γ A B} → (A → B) → Ctx R Γ B → Ctx R Γ A
+  inScan  : ∀ {Γ A B} → (B → A → B) → B → Ctx R Γ B → Ctx R Γ A
+  inCut   : ∀ {Γ A} → Bool → Bool → Ctx R Γ A → Ctx R Γ A
+  inLn    : ∀ {Γ A} → Bool → Ctx R Γ A → Ctx R Γ A
+  inTake  : ∀ {Γ A} → Bool → (A → Bool) → Ctx R Γ A → Ctx R Γ A
+  inOuter : ∀ {Γ A B} → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → List (St Γ B) → Ctx R Γ B → Ctx R Γ A
+  inLanes : ∀ {Γ A B} → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → List (St Γ B) → Ctx R Γ B → Ctx R Γ B
+  inSrc   : ∀ {Γ X B} → CS X → St (X ∷ Γ) B → Ctx R Γ B → Ctx R Γ X
+  inBody  : ∀ {Γ X B} → CS X → St Γ X → Ctx R Γ B → Ctx R (X ∷ Γ) B
+
+plug : ∀ {R Γ A} → Ctx R Γ A → St Γ A → St [] R
+plug top                               s = s
+plug (inMap f c)                       s = plug c (mapS f s)
+plug (inScan f z c)                    s = plug c (scanS f z s)
+plug (inCut l a c)                     s = plug c (cutS l a s)
+plug (inLn b c)                        s = plug c (lnS b s)
+plug (inTake i p c)                    s = plug c (takeS i p s)
+plug (inOuter op f d n q ls c)         s = plug c (flatS op f d n q s ls)
+plug (inLanes op f d n q o pre post c) s = plug c (flatS op f d n q o (pre ++ s ∷ post))
+plug (inSrc k b c)                     s = plug c (connS k s b)
+plug (inBody k o c)                    s = plug c (connS k o s)
+
+-- The child index of the hole in its parent.
+dir : ∀ {R Γ A} → Ctx R Γ A → ℕ
+dir (inLanes op f d n q o pre post c) = suc (length pre)
+dir (inBody k o c)                    = 1
+dir _                                 = 0
+
+dirs : ∀ {R Γ A} → Ctx R Γ A → List ℕ
+dirs top                                  = []
+dirs c@(inMap f c′)                       = dirs c′ ++ [ dir c ]
+dirs c@(inScan f z c′)                    = dirs c′ ++ [ dir c ]
+dirs c@(inCut l a c′)                     = dirs c′ ++ [ dir c ]
+dirs c@(inLn b c′)                        = dirs c′ ++ [ dir c ]
+dirs c@(inTake i p c′)                    = dirs c′ ++ [ dir c ]
+dirs c@(inOuter op f d n q ls c′)         = dirs c′ ++ [ dir c ]
+dirs c@(inLanes op f d n q o pre post c′) = dirs c′ ++ [ dir c ]
+dirs c@(inSrc k b c′)                     = dirs c′ ++ [ dir c ]
+dirs c@(inBody k o c′)                    = dirs c′ ++ [ dir c ]
+
+-- What the hole's observer answers when polled: rxjs's `closed`.  A
+-- switch off answers true; a connect's source asks its subject.
+closed : ∀ {R Γ A} → Ctx R Γ A → Bool
+closed top                               = false
+closed (inMap f c)                       = closed c
+closed (inScan f z c)                    = closed c
+closed (inCut l a c)                     = not l ∨ closed c
+closed (inLn b c)                        = closed c
+closed (inTake i p c)                    = closed c
+closed (inOuter op f d n q ls c)         = closed c
+closed (inLanes op f d n q o pre post c) = closed c
+closed (inSrc k b c)                     = CS.closed k
+closed (inBody k o c)                    = closed c
 
 ------------------------------------------------------------------------
--- THE DRIVER'S SHAPE
+-- Unsubscribing, node by node, as each operator's subscription reads.  A switch cut before its subscription is
+-- attached defers the unsubscribe to the attach, as `Kit.attach` does.
+-- Every started cold it reaches is handed back, to be stopped.
 
--- A pure transition: a state, an input that state admits, what follows.
--- Both runtimes are this one transition, fed by different drivers.
-record Driver (S : Set₁) (I : S → Set₁) (N : S → Set₁) : Set₁ where
-  field transition : (s : S) → I s → N s
+Torn : Set₁
+Torn = List (Σ Set L)
+
+private
+  wrap : ∀ {X Y : Set₁} → (X → Y) → X × Torn → Y × Torn
+  wrap f (x , t) = f x , t
+
+  both : ∀ {X Y Z : Set₁} → (X → Y → Z) → X × Torn → Y × Torn → Z × Torn
+  both f (x , t) (y , u) = f x y , t ++ u
+
+mutual
+  unsub : ∀ {Γ A} → St Γ A → St Γ A × Torn
+  unsub (coldS true l)          = coldS false l , [ (_ , l) ]
+  unsub (mapS f s)              = wrap (mapS f) (unsub s)
+  unsub (scanS f z s)           = wrap (scanS f z) (unsub s)
+  unsub (takeS i p s)           = wrap (takeS i p) (cut s)
+  unsub (flatS op f d n q o ls) = both (flatS op f d 0 q) (cut o) (killAll ls)
+  unsub (connS k o b)           = both (connS k) (unsub o) (unsub b)
+  unsub (joinS j g x)           = joinS j false x , []
+  unsub s                       = s , []
+
+  cut : ∀ {Γ A} → St Γ A → St Γ A × Torn
+  cut (cutS l true s)  = wrap (cutS false true) (unsub s)
+  cut (cutS l false s) = cutS false false s , []
+  cut s                = s , []
+
+  killAll : ∀ {Γ B} → List (St Γ B) → List (St Γ B) × Torn
+  killAll []                = [] , []
+  killAll (lnS true s ∷ ls) = both (λ s′ ls′ → lnS false s′ ∷ ls′) (cut s) (killAll ls)
+  killAll (l ∷ ls)          = wrap (l ∷_) (killAll ls)
 
 ------------------------------------------------------------------------
--- THE MACHINE, shared: the one interpreter of `Act`
+-- Moving the focus
 
-module Machine (C : Set → Set₁) (E : Set → Set) where
-  open Heap
-  open Run (prims C E)
-  open Kit using (skipᴬ)
+Focus : Set → Set₁
+Focus R = Σ (List Set) λ Γ → Σ Set λ A → Ctx R Γ A × St Γ A
 
-  ----------------------------------------------------------------------
-  -- The heap's contents
+pickL : ∀ {Γ B} → ℕ → List (St Γ B) → List (St Γ B) → Maybe (List (St Γ B) × St Γ B × List (St Γ B))
+pickL i       pre []         = nothing
+pickL zero    pre (s ∷ post) = just (pre , s , post)
+pickL (suc i) pre (s ∷ post) = pickL i (pre ++ [ s ]) post
 
-  record Callbacks (A : Set) (h : World) : Set₁ where
-    field
-      onNext     : A → Act h ⊤
-      onComplete : Act h ⊤
-      isClosed   : Act h Bool
+down : ∀ {R Γ A} → ℕ → Ctx R Γ A → St Γ A → Maybe (Focus R)
+down zero          c (mapS f s)              = just (_ , _ , inMap f c , s)
+down zero          c (scanS f z s)           = just (_ , _ , inScan f z c , s)
+down zero          c (cutS l a s)            = just (_ , _ , inCut l a c , s)
+down zero          c (lnS b s)               = just (_ , _ , inLn b c , s)
+down zero          c (takeS i p s)           = just (_ , _ , inTake i p c , s)
+down zero          c (flatS op f d n q o ls) = just (_ , _ , inOuter op f d n q ls c , o)
+down zero          c (connS k o b)           = just (_ , _ , inSrc k b c , o)
+down (suc zero)    c (connS k o b)           = just (_ , _ , inBody k o c , b)
+down (suc i)       c (flatS op f d n q o ls) with pickL i [] ls
+... | just (pre , s , post) = just (_ , _ , inLanes op f d n q o pre post c , s)
+... | nothing               = nothing
+down _             c _                       = nothing
 
-  -- What an entry holds, in the world the heap has reached.  A started
-  -- cold holds whether it is spent.
-  Val : World → Kind → Set₁
-  Val h (cell t) = Lift _ (El h t)
-  Val h (slot A) = Callbacks A h
-  Val h hush     = Act h ⊤
-  Val h play     = Lift _ Bool
+downs : ∀ {R Γ A} → List ℕ → Ctx R Γ A → St Γ A → Maybe (Focus R)
+downs []      c s = just (_ , _ , c , s)
+downs (i ∷ p) c s with down i c s
+... | just (_ , _ , c′ , s′) = downs p c′ s′
+... | nothing                = nothing
 
-  wkVal : ∀ {h v} k → h ⊑ v → Val h k → Val v k
-  wkVal (cell t) ρ x  = lift (wkEl t ρ (lower x))
-  wkVal (slot A) ρ cb = record { onNext = λ a → wkAct ρ (Callbacks.onNext cb a) ; onComplete = wkAct ρ (Callbacks.onComplete cb)
-                               ; isClosed = wkAct ρ (Callbacks.isClosed cb) }
-  wkVal hush     ρ m  = wkAct ρ m
-  wkVal play     ρ x  = x
+------------------------------------------------------------------------
+-- A join and its binder, found up the join's own context
 
-  get : ∀ {ℓ} {P : Kind → Set ℓ} {w k} → All P w → w ∋ k → P k
-  get (x ∷ xs) here      = x
-  get (x ∷ xs) (there i) = get xs i
+-- Joining: the binder's subject closed, or the joiner's path appended.
+-- `acc` is the path from the frame reached down to the joiner.
+joinUp : ∀ {R Γ A X} → Pos → Ctx R Γ A → X ∈ Γ → List ℕ → Bool × Ctx R Γ A
+joinUp j top                           ()        acc
+joinUp j c@(inMap f c′)                x         acc with joinUp j c′ x (dir c ∷ acc)
+... | b , c″ = b , inMap f c″
+joinUp j c@(inScan f z c′)             x         acc with joinUp j c′ x (dir c ∷ acc)
+... | b , c″ = b , inScan f z c″
+joinUp j c@(inCut l a c′)              x         acc with joinUp j c′ x (dir c ∷ acc)
+... | b , c″ = b , inCut l a c″
+joinUp j c@(inLn l c′)                 x         acc with joinUp j c′ x (dir c ∷ acc)
+... | b , c″ = b , inLn l c″
+joinUp j c@(inTake i p c′)             x         acc with joinUp j c′ x (dir c ∷ acc)
+... | b , c″ = b , inTake i p c″
+joinUp j c@(inOuter op f d n q ls c′)  x         acc with joinUp j c′ x (dir c ∷ acc)
+... | b , c″ = b , inOuter op f d n q ls c″
+joinUp j c@(inLanes op f d n q o pre post c′) x  acc with joinUp j c′ x (dir c ∷ acc)
+... | b , c″ = b , inLanes op f d n q o pre post c″
+joinUp j c@(inSrc k b′ c′)             x         acc with joinUp j c′ x (dir c ∷ acc)
+... | b , c″ = b , inSrc k b′ c″
+joinUp j (inBody k o c′)               (here refl) acc with CS.closed k
+... | true  = true , inBody k o c′
+... | false = false , inBody (record k { subs = CS.subs k ++ [ (1 ∷ acc , j) ] }) o c′
+joinUp j c@(inBody k o c′)             (there x) acc with joinUp j c′ x (dir c ∷ acc)
+... | b , c″ = b , inBody k o c″
 
-  put : ∀ {ℓ} {P : Kind → Set ℓ} {w k} → All P w → w ∋ k → P k → All P w
-  put (x ∷ xs) here      y = y ∷ xs
-  put (x ∷ xs) (there i) y = x ∷ put xs i y
+-- What the binder is feeding now.
+fedUp : ∀ {R Γ A X} → Ctx R Γ A → X ∈ Γ → Maybe (Ev X)
+fedUp top                               ()
+fedUp (inMap f c)                       x = fedUp c x
+fedUp (inScan f z c)                    x = fedUp c x
+fedUp (inCut l a c)                     x = fedUp c x
+fedUp (inLn b c)                        x = fedUp c x
+fedUp (inTake i p c)                    x = fedUp c x
+fedUp (inOuter op f d n q ls c)         x = fedUp c x
+fedUp (inLanes op f d n q o pre post c) x = fedUp c x
+fedUp (inSrc k b c)                     x = fedUp c x
+fedUp (inBody k o c)            (here refl) with CS.feeds k
+... | e ∷ _ = just e
+... | []    = nothing
+fedUp (inBody k o c)            (there x) = fedUp c x
 
-  -- An entry as it was stored, in the world it was stored in, and how
-  -- that world grew since.  Weakened only when read: a callback stored
-  -- and called k allocations later is weakened once, by the one composed
-  -- inclusion, not wrapped in k weakenings re-run at every call.
-  record Stored (h : World) (k : Kind) : Set₁ where
-    constructor stored
-    field
-      {made} : World
-      val    : Val made k
-      into   : made ⊑ h
+------------------------------------------------------------------------
+-- The machine
 
-  wkAll : ∀ {h v} {w} → h ⊑ v → All (Stored h) w → All (Stored v) w
-  wkAll ρ []                = []
-  wkAll ρ (stored x σ ∷ xs) = stored x (σ ⨾ ρ) ∷ wkAll ρ xs
+-- What a resumed job is: a joiner's feed; the attach of its child's
+-- subscription (a connect's body, then its source); what a body's
+-- completion left owed.
+data Tag : Set where
+  go att attBody owed : Tag
+  -- an of's i-th value
+  next : ℕ → Tag
+  -- a takeWhile's completion owed, then its cut
+  owedCp owedCut : Tag
+  -- a feed under way: the joiners still to feed, by path from the root,
+  -- and where each joined
+  feeding : List (List ℕ × Pos) → Tag
 
-  Heapᴹ : World → Set₁
-  Heapᴹ h = All (Stored h) h
+-- A job: the node, by its path; what it owes; where the run resumes it.
+Job : Set
+Job = List ℕ × Tag × Pos
 
-  extend : ∀ {h k} → Heapᴹ h → Val (k ∷ h) k → Heapᴹ (k ∷ h)
-  extend hp x = stored x same ∷ wkAll new hp
+data Mode (A : Set) : Set where
+  subscribing absorbed : Mode A
+  resuming : Tag → Mode A
+  rising   : Ev A → Mode A
 
-  -- What an entry holds, in the heap's world.
-  look : ∀ {h k} → Heapᴹ h → h ∋ k → Val h k
-  look {k = k} hp i with get hp i
-  ... | stored x σ = wkVal k σ x
+record Conf (R : Set) : Set₁ where
+  constructor ⟨_,_,_,_,_⟩
+  field
+    {Γ}  : List Set
+    {A}  : Set
+    ctx  : Ctx R Γ A
+    foc  : St Γ A
+    mode : Mode A
+    pos  : Pos
+    rets : List Job
 
-  store : ∀ {h k} → Heapᴹ h → h ∋ k → Val h k → Heapᴹ h
-  store hp i x = put hp i (stored x same)
+-- What the root is shown, and where.
+Shown : Set → Set
+Shown R = List (Pos × Ev R)
 
-  cbs : ∀ {h A} → Heapᴹ h → Sink h A → Callbacks A h
-  cbs hp s = look hp s
+-- A step taken, what it showed and the colds it tore down; or a cold
+-- subscribed, the run stopped until the runtime hands back its state.
+data Stepped (R : Set) : Set₁ where
+  moved    : Conf R → Shown R → Torn → Stepped R
+  starting : ∀ {A} → C A → Pos → (L A → Conf R) → Stepped R
 
-  spent? : ∀ {h} → Heapᴹ h → Handle h → Bool
-  spent? hp hd = lower (look hp hd)
+private
+  ok : ∀ {R} → Conf R → Stepped R
+  ok k = moved k [] []
 
-  ----------------------------------------------------------------------
-  -- Configurations
+_⊕_ : Pos → Pos → Pos
+p ⊕ q = p ++ q
 
-  -- What waits on a result of type X, made in world w.  `back`: a scope
-  -- returning, its position put back.  `rehold`: a delivery the driver
-  -- fed, after which the driver has the turn again.  `told`: a poll the
-  -- driver fed, its answer handed out.
-  data Wait (w : World) : Set → Set → Set₁ where
-    rest   : ∀ {B} → Act w B → Wait w ⊤ B
-    back   : ∀ {B} → Pos → Act w B → Wait w ⊤ B
-    rehold : Wait w ⊤ ⊤
-    told   : Wait w Bool ⊤
+-- The joiners, by path from the root, at the binder in `c`.
+rooted : ∀ {R Γ A} → Ctx R Γ A → List (List ℕ × Pos) → List (List ℕ × Pos)
+rooted c []             = []
+rooted c ((q , j) ∷ js) = (dirs c ++ q , j) ∷ rooted c js
 
-  -- Each frame made in its own world, linked to the one below it by how
-  -- that world grew.  The bottom hands the turn to the driver for good.
-  data Stack : World → Set → Set₁ where
-    bottom : ∀ {w} → Stack w ⊤
-    push   : ∀ {u w X Y} → Wait w X Y → u ⊑ w → Stack u Y → Stack w X
+drop₁ : ∀ {X : Set} → List X → List X
+drop₁ []       = []
+drop₁ (_ ∷ xs) = xs
 
-  -- What runs next in world h.  `held`: the DRIVER'S TURN — a cold's
-  -- burst being played, or nothing at all over `bottom`; the driver feeds
-  -- deliveries and polls, then `go` resumes the stack.  `asking`: an
-  -- effect's answer awaited.
-  data Ctl (h : World) : Set₁ where
-    run    : ∀ {w B} → Act h B → w ⊑ h → Stack w B → Ctl h
-    ret    : ∀ {w X} → X → w ⊑ h → Stack w X → Ctl h
-    held   : ∀ {w} → w ⊑ h → Stack w ⊤ → Ctl h
-    asking : ∀ {w X B} → E X → (X → Act h B) → w ⊑ h → Stack w B → Ctl h
+begin : ∀ {R Γ A} → Ctx R Γ A → Obs C Γ A → Pos → List Job → Stepped R
+begin c (cold x)          p rs = starting x p λ l → ⟨ c , coldS true l , absorbed , p , rs ⟩
+begin c empty             p rs = ok ⟨ c , doneS , rising cp , p ⊕ [ last ] , rs ⟩
+begin c (of xs)           p rs = ok ⟨ c , ofS xs , resuming (next 0) , p , rs ⟩
+begin c (map f s)         p rs = ok ⟨ inMap f c , pend s , subscribing , p , rs ⟩
+begin c (scan f z s)      p rs = ok ⟨ inScan f z c , pend s , subscribing , p , rs ⟩
+begin c (takeWhile i q s) p rs = let c′ = inTake i q c in
+  ok ⟨ inCut true false c′ , pend s , subscribing , p , (dirs c′ ++ [ 0 ] , att , p) ∷ rs ⟩
+begin c (flatMap op f s)  p rs = let c′ = inOuter op f false 0 [] [] c in
+  ok ⟨ inCut true false c′ , pend s , subscribing , p , (dirs c′ ++ [ 0 ] , att , p) ∷ rs ⟩
+-- the body under `ix 0`; its source, once the body's subscription
+-- exists, under `ix 1`
+begin c (connect s b)     p rs =
+  ok ⟨ inBody (cs false [] [] false true false) (pend s) c , pend b , subscribing , p ⊕ [ ix 0 ] , (dirs c , attBody , p) ∷ rs ⟩
+-- a joiner keeps where it joined; a completed subject completes it under `last`
+begin c (connected x)     p rs with joinUp p c x []
+... | true  , c′ = ok ⟨ c′ , doneS , rising cp , p ⊕ [ last ] , rs ⟩
+... | false , c′ = ok ⟨ c′ , joinS p true x , absorbed , p , rs ⟩
+-- a defer's body one level down
+begin c (defer l)         p rs = ok ⟨ c , pend (Later.force l) , subscribing , p ⊕ [ ix 1 ] , rs ⟩
 
-  record Conf : Set₁ where
-    constructor ⟨_,_,_⟩
-    field
-      {world} : World
-      heap    : Heapᴹ world
-      pos     : Pos          -- where the run is: a ghost the IO driver ignores
-      ctl     : Ctl world
-  open Conf
+-- A lane begun under `ix 1`, unless the flatMap's own observer is closed.
+start : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → A → Pos → List Job → Conf R
+start c op f d n q o ls a p rs with closed c
+... | true  = ⟨ c , flatS op f d n q o ls , absorbed , p , rs ⟩
+... | false = let c′ = inLn true (inLanes op f d (suc n) q o ls [] c) in
+  ⟨ inCut true false c′ , pend (f a) , subscribing , p ⊕ [ ix 1 ] , (dirs c′ ++ [ 0 ] , att , p ⊕ [ ix 1 ]) ∷ rs ⟩
 
-  -- What the machine asks of its driver.
-  data Output (h : World) : Set₁ where
-    perform  : ∀ {X} → E X → Output h                        -- run it, `answer` its result
-    start    : ∀ {A} → C A → Sink h A → Handle h → Output h  -- play it into the sink: its burst now
-    stopped  : Handle h → Output h                            -- tear it down
-    closedIs : Bool → Output h                                -- a poll's answer
+-- The outer done, no lane running and, `e`, none waiting: complete.
+settle : ∀ {B} → Bool → ℕ → Bool → Mode B
+settle d n e = if d ∧ (n ≡ᵇ 0) ∧ e then rising cp else absorbed
 
-  -- What an `asking` machine waits for.
-  Awaited : Conf → Set
-  Awaited ⟨ _ , _ , asking {X = X} _ _ _ _ ⟩ = X
-  Awaited _                                = ⊤
+-- A slot freed: the next waiting value's lane begun, else settle.
+dequeue : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → Pos → List Job → Conf R
+dequeue c op f d n []      o ls p rs = ⟨ c , flatS op f d n [] o ls , settle d n true , p , rs ⟩
+dequeue c op f d n (a ∷ q) o ls p rs = start c op f d n q o ls a p rs
 
-  -- What a driver may feed.  A delivery carries the position its
-  -- emission is placed at; the IO driver passes `[]`.
-  data Input (c : Conf) : Set₁ where
-    go      : Input c
-    answer  : Awaited c → Input c
-    deliver : ∀ {A} → Sink (world c) A → A → Pos → Input c
-    end     : ∀ {A} → Handle (world c) → Sink (world c) A → Pos → Input c   -- the cold completed: spent, then its sink's completion
-    poll    : ∀ {A} → Sink (world c) A → Input c
+admit : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → A → Pos → List Job → Stepped R
+admit c (mergeᶠ nothing)  f d n q o ls a p rs = ok (start c (mergeᶠ nothing) f d n q o ls a p rs)
+admit c (mergeᶠ (just m)) f d n q o ls a p rs =
+  ok (if n <ᵇ m then start c (mergeᶠ (just m)) f d n q o ls a p rs
+      else ⟨ c , flatS (mergeᶠ (just m)) f d n (q ++ [ a ]) o ls , absorbed , p , rs ⟩)
+admit c switchᶠ           f d n q o ls a p rs with killAll ls
+... | ls′ , t = moved (start c switchᶠ f d 0 q o ls′ a p rs) [] t
+admit c exhaustᶠ          f d n q o ls a p rs with n ≡ᵇ 0
+... | true  = ok (start c exhaustᶠ f d n q o ls a p rs)
+... | false = ok ⟨ c , flatS exhaustᶠ f d n q o ls , absorbed , p , rs ⟩
 
-  -- One transition's result: the next configuration, how the world grew,
-  -- and what is asked of the driver.
-  record Next (h : World) : Set₁ where
-    constructor next
-    field
-      conf    : Conf
-      grew    : h ⊑ world conf
-      outputs : List (Output (world conf))
+ended : ∀ {Γ B} → St Γ B → St Γ B
+ended (lnS b (cutS l a s)) = lnS b (cutS false a s)
+ended s                    = s
 
-  ----------------------------------------------------------------------
-  -- One transition
+-- A rise moves no position, except a takeWhile's own failing value and
+-- completion, under `ix 0` and `last`.
+rise : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Ev A → Pos → List Job → Stepped R
+rise top s e p rs = moved ⟨ top , s , absorbed , p , rs ⟩ [ (p , e) ] []
+rise (inMap f c) s e p rs = ok ⟨ c , mapS f s , rising (mapEv f e) , p , rs ⟩
+rise (inScan f z c) s (nx a) p rs = ok ⟨ c , scanS f (f z a) s , rising (nx (f z a)) , p , rs ⟩
+rise (inScan f z c) s cp     p rs = ok ⟨ c , scanS f z s , rising cp , p , rs ⟩
+rise (inCut l a c) s e p rs = ok ⟨ c , cutS l a s , (if l then rising e else absorbed) , p , rs ⟩
+rise (inLn b c) s e p rs = ok ⟨ c , lnS b s , rising e , p , rs ⟩
+rise (inTake i q c) s (nx a) p rs with q a | i
+... | true  | _     = ok ⟨ c , takeS i q s , rising (nx a) , p , rs ⟩
+... | false | true  = ok ⟨ c , takeS i q s , rising (nx a) , p ⊕ [ ix 0 ] , (dirs c , owedCp , p) ∷ rs ⟩
+... | false | false = ok ⟨ c , takeS i q s , rising cp , p ⊕ [ last ] , (dirs c , owedCut , p) ∷ rs ⟩
+rise (inTake i q c) s cp p rs = ok ⟨ c , takeS i q s , rising cp , p , rs ⟩
+rise (inOuter op f d n q ls c) o (nx a) p rs = admit c op f d n q o ls a p rs
+rise (inOuter op f d n q ls c) o cp     p rs = ok ⟨ c , flatS op f true n q o ls , settle true n (null q) , p , rs ⟩
+rise (inLanes op f d n q o pre post c) s (nx b) p rs = ok ⟨ c , flatS op f d n q o (pre ++ s ∷ post) , rising (nx b) , p , rs ⟩
+rise (inLanes op f d n q o pre post c) s cp     p rs = ok (dequeue c op f d (pred n) q o (pre ++ ended s ∷ post) p rs)
+rise (inSrc k b c) s (nx a) p rs = ok ⟨ c , connS (record k { feeds = nx a ∷ CS.feeds k }) s b , resuming (feeding (rooted c (CS.subs k))) , p , rs ⟩
+rise (inSrc k b c) s cp     p rs = ok ⟨ c , connS (record k { closed = true ; feeds = cp ∷ CS.feeds k }) s b , resuming (feeding (rooted c (CS.subs k))) , p , rs ⟩
+rise (inBody k o c) s (nx b) p rs = ok ⟨ c , connS k o s , rising (nx b) , p , rs ⟩
+rise (inBody k o c) s cp     p rs = ok ⟨ c , connS k o s , rising cp , p , (dirs c , owed , p) ∷ rs ⟩
 
-  still : ∀ {h} → Heapᴹ h → Pos → Ctl h → Next h
-  still hp p c = next ⟨ hp , p , c ⟩ same []
+-- A connect's next feed: each joiner fed under `sub` of where it joined;
+-- the last fed, the value is done.
+feedOn : ∀ {R Γ X B} → Ctx R Γ B → CS X → St Γ X → St (X ∷ Γ) B → List (List ℕ × Pos) → Pos → List Job → Conf R
+feedOn c k o b [] p rs = ⟨ c , connS (record k { feeds = drop₁ (CS.feeds k) }) o b , absorbed , p , rs ⟩
+feedOn c k o b ((q , j) ∷ js) p rs with downs q top (plug c (connS k o b))
+... | just (_ , _ , c′ , s′) = ⟨ c′ , s′ , resuming go , p ⊕ [ subᴾ j ] , (dirs c , feeding js , p) ∷ rs ⟩
+... | nothing                = ⟨ c , connS k o b , absorbed , p , rs ⟩
 
-  -- A `defer` reached: its body compiled one level down, as `deferᴰ`
-  -- puts it, its subscription's unsubscribe stashed.
-  unfolded : ∀ {h Γ A} → Later C Γ A → Env Γ h → (A → Act h ⊤) → Act h ⊤ → Act h Bool → (∀ {v} → h ⊑ v → Quiet v → Act v ⊤) → Act h ⊤
-  unfolded l e n c x k = under (ix 1)
-    (compile (Later.force l) e same (record { next = n ; complete = c ; closed = x }) λ σ sub →
-      stash (Subscription.unsubscribe sub) λ τ t → k (σ ⨾ τ) t)
-    (done tt)
+-- Which job a node and a tag make: every pairing the machine resumes,
+-- and the rest idle.
+data Res {Γ : List Set} {A : Set} : St Γ A → Tag → Set₁ where
+  ofR   : ∀ xs i → Res (ofS xs) (next i)
+  attR  : ∀ l a s → Res (cutS l a s) att
+  cpR   : ∀ i q s → Res (takeS i q s) owedCp
+  cutR  : ∀ i q s → Res (takeS i q s) owedCut
+  feedR : ∀ {X} k (o : St Γ X) b js → Res (connS k o b) (feeding js)
+  bodyR : ∀ {X} k (o : St Γ X) b → Res (connS k o b) attBody
+  srcR  : ∀ {X} k (o : St Γ X) b → Res (connS k o b) att
+  endR  : ∀ {X} k (o : St Γ X) b → Res (connS k o b) owed
+  joinR : ∀ j x → Res (joinS j true x) go
+  idle  : ∀ {s t} → Res s t
 
-  runs : ∀ {h w B} → Heapᴹ h → Pos → Act h B → w ⊑ h → Stack w B → Next h
-  runs hp p (done b)            σ k = still hp p (ret b σ k)
-  runs hp p (newRef t a k′)     σ k = next ⟨ extend hp (lift (wkEl t new a)) , p , run (k′ new here) (σ ⨾ new) k ⟩ new []
-  runs hp p (readRef r k′)      σ k = still hp p (run (k′ same (lower (look hp r))) σ k)
-  runs hp p (writeRef r a k′)   σ k = still (store hp r (lift a)) p (run k′ σ k)
-  runs hp p (register n c x k′) σ k = next ⟨ extend hp (record { onNext = λ a → wkAct new (n a) ; onComplete = wkAct new c ; isClosed = wkAct new x })
-                                           , p , run (k′ new here) (σ ⨾ new) k ⟩ new []
-  runs hp p (send s a k′)       σ k = still hp p (run (Callbacks.onNext (cbs hp s) a) same (push (rest k′) σ k))
-  runs hp p (finish s k′)       σ k = still hp p (run (Callbacks.onComplete (cbs hp s)) same (push (rest k′) σ k))
-  -- The cold's burst is the driver's: it holds, feeding deliveries, until
-  -- it says `go`.
-  runs hp p (startCold c s k′)  σ k = next ⟨ extend hp (lift false) , p , held same (push (rest (k′ new here)) (σ ⨾ new) k) ⟩ new
-                                           [ start c (wk∋ new s) here ]
-  runs hp p (stop hd k′)        σ k = next ⟨ store hp hd (lift true) , p , run k′ σ k ⟩ same [ stopped hd ]
-  runs hp p (stash m k′)        σ k = next ⟨ extend hp (wkAct new m) , p , run (k′ new here) (σ ⨾ new) k ⟩ new []
-  runs hp p (cancel t k′)       σ k = still hp p (run (look hp t) same (push (rest k′) σ k))
-  runs hp p (eff e k′)          σ k = next ⟨ hp , p , asking e k′ σ k ⟩ same [ perform e ]
-  runs hp p (here k′)           σ k = still hp p (run (k′ p) σ k)
-  runs hp p (under l m k′)      σ k = still hp (p ++ [ l ]) (run m same (push (back p k′) σ k))
-  runs hp p diverge             σ k = still hp p (run diverge σ k)
-  runs hp p (unfold l e n c x k′ m) σ k = still hp p (run (unfolded l e n c x k′) same (push (rest m) σ k))
+res : ∀ {Γ A} (s : St Γ A) t → Res s t
+res (ofS xs)         (next i)     = ofR xs i
+res (cutS l a s)     att          = attR l a s
+res (takeS i q s)    owedCp       = cpR i q s
+res (takeS i q s)    owedCut      = cutR i q s
+res (connS k o b)    (feeding js) = feedR k o b js
+res (connS k o b)    attBody      = bodyR k o b
+res (connS k o b)    att          = srcR k o b
+res (connS k o b)    owed         = endR k o b
+res (joinS j true x) go           = joinR j x
+res s                t            = idle
 
-  returns : ∀ {h w X} → Heapᴹ h → Pos → X → w ⊑ h → Stack w X → Next h
-  returns hp p x σ bottom              = still hp p (held σ bottom)
-  returns hp p x σ (push (rest m) ρ k)   = still hp p (run (wkAct σ m) (ρ ⨾ σ) k)
-  returns hp p x σ (push (back q m) ρ k) = still hp q (run (wkAct σ m) (ρ ⨾ σ) k)
-  returns hp p x σ (push rehold ρ k)     = still hp p (held (ρ ⨾ σ) k)
-  returns hp p b σ (push told ρ k)       = next ⟨ hp , p , held (ρ ⨾ σ) k ⟩ same [ closedIs b ]
+-- Unsubscribed or left as it is.
+unsubIf : ∀ {Γ A} → Bool → St Γ A → St Γ A × Torn
+unsubIf true  s = unsub s
+unsubIf false s = s , []
 
-  -- A callback the driver fed, run while it holds: at the position fed,
-  -- the old one put back, then the driver's turn again.
-  fed : ∀ {h w} → Heapᴹ h → Pos → Pos → Act h ⊤ → w ⊑ h → Stack w ⊤ → Next h
-  fed hp p q a σ k = still hp q (run a same (push (back p (done tt)) same (push rehold σ k)))
+resumeR : ∀ {R Γ A} {s : St Γ A} {t} → Ctx R Γ A → Res s t → Pos → List Job → Stepped R
+-- the i-th value under `ix i`, the completion under `last`, of where the of was subscribed
+resumeR c (ofR xs i) p rs with closed c | xs
+... | true  | _       = ok ⟨ c , doneS , absorbed , p , rs ⟩
+... | false | []      = ok ⟨ c , doneS , rising cp , p ⊕ [ last ] , rs ⟩
+... | false | x ∷ xs′ = ok ⟨ c , ofS xs′ , rising (nx x) , p ⊕ [ ix i ] , (dirs c , next (suc i) , p) ∷ rs ⟩
+resumeR c (attR l a s) p rs with unsubIf (not l) s
+... | s′ , t = moved ⟨ c , cutS l true s′ , absorbed , p , rs ⟩ [] t
+resumeR c (cpR i q s)  p rs = ok ⟨ c , takeS i q s , rising cp , p ⊕ [ last ] , (dirs c , owedCut , p) ∷ rs ⟩
+resumeR c (cutR i q s) p rs with cut s
+... | s′ , t = moved ⟨ c , takeS i q s′ , absorbed , p , rs ⟩ [] t
+resumeR c (feedR k o b js) p rs = ok (feedOn c k o b js p rs)
+resumeR c (bodyR k o b) p rs =
+  ok ⟨ inSrc (record k { bodyAtt = true }) b c , o , subscribing , p ⊕ [ ix 1 ] , (dirs c , att , p ⊕ [ ix 1 ]) ∷ rs ⟩
+resumeR c (srcR k o b) p rs with unsubIf (not (CS.srcLive k)) o
+... | o′ , t = moved ⟨ c , connS (record k { srcAtt = true }) o′ b , absorbed , p , rs ⟩ [] t
+resumeR c (endR k o b) p rs with unsubIf (CS.srcAtt k) o
+... | o′ , t = moved ⟨ c , connS (record k { srcLive = false }) o′ b , absorbed , p , rs ⟩ [] t
+resumeR c (joinR j x) p rs with fedUp c x
+... | just e  = ok ⟨ c , joinS j true x , rising e , p , rs ⟩
+... | nothing = ok ⟨ c , joinS j true x , absorbed , p , rs ⟩
+resumeR {s = s} c idle p rs = ok ⟨ c , s , absorbed , p , rs ⟩
 
-  transition : (c : Conf) → Input c → Next (world c)
-  transition ⟨ hp , p , run a σ k ⟩      go          = runs hp p a σ k
-  transition ⟨ hp , p , ret x σ k ⟩      go          = returns hp p x σ k
-  transition ⟨ hp , p , held σ k ⟩       go          = returns hp p tt σ k
-  transition ⟨ hp , p , asking e k′ σ k ⟩ (answer x) = still hp p (run (k′ x) σ k)
-  transition ⟨ hp , p , held σ k ⟩       (deliver s a q) = fed hp p q (Callbacks.onNext (cbs hp s) a) σ k
-  transition ⟨ hp , p , held σ k ⟩       (end hd s q) = fed (store hp hd (lift true)) p q (Callbacks.onComplete (cbs hp s)) σ k
-  transition ⟨ hp , p , held σ k ⟩       (poll s)    = still hp p (run (Callbacks.isClosed (cbs hp s)) same (push told σ k))
-  transition ⟨ hp , p , c ⟩              _           = still hp p c
+resume : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Tag → Pos → List Job → Stepped R
+resume c s t = resumeR c (res s t)
 
-  -- THE MACHINE: the one transition both drivers feed.
-  machine : Driver Conf Input (λ c → Next (world c))
-  machine = record { transition = transition }
+-- By the mode first, so a fact about a step splits on the mode alone.
+stepAt : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Mode A → Pos → List Job → Stepped R
+stepAt c s (resuming t) p rs = resume c s t p rs
+stepAt c s (rising e)   p rs = rise c s e p rs
+stepAt c (pend o) subscribing p rs = begin c o p rs
+stepAt c s subscribing p rs = ok ⟨ c , s , subscribing , p , rs ⟩
+-- a job resumed where it was suspended
+stepAt c s absorbed p ((q , t , p′) ∷ rs) with downs q top (plug c s)
+... | just (_ , _ , c′ , s′) = ok ⟨ c′ , s′ , resuming t , p′ , rs ⟩
+... | nothing                = ok ⟨ c , s , absorbed , p , rs ⟩
+stepAt c s absorbed p [] = ok ⟨ c , s , absorbed , p , [] ⟩
 
-  -- Subscribing at the root: the machine's first configuration.
-  load : ∀ {A} → Subscribe A [] → Observer A [] → Conf
-  load s o = ⟨ [] , root , run (s same o λ _ _ → done tt) same bottom ⟩
+step : ∀ {R} → Conf R → Stepped R
+step ⟨ c , s , m , p , rs ⟩ = stepAt c s m p rs
+
+-- The root subscribed.
+load : ∀ {R} → Obs C [] R → Conf R
+load o = ⟨ top , pend o , subscribing , root , [] ⟩
+
+------------------------------------------------------------------------
+-- What a runtime reads and does
+
+-- Where the focus is, from the root.
+spot : ∀ {R} → Conf R → List ℕ
+spot k = dirs (Conf.ctx k)
+
+-- Everything running now absorbed: the runtime's turn, once the jobs
+-- owed above what it is playing are done.
+calm : ∀ {R} → Conf R → Bool
+calm k with Conf.mode k
+... | absorbed = true
+... | _        = false
+
+-- How many jobs are owed.
+depth : ∀ {R} → Conf R → ℕ
+depth k = length (Conf.rets k)
+
+-- A started cold, found by its path: whether it is live; its state;
+-- whether its observer is closed; a delivery into it at a position,
+-- with its state after; its state replaced, nothing delivered.
+data Poke (R : Set) : Set₁ where
+  gone : Poke R
+  leaf : ∀ {A} → Bool → L A → Bool → (Ev A → L A → Bool → Pos → Conf R) → (L A → Conf R) → Poke R
+
+poke : ∀ {R} → List ℕ → Conf R → Poke R
+poke π ⟨ c , s , m , p , rs ⟩ with downs π top (plug c s)
+... | just (_ , _ , c′ , coldS b l) =
+  leaf b l (closed c′) (λ e l′ b′ p′ → ⟨ c′ , coldS b′ l′ , rising e , p′ , rs ⟩) (λ l′ → ⟨ c′ , coldS b l′ , absorbed , p , rs ⟩)
+... | _ = gone

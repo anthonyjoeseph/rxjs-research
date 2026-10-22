@@ -8,8 +8,7 @@ module port.Sorted.Walk where
 open import Data.List using ([])
 
 open import denotation.MonotonicList.Events using (Pos; root)
-open import operation.PureObservable using (PureObs)
-open import operation.StateTree.Pure using (module Driver)
+open import operation.PureObservable using (PureObs; module Driver)
 open import port.Sorted using (_≤ᵖ_; module Sorting)
 
 module SortingWalk (R : Set) where

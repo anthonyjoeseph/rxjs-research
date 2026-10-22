@@ -13,7 +13,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; <ᵖ-trans)
-open import operation.StateTree.Pure using (module Driver)
+open import operation.PureObservable using (module Driver)
 
 ------------------------------------------------------------------------
 -- The order, reflexive

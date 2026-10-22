@@ -172,7 +172,14 @@ def main():
     ap.add_argument("--port", default="port", help="the port directory, under --src")
     ap.add_argument("--old", nargs="+", default=["agda-impl/adequacy", "agda-impl/operation/Machine.agda"],
                     help="the old tower's paths, from the repo root")
+    ap.add_argument("--renamed", nargs="*", default=[], metavar="NEW=OLD",
+                    help="a cone module under --src, and a path from the repo root it was renamed from: "
+                         "what OLD declared at --base counts as declared before")
     a = ap.parse_args()
+    renamed = {}
+    for r in a.renamed:
+        new, old_path = r.split("=", 1)
+        renamed.setdefault(new, []).append(old_path)
 
     with tempfile.TemporaryDirectory() as d:
         old = kinds_by_file(d, snapshot(a.base, a.old, d))
@@ -188,7 +195,12 @@ def main():
     for f in cone(a.src, roots, in_tower):
         with open(os.path.join(a.src, f), encoding="utf-8") as fh:
             lines = fh.read().split("\n")
-        before = None if f in roots else names_at(a.base, os.path.join(prefix, f))
+        before = None
+        if f not in roots:
+            for path in [os.path.join(prefix, f)] + renamed.get(f, []):
+                names = names_at(a.base, path)
+                if names is not None:
+                    before = (before or set()) | names
         defs, _, postulate_names, order = wiring.extract_definitions(a.src, [f])[:4]
         for n in order:
             if n.startswith("...") or (before is not None and n in before):

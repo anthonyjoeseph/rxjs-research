@@ -1,7 +1,7 @@
 {-# OPTIONS --guardedness #-}
 
 -- THE LINK, PORTED to the state-tree engine.  The pure semantics the
--- harness runs (`operation.StateTree.Pure`) agrees with the denotation:
+-- harness runs (`operation.PureObservable`) agrees with the denotation:
 -- the limit of its prefixes, the n-th read for n steps up to tick n, is
 -- the meaning observed at the root, with positions forgotten down to
 -- ticks.
@@ -23,8 +23,7 @@ open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; sym; subst)
 
 open import operation.Placed using (Up; Placed; ahead; framed; shows; placed-⊑; frames-cut)
-open import operation.PureObservable using (PureObs; module Pure)
-open import operation.StateTree.Pure using (module Driver) renaming (run to prefix)
+open import operation.PureObservable using (PureObs; module Pure; module Driver) renaming (run to prefix)
 open import port.Sorted using (module Sorting)
 open import port.Sorted.Walk using (module SortingWalk)
 open import port.Content using (module Honesty)

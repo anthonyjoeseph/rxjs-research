@@ -32,8 +32,7 @@ open import port.Sorted using (_≤ᵖ_)
 open import port.Unsub using (module Unsubbing)
 open import port.Stepper.Past using (afterᴱ)
 open import denotation.Denote using (⟦_⟧)
-open import operation.PureObservable using (PureObs; module Pure)
-open import operation.StateTree.Pure using (module Driver)
+open import operation.PureObservable using (PureObs; module Pure; module Driver)
 open Events∞
 
 module Ghosting (R : Set) where
