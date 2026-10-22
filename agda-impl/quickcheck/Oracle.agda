@@ -16,13 +16,13 @@ module quickcheck.Oracle where
 open import Agda.Builtin.IO using (IO)
 open import Data.List using (List; []; _∷_; reverse) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using ([])
-open import Data.Bool using (true; false; if_then_else_)
+open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≡ᵇ_)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.String using (String; _++_; intersperse)
 open import Data.Product using (_×_; _,_)
-open import Data.Unit using (⊤)
+open import Data.Unit using (⊤; tt)
 open import IO.Primitive.Core using (pure; _>>=_)
 open import IO.Primitive.Finite using (putStrLn)
 
@@ -31,7 +31,9 @@ open import denotation.MonotonicList.Events using (ML; Burst; Burst∞; ML∞; d
 open import denotation.MonotonicList using (observe; ticks)
 open import denotation.Denote using (⟦_⟧[_])
 open import operation.StateTree.Pure using () renaming (run to runᴾ)
-open import operation.Observable using (IORef; IOCold; subscribeLogged; fromTimeline; newIORef; readIORef; writeIORef)
+open import operation.Observable using (IORef; IOCold; Emit; Observable; subscribe; forkIO; Signal; newSignal; raise; await; newIORef; readIORef; writeIORef)
+open import quickcheck.Clock using (Clock; newClock; fire; fromTimeline)
+import Tree as T
 open import quickcheck.Ty using (⟦_⟧ᵀ; showᵀ)
 open import quickcheck.Code using (Code; Leaf; cold; fresh; empty; of; map; scan; takeWhile; flatMap; connect; connected; μ; var; defer; Prog; toObs; timeline)
 
@@ -136,21 +138,46 @@ private
   logged nothing  ((t , a) ∷ xs) = tick t ∷ val a ∷ logged (just t) xs
   logged (just s) ((t , a) ∷ xs) = if s ≡ᵇ t then val a ∷ logged (just t) xs else tick t ∷ val a ∷ logged (just t) xs
 
--- Values are logged as they arrive, newest first, and read into a trace
--- once nothing is left to wait for.  Never `cut`: a program that never
--- finishes never returns.
+-- The program, run through the bare `subscribe` as any program is, with
+-- the harness's clock behind its inputs.  Around it, three colds of the
+-- harness's own: one per value, logging it with the clock's time; a
+-- probe merged beside it, which forks the thread that fires the timers;
+-- and a marker concatenated after it, recording its completion.  The
+-- forked thread first asks the probe's `closed`, which waits out the
+-- subscribe burst on the engine's lock; it then fires every timer, and
+-- once none is left the log is read, newest first.  Never `cut`: a
+-- program that never finishes never returns.
 ioTrace : ∀ {t} → ℕ → Prog t → IO (Trace ⟦ t ⟧ᵀ)
-ioTrace u p = newIORef false >>= λ fin → newIORef [] >>= λ log → newIORef 0 >>= λ names → subscribeLogged
-  (toObs (leaf names) u p [] [] [])
-  (λ t a → readIORef log >>= λ xs → writeIORef log ((t , a) ∷ xs))
-  (writeIORef fin true) >>= λ _ →
+ioTrace {t} u p =
+  newClock >>= λ ck → newIORef false >>= λ fin → newIORef [] >>= λ log → newIORef 0 >>= λ names → newSignal >>= λ over →
+  forkIO (subscribe (wrapped ck fin log over (toObs (leaf ck names) u p [] [] []))) >>= λ _ →
+  await over >>= λ _ →
   readIORef log >>= λ xs → readIORef fin >>= λ c →
   pure (logged nothing (reverse xs) ▸ (if c then completed else silent))
   where
     -- the leaves, each name drawn from the run's supply
-    leaf : IORef ℕ → Leaf IOCold
-    leaf names .Leaf.scripted s = fromTimeline names (Leaf.scripted timeline s)
-    leaf names .Leaf.named      = fromTimeline names Events.fresh
+    leaf : Clock → IORef ℕ → Leaf IOCold
+    leaf ck names .Leaf.scripted s = fromTimeline ck names (Leaf.scripted timeline s)
+    leaf ck names .Leaf.named      = fromTimeline ck names Events.fresh
+
+    doing : ∀ {A} → IO ⊤ → IOCold A
+    doing m = record { Internal = ⊤ ; create = λ e → record
+      { subscription = m >>= λ _ → Emit.complete e ; teardown = λ _ → pure tt } }
+
+    wrapped : Clock → IORef Bool → IORef (List (Time × ⟦ t ⟧ᵀ)) → Signal → Observable ⟦ t ⟧ᵀ → Observable ⊤
+    wrapped ck fin log over o = T.flatMap (T.mergeᶠ (just 1)) (λ b → if b then body else T.cold (doing (writeIORef fin true)))
+                                  (T.of (true ∷ false ∷ []))
+      where
+        tap : ⟦ t ⟧ᵀ → IOCold ⊤
+        tap a = doing (readIORef (Clock.now ck) >>= λ s → readIORef log >>= λ xs → writeIORef log ((s , a) ∷ xs))
+
+        probe : IOCold ⊤
+        probe = record { Internal = ⊤ ; create = λ e → record
+          { subscription = forkIO (Emit.closed e >>= λ _ → fire ck >>= λ _ → raise over) >>= λ _ → Emit.complete e
+          ; teardown = λ _ → pure tt } }
+
+        body : Observable ⊤
+        body = T.merge (T.flatMap (T.mergeᶠ nothing) (λ a → T.cold (tap a)) o) (T.cold probe)
 
 ------------------------------------------------------------------------
 -- One engine's trace, printed

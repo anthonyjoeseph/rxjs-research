@@ -14,7 +14,7 @@ module port.Adequacy where
 
 open import Data.Bool using (true; false; T)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using ([]; _++_; length)
+open import Data.List using ([]; _++_)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ; zero; suc; _≤_; s≤s; _<ᵇ_)
 open import Data.Nat.Properties using (≤-<-trans; <ᵇ⇒<; <⇒<ᵇ; n≤1+n)
@@ -22,7 +22,7 @@ open import Data.Product using (_,_; Σ; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; sym; subst)
 
-open import operation.Placed using (Up; Placed; Ahead; items; ahead; framed; shows; placed-⊑; frames-cut)
+open import operation.Placed using (Up; Placed; ahead; framed; shows; placed-⊑; frames-cut)
 open import operation.PureObservable using (PureObs; module Pure)
 open import operation.StateTree.Pure using (module Driver) renaming (run to prefix)
 open import port.Sorted using (module Sorting)

@@ -115,7 +115,7 @@ export const evalTm = (tm: Tm, th: Value[]): Value => {
 
 // A scripted cold: frames at offsets from subscription.  Frame 0 is
 // synchronous; each later one is a timer set where the frame before it
-// ends, as `operation.Observable.fromTimeline` plays it.
+// ends, as `quickcheck.Clock.fromTimeline` plays it.
 // One play of the frames. A replay starts a tick after the last frame,
 // as `quickcheck.Code.scriptML` restarts, so it is never synchronous.
 const play = (

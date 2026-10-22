@@ -11,15 +11,15 @@
 -- cold's emissions wait in its own leaf's inbox, and the cold names its
 -- leaf by path, so each is read at the leaf's type.
 --
--- Asynchrony is JavaScript's, not threads': a cold sets timers with
--- `after`, and the loop runs the earliest, ties in the order they were
--- set.  Time is the loop's own counter, so a run takes no wall-clock
--- time and two runs of one program agree.
+-- The runtime keeps no clock and no timers.  What happens later is a
+-- cold's own business — its own thread, its own delays — and it reaches
+-- the machine only through what it is handed: `produce`, `complete`,
+-- `closed`.
 --
 -- DELIVERY IS ATOMIC PER SUBSCRIPTION.  A cold may `produce` from any
 -- thread, and any interleaving of emissions is legal; a state no
 -- interleaving produces is not.  So every entry into the engine — the
--- subscribe burst, a `produce`, a `complete`, a timer — runs whole under
+-- subscribe burst, a `produce`, a `complete` — runs whole under
 -- one lock per `subscribe`, re-entrant on its own thread, since a
 -- cascade emits again synchronously.  A thread arriving mid-cascade
 -- blocks in `produce`, first come first served, and delivers after: as
@@ -31,23 +31,23 @@
 -- emission made while the machine is mid-step, from a teardown, waits in
 -- its inbox for the cold's next.
 --
--- The driver's recursion — running the machine until it is calm, the
--- loop's next turn — is closed with `fixIO`.  Every fixpoint it takes is
--- an IO action: one may run forever, but none is a value of any other
--- type, so nothing here proves anything.
+-- The driver's recursion — running the machine until it is calm — is
+-- closed with `fixIO`, exported for colds that loop.  Every fixpoint it
+-- takes is an IO action: one may run forever, but none is a value of any
+-- other type, so nothing proves anything with it.
 module operation.Observable where
 
 open import Agda.Builtin.IO using (IO)
 open import Data.Bool using (Bool; true; false; not; _∧_; _∨_; if_then_else_)
 open import Data.List using (List; _∷_; []; _++_)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; _+_; _∸_; _≤ᵇ_)
-open import Data.Product using (_×_; _,_; Σ)
+open import Data.Nat using (ℕ; _≤ᵇ_)
+open import Data.Product using (_,_)
 open import Data.Unit using (⊤; tt)
 open import IO.Primitive.Core using (pure; _>>=_)
 
 open import Tree using (Obs)
-open import denotation.MonotonicList.Events using (From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Timeline; fixed; fresh; timelineAt; Pos; ix)
+open import denotation.MonotonicList.Events using (Pos)
 
 ------------------------------------------------------------------------
 -- Haskell's refs
@@ -66,7 +66,7 @@ postulate
 
 -- Haskell's `fix` is untyped at the FFI, so it is bound at a simple
 -- type — and is unsound at most of them.  Its scope is this module, whose
--- one export takes fixpoints of IO actions only.
+-- one export, `fixIO`, takes fixpoints of IO actions only.
 private
   module FixIO where
     private
@@ -77,7 +77,7 @@ private
     fixIO : ∀ {a b} {X : Set a} {Y : X → Set b} → ((∀ x → IO (Y x)) → ∀ x → IO (Y x)) → ∀ x → IO (Y x)
     fixIO = fixᴴ
 
-open FixIO using (fixIO)
+open FixIO public using (fixIO)
 
 {-# FOREIGN GHC import qualified Data.IORef #-}
 {-# FOREIGN GHC import qualified Data.Function #-}
@@ -113,7 +113,7 @@ rxLockWith (RxLock m o) act = do
 {-# COMPILE GHC newLock = rxLockNew #-}
 {-# COMPILE GHC withLock = \ _ _ -> rxLockWith #-}
 
--- A wake-up for the loop: raised any number of times, it is taken once.
+-- A wake-up: raised any number of times, it is taken once.
 postulate
   Signal    : Set
   newSignal : IO Signal
@@ -125,6 +125,12 @@ postulate
 {-# COMPILE GHC raise = \ s -> () <$ Control.Concurrent.MVar.tryPutMVar s () #-}
 {-# COMPILE GHC await = Control.Concurrent.MVar.takeMVar #-}
 
+-- A thread of its own, for a cold whose emissions come later.
+postulate
+  forkIO : IO ⊤ → IO ⊤
+
+{-# COMPILE GHC forkIO = \ a -> () <$ Control.Concurrent.forkIO a #-}
+
 private
   infixl 1 _>>_
   _>>_ : ∀ {A : Set} → IO ⊤ → IO A → IO A
@@ -133,15 +139,15 @@ private
   unless : IORef Bool → IO ⊤ → IO ⊤
   unless r m = readIORef r >>= λ b → if b then pure tt else m
 
-  fixIO′ : ∀ {a b} {X : Set a} {Y : Set b} → ((X → IO Y) → X → IO Y) → X → IO Y
-  fixIO′ {Y = Y} = fixIO {Y = λ _ → Y}
+fixIO′ : ∀ {a b} {X : Set a} {Y : Set b} → ((X → IO Y) → X → IO Y) → X → IO Y
+fixIO′ {Y = Y} = fixIO {Y = λ _ → Y}
 
 ------------------------------------------------------------------------
 -- Colds
 
 -- A cold, as the user writes it.  `subscription` runs when the cold is
 -- subscribed; every `produce` it makes before returning is the
--- synchronous burst.  A `produce` from a timer it set is an async
+-- synchronous burst.  A `produce` from a thread it started is an async
 -- emission.  `teardown` runs once, on completion or unsubscribe; after
 -- it, `produce` and `complete` are ignored.
 record Started (Internal : Set) : Set where
@@ -149,14 +155,13 @@ record Started (Internal : Set) : Set where
     subscription : IO Internal
     teardown     : Internal → IO ⊤
 
--- What a cold is handed: how to emit, and how to set a timer.
--- `closed` is rxjs's `subscriber.closed`, for a producer to poll.
+-- What a cold is handed: rxjs's subscriber.  `closed` is
+-- `subscriber.closed`, for a producer that would otherwise loop forever.
 record Emit (A : Set) : Set where
   field
     produce  : A → IO ⊤
     complete : IO ⊤
     closed   : IO Bool
-    after    : ℕ → IO ⊤ → IO ⊤
 
 -- `create` takes an `Emit`, not its fields curried: with `Internal`
 -- erased MAlonzo compiles this record to a `newtype`, and GHC rejects a
@@ -209,42 +214,22 @@ postulate
 
 record Loop (R : Set) : Set where
   field
-    clock  : IORef ℕ
-    timers : IORef (List (ℕ × IO ⊤))
     lock   : Lock
-    wake   : Signal
     conf   : IORef₁ (Conf R)
 
 private
   atomically : ∀ {R a} {X : Set a} → Loop R → IO X → IO X
   atomically lp = withLock (Loop.lock lp)
 
-  -- After every timer due no later: two timers due together fire in the
-  -- order they were set.
-  insert : ℕ → IO ⊤ → List (ℕ × IO ⊤) → List (ℕ × IO ⊤)
-  insert d a []              = (d , a) ∷ []
-  insert d a ((e , b) ∷ ts) = if e ≤ᵇ d then (e , b) ∷ insert d a ts else (d , a) ∷ (e , b) ∷ ts
-
-  -- A cold may set a timer from its own thread, so the queue is touched
-  -- only under the lock, and the loop is woken.
-  setTimer : ∀ {R} → Loop R → ℕ → IO ⊤ → IO ⊤
-  setTimer lp d a = atomically lp (readIORef (Loop.clock lp) >>= λ now → readIORef (Loop.timers lp) >>= λ ts →
-                    writeIORef (Loop.timers lp) (insert (now + d) a ts)) >> raise (Loop.wake lp)
-
   runTeardown : Slot → IO ⊤
   runTeardown sl = readIORef (Slot.tearDown sl) >>= λ where
     nothing  → pure tt
     (just t) → writeIORef (Slot.tearDown sl) nothing >> t
 
-  nextTimer : ∀ {R} → Loop R → IO Bool
-  nextTimer lp = atomically lp (readIORef (Loop.timers lp) >>= λ where
-    []             → pure false
-    ((t , a) ∷ ts) → writeIORef (Loop.timers lp) ts >> writeIORef (Loop.clock lp) t >> a >> pure true)
-
 ------------------------------------------------------------------------
 -- THE IO DRIVER: the shared machine, fed by the world
 
-module Drive {R : Set} (lp : Loop R) (f : Time → R → IO ⊤) (c : IO ⊤) where
+module Drive {R : Set} (lp : Loop R) (c : IO ⊤) where
   -- What the driver does, as one recursion closed with `fixIO`: run the
   -- machine until it is calm with no more than `d` jobs owed; or take in
   -- what the cold at a path has made.
@@ -263,7 +248,7 @@ module Drive {R : Set} (lp : Loop R) (f : Time → R → IO ⊤) (c : IO ⊤) wh
 
   shown : Shown R → IO ⊤
   shown []               = pure tt
-  shown ((_ , nx a) ∷ s) = readIORef (Loop.clock lp) >>= λ t → f t a >> shown s
+  shown ((_ , nx a) ∷ s) = shown s
   shown ((_ , cp) ∷ s)   = c >> shown s
 
   -- The colds an unsubscribe reached: spent, then torn down.
@@ -295,8 +280,7 @@ module Drive {R : Set} (lp : Loop R) (f : Time → R → IO ⊤) (c : IO ⊤) wh
           st = IOCold.create x (record
             { produce  = λ a → atomically lp (unless sp (push l (just a) >> self (pulse π)))
             ; complete = atomically lp (unless sp (push l nothing >> self (pulse π) >> runTeardown sl))
-            ; closed   = atomically lp (readIORef sp >>= λ b → if b then pure true else ask π)
-            ; after    = setTimer lp })
+            ; closed   = atomically lp (readIORef sp >>= λ b → if b then pure true else ask π) })
       in writeIORef₁ (Loop.conf lp) k′ >>
          Started.subscription st >>= λ i →
          writeIORef td (just (Started.teardown st i)) >>
@@ -325,72 +309,15 @@ module Drive {R : Set} (lp : Loop R) (f : Time → R → IO ⊤) (c : IO ⊤) wh
   drive = fixIO′ Body.call
 
 ------------------------------------------------------------------------
--- A timeline, played
-
--- Frame 0 inline, then each later frame on a timer set where the burst
--- before it ends.  A closed subscriber or a teardown stops the playing.
--- IO knows no positions, so a `fresh` leaf's name is drawn from `names`,
--- a supply shared by the run: a position no other draw returns, which is
--- all a name is read for.
-fromTimeline : ∀ {A} → IORef ℕ → Timeline A → IOCold A
-fromTimeline {A} names c = record
-  { Internal = IORef Bool
-  ; create   = λ e → record
-      { subscription = newIORef false >>= λ off → named c >>= λ q → first e off (timelineAt c q) >> pure off
-      ; teardown     = λ off → writeIORef off true }
-  }
-  where
-    -- `self` plays the frames after this burst.
-    burst : Emit A → IORef Bool → (∀ t → From A (suc t) → IO ⊤) → ∀ t → Frame A t → IO ⊤
-    burst e off self t = fixIO′ λ next′ b → Emit.closed e >>= λ c → if c then pure tt else step next′ b
-      where
-        step : (Frame A t → IO ⊤) → Frame A t → IO ⊤
-        step next′ (emit a k) = Emit.produce e a >> unless off (next′ (Frame∞.force k))
-        step next′ (stall k)  = next′ (Frame∞.force k)
-        step next′ (close k)  = self t (From∞.force k)
-
-    play : Emit A → IORef Bool → Time → ∀ {u} → From A u → IO ⊤
-    play e off now m = fixIO′ step (now , _ , m)
-      where
-        step : (Time × Σ Time (From A) → IO ⊤) → Time × Σ Time (From A) → IO ⊤
-        step self (now , _ , done)     = Emit.complete e
-        step self (now , _ , quiet)    = pure tt
-        step self (now , _ , at t _ b) = Emit.after e (t ∸ now) (unless off (burst e off (λ t′ m′ → self (t′ , suc t′ , m′)) t b))
-
-    named : Timeline A → IO Pos
-    named (fixed _) = pure []
-    named fresh     = readIORef names >>= λ n → writeIORef names (suc n) >> pure (ix n ∷ [])
-
-    first : Emit A → IORef Bool → From A 0 → IO ⊤
-    first e off (at 0 _ b) = burst e off (λ t′ m′ → play e off t′ m′) 0 b
-    first e off m        = play e off 0 m
-
-------------------------------------------------------------------------
 -- The entry point
 
-private
-  -- The program loaded into the machine and run until it is calm; then
-  -- the loop, each timer under the lock, until none is left and `stop`
-  -- says so.  Each value is handed the loop's time at its arrival; `c`
-  -- runs on completion.
-  launch : ∀ {A} → Observable A → (Time → A → IO ⊤) → IO ⊤ → (Signal → IO Bool) → IO ⊤
-  launch o f c stop =
-    newLock >>= λ lk → newSignal >>= λ wk → newIORef 0 >>= λ cl → newIORef [] >>= λ ts → newIORef₁ (load o) >>= λ k →
-    let lp = record { clock = cl ; timers = ts ; lock = lk ; wake = wk ; conf = k } in
-    atomically lp (Drive.drive lp f (c >> raise wk) (Drive.settling 0)) >>
-    fixIO′ (λ again _ → nextTimer lp >>= λ more → if more then again tt else stop wk >>= λ s → if s then pure tt else again tt) tt
-
 -- THE ENTRY POINT, as rxjs's `subscribe()`: what the program does is done
--- by its colds; its values are dropped.  It returns once the program has
--- completed — until then a cold's thread may still emit or set a timer,
--- which wakes the loop.
+-- by its colds; its values are dropped.  The subscribe burst runs under
+-- the lock; then it waits for the root to complete, which a cold's thread
+-- may bring about at any time.
 subscribe : ∀ {A} → Observable A → IO ⊤
-subscribe o = newIORef false >>= λ fin →
-  launch o (λ _ _ → pure tt) (writeIORef fin true)
-    (λ wk → readIORef fin >>= λ d → if d then pure true else await wk >> pure false)
-
--- THE HARNESS'S ENTRY POINT: each value with the loop's time, and the
--- completion, handed out; returns once no timer is left, completed or
--- not, so a program that goes quiet can be read.
-subscribeLogged : ∀ {A} → Observable A → (Time → A → IO ⊤) → IO ⊤ → IO ⊤
-subscribeLogged o f c = launch o f c (λ _ → pure true)
+subscribe o =
+  newLock >>= λ lk → newSignal >>= λ wk → newIORef false >>= λ fin → newIORef₁ (load o) >>= λ k →
+  let lp = record { lock = lk ; conf = k } in
+  withLock lk (Drive.drive lp (writeIORef fin true >> raise wk) (Drive.settling 0)) >>
+  readIORef fin >>= λ d → if d then pure tt else await wk
