@@ -3,6 +3,7 @@
 -- MOVES: the witness (`port.Strong`'s `Sub`) rewritten at one node.
 module port.Moves where
 
+open import Data.Bool using (true)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.Linked using (Linked; [-]; _∷_)

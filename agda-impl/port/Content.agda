@@ -16,11 +16,11 @@
 module port.Content where
 
 open import Data.Bool using (Bool; true; false)
-open import Data.List using (List; []; _∷_; _++_; [_]; length)
+open import Data.List using (List; []; _∷_; _++_; [_]; length; head)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.List.Relation.Unary.Any using (Any; here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ; ++⁻)
-open import Data.List.Relation.Unary.All as All using ([])
+open import Data.List.Relation.Unary.All as All using (All; [])
 import Data.List.Relation.Unary.Any as Any
 import Data.List.Relation.Unary.Linked as Linked
 open Linked using (Linked)
@@ -29,6 +29,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Nat using (ℕ; zero; suc; _<ᵇ_; _<_; _≤_; s≤s; z≤n)
 open import Data.Nat.Properties using (suc-injective; +-suc; +-monoʳ-≤; n≤1+n; ≤-reflexive; n<1+n; <-trans)
 open import Data.Maybe using (just; nothing)
+import Data.Maybe.Relation.Unary.All as MAll
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
@@ -60,7 +61,7 @@ module Honesty (R : Set) where
   open Ghosting R using (Has; Sent; sentHere; sentLater; Alike; _≋_; same-agree; residual; Reached; launchedʰ; silentʰ; valueʰ;
     Stands; cutʰ; finʰ; dryʰ; Mirror; Inner; Logged; Shows; silentˢ; valueˢ; completeˢ; drainedˢ; inner-launch; ≋-refl;
     Steps; after; steps-after; Hopped; onward; lowered; weight; loadOf; load; _≼_; _≺_; _⊏_)
-  open Strongly R using (Strong; Carried; carried; closing; CtlAs; Meets; calmAs; noteAs; runAs; subAs; burstAs; popAs; Pops;
+  open Strongly R using (Strong; Carried; carried; closing; CtlAs; Meets; calmAs; noteAs; runAs; subAs; burstAs; popAs;
     Kernels; Owned; Meaning; Books; Path; ofˢ; seen; Sub; takeWhileˢ; part; Queue; BurstClocked; Each; Heads;
     Lingers; Untold; Ended; DoneBy; Begins; focused; attaching; coldˢ; waiting; fired; playing; Timed; Joined)
   open Ascending R using (Aloft; soar)
@@ -290,7 +291,7 @@ module Honesty (R : Set) where
     -- suspended, and resuming it there keeps what is owed; a path leading
     -- nowhere drops it.
     downs-plug : ∀ {q x Γ A} {c′ : Ctx R Γ A} {s′} → downs q top x ≡ just (Γ , A , c′ , s′) → plug c′ s′ ≡ x
-    owned-pop : ∀ {t m Γ A Γ′ A′} {c : Ctx R Γ A} {s p q τ p′ rs} {c′ : Ctx R Γ′ A′} {s′}
+    owned-popped: ∀ {t m Γ A Γ′ A′} {c : Ctx R Γ A} {s p q τ p′ rs} {c′ : Ctx R Γ′ A′} {s′}
               → Kernels t (Mach.conf m) → Owned t m → Mach.conf m ≡ ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩
               → downs q top (plug c s) ≡ just (_ , _ , c′ , s′)
               → Owned t (record m { conf = ⟨ c′ , s′ , resuming τ , p′ , rs ⟩ })
@@ -300,7 +301,7 @@ module Honesty (R : Set) where
     sorted-pop : ∀ {lo m Γ A Γ′ A′} {c : Ctx R Γ A} {s p q τ p′ rs} {c′ : Ctx R Γ′ A′} {s′} → WellMach lo m
                → Mach.conf m ≡ ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩ → downs q top (plug c s) ≡ just (_ , _ , c′ , s′)
                → WellMach lo (record m { conf = ⟨ c′ , s′ , resuming τ , p′ , rs ⟩ })
-    owned-drop : ∀ {t m Γ A} {c : Ctx R Γ A} {s p j rs} → Kernels t (Mach.conf m) → Owned t m
+    owned-dropped: ∀ {t m Γ A} {c : Ctx R Γ A} {s p j rs} → Kernels t (Mach.conf m) → Owned t m
                → Mach.conf m ≡ ⟨ c , s , absorbed , p , j ∷ rs ⟩ → downs (proj₁ j) top (plug c s) ≡ nothing
                → Owned t (record m { conf = ⟨ c , s , absorbed , p , rs ⟩ })
     meaning-drop : ∀ {t Γ A} {c : Ctx R Γ A} {s p j rs} → Kernels t ⟨ c , s , absorbed , p , j ∷ rs ⟩
@@ -362,9 +363,9 @@ module Honesty (R : Set) where
     settled : ∀ {Γ A} {c : Ctx R Γ A} {s p} rs clk tms ts → CtlAs (mach ⟨ c , s , absorbed , p , rs ⟩ clk tms ts)
     settled []       clk tms []       = calmAs refl refl
     settled []       clk tms (t ∷ ts) = burstAs refl refl refl
-    settled (j ∷ rs) clk tms []       = popAs refl tt
+    settled (j ∷ rs) clk tms []       = popAs refl MAll.nothing
     settled (j ∷ rs) clk tms (t ∷ ts) with depthOf t <ᵇ suc (length rs) in d
-    ... | true  = popAs refl d
+    ... | true  = popAs refl (MAll.just d)
     ... | false = burstAs refl refl d
 
     settled-meets : ∀ {Γ A} {c : Ctx R Γ A} {s p} rs clk tms ts {n g} → n ≡ just g → Meets (settled {c = c} {s} {p} rs clk tms ts) n g
@@ -530,38 +531,39 @@ module Honesty (R : Set) where
   sub-onward {m = mach _ _ _ _} {o = T.connected _}     cr refl with joined-silent
   ... | m′ , js = m′ , js , sub-joined cr refl js
 
-  -- A job owed nothing by its node: dropped, the ghost alike, the
-  -- control lighter.
-  idle-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {s t p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , resuming t , p , rs ⟩
-              → res s t ≡ idle → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
-  idle-onward {g} {mach _ clk tms ts} {c = c} {s} {t} {p} {rs} cr refl r with Carried.ctlAs cr | Carried.meets cr
-  ... | runAs refl | mt =
-    m′ , cong (Driver.took R _) (cong (λ x → Machine.resumeR c x p rs) r)
-    , g , m′ , now
-    , carried (record
-        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = Carried.tree cr
-        ; kernels = Carried.kernels cr ; ctlAs = settled rs clk tms ts ; meets = settled-meets rs clk tms ts mt
-        ; owned = owned-idle (Carried.kernels cr) (Carried.owned cr) refl r
-        ; meaning = meaning-idle (Carried.kernels cr) (Carried.meaning cr) r
-        ; queue = Carried.queue cr
-        ; books = record { clocked = tt ; ticked = Books.ticked (Carried.books cr) ; turned = Books.turned (Carried.books cr) }
-        ; sorted = proj₁ (Carried.sorted cr) , sorted-idle (proj₂ (Carried.sorted cr)) refl r
-        ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; told = Carried.told cr
-        ; ended = Carried.ended cr ; flags = Carried.flags cr })
-    , lowered (λ n → agree-refl n _) (inj₂ (refl , settled-lighter rs clk tms ts))
-    where m′ = mach ⟨ c , s , absorbed , p , rs ⟩ clk tms ts
-  ... | calmAs () _  | _
-  ... | noteAs () _  | _
-  ... | subAs ()     | _
-  ... | burstAs () _ _ | _
-  ... | popAs () _   | _
+  private
+    -- A job owed nothing by its node: dropped, the ghost alike, the
+    -- control lighter.
+    idle-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {s t p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , resuming t , p , rs ⟩
+                → res s t ≡ idle → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+    idle-onward {g} {mach _ clk tms ts} {c = c} {s} {t} {p} {rs} cr refl r with Carried.ctlAs cr | Carried.meets cr
+    ... | runAs refl | mt =
+      m′ , cong (Driver.took R _) (cong (λ x → Machine.resumeR c x p rs) r)
+      , g , m′ , now
+      , carried (record
+          { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = Carried.tree cr
+          ; kernels = Carried.kernels cr ; ctlAs = settled rs clk tms ts ; meets = settled-meets rs clk tms ts mt
+          ; owned = owned-idle (Carried.kernels cr) (Carried.owned cr) refl r
+          ; meaning = meaning-idle (Carried.kernels cr) (Carried.meaning cr) r
+          ; queue = Carried.queue cr
+          ; books = record { clocked = tt ; ticked = Books.ticked (Carried.books cr) ; turned = Books.turned (Carried.books cr) }
+          ; sorted = proj₁ (Carried.sorted cr) , sorted-idle (proj₂ (Carried.sorted cr)) refl r
+          ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; told = Carried.told cr
+          ; ended = Carried.ended cr ; flags = Carried.flags cr })
+      , lowered (λ n → agree-refl n _) (inj₂ (refl , settled-lighter rs clk tms ts))
+      where m′ = mach ⟨ c , s , absorbed , p , rs ⟩ clk tms ts
+    ... | calmAs () _  | _
+    ... | noteAs () _  | _
+    ... | subAs ()     | _
+    ... | burstAs () _ _ | _
+    ... | popAs () _   | _
 
   private
     -- A pop is the configuration's own step: the turns wait.
     pop-step : ∀ {m Γ A} {c : Ctx R Γ A} {s p j rs} → Mach.conf m ≡ ⟨ c , s , absorbed , p , j ∷ rs ⟩
-             → Pops (Mach.turns m) (suc (length rs)) → step m ≡ Driver.took R m (Machine.step (Mach.conf m))
+             → MAll.All (λ t → (depthOf t <ᵇ suc (length rs)) ≡ true) (head (Mach.turns m)) → step m ≡ Driver.took R m (Machine.step (Mach.conf m))
     pop-step {mach _ _ _ []} refl _ = refl
-    pop-step {mach _ _ _ (t ∷ ts)} {rs = rs} refl ps with depthOf t <ᵇ suc (length rs) | ps
+    pop-step {mach _ _ _ (t ∷ ts)} {rs = rs} refl (MAll.just ps) with depthOf t <ᵇ suc (length rs) | ps
     ... | true | refl = refl
 
     popping : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s p q τ p′ rs} {c′ : Ctx R Γ′ A′} {s′}
@@ -573,48 +575,49 @@ module Honesty (R : Set) where
              → Machine.step ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩ ≡ Machine.ok ⟨ c , s , absorbed , p , rs ⟩
     dropping d rewrite d = refl
 
-  -- A job popped: resumed where it was suspended, or dropped, the ghost
-  -- alike, the control lighter.
-  pop-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {s p j rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , j ∷ rs ⟩
-             → Pops (Mach.turns m) (suc (length rs)) → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
-  pop-onward {g} {mach k clk tms ts} {c = c} {s} {p} {q , τ , p′} {rs} cr e ps
-    with Carried.ctlAs cr | Carried.meets cr | downs q top (plug c s) in d
-  ... | popAs refl _ | mt | just (_ , _ , c′ , s′) =
-    m′ , trans (pop-step e ps) (cong (Driver.took R _) (popping d))
-    , g , m′ , now
-    , carried (record
-        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = Carried.tree cr
-        ; kernels = trans (Carried.kernels cr) (sym (downs-plug d)) ; ctlAs = runAs refl ; meets = mt
-        ; owned = owned-pop (Carried.kernels cr) (Carried.owned cr) e d
-        ; meaning = meaning-pop (Carried.kernels cr) (Carried.meaning cr) d
-        ; queue = Carried.queue cr
-        ; books = record { clocked = All.head (Books.ticked (Carried.books cr))
-                         ; ticked = All.tail (Books.ticked (Carried.books cr)) ; turned = Books.turned (Carried.books cr) }
-        ; sorted = proj₁ (Carried.sorted cr) , sorted-pop (proj₂ (Carried.sorted cr)) e d
-        ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; told = Carried.told cr
-        ; ended = Carried.ended cr ; flags = Carried.flags cr })
-    , lowered (λ n → agree-refl n _) (inj₂ (refl , n<1+n _))
-    where m′ = mach ⟨ c′ , s′ , resuming τ , p′ , rs ⟩ clk tms ts
-  ... | popAs refl _ | mt | nothing =
-    m′ , trans (pop-step e ps) (cong (Driver.took R _) (dropping d))
-    , g , m′ , now
-    , carried (record
-        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = Carried.tree cr
-        ; kernels = Carried.kernels cr ; ctlAs = settled rs clk tms ts ; meets = settled-meets rs clk tms ts mt
-        ; owned = owned-drop (Carried.kernels cr) (Carried.owned cr) e d
-        ; meaning = meaning-drop (Carried.kernels cr) (Carried.meaning cr) d
-        ; queue = Carried.queue cr
-        ; books = record { clocked = tt ; ticked = All.tail (Books.ticked (Carried.books cr)) ; turned = Books.turned (Carried.books cr) }
-        ; sorted = proj₁ (Carried.sorted cr) , sorted-drop (proj₂ (Carried.sorted cr)) e d
-        ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; told = Carried.told cr
-        ; ended = Carried.ended cr ; flags = Carried.flags cr })
-    , lowered (λ n → agree-refl n _) (inj₂ (refl , <-trans (settled-lighter rs clk tms ts) (n<1+n _)))
-    where m′ = mach ⟨ c , s , absorbed , p , rs ⟩ clk tms ts
-  ... | calmAs () _  | _ | _
-  ... | noteAs () _  | _ | _
-  ... | runAs ()     | _ | _
-  ... | subAs ()     | _ | _
-  ... | burstAs () _ _ | _ | _
+  private
+    -- A job popped: resumed where it was suspended, or dropped, the ghost
+    -- alike, the control lighter.
+    pop-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {s p j rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , j ∷ rs ⟩
+               → MAll.All (λ t → (depthOf t <ᵇ suc (length rs)) ≡ true) (head (Mach.turns m)) → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+    pop-onward {g} {mach k clk tms ts} {c = c} {s} {p} {q , τ , p′} {rs} cr e ps
+      with Carried.ctlAs cr | Carried.meets cr | downs q top (plug c s) in d
+    ... | popAs refl _ | mt | just (_ , _ , c′ , s′) =
+      m′ , trans (pop-step e ps) (cong (Driver.took R _) (popping d))
+      , g , m′ , now
+      , carried (record
+          { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = Carried.tree cr
+          ; kernels = trans (Carried.kernels cr) (sym (downs-plug d)) ; ctlAs = runAs refl ; meets = mt
+          ; owned = owned-popped (Carried.kernels cr) (Carried.owned cr) e d
+          ; meaning = meaning-pop (Carried.kernels cr) (Carried.meaning cr) d
+          ; queue = Carried.queue cr
+          ; books = record { clocked = All.head (Books.ticked (Carried.books cr))
+                           ; ticked = All.tail (Books.ticked (Carried.books cr)) ; turned = Books.turned (Carried.books cr) }
+          ; sorted = proj₁ (Carried.sorted cr) , sorted-pop (proj₂ (Carried.sorted cr)) e d
+          ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; told = Carried.told cr
+          ; ended = Carried.ended cr ; flags = Carried.flags cr })
+      , lowered (λ n → agree-refl n _) (inj₂ (refl , n<1+n _))
+      where m′ = mach ⟨ c′ , s′ , resuming τ , p′ , rs ⟩ clk tms ts
+    ... | popAs refl _ | mt | nothing =
+      m′ , trans (pop-step e ps) (cong (Driver.took R _) (dropping d))
+      , g , m′ , now
+      , carried (record
+          { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = Carried.tree cr
+          ; kernels = Carried.kernels cr ; ctlAs = settled rs clk tms ts ; meets = settled-meets rs clk tms ts mt
+          ; owned = owned-dropped (Carried.kernels cr) (Carried.owned cr) e d
+          ; meaning = meaning-drop (Carried.kernels cr) (Carried.meaning cr) d
+          ; queue = Carried.queue cr
+          ; books = record { clocked = tt ; ticked = All.tail (Books.ticked (Carried.books cr)) ; turned = Books.turned (Carried.books cr) }
+          ; sorted = proj₁ (Carried.sorted cr) , sorted-drop (proj₂ (Carried.sorted cr)) e d
+          ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; told = Carried.told cr
+          ; ended = Carried.ended cr ; flags = Carried.flags cr })
+      , lowered (λ n → agree-refl n _) (inj₂ (refl , <-trans (settled-lighter rs clk tms ts) (n<1+n _)))
+      where m′ = mach ⟨ c , s , absorbed , p , rs ⟩ clk tms ts
+    ... | calmAs () _  | _ | _
+    ... | noteAs () _  | _ | _
+    ... | runAs ()     | _ | _
+    ... | subAs ()     | _ | _
+    ... | burstAs () _ _ | _ | _
 
   private
     shut-step : ∀ {Γ A} {c : Ctx R Γ A} {xs i p rs} → closed c ≡ true

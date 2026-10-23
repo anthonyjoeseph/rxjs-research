@@ -15,13 +15,14 @@
 module port.Strong where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_)
-open import Data.List using (List; []; _∷_; _++_; [_]; length; map)
+open import Data.List using (List; []; _∷_; _++_; [_]; length; map; head)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Empty using (⊥)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup)
 open import Data.List.Relation.Unary.Linked using (Linked; [])
 import Data.List.Relation.Unary.Any as Any
 open import Data.Maybe using (Maybe; just; nothing; is-just; is-nothing)
+import Data.Maybe.Relation.Unary.All as MAll
 open import Data.Nat using (ℕ; suc; _+_; _<ᵇ_; _≡ᵇ_; _≤_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤)
@@ -304,12 +305,6 @@ module Strongly (R : Set) where
   -- turn about to play, no job owed above it; a job owed above the next
   -- turn, or with no turn, about to be popped.
 
-  -- The machine pops a job owed `n` deep: no turn, or the next turn's
-  -- depth under it.
-  Pops : List Turn → ℕ → Set
-  Pops []      n = ⊤
-  Pops (t ∷ _) n = (depthOf t <ᵇ n) ≡ true
-
   data CtlAs (m : Mach) : Set₁ where
     calmAs  : ∀ {Γ A} {c : Ctx R Γ A} {s p} → Mach.conf m ≡ ⟨ c , s , absorbed , p , [] ⟩ → Mach.turns m ≡ [] → CtlAs m
     noteAs  : ∀ {s a p rs} → Mach.conf m ≡ ⟨ top , s , rising (nx a) , p , rs ⟩ → Mach.clock m ≡ tick p → CtlAs m
@@ -318,7 +313,7 @@ module Strongly (R : Set) where
     burstAs : ∀ {Γ A} {c : Ctx R Γ A} {s p rs t ts} → Mach.conf m ≡ ⟨ c , s , absorbed , p , rs ⟩ → Mach.turns m ≡ t ∷ ts
             → (depthOf t <ᵇ length rs) ≡ false → CtlAs m
     popAs   : ∀ {Γ A} {c : Ctx R Γ A} {s p j rs} → Mach.conf m ≡ ⟨ c , s , absorbed , p , j ∷ rs ⟩
-            → Pops (Mach.turns m) (suc (length rs)) → CtlAs m
+            → MAll.All (λ t → (depthOf t <ᵇ suc (length rs)) ≡ true) (head (Mach.turns m)) → CtlAs m
 
   -- The ghost the witness reads: a value about to be shown, the ghost
   -- before it; otherwise the witness's own.
