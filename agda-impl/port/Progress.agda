@@ -30,6 +30,7 @@ open import operation.Placed using (Ahead; none; outᵃ; skipᵃ; endᵃ; hush�
 open import operation.PureObservable using (PureObs; module Driver)
 open import port.Content using (module Honesty)
 open import port.Ghost using (module Ghosting)
+open import port.Strong using (module Strongly)
 open import port.Unsub using (module Unsubbing)
 
 open Events∞
@@ -39,7 +40,8 @@ module Progressing (R : Set) where
     renaming (out to outᵗ; end to endᵗ)
   open Unsubbing R using (_⇝_; now; then)
   open Ghosting R using (Has; atOut; pastSkip; residual; begun; Past; past-pre; passed; lowered; showing;
-    has-agree; after; _≺_; ≺-wf; measure; depth; ahead-agree; Strong; strong-begin)
+    has-agree; after; _≺_; ≺-wf; measure; depth; ahead-agree)
+  open Strongly R using (Strong; strong-begin)
   open Honesty R using (Hop; valueᴴ; completeᴴ; drainedᴴ; silentᴴ; strong-hop; strong-agrees)
 
   ----------------------------------------------------------------------

@@ -8,14 +8,24 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE STRONG CARRIER
+#### THE CARRIER'S TOWER
 
-Untried: whether the heap machine's re-entry invariant has a reading on the
-state tree, whose nodes are addressed by path, not by heap cell. Settled
-when `Strong` is a ported body that `strong-hop` and `measure` go through,
-or the old body is shown not to port.
+Untried: whether the flatMap and connect arms (`flat-calm` over
+FlatOrder/FlatAfter/Calm/Burst/Walk, the connect order over Trail) carry to
+the current Unfold. Settled when all three are bodies.
 
-Members: `Strong`, `strong-begin`, `strong-sane`, `strong-hop`, `measure`.
+Members: `flat-calm`, `ordered-connect`, `steady-connect`.
+
+#### THE STRONG STEP
+
+Untried: whether each control state's step keeps `Carried` on the state
+tree — the old Climbs columns over `Sub` instead of the heap. Suspect:
+`Meaning`'s `owing` zips a subject's feeds with its feeding jobs, which
+`Owned` does not yet align. Settled when the onward leaves are bodies,
+`run-onward` first.
+
+Members: `run-onward`, `sub-onward`, `burst-onward`, `turn-pops`,
+`note-onward`, `note-least`, `turn-dry`.
 
 #### THE WALK
 

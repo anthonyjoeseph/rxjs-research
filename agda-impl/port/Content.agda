@@ -35,7 +35,7 @@ open import denotation.MonotonicList.Events using (Events; Pos; Time; tick; root
 open import denotation.MonotonicList using (observe; Agree)
 import denotation.Unfold as U
 open import denotation.Denote using (⟦_⟧)
-open import operation.PureObservable using (PureObs; module Pure; module Driver)
+open import operation.PureObservable using (PureObs; module Pure; module Driver; module Machine)
 open import port.Sorted using (_≤ᵖ_)
 open import port.Sane using (Sane)
 open import port.Placed.Order using (Placed)
@@ -43,14 +43,17 @@ open import port.Stepper.Past using (_≃_)
 open import port.Stepper using (step-skips)
 open import port.Unsub using (module Unsubbing)
 open import port.Ghost using (module Ghosting)
+open import port.Strong using (module Strongly)
 
 module Honesty (R : Set) where
-  open Driver R using (Mach; Step; silent; value; complete; drained; step; trace; shown; reading; begin; Read; read; marks; log; ending; noted)
+  open Driver R using (Mach; mach; depthOf; Step; silent; value; complete; drained; step; trace; shown; reading; begin; Read; read; marks; log; ending; noted)
   open Pure R using (End; finished; dry; cutOff)
   open Unsubbing R using (now; then)
   open Ghosting R using (Has; Sent; sentHere; sentLater; Alike; _≋_; same-agree; residual; Reached; launchedʰ; silentʰ; valueʰ;
     Stands; cutʰ; finʰ; dryʰ; Mirror; Inner; Logged; Shows; silentˢ; valueˢ; completeˢ; drainedˢ; inner-launch; ≋-refl;
-    Steps; after; steps-after; Hopped; onward; Strong)
+    Steps; after; steps-after; Hopped; onward)
+  open Strongly R using (Strong; Carried; carried; closing; calmAs; noteAs; runAs; subAs; burstAs)
+  open Machine using (Ctx; top; ⟨_,_,_,_,_⟩; absorbed; rising; resuming; subscribing; nx; pend)
 
   step-alike : ∀ g → Sane [] g → Placed g [] → residual g ≋ after (U.step g)
   step-alike g sn pl = same-agree (_≃_.agreeing (step-skips g sn pl))
@@ -58,11 +61,10 @@ module Honesty (R : Set) where
   residual-steps : ∀ g → Sane [] g → Placed g [] → Steps (residual g) (U.step g)
   residual-steps g sn pl = steps-after (U.step g) (step-alike g sn pl)
 
-  postulate
-    -- What a re-entry configuration's ghost is held to.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Content.agda
-    strong-sane : ∀ {g m} → Strong g m → Sane [] g × Placed g []
+  -- What a re-entry configuration's ghost is held to.
+  strong-sane : ∀ {g m} → Strong g m → Sane [] g × Placed g []
+  strong-sane (carried cr)        = Carried.sane cr , Carried.placed cr
+  strong-sane (closing _ _ sn pl) = sn , pl
 
   -- The ghost's residual is what its step shows, at every depth.
   strong-agrees : ∀ {g m} → Strong g m → ∀ n → Agree n (residual g) (after (U.step g))
@@ -80,10 +82,59 @@ module Honesty (R : Set) where
     silentᴴ   : ∀ {m′} → step m ≡ silent m′ → Hopped st m′ → Hop st
 
   postulate
-    -- By the re-entry state.
+    -- The turn, nothing owed and no timer queued: the ghost shows
+    -- nothing.
+    turn-dry : ∀ {g m Γ A} {c : Ctx R Γ A} {s p} → Carried g m → Mach.conf m ≡ ⟨ c , s , absorbed , p , [] ⟩
+             → Mach.turns m ≡ [] → Mach.timers m ≡ [] → ∀ {k b} → Has (residual g) k b → ⊥
+
+    -- A value recorded is the least the ghost still holds.
+    note-least : ∀ {g g′ m s a p rs} → Carried g m → Mach.conf m ≡ ⟨ top , s , rising (nx a) , p , rs ⟩
+               → U.step g ≡ U.outˢ p a g′ → ∀ {q b} → Has (residual g′) q b → q ≤ᵖ p → ⊥
+
+    -- The value shown, the configuration runs the stepped ghost.
     --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Content.agda
-    strong-hop : ∀ {g m} (st : Strong g m) → Hop st
+    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs.agda
+    note-onward : ∀ {g g′ m s a p rs} → Carried g m → Mach.conf m ≡ ⟨ top , s , rising (nx a) , p , rs ⟩
+                → U.step g ≡ U.outˢ p a g′ → Mirror g′ (record m { conf = ⟨ top , s , absorbed , p , rs ⟩ })
+
+    -- A job resumed runs silently on to a re-entry configuration the
+    -- configuration gains.
+    --
+    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs.agda
+    run-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {s t p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , resuming t , p , rs ⟩
+               → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+
+    -- A pending node begun, likewise.
+    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Lift/Order.agda
+    sub-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {o p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , pend o , subscribing , p , rs ⟩
+               → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+
+    -- A turn played, likewise.
+    --
+    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Base.agda
+    burst-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {s p rs t ts} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , rs ⟩
+                 → Mach.turns m ≡ t ∷ ts → (depthOf t <ᵇ length rs) ≡ false
+                 → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+
+    -- The next timer fired, likewise.
+    --
+    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs.agda
+    turn-pops : ∀ {g m Γ A} {c : Ctx R Γ A} {s p tm tms} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , [] ⟩
+              → Mach.turns m ≡ [] → Mach.timers m ≡ tm ∷ tms → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+
+  -- By the re-entry state.
+  strong-hop : ∀ {g m} (st : Strong g m) → Hop st
+  strong-hop {m = mach k clk tms ts} (closing refl stp sn pl) = completeᴴ refl stp
+  strong-hop {m = mach k clk tms ts} (carried cr) with Carried.ctlAs cr | Carried.meets cr
+  ... | noteAs refl ck | g′ , _ , stp = valueᴴ refl stp ck (note-least cr refl stp) (note-onward cr refl stp)
+  ... | runAs e | _ with run-onward cr e
+  ...   | m′ , eq , h = silentᴴ eq h
+  strong-hop {m = mach k clk tms ts} (carried cr) | subAs e | _ with sub-onward cr e
+  ...   | m′ , eq , h = silentᴴ eq h
+  strong-hop {m = mach k clk tms ts} (carried cr) | burstAs e et lt | _ with burst-onward cr e et lt
+  ...   | m′ , eq , h = silentᴴ eq h
+  strong-hop {m = mach k clk [] ts} (carried cr) | calmAs refl refl | _ = drainedᴴ refl (turn-dry cr refl refl refl)
+  strong-hop {m = mach k clk (tm ∷ tms) ts} (carried cr) | calmAs refl refl | _ = silentᴴ refl (turn-pops cr refl refl refl refl)
 
   strong-shows : ∀ {rest g m} → Strong g m → rest ≋ residual g → Shows rest (step m)
   strong-shows {rest} {g} st e with strong-hop st
