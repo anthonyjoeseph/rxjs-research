@@ -6,7 +6,9 @@
 -- climbing induction.
 module port.Ghost.Paths where
 
-open import Data.List using (List; []; _∷_; _++_)
+open import Data.Bool using (true; false)
+open import Data.Empty using (⊥)
+open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.Nat.Properties using (≤-refl; m<m+n)
 open import Data.Nat using (ℕ; suc; _<_; _+_)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -64,7 +66,7 @@ module GhostingPaths (R : Set) where
   SourceFirst (U.outˢ q _ _) sb = U.beforeˢ (q ++ [ ix 0 ]) sb ≡ true
   SourceFirst (U.skipˢ q _)  sb = U.beforeˢ (q ++ [ ix 0 ]) sb ≡ true
   SourceFirst (U.endˢ c)     sb = U.beforeˢ (c ++ [ ix 0 ]) sb ≡ true
-  SourceFirst U.hushˢ        sb = U.⊥
+  SourceFirst U.hushˢ        sb = ⊥
 
   BodyFirst : ∀ {Γ A B} → U.Step Γ A → U.Step (A ∷ Γ) B → Set
   BodyFirst (U.outˢ q _ _) sb = U.beforeˢ (q ++ [ ix 0 ]) sb ≡ false
@@ -257,20 +259,21 @@ module GhostingPaths (R : Set) where
   -- ONE: a path one operator long
 
   mutual
-    data One {Γ A} {t : Sub Γ A} : ∀ {Δ B π} {u : Sub Δ B} → Path t u π → Set₁ where
-      one-map    : ∀ {Δ B} {f : A → B} → One (in-map {f = f} {t = t} here)
-      one-scan   : ∀ {Δ B} {f : B → A → B} {z} → One (in-scan {f = f} {z} {t = t} here)
-      one-cut    : ∀ {Δ B l a} → One (in-cut {l = l} {a = a} {t = t} here)
-      one-lane   : ∀ {Δ B r} → One (in-lane {r = r} {t = t} here)
-      one-take   : ∀ {Δ B i q tk} → One (in-take {i = i} {q} {tk = tk} {t = t} here)
-      one-outer  : ∀ {Δ B op f d n qs pl} {ls : List (Sub Γ B)} → One (in-outer {op = op} {f = f} {d = d} {n = n} {qs = qs} {pl = pl} {t = t} {ls = ls} here)
-      one-lanes  : ∀ {Δ B op f d n qs pl} {o : Sub Γ A} {ls : List (Sub Γ B)} {u : Sub Δ B} {i π} {πL : PathLanes ls u i π}
-                 → OneLane πL → One (in-lanes {op = op} {f = f} {d = d} {n = n} {qs = qs} {pl = pl} {o = o} πL)
-      one-source : ∀ {Δ B k r e rt} {b : Sub (A ∷ Γ) B} → One (in-source {k = k} {r = r} {e = e} {rt = rt} {t = t} {b = b} here)
-      one-body   : ∀ {Δ B k r e rt} {s : Sub Γ A} {u : Sub (A ∷ Γ) B} → One (in-body {k = k} {r = r} {e = e} {rt = rt} {s = s} here)
+    data One : ∀ {Γ A Δ B π} {t : Sub Γ A} {u : Sub Δ B} → Path t u π → Set₁ where
+      one-map    : ∀ {Γ X A} {f : X → A} {t : Sub Γ X} → One (in-map {f = f} {t = t} here)
+      one-scan   : ∀ {Γ X A} {f : A → X → A} {z} {t : Sub Γ X} → One (in-scan {f = f} {z} {t = t} here)
+      one-cut    : ∀ {Γ A l a} {t : Sub Γ A} → One (in-cut {l = l} {a = a} {t = t} here)
+      one-lane   : ∀ {Γ A r} {t : Sub Γ A} → One (in-lane {r = r} {t = t} here)
+      one-take   : ∀ {Γ A i q tk} {t : Sub Γ A} → One (in-take {i = i} {q} {tk} {t = t} here)
+      one-outer  : ∀ {Γ X A op f d n qs pl} {t : Sub Γ X} {ls : List (Sub Γ A)}
+                 → One (in-outer {op = op} {f} {d} {n} {qs} {pl} {t = t} {ls} here)
+      one-lanes  : ∀ {Γ X A Δ B op f d n qs pl} {o : Sub Γ X} {ls : List (Sub Γ A)} {u : Sub Δ B} {i π} {πL : PathLanes ls u i π}
+                 → OneLane πL → One (in-lanes {op = op} {f} {d} {n} {qs} {pl} {o = o} πL)
+      one-source : ∀ {Γ X A k r e rt} {t : Sub Γ X} {b : Sub (X ∷ Γ) A} → One (in-source {k = k} {r} {e} {rt} {t = t} {b} here)
+      one-body   : ∀ {Γ X A k r e rt} {s : Sub Γ X} {t : Sub (X ∷ Γ) A} → One (in-body {k = k} {r} {e} {rt} {s = s} {t} here)
 
     data OneLane : ∀ {Γ A Δ B i π} {ls : List (Sub Γ A)} {u : Sub Δ B} → PathLanes ls u i π → Set₁ where
-      one-this : ∀ {Γ A Δ B π} {t : Sub Γ A} {ls : List (Sub Γ A)} {u : Sub Δ B} {ρ : Path t u π} → OneLane (this-lane {ls = ls} (here {t = t}))
+      one-this : ∀ {Γ A} {t : Sub Γ A} {ls} → OneLane (this-lane {t = t} {ls} here)
       one-next : ∀ {Γ A Δ B i π} {l : Sub Γ A} {ls : List (Sub Γ A)} {u : Sub Δ B} {πL : PathLanes ls u i π} → OneLane πL → OneLane (next-lane {l = l} πL)
 
   -- A path read from its far end: none, or a path and one operator more.
