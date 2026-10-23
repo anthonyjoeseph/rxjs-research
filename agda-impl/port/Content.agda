@@ -26,7 +26,7 @@ import Data.List.Relation.Unary.Linked as Linked
 open Linked using (Linked)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
-open import Data.Nat using (ℕ; zero; suc; _<ᵇ_; _<_; _≤_; s≤s; z≤n)
+open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_; _<_; _≤_; s≤s; z≤n)
 open import Data.Nat.Properties using (suc-injective; +-suc; +-monoʳ-≤; n≤1+n; ≤-reflexive; n<1+n; <-trans)
 open import Data.Maybe using (just; nothing)
 import Data.Maybe.Relation.Unary.All as MAll
