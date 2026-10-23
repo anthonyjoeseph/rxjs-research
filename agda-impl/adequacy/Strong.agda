@@ -18,30 +18,31 @@ open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_)
 open import Data.List using (List; []; _∷_; _++_; [_]; length; map; head)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Empty using (⊥)
-open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup)
+open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup) renaming (map to mapᴬ)
 open import Data.List.Relation.Unary.Linked using (Linked; [])
 import Data.List.Relation.Unary.Any as Any
 open import Data.Maybe using (Maybe; just; nothing; is-just; is-nothing)
 import Data.Maybe.Relation.Unary.All as MAll
 open import Data.Nat using (ℕ; suc; _+_; _<ᵇ_; _≡ᵇ_; _≤_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Level using (Lift)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl)
 open import Relation.Nullary using (¬_)
 
 import Tree as T
-open import denotation.MonotonicList.Events using (Time; Pos; From; Frame; at; ix; last; tick; root; _<ᵖ_) renaming (sub to subᴾ)
+open import denotation.MonotonicList.Events using (Time; Pos; From; Frame; at; ix; last; tick; root; _<ᵖ_; <ᵖ-trans) renaming (sub to subᴾ)
 import denotation.Unfold as U
 open import operation.PureObservable using (PureObs; Tape; tape; over; module Machine; module Driver)
 open import adequacy.Sane using (Sane; sane-subscribe)
 open import adequacy.Leaves using (Leaves; Twin; Restful)
 open import adequacy.Told using (untold; Tells)
-open import adequacy.Calm using (Calm; calm-subscribe)
+open import adequacy.Calm using (Calm; calm-below; calm-subscribe)
 open import adequacy.Opens using (opens-subscribe; heads-open)
 open import adequacy.Placed using (placed-subscribe)
 open import adequacy.Placed.Order using (Placed)
-open import adequacy.Sorted using (_≤ᵖ_)
+open import adequacy.Sorted using (_≤ᵖ_; ≤ᵖ-trans)
 open import adequacy.Sorted.Walk using (module SortingWalk)
 
 open Machine using (St; Ctx; Conf; CS; Job; Mode; Ev; plug; dirs; top; ⟨_,_,_,_,_⟩; absorbed; subscribing; resuming; rising; nx; cp; _⊕_;
@@ -330,6 +331,10 @@ module Strongly (R : Set) where
   Ahead : ∀ {Γ A} → Pos → U.Node Γ A → Set
   Ahead q c = Heads q c × Calm q c
 
+  -- Ahead of a position, ahead of any before it.
+  ahead-below : ∀ {q′ q Γ A} {c : U.Node Γ A} → q′ ≤ᵖ q → Ahead q c → Ahead q′ c
+  ahead-below {c = c} le (h , cm) = (λ {k} e → ≤ᵖ-trans le (h e)) , calm-below {c = c} le cm
+
   ------------------------------------------------------------------------
   -- THE JOBS, against the witness
 
@@ -414,6 +419,13 @@ module Strongly (R : Set) where
     ; pools = λ ψ sn e → Each.pools h ψ sn e , Each.pools c ψ sn e
     ; rests = λ ψ sn e pn pe → Each.rests h ψ sn e pn pe , Each.rests c ψ sn e pn pe }
 
+  -- What holds of each node, anything it implies holds of each.
+  each-weaken : ∀ {P Q : ∀ {Γ A} → U.Node Γ A → Set} {Γ A} {t : Sub Γ A} → (∀ {Γ A} {c : U.Node Γ A} → P c → Q c) → Each P t → Each Q t
+  each-weaken f h = record
+    { parts = λ ψ sn e → f (Each.parts h ψ sn e)
+    ; pools = λ ψ sn e → f (Each.pools h ψ sn e)
+    ; rests = λ ψ sn e pn pe → f (Each.rests h ψ sn e pn pe) }
+
   ------------------------------------------------------------------------
   -- What a subscription leaves running past its end
 
@@ -473,6 +485,10 @@ module Strongly (R : Set) where
   Untold q t = ∀ {Γ X B k r c₀ rt π} {s : Sub Γ X} {b : Sub (X ∷ Γ) B}
              → (ψ : Path t (connectˢ k r (just c₀) rt s b) π) → seen ψ ≡ true → part s ≡ nothing
              → ∀ {b₀} → part b ≡ just b₀ → Tells q c₀ (untold (Any.here refl) b₀)
+
+  -- Told no sooner than a position, no sooner than any before it.
+  untold-below : ∀ {q′ q Γ A} {t : Sub Γ A} → q′ ≤ᵖ q → Untold q t → Untold q′ t
+  untold-below le ut ψ sn ps pb = mapᴬ (≤ᵖ-trans le) (ut ψ sn ps pb)
 
   -- A connect still held past its source's end holds no source.
   Ended : ∀ {Γ₀ A₀} → Sub Γ₀ A₀ → Set₁
@@ -611,6 +627,16 @@ module Strongly (R : Set) where
       joined  : Joined t
       ordered : Linked (λ x y → cascade x <ᵖ cascade y ≡ true) timers
       ahead   : All (λ tm → clock ≤ Timer.due tm × p <ᵖ cascade tm ≡ true) timers
+
+  -- No later than one strictly before another, strictly before it.
+  ≤<ᵖ-trans : ∀ {p q r} → p ≤ᵖ q → q <ᵖ r ≡ true → p <ᵖ r ≡ true
+  ≤<ᵖ-trans (inj₁ refl)          h = h
+  ≤<ᵖ-trans {p} {q} {r} (inj₂ a) h = <ᵖ-trans p q r a h
+
+  -- Queued past a position, queued past any before it.
+  queue-below : ∀ {p′ p clk tms t} → p′ ≤ᵖ p → Queue p clk tms t → Queue p′ clk tms t
+  queue-below le q = record { timed = Queue.timed q ; joined = Queue.joined q ; ordered = Queue.ordered q
+                            ; ahead = mapᴬ (λ (d , a) → d , ≤<ᵖ-trans le a) (Queue.ahead q) }
 
   -- The frame a turn plays, at its cold's own tick.
   private
