@@ -8,13 +8,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE CARRIER'S TOWER
-
-Untried: whether `inside-under`'s old body carries without the
-`inside-cons` lemma the current Events lacks. Settled when it is a body.
-
-Members: `inside-under`.
-
 #### THE STRONG STEP
 
 Untried: whether each control state's step keeps `Carried` on the state

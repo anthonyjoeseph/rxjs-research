@@ -144,8 +144,11 @@ inside-prefix r k h i pr with prefix-rest k h pr
 ... | ys , refl = M.inside-++ r k ys i
 
 -- Inside `r` is under it.
--- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Placed/Trail.agda
-postulate inside-under : ∀ r k → M.inside r k ≡ true → Prefix r k
+inside-under : ∀ r k → M.inside r k ≡ true → Prefix r k
+inside-under []      k       i = tt
+inside-under (a ∷ r) []      ()
+inside-under (a ∷ r) (b ∷ k) i with M.inside-cons a r b k i
+... | e , i′ = e , inside-under r k i′
 
 ext-prefix : ∀ {k j n} → Ext k j → Prefix j n → Ext k n
 ext-prefix {k} {n = n} (ext l ls) pr with prefix-rest (k ++ l ∷ ls) n pr
