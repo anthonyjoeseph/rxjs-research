@@ -10,11 +10,10 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE CARRIER'S TOWER
 
-Untried: whether the flatMap and connect arms (`flat-calm` over
-FlatOrder/FlatAfter/Calm/Burst/Walk, the connect order over Trail) carry to
-the current Unfold. Settled when all three are bodies.
+Untried: whether `inside-under`'s old body carries without the
+`inside-cons` lemma the current Events lacks. Settled when it is a body.
 
-Members: `flat-calm`, `ordered-connect`, `steady-connect`.
+Members: `inside-under`.
 
 #### THE STRONG STEP
 
