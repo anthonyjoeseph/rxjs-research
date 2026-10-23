@@ -378,7 +378,7 @@ module Honesty (R : Set) where
     settled-meets []       clk tms []       e = e
     settled-meets []       clk tms (t ∷ ts) e = e
     settled-meets (j ∷ rs) clk tms []       e = e
-    settled-meets (j ∷ rs) clk tms (t ∷ ts) e with depthOf t <ᵇ suc (length rs)
+    settled-meets (j ∷ rs) clk tms (t ∷ ts) e with depthOf t <ᵇ suc (length rs) in d
     ... | true  = e
     ... | false = e
 
@@ -390,7 +390,7 @@ module Honesty (R : Set) where
     settled-lighter (j ∷ rs) clk tms []       = popped (suc (length rs))
       where popped : ∀ a → suc (suc (a + a)) ≤ suc a + suc a
             popped a = s≤s (s≤s (≤-reflexive (sym (+-suc a a))))
-    settled-lighter (j ∷ rs) clk tms (t ∷ ts) with depthOf t <ᵇ suc (length rs)
+    settled-lighter (j ∷ rs) clk tms (t ∷ ts) with depthOf t <ᵇ suc (length rs) in d
     ... | true  = s≤s (s≤s (≤-reflexive (sym (+-suc (suc (length rs)) (suc (length rs))))))
     ... | false = s≤s (+-monoʳ-≤ (suc (length rs)) (n≤1+n (suc (length rs))))
 
