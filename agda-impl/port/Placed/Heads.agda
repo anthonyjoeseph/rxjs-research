@@ -29,8 +29,8 @@ open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatM
 open import denotation.MonotonicList.Events using (timelineAt; Pos; From; Timeline; ix; sub; last; _<ᵖ_; inside)
 import denotation.MonotonicList.Events as M
 import denotation.Unfold as U
-open import port.Placed.Order using (Alienᴱ; Apart; Disjoint; Every; Headed; Owned; Placed;
-  Prefix; Reaches; Sides; Sorted; Within; every-monoᴱ; prefix-++)
+open import port.Placed.Order using (Alienᴱ; Apart; Disjoint; Headed; Owned; Placed;
+  Prefix; Sides; Within; every-monoᴱ; prefix-++)
 open import port.Placed.Keyed using (Admitted; Fit; Keyed; KeyedEarliest; KeyedOuter; KeyedStep; Keyedᴸ; Keyedᴹ; Keyedˢ; Noted; Qᴹ; keyed-head)
 open import denotation.Unfold using (NEnv)
 open import port.Placed.Keys using (Mark; ix-mark; last-mark; owned-tagged; owned-trans; prefix-refl; sibling; tagged-sub)
@@ -494,14 +494,3 @@ apart-sub s b p ρ hp al =
   , keyed-sub (apart-closed p hp) s (p ++ [ ix 1 ]) (sibling p (ix-mark 1) (λ ()) , sibling p (ix-mark 0) (λ ()))
   , every-monoᴱ (λ h n o → n (owned-trans p (p ++ [ ix 0 ]) h (inj₁ (prefix-++ p [ ix 0 ])) o)) ρ al
 
-postulate
-  -- Every position the meaning holds is headed.
-  --
-  -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Placed/Rising.agda
-  headed-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Every Headed (U.meaning (U.subscribe o p) ρ)
-
-  -- A flatMap's inner subscribe position is alienated from the environment.
-  --
-  -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Placed/Rising.agda
-  alien-shown : ∀ {Γ A B} (op : T.FlatOp) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → Alienᴱ p ρ
-              → ∀ x → Reaches (x ++ [ ix 0 ]) (U.meaning (U.subscribe (flatMap op f s) p) ρ) → Alienᴱ (x ++ [ ix 1 ]) ρ

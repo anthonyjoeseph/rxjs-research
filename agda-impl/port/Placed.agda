@@ -17,8 +17,8 @@ open import denotation.Unfold using (NEnv)
 open import port.Placed.Order using (Alienᴱ; Headed; Ordered; Owned; Placed; Sorted; Steady;
   every-lookup; headed-snoc; prefix-++)
 open import port.Placed.Keys using (alienᴱ-owned; every-reach)
-open import port.Placed.Heads using (alien-shown; apart-sub; headed-lane; headed-sub; start-within)
-open import port.Placed.Rising using (alien-sub)
+open import port.Placed.Heads using (apart-sub; headed-lane; start-within)
+open import port.Placed.Rising using (alien-shown; alien-sub; headed-sub)
 
 postulate
   -- The meaning of a subscribe is ordered.

@@ -29,13 +29,13 @@ open import denotation.Unfold using (NEnv)
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
 open import denotation.Compositional using (env-refl)
 open import port.Finite using (Finite; cold-f; empty-f; of-f; map-f; scan-f; takeWhile-f; flatMap-f; connect-f; connected-f; defer-f; trunc; finite-trunc; trunc-agree)
-open import port.Placed.Order using (Alien; Alienᴱ; Atop; Clear; Disjoint; Every; EveryT; Everyᴱ; Every∞; Ext; Headed; Ordered;
-  Owned; Past; Prefix; Steady; Tagged; atop-map; atop-scan; cons-ext; every; every-lookup;
-  every-mono; everyT-burstOn; everyT-idle; everyT-mono; everyT-∪; everyᵀ; every∞-mono; ext;
-  ext-eq; ext-irrefl; headed-snoc; ordered; prefix-++; steady; under-ext)
-open import port.Placed.Keys using (Mark; module Merge; alienᴱ-owned; atop-agree; clear-agree; earliest-all; every-beside;
-  every-lim; every-map; every-scan; every-≈; everyT-≈; ix-mark; last-mark; no-tick; ordered-≈;
-  owned-tagged; owned-trans; prefix-refl; sibling; steady-≈; tagged-mark; tagged-sub;
+open import port.Placed.Order using (Alien; Alienᴱ; Atop; Beneath; Clear; Disjoint; Every; EveryT; Everyᴱ; Every∞; Ext; Headed; Ordered;
+  Owned; Past; Prefix; Reaches; Sorted; Steady; Tagged; atop-map; atop-scan; cons-ext; every; every-lookup;
+  every-mono; every-monoᴱ; everyT-burstOn; everyT-idle; everyT-mono; everyT-∪; everyᵀ; every∞-mono; ext;
+  ext-eq; ext-irrefl; headed-snoc; ordered; prefix-++; sorted-headed; steady; under-ext)
+open import port.Placed.Keys using (Mark; module Merge; alienᴱ-owned; atop-agree; beneath-owned; beneath-snoc; clear-agree; earliest-all; every-beside;
+  every-lim; every-map; every-reach; every-scan; every-≈; everyT-≈; ix-mark; last-mark; no-tick; ordered-≈;
+  owned-lane; owned-snoc; owned-tagged; owned-trans; prefix-refl; sibling; steady-≈; tagged-mark; tagged-sub;
   tick-last; values-map)
 
 open Events∞
@@ -642,3 +642,43 @@ steady (steady-defer l p ρ hp cl st) =
   clear-agree (alike 1) (beyond-clear (p ++ [ ix 0 ]) S (atop-clear (p ++ [ ix 0 ]) (p ++ [ ix 0 ]) S (inj₁ (prefix-refl _)) atop alien) alien)
   , steady-≈ S X alike st
   where open Deferred l p ρ hp cl
+
+-- Headed: subscribing where a tick heads, over sources so headed.
+headedRules : Rules
+headedRules = record
+  { S      = Headed
+  ; P      = Headed
+  ; Src    = Headed
+  ; child  = λ j _ _ h → headed-snoc j h
+  ; deeper = λ h _ _ x → headed-snoc h x
+  ; held   = λ _ x → x
+  ; frame  = λ _ _ _ _ → tt
+  ; join   = λ q _ hq _ _ → headed-snoc q hq
+  ; source = λ _ x → x
+  }
+
+-- Keyed under `p`: subscribing where `p` keys, showing strictly under it.
+keyedRules : Pos → Rules
+keyedRules p = record
+  { S      = Owned p
+  ; P      = Beneath p
+  ; Src    = λ _ → ⊤
+  ; child  = λ j l _ o → owned-snoc p j l o
+  ; deeper = λ h l _ b → beneath-snoc p h l b
+  ; held   = beneath-owned p
+  ; frame  = λ n e b _ → inj₂ (inj₁ (beneath-owned p e b))
+  ; join   = λ q j _ o _ → inj₂ (owned-tagged p j (q ++ [ sub j ]) o (tagged-sub q j))
+  ; source = λ _ _ → tt
+  }
+
+-- Every position the meaning holds is headed.
+headed-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Every Headed (U.meaning (U.subscribe o p) ρ)
+headed-sub o p ρ hp so = Reach.reach headedRules o p ρ hp (sorted-headed ρ so)
+
+-- A flatMap's inner subscribe position is alienated from the environment.
+alien-shown : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → Alienᴱ p ρ
+            → ∀ x → Reaches (x ++ [ ix 0 ]) (U.meaning (U.subscribe (flatMap op f s) p) ρ) → Alienᴱ (x ++ [ ix 1 ]) ρ
+alien-shown op f s p ρ al x r =
+  alienᴱ-owned p (x ++ [ ix 1 ])
+    (owned-lane p x (every-reach _ (x ++ [ ix 0 ])
+      (Reach.reach (keyedRules p) (flatMap op f s) p ρ (inj₁ (prefix-refl p)) (every-monoᴱ (λ _ _ → tt) ρ al)) r)) ρ al
