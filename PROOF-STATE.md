@@ -17,7 +17,7 @@ reading. Settled when `port/Frame` typechecks and a scan part is its old body.
 
 Members: `emit-void`, `emit-open`, `scan-kernels`, `scan-lifts`,
 `scan-lefts`, `scan-owned`, `scan-meaning`, `scan-queue`, `scan-behind`,
-`scan-lingers`, `scan-told`, `scan-ended`, `scan-flags`, `gone-take`,
+`scan-lingers`, `scan-flags`, `gone-take`,
 `take-pass`, `take-out`, `take-end`, `call-outer`, `call-lanes`,
 `call-source`, `body-rest-heads`, `owned-body`, `burst-spent`,
 `behind-fire`, `fire-lingers`.
@@ -84,7 +84,7 @@ Believed unfoldings: a context climbing one frame, and the climbs with no old
 body. Settled when each is a body.
 
 Members: `of-path`, `map-at`, `scan-at`, `take-at`, `take-path`, `body-at`,
-`scan-books`, `scan-load`, `call-lane`, `emit-shut`, `last-void`,
+`scan-books`, `scan-load`, `scan-told`, `scan-ended`, `call-lane`, `emit-shut`, `last-void`,
 `last-enter`, `take1-void`, `take1-enter`.
 
 #### THE LINK

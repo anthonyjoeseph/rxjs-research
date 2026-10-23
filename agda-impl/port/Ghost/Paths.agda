@@ -15,7 +15,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Level using (Lift; lift)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
 import denotation.Unfold as U
 open import denotation.MonotonicList.Events using (Pos; ix; _<ᵖ_)
@@ -251,10 +251,6 @@ module GhostingPaths (R : Set) where
                 (e : x ≡ y) {L : Lifts ρ (f x) S} → Lefts L → Lefts (subst (λ z → Lifts ρ (f z) S) e L)
   lefts-subst f refl lt = lt
 
-  lefts-subst₂ : ∀ {Γ A Δ B π} {t : Sub Γ A} {u : Sub Δ B} {ρ : Path t u π} {ℓ ℓ′} {X : Set ℓ} {Y : Set ℓ′} (f : X → Y → U.Step Δ B) {S x₁ x₂ y₁ y₂}
-                 (e₁ : x₁ ≡ x₂) (e₂ : y₁ ≡ y₂) {L : Lifts ρ (f x₁ y₁) S} → Lefts L → Lefts (subst₂ (λ x y → Lifts ρ (f x y) S) e₁ e₂ L)
-  lefts-subst₂ f refl refl lt = lt
-
   ------------------------------------------------------------------------
   -- ONE: a path one operator long
 
@@ -428,23 +424,3 @@ module GhostingPaths (R : Set) where
                   → HealedL q (πL ⊕ᴸ σ) → HealedL q πL
     healedL-split (this-lane ρ)  σ hl = healed-split ρ σ hl
     healedL-split (next-lane πL) σ hl = healedL-split πL σ hl
-
-  -- An end reaching a connect's source: the connect's own end staged.
-  mutual
-    healed-end : ∀ {q Γ C Δ X B k r e rt π} {o : Sub Γ C} {s : Sub Δ X} {b : Sub (X ∷ Δ) B}
-                 (ρ : Path o (connectˢ k r e rt s b) π) → Healed q (ρ ⊕ in-source here) → part s ≡ nothing → e ≡ just q
-    healed-end here          (x , _) ns = x ns
-    healed-end (in-map ρ)    hl      ns = healed-end ρ hl ns
-    healed-end (in-scan ρ)   hl      ns = healed-end ρ hl ns
-    healed-end (in-cut ρ)    hl      ns = healed-end ρ hl ns
-    healed-end (in-lane ρ)   hl      ns = healed-end ρ hl ns
-    healed-end (in-take ρ)   hl      ns = healed-end ρ hl ns
-    healed-end (in-outer ρ)  hl      ns = healed-end ρ hl ns
-    healed-end (in-lanes πL) hl      ns = healedL-end πL hl ns
-    healed-end (in-source ρ) (_ , hl) ns = healed-end ρ hl ns
-    healed-end (in-body ρ)   hl      ns = healed-end ρ hl ns
-
-    healedL-end : ∀ {q Γ C Δ X B i π k r e rt} {ls : List (Sub Γ C)} {s : Sub Δ X} {b : Sub (X ∷ Δ) B}
-                  (πL : PathLanes ls (connectˢ k r e rt s b) i π) → HealedL q (πL ⊕ᴸ in-source here) → part s ≡ nothing → e ≡ just q
-    healedL-end (this-lane ρ)  hl ns = healed-end ρ hl ns
-    healedL-end (next-lane πL) hl ns = healedL-end πL hl ns

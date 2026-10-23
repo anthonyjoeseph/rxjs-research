@@ -7,7 +7,7 @@ module port.Climbs where
 open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_; _++_; [_]; map)
 open import Data.List.Properties using (++-conicalʳ)
-open import Data.List.Relation.Unary.All as All using ([])
+open import Data.List.Relation.Unary.All using ([]) renaming (lookup to lookupᴬ)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _<_)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred)
@@ -153,19 +153,21 @@ module Ascending (R : Set) where
              → One s → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ s) e → Called st m₁ (ρ ⊕ s)
     call-lane : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub [] R} {u : Sub Δ A} {v : Sub Δ′ A′} {π τ} (ρ : Path T u π) {s : Path u v τ}
               → One s → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ s) e → Called st m₁ (ρ ⊕ s)
-    -- DEAD ROUTE: the old body plants the inner on the heap's cells; the state tree's `admit` starts it in the flatMap's lanes.
-    --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Flat/Plant.agda
+    --
+    -- DEAD ROUTE: the old body plants the inner on the heap's cells; the state tree's `admit` starts it in the flatMap's lanes.
     call-outer : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub [] R} {u : Sub Δ A} {v : Sub Δ′ A′} {π τ} (ρ : Path T u π) {s : Path u v τ}
                → One s → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ s) e → Called st m₁ (ρ ⊕ s)
-    -- DEAD ROUTE: the old body frees the lane's heap slot; the state tree's `dequeue` starts the queue's head in place.
-    --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Lanes/Queue.agda
+    --
+    -- DEAD ROUTE: the old body frees the lane's heap slot; the state tree's `dequeue` starts the queue's head in place.
     call-lanes : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub [] R} {u : Sub Δ A} {v : Sub Δ′ A′} {π τ} (ρ : Path T u π) {s : Path u v τ}
                → One s → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ s) e → Called st m₁ (ρ ⊕ s)
+    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Connect.agda
+    --
     -- DEAD ROUTE: the old body writes the subject's heap cells; the state tree appends to the connect's `feeds` and resumes feeding.
     --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Connect.agda
+    -- RECOVERY: git show b039ebbb:agda-impl/port/Ghost/Paths.agda restores `healed-end`, an end reaching a connect's source read off `Healed`, and `lefts-subst₂`
     call-source : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub [] R} {u : Sub Δ A} {v : Sub Δ′ A′} {π τ} (ρ : Path T u π) {s : Path u v τ}
                 → One s → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ s) e → Called st m₁ (ρ ⊕ s)
 
@@ -231,7 +233,7 @@ module Ascending (R : Set) where
       fed-same h (takeWhileˢ _ _ _ s)        d       = fed-same h s d
       fed-same h (flatMapˢ _ _ _ _ _ _ o ls) (d , e) = fed-same h o d , fedL-same h ls e
       fed-same h (connectˢ _ _ _ _ s b)      (d , e) = fed-same h s d , fed-same h b e
-      fed-same h (joinˢ j _ x _) {π} {ν}     d       = λ g → trans (d g) (h (All.lookup ν x) π j)
+      fed-same h (joinˢ j _ x _) {π} {ν}     d       = λ g → trans (d g) (h (lookupᴬ ν x) π j)
 
       fedL-same : ∀ {k₁ k₂ : Conf R} → (∀ {X} (b : Feed X) π j → owing k₁ b π j ≡ owing k₂ b π j)
                 → ∀ {Γ B} (ls : List (Sub Γ B)) {π i ν} → FedLanes k₁ ls π i ν → FedLanes k₂ ls π i ν
@@ -261,18 +263,18 @@ module Ascending (R : Set) where
 
     -- The tree with the scan's accumulator rewritten is the machine's.
     --
-    -- DEAD ROUTE: the old body is a heap write's frame; the state tree has no heap, the write is a `plant`.
-    --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Frame/Repool.agda
+    --
+    -- DEAD ROUTE: the old body is a heap write's frame; the state tree has no heap, the write is a `plant`.
     scan-kernels : ∀ {Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π)
                    {c₀ : Ctx R Δ B} {x} → dirs c₀ ≡ π → forget T ≡ plug c₀ (scanS f z x)
                  → ∀ z′ → forget (plant ρ (scanˢ f z′ v)) ≡ plug c₀ (scanS f z′ x)
 
     -- A value through a scan, the carrier's parts on the rewritten tree.
     --
-    -- DEAD ROUTE: the old bodies are a heap write's frames; the state tree has no heap, the write is a `plant`.
-    --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Frame/Repool.agda
+    --
+    -- DEAD ROUTE: the old bodies are a heap write's frames; the state tree has no heap, the write is a `plant`.
     scan-lifts : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
                → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y)
                → Passed (Conf.pos (Mach.conf m₁)) g (planted ρ (scanˢ f (f z y) v)) (nx (f z y))
@@ -299,10 +301,8 @@ module Ascending (R : Set) where
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Scan.agda
     scan-lingers : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
                  → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y) → Lingers (plant ρ (scanˢ f (f z y) v))
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Frame/Repool.agda
     scan-told : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
               → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y) → Untold (Conf.pos (Mach.conf m₁)) (plant ρ (scanˢ f (f z y) v))
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Frame/Repool.agda
     scan-ended : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
                → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y) → Ended (plant ρ (scanˢ f (f z y) v))
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Scan.agda
@@ -404,15 +404,15 @@ module Ascending (R : Set) where
               {c : Ctx R Δ A} {x} → dirs c ≡ π ++ [ 0 ] → forget T ≡ plug c x
             → Σ (Ctx R Δ A) λ c₀ → c ≡ inTake i q c₀ × dirs c₀ ≡ π
 
-    -- DEAD ROUTE: the old body reads the take's liveness off a heap cell; the state tree holds it as the `Taking` stage.
-    --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Take.agda
+    --
+    -- DEAD ROUTE: the old body reads the take's liveness off a heap cell; the state tree holds it as the `Taking` stage.
     gone-take : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {i q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ i q tk v) π)
               → Calling g ℓ m₁ (ρ ⊕ in-take here) cp → part (takeWhileˢ i q tk v) ≡ nothing
 
-    -- DEAD ROUTE: the old bodies are heap writes of the take's liveness; the state tree's rise rewrites no node.
-    --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Base.agda
+    --
+    -- DEAD ROUTE: the old bodies are heap writes of the take's liveness; the state tree's rise rewrites no node.
     take-pass : ∀ {g m} (st : Strong g m) {m₁ Δ A π} {T : Sub [] R} {i q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ i q tk v) π) {y}
               → q y ≡ true → Calling g (loadOf st) m₁ (ρ ⊕ in-take here) (nx y) → Called st m₁ (ρ ⊕ in-take here)
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Take.agda
@@ -467,15 +467,15 @@ module Ascending (R : Set) where
     body-end (lifts-shut _ _ _ lifts-here) = refl
 
   postulate
-    -- DEAD ROUTE: the old body reads the body's rest off the heap's leftover; the state tree's leftover is `Strong`'s.
-    --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Base.agda
+    --
+    -- DEAD ROUTE: the old body reads the body's rest off the heap's leftover; the state tree's leftover is `Strong`'s.
     body-rest-heads : ∀ {g ℓ m₁ Δ X B π} {T : Sub [] R} {k r ej rt} {s : Sub Δ X} {b : Sub (X ∷ Δ) B} (ρ : Path T (connectˢ k r ej rt s b) π)
                     → Calling g ℓ m₁ (ρ ⊕ in-body here) cp → ClosedHeads (Conf.pos (Mach.conf m₁)) ρ cp
 
-    -- DEAD ROUTE: the old body owes the body's cut on the heap's agenda; the state tree pushes the job onto `rets`.
-    --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Base.agda
+    --
+    -- DEAD ROUTE: the old body owes the body's cut on the heap's agenda; the state tree pushes the job onto `rets`.
     owned-body : ∀ {T : Sub [] R} {Δ X B} {c : Ctx R Δ B} {k o x p rs clk tms ts}
                → Owned T (mach ⟨ inBody {X = X} k o c , x , rising cp , p , rs ⟩ clk tms ts)
                → Owned T (mach ⟨ c , connS k o x , rising cp , p , (dirs c , owed , p) ∷ rs ⟩ clk tms ts)
