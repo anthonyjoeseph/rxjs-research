@@ -53,7 +53,9 @@ module Honesty (R : Set) where
     Stands; cutʰ; finʰ; dryʰ; Mirror; Inner; Logged; Shows; silentˢ; valueˢ; completeˢ; drainedˢ; inner-launch; ≋-refl;
     Steps; after; steps-after; Hopped; onward)
   open Strongly R using (Strong; Carried; carried; closing; calmAs; noteAs; runAs; subAs; burstAs)
-  open Machine using (Ctx; top; ⟨_,_,_,_,_⟩; absorbed; rising; resuming; subscribing; nx; pend)
+  open Machine using (Ctx; top; ⟨_,_,_,_,_⟩; absorbed; rising; resuming; subscribing; nx; pend;
+    ofS; cutS; takeS; connS; joinS; next; att; owedCp; owedCut; feeding; attBody; owed; go;
+    res; ofR; attR; cpR; cutR; feedR; bodyR; srcR; endR; joinR; idle)
 
   step-alike : ∀ g → Sane [] g → Placed g [] → residual g ≋ after (U.step g)
   step-alike g sn pl = same-agree (_≃_.agreeing (step-skips g sn pl))
@@ -97,12 +99,61 @@ module Honesty (R : Set) where
     note-onward : ∀ {g g′ m s a p rs} → Carried g m → Mach.conf m ≡ ⟨ top , s , rising (nx a) , p , rs ⟩
                 → U.step g ≡ U.outˢ p a g′ → Mirror g′ (record m { conf = ⟨ top , s , absorbed , p , rs ⟩ })
 
-    -- A job resumed runs silently on to a re-entry configuration the
-    -- configuration gains.
+    -- An `of`'s next value, or its completion, climbs the observers
+    -- above it.
     --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs.agda
-    run-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {s t p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , resuming t , p , rs ⟩
+    emit-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {xs i p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , ofS xs , resuming (next i) , p , rs ⟩
+                → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+
+    -- A subscription's cut handed its unsubscribe, which it stashes, or
+    -- throws if already cut: the ghost alike, a job fewer.
+    kont-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {l a s p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , cutS l a s , resuming att , p , rs ⟩
+                → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+
+    -- A takeWhile's completion delivered under its failing value, then
+    -- its cut.
+    --
+    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs.agda
+    take1-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCp , p , rs ⟩
+                 → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+
+    -- A takeWhile's cut: what it holds unsubscribed; the ghost alike, a
+    -- job fewer.
+    --
+    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Lift.agda
+    cut-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩
                → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+
+    -- The rest of a connect's feed: the next joiner fed, or the feed
+    -- done.
+    feed-onward : ∀ {g m Γ A X} {c : Ctx R Γ A} {k : Machine.CS X} {o b js p rs} (cr : Carried g m)
+                → Mach.conf m ≡ ⟨ c , connS k o b , resuming (feeding js) , p , rs ⟩
+                → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+
+    -- A connect's source subscribed once its body is.
+    src-onward : ∀ {g m Γ A X} {c : Ctx R Γ A} {k : Machine.CS X} {o b p rs} (cr : Carried g m)
+               → Mach.conf m ≡ ⟨ c , connS k o b , resuming attBody , p , rs ⟩
+               → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+
+    -- A connect's source handed its unsubscribe: thrown if the body has
+    -- ended.
+    src-cut-onward : ∀ {g m Γ A X} {c : Ctx R Γ A} {k : Machine.CS X} {o b p rs} (cr : Carried g m)
+                   → Mach.conf m ≡ ⟨ c , connS k o b , resuming att , p , rs ⟩
+                   → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+
+    -- A connect's body ended: its source unsubscribed if attached.
+    body-cut-onward : ∀ {g m Γ A X} {c : Ctx R Γ A} {k : Machine.CS X} {o b p rs} (cr : Carried g m)
+                    → Mach.conf m ≡ ⟨ c , connS k o b , resuming owed , p , rs ⟩
+                    → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+
+    -- A joiner fed: what its subject holds for it, on its way up.
+    join-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {j x p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , joinS j true x , resuming go , p , rs ⟩
+                → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+
+    -- A job owed nothing by its node: dropped.
+    idle-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {s t p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , resuming t , p , rs ⟩
+                → res s t ≡ idle → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
 
     -- A pending node begun, likewise.
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Lift/Order.agda
@@ -121,6 +172,22 @@ module Honesty (R : Set) where
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs.agda
     turn-pops : ∀ {g m Γ A} {c : Ctx R Γ A} {s p tm tms} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , [] ⟩
               → Mach.turns m ≡ [] → Mach.timers m ≡ tm ∷ tms → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+
+  -- A job resumed runs silently on to a re-entry configuration the
+  -- configuration gains: by the job the node owes (`res`).
+  run-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {s t p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , resuming t , p , rs ⟩
+             → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+  run-onward {s = s} {t} cr e with s | t | res s t in r
+  ... | .(ofS _)          | .(next _)     | ofR _ _       = emit-onward cr e
+  ... | .(cutS _ _ _)     | .att          | attR _ _ _    = kont-onward cr e
+  ... | .(takeS _ _ _)    | .owedCp       | cpR _ _ _     = take1-onward cr e
+  ... | .(takeS _ _ _)    | .owedCut      | cutR _ _ _    = cut-onward cr e
+  ... | .(connS _ _ _)    | .(feeding _)  | feedR _ _ _ _ = feed-onward cr e
+  ... | .(connS _ _ _)    | .attBody      | bodyR _ _ _   = src-onward cr e
+  ... | .(connS _ _ _)    | .att          | srcR _ _ _    = src-cut-onward cr e
+  ... | .(connS _ _ _)    | .owed         | endR _ _ _    = body-cut-onward cr e
+  ... | .(joinS _ true _) | .go           | joinR _ _     = join-onward cr e
+  ... | _                 | _             | idle          = idle-onward cr e r
 
   -- By the re-entry state.
   strong-hop : ∀ {g m} (st : Strong g m) → Hop st
