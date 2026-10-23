@@ -433,12 +433,12 @@ module Honesty (R : Set) where
             → Linked (λ x y → cascade x <ᵖ cascade y ≡ true) (tm ∷ ts)
             → All (λ x → clk ≤ Timer.due x × p <ᵖ cascade x ≡ true) (tm ∷ ts)
             → All (λ x → Timer.due tm ≤ Timer.due x × p <ᵖ cascade x ≡ true) ts
-  ahead-pop {p = p} {tm = tm} lk (_ ∷ ah) = go (later lk) ah
+  ahead-pop {p = p} {tm = tm} lk (_ ∷ ah) = ahead-go (later lk) ah
     where
-      go : ∀ {clk xs} → All (λ x → cascade tm <ᵖ cascade x ≡ true) xs → All (λ x → clk ≤ Timer.due x × p <ᵖ cascade x ≡ true) xs
+      ahead-go : ∀ {clk xs} → All (λ x → cascade tm <ᵖ cascade x ≡ true) xs → All (λ x → clk ≤ Timer.due x × p <ᵖ cascade x ≡ true) xs
          → All (λ x → Timer.due tm ≤ Timer.due x × p <ᵖ cascade x ≡ true) xs
-      go []       []             = []
-      go {xs = x ∷ _} (c ∷ cs) ((_ , a) ∷ as) = (<ᵖ-tick (Timer.due tm) (Timer.due x) (subᴾ (Timer.from tm) ∷ []) (subᴾ (Timer.from x) ∷ []) c , a) ∷ go cs as
+      ahead-go []       []             = []
+      ahead-go {xs = x ∷ _} (c ∷ cs) ((_ , a) ∷ as) = (<ᵖ-tick (Timer.due tm) (Timer.due x) (subᴾ (Timer.from tm) ∷ []) (subᴾ (Timer.from x) ∷ []) c , a) ∷ ahead-go cs as
 
   -- THE TURN POPPING A TIMER: its cold fired, the same meaning node with
   -- its burst held, a timer fewer.
