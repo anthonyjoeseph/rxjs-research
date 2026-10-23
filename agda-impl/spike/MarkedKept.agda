@@ -631,5 +631,5 @@ module _ {R : Set} where
 
   -- A program run by the machine shows exactly what `denotation.Unfold`'s
   -- meaning of it subscribed at the root shows.
-  adequate : ∀ (o : Obs Timeline [] R) {q b} → Shows (load o) q b ≡ Shows (load o) q b → (Shows (load o) q b → Has (meaning (subscribe o root) []ᴬ) q b) × (Has (meaning (subscribe o root) []ᴬ) q b → Shows (load o) q b)
-  adequate o _ = sound (inv-load o) , shows-all (inv-load o)
+  adequate : ∀ (o : Obs Timeline [] R) {q b} → (Shows (load o) q b → Has (meaning (subscribe o root) []ᴬ) q b) × (Has (meaning (subscribe o root) []ᴬ) q b → Shows (load o) q b)
+  adequate o = sound (inv-load o) , shows-all (inv-load o)
