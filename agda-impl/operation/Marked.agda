@@ -53,16 +53,18 @@ data Att : Set where
   attAt    : Pos → Att
 
 -- A takeWhile running, its completion owed after the failing value at
--- `p`, or its source's cut owed.
+-- `p`, its source's cut owed, or over, its source cut.
 data Owe : Set where
-  free  : Owe
-  cpAt  : Pos → Owe
-  cutAt : Pos → Owe
+  free   : Owe
+  cpAt   : Pos → Owe
+  cutAt  : Pos → Owe
+  overAt : Pos → Owe
 
 -- A connect's subject and its source's switch, and what it owes: the
 -- source's subscription (the body subscribed at `p`), the source's
 -- attach (subscribed at `p`), the source's teardown (the body completed
--- at `p`).
+-- at `p`); where the source is subscribed, and where it ended, once
+-- closed.
 record CS : Set where
   constructor cs
   field
@@ -72,6 +74,8 @@ record CS : Set where
     bodyAt  : Maybe Pos
     attSrc  : Maybe Pos
     owedAt  : Maybe Pos
+    srcAt   : Pos
+    endAt   : Pos
 
 data St (Γ : List Set) : Set → Set₁ where
   pend  : ∀ {A} → Obs C Γ A → St Γ A
@@ -390,7 +394,7 @@ begin c (takeWhile i q s) p = ok ⟨ inCut true (attAt p) (inTake i q free c) , 
 begin c (flatMap op f s)  p = ok ⟨ inCut true (attAt p) (inOuter op f false 0 [] [] c) , pend s , subscribing , p ⟩
 -- the body under `ix 0`; its source, once the body's subscription
 -- exists, under `ix 1`
-begin c (connect s b)     p = ok ⟨ inBody (cs false true false (just p) nothing nothing) (pend s) c , pend b , subscribing , p ⊕ [ ix 0 ] ⟩
+begin c (connect s b)     p = ok ⟨ inBody (cs false true false (just p) nothing nothing (p ⊕ [ ix 1 ]) root) (pend s) c , pend b , subscribing , p ⊕ [ ix 0 ] ⟩
 -- a joiner keeps where it joined; a completed subject completes it under `last`
 begin c (connected x)     p with closedUp c x
 ... | true  = ok ⟨ c , doneS , rising cp , p ⊕ [ last ] ⟩
@@ -425,7 +429,7 @@ admit c exhaustᶠ          f d n q o ls a p with n ≡ᵇ 0
 ... | false = ok ⟨ c , flatS exhaustᶠ f d n q o ls , absorbed , p ⟩
 
 ended : ∀ {Γ B} → St Γ B → St Γ B
-ended (lnS b (cutS l a s)) = lnS b (cutS false a s)
+ended (lnS b (cutS l a s)) = lnS false (cutS false a s)
 ended s                    = s
 
 -- A rise moves no position, except a takeWhile's own failing value and
@@ -448,7 +452,7 @@ rise (inOuter op f d n q ls c) o cp     p = ok ⟨ c , flatS op f true n q o ls 
 rise (inLanes op f d n q o pre post c) s (nx b) p = ok ⟨ c , flatS op f d n q o (pre ++ s ∷ post) , rising (nx b) , p ⟩
 rise (inLanes op f d n q o pre post c) s cp     p = ok (dequeue c op f d (pred n) q o (pre ++ ended s ∷ post) p)
 rise (inSrc k b c) s (nx a) p = ok ⟨ c , connS k s (feed (here refl) p (nx a) b) , absorbed , p ⟩
-rise (inSrc k b c) s cp     p = ok ⟨ c , connS (record k { closed = true }) s (feed (here refl) p cp b) , absorbed , p ⟩
+rise (inSrc k b c) s cp     p = ok ⟨ c , connS (record k { closed = true ; endAt = p }) s (feed (here refl) p cp b) , absorbed , p ⟩
 rise (inBody k o c) s (nx b) p = ok ⟨ c , connS k o s , rising (nx b) , p ⟩
 rise (inBody k o c) s cp     p = ok ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
 
@@ -463,7 +467,7 @@ run c (cutS l (attAt p) s) attM _ with unsubIf (not l) s
 ... | s′ , t = moved ⟨ c , cutS l attached s′ , absorbed , p ⟩ [] t
 run c (takeS i q (cpAt p) s) cpM _ = ok ⟨ c , takeS i q (cutAt p) s , rising cp , p ⊕ [ last ] ⟩
 run c (takeS i q (cutAt p) s) cutM _ with cut s
-... | s′ , t = moved ⟨ c , takeS i q free s′ , absorbed , p ⟩ [] t
+... | s′ , t = moved ⟨ c , takeS i q (overAt p) s′ , absorbed , p ⟩ [] t
 run c (connS k o b) bodyM r with CS.bodyAt k
 ... | just p  = ok ⟨ inSrc (record k { bodyAt = nothing ; attSrc = just (p ⊕ [ ix 1 ]) }) b c , o , subscribing , p ⊕ [ ix 1 ] ⟩
 ... | nothing = ok ⟨ c , connS k o b , absorbed , r ⟩
