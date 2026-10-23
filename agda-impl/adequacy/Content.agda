@@ -52,6 +52,7 @@ open import adequacy.Stepper using (step-skips)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Strong using (module Strongly)
+open import adequacy.Calm using (Calm)
 open import adequacy.Sorted.Walk using (module SortingWalk)
 open import adequacy.Climbs using (module Ascending)
 open import adequacy.Climbs.Call using (module AscendingCall)
@@ -70,7 +71,7 @@ module Honesty (R : Set) where
     Stands; cutʰ; finʰ; dryʰ; Mirror; Inner; Logged; Shows; silentˢ; valueˢ; completeˢ; drainedˢ; inner-launch; ≋-refl;
     Steps; after; steps-after; Hopped; onward; lowered; weight; loadOf; load; _≼_; _≺_; _⊏_)
   open Strongly R using (Strong; Carried; carried; closing; CtlAs; Meets; calmAs; noteAs; runAs; subAs; burstAs; popAs;
-    Kernels; Owned; Meaning; Books; Path; ofˢ; seen; Sub; takeWhileˢ; part; Queue; BurstClocked; Each; Ahead;
+    Kernels; Owned; Meaning; Books; Path; ofˢ; seen; Sub; takeWhileˢ; part; Queue; BurstClocked; Each; Heads; Ahead; each-ahead; each-weaken; ahead-below; untold-below; queue-below;
     Lingers; Untold; Ended; pooledL; DoneBy; Begins; focused; attaching; coldˢ; waiting; fired; playing; Timed; Joined)
   open Ascending R using (Aloft)
   open AscendingCall R using (soar)
@@ -197,8 +198,10 @@ module Honesty (R : Set) where
                → All (BurstClocked (proj₁ (cut-torn cr e)) (Mach.clock m)) (Mach.turns m)
     cut-sorted : ∀ {lo m Γ A} {c : Ctx R Γ A} {i q s p rs} → WellMach lo m → Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩
                → WellMach lo (record m { conf = ⟨ c , takeS i q (proj₁ (cut s)) , absorbed , p , rs ⟩ })
-    cut-behind : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) (e : Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩)
-               → Each (Ahead p) (proj₁ (cut-torn cr e))
+    cut-heads : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) (e : Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩)
+               → Each (Heads p) (proj₁ (cut-torn cr e))
+    cut-calm  : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) (e : Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩)
+               → Each (Calm p) (proj₁ (cut-torn cr e))
     cut-lingers : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) (e : Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩)
                 → Lingers (proj₁ (cut-torn cr e))
     cut-told : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) (e : Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩)
@@ -632,15 +635,11 @@ module Honesty (R : Set) where
              → Machine.step ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩ ≡ Machine.moved ⟨ c , s , absorbed , p , rs ⟩ [] []
     dropping d rewrite d = refl
 
-  -- A job resumed runs at the position it was suspended at, the carrier's
-  -- position-read parts read there.
+  -- A job resumes at the position it was suspended at, no later than
+  -- the run, so the carrier's position-read parts read there more weakly.
   postulate
-    pop-queue  : ∀ {g m Γ A} {c : Ctx R Γ A} {s p q τ p′ rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩
-               → Queue p′ (Mach.clock m) (Mach.timers m) (Carried.tree cr)
-    pop-behind : ∀ {g m Γ A} {c : Ctx R Γ A} {s p q τ p′ rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩
-               → Each (Ahead p′) (Carried.tree cr)
-    pop-told   : ∀ {g m Γ A} {c : Ctx R Γ A} {s p q τ p′ rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩
-               → Untold p′ (Carried.tree cr)
+    pop-below : ∀ {g m Γ A} {c : Ctx R Γ A} {s p q τ p′ rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩
+              → p′ ≤ᵖ p
 
   private
     -- A job popped: resumed where it was suspended, or dropped, the ghost
@@ -657,11 +656,12 @@ module Honesty (R : Set) where
           ; kernels = trans (Carried.kernels cr) (sym (downs-plug {q = q} {plug c s} d)) ; ctlAs = runAs refl ; meets = mt
           ; owned = owned-popped {c = c} {s = s} {q = q} (Carried.kernels cr) (Carried.owned cr) refl d
           ; meaning = meaning-pop {c = c} {s = s} {q = q} (Carried.kernels cr) (Carried.meaning cr) d
-          ; queue = pop-queue cr refl
+          ; queue = queue-below (pop-below cr refl) (Carried.queue cr)
           ; books = record { clocked = All.head (Books.ticked (Carried.books cr))
                            ; ticked = All.tail (Books.ticked (Carried.books cr)) ; turned = Books.turned (Carried.books cr) }
           ; sorted = proj₁ (Carried.sorted cr) , sorted-pop {c = c} {s = s} {q = q} (proj₂ (Carried.sorted cr)) refl d
-          ; behind = pop-behind cr refl ; lingers = Carried.lingers cr ; told = pop-told cr refl
+          ; behind = each-weaken (λ {Γ} {A} {c} → ahead-below {c = c} (pop-below cr refl)) (Carried.behind cr)
+          ; lingers = Carried.lingers cr ; told = untold-below (pop-below cr refl) (Carried.told cr)
           ; ended = Carried.ended cr ; flags = Carried.flags cr })
       , lowered (λ n → agree-refl n _) (inj₂ (refl , subst (_ <_) (cong weight (sym eqc)) (n<1+n _)))
       where m′ = mach ⟨ c′ , s′ , resuming τ , p′ , rs ⟩ clk tms ts
@@ -741,7 +741,7 @@ module Honesty (R : Set) where
         ; owned = cut-owned cr refl ; meaning = cut-meaning cr refl ; queue = cut-queue cr refl
         ; books = record { clocked = tt ; ticked = Books.ticked (Carried.books cr) ; turned = cut-turned cr refl }
         ; sorted = proj₁ (Carried.sorted cr) , cut-sorted (proj₂ (Carried.sorted cr)) refl
-        ; behind = cut-behind cr refl ; lingers = cut-lingers cr refl ; told = cut-told cr refl
+        ; behind = each-ahead (cut-heads cr refl) (cut-calm cr refl) ; lingers = cut-lingers cr refl ; told = cut-told cr refl
         ; ended = cut-ended cr refl ; flags = cut-flags cr refl })
     , lowered (λ n → agree-refl n _) (under-lighter (cut-load cr refl) (subst (weight (settled rs clk tms ts) <_) (cong weight (sym eqc)) (settled-lighter rs clk tms ts)))
     where m′ = mach ⟨ c , takeS i q (proj₁ (cut s)) , absorbed , p , rs ⟩ clk tms ts

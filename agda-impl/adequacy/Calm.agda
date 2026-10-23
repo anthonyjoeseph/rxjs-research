@@ -7,7 +7,7 @@
 module adequacy.Calm where
 
 open import Data.List using (List; []; _∷_; _++_)
-open import Data.List.Relation.Unary.All using (All; []; _∷_)
+open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (map to mapᴬ)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to all-++⁺)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (zero; suc)
@@ -17,7 +17,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans)
 open import Tree using (Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList.Events using (Pos; From; Timeline; timelineAt; at; done; quiet)
 import denotation.Unfold as U
-open import adequacy.Sorted using (_≤ᵖ_)
+open import adequacy.Sorted using (_≤ᵖ_; ≤ᵖ-trans)
 open import adequacy.Leaves using (Pinned; pinned; unpinned; rest-pinned)
 
 -- A step's next event no earlier than `q`.
@@ -93,6 +93,10 @@ mutual
 -- Every rest a shut of the node falls back on heads no sooner than `q`.
 Calm : ∀ {Γ B} → Pos → U.Node Γ B → Set
 Calm q c = All (NoSooner q) (calms c)
+
+-- Calm past a position, calm past any before it.
+calm-below : ∀ {Γ B q′ q} {c : U.Node Γ B} → q′ ≤ᵖ q → Calm q c → Calm q′ c
+calm-below le = mapᴬ (λ h {k} e → ≤ᵖ-trans le (h e))
 
 -- A fresh subscription has no burst running, so nothing to fall back on.
 calm-start : ∀ {Γ A q} p (m : From A 0) → Calm q (U.startᶜ {Γ} p m)

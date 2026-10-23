@@ -20,6 +20,7 @@ import denotation.Unfold as U
 open import operation.PureObservable using (module Machine; module Driver)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Strong using (module Strongly)
+open import adequacy.Calm using (Calm)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Ghost.Paths using (module GhostingPaths)
 open import adequacy.Moves using (module Moving)
@@ -31,7 +32,7 @@ open Machine using (St; Ctx; Conf; Ev; nx; cp; dirs; plug; flatS; top; inOuter; 
 module AscendingFlat (R : Set) where
   open Driver R using (Mach; mach; step; silent)
   open Unsubbing R using (now; then)
-  open Strongly R using (Sub; Path; PathLanes; here; Strong; Owned; Meaning; Queue; Books; Each; Ahead; Lingers; Untold; Ended; DoneBy;
+  open Strongly R using (Sub; Path; PathLanes; here; Strong; Owned; Meaning; Queue; Books; Each; Heads; each-ahead; Lingers; Untold; Ended; DoneBy;
     outers; outersL; part; partLanes; merged; consᴹ; forget; forgetᴸ; in-outer; in-lanes; this-lane; next-lane;
     pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; cutˢ; laneˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ)
   open Moving R using (plantᴸ; planted)
@@ -287,10 +288,14 @@ module AscendingFlat (R : Set) where
                       (ρ : Path T (flatMapˢ op f true n [] pl o ls) π) (πL : PathLanes ls u i [])
                     → Calling g ℓ m₁ (ρ ⊕ in-lanes πL) cp → pred n ≡ 0 → ∀ {m₂} → step m₁ ≡ silent m₂
                     → Books (drainedAt ρ πL (Conf.pos (Mach.conf m₁))) m₂
-    lanes-end-behind : ∀ {g ℓ m₁ Γ X A π i} {T : Sub [] R} {op f n pl} {o : Sub Γ X} {ls : List (Sub Γ A)} {u : Sub Γ A}
+    lanes-end-heads : ∀ {g ℓ m₁ Γ X A π i} {T : Sub [] R} {op f n pl} {o : Sub Γ X} {ls : List (Sub Γ A)} {u : Sub Γ A}
                        (ρ : Path T (flatMapˢ op f true n [] pl o ls) π) (πL : PathLanes ls u i [])
                      → Calling g ℓ m₁ (ρ ⊕ in-lanes πL) cp → pred n ≡ 0 → ∀ {m₂} → step m₁ ≡ silent m₂
-                     → Each (Ahead (Conf.pos (Mach.conf m₂))) (drainedAt ρ πL (Conf.pos (Mach.conf m₁)))
+                     → Each (Heads (Conf.pos (Mach.conf m₂))) (drainedAt ρ πL (Conf.pos (Mach.conf m₁)))
+    lanes-end-calm  : ∀ {g ℓ m₁ Γ X A π i} {T : Sub [] R} {op f n pl} {o : Sub Γ X} {ls : List (Sub Γ A)} {u : Sub Γ A}
+                       (ρ : Path T (flatMapˢ op f true n [] pl o ls) π) (πL : PathLanes ls u i [])
+                     → Calling g ℓ m₁ (ρ ⊕ in-lanes πL) cp → pred n ≡ 0 → ∀ {m₂} → step m₁ ≡ silent m₂
+                     → Each (Calm (Conf.pos (Mach.conf m₂))) (drainedAt ρ πL (Conf.pos (Mach.conf m₁)))
     lanes-end-told : ∀ {g ℓ m₁ Γ X A π i} {T : Sub [] R} {op f n pl} {o : Sub Γ X} {ls : List (Sub Γ A)} {u : Sub Γ A}
                      (ρ : Path T (flatMapˢ op f true n [] pl o ls) π) (πL : PathLanes ls u i [])
                    → Calling g ℓ m₁ (ρ ⊕ in-lanes πL) cp → pred n ≡ 0 → ∀ {m₂} → step m₁ ≡ silent m₂
@@ -322,7 +327,7 @@ module AscendingFlat (R : Set) where
         ; owned = lanes-end-owned ρ πL cl pn st₁ ; kernels = trans (forget-heal _ (planted ρ w)) (plant-plug top ρ w)
         ; meaning = lanes-end-meaning ρ πL cl pn st₁
         ; queue = lanes-end-queue ρ πL cl pn st₁ ; books = lanes-end-books ρ πL cl pn st₁ ; sorted = sorted-step (Calling.sorted cl) st₁
-        ; behind = lanes-end-behind ρ πL cl pn st₁ ; lingers = lanes-end-lingers ρ πL cl pn
+        ; behind = each-ahead (lanes-end-heads ρ πL cl pn st₁) (lanes-end-calm ρ πL cl pn st₁) ; lingers = lanes-end-lingers ρ πL cl pn
         ; told = lanes-end-told ρ πL cl pn st₁ ; ended = lanes-end-ended ρ πL cl pn ; flags = lanes-end-flags ρ πL cl pn
         ; route = tt ; kept = subst (_≼ loadOf st) (sym (lanes-end-load ρ πL cl pn st₁)) (Calling.kept cl) })
     where w   = drained ρ πL
@@ -433,9 +438,12 @@ module AscendingFlat (R : Set) where
     outer-end-books : ∀ {g ℓ m₁ Γ X A π} {T : Sub [] R} {op f d pl} {o : Sub Γ X} {ls : List (Sub Γ A)}
                       (ρ : Path T (flatMapˢ op f d zero [] pl o ls) π) → Calling g ℓ m₁ (ρ ⊕ in-outer here) cp
                     → ∀ {m₂} → step m₁ ≡ silent m₂ → Books (spentAt ρ (Conf.pos (Mach.conf m₁))) m₂
-    outer-end-behind : ∀ {g ℓ m₁ Γ X A π} {T : Sub [] R} {op f d pl} {o : Sub Γ X} {ls : List (Sub Γ A)}
+    outer-end-heads : ∀ {g ℓ m₁ Γ X A π} {T : Sub [] R} {op f d pl} {o : Sub Γ X} {ls : List (Sub Γ A)}
                        (ρ : Path T (flatMapˢ op f d zero [] pl o ls) π) → Calling g ℓ m₁ (ρ ⊕ in-outer here) cp
-                     → ∀ {m₂} → step m₁ ≡ silent m₂ → Each (Ahead (Conf.pos (Mach.conf m₂))) (spentAt ρ (Conf.pos (Mach.conf m₁)))
+                     → ∀ {m₂} → step m₁ ≡ silent m₂ → Each (Heads (Conf.pos (Mach.conf m₂))) (spentAt ρ (Conf.pos (Mach.conf m₁)))
+    outer-end-calm  : ∀ {g ℓ m₁ Γ X A π} {T : Sub [] R} {op f d pl} {o : Sub Γ X} {ls : List (Sub Γ A)}
+                       (ρ : Path T (flatMapˢ op f d zero [] pl o ls) π) → Calling g ℓ m₁ (ρ ⊕ in-outer here) cp
+                     → ∀ {m₂} → step m₁ ≡ silent m₂ → Each (Calm (Conf.pos (Mach.conf m₂))) (spentAt ρ (Conf.pos (Mach.conf m₁)))
     outer-end-told : ∀ {g ℓ m₁ Γ X A π} {T : Sub [] R} {op f d pl} {o : Sub Γ X} {ls : List (Sub Γ A)}
                      (ρ : Path T (flatMapˢ op f d zero [] pl o ls) π) → Calling g ℓ m₁ (ρ ⊕ in-outer here) cp
                    → ∀ {m₂} → step m₁ ≡ silent m₂ → Untold (Conf.pos (Mach.conf m₂)) (spentAt ρ (Conf.pos (Mach.conf m₁)))
@@ -470,7 +478,7 @@ module AscendingFlat (R : Set) where
         ; owned = outer-end-owned ρ cl st₁ ; kernels = trans (forget-heal _ (planted ρ w)) (plant-plug top ρ w)
         ; meaning = outer-end-meaning ρ cl st₁
         ; queue = outer-end-queue ρ cl st₁ ; books = outer-end-books ρ cl st₁ ; sorted = sorted-step (Calling.sorted cl) st₁
-        ; behind = outer-end-behind ρ cl st₁ ; lingers = outer-end-lingers ρ cl
+        ; behind = each-ahead (outer-end-heads ρ cl st₁) (outer-end-calm ρ cl st₁) ; lingers = outer-end-lingers ρ cl
         ; told = outer-end-told ρ cl st₁ ; ended = outer-end-ended ρ cl ; flags = outer-end-flags ρ cl
         ; route = tt ; kept = subst (_≼ loadOf st) (sym (outer-end-load ρ cl st₁)) (Calling.kept cl) })
     where w   = spent ρ

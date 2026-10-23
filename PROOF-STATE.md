@@ -8,16 +8,16 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE CALM CARRIED
+#### THE TAKE'S JUMP
 
-Untried: whether every step keeps each burst source's rest, wherever a shut
-could fall back on it, heading no sooner than the run's position — the
-`Calm` half of `Carried.behind`. A rest early yet unreached is what
-refuted the unconditional shut. Settled when `take-end-behind` is a body
-or a reachable configuration refutes it.
+Untried: a take refusing a value at `p` moves the run to `p ++ [ix 0]` or
+`p ++ [last]`, so `Carried.behind` there needs nothing the tree holds,
+nor any rest a shut falls back on, heading inside `p`'s subtree. Open
+whether a climb keeps that. Settled when `take-end-calm` is a body or a
+reachable configuration refutes it.
 
-Members: `take-out-behind`, `take-end-behind`, `lanes-end-behind`,
-`outer-end-behind`, `cut-behind`, `pop-behind`.
+Members: `take-out-heads`, `take-out-calm`, `take-end-heads`,
+`take-end-calm`, `take-end-rest-heads`.
 
 #### THE FLATMAP UNDER A SHUT
 
@@ -34,7 +34,7 @@ left idle keeps the carrier. Settled when `owned-popped` and `meaning-pop`
 are bodies or refuted.
 
 Members: `owned-idle`, `meaning-idle`, `sorted-idle`, `owned-popped`,
-`meaning-pop`, `sorted-pop`, `pop-queue`, `pop-told`,
+`meaning-pop`, `sorted-pop`, `pop-below`,
 `owned-dropped`, `meaning-drop`, `sorted-drop`, `meaning-note`,
 `sorted-note`, `note-least`, `turn-dry`, `downs-plug`, `kont-onward`,
 `feed-onward`, `src-onward`, `join-onward`, `src-cut-onward`,
@@ -84,23 +84,23 @@ Members: `lanes-drained`, `outer-drained`.
 
 A climb planting its node anew — a take's next stage, a dead take, a
 flatMap done — has every part of `Calling` but the carrier's: open
-whether the jobs, meaning, queue, books, told and load survive the
+whether the jobs, meaning, queue, books, told, load, heads and calm survive the
 plant and the step past it, and whether the staged connects are ended,
 tied and flagged. Settled when `take-end-owned` is a body or refuted.
 
 Members: `take-out-owned`, `take-out-queue`, `take-out-books`,
-`take-out-told`, `take-out-load`,
-`take-end-rest-heads`, `take-end-ended`, `take-end-lingers`,
+`take-out-told`, `take-out-load`, `take-end-ended`, `take-end-lingers`,
 `take-end-flags`, `take-end-owned`, `take-end-meaning`,
 `take-end-queue`, `take-end-books`, `take-end-told`,
 `take-end-load`, `lanes-end-rest-heads`, `lanes-end-ended`,
 `lanes-end-lingers`, `lanes-end-flags`, `lanes-end-owned`,
 `lanes-end-meaning`, `lanes-end-queue`, `lanes-end-books`,
-`lanes-end-told`, `lanes-end-load`,
-`outer-end-rest-heads`, `outer-end-ended`, `outer-end-lingers`,
+`lanes-end-told`, `lanes-end-load`, `lanes-end-heads`,
+`lanes-end-calm`, `outer-end-rest-heads`, `outer-end-ended`, `outer-end-lingers`,
 `outer-end-flags`, `outer-end-owned`, `outer-end-meaning`,
 `outer-end-queue`, `outer-end-books`,
-`outer-end-told`, `outer-end-load`.
+`outer-end-told`, `outer-end-load`, `outer-end-heads`,
+`outer-end-calm`.
 
 #### THE CUT AND THE FIRE
 
@@ -110,7 +110,7 @@ on the state tree. The cut node has no old counterpart. Settled when
 
 Members: `call-cut`, `cut-torn`, `cut-owned`, `cut-meaning`, `cut-queue`,
 `cut-turned`, `cut-sorted`, `cut-lingers`, `cut-told`,
-`cut-ended`, `cut-flags`, `cut-load`, `fire-kernels`, `fire-part`,
+`cut-ended`, `cut-flags`, `cut-load`, `cut-heads`, `cut-calm`, `fire-kernels`, `fire-part`,
 `fire-load`, `fire-owned`, `fire-meaning`, `fire-timed`, `fire-joined`,
 `fire-sorted`, `burst-poll`,
 `burst-play`, `burst-finish`.
