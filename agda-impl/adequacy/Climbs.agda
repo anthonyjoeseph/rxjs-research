@@ -53,7 +53,8 @@ module Ascending (R : Set) where
   open Keeping R using (module Keep; Alive; Route; route-pre; _≈_; same; ≈-scan; ≈-of; ≈-pending; ≈-cold; ≈-join; ≈-cut-of; ≈-take-of; ≈-take-cut;
     ≈-connect-of; Back)
   open Ghosting R using (Hopped; Load; _≼_; load; loadOf; hopped-pre; showing; agrees)
-  open GhostingPaths R using (_⊕_; _⊕ᴸ_; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-body; lifts-shut; lefts-subst; lifts-split; lefts-up; healed-split; Lefts; Healed; One; whole; snoc; view;
+  open GhostingPaths R using (_⊕_; _⊕ᴸ_; Lifts; LiftsLane; lifts-here; lifts-map; lifts-scan; lifts-cut; lifts-lane; lifts-take; lifts-outer; lifts-lanes;
+    lifts-source; lifts-body; lifts-shut; lifts-this; lifts-next; lefts-subst; lifts-split; lefts-up; healed-split; Lefts; Healed; One; whole; snoc; view;
     height; heightL; one-lower;
     one-map; one-scan; one-cut; one-lane; one-take; one-outer; one-lanes; one-source; one-body)
 
@@ -299,13 +300,45 @@ module Ascending (R : Set) where
   scan-kernels ρ {c₀} d e z′ with at-path ρ {c = c₀} d e
   ... | refl , refl = plant-plug top ρ _
 
+  -- A lift reads the frames' siblings, never the node it starts from:
+  -- the same lift from wherever a node is planted.
+  mutual
+    lifts-planted : ∀ {Γ A Δ B π} {t : Sub Γ A} {u : Sub Δ B} (ψ : Path t u π) (w : Sub Δ B) {s S}
+                  → Lifts ψ s S → Lifts (planted ψ w) s S
+    lifts-planted here          w lifts-here                = lifts-here
+    lifts-planted (in-map ψ)    w (lifts-map L)             = lifts-map (lifts-planted ψ w L)
+    lifts-planted (in-scan ψ)   w (lifts-scan L)            = lifts-scan (lifts-planted ψ w L)
+    lifts-planted (in-cut ψ)    w (lifts-cut e L)           = lifts-cut e (lifts-planted ψ w L)
+    lifts-planted (in-lane ψ)   w (lifts-lane L)            = lifts-lane (lifts-planted ψ w L)
+    lifts-planted (in-take ψ)   w (lifts-take L)            = lifts-take (lifts-planted ψ w L)
+    lifts-planted (in-outer ψ)  w (lifts-outer of pb L)     = lifts-outer of pb (lifts-planted ψ w L)
+    lifts-planted (in-lanes ψ)  w (lifts-lanes L ea lf pb)  = lifts-lanes (liftsL-planted ψ w L) ea lf pb
+    lifts-planted (in-source ψ) w (lifts-source pb sf L)    = lifts-source pb sf (lifts-planted ψ w L)
+    lifts-planted (in-body ψ)   w (lifts-body ps bf L)      = lifts-body ps bf (lifts-planted ψ w L)
+    lifts-planted (in-body ψ)   w (lifts-shut ps pe rb L)   = lifts-shut ps pe rb (lifts-planted ψ w L)
+
+    liftsL-planted : ∀ {Γ A Δ B i π} {ls : List (Sub Γ A)} {u : Sub Δ B} (ψ : PathLanes ls u i π) (w : Sub Δ B) {s bs S as}
+                   → LiftsLane ψ s bs S as → LiftsLane (plantedᴸ ψ w) s bs S as
+    liftsL-planted (this-lane ψ) w (lifts-this L) = lifts-this (lifts-planted ψ w L)
+    liftsL-planted (next-lane ψ) w (lifts-next L) = lifts-next (liftsL-planted ψ w L)
+
+  private
+    -- A scan's own frame lifts a step by the scan.
+    scan-one : ∀ {Δ A B} {f : B → A → B} {z} {v : Sub Δ A} {s S′} → Lifts (in-scan {f = f} {z = z} (here {t = v})) s S′ → S′ ≡ U.scanˢ f z s
+    scan-one (lifts-scan lifts-here) = refl
+
+  -- A value through a scan: the accumulated value from the scan planted
+  -- with its new accumulator, lifted as the value was.
+  scan-lifts : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
+             → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y)
+             → Passed (Conf.pos (Mach.conf m₁)) g (planted ρ (scanˢ f (f z y) v)) (nx (f z y))
+  scan-lifts {f = f} {z} {v} ρ {y} cl =
+    let c₁ , pv , S , L , sg = Calling.lifted cl
+        _ , Lσ , Lρ = lifts-split ρ (in-scan here) L
+    in U.scanᶜ f (f z y) c₁ , cong (mapᴹ (U.scanᶜ f (f z y))) pv , S
+       , lifts-planted ρ (scanˢ f (f z y) v) (subst (λ x → Lifts ρ x S) (scan-one Lσ) Lρ) , sg
+
   postulate
-    -- A value through a scan, the carrier's parts on the rewritten tree.
-    --
-    -- DEAD ROUTE: the old bodies are a heap write's frames; the state tree has no heap, the write is a `plant`.
-    scan-lifts : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
-               → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y)
-               → Passed (Conf.pos (Mach.conf m₁)) g (planted ρ (scanˢ f (f z y) v)) (nx (f z y))
     -- DEAD ROUTE: the old body reads the scan's leftover unchanged across a heap store (leftover-off over Off); a `plant` aliases nothing.
     scan-lefts : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
                → (cl : Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y))

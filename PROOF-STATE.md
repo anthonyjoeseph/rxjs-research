@@ -42,13 +42,42 @@ Members: `owned-idle`, `meaning-idle`, `sorted-idle`, `owned-popped`,
 
 #### THE PLANTED CLIMBS
 
-A scan's accumulator write keeps the carrier parts read through `_≈_`; open:
-whether a take's stage or a job (`admit`, `dequeue`, `feeds`, `rets`) does.
+Untried: the climb carries no take's stage, so whether every take on a
+value's route is `taking`; and whether an `of`'s emission, a dropped turn
+and a body's owed completion keep the carrier. Settled when `take-pass` is
+a body or refuted.
+
+Members: `gone-take`, `take-pass`, `body-rest-heads`, `owned-body`,
+`emit-void`, `emit-open`, `burst-spent`.
+
+#### THE LEFTOVER ACROSS A PLANT
+
+A plant moves the part a connect above it reads into its leftover, so
+`Lefts` does not follow `lifts-planted` for free: open whether the
+leftovers twin along a live route, as `Keep.route-lingers` twins the
+pools. Every planted climb's `lefts` needs it. Settled when `scan-lefts`
+is a body or refuted.
+
+Members: `scan-lefts`.
+
+#### THE TAKE'S END
+
+The take planted at its next stage: `Keep`'s walks and `lifts-planted`
+give the plant's parts. Open: the parts read at the position, which the
+step moves past the take's (`behind`, `told`, `queue`); the owed job it
+pushes, whose new stage `_≈_` does not relate; the stage before it.
 Settled when `take-out` is a body or refuted.
 
-Members: `scan-lifts`, `scan-lefts`, `gone-take`, `take-pass`, `take-out`, `take-end`, `call-outer`,
-`call-lanes`, `call-source`, `body-rest-heads`, `owned-body`, `emit-void`,
-`emit-open`, `burst-spent`.
+Members: `take-out`, `take-end`.
+
+#### THE LANE AND FEED CLIMBS
+
+Each plants the flatMap or connect it climbs into (`admit`, `dequeue`,
+`feeds`): `Keep`'s walks and `lifts-planted` give the plant's parts. Open:
+the jobs each pushes and its lift through an outer, lanes or a source.
+Settled when `call-source` is a body or refuted.
+
+Members: `call-outer`, `call-lanes`, `call-source`.
 
 #### THE CUT AND THE FIRE
 
