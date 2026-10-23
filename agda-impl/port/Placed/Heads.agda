@@ -29,10 +29,11 @@ open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatM
 open import denotation.MonotonicList.Events using (timelineAt; Pos; From; Timeline; ix; sub; last; _<ᵖ_; inside)
 import denotation.MonotonicList.Events as M
 import denotation.Unfold as U
-open import port.Placed.Order using (Apart; Disjoint; Headed; Owned; Prefix; Sides; prefix-++)
+open import port.Placed.Order using (Alienᴱ; Apart; Disjoint; Every; Headed; Owned; Placed;
+  Prefix; Reaches; Sides; Sorted; Within; every-monoᴱ; prefix-++)
 open import port.Placed.Keyed using (Admitted; Fit; Keyed; KeyedEarliest; KeyedOuter; KeyedStep; Keyedᴸ; Keyedᴹ; Keyedˢ; Noted; Qᴹ; keyed-head)
 open import denotation.Unfold using (NEnv)
-open import port.Placed.Keys using (Mark; ix-mark; last-mark; owned-tagged; owned-trans; prefix-refl; tagged-sub)
+open import port.Placed.Keys using (Mark; ix-mark; last-mark; owned-tagged; owned-trans; prefix-refl; sibling; tagged-sub)
 open import port.Placed.Rising using (apart-join; apart-mark)
 
 -- Kept one mark on, at a frame tagged with it, and at a joiner's tag.
@@ -469,3 +470,38 @@ apart-sides : ∀ {Γ A B} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : N
 apart-sides r b s ρ (p , _ , hp , kb , ks , _) k q hk hq =
   sides-of (p ++ [ ix 0 ]) k q (keyed-head (Owned (p ++ [ ix 0 ])) (U.step b) (step-keyed (owned-closed (p ++ [ ix 0 ])) b kb) k hk)
                                (keyed-head (Disjoint (p ++ [ ix 0 ])) (U.step s) (step-keyed (apart-closed p hp) s ks) q hq)
+
+-- Within the start of a cold observable is trivially satisfied.
+start-within : ∀ {Γ A} p (m : From A 0) (ρ : NEnv Γ) → Within (U.startᶜ {Γ} p m) ρ
+start-within p (M.at zero _ _)    ρ = tt
+start-within p (M.at (suc _) _ _) ρ = tt
+start-within p M.done             ρ = tt
+start-within p M.quiet            ρ = tt
+
+-- A sibling of a headed position is also headed.
+headed-lane : ∀ x → Headed (x ++ [ ix 0 ]) → Headed (x ++ [ ix 1 ])
+headed-lane []          _ = tt
+headed-lane (ix _ ∷ _)  _ = tt
+headed-lane (sub _ ∷ _) ()
+headed-lane (last ∷ _)  ()
+
+-- A subscribe is apart: the body is owned and the source is disjoint.
+apart-sub : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → Headed p → Alienᴱ p ρ
+          → Apart (p ++ [ ix 1 ]) (U.subscribe b (p ++ [ ix 0 ])) (U.subscribe s (p ++ [ ix 1 ])) ρ
+apart-sub s b p ρ hp al =
+    p , refl , hp
+  , keyed-sub (owned-closed (p ++ [ ix 0 ])) b (p ++ [ ix 0 ]) (inj₁ (prefix-refl (p ++ [ ix 0 ])))
+  , keyed-sub (apart-closed p hp) s (p ++ [ ix 1 ]) (sibling p (ix-mark 1) (λ ()) , sibling p (ix-mark 0) (λ ()))
+  , every-monoᴱ (λ h n o → n (owned-trans p (p ++ [ ix 0 ]) h (inj₁ (prefix-++ p [ ix 0 ])) o)) ρ al
+
+postulate
+  -- Every position the meaning holds is headed.
+  --
+  -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Placed/Rising.agda
+  headed-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Every Headed (U.meaning (U.subscribe o p) ρ)
+
+  -- A flatMap's inner subscribe position is alienated from the environment.
+  --
+  -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Placed/Rising.agda
+  alien-shown : ∀ {Γ A B} (op : T.FlatOp) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → Alienᴱ p ρ
+              → ∀ x → Reaches (x ++ [ ix 0 ]) (U.meaning (U.subscribe (flatMap op f s) p) ρ) → Alienᴱ (x ++ [ ix 1 ]) ρ

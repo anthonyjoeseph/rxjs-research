@@ -8,13 +8,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE CARRIER'S FIELDS
+#### THE CARRIER'S TOWER
 
-Untried: whether the old `placed-sub` tower (order, trail, spread,
-fresh) carries to the current Unfold. Settled when `placed-subscribe` is
-its ported body.
+Untried: whether the old ordering/steadiness/headedness tower (Burst, Calm,
+FlatOrder, FlatAfter, Trail, Walk, Rising) carries to the current Unfold.
+Settled when all four are bodies.
 
-Members: `placed-subscribe`.
+Members: `ordered-sub`, `steady-sub`, `headed-sub`, `alien-shown`.
 
 #### THE STRONG STEP
 

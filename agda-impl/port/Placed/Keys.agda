@@ -26,7 +26,7 @@ import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
 open import port.Placed.Order using (Alienᴱ; Atop; Clear; Every; EveryT; EveryTs; Everys; Every∞; Ordered; Orders; Owned; Past;
-  Prefix; Steadies; Steady; Tagged; every; every-monoᴱ; every-onward; every-tailOf;
+  Prefix; Reaches; Steadies; Steady; Tagged; every; every-monoᴱ; every-onward; every-tailOf;
   everyT-burstOn; everyT-idle; everyT-∪; everyᵀ; every∞-mono; ordered; prefix-++; prefix-trans;
   steady)
 
@@ -534,3 +534,10 @@ clears-quiet k (l ∷ ls) (hl ∷ᴬ hs) rewrite hl = clears-quiet k ls hs
 ahead-quiet : ∀ {B} k (o : Maybe (Events∞ (MonotonicList B))) ls → M′.headᴼ o ≡ nothing → All (λ l → M′.head (force l) ≡ nothing) ls
             → M′.ahead-of k o ls ≡ true
 ahead-quiet k o ls ho hs rewrite ho = clears-quiet k ls hs
+
+-- A predicate holding at every position holds at one that is reached.
+every-reach : ∀ {A} {P : Pos → Set} (e : Events A) h → Every P e → Reaches h e → P h
+every-reach (out h _ r) _ pe out-here       = proj₁ (every pe)
+every-reach (out _ _ r) h pe (out-there x)  = every-reach (force r) h (proj₁ (proj₂ (every pe))) x
+every-reach (skip h r)  _ pe skip-here      = proj₁ (every pe)
+every-reach (skip _ r)  h pe (skip-there x) = every-reach (force r) h (proj₁ (proj₂ (every pe))) x

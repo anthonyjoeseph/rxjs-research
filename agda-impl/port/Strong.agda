@@ -36,6 +36,7 @@ open import port.Sane using (Sane; sane-subscribe)
 open import port.Leaves using (Leaves; Twin; Restful)
 open import port.Told using (untold; Tells)
 open import port.Opens using (opens-subscribe; heads-open)
+open import port.Placed using (placed-subscribe)
 open import port.Placed.Order using (Placed)
 open import port.Sorted using (_≤ᵖ_)
 open import port.Sorted.Walk using (module SortingWalk)
@@ -634,12 +635,6 @@ module Strongly (R : Set) where
 
   ------------------------------------------------------------------------
   -- THE LAUNCH: the root pending, about to begin
-
-  postulate
-    -- A program subscribed at the root is placed.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Placed.agda
-    placed-subscribe : (o : PureObs [] R) → Placed (U.subscribe o root) []
 
   -- A program subscribed at the root heads no earlier than it: its
   -- first event under the root, or a timer's tick past it.
