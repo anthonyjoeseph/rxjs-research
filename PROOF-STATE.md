@@ -10,13 +10,10 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE CARRIER'S FIELDS
 
-Untried: whether the old held/against predicates restate over `Sub` and
-hold at subscribe; no onward leaf can be proven against an opaque
-field. Settled when each is a ported body and its begin leaf
-goes through.
+Untried: whether the carrier holds at subscribe — the root pending is
+placed and headed. Settled when both begin leaves are bodies.
 
-Members: `Meaning`, `Queue`, `Books`, `placed-subscribe`,
-`meaning-begin`, `queue-begin`, `books-begin`, `heads-subscribe`.
+Members: `placed-subscribe`, `heads-subscribe`.
 
 #### THE STRONG STEP
 

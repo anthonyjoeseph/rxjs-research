@@ -17,16 +17,19 @@ module port.Strong where
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_)
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.All using ([])
+open import Data.Empty using (⊥)
+open import Data.List.Relation.Unary.All using (All; []; lookup)
+open import Data.List.Relation.Unary.Linked using (Linked; [])
 import Data.List.Relation.Unary.Any as Any
 open import Data.Maybe using (Maybe; just; nothing; is-just; is-nothing)
-open import Data.Nat using (ℕ; suc; _+_; _<ᵇ_)
-open import Data.Product using (Σ; _×_; _,_)
+open import Data.Nat using (ℕ; suc; _+_; _<ᵇ_; _≡ᵇ_; _≤_)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤)
+open import Level using (Lift)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl)
 
 import Tree as T
-open import denotation.MonotonicList.Events using (Time; Pos; From; Frame; at; ix; last; tick; root)
+open import denotation.MonotonicList.Events using (Time; Pos; From; Frame; at; ix; last; tick; root; _<ᵖ_) renaming (sub to subᴾ)
 import denotation.Unfold as U
 open import operation.PureObservable using (PureObs; Tape; tape; over; module Machine; module Driver)
 open import port.Sane using (Sane; sane-subscribe)
@@ -36,12 +39,12 @@ open import port.Placed.Order using (Placed)
 open import port.Sorted using (_≤ᵖ_)
 open import port.Sorted.Walk using (module SortingWalk)
 
-open Machine using (St; Ctx; Conf; CS; Job; Mode; plug; dirs; top; ⟨_,_,_,_,_⟩; absorbed; subscribing; resuming; rising; nx; cp;
-  att; attBody; owed; next; owedCp; owedCut; feeding;
+open Machine using (St; Ctx; Conf; CS; Job; Mode; Ev; plug; dirs; top; ⟨_,_,_,_,_⟩; absorbed; subscribing; resuming; rising; nx; cp; _⊕_;
+  go; att; attBody; owed; next; owedCp; owedCut; feeding;
   coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS) renaming (pend to pendS)
 
 module Strongly (R : Set) where
-  open Driver R using (Mach; depthOf; begin)
+  open Driver R using (Mach; Timer; Turn; play; finish; cascade; depthOf; begin)
   open SortingWalk R using (WellMach; begin-well)
 
   ------------------------------------------------------------------------
@@ -465,22 +468,136 @@ module Strongly (R : Set) where
   DoneBy t = ∀ {Γ X A op f d n qs pl π} {o : Sub Γ X} {ls : List (Sub Γ A)}
            → (ψ : Path t (flatMapˢ op f d n qs pl o ls) π) → seen ψ ≡ true → d ≡ is-nothing (part o)
 
-  postulate
-    -- Every live joiner holding what its feed owes it.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Strong/Against.agda
-    Meaning : Sub [] R → Set₁
+  ------------------------------------------------------------------------
+  -- The joiners' feed
 
-    -- The timers, each a waiting cold's next frame, in order, due no
-    -- earlier than now and past where the run is.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Strong/Against.agda
-    Queue : Pos → ℕ → List (Driver.Timer R) → Sub [] R → Set₁
+  -- Each connect in scope: its path, its subject, where its source ended.
+  record Feed (X : Set) : Set where
+    constructor feed
+    field
+      binder  : List ℕ
+      subject : CS X
+      ended   : Maybe Pos
 
-    -- The clock where the control says.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Strong/Against.agda
-    Books : Sub [] R → Mach → Set₁
+  Now : List Set → Set
+  Now = All Feed
+
+  private
+    samePath : List ℕ → List ℕ → Bool
+    samePath []       []       = true
+    samePath (a ∷ as) (b ∷ bs) = (a ≡ᵇ b) ∧ samePath as bs
+    samePath _        _        = false
+
+    listed : List ℕ → List (List ℕ × Pos) → Bool
+    listed π []              = false
+    listed π ((π′ , _) ∷ js) = samePath π π′ ∨ listed π js
+
+    -- The feeds under way at a connect, innermost first: the joiners
+    -- each has still to feed, and the value's position.
+    feedsAt : List ℕ → List Job → List (List (List ℕ × Pos) × Pos)
+    feedsAt ρ []                          = []
+    feedsAt ρ ((ρ′ , feeding js , p) ∷ jb) = if samePath ρ ρ′ then (js , p) ∷ feedsAt ρ jb else feedsAt ρ jb
+    feedsAt ρ (_ ∷ jb)                    = feedsAt ρ jb
+
+    -- The joiner at `π` about to read its binder's newest feed.
+    goingAt : ∀ {Γ A} → Ctx R Γ A → Mode A → List ℕ → Bool
+    goingAt c (resuming go) π = samePath (dirs c) π
+    goingAt c _             π = false
+
+    told₁ : ∀ {X} → Pos → Ev X → List (Pos × Maybe X) × Maybe Pos → List (Pos × Maybe X) × Maybe Pos
+    told₁ q (nx a) (xs , c) = (q , just a) ∷ xs , c
+    told₁ q cp     (xs , c) = xs , just q
+
+    -- What the feeds under way owe the joiner at `π`, joined at `j`,
+    -- innermost first: the newest to the joiner reading it, each to the
+    -- joiners it has still to feed.
+    owedFrom : ∀ {X} → Bool → List ℕ → Pos → List (Ev X) → List (List (List ℕ × Pos) × Pos) → List (Pos × Maybe X) × Maybe Pos
+    owedFrom r π j (e ∷ es) ((js , p) ∷ ls) =
+      if r ∨ listed π js then told₁ (p ⊕ [ subᴾ j ]) e (owedFrom false π j es ls) else owedFrom false π j es ls
+    owedFrom r π j _        _               = [] , nothing
+
+  -- What the meaning has fed the joiner at `π`, joined at `j`, and the
+  -- run still owes it; owed nothing, waiting while its source runs, gone
+  -- once the source has ended.
+  owing : ∀ {X} → Conf R → Feed X → List ℕ → Pos → Maybe (List (Pos × Maybe X) × Maybe Pos)
+  owing k b π j with owedFrom (goingAt (Conf.ctx k) (Conf.mode k) π) π j (CS.feeds (Feed.subject b)) (feedsAt (Feed.binder b) (agenda k))
+  ... | [] , nothing = if is-just (Feed.ended b) then nothing else just ([] , nothing)
+  ... | o            = just o
+
+  -- EVERY LIVE JOINER HOLDS WHAT THE RUN OWES IT, read at its path.
+  mutual
+    Fed : ∀ {Γ A} → Conf R → Sub Γ A → List ℕ → Now Γ → Set
+    Fed k (mapˢ f s)                     π ν = Fed k s (π ++ [ 0 ]) ν
+    Fed k (scanˢ f z s)                  π ν = Fed k s (π ++ [ 0 ]) ν
+    Fed k (cutˢ l a s)                   π ν = Fed k s (π ++ [ 0 ]) ν
+    Fed k (laneˢ r s)                    π ν = Fed k s (π ++ [ 0 ]) ν
+    Fed k (takeWhileˢ i q tk s)          π ν = Fed k s (π ++ [ 0 ]) ν
+    Fed k (flatMapˢ op f d n qs pl o ls) π ν = Fed k o (π ++ [ 0 ]) ν × FedLanes k ls π 1 ν
+    Fed k (connectˢ k′ r e rt s b)       π ν = Fed k s (π ++ [ 0 ]) ν × Fed k b (π ++ [ 1 ]) (feed π k′ e ∷ ν)
+    Fed k (joinˢ j g x st)               π ν = g ≡ true → st ≡ owing k (lookup ν x) π j
+    Fed k _                              π ν = ⊤
+
+    FedLanes : ∀ {Γ B} → Conf R → List (Sub Γ B) → List ℕ → ℕ → Now Γ → Set
+    FedLanes k []       π i ν = ⊤
+    FedLanes k (s ∷ ls) π i ν = Fed k s (π ++ [ i ]) ν × FedLanes k ls π (suc i) ν
+
+  Meaning : Sub [] R → Conf R → Set
+  Meaning t k = Fed k t [] []
+
+  ------------------------------------------------------------------------
+  -- The queue and the clock
+
+  -- The timer a waiting cold set for its next frame.
+  Waits : ∀ {A} → Timer → Phase A → Set
+  Waits tm (waiting τ e (at t _ _)) = Timer.due tm ≡ τ + t × Timer.from tm ≡ e
+  Waits tm _                        = ⊥
+
+  -- A timer is a cold's, live or torn down since, waiting for it.
+  Timed : Sub [] R → Timer → Set₁
+  Timed t tm = Σ (List Set) λ Γ → Σ Set λ A → Σ (Phase A) λ ph → Σ Bool λ b
+             → Path t (coldˢ {Γ} {A} b ph) (Timer.path tm) × Waits tm ph
+
+  -- Every joiner a connect's subject lists is at its listed path.
+  Joined : Sub [] R → Set₁
+  Joined t = ∀ {Γ X B k r e rt ρ} {s : Sub Γ X} {b : Sub (X ∷ Γ) B} → Path t (connectˢ k r e rt s b) ρ
+           → All (λ sj → Σ (List Set) λ Δ → Σ Set λ A → Σ (A ∈ Δ) λ x → Σ (Maybe (List (Pos × Maybe A) × Maybe Pos)) λ st → Σ Bool λ g
+                       → Path t (joinˢ {Δ} {A} (proj₂ sj) g x st) (ρ ++ proj₁ sj)) (CS.subs k)
+
+  -- The queue: each timer a cold's, in order, each due no earlier than
+  -- now and past where the run is; the subjects' joiners in place.
+  record Queue (p : Pos) (clock : ℕ) (timers : List Timer) (t : Sub [] R) : Set₁ where
+    field
+      timed   : All (Timed t) timers
+      joined  : Joined t
+      ordered : Linked (λ x y → cascade x <ᵖ cascade y ≡ true) timers
+      ahead   : All (λ tm → clock ≤ Timer.due tm × p <ᵖ cascade tm ≡ true) timers
+
+  -- The frame a turn plays, at its cold's own tick.
+  Plays : ∀ {A} → ℕ → Pos → Phase A → Set
+  Plays n u (fired τ e (at t _ _))   = n ≡ τ + t
+  Plays n u (playing {t} τ r i b)    = n ≡ τ + t × u ≡ r
+  Plays n u (waiting _ _ _)          = ⊥
+  Plays n u (fired _ _ _)            = ⊥
+
+  -- Where the clock stands for a turn: at its frame's tick, its cold
+  -- playing that frame.
+  BurstClocked : Sub [] R → ℕ → Turn → Set₁
+  BurstClocked t n (play π u i pl d) = n ≡ tick u × Σ (List Set) λ Γ → Σ Set λ A → Σ (Phase A) λ ph → Σ Bool λ b
+                                     → Path t (coldˢ {Γ} {A} b ph) π × Plays n u ph
+  BurstClocked t n (finish π e d)    = Lift _ (n ≡ tick e)
+
+  -- A callback's position at the clock's tick; between turns, none.
+  Clocked : ∀ {A} → ℕ → Mode A → Pos → Set
+  Clocked n absorbed p = ⊤
+  Clocked n _        p = n ≡ tick p
+
+  -- THE CLOCK WHERE THE CONTROL SAYS: the job about to run and every
+  -- job held at its tick; every turn held, at its frame's.
+  record Books (t : Sub [] R) (m : Mach) : Set₁ where
+    field
+      clocked : Clocked (Mach.clock m) (Conf.mode (Mach.conf m)) (Conf.pos (Mach.conf m))
+      ticked  : All (λ jb → Mach.clock m ≡ tick (proj₂ (proj₂ jb))) (Conf.rets (Mach.conf m))
+      turned  : All (BurstClocked t (Mach.clock m)) (Mach.turns m)
 
 
   -- THE CONFIGURATION RUNS THE GHOST FROM A RE-ENTRY STATE: a witness of
@@ -497,7 +614,7 @@ module Strongly (R : Set) where
       ctlAs   : CtlAs m
       meets   : Meets ctlAs (part tree) g
       owned   : Owned tree m
-      meaning : Meaning tree
+      meaning : Meaning tree (Mach.conf m)
       queue   : Queue (Conf.pos (Mach.conf m)) (Mach.clock m) (Mach.timers m) tree
       books   : Books tree m
       sorted  : Σ Pos λ lo → WellMach lo m
@@ -523,9 +640,6 @@ module Strongly (R : Set) where
     placed-subscribe : (o : PureObs [] R) → Placed (U.subscribe o root) []
 
     -- Each invariant, of the root pending at the launch.
-    meaning-begin : (o : PureObs [] R) → Meaning (pendingˢ o root)
-    queue-begin   : (o : PureObs [] R) → Queue root 0 [] (pendingˢ o root)
-    books-begin   : (o : PureObs [] R) → Books (pendingˢ o root) (begin o)
     -- A program subscribed at the root heads no earlier than the root.
     heads-subscribe : (o : PureObs [] R) → Heads root (U.subscribe o root)
 
@@ -544,9 +658,9 @@ module Strongly (R : Set) where
     ; owned   = record
         { ofs = λ () ; begun = λ { here → focused refl refl refl } ; attached = λ () ; ends = λ () ; cuts = λ ()
         ; feeds = λ () ; bodies = λ () ; sources = λ () ; owes = λ () }
-    ; meaning = meaning-begin o
-    ; queue   = queue-begin o
-    ; books   = books-begin o
+    ; meaning = _
+    ; queue   = record { timed = [] ; joined = λ () ; ordered = [] ; ahead = [] }
+    ; books   = record { clocked = refl ; ticked = [] ; turned = [] }
     ; sorted  = root , begin-well o
     ; behind  = record { parts = λ { here _ refl → heads-subscribe o } ; pools = λ () ; rests = λ () }
     ; lingers = record { pools = λ () ; rests = λ () }
