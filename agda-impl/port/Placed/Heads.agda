@@ -20,7 +20,7 @@ open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to 
 open import Data.Nat using (zero; suc; _+_; _<ᵇ_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Unit using (tt)
+open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl)
 open import Relation.Nullary using (¬_)
 
@@ -494,3 +494,31 @@ apart-sub s b p ρ hp al =
   , keyed-sub (apart-closed p hp) s (p ++ [ ix 1 ]) (sibling p (ix-mark 1) (λ ()) , sibling p (ix-mark 0) (λ ()))
   , every-monoᴱ (λ h n o → n (owned-trans p (p ++ [ ix 0 ]) h (inj₁ (prefix-++ p [ ix 0 ])) o)) ρ al
 
+
+ApartNext : ∀ {Γ A B} → Pos → U.Step (A ∷ Γ) B → U.Node Γ A → NEnv Γ → Set
+ApartNext r (U.outˢ k a b′) s ρ = Apart r b′ s ρ
+ApartNext r (U.skipˢ k b′)  s ρ = Apart r b′ s ρ
+ApartNext r (U.endˢ k)      s ρ = ⊤
+ApartNext r U.hushˢ         s ρ = ⊤
+
+apart-next : ∀ {Γ A B} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ) → Apart r b s ρ → ApartNext r (U.step b) s ρ
+apart-next r b s ρ (p , er , hp , kb , ks , al) with U.step b | step-keyed (owned-closed (p ++ [ ix 0 ])) b kb
+... | U.outˢ k a b′ | _ , kb′ = p , er , hp , kb′ , ks , al
+... | U.skipˢ k b′  | _ , kb′ = p , er , hp , kb′ , ks , al
+... | U.endˢ k      | _       = tt
+... | U.hushˢ       | _       = tt
+
+ApartFed : ∀ {Γ A B} → Pos → U.Node (A ∷ Γ) B → U.Step Γ A → NEnv Γ → Set
+ApartFed r b (U.outˢ q a s′) ρ = Apart r (U.feed (here refl) q (just a) b) s′ ρ
+ApartFed r b (U.skipˢ q s′)  ρ = Apart r (U.feed (here refl) q nothing b) s′ ρ
+ApartFed r b (U.endˢ c)      ρ = ⊤
+ApartFed r b U.hushˢ         ρ = ⊤
+
+apart-fed : ∀ {Γ A B} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ) → Apart r b s ρ → ApartFed r b (U.step s) ρ
+apart-fed r b s ρ (p , er , hp , kb , ks , al) with U.step s | step-keyed (apart-closed p hp) s ks
+... | U.outˢ q a s′ | _ , ks′ =
+  p , er , hp , feed-keyed (owned-closed (p ++ [ ix 0 ])) (here refl) q (just a) b (owned-fit (p ++ [ ix 0 ]) q) kb , ks′ , al
+... | U.skipˢ q s′  | _ , ks′ =
+  p , er , hp , feed-keyed (owned-closed (p ++ [ ix 0 ])) (here refl) q nothing b (owned-fit (p ++ [ ix 0 ]) q) kb , ks′ , al
+... | U.endˢ c      | _       = tt
+... | U.hushˢ       | _       = tt
