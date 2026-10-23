@@ -569,11 +569,11 @@ module Honesty (R : Set) where
 
     popping : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s p q τ p′ rs} {c′ : Ctx R Γ′ A′} {s′}
             → downs q top (plug c s) ≡ just (_ , _ , c′ , s′)
-            → Machine.step ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩ ≡ Machine.ok ⟨ c′ , s′ , resuming τ , p′ , rs ⟩
+            → Machine.step ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩ ≡ Machine.moved ⟨ c′ , s′ , resuming τ , p′ , rs ⟩ [] []
     popping d rewrite d = refl
 
     dropping : ∀ {Γ A} {c : Ctx R Γ A} {s p q τ p′ rs} → downs q top (plug c s) ≡ nothing
-             → Machine.step ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩ ≡ Machine.ok ⟨ c , s , absorbed , p , rs ⟩
+             → Machine.step ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩ ≡ Machine.moved ⟨ c , s , absorbed , p , rs ⟩ [] []
     dropping d rewrite d = refl
 
   private
@@ -622,15 +622,15 @@ module Honesty (R : Set) where
 
   private
     shut-step : ∀ {Γ A} {c : Ctx R Γ A} {xs i p rs} → closed c ≡ true
-              → Machine.resumeR c (ofR xs i) p rs ≡ Machine.ok ⟨ c , doneS , absorbed , p , rs ⟩
+              → Machine.resumeR c (ofR xs i) p rs ≡ Machine.moved ⟨ c , doneS , absorbed , p , rs ⟩ [] []
     shut-step e rewrite e = refl
 
     last-step : ∀ {Γ A} {c : Ctx R Γ A} {i p rs} → closed c ≡ false
-              → Machine.resumeR c (ofR [] i) p rs ≡ Machine.ok ⟨ c , doneS , rising cp , p ⊕ [ last ] , rs ⟩
+              → Machine.resumeR c (ofR [] i) p rs ≡ Machine.moved ⟨ c , doneS , rising cp , p ⊕ [ last ] , rs ⟩ [] []
     last-step e rewrite e = refl
 
     emit-step : ∀ {Γ A} {c : Ctx R Γ A} {x xs i p rs} → closed c ≡ false
-              → Machine.resumeR c (ofR (x ∷ xs) i) p rs ≡ Machine.ok ⟨ c , ofS xs , rising (nx x) , p ⊕ [ ix i ] , (dirs c , next (suc i) , p) ∷ rs ⟩
+              → Machine.resumeR c (ofR (x ∷ xs) i) p rs ≡ Machine.moved ⟨ c , ofS xs , rising (nx x) , p ⊕ [ ix i ] , (dirs c , next (suc i) , p) ∷ rs ⟩ [] []
     emit-step e rewrite e = refl
 
   -- A spent `of` the ghost holds: its completion delivered at its end.
