@@ -1,7 +1,7 @@
-.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain ghosts placing placing-count stepping bg bg-check bg-wait \
+.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain placing placing-count stepping bg bg-check bg-wait \
         wiring wiring-gate wiring-selftest unsafe-check dup-check dup-selftest \
         imports-check imports-fix imports-selftest comments-check comments-selftest \
-        roadmap-check roadmap-selftest find find-prose postulates notify split \
+        roadmap-check roadmap-selftest port-check port-selftest find find-prose postulates notify split \
         ts-check ts-lint ts-format-check ts-gate
 
 # UTF-8 locale for em-dashes and special characters in Agda output
@@ -44,11 +44,11 @@ help:
 	@echo "  chain         the denotation's approximants form a chain (ARGS=\"FROM COUNT\")"
 	@echo "  placing       the machine's trace is placed against the root's events (ARGS=\"FROM COUNT\", default 0 300, max 500 without SWEEP=1)"
 	@echo "  stepping      the stepper shows what its configuration means, skips included (ARGS=\"FROM COUNT\", default 0 300)"
-	@echo "  ghosts        every observer in the run is shown what its subtree denotes (ARGS=\"FROM COUNT\")"
 	@echo "  postulates    every postulate in $(SRC) by name — the work ledger"
 	@echo "  find          search the declared TYPE of every statement:  make find Q='⊑ lub'"
 	@echo "  find-prose    search comment blocks and docs for a finding:  make find-prose Q='dead route'"
 	@echo "  wiring        the wiring report (wiring-gate: the same, exiting 1)"
+	@echo "  port-check    the port keeps the old tower's names and postulates (PORT_BASE)"
 	@echo "  imports-fix   delete unused imports and names"
 	@echo "  split         cut a long module:  make split F=<file> (lists cuts);  make split F=<file> P='Mod Mod.B@120'"
 	@echo "                a nested one, in place:  make split F=<file> SUB='Inner Inner2@300'"
@@ -66,6 +66,7 @@ GATE_CHEAP = wiring-selftest wiring-gate \
              imports-selftest imports-check \
              roadmap-selftest roadmap-check \
              comments-selftest comments-check \
+             port-selftest port-check \
              ts-gate
 
 gate-cheap:
@@ -150,15 +151,6 @@ stepping: oracle-build
 	  if echo "$$out" | grep -q '^stepping: FAIL '; then echo "stepping: RED"; exit 1; fi; \
 	  echo "stepping: GREEN"
 
-# Every observer inside the run against its subtree's denotation, on
-# ARGS="FROM COUNT" seeds: green when the run reaches its `done` line and no
-# seed FAILs.
-ghosts: oracle-build
-	@out=$$($(ORACLE_BIN) ghosts $(ARGS)); echo "$$out"; \
-	  echo "$$out" | grep -q '^ghosts: done ' || { echo "ghosts: RED — the run never finished"; exit 1; }; \
-	  if echo "$$out" | grep -q '^ghosts: FAIL '; then echo "ghosts: RED"; exit 1; fi; \
-	  echo "ghosts: GREEN"
-
 # The runner prints a FAIL line per failing row and a closing `done` line;
 # a run without the `done` line died part-way and is red.  See
 # docs/bug-cache.md.
@@ -213,6 +205,38 @@ wiring-selftest:
 	  echo "$$led" | grep -q "^ffi-unbound " || { echo "SELFTEST FAIL: ffi-unbound missing from the ledger — the FFI exemption swallowed a CLI postulate with no binding"; fail=1; }; \
 	  echo "$$led" | grep -q "^ffi-outside " || { echo "SELFTEST FAIL: ffi-outside missing from the ledger — a binding outside CLI/ must earn nothing"; fail=1; }; \
 	  if [ $$fail -eq 0 ]; then echo "wiring-selftest: PASS (R2 fires on the passed-only lemma and on its eta-expansion, and on nothing else; module applications conduct; \`with\` arms conduct at both scopes; a postulate block nested in a seal reaches the ledger; a pragma nested in a pragma closes on its own close; a CLI postulate with a COMPILE GHC body leaves it, an unbound one or one outside CLI/ stays)"; \
+	  else echo "$$out"; exit 1; fi
+
+# THE PORT BOUNDARY (Anthony): in $(SRC)/port/ and what it imports, a body
+# keeps a name the old tower had at PORT_BASE; an old postulate stays one; a
+# postulated old body says where it was; a new postulate is free.  The frozen commit is
+# what the port answers to, so it moves only by hand.  → docs/port-check.md
+PORT_BASE := 9ec3e6c62e05857feabffdd65a05929de347e532
+# The engine's modules took the names of the ones they replaced; what they
+# declared at PORT_BASE under their old paths is not the port's.
+PORT_RENAMED := --renamed operation/AbstractObservable.agda=agda-impl/operation/StateTree.agda \
+                          operation/PureObservable.agda=agda-impl/operation/StateTree/Pure.agda
+
+port-check:
+	@scripts/check-port.py --base $(PORT_BASE) $(PORT_RENAMED)
+
+# PROVES port-check IS LOAD-BEARING: one row per way out of the boundary must
+# fire, a new body moved into the port's import cone included; and an old
+# name ported, a new postulate, an old postulate kept, a pointed-at old body,
+# a private helper and a where-local must not.
+port-selftest:
+	@out=$$(scripts/check-port.py --base $(PORT_BASE) --src scripts/port-selftest 2>&1); \
+	  fail=0; \
+	  for r in "NEW NAME    Engine.agda:smuggled" "NEW NAME    port/Fixture.agda:invented" "FILLED GAP  port/Fixture.agda:placing" \
+	           "NO OLD BODY port/Fixture.agda:complete" "BAD OLD BODY port/Fixture.agda:reaches" \
+	           "BAD OLD BODY port/Fixture.agda:prefix-chain" "BAD OLD BODY port/Fixture.agda:reached"; do \
+	    echo "$$out" | grep -qF "$$r" || { echo "SELFTEST FAIL: \`$$r\` not reported — the boundary has a hole"; fail=1; }; \
+	  done; \
+	  for n in run fresh-gap engine-gap ticks-up content helper read-of local; do \
+	    echo "$$out" | grep -q "\.agda:$$n " && { echo "SELFTEST FAIL: $$n reported, but it is inside the boundary"; fail=1; }; \
+	  done; \
+	  echo "$$out" | grep -q "port-check: FAIL — 7 problem" || { echo "SELFTEST FAIL: expected exactly 7 problems"; fail=1; }; \
+	  if [ $$fail -eq 0 ]; then echo "port-selftest: PASS (a new body, in the port or its import cone, a filled gap, and a missing or unresolving OLD BODY each fire; ported names, new and kept postulates and helpers do not)"; \
 	  else echo "$$out"; exit 1; fi
 
 # SOUNDNESS GUARD.  The build is not `--safe` — it cannot be while

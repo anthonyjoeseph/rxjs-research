@@ -21,7 +21,7 @@ open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; cong₂; subst₂)
 
-open import adequacy.Adequacy using (run; adequacy)
+open import port.Adequacy using (run; adequacy)
 open import denotation.MonotonicList using (ticks; inFrame; within; sameTick)
 open import denotation.MonotonicList.Events using (_≟ᵖ_; Events; Events∞; out; skip; end; hush; tick; Pos; Timeline; root)
 open import denotation.Order using (Item; val; fin; silent; Shows; ShowsIn; nil; done⁺; quiet⁺; at⁺; emit⁺; stall⁺; close⁺)

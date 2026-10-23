@@ -22,7 +22,7 @@ open import denotation.Denote using (DenEnv; ⟦_⟧)
 open import denotation.Compositional using (compositional; module Compositional)
 open import denotation.NonExpansive using (mapᴰ-ne)
 open import operation.PureObservable using (PureObs)
-open import adequacy.Adequacy using (run; adequacy)
+open import port.Adequacy using (run; adequacy)
 open Events∞
 
 ------------------------------------------------------------------------

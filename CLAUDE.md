@@ -43,6 +43,7 @@ Every `*-selftest` proves its checker still fires; they are not findings, they a
 | `imports-check` | an unused import, or an unused name in a surviving clause | [docs/imports-check.md](docs/imports-check.md) |
 | `roadmap-check` | a live postulate in no group or in two; a group member naming nothing live (pruned — deleting a postulate is free, Anthony); a group without `Members:`; a tier subsection other than its ledger; over a prose budget; a date | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `comments-check` | a date, a historical marker or a LINE NUMBER in `agda-impl`; evidence not last and in order; a DOUBLED marker (`-- -- RECOVERY:`); a `REFUTED`/`RECOVERY` that doesn't resolve. `DEAD ROUTE` is unvalidated — it names nothing | [docs/comments-check.md](docs/comments-check.md) |
+| `port-check` | in `port/` or what it imports: a body under a name the old tower lacks; a body for an old postulate; a postulated old body without a resolving `OLD BODY` pointer. New postulates are free | [docs/port-check.md](docs/port-check.md) |
 | `agda` | anything that does not typecheck from Main — **a warning is a failure** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
 
 Also: `make imports-fix`, `make postulates` (the complete remaining-work ledger, by name), `make find`, `make find-prose`.
@@ -252,15 +253,7 @@ Main also defines the build's COVERAGE — **`make agda` IS the claim graph**, a
 
 As purely functional as possible: no mutable state, no direct `.subscribe()`. Delegate IO/statefulness to rxjs operators like `scan`. Two reasons — cleanliness, and keeping the primitives and `batchSimultaneous` in near-direct correspondence with the Agda.
 
-## The change workflow — engine IMPLEMENTATION only
-
-Not for proof work, tooling or documentation.
-
-1. **Agda first**, before touching TypeScript.
-2. **QuickCheck** — `quickcheck.Quickcheck`: the pure runtime against the denotation on drawn programs.
-3. **Port to TypeScript**, only once QuickCheck passes.
-4. **Oracle** — all three Agda engines against real rxjs. Every divergence becomes a bug-cache row.
-5. **Formal verification last**, in phases, committing in-between results, until there are no gaps.
+## Semantics questions
 
 **Resolving ambiguity:** naive plain rxjs — actually run the example and see. If that doesn't settle it, surface the question with a TypeScript rxjs example that **avoids the `*All()` higher-order operators where possible**.
 

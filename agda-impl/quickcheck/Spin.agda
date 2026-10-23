@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
--- PROGRESS, AGAINST SPINS.  Adequacy's liveness half, `reachedᴿ`, says the run passes
+-- PROGRESS, AGAINST SPINS.  Adequacy's liveness half, `reached`, says the run passes
 -- every position the root's meaning shows, the two sides ending, falling
 -- quiet or spinning at the same point.  `quickcheck.Placing` cannot see a
 -- spin on one side only: running out of fuel reads as a pass.  This can:
@@ -28,14 +28,25 @@ open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Tree using (Obs; Later; of; map; takeWhile; flatMap; connect; connected; defer; merge; ones; mergeᶠ; switchᶠ; exhaustᶠ)
 import Tree as T
-open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush; Pos; _<ᵖ_; root; Timeline)
+open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush; Pos; Label; ix; sub; last; _<ᵖ_; root; Timeline)
 open import denotation.MonotonicList using (observe)
 open import denotation.Unfold using (⟦_⟧ˢ; [])
-open import operation.Machine using (module Machine)
+open import operation.PureObservable using (module Driver)
 open import quickcheck.Code using (script; timeline; module Leaf)
-open import quickcheck.Ghost using (showP)
 
-open Machine ℕ using (Trace; Trace∞; tau; out; end; idle; trace; begin)
+open Driver ℕ using (Trace; Trace∞; tau; out; end; idle; trace; begin)
+
+-- A position, printed.
+mutual
+  showL : Label → String
+  showL (ix n)  = showℕ n
+  showL (sub p) = "s(" S.++ showP p S.++ ")"
+  showL last    = "L"
+
+  showP : Pos → String
+  showP []       = ""
+  showP (l ∷ []) = showL l
+  showP (l ∷ ls) = showL l S.++ "." S.++ showP ls
 
 -- What a side shows, silent steps dropped.
 data Ev : Set where

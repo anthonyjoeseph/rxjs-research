@@ -198,7 +198,7 @@ const check = async (fam: Family, row: Row): Promise<string[]> => {
         : agrees(ioTrace, rx)
           ? []
           : [`io         ${show(ioTrace)}`]),
-    // the QUICKCHECK leg: the two pure engines, against each other
+    // the QUICKCHECK leg: the pure semantics, against the denotation
     ...(agrees(row.denote, row.pure) ? [] : ["(denotation and pure disagree)"]),
   ];
   return bad.length === 0

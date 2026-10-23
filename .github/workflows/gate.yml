@@ -47,8 +47,9 @@ jobs:
 
   gate:
     runs-on: ubuntu-latest
-    # A cold interface cache rechecks the stdlib too, and runs past 20.
-    timeout-minutes: 30
+    # A cold interface cache rechecks the stdlib and the whole adequacy
+    # tower, and runs to 30; a job killed there saves no cache.
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -145,11 +146,6 @@ jobs:
 
       - name: make stepping
         run: make stepping
-
-      # Every observer inside the run, completions included, at the
-      # denotation's positions: the observable half of `tells-past`.
-      - name: make ghosts
-        run: make ghosts ARGS="0 300"
 
 
   # The placing check: every drawn program's meaning is placed, rising

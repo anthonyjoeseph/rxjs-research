@@ -5,9 +5,6 @@
 **/node_modules
 typescript/node_modules
 typescript/.oracle-tmp
-typescript/.deep-tmp
-typescript/corpus/.deep-failures.ndjson
-typescript/.census-tmp
 
 # agda
 **/MAlonzo

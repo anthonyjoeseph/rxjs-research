@@ -7,9 +7,11 @@
 -- reaches, so it is the build's coverage as well as its claim set.
 module Main where
 
--- THE THEOREM: the pure runtime's run is the denotation's, observed at
--- time 0.  The IO runtime is the same engine over a different monad.
-open import adequacy.Adequacy using (adequacy)
+-- THE THEOREM, ON THE STATE TREE: the pure semantics' run
+-- (`operation.PureObservable`) is the denotation's, observed at time 0.
+-- The IO semantics is the same machine driven by the world
+-- (`operation.Observable`).
+open import port.Adequacy using (adequacy)
 
 -- THE MEANING IS A FOLD: the theorem's denotation is the limit of each
 -- operator's `MonotonicList` function applied to its children's.

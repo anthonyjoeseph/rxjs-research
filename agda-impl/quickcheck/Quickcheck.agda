@@ -1,7 +1,7 @@
 {-# OPTIONS --guardedness #-}
 
--- ADEQUACY, TESTED.  The denotation and the pure event loop must give the
--- same trace for every program; `quickcheck k` returns the seeds below k
+-- ADEQUACY, TESTED.  The denotation, the pure event loop and the
+-- state-tree machine must give the same trace for every program; `quickcheck k` returns the seeds below k
 -- whose program they disagree on.  A trace cut by the step budget only
 -- has to be a prefix of the other side's.
 module quickcheck.Quickcheck where
@@ -49,8 +49,8 @@ agrees t (xs ▸ _)   (ys ▸ cut) = prefix t ys xs
 agrees t (xs ▸ x)   (ys ▸ y)   = prefix t xs ys ∧ prefix t ys xs ∧ eqEnd x y
 
 -- Each `μ` unfolds at most 3 times; each trace is read for 500 steps.
-prop : Prog natᵗ → Bool
-prop p = agrees natᵗ (denoteTrace 3 500 p) (pureTrace 3 500 p)
+prop : ∀ t → Prog t → Bool
+prop t p = agrees t (denoteTrace 3 500 p) (pureTrace 3 500 p)
 
 ------------------------------------------------------------------------
 -- Generating: programs over ℕ, every context a list of `natᵗ`s
@@ -216,5 +216,4 @@ named seed with genNamed seed
 -- program or its named one.  Both read a name as its subscription's
 -- position, so here names compare exactly.
 quickcheck : ℕ → List ℕ
-quickcheck k = filterᵇ (λ seed → not (prop (program seed) ∧ agrees t (denoteTrace 3 500 (named seed)) (pureTrace 3 500 (named seed)))) (upTo k)
-  where t = natᵗ ×ᵗ nameᵗ
+quickcheck k = filterᵇ (λ seed → not (prop natᵗ (program seed) ∧ prop (natᵗ ×ᵗ nameᵗ) (named seed))) (upTo k)
