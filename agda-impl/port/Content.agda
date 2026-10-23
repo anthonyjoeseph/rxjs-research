@@ -24,15 +24,15 @@ open import Data.List.Relation.Unary.All using ([])
 import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
-open import Data.Nat using (ℕ; zero; suc; _<ᵇ_)
-open import Data.Nat.Properties using (suc-injective)
+open import Data.Nat using (ℕ; zero; suc; _<ᵇ_; _<_; _≤_; s≤s; z≤n)
+open import Data.Nat.Properties using (suc-injective; +-suc; +-monoʳ-≤; n≤1+n; ≤-reflexive)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import denotation.MonotonicList.Events using (Events; Pos; Time; tick; root)
-open import denotation.MonotonicList using (observe; Agree)
+open import denotation.MonotonicList using (observe; Agree; agree-refl)
 import denotation.Unfold as U
 open import denotation.Denote using (⟦_⟧)
 open import operation.PureObservable using (PureObs; module Pure; module Driver; module Machine)
@@ -44,6 +44,7 @@ open import port.Stepper using (step-skips)
 open import port.Unsub using (module Unsubbing)
 open import port.Ghost using (module Ghosting)
 open import port.Strong using (module Strongly)
+open import port.Sorted.Walk using (module SortingWalk)
 
 module Honesty (R : Set) where
   open Driver R using (Mach; mach; depthOf; Step; silent; value; complete; drained; step; trace; shown; reading; begin; Read; read; marks; log; ending; noted)
@@ -51,8 +52,10 @@ module Honesty (R : Set) where
   open Unsubbing R using (now; then)
   open Ghosting R using (Has; Sent; sentHere; sentLater; Alike; _≋_; same-agree; residual; Reached; launchedʰ; silentʰ; valueʰ;
     Stands; cutʰ; finʰ; dryʰ; Mirror; Inner; Logged; Shows; silentˢ; valueˢ; completeˢ; drainedˢ; inner-launch; ≋-refl;
-    Steps; after; steps-after; Hopped; onward)
-  open Strongly R using (Strong; Carried; carried; closing; calmAs; noteAs; runAs; subAs; burstAs; popAs; Pops)
+    Steps; after; steps-after; Hopped; onward; lowered; weight)
+  open Strongly R using (Strong; Carried; carried; closing; CtlAs; Meets; calmAs; noteAs; runAs; subAs; burstAs; popAs; Pops;
+    Kernels; Owned; Meaning)
+  open SortingWalk R using (WellMach)
   open Machine using (Ctx; top; ⟨_,_,_,_,_⟩; absorbed; rising; resuming; subscribing; nx; pend;
     ofS; cutS; takeS; connS; joinS; next; att; owedCp; owedCut; feeding; attBody; owed; go;
     res; ofR; attR; cpR; cutR; feedR; bodyR; srcR; endR; joinR; idle)
@@ -151,9 +154,16 @@ module Honesty (R : Set) where
     join-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {j x p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , joinS j true x , resuming go , p , rs ⟩
                 → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
 
-    -- A job owed nothing by its node: dropped.
-    idle-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {s t p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , resuming t , p , rs ⟩
-                → res s t ≡ idle → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+    -- AN IDLE JOB DROPPED: what is owed stays owed, what the joiners are
+    -- owed stays theirs, the machine stays sorted.
+    owned-idle : ∀ {t m Γ A} {c : Ctx R Γ A} {s τ p rs} → Kernels t (Mach.conf m) → Owned t m
+               → Mach.conf m ≡ ⟨ c , s , resuming τ , p , rs ⟩ → res s τ ≡ idle
+               → Owned t (record m { conf = ⟨ c , s , absorbed , p , rs ⟩ })
+    meaning-idle : ∀ {t Γ A} {c : Ctx R Γ A} {s τ p rs} → Kernels t ⟨ c , s , resuming τ , p , rs ⟩
+                 → Meaning t ⟨ c , s , resuming τ , p , rs ⟩ → res s τ ≡ idle → Meaning t ⟨ c , s , absorbed , p , rs ⟩
+    sorted-idle : ∀ {lo m Γ A} {c : Ctx R Γ A} {s τ p rs} → WellMach lo m
+                → Mach.conf m ≡ ⟨ c , s , resuming τ , p , rs ⟩ → res s τ ≡ idle
+                → WellMach lo (record m { conf = ⟨ c , s , absorbed , p , rs ⟩ })
 
     -- A pending node begun, likewise.
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Lift/Order.agda
@@ -176,6 +186,63 @@ module Honesty (R : Set) where
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs.agda
     turn-pops : ∀ {g m Γ A} {c : Ctx R Γ A} {s p tm tms} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , [] ⟩
               → Mach.turns m ≡ [] → Mach.timers m ≡ tm ∷ tms → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+
+  -- An absorbed configuration is a re-entry state: calm, a turn to play,
+  -- or a job to pop.
+  private
+    settled : ∀ {Γ A} {c : Ctx R Γ A} {s p} rs clk tms ts → CtlAs (mach ⟨ c , s , absorbed , p , rs ⟩ clk tms ts)
+    settled []       clk tms []       = calmAs refl refl
+    settled []       clk tms (t ∷ ts) = burstAs refl refl refl
+    settled (j ∷ rs) clk tms []       = popAs refl tt
+    settled (j ∷ rs) clk tms (t ∷ ts) with depthOf t <ᵇ suc (length rs) in d
+    ... | true  = popAs refl d
+    ... | false = burstAs refl refl d
+
+    settled-meets : ∀ {Γ A} {c : Ctx R Γ A} {s p} rs clk tms ts {n g} → n ≡ just g → Meets (settled {c = c} {s} {p} rs clk tms ts) n g
+    settled-meets []       clk tms []       e = e
+    settled-meets []       clk tms (t ∷ ts) e = e
+    settled-meets (j ∷ rs) clk tms []       e = e
+    settled-meets (j ∷ rs) clk tms (t ∷ ts) e with depthOf t <ᵇ suc (length rs)
+    ... | true  = e
+    ... | false = e
+
+    -- Settling a job's run weighs less than running it.
+    settled-lighter : ∀ {Γ A} {c : Ctx R Γ A} {s p} rs clk tms ts
+                    → weight (settled {c = c} {s} {p} rs clk tms ts) < suc (length rs) + suc (length rs)
+    settled-lighter []       clk tms []       = s≤s z≤n
+    settled-lighter []       clk tms (t ∷ ts) = s≤s z≤n
+    settled-lighter (j ∷ rs) clk tms []       = popped (suc (length rs))
+      where popped : ∀ a → suc (suc (a + a)) ≤ suc a + suc a
+            popped a = s≤s (s≤s (≤-reflexive (sym (+-suc a a))))
+    settled-lighter (j ∷ rs) clk tms (t ∷ ts) with depthOf t <ᵇ suc (length rs)
+    ... | true  = s≤s (s≤s (≤-reflexive (sym (+-suc (suc (length rs)) (suc (length rs))))))
+    ... | false = s≤s (+-monoʳ-≤ (suc (length rs)) (n≤1+n (suc (length rs))))
+
+  -- A job owed nothing by its node: dropped, the ghost alike, the
+  -- control lighter.
+  idle-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {s t p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , resuming t , p , rs ⟩
+              → res s t ≡ idle → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+  idle-onward {g} {mach _ clk tms ts} {c = c} {s} {t} {p} {rs} cr refl r with Carried.ctlAs cr | Carried.meets cr
+  ... | runAs refl | mt =
+    m′ , cong (Driver.took R _) (cong (λ x → Machine.resumeR c x p rs) r)
+    , g , m′ , now
+    , carried (record
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = Carried.tree cr
+        ; kernels = Carried.kernels cr ; ctlAs = settled rs clk tms ts ; meets = settled-meets rs clk tms ts mt
+        ; owned = owned-idle (Carried.kernels cr) (Carried.owned cr) refl r
+        ; meaning = meaning-idle (Carried.kernels cr) (Carried.meaning cr) r
+        ; queue = Carried.queue cr
+        ; books = record { clocked = tt ; ticked = Books.ticked (Carried.books cr) ; turned = Books.turned (Carried.books cr) }
+        ; sorted = proj₁ (Carried.sorted cr) , sorted-idle (proj₂ (Carried.sorted cr)) refl r
+        ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; told = Carried.told cr
+        ; ended = Carried.ended cr ; flags = Carried.flags cr })
+    , lowered (λ n → agree-refl n _) (inj₂ (refl , settled-lighter rs clk tms ts))
+    where m′ = mach ⟨ c , s , absorbed , p , rs ⟩ clk tms ts
+  ... | calmAs () _  | _
+  ... | noteAs () _  | _
+  ... | subAs ()     | _
+  ... | burstAs () _ _ | _
+  ... | popAs () _   | _
 
   -- A job resumed runs silently on to a re-entry configuration the
   -- configuration gains: by the job the node owes (`res`).
