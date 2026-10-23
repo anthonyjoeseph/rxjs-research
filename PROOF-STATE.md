@@ -10,10 +10,10 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SHUT'S HEADS
 
-Suspected false: `Heads` reads a node's step alone, and a burst skipping
-inside its range falls back, once shut out of it, to a rest no premise
-bounds. Settled by a machine counterexample, or a component-wise heads
-invariant carried by `Each` that bounds every rest.
+Believed true, unproven: a rest can head before its step, so a burst
+must keep its step in range under its own shut. A shut tells only `sub`
+and `last` ends, which lose every race to an `ix` skip. Settled when
+`shut-heads` is a body over that fact or a shut is shown to move one.
 
 Members: `shut-heads`.
 

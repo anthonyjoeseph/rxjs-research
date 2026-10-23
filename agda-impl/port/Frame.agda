@@ -196,14 +196,17 @@ module Framing (R : Set) where
   postulate
     -- A shut heads where the node did, or at an end it tells.
     --
-    -- SUSPECT: `Heads` reads a node's step alone.  A burst whose step
-    -- skips inside its range heads where the skip is, and its rest, which
-    -- the shut leaves alone, need not; a shut that moves the step out of
-    -- the range falls back to that rest.
+    -- A burst's rest can head before its step, so the burst case rests
+    -- on its step staying in range.  A shut tells only ends whose last
+    -- label is `sub` or `last`, and those lose every race against an
+    -- `ix` skip, so a burst's step should stay in range under its own
+    -- shut.  Owed: that fact, for a node and its own shut.
     --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Frame.agda
     --
+    -- REFUTED: 925497a9 a node's rest heading no sooner than its step, by two nested connects
     -- DEAD ROUTE: by steps kept `Down` through every step function. A burst's step falls back to its rest, and no `Down` of its step bounds its rest, so the burst case takes a premise that names neither node it is about.
+    -- DEAD ROUTE: by `Down` of the rests beside `Down` of the steps, over two unrelated nodes. A rest can head before its own node's step, so the two premises do not bound a fallen-back burst.
     shut-heads : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (b : U.Node Γ B) → Heads q b → Tells q c (untold i b) → Heads q (U.shut i c b)
 
   -- A FLATMAP'S HEAD: its pool's skip, its outer's step or its
