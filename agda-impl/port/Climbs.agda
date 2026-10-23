@@ -41,19 +41,19 @@ module Ascending (R : Set) where
   -- The node a signal reaches already past it, and the ghost's step the
   -- signal lifted along the path: a value leaves the node standing, an
   -- end leaves it gone, every connect it killed on the way ended.
-  Passed : (q : Pos) (g : U.Node [] R) {T : Sub [] R} {Δ A} {v : Sub Δ A} {π} → Path T v π → Ev A → Set₁
+  Passed : (q : Pos) (g : U.Node [] R) {T : Sub [] R} → ∀ {Δ A} {v : Sub Δ A} {π} → Path T v π → Ev A → Set₁
   Passed q g {Δ = Δ} {A} {v} σ (nx y) =
     Σ (U.Node Δ A) λ c′ → part v ≡ just c′ × Σ (U.Step [] R) λ S → Lifts σ (U.outˢ q y c′) S × U.step g ≡ S
   Passed q g {v = v} σ cp =
     part v ≡ nothing × Σ (U.Step [] R) λ S → Lifts σ (U.endˢ q) S × U.step g ≡ S × Healed q σ
 
   -- What a closed sub leaves running heads no earlier than the run.
-  ClosedHeads : (q : Pos) {T : Sub [] R} {Δ A} {v : Sub Δ A} {π} → Path T v π → Ev A → Set
+  ClosedHeads : (q : Pos) {T : Sub [] R} → ∀ {Δ A} {v : Sub Δ A} {π} → Path T v π → Ev A → Set
   ClosedHeads q σ (nx _)     = ⊤
   ClosedHeads q {v = v} σ cp = Heads q (U.restᶜ {B = ⊤} (leftover {B = ⊤} v))
 
   -- What the climbing signal's lift leaves free, left alike.
-  LeftsOf : (q : Pos) (g : U.Node [] R) {T : Sub [] R} {Δ A} {v : Sub Δ A} {π} (σ : Path T v π) (e : Ev A) → Passed q g σ e → Set₁
+  LeftsOf : (q : Pos) (g : U.Node [] R) {T : Sub [] R} → ∀ {Δ A} {v : Sub Δ A} {π} (σ : Path T v π) (e : Ev A) → Passed q g σ e → Set₁
   LeftsOf q g σ (nx y) (_ , _ , _ , L , _) = Lefts L
   LeftsOf q g σ cp     (_ , _ , L , _)     = Lefts L
 
