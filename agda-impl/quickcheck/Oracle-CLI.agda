@@ -22,8 +22,9 @@
 --                                "all" (`quickcheck.Placing`)
 --   Oracle-CLI stepping FROM COUNT the seeds whose stepper parts from the
 --                                meaning, skips included (`quickcheck.Stepping`)
---   Oracle-CLI order FROM COUNT  the seeds on which the marked engine's
---                                order fails (`quickcheck.MarkedOrder`)
+--   Oracle-CLI order FROM COUNT  per seed and check, the first configuration
+--                                at which the marked engine's order fails
+--                                (`quickcheck.MarkedOrder`)
 --   Oracle-CLI hand              placing over `quickcheck.Adversary`
 --   Oracle-CLI why-hand N        its Nth program and the checks it fails
 --   Oracle-CLI spin              progress over `quickcheck.Spin`'s programs
@@ -57,7 +58,7 @@ open import Tree using (Obs)
 open import denotation.MonotonicList.Events using (Timeline)
 open import quickcheck.Placing using (placing; placingParts)
 open import quickcheck.Stepping using (steppingFails)
-open import quickcheck.MarkedOrder using (orderFails)
+open import quickcheck.MarkedOrder using (orderReport)
 
 private
   each : List ℕ → (ℕ → IO ⊤) → IO ⊤
@@ -93,14 +94,7 @@ private
   spins ((l , o) ∷ cs) = putStrLn ((if Spin.progress 8 o then "spin: ok   " else "spin: FAIL ") ++ l) >>= λ _ → spins cs
 
   orderRun : ℕ → ℕ → IO ⊤
-  orderRun f c with orderFails f c
-  ... | fr , fi , lv , st , hi =
-    each fr (λ s → putStrLn ("order: FAIL fresh seed " ++ showℕ s)) >>= λ _ →
-    each fi (λ s → putStrLn ("order: FAIL first seed " ++ showℕ s)) >>= λ _ →
-    each lv (λ s → putStrLn ("order: FAIL live seed " ++ showℕ s)) >>= λ _ →
-    each st (λ s → putStrLn ("order: INFO strict seed " ++ showℕ s)) >>= λ _ →
-    each hi (λ s → putStrLn ("order: INFO hidden seed " ++ showℕ s)) >>= λ _ →
-    putStrLn ("order: done " ++ showℕ c)
+  orderRun f c = each′ (orderReport f c) >>= λ _ → putStrLn ("order: done " ++ showℕ c)
 
   nth : ∀ {ℓ} {X : Set ℓ} → ℕ → List (String × X) → Maybe (String × X)
   nth _       []       = nothing

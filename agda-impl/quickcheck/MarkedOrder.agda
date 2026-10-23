@@ -3,93 +3,178 @@
 -- SPIKE: THE ORDER, TESTED.  At every configuration the pointer-free
 -- engine (`operation.MarkedPure`) reaches on a seed's program:
 --
---   fresh   every key in the tree beyond `p`'s whole subtree while a
---           subscribe or a rise is at `p`; after `r`, no two alike,
---           once absorbed at `r`
---   first   a lane's value rising in its flatMap's list, its observer
---           open, is first among the flatMap's parts
---           (`spike.MarkedKept.lanes-first`, decided)
---   strict  and every other part's next event, and every tail the pool
---           holds, strictly after `p`
---   hidden  `first` again, its observer closed
---   live    every joiner still live whose source has ended holds that
---           completion in its inbox
+--   beyond    every key in the tree beyond `p`'s whole subtree while a
+--             subscribe or a rise is at `p`
+--   past      every key after `r` once absorbed at `r`
+--   live      every joiner still live and untold whose source's run is an
+--             end has that end after the position
+--   first     a lane's value rising in its flatMap's list, its observer
+--             open, is first among the flatMap's parts
+--             (`spike.MarkedKept.lanes-first`, decided)
+--   strict    and every other part's next event, and every tail the pool
+--             holds, strictly after `p`
+--   hidden    `first` again, its observer closed
+--   distinct  no two keys alike
 --
--- `fresh`, `first` and `live` are claims; `strict` and `hidden` are
--- probes of how far the order reaches, and fail no run.
+-- `beyond`, `past`, `live` and `first` are claims; the rest are probes of
+-- how far the order reaches, and fail no run.  Each seed reports, per
+-- check, the first configuration failing it: the mode and position, the
+-- focus and its frames, and the keys at fault.
 module quickcheck.MarkedOrder where
 
-open import Data.Bool using (Bool; true; false; _∧_; _∨_; not)
-open import Data.List using (List; []; _∷_; _++_; filterᵇ; upTo) renaming (map to mapL)
+open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
+open import Data.List using (List; []; _∷_; _++_; filterᵇ; upTo; take) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using (lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_)
+open import Data.Nat.Show renaming (show to showℕ)
 open import Data.Product using (_×_; _,_; proj₂)
+open import Data.String using (String; intersperse) renaming (_++_ to _++ˢ_)
 
 open import Tree using (Obs)
-open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Tail; Timeline; idle; pin; end; _<ᵖ_)
+open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Label; ix; sub; last; Tail; Timeline; idle; pin; end; _<ᵖ_)
 open import denotation.MonotonicList using (head; headᴼ)
 open import denotation.Unfold using (NEnv; stateᴺ; states; outerᴺ)
 open import operation.Key using (Key; at; after; _<ᴷ_)
 open import operation.MarkedPure using (module Machine; module Driver)
-open Machine using (St; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ctx; inLanes; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; nx;
+open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
+  Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody;
+  Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; nx; cp;
+  Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM;
   own; plug; closed; alive; load)
 open import spike.MarkedGhost using (gh; envAt; lane; outerG; lanesL; outerT; poolRuns; srcRun; srcG; endOf)
 open import quickcheck.Code using (Prog; toObs; timeline)
 open import quickcheck.Ty using (natᵗ)
 open import quickcheck.Quickcheck using (program)
 
+-- Per check, the first configuration failing it.
 record Verdict : Set where
   constructor verdict
   field
-    fresh first strict hidden live : Bool
+    beyond past live first strict hidden distinct : Maybe String
 
 private
   mutual
-    keys : ∀ {Γ A} → St Γ A → List Key
-    keys s = mapL proj₂ (own s) ++ kidKeys s
+    keyed : ∀ {Γ A} → St Γ A → List (Mark × Key)
+    keyed s = own s ++ kidKeyed s
 
-    kidKeys : ∀ {Γ A} → St Γ A → List Key
-    kidKeys (mapS f s)              = keys s
-    kidKeys (scanS f z s)           = keys s
-    kidKeys (cutS l a s)            = keys s
-    kidKeys (lnS b s)               = keys s
-    kidKeys (takeS i q w s)         = keys s
-    kidKeys (flatS op f d n q o ls) = keys o ++ keysL ls
-    kidKeys (connS k o b)           = keys o ++ keys b
-    kidKeys _                       = []
+    kidKeyed : ∀ {Γ A} → St Γ A → List (Mark × Key)
+    kidKeyed (mapS f s)              = keyed s
+    kidKeyed (scanS f z s)           = keyed s
+    kidKeyed (cutS l a s)            = keyed s
+    kidKeyed (lnS b s)               = keyed s
+    kidKeyed (takeS i q w s)         = keyed s
+    kidKeyed (flatS op f d n q o ls) = keyed o ++ keyedL ls
+    kidKeyed (connS k o b)           = keyed o ++ keyed b
+    kidKeyed _                       = []
 
-    keysL : ∀ {Γ A} → List (St Γ A) → List Key
-    keysL []       = []
-    keysL (s ∷ ls) = keys s ++ keysL ls
+    keyedL : ∀ {Γ A} → List (St Γ A) → List (Mark × Key)
+    keyedL []       = []
+    keyedL (s ∷ ls) = keyed s ++ keyedL ls
+
+  ------------------------------------------------------------------------
+  -- Showing what is at fault
+
+  mutual
+    showPos : Pos → String
+    showPos ls = "[" ++ˢ intersperse "." (showLabels ls) ++ˢ "]"
+
+    showLabels : Pos → List String
+    showLabels []       = []
+    showLabels (l ∷ ls) = showLabel l ∷ showLabels ls
+
+    showLabel : Label → String
+    showLabel (ix n)  = showℕ n
+    showLabel (sub q) = "s" ++ˢ showPos q
+    showLabel last    = "L"
+
+  showKey : Key → String
+  showKey (at p)    = "at" ++ˢ showPos p
+  showKey (after p) = "after" ++ˢ showPos p
+
+  showMark : Mark → String
+  showMark ofM     = "of"
+  showMark attM    = "att"
+  showMark bodyM   = "body"
+  showMark srcAttM = "srcAtt"
+  showMark owedM   = "owed"
+  showMark cpM     = "cp"
+  showMark cutM    = "cut"
+  showMark joinM   = "join"
+  showMark leafM   = "leaf"
+
+  showKeyed : List (Mark × Key) → String
+  showKeyed mks = intersperse " " (mapL (λ { (m , k) → showMark m ++ˢ ":" ++ˢ showKey k }) (take 4 mks))
+
+  stName : ∀ {Γ A} → St Γ A → String
+  stName (pend o)          = "pend"
+  stName (coldS b l)       = "cold"
+  stName (ofS i p xs)      = "of"
+  stName doneS             = "done"
+  stName (mapS f s)        = "map"
+  stName (scanS f z s)     = "scan"
+  stName (cutS l a s)      = "cut"
+  stName (lnS b s)         = "ln"
+  stName (takeS i q w s)   = "take"
+  stName (flatS _ _ _ _ _ _ _) = "flat"
+  stName (connS k o b)     = "conn"
+  stName (joinS j g x ib)  = "join"
+
+  frames : ∀ {R Γ A} → Ctx R Γ A → List String
+  frames top                             = []
+  frames (inMap f c)                     = "map" ∷ frames c
+  frames (inScan f z c)                  = "scan" ∷ frames c
+  frames (inCut l a c)                   = "cut" ∷ frames c
+  frames (inLn b c)                      = "ln" ∷ frames c
+  frames (inTake i q w c)                = "take" ∷ frames c
+  frames (inOuter _ _ _ _ _ _ c)         = "outer" ∷ frames c
+  frames (inLanes _ _ _ _ _ _ _ _ c)     = "lanes" ∷ frames c
+  frames (inSrc k b c)                   = "src" ∷ frames c
+  frames (inBody k o c)                  = "body" ∷ frames c
+
+  showMode : ∀ {A} → Mode A → String
+  showMode subscribing  = "subscribing"
+  showMode absorbed     = "absorbed"
+  showMode (rising (nx a)) = "rising-nx"
+  showMode (rising cp)  = "rising-cp"
+
+  where′ : ∀ {R} → Conf R → String
+  where′ ⟨ c , s , m , p ⟩ = showMode m ++ˢ " " ++ˢ showPos p ++ˢ " focus " ++ˢ stName s ++ˢ " frames " ++ˢ intersperse "<" (frames c)
+
+  blame : ∀ {R} → Conf R → String → Maybe String
+  blame x why = just (where′ x ++ˢ " :: " ++ˢ why)
+
+  ------------------------------------------------------------------------
+  -- The checks
 
   all : ∀ {X : Set} → (X → Bool) → List X → Bool
   all g []       = true
   all g (x ∷ xs) = g x ∧ all g xs
 
-  isEnd : ∀ {X} → Events X → Bool
-  isEnd (end _) = true
-  isEnd _       = false
-
   told : Maybe Pos → Bool
   told (just _) = true
   told nothing  = false
 
+  -- The untold joiners whose source's run is an end not after `p`.
   mutual
-    live? : ∀ {Γ A} → NEnv Γ → St Γ A → Bool
-    live? ρ (mapS f s)              = live? ρ s
-    live? ρ (scanS f z s)           = live? ρ s
-    live? ρ (cutS l a s)            = live? ρ s
-    live? ρ (lnS b s)               = live? ρ s
-    live? ρ (takeS i q w s)         = live? ρ s
-    live? ρ (flatS op f d n q o ls) = live? ρ o ∧ livesL ρ ls
-    live? ρ (connS k o b)           = live? ρ o ∧ live? (srcRun (srcG k o) ρ ∷ᴬ ρ) b
-    live? ρ (joinS j true x ib)     = not (isEnd (lookup ρ x)) ∨ told (endOf ib)
-    live? ρ _                       = true
+    stale : ∀ {Γ A} → Pos → NEnv Γ → St Γ A → List String
+    stale p ρ (mapS f s)              = stale p ρ s
+    stale p ρ (scanS f z s)           = stale p ρ s
+    stale p ρ (cutS l a s)            = stale p ρ s
+    stale p ρ (lnS b s)               = stale p ρ s
+    stale p ρ (takeS i q w s)         = stale p ρ s
+    stale p ρ (flatS op f d n q o ls) = stale p ρ o ++ staleL p ρ ls
+    stale p ρ (connS k o b)           = stale p ρ o ++ stale p (srcRun (srcG k o) ρ ∷ᴬ ρ) b
+    stale p ρ (joinS j true x ib)     = staleAt (lookup ρ x) (told (endOf ib))
+      where
+        staleAt : ∀ {X} → Events X → Bool → List String
+        staleAt (end e) false = if p <ᵖ e then [] else ("joiner" ++ˢ showPos j ++ˢ " source-end" ++ˢ showPos e) ∷ []
+        staleAt _       _     = []
+    stale p ρ _                       = []
 
-    livesL : ∀ {Γ A} → NEnv Γ → List (St Γ A) → Bool
-    livesL ρ []       = true
-    livesL ρ (s ∷ ls) = live? ρ s ∧ livesL ρ ls
+    staleL : ∀ {Γ A} → Pos → NEnv Γ → List (St Γ A) → List String
+    staleL p ρ []       = []
+    staleL p ρ (s ∷ ls) = stale p ρ s ++ staleL p ρ ls
 
   notBefore later : Pos → Maybe Pos → Bool
   notBefore p nothing  = true
@@ -107,10 +192,19 @@ private
   hd h = head (Events∞.force h)
 
   ok : Verdict
-  ok = verdict true true true true true
+  ok = verdict nothing nothing nothing nothing nothing nothing nothing
+
+  orM : Maybe String → Maybe String → Maybe String
+  orM (just a) _ = just a
+  orM nothing  b = b
 
   both : Verdict → Verdict → Verdict
-  both (verdict a b c d e) (verdict a′ b′ c′ d′ e′) = verdict (a ∧ a′) (b ∧ b′) (c ∧ c′) (d ∧ d′) (e ∧ e′)
+  both (verdict a b c d e f g) (verdict a′ b′ c′ d′ e′ f′ g′) =
+    verdict (orM a a′) (orM b b′) (orM c c′) (orM d d′) (orM e e′) (orM f f′) (orM g g′)
+
+  when : ∀ {R} → Bool → Conf R → String → Maybe String
+  when true  x why = nothing
+  when false x why = blame x why
 
   -- The flatMap's parts around a lane rising at `p`.
   parts : ∀ {R Γ A B} (f : A → Obs Timeline Γ B) → Bool → St Γ A → (pre post : List (St Γ B)) → Ctx R Γ B → St Γ B → Pos → Bool × Bool
@@ -126,32 +220,47 @@ private
 
   -- A lane out of the list is absorbed; one under a closed observer is
   -- only probed.
-  lanesAt : Bool → Bool → Bool × Bool → Verdict
-  lanesAt false _     _        = ok
-  lanesAt true  false (fi , st) = verdict true fi st true true
-  lanesAt true  true  (fi , _)  = verdict true true true fi true
+  lanesAt : ∀ {R} → Conf R → Bool → Bool → Bool × Bool → Verdict
+  lanesAt x false _     _         = ok
+  lanesAt x true  false (fi , st) = verdict nothing nothing nothing (when fi x "lane not first") (when st x "a part not strictly after") nothing nothing
+  lanesAt x true  true  (fi , _)  = verdict nothing nothing nothing nothing nothing (when fi x "closed lane not first") nothing
 
   laneCheck : ∀ {R} → Conf R → Verdict
-  laneCheck ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩ = lanesAt (alive s) (closed c) (parts f d o pre post c s p)
+  laneCheck x@(⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩) = lanesAt x (alive s) (closed c) (parts f d o pre post c s p)
   laneCheck x = ok
 
-  distinct : List Key → Bool
-  distinct []       = true
-  distinct (k ∷ ks) = all (λ k′ → (k <ᴷ k′) ∨ (k′ <ᴷ k)) ks ∧ distinct ks
+  alike : List (Mark × Key) → List (Mark × Key)
+  alike []             = []
+  alike ((m , k) ∷ ks) with filterᵇ (λ { (_ , k′) → not ((k <ᴷ k′) ∨ (k′ <ᴷ k)) }) ks
+  ... | []    = alike ks
+  ... | hits  = (m , k) ∷ hits
 
-  beyond : Pos → List Key → Bool
-  beyond p = all (λ k → not (k <ᴷ after p))
+  faulty : ∀ {R} → Conf R → Maybe String → Maybe String
+  faulty x nothing  = nothing
+  faulty x (just w) = blame x w
 
-  freshCheck : ∀ {R} → Conf R → Bool
-  freshCheck ⟨ c , s , subscribing , p ⟩ = beyond p (keys (plug c s)) ∧ distinct (keys (plug c s))
-  freshCheck ⟨ c , s , rising e , p ⟩    = beyond p (keys (plug c s)) ∧ distinct (keys (plug c s))
-  freshCheck ⟨ c , s , absorbed , r ⟩    = all (λ k → at r <ᴷ k) (keys (plug c s)) ∧ distinct (keys (plug c s))
+  some : List (Mark × Key) → Maybe String
+  some []  = nothing
+  some mks = just (showKeyed mks)
+
+  someS : List String → Maybe String
+  someS [] = nothing
+  someS ws = just (intersperse " " (take 3 ws))
+
+  isAbsorbed : ∀ {A} → Mode A → Bool
+  isAbsorbed absorbed = true
+  isAbsorbed _        = false
+
+  keyCheck : ∀ {R} → Conf R → Verdict
+  keyCheck x@(⟨ c , s , m , p ⟩) =
+    verdict (faulty x (if isAbsorbed m then nothing else some (filterᵇ (λ { (_ , k) → k <ᴷ after p }) ks)))
+            (faulty x (if isAbsorbed m then some (filterᵇ (λ { (_ , k) → not (at p <ᴷ k) }) ks) else nothing))
+            (faulty x (someS (stale p []ᴬ (plug c s)))) nothing nothing nothing (faulty x (some (alike ks)))
+    where
+      ks = keyed (plug c s)
 
   check : ∀ {R} → Conf R → Verdict
-  liveCheck : ∀ {R} → Conf R → Bool
-  liveCheck ⟨ c , s , m , p ⟩ = live? []ᴬ (plug c s)
-
-  check x = both (verdict (freshCheck x) true true true (liveCheck x)) (laneCheck x)
+  check x = both (keyCheck x) (laneCheck x)
 
   open Driver ℕ using (step; silent; value; complete; drained)
 
@@ -169,11 +278,20 @@ budget = 4000
 order : Prog natᵗ → Verdict
 order p = walk budget (load (toObs timeline 3 p []ᴬ []ᴬ []ᴬ))
 
--- The seeds from f on which each check fails: fresh, first, live, strict,
--- hidden.
-orderFails : ℕ → ℕ → List ℕ × List ℕ × List ℕ × List ℕ × List ℕ
-orderFails f c = fails Verdict.fresh , fails Verdict.first , fails Verdict.live , fails Verdict.strict , fails Verdict.hidden
+-- One line per seed and failing check, claims as FAIL, probes as INFO.
+orderReport : ℕ → ℕ → List String
+orderReport f c = go (mapL (f +_) (upTo c))
   where
-    seeds = mapL (f +_) (upTo c)
-    fails : (Verdict → Bool) → List ℕ
-    fails g = filterᵇ (λ s → not (g (order (program s)))) seeds
+    line : String → String → ℕ → Maybe String → List String
+    line tag name s nothing  = []
+    line tag name s (just w) = ("order: " ++ˢ tag ++ˢ " " ++ˢ name ++ˢ " seed " ++ˢ showℕ s ++ˢ " " ++ˢ w) ∷ []
+
+    one : ℕ → List String
+    one s with order (program s)
+    ... | verdict a b l fi st hi di =
+      line "FAIL" "beyond" s a ++ line "FAIL" "past" s b ++ line "FAIL" "live" s l ++ line "FAIL" "first" s fi
+        ++ line "INFO" "strict" s st ++ line "INFO" "hidden" s hi ++ line "INFO" "distinct" s di
+
+    go : List ℕ → List String
+    go []       = []
+    go (s ∷ ss) = one s ++ go ss
