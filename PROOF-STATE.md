@@ -32,7 +32,7 @@ Members: `of-path`, `emit-shut`, `last-void`, `last-enter`, `emit-void`,
 `cut-lingers`, `cut-told`, `cut-ended`, `cut-flags`, `cut-load`,
 `feed-onward`, `src-onward`, `src-cut-onward`, `body-cut-onward`,
 `join-onward`, `owned-idle`, `meaning-idle`, `sorted-idle`, `downs-plug`, `owned-pop`, `meaning-pop`,
-`sorted-pop`, `owned-drop`, `meaning-drop`, `sorted-drop`, `sub-onward`, `burst-onward`, `fire-kernels`, `fire-part`, `fire-load`,
+`sorted-pop`, `owned-drop`, `meaning-drop`, `sorted-drop`, `sub-onward`, `burst-spent`, `burst-poll`, `burst-play`, `burst-finish`, `fire-kernels`, `fire-part`, `fire-load`,
 `fire-owned`, `fire-meaning`, `fire-timed`, `fire-joined`, `fire-sorted`, `fire-flags`,
 `fire-told`, `fire-ended`, `behind-fire`, `fire-lingers`,
 `meaning-note`, `sorted-note`, `note-least`, `turn-dry`.

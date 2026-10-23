@@ -15,7 +15,7 @@
 -- reached from one by its own silent steps.
 module port.Content where
 
-open import Data.Bool using (true; false)
+open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.List.Relation.Unary.Any using (Any; here; there)
@@ -33,12 +33,12 @@ open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import denotation.MonotonicList.Events using (Events; Pos; Time; tick; root; last; ix; Frame; at; done; quiet; _<ᵖ_; <ᵖ-tick)
+open import denotation.MonotonicList.Events using (Events; Pos; Time; tick; root; last; ix; Frame; at; done; quiet; emit; stall; close; _<ᵖ_; <ᵖ-tick)
   renaming (sub to subᴾ)
 open import denotation.MonotonicList using (observe; Agree; agree-refl)
 import denotation.Unfold as U
 open import denotation.Denote using (⟦_⟧)
-open import operation.PureObservable using (PureObs; module Pure; module Driver; module Machine)
+open import operation.PureObservable using (PureObs; module Pure; module Driver; module Machine; tape; over)
 open import port.Sorted using (_≤ᵖ_)
 open import port.Sane using (Sane; sane-out)
 open import port.Stepper.Within using (placed-after)
@@ -53,7 +53,7 @@ open import port.Climbs using (module Ascending)
 open import port.Moves using (module Moving)
 
 module Honesty (R : Set) where
-  open Driver R using (Mach; mach; depthOf; Timer; play; cascade; Step; silent; value; complete; drained; step; trace; shown; reading; begin; Read; read; marks; log; ending; noted)
+  open Driver R using (Mach; mach; depthOf; Timer; play; finish; cascade; Step; silent; value; complete; drained; step; trace; shown; reading; begin; Read; read; marks; log; ending; noted)
   open Pure R using (End; finished; dry; cutOff)
   open Unsubbing R using (_⇝_; now; then)
   open Ghosting R using (Has; Sent; sentHere; sentLater; Alike; _≋_; same-agree; residual; Reached; launchedʰ; silentʰ; valueʰ;
@@ -67,7 +67,7 @@ module Honesty (R : Set) where
   open SortingWalk R using (WellMach)
   open Machine using (Conf; Ctx; top; plug; downs; dirs; closed; doneS; cp; _⊕_; ⟨_,_,_,_,_⟩; absorbed; rising; resuming; subscribing; nx; pend;
     ofS; cutS; takeS; connS; joinS; next; att; owedCp; owedCut; feeding; attBody; owed; go;
-    res; ofR; attR; cpR; cutR; feedR; bodyR; srcR; endR; joinR; idle; cut)
+    res; ofR; attR; cpR; cutR; feedR; bodyR; srcR; endR; joinR; idle; cut; Poke; gone; leaf; poke)
 
   step-alike : ∀ g → Sane [] g → Placed g [] → residual g ≋ after (U.step g)
   step-alike g sn pl = same-agree (_≃_.agreeing (step-skips g sn pl))
@@ -238,12 +238,32 @@ module Honesty (R : Set) where
     sub-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {o p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , pend o , subscribing , p , rs ⟩
                → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
 
-    -- A turn played, likewise.
+    -- A spent burst dropped, the stack resumed: the turn over nothing.
+    -- The ghost alike, a turn fewer.
     --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Base.agda
-    burst-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {s p rs t ts} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , rs ⟩
-                 → Mach.turns m ≡ t ∷ ts → (depthOf t <ᵇ length rs) ≡ false
-                 → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+    burst-spent : ∀ {g m Γ A} {c : Ctx R Γ A} {s p rs π u i pl d ts} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , rs ⟩
+                → Mach.turns m ≡ play π u i pl d ∷ ts → (d <ᵇ length rs) ≡ false → live (poke π (Mach.conf m)) ≡ false
+                → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+
+    -- A live burst's sink polled: open, the frame to play; closed, the
+    -- burst dropped and the stack resumed.
+    burst-poll : ∀ {g m Γ A} {c : Ctx R Γ A} {s p rs π u i d ts} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , rs ⟩
+               → Mach.turns m ≡ play π u i false d ∷ ts → (d <ᵇ length rs) ≡ false → live (poke π (Mach.conf m)) ≡ true
+               → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+
+    -- A polled burst's frame played: a value delivered and run to the
+    -- next re-entry state, a stall's skip passed, or a close scheduling
+    -- the rest.
+    burst-play : ∀ {g m Γ A} {c : Ctx R Γ A} {s p rs π u i d ts} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , rs ⟩
+               → Mach.turns m ≡ play π u i true d ∷ ts → (d <ᵇ length rs) ≡ false → live (poke π (Mach.conf m)) ≡ true
+               → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+
+    -- A cold's completion owed at the turn: delivered under its
+    -- position, the leaf spent.
+    burst-finish : ∀ {g m Γ A} {c : Ctx R Γ A} {s p rs π e d ts} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , rs ⟩
+                 → Mach.turns m ≡ finish π e d ∷ ts → (d <ᵇ length rs) ≡ false
+                 → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
 
     -- A job owed above the next turn popped and resumed, likewise.
     -- A JOB POPPED: its path leads from the root to where it was
@@ -425,6 +445,47 @@ module Honesty (R : Set) where
   ... | subAs ()       | _ | _
   ... | burstAs () _ _ | _ | _
   ... | popAs () _     | _ | _
+
+  private
+    -- Whether a turn's leaf still runs.
+    live : Poke R → Bool
+    live gone             = false
+    live (leaf b _ _ _ _) = b
+
+    -- A turn played is silent, whatever the leaf.
+    playing-silent : ∀ m π u i pl d ts pk → Σ Mach λ m′ → Driver.playing R m π u i pl d ts pk ≡ silent m′
+    playing-silent m π u i pl    d ts gone                                       = _ , refl
+    playing-silent m π u i pl    d ts (leaf false l cl dv st)                    = _ , refl
+    playing-silent m π u i false d ts (leaf true l true dv st)                   = _ , refl
+    playing-silent m π u i false d ts (leaf true l false dv st)                  = _ , refl
+    playing-silent m π u i true  d ts (leaf true (tape t (emit a k)) cl dv st)   = _ , refl
+    playing-silent m π u i true  d ts (leaf true (tape t (stall k)) cl dv st)    = _ , refl
+    playing-silent m π u i true  d ts (leaf true (tape t (close k)) cl dv st)    = _ , refl
+    playing-silent m π u i true  d ts (leaf true over cl dv st)                  = _ , refl
+
+    finishing-silent : ∀ m e ts pk → Σ Mach λ m′ → Driver.finishing R m e ts pk ≡ silent m′
+    finishing-silent m e ts gone              = _ , refl
+    finishing-silent m e ts (leaf b l cl dv st) = _ , refl
+
+    -- Nothing owed above it: the turn is played.
+    burst-step : ∀ {Γ A} {c : Ctx R Γ A} {s p rs clk tms t ts} → (depthOf t <ᵇ length rs) ≡ false
+               → step (mach ⟨ c , s , absorbed , p , rs ⟩ clk tms (t ∷ ts)) ≡ Driver.played R (mach ⟨ c , s , absorbed , p , rs ⟩ clk tms (t ∷ ts)) t ts
+    burst-step d rewrite d = refl
+
+  -- A turn played: spent, dropped; live and unpolled, polled; polled,
+  -- its frame played; a completion owed, delivered.
+  burst-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {s p rs t ts} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , rs ⟩
+               → Mach.turns m ≡ t ∷ ts → (depthOf t <ᵇ length rs) ≡ false
+               → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+  burst-onward {m = mach k clk tms (play π u i pl d ∷ ts)} cr refl refl dl
+    with playing-silent (mach k clk tms (play π u i pl d ∷ ts)) π u i pl d ts (poke π k)
+  ... | m′ , ps with live (poke π k) in lv | pl
+  ...   | false | _     = m′ , trans (burst-step dl) ps , burst-spent cr refl refl dl lv (trans (burst-step dl) ps)
+  ...   | true  | false = m′ , trans (burst-step dl) ps , burst-poll cr refl refl dl lv (trans (burst-step dl) ps)
+  ...   | true  | true  = m′ , trans (burst-step dl) ps , burst-play cr refl refl dl lv (trans (burst-step dl) ps)
+  burst-onward {m = mach k clk tms (finish π e d ∷ ts)} cr refl refl dl
+    with finishing-silent (mach k clk tms (finish π e d ∷ ts)) e ts (poke π k)
+  ... | m′ , fs = m′ , trans (burst-step dl) fs , burst-finish cr refl refl dl (trans (burst-step dl) fs)
 
   -- A job owed nothing by its node: dropped, the ghost alike, the
   -- control lighter.
