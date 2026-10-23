@@ -32,6 +32,7 @@ open import adequacy.Told using (untold)
 open import adequacy.Frame using (module Framing)
 open import adequacy.Replant using (module Replanting)
 open import adequacy.Replant.Keep using (module Keeping)
+open import adequacy.Leaves using (tw-refl)
 
 open Machine using (St; Ctx; Conf; Job; Ev; nx; cp; dirs; plug; scanS; connS; owed; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody;
   ⟨_,_,_,_,_⟩; rising)
@@ -43,11 +44,11 @@ module Ascending (R : Set) where
   open Strongly R using (Sub; Path; here; Strong; Carried; carried; closing; noteAs; Owned; Kernels; Meaning; Queue; Books;
     Each; Heads; connected; Lingers; Untold; Ended; DoneBy; outers; outersL; part; leftover; forget; mapᴹ; Feed; owing; Fed; FedLanes;
     Begins; focused; attaching; PathLanes; this-lane; next-lane; in-map; in-scan; in-cut; in-lane; in-take; in-outer; in-lanes;
-    in-source; in-body; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; cutˢ; laneˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ)
+    in-source; in-body; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; cutˢ; laneˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; pooledL)
   open Moving R using (plant; planted; plantedᴸ)
   open Framing R using (heads-scan)
-  open Replanting R using (module Shift; Heading; Pred; ≡-⊑; map-fwd; map-back; each-scan; each-sub)
-  open Keeping R using (module Keep; Alive)
+  open Replanting R using (module Shift; Heading; Pred; ≡-⊑; map-fwd; map-back; each-scan; each-sub; lingers-sub; lg-scan)
+  open Keeping R using (module Keep; Alive; Route; route-pre)
   open Ghosting R using (Hopped; Load; _≼_; load; loadOf; hopped-pre; showing; agrees)
   open GhostingPaths R using (_⊕_; _⊕ᴸ_; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-body; lifts-shut; lefts-subst; lifts-split; lefts-up; healed-split; Lefts; Healed; One; whole; snoc; view;
     height; heightL; one-lower;
@@ -71,6 +72,12 @@ module Ascending (R : Set) where
   LeftsOf : (q : Pos) (g : U.Node [] R) {T : Sub [] R} → ∀ {Δ A} {v : Sub Δ A} {π} (σ : Path T v π) (e : Ev A) → Passed q g σ e → Set₁
   LeftsOf q g σ (nx y) (_ , _ , _ , L , _) = Lefts L
   LeftsOf q g σ cp     (_ , _ , L , _)     = Lefts L
+
+  -- A value climbs a live route; an end may climb out of a node already
+  -- past its end.
+  Live : {T : Sub [] R} → ∀ {Δ A} {v : Sub Δ A} {π} → Path T v π → Ev A → Set
+  Live σ (nx _) = Route σ
+  Live σ cp     = ⊤
 
   -- A SIGNAL ON ITS WAY UP: `e` about to be told to the frame above the
   -- node the path walks to, the witness holding everything else the
@@ -100,6 +107,7 @@ module Ascending (R : Set) where
       told    : Untold (Conf.pos (Mach.conf m₁)) T
       ended   : Ended T
       flags   : DoneBy T (outers σ)
+      route   : Live σ e
       kept    : load m₁ T ≼ ℓ
 
   -- One operator called: a re-entry configuration reached, or a signal
@@ -309,15 +317,6 @@ module Ascending (R : Set) where
     scan-queue : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
                → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y)
                → Queue (Conf.pos (Mach.conf m₁)) (Mach.clock m₁) (Mach.timers m₁) (plant ρ (scanˢ f (f z y) v))
-    -- A held connect's leftover reads its running source's part, which
-    -- the accumulator moves; it is read only past a cut or an end, which
-    -- no climb's ancestor is. The carrier says neither of a pool-cut
-    -- lane (`laneˢ false`) nor of a node a `Lifts` path climbs.
-    --
-    -- DEAD ROUTE: the old body is the heap-write Shift frame, its lingering read by comparing two heaps (leftover-alike); a `plant` has no second heap.
-    -- DEAD ROUTE: `Shift.shift-lingers` needs `Lingering.ling-same`, a part unmoved; a scan's moves with its accumulator.
-    scan-lingers : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
-                 → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y) → Lingers (plant ρ (scanˢ f (f z y) v))
 
     -- The books and the load, the accumulator rewritten.
     scan-books : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
@@ -377,6 +376,15 @@ module Ascending (R : Set) where
     subst (DoneBy (plant ρ w)) (sym (outers-planted ρ w)) (Keep.shift-flags ρ w scan-alive (done-up ρ (in-scan here) refl (Calling.flags cl)))
     where w = scanˢ f (f z y) v
 
+  -- A held connect's leftover reads its running source's part, which the
+  -- accumulator moves; a value's route reads none, every lane on it
+  -- running, every outer unended, every source showing.
+  scan-lingers : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
+               → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y) → Lingers (plant ρ (scanˢ f (f z y) v))
+  scan-lingers ρ cl =
+    Keep.route-lingers ρ _ scan-alive (route-pre ρ (in-scan here) (Calling.route cl)) (λ {ls} → tw-refl (pooledL ls))
+      (λ lg → lg-scan (lingers-sub lg (in-scan here) refl)) (Calling.lingers cl)
+
   call-scan : ∀ {g m} (st : Strong g m) {m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π)
             → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ in-scan here) e → Called st m₁ (ρ ⊕ in-scan here)
   call-scan st {m₁ = mach k clk tms ts} {f = f} {z} {v} ρ {nx y} cl
@@ -391,7 +399,7 @@ module Ascending (R : Set) where
         ; owned = scan-owned ρ cl refl ; kernels = scan-kernels ρ {c₀ = c₀} {x} at₀ kn (f z y) ; meaning = scan-meaning ρ cl refl
         ; queue = scan-queue ρ cl ; books = scan-books ρ cl refl ; sorted = sorted-step (Calling.sorted cl) refl
         ; behind = scan-behind ρ cl ; lingers = scan-lingers ρ cl ; told = scan-told ρ cl ; ended = scan-ended ρ cl
-        ; flags = scan-flags ρ cl ; kept = subst (_≼ loadOf st) (sym (scan-load ρ cl refl)) (Calling.kept cl) })
+        ; flags = scan-flags ρ cl ; route = Keep.route-planted ρ _ scan-alive (route-pre ρ (in-scan here) (Calling.route cl)) ; kept = subst (_≼ loadOf st) (sym (scan-load ρ cl refl)) (Calling.kept cl) })
   call-scan st {m₁ = mach k clk tms ts} {T = T} {f = f} {z} {v} ρ {cp} cl
     with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
   ... | c | x | at | refl | kn | gn , S , L , sg , hl | lt with scan-at ρ {c = c} {x} at kn
@@ -407,7 +415,7 @@ module Ascending (R : Set) where
         ; books = record { clocked = Books.clocked (Calling.books cl) ; ticked = Books.ticked (Calling.books cl) ; turned = Books.turned (Calling.books cl) }
         ; sorted = sorted-step (Calling.sorted cl) refl
         ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl
-        ; flags = done-up ρ (in-scan here) refl (Calling.flags cl) ; kept = Calling.kept cl })
+        ; flags = done-up ρ (in-scan here) refl (Calling.flags cl) ; route = tt ; kept = Calling.kept cl })
 
   ------------------------------------------------------------------------
   -- THE CLIMB THROUGH A MAP: the signal mapped, the tree as it is.
@@ -435,7 +443,7 @@ module Ascending (R : Set) where
         ; books = record { clocked = Books.clocked (Calling.books cl) ; ticked = Books.ticked (Calling.books cl) ; turned = Books.turned (Calling.books cl) }
         ; sorted = sorted-step (Calling.sorted cl) refl
         ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl
-        ; flags = done-up ρ (in-map here) refl (Calling.flags cl) ; kept = Calling.kept cl })
+        ; flags = done-up ρ (in-map here) refl (Calling.flags cl) ; route = route-pre ρ (in-map here) (Calling.route cl) ; kept = Calling.kept cl })
   call-map st {m₁ = mach k clk tms ts} {T = T} {f = f} {v} ρ {cp} cl
     with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
   ... | c | x | at | refl | kn | gn , S , L , sg , hl | lt with map-at ρ {c = c} {x} at kn
@@ -451,7 +459,7 @@ module Ascending (R : Set) where
         ; books = record { clocked = Books.clocked (Calling.books cl) ; ticked = Books.ticked (Calling.books cl) ; turned = Books.turned (Calling.books cl) }
         ; sorted = sorted-step (Calling.sorted cl) refl
         ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl
-        ; flags = done-up ρ (in-map here) refl (Calling.flags cl) ; kept = Calling.kept cl })
+        ; flags = done-up ρ (in-map here) refl (Calling.flags cl) ; route = tt ; kept = Calling.kept cl })
 
   ------------------------------------------------------------------------
   -- THE CLIMB THROUGH A TAKEWHILE: a value passed, the take ended over
@@ -498,7 +506,7 @@ module Ascending (R : Set) where
         ; books = record { clocked = Books.clocked (Calling.books cl) ; ticked = Books.ticked (Calling.books cl) ; turned = Books.turned (Calling.books cl) }
         ; sorted = sorted-step (Calling.sorted cl) refl
         ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl
-        ; flags = done-up ρ (in-take here) refl (Calling.flags cl) ; kept = Calling.kept cl })
+        ; flags = done-up ρ (in-take here) refl (Calling.flags cl) ; route = tt ; kept = Calling.kept cl })
 
   ------------------------------------------------------------------------
   -- THE CLIMB THROUGH A CONNECT'S BODY: a value as it is; an end, the
@@ -556,7 +564,7 @@ module Ascending (R : Set) where
         ; books = record { clocked = Books.clocked (Calling.books cl) ; ticked = Books.ticked (Calling.books cl) ; turned = Books.turned (Calling.books cl) }
         ; sorted = sorted-step (Calling.sorted cl) refl
         ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl
-        ; flags = done-up ρ (in-body here) refl (Calling.flags cl) ; kept = Calling.kept cl })
+        ; flags = done-up ρ (in-body here) refl (Calling.flags cl) ; route = route-pre ρ (in-body here) (Calling.route cl) ; kept = Calling.kept cl })
   ...     | _ , lifts-shut pt refl _ lifts-here , Lρ =
     rose {σ′ = ρ} {e′ = nx y} (then refl now) (one-lower ρ one-body)
       (record
@@ -568,7 +576,7 @@ module Ascending (R : Set) where
         ; books = record { clocked = Books.clocked (Calling.books cl) ; ticked = Books.ticked (Calling.books cl) ; turned = Books.turned (Calling.books cl) }
         ; sorted = sorted-step (Calling.sorted cl) refl
         ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl
-        ; flags = done-up ρ (in-body here) refl (Calling.flags cl) ; kept = Calling.kept cl })
+        ; flags = done-up ρ (in-body here) refl (Calling.flags cl) ; route = route-pre ρ (in-body here) (Calling.route cl) ; kept = Calling.kept cl })
   call-body st {m₁ = mach kk clk tms ts} {T = T} {k = k} {r} {ej} {rt} {s} {b} ρ {cp} cl
     with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
   ... | c | x | at | refl | kn | gn , S , L , sg , hl | lt with body-at ρ {c = c} {x} at kn
@@ -583,7 +591,7 @@ module Ascending (R : Set) where
         ; queue = Calling.queue cl ; books = body-books (Calling.books cl)
         ; sorted = sorted-step (Calling.sorted cl) refl
         ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl
-        ; flags = done-up ρ (in-body here) refl (Calling.flags cl) ; kept = Calling.kept cl })
+        ; flags = done-up ρ (in-body here) refl (Calling.flags cl) ; route = tt ; kept = Calling.kept cl })
 
   call-step : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub [] R} {u : Sub Δ A} {v : Sub Δ′ A′} {π τ}
               (ρ : Path T u π) {s : Path u v τ} → One s → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ s) e → Called st m₁ (ρ ⊕ s)

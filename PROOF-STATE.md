@@ -48,7 +48,7 @@ Untried, and every old body a dead route: whether a climb's write, read as a
 `take-out` are bodies or refuted.
 
 Members: `scan-kernels`, `scan-lifts`, `scan-lefts`, `scan-owned`,
-`scan-meaning`, `scan-queue`, `scan-lingers`, `gone-take`, `take-pass`, `take-out`, `take-end`, `call-outer`,
+`scan-meaning`, `scan-queue`, `gone-take`, `take-pass`, `take-out`, `take-end`, `call-outer`,
 `call-lanes`, `call-source`, `body-rest-heads`, `owned-body`, `emit-void`,
 `emit-open`, `burst-spent`.
 

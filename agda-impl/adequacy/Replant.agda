@@ -722,247 +722,246 @@ module Replanting (R : Set) where
   -- THE TIES: `u` replanted to `v` with its part the same, every node
   -- above it shows the same part and leaves running what it did.
 
-  private
-    -- Leftovers rest as they step.
+  -- Leftovers rest as they step.
+  mutual
+    leftover-restful : ∀ {Γ A B} (s : Sub Γ A) → Restful (leftover {B = B} s)
+    leftover-restful (pendingˢ o q)                 = rf-rest
+    leftover-restful (coldˢ b ph)                   = rf-idle
+    leftover-restful (ofˢ q j xs)                   = rf-idle
+    leftover-restful doneˢ                          = rf-idle
+    leftover-restful (mapˢ f s)                     = leftover-restful s
+    leftover-restful (scanˢ f z s)                  = leftover-restful s
+    leftover-restful (cutˢ l a s)                   = leftover-restful s
+    leftover-restful (laneˢ r s)                    = leftover-restful s
+    leftover-restful (takeWhileˢ i q tk s)          = leftover-restful s
+    leftover-restful (flatMapˢ op f d n qs pl o ls) = rf-union (leftover-restful o) (leftoverL-restful ls)
+    leftover-restful (connectˢ k r e rt s b)        = rf-union rf-burst (rf-under (leftover-restful b))
+    leftover-restful (joinˢ j g x st)               = rf-idle
+
+    leftoverL-restful : ∀ {Γ A B} (ls : List (Sub Γ A)) → Restful (leftoverL {B = B} ls)
+    leftoverL-restful []       = rf-idle
+    leftoverL-restful (s ∷ ls) = rf-union (leftover-restful s) (leftoverL-restful ls)
+
+  -- A lane's pool beside the same rest.
+  pool-cons : ∀ {Γ B} (l : Sub Γ B) {ls ls′ : List (Sub Γ B)} → Twin (pooledL ls) (pooledL ls′) → Twin (pooledL (l ∷ ls)) (pooledL (l ∷ ls′))
+  pool-cons (laneˢ r s)                    t = tw-if r t (tw-union (tw-refl (leftover s)) t)
+  pool-cons (pendingˢ o q)                 t = t
+  pool-cons (coldˢ b ph)                   t = t
+  pool-cons (ofˢ q j xs)                   t = t
+  pool-cons doneˢ                          t = t
+  pool-cons (mapˢ f s)                     t = t
+  pool-cons (scanˢ f z s)                  t = t
+  pool-cons (cutˢ l a s)                   t = t
+  pool-cons (takeWhileˢ i q tk s)          t = t
+  pool-cons (flatMapˢ op f d n qs pl o ls) t = t
+  pool-cons (connectˢ k r e rt s b)        t = t
+  pool-cons (joinˢ j g x st)               t = t
+
+  -- A connect's leftover over its source, the source's part the same.
+  src-rested : ∀ {Γ A B} r (m m′ : Maybe (U.Node Γ A)) {l l′ : U.Node Γ A} (x : U.Node (A ∷ Γ) ⊤) → m′ ≡ m
+             → Restful l → Restful l′ → Twin l l′
+             → Twin (U.unionᶜ {B = B} (U.burstingᶜ r (sourced m l)) (U.underᶜ (U.live (sourced m l)) x))
+                    (U.unionᶜ {B = B} (U.burstingᶜ r (sourced m′ l′)) (U.underᶜ (U.live (sourced m′ l′)) x))
+  src-rested r (just n) _ x refl rf rf′ t = tw-refl _
+  src-rested r nothing  _ x refl rf rf′ t = tw-union (tw-burst r rf rf′ t) (tw-shift x rf rf′ t)
+
+  -- What a tree's ties hold, of a seen subtree; of a flatMap's lanes.
+  lingers-sub : ∀ {Γ A Δ B π} {t : Sub Γ A} {x : Sub Δ B} → Lingers t → (ρ : Path t x π) → seen ρ ≡ true → Lingers x
+  lingers-sub lg ρ sρ = record
+    { pools = λ ψ sn → Lingers.pools lg (ρ ⊕ ψ) (seen-⊕ ρ ψ sρ sn)
+    ; rests = λ ψ sn → Lingers.rests lg (ρ ⊕ ψ) (seen-⊕ ρ ψ sρ sn) }
+
+  record LingersL {Γ₀ B₀} (ls : List (Sub Γ₀ B₀)) : Set₁ where
+    field
+      poolsL : ∀ {Γ X A op f d n qs pl i π} {o : Sub Γ X} {ls′ : List (Sub Γ A)}
+             → (ψ : PathLanes ls (flatMapˢ op f d n qs pl o ls′) i π) → seenL ψ ≡ true
+             → ∀ {c} → part (flatMapˢ op f d n qs pl o ls′) ≡ just c → Leaves pl (pooled d o ls′) × Restful pl
+      restsL : ∀ {Γ X B k r e rt i π} {s : Sub Γ X} {b : Sub (X ∷ Γ) B}
+             → (ψ : PathLanes ls (connectˢ k r e rt s b) i π) → seenL ψ ≡ true
+             → ∀ {n} → part (connectˢ k r e rt s b) ≡ just n
+             → part s ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Twin rt (leftover {B = ⊤} s) × Restful rt
+
+  lingersL-of : ∀ {Γ X A op f d n qs pl} {o : Sub Γ X} {ls : List (Sub Γ A)} → Lingers (flatMapˢ op f d n qs pl o ls) → LingersL ls
+  lingersL-of lg = record { poolsL = λ ψ → Lingers.pools lg (in-lanes ψ) ; restsL = λ ψ → Lingers.rests lg (in-lanes ψ) }
+
+  lingersL-head : ∀ {Γ B} {l : Sub Γ B} {ls} → LingersL (l ∷ ls) → Lingers l
+  lingersL-head lL = record { pools = λ ψ → LingersL.poolsL lL (this-lane ψ) ; rests = λ ψ → LingersL.restsL lL (this-lane ψ) }
+
+  lingersL-tail : ∀ {Γ B} {l : Sub Γ B} {ls} → LingersL (l ∷ ls) → LingersL ls
+  lingersL-tail lL = record { poolsL = λ ψ → LingersL.poolsL lL (next-lane ψ) ; restsL = λ ψ → LingersL.restsL lL (next-lane ψ) }
+
+  lgL-cons : ∀ {Γ B} {l : Sub Γ B} {ls} → Lingers l → LingersL ls → LingersL (l ∷ ls)
+  lgL-cons ll lL = record
+    { poolsL = λ { (this-lane ψ) → Lingers.pools ll ψ ; (next-lane ψ) → LingersL.poolsL lL ψ }
+    ; restsL = λ { (this-lane ψ) → Lingers.rests ll ψ ; (next-lane ψ) → LingersL.restsL lL ψ } }
+
+  -- Building a node's ties from its children's.
+  lg-map : ∀ {Γ A B} {f : A → B} {s : Sub Γ A} → Lingers s → Lingers (mapˢ f s)
+  lg-map ls = record
+    { pools = λ { (in-map ψ) → Lingers.pools ls ψ }
+    ; rests = λ { (in-map ψ) → Lingers.rests ls ψ } }
+
+  lg-scan : ∀ {Γ A B} {f : B → A → B} {z} {s : Sub Γ A} → Lingers s → Lingers (scanˢ f z s)
+  lg-scan ls = record
+    { pools = λ { (in-scan ψ) → Lingers.pools ls ψ }
+    ; rests = λ { (in-scan ψ) → Lingers.rests ls ψ } }
+
+  lg-lane : ∀ {Γ A r} {s : Sub Γ A} → Lingers s → Lingers (laneˢ r s)
+  lg-lane ls = record
+    { pools = λ { (in-lane ψ) → Lingers.pools ls ψ }
+    ; rests = λ { (in-lane ψ) → Lingers.rests ls ψ } }
+
+  lg-cut : ∀ {Γ A l a} {s : Sub Γ A} → (l ≡ true → Lingers s) → Lingers (cutˢ l a s)
+  lg-cut {l = l} ls = record
+    { pools = λ { (in-cut ψ) sn → thru l sn (λ x s′ → Lingers.pools (ls x) ψ s′) }
+    ; rests = λ { (in-cut ψ) sn → thru l sn (λ x s′ → Lingers.rests (ls x) ψ s′) } }
+
+  lg-take : ∀ {Γ A i p tk} {s : Sub Γ A} → (isTaking tk ≡ true → Lingers s) → Lingers (takeWhileˢ i p tk s)
+  lg-take {tk = tk} ls = record
+    { pools = λ { (in-take ψ) sn → thru (isTaking tk) sn (λ x s′ → Lingers.pools (ls x) ψ s′) }
+    ; rests = λ { (in-take ψ) sn → thru (isTaking tk) sn (λ x s′ → Lingers.rests (ls x) ψ s′) } }
+
+  lg-flat : ∀ {Γ X A op f d n qs pl} {o : Sub Γ X} {ls : List (Sub Γ A)}
+          → (∀ {c} → part (flatMapˢ op f d n qs pl o ls) ≡ just c → Leaves pl (pooled d o ls) × Restful pl)
+          → Lingers o → LingersL ls → Lingers (flatMapˢ op f d n qs pl o ls)
+  lg-flat pool lo lL = record
+    { pools = λ { here _ x → pool x ; (in-outer ψ) → Lingers.pools lo ψ ; (in-lanes ψ) → LingersL.poolsL lL ψ }
+    ; rests = λ { (in-outer ψ) → Lingers.rests lo ψ ; (in-lanes ψ) → LingersL.restsL lL ψ } }
+
+  lg-connect : ∀ {Γ X B k r e rt} {s : Sub Γ X} {b : Sub (X ∷ Γ) B}
+             → (∀ {n} → part (connectˢ k r e rt s b) ≡ just n → part s ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Twin rt (leftover {B = ⊤} s) × Restful rt)
+             → (is-just (part b) ≡ true → Lingers s) → ((is-just (part s) ∨ is-just e) ≡ true → Lingers b)
+             → Lingers (connectˢ k r e rt s b)
+  lg-connect {e = e} {s = s} {b} rest ls lb = record
+    { pools = λ { (in-source ψ) sn → thru (is-just (part b)) sn (λ x s′ → Lingers.pools (ls x) ψ s′)
+                ; (in-body ψ) sn → thru (is-just (part s) ∨ is-just e) sn (λ x s′ → Lingers.pools (lb x) ψ s′) }
+    ; rests = λ { here _ x pn pe → rest x pn pe
+                ; (in-source ψ) sn → thru (is-just (part b)) sn (λ x s′ → Lingers.rests (ls x) ψ s′)
+                ; (in-body ψ) sn → thru (is-just (part s) ∨ is-just e) sn (λ x s′ → Lingers.rests (lb x) ψ s′) } }
+
+  module Tying {Δ₀ A₀} {u v : Sub Δ₀ A₀}
+               (same₀ : part v ≡ part u)
+               (take₀ : ∀ {i p tk} → part (takeWhileˢ i p tk v) ≡ part (takeWhileˢ i p tk u))
+               (rs₀ : ∀ {C} → Twin (leftover {B = C} u) (leftover {B = C} v))
+               (lp₀ : ∀ {ls} → Twin (pooledL (u ∷ ls)) (pooledL (v ∷ ls)))
+               (lb₀ : Lingers u → Lingers v) where
+
+    -- Every part above the node the same.
     mutual
-      leftover-restful : ∀ {Γ A B} (s : Sub Γ A) → Restful (leftover {B = B} s)
-      leftover-restful (pendingˢ o q)                 = rf-rest
-      leftover-restful (coldˢ b ph)                   = rf-idle
-      leftover-restful (ofˢ q j xs)                   = rf-idle
-      leftover-restful doneˢ                          = rf-idle
-      leftover-restful (mapˢ f s)                     = leftover-restful s
-      leftover-restful (scanˢ f z s)                  = leftover-restful s
-      leftover-restful (cutˢ l a s)                   = leftover-restful s
-      leftover-restful (laneˢ r s)                    = leftover-restful s
-      leftover-restful (takeWhileˢ i q tk s)          = leftover-restful s
-      leftover-restful (flatMapˢ op f d n qs pl o ls) = rf-union (leftover-restful o) (leftoverL-restful ls)
-      leftover-restful (connectˢ k r e rt s b)        = rf-union rf-burst (rf-under (leftover-restful b))
-      leftover-restful (joinˢ j g x st)               = rf-idle
+      same : ∀ {Γ A π} {t : Sub Γ A} (ρ : Path t u π) → part (plant ρ v) ≡ part t
+      same here = same₀
+      same (in-map {f = f} ρ) = cong (mapᴹ (U.mapᶜ f)) (same ρ)
+      same (in-scan {f = f} {z = z} ρ) = cong (mapᴹ (U.scanᶜ f z)) (same ρ)
+      same (in-cut {l = l} ρ) = cong (λ m → if l then m else nothing) (same ρ)
+      same (in-lane ρ) = same ρ
+      same (in-take {i = i} {q = p} {tk = tk} ρ) = take-same {i = i} {p = p} {tk = tk} ρ
+      same (in-outer {op = op} {f = f} {qs = qs} {pl = pl} {ls = ls} ρ) =
+        cong (λ m → merged op (λ x r → U.subscribe (f x) r) m (partLanes ls) qs pl) (same ρ)
+      same (in-lanes {op = op} {f = f} {qs = qs} {pl = pl} {o = o} ρ) =
+        cong (λ L → merged op (λ x r → U.subscribe (f x) r) (part o) L qs pl) (sameL ρ)
+      same (in-source {r = r} {e = e} {rt = rt} {b = b} ρ) = cong (λ m → connected r e rt m (part b)) (same ρ)
+      same (in-body {r = r} {e = e} {rt = rt} {s = s} ρ) = cong (connected r e rt (part s)) (same ρ)
 
-      leftoverL-restful : ∀ {Γ A B} (ls : List (Sub Γ A)) → Restful (leftoverL {B = B} ls)
-      leftoverL-restful []       = rf-idle
-      leftoverL-restful (s ∷ ls) = rf-union (leftover-restful s) (leftoverL-restful ls)
+      sameL : ∀ {Γ B i π} {ls : List (Sub Γ B)} (ρ : PathLanes ls u i π) → partLanes (plantᴸ ρ v) ≡ partLanes ls
+      sameL (this-lane {ls = ls} ρ) = cong (λ m → consᴹ m (partLanes ls)) (same ρ)
+      sameL (next-lane {l = l} ρ) = cong (consᴹ (part l)) (sameL ρ)
 
-    -- A lane's pool beside the same rest.
-    pool-cons : ∀ {Γ B} (l : Sub Γ B) {ls ls′ : List (Sub Γ B)} → Twin (pooledL ls) (pooledL ls′) → Twin (pooledL (l ∷ ls)) (pooledL (l ∷ ls′))
-    pool-cons (laneˢ r s)                    t = tw-if r t (tw-union (tw-refl (leftover s)) t)
-    pool-cons (pendingˢ o q)                 t = t
-    pool-cons (coldˢ b ph)                   t = t
-    pool-cons (ofˢ q j xs)                   t = t
-    pool-cons doneˢ                          t = t
-    pool-cons (mapˢ f s)                     t = t
-    pool-cons (scanˢ f z s)                  t = t
-    pool-cons (cutˢ l a s)                   t = t
-    pool-cons (takeWhileˢ i q tk s)          t = t
-    pool-cons (flatMapˢ op f d n qs pl o ls) t = t
-    pool-cons (connectˢ k r e rt s b)        t = t
-    pool-cons (joinˢ j g x st)               t = t
+      -- A take above the node: switched alike, since only a cut
+      -- switches it and the path keeps every node's own constructor.
+      take-same : ∀ {Γ A π i p tk} {t : Sub Γ A} (ρ : Path t u π) → part (takeWhileˢ i p tk (plant ρ v)) ≡ part (takeWhileˢ i p tk t)
+      take-same {i = i} {p} {tk} here = take₀ {i} {p} {tk}
+      take-same {i = i} {p} {tk} (in-cut {l = l} {a = a} ρ) = cong (λ m → if l then taking? i p tk m else nothing) (same (in-cut {l = l} {a = a} ρ))
+      take-same {i = i} {p} {tk} ρ@(in-map _)    = cong (taking? i p tk) (same ρ)
+      take-same {i = i} {p} {tk} ρ@(in-scan _)   = cong (taking? i p tk) (same ρ)
+      take-same {i = i} {p} {tk} ρ@(in-lane _)   = cong (taking? i p tk) (same ρ)
+      take-same {i = i} {p} {tk} ρ@(in-take _)   = cong (taking? i p tk) (same ρ)
+      take-same {i = i} {p} {tk} ρ@(in-outer _)  = cong (taking? i p tk) (same ρ)
+      take-same {i = i} {p} {tk} ρ@(in-lanes _)  = cong (taking? i p tk) (same ρ)
+      take-same {i = i} {p} {tk} ρ@(in-source _) = cong (taking? i p tk) (same ρ)
+      take-same {i = i} {p} {tk} ρ@(in-body _)   = cong (taking? i p tk) (same ρ)
 
-    -- A connect's leftover over its source, the source's part the same.
-    src-rested : ∀ {Γ A B} r (m m′ : Maybe (U.Node Γ A)) {l l′ : U.Node Γ A} (x : U.Node (A ∷ Γ) ⊤) → m′ ≡ m
-               → Restful l → Restful l′ → Twin l l′
-               → Twin (U.unionᶜ {B = B} (U.burstingᶜ r (sourced m l)) (U.underᶜ (U.live (sourced m l)) x))
-                      (U.unionᶜ {B = B} (U.burstingᶜ r (sourced m′ l′)) (U.underᶜ (U.live (sourced m′ l′)) x))
-    src-rested r (just n) _ x refl rf rf′ t = tw-refl _
-    src-rested r nothing  _ x refl rf rf′ t = tw-union (tw-burst r rf rf′ t) (tw-shift x rf rf′ t)
+    -- Every node above leaves running what it did.
+    mutual
+      restedUp : ∀ {Γ A π} {t : Sub Γ A} (ρ : Path t u π) → ∀ {C} → Twin (leftover {B = C} t) (leftover {B = C} (plant ρ v))
+      restedUp here = rs₀
+      restedUp (in-map ρ) = restedUp ρ
+      restedUp (in-scan ρ) = restedUp ρ
+      restedUp (in-cut ρ) = restedUp ρ
+      restedUp (in-lane ρ) = restedUp ρ
+      restedUp (in-take ρ) = restedUp ρ
+      restedUp (in-outer {ls = ls} ρ) = tw-union (restedUp ρ) (tw-refl (leftoverL ls))
+      restedUp (in-lanes {o = o} ρ) = tw-union (tw-refl (leftover o)) (restedUpL ρ)
+      restedUp (in-source {r = r} {t = s} {b = b} ρ) =
+        src-rested r (part s) (part (plant ρ v)) (leftover b) (same ρ) (leftover-restful s) (leftover-restful (plant ρ v)) (restedUp ρ)
+      restedUp (in-body {r = r} {s = s} ρ) =
+        tw-union (tw-refl (U.burstingᶜ r (sourced (part s) (leftover s)))) (tw-under (U.live (sourced (part s) (leftover s))) (restedUp ρ))
 
-    -- What a tree's ties hold, of a seen subtree; of a flatMap's lanes.
-    lingers-sub : ∀ {Γ A Δ B π} {t : Sub Γ A} {x : Sub Δ B} → Lingers t → (ρ : Path t x π) → seen ρ ≡ true → Lingers x
-    lingers-sub lg ρ sρ = record
-      { pools = λ ψ sn → Lingers.pools lg (ρ ⊕ ψ) (seen-⊕ ρ ψ sρ sn)
-      ; rests = λ ψ sn → Lingers.rests lg (ρ ⊕ ψ) (seen-⊕ ρ ψ sρ sn) }
+      restedUpL : ∀ {Γ B i π} {ls : List (Sub Γ B)} (ρ : PathLanes ls u i π) → ∀ {C} → Twin (leftoverL {B = C} ls) (leftoverL {B = C} (plantᴸ ρ v))
+      restedUpL (this-lane {ls = ls} ρ) = tw-union (restedUp ρ) (tw-refl (leftoverL ls))
+      restedUpL (next-lane {l = l} ρ) = tw-union (tw-refl (leftover l)) (restedUpL ρ)
 
-    record LingersL {Γ₀ B₀} (ls : List (Sub Γ₀ B₀)) : Set₁ where
-      field
-        poolsL : ∀ {Γ X A op f d n qs pl i π} {o : Sub Γ X} {ls′ : List (Sub Γ A)}
-               → (ψ : PathLanes ls (flatMapˢ op f d n qs pl o ls′) i π) → seenL ψ ≡ true
-               → ∀ {c} → part (flatMapˢ op f d n qs pl o ls′) ≡ just c → Leaves pl (pooled d o ls′) × Restful pl
-        restsL : ∀ {Γ X B k r e rt i π} {s : Sub Γ X} {b : Sub (X ∷ Γ) B}
-               → (ψ : PathLanes ls (connectˢ k r e rt s b) i π) → seenL ψ ≡ true
-               → ∀ {n} → part (connectˢ k r e rt s b) ≡ just n
-               → part s ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Twin rt (leftover {B = ⊤} s) × Restful rt
+    -- A lane's pool, its lane replanted.
+    lane-pool : ∀ {Γ B π} {l : Sub Γ B} {ls} (ρ : Path l u π) → Twin (pooledL (l ∷ ls)) (pooledL (plant ρ v ∷ ls))
+    lane-pool here = lp₀
+    lane-pool {ls = ls} (in-lane {r = r} ρ) = tw-if r (tw-refl (pooledL ls)) (tw-union (restedUp ρ) (tw-refl (pooledL ls)))
+    lane-pool {ls = ls} (in-map ρ)    = tw-refl (pooledL ls)
+    lane-pool {ls = ls} (in-scan ρ)   = tw-refl (pooledL ls)
+    lane-pool {ls = ls} (in-cut ρ)    = tw-refl (pooledL ls)
+    lane-pool {ls = ls} (in-take ρ)   = tw-refl (pooledL ls)
+    lane-pool {ls = ls} (in-outer ρ)  = tw-refl (pooledL ls)
+    lane-pool {ls = ls} (in-lanes ρ)  = tw-refl (pooledL ls)
+    lane-pool {ls = ls} (in-source ρ) = tw-refl (pooledL ls)
+    lane-pool {ls = ls} (in-body ρ)   = tw-refl (pooledL ls)
 
-    lingersL-of : ∀ {Γ X A op f d n qs pl} {o : Sub Γ X} {ls : List (Sub Γ A)} → Lingers (flatMapˢ op f d n qs pl o ls) → LingersL ls
-    lingersL-of lg = record { poolsL = λ ψ → Lingers.pools lg (in-lanes ψ) ; restsL = λ ψ → Lingers.rests lg (in-lanes ψ) }
+    pooledUpL : ∀ {Γ B i π} {ls : List (Sub Γ B)} (ρ : PathLanes ls u i π) → Twin (pooledL ls) (pooledL (plantᴸ ρ v))
+    pooledUpL (this-lane ρ) = lane-pool ρ
+    pooledUpL (next-lane {l = l} ρ) = pool-cons l (pooledUpL ρ)
 
-    lingersL-head : ∀ {Γ B} {l : Sub Γ B} {ls} → LingersL (l ∷ ls) → Lingers l
-    lingersL-head lL = record { pools = λ ψ → LingersL.poolsL lL (this-lane ψ) ; rests = λ ψ → LingersL.restsL lL (this-lane ψ) }
+    via-same : ∀ {Γ A π} {t : Sub Γ A} (ρ : Path t u π) {c} → part (plant ρ v) ≡ just c → part t ≡ just c
+    via-same ρ x = trans (sym (same ρ)) x
 
-    lingersL-tail : ∀ {Γ B} {l : Sub Γ B} {ls} → LingersL (l ∷ ls) → LingersL ls
-    lingersL-tail lL = record { poolsL = λ ψ → LingersL.poolsL lL (next-lane ψ) ; restsL = λ ψ → LingersL.restsL lL (next-lane ψ) }
+    mutual
+      shiftLg : ∀ {Γ A π} {t : Sub Γ A} (ρ : Path t u π) → Lingers t → Lingers (plant ρ v)
+      shiftLg here lg = lb₀ lg
+      shiftLg (in-map ρ) lg = lg-map (shiftLg ρ (lingers-sub lg (in-map here) refl))
+      shiftLg (in-scan ρ) lg = lg-scan (shiftLg ρ (lingers-sub lg (in-scan here) refl))
+      shiftLg (in-cut ρ) lg = lg-cut (λ x → shiftLg ρ (lingers-sub lg (in-cut here) (∧-join x refl)))
+      shiftLg (in-lane ρ) lg = lg-lane (shiftLg ρ (lingers-sub lg (in-lane here) refl))
+      shiftLg (in-take ρ) lg = lg-take (λ x → shiftLg ρ (lingers-sub lg (in-take here) (∧-join x refl)))
+      shiftLg (in-outer {op = op} {f = f} {d = d} {n = n} {qs = qs} {pl = pl} {t = s} {ls = ls} ρ) lg =
+        lg-flat pool (shiftLg ρ (lingers-sub lg (in-outer here) refl)) (lingersL-of lg)
+        where
+          pool : ∀ {c} → part (flatMapˢ op f d n qs pl (plant ρ v) ls) ≡ just c → Leaves pl (pooled d (plant ρ v) ls) × Restful pl
+          pool x = lv-tie (Lingers.pools lg here refl (via-same (in-outer {op = op} {f = f} {d = d} {n = n} {qs = qs} {pl = pl} {ls = ls} ρ) x))
+                     (proj₁ (tw-union (tw-if d (restedUp ρ) (tw-refl U.idleᶜ)) (tw-refl (pooledL ls))))
+      shiftLg (in-lanes {op = op} {f = f} {d = d} {n = n} {qs = qs} {pl = pl} {o = o} {ls = ls} ρ) lg =
+        lg-flat pool (lingers-sub lg (in-outer here) refl) (shiftLgL ρ (lingersL-of lg))
+        where
+          pool : ∀ {c} → part (flatMapˢ op f d n qs pl o (plantᴸ ρ v)) ≡ just c → Leaves pl (pooled d o (plantᴸ ρ v)) × Restful pl
+          pool x = lv-tie (Lingers.pools lg here refl (via-same (in-lanes {op = op} {f = f} {d = d} {n = n} {qs = qs} {pl = pl} {o = o} ρ) x))
+                     (proj₁ (tw-union (tw-refl (if d then leftover o else U.idleᶜ)) (pooledUpL ρ)))
+      shiftLg (in-source {k = k} {r = r} {e = e} {rt = rt} {t = s} {b = b} ρ) lg = lg-connect rest ls lb
+        where
+          ls : is-just (part b) ≡ true → Lingers (plant ρ v)
+          ls jb = shiftLg ρ (lingers-sub lg (in-source here) (∧-join jb refl))
+          lb : (is-just (part (plant ρ v)) ∨ is-just e) ≡ true → Lingers b
+          lb js = lingers-sub lg (in-body here) (∧-join (subst (λ m → (is-just m ∨ is-just e) ≡ true) (same ρ) js) refl)
+          rest : ∀ {n} → part (connectˢ k r e rt (plant ρ v) b) ≡ just n → part (plant ρ v) ≡ nothing → ∀ {c₀} → e ≡ just c₀
+               → Twin rt (leftover {B = ⊤} (plant ρ v)) × Restful rt
+          rest x pn pe = tw-tie (Lingers.rests lg here refl (via-same (in-source {k = k} {r = r} {e = e} {rt = rt} {b = b} ρ) x) (trans (sym (same ρ)) pn) pe) (restedUp ρ)
+      shiftLg (in-body {k = k} {r = r} {e = e} {rt = rt} {s = s} {t = b} ρ) lg = lg-connect rest ls lb
+        where
+          ls : is-just (part (plant ρ v)) ≡ true → Lingers s
+          ls jb = lingers-sub lg (in-source here) (∧-join (subst (λ m → is-just m ≡ true) (same ρ) jb) refl)
+          lb : (is-just (part s) ∨ is-just e) ≡ true → Lingers (plant ρ v)
+          lb js = shiftLg ρ (lingers-sub lg (in-body here) (∧-join js refl))
+          rest : ∀ {n} → part (connectˢ k r e rt s (plant ρ v)) ≡ just n → part s ≡ nothing → ∀ {c₀} → e ≡ just c₀
+               → Twin rt (leftover {B = ⊤} s) × Restful rt
+          rest x pn pe = Lingers.rests lg here refl (via-same (in-body {k = k} {r = r} {e = e} {rt = rt} {s = s} ρ) x) pn pe
 
-    lgL-cons : ∀ {Γ B} {l : Sub Γ B} {ls} → Lingers l → LingersL ls → LingersL (l ∷ ls)
-    lgL-cons ll lL = record
-      { poolsL = λ { (this-lane ψ) → Lingers.pools ll ψ ; (next-lane ψ) → LingersL.poolsL lL ψ }
-      ; restsL = λ { (this-lane ψ) → Lingers.rests ll ψ ; (next-lane ψ) → LingersL.restsL lL ψ } }
-
-    -- Building a node's ties from its children's.
-    lg-map : ∀ {Γ A B} {f : A → B} {s : Sub Γ A} → Lingers s → Lingers (mapˢ f s)
-    lg-map ls = record
-      { pools = λ { (in-map ψ) → Lingers.pools ls ψ }
-      ; rests = λ { (in-map ψ) → Lingers.rests ls ψ } }
-
-    lg-scan : ∀ {Γ A B} {f : B → A → B} {z} {s : Sub Γ A} → Lingers s → Lingers (scanˢ f z s)
-    lg-scan ls = record
-      { pools = λ { (in-scan ψ) → Lingers.pools ls ψ }
-      ; rests = λ { (in-scan ψ) → Lingers.rests ls ψ } }
-
-    lg-lane : ∀ {Γ A r} {s : Sub Γ A} → Lingers s → Lingers (laneˢ r s)
-    lg-lane ls = record
-      { pools = λ { (in-lane ψ) → Lingers.pools ls ψ }
-      ; rests = λ { (in-lane ψ) → Lingers.rests ls ψ } }
-
-    lg-cut : ∀ {Γ A l a} {s : Sub Γ A} → (l ≡ true → Lingers s) → Lingers (cutˢ l a s)
-    lg-cut {l = l} ls = record
-      { pools = λ { (in-cut ψ) sn → thru l sn (λ x s′ → Lingers.pools (ls x) ψ s′) }
-      ; rests = λ { (in-cut ψ) sn → thru l sn (λ x s′ → Lingers.rests (ls x) ψ s′) } }
-
-    lg-take : ∀ {Γ A i p tk} {s : Sub Γ A} → (isTaking tk ≡ true → Lingers s) → Lingers (takeWhileˢ i p tk s)
-    lg-take {tk = tk} ls = record
-      { pools = λ { (in-take ψ) sn → thru (isTaking tk) sn (λ x s′ → Lingers.pools (ls x) ψ s′) }
-      ; rests = λ { (in-take ψ) sn → thru (isTaking tk) sn (λ x s′ → Lingers.rests (ls x) ψ s′) } }
-
-    lg-flat : ∀ {Γ X A op f d n qs pl} {o : Sub Γ X} {ls : List (Sub Γ A)}
-            → (∀ {c} → part (flatMapˢ op f d n qs pl o ls) ≡ just c → Leaves pl (pooled d o ls) × Restful pl)
-            → Lingers o → LingersL ls → Lingers (flatMapˢ op f d n qs pl o ls)
-    lg-flat pool lo lL = record
-      { pools = λ { here _ x → pool x ; (in-outer ψ) → Lingers.pools lo ψ ; (in-lanes ψ) → LingersL.poolsL lL ψ }
-      ; rests = λ { (in-outer ψ) → Lingers.rests lo ψ ; (in-lanes ψ) → LingersL.restsL lL ψ } }
-
-    lg-connect : ∀ {Γ X B k r e rt} {s : Sub Γ X} {b : Sub (X ∷ Γ) B}
-               → (∀ {n} → part (connectˢ k r e rt s b) ≡ just n → part s ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Twin rt (leftover {B = ⊤} s) × Restful rt)
-               → (is-just (part b) ≡ true → Lingers s) → ((is-just (part s) ∨ is-just e) ≡ true → Lingers b)
-               → Lingers (connectˢ k r e rt s b)
-    lg-connect {e = e} {s = s} {b} rest ls lb = record
-      { pools = λ { (in-source ψ) sn → thru (is-just (part b)) sn (λ x s′ → Lingers.pools (ls x) ψ s′)
-                  ; (in-body ψ) sn → thru (is-just (part s) ∨ is-just e) sn (λ x s′ → Lingers.pools (lb x) ψ s′) }
-      ; rests = λ { here _ x pn pe → rest x pn pe
-                  ; (in-source ψ) sn → thru (is-just (part b)) sn (λ x s′ → Lingers.rests (ls x) ψ s′)
-                  ; (in-body ψ) sn → thru (is-just (part s) ∨ is-just e) sn (λ x s′ → Lingers.rests (lb x) ψ s′) } }
-
-    module Tying {Δ₀ A₀} {u v : Sub Δ₀ A₀}
-                 (same₀ : part v ≡ part u)
-                 (take₀ : ∀ {i p tk} → part (takeWhileˢ i p tk v) ≡ part (takeWhileˢ i p tk u))
-                 (rs₀ : ∀ {C} → Twin (leftover {B = C} u) (leftover {B = C} v))
-                 (lp₀ : ∀ {ls} → Twin (pooledL (u ∷ ls)) (pooledL (v ∷ ls)))
-                 (lb₀ : Lingers u → Lingers v) where
-
-      -- Every part above the node the same.
-      mutual
-        same : ∀ {Γ A π} {t : Sub Γ A} (ρ : Path t u π) → part (plant ρ v) ≡ part t
-        same here = same₀
-        same (in-map {f = f} ρ) = cong (mapᴹ (U.mapᶜ f)) (same ρ)
-        same (in-scan {f = f} {z = z} ρ) = cong (mapᴹ (U.scanᶜ f z)) (same ρ)
-        same (in-cut {l = l} ρ) = cong (λ m → if l then m else nothing) (same ρ)
-        same (in-lane ρ) = same ρ
-        same (in-take {i = i} {q = p} {tk = tk} ρ) = take-same {i = i} {p = p} {tk = tk} ρ
-        same (in-outer {op = op} {f = f} {qs = qs} {pl = pl} {ls = ls} ρ) =
-          cong (λ m → merged op (λ x r → U.subscribe (f x) r) m (partLanes ls) qs pl) (same ρ)
-        same (in-lanes {op = op} {f = f} {qs = qs} {pl = pl} {o = o} ρ) =
-          cong (λ L → merged op (λ x r → U.subscribe (f x) r) (part o) L qs pl) (sameL ρ)
-        same (in-source {r = r} {e = e} {rt = rt} {b = b} ρ) = cong (λ m → connected r e rt m (part b)) (same ρ)
-        same (in-body {r = r} {e = e} {rt = rt} {s = s} ρ) = cong (connected r e rt (part s)) (same ρ)
-
-        sameL : ∀ {Γ B i π} {ls : List (Sub Γ B)} (ρ : PathLanes ls u i π) → partLanes (plantᴸ ρ v) ≡ partLanes ls
-        sameL (this-lane {ls = ls} ρ) = cong (λ m → consᴹ m (partLanes ls)) (same ρ)
-        sameL (next-lane {l = l} ρ) = cong (consᴹ (part l)) (sameL ρ)
-
-        -- A take above the node: switched alike, since only a cut
-        -- switches it and the path keeps every node's own constructor.
-        take-same : ∀ {Γ A π i p tk} {t : Sub Γ A} (ρ : Path t u π) → part (takeWhileˢ i p tk (plant ρ v)) ≡ part (takeWhileˢ i p tk t)
-        take-same {i = i} {p} {tk} here = take₀ {i} {p} {tk}
-        take-same {i = i} {p} {tk} (in-cut {l = l} {a = a} ρ) = cong (λ m → if l then taking? i p tk m else nothing) (same (in-cut {l = l} {a = a} ρ))
-        take-same {i = i} {p} {tk} ρ@(in-map _)    = cong (taking? i p tk) (same ρ)
-        take-same {i = i} {p} {tk} ρ@(in-scan _)   = cong (taking? i p tk) (same ρ)
-        take-same {i = i} {p} {tk} ρ@(in-lane _)   = cong (taking? i p tk) (same ρ)
-        take-same {i = i} {p} {tk} ρ@(in-take _)   = cong (taking? i p tk) (same ρ)
-        take-same {i = i} {p} {tk} ρ@(in-outer _)  = cong (taking? i p tk) (same ρ)
-        take-same {i = i} {p} {tk} ρ@(in-lanes _)  = cong (taking? i p tk) (same ρ)
-        take-same {i = i} {p} {tk} ρ@(in-source _) = cong (taking? i p tk) (same ρ)
-        take-same {i = i} {p} {tk} ρ@(in-body _)   = cong (taking? i p tk) (same ρ)
-
-      -- Every node above leaves running what it did.
-      mutual
-        restedUp : ∀ {Γ A π} {t : Sub Γ A} (ρ : Path t u π) → ∀ {C} → Twin (leftover {B = C} t) (leftover {B = C} (plant ρ v))
-        restedUp here = rs₀
-        restedUp (in-map ρ) = restedUp ρ
-        restedUp (in-scan ρ) = restedUp ρ
-        restedUp (in-cut ρ) = restedUp ρ
-        restedUp (in-lane ρ) = restedUp ρ
-        restedUp (in-take ρ) = restedUp ρ
-        restedUp (in-outer {ls = ls} ρ) = tw-union (restedUp ρ) (tw-refl (leftoverL ls))
-        restedUp (in-lanes {o = o} ρ) = tw-union (tw-refl (leftover o)) (restedUpL ρ)
-        restedUp (in-source {r = r} {t = s} {b = b} ρ) =
-          src-rested r (part s) (part (plant ρ v)) (leftover b) (same ρ) (leftover-restful s) (leftover-restful (plant ρ v)) (restedUp ρ)
-        restedUp (in-body {r = r} {s = s} ρ) =
-          tw-union (tw-refl (U.burstingᶜ r (sourced (part s) (leftover s)))) (tw-under (U.live (sourced (part s) (leftover s))) (restedUp ρ))
-
-        restedUpL : ∀ {Γ B i π} {ls : List (Sub Γ B)} (ρ : PathLanes ls u i π) → ∀ {C} → Twin (leftoverL {B = C} ls) (leftoverL {B = C} (plantᴸ ρ v))
-        restedUpL (this-lane {ls = ls} ρ) = tw-union (restedUp ρ) (tw-refl (leftoverL ls))
-        restedUpL (next-lane {l = l} ρ) = tw-union (tw-refl (leftover l)) (restedUpL ρ)
-
-      -- A lane's pool, its lane replanted.
-      lane-pool : ∀ {Γ B π} {l : Sub Γ B} {ls} (ρ : Path l u π) → Twin (pooledL (l ∷ ls)) (pooledL (plant ρ v ∷ ls))
-      lane-pool here = lp₀
-      lane-pool {ls = ls} (in-lane {r = r} ρ) = tw-if r (tw-refl (pooledL ls)) (tw-union (restedUp ρ) (tw-refl (pooledL ls)))
-      lane-pool {ls = ls} (in-map ρ)    = tw-refl (pooledL ls)
-      lane-pool {ls = ls} (in-scan ρ)   = tw-refl (pooledL ls)
-      lane-pool {ls = ls} (in-cut ρ)    = tw-refl (pooledL ls)
-      lane-pool {ls = ls} (in-take ρ)   = tw-refl (pooledL ls)
-      lane-pool {ls = ls} (in-outer ρ)  = tw-refl (pooledL ls)
-      lane-pool {ls = ls} (in-lanes ρ)  = tw-refl (pooledL ls)
-      lane-pool {ls = ls} (in-source ρ) = tw-refl (pooledL ls)
-      lane-pool {ls = ls} (in-body ρ)   = tw-refl (pooledL ls)
-
-      pooledUpL : ∀ {Γ B i π} {ls : List (Sub Γ B)} (ρ : PathLanes ls u i π) → Twin (pooledL ls) (pooledL (plantᴸ ρ v))
-      pooledUpL (this-lane ρ) = lane-pool ρ
-      pooledUpL (next-lane {l = l} ρ) = pool-cons l (pooledUpL ρ)
-
-      via-same : ∀ {Γ A π} {t : Sub Γ A} (ρ : Path t u π) {c} → part (plant ρ v) ≡ just c → part t ≡ just c
-      via-same ρ x = trans (sym (same ρ)) x
-
-      mutual
-        shiftLg : ∀ {Γ A π} {t : Sub Γ A} (ρ : Path t u π) → Lingers t → Lingers (plant ρ v)
-        shiftLg here lg = lb₀ lg
-        shiftLg (in-map ρ) lg = lg-map (shiftLg ρ (lingers-sub lg (in-map here) refl))
-        shiftLg (in-scan ρ) lg = lg-scan (shiftLg ρ (lingers-sub lg (in-scan here) refl))
-        shiftLg (in-cut ρ) lg = lg-cut (λ x → shiftLg ρ (lingers-sub lg (in-cut here) (∧-join x refl)))
-        shiftLg (in-lane ρ) lg = lg-lane (shiftLg ρ (lingers-sub lg (in-lane here) refl))
-        shiftLg (in-take ρ) lg = lg-take (λ x → shiftLg ρ (lingers-sub lg (in-take here) (∧-join x refl)))
-        shiftLg (in-outer {op = op} {f = f} {d = d} {n = n} {qs = qs} {pl = pl} {t = s} {ls = ls} ρ) lg =
-          lg-flat pool (shiftLg ρ (lingers-sub lg (in-outer here) refl)) (lingersL-of lg)
-          where
-            pool : ∀ {c} → part (flatMapˢ op f d n qs pl (plant ρ v) ls) ≡ just c → Leaves pl (pooled d (plant ρ v) ls) × Restful pl
-            pool x = lv-tie (Lingers.pools lg here refl (via-same (in-outer {op = op} {f = f} {d = d} {n = n} {qs = qs} {pl = pl} {ls = ls} ρ) x))
-                       (proj₁ (tw-union (tw-if d (restedUp ρ) (tw-refl U.idleᶜ)) (tw-refl (pooledL ls))))
-        shiftLg (in-lanes {op = op} {f = f} {d = d} {n = n} {qs = qs} {pl = pl} {o = o} {ls = ls} ρ) lg =
-          lg-flat pool (lingers-sub lg (in-outer here) refl) (shiftLgL ρ (lingersL-of lg))
-          where
-            pool : ∀ {c} → part (flatMapˢ op f d n qs pl o (plantᴸ ρ v)) ≡ just c → Leaves pl (pooled d o (plantᴸ ρ v)) × Restful pl
-            pool x = lv-tie (Lingers.pools lg here refl (via-same (in-lanes {op = op} {f = f} {d = d} {n = n} {qs = qs} {pl = pl} {o = o} ρ) x))
-                       (proj₁ (tw-union (tw-refl (if d then leftover o else U.idleᶜ)) (pooledUpL ρ)))
-        shiftLg (in-source {k = k} {r = r} {e = e} {rt = rt} {t = s} {b = b} ρ) lg = lg-connect rest ls lb
-          where
-            ls : is-just (part b) ≡ true → Lingers (plant ρ v)
-            ls jb = shiftLg ρ (lingers-sub lg (in-source here) (∧-join jb refl))
-            lb : (is-just (part (plant ρ v)) ∨ is-just e) ≡ true → Lingers b
-            lb js = lingers-sub lg (in-body here) (∧-join (subst (λ m → (is-just m ∨ is-just e) ≡ true) (same ρ) js) refl)
-            rest : ∀ {n} → part (connectˢ k r e rt (plant ρ v) b) ≡ just n → part (plant ρ v) ≡ nothing → ∀ {c₀} → e ≡ just c₀
-                 → Twin rt (leftover {B = ⊤} (plant ρ v)) × Restful rt
-            rest x pn pe = tw-tie (Lingers.rests lg here refl (via-same (in-source {k = k} {r = r} {e = e} {rt = rt} {b = b} ρ) x) (trans (sym (same ρ)) pn) pe) (restedUp ρ)
-        shiftLg (in-body {k = k} {r = r} {e = e} {rt = rt} {s = s} {t = b} ρ) lg = lg-connect rest ls lb
-          where
-            ls : is-just (part (plant ρ v)) ≡ true → Lingers s
-            ls jb = lingers-sub lg (in-source here) (∧-join (subst (λ m → is-just m ≡ true) (same ρ) jb) refl)
-            lb : (is-just (part s) ∨ is-just e) ≡ true → Lingers (plant ρ v)
-            lb js = shiftLg ρ (lingers-sub lg (in-body here) (∧-join js refl))
-            rest : ∀ {n} → part (connectˢ k r e rt s (plant ρ v)) ≡ just n → part s ≡ nothing → ∀ {c₀} → e ≡ just c₀
-                 → Twin rt (leftover {B = ⊤} s) × Restful rt
-            rest x pn pe = Lingers.rests lg here refl (via-same (in-body {k = k} {r = r} {e = e} {rt = rt} {s = s} ρ) x) pn pe
-
-        shiftLgL : ∀ {Γ B i π} {ls : List (Sub Γ B)} (ρ : PathLanes ls u i π) → LingersL ls → LingersL (plantᴸ ρ v)
-        shiftLgL (this-lane ρ) lL = lgL-cons (shiftLg ρ (lingersL-head lL)) (lingersL-tail lL)
-        shiftLgL (next-lane ρ) lL = lgL-cons (lingersL-head lL) (shiftLgL ρ (lingersL-tail lL))
+      shiftLgL : ∀ {Γ B i π} {ls : List (Sub Γ B)} (ρ : PathLanes ls u i π) → LingersL ls → LingersL (plantᴸ ρ v)
+      shiftLgL (this-lane ρ) lL = lgL-cons (shiftLg ρ (lingersL-head lL)) (lingersL-tail lL)
+      shiftLgL (next-lane ρ) lL = lgL-cons (lingersL-head lL) (shiftLgL ρ (lingersL-tail lL))
 
   module Shift {T : Sub [] R} {Δ A π} {u : Sub Δ A} (ρ : Path T u π) where
     -- Every node the replanted tree holds heads no earlier than `q`.
