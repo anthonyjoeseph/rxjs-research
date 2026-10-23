@@ -63,9 +63,10 @@ module Keeping (R : Set) where
       alive-ended : Ended u → Ended v
       alive-flags : ∀ N → FlagsBy N u → FlagsBy N v
 
-  -- A VALUE'S ROUTE, LIVE: every lane on it running, every flatMap it
-  -- enters by the outer not yet past the outer's end, every connect it
-  -- enters by the source showing that source.
+  -- A VALUE'S ROUTE, LIVE: every lane on it running, every take on it
+  -- still taking, every flatMap it enters by the outer not yet past the
+  -- outer's end, every connect it enters by the source showing that
+  -- source.
   mutual
     Route : ∀ {Γ A Δ B π} {t : Sub Γ A} {u : Sub Δ B} → Path t u π → Set
     Route here                      = ⊤
@@ -73,7 +74,7 @@ module Keeping (R : Set) where
     Route (in-scan ψ)               = Route ψ
     Route (in-cut ψ)                = Route ψ
     Route (in-lane {r = r} ψ)       = r ≡ true × Route ψ
-    Route (in-take ψ)               = Route ψ
+    Route (in-take {tk = tk} ψ)     = isTaking tk ≡ true × Route ψ
     Route (in-outer {d = d} ψ)      = d ≡ false × Route ψ
     Route (in-lanes ψ)              = RouteL ψ
     Route (in-source {t = s} ψ)     = is-just (part s) ≡ true × Route ψ
@@ -91,7 +92,7 @@ module Keeping (R : Set) where
     route-pre (in-scan ρ)   c r       = route-pre ρ c r
     route-pre (in-cut ρ)    c r       = route-pre ρ c r
     route-pre (in-lane ρ)   c (e , r) = e , route-pre ρ c r
-    route-pre (in-take ρ)   c r       = route-pre ρ c r
+    route-pre (in-take ρ)   c (e , r) = e , route-pre ρ c r
     route-pre (in-outer ρ)  c (e , r) = e , route-pre ρ c r
     route-pre (in-lanes ρ)  c r       = route-preL ρ c r
     route-pre (in-source ρ) c (e , r) = e , route-pre ρ c r
@@ -101,6 +102,25 @@ module Keeping (R : Set) where
                → RouteL (ρ ⊕ᴸ c) → RouteL ρ
     route-preL (this-lane ρ) c r = route-pre ρ c r
     route-preL (next-lane ρ) c r = route-preL ρ c r
+
+  -- The route below a node, live as the whole was.
+  mutual
+    route-post : ∀ {Γ A Δ B Ε C π τ} {t : Sub Γ A} {x : Sub Δ B} {w : Sub Ε C} (ρ : Path t x π) (c : Path x w τ) → Route (ρ ⊕ c) → Route c
+    route-post here          c r       = r
+    route-post (in-map ρ)    c r       = route-post ρ c r
+    route-post (in-scan ρ)   c r       = route-post ρ c r
+    route-post (in-cut ρ)    c r       = route-post ρ c r
+    route-post (in-lane ρ)   c (_ , r) = route-post ρ c r
+    route-post (in-take ρ)   c (_ , r) = route-post ρ c r
+    route-post (in-outer ρ)  c (_ , r) = route-post ρ c r
+    route-post (in-lanes ρ)  c r       = route-postL ρ c r
+    route-post (in-source ρ) c (_ , r) = route-post ρ c r
+    route-post (in-body ρ)   c r       = route-post ρ c r
+
+    route-postL : ∀ {Γ A Δ B Ε C i π τ} {ls : List (Sub Γ A)} {x : Sub Δ B} {w : Sub Ε C} (ρ : PathLanes ls x i π) (c : Path x w τ)
+                → RouteL (ρ ⊕ᴸ c) → Route c
+    route-postL (this-lane ρ) c r = route-post ρ c r
+    route-postL (next-lane ρ) c r = route-postL ρ c r
 
   -- A NODE BESIDE ITS REPLANT: the same node, or one of the same head
   -- whose subscriptions may differ; a takeWhile's source beside in turn,
@@ -208,7 +228,7 @@ module Keeping (R : Set) where
         routed (in-scan ρ)   w       = routed ρ w
         routed (in-cut ρ)    w       = routed ρ w
         routed (in-lane ρ)   (e , w) = e , routed ρ w
-        routed (in-take ρ)   w       = routed ρ w
+        routed (in-take ρ)   (e , w) = e , routed ρ w
         routed (in-outer ρ)  (e , w) = e , routed ρ w
         routed (in-lanes ρ)  w       = routedL ρ w
         routed (in-source ρ) (j , w) = alive ρ j , routed ρ w
@@ -366,7 +386,7 @@ module Keeping (R : Set) where
           lingersUp (in-scan ρ) w lg = lg-scan (lingersUp ρ w (lingers-sub lg (in-scan here) refl))
           lingersUp (in-cut ρ) w lg = lg-cut (λ x → lingersUp ρ w (lingers-sub lg (in-cut here) (∧-join x refl)))
           lingersUp (in-lane ρ) (_ , w) lg = lg-lane (lingersUp ρ w (lingers-sub lg (in-lane here) refl))
-          lingersUp (in-take ρ) w lg = lg-take (λ x → lingersUp ρ w (lingers-sub lg (in-take here) (∧-join x refl)))
+          lingersUp (in-take ρ) (_ , w) lg = lg-take (λ x → lingersUp ρ w (lingers-sub lg (in-take here) (∧-join x refl)))
           lingersUp (in-outer {op = op} {f = f} {n = n} {qs = qs} {pl = pl} {ls = ls} ρ) (refl , w) lg =
             lg-flat (λ x → Lingers.pools lg here refl (proj₂ (shown (in-outer {op = op} {f = f} {d = false} {n = n} {qs = qs} {pl = pl} {ls = ls} ρ) x)))
                     (lingersUp ρ w (lingers-sub lg (in-outer here) refl)) (lingersL-of lg)

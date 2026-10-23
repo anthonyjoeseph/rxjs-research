@@ -58,26 +58,49 @@ leftovers twin along a live route, as `Keep.route-lingers` twins the
 pools. Every planted climb's `lefts` needs it. Settled when `scan-lefts`
 is a body or refuted.
 
-Members: `scan-lefts`.
+Members: `scan-lefts`, `take-out-lefts`, `take-end-lefts`,
+`lanes-end-lefts`, `outer-end-lefts`.
 
-#### THE TAKE'S END
+#### THE LANDING CLIMBS
 
-The take planted at its next stage: `Keep`'s walks and `lifts-planted`
-give the plant's parts. Open: the parts read at the position, which the
-step moves past the take's (`behind`, `told`, `queue`); the owed job it
-pushes, whose new stage `_≈_` does not relate; the stage before it.
-Settled when `take-out` is a body or refuted.
+A climb that lands plants a node and stops: a `Hopped` needs `Carried`'s
+`meets` and a `Gain`, which want the lift of a skip through the plant —
+no lemma gives it. Open which skip each lands on: a queued value begun,
+an admitted lane, a connect's feed. Settled when `outer-admit` is a body
+or refuted.
 
-Members: `take-out`, `take-end`.
+Members: `outer-admit`, `outer-settle`, `lanes-dequeue`, `call-source`.
 
-#### THE LANE AND FEED CLIMBS
+#### THE FLATMAP DRAINED
 
-Each plants the flatMap or connect it climbs into (`admit`, `dequeue`,
-`feeds`): `Keep`'s walks and `lifts-planted` give the plant's parts. Open:
-the jobs each pushes and its lift through an outer, lanes or a source.
-Settled when `call-source` is a body or refuted.
+Suspect: nothing in the carrier ties a flatMap's count to its running
+lanes or its done flag to its outer's part, so its last end may not
+leave both gone. A missing invariant goes in the record. Settled when
+`lanes-drained` is a body or refuted.
 
-Members: `call-outer`, `call-lanes`, `call-source`.
+Members: `lanes-drained`, `outer-drained`.
+
+#### THE PLANTED END'S CARRIER
+
+A climb planting its node anew — a take's next stage, a dead take, a
+flatMap done — has every part of `Calling` but the carrier's: open
+whether the jobs, meaning, queue, books, heads and load survive the
+plant and the step past it, and whether the staged connects are ended,
+tied and flagged. Settled when `take-end-owned` is a body or refuted.
+
+Members: `take-out-owned`, `take-out-queue`, `take-out-books`,
+`take-out-behind`, `take-out-told`, `take-out-load`,
+`take-end-rest-heads`, `take-end-ended`, `take-end-lingers`,
+`take-end-flags`, `take-end-owned`, `take-end-meaning`,
+`take-end-queue`, `take-end-books`, `take-end-behind`, `take-end-told`,
+`take-end-load`, `lanes-end-rest-heads`, `lanes-end-ended`,
+`lanes-end-lingers`, `lanes-end-flags`, `lanes-end-owned`,
+`lanes-end-meaning`, `lanes-end-queue`, `lanes-end-books`,
+`lanes-end-behind`, `lanes-end-told`, `lanes-end-load`,
+`outer-end-rest-heads`, `outer-end-ended`, `outer-end-lingers`,
+`outer-end-flags`, `outer-end-owned`, `outer-end-meaning`,
+`outer-end-queue`, `outer-end-books`, `outer-end-behind`,
+`outer-end-told`, `outer-end-load`.
 
 #### THE CUT AND THE FIRE
 

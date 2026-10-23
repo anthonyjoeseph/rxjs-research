@@ -54,6 +54,7 @@ open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Sorted.Walk using (module SortingWalk)
 open import adequacy.Climbs using (module Ascending)
+open import adequacy.Climbs.Call using (module AscendingCall)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Replant using (module Replanting)
 open import adequacy.Replant.Keep using (module Keeping)
@@ -71,7 +72,8 @@ module Honesty (R : Set) where
   open Strongly R using (Strong; Carried; carried; closing; CtlAs; Meets; calmAs; noteAs; runAs; subAs; burstAs; popAs;
     Kernels; Owned; Meaning; Books; Path; ofˢ; seen; Sub; takeWhileˢ; part; Queue; BurstClocked; Each; Heads;
     Lingers; Untold; Ended; pooledL; DoneBy; Begins; focused; attaching; coldˢ; waiting; fired; playing; Timed; Joined)
-  open Ascending R using (Aloft; soar)
+  open Ascending R using (Aloft)
+  open AscendingCall R using (soar)
   open Moving R using (plant; planted; later)
   open Replanting R using (module Shift; Heading; Lingering; Pred)
   open Keeping R using (module Keep; Alive)
