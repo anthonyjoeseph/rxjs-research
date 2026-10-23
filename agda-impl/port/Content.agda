@@ -30,6 +30,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_; _<_; _≤_; s≤s; z≤n)
 open import Data.Nat.Properties using (suc-injective; +-suc; +-monoʳ-≤; n≤1+n; ≤-reflexive; n<1+n; <-trans)
 open import Data.Maybe using (just; nothing)
+open import Data.Maybe.Properties using (just-injective)
 import Data.Maybe.Relation.Unary.All as MAll
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (tt)
@@ -54,6 +55,9 @@ open import port.Strong using (module Strongly)
 open import port.Sorted.Walk using (module SortingWalk)
 open import port.Climbs using (module Ascending)
 open import port.Moves using (module Moving)
+open import port.Replant using (module Replanting)
+open import port.Told using (Tells; untold)
+open import port.Leaves using (Twin; leaves; unpinned; tw-refl)
 
 module Honesty (R : Set) where
   open Driver R using (Mach; mach; depthOf; Timer; play; finish; cascade; Step; silent; value; complete; drained; step; trace; shown; reading; begin; Read; read; marks; log; ending; noted)
@@ -64,9 +68,11 @@ module Honesty (R : Set) where
     Steps; after; steps-after; Hopped; onward; lowered; weight; loadOf; load; _≼_; _≺_; _⊏_)
   open Strongly R using (Strong; Carried; carried; closing; CtlAs; Meets; calmAs; noteAs; runAs; subAs; burstAs; popAs;
     Kernels; Owned; Meaning; Books; Path; ofˢ; seen; Sub; takeWhileˢ; part; Queue; BurstClocked; Each; Heads;
-    Lingers; Untold; Ended; DoneBy; Begins; focused; attaching; coldˢ; waiting; fired; playing; Timed; Joined)
+    Lingers; Untold; Ended; pooledL; DoneBy; Begins; focused; attaching; coldˢ; waiting; fired; playing; Timed; Joined)
   open Ascending R using (Aloft; soar)
   open Moving R using (plant; planted; later)
+  open Replanting R using (module Shift; Heading; Lingering; Pred)
+  open Strongly R using () renaming (here to hereᴾ)
   open SortingWalk R using (WellMach)
   open Machine using (Conf; Ctx; top; plug; downs; dirs; closed; doneS; cp; _⊕_; ⟨_,_,_,_,_⟩; absorbed; rising; resuming; subscribing; nx; pend;
     ofS; cutS; takeS; connS; joinS; next; att; owedCp; owedCut; feeding; attBody; owed; go;
@@ -251,6 +257,8 @@ module Honesty (R : Set) where
     -- A SUBSCRIPTION BEGUN, BY ITS PROGRAM: a cold started, an `of` or
     -- `empty` set running, an operator's source pending below it, a
     -- joiner joined, a defer's body pending.  The ghost alike.
+    --
+    -- RECOVERY: git show 9ec3e6c62e05857feabffdd65a05929de347e532:agda-impl/adequacy/Frame.agda restores `sub-heads`, a subscription at a headed position heading no sooner than it, which the old `sub-take` and `sub-flat` bodies read
     sub-cold    : ∀ {g m Γ A} {c : Ctx R Γ A} {x p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , pend (T.cold x) , subscribing , p , rs ⟩
                 → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
     sub-empty   : ∀ {g m Γ A} {c : Ctx R Γ A} {p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , pend T.empty , subscribing , p , rs ⟩
@@ -357,20 +365,42 @@ module Honesty (R : Set) where
                  (ψ : Path (Carried.tree cr) (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
                → Ended (plant ψ (coldˢ b (fired τ e (at u x fr))))
 
-    -- A live timer popped at the turn: its cold, fired, heads past where
-    -- the run is.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Lift.agda
-    behind-fire : ∀ {g m Γ A w τ e u x b π} {fr : Frame A u} (cr : Carried g m)
-                  (ψ : Path (Carried.tree cr) (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
-                → Each (Heads (Conf.pos (Mach.conf m))) (plant ψ (coldˢ b (fired τ e (at u x fr))))
+  -- A fire rewrites a cold's phase and not its node: no part revived,
+  -- the joiners told alike, the cold itself heading as before.
+  private
+    fire-heading : ∀ {Γ A w τ e u x b q} {fr : Frame A u} {E : Pred Γ}
+                 → Heading q E (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) (coldˢ b (fired τ e (at u x fr)))
+    fire-heading = record
+      { head-revive = λ j → j
+      ; head-take   = λ j → j
+      ; head-told  = λ i _ e₀ e′ → subst (λ y → Tells _ _ (untold i y)) (just-injective (trans (sym e₀) e′))
+      ; head-below  = λ ev → record { parts = λ { hereᴾ sn e → Each.parts ev hereᴾ sn e } ; pools = λ () ; rests = λ () } }
 
-    -- A timer fired leaves every tie held: a cold runs nothing past its end.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Lift.agda
-    fire-lingers : ∀ {g m Γ A w τ e u x b π} {fr : Frame A u} (cr : Carried g m)
-                   (ψ : Path (Carried.tree cr) (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
-                 → Lingers (plant ψ (coldˢ b (fired τ e (at u x fr))))
+    -- Nothing left running, alike.
+    idle-twin : ∀ {Γ A B} → Twin (U.idleᶜ {Γ = Γ} {B = A}) (U.idleᶜ {Γ = Γ} {B = B})
+    idle-twin = leaves (λ ρ d n → agree-refl n _) (λ ρ d → d) unpinned , (λ ρ d → d)
+
+    fire-lingering : ∀ {Γ A w τ e u x b} {fr : Frame A u}
+                   → Lingering (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) (coldˢ b (fired τ e (at u x fr)))
+    fire-lingering = record
+      { ling-same   = refl
+      ; ling-take   = refl
+      ; ling-rested = idle-twin
+      ; ling-pool   = λ {ls} → tw-refl (pooledL ls)
+      ; ling-below  = λ _ → record { pools = λ () ; rests = λ () } }
+
+  -- A live timer popped at the turn: its cold, fired, heads past where
+  -- the run is.
+  behind-fire : ∀ {g m Γ A w τ e u x b π} {fr : Frame A u} (cr : Carried g m)
+                (ψ : Path (Carried.tree cr) (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
+              → Each (Heads (Conf.pos (Mach.conf m))) (plant ψ (coldˢ b (fired τ e (at u x fr))))
+  behind-fire cr ψ = Shift.shift-behind ψ _ (Carried.told cr) (Carried.ended cr) fire-heading (Carried.behind cr)
+
+  -- A timer fired leaves every tie held: a cold runs nothing past its end.
+  fire-lingers : ∀ {g m Γ A w τ e u x b π} {fr : Frame A u} (cr : Carried g m)
+                 (ψ : Path (Carried.tree cr) (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
+               → Lingers (plant ψ (coldˢ b (fired τ e (at u x fr))))
+  fire-lingers cr ψ = Shift.shift-lingers ψ _ (Carried.ended cr) fire-lingering (Carried.lingers cr)
 
   -- An absorbed configuration is a re-entry state: calm, a turn to play,
   -- or a job to pop.

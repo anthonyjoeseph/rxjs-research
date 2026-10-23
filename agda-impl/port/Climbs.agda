@@ -303,6 +303,8 @@ module Ascending (R : Set) where
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Frame/Repool.agda
     --
     -- DEAD ROUTE: the old body splits on heap aliasing after the store (scan-sees, part-alike); a `plant` rewrites the node itself.
+    --
+    -- RECOVERY: git show 9ec3e6c62e05857feabffdd65a05929de347e532:agda-impl/adequacy/Frame.agda restores `heads-rescan`, a scan heading where its source does whatever its accumulator
     scan-behind : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
                 → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y)
                 → Each (Heads (Conf.pos (Mach.conf m₁))) (plant ρ (scanˢ f (f z y) v))

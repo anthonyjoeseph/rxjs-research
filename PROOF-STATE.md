@@ -8,13 +8,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE REPLANT WALK
+#### THE SHUT'S HEADS
 
-Whether the old replant walk carries: at a fire the heap passes unchanged,
-so its preservation of `Each` and `Lingers` is a walk over the planted path.
-Settled when `behind-fire` is its old body.
+Suspected false: `Heads` reads a node's step alone, and a burst skipping
+inside its range falls back, once shut out of it, to a rest no premise
+bounds. Settled by a machine counterexample, or a component-wise heads
+invariant carried by `Each` that bounds every rest.
 
-Members: `behind-fire`, `fire-lingers`.
+Members: `shut-heads`.
 
 ## Tier 1 — the adequacy theorem
 

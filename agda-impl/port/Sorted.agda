@@ -7,12 +7,12 @@
 module port.Sorted where
 
 open import Data.Bool using (true; false)
-open import Data.List using (List; []; _∷_)
+open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.Nat using (suc; _<ᵇ_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; <ᵖ-trans)
+open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; <ᵖ-trans; <ᵖ-below)
 open import operation.PureObservable using (module Driver)
 
 ------------------------------------------------------------------------
@@ -25,6 +25,10 @@ p ≤ᵖ q = p ≡ q ⊎ p <ᵖ q ≡ true
 ≤ᵖ-trans (inj₁ refl) h           = h
 ≤ᵖ-trans h           (inj₁ refl) = h
 ≤ᵖ-trans {p} {q} {r} (inj₂ a) (inj₂ b) = inj₂ (<ᵖ-trans p q r a b)
+
+-- A child comes after its parent.
+≤ᵖ-child : ∀ q {l lo} → lo ≤ᵖ q → lo ≤ᵖ (q ++ [ l ])
+≤ᵖ-child q le = ≤ᵖ-trans le (inj₂ (<ᵖ-below q []))
 
 module Sorting (R : Set) where
   open Driver R using (Mach; Step; silent; value; complete; drained; step; trace; shown; reading; marks)
