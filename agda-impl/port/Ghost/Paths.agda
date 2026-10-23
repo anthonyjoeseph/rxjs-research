@@ -108,7 +108,7 @@ module GhostingPaths (R : Set) where
       lifts-scan   : ∀ {Γ X A Δ B π} {f : A → X → A} {z} {t : Sub Γ X} {u : Sub Δ B} {ρ : Path t u π} {s S}
                    → Lifts ρ s S → Lifts (in-scan {f = f} {z} ρ) s (U.scanˢ f z S)
       lifts-cut    : ∀ {Γ A Δ B l a π} {t : Sub Γ A} {u : Sub Δ B} {ρ : Path t u π} {s S}
-                   → l ≡ true → Lifts ρ s S → Lifts (in-cut {l = l} ρ) s S
+                   → l ≡ true → Lifts ρ s S → Lifts (in-cut {l = l} {a = a} ρ) s S
       lifts-lane   : ∀ {Γ A Δ B r π} {t : Sub Γ A} {u : Sub Δ B} {ρ : Path t u π} {s S}
                    → Lifts ρ s S → Lifts (in-lane {r = r} ρ) s S
       lifts-take   : ∀ {Γ A Δ B i q tk π} {t : Sub Γ A} {u : Sub Δ B} {ρ : Path t u π} {s S}
@@ -401,7 +401,7 @@ module GhostingPaths (R : Set) where
     Healed q (in-take p)                                = Healed q p
     Healed q (in-outer p)                               = Healed q p
     Healed q (in-lanes p)                               = HealedL q p
-    Healed q (in-source {t = s} {e = e} p)              = (part s ≡ nothing → e ≡ just q) × Healed q p
+    Healed q (in-source {e = e} {t = s} p)              = (part s ≡ nothing → e ≡ just q) × Healed q p
     Healed q (in-body p)                                = Healed q p
 
     HealedL : ∀ (q : Pos) {Γ A Δ B i π} {ls : List (Sub Γ A)} {u : Sub Δ B} → PathLanes ls u i π → Set₁
