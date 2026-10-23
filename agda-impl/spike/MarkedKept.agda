@@ -9,7 +9,8 @@
 -- rise passes, the one node a mark runs, or the one former a subscribe
 -- begins.  Each clause is one frame's or one node's fact, carried to the
 -- root by `lift-≅` or `closed-hides`; no clause reads any other node, and
--- the invariant (`Inv`) is read only at the node it constrains (`wf-up`).
+-- the invariant (`spike.MarkedInv.Inv`) is read only at the node it
+-- constrains (`wf-split`).
 --
 -- So the obligations are per frame and per node, not per step and field.
 -- What is left: the frames with siblings (a flatMap's outer and lanes, a
@@ -48,6 +49,8 @@ open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; 
   Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM; search; found; run; unsub; leaf)
   renaming (cut to cutᴹ)
 open import spike.MarkedGhost
+open import spike.MarkedInv using (Unpended; Opened; Wf; Inv; module Inv; inv-at; wfI; wf-split; Owns; ofO; attO; cpO; cutO; bodyO; srcAttO; owedO; joinO; leafO; owned;
+  search-hit; NextInv; inv-next; inv-load)
 open import spike.MarkedRace using (First; go-rise; cuts-swap)
 
 open Events∞
@@ -63,84 +66,6 @@ out-≅ {r = r} {r′} e = to e , to (sym e)
     to : ∀ {x y : Events∞ _} → force x ≡ force y → ∀ {k b} → Has (out _ _ x) k b → Has (out _ _ y) k b
     to e atOut       = atOut
     to e (pastOut h) = pastOut (subst (λ z → Has z _ _) e h)
-
-------------------------------------------------------------------------
--- The invariant, read node by node
-
--- A connect's source is not ended before it is subscribed.
-Opened : CS → Set
-Opened (cs cl _ _ (just _) _ _ _ _) = cl ≡ false
-Opened (cs _ _ _ nothing _ _ _ _)   = ⊤
-
-mutual
-  Wf : ∀ {Γ A} → St Γ A → Set
-  Wf (mapS f s)              = Wf s
-  Wf (scanS f z s)           = Wf s
-  Wf (cutS l a s)            = Wf s
-  Wf (lnS b s)               = Wf s
-  Wf (takeS i q w s)         = Wf s
-  Wf (flatS op f d n q o ls) = Wf o × Wfs ls
-  Wf (connS k o b)           = Opened k × Wf o × Wf b
-  Wf _                       = ⊤
-
-  Wfs : ∀ {Γ A} → List (St Γ A) → Set
-  Wfs []       = ⊤
-  Wfs (s ∷ ls) = Wf s × Wfs ls
-
-wfs-mid : ∀ {Γ A} (pre : List (St Γ A)) {s post} → Wfs (pre ++ s ∷ post) → Wf s
-wfs-mid []        (w , _)  = w
-wfs-mid (x ∷ pre) (_ , ws) = wfs-mid pre ws
-
--- A node a run has settled on is not one still to be subscribed.
-Unpended : ∀ {Γ A} → St Γ A → Set
-Unpended (pend o) = ⊥
-Unpended _        = ⊤
-
-Settled : ∀ {R} → Conf R → Set
-Settled ⟨ c , s , absorbed , p ⟩ = Unpended s
-Settled _                        = ⊤
-
--- What the whole tree satisfies, the hole does.
-wf-up : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Wf (plug c s) → Wf s
-wf-up top                               s w = w
-wf-up (inMap f c)                       s w = wf-up c (mapS f s) w
-wf-up (inScan f z c)                    s w = wf-up c (scanS f z s) w
-wf-up (inCut l a c)                     s w = wf-up c (cutS l a s) w
-wf-up (inLn b c)                        s w = wf-up c (lnS b s) w
-wf-up (inTake i q x c)                  s w = wf-up c (takeS i q x s) w
-wf-up (inOuter op f d n q ls c)         s w = proj₁ (wf-up c (flatS op f d n q s ls) w)
-wf-up (inLanes op f d n q o pre post c) s w = wfs-mid pre (proj₂ (wf-up c (flatS op f d n q o (pre ++ s ∷ post)) w))
-wf-up (inSrc k b c)                     s w = proj₁ (proj₂ (wf-up c (connS k s b) w))
-wf-up (inBody k o c)                    s w = proj₂ (proj₂ (wf-up c (connS k o s) w))
-
-record Inv {R} (k : Conf R) : Set where
-  constructor inv
-  field
-    settled  : Settled k
-    wf       : Wf (plug (Conf.ctx k) (Conf.foc k))
-
--- The marks a node owns, as `own` lists them.
-data Owns {Γ} : ∀ {A} → St Γ A → Mark → Set₁ where
-  ofO     : ∀ {A i p} {xs : List A} → Owns (ofS i p xs) ofM
-  attO    : ∀ {A l p} {s : St Γ A} → Owns (cutS l (attAt p) s) attM
-  cpO     : ∀ {A i q p} {s : St Γ A} → Owns (takeS i q (cpAt p) s) cpM
-  cutO    : ∀ {A i q p} {s : St Γ A} → Owns (takeS i q (cutAt p) s) cutM
-  bodyO   : ∀ {X B k} {o : St Γ X} {b : St (X ∷ Γ) B} → Owns (connS k o b) bodyM
-  srcAttO : ∀ {X B k} {o : St Γ X} {b : St (X ∷ Γ) B} → Owns (connS k o b) srcAttM
-  owedO   : ∀ {X B k} {o : St Γ X} {b : St (X ∷ Γ) B} → Owns (connS k o b) owedM
-  joinO   : ∀ {A j g x q e ib} → Owns (joinS {A = A} j g x ((q , e) ∷ ib)) joinM
-  leafO   : ∀ {A b} {l : Tape A} → Owns (coldS b l) leafM
-
-owned : ∀ {Γ A} {s : St Γ A} {m} → Owns s m → Unpended s
-owned ofO     = tt
-owned attO    = tt
-owned cpO     = tt
-owned cutO    = tt
-owned bodyO   = tt
-owned srcAttO = tt
-owned owedO   = tt
-owned joinO   = tt
-owned leafO   = tt
 
 ------------------------------------------------------------------------
 -- Each frame is the node it is a hole of
@@ -248,10 +173,10 @@ private
   sub-settled p (connS k o b)           u = refl
   sub-settled p (joinS j g x ib)        u = refl
 
-  conn-plug : ∀ {Γ X B} k (b : St (X ∷ Γ) B) (s : St Γ X) (ρ : NEnv Γ) → Unpended s → Opened k
+  conn-plug : ∀ {Γ X B} k (b : St (X ∷ Γ) B) (s : St Γ X) (ρ : NEnv Γ) → Unpended s → Opened k s
             → connSrc (CS.closed k) (CS.srcAt k) (CS.endAt k) (gh b) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (connectᶜ (CS.srcAt k) (gh b) (srcG k s)) ρ
   conn-plug (cs false sl sa (just p) as ow r e) b s ρ u o rewrite sub-settled (p ⊕ [ ix 1 ]) s u = ≋-by refl refl
-  conn-plug (cs true  sl sa (just p) as ow r e) b s ρ u ()
+  conn-plug (cs true  sl sa (just p) as ow r e) b s ρ u (() , _)
   conn-plug (cs false sl sa nothing as ow r e)  b s ρ u o = ≋-by refl refl
   conn-plug {X = X} (cs true sl sa nothing as ow r e) b s ρ u o k =
     ∪-ne (burstOn-ne r (R k)) (agreeᵀ-refl k _) ,ˢ beside-ne r (same k _) (R k)
@@ -259,7 +184,7 @@ private
       R : rested {B = X} (stateᴺ (gh s) ρ) ≋ stateᴺ (restᶜ (gh s)) ρ
       R = ≋-by refl refl
 
-  src-plug : ∀ {Γ X B} k (b : St (X ∷ Γ) B) (s : St Γ X) (ρ : NEnv Γ) → Unpended s → Opened k
+  src-plug : ∀ {Γ X B} k (b : St (X ∷ Γ) B) (s : St Γ X) (ρ : NEnv Γ) → Unpended s → Opened k s
            → srcFrame k (gh b) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (gh (connS k s b)) ρ
   src-plug k b s ρ u o = done-plug (CS.owedAt k) (CS.srcLive k) _ ρ (conn-plug k b s ρ u o)
 
@@ -325,9 +250,6 @@ module _ {R : Set} where
   -- The leaves: each one frame's or one node's fact
 
   postulate
-    -- The least mark is a node's own, and its focus plugs back to the tree.
-    search-hit : ∀ {Γ A} (t : St [] R) {c : Ctx R Γ A} {s m key} → search top t ≡ just (found (Γ , A , c , s) m key)
-               → plug c s ≡ t × Owns s m
     -- Nothing owed, nothing more shown.
     quiet-empty : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , absorbed , p ⟩ → search top (plug c s) ≡ nothing
                 → M ⟨ c , s , absorbed , p ⟩ ≅ hush
@@ -390,7 +312,7 @@ module _ {R : Set} where
   plug-up (inLanes op f d n q o pre post c) s u w =
     ≅-trans (lift-≅ c true (lanes-plug op f d n q o pre post s (envAt c))) (plug-up c (flatS op f d n q o (pre ++ s ∷ post)) tt w)
   plug-up (inSrc k b c)                     s u w =
-    ≅-trans (lift-≅ c true (src-plug k b s (envAt c) u (proj₁ (wf-up c (connS k s b) w)))) (plug-up c (connS k s b) tt w)
+    ≅-trans (lift-≅ c true (src-plug k b s (envAt c) u (proj₁ (proj₂ (wf-split c (connS k s b) tt w))))) (plug-up c (connS k s b) tt w)
   plug-up (inBody k o c)                    s u w = ≅-trans (lift-≅ c true (body-plug k o s (envAt c))) (plug-up c (connS k o s) tt w)
 
   lift-plug : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Unpended s → Wf (plug c s) → M ⟨ c , s , absorbed , p ⟩ ≅ meaning (gh (plug c s)) []ᴬ
@@ -535,8 +457,8 @@ module _ {R : Set} where
   cut-rest c (connS k o b)           refl = ≅-refl
   cut-rest c (joinS j g x ib)        refl = ≅-refl
 
-  opened : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) {p} → Inv ⟨ c , connS k o b , absorbed , p ⟩ → Opened k
-  opened c k o b v = proj₁ (wf-up c (connS k o b) (Inv.wf v))
+  opened : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) {p} → Inv ⟨ c , connS k o b , absorbed , p ⟩ → Opened k o
+  opened c k o b v = proj₁ (Inv.focWf v)
 
   -- A cold's frame played on: a value shown, a stall or a close skipped.
   playing : ∀ {Γ A t} (c : Ctx R Γ A) τ u i (fr : Frame A t) p
@@ -558,7 +480,7 @@ module _ {R : Set} where
   runs c (takeS i x (cutAt q) s) cutM p cutO v with cutᴹ s in e
   ... | s′ , t = cut-rest c s e
   runs c (connS (cs cl sl sa nothing as ow r e) o b) bodyM p bodyO v = ≅-refl
-  runs c (connS (cs cl sl sa (just q) as ow r e) o b) bodyM p bodyO v with opened c (cs cl sl sa (just q) as ow r e) o b v
+  runs c (connS (cs cl sl sa (just q) as ow r e) o b) bodyM p bodyO v with proj₁ (opened c (cs cl sl sa (just q) as ow r e) o b v)
   ... | refl = lift-≅ c true (conn-src ow sl r e (gh b) (subOr (q ⊕ [ ix 1 ]) o) (envAt c))
   runs c (connS (cs cl sl sa ba nothing ow r e) o b)          srcAttM p srcAttO v = ≅-refl
   runs c (connS (cs cl true sa ba (just q) ow r e) o b)       srcAttM p srcAttO v = ≅-refl
@@ -608,8 +530,8 @@ module _ {R : Set} where
   kept ⟨ c , s , absorbed , p ⟩ v with search top (plug c s) in e
   ... | nothing = quiet-empty c s p v e
   ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
-  ...   | pl , own = kept-pre (tookᴰ (run c′ s′ m p)) (refocus c s c′ s′ p (Inv.settled v) (owned own) (Inv.wf v) pl)
-                       (runs c′ s′ m p own (inv (owned own) (subst Wf (sym pl) (Inv.wf v))))
+  ...   | pl , own = kept-pre (tookᴰ (run c′ s′ m p)) (refocus c s c′ s′ p (Inv.settled v) (owned own) (wfI v) pl)
+                       (runs c′ s′ m p own (inv-at c′ s′ p (owned own) (subst Wf (sym pl) (wfI v))))
 
   ----------------------------------------------------------------------
   -- THE TOP LINE: whatever the machine shows, the meaning shows
@@ -620,16 +542,8 @@ module _ {R : Set} where
     later-s : ∀ {k t k′ q b} → step k ≡ silent t k′ → Shows k′ q b → Shows k q b
     later-v : ∀ {k t p a k′ q b} → step k ≡ value t p a k′ → Shows k′ q b → Shows k q b
 
-  NextInv : Step → Set
-  NextInv (silent t k)    = Inv k
-  NextInv (value t p a k) = Inv k
-  NextInv (complete p)    = ⊤
-  NextInv drained         = ⊤
-
   postulate
-    -- Every step keeps the invariant.
-    inv-next : ∀ k → Inv k → NextInv (step k)
-    -- And the machine shows everything the meaning does: progress.
+    -- The the machine shows everything the meaning does: progress.
     shows-all : ∀ {k q b} → Inv k → Has (M k) q b → Shows k q b
 
   sound : ∀ {k q b} → Inv k → Shows k q b → Has (M k) q b
@@ -637,9 +551,6 @@ module _ {R : Set} where
   sound {k} v (shown-c e)    = proj₂ (subst (KeptFrom (M k)) e (kept k v)) atEnd
   sound {k} v (later-s e sh) = proj₂ (subst (KeptFrom (M k)) e (kept k v)) (sound (subst NextInv e (inv-next k v)) sh)
   sound {k} v (later-v e sh) = proj₂ (subst (KeptFrom (M k)) e (kept k v)) (pastOut (sound (subst NextInv e (inv-next k v)) sh))
-
-  inv-load : (o : Obs Timeline [] R) → Inv (load o)
-  inv-load o = inv tt tt
 
   -- A program run by the machine shows exactly what `denotation.Unfold`'s
   -- meaning of it subscribed at the root shows.
