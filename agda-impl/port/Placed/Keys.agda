@@ -5,7 +5,7 @@ module port.Placed.Keys where
 open import Data.Bool using (true; false)
 open import Data.Empty using (⊥-elim)
 open import Data.List.Properties using (∷-injective; ∷-injectiveʳ)
-open import Data.Sum using (inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.Nat using (ℕ; suc; _<ᵇ_; _+_; _≤_; _<_; z≤n; s≤s)
 open import Data.Nat.Properties using (+-monoʳ-≤; <⇒≤; <-≤-trans; ≤-trans; m≤n+m; m≤m+n; <-irrefl)
@@ -133,6 +133,14 @@ no-tick (_ ∷ _ ∷ _) m ()
 prefix-refl : ∀ k → Prefix k k
 prefix-refl []      = tt
 prefix-refl (a ∷ k) = refl , prefix-refl k
+
+-- A prefix is the position itself or a proper one.
+prefix-plus : ∀ k h → Prefix k h → k ≡ h ⊎ Prefix⁺ k h
+prefix-plus []      []      tt         = inj₁ refl
+prefix-plus []      (_ ∷ _) tt         = inj₂ tt
+prefix-plus (a ∷ k) (b ∷ h) (refl , q) with prefix-plus k h q
+... | inj₁ refl = inj₁ refl
+... | inj₂ q⁺   = inj₂ (refl , q⁺)
 
 -- What a flatMap shows just before a lane, strictly under `p`, puts the
 -- lane under `p`.
