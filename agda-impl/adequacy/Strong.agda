@@ -153,10 +153,9 @@ module Strongly (R : Set) where
     forget (connectˢ k r e rt s b)            = connS k (forget s) (forget b)
     forget (joinˢ j g x st)                   = joinS j g x
 
-    private
-      forgetᴸ : ∀ {Γ B} → List (Sub Γ B) → List (St Γ B)
-      forgetᴸ []       = []
-      forgetᴸ (s ∷ ls) = forget s ∷ forgetᴸ ls
+    forgetᴸ : ∀ {Γ B} → List (Sub Γ B) → List (St Γ B)
+    forgetᴸ []       = []
+    forgetᴸ (s ∷ ls) = forget s ∷ forgetᴸ ls
 
   -- The machine's tree is the witness, forgotten.
   Kernels : Sub [] R → Conf R → Set₁

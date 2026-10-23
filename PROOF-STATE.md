@@ -42,13 +42,11 @@ Members: `owned-idle`, `meaning-idle`, `sorted-idle`, `owned-popped`,
 
 #### THE PLANTED CLIMBS
 
-Untried, and every old body a dead route: whether a climb's write, read as a
-`plant` (a scan's accumulator, a take's stage) or a job (`admit`, `dequeue`,
-`feeds`, `rets`), keeps each carrier part. Settled when `scan-owned` and
-`take-out` are bodies or refuted.
+A scan's accumulator write keeps the carrier parts read through `_≈_`; open:
+whether a take's stage or a job (`admit`, `dequeue`, `feeds`, `rets`) does.
+Settled when `take-out` is a body or refuted.
 
-Members: `scan-kernels`, `scan-lifts`, `scan-lefts`, `scan-owned`,
-`scan-meaning`, `scan-queue`, `scan-lingers`, `gone-take`, `take-pass`, `take-out`, `take-end`, `call-outer`,
+Members: `scan-lifts`, `scan-lefts`, `gone-take`, `take-pass`, `take-out`, `take-end`, `call-outer`,
 `call-lanes`, `call-source`, `body-rest-heads`, `owned-body`, `emit-void`,
 `emit-open`, `burst-spent`.
 
@@ -91,11 +89,9 @@ Members: `sub-cold`, `sub-empty`, `sub-of`, `sub-map`, `sub-scan`,
 
 #### THE CLIMB FRAMES
 
-Believed unfoldings: a context climbing one frame, and the climbs with no old
-body. Settled when each is a body.
+Believed unfoldings: the climbs with no old body. Settled when each is a body.
 
-Members: `of-path`, `map-at`, `scan-at`, `take-at`, `take-path`, `body-at`,
-`scan-books`, `scan-load`, `call-lane`, `emit-shut`, `last-void`,
+Members: `scan-books`, `scan-load`, `call-lane`, `emit-shut`, `last-void`,
 `last-enter`, `take1-void`, `take1-enter`.
 
 #### THE LINK
