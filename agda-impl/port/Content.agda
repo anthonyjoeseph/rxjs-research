@@ -37,6 +37,7 @@ open import denotation.MonotonicList.Events using (Events; Pos; Time; tick; root
   renaming (sub to subᴾ)
 open import denotation.MonotonicList using (observe; Agree; agree-refl)
 import denotation.Unfold as U
+import Tree as T
 open import denotation.Denote using (⟦_⟧)
 open import operation.PureObservable using (PureObs; module Pure; module Driver; module Machine; tape; over)
 open import port.Sorted using (_≤ᵖ_)
@@ -233,10 +234,29 @@ module Honesty (R : Set) where
                 → Mach.conf m ≡ ⟨ c , s , resuming τ , p , rs ⟩ → res s τ ≡ idle
                 → WellMach lo (record m { conf = ⟨ c , s , absorbed , p , rs ⟩ })
 
-    -- A pending node begun, likewise.
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Lift/Order.agda
-    sub-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {o p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , pend o , subscribing , p , rs ⟩
-               → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+    -- A SUBSCRIPTION BEGUN, BY ITS PROGRAM: a cold started, an `of` or
+    -- `empty` set running, an operator's source pending below it, a
+    -- joiner joined, a defer's body pending.  The ghost alike.
+    sub-cold    : ∀ {g m Γ A} {c : Ctx R Γ A} {x p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , pend (T.cold x) , subscribing , p , rs ⟩
+                → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+    sub-empty   : ∀ {g m Γ A} {c : Ctx R Γ A} {p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , pend T.empty , subscribing , p , rs ⟩
+                → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+    sub-of      : ∀ {g m Γ A} {c : Ctx R Γ A} {xs p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , pend (T.of xs) , subscribing , p , rs ⟩
+                → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+    sub-map     : ∀ {g m Γ A X} {c : Ctx R Γ A} {f : X → A} {o p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , pend (T.map f o) , subscribing , p , rs ⟩
+                → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+    sub-scan    : ∀ {g m Γ A X} {c : Ctx R Γ A} {f : A → X → A} {z o p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , pend (T.scan f z o) , subscribing , p , rs ⟩
+                → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+    sub-take    : ∀ {g m Γ A} {c : Ctx R Γ A} {i q o p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , pend (T.takeWhile i q o) , subscribing , p , rs ⟩
+                → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+    sub-flat    : ∀ {g m Γ A X} {c : Ctx R Γ A} {op} {f : X → _} {o p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , pend (T.flatMap op f o) , subscribing , p , rs ⟩
+                → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+    sub-connect : ∀ {g m Γ A X} {c : Ctx R Γ A} {o : T.Obs _ Γ X} {b p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , pend (T.connect o b) , subscribing , p , rs ⟩
+                → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+    sub-joined  : ∀ {g m Γ A} {c : Ctx R Γ A} {x p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , pend (T.connected x) , subscribing , p , rs ⟩
+                → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+    sub-defer   : ∀ {g m Γ A} {c : Ctx R Γ A} {l p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , pend (T.defer l) , subscribing , p , rs ⟩
+                → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
 
     -- A spent burst dropped, the stack resumed: the turn over nothing.
     -- The ghost alike, a turn fewer.
@@ -486,6 +506,29 @@ module Honesty (R : Set) where
   burst-onward {m = mach k clk tms (finish π e d ∷ ts)} cr refl refl dl
     with finishing-silent (mach k clk tms (finish π e d ∷ ts)) e ts (poke π k)
   ... | m′ , fs = m′ , trans (burst-step dl) fs , burst-finish cr refl refl dl (trans (burst-step dl) fs)
+
+  private
+    -- A joiner's subscription is silent, joined or completed.
+    joined-silent : ∀ {Γ A} {c : Ctx R Γ A} {x p rs clk tms ts}
+                  → Σ Mach λ m′ → step (mach ⟨ c , pend (T.connected x) , subscribing , p , rs ⟩ clk tms ts) ≡ silent m′
+    joined-silent {c = c} {x} {p} with Machine.joinUp p c x [] in j
+    ... | true  , _ rewrite j = _ , refl
+    ... | false , _ rewrite j = _ , refl
+
+  -- A subscription begun, by its program.
+  sub-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {o p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , pend o , subscribing , p , rs ⟩
+             → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+  sub-onward {m = mach _ _ _ _} {o = T.cold _}          cr refl = _ , refl , sub-cold cr refl refl
+  sub-onward {m = mach _ _ _ _} {o = T.empty}           cr refl = _ , refl , sub-empty cr refl refl
+  sub-onward {m = mach _ _ _ _} {o = T.of _}            cr refl = _ , refl , sub-of cr refl refl
+  sub-onward {m = mach _ _ _ _} {o = T.map _ _}         cr refl = _ , refl , sub-map cr refl refl
+  sub-onward {m = mach _ _ _ _} {o = T.scan _ _ _}      cr refl = _ , refl , sub-scan cr refl refl
+  sub-onward {m = mach _ _ _ _} {o = T.takeWhile _ _ _} cr refl = _ , refl , sub-take cr refl refl
+  sub-onward {m = mach _ _ _ _} {o = T.flatMap _ _ _}   cr refl = _ , refl , sub-flat cr refl refl
+  sub-onward {m = mach _ _ _ _} {o = T.connect _ _}     cr refl = _ , refl , sub-connect cr refl refl
+  sub-onward {m = mach _ _ _ _} {o = T.defer _}         cr refl = _ , refl , sub-defer cr refl refl
+  sub-onward {m = mach _ _ _ _} {o = T.connected _}     cr refl with joined-silent
+  ... | m′ , js = m′ , js , sub-joined cr refl js
 
   -- A job owed nothing by its node: dropped, the ghost alike, the
   -- control lighter.
