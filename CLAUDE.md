@@ -72,7 +72,7 @@ Every PROOF-STATE.md tier discharged: no postulates, everything typechecks. "Pas
 - **The tell, and it is reliable: if writing the directive required you to do the analysis, you have already done the expensive part.**
 - Parallel workers authorized; Agda builds one at a time.
 - **Directives carry the law** — every worker prompt restates the rules it needs.
-- Workers don't commit. Land green work via a PR, never a direct push to main — ask first.
+- Workers don't commit. Land green work via a PR, never a direct push to main. **Open the PR without asking (Anthony).**
 - **Stage explicitly while a worker holds a file — never `git add -A` (Anthony).**
 - **Run continuously** (Anthony: "continue and continue, don't stop for context window or usage credits"). Review, merge, launch the next.
 
