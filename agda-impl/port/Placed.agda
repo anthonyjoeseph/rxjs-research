@@ -14,22 +14,39 @@ open import Tree using (Obs; cold; empty; of; map; scan; takeWhile; flatMap; con
 open import denotation.MonotonicList.Events using (Timeline; ix; root; timelineAt)
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
+open import port.Finite using (Finite; trunc; finite-trunc; trunc-agree)
 open import port.Placed.Order using (Alienᴱ; Headed; Ordered; Owned; Placed; Sorted; Steady;
   every-lookup; headed-snoc; prefix-++)
-open import port.Placed.Keys using (alienᴱ-owned; every-reach)
+open import port.Placed.Keys using (alienᴱ-owned; every-reach; ordered-lim; steady-lim)
 open import port.Placed.Heads using (apart-sub; headed-lane; start-within)
 open import port.Placed.Rising using (alien-shown; alien-sub; headed-sub)
 
 postulate
-  -- The meaning of a subscribe is ordered.
+  -- A FINITE PROGRAM SUBSCRIBED IS IN ORDER.
   --
   -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Placed.agda
-  ordered-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ → Ordered (U.meaning (U.subscribe o p) ρ)
+  ordered-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+               → Ordered (U.meaning (U.subscribe o p) ρ)
 
-  -- The meaning of a subscribe is steady.
+  -- A FINITE PROGRAM SUBSCRIBED IS STEADY.
   --
   -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Placed.agda
-  steady-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ → Steady (U.meaning (U.subscribe o p) ρ)
+  steady-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+              → Steady (U.meaning (U.subscribe o p) ρ)
+
+-- A PROGRAM SUBSCRIBED IS IN ORDER AND STEADY: its truncations are, and
+-- it agrees with each for as many steps as it is deep.
+ordered-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ → Ordered (U.meaning (U.subscribe o p) ρ)
+ordered-sub o p ρ hp so cl =
+  ordered-lim (λ n → U.meaning (U.subscribe (trunc n o) p) ρ) _
+    (λ n → ordered-subᶠ (trunc n o) (finite-trunc n o) p ρ hp so cl)
+    (λ n → trunc-agree n o p ρ)
+
+steady-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ → Steady (U.meaning (U.subscribe o p) ρ)
+steady-sub o p ρ hp so cl =
+  steady-lim (λ n → U.meaning (U.subscribe (trunc n o) p) ρ) _
+    (λ n → steady-subᶠ (trunc n o) (finite-trunc n o) p ρ hp so cl)
+    (λ n → trunc-agree n o p ρ)
 
 -- A subscribe at a headed, sorted, alien position is placed.
 placed-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ → Placed (U.subscribe o p) ρ

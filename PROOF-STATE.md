@@ -10,12 +10,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE CARRIER'S TOWER
 
-Untried: whether the old finite-ordering tower (`ordered-subᶠ`,
-`steady-subᶠ` over Burst, Calm, FlatOrder, FlatAfter, Trail, Walk, and
-Finite's truncation) carries to the current Unfold. Settled when both are
+Untried: whether the per-constructor induction (`ordered-subᶠ`,
+`steady-subᶠ`) carries to the current Unfold — each case needs the submodule
+tower (Trail, Burst, Calm, FlatOrder, FlatAfter, Walk). Settled when both are
 bodies.
 
-Members: `ordered-sub`, `steady-sub`.
+Members: `ordered-subᶠ`, `steady-subᶠ`.
 
 #### THE STRONG STEP
 
