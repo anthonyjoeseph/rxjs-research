@@ -26,7 +26,7 @@ import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
 open import port.Placed.Order using (Alienᴱ; Atop; Clear; Every; EveryT; EveryTs; Everys; Every∞; Ordered; Orders; Owned; Past;
-  Prefix; Reaches; Steadies; Steady; Tagged; every; every-monoᴱ; every-onward; every-tailOf;
+  Prefix; Reaches; out-here; out-there; skip-here; skip-there; Steadies; Steady; Tagged; every; every-monoᴱ; every-onward; every-tailOf;
   everyT-burstOn; everyT-idle; everyT-∪; everyᵀ; every∞-mono; ordered; prefix-++; prefix-trans;
   steady)
 
