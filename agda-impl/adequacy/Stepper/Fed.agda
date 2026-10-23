@@ -8,7 +8,7 @@
 -- its own, the step alien to the body's region; a lane yet to subscribe
 -- is reached alike.  Likewise a node told a source's end, its sources
 -- alike at every depth, the end alien where its source was.
-module port.Stepper.Fed where
+module adequacy.Stepper.Fed where
 
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
@@ -24,14 +24,14 @@ open import denotation.MonotonicList using (agree-refl; agree-sym)
 open import denotation.NonExpansive using (Agreeˢ)
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
-open import port.Sane using (Sane; Saneᴹ; Saneᴸ; Mode; runs; allLive)
-open import port.Placed.Order using (Alienᴱ; Every; Everyᴱ; Placed; Placedᴸ; Placedᴹ; Sorted; Within; every; every-lookup)
-open import port.Placed.Keys using (ordered-≈; every-≈)
-open import port.Placed.Rising using (apart-join)
-open import port.Placed.Heads using (apart-closed; feed-keyed; owned-closed; owned-fit; shut-keyed)
-open import port.Env using (Same; everyᴱ-agree; lookup-ne; meaning-same; reaches-agree; replay-ne; same-cons; sorted-agree)
-open import port.Stepper.Past using (_≃_; alike; shows)
-open import port.Stepper.Parts using (Fed; fed-here; fed-there; feed-alikeⁱ; shut-alikeⁱ)
+open import adequacy.Sane using (Sane; Saneᴹ; Saneᴸ; Mode; runs; allLive)
+open import adequacy.Placed.Order using (Alienᴱ; Every; Everyᴱ; Placed; Placedᴸ; Placedᴹ; Sorted; Within; every; every-lookup)
+open import adequacy.Placed.Keys using (ordered-≈; every-≈)
+open import adequacy.Placed.Rising using (apart-join)
+open import adequacy.Placed.Heads using (apart-closed; feed-keyed; owned-closed; owned-fit; shut-keyed)
+open import adequacy.Env using (Same; everyᴱ-agree; lookup-ne; meaning-same; reaches-agree; replay-ne; same-cons; sorted-agree)
+open import adequacy.Stepper.Past using (_≃_; alike; shows)
+open import adequacy.Stepper.Parts using (Fed; fed-here; fed-there; feed-alikeⁱ; shut-alikeⁱ)
 
 open _≃_
 open Agreeˢ using (nowˢ)

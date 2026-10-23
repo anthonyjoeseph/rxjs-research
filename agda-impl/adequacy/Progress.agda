@@ -2,14 +2,14 @@
 
 -- PROGRESS: whatever item the meaning's events reach, finitely many steps
 -- of the machine, read to as many ticks, reach.  The upper half of the
--- link (`port.Adequacy`).
+-- link (`adequacy.Adequacy`).
 --
 -- From a re-entry configuration the machine records the ghost's value,
 -- ends or drains with it, or runs silently to a ghost past its skips
--- (`port.Content`'s `Hop`).  A value or a skip passed lowers how far
+-- (`adequacy.Content`'s `Hop`).  A value or a skip passed lowers how far
 -- into the residual the item lies; a ghost left where it was lowers the
 -- witness's remaining work (`measure`), which is well-founded.
-module port.Progress where
+module adequacy.Progress where
 
 open import Data.Bool using (true; false; T)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -28,10 +28,10 @@ open import denotation.Denote using (⟦_⟧)
 import denotation.Unfold as U
 open import operation.Placed using (Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ; items)
 open import operation.PureObservable using (PureObs; module Driver)
-open import port.Content using (module Honesty)
-open import port.Ghost using (module Ghosting)
-open import port.Strong using (module Strongly)
-open import port.Unsub using (module Unsubbing)
+open import adequacy.Content using (module Honesty)
+open import adequacy.Ghost using (module Ghosting)
+open import adequacy.Strong using (module Strongly)
+open import adequacy.Unsub using (module Unsubbing)
 
 open Events∞
 

@@ -5,7 +5,7 @@
 -- as many, each operator's own non-expansiveness carried through the
 -- node; and sources alike at every depth leave a node in order alike,
 -- every order predicate being read off the steps alone.
-module port.Env where
+module adequacy.Env where
 
 open import Data.List using (List; []; _∷_; _++_; [_])
 import Data.List as L
@@ -28,9 +28,9 @@ open import denotation.Compositional using (EnvAgree; []ᵉ; _∷ᵉ_; deferᴰ-
 open import denotation.Denote using (flatOp)
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
-open import port.Placed.Order using (Everyᴱ; Reaches; out-here; skip-here; out-there; skip-there; Sorted)
-open import port.Placed.Keys using (ordered-≈; steady-≈; every-≈)
-open import port.Deep using (Deep; Deeps; DeepR; Deepᴹ; Deepᴸ; DeepRᴹ; DeepRᴸ)
+open import adequacy.Placed.Order using (Everyᴱ; Reaches; out-here; skip-here; out-there; skip-there; Sorted)
+open import adequacy.Placed.Keys using (ordered-≈; steady-≈; every-≈)
+open import adequacy.Deep using (Deep; Deeps; DeepR; Deepᴹ; Deepᴸ; DeepRᴹ; DeepRᴸ)
 
 open Events∞
 open Tail∞

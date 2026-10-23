@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
-module port.Placed.Calm where
+module adequacy.Placed.Calm where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -22,10 +22,10 @@ import denotation.MonotonicList.Events as M
 import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
-open import port.Placed.Order using (Atop; Clear; Disjoint; Every; EveryT; Ext; Ordered; Owned; Past; Steady; every; everyᵀ; ext; ext-eq; ordered; owned-ext; prefix-++; prefix-trans; steady)
-open import port.Placed.Keys using (earliest-all; ix-mark; owned-trans; snoc-inj; tagged-++; tagged-mark)
-open import port.Placed.Rising using (AtopT; Atopᴹ; Beyond; apart-mark; ext-snoc; prefix-split; snoc-atop)
-open import port.Placed.Trail using (FlatT; SortedT; Sp; Trail; TrailE; disjoint-swap; trail; trailᶠ; t≢f)
+open import adequacy.Placed.Order using (Atop; Clear; Disjoint; Every; EveryT; Ext; Ordered; Owned; Past; Steady; every; everyᵀ; ext; ext-eq; ordered; owned-ext; prefix-++; prefix-trans; steady)
+open import adequacy.Placed.Keys using (earliest-all; ix-mark; owned-trans; snoc-inj; tagged-++; tagged-mark)
+open import adequacy.Placed.Rising using (AtopT; Atopᴹ; Beyond; apart-mark; ext-snoc; prefix-split; snoc-atop)
+open import adequacy.Placed.Trail using (FlatT; SortedT; Sp; Trail; TrailE; disjoint-swap; trail; trailᶠ; t≢f)
 
 open Events∞
 open Tail∞

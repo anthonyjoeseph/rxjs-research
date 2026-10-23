@@ -5,7 +5,7 @@
 -- leaves.  Stated at the root, where no connect's source is in scope;
 -- inside a body the step is the run's next event only if it comes before
 -- each running source's, its pool's and each ended source's rest.
-module port.Stepper where
+module adequacy.Stepper where
 
 open import Data.Bool using (Bool; true; false; T)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -24,21 +24,21 @@ open import denotation.MonotonicList.Events using (Events; Events∞; out; skip;
   <ᵖ-irrefl; <ᵖ-asym; <ᵖ-below; <ᵖ-split; <ᵖ-step)
 open import denotation.MonotonicList using (Agree; Agreeᵀ; stop; stopᵀ; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agreeᵀ-refl; agreeᵀ-sym; agree-trans)
 open import denotation.NonExpansive using (Agreeˢ; _,ˢ_; beside-ne; body-ne; before-agree; ∪-ne; burstOn-ne)
-open import port.Stepper.Past using (Belowᴱ; Clear; Clearᴱ; First; Firsts; Firstᴸ; Firstᴹ; Floor; Floorᴱ; Past; Pastᴱ; Shy; Skips;
+open import adequacy.Stepper.Past using (Belowᴱ; Clear; Clearᴱ; First; Firsts; Firstᴸ; Firstᴹ; Floor; Floorᴱ; Past; Pastᴱ; Shy; Skips;
   Skipsᴸ; Skipsᴹ; _≃_; afterᴱ; alike; before-after; clear-floor; clear-lower; first-join;
   floorᴱ-agree; head-map; head-scan; join-skips; one-map; one-scan; one-take; past-before;
   past-map; past-scan; past-take; past-under; shows; under-≡)
-open import port.Stepper.Flat using (earliest-found; flat-first)
-open import port.Stepper.Parts using (<ᵖ-either; after-map; after-scan; after-take; agree-hush; agree-shown; ahead-split; before-false; before-pos; belowᴱ-shown; burst-after; bursting-skips; clear-take; defer-skips; ended-hush; ended-skips; ended-split; feed-alike; first-bursting; first-defer; first-rest; first-under; first-union; flat-skips; frames-after; head-body; head-shut; hush?; hushˢ?; move; of-after; one-body; one-bodyˢ; one-shut; one-shutˢ; over-before; pastᴱ-body; pastᴱ-pos; pick; pos-pastᴱ; pos-shown; posᴱ; rest-skips; shownˢ; shut-alike; side-ahead; source-hush; source-split; under-before; under-or; under-shownˢ; under-skips; union-skips)
+open import adequacy.Stepper.Flat using (earliest-found; flat-first)
+open import adequacy.Stepper.Parts using (<ᵖ-either; after-map; after-scan; after-take; agree-hush; agree-shown; ahead-split; before-false; before-pos; belowᴱ-shown; burst-after; bursting-skips; clear-take; defer-skips; ended-hush; ended-skips; ended-split; feed-alike; first-bursting; first-defer; first-rest; first-under; first-union; flat-skips; frames-after; head-body; head-shut; hush?; hushˢ?; move; of-after; one-body; one-bodyˢ; one-shut; one-shutˢ; over-before; pastᴱ-body; pastᴱ-pos; pick; pos-pastᴱ; pos-shown; posᴱ; rest-skips; shownˢ; shut-alike; side-ahead; source-hush; source-split; under-before; under-or; under-shownˢ; under-skips; union-skips)
 
 open Agreeˢ using (nowˢ)
 import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
-open import port.Sane using (Sane; Saneᴹ; Saneᴸ; Mode; runs; over; Rested; step-rested)
-open import port.Placed.Order using (still; Placed; Placedᴹ; Placedᴸ; Sides)
-open import port.Placed.Heads using (apart-sides)
-open import port.Placed.Keys using (ahead-quiet)
+open import adequacy.Sane using (Sane; Saneᴹ; Saneᴸ; Mode; runs; over; Rested; step-rested)
+open import adequacy.Placed.Order using (still; Placed; Placedᴹ; Placedᴸ; Sides)
+open import adequacy.Placed.Heads using (apart-sides)
+open import adequacy.Placed.Keys using (ahead-quiet)
 
 open _≃_
 open Events∞

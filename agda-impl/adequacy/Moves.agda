@@ -1,7 +1,7 @@
 {-# OPTIONS --guardedness #-}
 
--- MOVES: the witness (`port.Strong`'s `Sub`) rewritten at one node.
-module port.Moves where
+-- MOVES: the witness (`adequacy.Strong`'s `Sub`) rewritten at one node.
+module adequacy.Moves where
 
 open import Data.Bool using (true)
 open import Data.List using (List; []; _∷_)
@@ -12,7 +12,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import denotation.MonotonicList.Events using (_<ᵖ_; <ᵖ-trans)
 open import operation.PureObservable using (module Driver)
-open import port.Strong using (module Strongly)
+open import adequacy.Strong using (module Strongly)
 
 module Moving (R : Set) where
   open Driver R using (Timer; cascade)

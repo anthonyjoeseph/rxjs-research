@@ -3,13 +3,13 @@
 -- THE WALK: a well configuration rises.  `WellMach` is the machine's
 -- invariant, kept by every step (`preserve`) and held at the launch
 -- (`begin-well`); a run from a well configuration is a rising one.
-module port.Sorted.Walk where
+module adequacy.Sorted.Walk where
 
 open import Data.List using ([])
 
 open import denotation.MonotonicList.Events using (Pos; root)
 open import operation.PureObservable using (PureObs; module Driver)
-open import port.Sorted using (_≤ᵖ_; module Sorting)
+open import adequacy.Sorted using (_≤ᵖ_; module Sorting)
 
 module SortingWalk (R : Set) where
   open Driver R using (Mach; Step; silent; value; complete; drained; step; begin)

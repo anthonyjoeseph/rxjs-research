@@ -4,7 +4,7 @@
 -- conditions `Lifts` reads at each ancestor, what each lift leaves free,
 -- the path split along each half, and path-length arithmetic used by the
 -- climbing induction.
-module port.Ghost.Paths where
+module adequacy.Ghost.Paths where
 
 open import Data.Bool using (true; false)
 open import Data.Empty using (⊥)
@@ -19,8 +19,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 import denotation.Unfold as U
 open import denotation.MonotonicList.Events using (Pos; ix; _<ᵖ_)
-open import port.Leaves using (Leaves)
-open import port.Strong using (module Strongly)
+open import adequacy.Leaves using (Leaves)
+open import adequacy.Strong using (module Strongly)
 
 module GhostingPaths (R : Set) where
   open Strongly R using

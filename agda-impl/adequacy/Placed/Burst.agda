@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
-module port.Placed.Burst where
+module adequacy.Placed.Burst where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -24,11 +24,11 @@ import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
-open import port.Placed.Order using (Atop; Clear; Disjoint; Every; EveryT; Every∞; Ext; Ordered; Owned; Past; Prefix; Steady; Tagged; every; everyT-idle; everyT-mono; everyᵀ; ext; ext-irrefl; ordered; prefix-++; steady)
-open import port.Placed.Keys using (Mark; everyT-≈; ix-mark; last-mark; owned-trans; owned-weigh; prefix-refl; rest-agree; snoc-inj; tagged-prefix; tagged-sub; tagged-weigh; weigh; weighˡ)
-open import port.Placed.Rising using (AtopT; below-under)
-open import port.Placed.Trail using (FlatT; Marked; SortedT; Trail; Trailing; atopT-every; ext-prefix; flatT-idle; flatᵀ; inside-prefix; marked-cue; marks-past; marks-prefix; marks-under; past-noext; reshown; shown; sortedT-idle; sortedᵀ; trail; trailᶠ)
-open import port.Placed.FlatAfter using (Going; Head; take-ahead)
+open import adequacy.Placed.Order using (Atop; Clear; Disjoint; Every; EveryT; Every∞; Ext; Ordered; Owned; Past; Prefix; Steady; Tagged; every; everyT-idle; everyT-mono; everyᵀ; ext; ext-irrefl; ordered; prefix-++; steady)
+open import adequacy.Placed.Keys using (Mark; everyT-≈; ix-mark; last-mark; owned-trans; owned-weigh; prefix-refl; rest-agree; snoc-inj; tagged-prefix; tagged-sub; tagged-weigh; weigh; weighˡ)
+open import adequacy.Placed.Rising using (AtopT; below-under)
+open import adequacy.Placed.Trail using (FlatT; Marked; SortedT; Trail; Trailing; atopT-every; ext-prefix; flatT-idle; flatᵀ; inside-prefix; marked-cue; marks-past; marks-prefix; marks-under; past-noext; reshown; shown; sortedT-idle; sortedᵀ; trail; trailᶠ)
+open import adequacy.Placed.FlatAfter using (Going; Head; take-ahead)
 
 open Events∞
 open Tail∞

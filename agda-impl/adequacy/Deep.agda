@@ -4,7 +4,7 @@
 -- looks at no node under a rest, a union, a burst or an ended source, so
 -- the order a run's rests keep is carried beside it.  A connect is in
 -- order as its source's burst is, so every piece of every cut is.
-module port.Deep where
+module adequacy.Deep where
 
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.All using (_∷_)
@@ -16,10 +16,10 @@ open import denotation.MonotonicList.Events using (Tail; Tail∞; pin; idle; ix;
 import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
-open import port.Placed.Order using (Atop; Ordered; Reaches; Headed; Sorted; Alienᴱ; ordered)
-open import port.Placed.Rising using (AtopT)
-open import port.Placed.Trail using (SortedT; sortedᵀ; sortedT-idle; sortedT-∪)
-open import port.Placed.Burst using (ordered-tail)
+open import adequacy.Placed.Order using (Atop; Ordered; Reaches; Headed; Sorted; Alienᴱ; ordered)
+open import adequacy.Placed.Rising using (AtopT)
+open import adequacy.Placed.Trail using (SortedT; sortedᵀ; sortedT-idle; sortedT-∪)
+open import adequacy.Placed.Burst using (ordered-tail)
 
 open Tail∞
 

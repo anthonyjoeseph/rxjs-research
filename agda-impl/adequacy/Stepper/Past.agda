@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
-module port.Stepper.Past where
+module adequacy.Stepper.Past where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -24,9 +24,9 @@ open Agreeˢ using (nowˢ)
 import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
-open import port.Sane using (Mode; runs; over; loose; Told)
-open import port.Placed.Order using (Alien; Atop; Ordered; ordered; Placed; Prefix; Within; every)
-open import port.Placed.Keys using (ordered-≈; prefix-refl)
+open import adequacy.Sane using (Mode; runs; over; loose; Told)
+open import adequacy.Placed.Order using (Alien; Atop; Ordered; ordered; Placed; Prefix; Within; every)
+open import adequacy.Placed.Keys using (ordered-≈; prefix-refl)
 
 ------------------------------------------------------------------------
 -- Alike: the same events at the same positions, skips and what a cut

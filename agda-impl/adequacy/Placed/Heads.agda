@@ -8,7 +8,7 @@
 -- A connect's body subscribes where every position it holds is owned by
 -- its subscription, and its source where every one is disjoint from it:
 -- `Apart`, each key kept by a step and the body's by a feed.
-module port.Placed.Heads where
+module adequacy.Placed.Heads where
 
 open import Data.Bool using (true; false)
 open import Data.Sum using (inj₁; inj₂)
@@ -29,12 +29,12 @@ open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatM
 open import denotation.MonotonicList.Events using (timelineAt; Pos; From; Timeline; ix; sub; last; _<ᵖ_; inside)
 import denotation.MonotonicList.Events as M
 import denotation.Unfold as U
-open import port.Placed.Order using (Alienᴱ; Apart; Disjoint; Headed; Owned; Placed;
+open import adequacy.Placed.Order using (Alienᴱ; Apart; Disjoint; Headed; Owned; Placed;
   Prefix; Sides; Within; every-monoᴱ; prefix-++)
-open import port.Placed.Keyed using (Admitted; Fit; Keyed; KeyedEarliest; KeyedOuter; KeyedStep; Keyedᴸ; Keyedᴹ; Keyedˢ; Noted; Qᴹ; keyed-head)
+open import adequacy.Placed.Keyed using (Admitted; Fit; Keyed; KeyedEarliest; KeyedOuter; KeyedStep; Keyedᴸ; Keyedᴹ; Keyedˢ; Noted; Qᴹ; keyed-head)
 open import denotation.Unfold using (NEnv)
-open import port.Placed.Keys using (Mark; ix-mark; last-mark; owned-tagged; owned-trans; prefix-refl; sibling; tagged-sub)
-open import port.Placed.Rising using (apart-join; apart-mark)
+open import adequacy.Placed.Keys using (Mark; ix-mark; last-mark; owned-tagged; owned-trans; prefix-refl; sibling; tagged-sub)
+open import adequacy.Placed.Rising using (apart-join; apart-mark)
 
 -- Kept one mark on, at a frame tagged with it, and at a joiner's tag.
 record Closed (Q : Pos → Set) : Set where

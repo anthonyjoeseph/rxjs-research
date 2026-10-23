@@ -4,7 +4,7 @@
 -- never fall.  A fact about the machine alone; no meaning is consulted.
 -- What is claimed is a rising run (`Rising`), and a rising run's record,
 -- read to any step and any tick, ascends.
-module port.Sorted where
+module adequacy.Sorted where
 
 open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_; _++_; [_])

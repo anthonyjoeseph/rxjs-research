@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
-module port.Placed.Rising where
+module adequacy.Placed.Rising where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥-elim)
@@ -28,12 +28,12 @@ import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
 open import denotation.Compositional using (env-refl)
-open import port.Finite using (Finite; cold-f; empty-f; of-f; map-f; scan-f; takeWhile-f; flatMap-f; connect-f; connected-f; defer-f; trunc; finite-trunc; trunc-agree)
-open import port.Placed.Order using (Alien; Alienᴱ; Atop; Beneath; Clear; Disjoint; Every; EveryT; Everyᴱ; Every∞; Ext; Headed; Ordered;
+open import adequacy.Finite using (Finite; cold-f; empty-f; of-f; map-f; scan-f; takeWhile-f; flatMap-f; connect-f; connected-f; defer-f; trunc; finite-trunc; trunc-agree)
+open import adequacy.Placed.Order using (Alien; Alienᴱ; Atop; Beneath; Clear; Disjoint; Every; EveryT; Everyᴱ; Every∞; Ext; Headed; Ordered;
   Owned; Past; Prefix; Reaches; Sorted; Steady; Tagged; atop-map; atop-scan; cons-ext; every; every-lookup;
   every-mono; every-monoᴱ; everyT-burstOn; everyT-idle; everyT-mono; everyT-∪; everyᵀ; every∞-mono; ext;
   ext-eq; ext-irrefl; headed-snoc; ordered; prefix-++; sorted-headed; steady; under-ext)
-open import port.Placed.Keys using (Mark; module Merge; alienᴱ-owned; atop-agree; beneath-owned; beneath-snoc; clear-agree; earliest-all; every-beside;
+open import adequacy.Placed.Keys using (Mark; module Merge; alienᴱ-owned; atop-agree; beneath-owned; beneath-snoc; clear-agree; earliest-all; every-beside;
   every-lim; every-map; every-reach; every-scan; every-≈; everyT-≈; ix-mark; last-mark; no-tick; ordered-≈;
   owned-lane; owned-snoc; owned-tagged; owned-trans; prefix-refl; sibling; steady-≈; tagged-mark; tagged-sub;
   tick-last; values-map)

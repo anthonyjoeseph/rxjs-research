@@ -1,4 +1,4 @@
-module port.Placed.Keyed where
+module adequacy.Placed.Keyed where
 
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.All using (All)

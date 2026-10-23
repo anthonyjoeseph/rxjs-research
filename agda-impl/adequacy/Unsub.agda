@@ -2,7 +2,7 @@
 
 -- A SILENT RUN: the machine's own silent steps, from one configuration
 -- to another.
-module port.Unsub where
+module adequacy.Unsub where
 
 open import Relation.Binary.PropositionalEquality using (_≡_)
 

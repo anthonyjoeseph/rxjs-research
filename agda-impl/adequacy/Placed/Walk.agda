@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
-module port.Placed.Walk where
+module adequacy.Placed.Walk where
 
 open import Data.Bool using (true; false)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -20,13 +20,13 @@ import denotation.MonotonicList.Events as M
 import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
-open import port.Placed.Order using (Atop; Away; Clear; Disjoint; Every; EveryT; Every∞; Ext; Headed; Ordered; Owned; Past; Prefix; Steady; clear-away; every; every-mono; every-onward; everyT-burstOn; everyT-mono; everyT-∪; everyᵀ; every∞-mono; ext-eq; ordered; owned-ext; past-away; prefix-++; prefix-trans; steady; still; under-ext)
-open import port.Placed.Keys using (beneath-owned; every-ahead; ix-mark; owned-snoc; owned-tick; owned-trans; snoc-inj; tagged-lane; tagged-mark)
-open import port.Placed.Rising using (Rise; apart-mark; atop-ahead; before-atop; below-under; everyT-zip; every∞-zip; prefix-lt; prefix-rest; prefix-split)
-open import port.Placed.Trail using (Apart; FlatT; Marked; SortedT; Sp; Spread; Trail; TrailE; Trailing; flatT-∪; inside-under; marked-cue; marks-alien; marks-mid; marks-past; shown; sortedT-∪; spread; trail; trailᶠ; t≢f)
-open import port.Placed.Calm using (At; sp-of; sp-step)
-open import port.Placed.FlatAfter using (Going; Head; disjoint-snoc; take-ahead)
-open import port.Placed.Burst using (module Bursting; Fresh; FreshRun; Unrelated; ext-prefixed; fresh-past; fresh-tail; fresh-under; fresh-up; fresh-widen; freshᴿ; longer; ordered-onward; steady-onward; strict; trail-hushed; trailing-onward)
+open import adequacy.Placed.Order using (Atop; Away; Clear; Disjoint; Every; EveryT; Every∞; Ext; Headed; Ordered; Owned; Past; Prefix; Steady; clear-away; every; every-mono; every-onward; everyT-burstOn; everyT-mono; everyT-∪; everyᵀ; every∞-mono; ext-eq; ordered; owned-ext; past-away; prefix-++; prefix-trans; steady; still; under-ext)
+open import adequacy.Placed.Keys using (beneath-owned; every-ahead; ix-mark; owned-snoc; owned-tick; owned-trans; snoc-inj; tagged-lane; tagged-mark)
+open import adequacy.Placed.Rising using (Rise; apart-mark; atop-ahead; before-atop; below-under; everyT-zip; every∞-zip; prefix-lt; prefix-rest; prefix-split)
+open import adequacy.Placed.Trail using (Apart; FlatT; Marked; SortedT; Sp; Spread; Trail; TrailE; Trailing; flatT-∪; inside-under; marked-cue; marks-alien; marks-mid; marks-past; shown; sortedT-∪; spread; trail; trailᶠ; t≢f)
+open import adequacy.Placed.Calm using (At; sp-of; sp-step)
+open import adequacy.Placed.FlatAfter using (Going; Head; disjoint-snoc; take-ahead)
+open import adequacy.Placed.Burst using (module Bursting; Fresh; FreshRun; Unrelated; ext-prefixed; fresh-past; fresh-tail; fresh-under; fresh-up; fresh-widen; freshᴿ; longer; ordered-onward; steady-onward; strict; trail-hushed; trailing-onward)
 
 open Events∞
 open Tail∞

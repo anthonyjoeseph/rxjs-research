@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
-module port.Placed.FlatOrder where
+module adequacy.Placed.FlatOrder where
 
 open import Data.Bool using (true; false)
 open import Data.Empty using (⊥-elim)
@@ -21,11 +21,11 @@ open import denotation.MonotonicList using (MonotonicList; none; found)
 import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
-open import port.Placed.Order using (Atop; Beneath; Clear; Disjoint; Every; EveryT; Every∞; Ext; Headed; Ordered; Owned; Steady; every; every-mono; everyT-idle; everyT-mono; everyT-∪; everyᵀ; headed-snoc; ordered; owned-ext; prefix-++; steady; still)
-open import port.Placed.Keys using (Values; beneath-owned; ix-mark; owned-snoc; owned-trans; prefix-plus; prefix-refl; sibling; values)
-open import port.Placed.Rising using (AtopT; Atopᴹ; Beyond; apart-mark; atop-clear; atop-go; atop-weaken; every-zip; everyT-zip; ext-snoc)
-open import port.Placed.Trail using (Apart; Atopᴴ; Behind; FlatT; Lead; Parted; SortedT; Spread; Trail; TrailE; Trailing; ahead-atop; all-pick; all-zip; apart-of; atop-just; atop-nothing; atopT-every; atopT-∪; atopᴴ; atopᴴ-nothing; behind-at; behind-atop; beyond-atop; beyond-just; beyond-step; beyond-still; clear-beyond; cuts-every; disjoint-swap; earliest-picks; everyT-all; flatT-idle; flatT-∪; flatᵀ; lead-hush; lead-of; marks-between; parted-pick; past-beyond; pool-step; self-atop; sortedT-idle; sortedT-∪; sortedᵀ; spread; trail; trailᶠ)
-open import port.Placed.Calm using (Aloof; At; Clean; LaneAt; Obl; OuterAt; OuterAtᴹ; PoolAt; at-apart; at-beyond; away-lane; away-outer; clean-of; laneAt-map; outerAt-map; outerᴹ-map; past-at; past-step; pool-apart; poolAt-map; poolAt-∪; step-past)
+open import adequacy.Placed.Order using (Atop; Beneath; Clear; Disjoint; Every; EveryT; Every∞; Ext; Headed; Ordered; Owned; Steady; every; every-mono; everyT-idle; everyT-mono; everyT-∪; everyᵀ; headed-snoc; ordered; owned-ext; prefix-++; steady; still)
+open import adequacy.Placed.Keys using (Values; beneath-owned; ix-mark; owned-snoc; owned-trans; prefix-plus; prefix-refl; sibling; values)
+open import adequacy.Placed.Rising using (AtopT; Atopᴹ; Beyond; apart-mark; atop-clear; atop-go; atop-weaken; every-zip; everyT-zip; ext-snoc)
+open import adequacy.Placed.Trail using (Apart; Atopᴴ; Behind; FlatT; Lead; Parted; SortedT; Spread; Trail; TrailE; Trailing; ahead-atop; all-pick; all-zip; apart-of; atop-just; atop-nothing; atopT-every; atopT-∪; atopᴴ; atopᴴ-nothing; behind-at; behind-atop; beyond-atop; beyond-just; beyond-step; beyond-still; clear-beyond; cuts-every; disjoint-swap; earliest-picks; everyT-all; flatT-idle; flatT-∪; flatᵀ; lead-hush; lead-of; marks-between; parted-pick; past-beyond; pool-step; self-atop; sortedT-idle; sortedT-∪; sortedᵀ; spread; trail; trailᶠ)
+open import adequacy.Placed.Calm using (Aloof; At; Clean; LaneAt; Obl; OuterAt; OuterAtᴹ; PoolAt; at-apart; at-beyond; away-lane; away-outer; clean-of; laneAt-map; outerAt-map; outerᴹ-map; past-at; past-step; pool-apart; poolAt-map; poolAt-∪; step-past)
 
 open Events∞
 open Tail∞

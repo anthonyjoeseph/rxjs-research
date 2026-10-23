@@ -7,7 +7,7 @@
 -- with the program for `n` steps, since a `defer` shows a skip before its
 -- body.  A safety property closed under agreement at every depth then
 -- holds of every program once it holds of every finite one.
-module port.Finite where
+module adequacy.Finite where
 
 open import Data.List using (_∷_)
 open import Data.Nat using (ℕ; zero; suc)

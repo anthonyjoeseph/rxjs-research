@@ -3,7 +3,7 @@
 -- WHERE A SUBSCRIPTION OPENS: a program subscribed heads at a position,
 -- never the empty one; each head is something appended to, or a
 -- timer's cascade; so at the root, no earlier than the root.
-module port.Opens where
+module adequacy.Opens where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥)
@@ -18,7 +18,7 @@ open import Tree using (Obs; cold; empty; of; map; scan; takeWhile; flatMap; con
 open import denotation.MonotonicList.Events using (Pos; From; Frame; Timeline; timelineAt; at; done; quiet; emit; stall; close; ix; last; tick; root)
   renaming (sub to subᴾ)
 import denotation.Unfold as U
-open import port.Sorted using (_≤ᵖ_)
+open import adequacy.Sorted using (_≤ᵖ_)
 
 Opens : Maybe Pos → Set
 Opens nothing        = ⊤

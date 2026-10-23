@@ -4,7 +4,7 @@
 -- Heap-dependent parts of old adequacy/Frame.agda (scan-part, gates,
 -- defined-alike, seen-gates, gates-apart, scan-apart, store-alike,
 -- scan-defined, scan-sees, merged-eq) are not ported.
-module port.Frame where
+module adequacy.Frame where
 
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -14,8 +14,8 @@ open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈�
 open import Data.Maybe using (Maybe; just; nothing)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong₂)
 open import Data.Bool using (Bool; true; false; if_then_else_)
-open import port.Sorted using (_≤ᵖ_; ≤ᵖ-child; ≤ᵖ-trans)
-open import port.Told using (untoldᴶ; untold; untoldʳ; untoldʳᴹ; untoldʳᴸ; untoldᵇ; untoldᴹ; untoldᴸ; untoldˢ; Tells)
+open import adequacy.Sorted using (_≤ᵖ_; ≤ᵖ-child; ≤ᵖ-trans)
+open import adequacy.Told using (untoldᴶ; untold; untoldʳ; untoldʳᴹ; untoldʳᴸ; untoldᵇ; untoldᴹ; untoldᴸ; untoldˢ; Tells)
 open import Data.Unit using (⊤; tt)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Product using (Σ; _×_; _,_; proj₂)
@@ -26,9 +26,9 @@ import Data.List.Relation.Binary.Pointwise as LP
 open import denotation.MonotonicList.Events using () renaming (done to doneᶠ; quiet to quietᶠ; at to atᶠ; emit to emitᶠ; stall to stallᶠ; close to closeᶠ)
 import denotation.Unfold as U
 open import denotation.MonotonicList.Events using () renaming (sub to subᴾ)
-open import port.Stepper.Past using (head-map; head-scan)
+open import adequacy.Stepper.Past using (head-map; head-scan)
 import Tree as T
-open import port.Strong using (module Strongly)
+open import adequacy.Strong using (module Strongly)
 open Events∞
 
 

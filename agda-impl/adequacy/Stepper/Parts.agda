@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
-module port.Stepper.Parts where
+module adequacy.Stepper.Parts where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -19,16 +19,16 @@ open import denotation.MonotonicList.Events using (Events; Events∞; out; skip;
   <ᵖ-asym; <ᵖ-below)
 open import denotation.MonotonicList using (Agree; stop; stopᵀ; out⁼; skip⁼; end⁼; hush⁼)
 open import denotation.NonExpansive using (Agreeˢ)
-open import port.Stepper.Past using (<ᵖ-past; Belowᴱ; Clear; Firsts; Past; Pastᴱ; Skips; Skipsᴸ; Skipsᴹ; Underᵐ; _≃_; afterᴱ;
+open import adequacy.Stepper.Past using (<ᵖ-past; Belowᴱ; Clear; Firsts; Past; Pastᴱ; Skips; Skipsᴸ; Skipsᴹ; Underᵐ; _≃_; afterᴱ;
   shows)
 
 open Agreeˢ using (nowˢ)
 import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
-open import port.Sane using (Sane; Mode; runs; over; loose; RestedS)
-open import port.Placed.Order using (still; Placed)
-open import port.Env using (Same; nagree-refl; same-cons)
+open import adequacy.Sane using (Sane; Mode; runs; over; loose; RestedS)
+open import adequacy.Placed.Order using (still; Placed)
+open import adequacy.Env using (Same; nagree-refl; same-cons)
 
 open _≃_
 open Events∞

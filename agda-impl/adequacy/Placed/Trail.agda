@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
-module port.Placed.Trail where
+module adequacy.Placed.Trail where
 
 open import Data.Bool using (true; false)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -25,9 +25,9 @@ import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
-open import port.Placed.Order using (Alienᴱ; Atop; Beneath; Disjoint; Every; EveryT; Every∞; Ext; Headed; Owned; Past; Prefix; every; everyT-idle; everyT-mono; everyT-∪; everyᵀ; ext; owned-ext; prefix-++; prefix-trans; still)
-open import port.Placed.Keys using (every-lim; every-map; every-scan; everyT-lim; everyT-≈; prefix-refl; rest; rest-agree; restᵀ-agree; tagged-lane)
-open import port.Placed.Rising using (AtopT; Atopᴹ; Beyond; module Deferred; atop-weaken; prefix-rest; prefix-split)
+open import adequacy.Placed.Order using (Alienᴱ; Atop; Beneath; Disjoint; Every; EveryT; Every∞; Ext; Headed; Owned; Past; Prefix; every; everyT-idle; everyT-mono; everyT-∪; everyᵀ; ext; owned-ext; prefix-++; prefix-trans; still)
+open import adequacy.Placed.Keys using (every-lim; every-map; every-scan; everyT-lim; everyT-≈; prefix-refl; rest; rest-agree; restᵀ-agree; tagged-lane)
+open import adequacy.Placed.Rising using (AtopT; Atopᴹ; Beyond; module Deferred; atop-weaken; prefix-rest; prefix-split)
 
 open Events∞
 open Tail∞

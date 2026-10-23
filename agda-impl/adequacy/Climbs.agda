@@ -2,7 +2,7 @@
 
 -- THE CLIMB: a signal carried from its emitter up the context, each
 -- operator's frame one rise, to a re-entry configuration.
-module port.Climbs where
+module adequacy.Climbs where
 
 open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_; _++_; [_]; map)
@@ -19,14 +19,14 @@ open import denotation.MonotonicList.Events using (Pos)
 open import denotation.MonotonicList using (agree-refl)
 import denotation.Unfold as U
 open import operation.PureObservable using (module Machine; module Driver)
-open import port.Sane using (Sane)
-open import port.Placed.Order using (Placed)
-open import port.Unsub using (module Unsubbing)
-open import port.Strong using (module Strongly)
-open import port.Sorted.Walk using (module SortingWalk)
-open import port.Ghost using (module Ghosting)
-open import port.Ghost.Paths using (module GhostingPaths)
-open import port.Moves using (module Moving)
+open import adequacy.Sane using (Sane)
+open import adequacy.Placed.Order using (Placed)
+open import adequacy.Unsub using (module Unsubbing)
+open import adequacy.Strong using (module Strongly)
+open import adequacy.Sorted.Walk using (module SortingWalk)
+open import adequacy.Ghost using (module Ghosting)
+open import adequacy.Ghost.Paths using (module GhostingPaths)
+open import adequacy.Moves using (module Moving)
 
 open Machine using (St; Ctx; Conf; Job; Ev; nx; cp; dirs; plug; scanS; connS; owed; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody;
   ⟨_,_,_,_,_⟩; rising)

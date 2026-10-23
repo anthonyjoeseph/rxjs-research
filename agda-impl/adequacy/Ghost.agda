@@ -6,7 +6,7 @@
 --
 -- The machine keeps no record: a configuration reached from a launch is
 -- reached WITH the record its steps showed (`Reached`).
-module port.Ghost where
+module adequacy.Ghost where
 
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.List.Relation.Unary.Any using (Any)
@@ -28,10 +28,10 @@ open import denotation.MonotonicList using (observe; Agree; out⁼; skip⁼; end
 import denotation.Unfold as U
 open import operation.Placed using (Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ)
 open import denotation.Compositional using ([]ᵉ)
-open import port.Sorted using (_≤ᵖ_)
-open import port.Unsub using (module Unsubbing)
-open import port.Strong using (module Strongly)
-open import port.Stepper.Past using (afterᴱ)
+open import adequacy.Sorted using (_≤ᵖ_)
+open import adequacy.Unsub using (module Unsubbing)
+open import adequacy.Strong using (module Strongly)
+open import adequacy.Stepper.Past using (afterᴱ)
 open import denotation.Denote using (⟦_⟧)
 open import operation.PureObservable using (PureObs; module Pure; module Driver)
 open Events∞

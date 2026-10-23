@@ -3,7 +3,7 @@
 -- WHAT A REST LEAVES RUNNING, AND WHEN TWO LEAVE ALIKE: the next pin a
 -- rest steps to, a rest's shape, and two nodes whose rests run alike at
 -- every depth.
-module port.Leaves where
+module adequacy.Leaves where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_)
@@ -19,11 +19,11 @@ open import denotation.MonotonicList using (Agree; Agreeᵀ; tailᴱ; agree-refl
 open import denotation.NonExpansive using (tailᴱ-ne; ∪-ne; burstOn-ne; _,ˢ_)
 import denotation.MonotonicList as M′
 import denotation.Unfold as U
-open import port.Placed.Order using (Ordered)
-open import port.Placed.Burst using (ordered-tail)
-open import port.Deep using (Deep; Deeps; DeepR; deep-rest; deepR-rest; deep-cutR; ordered-retyped)
-open import port.Env using (cut-ne; nagree-refl; deepR-same)
-open import port.Placed.Keys using (ordered-≈)
+open import adequacy.Placed.Order using (Ordered)
+open import adequacy.Placed.Burst using (ordered-tail)
+open import adequacy.Deep using (Deep; Deeps; DeepR; deep-rest; deepR-rest; deep-cutR; ordered-retyped)
+open import adequacy.Env using (cut-ne; nagree-refl; deepR-same)
+open import adequacy.Placed.Keys using (ordered-≈)
 
 open Tail∞
 

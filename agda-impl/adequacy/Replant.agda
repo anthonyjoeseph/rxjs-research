@@ -4,7 +4,7 @@
 -- to the root.  Every node above reads its path child only through the
 -- child's part, its heads and its leftover, which the node's premises
 -- carry; every node beside the path is the same node.
-module port.Replant where
+module adequacy.Replant where
 
 open import Data.List using (List; []; _∷_; _++_)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
@@ -20,12 +20,12 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 import denotation.Unfold as U
 open import denotation.MonotonicList.Events using (Pos)
-open import port.Told using (Tells; untold; untoldᴹ; untoldᴸ)
-open import port.Leaves using (Leaves; Twin; Restful; rf-idle; rf-rest; rf-union; rf-burst; rf-under; tw-refl; tw-union; tw-under; tw-burst; tw-shift; tw-if; tw-tie; lv-tie)
-open import port.Strong using (module Strongly)
-open import port.Moves using (module Moving)
-open import port.Frame using (module Framing)
-open import port.Ghost.Paths using (module GhostingPaths)
+open import adequacy.Told using (Tells; untold; untoldᴹ; untoldᴸ)
+open import adequacy.Leaves using (Leaves; Twin; Restful; rf-idle; rf-rest; rf-union; rf-burst; rf-under; tw-refl; tw-union; tw-under; tw-burst; tw-shift; tw-if; tw-tie; lv-tie)
+open import adequacy.Strong using (module Strongly)
+open import adequacy.Moves using (module Moving)
+open import adequacy.Frame using (module Framing)
+open import adequacy.Ghost.Paths using (module GhostingPaths)
 
 module Replanting (R : Set) where
   open Strongly R using (Sub; Path; PathLanes; here; in-map; in-scan; in-cut; in-lane; in-take; in-outer; in-lanes; in-source; in-body;

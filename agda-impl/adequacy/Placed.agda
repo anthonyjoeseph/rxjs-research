@@ -4,7 +4,7 @@
 -- it, comes in position order.  A connect takes its source's step ahead
 -- of its body's skips tied with it, so the stepper needs the source's
 -- rest atop that step.
-module port.Placed where
+module adequacy.Placed where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -30,18 +30,18 @@ import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
 open import denotation.Compositional using (env-refl)
-open import port.Finite using (Finite; map-f; scan-f; takeWhile-f; flatMap-f; connect-f; defer-f; trunc; finite-trunc;
+open import adequacy.Finite using (Finite; map-f; scan-f; takeWhile-f; flatMap-f; connect-f; defer-f; trunc; finite-trunc;
   trunc-agree)
-open import port.Placed.Order using (Alien; Alienᴱ; Atop; Disjoint; Every; EveryT; Everyᴱ; Every∞; Headed; Ordered; Owned; Placed; Prefix; Sorted; Steady; atop-map; every; every-lookup; every-mono; every-monoᴱ; everyT-idle; everyT-mono; everyT-∪; everyᵀ; every∞-mono; headed-snoc; ordered; ordered-map; ordered-rejoin; ordered-scan; prefix-++; prefix-trans; sorted-headed; sorted-lookup; steady; steady-map; steady-rejoin; steady-scan)
-open import port.Placed.Keys using (Mark; Values; alienᴱ-owned; beneath-owned; earliest-all; every-map; every-reach; everyT-≈; ix-mark; last-mark; no-tick; ordered-lim; owned-tagged; owned-trans; owned-weigh; prefix-refl; prefix-weigh; sibling; snoc-inj; steady-lim; tagged-lane; tagged-mark; tagged-weigh; values; values-map; weigh; weighˡ)
-open import port.Placed.Rising using (Beyond; module Deferred; module Reach; Rise; alien-shown; alien-sub; apart-mark; apartRules; atop-go; below-lane; every-zip; everyT-zip; headed-lane; headed-sub; headedRules; keyedRules; next-ix; ordered-defer; ordered-of; ordered-start; ordered-take; prefix-split; rise-env; rise-owned; rise-sub; risingRules; steady-defer; steady-of; steady-start; steady-take; tagged-split)
-open import port.Placed.Trail using (Sp; Spread; Trail; Trailing; disjoint-swap; flatT-idle; past-beyond; shown; sortedT-idle; spread; spread-defer; spread-map; spread-scan; tick-beneath; trail; trail-idle; trail-map; trail-of; trail-rejoin; trail-scan; trailing-start)
-open import port.Placed.Calm using (calm-steady; calm-trail)
-open import port.Placed.FlatOrder using (module FlatOrder)
-open import port.Placed.FlatAfter using (module FlatAfter; trail-defer; trail-take)
-open import port.Placed.Burst using (module Bursting; Fresh; FreshRun; Fresh∞; fresh-map; fresh-of; fresh-past; fresh-rejoin; fresh-scan; fresh-start; fresh-take; fresh-under; fresh-up; fresh-widen; fresh-≈; freshᴿ; heavy; longer; mark-sub; owned-drop; snoc-ne; sub-owned; sub-tagged)
-open import port.Placed.Walk using (module Walk)
-open import port.Placed.Heads using (apart-sub; start-within)
+open import adequacy.Placed.Order using (Alien; Alienᴱ; Atop; Disjoint; Every; EveryT; Everyᴱ; Every∞; Headed; Ordered; Owned; Placed; Prefix; Sorted; Steady; atop-map; every; every-lookup; every-mono; every-monoᴱ; everyT-idle; everyT-mono; everyT-∪; everyᵀ; every∞-mono; headed-snoc; ordered; ordered-map; ordered-rejoin; ordered-scan; prefix-++; prefix-trans; sorted-headed; sorted-lookup; steady; steady-map; steady-rejoin; steady-scan)
+open import adequacy.Placed.Keys using (Mark; Values; alienᴱ-owned; beneath-owned; earliest-all; every-map; every-reach; everyT-≈; ix-mark; last-mark; no-tick; ordered-lim; owned-tagged; owned-trans; owned-weigh; prefix-refl; prefix-weigh; sibling; snoc-inj; steady-lim; tagged-lane; tagged-mark; tagged-weigh; values; values-map; weigh; weighˡ)
+open import adequacy.Placed.Rising using (Beyond; module Deferred; module Reach; Rise; alien-shown; alien-sub; apart-mark; apartRules; atop-go; below-lane; every-zip; everyT-zip; headed-lane; headed-sub; headedRules; keyedRules; next-ix; ordered-defer; ordered-of; ordered-start; ordered-take; prefix-split; rise-env; rise-owned; rise-sub; risingRules; steady-defer; steady-of; steady-start; steady-take; tagged-split)
+open import adequacy.Placed.Trail using (Sp; Spread; Trail; Trailing; disjoint-swap; flatT-idle; past-beyond; shown; sortedT-idle; spread; spread-defer; spread-map; spread-scan; tick-beneath; trail; trail-idle; trail-map; trail-of; trail-rejoin; trail-scan; trailing-start)
+open import adequacy.Placed.Calm using (calm-steady; calm-trail)
+open import adequacy.Placed.FlatOrder using (module FlatOrder)
+open import adequacy.Placed.FlatAfter using (module FlatAfter; trail-defer; trail-take)
+open import adequacy.Placed.Burst using (module Bursting; Fresh; FreshRun; Fresh∞; fresh-map; fresh-of; fresh-past; fresh-rejoin; fresh-scan; fresh-start; fresh-take; fresh-under; fresh-up; fresh-widen; fresh-≈; freshᴿ; heavy; longer; mark-sub; owned-drop; snoc-ne; sub-owned; sub-tagged)
+open import adequacy.Placed.Walk using (module Walk)
+open import adequacy.Placed.Heads using (apart-sub; start-within)
 
 open Events∞
 open Tail∞

@@ -10,7 +10,7 @@
 -- record is sorted and alike the meaning's events as a set, so placed
 -- against them.  ABOVE, liveness: whatever the meaning shows, some prefix
 -- reaches.
-module port.Adequacy where
+module adequacy.Adequacy where
 
 open import Data.Bool using (true; false; T)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -24,11 +24,11 @@ open import Relation.Binary.PropositionalEquality using (_≡_; sym; subst)
 
 open import operation.Placed using (Up; Placed; ahead; framed; shows; placed-⊑; frames-cut)
 open import operation.PureObservable using (PureObs; module Pure; module Driver) renaming (run to prefix)
-open import port.Sorted using (module Sorting)
-open import port.Sorted.Walk using (module SortingWalk)
-open import port.Content using (module Honesty)
-open import port.Ghost using (module Ghosting)
-open import port.Progress using (module Progressing)
+open import adequacy.Sorted using (module Sorting)
+open import adequacy.Sorted.Walk using (module SortingWalk)
+open import adequacy.Content using (module Honesty)
+open import adequacy.Ghost using (module Ghosting)
+open import adequacy.Progress using (module Progressing)
 open import denotation.MonotonicList.Events using (ML; Time; root)
 open import denotation.MonotonicList using (observe; ticks)
 open import denotation.Order using (_⊑_; _≃_; Shows; Chain; limit; limit-ub; limit-least; shows-≼; shows-cmp; cmp-long)

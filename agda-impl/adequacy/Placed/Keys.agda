@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
-module port.Placed.Keys where
+module adequacy.Placed.Keys where
 
 open import Data.Bool using (true; false)
 open import Data.Empty using (⊥-elim)
@@ -25,7 +25,7 @@ import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
-open import port.Placed.Order using (Alienᴱ; Atop; Beneath; Clear; Every; EveryT; EveryTs; Everys; Every∞; Headed; Ordered; Orders; Owned; Past;
+open import adequacy.Placed.Order using (Alienᴱ; Atop; Beneath; Clear; Every; EveryT; EveryTs; Everys; Every∞; Headed; Ordered; Orders; Owned; Past;
   Prefix; Prefix⁺; Reaches; out-here; out-there; skip-here; skip-there; Steadies; Steady; Tagged; every; every-monoᴱ; every-onward; every-tailOf;
   everyT-burstOn; everyT-idle; everyT-∪; everyᵀ; every∞-mono; ordered; prefix-++; prefix-trans;
   steady)

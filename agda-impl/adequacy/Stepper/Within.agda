@@ -3,7 +3,7 @@
 -- A STEP KEEPS THE GHOST PLACED: what a node's step leaves is placed
 -- within, at any scope whose sources are clear of the step, node by
 -- node as the step runs each part.
-module port.Stepper.Within where
+module adequacy.Stepper.Within where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; _++_; [_])
@@ -24,14 +24,14 @@ open import denotation.MonotonicList using (agree-refl)
 import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
-open import port.Sane using (Sane; Mode; over)
-open import port.Stepper.Past using (Clear; Placedˢ; Shy; Skips; Withinˢ; _≃_; afterᴱ; alike; clear-lower; head-map; head-scan; placed-step; shows)
-open import port.Stepper.Fed using (placed-fed; placed-shut)
-open import port.Env using (nagree-refl; same-cons)
-open import port.Stepper.Parts using (clear-take; fed-here; head-body; head-shut)
-open import port.Stepper using (skips; shy-clear; step-skips)
-open import port.Placed.Order using (Placed; Within)
-open import port.Placed.Heads using (ApartFed; ApartNext; apart-fed; apart-next; apart-sides)
+open import adequacy.Sane using (Sane; Mode; over)
+open import adequacy.Stepper.Past using (Clear; Placedˢ; Shy; Skips; Withinˢ; _≃_; afterᴱ; alike; clear-lower; head-map; head-scan; placed-step; shows)
+open import adequacy.Stepper.Fed using (placed-fed; placed-shut)
+open import adequacy.Env using (nagree-refl; same-cons)
+open import adequacy.Stepper.Parts using (clear-take; fed-here; head-body; head-shut)
+open import adequacy.Stepper using (skips; shy-clear; step-skips)
+open import adequacy.Placed.Order using (Placed; Within)
+open import adequacy.Placed.Heads using (ApartFed; ApartNext; apart-fed; apart-next; apart-sides)
 
 open _≃_
 open Events∞

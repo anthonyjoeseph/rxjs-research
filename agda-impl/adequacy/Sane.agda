@@ -1,6 +1,6 @@
 -- THE GHOST IS A RUN'S CONFIGURATION (`Sane`): which joiners are told
 -- their end, per connect in scope.
-module port.Sane where
+module adequacy.Sane where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; _++_; [_]; length)

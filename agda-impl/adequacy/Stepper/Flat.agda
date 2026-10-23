@@ -8,7 +8,7 @@
 -- alike, and otherwise the whole starts past a source of either (`combine`).
 -- Three levels: the lanes' earliest, the outer against it, the pool
 -- against the outer and the lanes.
-module port.Stepper.Flat where
+module adequacy.Stepper.Flat where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -29,10 +29,10 @@ import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import denotation.Denote using (flatOp)
-open import port.Placed.Order using (still)
-open import port.Sane using (Mode; Rested; RestedS; step-rested)
-open import port.Stepper.Past using (Past; First; Firsts; Firstᴹ; Firstᴸ; Underᵐ; afterᴱ)
-open import port.Stepper.Parts using (posᴱ; pastᴱ-pos; pos-pastᴱ; move; pick; under-or; Overᵐ)
+open import adequacy.Placed.Order using (still)
+open import adequacy.Sane using (Mode; Rested; RestedS; step-rested)
+open import adequacy.Stepper.Past using (Past; First; Firsts; Firstᴹ; Firstᴸ; Underᵐ; afterᴱ)
+open import adequacy.Stepper.Parts using (posᴱ; pastᴱ-pos; pos-pastᴱ; move; pick; under-or; Overᵐ)
 
 open Events∞
 

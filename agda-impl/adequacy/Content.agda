@@ -1,7 +1,7 @@
 {-# OPTIONS --guardedness #-}
 
 -- CONTENT: the root's record is the meaning's events, as a set.
--- Sortedness (`port.Sorted`) says nothing of WHAT arrives; this says
+-- Sortedness (`adequacy.Sorted`) says nothing of WHAT arrives; this says
 -- nothing of the ORDER, so neither proof reads the other.
 --
 -- A GHOST: the meaning's own configuration (`denotation.Unfold`'s
@@ -13,7 +13,7 @@
 -- machine is matched to a step of a stepper.  Only the run's re-entry
 -- configurations are related to the ghost (`Strong`); every other is
 -- reached from one by its own silent steps.
-module port.Content where
+module adequacy.Content where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; _++_; [_]; length; head)
@@ -43,21 +43,21 @@ import denotation.Unfold as U
 import Tree as T
 open import denotation.Denote using (⟦_⟧)
 open import operation.PureObservable using (PureObs; module Pure; module Driver; module Machine; tape; over)
-open import port.Sorted using (_≤ᵖ_)
-open import port.Sane using (Sane; sane-out)
-open import port.Stepper.Within using (placed-after)
-open import port.Placed.Order using (Placed)
-open import port.Stepper.Past using (_≃_; Placedˢ)
-open import port.Stepper using (step-skips)
-open import port.Unsub using (module Unsubbing)
-open import port.Ghost using (module Ghosting)
-open import port.Strong using (module Strongly)
-open import port.Sorted.Walk using (module SortingWalk)
-open import port.Climbs using (module Ascending)
-open import port.Moves using (module Moving)
-open import port.Replant using (module Replanting)
-open import port.Told using (Tells; untold)
-open import port.Leaves using (Twin; leaves; unpinned; tw-refl)
+open import adequacy.Sorted using (_≤ᵖ_)
+open import adequacy.Sane using (Sane; sane-out)
+open import adequacy.Stepper.Within using (placed-after)
+open import adequacy.Placed.Order using (Placed)
+open import adequacy.Stepper.Past using (_≃_; Placedˢ)
+open import adequacy.Stepper using (step-skips)
+open import adequacy.Unsub using (module Unsubbing)
+open import adequacy.Ghost using (module Ghosting)
+open import adequacy.Strong using (module Strongly)
+open import adequacy.Sorted.Walk using (module SortingWalk)
+open import adequacy.Climbs using (module Ascending)
+open import adequacy.Moves using (module Moving)
+open import adequacy.Replant using (module Replanting)
+open import adequacy.Told using (Tells; untold)
+open import adequacy.Leaves using (Twin; leaves; unpinned; tw-refl)
 
 module Honesty (R : Set) where
   open Driver R using (Mach; mach; depthOf; Timer; play; finish; cascade; Step; silent; value; complete; drained; step; trace; shown; reading; begin; Read; read; marks; log; ending; noted)

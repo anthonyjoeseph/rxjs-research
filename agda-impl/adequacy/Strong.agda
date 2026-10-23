@@ -12,7 +12,7 @@
 -- relation is carried by a witness, `Sub`: the tree node for node, with
 -- that ghost data besides.  `forget` drops it, giving the machine's tree
 -- back (`Kernels`); `part` reads it as the ghost, exactly.
-module port.Strong where
+module adequacy.Strong where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_)
 open import Data.List using (List; []; _∷_; _++_; [_]; length; map; head)
@@ -34,14 +34,14 @@ import Tree as T
 open import denotation.MonotonicList.Events using (Time; Pos; From; Frame; at; ix; last; tick; root; _<ᵖ_) renaming (sub to subᴾ)
 import denotation.Unfold as U
 open import operation.PureObservable using (PureObs; Tape; tape; over; module Machine; module Driver)
-open import port.Sane using (Sane; sane-subscribe)
-open import port.Leaves using (Leaves; Twin; Restful)
-open import port.Told using (untold; Tells)
-open import port.Opens using (opens-subscribe; heads-open)
-open import port.Placed using (placed-subscribe)
-open import port.Placed.Order using (Placed)
-open import port.Sorted using (_≤ᵖ_)
-open import port.Sorted.Walk using (module SortingWalk)
+open import adequacy.Sane using (Sane; sane-subscribe)
+open import adequacy.Leaves using (Leaves; Twin; Restful)
+open import adequacy.Told using (untold; Tells)
+open import adequacy.Opens using (opens-subscribe; heads-open)
+open import adequacy.Placed using (placed-subscribe)
+open import adequacy.Placed.Order using (Placed)
+open import adequacy.Sorted using (_≤ᵖ_)
+open import adequacy.Sorted.Walk using (module SortingWalk)
 
 open Machine using (St; Ctx; Conf; CS; Job; Mode; Ev; plug; dirs; top; ⟨_,_,_,_,_⟩; absorbed; subscribing; resuming; rising; nx; cp; _⊕_;
   go; att; attBody; owed; next; owedCp; owedCut; feeding;

@@ -2,7 +2,7 @@
 
 -- WHAT A SHUT TELLS: the joiners of a binder not yet told its end,
 -- and where each is told.
-module port.Told where
+module adequacy.Told where
 
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.Any using (there)
@@ -11,7 +11,7 @@ open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈�
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Bool using (if_then_else_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-open import port.Sorted using (_≤ᵖ_)
+open import adequacy.Sorted using (_≤ᵖ_)
 open import denotation.MonotonicList.Events using (Pos; last; _<ᵖ_) renaming (sub to subᴾ)
 import denotation.Unfold as U
 

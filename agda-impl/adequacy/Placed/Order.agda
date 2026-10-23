@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
-module port.Placed.Order where
+module adequacy.Placed.Order where
 
 open import Data.Bool using (true; false)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -25,7 +25,7 @@ import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
-open import port.Placed.Keyed using (Keyed)
+open import adequacy.Placed.Keyed using (Keyed)
 
 open Events∞
 open Tail∞
