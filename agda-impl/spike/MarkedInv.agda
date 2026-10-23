@@ -546,11 +546,11 @@ module _ {R : Set} where
   NextInv drained         = ⊤
 
   postulate
-    -- EVERY STEP KEEPS THE ORDER.  Not inductive as `Ord` stands: a run
-    -- of the least key `at q` rises at `q`, and `beyond` there needs no
-    -- other key at or under `at q` short of `after q`, which `past` does
-    -- not say.  `quickcheck.MarkedOrder` probes that strengthening as
-    -- `apart`.
+    -- EVERY STEP KEEPS THE ORDER.  False over this `Inv`: a node's next
+    -- key need not be under its current one, and nothing here says no
+    -- other node holds a key where it lands.  What does is provenance,
+    -- a zone per node, pairwise disjoint.  Refuted, with and without
+    -- `apart`, in `spike.MarkedApart`.
     ord-next : ∀ k → Base k → Ord k → NextOrd (step k)
 
   both : ∀ x → NextBase x → NextOrd x → NextInv x

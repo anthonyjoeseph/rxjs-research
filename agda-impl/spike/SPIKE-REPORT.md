@@ -285,53 +285,74 @@ Two design facts the CI run settled:
 mode, then by the frame, node or former. Every clause is local. The
 grid did not come back there.
 
-### The remaining risk: `ord-next`
+### The kill test: `ord-next`, `rise-src-nx`, `unsub-rest`
 
-`ord-next` is a bare postulate, and as `Ord` stands it is **not
-inductive**. This is the honest gap, and its shape is now known.
+The criterion: the test fails if any of the three needs an `Inv` field
+that is neither a fold over nodes nor a comparison of keys against `p`,
+or if any `ord-next` clause needs an argument of its own.
 
-When the machine runs the least key `at q` and rises at `q`, `beyond`
-at `q` needs no other key in `[at q, after q)`. That interval holds the
-other `at q` keys and every key of a position under `q`. `past` does not
-say this. The needed strengthening is a third conjunct:
+**It fails, at `ord-next`, before the clauses.** `spike/MarkedApart.agda`
+refutes both candidate statements by evaluation (typechecks), at
+configurations `Base` admits:
 
-- **apart**: no key lies at or under another's `at q`, short of
-  `after q`.
+- `ord-next-false`: `ord-next` as postulated, over `Ord`.
+- `apart-next-false`: `Ord` with `apart` added, the strengthening CI
+  measured true on 300 seeds. CI measured it on reachable states. The
+  proof needs it inductive over every state the invariant admits, and
+  it is not.
 
-With **apart**, every case of preservation splits the same way:
+The configuration is two lanes. One holds an `of` subscribed at `q`; the
+other holds an `of` subscribed at `q ⊕ ix 1`. The first of's *next* key
+is a **sibling** of its current one (`ix i` to `ix (suc i)`), not a
+child, so running it lands on territory the second lane already holds.
+Three node kinds key their future outside their current key's subtree:
 
-1. **The keys the step rewrote.** They are one node's own marks, keyed
-   from `p` (for example `ofS`'s next at `p⊕ix (i+1)`, a take's
-   `at p⊕last` written as it becomes absorbed at `p`). This is a
-   per-clause check on one node.
-2. **Everything else is untouched.** There are two generic transition
-   lemmas over `All`, one per mode change:
-   - absorbed→rising (least + apart ⇒ beyond);
-   - rising→absorbed (beyond ⇒ past).
+- an `of` (its next index);
+- a cold (its next frame, on a root-level timer cascade);
+- a joiner (its next inbox entry, a key nobody can see yet).
 
-Neither lemma is per-clause.
+What excludes these configurations in a real run is **provenance**: a
+key under `q ⊕ ix 1` is made only by an event there, and only the first
+of emits there. As an invariant, that is a zone per node (every key it
+will ever make), with zones **pairwise disjoint**. A pairwise field is
+what the criterion forbids. It is the grid's shape, read node × node.
 
-`live` has a candidate route out of being an invariant at all. If
-**untold** holds ("every live, untold joiner sits under a connect whose
-source is not closed"), then a joiner's source is a live node. `ahead`
-then puts its head `c` after `p`, and `live` follows from `beyond`
-plus one node-and-binder fact of the `Opened` kind already in `Wf`.
+Two things make it worse than a single extra field:
 
-Both strengthenings are probed in CI (`apart` and `untold`):
+- **The zones are not intervals.** An of at index `i` owns
+  `[at (q ⊕ ix i), after q)`. A cold owns a cascade *column* (every tick,
+  under `sub` of its frame's end). A feed needs every joiner's join
+  position distinct, and no zone covers that.
+- **"Everything so far was made at or before `p`" is not a fact about
+  the Conf's `p`.** That would be the key-vs-position form of
+  provenance. But an `after`-mark (`attM`, `srcAttM`, `owedM`, `cutM`)
+  moves the position *back* to the mark's own `p`. The fact needs a
+  cursor key the engine does not carry. That is an engine change, which
+  is free, but it is not this engine.
 
-**CI result (run 40015729045, `order` job, commit 419e31a3):**
+The leaves, analysed but not proven:
 
-- The run covered 300 seeds, 4000 steps each, and checked every
-  configuration in every mode.
-- There were **zero** `apart` failures and **zero** `untold` failures.
-- There were **zero** FAIL lines (beyond, past, live, first).
-- `strict` and `hidden` had no reports.
-- The only reports were `distinct` ties, as before. They come from
-  emission-free `after` keys and are harmless.
-
-So both strengthenings hold empirically. `ord-next` has a concrete
-inductive statement to prove: `Ord` with `apart`, and with `live`
-replaced by `untold` as a `Wf` field.
+- **`unsub-rest` forces no `Inv` field.** Before an unsubscribe, a
+  connect's source burst inside `srcAt` survives as tail pins
+  (`burstOn`). After it, a torn-down cold is idle. Tails show only
+  skips, so the leaf is "a hole showing nothing swaps for another
+  showing nothing": a `≅`-congruence column, one fact per frame.
+  - **Caveat:** that is false for a Zeno frame (infinitely many stalls
+    inside `r`), whose skips starve a merge's siblings. Either frames
+    carry a finiteness fact (a node fold), or it is a semantics
+    question.
+- **`rise-src-nx` forces two facts.** It needs `gh` of `Marked.feed` to
+  match `Unfold.feed` of `gh`. `Marked.feed` feeds every live joiner by
+  sorted insert; `Unfold.feed` feeds only joiners joined before the
+  feed, by append. So:
+  - **Every live joiner joined before `p`.** This compares joiner
+    positions against `p`, but needs a mode split, because `p` moves
+    back at `after`-marks.
+  - **At a feed, every inbox entry is before the new one.** Insert is
+    then append. Only scoping guarantees this: a body cannot reach its
+    own source, so a source never emits under its own last emission.
+    Scoping is invisible to `Ord`, so this is provenance again, between
+    a source's zone and its joiners' inboxes.
 
 ### Coverage caveats
 
@@ -344,10 +365,12 @@ replaced by `untold` as a `Wf` field.
 
 ## Go / no-go
 
-**GO.** The direction works. The grid is gone by construction, not
-merely postponed.
-
-What step 4 set out to show, and what it showed:
+**NO-GO on this engine as the place the grid ends.** `kept` and `Base`
+stay per frame and per node, and that half holds: the table's first five
+rows below are unchanged. But the order half reintroduces a pairwise
+invariant (zone disjointness), and its preservation is exactly where a
+grid would grow: every clause's new zones, against every other node
+kind's zones.
 
 | Question | Answer | Evidence |
 | --- | --- | --- |
@@ -356,19 +379,28 @@ What step 4 set out to show, and what it showed:
 | Is takeWhile's jump (the acid test) cheap? | **Yes**, with no postulate | typechecks |
 | Does the invariant's preservation rebuild the grid? | **No** for `Base`: `base-next` is a real body, every clause one node's fold | typechecks |
 | Can the one global fact (`lanes-first`) be had without pointers? | **Yes.** It is a real body over `Ord`, through a 12-row `ahead` over 7 stream-function leaves | typechecks |
-| Is `Ord` true? | **Yes**, at every configuration | CI, 300 seeds |
-| Is `Ord` inductive? | **Not as stated.** With `apart` and `untold`, the shape is per-clause plus two generic mode-change lemmas | CI, 300 seeds; Agda proof not written |
+| Is `Ord` true? | **Yes**, at every reachable configuration | CI, 300 seeds |
+| Is `Ord` (or `Ord` with `apart`) inductive? | **No.** Both are refuted at `Base`-admitted configurations; the missing fact is pairwise provenance | `spike.MarkedApart`, typechecks |
+
+The open question is no longer the proof. It is whether provenance can
+be made **local**: whether the engine can carry, per node, the territory
+it owns, so that disjointness holds by construction rather than as an
+invariant. Two candidates:
+
+- **Keys relative to a node's own subscription position, never
+  absolute.** The cascades are the obstacle, because a cold's later
+  frames are rooted at the root.
+- **A cursor key in the Conf**, with every node's next key derived from
+  its current key and the cursor.
+
+Neither is designed.
 
 ### What is left, ranked by risk
 
-1. **`ord-next`.** This is the order's preservation, with `apart` added
-   and `live` replaced by `untold`. The strengthening is now measured
-   true, so the open part is the proof. The split is per-clause (the
-   keys one node writes, relative to `p`) plus two generic lemmas
-   (least + apart ⇒ beyond; beyond ⇒ past). That split is the claim
-   most likely to hide a surprise: some clause might write a key that
-   is not relative to its own position. The `apart` probe passing in
-   every mode makes this unlikely.
+1. **Local provenance.** `ord-next` is false over the present `Inv`.
+   The missing fact is pairwise zone disjointness. Either an engine
+   change makes it local, or the order half carries a pairwise
+   invariant.
 2. **`shows-all` (completeness).** It has not been attempted. It needs
    a progress measure. The old tower had the same obligation, so this
    is not new risk, but it is unmeasured.

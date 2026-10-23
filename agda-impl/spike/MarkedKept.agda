@@ -257,6 +257,10 @@ module _ {R : Set} where
     -- A skip dropped at the hole drops nothing a run shows.
     lift-skip : ∀ {Γ A} (c : Ctx R Γ A) f {h h′ : Events∞ A} {q r} → force h ≡ skip q r → r ≋ h′ → up c f h ≅ up c f h′
     -- An unsubscribe leaves a rest showing what the rest before it showed.
+    -- The two rests differ only in tail pins (a connect source's burst
+    -- inside `srcAt`, kept by `burstOn`, against a torn-down cold), which
+    -- show only skips: a frame-by-frame congruence, false for a frame
+    -- stalling forever inside `srcAt`.
     unsub-rest : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) {s′ t} → unsub s ≡ (s′ , t)
                → up c true (stateᴺ (restᶜ (gh s)) (envAt c)) ≅ up c true (stateᴺ (restᶜ (gh s′)) (envAt c))
     -- And a connect's rest, its source unsubscribed.
@@ -273,6 +277,11 @@ module _ {R : Set} where
     rise-lanes-cp : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (c : Ctx R Γ B) (s : St Γ B) p
                   → Inv ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → flagOf s ≡ true
                   → up (inLanes op f d n q o pre post c) true (risen (gh s) (envAt c) cp p) ≅ M (Machine.dequeue c op f d (pred n) q o (pre ++ Machine.ended s ∷ post) p)
+    -- The body fed: `operation.Marked.feed` inserts into every live
+    -- joiner, `denotation.Unfold.feed` appends to those joined before the
+    -- feed.  They agree only if every live joiner joined before `p`, and
+    -- every inbox entry is before the new one, which scoping alone
+    -- guarantees (a body never reaches its own source).
     rise-src-nx : ∀ {Γ X B} k (b : St (X ∷ Γ) B) (c : Ctx R Γ B) (s : St Γ X) a p
                 → Inv ⟨ inSrc k b c , s , rising (nx a) , p ⟩ → Kept ⟨ inSrc k b c , s , rising (nx a) , p ⟩
     rise-src-cp : ∀ {Γ X B} k (b : St (X ∷ Γ) B) (c : Ctx R Γ B) (s : St Γ X) p
