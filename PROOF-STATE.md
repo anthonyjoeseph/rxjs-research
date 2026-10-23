@@ -18,8 +18,10 @@ Members: `placed-subscribe`, `heads-subscribe`.
 #### THE STRONG STEP
 
 Untried: whether each control state's step keeps `Carried` on the state
-tree — the old Climbs columns over `Sub` instead of the heap. Settled when
-the onward leaves are bodies, `run-onward` first.
+tree — the old Climbs columns over `Sub` instead of the heap. Suspect:
+`Meaning`'s `owing` zips a subject's feeds with its feeding jobs, which
+`Owned` does not yet align. Settled when the onward leaves are bodies,
+`run-onward` first.
 
 Members: `run-onward`, `sub-onward`, `burst-onward`, `turn-pops`,
 `note-onward`, `note-least`, `turn-dry`.

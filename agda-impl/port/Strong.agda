@@ -573,11 +573,12 @@ module Strongly (R : Set) where
       ahead   : All (λ tm → clock ≤ Timer.due tm × p <ᵖ cascade tm ≡ true) timers
 
   -- The frame a turn plays, at its cold's own tick.
-  Plays : ∀ {A} → ℕ → Pos → Phase A → Set
-  Plays n u (fired τ e (at t _ _))   = n ≡ τ + t
-  Plays n u (playing {t} τ r i b)    = n ≡ τ + t × u ≡ r
-  Plays n u (waiting _ _ _)          = ⊥
-  Plays n u (fired _ _ _)            = ⊥
+  private
+    Plays : ∀ {A} → ℕ → Pos → Phase A → Set
+    Plays n u (fired τ e (at t _ _))   = n ≡ τ + t
+    Plays n u (playing {t} τ r i b)    = n ≡ τ + t × u ≡ r
+    Plays n u (waiting _ _ _)          = ⊥
+    Plays n u (fired _ _ _)            = ⊥
 
   -- Where the clock stands for a turn: at its frame's tick, its cold
   -- playing that frame.
