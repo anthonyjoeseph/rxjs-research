@@ -46,7 +46,7 @@ open import System.Environment.Primitive using (getArgs)
 
 open import quickcheck.Ty using (Ty; natᵗ; nameᵗ; _×ᵗ_)
 open import quickcheck.Code using (Prog; showCode)
-open import quickcheck.Oracle using (showTrace; denoteTrace; pureTrace; oracle; ioOp)
+open import quickcheck.Oracle using (showTrace; denoteTrace; pureTrace; marksTrace; oracle; ioOp; marksIoOp)
 open import quickcheck.Quickcheck using (program; named)
 open import quickcheck.Chain using (chainFails)
 open import quickcheck.Adversary using (cases)
@@ -68,7 +68,7 @@ private
   prog : ℕ → IO ⊤
   prog s = putStrLn ("{\"seed\":" ++ showℕ s ++ ",\"prog\":" ++ showCode natᵗ (program s)
                      ++ ",\"denote\":" ++ showTrace natᵗ (denoteTrace 3 500 (program s))
-                     ++ ",\"pure\":" ++ showTrace natᵗ (pureTrace 3 500 (program s)) ++ "}")
+                     ++ ",\"pure\":" ++ showTrace natᵗ (pureTrace 3 500 (program s)) ++ ",\"marks\":" ++ showTrace natᵗ (marksTrace 3 500 (program s)) ++ "}")
 
   io : ℕ → IO ⊤
   io s = oracle ioOp 3 500 (program s)
@@ -79,7 +79,7 @@ private
   namedProg : ℕ → IO ⊤
   namedProg s = putStrLn ("{\"seed\":" ++ showℕ s ++ ",\"prog\":" ++ showCode namedᵗ (named s)
                           ++ ",\"denote\":" ++ showTrace namedᵗ (denoteTrace 3 500 (named s))
-                          ++ ",\"pure\":" ++ showTrace namedᵗ (pureTrace 3 500 (named s)) ++ "}")
+                          ++ ",\"pure\":" ++ showTrace namedᵗ (pureTrace 3 500 (named s)) ++ ",\"marks\":" ++ showTrace namedᵗ (marksTrace 3 500 (named s)) ++ "}")
 
   hand : List (String × Prog natᵗ) → IO ⊤
   hand []             = putStrLn "hand: done"
@@ -113,11 +113,20 @@ private
   dispatch ("named-io" ∷ s ∷ []) with nat s
   ... | just s′ = oracle ioOp 3 500 (named s′)
   ... | nothing = usage
+  dispatch ("named-marks-io" ∷ s ∷ []) with nat s
+  ... | just s′ = oracle marksIoOp 3 500 (named s′)
+  ... | nothing = usage
+  dispatch ("marks-io" ∷ s ∷ []) with nat s
+  ... | just s′ = oracle marksIoOp 3 500 (program s′)
+  ... | nothing = usage
   dispatch ("code" ∷ s ∷ []) with nat s
   ... | just s′ = putStrLn (showCode natᵗ (program s′))
   ... | nothing = usage
   dispatch ("denote" ∷ s ∷ []) with nat s
   ... | just s′ = putStrLn (showTrace natᵗ (denoteTrace 3 500 (program s′)))
+  ... | nothing = usage
+  dispatch ("marks" ∷ s ∷ []) with nat s
+  ... | just s′ = putStrLn (showTrace natᵗ (marksTrace 3 500 (program s′)))
   ... | nothing = usage
   dispatch ("pure" ∷ s ∷ []) with nat s
   ... | just s′ = putStrLn (showTrace natᵗ (pureTrace 3 500 (program s′)))

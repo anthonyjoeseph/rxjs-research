@@ -70,6 +70,7 @@ type Row = {
   prog: Code;
   denote: Trace;
   pure: Trace;
+  marks: Trace;
 };
 
 const bin = process.env.AGDA_CLI_BIN ?? "../agda-impl/_cli/Oracle-CLI";
@@ -164,16 +165,26 @@ type Family = {
   prog: string;
   code: string;
   io: string;
+  marksIo: string;
   engines: boolean;
   share: number;
 };
 const families: Family[] = [
-  { label: "", prog: "prog", code: "code", io: "io", engines: true, share: 1 },
+  {
+    label: "",
+    prog: "prog",
+    code: "code",
+    io: "io",
+    marksIo: "marks-io",
+    engines: true,
+    share: 1,
+  },
   {
     label: "named ",
     prog: "named",
     code: "named-code",
     io: "named-io",
+    marksIo: "named-marks-io",
     engines: false,
     share: 0.1,
   },
@@ -188,9 +199,19 @@ const check = async (fam: Family, row: Row): Promise<string[]> => {
     io?.failed === undefined && io !== undefined
       ? (exactly(io.out) as Trace)
       : undefined;
+  // SPIKE: the pointer-free engine's IO runtime
+  const mio = loops(row.prog)
+    ? undefined
+    : cli([fam.marksIo, String(row.seed)]);
+  const mioTrace: Trace | undefined =
+    mio?.failed === undefined && mio !== undefined
+      ? (exactly(mio.out) as Trace)
+      : undefined;
   const bad = [
     ...(agrees(row.denote, rx) ? [] : [`denotation ${show(row.denote)}`]),
     ...(agrees(row.pure, rx) ? [] : [`pure       ${show(row.pure)}`]),
+    // SPIKE: the pointer-free engine's pure semantics
+    ...(agrees(row.marks, rx) ? [] : [`marks      ${show(row.marks)}`]),
     ...(io === undefined
       ? []
       : ioTrace === undefined
@@ -198,6 +219,13 @@ const check = async (fam: Family, row: Row): Promise<string[]> => {
         : agrees(ioTrace, rx)
           ? []
           : [`io         ${show(ioTrace)}`]),
+    ...(mio === undefined
+      ? []
+      : mioTrace === undefined
+        ? [`marks io   ${mio.failed}`]
+        : agrees(mioTrace, rx)
+          ? []
+          : [`marks io   ${show(mioTrace)}`]),
     // the QUICKCHECK leg: the pure semantics, against the denotation
     ...(agrees(row.denote, row.pure) ? [] : ["(denotation and pure disagree)"]),
   ];
@@ -253,6 +281,7 @@ const run = async (
         ...(JSON.parse(l) as Row),
         denote: exact.denote,
         pure: exact.pure,
+        marks: exact.marks,
       };
     });
   const verdicts = await Promise.all(

@@ -31,6 +31,8 @@ open import denotation.MonotonicList.Events using (ML; Burst; Burst∞; ML∞; d
 open import denotation.MonotonicList using (observe; ticks)
 open import denotation.Denote using (⟦_⟧[_])
 open import operation.PureObservable using () renaming (run to runᴾ)
+open import operation.MarkedPure using () renaming (run to runᴹ)
+open import operation.MarkedObservable using () renaming (subscribe to subscribeᴹ)
 open import operation.Observable using (IORef; IOCold; Emit; Observable; subscribe; forkIO; Signal; newSignal; raise; await; newIORef; readIORef; writeIORef)
 open import quickcheck.Clock using (Clock; newClock; fire; fromTimeline)
 import Tree as T
@@ -114,6 +116,10 @@ horizon = 100
 pureTrace : ∀ {t} → ℕ → ℕ → Prog t → Trace ⟦ t ⟧ᵀ
 pureTrace u n p = traceML n (runᴾ (200 * n) horizon (toObs timeline u p [] [] []))
 
+-- SPIKE: the pointer-free engine's pure semantics, under the same budget.
+marksTrace : ∀ {t} → ℕ → ℕ → Prog t → Trace ⟦ t ⟧ᵀ
+marksTrace u n p = traceML n (runᴹ (200 * n) horizon (toObs timeline u p [] [] []))
+
 ------------------------------------------------------------------------
 -- JSON
 
@@ -147,10 +153,10 @@ private
 -- subscribe burst on the engine's lock; it then fires every timer, and
 -- once none is left the log is read, newest first.  Never `cut`: a
 -- program that never finishes never returns.
-ioTrace : ∀ {t} → ℕ → Prog t → IO (Trace ⟦ t ⟧ᵀ)
-ioTrace {t} u p =
+ioTraceWith : ∀ {t} → (∀ {A} → Observable A → IO ⊤) → ℕ → Prog t → IO (Trace ⟦ t ⟧ᵀ)
+ioTraceWith {t} sub u p =
   newClock >>= λ ck → newIORef false >>= λ fin → newIORef [] >>= λ log → newIORef 0 >>= λ names → newSignal >>= λ over →
-  forkIO (subscribe (wrapped ck fin log over (toObs (leaf ck names) u p [] [] []))) >>= λ _ →
+  forkIO (sub (wrapped ck fin log over (toObs (leaf ck names) u p [] [] []))) >>= λ _ →
   await over >>= λ _ →
   readIORef log >>= λ xs → readIORef fin >>= λ c →
   pure (logged nothing (reverse xs) ▸ (if c then completed else silent))
@@ -182,11 +188,19 @@ ioTrace {t} u p =
 ------------------------------------------------------------------------
 -- One engine's trace, printed
 
+ioTrace : ∀ {t} → ℕ → Prog t → IO (Trace ⟦ t ⟧ᵀ)
+ioTrace = ioTraceWith subscribe
+
+-- SPIKE: the same, through the pointer-free engine's IO runtime.
+marksIoTrace : ∀ {t} → ℕ → Prog t → IO (Trace ⟦ t ⟧ᵀ)
+marksIoTrace = ioTraceWith subscribeᴹ
+
 data Engine : Set where
-  denotational pureOp ioOp : Engine
+  denotational pureOp ioOp marksIoOp : Engine
 
 -- `u` bounds each `μ`'s unfolding; `n` bounds a pure trace.
 oracle : ∀ {t} → Engine → ℕ → ℕ → Prog t → IO ⊤
 oracle {t} denotational u n p = putStrLn (showTrace t (denoteTrace u n p))
 oracle {t} pureOp       u n p = putStrLn (showTrace t (pureTrace u n p))
 oracle {t} ioOp         u n p = ioTrace u p >>= λ tr → putStrLn (showTrace t tr)
+oracle {t} marksIoOp    u n p = marksIoTrace u p >>= λ tr → putStrLn (showTrace t tr)
