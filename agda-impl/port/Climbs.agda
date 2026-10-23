@@ -6,6 +6,7 @@ module port.Climbs where
 
 open import Data.List using (List; []; _++_; [_])
 open import Data.List.Properties using (++-conicalʳ)
+open import Data.List.Relation.Unary.All using ([])
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _<_)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred)
