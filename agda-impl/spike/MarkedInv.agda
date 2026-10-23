@@ -1,6 +1,8 @@
 {-# OPTIONS --guardedness #-}
 
--- SPIKE: EVERY STEP KEEPS THE INVARIANT (`inv-next`), dispatched as the
+-- SPIKE: EVERY STEP KEEPS THE INVARIANT (`inv-next`): its fold part
+-- (`Base`, kept by `base-next`) and its order part (`spike.MarkedFirst.Ord`,
+-- kept by `ord-next`).  The fold part is dispatched as the
 -- step is: by mode, then by the one frame a rise passes, the one former
 -- a subscribe begins, or the one node a mark runs.  The invariant is a
 -- fold over the tree (`Wf`), split at the focus into the context's share
@@ -16,11 +18,13 @@ open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Unit using (⊤; tt)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
+import Data.List.Relation.Unary.All
 open import Data.Empty using (⊥)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList.Events using (Timeline; emit; stall; close)
+open import spike.MarkedFirst using (Ord; Past; fresh)
 open import operation.MarkedPure using (Tape; play; ending; over; module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; closed; closedUp;
@@ -83,7 +87,8 @@ WfC (inLanes op f d n q o pre post c) = Wf o × Wfs pre × Wfs post × WfC c
 WfC (inSrc k b c)                     = CS.bodyAt k ≡ nothing × Wf b × WfC c
 WfC (inBody k o c)                    = Opened k o × Wf o × WfC c
 
-record Inv {R} (k : Conf R) : Set where
+-- The fold part of the invariant.
+record Base {R} (k : Conf R) : Set where
   constructor inv
   field
     settled : Settled k
@@ -156,12 +161,12 @@ wf-split (inBody k o c)                    s u w with wf-split c (connS k o s) t
 ... | v , (op , wo , w′) = (op , wo , v) , w′
 
 -- The whole tree's fold, read off the invariant.
-wfI : ∀ {R} {k : Conf R} → Inv k → Wf (plug (Conf.ctx k) (Conf.foc k))
-wfI {k = ⟨ c , s , m , p ⟩} v = wf-join c s (Inv.ctxWf v) (Inv.focWf v)
+wfI : ∀ {R} {k : Conf R} → Base k → Wf (plug (Conf.ctx k) (Conf.foc k))
+wfI {k = ⟨ c , s , m , p ⟩} v = wf-join c s (Base.ctxWf v) (Base.focWf v)
 
 -- A settled node anywhere in a well-formed tree: the invariant at it.
-inv-at : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Unpended s → Wf (plug c s) → Inv ⟨ c , s , absorbed , p ⟩
-inv-at c s p u w with wf-split c s u w
+base-at : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Unpended s → Wf (plug c s) → Base ⟨ c , s , absorbed , p ⟩
+base-at c s p u w with wf-split c s u w
 ... | v , w′ = inv u v w′
 
 ------------------------------------------------------------------------
@@ -371,11 +376,11 @@ owned leafO   = tt
 module _ {R : Set} where
   open Driver R using (Step; silent; value; complete; drained; step; played; took)
 
-  NextInv : Step → Set
-  NextInv (silent t k)    = Inv k
-  NextInv (value t p a k) = Inv k
-  NextInv (complete p)    = ⊤
-  NextInv drained         = ⊤
+  NextBase : Step → Set
+  NextBase (silent t k)    = Base k
+  NextBase (value t p a k) = Base k
+  NextBase (complete p)    = ⊤
+  NextBase drained         = ⊤
 
   postulate
     -- The least mark is a node's own, and its focus plugs back to the tree.
@@ -383,8 +388,8 @@ module _ {R : Set} where
                → plug c s ≡ t × Owns s m
 
   -- A leaf's turn: whatever the runtime plays, the leaf is all that moves.
-  played-inv : ∀ {A} b (l : Tape A) cl dv st → (∀ e l′ b′ p′ → Inv (dv e l′ b′ p′)) → (∀ l′ → Inv (st l′))
-             → NextInv (played (leaf b l cl dv st))
+  played-inv : ∀ {A} b (l : Tape A) cl dv st → (∀ e l′ b′ p′ → Base (dv e l′ b′ p′)) → (∀ l′ → Base (st l′))
+             → NextBase (played (leaf b l cl dv st))
   played-inv b     (ending e)                  cl    dv st d s = d cp over false e
   played-inv false (play τ u i t fr)           cl    dv st d s = s over
   played-inv false over                        cl    dv st d s = s over
@@ -396,21 +401,21 @@ module _ {R : Set} where
   played-inv true  over                        false dv st d s = s over
 
   start-inv : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p → WfC c → Wf o → Wfs ls
-            → Inv (start c op f d n q o ls a p)
+            → Base (start c op f d n q o ls a p)
   start-inv c op f d n q o ls a p v wo ws with closed c
   ... | true  = inv tt v (wo , ws)
   ... | false = inv tt (wo , ws , tt , v) tt
 
   dequeue-inv : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls p → WfC c → Wf o → Wfs ls
-              → Inv (dequeue c op f d n q o ls p)
+              → Base (dequeue c op f d n q o ls p)
   dequeue-inv c op f d n []      o ls p v wo ws = inv (settledU (settle d n true) tt) v (wo , ws)
   dequeue-inv c op f d n (a ∷ q) o ls p v wo ws = start-inv c op f d n q o ls a p v wo ws
 
   admit-inv : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p → WfC c → Wf o → Wfs ls
-            → NextInv (took (admit c op f d n q o ls a p))
+            → NextBase (took (admit c op f d n q o ls a p))
   admit-inv c (mergeᶠ nothing)  f d n q o ls a p v wo ws = start-inv c (mergeᶠ nothing) f d n q o ls a p v wo ws
   admit-inv c (mergeᶠ (just m)) f d n q o ls a p v wo ws =
-    if-inv Inv (n <ᵇ m) (start-inv c (mergeᶠ (just m)) f d n q o ls a p v wo ws) (inv tt v (wo , ws))
+    if-inv Base (n <ᵇ m) (start-inv c (mergeᶠ (just m)) f d n q o ls a p v wo ws) (inv tt v (wo , ws))
   admit-inv c switchᶠ           f d n q o ls a p v wo ws with killAll ls | wf-killAll ls ws
   ... | ls′ , t | ws′ = start-inv c switchᶠ f d 0 q o ls′ a p v wo ws′
   admit-inv c exhaustᶠ          f d n q o ls a p v wo ws with n ≡ᵇ 0
@@ -418,7 +423,7 @@ module _ {R : Set} where
   ... | false = inv tt v (wo , ws)
 
   -- A rise, by the frame it passes.
-  rise-inv : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Inv ⟨ c , s , rising e , p ⟩ → NextInv (took (rise c s e p))
+  rise-inv : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Base ⟨ c , s , rising e , p ⟩ → NextBase (took (rise c s e p))
   rise-inv top                               s (nx a) p (inv u v w) = inv u v w
   rise-inv top                               s cp     p (inv u v w) = tt
   rise-inv (inMap f c)                       s e      p (inv u v w) = inv tt v w
@@ -439,9 +444,9 @@ module _ {R : Set} where
   rise-inv (inOuter op f d n q ls c)         s cp     p (inv u (ws , v) w) =
     inv (settledU (settle true n (Data.List.null q)) tt) v (w , ws)
   rise-inv (inLanes op f d n q o pre post c) s (nx b) p (inv u (wo , wp , wq , v) w) =
-    if-inv Inv (alive s) (inv tt v (wo , wfs-++ pre wp w wq)) (inv tt v (wo , wfs-++ pre wp w wq))
+    if-inv Base (alive s) (inv tt v (wo , wfs-++ pre wp w wq)) (inv tt v (wo , wfs-++ pre wp w wq))
   rise-inv (inLanes op f d n q o pre post c) s cp     p (inv u (wo , wp , wq , v) w) =
-    if-inv Inv (alive s) (dequeue-inv c op f d _ q o (pre ++ ended s ∷ post) p v wo (wfs-++ pre wp (wf-ended s w) wq)) (inv tt v (wo , wfs-++ pre wp w wq))
+    if-inv Base (alive s) (dequeue-inv c op f d _ q o (pre ++ ended s ∷ post) p v wo (wfs-++ pre wp (wf-ended s w) wq)) (inv tt v (wo , wfs-++ pre wp w wq))
   rise-inv (inSrc k b c)                     s (nx a) p (inv u (e , wb , v) w) =
     inv tt v (opened-none k s e , w , wf-feed (here refl) p (nx a) b wb)
   rise-inv (inSrc k b c)                     s cp     p (inv u (e , wb , v) w) =
@@ -451,7 +456,7 @@ module _ {R : Set} where
     inv tt v (opened-move cl sl sa ba as ow r e sl sa as (just p) r e (λ ip → ip) op , wo , w)
 
   -- A subscribe, by the former it begins.
-  begin-inv : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Inv ⟨ c , pend o , subscribing , p ⟩ → NextInv (took (begin c o p))
+  begin-inv : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Base ⟨ c , pend o , subscribing , p ⟩ → NextBase (took (begin c o p))
   begin-inv c (cold x)          p (inv u v w) = inv tt v tt
   begin-inv c empty             p (inv u v w) = inv tt v tt
   begin-inv c (of xs)           p (inv u v w) = inv tt v tt
@@ -466,7 +471,7 @@ module _ {R : Set} where
   begin-inv c (defer l)         p (inv u v w) = inv tt v tt
 
   -- A mark run, by the node that owns it.
-  run-inv : ∀ {Γ A} (c : Ctx R Γ A) {s : St Γ A} {m} p → Owns s m → WfC c → Wf s → NextInv (took (run c s m p))
+  run-inv : ∀ {Γ A} (c : Ctx R Γ A) {s : St Γ A} {m} p → Owns s m → WfC c → Wf s → NextBase (took (run c s m p))
   run-inv c p (ofO {xs = xs}) v w with closed c | xs
   ... | true  | _       = inv tt v tt
   ... | false | []      = inv tt v tt
@@ -495,26 +500,72 @@ module _ {R : Set} where
       (λ e l′ b′ p′ → inv tt v tt) (λ l′ → inv tt v tt)
 
   -- EVERY STEP KEEPS THE INVARIANT.
-  inv-next : ∀ k → Inv k → NextInv (step k)
-  inv-next ⟨ c , s , rising e , p ⟩     v = rise-inv c s e p v
-  inv-next ⟨ c , pend o , subscribing , p ⟩ v = begin-inv c o p v
+  base-next : ∀ k → Base k → NextBase (step k)
+  base-next ⟨ c , s , rising e , p ⟩     v = rise-inv c s e p v
+  base-next ⟨ c , pend o , subscribing , p ⟩ v = begin-inv c o p v
 
-  inv-next ⟨ c , (coldS xb xl) , subscribing , p ⟩ v = v
-  inv-next ⟨ c , (ofS xi xp xxs) , subscribing , p ⟩ v = v
-  inv-next ⟨ c , doneS , subscribing , p ⟩ v = v
-  inv-next ⟨ c , (mapS xf xs) , subscribing , p ⟩ v = v
-  inv-next ⟨ c , (scanS xf xz xs) , subscribing , p ⟩ v = v
-  inv-next ⟨ c , (cutS xl xa xs) , subscribing , p ⟩ v = v
-  inv-next ⟨ c , (lnS xb xs) , subscribing , p ⟩ v = v
-  inv-next ⟨ c , (takeS xi xq xw xs) , subscribing , p ⟩ v = v
-  inv-next ⟨ c , (flatS xop xf xd xn xq xo xls) , subscribing , p ⟩ v = v
-  inv-next ⟨ c , (connS xk xo xb) , subscribing , p ⟩ v = v
-  inv-next ⟨ c , (joinS xj xg xx xib) , subscribing , p ⟩ v = v
-  inv-next ⟨ c , s , absorbed , p ⟩ v with search top (plug c s) in e
+  base-next ⟨ c , (coldS xb xl) , subscribing , p ⟩ v = v
+  base-next ⟨ c , (ofS xi xp xxs) , subscribing , p ⟩ v = v
+  base-next ⟨ c , doneS , subscribing , p ⟩ v = v
+  base-next ⟨ c , (mapS xf xs) , subscribing , p ⟩ v = v
+  base-next ⟨ c , (scanS xf xz xs) , subscribing , p ⟩ v = v
+  base-next ⟨ c , (cutS xl xa xs) , subscribing , p ⟩ v = v
+  base-next ⟨ c , (lnS xb xs) , subscribing , p ⟩ v = v
+  base-next ⟨ c , (takeS xi xq xw xs) , subscribing , p ⟩ v = v
+  base-next ⟨ c , (flatS xop xf xd xn xq xo xls) , subscribing , p ⟩ v = v
+  base-next ⟨ c , (connS xk xo xb) , subscribing , p ⟩ v = v
+  base-next ⟨ c , (joinS xj xg xx xib) , subscribing , p ⟩ v = v
+  base-next ⟨ c , s , absorbed , p ⟩ v with search top (plug c s) in e
   ... | nothing = tt
   ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
   ...   | pl , own with wf-split c′ s′ (owned own) (subst Wf (sym pl) (wfI v))
   ...     | v′ , w′ = run-inv c′ p own v′ w′
 
+  base-load : (o : Obs Timeline [] R) → Base (Machine.load o)
+  base-load o = inv tt tt tt
+
+  ----------------------------------------------------------------------
+  -- The whole invariant: the fold and the order
+
+  record Inv (k : Conf R) : Set where
+    constructor _&_
+    field
+      base : Base k
+      ord  : Ord k
+
+  NextOrd : Step → Set
+  NextOrd (silent t k)    = Ord k
+  NextOrd (value t p a k) = Ord k
+  NextOrd (complete p)    = ⊤
+  NextOrd drained         = ⊤
+
+  NextInv : Step → Set
+  NextInv (silent t k)    = Inv k
+  NextInv (value t p a k) = Inv k
+  NextInv (complete p)    = ⊤
+  NextInv drained         = ⊤
+
+  postulate
+    -- EVERY STEP KEEPS THE ORDER.  Not inductive as `Ord` stands: a run
+    -- of the least key `at q` rises at `q`, and `beyond` there needs no
+    -- other key at or under `at q` short of `after q`, which `past` does
+    -- not say.  `quickcheck.MarkedOrder` probes that strengthening as
+    -- `apart`.
+    ord-next : ∀ k → Base k → Ord k → NextOrd (step k)
+
+  both : ∀ x → NextBase x → NextOrd x → NextInv x
+  both (silent t k)    b o = b & o
+  both (value t p a k) b o = b & o
+  both (complete p)    b o = tt
+  both drained         b o = tt
+
+  inv-next : ∀ k → Inv k → NextInv (step k)
+  inv-next k (b & o) = both (step k) (base-next k b) (ord-next k b o)
+
   inv-load : (o : Obs Timeline [] R) → Inv (Machine.load o)
-  inv-load o = inv tt tt tt
+  inv-load o = base-load o & fresh Data.List.Relation.Unary.All.[] tt
+
+  -- A settled node anywhere in a tree the invariant holds of, absorbed at
+  -- the same position: the invariant at it.
+  inv-at : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Unpended s → Wf (plug c s) → Past p (plug c s) → Inv ⟨ c , s , absorbed , p ⟩
+  inv-at c s p u w o = base-at c s p u w & o

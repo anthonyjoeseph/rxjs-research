@@ -15,6 +15,8 @@
 --             holds, strictly after `p`
 --   hidden    `first` again, its observer closed
 --   distinct  no two keys alike
+--   apart     once absorbed, no key at or under another's `at q`, short
+--             of `after q`: the strengthening an inductive `beyond` needs
 --
 -- `beyond`, `past`, `live` and `first` are claims; the rest are probes of
 -- how far the order reaches, and fail no run.  Each seed reports, per
@@ -51,7 +53,7 @@ open import quickcheck.Quickcheck using (program)
 record Verdict : Set where
   constructor verdict
   field
-    beyond past live first strict hidden distinct : Maybe String
+    beyond past live first strict hidden distinct apart : Maybe String
 
 private
   mutual
@@ -192,15 +194,15 @@ private
   hd h = head (Events∞.force h)
 
   ok : Verdict
-  ok = verdict nothing nothing nothing nothing nothing nothing nothing
+  ok = verdict nothing nothing nothing nothing nothing nothing nothing nothing
 
   orM : Maybe String → Maybe String → Maybe String
   orM (just a) _ = just a
   orM nothing  b = b
 
   both : Verdict → Verdict → Verdict
-  both (verdict a b c d e f g) (verdict a′ b′ c′ d′ e′ f′ g′) =
-    verdict (orM a a′) (orM b b′) (orM c c′) (orM d d′) (orM e e′) (orM f f′) (orM g g′)
+  both (verdict a b c d e f g h) (verdict a′ b′ c′ d′ e′ f′ g′ h′) =
+    verdict (orM a a′) (orM b b′) (orM c c′) (orM d d′) (orM e e′) (orM f f′) (orM g g′) (orM h h′)
 
   when : ∀ {R} → Bool → Conf R → String → Maybe String
   when true  x why = nothing
@@ -222,8 +224,8 @@ private
   -- only probed.
   lanesAt : ∀ {R} → Conf R → Bool → Bool → Bool × Bool → Verdict
   lanesAt x false _     _         = ok
-  lanesAt x true  false (fi , st) = verdict nothing nothing nothing (when fi x "lane not first") (when st x "a part not strictly after") nothing nothing
-  lanesAt x true  true  (fi , _)  = verdict nothing nothing nothing nothing nothing (when fi x "closed lane not first") nothing
+  lanesAt x true  false (fi , st) = verdict nothing nothing nothing (when fi x "lane not first") (when st x "a part not strictly after") nothing nothing nothing
+  lanesAt x true  true  (fi , _)  = verdict nothing nothing nothing nothing nothing (when fi x "closed lane not first") nothing nothing
 
   laneCheck : ∀ {R} → Conf R → Verdict
   laneCheck x@(⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩) = lanesAt x (alive s) (closed c) (parts f d o pre post c s p)
@@ -234,6 +236,17 @@ private
   alike ((m , k) ∷ ks) with filterᵇ (λ { (_ , k′) → not ((k <ᴷ k′) ∨ (k′ <ᴷ k)) }) ks
   ... | []    = alike ks
   ... | hits  = (m , k) ∷ hits
+
+  -- The keys at or under `at q`, short of `after q`.
+  under : Pos → List (Mark × Key) → List (Mark × Key)
+  under q = filterᵇ (λ { (_ , k′) → not (k′ <ᴷ at q) ∧ (k′ <ᴷ after q) })
+
+  crowd : List (Mark × Key) → List (Mark × Key) → List (Mark × Key)
+  crowd ks []                   = []
+  crowd ks ((m , after q) ∷ ms) = crowd ks ms
+  crowd ks ((m , at q) ∷ ms) with under q ks
+  ... | _ ∷ _ ∷ _ = under q ks
+  ... | _         = crowd ks ms
 
   faulty : ∀ {R} → Conf R → Maybe String → Maybe String
   faulty x nothing  = nothing
@@ -256,6 +269,7 @@ private
     verdict (faulty x (if isAbsorbed m then nothing else some (filterᵇ (λ { (_ , k) → k <ᴷ after p }) ks)))
             (faulty x (if isAbsorbed m then some (filterᵇ (λ { (_ , k) → not (at p <ᴷ k) }) ks) else nothing))
             (faulty x (someS (stale p []ᴬ (plug c s)))) nothing nothing nothing (faulty x (some (alike ks)))
+            (faulty x (if isAbsorbed m then some (crowd ks ks) else nothing))
     where
       ks = keyed (plug c s)
 
@@ -288,9 +302,9 @@ orderReport f c = go (mapL (f +_) (upTo c))
 
     one : ℕ → List String
     one s with order (program s)
-    ... | verdict a b l fi st hi di =
+    ... | verdict a b l fi st hi di ap =
       line "FAIL" "beyond" s a ++ line "FAIL" "past" s b ++ line "FAIL" "live" s l ++ line "FAIL" "first" s fi
-        ++ line "INFO" "strict" s st ++ line "INFO" "hidden" s hi ++ line "INFO" "distinct" s di
+        ++ line "INFO" "strict" s st ++ line "INFO" "hidden" s hi ++ line "INFO" "distinct" s di ++ line "INFO" "apart" s ap
 
     go : List ℕ → List String
     go []       = []

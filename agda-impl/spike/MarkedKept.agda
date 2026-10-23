@@ -49,9 +49,10 @@ open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; 
   Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM; search; found; run; unsub; leaf)
   renaming (cut to cutᴹ)
 open import spike.MarkedGhost
-open import spike.MarkedInv using (Unpended; Opened; Wf; Inv; module Inv; inv-at; wfI; wf-split; Owns; ofO; attO; cpO; cutO; bodyO; srcAttO; owedO; joinO; leafO; owned;
+open import spike.MarkedInv using (Unpended; Opened; Wf; Base; module Base; Inv; module Inv; inv-at; wfI; wf-split; Owns; ofO; attO; cpO; cutO; bodyO; srcAttO; owedO; joinO; leafO; owned;
   search-hit; NextInv; inv-next; inv-load)
 open import spike.MarkedRace using (First; go-rise; cuts-swap)
+open import spike.MarkedFirst using (Past; first-lanes)
 
 open Events∞
 
@@ -268,11 +269,6 @@ module _ {R : Set} where
                   → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ → Kept ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
     rise-outer-cp : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q ls (c : Ctx R Γ B) (o : St Γ A) p
                   → Inv ⟨ inOuter op f d n q ls c , o , rising cp , p ⟩ → Kept ⟨ inOuter op f d n q ls c , o , rising cp , p ⟩
-    -- THE ORDER: a lane's value rises first among its flatMap's parts.
-    lanes-first : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (c : Ctx R Γ B) (s : St Γ B) b p
-                → Inv ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩ → flagOf s ≡ true → closed c ≡ false
-                → First p (outerᴺ (lane f) (outerG d (gh o)) (envAt c)) (states (lanesL post) (envAt c)) (states (lanesL pre) (envAt c))
-                    (outerT d (gh o) (envAt c) (poolRuns pre post true (envAt c) (stateᴺ (gh s) (envAt c))))
     -- A lane still in its flatMap's list completing frees its slot.
     rise-lanes-cp : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (c : Ctx R Γ B) (s : St Γ B) p
                   → Inv ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → flagOf s ≡ true
@@ -294,6 +290,13 @@ module _ {R : Set} where
                   → closedUp c x ≡ true → M ⟨ c , pend (connected x) , subscribing , p ⟩ ≅ M ⟨ c , doneS , rising cp , p ⊕ [ last ] ⟩
     -- A defer is the program it defers, one level down, after a skip.
     defer-kept : ∀ {Γ A} (c : Ctx R Γ A) l p → Inv ⟨ c , pend (defer l) , subscribing , p ⟩ → Kept ⟨ c , pend (defer l) , subscribing , p ⟩
+
+  -- THE ORDER: a lane's value rises first among its flatMap's parts.
+  lanes-first : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (c : Ctx R Γ B) (s : St Γ B) b p
+              → Inv ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩ → flagOf s ≡ true → closed c ≡ false
+              → First p (outerᴺ (lane f) (outerG d (gh o)) (envAt c)) (states (lanesL post) (envAt c)) (states (lanesL pre) (envAt c))
+                  (outerT d (gh o) (envAt c) (poolRuns pre post true (envAt c) (stateᴺ (gh s) (envAt c))))
+  lanes-first op f d n q o pre post c s b p v _ _ = first-lanes op f d n q o pre post c s p (Inv.ord v)
 
   ----------------------------------------------------------------------
   -- A configuration focused anywhere means what its whole tree means
@@ -490,7 +493,7 @@ module _ {R : Set} where
   cut-rest c (joinS j g x ib)        refl = ≅-refl
 
   opened : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) {p} → Inv ⟨ c , connS k o b , absorbed , p ⟩ → Opened k o
-  opened c k o b v = proj₁ (Inv.focWf v)
+  opened c k o b v = proj₁ (Base.focWf (Inv.base v))
 
   -- A cold's frame played on: a value shown, a stall or a close skipped.
   playing : ∀ {Γ A t} (c : Ctx R Γ A) τ u i (fr : Frame A t) p
@@ -563,8 +566,8 @@ module _ {R : Set} where
   kept ⟨ c , s , absorbed , p ⟩ v with search top (plug c s) in e
   ... | nothing = quiet-empty c s p v e
   ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
-  ...   | pl , own = kept-pre (tookᴰ (run c′ s′ m p)) (refocus c s c′ s′ p (Inv.settled v) (owned own) (wfI v) pl)
-                       (runs c′ s′ m p own (inv-at c′ s′ p (owned own) (subst Wf (sym pl) (wfI v))))
+  ...   | pl , own = kept-pre (tookᴰ (run c′ s′ m p)) (refocus c s c′ s′ p (Base.settled (Inv.base v)) (owned own) (wfI (Inv.base v)) pl)
+                       (runs c′ s′ m p own (inv-at c′ s′ p (owned own) (subst Wf (sym pl) (wfI (Inv.base v))) (subst (Past p) (sym pl) (Inv.ord v))))
 
   ----------------------------------------------------------------------
   -- THE TOP LINE: whatever the machine shows, the meaning shows
