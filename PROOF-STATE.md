@@ -2,26 +2,29 @@
 
 Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
-## Tier 0 — the port
-
-**Port:** the old `adequacy/` tower carried to the state tree in `port/`, old names only (`make port-check`, deleted with this tier).
-
-### Ledger
-
-#### THE SHUT'S HEADS
-
-Believed true, unproven: a rest can head before its step, so a burst
-must keep its step in range under its own shut. A shut tells only `sub`
-and `last` ends, which lose every race to an `ix` skip. Settled when
-`shut-heads` is a body over that fact or a shut is shown to move one.
-
-Members: `shut-heads`.
-
 ## Tier 1 — the adequacy theorem
 
 **Adequacy:** the denotation matches the operational semantics.
 
 ### Ledger
+
+#### THE BURST UNDER A SHUT
+
+Refuted: `bursts-down` is false over arbitrary nodes, so `shut-heads`, its
+body, is too. A joiner subscribed outside a burst's root is told an end that
+moves the burst onto a sibling's early rest. Settled when `bursts-down` is
+restated over a premise the carrier holds — every burst's source rest heads
+no sooner than `q`, or joiners under a burst sit inside its root — and
+`body-up` supplies it.
+
+Members: `bursts-down`.
+
+#### THE FLATMAP UNDER A SHUT
+
+Untried: whether a flatMap's step stays twinned or past `q` when its outer,
+lanes and pool do. Settled when `flat-down` is a body or refuted.
+
+Members: `flat-down`.
 
 #### THE JOB STACK
 

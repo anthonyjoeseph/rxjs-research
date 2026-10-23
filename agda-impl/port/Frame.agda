@@ -445,6 +445,8 @@ module Framing (R : Set) where
     -- rest do.  False: a source's rest can head before its own step, so
     -- a step moved out of the burst's range falls back onto a rest
     -- twinned below `q`.
+    --
+    -- REFUTED: 49fd64e7 by a joiner subscribed outside the burst's root and a sibling lane resting early
     bursts-down : ∀ {Γ A B q} r (t t′ : U.Node Γ A) (st st′ : U.Step Γ A) → Down q st st′ → Down q (U.restˢ {B = B} t) (U.restˢ {B = B} t′)
                 → Down {Γ} {B} q (U.burstsˢ r t st) (U.burstsˢ r t′ st′)
 
@@ -650,6 +652,8 @@ module Framing (R : Set) where
   ended-head r c b t st hb ht = ended-heads r c b (U.step b) t st hb ht
 
   -- A shut heads where the node did, or at an end it tells.
+  --
+  -- REFUTED: 49fd64e7 by a joiner subscribed outside a burst's root, told an end that moves the burst onto an early rest
   shut-heads : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (b : U.Node Γ B) → Heads q b → Tells q c (untold i b) → Heads q (U.shut i c b)
   shut-heads i c b hb tl e with shut-down i c b tl
   ... | inj₁ tw       = hb (trans (twin-head tw) e)
