@@ -70,7 +70,7 @@ module Honesty (R : Set) where
     Stands; cutʰ; finʰ; dryʰ; Mirror; Inner; Logged; Shows; silentˢ; valueˢ; completeˢ; drainedˢ; inner-launch; ≋-refl;
     Steps; after; steps-after; Hopped; onward; lowered; weight; loadOf; load; _≼_; _≺_; _⊏_)
   open Strongly R using (Strong; Carried; carried; closing; CtlAs; Meets; calmAs; noteAs; runAs; subAs; burstAs; popAs;
-    Kernels; Owned; Meaning; Books; Path; ofˢ; seen; Sub; takeWhileˢ; part; Queue; BurstClocked; Each; Heads;
+    Kernels; Owned; Meaning; Books; Path; ofˢ; seen; Sub; takeWhileˢ; part; Queue; BurstClocked; Each; Ahead;
     Lingers; Untold; Ended; pooledL; DoneBy; Begins; focused; attaching; coldˢ; waiting; fired; playing; Timed; Joined)
   open Ascending R using (Aloft)
   open AscendingCall R using (soar)
@@ -198,7 +198,7 @@ module Honesty (R : Set) where
     cut-sorted : ∀ {lo m Γ A} {c : Ctx R Γ A} {i q s p rs} → WellMach lo m → Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩
                → WellMach lo (record m { conf = ⟨ c , takeS i q (proj₁ (cut s)) , absorbed , p , rs ⟩ })
     cut-behind : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) (e : Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩)
-               → Each (Heads p) (proj₁ (cut-torn cr e))
+               → Each (Ahead p) (proj₁ (cut-torn cr e))
     cut-lingers : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) (e : Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩)
                 → Lingers (proj₁ (cut-torn cr e))
     cut-told : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) (e : Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩)
@@ -402,7 +402,7 @@ module Honesty (R : Set) where
   -- the run is.
   behind-fire : ∀ {g m Γ A w τ e u x b π} {fr : Frame A u} (cr : Carried g m)
                 (ψ : Path (Carried.tree cr) (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
-              → Each (Heads (Conf.pos (Mach.conf m))) (plant ψ (coldˢ b (fired τ e (at u x fr))))
+              → Each (Ahead (Conf.pos (Mach.conf m))) (plant ψ (coldˢ b (fired τ e (at u x fr))))
   behind-fire cr ψ = Shift.shift-behind ψ _ (Carried.told cr) (Carried.ended cr) fire-heading (Carried.behind cr)
 
   -- A timer fired leaves every tie held: a cold runs nothing past its end.
@@ -638,7 +638,7 @@ module Honesty (R : Set) where
     pop-queue  : ∀ {g m Γ A} {c : Ctx R Γ A} {s p q τ p′ rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩
                → Queue p′ (Mach.clock m) (Mach.timers m) (Carried.tree cr)
     pop-behind : ∀ {g m Γ A} {c : Ctx R Γ A} {s p q τ p′ rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩
-               → Each (Heads p′) (Carried.tree cr)
+               → Each (Ahead p′) (Carried.tree cr)
     pop-told   : ∀ {g m Γ A} {c : Ctx R Γ A} {s p q τ p′ rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩
                → Untold p′ (Carried.tree cr)
 

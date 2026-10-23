@@ -29,11 +29,11 @@ open import adequacy.Ghost.Paths using (module GhostingPaths)
 
 module Replanting (R : Set) where
   open Strongly R using (Sub; Path; PathLanes; here; in-map; in-scan; in-cut; in-lane; in-take; in-outer; in-lanes; in-source; in-body;
-    this-lane; next-lane; part; partLanes; leftover; leftoverL; pooledL; pooled; sourced; Each; Heads; Lingers; Untold; Ended; Taking; taking; ending; taken; taking?; merged; connected;
+    this-lane; next-lane; part; partLanes; leftover; leftoverL; pooledL; pooled; sourced; Each; Ahead; Lingers; Untold; Ended; Taking; taking; ending; taken; taking?; merged; connected;
     consᴹ; mapᴹ; seen; seenL; isTaking;
     pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; cutˢ; laneˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ)
   open Moving R using (plant; plantᴸ)
-  open Framing R using (heads-map; heads-scan; heads-take; heads-source; shut-heads; heads-flat; untold-shut; ended-head)
+  open Framing R using (ahead-map; ahead-scan; ahead-take; ahead-source; ahead-flat; ahead-ended; untold-shut)
   open GhostingPaths R using (_⊕_; _⊕ᴸ_)
 
   -- Joiners that tell past `q` at the end `c` if `ys`'s joiners do.
@@ -84,7 +84,7 @@ module Replanting (R : Set) where
       head-revive : is-just (part v) ≡ true → is-just (part u) ≡ true
       head-take   : ∀ {i p k c} → is-just (part (takeWhileˢ i p (ending k c) v)) ≡ true → is-just (part (takeWhileˢ i p (ending k c) u)) ≡ true
       head-told   : ∀ {A′} (i : A′ ∈ᴸ Δ) {c} → E i c → ∀ {b₀ b′} → part u ≡ just b₀ → part v ≡ just b′ → untold i b′ ⊑[ q / c ] untold i b₀
-      head-below  : Each (Heads q) u → Each (Heads q) v
+      head-below  : Each (Ahead q) u → Each (Ahead q) v
 
   -- THE NODE'S TIES, MOVED: its part the same, under a take as well,
   -- what it leaves running and what it pools as a lane twinned as
@@ -555,11 +555,11 @@ module Replanting (R : Set) where
 
     module Behind (q : Pos) (E : Pred Δ₀)
                   (tl₀ : ∀ {C} (i : C ∈ᴸ Δ₀) {c} → E i c → ∀ {b₀ b′} → part u ≡ just b₀ → part v ≡ just b′ → untold i b′ ⊑[ q / c ] untold i b₀)
-                  (bl₀ : Each (Heads q) u → Each (Heads q) v) where
+                  (bl₀ : Each (Ahead q) u → Each (Ahead q) v) where
       open Telling q E tl₀
 
       P : ∀ {Γ A} → U.Node Γ A → Set
-      P c = Heads q c
+      P c = Ahead q c
 
       lift-ᴹ : ∀ {Δ A B} (g : U.Node Δ A → U.Node Δ B) (m : Maybe (U.Node Δ A)) → (∀ c → P c → P (g c))
              → (∀ {c} → m ≡ just c → P c) → ∀ {c} → mapᴹ g m ≡ just c → P c
@@ -572,7 +572,7 @@ module Replanting (R : Set) where
               → (isTaking tk ≡ true → ∀ {c} → part x′ ≡ just c → P c)
               → ∀ {c} → part (takeWhileˢ ib p tk x′) ≡ just c → P c
       take-up ib p taking x x′ old te up e′ with sw ib p x′
-      ... | inj₁ f′      = lift-ᴹ (U.takeWhileᶜ ib p) (part x′) (λ c → heads-take ib p {c}) (up refl) (trans (sym (f′ taking)) e′)
+      ... | inj₁ f′      = lift-ᴹ (U.takeWhileᶜ ib p) (part x′) (λ c → ahead-take ib p {c}) (up refl) (trans (sym (f′ taking)) e′)
       ... | inj₂ (n , _) = false≢ (via (n taking) (isj e′))
       take-up ib p (ending k c) x x′ old te up e′ = old (ending-eq ib p k c x x′ (te (isj e′)) e′)
       take-up ib p taken x x′ old te up e′ with sw ib p x′
@@ -582,7 +582,7 @@ module Replanting (R : Set) where
       root-flat : ∀ {Δ A B} op (g : A → Pos → U.Node Δ B) (o′ : Maybe (U.Node Δ A)) (L′ : List (U.Node Δ B)) (Q : List A) pl
                 → P pl → (∀ {c} → o′ ≡ just c → P c) → All P L′
                 → ∀ {c} → merged op g o′ L′ Q pl ≡ just c → P c
-      root-flat op g o′ L′ Q pl hp ho hL x = subst P (sym (merged-eq op g o′ L′ Q pl x)) (heads-flat op g o′ L′ Q pl hp ho hL)
+      root-flat op g o′ L′ Q pl hp ho hL x = subst P (sym (merged-eq op g o′ L′ Q pl x)) (ahead-flat op g o′ L′ Q pl hp ho hL)
 
       -- The source replanted: a source running on either side heads
       -- the connect beside its body; past the end, nothing moved.
@@ -594,7 +594,7 @@ module Replanting (R : Set) where
              → ((is-just s ∨ is-just e) ≡ true → ∀ {c} → mb ≡ just c → P c)
              → ∀ {c} → connected r e rt s′ mb ≡ just c → P c
       src-up r e        rt s        s′        nothing  old en rv hs hb ()
-      src-up r e        rt s        (just c′) (just b) old en rv hs hb refl = heads-source r {b} {c′} (hs refl refl) (hb (∨-l (rv refl)) refl)
+      src-up r e        rt s        (just c′) (just b) old en rv hs hb refl = ahead-source r {b} {c′} (hs refl refl) (hb (∨-l (rv refl)) refl)
       src-up r (just x) rt (just c) nothing   (just b) old en rv hs hb _    with en refl refl
       ... | ()
       src-up r (just x) rt nothing  nothing   (just b) old en rv hs hb refl = old refl
@@ -611,11 +611,10 @@ module Replanting (R : Set) where
               → (∀ {n} → connected r e rt s mb ≡ just n → s ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt)
               → ∀ {c} → connected r e rt s mb′ ≡ just c → P c
       body-up r e         rt s        mb        nothing   rv hs hb tl ut hr ()
-      body-up r e         rt (just c) mb        (just b′) rv hs hb tl ut hr refl = heads-source r {b′} {c} (hs (rv refl) refl) (hb refl refl)
+      body-up r e         rt (just c) mb        (just b′) rv hs hb tl ut hr refl = ahead-source r {b′} {c} (hs (rv refl) refl) (hb refl refl)
       body-up r (just c₀) rt nothing  nothing   (just b′) rv hs hb tl ut hr _    = false≢ (rv refl)
       body-up r (just c₀) rt nothing  (just b₀) (just b′) rv hs hb tl ut hr refl =
-        ended-head r c₀ (U.shut (here refl) c₀ b′) rt (U.step rt)
-          (shut-heads (here refl) c₀ b′ (hb refl refl) (tl refl refl refl refl (ut refl refl refl))) (hr refl refl refl)
+        ahead-ended r c₀ b′ rt (hb refl refl) (tl refl refl refl refl (ut refl refl refl)) (hr refl refl refl)
       body-up r nothing   rt nothing  mb        (just b′) rv hs hb tl ut hr ()
 
       mutual
@@ -623,12 +622,12 @@ module Replanting (R : Set) where
                → ∀ {K : Pred Γ} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → Binds ρ K j c → E j c) → Each P (plant ρ v)
         shiftE here ev ut en κ = bl₀ ev
         shiftE (in-map {f = f} ρ) ev ut en κ =
-          each-map (lift-ᴹ (U.mapᶜ f) (part (plant ρ v)) (λ c → heads-map f {c}) (Each.parts es here refl)) es
+          each-map (lift-ᴹ (U.mapᶜ f) (part (plant ρ v)) (λ c → ahead-map f {c}) (Each.parts es here refl)) es
           where
             es : Each P (plant ρ v)
             es = shiftE ρ (each-sub ev (in-map here) refl) (ut-sub ut (in-map here) refl) (en-sub en (in-map here) refl) κ
         shiftE (in-scan {f = f} {z = z} ρ) ev ut en κ =
-          each-scan (lift-ᴹ (U.scanᶜ f z) (part (plant ρ v)) (λ c → heads-scan f z {c}) (Each.parts es here refl)) es
+          each-scan (lift-ᴹ (U.scanᶜ f z) (part (plant ρ v)) (λ c → ahead-scan f z {c}) (Each.parts es here refl)) es
           where
             es : Each P (plant ρ v)
             es = shiftE ρ (each-sub ev (in-scan here) refl) (ut-sub ut (in-scan here) refl) (en-sub en (in-scan here) refl) κ
@@ -965,7 +964,7 @@ module Replanting (R : Set) where
 
   module Shift {T : Sub [] R} {Δ A π} {u : Sub Δ A} (ρ : Path T u π) where
     -- Every node the replanted tree holds heads no earlier than `q`.
-    shift-behind : (v : Sub Δ A) → ∀ {q} → Untold q T → Ended T → Heading q (Bound ρ) u v → Each (Heads q) T → Each (Heads q) (plant ρ v)
+    shift-behind : (v : Sub Δ A) → ∀ {q} → Untold q T → Ended T → Heading q (Bound ρ) u v → Each (Ahead q) T → Each (Ahead q) (plant ρ v)
     shift-behind v {q} ut en hd ev =
       Walk.Behind.shiftE (Heading.head-revive hd) (λ {i} {p} {k} {c} → Heading.head-take hd {i} {p} {k} {c}) q (Bound ρ) (Heading.head-told hd) (Heading.head-below hd)
         ρ ev ut en (λ j w → w)

@@ -8,7 +8,7 @@ module adequacy.Frame where
 
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (lookup to lookupᴬ)
+open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (lookup to lookupᴬ; head to headᴬ; tail to tailᴬ; map to mapᴬ)
 open import Data.List.Relation.Unary.All.Properties using (++⁻ˡ; ++⁻ʳ) renaming (++⁺ to all-++⁺)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -16,9 +16,10 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import adequacy.Sorted using (_≤ᵖ_; ≤ᵖ-child; ≤ᵖ-trans)
 open import adequacy.Told using (untoldᴶ; untold; untoldʳ; untoldʳᴹ; untoldʳᴸ; untoldᵇ; untoldᴹ; untoldᴸ; untoldˢ; Tells)
+open import adequacy.Calm using (NoSooner; restHead; rest-heads; Calm; calms; calmsʳ; calmsᴹ; calmsᴸ; calmsʳᴹ; calmsʳᴸ; calm-just; calm-all)
 open import Data.Unit using (⊤; tt)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Product using (Σ; _×_; _,_; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 
 open import denotation.MonotonicList.Events using (Events∞; Pos; ix; last; _<ᵖ_; <ᵖ-trans; <ᵖ-split; <ᵖ-asym; <ᵖ-below; inside)
 import Data.Maybe.Relation.Binary.Pointwise as MP
@@ -33,7 +34,7 @@ open Events∞
 
 
 module Framing (R : Set) where
-  open Strongly R using (Heads)
+  open Strongly R using (Heads; Ahead)
 
   heads-map : ∀ {Γ A B q} (g : A → B) {c : U.Node Γ A} → Heads q c → Heads q (U.mapᶜ g c)
   heads-map g {c} hd e = hd (trans (sym (head-map g (U.step c))) e)
@@ -440,15 +441,32 @@ module Framing (R : Set) where
   union-down x x′ y y′ sx sx′ _ _ () hy′ (inj₂ _) (inj₁ outᵗ)
   union-down x x′ y y′ sx sx′ _ _ () hy′ (inj₂ _) (inj₁ endᵗ)
 
-  postulate
-    -- A burst steps as before, or past `q`, when its source's step and
-    -- rest do.  False: a source's rest can head before its own step, so
-    -- a step moved out of the burst's range falls back onto a rest
-    -- twinned below `q`.
-    --
-    -- REFUTED: 49fd64e7 by a joiner subscribed outside the burst's root and a sibling lane resting early
-    bursts-down : ∀ {Γ A B q} r (t t′ : U.Node Γ A) (st st′ : U.Step Γ A) → Down q st st′ → Down q (U.restˢ {B = B} t) (U.restˢ {B = B} t′)
-                → Down {Γ} {B} q (U.burstsˢ r t st) (U.burstsˢ r t′ st′)
+  down-heads : ∀ {Γ A q} {s s′ : U.Step Γ A} → Down q s s′ → HeadsS q s → HeadsS q s′
+  down-heads (inj₁ tw)      h e = h (trans (twin-head tw) e)
+  down-heads (inj₂ (_ , h′)) h e = h′ e
+
+  bursts-heads : ∀ {Γ A B q} r (t : U.Node Γ A) (st : U.Step Γ A) → HeadsS q st → HeadsS q (U.restˢ {B = B} t) → HeadsS {Γ} {B} q (U.burstsˢ r t st)
+  bursts-heads {B = B} r t (U.outˢ k a t′) hs hr = if-head (inside r k) (U.skipˢ k (U.burstingᶜ r t′)) (U.restˢ {B = B} t) (λ { refl → hs refl }) hr
+  bursts-heads {B = B} r t (U.skipˢ k t′)  hs hr = if-head (inside r k) (U.skipˢ k (U.burstingᶜ r t′)) (U.restˢ {B = B} t) (λ { refl → hs refl }) hr
+  bursts-heads r t (U.endˢ _)      hs hr = hr
+  bursts-heads r t U.hushˢ         hs hr = hr
+
+  -- A burst steps as before, or past `q`, when its source's step and
+  -- rest do and that rest heads no sooner than `q`: a step moved out of
+  -- the burst's range falls back onto the rest.
+  --
+  -- REFUTED: 49fd64e7 by a joiner subscribed outside the burst's root and a sibling lane resting early, without the rest's head
+  bursts-down : ∀ {Γ A B q} r (t t′ : U.Node Γ A) (st st′ : U.Step Γ A) → Down q st st′ → Down q (U.restˢ {B = B} t) (U.restˢ {B = B} t′)
+              → HeadsS q (U.restˢ {B = B} t) → Down {Γ} {B} q (U.burstsˢ r t st) (U.burstsˢ r t′ st′)
+  bursts-down r t t′ _ _ (inj₁ (outᵗ {k}))  dr hr with inside r k
+  ... | true  = inj₁ skipᵗ
+  ... | false = dr
+  bursts-down r t t′ _ _ (inj₁ (skipᵗ {k})) dr hr with inside r k
+  ... | true  = inj₁ skipᵗ
+  ... | false = dr
+  bursts-down r t t′ _ _ (inj₁ endᵗ)        dr hr = dr
+  bursts-down r t t′ _ _ (inj₁ hushᵗ)       dr hr = dr
+  bursts-down r t t′ st st′ (inj₂ (hs , hs′)) dr hr = inj₂ (bursts-heads r t st hs hr , bursts-heads r t′ st′ hs′ (down-heads dr hr))
 
   body-twin : ∀ {Γ A B} r (s s′ : U.Source Γ A) {sb sb′ : U.Step (A ∷ Γ) B} → Twin sb sb′ → Twin (U.bodyˢ r s sb) (U.bodyˢ r s′ sb′)
   body-twin r s s′ outᵗ  = outᵗ
@@ -538,126 +556,222 @@ module Framing (R : Set) where
               → DownN q (U.flatMapᶜ op g o ls qs pl) (U.flatMapᶜ op g o′ ls′ qs pl′)
 
   mutual
-    shut-down : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (b : U.Node Γ B) → Tells q c (untold i b) → DownN q b (U.shut i c b)
-    shut-down i c (U.framesᶜ τ e m)            tl = inj₁ (twin-refl _)
-    shut-down i c (U.burstᶜ τ r k b)           tl = inj₁ (twin-refl _)
-    shut-down i c (U.ofᶜ p k xs)               tl = inj₁ (twin-refl _)
-    shut-down i c (U.mapᶜ f n)                 tl = map-down f (U.step n) (U.step (U.shut i c n)) (shut-down i c n tl)
-    shut-down i c (U.scanᶜ f z n)              tl = scan-down f z (U.step n) (U.step (U.shut i c n)) (shut-down i c n tl)
-    shut-down i c (U.takeWhileᶜ t p n)         tl = take-down t p (U.step n) (U.step (U.shut i c n)) (shut-down i c n tl)
-    shut-down i c (U.flatMapᶜ op g o ls qs pl) tl =
+    shut-down : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (b : U.Node Γ B) → Tells q c (untold i b) → Calm q b → DownN q b (U.shut i c b)
+    shut-down i c (U.framesᶜ τ e m)            tl cm = inj₁ (twin-refl _)
+    shut-down i c (U.burstᶜ τ r k b)           tl cm = inj₁ (twin-refl _)
+    shut-down i c (U.ofᶜ p k xs)               tl cm = inj₁ (twin-refl _)
+    shut-down i c (U.mapᶜ f n)                 tl cm = map-down f (U.step n) (U.step (U.shut i c n)) (shut-down i c n tl cm)
+    shut-down i c (U.scanᶜ f z n)              tl cm = scan-down f z (U.step n) (U.step (U.shut i c n)) (shut-down i c n tl cm)
+    shut-down i c (U.takeWhileᶜ t p n)         tl cm = take-down t p (U.step n) (U.step (U.shut i c n)) (shut-down i c n tl cm)
+    shut-down i c (U.flatMapᶜ op g o ls qs pl) tl cm =
       flat-down op g o (U.shutᴹ i c o) ls (U.shutᴸ i c ls) qs pl (U.shut i c pl)
-        (shut-downᴹ i c o (++⁻ˡ (untoldᴹ i o) tl))
-        (shut-downᴸ i c ls (++⁻ˡ (untoldᴸ i ls) (++⁻ʳ (untoldᴹ i o) tl)))
-        (shut-down i c pl (++⁻ʳ (untoldᴸ i ls) (++⁻ʳ (untoldᴹ i o) tl)))
-    shut-down i c (U.joinᶜ j p ((_ , just a) ∷ xs) e)  tl = inj₁ outᵗ
-    shut-down i c (U.joinᶜ j p ((_ , nothing) ∷ xs) e) tl = inj₁ skipᵗ
-    shut-down i c (U.joinᶜ j p [] (just e))            tl = inj₁ endᵗ
-    shut-down i c (U.joinᶜ j p [] nothing)             tl with U.same? i j
+        (shut-downᴹ i c o (++⁻ˡ (untoldᴹ i o) tl) (++⁻ˡ (calmsᴹ o) cm))
+        (shut-downᴸ i c ls (++⁻ˡ (untoldᴸ i ls) (++⁻ʳ (untoldᴹ i o) tl)) (++⁻ˡ (calmsᴸ ls) (++⁻ʳ (calmsᴹ o) cm)))
+        (shut-down i c pl (++⁻ʳ (untoldᴸ i ls) (++⁻ʳ (untoldᴹ i o) tl)) (++⁻ʳ (calmsᴸ ls) (++⁻ʳ (calmsᴹ o) cm)))
+    shut-down i c (U.joinᶜ j p ((_ , just a) ∷ xs) e)  tl cm = inj₁ outᵗ
+    shut-down i c (U.joinᶜ j p ((_ , nothing) ∷ xs) e) tl cm = inj₁ skipᵗ
+    shut-down i c (U.joinᶜ j p [] (just e))            tl cm = inj₁ endᵗ
+    shut-down i c (U.joinᶜ j p [] nothing)             tl cm with U.same? i j
     ... | nothing   = inj₁ hushᵗ
     ... | just refl = told-end tl
-    shut-down i c (U.connectᶜ r b (U.live s))  tl =
+    shut-down i c (U.connectᶜ r b (U.live s))  tl cm =
       source-down r b (U.shut (there i) c b) s (U.shut i c s) (U.step b) (U.step (U.shut (there i) c b)) (U.step s) (U.step (U.shut i c s))
-        (shut-down (there i) c b (++⁻ˡ (untold (there i) b) tl)) (shut-down i c s (++⁻ʳ (untold (there i) b) tl))
-    shut-down i c (U.connectᶜ r b (U.ended e t)) tl =
+        (shut-down (there i) c b (++⁻ˡ (untold (there i) b) tl) (++⁻ˡ (calms b) cm)) (shut-down i c s (++⁻ʳ (untold (there i) b) tl) (++⁻ʳ (calms b) cm))
+    shut-down i c (U.connectᶜ r b (U.ended e t)) tl cm =
       ended-down r e b (U.shut (there i) c b) t (U.shut i c t) (U.step b) (U.step (U.shut (there i) c b)) (U.step t) (U.step (U.shut i c t))
-        (shut-down (there i) c b (++⁻ˡ (untold (there i) b) tl)) (shut-down i c t (++⁻ʳ (untold (there i) b) tl))
-    shut-down i c (U.deferᶜ l p ns)            tl = inj₁ (twin-refl _)
-    shut-down i c (U.endingᶜ p n)              tl = inj₁ endᵗ
-    shut-down i c (U.restᶜ n)                  tl = rest-down i c n tl
-    shut-down i c U.idleᶜ                      tl = inj₁ hushᵗ
-    shut-down i c (U.unionᶜ x y)               tl =
+        (shut-down (there i) c b (++⁻ˡ (untold (there i) b) tl) (++⁻ˡ (calms b) cm)) (shut-down i c t (++⁻ʳ (untold (there i) b) tl) (++⁻ʳ (calms b) cm))
+    shut-down i c (U.deferᶜ l p ns)            tl cm = inj₁ (twin-refl _)
+    shut-down i c (U.endingᶜ p n)              tl cm = inj₁ endᵗ
+    shut-down i c (U.restᶜ n)                  tl cm = rest-down i c n tl cm
+    shut-down i c U.idleᶜ                      tl cm = inj₁ hushᵗ
+    shut-down i c (U.unionᶜ x y)               tl cm =
       union-down x (U.shut i c x) y (U.shut i c y) (U.restˢ x) (U.restˢ (U.shut i c x)) (U.restˢ y) (U.restˢ (U.shut i c y))
-        (rest-hushed y) (rest-hushed (U.shut i c y)) (rest-down i c x (++⁻ˡ (untoldʳ i x) tl)) (rest-down i c y (++⁻ʳ (untoldʳ i x) tl))
-    shut-down i c (U.burstingᶜ r t)            tl =
-      bursts-down r t (U.shut i c t) (U.step t) (U.step (U.shut i c t)) (shut-down i c t (++⁻ˡ (untold i t) tl)) (rest-down i c t (++⁻ʳ (untold i t) tl))
-    shut-down i c (U.underᶜ {C = C} s b)       tl =
-      under-down s (U.shutˢ i c s) (U.restˢ {B = C} b) (U.restˢ {B = C} (U.shut (there i) c b)) (rest-down (there i) c b tl)
+        (rest-hushed y) (rest-hushed (U.shut i c y))
+        (rest-down i c x (++⁻ˡ (untoldʳ i x) tl) (++⁻ˡ (calmsʳ x) cm)) (rest-down i c y (++⁻ʳ (untoldʳ i x) tl) (++⁻ʳ (calmsʳ x) cm))
+    shut-down i c (U.burstingᶜ r t)            tl (h ∷ cm) = burst-down i c r t tl h cm
+    shut-down i c (U.underᶜ {C = C} s b)       tl cm =
+      under-down s (U.shutˢ i c s) (U.restˢ {B = C} b) (U.restˢ {B = C} (U.shut (there i) c b)) (rest-down (there i) c b tl cm)
 
-    shut-downᴹ : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (o : Maybe (U.Node Γ B)) → Tells q c (untoldᴹ i o) → MP.Pointwise (DownN q) o (U.shutᴹ i c o)
-    shut-downᴹ i c nothing  tl = MP.nothing
-    shut-downᴹ i c (just n) tl = MP.just (shut-down i c n tl)
+    shut-downᴹ : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (o : Maybe (U.Node Γ B)) → Tells q c (untoldᴹ i o) → All (NoSooner q) (calmsᴹ o)
+               → MP.Pointwise (DownN q) o (U.shutᴹ i c o)
+    shut-downᴹ i c nothing  tl cm = MP.nothing
+    shut-downᴹ i c (just n) tl cm = MP.just (shut-down i c n tl cm)
 
-    shut-downᴸ : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (ls : List (U.Node Γ B)) → Tells q c (untoldᴸ i ls) → LP.Pointwise (DownN q) ls (U.shutᴸ i c ls)
-    shut-downᴸ i c []       tl = LP.[]
-    shut-downᴸ i c (n ∷ ns) tl = shut-down i c n (++⁻ˡ (untold i n) tl) LP.∷ shut-downᴸ i c ns (++⁻ʳ (untold i n) tl)
+    shut-downᴸ : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (ls : List (U.Node Γ B)) → Tells q c (untoldᴸ i ls) → All (NoSooner q) (calmsᴸ ls)
+               → LP.Pointwise (DownN q) ls (U.shutᴸ i c ls)
+    shut-downᴸ i c []       tl cm = LP.[]
+    shut-downᴸ i c (n ∷ ns) tl cm =
+      shut-down i c n (++⁻ˡ (untold i n) tl) (++⁻ˡ (calms n) cm) LP.∷ shut-downᴸ i c ns (++⁻ʳ (untold i n) tl) (++⁻ʳ (calms n) cm)
 
-    rest-down : ∀ {Γ A B C q} (i : A ∈ᴸ Γ) c (n : U.Node Γ B) → Tells q c (untoldʳ i n) → Down q (U.restˢ {B = C} n) (U.restˢ {B = C} (U.shut i c n))
-    rest-down i c (U.framesᶜ τ e m)            tl = inj₁ hushᵗ
-    rest-down i c (U.burstᶜ τ r k b)           tl = inj₁ hushᵗ
-    rest-down i c (U.ofᶜ p k xs)               tl = inj₁ hushᵗ
-    rest-down i c (U.mapᶜ f n)                 tl = rest-down i c n tl
-    rest-down i c (U.scanᶜ f z n)              tl = rest-down i c n tl
-    rest-down i c (U.takeWhileᶜ t p n)         tl = rest-down i c n tl
-    rest-down i c (U.flatMapᶜ op g o ls qs pl) tl =
+    -- A burst under a shut, its source's rest heading no sooner than `q`.
+    burst-down : ∀ {Γ A B C q} (i : A ∈ᴸ Γ) c r (t : U.Node Γ B) → Tells q c (untold i t ++ untoldʳ i t) → NoSooner q (restHead t)
+               → All (NoSooner q) (calms t ++ calmsʳ t) → Down {Γ} {C} q (U.burstsˢ r t (U.step t)) (U.burstsˢ r (U.shut i c t) (U.step (U.shut i c t)))
+    burst-down i c r t tl h cm =
+      bursts-down r t (U.shut i c t) (U.step t) (U.step (U.shut i c t))
+        (shut-down i c t (++⁻ˡ (untold i t) tl) (++⁻ˡ (calms t) cm)) (rest-down i c t (++⁻ʳ (untold i t) tl) (++⁻ʳ (calms t) cm)) (rest-heads t h)
+
+    rest-down : ∀ {Γ A B C q} (i : A ∈ᴸ Γ) c (n : U.Node Γ B) → Tells q c (untoldʳ i n) → All (NoSooner q) (calmsʳ n)
+              → Down q (U.restˢ {B = C} n) (U.restˢ {B = C} (U.shut i c n))
+    rest-down i c (U.framesᶜ τ e m)            tl cm = inj₁ hushᵗ
+    rest-down i c (U.burstᶜ τ r k b)           tl cm = inj₁ hushᵗ
+    rest-down i c (U.ofᶜ p k xs)               tl cm = inj₁ hushᵗ
+    rest-down i c (U.mapᶜ f n)                 tl cm = rest-down i c n tl cm
+    rest-down i c (U.scanᶜ f z n)              tl cm = rest-down i c n tl cm
+    rest-down i c (U.takeWhileᶜ t p n)         tl cm = rest-down i c n tl cm
+    rest-down i c (U.flatMapᶜ op g o ls qs pl) tl cm =
       union-down (U.outerᶜ o) (U.outerᶜ o′) (U.unionᶜ (U.restsᶜ ls) (U.restᶜ pl)) (U.unionᶜ (U.restsᶜ ls′) (U.restᶜ pl′))
         (U.restᴹ o) (U.restᴹ o′) (U.unionˢ (U.restsᶜ ls) (U.restsˢ ls) (U.restᶜ pl) (U.restˢ pl)) (U.unionˢ (U.restsᶜ ls′) (U.restsˢ ls′) (U.restᶜ pl′) (U.restˢ pl′))
         (union-hushed (U.restsᶜ ls) (U.restsˢ ls) (U.restᶜ pl) (U.restˢ pl) (rest-hushed pl))
         (union-hushed (U.restsᶜ ls′) (U.restsˢ ls′) (U.restᶜ pl′) (U.restˢ pl′) (rest-hushed pl′))
-        (rest-downᴹ i c o (++⁻ˡ (untoldʳᴹ i o) tl))
+        (rest-downᴹ i c o (++⁻ˡ (untoldʳᴹ i o) tl) (++⁻ˡ (calmsʳᴹ o) cm))
         (union-down (U.restsᶜ ls) (U.restsᶜ ls′) (U.restᶜ pl) (U.restᶜ pl′) (U.restsˢ ls) (U.restsˢ ls′) (U.restˢ pl) (U.restˢ pl′)
           (rest-hushed pl) (rest-hushed pl′)
-          (rests-down i c ls (++⁻ˡ (untoldʳᴸ i ls) (++⁻ʳ (untoldʳᴹ i o) tl)))
-          (rest-down i c pl (++⁻ʳ (untoldʳᴸ i ls) (++⁻ʳ (untoldʳᴹ i o) tl))))
+          (rests-down i c ls (++⁻ˡ (untoldʳᴸ i ls) (++⁻ʳ (untoldʳᴹ i o) tl)) (++⁻ˡ (calmsʳᴸ ls) (++⁻ʳ (calmsʳᴹ o) cm)))
+          (rest-down i c pl (++⁻ʳ (untoldʳᴸ i ls) (++⁻ʳ (untoldʳᴹ i o) tl)) (++⁻ʳ (calmsʳᴸ ls) (++⁻ʳ (calmsʳᴹ o) cm))))
       where o′ = U.shutᴹ i c o
             ls′ = U.shutᴸ i c ls
             pl′ = U.shut i c pl
-    rest-down i c (U.joinᶜ j p xs e)           tl = inj₁ hushᵗ
-    rest-down i c (U.connectᶜ {B = C} r b (U.live s)) tl =
+    rest-down i c (U.joinᶜ j p xs e)           tl cm = inj₁ hushᵗ
+    rest-down i c (U.connectᶜ {B = C} r b (U.live s)) tl cm =
       union-down (U.burstingᶜ r s) (U.burstingᶜ r s′) (U.underᶜ (U.live s) b) (U.underᶜ (U.live s′) b′)
         (U.burstsˢ r s (U.step s)) (U.burstsˢ r s′ (U.step s′)) (U.underˢ (U.live s) (U.restˢ {B = C} b)) (U.underˢ (U.live s′) (U.restˢ {B = C} b′))
         (under-hushed (U.live s) (U.restˢ {B = C} b)) (under-hushed (U.live s′) (U.restˢ {B = C} b′))
-        (bursts-down r s s′ (U.step s) (U.step s′) (shut-down i c s (++⁻ˡ (untold i s) tlₛ)) (rest-down i c s (++⁻ʳ (untold i s) tlₛ)))
-        (under-down (U.live s) (U.live s′) (U.restˢ {B = C} b) (U.restˢ {B = C} b′) (rest-down (there i) c b (++⁻ˡ (untoldʳ (there i) b) tl)))
+        (burst-down i c r s (++⁻ʳ (untoldʳ (there i) b) tl) (headᴬ (++⁻ʳ (calmsʳ b) cm)) (tailᴬ (++⁻ʳ (calmsʳ b) cm)))
+        (under-down (U.live s) (U.live s′) (U.restˢ {B = C} b) (U.restˢ {B = C} b′) (rest-down (there i) c b (++⁻ˡ (untoldʳ (there i) b) tl) (++⁻ˡ (calmsʳ b) cm)))
       where s′ = U.shut i c s
             b′ = U.shut (there i) c b
-            tlₛ = ++⁻ʳ (untoldʳ (there i) b) tl
-    rest-down i c (U.connectᶜ {B = C} r b (U.ended e t)) tl =
+    rest-down i c (U.connectᶜ {B = C} r b (U.ended e t)) tl cm =
       union-down (U.burstingᶜ r t) (U.burstingᶜ r t′) (U.underᶜ (U.ended e t) b) (U.underᶜ (U.ended e t′) b′)
         (U.burstsˢ r t (U.step t)) (U.burstsˢ r t′ (U.step t′)) (U.underˢ (U.ended e t) (U.restˢ {B = C} b)) (U.underˢ (U.ended e t′) (U.restˢ {B = C} b′))
         (under-hushed (U.ended e t) (U.restˢ {B = C} b)) (under-hushed (U.ended e t′) (U.restˢ {B = C} b′))
-        (bursts-down r t t′ (U.step t) (U.step t′) (shut-down i c t (++⁻ˡ (untold i t) tlₜ)) (rest-down i c t (++⁻ʳ (untold i t) tlₜ)))
-        (under-down (U.ended e t) (U.ended e t′) (U.restˢ {B = C} b) (U.restˢ {B = C} b′) (rest-down (there i) c b (++⁻ˡ (untoldʳ (there i) b) tl)))
+        (burst-down i c r t (++⁻ʳ (untoldʳ (there i) b) tl) (headᴬ (++⁻ʳ (calmsʳ b) cm)) (tailᴬ (++⁻ʳ (calmsʳ b) cm)))
+        (under-down (U.ended e t) (U.ended e t′) (U.restˢ {B = C} b) (U.restˢ {B = C} b′) (rest-down (there i) c b (++⁻ˡ (untoldʳ (there i) b) tl) (++⁻ˡ (calmsʳ b) cm)))
       where t′ = U.shut i c t
             b′ = U.shut (there i) c b
-            tlₜ = ++⁻ʳ (untoldʳ (there i) b) tl
-    rest-down i c (U.deferᶜ l p ns)            tl = inj₁ hushᵗ
-    rest-down i c (U.endingᶜ p n)              tl = rest-down i c n tl
-    rest-down i c (U.restᶜ n)                  tl = rest-down i c n tl
-    rest-down i c U.idleᶜ                      tl = inj₁ hushᵗ
-    rest-down i c (U.unionᶜ x y)               tl =
+    rest-down i c (U.deferᶜ l p ns)            tl cm = inj₁ hushᵗ
+    rest-down i c (U.endingᶜ p n)              tl cm = rest-down i c n tl cm
+    rest-down i c (U.restᶜ n)                  tl cm = rest-down i c n tl cm
+    rest-down i c U.idleᶜ                      tl cm = inj₁ hushᵗ
+    rest-down i c (U.unionᶜ x y)               tl cm =
       union-down (U.restᶜ x) (U.restᶜ (U.shut i c x)) (U.restᶜ y) (U.restᶜ (U.shut i c y))
         (U.restˢ x) (U.restˢ (U.shut i c x)) (U.restˢ y) (U.restˢ (U.shut i c y))
-        (rest-hushed y) (rest-hushed (U.shut i c y)) (rest-down i c x (++⁻ˡ (untoldʳ i x) tl)) (rest-down i c y (++⁻ʳ (untoldʳ i x) tl))
-    rest-down i c (U.burstingᶜ r t)            tl =
-      bursts-down r t (U.shut i c t) (U.step t) (U.step (U.shut i c t)) (shut-down i c t (++⁻ˡ (untold i t) tl)) (rest-down i c t (++⁻ʳ (untold i t) tl))
-    rest-down i c (U.underᶜ {C = C} s b)       tl =
-      under-down s (U.shutˢ i c s) (U.restˢ {B = C} b) (U.restˢ {B = C} (U.shut (there i) c b)) (rest-down (there i) c b tl)
+        (rest-hushed y) (rest-hushed (U.shut i c y))
+        (rest-down i c x (++⁻ˡ (untoldʳ i x) tl) (++⁻ˡ (calmsʳ x) cm)) (rest-down i c y (++⁻ʳ (untoldʳ i x) tl) (++⁻ʳ (calmsʳ x) cm))
+    rest-down i c (U.burstingᶜ r t)            tl (h ∷ cm) = burst-down i c r t tl h cm
+    rest-down i c (U.underᶜ {C = C} s b)       tl cm =
+      under-down s (U.shutˢ i c s) (U.restˢ {B = C} b) (U.restˢ {B = C} (U.shut (there i) c b)) (rest-down (there i) c b tl cm)
 
-    rest-downᴹ : ∀ {Γ A B C q} (i : A ∈ᴸ Γ) c (o : Maybe (U.Node Γ B)) → Tells q c (untoldʳᴹ i o) → Down q (U.restᴹ {B = C} o) (U.restᴹ {B = C} (U.shutᴹ i c o))
-    rest-downᴹ i c nothing  tl = inj₁ hushᵗ
-    rest-downᴹ i c (just n) tl = rest-down i c n tl
+    rest-downᴹ : ∀ {Γ A B C q} (i : A ∈ᴸ Γ) c (o : Maybe (U.Node Γ B)) → Tells q c (untoldʳᴹ i o) → All (NoSooner q) (calmsʳᴹ o)
+               → Down q (U.restᴹ {B = C} o) (U.restᴹ {B = C} (U.shutᴹ i c o))
+    rest-downᴹ i c nothing  tl cm = inj₁ hushᵗ
+    rest-downᴹ i c (just n) tl cm = rest-down i c n tl cm
 
-    rests-down : ∀ {Γ A B C q} (i : A ∈ᴸ Γ) c (ls : List (U.Node Γ B)) → Tells q c (untoldʳᴸ i ls) → Down q (U.restsˢ {B = C} ls) (U.restsˢ {B = C} (U.shutᴸ i c ls))
-    rests-down i c []       tl = inj₁ hushᵗ
-    rests-down i c (l ∷ ls) tl =
+    rests-down : ∀ {Γ A B C q} (i : A ∈ᴸ Γ) c (ls : List (U.Node Γ B)) → Tells q c (untoldʳᴸ i ls) → All (NoSooner q) (calmsʳᴸ ls)
+               → Down q (U.restsˢ {B = C} ls) (U.restsˢ {B = C} (U.shutᴸ i c ls))
+    rests-down i c []       tl cm = inj₁ hushᵗ
+    rests-down i c (l ∷ ls) tl cm =
       union-down (U.restᶜ l) (U.restᶜ (U.shut i c l)) (U.restsᶜ ls) (U.restsᶜ (U.shutᴸ i c ls))
         (U.restˢ l) (U.restˢ (U.shut i c l)) (U.restsˢ ls) (U.restsˢ (U.shutᴸ i c ls))
-        (rests-hushed ls) (rests-hushed (U.shutᴸ i c ls)) (rest-down i c l (++⁻ˡ (untoldʳ i l) tl)) (rests-down i c ls (++⁻ʳ (untoldʳ i l) tl))
-
+        (rests-hushed ls) (rests-hushed (U.shutᴸ i c ls))
+        (rest-down i c l (++⁻ˡ (untoldʳ i l) tl) (++⁻ˡ (calmsʳ l) cm)) (rests-down i c ls (++⁻ʳ (untoldʳ i l) tl) (++⁻ʳ (calmsʳ l) cm))
 
   -- An ended connect heads where its body and its source's rest do.
   ended-head : ∀ {Γ A B q} r c (b : U.Node (A ∷ Γ) B) (t : U.Node Γ A) (st : U.Step Γ A)
              → Heads q b → HeadsS q st → HeadsS q (U.endedˢ r b (U.step b) c t st)
   ended-head r c b t st hb ht = ended-heads r c b (U.step b) t st hb ht
 
-  -- A shut heads where the node did, or at an end it tells.
+  -- A shut heads where the node did, or at an end it tells, every rest
+  -- it falls back on heading no sooner than `q`.
   --
-  -- REFUTED: 49fd64e7 by a joiner subscribed outside a burst's root, told an end that moves the burst onto an early rest
-  shut-heads : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (b : U.Node Γ B) → Heads q b → Tells q c (untold i b) → Heads q (U.shut i c b)
-  shut-heads i c b hb tl e with shut-down i c b tl
+  -- REFUTED: 49fd64e7 by a joiner subscribed outside a burst's root, told an end that moves the burst onto an early rest, without `Calm`
+  shut-heads : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (b : U.Node Γ B) → Heads q b → Tells q c (untold i b) → Calm q b → Heads q (U.shut i c b)
+  shut-heads i c b hb tl cm e with shut-down i c b tl cm
   ... | inj₁ tw       = hb (trans (twin-head tw) e)
   ... | inj₂ (_ , h′) = h′ e
+
+  -- A shut keeps every rest it falls back on no sooner than `q`: each
+  -- one steps as before, or past `q`.
+  mutual
+    calm-shut : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (b : U.Node Γ B) → Tells q c (untold i b) → Calm q b → Calm q (U.shut i c b)
+    calm-shut i c (U.framesᶜ τ e m)            tl cm = []
+    calm-shut i c (U.burstᶜ τ r k b)           tl cm = []
+    calm-shut i c (U.ofᶜ p k xs)               tl cm = []
+    calm-shut i c (U.mapᶜ f n)                 tl cm = calm-shut i c n tl cm
+    calm-shut i c (U.scanᶜ f z n)              tl cm = calm-shut i c n tl cm
+    calm-shut i c (U.takeWhileᶜ t p n)         tl cm = calm-shut i c n tl cm
+    calm-shut i c (U.flatMapᶜ op g o ls qs pl) tl cm =
+      all-++⁺ (calm-shutᴹ i c o (++⁻ˡ (untoldᴹ i o) tl) (++⁻ˡ (calmsᴹ o) cm))
+        (all-++⁺ (calm-shutᴸ i c ls (++⁻ˡ (untoldᴸ i ls) (++⁻ʳ (untoldᴹ i o) tl)) (++⁻ˡ (calmsᴸ ls) (++⁻ʳ (calmsᴹ o) cm)))
+          (calm-shut i c pl (++⁻ʳ (untoldᴸ i ls) (++⁻ʳ (untoldᴹ i o) tl)) (++⁻ʳ (calmsᴸ ls) (++⁻ʳ (calmsᴹ o) cm))))
+    calm-shut i c (U.joinᶜ j p xs e)           tl cm = []
+    calm-shut i c (U.connectᶜ r b (U.live s))  tl cm =
+      all-++⁺ (calm-shut (there i) c b (++⁻ˡ (untold (there i) b) tl) (++⁻ˡ (calms b) cm)) (calm-shut i c s (++⁻ʳ (untold (there i) b) tl) (++⁻ʳ (calms b) cm))
+    calm-shut i c (U.connectᶜ r b (U.ended e t)) tl cm =
+      all-++⁺ (calm-shut (there i) c b (++⁻ˡ (untold (there i) b) tl) (++⁻ˡ (calms b) cm)) (calm-shut i c t (++⁻ʳ (untold (there i) b) tl) (++⁻ʳ (calms b) cm))
+    calm-shut i c (U.deferᶜ l p ns)            tl cm = []
+    calm-shut i c (U.endingᶜ p n)              tl cm = calm-shut i c n tl cm
+    calm-shut i c (U.restᶜ n)                  tl cm = calmʳ-shut i c n tl cm
+    calm-shut i c U.idleᶜ                      tl cm = []
+    calm-shut i c (U.unionᶜ x y)               tl cm =
+      all-++⁺ (calmʳ-shut i c x (++⁻ˡ (untoldʳ i x) tl) (++⁻ˡ (calmsʳ x) cm)) (calmʳ-shut i c y (++⁻ʳ (untoldʳ i x) tl) (++⁻ʳ (calmsʳ x) cm))
+    calm-shut i c (U.burstingᶜ r t)            tl (h ∷ cm) = calm-burst i c t tl h cm
+    calm-shut i c (U.underᶜ s b)               tl cm = calmʳ-shut (there i) c b tl cm
+
+    calm-shutᴹ : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (o : Maybe (U.Node Γ B)) → Tells q c (untoldᴹ i o) → All (NoSooner q) (calmsᴹ o)
+               → All (NoSooner q) (calmsᴹ (U.shutᴹ i c o))
+    calm-shutᴹ i c nothing  tl cm = []
+    calm-shutᴹ i c (just n) tl cm = calm-shut i c n tl cm
+
+    calm-shutᴸ : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (ls : List (U.Node Γ B)) → Tells q c (untoldᴸ i ls) → All (NoSooner q) (calmsᴸ ls)
+               → All (NoSooner q) (calmsᴸ (U.shutᴸ i c ls))
+    calm-shutᴸ i c []       tl cm = []
+    calm-shutᴸ i c (n ∷ ns) tl cm =
+      all-++⁺ (calm-shut i c n (++⁻ˡ (untold i n) tl) (++⁻ˡ (calms n) cm)) (calm-shutᴸ i c ns (++⁻ʳ (untold i n) tl) (++⁻ʳ (calms n) cm))
+
+    calm-burst : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (t : U.Node Γ B) → Tells q c (untold i t ++ untoldʳ i t) → NoSooner q (restHead t)
+               → All (NoSooner q) (calms t ++ calmsʳ t) → All (NoSooner q) (restHead (U.shut i c t) ∷ calms (U.shut i c t) ++ calmsʳ (U.shut i c t))
+    calm-burst i c t tl h cm =
+      down-heads (rest-down {C = ⊤} i c t (++⁻ʳ (untold i t) tl) (++⁻ʳ (calms t) cm)) h
+        ∷ all-++⁺ (calm-shut i c t (++⁻ˡ (untold i t) tl) (++⁻ˡ (calms t) cm)) (calmʳ-shut i c t (++⁻ʳ (untold i t) tl) (++⁻ʳ (calms t) cm))
+
+    calmʳ-shut : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (n : U.Node Γ B) → Tells q c (untoldʳ i n) → All (NoSooner q) (calmsʳ n)
+               → All (NoSooner q) (calmsʳ (U.shut i c n))
+    calmʳ-shut i c (U.framesᶜ τ e m)            tl cm = []
+    calmʳ-shut i c (U.burstᶜ τ r k b)           tl cm = []
+    calmʳ-shut i c (U.ofᶜ p k xs)               tl cm = []
+    calmʳ-shut i c (U.mapᶜ f n)                 tl cm = calmʳ-shut i c n tl cm
+    calmʳ-shut i c (U.scanᶜ f z n)              tl cm = calmʳ-shut i c n tl cm
+    calmʳ-shut i c (U.takeWhileᶜ t p n)         tl cm = calmʳ-shut i c n tl cm
+    calmʳ-shut i c (U.flatMapᶜ op g o ls qs pl) tl cm =
+      all-++⁺ (calmʳ-shutᴹ i c o (++⁻ˡ (untoldʳᴹ i o) tl) (++⁻ˡ (calmsʳᴹ o) cm))
+        (all-++⁺ (calmʳ-shutᴸ i c ls (++⁻ˡ (untoldʳᴸ i ls) (++⁻ʳ (untoldʳᴹ i o) tl)) (++⁻ˡ (calmsʳᴸ ls) (++⁻ʳ (calmsʳᴹ o) cm)))
+          (calmʳ-shut i c pl (++⁻ʳ (untoldʳᴸ i ls) (++⁻ʳ (untoldʳᴹ i o) tl)) (++⁻ʳ (calmsʳᴸ ls) (++⁻ʳ (calmsʳᴹ o) cm))))
+    calmʳ-shut i c (U.joinᶜ j p xs e)           tl cm = []
+    calmʳ-shut i c (U.connectᶜ r b (U.live s))  tl cm =
+      all-++⁺ (calmʳ-shut (there i) c b (++⁻ˡ (untoldʳ (there i) b) tl) (++⁻ˡ (calmsʳ b) cm))
+        (calm-burst i c s (++⁻ʳ (untoldʳ (there i) b) tl) (headᴬ (++⁻ʳ (calmsʳ b) cm)) (tailᴬ (++⁻ʳ (calmsʳ b) cm)))
+    calmʳ-shut i c (U.connectᶜ r b (U.ended e t)) tl cm =
+      all-++⁺ (calmʳ-shut (there i) c b (++⁻ˡ (untoldʳ (there i) b) tl) (++⁻ˡ (calmsʳ b) cm))
+        (calm-burst i c t (++⁻ʳ (untoldʳ (there i) b) tl) (headᴬ (++⁻ʳ (calmsʳ b) cm)) (tailᴬ (++⁻ʳ (calmsʳ b) cm)))
+    calmʳ-shut i c (U.deferᶜ l p ns)            tl cm = []
+    calmʳ-shut i c (U.endingᶜ p n)              tl cm = calmʳ-shut i c n tl cm
+    calmʳ-shut i c (U.restᶜ n)                  tl cm = calmʳ-shut i c n tl cm
+    calmʳ-shut i c U.idleᶜ                      tl cm = []
+    calmʳ-shut i c (U.unionᶜ x y)               tl cm =
+      all-++⁺ (calmʳ-shut i c x (++⁻ˡ (untoldʳ i x) tl) (++⁻ˡ (calmsʳ x) cm)) (calmʳ-shut i c y (++⁻ʳ (untoldʳ i x) tl) (++⁻ʳ (calmsʳ x) cm))
+    calmʳ-shut i c (U.burstingᶜ r t)            tl (h ∷ cm) = calm-burst i c t tl h cm
+    calmʳ-shut i c (U.underᶜ s b)               tl cm = calmʳ-shut (there i) c b tl cm
+
+    calmʳ-shutᴹ : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (o : Maybe (U.Node Γ B)) → Tells q c (untoldʳᴹ i o) → All (NoSooner q) (calmsʳᴹ o)
+                → All (NoSooner q) (calmsʳᴹ (U.shutᴹ i c o))
+    calmʳ-shutᴹ i c nothing  tl cm = []
+    calmʳ-shutᴹ i c (just n) tl cm = calmʳ-shut i c n tl cm
+
+    calmʳ-shutᴸ : ∀ {Γ A B q} (i : A ∈ᴸ Γ) c (ls : List (U.Node Γ B)) → Tells q c (untoldʳᴸ i ls) → All (NoSooner q) (calmsʳᴸ ls)
+                → All (NoSooner q) (calmsʳᴸ (U.shutᴸ i c ls))
+    calmʳ-shutᴸ i c []       tl cm = []
+    calmʳ-shutᴸ i c (n ∷ ns) tl cm =
+      all-++⁺ (calmʳ-shut i c n (++⁻ˡ (untoldʳ i n) tl) (++⁻ˡ (calmsʳ n) cm)) (calmʳ-shutᴸ i c ns (++⁻ʳ (untoldʳ i n) tl) (++⁻ʳ (calmsʳ n) cm))
 
   -- A FLATMAP'S HEAD: its pool's skip, its outer's step or its
   -- earliest lane's, each moved at most a child down.  So it heads no
@@ -747,3 +861,27 @@ module Framing (R : Set) where
              → Heads q pl → (∀ {c} → o ≡ just c → Heads q c) → All (Heads q) L → Heads q (U.flatMapᶜ op g o L Q pl)
   heads-flat op g o L Q pl hp ho hL = flatˢ-heads op g (U.outerOf o) L Q pl (U.step pl) (U.earliest L) hp (outer-of o ho) (earliest-heads L hL)
 
+  -- A NODE AHEAD OF `q`, built: its head as above, and every rest a
+  -- shut of it falls back on from its parts'.
+  ahead-map : ∀ {Γ A B q} (g : A → B) {c : U.Node Γ A} → Ahead q c → Ahead q (U.mapᶜ g c)
+  ahead-map g {c} (h , cm) = heads-map g {c} h , cm
+
+  ahead-scan : ∀ {Γ A B q} (g : B → A → B) z {c : U.Node Γ A} → Ahead q c → Ahead q (U.scanᶜ g z c)
+  ahead-scan g z {c} (h , cm) = heads-scan g z {c} h , cm
+
+  ahead-take : ∀ {Γ A q} i (p : A → Bool) {c : U.Node Γ A} → Ahead q c → Ahead q (U.takeWhileᶜ i p c)
+  ahead-take i p {c} (h , cm) = heads-take i p {c} h , cm
+
+  ahead-source : ∀ {Γ A B q} r {b : U.Node (A ∷ Γ) B} {s : U.Node Γ A} → Ahead q s → Ahead q b → Ahead q (U.connectᶜ r b (U.live s))
+  ahead-source r {b} {s} (hs , cs) (hb , cb) = heads-source r {b} {s} hs hb , all-++⁺ cb cs
+
+  ahead-flat : ∀ {Δ A B q} op (g : A → Pos → U.Node Δ B) (o : Maybe (U.Node Δ A)) (L : List (U.Node Δ B)) Q pl
+             → Ahead q pl → (∀ {c} → o ≡ just c → Ahead q c) → All (Ahead q) L → Ahead q (U.flatMapᶜ op g o L Q pl)
+  ahead-flat op g o L Q pl (hp , cp) ho hL =
+    heads-flat op g o L Q pl hp (λ e → proj₁ (ho e)) (mapᴬ proj₁ hL) , all-++⁺ (calm-just o (λ e → proj₂ (ho e))) (all-++⁺ (calm-all L (mapᴬ proj₂ hL)) cp)
+
+  -- A body shut past its source's end, beside the source's rest.
+  ahead-ended : ∀ {Γ A B q} r c (b : U.Node (A ∷ Γ) B) (t : U.Node Γ A) → Ahead q b → Tells q c (untold (here refl) b) → Ahead q t
+              → Ahead q (U.connectᶜ r (U.shut (here refl) c b) (U.ended c t))
+  ahead-ended r c b t (hb , cb) tl (ht , ct) =
+    ended-head r c (U.shut (here refl) c b) t (U.step t) (shut-heads (here refl) c b hb tl cb) ht , all-++⁺ (calm-shut (here refl) c b tl cb) ct

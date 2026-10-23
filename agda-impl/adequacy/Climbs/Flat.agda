@@ -31,7 +31,7 @@ open Machine using (St; Ctx; Conf; Ev; nx; cp; dirs; plug; flatS; top; inOuter; 
 module AscendingFlat (R : Set) where
   open Driver R using (Mach; mach; step; silent)
   open Unsubbing R using (now; then)
-  open Strongly R using (Sub; Path; PathLanes; here; Strong; Owned; Meaning; Queue; Books; Each; Heads; Lingers; Untold; Ended; DoneBy;
+  open Strongly R using (Sub; Path; PathLanes; here; Strong; Owned; Meaning; Queue; Books; Each; Ahead; Lingers; Untold; Ended; DoneBy;
     outers; outersL; part; partLanes; merged; consᴹ; forget; forgetᴸ; in-outer; in-lanes; this-lane; next-lane;
     pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; cutˢ; laneˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ)
   open Moving R using (plantᴸ; planted)
@@ -290,7 +290,7 @@ module AscendingFlat (R : Set) where
     lanes-end-behind : ∀ {g ℓ m₁ Γ X A π i} {T : Sub [] R} {op f n pl} {o : Sub Γ X} {ls : List (Sub Γ A)} {u : Sub Γ A}
                        (ρ : Path T (flatMapˢ op f true n [] pl o ls) π) (πL : PathLanes ls u i [])
                      → Calling g ℓ m₁ (ρ ⊕ in-lanes πL) cp → pred n ≡ 0 → ∀ {m₂} → step m₁ ≡ silent m₂
-                     → Each (Heads (Conf.pos (Mach.conf m₂))) (drainedAt ρ πL (Conf.pos (Mach.conf m₁)))
+                     → Each (Ahead (Conf.pos (Mach.conf m₂))) (drainedAt ρ πL (Conf.pos (Mach.conf m₁)))
     lanes-end-told : ∀ {g ℓ m₁ Γ X A π i} {T : Sub [] R} {op f n pl} {o : Sub Γ X} {ls : List (Sub Γ A)} {u : Sub Γ A}
                      (ρ : Path T (flatMapˢ op f true n [] pl o ls) π) (πL : PathLanes ls u i [])
                    → Calling g ℓ m₁ (ρ ⊕ in-lanes πL) cp → pred n ≡ 0 → ∀ {m₂} → step m₁ ≡ silent m₂
@@ -435,7 +435,7 @@ module AscendingFlat (R : Set) where
                     → ∀ {m₂} → step m₁ ≡ silent m₂ → Books (spentAt ρ (Conf.pos (Mach.conf m₁))) m₂
     outer-end-behind : ∀ {g ℓ m₁ Γ X A π} {T : Sub [] R} {op f d pl} {o : Sub Γ X} {ls : List (Sub Γ A)}
                        (ρ : Path T (flatMapˢ op f d zero [] pl o ls) π) → Calling g ℓ m₁ (ρ ⊕ in-outer here) cp
-                     → ∀ {m₂} → step m₁ ≡ silent m₂ → Each (Heads (Conf.pos (Mach.conf m₂))) (spentAt ρ (Conf.pos (Mach.conf m₁)))
+                     → ∀ {m₂} → step m₁ ≡ silent m₂ → Each (Ahead (Conf.pos (Mach.conf m₂))) (spentAt ρ (Conf.pos (Mach.conf m₁)))
     outer-end-told : ∀ {g ℓ m₁ Γ X A π} {T : Sub [] R} {op f d pl} {o : Sub Γ X} {ls : List (Sub Γ A)}
                      (ρ : Path T (flatMapˢ op f d zero [] pl o ls) π) → Calling g ℓ m₁ (ρ ⊕ in-outer here) cp
                    → ∀ {m₂} → step m₁ ≡ silent m₂ → Untold (Conf.pos (Mach.conf m₂)) (spentAt ρ (Conf.pos (Mach.conf m₁)))

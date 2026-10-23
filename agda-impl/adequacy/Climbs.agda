@@ -44,12 +44,12 @@ module Ascending (R : Set) where
   open Unsubbing R using (_⇝_; now; then)
   open SortingWalk R using (WellMach; WellStep; silentʷ; preserve)
   open Strongly R using (Sub; Path; here; Strong; Carried; carried; closing; noteAs; Owned; Kernels; Meaning; Queue; Books;
-    Each; Heads; connected; Lingers; Untold; Ended; DoneBy; outers; outersL; part; leftover; forget; forgetᴸ; mapᴹ; Feed; owing; Fed; FedLanes;
+    Each; Heads; Ahead; connected; Lingers; Untold; Ended; DoneBy; outers; outersL; part; leftover; forget; forgetᴸ; mapᴹ; Feed; owing; Fed; FedLanes;
     Begins; focused; attaching; PathLanes; this-lane; next-lane; in-map; in-scan; in-cut; in-lane; in-take; in-outer; in-lanes;
     in-source; in-body; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; cutˢ; laneˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; pooledL; Timed; Joined; seen;
     Taking; taking; ending; taken; taking?; isTaking)
   open Moving R using (plant; plantᴸ; planted; plantedᴸ; replanted)
-  open Framing R using (heads-scan)
+  open Framing R using (ahead-scan)
   open Plugging R using (ctxAt; dirs-at; ctx-⊕; plant-plug; at-path)
   open Replanting R using (module Shift; Heading; Pred; ≡-⊑; map-fwd; map-back; each-scan; each-sub; lingers-sub; lg-scan; lg-take)
   open Keeping R using (module Keep; Alive; Route; route-pre; route-post; _≈_; same; ≈-scan; ≈-of; ≈-pending; ≈-cold; ≈-join; ≈-cut-of; ≈-take-of; ≈-take-cut;
@@ -108,7 +108,7 @@ module Ascending (R : Set) where
       queue   : Queue (Conf.pos (Mach.conf m₁)) (Mach.clock m₁) (Mach.timers m₁) T
       books   : Books T m₁
       sorted  : Σ Pos λ lo → WellMach lo m₁
-      behind  : Each (Heads (Conf.pos (Mach.conf m₁))) T
+      behind  : Each (Ahead (Conf.pos (Mach.conf m₁))) T
       lingers : Lingers T
       told    : Untold (Conf.pos (Mach.conf m₁)) T
       ended   : Ended T
@@ -354,9 +354,9 @@ module Ascending (R : Set) where
                 → mapᴹ (U.scanᶜ f z) m ≡ just b₀ → mapᴹ (U.scanᶜ f z′) m ≡ just b′ → untold i b′ ≡ untold i b₀
     rescan-told i (just c) refl refl = refl
 
-    rescan-root : ∀ {Γ A B q} {f : B → A → B} {z} {m : Maybe (U.Node Γ A)} → (∀ {c} → m ≡ just c → Heads q c)
-                → ∀ {c} → mapᴹ (U.scanᶜ f z) m ≡ just c → Heads q c
-    rescan-root {f = f} {z} {just c} h refl = heads-scan f z {c} (h refl)
+    rescan-root : ∀ {Γ A B q} {f : B → A → B} {z} {m : Maybe (U.Node Γ A)} → (∀ {c} → m ≡ just c → Ahead q c)
+                → ∀ {c} → mapᴹ (U.scanᶜ f z) m ≡ just c → Ahead q c
+    rescan-root {f = f} {z} {just c} h refl = ahead-scan f z {c} (h refl)
 
     scan-heading : ∀ {Δ A B q} {f : B → A → B} {z z′} {v : Sub Δ A} {E : Pred Δ} → Heading q E (scanˢ f z v) (scanˢ f z′ v)
     scan-heading {v = v} = record
@@ -443,7 +443,7 @@ module Ascending (R : Set) where
   -- and flags.
   scan-behind : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
               → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y)
-              → Each (Heads (Conf.pos (Mach.conf m₁))) (plant ρ (scanˢ f (f z y) v))
+              → Each (Ahead (Conf.pos (Mach.conf m₁))) (plant ρ (scanˢ f (f z y) v))
   scan-behind ρ cl = Shift.shift-behind ρ _ (Calling.told cl) (Calling.ended cl) scan-heading (Calling.behind cl)
 
   scan-told : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
