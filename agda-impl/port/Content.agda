@@ -291,7 +291,7 @@ module Honesty (R : Set) where
     -- suspended, and resuming it there keeps what is owed; a path leading
     -- nowhere drops it.
     downs-plug : ∀ {q x Γ A} {c′ : Ctx R Γ A} {s′} → downs q top x ≡ just (Γ , A , c′ , s′) → plug c′ s′ ≡ x
-    owned-popped: ∀ {t m Γ A Γ′ A′} {c : Ctx R Γ A} {s p q τ p′ rs} {c′ : Ctx R Γ′ A′} {s′}
+    owned-popped : ∀ {t m Γ A Γ′ A′} {c : Ctx R Γ A} {s p q τ p′ rs} {c′ : Ctx R Γ′ A′} {s′}
               → Kernels t (Mach.conf m) → Owned t m → Mach.conf m ≡ ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩
               → downs q top (plug c s) ≡ just (_ , _ , c′ , s′)
               → Owned t (record m { conf = ⟨ c′ , s′ , resuming τ , p′ , rs ⟩ })
@@ -301,7 +301,7 @@ module Honesty (R : Set) where
     sorted-pop : ∀ {lo m Γ A Γ′ A′} {c : Ctx R Γ A} {s p q τ p′ rs} {c′ : Ctx R Γ′ A′} {s′} → WellMach lo m
                → Mach.conf m ≡ ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩ → downs q top (plug c s) ≡ just (_ , _ , c′ , s′)
                → WellMach lo (record m { conf = ⟨ c′ , s′ , resuming τ , p′ , rs ⟩ })
-    owned-dropped: ∀ {t m Γ A} {c : Ctx R Γ A} {s p j rs} → Kernels t (Mach.conf m) → Owned t m
+    owned-dropped : ∀ {t m Γ A} {c : Ctx R Γ A} {s p j rs} → Kernels t (Mach.conf m) → Owned t m
                → Mach.conf m ≡ ⟨ c , s , absorbed , p , j ∷ rs ⟩ → downs (proj₁ j) top (plug c s) ≡ nothing
                → Owned t (record m { conf = ⟨ c , s , absorbed , p , rs ⟩ })
     meaning-drop : ∀ {t Γ A} {c : Ctx R Γ A} {s p j rs} → Kernels t ⟨ c , s , absorbed , p , j ∷ rs ⟩
