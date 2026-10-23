@@ -33,6 +33,7 @@ open import adequacy.Frame using (module Framing)
 open import adequacy.Replant using (module Replanting)
 open import adequacy.Replant.Keep using (module Keeping)
 open import adequacy.Leaves using (tw-refl)
+open import adequacy.Plugged using (module Plugging)
 
 open Machine using (St; Ctx; Conf; Job; Ev; nx; cp; dirs; plug; scanS; connS; owed; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody;
   ⟨_,_,_,_,_⟩; rising)
@@ -47,6 +48,7 @@ module Ascending (R : Set) where
     in-source; in-body; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; cutˢ; laneˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; pooledL; Timed; Joined; seen)
   open Moving R using (plant; plantᴸ; planted; plantedᴸ; replanted)
   open Framing R using (heads-scan)
+  open Plugging R using (ctxAt; dirs-at; ctx-⊕; plant-plug; at-path)
   open Replanting R using (module Shift; Heading; Pred; ≡-⊑; map-fwd; map-back; each-scan; each-sub; lingers-sub; lg-scan)
   open Keeping R using (module Keep; Alive; Route; route-pre; _≈_; same; ≈-scan; ≈-of; ≈-pending; ≈-cold; ≈-join; ≈-cut-of; ≈-take-of; ≈-take-cut;
     ≈-connect-of; Back)
@@ -284,19 +286,20 @@ module Ascending (R : Set) where
           → outers c ≡ [] → DoneBy T (outers (ρ ⊕ c)) → DoneBy T (outers ρ)
   done-up {T = T} ρ c e d = subst (DoneBy T) (outers-up ρ c e) d
 
+  -- A context climbing through a scan, the scan's own frame first.
+  scan-at : ∀ {Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π)
+            {c : Ctx R Δ A} {x} → dirs c ≡ π ++ [ 0 ] → forget T ≡ plug c x
+          → Σ (Ctx R Δ B) λ c₀ → c ≡ inScan f z c₀ × dirs c₀ ≡ π
+  scan-at ρ d e = ctxAt top ρ , trans (proj₁ (at-path (ρ ⊕ in-scan here) d e)) (ctx-⊕ top ρ (in-scan here)) , dirs-at top ρ
+
+  -- The tree with the scan's accumulator rewritten is the machine's.
+  scan-kernels : ∀ {Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π)
+                 {c₀ : Ctx R Δ B} {x} → dirs c₀ ≡ π → forget T ≡ plug c₀ (scanS f z x)
+               → ∀ z′ → forget (plant ρ (scanˢ f z′ v)) ≡ plug c₀ (scanS f z′ x)
+  scan-kernels ρ {c₀} d e z′ with at-path ρ {c = c₀} d e
+  ... | refl , refl = plant-plug top ρ _
+
   postulate
-    -- A context climbing through a scan, the scan's own frame first.
-    scan-at : ∀ {Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π)
-              {c : Ctx R Δ A} {x} → dirs c ≡ π ++ [ 0 ] → forget T ≡ plug c x
-            → Σ (Ctx R Δ B) λ c₀ → c ≡ inScan f z c₀ × dirs c₀ ≡ π
-
-    -- The tree with the scan's accumulator rewritten is the machine's.
-    --
-    -- DEAD ROUTE: the old body is a heap write's frame; the state tree has no heap, the write is a `plant`.
-    scan-kernels : ∀ {Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π)
-                   {c₀ : Ctx R Δ B} {x} → dirs c₀ ≡ π → forget T ≡ plug c₀ (scanS f z x)
-                 → ∀ z′ → forget (plant ρ (scanˢ f z′ v)) ≡ plug c₀ (scanS f z′ x)
-
     -- A value through a scan, the carrier's parts on the rewritten tree.
     --
     -- DEAD ROUTE: the old bodies are a heap write's frames; the state tree has no heap, the write is a `plant`.
@@ -504,11 +507,11 @@ module Ascending (R : Set) where
   ------------------------------------------------------------------------
   -- THE CLIMB THROUGH A MAP: the signal mapped, the tree as it is.
 
-  postulate
-    -- A context climbing through a map, the map's own frame first.
-    map-at : ∀ {Δ A B π} {T : Sub [] R} {f : A → B} {v : Sub Δ A} (ρ : Path T (mapˢ f v) π)
-             {c : Ctx R Δ A} {x} → dirs c ≡ π ++ [ 0 ] → forget T ≡ plug c x
-           → Σ (Ctx R Δ B) λ c₀ → c ≡ inMap f c₀ × dirs c₀ ≡ π
+  -- A context climbing through a map, the map's own frame first.
+  map-at : ∀ {Δ A B π} {T : Sub [] R} {f : A → B} {v : Sub Δ A} (ρ : Path T (mapˢ f v) π)
+           {c : Ctx R Δ A} {x} → dirs c ≡ π ++ [ 0 ] → forget T ≡ plug c x
+         → Σ (Ctx R Δ B) λ c₀ → c ≡ inMap f c₀ × dirs c₀ ≡ π
+  map-at ρ d e = ctxAt top ρ , trans (proj₁ (at-path (ρ ⊕ in-map here) d e)) (ctx-⊕ top ρ (in-map here)) , dirs-at top ρ
 
   call-map : ∀ {g m} (st : Strong g m) {m₁ Δ A B π} {T : Sub [] R} {f : A → B} {v : Sub Δ A} (ρ : Path T (mapˢ f v) π)
            → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ in-map here) e → Called st m₁ (ρ ⊕ in-map here)
@@ -549,12 +552,13 @@ module Ascending (R : Set) where
   -- THE CLIMB THROUGH A TAKEWHILE: a value passed, the take ended over
   -- it or out under it; an end as it is.
 
-  postulate
-    -- A context climbing through a takeWhile, the take's own frame first.
-    take-at : ∀ {Δ A π} {T : Sub [] R} {i q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ i q tk v) π)
-              {c : Ctx R Δ A} {x} → dirs c ≡ π ++ [ 0 ] → forget T ≡ plug c x
-            → Σ (Ctx R Δ A) λ c₀ → c ≡ inTake i q c₀ × dirs c₀ ≡ π
+  -- A context climbing through a takeWhile, the take's own frame first.
+  take-at : ∀ {Δ A π} {T : Sub [] R} {i q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ i q tk v) π)
+            {c : Ctx R Δ A} {x} → dirs c ≡ π ++ [ 0 ] → forget T ≡ plug c x
+          → Σ (Ctx R Δ A) λ c₀ → c ≡ inTake i q c₀ × dirs c₀ ≡ π
+  take-at ρ d e = ctxAt top ρ , trans (proj₁ (at-path (ρ ⊕ in-take here) d e)) (ctx-⊕ top ρ (in-take here)) , dirs-at top ρ
 
+  postulate
     -- DEAD ROUTE: the old body reads the take's liveness off a heap cell; the state tree holds it as the `Taking` stage.
     gone-take : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {i q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ i q tk v) π)
               → Calling g ℓ m₁ (ρ ⊕ in-take here) cp → part (takeWhileˢ i q tk v) ≡ nothing
@@ -596,11 +600,11 @@ module Ascending (R : Set) where
   -- THE CLIMB THROUGH A CONNECT'S BODY: a value as it is; an end, the
   -- body's completion owed ahead of the agenda.
 
-  postulate
-    -- A context climbing through a connect's body, the body's own frame first.
-    body-at : ∀ {Δ X B π} {T : Sub [] R} {k r ej rt} {s : Sub Δ X} {b : Sub (X ∷ Δ) B} (ρ : Path T (connectˢ k r ej rt s b) π)
-              {c : Ctx R (X ∷ Δ) B} {x} → dirs c ≡ π ++ [ 1 ] → forget T ≡ plug c x
-            → Σ (Ctx R Δ B) λ c₀ → c ≡ inBody k (forget s) c₀ × dirs c₀ ≡ π
+  -- A context climbing through a connect's body, the body's own frame first.
+  body-at : ∀ {Δ X B π} {T : Sub [] R} {k r ej rt} {s : Sub Δ X} {b : Sub (X ∷ Δ) B} (ρ : Path T (connectˢ k r ej rt s b) π)
+            {c : Ctx R (X ∷ Δ) B} {x} → dirs c ≡ π ++ [ 1 ] → forget T ≡ plug c x
+          → Σ (Ctx R Δ B) λ c₀ → c ≡ inBody k (forget s) c₀ × dirs c₀ ≡ π
+  body-at ρ d e = ctxAt top ρ , trans (proj₁ (at-path (ρ ⊕ in-body here) d e)) (ctx-⊕ top ρ (in-body here)) , dirs-at top ρ
 
   private
     -- A connect whose body is gone is gone.

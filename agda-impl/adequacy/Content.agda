@@ -57,6 +57,7 @@ open import adequacy.Climbs using (module Ascending)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Replant using (module Replanting)
 open import adequacy.Replant.Keep using (module Keeping)
+open import adequacy.Plugged using (module Plugging)
 open import adequacy.Told using (Tells; untold)
 open import adequacy.Leaves using (Twin; leaves; unpinned; tw-refl)
 
@@ -74,6 +75,7 @@ module Honesty (R : Set) where
   open Moving R using (plant; planted; later)
   open Replanting R using (module Shift; Heading; Lingering; Pred)
   open Keeping R using (module Keep; Alive)
+  open Plugging R using (of-path; take-path)
   open Strongly R using () renaming (here to hereᴾ)
   open SortingWalk R using (WellMach)
   open Machine using (Conf; Ctx; top; plug; downs; dirs; closed; doneS; cp; _⊕_; ⟨_,_,_,_,_⟩; absorbed; rising; resuming; subscribing; nx; pend;
@@ -130,10 +132,6 @@ module Honesty (R : Set) where
                 → Mach.conf m ≡ ⟨ c , s , rising (nx a) , p , rs ⟩
                 → WellMach lo (record m { conf = ⟨ c , s , absorbed , p , rs ⟩ })
 
-    -- The `of` a job resumes is the witness's at the job's path.
-    of-path : ∀ {g m Γ A} {c : Ctx R Γ A} {xs i p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , ofS xs , resuming (next i) , p , rs ⟩
-            → Σ Pos λ p₀ → Σ ℕ λ j → Path (Carried.tree cr) (ofˢ {Γ} {A} p₀ j xs) (dirs c)
-
     -- An `of` under a closed observer: done, the ghost alike.
     emit-shut : ∀ {g m Γ A} {c : Ctx R Γ A} {xs i p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , ofS xs , resuming (next i) , p , rs ⟩
               → closed c ≡ true → Hopped (carried cr) (record m { conf = ⟨ c , doneS , absorbed , p , rs ⟩ })
@@ -169,10 +167,6 @@ module Honesty (R : Set) where
     -- throws if already cut: the ghost alike, a job fewer.
     kont-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {l a s p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , cutS l a s , resuming att , p , rs ⟩
                 → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
-
-    -- The takeWhile a job resumes is the witness's at the job's path.
-    take-path : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s τ p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , takeS i q s , resuming τ , p , rs ⟩
-              → Σ _ λ tk → Σ (Sub Γ A) λ u → Path (Carried.tree cr) (takeWhileˢ i q tk u) (dirs c)
 
     -- A takeWhile's completion the ghost does not hold: it climbs unseen.
     take1-void : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs tk u} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCp , p , rs ⟩
