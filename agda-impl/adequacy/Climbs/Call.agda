@@ -35,7 +35,7 @@ module AscendingCall (R : Set) where
   open Unsubbing R using (_⇝_; now; then)
   open SortingWalk R using (WellMach; WellStep; silentʷ; preserve)
   open Strongly R using (Sub; Path; here; Strong; Carried; carried; closing; noteAs; Owned; Kernels; Meaning; Queue; Books;
-    Each; Heads; connected; Lingers; Untold; Ended; DoneBy; outers; outersL; part; leftover; forget; forgetᴸ; mapᴹ; Feed; owing; Fed; FedLanes;
+    Each; Ahead; connected; Lingers; Untold; Ended; DoneBy; outers; outersL; part; leftover; forget; forgetᴸ; mapᴹ; Feed; owing; Fed; FedLanes;
     Begins; focused; attaching; PathLanes; this-lane; next-lane; in-map; in-scan; in-cut; in-lane; in-take; in-outer; in-lanes;
     in-source; in-body; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; cutˢ; laneˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; pooledL; Timed; Joined; seen;
     Taking; taking; ending; taken; taking?; isTaking)

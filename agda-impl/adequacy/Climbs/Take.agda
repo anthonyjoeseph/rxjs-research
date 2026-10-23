@@ -35,7 +35,7 @@ module AscendingTake (R : Set) where
   open Unsubbing R using (_⇝_; now; then)
   open SortingWalk R using (WellMach; WellStep; silentʷ; preserve)
   open Strongly R using (Sub; Path; here; Strong; Carried; carried; closing; noteAs; Owned; Kernels; Meaning; Queue; Books;
-    Each; Heads; connected; Lingers; Untold; Ended; DoneBy; outers; outersL; part; leftover; forget; forgetᴸ; mapᴹ; Feed; owing; Fed; FedLanes;
+    Each; Ahead; connected; Lingers; Untold; Ended; DoneBy; outers; outersL; part; leftover; forget; forgetᴸ; mapᴹ; Feed; owing; Fed; FedLanes;
     Begins; focused; attaching; PathLanes; this-lane; next-lane; in-map; in-scan; in-cut; in-lane; in-take; in-outer; in-lanes;
     in-source; in-body; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; cutˢ; laneˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; pooledL; Timed; Joined; seen;
     Taking; taking; ending; taken; taking?; isTaking)
@@ -157,7 +157,7 @@ module AscendingTake (R : Set) where
                    → Books (plant ρ (outed ρ cl)) m₂
     take-out-behind : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ true q tk v) π) {y}
                     → q y ≡ false → (cl : Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y)) → ∀ {m₂} → step m₁ ≡ silent m₂
-                    → Each (Heads (Conf.pos (Mach.conf m₂))) (plant ρ (outed ρ cl))
+                    → Each (Ahead (Conf.pos (Mach.conf m₂))) (plant ρ (outed ρ cl))
     take-out-told : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ true q tk v) π) {y}
                   → q y ≡ false → (cl : Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y)) → ∀ {m₂} → step m₁ ≡ silent m₂
                   → Untold (Conf.pos (Mach.conf m₂)) (plant ρ (outed ρ cl))
@@ -258,7 +258,7 @@ module AscendingTake (R : Set) where
                    → Books (fallen ρ (Conf.pos (Mach.conf m₁))) m₂
     take-end-behind : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ false q tk v) π) {y}
                     → q y ≡ false → Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y) → ∀ {m₂} → step m₁ ≡ silent m₂
-                    → Each (Heads (Conf.pos (Mach.conf m₂))) (fallen ρ (Conf.pos (Mach.conf m₁)))
+                    → Each (Ahead (Conf.pos (Mach.conf m₂))) (fallen ρ (Conf.pos (Mach.conf m₁)))
     take-end-told : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ false q tk v) π) {y}
                   → q y ≡ false → Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y) → ∀ {m₂} → step m₁ ≡ silent m₂
                   → Untold (Conf.pos (Mach.conf m₂)) (fallen ρ (Conf.pos (Mach.conf m₁)))

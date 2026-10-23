@@ -37,6 +37,7 @@ open import operation.PureObservable using (PureObs; Tape; tape; over; module Ma
 open import adequacy.Sane using (Sane; sane-subscribe)
 open import adequacy.Leaves using (Leaves; Twin; Restful)
 open import adequacy.Told using (untold; Tells)
+open import adequacy.Calm using (Calm; calm-subscribe)
 open import adequacy.Opens using (opens-subscribe; heads-open)
 open import adequacy.Placed using (placed-subscribe)
 open import adequacy.Placed.Order using (Placed)
@@ -323,6 +324,11 @@ module Strongly (R : Set) where
   -- Its next event no earlier than `q`.
   Heads : ∀ {Γ A} → Pos → U.Node Γ A → Set
   Heads q c = ∀ {k} → U.headˢ (U.step c) ≡ just k → q ≤ᵖ k
+
+  -- Heading no sooner than `q`, and so is every rest a shut of it falls
+  -- back on.
+  Ahead : ∀ {Γ A} → Pos → U.Node Γ A → Set
+  Ahead q c = Heads q c × Calm q c
 
   ------------------------------------------------------------------------
   -- THE JOBS, against the witness
@@ -646,7 +652,7 @@ module Strongly (R : Set) where
       queue   : Queue (Conf.pos (Mach.conf m)) (Mach.clock m) (Mach.timers m) tree
       books   : Books tree m
       sorted  : Σ Pos λ lo → WellMach lo m
-      behind  : Each (Heads (Conf.pos (Mach.conf m))) tree
+      behind  : Each (Ahead (Conf.pos (Mach.conf m))) tree
       lingers : Lingers tree
       told    : Untold (Conf.pos (Mach.conf m)) tree
       ended   : Ended tree
@@ -685,7 +691,7 @@ module Strongly (R : Set) where
     ; queue   = record { timed = [] ; joined = λ () ; ordered = [] ; ahead = [] }
     ; books   = record { clocked = refl ; ticked = [] ; turned = [] }
     ; sorted  = root , begin-well o
-    ; behind  = record { parts = λ { here _ refl → heads-begin o } ; pools = λ () ; rests = λ () }
+    ; behind  = record { parts = λ { here _ refl → heads-begin o , calm-subscribe o root } ; pools = λ () ; rests = λ () }
     ; lingers = record { pools = λ () ; rests = λ () }
     ; told    = λ ()
     ; ended   = λ ()
