@@ -22,6 +22,8 @@ open import Data.List.Relation.Unary.Any using (Any; here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ; ++⁻)
 open import Data.List.Relation.Unary.All as All using ([])
 import Data.List.Relation.Unary.Any as Any
+import Data.List.Relation.Unary.Linked as Linked
+open Linked using (Linked)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Nat using (ℕ; zero; suc; _<ᵇ_; _<_; _≤_; s≤s; z≤n)
@@ -31,7 +33,8 @@ open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import denotation.MonotonicList.Events using (Events; Pos; Time; tick; root; last; ix)
+open import denotation.MonotonicList.Events using (Events; Pos; Time; tick; root; last; ix; Frame; at; done; quiet; _<ᵖ_; <ᵖ-tick)
+  renaming (sub to subᴾ)
 open import denotation.MonotonicList using (observe; Agree; agree-refl)
 import denotation.Unfold as U
 open import denotation.Denote using (⟦_⟧)
@@ -47,20 +50,22 @@ open import port.Ghost using (module Ghosting)
 open import port.Strong using (module Strongly)
 open import port.Sorted.Walk using (module SortingWalk)
 open import port.Climbs using (module Ascending)
+open import port.Moves using (module Moving)
 
 module Honesty (R : Set) where
-  open Driver R using (Mach; mach; depthOf; Step; silent; value; complete; drained; step; trace; shown; reading; begin; Read; read; marks; log; ending; noted)
+  open Driver R using (Mach; mach; depthOf; Timer; play; cascade; Step; silent; value; complete; drained; step; trace; shown; reading; begin; Read; read; marks; log; ending; noted)
   open Pure R using (End; finished; dry; cutOff)
   open Unsubbing R using (_⇝_; now; then)
   open Ghosting R using (Has; Sent; sentHere; sentLater; Alike; _≋_; same-agree; residual; Reached; launchedʰ; silentʰ; valueʰ;
     Stands; cutʰ; finʰ; dryʰ; Mirror; Inner; Logged; Shows; silentˢ; valueˢ; completeˢ; drainedˢ; inner-launch; ≋-refl;
-    Steps; after; steps-after; Hopped; onward; lowered; weight; loadOf; load; _≼_; _≺_)
+    Steps; after; steps-after; Hopped; onward; lowered; weight; loadOf; load; _≼_; _≺_; _⊏_)
   open Strongly R using (Strong; Carried; carried; closing; CtlAs; Meets; calmAs; noteAs; runAs; subAs; burstAs; popAs; Pops;
     Kernels; Owned; Meaning; Books; Path; ofˢ; seen; Sub; takeWhileˢ; part; Queue; BurstClocked; Each; Heads;
-    Lingers; Untold; Ended; DoneBy; Begins; focused; attaching)
+    Lingers; Untold; Ended; DoneBy; Begins; focused; attaching; coldˢ; waiting; fired; playing; Timed; Joined)
   open Ascending R using (Aloft; soar)
+  open Moving R using (plant; planted; later)
   open SortingWalk R using (WellMach)
-  open Machine using (Ctx; top; plug; downs; dirs; closed; doneS; cp; _⊕_; ⟨_,_,_,_,_⟩; absorbed; rising; resuming; subscribing; nx; pend;
+  open Machine using (Conf; Ctx; top; plug; downs; dirs; closed; doneS; cp; _⊕_; ⟨_,_,_,_,_⟩; absorbed; rising; resuming; subscribing; nx; pend;
     ofS; cutS; takeS; connS; joinS; next; att; owedCp; owedCut; feeding; attBody; owed; go;
     res; ofR; attR; cpR; cutR; feedR; bodyR; srcR; endR; joinR; idle; cut)
 
@@ -265,11 +270,51 @@ module Honesty (R : Set) where
                 → Mach.conf m ≡ ⟨ c , s , absorbed , p , j ∷ rs ⟩ → downs (proj₁ j) top (plug c s) ≡ nothing
                 → WellMach lo (record m { conf = ⟨ c , s , absorbed , p , rs ⟩ })
 
-    -- The next timer fired, likewise.
+    -- A TIMER FIRED, ON THE WITNESS: its cold's phase fired, which the
+    -- machine's tree does not read, the ghost alike, every column kept
+    -- with the timer gone and its turn held.
+    fire-kernels : ∀ {t k Γ A w τ e u x b π} {fr : Frame A u} (ψ : Path t (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
+                 → Kernels t k → Kernels (plant ψ (coldˢ b (fired τ e (at u x fr)))) k
+    fire-part : ∀ {t Γ A w τ e u x b π} {fr : Frame A u} (ψ : Path t (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
+              → part (plant ψ (coldˢ b (fired τ e (at u x fr)))) ≡ part t
+    fire-load : ∀ {g m Γ A w τ e u x b π tm tms} {fr : Frame A u} (cr : Carried g m) → Mach.timers m ≡ tm ∷ tms
+              → (ψ : Path (Carried.tree cr) (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
+              → load (record m { clock = Timer.due tm ; timers = tms ; turns = [ play π (cascade tm) 0 false 0 ] })
+                     (plant ψ (coldˢ b (fired τ e (at u x fr)))) ⊏ loadOf (carried cr)
+    fire-owned : ∀ {g m Γ A w τ e u x b π tm tms} {fr : Frame A u} (cr : Carried g m) → Mach.timers m ≡ tm ∷ tms
+               → (ψ : Path (Carried.tree cr) (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
+               → Owned (plant ψ (coldˢ b (fired τ e (at u x fr)))) (record m { clock = Timer.due tm ; timers = tms ; turns = [ play π (cascade tm) 0 false 0 ] })
+    fire-meaning : ∀ {t k Γ A w τ e u x b π} {fr : Frame A u} (ψ : Path t (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
+                 → Meaning t k → Meaning (plant ψ (coldˢ b (fired τ e (at u x fr)))) k
+    fire-timed : ∀ {t Γ A w τ e u x b π tm tms} {fr : Frame A u} (ψ : Path t (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
+               → All (Timed t) (tm ∷ tms) → Timer.path tm ≡ π → All (Timed (plant ψ (coldˢ b (fired τ e (at u x fr))))) tms
+    fire-joined : ∀ {t Γ A w τ e u x b π} {fr : Frame A u} (ψ : Path t (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
+                → Joined t → Joined (plant ψ (coldˢ b (fired τ e (at u x fr))))
+    fire-sorted : ∀ {lo m tm tms} → WellMach lo m → Mach.turns m ≡ [] → Mach.timers m ≡ tm ∷ tms
+                → WellMach lo (record m { clock = Timer.due tm ; timers = tms ; turns = [ play (Timer.path tm) (cascade tm) 0 false 0 ] })
+    fire-flags : ∀ {t Γ A w τ e u x b π} {fr : Frame A u} (ψ : Path t (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
+               → DoneBy t [] → DoneBy (plant ψ (coldˢ b (fired τ e (at u x fr)))) []
+    fire-told : ∀ {g m Γ A w τ e u x b π} {fr : Frame A u} (cr : Carried g m)
+                (ψ : Path (Carried.tree cr) (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
+              → Untold (Conf.pos (Mach.conf m)) (plant ψ (coldˢ b (fired τ e (at u x fr))))
+    fire-ended : ∀ {g m Γ A w τ e u x b π} {fr : Frame A u} (cr : Carried g m)
+                 (ψ : Path (Carried.tree cr) (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
+               → Ended (plant ψ (coldˢ b (fired τ e (at u x fr))))
+
+    -- A live timer popped at the turn: its cold, fired, heads past where
+    -- the run is.
     --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs.agda
-    turn-pops : ∀ {g m Γ A} {c : Ctx R Γ A} {s p tm tms} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , [] ⟩
-              → Mach.turns m ≡ [] → Mach.timers m ≡ tm ∷ tms → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Lift.agda
+    behind-fire : ∀ {g m Γ A w τ e u x b π} {fr : Frame A u} (cr : Carried g m)
+                  (ψ : Path (Carried.tree cr) (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
+                → Each (Heads (Conf.pos (Mach.conf m))) (plant ψ (coldˢ b (fired τ e (at u x fr))))
+
+    -- A timer fired leaves every tie held: a cold runs nothing past its end.
+    --
+    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Lift.agda
+    fire-lingers : ∀ {g m Γ A w τ e u x b π} {fr : Frame A u} (cr : Carried g m)
+                   (ψ : Path (Carried.tree cr) (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
+                 → Lingers (plant ψ (coldˢ b (fired τ e (at u x fr))))
 
   -- An absorbed configuration is a re-entry state: calm, a turn to play,
   -- or a job to pop.
@@ -335,6 +380,51 @@ module Honesty (R : Set) where
   ... | subAs ()       | _
   ... | burstAs () _ _ | _
   ... | popAs () _     | _
+
+  -- The queue's head popped: the rest due no earlier than it.
+  ahead-pop : ∀ {p : Pos} {clk} {tm : Timer} {ts}
+            → Linked (λ x y → cascade x <ᵖ cascade y ≡ true) (tm ∷ ts)
+            → All (λ x → clk ≤ Timer.due x × p <ᵖ cascade x ≡ true) (tm ∷ ts)
+            → All (λ x → Timer.due tm ≤ Timer.due x × p <ᵖ cascade x ≡ true) ts
+  ahead-pop {p = p} {tm = tm} lk (_ ∷ ah) = go (later lk) ah
+    where
+      go : ∀ {clk xs} → All (λ x → cascade tm <ᵖ cascade x ≡ true) xs → All (λ x → clk ≤ Timer.due x × p <ᵖ cascade x ≡ true) xs
+         → All (λ x → Timer.due tm ≤ Timer.due x × p <ᵖ cascade x ≡ true) xs
+      go []       []             = []
+      go {xs = x ∷ _} (c ∷ cs) ((_ , a) ∷ as) = (<ᵖ-tick (Timer.due tm) (Timer.due x) (subᴾ (Timer.from tm) ∷ []) (subᴾ (Timer.from x) ∷ []) c , a) ∷ go cs as
+
+  -- THE TURN POPPING A TIMER: its cold fired, the same meaning node with
+  -- its burst held, a timer fewer.
+  turn-pops : ∀ {g m Γ A} {c : Ctx R Γ A} {s p tm tms} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , [] ⟩
+            → Mach.turns m ≡ [] → Mach.timers m ≡ tm ∷ tms → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′
+  turn-pops {g} {mach _ clk (tm ∷ tms) []} {c = c} {s} {p} cr refl refl refl refl
+    with Carried.ctlAs cr | Carried.meets cr | All.head (Queue.timed (Carried.queue cr))
+  ... | calmAs refl refl | mt | _ , _ , waiting τ e (at u x fr) , b , ψ , dd , _ =
+    g , m′ , now
+    , carried (record
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = plant ψ v
+        ; kernels = fire-kernels ψ (Carried.kernels cr)
+        ; ctlAs = burstAs refl refl refl ; meets = trans (fire-part ψ) mt
+        ; owned = fire-owned cr refl ψ ; meaning = fire-meaning ψ (Carried.meaning cr)
+        ; queue = record { timed = fire-timed ψ (Queue.timed q) refl ; joined = fire-joined ψ (Queue.joined q)
+                         ; ordered = Linked.tail (Queue.ordered q) ; ahead = ahead-pop {p = p} (Queue.ordered q) (Queue.ahead q) }
+        ; books = record { clocked = tt ; ticked = [] ; turned = (refl , _ , _ , _ , b , planted ψ v , dd) ∷ [] }
+        ; sorted = proj₁ (Carried.sorted cr) , fire-sorted (proj₂ (Carried.sorted cr)) refl refl
+        ; behind = behind-fire cr ψ ; lingers = fire-lingers cr ψ ; told = fire-told cr ψ
+        ; ended = fire-ended cr ψ ; flags = fire-flags ψ (Carried.flags cr) })
+    , lowered (λ n → agree-refl n _) (inj₁ (fire-load cr refl ψ))
+    where q = Carried.queue cr
+          v = coldˢ b (fired τ e (at u x fr))
+          m′ = mach ⟨ c , s , absorbed , p , [] ⟩ (Timer.due tm) tms [ play (Timer.path tm) (cascade tm) 0 false 0 ]
+  ... | calmAs refl refl | _ | _ , _ , waiting _ _ done  , _ , _ , ()
+  ... | calmAs refl refl | _ | _ , _ , waiting _ _ quiet , _ , _ , ()
+  ... | calmAs refl refl | _ | _ , _ , fired _ _ _       , _ , _ , ()
+  ... | calmAs refl refl | _ | _ , _ , playing _ _ _ _   , _ , _ , ()
+  ... | noteAs () _    | _ | _
+  ... | runAs ()       | _ | _
+  ... | subAs ()       | _ | _
+  ... | burstAs () _ _ | _ | _
+  ... | popAs () _     | _ | _
 
   -- A job owed nothing by its node: dropped, the ghost alike, the
   -- control lighter.
