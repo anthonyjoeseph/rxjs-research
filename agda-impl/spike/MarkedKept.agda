@@ -36,7 +36,7 @@ open import Tree using (Obs; FlatOp; cold; empty; of; map; scan; takeWhile; flat
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Time; Frame; From; From∞; Timeline; timelineAt;
   out; skip; end; hush; idle; _∪_; ix; last; root; at; done; emit; stall; close)
   renaming (quiet to silentᶠ)
-open import denotation.MonotonicList using (agreeᵀ-refl; agree-refl; _≈[_]_; agrees)
+open import denotation.MonotonicList using (Agreeᵀ; agreeᵀ-refl; agree-refl; _≈[_]_; agrees)
 import denotation.MonotonicList as M′
 open import denotation.NonExpansive using (_,ˢ_; liveᴼ; []ᴸ; []ᑫ; go-ne; mapᴱ-neᴹ; ∪-ne; burstOn-ne; beside-ne)
 open import denotation.Unfold using (Node; idleᶜ; ofᶜ; restsᶜ; states; ended; outerᴺ; restᶜ; takeWhileᶜ; endingᶜ; burstᶜ; joinᶜ; connectᶜ; live; stateᴺ; cutᴺ; meaning; subscribe; outer∞; NEnv)
@@ -270,7 +270,7 @@ module _ {R : Set} where
                   → Inv ⟨ inOuter op f d n q ls c , o , rising cp , p ⟩ → Kept ⟨ inOuter op f d n q ls c , o , rising cp , p ⟩
     -- THE ORDER: a lane's value rises first among its flatMap's parts.
     lanes-first : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (c : Ctx R Γ B) (s : St Γ B) b p
-                → Inv ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩ → flagOf s ≡ true
+                → Inv ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩ → flagOf s ≡ true → closed c ≡ false
                 → First p (outerᴺ (lane f) (outerG d (gh o)) (envAt c)) (states (lanesL post) (envAt c)) (states (lanesL pre) (envAt c))
                     (outerT d (gh o) (envAt c) (poolRuns pre post true (envAt c) (stateᴺ (gh s) (envAt c))))
     -- A lane still in its flatMap's list completing frees its slot.
@@ -321,6 +321,30 @@ module _ {R : Set} where
   ----------------------------------------------------------------------
   -- A rise, by the frame it passes
 
+  -- A lane in the list is one of its flatMap's runs, between the lanes
+  -- after it and before it; its pool, the lanes ended around it.
+  lanes-L : ∀ {Γ B} pre (s : St Γ B) post (ρ : NEnv Γ) → flagOf s ≡ true
+          → states (lanesL (pre ++ s ∷ post)) ρ ≡ states (lanesL post) ρ ++ stateᴺ (gh s) ρ ∷ states (lanesL pre) ρ
+  lanes-L pre s post ρ fl = trans (lanes-runs pre s post ρ) (cong (λ x → laneRuns pre post x ρ (stateᴺ (gh s) ρ)) fl)
+
+  lanes-P : ∀ {Γ A B} d (o : St Γ A) pre (s : St Γ B) post (ρ : NEnv Γ) → flagOf s ≡ true
+          → outerT d (gh o) ρ (poolRuns pre post true ρ (stateᴺ (gh s) ρ)) ≡ cutᴺ (poolG d (gh o) (deadL (pre ++ s ∷ post))) ρ
+  lanes-P false o pre s post ρ fl = sym (trans (pool-runs pre s post ρ) (cong (λ x → poolRuns pre post x ρ (stateᴺ (gh s) ρ)) fl))
+  lanes-P true  o pre s post ρ fl = cong (cutᴺ (gh o) ρ ∪_) (lanes-P false o pre s post ρ fl)
+
+  -- What the flatMap leaves running is what it left: the lane's tail is
+  -- its rise's.
+  lanes-cut : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) (ρ : NEnv Γ) b p → flagOf s ≡ true
+            → cut (lanesFrame op (lane f) d q (gh o) pre post true ρ (risen (gh s) ρ (nx b) p)) ≡ cutᴺ (gh (flatS op f d n q o (pre ++ s ∷ post))) ρ
+  lanes-cut op f d n q o pre post s ρ b p fl =
+    trans (cong (λ z → M′.cutᴼ O ∪ z ∪ T) (cuts-swap Ls (risen (gh s) ρ (nx b) p) (stateᴺ (gh s) ρ) Rs refl))
+      (cong₂ (M′.whole O) (sym (lanes-L pre s post ρ fl)) (lanes-P d o pre s post ρ fl))
+    where
+      O  = outerᴺ (lane f) (outerG d (gh o)) ρ
+      Ls = states (lanesL post) ρ
+      Rs = states (lanesL pre) ρ
+      T  = outerT d (gh o) ρ (poolRuns pre post true ρ (stateᴺ (gh s) ρ))
+
   -- A lane's value, first among its flatMap's parts, is the flatMap's.
   rise-lanes-true : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (c : Ctx R Γ B) (s : St Γ B) b p
                   → flagOf s ≡ true
@@ -332,7 +356,7 @@ module _ {R : Set} where
     lift-≅ c true (≋-out (go-rise (flatOp op) O Ls (risen (gh s) ρ (nx b) p) Rs Q T refl fi) refl
       (cong₂ (λ ls t → M′.go (flatOp op) O ls Q t) (sym L) P)
       (cong₂ (M′.whole O) (sym L) P)
-      (trans (cong (λ z → M′.cutᴼ O ∪ z ∪ T) (cuts-swap Ls (risen (gh s) ρ (nx b) p) (stateᴺ (gh s) ρ) Rs refl)) (cong₂ (M′.whole O) (sym L) P)))
+      (lanes-cut op f d n q o pre post s ρ b p fl))
     where
       ρ  = envAt c
       O  = outerᴺ (lane f) (outerG d (gh o)) ρ
@@ -340,14 +364,21 @@ module _ {R : Set} where
       Rs = states (lanesL pre) ρ
       Q  = Data.List.map (laneᴹ (lane f) ρ) q
       T  = outerT d (gh o) ρ (poolRuns pre post true ρ (stateᴺ (gh s) ρ))
-      L : states (lanesL (pre ++ s ∷ post)) ρ ≡ Ls ++ stateᴺ (gh s) ρ ∷ Rs
-      L = trans (lanes-runs pre s post ρ) (cong (λ x → laneRuns pre post x ρ (stateᴺ (gh s) ρ)) fl)
-      pr : cutᴺ (restsᶜ (deadL (pre ++ s ∷ post))) ρ ≡ poolRuns pre post true ρ (stateᴺ (gh s) ρ)
-      pr = trans (pool-runs pre s post ρ) (cong (λ x → poolRuns pre post x ρ (stateᴺ (gh s) ρ)) fl)
-      pool : ∀ d → outerT d (gh o) ρ (poolRuns pre post true ρ (stateᴺ (gh s) ρ)) ≡ cutᴺ (poolG d (gh o) (deadL (pre ++ s ∷ post))) ρ
-      pool false = sym pr
-      pool true  = cong (cutᴺ (gh o) ρ ∪_) (sym pr)
-      P = pool d
+      L  = lanes-L pre s post ρ fl
+      P  = lanes-P d o pre s post ρ fl
+
+  -- A lane's value under a closed observer: the flatMap is read through
+  -- its tail alone, and the lane's tail is its rise's.
+  lanes-closed : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (c : Ctx R Γ B) (s : St Γ B) b p
+               → flagOf s ≡ true → closed c ≡ true
+               → up (inLanes op f d n q o pre post c) true (risen (gh s) (envAt c) (nx b) p)
+               ≅ up c true (risen (gh (flatS op f d n q o (pre ++ s ∷ post))) (envAt c) (nx b) p)
+  lanes-closed op f d n q o pre post c s b p fl ce =
+    agree-≅ (closed-hides c true H (risen (gh (flatS op f d n q o (pre ++ s ∷ post))) ρ (nx b) p) ce
+      (λ k → subst (Agreeᵀ k (cut H)) (lanes-cut op f d n q o pre post s ρ b p fl) (agreeᵀ-refl k (cut H))))
+    where
+      ρ = envAt c
+      H = lanesFrame op (lane f) d q (gh o) pre post true ρ (risen (gh s) ρ (nx b) p)
 
   -- A lane out of its flatMap's list: what reaches it is absorbed, as
   -- the flatMap reads it through its tail alone.
@@ -364,9 +395,10 @@ module _ {R : Set} where
 
   rise-lanes-nx : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (c : Ctx R Γ B) (s : St Γ B) b p
                 → Inv ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩ → Kept ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩
-  rise-lanes-nx op f d n q o pre post c s b p v with flagOf s in fl
-  ... | true  = rise-lanes-true op f d n q o pre post c s b p fl (lanes-first op f d n q o pre post c s b p v fl)
-  ... | false = lane-dead op f d n q o pre post c s (nx b) p fl
+  rise-lanes-nx op f d n q o pre post c s b p v with flagOf s in fl | closed c in ce
+  ... | true  | true  = lanes-closed op f d n q o pre post c s b p fl ce
+  ... | true  | false = rise-lanes-true op f d n q o pre post c s b p fl (lanes-first op f d n q o pre post c s b p v fl ce)
+  ... | false | _     = lane-dead op f d n q o pre post c s (nx b) p fl
 
   rise-lanes : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (c : Ctx R Γ B) (s : St Γ B) p
              → Inv ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → Kept ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩
@@ -492,7 +524,8 @@ module _ {R : Set} where
   runs c (connS (cs cl sl false ba as (just w) r e) o b)     owedM p owedO v = ≅-refl
   runs c (connS (cs cl sl true ba as (just w) r e) o b)      owedM p owedO v with unsub o in u
   ... | o′ , t = conn-unsub c (cs cl sl true ba as (just w) r e) b o u
-  runs c (joinS j false x ((q , ev) ∷ ib))   joinM p joinO v = ≅-refl
+  runs c (joinS j false x ((q , nx a) ∷ ib)) joinM p joinO v = ≅-refl
+  runs c (joinS j false x ((q , cp) ∷ ib))   joinM p joinO v = ≅-refl
   runs c (joinS j true  x ((q , cp) ∷ ib))   joinM p joinO v = lift-≅ c true (≋-by refl refl)
   runs c (joinS j true  x ((q , nx a) ∷ ib)) joinM p joinO v = join-nx c j x q a ib p v
   runs c (coldS b (ending e))               leafM p leafO v = lift-≅ c true (≋-by refl refl)

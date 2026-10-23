@@ -1,4 +1,4 @@
-.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain placing placing-count stepping bg bg-check bg-wait \
+.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain placing placing-count stepping order bg bg-check bg-wait \
         wiring wiring-gate wiring-selftest unsafe-check dup-check dup-selftest \
         imports-check imports-fix imports-selftest comments-check comments-selftest \
         roadmap-check roadmap-selftest find find-prose postulates notify split \
@@ -148,6 +148,16 @@ stepping: oracle-build
 	  echo "$$out" | grep -q '^stepping: done ' || { echo "stepping: RED — the run never finished"; exit 1; }; \
 	  if echo "$$out" | grep -q '^stepping: FAIL '; then echo "stepping: RED"; exit 1; fi; \
 	  echo "stepping: GREEN"
+
+# The pointer-free engine's order, at every configuration it reaches, on
+# ARGS="FROM COUNT" seeds (default "0 300"): red on a FAIL line, never on
+# an INFO line, which probes how far the order reaches.
+ORDER_ARGS = $(or $(ARGS),0 300)
+order: oracle-build
+	@out=$$($(ORACLE_BIN) order $(ORDER_ARGS)); echo "$$out"; \
+	  echo "$$out" | grep -q '^order: done ' || { echo "order: RED — the run never finished"; exit 1; }; \
+	  if echo "$$out" | grep -q '^order: FAIL '; then echo "order: RED"; exit 1; fi; \
+	  echo "order: GREEN"
 
 # The runner prints a FAIL line per failing row and a closing `done` line;
 # a run without the `done` line died part-way and is red.  See

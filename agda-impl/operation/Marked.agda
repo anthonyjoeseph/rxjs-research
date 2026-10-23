@@ -490,7 +490,9 @@ run c (connS k o b) srcAttM r with CS.attSrc k | unsubIf (not (CS.srcLive k)) o
 run c (connS k o b) owedM r with CS.owedAt k | unsubIf (CS.srcAtt k) o
 ... | just p  | o′ , t = moved ⟨ c , connS (record k { srcLive = false ; owedAt = nothing }) o′ b , absorbed , p ⟩ [] t
 ... | nothing | _      = ok ⟨ c , connS k o b , absorbed , r ⟩
-run c (joinS j g x ((q , e) ∷ ib)) joinM _ = ok ⟨ c , joinS j g x ib , (if g then rising e else absorbed) , q ⟩
+-- a joiner's completion leaves it off, as an unsubscribe does
+run c (joinS j g x ((q , nx a) ∷ ib)) joinM _ = ok ⟨ c , joinS j g x ib , (if g then rising (nx a) else absorbed) , q ⟩
+run c (joinS j g x ((q , cp) ∷ ib))   joinM _ = ok ⟨ c , joinS j false x ib , (if g then rising cp else absorbed) , q ⟩
 run c (coldS b l) leafM r =
   turn (leaf b l (closed c) (λ e l′ b′ p′ → ⟨ c , coldS b′ l′ , rising e , p′ ⟩) (λ l′ → ⟨ c , coldS b l′ , absorbed , r ⟩))
 run c s m r = ok ⟨ c , s , absorbed , r ⟩
