@@ -100,625 +100,623 @@ module Replanting (R : Set) where
       ling-pool   : ∀ {ls} → Twin (pooledL (u ∷ ls)) (pooledL (v ∷ ls))
       ling-below  : Lingers u → Lingers v
 
-  private
-    ----------------------------------------------------------------------
-    -- Booleans and options
+  ----------------------------------------------------------------------
+  -- Booleans and options
 
-    ∧-join : ∀ {a b} → a ≡ true → b ≡ true → a ∧ b ≡ true
-    ∧-join refl b = b
+  ∧-join : ∀ {a b} → a ≡ true → b ≡ true → a ∧ b ≡ true
+  ∧-join refl b = b
 
-    thru : ∀ {ℓ} {X : Set ℓ} a {b} → a ∧ b ≡ true → (a ≡ true → b ≡ true → X) → X
-    thru true  s k = k refl s
-    thru false () k
+  thru : ∀ {ℓ} {X : Set ℓ} a {b} → a ∧ b ≡ true → (a ≡ true → b ≡ true → X) → X
+  thru true  s k = k refl s
+  thru false () k
 
-    ∨-l : ∀ {a b} → a ≡ true → a ∨ b ≡ true
-    ∨-l refl = refl
+  ∨-l : ∀ {a b} → a ≡ true → a ∨ b ≡ true
+  ∨-l refl = refl
 
-    ∨-r : ∀ a {b} → b ≡ true → a ∨ b ≡ true
-    ∨-r true  _ = refl
-    ∨-r false e = e
+  ∨-r : ∀ a {b} → b ≡ true → a ∨ b ≡ true
+  ∨-r true  _ = refl
+  ∨-r false e = e
 
-    ∨-mono : ∀ {a a′} b → (a′ ≡ true → a ≡ true) → a′ ∨ b ≡ true → a ∨ b ≡ true
-    ∨-mono {a′ = true}  b f _ = ∨-l (f refl)
-    ∨-mono {a′ = false} b f e = ∨-r _ e
+  ∨-mono : ∀ {a a′} b → (a′ ≡ true → a ≡ true) → a′ ∨ b ≡ true → a ∨ b ≡ true
+  ∨-mono {a′ = true}  b f _ = ∨-l (f refl)
+  ∨-mono {a′ = false} b f e = ∨-r _ e
 
-    false≢ : ∀ {ℓ} {X : Set ℓ} → false ≡ true → X
-    false≢ ()
+  false≢ : ∀ {ℓ} {X : Set ℓ} → false ≡ true → X
+  false≢ ()
 
-    isj : ∀ {X : Set₁} {m : Maybe X} {c} → m ≡ just c → is-just m ≡ true
-    isj refl = refl
+  isj : ∀ {X : Set₁} {m : Maybe X} {c} → m ≡ just c → is-just m ≡ true
+  isj refl = refl
 
-    just-of : ∀ {X : Set₁} {m : Maybe X} → is-just m ≡ true → Σ X λ c → m ≡ just c
-    just-of {m = just c} _ = c , refl
+  just-of : ∀ {X : Set₁} {m : Maybe X} → is-just m ≡ true → Σ X λ c → m ≡ just c
+  just-of {m = just c} _ = c , refl
 
-    via : ∀ {X : Set₁} {m m′ : Maybe X} → m ≡ m′ → is-just m ≡ true → is-just m′ ≡ true
-    via refl j = j
+  via : ∀ {X : Set₁} {m m′ : Maybe X} → m ≡ m′ → is-just m ≡ true → is-just m′ ≡ true
+  via refl j = j
 
-    map-fwd : ∀ {X Y : Set₁} {g : X → Y} (m : Maybe X) → is-just m ≡ true → is-just (mapᴹ g m) ≡ true
-    map-fwd (just _) _ = refl
+  map-fwd : ∀ {X Y : Set₁} {g : X → Y} (m : Maybe X) → is-just m ≡ true → is-just (mapᴹ g m) ≡ true
+  map-fwd (just _) _ = refl
 
-    map-back : ∀ {X Y : Set₁} {g : X → Y} (m : Maybe X) → is-just (mapᴹ g m) ≡ true → is-just m ≡ true
-    map-back (just _) _ = refl
+  map-back : ∀ {X Y : Set₁} {g : X → Y} (m : Maybe X) → is-just (mapᴹ g m) ≡ true → is-just m ≡ true
+  map-back (just _) _ = refl
 
-    ----------------------------------------------------------------------
-    -- A take's switch: its source's, off only under a cut switched off,
-    -- which shows nothing.
+  ----------------------------------------------------------------------
+  -- A take's switch: its source's, off only under a cut switched off,
+  -- which shows nothing.
 
-    Sw : ∀ {Γ A} → Bool → (A → Bool) → Sub Γ A → Set₁
-    Sw i p x = (∀ tk → part (takeWhileˢ i p tk x) ≡ taking? i p tk (part x)) ⊎ ((∀ tk → part (takeWhileˢ i p tk x) ≡ nothing) × part x ≡ nothing)
+  Sw : ∀ {Γ A} → Bool → (A → Bool) → Sub Γ A → Set₁
+  Sw i p x = (∀ tk → part (takeWhileˢ i p tk x) ≡ taking? i p tk (part x)) ⊎ ((∀ tk → part (takeWhileˢ i p tk x) ≡ nothing) × part x ≡ nothing)
 
-    sw : ∀ {Γ A} i (p : A → Bool) (x : Sub Γ A) → Sw {Γ} i p x
-    sw i p (pendingˢ o q)                 = inj₁ (λ _ → refl)
-    sw i p (coldˢ b ph)                   = inj₁ (λ _ → refl)
-    sw i p (ofˢ q j xs)                   = inj₁ (λ _ → refl)
-    sw i p doneˢ                          = inj₁ (λ _ → refl)
-    sw i p (mapˢ f s)                     = inj₁ (λ _ → refl)
-    sw i p (scanˢ f z s)                  = inj₁ (λ _ → refl)
-    sw i p (cutˢ true a s)                = inj₁ (λ _ → refl)
-    sw i p (cutˢ false a s)               = inj₂ ((λ _ → refl) , refl)
-    sw i p (laneˢ r s)                    = inj₁ (λ _ → refl)
-    sw i p (takeWhileˢ j p′ tk s)         = inj₁ (λ _ → refl)
-    sw i p (flatMapˢ op f d n qs pl o ls) = inj₁ (λ _ → refl)
-    sw i p (connectˢ k r e rt s b)        = inj₁ (λ _ → refl)
-    sw i p (joinˢ j g x st)               = inj₁ (λ _ → refl)
+  sw : ∀ {Γ A} i (p : A → Bool) (x : Sub Γ A) → Sw {Γ} i p x
+  sw i p (pendingˢ o q)                 = inj₁ (λ _ → refl)
+  sw i p (coldˢ b ph)                   = inj₁ (λ _ → refl)
+  sw i p (ofˢ q j xs)                   = inj₁ (λ _ → refl)
+  sw i p doneˢ                          = inj₁ (λ _ → refl)
+  sw i p (mapˢ f s)                     = inj₁ (λ _ → refl)
+  sw i p (scanˢ f z s)                  = inj₁ (λ _ → refl)
+  sw i p (cutˢ true a s)                = inj₁ (λ _ → refl)
+  sw i p (cutˢ false a s)               = inj₂ ((λ _ → refl) , refl)
+  sw i p (laneˢ r s)                    = inj₁ (λ _ → refl)
+  sw i p (takeWhileˢ j p′ tk s)         = inj₁ (λ _ → refl)
+  sw i p (flatMapˢ op f d n qs pl o ls) = inj₁ (λ _ → refl)
+  sw i p (connectˢ k r e rt s b)        = inj₁ (λ _ → refl)
+  sw i p (joinˢ j g x st)               = inj₁ (λ _ → refl)
 
-    -- A take showing: taking, its source showing; ending, the same end.
-    take-rv : ∀ {Γ A} i (p : A → Bool) (tk : Taking Γ A) (x x′ : Sub Γ A)
-            → (is-just (part x′) ≡ true → is-just (part x) ≡ true)
-            → (∀ {k c} → is-just (part (takeWhileˢ i p (ending k c) x′)) ≡ true → is-just (part (takeWhileˢ i p (ending k c) x)) ≡ true)
-            → is-just (part (takeWhileˢ i p tk x′)) ≡ true → is-just (part (takeWhileˢ i p tk x)) ≡ true
-    take-rv i p (ending k c) x x′ rv te j = te j
-    take-rv i p taking x x′ rv te j with sw i p x′ | sw i p x
-    ... | inj₁ e′       | inj₁ e       = via (sym (e taking)) (map-fwd (part x) (rv (map-back (part x′) (via (e′ taking) j))))
-    ... | inj₁ e′       | inj₂ (_ , n) = false≢ (trans (sym (cong is-just n)) (rv (map-back (part x′) (via (e′ taking) j))))
-    ... | inj₂ (n′ , _) | _            = false≢ (via (n′ taking) j)
-    take-rv i p taken x x′ rv te j with sw i p x′
-    ... | inj₁ e′       = false≢ (via (e′ taken) j)
-    ... | inj₂ (n′ , _) = false≢ (via (n′ taken) j)
+  -- A take showing: taking, its source showing; ending, the same end.
+  take-rv : ∀ {Γ A} i (p : A → Bool) (tk : Taking Γ A) (x x′ : Sub Γ A)
+          → (is-just (part x′) ≡ true → is-just (part x) ≡ true)
+          → (∀ {k c} → is-just (part (takeWhileˢ i p (ending k c) x′)) ≡ true → is-just (part (takeWhileˢ i p (ending k c) x)) ≡ true)
+          → is-just (part (takeWhileˢ i p tk x′)) ≡ true → is-just (part (takeWhileˢ i p tk x)) ≡ true
+  take-rv i p (ending k c) x x′ rv te j = te j
+  take-rv i p taking x x′ rv te j with sw i p x′ | sw i p x
+  ... | inj₁ e′       | inj₁ e       = via (sym (e taking)) (map-fwd (part x) (rv (map-back (part x′) (via (e′ taking) j))))
+  ... | inj₁ e′       | inj₂ (_ , n) = false≢ (trans (sym (cong is-just n)) (rv (map-back (part x′) (via (e′ taking) j))))
+  ... | inj₂ (n′ , _) | _            = false≢ (via (n′ taking) j)
+  take-rv i p taken x x′ rv te j with sw i p x′
+  ... | inj₁ e′       = false≢ (via (e′ taken) j)
+  ... | inj₂ (n′ , _) = false≢ (via (n′ taken) j)
 
-    -- An ending take shows its end alike over either source.
-    ending-eq : ∀ {Γ A} i (p : A → Bool) k (c : U.Node Γ A) (x x′ : Sub Γ A) {n}
-              → is-just (part (takeWhileˢ i p (ending k c) x)) ≡ true → part (takeWhileˢ i p (ending k c) x′) ≡ just n
-              → part (takeWhileˢ i p (ending k c) x) ≡ just n
-    ending-eq i p k c x x′ j e′ with sw i p x′ | sw i p x
-    ... | inj₁ f′       | inj₁ f       = trans (f (ending k c)) (trans (sym (f′ (ending k c))) e′)
-    ... | _             | inj₂ (n , _) = false≢ (via (n (ending k c)) j)
-    ... | inj₂ (n′ , _) | inj₁ _       = false≢ (via (n′ (ending k c)) (isj e′))
+  -- An ending take shows its end alike over either source.
+  ending-eq : ∀ {Γ A} i (p : A → Bool) k (c : U.Node Γ A) (x x′ : Sub Γ A) {n}
+            → is-just (part (takeWhileˢ i p (ending k c) x)) ≡ true → part (takeWhileˢ i p (ending k c) x′) ≡ just n
+            → part (takeWhileˢ i p (ending k c) x) ≡ just n
+  ending-eq i p k c x x′ j e′ with sw i p x′ | sw i p x
+  ... | inj₁ f′       | inj₁ f       = trans (f (ending k c)) (trans (sym (f′ (ending k c))) e′)
+  ... | _             | inj₂ (n , _) = false≢ (via (n (ending k c)) j)
+  ... | inj₂ (n′ , _) | inj₁ _       = false≢ (via (n′ (ending k c)) (isj e′))
 
-    -- A flatMap open: its outer, a lane or the queue.
-    filled : ∀ {X : Set₁} → List X → Bool
-    filled []      = false
-    filled (_ ∷ _) = true
+  -- A flatMap open: its outer, a lane or the queue.
+  filled : ∀ {X : Set₁} → List X → Bool
+  filled []      = false
+  filled (_ ∷ _) = true
 
-    cons-rv : ∀ {Γ B} (m m′ : Maybe (U.Node Γ B)) {L L′ : List (U.Node Γ B)} → (is-just m′ ≡ true → is-just m ≡ true)
-            → (filled L′ ≡ true → filled L ≡ true) → filled (consᴹ m′ L′) ≡ true → filled (consᴹ m L) ≡ true
-    cons-rv (just _) m′        rv fL j = refl
-    cons-rv nothing  (just _)  rv fL j = false≢ (rv refl)
-    cons-rv nothing  nothing   rv fL j = fL j
+  cons-rv : ∀ {Γ B} (m m′ : Maybe (U.Node Γ B)) {L L′ : List (U.Node Γ B)} → (is-just m′ ≡ true → is-just m ≡ true)
+          → (filled L′ ≡ true → filled L ≡ true) → filled (consᴹ m′ L′) ≡ true → filled (consᴹ m L) ≡ true
+  cons-rv (just _) m′        rv fL j = refl
+  cons-rv nothing  (just _)  rv fL j = false≢ (rv refl)
+  cons-rv nothing  nothing   rv fL j = fL j
 
-    merged-rv : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) (o o′ : Maybe (U.Node Γ A)) (L L′ : List (U.Node Γ B)) Q pl
-              → (is-just o′ ≡ true → is-just o ≡ true) → (filled L′ ≡ true → filled L ≡ true)
-              → is-just (merged op g o′ L′ Q pl) ≡ true → is-just (merged op g o L Q pl) ≡ true
-    merged-rv op g (just _) o′        L        L′       Q       pl ro rL j = refl
-    merged-rv op g nothing  (just _)  L        L′       Q       pl ro rL j = false≢ (ro refl)
-    merged-rv op g nothing  nothing   (_ ∷ _)  L′       Q       pl ro rL j = refl
-    merged-rv op g nothing  nothing   []       (_ ∷ _)  Q       pl ro rL j = false≢ (rL refl)
-    merged-rv op g nothing  nothing   []       []       Q       pl ro rL j = j
+  merged-rv : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) (o o′ : Maybe (U.Node Γ A)) (L L′ : List (U.Node Γ B)) Q pl
+            → (is-just o′ ≡ true → is-just o ≡ true) → (filled L′ ≡ true → filled L ≡ true)
+            → is-just (merged op g o′ L′ Q pl) ≡ true → is-just (merged op g o L Q pl) ≡ true
+  merged-rv op g (just _) o′        L        L′       Q       pl ro rL j = refl
+  merged-rv op g nothing  (just _)  L        L′       Q       pl ro rL j = false≢ (ro refl)
+  merged-rv op g nothing  nothing   (_ ∷ _)  L′       Q       pl ro rL j = refl
+  merged-rv op g nothing  nothing   []       (_ ∷ _)  Q       pl ro rL j = false≢ (rL refl)
+  merged-rv op g nothing  nothing   []       []       Q       pl ro rL j = j
 
-    conn-src : ∀ {Γ A B} r e (rt : U.Node Γ A) (s s′ : Maybe (U.Node Γ A)) (mb : Maybe (U.Node (A ∷ Γ) B))
-             → (is-just s′ ≡ true → is-just s ≡ true) → is-just (connected r e rt s′ mb) ≡ true → is-just (connected r e rt s mb) ≡ true
-    conn-src r e        rt s        s′        nothing  rv ()
-    conn-src r e        rt (just _) s′        (just _) rv j = refl
-    conn-src r (just _) rt nothing  s′        (just _) rv j = refl
-    conn-src r nothing  rt nothing  (just _)  (just _) rv j = false≢ (rv refl)
-    conn-src r nothing  rt nothing  nothing   (just _) rv j = j
+  conn-src : ∀ {Γ A B} r e (rt : U.Node Γ A) (s s′ : Maybe (U.Node Γ A)) (mb : Maybe (U.Node (A ∷ Γ) B))
+           → (is-just s′ ≡ true → is-just s ≡ true) → is-just (connected r e rt s′ mb) ≡ true → is-just (connected r e rt s mb) ≡ true
+  conn-src r e        rt s        s′        nothing  rv ()
+  conn-src r e        rt (just _) s′        (just _) rv j = refl
+  conn-src r (just _) rt nothing  s′        (just _) rv j = refl
+  conn-src r nothing  rt nothing  (just _)  (just _) rv j = false≢ (rv refl)
+  conn-src r nothing  rt nothing  nothing   (just _) rv j = j
 
-    conn-body : ∀ {Γ A B} r e (rt : U.Node Γ A) (s : Maybe (U.Node Γ A)) (mb mb′ : Maybe (U.Node (A ∷ Γ) B))
-              → (is-just mb′ ≡ true → is-just mb ≡ true) → is-just (connected r e rt s mb′) ≡ true → is-just (connected r e rt s mb) ≡ true
-    conn-body r e        rt s        mb       nothing  rv ()
-    conn-body r e        rt s        nothing  (just _) rv j = false≢ (rv refl)
-    conn-body r e        rt (just _) (just _) (just _) rv j = refl
-    conn-body r (just _) rt nothing  (just _) (just _) rv j = refl
-    conn-body r nothing  rt nothing  (just _) (just _) rv ()
+  conn-body : ∀ {Γ A B} r e (rt : U.Node Γ A) (s : Maybe (U.Node Γ A)) (mb mb′ : Maybe (U.Node (A ∷ Γ) B))
+            → (is-just mb′ ≡ true → is-just mb ≡ true) → is-just (connected r e rt s mb′) ≡ true → is-just (connected r e rt s mb) ≡ true
+  conn-body r e        rt s        mb       nothing  rv ()
+  conn-body r e        rt s        nothing  (just _) rv j = false≢ (rv refl)
+  conn-body r e        rt (just _) (just _) (just _) rv j = refl
+  conn-body r (just _) rt nothing  (just _) (just _) rv j = refl
+  conn-body r nothing  rt nothing  (just _) (just _) rv ()
 
-    -- A flatMap's part, open.
-    merged-eq : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) (o : Maybe (U.Node Γ A)) (L : List (U.Node Γ B)) Q pl {n}
-              → merged op g o L Q pl ≡ just n → n ≡ U.flatMapᶜ op g o L Q pl
-    merged-eq op g (just _) L       Q       pl refl = refl
-    merged-eq op g nothing  (_ ∷ _) Q       pl refl = refl
-    merged-eq op g nothing  []      (_ ∷ _) pl refl = refl
-    merged-eq op g nothing  []      []      pl ()
+  -- A flatMap's part, open.
+  merged-eq : ∀ {Γ A B} op (g : A → Pos → U.Node Γ B) (o : Maybe (U.Node Γ A)) (L : List (U.Node Γ B)) Q pl {n}
+            → merged op g o L Q pl ≡ just n → n ≡ U.flatMapᶜ op g o L Q pl
+  merged-eq op g (just _) L       Q       pl refl = refl
+  merged-eq op g nothing  (_ ∷ _) Q       pl refl = refl
+  merged-eq op g nothing  []      (_ ∷ _) pl refl = refl
+  merged-eq op g nothing  []      []      pl ()
 
-    ----------------------------------------------------------------------
-    -- A seen path, extended by a seen path
+  ----------------------------------------------------------------------
+  -- A seen path, extended by a seen path
 
-    mutual
-      seen-⊕ : ∀ {Γ A Δ B Ε C π τ} {t : Sub Γ A} {x : Sub Δ B} {y : Sub Ε C} (ρ : Path t x π) (ψ : Path x y τ)
-             → seen ρ ≡ true → seen ψ ≡ true → seen (ρ ⊕ ψ) ≡ true
-      seen-⊕ here                       ψ a s = s
-      seen-⊕ (in-map ρ)                 ψ a s = seen-⊕ ρ ψ a s
-      seen-⊕ (in-scan ρ)                ψ a s = seen-⊕ ρ ψ a s
-      seen-⊕ (in-cut {l = l} ρ)         ψ a s = thru l a (λ x a′ → ∧-join x (seen-⊕ ρ ψ a′ s))
-      seen-⊕ (in-lane ρ)                ψ a s = seen-⊕ ρ ψ a s
-      seen-⊕ (in-take {tk = tk} ρ)      ψ a s = thru (isTaking tk) a (λ x a′ → ∧-join x (seen-⊕ ρ ψ a′ s))
-      seen-⊕ (in-outer ρ)               ψ a s = seen-⊕ ρ ψ a s
-      seen-⊕ (in-lanes ρ)               ψ a s = seenL-⊕ ρ ψ a s
-      seen-⊕ (in-source {b = b} ρ)      ψ a s = thru (is-just (part b)) a (λ x a′ → ∧-join x (seen-⊕ ρ ψ a′ s))
-      seen-⊕ (in-body {e = e} {s = s₀} ρ) ψ a s = thru (is-just (part s₀) ∨ is-just e) a (λ x a′ → ∧-join x (seen-⊕ ρ ψ a′ s))
+  mutual
+    seen-⊕ : ∀ {Γ A Δ B Ε C π τ} {t : Sub Γ A} {x : Sub Δ B} {y : Sub Ε C} (ρ : Path t x π) (ψ : Path x y τ)
+           → seen ρ ≡ true → seen ψ ≡ true → seen (ρ ⊕ ψ) ≡ true
+    seen-⊕ here                       ψ a s = s
+    seen-⊕ (in-map ρ)                 ψ a s = seen-⊕ ρ ψ a s
+    seen-⊕ (in-scan ρ)                ψ a s = seen-⊕ ρ ψ a s
+    seen-⊕ (in-cut {l = l} ρ)         ψ a s = thru l a (λ x a′ → ∧-join x (seen-⊕ ρ ψ a′ s))
+    seen-⊕ (in-lane ρ)                ψ a s = seen-⊕ ρ ψ a s
+    seen-⊕ (in-take {tk = tk} ρ)      ψ a s = thru (isTaking tk) a (λ x a′ → ∧-join x (seen-⊕ ρ ψ a′ s))
+    seen-⊕ (in-outer ρ)               ψ a s = seen-⊕ ρ ψ a s
+    seen-⊕ (in-lanes ρ)               ψ a s = seenL-⊕ ρ ψ a s
+    seen-⊕ (in-source {b = b} ρ)      ψ a s = thru (is-just (part b)) a (λ x a′ → ∧-join x (seen-⊕ ρ ψ a′ s))
+    seen-⊕ (in-body {e = e} {s = s₀} ρ) ψ a s = thru (is-just (part s₀) ∨ is-just e) a (λ x a′ → ∧-join x (seen-⊕ ρ ψ a′ s))
 
-      seenL-⊕ : ∀ {Γ A Δ B Ε C i π τ} {ls : List (Sub Γ A)} {x : Sub Δ B} {y : Sub Ε C} (ρ : PathLanes ls x i π) (ψ : Path x y τ)
-              → seenL ρ ≡ true → seen ψ ≡ true → seenL (ρ ⊕ᴸ ψ) ≡ true
-      seenL-⊕ (this-lane ρ) ψ a s = seen-⊕ ρ ψ a s
-      seenL-⊕ (next-lane ρ) ψ a s = seenL-⊕ ρ ψ a s
+    seenL-⊕ : ∀ {Γ A Δ B Ε C i π τ} {ls : List (Sub Γ A)} {x : Sub Δ B} {y : Sub Ε C} (ρ : PathLanes ls x i π) (ψ : Path x y τ)
+            → seenL ρ ≡ true → seen ψ ≡ true → seenL (ρ ⊕ᴸ ψ) ≡ true
+    seenL-⊕ (this-lane ρ) ψ a s = seen-⊕ ρ ψ a s
+    seenL-⊕ (next-lane ρ) ψ a s = seenL-⊕ ρ ψ a s
 
-    ----------------------------------------------------------------------
-    -- What a tree holds, of a seen subtree; of a flatMap's lanes
+  ----------------------------------------------------------------------
+  -- What a tree holds, of a seen subtree; of a flatMap's lanes
 
-    module _ {P : ∀ {Γ A} → U.Node Γ A → Set} where
-      each-sub : ∀ {Γ A Δ B π} {t : Sub Γ A} {x : Sub Δ B} → Each P t → (ρ : Path t x π) → seen ρ ≡ true → Each P x
-      each-sub ev ρ sρ = record
-        { parts = λ ψ sn → Each.parts ev (ρ ⊕ ψ) (seen-⊕ ρ ψ sρ sn)
-        ; pools = λ ψ sn → Each.pools ev (ρ ⊕ ψ) (seen-⊕ ρ ψ sρ sn)
-        ; rests = λ ψ sn → Each.rests ev (ρ ⊕ ψ) (seen-⊕ ρ ψ sρ sn) }
+  module _ {P : ∀ {Γ A} → U.Node Γ A → Set} where
+    each-sub : ∀ {Γ A Δ B π} {t : Sub Γ A} {x : Sub Δ B} → Each P t → (ρ : Path t x π) → seen ρ ≡ true → Each P x
+    each-sub ev ρ sρ = record
+      { parts = λ ψ sn → Each.parts ev (ρ ⊕ ψ) (seen-⊕ ρ ψ sρ sn)
+      ; pools = λ ψ sn → Each.pools ev (ρ ⊕ ψ) (seen-⊕ ρ ψ sρ sn)
+      ; rests = λ ψ sn → Each.rests ev (ρ ⊕ ψ) (seen-⊕ ρ ψ sρ sn) }
 
-      record EachL {Γ₀ B₀} (ls : List (Sub Γ₀ B₀)) : Set₁ where
-        field
-          partsL : ∀ {Δ B i π} {x : Sub Δ B} (ψ : PathLanes ls x i π) → seenL ψ ≡ true → ∀ {c} → part x ≡ just c → P c
-          poolsL : ∀ {Γ X A op f d n qs pl i π} {o : Sub Γ X} {ls′ : List (Sub Γ A)}
-                 → (ψ : PathLanes ls (flatMapˢ op f d n qs pl o ls′) i π) → seenL ψ ≡ true
-                 → ∀ {c} → part (flatMapˢ op f d n qs pl o ls′) ≡ just c → P pl
-          restsL : ∀ {Γ X B k r e rt i π} {s : Sub Γ X} {b : Sub (X ∷ Γ) B}
-                 → (ψ : PathLanes ls (connectˢ k r e rt s b) i π) → seenL ψ ≡ true
-                 → ∀ {n} → part (connectˢ k r e rt s b) ≡ just n
-                 → part s ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt
+    record EachL {Γ₀ B₀} (ls : List (Sub Γ₀ B₀)) : Set₁ where
+      field
+        partsL : ∀ {Δ B i π} {x : Sub Δ B} (ψ : PathLanes ls x i π) → seenL ψ ≡ true → ∀ {c} → part x ≡ just c → P c
+        poolsL : ∀ {Γ X A op f d n qs pl i π} {o : Sub Γ X} {ls′ : List (Sub Γ A)}
+               → (ψ : PathLanes ls (flatMapˢ op f d n qs pl o ls′) i π) → seenL ψ ≡ true
+               → ∀ {c} → part (flatMapˢ op f d n qs pl o ls′) ≡ just c → P pl
+        restsL : ∀ {Γ X B k r e rt i π} {s : Sub Γ X} {b : Sub (X ∷ Γ) B}
+               → (ψ : PathLanes ls (connectˢ k r e rt s b) i π) → seenL ψ ≡ true
+               → ∀ {n} → part (connectˢ k r e rt s b) ≡ just n
+               → part s ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt
 
-      eachL-of : ∀ {Γ X A op f d n qs pl} {o : Sub Γ X} {ls : List (Sub Γ A)} → Each P (flatMapˢ op f d n qs pl o ls) → EachL ls
-      eachL-of ev = record { partsL = λ ψ → Each.parts ev (in-lanes ψ) ; poolsL = λ ψ → Each.pools ev (in-lanes ψ) ; restsL = λ ψ → Each.rests ev (in-lanes ψ) }
+    eachL-of : ∀ {Γ X A op f d n qs pl} {o : Sub Γ X} {ls : List (Sub Γ A)} → Each P (flatMapˢ op f d n qs pl o ls) → EachL ls
+    eachL-of ev = record { partsL = λ ψ → Each.parts ev (in-lanes ψ) ; poolsL = λ ψ → Each.pools ev (in-lanes ψ) ; restsL = λ ψ → Each.rests ev (in-lanes ψ) }
 
-      eachL-head : ∀ {Γ B} {l : Sub Γ B} {ls} → EachL (l ∷ ls) → Each P l
-      eachL-head eL = record { parts = λ ψ → EachL.partsL eL (this-lane ψ) ; pools = λ ψ → EachL.poolsL eL (this-lane ψ) ; rests = λ ψ → EachL.restsL eL (this-lane ψ) }
+    eachL-head : ∀ {Γ B} {l : Sub Γ B} {ls} → EachL (l ∷ ls) → Each P l
+    eachL-head eL = record { parts = λ ψ → EachL.partsL eL (this-lane ψ) ; pools = λ ψ → EachL.poolsL eL (this-lane ψ) ; rests = λ ψ → EachL.restsL eL (this-lane ψ) }
 
-      eachL-tail : ∀ {Γ B} {l : Sub Γ B} {ls} → EachL (l ∷ ls) → EachL ls
-      eachL-tail eL = record { partsL = λ ψ → EachL.partsL eL (next-lane ψ) ; poolsL = λ ψ → EachL.poolsL eL (next-lane ψ) ; restsL = λ ψ → EachL.restsL eL (next-lane ψ) }
+    eachL-tail : ∀ {Γ B} {l : Sub Γ B} {ls} → EachL (l ∷ ls) → EachL ls
+    eachL-tail eL = record { partsL = λ ψ → EachL.partsL eL (next-lane ψ) ; poolsL = λ ψ → EachL.poolsL eL (next-lane ψ) ; restsL = λ ψ → EachL.restsL eL (next-lane ψ) }
 
-      eachL-cons : ∀ {Γ B} {l : Sub Γ B} {ls} → Each P l → EachL ls → EachL (l ∷ ls)
-      eachL-cons el eL = record
-        { partsL = λ { (this-lane ψ) → Each.parts el ψ ; (next-lane ψ) → EachL.partsL eL ψ }
-        ; poolsL = λ { (this-lane ψ) → Each.pools el ψ ; (next-lane ψ) → EachL.poolsL eL ψ }
-        ; restsL = λ { (this-lane ψ) → Each.rests el ψ ; (next-lane ψ) → EachL.restsL eL ψ } }
+    eachL-cons : ∀ {Γ B} {l : Sub Γ B} {ls} → Each P l → EachL ls → EachL (l ∷ ls)
+    eachL-cons el eL = record
+      { partsL = λ { (this-lane ψ) → Each.parts el ψ ; (next-lane ψ) → EachL.partsL eL ψ }
+      ; poolsL = λ { (this-lane ψ) → Each.pools el ψ ; (next-lane ψ) → EachL.poolsL eL ψ }
+      ; restsL = λ { (this-lane ψ) → Each.rests el ψ ; (next-lane ψ) → EachL.restsL eL ψ } }
 
-      -- Every lane's part, from what each lane holds.
-      lanes-all : ∀ {Γ B} (ls : List (Sub Γ B)) → EachL ls → All P (partLanes ls)
-      lanes-all []       eL = []
-      lanes-all (l ∷ ls) eL = all-cons (part l) (EachL.partsL eL (this-lane here) refl) (lanes-all ls (eachL-tail eL))
-        where
-          all-cons : ∀ {Γ B} (m : Maybe (U.Node Γ B)) {L} → (∀ {c} → m ≡ just c → P c) → All P L → All P (consᴹ m L)
-          all-cons nothing  hm hL = hL
-          all-cons (just c) hm hL = hm refl ∷ hL
+    -- Every lane's part, from what each lane holds.
+    lanes-all : ∀ {Γ B} (ls : List (Sub Γ B)) → EachL ls → All P (partLanes ls)
+    lanes-all []       eL = []
+    lanes-all (l ∷ ls) eL = all-cons (part l) (EachL.partsL eL (this-lane here) refl) (lanes-all ls (eachL-tail eL))
+      where
+        all-cons : ∀ {Γ B} (m : Maybe (U.Node Γ B)) {L} → (∀ {c} → m ≡ just c → P c) → All P L → All P (consᴹ m L)
+        all-cons nothing  hm hL = hL
+        all-cons (just c) hm hL = hm refl ∷ hL
 
-      -- Building what a node holds from what its children hold.
-      Root : ∀ {Γ A} → Sub Γ A → Set₁
-      Root t = ∀ {c} → part t ≡ just c → P c
+    -- Building what a node holds from what its children hold.
+    Root : ∀ {Γ A} → Sub Γ A → Set₁
+    Root t = ∀ {c} → part t ≡ just c → P c
 
-      each-map : ∀ {Γ A B} {f : A → B} {s : Sub Γ A} → Root (mapˢ f s) → Each P s → Each P (mapˢ f s)
-      each-map root es = record
-        { parts = λ { here _ e → root e ; (in-map ψ) → Each.parts es ψ }
-        ; pools = λ { (in-map ψ) → Each.pools es ψ }
-        ; rests = λ { (in-map ψ) → Each.rests es ψ } }
+    each-map : ∀ {Γ A B} {f : A → B} {s : Sub Γ A} → Root (mapˢ f s) → Each P s → Each P (mapˢ f s)
+    each-map root es = record
+      { parts = λ { here _ e → root e ; (in-map ψ) → Each.parts es ψ }
+      ; pools = λ { (in-map ψ) → Each.pools es ψ }
+      ; rests = λ { (in-map ψ) → Each.rests es ψ } }
 
-      each-scan : ∀ {Γ A B} {f : B → A → B} {z} {s : Sub Γ A} → Root (scanˢ f z s) → Each P s → Each P (scanˢ f z s)
-      each-scan root es = record
-        { parts = λ { here _ e → root e ; (in-scan ψ) → Each.parts es ψ }
-        ; pools = λ { (in-scan ψ) → Each.pools es ψ }
-        ; rests = λ { (in-scan ψ) → Each.rests es ψ } }
+    each-scan : ∀ {Γ A B} {f : B → A → B} {z} {s : Sub Γ A} → Root (scanˢ f z s) → Each P s → Each P (scanˢ f z s)
+    each-scan root es = record
+      { parts = λ { here _ e → root e ; (in-scan ψ) → Each.parts es ψ }
+      ; pools = λ { (in-scan ψ) → Each.pools es ψ }
+      ; rests = λ { (in-scan ψ) → Each.rests es ψ } }
 
-      each-lane : ∀ {Γ A r} {s : Sub Γ A} → Root (laneˢ r s) → Each P s → Each P (laneˢ r s)
-      each-lane root es = record
-        { parts = λ { here _ e → root e ; (in-lane ψ) → Each.parts es ψ }
-        ; pools = λ { (in-lane ψ) → Each.pools es ψ }
-        ; rests = λ { (in-lane ψ) → Each.rests es ψ } }
+    each-lane : ∀ {Γ A r} {s : Sub Γ A} → Root (laneˢ r s) → Each P s → Each P (laneˢ r s)
+    each-lane root es = record
+      { parts = λ { here _ e → root e ; (in-lane ψ) → Each.parts es ψ }
+      ; pools = λ { (in-lane ψ) → Each.pools es ψ }
+      ; rests = λ { (in-lane ψ) → Each.rests es ψ } }
 
-      each-cut : ∀ {Γ A l a} {s : Sub Γ A} → Root (cutˢ l a s) → (l ≡ true → Each P s) → Each P (cutˢ l a s)
-      each-cut {l = l} root es = record
-        { parts = λ { here _ e → root e ; (in-cut ψ) sn → thru l sn (λ x s′ → Each.parts (es x) ψ s′) }
-        ; pools = λ { (in-cut ψ) sn → thru l sn (λ x s′ → Each.pools (es x) ψ s′) }
-        ; rests = λ { (in-cut ψ) sn → thru l sn (λ x s′ → Each.rests (es x) ψ s′) } }
+    each-cut : ∀ {Γ A l a} {s : Sub Γ A} → Root (cutˢ l a s) → (l ≡ true → Each P s) → Each P (cutˢ l a s)
+    each-cut {l = l} root es = record
+      { parts = λ { here _ e → root e ; (in-cut ψ) sn → thru l sn (λ x s′ → Each.parts (es x) ψ s′) }
+      ; pools = λ { (in-cut ψ) sn → thru l sn (λ x s′ → Each.pools (es x) ψ s′) }
+      ; rests = λ { (in-cut ψ) sn → thru l sn (λ x s′ → Each.rests (es x) ψ s′) } }
 
-      each-take : ∀ {Γ A i p tk} {s : Sub Γ A} → Root (takeWhileˢ i p tk s) → (isTaking tk ≡ true → Each P s) → Each P (takeWhileˢ i p tk s)
-      each-take {tk = tk} root es = record
-        { parts = λ { here _ e → root e ; (in-take ψ) sn → thru (isTaking tk) sn (λ x s′ → Each.parts (es x) ψ s′) }
-        ; pools = λ { (in-take ψ) sn → thru (isTaking tk) sn (λ x s′ → Each.pools (es x) ψ s′) }
-        ; rests = λ { (in-take ψ) sn → thru (isTaking tk) sn (λ x s′ → Each.rests (es x) ψ s′) } }
+    each-take : ∀ {Γ A i p tk} {s : Sub Γ A} → Root (takeWhileˢ i p tk s) → (isTaking tk ≡ true → Each P s) → Each P (takeWhileˢ i p tk s)
+    each-take {tk = tk} root es = record
+      { parts = λ { here _ e → root e ; (in-take ψ) sn → thru (isTaking tk) sn (λ x s′ → Each.parts (es x) ψ s′) }
+      ; pools = λ { (in-take ψ) sn → thru (isTaking tk) sn (λ x s′ → Each.pools (es x) ψ s′) }
+      ; rests = λ { (in-take ψ) sn → thru (isTaking tk) sn (λ x s′ → Each.rests (es x) ψ s′) } }
 
-      each-flat : ∀ {Γ X A op f d n qs pl} {o : Sub Γ X} {ls : List (Sub Γ A)}
-                → Root (flatMapˢ op f d n qs pl o ls) → (∀ {c} → part (flatMapˢ op f d n qs pl o ls) ≡ just c → P pl)
-                → Each P o → EachL ls → Each P (flatMapˢ op f d n qs pl o ls)
-      each-flat root pool eo eL = record
-        { parts = λ { here _ e → root e ; (in-outer ψ) → Each.parts eo ψ ; (in-lanes ψ) → EachL.partsL eL ψ }
-        ; pools = λ { here _ e → pool e ; (in-outer ψ) → Each.pools eo ψ ; (in-lanes ψ) → EachL.poolsL eL ψ }
-        ; rests = λ { (in-outer ψ) → Each.rests eo ψ ; (in-lanes ψ) → EachL.restsL eL ψ } }
+    each-flat : ∀ {Γ X A op f d n qs pl} {o : Sub Γ X} {ls : List (Sub Γ A)}
+              → Root (flatMapˢ op f d n qs pl o ls) → (∀ {c} → part (flatMapˢ op f d n qs pl o ls) ≡ just c → P pl)
+              → Each P o → EachL ls → Each P (flatMapˢ op f d n qs pl o ls)
+    each-flat root pool eo eL = record
+      { parts = λ { here _ e → root e ; (in-outer ψ) → Each.parts eo ψ ; (in-lanes ψ) → EachL.partsL eL ψ }
+      ; pools = λ { here _ e → pool e ; (in-outer ψ) → Each.pools eo ψ ; (in-lanes ψ) → EachL.poolsL eL ψ }
+      ; rests = λ { (in-outer ψ) → Each.rests eo ψ ; (in-lanes ψ) → EachL.restsL eL ψ } }
 
-      each-connect : ∀ {Γ X B k r e rt} {s : Sub Γ X} {b : Sub (X ∷ Γ) B}
-                   → Root (connectˢ k r e rt s b)
-                   → (∀ {n} → part (connectˢ k r e rt s b) ≡ just n → part s ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt)
-                   → (is-just (part b) ≡ true → Each P s) → ((is-just (part s) ∨ is-just e) ≡ true → Each P b)
-                   → Each P (connectˢ k r e rt s b)
-      each-connect {e = e} {s = s} {b} root rest es eb = record
-        { parts = λ { here _ e′ → root e′
-                    ; (in-source ψ) sn → thru (is-just (part b)) sn (λ x s′ → Each.parts (es x) ψ s′)
-                    ; (in-body ψ) sn → thru (is-just (part s) ∨ is-just e) sn (λ x s′ → Each.parts (eb x) ψ s′) }
-        ; pools = λ { (in-source ψ) sn → thru (is-just (part b)) sn (λ x s′ → Each.pools (es x) ψ s′)
-                    ; (in-body ψ) sn → thru (is-just (part s) ∨ is-just e) sn (λ x s′ → Each.pools (eb x) ψ s′) }
-        ; rests = λ { here _ e′ → rest e′
-                    ; (in-source ψ) sn → thru (is-just (part b)) sn (λ x s′ → Each.rests (es x) ψ s′)
-                    ; (in-body ψ) sn → thru (is-just (part s) ∨ is-just e) sn (λ x s′ → Each.rests (eb x) ψ s′) } }
+    each-connect : ∀ {Γ X B k r e rt} {s : Sub Γ X} {b : Sub (X ∷ Γ) B}
+                 → Root (connectˢ k r e rt s b)
+                 → (∀ {n} → part (connectˢ k r e rt s b) ≡ just n → part s ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt)
+                 → (is-just (part b) ≡ true → Each P s) → ((is-just (part s) ∨ is-just e) ≡ true → Each P b)
+                 → Each P (connectˢ k r e rt s b)
+    each-connect {e = e} {s = s} {b} root rest es eb = record
+      { parts = λ { here _ e′ → root e′
+                  ; (in-source ψ) sn → thru (is-just (part b)) sn (λ x s′ → Each.parts (es x) ψ s′)
+                  ; (in-body ψ) sn → thru (is-just (part s) ∨ is-just e) sn (λ x s′ → Each.parts (eb x) ψ s′) }
+      ; pools = λ { (in-source ψ) sn → thru (is-just (part b)) sn (λ x s′ → Each.pools (es x) ψ s′)
+                  ; (in-body ψ) sn → thru (is-just (part s) ∨ is-just e) sn (λ x s′ → Each.pools (eb x) ψ s′) }
+      ; rests = λ { here _ e′ → rest e′
+                  ; (in-source ψ) sn → thru (is-just (part b)) sn (λ x s′ → Each.rests (es x) ψ s′)
+                  ; (in-body ψ) sn → thru (is-just (part s) ∨ is-just e) sn (λ x s′ → Each.rests (eb x) ψ s′) } }
 
-    ----------------------------------------------------------------------
-    -- Told and ended, of a seen subtree; of a flatMap's lanes
+  ----------------------------------------------------------------------
+  -- Told and ended, of a seen subtree; of a flatMap's lanes
 
-    ut-sub : ∀ {q Γ A Δ B π} {t : Sub Γ A} {x : Sub Δ B} → Untold q t → (ρ : Path t x π) → seen ρ ≡ true → Untold q x
-    ut-sub ut ρ sρ ψ sn = ut (ρ ⊕ ψ) (seen-⊕ ρ ψ sρ sn)
+  ut-sub : ∀ {q Γ A Δ B π} {t : Sub Γ A} {x : Sub Δ B} → Untold q t → (ρ : Path t x π) → seen ρ ≡ true → Untold q x
+  ut-sub ut ρ sρ ψ sn = ut (ρ ⊕ ψ) (seen-⊕ ρ ψ sρ sn)
 
-    en-sub : ∀ {Γ A Δ B π} {t : Sub Γ A} {x : Sub Δ B} → Ended t → (ρ : Path t x π) → seen ρ ≡ true → Ended x
-    en-sub en ρ sρ ψ sn = en (ρ ⊕ ψ) (seen-⊕ ρ ψ sρ sn)
+  en-sub : ∀ {Γ A Δ B π} {t : Sub Γ A} {x : Sub Δ B} → Ended t → (ρ : Path t x π) → seen ρ ≡ true → Ended x
+  en-sub en ρ sρ ψ sn = en (ρ ⊕ ψ) (seen-⊕ ρ ψ sρ sn)
 
-    UntoldL : ∀ {Γ₀ B₀} → Pos → List (Sub Γ₀ B₀) → Set₁
-    UntoldL q ls = ∀ {Γ X B k r c₀ rt i π} {s : Sub Γ X} {b : Sub (X ∷ Γ) B}
-                 → (ψ : PathLanes ls (connectˢ k r (just c₀) rt s b) i π) → seenL ψ ≡ true → part s ≡ nothing
-                 → ∀ {b₀} → part b ≡ just b₀ → Tells q c₀ (untold (here refl) b₀)
+  UntoldL : ∀ {Γ₀ B₀} → Pos → List (Sub Γ₀ B₀) → Set₁
+  UntoldL q ls = ∀ {Γ X B k r c₀ rt i π} {s : Sub Γ X} {b : Sub (X ∷ Γ) B}
+               → (ψ : PathLanes ls (connectˢ k r (just c₀) rt s b) i π) → seenL ψ ≡ true → part s ≡ nothing
+               → ∀ {b₀} → part b ≡ just b₀ → Tells q c₀ (untold (here refl) b₀)
 
-    EndedL : ∀ {Γ₀ B₀} → List (Sub Γ₀ B₀) → Set₁
-    EndedL ls = ∀ {Γ X B k r e rt i π} {s : Sub Γ X} {b : Sub (X ∷ Γ) B}
-              → (ψ : PathLanes ls (connectˢ k r e rt s b) i π) → seenL ψ ≡ true
-              → ∀ {n} → part (connectˢ k r e rt s b) ≡ just n → ∀ {c₀} → e ≡ just c₀ → part s ≡ nothing
+  EndedL : ∀ {Γ₀ B₀} → List (Sub Γ₀ B₀) → Set₁
+  EndedL ls = ∀ {Γ X B k r e rt i π} {s : Sub Γ X} {b : Sub (X ∷ Γ) B}
+            → (ψ : PathLanes ls (connectˢ k r e rt s b) i π) → seenL ψ ≡ true
+            → ∀ {n} → part (connectˢ k r e rt s b) ≡ just n → ∀ {c₀} → e ≡ just c₀ → part s ≡ nothing
 
-    -- A connect past its source's end, its joiners untold no sooner.
-    untold-at : ∀ {q Γ X B k r e rt} {s : Sub Γ X} {b : Sub (X ∷ Γ) B} → Untold q (connectˢ k r e rt s b)
-              → ∀ {c₀} → e ≡ just c₀ → part s ≡ nothing → ∀ {b₀} → part b ≡ just b₀ → Tells q c₀ (untold (here refl) b₀)
-    untold-at ut refl pn eb = ut here refl pn eb
+  -- A connect past its source's end, its joiners untold no sooner.
+  untold-at : ∀ {q Γ X B k r e rt} {s : Sub Γ X} {b : Sub (X ∷ Γ) B} → Untold q (connectˢ k r e rt s b)
+            → ∀ {c₀} → e ≡ just c₀ → part s ≡ nothing → ∀ {b₀} → part b ≡ just b₀ → Tells q c₀ (untold (here refl) b₀)
+  untold-at ut refl pn eb = ut here refl pn eb
 
-    ----------------------------------------------------------------------
-    -- Joiners told no sooner
+  ----------------------------------------------------------------------
+  -- Joiners told no sooner
 
-    ≡-⊑ : ∀ {q c xs ys} → xs ≡ ys → xs ⊑[ q / c ] ys
-    ≡-⊑ refl t = t
+  ≡-⊑ : ∀ {q c xs ys} → xs ≡ ys → xs ⊑[ q / c ] ys
+  ≡-⊑ refl t = t
 
-    ++-⊑ : ∀ {q c} xs xs′ {ys ys′} → xs′ ⊑[ q / c ] xs → ys′ ⊑[ q / c ] ys → (xs′ ++ ys′) ⊑[ q / c ] (xs ++ ys)
-    ++-⊑ xs xs′ fx fy t = all-++⁺ (fx (++⁻ˡ xs t)) (fy (++⁻ʳ xs t))
+  ++-⊑ : ∀ {q c} xs xs′ {ys ys′} → xs′ ⊑[ q / c ] xs → ys′ ⊑[ q / c ] ys → (xs′ ++ ys′) ⊑[ q / c ] (xs ++ ys)
+  ++-⊑ xs xs′ fx fy t = all-++⁺ (fx (++⁻ˡ xs t)) (fy (++⁻ʳ xs t))
 
-    cons-untold : ∀ {Γ A B} (i : A ∈ᴸ Γ) (m : Maybe (U.Node Γ B)) L → untoldᴸ i (consᴹ m L) ≡ untoldᴹ i m ++ untoldᴸ i L
-    cons-untold i nothing  L = refl
-    cons-untold i (just c) L = refl
+  cons-untold : ∀ {Γ A B} (i : A ∈ᴸ Γ) (m : Maybe (U.Node Γ B)) L → untoldᴸ i (consᴹ m L) ≡ untoldᴹ i m ++ untoldᴸ i L
+  cons-untold i nothing  L = refl
+  cons-untold i (just c) L = refl
 
   ------------------------------------------------------------------------
   -- THE WALK: `u` replanted to `v`, every node above it rebuilt from its
   -- path child, every node beside the path the same node.
 
-  private
-    module Walk {Δ₀ A₀} {u v : Sub Δ₀ A₀}
-                (rv₀ : is-just (part v) ≡ true → is-just (part u) ≡ true)
-                (tk₀ : ∀ {i p k c} → is-just (part (takeWhileˢ i p (ending k c) v)) ≡ true → is-just (part (takeWhileˢ i p (ending k c) u)) ≡ true) where
+  module Walk {Δ₀ A₀} {u v : Sub Δ₀ A₀}
+              (rv₀ : is-just (part v) ≡ true → is-just (part u) ≡ true)
+              (tk₀ : ∀ {i p k c} → is-just (part (takeWhileˢ i p (ending k c) v)) ≡ true → is-just (part (takeWhileˢ i p (ending k c) u)) ≡ true) where
 
-      -- No take above the node switched back on.
-      takes : ∀ {Γ A π} {t : Sub Γ A} (ρ : Path t u π)
-            → ∀ {i p k c} → is-just (part (takeWhileˢ i p (ending k c) (plant ρ v))) ≡ true → is-just (part (takeWhileˢ i p (ending k c) t)) ≡ true
-      takes here {i} {p} {k} {c} j = tk₀ {i} {p} {k} {c} j
-      takes (in-map ρ)     j = j
-      takes (in-scan ρ)    j = j
-      takes (in-cut ρ)     j = j
-      takes (in-lane ρ)    j = j
-      takes (in-take ρ)    j = j
-      takes (in-outer ρ)   j = j
-      takes (in-lanes ρ)   j = j
-      takes (in-source ρ)  j = j
-      takes (in-body ρ)    j = j
+    -- No take above the node switched back on.
+    takes : ∀ {Γ A π} {t : Sub Γ A} (ρ : Path t u π)
+          → ∀ {i p k c} → is-just (part (takeWhileˢ i p (ending k c) (plant ρ v))) ≡ true → is-just (part (takeWhileˢ i p (ending k c) t)) ≡ true
+    takes here {i} {p} {k} {c} j = tk₀ {i} {p} {k} {c} j
+    takes (in-map ρ)     j = j
+    takes (in-scan ρ)    j = j
+    takes (in-cut ρ)     j = j
+    takes (in-lane ρ)    j = j
+    takes (in-take ρ)    j = j
+    takes (in-outer ρ)   j = j
+    takes (in-lanes ρ)   j = j
+    takes (in-source ρ)  j = j
+    takes (in-body ρ)    j = j
 
-      -- No part above the node revived.
-      mutual
-        revive : ∀ {Γ A π} {t : Sub Γ A} (ρ : Path t u π) → is-just (part (plant ρ v)) ≡ true → is-just (part t) ≡ true
-        revive here j = rv₀ j
-        revive (in-map {t = s} ρ) j = map-fwd (part s) (revive ρ (map-back (part (plant ρ v)) j))
-        revive (in-scan {t = s} ρ) j = map-fwd (part s) (revive ρ (map-back (part (plant ρ v)) j))
-        revive (in-cut {l = true} ρ) j = revive ρ j
-        revive (in-cut {l = false} ρ) ()
-        revive (in-lane ρ) j = revive ρ j
-        revive (in-take {i = i} {q = p} {tk = tk} {t = s} ρ) j = take-rv i p tk s (plant ρ v) (revive ρ) (λ {k} {c} → takes ρ {i} {p} {k} {c}) j
-        revive (in-outer {op = op} {f = f} {qs = qs} {pl = pl} {t = s} {ls = ls} ρ) j =
-          merged-rv op (λ x r → U.subscribe (f x) r) (part s) (part (plant ρ v)) (partLanes ls) (partLanes ls) qs pl (revive ρ) (λ x → x) j
-        revive (in-lanes {op = op} {f = f} {qs = qs} {pl = pl} {o = o} {ls = ls} ρ) j =
-          merged-rv op (λ x r → U.subscribe (f x) r) (part o) (part o) (partLanes ls) (partLanes (plantᴸ ρ v)) qs pl (λ x → x) (reviveL ρ) j
-        revive (in-source {r = r} {e = e} {rt = rt} {t = s} {b = b} ρ) j = conn-src r e rt (part s) (part (plant ρ v)) (part b) (revive ρ) j
-        revive (in-body {r = r} {e = e} {rt = rt} {s = s} {t = b} ρ) j = conn-body r e rt (part s) (part b) (part (plant ρ v)) (revive ρ) j
+    -- No part above the node revived.
+    mutual
+      revive : ∀ {Γ A π} {t : Sub Γ A} (ρ : Path t u π) → is-just (part (plant ρ v)) ≡ true → is-just (part t) ≡ true
+      revive here j = rv₀ j
+      revive (in-map {t = s} ρ) j = map-fwd (part s) (revive ρ (map-back (part (plant ρ v)) j))
+      revive (in-scan {t = s} ρ) j = map-fwd (part s) (revive ρ (map-back (part (plant ρ v)) j))
+      revive (in-cut {l = true} ρ) j = revive ρ j
+      revive (in-cut {l = false} ρ) ()
+      revive (in-lane ρ) j = revive ρ j
+      revive (in-take {i = i} {q = p} {tk = tk} {t = s} ρ) j = take-rv i p tk s (plant ρ v) (revive ρ) (λ {k} {c} → takes ρ {i} {p} {k} {c}) j
+      revive (in-outer {op = op} {f = f} {qs = qs} {pl = pl} {t = s} {ls = ls} ρ) j =
+        merged-rv op (λ x r → U.subscribe (f x) r) (part s) (part (plant ρ v)) (partLanes ls) (partLanes ls) qs pl (revive ρ) (λ x → x) j
+      revive (in-lanes {op = op} {f = f} {qs = qs} {pl = pl} {o = o} {ls = ls} ρ) j =
+        merged-rv op (λ x r → U.subscribe (f x) r) (part o) (part o) (partLanes ls) (partLanes (plantᴸ ρ v)) qs pl (λ x → x) (reviveL ρ) j
+      revive (in-source {r = r} {e = e} {rt = rt} {t = s} {b = b} ρ) j = conn-src r e rt (part s) (part (plant ρ v)) (part b) (revive ρ) j
+      revive (in-body {r = r} {e = e} {rt = rt} {s = s} {t = b} ρ) j = conn-body r e rt (part s) (part b) (part (plant ρ v)) (revive ρ) j
 
-        reviveL : ∀ {Γ B i π} {ls : List (Sub Γ B)} (ρ : PathLanes ls u i π) → filled (partLanes (plantᴸ ρ v)) ≡ true → filled (partLanes ls) ≡ true
-        reviveL (this-lane {t = s} ρ) j = cons-rv (part s) (part (plant ρ v)) (revive ρ) (λ x → x) j
-        reviveL (next-lane {l = l} ρ) j = cons-rv (part l) (part l) (λ x → x) (reviveL ρ) j
+      reviveL : ∀ {Γ B i π} {ls : List (Sub Γ B)} (ρ : PathLanes ls u i π) → filled (partLanes (plantᴸ ρ v)) ≡ true → filled (partLanes ls) ≡ true
+      reviveL (this-lane {t = s} ρ) j = cons-rv (part s) (part (plant ρ v)) (revive ρ) (λ x → x) j
+      reviveL (next-lane {l = l} ρ) j = cons-rv (part l) (part l) (λ x → x) (reviveL ρ) j
 
-      -- Where the path's flatMap shows, it showed.
-      shown : ∀ {Γ A π} {t : Sub Γ A} (ρ : Path t u π) → ∀ {n} → part (plant ρ v) ≡ just n → Σ _ λ n₀ → part t ≡ just n₀
-      shown ρ x = just-of (revive ρ (isj x))
+    -- Where the path's flatMap shows, it showed.
+    shown : ∀ {Γ A π} {t : Sub Γ A} (ρ : Path t u π) → ∀ {n} → part (plant ρ v) ≡ just n → Σ _ λ n₀ → part t ≡ just n₀
+    shown ρ x = just-of (revive ρ (isj x))
 
-      ----------------------------------------------------------------------
-      -- EACH BINDER'S JOINERS TOLD NO SOONER
+    ----------------------------------------------------------------------
+    -- EACH BINDER'S JOINERS TOLD NO SOONER
 
-      module Telling (q : Pos) (E : Pred Δ₀)
-                     (tl₀ : ∀ {C} (i : C ∈ᴸ Δ₀) {c} → E i c → ∀ {b₀ b′} → part u ≡ just b₀ → part v ≡ just b′ → untold i b′ ⊑[ q / c ] untold i b₀) where
+    module Telling (q : Pos) (E : Pred Δ₀)
+                   (tl₀ : ∀ {C} (i : C ∈ᴸ Δ₀) {c} → E i c → ∀ {b₀ b′} → part u ≡ just b₀ → part v ≡ just b′ → untold i b′ ⊑[ q / c ] untold i b₀) where
 
-        told-ᴹ : ∀ {Δ A B C ω} (i : C ∈ᴸ Δ) (g : U.Node Δ A → U.Node Δ B) → (∀ c → untold i (g c) ≡ untold i c)
-               → (m m′ : Maybe (U.Node Δ A)) → ∀ {b₀ b′} → mapᴹ g m ≡ just b₀ → mapᴹ g m′ ≡ just b′
-               → (∀ {c c′} → m ≡ just c → m′ ≡ just c′ → untold i c′ ⊑[ q / ω ] untold i c) → untold i b′ ⊑[ q / ω ] untold i b₀
-        told-ᴹ i g up (just c) (just c′) refl refl sub = λ t → ≡-⊑ (up c′) (sub refl refl (≡-⊑ (sym (up c)) t))
+      told-ᴹ : ∀ {Δ A B C ω} (i : C ∈ᴸ Δ) (g : U.Node Δ A → U.Node Δ B) → (∀ c → untold i (g c) ≡ untold i c)
+             → (m m′ : Maybe (U.Node Δ A)) → ∀ {b₀ b′} → mapᴹ g m ≡ just b₀ → mapᴹ g m′ ≡ just b′
+             → (∀ {c c′} → m ≡ just c → m′ ≡ just c′ → untold i c′ ⊑[ q / ω ] untold i c) → untold i b′ ⊑[ q / ω ] untold i b₀
+      told-ᴹ i g up (just c) (just c′) refl refl sub = λ t → ≡-⊑ (up c′) (sub refl refl (≡-⊑ (sym (up c)) t))
 
-        toldᴹ : ∀ {Δ B C ω} (i : C ∈ᴸ Δ) (m m′ : Maybe (U.Node Δ B)) → (∀ {c c′} → m ≡ just c → m′ ≡ just c′ → untold i c′ ⊑[ q / ω ] untold i c)
-              → (is-just m′ ≡ true → is-just m ≡ true) → untoldᴹ i m′ ⊑[ q / ω ] untoldᴹ i m
-        toldᴹ i m        nothing   sub rv = λ _ → []
-        toldᴹ i (just c) (just c′) sub rv = sub refl refl
-        toldᴹ i nothing  (just c′) sub rv = false≢ (rv refl)
+      toldᴹ : ∀ {Δ B C ω} (i : C ∈ᴸ Δ) (m m′ : Maybe (U.Node Δ B)) → (∀ {c c′} → m ≡ just c → m′ ≡ just c′ → untold i c′ ⊑[ q / ω ] untold i c)
+            → (is-just m′ ≡ true → is-just m ≡ true) → untoldᴹ i m′ ⊑[ q / ω ] untoldᴹ i m
+      toldᴹ i m        nothing   sub rv = λ _ → []
+      toldᴹ i (just c) (just c′) sub rv = sub refl refl
+      toldᴹ i nothing  (just c′) sub rv = false≢ (rv refl)
 
-        flat-told : ∀ {Δ A B C ω} (i : C ∈ᴸ Δ) op (g : A → Pos → U.Node Δ B) (o o′ : Maybe (U.Node Δ A)) (L L′ : List (U.Node Δ B)) Q pl
-                  → untoldᴹ i o′ ⊑[ q / ω ] untoldᴹ i o → untoldᴸ i L′ ⊑[ q / ω ] untoldᴸ i L
-                  → ∀ {b₀ b′} → merged op g o L Q pl ≡ just b₀ → merged op g o′ L′ Q pl ≡ just b′ → untold i b′ ⊑[ q / ω ] untold i b₀
-        flat-told i op g o o′ L L′ Q pl so sL e₀ e′ t
-          rewrite merged-eq op g o L Q pl e₀ | merged-eq op g o′ L′ Q pl e′ =
-          ++-⊑ (untoldᴹ i o) (untoldᴹ i o′) so (++-⊑ (untoldᴸ i L) (untoldᴸ i L′) sL (λ m → m)) t
+      flat-told : ∀ {Δ A B C ω} (i : C ∈ᴸ Δ) op (g : A → Pos → U.Node Δ B) (o o′ : Maybe (U.Node Δ A)) (L L′ : List (U.Node Δ B)) Q pl
+                → untoldᴹ i o′ ⊑[ q / ω ] untoldᴹ i o → untoldᴸ i L′ ⊑[ q / ω ] untoldᴸ i L
+                → ∀ {b₀ b′} → merged op g o L Q pl ≡ just b₀ → merged op g o′ L′ Q pl ≡ just b′ → untold i b′ ⊑[ q / ω ] untold i b₀
+      flat-told i op g o o′ L L′ Q pl so sL e₀ e′ t
+        rewrite merged-eq op g o L Q pl e₀ | merged-eq op g o′ L′ Q pl e′ =
+        ++-⊑ (untoldᴹ i o) (untoldᴹ i o′) so (++-⊑ (untoldᴸ i L) (untoldᴸ i L′) sL (λ m → m)) t
 
-        -- A take: taking, its source's joiners; ending, the same end.
-        told-take : ∀ {Δ A C ω} (i : C ∈ᴸ Δ) ib (p : A → Bool) (tk : Taking Δ A) (x x′ : Sub Δ A)
-                  → ∀ {b₀ b′} → part (takeWhileˢ ib p tk x) ≡ just b₀ → part (takeWhileˢ ib p tk x′) ≡ just b′
-                  → (isTaking tk ≡ true → ∀ {c c′} → part x ≡ just c → part x′ ≡ just c′ → untold i c′ ⊑[ q / ω ] untold i c)
-                  → untold i b′ ⊑[ q / ω ] untold i b₀
-        told-take i ib p taking x x′ e₀ e′ sub with sw ib p x | sw ib p x′
-        ... | inj₁ f | inj₁ f′ =
-          told-ᴹ i (U.takeWhileᶜ ib p) (λ _ → refl) (part x) (part x′) (trans (sym (f taking)) e₀) (trans (sym (f′ taking)) e′) (sub refl)
-        ... | inj₂ (n , _) | _ = false≢ (via (n taking) (isj e₀))
-        ... | inj₁ _ | inj₂ (n′ , _) = false≢ (via (n′ taking) (isj e′))
-        told-take i ib p (ending k c) x x′ e₀ e′ sub with sw ib p x | sw ib p x′
-        ... | inj₁ f | inj₁ f′ with trans (sym e₀) (trans (f (ending k c)) (trans (sym (f′ (ending k c))) e′))
-        ...   | refl = λ t → t
-        told-take i ib p (ending k c) x x′ e₀ e′ sub | inj₂ (n , _) | _ = false≢ (via (n (ending k c)) (isj e₀))
-        told-take i ib p (ending k c) x x′ e₀ e′ sub | inj₁ _ | inj₂ (n′ , _) = false≢ (via (n′ (ending k c)) (isj e′))
-        told-take i ib p taken x x′ e₀ e′ sub with sw ib p x
-        ... | inj₁ f = false≢ (via (f taken) (isj e₀))
-        ... | inj₂ (n , _) = false≢ (via (n taken) (isj e₀))
+      -- A take: taking, its source's joiners; ending, the same end.
+      told-take : ∀ {Δ A C ω} (i : C ∈ᴸ Δ) ib (p : A → Bool) (tk : Taking Δ A) (x x′ : Sub Δ A)
+                → ∀ {b₀ b′} → part (takeWhileˢ ib p tk x) ≡ just b₀ → part (takeWhileˢ ib p tk x′) ≡ just b′
+                → (isTaking tk ≡ true → ∀ {c c′} → part x ≡ just c → part x′ ≡ just c′ → untold i c′ ⊑[ q / ω ] untold i c)
+                → untold i b′ ⊑[ q / ω ] untold i b₀
+      told-take i ib p taking x x′ e₀ e′ sub with sw ib p x | sw ib p x′
+      ... | inj₁ f | inj₁ f′ =
+        told-ᴹ i (U.takeWhileᶜ ib p) (λ _ → refl) (part x) (part x′) (trans (sym (f taking)) e₀) (trans (sym (f′ taking)) e′) (sub refl)
+      ... | inj₂ (n , _) | _ = false≢ (via (n taking) (isj e₀))
+      ... | inj₁ _ | inj₂ (n′ , _) = false≢ (via (n′ taking) (isj e′))
+      told-take i ib p (ending k c) x x′ e₀ e′ sub with sw ib p x | sw ib p x′
+      ... | inj₁ f | inj₁ f′ with trans (sym e₀) (trans (f (ending k c)) (trans (sym (f′ (ending k c))) e′))
+      ...   | refl = λ t → t
+      told-take i ib p (ending k c) x x′ e₀ e′ sub | inj₂ (n , _) | _ = false≢ (via (n (ending k c)) (isj e₀))
+      told-take i ib p (ending k c) x x′ e₀ e′ sub | inj₁ _ | inj₂ (n′ , _) = false≢ (via (n′ (ending k c)) (isj e′))
+      told-take i ib p taken x x′ e₀ e′ sub with sw ib p x
+      ... | inj₁ f = false≢ (via (f taken) (isj e₀))
+      ... | inj₂ (n , _) = false≢ (via (n taken) (isj e₀))
 
-        -- The source replanted: a source still running past an end is
-        -- refuted by the end, and one gone on both sides tells alike.
-        src-told : ∀ {Δ A B C ω} (i : C ∈ᴸ Δ) r (e : Maybe Pos) (rt : U.Node Δ A) (s s′ : Maybe (U.Node Δ A)) (mb : Maybe (U.Node (A ∷ Δ) B))
-                 → (is-just s′ ≡ true → is-just s ≡ true)
-                 → (is-just mb ≡ true → ∀ {c c′} → s ≡ just c → s′ ≡ just c′ → untold i c′ ⊑[ q / ω ] untold i c)
-                 → (∀ {n} → connected r e rt s mb ≡ just n → ∀ {c₀} → e ≡ just c₀ → s ≡ nothing)
-                 → ∀ {b₀ b′} → connected r e rt s mb ≡ just b₀ → connected r e rt s′ mb ≡ just b′ → untold i b′ ⊑[ q / ω ] untold i b₀
-        src-told i r e        rt s        s′        nothing  rv sub en ()   e′
-        src-told i r e        rt (just c) (just c′) (just b) rv sub en refl refl = ++-⊑ (untold (there i) b) (untold (there i) b) (λ m → m) (sub refl refl refl)
-        src-told i r (just x) rt (just c) nothing   (just b) rv sub en e₀   e′   with en e₀ refl
-        ... | ()
-        src-told i r nothing  rt (just c) nothing   (just b) rv sub en e₀   ()
-        src-told i r e        rt nothing  (just c′) (just b) rv sub en e₀   e′   = false≢ (rv refl)
-        src-told i r (just x) rt nothing  nothing   (just b) rv sub en refl refl = λ m → m
-        src-told i r nothing  rt nothing  nothing   (just b) rv sub en ()   e′
-
-        -- The body replanted: its joiners read one frame down, through a
-        -- shut when the source has ended.
-        body-told : ∀ {Δ A B C ω} (i : C ∈ᴸ Δ) r (e : Maybe Pos) (rt : U.Node Δ A) (s : Maybe (U.Node Δ A)) (mb mb′ : Maybe (U.Node (A ∷ Δ) B))
-                  → (is-just mb′ ≡ true → is-just mb ≡ true)
-                  → ((is-just s ∨ is-just e) ≡ true → ∀ {c c′} → mb ≡ just c → mb′ ≡ just c′ → untold (there i) c′ ⊑[ q / ω ] untold (there i) c)
-                  → ∀ {b₀ b′} → connected r e rt s mb ≡ just b₀ → connected r e rt s mb′ ≡ just b′ → untold i b′ ⊑[ q / ω ] untold i b₀
-        body-told i r e        rt s        mb       nothing   rv sub e₀   ()
-        body-told i r e        rt s        nothing  (just b′) rv sub e₀   e′   = false≢ (rv refl)
-        body-told i r e        rt (just c) (just b) (just b′) rv sub refl refl = ++-⊑ (untold (there i) b) (untold (there i) b′) (sub refl refl refl) (λ m → m)
-        body-told i r (just x) rt nothing  (just b) (just b′) rv sub refl refl =
-          ++-⊑ (untold (there i) (U.shut (here refl) x b)) (untold (there i) (U.shut (here refl) x b′))
-            (λ t → ≡-⊑ (untold-shut i x b′) (sub refl refl refl (≡-⊑ (sym (untold-shut i x b)) t))) (λ m → m)
-        body-told i r nothing  rt nothing  (just b) (just b′) rv sub ()   e′
-
-        mutual
-          told : ∀ {Γ A π} {t : Sub Γ A} (ρ : Path t u π) → Ended t
-               → ∀ {K : Pred Γ} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → Binds ρ K j c → E j c)
-               → ∀ {C ω} (i : C ∈ᴸ Γ) → K i ω → ∀ {b₀ b′} → part t ≡ just b₀ → part (plant ρ v) ≡ just b′ → untold i b′ ⊑[ q / ω ] untold i b₀
-          told here en κ i wk e₀ e′ = tl₀ i (κ i wk) e₀ e′
-          told (in-map {f = f} {t = s} ρ) en κ i wk e₀ e′ =
-            told-ᴹ i (U.mapᶜ f) (λ _ → refl) (part s) (part (plant ρ v)) e₀ e′ (told ρ (en-sub en (in-map here) refl) κ i wk)
-          told (in-scan {f = f} {z = z} {t = s} ρ) en κ i wk e₀ e′ =
-            told-ᴹ i (U.scanᶜ f z) (λ _ → refl) (part s) (part (plant ρ v)) e₀ e′ (told ρ (en-sub en (in-scan here) refl) κ i wk)
-          told (in-cut {l = true} ρ) en κ i wk e₀ e′ = told ρ (en-sub en (in-cut here) refl) κ i wk e₀ e′
-          told (in-cut {l = false} ρ) en κ i wk () e′
-          told (in-lane ρ) en κ i wk e₀ e′ = told ρ (en-sub en (in-lane here) refl) κ i wk e₀ e′
-          told (in-take {i = ib} {q = p} {tk = tk} {t = s} ρ) en κ i wk e₀ e′ =
-            told-take i ib p tk s (plant ρ v) e₀ e′ (λ ok → told ρ (en-sub en (in-take here) (∧-join ok refl)) κ i wk)
-          told (in-outer {op = op} {f = f} {qs = qs} {pl = pl} {t = s} {ls = ls} ρ) en κ i wk e₀ e′ =
-            flat-told i op (λ a r → U.subscribe (f a) r) (part s) (part (plant ρ v)) (partLanes ls) (partLanes ls) qs pl
-              (toldᴹ i (part s) (part (plant ρ v)) (told ρ (en-sub en (in-outer here) refl) κ i wk) (revive ρ)) (λ t → t) e₀ e′
-          told (in-lanes {op = op} {f = f} {qs = qs} {pl = pl} {o = o} {ls = ls} ρ) en κ i wk e₀ e′ =
-            flat-told i op (λ a r → U.subscribe (f a) r) (part o) (part o) (partLanes ls) (partLanes (plantᴸ ρ v)) qs pl
-              (λ t → t) (toldL ρ (λ ψ → en (in-lanes ψ)) κ i wk) e₀ e′
-          told (in-source {r = r} {e = e} {rt = rt} {t = s} {b = b} ρ) en κ i wk e₀ e′ =
-            src-told i r e rt (part s) (part (plant ρ v)) (part b) (revive ρ)
-              (λ jb → told ρ (en-sub en (in-source here) (∧-join jb refl)) κ i wk) (en here refl) e₀ e′
-          told (in-body {r = r} {e = e} {rt = rt} {s = s} {t = b} ρ) en κ i wk e₀ e′ =
-            body-told i r e rt (part s) (part b) (part (plant ρ v)) (revive ρ)
-              (λ js → told ρ (en-sub en (in-body here) (∧-join js refl)) κ (there i) wk) e₀ e′
-
-          toldL : ∀ {Γ B i₀ π} {ls : List (Sub Γ B)} (ρ : PathLanes ls u i₀ π) → EndedL ls
-                → ∀ {K : Pred Γ} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → BindsL ρ K j c → E j c)
-                → ∀ {C ω} (i : C ∈ᴸ Γ) → K i ω → untoldᴸ i (partLanes (plantᴸ ρ v)) ⊑[ q / ω ] untoldᴸ i (partLanes ls)
-          toldL (this-lane {t = s} {ls = ls} ρ) en κ i wk t =
-            ≡-⊑ (cons-untold i (part (plant ρ v)) (partLanes ls))
-              (++-⊑ (untoldᴹ i (part s)) (untoldᴹ i (part (plant ρ v)))
-                (toldᴹ i (part s) (part (plant ρ v)) (told ρ (λ ψ → en (this-lane ψ)) κ i wk) (revive ρ)) (λ m → m)
-                (≡-⊑ (sym (cons-untold i (part s) (partLanes ls))) t))
-          toldL (next-lane {l = l} {ls = ls} ρ) en κ i wk t =
-            ≡-⊑ (cons-untold i (part l) (partLanes (plantᴸ ρ v)))
-              (++-⊑ (untoldᴹ i (part l)) (untoldᴹ i (part l)) (λ m → m) (toldL ρ (λ ψ → en (next-lane ψ)) κ i wk)
-                (≡-⊑ (sym (cons-untold i (part l) (partLanes ls))) t))
-
-      ----------------------------------------------------------------------
-      -- NO HEAD BEFORE `q`: every node above heads no sooner after the
-      -- replant than before.
-
-      module Behind (q : Pos) (E : Pred Δ₀)
-                    (tl₀ : ∀ {C} (i : C ∈ᴸ Δ₀) {c} → E i c → ∀ {b₀ b′} → part u ≡ just b₀ → part v ≡ just b′ → untold i b′ ⊑[ q / c ] untold i b₀)
-                    (bl₀ : Each (Heads q) u → Each (Heads q) v) where
-        open Telling q E tl₀
-
-        P : ∀ {Γ A} → U.Node Γ A → Set
-        P c = Heads q c
-
-        lift-ᴹ : ∀ {Δ A B} (g : U.Node Δ A → U.Node Δ B) (m : Maybe (U.Node Δ A)) → (∀ c → P c → P (g c))
-               → (∀ {c} → m ≡ just c → P c) → ∀ {c} → mapᴹ g m ≡ just c → P c
-        lift-ᴹ g (just c) up hm refl = up c (hm refl)
-
-        -- A take: taking, its source heading; ending, as before.
-        take-up : ∀ {Δ A} ib (p : A → Bool) (tk : Taking Δ A) (x x′ : Sub Δ A)
-                → (∀ {c} → part (takeWhileˢ ib p tk x) ≡ just c → P c)
-                → (∀ {k c} → is-just (part (takeWhileˢ ib p (ending k c) x′)) ≡ true → is-just (part (takeWhileˢ ib p (ending k c) x)) ≡ true)
-                → (isTaking tk ≡ true → ∀ {c} → part x′ ≡ just c → P c)
-                → ∀ {c} → part (takeWhileˢ ib p tk x′) ≡ just c → P c
-        take-up ib p taking x x′ old te up e′ with sw ib p x′
-        ... | inj₁ f′      = lift-ᴹ (U.takeWhileᶜ ib p) (part x′) (λ c → heads-take ib p {c}) (up refl) (trans (sym (f′ taking)) e′)
-        ... | inj₂ (n , _) = false≢ (via (n taking) (isj e′))
-        take-up ib p (ending k c) x x′ old te up e′ = old (ending-eq ib p k c x x′ (te (isj e′)) e′)
-        take-up ib p taken x x′ old te up e′ with sw ib p x′
-        ... | inj₁ f′      = false≢ (via (f′ taken) (isj e′))
-        ... | inj₂ (n , _) = false≢ (via (n taken) (isj e′))
-
-        root-flat : ∀ {Δ A B} op (g : A → Pos → U.Node Δ B) (o′ : Maybe (U.Node Δ A)) (L′ : List (U.Node Δ B)) (Q : List A) pl
-                  → P pl → (∀ {c} → o′ ≡ just c → P c) → All P L′
-                  → ∀ {c} → merged op g o′ L′ Q pl ≡ just c → P c
-        root-flat op g o′ L′ Q pl hp ho hL x = subst P (sym (merged-eq op g o′ L′ Q pl x)) (heads-flat op g o′ L′ Q pl hp ho hL)
-
-        -- The source replanted: a source running on either side heads
-        -- the connect beside its body; past the end, nothing moved.
-        src-up : ∀ {Δ A B} r (e : Maybe Pos) (rt : U.Node Δ A) (s s′ : Maybe (U.Node Δ A)) (mb : Maybe (U.Node (A ∷ Δ) B))
-               → (∀ {c} → connected r e rt s mb ≡ just c → P c)
-               → (∀ {n} → connected r e rt s mb ≡ just n → ∀ {c₀} → e ≡ just c₀ → s ≡ nothing)
+      -- The source replanted: a source still running past an end is
+      -- refuted by the end, and one gone on both sides tells alike.
+      src-told : ∀ {Δ A B C ω} (i : C ∈ᴸ Δ) r (e : Maybe Pos) (rt : U.Node Δ A) (s s′ : Maybe (U.Node Δ A)) (mb : Maybe (U.Node (A ∷ Δ) B))
                → (is-just s′ ≡ true → is-just s ≡ true)
-               → (is-just mb ≡ true → ∀ {c} → s′ ≡ just c → P c)
-               → ((is-just s ∨ is-just e) ≡ true → ∀ {c} → mb ≡ just c → P c)
-               → ∀ {c} → connected r e rt s′ mb ≡ just c → P c
-        src-up r e        rt s        s′        nothing  old en rv hs hb ()
-        src-up r e        rt s        (just c′) (just b) old en rv hs hb refl = heads-source r {b} {c′} (hs refl refl) (hb (∨-l (rv refl)) refl)
-        src-up r (just x) rt (just c) nothing   (just b) old en rv hs hb _    with en refl refl
-        ... | ()
-        src-up r (just x) rt nothing  nothing   (just b) old en rv hs hb refl = old refl
-        src-up r nothing  rt s        nothing   (just b) old en rv hs hb ()
+               → (is-just mb ≡ true → ∀ {c c′} → s ≡ just c → s′ ≡ just c′ → untold i c′ ⊑[ q / ω ] untold i c)
+               → (∀ {n} → connected r e rt s mb ≡ just n → ∀ {c₀} → e ≡ just c₀ → s ≡ nothing)
+               → ∀ {b₀ b′} → connected r e rt s mb ≡ just b₀ → connected r e rt s′ mb ≡ just b′ → untold i b′ ⊑[ q / ω ] untold i b₀
+      src-told i r e        rt s        s′        nothing  rv sub en ()   e′
+      src-told i r e        rt (just c) (just c′) (just b) rv sub en refl refl = ++-⊑ (untold (there i) b) (untold (there i) b) (λ m → m) (sub refl refl refl)
+      src-told i r (just x) rt (just c) nothing   (just b) rv sub en e₀   e′   with en e₀ refl
+      ... | ()
+      src-told i r nothing  rt (just c) nothing   (just b) rv sub en e₀   ()
+      src-told i r e        rt nothing  (just c′) (just b) rv sub en e₀   e′   = false≢ (rv refl)
+      src-told i r (just x) rt nothing  nothing   (just b) rv sub en refl refl = λ m → m
+      src-told i r nothing  rt nothing  nothing   (just b) rv sub en ()   e′
 
-        -- The body replanted: past the source's end the new body heads
-        -- through a shut, telling only what the old body left untold.
-        body-up : ∀ {Δ A B} r (e : Maybe Pos) (rt : U.Node Δ A) (s : Maybe (U.Node Δ A)) (mb mb′ : Maybe (U.Node (A ∷ Δ) B))
+      -- The body replanted: its joiners read one frame down, through a
+      -- shut when the source has ended.
+      body-told : ∀ {Δ A B C ω} (i : C ∈ᴸ Δ) r (e : Maybe Pos) (rt : U.Node Δ A) (s : Maybe (U.Node Δ A)) (mb mb′ : Maybe (U.Node (A ∷ Δ) B))
                 → (is-just mb′ ≡ true → is-just mb ≡ true)
-                → (is-just mb ≡ true → ∀ {c} → s ≡ just c → P c)
-                → ((is-just s ∨ is-just e) ≡ true → ∀ {c} → mb′ ≡ just c → P c)
-                → (∀ {c₀} → e ≡ just c₀ → s ≡ nothing → ∀ {b₀ b′} → mb ≡ just b₀ → mb′ ≡ just b′ → untold (here refl) b′ ⊑[ q / c₀ ] untold (here refl) b₀)
-                → (∀ {c₀} → e ≡ just c₀ → s ≡ nothing → ∀ {b₀} → mb ≡ just b₀ → Tells q c₀ (untold (here refl) b₀))
-                → (∀ {n} → connected r e rt s mb ≡ just n → s ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt)
-                → ∀ {c} → connected r e rt s mb′ ≡ just c → P c
-        body-up r e         rt s        mb        nothing   rv hs hb tl ut hr ()
-        body-up r e         rt (just c) mb        (just b′) rv hs hb tl ut hr refl = heads-source r {b′} {c} (hs (rv refl) refl) (hb refl refl)
-        body-up r (just c₀) rt nothing  nothing   (just b′) rv hs hb tl ut hr _    = false≢ (rv refl)
-        body-up r (just c₀) rt nothing  (just b₀) (just b′) rv hs hb tl ut hr refl =
-          ended-head r c₀ (U.shut (here refl) c₀ b′) rt (U.step rt)
-            (shut-heads (here refl) c₀ b′ (hb refl refl) (tl refl refl refl refl (ut refl refl refl))) (hr refl refl refl)
-        body-up r nothing   rt nothing  mb        (just b′) rv hs hb tl ut hr ()
+                → ((is-just s ∨ is-just e) ≡ true → ∀ {c c′} → mb ≡ just c → mb′ ≡ just c′ → untold (there i) c′ ⊑[ q / ω ] untold (there i) c)
+                → ∀ {b₀ b′} → connected r e rt s mb ≡ just b₀ → connected r e rt s mb′ ≡ just b′ → untold i b′ ⊑[ q / ω ] untold i b₀
+      body-told i r e        rt s        mb       nothing   rv sub e₀   ()
+      body-told i r e        rt s        nothing  (just b′) rv sub e₀   e′   = false≢ (rv refl)
+      body-told i r e        rt (just c) (just b) (just b′) rv sub refl refl = ++-⊑ (untold (there i) b) (untold (there i) b′) (sub refl refl refl) (λ m → m)
+      body-told i r (just x) rt nothing  (just b) (just b′) rv sub refl refl =
+        ++-⊑ (untold (there i) (U.shut (here refl) x b)) (untold (there i) (U.shut (here refl) x b′))
+          (λ t → ≡-⊑ (untold-shut i x b′) (sub refl refl refl (≡-⊑ (sym (untold-shut i x b)) t))) (λ m → m)
+      body-told i r nothing  rt nothing  (just b) (just b′) rv sub ()   e′
 
-        mutual
-          shiftE : ∀ {Γ A π} {t : Sub Γ A} (ρ : Path t u π) → Each P t → Untold q t → Ended t
-                 → ∀ {K : Pred Γ} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → Binds ρ K j c → E j c) → Each P (plant ρ v)
-          shiftE here ev ut en κ = bl₀ ev
-          shiftE (in-map {f = f} ρ) ev ut en κ =
-            each-map (lift-ᴹ (U.mapᶜ f) (part (plant ρ v)) (λ c → heads-map f {c}) (Each.parts es here refl)) es
-            where
-              es : Each P (plant ρ v)
-              es = shiftE ρ (each-sub ev (in-map here) refl) (ut-sub ut (in-map here) refl) (en-sub en (in-map here) refl) κ
-          shiftE (in-scan {f = f} {z = z} ρ) ev ut en κ =
-            each-scan (lift-ᴹ (U.scanᶜ f z) (part (plant ρ v)) (λ c → heads-scan f z {c}) (Each.parts es here refl)) es
-            where
-              es : Each P (plant ρ v)
-              es = shiftE ρ (each-sub ev (in-scan here) refl) (ut-sub ut (in-scan here) refl) (en-sub en (in-scan here) refl) κ
-          shiftE (in-cut {l = true} ρ) ev ut en κ = each-cut (Each.parts es here refl) (λ _ → es)
-            where
-              es : Each P (plant ρ v)
-              es = shiftE ρ (each-sub ev (in-cut here) refl) (ut-sub ut (in-cut here) refl) (en-sub en (in-cut here) refl) κ
-          shiftE (in-cut {l = false} ρ) ev ut en κ = each-cut (λ ()) (λ ())
-          shiftE (in-lane ρ) ev ut en κ = each-lane (Each.parts es here refl) es
-            where
-              es : Each P (plant ρ v)
-              es = shiftE ρ (each-sub ev (in-lane here) refl) (ut-sub ut (in-lane here) refl) (en-sub en (in-lane here) refl) κ
-          shiftE (in-take {i = ib} {q = p} {tk = tk} {t = s} ρ) ev ut en κ =
-            each-take (take-up ib p tk s (plant ρ v) (Each.parts ev here refl) (λ {k} {c} → takes ρ {ib} {p} {k} {c}) (λ ok → Each.parts (es ok) here refl)) es
-            where
-              es : isTaking tk ≡ true → Each P (plant ρ v)
-              es ok = shiftE ρ (each-sub ev (in-take here) sk) (ut-sub ut (in-take here) sk) (en-sub en (in-take here) sk) κ
-                where
-                  sk : isTaking tk ∧ true ≡ true
-                  sk = ∧-join ok refl
-          shiftE (in-outer {op = op} {f = f} {d = d₀} {n = n₀} {qs = qs} {pl = pl} {t = s} {ls = ls} ρ) ev ut en κ =
-            each-flat root pool eo eL
-            where
-              eo : Each P (plant ρ v)
-              eo = shiftE ρ (each-sub ev (in-outer here) refl) (ut-sub ut (in-outer here) refl) (en-sub en (in-outer here) refl) κ
-              eL : EachL ls
-              eL = eachL-of ev
-              pool : ∀ {n} → part (plant (in-outer {op = op} {f = f} {d = d₀} {n = n₀} {qs = qs} {pl = pl} {ls = ls} ρ) v) ≡ just n → P pl
-              pool x with shown (in-outer {op = op} {f = f} {d = d₀} {n = n₀} {qs = qs} {pl = pl} {ls = ls} ρ) x
-              ... | _ , e₀ = Each.pools ev here refl e₀
-              root : ∀ {n} → part (plant (in-outer {op = op} {f = f} {d = d₀} {n = n₀} {qs = qs} {pl = pl} {ls = ls} ρ) v) ≡ just n → P n
-              root x = root-flat op (λ a r → U.subscribe (f a) r) (part (plant ρ v)) (partLanes ls) qs pl (pool x)
-                         (Each.parts eo here refl) (lanes-all ls eL) x
-          shiftE (in-lanes {op = op} {f = f} {d = d₀} {n = n₀} {qs = qs} {pl = pl} {o = o} {ls = ls} ρ) ev ut en κ =
-            each-flat root pool eo eL
-            where
-              eo : Each P o
-              eo = each-sub ev (in-outer here) refl
-              eL : EachL (plantᴸ ρ v)
-              eL = shiftL ρ (eachL-of ev) (λ ψ → ut (in-lanes ψ)) (λ ψ → en (in-lanes ψ)) κ
-              pool : ∀ {n} → part (plant (in-lanes {op = op} {f = f} {d = d₀} {n = n₀} {qs = qs} {pl = pl} {o = o} ρ) v) ≡ just n → P pl
-              pool x with shown (in-lanes {op = op} {f = f} {d = d₀} {n = n₀} {qs = qs} {pl = pl} {o = o} ρ) x
-              ... | _ , e₀ = Each.pools ev here refl e₀
-              root : ∀ {n} → part (plant (in-lanes {op = op} {f = f} {d = d₀} {n = n₀} {qs = qs} {pl = pl} {o = o} ρ) v) ≡ just n → P n
-              root x = root-flat op (λ a r → U.subscribe (f a) r) (part o) (partLanes (plantᴸ ρ v)) qs pl (pool x)
-                         (Each.parts eo here refl) (lanes-all (plantᴸ ρ v) eL) x
-          shiftE (in-source {k = k} {r = r} {e = e} {rt = rt} {t = s} {b = b} ρ) ev ut en κ =
-            each-connect root rest es eb
-            where
-              es : is-just (part b) ≡ true → Each P (plant ρ v)
-              es jb = shiftE ρ (each-sub ev (in-source here) s₁) (ut-sub ut (in-source here) s₁) (en-sub en (in-source here) s₁) κ
-                where
-                  s₁ : is-just (part b) ∧ true ≡ true
-                  s₁ = ∧-join jb refl
-              eb : (is-just (part (plant ρ v)) ∨ is-just e) ≡ true → Each P b
-              eb js = each-sub ev (in-body here) (∧-join (∨-mono (is-just e) (revive ρ) js) refl)
-              rest : ∀ {n} → part (connectˢ k r e rt (plant ρ v) b) ≡ just n → part (plant ρ v) ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt
-              rest x _ pe with shown (in-source {k = k} {r = r} {e = e} {rt = rt} {b = b} ρ) x
-              ... | _ , e₀ = Each.rests ev here refl e₀ (en here refl e₀ pe) pe
-              root : ∀ {n} → part (connectˢ k r e rt (plant ρ v) b) ≡ just n → P n
-              root = src-up r e rt (part s) (part (plant ρ v)) (part b) (Each.parts ev here refl) (en here refl) (revive ρ)
-                       (λ jb → Each.parts (es jb) here refl) (λ j → Each.parts ev (in-body here) (∧-join j refl))
-          shiftE (in-body {k = k} {r = r} {e = e} {rt = rt} {s = s} {t = b} ρ) ev ut en κ =
-            each-connect root rest es eb
-            where
-              eb : (is-just (part s) ∨ is-just e) ≡ true → Each P (plant ρ v)
-              eb js = shiftE ρ (each-sub ev (in-body here) sb) (ut-sub ut (in-body here) sb) (en-sub en (in-body here) sb) κ
-                where
-                  sb : (is-just (part s) ∨ is-just e) ∧ true ≡ true
-                  sb = ∧-join js refl
-              es : is-just (part (plant ρ v)) ≡ true → Each P s
-              es jb = each-sub ev (in-source here) (∧-join (revive ρ jb) refl)
-              rest : ∀ {n} → part (connectˢ k r e rt s (plant ρ v)) ≡ just n → part s ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt
-              rest x pn pe with shown (in-body {k = k} {r = r} {e = e} {rt = rt} {s = s} ρ) x
-              ... | _ , e₀ = Each.rests ev here refl e₀ pn pe
-              root : ∀ {n} → part (connectˢ k r e rt s (plant ρ v)) ≡ just n → P n
-              root = body-up r e rt (part s) (part b) (part (plant ρ v)) (revive ρ)
-                       (λ jb → Each.parts ev (in-source here) (∧-join jb refl))
-                       (λ js → Each.parts (eb js) here refl)
-                       (λ {c₀} pe pn → told ρ (en-sub en (in-body here) (∧-join (∨-r (is-just (part s)) (cong is-just pe)) refl)) κ (here refl) (pe , pn))
-                       (untold-at ut) (Each.rests ev here refl)
+      mutual
+        told : ∀ {Γ A π} {t : Sub Γ A} (ρ : Path t u π) → Ended t
+             → ∀ {K : Pred Γ} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → Binds ρ K j c → E j c)
+             → ∀ {C ω} (i : C ∈ᴸ Γ) → K i ω → ∀ {b₀ b′} → part t ≡ just b₀ → part (plant ρ v) ≡ just b′ → untold i b′ ⊑[ q / ω ] untold i b₀
+        told here en κ i wk e₀ e′ = tl₀ i (κ i wk) e₀ e′
+        told (in-map {f = f} {t = s} ρ) en κ i wk e₀ e′ =
+          told-ᴹ i (U.mapᶜ f) (λ _ → refl) (part s) (part (plant ρ v)) e₀ e′ (told ρ (en-sub en (in-map here) refl) κ i wk)
+        told (in-scan {f = f} {z = z} {t = s} ρ) en κ i wk e₀ e′ =
+          told-ᴹ i (U.scanᶜ f z) (λ _ → refl) (part s) (part (plant ρ v)) e₀ e′ (told ρ (en-sub en (in-scan here) refl) κ i wk)
+        told (in-cut {l = true} ρ) en κ i wk e₀ e′ = told ρ (en-sub en (in-cut here) refl) κ i wk e₀ e′
+        told (in-cut {l = false} ρ) en κ i wk () e′
+        told (in-lane ρ) en κ i wk e₀ e′ = told ρ (en-sub en (in-lane here) refl) κ i wk e₀ e′
+        told (in-take {i = ib} {q = p} {tk = tk} {t = s} ρ) en κ i wk e₀ e′ =
+          told-take i ib p tk s (plant ρ v) e₀ e′ (λ ok → told ρ (en-sub en (in-take here) (∧-join ok refl)) κ i wk)
+        told (in-outer {op = op} {f = f} {qs = qs} {pl = pl} {t = s} {ls = ls} ρ) en κ i wk e₀ e′ =
+          flat-told i op (λ a r → U.subscribe (f a) r) (part s) (part (plant ρ v)) (partLanes ls) (partLanes ls) qs pl
+            (toldᴹ i (part s) (part (plant ρ v)) (told ρ (en-sub en (in-outer here) refl) κ i wk) (revive ρ)) (λ t → t) e₀ e′
+        told (in-lanes {op = op} {f = f} {qs = qs} {pl = pl} {o = o} {ls = ls} ρ) en κ i wk e₀ e′ =
+          flat-told i op (λ a r → U.subscribe (f a) r) (part o) (part o) (partLanes ls) (partLanes (plantᴸ ρ v)) qs pl
+            (λ t → t) (toldL ρ (λ ψ → en (in-lanes ψ)) κ i wk) e₀ e′
+        told (in-source {r = r} {e = e} {rt = rt} {t = s} {b = b} ρ) en κ i wk e₀ e′ =
+          src-told i r e rt (part s) (part (plant ρ v)) (part b) (revive ρ)
+            (λ jb → told ρ (en-sub en (in-source here) (∧-join jb refl)) κ i wk) (en here refl) e₀ e′
+        told (in-body {r = r} {e = e} {rt = rt} {s = s} {t = b} ρ) en κ i wk e₀ e′ =
+          body-told i r e rt (part s) (part b) (part (plant ρ v)) (revive ρ)
+            (λ js → told ρ (en-sub en (in-body here) (∧-join js refl)) κ (there i) wk) e₀ e′
 
-          shiftL : ∀ {Γ B i π} {ls : List (Sub Γ B)} (ρ : PathLanes ls u i π) → EachL ls → UntoldL q ls → EndedL ls
-                 → ∀ {K : Pred Γ} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → BindsL ρ K j c → E j c) → EachL (plantᴸ ρ v)
-          shiftL (this-lane ρ) eL ut en κ =
-            eachL-cons (shiftE ρ (eachL-head eL) (λ ψ → ut (this-lane ψ)) (λ ψ → en (this-lane ψ)) κ) (eachL-tail eL)
-          shiftL (next-lane ρ) eL ut en κ =
-            eachL-cons (eachL-head eL) (shiftL ρ (eachL-tail eL) (λ ψ → ut (next-lane ψ)) (λ ψ → en (next-lane ψ)) κ)
+        toldL : ∀ {Γ B i₀ π} {ls : List (Sub Γ B)} (ρ : PathLanes ls u i₀ π) → EndedL ls
+              → ∀ {K : Pred Γ} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → BindsL ρ K j c → E j c)
+              → ∀ {C ω} (i : C ∈ᴸ Γ) → K i ω → untoldᴸ i (partLanes (plantᴸ ρ v)) ⊑[ q / ω ] untoldᴸ i (partLanes ls)
+        toldL (this-lane {t = s} {ls = ls} ρ) en κ i wk t =
+          ≡-⊑ (cons-untold i (part (plant ρ v)) (partLanes ls))
+            (++-⊑ (untoldᴹ i (part s)) (untoldᴹ i (part (plant ρ v)))
+              (toldᴹ i (part s) (part (plant ρ v)) (told ρ (λ ψ → en (this-lane ψ)) κ i wk) (revive ρ)) (λ m → m)
+              (≡-⊑ (sym (cons-untold i (part s) (partLanes ls))) t))
+        toldL (next-lane {l = l} {ls = ls} ρ) en κ i wk t =
+          ≡-⊑ (cons-untold i (part l) (partLanes (plantᴸ ρ v)))
+            (++-⊑ (untoldᴹ i (part l)) (untoldᴹ i (part l)) (λ m → m) (toldL ρ (λ ψ → en (next-lane ψ)) κ i wk)
+              (≡-⊑ (sym (cons-untold i (part l) (partLanes ls))) t))
+
+    ----------------------------------------------------------------------
+    -- NO HEAD BEFORE `q`: every node above heads no sooner after the
+    -- replant than before.
+
+    module Behind (q : Pos) (E : Pred Δ₀)
+                  (tl₀ : ∀ {C} (i : C ∈ᴸ Δ₀) {c} → E i c → ∀ {b₀ b′} → part u ≡ just b₀ → part v ≡ just b′ → untold i b′ ⊑[ q / c ] untold i b₀)
+                  (bl₀ : Each (Heads q) u → Each (Heads q) v) where
+      open Telling q E tl₀
+
+      P : ∀ {Γ A} → U.Node Γ A → Set
+      P c = Heads q c
+
+      lift-ᴹ : ∀ {Δ A B} (g : U.Node Δ A → U.Node Δ B) (m : Maybe (U.Node Δ A)) → (∀ c → P c → P (g c))
+             → (∀ {c} → m ≡ just c → P c) → ∀ {c} → mapᴹ g m ≡ just c → P c
+      lift-ᴹ g (just c) up hm refl = up c (hm refl)
+
+      -- A take: taking, its source heading; ending, as before.
+      take-up : ∀ {Δ A} ib (p : A → Bool) (tk : Taking Δ A) (x x′ : Sub Δ A)
+              → (∀ {c} → part (takeWhileˢ ib p tk x) ≡ just c → P c)
+              → (∀ {k c} → is-just (part (takeWhileˢ ib p (ending k c) x′)) ≡ true → is-just (part (takeWhileˢ ib p (ending k c) x)) ≡ true)
+              → (isTaking tk ≡ true → ∀ {c} → part x′ ≡ just c → P c)
+              → ∀ {c} → part (takeWhileˢ ib p tk x′) ≡ just c → P c
+      take-up ib p taking x x′ old te up e′ with sw ib p x′
+      ... | inj₁ f′      = lift-ᴹ (U.takeWhileᶜ ib p) (part x′) (λ c → heads-take ib p {c}) (up refl) (trans (sym (f′ taking)) e′)
+      ... | inj₂ (n , _) = false≢ (via (n taking) (isj e′))
+      take-up ib p (ending k c) x x′ old te up e′ = old (ending-eq ib p k c x x′ (te (isj e′)) e′)
+      take-up ib p taken x x′ old te up e′ with sw ib p x′
+      ... | inj₁ f′      = false≢ (via (f′ taken) (isj e′))
+      ... | inj₂ (n , _) = false≢ (via (n taken) (isj e′))
+
+      root-flat : ∀ {Δ A B} op (g : A → Pos → U.Node Δ B) (o′ : Maybe (U.Node Δ A)) (L′ : List (U.Node Δ B)) (Q : List A) pl
+                → P pl → (∀ {c} → o′ ≡ just c → P c) → All P L′
+                → ∀ {c} → merged op g o′ L′ Q pl ≡ just c → P c
+      root-flat op g o′ L′ Q pl hp ho hL x = subst P (sym (merged-eq op g o′ L′ Q pl x)) (heads-flat op g o′ L′ Q pl hp ho hL)
+
+      -- The source replanted: a source running on either side heads
+      -- the connect beside its body; past the end, nothing moved.
+      src-up : ∀ {Δ A B} r (e : Maybe Pos) (rt : U.Node Δ A) (s s′ : Maybe (U.Node Δ A)) (mb : Maybe (U.Node (A ∷ Δ) B))
+             → (∀ {c} → connected r e rt s mb ≡ just c → P c)
+             → (∀ {n} → connected r e rt s mb ≡ just n → ∀ {c₀} → e ≡ just c₀ → s ≡ nothing)
+             → (is-just s′ ≡ true → is-just s ≡ true)
+             → (is-just mb ≡ true → ∀ {c} → s′ ≡ just c → P c)
+             → ((is-just s ∨ is-just e) ≡ true → ∀ {c} → mb ≡ just c → P c)
+             → ∀ {c} → connected r e rt s′ mb ≡ just c → P c
+      src-up r e        rt s        s′        nothing  old en rv hs hb ()
+      src-up r e        rt s        (just c′) (just b) old en rv hs hb refl = heads-source r {b} {c′} (hs refl refl) (hb (∨-l (rv refl)) refl)
+      src-up r (just x) rt (just c) nothing   (just b) old en rv hs hb _    with en refl refl
+      ... | ()
+      src-up r (just x) rt nothing  nothing   (just b) old en rv hs hb refl = old refl
+      src-up r nothing  rt s        nothing   (just b) old en rv hs hb ()
+
+      -- The body replanted: past the source's end the new body heads
+      -- through a shut, telling only what the old body left untold.
+      body-up : ∀ {Δ A B} r (e : Maybe Pos) (rt : U.Node Δ A) (s : Maybe (U.Node Δ A)) (mb mb′ : Maybe (U.Node (A ∷ Δ) B))
+              → (is-just mb′ ≡ true → is-just mb ≡ true)
+              → (is-just mb ≡ true → ∀ {c} → s ≡ just c → P c)
+              → ((is-just s ∨ is-just e) ≡ true → ∀ {c} → mb′ ≡ just c → P c)
+              → (∀ {c₀} → e ≡ just c₀ → s ≡ nothing → ∀ {b₀ b′} → mb ≡ just b₀ → mb′ ≡ just b′ → untold (here refl) b′ ⊑[ q / c₀ ] untold (here refl) b₀)
+              → (∀ {c₀} → e ≡ just c₀ → s ≡ nothing → ∀ {b₀} → mb ≡ just b₀ → Tells q c₀ (untold (here refl) b₀))
+              → (∀ {n} → connected r e rt s mb ≡ just n → s ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt)
+              → ∀ {c} → connected r e rt s mb′ ≡ just c → P c
+      body-up r e         rt s        mb        nothing   rv hs hb tl ut hr ()
+      body-up r e         rt (just c) mb        (just b′) rv hs hb tl ut hr refl = heads-source r {b′} {c} (hs (rv refl) refl) (hb refl refl)
+      body-up r (just c₀) rt nothing  nothing   (just b′) rv hs hb tl ut hr _    = false≢ (rv refl)
+      body-up r (just c₀) rt nothing  (just b₀) (just b′) rv hs hb tl ut hr refl =
+        ended-head r c₀ (U.shut (here refl) c₀ b′) rt (U.step rt)
+          (shut-heads (here refl) c₀ b′ (hb refl refl) (tl refl refl refl refl (ut refl refl refl))) (hr refl refl refl)
+      body-up r nothing   rt nothing  mb        (just b′) rv hs hb tl ut hr ()
+
+      mutual
+        shiftE : ∀ {Γ A π} {t : Sub Γ A} (ρ : Path t u π) → Each P t → Untold q t → Ended t
+               → ∀ {K : Pred Γ} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → Binds ρ K j c → E j c) → Each P (plant ρ v)
+        shiftE here ev ut en κ = bl₀ ev
+        shiftE (in-map {f = f} ρ) ev ut en κ =
+          each-map (lift-ᴹ (U.mapᶜ f) (part (plant ρ v)) (λ c → heads-map f {c}) (Each.parts es here refl)) es
+          where
+            es : Each P (plant ρ v)
+            es = shiftE ρ (each-sub ev (in-map here) refl) (ut-sub ut (in-map here) refl) (en-sub en (in-map here) refl) κ
+        shiftE (in-scan {f = f} {z = z} ρ) ev ut en κ =
+          each-scan (lift-ᴹ (U.scanᶜ f z) (part (plant ρ v)) (λ c → heads-scan f z {c}) (Each.parts es here refl)) es
+          where
+            es : Each P (plant ρ v)
+            es = shiftE ρ (each-sub ev (in-scan here) refl) (ut-sub ut (in-scan here) refl) (en-sub en (in-scan here) refl) κ
+        shiftE (in-cut {l = true} ρ) ev ut en κ = each-cut (Each.parts es here refl) (λ _ → es)
+          where
+            es : Each P (plant ρ v)
+            es = shiftE ρ (each-sub ev (in-cut here) refl) (ut-sub ut (in-cut here) refl) (en-sub en (in-cut here) refl) κ
+        shiftE (in-cut {l = false} ρ) ev ut en κ = each-cut (λ ()) (λ ())
+        shiftE (in-lane ρ) ev ut en κ = each-lane (Each.parts es here refl) es
+          where
+            es : Each P (plant ρ v)
+            es = shiftE ρ (each-sub ev (in-lane here) refl) (ut-sub ut (in-lane here) refl) (en-sub en (in-lane here) refl) κ
+        shiftE (in-take {i = ib} {q = p} {tk = tk} {t = s} ρ) ev ut en κ =
+          each-take (take-up ib p tk s (plant ρ v) (Each.parts ev here refl) (λ {k} {c} → takes ρ {ib} {p} {k} {c}) (λ ok → Each.parts (es ok) here refl)) es
+          where
+            es : isTaking tk ≡ true → Each P (plant ρ v)
+            es ok = shiftE ρ (each-sub ev (in-take here) sk) (ut-sub ut (in-take here) sk) (en-sub en (in-take here) sk) κ
+              where
+                sk : isTaking tk ∧ true ≡ true
+                sk = ∧-join ok refl
+        shiftE (in-outer {op = op} {f = f} {d = d₀} {n = n₀} {qs = qs} {pl = pl} {t = s} {ls = ls} ρ) ev ut en κ =
+          each-flat root pool eo eL
+          where
+            eo : Each P (plant ρ v)
+            eo = shiftE ρ (each-sub ev (in-outer here) refl) (ut-sub ut (in-outer here) refl) (en-sub en (in-outer here) refl) κ
+            eL : EachL ls
+            eL = eachL-of ev
+            pool : ∀ {n} → part (plant (in-outer {op = op} {f = f} {d = d₀} {n = n₀} {qs = qs} {pl = pl} {ls = ls} ρ) v) ≡ just n → P pl
+            pool x with shown (in-outer {op = op} {f = f} {d = d₀} {n = n₀} {qs = qs} {pl = pl} {ls = ls} ρ) x
+            ... | _ , e₀ = Each.pools ev here refl e₀
+            root : ∀ {n} → part (plant (in-outer {op = op} {f = f} {d = d₀} {n = n₀} {qs = qs} {pl = pl} {ls = ls} ρ) v) ≡ just n → P n
+            root x = root-flat op (λ a r → U.subscribe (f a) r) (part (plant ρ v)) (partLanes ls) qs pl (pool x)
+                       (Each.parts eo here refl) (lanes-all ls eL) x
+        shiftE (in-lanes {op = op} {f = f} {d = d₀} {n = n₀} {qs = qs} {pl = pl} {o = o} {ls = ls} ρ) ev ut en κ =
+          each-flat root pool eo eL
+          where
+            eo : Each P o
+            eo = each-sub ev (in-outer here) refl
+            eL : EachL (plantᴸ ρ v)
+            eL = shiftL ρ (eachL-of ev) (λ ψ → ut (in-lanes ψ)) (λ ψ → en (in-lanes ψ)) κ
+            pool : ∀ {n} → part (plant (in-lanes {op = op} {f = f} {d = d₀} {n = n₀} {qs = qs} {pl = pl} {o = o} ρ) v) ≡ just n → P pl
+            pool x with shown (in-lanes {op = op} {f = f} {d = d₀} {n = n₀} {qs = qs} {pl = pl} {o = o} ρ) x
+            ... | _ , e₀ = Each.pools ev here refl e₀
+            root : ∀ {n} → part (plant (in-lanes {op = op} {f = f} {d = d₀} {n = n₀} {qs = qs} {pl = pl} {o = o} ρ) v) ≡ just n → P n
+            root x = root-flat op (λ a r → U.subscribe (f a) r) (part o) (partLanes (plantᴸ ρ v)) qs pl (pool x)
+                       (Each.parts eo here refl) (lanes-all (plantᴸ ρ v) eL) x
+        shiftE (in-source {k = k} {r = r} {e = e} {rt = rt} {t = s} {b = b} ρ) ev ut en κ =
+          each-connect root rest es eb
+          where
+            es : is-just (part b) ≡ true → Each P (plant ρ v)
+            es jb = shiftE ρ (each-sub ev (in-source here) s₁) (ut-sub ut (in-source here) s₁) (en-sub en (in-source here) s₁) κ
+              where
+                s₁ : is-just (part b) ∧ true ≡ true
+                s₁ = ∧-join jb refl
+            eb : (is-just (part (plant ρ v)) ∨ is-just e) ≡ true → Each P b
+            eb js = each-sub ev (in-body here) (∧-join (∨-mono (is-just e) (revive ρ) js) refl)
+            rest : ∀ {n} → part (connectˢ k r e rt (plant ρ v) b) ≡ just n → part (plant ρ v) ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt
+            rest x _ pe with shown (in-source {k = k} {r = r} {e = e} {rt = rt} {b = b} ρ) x
+            ... | _ , e₀ = Each.rests ev here refl e₀ (en here refl e₀ pe) pe
+            root : ∀ {n} → part (connectˢ k r e rt (plant ρ v) b) ≡ just n → P n
+            root = src-up r e rt (part s) (part (plant ρ v)) (part b) (Each.parts ev here refl) (en here refl) (revive ρ)
+                     (λ jb → Each.parts (es jb) here refl) (λ j → Each.parts ev (in-body here) (∧-join j refl))
+        shiftE (in-body {k = k} {r = r} {e = e} {rt = rt} {s = s} {t = b} ρ) ev ut en κ =
+          each-connect root rest es eb
+          where
+            eb : (is-just (part s) ∨ is-just e) ≡ true → Each P (plant ρ v)
+            eb js = shiftE ρ (each-sub ev (in-body here) sb) (ut-sub ut (in-body here) sb) (en-sub en (in-body here) sb) κ
+              where
+                sb : (is-just (part s) ∨ is-just e) ∧ true ≡ true
+                sb = ∧-join js refl
+            es : is-just (part (plant ρ v)) ≡ true → Each P s
+            es jb = each-sub ev (in-source here) (∧-join (revive ρ jb) refl)
+            rest : ∀ {n} → part (connectˢ k r e rt s (plant ρ v)) ≡ just n → part s ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt
+            rest x pn pe with shown (in-body {k = k} {r = r} {e = e} {rt = rt} {s = s} ρ) x
+            ... | _ , e₀ = Each.rests ev here refl e₀ pn pe
+            root : ∀ {n} → part (connectˢ k r e rt s (plant ρ v)) ≡ just n → P n
+            root = body-up r e rt (part s) (part b) (part (plant ρ v)) (revive ρ)
+                     (λ jb → Each.parts ev (in-source here) (∧-join jb refl))
+                     (λ js → Each.parts (eb js) here refl)
+                     (λ {c₀} pe pn → told ρ (en-sub en (in-body here) (∧-join (∨-r (is-just (part s)) (cong is-just pe)) refl)) κ (here refl) (pe , pn))
+                     (untold-at ut) (Each.rests ev here refl)
+
+        shiftL : ∀ {Γ B i π} {ls : List (Sub Γ B)} (ρ : PathLanes ls u i π) → EachL ls → UntoldL q ls → EndedL ls
+               → ∀ {K : Pred Γ} → (∀ {C} (j : C ∈ᴸ Δ₀) {c} → BindsL ρ K j c → E j c) → EachL (plantᴸ ρ v)
+        shiftL (this-lane ρ) eL ut en κ =
+          eachL-cons (shiftE ρ (eachL-head eL) (λ ψ → ut (this-lane ψ)) (λ ψ → en (this-lane ψ)) κ) (eachL-tail eL)
+        shiftL (next-lane ρ) eL ut en κ =
+          eachL-cons (eachL-head eL) (shiftL ρ (eachL-tail eL) (λ ψ → ut (next-lane ψ)) (λ ψ → en (next-lane ψ)) κ)
 
   ------------------------------------------------------------------------
   -- THE TIES: `u` replanted to `v` with its part the same, every node

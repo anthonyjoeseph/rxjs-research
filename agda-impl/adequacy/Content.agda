@@ -56,6 +56,7 @@ open import adequacy.Sorted.Walk using (module SortingWalk)
 open import adequacy.Climbs using (module Ascending)
 open import adequacy.Moves using (module Moving)
 open import adequacy.Replant using (module Replanting)
+open import adequacy.Replant.Keep using (module Keeping)
 open import adequacy.Told using (Tells; untold)
 open import adequacy.Leaves using (Twin; leaves; unpinned; tw-refl)
 
@@ -72,6 +73,7 @@ module Honesty (R : Set) where
   open Ascending R using (Aloft; soar)
   open Moving R using (plant; planted; later)
   open Replanting R using (module Shift; Heading; Lingering; Pred)
+  open Keeping R using (module Keep; Alive)
   open Strongly R using () renaming (here to hereᴾ)
   open SortingWalk R using (WellMach)
   open Machine using (Conf; Ctx; top; plug; downs; dirs; closed; doneS; cp; _⊕_; ⟨_,_,_,_,_⟩; absorbed; rising; resuming; subscribing; nx; pend;
@@ -350,14 +352,6 @@ module Honesty (R : Set) where
                 → Joined t → Joined (plant ψ (coldˢ b (fired τ e (at u x fr))))
     fire-sorted : ∀ {lo m tm tms} → WellMach lo m → Mach.turns m ≡ [] → Mach.timers m ≡ tm ∷ tms
                 → WellMach lo (record m { clock = Timer.due tm ; timers = tms ; turns = [ play (Timer.path tm) (cascade tm) 0 false 0 ] })
-    fire-flags : ∀ {t Γ A w τ e u x b π} {fr : Frame A u} (ψ : Path t (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
-               → DoneBy t [] → DoneBy (plant ψ (coldˢ b (fired τ e (at u x fr)))) []
-    fire-told : ∀ {g m Γ A w τ e u x b π} {fr : Frame A u} (cr : Carried g m)
-                (ψ : Path (Carried.tree cr) (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
-              → Untold (Conf.pos (Mach.conf m)) (plant ψ (coldˢ b (fired τ e (at u x fr))))
-    fire-ended : ∀ {g m Γ A w τ e u x b π} {fr : Frame A u} (cr : Carried g m)
-                 (ψ : Path (Carried.tree cr) (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
-               → Ended (plant ψ (coldˢ b (fired τ e (at u x fr))))
 
   -- A fire rewrites a cold's phase and not its node: no part revived,
   -- the joiners told alike, the cold itself heading as before.
@@ -382,6 +376,31 @@ module Honesty (R : Set) where
       ; ling-rested = idle-twin
       ; ling-pool   = λ {ls} → tw-refl (pooledL ls)
       ; ling-below  = λ _ → record { pools = λ () ; rests = λ () } }
+
+    fire-alive : ∀ {Γ A w τ e u x b} {fr : Frame A u}
+               → Alive (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) (coldˢ b (fired τ e (at u x fr)))
+    fire-alive = record
+      { alive-back  = λ j → j
+      ; alive-fwd   = λ j → j
+      ; take-back   = λ j → j
+      ; take-fwd    = λ j → j
+      ; alive-ended = λ _ → λ ()
+      ; alive-flags = λ _ _ → λ () }
+
+  -- A timer fired, the rewritten tree's flags, joiners and ends.
+  fire-flags : ∀ {t Γ A w τ e u x b π} {fr : Frame A u} (ψ : Path t (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
+             → DoneBy t [] → DoneBy (plant ψ (coldˢ b (fired τ e (at u x fr)))) []
+  fire-flags ψ fl = Keep.shift-flags ψ _ fire-alive fl
+
+  fire-told : ∀ {g m Γ A w τ e u x b π} {fr : Frame A u} (cr : Carried g m)
+              (ψ : Path (Carried.tree cr) (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
+            → Untold (Conf.pos (Mach.conf m)) (plant ψ (coldˢ b (fired τ e (at u x fr))))
+  fire-told cr ψ = Keep.shift-told ψ _ fire-alive fire-heading (λ _ _ → λ ()) (Carried.told cr) (Carried.ended cr)
+
+  fire-ended : ∀ {g m Γ A w τ e u x b π} {fr : Frame A u} (cr : Carried g m)
+               (ψ : Path (Carried.tree cr) (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
+             → Ended (plant ψ (coldˢ b (fired τ e (at u x fr))))
+  fire-ended cr ψ = Keep.shift-ended ψ _ fire-alive (Carried.ended cr)
 
   -- A live timer popped at the turn: its cold, fired, heads past where
   -- the run is.
