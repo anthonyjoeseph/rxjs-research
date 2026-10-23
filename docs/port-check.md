@@ -4,6 +4,9 @@ Tier 0 carries the old adequacy proof (`adequacy/`, `operation/Machine.agda`) to
 the state tree, in `agda-impl/port/`. The boundary is that the port **only
 ports**: work the old proof left undone is Tier 1's, never the port's.
 
+**Delete this tool when Tier 0 is discharged** (Anthony): the script, its selftest,
+its Makefile and gate entries, this doc and the `OLD BODY` markers.
+
 `scripts/check-port.py` reads the old tower at `PORT_BASE` (the Makefile) out of
 git, and checks every non-private top-level declaration under `port/`. **Bodies
 and postulates answer to different rules:** a body must be an old one, carried
