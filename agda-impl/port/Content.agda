@@ -20,7 +20,7 @@ open import Data.List using (List; []; _∷_; _++_; [_]; length; head)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.List.Relation.Unary.Any using (Any; here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ; ++⁻)
-open import Data.List.Relation.Unary.All as All using (All; [])
+open import Data.List.Relation.Unary.All as All using (All; []; _∷_)
 import Data.List.Relation.Unary.Any as Any
 import Data.List.Relation.Unary.Linked as Linked
 open Linked using (Linked)
@@ -322,7 +322,7 @@ module Honesty (R : Set) where
     -- with the timer gone and its turn held.
     fire-kernels : ∀ {t k Γ A w τ e u x b π} {fr : Frame A u} (ψ : Path t (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
                  → Kernels t k → Kernels (plant ψ (coldˢ b (fired τ e (at u x fr)))) k
-    fire-part : ∀ {t Γ A w τ e u x b π} {fr : Frame A u} (ψ : Path t (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
+    fire-part : ∀ {t : Sub [] R} {Γ A w τ e u x b π} {fr : Frame A u} (ψ : Path t (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
               → part (plant ψ (coldˢ b (fired τ e (at u x fr)))) ≡ part t
     fire-load : ∀ {g m Γ A w τ e u x b π tm tms} {fr : Frame A u} (cr : Carried g m) → Mach.timers m ≡ tm ∷ tms
               → (ψ : Path (Carried.tree cr) (coldˢ {Γ} {A} b (waiting {u = w} τ e (at u x fr))) π)
@@ -366,21 +366,27 @@ module Honesty (R : Set) where
   -- An absorbed configuration is a re-entry state: calm, a turn to play,
   -- or a job to pop.
   private
+    -- The job's turn or the turn's, as the turn's depth decides.
+    picked : ∀ {Γ A} {c : Ctx R Γ A} {s p j rs clk tms t ts} (b : Bool) → (depthOf t <ᵇ suc (length rs)) ≡ b
+           → CtlAs (mach ⟨ c , s , absorbed , p , j ∷ rs ⟩ clk tms (t ∷ ts))
+    picked true  d = popAs refl (MAll.just d)
+    picked false d = burstAs refl refl d
+
     settled : ∀ {Γ A} {c : Ctx R Γ A} {s p} rs clk tms ts → CtlAs (mach ⟨ c , s , absorbed , p , rs ⟩ clk tms ts)
     settled []       clk tms []       = calmAs refl refl
     settled []       clk tms (t ∷ ts) = burstAs refl refl refl
     settled (j ∷ rs) clk tms []       = popAs refl MAll.nothing
-    settled (j ∷ rs) clk tms (t ∷ ts) with depthOf t <ᵇ suc (length rs) in d
-    ... | true  = popAs refl (MAll.just d)
-    ... | false = burstAs refl refl d
+    settled (j ∷ rs) clk tms (t ∷ ts) = picked _ refl
 
     settled-meets : ∀ {Γ A} {c : Ctx R Γ A} {s p} rs clk tms ts {n g} → n ≡ just g → Meets (settled {c = c} {s} {p} rs clk tms ts) n g
     settled-meets []       clk tms []       e = e
     settled-meets []       clk tms (t ∷ ts) e = e
     settled-meets (j ∷ rs) clk tms []       e = e
-    settled-meets (j ∷ rs) clk tms (t ∷ ts) e with depthOf t <ᵇ suc (length rs) in d
-    ... | true  = e
-    ... | false = e
+    settled-meets (j ∷ rs) clk tms (t ∷ ts) e = picked-meets _ refl e
+      where picked-meets : ∀ {Γ A} {c : Ctx R Γ A} {s p n g} b (d : (depthOf t <ᵇ suc (length rs)) ≡ b) → n ≡ just g
+                         → Meets (picked {c = c} {s} {p} {j} {rs} {clk} {tms} {t} {ts} b d) n g
+            picked-meets true  d e = e
+            picked-meets false d e = e
 
     -- Settling a job's run weighs less than running it.
     settled-lighter : ∀ {Γ A} {c : Ctx R Γ A} {s p} rs clk tms ts
@@ -389,10 +395,12 @@ module Honesty (R : Set) where
     settled-lighter []       clk tms (t ∷ ts) = s≤s z≤n
     settled-lighter (j ∷ rs) clk tms []       = popped (suc (length rs))
       where popped : ∀ a → suc (suc (a + a)) ≤ suc a + suc a
-            popped a = s≤s (s≤s (≤-reflexive (sym (+-suc a a))))
-    settled-lighter (j ∷ rs) clk tms (t ∷ ts) with depthOf t <ᵇ suc (length rs) in d
-    ... | true  = s≤s (s≤s (≤-reflexive (sym (+-suc (suc (length rs)) (suc (length rs))))))
-    ... | false = s≤s (+-monoʳ-≤ (suc (length rs)) (n≤1+n (suc (length rs))))
+            popped a = s≤s (≤-reflexive (sym (+-suc a a)))
+    settled-lighter (j ∷ rs) clk tms (t ∷ ts) = picked-lighter _ refl
+      where picked-lighter : ∀ {Γ A} {c : Ctx R Γ A} {s p} b (d : (depthOf t <ᵇ suc (length rs)) ≡ b)
+                           → weight (picked {c = c} {s} {p} {j} {rs} {clk} {tms} {t} {ts} b d) < suc (length (j ∷ rs)) + suc (length (j ∷ rs))
+            picked-lighter true  d = s≤s (s≤s (≤-reflexive (sym (+-suc (length rs) (suc (length rs))))))
+            picked-lighter false d = s≤s (+-monoʳ-≤ (suc (length rs)) (n≤1+n (suc (length rs))))
 
     -- At rest, a shown value's jobs are the same jobs.
     owned-note : ∀ {t s a p rs clk tms ts} → Owned t (mach ⟨ top , s , rising (nx a) , p , rs ⟩ clk tms ts)
@@ -409,6 +417,11 @@ module Honesty (R : Set) where
   note-onward : ∀ {g g′ m s a p rs} → Carried g m → Mach.conf m ≡ ⟨ top , s , rising (nx a) , p , rs ⟩
               → U.step g ≡ U.outˢ p a g′ → Mirror g′ (record m { conf = ⟨ top , s , absorbed , p , rs ⟩ })
   note-onward {g} {m = mach _ clk tms ts} {s} {p = p} {rs} cr refl stp with Carried.ctlAs cr | Carried.meets cr
+  ... | calmAs () _    | _
+  ... | runAs ()       | _
+  ... | subAs ()       | _
+  ... | burstAs () _ _ | _
+  ... | popAs () _     | _
   ... | noteAs refl ck | g″ , pe , st″ with trans (sym st″) stp
   ...   | refl = m′ , now , carried (record
           { sane = sane-out {g = g} (Carried.sane cr) stp
@@ -422,11 +435,6 @@ module Honesty (R : Set) where
           ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; told = Carried.told cr
           ; ended = Carried.ended cr ; flags = Carried.flags cr })
     where m′ = mach ⟨ top , s , absorbed , p , rs ⟩ clk tms ts
-  ... | calmAs () _    | _
-  ... | runAs ()       | _
-  ... | subAs ()       | _
-  ... | burstAs () _ _ | _
-  ... | popAs () _     | _
 
   -- The queue's head popped: the rest due no earlier than it.
   ahead-pop : ∀ {p : Pos} {clk} {tm : Timer} {ts}
@@ -450,8 +458,8 @@ module Honesty (R : Set) where
     g , m′ , now
     , carried (record
         { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = plant ψ v
-        ; kernels = fire-kernels ψ (Carried.kernels cr)
-        ; ctlAs = burstAs refl refl refl ; meets = trans (fire-part ψ) mt
+        ; kernels = fire-kernels {t = Carried.tree cr} {k = ⟨ c , s , absorbed , p , [] ⟩} ψ (Carried.kernels cr)
+        ; ctlAs = burstAs refl refl refl ; meets = trans (fire-part {t = Carried.tree cr} ψ) mt
         ; owned = fire-owned cr refl ψ ; meaning = fire-meaning ψ (Carried.meaning cr)
         ; queue = record { timed = fire-timed ψ (Queue.timed q) refl ; joined = fire-joined ψ (Queue.joined q)
                          ; ordered = Linked.tail (Queue.ordered q) ; ahead = ahead-pop {p = p} (Queue.ordered q) (Queue.ahead q) }
@@ -470,7 +478,7 @@ module Honesty (R : Set) where
   ... | noteAs () _    | _ | _
   ... | runAs ()       | _ | _
   ... | subAs ()       | _ | _
-  ... | burstAs () _ _ | _ | _
+  ... | burstAs _ () _ | _ | _
   ... | popAs () _     | _ | _
 
   private
@@ -499,23 +507,23 @@ module Honesty (R : Set) where
   burst-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {s p rs t ts} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , rs ⟩
                → Mach.turns m ≡ t ∷ ts → (depthOf t <ᵇ length rs) ≡ false
                → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
-  burst-onward {m = mach k clk tms (play π u i pl d ∷ ts)} cr refl refl dl
+  burst-onward {m = mach k clk tms (play π u i pl d ∷ ts)} {c = c} {s} {p} {rs} cr refl refl dl
     with playing-silent (mach k clk tms (play π u i pl d ∷ ts)) π u i pl d ts (poke π k)
   ... | m′ , ps with live (poke π k) in lv | pl
-  ...   | false | _     = m′ , trans (burst-step dl) ps , burst-spent cr refl refl dl lv (trans (burst-step dl) ps)
-  ...   | true  | false = m′ , trans (burst-step dl) ps , burst-poll cr refl refl dl lv (trans (burst-step dl) ps)
-  ...   | true  | true  = m′ , trans (burst-step dl) ps , burst-play cr refl refl dl lv (trans (burst-step dl) ps)
-  burst-onward {m = mach k clk tms (finish π e d ∷ ts)} cr refl refl dl
+  ...   | false | _     = m′ , trans (burst-step {c = c} {s} {p} {rs} {clk} {tms} {_} {ts} dl) ps , burst-spent cr refl refl dl lv (trans (burst-step {c = c} {s} {p} {rs} {clk} {tms} {_} {ts} dl) ps)
+  ...   | true  | false = m′ , trans (burst-step {c = c} {s} {p} {rs} {clk} {tms} {_} {ts} dl) ps , burst-poll cr refl refl dl lv (trans (burst-step {c = c} {s} {p} {rs} {clk} {tms} {_} {ts} dl) ps)
+  ...   | true  | true  = m′ , trans (burst-step {c = c} {s} {p} {rs} {clk} {tms} {_} {ts} dl) ps , burst-play cr refl refl dl lv (trans (burst-step {c = c} {s} {p} {rs} {clk} {tms} {_} {ts} dl) ps)
+  burst-onward {m = mach k clk tms (finish π e d ∷ ts)} {c = c} {s} {p} {rs} cr refl refl dl
     with finishing-silent (mach k clk tms (finish π e d ∷ ts)) e ts (poke π k)
-  ... | m′ , fs = m′ , trans (burst-step dl) fs , burst-finish cr refl refl dl (trans (burst-step dl) fs)
+  ... | m′ , fs = m′ , trans (burst-step {c = c} {s} {p} {rs} {clk} {tms} {_} {ts} dl) fs , burst-finish cr refl refl dl (trans (burst-step {c = c} {s} {p} {rs} {clk} {tms} {_} {ts} dl) fs)
 
   private
     -- A joiner's subscription is silent, joined or completed.
     joined-silent : ∀ {Γ A} {c : Ctx R Γ A} {x p rs clk tms ts}
                   → Σ Mach λ m′ → step (mach ⟨ c , pend (T.connected x) , subscribing , p , rs ⟩ clk tms ts) ≡ silent m′
-    joined-silent {c = c} {x} {p} with Machine.joinUp p c x [] in j
-    ... | true  , _ rewrite j = _ , refl
-    ... | false , _ rewrite j = _ , refl
+    joined-silent {c = c} {x} {p} with Machine.joinUp p c x []
+    ... | true  , _ = _ , refl
+    ... | false , _ = _ , refl
 
   -- A subscription begun, by its program.
   sub-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {o p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , pend o , subscribing , p , rs ⟩
@@ -537,7 +545,7 @@ module Honesty (R : Set) where
     -- control lighter.
     idle-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {s t p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , resuming t , p , rs ⟩
                 → res s t ≡ idle → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
-    idle-onward {g} {mach _ clk tms ts} {c = c} {s} {t} {p} {rs} cr refl r with Carried.ctlAs cr | Carried.meets cr
+    idle-onward {g} {mach _ clk tms ts} {c = c} {s} {t} {p} {rs} cr refl r with Carried.ctlAs cr in eqc | Carried.meets cr
     ... | runAs refl | mt =
       m′ , cong (Driver.took R _) (cong (λ x → Machine.resumeR c x p rs) r)
       , g , m′ , now
@@ -551,7 +559,7 @@ module Honesty (R : Set) where
           ; sorted = proj₁ (Carried.sorted cr) , sorted-idle (proj₂ (Carried.sorted cr)) refl r
           ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; told = Carried.told cr
           ; ended = Carried.ended cr ; flags = Carried.flags cr })
-      , lowered (λ n → agree-refl n _) (inj₂ (refl , settled-lighter rs clk tms ts))
+      , lowered (λ n → agree-refl n _) (inj₂ (refl , subst (weight (settled rs clk tms ts) <_) (cong weight (sym eqc)) (settled-lighter rs clk tms ts)))
       where m′ = mach ⟨ c , s , absorbed , p , rs ⟩ clk tms ts
     ... | calmAs () _  | _
     ... | noteAs () _  | _
@@ -576,62 +584,63 @@ module Honesty (R : Set) where
              → Machine.step ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩ ≡ Machine.moved ⟨ c , s , absorbed , p , rs ⟩ [] []
     dropping d rewrite d = refl
 
+  -- A job resumed runs at the position it was suspended at, the carrier's
+  -- position-read parts read there.
+  postulate
+    pop-queue  : ∀ {g m Γ A} {c : Ctx R Γ A} {s p q τ p′ rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩
+               → Queue p′ (Mach.clock m) (Mach.timers m) (Carried.tree cr)
+    pop-behind : ∀ {g m Γ A} {c : Ctx R Γ A} {s p q τ p′ rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩
+               → Each (Heads p′) (Carried.tree cr)
+    pop-told   : ∀ {g m Γ A} {c : Ctx R Γ A} {s p q τ p′ rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩
+               → Untold p′ (Carried.tree cr)
+
   private
     -- A job popped: resumed where it was suspended, or dropped, the ghost
     -- alike, the control lighter.
     pop-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {s p j rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , j ∷ rs ⟩
                → MAll.All (λ t → (depthOf t <ᵇ suc (length rs)) ≡ true) (head (Mach.turns m)) → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
-    pop-onward {g} {mach k clk tms ts} {c = c} {s} {p} {q , τ , p′} {rs} cr e ps
-      with Carried.ctlAs cr | Carried.meets cr | downs q top (plug c s) in d
+    pop-onward {g} {mach k clk tms ts} {c = c} {s} {p} {q , τ , p′} {rs} cr refl ps
+      with Carried.ctlAs cr in eqc | Carried.meets cr | downs q top (plug c s) in d
     ... | popAs refl _ | mt | just (_ , _ , c′ , s′) =
-      m′ , trans (pop-step e ps) (cong (Driver.took R _) (popping d))
+      m′ , trans (pop-step refl ps) (cong (Driver.took R _) (popping {c = c} {s} {p} {q} {τ} {p′} {rs} d))
       , g , m′ , now
       , carried (record
           { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = Carried.tree cr
-          ; kernels = trans (Carried.kernels cr) (sym (downs-plug d)) ; ctlAs = runAs refl ; meets = mt
-          ; owned = owned-popped (Carried.kernels cr) (Carried.owned cr) e d
-          ; meaning = meaning-pop (Carried.kernels cr) (Carried.meaning cr) d
-          ; queue = Carried.queue cr
+          ; kernels = trans (Carried.kernels cr) (sym (downs-plug {q = q} {plug c s} d)) ; ctlAs = runAs refl ; meets = mt
+          ; owned = owned-popped {c = c} {s = s} {q = q} (Carried.kernels cr) (Carried.owned cr) refl d
+          ; meaning = meaning-pop {c = c} {s = s} {q = q} (Carried.kernels cr) (Carried.meaning cr) d
+          ; queue = pop-queue cr refl
           ; books = record { clocked = All.head (Books.ticked (Carried.books cr))
                            ; ticked = All.tail (Books.ticked (Carried.books cr)) ; turned = Books.turned (Carried.books cr) }
-          ; sorted = proj₁ (Carried.sorted cr) , sorted-pop (proj₂ (Carried.sorted cr)) e d
-          ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; told = Carried.told cr
+          ; sorted = proj₁ (Carried.sorted cr) , sorted-pop {c = c} {s = s} {q = q} (proj₂ (Carried.sorted cr)) refl d
+          ; behind = pop-behind cr refl ; lingers = Carried.lingers cr ; told = pop-told cr refl
           ; ended = Carried.ended cr ; flags = Carried.flags cr })
-      , lowered (λ n → agree-refl n _) (inj₂ (refl , n<1+n _))
+      , lowered (λ n → agree-refl n _) (inj₂ (refl , subst (_ <_) (cong weight (sym eqc)) (n<1+n _)))
       where m′ = mach ⟨ c′ , s′ , resuming τ , p′ , rs ⟩ clk tms ts
     ... | popAs refl _ | mt | nothing =
-      m′ , trans (pop-step e ps) (cong (Driver.took R _) (dropping d))
+      m′ , trans (pop-step refl ps) (cong (Driver.took R _) (dropping {c = c} {s} {p} {q} {τ} {p′} {rs} d))
       , g , m′ , now
       , carried (record
           { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = Carried.tree cr
           ; kernels = Carried.kernels cr ; ctlAs = settled rs clk tms ts ; meets = settled-meets rs clk tms ts mt
-          ; owned = owned-dropped (Carried.kernels cr) (Carried.owned cr) e d
-          ; meaning = meaning-drop (Carried.kernels cr) (Carried.meaning cr) d
+          ; owned = owned-dropped {c = c} {s = s} {j = q , τ , p′} (Carried.kernels cr) (Carried.owned cr) refl d
+          ; meaning = meaning-drop {c = c} {s = s} {j = q , τ , p′} (Carried.kernels cr) (Carried.meaning cr) d
           ; queue = Carried.queue cr
           ; books = record { clocked = tt ; ticked = All.tail (Books.ticked (Carried.books cr)) ; turned = Books.turned (Carried.books cr) }
-          ; sorted = proj₁ (Carried.sorted cr) , sorted-drop (proj₂ (Carried.sorted cr)) e d
+          ; sorted = proj₁ (Carried.sorted cr) , sorted-drop {c = c} {s = s} {j = q , τ , p′} (proj₂ (Carried.sorted cr)) refl d
           ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; told = Carried.told cr
           ; ended = Carried.ended cr ; flags = Carried.flags cr })
-      , lowered (λ n → agree-refl n _) (inj₂ (refl , <-trans (settled-lighter rs clk tms ts) (n<1+n _)))
+      , lowered (λ n → agree-refl n _) (inj₂ (refl , subst (weight (settled rs clk tms ts) <_) (cong weight (sym eqc)) (<-trans (settled-lighter rs clk tms ts) (n<1+n _))))
       where m′ = mach ⟨ c , s , absorbed , p , rs ⟩ clk tms ts
     ... | calmAs () _  | _ | _
     ... | noteAs () _  | _ | _
     ... | runAs ()     | _ | _
     ... | subAs ()     | _ | _
-    ... | burstAs () _ _ | _ | _
-
-  private
-    shut-step : ∀ {Γ A} {c : Ctx R Γ A} {xs i p rs} → closed c ≡ true
-              → Machine.resumeR c (ofR xs i) p rs ≡ Machine.moved ⟨ c , doneS , absorbed , p , rs ⟩ [] []
-    shut-step e rewrite e = refl
-
-    last-step : ∀ {Γ A} {c : Ctx R Γ A} {i p rs} → closed c ≡ false
-              → Machine.resumeR c (ofR [] i) p rs ≡ Machine.moved ⟨ c , doneS , rising cp , p ⊕ [ last ] , rs ⟩ [] []
-    last-step e rewrite e = refl
-
-    emit-step : ∀ {Γ A} {c : Ctx R Γ A} {x xs i p rs} → closed c ≡ false
-              → Machine.resumeR c (ofR (x ∷ xs) i) p rs ≡ Machine.moved ⟨ c , ofS xs , rising (nx x) , p ⊕ [ ix i ] , (dirs c , next (suc i) , p) ∷ rs ⟩ [] []
-    emit-step e rewrite e = refl
+    ... | burstAs refl refl lt | _ | _ = ⊥-elim (unpoppable refl lt ps)
+      where unpoppable : ∀ {Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ p′ rs′ t} → ⟨ c′ , s′ , absorbed , p′ , rs′ ⟩ ≡ ⟨ c , s , absorbed , p , (q , τ , p′) ∷ rs ⟩
+                       → (depthOf t <ᵇ length rs′) ≡ false → MAll.All (λ t → (depthOf t <ᵇ suc (length rs)) ≡ true) (just t) → ⊥
+            unpoppable refl lt (MAll.just pt) with trans (sym lt) pt
+            ... | ()
 
   -- A spent `of` the ghost holds: its completion delivered at its end.
   emit-last : ∀ {g m Γ A} {c : Ctx R Γ A} {i p rs p₀ j} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , ofS [] , resuming (next i) , p , rs ⟩
@@ -643,16 +652,16 @@ module Honesty (R : Set) where
   -- completion; under a closed observer, nothing.
   emit-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {xs i p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , ofS xs , resuming (next i) , p , rs ⟩
               → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
-  emit-onward {m = mach _ clk tms ts} {c = c} {xs} cr refl with closed c in cl
-  ... | true = _ , cong (Driver.took R _) (shut-step cl) , emit-shut cr refl cl
-  emit-onward {m = mach _ clk tms ts} {c = c} {[]} cr refl | false with of-path cr refl
+  emit-onward {m = mach _ clk tms ts} {c = c} {xs} {i} {p} {rs} cr refl with closed c in cl
+  ... | true = _ , refl , emit-shut cr refl cl
+  emit-onward {m = mach _ clk tms ts} {c = c} {[]} {i} {p} {rs} cr refl | false with of-path cr refl
   ... | _ , _ , ψ with seen ψ in sn
-  ...   | false = _ , cong (Driver.took R _) (last-step cl) , last-void cr refl cl ψ sn
-  ...   | true  = _ , cong (Driver.took R _) (last-step cl) , emit-last cr refl cl ψ sn
-  emit-onward {m = mach _ clk tms ts} {c = c} {x ∷ xs} cr refl | false with of-path cr refl
+  ...   | false = _ , refl , last-void cr refl cl ψ sn
+  ...   | true  = _ , refl , emit-last cr refl cl ψ sn
+  emit-onward {m = mach _ clk tms ts} {c = c} {x ∷ xs} {i} {p} {rs} cr refl | false with of-path cr refl
   ... | _ , _ , ψ with seen ψ in sn
-  ...   | false = _ , cong (Driver.took R _) (emit-step cl) , emit-void cr refl cl ψ sn
-  ...   | true  = _ , cong (Driver.took R _) (emit-step cl) , soar (carried cr) (emit-open cr refl cl ψ sn)
+  ...   | false = _ , refl , emit-void cr refl cl ψ sn
+  ...   | true  = _ , refl , soar (carried cr) (emit-open cr refl cl ψ sn)
 
   -- A takeWhile's completion delivered under its failing value, then
   -- its cut.
@@ -673,7 +682,7 @@ module Honesty (R : Set) where
   -- job fewer.
   cut-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩
              → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
-  cut-onward {g} {mach _ clk tms ts} {c = c} {i} {q} {s} {p} {rs} cr refl with Carried.ctlAs cr | Carried.meets cr
+  cut-onward {g} {mach _ clk tms ts} {c = c} {i} {q} {s} {p} {rs} cr refl with Carried.ctlAs cr in eqc | Carried.meets cr
   ... | runAs refl | mt =
     m′ , refl
     , g , m′ , now
@@ -686,7 +695,7 @@ module Honesty (R : Set) where
         ; sorted = proj₁ (Carried.sorted cr) , cut-sorted (proj₂ (Carried.sorted cr)) refl
         ; behind = cut-behind cr refl ; lingers = cut-lingers cr refl ; told = cut-told cr refl
         ; ended = cut-ended cr refl ; flags = cut-flags cr refl })
-    , lowered (λ n → agree-refl n _) (under-lighter (cut-load cr refl) (settled-lighter rs clk tms ts))
+    , lowered (λ n → agree-refl n _) (under-lighter (cut-load cr refl) (subst (weight (settled rs clk tms ts) <_) (cong weight (sym eqc)) (settled-lighter rs clk tms ts)))
     where m′ = mach ⟨ c , takeS i q (proj₁ (cut s)) , absorbed , p , rs ⟩ clk tms ts
   ... | calmAs () _  | _
   ... | noteAs () _  | _
