@@ -52,7 +52,7 @@ module Honesty (R : Set) where
   open Ghosting R using (Has; Sent; sentHere; sentLater; Alike; _≋_; same-agree; residual; Reached; launchedʰ; silentʰ; valueʰ;
     Stands; cutʰ; finʰ; dryʰ; Mirror; Inner; Logged; Shows; silentˢ; valueˢ; completeˢ; drainedˢ; inner-launch; ≋-refl;
     Steps; after; steps-after; Hopped; onward)
-  open Strongly R using (Strong; Carried; carried; closing; calmAs; noteAs; runAs; subAs; burstAs)
+  open Strongly R using (Strong; Carried; carried; closing; calmAs; noteAs; runAs; subAs; burstAs; popAs; Pops)
   open Machine using (Ctx; top; ⟨_,_,_,_,_⟩; absorbed; rising; resuming; subscribing; nx; pend;
     ofS; cutS; takeS; connS; joinS; next; att; owedCp; owedCut; feeding; attBody; owed; go;
     res; ofR; attR; cpR; cutR; feedR; bodyR; srcR; endR; joinR; idle)
@@ -167,6 +167,10 @@ module Honesty (R : Set) where
                  → Mach.turns m ≡ t ∷ ts → (depthOf t <ᵇ length rs) ≡ false
                  → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
 
+    -- A job owed above the next turn popped and resumed, likewise.
+    pop-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {s p j rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , j ∷ rs ⟩
+               → Pops (Mach.turns m) (suc (length rs)) → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+
     -- The next timer fired, likewise.
     --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs.agda
@@ -199,6 +203,8 @@ module Honesty (R : Set) where
   strong-hop {m = mach k clk tms ts} (carried cr) | subAs e | _ with sub-onward cr e
   ...   | m′ , eq , h = silentᴴ eq h
   strong-hop {m = mach k clk tms ts} (carried cr) | burstAs e et lt | _ with burst-onward cr e et lt
+  ...   | m′ , eq , h = silentᴴ eq h
+  strong-hop {m = mach k clk tms ts} (carried cr) | popAs e ps | _ with pop-onward cr e ps
   ...   | m′ , eq , h = silentᴴ eq h
   strong-hop {m = mach k clk [] ts} (carried cr) | calmAs refl refl | _ = drainedᴴ refl (turn-dry cr refl refl refl)
   strong-hop {m = mach k clk (tm ∷ tms) ts} (carried cr) | calmAs refl refl | _ = silentᴴ refl (turn-pops cr refl refl refl refl)

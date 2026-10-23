@@ -300,7 +300,14 @@ module Strongly (R : Set) where
   -- THE RE-ENTRY STATES, by the machine's configuration: nothing owed
   -- and no turn to play; a value about to be shown at the root, at its
   -- tick; a job about to resume; a pending node about to begin; the next
-  -- turn about to play, no job owed above it.
+  -- turn about to play, no job owed above it; a job owed above the next
+  -- turn, or with no turn, about to be popped.
+
+  -- The machine pops a job owed `n` deep: no turn, or the next turn's
+  -- depth under it.
+  Pops : List Turn → ℕ → Set
+  Pops []      n = ⊤
+  Pops (t ∷ _) n = (depthOf t <ᵇ n) ≡ true
 
   data CtlAs (m : Mach) : Set₁ where
     calmAs  : ∀ {Γ A} {c : Ctx R Γ A} {s p} → Mach.conf m ≡ ⟨ c , s , absorbed , p , [] ⟩ → Mach.turns m ≡ [] → CtlAs m
@@ -309,6 +316,8 @@ module Strongly (R : Set) where
     subAs   : ∀ {Γ A} {c : Ctx R Γ A} {o p rs} → Mach.conf m ≡ ⟨ c , pendS o , subscribing , p , rs ⟩ → CtlAs m
     burstAs : ∀ {Γ A} {c : Ctx R Γ A} {s p rs t ts} → Mach.conf m ≡ ⟨ c , s , absorbed , p , rs ⟩ → Mach.turns m ≡ t ∷ ts
             → (depthOf t <ᵇ length rs) ≡ false → CtlAs m
+    popAs   : ∀ {Γ A} {c : Ctx R Γ A} {s p j rs} → Mach.conf m ≡ ⟨ c , s , absorbed , p , j ∷ rs ⟩
+            → Pops (Mach.turns m) (suc (length rs)) → CtlAs m
 
   -- The ghost the witness reads: a value about to be shown, the ghost
   -- before it; otherwise the witness's own.

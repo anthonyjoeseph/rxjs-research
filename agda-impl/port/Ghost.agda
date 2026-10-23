@@ -15,7 +15,7 @@ open import Data.Empty using (⊥)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Nat.Properties using (≤-reflexive; ≤-trans; m≤n⇒m≤1+n)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; _<_; _≤_; z≤n)
+open import Data.Nat using (ℕ; suc; _+_; _<_; _≤_; z≤n)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Induction.WellFounded using (WellFounded)
 open import Data.Product.Relation.Binary.Lex.Strict using (×-Lex; ×-wellFounded)
@@ -40,7 +40,7 @@ module Ghosting (R : Set) where
   open Driver R using (Mach; Step; silent; value; complete; drained; step; begin)
   open Pure R using (End; finished; dry; cutOff)
   open Unsubbing R using (_⇝_; now)
-  open Strongly R using (Strong; carried; closing; strong-begin; Carried; Sub; CtlAs; calmAs; noteAs; runAs; subAs; burstAs; pend; takes; left)
+  open Strongly R using (Strong; carried; closing; strong-begin; Carried; Sub; CtlAs; calmAs; noteAs; runAs; subAs; burstAs; popAs; pend; takes; left)
 
   ----------------------------------------------------------------------
   -- Alike as sets
@@ -285,13 +285,19 @@ module Ghosting (R : Set) where
   load : (m : Mach) → Sub [] R → Load
   load m t = pend t , takes t , length (Mach.timers m) , length (Mach.turns m) , left t
 
-  -- The control's own: the jobs owed, and the one about to run.
+  private
+    twice : ℕ → ℕ
+    twice n = n + n
+
+  -- The control's own: twice the jobs owed and the one about to run, and
+  -- one more for a job about to be popped, which pops to fewer.
   weight : ∀ {m} → CtlAs m → ℕ
   weight (calmAs _ _)              = 0
-  weight (noteAs {rs = rs} _ _)    = suc (length rs)
-  weight (runAs {rs = rs} _)       = suc (length rs)
-  weight (subAs {rs = rs} _)       = suc (length rs)
-  weight (burstAs {rs = rs} _ _ _) = length rs
+  weight (noteAs {rs = rs} _ _)    = twice (suc (length rs))
+  weight (runAs {rs = rs} _)       = twice (suc (length rs))
+  weight (subAs {rs = rs} _)       = twice (suc (length rs))
+  weight (burstAs {rs = rs} _ _ _) = twice (length rs)
+  weight (popAs {rs = rs} _ _)     = suc (twice (suc (length rs)))
 
   -- The work a re-entry configuration has left before its ghost moves.
   measure : ∀ {g m} → Strong g m → Measure
