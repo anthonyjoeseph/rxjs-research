@@ -28,7 +28,7 @@ open import port.Ghost using (module Ghosting)
 open import port.Ghost.Paths using (module GhostingPaths)
 open import port.Moves using (module Moving)
 
-open Machine using (St; Ctx; Conf; Job; Ev; nx; cp; dirs; plug; scanS; connS; owed; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc;
+open Machine using (St; Ctx; Conf; Job; Ev; nx; cp; dirs; plug; scanS; connS; owed; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody;
   ⟨_,_,_,_,_⟩; rising)
 
 module Ascending (R : Set) where
@@ -322,7 +322,7 @@ module Ascending (R : Set) where
             → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ in-scan here) e → Called st m₁ (ρ ⊕ in-scan here)
   call-scan st {m₁ = mach k clk tms ts} {f = f} {z} {v} ρ {nx y} cl
     with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl
-  ... | c | x | at | refl | kn with scan-at ρ at kn
+  ... | c | x | at | refl | kn with scan-at ρ {c = c} {x} at kn
   ...   | c₀ , refl , at₀ =
     rose {σ′ = planted ρ (scanˢ f (f z y) v)} {e′ = nx (f z y)} (then refl now)
       (subst (_< height (ρ ⊕ in-scan here)) (sym (height-planted ρ (scanˢ f (f z y) v))) (one-lower ρ one-scan))
@@ -335,7 +335,7 @@ module Ascending (R : Set) where
         ; flags = scan-flags ρ cl ; kept = subst (_≼ loadOf st) (sym (scan-load ρ cl refl)) (Calling.kept cl) })
   call-scan st {m₁ = mach k clk tms ts} {f = f} {z} {v} ρ {cp} cl
     with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
-  ... | c | x | at | refl | kn | gn , S , L , sg , hl | lt with scan-at ρ at kn
+  ... | c | x | at | refl | kn | gn , S , L , sg , hl | lt with scan-at ρ {c = c} {x} at kn
   ...   | c₀ , refl , at₀ with lifts-split ρ (in-scan here) L in eqS
   ...     | _ , lifts-scan lifts-here , Lρ =
     rose {σ′ = ρ} {e′ = cp} (then refl now) (one-lower ρ one-scan)
@@ -363,7 +363,7 @@ module Ascending (R : Set) where
            → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ in-map here) e → Called st m₁ (ρ ⊕ in-map here)
   call-map st {m₁ = mach k clk tms ts} {f = f} {v} ρ {nx y} cl
     with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
-  ... | c | x | at | refl | kn | c′ , pv , S , L , sg | lt with map-at ρ at kn
+  ... | c | x | at | refl | kn | c′ , pv , S , L , sg | lt with map-at ρ {c = c} {x} at kn
   ...   | c₀ , refl , at₀ with lifts-split ρ (in-map here) L in eqS
   ...     | _ , lifts-map lifts-here , Lρ =
     rose {σ′ = ρ} {e′ = nx (f y)} (then refl now) (one-lower ρ one-map)
@@ -379,7 +379,7 @@ module Ascending (R : Set) where
         ; flags = done-up ρ (in-map here) refl (Calling.flags cl) ; kept = Calling.kept cl })
   call-map st {m₁ = mach k clk tms ts} {f = f} {v} ρ {cp} cl
     with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
-  ... | c | x | at | refl | kn | gn , S , L , sg , hl | lt with map-at ρ at kn
+  ... | c | x | at | refl | kn | gn , S , L , sg , hl | lt with map-at ρ {c = c} {x} at kn
   ...   | c₀ , refl , at₀ with lifts-split ρ (in-map here) L in eqS
   ...     | _ , lifts-map lifts-here , Lρ =
     rose {σ′ = ρ} {e′ = cp} (then refl now) (one-lower ρ one-map)
@@ -430,7 +430,7 @@ module Ascending (R : Set) where
   ... | false | false = take-end st ρ qy ii cl
   call-take st {m₁ = mach k clk tms ts} {i = i} {q} {tk} {v} ρ {cp} cl
     with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
-  ... | c | x | at | refl | kn | gn , S , L , sg , hl | lt with take-at ρ at kn
+  ... | c | x | at | refl | kn | gn , S , L , sg , hl | lt with take-at ρ {c = c} {x} at kn
   ...   | c₀ , refl , at₀ with lifts-split ρ (in-take here) L in eqS
   ...     | _ , lifts-take lifts-here , Lρ =
     rose {σ′ = ρ} {e′ = cp} (then refl now) (one-lower ρ one-take)
@@ -492,7 +492,7 @@ module Ascending (R : Set) where
               (ρ : Path T (connectˢ k r ej rt s b) π) → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ in-body here) e → Called st m₁ (ρ ⊕ in-body here)
   call-body st {m₁ = mach kk clk tms ts} {r = r} {ej} {rt} ρ {nx y} cl
     with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
-  ... | c | x | at | refl | kn | c′ , pv , S , L , sg | lt with body-at ρ at kn
+  ... | c | x | at | refl | kn | c′ , pv , S , L , sg | lt with body-at ρ {c = c} {x} at kn
   ...   | c₀ , refl , at₀ with lifts-split ρ (in-body here) L in eqS
   ...     | _ , lifts-body pt _ lifts-here , Lρ =
     rose {σ′ = ρ} {e′ = nx y} (then refl now) (one-lower ρ one-body)
@@ -520,7 +520,7 @@ module Ascending (R : Set) where
         ; flags = done-up ρ (in-body here) refl (Calling.flags cl) ; kept = Calling.kept cl })
   call-body st {m₁ = mach kk clk tms ts} ρ {cp} cl
     with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
-  ... | c | x | at | refl | kn | gn , S , L , sg , hl | lt with body-at ρ at kn
+  ... | c | x | at | refl | kn | gn , S , L , sg , hl | lt with body-at ρ {c = c} {x} at kn
   ...   | c₀ , refl , at₀ with lifts-split ρ (in-body here) L in eqB
   ...     | _ , Lb , Lρ =
     rose {σ′ = ρ} {e′ = cp} (then refl now) (one-lower ρ one-body)
