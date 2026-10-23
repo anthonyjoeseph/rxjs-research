@@ -7,7 +7,7 @@ module port.Climbs where
 open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_; _++_; [_]; map)
 open import Data.List.Properties using (++-conicalʳ)
-open import Data.List.Relation.Unary.All using ([])
+open import Data.List.Relation.Unary.All as All using ([])
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _<_)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred)
@@ -231,7 +231,7 @@ module Ascending (R : Set) where
       fed-same h (takeWhileˢ _ _ _ s)        d       = fed-same h s d
       fed-same h (flatMapˢ _ _ _ _ _ _ o ls) (d , e) = fed-same h o d , fedL-same h ls e
       fed-same h (connectˢ _ _ _ _ s b)      (d , e) = fed-same h s d , fed-same h b e
-      fed-same h (joinˢ j _ _ _) {π}         d       = λ g → trans (d g) (h _ π j)
+      fed-same h (joinˢ j _ x _) {π} {ν}     d       = λ g → trans (d g) (h (All.lookup ν x) π j)
 
       fedL-same : ∀ {k₁ k₂ : Conf R} → (∀ {X} (b : Feed X) π j → owing k₁ b π j ≡ owing k₂ b π j)
                 → ∀ {Γ B} (ls : List (Sub Γ B)) {π i ν} → FedLanes k₁ ls π i ν → FedLanes k₂ ls π i ν
