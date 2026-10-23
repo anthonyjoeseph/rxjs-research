@@ -40,7 +40,7 @@ module Ascending (R : Set) where
     in-source; in-body; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; cutˢ; laneˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ)
   open Moving R using (plant; planted; plantedᴸ)
   open Ghosting R using (Hopped; Load; _≼_; load; loadOf; hopped-pre; showing; agrees)
-  open GhostingPaths R using (_⊕_; _⊕ᴸ_; Lifts; lifts-here; lifts-map; lifts-scan; lifts-split; lefts-up; healed-split; Lefts; Healed; One; whole; snoc; view;
+  open GhostingPaths R using (_⊕_; _⊕ᴸ_; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-split; lefts-up; healed-split; Lefts; Healed; One; whole; snoc; view;
     height; heightL; one-lower;
     one-map; one-scan; one-cut; one-lane; one-take; one-outer; one-lanes; one-source; one-body)
 
@@ -151,9 +151,6 @@ module Ascending (R : Set) where
     call-cut : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub [] R} {u : Sub Δ A} {v : Sub Δ′ A′} {π τ} (ρ : Path T u π) {s : Path u v τ}
              → One s → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ s) e → Called st m₁ (ρ ⊕ s)
     call-lane : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub [] R} {u : Sub Δ A} {v : Sub Δ′ A′} {π τ} (ρ : Path T u π) {s : Path u v τ}
-              → One s → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ s) e → Called st m₁ (ρ ⊕ s)
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Take.agda
-    call-take : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub [] R} {u : Sub Δ A} {v : Sub Δ′ A′} {π τ} (ρ : Path T u π) {s : Path u v τ}
               → One s → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ s) e → Called st m₁ (ρ ⊕ s)
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Flat/Plant.agda
     call-outer : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub [] R} {u : Sub Δ A} {v : Sub Δ′ A′} {π τ} (ρ : Path T u π) {s : Path u v τ}
@@ -393,13 +390,64 @@ module Ascending (R : Set) where
         ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl
         ; flags = done-up ρ (in-map here) refl (Calling.flags cl) ; kept = Calling.kept cl })
 
+  ------------------------------------------------------------------------
+  -- THE CLIMB THROUGH A TAKEWHILE: a value passed, the take ended over
+  -- it or out under it; an end as it is.
+
+  postulate
+    -- A context climbing through a takeWhile, the take's own frame first.
+    take-at : ∀ {Δ A π} {T : Sub [] R} {i q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ i q tk v) π)
+              {c : Ctx R Δ A} {x} → dirs c ≡ π ++ [ 0 ] → forget T ≡ plug c x
+            → Σ (Ctx R Δ A) λ c₀ → c ≡ inTake i q c₀ × dirs c₀ ≡ π
+
+    -- DEAD ROUTE: the old body reads the take's liveness off a heap cell; the state tree holds it as the `Taking` stage.
+    --
+    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Take.agda
+    gone-take : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {i q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ i q tk v) π)
+              → Calling g ℓ m₁ (ρ ⊕ in-take here) cp → part (takeWhileˢ i q tk v) ≡ nothing
+
+    -- DEAD ROUTE: the old bodies are heap writes of the take's liveness; the state tree's rise rewrites no node.
+    --
+    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Base.agda
+    take-pass : ∀ {g m} (st : Strong g m) {m₁ Δ A π} {T : Sub [] R} {i q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ i q tk v) π) {y}
+              → q y ≡ true → Calling g (loadOf st) m₁ (ρ ⊕ in-take here) (nx y) → Called st m₁ (ρ ⊕ in-take here)
+    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Take.agda
+    take-out : ∀ {g m} (st : Strong g m) {m₁ Δ A π} {T : Sub [] R} {i q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ i q tk v) π) {y}
+             → q y ≡ false → i ≡ true → Calling g (loadOf st) m₁ (ρ ⊕ in-take here) (nx y) → Called st m₁ (ρ ⊕ in-take here)
+    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Take.agda
+    take-end : ∀ {g m} (st : Strong g m) {m₁ Δ A π} {T : Sub [] R} {i q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ i q tk v) π) {y}
+             → q y ≡ false → i ≡ false → Calling g (loadOf st) m₁ (ρ ⊕ in-take here) (nx y) → Called st m₁ (ρ ⊕ in-take here)
+
+  call-take : ∀ {g m} (st : Strong g m) {m₁ Δ A π} {T : Sub [] R} {i q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ i q tk v) π)
+            → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ in-take here) e → Called st m₁ (ρ ⊕ in-take here)
+  call-take st {i = i} {q} ρ {nx y} cl with q y in qy | i in ii
+  ... | true  | _     = take-pass st ρ qy cl
+  ... | false | true  = take-out st ρ qy ii cl
+  ... | false | false = take-end st ρ qy ii cl
+  call-take st {m₁ = mach k clk tms ts} {i = i} {q} {tk} {v} ρ {cp} cl
+    with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
+  ... | c | x | at | refl | kn | gn , S , L , sg , hl | lt with take-at ρ at kn
+  ...   | c₀ , refl , at₀ with lifts-split ρ (in-take here) L in eqS
+  ...     | _ , lifts-take lifts-here , Lρ =
+    rose {σ′ = ρ} {e′ = cp} (then refl now) (one-lower ρ one-take)
+      (record
+        { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = refl ; at = at₀
+        ; lifted = gone-take ρ cl , S , Lρ , sg , healed-split ρ (in-take here) hl
+        ; lefts = lefts-up ρ (in-take here) eqS lt ; rest-heads = Calling.rest-heads cl
+        ; owned = owned-rise (Calling.owned cl) ; kernels = kn ; meaning = fed-same (λ _ _ _ → refl) _ (Calling.meaning cl)
+        ; queue = Calling.queue cl
+        ; books = record { clocked = Books.clocked (Calling.books cl) ; ticked = Books.ticked (Calling.books cl) ; turned = Books.turned (Calling.books cl) }
+        ; sorted = sorted-step (Calling.sorted cl) refl
+        ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl
+        ; flags = done-up ρ (in-take here) refl (Calling.flags cl) ; kept = Calling.kept cl })
+
   call-step : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub [] R} {u : Sub Δ A} {v : Sub Δ′ A′} {π τ}
               (ρ : Path T u π) {s : Path u v τ} → One s → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ s) e → Called st m₁ (ρ ⊕ s)
   call-step st ρ one-map         cl = call-map st ρ cl
   call-step st ρ one-scan        cl = call-scan st ρ cl
   call-step st ρ o@one-cut       cl = call-cut st ρ o cl
   call-step st ρ o@one-lane      cl = call-lane st ρ o cl
-  call-step st ρ o@one-take      cl = call-take st ρ o cl
+  call-step st ρ one-take        cl = call-take st ρ cl
   call-step st ρ o@one-outer     cl = call-outer st ρ o cl
   call-step st ρ o@(one-lanes _) cl = call-lanes st ρ o cl
   call-step st ρ o@one-source    cl = call-source st ρ o cl
