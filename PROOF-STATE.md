@@ -4,31 +4,23 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ## Tier 0 — the port
 
-**Port:** the old `adequacy/` tower carried to the state tree in `port/`, old names only (`make port-check`).
+**Port:** the old `adequacy/` tower carried to the state tree in `port/`, old names only (`make port-check`, deleted with this tier).
 
 ### Ledger
 
 #### THE STRONG STEP
 
-Untried: whether each control state's step keeps `Carried` on the state
-tree — the old Climbs columns over `Sub` instead of the heap. Suspect:
-`Meaning`'s `owing` zips a subject's feeds with its feeding jobs, which
-`Owned` does not yet align. Settled when the onward leaves are bodies,
-the resumed jobs first.
+Whether the old climb and fire bodies carry once a heap write reads as a
+`plant` and an owed job as a push onto `rets`: the old `Frame` and `Retag`
+lemmas over the planted tree. Nine are marked as not carrying on the heap
+reading. Settled when `port/Frame` typechecks and a scan part is its old body.
 
-Members: `of-path`, `emit-shut`, `last-void`, `last-enter`, `emit-void`,
-`emit-open`, `call-map`, `call-scan`, `call-cut`, `call-lane`, `call-take`,
-`call-outer`, `call-lanes`, `call-source`, `call-body`, `kont-onward`,
-`take-path`, `take1-void`, `take1-enter`, `cut-torn`, `cut-owned`,
-`cut-meaning`, `cut-queue`, `cut-turned`, `cut-sorted`, `cut-behind`,
-`cut-lingers`, `cut-told`, `cut-ended`, `cut-flags`, `cut-load`,
-`feed-onward`, `src-onward`, `src-cut-onward`, `body-cut-onward`,
-`join-onward`, `owned-idle`, `meaning-idle`, `sorted-idle`, `downs-plug`, `owned-popped`, `meaning-pop`,
-`sorted-pop`, `pop-queue`, `pop-behind`, `pop-told`, `owned-dropped`, `meaning-drop`, `sorted-drop`, `sub-cold`, `sub-empty`, `sub-of`, `sub-map`, `sub-scan`, `sub-take`,
-`sub-flat`, `sub-connect`, `sub-joined`, `sub-defer`, `burst-spent`, `burst-poll`, `burst-play`, `burst-finish`, `fire-kernels`, `fire-part`, `fire-load`,
-`fire-owned`, `fire-meaning`, `fire-timed`, `fire-joined`, `fire-sorted`, `fire-flags`,
-`fire-told`, `fire-ended`, `behind-fire`, `fire-lingers`,
-`meaning-note`, `sorted-note`, `note-least`, `turn-dry`.
+Members: `emit-void`, `emit-open`, `scan-kernels`, `scan-lifts`,
+`scan-lefts`, `scan-owned`, `scan-meaning`, `scan-queue`, `scan-behind`,
+`scan-lingers`, `scan-flags`, `gone-take`,
+`take-pass`, `take-out`, `take-end`, `call-outer`, `call-lanes`,
+`call-source`, `body-rest-heads`, `owned-body`, `burst-spent`,
+`behind-fire`, `fire-lingers`.
 
 #### THE WALK
 
@@ -36,6 +28,39 @@ Untried: whether the old well-configuration walk carries to the state tree's
 step. Settled when `WellMach` is a ported body and `preserve` goes through.
 
 Members: `WellMach`, `preserve`, `begin-well`.
+
+## Tier 1 — the adequacy theorem
+
+**Adequacy:** the denotation matches the operational semantics.
+
+### Ledger
+
+#### THE JOB STACK
+
+Suspect: `Meaning`'s `owing` zips a subject's feeds with its feeding jobs,
+which `Owned` does not yet align. Whether a job pushed, popped, dropped or
+left idle keeps the carrier. Settled when `owned-popped` and `meaning-pop`
+are bodies or refuted.
+
+Members: `owned-idle`, `meaning-idle`, `sorted-idle`, `owned-popped`,
+`meaning-pop`, `sorted-pop`, `pop-queue`, `pop-behind`, `pop-told`,
+`owned-dropped`, `meaning-drop`, `sorted-drop`, `meaning-note`,
+`sorted-note`, `note-least`, `turn-dry`, `downs-plug`, `kont-onward`,
+`feed-onward`, `src-onward`, `join-onward`, `src-cut-onward`,
+`body-cut-onward`, `body-meaning`, `body-books`.
+
+#### THE CUT AND THE FIRE
+
+Untried: whether a cut node's step and a timer's fire keep each carrier part
+on the state tree. The cut node has no old counterpart. Settled when
+`cut-owned` and `fire-owned` are bodies.
+
+Members: `call-cut`, `cut-torn`, `cut-owned`, `cut-meaning`, `cut-queue`,
+`cut-turned`, `cut-sorted`, `cut-behind`, `cut-lingers`, `cut-told`,
+`cut-ended`, `cut-flags`, `cut-load`, `fire-kernels`, `fire-part`,
+`fire-load`, `fire-owned`, `fire-meaning`, `fire-timed`, `fire-joined`,
+`fire-sorted`, `fire-flags`, `fire-told`, `fire-ended`, `burst-poll`,
+`burst-play`, `burst-finish`.
 
 #### THE ROOT STEP
 
@@ -45,11 +70,22 @@ admitted lanes; a defer's program, subscribed or fed. Settled when
 
 Members: `flat-within`, `defer-within`, `defer-fed`, `under-shown-connect`.
 
-## Tier 1 — the adequacy theorem
+#### THE SUBSCRIBE
 
-**Adequacy:** the denotation matches the operational semantics.
+Untried: whether subscribing each operator keeps the carrier. Settled when
+`sub-flat` and `sub-connect` are bodies.
 
-### Ledger
+Members: `sub-cold`, `sub-empty`, `sub-of`, `sub-map`, `sub-scan`,
+`sub-take`, `sub-flat`, `sub-connect`, `sub-joined`, `sub-defer`.
+
+#### THE CLIMB FRAMES
+
+Believed unfoldings: a context climbing one frame, and the climbs with no old
+body. Settled when each is a body.
+
+Members: `of-path`, `map-at`, `scan-at`, `take-at`, `take-path`, `body-at`,
+`scan-books`, `scan-load`, `scan-told`, `scan-ended`, `call-lane`, `emit-shut`, `last-void`,
+`last-enter`, `take1-void`, `take1-enter`.
 
 #### THE LINK
 

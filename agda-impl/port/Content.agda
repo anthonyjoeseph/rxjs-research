@@ -179,6 +179,8 @@ module Honesty (R : Set) where
 
     -- A TAKEWHILE'S CUT, ON THE WITNESS: the tree with that node torn,
     -- read alike by the ghost (`part`), and every column kept.
+    --
+    -- RECOVERY: git show b039ebbb restores `port/Frame`, `port/Retag` and `port/Retag/Shut`, the old shut lemmas over the denotation's nodes (`untold-apart`, `shut-down`, `tells`), untypechecked
     cut-torn : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩
              → Σ (Sub [] R) λ t′ → Kernels t′ ⟨ c , takeS i q (proj₁ (cut s)) , absorbed , p , rs ⟩ × part t′ ≡ part (Carried.tree cr)
     cut-owned : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) (e : Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩)
