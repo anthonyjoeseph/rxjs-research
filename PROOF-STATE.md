@@ -17,7 +17,7 @@ tree — the old Climbs columns over `Sub` instead of the heap. Suspect:
 the resumed jobs first.
 
 Members: `of-path`, `emit-shut`, `last-void`, `last-enter`, `emit-void`,
-`emit-open`, `call-map`, `scan-at`, `scan-kernels`, `scan-lifts`,
+`emit-open`, `map-at`, `scan-at`, `scan-kernels`, `scan-lifts`,
 `scan-lefts`, `scan-owned`, `scan-meaning`, `scan-queue`, `scan-books`,
 `scan-behind`, `scan-lingers`, `scan-told`, `scan-ended`, `scan-flags`,
 `scan-load`, `call-cut`, `call-lane`, `call-take`,
