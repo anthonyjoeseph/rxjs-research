@@ -28,7 +28,7 @@ Members: `of-path`, `emit-shut`, `last-void`, `last-enter`, `emit-void`,
 `cut-lingers`, `cut-told`, `cut-ended`, `cut-flags`, `cut-load`,
 `feed-onward`, `src-onward`, `src-cut-onward`, `body-cut-onward`,
 `join-onward`, `owned-idle`, `meaning-idle`, `sorted-idle`, `downs-plug`, `owned-popped`, `meaning-pop`,
-`sorted-pop`, `owned-dropped`, `meaning-drop`, `sorted-drop`, `sub-cold`, `sub-empty`, `sub-of`, `sub-map`, `sub-scan`, `sub-take`,
+`sorted-pop`, `pop-queue`, `pop-behind`, `pop-told`, `owned-dropped`, `meaning-drop`, `sorted-drop`, `sub-cold`, `sub-empty`, `sub-of`, `sub-map`, `sub-scan`, `sub-take`,
 `sub-flat`, `sub-connect`, `sub-joined`, `sub-defer`, `burst-spent`, `burst-poll`, `burst-play`, `burst-finish`, `fire-kernels`, `fire-part`, `fire-load`,
 `fire-owned`, `fire-meaning`, `fire-timed`, `fire-joined`, `fire-sorted`, `fire-flags`,
 `fire-told`, `fire-ended`, `behind-fire`, `fire-lingers`,
@@ -40,6 +40,14 @@ Untried: whether the old well-configuration walk carries to the state tree's
 step. Settled when `WellMach` is a ported body and `preserve` goes through.
 
 Members: `WellMach`, `preserve`, `begin-well`.
+
+#### THE ROOT STEP
+
+Whether a step, its sources clear of it, keeps its parts placed: a flatMap's
+admitted lanes; a defer's program, subscribed or fed. Settled when
+`flat-within` is a body or refuted.
+
+Members: `flat-within`, `defer-within`, `defer-fed`, `under-shown-connect`.
 
 ## Tier 1 — the adequacy theorem
 
