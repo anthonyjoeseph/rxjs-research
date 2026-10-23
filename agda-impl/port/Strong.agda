@@ -18,7 +18,7 @@ open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_)
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Empty using (⊥)
-open import Data.List.Relation.Unary.All using (All; []; lookup)
+open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup)
 open import Data.List.Relation.Unary.Linked using (Linked; [])
 import Data.List.Relation.Unary.Any as Any
 open import Data.Maybe using (Maybe; just; nothing; is-just; is-nothing)
@@ -479,7 +479,7 @@ module Strongly (R : Set) where
       subject : CS X
       ended   : Maybe Pos
 
-  Now : List Set → Set
+  Now : List Set → Set₁
   Now = All Feed
 
   private
