@@ -455,15 +455,15 @@ module Ascending (R : Set) where
             → Σ (Ctx R Δ B) λ c₀ → c ≡ inBody k (forget s) c₀ × dirs c₀ ≡ π
 
   private
-   -- A connect whose body is gone is gone.
+    -- A connect whose body is gone is gone.
     gone-connect : ∀ {Δ X B} {k r ej rt} {s : Sub Δ X} {b : Sub (X ∷ Δ) B} → part b ≡ nothing → part (connectˢ k r ej rt s b) ≡ nothing
-   gone-connect gn rewrite gn = refl
+    gone-connect gn rewrite gn = refl
 
-   -- An end lifted out of a body is the connect's end.
-   body-end : ∀ {Δ X B} {k r ej rt} {s : Sub Δ X} {b : Sub (X ∷ Δ) B} {q S}
-            → Lifts (in-body {k = k} {r = r} {e = ej} {rt = rt} {s = s} (here {t = b})) (U.endˢ q) S → S ≡ U.endˢ q
-   body-end (lifts-body _ _ lifts-here)   = refl
-   body-end (lifts-shut _ _ _ lifts-here) = refl
+    -- An end lifted out of a body is the connect's end.
+    body-end : ∀ {Δ X B} {k r ej rt} {s : Sub Δ X} {b : Sub (X ∷ Δ) B} {q S}
+             → Lifts (in-body {k = k} {r = r} {e = ej} {rt = rt} {s = s} (here {t = b})) (U.endˢ q) S → S ≡ U.endˢ q
+    body-end (lifts-body _ _ lifts-here)   = refl
+    body-end (lifts-shut _ _ _ lifts-here) = refl
 
   postulate
     -- DEAD ROUTE: the old body reads the body's rest off the heap's leftover; the state tree's leftover is `Strong`'s.
