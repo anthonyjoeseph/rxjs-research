@@ -257,6 +257,10 @@ sorted-headed : ∀ {Γ} (ρ : NEnv Γ) → Sorted ρ → Everyᴱ Headed ρ
 sorted-headed []ᴬ      _            = tt
 sorted-headed (e ∷ᴬ ρ) (_ , h , so) = h , sorted-headed ρ so
 
+sorted-lookup : ∀ {Γ A} (ρ : NEnv Γ) → Sorted ρ → (i : A ∈ Γ) → Ordered (lookup ρ i) × Steady (lookup ρ i)
+sorted-lookup (e ∷ᴬ ρ) (o , _ , so) (here refl) = o
+sorted-lookup (e ∷ᴬ ρ) (o , _ , so) (there i)   = sorted-lookup ρ so i
+
 -- A connect's body steps neither where its source steps nor where that
 -- shows: the two subscribed apart.
 --

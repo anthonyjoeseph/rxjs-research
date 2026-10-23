@@ -2,37 +2,96 @@
 
 module port.Placed where
 
-open import Data.List using ([]; _++_; [_])
+open import Data.List using ([]; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
-open import Data.Product using (_,_; proj₁)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Data.Sum using (inj₁)
+open import Relation.Binary.PropositionalEquality using (subst; sym)
 open import Relation.Nullary using (¬_)
 
 import Tree as T
-open import Tree using (Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList.Events using (Timeline; ix; root; timelineAt)
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
-open import port.Finite using (Finite; trunc; finite-trunc; trunc-agree)
+open import port.Finite using (Finite; map-f; scan-f; takeWhile-f; flatMap-f; connect-f; defer-f; trunc; finite-trunc; trunc-agree)
 open import port.Placed.Order using (Alienᴱ; Headed; Ordered; Owned; Placed; Sorted; Steady;
-  every-lookup; headed-snoc; prefix-++)
+  every-lookup; headed-snoc; ordered-map; ordered-rejoin; ordered-scan; prefix-++;
+  sorted-lookup; steady-map; steady-rejoin; steady-scan)
 open import port.Placed.Keys using (alienᴱ-owned; every-reach; ordered-lim; steady-lim)
 open import port.Placed.Heads using (apart-sub; headed-lane; start-within)
-open import port.Placed.Rising using (alien-shown; alien-sub; headed-sub)
+open import port.Placed.Rising using (alien-shown; alien-sub; headed-sub;
+  ordered-defer; ordered-of; ordered-start; ordered-take;
+  steady-defer; steady-of; steady-start; steady-take)
+open import port.Placed.Trail using (Trailing)
 
 postulate
-  -- A FINITE PROGRAM SUBSCRIBED IS IN ORDER.
+  -- A FLATMAP SUBSCRIBED MERGES IN ORDER AND STEADY, ITS CUTS TRAILING
+  -- IT: over sorted sources alien to where it subscribes.
   --
   -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Placed.agda
-  ordered-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
-               → Ordered (U.meaning (U.subscribe o p) ρ)
+  --
+  -- REFUTED: 37b70651 of any outer node in order, by a joiner told a value and a skip at one position
+  -- REFUTED: 0d0df253 wherever no tick heads the position, a lane's timer frame sorting before the step admitting it
+  flat-calm : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) → (∀ a → Finite (f a)) → Finite s
+            → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+            → Ordered (U.meaning (U.subscribe (flatMap op f s) p) ρ) × Steady (U.meaning (U.subscribe (flatMap op f s) p) ρ)
+              × Trailing (U.stateᴺ (U.subscribe (flatMap op f s) p) ρ)
 
-  -- A FINITE PROGRAM SUBSCRIBED IS STEADY.
+  -- A CONNECT SUBSCRIBED IS IN ORDER.
   --
   -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Placed.agda
-  steady-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
-              → Steady (U.meaning (U.subscribe o p) ρ)
+  ordered-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b
+                  → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+                  → Ordered (U.meaning (U.subscribe (connect s b) p) ρ)
+
+  -- A CONNECT SUBSCRIBED WHERE A TICK HEADS IS STEADY.
+  --
+  -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Placed.agda
+  steady-connect : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Finite s → Finite b
+                 → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+                 → Steady (U.meaning (U.subscribe (connect s b) p) ρ)
+
+-- A FINITE PROGRAM SUBSCRIBED IS IN ORDER, where a tick heads, over
+-- sorted sources alien to where it subscribes.
+ordered-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+             → Ordered (U.meaning (U.subscribe o p) ρ)
+ordered-subᶠ (cold c) _ p ρ hp so cl = subst Ordered (sym (U.start-meaning p (timelineAt c p) ρ)) (ordered-start p (timelineAt c p) hp)
+ordered-subᶠ empty _ p ρ hp so cl = record { ordered = tt }
+ordered-subᶠ (of xs) _ p ρ hp so cl = ordered-of p 0 xs
+ordered-subᶠ (map f s) (map-f fs) p ρ hp so cl = ordered-map f _ (ordered-subᶠ s fs p ρ hp so cl)
+ordered-subᶠ (scan f z s) (scan-f fs) p ρ hp so cl = ordered-scan f z _ (ordered-subᶠ s fs p ρ hp so cl)
+ordered-subᶠ (takeWhile i q s) (takeWhile-f fs) p ρ hp so cl = ordered-take i q _ (ordered-subᶠ s fs p ρ hp so cl)
+ordered-subᶠ (flatMap op f s) (flatMap-f ff fs) p ρ hp so cl = proj₁ (flat-calm op f s ff fs p ρ hp so cl)
+ordered-subᶠ (connect s b) (connect-f fs fb) p ρ hp so cl = ordered-connect s b fs fb p ρ hp so cl
+ordered-subᶠ (connected i) _ p ρ hp so cl = ordered-rejoin p _ (proj₁ sl) (proj₂ sl)
+  where sl = sorted-lookup ρ so i
+ordered-subᶠ (defer l) (defer-f fl) p ρ hp so cl =
+  ordered-defer l p ρ hp cl (ordered-subᶠ (Later.force l) fl (p ++ [ ix 1 ]) ρ (headed-snoc p hp) so
+                               (alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl))
+
+-- A FINITE PROGRAM SUBSCRIBED IS STEADY, where a tick heads, over
+-- sorted sources alien to where it subscribes.
+--
+-- REFUTED: 91953190 at the empty position, a lane's timer frame shown just inside the outer's step at its tick
+-- REFUTED: 0d0df253 off the empty position where no tick heads it, that frame sorting before the step
+-- REFUTED: 42e70878 over sources stepping and then emitting at one position, a takeWhile showing the value inside the step
+steady-subᶠ : ∀ {Γ A} (o : Obs Timeline Γ A) → Finite o → ∀ p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+            → Steady (U.meaning (U.subscribe o p) ρ)
+steady-subᶠ (cold c) _ p ρ hp so cl = subst Steady (sym (U.start-meaning p (timelineAt c p) ρ)) (steady-start p (timelineAt c p) hp)
+steady-subᶠ empty _ p ρ hp so cl = record { steady = tt }
+steady-subᶠ (of xs) _ p ρ hp so cl = steady-of p 0 xs
+steady-subᶠ (map f s) (map-f fs) p ρ hp so cl = steady-map f _ (steady-subᶠ s fs p ρ hp so cl)
+steady-subᶠ (scan f z s) (scan-f fs) p ρ hp so cl = steady-scan f z _ (steady-subᶠ s fs p ρ hp so cl)
+steady-subᶠ (takeWhile i q s) (takeWhile-f fs) p ρ hp so cl = steady-take i q _ (steady-subᶠ s fs p ρ hp so cl)
+steady-subᶠ (flatMap op f s) (flatMap-f ff fs) p ρ hp so cl = proj₁ (proj₂ (flat-calm op f s ff fs p ρ hp so cl))
+steady-subᶠ (connect s b) (connect-f fs fb) p ρ hp so cl = steady-connect s b fs fb p ρ hp so cl
+steady-subᶠ (connected i) _ p ρ hp so cl =
+  steady-rejoin p _ (proj₁ (sorted-lookup ρ so i)) (proj₂ (sorted-lookup ρ so i)) (every-lookup (λ h → ¬ Owned p h) ρ cl i)
+steady-subᶠ (defer l) (defer-f fl) p ρ hp so cl =
+  steady-defer l p ρ hp cl (steady-subᶠ (Later.force l) fl (p ++ [ ix 1 ]) ρ (headed-snoc p hp) so
+                              (alienᴱ-owned p (p ++ [ ix 1 ]) (inj₁ (prefix-++ p [ ix 1 ])) ρ cl))
 
 -- A PROGRAM SUBSCRIBED IS IN ORDER AND STEADY: its truncations are, and
 -- it agrees with each for as many steps as it is deep.

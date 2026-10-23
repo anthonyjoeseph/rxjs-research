@@ -512,6 +512,31 @@ rises (rising-of p i [])           = tt
 rises (rising-of p i (x ∷ []))     = ix-last p i , rising-of p (suc i) []
 rises (rising-of p i (x ∷ y ∷ xs)) = next-ix p i , rising-of p (suc i) (y ∷ xs)
 
+-- A COLD LEAF'S START RISES where a tick heads it: frames at rising
+-- ticks, each burst within its frame's tick.
+--
+-- REFUTED: 6f6818f6 wherever no tick heads the position, a timer's frame at a bare tick sorting before the burst behind it
+rising-start : ∀ {A} p (m : From A 0) → Headed p → Rising (M′.start p m)
+rising-start (ix τ ∷ q)  (M.at zero _ b)    hp = rising-burst τ τ q 0 b (sym (+-identityʳ τ))
+rising-start []          (M.at zero _ b)    ()
+rising-start (sub _ ∷ _) (M.at zero _ b)    ()
+rising-start (last ∷ _)  (M.at zero _ b)    ()
+rising-start p           (M.at (suc t) l b) hp = rising-frames (tick p) (p ++ [ last ]) (M.at (suc t) l b)
+rising-start p           M.done             hp = rising-frames {t = 0} (tick p) (p ++ [ last ]) M.done
+rising-start p           M.quiet            hp = rising-frames {t = 0} (tick p) (p ++ [ last ]) M.quiet
+
+ordered-start : ∀ {A} p (m : From A 0) → Headed p → Ordered (M′.start p m)
+ordered-start p m hp = rising-ordered _ (rising-start p m hp)
+
+steady-start : ∀ {A} p (m : From A 0) → Headed p → Steady (M′.start p m)
+steady-start p m hp = rising-steady _ (rising-start p m hp)
+
+ordered-of : ∀ {A} p i (xs : List A) → Ordered (M′.ofᴱ p i xs)
+ordered-of p i xs = rising-ordered _ (rising-of p i xs)
+
+steady-of : ∀ {A} p i (xs : List A) → Steady (M′.ofᴱ p i xs)
+steady-of p i xs = rising-steady _ (rising-of p i xs)
+
 -- A position one label down from another is inside only what that one
 -- is inside or is.
 ext-snoc : ∀ k h x → Ext k (h ++ [ x ]) → Ext k h ⊎ k ≡ h
