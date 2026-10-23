@@ -101,3 +101,35 @@ named obstacles, so the next spike starts there: can a joiner's and a
 cold's keys be defined from their position in the tree, with the
 connect's `next` the min over its body and its source's next
 emissions, tagged?
+
+### Idea 3, first test: the machine's next as the stepper's head
+
+The compositional stepper already exists: `denotation.Unfold.step` is
+structural recursion, and every decision it makes (`pick`, `raceˢ`,
+`sourceˢ`, `aheadˢ`, `burstsˢ`, `unionˢ`) reads only its children's head
+positions. Hypothesis H: per node, the engine's next key is the head of
+`step (gh s)` (or at most it, for a silent step). H composes through min
+and needs neither `Ord` nor births, provided every engine decision mirrors
+the stepper's.
+
+- **Tie rules alone do not diverge** (`passing-agree`): two lanes on one
+  key take the older lane in both.
+- **H is false of today's engine, per node** (`spike.MarkedGap`). The
+  engine runs a step at its key; the stepper races steps by where their
+  EVENT sits. A failing inclusive takeWhile runs at its source's key `k`
+  and shows at `k ⊕ ix 0`. Two lanes on one key, the first under such a
+  takeWhile: the engine shows the first lane's value, the stepper the
+  second's (`engine-first`, `stepper-first`), and every node maps to its
+  ghost. Agreement in such a gap holds only if no other node holds a key
+  inside it — pairs again.
+- **So the repair is in the engine, not the invariant**: a node's key
+  must be the position of the event its next step makes, not the
+  position it runs at. For takeWhile that means peeking at its source's
+  next value; that is a function of the child's observation, so the step
+  stays compositional, but the TS must mirror the peek.
+
+Next: list every former whose run position and event position differ
+(takeWhile failing, the connect's `q ⊕ ix 0` source comparison, a
+joiner's feed, a cold's cascade), give the engine event-position keys for
+each, port to TS and let the oracle judge; then K1 (of / map / empty /
+merge) preservation of H.
