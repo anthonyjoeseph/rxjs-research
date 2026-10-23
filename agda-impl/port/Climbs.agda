@@ -329,11 +329,11 @@ module Ascending (R : Set) where
       (record
         { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = refl ; at = at₀
         ; lifted = scan-lifts ρ cl ; lefts = scan-lefts ρ cl ; rest-heads = tt
-        ; owned = scan-owned ρ cl refl ; kernels = scan-kernels ρ at₀ kn (f z y) ; meaning = scan-meaning ρ cl refl
+        ; owned = scan-owned ρ cl refl ; kernels = scan-kernels ρ {c₀ = c₀} {x} at₀ kn (f z y) ; meaning = scan-meaning ρ cl refl
         ; queue = scan-queue ρ cl ; books = scan-books ρ cl refl ; sorted = sorted-step (Calling.sorted cl) refl
         ; behind = scan-behind ρ cl ; lingers = scan-lingers ρ cl ; told = scan-told ρ cl ; ended = scan-ended ρ cl
         ; flags = scan-flags ρ cl ; kept = subst (_≼ loadOf st) (sym (scan-load ρ cl refl)) (Calling.kept cl) })
-  call-scan st {m₁ = mach k clk tms ts} {f = f} {z} {v} ρ {cp} cl
+  call-scan st {m₁ = mach k clk tms ts} {T = T} {f = f} {z} {v} ρ {cp} cl
     with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
   ... | c | x | at | refl | kn | gn , S , L , sg , hl | lt with scan-at ρ {c = c} {x} at kn
   ...   | c₀ , refl , at₀ with lifts-split ρ (in-scan here) L in eqS
@@ -343,7 +343,7 @@ module Ascending (R : Set) where
         { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = refl ; at = at₀
         ; lifted = cong (mapᴹ (U.scanᶜ f z)) gn , S , Lρ , sg , healed-split ρ (in-scan here) hl
         ; lefts = lefts-up ρ (in-scan here) eqS lt ; rest-heads = Calling.rest-heads cl
-        ; owned = owned-rise (Calling.owned cl) ; kernels = kn ; meaning = fed-same (λ _ _ _ → refl) _ (Calling.meaning cl)
+        ; owned = owned-rise (Calling.owned cl) ; kernels = kn ; meaning = fed-same (λ _ _ _ → refl) T (Calling.meaning cl)
         ; queue = Calling.queue cl
         ; books = record { clocked = Books.clocked (Calling.books cl) ; ticked = Books.ticked (Calling.books cl) ; turned = Books.turned (Calling.books cl) }
         ; sorted = sorted-step (Calling.sorted cl) refl
@@ -361,7 +361,7 @@ module Ascending (R : Set) where
 
   call-map : ∀ {g m} (st : Strong g m) {m₁ Δ A B π} {T : Sub [] R} {f : A → B} {v : Sub Δ A} (ρ : Path T (mapˢ f v) π)
            → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ in-map here) e → Called st m₁ (ρ ⊕ in-map here)
-  call-map st {m₁ = mach k clk tms ts} {f = f} {v} ρ {nx y} cl
+  call-map st {m₁ = mach k clk tms ts} {T = T} {f = f} {v} ρ {nx y} cl
     with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
   ... | c | x | at | refl | kn | c′ , pv , S , L , sg | lt with map-at ρ {c = c} {x} at kn
   ...   | c₀ , refl , at₀ with lifts-split ρ (in-map here) L in eqS
@@ -371,13 +371,13 @@ module Ascending (R : Set) where
         { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = refl ; at = at₀
         ; lifted = U.mapᶜ f c′ , cong (mapᴹ (U.mapᶜ f)) pv , S , Lρ , sg
         ; lefts = lefts-up ρ (in-map here) eqS lt ; rest-heads = tt
-        ; owned = owned-rise (Calling.owned cl) ; kernels = kn ; meaning = fed-same (λ _ _ _ → refl) _ (Calling.meaning cl)
+        ; owned = owned-rise (Calling.owned cl) ; kernels = kn ; meaning = fed-same (λ _ _ _ → refl) T (Calling.meaning cl)
         ; queue = Calling.queue cl
         ; books = record { clocked = Books.clocked (Calling.books cl) ; ticked = Books.ticked (Calling.books cl) ; turned = Books.turned (Calling.books cl) }
         ; sorted = sorted-step (Calling.sorted cl) refl
         ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl
         ; flags = done-up ρ (in-map here) refl (Calling.flags cl) ; kept = Calling.kept cl })
-  call-map st {m₁ = mach k clk tms ts} {f = f} {v} ρ {cp} cl
+  call-map st {m₁ = mach k clk tms ts} {T = T} {f = f} {v} ρ {cp} cl
     with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
   ... | c | x | at | refl | kn | gn , S , L , sg , hl | lt with map-at ρ {c = c} {x} at kn
   ...   | c₀ , refl , at₀ with lifts-split ρ (in-map here) L in eqS
@@ -387,7 +387,7 @@ module Ascending (R : Set) where
         { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = refl ; at = at₀
         ; lifted = cong (mapᴹ (U.mapᶜ f)) gn , S , Lρ , sg , healed-split ρ (in-map here) hl
         ; lefts = lefts-up ρ (in-map here) eqS lt ; rest-heads = Calling.rest-heads cl
-        ; owned = owned-rise (Calling.owned cl) ; kernels = kn ; meaning = fed-same (λ _ _ _ → refl) _ (Calling.meaning cl)
+        ; owned = owned-rise (Calling.owned cl) ; kernels = kn ; meaning = fed-same (λ _ _ _ → refl) T (Calling.meaning cl)
         ; queue = Calling.queue cl
         ; books = record { clocked = Books.clocked (Calling.books cl) ; ticked = Books.ticked (Calling.books cl) ; turned = Books.turned (Calling.books cl) }
         ; sorted = sorted-step (Calling.sorted cl) refl
@@ -428,7 +428,7 @@ module Ascending (R : Set) where
   ... | true  | _     = take-pass st ρ qy cl
   ... | false | true  = take-out st ρ qy refl cl
   ... | false | false = take-end st ρ qy refl cl
-  call-take st {m₁ = mach k clk tms ts} {i = i} {q} {tk} {v} ρ {cp} cl
+  call-take st {m₁ = mach k clk tms ts} {T = T} {i = i} {q} {tk} {v} ρ {cp} cl
     with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
   ... | c | x | at | refl | kn | gn , S , L , sg , hl | lt with take-at ρ {c = c} {x} at kn
   ...   | c₀ , refl , at₀ with lifts-split ρ (in-take here) L in eqS
@@ -438,7 +438,7 @@ module Ascending (R : Set) where
         { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = refl ; at = at₀
         ; lifted = gone-take ρ cl , S , Lρ , sg , healed-split ρ (in-take here) hl
         ; lefts = lefts-up ρ (in-take here) eqS lt ; rest-heads = Calling.rest-heads cl
-        ; owned = owned-rise (Calling.owned cl) ; kernels = kn ; meaning = fed-same (λ _ _ _ → refl) _ (Calling.meaning cl)
+        ; owned = owned-rise (Calling.owned cl) ; kernels = kn ; meaning = fed-same (λ _ _ _ → refl) T (Calling.meaning cl)
         ; queue = Calling.queue cl
         ; books = record { clocked = Books.clocked (Calling.books cl) ; ticked = Books.ticked (Calling.books cl) ; turned = Books.turned (Calling.books cl) }
         ; sorted = sorted-step (Calling.sorted cl) refl
@@ -490,7 +490,7 @@ module Ascending (R : Set) where
 
   call-body : ∀ {g m} (st : Strong g m) {m₁ Δ X B π} {T : Sub [] R} {k r ej rt} {s : Sub Δ X} {b : Sub (X ∷ Δ) B}
               (ρ : Path T (connectˢ k r ej rt s b) π) → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ in-body here) e → Called st m₁ (ρ ⊕ in-body here)
-  call-body st {m₁ = mach kk clk tms ts} {r = r} {ej} {rt} ρ {nx y} cl
+  call-body st {m₁ = mach kk clk tms ts} {T = T} {r = r} {ej} {rt} ρ {nx y} cl
     with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
   ... | c | x | at | refl | kn | c′ , pv , S , L , sg | lt with body-at ρ {c = c} {x} at kn
   ...   | c₀ , refl , at₀ with lifts-split ρ (in-body here) L in eqS
@@ -500,7 +500,7 @@ module Ascending (R : Set) where
         { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = refl ; at = at₀
         ; lifted = _ , cong₂ (connected r ej rt) pt pv , S , Lρ , sg
         ; lefts = lefts-up ρ (in-body here) eqS lt ; rest-heads = tt
-        ; owned = owned-rise (Calling.owned cl) ; kernels = kn ; meaning = fed-same (λ _ _ _ → refl) _ (Calling.meaning cl)
+        ; owned = owned-rise (Calling.owned cl) ; kernels = kn ; meaning = fed-same (λ _ _ _ → refl) T (Calling.meaning cl)
         ; queue = Calling.queue cl
         ; books = record { clocked = Books.clocked (Calling.books cl) ; ticked = Books.ticked (Calling.books cl) ; turned = Books.turned (Calling.books cl) }
         ; sorted = sorted-step (Calling.sorted cl) refl
@@ -512,13 +512,13 @@ module Ascending (R : Set) where
         { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = refl ; at = at₀
         ; lifted = _ , cong₂ (connected r ej rt) pt pv , S , Lρ , sg
         ; lefts = lefts-up ρ (in-body here) eqS lt ; rest-heads = tt
-        ; owned = owned-rise (Calling.owned cl) ; kernels = kn ; meaning = fed-same (λ _ _ _ → refl) _ (Calling.meaning cl)
+        ; owned = owned-rise (Calling.owned cl) ; kernels = kn ; meaning = fed-same (λ _ _ _ → refl) T (Calling.meaning cl)
         ; queue = Calling.queue cl
         ; books = record { clocked = Books.clocked (Calling.books cl) ; ticked = Books.ticked (Calling.books cl) ; turned = Books.turned (Calling.books cl) }
         ; sorted = sorted-step (Calling.sorted cl) refl
         ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl
         ; flags = done-up ρ (in-body here) refl (Calling.flags cl) ; kept = Calling.kept cl })
-  call-body st {m₁ = mach kk clk tms ts} ρ {cp} cl
+  call-body st {m₁ = mach kk clk tms ts} {T = T} {k = k} {r} {ej} {rt} {s} {b} ρ {cp} cl
     with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
   ... | c | x | at | refl | kn | gn , S , L , sg , hl | lt with body-at ρ {c = c} {x} at kn
   ...   | c₀ , refl , at₀ with lifts-split ρ (in-body here) L in eqB
@@ -526,9 +526,9 @@ module Ascending (R : Set) where
     rose {σ′ = ρ} {e′ = cp} (then refl now) (one-lower ρ one-body)
       (record
         { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = refl ; at = at₀
-        ; lifted = gone-connect gn , S , subst (λ w → Lifts ρ w S) (body-end Lb) Lρ , sg , healed-split ρ (in-body here) hl
+        ; lifted = gone-connect {k = k} {r} {ej} {rt} {s} {b} gn , S , subst (λ w → Lifts ρ w S) (body-end Lb) Lρ , sg , healed-split ρ (in-body here) hl
         ; lefts = lefts-subst (λ w → w) (body-end Lb) (lefts-up ρ (in-body here) eqB lt) ; rest-heads = body-rest-heads ρ cl
-        ; owned = owned-body (Calling.owned cl) ; kernels = kn ; meaning = body-meaning (Calling.meaning cl)
+        ; owned = owned-body (Calling.owned cl) ; kernels = kn ; meaning = body-meaning {T = T} {c = c₀} {k = k} {o = forget s} {x = x} (Calling.meaning cl)
         ; queue = Calling.queue cl ; books = body-books (Calling.books cl)
         ; sorted = sorted-step (Calling.sorted cl) refl
         ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl
