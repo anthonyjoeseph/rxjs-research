@@ -291,10 +291,6 @@ module Ghosting (R : Set) where
   ≼-trans (inj₂ ab)   (inj₁ refl) = inj₂ ab
   ≼-trans (inj₂ ab)   (inj₂ bc)   = inj₂ (⊏-trans ab bc)
 
-  ⊏-≼ : ∀ {a b c} → a ⊏ b → b ≼ c → a ⊏ c
-  ⊏-≼ ab (inj₁ refl) = ab
-  ⊏-≼ ab (inj₂ bc)   = ⊏-trans ab bc
-
   Measure : Set
   Measure = Load × ℕ
 

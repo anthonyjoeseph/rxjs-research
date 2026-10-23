@@ -20,7 +20,8 @@ open import Data.List using (List; []; _∷_; _++_; [_]; length; head)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.List.Relation.Unary.Any using (Any; here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ; ++⁻)
-open import Data.List.Relation.Unary.All as All using (All; []; _∷_)
+import Data.List.Relation.Unary.All as All
+open All using (All; []; _∷_)
 import Data.List.Relation.Unary.Any as Any
 import Data.List.Relation.Unary.Linked as Linked
 open Linked using (Linked)

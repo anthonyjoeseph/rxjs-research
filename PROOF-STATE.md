@@ -37,6 +37,14 @@ step. Settled when `WellMach` is a ported body and `preserve` goes through.
 
 Members: `WellMach`, `preserve`, `begin-well`.
 
+#### THE ROOT STEP
+
+Whether a step, its sources clear of it, keeps its parts placed: a flatMap's
+admitted lanes; a defer's program, subscribed or fed. Settled when
+`flat-within` is a body or refuted.
+
+Members: `flat-within`, `defer-within`, `defer-fed`, `under-shown-connect`.
+
 ## Tier 1 — the adequacy theorem
 
 **Adequacy:** the denotation matches the operational semantics.
