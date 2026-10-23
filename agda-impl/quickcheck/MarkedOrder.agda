@@ -15,8 +15,11 @@
 --             holds, strictly after `p`
 --   hidden    `first` again, its observer closed
 --   distinct  no two keys alike
---   apart     once absorbed, no key at or under another's `at q`, short
---             of `after q`: the strengthening an inductive `beyond` needs
+--   apart     no key at or under another's `at q`, short of `after q`:
+--             the strengthening an inductive `beyond` needs
+--   untold    every joiner still live and untold sits under a connect
+--             whose source is not closed: what would make `live` follow
+--             from `beyond`
 --
 -- `beyond`, `past`, `live` and `first` are claims; the rest are probes of
 -- how far the order reaches, and fail no run.  Each seed reports, per
@@ -26,7 +29,7 @@ module quickcheck.MarkedOrder where
 
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_; filterᵇ; upTo; take) renaming (map to mapL)
-open import Data.List.Relation.Unary.All using (lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
+open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Nat.Show renaming (show to showℕ)
@@ -43,7 +46,7 @@ open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; 
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody;
   Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; nx; cp;
   Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM;
-  own; plug; closed; alive; load)
+  own; plug; closed; alive; load; CS; module CS)
 open import spike.MarkedGhost using (gh; envAt; lane; outerG; lanesL; outerT; poolRuns; srcRun; srcG; endOf)
 open import quickcheck.Code using (Prog; toObs; timeline)
 open import quickcheck.Ty using (natᵗ)
@@ -53,7 +56,7 @@ open import quickcheck.Quickcheck using (program)
 record Verdict : Set where
   constructor verdict
   field
-    beyond past live first strict hidden distinct apart : Maybe String
+    beyond past live first strict hidden distinct apart untold : Maybe String
 
 private
   mutual
@@ -174,6 +177,23 @@ private
         staleAt _       _     = []
     stale p ρ _                       = []
 
+    -- The live untold joiners whose connect's source is closed.
+    shut : ∀ {Γ A} → All (λ _ → Bool) Γ → St Γ A → List String
+    shut ρ (mapS f s)              = shut ρ s
+    shut ρ (scanS f z s)           = shut ρ s
+    shut ρ (cutS l a s)            = shut ρ s
+    shut ρ (lnS b s)               = shut ρ s
+    shut ρ (takeS i q w s)         = shut ρ s
+    shut ρ (flatS op f d n q o ls) = shut ρ o ++ shutL ρ ls
+    shut ρ (connS k o b)           = shut ρ o ++ shut (CS.closed k ∷ᴬ ρ) b
+    shut ρ (joinS j true x ib)     =
+      if lookup ρ x ∧ not (told (endOf ib)) then ("joiner" ++ˢ showPos j ++ˢ " source closed") ∷ [] else []
+    shut ρ _                       = []
+
+    shutL : ∀ {Γ A} → All (λ _ → Bool) Γ → List (St Γ A) → List String
+    shutL ρ []       = []
+    shutL ρ (s ∷ ls) = shut ρ s ++ shutL ρ ls
+
     staleL : ∀ {Γ A} → Pos → NEnv Γ → List (St Γ A) → List String
     staleL p ρ []       = []
     staleL p ρ (s ∷ ls) = stale p ρ s ++ staleL p ρ ls
@@ -194,15 +214,15 @@ private
   hd h = head (Events∞.force h)
 
   ok : Verdict
-  ok = verdict nothing nothing nothing nothing nothing nothing nothing nothing
+  ok = verdict nothing nothing nothing nothing nothing nothing nothing nothing nothing
 
   orM : Maybe String → Maybe String → Maybe String
   orM (just a) _ = just a
   orM nothing  b = b
 
   both : Verdict → Verdict → Verdict
-  both (verdict a b c d e f g h) (verdict a′ b′ c′ d′ e′ f′ g′ h′) =
-    verdict (orM a a′) (orM b b′) (orM c c′) (orM d d′) (orM e e′) (orM f f′) (orM g g′) (orM h h′)
+  both (verdict a b c d e f g h i) (verdict a′ b′ c′ d′ e′ f′ g′ h′ i′) =
+    verdict (orM a a′) (orM b b′) (orM c c′) (orM d d′) (orM e e′) (orM f f′) (orM g g′) (orM h h′) (orM i i′)
 
   when : ∀ {R} → Bool → Conf R → String → Maybe String
   when true  x why = nothing
@@ -224,8 +244,8 @@ private
   -- only probed.
   lanesAt : ∀ {R} → Conf R → Bool → Bool → Bool × Bool → Verdict
   lanesAt x false _     _         = ok
-  lanesAt x true  false (fi , st) = verdict nothing nothing nothing (when fi x "lane not first") (when st x "a part not strictly after") nothing nothing nothing
-  lanesAt x true  true  (fi , _)  = verdict nothing nothing nothing nothing nothing (when fi x "closed lane not first") nothing nothing
+  lanesAt x true  false (fi , st) = verdict nothing nothing nothing (when fi x "lane not first") (when st x "a part not strictly after") nothing nothing nothing nothing
+  lanesAt x true  true  (fi , _)  = verdict nothing nothing nothing nothing nothing (when fi x "closed lane not first") nothing nothing nothing
 
   laneCheck : ∀ {R} → Conf R → Verdict
   laneCheck x@(⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩) = lanesAt x (alive s) (closed c) (parts f d o pre post c s p)
@@ -269,7 +289,7 @@ private
     verdict (faulty x (if isAbsorbed m then nothing else some (filterᵇ (λ { (_ , k) → k <ᴷ after p }) ks)))
             (faulty x (if isAbsorbed m then some (filterᵇ (λ { (_ , k) → not (at p <ᴷ k) }) ks) else nothing))
             (faulty x (someS (stale p []ᴬ (plug c s)))) nothing nothing nothing (faulty x (some (alike ks)))
-            (faulty x (if isAbsorbed m then some (crowd ks ks) else nothing))
+            (faulty x (some (crowd ks ks))) (faulty x (someS (shut []ᴬ (plug c s))))
     where
       ks = keyed (plug c s)
 
@@ -302,9 +322,9 @@ orderReport f c = go (mapL (f +_) (upTo c))
 
     one : ℕ → List String
     one s with order (program s)
-    ... | verdict a b l fi st hi di ap =
+    ... | verdict a b l fi st hi di ap un =
       line "FAIL" "beyond" s a ++ line "FAIL" "past" s b ++ line "FAIL" "live" s l ++ line "FAIL" "first" s fi
-        ++ line "INFO" "strict" s st ++ line "INFO" "hidden" s hi ++ line "INFO" "distinct" s di ++ line "INFO" "apart" s ap
+        ++ line "INFO" "strict" s st ++ line "INFO" "hidden" s hi ++ line "INFO" "distinct" s di ++ line "INFO" "apart" s ap ++ line "INFO" "untold" s un
 
     go : List ℕ → List String
     go []       = []
