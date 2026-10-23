@@ -391,7 +391,7 @@ module Strongly (R : Set) where
   -- parts left running, and what a held connect's ended source did.
   -- Held: `seen`, so a teardown, which leaves what it reached unseen,
   -- answers for nothing below its switch.
-  record Each (P : ∀ {Γ A} → U.Node Γ A → Set) (t : Sub [] R) : Set₁ where
+  record Each (P : ∀ {Γ A} → U.Node Γ A → Set) {Γ₀ A₀} (t : Sub Γ₀ A₀) : Set₁ where
     field
       parts : ∀ {Δ B π} {u : Sub Δ B} (ψ : Path t u π) → seen ψ ≡ true → ∀ {c} → part u ≡ just c → P c
       pools : ∀ {Γ X A op f d n qs pl π} {o : Sub Γ X} {ls : List (Sub Γ A)}
@@ -445,7 +445,7 @@ module Strongly (R : Set) where
   -- leaves what the witness reads off as its ended parts' leftovers; a
   -- held connect's ended source's rest leaves the source's, its order
   -- read back besides.
-  record Lingers (t : Sub [] R) : Set₁ where
+  record Lingers {Γ₀ A₀} (t : Sub Γ₀ A₀) : Set₁ where
     field
       pools : ∀ {Γ X A op f d n qs pl π} {o : Sub Γ X} {ls : List (Sub Γ A)}
             → (ψ : Path t (flatMapˢ op f d n qs pl o ls) π) → seen ψ ≡ true
@@ -457,13 +457,13 @@ module Strongly (R : Set) where
 
   -- What a connect past its source's end has not told its body's
   -- joiners, it tells no sooner than `q`.
-  Untold : Pos → Sub [] R → Set₁
+  Untold : ∀ {Γ₀ A₀} → Pos → Sub Γ₀ A₀ → Set₁
   Untold q t = ∀ {Γ X B k r c₀ rt π} {s : Sub Γ X} {b : Sub (X ∷ Γ) B}
              → (ψ : Path t (connectˢ k r (just c₀) rt s b) π) → seen ψ ≡ true → part s ≡ nothing
              → ∀ {b₀} → part b ≡ just b₀ → Tells q c₀ (untold (Any.here refl) b₀)
 
   -- A connect still held past its source's end holds no source.
-  Ended : Sub [] R → Set₁
+  Ended : ∀ {Γ₀ A₀} → Sub Γ₀ A₀ → Set₁
   Ended t = ∀ {Γ X B k r e rt π} {s : Sub Γ X} {b : Sub (X ∷ Γ) B}
           → (ψ : Path t (connectˢ k r e rt s b) π) → seen ψ ≡ true
           → ∀ {n} → part (connectˢ k r e rt s b) ≡ just n → ∀ {c₀} → e ≡ just c₀ → part s ≡ nothing
