@@ -23,7 +23,7 @@ open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (zero; suc)
+open import Data.Nat using (zero; suc; pred)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
@@ -66,16 +66,6 @@ out-≅ {r = r} {r′} e = to e , to (sym e)
 
 ------------------------------------------------------------------------
 -- The invariant, read node by node
-
--- A rise into a takeWhile meets it running.
-TakeR : ∀ {R Γ A} → Ctx R Γ A → Set
-TakeR (inTake i q w c) = w ≡ free
-TakeR _                = ⊤
-
-TakeFree : ∀ {R} → Conf R → Set
-TakeFree ⟨ c , s , subscribing , p ⟩ = ⊤
-TakeFree ⟨ c , s , absorbed , p ⟩    = ⊤
-TakeFree ⟨ c , s , rising e , p ⟩    = TakeR c
 
 -- A connect's source is not ended before it is subscribed.
 Opened : CS → Set
@@ -126,7 +116,6 @@ wf-up (inBody k o c)                    s w = proj₂ (proj₂ (wf-up c (connS k
 record Inv {R} (k : Conf R) : Set where
   constructor inv
   field
-    takeFree : TakeFree k
     settled  : Settled k
     wf       : Wf (plug (Conf.ctx k) (Conf.foc k))
 
@@ -357,16 +346,15 @@ module _ {R : Set} where
                   → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ → Kept ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
     rise-outer-cp : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q ls (c : Ctx R Γ B) (o : St Γ A) p
                   → Inv ⟨ inOuter op f d n q ls c , o , rising cp , p ⟩ → Kept ⟨ inOuter op f d n q ls c , o , rising cp , p ⟩
-    -- A rise reaches a flatMap only from a lane still in its list.
-    lane-live : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (c : Ctx R Γ B) (s : St Γ B) e p
-              → Inv ⟨ inLanes op f d n q o pre post c , s , rising e , p ⟩ → flagOf s ≡ true
     -- THE ORDER: a lane's value rises first among its flatMap's parts.
     lanes-first : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (c : Ctx R Γ B) (s : St Γ B) b p
-                → Inv ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩
+                → Inv ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩ → flagOf s ≡ true
                 → First p (outerᴺ (lane f) (outerG d (gh o)) (envAt c)) (states (lanesL post) (envAt c)) (states (lanesL pre) (envAt c))
                     (outerT d (gh o) (envAt c) (poolRuns pre post true (envAt c) (stateᴺ (gh s) (envAt c))))
+    -- A lane still in its flatMap's list completing frees its slot.
     rise-lanes-cp : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (c : Ctx R Γ B) (s : St Γ B) p
-                  → Inv ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → Kept ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩
+                  → Inv ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → flagOf s ≡ true
+                  → up (inLanes op f d n q o pre post c) true (risen (gh s) (envAt c) cp p) ≅ M (Machine.dequeue c op f d (pred n) q o (pre ++ Machine.ended s ∷ post) p)
     rise-src-nx : ∀ {Γ X B} k (b : St (X ∷ Γ) B) (c : Ctx R Γ B) (s : St Γ X) a p
                 → Inv ⟨ inSrc k b c , s , rising (nx a) , p ⟩ → Kept ⟨ inSrc k b c , s , rising (nx a) , p ⟩
     rise-src-cp : ∀ {Γ X B} k (b : St (X ∷ Γ) B) (c : Ctx R Γ B) (s : St Γ X) p
@@ -439,12 +427,30 @@ module _ {R : Set} where
       pool true  = cong (cutᴺ (gh o) ρ ∪_) (sym pr)
       P = pool d
 
+  -- A lane out of its flatMap's list: what reaches it is absorbed, as
+  -- the flatMap reads it through its tail alone.
+  lane-dead : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (c : Ctx R Γ B) (s : St Γ B) e p → flagOf s ≡ false
+            → up (inLanes op f d n q o pre post c) false (risen (gh s) (envAt c) e p) ≅ M ⟨ c , flatS op f d n q o (pre ++ s ∷ post) , absorbed , p ⟩
+  lane-dead op f d n q o pre post c s e p fl =
+    lift-≅ c true (≋-trans (lanes-dead op (lane f) d q (gh o) pre post (envAt c) (risen (gh s) (envAt c) e p) (stateᴺ (gh s) (envAt c)) (rc e))
+      (subst (λ x → lanesFrame op (lane f) d q (gh o) pre post x (envAt c) (stateᴺ (gh s) (envAt c)) ≋ stateᴺ (gh (flatS op f d n q o (pre ++ s ∷ post))) (envAt c))
+        fl (lanes-plug op f d n q o pre post s (envAt c))))
+    where
+      rc : ∀ e → cut (risen (gh s) (envAt c) e p) ≡ cut (stateᴺ (gh s) (envAt c))
+      rc (nx b) = refl
+      rc cp     = refl
+
   rise-lanes-nx : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (c : Ctx R Γ B) (s : St Γ B) b p
                 → Inv ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩ → Kept ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩
-  rise-lanes-nx op f d n q o pre post c s b p v =
-    subst (λ x → up (inLanes op f d n q o pre post c) x (risen (gh s) (envAt c) (nx b) p) ≅ M ⟨ c , flatS op f d n q o (pre ++ s ∷ post) , rising (nx b) , p ⟩)
-      (sym (lane-live op f d n q o pre post c s (nx b) p v))
-      (rise-lanes-true op f d n q o pre post c s b p (lane-live op f d n q o pre post c s (nx b) p v) (lanes-first op f d n q o pre post c s b p v))
+  rise-lanes-nx op f d n q o pre post c s b p v with flagOf s in fl
+  ... | true  = rise-lanes-true op f d n q o pre post c s b p fl (lanes-first op f d n q o pre post c s b p v fl)
+  ... | false = lane-dead op f d n q o pre post c s (nx b) p fl
+
+  rise-lanes : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (c : Ctx R Γ B) (s : St Γ B) p
+             → Inv ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → Kept ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩
+  rise-lanes op f d n q o pre post c s p v with flagOf s in fl
+  ... | true  = rise-lanes-cp op f d n q o pre post c s p v fl
+  ... | false = lane-dead op f d n q o pre post c s cp p fl
 
   -- THE ACID TEST: takeWhile's three outcomes, each exact.
   took-nx : ∀ {Γ A} i (q : A → Bool) (c : Ctx R Γ A) (s : St Γ A) a p → Kept ⟨ inTake i q free c , s , rising (nx a) , p ⟩
@@ -464,12 +470,18 @@ module _ {R : Set} where
   rises (inCut false a c)                 s (nx x) p v          = lift-≅ c true (≋-by refl refl)
   rises (inCut false a c)                 s cp     p v          = lift-≅ c true (≋-by refl refl)
   rises (inLn b c)                        s e      p v          = ≅-refl
-  rises (inTake i q w c)                  s (nx a) p (inv refl _ _) = took-nx i q c s a p
-  rises (inTake i q w c)                  s cp     p (inv refl _ _) = lift-≅ c true (≋-by refl refl)
+  rises (inTake i q free c)               s (nx a) p v          = took-nx i q c s a p
+  rises (inTake i q free c)               s cp     p v          = lift-≅ c true (≋-by refl refl)
+  rises (inTake i q (cpAt r) c)      s (nx a) p v          = lift-≅ c true (≋-by refl refl)
+  rises (inTake i q (cpAt r) c)      s cp     p v          = lift-≅ c true (≋-by refl refl)
+  rises (inTake i q (cutAt r) c)     s (nx a) p v          = lift-≅ c true (≋-by refl refl)
+  rises (inTake i q (cutAt r) c)     s cp     p v          = lift-≅ c true (≋-by refl refl)
+  rises (inTake i q (overAt r) c)    s (nx a) p v          = lift-≅ c true (≋-by refl refl)
+  rises (inTake i q (overAt r) c)    s cp     p v          = lift-≅ c true (≋-by refl refl)
   rises (inOuter op f d n q ls c)         s (nx a) p v          = rise-outer-nx op f d n q ls c s a p v
   rises (inOuter op f d n q ls c)         s cp     p v          = rise-outer-cp op f d n q ls c s p v
   rises (inLanes op f d n q o pre post c) s (nx b) p v          = rise-lanes-nx op f d n q o pre post c s b p v
-  rises (inLanes op f d n q o pre post c) s cp     p v          = rise-lanes-cp op f d n q o pre post c s p v
+  rises (inLanes op f d n q o pre post c) s cp     p v          = rise-lanes op f d n q o pre post c s p v
   rises (inSrc k b c)                     s (nx a) p v          = rise-src-nx k b c s a p v
   rises (inSrc k b c)                     s cp     p v          = rise-src-cp k b c s p v
   rises (inBody k o c)                    s (nx b) p v          = rise-body-nx k o c s b p v
@@ -597,7 +609,7 @@ module _ {R : Set} where
   ... | nothing = quiet-empty c s p v e
   ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
   ...   | pl , own = kept-pre (tookᴰ (run c′ s′ m p)) (refocus c s c′ s′ p (Inv.settled v) (owned own) (Inv.wf v) pl)
-                       (runs c′ s′ m p own (inv tt (owned own) (subst Wf (sym pl) (Inv.wf v))))
+                       (runs c′ s′ m p own (inv (owned own) (subst Wf (sym pl) (Inv.wf v))))
 
   ----------------------------------------------------------------------
   -- THE TOP LINE: whatever the machine shows, the meaning shows
@@ -627,7 +639,7 @@ module _ {R : Set} where
   sound {k} v (later-v e sh) = proj₂ (subst (KeptFrom (M k)) e (kept k v)) (pastOut (sound (subst NextInv e (inv-next k v)) sh))
 
   inv-load : (o : Obs Timeline [] R) → Inv (load o)
-  inv-load o = inv tt tt tt
+  inv-load o = inv tt tt
 
   -- A program run by the machine shows exactly what `denotation.Unfold`'s
   -- meaning of it subscribed at the root shows.

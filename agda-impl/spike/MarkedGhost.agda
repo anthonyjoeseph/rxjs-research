@@ -25,11 +25,11 @@ open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᴬ; _∷
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product using (_×_; _,_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; cong)
 
 open import Tree using (Obs; FlatOp)
 open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Timeline; Pos; out; skip; end; hush; idle; _∪_; ix; last)
-open import denotation.MonotonicList using (MonotonicList; tailᴱ; Agree; Agreeᵀ; stop; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agree-sym; agreeᵀ-refl; _≈[_]_; agrees)
+open import denotation.MonotonicList using (MonotonicList; tailᴱ; Agree; Agreeᵀ; stop; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agree-sym; agree-trans; agreeᵀ-refl; agreeᵀ-trans; _≈[_]_; agrees)
   renaming (cold to coldᴹ)
 import denotation.MonotonicList as M′
 open import denotation.NonExpansive using (Agreeˢ; _,ˢ_; Lanes; []ᴸ; _∷ᴸ_; Queue; []ᑫ; _∷ᑫ_; Outerᴿ; doneᴼ; liveᴼ;
@@ -42,7 +42,7 @@ open import operation.MarkedPure using (Tape; play; ending; over; due)
 open import operation.MarkedPure using (module Machine)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; closed;
-  CS; cs; Owe; free; cpAt; cutAt; overAt; Ev; nx; cp; _⊕_; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising)
+  CS; cs; Owe; free; cpAt; cutAt; overAt; Ev; nx; cp; _⊕_; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; alive)
 
 open Events∞
 
@@ -308,8 +308,7 @@ hole c s absorbed    p = stateᴺ (gh s) (envAt c)
 hole c s (rising e)  p = risen (gh s) (envAt c) e p
 
 flagOf : ∀ {Γ A} → St Γ A → Bool
-flagOf (lnS b s) = b
-flagOf s         = true
+flagOf s = alive s
 
 M : ∀ {R} → Conf R → Events R
 M ⟨ c , s , m , p ⟩ = up c (flagOf s) (hole c s m p)
@@ -376,6 +375,9 @@ agree-≅ a = has-agree a , has-agree (λ n → agree-sym (a n))
     outs (suc m) = out⁼ (subst (λ x → Agreeᵀ m (cut r) x) t (agreeᵀ-refl m _)) (subst (λ x → Agree m (force r) x) f (agree-refl m _))
 
 -- Alike, then the same by definition.
+≋-trans : ∀ {A} {h h′ h″ : Events∞ A} → h ≋ h′ → h′ ≋ h″ → h ≋ h″
+≋-trans x y n = agreeᵀ-trans (cutˢ (x n)) (cutˢ (y n)) ,ˢ agree-trans (nowˢ (x n)) (nowˢ (y n))
+
 ≋-tr : ∀ {A} {h h′ h″ : Events∞ A} → h ≋ h′ → force h′ ≡ force h″ → cut h′ ≡ cut h″ → h ≋ h″
 ≋-tr {h = h} x e t n = subst (Agreeᵀ n (cut h)) t (cutˢ (x n)) ,ˢ subst (Agree n (force h)) e (nowˢ (x n))
 
@@ -495,6 +497,16 @@ lanesFrame-cut : ∀ {Γ A B n} op (g : A → Pos → Node Γ B) d q (o : Node �
 lanesFrame-cut {n = n} op g d q o pre post f ρ h h′ t =
   ∪-ne (agreeᵀ-refl n (M′.cutᴼ (outerᴺ g (outerG d o) ρ)))
     (∪-ne (cuts-hole (states (lanesL post) ρ) f (states (lanesL pre) ρ) h h′ t) (outerT-ne d o ρ (poolRuns-cut pre post f ρ h h′ t)))
+
+-- A lane out of its flatMap's list is read through its tail alone.
+lanes-dead : ∀ {Γ A B} op (g : A → Pos → Node Γ B) d q (o : Node Γ A) pre post (ρ : NEnv Γ) (h h′ : Events∞ B) → cut h ≡ cut h′
+           → lanesFrame op g d q o pre post false ρ h ≋ lanesFrame op g d q o pre post false ρ h′
+lanes-dead op g d q o pre post ρ h h′ e =
+  ≋-by (cong (λ t → M′.go (flatOp op) O Ls (L.map (laneᴹ g ρ) q) (outerT d o ρ (tailsOn (deadL pre) ρ (t ∪ poolT (deadL post) ρ)))) e)
+       (cong (λ t → M′.whole O Ls (outerT d o ρ (tailsOn (deadL pre) ρ (t ∪ poolT (deadL post) ρ)))) e)
+  where
+    O  = outerᴺ g (outerG d o) ρ
+    Ls = states (lanesL post) ρ ++ states (lanesL pre) ρ
 
 -- An ended source is read through its tail alone.
 connSrc-closed : ∀ {Γ X B n} r e (b : Node (X ∷ Γ) B) (ρ : NEnv Γ) (h h′ : Events∞ X) → Agreeᵀ n (cut h) (cut h′)

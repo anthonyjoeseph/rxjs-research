@@ -100,6 +100,11 @@ data St (Γ : List Set) : Set → Set₁ where
   -- yet shown, each at the position it is shown at, in order
   joinS : ∀ {A} → Pos → Bool → A ∈ Γ → List (Pos × Ev A) → St Γ A
 
+-- Whether a node is a lane still in its flatMap's list.
+alive : ∀ {Γ A} → St Γ A → Bool
+alive (lnS b s) = b
+alive s         = true
+
 ------------------------------------------------------------------------
 -- Contexts: one hole, at scope Γ and type A, in a root at [] and R.
 
@@ -442,15 +447,23 @@ rise (inScan f z c) s (nx a) p = ok ⟨ c , scanS f (f z a) s , rising (nx (f z 
 rise (inScan f z c) s cp     p = ok ⟨ c , scanS f z s , rising cp , p ⟩
 rise (inCut l a c) s e p = ok ⟨ c , cutS l a s , (if l then rising e else absorbed) , p ⟩
 rise (inLn b c) s e p = ok ⟨ c , lnS b s , rising e , p ⟩
-rise (inTake i q w c) s (nx a) p with q a | i
-... | true  | _     = ok ⟨ c , takeS i q w s , rising (nx a) , p ⟩
+rise (inTake i q free c) s (nx a) p with q a | i
+... | true  | _     = ok ⟨ c , takeS i q free s , rising (nx a) , p ⟩
 ... | false | true  = ok ⟨ c , takeS i q (cpAt p) s , rising (nx a) , p ⊕ [ ix 0 ] ⟩
 ... | false | false = ok ⟨ c , takeS i q (cutAt p) s , rising cp , p ⊕ [ last ] ⟩
-rise (inTake i q w c) s cp p = ok ⟨ c , takeS i q w s , rising cp , p ⟩
+rise (inTake i q free c) s cp p = ok ⟨ c , takeS i q free s , rising cp , p ⟩
+-- a takeWhile already over absorbs whatever still reaches it, as a
+-- switch off does
+rise (inTake i q (cpAt r) c)  s e p = ok ⟨ c , takeS i q (cpAt r) s , absorbed , p ⟩
+rise (inTake i q (cutAt r) c) s e p = ok ⟨ c , takeS i q (cutAt r) s , absorbed , p ⟩
+rise (inTake i q (overAt r) c) s e p = ok ⟨ c , takeS i q (overAt r) s , absorbed , p ⟩
 rise (inOuter op f d n q ls c) o (nx a) p = admit c op f d n q o ls a p
 rise (inOuter op f d n q ls c) o cp     p = ok ⟨ c , flatS op f true n q o ls , settle true n (null q) , p ⟩
-rise (inLanes op f d n q o pre post c) s (nx b) p = ok ⟨ c , flatS op f d n q o (pre ++ s ∷ post) , rising (nx b) , p ⟩
-rise (inLanes op f d n q o pre post c) s cp     p = ok (dequeue c op f d (pred n) q o (pre ++ ended s ∷ post) p)
+-- a lane out of its flatMap's list is over, and absorbs what still reaches it
+rise (inLanes op f d n q o pre post c) s (nx b) p =
+  ok (if alive s then ⟨ c , flatS op f d n q o (pre ++ s ∷ post) , rising (nx b) , p ⟩ else ⟨ c , flatS op f d n q o (pre ++ s ∷ post) , absorbed , p ⟩)
+rise (inLanes op f d n q o pre post c) s cp     p =
+  ok (if alive s then dequeue c op f d (pred n) q o (pre ++ ended s ∷ post) p else ⟨ c , flatS op f d n q o (pre ++ s ∷ post) , absorbed , p ⟩)
 rise (inSrc k b c) s (nx a) p = ok ⟨ c , connS k s (feed (here refl) p (nx a) b) , absorbed , p ⟩
 rise (inSrc k b c) s cp     p = ok ⟨ c , connS (record k { closed = true ; endAt = p }) s (feed (here refl) p cp b) , absorbed , p ⟩
 rise (inBody k o c) s (nx b) p = ok ⟨ c , connS k o s , rising (nx b) , p ⟩
