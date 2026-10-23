@@ -37,9 +37,10 @@ import denotation.Unfold as U
 open import denotation.Denote using (⟦_⟧)
 open import operation.PureObservable using (PureObs; module Pure; module Driver; module Machine)
 open import port.Sorted using (_≤ᵖ_)
-open import port.Sane using (Sane)
+open import port.Sane using (Sane; sane-out)
+open import port.Stepper.Within using (placed-after)
 open import port.Placed.Order using (Placed)
-open import port.Stepper.Past using (_≃_)
+open import port.Stepper.Past using (_≃_; Placedˢ)
 open import port.Stepper using (step-skips)
 open import port.Unsub using (module Unsubbing)
 open import port.Ghost using (module Ghosting)
@@ -56,7 +57,7 @@ module Honesty (R : Set) where
     Steps; after; steps-after; Hopped; onward; lowered; weight; loadOf; load; _≼_; _≺_)
   open Strongly R using (Strong; Carried; carried; closing; CtlAs; Meets; calmAs; noteAs; runAs; subAs; burstAs; popAs; Pops;
     Kernels; Owned; Meaning; Books; Path; ofˢ; seen; Sub; takeWhileˢ; part; Queue; BurstClocked; Each; Heads;
-    Lingers; Untold; Ended; DoneBy)
+    Lingers; Untold; Ended; DoneBy; Begins; focused; attaching)
   open Ascending R using (Aloft; soar)
   open SortingWalk R using (WellMach)
   open Machine using (Ctx; top; plug; downs; dirs; closed; doneS; cp; _⊕_; ⟨_,_,_,_,_⟩; absorbed; rising; resuming; subscribing; nx; pend;
@@ -99,11 +100,13 @@ module Honesty (R : Set) where
     note-least : ∀ {g g′ m s a p rs} → Carried g m → Mach.conf m ≡ ⟨ top , s , rising (nx a) , p , rs ⟩
                → U.step g ≡ U.outˢ p a g′ → ∀ {q b} → Has (residual g′) q b → q ≤ᵖ p → ⊥
 
-    -- The value shown, the configuration runs the stepped ghost.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs.agda
-    note-onward : ∀ {g g′ m s a p rs} → Carried g m → Mach.conf m ≡ ⟨ top , s , rising (nx a) , p , rs ⟩
-                → U.step g ≡ U.outˢ p a g′ → Mirror g′ (record m { conf = ⟨ top , s , absorbed , p , rs ⟩ })
+    -- A VALUE SHOWN, ABSORBED: what each subject owes its joiners, and
+    -- the machine's order, read alike at rest.
+    meaning-note : ∀ {t Γ A} {c : Ctx R Γ A} {s a p rs} → Kernels t ⟨ c , s , rising (nx a) , p , rs ⟩
+                 → Meaning t ⟨ c , s , rising (nx a) , p , rs ⟩ → Meaning t ⟨ c , s , absorbed , p , rs ⟩
+    sorted-note : ∀ {lo m Γ A} {c : Ctx R Γ A} {s a p rs} → WellMach lo m
+                → Mach.conf m ≡ ⟨ c , s , rising (nx a) , p , rs ⟩
+                → WellMach lo (record m { conf = ⟨ c , s , absorbed , p , rs ⟩ })
 
     -- The `of` a job resumes is the witness's at the job's path.
     of-path : ∀ {g m Γ A} {c : Ctx R Γ A} {xs i p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , ofS xs , resuming (next i) , p , rs ⟩
@@ -298,6 +301,40 @@ module Honesty (R : Set) where
     settled-lighter (j ∷ rs) clk tms (t ∷ ts) with depthOf t <ᵇ suc (length rs)
     ... | true  = s≤s (s≤s (≤-reflexive (sym (+-suc (suc (length rs)) (suc (length rs))))))
     ... | false = s≤s (+-monoʳ-≤ (suc (length rs)) (n≤1+n (suc (length rs))))
+
+    -- At rest, a shown value's jobs are the same jobs.
+    owned-note : ∀ {t s a p rs clk tms ts} → Owned t (mach ⟨ top , s , rising (nx a) , p , rs ⟩ clk tms ts)
+               → Owned t (mach ⟨ top , s , absorbed , p , rs ⟩ clk tms ts)
+    owned-note {s = s} {a} {p} {rs} o = record
+      { ofs = Owned.ofs o ; begun = λ ψ → rebegin (Owned.begun o ψ) ; attached = Owned.attached o ; ends = Owned.ends o
+      ; cuts = Owned.cuts o ; feeds = Owned.feeds o ; bodies = Owned.bodies o ; sources = Owned.sources o ; owes = Owned.owes o }
+      where rebegin : ∀ {π q} → Begins ⟨ top , s , rising (nx a) , p , rs ⟩ π q → Begins ⟨ top , s , absorbed , p , rs ⟩ π q
+            rebegin (focused _ () _)
+            rebegin (attaching ρ p′ e j e′) = attaching ρ p′ e j e′
+
+  -- Past a value shown, the configuration runs the stepped ghost: at
+  -- rest, on the agenda.
+  note-onward : ∀ {g g′ m s a p rs} → Carried g m → Mach.conf m ≡ ⟨ top , s , rising (nx a) , p , rs ⟩
+              → U.step g ≡ U.outˢ p a g′ → Mirror g′ (record m { conf = ⟨ top , s , absorbed , p , rs ⟩ })
+  note-onward {g} {m = mach _ clk tms ts} {s} {p = p} {rs} cr refl stp with Carried.ctlAs cr | Carried.meets cr
+  ... | noteAs refl ck | g″ , pe , st″ with trans (sym st″) stp
+  ...   | refl = m′ , now , carried (record
+          { sane = sane-out {g = g} (Carried.sane cr) stp
+          ; placed = proj₂ (subst (Placedˢ []) stp (placed-after g (Carried.sane cr) (Carried.placed cr)))
+          ; tree = Carried.tree cr ; kernels = Carried.kernels cr
+          ; ctlAs = settled rs clk tms ts ; meets = settled-meets rs clk tms ts pe
+          ; owned = owned-note (Carried.owned cr) ; meaning = meaning-note (Carried.kernels cr) (Carried.meaning cr)
+          ; queue = Carried.queue cr
+          ; books = record { clocked = tt ; ticked = Books.ticked (Carried.books cr) ; turned = Books.turned (Carried.books cr) }
+          ; sorted = proj₁ (Carried.sorted cr) , sorted-note (proj₂ (Carried.sorted cr)) refl
+          ; behind = Carried.behind cr ; lingers = Carried.lingers cr ; told = Carried.told cr
+          ; ended = Carried.ended cr ; flags = Carried.flags cr })
+    where m′ = mach ⟨ top , s , absorbed , p , rs ⟩ clk tms ts
+  ... | calmAs () _    | _
+  ... | runAs ()       | _
+  ... | subAs ()       | _
+  ... | burstAs () _ _ | _
+  ... | popAs () _     | _
 
   -- A job owed nothing by its node: dropped, the ghost alike, the
   -- control lighter.
