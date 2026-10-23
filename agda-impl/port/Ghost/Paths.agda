@@ -253,3 +253,23 @@ module GhostingPaths (R : Set) where
     heightL : ∀ {Γ A Δ B i π} {ls : List (Sub Γ A)} {u : Sub Δ B} → PathLanes ls u i π → ℕ
     heightL (this-lane p) = suc (height p)
     heightL (next-lane p) = heightL p
+
+  ------------------------------------------------------------------------
+  -- HEALED: an end reaching a connect's source has the connect's own end staged
+
+  mutual
+    Healed : ∀ (q : Pos) {Γ A Δ B π} {t : Sub Γ A} {u : Sub Δ B} → Path t u π → Set₁
+    Healed q here                                       = Lift _ ⊤
+    Healed q (in-map p)                                 = Healed q p
+    Healed q (in-scan p)                                = Healed q p
+    Healed q (in-cut p)                                 = Healed q p
+    Healed q (in-lane p)                                = Healed q p
+    Healed q (in-take p)                                = Healed q p
+    Healed q (in-outer p)                               = Healed q p
+    Healed q (in-lanes p)                               = HealedL q p
+    Healed q (in-source {e = e} {t = s} p)              = (part s ≡ nothing → e ≡ just q) × Healed q p
+    Healed q (in-body p)                                = Healed q p
+
+    HealedL : ∀ (q : Pos) {Γ A Δ B i π} {ls : List (Sub Γ A)} {u : Sub Δ B} → PathLanes ls u i π → Set₁
+    HealedL q (this-lane p) = Healed q p
+    HealedL q (next-lane p) = HealedL q p
