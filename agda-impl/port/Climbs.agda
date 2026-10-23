@@ -424,10 +424,10 @@ module Ascending (R : Set) where
 
   call-take : ∀ {g m} (st : Strong g m) {m₁ Δ A π} {T : Sub [] R} {i q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ i q tk v) π)
             → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ in-take here) e → Called st m₁ (ρ ⊕ in-take here)
-  call-take st {i = i} {q} ρ {nx y} cl with q y in qy | i in ii
+  call-take st {i = i} {q} ρ {nx y} cl with q y in qy | i
   ... | true  | _     = take-pass st ρ qy cl
-  ... | false | true  = take-out st ρ qy ii cl
-  ... | false | false = take-end st ρ qy ii cl
+  ... | false | true  = take-out st ρ qy refl cl
+  ... | false | false = take-end st ρ qy refl cl
   call-take st {m₁ = mach k clk tms ts} {i = i} {q} {tk} {v} ρ {cp} cl
     with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
   ... | c | x | at | refl | kn | gn , S , L , sg , hl | lt with take-at ρ {c = c} {x} at kn
