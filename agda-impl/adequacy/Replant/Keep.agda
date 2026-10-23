@@ -7,7 +7,7 @@
 -- only through whether the child shows, both ways round.
 module adequacy.Replant.Keep where
 
-open import Data.Bool using (true; false; _∨_; if_then_else_)
+open import Data.Bool using (true; false; _∧_; _∨_; if_then_else_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
@@ -31,7 +31,7 @@ open import adequacy.Ghost.Paths using (module GhostingPaths)
 module Keeping (R : Set) where
   open Strongly R using (Sub; Path; PathLanes; here; in-map; in-scan; in-cut; in-lane; in-take; in-outer; in-lanes; in-source; in-body;
     this-lane; next-lane; part; seen; seenL; isTaking; connected; Untold; Ended; DoneBy; ending; takeWhileˢ; flatMapˢ; connectˢ;
-    Lingers; leftover; pooled; pooledL)
+    Lingers; leftover; pooled; pooledL; ofˢ; pendingˢ; coldˢ; joinˢ; mapˢ; scanˢ; cutˢ; laneˢ)
   open Moving R using (plant; plantᴸ; planted; plantedᴸ; replanted)
   open Replanting R using (_⊑[_/_]_; Pred; Binds; BindsL; Bound; Heading; module Walk; thru; ∧-join; ∨-r; ∨-mono; isj; just-of; en-sub; ut-sub; EndedL; UntoldL;
     LingersL; lingers-sub; lingersL-of; lingersL-head; lingersL-tail; lgL-cons; lg-map; lg-scan; lg-lane; lg-cut; lg-take; lg-flat; lg-connect; pool-cons)
@@ -102,7 +102,67 @@ module Keeping (R : Set) where
     route-preL (this-lane ρ) c r = route-pre ρ c r
     route-preL (next-lane ρ) c r = route-preL ρ c r
 
+  -- A NODE BESIDE ITS REPLANT: the same node, or one of the same head
+  -- whose subscriptions may differ; a takeWhile's source beside in turn,
+  -- a connect's body ending no later.
+  data _≈_ : ∀ {Γ A} → Sub Γ A → Sub Γ A → Set₁ where
+    same      : ∀ {Γ A} {x : Sub Γ A} → x ≈ x
+    ≈-map     : ∀ {Γ A B} {f : A → B} {s s′ : Sub Γ A} → mapˢ f s ≈ mapˢ f s′
+    ≈-scan    : ∀ {Γ A B} {f : B → A → B} {z z′} {s s′ : Sub Γ A} → scanˢ f z s ≈ scanˢ f z′ s′
+    ≈-cut     : ∀ {Γ A l a} {s s′ : Sub Γ A} → cutˢ l a s ≈ cutˢ l a s′
+    ≈-lane    : ∀ {Γ A r} {s s′ : Sub Γ A} → laneˢ r s ≈ laneˢ r s′
+    ≈-take    : ∀ {Γ A i q tk} {s s′ : Sub Γ A} → s ≈ s′ → takeWhileˢ i q tk s ≈ takeWhileˢ i q tk s′
+    ≈-flat    : ∀ {Γ X A op f d n qs pl} {o o′ : Sub Γ X} {ls ls′ : List (Sub Γ A)}
+              → flatMapˢ op f d n qs pl o ls ≈ flatMapˢ op f d n qs pl o′ ls′
+    ≈-connect : ∀ {Γ X B k r e rt} {s s′ : Sub Γ X} {b b′ : Sub (X ∷ Γ) B} → (part b′ ≡ nothing → part b ≡ nothing)
+              → connectˢ k r e rt s b ≈ connectˢ k r e rt s′ b′
+
+  -- Beside a node with no subscription, the node.
+  ≈-of : ∀ {Γ A p i xs} {x₀ : Sub Γ A} → x₀ ≈ ofˢ p i xs → x₀ ≡ ofˢ p i xs
+  ≈-of same = refl
+
+  ≈-pending : ∀ {Γ A o q} {x₀ : Sub Γ A} → x₀ ≈ pendingˢ o q → x₀ ≡ pendingˢ o q
+  ≈-pending same = refl
+
+  ≈-cold : ∀ {Γ A b ph} {x₀ : Sub Γ A} → x₀ ≈ coldˢ b ph → x₀ ≡ coldˢ b ph
+  ≈-cold same = refl
+
+  ≈-join : ∀ {Γ A j g x st} {x₀ : Sub Γ A} → x₀ ≈ joinˢ j g x st → x₀ ≡ joinˢ j g x st
+  ≈-join same = refl
+
+  -- Beside a switch, a takeWhile or a connect, one of the same head.
+  ≈-cut-of : ∀ {Γ A l a} {s : Sub Γ A} {x₀} → x₀ ≈ cutˢ l a s → Σ (Sub Γ A) λ s₀ → x₀ ≡ cutˢ l a s₀
+  ≈-cut-of same  = _ , refl
+  ≈-cut-of ≈-cut = _ , refl
+
+  ≈-take-of : ∀ {Γ A i q tk} {s : Sub Γ A} {x₀} → x₀ ≈ takeWhileˢ i q tk s → Σ (Sub Γ A) λ s₀ → x₀ ≡ takeWhileˢ i q tk s₀
+  ≈-take-of same       = _ , refl
+  ≈-take-of (≈-take _) = _ , refl
+
+  ≈-take-cut : ∀ {Γ A i q tk l a} {s : Sub Γ A} {x₀} → x₀ ≈ takeWhileˢ i q tk (cutˢ l a s)
+             → Σ (Sub Γ A) λ s₀ → x₀ ≡ takeWhileˢ i q tk (cutˢ l a s₀)
+  ≈-take-cut same             = _ , refl
+  ≈-take-cut (≈-take same)    = _ , refl
+  ≈-take-cut (≈-take ≈-cut)   = _ , refl
+
+  ≈-connect-of : ∀ {Γ X B k r e rt} {s : Sub Γ X} {b : Sub (X ∷ Γ) B} {x₀}
+               → x₀ ≈ connectˢ k r e rt s b
+               → Σ (Sub Γ X) λ s₀ → Σ (Sub (X ∷ Γ) B) λ b₀ → (part b ≡ nothing → part b₀ ≡ nothing) × x₀ ≡ connectˢ k r e rt s₀ b₀
+  ≈-connect-of same            = _ , _ , (λ n → n) , refl
+  ≈-connect-of (≈-connect h)   = _ , _ , h , refl
+
+  -- EVERY NODE OF `t′` BESIDE ONE OF `t`'s AT ITS PATH, held when it is.
+  Back : ∀ {Γ A} → Sub Γ A → Sub Γ A → Set₁
+  Back t t′ = ∀ {Δ B π} {x : Sub Δ B} (ψ : Path t′ x π)
+            → Σ (Sub Δ B) λ x₀ → Σ (Path t x₀ π) λ ψ₀ → x₀ ≈ x × (seen ψ ≡ true → seen ψ₀ ≡ true)
+
   private
+    ∧-mapʳ : ∀ a {b c} → (b ≡ true → c ≡ true) → a ∧ b ≡ true → a ∧ c ≡ true
+    ∧-mapʳ a h e = thru a e (λ x y → ∧-join x (h y))
+
+    ∧-mapˡ : ∀ {a a′} b → (a′ ≡ true → a ≡ true) → a′ ∧ b ≡ true → a ∧ b ≡ true
+    ∧-mapˡ {a′ = a′} b h e = thru a′ e (λ x y → ∧-join (h x) y)
+
     -- A part shown is not missing.
     shows-not : ∀ {X : Set₁} {m : Maybe X} → is-just m ≡ true → m ≡ nothing → ⊥
     shows-not {m = just _}  _  ()
@@ -157,6 +217,58 @@ module Keeping (R : Set) where
         routedL : ∀ {Γ B i π} {ls : List (Sub Γ B)} (ρ : PathLanes ls u i π) → RouteL ρ → RouteL (plantedᴸ ρ v)
         routedL (this-lane ρ) w = routed ρ w
         routedL (next-lane ρ) w = routedL ρ w
+
+      -- EVERY NODE OF THE REPLANTED TREE BESIDE ONE OF THE TREE's: off
+      -- the path the same, on it one of the same head, under the node as
+      -- `bk` says.
+      module Beside (≈₀ : u ≈ v) (bk : Back u v) where
+        beside : ∀ {Γ A π} {t : Sub Γ A} (ρ : Path t u π) → t ≈ plant ρ v
+        beside here          = ≈₀
+        beside (in-map ρ)    = ≈-map
+        beside (in-scan ρ)   = ≈-scan
+        beside (in-cut ρ)    = ≈-cut
+        beside (in-lane ρ)   = ≈-lane
+        beside (in-take ρ)   = ≈-take (beside ρ)
+        beside (in-outer ρ)  = ≈-flat
+        beside (in-lanes ρ)  = ≈-flat
+        beside (in-source ρ) = ≈-connect (λ n → n)
+        beside (in-body ρ)   = ≈-connect (nothing-back (alive ρ))
+
+        mutual
+          back : ∀ {Γ A π} {t : Sub Γ A} (ρ : Path t u π) → Back t (plant ρ v)
+          back here ψ = bk ψ
+          back ρ@(in-map _) here = _ , here , beside ρ , λ e → e
+          back (in-map ρ) (in-map ψ) = let x₀ , ψ₀ , b , h = back ρ ψ in x₀ , in-map ψ₀ , b , h
+          back ρ@(in-scan _) here = _ , here , beside ρ , λ e → e
+          back (in-scan ρ) (in-scan ψ) = let x₀ , ψ₀ , b , h = back ρ ψ in x₀ , in-scan ψ₀ , b , h
+          back ρ@(in-cut _) here = _ , here , beside ρ , λ e → e
+          back (in-cut {l = l} ρ) (in-cut ψ) = let x₀ , ψ₀ , b , h = back ρ ψ in x₀ , in-cut ψ₀ , b , ∧-mapʳ l h
+          back ρ@(in-lane _) here = _ , here , beside ρ , λ e → e
+          back (in-lane ρ) (in-lane ψ) = let x₀ , ψ₀ , b , h = back ρ ψ in x₀ , in-lane ψ₀ , b , h
+          back ρ@(in-take _) here = _ , here , beside ρ , λ e → e
+          back (in-take {tk = tk} ρ) (in-take ψ) = let x₀ , ψ₀ , b , h = back ρ ψ in x₀ , in-take ψ₀ , b , ∧-mapʳ (isTaking tk) h
+          back ρ@(in-outer _) here = _ , here , beside ρ , λ e → e
+          back (in-outer ρ) (in-outer ψ) = let x₀ , ψ₀ , b , h = back ρ ψ in x₀ , in-outer ψ₀ , b , h
+          back (in-outer ρ) (in-lanes ψ) = _ , in-lanes ψ , same , λ e → e
+          back ρ@(in-lanes _) here = _ , here , beside ρ , λ e → e
+          back (in-lanes ρ) (in-outer ψ) = _ , in-outer ψ , same , λ e → e
+          back (in-lanes ρ) (in-lanes ψ) = let x₀ , ψ₀ , b , h = backL ρ ψ in x₀ , in-lanes ψ₀ , b , h
+          back ρ@(in-source _) here = _ , here , beside ρ , λ e → e
+          back (in-source {b = b′} ρ) (in-source ψ) =
+            let x₀ , ψ₀ , b , h = back ρ ψ in x₀ , in-source ψ₀ , b , ∧-mapʳ (is-just (part b′)) h
+          back (in-source {e = e} ρ) (in-body ψ) = _ , in-body ψ , same , ∧-mapˡ (seen ψ) (∨-mono (is-just e) (revive ρ))
+          back ρ@(in-body _) here = _ , here , beside ρ , λ e → e
+          back (in-body ρ) (in-source ψ) = _ , in-source ψ , same , ∧-mapˡ (seen ψ) (revive ρ)
+          back (in-body {e = e} {s = s} ρ) (in-body ψ) =
+            let x₀ , ψ₀ , b , h = back ρ ψ in x₀ , in-body ψ₀ , b , ∧-mapʳ (is-just (part s) ∨ is-just e) h
+
+          backL : ∀ {Γ B i π} {ls : List (Sub Γ B)} (ρ : PathLanes ls u i π)
+                → ∀ {Δ C j τ} {x : Sub Δ C} (ψ : PathLanes (plantᴸ ρ v) x j τ)
+                → Σ (Sub Δ C) λ x₀ → Σ (PathLanes ls x₀ j τ) λ ψ₀ → x₀ ≈ x × (seenL ψ ≡ true → seenL ψ₀ ≡ true)
+          backL (this-lane ρ) (this-lane ψ) = let x₀ , ψ₀ , b , h = back ρ ψ in x₀ , this-lane ψ₀ , b , h
+          backL (this-lane ρ) (next-lane ψ) = _ , next-lane ψ , same , λ e → e
+          backL (next-lane ρ) (this-lane ψ) = _ , this-lane ψ , same , λ e → e
+          backL (next-lane ρ) (next-lane ψ) = let x₀ , ψ₀ , b , h = backL ρ ψ in x₀ , next-lane ψ₀ , b , h
 
       -- No held connect above the node holds a source past its end.
       mutual
@@ -360,6 +472,10 @@ module Keeping (R : Set) where
     shift-told : (v : Sub Δ A) → Alive u v → ∀ {q} → Heading q (Bound ρ) u v → (Ended u → Untold q u → Untold q v)
                → Untold q T → Ended T → Untold q (plant ρ v)
     shift-told v al {q} hd ut₀ ut en = Up.Told.toldUp al q (Bound ρ) (Heading.head-told hd) ut₀ ρ ut en (λ j w → w)
+
+    -- Every node of the replanted tree beside one of the tree's.
+    back-planted : (v : Sub Δ A) → Alive u v → u ≈ v → Back u v → Back T (plant ρ v)
+    back-planted v al ≈₀ bk = Up.Beside.back al ≈₀ bk ρ
 
     -- The route, live, lives on.
     route-planted : (v : Sub Δ A) → Alive u v → Route ρ → Route (planted ρ v)

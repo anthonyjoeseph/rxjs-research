@@ -42,13 +42,12 @@ Members: `owned-idle`, `meaning-idle`, `sorted-idle`, `owned-popped`,
 
 #### THE PLANTED CLIMBS
 
-Untried, and every old body a dead route: whether a climb's write, read as a
-`plant` (a scan's accumulator, a take's stage) or a job (`admit`, `dequeue`,
-`feeds`, `rets`), keeps each carrier part. Settled when `scan-owned` and
-`take-out` are bodies or refuted.
+A scan's accumulator write keeps the carrier parts read through `_≈_`; open:
+whether a take's stage or a job (`admit`, `dequeue`, `feeds`, `rets`) does,
+and whether the kernels survive a plant. Settled when `take-out` and
+`scan-kernels` are bodies or refuted.
 
-Members: `scan-kernels`, `scan-lifts`, `scan-lefts`, `scan-owned`,
-`scan-meaning`, `scan-queue`, `gone-take`, `take-pass`, `take-out`, `take-end`, `call-outer`,
+Members: `scan-kernels`, `scan-lifts`, `scan-lefts`, `gone-take`, `take-pass`, `take-out`, `take-end`, `call-outer`,
 `call-lanes`, `call-source`, `body-rest-heads`, `owned-body`, `emit-void`,
 `emit-open`, `burst-spent`.
 
