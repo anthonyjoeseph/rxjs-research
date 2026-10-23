@@ -10,10 +10,11 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE CARRIER'S FIELDS
 
-Untried: whether the carrier holds at subscribe — the root pending is
-placed and headed. Settled when both begin leaves are bodies.
+Untried: whether the old `placed-sub` tower (order, trail, spread,
+fresh) carries to the current Unfold. Settled when `placed-subscribe` is
+its ported body.
 
-Members: `placed-subscribe`, `heads-subscribe`.
+Members: `placed-subscribe`.
 
 #### THE STRONG STEP
 
