@@ -22,7 +22,7 @@ open import Data.Product using (_,_; Σ; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; sym; subst)
 
-open import operation.Placed using (Up; Placed; ahead; framed; shows; placed-⊑; frames-cut)
+open import adequacy.Record using (Up; Placed; ahead; framed; shows; placed-⊑; frames-cut)
 open import operation.PureObservable using (PureObs; module Pure; module Driver) renaming (run to prefix)
 open import adequacy.Sorted using (module Sorting)
 open import adequacy.Sorted.Walk using (module SortingWalk)

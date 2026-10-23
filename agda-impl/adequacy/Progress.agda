@@ -26,7 +26,7 @@ open import denotation.MonotonicList.Events using (Events∞; Time; out; skip; e
 open import denotation.MonotonicList using (Agree; agree-refl; agree-trans; observe)
 open import denotation.Denote using (⟦_⟧)
 import denotation.Unfold as U
-open import operation.Placed using (Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ; items)
+open import adequacy.Record using (Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ; items)
 open import operation.PureObservable using (PureObs; module Driver)
 open import adequacy.Content using (module Honesty)
 open import adequacy.Ghost using (module Ghosting)
