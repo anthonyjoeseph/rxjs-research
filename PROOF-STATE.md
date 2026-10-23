@@ -26,7 +26,8 @@ the resumed jobs first.
 
 Members: `emit-onward`, `kont-onward`, `take1-onward`, `cut-onward`,
 `feed-onward`, `src-onward`, `src-cut-onward`, `body-cut-onward`,
-`join-onward`, `owned-idle`, `meaning-idle`, `sorted-idle`, `pop-onward`, `sub-onward`, `burst-onward`, `turn-pops`,
+`join-onward`, `owned-idle`, `meaning-idle`, `sorted-idle`, `downs-plug`, `owned-pop`, `meaning-pop`,
+`sorted-pop`, `owned-drop`, `meaning-drop`, `sorted-drop`, `sub-onward`, `burst-onward`, `turn-pops`,
 `note-onward`, `note-least`, `turn-dry`.
 
 #### THE WALK
