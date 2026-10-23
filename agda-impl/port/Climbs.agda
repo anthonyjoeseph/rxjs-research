@@ -27,7 +27,7 @@ open import port.Ghost using (module Ghosting)
 open import port.Ghost.Paths using (module GhostingPaths)
 open import port.Moves using (module Moving)
 
-open Machine using (St; Ctx; Conf; Job; Ev; nx; cp; dirs; plug; scanS; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc;
+open Machine using (St; Ctx; Conf; Job; Ev; nx; cp; dirs; plug; scanS; connS; owed; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc;
   ⟨_,_,_,_,_⟩; rising)
 
 module Ascending (R : Set) where
@@ -35,12 +35,12 @@ module Ascending (R : Set) where
   open Unsubbing R using (_⇝_; now; then)
   open SortingWalk R using (WellMach; WellStep; silentʷ; preserve)
   open Strongly R using (Sub; Path; here; Strong; Carried; carried; closing; noteAs; Owned; Kernels; Meaning; Queue; Books;
-    Each; Heads; Lingers; Untold; Ended; DoneBy; outers; outersL; part; leftover; forget; mapᴹ; Feed; owing; Fed; FedLanes;
+    Each; Heads; connected; Lingers; Untold; Ended; DoneBy; outers; outersL; part; leftover; forget; mapᴹ; Feed; owing; Fed; FedLanes;
     Begins; focused; attaching; PathLanes; this-lane; next-lane; in-map; in-scan; in-cut; in-lane; in-take; in-outer; in-lanes;
     in-source; in-body; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; cutˢ; laneˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ)
   open Moving R using (plant; planted; plantedᴸ)
   open Ghosting R using (Hopped; Load; _≼_; load; loadOf; hopped-pre; showing; agrees)
-  open GhostingPaths R using (_⊕_; _⊕ᴸ_; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-split; lefts-up; healed-split; Lefts; Healed; One; whole; snoc; view;
+  open GhostingPaths R using (_⊕_; _⊕ᴸ_; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-body; lifts-shut; lefts-subst; lifts-split; lefts-up; healed-split; Lefts; Healed; One; whole; snoc; view;
     height; heightL; one-lower;
     one-map; one-scan; one-cut; one-lane; one-take; one-outer; one-lanes; one-source; one-body)
 
@@ -161,9 +161,6 @@ module Ascending (R : Set) where
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Connect.agda
     call-source : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub [] R} {u : Sub Δ A} {v : Sub Δ′ A′} {π τ} (ρ : Path T u π) {s : Path u v τ}
                 → One s → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ s) e → Called st m₁ (ρ ⊕ s)
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Base.agda
-    call-body : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub [] R} {u : Sub Δ A} {v : Sub Δ′ A′} {π τ} (ρ : Path T u π) {s : Path u v τ}
-              → One s → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ s) e → Called st m₁ (ρ ⊕ s)
 
   ------------------------------------------------------------------------
   -- THE CLIMB THROUGH A SCAN: a value accumulated, the scan's node
@@ -441,6 +438,95 @@ module Ascending (R : Set) where
         ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl
         ; flags = done-up ρ (in-take here) refl (Calling.flags cl) ; kept = Calling.kept cl })
 
+  ------------------------------------------------------------------------
+  -- THE CLIMB THROUGH A CONNECT'S BODY: a value as it is; an end, the
+  -- body's completion owed ahead of the agenda.
+
+  postulate
+    -- A context climbing through a connect's body, the body's own frame first.
+    body-at : ∀ {Δ X B π} {T : Sub [] R} {k r ej rt} {s : Sub Δ X} {b : Sub (X ∷ Δ) B} (ρ : Path T (connectˢ k r ej rt s b) π)
+              {c : Ctx R (X ∷ Δ) B} {x} → dirs c ≡ π ++ [ 1 ] → forget T ≡ plug c x
+            → Σ (Ctx R Δ B) λ c₀ → c ≡ inBody k (forget s) c₀ × dirs c₀ ≡ π
+
+  private
+   -- A connect whose body is gone is gone.
+    gone-connect : ∀ {Δ X B} {k r ej rt} {s : Sub Δ X} {b : Sub (X ∷ Δ) B} → part b ≡ nothing → part (connectˢ k r ej rt s b) ≡ nothing
+   gone-connect gn rewrite gn = refl
+
+   -- An end lifted out of a body is the connect's end.
+   body-end : ∀ {Δ X B} {k r ej rt} {s : Sub Δ X} {b : Sub (X ∷ Δ) B} {q S}
+            → Lifts (in-body {k = k} {r = r} {e = ej} {rt = rt} {s = s} (here {t = b})) (U.endˢ q) S → S ≡ U.endˢ q
+   body-end (lifts-body _ _ lifts-here)   = refl
+   body-end (lifts-shut _ _ _ lifts-here) = refl
+
+  postulate
+    -- DEAD ROUTE: the old body reads the body's rest off the heap's leftover; the state tree's leftover is `Strong`'s.
+    --
+    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Base.agda
+    body-rest-heads : ∀ {g ℓ m₁ Δ X B π} {T : Sub [] R} {k r ej rt} {s : Sub Δ X} {b : Sub (X ∷ Δ) B} (ρ : Path T (connectˢ k r ej rt s b) π)
+                    → Calling g ℓ m₁ (ρ ⊕ in-body here) cp → ClosedHeads (Conf.pos (Mach.conf m₁)) ρ cp
+
+    -- DEAD ROUTE: the old body owes the body's cut on the heap's agenda; the state tree pushes the job onto `rets`.
+    --
+    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Base.agda
+    owned-body : ∀ {T : Sub [] R} {Δ X B} {c : Ctx R Δ B} {k o x p rs clk tms ts}
+               → Owned T (mach ⟨ inBody {X = X} k o c , x , rising cp , p , rs ⟩ clk tms ts)
+               → Owned T (mach ⟨ c , connS k o x , rising cp , p , (dirs c , owed , p) ∷ rs ⟩ clk tms ts)
+
+    -- The meaning and the books with the body's completion owed.
+    body-meaning : ∀ {T : Sub [] R} {Δ X B} {c : Ctx R Δ B} {k o x p rs}
+                 → Meaning T ⟨ inBody {X = X} k o c , x , rising cp , p , rs ⟩
+                 → Meaning T ⟨ c , connS k o x , rising cp , p , (dirs c , owed , p) ∷ rs ⟩
+    body-books : ∀ {T : Sub [] R} {Δ X B} {c : Ctx R Δ B} {k o x p rs clk tms ts}
+               → Books T (mach ⟨ inBody {X = X} k o c , x , rising cp , p , rs ⟩ clk tms ts)
+               → Books T (mach ⟨ c , connS k o x , rising cp , p , (dirs c , owed , p) ∷ rs ⟩ clk tms ts)
+
+  call-body : ∀ {g m} (st : Strong g m) {m₁ Δ X B π} {T : Sub [] R} {k r ej rt} {s : Sub Δ X} {b : Sub (X ∷ Δ) B}
+              (ρ : Path T (connectˢ k r ej rt s b) π) → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ in-body here) e → Called st m₁ (ρ ⊕ in-body here)
+  call-body st {m₁ = mach kk clk tms ts} {r = r} {ej} {rt} ρ {nx y} cl
+    with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
+  ... | c | x | at | refl | kn | c′ , pv , S , L , sg | lt with body-at ρ at kn
+  ...   | c₀ , refl , at₀ with lifts-split ρ (in-body here) L in eqS
+  ...     | _ , lifts-body pt _ lifts-here , Lρ =
+    rose {σ′ = ρ} {e′ = nx y} (then refl now) (one-lower ρ one-body)
+      (record
+        { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = refl ; at = at₀
+        ; lifted = _ , cong₂ (connected r ej rt) pt pv , S , Lρ , sg
+        ; lefts = lefts-up ρ (in-body here) eqS lt ; rest-heads = tt
+        ; owned = owned-rise (Calling.owned cl) ; kernels = kn ; meaning = fed-same (λ _ _ _ → refl) _ (Calling.meaning cl)
+        ; queue = Calling.queue cl
+        ; books = record { clocked = Books.clocked (Calling.books cl) ; ticked = Books.ticked (Calling.books cl) ; turned = Books.turned (Calling.books cl) }
+        ; sorted = sorted-step (Calling.sorted cl) refl
+        ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl
+        ; flags = done-up ρ (in-body here) refl (Calling.flags cl) ; kept = Calling.kept cl })
+  ...     | _ , lifts-shut pt refl _ lifts-here , Lρ =
+    rose {σ′ = ρ} {e′ = nx y} (then refl now) (one-lower ρ one-body)
+      (record
+        { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = refl ; at = at₀
+        ; lifted = _ , cong₂ (connected r ej rt) pt pv , S , Lρ , sg
+        ; lefts = lefts-up ρ (in-body here) eqS lt ; rest-heads = tt
+        ; owned = owned-rise (Calling.owned cl) ; kernels = kn ; meaning = fed-same (λ _ _ _ → refl) _ (Calling.meaning cl)
+        ; queue = Calling.queue cl
+        ; books = record { clocked = Books.clocked (Calling.books cl) ; ticked = Books.ticked (Calling.books cl) ; turned = Books.turned (Calling.books cl) }
+        ; sorted = sorted-step (Calling.sorted cl) refl
+        ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl
+        ; flags = done-up ρ (in-body here) refl (Calling.flags cl) ; kept = Calling.kept cl })
+  call-body st {m₁ = mach kk clk tms ts} ρ {cp} cl
+    with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
+  ... | c | x | at | refl | kn | gn , S , L , sg , hl | lt with body-at ρ at kn
+  ...   | c₀ , refl , at₀ with lifts-split ρ (in-body here) L in eqB
+  ...     | _ , Lb , Lρ =
+    rose {σ′ = ρ} {e′ = cp} (then refl now) (one-lower ρ one-body)
+      (record
+        { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = refl ; at = at₀
+        ; lifted = gone-connect gn , S , subst (λ w → Lifts ρ w S) (body-end Lb) Lρ , sg , healed-split ρ (in-body here) hl
+        ; lefts = lefts-subst (λ w → w) (body-end Lb) (lefts-up ρ (in-body here) eqB lt) ; rest-heads = body-rest-heads ρ cl
+        ; owned = owned-body (Calling.owned cl) ; kernels = kn ; meaning = body-meaning (Calling.meaning cl)
+        ; queue = Calling.queue cl ; books = body-books (Calling.books cl)
+        ; sorted = sorted-step (Calling.sorted cl) refl
+        ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl
+        ; flags = done-up ρ (in-body here) refl (Calling.flags cl) ; kept = Calling.kept cl })
+
   call-step : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub [] R} {u : Sub Δ A} {v : Sub Δ′ A′} {π τ}
               (ρ : Path T u π) {s : Path u v τ} → One s → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ s) e → Called st m₁ (ρ ⊕ s)
   call-step st ρ one-map         cl = call-map st ρ cl
@@ -451,7 +537,7 @@ module Ascending (R : Set) where
   call-step st ρ o@one-outer     cl = call-outer st ρ o cl
   call-step st ρ o@(one-lanes _) cl = call-lanes st ρ o cl
   call-step st ρ o@one-source    cl = call-source st ρ o cl
-  call-step st ρ o@one-body      cl = call-body st ρ o cl
+  call-step st ρ one-body        cl = call-body st ρ cl
 
   -- A SIGNAL CLIMBS TO A RE-ENTRY CONFIGURATION: one operator at a time,
   -- from the path's far end, each step to a shorter path.
