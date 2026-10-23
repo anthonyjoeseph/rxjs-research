@@ -17,6 +17,7 @@ import denotation.Unfold as U
 open import operation.PureObservable using (module Machine; module Driver)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Strong using (module Strongly)
+open import adequacy.Calm using (Calm)
 open import adequacy.Sorted.Walk using (module SortingWalk)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Ghost.Paths using (module GhostingPaths)
@@ -35,7 +36,7 @@ module AscendingTake (R : Set) where
   open Unsubbing R using (_⇝_; now; then)
   open SortingWalk R using (WellMach; WellStep; silentʷ; preserve)
   open Strongly R using (Sub; Path; here; Strong; Carried; carried; closing; noteAs; Owned; Kernels; Meaning; Queue; Books;
-    Each; Ahead; connected; Lingers; Untold; Ended; DoneBy; outers; outersL; part; leftover; forget; forgetᴸ; mapᴹ; Feed; owing; Fed; FedLanes;
+    Each; Heads; each-ahead; connected; Lingers; Untold; Ended; DoneBy; outers; outersL; part; leftover; forget; forgetᴸ; mapᴹ; Feed; owing; Fed; FedLanes;
     Begins; focused; attaching; PathLanes; this-lane; next-lane; in-map; in-scan; in-cut; in-lane; in-take; in-outer; in-lanes;
     in-source; in-body; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; cutˢ; laneˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; pooledL; Timed; Joined; seen;
     Taking; taking; ending; taken; taking?; isTaking)
@@ -155,9 +156,12 @@ module AscendingTake (R : Set) where
     take-out-books : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ true q tk v) π) {y}
                    → q y ≡ false → (cl : Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y)) → ∀ {m₂} → step m₁ ≡ silent m₂
                    → Books (plant ρ (outed ρ cl)) m₂
-    take-out-behind : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ true q tk v) π) {y}
+    take-out-heads : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ true q tk v) π) {y}
                     → q y ≡ false → (cl : Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y)) → ∀ {m₂} → step m₁ ≡ silent m₂
-                    → Each (Ahead (Conf.pos (Mach.conf m₂))) (plant ρ (outed ρ cl))
+                    → Each (Heads (Conf.pos (Mach.conf m₂))) (plant ρ (outed ρ cl))
+    take-out-calm  : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ true q tk v) π) {y}
+                    → q y ≡ false → (cl : Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y)) → ∀ {m₂} → step m₁ ≡ silent m₂
+                    → Each (Calm (Conf.pos (Mach.conf m₂))) (plant ρ (outed ρ cl))
     take-out-told : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ true q tk v) π) {y}
                   → q y ≡ false → (cl : Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y)) → ∀ {m₂} → step m₁ ≡ silent m₂
                   → Untold (Conf.pos (Mach.conf m₂)) (plant ρ (outed ρ cl))
@@ -182,7 +186,7 @@ module AscendingTake (R : Set) where
         ; owned = take-out-owned ρ qy cl st₁ ; kernels = take-kernels ρ {c₀ = c₀} {x} at₀ kn _
         ; meaning = fed-plant (λ d → d) ρ (fed-same (λ _ _ _ → refl) T (Calling.meaning cl))
         ; queue = take-out-queue ρ qy cl st₁ ; books = take-out-books ρ qy cl st₁ ; sorted = sorted-step (Calling.sorted cl) st₁
-        ; behind = take-out-behind ρ qy cl st₁
+        ; behind = each-ahead (take-out-heads ρ qy cl st₁) (take-out-calm ρ qy cl st₁)
         ; lingers = Keep.route-lingers ρ w alive rt (λ {ls} → tw-refl (pooledL ls)) (λ _ → lg-take (λ ())) (Calling.lingers cl)
         ; told = take-out-told ρ qy cl st₁ ; ended = Keep.shift-ended ρ w alive (Calling.ended cl)
         ; flags = subst (DoneBy (plant ρ w)) (sym (outers-planted ρ w)) (Keep.shift-flags ρ w alive (done-up ρ (in-take here) refl (Calling.flags cl)))
@@ -256,9 +260,12 @@ module AscendingTake (R : Set) where
     take-end-books : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ false q tk v) π) {y}
                    → q y ≡ false → Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y) → ∀ {m₂} → step m₁ ≡ silent m₂
                    → Books (fallen ρ (Conf.pos (Mach.conf m₁))) m₂
-    take-end-behind : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ false q tk v) π) {y}
+    take-end-heads : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ false q tk v) π) {y}
                     → q y ≡ false → Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y) → ∀ {m₂} → step m₁ ≡ silent m₂
-                    → Each (Ahead (Conf.pos (Mach.conf m₂))) (fallen ρ (Conf.pos (Mach.conf m₁)))
+                    → Each (Heads (Conf.pos (Mach.conf m₂))) (fallen ρ (Conf.pos (Mach.conf m₁)))
+    take-end-calm  : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ false q tk v) π) {y}
+                    → q y ≡ false → Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y) → ∀ {m₂} → step m₁ ≡ silent m₂
+                    → Each (Calm (Conf.pos (Mach.conf m₂))) (fallen ρ (Conf.pos (Mach.conf m₁)))
     take-end-told : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ false q tk v) π) {y}
                   → q y ≡ false → Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y) → ∀ {m₂} → step m₁ ≡ silent m₂
                   → Untold (Conf.pos (Mach.conf m₂)) (fallen ρ (Conf.pos (Mach.conf m₁)))
@@ -282,7 +289,7 @@ module AscendingTake (R : Set) where
         ; owned = take-end-owned ρ qy cl st₁ ; kernels = trans (forget-heal _ (planted ρ w)) (take-kernels ρ {c₀ = c₀} {x} at₀ kn taken)
         ; meaning = take-end-meaning ρ qy cl st₁
         ; queue = take-end-queue ρ qy cl st₁ ; books = take-end-books ρ qy cl st₁ ; sorted = sorted-step (Calling.sorted cl) st₁
-        ; behind = take-end-behind ρ qy cl st₁ ; lingers = take-end-lingers ρ qy cl
+        ; behind = each-ahead (take-end-heads ρ qy cl st₁) (take-end-calm ρ qy cl st₁) ; lingers = take-end-lingers ρ qy cl
         ; told = take-end-told ρ qy cl st₁ ; ended = take-end-ended ρ qy cl ; flags = take-end-flags ρ qy cl
         ; route = tt ; kept = subst (_≼ loadOf st) (sym (take-end-load ρ qy cl st₁)) (Calling.kept cl) })
     where w   = takeWhileˢ false q taken v

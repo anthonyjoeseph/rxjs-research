@@ -407,6 +407,13 @@ module Strongly (R : Set) where
             → ∀ {n} → part (connectˢ k r e rt s b) ≡ just n
             → part s ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt
 
+  -- Heading and calm, each through the whole tree.
+  each-ahead : ∀ {q Γ A} {t : Sub Γ A} → Each (Heads q) t → Each (Calm q) t → Each (Ahead q) t
+  each-ahead h c = record
+    { parts = λ ψ sn e → Each.parts h ψ sn e , Each.parts c ψ sn e
+    ; pools = λ ψ sn e → Each.pools h ψ sn e , Each.pools c ψ sn e
+    ; rests = λ ψ sn e pn pe → Each.rests h ψ sn e pn pe , Each.rests c ψ sn e pn pe }
+
   ------------------------------------------------------------------------
   -- What a subscription leaves running past its end
 
