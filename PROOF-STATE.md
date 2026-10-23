@@ -8,24 +8,27 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE CARRIER'S TOWER
-
-Untried: whether the flatMap and connect arms (`flat-calm` over
-FlatOrder/FlatAfter/Calm/Burst/Walk, the connect order over Trail) carry to
-the current Unfold. Settled when all three are bodies.
-
-Members: `flat-calm`, `ordered-connect`, `steady-connect`.
-
 #### THE STRONG STEP
 
 Untried: whether each control state's step keeps `Carried` on the state
 tree — the old Climbs columns over `Sub` instead of the heap. Suspect:
 `Meaning`'s `owing` zips a subject's feeds with its feeding jobs, which
 `Owned` does not yet align. Settled when the onward leaves are bodies,
-`run-onward` first.
+the resumed jobs first.
 
-Members: `run-onward`, `sub-onward`, `burst-onward`, `turn-pops`,
-`note-onward`, `note-least`, `turn-dry`.
+Members: `of-path`, `emit-shut`, `last-void`, `last-enter`, `emit-void`,
+`emit-open`, `call-map`, `call-scan`, `call-cut`, `call-lane`, `call-take`,
+`call-outer`, `call-lanes`, `call-source`, `call-body`, `kont-onward`,
+`take-path`, `take1-void`, `take1-enter`, `cut-torn`, `cut-owned`,
+`cut-meaning`, `cut-queue`, `cut-turned`, `cut-sorted`, `cut-behind`,
+`cut-lingers`, `cut-told`, `cut-ended`, `cut-flags`, `cut-load`,
+`feed-onward`, `src-onward`, `src-cut-onward`, `body-cut-onward`,
+`join-onward`, `owned-idle`, `meaning-idle`, `sorted-idle`, `downs-plug`, `owned-popped`, `meaning-pop`,
+`sorted-pop`, `pop-queue`, `pop-behind`, `pop-told`, `owned-dropped`, `meaning-drop`, `sorted-drop`, `sub-cold`, `sub-empty`, `sub-of`, `sub-map`, `sub-scan`, `sub-take`,
+`sub-flat`, `sub-connect`, `sub-joined`, `sub-defer`, `burst-spent`, `burst-poll`, `burst-play`, `burst-finish`, `fire-kernels`, `fire-part`, `fire-load`,
+`fire-owned`, `fire-meaning`, `fire-timed`, `fire-joined`, `fire-sorted`, `fire-flags`,
+`fire-told`, `fire-ended`, `behind-fire`, `fire-lingers`,
+`meaning-note`, `sorted-note`, `note-least`, `turn-dry`.
 
 #### THE WALK
 
@@ -33,6 +36,14 @@ Untried: whether the old well-configuration walk carries to the state tree's
 step. Settled when `WellMach` is a ported body and `preserve` goes through.
 
 Members: `WellMach`, `preserve`, `begin-well`.
+
+#### THE ROOT STEP
+
+Whether a step, its sources clear of it, keeps its parts placed: a flatMap's
+admitted lanes; a defer's program, subscribed or fed. Settled when
+`flat-within` is a body or refuted.
+
+Members: `flat-within`, `defer-within`, `defer-fed`, `under-shown-connect`.
 
 ## Tier 1 — the adequacy theorem
 

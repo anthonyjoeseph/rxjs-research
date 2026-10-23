@@ -5,7 +5,7 @@ module port.Placed.Keys where
 open import Data.Bool using (true; false)
 open import Data.Empty using (⊥-elim)
 open import Data.List.Properties using (∷-injective; ∷-injectiveʳ)
-open import Data.Sum using (inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.Nat using (ℕ; suc; _<ᵇ_; _+_; _≤_; _<_; z≤n; s≤s)
 open import Data.Nat.Properties using (+-monoʳ-≤; <⇒≤; <-≤-trans; ≤-trans; m≤n+m; m≤m+n; <-irrefl)
@@ -25,7 +25,7 @@ import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
-open import port.Placed.Order using (Alienᴱ; Atop; Beneath; Clear; Every; EveryT; EveryTs; Everys; Every∞; Ordered; Orders; Owned; Past;
+open import port.Placed.Order using (Alienᴱ; Atop; Beneath; Clear; Every; EveryT; EveryTs; Everys; Every∞; Headed; Ordered; Orders; Owned; Past;
   Prefix; Prefix⁺; Reaches; out-here; out-there; skip-here; skip-there; Steadies; Steady; Tagged; every; every-monoᴱ; every-onward; every-tailOf;
   everyT-burstOn; everyT-idle; everyT-∪; everyᵀ; every∞-mono; ordered; prefix-++; prefix-trans;
   steady)
@@ -133,6 +133,23 @@ no-tick (_ ∷ _ ∷ _) m ()
 prefix-refl : ∀ k → Prefix k k
 prefix-refl []      = tt
 prefix-refl (a ∷ k) = refl , prefix-refl k
+
+-- A prefix is the position itself or a proper one.
+prefix-plus : ∀ k h → Prefix k h → k ≡ h ⊎ Prefix⁺ k h
+prefix-plus []      []      tt         = inj₁ refl
+prefix-plus []      (_ ∷ _) tt         = inj₂ tt
+prefix-plus (a ∷ k) (b ∷ h) (refl , q) with prefix-plus k h q
+... | inj₁ refl = inj₁ refl
+... | inj₂ q⁺   = inj₂ (refl , q⁺)
+
+-- A tick-singleton cannot be owned by a headed position's lane.
+owned-tick : ∀ p t → Headed p → ¬ Owned (p ++ [ ix 1 ]) (ix t ∷ [])
+owned-tick (ix _ ∷ [])    t _ (inj₁ (_ , ()))
+owned-tick (ix _ ∷ _ ∷ _) t _ (inj₁ (_ , ()))
+owned-tick (ix _ ∷ _)     t _ (inj₂ ())
+owned-tick []             t () _
+owned-tick (sub _ ∷ _)    t () _
+owned-tick (last ∷ _)     t () _
 
 -- What a flatMap shows just before a lane, strictly under `p`, puts the
 -- lane under `p`.

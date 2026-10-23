@@ -13,9 +13,9 @@ open import Data.List.Relation.Unary.Any using (Any)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Empty using (⊥)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Nat.Properties using (≤-reflexive; ≤-trans; m≤n⇒m≤1+n)
+open import Data.Nat.Properties using (≤-reflexive; ≤-trans; m≤n⇒m≤1+n; <-trans)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; _<_; _≤_; z≤n)
+open import Data.Nat using (ℕ; suc; _+_; _<_; _≤_; z≤n)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Induction.WellFounded using (WellFounded)
 open import Data.Product.Relation.Binary.Lex.Strict using (×-Lex; ×-wellFounded)
@@ -39,8 +39,8 @@ open Events∞
 module Ghosting (R : Set) where
   open Driver R using (Mach; Step; silent; value; complete; drained; step; begin)
   open Pure R using (End; finished; dry; cutOff)
-  open Unsubbing R using (_⇝_; now)
-  open Strongly R using (Strong; carried; closing; strong-begin; Carried; Sub; CtlAs; calmAs; noteAs; runAs; subAs; burstAs; pend; takes; left)
+  open Unsubbing R using (_⇝_; now; ⇝-trans)
+  open Strongly R using (Strong; carried; closing; strong-begin; Carried; Sub; CtlAs; calmAs; noteAs; runAs; subAs; burstAs; popAs; pend; takes; left)
 
   ----------------------------------------------------------------------
   -- Alike as sets
@@ -271,6 +271,26 @@ module Ghosting (R : Set) where
   _⊏_ : Load → Load → Set
   _⊏_ = ×-Lex _≡_ _<_ (×-Lex _≡_ _<_ (×-Lex _≡_ _<_ (×-Lex _≡_ _<_ _<_)))
 
+  _≼_ : Load → Load → Set
+  a ≼ b = a ≡ b ⊎ a ⊏ b
+
+  lex-trans : ∀ {B : Set} {_<₂_ : B → B → Set} → (∀ {x y z} → x <₂ y → y <₂ z → x <₂ z)
+            → ∀ {a b c : ℕ × B} → ×-Lex _≡_ _<_ _<₂_ a b → ×-Lex _≡_ _<_ _<₂_ b c → ×-Lex _≡_ _<_ _<₂_ a c
+  lex-trans t (inj₁ ab)          (inj₁ bc)          = inj₁ (<-trans ab bc)
+  lex-trans t (inj₁ ab)          (inj₂ (refl , _))  = inj₁ ab
+  lex-trans t (inj₂ (refl , _))  (inj₁ bc)          = inj₁ bc
+  lex-trans t (inj₂ (refl , ab)) (inj₂ (refl , bc)) = inj₂ (refl , t ab bc)
+
+  ⊏-trans : ∀ {a b c} → a ⊏ b → b ⊏ c → a ⊏ c
+  ⊏-trans = lex-trans {_<₂_ = ×-Lex _≡_ _<_ (×-Lex _≡_ _<_ (×-Lex _≡_ _<_ _<_))}
+              (lex-trans {_<₂_ = ×-Lex _≡_ _<_ (×-Lex _≡_ _<_ _<_)}
+                (lex-trans {_<₂_ = ×-Lex _≡_ _<_ _<_} (lex-trans {_<₂_ = _<_} <-trans)))
+
+  ≼-trans : ∀ {a b c} → a ≼ b → b ≼ c → a ≼ c
+  ≼-trans (inj₁ refl) bc          = bc
+  ≼-trans (inj₂ ab)   (inj₁ refl) = inj₂ ab
+  ≼-trans (inj₂ ab)   (inj₂ bc)   = inj₂ (⊏-trans ab bc)
+
   Measure : Set
   Measure = Load × ℕ
 
@@ -285,18 +305,27 @@ module Ghosting (R : Set) where
   load : (m : Mach) → Sub [] R → Load
   load m t = pend t , takes t , length (Mach.timers m) , length (Mach.turns m) , left t
 
-  -- The control's own: the jobs owed, and the one about to run.
+  private
+    twice : ℕ → ℕ
+    twice n = n + n
+
+  -- The control's own: twice the jobs owed and the one about to run, and
+  -- one more for a job about to be popped, which pops to fewer.
   weight : ∀ {m} → CtlAs m → ℕ
   weight (calmAs _ _)              = 0
-  weight (noteAs {rs = rs} _ _)    = suc (length rs)
-  weight (runAs {rs = rs} _)       = suc (length rs)
-  weight (subAs {rs = rs} _)       = suc (length rs)
-  weight (burstAs {rs = rs} _ _ _) = length rs
+  weight (noteAs {rs = rs} _ _)    = twice (suc (length rs))
+  weight (runAs {rs = rs} _)       = twice (suc (length rs))
+  weight (subAs {rs = rs} _)       = twice (suc (length rs))
+  weight (burstAs {rs = rs} _ _ _) = twice (length rs)
+  weight (popAs {rs = rs} _ _)     = suc (twice (suc (length rs)))
 
   -- The work a re-entry configuration has left before its ghost moves.
   measure : ∀ {g m} → Strong g m → Measure
   measure {m = m} (carried cr) = load m (Carried.tree cr) , weight (Carried.ctlAs cr)
   measure (closing _ _ _ _)    = (0 , 0 , 0 , 0 , 0) , 0
+
+  loadOf : ∀ {g m} → Strong g m → Load
+  loadOf st = proj₁ (measure st)
 
   -- WHAT A SILENT RUN BETWEEN RE-ENTRY CONFIGURATIONS GAINS: the ghost
   -- past a skip of its residual; or the ghost alike, less work left; or
@@ -314,6 +343,9 @@ module Ghosting (R : Set) where
   -- `m′` runs silently to a re-entry configuration, which `st` gains.
   Hopped : ∀ {g m} → Strong g m → Mach → Set₁
   Hopped st m′ = Σ (U.Node [] R) λ g″ → Σ Mach λ m₀ → m′ ⇝ m₀ × Σ (Strong g″ m₀) λ st₀ → Gain st st₀
+
+  hopped-pre : ∀ {g m m′ m₁} {st : Strong g m} → m′ ⇝ m₁ → Hopped st m₁ → Hopped st m′
+  hopped-pre path (g″ , m₀ , path′ , st₀ , gn) = g″ , m₀ , ⇝-trans path path′ , st₀ , gn
 
   onward : ∀ {rest g m m′} {st : Strong g m} → rest ≋ residual g → Hopped st m′ → Inner rest m′
   onward e (g″ , m₀ , path , st₀ , gn) = record { ghost = g″ ; same = ≋-trans e (past-same (gain-past gn)) ; mirror = m₀ , path , st₀ }

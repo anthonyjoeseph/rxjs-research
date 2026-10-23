@@ -12,7 +12,7 @@ import Data.List.Relation.Unary.Any as Any
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Product using (_×_; _,_; proj₁)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 
 import Tree as T
 open import Tree using (Obs)
@@ -631,3 +631,6 @@ mutual
   early-sane {ν = ν} (l ∷ ls) (sl , s) =
     pick-sane l (U.step l) ls (U.headˢ (U.step l)) (U.earliest ls) (weaken (below-loosen ν) l sl) (step-sane l sl)
       (weakenᴸ (below-loosen ν) ls s) (early-sane ls s)
+
+sane-out : ∀ {A} {g : U.Node [] A} {k a g′} → Sane []ᴬ g → U.step g ≡ U.outˢ k a g′ → Sane []ᴬ g′
+sane-out {g = g} s e = subst (SaneS []ᴬ) e (step-sane g s)

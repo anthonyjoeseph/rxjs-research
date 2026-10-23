@@ -15,18 +15,20 @@
 module port.Strong where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_)
-open import Data.List using (List; []; _∷_; _++_; [_]; length)
+open import Data.List using (List; []; _∷_; _++_; [_]; length; map; head)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Empty using (⊥)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup)
 open import Data.List.Relation.Unary.Linked using (Linked; [])
 import Data.List.Relation.Unary.Any as Any
 open import Data.Maybe using (Maybe; just; nothing; is-just; is-nothing)
+import Data.Maybe.Relation.Unary.All as MAll
 open import Data.Nat using (ℕ; suc; _+_; _<ᵇ_; _≡ᵇ_; _≤_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤)
 open import Level using (Lift)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl)
+open import Relation.Nullary using (¬_)
 
 import Tree as T
 open import denotation.MonotonicList.Events using (Time; Pos; From; Frame; at; ix; last; tick; root; _<ᵖ_) renaming (sub to subᴾ)
@@ -300,7 +302,8 @@ module Strongly (R : Set) where
   -- THE RE-ENTRY STATES, by the machine's configuration: nothing owed
   -- and no turn to play; a value about to be shown at the root, at its
   -- tick; a job about to resume; a pending node about to begin; the next
-  -- turn about to play, no job owed above it.
+  -- turn about to play, no job owed above it; a job owed above the next
+  -- turn, or with no turn, about to be popped.
 
   data CtlAs (m : Mach) : Set₁ where
     calmAs  : ∀ {Γ A} {c : Ctx R Γ A} {s p} → Mach.conf m ≡ ⟨ c , s , absorbed , p , [] ⟩ → Mach.turns m ≡ [] → CtlAs m
@@ -309,6 +312,8 @@ module Strongly (R : Set) where
     subAs   : ∀ {Γ A} {c : Ctx R Γ A} {o p rs} → Mach.conf m ≡ ⟨ c , pendS o , subscribing , p , rs ⟩ → CtlAs m
     burstAs : ∀ {Γ A} {c : Ctx R Γ A} {s p rs t ts} → Mach.conf m ≡ ⟨ c , s , absorbed , p , rs ⟩ → Mach.turns m ≡ t ∷ ts
             → (depthOf t <ᵇ length rs) ≡ false → CtlAs m
+    popAs   : ∀ {Γ A} {c : Ctx R Γ A} {s p j rs} → Mach.conf m ≡ ⟨ c , s , absorbed , p , j ∷ rs ⟩
+            → MAll.All (λ t → (depthOf t <ᵇ suc (length rs)) ≡ true) (head (Mach.turns m)) → CtlAs m
 
   -- The ghost the witness reads: a value about to be shown, the ghost
   -- before it; otherwise the witness's own.
@@ -463,12 +468,33 @@ module Strongly (R : Set) where
           → (ψ : Path t (connectˢ k r e rt s b) π) → seen ψ ≡ true
           → ∀ {n} → part (connectˢ k r e rt s b) ≡ just n → ∀ {c₀} → e ≡ just c₀ → part s ≡ nothing
 
-  -- EVERY SEEN FLATMAP'S DONE FLAG READS ITS OUTER GONE: an outer's end
-  -- sets the flag as it rises to the flatMap, and no re-entry state
-  -- falls between.
-  DoneBy : Sub [] R → Set₁
-  DoneBy t = ∀ {Γ X A op f d n qs pl π} {o : Sub Γ X} {ls : List (Sub Γ A)}
-           → (ψ : Path t (flatMapˢ op f d n qs pl o ls) π) → seen ψ ≡ true → d ≡ is-nothing (part o)
+  -- The flatMaps a path enters by their outer, at their paths.
+  mutual
+    outers : ∀ {Γ A Δ B} {t : Sub Γ A} {u : Sub Δ B} {π} → Path t u π → List (List ℕ)
+    outers here          = []
+    outers (in-map p)    = map (0 ∷_) (outers p)
+    outers (in-scan p)   = map (0 ∷_) (outers p)
+    outers (in-cut p)    = map (0 ∷_) (outers p)
+    outers (in-lane p)   = map (0 ∷_) (outers p)
+    outers (in-take p)   = map (0 ∷_) (outers p)
+    outers (in-outer p)  = [] ∷ map (0 ∷_) (outers p)
+    outers (in-lanes {i = i} p) = map (suc i ∷_) (outersL p)
+    outers (in-source p) = map (0 ∷_) (outers p)
+    outers (in-body p)   = map (1 ∷_) (outers p)
+
+    outersL : ∀ {Γ A Δ B} {ls : List (Sub Γ A)} {u : Sub Δ B} {i π} → PathLanes ls u i π → List (List ℕ)
+    outersL (this-lane p) = outers p
+    outersL (next-lane p) = outersL p
+
+  -- EVERY SEEN FLATMAP'S DONE FLAG READS ITS OUTER GONE, but the flags
+  -- named, which read unset: an outer ends at its leaf, its flag set
+  -- only once the end has climbed to the flatMap.
+  Flagged : ∀ {Γ X} → List (List ℕ) → List ℕ → Bool → Sub Γ X → Set
+  Flagged ns π d o = (π ∈ ns → d ≡ false) × (¬ (π ∈ ns) → d ≡ is-nothing (part o))
+
+  DoneBy : Sub [] R → List (List ℕ) → Set₁
+  DoneBy t ns = ∀ {Γ X A op f d n qs pl π} {o : Sub Γ X} {ls : List (Sub Γ A)}
+              → (ψ : Path t (flatMapˢ op f d n qs pl o ls) π) → seen ψ ≡ true → Flagged ns π d o
 
   ------------------------------------------------------------------------
   -- The joiners' feed
@@ -625,7 +651,7 @@ module Strongly (R : Set) where
       lingers : Lingers tree
       told    : Untold (Conf.pos (Mach.conf m)) tree
       ended   : Ended tree
-      flags   : DoneBy tree
+      flags   : DoneBy tree []
 
   -- A RE-ENTRY CONFIGURATION AGAINST THE GHOST: carried, or the root's
   -- completion about to be shown where the ghost ends.
