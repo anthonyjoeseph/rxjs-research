@@ -19,6 +19,8 @@ module SortingWalk (R : Set) where
     -- A configuration well past `lo`, the last position delivered.
     --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Sorted/Walk.agda
+    --
+    -- DEAD ROUTE: the old invariant carries a well heap over the CPS machine's states; the state tree has neither.
     WellMach : Pos → Mach → Set₁
 
   -- One step, its next configuration well and never earlier.
@@ -33,11 +35,15 @@ module SortingWalk (R : Set) where
     -- it well, and a value it shows is no earlier than the last.
     --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Sorted/Walk.agda
+    --
+    -- DEAD ROUTE: the old body is a case split on the CPS machine's states, every arm reading or writing the heap.
     preserve : ∀ {lo m} → WellMach lo m → WellStep lo (step m)
 
     -- The run begins well, the program loaded at the root.
     --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Sorted/Walk.agda
+    --
+    -- DEAD ROUTE: the old body builds the empty heap's well-ness; the state tree has no heap.
     begin-well : (o : PureObs [] R) → WellMach root (begin o)
 
   mutual

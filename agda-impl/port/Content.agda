@@ -144,6 +144,8 @@ module Honesty (R : Set) where
     -- An open `of` the ghost does not hold: its value climbs unseen.
     --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Lift/Order.agda
+    --
+    -- DEAD ROUTE: the old body dispatches on the heap's opened flag and reads the pool's and rest's parts off the heap (void-site); the state tree reads `closed` off the context.
     emit-void : ∀ {g m Γ A} {c : Ctx R Γ A} {x xs i p rs p₀ j} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , ofS (x ∷ xs) , resuming (next i) , p , rs ⟩
               → closed c ≡ false → (ψ : Path (Carried.tree cr) (ofˢ {Γ} {A} p₀ j (x ∷ xs)) (dirs c)) → seen ψ ≡ false
               → Hopped (carried cr) (record m { conf = ⟨ c , ofS xs , rising (nx x) , p ⊕ [ ix i ] , (dirs c , next (suc i) , p) ∷ rs ⟩ })
@@ -152,6 +154,8 @@ module Honesty (R : Set) where
     -- step that value lifted.
     --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs.agda
+    --
+    -- DEAD ROUTE: the old body threads the heap's opened flag and heap-read Lifts through emit-lifts; the state tree reads `closed` off the context.
     emit-open : ∀ {g m Γ A} {c : Ctx R Γ A} {x xs i p rs p₀ j} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , ofS (x ∷ xs) , resuming (next i) , p , rs ⟩
               → closed c ≡ false → (ψ : Path (Carried.tree cr) (ofˢ {Γ} {A} p₀ j (x ∷ xs)) (dirs c)) → seen ψ ≡ true
               → Σ Mach λ m₁ → record m { conf = ⟨ c , ofS xs , rising (nx x) , p ⊕ [ ix i ] , (dirs c , next (suc i) , p) ∷ rs ⟩ } ⇝ m₁
@@ -272,6 +276,8 @@ module Honesty (R : Set) where
     -- The ghost alike, a turn fewer.
     --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Base.agda
+    --
+    -- DEAD ROUTE: the old body drops the burst's handle from the heap (drop-held, owned-spent) on the heap's spent flag; the state tree reads liveness by `poke`.
     burst-spent : ∀ {g m Γ A} {c : Ctx R Γ A} {s p rs π u i pl d ts} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , s , absorbed , p , rs ⟩
                 → Mach.turns m ≡ play π u i pl d ∷ ts → (d <ᵇ length rs) ≡ false → live (poke π (Mach.conf m)) ≡ false
                 → ∀ {m′} → step m ≡ silent m′ → Hopped (carried cr) m′

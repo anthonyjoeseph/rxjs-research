@@ -8,26 +8,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE STRONG STEP
+#### THE REPLANT WALK
 
-Whether the old climb and fire bodies carry once a heap write reads as a
-`plant` and an owed job as a push onto `rets`: the old `Frame` and `Retag`
-lemmas over the planted tree. Nine are marked as not carrying on the heap
-reading. Settled when `port/Frame` typechecks and a scan part is its old body.
+Whether the old replant walk carries: at a fire the heap passes unchanged,
+so its preservation of `Each` and `Lingers` is a walk over the planted path.
+Settled when `behind-fire` is its old body.
 
-Members: `emit-void`, `emit-open`, `scan-kernels`, `scan-lifts`,
-`scan-lefts`, `scan-owned`, `scan-meaning`, `scan-queue`, `scan-behind`,
-`scan-lingers`, `scan-flags`, `gone-take`,
-`take-pass`, `take-out`, `take-end`, `call-outer`, `call-lanes`,
-`call-source`, `body-rest-heads`, `owned-body`, `burst-spent`,
-`behind-fire`, `fire-lingers`.
-
-#### THE WALK
-
-Untried: whether the old well-configuration walk carries to the state tree's
-step. Settled when `WellMach` is a ported body and `preserve` goes through.
-
-Members: `WellMach`, `preserve`, `begin-well`.
+Members: `behind-fire`, `fire-lingers`.
 
 ## Tier 1 — the adequacy theorem
 
@@ -49,6 +36,19 @@ Members: `owned-idle`, `meaning-idle`, `sorted-idle`, `owned-popped`,
 `feed-onward`, `src-onward`, `join-onward`, `src-cut-onward`,
 `body-cut-onward`, `body-meaning`, `body-books`.
 
+#### THE PLANTED CLIMBS
+
+Untried, and every old body a dead route: whether a climb's write, read as a
+`plant` (a scan's accumulator, a take's stage) or a job (`admit`, `dequeue`,
+`feeds`, `rets`), keeps each carrier part. Settled when `scan-owned` and
+`take-out` are bodies or refuted.
+
+Members: `scan-kernels`, `scan-lifts`, `scan-lefts`, `scan-owned`,
+`scan-meaning`, `scan-queue`, `scan-behind`, `scan-lingers`, `scan-flags`,
+`gone-take`, `take-pass`, `take-out`, `take-end`, `call-outer`,
+`call-lanes`, `call-source`, `body-rest-heads`, `owned-body`, `emit-void`,
+`emit-open`, `burst-spent`.
+
 #### THE CUT AND THE FIRE
 
 Untried: whether a cut node's step and a timer's fire keep each carrier part
@@ -61,6 +61,14 @@ Members: `call-cut`, `cut-torn`, `cut-owned`, `cut-meaning`, `cut-queue`,
 `fire-load`, `fire-owned`, `fire-meaning`, `fire-timed`, `fire-joined`,
 `fire-sorted`, `fire-flags`, `fire-told`, `fire-ended`, `burst-poll`,
 `burst-play`, `burst-finish`.
+
+#### THE WALK
+
+Untried: the old well-configuration invariant was a well heap over the CPS
+machine's states, so a state-tree `WellMach` is unwritten. Settled when it is
+a definition and `preserve` a body or refuted.
+
+Members: `WellMach`, `preserve`, `begin-well`.
 
 #### THE ROOT STEP
 
