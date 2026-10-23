@@ -14,18 +14,19 @@
 -- back (`Kernels`); `part` reads it as the ghost, exactly.
 module port.Strong where
 
-open import Data.Bool using (Bool; false; if_then_else_)
+open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_)
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using ([])
 import Data.List.Relation.Unary.Any as Any
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (Maybe; just; nothing; is-just)
 open import Data.Nat using (ℕ; suc; _+_; _<ᵇ_)
 open import Data.Product using (Σ; _×_; _,_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Data.Sum using (_⊎_)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl)
 
 import Tree as T
-open import denotation.MonotonicList.Events using (Time; Pos; From; Frame; at; last; tick; root)
+open import denotation.MonotonicList.Events using (Time; Pos; From; Frame; at; ix; last; tick; root)
 import denotation.Unfold as U
 open import operation.PureObservable using (PureObs; Tape; tape; over; module Machine; module Driver)
 open import port.Sane using (Sane; sane-subscribe)
@@ -33,7 +34,8 @@ open import port.Placed.Order using (Placed)
 open import port.Sorted using (_≤ᵖ_)
 open import port.Sorted.Walk using (module SortingWalk)
 
-open Machine using (St; Ctx; Conf; CS; plug; top; ⟨_,_,_,_,_⟩; absorbed; subscribing; resuming; rising; nx; cp;
+open Machine using (St; Ctx; Conf; CS; Job; Mode; plug; dirs; top; ⟨_,_,_,_,_⟩; absorbed; subscribing; resuming; rising; nx; cp;
+  att; attBody; owed; next; owedCp; owedCut; feeding;
   coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS) renaming (pend to pendS)
 
 module Strongly (R : Set) where
@@ -60,42 +62,61 @@ module Strongly (R : Set) where
     ending : Pos → U.Node Γ A → Taking Γ A
     taken  : Taking Γ A
 
-  mutual
-    data Sub : List Set → Set → Set₁ where
-      -- Reached at `q`, not yet begun.
-      pendingˢ   : ∀ {Γ A} → PureObs Γ A → Pos → Sub Γ A
-      -- Live, and its phase.
-      coldˢ      : ∀ {Γ A} → Bool → Phase A → Sub Γ A
-      -- `of`, subscribed at `p`, `i` emitted, the rest to come.
-      ofˢ        : ∀ {Γ A} → Pos → ℕ → List A → Sub Γ A
-      -- Nothing left: `empty`, a spent `of`.
-      doneˢ      : ∀ {Γ A} → Sub Γ A
-      mapˢ       : ∀ {Γ A B} → (A → B) → Sub Γ A → Sub Γ B
-      scanˢ      : ∀ {Γ A B} → (B → A → B) → B → Sub Γ A → Sub Γ B
-      -- Its kill switch, live and attached, and the source.
-      takeWhileˢ : ∀ {Γ A} → Bool → (A → Bool) → Bool → Bool → Taking Γ A → Sub Γ A → Sub Γ A
-      -- Outer done, lanes running, the values waiting, the outer's kill
-      -- switch, the meaning's pool of what its ended parts left running,
-      -- the outer, and every lane begun.
-      flatMapˢ   : ∀ {Γ A B} → T.FlatOp → (A → PureObs Γ B) → Bool → ℕ → List A → Bool → Bool
-                 → U.Node Γ B → Sub Γ A → List (Lane Γ B) → Sub Γ B
-      -- The subject; where the source subscribes, where it ended once it
-      -- has and what the meaning keeps of it running past that; the
-      -- source; the body.
-      connectˢ   : ∀ {Γ X B} → CS X → Pos → Maybe Pos → U.Node Γ X → Sub Γ X → Sub (X ∷ Γ) B → Sub Γ B
-      -- Joined at `j`, its gate, and what the meaning has fed it and not
-      -- yet shown, with where it ends once told.
-      joinˢ      : ∀ {Γ A} → Pos → Bool → A ∈ Γ → Maybe (List (Pos × Maybe A) × Maybe Pos) → Sub Γ A
+  -- Node for node the machine's tree, each with what the meaning keeps
+  -- besides.
+  data Sub : List Set → Set → Set₁ where
+    -- Reached at `q`, not yet begun.
+    pendingˢ   : ∀ {Γ A} → PureObs Γ A → Pos → Sub Γ A
+    -- Live, and its phase.
+    coldˢ      : ∀ {Γ A} → Bool → Phase A → Sub Γ A
+    -- `of`, subscribed at `p`, `i` emitted, the rest to come.
+    ofˢ        : ∀ {Γ A} → Pos → ℕ → List A → Sub Γ A
+    -- Nothing left: `empty`, a spent `of`.
+    doneˢ      : ∀ {Γ A} → Sub Γ A
+    mapˢ       : ∀ {Γ A B} → (A → B) → Sub Γ A → Sub Γ B
+    scanˢ      : ∀ {Γ A B} → (B → A → B) → B → Sub Γ A → Sub Γ B
+    -- A kill switch, live and attached, over its subscription.
+    cutˢ       : ∀ {Γ A} → Bool → Bool → Sub Γ A → Sub Γ A
+    -- A lane, still running in its flatMap's list.
+    laneˢ      : ∀ {Γ A} → Bool → Sub Γ A → Sub Γ A
+    -- Inclusive, the predicate, where it is in failing, and its source's
+    -- switch.
+    takeWhileˢ : ∀ {Γ A} → Bool → (A → Bool) → Taking Γ A → Sub Γ A → Sub Γ A
+    -- Outer done, lanes running, the values waiting, the meaning's pool
+    -- of what its ended parts left running, the outer's switch, and
+    -- every lane begun.
+    flatMapˢ   : ∀ {Γ A B} → T.FlatOp → (A → PureObs Γ B) → Bool → ℕ → List A
+               → U.Node Γ B → Sub Γ A → List (Sub Γ B) → Sub Γ B
+    -- The subject; where the source subscribes, where it ended once it
+    -- has and what the meaning keeps of it running past that; the
+    -- source; the body.
+    connectˢ   : ∀ {Γ X B} → CS X → Pos → Maybe Pos → U.Node Γ X → Sub Γ X → Sub (X ∷ Γ) B → Sub Γ B
+    -- Joined at `j`, its gate, and what the meaning has fed it and not
+    -- yet shown, with where it ends once told.
+    joinˢ      : ∀ {Γ A} → Pos → Bool → A ∈ Γ → Maybe (List (Pos × Maybe A) × Maybe Pos) → Sub Γ A
 
-    -- A lane: in its flatMap's list, its kill switch, its subscription.
-    record Lane (Γ : List Set) (B : Set) : Set₁ where
-      inductive
-      constructor lane
-      field
-        running  : Bool
-        live     : Bool
-        attached : Bool
-        inner    : Sub Γ B
+  -- A node below another, by the child indices the machine moves down
+  -- by.
+  mutual
+    data Path : ∀ {Γ A} → Sub Γ A → ∀ {Δ B} → Sub Δ B → List ℕ → Set₁ where
+      here      : ∀ {Γ A} {t : Sub Γ A} → Path t t []
+      in-map    : ∀ {Γ X A Δ B} {f : X → A} {t : Sub Γ X} {u : Sub Δ B} {π} → Path t u π → Path (mapˢ f t) u (0 ∷ π)
+      in-scan   : ∀ {Γ X A Δ B} {f : A → X → A} {z} {t : Sub Γ X} {u : Sub Δ B} {π} → Path t u π → Path (scanˢ f z t) u (0 ∷ π)
+      in-cut    : ∀ {Γ A Δ B l a} {t : Sub Γ A} {u : Sub Δ B} {π} → Path t u π → Path (cutˢ l a t) u (0 ∷ π)
+      in-lane   : ∀ {Γ A Δ B r} {t : Sub Γ A} {u : Sub Δ B} {π} → Path t u π → Path (laneˢ r t) u (0 ∷ π)
+      in-take   : ∀ {Γ A Δ B i q tk} {t : Sub Γ A} {u : Sub Δ B} {π} → Path t u π → Path (takeWhileˢ i q tk t) u (0 ∷ π)
+      in-outer  : ∀ {Γ X A Δ B op f d n qs pl} {t : Sub Γ X} {ls : List (Sub Γ A)} {u : Sub Δ B} {π}
+                → Path t u π → Path (flatMapˢ op f d n qs pl t ls) u (0 ∷ π)
+      in-lanes  : ∀ {Γ X A Δ B op f d n qs pl} {o : Sub Γ X} {ls : List (Sub Γ A)} {u : Sub Δ B} {i π}
+                → PathLanes ls u i π → Path (flatMapˢ op f d n qs pl o ls) u (suc i ∷ π)
+      in-source : ∀ {Γ X A Δ B k r e rt} {t : Sub Γ X} {b : Sub (X ∷ Γ) A} {u : Sub Δ B} {π}
+                → Path t u π → Path (connectˢ k r e rt t b) u (0 ∷ π)
+      in-body   : ∀ {Γ X A Δ B k r e rt} {s : Sub Γ X} {t : Sub (X ∷ Γ) A} {u : Sub Δ B} {π}
+                → Path t u π → Path (connectˢ k r e rt s t) u (1 ∷ π)
+
+    data PathLanes : ∀ {Γ A} → List (Sub Γ A) → ∀ {Δ B} → Sub Δ B → ℕ → List ℕ → Set₁ where
+      this-lane : ∀ {Γ A Δ B} {t : Sub Γ A} {ls} {u : Sub Δ B} {π} → Path t u π → PathLanes (t ∷ ls) u 0 π
+      next-lane : ∀ {Γ A Δ B} {l : Sub Γ A} {ls} {u : Sub Δ B} {i π} → PathLanes ls u i π → PathLanes (l ∷ ls) u (suc i) π
 
   ------------------------------------------------------------------------
   -- The machine's tree, the ghost data dropped
@@ -116,15 +137,17 @@ module Strongly (R : Set) where
     forget doneˢ                              = doneS
     forget (mapˢ f s)                         = mapS f (forget s)
     forget (scanˢ f z s)                      = scanS f z (forget s)
-    forget (takeWhileˢ i q l a tk s)          = takeS i q (cutS l a (forget s))
-    forget (flatMapˢ op f d n qs l a pl o ls) = flatS op f d n qs (cutS l a (forget o)) (forgetᴸ ls)
+    forget (cutˢ l a s)                       = cutS l a (forget s)
+    forget (laneˢ r s)                        = lnS r (forget s)
+    forget (takeWhileˢ i q tk s)              = takeS i q (forget s)
+    forget (flatMapˢ op f d n qs pl o ls)     = flatS op f d n qs (forget o) (forgetᴸ ls)
     forget (connectˢ k r e rt s b)            = connS k (forget s) (forget b)
     forget (joinˢ j g x st)                   = joinS j g x
 
     private
-      forgetᴸ : ∀ {Γ B} → List (Lane Γ B) → List (St Γ B)
-      forgetᴸ []                  = []
-      forgetᴸ (lane r l a s ∷ ls) = lnS r (cutS l a (forget s)) ∷ forgetᴸ ls
+      forgetᴸ : ∀ {Γ B} → List (Sub Γ B) → List (St Γ B)
+      forgetᴸ []       = []
+      forgetᴸ (s ∷ ls) = forget s ∷ forgetᴸ ls
 
   -- The machine's tree is the witness, forgotten.
   Kernels : Sub [] R → Conf R → Set₁
@@ -170,6 +193,12 @@ module Strongly (R : Set) where
   taking? i p (ending k c) s = just (U.endingᶜ (k ++ [ last ]) c)
   taking? i p taken        s = nothing
 
+  -- A switch's own state: off once cut; anything else is not a switch.
+  private
+    switched : ∀ {Γ A} → Sub Γ A → Bool
+    switched (cutˢ l a s) = l
+    switched _            = true
+
   mutual
     part : ∀ {Γ A} → Sub Γ A → Maybe (U.Node Γ A)
     part (pendingˢ o q)                     = just (U.subscribe o q)
@@ -178,14 +207,16 @@ module Strongly (R : Set) where
     part doneˢ                              = nothing
     part (mapˢ f s)                         = mapᴹ (U.mapᶜ f) (part s)
     part (scanˢ f z s)                      = mapᴹ (U.scanᶜ f z) (part s)
-    part (takeWhileˢ i q l a tk s)          = if l then taking? i q tk (part s) else nothing
-    part (flatMapˢ op f d n qs l a pl o ls) = merged op (λ x r → U.subscribe (f x) r) (part o) (partLanes ls) qs pl
+    part (cutˢ l a s)                       = if l then part s else nothing
+    part (laneˢ r s)                        = part s
+    part (takeWhileˢ i q tk s)              = if switched s then taking? i q tk (part s) else nothing
+    part (flatMapˢ op f d n qs pl o ls)     = merged op (λ x r → U.subscribe (f x) r) (part o) (partLanes ls) qs pl
     part (connectˢ k r e rt s b)            = connected r e rt (part s) (part b)
     part (joinˢ j g x st)                   = if g then joinedᶜ x j st else nothing
 
-    partLanes : ∀ {Γ B} → List (Lane Γ B) → List (U.Node Γ B)
-    partLanes []                  = []
-    partLanes (lane r l a s ∷ ls) = if l then consᴹ (part s) (partLanes ls) else partLanes ls
+    partLanes : ∀ {Γ B} → List (Sub Γ B) → List (U.Node Γ B)
+    partLanes []       = []
+    partLanes (s ∷ ls) = consᴹ (part s) (partLanes ls)
 
   ------------------------------------------------------------------------
   -- THE WORK OWED: one for each operator reached and not begun.  A
@@ -209,14 +240,16 @@ module Strongly (R : Set) where
     pend (pendingˢ s q)                     = syn s
     pend (mapˢ f s)                         = pend s
     pend (scanˢ f z s)                      = pend s
-    pend (takeWhileˢ i q l a tk s)          = pend s
-    pend (flatMapˢ op f d n qs l a pl o ls) = pend o + pendᴸ ls
+    pend (cutˢ l a s)                       = pend s
+    pend (laneˢ r s)                        = pend s
+    pend (takeWhileˢ i q tk s)              = pend s
+    pend (flatMapˢ op f d n qs pl o ls)     = pend o + pendᴸ ls
     pend (connectˢ k r e rt s b)            = pend s + pend b
     pend _                                  = 0
 
-    pendᴸ : ∀ {Γ B} → List (Lane Γ B) → ℕ
-    pendᴸ []                  = 0
-    pendᴸ (lane r l a s ∷ ls) = pend s + pendᴸ ls
+    pendᴸ : ∀ {Γ B} → List (Sub Γ B) → ℕ
+    pendᴸ []       = 0
+    pendᴸ (s ∷ ls) = pend s + pendᴸ ls
 
   -- What each takeWhile has still to do: fail, then complete.
   stage : ∀ {Γ A} → Taking Γ A → ℕ
@@ -228,14 +261,16 @@ module Strongly (R : Set) where
     takes : ∀ {Γ A} → Sub Γ A → ℕ
     takes (mapˢ f s)                         = takes s
     takes (scanˢ f z s)                      = takes s
-    takes (takeWhileˢ i q l a tk s)          = stage tk + takes s
-    takes (flatMapˢ op f d n qs l a pl o ls) = takes o + takesᴸ ls
+    takes (cutˢ l a s)                       = takes s
+    takes (laneˢ r s)                        = takes s
+    takes (takeWhileˢ i q tk s)              = stage tk + takes s
+    takes (flatMapˢ op f d n qs pl o ls)     = takes o + takesᴸ ls
     takes (connectˢ k r e rt s b)            = takes s + takes b
     takes _                                  = 0
 
-    takesᴸ : ∀ {Γ B} → List (Lane Γ B) → ℕ
-    takesᴸ []                  = 0
-    takesᴸ (lane r l a s ∷ ls) = takes s + takesᴸ ls
+    takesᴸ : ∀ {Γ B} → List (Sub Γ B) → ℕ
+    takesᴸ []       = 0
+    takesᴸ (s ∷ ls) = takes s + takesᴸ ls
 
   -- The values the tree's `of`s have still to emit.
   mutual
@@ -243,14 +278,16 @@ module Strongly (R : Set) where
     left (ofˢ _ _ xs)                       = length xs
     left (mapˢ f s)                         = left s
     left (scanˢ f z s)                      = left s
-    left (takeWhileˢ i q l a tk s)          = left s
-    left (flatMapˢ op f d n qs l a pl o ls) = left o + leftᴸ ls
+    left (cutˢ l a s)                       = left s
+    left (laneˢ r s)                        = left s
+    left (takeWhileˢ i q tk s)              = left s
+    left (flatMapˢ op f d n qs pl o ls)     = left o + leftᴸ ls
     left (connectˢ k r e rt s b)            = left s + left b
     left _                                  = 0
 
-    leftᴸ : ∀ {Γ B} → List (Lane Γ B) → ℕ
-    leftᴸ []                  = 0
-    leftᴸ (lane r l a s ∷ ls) = left s + leftᴸ ls
+    leftᴸ : ∀ {Γ B} → List (Sub Γ B) → ℕ
+    leftᴸ []       = 0
+    leftᴸ (s ∷ ls) = left s + leftᴸ ls
 
   ------------------------------------------------------------------------
   -- THE RE-ENTRY STATES, by the machine's configuration: nothing owed
@@ -276,14 +313,69 @@ module Strongly (R : Set) where
   Heads : ∀ {Γ A} → Pos → U.Node Γ A → Set
   Heads q c = ∀ {k} → U.headˢ (U.step c) ≡ just k → q ≤ᵖ k
 
-  postulate
-    -- EVERYTHING DUE BEFORE THE NEXT TURN IS OWED: an `of`'s rest, a
-    -- takeWhile's completion and cut, a connect's feed and its source's
-    -- attach, each a job at its node's path.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Strong/Against.agda
-    Owned : Sub [] R → Mach → Set₁
+  ------------------------------------------------------------------------
+  -- THE JOBS, against the witness
 
+  -- What is owed: the job about to resume, then every job suspended.
+  agenda : Conf R → List Job
+  agenda k = now (Conf.ctx k) (Conf.mode k) (Conf.pos k) ++ Conf.rets k
+    where now : ∀ {Γ A} → Ctx R Γ A → Mode A → Pos → List Job
+          now c (resuming t) p = [ (dirs c , t , p) ]
+          now c _            p = []
+
+  -- Whether the ghost holds the path's end: every switch on, every
+  -- takeWhile taking, every connect open on the side the path leaves.
+  isTaking : ∀ {Γ A} → Taking Γ A → Bool
+  isTaking taking = true
+  isTaking _      = false
+
+  mutual
+    seen : ∀ {Γ A Δ B} {t : Sub Γ A} {u : Sub Δ B} {π} → Path t u π → Bool
+    seen here                                = true
+    seen (in-map ψ)                          = seen ψ
+    seen (in-scan ψ)                         = seen ψ
+    seen (in-cut {l = l} ψ)                  = l ∧ seen ψ
+    seen (in-lane ψ)                         = seen ψ
+    seen (in-take {tk = tk} ψ)               = isTaking tk ∧ seen ψ
+    seen (in-outer ψ)                        = seen ψ
+    seen (in-lanes ψ)                        = seenL ψ
+    seen (in-source {b = b} ψ)               = is-just (part b) ∧ seen ψ
+    seen (in-body {e = e} {s = s} ψ)         = (is-just (part s) ∨ is-just e) ∧ seen ψ
+
+    seenL : ∀ {Γ A Δ B} {ls : List (Sub Γ A)} {u : Sub Δ B} {i π} → PathLanes ls u i π → Bool
+    seenL (this-lane ψ) = seen ψ
+    seenL (next-lane ψ) = seenL ψ
+
+  -- A pending node: the focus, about to begin where it was reached; or a
+  -- connect's source, its subscription owed to the body's attach, one
+  -- level down from where the connect was subscribed.
+  data Begins (k : Conf R) (π : List ℕ) (q : Pos) : Set₁ where
+    focused : dirs (Conf.ctx k) ≡ π → Conf.mode k ≡ subscribing → Conf.pos k ≡ q → Begins k π q
+    sourced : ∀ ρ p → π ≡ ρ ++ [ 0 ] → (ρ , attBody , p) ∈ agenda k → q ≡ p ++ [ ix 1 ] → Begins k π q
+
+  -- EVERYTHING DUE BEFORE THE NEXT TURN IS OWED, each a job at its
+  -- node's path: an `of`'s next value; a pending node's subscription; a
+  -- switch's attach; a takeWhile's completion, then its cut while its
+  -- source's switch is on; a connect's feed, its body's attach, then its
+  -- source's, and the source's teardown once a held body is gone.
+  record Owned (t : Sub [] R) (m : Mach) : Set₁ where
+    private k = Mach.conf m
+    field
+      ofs     : ∀ {Γ A p i xs π} → Path t (ofˢ {Γ} {A} p i xs) π → (π , next i , p) ∈ agenda k
+      begun   : ∀ {Γ A o q π} → Path t (pendingˢ {Γ} {A} o q) π → Begins k π q
+      attached : ∀ {Γ A l s π} → Path t (cutˢ {Γ} {A} l false s) π → Σ Pos λ q → (π , att , q) ∈ agenda k
+      ends    : ∀ {Γ A i f q c s π} → Path t (takeWhileˢ {Γ} {A} i f (ending q c) s) π → (π , owedCp , q) ∈ agenda k
+      cuts    : ∀ {Γ A i f a s π} → Path t (takeWhileˢ {Γ} {A} i f taken (cutˢ true a s)) π → Σ Pos λ q → (π , owedCut , q) ∈ agenda k
+      feeds   : ∀ {Γ X B k′ r e rt s b π} → Path t (connectˢ {Γ} {X} {B} k′ r e rt s b) π → CS.feeds k′ ≢ []
+              → Σ _ λ js → Σ Pos λ q → (π , feeding js , q) ∈ agenda k
+      bodies  : ∀ {Γ X B k′ r e rt s b π} → Path t (connectˢ {Γ} {X} {B} k′ r e rt s b) π → CS.bodyAtt k′ ≡ false
+              → Σ Pos λ p → (π , attBody , p) ∈ agenda k × r ≡ p ++ [ ix 1 ]
+      sources : ∀ {Γ X B k′ r e rt s b π} → Path t (connectˢ {Γ} {X} {B} k′ r e rt s b) π → CS.bodyAtt k′ ≡ true → CS.srcAtt k′ ≡ false
+              → (π , att , r) ∈ agenda k
+      owes    : ∀ {Γ X B k′ r e rt s b π} (ψ : Path t (connectˢ {Γ} {X} {B} k′ r e rt s b) π) → seen ψ ≡ true
+              → CS.srcLive k′ ≡ true → part b ≡ nothing → Σ Pos λ q → (π , owed , q) ∈ agenda k
+
+  postulate
     -- Every live joiner holding what its feed owes it.
     --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Strong/Against.agda
@@ -367,7 +459,6 @@ module Strongly (R : Set) where
     placed-subscribe : (o : PureObs [] R) → Placed (U.subscribe o root) []
 
     -- Each invariant, of the root pending at the launch.
-    owned-begin   : (o : PureObs [] R) → Owned (pendingˢ o root) (begin o)
     meaning-begin : (o : PureObs [] R) → Meaning (pendingˢ o root)
     queue-begin   : (o : PureObs [] R) → Queue root 0 [] (pendingˢ o root)
     books-begin   : (o : PureObs [] R) → Books (pendingˢ o root) (begin o)
@@ -389,7 +480,9 @@ module Strongly (R : Set) where
     ; kernels = refl
     ; ctlAs   = subAs refl
     ; meets   = refl
-    ; owned   = owned-begin o
+    ; owned   = record
+        { ofs = λ () ; begun = λ { here → focused refl refl refl } ; attached = λ () ; ends = λ () ; cuts = λ ()
+        ; feeds = λ () ; bodies = λ () ; sources = λ () ; owes = λ () }
     ; meaning = meaning-begin o
     ; queue   = queue-begin o
     ; books   = books-begin o

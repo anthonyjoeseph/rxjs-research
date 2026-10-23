@@ -15,8 +15,8 @@ hold at subscribe; no onward leaf can be proven against an opaque
 field. Settled when each is a ported body and its begin leaf
 goes through.
 
-Members: `Owned`, `Meaning`, `Queue`, `Books`, `Each`, `Lingers`, `Untold`,
-`Ended`, `DoneBy`, `placed-subscribe`, `owned-begin`, `meaning-begin`,
+Members: `Meaning`, `Queue`, `Books`, `Each`, `Lingers`, `Untold`,
+`Ended`, `DoneBy`, `placed-subscribe`, `meaning-begin`,
 `queue-begin`, `books-begin`, `behind-begin`, `lingers-begin`, `told-begin`,
 `ended-begin`, `flags-begin`.
 
