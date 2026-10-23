@@ -8,7 +8,8 @@ open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_; _++_; [_]; map)
 open import Data.List.Properties using (++-conicalʳ)
 open import Data.List.Relation.Unary.All using ([]) renaming (lookup to lookupᴬ)
-open import Data.Maybe using (just; nothing)
+open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _<_)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred)
 open import Data.Product using (_×_; _,_; Σ)
@@ -27,6 +28,10 @@ open import adequacy.Sorted.Walk using (module SortingWalk)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Ghost.Paths using (module GhostingPaths)
 open import adequacy.Moves using (module Moving)
+open import adequacy.Told using (untold)
+open import adequacy.Frame using (module Framing)
+open import adequacy.Replant using (module Replanting)
+open import adequacy.Replant.Keep using (module Keeping)
 
 open Machine using (St; Ctx; Conf; Job; Ev; nx; cp; dirs; plug; scanS; connS; owed; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody;
   ⟨_,_,_,_,_⟩; rising)
@@ -40,6 +45,9 @@ module Ascending (R : Set) where
     Begins; focused; attaching; PathLanes; this-lane; next-lane; in-map; in-scan; in-cut; in-lane; in-take; in-outer; in-lanes;
     in-source; in-body; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; cutˢ; laneˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ)
   open Moving R using (plant; planted; plantedᴸ)
+  open Framing R using (heads-scan)
+  open Replanting R using (module Shift; Heading; Pred; ≡-⊑; map-fwd; map-back; each-scan; each-sub)
+  open Keeping R using (module Keep; Alive)
   open Ghosting R using (Hopped; Load; _≼_; load; loadOf; hopped-pre; showing; agrees)
   open GhostingPaths R using (_⊕_; _⊕ᴸ_; Lifts; lifts-here; lifts-map; lifts-scan; lifts-take; lifts-body; lifts-shut; lefts-subst; lifts-split; lefts-up; healed-split; Lefts; Healed; One; whole; snoc; view;
     height; heightL; one-lower;
@@ -212,6 +220,24 @@ module Ascending (R : Set) where
       heightL-planted (this-lane ψ) w = cong suc (height-planted ψ w)
       heightL-planted (next-lane ψ) w = heightL-planted ψ w
 
+    mutual
+      outers-planted : ∀ {Γ A Δ B π} {t : Sub Γ A} {u : Sub Δ B} (ψ : Path t u π) (w : Sub Δ B) → outers (planted ψ w) ≡ outers ψ
+      outers-planted here          w = refl
+      outers-planted (in-map ψ)    w = cong (map (0 ∷_)) (outers-planted ψ w)
+      outers-planted (in-scan ψ)   w = cong (map (0 ∷_)) (outers-planted ψ w)
+      outers-planted (in-cut ψ)    w = cong (map (0 ∷_)) (outers-planted ψ w)
+      outers-planted (in-lane ψ)   w = cong (map (0 ∷_)) (outers-planted ψ w)
+      outers-planted (in-take ψ)   w = cong (map (0 ∷_)) (outers-planted ψ w)
+      outers-planted (in-outer ψ)  w = cong (λ ns → [] ∷ map (0 ∷_) ns) (outers-planted ψ w)
+      outers-planted (in-lanes {i = i} ψ) w = cong (map (suc i ∷_)) (outersL-planted ψ w)
+      outers-planted (in-source ψ) w = cong (map (0 ∷_)) (outers-planted ψ w)
+      outers-planted (in-body ψ)   w = cong (map (1 ∷_)) (outers-planted ψ w)
+
+      outersL-planted : ∀ {Γ A Δ B i π} {ls : List (Sub Γ A)} {u : Sub Δ B} (ψ : PathLanes ls u i π) (w : Sub Δ B)
+                      → outersL (plantedᴸ ψ w) ≡ outersL ψ
+      outersL-planted (this-lane ψ) w = outers-planted ψ w
+      outersL-planted (next-lane ψ) w = outersL-planted ψ w
+
     -- What a joiner is owed reads the configuration only through `owing`.
     mutual
       fed-same : ∀ {k₁ k₂ : Conf R} → (∀ {X} (b : Feed X) π j → owing k₁ b π j ≡ owing k₂ b π j)
@@ -283,23 +309,15 @@ module Ascending (R : Set) where
     scan-queue : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
                → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y)
                → Queue (Conf.pos (Mach.conf m₁)) (Mach.clock m₁) (Mach.timers m₁) (plant ρ (scanˢ f (f z y) v))
-    -- DEAD ROUTE: the old body splits on heap aliasing after the store (scan-sees, part-alike); a `plant` rewrites the node itself.
+    -- A held connect's leftover reads its running source's part, which
+    -- the accumulator moves; it is read only past a cut or an end, which
+    -- no climb's ancestor is. The carrier says neither of a pool-cut
+    -- lane (`laneˢ false`) nor of a node a `Lifts` path climbs.
     --
-    -- RECOVERY: git show 9ec3e6c62e05857feabffdd65a05929de347e532:agda-impl/adequacy/Frame.agda restores `heads-rescan`, a scan heading where its source does whatever its accumulator
-    scan-behind : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
-                → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y)
-                → Each (Heads (Conf.pos (Mach.conf m₁))) (plant ρ (scanˢ f (f z y) v))
     -- DEAD ROUTE: the old body is the heap-write Shift frame, its lingering read by comparing two heaps (leftover-alike); a `plant` has no second heap.
+    -- DEAD ROUTE: `Shift.shift-lingers` needs `Lingering.ling-same`, a part unmoved; a scan's moves with its accumulator.
     scan-lingers : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
                  → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y) → Lingers (plant ρ (scanˢ f (f z y) v))
-    scan-told : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
-              → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y) → Untold (Conf.pos (Mach.conf m₁)) (plant ρ (scanˢ f (f z y) v))
-    scan-ended : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
-               → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y) → Ended (plant ρ (scanˢ f (f z y) v))
-    -- DEAD ROUTE: the old body is the heap-write Shift frame, its flags read by comparing two heaps (flags-alike); a `plant` has no second heap.
-    scan-flags : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
-               → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y)
-               → DoneBy (plant ρ (scanˢ f (f z y) v)) (outers (planted ρ (scanˢ f (f z y) v)))
 
     -- The books and the load, the accumulator rewritten.
     scan-books : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
@@ -308,6 +326,56 @@ module Ascending (R : Set) where
     scan-load : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
               → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y) → ∀ {m₂} → step m₁ ≡ silent m₂
               → load m₂ (plant ρ (scanˢ f (f z y) v)) ≡ load m₁ T
+
+  -- A SCAN'S ACCUMULATOR REWRITTEN: the node shows, ends, tells and
+  -- flags as before, and heads as its source does.
+  private
+    rescan-told : ∀ {Γ A B C} (i : C ∈ᴸ Γ) {f : B → A → B} {z z′} (m : Maybe (U.Node Γ A)) {b₀ b′}
+                → mapᴹ (U.scanᶜ f z) m ≡ just b₀ → mapᴹ (U.scanᶜ f z′) m ≡ just b′ → untold i b′ ≡ untold i b₀
+    rescan-told i (just c) refl refl = refl
+
+    rescan-root : ∀ {Γ A B q} {f : B → A → B} {z} {m : Maybe (U.Node Γ A)} → (∀ {c} → m ≡ just c → Heads q c)
+                → ∀ {c} → mapᴹ (U.scanᶜ f z) m ≡ just c → Heads q c
+    rescan-root {f = f} {z} {just c} h refl = heads-scan f z {c} (h refl)
+
+    scan-heading : ∀ {Δ A B q} {f : B → A → B} {z z′} {v : Sub Δ A} {E : Pred Δ} → Heading q E (scanˢ f z v) (scanˢ f z′ v)
+    scan-heading {v = v} = record
+      { head-revive = λ j → map-fwd (part v) (map-back (part v) j)
+      ; head-take   = λ j → j
+      ; head-told   = λ i _ e₀ e′ → ≡-⊑ (rescan-told i (part v) e₀ e′)
+      ; head-below  = λ ev → each-scan (rescan-root (Each.parts ev (in-scan here) refl)) (each-sub ev (in-scan here) refl) }
+
+    scan-alive : ∀ {Δ A B} {f : B → A → B} {z z′} {v : Sub Δ A} → Alive (scanˢ f z v) (scanˢ f z′ v)
+    scan-alive {v = v} = record
+      { alive-back  = λ j → map-fwd (part v) (map-back (part v) j)
+      ; alive-fwd   = λ j → map-fwd (part v) (map-back (part v) j)
+      ; take-back   = λ j → j
+      ; take-fwd    = λ j → j
+      ; alive-ended = λ en → λ { (in-scan ψ) → en (in-scan ψ) }
+      ; alive-flags = λ N fl → λ { (in-scan ψ) → fl (in-scan ψ) } }
+
+  -- A value through a scan, the rewritten tree's heads, ends, joiners
+  -- and flags.
+  scan-behind : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
+              → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y)
+              → Each (Heads (Conf.pos (Mach.conf m₁))) (plant ρ (scanˢ f (f z y) v))
+  scan-behind ρ cl = Shift.shift-behind ρ _ (Calling.told cl) (Calling.ended cl) scan-heading (Calling.behind cl)
+
+  scan-told : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
+            → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y) → Untold (Conf.pos (Mach.conf m₁)) (plant ρ (scanˢ f (f z y) v))
+  scan-told ρ cl =
+    Keep.shift-told ρ _ scan-alive scan-heading (λ _ ut → λ { (in-scan ψ) → ut (in-scan ψ) }) (Calling.told cl) (Calling.ended cl)
+
+  scan-ended : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
+             → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y) → Ended (plant ρ (scanˢ f (f z y) v))
+  scan-ended ρ cl = Keep.shift-ended ρ _ scan-alive (Calling.ended cl)
+
+  scan-flags : ∀ {g ℓ m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π) {y}
+             → Calling g ℓ m₁ (ρ ⊕ in-scan here) (nx y)
+             → DoneBy (plant ρ (scanˢ f (f z y) v)) (outers (planted ρ (scanˢ f (f z y) v)))
+  scan-flags {f = f} {z} {v} ρ {y} cl =
+    subst (DoneBy (plant ρ w)) (sym (outers-planted ρ w)) (Keep.shift-flags ρ w scan-alive (done-up ρ (in-scan here) refl (Calling.flags cl)))
+    where w = scanˢ f (f z y) v
 
   call-scan : ∀ {g m} (st : Strong g m) {m₁ Δ A B π} {T : Sub [] R} {f : B → A → B} {z} {v : Sub Δ A} (ρ : Path T (scanˢ f z v) π)
             → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ in-scan here) e → Called st m₁ (ρ ⊕ in-scan here)

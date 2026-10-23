@@ -8,7 +8,7 @@ open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.Linked using (Linked; [-]; _∷_)
 open import Data.List.Relation.Unary.Linked.Properties using (Linked⇒All)
-open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 
 open import denotation.MonotonicList.Events using (_<ᵖ_; <ᵖ-trans)
 open import operation.PureObservable using (module Driver)
@@ -58,6 +58,27 @@ module Moving (R : Set) where
              → PathLanes (plantᴸ ψ v) v i π
     plantedᴸ (this-lane π) v = this-lane (planted π v)
     plantedᴸ (next-lane π) v = next-lane (plantedᴸ π v)
+
+  -- The old node planted back where the new one sits: the tree as it was.
+  mutual
+    replanted : ∀ {Γ A Δ B π} {t : Sub Γ A} {u : Sub Δ B} (ψ : Path t u π) (v : Sub Δ B) → plant (planted ψ v) u ≡ t
+    replanted here v = refl
+    replanted (in-map {f = f} π) v = cong (mapˢ f) (replanted π v)
+    replanted (in-scan {f = f} {z = z} π) v = cong (scanˢ f z) (replanted π v)
+    replanted (in-cut {l = l} {a = a} π) v = cong (cutˢ l a) (replanted π v)
+    replanted (in-lane {r = r} π) v = cong (laneˢ r) (replanted π v)
+    replanted (in-take {i = i} {q = q} {tk = tk} π) v = cong (takeWhileˢ i q tk) (replanted π v)
+    replanted (in-outer {op = op} {f = f} {d = d} {n = n} {qs = qs} {pl = pl} {ls = ls} π) v =
+      cong (λ o → flatMapˢ op f d n qs pl o ls) (replanted π v)
+    replanted (in-lanes {op = op} {f = f} {d = d} {n = n} {qs = qs} {pl = pl} {o = o} π) v =
+      cong (flatMapˢ op f d n qs pl o) (replantedᴸ π v)
+    replanted (in-source {k = k} {r = r} {e = e} {rt = rt} {b = b} π) v = cong (λ s → connectˢ k r e rt s b) (replanted π v)
+    replanted (in-body {k = k} {r = r} {e = e} {rt = rt} {s = s} π) v = cong (connectˢ k r e rt s) (replanted π v)
+
+    replantedᴸ : ∀ {Γ A Δ B i π} {ls : List (Sub Γ A)} {u : Sub Δ B} (ψ : PathLanes ls u i π) (v : Sub Δ B)
+               → plantᴸ (plantedᴸ ψ v) u ≡ ls
+    replantedᴸ (this-lane {ls = ls} π) v = cong (_∷ ls) (replanted π v)
+    replantedᴸ (next-lane {l = l} π) v = cong (l ∷_) (replantedᴸ π v)
 
   -- The queue past its head: each later.
   later : ∀ {tm : Timer} {ts} → Linked (λ y z → cascade y <ᵖ cascade z ≡ true) (tm ∷ ts)

@@ -48,8 +48,7 @@ Untried, and every old body a dead route: whether a climb's write, read as a
 `take-out` are bodies or refuted.
 
 Members: `scan-kernels`, `scan-lifts`, `scan-lefts`, `scan-owned`,
-`scan-meaning`, `scan-queue`, `scan-behind`, `scan-lingers`, `scan-flags`,
-`gone-take`, `take-pass`, `take-out`, `take-end`, `call-outer`,
+`scan-meaning`, `scan-queue`, `scan-lingers`, `gone-take`, `take-pass`, `take-out`, `take-end`, `call-outer`,
 `call-lanes`, `call-source`, `body-rest-heads`, `owned-body`, `emit-void`,
 `emit-open`, `burst-spent`.
 
@@ -63,7 +62,7 @@ Members: `call-cut`, `cut-torn`, `cut-owned`, `cut-meaning`, `cut-queue`,
 `cut-turned`, `cut-sorted`, `cut-behind`, `cut-lingers`, `cut-told`,
 `cut-ended`, `cut-flags`, `cut-load`, `fire-kernels`, `fire-part`,
 `fire-load`, `fire-owned`, `fire-meaning`, `fire-timed`, `fire-joined`,
-`fire-sorted`, `fire-flags`, `fire-told`, `fire-ended`, `burst-poll`,
+`fire-sorted`, `burst-poll`,
 `burst-play`, `burst-finish`.
 
 #### THE WALK
@@ -96,7 +95,7 @@ Believed unfoldings: a context climbing one frame, and the climbs with no old
 body. Settled when each is a body.
 
 Members: `of-path`, `map-at`, `scan-at`, `take-at`, `take-path`, `body-at`,
-`scan-books`, `scan-load`, `scan-told`, `scan-ended`, `call-lane`, `emit-shut`, `last-void`,
+`scan-books`, `scan-load`, `call-lane`, `emit-shut`, `last-void`,
 `last-enter`, `take1-void`, `take1-enter`.
 
 #### THE LINK
