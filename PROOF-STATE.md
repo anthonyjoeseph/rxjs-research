@@ -26,7 +26,10 @@ the resumed jobs first.
 
 Members: `of-path`, `emit-shut`, `last-void`, `last-enter`, `emit-void`,
 `emit-open`, `call-map`, `call-scan`, `call-cut`, `call-lane`, `call-take`,
-`call-outer`, `call-lanes`, `call-source`, `call-body`, `kont-onward`, `take1-onward`, `cut-onward`,
+`call-outer`, `call-lanes`, `call-source`, `call-body`, `kont-onward`,
+`take-path`, `take1-void`, `take1-enter`, `cut-torn`, `cut-owned`,
+`cut-meaning`, `cut-queue`, `cut-turned`, `cut-sorted`, `cut-behind`,
+`cut-lingers`, `cut-told`, `cut-ended`, `cut-flags`, `cut-load`,
 `feed-onward`, `src-onward`, `src-cut-onward`, `body-cut-onward`,
 `join-onward`, `owned-idle`, `meaning-idle`, `sorted-idle`, `downs-plug`, `owned-pop`, `meaning-pop`,
 `sorted-pop`, `owned-drop`, `meaning-drop`, `sorted-drop`, `sub-onward`, `burst-onward`, `turn-pops`,

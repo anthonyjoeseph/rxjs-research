@@ -53,14 +53,15 @@ module Honesty (R : Set) where
   open Unsubbing R using (_⇝_; now; then)
   open Ghosting R using (Has; Sent; sentHere; sentLater; Alike; _≋_; same-agree; residual; Reached; launchedʰ; silentʰ; valueʰ;
     Stands; cutʰ; finʰ; dryʰ; Mirror; Inner; Logged; Shows; silentˢ; valueˢ; completeˢ; drainedˢ; inner-launch; ≋-refl;
-    Steps; after; steps-after; Hopped; onward; lowered; weight; loadOf)
+    Steps; after; steps-after; Hopped; onward; lowered; weight; loadOf; load; _≼_; _≺_)
   open Strongly R using (Strong; Carried; carried; closing; CtlAs; Meets; calmAs; noteAs; runAs; subAs; burstAs; popAs; Pops;
-    Kernels; Owned; Meaning; Books; Path; ofˢ; seen)
+    Kernels; Owned; Meaning; Books; Path; ofˢ; seen; Sub; takeWhileˢ; part; Queue; BurstClocked; Each; Heads;
+    Lingers; Untold; Ended; DoneBy)
   open Ascending R using (Aloft; soar)
   open SortingWalk R using (WellMach)
   open Machine using (Ctx; top; plug; downs; dirs; closed; doneS; cp; _⊕_; ⟨_,_,_,_,_⟩; absorbed; rising; resuming; subscribing; nx; pend;
     ofS; cutS; takeS; connS; joinS; next; att; owedCp; owedCut; feeding; attBody; owed; go;
-    res; ofR; attR; cpR; cutR; feedR; bodyR; srcR; endR; joinR; idle)
+    res; ofR; attR; cpR; cutR; feedR; bodyR; srcR; endR; joinR; idle; cut)
 
   step-alike : ∀ g → Sane [] g → Placed g [] → residual g ≋ after (U.step g)
   step-alike g sn pl = same-agree (_≃_.agreeing (step-skips g sn pl))
@@ -144,19 +145,48 @@ module Honesty (R : Set) where
     kont-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {l a s p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , cutS l a s , resuming att , p , rs ⟩
                 → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
 
-    -- A takeWhile's completion delivered under its failing value, then
-    -- its cut.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs.agda
-    take1-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCp , p , rs ⟩
-                 → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+    -- The takeWhile a job resumes is the witness's at the job's path.
+    take-path : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s τ p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , takeS i q s , resuming τ , p , rs ⟩
+              → Σ _ λ tk → Σ (Sub Γ A) λ u → Path (Carried.tree cr) (takeWhileˢ i q tk u) (dirs c)
 
-    -- A takeWhile's cut: what it holds unsubscribed; the ghost alike, a
-    -- job fewer.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Lift.agda
-    cut-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩
-               → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+    -- A takeWhile's completion the ghost does not hold: it climbs unseen.
+    take1-void : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs tk u} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCp , p , rs ⟩
+               → (ψ : Path (Carried.tree cr) (takeWhileˢ {Γ} {A} i q tk u) (dirs c)) → seen ψ ≡ false
+               → Hopped (carried cr) (record m { conf = ⟨ c , takeS i q s , rising cp , p ⊕ [ last ] , (dirs c , owedCut , p) ∷ rs ⟩ })
+
+    -- A takeWhile's completion the ghost holds: on its way up.
+    take1-enter : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs tk u} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCp , p , rs ⟩
+                → (ψ : Path (Carried.tree cr) (takeWhileˢ {Γ} {A} i q tk u) (dirs c)) → seen ψ ≡ true
+                → Σ Mach λ m₁ → record m { conf = ⟨ c , takeS i q s , rising cp , p ⊕ [ last ] , (dirs c , owedCut , p) ∷ rs ⟩ } ⇝ m₁
+                  × Aloft g (loadOf (carried cr)) m₁
+
+    -- A TAKEWHILE'S CUT, ON THE WITNESS: the tree with that node torn,
+    -- read alike by the ghost (`part`), and every column kept.
+    cut-torn : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩
+             → Σ (Sub [] R) λ t′ → Kernels t′ ⟨ c , takeS i q (proj₁ (cut s)) , absorbed , p , rs ⟩ × part t′ ≡ part (Carried.tree cr)
+    cut-owned : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) (e : Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩)
+              → Owned (proj₁ (cut-torn cr e)) (record m { conf = ⟨ c , takeS i q (proj₁ (cut s)) , absorbed , p , rs ⟩ })
+    cut-meaning : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) (e : Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩)
+                → Meaning (proj₁ (cut-torn cr e)) ⟨ c , takeS i q (proj₁ (cut s)) , absorbed , p , rs ⟩
+    cut-queue : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) (e : Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩)
+              → Queue p (Mach.clock m) (Mach.timers m) (proj₁ (cut-torn cr e))
+    cut-turned : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) (e : Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩)
+               → All (BurstClocked (proj₁ (cut-torn cr e)) (Mach.clock m)) (Mach.turns m)
+    cut-sorted : ∀ {lo m Γ A} {c : Ctx R Γ A} {i q s p rs} → WellMach lo m → Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩
+               → WellMach lo (record m { conf = ⟨ c , takeS i q (proj₁ (cut s)) , absorbed , p , rs ⟩ })
+    cut-behind : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) (e : Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩)
+               → Each (Heads p) (proj₁ (cut-torn cr e))
+    cut-lingers : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) (e : Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩)
+                → Lingers (proj₁ (cut-torn cr e))
+    cut-told : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) (e : Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩)
+             → Untold p (proj₁ (cut-torn cr e))
+    cut-ended : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) (e : Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩)
+              → Ended (proj₁ (cut-torn cr e))
+    cut-flags : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) (e : Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩)
+              → DoneBy (proj₁ (cut-torn cr e)) []
+    -- Tearing frees what it reaches: the load never rises.
+    cut-load : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) (e : Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩)
+             → load (record m { conf = ⟨ c , takeS i q (proj₁ (cut s)) , absorbed , p , rs ⟩ }) (proj₁ (cut-torn cr e)) ≼ loadOf (carried cr)
 
     -- The rest of a connect's feed: the next joiner fed, or the feed
     -- done.
@@ -388,6 +418,46 @@ module Honesty (R : Set) where
   ... | _ , _ , ψ with seen ψ in sn
   ...   | false = _ , cong (Driver.took R _) (emit-step cl) , emit-void cr refl cl ψ sn
   ...   | true  = _ , cong (Driver.took R _) (emit-step cl) , soar (carried cr) (emit-open cr refl cl ψ sn)
+
+  -- A takeWhile's completion delivered under its failing value, then
+  -- its cut.
+  take1-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCp , p , rs ⟩
+               → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+  take1-onward {m = mach _ clk tms ts} cr refl with take-path cr refl
+  ... | _ , _ , ψ with seen ψ in sn
+  ...   | false = _ , refl , take1-void cr refl ψ sn
+  ...   | true  = _ , refl , soar (carried cr) (take1-enter cr refl ψ sn)
+
+  private
+    -- A load no higher and a lighter control weigh less.
+    under-lighter : ∀ {ℓ ℓ′ w w′} → ℓ′ ≼ ℓ → w′ < w → (ℓ′ , w′) ≺ (ℓ , w)
+    under-lighter (inj₁ refl) lt = inj₂ (refl , lt)
+    under-lighter (inj₂ lt)   _  = inj₁ lt
+
+  -- A takeWhile's cut: what it holds unsubscribed; the ghost alike, a
+  -- job fewer.
+  cut-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {i q s p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , takeS i q s , resuming owedCut , p , rs ⟩
+             → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+  cut-onward {g} {mach _ clk tms ts} {c = c} {i} {q} {s} {p} {rs} cr refl with Carried.ctlAs cr | Carried.meets cr
+  ... | runAs refl | mt =
+    m′ , refl
+    , g , m′ , now
+    , carried (record
+        { sane = Carried.sane cr ; placed = Carried.placed cr ; tree = proj₁ (cut-torn cr refl)
+        ; kernels = proj₁ (proj₂ (cut-torn cr refl)) ; ctlAs = settled rs clk tms ts
+        ; meets = settled-meets rs clk tms ts (trans (proj₂ (proj₂ (cut-torn cr refl))) mt)
+        ; owned = cut-owned cr refl ; meaning = cut-meaning cr refl ; queue = cut-queue cr refl
+        ; books = record { clocked = tt ; ticked = Books.ticked (Carried.books cr) ; turned = cut-turned cr refl }
+        ; sorted = proj₁ (Carried.sorted cr) , cut-sorted (proj₂ (Carried.sorted cr)) refl
+        ; behind = cut-behind cr refl ; lingers = cut-lingers cr refl ; told = cut-told cr refl
+        ; ended = cut-ended cr refl ; flags = cut-flags cr refl })
+    , lowered (λ n → agree-refl n _) (under-lighter (cut-load cr refl) (settled-lighter rs clk tms ts))
+    where m′ = mach ⟨ c , takeS i q (proj₁ (cut s)) , absorbed , p , rs ⟩ clk tms ts
+  ... | calmAs () _  | _
+  ... | noteAs () _  | _
+  ... | subAs ()     | _
+  ... | burstAs () _ _ | _
+  ... | popAs () _   | _
 
   -- A job resumed runs silently on to a re-entry configuration the
   -- configuration gains: by the job the node owes (`res`).
