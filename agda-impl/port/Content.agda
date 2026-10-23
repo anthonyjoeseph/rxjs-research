@@ -97,6 +97,12 @@ module Honesty (R : Set) where
     drainedᴴ  : step m ≡ drained → (∀ {k b} → Has (residual g) k b → ⊥) → Hop st
     silentᴴ   : ∀ {m′} → step m ≡ silent m′ → Hopped st m′ → Hop st
 
+  private
+    -- Whether a turn's leaf still runs.
+    live : Poke R → Bool
+    live gone             = false
+    live (leaf b _ _ _ _) = b
+
   postulate
     -- The turn, nothing owed and no timer queued: the ghost shows
     -- nothing.
@@ -468,11 +474,6 @@ module Honesty (R : Set) where
   ... | popAs () _     | _ | _
 
   private
-    -- Whether a turn's leaf still runs.
-    live : Poke R → Bool
-    live gone             = false
-    live (leaf b _ _ _ _) = b
-
     -- A turn played is silent, whatever the leaf.
     playing-silent : ∀ m π u i pl d ts pk → Σ Mach λ m′ → Driver.playing R m π u i pl d ts pk ≡ silent m′
     playing-silent m π u i pl    d ts gone                                       = _ , refl
