@@ -23,7 +23,7 @@
 -- than the node.
 module spike.MarkedBorn where
 
-open import Data.Bool using (false)
+open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_; [_])
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.Maybe using (nothing)
