@@ -26,7 +26,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; con
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Time; tick; out; skip; end; hush; root)
 open import denotation.MonotonicList using (observe; Agree; out⁼; skip⁼; end⁼; hush⁼; agree; agree-sym)
 import denotation.Unfold as U
-open import operation.Placed using (Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ)
+open import adequacy.Record using (Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ)
 open import denotation.Compositional using ([]ᵉ)
 open import adequacy.Sorted using (_≤ᵖ_)
 open import adequacy.Unsub using (module Unsubbing)

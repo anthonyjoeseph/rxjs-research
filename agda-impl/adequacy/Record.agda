@@ -11,7 +11,7 @@
 -- Only the events' ticks must not fall: `ticks` closes a frame at the
 -- first event past its tick, and one that fell back would land in the
 -- wrong frame.
-module operation.Placed where
+module adequacy.Record where
 
 open import Data.Bool using (true; false; T)
 open import Data.List using (List; []; _∷_; _++_; [_]; length) renaming (map to mapL)
