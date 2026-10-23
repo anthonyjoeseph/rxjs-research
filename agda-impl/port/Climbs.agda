@@ -40,7 +40,7 @@ module Ascending (R : Set) where
     in-source; in-body; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; cutˢ; laneˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ)
   open Moving R using (plant; planted; plantedᴸ)
   open Ghosting R using (Hopped; Load; _≼_; load; loadOf; hopped-pre; showing; agrees)
-  open GhostingPaths R using (_⊕_; _⊕ᴸ_; Lifts; lifts-here; lifts-scan; lifts-split; lefts-up; healed-split; Lefts; Healed; One; whole; snoc; view;
+  open GhostingPaths R using (_⊕_; _⊕ᴸ_; Lifts; lifts-here; lifts-map; lifts-scan; lifts-split; lefts-up; healed-split; Lefts; Healed; One; whole; snoc; view;
     height; heightL; one-lower;
     one-map; one-scan; one-cut; one-lane; one-take; one-outer; one-lanes; one-source; one-body)
 
@@ -148,9 +148,6 @@ module Ascending (R : Set) where
   -- ONE OPERATOR CALLED, by the operator: its frame's rise, the signal
   -- one operator higher or the climb landed.
   postulate
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs/Base.agda
-    call-map : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub [] R} {u : Sub Δ A} {v : Sub Δ′ A′} {π τ} (ρ : Path T u π) {s : Path u v τ}
-             → One s → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ s) e → Called st m₁ (ρ ⊕ s)
     call-cut : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub [] R} {u : Sub Δ A} {v : Sub Δ′ A′} {π τ} (ρ : Path T u π) {s : Path u v τ}
              → One s → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ s) e → Called st m₁ (ρ ⊕ s)
     call-lane : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub [] R} {u : Sub Δ A} {v : Sub Δ′ A′} {π τ} (ρ : Path T u π) {s : Path u v τ}
@@ -352,9 +349,53 @@ module Ascending (R : Set) where
         ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl
         ; flags = done-up ρ (in-scan here) refl (Calling.flags cl) ; kept = Calling.kept cl })
 
+  ------------------------------------------------------------------------
+  -- THE CLIMB THROUGH A MAP: the signal mapped, the tree as it is.
+
+  postulate
+    -- A context climbing through a map, the map's own frame first.
+    map-at : ∀ {Δ A B π} {T : Sub [] R} {f : A → B} {v : Sub Δ A} (ρ : Path T (mapˢ f v) π)
+             {c : Ctx R Δ A} {x} → dirs c ≡ π ++ [ 0 ] → forget T ≡ plug c x
+           → Σ (Ctx R Δ B) λ c₀ → c ≡ inMap f c₀ × dirs c₀ ≡ π
+
+  call-map : ∀ {g m} (st : Strong g m) {m₁ Δ A B π} {T : Sub [] R} {f : A → B} {v : Sub Δ A} (ρ : Path T (mapˢ f v) π)
+           → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ in-map here) e → Called st m₁ (ρ ⊕ in-map here)
+  call-map st {m₁ = mach k clk tms ts} {f = f} {v} ρ {nx y} cl
+    with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
+  ... | c | x | at | refl | kn | c′ , pv , S , L , sg | lt with map-at ρ at kn
+  ...   | c₀ , refl , at₀ with lifts-split ρ (in-map here) L in eqS
+  ...     | _ , lifts-map lifts-here , Lρ =
+    rose {σ′ = ρ} {e′ = nx (f y)} (then refl now) (one-lower ρ one-map)
+      (record
+        { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = refl ; at = at₀
+        ; lifted = U.mapᶜ f c′ , cong (mapᴹ (U.mapᶜ f)) pv , S , Lρ , sg
+        ; lefts = lefts-up ρ (in-map here) eqS lt ; rest-heads = tt
+        ; owned = owned-rise (Calling.owned cl) ; kernels = kn ; meaning = fed-same (λ _ _ _ → refl) _ (Calling.meaning cl)
+        ; queue = Calling.queue cl
+        ; books = record { clocked = Books.clocked (Calling.books cl) ; ticked = Books.ticked (Calling.books cl) ; turned = Books.turned (Calling.books cl) }
+        ; sorted = sorted-step (Calling.sorted cl) refl
+        ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl
+        ; flags = done-up ρ (in-map here) refl (Calling.flags cl) ; kept = Calling.kept cl })
+  call-map st {m₁ = mach k clk tms ts} {f = f} {v} ρ {cp} cl
+    with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
+  ... | c | x | at | refl | kn | gn , S , L , sg , hl | lt with map-at ρ at kn
+  ...   | c₀ , refl , at₀ with lifts-split ρ (in-map here) L in eqS
+  ...     | _ , lifts-map lifts-here , Lρ =
+    rose {σ′ = ρ} {e′ = cp} (then refl now) (one-lower ρ one-map)
+      (record
+        { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = refl ; at = at₀
+        ; lifted = cong (mapᴹ (U.mapᶜ f)) gn , S , Lρ , sg , healed-split ρ (in-map here) hl
+        ; lefts = lefts-up ρ (in-map here) eqS lt ; rest-heads = Calling.rest-heads cl
+        ; owned = owned-rise (Calling.owned cl) ; kernels = kn ; meaning = fed-same (λ _ _ _ → refl) _ (Calling.meaning cl)
+        ; queue = Calling.queue cl
+        ; books = record { clocked = Books.clocked (Calling.books cl) ; ticked = Books.ticked (Calling.books cl) ; turned = Books.turned (Calling.books cl) }
+        ; sorted = sorted-step (Calling.sorted cl) refl
+        ; behind = Calling.behind cl ; lingers = Calling.lingers cl ; told = Calling.told cl ; ended = Calling.ended cl
+        ; flags = done-up ρ (in-map here) refl (Calling.flags cl) ; kept = Calling.kept cl })
+
   call-step : ∀ {g m} (st : Strong g m) {m₁ Δ A Δ′ A′} {T : Sub [] R} {u : Sub Δ A} {v : Sub Δ′ A′} {π τ}
               (ρ : Path T u π) {s : Path u v τ} → One s → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ s) e → Called st m₁ (ρ ⊕ s)
-  call-step st ρ o@one-map       cl = call-map st ρ o cl
+  call-step st ρ one-map         cl = call-map st ρ cl
   call-step st ρ one-scan        cl = call-scan st ρ cl
   call-step st ρ o@one-cut       cl = call-cut st ρ o cl
   call-step st ρ o@one-lane      cl = call-lane st ρ o cl
