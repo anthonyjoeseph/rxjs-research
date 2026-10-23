@@ -4,6 +4,7 @@
 -- operator's frame one rise, to a re-entry configuration.
 module port.Climbs where
 
+open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_; _++_; [_]; map)
 open import Data.List.Properties using (++-conicalʳ)
 open import Data.List.Relation.Unary.All using ([])
@@ -12,7 +13,7 @@ open import Data.Nat using (ℕ; zero; suc; _<_)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred)
 open import Data.Product using (_×_; _,_; Σ)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; cong; sym; trans)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; cong; cong₂; sym; trans)
 
 open import denotation.MonotonicList.Events using (Pos)
 open import denotation.MonotonicList using (agree-refl)
