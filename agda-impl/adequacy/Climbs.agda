@@ -9,14 +9,14 @@ open import Data.List using (List; []; _∷_; _++_; [_]; map)
 open import Data.List.Properties using (++-conicalʳ)
 open import Data.List.Relation.Unary.All using ([]) renaming (lookup to lookupᴬ; map to mapᴬ)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (Maybe; just; nothing; is-just)
 open import Data.Nat using (ℕ; zero; suc; _<_)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; cong; cong₂; sym; trans)
 
-open import denotation.MonotonicList.Events using (Pos)
+open import denotation.MonotonicList.Events using (Pos; ix; last)
 open import denotation.MonotonicList using (agree-refl)
 import denotation.Unfold as U
 open import operation.PureObservable using (module Machine; module Driver)
@@ -35,7 +35,7 @@ open import adequacy.Replant.Keep using (module Keeping)
 open import adequacy.Leaves using (tw-refl)
 open import adequacy.Plugged using (module Plugging)
 
-open Machine using (St; Ctx; Conf; Job; Ev; nx; cp; dirs; plug; scanS; connS; owed; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody;
+open Machine using (St; Ctx; Conf; Job; Ev; nx; cp; dirs; plug; scanS; takeS; connS; owed; owedCp; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody;
   ⟨_,_,_,_,_⟩; rising)
 
 module Ascending (R : Set) where
@@ -45,12 +45,13 @@ module Ascending (R : Set) where
   open Strongly R using (Sub; Path; here; Strong; Carried; carried; closing; noteAs; Owned; Kernels; Meaning; Queue; Books;
     Each; Heads; connected; Lingers; Untold; Ended; DoneBy; outers; outersL; part; leftover; forget; mapᴹ; Feed; owing; Fed; FedLanes;
     Begins; focused; attaching; PathLanes; this-lane; next-lane; in-map; in-scan; in-cut; in-lane; in-take; in-outer; in-lanes;
-    in-source; in-body; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; cutˢ; laneˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; pooledL; Timed; Joined; seen)
+    in-source; in-body; pendingˢ; coldˢ; ofˢ; doneˢ; mapˢ; scanˢ; cutˢ; laneˢ; takeWhileˢ; flatMapˢ; connectˢ; joinˢ; pooledL; Timed; Joined; seen;
+    Taking; taking; ending; taken; taking?; isTaking)
   open Moving R using (plant; plantᴸ; planted; plantedᴸ; replanted)
   open Framing R using (heads-scan)
   open Plugging R using (ctxAt; dirs-at; ctx-⊕; plant-plug; at-path)
-  open Replanting R using (module Shift; Heading; Pred; ≡-⊑; map-fwd; map-back; each-scan; each-sub; lingers-sub; lg-scan)
-  open Keeping R using (module Keep; Alive; Route; route-pre; _≈_; same; ≈-scan; ≈-of; ≈-pending; ≈-cold; ≈-join; ≈-cut-of; ≈-take-of; ≈-take-cut;
+  open Replanting R using (module Shift; Heading; Pred; ≡-⊑; map-fwd; map-back; each-scan; each-sub; lingers-sub; lg-scan; lg-take)
+  open Keeping R using (module Keep; Alive; Route; route-pre; route-post; _≈_; same; ≈-scan; ≈-of; ≈-pending; ≈-cold; ≈-join; ≈-cut-of; ≈-take-of; ≈-take-cut;
     ≈-connect-of; Back)
   open Ghosting R using (Hopped; Load; _≼_; load; loadOf; hopped-pre; showing; agrees)
   open GhostingPaths R using (_⊕_; _⊕ᴸ_; Lifts; LiftsLane; lifts-here; lifts-map; lifts-scan; lifts-cut; lifts-lane; lifts-take; lifts-outer; lifts-lanes;
@@ -600,18 +601,139 @@ module Ascending (R : Set) where
     take-pass : ∀ {g m} (st : Strong g m) {m₁ Δ A π} {T : Sub [] R} {i q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ i q tk v) π) {y}
               → q y ≡ true → Calling g (loadOf st) m₁ (ρ ⊕ in-take here) (nx y) → Called st m₁ (ρ ⊕ in-take here)
     -- DEAD ROUTE: the old body reads the take's liveness off a heap ref into the end's ghost (end-ghost); the state tree holds it as the `Taking` stage.
-    take-out : ∀ {g m} (st : Strong g m) {m₁ Δ A π} {T : Sub [] R} {i q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ i q tk v) π) {y}
-             → q y ≡ false → i ≡ true → Calling g (loadOf st) m₁ (ρ ⊕ in-take here) (nx y) → Called st m₁ (ρ ⊕ in-take here)
-    -- DEAD ROUTE: the old body reads the take's liveness off a heap ref into the end's ghost (end-ghost); the state tree holds it as the `Taking` stage.
-    take-end : ∀ {g m} (st : Strong g m) {m₁ Δ A π} {T : Sub [] R} {i q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ i q tk v) π) {y}
-             → q y ≡ false → i ≡ false → Calling g (loadOf st) m₁ (ρ ⊕ in-take here) (nx y) → Called st m₁ (ρ ⊕ in-take here)
+    take-end : ∀ {g m} (st : Strong g m) {m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ false q tk v) π) {y}
+             → q y ≡ false → Calling g (loadOf st) m₁ (ρ ⊕ in-take here) (nx y) → Called st m₁ (ρ ⊕ in-take here)
+
+  -- An inclusive take's failing value: shown, the take's completion owed
+  -- where the value reached it.
+  take-out-step : ∀ {Δ A} {c₀ : Ctx R Δ A} {q : A → Bool} {x y p rs clk tms ts} → q y ≡ false
+                → step (mach ⟨ inTake true q c₀ , x , rising (nx y) , p , rs ⟩ clk tms ts)
+                  ≡ silent (mach ⟨ c₀ , takeS true q x , rising (nx y) , p ++ [ ix 0 ] , (dirs c₀ , owedCp , p) ∷ rs ⟩ clk tms ts)
+  take-out-step {q = q} {y = y} qy with q y
+  take-out-step qy | false = refl
+
+  private
+    -- A take's own frame lifts a step by the take.
+    take-one : ∀ {Δ A i q tk} {v : Sub Δ A} {s S′} → Lifts (in-take {i = i} {q} {tk = tk} (here {t = v})) s S′ → S′ ≡ U.takeWhileˢ i q s
+    take-one (lifts-take lifts-here) = refl
+
+    -- A take over a source showing shows by its stage alone.
+    take-shown : ∀ {Γ A i q} {tk : Taking Γ A} {v : Sub Γ A} {c} → part v ≡ just c → part (takeWhileˢ i q tk v) ≡ taking? i q tk (just c)
+    take-shown {i = i} {q} {tk} {pendingˢ _ _}                pv = cong (taking? i q tk) pv
+    take-shown {i = i} {q} {tk} {coldˢ _ _}                   pv = cong (taking? i q tk) pv
+    take-shown {i = i} {q} {tk} {ofˢ _ _ _}                   pv = cong (taking? i q tk) pv
+    take-shown                  {v = doneˢ}                   ()
+    take-shown {i = i} {q} {tk} {mapˢ _ _}                    pv = cong (taking? i q tk) pv
+    take-shown {i = i} {q} {tk} {scanˢ _ _ _}                 pv = cong (taking? i q tk) pv
+    take-shown {i = i} {q} {tk} {cutˢ true _ _}               pv = cong (taking? i q tk) pv
+    take-shown                  {v = cutˢ false _ _}          ()
+    take-shown {i = i} {q} {tk} {laneˢ _ _}                   pv = cong (taking? i q tk) pv
+    take-shown {i = i} {q} {tk} {takeWhileˢ _ _ _ _}          pv = cong (taking? i q tk) pv
+    take-shown {i = i} {q} {tk} {flatMapˢ _ _ _ _ _ _ _ _}    pv = cong (taking? i q tk) pv
+    take-shown {i = i} {q} {tk} {connectˢ _ _ _ _ _ _}        pv = cong (taking? i q tk) pv
+    take-shown {i = i} {q} {tk} {joinˢ _ _ _ _}               pv = cong (taking? i q tk) pv
+
+    taking-of : ∀ {Γ A} {tk : Taking Γ A} → isTaking tk ≡ true → tk ≡ taking
+    taking-of {tk = taking}     refl = refl
+    taking-of {tk = ending _ _} ()
+    taking-of {tk = taken}      ()
+
+    -- A take past its failing value lives as it did; nothing under it is
+    -- held any more.
+    take-alive : ∀ {Δ A q k} {v : Sub Δ A} {c₁} → part v ≡ just c₁ → Alive (takeWhileˢ true q taking v) (takeWhileˢ true q (ending k c₁) v)
+    take-alive {q = q} {k} {v} {c₁} pv = record
+      { alive-back  = λ _ → cong is-just (take-shown {i = true} {q} {taking} {v} pv)
+      ; alive-fwd   = λ _ → cong is-just (take-shown {i = true} {q} {ending k c₁} {v} pv)
+      ; take-back   = λ j → j
+      ; take-fwd    = λ j → j
+      ; alive-ended = λ en → λ { (in-take ψ) () }
+      ; alive-flags = λ N fl → λ { (in-take ψ) () } }
+
+  -- The tree with the take's stage rewritten is the machine's.
+  take-kernels : ∀ {Δ A π} {T : Sub [] R} {i q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ i q tk v) π)
+                 {c₀ : Ctx R Δ A} {x} → dirs c₀ ≡ π → forget T ≡ plug c₀ (takeS i q x)
+               → ∀ tk′ → forget (plant ρ (takeWhileˢ i q tk′ v)) ≡ plug c₀ (takeS i q x)
+  take-kernels ρ {c₀} d e tk′ with at-path ρ {c = c₀} d e
+  ... | refl , refl = plant-plug top ρ _
+
+  -- The take past the value climbing it, its completion owed where the
+  -- value reached it.
+  outed : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {i q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ i q tk v) π) {y}
+        → Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y) → Sub Δ A
+  outed {m₁ = m₁} {i = i} {q} {v = v} ρ cl = takeWhileˢ i q (ending (Conf.pos (Mach.conf m₁)) (proj₁ (Calling.lifted cl))) v
+
+  -- An inclusive take's failing value: from the take planted past it,
+  -- lifted as the value was.
+  take-out-lifts : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ true q tk v) π) {y}
+                 → q y ≡ false → (cl : Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y))
+                 → Passed (Conf.pos (Mach.conf m₁) ++ [ ix 0 ]) g (planted ρ (outed ρ cl)) (nx y)
+  take-out-lifts {m₁ = m₁} {q = q} {v = v} ρ {y} qy cl =
+    let c₁ , pv , S , L , sg = Calling.lifted cl
+        _ , Lσ , Lρ = lifts-split ρ (in-take here) L
+        p = Conf.pos (Mach.conf m₁)
+    in U.endingᶜ (p ++ [ last ]) c₁ , take-shown {i = true} {q} {ending p c₁} {v} pv , S
+       , lifts-planted ρ (outed ρ cl) (subst (λ x → Lifts ρ x S) (trans (take-one Lσ) (cong (U.taking true q p y c₁) qy)) Lρ) , sg
+
+  postulate
+    -- What the take past its failing value leaves free, left alike.
+    take-out-lefts : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ true q tk v) π) {y}
+                   → (qy : q y ≡ false) (cl : Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y))
+                   → LeftsOf (Conf.pos (Mach.conf m₁) ++ [ ix 0 ]) g (planted ρ (outed ρ cl)) (nx y) (take-out-lifts ρ qy cl)
+
+    -- The take past its failing value, its completion owed: the jobs, the
+    -- queue, the books, the heads, the joiners told and the load.
+    take-out-owned : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ true q tk v) π) {y}
+                   → q y ≡ false → (cl : Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y)) → ∀ {m₂} → step m₁ ≡ silent m₂
+                   → Owned (plant ρ (outed ρ cl)) m₂
+    take-out-queue : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ true q tk v) π) {y}
+                   → q y ≡ false → (cl : Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y)) → ∀ {m₂} → step m₁ ≡ silent m₂
+                   → Queue (Conf.pos (Mach.conf m₂)) (Mach.clock m₂) (Mach.timers m₂) (plant ρ (outed ρ cl))
+    take-out-books : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ true q tk v) π) {y}
+                   → q y ≡ false → (cl : Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y)) → ∀ {m₂} → step m₁ ≡ silent m₂
+                   → Books (plant ρ (outed ρ cl)) m₂
+    take-out-behind : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ true q tk v) π) {y}
+                    → q y ≡ false → (cl : Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y)) → ∀ {m₂} → step m₁ ≡ silent m₂
+                    → Each (Heads (Conf.pos (Mach.conf m₂))) (plant ρ (outed ρ cl))
+    take-out-told : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ true q tk v) π) {y}
+                  → q y ≡ false → (cl : Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y)) → ∀ {m₂} → step m₁ ≡ silent m₂
+                  → Untold (Conf.pos (Mach.conf m₂)) (plant ρ (outed ρ cl))
+    take-out-load : ∀ {g ℓ m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ true q tk v) π) {y}
+                  → q y ≡ false → (cl : Calling g ℓ m₁ (ρ ⊕ in-take here) (nx y)) → ∀ {m₂} → step m₁ ≡ silent m₂
+                  → load m₂ (plant ρ (outed ρ cl)) ≡ load m₁ T
+
+  -- AN INCLUSIVE TAKE'S FAILING VALUE: the value climbs on from the take
+  -- planted past it, its route still taking, the take's completion owed.
+  take-out : ∀ {g m} (st : Strong g m) {m₁ Δ A π} {T : Sub [] R} {q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ true q tk v) π) {y}
+           → q y ≡ false → Calling g (loadOf st) m₁ (ρ ⊕ in-take here) (nx y) → Called st m₁ (ρ ⊕ in-take here)
+  take-out st {m₁ = mach k clk tms ts} {T = T} {q = q} {tk} {v} ρ {y} qy cl
+    with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl
+  ... | c | x | at | refl | kn with take-at ρ {c = c} {x} at kn
+  ...   | c₀ , refl , at₀ with taking-of (proj₁ (route-post ρ (in-take here) (Calling.route cl)))
+  ...     | refl =
+    rose {σ′ = planted ρ w} {e′ = nx y} (then st₁ now)
+      (subst (_< height (ρ ⊕ in-take here)) (sym (height-planted ρ w)) (one-lower ρ one-take))
+      (record
+        { sane = Calling.sane cl ; placed = Calling.placed cl ; ctl = refl ; at = at₀
+        ; lifted = take-out-lifts ρ qy cl ; lefts = take-out-lefts ρ qy cl ; rest-heads = tt
+        ; owned = take-out-owned ρ qy cl st₁ ; kernels = take-kernels ρ {c₀ = c₀} {x} at₀ kn _
+        ; meaning = fed-plant (λ d → d) ρ (fed-same (λ _ _ _ → refl) T (Calling.meaning cl))
+        ; queue = take-out-queue ρ qy cl st₁ ; books = take-out-books ρ qy cl st₁ ; sorted = sorted-step (Calling.sorted cl) st₁
+        ; behind = take-out-behind ρ qy cl st₁
+        ; lingers = Keep.route-lingers ρ w alive rt (λ {ls} → tw-refl (pooledL ls)) (λ _ → lg-take (λ ())) (Calling.lingers cl)
+        ; told = take-out-told ρ qy cl st₁ ; ended = Keep.shift-ended ρ w alive (Calling.ended cl)
+        ; flags = subst (DoneBy (plant ρ w)) (sym (outers-planted ρ w)) (Keep.shift-flags ρ w alive (done-up ρ (in-take here) refl (Calling.flags cl)))
+        ; route = Keep.route-planted ρ w alive rt ; kept = subst (_≼ loadOf st) (sym (take-out-load ρ qy cl st₁)) (Calling.kept cl) })
+    where w     = outed ρ cl
+          st₁   = take-out-step {c₀ = c₀} {q = q} {x = x} {y = y} {p = Calling.p cl} {rs = Calling.rs cl} {clk} {tms} {ts} qy
+          alive = take-alive {q = q} (proj₁ (proj₂ (Calling.lifted cl)))
+          rt    = route-pre ρ (in-take here) (Calling.route cl)
 
   call-take : ∀ {g m} (st : Strong g m) {m₁ Δ A π} {T : Sub [] R} {i q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ i q tk v) π)
             → ∀ {e} → Calling g (loadOf st) m₁ (ρ ⊕ in-take here) e → Called st m₁ (ρ ⊕ in-take here)
   call-take st {i = i} {q} ρ {nx y} cl with q y in qy | i
   ... | true  | _     = take-pass st ρ qy cl
-  ... | false | true  = take-out st ρ qy refl cl
-  ... | false | false = take-end st ρ qy refl cl
+  ... | false | true  = take-out st ρ qy cl
+  ... | false | false = take-end st ρ qy cl
   call-take st {m₁ = mach k clk tms ts} {T = T} {i = i} {q} {tk} {v} ρ {cp} cl
     with Calling.c cl | Calling.s cl | Calling.at cl | Calling.ctl cl | Calling.kernels cl | Calling.lifted cl | Calling.lefts cl
   ... | c | x | at | refl | kn | gn , S , L , sg , hl | lt with take-at ρ {c = c} {x} at kn
