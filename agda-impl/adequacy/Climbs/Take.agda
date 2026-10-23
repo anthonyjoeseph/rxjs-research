@@ -3,14 +3,13 @@
 module adequacy.Climbs.Take where
 
 open import Data.Bool using (Bool; true; false)
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using ([]; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.All using ([]) renaming (lookup to lookupᴬ; map to mapᴬ)
 open import Data.List.Membership.Propositional using () renaming (_∈_ to _∈ᴸ_)
-open import Data.Maybe using (Maybe; just; nothing; is-just)
-open import Data.Nat using (suc; _<_)
+open import Data.Maybe using (just; nothing; is-just)
+open import Data.Nat using (_<_)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (tt)
-open import Level using (lift)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; cong; sym; trans)
 
 open import denotation.MonotonicList.Events using (Pos; ix; last)
@@ -51,7 +50,8 @@ module AscendingTake (R : Set) where
     lifts-source; lifts-body; lifts-shut; lifts-this; lifts-next; lefts-subst; lifts-split; lefts-up; healed-split; Lefts; Healed; HealedL; One; whole; snoc; view;
     height; heightL; one-lower;
     one-map; one-scan; one-cut; one-lane; one-take; one-outer; one-lanes; one-source; one-body)
-  open Ascending R using (Called; Calling; ClosedHeads; LeftsOf; Passed; done-up; fed-plant; fed-same; height-planted; lifts-planted; outers-planted; owned-rise; rose; sorted-step)
+  open Ascending R using (Called; Calling; ClosedHeads; LeftsOf; Passed; done-up; fed-plant; fed-same; height-planted; lifts-planted; outers-planted; owned-rise; rose; sorted-step;
+    heal; healing; heal-healed; lifts-healed; forget-heal; heal-height)
 
   -- A context climbing through a takeWhile, the take's own frame first.
   take-at : ∀ {Δ A π} {T : Sub [] R} {i q tk} {v : Sub Δ A} (ρ : Path T (takeWhileˢ i q tk v) π)
@@ -191,133 +191,6 @@ module AscendingTake (R : Set) where
           st₁   = take-out-step {c₀ = c₀} {q = q} {x = x} {y = y} {p = Calling.p cl} {rs = Calling.rs cl} {clk} {tms} {ts} qy
           alive = take-alive {q = q} (proj₁ (proj₂ (Calling.lifted cl)))
           rt    = route-pre ρ (in-take here) (Calling.route cl)
-
-  ------------------------------------------------------------------------
-  -- AN END'S CONNECTS STAGED: down a path, every connect entered by a
-  -- source now gone staged to end at `q`, keeping what that source
-  -- leaves running.
-
-  staged : ∀ {a} {X : Set a} → Pos → Maybe Pos → Maybe X → Maybe Pos
-  staged q e (just _) = e
-  staged q e nothing  = just q
-
-  rested : ∀ {a b} {X : Set a} {N : Set b} → N → Maybe X → N → N
-  rested rt (just _) _ = rt
-  rested rt nothing  l = l
-
-  mutual
-    heal : Pos → ∀ {Γ A Δ B π} {t : Sub Γ A} {u : Sub Δ B} → Path t u π → Sub Γ A
-    heal q (here {t = t})                                                 = t
-    heal q (in-map {f = f} ψ)                                             = mapˢ f (heal q ψ)
-    heal q (in-scan {f = f} {z = z} ψ)                                    = scanˢ f z (heal q ψ)
-    heal q (in-cut {l = l} {a = a} ψ)                                     = cutˢ l a (heal q ψ)
-    heal q (in-lane {r = r} ψ)                                            = laneˢ r (heal q ψ)
-    heal q (in-take {i = i} {q = p} {tk = tk} ψ)                          = takeWhileˢ i p tk (heal q ψ)
-    heal q (in-outer {op = op} {f = f} {d = d} {n = n} {qs = qs} {pl = pl} {ls = ls} ψ)
-                                                                          = flatMapˢ op f d n qs pl (heal q ψ) ls
-    heal q (in-lanes {op = op} {f = f} {d = d} {n = n} {qs = qs} {pl = pl} {o = o} ψ)
-                                                                          = flatMapˢ op f d n qs pl o (healᴸ q ψ)
-    heal q (in-source {k = k} {r = r} {e = e} {rt = rt} {b = b} ψ)        =
-      connectˢ k r (staged q e (part (heal q ψ))) (rested rt (part (heal q ψ)) (leftover (heal q ψ))) (heal q ψ) b
-    heal q (in-body {k = k} {r = r} {e = e} {rt = rt} {s = s} ψ)          = connectˢ k r e rt s (heal q ψ)
-
-    healᴸ : Pos → ∀ {Γ A Δ B i π} {ls : List (Sub Γ A)} {u : Sub Δ B} → PathLanes ls u i π → List (Sub Γ A)
-    healᴸ q (this-lane {ls = ls} ψ) = heal q ψ ∷ ls
-    healᴸ q (next-lane {l = l} ψ)   = l ∷ healᴸ q ψ
-
-  -- The node where it was.
-  mutual
-    healing : ∀ q {Γ A Δ B π} {t : Sub Γ A} {u : Sub Δ B} (ψ : Path t u π) → Path (heal q ψ) u π
-    healing q here          = here
-    healing q (in-map ψ)    = in-map (healing q ψ)
-    healing q (in-scan ψ)   = in-scan (healing q ψ)
-    healing q (in-cut ψ)    = in-cut (healing q ψ)
-    healing q (in-lane ψ)   = in-lane (healing q ψ)
-    healing q (in-take ψ)   = in-take (healing q ψ)
-    healing q (in-outer ψ)  = in-outer (healing q ψ)
-    healing q (in-lanes ψ)  = in-lanes (healingᴸ q ψ)
-    healing q (in-source ψ) = in-source (healing q ψ)
-    healing q (in-body ψ)   = in-body (healing q ψ)
-
-    healingᴸ : ∀ q {Γ A Δ B i π} {ls : List (Sub Γ A)} {u : Sub Δ B} (ψ : PathLanes ls u i π) → PathLanes (healᴸ q ψ) u i π
-    healingᴸ q (this-lane ψ) = this-lane (healing q ψ)
-    healingᴸ q (next-lane ψ) = next-lane (healingᴸ q ψ)
-
-  -- An end reaching every connect it stages has that connect's end staged.
-  mutual
-    heal-healed : ∀ q {Γ A Δ B π} {t : Sub Γ A} {u : Sub Δ B} (ψ : Path t u π) → Healed q (healing q ψ)
-    heal-healed q here                    = lift tt
-    heal-healed q (in-map ψ)              = heal-healed q ψ
-    heal-healed q (in-scan ψ)             = heal-healed q ψ
-    heal-healed q (in-cut ψ)              = heal-healed q ψ
-    heal-healed q (in-lane ψ)             = heal-healed q ψ
-    heal-healed q (in-take ψ)             = heal-healed q ψ
-    heal-healed q (in-outer ψ)            = heal-healed q ψ
-    heal-healed q (in-lanes ψ)            = healL-healed q ψ
-    heal-healed q (in-source {e = e} ψ)   = cong (staged q e) , heal-healed q ψ
-    heal-healed q (in-body ψ)             = heal-healed q ψ
-
-    healL-healed : ∀ q {Γ A Δ B i π} {ls : List (Sub Γ A)} {u : Sub Δ B} (ψ : PathLanes ls u i π) → HealedL q (healingᴸ q ψ)
-    healL-healed q (this-lane ψ) = heal-healed q ψ
-    healL-healed q (next-lane ψ) = healL-healed q ψ
-
-  -- A lift reads no connect's end it enters by the source: the same lift
-  -- with every such end staged.
-  mutual
-    lifts-healed : ∀ q {Γ A Δ B π} {t : Sub Γ A} {u : Sub Δ B} (ψ : Path t u π) {s S} → Lifts ψ s S → Lifts (healing q ψ) s S
-    lifts-healed q here          lifts-here               = lifts-here
-    lifts-healed q (in-map ψ)    (lifts-map L)            = lifts-map (lifts-healed q ψ L)
-    lifts-healed q (in-scan ψ)   (lifts-scan L)           = lifts-scan (lifts-healed q ψ L)
-    lifts-healed q (in-cut ψ)    (lifts-cut e L)          = lifts-cut e (lifts-healed q ψ L)
-    lifts-healed q (in-lane ψ)   (lifts-lane L)           = lifts-lane (lifts-healed q ψ L)
-    lifts-healed q (in-take ψ)   (lifts-take L)           = lifts-take (lifts-healed q ψ L)
-    lifts-healed q (in-outer ψ)  (lifts-outer of pb L)    = lifts-outer of pb (lifts-healed q ψ L)
-    lifts-healed q (in-lanes ψ)  (lifts-lanes L ea lf pb) = lifts-lanes (liftsL-healed q ψ L) ea lf pb
-    lifts-healed q (in-source ψ) (lifts-source pb sf L)   = lifts-source pb sf (lifts-healed q ψ L)
-    lifts-healed q (in-body ψ)   (lifts-body ps bf L)     = lifts-body ps bf (lifts-healed q ψ L)
-    lifts-healed q (in-body ψ)   (lifts-shut ps pe rb L)  = lifts-shut ps pe rb (lifts-healed q ψ L)
-
-    liftsL-healed : ∀ q {Γ A Δ B i π} {ls : List (Sub Γ A)} {u : Sub Δ B} (ψ : PathLanes ls u i π) {s bs S as}
-                  → LiftsLane ψ s bs S as → LiftsLane (healingᴸ q ψ) s bs S as
-    liftsL-healed q (this-lane ψ) (lifts-this L) = lifts-this (lifts-healed q ψ L)
-    liftsL-healed q (next-lane ψ) (lifts-next L) = lifts-next (liftsL-healed q ψ L)
-
-  -- The machine reads no end staged.
-  mutual
-    forget-heal : ∀ q {Γ A Δ B π} {t : Sub Γ A} {u : Sub Δ B} (ψ : Path t u π) → forget (heal q ψ) ≡ forget t
-    forget-heal q here                                   = refl
-    forget-heal q (in-map {f = f} ψ)                     = cong (mapS f) (forget-heal q ψ)
-    forget-heal q (in-scan {f = f} {z = z} ψ)            = cong (scanS f z) (forget-heal q ψ)
-    forget-heal q (in-cut {l = l} {a = a} ψ)             = cong (cutS l a) (forget-heal q ψ)
-    forget-heal q (in-lane {r = r} ψ)                    = cong (lnS r) (forget-heal q ψ)
-    forget-heal q (in-take {i = i} {q = p} ψ)            = cong (takeS i p) (forget-heal q ψ)
-    forget-heal q (in-outer {op = op} {f = f} {d = d} {n = n} {qs = qs} {ls = ls} ψ)
-                                                         = cong (λ o → flatS op f d n qs o (forgetᴸ ls)) (forget-heal q ψ)
-    forget-heal q (in-lanes {op = op} {f = f} {d = d} {n = n} {qs = qs} {o = o} ψ)
-                                                         = cong (flatS op f d n qs (forget o)) (forgetL-heal q ψ)
-    forget-heal q (in-source {k = k} {b = b} ψ)          = cong (λ s → connS k s (forget b)) (forget-heal q ψ)
-    forget-heal q (in-body {k = k} {s = s} ψ)            = cong (connS k (forget s)) (forget-heal q ψ)
-
-    forgetL-heal : ∀ q {Γ A Δ B i π} {ls : List (Sub Γ A)} {u : Sub Δ B} (ψ : PathLanes ls u i π) → forgetᴸ (healᴸ q ψ) ≡ forgetᴸ ls
-    forgetL-heal q (this-lane {ls = ls} ψ) = cong (_∷ forgetᴸ ls) (forget-heal q ψ)
-    forgetL-heal q (next-lane {l = l} ψ)   = cong (forget l ∷_) (forgetL-heal q ψ)
-
-  mutual
-    heal-height : ∀ q {Γ A Δ B π} {t : Sub Γ A} {u : Sub Δ B} (ψ : Path t u π) → height (healing q ψ) ≡ height ψ
-    heal-height q here          = refl
-    heal-height q (in-map ψ)    = cong suc (heal-height q ψ)
-    heal-height q (in-scan ψ)   = cong suc (heal-height q ψ)
-    heal-height q (in-cut ψ)    = cong suc (heal-height q ψ)
-    heal-height q (in-lane ψ)   = cong suc (heal-height q ψ)
-    heal-height q (in-take ψ)   = cong suc (heal-height q ψ)
-    heal-height q (in-outer ψ)  = cong suc (heal-height q ψ)
-    heal-height q (in-lanes ψ)  = healL-height q ψ
-    heal-height q (in-source ψ) = cong suc (heal-height q ψ)
-    heal-height q (in-body ψ)   = cong suc (heal-height q ψ)
-
-    healL-height : ∀ q {Γ A Δ B i π} {ls : List (Sub Γ A)} {u : Sub Δ B} (ψ : PathLanes ls u i π) → heightL (healingᴸ q ψ) ≡ heightL ψ
-    healL-height q (this-lane ψ) = cong suc (heal-height q ψ)
-    healL-height q (next-lane ψ) = healL-height q ψ
 
   -- A non-inclusive take's failing value: the take gone, its end at
   -- `last`, every connect whose source it leaves gone staged to end there.

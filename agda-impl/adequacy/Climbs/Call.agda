@@ -26,6 +26,7 @@ open import adequacy.Replant.Keep using (module Keeping)
 open import adequacy.Plugged using (module Plugging)
 open import adequacy.Climbs using (module Ascending)
 open import adequacy.Climbs.Take using (module AscendingTake)
+open import adequacy.Climbs.Flat using (module AscendingFlat)
 open Machine using (St; Ctx; Conf; Job; Ev; nx; cp; dirs; plug; mapS; scanS; cutS; lnS; takeS; flatS; connS; owed; owedCp; owedCut; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody;
   ⟨_,_,_,_,_⟩; rising)
 
@@ -49,8 +50,9 @@ module AscendingCall (R : Set) where
     lifts-source; lifts-body; lifts-shut; lifts-this; lifts-next; lefts-subst; lifts-split; lefts-up; healed-split; Lefts; Healed; HealedL; One; whole; snoc; view;
     height; heightL; one-lower;
     one-map; one-scan; one-cut; one-lane; one-take; one-outer; one-lanes; one-source; one-body)
-  open Ascending R using (Aloft; Called; Calling; ClosedHeads; aloft; call-cut; call-lane; call-lanes; call-map; call-outer; call-root; call-scan; call-source; done-up; fed-same; landed; owned-rise; rose; sorted-step)
+  open Ascending R using (Aloft; Called; Calling; ClosedHeads; aloft; call-cut; call-lane; call-map; call-root; call-scan; call-source; done-up; fed-same; landed; owned-rise; rose; sorted-step)
   open AscendingTake R using (call-take)
+  open AscendingFlat R using (call-lanes; call-outer)
 
   -- A context climbing through a connect's body, the body's own frame first.
   body-at : ∀ {Δ X B π} {T : Sub [] R} {k r ej rt} {s : Sub Δ X} {b : Sub (X ∷ Δ) B} (ρ : Path T (connectˢ k r ej rt s b) π)
@@ -140,8 +142,8 @@ module AscendingCall (R : Set) where
   call-step st ρ o@one-cut       cl = call-cut st ρ o cl
   call-step st ρ o@one-lane      cl = call-lane st ρ o cl
   call-step st ρ one-take        cl = call-take st ρ cl
-  call-step st ρ o@one-outer     cl = call-outer st ρ o cl
-  call-step st ρ o@(one-lanes _) cl = call-lanes st ρ o cl
+  call-step st ρ one-outer       cl = call-outer st ρ cl
+  call-step st ρ (one-lanes ol)  cl = call-lanes st ρ ol cl
   call-step st ρ o@one-source    cl = call-source st ρ o cl
   call-step st ρ one-body        cl = call-body st ρ cl
 
