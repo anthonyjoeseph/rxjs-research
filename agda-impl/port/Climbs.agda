@@ -36,7 +36,7 @@ module Ascending (R : Set) where
   open Strongly R using (Sub; Path; here; Strong; Carried; carried; closing; noteAs; Owned; Kernels; Meaning; Queue; Books;
     Each; Heads; Lingers; Untold; Ended; DoneBy; outers; part; leftover)
   open Ghosting R using (Hopped; Load; _≼_; load; loadOf; hopped-pre; showing; agrees)
-  open GhostingPaths R using (_⊕_; Lifts; lifts-here; Lefts; Healed; One; whole; snoc; view; height; one-lower;
+  open GhostingPaths R using (_⊕_; Lifts; lifts-here; Lefts; One; whole; snoc; view; height;
     one-map; one-scan; one-cut; one-lane; one-take; one-outer; one-lanes; one-source; one-body)
 
   -- The node a signal reaches already past it, and the ghost's step the
