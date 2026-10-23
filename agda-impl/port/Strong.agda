@@ -19,10 +19,10 @@ open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using ([])
 import Data.List.Relation.Unary.Any as Any
-open import Data.Maybe using (Maybe; just; nothing; is-just)
+open import Data.Maybe using (Maybe; just; nothing; is-just; is-nothing)
 open import Data.Nat using (ℕ; suc; _+_; _<ᵇ_)
 open import Data.Product using (Σ; _×_; _,_)
-open import Data.Sum using (_⊎_)
+open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl)
 
 import Tree as T
@@ -30,6 +30,8 @@ open import denotation.MonotonicList.Events using (Time; Pos; From; Frame; at; i
 import denotation.Unfold as U
 open import operation.PureObservable using (PureObs; Tape; tape; over; module Machine; module Driver)
 open import port.Sane using (Sane; sane-subscribe)
+open import port.Leaves using (Leaves; Twin; Restful)
+open import port.Told using (untold; Tells)
 open import port.Placed.Order using (Placed)
 open import port.Sorted using (_≤ᵖ_)
 open import port.Sorted.Walk using (module SortingWalk)
@@ -351,7 +353,7 @@ module Strongly (R : Set) where
   -- level down from where the connect was subscribed.
   data Begins (k : Conf R) (π : List ℕ) (q : Pos) : Set₁ where
     focused : dirs (Conf.ctx k) ≡ π → Conf.mode k ≡ subscribing → Conf.pos k ≡ q → Begins k π q
-    sourced : ∀ ρ p → π ≡ ρ ++ [ 0 ] → (ρ , attBody , p) ∈ agenda k → q ≡ p ++ [ ix 1 ] → Begins k π q
+    attaching : ∀ ρ p → π ≡ ρ ++ [ 0 ] → (ρ , attBody , p) ∈ agenda k → q ≡ p ++ [ ix 1 ] → Begins k π q
 
   -- EVERYTHING DUE BEFORE THE NEXT TURN IS OWED, each a job at its
   -- node's path: an `of`'s next value; a pending node's subscription; a
@@ -375,6 +377,94 @@ module Strongly (R : Set) where
       owes    : ∀ {Γ X B k′ r e rt s b π} (ψ : Path t (connectˢ {Γ} {X} {B} k′ r e rt s b) π) → seen ψ ≡ true
               → CS.srcLive k′ ≡ true → part b ≡ nothing → Σ Pos λ q → (π , owed , q) ∈ agenda k
 
+  -- `P` of every node the ghost holds, and of what a held flatMap's ended
+  -- parts left running, and what a held connect's ended source did.
+  -- Held: `seen`, so a teardown, which leaves what it reached unseen,
+  -- answers for nothing below its switch.
+  record Each (P : ∀ {Γ A} → U.Node Γ A → Set) (t : Sub [] R) : Set₁ where
+    field
+      parts : ∀ {Δ B π} {u : Sub Δ B} (ψ : Path t u π) → seen ψ ≡ true → ∀ {c} → part u ≡ just c → P c
+      pools : ∀ {Γ X A op f d n qs pl π} {o : Sub Γ X} {ls : List (Sub Γ A)}
+            → (ψ : Path t (flatMapˢ op f d n qs pl o ls) π) → seen ψ ≡ true
+            → ∀ {c} → part (flatMapˢ op f d n qs pl o ls) ≡ just c → P pl
+      rests : ∀ {Γ X B k r e rt π} {s : Sub Γ X} {b : Sub (X ∷ Γ) B}
+            → (ψ : Path t (connectˢ k r e rt s b) π) → seen ψ ≡ true
+            → ∀ {n} → part (connectˢ k r e rt s b) ≡ just n
+            → part s ≡ nothing → ∀ {c₀} → e ≡ just c₀ → P rt
+
+  ------------------------------------------------------------------------
+  -- What a subscription leaves running past its end
+
+  -- A source's node: what it shows while it runs, else what it left.
+  sourced : ∀ {Γ A} → Maybe (U.Node Γ A) → U.Node Γ A → U.Node Γ A
+  sourced (just s) _ = s
+  sourced nothing  t = t
+
+  -- Read off the witness past every switch and pool: each connect's
+  -- source run under where it subscribed, beside its body's leftover; a
+  -- pending node's, once begun.
+  mutual
+    leftover : ∀ {Γ A B} → Sub Γ A → U.Node Γ B
+    leftover (pendingˢ o q)                 = U.restᶜ (U.subscribe o q)
+    leftover (mapˢ f s)                     = leftover s
+    leftover (scanˢ f z s)                  = leftover s
+    leftover (cutˢ l a s)                   = leftover s
+    leftover (laneˢ r s)                    = leftover s
+    leftover (takeWhileˢ i q tk s)          = leftover s
+    leftover (flatMapˢ op f d n qs pl o ls) = U.unionᶜ (leftover o) (leftoverL ls)
+    leftover (connectˢ k r e rt s b)        = U.unionᶜ (U.burstingᶜ r m) (U.underᶜ (U.live m) (leftover {B = ⊤} b))
+      where m = sourced (part s) (leftover s)
+    leftover _                              = U.idleᶜ
+
+    leftoverL : ∀ {Γ A B} → List (Sub Γ A) → U.Node Γ B
+    leftoverL []       = U.idleᶜ
+    leftoverL (s ∷ ls) = U.unionᶜ (leftover s) (leftoverL ls)
+
+  -- What a flatMap's pool runs, by its own flags: its outer's leftover
+  -- once it heard the outer end, each lane's once it cut the lane.
+  pooledL : ∀ {Γ B} → List (Sub Γ B) → U.Node Γ B
+  pooledL []                = U.idleᶜ
+  pooledL (laneˢ r s ∷ ls)  = if r then pooledL ls else U.unionᶜ (leftover s) (pooledL ls)
+  pooledL (_ ∷ ls)          = pooledL ls
+
+  pooled : ∀ {Γ X B} → Bool → Sub Γ X → List (Sub Γ B) → U.Node Γ B
+  pooled d o ls = U.unionᶜ (if d then leftover o else U.idleᶜ) (pooledL ls)
+
+  -- WHAT A HELD NODE KEEPS OF ITS ENDED PARTS IS WHAT THEY STILL RUN,
+  -- to every depth: below `t`, a held flatMap's pool, a rest's shape,
+  -- leaves what the witness reads off as its ended parts' leftovers; a
+  -- held connect's ended source's rest leaves the source's, its order
+  -- read back besides.
+  record Lingers (t : Sub [] R) : Set₁ where
+    field
+      pools : ∀ {Γ X A op f d n qs pl π} {o : Sub Γ X} {ls : List (Sub Γ A)}
+            → (ψ : Path t (flatMapˢ op f d n qs pl o ls) π) → seen ψ ≡ true
+            → ∀ {c} → part (flatMapˢ op f d n qs pl o ls) ≡ just c → Leaves pl (pooled d o ls) × Restful pl
+      rests : ∀ {Γ X B k r e rt π} {s : Sub Γ X} {b : Sub (X ∷ Γ) B}
+            → (ψ : Path t (connectˢ k r e rt s b) π) → seen ψ ≡ true
+            → ∀ {n} → part (connectˢ k r e rt s b) ≡ just n
+            → part s ≡ nothing → ∀ {c₀} → e ≡ just c₀ → Twin rt (leftover {B = ⊤} s) × Restful rt
+
+  -- What a connect past its source's end has not told its body's
+  -- joiners, it tells no sooner than `q`.
+  Untold : Pos → Sub [] R → Set₁
+  Untold q t = ∀ {Γ X B k r c₀ rt π} {s : Sub Γ X} {b : Sub (X ∷ Γ) B}
+             → (ψ : Path t (connectˢ k r (just c₀) rt s b) π) → seen ψ ≡ true → part s ≡ nothing
+             → ∀ {b₀} → part b ≡ just b₀ → Tells q c₀ (untold (Any.here refl) b₀)
+
+  -- A connect still held past its source's end holds no source.
+  Ended : Sub [] R → Set₁
+  Ended t = ∀ {Γ X B k r e rt π} {s : Sub Γ X} {b : Sub (X ∷ Γ) B}
+          → (ψ : Path t (connectˢ k r e rt s b) π) → seen ψ ≡ true
+          → ∀ {n} → part (connectˢ k r e rt s b) ≡ just n → ∀ {c₀} → e ≡ just c₀ → part s ≡ nothing
+
+  -- EVERY SEEN FLATMAP'S DONE FLAG READS ITS OUTER GONE: an outer's end
+  -- sets the flag as it rises to the flatMap, and no re-entry state
+  -- falls between.
+  DoneBy : Sub [] R → Set₁
+  DoneBy t = ∀ {Γ X A op f d n qs pl π} {o : Sub Γ X} {ls : List (Sub Γ A)}
+           → (ψ : Path t (flatMapˢ op f d n qs pl o ls) π) → seen ψ ≡ true → d ≡ is-nothing (part o)
+
   postulate
     -- Every live joiner holding what its feed owes it.
     --
@@ -392,32 +482,6 @@ module Strongly (R : Set) where
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Strong/Against.agda
     Books : Sub [] R → Mach → Set₁
 
-    -- `P` of every node the ghost holds, and of every held flatMap's pool
-    -- and ended connect's rest.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Strong/Against.agda
-    Each : (∀ {Γ A} → U.Node Γ A → Set) → Sub [] R → Set₁
-
-    -- What a held node keeps of its ended parts is what they still run.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Strong/Against.agda
-    Lingers : Sub [] R → Set₁
-
-    -- What a connect past its source's end has not told its body's
-    -- joiners, it tells no sooner than `q`.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Strong/Held.agda
-    Untold : Pos → Sub [] R → Set₁
-
-    -- A connect still held past its source's end holds no source.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Strong/Held.agda
-    Ended : Sub [] R → Set₁
-
-    -- Every held flatMap's outer-done flag reads its outer gone.
-    --
-    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Strong/Held.agda
-    DoneBy : Sub [] R → Set₁
 
   -- THE CONFIGURATION RUNS THE GHOST FROM A RE-ENTRY STATE: a witness of
   -- every subscription the run reaches, which the machine's tree forgets
@@ -462,11 +526,8 @@ module Strongly (R : Set) where
     meaning-begin : (o : PureObs [] R) → Meaning (pendingˢ o root)
     queue-begin   : (o : PureObs [] R) → Queue root 0 [] (pendingˢ o root)
     books-begin   : (o : PureObs [] R) → Books (pendingˢ o root) (begin o)
-    behind-begin  : (o : PureObs [] R) → Each (Heads root) (pendingˢ o root)
-    lingers-begin : (o : PureObs [] R) → Lingers (pendingˢ o root)
-    told-begin    : (o : PureObs [] R) → Untold root (pendingˢ o root)
-    ended-begin   : (o : PureObs [] R) → Ended (pendingˢ o root)
-    flags-begin   : (o : PureObs [] R) → DoneBy (pendingˢ o root)
+    -- A program subscribed at the root heads no earlier than the root.
+    heads-subscribe : (o : PureObs [] R) → Heads root (U.subscribe o root)
 
   -- The launch is a re-entry configuration against the program
   -- subscribed at the root.
@@ -487,9 +548,9 @@ module Strongly (R : Set) where
     ; queue   = queue-begin o
     ; books   = books-begin o
     ; sorted  = root , begin-well o
-    ; behind  = behind-begin o
-    ; lingers = lingers-begin o
-    ; told    = told-begin o
-    ; ended   = ended-begin o
-    ; flags   = flags-begin o
+    ; behind  = record { parts = λ { here _ refl → heads-subscribe o } ; pools = λ () ; rests = λ () }
+    ; lingers = record { pools = λ () ; rests = λ () }
+    ; told    = λ ()
+    ; ended   = λ ()
+    ; flags   = λ ()
     }

@@ -15,10 +15,8 @@ hold at subscribe; no onward leaf can be proven against an opaque
 field. Settled when each is a ported body and its begin leaf
 goes through.
 
-Members: `Meaning`, `Queue`, `Books`, `Each`, `Lingers`, `Untold`,
-`Ended`, `DoneBy`, `placed-subscribe`, `meaning-begin`,
-`queue-begin`, `books-begin`, `behind-begin`, `lingers-begin`, `told-begin`,
-`ended-begin`, `flags-begin`.
+Members: `Meaning`, `Queue`, `Books`, `placed-subscribe`,
+`meaning-begin`, `queue-begin`, `books-begin`, `heads-subscribe`.
 
 #### THE STRONG STEP
 
