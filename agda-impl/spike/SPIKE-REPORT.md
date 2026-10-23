@@ -126,10 +126,86 @@ the stepper's.
   must be the position of the event its next step makes, not the
   position it runs at. For takeWhile that means peeking at its source's
   next value; that is a function of the child's observation, so the step
-  stays compositional, but the TS must mirror the peek.
+  stays compositional.
 
-Next: list every former whose run position and event position differ
-(takeWhile failing, the connect's `q ⊕ ix 0` source comparison, a
-joiner's feed, a cold's cascade), give the engine event-position keys for
-each, port to TS and let the oracle judge; then K1 (of / map / empty /
-merge) preservation of H.
+## Plan: event-position keys (current)
+
+1. **Census.** Every former whose run position and event position
+   differ. Candidates: a failing takeWhile, the connect's `q ⊕ ix 0`
+   source comparison, a joiner's feed, a cold's cascade.
+2. **Engine.** Give `operation.Marked` event-position keys for each.
+   The TS side is rxjs itself; the oracle's `marks` and `marks io`
+   columns judge the Agda engine against it in CI.
+3. **K1.** Prove H preserved for of / map / empty / merge; then K2
+   (connect, feed) and K3 (colds).
+
+Kill criterion unchanged: a needed field that is neither a fold over
+nodes nor a comparison of keys against the position, or clauses needing
+bespoke arguments.
+
+## Findings: the census (step 1)
+
+Where `denotation.Unfold.step`'s head differs from the key the engine
+runs at, by kind.
+
+**Tie-only shifts, to `k ⊕ ix 0`.** A connect's source event
+(`sourceˢ`, `endedˢ`), a flatMap's outer value (`outerˢ`), a lane ending
+with a value queued (`laneˢ`), a defer (`step`), an inclusive takeWhile's
+failing value (`taking`). Nothing lies strictly between `k` and
+`k ⊕ ix 0` (`adequacy.Stepper.shy-order`), so these diverge only when
+another node is keyed at exactly `k`: a tie-break. The stepper's
+tie-break reads the EVENT, not just its position: its kind (out, skip or
+end) at the outer, the source and a lane, and its value at a takeWhile
+(`spike.MarkedGap`). Every event the engine searches for carries that
+information on reachable nodes: an of's list, a joiner's inbox, a pure
+cold's tape. IO's colds are never searched
+(`operation.MarkedObservable`: what a cold makes is pushed). So tie-breaks
+that mirror the stepper fit the shared engine, given a `due` that also
+says what the cold's next event is.
+
+**Real gaps: the run's own region.** A non-inclusive takeWhile ends at
+`k ⊕ last`. Each synchronous subscribe cascade reaches its events under
+the run position: empty's end, a closed joiner's end, a connect's body
+under `ix 0` and its source under `ix 1` (`bodyM`), a lane started under
+`ix 1`. The engine runs through the region under `k` in one go, while
+the stepper races any foreign head inside it. The engine agrees only if
+nothing else is keyed under `k`, which is the pairwise fact again. Exact
+keys would need the engine to compute each pending subscription's first
+head from its `Obs` (pure; a cold's first frame from `timelineAt`), and
+in IO a cold's first frame is unknown.
+
+**What sits in a gap is never a value.** A subscribe cascade shows only
+completions (`operation.Marked.begin`: of waits, cold starts, the rest
+descend), and only a takeWhile moves a position on the way up
+(`operation.Marked.rise`); its value moves only into a tie-only gap.
+Values always show at their own keys (of, joiner, cold). So in a real gap
+the engine and stepper differ only in the order of SILENT steps:
+completions and skips.
+
+**Joiners and colds are not obstacles.** A joiner runs at its inbox
+head, which is where it shows (`joinˢ`). A pure cold's `due` is its
+frame's head (`burstˢ`), except the done case: it ends at its
+subscription's `last`, which is K3's question.
+
+### What this leaves for step 2
+
+- **Ties:** mechanical. Change `kids`/`better` to the stepper's rules;
+  the extra input is the next event's kind and value.
+- **Real gaps:** exact keys alone do not close them. The second event of
+  a cascade needs a later position than the first, which opens a gap no
+  choice of positions closes, so the denotation cannot be moved to fix
+  it either. Two routes:
+  - (d) **One event per search.** Every synchronous continuation becomes
+    a mark at its event position, as a takeWhile's completion already is
+    (`cpAt`). Lane starts and a connect's subscriptions become marks
+    keyed at their first head, computed from the `Obs`: a defer stops
+    at its skip, so this terminates, and a pure cold uses `timelineAt`.
+    The engine then interleaves as the stepper does on every
+    configuration. It matches rxjs's sequential cascades only where
+    positions are causal, which the oracle checks, not a proof. IO keys
+    a cold's subscription at its lower bound, `u ⊕ ix 0`.
+  - (b) **Weaken H** to agreement up to reordering silent steps inside
+    a run's region. This is no longer a per-node head equation, so it
+    gives up idea 3.
+- **Recommendation: (d), after a cheap fit test.** Re-key the ties, mark
+  the lane start, and run the oracle, before touching the connect.
