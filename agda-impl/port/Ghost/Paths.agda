@@ -154,7 +154,7 @@ module GhostingPaths (R : Set) where
     Lefts (lifts-take L)                                   = Lefts L
     Lefts (lifts-outer {t = t} {S = S} {o₀ = o₀} _ _ L)  = OnEnd S (Leaves o₀ (leftover {B = ⊤} t)) × Lefts L
     Lefts (lifts-lanes {l = l} L _ _ _)                   = LeftsL l L
-    Lefts (lifts-source {t = t} {c₀ = c₀} {S = S} _ _ L) = OnEnd S (Leaves c₀ (leftover {B = ⊤} t)) × Lefts L
+    Lefts (lifts-source {t = t} {S = S} {c₀ = c₀} _ _ L) = OnEnd S (Leaves c₀ (leftover {B = ⊤} t)) × Lefts L
     Lefts (lifts-body _ _ L)                               = Lefts L
     Lefts (lifts-shut _ _ _ L)                             = Lefts L
 
