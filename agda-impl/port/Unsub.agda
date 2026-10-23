@@ -14,3 +14,7 @@ module Unsubbing (R : Set) where
   data _⇝_ (m : Mach) : Mach → Set₁ where
     now  : m ⇝ m
     then : ∀ {m₁ m′} → step m ≡ silent m₁ → m₁ ⇝ m′ → m ⇝ m′
+
+  ⇝-trans : ∀ {m₁ m₂ m₃} → m₁ ⇝ m₂ → m₂ ⇝ m₃ → m₁ ⇝ m₃
+  ⇝-trans now          q = q
+  ⇝-trans (then e p) q = then e (⇝-trans p q)

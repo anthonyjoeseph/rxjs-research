@@ -15,7 +15,7 @@
 module port.Strong where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_)
-open import Data.List using (List; []; _∷_; _++_; [_]; length)
+open import Data.List using (List; []; _∷_; _++_; [_]; length; map)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Empty using (⊥)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup)
@@ -27,6 +27,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤)
 open import Level using (Lift)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl)
+open import Relation.Nullary using (¬_)
 
 import Tree as T
 open import denotation.MonotonicList.Events using (Time; Pos; From; Frame; at; ix; last; tick; root; _<ᵖ_) renaming (sub to subᴾ)
@@ -472,12 +473,33 @@ module Strongly (R : Set) where
           → (ψ : Path t (connectˢ k r e rt s b) π) → seen ψ ≡ true
           → ∀ {n} → part (connectˢ k r e rt s b) ≡ just n → ∀ {c₀} → e ≡ just c₀ → part s ≡ nothing
 
-  -- EVERY SEEN FLATMAP'S DONE FLAG READS ITS OUTER GONE: an outer's end
-  -- sets the flag as it rises to the flatMap, and no re-entry state
-  -- falls between.
-  DoneBy : Sub [] R → Set₁
-  DoneBy t = ∀ {Γ X A op f d n qs pl π} {o : Sub Γ X} {ls : List (Sub Γ A)}
-           → (ψ : Path t (flatMapˢ op f d n qs pl o ls) π) → seen ψ ≡ true → d ≡ is-nothing (part o)
+  -- The flatMaps a path enters by their outer, at their paths.
+  mutual
+    outers : ∀ {Γ A Δ B} {t : Sub Γ A} {u : Sub Δ B} {π} → Path t u π → List (List ℕ)
+    outers here          = []
+    outers (in-map p)    = map (0 ∷_) (outers p)
+    outers (in-scan p)   = map (0 ∷_) (outers p)
+    outers (in-cut p)    = map (0 ∷_) (outers p)
+    outers (in-lane p)   = map (0 ∷_) (outers p)
+    outers (in-take p)   = map (0 ∷_) (outers p)
+    outers (in-outer p)  = [] ∷ map (0 ∷_) (outers p)
+    outers (in-lanes {i = i} p) = map (suc i ∷_) (outersL p)
+    outers (in-source p) = map (0 ∷_) (outers p)
+    outers (in-body p)   = map (1 ∷_) (outers p)
+
+    outersL : ∀ {Γ A Δ B} {ls : List (Sub Γ A)} {u : Sub Δ B} {i π} → PathLanes ls u i π → List (List ℕ)
+    outersL (this-lane p) = outers p
+    outersL (next-lane p) = outersL p
+
+  -- EVERY SEEN FLATMAP'S DONE FLAG READS ITS OUTER GONE, but the flags
+  -- named, which read unset: an outer ends at its leaf, its flag set
+  -- only once the end has climbed to the flatMap.
+  Flagged : ∀ {Γ X} → List (List ℕ) → List ℕ → Bool → Sub Γ X → Set
+  Flagged ns π d o = (π ∈ ns → d ≡ false) × (¬ (π ∈ ns) → d ≡ is-nothing (part o))
+
+  DoneBy : Sub [] R → List (List ℕ) → Set₁
+  DoneBy t ns = ∀ {Γ X A op f d n qs pl π} {o : Sub Γ X} {ls : List (Sub Γ A)}
+              → (ψ : Path t (flatMapˢ op f d n qs pl o ls) π) → seen ψ ≡ true → Flagged ns π d o
 
   ------------------------------------------------------------------------
   -- The joiners' feed
@@ -634,7 +656,7 @@ module Strongly (R : Set) where
       lingers : Lingers tree
       told    : Untold (Conf.pos (Mach.conf m)) tree
       ended   : Ended tree
-      flags   : DoneBy tree
+      flags   : DoneBy tree []
 
   -- A RE-ENTRY CONFIGURATION AGAINST THE GHOST: carried, or the root's
   -- completion about to be shown where the ghost ends.

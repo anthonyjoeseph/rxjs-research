@@ -31,7 +31,7 @@ open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import denotation.MonotonicList.Events using (Events; Pos; Time; tick; root)
+open import denotation.MonotonicList.Events using (Events; Pos; Time; tick; root; last; ix)
 open import denotation.MonotonicList using (observe; Agree; agree-refl)
 import denotation.Unfold as U
 open import denotation.Denote using (⟦_⟧)
@@ -45,18 +45,20 @@ open import port.Unsub using (module Unsubbing)
 open import port.Ghost using (module Ghosting)
 open import port.Strong using (module Strongly)
 open import port.Sorted.Walk using (module SortingWalk)
+open import port.Climbs using (module Ascending)
 
 module Honesty (R : Set) where
   open Driver R using (Mach; mach; depthOf; Step; silent; value; complete; drained; step; trace; shown; reading; begin; Read; read; marks; log; ending; noted)
   open Pure R using (End; finished; dry; cutOff)
-  open Unsubbing R using (now; then)
+  open Unsubbing R using (_⇝_; now; then)
   open Ghosting R using (Has; Sent; sentHere; sentLater; Alike; _≋_; same-agree; residual; Reached; launchedʰ; silentʰ; valueʰ;
     Stands; cutʰ; finʰ; dryʰ; Mirror; Inner; Logged; Shows; silentˢ; valueˢ; completeˢ; drainedˢ; inner-launch; ≋-refl;
-    Steps; after; steps-after; Hopped; onward; lowered; weight)
+    Steps; after; steps-after; Hopped; onward; lowered; weight; loadOf)
   open Strongly R using (Strong; Carried; carried; closing; CtlAs; Meets; calmAs; noteAs; runAs; subAs; burstAs; popAs; Pops;
-    Kernels; Owned; Meaning; Books)
+    Kernels; Owned; Meaning; Books; Path; ofˢ; seen)
+  open Ascending R using (Aloft; soar)
   open SortingWalk R using (WellMach)
-  open Machine using (Ctx; top; plug; downs; ⟨_,_,_,_,_⟩; absorbed; rising; resuming; subscribing; nx; pend;
+  open Machine using (Ctx; top; plug; downs; dirs; closed; doneS; cp; _⊕_; ⟨_,_,_,_,_⟩; absorbed; rising; resuming; subscribing; nx; pend;
     ofS; cutS; takeS; connS; joinS; next; att; owedCp; owedCut; feeding; attBody; owed; go;
     res; ofR; attR; cpR; cutR; feedR; bodyR; srcR; endR; joinR; idle)
 
@@ -102,12 +104,40 @@ module Honesty (R : Set) where
     note-onward : ∀ {g g′ m s a p rs} → Carried g m → Mach.conf m ≡ ⟨ top , s , rising (nx a) , p , rs ⟩
                 → U.step g ≡ U.outˢ p a g′ → Mirror g′ (record m { conf = ⟨ top , s , absorbed , p , rs ⟩ })
 
-    -- An `of`'s next value, or its completion, climbs the observers
-    -- above it.
+    -- The `of` a job resumes is the witness's at the job's path.
+    of-path : ∀ {g m Γ A} {c : Ctx R Γ A} {xs i p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , ofS xs , resuming (next i) , p , rs ⟩
+            → Σ Pos λ p₀ → Σ ℕ λ j → Path (Carried.tree cr) (ofˢ {Γ} {A} p₀ j xs) (dirs c)
+
+    -- An `of` under a closed observer: done, the ghost alike.
+    emit-shut : ∀ {g m Γ A} {c : Ctx R Γ A} {xs i p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , ofS xs , resuming (next i) , p , rs ⟩
+              → closed c ≡ true → Hopped (carried cr) (record m { conf = ⟨ c , doneS , absorbed , p , rs ⟩ })
+
+    -- A spent `of` the ghost does not hold: its completion climbs
+    -- unseen.
+    last-void : ∀ {g m Γ A} {c : Ctx R Γ A} {i p rs p₀ j} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , ofS [] , resuming (next i) , p , rs ⟩
+              → closed c ≡ false → (ψ : Path (Carried.tree cr) (ofˢ {Γ} {A} p₀ j []) (dirs c)) → seen ψ ≡ false
+              → Hopped (carried cr) (record m { conf = ⟨ c , doneS , rising cp , p ⊕ [ last ] , rs ⟩ })
+
+    -- A spent `of` the ghost holds: its completion on its way up.
+    last-enter : ∀ {g m Γ A} {c : Ctx R Γ A} {i p rs p₀ j} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , ofS [] , resuming (next i) , p , rs ⟩
+               → closed c ≡ false → (ψ : Path (Carried.tree cr) (ofˢ {Γ} {A} p₀ j []) (dirs c)) → seen ψ ≡ true
+               → Σ Mach λ m₁ → record m { conf = ⟨ c , doneS , rising cp , p ⊕ [ last ] , rs ⟩ } ⇝ m₁ × Aloft g (loadOf (carried cr)) m₁
+
+    -- An open `of` the ghost does not hold: its value climbs unseen.
+    --
+    -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Lift/Order.agda
+    emit-void : ∀ {g m Γ A} {c : Ctx R Γ A} {x xs i p rs p₀ j} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , ofS (x ∷ xs) , resuming (next i) , p , rs ⟩
+              → closed c ≡ false → (ψ : Path (Carried.tree cr) (ofˢ {Γ} {A} p₀ j (x ∷ xs)) (dirs c)) → seen ψ ≡ false
+              → Hopped (carried cr) (record m { conf = ⟨ c , ofS xs , rising (nx x) , p ⊕ [ ix i ] , (dirs c , next (suc i) , p) ∷ rs ⟩ })
+
+    -- An open `of` the ghost holds: its value on its way up, the ghost's
+    -- step that value lifted.
     --
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Climbs.agda
-    emit-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {xs i p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , ofS xs , resuming (next i) , p , rs ⟩
-                → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+    emit-open : ∀ {g m Γ A} {c : Ctx R Γ A} {x xs i p rs p₀ j} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , ofS (x ∷ xs) , resuming (next i) , p , rs ⟩
+              → closed c ≡ false → (ψ : Path (Carried.tree cr) (ofˢ {Γ} {A} p₀ j (x ∷ xs)) (dirs c)) → seen ψ ≡ true
+              → Σ Mach λ m₁ → record m { conf = ⟨ c , ofS xs , rising (nx x) , p ⊕ [ ix i ] , (dirs c , next (suc i) , p) ∷ rs ⟩ } ⇝ m₁
+                × Aloft g (loadOf (carried cr)) m₁
 
     -- A subscription's cut handed its unsubscribe, which it stashes, or
     -- throws if already cut: the ghost alike, a job fewer.
@@ -324,6 +354,40 @@ module Honesty (R : Set) where
   ... | runAs ()     | _ | _
   ... | subAs ()     | _ | _
   ... | burstAs () _ _ | _ | _
+
+  private
+    shut-step : ∀ {Γ A} {c : Ctx R Γ A} {xs i p rs} → closed c ≡ true
+              → Machine.resumeR c (ofR xs i) p rs ≡ Machine.ok ⟨ c , doneS , absorbed , p , rs ⟩
+    shut-step e rewrite e = refl
+
+    last-step : ∀ {Γ A} {c : Ctx R Γ A} {i p rs} → closed c ≡ false
+              → Machine.resumeR c (ofR [] i) p rs ≡ Machine.ok ⟨ c , doneS , rising cp , p ⊕ [ last ] , rs ⟩
+    last-step e rewrite e = refl
+
+    emit-step : ∀ {Γ A} {c : Ctx R Γ A} {x xs i p rs} → closed c ≡ false
+              → Machine.resumeR c (ofR (x ∷ xs) i) p rs ≡ Machine.ok ⟨ c , ofS xs , rising (nx x) , p ⊕ [ ix i ] , (dirs c , next (suc i) , p) ∷ rs ⟩
+    emit-step e rewrite e = refl
+
+  -- A spent `of` the ghost holds: its completion delivered at its end.
+  emit-last : ∀ {g m Γ A} {c : Ctx R Γ A} {i p rs p₀ j} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , ofS [] , resuming (next i) , p , rs ⟩
+            → closed c ≡ false → (ψ : Path (Carried.tree cr) (ofˢ {Γ} {A} p₀ j []) (dirs c)) → seen ψ ≡ true
+            → Hopped (carried cr) (record m { conf = ⟨ c , doneS , rising cp , p ⊕ [ last ] , rs ⟩ })
+  emit-last cr e cl ψ sn = soar (carried cr) (last-enter cr e cl ψ sn)
+
+  -- An `of`'s next value climbs the observers above it; spent, its
+  -- completion; under a closed observer, nothing.
+  emit-onward : ∀ {g m Γ A} {c : Ctx R Γ A} {xs i p rs} (cr : Carried g m) → Mach.conf m ≡ ⟨ c , ofS xs , resuming (next i) , p , rs ⟩
+              → Σ Mach λ m′ → step m ≡ silent m′ × Hopped (carried cr) m′
+  emit-onward {m = mach _ clk tms ts} {c = c} {xs} cr refl with closed c in cl
+  ... | true = _ , cong (Driver.took R _) (shut-step cl) , emit-shut cr refl cl
+  emit-onward {m = mach _ clk tms ts} {c = c} {[]} cr refl | false with of-path cr refl
+  ... | _ , _ , ψ with seen ψ in sn
+  ...   | false = _ , cong (Driver.took R _) (last-step cl) , last-void cr refl cl ψ sn
+  ...   | true  = _ , cong (Driver.took R _) (last-step cl) , emit-last cr refl cl ψ sn
+  emit-onward {m = mach _ clk tms ts} {c = c} {x ∷ xs} cr refl | false with of-path cr refl
+  ... | _ , _ , ψ with seen ψ in sn
+  ...   | false = _ , cong (Driver.took R _) (emit-step cl) , emit-void cr refl cl ψ sn
+  ...   | true  = _ , cong (Driver.took R _) (emit-step cl) , soar (carried cr) (emit-open cr refl cl ψ sn)
 
   -- A job resumed runs silently on to a re-entry configuration the
   -- configuration gains: by the job the node owes (`res`).
