@@ -125,7 +125,7 @@ module Ascending (R : Set) where
 
   call-root : ∀ {g m} (st : Strong g m) {ℓ m₁} {T : Sub [] R} {e : Ev R} → Calling g ℓ m₁ {T = T} here e → Hopped st m₁
   call-root {g} st {m₁ = mach k clk tms ts} {T} {nx y} cl
-    with Calling.c cl | top-of (Calling.at cl) | Calling.ctl cl | Calling.lifted cl
+    with Calling.c cl | top-of {Calling.c cl} (Calling.at cl) | Calling.ctl cl | Calling.lifted cl
   ... | .top | refl | refl | c′ , pv , _ , lifts-here , sg =
     g , _ , now
     , carried (record
@@ -136,7 +136,7 @@ module Ascending (R : Set) where
         ; ended = Calling.ended cl ; flags = Calling.flags cl })
     , showing (agrees (λ n → agree-refl n _)) (λ ())
   call-root {g} st {m₁ = mach k clk tms ts} {T} {cp} cl
-    with Calling.c cl | top-of (Calling.at cl) | Calling.ctl cl | Calling.lifted cl
+    with Calling.c cl | top-of {Calling.c cl} (Calling.at cl) | Calling.ctl cl | Calling.lifted cl
   ... | .top | refl | refl | _ , _ , lifts-here , sg , _ =
     g , _ , now , closing refl sg (Calling.sane cl) (Calling.placed cl) , showing (agrees (λ n → agree-refl n _)) (λ ())
 
