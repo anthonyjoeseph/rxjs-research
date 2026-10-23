@@ -35,6 +35,7 @@ open import operation.PureObservable using (PureObs; Tape; tape; over; module Ma
 open import port.Sane using (Sane; sane-subscribe)
 open import port.Leaves using (Leaves; Twin; Restful)
 open import port.Told using (untold; Tells)
+open import port.Opens using (opens-subscribe; heads-open)
 open import port.Placed.Order using (Placed)
 open import port.Sorted using (_≤ᵖ_)
 open import port.Sorted.Walk using (module SortingWalk)
@@ -640,9 +641,10 @@ module Strongly (R : Set) where
     -- OLD BODY: 9ec3e6c62e05857feabffdd65a05929de347e532 agda-impl/adequacy/Placed.agda
     placed-subscribe : (o : PureObs [] R) → Placed (U.subscribe o root) []
 
-    -- Each invariant, of the root pending at the launch.
-    -- A program subscribed at the root heads no earlier than the root.
-    heads-subscribe : (o : PureObs [] R) → Heads root (U.subscribe o root)
+  -- A program subscribed at the root heads no earlier than it: its
+  -- first event under the root, or a timer's tick past it.
+  heads-begin : (o : PureObs [] R) → Heads root (U.subscribe o root)
+  heads-begin o e = heads-open _ (opens-subscribe o root) e
 
   -- The launch is a re-entry configuration against the program
   -- subscribed at the root.
@@ -663,7 +665,7 @@ module Strongly (R : Set) where
     ; queue   = record { timed = [] ; joined = λ () ; ordered = [] ; ahead = [] }
     ; books   = record { clocked = refl ; ticked = [] ; turned = [] }
     ; sorted  = root , begin-well o
-    ; behind  = record { parts = λ { here _ refl → heads-subscribe o } ; pools = λ () ; rests = λ () }
+    ; behind  = record { parts = λ { here _ refl → heads-begin o } ; pools = λ () ; rests = λ () }
     ; lingers = record { pools = λ () ; rests = λ () }
     ; told    = λ ()
     ; ended   = λ ()
