@@ -388,24 +388,26 @@ takeT i q free h o              = h , o
 takeT i q w    h o              = h , still
 
 -- The outer's value is a skip just past it; its end ends the flatMap
--- only with nothing running or waiting.
+-- only with nothing running or waiting; its skip stays where it is.
 outerT : ∀ {A B : Set} → ℕ → List A → Key → Out A → Key × Out B
 outerT n q h (shows cp) = h , (if (n ≡ᵇ 0) ∧ null q then shows cp else still)
-outerT n q h o          = shift h , still
+outerT n q h (shows (nx a)) = shift h , still
+outerT n q h still          = h , still
 
 -- A lane's end: a skip just past it when a value waits, else the
 -- flatMap's end once nothing else runs.
-laneT : ∀ {A B : Set} → Bool → Bool → ℕ → List A → Key → Out B → Key × Out B
-laneT false d n q       h o              = h , still
-laneT true  d n []      h (shows cp)     = h , (if d ∧ (pred n ≡ᵇ 0) then shows cp else still)
-laneT true  d n (_ ∷ _) h (shows cp)     = shift h , still
-laneT true  d n q       h o              = h , o
+laneT : ∀ {A B : Set} → Bool → ℕ → List A → Key → Out B → Key × Out B
+laneT d n []      h (shows cp) = h , (if d ∧ (pred n ≡ᵇ 0) then shows cp else still)
+laneT d n (_ ∷ _) h (shows cp) = shift h , still
+laneT d n q       h o          = h , o
 
--- The outer only strictly before every lane, by its own event.
-raceT : ∀ {R A B} → ℕ → List A → Maybe (Cand R A) → Maybe (Cand R B) → Maybe (Cand R B)
-raceT n q nothing            l                    = l
-raceT n q (just (f , h , o)) nothing              = just (f , outerT n q h o)
-raceT n q (just (f , h , o)) (just (g , k , o′))  = if h <ᴷ k then just (f , outerT n q h o) else just (g , k , o′)
+-- The outer only strictly before the earliest lane, each by its own
+-- head; the winner's event then read as the flatMap's.
+raceT : ∀ {R A B} → Bool → ℕ → List A → Maybe (Cand R A) → Maybe (Cand R B) → Maybe (Cand R B)
+raceT d n q nothing            nothing              = nothing
+raceT d n q nothing            (just (g , k , o′))  = just (g , laneT d n q k o′)
+raceT d n q (just (f , h , o)) nothing              = just (f , outerT n q h o)
+raceT d n q (just (f , h , o)) (just (g , k , o′))  = if h <ᴷ k then just (f , outerT n q h o) else just (g , laneT d n q k o′)
 
 -- The source only strictly before the body, a skip just past its event.
 sourceT : ∀ {R A B} → Maybe (Cand R A) → Maybe (Cand R B) → Maybe (Cand R B)
@@ -425,14 +427,14 @@ mutual
   kids c (cutS l a s)            = retag (cutT l) (seek (inCut l a c) s)
   kids c (lnS b s)               = seek (inLn b c) s
   kids c (takeS i q w s)         = retag (takeT i q w) (seek (inTake i q w c) s)
-  kids c (flatS op f d n q o ls) = raceT n q (seek (inOuter op f d n q ls c) o) (lanes c op f d n q o [] ls)
+  kids c (flatS op f d n q o ls) = raceT d n q (seek (inOuter op f d n q ls c) o) (lanes c op f d n q o [] ls)
   kids c (connS k o b)           = sourceT (seek (inSrc k b c) o) (seek (inBody k o c) b)
   kids c _                       = nothing
 
   lanes : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → List (St Γ B) → Maybe (Cand R B)
   lanes c op f d n q o pre []         = nothing
   lanes c op f d n q o pre (s ∷ post) =
-    first (retag (laneT (alive s) d n q) (seek (inLanes op f d n q o pre post c) s)) (lanes c op f d n q o (pre ++ [ s ]) post)
+    first (retag (cutT (alive s)) (seek (inLanes op f d n q o pre post c) s)) (lanes c op f d n q o (pre ++ [ s ]) post)
 
 search : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Maybe (Found R)
 search c s = mapᴹ proj₁ (seek c s)
