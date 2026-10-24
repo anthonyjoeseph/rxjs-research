@@ -44,7 +44,7 @@ help:
 	@echo "  chain         the denotation's approximants form a chain (ARGS=\"FROM COUNT\")"
 	@echo "  placing       the machine's trace is placed against the root's events (ARGS=\"FROM COUNT\", default 0 300, max 500 without SWEEP=1)"
 	@echo "  stepping      the stepper shows what its configuration means, skips included (ARGS=\"FROM COUNT\", default 0 300)"
-	@echo "  kept-depth    every silent engine step drops its meaning's first skip or means the same (ARGS=\"FROM COUNT\", default 0 100)"
+	@echo "  kept-depth    every silent engine step drops leading skips of its meaning or means the same (ARGS=\"FROM COUNT\", default 0 100)"
 	@echo "  postulates    every postulate in $(SRC) by name — the work ledger"
 	@echo "  find          search the declared TYPE of every statement:  make find Q='⊑ lub'"
 	@echo "  find-prose    search comment blocks and docs for a finding:  make find-prose Q='dead route'"
@@ -151,7 +151,7 @@ stepping: oracle-build
 	  if echo "$$out" | grep -q '^stepping: FAIL '; then echo "stepping: RED"; exit 1; fi; \
 	  echo "stepping: GREEN"
 
-# Every silent engine step drops its meaning's first skip or means the
+# Every silent engine step drops leading skips of its meaning or means the
 # same, on ARGS="FROM COUNT" seeds (default "0 100"); each line carries the
 # seed's longest run of steps meaning the same.
 KEPT_DEPTH_ARGS = $(or $(ARGS),0 100)

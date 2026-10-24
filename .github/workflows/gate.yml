@@ -179,8 +179,8 @@ jobs:
       - name: make placing
         run: make placing ARGS="0 100"
 
-  # The kept depth: every silent engine step drops its meaning's first
-  # skip or means the same.  Its own job, so a red run never starves the
+  # The kept depth: every silent engine step drops leading skips of its
+  # meaning or means the same.  Its own job, so a red run never starves the
   # oracle.
   kept-depth:
     runs-on: ubuntu-latest

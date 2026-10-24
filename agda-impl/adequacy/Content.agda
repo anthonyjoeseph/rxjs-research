@@ -25,7 +25,7 @@ import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Nat using (ℕ; zero; suc; _<_; _<ᵇ_)
-open import Data.Nat.Properties using (suc-injective; ≤-refl)
+open import Data.Nat.Properties using (suc-injective; ≤-refl; <-trans)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (tt)
@@ -207,19 +207,25 @@ module Honesty (R : Set) where
     same′ = out-cancel above (value-past (Agrees.inv ag) e)
               (≅-trans (≅-sym (led-same sn pl ld)) (≅-trans (Agrees.same ag) k))
 
-  -- A step dropping the first skip of what its configuration means.
-  data Drop (m m′ : Conf R) : Set where
-    drop : ∀ {k r} → (∀ n → Agree n (M m) (skip k r)) → (∀ n → Agree n (force r) (M m′)) → Drop m m′
+  -- A run past one or more of its leading skips.
+  data Drops (e e′ : Events R) : Set where
+    drop  : ∀ {k r} → (∀ n → Agree n e (skip k r)) → (∀ n → Agree n (force r) e′) → Drops e e′
+    drops : ∀ {k r} → (∀ n → Agree n e (skip k r)) → Drops (force r) e′ → Drops e e′
+
+  -- A step dropping leading skips of what its configuration means.
+  Drop : Conf R → Conf R → Set
+  Drop m m′ = Drops (M m) (M m′)
 
   -- Two configurations meaning the same, at every depth.
   Same : Conf R → Conf R → Set
   Same m m′ = ∀ n → Agree n (M m) (M m′)
 
   postulate
-    -- A SILENT STEP DROPS A SKIP OR KEEPS ITS MEANING: a stall, a frame's
-    -- close, a defer begun or a value absorbed drops the first skip of
-    -- what the configuration means; every other silent step means the
-    -- same.
+    -- A SILENT STEP DROPS SKIPS OR KEEPS ITS MEANING: a stall, a frame's
+    -- close, a defer begun or a value absorbed drops one or more leading
+    -- skips of what the configuration means (a defer begun drops every
+    -- skip its subscription's subtree leads with); every other silent
+    -- step means the same.
     silent-exact : ∀ {m t m′} → Inv m → step m ≡ silent t m′ → Drop m m′ ⊎ Same m m′
 
     -- A SILENT STEP KEEPING ITS MEANING IS WORK DONE in the
@@ -231,11 +237,14 @@ module Honesty (R : Set) where
     --   measure bounds; only an item its meaning reaches bounds it.
     silent-work : ∀ {m t m′} → Inv m → step m ≡ silent t m′ → Same m m′ → work m′ ≺ work m
 
-  -- Past a dropped skip every item lies shallower.
-  drop-suc : ∀ {m m′ k} → Drop m m′ → (c : Ahead (M m) (suc k)) → Σ (Ahead (M m′) (suc k)) λ c₀ → depth c₀ < depth c
+  -- Past dropped skips every item lies shallower.
+  drop-suc : ∀ {e e′ k} → Drops e e′ → (c : Ahead e (suc k)) → Σ (Ahead e′ (suc k)) λ c₀ → depth c₀ < depth c
   drop-suc (drop ag ag′) c with ahead-agree ag c
   ... | skipᵃ c′ , de with ahead-agree ag′ c′
   ...   | c₀ , de′ = c₀ , subst (_< _) (sym de′) (subst (depth c′ <_) de ≤-refl)
+  drop-suc (drops ag d) c with ahead-agree ag c
+  ... | skipᵃ c′ , de with drop-suc d c′
+  ...   | c₀ , lt = c₀ , <-trans lt (subst (depth c′ <_) de ≤-refl)
 
   -- A silent step brings every item the configuration's meaning reaches
   -- nearer: shallower, or as deep with less work left.

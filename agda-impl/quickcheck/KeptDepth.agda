@@ -1,13 +1,13 @@
 {-# OPTIONS --guardedness #-}
 
--- THE KEPT DEPTH, TESTED: every silent step of the engine drops the first
--- skip of what its configuration means (`adequacy.Engine.Meaning.M`), or
+-- THE KEPT DEPTH, TESTED: every silent step of the engine drops leading
+-- skips of what its configuration means (`adequacy.Engine.Meaning.M`), or
 -- means the same, event for event, skips and positions included
 -- (`adequacy.Content.silent-exact`).  Also the longest run of silent steps
 -- meaning the same, which is what `adequacy.Ghost.work` has to bound.
 module quickcheck.KeptDepth where
 
-open import Data.Bool using (if_then_else_)
+open import Data.Bool using (Bool; false; _∨_; if_then_else_)
 open import Data.List using (List; []; _∷_; upTo) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_)
@@ -58,13 +58,16 @@ private
   depth : ℕ
   depth = 60
 
-  -- A silent step from `m` to `m′`: 2 dropped the first skip, 1 meant the
+  -- Whether `e′` is `e` past one or more of its first `k` leading skips.
+  dropped : ℕ → Events ℕ → Events ℕ → Bool
+  dropped zero    e          e′ = false
+  dropped (suc k) (skip p r) e′ = exactᵇ depth (Events∞.force r) e′ ∨ dropped k (Events∞.force r) e′
+  dropped (suc k) _          e′ = false
+
+  -- A silent step from `m` to `m′`: 2 dropped leading skips, 1 meant the
   -- same, 0 neither.
   kind : Conf ℕ → Conf ℕ → ℕ
-  kind m m′ = if exactᵇ depth (M m) (M m′) then 1 else dropped (M m)
-    where dropped : Events ℕ → ℕ
-          dropped (skip p r) = if exactᵇ depth (Events∞.force r) (M m′) then 2 else 0
-          dropped _          = 0
+  kind m m′ = if exactᵇ depth (M m) (M m′) then 1 else (if dropped 64 (M m) (M m′) then 2 else 0)
 
   -- Whether every silent step keeps its meaning so, and the longest run
   -- meaning the same.

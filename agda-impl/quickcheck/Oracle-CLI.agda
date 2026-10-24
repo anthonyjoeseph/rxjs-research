@@ -23,8 +23,8 @@
 --   Oracle-CLI stepping FROM COUNT the seeds whose stepper parts from the
 --                                meaning, skips included (`quickcheck.Stepping`)
 --   Oracle-CLI kept-depth FROM COUNT each seed's engine run: whether every
---                                silent step drops its meaning's first skip
---                                or means the same (`quickcheck.KeptDepth`)
+--                                silent step drops leading skips of its
+--                                meaning or means the same (`quickcheck.KeptDepth`)
 --   Oracle-CLI hand              placing over `quickcheck.Adversary`
 --   Oracle-CLI why-hand N        its Nth program and the checks it fails
 --   Oracle-CLI spin              progress over `quickcheck.Spin`'s programs
