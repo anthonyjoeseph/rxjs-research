@@ -20,8 +20,11 @@
 --   untold    every joiner still live and untold sits under a connect
 --             whose source is not closed: what would make `live` follow
 --             from `beyond`
+--   kept      what the configuration means is what its step shows, then
+--             what the next means (`spike.MarkedKept.Kept`), on the
+--             events each shows among its first `shownDepth`, skips erased
 --
--- `beyond`, `past`, `live` and `first` are claims; the rest are probes of
+-- `beyond`, `past`, `live`, `first` and `kept` are claims; the rest are probes of
 -- how far the order reaches, and fail no run.  Each seed reports, per
 -- check, the first configuration failing it: the mode and position, the
 -- focus and its frames, and the keys at fault.
@@ -31,13 +34,13 @@ open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_
 open import Data.List using (List; []; _∷_; _++_; filterᵇ; upTo; take) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _≡ᵇ_)
 open import Data.Nat.Show renaming (show to showℕ)
 open import Data.Product using (_×_; _,_)
 open import Data.String using (String; intersperse) renaming (_++_ to _++ˢ_)
 
 open import Tree using (Obs)
-open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Label; ix; sub; last; Tail; Timeline; idle; pin; end; _<ᵖ_)
+open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Label; ix; sub; last; Tail; Timeline; idle; pin; out; skip; end; hush; _<ᵖ_)
 open import denotation.MonotonicList using (head; headᴼ)
 open import denotation.Unfold using (NEnv; stateᴺ; states; outerᴺ)
 open import operation.Key using (Key; at; after; _<ᴷ_)
@@ -47,7 +50,7 @@ open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; 
   Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; nx; cp;
   Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM;
   own; plug; closed; alive; load; CS; module CS)
-open import spike.MarkedGhost using (gh; envAt; lane; outerG; lanesL; outerT; poolRuns; srcRun; srcG; endOf)
+open import spike.MarkedGhost using (gh; envAt; lane; outerG; lanesL; outerT; poolRuns; srcRun; srcG; endOf; M)
 open import quickcheck.Code using (Prog; toObs; timeline)
 open import quickcheck.Ty using (natᵗ)
 open import quickcheck.Quickcheck using (program)
@@ -306,11 +309,66 @@ private
   ... | complete p     = check x
   ... | drained        = check x
 
+  -- What a run shows among its first `n` events, skips erased, and
+  -- whether it was read to its finish.
+  shown : ℕ → Events ℕ → List (Pos × Maybe ℕ) × Bool
+  shown zero    _           = [] , false
+  shown (suc n) (out p a r) with shown n (Events∞.force r)
+  ... | xs , f = (p , just a) ∷ xs , f
+  shown (suc n) (skip p r)  = shown n (Events∞.force r)
+  shown (suc n) (end p)     = (p , nothing) ∷ [] , true
+  shown (suc n) hush        = [] , true
+
+  sameEv : Pos × Maybe ℕ → Pos × Maybe ℕ → Bool
+  sameEv (p , just a)  (q , just b)  = not (p <ᵖ q) ∧ not (q <ᵖ p) ∧ (a ≡ᵇ b)
+  sameEv (p , nothing) (q , nothing) = not (p <ᵖ q) ∧ not (q <ᵖ p)
+  sameEv _             _             = false
+
+  -- Alike as far as both were read; one read to its finish shows nothing more.
+  alikeTo : List (Pos × Maybe ℕ) → Bool → List (Pos × Maybe ℕ) → Bool → Bool
+  alikeTo []       f []       g = true
+  alikeTo []       f (_ ∷ _)  g = not f
+  alikeTo (_ ∷ _)  f []       g = not g
+  alikeTo (x ∷ xs) f (y ∷ ys) g = sameEv x y ∧ alikeTo xs f ys g
+
+  shownDepth : ℕ
+  shownDepth = 60
+
+  keptBy : Conf ℕ → Events ℕ → Maybe String
+  keptBy x e with shown shownDepth (M x) | shown shownDepth e
+  ... | xs , f | ys , g = if alikeTo xs f ys g then nothing else blame x "the step shows other than the configuration means"
+
+  now′ : Events ℕ → Events∞ ℕ
+  now′ e .Events∞.force = e
+  now′ e .Events∞.cut   = idle
+
+  keptAt : Conf ℕ → Maybe String
+  keptAt x with step x
+  ... | silent t x′    = keptBy x (M x′)
+  ... | value t p a x′ = keptBy x (out p a (now′ (M x′)))
+  ... | complete p     = keptBy x (end p)
+  ... | drained        = keptBy x hush
+
+  -- The first configuration whose step is not kept.
+  walkK : ℕ → Conf ℕ → Maybe String
+  walkK zero    x = keptAt x
+  walkK (suc n) x with keptAt x | step x
+  ... | just w  | _              = just w
+  ... | nothing | silent t x′    = walkK n x′
+  ... | nothing | value t p a x′ = walkK n x′
+  ... | nothing | _              = nothing
+
 budget : ℕ
 budget = 4000
 
 order : Prog natᵗ → Verdict
 order p = walk budget (load (toObs timeline 3 p []ᴬ []ᴬ []ᴬ))
+
+keptBudget : ℕ
+keptBudget = 600
+
+kept : Prog natᵗ → Maybe String
+kept p = walkK keptBudget (load (toObs timeline 3 p []ᴬ []ᴬ []ᴬ))
 
 -- One line per seed and failing check, claims as FAIL, probes as INFO.
 orderReport : ℕ → ℕ → List String
@@ -325,6 +383,7 @@ orderReport f c = go (mapL (f +_) (upTo c))
     ... | verdict a b l fi st hi di ap un =
       line "FAIL" "beyond" s a ++ line "FAIL" "past" s b ++ line "FAIL" "live" s l ++ line "FAIL" "first" s fi
         ++ line "INFO" "strict" s st ++ line "INFO" "hidden" s hi ++ line "INFO" "distinct" s di ++ line "INFO" "apart" s ap ++ line "INFO" "untold" s un
+        ++ line "FAIL" "kept" s (kept (program s))
 
     go : List ℕ → List String
     go []       = []
