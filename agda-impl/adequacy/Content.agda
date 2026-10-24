@@ -229,13 +229,19 @@ module Honesty (R : Set) where
     silent-exact : ∀ {m t m′} → Inv m → step m ≡ silent t m′ → Drop m m′ ⊎ Same m m′
 
     -- A SILENT STEP KEEPING ITS MEANING IS WORK DONE in the
-    -- configuration's control.
+    -- configuration's control, while that meaning reaches an item.
+    --
+    -- Without an item there is no bound: a cold whose frames are all empty,
+    -- one per tick forever, means skips only, so each close keeps its
+    -- meaning exactly at every depth while what it owes stays one stop.
+    -- With an item ahead, a step dropping a skip moves the item shallower
+    -- and so is no such step.
     --
     -- DEAD ROUTE: a measure on the configuration alone, lowered while the
     --   ghost's next step is no skip.  Agreement as a set lets a ghost
     --   showing nothing run a cold stalling forever, whose silent run no
     --   measure bounds; only an item its meaning reaches bounds it.
-    silent-work : ∀ {m t m′} → Inv m → step m ≡ silent t m′ → Same m m′ → work m′ ≺ work m
+    silent-work : ∀ {m t m′ k} → Inv m → step m ≡ silent t m′ → Same m m′ → Ahead (M m) (suc k) → work m′ ≺ work m
 
   -- Past dropped skips every item lies shallower.
   drop-suc : ∀ {e e′ k} → Drops e e′ → (c : Ahead e (suc k)) → Σ (Ahead e′ (suc k)) λ c₀ → depth c₀ < depth c
@@ -251,7 +257,7 @@ module Honesty (R : Set) where
   silent-lowers : ∀ {m t m′} → Inv m → step m ≡ silent t m′ → Lowers m m′
   silent-lowers iv e c with silent-exact iv e
   ... | inj₁ d  = proj₁ (drop-suc d c) , inj₁ (proj₂ (drop-suc d c))
-  ... | inj₂ sm = proj₁ (ahead-agree sm c) , inj₂ (proj₂ (ahead-agree sm c) , silent-work iv e sm)
+  ... | inj₂ sm = proj₁ (ahead-agree sm c) , inj₂ (proj₂ (ahead-agree sm c) , silent-work iv e sm c)
 
   -- A silent step keeps the configuration running its ghost.
   agrees-silent : ∀ {g m t m′} → Agrees g m → step m ≡ silent t m′ → Agrees g m′
