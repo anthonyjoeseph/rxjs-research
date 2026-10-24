@@ -1,7 +1,7 @@
 {-# OPTIONS --guardedness #-}
 
 -- SPIKE: EVERY STEP KEEPS THE INVARIANT (`inv-next`): its fold part
--- (`Base`, kept by `base-next`) and its order part (`spike.MarkedFirst.Ord`,
+-- (`Base`, kept by `base-next`) and its order part (`spike.MarkedPick.Order`,
 -- kept by `ord-next`).  The fold part is dispatched as the
 -- step is: by mode, then by the one frame a rise passes, the one former
 -- a subscribe begins, or the one node a mark runs.  The invariant is a
@@ -24,7 +24,9 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList.Events using (Timeline; emit; stall; close)
-open import spike.MarkedFirst using (Ord; Past; fresh)
+open import operation.Key using (at)
+open import spike.MarkedHead using (Frag)
+open import spike.MarkedPick using (Order; order; module Order; whole; Lead; Clear; Won; won-clear; search-won)
 open import operation.MarkedPure using (Tape; play; ending; over; module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; closed; closedUp;
@@ -535,11 +537,11 @@ module _ {R : Set} where
     constructor _&_
     field
       base : Base k
-      ord  : Ord k
+      ord  : Order k
 
   NextOrd : Step → Set
-  NextOrd (silent t k)    = Ord k
-  NextOrd (value t p a k) = Ord k
+  NextOrd (silent t k)    = Order k
+  NextOrd (value t p a k) = Order k
   NextOrd (complete p)    = ⊤
   NextOrd drained         = ⊤
 
@@ -549,13 +551,70 @@ module _ {R : Set} where
   NextInv (complete p)    = ⊤
   NextInv drained         = ⊤
 
+  NextShape NextLead : Step → Set
+  NextShape (silent t k)    = Frag (whole k)
+  NextShape (value t p a k) = Frag (whole k)
+  NextShape (complete p)    = ⊤
+  NextShape drained         = ⊤
+  NextLead (silent t k)    = Lead k
+  NextLead (value t p a k) = Lead k
+  NextLead (complete p)    = ⊤
+  NextLead drained         = ⊤
+
   postulate
-    -- EVERY STEP KEEPS THE ORDER.  False over this `Inv`: a node's next
-    -- key need not be under its current one, and nothing here says no
-    -- other node holds a key where it lands.  What does is provenance,
-    -- a zone per node, pairwise disjoint.  Refuted, with and without
-    -- `apart`, in `spike.MarkedApart`.
-    ord-next : ∀ k → Base k → Ord k → NextOrd (step k)
+    -- THE SHAPE: a step keeps the whole tree in the fragment.
+    shape-next : ∀ k → Base k → Frag (whole k) → NextShape (step k)
+    -- A rise carries its lead: each frame it leaves was clear at its position.
+    rise-lead : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Base ⟨ c , s , rising e , p ⟩ → Clear p c → NextLead (took (rise c s e p))
+    -- A mark run rises, if at all, at its own key.
+    run-lead : ∀ (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} p → search top t ≡ just (found (Γ , A , c , s) m key)
+             → (∀ q → at q ≡ key → Clear q c) → NextLead (took (run c s m p))
+
+  -- A subscribe rises nothing.
+  sub-lead : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → NextLead (step ⟨ c , s , subscribing , p ⟩)
+  sub-lead c (pend (cold x))          p = tt
+  sub-lead c (pend empty)             p = tt
+  sub-lead c (pend (of xs))           p = tt
+  sub-lead c (pend (map f o))         p = tt
+  sub-lead c (pend (scan f z o))      p = tt
+  sub-lead c (pend (takeWhile i q o)) p = tt
+  sub-lead c (pend (flatMap op f o))  p = tt
+  sub-lead c (pend (connect o b))     p = tt
+  sub-lead c (pend (connected x))     p with closedUp c x
+  ... | true  = tt
+  ... | false = tt
+  sub-lead c (pend (defer l))         p = tt
+  sub-lead c (coldS b l)              p = tt
+  sub-lead c (ofS i q xs)             p = tt
+  sub-lead c doneS                    p = tt
+  sub-lead c (mapS f s)               p = tt
+  sub-lead c (scanS f z s)            p = tt
+  sub-lead c (cutS l a s)             p = tt
+  sub-lead c (lnS b s)                p = tt
+  sub-lead c (takeS i q w s)          p = tt
+  sub-lead c (flatS op f d n q o ls)  p = tt
+  sub-lead c (connS k o b)            p = tt
+  sub-lead c (joinS j g x ib)         p = tt
+
+  -- THE PICK: the run of the least mark leads every frame above it.
+  lead-next : ∀ k → Base k → Order k → NextLead (step k)
+  lead-next ⟨ c , s , rising e , p ⟩    b o = rise-lead c s e p b (Order.lead o)
+  lead-next ⟨ c , s , subscribing , p ⟩ b o = sub-lead c s p
+  lead-next ⟨ c , s , absorbed , p ⟩    b o with search top (plug c s) in e
+  ... | nothing = tt
+  ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
+  ...   | pl , _ = run-lead (plug c s) p e
+                     (λ q eq → won-clear q c′ s′ (subst (λ k → Won k c′ s′) (sym eq) (search-won (plug c s) e)) (subst Frag (sym pl) (Order.shape o)))
+
+  joined : ∀ x → NextShape x → NextLead x → NextOrd x
+  joined (silent t k)    f l = order f l
+  joined (value t p a k) f l = order f l
+  joined (complete p)    f l = tt
+  joined drained         f l = tt
+
+  -- EVERY STEP KEEPS THE ORDER.
+  ord-next : ∀ k → Base k → Order k → NextOrd (step k)
+  ord-next k b o = joined (step k) (shape-next k b (Order.shape o)) (lead-next k b o)
 
   both : ∀ x → NextBase x → NextOrd x → NextInv x
   both (silent t k)    b o = b & o
@@ -567,9 +626,9 @@ module _ {R : Set} where
   inv-next k (b & o) = both (step k) (base-next k b) (ord-next k b o)
 
   inv-load : (o : Obs Timeline [] R) → Inv (Machine.load o)
-  inv-load o = base-load o & fresh Data.List.Relation.Unary.All.[] tt
+  inv-load o = base-load o & order tt tt
 
   -- A settled node anywhere in a tree the invariant holds of, absorbed at
   -- the same position: the invariant at it.
-  inv-at : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Unpended s → Wf (plug c s) → Past p (plug c s) → Inv ⟨ c , s , absorbed , p ⟩
-  inv-at c s p u w o = base-at c s p u w & o
+  inv-at : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Unpended s → Wf (plug c s) → Frag (plug c s) → Inv ⟨ c , s , absorbed , p ⟩
+  inv-at c s p u w f = base-at c s p u w & order f tt

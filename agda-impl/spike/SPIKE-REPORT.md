@@ -310,10 +310,64 @@ hushes, so `NoConn` needs no cold case.
   about subscribing, not about H; it is the same kind of fact as K2's
   `sub-head`.
 
+## Findings: the pick from H (`spike.MarkedPick`)
+
+`spike.MarkedInv` and `spike.MarkedKept` now carry `Order` in place of
+the global key order `Ord` (refuted as non-inductive by
+`spike.MarkedApart`). `Order` has two fields: `shape`, which is `Frag`
+of the whole tree, and `lead`, which is `Clear` at a rising
+configuration. `Clear` holds, at each flatMap frame a rising lane sits
+in, the `First` facts `lanes-first` consumes, read off the meaning.
+Both modules typecheck: `lanes-first` is now one projection.
+
+**The grid is gone from the pick half.** `won-clear` builds `Clear` at
+the step that finds a node. It walks up the found node's frames and,
+at each flatMap, reads:
+
+- the engine's race there (`search-won`: the found node's lane beat each
+  older lane strictly and each newer lane and the outer weakly);
+- `head-agrees` at each sibling, turning candidate order into
+  step-head order (`after-step`, `not-before-step`, `race-steps`);
+- `sides-link`, which turns step heads into the meaning's heads and
+  tails.
+
+No comparison between two nodes not related by a frame appears: each
+sibling is compared with the winner only through the one race they
+both entered.
+
+**Leaves, by kind.**
+
+- *Shape only:* `frag-flat` (a subtree of a `Frag` tree is `Frag`),
+  `shape-next` (`Frag` survives a step). The new `Frag` clauses (scan,
+  takeWhile, bounded merge, switch and exhaust as flatMaps, a pending
+  subscription) cost five per-former H leaves (`scanS-head`,
+  `takeS-head`, `limit-head`, `switch-head`, `exhaust-head`), each the
+  same kind of clause K1–K3 proved.
+- *Engine only:* `search-won`, `run-lead` (a run's lead from the found
+  node's `Clear`). `sub-lead` is proven: a subscribe never rises.
+- *Meaning link:* `sides-link`, which needs the stepper's step of each
+  part to be the meaning's head. That is the ghost correspondence,
+  possibly with `Base` for a joiner's buffer.
+
+**Risks, riskiest first.**
+
+1. `rise-lead`: a rise keeps its position, except an inclusive
+   takeWhile's failing value, which moves to `p ⊕ [ix 0]`. A `NotBefore`
+   proven at `p` is not obviously one at `p ⊕ [ix 0]` against a sibling
+   keyed exactly there. This is the tie-only gap of the census,
+   reappearing in the lead; the first thing to try to refute.
+2. `limited-sides`: for a bounded merge, switch or exhaust, the queue
+   and the one-lane rule sit outside the race `race-steps` reads, so the
+   merge clause's route does not carry over as written.
+3. `rise-src-nx` / `rise-body-nx` in `spike.MarkedKept`: `Clear` passes
+   through a connect's frames unchanged, so whatever order these relied
+   on from `Ord` must now come from the connect's own phase (`Conn`).
+
 ## Where the spike stands
 
 H is a body for of, empty, map, the switches, merge without a queue,
-connect, the joiner and colds. Not yet covered: scan, takeWhile, a
-merge with a concurrency limit or queue, switch and exhaust as
-flatMaps, and a lane's bare `lnS`. Each is a new clause of the same
-recursion. The order facts and the subscription facts remain leaves.
+connect, the joiner and colds. It is a leaf per former for scan,
+takeWhile, a bounded merge, and switch and exhaust as flatMaps. The order
+the preservation half consumes is local: `Order` is a shape fact plus
+per-frame race facts, and the pick discharges the latter from H. Next:
+try to refute `rise-lead` at an inclusive takeWhile's failing value.

@@ -28,8 +28,8 @@ open import Data.Unit using (⊤; tt)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
 
-open import Tree using (mergeᶠ)
-open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; ix; emit; stall; close)
+open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
+open import denotation.MonotonicList.Events using (Pos; Timeline; _<ᵖ_; ix; emit; stall; close)
 open import denotation.Unfold using (Node; Step; outˢ; skipˢ; endˢ; hushˢ; headˢ; step; restˢ; restsˢ; restᴹ; restsᶜ; restᶜ; unionˢ;
   Earliest; found; earliest; pick; Outer; doneᵒ; runᵒ; outerOf; goˢ; outerˢ; laneˢ; flatˢ;
   Source; live; ended; connectᶜ; burstingᶜ; underᶜ; subscribe; sourceˢ; bodyˢ; shutˢᵗ; burstsˢ; beforeˢ) renaming (none to noneᴱ)
@@ -37,7 +37,7 @@ open import operation.Key using (Key; at; after; _<ᴷ_)
 open import operation.MarkedPure using (module Machine; Tape; play; ending) renaming (over to overᵀ)
 
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ctx; closed; inMap; inCut;
-  Out; still; shows; Cand; seek; first; retag; mapT; cutT; nx; cp; attached; attAt; raceT; outerT; laneT; lanes; inOuter; inLanes; inLn;
+  Out; still; shows; Cand; seek; first; retag; mapT; cutT; nx; cp; attached; attAt; raceT; outerT; laneT; lanes; inOuter; inLanes; inLn; inScan; inTake; free; cpAt; cutAt; overAt;
   CS; cs; inSrc; inBody; own; ownBest; shift; over; sourceT; bodyM; owedM) renaming (found to foundᴹ)
 open import spike.MarkedGhost using (gh; lanesL; deadL; outerG; poolG)
 
@@ -106,6 +106,12 @@ mutual
   Frag (connS k o b)                          = Conn k o b
   Frag (joinS j g x ib)                       = ⊤
   Frag (coldS b l)                            = ⊤
+  Frag (pend o)                               = ⊤
+  Frag (scanS f z s)                          = Frag s
+  Frag (takeS i q w s)                        = Frag s
+  Frag (flatS (mergeᶠ (just m)) f d n q o ls) = Frag o × Lanes ls × (d ≡ true → Done o × NoConn o)
+  Frag (flatS switchᶠ f d n q o ls)           = Frag o × Lanes ls × (d ≡ true → Done o × NoConn o)
+  Frag (flatS exhaustᶠ f d n q o ls)          = Frag o × Lanes ls × (d ≡ true → Done o × NoConn o)
   Frag _                                      = ⊥
 
   -- A connect whose source waits on its subscription mark, subscribed at
@@ -214,6 +220,18 @@ mutual
   rest-hush (joinS j false x ib) _ _ = refl
   rest-hush (joinS j true x ib)  _ _ = refl
   rest-hush (connS k o b) _ ()
+  rest-hush (pend o)        _  _  = refl
+  rest-hush (scanS f z s)   fs ns = rest-hush s fs ns
+  rest-hush (takeS i q free s)       fs ns = rest-hush s fs ns
+  rest-hush (takeS i q (cpAt p) s)   fs ns = rest-hush s fs ns
+  rest-hush (takeS i q (cutAt p) s)  fs ns = rest-hush s fs ns
+  rest-hush (takeS i q (overAt p) s) fs ns = rest-hush s fs ns
+  rest-hush {B = B} (flatS (mergeᶠ (just m)) f d n q o ls) (fo , fl , dd) (no , nls)
+    rewrite outer-hush {B = B} d o fo no | rests-hush (live-hush {B = B} ls fl nls) | pool-hush {B = B} d o ls fo fl (λ _ → no) = refl
+  rest-hush {B = B} (flatS switchᶠ f d n q o ls) (fo , fl , dd) (no , nls)
+    rewrite outer-hush {B = B} d o fo no | rests-hush (live-hush {B = B} ls fl nls) | pool-hush {B = B} d o ls fo fl (λ _ → no) = refl
+  rest-hush {B = B} (flatS exhaustᶠ f d n q o ls) (fo , fl , dd) (no , nls)
+    rewrite outer-hush {B = B} d o fo no | rests-hush (live-hush {B = B} ls fl nls) | pool-hush {B = B} d o ls fo fl (λ _ → no) = refl
   rest-hush (coldS b (ending e))          _ _ = refl
   rest-hush (coldS b overᵀ)               _ _ = refl
   rest-hush (coldS true  (play τ u i t fr)) _ _ = refl
@@ -284,6 +302,23 @@ done-head : ∀ {R Γ A} (c : Ctx R Γ A) → Head c (doneS {A = A})
 done-head c with closed c
 ... | true  = none
 ... | false = exact refl
+
+-- Still to subscribe: no mark, and an idle ghost.
+pend-head : ∀ {R Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) → Head c (pend o)
+pend-head c o with closed c
+... | true  = none
+... | false = exact refl
+
+-- The formers outside the merge fragment, one fact each.
+postulate
+  scanS-head : ∀ {R Γ A B} (c : Ctx R Γ B) (f : B → A → B) z (s : St Γ A) → Head (inScan f z c) s → Head c (scanS f z s)
+  takeS-head : ∀ {R Γ A} (c : Ctx R Γ A) i q w (s : St Γ A) → Head (inTake i q w c) s → Head c (takeS i q w s)
+  limit-head : ∀ {R Γ A B} (c : Ctx R Γ B) m (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls
+             → Frag o → Lanes ls → (d ≡ true → Done o × NoConn o) → Head c (flatS (mergeᶠ (just m)) f d n q o ls)
+  switch-head : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls
+              → Frag o → Lanes ls → (d ≡ true → Done o × NoConn o) → Head c (flatS switchᶠ f d n q o ls)
+  exhaust-head : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls
+               → Frag o → Lanes ls → (d ≡ true → Done o × NoConn o) → Head c (flatS exhaustᶠ f d n q o ls)
 
 map-head : ∀ {R Γ A B} b (f : A → B) (y : Maybe (Cand R A)) (s : St Γ A)
          → HeadAt b (mapᴹ proj₂ y) s → HeadAt b (mapᴹ proj₂ (retag (mapT f) y)) (mapS f s)

@@ -52,7 +52,8 @@ open import spike.MarkedGhost
 open import spike.MarkedInv using (Unpended; Opened; Wf; Base; module Base; Inv; module Inv; inv-at; wfI; wf-split; Owns; ofO; attO; cpO; cutO; bodyO; srcAttO; owedO; joinO; leafO; owned;
   search-hit; NextInv; inv-next; inv-load)
 open import spike.MarkedRace using (First; go-rise; cuts-swap)
-open import spike.MarkedFirst using (Past; first-lanes)
+open import spike.MarkedHead using (Frag)
+open import spike.MarkedPick using (module Order)
 
 open Events∞
 
@@ -305,7 +306,7 @@ module _ {R : Set} where
               → Inv ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩ → flagOf s ≡ true → closed c ≡ false
               → First p (outerᴺ (lane f) (outerG d (gh o)) (envAt c)) (states (lanesL post) (envAt c)) (states (lanesL pre) (envAt c))
                   (outerT d (gh o) (envAt c) (poolRuns pre post true (envAt c) (stateᴺ (gh s) (envAt c))))
-  lanes-first op f d n q o pre post c s b p v _ _ = first-lanes op f d n q o pre post c s p (Inv.ord v)
+  lanes-first op f d n q o pre post c s b p v _ ce = proj₁ (Order.lead (Inv.ord v)) ce
 
   ----------------------------------------------------------------------
   -- A configuration focused anywhere means what its whole tree means
@@ -580,7 +581,7 @@ module _ {R : Set} where
   ... | nothing = quiet-empty c s p v e
   ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
   ...   | pl , own = kept-pre (tookᴰ (run c′ s′ m p)) (refocus c s c′ s′ p (Base.settled (Inv.base v)) (owned own) (wfI (Inv.base v)) pl)
-                       (runs c′ s′ m p own (inv-at c′ s′ p (owned own) (subst Wf (sym pl) (wfI (Inv.base v))) (subst (Past p) (sym pl) (Inv.ord v))))
+                       (runs c′ s′ m p own (inv-at c′ s′ p (owned own) (subst Wf (sym pl) (wfI (Inv.base v))) (subst Frag (sym pl) (Order.shape (Inv.ord v)))))
 
   ----------------------------------------------------------------------
   -- THE TOP LINE: whatever the machine shows, the meaning shows
