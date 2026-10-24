@@ -10,11 +10,11 @@
 -- rewrites, and the context's share rides along.
 module spike.MarkedInv where
 
-open import Data.Bool using (Bool; true; false; not; if_then_else_)
-open import Data.List using (List; []; _∷_; _++_; [_])
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Bool using (true; false; not; if_then_else_)
+open import Data.List using (List; []; _∷_; _++_)
+open import Data.Maybe using (just; nothing)
 open import Data.Nat using (_<ᵇ_; _≡ᵇ_)
-open import Data.Product using (Σ; _×_; _,_; proj₁)
+open import Data.Product using (_×_; _,_; proj₁)
 open import Data.Unit using (⊤; tt)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)

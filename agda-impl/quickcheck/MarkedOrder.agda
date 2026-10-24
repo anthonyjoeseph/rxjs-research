@@ -33,7 +33,7 @@ open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []�
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Nat.Show renaming (show to showℕ)
-open import Data.Product using (_×_; _,_; proj₂)
+open import Data.Product using (_×_; _,_)
 open import Data.String using (String; intersperse) renaming (_++_ to _++ˢ_)
 
 open import Tree using (Obs)

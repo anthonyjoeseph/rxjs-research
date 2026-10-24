@@ -27,21 +27,21 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (zero; suc; pred)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Unit using (⊤; tt)
-open import Data.Empty using (⊥)
+open import Data.Unit using (tt)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; cong; cong₂; trans)
 
-open import Tree using (Obs; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+open import Tree using (Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Time; Frame; From; From∞; Timeline; timelineAt;
   out; skip; end; hush; idle; _∪_; ix; last; root; at; done; emit; stall; close)
   renaming (quiet to silentᶠ)
-open import denotation.MonotonicList using (Agreeᵀ; agreeᵀ-refl; agree-refl; _≈[_]_; agrees)
+open import denotation.MonotonicList using (Agreeᵀ; agreeᵀ-refl; agree-refl; _≈[_]_)
 import denotation.MonotonicList as M′
 open import denotation.NonExpansive using (_,ˢ_; liveᴼ; []ᴸ; []ᑫ; go-ne; mapᴱ-neᴹ; ∪-ne; burstOn-ne; beside-ne)
-open import denotation.Unfold using (Node; idleᶜ; ofᶜ; restsᶜ; states; ended; outerᴺ; restᶜ; takeWhileᶜ; endingᶜ; burstᶜ; joinᶜ; connectᶜ; live; stateᴺ; cutᴺ; meaning; subscribe; outer∞; NEnv)
+open import denotation.Unfold using (Node; idleᶜ; ofᶜ; restsᶜ; states; ended; outerᴺ; restᶜ; takeWhileᶜ; endingᶜ; burstᶜ;
+  connectᶜ; live; stateᴺ; cutᴺ; meaning; subscribe; outer∞; NEnv)
 open import denotation.Denote using (flatOp)
-open import operation.MarkedPure using (Tape; play; ending; over; rest; module Machine; module Driver)
+open import operation.MarkedPure using (play; ending; over; rest; module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; closed; closedUp;
   CS; cs; Att; attAt; attached; Owe; free; cpAt; cutAt; overAt; Ev; nx; cp; _⊕_;

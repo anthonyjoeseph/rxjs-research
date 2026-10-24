@@ -12,7 +12,7 @@
 -- (`lanes-first`), each part being a sibling of the hole in the tree.
 module spike.MarkedFirst where
 
-open import Data.Bool using (Bool; true; false; _∨_; if_then_else_)
+open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; _++_; [_]) renaming (map to mapL)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -21,25 +21,24 @@ open import Data.List.Relation.Unary.All.Properties using (++⁻ˡ; ++⁻ʳ) ren
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
-open import Data.Empty using (⊥)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
 
-open import Tree using (Obs; FlatOp)
-open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Tail; Timeline; idle; pin; out; skip; end; hush; ix; last;
-  _∪_; _<ᵖ_; <ᵖ-trans; <ᵖ-asym; <ᵖ-below; inside)
+open import Tree using (Obs)
+open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Tail; Timeline; idle; pin; out; skip; end; hush; ix; _∪_; _<ᵖ_;
+  <ᵖ-trans; <ᵖ-asym; <ᵖ-below; inside)
 open import denotation.MonotonicList using (MonotonicList; head; headᴼ; cutᴼ; cuts; whole; go; beside; burstOn; runOn; pinned; tailᴱ; rejoin;
   mapᴱ; scanᴱ; takeWhileᴱ) renaming (cold to coldᴹ)
 open import denotation.Denote using (flatOp)
-open import denotation.Unfold using (Node; NEnv; meaning; cutᴺ; stateᴺ; states; outerᴺ; outer∞; subscribe; restᶜ; restsᶜ; unionᶜ; connectᶜ;
-  Source; live; ended; fedᴺ; joined; idleᶜ)
+open import denotation.Unfold using (Node; NEnv; meaning; cutᴺ; stateᴺ; states; outerᴺ; subscribe; restᶜ; restsᶜ; connectᶜ;
+  Source; live; ended)
 open import operation.Key using (Key; at; after; _<ᴷ_)
 open import operation.MarkedPure using (Tape; module Machine)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug;
   CS; cs; free; cpAt; cutAt; overAt; nx; cp; attached; attAt;
   Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; own)
-open import spike.MarkedGhost using (gh; tape; subOr; srcOf; srcG; srcRun; srcState; envAt; lane; outerG; poolG; doneG; lanesL; liveL; deadL; deadOne;
-  outerT; poolRuns; tailsOn; poolT; holeT; vals; endOf)
+open import spike.MarkedGhost using (gh; tape; subOr; srcG; srcRun; srcState; envAt; lane; outerG; poolG; doneG; lanesL; liveL;
+  deadL; deadOne; outerT; poolRuns; tailsOn; endOf)
 open import spike.MarkedRace using (First; first; NotBefore; After; TailNotBefore)
 open import adequacy.Stepper.Flat using (head-mapᴱ)
 

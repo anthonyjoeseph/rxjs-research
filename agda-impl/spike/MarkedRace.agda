@@ -8,7 +8,7 @@
 -- ended parts left no earlier.
 module spike.MarkedRace where
 
-open import Data.Bool using (Bool; true; false; _∧_)
+open import Data.Bool using (true; false)
 open import Data.Bool.Properties using (∧-zeroʳ)
 open import Data.List using (List; []; _∷_; _++_)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
@@ -16,8 +16,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 
-open import Tree using (FlatOp)
-open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Tail; idle; pin; out; _∪_; _<ᵖ_)
+open import denotation.MonotonicList.Events using (Events∞; Pos; Tail; idle; pin; out; _∪_; _<ᵖ_)
 open import denotation.MonotonicList using (MonotonicList; head; headᴼ; Earliest; none; found; earliest; clear; clears; cuts; go; parts; race; lane)
 
 open Events∞

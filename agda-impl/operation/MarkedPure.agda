@@ -8,7 +8,7 @@
 -- depths.  The run's time is the tick of the position it is at.
 module operation.MarkedPure where
 
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_)

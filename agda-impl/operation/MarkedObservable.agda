@@ -24,10 +24,10 @@ open import Data.Product using (_×_; _,_)
 open import Data.Unit using (⊤; tt)
 open import IO.Primitive.Core using (pure; _>>=_)
 
-open import Tree using (Obs)
 open import denotation.MonotonicList.Events using (Pos; ix)
 open import operation.Key using (Key; _<ᴷ_)
-open import operation.Observable using (IORef; newIORef; readIORef; writeIORef; Lock; newLock; withLock; Signal; newSignal; raise; await; fixIO′; Started; Emit; IOCold; Slot; Observable; IORef₁; newIORef₁; readIORef₁; writeIORef₁)
+open import operation.Observable using (IORef; newIORef; readIORef; writeIORef; Lock; newLock; withLock; newSignal; raise; await;
+  fixIO′; Started; IOCold; Slot; Observable; IORef₁; newIORef₁; readIORef₁; writeIORef₁)
 
 private
   infixl 1 _>>_

@@ -13,13 +13,13 @@
 module spike.MarkedGap where
 
 open import Data.Bool using (Bool; true; false)
-open import Data.List using (List; []; _∷_; [_])
+open import Data.List using ([]; _∷_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Tree using (empty; mergeᶠ)
-open import denotation.MonotonicList.Events using (Pos; ix; root)
+open import denotation.MonotonicList.Events using (Pos; root)
 open import denotation.Unfold using (outˢ) renaming (Step to Stepᵁ; step to stepᵁ)
 open import operation.MarkedPure using (module Machine; module Driver)
 open Machine using (St; ofS; doneS; lnS; takeS; flatS; free; top; Conf; ⟨_,_,_,_⟩; absorbed)

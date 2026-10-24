@@ -260,4 +260,33 @@ event, or a silent mark no later; under a closed observer, `Quiet`).
   oracle-confirmed: lanes were transformed before racing, and a silent
   outer step was shifted.
 
-### Next: K2 (connect, feed), then K3 (colds)
+## Findings: K2 — connect and feed
+
+**H holds of every connect and joiner state, still by recursion on the
+state, with no order invariant** (`spike.MarkedHead.Agrees.conn-at`,
+`join-head`). The kill criterion is not hit.
+
+- **The invariant grows by shape only.** `Conn` records which phase a
+  connect is in: pending source with the body's own mark at `r = p ++
+  [ix 1]`, or subscribed. `NoConn` (no connect inside) appears wherever
+  the stepper's rest must be hush: under a cut-off switch, in dead
+  lanes, in a done outer, in an over connect's source and body, in an
+  ended connect's source. Still no order between nodes, no births.
+- **The phases split cleanly.** Pending: the body's mark is silent and
+  no later than the stepper's head. Live: every step of the source is
+  either the body's step or a skip just past the source's key, so a
+  disagreement is a silent mark no later, or a contradiction. Ended:
+  the stepper shuts. Over: the stepper hushes or shows the source's
+  head. Closed: everything is quiet.
+- **Left as leaves: two stepper facts about a fresh subscription**
+  (`sub-head`, `sub-bursts`): what `denotation.Unfold.subscribe`'s first
+  step and its bursts are. Statements about the denotation only.
+- **Two engine bugs found by writing the clauses**, both fixed: a joiner
+  under a closed observer showed its event, and an over connect still
+  shifted its source's keys.
+- **Coverage boundary:** a connect under a rest (cut off, a dead lane, a
+  done outer, an over connect's parts) is excluded by `NoConn`. The real
+  case behind it is the pool's race with rest skips, which K3's colds
+  and a later pass must cover.
+
+### Next: K3 (colds)

@@ -17,7 +17,7 @@
 -- closed is read only through its tail (`closed-hides`).
 module spike.MarkedGhost where
 
-open import Data.Bool using (Bool; true; false; not; _∨_)
+open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; _++_; [_])
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
@@ -25,10 +25,10 @@ open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᴬ; _∷
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product using (_×_; _,_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; subst; sym; cong)
 
 open import Tree using (Obs; FlatOp)
-open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Timeline; Pos; out; skip; end; hush; idle; _∪_; ix; last)
+open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Timeline; Pos; out; skip; end; idle; _∪_; ix; last)
 open import denotation.MonotonicList using (MonotonicList; tailᴱ; Agree; Agreeᵀ; stop; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agree-sym; agree-trans; agreeᵀ-refl; agreeᵀ-trans; _≈[_]_; agrees)
   renaming (cold to coldᴹ)
 import denotation.MonotonicList as M′
@@ -38,7 +38,7 @@ open Agreeˢ
 open import denotation.Unfold using (Node; burstᶜ; ofᶜ; mapᶜ; scanᶜ; takeWhileᶜ; flatMapᶜ; joinᶜ; connectᶜ; endingᶜ; restᶜ; idleᶜ; unionᶜ;
   restsᶜ; Source; live; ended; subscribe; NEnv; meaning; cutᴺ; stateᴺ; states; outerᴺ)
 open import denotation.Denote using (flatOp)
-open import operation.MarkedPure using (Tape; play; ending; over; due)
+open import operation.MarkedPure using (Tape; play; ending; over)
 open import operation.MarkedPure using (module Machine)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; closed;
