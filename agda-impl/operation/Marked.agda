@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (Maybe; just; nothing) renaming (map to mapᴹ)
 open import operation.Key using (Key; at; after; _<ᴷ_)
 
 -- SPIKE: THE ENGINE WITH NO POINTERS.  `operation.AbstractObservable`'s
@@ -19,15 +19,23 @@ open import operation.Key using (Key; at; after; _<ᴷ_)
 -- A connect's feed is pushed into each joiner's own inbox when its source
 -- rises, as `denotation.Unfold`'s `feed` does; each joiner then runs its
 -- inbox at its own positions.  A cold leaf's runtime state says when it
--- is next due (`due`), so a runtime's frames and timers are marks too.
-module operation.Marked (C L : Set → Set₁) (due : ∀ {A} → L A → Maybe Key) where
+-- is next due (`due`), so a runtime's frames and timers are marks too,
+-- and what it shows then (`peek`: a value, its end, or nothing).
+--
+-- ONE EVENT PER SEARCH.  No event is shown except by a mark keyed where
+-- it sits: a subscribe shows nothing, and an end it owes (empty's, a
+-- joiner's whose subject is over) is an of with nothing left, owed at
+-- its `last`.  The least mark is the one `denotation.Unfold.step` races
+-- first: each candidate is keyed by where its event sits as its parent
+-- sees it, and every tie goes as the stepper's does.
+module operation.Marked (C L : Set → Set₁) (due : ∀ {A} → L A → Maybe Key) (peek : ∀ {A} → L A → Maybe (Maybe A)) where
 
 open import Data.List using (List; []; _∷_; _++_; [_]; length; null)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; zero; suc; pred; _≡ᵇ_; _<ᵇ_)
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
-open import Data.Product using (Σ; _×_; _,_)
+open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
@@ -318,35 +326,116 @@ record Found (R : Set) : Set₁ where
     mark  : Mark
     key   : Key
 
+-- What a mark run shows its parent: an event, or nothing.
+data Out (A : Set) : Set where
+  still : Out A
+  shows : Ev A → Out A
+
+-- A mark, with where its event sits as the node above sees it.
+Cand : Set → Set → Set₁
+Cand R A = Found R × Key × Out A
+
+-- Just past a position: its `ix 0`.  Nothing lies strictly between.
+shift : Key → Key
+shift (at p)    = at (p ⊕ [ ix 0 ])
+shift (after p) = after p
+
 -- The earlier; the first on a tie.
-better : ∀ {R} → Maybe (Found R) → Maybe (Found R) → Maybe (Found R)
-better nothing  y        = y
-better (just x) nothing  = just x
-better (just x) (just y) = if Found.key y <ᴷ Found.key x then just y else just x
+first : ∀ {R A} → Maybe (Cand R A) → Maybe (Cand R A) → Maybe (Cand R A)
+first nothing             y                     = y
+first (just x)            nothing               = just x
+first (just (f , h , o))  (just (g , h′ , o′))  = if h′ <ᴷ h then just (g , h′ , o′) else just (f , h , o)
 
-ownBest : ∀ {R Γ A} → Ctx R Γ A → St Γ A → List (Mark × Key) → Maybe (Found R)
+retag : ∀ {R A B} → (Key → Out A → Key × Out B) → Maybe (Cand R A) → Maybe (Cand R B)
+retag t nothing            = nothing
+retag t (just (f , h , o)) = just (f , t h o)
+
+-- What a node's own mark shows.
+outOf : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Mark → Out A
+outOf c (ofS i p xs) ofM with closed c | xs
+... | true  | _     = still
+... | false | []    = shows cp
+... | false | x ∷ _ = shows (nx x)
+outOf c (takeS i q (cpAt p) s) cpM = shows cp
+outOf c (joinS j g x ((q , e) ∷ ib)) joinM = if g then shows e else still
+outOf c (coldS b l) leafM with peek l
+... | just nothing  = shows cp
+... | just (just a) = if b ∧ not (closed c) then shows (nx a) else still
+... | nothing       = still
+outOf c s m = still
+
+ownBest : ∀ {R Γ A} → Ctx R Γ A → St Γ A → List (Mark × Key) → Maybe (Cand R A)
 ownBest c s []             = nothing
-ownBest c s ((m , k) ∷ ms) = better (just (found (_ , _ , c , s) m k)) (ownBest c s ms)
+ownBest c s ((m , k) ∷ ms) = first (just (found (_ , _ , c , s) m k , k , outOf c s m)) (ownBest c s ms)
 
--- The least mark under the hole, in pre-order on a tie: a node before
--- its children.
+-- Each node's rise, as its parent reads it.
+mapT : ∀ {A B} → (A → B) → Key → Out A → Key × Out B
+mapT f h still     = h , still
+mapT f h (shows e) = h , shows (mapEv f e)
+
+scanT : ∀ {A B} → (B → A → B) → B → Key → Out A → Key × Out B
+scanT f z h (shows (nx a)) = h , shows (nx (f z a))
+scanT f z h (shows cp)     = h , shows cp
+scanT f z h still          = h , still
+
+cutT : ∀ {A} → Bool → Key → Out A → Key × Out A
+cutT l h o = h , (if l then o else still)
+
+-- A failing value: inclusive, shown just past; else dropped, the end owed.
+takeT : ∀ {A} → Bool → (A → Bool) → Owe → Key → Out A → Key × Out A
+takeT i q free h (shows (nx a)) = if q a then (h , shows (nx a)) else (if i then (shift h , shows (nx a)) else (h , still))
+takeT i q free h o              = h , o
+takeT i q w    h o              = h , still
+
+-- The outer's value is a skip just past it; its end ends the flatMap
+-- only with nothing running or waiting.
+outerT : ∀ {A B : Set} → ℕ → List A → Key → Out A → Key × Out B
+outerT n q h (shows cp) = h , (if (n ≡ᵇ 0) ∧ null q then shows cp else still)
+outerT n q h o          = shift h , still
+
+-- A lane's end: a skip just past it when a value waits, else the
+-- flatMap's end once nothing else runs.
+laneT : ∀ {A B : Set} → Bool → Bool → ℕ → List A → Key → Out B → Key × Out B
+laneT false d n q       h o              = h , still
+laneT true  d n []      h (shows cp)     = h , (if d ∧ (pred n ≡ᵇ 0) then shows cp else still)
+laneT true  d n (_ ∷ _) h (shows cp)     = shift h , still
+laneT true  d n q       h o              = h , o
+
+-- The outer only strictly before every lane, by its own event.
+raceT : ∀ {R A B} → ℕ → List A → Maybe (Cand R A) → Maybe (Cand R B) → Maybe (Cand R B)
+raceT n q nothing            l                    = l
+raceT n q (just (f , h , o)) nothing              = just (f , outerT n q h o)
+raceT n q (just (f , h , o)) (just (g , k , o′))  = if h <ᴷ k then just (f , outerT n q h o) else just (g , k , o′)
+
+-- The source only strictly before the body, a skip just past its event.
+sourceT : ∀ {R A B} → Maybe (Cand R A) → Maybe (Cand R B) → Maybe (Cand R B)
+sourceT nothing            b                    = b
+sourceT (just (f , h , o)) nothing              = just (f , shift h , still)
+sourceT (just (f , h , o)) (just (g , k , o′))  = if shift h <ᴷ k then just (f , shift h , still) else just (g , k , o′)
+
+-- The mark the stepper races first under the hole, a node's own before
+-- its children on a tie.
 mutual
-  search : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Maybe (Found R)
-  search c s = better (ownBest c s (own s)) (kids c s)
+  seek : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Maybe (Cand R A)
+  seek c s = first (ownBest c s (own s)) (kids c s)
 
-  kids : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Maybe (Found R)
-  kids c (mapS f s)              = search (inMap f c) s
-  kids c (scanS f z s)           = search (inScan f z c) s
-  kids c (cutS l a s)            = search (inCut l a c) s
-  kids c (lnS b s)               = search (inLn b c) s
-  kids c (takeS i q w s)         = search (inTake i q w c) s
-  kids c (flatS op f d n q o ls) = better (search (inOuter op f d n q ls c) o) (lanes c op f d n q o [] ls)
-  kids c (connS k o b)           = better (search (inSrc k b c) o) (search (inBody k o c) b)
+  kids : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Maybe (Cand R A)
+  kids c (mapS f s)              = retag (mapT f) (seek (inMap f c) s)
+  kids c (scanS f z s)           = retag (scanT f z) (seek (inScan f z c) s)
+  kids c (cutS l a s)            = retag (cutT l) (seek (inCut l a c) s)
+  kids c (lnS b s)               = seek (inLn b c) s
+  kids c (takeS i q w s)         = retag (takeT i q w) (seek (inTake i q w c) s)
+  kids c (flatS op f d n q o ls) = raceT n q (seek (inOuter op f d n q ls c) o) (lanes c op f d n q o [] ls)
+  kids c (connS k o b)           = sourceT (seek (inSrc k b c) o) (seek (inBody k o c) b)
   kids c _                       = nothing
 
-  lanes : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → List (St Γ B) → Maybe (Found R)
+  lanes : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → List (St Γ B) → Maybe (Cand R B)
   lanes c op f d n q o pre []         = nothing
-  lanes c op f d n q o pre (s ∷ post) = better (search (inLanes op f d n q o pre post c) s) (lanes c op f d n q o (pre ++ [ s ]) post)
+  lanes c op f d n q o pre (s ∷ post) =
+    first (retag (laneT (alive s) d n q) (seek (inLanes op f d n q o pre post c) s)) (lanes c op f d n q o (pre ++ [ s ]) post)
+
+search : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Maybe (Found R)
+search c s = mapᴹ proj₁ (seek c s)
 
 ------------------------------------------------------------------------
 -- The machine
@@ -391,7 +480,7 @@ private
 
 begin : ∀ {R Γ A} → Ctx R Γ A → Obs C Γ A → Pos → Stepped R
 begin c (cold x)          p = starting x p λ l → ⟨ c , coldS true l , absorbed , p ⟩
-begin c empty             p = ok ⟨ c , doneS , rising cp , p ⊕ [ last ] ⟩
+begin c empty             p = ok ⟨ c , ofS 0 p [] , absorbed , p ⟩
 begin c (of xs)           p = ok ⟨ c , ofS 0 p xs , absorbed , p ⟩
 begin c (map f s)         p = ok ⟨ inMap f c , pend s , subscribing , p ⟩
 begin c (scan f z s)      p = ok ⟨ inScan f z c , pend s , subscribing , p ⟩
@@ -400,9 +489,9 @@ begin c (flatMap op f s)  p = ok ⟨ inCut true (attAt p) (inOuter op f false 0 
 -- the body under `ix 0`; its source, once the body's subscription
 -- exists, under `ix 1`
 begin c (connect s b)     p = ok ⟨ inBody (cs false true false (just p) nothing nothing (p ⊕ [ ix 1 ]) root) (pend s) c , pend b , subscribing , p ⊕ [ ix 0 ] ⟩
--- a joiner keeps where it joined; a completed subject completes it under `last`
+-- a joiner keeps where it joined; a completed subject owes it its end under `last`
 begin c (connected x)     p with closedUp c x
-... | true  = ok ⟨ c , doneS , rising cp , p ⊕ [ last ] ⟩
+... | true  = ok ⟨ c , ofS 0 p [] , absorbed , p ⟩
 ... | false = ok ⟨ c , joinS p true x [] , absorbed , p ⟩
 -- a defer's body one level down
 begin c (defer l)         p = ok ⟨ c , pend (Later.force l) , subscribing , p ⊕ [ ix 1 ] ⟩
@@ -437,8 +526,8 @@ ended : ∀ {Γ B} → St Γ B → St Γ B
 ended (lnS b (cutS l a s)) = lnS false (cutS false a s)
 ended s                    = s
 
--- A rise moves no position, except a takeWhile's own failing value and
--- completion, under `ix 0` and `last`.  A connect's source feeds every
+-- A rise moves no position, except an inclusive takeWhile's failing
+-- value, under `ix 0`; a non-inclusive one's end is owed under `last`.  A connect's source feeds every
 -- live joiner of its subject at once, each to show it at its own turn.
 rise : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Ev A → Pos → Stepped R
 rise top s e p = moved ⟨ top , s , absorbed , p ⟩ [ (p , e) ] []
@@ -450,7 +539,7 @@ rise (inLn b c) s e p = ok ⟨ c , lnS b s , rising e , p ⟩
 rise (inTake i q free c) s (nx a) p with q a | i
 ... | true  | _     = ok ⟨ c , takeS i q free s , rising (nx a) , p ⟩
 ... | false | true  = ok ⟨ c , takeS i q (cpAt p) s , rising (nx a) , p ⊕ [ ix 0 ] ⟩
-... | false | false = ok ⟨ c , takeS i q (cutAt p) s , rising cp , p ⊕ [ last ] ⟩
+... | false | false = ok ⟨ c , takeS i q (cpAt p) s , absorbed , p ⟩
 rise (inTake i q free c) s cp p = ok ⟨ c , takeS i q free s , rising cp , p ⟩
 -- a takeWhile already over absorbs whatever still reaches it, as a
 -- switch off does

@@ -204,7 +204,7 @@ private
   take-incl q n ρ a p e = ≋-out (cong (λ b → M′.taking true q p a b (stateᴺ n ρ)) e) refl refl refl refl
 
   take-excl : ∀ {Γ A} (q : A → Bool) (n : Node Γ A) (ρ : NEnv Γ) a p → q a ≡ false
-            → took false q (risen n ρ (nx a) p) ≋ risen (restᶜ n) ρ cp (p ⊕ [ last ])
+            → took false q (risen n ρ (nx a) p) ≋ stateᴺ (endingᶜ (p ⊕ [ last ]) n) ρ
   take-excl q n ρ a p e = ≋-by (cong (λ b → M′.taking false q p a b (stateᴺ n ρ)) e) refl
 
   -- A connect, its source subscribed now, is the source's frame read
@@ -294,9 +294,9 @@ module _ {R : Set} where
     -- A joiner's next fed value, shown at its position.
     join-nx : ∀ {Γ A} (c : Ctx R Γ A) j x q (a : A) ib p → Inv ⟨ c , joinS j true x ((q , nx a) ∷ ib) , absorbed , p ⟩
             → M ⟨ c , joinS j true x ((q , nx a) ∷ ib) , absorbed , p ⟩ ≅ M ⟨ c , joinS j true x ib , rising (nx a) , q ⟩
-    -- A joiner of a source already ended completes.
+    -- A joiner of a source already ended owes its end at its `last`.
     joined-closed : ∀ {Γ A} (c : Ctx R Γ A) (x : A ∈ Γ) p → Inv ⟨ c , pend (connected x) , subscribing , p ⟩
-                  → closedUp c x ≡ true → M ⟨ c , pend (connected x) , subscribing , p ⟩ ≅ M ⟨ c , doneS , rising cp , p ⊕ [ last ] ⟩
+                  → closedUp c x ≡ true → M ⟨ c , pend (connected x) , subscribing , p ⟩ ≅ M ⟨ c , ofS 0 p [] , absorbed , p ⟩
     -- A defer is the program it defers, one level down, after a skip.
     defer-kept : ∀ {Γ A} (c : Ctx R Γ A) l p → Inv ⟨ c , pend (defer l) , subscribing , p ⟩ → Kept ⟨ c , pend (defer l) , subscribing , p ⟩
 

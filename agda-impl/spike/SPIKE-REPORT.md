@@ -209,3 +209,24 @@ subscription's `last`, which is K3's question.
     gives up idea 3.
 - **Recommendation: (d), after a cheap fit test.** Re-key the ties, mark
   the lane start, and run the oracle, before touching the connect.
+
+## Findings: one event per search (step 2, route d)
+
+`operation.Marked` now keys each candidate where its event sits as its
+parent sees it (`seek`), and breaks every tie as the stepper does.
+
+- **The cold needs one more parameter**: `peek`, what a leaf shows when
+  due (a value, its end, or nothing). Pure: its tape's head
+  (`operation.MarkedPure.peek`). IO: never, since its colds push.
+- **Subscribe cascades are silent.** Empty's end and a closed joiner's
+  end are an of with nothing left, owed at their `last`; a non-inclusive
+  takeWhile's end is a `cpAt` mark. A subscribe itself shows nothing.
+- **The tie that refuted H per node now agrees** (`spike.MarkedGap`:
+  `failing-agree`, `passing-agree`).
+- **Still not the stepper's rule, to watch in K1/K2:** a silent candidate
+  is shifted only at the outer and the source; a dead lane races as a
+  lane, where the stepper pools dead lanes and takes them only strictly
+  ahead; a node's own mark wins a tie against its children.
+- **Lane starts and a connect's subscriptions are not yet marks keyed at
+  their first head.** The fit test comes first: the oracle's `marks` and
+  `marks io` columns judge this engine against rxjs in CI.

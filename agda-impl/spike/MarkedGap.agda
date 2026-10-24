@@ -1,21 +1,15 @@
 {-# OPTIONS --guardedness #-}
 
--- SPIKE: A GAP BETWEEN WHEN A STEP RUNS AND WHERE ITS EVENT SITS IS
--- WHAT NEEDS PAIRS.  The engine runs a step at its key
--- (`operation.Marked`); the stepper `denotation.Unfold.step` races steps
--- by the position of the event each makes.  Where the two differ, the
--- engine and the stepper agree only if no other node holds a key in the
--- gap, which is a fact about pairs of nodes.  A failing inclusive
--- takeWhile has one: it runs at its source's key `k` and shows at
--- `k ⊕ ix 0`.
---
--- Two lanes, both keyed `q ⊕ ix 0`, the first under a takeWhile its value
--- fails.  Every node maps to its ghost (`spike.MarkedGhost.gh`), so no
--- per-node relation excludes the configuration; the engine shows the
--- first lane's value first (`engine-first`), the stepper the second's
--- (`stepper-first`), and the engine's run goes backwards in position.
--- With a value that passes, both take the older lane (`passing-agree`):
--- the tie alone is not what diverges.
+-- SPIKE: A TIE IS BROKEN BY WHERE THE EVENT SITS.  A failing inclusive
+-- takeWhile runs at its source's key `k` and shows at `k ⊕ ix 0`, and
+-- nothing lies strictly between, so it differs from the stepper
+-- (`denotation.Unfold.step`) only against another node keyed at `k`.
+-- Two lanes keyed `q ⊕ ix 0`, the first under a takeWhile its value
+-- fails, every node mapping to its ghost (`spike.MarkedGhost.gh`): the
+-- engine keys each candidate where its event sits as its parent sees it
+-- (`operation.Marked.seek`), so it shows the second lane's value first,
+-- as the stepper does (`failing-agree`); with a value that passes, both
+-- take the older lane (`passing-agree`).
 module spike.MarkedGap where
 
 open import Data.Bool using (Bool; true; false)
@@ -58,11 +52,8 @@ private
   at₀ : (ℕ → Bool) → Conf ℕ
   at₀ ok = ⟨ top , lanes ok , absorbed , q ⟩
 
-engine-first : firstᴱ 10 (at₀ (λ _ → false)) ≡ just 1
-engine-first = refl
-
-stepper-first : firstᵁ (stepᵁ (gh (lanes (λ _ → false)))) ≡ just 2
-stepper-first = refl
+failing-agree : firstᴱ 10 (at₀ (λ _ → false)) ≡ firstᵁ (stepᵁ (gh (lanes (λ _ → false))))
+failing-agree = refl
 
 passing-agree : firstᴱ 10 (at₀ (λ _ → true)) ≡ firstᵁ (stepᵁ (gh (lanes (λ _ → true))))
 passing-agree = refl

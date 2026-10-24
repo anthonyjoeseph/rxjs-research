@@ -48,8 +48,11 @@ record Leaf (A : Set) : Set₁ where
 never : ∀ {A} → Leaf A → Maybe Key
 never _ = nothing
 
+unseen : ∀ {A} → Leaf A → Maybe (Maybe A)
+unseen _ = nothing
+
 import operation.Marked
-module Machine = operation.Marked IOCold Leaf never
+module Machine = operation.Marked IOCold Leaf never unseen
 open Machine using (Conf; Stepped; moved; starting; turn; quiet; Shown; Torn; Ev; nx; cp; load; Poke; gone; leaf; poke; spot; calm; next)
   renaming (step to stepᴹ)
 

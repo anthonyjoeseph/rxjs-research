@@ -32,6 +32,14 @@ due (play τ u i t fr) = just (atᴷ (u ++ [ ix i ]))
 due (ending e)        = just (atᴷ e)
 due over              = nothing
 
+-- What it shows when due: a frame's value or its end; a stall or a
+-- frame's close shows nothing.
+peek : ∀ {A} → Tape A → Maybe (Maybe A)
+peek (play τ u i t (emit a k)) = just (just a)
+peek (play τ u i t _)          = nothing
+peek (ending e)                = just nothing
+peek over                      = nothing
+
 -- After a frame ending at `e`: a completion owed, nothing, or the next
 -- frame, under a cascade at its tick.
 rest : ∀ {A t} → Time → Pos → From A t → Tape A
@@ -46,7 +54,7 @@ opening p (at zero _ b) = play (tick p) p 0 0 b
 opening p m             = rest (tick p) (p ++ [ last ]) m
 
 import operation.Marked
-module Machine = operation.Marked Timeline Tape due
+module Machine = operation.Marked Timeline Tape due peek
 open Machine using (Conf; Stepped; moved; starting; turn; quiet; load; Poke; gone; leaf; nx; cp)
   renaming (step to stepᴹ)
 
