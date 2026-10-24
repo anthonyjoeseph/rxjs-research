@@ -10,20 +10,19 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SILENT RUN
 
-Untried: whether every silent engine step either drops a skip lying before
-every item the configuration's meaning reaches (a stall, a close) or lowers a
-measure of the control (`work`); a stall past an unshown item breaks it.
-Settled when `work` is a definition and `silent-strict` a body, or refuted.
+Untried: a measure of the control (`work`) falling on every silent step that
+keeps the configuration's meaning exactly: rises, begins, mark runs. Settled
+when `work` is a definition and `silent-work` a body, or refuted.
 
-Members: `silent-strict`, `work`.
+Members: `silent-work`, `work`.
 
 #### THE KEPT DEPTH
 
-Untried: Kept is set-level; these say a step keeps items at depth: a silent
-step deepens none, a value step's leftover reaches all after the value.
-Settled when a depth-aware Kept dispatch proves both, or a step adds a skip.
+Untried: Kept is set-level; these keep the meaning at every depth: a silent
+step drops its first skip or means the same, a value step's leftover reaches
+all after it. Settled when a depth-aware Kept dispatch proves both, or refuted.
 
-Members: `silent-fewer`, `value-ahead`.
+Members: `silent-exact`, `value-ahead`.
 
 #### THE WALK
 

@@ -25,13 +25,13 @@ import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Nat using (ℕ; zero; suc; _<_; _<ᵇ_)
-open import Data.Nat.Properties using (suc-injective; m≤n⇒m<n∨m≡n)
+open import Data.Nat.Properties using (suc-injective; ≤-refl)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Time; tick; root; out; end; hush; _<ᵖ_; <ᵖ-irrefl; <ᵖ-asym; emit; stall; close)
+open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Time; tick; root; out; skip; end; hush; _<ᵖ_; <ᵖ-irrefl; <ᵖ-asym; emit; stall; close)
 open import denotation.MonotonicList using (observe; Agree; agree-refl; agree-sym)
 open import adequacy.Record using (Ahead; outᵃ; skipᵃ) renaming (none to noneᵃ)
 import denotation.Unfold as U
@@ -59,7 +59,7 @@ module Honesty (R : Set) where
   open Unsubbing R using (_⇝_; now; then)
   open Ghosting R using (Sent; sentHere; sentLater; Alike; residual; Reached; launchedʰ; silentʰ; valueʰ;
     Stands; cutʰ; finʰ; dryʰ; Mirror; Inner; Logged; Shows; silentˢ; valueˢ; completeˢ; drainedˢ; inner-launch;
-    Steps; after; steps-after; Hopped; onward; Past; past-same; agrees; skipped; lowered; Lowers; depth; ahead-agree; Fewer; work; _≺_)
+    Steps; after; steps-after; Hopped; onward; Past; past-same; agrees; skipped; lowered; Lowers; depth; ahead-agree; work; _≺_)
   open Strongly R using (Strong; Carried; module Carried; Agrees; module Agrees; Leads; shown; skips; carried; carried-sane)
 
   -- WHERE THE GHOST'S SKIPS LEAD: a ghost past them, keeping the
@@ -207,34 +207,42 @@ module Honesty (R : Set) where
     same′ = out-cancel above (value-past (Agrees.inv ag) e)
               (≅-trans (≅-sym (led-same sn pl ld)) (≅-trans (Agrees.same ag) k))
 
-  -- Every item `x` reaches, `y` reaches strictly shallower.
-  Dropped : Events R → Events R → Set
-  Dropped x y = ∀ {k} (c : Ahead x (suc k)) → Σ (Ahead y (suc k)) λ c₀ → depth c₀ < depth c
+  -- A step dropping the first skip of what its configuration means.
+  data Drop (m m′ : Conf R) : Set where
+    drop : ∀ {k r} → (∀ n → Agree n (M m) (skip k r)) → (∀ n → Agree n (force r) (M m′)) → Drop m m′
+
+  -- Two configurations meaning the same, at every depth.
+  Same : Conf R → Conf R → Set
+  Same m m′ = ∀ n → Agree n (M m) (M m′)
 
   postulate
-    -- NO SILENT STEP DEEPENS AN ITEM: whatever the configuration's
-    -- meaning reaches, the configuration it steps to reaches no deeper.
-    silent-fewer : ∀ {m t m′} → Inv m → step m ≡ silent t m′ → Fewer (M m) (M m′)
+    -- A SILENT STEP DROPS A SKIP OR KEEPS ITS MEANING: a stall, a frame's
+    -- close, a defer begun or a value absorbed drops the first skip of
+    -- what the configuration means; every other silent step means the
+    -- same.
+    silent-exact : ∀ {m t m′} → Inv m → step m ≡ silent t m′ → Drop m m′ ⊎ Same m m′
 
-    -- A SILENT STEP IS WORK DONE: a skip dropped before every item the
-    -- configuration's meaning reaches (a stall, a frame's close), or less
-    -- work left in its control.
+    -- A SILENT STEP KEEPING ITS MEANING IS WORK DONE in the
+    -- configuration's control.
     --
     -- DEAD ROUTE: a measure on the configuration alone, lowered while the
     --   ghost's next step is no skip.  Agreement as a set lets a ghost
     --   showing nothing run a cold stalling forever, whose silent run no
     --   measure bounds; only an item its meaning reaches bounds it.
-    silent-strict : ∀ {m t m′} → Inv m → step m ≡ silent t m′ → Dropped (M m) (M m′) ⊎ work m′ ≺ work m
+    silent-work : ∀ {m t m′} → Inv m → step m ≡ silent t m′ → Same m m′ → work m′ ≺ work m
+
+  -- Past a dropped skip every item lies shallower.
+  drop-suc : ∀ {m m′ k} → Drop m m′ → (c : Ahead (M m) (suc k)) → Σ (Ahead (M m′) (suc k)) λ c₀ → depth c₀ < depth c
+  drop-suc (drop ag ag′) c with ahead-agree ag c
+  ... | skipᵃ c′ , de with ahead-agree ag′ c′
+  ...   | c₀ , de′ = c₀ , subst (_< _) (sym de′) (subst (depth c′ <_) de ≤-refl)
 
   -- A silent step brings every item the configuration's meaning reaches
   -- nearer: shallower, or as deep with less work left.
   silent-lowers : ∀ {m t m′} → Inv m → step m ≡ silent t m′ → Lowers m m′
-  silent-lowers iv e c with silent-strict iv e
-  ... | inj₁ dr = proj₁ (dr c) , inj₁ (proj₂ (dr c))
-  ... | inj₂ lt with silent-fewer iv e c
-  ...   | c₀ , le with m≤n⇒m<n∨m≡n le
-  ...     | inj₁ dl = c₀ , inj₁ dl
-  ...     | inj₂ de = c₀ , inj₂ (de , lt)
+  silent-lowers iv e c with silent-exact iv e
+  ... | inj₁ d  = proj₁ (drop-suc d c) , inj₁ (proj₂ (drop-suc d c))
+  ... | inj₂ sm = proj₁ (ahead-agree sm c) , inj₂ (proj₂ (ahead-agree sm c) , silent-work iv e sm)
 
   -- A silent step keeps the configuration running its ghost.
   agrees-silent : ∀ {g m t m′} → Agrees g m → step m ≡ silent t m′ → Agrees g m′
