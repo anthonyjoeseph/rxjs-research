@@ -538,8 +538,12 @@ module _ {R : Set} where
   ... | o′ , t = conn-unsub c (cs cl sl true ba as (just w) r e) b o u
   runs c (joinS j false x ((q , nx a) ∷ ib)) joinM p joinO v = ≅-refl
   runs c (joinS j false x ((q , cp) ∷ ib))   joinM p joinO v = ≅-refl
-  runs c (joinS j true  x ((q , cp) ∷ ib))   joinM p joinO v = lift-≅ c true (≋-by refl refl)
-  runs c (joinS j true  x ((q , nx a) ∷ ib)) joinM p joinO v = join-nx c j x q a ib p v
+  runs c (joinS j true  x ((q , cp) ∷ ib))   joinM p joinO v with closed c in ce
+  ... | false = lift-≅ c true (≋-by refl refl)
+  ... | true  = agree-≅ (closed-hides c true (stateᴺ (joinG true x j ((q , cp) ∷ ib)) (envAt c)) (stateᴺ idleᶜ (envAt c)) ce (λ n → agreeᵀ-refl n idle))
+  runs c (joinS j true  x ((q , nx a) ∷ ib)) joinM p joinO v with closed c in ce
+  ... | false = join-nx c j x q a ib p v
+  ... | true  = agree-≅ (closed-hides c true (stateᴺ (joinG true x j ((q , nx a) ∷ ib)) (envAt c)) (stateᴺ (joinG true x j ib) (envAt c)) ce (λ n → agreeᵀ-refl n idle))
   runs c (coldS b (ending e))               leafM p leafO v = lift-≅ c true (≋-by refl refl)
   runs c (coldS false (play τ u i t fr))    leafM p leafO v = ≅-refl
   runs c (coldS false over)                 leafM p leafO v = ≅-refl

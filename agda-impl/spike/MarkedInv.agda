@@ -491,8 +491,12 @@ module _ {R : Set} where
     with unsubIf sa o | wf-unsubIf sa o wo | pend-unsubIf sa o
   ... | o′ , t | wo′ | pu = inv tt v (opened-move cl sl sa ba as (just q) r e false sa as nothing r e pu op , wo′ , wb)
   run-inv c p (owedO {k = cs cl sl sa ba as nothing r e}) v w = inv tt v w
-  run-inv c p (joinO {g = true}  {e = nx a}) v w = inv tt v tt
-  run-inv c p (joinO {g = true}  {e = cp})   v w = inv tt v tt
+  run-inv c p (joinO {g = true}  {e = nx a}) v w with closed c
+  ... | true  = inv tt v tt
+  ... | false = inv tt v tt
+  run-inv c p (joinO {g = true}  {e = cp})   v w with closed c
+  ... | true  = inv tt v tt
+  ... | false = inv tt v tt
   run-inv c p (joinO {g = false} {e = nx a}) v w = inv tt v tt
   run-inv c p (joinO {g = false} {e = cp})   v w = inv tt v tt
   run-inv c p (leafO {b = b} {l = l}) v w =
