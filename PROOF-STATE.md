@@ -18,9 +18,10 @@ Members: `silent-work`, `work`.
 
 #### THE KEPT DEPTH
 
-Untried: Kept is set-level; these keep the meaning at every depth: a silent
-step drops its first skip or means the same, a value step's leftover reaches
-all after it. Settled when a depth-aware Kept dispatch proves both, or refuted.
+Probed: Kept is set-level; these keep the meaning at every depth: a silent
+step drops leading skips or means the same (`quickcheck.KeptDepth`: a defer
+begun drops several), a value step's leftover reaches all after it. Settled
+when a depth-aware Kept dispatch proves both, or refuted.
 
 Members: `silent-exact`, `value-ahead`.
 

@@ -21,13 +21,14 @@ private
   samePos : Pos → Pos → Bool
   samePos p q = not (p <ᵖ q) ∧ not (q <ᵖ p)
 
-  exactᵇ : ℕ → Events ℕ → Events ℕ → Bool
-  exactᵇ zero    _           _            = true
-  exactᵇ (suc k) (out p a r) (out q b r′) = samePos p q ∧ (a ≡ᵇ b) ∧ exactᵇ k (Events∞.force r) (Events∞.force r′)
-  exactᵇ (suc k) (skip p r)  (skip q r′)  = samePos p q ∧ exactᵇ k (Events∞.force r) (Events∞.force r′)
-  exactᵇ (suc k) (end p)     (end q)      = samePos p q
-  exactᵇ (suc k) hush        hush         = true
-  exactᵇ (suc k) _           _            = false
+-- Two runs alike to `k` events, skips and positions included.
+exactᵇ : ℕ → Events ℕ → Events ℕ → Bool
+exactᵇ zero    _           _            = true
+exactᵇ (suc k) (out p a r) (out q b r′) = samePos p q ∧ (a ≡ᵇ b) ∧ exactᵇ k (Events∞.force r) (Events∞.force r′)
+exactᵇ (suc k) (skip p r)  (skip q r′)  = samePos p q ∧ exactᵇ k (Events∞.force r) (Events∞.force r′)
+exactᵇ (suc k) (end p)     (end q)      = samePos p q
+exactᵇ (suc k) hush        hush         = true
+exactᵇ (suc k) _           _            = false
 
 -- The stepper's run against the meaning of the configuration it starts from.
 stepping : Prog natᵗ → Bool
