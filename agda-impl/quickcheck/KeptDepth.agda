@@ -10,16 +10,20 @@
 module quickcheck.KeptDepth where
 
 open import Data.Bool using (Bool; true; false; not; _∧_; _∨_; if_then_else_)
-open import Data.List using (List; []; _∷_; upTo) renaming (map to mapL)
+open import Data.List using (List; []; _∷_; upTo) renaming (map to mapL; _++_ to _++L_)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_; _<ᵇ_; _≡ᵇ_)
-open import Data.Product using (_,_)
-open import Data.Maybe using (just)
+open import Data.Product using (_×_; _,_)
+open import Data.Maybe using (just; nothing)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.String using (String; _++_)
 
 open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush)
-open import Tree using (defer)
+open import Tree using (defer; mergeᶠ)
+open import Data.List.Relation.Unary.Any using (here)
+open import Relation.Binary.PropositionalEquality using (refl)
+open import quickcheck.Tm using (nat; bool; var)
+open import quickcheck.Code using (Code; Prog; of; takeWhile; flatMap; connect; connected) renaming (defer to deferᶜ)
 open import denotation.MonotonicList.Events using (stall; close)
 open import operation.PureObservable using (play; module Driver; module Machine)
 open import adequacy.Engine.Meaning using (M)
@@ -119,12 +123,33 @@ private
     after n run best m m′ (suc zero)    = walk n (suc run) best m′
     after n run best m m′ (suc (suc _)) = walk n 0 (best ⊔ run) m′
 
--- One seed's verdict.
-keptLine : ℕ → String
-keptLine s with walk 400 0 0 (load (toObs timeline 3 (program s) []ᴬ []ᴬ []ᴬ))
-... | yes l = "kept-depth: ok   seed " ++ showℕ s ++ " longest " ++ showℕ l
-... | no l w = "kept-depth: FAIL seed " ++ showℕ s ++ " longest " ++ showℕ l ++ "\n  program " ++ showCode natᵗ (program s) ++ w
+-- One program's verdict, under a label.
+keptLine : String → Prog natᵗ → String
+keptLine n p with walk 400 0 0 (load (toObs timeline 3 p []ᴬ []ᴬ []ᴬ))
+... | yes l = "kept-depth: ok   " ++ n ++ " longest " ++ showℕ l
+... | no l w = "kept-depth: FAIL " ++ n ++ " longest " ++ showℕ l ++ "\n  program " ++ showCode natᵗ p ++ w
 
--- The verdicts on seeds from f.
+private
+  -- A connect whose body's first value ends the takeWhile above it while
+  -- the connect is still being subscribed, so its source is begun under
+  -- a closed cut; a lane of a merge, so the run goes on past it.
+  closedSrc : ∀ {Γ Δᵍ Δ Θ} → Bool → Code Γ Δᵍ Δ Θ natᵗ → Code Γ Δᵍ Δ Θ natᵗ
+  closedSrc i s = takeWhile i (bool false) (connect s (of (nat 0 ∷ nat 1 ∷ [])))
+
+  inLane : Code [] [] [] (natᵗ ∷ []) natᵗ → Prog natᵗ
+  inLane l = flatMap (mergeᶠ nothing) l (of (nat 0 ∷ nat 1 ∷ []))
+
+  -- Steps drawn programs rarely take: a step begun under a closed cut.
+  hands : List (String × Prog natᵗ)
+  hands =
+      ("a deferred source begun under a closed cut" , inLane (closedSrc false (deferᶜ (of (nat 5 ∷ [])))))
+    ∷ ("a deferred source begun under a closed cut, inclusive" , inLane (closedSrc true (deferᶜ (of (nat 5 ∷ [])))))
+    ∷ ("a deferred connect begun under a closed cut"
+      , inLane (closedSrc false (deferᶜ (connect (of (nat 5 ∷ [])) (connected (here refl))))))
+    ∷ ("a deferred merge begun under a closed cut"
+      , inLane (closedSrc false (deferᶜ (flatMap (mergeᶠ nothing) (deferᶜ (of (var (here refl) ∷ []))) (of (nat 5 ∷ nat 6 ∷ []))))))
+    ∷ []
+
+-- The verdicts on seeds from f, then on the hand programs.
 keptLines : ℕ → ℕ → List String
-keptLines f c = mapL (λ s → keptLine (f + s)) (upTo c)
+keptLines f c = mapL (λ s → keptLine ("seed " ++ showℕ (f + s)) (program (f + s))) (upTo c) ++L mapL (λ (n , p) → keptLine n p) hands
