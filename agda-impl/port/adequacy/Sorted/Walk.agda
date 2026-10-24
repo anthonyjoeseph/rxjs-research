@@ -9,8 +9,7 @@ open import Data.List using ([])
 
 open import denotation.MonotonicList.Events using (Pos; root)
 open import port.operation.PureObservable using (PureObs; module Driver; module Machine)
-open import adequacy.Sorted using (_≤ᵖ_)
-open import port.adequacy.Sorted using (module Sorting)
+open import port.adequacy.Sorted using (_≤ᵖ_; module Sorting)
 
 module SortingWalk (R : Set) where
   open Driver R using (Step; silent; value; complete; drained; step)

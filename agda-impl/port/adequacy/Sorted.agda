@@ -9,10 +9,22 @@ module port.adequacy.Sorted where
 open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_)
 open import Data.Nat using (zero; suc; _<ᵇ_)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import denotation.MonotonicList.Events using (Pos)
+open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; <ᵖ-trans)
 open import port.operation.PureObservable using (module Driver; module Machine)
-open import adequacy.Sorted using (_≤ᵖ_; ≤ᵖ-trans)
+
+------------------------------------------------------------------------
+-- The order, reflexive
+
+_≤ᵖ_ : Pos → Pos → Set
+p ≤ᵖ q = p ≡ q ⊎ p <ᵖ q ≡ true
+
+≤ᵖ-trans : ∀ {p q r} → p ≤ᵖ q → q ≤ᵖ r → p ≤ᵖ r
+≤ᵖ-trans (inj₁ refl) h           = h
+≤ᵖ-trans h           (inj₁ refl) = h
+≤ᵖ-trans {p} {q} {r} (inj₂ a) (inj₂ b) = inj₂ (<ᵖ-trans p q r a b)
 
 module Sorting (R : Set) where
   open Driver R using (Step; silent; value; complete; drained; step; reading; Read)

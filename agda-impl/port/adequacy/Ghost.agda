@@ -26,15 +26,14 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; con
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Time; tick; out; skip; end; hush; root)
 open import denotation.MonotonicList using (observe; Agree; out⁼; skip⁼; end⁼; hush⁼; agree; agree-sym)
 import denotation.Unfold as U
-open import adequacy.Record using (Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ)
+open import port.adequacy.Record using (Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ)
 open import denotation.Compositional using ([]ᵉ)
-open import adequacy.Sorted using (_≤ᵖ_)
+open import port.adequacy.Sorted using (_≤ᵖ_)
 open import port.adequacy.Unsub using (module Unsubbing)
 open import port.adequacy.Strong using (module Strongly)
 open import adequacy.Stepper.Past using (afterᴱ)
 open import denotation.Denote using (⟦_⟧)
-open import operation.PureObservable using (module Pure)
-open import port.operation.PureObservable using (PureObs; module Driver; module Machine)
+open import port.operation.PureObservable using (PureObs; module Driver; module Machine; module Pure)
 open Events∞
 
 module Ghosting (R : Set) where

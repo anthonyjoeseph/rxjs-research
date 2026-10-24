@@ -35,9 +35,8 @@ open import denotation.MonotonicList.Events using (Events; Pos; Time; tick; root
 open import denotation.MonotonicList using (observe; Agree)
 import denotation.Unfold as U
 open import denotation.Denote using (⟦_⟧)
-open import operation.PureObservable using (module Pure)
-open import port.operation.PureObservable using (PureObs; module Driver; module Machine)
-open import adequacy.Sorted using (_≤ᵖ_)
+open import port.operation.PureObservable using (PureObs; module Driver; module Machine; module Pure)
+open import port.adequacy.Sorted using (_≤ᵖ_)
 open import adequacy.Sane using (Sane)
 open import adequacy.Placed.Order using (Placed)
 open import adequacy.Stepper.Past using (_≃_)

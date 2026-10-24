@@ -8,16 +8,55 @@
 -- depths.  The run's time is the tick of the position it is at.
 module port.operation.PureObservable where
 
-open import Data.Bool using (true; false; if_then_else_)
+open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_)
 
 open import Tree using (Obs)
-open import denotation.MonotonicList.Events using (Timeline; timelineAt; ML; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Pos; ix; last; tick) renaming (sub to subᴾ)
+open import denotation.MonotonicList.Events using (Timeline; timelineAt; ML; Burst; Burst∞; ML∞; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Pos; ix; last; tick) renaming (sub to subᴾ)
 open import operation.Key using (Key) renaming (at to atᴷ)
-open import operation.PureObservable using (module Pure)
+
+------------------------------------------------------------------------
+-- Observing a run
+
+-- `R` is the type the root observes.
+module Pure (R : Set) where
+  -- How the record of a run ends.
+  data End : Set where
+    finished : End
+    dry      : End
+    cutOff   : Time → End
+
+  stalls : ∀ {A} → Burst∞ A
+  stalls .Burst∞.force = stall stalls
+
+  ending : ∀ {A} → End → ML A
+  ending finished   = done
+  ending dry        = quiet
+  ending (cutOff t) = at t (stall stalls)
+
+  sameFrame : ∀ {A} → Bool → Burst A → Burst A → Burst A
+  sameFrame true  b _ = b
+  sameFrame false _ c = c
+
+  mutual
+    -- The record, from a frame at tick t whose values so far are out.
+    frames : ∀ {A} → List (Time × A) → End → ML A
+    frames []             e = ending e
+    frames ((t , a) ∷ xs) e = at t (emit a (within t xs e))
+
+    within : ∀ {A} → Time → List (Time × A) → End → Burst∞ A
+    within t xs e .Burst∞.force = inFrame t xs e
+
+    inFrame : ∀ {A} → Time → List (Time × A) → End → Burst A
+    inFrame t []               (cutOff c) = sameFrame (c ≡ᵇ t) (stall stalls) (close (later (ending (cutOff c))))
+    inFrame t []               e          = close (later (ending e))
+    inFrame t ((t′ , a) ∷ xs) e          = sameFrame (t′ ≡ᵇ t) (emit a (within t xs e)) (close (later (frames ((t′ , a) ∷ xs) e)))
+
+    later : ∀ {A} → ML A → ML∞ A
+    later m .ML∞.force = m
 
 -- What a started cold keeps: the frame it plays, from the tick it was
 -- subscribed at, in cascade `u`, its next index; the completion it owes
