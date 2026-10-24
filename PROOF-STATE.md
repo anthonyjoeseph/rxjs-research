@@ -13,11 +13,22 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 Each skipped step (an outer value, a lane's completion under a queue, a defer
 begun, a frame's stall or close) drops a leading skip at its hole; whether the
 frames above pass it up: an outer frame, a connect's source (joiners' images
-drop too) and its body (a hush source loses its tail). Settled when these are
+drop too), and every frame's `Pass` condition at a real configuration (a
+hushed connect source leaves nothing running). Settled when these are
 bodies, or refuted.
 
 Members: `outer-drop`, `lane-drop`, `stall-drop`, `close-drop`, `defer-hole`,
-`defer-pass`, `outer-drops`, `src-drops`, `body-drops`.
+`defer-pass`, `outer-drops`, `src-drops`.
+
+#### THE TAIL'S SKIP
+
+Probed (`quickcheck.KeptDepth`'s closed-cut programs): a defer begun under a
+frame reading only its tail still drops a skip at the root, through the pin
+the connect's burst leaves. Whether every such skip is pinned, and a lift
+carrying each skip with its pin. Settled when the lift is a body, or a
+skipped step there is refuted.
+
+Members: `defer-tail`.
 
 #### THE KEPT DEPTH
 

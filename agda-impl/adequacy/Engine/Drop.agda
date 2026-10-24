@@ -14,7 +14,7 @@
 -- the rest (`Fed`).
 module adequacy.Engine.Drop where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (Bool; true; false; not; _∧_)
 open import Data.Empty using (⊥)
 open import Data.List using (_∷_; _++_; reverse)
 import Data.List as L
@@ -27,14 +27,14 @@ open import Data.Sum using (_⊎_)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
 
-open import denotation.MonotonicList.Events using (Events; Events∞; Pos; skip; hush)
-open import denotation.MonotonicList using (head; shownAt; Agree; stop; skip⁼; agree-trans; agreeᵀ-refl)
-open import denotation.NonExpansive using (_,ˢ_; mapᴱ-ne; scanᴱ-ne; takeWhileᴱ-ne)
+open import denotation.MonotonicList.Events using (Events; Events∞; Pos; out; skip; end; hush; idle; _∪_)
+open import denotation.MonotonicList using (head; shownAt; Agree; Agreeᵀ; stop; skip⁼; agree-refl; agree-trans; agreeᵀ-refl; agreeᵀ-sym)
+open import denotation.NonExpansive using (_,ˢ_; mapᴱ-ne; scanᴱ-ne; takeWhileᴱ-ne; ∪-ne; beside-ne)
 open import denotation.Unfold using (Node; NEnv; stateᴺ; states; outerᴺ)
 open import denotation.Denote using (flatOp)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; cs; free; cpAt; cutAt; overAt)
-open import adequacy.Engine.Meaning using (_≋_; ≋-by; up; mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn; srcState;
+open import adequacy.Engine.Meaning using (_≋_; ≋-by; same; up; mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn; srcState;
   srcG; envAt; gh; lane; lanesL; deadL; outerG; outerT; poolRuns; poolT; laneᴹ; lanesFrame-ne)
 open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore; go-rise)
 open Events∞
@@ -76,6 +76,28 @@ shown e    = just (shownAt e)
 Fed : ∀ {B} → (Pos → Set) → Events∞ B → Events∞ B → Set
 Fed P β β′ = β ≋ β′ ⊎ Dropsˢ (Under P) β β′
 
+-- Whether every frame up the context shows the hole's next step, rather
+-- than reading only its tail: `Pass` is empty exactly where this fails.
+shows : ∀ {R Γ A} → Ctx R Γ A → Bool → Bool
+shows top                                                 f = true
+shows (inMap g c)                                         f = shows c true
+shows (inScan g z c)                                      f = shows c true
+shows (inCut l a c)                                       f = l ∧ shows c true
+shows (inLn b c)                                          f = shows c b
+shows (inTake i q free c)                                 f = shows c true
+shows (inTake i q (cpAt _) c)                             f = false
+shows (inTake i q (cutAt _) c)                            f = false
+shows (inTake i q (overAt _) c)                           f = false
+shows (inOuter op g d n q ls c)                           f = not d ∧ shows c true
+shows (inLanes op g d n q o pre post c)                   f = f ∧ shows c true
+shows (inSrc (cs false true sa ba as nothing r en) b c)   f = shows c true
+shows (inSrc (cs false true sa ba as (just _) r en) b c)  f = false
+shows (inSrc (cs false false sa ba as ow r en) b c)       f = false
+shows (inSrc (cs true sl sa ba as ow r en) b c)           f = false
+shows (inBody (cs cl true sa ba as nothing r en) o c)     f = shows c true
+shows (inBody (cs cl true sa ba as (just _) r en) o c)    f = false
+shows (inBody (cs cl false sa ba as ow r en) o c)         f = false
+
 mutual
   Pass : ∀ {R Γ A} → (Pos → Set) → Ctx R Γ A → Bool → Events∞ A → Events∞ A → Set
   Pass P top                               f h h′ = ⊤
@@ -105,7 +127,9 @@ mutual
   Pass P (inSrc (cs false false sa ba as ow r en) b c)      f h h′ = ⊥
   Pass P (inSrc (cs true sl sa ba as ow r en) b c)          f h h′ = ⊥
   Pass P (inBody (cs cl true sa ba as nothing r en) o c)    f h h′ =
-    (∀ k → P k → NotBefore k (shown (force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)))))
+    (force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) ≡ hush
+       → ∀ d → Agreeᵀ d (cut (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c))) idle)
+    × (∀ k → P k → NotBefore k (shown (force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)))))
     × Pass P c true (bodyConn r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) h)
                     (bodyConn r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) h′)
   Pass P (inBody (cs cl true sa ba as (just _) r en) o c)   f h h′ = ⊥
@@ -183,10 +207,42 @@ postulate
   src-drops : ∀ {Γ X B P} r en (b : Node (X ∷ Γ) B) (ρ : NEnv Γ) {h h′ : Events∞ X}
             → SrcPass P (stateᴺ b (force h ∷ᴬ ρ)) (stateᴺ b (force h′ ∷ᴬ ρ)) h′
             → Dropsˢ P h h′ → Dropsˢ (Under P) (connSrc false r en b ρ h) (connSrc false r en b ρ h′)
-  -- A BODY'S SKIPS, THE SOURCE'S NEXT NO EARLIER: the body's skips pass.
-  body-drops : ∀ {X B P} r (σ : Events∞ X) {h h′ : Events∞ B}
-             → (∀ k → P k → NotBefore k (shown (force σ)))
-             → Dropsˢ P h h′ → Dropsˢ P (bodyConn r σ h) (bodyConn r σ h′)
+
+private
+  -- The body past its skip, the source beside it as it stands.
+  sideC : ∀ {X B} → Pos → Events∞ X → Events X → Events∞ B → Events∞ B
+  sideC r σ e r₁ .force = M′.side r r₁ σ e
+  sideC r σ e r₁ .cut   = M′.burstOn r σ ∪ cut r₁
+
+  -- The body's skip, the source's next no earlier, comes first.  A
+  -- source hushed is the body alone, so what it leaves running must be
+  -- nothing, or the connect's tail would lose it past the skip.
+  side-skip : ∀ {X B} r (σ : Events∞ X) (e : Events X) {k} (r₁ h : Events∞ B) → force σ ≡ e
+            → (force σ ≡ hush → ∀ d → Agreeᵀ d (cut σ) idle) → NotBefore k (shown e)
+            → ∀ n → Agree n (M′.side r (skipped k r₁ h) σ e) (skip k (sideC r σ e r₁))
+  side-skip r σ e r₁ h eq hc nb zero = stop
+  side-skip r σ hush r₁ h eq hc nb (suc n) =
+    skip⁼ (subst (λ x → Agreeᵀ n (cut r₁) (M′.runOn r x (cut σ) ∪ cut r₁)) (sym eq) (agreeᵀ-sym (∪-ne (hc eq n) (agreeᵀ-refl n (cut r₁)))))
+      (agree-refl n (force r₁))
+  side-skip r σ (out q a s) r₁ h eq hc nb (suc n) rewrite nb = skip⁼ (agreeᵀ-refl n _) (agree-refl n _)
+  side-skip r σ (skip q s)  r₁ h eq hc nb (suc n) rewrite nb = skip⁼ (agreeᵀ-refl n _) (agree-refl n _)
+  side-skip r σ (end q)     r₁ h eq hc nb (suc n) rewrite nb = skip⁼ (agreeᵀ-refl n _) (agree-refl n _)
+
+  body-skip : ∀ {X B k} r (σ : Events∞ X) {h r₁ : Events∞ B}
+            → (force σ ≡ hush → ∀ d → Agreeᵀ d (cut σ) idle) → NotBefore k (shown (force σ))
+            → (∀ n → Agree n (force h) (skip k r₁)) → ∀ n → Agree n (force (bodyConn r σ h)) (skip k (bodyConn r σ r₁))
+  body-skip {k = k} r σ {h} {r₁} hc nb ag n =
+    agree-trans (beside-ne r (skipped-≋ ag n) (same n σ))
+      (agree-trans (side-skip r σ (force σ) r₁ h refl hc nb n) (skip-≋ {r = sideC r σ (force σ) r₁} {r′ = bodyConn r σ r₁} (≋-by refl refl) n))
+
+-- A BODY'S SKIPS, THE SOURCE'S NEXT NO EARLIER, pass its connect.
+body-drops : ∀ {X B P} r (σ : Events∞ X) {h h′ : Events∞ B}
+           → (force σ ≡ hush → ∀ d → Agreeᵀ d (cut σ) idle) → (∀ k → P k → NotBefore k (shown (force σ)))
+           → Dropsˢ P h h′ → Dropsˢ P (bodyConn r σ h) (bodyConn r σ h′)
+body-drops r σ hc nb (dropˢ {k} {r₁} pk ag x) =
+  dropˢ pk (body-skip r σ hc (nb k pk) ag) (λ n → ∪-ne (agreeᵀ-refl n (M′.burstOn r σ)) (cutˢ (x n)) ,ˢ beside-ne r (x n) (same n σ))
+body-drops r σ hc nb (dropsˢ {k} {r₁} pk ag d) =
+  dropsˢ pk (body-skip r σ hc (nb k pk) ag) (body-drops r σ hc nb d)
 
 ------------------------------------------------------------------------
 -- Up to the root
@@ -210,5 +266,5 @@ lift-drops P (inLanes op g d′ n q o pre post c) true d (fi , ps) =
   lift-drops P c true (lanes-drops op (lane g) d′ q (gh o) (reverse pre) post (envAt c) fi d) ps
 lift-drops P (inSrc (cs false true sa ba as nothing r en) b c) f d (sp , ps) =
   lift-drops (Under P) c true (src-drops r en (gh b) (envAt c) sp d) ps
-lift-drops P (inBody (cs cl true sa ba as nothing r en) o c) f d (bp , ps) =
-  lift-drops P c true (body-drops r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) bp d) ps
+lift-drops P (inBody (cs cl true sa ba as nothing r en) o c) f d (hc , bp , ps) =
+  lift-drops P c true (body-drops r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) hc bp d) ps
