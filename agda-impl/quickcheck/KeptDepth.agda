@@ -4,7 +4,7 @@
 -- skips of what its configuration means (`adequacy.Engine.Meaning.M`), or
 -- means the same, event for event, skips and positions included
 -- (`adequacy.Content.silent-exact`), with less work left
--- (`adequacy.Content.silent-work`).  Also the longest run of silent steps
+-- (`adequacy.Engine.Spent.Spending.silent-spent`).  Also the longest run of silent steps
 -- meaning the same.
 module quickcheck.KeptDepth where
 

@@ -31,7 +31,8 @@ open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Time; tick; root; out; skip; end; hush; _<ᵖ_; <ᵖ-irrefl; <ᵖ-asym; emit; stall; close)
+open import Tree using (Obs; defer)
+open import denotation.MonotonicList.Events using (Timeline; Events; Events∞; Pos; Time; tick; root; out; skip; end; hush; _<ᵖ_; <ᵖ-irrefl; <ᵖ-asym; emit; stall; close)
 open import denotation.MonotonicList using (observe; Agree; agree-refl; agree-sym)
 open import adequacy.Record using (Ahead; outᵃ; skipᵃ) renaming (none to noneᵃ)
 import denotation.Unfold as U
@@ -48,13 +49,16 @@ open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Engine.Meaning using (M; Has; atOut; atEnd; pastOut; _≅_; ≅-refl; ≅-sym; ≅-trans; agree-≅)
 open import adequacy.Engine.Inv using (Inv; NextInv; inv-next)
+open import adequacy.Engine.Spent using (module Spending)
 open import adequacy.Engine.Kept using (KeptFrom) renaming (kept to engine-kept)
 open import adequacy.Strong using (module Strongly)
 open Events∞ using (force)
 
 module Honesty (R : Set) where
   open Driver R using (Step; silent; value; complete; drained; step; reading; Read; read; later; played; took)
-  open Machine using (Conf; load; moved; starting; turn; quiet; gone; leaf; nx; cp) renaming (step to stepᴹ)
+  open Machine using (Conf; ⟨_,_,_,_⟩; load; moved; starting; turn; quiet; gone; leaf; nx; cp; St; pend; coldS; Ctx; top; inOuter; inLanes;
+    inSrc; plug; closed; alive; search; found; leafM; subscribing; absorbed; rising) renaming (step to stepᴹ)
+  open Spending R using (Skipped; outerᵏ; laneᵏ; srcᵏ; deferᵏ; stallᵏ; closeᵏ; silent-spent)
   open Pure R using (End; finished; dry; cutOff)
   open Unsubbing R using (_⇝_; now; then)
   open Ghosting R using (Sent; sentHere; sentLater; Alike; residual; Reached; launchedʰ; silentʰ; valueʰ;
@@ -228,20 +232,40 @@ module Honesty (R : Set) where
     -- step means the same.
     silent-exact : ∀ {m t m′} → Inv m → step m ≡ silent t m′ → Drop m m′ ⊎ Same m m′
 
-    -- A SILENT STEP KEEPING ITS MEANING IS WORK DONE in the
-    -- configuration's control, while that meaning reaches an item.
-    --
-    -- Without an item there is no bound: a cold whose frames are all empty,
-    -- one per tick forever, means skips only, so each close keeps its
-    -- meaning exactly at every depth while what it owes stays one stop.
-    -- With an item ahead, a step dropping a skip moves the item shallower
-    -- and so is no such step.
-    --
-    -- DEAD ROUTE: a measure on the configuration alone, lowered while the
-    --   ghost's next step is no skip.  Agreement as a set lets a ghost
-    --   showing nothing run a cold stalling forever, whose silent run no
-    --   measure bounds; only an item its meaning reaches bounds it.
-    silent-work : ∀ {m t m′ k} → Inv m → step m ≡ silent t m′ → Same m m′ → Ahead (M m) (suc k) → work m′ ≺ work m
+    -- EACH STEP WHOSE WORK MAY GROW DROPS A SKIP (`adequacy.Engine.Spent`'s
+    -- `Skipped`): what the step leaves means less by at least one leading
+    -- skip, never the same.  Every other silent step lowers its work.
+    outer-drop : ∀ {Γ A B op d n q ls} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {a p t m′}
+               → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
+               → step ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ ≡ silent t m′
+               → Drop ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ m′
+    lane-drop : ∀ {Γ A B op d n a q pre post} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {s : St Γ B} {p t m′}
+              → alive s ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
+              → step ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ ≡ silent t m′
+              → Drop ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ m′
+    src-drop : ∀ {Γ X B k} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {s : St Γ X} {e p t m′}
+             → Inv ⟨ inSrc k b c , s , rising e , p ⟩ → step ⟨ inSrc k b c , s , rising e , p ⟩ ≡ silent t m′
+             → Drop ⟨ inSrc k b c , s , rising e , p ⟩ m′
+    defer-drop : ∀ {Γ A} {c : Ctx R Γ A} {l p t m′}
+               → Inv ⟨ c , pend (defer l) , subscribing , p ⟩ → step ⟨ c , pend (defer l) , subscribing , p ⟩ ≡ silent t m′
+               → Drop ⟨ c , pend (defer l) , subscribing , p ⟩ m′
+    stall-drop : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p t m′}
+               → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (stall k))) leafM key)
+               → closed c′ ≡ false → Inv ⟨ c , s , absorbed , p ⟩ → step ⟨ c , s , absorbed , p ⟩ ≡ silent t m′
+               → Drop ⟨ c , s , absorbed , p ⟩ m′
+    close-drop : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p t m′}
+               → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (close k))) leafM key)
+               → closed c′ ≡ false → Inv ⟨ c , s , absorbed , p ⟩ → step ⟨ c , s , absorbed , p ⟩ ≡ silent t m′
+               → Drop ⟨ c , s , absorbed , p ⟩ m′
+
+  -- A step whose work may grow drops a skip.
+  skipped-drop : ∀ {m t m′} → Inv m → step m ≡ silent t m′ → Skipped m → Drop m m′
+  skipped-drop iv e outerᵏ          = outer-drop iv e
+  skipped-drop iv e (laneᵏ al)      = lane-drop al iv e
+  skipped-drop iv e srcᵏ            = src-drop iv e
+  skipped-drop iv e deferᵏ          = defer-drop iv e
+  skipped-drop iv e (stallᵏ eq ce)  = stall-drop eq ce iv e
+  skipped-drop iv e (closeᵏ eq ce)  = close-drop eq ce iv e
 
   -- Past dropped skips every item lies shallower.
   drop-suc : ∀ {e e′ k} → Drops e e′ → (c : Ahead e (suc k)) → Σ (Ahead e′ (suc k)) λ c₀ → depth c₀ < depth c
@@ -255,9 +279,10 @@ module Honesty (R : Set) where
   -- A silent step brings every item the configuration's meaning reaches
   -- nearer: shallower, or as deep with less work left.
   silent-lowers : ∀ {m t m′} → Inv m → step m ≡ silent t m′ → Lowers m m′
-  silent-lowers iv e c with silent-exact iv e
-  ... | inj₁ d  = proj₁ (drop-suc d c) , inj₁ (proj₂ (drop-suc d c))
-  ... | inj₂ sm = proj₁ (ahead-agree sm c) , inj₂ (proj₂ (ahead-agree sm c) , silent-work iv e sm c)
+  silent-lowers iv e c with silent-exact iv e | silent-spent iv e
+  ... | inj₁ d  | _       = proj₁ (drop-suc d c) , inj₁ (proj₂ (drop-suc d c))
+  ... | inj₂ sm | inj₁ lt = proj₁ (ahead-agree sm c) , inj₂ (proj₂ (ahead-agree sm c) , lt)
+  ... | inj₂ sm | inj₂ sk = proj₁ (drop-suc (skipped-drop iv e sk) c) , inj₁ (proj₂ (drop-suc (skipped-drop iv e sk) c))
 
   -- A silent step keeps the configuration running its ghost.
   agrees-silent : ∀ {g m t m′} → Agrees g m → step m ≡ silent t m′ → Agrees g m′

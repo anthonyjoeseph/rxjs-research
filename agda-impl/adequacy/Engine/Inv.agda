@@ -10,7 +10,7 @@
 -- rewrites, and the context's share rides along.
 module adequacy.Engine.Inv where
 
-open import Data.Bool using (true; false; not; if_then_else_)
+open import Data.Bool using (true; false; not; if_then_else_; _∧_)
 open import Data.List using (List; []; _∷_; _ʳ++_; null)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (zero; suc; pred; _<ᵇ_; _≡ᵇ_)
@@ -28,7 +28,7 @@ open import operation.Key using (at)
 open import denotation.Unfold using (same?)
 open import adequacy.Engine.Head using (Frag)
 open import adequacy.Engine.Pick using (Order; order; module Order; whole; Lead; Clear; Won; won-clear; search-won)
-open import operation.PureObservable using (Tape; play; ending; over; module Machine; module Driver)
+open import operation.PureObservable using (Tape; due; play; ending; over; module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; closed; closedUp;
   CS; cs; shows; outOf; attAt; attached; free; cpAt; cutAt; overAt; nx; cp;
@@ -49,9 +49,10 @@ IsPend : ∀ {Γ A} → St Γ A → Set
 IsPend (pend o) = ⊤
 IsPend _        = ⊥
 
--- What runs now, rising or absorbed, is never a node still to subscribe.
+-- What subscribes now is a node still to subscribe; what runs now,
+-- rising or absorbed, never is.
 Settled : ∀ {R} → Conf R → Set
-Settled ⟨ c , s , subscribing , p ⟩ = ⊤
+Settled ⟨ c , s , subscribing , p ⟩ = IsPend s
 Settled ⟨ c , s , absorbed , p ⟩    = Unpended s
 Settled ⟨ c , s , rising e , p ⟩    = Unpended s
 
@@ -351,10 +352,8 @@ if-inv : ∀ {ℓ} {X : Set ℓ} (P : X → Set) b {x y} → P x → P y → P (
 if-inv P true  px py = px
 if-inv P false px py = py
 
-settledU : ∀ {R Γ A} {c : Ctx R Γ A} {s : St Γ A} m {p} → Unpended s → Settled ⟨ c , s , m , p ⟩
-settledU subscribing u = tt
-settledU absorbed    u = u
-settledU (rising e)  u = u
+settle-settled : ∀ {R Γ A} {c : Ctx R Γ A} {s : St Γ A} d n e {p} → Unpended s → Settled ⟨ c , s , settle d n e , p ⟩
+settle-settled {c = c} {s} d n e {p} u = if-inv (λ m → Settled ⟨ c , s , m , p ⟩) (d ∧ (n ≡ᵇ 0) ∧ e) u u
 
 ------------------------------------------------------------------------
 -- The marks a node owns, as `own` lists them
@@ -364,22 +363,22 @@ data Owns {Γ} : ∀ {A} → St Γ A → Mark → Set₁ where
   attO    : ∀ {A l p} {s : St Γ A} → Owns (cutS l (attAt p) s) attM
   cpO     : ∀ {A i q p} {s : St Γ A} → Owns (takeS i q (cpAt p) s) cpM
   cutO    : ∀ {A i q p} {s : St Γ A} → Owns (takeS i q (cutAt p) s) cutM
-  bodyO   : ∀ {X B k} {o : St Γ X} {b : St (X ∷ Γ) B} → Owns (connS k o b) bodyM
-  srcAttO : ∀ {X B k} {o : St Γ X} {b : St (X ∷ Γ) B} → Owns (connS k o b) srcAttM
-  owedO   : ∀ {X B k} {o : St Γ X} {b : St (X ∷ Γ) B} → Owns (connS k o b) owedM
+  bodyO   : ∀ {X B k p} {o : St Γ X} {b : St (X ∷ Γ) B} → CS.bodyAt k ≡ just p → Owns (connS k o b) bodyM
+  srcAttO : ∀ {X B k p} {o : St Γ X} {b : St (X ∷ Γ) B} → CS.attSrc k ≡ just p → Owns (connS k o b) srcAttM
+  owedO   : ∀ {X B k p} {o : St Γ X} {b : St (X ∷ Γ) B} → CS.owedAt k ≡ just p → Owns (connS k o b) owedM
   joinO   : ∀ {A j g x q e ib} → Owns (joinS {A = A} j g x ((q , e) ∷ ib)) joinM
-  leafO   : ∀ {A b} {l : Tape A} → Owns (coldS b l) leafM
+  leafO   : ∀ {A b key} {l : Tape A} → due l ≡ just key → Owns (coldS b l) leafM
 
 owned : ∀ {Γ A} {s : St Γ A} {m} → Owns s m → Unpended s
 owned ofO     = tt
 owned attO    = tt
 owned cpO     = tt
 owned cutO    = tt
-owned bodyO   = tt
-owned srcAttO = tt
-owned owedO   = tt
-owned joinO   = tt
-owned leafO   = tt
+owned (bodyO _)   = tt
+owned (srcAttO _) = tt
+owned (owedO _)   = tt
+owned joinO       = tt
+owned (leafO _)   = tt
 
 ------------------------------------------------------------------------
 -- The step, case by case
@@ -419,7 +418,7 @@ module _ {R : Set} where
 
   dequeue-inv : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls p → WfC c → Wf o → Wfs ls
               → Base (dequeue c op f d n q o ls p)
-  dequeue-inv c op f d n []      o ls p v wo ws = inv (settledU (settle d n true) tt) v (wo , ws)
+  dequeue-inv c op f d n []      o ls p v wo ws = inv (settle-settled d n true tt) v (wo , ws)
   dequeue-inv c op f d n (a ∷ q) o ls p v wo ws = start-inv c op f d n q o ls a p v wo ws
 
   admit-inv : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p → WfC c → Wf o → Wfs ls
@@ -453,7 +452,7 @@ module _ {R : Set} where
   rise-inv (inTake i q (overAt r) c)         s e      p (inv u v w) = inv tt v w
   rise-inv (inOuter op f d n q ls c)         s (nx a) p (inv u (ws , v) w) = admit-inv c op f d n q s ls a p v w ws
   rise-inv (inOuter op f d n q ls c)         s cp     p (inv u (ws , v) w) =
-    inv (settledU (settle true n (Data.List.null q)) tt) v (w , ws)
+    inv (settle-settled true n (Data.List.null q) tt) v (w , ws)
   rise-inv (inLanes op f d n q o pre post c) s (nx b) p (inv u (wo , wp , wq , v) w) =
     if-inv Base (alive s) (inv tt v (wo , wfs-++ pre wp w wq)) (inv tt v (wo , wfs-++ pre wp w wq))
   rise-inv (inLanes op f d n q o pre post c) s cp     p (inv u (wo , wp , wq , v) w) =
@@ -492,16 +491,16 @@ module _ {R : Set} where
   run-inv c p cpO v w = inv tt v w
   run-inv c p (cutO {s = s}) v w with cutᴹ s | wf-cut s w
   ... | s′ , t | w′ = inv tt v w′
-  run-inv c p (bodyO {k = cs cl sl sa (just q) as ow r e}) v (op , wo , wb) = inv tt (refl , wb , v) wo
-  run-inv c p (bodyO {k = cs cl sl sa nothing as ow r e}) v w = inv tt v w
-  run-inv c p (srcAttO {k = cs cl sl sa ba (just q) ow r e} {o = o}) v (op , wo , wb)
+  run-inv c p (bodyO {k = cs cl sl sa (just q) as ow r e} _) v (op , wo , wb) = inv (proj₂ op) (refl , wb , v) wo
+  run-inv c p (bodyO {k = cs cl sl sa nothing as ow r e} ()) v w
+  run-inv c p (srcAttO {k = cs cl sl sa ba (just q) ow r e} {o = o} _) v (op , wo , wb)
     with unsubIf (not sl) o | wf-unsubIf (not sl) o wo | pend-unsubIf (not sl) o
   ... | o′ , t | wo′ | pu = inv tt v (opened-move cl sl sa ba (just q) ow r e sl true nothing ow r e pu op , wo′ , wb)
-  run-inv c p (srcAttO {k = cs cl sl sa ba nothing ow r e}) v w = inv tt v w
-  run-inv c p (owedO {k = cs cl sl sa ba as (just q) r e} {o = o}) v (op , wo , wb)
+  run-inv c p (srcAttO {k = cs cl sl sa ba nothing ow r e} ()) v w
+  run-inv c p (owedO {k = cs cl sl sa ba as (just q) r e} {o = o} _) v (op , wo , wb)
     with unsubIf sa o | wf-unsubIf sa o wo | pend-unsubIf sa o
   ... | o′ , t | wo′ | pu = inv tt v (opened-move cl sl sa ba as (just q) r e false sa as nothing r e pu op , wo′ , wb)
-  run-inv c p (owedO {k = cs cl sl sa ba as nothing r e}) v w = inv tt v w
+  run-inv c p (owedO {k = cs cl sl sa ba as nothing r e} ()) v w
   run-inv c p (joinO {g = true}  {e = nx a}) v w with closed c
   ... | true  = inv tt v tt
   ... | false = inv tt v tt
@@ -510,7 +509,7 @@ module _ {R : Set} where
   ... | false = inv tt v tt
   run-inv c p (joinO {g = false} {e = nx a}) v w = inv tt v tt
   run-inv c p (joinO {g = false} {e = cp})   v w = inv tt v tt
-  run-inv c p (leafO {b = b} {l = l}) v w =
+  run-inv c p (leafO {b = b} {l = l} _) v w =
     played-inv b l (closed c) (λ e l′ b′ p′ → ⟨ c , coldS b′ l′ , rising e , p′ ⟩) (λ l′ → ⟨ c , coldS b l′ , absorbed , p ⟩)
       (λ e l′ b′ p′ → inv tt v tt) (λ l′ → inv tt v tt)
 

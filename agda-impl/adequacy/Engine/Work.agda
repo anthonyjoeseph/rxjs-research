@@ -97,14 +97,34 @@ mutual
   owed (cutS l a s)            = attW a + owed s
   owed (lnS b s)               = one b + owed s
   owed (takeS i q w s)         = oweW w + owed s
-  owed (flatS op f true n q o ls)  = length q + owed o + owedL ls
-  owed (flatS op f false n q o ls) = suc (length q + owed o + owedL ls)
+  owed (flatS op f true n q o ls)  = owedL ls + (length q + owed o)
+  owed (flatS op f false n q o ls) = suc (owedL ls + (length q + owed o))
   owed (connS k o b)           = csW k + owed o + owed b
   owed (joinS j g x ib)        = length ib
 
   owedL : ∀ {Γ A} → List (St Γ A) → ℕ
   owedL []       = 0
   owedL (s ∷ ls) = owed s + owedL ls
+
+-- A connect's teardown owed once its body completed.  Counted apart:
+-- the completion that owes it spends height, not what the tree owes.
+tornC : CS → ℕ
+tornC k = just? 1 (CS.owedAt k)
+
+mutual
+  torn : ∀ {Γ A} → St Γ A → ℕ
+  torn (mapS f s)              = torn s
+  torn (scanS f z s)           = torn s
+  torn (cutS l a s)            = torn s
+  torn (lnS b s)               = torn s
+  torn (takeS i q w s)         = torn s
+  torn (flatS op f d n q o ls) = tornL ls + torn o
+  torn (connS k o b)           = tornC k + torn o + torn b
+  torn _                       = 0
+
+  tornL : ∀ {Γ A} → List (St Γ A) → ℕ
+  tornL []       = 0
+  tornL (s ∷ ls) = torn s + tornL ls
 
 -- How far a context's hole lies below the root.
 height : ∀ {R Γ A} → Ctx R Γ A → ℕ
@@ -121,7 +141,7 @@ height (inBody k o c)                    = suc (height c)
 
 -- A configuration's counts: what the whole tree owes, an event in flight
 -- included; whether everything running is absorbed; how far an event in
--- flight has still to rise.
+-- flight has still to rise; the teardowns owed.
 owedᶜ : ∀ {R} → Conf R → ℕ
 owedᶜ ⟨ c , s , rising e , p ⟩ = suc (owed (plug c s))
 owedᶜ ⟨ c , s , _ , p ⟩        = owed (plug c s)
@@ -129,6 +149,9 @@ owedᶜ ⟨ c , s , _ , p ⟩        = owed (plug c s)
 calmᶜ : ∀ {R} → Conf R → ℕ
 calmᶜ ⟨ c , s , absorbed , p ⟩ = 1
 calmᶜ ⟨ c , s , _ , p ⟩        = 0
+
+tornᶜ : ∀ {R} → Conf R → ℕ
+tornᶜ ⟨ c , s , m , p ⟩ = torn (plug c s)
 
 flightᶜ : ∀ {R} → Conf R → ℕ
 flightᶜ ⟨ c , s , rising e , p ⟩ = height c
