@@ -4,20 +4,24 @@
 -- skips of what its configuration means (`adequacy.Engine.Meaning.M`), or
 -- means the same, event for event, skips and positions included
 -- (`adequacy.Content.silent-exact`), with less work left
--- (`adequacy.Engine.Spent.Spending.silent-spent`).  Also the longest run of silent steps
--- meaning the same.
+-- (`adequacy.Engine.Spent.Spending.silent-spent`), and never the same
+-- when the step is one whose work may grow (`adequacy.Content`'s drops).
+-- Also the longest run of silent steps meaning the same.
 module quickcheck.KeptDepth where
 
-open import Data.Bool using (Bool; false; _∧_; _∨_; if_then_else_)
+open import Data.Bool using (Bool; true; false; not; _∧_; _∨_; if_then_else_)
 open import Data.List using (List; []; _∷_; upTo) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_; _<ᵇ_; _≡ᵇ_)
 open import Data.Product using (_,_)
+open import Data.Maybe using (just)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.String using (String; _++_)
 
 open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush)
-open import operation.PureObservable using (module Driver; module Machine)
+open import Tree using (defer)
+open import denotation.MonotonicList.Events using (stall; close)
+open import operation.PureObservable using (play; module Driver; module Machine)
 open import adequacy.Engine.Meaning using (M)
 open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Ty using (natᵗ)
@@ -28,7 +32,8 @@ open import quickcheck.Spin using (showP)
 
 open Driver ℕ using (Step; step; silent; value; complete; drained)
 open Ghosting ℕ using (work; Measure)
-open Machine using (Conf; load; spot; subscribing; absorbed; rising)
+open Machine using (Conf; ⟨_,_,_,_⟩; load; spot; subscribing; absorbed; rising; nx; cp; pend; coldS; top; inOuter; inLanes; inSrc;
+  plug; closed; alive; search; found; leafM)
 
 private
   -- A run's verdict, carrying its longest run of steps meaning the same.
@@ -64,10 +69,22 @@ private
   showW : Measure → String
   showW ((a , b , c , d , e) , f) = showℕ a ++ "," ++ showℕ b ++ "," ++ showℕ c ++ "," ++ showℕ d ++ "," ++ showℕ e ++ ";" ++ showℕ f
 
+  -- The steps whose work may grow (`adequacy.Engine.Spent.Spending.Skipped`).
+  skippedᵇ : Conf ℕ → Bool
+  skippedᵇ ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩         = true
+  skippedᵇ ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ = alive s
+  skippedᵇ ⟨ inSrc k b c , s , rising e , p ⟩                           = true
+  skippedᵇ ⟨ c , pend (defer l) , subscribing , p ⟩                     = true
+  skippedᵇ ⟨ c , s , absorbed , p ⟩ with search top (plug c s)
+  ... | just (found (Γ′ , A′ , c′ , coldS true (play τ u i t (stall k))) leafM key) = not (closed c′)
+  ... | just (found (Γ′ , A′ , c′ , coldS true (play τ u i t (close k))) leafM key) = not (closed c′)
+  ... | _ = false
+  skippedᵇ _ = false
+
   -- What a silent step neither dropping nor keeping its meaning did.
   why : Conf ℕ → Conf ℕ → String
   why m m′ = "\n  from " ++ showMode m ++ " at " ++ showSpot (spot m) ++ " to " ++ showMode m′ ++ " at " ++ showSpot (spot m′)
-             ++ "\n  work " ++ showW (work m) ++ " to " ++ showW (work m′)
+             ++ (if skippedᵇ m then " (skipped)" else "") ++ "\n  work " ++ showW (work m) ++ " to " ++ showW (work m′)
              ++ "\n  before " ++ showE 10 (M m) ++ "\n  after  " ++ showE 10 (M m′)
 
   depth : ℕ
@@ -80,9 +97,9 @@ private
   dropped (suc k) _          e′ = false
 
   -- A silent step from `m` to `m′`: 2 dropped leading skips, 1 meant the
-  -- same with less work left, 0 neither.
+  -- same with less work left and not skipped, 0 neither.
   kind : Conf ℕ → Conf ℕ → ℕ
-  kind m m′ = if exactᵇ depth (M m) (M m′) then (if lowerᵇ (work m′) (work m) then 1 else 0)
+  kind m m′ = if exactᵇ depth (M m) (M m′) then (if lowerᵇ (work m′) (work m) ∧ not (skippedᵇ m) then 1 else 0)
               else (if dropped 64 (M m) (M m′) then 2 else 0)
 
   -- Whether every silent step keeps its meaning so, and the longest run
