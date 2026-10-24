@@ -223,10 +223,41 @@ parent sees it (`seek`), and breaks every tie as the stepper does.
   takeWhile's end is a `cpAt` mark. A subscribe itself shows nothing.
 - **The tie that refuted H per node now agrees** (`spike.MarkedGap`:
   `failing-agree`, `passing-agree`).
-- **Still not the stepper's rule, to watch in K1/K2:** a silent candidate
-  is shifted only at the outer and the source; a dead lane races as a
-  lane, where the stepper pools dead lanes and takes them only strictly
-  ahead; a node's own mark wins a tie against its children.
+- **A merge races raw heads, as the stepper does** (`Unfold.goˢ`): the
+  outer and the earliest lane each by its own head, the winner's event
+  then read as the merge's (`raceT` over `outerT`/`laneT`). A silent
+  outer step stays where it is.
 - **Lane starts and a connect's subscriptions are not yet marks keyed at
-  their first head.** The fit test comes first: the oracle's `marks` and
-  `marks io` columns judge this engine against rxjs in CI.
+  their first head.**
+- **The oracle agrees** with this engine (1000/1000 random seeds,
+  100/100 named).
+
+## Findings: K1 — the fragment of / empty / map / switches / merge
+
+**H holds of every state of the fragment, by recursion on the state**
+(`spike.MarkedHead.head-agrees`). No step-preservation argument at all:
+H is per node (`Agrees`: the engine's candidate is the stepper's next
+event, or a silent mark no later; under a closed observer, `Quiet`).
+
+- **The fragment's invariant (`Frag`) passes the kill criterion.** Its
+  fields: a lane count equal to the live lanes (a fold), "outer done →
+  `Done`" (a shape predicate), each lane a switch on or off, the queue
+  empty. No order between nodes, no births.
+- **The merge is the only real work, and it is generic.** The engine's
+  lanes fold oldest-first, ties to the left; the stepper's `earliest`
+  runs newest-first, ties to the right. They meet through one exchange
+  lemma (`swap`) over two `Pos` facts already in `Events`, and a snoc
+  lemma (`win-snoc`). The race then splits four ways (engine and stepper
+  each take outer or lane); every disagreeing branch is either
+  impossible or the engine's pick is silent and no later.
+- **What was cheap:** dead lanes, a silent outer, an attach's own mark
+  winning a tie — all one lemma: a silent candidate first is harmless
+  (`silent-first`, `quiet-wa`).
+- **Left as leaves:** five order facts about keys (`<ᴷ-trans`,
+  `<ᴷ-irrefl`, `≮ᴷ-trans`, `at-<ᵖ`, `ext-≮`), each a statement about
+  `operation.Key`'s lexicographic order, none about the engine.
+- **Two engine bugs found by writing the merge clause**, both fixed and
+  oracle-confirmed: lanes were transformed before racing, and a silent
+  outer step was shifted.
+
+### Next: K2 (connect, feed), then K3 (colds)
