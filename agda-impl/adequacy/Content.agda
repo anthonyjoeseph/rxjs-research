@@ -29,7 +29,7 @@ open import Data.Nat.Properties using (suc-injective)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Time; tick; root; out; end; hush; _<ᵖ_; <ᵖ-irrefl; <ᵖ-asym; emit; stall; close)
 open import denotation.MonotonicList using (observe; Agree; agree-refl)
@@ -46,8 +46,8 @@ open import adequacy.Stepper using (step-skips)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Engine.Meaning using (M; Has; atOut; atEnd; pastOut; _≅_; ≅-refl; ≅-sym; ≅-trans; agree-≅)
-open import adequacy.Engine.Inv using (Inv; inv-next)
-open import adequacy.Engine.Kept using () renaming (kept to engine-kept)
+open import adequacy.Engine.Inv using (Inv; NextInv; inv-next)
+open import adequacy.Engine.Kept using (KeptFrom) renaming (kept to engine-kept)
 open import adequacy.Strong using (module Strongly)
 open Events∞ using (force)
 
@@ -58,7 +58,7 @@ module Honesty (R : Set) where
   open Unsubbing R using (_⇝_; now; then)
   open Ghosting R using (Sent; sentHere; sentLater; Alike; residual; Reached; launchedʰ; silentʰ; valueʰ;
     Stands; cutʰ; finʰ; dryʰ; Mirror; Inner; Logged; Shows; silentˢ; valueˢ; completeˢ; drainedˢ; inner-launch;
-    Steps; after; steps-after; Hopped; onward; Past; past-same; agrees; skipped)
+    Steps; after; steps-after; Hopped; onward; Past; past-same; agrees; skipped; passed; lowered; skip-same; work; _≺_)
   open Strongly R using (Strong; Carried; module Carried; Agrees; module Agrees; Leads; shown; skips; carried; carried-sane)
 
   -- WHERE THE GHOST'S SKIPS LEAD: a ghost past them, keeping the
@@ -186,10 +186,50 @@ module Honesty (R : Set) where
     same′ = out-cancel above (value-past (Agrees.inv ag) e)
               (≅-trans (≅-sym (led-same sn pl ld)) (≅-trans (Agrees.same ag) k))
 
+  -- A silent step keeps the configuration running its ghost.
+  agrees-silent : ∀ {g m t m′} → Agrees g m → step m ≡ silent t m′ → Agrees g m′
+  agrees-silent {m = m} ag e = record
+    { inv  = subst NextInv e (inv-next m (Agrees.inv ag))
+    ; same = ≅-trans (Agrees.same ag) (subst (KeptFrom (M m)) e (engine-kept m (Agrees.inv ag)))
+    }
+
+  -- Whether a ghost's step is a skip.
+  skip? : (s : U.Step [] R) → (Σ Pos λ k → Σ (U.Node [] R) λ g₁ → s ≡ U.skipˢ k g₁) ⊎ (∀ {k g₁} → s ≢ U.skipˢ k g₁)
+  skip? (U.skipˢ k g₁) = inj₁ (k , g₁ , refl)
+  skip? (U.outˢ k a c) = inj₂ λ ()
+  skip? (U.endˢ k)     = inj₂ λ ()
+  skip? U.hushˢ        = inj₂ λ ()
+
   postulate
-    -- A carried configuration's silent step runs on to a re-entry
-    -- configuration, past this one's skips or lower in the measure.
-    carried-silent : ∀ {g m t m′} (cr : Carried g m) → step m ≡ silent t m′ → Hopped (carried cr) m′
+    -- A SILENT STEP IS WORK DONE: from a configuration running its ghost,
+    -- a silent step whose ghost does not skip next lowers the work left.
+    silent-lowers : ∀ {g m t m′} → Sane [] g → Placed g [] → Agrees g m → step m ≡ silent t m′
+                  → (∀ {k g₁} → U.step g ≢ U.skipˢ k g₁) → work m′ ≺ work m
+
+  -- A carried configuration's silent step runs on to a re-entry
+  -- configuration: its ghost past a skip, or the same ghost with less
+  -- work left.  Agreement as a set does not see the skip, so the ghost
+  -- may take it on any silent step.
+  carried-silent : ∀ {g m t m′} (cr : Carried g m) → step m ≡ silent t m′ → Hopped (carried cr) m′
+  carried-silent {g} {m} {t} {m′} cr e with skip? (U.step g)
+  ... | inj₁ (k , g₁ , es) = g₁ , m′ , now , carried cr₁ ,
+        passed (λ n → subst (λ s → Agree n (residual g) (after s)) es (_≃_.agreeing (step-skips g sn pl) n)) (agrees (λ n → agree-refl n _))
+    where
+    sn = Carried.sane cr
+    pl = Carried.placed cr
+    ag = agrees-silent (Carried.agrees cr) e
+    cr₁ : Carried g₁ m′
+    cr₁ = record
+      { sane   = subst (SaneS []) es (step-sane g sn)
+      ; placed = proj₂ (subst (Placedˢ []) es (placed-after g sn pl))
+      ; agrees = record { inv = Agrees.inv ag ; same = ≅-trans (≅-sym skip-same) (≅-trans (≅-sym (led-same sn pl (shown es))) (Agrees.same ag)) }
+      }
+  ... | inj₂ ns = g , m′ , now , carried cr′ , lowered (λ n → agree-refl n _) (silent-lowers sn pl (Carried.agrees cr) e ns)
+    where
+    sn = Carried.sane cr
+    pl = Carried.placed cr
+    cr′ : Carried g m′
+    cr′ = record { sane = sn ; placed = pl ; agrees = agrees-silent (Carried.agrees cr) e }
 
   -- A carried configuration's step: its value shown, its completion,
   -- its drain, or a silent run on to a re-entry configuration.  After a

@@ -2,7 +2,7 @@
 
 -- THE GHOST: the meaning's configuration a machine's run carries
 -- (`Strong`), what is left of it to deliver (`residual`), and the
--- measure a silent run between two such configurations lowers.
+-- work a silent run between two such configurations lowers (`work`).
 --
 -- The machine keeps no record: a configuration reached from a launch is
 -- reached WITH the record its steps showed (`Reached`).
@@ -21,7 +21,7 @@ open import Induction.WellFounded using (WellFounded)
 open import Data.Product.Relation.Binary.Lex.Strict using (×-Lex; ×-wellFounded)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Time; tick; out; skip; end; hush; root)
 open import denotation.MonotonicList using (observe; Agree; out⁼; skip⁼; end⁼; hush⁼; agree; agree-sym)
@@ -276,21 +276,18 @@ module Ghosting (R : Set) where
            (×-wellFounded <-wellFounded <-wellFounded)))) <-wellFounded
 
   postulate
-    -- The work a re-entry configuration has left before its ghost moves.
-    measure : ∀ {g m} → Strong g m → Measure
+    -- The work a configuration has left before its ghost moves.
+    work : Conf R → Measure
 
   -- WHAT A SILENT RUN BETWEEN RE-ENTRY CONFIGURATIONS GAINS: the ghost
-  -- past a skip of its residual; or the ghost alike, less work left; or
-  -- a configuration whose next step shows something.
+  -- past a skip of its residual; or the ghost alike, less work left.
   data Gain {g m g″ m₀} (st : Strong g m) (st₀ : Strong g″ m₀) : Set₁ where
     passed  : ∀ {k r} → (∀ n → Agree n (residual g) (skip k r)) → Past (force r) (residual g″) → Gain st st₀
-    lowered : (∀ n → Agree n (residual g) (residual g″)) → measure st₀ ≺ measure st → Gain st st₀
-    showing : Past (residual g) (residual g″) → (∀ {t m″} → step m₀ ≢ silent t m″) → Gain st st₀
+    lowered : (∀ n → Agree n (residual g) (residual g″)) → work m₀ ≺ work m → Gain st st₀
 
   gain-past : ∀ {g m g″ m₀} {st : Strong g m} {st₀ : Strong g″ m₀} → Gain st st₀ → Past (residual g) (residual g″)
   gain-past (passed ag p)  = skipped ag p
   gain-past (lowered ag _) = agrees ag
-  gain-past (showing p _)  = p
 
   -- `m′` runs silently to a re-entry configuration, which `st` gains.
   Hopped : ∀ {g m} → Strong g m → Conf R → Set₁

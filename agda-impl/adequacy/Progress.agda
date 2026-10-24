@@ -8,7 +8,7 @@
 -- ends or drains with it, or runs silently to a ghost past its skips
 -- (`adequacy.Content`'s `Hop`).  A value or a skip passed lowers how
 -- far into the residual the item lies; a ghost left where it was lowers
--- the witness's remaining work (`measure`), which is well-founded.
+-- the configuration's remaining work (`work`), which is well-founded.
 module adequacy.Progress where
 
 open import Data.Bool using (true; false; T)
@@ -39,8 +39,8 @@ module Progressing (R : Set) where
   open Driver R using (step; silent; value; complete; drained; reading; Read; later)
   open Machine using (Conf; load)
   open Unsubbing R using (_⇝_; now; then)
-  open Ghosting R using (residual; begun; Past; past-pre; passed; lowered; showing;
-    after; _≺_; ≺-wf; measure; depth; ahead-agree)
+  open Ghosting R using (residual; begun; Past; past-pre; passed; lowered;
+    after; _≺_; ≺-wf; work; depth; ahead-agree)
   open Strongly R using (Strong; strong-begin)
   open Honesty R using (Hop; valueᴴ; completeᴴ; drainedᴴ; silentᴴ; strong-hop; strong-sane; led-agrees)
 
@@ -145,7 +145,7 @@ module Progressing (R : Set) where
   -- alone.
   mutual
     reentry : ∀ f {e g m k} (a : Ahead e k) → depth a < f → (st : Strong g m) → (∀ n → Agree n e (residual g))
-            → Acc _≺_ (measure st) → Hop st → Gets m k
+            → Acc _≺_ (work m) → Hop st → Gets m k
     reentry f a lt st ag ac h@(valueᴴ eq _ _ _ _) = shown-gets f a lt st ag h (λ eq′ → value≢silent (trans (sym eq) eq′))
     reentry f a lt st ag ac h@(completeᴴ eq _)    = shown-gets f a lt st ag h (λ eq′ → complete≢silent (trans (sym eq) eq′))
     reentry f a lt st ag ac h@(drainedᴴ eq _)     = shown-gets f a lt st ag h (λ eq′ → drained≢silent (trans (sym eq) eq′))
@@ -156,9 +156,6 @@ module Progressing (R : Set) where
     reentry (suc f) {k = suc k} a (s≤s lt) st ag ac (silentᴴ eq (g″ , m₀ , path , st₀ , passed ag₁ p)) =
       tauᵍ eq (walk path (reentry f (proj₁ b) (proj₂ b) st₀ (λ n → agree-refl n _) (≺-wf _) (strong-hop st₀)))
       where b = skipped-split (λ n → agree-trans (ag n) (ag₁ n)) p a lt
-    reentry (suc f) {k = suc k} a (s≤s lt) st ag ac (silentᴴ eq (g″ , m₀ , path , st₀ , showing p ns)) =
-      tauᵍ eq (walk path (shown-gets (suc f) (proj₁ b) (s≤s (≤-trans (proj₂ b) lt)) st₀ (λ n → agree-refl n _) (strong-hop st₀) ns))
-      where b = Past.fewer (past-pre ag p) a
 
     -- A re-entry configuration whose step shows something.
     shown-gets : ∀ f {e g m k} (a : Ahead e k) → depth a < f → (st : Strong g m) → (∀ n → Agree n e (residual g)) → Hop st

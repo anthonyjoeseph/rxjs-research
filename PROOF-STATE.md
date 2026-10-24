@@ -10,12 +10,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SILENT RUN
 
-Untried: whether every silent engine step from a carried configuration lowers
-a well-founded measure or passes a skip of the ghost; a cold stalling forever
-is silent forever. Settled when `carried-silent` is a body and `measure` a
-definition, or a reachable run refutes it.
+Untried: whether some measure of the engine's configuration falls on every
+silent step taken while the ghost's next step is not a skip; a ghost skip
+is free to take on any silent step. Settled when `work` is a definition and
+`silent-lowers` a body, or a reachable run refutes it.
 
-Members: `carried-silent`, `measure`.
+Members: `silent-lowers`, `work`.
 
 #### THE WALK
 
