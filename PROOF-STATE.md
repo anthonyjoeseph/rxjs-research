@@ -10,13 +10,20 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SILENT RUN
 
-Untried: whether every silent engine step brings each item the
-configuration's meaning reaches nearer, by its depth or else by a measure of
-the control (`work`). Kept is set-level, so a stall dropping a skip of the
-meaning is unseen today. Settled when `work` is a definition and
-`silent-lowers` a body, or a reachable run refutes it.
+Untried: whether every silent engine step either drops a skip lying before
+every item the configuration's meaning reaches (a stall, a close) or lowers a
+measure of the control (`work`); a stall past an unshown item breaks it.
+Settled when `work` is a definition and `silent-strict` a body, or refuted.
 
-Members: `silent-lowers`, `work`.
+Members: `silent-strict`, `work`.
+
+#### THE KEPT DEPTH
+
+Untried: Kept is set-level; these say a step keeps items at depth: a silent
+step deepens none, a value step's leftover reaches all after the value.
+Settled when a depth-aware Kept dispatch proves both, or a step adds a skip.
+
+Members: `silent-fewer`, `value-ahead`.
 
 #### THE WALK
 
@@ -29,11 +36,10 @@ Members: `WellMach`, `preserve`, `begin-well`.
 #### THE VALUE'S PLACE
 
 Untried: a value the engine shows is the ghost's least, unique at its
-position, the first item of the configuration's meaning, and both what the
-engine leaves and what the ghost leaves lie strictly after it. Settled when
-the four are bodies or refuted.
+position, and both what the engine leaves and what the ghost leaves lie
+strictly after it. Settled when the three are bodies or refuted.
 
-Members: `value-past`, `value-ahead`, `ghost-out`, `ghost-end`.
+Members: `value-past`, `ghost-out`, `ghost-end`.
 
 #### THE ROOT STEP
 
