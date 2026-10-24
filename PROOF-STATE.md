@@ -8,13 +8,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE PORTED LINK
+#### THE CARRIER
 
-Untried: whether the old bodies of these carry to the pointer-free engine's
-read, or must each be postulated over it. Settled when each is a ported
-body, or its own old body is postulated in `port/` beneath it.
+Untried: what a grid-free `Carried` holds of the pointer-free engine's
+configuration so the old dispatch by state carries. Settled when `Carried`
+is a record and `carried-hop` a body by the engine's step over per-move leaves.
 
-Members: `content`, `reached`.
+Members: `Carried`, `carried-sane`, `carried-hop`, `strong-begin`, `measure`.
 
 ## Tier 1 — the adequacy theorem
 

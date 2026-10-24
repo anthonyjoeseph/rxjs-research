@@ -27,7 +27,7 @@ open import port.operation.PureObservable using (PureObs; module Driver; module 
 open import port.adequacy.Sorted using (module Sorting)
 open import port.adequacy.Sorted.Walk using (module SortingWalk)
 open import port.adequacy.Content using (module Honesty)
-open import adequacy.Ghost using (module Ghosting)
+open import port.adequacy.Ghost using (module Ghosting)
 open import port.adequacy.Progress using (module Progressing)
 open import denotation.MonotonicList.Events using (ML; Time; root)
 open import denotation.MonotonicList using (observe; ticks)
