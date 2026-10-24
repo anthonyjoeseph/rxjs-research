@@ -8,15 +8,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE CARRIER
+#### THE SILENT RUN
 
-Untried: whether the engine runs the stepper's own ghost per node, with no
-pairwise facts between nodes, and keeps doing so across a silent run. Settled
-when `Agrees` is a definition and `agrees-moves` and `carried-silent` bodies,
-or a reachable configuration refutes it.
+Untried: whether every silent engine step from a carried configuration lowers
+a well-founded measure or passes a skip of the ghost; a cold stalling forever
+is silent forever. Settled when `carried-silent` is a body and `measure` a
+definition, or a reachable run refutes it.
 
-Members: `Agrees`, `agrees-begin`, `agrees-moves`, `carried-silent`,
-`measure`.
+Members: `carried-silent`, `measure`.
 
 #### THE WALK
 
@@ -26,6 +25,14 @@ a definition and `preserve` a body or refuted.
 
 Members: `WellMach`, `preserve`, `begin-well`.
 
+#### THE VALUE'S PLACE
+
+Untried: a value the engine shows is the ghost's least, unique at its
+position, and both what the engine leaves and what the ghost leaves lie
+strictly after it. Settled when the three are bodies or refuted.
+
+Members: `value-past`, `ghost-out`, `ghost-end`.
+
 #### THE ROOT STEP
 
 Whether a step, its sources clear of it, keeps its parts placed: a flatMap's
@@ -33,6 +40,41 @@ admitted lanes; a defer's program, subscribed or fed. Settled when
 `flat-within` is a body or refuted.
 
 Members: `flat-within`, `defer-within`, `defer-fed`, `under-shown-connect`.
+
+#### THE KEPT FRAMES
+
+Each frame's or node's step keeps what the configuration means, up to what
+it shows: the rises through an outer, lanes, a connect's source and body, a
+joiner, a defer, an unsubscribe. Probed on the spike engine. Settled when
+each is a body.
+
+Members: `quiet-empty`, `lift-skip`, `unsub-rest`, `conn-unsub`,
+`rise-outer-nx`, `rise-outer-cp`, `rise-lanes-cp`, `src-leads`, `fed-ghost`,
+`rise-src-cp`, `rise-body-nx`, `rise-body-cp`, `join-nx`, `joined-closed`,
+`defer-kept`, `env-ne`.
+
+#### THE PICK
+
+The search's found node leads every race above it, and a step keeps the tree
+in the fragment. Probed on the spike engine. Settled when each is a body.
+
+Members: `search-hit`, `search-won`, `shape-next`, `run-lead`, `frag-flat`,
+`frag-body`, `sides-link`, `limited-sides`.
+
+#### THE HEADS
+
+Each operator's state heads no earlier than its subscription, and a
+subscription's burst leaves nothing earlier. Settled when each is a body.
+
+Members: `sub-head`, `sub-bursts`, `scanS-head`, `takeS-head`, `limit-head`,
+`switch-head`, `exhaust-head`.
+
+#### THE KEY ORDER
+
+Keys are a strict order agreeing with positions. Believed unfoldings.
+Settled when each is a body.
+
+Members: `<ᴷ-trans`, `<ᴷ-irrefl`, `≮ᴷ-trans`, `at-<ᵖ`, `ext-≮`.
 
 #### THE LINK
 

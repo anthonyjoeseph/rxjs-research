@@ -22,13 +22,14 @@ open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; subst)
 open import Induction.WellFounded using (Acc; acc)
 
-open import denotation.MonotonicList.Events using (Events∞; Time; out; skip; end; root)
+open import denotation.MonotonicList.Events using (Events; Events∞; Time; out; skip; end; root)
 open import denotation.MonotonicList using (Agree; agree-refl; agree-trans; observe)
 open import denotation.Denote using (⟦_⟧)
 open import adequacy.Record using (Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ; items)
 open import operation.PureObservable using (PureObs; module Driver; module Machine)
 open import adequacy.Content using (module Honesty)
 open import adequacy.Ghost using (module Ghosting)
+open import adequacy.Engine.Meaning using (Has; atOut; pastSkip; has-agree)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Unsub using (module Unsubbing)
 
@@ -38,10 +39,10 @@ module Progressing (R : Set) where
   open Driver R using (step; silent; value; complete; drained; reading; Read; later)
   open Machine using (Conf; load)
   open Unsubbing R using (_⇝_; now; then)
-  open Ghosting R using (Has; atOut; pastSkip; residual; begun; Past; past-pre; passed; lowered; showing;
-    has-agree; after; _≺_; ≺-wf; measure; depth; ahead-agree)
+  open Ghosting R using (residual; begun; Past; past-pre; passed; lowered; showing;
+    after; _≺_; ≺-wf; measure; depth; ahead-agree)
   open Strongly R using (Strong; strong-begin)
-  open Honesty R using (Hop; valueᴴ; completeᴴ; drainedᴴ; silentᴴ; strong-hop; strong-agrees)
+  open Honesty R using (Hop; valueᴴ; completeᴴ; drainedᴴ; silentᴴ; strong-hop; strong-sane; led-agrees)
 
   ----------------------------------------------------------------------
   -- How far a run gets
@@ -95,7 +96,7 @@ module Progressing (R : Set) where
   walk (then eq path) g = tauᵍ eq (walk path g)
 
   -- Events with nothing in them reach their silence at most.
-  ahead-none : ∀ {e k} → (∀ {q b} → Has e q b → ⊥) → Ahead e k → k ≤ 1
+  ahead-none : ∀ {e : Events R} {k} → (∀ {q b} → Has e q b → ⊥) → Ahead e k → k ≤ 1
   ahead-none no none      = z≤n
   ahead-none no (outᵃ a)  = ⊥-elim (no atOut)
   ahead-none no (skipᵃ a) = ahead-none (λ h → no (pastSkip h)) a
@@ -117,7 +118,7 @@ module Progressing (R : Set) where
   ... | endᵃ , _ = endᵍ eq
 
   -- A ghost showing nothing shows its silence at most.
-  idle-gets : ∀ {m e k} → step m ≡ drained → Ahead e k → (∀ {q b} → Has e q b → ⊥) → Gets m k
+  idle-gets : ∀ {m} {e : Events R} {k} → step m ≡ drained → Ahead e k → (∀ {q b} → Has e q b → ⊥) → Gets m k
   idle-gets eq x no with ahead-none no x
   ... | z≤n     = zeroᵍ
   ... | s≤s z≤n = idleᵍ eq
@@ -164,11 +165,14 @@ module Progressing (R : Set) where
                → (∀ {t m″} → step m ≢ silent t m″) → Gets m k
     shown-gets f       {k = zero}  a lt st ag h ns = zeroᵍ
     shown-gets zero    {k = suc k} a () st ag h ns
-    shown-gets (suc f) {g = g} {k = suc k} a (s≤s lt) st ag (valueᴴ eq stp _ _ (m₀ , path , st₀)) ns =
-      outᵍ eq (walk path (reentry f (proj₁ v) (proj₂ v) st₀ (λ n → agree-refl n _) (≺-wf _) (strong-hop st₀)))
-      where v = value-step a lt (λ n → agree-trans (ag n) (subst (λ s → Agree n (residual g) (after s)) stp (strong-agrees st n)))
-    shown-gets (suc f) {g = g} {k = suc k} a (s≤s lt) st ag (completeᴴ eq stp) ns =
-      end-gets eq a (λ n → agree-trans (ag n) (subst (λ s → Agree n (residual g) (after s)) stp (strong-agrees st n)))
+    shown-gets (suc f) {k = suc k} a (s≤s lt) st ag (valueᴴ eq ld _ _ (m₀ , path , st₀)) ns
+      with led-agrees (proj₁ (strong-sane st)) (proj₂ (strong-sane st)) ld
+    ... | y , p , ag′ with Past.fewer (past-pre ag p) a
+    ...   | b , le with value-step b (≤-trans le lt) ag′
+    ...     | v , lt′ = outᵍ eq (walk path (reentry f v lt′ st₀ (λ n → agree-refl n _) (≺-wf _) (strong-hop st₀)))
+    shown-gets (suc f) {k = suc k} a (s≤s lt) st ag (completeᴴ eq ld) ns
+      with led-agrees (proj₁ (strong-sane st)) (proj₂ (strong-sane st)) ld
+    ... | y , p , ag′ = end-gets eq (proj₁ (Past.fewer (past-pre ag p) a)) ag′
     shown-gets (suc f) {k = suc k} a (s≤s lt) st ag (drainedᴴ eq no) ns =
       idle-gets eq a (λ h → no (has-agree ag h))
     shown-gets (suc f) {k = suc k} a lt st ag (silentᴴ eq _) ns = ⊥-elim (ns eq)
