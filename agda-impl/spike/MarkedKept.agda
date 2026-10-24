@@ -26,7 +26,8 @@ open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ; _∷_ t
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (zero; suc; pred)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.List.Relation.Unary.Any using (here)
 open import Data.Unit using (tt)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; cong; cong₂; trans)
@@ -39,21 +40,21 @@ open import denotation.MonotonicList using (Agreeᵀ; agreeᵀ-refl; agree-refl;
 import denotation.MonotonicList as M′
 open import denotation.NonExpansive using (_,ˢ_; liveᴼ; []ᴸ; []ᑫ; go-ne; mapᴱ-neᴹ; ∪-ne; burstOn-ne; beside-ne)
 open import denotation.Unfold using (Node; idleᶜ; ofᶜ; restsᶜ; states; ended; outerᴺ; restᶜ; takeWhileᶜ; endingᶜ; burstᶜ;
-  connectᶜ; live; stateᴺ; cutᴺ; meaning; subscribe; outer∞; NEnv)
+  connectᶜ; live; stateᴺ; cutᴺ; meaning; subscribe; outer∞; NEnv) renaming (feed to feedᵁ)
 open import denotation.Denote using (flatOp)
 open import operation.MarkedPure using (play; ending; over; rest; module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; closed; closedUp;
   CS; cs; Att; attAt; attached; Owe; free; cpAt; cutAt; overAt; Ev; nx; cp; _⊕_;
   Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load;
-  Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM; search; found; run; unsub; leaf)
+  Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM; search; found; run; unsub; leaf; feed)
   renaming (cut to cutᴹ)
 open import spike.MarkedGhost
 open import spike.MarkedInv using (Unpended; Opened; Wf; Base; module Base; Inv; module Inv; inv-at; wfI; wf-split; Owns; ofO; attO; cpO; cutO; bodyO; srcAttO; owedO; joinO; leafO; owned;
   search-hit; NextInv; inv-next; inv-load)
 open import spike.MarkedRace using (First; go-rise; cuts-swap)
 open import spike.MarkedHead using (Frag)
-open import spike.MarkedPick using (module Order)
+open import spike.MarkedPick using (module Order; Clear)
 
 open Events∞
 
@@ -278,15 +279,24 @@ module _ {R : Set} where
     rise-lanes-cp : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (c : Ctx R Γ B) (s : St Γ B) p
                   → Inv ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → flagOf s ≡ true
                   → up (inLanes op f d n q o pre post c) true (risen (gh s) (envAt c) cp p) ≅ M (Machine.dequeue c op f d (pred n) q o (pre ++ Machine.ended s ∷ post) p)
-    -- The body fed.  On a live joiner `operation.Marked.queued` makes
-    -- the meaning's choice, so the feeds differ only where the meaning
-    -- feeds what the engine has not started: a flatMap's later lanes, a
-    -- source not yet subscribed.  Each joins under a key of the body,
-    -- every one of them past `shift p` once the source wins its race, so
-    -- the meaning feeds it only skips.  Owed: that race as a `Won` clause
-    -- at `inSrc`, and `_≅_` closed under a node gaining skips.
-    rise-src-nx : ∀ {Γ X B} k (b : St (X ∷ Γ) B) (c : Ctx R Γ B) (s : St Γ X) a p
-                → Inv ⟨ inSrc k b c , s , rising (nx a) , p ⟩ → Kept ⟨ inSrc k b c , s , rising (nx a) , p ⟩
+    -- A source's value, read by its body, is shown first as a skip just
+    -- past it: the body's next event is later (the race `Clear` carries
+    -- at `inSrc`), and what follows is the body fed as the meaning feeds
+    -- it (`denotation.Unfold.feed`), the source past its value.  The
+    -- stepper's `adequacy.Stepper.SourceFirst.fed-first` is this fact.
+    src-leads : ∀ {Γ X B} k (b : St (X ∷ Γ) B) (c : Ctx R Γ B) (s : St Γ X) a p
+              → Inv ⟨ inSrc k b c , s , rising (nx a) , p ⟩ → Clear p a (inSrc k b c) s
+              → Σ (Events∞ B) λ r → force (srcFrame k (gh b) (envAt c) (risen (gh s) (envAt c) (nx a) p)) ≡ skip (p ⊕ [ ix 0 ]) r
+                                  × r ≋ srcFrame k (feedᵁ (here refl) p (just a) (gh b)) (envAt c) (stateᴺ (gh s) (envAt c))
+    -- The meaning's feed and the engine's differ only in skips.  On a
+    -- live joiner joined before `p` both queue the value under it
+    -- (`operation.Marked.queued`); one joined at or after `p`, and a lane
+    -- or subscription not yet started, the meaning hands a skip the
+    -- engine does not keep.  Each such start is past the source's
+    -- position, the race won at `inSrc`, so none is handed the value.
+    fed-ghost : ∀ {Γ X B} k (b : St (X ∷ Γ) B) (c : Ctx R Γ B) (s : St Γ X) a p → Inv ⟨ inSrc k b c , s , rising (nx a) , p ⟩
+              → up c true (srcFrame k (feedᵁ (here refl) p (just a) (gh b)) (envAt c) (stateᴺ (gh s) (envAt c)))
+              ≅ up c true (srcFrame k (gh (feed (here refl) p (nx a) b)) (envAt c) (stateᴺ (gh s) (envAt c)))
     rise-src-cp : ∀ {Γ X B} k (b : St (X ∷ Γ) B) (c : Ctx R Γ B) (s : St Γ X) p
                 → Inv ⟨ inSrc k b c , s , rising cp , p ⟩ → Kept ⟨ inSrc k b c , s , rising cp , p ⟩
     rise-body-nx : ∀ {Γ X B} k (o : St Γ X) (c : Ctx R Γ B) (s : St (X ∷ Γ) B) b p
@@ -427,6 +437,18 @@ module _ {R : Set} where
   ... | true = lift-≅ c true (take-true i q (gh s) (envAt c) a p e)
   took-nx true  q c s a p | false = lift-≅ c true (take-incl q (gh s) (envAt c) a p e)
   took-nx false q c s a p | false = lift-≅ c true (take-excl q (gh s) (envAt c) a p e)
+
+  -- The body fed: the source's value a skip at the top, then the
+  -- meaning's feed, then the engine's.
+  rise-src-nx : ∀ {Γ X B} k (b : St (X ∷ Γ) B) (c : Ctx R Γ B) (s : St Γ X) a p
+              → Inv ⟨ inSrc k b c , s , rising (nx a) , p ⟩ → Kept ⟨ inSrc k b c , s , rising (nx a) , p ⟩
+  rise-src-nx k b c s a p v =
+    ≅-trans (lift-skip c true (proj₁ (proj₂ L)) (proj₂ (proj₂ L)))
+      (≅-trans (fed-ghost k b c s a p v)
+        (lift-≅ c true (src-plug k (feed (here refl) p (nx a) b) s (envAt c) (Base.settled (Inv.base v))
+          (proj₁ (proj₂ (wf-split c (connS k s b) tt (wfI (Inv.base v))))))))
+    where
+      L = src-leads k b c s a p v (Order.lead (Inv.ord v))
 
   rises : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Inv ⟨ c , s , rising e , p ⟩ → Kept ⟨ c , s , rising e , p ⟩
   rises top                               s (nx a) p v          = out-≅ refl

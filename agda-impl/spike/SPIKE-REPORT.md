@@ -426,6 +426,32 @@ race the other way, at `inBody` (the source not strictly before).
 
 **Verdict: firm ground.** No pairwise fact returns.
 
+### `rise-src-nx` as a body
+
+`rise-src-nx` is now a body (`spike.MarkedKept`). It chains three steps:
+
+1. **`src-leads`.** The source's value shows at the top as a skip at
+   `p ⊕ [ix 0]`. What follows is the body as `denotation.Unfold.feed`
+   feeds it. This is the stepper's own `fed-first`, restated for the
+   ghost. Its race is now a field. `Won` at `inSrc` carries the
+   engine's `sourceT` comparison: the body's candidate is strictly after
+   the source's shifted key. `won-clear` turns that comparison into
+   `Clear` at `inSrc`, an `After` on the body's step head (`frag-body`
+   is the shape leaf it reads).
+2. **`fed-ghost`.** The meaning's feed and the engine's differ only in
+   skips. Each skip goes to a joiner joined at or after `p`, or to a
+   lane or subscription not yet started. Each such start is past the
+   source's position, by the race just carried.
+3. **`src-plug`** (proven). This returns to the after-configuration.
+
+`lift-skip` drops the top skip. Every leaf reads one connect and its
+own subtree, and none relates two nodes.
+
+**Measured.** `quickcheck.MarkedOrder`'s `kept` checks the whole
+preservation statement, `Kept`, for every step. The check covers the
+first 600 steps of each of 300 seeds, on the first 60 events each side
+shows, with skips erased. CI's `order` job: no failure.
+
 ## Where the spike stands
 
 H is a body for of, empty, map, the switches, merge without a queue,
@@ -434,4 +460,6 @@ takeWhile, a bounded merge, and switch and exhaust as flatMaps. The order
 the preservation half consumes is local: `Order` is a shape fact plus
 per-frame race facts. The pick discharges the race facts from H, and a
 rise carries them by definition. The connect's feed needs no pairwise
-fact once the engine makes the meaning's choice. Next: `limited-sides`.
+fact once the engine makes the meaning's choice. `rise-src-nx` is a body
+over grid-free leaves, and `Kept` holds on every measured step. Next:
+`limited-sides`.

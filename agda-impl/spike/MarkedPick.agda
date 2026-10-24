@@ -80,7 +80,7 @@ Clear p a (inTake i q (overAt r) c)         s = ⊤
 Clear p a (inOuter op f d n q ls c)         s = ⊤
 Clear p a (inLanes op f d n q o pre post c) s =
   alive s ≡ true → (closed c ≡ false → Sides p f d o pre post (envAt c)) × Clear p a c (flatS op f d n q o (pre ++ s ∷ post))
-Clear p a (inSrc k b c)                     s = ⊤
+Clear p a (inSrc k b c)                     s = over k ≡ false → closed c ≡ false → After (p ⊕ [ ix 0 ]) (headˢ (step (gh b)))
 Clear p a (inBody k o c)                    s = Clear p a c (connS k o s)
 
 -- The configuration's order: the whole tree's shape, and a rise's lead.
@@ -137,7 +137,8 @@ Won (k , o) (inTake i q w c)                   s = Won (takeT i q w k o) c (take
 Won (k , o) (inOuter op f d n q ls c)          s = Won (outerK n q k o) c (flatS op f d n q s ls)
 Won (k , o) (inLanes op f d n q o′ pre post c) s =
   LaneWon k c op f d n q o′ pre post s × Won (uncurry (laneT d n q) (cutT (alive s) k o)) c (flatS op f d n q o′ (pre ++ s ∷ post))
-Won (k , o) (inSrc kk b c)                     s = Won ((if over kk then k else shift k) , still) c (connS kk s b)
+Won (k , o) (inSrc kk b c)                     s =
+  KAfter (if over kk then k else shift k) (cand (inBody kk s c) b) × Won ((if over kk then k else shift k) , still) c (connS kk s b)
 Won h       (inBody kk o c)                    s = Won h c (connS kk o s)
 
 postulate
@@ -147,6 +148,8 @@ postulate
   -- A flatMap of a fragment tree is of the fragment.
   frag-flat : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls
             → Frag (plug c (flatS op f d n q o ls)) → Frag (flatS op f d n q o ls)
+  -- A connect's body in a fragment tree is of the fragment.
+  frag-body : ∀ {R Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) → Frag (plug c (connS k o b)) → Frag b
 
 ------------------------------------------------------------------------
 -- From the race to the stepper's heads
@@ -260,5 +263,7 @@ won-clear p a (inLanes op f d n q o pre post c) s s′ al (l , w) ft lv =
   (λ cl → lane-sides p c op f d n q o pre post s cl l ft (frag-flat c op f d n q o (pre ++ s ∷ post) ft))
   , won-clear p a c (flatS op f d n q o (pre ++ s ∷ post)) (flatS op f d n q o (pre ++ s′ ∷ post)) refl
       (lane-on d n q {alive s} {at p} a {c} {flatS op f d n q o (pre ++ s ∷ post)} (trans al lv) w) ft
-won-clear p a (inSrc kk b c)                    s s′ al w ft = tt
+won-clear p a (inSrc kk b c)                    s s′ al (w , _) ft with over kk
+... | true  = λ ()
+... | false = λ _ cl → after-step (p ⊕ [ ix 0 ]) (cand (inBody kk s c) b) (step (gh b)) w (open-agrees (inBody kk s c) b cl (frag-body c kk s b ft))
 won-clear p a (inBody kk o c)                   s s′ al w ft = won-clear p a c (connS kk o s) (connS kk o s′) refl w ft
