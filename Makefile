@@ -66,7 +66,6 @@ GATE_CHEAP = wiring-selftest wiring-gate \
              imports-selftest imports-check \
              roadmap-selftest roadmap-check \
              comments-selftest comments-check \
-             port-selftest port-check \
              ts-gate
 
 gate-cheap:
@@ -207,6 +206,7 @@ wiring-selftest:
 	  if [ $$fail -eq 0 ]; then echo "wiring-selftest: PASS (R2 fires on the passed-only lemma and on its eta-expansion, and on nothing else; module applications conduct; \`with\` arms conduct at both scopes; a postulate block nested in a seal reaches the ledger; a pragma nested in a pragma closes on its own close; a CLI postulate with a COMPILE GHC body leaves it, an unbound one or one outside CLI/ stays)"; \
 	  else echo "$$out"; exit 1; fi
 
+# Not in the gate (Anthony): run by hand while a port/ directory exists.
 # THE PORT BOUNDARY (Anthony): in $(SRC)/port/ and what it imports, a body
 # keeps a name the old tower had at PORT_BASE; an old postulate stays one; a
 # postulated old body says where it was; a new postulate is free.  The frozen commit is

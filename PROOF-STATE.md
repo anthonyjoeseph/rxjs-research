@@ -10,13 +10,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE CARRIER
 
-Untried: a `Carried` with no pairwise facts between nodes — the state's
-shape and a per-frame lead order — from which every node's next key is
-the stepper's head, so the least is the ghost's. Settled when `Carried`
-is a record and `carried-hop` a body over per-node leaves, or a
-reachable configuration refutes it.
+Untried: whether the engine runs the stepper's own ghost per node, with no
+pairwise facts between nodes, and keeps doing so across a silent run. Settled
+when `Agrees` is a definition and `agrees-moves` and `carried-silent` bodies,
+or a reachable configuration refutes it.
 
-Members: `Carried`, `carried-sane`, `carried-hop`, `strong-begin`, `measure`.
+Members: `Agrees`, `agrees-begin`, `agrees-moves`, `carried-silent`,
+`measure`.
 
 #### THE WALK
 
@@ -25,6 +25,14 @@ machine's states, so a state-tree `WellMach` is unwritten. Settled when it is
 a definition and `preserve` a body or refuted.
 
 Members: `WellMach`, `preserve`, `begin-well`.
+
+#### THE ROOT STEP
+
+Whether a step, its sources clear of it, keeps its parts placed: a flatMap's
+admitted lanes; a defer's program, subscribed or fed. Settled when
+`flat-within` is a body or refuted.
+
+Members: `flat-within`, `defer-within`, `defer-fed`, `under-shown-connect`.
 
 #### THE LINK
 

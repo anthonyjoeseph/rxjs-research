@@ -14,7 +14,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (lookup; updateAt) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (refl)
 
@@ -28,7 +28,8 @@ open import denotation.Compositional using (EnvAgree; []ᵉ; _∷ᵉ_; deferᴰ-
 open import denotation.Denote using (flatOp)
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
-open import adequacy.Placed.Order using (Reaches; out-here; skip-here; out-there; skip-there)
+open import adequacy.Placed.Order using (Everyᴱ; Reaches; out-here; skip-here; out-there; skip-there; Sorted)
+open import adequacy.Placed.Keys using (ordered-≈; steady-≈; every-≈)
 
 open Events∞
 open Tail∞
@@ -176,6 +177,15 @@ Same ρ ρ′ = ∀ m → NAgree m ρ ρ′
 same-cons : ∀ {Γ A} {e e′ : Events A} {ρ ρ′ : NEnv Γ} → (∀ m → Agree m e e′) → Same ρ ρ′ → Same (e ∷ᴬ ρ) (e′ ∷ᴬ ρ′)
 same-cons a S m = a m , S m
 
--- A node in order to every depth stays so under an environment alike
--- at every depth.
+meaning-same : ∀ {Γ A} (n : U.Node Γ A) {ρ ρ′ : NEnv Γ} → Same ρ ρ′ → ∀ m → Agree m (U.meaning n ρ) (U.meaning n ρ′)
+meaning-same n S m = meaning-ne n (S m)
 
+everyᴱ-agree : ∀ {Γ} {P : Pos → Set} {ρ ρ′ : NEnv Γ} → Same ρ ρ′ → Everyᴱ P ρ → Everyᴱ P ρ′
+everyᴱ-agree {ρ = []ᴬ}    {[]ᴬ}      S _       = tt
+everyᴱ-agree {ρ = _ ∷ᴬ _} {_ ∷ᴬ _} S (v , w) = every-≈ _ _ (λ m → proj₁ (S m)) v , everyᴱ-agree (λ m → proj₂ (S m)) w
+
+sorted-agree : ∀ {Γ} {ρ ρ′ : NEnv Γ} → Same ρ ρ′ → Sorted ρ → Sorted ρ′
+sorted-agree {ρ = []ᴬ}    {[]ᴬ}      S _                 = tt
+sorted-agree {ρ = _ ∷ᴬ _} {_ ∷ᴬ _} S ((o , s) , h , w) =
+  (ordered-≈ _ _ H o , steady-≈ _ _ H s) , every-≈ _ _ H h , sorted-agree (λ m → proj₂ (S m)) w
+  where H = λ m → proj₁ (S m)

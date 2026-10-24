@@ -20,7 +20,7 @@ open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to 
 open import Data.Nat using (zero; suc; _+_; _<ᵇ_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Unit using (tt)
+open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl)
 open import Relation.Nullary using (¬_)
 
@@ -29,10 +29,11 @@ open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatM
 open import denotation.MonotonicList.Events using (timelineAt; Pos; From; Timeline; ix; sub; last; _<ᵖ_; inside)
 import denotation.MonotonicList.Events as M
 import denotation.Unfold as U
-open import adequacy.Placed.Order using (Apart; Disjoint; Headed; Owned; Placed; Prefix; Sides; prefix-++)
+open import adequacy.Placed.Order using (Alienᴱ; Apart; Disjoint; Headed; Owned; Placed;
+  Prefix; Sides; Within; every-monoᴱ; prefix-++)
 open import adequacy.Placed.Keyed using (Admitted; Fit; Keyed; KeyedEarliest; KeyedOuter; KeyedStep; Keyedᴸ; Keyedᴹ; Keyedˢ; Noted; Qᴹ; keyed-head)
 open import denotation.Unfold using (NEnv)
-open import adequacy.Placed.Keys using (Mark; ix-mark; last-mark; owned-tagged; owned-trans; prefix-refl; tagged-sub)
+open import adequacy.Placed.Keys using (Mark; ix-mark; last-mark; owned-tagged; owned-trans; prefix-refl; sibling; tagged-sub)
 open import adequacy.Placed.Rising using (apart-join; apart-mark)
 
 -- Kept one mark on, at a frame tagged with it, and at a joiner's tag.
@@ -470,3 +471,54 @@ apart-sides r b s ρ (p , _ , hp , kb , ks , _) k q hk hq =
   sides-of (p ++ [ ix 0 ]) k q (keyed-head (Owned (p ++ [ ix 0 ])) (U.step b) (step-keyed (owned-closed (p ++ [ ix 0 ])) b kb) k hk)
                                (keyed-head (Disjoint (p ++ [ ix 0 ])) (U.step s) (step-keyed (apart-closed p hp) s ks) q hq)
 
+-- Within the start of a cold observable is trivially satisfied.
+start-within : ∀ {Γ A} p (m : From A 0) (ρ : NEnv Γ) → Within (U.startᶜ {Γ} p m) ρ
+start-within p (M.at zero _ _)    ρ = tt
+start-within p (M.at (suc _) _ _) ρ = tt
+start-within p M.done             ρ = tt
+start-within p M.quiet            ρ = tt
+
+-- A sibling of a headed position is also headed.
+headed-lane : ∀ x → Headed (x ++ [ ix 0 ]) → Headed (x ++ [ ix 1 ])
+headed-lane []          _ = tt
+headed-lane (ix _ ∷ _)  _ = tt
+headed-lane (sub _ ∷ _) ()
+headed-lane (last ∷ _)  ()
+
+-- A subscribe is apart: the body is owned and the source is disjoint.
+apart-sub : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (ρ : NEnv Γ) → Headed p → Alienᴱ p ρ
+          → Apart (p ++ [ ix 1 ]) (U.subscribe b (p ++ [ ix 0 ])) (U.subscribe s (p ++ [ ix 1 ])) ρ
+apart-sub s b p ρ hp al =
+    p , refl , hp
+  , keyed-sub (owned-closed (p ++ [ ix 0 ])) b (p ++ [ ix 0 ]) (inj₁ (prefix-refl (p ++ [ ix 0 ])))
+  , keyed-sub (apart-closed p hp) s (p ++ [ ix 1 ]) (sibling p (ix-mark 1) (λ ()) , sibling p (ix-mark 0) (λ ()))
+  , every-monoᴱ (λ h n o → n (owned-trans p (p ++ [ ix 0 ]) h (inj₁ (prefix-++ p [ ix 0 ])) o)) ρ al
+
+
+ApartNext : ∀ {Γ A B} → Pos → U.Step (A ∷ Γ) B → U.Node Γ A → NEnv Γ → Set
+ApartNext r (U.outˢ k a b′) s ρ = Apart r b′ s ρ
+ApartNext r (U.skipˢ k b′)  s ρ = Apart r b′ s ρ
+ApartNext r (U.endˢ k)      s ρ = ⊤
+ApartNext r U.hushˢ         s ρ = ⊤
+
+apart-next : ∀ {Γ A B} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ) → Apart r b s ρ → ApartNext r (U.step b) s ρ
+apart-next r b s ρ (p , er , hp , kb , ks , al) with U.step b | step-keyed (owned-closed (p ++ [ ix 0 ])) b kb
+... | U.outˢ k a b′ | _ , kb′ = p , er , hp , kb′ , ks , al
+... | U.skipˢ k b′  | _ , kb′ = p , er , hp , kb′ , ks , al
+... | U.endˢ k      | _       = tt
+... | U.hushˢ       | _       = tt
+
+ApartFed : ∀ {Γ A B} → Pos → U.Node (A ∷ Γ) B → U.Step Γ A → NEnv Γ → Set
+ApartFed r b (U.outˢ q a s′) ρ = Apart r (U.feed (here refl) q (just a) b) s′ ρ
+ApartFed r b (U.skipˢ q s′)  ρ = Apart r (U.feed (here refl) q nothing b) s′ ρ
+ApartFed r b (U.endˢ c)      ρ = ⊤
+ApartFed r b U.hushˢ         ρ = ⊤
+
+apart-fed : ∀ {Γ A B} r (b : U.Node (A ∷ Γ) B) (s : U.Node Γ A) (ρ : NEnv Γ) → Apart r b s ρ → ApartFed r b (U.step s) ρ
+apart-fed r b s ρ (p , er , hp , kb , ks , al) with U.step s | step-keyed (apart-closed p hp) s ks
+... | U.outˢ q a s′ | _ , ks′ =
+  p , er , hp , feed-keyed (owned-closed (p ++ [ ix 0 ])) (here refl) q (just a) b (owned-fit (p ++ [ ix 0 ]) q) kb , ks′ , al
+... | U.skipˢ q s′  | _ , ks′ =
+  p , er , hp , feed-keyed (owned-closed (p ++ [ ix 0 ])) (here refl) q nothing b (owned-fit (p ++ [ ix 0 ]) q) kb , ks′ , al
+... | U.endˢ c      | _       = tt
+... | U.hushˢ       | _       = tt
