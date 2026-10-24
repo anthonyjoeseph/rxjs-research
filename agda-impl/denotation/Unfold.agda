@@ -224,7 +224,7 @@ headˢ (endˢ k)     = just k
 headˢ hushˢ        = nothing
 
 burstˢ : ∀ {Γ A t} → Time → Pos → ℕ → Frame A t → Step Γ A
-burstˢ τ r i (emit a k) = outˢ (r ++ [ ix i ]) a (burstᶜ τ r (suc i) (Frame∞.force k))
+burstˢ τ r i (emit a k) = outˢ (r ++ [ ix i ]) a (burstᶜ τ r (suc i) k)
 burstˢ τ r i (stall k)  = skipˢ (r ++ [ ix i ]) (burstᶜ τ r (suc i) (Frame∞.force k))
 burstˢ τ r i (close k)  = skipˢ (r ++ [ ix i ]) (framesᶜ τ (r ++ [ last ]) (From∞.force k))
 

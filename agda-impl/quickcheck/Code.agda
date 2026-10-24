@@ -28,7 +28,7 @@ open import Relation.Binary.PropositionalEquality using (refl)
 
 import Tree as T
 open import Tree using (Obs; Later; renameLater)
-open import denotation.MonotonicList.Events using (From; Frame; Frame∞; From∞; done; quiet; at; emit; close; Timeline; fixed; Pos)
+open import denotation.MonotonicList.Events using (From; Frame; From∞; done; quiet; at; emit; close; Timeline; fixed; Pos)
 import denotation.MonotonicList.Events as Events
 open import quickcheck.Ty using (Ty; boolᵗ; listᵗ; nameᵗ; ⟦_⟧ᵀ; showᵀ)
 open import quickcheck.Tm using (Vals; Tm; ⟦_⟧ᵗ; position; showTm)
@@ -144,7 +144,7 @@ mutual
 
   burst : ∀ {A t} → List (ℕ × List A) → List A → List (ℕ × List A) → Bool → Bool → Frame A t
   burst {t = t} rs []       fs c l = close λ where .From∞.force → scriptML (suc t) rs fs c l
-  burst         rs (x ∷ xs) fs c l = emit x λ where .Frame∞.force → burst rs xs fs c l
+  burst         rs (x ∷ xs) fs c l = emit x (burst rs xs fs c l)
 
 timeline : Leaf Timeline
 timeline .scripted (script fs c l) = fixed (scriptML 0 fs fs c l)

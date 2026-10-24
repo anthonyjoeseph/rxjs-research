@@ -97,7 +97,7 @@ mutual
 
   burst : ∀ {A t} → Time → Pos → ℕ → Frame A t → Events A
   burst τ r i (emit a k) = out (r ++ [ ix i ]) a λ where
-    .force → burst τ r (suc i) (Frame∞.force k)
+    .force → burst τ r (suc i) k
     .cut   → idle
   burst τ r i (stall k)  = skip (r ++ [ ix i ]) λ where
     .force → burst τ r (suc i) (Frame∞.force k)

@@ -76,7 +76,7 @@ fromTimeline {A} ck names c = record
     burst e off self t = fixIO′ λ next′ b → Emit.closed e >>= λ c → if c then pure tt else step next′ b
       where
         step : (Frame A t → IO ⊤) → Frame A t → IO ⊤
-        step next′ (emit a k) = Emit.produce e a >> unless off (next′ (Frame∞.force k))
+        step next′ (emit a k) = Emit.produce e a >> unless off (next′ k)
         step next′ (stall k)  = next′ (Frame∞.force k)
         step next′ (close k)  = self t (From∞.force k)
 

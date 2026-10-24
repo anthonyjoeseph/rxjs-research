@@ -427,7 +427,7 @@ mutual
   fresh-frames p τ e (M.at t _ b) = fresh-burst p τ (ix (τ + t) ∷ sub e ∷ []) 0 b
 
   fresh-burst : ∀ {A t} p τ r i (b : M.Frame A t) → FreshRun p (M′.burst τ r i b)
-  freshᴿ (fresh-burst p τ r i (M.emit a k)) = everyT-idle , fresh-burst p τ r (suc i) (M.Frame∞.force k)
+  freshᴿ (fresh-burst p τ r i (M.emit a k)) = everyT-idle , fresh-burst p τ r (suc i) k
   freshᴿ (fresh-burst p τ r i (M.stall k))  = everyT-idle , fresh-burst p τ r (suc i) (M.Frame∞.force k)
   freshᴿ (fresh-burst p τ r i (M.close k))  = everyT-idle , fresh-frames p τ (r ++ [ last ]) (M.From∞.force k)
 

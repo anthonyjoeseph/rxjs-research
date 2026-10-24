@@ -3,16 +3,17 @@
 -- WHAT A CONFIGURATION STILL OWES, counted.  Everything finite a state
 -- tree holds and will spend by its own marks and subscriptions: a
 -- program not yet subscribed, by its syntax up to a `defer`; an of's
--- values and its end; a started cold's next turn, while it has one; a
--- kill switch's attach; a takeWhile's owed completion and cut; a
+-- values and its end; a started cold's stop, and the values its frame
+-- plays before it next yields; a kill switch's attach; a takeWhile's owed completion and cut; a
 -- flatMap's outer, the values waiting for a slot, each lane's retirement;
 -- a connect's body mark, its source's attach and teardown; a joiner's
--- inbox.
+-- inbox; and an event in flight, owed until it is shown or absorbed.
 --
--- An event in flight is not owed: making one spends what made it, or
--- calms nothing (`calmᶜ`), and an event rising spends height
--- (`flightᶜ`).  A cold's tape may be infinite, so its turns are one
--- count, spent only when it stops.
+-- Making an event spends what made it and owes the event, so the count
+-- stays and the control leaves calm (`calmᶜ`); an event rising spends
+-- height (`flightᶜ`).  A stall or a frame's close drops a skip of the
+-- meaning (`adequacy.Content.silent-exact`), so a cold owes only the run
+-- of values up to its next one, finite by `Frame`.
 module adequacy.Engine.Work where
 
 open import Data.Bool using (Bool; true; false)
@@ -20,16 +21,38 @@ open import Data.List using (List; []; _∷_; length)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; suc; _+_)
 
-open import denotation.MonotonicList.Events using (Timeline)
+open import denotation.MonotonicList.Events using (Timeline; fixed; fresh; From; done; quiet; at; Frame; emit; stall; close)
 open import Tree using (Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import operation.PureObservable using (due; module Machine)
+open import operation.PureObservable using (Tape; play; ending; over; module Machine)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; Att; attached; attAt; Owe; free; cpAt; cutAt; overAt; CS; Conf; ⟨_,_,_,_⟩; absorbed; rising)
+
+-- The values a frame plays before it next yields.
+run : ∀ {A t} → Frame A t → ℕ
+run (emit a k) = suc (run k)
+run (stall k)  = 0
+run (close k)  = 0
+
+-- A started cold: its stop, and its frame's run.
+tapeW : ∀ {A} → Tape A → ℕ
+tapeW (play τ u i t fr) = suc (run fr)
+tapeW (ending e)        = 1
+tapeW over              = 0
+
+-- A cold's first frame, wherever it is played.
+firstW : ∀ {A t} → From A t → ℕ
+firstW done          = 0
+firstW quiet         = 0
+firstW (at t′ le fr) = run fr
+
+coldW : ∀ {A} → Timeline A → ℕ
+coldW (fixed m) = firstW m
+coldW fresh     = 1
 
 -- A program not yet subscribed: each operator what its subscription
 -- leaves owed, and one more.  A defer is a skip, so owes only itself.
 size : ∀ {Γ A} → Obs Timeline Γ A → ℕ
-size (cold x)          = 2
+size (cold x)          = 2 + coldW x
 size empty             = 2
 size (of xs)           = 2 + length xs
 size (map f s)         = suc (size s)
@@ -66,7 +89,7 @@ csW k = just? 2 (CS.bodyAt k) + just? 1 (CS.attSrc k) + one (CS.srcLive k)
 mutual
   owed : ∀ {Γ A} → St Γ A → ℕ
   owed (pend o)                = size o
-  owed (coldS b l)             = just? 1 (due l)
+  owed (coldS b l)             = tapeW l
   owed (ofS i p xs)            = suc (length xs)
   owed doneS                   = 0
   owed (mapS f s)              = owed s
@@ -96,10 +119,12 @@ height (inLanes op f d n q o pre post c) = suc (height c)
 height (inSrc k b c)                     = suc (height c)
 height (inBody k o c)                    = suc (height c)
 
--- A configuration's counts: what the whole tree owes; whether everything
--- running is absorbed; how far an event in flight has still to rise.
+-- A configuration's counts: what the whole tree owes, an event in flight
+-- included; whether everything running is absorbed; how far an event in
+-- flight has still to rise.
 owedᶜ : ∀ {R} → Conf R → ℕ
-owedᶜ ⟨ c , s , m , p ⟩ = owed (plug c s)
+owedᶜ ⟨ c , s , rising e , p ⟩ = suc (owed (plug c s))
+owedᶜ ⟨ c , s , _ , p ⟩        = owed (plug c s)
 
 calmᶜ : ∀ {R} → Conf R → ℕ
 calmᶜ ⟨ c , s , absorbed , p ⟩ = 1

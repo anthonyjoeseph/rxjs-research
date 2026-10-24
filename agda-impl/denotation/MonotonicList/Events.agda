@@ -48,6 +48,8 @@ mutual
 -- WHAT A COLD LEAF SAYS: frames at strictly increasing ticks, relative
 -- to its subscription, by construction.  Every frame of `From A t` is at
 -- `t` or later, and the timeline after a frame at `t′` is `From A (suc t′)`.
+-- A frame's values between stalls are finite: a synchronous run that
+-- never yields would hang rxjs, and its scripted colds are finite lists.
 mutual
   data From (A : Set) (t : Time) : Set where
     done  : From A t
@@ -55,7 +57,7 @@ mutual
     at    : ∀ t′ → t ≤ t′ → Frame A t′ → From A t
 
   data Frame (A : Set) (t : Time) : Set where
-    emit  : A → Frame∞ A t → Frame A t
+    emit  : A → Frame A t → Frame A t
     stall : Frame∞ A t → Frame A t
     close : From∞ A (suc t) → Frame A t
 
@@ -142,9 +144,8 @@ data Timeline : Set → Set₁ where
 
 timelineAt : ∀ {A} → Timeline A → Pos → From A 0
 timelineAt (fixed m) p = m
-timelineAt fresh     p = at 0 z≤n (emit p λ where
-  .Frame∞.force → close λ where
-    .From∞.force → done)
+timelineAt fresh     p = at 0 z≤n (emit p (close λ where
+  .From∞.force → done))
 
 private
   data Cmp : Set where

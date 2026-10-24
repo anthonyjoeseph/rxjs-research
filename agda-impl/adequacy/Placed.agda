@@ -304,13 +304,13 @@ module Apart {A : Set} (τ : ℕ) (r : Pos) (i : ℕ) where
     frames-apart c ok (M.at t _ b) = chain-burst (τ + t) c 0 b
 
     chain-burst : ∀ {e t} n → Chain e → ∀ j (b : M.Frame A t) → Every (Sp (r ++ [ ix i ])) (M′.burst τ (ix n ∷ sub e ∷ []) j b)
-    every (chain-burst n c j (M.emit a k)) = frame-sp c n (ix-mark j) , chain-burst n c (suc j) (M.Frame∞.force k) , everyT-idle
+    every (chain-burst n c j (M.emit a k)) = frame-sp c n (ix-mark j) , chain-burst n c (suc j) k , everyT-idle
     every (chain-burst n c j (M.stall k))  = frame-sp c n (ix-mark j) , chain-burst n c (suc j) (M.Frame∞.force k) , everyT-idle
     every (chain-burst n c j (M.close k))  =
       frame-sp c n (ix-mark j) , frames-apart (step n c) (frame-sp c n last-mark) (M.From∞.force k) , everyT-idle
 
   burst-apart : ∀ {t} j → i < j → (b : M.Frame A t) → Every (Sp (r ++ [ ix i ])) (M′.burst τ r j b)
-  every (burst-apart j lt (M.emit a k)) = sib j lt , burst-apart (suc j) (<-≤-trans lt (n≤1+n j)) (M.Frame∞.force k) , everyT-idle
+  every (burst-apart j lt (M.emit a k)) = sib j lt , burst-apart (suc j) (<-≤-trans lt (n≤1+n j)) k , everyT-idle
     where sib : ∀ j → i < j → Sp (r ++ [ ix i ]) (r ++ [ ix j ])
           sib j lt = sibling-spread r (ix-mark j) (ix-mark i) (λ { refl → <⇒≢ lt refl })
   every (burst-apart j lt (M.stall k))  = sib j lt , burst-apart (suc j) (<-≤-trans lt (n≤1+n j)) (M.Frame∞.force k) , everyT-idle
@@ -329,7 +329,7 @@ spread-frames τ e M.quiet      = record { spread = tt }
 spread-frames τ e (M.at t _ b) = spread-burst τ (ix (τ + t) ∷ sub e ∷ []) 0 b
 
 spread (spread-burst τ r i (M.emit a k)) =
-  (Apart.burst-apart τ r i (suc i) ≤-refl (M.Frame∞.force k) , everyT-idle) , spread-burst τ r (suc i) (M.Frame∞.force k)
+  (Apart.burst-apart τ r i (suc i) ≤-refl k , everyT-idle) , spread-burst τ r (suc i) k
 spread (spread-burst τ r i (M.stall k))  = spread-burst τ r (suc i) (M.Frame∞.force k)
 spread (spread-burst τ r i (M.close k))  = spread-frames τ (r ++ [ last ]) (M.From∞.force k)
 

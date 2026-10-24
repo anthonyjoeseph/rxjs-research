@@ -119,7 +119,7 @@ module Driver (R : Set) where
   played (leaf false l cl dv st) = silent 0 (st over)
   played (leaf true l true dv st) = silent 0 (st over)
   played (leaf true (play τ u i t (emit a k)) false dv st) =
-    silent (tick u) (dv (nx a) (play τ u (suc i) t (Frame∞.force k)) true (u ++ [ ix i ]))
+    silent (tick u) (dv (nx a) (play τ u (suc i) t k) true (u ++ [ ix i ]))
   played (leaf true (play τ u i t (stall k)) false dv st) = silent (tick u) (st (play τ u (suc i) t (Frame∞.force k)))
   played (leaf true (play τ u i t (close k)) false dv st) = silent (tick u) (st (rest τ (u ++ [ last ]) (From∞.force k)))
   played (leaf true over false dv st) = silent 0 (st over)
