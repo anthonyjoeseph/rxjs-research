@@ -11,16 +11,16 @@
 module spike.MarkedInv where
 
 open import Data.Bool using (true; false; not; if_then_else_)
-open import Data.List using (List; []; _∷_; _++_)
+open import Data.List using (List; []; _∷_; _++_; null)
 open import Data.Maybe using (just; nothing)
-open import Data.Nat using (_<ᵇ_; _≡ᵇ_)
-open import Data.Product using (_×_; _,_; proj₁)
+open import Data.Nat using (zero; suc; pred; _<ᵇ_; _≡ᵇ_)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 import Data.List.Relation.Unary.All
 open import Data.Empty using (⊥)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; subst₂; sym)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList.Events using (Timeline; emit; stall; close)
@@ -30,7 +30,7 @@ open import spike.MarkedPick using (Order; order; module Order; whole; Lead; Cle
 open import operation.MarkedPure using (Tape; play; ending; over; module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; closed; closedUp;
-  CS; cs; attAt; attached; free; cpAt; cutAt; overAt; nx; cp;
+  CS; cs; shows; outOf; attAt; attached; free; cpAt; cutAt; overAt; nx; cp;
   Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising;
   Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM; search; found; leaf;
   rise; run; begin; start; admit; dequeue; settle; ended; alive; feed; feedL; unsub; killAll; unsubIf)
@@ -564,11 +564,77 @@ module _ {R : Set} where
   postulate
     -- THE SHAPE: a step keeps the whole tree in the fragment.
     shape-next : ∀ k → Base k → Frag (whole k) → NextShape (step k)
-    -- A rise carries its lead: each frame it leaves was clear at its position.
-    rise-lead : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Base ⟨ c , s , rising e , p ⟩ → Clear p c → NextLead (took (rise c s e p))
-    -- A mark run rises, if at all, at its own key.
+    -- A mark run rises, if at all, the event it showed, at its own key,
+    -- leaving a node as live as the one it ran.
     run-lead : ∀ (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} p → search top t ≡ just (found (Γ , A , c , s) m key)
-             → (∀ q → at q ≡ key → Clear q c) → NextLead (took (run c s m p))
+             → (∀ q a (s′ : St Γ A) → key ≡ at q → outOf c s m ≡ shows (nx a) → alive s ≡ alive s′ → Clear q a c s′)
+             → NextLead (took (run c s m p))
+
+  -- Nothing a subscription starts, a slot frees or an outer completes rises a value.
+  start-lead : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p → Lead (start c op f d n q o ls a p)
+  start-lead c op f d n q o ls a p with closed c
+  ... | true  = tt
+  ... | false = tt
+
+  settle-lead : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) d n e p → Lead ⟨ c , s , settle d n e , p ⟩
+  settle-lead c s false n       e     p = tt
+  settle-lead c s true  zero    true  p = tt
+  settle-lead c s true  zero    false p = tt
+  settle-lead c s true  (suc n) e     p = tt
+
+  dequeue-lead : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls p → Lead (dequeue c op f d n q o ls p)
+  dequeue-lead c op f d n []      o ls p = settle-lead c (flatS op f d n [] o ls) d n true p
+  dequeue-lead c op f d n (a ∷ q) o ls p = start-lead c op f d n q o ls a p
+
+  admit-lead : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p → NextLead (took (admit c op f d n q o ls a p))
+  admit-lead c (mergeᶠ nothing)  f d n q o ls a p = start-lead c (mergeᶠ nothing) f d n q o ls a p
+  admit-lead c (mergeᶠ (just m)) f d n q o ls a p with n <ᵇ m
+  ... | true  = start-lead c (mergeᶠ (just m)) f d n q o ls a p
+  ... | false = tt
+  admit-lead c switchᶠ           f d n q o ls a p with killAll ls
+  ... | ls′ , t = start-lead c switchᶠ f d 0 q o ls′ a p
+  admit-lead c exhaustᶠ          f d n q o ls a p with n ≡ᵇ 0
+  ... | true  = start-lead c exhaustᶠ f d n q o ls a p
+  ... | false = tt
+
+  -- A rise carries its lead: each frame was clear at the position the
+  -- value reaches it.
+  rise-lead : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Lead ⟨ c , s , rising e , p ⟩ → NextLead (took (rise c s e p))
+  rise-lead top                               s (nx a) p l = tt
+  rise-lead top                               s cp     p l = tt
+  rise-lead (inMap f c)                       s (nx a) p l = l
+  rise-lead (inMap f c)                       s cp     p l = tt
+  rise-lead (inScan f z c)                    s (nx a) p l = l
+  rise-lead (inScan f z c)                    s cp     p l = tt
+  rise-lead (inCut true x c)                  s (nx a) p l = l refl
+  rise-lead (inCut true x c)                  s cp     p l = tt
+  rise-lead (inCut false x c)                 s (nx a) p l = tt
+  rise-lead (inCut false x c)                 s cp     p l = tt
+  rise-lead (inLn b c)                        s (nx a) p l = l
+  rise-lead (inLn b c)                        s cp     p l = tt
+  rise-lead (inTake i q free c)               s (nx a) p l with q a | i
+  ... | true  | _     = proj₁ l refl
+  ... | false | true  = proj₂ l refl refl
+  ... | false | false = tt
+  rise-lead (inTake i q free c)               s cp     p l = tt
+  rise-lead (inTake i q (cpAt r) c)           s (nx a) p l = tt
+  rise-lead (inTake i q (cpAt r) c)           s cp     p l = tt
+  rise-lead (inTake i q (cutAt r) c)          s (nx a) p l = tt
+  rise-lead (inTake i q (cutAt r) c)          s cp     p l = tt
+  rise-lead (inTake i q (overAt r) c)         s (nx a) p l = tt
+  rise-lead (inTake i q (overAt r) c)         s cp     p l = tt
+  rise-lead (inOuter op f d n q ls c)         s (nx a) p l = admit-lead c op f d n q s ls a p
+  rise-lead (inOuter op f d n q ls c)         s cp     p l = settle-lead c (flatS op f true n q s ls) true n (null q) p
+  rise-lead (inLanes op f d n q o pre post c) s (nx b) p l with alive s
+  ... | true  = proj₂ (l refl)
+  ... | false = tt
+  rise-lead (inLanes op f d n q o pre post c) s cp     p l with alive s
+  ... | true  = dequeue-lead c op f d (pred n) q o (pre ++ ended s ∷ post) p
+  ... | false = tt
+  rise-lead (inSrc k b c)                     s (nx a) p l = tt
+  rise-lead (inSrc k b c)                     s cp     p l = tt
+  rise-lead (inBody k o c)                    s (nx b) p l = l
+  rise-lead (inBody k o c)                    s cp     p l = tt
 
   -- A subscribe rises nothing.
   sub-lead : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → NextLead (step ⟨ c , s , subscribing , p ⟩)
@@ -598,13 +664,14 @@ module _ {R : Set} where
 
   -- THE PICK: the run of the least mark leads every frame above it.
   lead-next : ∀ k → Base k → Order k → NextLead (step k)
-  lead-next ⟨ c , s , rising e , p ⟩    b o = rise-lead c s e p b (Order.lead o)
+  lead-next ⟨ c , s , rising e , p ⟩    b o = rise-lead c s e p (Order.lead o)
   lead-next ⟨ c , s , subscribing , p ⟩ b o = sub-lead c s p
   lead-next ⟨ c , s , absorbed , p ⟩    b o with search top (plug c s) in e
   ... | nothing = tt
   ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
   ...   | pl , _ = run-lead (plug c s) p e
-                     (λ q eq → won-clear q c′ s′ (subst (λ k → Won k c′ s′) (sym eq) (search-won (plug c s) e)) (subst Frag (sym pl) (Order.shape o)))
+                     (λ q a s″ kq oa al → won-clear q a c′ s′ s″ al
+                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oa (search-won (plug c s) e)) (subst Frag (sym pl) (Order.shape o)))
 
   joined : ∀ x → NextShape x → NextLead x → NextOrd x
   joined (silent t k)    f l = order f l

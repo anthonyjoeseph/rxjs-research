@@ -343,25 +343,35 @@ both entered.
   subscription) cost five per-former H leaves (`scanS-head`,
   `takeS-head`, `limit-head`, `switch-head`, `exhaust-head`), each the
   same kind of clause K1–K3 proved.
-- *Engine only:* `search-won`, `run-lead` (a run's lead from the found
-  node's `Clear`). `sub-lead` is proven: a subscribe never rises.
+- *Engine only:* `search-won`, `run-lead` (a run rises, if at all, the
+  event it showed at its own key). `sub-lead` and `rise-lead` are proven.
 - *Meaning link:* `sides-link`, which needs the stepper's step of each
   part to be the meaning's head. That is the ghost correspondence,
   possibly with `Base` for a joiner's buffer.
 
+**`rise-lead` is a body, after a restatement.** As first stated, the
+lead was one position for every frame, and it is false. An inclusive
+takeWhile failing at `p` sends its value up at `p ⊕ [ ix 0 ]`. An older
+lane headed exactly there is after `p`, but not after where the value
+arrives. The repair moved an index; no new mathematics was needed.
+`Clear` now follows the value up as `rise` carries it: each frame at the
+position the value has there, ending where `rise` absorbs it. `Won`
+follows the winner's candidate up as `seek` retags it, and `seek` shifts
+the key at the same frames by the same `shift`. So `won-clear` reads each
+frame's race at the position the value will reach it, and `rise-lead` is
+one clause per frame.
+
 **Risks, riskiest first.**
 
-1. `rise-lead`: a rise keeps its position, except an inclusive
-   takeWhile's failing value, which moves to `p ⊕ [ix 0]`. A `NotBefore`
-   proven at `p` is not obviously one at `p ⊕ [ix 0]` against a sibling
-   keyed exactly there. This is the tie-only gap of the census,
-   reappearing in the lead; the first thing to try to refute.
-2. `limited-sides`: for a bounded merge, switch or exhaust, the queue
+1. `limited-sides`: for a bounded merge, switch or exhaust, the queue
    and the one-lane rule sit outside the race `race-steps` reads, so the
    merge clause's route does not carry over as written.
-3. `rise-src-nx` / `rise-body-nx` in `spike.MarkedKept`: `Clear` passes
-   through a connect's frames unchanged, so whatever order these relied
-   on from `Ord` must now come from the connect's own phase (`Conn`).
+2. `rise-src-nx` / `rise-body-nx` in `spike.MarkedKept`: `Clear` stops
+   at a connect's source and passes through its body unchanged, so
+   whatever order these relied on from `Ord` must now come from the
+   connect's own phase (`Conn`).
+3. `sides-link`: the stepper's head of each part is the meaning's. It may
+   need `Base` for a joiner's buffer.
 
 ## Where the spike stands
 
@@ -369,5 +379,5 @@ H is a body for of, empty, map, the switches, merge without a queue,
 connect, the joiner and colds. It is a leaf per former for scan,
 takeWhile, a bounded merge, and switch and exhaust as flatMaps. The order
 the preservation half consumes is local: `Order` is a shape fact plus
-per-frame race facts, and the pick discharges the latter from H. Next:
-try to refute `rise-lead` at an inclusive takeWhile's failing value.
+per-frame race facts. The pick discharges the race facts from H, and a
+rise carries them by definition. Next: `limited-sides`.

@@ -13,26 +13,42 @@
 -- So a configuration carries only the fragment's shape (`Frag` of its
 -- whole tree) and, while a value rises, what that pick established about
 -- the frames above it (`Clear`).  Nothing relates two nodes' keys.
+--
+-- `Clear` follows the value up as `rise` carries it, each frame at the
+-- position the value has there: an inclusive takeWhile's failing value
+-- reaches the frames above at `p ⊕ [ ix 0 ]`.  `Won` follows the
+-- winner's candidate up as `seek` retags it, which moves the key at the
+-- same frames by the same `shift`, so each frame's race is read at the
+-- position the value will rise to.
+
+-- DEAD ROUTE: one position for every frame (`Clear p c`, the winner's own
+--   key throughout).  Above an inclusive takeWhile failing at `p` the value
+--   rises at `p ⊕ [ ix 0 ]`; an older lane headed exactly there is after
+--   `p` but not after where the value arrives, so no step from the lead at
+--   `p` reaches the lead the frame above needs.  The engine's race there
+--   is already at the shifted key.
 module spike.MarkedPick where
 
 open import Data.Empty using (⊥)
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to all-++⁺)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂; uncurry)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; trans)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.MonotonicList.Events using (Pos; Timeline; idle; _∪_)
+open import denotation.MonotonicList.Events using (Pos; Timeline; idle; _∪_; ix)
 open import denotation.Unfold using (Step; NEnv; states; outerᴺ; step; headˢ; hushˢ; outˢ; skipˢ; endˢ)
 open import operation.Key using (Key; at; _<ᴷ_)
 open import operation.MarkedPure using (module Machine)
 open Machine using (St; mapS; scanS; cutS; lnS; takeS; flatS; connS; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes;
-  inSrc; inBody; plug; closed; Out; still; seek; search; found; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising)
+  inSrc; inBody; plug; closed; Out; still; shows; seek; search; found; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
+  nx; cp; alive; free; cpAt; cutAt; overAt; _⊕_; mapT; scanT; cutT; takeT; laneT; shift; over; outOf)
+  renaming (outerT to outerK)
 open import spike.MarkedGhost using (gh; lane; outerG; poolG; lanesL; deadL; poolT; tailsOn; outerT; envAt)
 open import spike.MarkedRace using (First; NotBefore; After)
 open import spike.MarkedHead using (Frag; Lanes; Lane; Agrees; exact; early; HeadAt; cand; pool-step; at-<ᵖ; <≮ᴷ; ≮ᴷ-trans)
@@ -47,24 +63,32 @@ Sides p f d o pre post ρ =
   First p (outerᴺ (lane f) (outerG d (gh o)) ρ) (states (lanesL post) ρ) (states (lanesL pre) ρ)
     (outerT d (gh o) ρ (tailsOn (deadL pre) ρ (idle ∪ poolT (deadL post) ρ)))
 
--- Every flatMap frame above a value rising at `p`, while its observer is open.
-Clear : ∀ {R Γ A} → Pos → Ctx R Γ A → Set
-Clear p top                               = ⊤
-Clear p (inMap f c)                       = Clear p c
-Clear p (inScan f z c)                    = Clear p c
-Clear p (inCut l a c)                     = Clear p c
-Clear p (inLn b c)                        = Clear p c
-Clear p (inTake i q w c)                  = Clear p c
-Clear p (inOuter op f d n q ls c)         = Clear p c
-Clear p (inLanes op f d n q o pre post c) = (closed c ≡ false → Sides p f d o pre post (envAt c)) × Clear p c
-Clear p (inSrc k b c)                     = Clear p c
-Clear p (inBody k o c)                    = Clear p c
+-- Every frame a value `a` rising at `p` passes, at the position it has
+-- there and the node `rise` leaves below; each flatMap frame while its
+-- observer is open.
+Clear : ∀ {R Γ A} → Pos → A → Ctx R Γ A → St Γ A → Set
+Clear p a top                               s = ⊤
+Clear p a (inMap f c)                       s = Clear p (f a) c (mapS f s)
+Clear p a (inScan f z c)                    s = Clear p (f z a) c (scanS f (f z a) s)
+Clear p a (inCut l x c)                     s = l ≡ true → Clear p a c (cutS l x s)
+Clear p a (inLn b c)                        s = Clear p a c (lnS b s)
+Clear p a (inTake i q free c)               s = (q a ≡ true → Clear p a c (takeS i q free s))
+                                              × (q a ≡ false → i ≡ true → Clear (p ⊕ [ ix 0 ]) a c (takeS i q (cpAt p) s))
+Clear p a (inTake i q (cpAt r) c)           s = ⊤
+Clear p a (inTake i q (cutAt r) c)          s = ⊤
+Clear p a (inTake i q (overAt r) c)         s = ⊤
+Clear p a (inOuter op f d n q ls c)         s = ⊤
+Clear p a (inLanes op f d n q o pre post c) s =
+  alive s ≡ true → (closed c ≡ false → Sides p f d o pre post (envAt c)) × Clear p a c (flatS op f d n q o (pre ++ s ∷ post))
+Clear p a (inSrc k b c)                     s = ⊤
+Clear p a (inBody k o c)                    s = Clear p a c (connS k o s)
 
 -- The configuration's order: the whole tree's shape, and a rise's lead.
 Lead : ∀ {R} → Conf R → Set
-Lead ⟨ c , s , rising e , p ⟩  = Clear p c
-Lead ⟨ c , s , subscribing , p ⟩ = ⊤
-Lead ⟨ c , s , absorbed , p ⟩    = ⊤
+Lead ⟨ c , s , rising (nx a) , p ⟩ = Clear p a c s
+Lead ⟨ c , s , rising cp , p ⟩     = ⊤
+Lead ⟨ c , s , subscribing , p ⟩   = ⊤
+Lead ⟨ c , s , absorbed , p ⟩      = ⊤
 
 whole : ∀ {R} → Conf R → St [] R
 whole ⟨ c , s , m , p ⟩ = plug c s
@@ -101,22 +125,25 @@ record LaneWon {R Γ A B} (k : Key) (c : Ctx R Γ B) op (f : A → Obs Timeline 
     olderW : Race KAfter k c op f d n q o [] pre (s ∷ post)
     newerW : Race KNotBefore k c op f d n q o (pre ++ [ s ]) post []
 
--- Every flatMap above the found node raced it in.
-Won : ∀ {R Γ A} → Key → Ctx R Γ A → St Γ A → Set
-Won k top s                               = ⊤
-Won k (inMap f c) s                       = Won k c (mapS f s)
-Won k (inScan f z c) s                    = Won k c (scanS f z s)
-Won k (inCut l a c) s                     = Won k c (cutS l a s)
-Won k (inLn b c) s                        = Won k c (lnS b s)
-Won k (inTake i q w c) s                  = Won k c (takeS i q w s)
-Won k (inOuter op f d n q ls c) s         = Won k c (flatS op f d n q s ls)
-Won k (inLanes op f d n q o pre post c) s = LaneWon k c op f d n q o pre post s × Won k c (flatS op f d n q o (pre ++ s ∷ post))
-Won k (inSrc kk b c) s                    = Won k c (connS kk s b)
-Won k (inBody kk o c) s                   = Won k c (connS kk o s)
+-- Every flatMap above the found node raced it in, each at the key and
+-- event its candidate has there.
+Won : ∀ {R Γ A} → Key × Out A → Ctx R Γ A → St Γ A → Set
+Won h       top                                s = ⊤
+Won (k , o) (inMap f c)                        s = Won (mapT f k o) c (mapS f s)
+Won (k , o) (inScan f z c)                     s = Won (scanT f z k o) c (scanS f z s)
+Won (k , o) (inCut l a c)                      s = Won (cutT l k o) c (cutS l a s)
+Won h       (inLn b c)                         s = Won h c (lnS b s)
+Won (k , o) (inTake i q w c)                   s = Won (takeT i q w k o) c (takeS i q w s)
+Won (k , o) (inOuter op f d n q ls c)          s = Won (outerK n q k o) c (flatS op f d n q s ls)
+Won (k , o) (inLanes op f d n q o′ pre post c) s =
+  LaneWon k c op f d n q o′ pre post s × Won (uncurry (laneT d n q) (cutT (alive s) k o)) c (flatS op f d n q o′ (pre ++ s ∷ post))
+Won (k , o) (inSrc kk b c)                     s = Won ((if over kk then k else shift k) , still) c (connS kk s b)
+Won h       (inBody kk o c)                    s = Won h c (connS kk o s)
 
 postulate
   -- The engine's search: the found node's key leads every race above it.
-  search-won : ∀ {R} (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} → search top t ≡ just (found (Γ , A , c , s) m key) → Won key c s
+  search-won : ∀ {R} (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} → search top t ≡ just (found (Γ , A , c , s) m key)
+             → Won (key , outOf c s m) c s
   -- A flatMap of a fragment tree is of the fragment.
   frag-flat : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls
             → Frag (plug c (flatS op f d n q o ls)) → Frag (flatS op f d n q o ls)
@@ -205,17 +232,33 @@ lane-sides p c (mergeᶠ (just m)) f d n q o pre post s cl w ft _ = limited-side
 lane-sides p c switchᶠ f d n q o pre post s cl w ft _ = limited-sides p c switchᶠ f d n q o pre post s (λ ()) cl w ft
 lane-sides p c exhaustᶠ f d n q o pre post s cl w ft _ = limited-sides p c exhaustᶠ f d n q o pre post s (λ ()) cl w ft
 
--- Up the found node's frames: each flatMap it won is clear.
-won-clear : ∀ {R Γ A} p (c : Ctx R Γ A) (s : St Γ A) → Won (at p) c s → Frag (plug c s) → Clear p c
-won-clear p top                               s w       ft = tt
-won-clear p (inMap f c)                       s w       ft = won-clear p c (mapS f s) w ft
-won-clear p (inScan f z c)                    s w       ft = won-clear p c (scanS f z s) w ft
-won-clear p (inCut l a c)                     s w       ft = won-clear p c (cutS l a s) w ft
-won-clear p (inLn b c)                        s w       ft = won-clear p c (lnS b s) w ft
-won-clear p (inTake i q w′ c)                 s w       ft = won-clear p c (takeS i q w′ s) w ft
-won-clear p (inOuter op f d n q ls c)         s w       ft = won-clear p c (flatS op f d n q s ls) w ft
-won-clear p (inLanes op f d n q o pre post c) s (l , w) ft =
+-- A live lane's value passes its flatMap's retag unchanged.
+lane-on : ∀ {R Γ A B} d n (q : List A) {b} {k} (a : B) {c : Ctx R Γ B} {t} → b ≡ true
+        → Won (uncurry (laneT d n q) (cutT b k (shows (nx a)))) c t → Won (k , shows (nx a)) c t
+lane-on d n []      a refl w = w
+lane-on d n (_ ∷ _) a refl w = w
+
+-- Up the found node's frames: each one the value reaches is clear there.
+-- `s` is the node the search saw, `s′` the one the rise leaves.
+won-clear : ∀ {R Γ A} p (a : A) (c : Ctx R Γ A) (s s′ : St Γ A) → alive s ≡ alive s′
+          → Won (at p , shows (nx a)) c s → Frag (plug c s) → Clear p a c s′
+won-clear p a top                               s s′ al w ft = tt
+won-clear p a (inMap f c)                       s s′ al w ft = won-clear p (f a) c (mapS f s) (mapS f s′) refl w ft
+won-clear p a (inScan f z c)                    s s′ al w ft = won-clear p (f z a) c (scanS f z s) (scanS f (f z a) s′) refl w ft
+won-clear p a (inCut true x c)                  s s′ al w ft = λ _ → won-clear p a c (cutS true x s) (cutS true x s′) refl w ft
+won-clear p a (inCut false x c)                 s s′ al w ft = λ ()
+won-clear p a (inLn b c)                        s s′ al w ft = won-clear p a c (lnS b s) (lnS b s′) refl w ft
+won-clear p a (inTake i q free c)               s s′ al w ft with q a | i
+... | true  | _     = (λ _ → won-clear p a c (takeS _ q free s) (takeS _ q free s′) refl w ft) , (λ ())
+... | false | true  = (λ ()) , (λ _ _ → won-clear (p ⊕ [ ix 0 ]) a c (takeS true q free s) (takeS true q (cpAt p) s′) refl w ft)
+... | false | false = (λ ()) , (λ _ ())
+won-clear p a (inTake i q (cpAt r) c)           s s′ al w ft = tt
+won-clear p a (inTake i q (cutAt r) c)          s s′ al w ft = tt
+won-clear p a (inTake i q (overAt r) c)         s s′ al w ft = tt
+won-clear p a (inOuter op f d n q ls c)         s s′ al w ft = tt
+won-clear p a (inLanes op f d n q o pre post c) s s′ al (l , w) ft lv =
   (λ cl → lane-sides p c op f d n q o pre post s cl l ft (frag-flat c op f d n q o (pre ++ s ∷ post) ft))
-  , won-clear p c (flatS op f d n q o (pre ++ s ∷ post)) w ft
-won-clear p (inSrc kk b c)                    s w       ft = won-clear p c (connS kk s b) w ft
-won-clear p (inBody kk o c)                   s w       ft = won-clear p c (connS kk o s) w ft
+  , won-clear p a c (flatS op f d n q o (pre ++ s ∷ post)) (flatS op f d n q o (pre ++ s′ ∷ post)) refl
+      (lane-on d n q {alive s} {at p} a {c} {flatS op f d n q o (pre ++ s ∷ post)} (trans al lv) w) ft
+won-clear p a (inSrc kk b c)                    s s′ al w ft = tt
+won-clear p a (inBody kk o c)                   s s′ al w ft = won-clear p a c (connS kk o s) (connS kk o s′) refl w ft

@@ -306,7 +306,7 @@ module _ {R : Set} where
               → Inv ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩ → flagOf s ≡ true → closed c ≡ false
               → First p (outerᴺ (lane f) (outerG d (gh o)) (envAt c)) (states (lanesL post) (envAt c)) (states (lanesL pre) (envAt c))
                   (outerT d (gh o) (envAt c) (poolRuns pre post true (envAt c) (stateᴺ (gh s) (envAt c))))
-  lanes-first op f d n q o pre post c s b p v _ ce = proj₁ (Order.lead (Inv.ord v)) ce
+  lanes-first op f d n q o pre post c s b p v fl ce = proj₁ (Order.lead (Inv.ord v) fl) ce
 
   ----------------------------------------------------------------------
   -- A configuration focused anywhere means what its whole tree means
