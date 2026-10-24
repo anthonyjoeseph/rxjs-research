@@ -18,16 +18,21 @@ open import adequacy.Placed.Order using (Placed)
 open import adequacy.Placed using (placed-subscribe)
 open import adequacy.Engine.Meaning using (M; _≅_; ≅-refl)
 open import adequacy.Engine.Inv using (Inv; inv-load)
+open import adequacy.Record using (Ahead)
 
 open Machine using (Conf; load)
 
 module Strongly (R : Set) where
   -- THE ENGINE RUNS ITS GHOST: the configuration keeps the engine's
-  -- invariant, and means, as a set, what the ghost has left to show.
+  -- invariant, and means, as a set, what the ghost has left to show;
+  -- and whatever items the ghost's meaning reaches, so does its own.
+  -- A set does not see a silence: a ghost showing nothing agrees as one
+  -- with a cold stalling forever.
   record Agrees (g : U.Node [] R) (m : Conf R) : Set where
     field
-      inv  : Inv m
-      same : U.meaning g [] ≅ M m
+      inv   : Inv m
+      same  : U.meaning g [] ≅ M m
+      ahead : ∀ {k} → Ahead (U.meaning g []) k → Ahead (M m) k
 
   -- THE GHOST COMES TO `s` by none or more of its own skips.
   data Leads : U.Node [] R → U.Step [] R → Set₁ where
@@ -52,7 +57,7 @@ module Strongly (R : Set) where
 
   -- The launch runs the program subscribed at the root.
   agrees-begin : (o : PureObs [] R) → Agrees (U.subscribe o root) (load o)
-  agrees-begin o = record { inv = inv-load o ; same = ≅-refl }
+  agrees-begin o = record { inv = inv-load o ; same = ≅-refl ; ahead = λ a → a }
 
   -- The launch is a re-entry configuration against the program
   -- subscribed at the root.

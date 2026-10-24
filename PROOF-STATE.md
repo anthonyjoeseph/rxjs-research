@@ -10,9 +10,10 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SILENT RUN
 
-Untried: whether some measure of the engine's configuration falls on every
-silent step taken while the ghost's next step is not a skip; a ghost skip
-is free to take on any silent step. Settled when `work` is a definition and
+Untried: whether every silent engine step brings each item the
+configuration's meaning reaches nearer, by its depth or else by a measure of
+the control (`work`). Kept is set-level, so a stall dropping a skip of the
+meaning is unseen today. Settled when `work` is a definition and
 `silent-lowers` a body, or a reachable run refutes it.
 
 Members: `silent-lowers`, `work`.
@@ -28,10 +29,11 @@ Members: `WellMach`, `preserve`, `begin-well`.
 #### THE VALUE'S PLACE
 
 Untried: a value the engine shows is the ghost's least, unique at its
-position, and both what the engine leaves and what the ghost leaves lie
-strictly after it. Settled when the three are bodies or refuted.
+position, the first item of the configuration's meaning, and both what the
+engine leaves and what the ghost leaves lie strictly after it. Settled when
+the four are bodies or refuted.
 
-Members: `value-past`, `ghost-out`, `ghost-end`.
+Members: `value-past`, `value-ahead`, `ghost-out`, `ghost-end`.
 
 #### THE ROOT STEP
 

@@ -2,7 +2,7 @@
 
 -- THE GHOST: the meaning's configuration a machine's run carries
 -- (`Strong`), what is left of it to deliver (`residual`), and the
--- work a silent run between two such configurations lowers (`work`).
+-- work a silent run between two such configurations lowers (`Lowers`).
 --
 -- The machine keeps no record: a configuration reached from a launch is
 -- reached WITH the record its steps showed (`Reached`).
@@ -32,7 +32,7 @@ open import adequacy.Sorted using (_≤ᵖ_)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Stepper.Past using (afterᴱ)
-open import adequacy.Engine.Meaning using (Has; atOut; atEnd; pastOut; pastSkip; _≅_; ≅-trans; agree-≅)
+open import adequacy.Engine.Meaning using (M; Has; atOut; atEnd; pastOut; pastSkip; _≅_; ≅-trans; agree-≅)
 open import denotation.Denote using (⟦_⟧)
 open import operation.PureObservable using (PureObs; module Driver; module Machine; module Pure)
 open Events∞
@@ -276,17 +276,26 @@ module Ghosting (R : Set) where
            (×-wellFounded <-wellFounded <-wellFounded)))) <-wellFounded
 
   postulate
-    -- The work a configuration has left before its ghost moves.
+    -- The work a configuration has left in its own control.
     work : Conf R → Measure
 
+  -- Toward an item: the item's depth, then the configuration's work.
+  _⋖_ : ℕ × Measure → ℕ × Measure → Set
+  _⋖_ = ×-Lex _≡_ _<_ _≺_
+
+  ⋖-wf : WellFounded _⋖_
+  ⋖-wf = ×-wellFounded <-wellFounded ≺-wf
+
+  -- `m₀` is nearer than `m` to every item `m`'s meaning reaches.
+  Lowers : Conf R → Conf R → Set
+  Lowers m m₀ = ∀ {k} (c : Ahead (M m) (suc k)) → Σ (Ahead (M m₀) (suc k)) λ c₀ → (depth c₀ , work m₀) ⋖ (depth c , work m)
+
   -- WHAT A SILENT RUN BETWEEN RE-ENTRY CONFIGURATIONS GAINS: the ghost
-  -- past a skip of its residual; or the ghost alike, less work left.
+  -- alike, every item its configuration reaches nearer.
   data Gain {g m g″ m₀} (st : Strong g m) (st₀ : Strong g″ m₀) : Set₁ where
-    passed  : ∀ {k r} → (∀ n → Agree n (residual g) (skip k r)) → Past (force r) (residual g″) → Gain st st₀
-    lowered : (∀ n → Agree n (residual g) (residual g″)) → work m₀ ≺ work m → Gain st st₀
+    lowered : (∀ n → Agree n (residual g) (residual g″)) → Lowers m m₀ → Gain st st₀
 
   gain-past : ∀ {g m g″ m₀} {st : Strong g m} {st₀ : Strong g″ m₀} → Gain st st₀ → Past (residual g) (residual g″)
-  gain-past (passed ag p)  = skipped ag p
   gain-past (lowered ag _) = agrees ag
 
   -- `m′` runs silently to a re-entry configuration, which `st` gains.
