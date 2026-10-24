@@ -28,11 +28,12 @@ open import Data.Nat using (ℕ; zero; suc; _<_; _<ᵇ_)
 open import Data.Nat.Properties using (suc-injective; ≤-refl; <-trans)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
-open import Data.Unit using (tt)
+open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import Tree using (Obs; defer)
-open import denotation.MonotonicList.Events using (Timeline; Events; Events∞; Pos; Time; tick; root; out; skip; end; hush; _<ᵖ_; <ᵖ-irrefl; <ᵖ-asym; emit; stall; close)
+open import Tree using (Obs; Later; defer)
+open import denotation.MonotonicList.Events using (Timeline; Events; Events∞; Pos; Time; tick; root; out; end; hush; ix; _<ᵖ_; <ᵖ-irrefl;
+  <ᵖ-asym; emit; stall; close)
 open import denotation.MonotonicList using (observe; Agree; agree-refl; agree-sym)
 open import adequacy.Record using (Ahead; outᵃ; skipᵃ) renaming (none to noneᵃ)
 import denotation.Unfold as U
@@ -47,7 +48,8 @@ open import adequacy.Stepper.Within using (placed-after)
 open import adequacy.Stepper using (step-skips)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Ghost using (module Ghosting)
-open import adequacy.Engine.Meaning using (M; Has; atOut; atEnd; pastOut; _≅_; ≅-refl; ≅-sym; ≅-trans; agree-≅)
+open import adequacy.Engine.Drop using (Drops; drop; drops; Dropsˢ; Pass; lift-drops)
+open import adequacy.Engine.Meaning using (M; flagOf; envAt; Has; atOut; atEnd; pastOut; _≅_; ≅-refl; ≅-sym; ≅-trans; agree-≅)
 open import adequacy.Engine.Inv using (Inv; NextInv; inv-next)
 open import adequacy.Engine.Spent using (module Spending)
 open import adequacy.Engine.Kept using (KeptFrom) renaming (kept to engine-kept)
@@ -57,7 +59,7 @@ open Events∞ using (force)
 module Honesty (R : Set) where
   open Driver R using (Step; silent; value; complete; drained; step; reading; Read; read; later; played; took)
   open Machine using (Conf; ⟨_,_,_,_⟩; load; moved; starting; turn; quiet; gone; leaf; nx; cp; St; pend; coldS; Ctx; top; inOuter; inLanes;
-    plug; closed; alive; search; found; leafM; subscribing; absorbed; rising) renaming (step to stepᴹ)
+    plug; closed; alive; search; found; leafM; subscribing; absorbed; rising; _⊕_) renaming (step to stepᴹ)
   open Spending R using (Skipped; outerᵏ; laneᵏ; deferᵏ; stallᵏ; closeᵏ; silent-spent)
   open Pure R using (End; finished; dry; cutOff)
   open Unsubbing R using (_⇝_; now; then)
@@ -211,11 +213,6 @@ module Honesty (R : Set) where
     same′ = out-cancel above (value-past (Agrees.inv ag) e)
               (≅-trans (≅-sym (led-same sn pl ld)) (≅-trans (Agrees.same ag) k))
 
-  -- A run past one or more of its leading skips.
-  data Drops (e e′ : Events R) : Set where
-    drop  : ∀ {k r} → (∀ n → Agree n e (skip k r)) → (∀ n → Agree n (force r) e′) → Drops e e′
-    drops : ∀ {k r} → (∀ n → Agree n e (skip k r)) → Drops (force r) e′ → Drops e e′
-
   -- A step dropping leading skips of what its configuration means.
   Drop : Conf R → Conf R → Set
   Drop m m′ = Drops (M m) (M m′)
@@ -243,9 +240,6 @@ module Honesty (R : Set) where
               → alive s ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
               → step ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ ≡ silent t m′
               → Drop ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ m′
-    defer-drop : ∀ {Γ A} {c : Ctx R Γ A} {l p t m′}
-               → Inv ⟨ c , pend (defer l) , subscribing , p ⟩ → step ⟨ c , pend (defer l) , subscribing , p ⟩ ≡ silent t m′
-               → Drop ⟨ c , pend (defer l) , subscribing , p ⟩ m′
     stall-drop : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p t m′}
                → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (stall k))) leafM key)
                → closed c′ ≡ false → Inv ⟨ c , s , absorbed , p ⟩ → step ⟨ c , s , absorbed , p ⟩ ≡ silent t m′
@@ -254,6 +248,22 @@ module Honesty (R : Set) where
                → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (close k))) leafM key)
                → closed c′ ≡ false → Inv ⟨ c , s , absorbed , p ⟩ → step ⟨ c , s , absorbed , p ⟩ ≡ silent t m′
                → Drop ⟨ c , s , absorbed , p ⟩ m′
+
+    -- A DEFER'S HOLE IS THE PROGRAM IT DEFERS PAST ONE SKIP: the
+    -- meaning's lead skip, then the program subscribed just past it, its
+    -- tail with it (`denotation.Unfold.subscribed`).
+    defer-hole : ∀ {Γ A} l p (ρ : U.NEnv Γ)
+               → Dropsˢ {A} (λ _ → ⊤) (U.stateᴺ (U.deferᶜ l p []) ρ) (U.stateᴺ (U.subscribe (Later.force l) (p ⊕ [ ix 1 ])) ρ)
+    -- A DEFER BEGUN IS SHOWN NEXT: every frame above it passes its skip.
+    defer-pass : ∀ {Γ A} {c : Ctx R Γ A} {l p} → Inv ⟨ c , pend (defer l) , subscribing , p ⟩
+               → Pass (λ _ → ⊤) c (flagOf (pend (defer l))) (U.stateᴺ (U.deferᶜ l p []) (envAt c))
+                   (U.stateᴺ (U.subscribe (Later.force l) (p ⊕ [ ix 1 ])) (envAt c))
+
+  -- A defer begun drops its skip.
+  defer-drop : ∀ {Γ A} {c : Ctx R Γ A} {l p t m′}
+             → Inv ⟨ c , pend (defer l) , subscribing , p ⟩ → step ⟨ c , pend (defer l) , subscribing , p ⟩ ≡ silent t m′
+             → Drop ⟨ c , pend (defer l) , subscribing , p ⟩ m′
+  defer-drop {c = c} {l} {p} iv refl = lift-drops (λ _ → ⊤) c (flagOf (pend (defer l))) (defer-hole l p (envAt c)) (defer-pass iv)
 
   -- A step whose work may grow drops a skip.
   skipped-drop : ∀ {m t m′} → Inv m → step m ≡ silent t m′ → Skipped m → Drop m m′

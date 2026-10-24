@@ -1,8 +1,8 @@
 {-# OPTIONS --guardedness #-}
 
--- A LANE FIRST.  When the lane a value rises from comes first
--- among a merge's parts, the merge shows that value next and runs on
--- with the lane's rest in its place (`go-rise`).  First means: no lane
+-- A LANE FIRST.  When a lane headed at `p` comes first among a
+-- merge's parts, the merge's next is the lane's next, whatever it is,
+-- and runs on with the lane's rest in its place (`go-rise`).  First means: no lane
 -- before it in the list earlier, none after it as early (`M′.earliest`
 -- breaks a tie toward the later lane), the outer no earlier, and what
 -- ended parts left no earlier.
@@ -16,7 +16,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 
-open import denotation.MonotonicList.Events using (Events∞; Pos; Tail; idle; pin; out; _∪_; _<ᵖ_)
+open import denotation.MonotonicList.Events using (Events∞; Pos; Tail; idle; pin; _∪_; _<ᵖ_)
 open import denotation.MonotonicList using (MonotonicList; head; headᴼ; Earliest; none; found; earliest; clear; clears; cuts; go; parts; race; lane)
 
 open Events∞
@@ -59,7 +59,7 @@ private
   ...   | true  = a′
   ...   | false = e
 
-  earliest-hole : ∀ {B} p (ls : List (Events∞ B)) (h : Events∞ B) rs {b r} → force h ≡ out p b r
+  earliest-hole : ∀ {B} p (ls : List (Events∞ B)) (h : Events∞ B) rs → head (force h) ≡ just p
                 → All (λ l → NotBefore p (head (force l))) ls → All (λ l → After p (head (force l))) rs
                 → earliest (ls ++ h ∷ rs) ≡ found p ls h rs
   earliest-hole p [] h rs e [] as rewrite e with earliest rs | earliest-after p rs as
@@ -69,7 +69,7 @@ private
   ... | nothing | _  = refl
   ... | just k  | n′ rewrite n′ = refl
 
-  clears-hole : ∀ {B} k p (ls : List (Events∞ B)) (h : Events∞ B) rs {b r} → force h ≡ out p b r → k <ᵖ p ≡ false
+  clears-hole : ∀ {B} k p (ls : List (Events∞ B)) (h : Events∞ B) rs → head (force h) ≡ just p → k <ᵖ p ≡ false
               → clears k (ls ++ h ∷ rs) ≡ false
   clears-hole k p []       h rs e n rewrite e | n = refl
   clears-hole k p (l ∷ ls) h rs e n rewrite clears-hole k p ls h rs e n = ∧-zeroʳ (clear k (head (force l)))
@@ -81,13 +81,13 @@ private
   ... | nothing | _ = refl
   ... | just k′ | n rewrite n = refl
 
-  parts-rise : ∀ {B} op (o : Maybe (Events∞ (MonotonicList B))) ls (h : Events∞ B) rs qs t {p b r} → force h ≡ out p b r
+  parts-rise : ∀ {B} op (o : Maybe (Events∞ (MonotonicList B))) ls (h : Events∞ B) rs qs t {p} → head (force h) ≡ just p
              → All (λ l → NotBefore p (head (force l))) ls → All (λ l → After p (head (force l))) rs → NotBefore p (headᴼ o)
              → parts op o (ls ++ h ∷ rs) qs t ≡ lane op o ls h rs qs t (force h)
   parts-rise op o ls h rs qs t {p} e ns as on rewrite earliest-hole p ls h rs e ns as = race-rise op o p ls h rs qs t on
 
--- THE LANE FIRST: the merge's next is the lane's value.
-go-rise : ∀ {B} op (o : Maybe (Events∞ (MonotonicList B))) ls (h : Events∞ B) rs qs t {p b r} → force h ≡ out p b r
+-- THE LANE FIRST: the merge's next is the lane's.
+go-rise : ∀ {B} op (o : Maybe (Events∞ (MonotonicList B))) ls (h : Events∞ B) rs qs t {p} → head (force h) ≡ just p
         → First p o ls rs t → go op o (ls ++ h ∷ rs) qs t ≡ lane op o ls h rs qs t (force h)
 go-rise op o ls h rs qs idle      e (first ns as on tn) = parts-rise op o ls h rs qs idle e ns as on
 go-rise op o ls h rs qs (pin k u) {p} e (first ns as on tn)
