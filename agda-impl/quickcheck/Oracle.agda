@@ -147,10 +147,10 @@ private
 -- subscribe burst on the engine's lock; it then fires every timer, and
 -- once none is left the log is read, newest first.  Never `cut`: a
 -- program that never finishes never returns.
-ioTrace : ∀ {t} → ℕ → Prog t → IO (Trace ⟦ t ⟧ᵀ)
-ioTrace {t} u p =
+ioTraceWith : ∀ {t} → (∀ {A} → Observable A → IO ⊤) → ℕ → Prog t → IO (Trace ⟦ t ⟧ᵀ)
+ioTraceWith {t} sub u p =
   newClock >>= λ ck → newIORef false >>= λ fin → newIORef [] >>= λ log → newIORef 0 >>= λ names → newSignal >>= λ over →
-  forkIO (subscribe (wrapped ck fin log over (toObs (leaf ck names) u p [] [] []))) >>= λ _ →
+  forkIO (sub (wrapped ck fin log over (toObs (leaf ck names) u p [] [] []))) >>= λ _ →
   await over >>= λ _ →
   readIORef log >>= λ xs → readIORef fin >>= λ c →
   pure (logged nothing (reverse xs) ▸ (if c then completed else silent))
@@ -181,6 +181,9 @@ ioTrace {t} u p =
 
 ------------------------------------------------------------------------
 -- One engine's trace, printed
+
+ioTrace : ∀ {t} → ℕ → Prog t → IO (Trace ⟦ t ⟧ᵀ)
+ioTrace = ioTraceWith subscribe
 
 data Engine : Set where
   denotational pureOp ioOp : Engine

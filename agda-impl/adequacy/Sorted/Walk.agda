@@ -8,22 +8,21 @@ module adequacy.Sorted.Walk where
 open import Data.List using ([])
 
 open import denotation.MonotonicList.Events using (Pos; root)
-open import operation.PureObservable using (PureObs; module Driver)
+open import operation.PureObservable using (PureObs; module Driver; module Machine)
 open import adequacy.Sorted using (_≤ᵖ_; module Sorting)
 
 module SortingWalk (R : Set) where
-  open Driver R using (Mach; Step; silent; value; complete; drained; step; begin)
+  open Driver R using (Step; silent; value; complete; drained; step)
+  open Machine using (Conf; load)
   open Sorting R using (Rising; RisingStep; silentʳ; valueʳ; completeʳ; drainedʳ)
 
   postulate
     -- A configuration well past `lo`, the last position delivered.
-    --
-    -- DEAD ROUTE: the old invariant carries a well heap over the CPS machine's states; the state tree has neither.
-    WellMach : Pos → Mach → Set₁
+    WellMach : Pos → Conf R → Set₁
 
   -- One step, its next configuration well and never earlier.
   data WellStep (lo : Pos) : Step → Set₁ where
-    silentʷ   : ∀ {m lo′} → lo ≤ᵖ lo′ → WellMach lo′ m → WellStep lo (silent m)
+    silentʷ   : ∀ {t m lo′} → lo ≤ᵖ lo′ → WellMach lo′ m → WellStep lo (silent t m)
     valueʷ    : ∀ {t p a m} → lo ≤ᵖ p → WellMach p m → WellStep lo (value t p a m)
     completeʷ : ∀ {p} → lo ≤ᵖ p → WellStep lo (complete p)
     drainedʷ  : WellStep lo drained
@@ -31,14 +30,10 @@ module SortingWalk (R : Set) where
   postulate
     -- The machine's fundamental lemma: a well configuration's step keeps
     -- it well, and a value it shows is no earlier than the last.
-    --
-    -- DEAD ROUTE: the old body is a case split on the CPS machine's states, every arm reading or writing the heap.
     preserve : ∀ {lo m} → WellMach lo m → WellStep lo (step m)
 
     -- The run begins well, the program loaded at the root.
-    --
-    -- DEAD ROUTE: the old body builds the empty heap's well-ness; the state tree has no heap.
-    begin-well : (o : PureObs [] R) → WellMach root (begin o)
+    begin-well : (o : PureObs [] R) → WellMach root (load o)
 
   mutual
     rising : ∀ {lo m} → WellMach lo m → Rising lo m
@@ -51,5 +46,5 @@ module SortingWalk (R : Set) where
     risingˢ drainedʷ        = drainedʳ
 
   -- SORTEDNESS: the program's run rises from the root.
-  sorted : (o : PureObs [] R) → Rising root (begin o)
+  sorted : (o : PureObs [] R) → Rising root (load o)
   sorted o = rising (begin-well o)

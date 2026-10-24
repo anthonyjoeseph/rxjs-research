@@ -1,10 +1,9 @@
 {-# OPTIONS --guardedness #-}
 
--- THE LINK, PORTED to the state-tree engine.  The pure semantics the
--- harness runs (`operation.PureObservable`) agrees with the denotation:
--- the limit of its prefixes, the n-th read for n steps up to tick n, is
--- the meaning observed at the root, with positions forgotten down to
--- ticks.
+-- THE LINK.  The pure semantics the harness
+-- runs (`operation.PureObservable`) agrees with the denotation: the
+-- limit of its prefixes, the n-th read for n steps up to tick n, is the
+-- meaning observed at the root, with positions forgotten down to ticks.
 --
 -- Two halves, proven apart.  BELOW, safety: every prefix's
 -- record is sorted and alike the meaning's events as a set, so placed
@@ -23,7 +22,7 @@ open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; sym; subst)
 
 open import adequacy.Record using (Up; Placed; ahead; framed; shows; placed-⊑; frames-cut)
-open import operation.PureObservable using (PureObs; module Pure; module Driver) renaming (run to prefix)
+open import operation.PureObservable using (PureObs; module Driver; module Machine; module Pure) renaming (run to prefix)
 open import adequacy.Sorted using (module Sorting)
 open import adequacy.Sorted.Walk using (module SortingWalk)
 open import adequacy.Content using (module Honesty)
@@ -41,7 +40,8 @@ run : ∀ {A} → PureObs [] A → ML A
 run o = limit λ n → prefix n n o
 
 module Link (R : Set) where
-  open Driver R using (Trace∞; tau; out; end; idle; trace; begin; reading; Read; read; marks; log; ending; noted)
+  open Driver R using (silent; value; drained; step; reading; Read; read; noted; later) renaming (complete to completeˢ)
+  open Machine using (Conf; load)
   open Pure R using (finished; cutOff; frames)
   open Sorting R using (Ascending; ascending)
   open SortingWalk R using (sorted)
@@ -51,7 +51,7 @@ module Link (R : Set) where
 
   -- The first n steps up to tick h, read.
   read-of : PureObs [] R → ℕ → Time → Read
-  read-of o n h = reading h n 0 (trace (begin o))
+  read-of o n h = reading h n 0 (load o)
 
   postulate
     -- SORTED AND ALIKE IS PLACED: a record ascending in its marks and
@@ -63,21 +63,17 @@ module Link (R : Set) where
 
   -- SAFETY: every prefix of the run is placed against the meaning's
   -- events.
-  placedᴿ : (o : PureObs [] R) (n h : ℕ) → Placed (ending (read-of o n h)) (marks (read-of o n h)) (log (read-of o n h)) (events o)
+  placedᴿ : (o : PureObs [] R) (n h : ℕ) → Placed (Read.endedAs (read-of o n h)) (Read.marks (read-of o n h)) (Read.log (read-of o n h)) (events o)
   placedᴿ o n h = placing o (ascending (sorted o) n h 0) (content o n h)
 
   postulate
     -- The meaning's ticks never fall.
-    --
-    -- RECOVERY: `git show a2e0bb8b` restores `<ᵖ-trans`, `<ᵖ-irrefl` and
-    --   `<ᵖ-ix` in `denotation.MonotonicList`: positions strictly ordered,
-    --   and an earlier one at no later a tick.
     ticks-up : (o : PureObs [] R) → Up 0 (events o)
 
   -- Whatever the meaning shows, some prefix shows.
   reaches : (o : PureObs [] R) → ∀ {is} → Shows (ticks (events o)) is → Σ ℕ λ n → Shows (prefix n n o) is
   reaches o s with reached o (ahead s)
-  ... | n , long = n , shows-≼ (cmp-long (shows-cmp s (shows (ticks-up o) (placedᴿ o n n))) long) (framed (log r) (ending r))
+  ... | n , long = n , shows-≼ (cmp-long (shows-cmp s (shows (ticks-up o) (placedᴿ o n n))) long) (framed (Read.log r) (Read.endedAs r))
     where r = read-of o n n
 
   -- Each prefix is below the meaning.
@@ -102,25 +98,26 @@ module Link (R : Set) where
     past : ∀ {h h′} t → h ≤ h′ → (h <ᵇ t) ≡ false → (h′ <ᵇ t) ≡ true → ⊥
     past {h} {h′} t le f tr = subst T f (<⇒<ᵇ (≤-<-trans le (<ᵇ⇒< h′ t (subst T (sym tr) tt))))
 
-    grows : ∀ {h h′ n n′} c l → h ≤ h′ → n ≤ n′ → Grows (reading h n c l) (reading h′ n′ c l)
-    grows {n = zero} c l hh nn = cuts _
-    grows {h} {h′} {suc n} {suc n′} c (tau t k) hh (s≤s nn) with h <ᵇ t in e | h′ <ᵇ t in e′
-    ... | true  | _     = cuts _
-    ... | false | true  = ⊥-elim (past t hh e e′)
-    ... | false | false = grows t (Trace∞.force k) hh nn
-    grows {h} {h′} {suc n} {suc n′} c (out t p a k) hh (s≤s nn) with h <ᵇ t in e | h′ <ᵇ t in e′
-    ... | true  | _     = cuts _
-    ... | false | true  = ⊥-elim (past t hh e e′)
-    ... | false | false = noted-grows (grows t (Trace∞.force k) hh nn)
-    grows {n = suc n} {suc n′} c (end p) hh (s≤s nn) = stays
-    grows {n = suc n} {suc n′} c idle    hh (s≤s nn) = stays
+    grows : ∀ {h h′ n n′} c (k : Conf R) → h ≤ h′ → n ≤ n′ → Grows (reading h n c k) (reading h′ n′ c k)
+    grows {n = zero} c k hh nn = cuts _
+    grows {h} {h′} {suc n} {suc n′} c k hh (s≤s nn) with step k
+    ... | silent t k′ with h <ᵇ t in e | h′ <ᵇ t in e′
+    ...   | true  | _     = cuts _
+    ...   | false | true  = ⊥-elim (past t hh e e′)
+    ...   | false | false = grows (later c t) k′ hh nn
+    grows {h} {h′} {suc n} {suc n′} c k hh (s≤s nn) | value t p a k′ with h <ᵇ t in e | h′ <ᵇ t in e′
+    ...   | true  | _     = cuts _
+    ...   | false | true  = ⊥-elim (past t hh e e′)
+    ...   | false | false = noted-grows (grows t k′ hh nn)
+    grows {n = suc n} {suc n′} c k hh (s≤s nn) | completeˢ p = stays
+    grows {n = suc n} {suc n′} c k hh (s≤s nn) | drained    = stays
 
-    grows-⊑ : ∀ {r r′} → Grows r r′ → frames (log r) (ending r) ⊑ frames (log r′) (ending r′)
+    grows-⊑ : ∀ {r r′} → Grows r r′ → frames (Read.log r) (Read.endedAs r) ⊑ frames (Read.log r′) (Read.endedAs r′)
     grows-⊑ stays s                               = s
     grows-⊑ (cuts {xs = xs} {c = c} {e′ = e′} ys) = frames-cut xs ys c e′
 
   prefix-chain : (o : PureObs [] R) → Chain (λ n → prefix n n o)
-  prefix-chain o n = grows-⊑ (grows 0 (trace (begin o)) (n≤1+n n) (n≤1+n n))
+  prefix-chain o n = grows-⊑ (grows 0 (load o) (n≤1+n n) (n≤1+n n))
 
 adequacy : ∀ {A} (o : PureObs [] A) → run o ≃ ticks (observe (⟦ o ⟧ []) root)
 adequacy {A} o = limit-least (prefix-chain o) (complete o)

@@ -5,7 +5,7 @@ module adequacy.Placed.Keys where
 open import Data.Bool using (true; false)
 open import Data.Empty using (⊥-elim)
 open import Data.List.Properties using (∷-injective; ∷-injectiveʳ)
-open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.Nat using (ℕ; suc; _<ᵇ_; _+_; _≤_; _<_; z≤n; s≤s)
 open import Data.Nat.Properties using (+-monoʳ-≤; <⇒≤; <-≤-trans; ≤-trans; m≤n+m; m≤m+n; <-irrefl)
@@ -25,8 +25,8 @@ import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
 open import denotation.Denote using (flatOp) renaming (⟦_⟧ to ⟦_⟧ᴰ)
-open import adequacy.Placed.Order using (Alienᴱ; Atop; Beneath; Clear; Every; EveryT; EveryTs; Everys; Every∞; Headed; Ordered; Orders; Owned; Past;
-  Prefix; Prefix⁺; Reaches; out-here; out-there; skip-here; skip-there; Steadies; Steady; Tagged; every; every-monoᴱ; every-onward; every-tailOf;
+open import adequacy.Placed.Order using (Alienᴱ; Atop; Clear; Every; EveryT; EveryTs; Everys; Every∞; Ordered; Orders; Owned; Past;
+  Prefix; Steadies; Steady; Tagged; every; every-monoᴱ; every-onward; every-tailOf;
   everyT-burstOn; everyT-idle; everyT-∪; everyᵀ; every∞-mono; ordered; prefix-++; prefix-trans;
   steady)
 
@@ -133,78 +133,6 @@ no-tick (_ ∷ _ ∷ _) m ()
 prefix-refl : ∀ k → Prefix k k
 prefix-refl []      = tt
 prefix-refl (a ∷ k) = refl , prefix-refl k
-
--- A prefix is the position itself or a proper one.
-prefix-plus : ∀ k h → Prefix k h → k ≡ h ⊎ Prefix⁺ k h
-prefix-plus []      []      tt         = inj₁ refl
-prefix-plus []      (_ ∷ _) tt         = inj₂ tt
-prefix-plus (a ∷ k) (b ∷ h) (refl , q) with prefix-plus k h q
-... | inj₁ refl = inj₁ refl
-... | inj₂ q⁺   = inj₂ (refl , q⁺)
-
--- A tick-singleton cannot be owned by a headed position's lane.
-owned-tick : ∀ p t → Headed p → ¬ Owned (p ++ [ ix 1 ]) (ix t ∷ [])
-owned-tick (ix _ ∷ [])    t _ (inj₁ (_ , ()))
-owned-tick (ix _ ∷ _ ∷ _) t _ (inj₁ (_ , ()))
-owned-tick (ix _ ∷ _)     t _ (inj₂ ())
-owned-tick []             t () _
-owned-tick (sub _ ∷ _)    t () _
-owned-tick (last ∷ _)     t () _
-
--- What a flatMap shows just before a lane, strictly under `p`, puts the
--- lane under `p`.
-prefix-lane : ∀ k x l → Prefix⁺ k (x ++ [ l ]) → Prefix k x
-prefix-lane []          x       l _          = tt
-prefix-lane (_ ∷ [])    []      l (refl , ())
-prefix-lane (_ ∷ _ ∷ _) []      l (refl , ())
-prefix-lane (a ∷ k)     (b ∷ x) l (refl , p) = refl , prefix-lane k x l p
-
-tagged-lane : ∀ k x n → Tagged k (x ++ [ ix n ]) → Tagged k x
-tagged-lane k []          n ()
-tagged-lane k (ix _ ∷ x)  n t        = tagged-lane k x n t
-tagged-lane k (last ∷ x)  n t        = tagged-lane k x n t
-tagged-lane k (sub _ ∷ x) n (inj₁ o) = inj₁ o
-tagged-lane k (sub _ ∷ x) n (inj₂ t) = inj₂ (tagged-lane k x n t)
-
-tagged-++ : ∀ k h w → Tagged k h → Tagged k (h ++ w)
-tagged-++ k []          w ()
-tagged-++ k (ix _ ∷ h)  w t        = tagged-++ k h w t
-tagged-++ k (last ∷ h)  w t        = tagged-++ k h w t
-tagged-++ k (sub _ ∷ h) w (inj₁ o) = inj₁ o
-tagged-++ k (sub _ ∷ h) w (inj₂ t) = inj₂ (tagged-++ k h w t)
-
-owned-lane : ∀ p x → Beneath p (x ++ [ ix 0 ]) → Owned p (x ++ [ ix 1 ])
-owned-lane p x (inj₁ q) = inj₁ (prefix-trans p x (x ++ [ ix 1 ]) (prefix-lane p x (ix 0) q) (prefix-++ x [ ix 1 ]))
-owned-lane p x (inj₂ t) = inj₂ (tagged-++ p x [ ix 1 ] (tagged-lane p x 0 t))
-
-prefix-snoc : ∀ k r l → Prefix k r → Prefix⁺ k (r ++ [ l ])
-prefix-snoc []      []      l _          = tt
-prefix-snoc []      (_ ∷ _) l _          = tt
-prefix-snoc (_ ∷ _) []      l ()
-prefix-snoc (a ∷ k) (b ∷ r) l (refl , q) = refl , prefix-snoc k r l q
-
-prefix⁺-++ : ∀ k h w → Prefix⁺ k h → Prefix⁺ k (h ++ w)
-prefix⁺-++ []      []      w ()
-prefix⁺-++ []      (_ ∷ _) w _          = tt
-prefix⁺-++ (_ ∷ _) []      w ()
-prefix⁺-++ (a ∷ k) (b ∷ h) w (refl , q) = refl , prefix⁺-++ k h w q
-
-prefix⁺-prefix : ∀ k h → Prefix⁺ k h → Prefix k h
-prefix⁺-prefix []      h       _          = tt
-prefix⁺-prefix (_ ∷ _) []      ()
-prefix⁺-prefix (a ∷ k) (b ∷ h) (refl , q) = refl , prefix⁺-prefix k h q
-
-owned-snoc : ∀ p r l → Owned p r → Beneath p (r ++ [ l ])
-owned-snoc p r l (inj₁ q) = inj₁ (prefix-snoc p r l q)
-owned-snoc p r l (inj₂ t) = inj₂ (tagged-++ p r [ l ] t)
-
-beneath-snoc : ∀ p k l → Beneath p k → Beneath p (k ++ [ l ])
-beneath-snoc p k l (inj₁ q) = inj₁ (prefix⁺-++ p k [ l ] q)
-beneath-snoc p k l (inj₂ t) = inj₂ (tagged-++ p k [ l ] t)
-
-beneath-owned : ∀ p k → Beneath p k → Owned p k
-beneath-owned p k (inj₁ q) = inj₁ (prefix⁺-prefix p k q)
-beneath-owned p k (inj₂ t) = inj₂ t
 
 -- A join at `p` tags what it rekeys with `p` itself.
 tagged-sub : ∀ q p → Tagged p (q ++ [ sub p ])
@@ -607,9 +535,3 @@ ahead-quiet : ∀ {B} k (o : Maybe (Events∞ (MonotonicList B))) ls → M′.he
             → M′.ahead-of k o ls ≡ true
 ahead-quiet k o ls ho hs rewrite ho = clears-quiet k ls hs
 
--- A predicate holding at every position holds at one that is reached.
-every-reach : ∀ {A} {P : Pos → Set} (e : Events A) h → Every P e → Reaches h e → P h
-every-reach (out h _ r) _ pe out-here       = proj₁ (every pe)
-every-reach (out _ _ r) h pe (out-there x)  = every-reach (force r) h (proj₁ (proj₂ (every pe))) x
-every-reach (skip h r)  _ pe skip-here      = proj₁ (every pe)
-every-reach (skip _ r)  h pe (skip-there x) = every-reach (force r) h (proj₁ (proj₂ (every pe))) x

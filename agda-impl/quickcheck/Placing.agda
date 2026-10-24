@@ -26,11 +26,12 @@ open import Data.Product using (_×_; _,_)
 open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush; Pos; ix; sub; _<ᵖ_; tick; root; Tail; Tail∞; pin; idle)
 open import denotation.MonotonicList using (enter)
 open import denotation.Unfold using (⟦_⟧ˢ; [])
-open import operation.PureObservable using (module Driver)
+open import operation.PureObservable using (module Driver; module Machine)
 open import quickcheck.Code using (Prog; toObs; timeline)
 open import quickcheck.Ty using (natᵗ)
 
-open Driver ℕ using (Trace; Trace∞; tau; out; end; idle; trace; begin)
+open Driver ℕ using (Trace; Trace∞; tau; out; end; idle; trace)
+open Machine using (load)
 
 private
   samePos : Pos → Pos → Bool
@@ -190,7 +191,7 @@ private
 -- steady and keying nothing just past its own events; and what a cut
 -- leaves running trailing it, and its values spread.  Each check by name.
 checks : Prog natᵗ → List (String × Bool)
-checks p = ("placed" , placedᵇ 6000 12000 (trace (begin o)) e) ∷ ("rising" , rising 4000 [] e) ∷ ("steady" , steadyᵇ 4000 e)
+checks p = ("placed" , placedᵇ 6000 12000 (trace (load o)) e) ∷ ("rising" , rising 4000 [] e) ∷ ("steady" , steadyᵇ 4000 e)
          ∷ ("steps" , stepsᵇ (positions 200 e)) ∷ ("trails" , trailsᵇ 400 s) ∷ ("spread" , spreadᵇ 100 e)
          ∷ ("flat" , flatsᵇ 400 s) ∷ []
   where o = toObs timeline 3 p [] [] []

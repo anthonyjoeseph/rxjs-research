@@ -7,13 +7,13 @@
 module adequacy.Sorted where
 
 open import Data.Bool using (true; false)
-open import Data.List using (List; []; _∷_; _++_; [_])
-open import Data.Nat using (suc; _<ᵇ_)
+open import Data.List using (List; []; _∷_)
+open import Data.Nat using (zero; suc; _<ᵇ_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; <ᵖ-trans; <ᵖ-below)
-open import operation.PureObservable using (module Driver)
+open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; <ᵖ-trans)
+open import operation.PureObservable using (module Driver; module Machine)
 
 ------------------------------------------------------------------------
 -- The order, reflexive
@@ -26,23 +26,20 @@ p ≤ᵖ q = p ≡ q ⊎ p <ᵖ q ≡ true
 ≤ᵖ-trans h           (inj₁ refl) = h
 ≤ᵖ-trans {p} {q} {r} (inj₂ a) (inj₂ b) = inj₂ (<ᵖ-trans p q r a b)
 
--- A child comes after its parent.
-≤ᵖ-child : ∀ q {l lo} → lo ≤ᵖ q → lo ≤ᵖ (q ++ [ l ])
-≤ᵖ-child q le = ≤ᵖ-trans le (inj₂ (<ᵖ-below q []))
-
 module Sorting (R : Set) where
-  open Driver R using (Mach; Step; silent; value; complete; drained; step; trace; shown; reading; marks)
+  open Driver R using (Step; silent; value; complete; drained; step; reading; Read)
+  open Machine using (Conf)
 
   ----------------------------------------------------------------------
   -- What is claimed: the root's values at positions that never fall
 
   mutual
-    record Rising (lo : Pos) (m : Mach) : Set₁ where
+    record Rising (lo : Pos) (m : Conf R) : Set₁ where
       coinductive
       field rises : RisingStep lo (step m)
 
     data RisingStep (lo : Pos) : Step → Set₁ where
-      silentʳ   : ∀ {m lo′} → lo ≤ᵖ lo′ → Rising lo′ m → RisingStep lo (silent m)
+      silentʳ   : ∀ {t m lo′} → lo ≤ᵖ lo′ → Rising lo′ m → RisingStep lo (silent t m)
       valueʳ    : ∀ {t p a m} → lo ≤ᵖ p → Rising p m → RisingStep lo (value t p a m)
       completeʳ : ∀ {p} → lo ≤ᵖ p → RisingStep lo (complete p)
       drainedʳ  : RisingStep lo drained
@@ -57,17 +54,14 @@ module Sorting (R : Set) where
 
   -- A rising run's record is ascending, however far it is read: a step
   -- past the horizon cuts the record there, adding nothing.
-  mutual
-    ascending : ∀ {lo m} → Rising lo m → ∀ n h c → Ascending lo (marks (reading h n c (trace m)))
-    ascending r 0       h c = []ᵃ
-    ascending r (suc n) h c = ascendingˢ (Rising.rises r) n h c
-
-    ascendingˢ : ∀ {lo s} → RisingStep lo s → ∀ n h c → Ascending lo (marks (reading h (suc n) c (shown s)))
-    ascendingˢ (silentʳ {m = m} le r) n h c with h <ᵇ Mach.clock m
-    ... | true  = []ᵃ
-    ... | false = ascending-from le (ascending r n h _)
-    ascendingˢ (valueʳ {t = t} le r)  n h c with h <ᵇ t
-    ... | true  = []ᵃ
-    ... | false = le ∷ᵃ ascending r n h _
-    ascendingˢ (completeʳ le)         n h c = le ∷ᵃ []ᵃ
-    ascendingˢ drainedʳ               n h c = []ᵃ
+  ascending : ∀ {lo m} → Rising lo m → ∀ n h c → Ascending lo (Read.marks (reading h n c m))
+  ascending r zero h c = []ᵃ
+  ascending {m = m} r (suc n) h c with step m | Rising.rises r
+  ... | silent t k | silentʳ le r′ with h <ᵇ t
+  ...   | true  = []ᵃ
+  ...   | false = ascending-from le (ascending r′ n h _)
+  ascending r (suc n) h c | value t p a k | valueʳ le r′ with h <ᵇ t
+  ...   | true  = []ᵃ
+  ...   | false = le ∷ᵃ ascending r′ n h t
+  ascending r (suc n) h c | complete p | completeʳ le = le ∷ᵃ []ᵃ
+  ascending r (suc n) h c | drained    | drainedʳ     = []ᵃ

@@ -6,9 +6,9 @@
 --
 -- From a re-entry configuration the machine records the ghost's value,
 -- ends or drains with it, or runs silently to a ghost past its skips
--- (`adequacy.Content`'s `Hop`).  A value or a skip passed lowers how far
--- into the residual the item lies; a ghost left where it was lowers the
--- witness's remaining work (`measure`), which is well-founded.
+-- (`adequacy.Content`'s `Hop`).  A value or a skip passed lowers how
+-- far into the residual the item lies; a ghost left where it was lowers
+-- the witness's remaining work (`measure`), which is well-founded.
 module adequacy.Progress where
 
 open import Data.Bool using (true; false; T)
@@ -25,9 +25,8 @@ open import Induction.WellFounded using (Acc; acc)
 open import denotation.MonotonicList.Events using (Events∞; Time; out; skip; end; root)
 open import denotation.MonotonicList using (Agree; agree-refl; agree-trans; observe)
 open import denotation.Denote using (⟦_⟧)
-import denotation.Unfold as U
 open import adequacy.Record using (Ahead; none; outᵃ; skipᵃ; endᵃ; hushᵃ; items)
-open import operation.PureObservable using (PureObs; module Driver)
+open import operation.PureObservable using (PureObs; module Driver; module Machine)
 open import adequacy.Content using (module Honesty)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Strong using (module Strongly)
@@ -36,8 +35,8 @@ open import adequacy.Unsub using (module Unsubbing)
 open Events∞
 
 module Progressing (R : Set) where
-  open Driver R using (Mach; step; silent; value; complete; drained; trace; shown; reading; begin; Trace; Trace∞; tau; idle; log; ending)
-    renaming (out to outᵗ; end to endᵗ)
+  open Driver R using (step; silent; value; complete; drained; reading; Read; later)
+  open Machine using (Conf; load)
   open Unsubbing R using (_⇝_; now; then)
   open Ghosting R using (Has; atOut; pastSkip; residual; begun; Past; past-pre; passed; lowered; showing;
     has-agree; after; _≺_; ≺-wf; measure; depth; ahead-agree)
@@ -45,15 +44,15 @@ module Progressing (R : Set) where
   open Honesty R using (Hop; valueᴴ; completeᴴ; drainedᴴ; silentᴴ; strong-hop; strong-agrees)
 
   ----------------------------------------------------------------------
-  -- How far a trace gets
+  -- How far a run gets
 
-  -- The trace shows `k` items, each within finitely many steps.
-  data Gets : Trace → ℕ → Set where
-    zeroᵍ : ∀ {t} → Gets t 0
-    tauᵍ  : ∀ {c l n} → Gets (Trace∞.force l) n → Gets (tau c l) n
-    outᵍ  : ∀ {c p a l n} → Gets (Trace∞.force l) n → Gets (outᵗ c p a l) (suc n)
-    endᵍ  : ∀ {p} → Gets (endᵗ p) 1
-    idleᵍ : Gets idle 1
+  -- The run from `m` shows `k` items, each within finitely many steps.
+  data Gets : Conf R → ℕ → Set₁ where
+    zeroᵍ : ∀ {m} → Gets m 0
+    tauᵍ  : ∀ {m t m′ n} → step m ≡ silent t m′ → Gets m′ n → Gets m n
+    outᵍ  : ∀ {m t p a m′ n} → step m ≡ value t p a m′ → Gets m′ n → Gets m (suc n)
+    endᵍ  : ∀ {m p} → step m ≡ complete p → Gets m 1
+    idleᵍ : ∀ {m} → step m ≡ drained → Gets m 1
 
   private
     -- A tick no later than the horizon is not past it.
@@ -62,32 +61,38 @@ module Progressing (R : Set) where
     ... | false = refl
     ... | true  = ⊥-elim (<⇒≱ (<ᵇ⇒< h t (subst T (sym e) tt)) le)
 
-  -- Some prefix reads as many items as a trace gets: every prefix of at
+  -- Some prefix reads as many items as a run gets: every prefix of at
   -- least so many steps, read to at least so late a tick.
-  gets-reading : ∀ {t k} → Gets t k → ∀ c → Σ ℕ λ s → Σ Time λ b
-               → ∀ n h → s ≤ n → b ≤ h → k ≤ length (items (log (reading h n c t)) (ending (reading h n c t)))
+  gets-reading : ∀ {m k} → Gets m k → ∀ c → Σ ℕ λ s → Σ Time λ b
+               → ∀ n h → s ≤ n → b ≤ h → k ≤ length (items (Read.log (reading h n c m)) (Read.endedAs (reading h n c m)))
   gets-reading zeroᵍ c = 0 , 0 , λ n h _ _ → z≤n
-  gets-reading (tauᵍ {c = c′} {l} {k} g) c = suc s , c′ ⊔ b , go
+  gets-reading {m} {k} (tauᵍ {t = t} {m′} eq g) c = suc s , t ⊔ b , go
     where
-    ih = gets-reading g c′
+    ih = gets-reading g (later c t)
     s  = proj₁ ih
     b  = proj₁ (proj₂ ih)
-    go : ∀ n h → suc s ≤ n → c′ ⊔ b ≤ h → k ≤ length (items (log (reading h n c (tau c′ l))) (ending (reading h n c (tau c′ l))))
-    go (suc n) h (s≤s le) bh rewrite within {c′} {h} (≤-trans (m≤m⊔n c′ b) bh) = proj₂ (proj₂ ih) n h le (≤-trans (m≤n⊔m c′ b) bh)
-  gets-reading (outᵍ {c = c′} {p} {a} {l} {k} g) c = suc s , c′ ⊔ b , go
+    go : ∀ n h → suc s ≤ n → t ⊔ b ≤ h → k ≤ length (items (Read.log (reading h n c m)) (Read.endedAs (reading h n c m)))
+    go (suc n) h (s≤s le) bh rewrite eq | within {t} {h} (≤-trans (m≤m⊔n t b) bh) = proj₂ (proj₂ ih) n h le (≤-trans (m≤n⊔m t b) bh)
+  gets-reading {m} {suc k} (outᵍ {t = t} {m′ = m′} eq g) c = suc s , t ⊔ b , go
     where
-    ih = gets-reading g c′
+    ih = gets-reading g t
     s  = proj₁ ih
     b  = proj₁ (proj₂ ih)
-    go : ∀ n h → suc s ≤ n → c′ ⊔ b ≤ h → suc k ≤ length (items (log (reading h n c (outᵗ c′ p a l))) (ending (reading h n c (outᵗ c′ p a l))))
-    go (suc n) h (s≤s le) bh rewrite within {c′} {h} (≤-trans (m≤m⊔n c′ b) bh) = s≤s (proj₂ (proj₂ ih) n h le (≤-trans (m≤n⊔m c′ b) bh))
-  gets-reading endᵍ  c = 1 , 0 , λ { (suc n) h (s≤s _) _ → ≤-refl }
-  gets-reading idleᵍ c = 1 , 0 , λ { (suc n) h (s≤s _) _ → ≤-refl }
+    go : ∀ n h → suc s ≤ n → t ⊔ b ≤ h → suc k ≤ length (items (Read.log (reading h n c m)) (Read.endedAs (reading h n c m)))
+    go (suc n) h (s≤s le) bh rewrite eq | within {t} {h} (≤-trans (m≤m⊔n t b) bh) = s≤s (proj₂ (proj₂ ih) n h le (≤-trans (m≤n⊔m t b) bh))
+  gets-reading {m} (endᵍ eq)  c = 1 , 0 , go
+    where
+    go : ∀ n h → 1 ≤ n → 0 ≤ h → 1 ≤ length (items (Read.log (reading h n c m)) (Read.endedAs (reading h n c m)))
+    go (suc n) h (s≤s _) _ rewrite eq = ≤-refl
+  gets-reading {m} (idleᵍ eq) c = 1 , 0 , go
+    where
+    go : ∀ n h → 1 ≤ n → 0 ≤ h → 1 ≤ length (items (Read.log (reading h n c m)) (Read.endedAs (reading h n c m)))
+    go (suc n) h (s≤s _) _ rewrite eq = ≤-refl
 
-  -- A silent run adds nothing to what a trace gets.
-  walk : ∀ {m m₀ k} → m ⇝ m₀ → Gets (trace m₀) k → Gets (trace m) k
-  walk now           g = g
-  walk (then eq path) g = subst (λ s → Gets (shown s) _) (sym eq) (tauᵍ (walk path g))
+  -- A silent run adds nothing to what a run gets.
+  walk : ∀ {m m₀ k} → m ⇝ m₀ → Gets m₀ k → Gets m k
+  walk now            g = g
+  walk (then eq path) g = tauᵍ eq (walk path g)
 
   -- Events with nothing in them reach their silence at most.
   ahead-none : ∀ {e k} → (∀ {q b} → Has e q b → ⊥) → Ahead e k → k ≤ 1
@@ -106,16 +111,16 @@ module Progressing (R : Set) where
   ... | outᵃ b , de = b , subst (_≤ _) (sym de) le
 
   -- The ghost's end is the last item.
-  end-gets : ∀ {e p q k} → Ahead e k → (∀ n → Agree n e (end q)) → Gets (endᵗ p) k
-  end-gets x ag with ahead-agree ag x
+  end-gets : ∀ {m e p q k} → step m ≡ complete p → Ahead e k → (∀ n → Agree n e (end q)) → Gets m k
+  end-gets eq x ag with ahead-agree ag x
   ... | none , _ = zeroᵍ
-  ... | endᵃ , _ = endᵍ
+  ... | endᵃ , _ = endᵍ eq
 
   -- A ghost showing nothing shows its silence at most.
-  idle-gets : ∀ {e k} → Ahead e k → (∀ {q b} → Has e q b → ⊥) → Gets idle k
-  idle-gets x no with ahead-none no x
+  idle-gets : ∀ {m e k} → step m ≡ drained → Ahead e k → (∀ {q b} → Has e q b → ⊥) → Gets m k
+  idle-gets eq x no with ahead-none no x
   ... | z≤n     = zeroᵍ
-  ... | s≤s z≤n = idleᵍ
+  ... | s≤s z≤n = idleᵍ eq
 
   -- Past a skip of `e`, an item lies shallower.
   skipped-split : ∀ {f e q r y k} → (∀ n → Agree n e (skip q r)) → Past (force r) y → (a : Ahead e (suc k)) → depth a ≤ f
@@ -124,13 +129,13 @@ module Progressing (R : Set) where
   ... | skipᵃ a′ , de with Past.fewer p a′
   ...   | b , le′ = b , ≤-trans (s≤s le′) (subst (_≤ f) (sym de) le)
 
-  value≢silent : ∀ {t p a m′ m″} → value t p a m′ ≢ silent m″
+  value≢silent : ∀ {t p a m′ t′ m″} → value t p a m′ ≢ silent t′ m″
   value≢silent ()
 
-  complete≢silent : ∀ {p m″} → complete p ≢ silent m″
+  complete≢silent : ∀ {p t m″} → complete p ≢ silent t m″
   complete≢silent ()
 
-  drained≢silent : ∀ {m″} → drained ≢ silent m″
+  drained≢silent : ∀ {t m″} → drained ≢ silent t m″
   drained≢silent ()
 
   -- From a re-entry configuration over `e`, the machine gets as far as
@@ -139,44 +144,39 @@ module Progressing (R : Set) where
   -- alone.
   mutual
     reentry : ∀ f {e g m k} (a : Ahead e k) → depth a < f → (st : Strong g m) → (∀ n → Agree n e (residual g))
-            → Acc _≺_ (measure st) → Hop st → Gets (trace m) k
+            → Acc _≺_ (measure st) → Hop st → Gets m k
     reentry f a lt st ag ac h@(valueᴴ eq _ _ _ _) = shown-gets f a lt st ag h (λ eq′ → value≢silent (trans (sym eq) eq′))
     reentry f a lt st ag ac h@(completeᴴ eq _)    = shown-gets f a lt st ag h (λ eq′ → complete≢silent (trans (sym eq) eq′))
     reentry f a lt st ag ac h@(drainedᴴ eq _)     = shown-gets f a lt st ag h (λ eq′ → drained≢silent (trans (sym eq) eq′))
     reentry f       {k = zero}  a lt st ag ac (silentᴴ _ _) = zeroᵍ
     reentry zero    {k = suc k} a () st ag ac (silentᴴ _ _)
     reentry (suc f) {k = suc k} a (s≤s lt) st ag (acc rs) (silentᴴ eq (g″ , m₀ , path , st₀ , lowered ag″ lo)) =
-      subst (λ s → Gets (shown s) (suc k)) (sym eq)
-        (tauᵍ (walk path (reentry (suc f) a (s≤s lt) st₀ (λ n → agree-trans (ag n) (ag″ n)) (rs lo) (strong-hop st₀))))
+      tauᵍ eq (walk path (reentry (suc f) a (s≤s lt) st₀ (λ n → agree-trans (ag n) (ag″ n)) (rs lo) (strong-hop st₀)))
     reentry (suc f) {k = suc k} a (s≤s lt) st ag ac (silentᴴ eq (g″ , m₀ , path , st₀ , passed ag₁ p)) =
-      subst (λ s → Gets (shown s) (suc k)) (sym eq)
-        (tauᵍ (walk path (reentry f (proj₁ b) (proj₂ b) st₀ (λ n → agree-refl n _) (≺-wf _) (strong-hop st₀))))
+      tauᵍ eq (walk path (reentry f (proj₁ b) (proj₂ b) st₀ (λ n → agree-refl n _) (≺-wf _) (strong-hop st₀)))
       where b = skipped-split (λ n → agree-trans (ag n) (ag₁ n)) p a lt
     reentry (suc f) {k = suc k} a (s≤s lt) st ag ac (silentᴴ eq (g″ , m₀ , path , st₀ , showing p ns)) =
-      subst (λ s → Gets (shown s) (suc k)) (sym eq)
-        (tauᵍ (walk path (shown-gets (suc f) (proj₁ b) (s≤s (≤-trans (proj₂ b) lt)) st₀ (λ n → agree-refl n _) (strong-hop st₀) ns)))
+      tauᵍ eq (walk path (shown-gets (suc f) (proj₁ b) (s≤s (≤-trans (proj₂ b) lt)) st₀ (λ n → agree-refl n _) (strong-hop st₀) ns))
       where b = Past.fewer (past-pre ag p) a
 
     -- A re-entry configuration whose step shows something.
     shown-gets : ∀ f {e g m k} (a : Ahead e k) → depth a < f → (st : Strong g m) → (∀ n → Agree n e (residual g)) → Hop st
-               → (∀ {m″} → step m ≢ silent m″) → Gets (trace m) k
+               → (∀ {t m″} → step m ≢ silent t m″) → Gets m k
     shown-gets f       {k = zero}  a lt st ag h ns = zeroᵍ
     shown-gets zero    {k = suc k} a () st ag h ns
     shown-gets (suc f) {g = g} {k = suc k} a (s≤s lt) st ag (valueᴴ eq stp _ _ (m₀ , path , st₀)) ns =
-      subst (λ s → Gets (shown s) (suc k)) (sym eq)
-        (outᵍ (walk path (reentry f (proj₁ v) (proj₂ v) st₀ (λ n → agree-refl n _) (≺-wf _) (strong-hop st₀))))
+      outᵍ eq (walk path (reentry f (proj₁ v) (proj₂ v) st₀ (λ n → agree-refl n _) (≺-wf _) (strong-hop st₀)))
       where v = value-step a lt (λ n → agree-trans (ag n) (subst (λ s → Agree n (residual g) (after s)) stp (strong-agrees st n)))
     shown-gets (suc f) {g = g} {k = suc k} a (s≤s lt) st ag (completeᴴ eq stp) ns =
-      subst (λ s → Gets (shown s) (suc k)) (sym eq)
-        (end-gets a (λ n → agree-trans (ag n) (subst (λ s → Agree n (residual g) (after s)) stp (strong-agrees st n))))
+      end-gets eq a (λ n → agree-trans (ag n) (subst (λ s → Agree n (residual g) (after s)) stp (strong-agrees st n)))
     shown-gets (suc f) {k = suc k} a (s≤s lt) st ag (drainedᴴ eq no) ns =
-      subst (λ s → Gets (shown s) (suc k)) (sym eq) (idle-gets a (λ h → no (has-agree ag h)))
+      idle-gets eq a (λ h → no (has-agree ag h))
     shown-gets (suc f) {k = suc k} a lt st ag (silentᴴ eq _) ns = ⊥-elim (ns eq)
 
   -- LIVENESS: whatever item the meaning's events reach, some prefix of
   -- the launch's run reads, as many steps as ticks.
   reached : (o : PureObs [] R) → ∀ {k} → Ahead (observe (⟦ o ⟧ []) root) k
-          → Σ ℕ λ n → k ≤ length (items (log (reading n n 0 (trace (begin o)))) (ending (reading n n 0 (trace (begin o)))))
+          → Σ ℕ λ n → k ≤ length (items (Read.log (reading n n 0 (load o))) (Read.endedAs (reading n n 0 (load o))))
   reached o a with gets-reading (reentry (suc (depth b)) b ≤-refl st (λ n → agree-refl n _) (≺-wf _) (strong-hop st)) 0
     where b  = proj₁ (ahead-agree (begun o) a)
           st = strong-begin o

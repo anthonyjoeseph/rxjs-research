@@ -94,13 +94,6 @@ Prefix []      h       = ⊤
 Prefix (_ ∷ _) []      = ⊥
 Prefix (a ∷ k) (b ∷ h) = a ≡ b × Prefix k h
 
--- `k` a strict prefix of `h`.
-Prefix⁺ : Pos → Pos → Set
-Prefix⁺ []      []      = ⊥
-Prefix⁺ []      (_ ∷ _) = ⊤
-Prefix⁺ (_ ∷ _) []      = ⊥
-Prefix⁺ (a ∷ k) (b ∷ h) = a ≡ b × Prefix⁺ k h
-
 -- `h` keyed under `k`: inside its subtree, or tagged by a join or a
 -- timer keyed under it.  A rejoin at `p` keys a source's `q` as
 -- `q ++ [ sub p ]`, and a frame of a cold at `p` sits at
@@ -114,10 +107,6 @@ mutual
   Tagged k (ix _ ∷ h)  = Tagged k h
   Tagged k (sub j ∷ h) = Owned k j ⊎ Tagged k h
   Tagged k (last ∷ h)  = Tagged k h
-
--- `h` strictly inside `k`'s subtree or tagged by it.
-Beneath : Pos → Pos → Set
-Beneath k h = Prefix⁺ k h ⊎ Tagged k h
 
 -- Every position a tail would step at satisfies `P`.
 mutual
@@ -252,14 +241,6 @@ Headed _          = ⊥
 Sorted : ∀ {Γ} → NEnv Γ → Set
 Sorted []ᴬ      = ⊤
 Sorted (e ∷ᴬ ρ) = (Ordered e × Steady e) × Every Headed e × Sorted ρ
-
-sorted-headed : ∀ {Γ} (ρ : NEnv Γ) → Sorted ρ → Everyᴱ Headed ρ
-sorted-headed []ᴬ      _            = tt
-sorted-headed (e ∷ᴬ ρ) (_ , h , so) = h , sorted-headed ρ so
-
-sorted-lookup : ∀ {Γ A} (ρ : NEnv Γ) → Sorted ρ → (i : A ∈ Γ) → Ordered (lookup ρ i) × Steady (lookup ρ i)
-sorted-lookup (e ∷ᴬ ρ) (o , _ , so) (here refl) = o
-sorted-lookup (e ∷ᴬ ρ) (o , _ , so) (there i)   = sorted-lookup ρ so i
 
 -- A connect's body steps neither where its source steps nor where that
 -- shows: the two subscribed apart.

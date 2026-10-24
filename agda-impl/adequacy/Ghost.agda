@@ -8,14 +8,14 @@
 -- reached WITH the record its steps showed (`Reached`).
 module adequacy.Ghost where
 
-open import Data.List using (List; []; _∷_; _++_; [_]; length)
+open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.Any using (Any)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Empty using (⊥)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Nat.Properties using (≤-reflexive; ≤-trans; m≤n⇒m≤1+n; <-trans)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; _+_; _<_; _≤_; z≤n)
+open import Data.Nat using (ℕ; suc; _<_; _≤_; z≤n)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Induction.WellFounded using (WellFounded)
 open import Data.Product.Relation.Binary.Lex.Strict using (×-Lex; ×-wellFounded)
@@ -33,14 +33,15 @@ open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Stepper.Past using (afterᴱ)
 open import denotation.Denote using (⟦_⟧)
-open import operation.PureObservable using (PureObs; module Pure; module Driver)
+open import operation.PureObservable using (PureObs; module Driver; module Machine; module Pure)
 open Events∞
 
 module Ghosting (R : Set) where
-  open Driver R using (Mach; Step; silent; value; complete; drained; step; begin)
+  open Driver R using (Step; silent; value; complete; drained; step)
+  open Machine using (Conf; load)
   open Pure R using (End; finished; dry; cutOff)
-  open Unsubbing R using (_⇝_; now; ⇝-trans)
-  open Strongly R using (Strong; carried; closing; strong-begin; Carried; Sub; CtlAs; calmAs; noteAs; runAs; subAs; burstAs; popAs; pend; takes; left)
+  open Unsubbing R using (_⇝_; now)
+  open Strongly R using (Strong; strong-begin)
 
   ----------------------------------------------------------------------
   -- Alike as sets
@@ -118,15 +119,15 @@ module Ghosting (R : Set) where
 
   -- A configuration reached from a program's launch by the machine's own
   -- steps, with the record they showed: each value at its mark.
-  data Reached (e : Events R) : List Pos → List (Time × R) → Mach → Set₁ where
-    launchedʰ : (o : PureObs [] R) → e ≡ observe (⟦ o ⟧ []) root → Reached e [] [] (begin o)
-    silentʰ   : ∀ {qs xs m m′} → Reached e qs xs m → step m ≡ silent m′ → Reached e qs xs m′
+  data Reached (e : Events R) : List Pos → List (Time × R) → Conf R → Set₁ where
+    launchedʰ : (o : PureObs [] R) → e ≡ observe (⟦ o ⟧ []) root → Reached e [] [] (load o)
+    silentʰ   : ∀ {qs xs m m′ t} → Reached e qs xs m → step m ≡ silent t m′ → Reached e qs xs m′
     valueʰ    : ∀ {qs xs m m′ t p a} → Reached e qs xs m → step m ≡ value t p a m′ → Reached e (qs ++ [ p ]) (xs ++ [ (t , a) ]) m′
 
   -- How a configuration's record, marked `qs`, stands: cut, at whatever
   -- clock, or the run drained there; or complete there, its completion
   -- marked last.
-  data Stands (m : Mach) (qs : List Pos) : End → List Pos → Set₁ where
+  data Stands (m : Conf R) (qs : List Pos) : End → List Pos → Set₁ where
     cutʰ  : ∀ {c} → Stands m qs (cutOff c) qs
     finʰ  : ∀ {p} → step m ≡ complete p → Stands m qs finished (qs ++ [ p ])
     dryʰ  : step m ≡ drained → Stands m qs dry qs
@@ -134,12 +135,12 @@ module Ghosting (R : Set) where
   -- THE CONFIGURATION RUNS THE GHOST: it runs silently to a re-entry
   -- configuration against it.  No intermediate configuration is related
   -- to the ghost but by the steps the machine takes from it.
-  Mirror : U.Node [] R → Mach → Set₁
-  Mirror g m = Σ Mach λ m₀ → m ⇝ m₀ × Strong g m₀
+  Mirror : U.Node [] R → Conf R → Set₁
+  Mirror g m = Σ (Conf R) λ m₀ → m ⇝ m₀ × Strong g m₀
 
   -- THE CONFIGURATION WILL DELIVER `rest`: it runs a ghost whose
   -- residual `rest` is, as a set.
-  record Inner (rest : Events R) (m : Mach) : Set₁ where
+  record Inner (rest : Events R) (m : Conf R) : Set₁ where
     field
       ghost  : U.Node [] R
       same   : rest ≋ residual ghost
@@ -155,7 +156,7 @@ module Ghosting (R : Set) where
   -- the value; a completion is its end, no value left in it; a drained
   -- run leaves nothing of it.
   data Shows (rest : Events R) : Step → Set₁ where
-    silentˢ   : ∀ {m′} → Inner rest m′ → Shows rest (silent m′)
+    silentˢ   : ∀ {t m′} → Inner rest m′ → Shows rest (silent t m′)
     valueˢ    : ∀ {t p a m′ r} → t ≡ tick p → Has rest p (just a)
               → (∀ {k b} → Has r k b → Has rest k b) → (∀ {k b} → Has rest k b → (k ≡ p × b ≡ just a) ⊎ Has r k b)
               → (∀ {k b} → Has r k b → k ≤ᵖ p → ⊥) → Inner r m′
@@ -164,8 +165,8 @@ module Ghosting (R : Set) where
     drainedˢ  : (∀ {k b} → Has rest k b → ⊥) → Shows rest drained
 
   -- The launch will deliver the meaning's events.
-  inner-launch : (o : PureObs [] R) → Inner (observe (⟦ o ⟧ []) root) (begin o)
-  inner-launch o = record { ghost = U.subscribe o root ; same = same-agree (begun o) ; mirror = begin o , now , strong-begin o }
+  inner-launch : (o : PureObs [] R) → Inner (observe (⟦ o ⟧ []) root) (load o)
+  inner-launch o = record { ghost = U.subscribe o root ; same = same-agree (begun o) ; mirror = load o , now , strong-begin o }
 
   ≋-refl : ∀ {x} → x ≋ x
   ≋-refl = (λ h → h) , (λ h → h)
@@ -301,31 +302,9 @@ module Ghosting (R : Set) where
   ≺-wf = ×-wellFounded (×-wellFounded <-wellFounded (×-wellFounded <-wellFounded (×-wellFounded <-wellFounded
            (×-wellFounded <-wellFounded <-wellFounded)))) <-wellFounded
 
-  -- The work in the witness, the timers and the turns.
-  load : (m : Mach) → Sub [] R → Load
-  load m t = pend t , takes t , length (Mach.timers m) , length (Mach.turns m) , left t
-
-  private
-    twice : ℕ → ℕ
-    twice n = n + n
-
-  -- The control's own: twice the jobs owed and the one about to run, and
-  -- one more for a job about to be popped, which pops to fewer.
-  weight : ∀ {m} → CtlAs m → ℕ
-  weight (calmAs _ _)              = 0
-  weight (noteAs {rs = rs} _ _)    = twice (suc (length rs))
-  weight (runAs {rs = rs} _)       = twice (suc (length rs))
-  weight (subAs {rs = rs} _)       = twice (suc (length rs))
-  weight (burstAs {rs = rs} _ _ _) = twice (length rs)
-  weight (popAs {rs = rs} _ _)     = suc (twice (suc (length rs)))
-
-  -- The work a re-entry configuration has left before its ghost moves.
-  measure : ∀ {g m} → Strong g m → Measure
-  measure {m = m} (carried cr) = load m (Carried.tree cr) , weight (Carried.ctlAs cr)
-  measure (closing _ _ _ _)    = (0 , 0 , 0 , 0 , 0) , 0
-
-  loadOf : ∀ {g m} → Strong g m → Load
-  loadOf st = proj₁ (measure st)
+  postulate
+    -- The work a re-entry configuration has left before its ghost moves.
+    measure : ∀ {g m} → Strong g m → Measure
 
   -- WHAT A SILENT RUN BETWEEN RE-ENTRY CONFIGURATIONS GAINS: the ghost
   -- past a skip of its residual; or the ghost alike, less work left; or
@@ -333,7 +312,7 @@ module Ghosting (R : Set) where
   data Gain {g m g″ m₀} (st : Strong g m) (st₀ : Strong g″ m₀) : Set₁ where
     passed  : ∀ {k r} → (∀ n → Agree n (residual g) (skip k r)) → Past (force r) (residual g″) → Gain st st₀
     lowered : (∀ n → Agree n (residual g) (residual g″)) → measure st₀ ≺ measure st → Gain st st₀
-    showing : Past (residual g) (residual g″) → (∀ {m″} → step m₀ ≢ silent m″) → Gain st st₀
+    showing : Past (residual g) (residual g″) → (∀ {t m″} → step m₀ ≢ silent t m″) → Gain st st₀
 
   gain-past : ∀ {g m g″ m₀} {st : Strong g m} {st₀ : Strong g″ m₀} → Gain st st₀ → Past (residual g) (residual g″)
   gain-past (passed ag p)  = skipped ag p
@@ -341,11 +320,8 @@ module Ghosting (R : Set) where
   gain-past (showing p _)  = p
 
   -- `m′` runs silently to a re-entry configuration, which `st` gains.
-  Hopped : ∀ {g m} → Strong g m → Mach → Set₁
-  Hopped st m′ = Σ (U.Node [] R) λ g″ → Σ Mach λ m₀ → m′ ⇝ m₀ × Σ (Strong g″ m₀) λ st₀ → Gain st st₀
-
-  hopped-pre : ∀ {g m m′ m₁} {st : Strong g m} → m′ ⇝ m₁ → Hopped st m₁ → Hopped st m′
-  hopped-pre path (g″ , m₀ , path′ , st₀ , gn) = g″ , m₀ , ⇝-trans path path′ , st₀ , gn
+  Hopped : ∀ {g m} → Strong g m → Conf R → Set₁
+  Hopped st m′ = Σ (U.Node [] R) λ g″ → Σ (Conf R) λ m₀ → m′ ⇝ m₀ × Σ (Strong g″ m₀) λ st₀ → Gain st st₀
 
   onward : ∀ {rest g m m′} {st : Strong g m} → rest ≋ residual g → Hopped st m′ → Inner rest m′
   onward e (g″ , m₀ , path , st₀ , gn) = record { ghost = g″ ; same = ≋-trans e (past-same (gain-past gn)) ; mirror = m₀ , path , st₀ }

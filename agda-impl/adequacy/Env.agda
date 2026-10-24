@@ -7,19 +7,19 @@
 -- every order predicate being read off the steps alone.
 module adequacy.Env where
 
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (lookup; updateAt) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Tree using (Later)
-open import denotation.MonotonicList.Events using (Events; Events∞; Tail∞; Pos; out; skip; end; idle; ix)
+open import denotation.MonotonicList.Events using (Events; Events∞; Tail∞; Pos; out; skip; end; idle)
 open import denotation.MonotonicList using (MonotonicList; Agree; Agreeᵀ; stop; out⁼; skip⁼; end⁼; hush⁼; pin⁼; idle⁼;
   agree-refl; agree-sym; agree-pred; agreeᵀ-refl; _≈[_]_; agrees; agree; ≈ₖ-pred) renaming (cold to coldᴹ)
 open import denotation.NonExpansive using (Agreeˢ; _,ˢ_; mapᴱ-ne; scanᴱ-ne; takeWhileᴱ-ne; tailᴱ-ne; ∪-ne; burstOn-ne; beside-ne;
@@ -28,9 +28,7 @@ open import denotation.Compositional using (EnvAgree; []ᵉ; _∷ᵉ_; deferᴰ-
 open import denotation.Denote using (flatOp)
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
-open import adequacy.Placed.Order using (Everyᴱ; Reaches; out-here; skip-here; out-there; skip-there; Sorted)
-open import adequacy.Placed.Keys using (ordered-≈; steady-≈; every-≈)
-open import adequacy.Deep using (Deep; Deeps; DeepR; Deepᴹ; Deepᴸ; DeepRᴹ; DeepRᴸ)
+open import adequacy.Placed.Order using (Reaches; out-here; skip-here; out-there; skip-there)
 
 open Events∞
 open Tail∞
@@ -178,84 +176,6 @@ Same ρ ρ′ = ∀ m → NAgree m ρ ρ′
 same-cons : ∀ {Γ A} {e e′ : Events A} {ρ ρ′ : NEnv Γ} → (∀ m → Agree m e e′) → Same ρ ρ′ → Same (e ∷ᴬ ρ) (e′ ∷ᴬ ρ′)
 same-cons a S m = a m , S m
 
-meaning-same : ∀ {Γ A} (n : U.Node Γ A) {ρ ρ′ : NEnv Γ} → Same ρ ρ′ → ∀ m → Agree m (U.meaning n ρ) (U.meaning n ρ′)
-meaning-same n S m = meaning-ne n (S m)
-
-everyᴱ-agree : ∀ {Γ} {P : Pos → Set} {ρ ρ′ : NEnv Γ} → Same ρ ρ′ → Everyᴱ P ρ → Everyᴱ P ρ′
-everyᴱ-agree {ρ = []ᴬ}    {[]ᴬ}      S _       = tt
-everyᴱ-agree {ρ = _ ∷ᴬ _} {_ ∷ᴬ _} S (v , w) = every-≈ _ _ (λ m → proj₁ (S m)) v , everyᴱ-agree (λ m → proj₂ (S m)) w
-
-sorted-agree : ∀ {Γ} {ρ ρ′ : NEnv Γ} → Same ρ ρ′ → Sorted ρ → Sorted ρ′
-sorted-agree {ρ = []ᴬ}    {[]ᴬ}      S _                 = tt
-sorted-agree {ρ = _ ∷ᴬ _} {_ ∷ᴬ _} S ((o , s) , h , w) =
-  (ordered-≈ _ _ H o , steady-≈ _ _ H s) , every-≈ _ _ H h , sorted-agree (λ m → proj₂ (S m)) w
-  where H = λ m → proj₁ (S m)
-
 -- A node in order to every depth stays so under an environment alike
 -- at every depth.
-mutual
-  deep-same : ∀ {Γ A} (n : U.Node Γ A) {ρ ρ′ : NEnv Γ} → Same ρ ρ′ → Deep n ρ → Deep n ρ′
-  deep-same n S (o , d) = ordered-≈ _ _ (meaning-same n S) o , deeps-same n S d
 
-  deeps-same : ∀ {Γ A} (n : U.Node Γ A) {ρ ρ′ : NEnv Γ} → Same ρ ρ′ → Deeps n ρ → Deeps n ρ′
-  deeps-same (U.framesᶜ _ _ _)    S d = tt
-  deeps-same (U.burstᶜ _ _ _ _)   S d = tt
-  deeps-same (U.ofᶜ _ _ _)        S d = tt
-  deeps-same (U.mapᶜ f c)         S d = deep-same c S d
-  deeps-same (U.scanᶜ f z c)      S d = deep-same c S d
-  deeps-same (U.takeWhileᶜ i p c) S d = deep-same c S d
-  deeps-same (U.flatMapᶜ op g o ls qs pl) S (dm , dl , dp , dg) =
-    deepᴹ-same o S dm , deepᴸ-same ls S dl , deep-same pl S dp ,
-    λ a x r → deep-same (g a (x ++ [ ix 1 ])) S (dg a x (reaches-agree (λ m → agree-sym (meaning-ne (U.flatMapᶜ op g o ls qs pl) (S m))) r))
-  deeps-same (U.joinᶜ _ _ _ _)    S d = tt
-  deeps-same (U.connectᶜ r b (U.live s))    S (db , ob , ds) =
-    deep-same b (same-cons (meaning-same s S) S) db , ordered-≈ _ _ (meaning-same (U.burstingᶜ {B = ⊤} r s) S) ob , deep-same s S ds
-  deeps-same (U.connectᶜ r b (U.ended c t)) S (db , ob , dt) =
-    deep-same b (same-cons (λ m → agree-refl m (end c)) S) db , ordered-≈ _ _ (meaning-same (U.burstingᶜ {B = ⊤} r t) S) ob , deep-same t S dt
-  deeps-same (U.deferᶜ l p ns)    S (h , s , a) =
-    h , sorted-agree (λ m → replay-ne ns (S m)) s , everyᴱ-agree (λ m → replay-ne ns (S m)) a
-  deeps-same (U.endingᶜ p n)      S d = deep-same n S d
-  deeps-same (U.restᶜ n)          S d = deepR-same n S d
-  deeps-same U.idleᶜ              S d = tt
-  deeps-same (U.unionᶜ x y)       S (dx , dy) = deep-same x S dx , deep-same y S dy
-  deeps-same (U.burstingᶜ r t)    S d = deep-same t S d
-  deeps-same (U.underᶜ (U.live s) b)    S (ds , db) = deep-same s S ds , deep-same b (same-cons (meaning-same s S) S) db
-  deeps-same (U.underᶜ (U.ended c t) b) S (dt , db) = deep-same t S dt , deep-same b (same-cons (λ m → agree-refl m (end c)) S) db
-
-  deepᴹ-same : ∀ {Γ A} (o : Maybe (U.Node Γ A)) {ρ ρ′ : NEnv Γ} → Same ρ ρ′ → Deepᴹ o ρ → Deepᴹ o ρ′
-  deepᴹ-same nothing  S d = tt
-  deepᴹ-same (just c) S d = deep-same c S d
-
-  deepᴸ-same : ∀ {Γ A} (ls : List (U.Node Γ A)) {ρ ρ′ : NEnv Γ} → Same ρ ρ′ → Deepᴸ ls ρ → Deepᴸ ls ρ′
-  deepᴸ-same []       S d        = tt
-  deepᴸ-same (c ∷ cs) S (d , ds) = deep-same c S d , deepᴸ-same cs S ds
-
-  deepR-same : ∀ {Γ A} (n : U.Node Γ A) {ρ ρ′ : NEnv Γ} → Same ρ ρ′ → DeepR n ρ → DeepR n ρ′
-  deepR-same (U.framesᶜ _ _ _)    S d = tt
-  deepR-same (U.burstᶜ _ _ _ _)   S d = tt
-  deepR-same (U.ofᶜ _ _ _)        S d = tt
-  deepR-same (U.mapᶜ f c)         S d = deepR-same c S d
-  deepR-same (U.scanᶜ f z c)      S d = deepR-same c S d
-  deepR-same (U.takeWhileᶜ i p c) S d = deepR-same c S d
-  deepR-same (U.flatMapᶜ op g o ls qs pl) S (dm , dl , dp) = deepRᴹ-same o S dm , deepRᴸ-same ls S dl , deepR-same pl S dp
-  deepR-same (U.joinᶜ _ _ _ _)    S d = tt
-  deepR-same (U.connectᶜ r b (U.live s))    S (db , ob , ds) =
-    deepR-same b (same-cons (meaning-same s S) S) db , ordered-≈ _ _ (meaning-same (U.burstingᶜ {B = ⊤} r s) S) ob , deep-same s S ds
-  deepR-same (U.connectᶜ r b (U.ended c t)) S (db , ob , dt) =
-    deepR-same b (same-cons (λ m → agree-refl m (end c)) S) db , ordered-≈ _ _ (meaning-same (U.burstingᶜ {B = ⊤} r t) S) ob , deep-same t S dt
-  deepR-same (U.deferᶜ _ _ _)     S d = tt
-  deepR-same (U.endingᶜ p n)      S d = deepR-same n S d
-  deepR-same (U.restᶜ n)          S d = deepR-same n S d
-  deepR-same U.idleᶜ              S d = tt
-  deepR-same (U.unionᶜ x y)       S (dx , dy) = deepR-same x S dx , deepR-same y S dy
-  deepR-same (U.burstingᶜ r t)    S (ob , dt) = ordered-≈ _ _ (meaning-same (U.burstingᶜ {B = ⊤} r t) S) ob , deep-same t S dt
-  deepR-same (U.underᶜ (U.live s) b)    S (ds , db) = deep-same s S ds , deepR-same b (same-cons (meaning-same s S) S) db
-  deepR-same (U.underᶜ (U.ended c t) b) S (dt , db) = deep-same t S dt , deepR-same b (same-cons (λ m → agree-refl m (end c)) S) db
-
-  deepRᴹ-same : ∀ {Γ A} (o : Maybe (U.Node Γ A)) {ρ ρ′ : NEnv Γ} → Same ρ ρ′ → DeepRᴹ o ρ → DeepRᴹ o ρ′
-  deepRᴹ-same nothing  S d = tt
-  deepRᴹ-same (just c) S d = deepR-same c S d
-
-  deepRᴸ-same : ∀ {Γ A} (ls : List (U.Node Γ A)) {ρ ρ′ : NEnv Γ} → Same ρ ρ′ → DeepRᴸ ls ρ → DeepRᴸ ls ρ′
-  deepRᴸ-same []       S d        = tt
-  deepRᴸ-same (c ∷ cs) S (d , ds) = deepR-same c S d , deepRᴸ-same cs S ds
