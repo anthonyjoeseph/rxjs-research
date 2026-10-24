@@ -66,7 +66,7 @@ module Reach (R : Rules) where
         (frame (τ + t′) e pe (subst (_≤ τ + t′) (sym te) (+-monoʳ-≤ τ le)))))
 
     every-burst : ∀ {A t} τ r i (b : M.Frame A t) → tick r ≡ τ + t → S r → Every P (M′.burst τ r i b)
-    every (every-burst τ r i (M.emit a k) tr sr) = child r (ix i) (ix-mark i) sr , every-burst τ r (suc i) (M.Frame∞.force k) tr sr , everyT-idle
+    every (every-burst τ r i (M.emit a k) tr sr) = child r (ix i) (ix-mark i) sr , every-burst τ r (suc i) k tr sr , everyT-idle
     every (every-burst τ r i (M.stall k)  tr sr) = child r (ix i) (ix-mark i) sr , every-burst τ r (suc i) (M.Frame∞.force k) tr sr , everyT-idle
     every (every-burst τ r i (M.close k)  tr sr) =
       child r (ix i) (ix-mark i) sr , every-frames τ (r ++ [ last ]) (M.From∞.force k) (trans (tick-last r) tr) (child r last last-mark sr) , everyT-idle
@@ -492,7 +492,7 @@ burst-past τ r i (M.close _)  h = h
 -- each frame's tick past the last.
 mutual
   rising-burst : ∀ {A t} τ n q i (b : M.Frame A t) → n ≡ τ + t → Rising (M′.burst τ (ix n ∷ q) i b)
-  rises (rising-burst τ n q i (M.emit a f) e) = burst-past τ _ (suc i) (M.Frame∞.force f) (next-ix (ix n ∷ q) i) , rising-burst τ n q (suc i) _ e
+  rises (rising-burst τ n q i (M.emit a f) e) = burst-past τ _ (suc i) f (next-ix (ix n ∷ q) i) , rising-burst τ n q (suc i) _ e
   rises (rising-burst τ n q i (M.stall f)  e) = burst-past τ _ (suc i) (M.Frame∞.force f) (next-ix (ix n ∷ q) i) , rising-burst τ n q (suc i) _ e
   rises (rising-burst τ n q i (M.close f)  e) = frames-past τ q i (M.From∞.force f) e , rising-frames τ _ (M.From∞.force f)
 

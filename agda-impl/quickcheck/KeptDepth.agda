@@ -3,14 +3,16 @@
 -- THE KEPT DEPTH, TESTED: every silent step of the engine drops leading
 -- skips of what its configuration means (`adequacy.Engine.Meaning.M`), or
 -- means the same, event for event, skips and positions included
--- (`adequacy.Content.silent-exact`).  Also the longest run of silent steps
--- meaning the same, which is what `adequacy.Ghost.work` has to bound.
+-- (`adequacy.Content.silent-exact`), with less work left
+-- (`adequacy.Content.silent-work`).  Also the longest run of silent steps
+-- meaning the same.
 module quickcheck.KeptDepth where
 
-open import Data.Bool using (Bool; false; _∨_; if_then_else_)
+open import Data.Bool using (Bool; false; _∧_; _∨_; if_then_else_)
 open import Data.List using (List; []; _∷_; upTo) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
-open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_; _<ᵇ_; _≡ᵇ_)
+open import Data.Product using (_,_)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.String using (String; _++_)
 
@@ -21,9 +23,11 @@ open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Ty using (natᵗ)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Stepping using (exactᵇ)
+open import adequacy.Ghost using (module Ghosting)
 open import quickcheck.Spin using (showP)
 
 open Driver ℕ using (Step; step; silent; value; complete; drained)
+open Ghosting ℕ using (work; Measure)
 open Machine using (Conf; load; spot; subscribing; absorbed; rising)
 
 private
@@ -50,9 +54,20 @@ private
   showSpot []      = ""
   showSpot (i ∷ π) = showℕ i ++ "." ++ showSpot π
 
+  -- `work`'s order, decided.
+  lowerᵇ : Measure → Measure → Bool
+  lowerᵇ ((a , b , c , d , e) , f) ((a′ , b′ , c′ , d′ , e′) , f′) =
+    lex₆ a a′ (lex₆ b b′ (lex₆ c c′ (lex₆ d d′ (lex₆ e e′ (f <ᵇ f′)))))
+    where lex₆ : ℕ → ℕ → Bool → Bool
+          lex₆ x y r = (x <ᵇ y) ∨ ((x ≡ᵇ y) ∧ r)
+
+  showW : Measure → String
+  showW ((a , b , c , d , e) , f) = showℕ a ++ "," ++ showℕ b ++ "," ++ showℕ c ++ "," ++ showℕ d ++ "," ++ showℕ e ++ ";" ++ showℕ f
+
   -- What a silent step neither dropping nor keeping its meaning did.
   why : Conf ℕ → Conf ℕ → String
   why m m′ = "\n  from " ++ showMode m ++ " at " ++ showSpot (spot m) ++ " to " ++ showMode m′ ++ " at " ++ showSpot (spot m′)
+             ++ "\n  work " ++ showW (work m) ++ " to " ++ showW (work m′)
              ++ "\n  before " ++ showE 10 (M m) ++ "\n  after  " ++ showE 10 (M m′)
 
   depth : ℕ
@@ -65,9 +80,10 @@ private
   dropped (suc k) _          e′ = false
 
   -- A silent step from `m` to `m′`: 2 dropped leading skips, 1 meant the
-  -- same, 0 neither.
+  -- same with less work left, 0 neither.
   kind : Conf ℕ → Conf ℕ → ℕ
-  kind m m′ = if exactᵇ depth (M m) (M m′) then 1 else (if dropped 64 (M m) (M m′) then 2 else 0)
+  kind m m′ = if exactᵇ depth (M m) (M m′) then (if lowerᵇ (work m′) (work m) then 1 else 0)
+              else (if dropped 64 (M m) (M m′) then 2 else 0)
 
   -- Whether every silent step keeps its meaning so, and the longest run
   -- meaning the same.
