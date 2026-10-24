@@ -20,6 +20,16 @@ bodies, or refuted.
 Members: `outer-drop`, `lane-drop`, `stall-drop`, `close-drop`, `defer-hole`,
 `defer-pass`, `outer-drops`, `src-drops`.
 
+#### THE TAIL'S SKIP
+
+Probed (`quickcheck.KeptDepth`'s closed-cut programs): a defer begun under a
+frame reading only its tail still drops a skip at the root, through the pin
+the connect's burst leaves. Whether every such skip is pinned, and a lift
+carrying each skip with its pin. Settled when the lift is a body, or a
+skipped step there is refuted.
+
+Members: `defer-tail`.
+
 #### THE KEPT DEPTH
 
 Probed: Kept is set-level; these keep the meaning at every depth: a silent

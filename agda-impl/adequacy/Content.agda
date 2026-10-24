@@ -48,7 +48,7 @@ open import adequacy.Stepper.Within using (placed-after)
 open import adequacy.Stepper using (step-skips)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Ghost using (module Ghosting)
-open import adequacy.Engine.Drop using (Drops; drop; drops; Dropsˢ; Pass; lift-drops)
+open import adequacy.Engine.Drop using (Drops; drop; drops; Dropsˢ; Pass; shows; lift-drops)
 open import adequacy.Engine.Meaning using (M; flagOf; envAt; Has; atOut; atEnd; pastOut; _≅_; ≅-refl; ≅-sym; ≅-trans; agree-≅)
 open import adequacy.Engine.Inv using (Inv; NextInv; inv-next)
 open import adequacy.Engine.Spent using (module Spending)
@@ -254,16 +254,32 @@ module Honesty (R : Set) where
     -- tail with it (`denotation.Unfold.subscribed`).
     defer-hole : ∀ {Γ A} l p (ρ : U.NEnv Γ)
                → Dropsˢ {A} (λ _ → ⊤) (U.stateᴺ (U.deferᶜ l p []) ρ) (U.stateᴺ (U.subscribe (Later.force l) (p ⊕ [ ix 1 ])) ρ)
-    -- A DEFER BEGUN IS SHOWN NEXT: every frame above it passes its skip.
-    defer-pass : ∀ {Γ A} {c : Ctx R Γ A} {l p} → Inv ⟨ c , pend (defer l) , subscribing , p ⟩
+    -- A DEFER BEGUN WHERE IT IS SHOWN IS SHOWN NEXT: every frame above it
+    -- passes its skip.
+    defer-pass : ∀ {Γ A} {c : Ctx R Γ A} {l p} → shows c true ≡ true → Inv ⟨ c , pend (defer l) , subscribing , p ⟩
                → Pass (λ _ → ⊤) c (flagOf (pend (defer l))) (U.stateᴺ (U.deferᶜ l p []) (envAt c))
                    (U.stateᴺ (U.subscribe (Later.force l) (p ⊕ [ ix 1 ])) (envAt c))
+
+    -- A DEFER BEGUN WHERE ONLY TAILS ARE READ drops its skip through the
+    -- tail that pins it: a takeWhile past its decision above a connect
+    -- still subscribing its source reads the connect's tail, and the
+    -- connect's burst pins its source's steps (`quickcheck.KeptDepth`'s
+    -- closed-cut programs drop there).
+    --
+    -- DEAD ROUTE: `lift-drops` alone. Its `Pass` is empty at every frame
+    --   reading only a tail, since `Dropsˢ` says nothing of the hole's tail
+    --   before the skip; a lift through such a frame needs each dropped skip
+    --   carried with the pin it leaves in the tail.
+    defer-tail : ∀ {Γ A} {c : Ctx R Γ A} {l p} → shows c true ≡ false → Inv ⟨ c , pend (defer l) , subscribing , p ⟩
+               → Drop ⟨ c , pend (defer l) , subscribing , p ⟩ ⟨ c , pend (Later.force l) , subscribing , p ⊕ [ ix 1 ] ⟩
 
   -- A defer begun drops its skip.
   defer-drop : ∀ {Γ A} {c : Ctx R Γ A} {l p t m′}
              → Inv ⟨ c , pend (defer l) , subscribing , p ⟩ → step ⟨ c , pend (defer l) , subscribing , p ⟩ ≡ silent t m′
              → Drop ⟨ c , pend (defer l) , subscribing , p ⟩ m′
-  defer-drop {c = c} {l} {p} iv refl = lift-drops (λ _ → ⊤) c (flagOf (pend (defer l))) (defer-hole l p (envAt c)) (defer-pass iv)
+  defer-drop {c = c} {l} {p} iv refl with shows c true in sh
+  ... | true  = lift-drops (λ _ → ⊤) c (flagOf (pend (defer l))) (defer-hole l p (envAt c)) (defer-pass sh iv)
+  ... | false = defer-tail sh iv
 
   -- A step whose work may grow drops a skip.
   skipped-drop : ∀ {m t m′} → Inv m → step m ≡ silent t m′ → Skipped m → Drop m m′

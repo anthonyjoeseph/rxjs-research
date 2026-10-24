@@ -14,7 +14,7 @@
 -- the rest (`Fed`).
 module adequacy.Engine.Drop where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (Bool; true; false; not; _∧_)
 open import Data.Empty using (⊥)
 open import Data.List using (_∷_; _++_; reverse)
 import Data.List as L
@@ -75,6 +75,28 @@ shown e    = just (shownAt e)
 -- its leading skips, each under one of the source's.
 Fed : ∀ {B} → (Pos → Set) → Events∞ B → Events∞ B → Set
 Fed P β β′ = β ≋ β′ ⊎ Dropsˢ (Under P) β β′
+
+-- Whether every frame up the context shows the hole's next step, rather
+-- than reading only its tail: `Pass` is empty exactly where this fails.
+shows : ∀ {R Γ A} → Ctx R Γ A → Bool → Bool
+shows top                                                 f = true
+shows (inMap g c)                                         f = shows c true
+shows (inScan g z c)                                      f = shows c true
+shows (inCut l a c)                                       f = l ∧ shows c true
+shows (inLn b c)                                          f = shows c b
+shows (inTake i q free c)                                 f = shows c true
+shows (inTake i q (cpAt _) c)                             f = false
+shows (inTake i q (cutAt _) c)                            f = false
+shows (inTake i q (overAt _) c)                           f = false
+shows (inOuter op g d n q ls c)                           f = not d ∧ shows c true
+shows (inLanes op g d n q o pre post c)                   f = f ∧ shows c true
+shows (inSrc (cs false true sa ba as nothing r en) b c)   f = shows c true
+shows (inSrc (cs false true sa ba as (just _) r en) b c)  f = false
+shows (inSrc (cs false false sa ba as ow r en) b c)       f = false
+shows (inSrc (cs true sl sa ba as ow r en) b c)           f = false
+shows (inBody (cs cl true sa ba as nothing r en) o c)     f = shows c true
+shows (inBody (cs cl true sa ba as (just _) r en) o c)    f = false
+shows (inBody (cs cl false sa ba as ow r en) o c)         f = false
 
 mutual
   Pass : ∀ {R Γ A} → (Pos → Set) → Ctx R Γ A → Bool → Events∞ A → Events∞ A → Set
