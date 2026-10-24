@@ -15,8 +15,8 @@
 -- reached from one by its own silent steps.
 module adequacy.Content where
 
-open import Data.Bool using (true; false; if_then_else_)
-open import Data.List using (List; []; _∷_; _++_; [_]; length)
+open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.List using (List; []; _∷_; _++_; [_]; length; reverse; _ʳ++_)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.List.Relation.Unary.Any using (Any; here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ; ++⁻)
@@ -24,14 +24,14 @@ open import Data.List.Relation.Unary.All using ([])
 import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
-open import Data.Nat using (ℕ; zero; suc; _<_; _<ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _<_; _<ᵇ_; _≡ᵇ_)
 open import Data.Nat.Properties using (suc-injective; ≤-refl; <-trans)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import Tree using (Obs; Later; defer)
+open import Tree using (Obs; Later; defer; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.MonotonicList.Events using (Timeline; Events; Events∞; Pos; Time; tick; root; out; end; hush; ix; _<ᵖ_; <ᵖ-irrefl;
   <ᵖ-asym; emit; stall; close)
 open import denotation.MonotonicList using (observe; Agree; agree-refl; agree-sym)
@@ -48,8 +48,8 @@ open import adequacy.Stepper.Within using (placed-after)
 open import adequacy.Stepper using (step-skips)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Ghost using (module Ghosting)
-open import adequacy.Engine.Drop using (Drops; drop; drops; Dropsˢ; Pass; shows; lift-drops)
-open import adequacy.Engine.Meaning using (M; flagOf; envAt; Has; atOut; atEnd; pastOut; _≅_; ≅-refl; ≅-sym; ≅-trans; agree-≅)
+open import adequacy.Engine.Drop using (Drops; drop; drops; Dropsˢ; Pass; shows; shows-open; lift-drops)
+open import adequacy.Engine.Meaning using (M; flagOf; envAt; risen; gh; lane; lanesL; deadL; outerFrame; lanesFrame; Has; atOut; atEnd; pastOut; _≅_; ≅-refl; ≅-sym; ≅-trans; agree-≅)
 open import adequacy.Engine.Inv using (Inv; NextInv; inv-next)
 open import adequacy.Engine.Spent using (module Spending)
 open import adequacy.Engine.Kept using (KeptFrom) renaming (kept to engine-kept)
@@ -59,7 +59,7 @@ open Events∞ using (force)
 module Honesty (R : Set) where
   open Driver R using (Step; silent; value; complete; drained; step; reading; Read; read; later; played; took)
   open Machine using (Conf; ⟨_,_,_,_⟩; load; moved; starting; turn; quiet; gone; leaf; nx; cp; St; pend; coldS; Ctx; top; inOuter; inLanes;
-    plug; closed; alive; search; found; leafM; subscribing; absorbed; rising; _⊕_) renaming (step to stepᴹ)
+    plug; closed; alive; search; found; leafM; subscribing; absorbed; rising; _⊕_; inCut; inLn; attAt; flatS; killAll) renaming (step to stepᴹ; ended to endedˢ)
   open Spending R using (Skipped; outerᵏ; laneᵏ; deferᵏ; stallᵏ; closeᵏ; silent-spent)
   open Pure R using (End; finished; dry; cutOff)
   open Unsubbing R using (_⇝_; now; then)
@@ -232,14 +232,6 @@ module Honesty (R : Set) where
     -- EACH STEP WHOSE WORK MAY GROW DROPS A SKIP (`adequacy.Engine.Spent`'s
     -- `Skipped`): what the step leaves means less by at least one leading
     -- skip, never the same.  Every other silent step lowers its work.
-    outer-drop : ∀ {Γ A B op d n q ls} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {a p t m′}
-               → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
-               → step ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ ≡ silent t m′
-               → Drop ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ m′
-    lane-drop : ∀ {Γ A B op d n a q pre post} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {s : St Γ B} {p t m′}
-              → alive s ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
-              → step ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ ≡ silent t m′
-              → Drop ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ m′
     stall-drop : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p t m′}
                → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (stall k))) leafM key)
                → closed c′ ≡ false → Inv ⟨ c , s , absorbed , p ⟩ → step ⟨ c , s , absorbed , p ⟩ ≡ silent t m′
@@ -280,6 +272,123 @@ module Honesty (R : Set) where
   defer-drop {c = c} {l} {p} iv refl with shows c true in sh
   ... | true  = lift-drops (λ _ → ⊤) c (flagOf (pend (defer l))) (defer-hole l p (envAt c)) (defer-pass sh iv)
   ... | false = defer-tail sh iv
+
+  -- What a value admitted into a flatMap's lanes leaves running: the
+  -- lanes a switch kills gone, and its count from none.
+  keptLanes : ∀ {Γ B} → FlatOp → List (St Γ B) → List (St Γ B)
+  keptLanes switchᶠ    ls = proj₁ (killAll ls)
+  keptLanes (mergeᶠ m) ls = ls
+  keptLanes exhaustᶠ   ls = ls
+
+  running : FlatOp → ℕ → ℕ
+  running switchᶠ    n = 0
+  running (mergeᶠ m) n = n
+  running exhaustᶠ   n = n
+
+  -- An outer's value admitted: its lane begun, or queued, or dropped by
+  -- a busy exhaust.
+  data Admitted {Γ A B} (c : Ctx R Γ B) (op : FlatOp) (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (q : List A) (o : St Γ A)
+                (ls : List (St Γ B)) (a : A) (p : Pos) : Conf R → Set₁ where
+    begun   : ∀ {ls′} → ls′ ≡ keptLanes op ls
+            → Admitted c op f d n q o ls a p
+                ⟨ inCut true (attAt (p ⊕ [ ix 1 ])) (inLn true (inLanes op f d (suc (running op n)) q o (reverse ls′) [] c)) , pend (f a) , subscribing , p ⊕ [ ix 1 ] ⟩
+    queued  : Admitted c op f d n q o ls a p ⟨ c , flatS op f d n (q ++ [ a ]) o ls , absorbed , p ⟩
+    ignored : Admitted c op f d n q o ls a p ⟨ c , flatS op f d n q o ls , absorbed , p ⟩
+
+  admitted : ∀ {Γ A B} {c : Ctx R Γ B} {op f d n q} {o : St Γ A} {ls a p t m′} → closed c ≡ false
+           → step ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ ≡ silent t m′ → Admitted c op f d n q o ls a p m′
+  admitted {c = c} {op = mergeᶠ nothing} cl e with closed c | cl | e
+  ... | false | refl | refl = begun refl
+  admitted {c = c} {op = mergeᶠ (just k)} {n = n} cl e with n <ᵇ k | closed c | cl | e
+  ... | true  | false | refl | refl = begun refl
+  ... | false | _     | _    | refl = queued
+  admitted {c = c} {op = switchᶠ} {ls = ls} cl e with killAll ls in ek | closed c | cl | e
+  ... | ls′ , _ | false | refl | refl = begun (cong proj₁ (sym ek))
+  admitted {c = c} {op = exhaustᶠ} {n = n} cl e with n ≡ᵇ 0 | e
+  ... | false | refl = ignored
+  ... | true  | e′ with closed c | cl | e′
+  ...   | false | refl | refl = begun refl
+
+  -- The outer frame with its value risen, and what each admission leaves.
+  outerX : ∀ {Γ A B} → Ctx R Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → List A → List (St Γ B) → St Γ A → A → Pos → Events∞ B
+  outerX c op f d q ls o a p = outerFrame op (lane f) d q (lanesL ls) (deadL ls) (envAt c) (risen (gh o) (envAt c) (nx a) p)
+
+  begunY : ∀ {Γ A B} → Ctx R Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → List A → St Γ A → List (St Γ B) → A → Pos → Events∞ B
+  begunY c op f d q o ls a p =
+    lanesFrame op (lane f) d q (gh o) (reverse (reverse ls)) [] true (envAt c) (U.stateᴺ (U.subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c))
+
+  postulate
+    -- AN OUTER'S VALUE BEGINS ITS LANE PAST ONE SKIP: the flatMap shows
+    -- the value as a skip, then the lane subscribed just past it.
+    outer-begins : ∀ {Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
+                 → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
+                 → Dropsˢ (λ _ → ⊤) (outerX c op f d q ls o a p) (begunY c op f d q o (keptLanes op ls) a p)
+    -- AN OUTER'S VALUE QUEUED, OR DROPPED BY A BUSY EXHAUST, IS ITS SKIP.
+    outer-queues : ∀ {Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
+                 → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
+                 → Dropsˢ (λ _ → ⊤) (outerX c op f d q ls o a p) (U.stateᴺ (gh (flatS op f d n (q ++ [ a ]) o ls)) (envAt c))
+    outer-ignores : ∀ {Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
+                  → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
+                  → Dropsˢ (λ _ → ⊤) (outerX c op f d q ls o a p) (U.stateᴺ (gh (flatS op f d n q o ls)) (envAt c))
+    -- AN OUTER'S VALUE ADMITTED WHERE IT IS SHOWN IS SHOWN NEXT: every
+    -- frame above passes its skip, whatever the admission left.
+    outer-begins-pass : ∀ {Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
+                      → shows (inOuter op f d n q ls c) true ≡ true → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
+                      → Pass (λ _ → ⊤) c true (outerX c op f d q ls o a p) (begunY c op f d q o (keptLanes op ls) a p)
+    outer-queues-pass : ∀ {Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
+                      → shows (inOuter op f d n q ls c) true ≡ true → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
+                      → Pass (λ _ → ⊤) c true (outerX c op f d q ls o a p) (U.stateᴺ (gh (flatS op f d n (q ++ [ a ]) o ls)) (envAt c))
+    outer-ignores-pass : ∀ {Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
+                       → shows (inOuter op f d n q ls c) true ≡ true → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
+                       → Pass (λ _ → ⊤) c true (outerX c op f d q ls o a p) (U.stateᴺ (gh (flatS op f d n q o ls)) (envAt c))
+    -- AN OUTER'S VALUE ADMITTED WHERE ONLY TAILS ARE READ drops its skip
+    -- through the tail that pins it, as `defer-tail`.
+    outer-tail : ∀ {Γ A B op d n q ls} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {a p t m′}
+               → shows (inOuter op f d n q ls c) true ≡ false → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
+               → step ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ ≡ silent t m′
+               → Drop ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ m′
+
+  -- An outer's value admitted drops its skip.
+  outer-drop : ∀ {Γ A B op d n q ls} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {a p t m′}
+             → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
+             → step ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ ≡ silent t m′
+             → Drop ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ m′
+  outer-drop {op = op} {d} {n} {q} {ls} {f} {c} {o} {a} {p} iv e with shows (inOuter op f d n q ls c) true in sh
+  ... | false = outer-tail sh iv e
+  ... | true with admitted {c = c} {op = op} (shows-open (inOuter op f d n q ls c) true sh) e
+  ...   | begun refl = lift-drops (λ _ → ⊤) c true (outer-begins iv) (outer-begins-pass sh iv)
+  ...   | queued     = lift-drops (λ _ → ⊤) c true (outer-queues iv) (outer-queues-pass sh iv)
+  ...   | ignored    = lift-drops (λ _ → ⊤) c true (outer-ignores iv) (outer-ignores-pass sh iv)
+
+  -- A lane's completion under a queue, and the queue's next lane begun.
+  laneX : ∀ {Γ A B} → Ctx R Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → List A → St Γ A → List (St Γ B) → List (St Γ B) → St Γ B → Pos → Events∞ B
+  laneX c op f d q o pre post s p = lanesFrame op (lane f) d q (gh o) (reverse pre) post true (envAt c) (risen (gh s) (envAt c) cp p)
+
+  postulate
+    -- A LANE'S COMPLETION UNDER A QUEUE BEGINS THE NEXT LANE PAST ONE SKIP.
+    lane-begins : ∀ {Γ A B op d n a q pre post} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {s : St Γ B} {p}
+                → alive s ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
+                → Dropsˢ (λ _ → ⊤) (laneX c op f d (a ∷ q) o pre post s p) (begunY c op f d q o (pre ʳ++ endedˢ s ∷ post) a p)
+    -- AND WHERE IT IS SHOWN IS SHOWN NEXT.
+    lane-begins-pass : ∀ {Γ A B op d n a q pre post} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {s : St Γ B} {p}
+                     → shows (inLanes op f d n (a ∷ q) o pre post c) true ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
+                     → Pass (λ _ → ⊤) c true (laneX c op f d (a ∷ q) o pre post s p) (begunY c op f d q o (pre ʳ++ endedˢ s ∷ post) a p)
+    -- A LANE'S COMPLETION WHERE ONLY TAILS ARE READ, as `defer-tail`.
+    lane-tail : ∀ {Γ A B op d n a q pre post} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {s : St Γ B} {p t m′}
+              → alive s ≡ true → shows (inLanes op f d n (a ∷ q) o pre post c) true ≡ false
+              → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
+              → step ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ ≡ silent t m′
+              → Drop ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ m′
+
+  -- A lane's completion under a queue drops its skip.
+  lane-drop : ∀ {Γ A B op d n a q pre post} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {s : St Γ B} {p t m′}
+            → alive s ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
+            → step ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ ≡ silent t m′
+            → Drop ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ m′
+  lane-drop {op = op} {d} {n} {a} {q} {pre} {post} {f} {c} {o} {s} {p} al iv e with shows (inLanes op f d n (a ∷ q) o pre post c) true in sh
+  ... | false = lane-tail al sh iv e
+  ... | true with alive s | al | closed c | shows-open (inLanes op f d n (a ∷ q) o pre post c) true sh | e
+  ...   | true | refl | false | refl | refl = lift-drops (λ _ → ⊤) c true (lane-begins al iv) (lane-begins-pass sh iv)
 
   -- A step whose work may grow drops a skip.
   skipped-drop : ∀ {m t m′} → Inv m → step m ≡ silent t m′ → Skipped m → Drop m m′

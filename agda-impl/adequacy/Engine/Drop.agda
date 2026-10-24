@@ -33,7 +33,7 @@ open import denotation.NonExpansive using (_,ˢ_; mapᴱ-ne; scanᴱ-ne; takeWhi
 open import denotation.Unfold using (Node; NEnv; stateᴺ; states; outerᴺ)
 open import denotation.Denote using (flatOp)
 open import operation.PureObservable using (module Machine)
-open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; cs; free; cpAt; cutAt; overAt)
+open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; cs; free; cpAt; cutAt; overAt; closed)
 open import adequacy.Engine.Meaning using (_≋_; ≋-by; same; up; mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn; srcState;
   srcG; envAt; gh; lane; lanesL; deadL; outerG; outerT; poolRuns; poolT; laneᴹ; lanesFrame-ne)
 open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore; go-rise)
@@ -97,6 +97,30 @@ shows (inSrc (cs true sl sa ba as ow r en) b c)           f = false
 shows (inBody (cs cl true sa ba as nothing r en) o c)     f = shows c true
 shows (inBody (cs cl true sa ba as (just _) r en) o c)    f = false
 shows (inBody (cs cl false sa ba as ow r en) o c)         f = false
+
+-- A context showing its hole's next step is not closed.
+shows-open : ∀ {R Γ A} (c : Ctx R Γ A) f → shows c f ≡ true → closed c ≡ false
+shows-open top                                                 f e = refl
+shows-open (inMap g c)                                         f e = shows-open c true e
+shows-open (inScan g z c)                                      f e = shows-open c true e
+shows-open (inCut true a c)                                    f e = shows-open c true e
+shows-open (inCut false a c)                                   f ()
+shows-open (inLn b c)                                          f e = shows-open c b e
+shows-open (inTake i q free c)                                 f e = shows-open c true e
+shows-open (inTake i q (cpAt _) c)                             f ()
+shows-open (inTake i q (cutAt _) c)                            f ()
+shows-open (inTake i q (overAt _) c)                           f ()
+shows-open (inOuter op g false n q ls c)                       f e = shows-open c true e
+shows-open (inOuter op g true n q ls c)                        f ()
+shows-open (inLanes op g d n q o pre post c)                   true  e = shows-open c true e
+shows-open (inLanes op g d n q o pre post c)                   false ()
+shows-open (inSrc (cs false true sa ba as nothing r en) b c)   f e = refl
+shows-open (inSrc (cs false true sa ba as (just _) r en) b c)  f ()
+shows-open (inSrc (cs false false sa ba as ow r en) b c)       f ()
+shows-open (inSrc (cs true sl sa ba as ow r en) b c)           f ()
+shows-open (inBody (cs cl true sa ba as nothing r en) o c)     f e = shows-open c true e
+shows-open (inBody (cs cl true sa ba as (just _) r en) o c)    f ()
+shows-open (inBody (cs cl false sa ba as ow r en) o c)         f ()
 
 mutual
   Pass : ∀ {R Γ A} → (Pos → Set) → Ctx R Γ A → Bool → Events∞ A → Events∞ A → Set
