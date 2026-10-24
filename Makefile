@@ -1,4 +1,4 @@
-.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain placing placing-count stepping bg bg-check bg-wait \
+.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain placing placing-count stepping kept-depth bg bg-check bg-wait \
         wiring wiring-gate wiring-selftest unsafe-check dup-check dup-selftest \
         imports-check imports-fix imports-selftest comments-check comments-selftest \
         roadmap-check roadmap-selftest port-check port-selftest find find-prose postulates notify split \
@@ -44,6 +44,7 @@ help:
 	@echo "  chain         the denotation's approximants form a chain (ARGS=\"FROM COUNT\")"
 	@echo "  placing       the machine's trace is placed against the root's events (ARGS=\"FROM COUNT\", default 0 300, max 500 without SWEEP=1)"
 	@echo "  stepping      the stepper shows what its configuration means, skips included (ARGS=\"FROM COUNT\", default 0 300)"
+	@echo "  kept-depth    every silent engine step drops its meaning's first skip or means the same (ARGS=\"FROM COUNT\", default 0 100)"
 	@echo "  postulates    every postulate in $(SRC) by name — the work ledger"
 	@echo "  find          search the declared TYPE of every statement:  make find Q='⊑ lub'"
 	@echo "  find-prose    search comment blocks and docs for a finding:  make find-prose Q='dead route'"
@@ -149,6 +150,16 @@ stepping: oracle-build
 	  echo "$$out" | grep -q '^stepping: done ' || { echo "stepping: RED — the run never finished"; exit 1; }; \
 	  if echo "$$out" | grep -q '^stepping: FAIL '; then echo "stepping: RED"; exit 1; fi; \
 	  echo "stepping: GREEN"
+
+# Every silent engine step drops its meaning's first skip or means the
+# same, on ARGS="FROM COUNT" seeds (default "0 100"); each line carries the
+# seed's longest run of steps meaning the same.
+KEPT_DEPTH_ARGS = $(or $(ARGS),0 100)
+kept-depth: oracle-build
+	@out=$$($(ORACLE_BIN) kept-depth $(KEPT_DEPTH_ARGS)); echo "$$out"; \
+	  echo "$$out" | grep -q '^kept-depth: done ' || { echo "kept-depth: RED — the run never finished"; exit 1; }; \
+	  if echo "$$out" | grep -q '^kept-depth: FAIL '; then echo "kept-depth: RED"; exit 1; fi; \
+	  echo "kept-depth: GREEN"
 
 # The runner prints a FAIL line per failing row and a closing `done` line;
 # a run without the `done` line died part-way and is red.  See
