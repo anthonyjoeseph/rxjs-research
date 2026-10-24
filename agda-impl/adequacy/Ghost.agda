@@ -2,7 +2,7 @@
 
 -- THE GHOST: the meaning's configuration a machine's run carries
 -- (`Strong`), what is left of it to deliver (`residual`), and the
--- measure a silent run between two such configurations lowers.
+-- work a silent run between two such configurations lowers (`Lowers`).
 --
 -- The machine keeps no record: a configuration reached from a launch is
 -- reached WITH the record its steps showed (`Reached`).
@@ -21,7 +21,7 @@ open import Induction.WellFounded using (WellFounded)
 open import Data.Product.Relation.Binary.Lex.Strict using (×-Lex; ×-wellFounded)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Time; tick; out; skip; end; hush; root)
 open import denotation.MonotonicList using (observe; Agree; out⁼; skip⁼; end⁼; hush⁼; agree; agree-sym)
@@ -32,6 +32,7 @@ open import adequacy.Sorted using (_≤ᵖ_)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Stepper.Past using (afterᴱ)
+open import adequacy.Engine.Meaning using (M; Has; atOut; atEnd; pastOut; pastSkip; _≅_; ≅-trans; agree-≅)
 open import denotation.Denote using (⟦_⟧)
 open import operation.PureObservable using (PureObs; module Driver; module Machine; module Pure)
 open Events∞
@@ -45,13 +46,6 @@ module Ghosting (R : Set) where
 
   ----------------------------------------------------------------------
   -- Alike as sets
-
-  -- The events hold a value (`just`) or their end (`nothing`) at `k`.
-  data Has : Events R → Pos → Maybe R → Set where
-    atOut    : ∀ {k a r} → Has (out k a r) k (just a)
-    atEnd    : ∀ {k} → Has (end k) k nothing
-    pastOut  : ∀ {k a r q b} → Has (force r) q b → Has (out k a r) q b
-    pastSkip : ∀ {k r q b} → Has (force r) q b → Has (skip k r) q b
 
   -- The record has sent `a` at `k`, on `k`'s tick.
   data Sent : List Pos → List (Time × R) → Pos → R → Set where
@@ -87,21 +81,6 @@ module Ghosting (R : Set) where
 
   tail-skip : ∀ {n k} {l r : Events∞ R} → Agree (suc n) (skip k l) (skip k r) → Agree n (force l) (force r)
   tail-skip (skip⁼ _ x) = x
-
-  -- Events alike at every depth hold the same events.
-  has-agree : ∀ {x y k b} → (∀ n → Agree n x y) → Has x k b → Has y k b
-  has-agree ag h with ag 1
-  has-agree ag atOut        | out⁼ _ _ = atOut
-  has-agree ag atEnd        | end⁼    = atEnd
-  has-agree ag (pastOut h)  | out⁼ _ _ = pastOut (has-agree (λ n → tail-out (ag (suc n))) h)
-  has-agree ag (pastSkip h) | skip⁼ _ _ = pastSkip (has-agree (λ n → tail-skip (ag (suc n))) h)
-
-  -- The same events, as a set.
-  _≋_ : Events R → Events R → Set
-  x ≋ y = ∀ {k b} → (Has x k b → Has y k b) × (Has y k b → Has x k b)
-
-  same-agree : ∀ {x y} → (∀ n → Agree n x y) → x ≋ y
-  same-agree ag = has-agree ag , has-agree (λ n → agree-sym (ag n))
 
   ----------------------------------------------------------------------
   -- THE GHOST
@@ -143,7 +122,7 @@ module Ghosting (R : Set) where
   record Inner (rest : Events R) (m : Conf R) : Set₁ where
     field
       ghost  : U.Node [] R
-      same   : rest ≋ residual ghost
+      same   : rest ≅ residual ghost
       mirror : Mirror ghost m
 
   -- The record holds a value at `k`; it never holds an end.
@@ -166,13 +145,7 @@ module Ghosting (R : Set) where
 
   -- The launch will deliver the meaning's events.
   inner-launch : (o : PureObs [] R) → Inner (observe (⟦ o ⟧ []) root) (load o)
-  inner-launch o = record { ghost = U.subscribe o root ; same = same-agree (begun o) ; mirror = load o , now , strong-begin o }
-
-  ≋-refl : ∀ {x} → x ≋ x
-  ≋-refl = (λ h → h) , (λ h → h)
-
-  ≋-trans : ∀ {x y z} → x ≋ y → y ≋ z → x ≋ z
-  ≋-trans xy yz = (λ h → proj₁ yz (proj₁ xy h)) , (λ h → proj₂ xy (proj₂ yz h))
+  inner-launch o = record { ghost = U.subscribe o root ; same = agree-≅ (begun o) ; mirror = load o , now , strong-begin o }
 
   -- WHAT THE GHOST'S STEP SAYS OF ITS RESIDUAL, as a set: a value is in
   -- it, and the rest is what the stepped ghost shows; a skip keeps it; an
@@ -180,7 +153,7 @@ module Ghosting (R : Set) where
   Steps : Events R → U.Step [] R → Set
   Steps e (U.outˢ k a g′) = Has e k (just a) × (∀ {q b} → Has (residual g′) q b → Has e q b)
                           × (∀ {q b} → Has e q b → (q ≡ k × b ≡ just a) ⊎ Has (residual g′) q b)
-  Steps e (U.skipˢ k g′)  = e ≋ residual g′
+  Steps e (U.skipˢ k g′)  = e ≅ residual g′
   Steps e (U.endˢ k)      = Has e k nothing × (∀ {q a} → Has e q (just a) → ⊥)
   Steps e U.hushˢ         = ∀ {q b} → Has e q b → ⊥
 
@@ -189,7 +162,7 @@ module Ghosting (R : Set) where
   after = afterᴱ []
 
   -- Events alike, as a set, with what a step shows are what it says.
-  steps-after : ∀ {e} s → e ≋ after s → Steps e s
+  steps-after : ∀ {e} s → e ≅ after s → Steps e s
   steps-after (U.outˢ k a g′) eq = proj₂ eq atOut , (λ h → proj₂ eq (pastOut h)) , λ h → split (proj₁ eq h)
     where split : ∀ {q b} → Has (after (U.outˢ k a g′)) q b → (q ≡ k × b ≡ just a) ⊎ Has (residual g′) q b
           split atOut       = inj₁ (refl , refl)
@@ -230,24 +203,24 @@ module Ghosting (R : Set) where
   Fewer x y = ∀ {k} (a : Ahead x k) → Σ (Ahead y k) λ b → depth b ≤ depth a
 
   -- `y` is `x` with none or more of its skips gone.  As sets the two are
-  -- the same; as a measure a skip dropped is progress, which `≋` cannot
+  -- the same; as a measure a skip dropped is progress, which `≅` cannot
   -- see.
   record Past (x y : Events R) : Set where
     field
-      same  : x ≋ y
+      same  : x ≅ y
       fewer : Fewer x y
 
-  skip-same : ∀ {k r} → skip k r ≋ force r
+  skip-same : ∀ {k} {r : Events∞ R} → skip k r ≅ force r
   skip-same = (λ { (pastSkip h) → h }) , pastSkip
 
-  past-same : ∀ {x y} → Past x y → x ≋ y
+  past-same : ∀ {x y} → Past x y → x ≅ y
   past-same = Past.same
 
   agrees : ∀ {x y} → (∀ n → Agree n x y) → Past x y
-  agrees ag = record { same = same-agree ag ; fewer = λ a → proj₁ (ahead-agree ag a) , ≤-reflexive (proj₂ (ahead-agree ag a)) }
+  agrees ag = record { same = agree-≅ ag ; fewer = λ a → proj₁ (ahead-agree ag a) , ≤-reflexive (proj₂ (ahead-agree ag a)) }
 
   skipped : ∀ {x y k r} → (∀ n → Agree n x (skip k r)) → Past (force r) y → Past x y
-  skipped {x} {y} {k} {r} ag p = record { same = ≋-trans (same-agree ag) (≋-trans skip-same (Past.same p)) ; fewer = fewer }
+  skipped {x} {y} {k} {r} ag p = record { same = ≅-trans (agree-≅ ag) (≅-trans skip-same (Past.same p)) ; fewer = fewer }
     where fewer : Fewer x y
           fewer a with ahead-agree ag a
           ... | none     , _  = none , z≤n
@@ -255,7 +228,7 @@ module Ghosting (R : Set) where
           ...   | b , le = b , ≤-trans (m≤n⇒m≤1+n le) (≤-reflexive de)
 
   past-pre : ∀ {x y z} → (∀ n → Agree n x y) → Past y z → Past x z
-  past-pre {x} {y} {z} ag p = record { same = ≋-trans (same-agree ag) (Past.same p) ; fewer = fewer }
+  past-pre {x} {y} {z} ag p = record { same = ≅-trans (agree-≅ ag) (Past.same p) ; fewer = fewer }
     where fewer : Fewer x z
           fewer a with ahead-agree ag a
           ... | b , de with Past.fewer p b
@@ -303,25 +276,31 @@ module Ghosting (R : Set) where
            (×-wellFounded <-wellFounded <-wellFounded)))) <-wellFounded
 
   postulate
-    -- The work a re-entry configuration has left before its ghost moves.
-    measure : ∀ {g m} → Strong g m → Measure
+    -- The work a configuration has left in its own control.
+    work : Conf R → Measure
+
+  -- Toward an item: the item's depth, then the configuration's work.
+  _⋖_ : ℕ × Measure → ℕ × Measure → Set
+  _⋖_ = ×-Lex _≡_ _<_ _≺_
+
+  ⋖-wf : WellFounded _⋖_
+  ⋖-wf = ×-wellFounded <-wellFounded ≺-wf
+
+  -- `m₀` is nearer than `m` to every item `m`'s meaning reaches.
+  Lowers : Conf R → Conf R → Set
+  Lowers m m₀ = ∀ {k} (c : Ahead (M m) (suc k)) → Σ (Ahead (M m₀) (suc k)) λ c₀ → (depth c₀ , work m₀) ⋖ (depth c , work m)
 
   -- WHAT A SILENT RUN BETWEEN RE-ENTRY CONFIGURATIONS GAINS: the ghost
-  -- past a skip of its residual; or the ghost alike, less work left; or
-  -- a configuration whose next step shows something.
+  -- alike, every item its configuration reaches nearer.
   data Gain {g m g″ m₀} (st : Strong g m) (st₀ : Strong g″ m₀) : Set₁ where
-    passed  : ∀ {k r} → (∀ n → Agree n (residual g) (skip k r)) → Past (force r) (residual g″) → Gain st st₀
-    lowered : (∀ n → Agree n (residual g) (residual g″)) → measure st₀ ≺ measure st → Gain st st₀
-    showing : Past (residual g) (residual g″) → (∀ {t m″} → step m₀ ≢ silent t m″) → Gain st st₀
+    lowered : (∀ n → Agree n (residual g) (residual g″)) → Lowers m m₀ → Gain st st₀
 
   gain-past : ∀ {g m g″ m₀} {st : Strong g m} {st₀ : Strong g″ m₀} → Gain st st₀ → Past (residual g) (residual g″)
-  gain-past (passed ag p)  = skipped ag p
   gain-past (lowered ag _) = agrees ag
-  gain-past (showing p _)  = p
 
   -- `m′` runs silently to a re-entry configuration, which `st` gains.
   Hopped : ∀ {g m} → Strong g m → Conf R → Set₁
   Hopped st m′ = Σ (U.Node [] R) λ g″ → Σ (Conf R) λ m₀ → m′ ⇝ m₀ × Σ (Strong g″ m₀) λ st₀ → Gain st st₀
 
-  onward : ∀ {rest g m m′} {st : Strong g m} → rest ≋ residual g → Hopped st m′ → Inner rest m′
-  onward e (g″ , m₀ , path , st₀ , gn) = record { ghost = g″ ; same = ≋-trans e (past-same (gain-past gn)) ; mirror = m₀ , path , st₀ }
+  onward : ∀ {rest g m m′} {st : Strong g m} → rest ≅ residual g → Hopped st m′ → Inner rest m′
+  onward e (g″ , m₀ , path , st₀ , gn) = record { ghost = g″ ; same = ≅-trans e (past-same (gain-past gn)) ; mirror = m₀ , path , st₀ }
