@@ -1,34 +1,22 @@
 {-# OPTIONS --guardedness #-}
 
--- THE PURE RUNTIME.  `operation.AbstractObservable`'s machine, fed on a
--- virtual clock: every transition is the shared one, and what this
--- module adds is only what the pure runtime does at a cold — its
--- timeline, read at the position it was subscribed at, played into its
--- leaf a frame at a time, its later frames on timers — and what only a
--- pure runtime can do, read its run off as a timeline.  So the program
--- itself says when everything happens: there is no separate schedule,
--- and quantifying over programs covers every ordering.
---
--- A leaf keeps its own TAPE: the frame it is playing or waiting for, at
--- its tick on the cold's own timeline.  So what the driver keeps is
--- untyped — paths, positions, ticks — and every value it delivers comes
--- out of the leaf it goes into.
---
--- A frame is played at the depth of the job stack it was started or
--- fired at: the jobs a delivery owes are run before the next value, as
--- the value's cascade would run them inside rxjs's `next`.
+-- THE PURE RUNTIME OVER `operation.AbstractObservable`.  A cold leaf keeps
+-- the frame it plays — the cascade it sits in, its next index — or the
+-- completion it owes; that is its mark's key.  A frame's later frames
+-- are the same leaf, rekeyed under the timer cascade `Unfold` places them
+-- in.  So the driver keeps nothing: no clock, no timers, no turns, no
+-- depths.  The run's time is the tick of the position it is at.
 module operation.PureObservable where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_; [_])
-open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_)
+open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_)
 
 open import Tree using (Obs)
-open import denotation.MonotonicList.Events using (Timeline; timelineAt; ML; Burst; Burst∞; ML∞; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Pos; ix; last) renaming (sub to subᴾ)
-
-PureObs : List Set → Set → Set₁
-PureObs = Obs Timeline
+open import denotation.MonotonicList.Events using (Timeline; timelineAt; ML; Burst; Burst∞; ML∞; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Pos; ix; last; tick) renaming (sub to subᴾ)
+open import operation.Key using (Key) renaming (at to atᴷ)
 
 ------------------------------------------------------------------------
 -- Observing a run
@@ -70,137 +58,82 @@ module Pure (R : Set) where
     later : ∀ {A} → ML A → ML∞ A
     later m .ML∞.force = m
 
-------------------------------------------------------------------------
--- The driver
-
--- What a started cold keeps: the frame due at tick `t` of its own
--- timeline, or nothing more.
+-- What a started cold keeps: the frame it plays, from the tick it was
+-- subscribed at, in cascade `u`, its next index; the completion it owes
+-- at a position; or nothing more.
 data Tape (A : Set) : Set₁ where
-  tape : ∀ t → Frame A t → Tape A
-  over : Tape A
+  play   : Time → Pos → ℕ → (t : Time) → Frame A t → Tape A
+  ending : Pos → Tape A
+  over   : Tape A
+
+due : ∀ {A} → Tape A → Maybe Key
+due (play τ u i t fr) = just (atᴷ (u ++ [ ix i ]))
+due (ending e)        = just (atᴷ e)
+due over              = nothing
+
+-- What it shows when due: a frame's value or its end; a stall or a
+-- frame's close shows nothing.
+peek : ∀ {A} → Tape A → Maybe (Maybe A)
+peek (play τ u i t (emit a k)) = just (just a)
+peek (play τ u i t _)          = nothing
+peek (ending e)                = just nothing
+peek over                      = nothing
+
+-- After a frame ending at `e`: a completion owed, nothing, or the next
+-- frame, under a cascade at its tick.
+rest : ∀ {A t} → Time → Pos → From A t → Tape A
+rest τ e done        = ending e
+rest τ e quiet       = over
+rest τ e (at t _ fr) = play τ (ix (τ + t) ∷ subᴾ e ∷ []) 0 t fr
+
+-- A timeline subscribed at `p`: frame 0 played in place, or its frames
+-- after it.
+opening : ∀ {A} → Pos → From A 0 → Tape A
+opening p (at zero _ b) = play (tick p) p 0 0 b
+opening p m             = rest (tick p) (p ++ [ last ]) m
+
+-- A program the pure runtime runs: colds are timelines.
+PureObs : List Set → Set → Set₁
+PureObs = Obs Timeline
 
 import operation.AbstractObservable
-module Machine = operation.AbstractObservable Timeline Tape
-open Machine using (Conf; Stepped; moved; starting; load; Poke; gone; leaf; poke; spot; calm; depth; nx; cp)
+module Machine = operation.AbstractObservable Timeline Tape due peek
+open Machine using (Conf; Stepped; moved; starting; turn; quiet; load; Poke; gone; leaf; nx; cp)
   renaming (step to stepᴹ)
 
 module Driver (R : Set) where
   open Pure R using (End; finished; cutOff; frames) renaming (dry to dryᴱ)
 
-  ------------------------------------------------------------------------
-  -- The driver's state
-
-  -- A frame being played: the leaf, by its path; where the frame sits;
-  -- its next value's index; whether its observer has been asked if it is
-  -- closed; the depth it plays at.  Or a completion owed the leaf, at its
-  -- position, at a depth.
-  data Turn : Set where
-    play   : List ℕ → Pos → ℕ → Bool → ℕ → Turn
-    finish : List ℕ → Pos → ℕ → Turn
-
-  depthOf : Turn → ℕ
-  depthOf (play _ _ _ _ d) = d
-  depthOf (finish _ _ d)   = d
-
-  -- A frame due on the clock, for the leaf at `path`; `from` is the
-  -- position the timer was set at, which places the frame.
-  record Timer : Set where
-    constructor timer
-    field
-      due  : ℕ
-      path : List ℕ
-      from : Pos
-
-  -- A frame set at e, due at t, is a cascade rooted at ix t ∷ subᴾ e ∷ [].
-  cascade : Timer → Pos
-  cascade tm = ix (Timer.due tm) ∷ subᴾ (Timer.from tm) ∷ []
-
-  -- After every timer due no later: two timers due together fire in the
-  -- order they were set.
-  insert : Timer → List Timer → List Timer
-  insert tm []        = tm ∷ []
-  insert tm (t′ ∷ ts) = if Timer.due t′ ≤ᵇ Timer.due tm then t′ ∷ insert tm ts else tm ∷ t′ ∷ ts
-
-  record Mach : Set₁ where
-    constructor mach
-    field
-      conf   : Conf R
-      clock  : ℕ
-      timers : List Timer
-      turns  : List Turn       -- innermost first
-
-  ------------------------------------------------------------------------
-  -- One step
-
-  -- What a step shows: nothing, a value recorded at the clock and the
-  -- position it was made at, the root's completion, or nothing left.
   data Step : Set₁ where
-    silent   : Mach → Step
-    value    : Time → Pos → R → Mach → Step
+    silent   : Time → Conf R → Step
+    value    : Time → Pos → R → Conf R → Step
     complete : Pos → Step
     drained  : Step
 
-  -- The frames after one ending at `now`, at position e: a completion
-  -- owed, nothing, or a timer for the next.  `k` puts the leaf's tape.
-  rest : Mach → ∀ {A u} → Time → Pos → From A u → (Tape A → Conf R) → Mach
-  rest m now e done        k = let c = k over in record m { conf = c ; turns = finish (spot c) e (depth c) ∷ Mach.turns m }
-  rest m now e quiet       k = record m { conf = k over }
-  rest m now e (at t _ fr) k = let c = k (tape t fr) in
-    record m { conf = c ; timers = insert (timer (Mach.clock m + (t ∸ now)) (spot c) e) (Mach.timers m) }
+  -- A leaf's turn: a completion owed is delivered; a leaf gone, torn
+  -- down or closed stops; else its frame's next value delivered, a stall
+  -- skipped, a close rekeying it to its next frame.
+  played : Poke R → Step
+  played gone = drained
+  played (leaf b (ending e) cl dv st) = silent (tick e) (dv cp over false e)
+  played (leaf false l cl dv st) = silent 0 (st over)
+  played (leaf true l true dv st) = silent 0 (st over)
+  played (leaf true (play τ u i t (emit a k)) false dv st) =
+    silent (tick u) (dv (nx a) (play τ u (suc i) t (Frame∞.force k)) true (u ++ [ ix i ]))
+  played (leaf true (play τ u i t (stall k)) false dv st) = silent (tick u) (st (play τ u (suc i) t (Frame∞.force k)))
+  played (leaf true (play τ u i t (close k)) false dv st) = silent (tick u) (st (rest τ (u ++ [ last ]) (From∞.force k)))
+  played (leaf true over false dv st) = silent 0 (st over)
 
-  -- A timeline just started at p: frame 0 played now, or its frames
-  -- scheduled.
-  opening : Mach → ∀ {A} → Pos → From A 0 → (Tape A → Conf R) → Mach
-  opening m p (at zero _ b) k = let c = k (tape 0 b) in record m { conf = c ; turns = play (spot c) p 0 false (depth c) ∷ Mach.turns m }
-  opening m p f             k = rest m 0 (p ++ [ last ]) f k
+  took : Stepped R → Step
+  took (moved c ((p , nx a) ∷ _) _) = value (tick p) p a c
+  took (moved c ((p , cp) ∷ _) _)   = complete p
+  took (moved c [] _)               = silent (tick (Conf.pos c)) c
+  took (starting x p k)             = silent (tick p) (k (opening p (timelineAt x p)))
+  took (turn pk)                    = played pk
+  took quiet                        = drained
 
-  -- What the machine did, taken in.
-  took : Mach → Stepped R → Step
-  took m (moved c ((p , nx a) ∷ _) _) = value (Mach.clock m) p a (record m { conf = c })
-  took m (moved c ((p , cp) ∷ _) _)   = complete p
-  took m (moved c [] _)               = silent (record m { conf = c })
-  took m (starting x p k)             = silent (opening m p (timelineAt x p) k)
-
-  -- A frame's step: a leaf gone, torn down or closed ends it; else its
-  -- observer asked, then its next value delivered, a stall skipped, a
-  -- close scheduling the rest.
-  playing : Mach → List ℕ → Pos → ℕ → Bool → ℕ → List Turn → Poke R → Step
-  playing m π u i pl     d ts gone                     = silent (record m { turns = ts })
-  playing m π u i pl     d ts (leaf false l cl dv st)  = silent (record m { turns = ts })
-  playing m π u i false  d ts (leaf true l true dv st)  = silent (record m { turns = ts })
-  playing m π u i false  d ts (leaf true l false dv st) = silent (record m { turns = play π u i true d ∷ ts })
-  playing m π u i true   d ts (leaf true (tape t (emit a k)) cl dv st) =
-    silent (record m { conf = dv (nx a) (tape t (Frame∞.force k)) true (u ++ [ ix i ]) ; turns = play π u (suc i) false d ∷ ts })
-  playing m π u i true   d ts (leaf true (tape t (stall k)) cl dv st) =
-    silent (record m { conf = st (tape t (Frame∞.force k)) ; turns = play π u (suc i) true d ∷ ts })
-  playing m π u i true   d ts (leaf true (tape t (close k)) cl dv st) =
-    silent (rest (record m { turns = ts }) t (u ++ [ last ]) (From∞.force k) st)
-  playing m π u i true   d ts (leaf true over cl dv st) = silent (record m { turns = ts })
-
-  -- A completion owed: delivered under its position, the leaf spent.
-  finishing : Mach → Pos → List Turn → Poke R → Step
-  finishing m e ts gone                  = silent (record m { turns = ts })
-  finishing m e ts (leaf b l cl dv st)   = silent (record m { conf = dv cp l false e ; turns = ts })
-
-  played : Mach → Turn → List Turn → Step
-  played m (play π u i pl d) ts = playing m π u i pl d ts (poke π (Mach.conf m))
-  played m (finish π e d)    ts = finishing m e ts (poke π (Mach.conf m))
-
-  -- Nothing running and nothing playing: the next timer fired.
-  fire : Mach → List Timer → Step
-  fire m []         = drained
-  fire m (tm ∷ tms) = silent (record m { clock = Timer.due tm ; timers = tms ; turns = [ play (Timer.path tm) (cascade tm) 0 false 0 ] })
-
-  -- The driver's turn: the jobs owed above the frame playing run first.
-  turned : Mach → List Turn → Step
-  turned m (t ∷ ts) = if depthOf t <ᵇ depth (Mach.conf m) then took m (stepᴹ (Mach.conf m)) else played m t ts
-  turned m []       = if 0 <ᵇ depth (Mach.conf m) then took m (stepᴹ (Mach.conf m)) else fire m (Mach.timers m)
-
-  step : Mach → Step
-  step m = if calm (Mach.conf m) then turned m (Mach.turns m) else took m (stepᴹ (Mach.conf m))
-
-  begin : Obs Timeline [] R → Mach
-  begin o = mach (load o) 0 [] []
+  step : Conf R → Step
+  step c = took (stepᴹ c)
 
   ------------------------------------------------------------------------
   -- The run
@@ -221,43 +154,44 @@ module Driver (R : Set) where
   open Trace∞
 
   mutual
-    trace : Mach → Trace
+    trace : Conf R → Trace
     trace m = shown (step m)
 
     shown : Step → Trace
-    shown (silent m)      = tau (Mach.clock m) λ where .force → trace m
+    shown (silent t m)    = tau t λ where .force → trace m
     shown (value t p a m) = out t p a λ where .force → trace m
     shown (complete p)    = end p
     shown drained         = idle
 
-  -- What a reader of the first n steps has: where each value was shown,
-  -- each value at its clock, and how the run stood — cut at the last clock
-  -- seen, complete, or dry.  A completion is placed too.  A step past the
-  -- horizon cuts it there: a looping program works forever, so it is read
-  -- up to a time.
+  ------------------------------------------------------------------------
+  -- The run, read as `operation.PureObservable` reads its own
+
   record Read : Set where
     constructor read
     field
-      marks  : List Pos
-      log    : List (Time × R)
-      ending : End
-  open Read public
+      marks   : List Pos
+      log     : List (Time × R)
+      endedAs : End
 
   noted : Pos → Time × R → Read → Read
-  noted p x r = read (p ∷ marks r) (x ∷ log r) (ending r)
+  noted p x r = read (p ∷ Read.marks r) (x ∷ Read.log r) (Read.endedAs r)
 
-  reading : Time → ℕ → Time → Trace → Read
-  reading h zero    c _             = read [] [] (cutOff c)
-  reading h (suc n) c (tau t k)     = if h <ᵇ t then read [] [] (cutOff c) else reading h n t (force k)
-  reading h (suc n) c (out t p a k) = if h <ᵇ t then read [] [] (cutOff c) else noted p (t , a) (reading h n t (force k))
-  reading h (suc n) c (end p)       = read [ p ] [] finished
-  reading h (suc n) c idle          = read [] [] dryᴱ
+  later : Time → Time → Time
+  later c t = if c <ᵇ t then t else c
 
-  -- The first n steps of a program's run, up to tick h, as a timeline.
-  prefix : ℕ → Time → Obs Timeline [] R → ML R
-  prefix n h o = frames (log r) (ending r)
-    where r = reading h n 0 (trace (begin o))
+  -- `c` the last time seen; a step past the horizon cuts the run there.
+  reading : Time → ℕ → Time → Conf R → Read
+  reading h zero    c k = read [] [] (cutOff c)
+  reading h (suc n) c k with step k
+  ... | silent t k′    = if h <ᵇ t then read [] [] (cutOff c) else reading h n (later c t) k′
+  ... | value t p a k′ = if h <ᵇ t then read [] [] (cutOff c) else noted p (t , a) (reading h n t k′)
+  ... | complete p     = read [ p ] [] finished
+  ... | drained        = read [] [] dryᴱ
 
--- THE PURE OPERATIONAL SEMANTICS: a program's first n steps up to tick h.
-run : ∀ {R} → ℕ → Time → Obs Timeline [] R → ML R
+  prefix : ℕ → Time → PureObs [] R → ML R
+  prefix n h o = frames (Read.log r) (Read.endedAs r)
+    where r = reading h n 0 (load o)
+
+-- THE PURE SEMANTICS: a program's first n steps up to tick h.
+run : ∀ {R} → ℕ → Time → PureObs [] R → ML R
 run {R} = Driver.prefix R

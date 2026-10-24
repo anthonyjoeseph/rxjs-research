@@ -4,9 +4,8 @@
 -- the world: user-written colds that may perform IO feed it their
 -- emissions, and what it shows and tears down is done for real.  Every
 -- transition is the one the pure runtime (`operation.PureObservable`)
--- takes; only the
--- driver is unproven, and it is checked against the TypeScript by the
--- oracle.
+-- takes; only the driver is unproven, and it is checked against the
+-- TypeScript by the oracle.
 --
 -- Nothing is coerced.  The driver keeps no typed state of its own: a
 -- cold's emissions wait in its own leaf's inbox, and the cold names its
@@ -36,19 +35,30 @@
 -- closed with `fixIO`, exported for colds that loop.  Every fixpoint it
 -- takes is an IO action: one may run forever, but none is a value of any
 -- other type, so nothing proves anything with it.
+--
+-- Before a delivery the driver runs the machine while the least mark is
+-- earlier than the least mark before the delivery.
+--
+-- The driver MAKES the positions IO does not have.  A cold delivering
+-- during its own `subscription`, begun at `u`, delivers its i-th at
+-- `u ++ [ix i]`, as a pure cold's subscribe burst does.  Any other
+-- delivery comes when the machine has nothing owed, so it starts a fresh
+-- root of its own, past every one before it.  Its leaves are never due:
+-- what a cold makes is pushed, never scheduled.
 module operation.Observable where
 
 open import Agda.Builtin.IO using (IO)
 open import Data.Bool using (Bool; true; false; not; _∧_; _∨_; if_then_else_)
-open import Data.List using (List; _∷_; []; _++_)
+open import Data.List using (List; _∷_; []; _++_; [_])
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; _≤ᵇ_)
-open import Data.Product using (_,_)
+open import Data.Nat using (ℕ; suc)
+open import Data.Product using (_×_; _,_)
 open import Data.Unit using (⊤; tt)
 open import IO.Primitive.Core using (pure; _>>=_)
 
+open import denotation.MonotonicList.Events using (Pos; ix)
+open import operation.Key using (Key; _<ᴷ_)
 open import Tree using (Obs)
-open import denotation.MonotonicList.Events using (Pos)
 
 ------------------------------------------------------------------------
 -- Haskell's refs
@@ -183,24 +193,6 @@ record Slot : Set where
 Observable : Set → Set₁
 Observable = Obs IOCold []
 
--- What the driver keeps at a started cold: what it has made and the
--- machine not yet taken in, oldest first — a value, or `nothing` for its
--- completion — and its slot.  A cold's `produce` reaches its leaf by
--- path, and reads the leaf's own inbox there, so every value goes in at
--- the type the machine has at that leaf.
-record Leaf (A : Set) : Set₁ where
-  field
-    inbox : IORef (List (Maybe A))
-    slot  : Slot
-
-import operation.AbstractObservable
-module Machine = operation.AbstractObservable IOCold Leaf
-open Machine using (Conf; Stepped; moved; starting; Shown; Torn; Ev; nx; cp; load; Poke; gone; leaf; poke; spot; calm; depth)
-  renaming (step to stepᴹ)
-
-------------------------------------------------------------------------
--- The driver's state
-
 -- The machine's configuration lives in `Set₁`, so its ref is one level up.
 postulate
   IORef₁      : Set₁ → Set
@@ -213,10 +205,32 @@ postulate
 {-# COMPILE GHC readIORef₁ = \ _ -> Data.IORef.readIORef #-}
 {-# COMPILE GHC writeIORef₁ = \ _ -> Data.IORef.writeIORef #-}
 
+-- What the driver keeps at a started cold: what it has made and the
+-- machine not yet taken in, oldest first — a value, or `nothing` for its
+-- completion — its slot, and, while its `subscription` runs, where it
+-- was begun and its next value's index.
+record Leaf (A : Set) : Set₁ where
+  field
+    inbox : IORef (List (Maybe A))
+    slot  : Slot
+    burst : IORef (Maybe (Pos × ℕ))
+
+never : ∀ {A} → Leaf A → Maybe Key
+never _ = nothing
+
+unseen : ∀ {A} → Leaf A → Maybe (Maybe A)
+unseen _ = nothing
+
+import operation.AbstractObservable
+module Machine = operation.AbstractObservable IOCold Leaf never unseen
+open Machine using (Conf; Stepped; moved; starting; turn; quiet; Shown; Torn; Ev; nx; cp; load; Poke; gone; leaf; poke; spot; calm; next)
+  renaming (step to stepᴹ)
+
 record Loop (R : Set) : Set where
   field
-    lock   : Lock
-    conf   : IORef₁ (Conf R)
+    lock  : Lock
+    conf  : IORef₁ (Conf R)
+    roots : IORef ℕ
 
 private
   atomically : ∀ {R a} {X : Set a} → Loop R → IO X → IO X
@@ -227,19 +241,18 @@ private
     nothing  → pure tt
     (just t) → writeIORef (Slot.tearDown sl) nothing >> t
 
-------------------------------------------------------------------------
--- THE IO DRIVER: the shared machine, fed by the world
+-- Whether the least mark still runs under a bound: under none, while any
+-- is owed; else while it is earlier than the bound.
+below : Maybe Key → Maybe Key → Bool
+below _        nothing  = false
+below nothing  (just _) = true
+below (just b) (just k) = k <ᴷ b
 
 module Drive {R : Set} (lp : Loop R) (c : IO ⊤) where
-  -- What the driver does, as one recursion closed with `fixIO`: run the
-  -- machine until it is calm with no more than `d` jobs owed; or take in
-  -- what the cold at a path has made.
   data Call : Set where
-    settling : ℕ → Call
+    settling : Maybe Key → Call
     pulse    : List ℕ → Call
 
-  -- rxjs's `closed`, for the cold at a path: gone, ended, or its
-  -- observer closed.
   asked : Poke R → Bool
   asked gone              = true
   asked (leaf b _ cl _ _) = not b ∨ cl
@@ -252,7 +265,6 @@ module Drive {R : Set} (lp : Loop R) (c : IO ⊤) where
   shown ((_ , nx a) ∷ s) = shown s
   shown ((_ , cp) ∷ s)   = c >> shown s
 
-  -- The colds an unsubscribe reached: spent, then torn down.
   tear : Torn → IO ⊤
   tear []             = pure tt
   tear ((_ , l) ∷ ls) = writeIORef (Slot.spent (Leaf.slot l)) true >> runTeardown (Leaf.slot l) >> tear ls
@@ -260,65 +272,66 @@ module Drive {R : Set} (lp : Loop R) (c : IO ⊤) where
   push : ∀ {A} → Leaf A → Maybe A → IO ⊤
   push l e = readIORef (Leaf.inbox l) >>= λ es → writeIORef (Leaf.inbox l) (es ++ e ∷ [])
 
-  -- What a cold made, as the machine takes it: IO knows no positions.
-  delivered : ∀ {A} → (Ev A → Leaf A → Bool → Pos → Conf R) → Leaf A → Maybe A → Conf R
-  delivered dv l (just a) = dv (nx a) l true []
-  delivered dv l nothing  = dv cp l false []
+  -- Where a delivery goes: in its cold's subscribe burst, or a fresh root.
+  placed : ∀ {A} → Leaf A → IO Pos
+  placed l = readIORef (Leaf.burst l) >>= λ where
+    (just (u , i)) → writeIORef (Leaf.burst l) (just (u , suc i)) >> pure (u ++ [ ix i ])
+    nothing        → readIORef (Loop.roots lp) >>= λ n → writeIORef (Loop.roots lp) (suc n) >> pure [ ix (suc n) ]
+
+  delivered : ∀ {A} → (Ev A → Leaf A → Bool → Pos → Conf R) → Leaf A → Maybe A → Pos → Conf R
+  delivered dv l (just a) p = dv (nx a) l true p
+  delivered dv l nothing  p = dv cp l false p
 
   module Body (self : Call → IO ⊤) where
-    settle : ℕ → IO ⊤
-    settle d = self (settling d)
+    settle : Maybe Key → IO ⊤
+    settle b = self (settling b)
 
-    -- A cold subscribed: its leaf made and the machine resumed at it,
-    -- then its `subscription` run, each `produce` taken in as it is made.
-    started : ∀ {A} → IOCold A → (Leaf A → Conf R) → ℕ → IO ⊤
-    started x k d =
-      newIORef [] >>= λ ib → newIORef false >>= λ sp → newIORef nothing >>= λ td →
+    started : ∀ {A} → IOCold A → Pos → (Leaf A → Conf R) → Maybe Key → IO ⊤
+    started x u k b =
+      newIORef [] >>= λ ib → newIORef false >>= λ sp → newIORef nothing >>= λ td → newIORef (just (u , 0)) >>= λ bs →
       let sl = record { spent = sp ; tearDown = td }
-          l  = record { inbox = ib ; slot = sl }
+          l  = record { inbox = ib ; slot = sl ; burst = bs }
           k′ = k l
           π  = spot k′
           st = IOCold.create x (record
             { produce  = λ a → atomically lp (unless sp (push l (just a) >> self (pulse π)))
             ; complete = atomically lp (unless sp (push l nothing >> self (pulse π) >> runTeardown sl))
-            ; closed   = atomically lp (readIORef sp >>= λ b → if b then pure true else ask π) })
+            ; closed   = atomically lp (readIORef sp >>= λ d → if d then pure true else ask π) })
       in writeIORef₁ (Loop.conf lp) k′ >>
          Started.subscription st >>= λ i →
+         writeIORef bs nothing >>
          writeIORef td (just (Started.teardown st i)) >>
-         readIORef sp >>= λ b → (if b then runTeardown sl else pure tt) >>
-         settle d
+         readIORef sp >>= λ d → (if d then runTeardown sl else pure tt) >>
+         settle b
 
-    taken : Stepped R → ℕ → IO ⊤
-    taken (moved k s t)    d = writeIORef₁ (Loop.conf lp) k >> shown s >> tear t >> settle d
-    taken (starting x _ k) d = started x k d
+    taken : Stepped R → Maybe Key → IO ⊤
+    taken (moved k s t)    b = writeIORef₁ (Loop.conf lp) k >> shown s >> tear t >> settle b
+    taken (starting x u k) b = started x u k b
+    taken (turn _)         b = pure tt
+    taken quiet            b = pure tt
 
     -- The oldest thing a cold made, delivered if the cold is still live;
-    -- the machine then run back down to the jobs owed before it.
-    pulsed : ℕ → Poke R → IO ⊤
-    pulsed d gone                = pure tt
-    pulsed d (leaf b l cl dv st) = readIORef (Leaf.inbox l) >>= λ where
+    -- the machine then run while what it owes is earlier than what it
+    -- owed before.
+    pulsed : Maybe Key → Poke R → IO ⊤
+    pulsed b gone                = pure tt
+    pulsed b (leaf v l cl dv st) = readIORef (Leaf.inbox l) >>= λ where
       []       → pure tt
       (e ∷ es) → writeIORef (Leaf.inbox l) es >>
-                 (if b then writeIORef₁ (Loop.conf lp) (delivered dv l e) >> settle d else pure tt)
+                 (if v then placed l >>= (λ p → writeIORef₁ (Loop.conf lp) (delivered dv l e p) >> settle b) else pure tt)
 
     call : Call → IO ⊤
-    call (settling d) = readIORef₁ (Loop.conf lp) >>= λ k →
-      if calm k ∧ (depth k ≤ᵇ d) then pure tt else taken (stepᴹ k) d
-    call (pulse π)    = readIORef₁ (Loop.conf lp) >>= λ k → if calm k then pulsed (depth k) (poke π k) else pure tt
+    call (settling b) = readIORef₁ (Loop.conf lp) >>= λ k →
+      if calm k ∧ not (below b (next k)) then pure tt else taken (stepᴹ k) b
+    call (pulse π)    = readIORef₁ (Loop.conf lp) >>= λ k → if calm k then pulsed (next k) (poke π k) else pure tt
 
   drive : Call → IO ⊤
   drive = fixIO′ Body.call
 
-------------------------------------------------------------------------
--- The entry point
-
--- THE ENTRY POINT, as rxjs's `subscribe()`: what the program does is done
--- by its colds; its values are dropped.  The subscribe burst runs under
--- the lock; then it waits for the root to complete, which a cold's thread
--- may bring about at any time.
+-- THE ENTRY POINT, as `operation.Observable.subscribe`.
 subscribe : ∀ {A} → Observable A → IO ⊤
 subscribe o =
-  newLock >>= λ lk → newSignal >>= λ wk → newIORef false >>= λ fin → newIORef₁ (load o) >>= λ k →
-  let lp = record { lock = lk ; conf = k } in
-  withLock lk (Drive.drive lp (writeIORef fin true >> raise wk) (Drive.settling 0)) >>
+  newLock >>= λ lk → newSignal >>= λ wk → newIORef false >>= λ fin → newIORef₁ (load o) >>= λ k → newIORef 0 >>= λ rs →
+  let lp = record { lock = lk ; conf = k ; roots = rs } in
+  withLock lk (Drive.drive lp (writeIORef fin true >> raise wk) (Drive.settling nothing)) >>
   readIORef fin >>= λ d → if d then pure tt else await wk

@@ -31,10 +31,11 @@ import Tree as T
 open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush; Pos; Label; ix; sub; last; _<ᵖ_; root; Timeline)
 open import denotation.MonotonicList using (observe)
 open import denotation.Unfold using (⟦_⟧ˢ; [])
-open import operation.PureObservable using (module Driver)
+open import operation.PureObservable using (module Driver; module Machine)
 open import quickcheck.Code using (script; timeline; module Leaf)
 
-open Driver ℕ using (Trace; Trace∞; tau; out; end; idle; trace; begin)
+open Driver ℕ using (Trace; Trace∞; tau; out; end; idle; trace)
+open Machine using (load)
 
 -- A position, printed.
 mutual
@@ -91,11 +92,11 @@ private
 
 -- Each side's first `n` events, the same.
 progress : ℕ → Obs Timeline [] ℕ → Bool
-progress n o = sameAll (run n budget (trace (begin o))) (meant n budget (observe (⟦ o ⟧ˢ []) root))
+progress n o = sameAll (run n budget (trace (load o))) (meant n budget (observe (⟦ o ⟧ˢ []) root))
 
 -- Each side's first `n` events.
 progressWhy : ℕ → Obs Timeline [] ℕ → List String
-progressWhy n o = "machine:" ∷ shows (run n budget (trace (begin o)))
+progressWhy n o = "machine:" ∷ shows (run n budget (trace (load o)))
                ++ "meaning:" ∷ shows (meant n budget (observe (⟦ o ⟧ˢ []) root))
   where
         showE : Ev → String

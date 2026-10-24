@@ -31,8 +31,6 @@ open import denotation.MonotonicList.Events using (ML; Burst; Burst∞; ML∞; d
 open import denotation.MonotonicList using (observe; ticks)
 open import denotation.Denote using (⟦_⟧[_])
 open import operation.PureObservable using () renaming (run to runᴾ)
-open import port.operation.PureObservable using () renaming (run to runᴹ)
-open import port.operation.Observable using () renaming (subscribe to subscribeᴹ)
 open import operation.Observable using (IORef; IOCold; Emit; Observable; subscribe; forkIO; Signal; newSignal; raise; await; newIORef; readIORef; writeIORef)
 open import quickcheck.Clock using (Clock; newClock; fire; fromTimeline)
 import Tree as T
@@ -116,10 +114,6 @@ horizon = 100
 pureTrace : ∀ {t} → ℕ → ℕ → Prog t → Trace ⟦ t ⟧ᵀ
 pureTrace u n p = traceML n (runᴾ (200 * n) horizon (toObs timeline u p [] [] []))
 
--- The pointer-free engine's pure semantics (`port.operation.PureObservable`), under the same budget.
-marksTrace : ∀ {t} → ℕ → ℕ → Prog t → Trace ⟦ t ⟧ᵀ
-marksTrace u n p = traceML n (runᴹ (200 * n) horizon (toObs timeline u p [] [] []))
-
 ------------------------------------------------------------------------
 -- JSON
 
@@ -191,16 +185,11 @@ ioTraceWith {t} sub u p =
 ioTrace : ∀ {t} → ℕ → Prog t → IO (Trace ⟦ t ⟧ᵀ)
 ioTrace = ioTraceWith subscribe
 
--- The same, through the pointer-free engine's IO runtime (`port.operation.Observable`).
-marksIoTrace : ∀ {t} → ℕ → Prog t → IO (Trace ⟦ t ⟧ᵀ)
-marksIoTrace = ioTraceWith subscribeᴹ
-
 data Engine : Set where
-  denotational pureOp ioOp marksIoOp : Engine
+  denotational pureOp ioOp : Engine
 
 -- `u` bounds each `μ`'s unfolding; `n` bounds a pure trace.
 oracle : ∀ {t} → Engine → ℕ → ℕ → Prog t → IO ⊤
 oracle {t} denotational u n p = putStrLn (showTrace t (denoteTrace u n p))
 oracle {t} pureOp       u n p = putStrLn (showTrace t (pureTrace u n p))
 oracle {t} ioOp         u n p = ioTrace u p >>= λ tr → putStrLn (showTrace t tr)
-oracle {t} marksIoOp    u n p = marksIoTrace u p >>= λ tr → putStrLn (showTrace t tr)
