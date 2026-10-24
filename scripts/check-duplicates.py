@@ -364,6 +364,12 @@ def collisions(buckets):
     ClashingDefinition Agda will raise itself."""
     out = []
     for ty, ds in buckets.items():
+        # THE PORT'S MIRROR (Tier 0): a `port/` declaration wearing the
+        # name of one outside `port/` is that declaration carried over,
+        # and the two never meet — the old one is deleted when the port
+        # replaces it.  Delete this with `make port-check`.
+        olds = {d[0] for d in ds if not d[1].startswith("port/")}
+        ds = [d for d in ds if not (d[1].startswith("port/") and d[0] in olds)]
         sites = {(d[0], d[1]) for d in ds}
         names = sorted({d[0] for d in ds})
         if len(sites) < 2:

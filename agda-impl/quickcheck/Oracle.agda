@@ -31,8 +31,8 @@ open import denotation.MonotonicList.Events using (ML; Burst; Burst∞; ML∞; d
 open import denotation.MonotonicList using (observe; ticks)
 open import denotation.Denote using (⟦_⟧[_])
 open import operation.PureObservable using () renaming (run to runᴾ)
-open import operation.MarkedPure using () renaming (run to runᴹ)
-open import operation.MarkedObservable using () renaming (subscribe to subscribeᴹ)
+open import port.operation.PureObservable using () renaming (run to runᴹ)
+open import port.operation.Observable using () renaming (subscribe to subscribeᴹ)
 open import operation.Observable using (IORef; IOCold; Emit; Observable; subscribe; forkIO; Signal; newSignal; raise; await; newIORef; readIORef; writeIORef)
 open import quickcheck.Clock using (Clock; newClock; fire; fromTimeline)
 import Tree as T

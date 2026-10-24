@@ -1,12 +1,12 @@
 {-# OPTIONS --guardedness #-}
 
--- SPIKE: THE PURE RUNTIME OVER `operation.Marked`.  A cold leaf keeps
+-- THE PURE RUNTIME OVER `port.operation.AbstractObservable`.  A cold leaf keeps
 -- the frame it plays — the cascade it sits in, its next index — or the
 -- completion it owes; that is its mark's key.  A frame's later frames
 -- are the same leaf, rekeyed under the timer cascade `Unfold` places them
 -- in.  So the driver keeps nothing: no clock, no timers, no turns, no
 -- depths.  The run's time is the tick of the position it is at.
-module operation.MarkedPure where
+module port.operation.PureObservable where
 
 open import Data.Bool using (true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_; [_])
@@ -53,8 +53,12 @@ opening : ∀ {A} → Pos → From A 0 → Tape A
 opening p (at zero _ b) = play (tick p) p 0 0 b
 opening p m             = rest (tick p) (p ++ [ last ]) m
 
-import operation.Marked
-module Machine = operation.Marked Timeline Tape due peek
+-- A program the pure runtime runs: colds are timelines.
+PureObs : List Set → Set → Set₁
+PureObs = Obs Timeline
+
+import port.operation.AbstractObservable
+module Machine = port.operation.AbstractObservable Timeline Tape due peek
 open Machine using (Conf; Stepped; moved; starting; turn; quiet; load; Poke; gone; leaf; nx; cp)
   renaming (step to stepᴹ)
 
@@ -117,10 +121,10 @@ module Driver (R : Set) where
   ... | complete p     = read [ p ] [] finished
   ... | drained        = read [] [] dryᴱ
 
-  prefix : ℕ → Time → Obs Timeline [] R → ML R
+  prefix : ℕ → Time → PureObs [] R → ML R
   prefix n h o = frames (Read.log r) (Read.endedAs r)
     where r = reading h n 0 (load o)
 
--- THE SPIKE'S PURE SEMANTICS: a program's first n steps up to tick h.
-run : ∀ {R} → ℕ → Time → Obs Timeline [] R → ML R
+-- THE PURE SEMANTICS: a program's first n steps up to tick h.
+run : ∀ {R} → ℕ → Time → PureObs [] R → ML R
 run {R} = Driver.prefix R

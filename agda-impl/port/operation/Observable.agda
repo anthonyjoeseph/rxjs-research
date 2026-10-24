@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
--- SPIKE: THE IO RUNTIME OVER `operation.Marked`.  `operation.Observable`'s
+-- THE IO RUNTIME OVER `port.operation.AbstractObservable`.  `operation.Observable`'s
 -- driver, its colds, lock and refs reused, with the machine's job depth
 -- replaced by keys.  Nothing in it knows a depth: where today's driver
 -- runs the machine back down to the jobs owed before a delivery, this one
@@ -13,7 +13,7 @@
 -- delivery comes when the machine has nothing owed, so it starts a fresh
 -- root of its own, past every one before it.  Its leaves are never due:
 -- what a cold makes is pushed, never scheduled.
-module operation.MarkedObservable where
+module port.operation.Observable where
 
 open import Agda.Builtin.IO using (IO)
 open import Data.Bool using (Bool; true; false; not; _∧_; _∨_; if_then_else_)
@@ -51,8 +51,8 @@ never _ = nothing
 unseen : ∀ {A} → Leaf A → Maybe (Maybe A)
 unseen _ = nothing
 
-import operation.Marked
-module Machine = operation.Marked IOCold Leaf never unseen
+import port.operation.AbstractObservable
+module Machine = port.operation.AbstractObservable IOCold Leaf never unseen
 open Machine using (Conf; Stepped; moved; starting; turn; quiet; Shown; Torn; Ev; nx; cp; load; Poke; gone; leaf; poke; spot; calm; next)
   renaming (step to stepᴹ)
 

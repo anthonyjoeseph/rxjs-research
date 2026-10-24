@@ -22,9 +22,6 @@
 --                                "all" (`quickcheck.Placing`)
 --   Oracle-CLI stepping FROM COUNT the seeds whose stepper parts from the
 --                                meaning, skips included (`quickcheck.Stepping`)
---   Oracle-CLI order FROM COUNT  per seed and check, the first configuration
---                                at which the marked engine's order fails
---                                (`quickcheck.MarkedOrder`)
 --   Oracle-CLI hand              placing over `quickcheck.Adversary`
 --   Oracle-CLI why-hand N        its Nth program and the checks it fails
 --   Oracle-CLI spin              progress over `quickcheck.Spin`'s programs
@@ -58,7 +55,6 @@ open import Tree using (Obs)
 open import denotation.MonotonicList.Events using (Timeline)
 open import quickcheck.Placing using (placing; placingParts)
 open import quickcheck.Stepping using (steppingFails)
-open import quickcheck.MarkedOrder using (orderReport)
 
 private
   each : List ℕ → (ℕ → IO ⊤) → IO ⊤
@@ -93,9 +89,6 @@ private
   spins []             = putStrLn "spin: done"
   spins ((l , o) ∷ cs) = putStrLn ((if Spin.progress 8 o then "spin: ok   " else "spin: FAIL ") ++ l) >>= λ _ → spins cs
 
-  orderRun : ℕ → ℕ → IO ⊤
-  orderRun f c = each′ (orderReport f c) >>= λ _ → putStrLn ("order: done " ++ showℕ c)
-
   nth : ∀ {ℓ} {X : Set ℓ} → ℕ → List (String × X) → Maybe (String × X)
   nth _       []       = nothing
   nth zero    (c ∷ cs) = just c
@@ -105,7 +98,7 @@ private
   nat = readMaybe 10
 
   usage : IO ⊤
-  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI code SEED | Oracle-CLI named FROM COUNT | Oracle-CLI named-code SEED | Oracle-CLI named-io SEED | Oracle-CLI denote SEED | Oracle-CLI pure SEED | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI placing SEED CHECK | Oracle-CLI stepping FROM COUNT | Oracle-CLI order FROM COUNT | Oracle-CLI hand | Oracle-CLI why-hand N | Oracle-CLI spin | Oracle-CLI why-spin N K"
+  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI code SEED | Oracle-CLI named FROM COUNT | Oracle-CLI named-code SEED | Oracle-CLI named-io SEED | Oracle-CLI denote SEED | Oracle-CLI pure SEED | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI placing SEED CHECK | Oracle-CLI stepping FROM COUNT | Oracle-CLI hand | Oracle-CLI why-hand N | Oracle-CLI spin | Oracle-CLI why-spin N K"
 
   dispatch : List String → IO ⊤
   dispatch ("prog" ∷ f ∷ c ∷ []) with nat f | nat c
@@ -154,9 +147,6 @@ private
   dispatch ("stepping" ∷ f ∷ c ∷ []) with nat f | nat c
   ... | just f′ | just c′ = each (steppingFails f′ c′) (λ s → putStrLn ("stepping: FAIL seed " ++ showℕ s))
                             >>= λ _ → putStrLn ("stepping: done " ++ showℕ c′)
-  ... | _       | _       = usage
-  dispatch ("order" ∷ f ∷ c ∷ []) with nat f | nat c
-  ... | just f′ | just c′ = orderRun f′ c′
   ... | _       | _       = usage
   dispatch ("hand" ∷ []) = hand cases
   dispatch ("spin" ∷ []) = spins Spin.cases

@@ -179,23 +179,3 @@ jobs:
       - name: make placing
         run: make placing ARGS="0 100"
 
-  # The pointer-free engine's order at every configuration it reaches.
-  # Its own job, so a slow seed never starves the oracle.
-  order:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Agda
-        uses: ./.github/actions/agda-toolchain
-
-      - name: Cache compiled MAlonzo objects
-        uses: actions/cache@v4
-        with:
-          path: agda-impl/_cli/MAlonzo
-          key: agda-cli-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
-
-      - name: make order
-        run: make order

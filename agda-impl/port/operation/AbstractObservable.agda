@@ -3,7 +3,7 @@
 open import Data.Maybe using (Maybe; just; nothing) renaming (map to mapᴹ)
 open import operation.Key using (Key; at; after; _<ᴷ_)
 
--- SPIKE: THE ENGINE WITH NO POINTERS.  `operation.AbstractObservable`'s
+-- THE ENGINE WITH NO POINTERS.  `operation.AbstractObservable`'s
 -- typed zipper, with every continuation it keeps on its job stack moved
 -- onto the node that owns it, as a MARK keyed by when it runs
 -- (`operation.Key`).  Once what runs now is absorbed, the least-keyed
@@ -28,7 +28,7 @@ open import operation.Key using (Key; at; after; _<ᴷ_)
 -- its `last`.  The least mark is the one `denotation.Unfold.step` races
 -- first: each candidate is keyed by where its event sits as its parent
 -- sees it, and every tie goes as the stepper's does.
-module operation.Marked (C L : Set → Set₁) (due : ∀ {A} → L A → Maybe Key) (peek : ∀ {A} → L A → Maybe (Maybe A)) where
+module port.operation.AbstractObservable (C L : Set → Set₁) (due : ∀ {A} → L A → Maybe Key) (peek : ∀ {A} → L A → Maybe (Maybe A)) where
 
 open import Data.List using (List; []; _∷_; _++_; [_]; length; null)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -36,10 +36,11 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; zero; suc; pred; _≡ᵇ_; _<ᵇ_)
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
 open import Data.Product using (Σ; _×_; _,_; proj₁)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList.Events using (Pos; ix; last; root; _<ᵖ_) renaming (sub to subᴾ)
+open import denotation.Unfold using (same?)
 
 data Ev (A : Set) : Set where
   nx : A → Ev A
@@ -229,11 +230,6 @@ unsubIf false s = s , []
 
 ------------------------------------------------------------------------
 -- A connect's feed, pushed into each of its live joiners
-
-same? : ∀ {Γ : List Set} {A B : Set} → A ∈ Γ → B ∈ Γ → Maybe (A ≡ B)
-same? (here refl) (here refl) = just refl
-same? (there i)   (there j)   = same? i j
-same? _           _           = nothing
 
 -- A step at `p` queued last for a joiner joined at `j`, as
 -- `denotation.Unfold.fed` and `denotation.Unfold.told` queue it: under

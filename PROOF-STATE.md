@@ -2,6 +2,20 @@
 
 Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
+## Tier 0 — the port
+
+**Port:** `adequacy.Adequacy` carried to the pointer-free engine in `port/`, old names only (`make port-check`): no grid in the preservation half.
+
+### Ledger
+
+#### THE PORTED LINK
+
+Untried: whether the old bodies of these carry to the pointer-free engine's
+read, or must each be postulated over it. Settled when each is a ported
+body, or its own old body is postulated in `port/` beneath it.
+
+Members: `content`, `reached`.
+
 ## Tier 1 — the adequacy theorem
 
 **Adequacy:** the denotation matches the operational semantics.

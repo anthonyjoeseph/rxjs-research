@@ -15,7 +15,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; Time)
 open import operation.PureObservable using (module Pure; module Driver)
-import operation.MarkedPure as M
+import port.operation.PureObservable as M
 open import quickcheck.Code using (Prog; toObs; timeline)
 open import quickcheck.Ty using (natᵗ)
 open import quickcheck.Bug-Cache using (cases)
