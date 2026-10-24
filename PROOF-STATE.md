@@ -11,12 +11,11 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE SILENT RUN
 
 Each silent step lowers `work` or is a skipped step (an outer value, a lane's
-completion under a queue, a source's rise, a defer begun, a frame's stall or
-close); whether each skipped step drops a leading skip of the meaning.
-Settled when the six are bodies, or refuted.
+completion under a queue, a defer begun, a frame's stall or close); whether
+each skipped step drops a leading skip of the meaning. Settled when the five
+are bodies, or refuted.
 
-Members: `outer-drop`, `lane-drop`, `src-drop`, `defer-drop`, `stall-drop`,
-`close-drop`.
+Members: `outer-drop`, `lane-drop`, `defer-drop`, `stall-drop`, `close-drop`.
 
 #### THE KEPT DEPTH
 

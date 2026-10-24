@@ -32,7 +32,7 @@ open import quickcheck.Spin using (showP)
 
 open Driver ℕ using (Step; step; silent; value; complete; drained)
 open Ghosting ℕ using (work; Measure)
-open Machine using (Conf; ⟨_,_,_,_⟩; load; spot; subscribing; absorbed; rising; nx; cp; pend; coldS; top; inOuter; inLanes; inSrc;
+open Machine using (Conf; ⟨_,_,_,_⟩; load; spot; subscribing; absorbed; rising; nx; cp; pend; coldS; top; inOuter; inLanes;
   plug; closed; alive; search; found; leafM)
 
 private
@@ -73,7 +73,6 @@ private
   skippedᵇ : Conf ℕ → Bool
   skippedᵇ ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩         = true
   skippedᵇ ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ = alive s
-  skippedᵇ ⟨ inSrc k b c , s , rising e , p ⟩                           = true
   skippedᵇ ⟨ c , pend (defer l) , subscribing , p ⟩                     = true
   skippedᵇ ⟨ c , s , absorbed , p ⟩ with search top (plug c s)
   ... | just (found (Γ′ , A′ , c′ , coldS true (play τ u i t (stall k))) leafM key) = not (closed c′)

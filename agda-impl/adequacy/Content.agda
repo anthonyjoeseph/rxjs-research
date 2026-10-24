@@ -57,8 +57,8 @@ open Events∞ using (force)
 module Honesty (R : Set) where
   open Driver R using (Step; silent; value; complete; drained; step; reading; Read; read; later; played; took)
   open Machine using (Conf; ⟨_,_,_,_⟩; load; moved; starting; turn; quiet; gone; leaf; nx; cp; St; pend; coldS; Ctx; top; inOuter; inLanes;
-    inSrc; plug; closed; alive; search; found; leafM; subscribing; absorbed; rising) renaming (step to stepᴹ)
-  open Spending R using (Skipped; outerᵏ; laneᵏ; srcᵏ; deferᵏ; stallᵏ; closeᵏ; silent-spent)
+    plug; closed; alive; search; found; leafM; subscribing; absorbed; rising) renaming (step to stepᴹ)
+  open Spending R using (Skipped; outerᵏ; laneᵏ; deferᵏ; stallᵏ; closeᵏ; silent-spent)
   open Pure R using (End; finished; dry; cutOff)
   open Unsubbing R using (_⇝_; now; then)
   open Ghosting R using (Sent; sentHere; sentLater; Alike; residual; Reached; launchedʰ; silentʰ; valueʰ;
@@ -243,9 +243,6 @@ module Honesty (R : Set) where
               → alive s ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
               → step ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ ≡ silent t m′
               → Drop ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ m′
-    src-drop : ∀ {Γ X B k} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {s : St Γ X} {e p t m′}
-             → Inv ⟨ inSrc k b c , s , rising e , p ⟩ → step ⟨ inSrc k b c , s , rising e , p ⟩ ≡ silent t m′
-             → Drop ⟨ inSrc k b c , s , rising e , p ⟩ m′
     defer-drop : ∀ {Γ A} {c : Ctx R Γ A} {l p t m′}
                → Inv ⟨ c , pend (defer l) , subscribing , p ⟩ → step ⟨ c , pend (defer l) , subscribing , p ⟩ ≡ silent t m′
                → Drop ⟨ c , pend (defer l) , subscribing , p ⟩ m′
@@ -262,7 +259,6 @@ module Honesty (R : Set) where
   skipped-drop : ∀ {m t m′} → Inv m → step m ≡ silent t m′ → Skipped m → Drop m m′
   skipped-drop iv e outerᵏ          = outer-drop iv e
   skipped-drop iv e (laneᵏ al)      = lane-drop al iv e
-  skipped-drop iv e srcᵏ            = src-drop iv e
   skipped-drop iv e deferᵏ          = defer-drop iv e
   skipped-drop iv e (stallᵏ eq ce)  = stall-drop eq ce iv e
   skipped-drop iv e (closeᵏ eq ce)  = close-drop eq ce iv e
