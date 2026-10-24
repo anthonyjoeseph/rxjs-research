@@ -10,11 +10,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SILENT RUN
 
-Untried: a measure of the control (`work`) falling on every silent step that
-keeps the configuration's meaning exactly: rises, begins, mark runs. Settled
-when `work` is a definition and `silent-work` a body, or refuted.
+Probed: `work` (owed counts, then calm, then flight height) falling on every
+silent step that keeps the configuration's meaning exactly. Open: whether an
+emission absorbed with the meaning unchanged can leave it level. Settled when
+`silent-work` is a body, or refuted.
 
-Members: `silent-work`, `work`.
+Members: `silent-work`.
 
 #### THE KEPT DEPTH
 
