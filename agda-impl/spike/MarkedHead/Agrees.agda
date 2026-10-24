@@ -21,7 +21,7 @@ open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; 
   Out; still; shows; Cand; seek; first; retag; mapT; cutT; nx; cp; attached; attAt; raceT; outerT; laneT; lanes; inOuter; inLanes; inLn;
   CS; cs; inSrc; inBody; own; ownBest; shift; over; sourceT; bodyM; owedM) renaming (found to foundᴹ)
 open import spike.MarkedGhost using (gh; lane; lanesL; deadL; outerG; poolG)
-open import spike.MarkedHead using (Agrees; Conn; Done; Frag; Head; HeadAt; Lanes; NoConn; Quiet; []; _∷_; att-head; calm; cand; done-head; done-step; early; exact; hush-quiet; map-head; none; of-head; off-head; off-quiet; on-head; pool-step; quiet-first; quiet-hush; rest-hush)
+open import spike.MarkedHead using (cold-head; Agrees; Conn; Done; Frag; Head; HeadAt; Lanes; NoConn; Quiet; []; _∷_; att-head; calm; cand; done-head; done-step; early; exact; hush-quiet; map-head; none; of-head; off-head; off-quiet; on-head; pool-step; quiet-first; quiet-hush; rest-hush)
 open import spike.MarkedHead.Race using (WA; calm-first; ended-shut; first-l; len-earliest; min-wa; on-true; outer-at; over-ended; over-src; over-step; own-calm; own-first; p1-live; p3-live; quiet-race; quiet-wa; race; shut-via; src-calm; src-quiet; sub-bursts; sub-head; under-hush; union-upto; win; win-snoc)
 
 ------------------------------------------------------------------------
@@ -42,7 +42,7 @@ mutual
   head-agrees c (connS k o b)    fs = conn-at (closed c) c k o b refl fs
   head-agrees c (joinS j g x ib) _  = join-head c j g x ib
   head-agrees c (pend o)        ()
-  head-agrees c (coldS b l)     ()
+  head-agrees c (coldS b l)     _  = cold-head c b l
   head-agrees c (scanS f z s)   ()
   head-agrees c (lnS b s)       ()
   head-agrees c (takeS i q w s) ()

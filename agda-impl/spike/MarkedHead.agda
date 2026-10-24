@@ -5,7 +5,8 @@
 -- where and what `denotation.Unfold.step` shows next of its ghost
 -- (`spike.MarkedGhost.gh`), or a silent mark no later (`Agrees`); under a
 -- closed observer, only silent marks (`Quiet`).  It holds of every state
--- of the fragment of / empty / map / merge (`Frag`) by recursion on the
+-- of the fragment of / empty / map / merge / connect / joiner / cold
+-- (`Frag`) by recursion on the
 -- state (`head-agrees`): no order between nodes, no births, only each
 -- node's own shape.  So it is not an invariant a step must preserve.
 -- A connect (`conn-at`) races its source's skip against its body's mark;
@@ -28,12 +29,12 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
 
 open import Tree using (mergeᶠ)
-open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; ix)
+open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; ix; emit; stall; close)
 open import denotation.Unfold using (Node; Step; outˢ; skipˢ; endˢ; hushˢ; headˢ; step; restˢ; restsˢ; restᴹ; restsᶜ; restᶜ; unionˢ;
   Earliest; found; earliest; pick; Outer; doneᵒ; runᵒ; outerOf; goˢ; outerˢ; laneˢ; flatˢ;
   Source; live; ended; connectᶜ; burstingᶜ; underᶜ; subscribe; sourceˢ; bodyˢ; shutˢᵗ; burstsˢ; beforeˢ) renaming (none to noneᴱ)
 open import operation.Key using (Key; at; after; _<ᴷ_)
-open import operation.MarkedPure using (module Machine)
+open import operation.MarkedPure using (module Machine; Tape; play; ending) renaming (over to overᵀ)
 
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ctx; closed; inMap; inCut;
   Out; still; shows; Cand; seek; first; retag; mapT; cutT; nx; cp; attached; attAt; raceT; outerT; laneT; lanes; inOuter; inLanes; inLn;
@@ -104,6 +105,7 @@ mutual
   Frag (flatS (mergeᶠ nothing) f d n [] o ls) = Frag o × Lanes ls × n ≡ length (lanesL ls) × (d ≡ true → Done o × NoConn o)
   Frag (connS k o b)                          = Conn k o b
   Frag (joinS j g x ib)                       = ⊤
+  Frag (coldS b l)                            = ⊤
   Frag _                                      = ⊥
 
   -- A connect whose source waits on its subscription mark, subscribed at
@@ -212,6 +214,10 @@ mutual
   rest-hush (joinS j false x ib) _ _ = refl
   rest-hush (joinS j true x ib)  _ _ = refl
   rest-hush (connS k o b) _ ()
+  rest-hush (coldS b (ending e))          _ _ = refl
+  rest-hush (coldS b overᵀ)               _ _ = refl
+  rest-hush (coldS true  (play τ u i t fr)) _ _ = refl
+  rest-hush (coldS false (play τ u i t fr)) _ _ = refl
   rest-hush {B = B} (flatS (mergeᶠ nothing) f d n [] o ls) (fo , fl , _) (no , nls)
     rewrite outer-hush {B = B} d o fo no | rests-hush (live-hush {B = B} ls fl nls) | pool-hush {B = B} d o ls fo fl (λ _ → no) = refl
 
@@ -245,6 +251,34 @@ of-head c i p [] with closed c
 of-head c i p (x ∷ xs) with closed c
 ... | true  = calm
 ... | false = exact refl
+
+-- A cold: its frame's next event where it sits, or the end it owes;
+-- unsubscribed, a silent mark the stepper has no head against.
+cold-head : ∀ {R Γ A} (c : Ctx R Γ A) b (l : Tape A) → Head c (coldS b l)
+cold-head c b (ending e) with closed c
+... | true  = calm
+... | false = exact refl
+cold-head c b overᵀ with closed c
+... | true  = none
+... | false = exact refl
+cold-head c true (play τ u i t (emit a k)) with closed c
+... | true  = calm
+... | false = exact refl
+cold-head c true (play τ u i t (stall k)) with closed c
+... | true  = calm
+... | false = exact refl
+cold-head c true (play τ u i t (close k)) with closed c
+... | true  = calm
+... | false = exact refl
+cold-head c false (play τ u i t (emit a k)) with closed c
+... | true  = calm
+... | false = early tt
+cold-head c false (play τ u i t (stall k)) with closed c
+... | true  = calm
+... | false = early tt
+cold-head c false (play τ u i t (close k)) with closed c
+... | true  = calm
+... | false = early tt
 
 done-head : ∀ {R Γ A} (c : Ctx R Γ A) → Head c (doneS {A = A})
 done-head c with closed c

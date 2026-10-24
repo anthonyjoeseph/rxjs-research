@@ -289,4 +289,31 @@ state, with no order invariant** (`spike.MarkedHead.Agrees.conn-at`,
   case behind it is the pool's race with rest skips, which K3's colds
   and a later pass must cover.
 
-### Next: K3 (colds)
+## Findings: K3 — colds
+
+**H holds of every cold state, with no new invariant and no leaves**
+(`spike.MarkedHead.cold-head`). A cold's ghost is its tape read as a
+node (`spike.MarkedGhost.tape`), so each clause is one evaluation: a
+playing cold shows its frame's next event where the stepper's burst
+does; an unsubscribed one is a silent mark against a stepper with no
+head; a cold owing its end shows it at the same key. A cold under a rest
+hushes, so `NoConn` needs no cold case.
+
+- **One engine mismatch found and fixed:** a cold owing its end showed
+  it even under a closed observer; it is now silent there, as an of's
+  end is. The runner still delivers that end, into an observer that has
+  closed.
+- **What K3 did not test:** that the tape a subscription opens IS the
+  stepper's node for that subscription (`operation.MarkedPure.opening`
+  against `denotation.Unfold.subscribe`), including the end owed at the
+  subscription's `last`. That is the ghost's correspondence, a statement
+  about subscribing, not about H; it is the same kind of fact as K2's
+  `sub-head`.
+
+## Where the spike stands
+
+H is a body for of, empty, map, the switches, merge without a queue,
+connect, the joiner and colds. Not yet covered: scan, takeWhile, a
+merge with a concurrency limit or queue, switch and exhaust as
+flatMaps, and a lane's bare `lnS`. Each is a new clause of the same
+recursion. The order facts and the subscription facts remain leaves.
