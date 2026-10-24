@@ -37,9 +37,10 @@ import denotation.Unfold as U
 open import denotation.Denote using (⟦_⟧)
 open import operation.PureObservable using (PureObs; module Driver; module Machine; module Pure)
 open import adequacy.Sorted using (_≤ᵖ_)
-open import adequacy.Sane using (Sane)
+open import adequacy.Sane using (Sane; sane-out)
 open import adequacy.Placed.Order using (Placed)
-open import adequacy.Stepper.Past using (_≃_)
+open import adequacy.Stepper.Past using (_≃_; Placedˢ)
+open import adequacy.Stepper.Within using (placed-after)
 open import adequacy.Stepper using (step-skips)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Ghost using (module Ghosting)
@@ -49,11 +50,11 @@ module Honesty (R : Set) where
   open Driver R using (Step; silent; value; complete; drained; step; reading; Read; read; later)
   open Machine using (Conf; load)
   open Pure R using (End; finished; dry; cutOff)
-  open Unsubbing R using (now; then)
+  open Unsubbing R using (_⇝_; now; then)
   open Ghosting R using (Has; Sent; sentHere; sentLater; Alike; _≋_; same-agree; residual; Reached; launchedʰ; silentʰ; valueʰ;
     Stands; cutʰ; finʰ; dryʰ; Mirror; Inner; Logged; Shows; silentˢ; valueˢ; completeˢ; drainedˢ; inner-launch; ≋-refl;
     Steps; after; steps-after; Hopped; onward)
-  open Strongly R using (Strong; Carried; carried; closing; carried-sane)
+  open Strongly R using (Strong; Carried; module Carried; Agrees; carried; closing; carried-sane)
 
   step-alike : ∀ g → Sane [] g → Placed g [] → residual g ≋ after (U.step g)
   step-alike g sn pl = same-agree (_≃_.agreeing (step-skips g sn pl))
@@ -81,10 +82,48 @@ module Honesty (R : Set) where
     drainedᴴ  : step m ≡ drained → (∀ {k b} → Has (residual g) k b → ⊥) → Hop st
     silentᴴ   : ∀ {t m′} → step m ≡ silent t m′ → Hopped st m′ → Hop st
 
+  -- Where the engine comes to rest after showing a value: running the
+  -- stepped ghost, or the root's completion about to be shown.
+  data Lands (g′ : U.Node [] R) (m₀ : Conf R) : Set₁ where
+    runs   : Agrees g′ m₀ → Lands g′ m₀
+    closes : ∀ {p} → step m₀ ≡ complete p → U.step g′ ≡ U.endˢ p → Lands g′ m₀
+
+  -- WHAT A CONFIGURATION RUNNING ITS GHOST DOES NEXT: the value the
+  -- ghost's step shows, then silently on to where it lands; the ghost's
+  -- completion; a drain over a ghost showing nothing; or a silent step.
+  data Moves (g : U.Node [] R) (m : Conf R) : Set₁ where
+    valueᴹ    : ∀ {t p a m′ g′} → step m ≡ value t p a m′ → U.step g ≡ U.outˢ p a g′ → t ≡ tick p
+              → (∀ {q b} → Has (residual g′) q b → q ≤ᵖ p → ⊥) → ∀ {m₀} → m′ ⇝ m₀ → Lands g′ m₀ → Moves g m
+    completeᴹ : ∀ {p} → step m ≡ complete p → U.step g ≡ U.endˢ p → Moves g m
+    drainedᴹ  : step m ≡ drained → (∀ {k b} → Has (residual g) k b → ⊥) → Moves g m
+    silentᴹ   : ∀ {t m′} → step m ≡ silent t m′ → Moves g m
+
   postulate
-    -- A carried configuration's step: its value shown, its completion,
-    -- its drain, or a silent run on to a re-entry configuration.
-    carried-hop : ∀ {g m} (cr : Carried g m) → Hop (carried cr)
+    -- An engine running its ghost moves as the ghost's step says.
+    -- RECOVERY: git show 85c14392:agda-impl/spike/MarkedKept.agda restores the per-frame and per-node dispatch (`kept`) that every step keeps what its configuration means, up to what a run shows
+    agrees-moves : ∀ {g m} → Sane [] g → Placed g [] → Agrees g m → Moves g m
+
+    -- A carried configuration's silent step runs on to a re-entry
+    -- configuration, past this one's skips or lower in the measure.
+    carried-silent : ∀ {g m t m′} (cr : Carried g m) → step m ≡ silent t m′ → Hopped (carried cr) m′
+
+  -- A carried configuration's step: its value shown, its completion,
+  -- its drain, or a silent run on to a re-entry configuration.  After a
+  -- value the stepped ghost keeps the stepper's invariants.
+  carried-hop : ∀ {g m} (cr : Carried g m) → Hop (carried cr)
+  carried-hop {g} cr with agrees-moves (Carried.sane cr) (Carried.placed cr) (Carried.agrees cr)
+  ... | valueᴹ {g′ = g′} eq stp ck least {m₀} path ld = valueᴴ eq stp ck least (m₀ , path , land ld)
+    where
+      sn′ : Sane [] g′
+      sn′ = sane-out {g = g} (Carried.sane cr) stp
+      pl′ : Placed g′ []
+      pl′ = proj₂ (subst (Placedˢ []) stp (placed-after g (Carried.sane cr) (Carried.placed cr)))
+      land : Lands g′ m₀ → Strong g′ m₀
+      land (runs ag)    = carried record { sane = sn′ ; placed = pl′ ; agrees = ag }
+      land (closes c e) = closing c e sn′ pl′
+  ... | completeᴹ eq stp = completeᴴ eq stp
+  ... | drainedᴹ eq no   = drainedᴴ eq no
+  ... | silentᴹ eq       = silentᴴ eq (carried-silent cr eq)
 
   -- By the re-entry state.
   strong-hop : ∀ {g m} (st : Strong g m) → Hop st
