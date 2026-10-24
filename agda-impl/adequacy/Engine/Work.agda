@@ -9,6 +9,10 @@
 -- a connect's body mark, its source's attach and teardown; a joiner's
 -- inbox; and an event in flight, owed until it is shown or absorbed.
 --
+-- A connect's source owes once for itself and once for every joiner its
+-- steps are fed to (`fan`), and so does an event rising under it (`wt`):
+-- a feed spends the event's weight and leaves one entry in each inbox.
+--
 -- Making an event spends what made it and owes the event, so the count
 -- stays and the control leaves calm (`calmᶜ`); an event rising spends
 -- height (`flightᶜ`).  A stall or a frame's close drops a skip of the
@@ -19,10 +23,14 @@ module adequacy.Engine.Work where
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; length)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; _+_)
+open import Data.Nat using (ℕ; suc; _+_; _*_)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
+open import Relation.Binary.PropositionalEquality using (refl)
 
 open import denotation.MonotonicList.Events using (Timeline; fixed; fresh; From; done; quiet; at; Frame; emit; stall; close)
 open import Tree using (Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+open import denotation.Unfold using (same?)
 open import operation.PureObservable using (Tape; play; ending; over; module Machine)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; Att; attached; attAt; Owe; free; cpAt; cutAt; overAt; CS; Conf; ⟨_,_,_,_⟩; absorbed; rising)
@@ -49,6 +57,21 @@ coldW : ∀ {A} → Timeline A → ℕ
 coldW (fixed m) = firstW m
 coldW fresh     = 1
 
+just? : ∀ {a} {A : Set a} → ℕ → Maybe A → ℕ
+just? w (just _) = w
+just? w nothing  = 0
+
+-- How many inbox entries one step of binder `i` leaves below a program:
+-- one per joiner of it, each under a source as often as that source fans.
+fedO : ∀ {Γ X A} → X ∈ Γ → Obs Timeline Γ A → ℕ
+fedO i (connected x)     = just? 1 (same? i x)
+fedO i (map f s)         = fedO i s
+fedO i (scan f z s)      = fedO i s
+fedO i (takeWhile v q s) = fedO i s
+fedO i (flatMap op f s)  = fedO i s
+fedO i (connect s b)     = suc (fedO (here refl) b) * fedO i s + fedO (there i) b
+fedO i _                 = 0
+
 -- A program not yet subscribed: each operator what its subscription
 -- leaves owed, and one more.  A defer is a skip, so owes only itself.
 size : ∀ {Γ A} → Obs Timeline Γ A → ℕ
@@ -59,7 +82,7 @@ size (map f s)         = suc (size s)
 size (scan f z s)      = suc (size s)
 size (takeWhile i q s) = 5 + size s
 size (flatMap op f s)  = 3 + size s
-size (connect s b)     = 4 + size s + size b
+size (connect s b)     = 4 + suc (fedO (here refl) b) * size s + size b
 size (connected x)     = 2
 size (defer l)         = 1
 
@@ -78,13 +101,35 @@ oweW (cpAt p)   = 2
 oweW (cutAt p)  = 1
 oweW (overAt p) = 0
 
-just? : ∀ {A : Set} → ℕ → Maybe A → ℕ
-just? w (just _) = w
-just? w nothing  = 0
-
 -- The body mark, then the source's attach; the teardown, while live.
 csW : CS → ℕ
 csW k = just? 2 (CS.bodyAt k) + just? 1 (CS.attSrc k) + one (CS.srcLive k)
+
+-- A joiner, while live, takes every step of its binder.
+joinF : ∀ {a} {A : Set a} → Bool → Maybe A → ℕ
+joinF true  m = just? 1 m
+joinF false m = 0
+
+mutual
+  fed : ∀ {Γ X A} → X ∈ Γ → St Γ A → ℕ
+  fed i (pend o)                = fedO i o
+  fed i (joinS j g x ib)        = joinF g (same? i x)
+  fed i (mapS f s)              = fed i s
+  fed i (scanS f z s)           = fed i s
+  fed i (cutS l a s)            = fed i s
+  fed i (lnS b s)               = fed i s
+  fed i (takeS v q w s)         = fed i s
+  fed i (flatS op f d n q o ls) = fed i o + fedL i ls
+  fed i (connS k o b)           = suc (fed (here refl) b) * fed i o + fed (there i) b
+  fed i _                       = 0
+
+  fedL : ∀ {Γ X A} → X ∈ Γ → List (St Γ A) → ℕ
+  fedL i []       = 0
+  fedL i (s ∷ ls) = fed i s + fedL i ls
+
+-- How often a connect's source owes: once, and once per joiner fed.
+fan : ∀ {Γ X B} → St (X ∷ Γ) B → ℕ
+fan b = suc (fed (here refl) b)
 
 mutual
   owed : ∀ {Γ A} → St Γ A → ℕ
@@ -97,14 +142,34 @@ mutual
   owed (cutS l a s)            = attW a + owed s
   owed (lnS b s)               = one b + owed s
   owed (takeS i q w s)         = oweW w + owed s
-  owed (flatS op f true n q o ls)  = length q + owed o + owedL ls
-  owed (flatS op f false n q o ls) = suc (length q + owed o + owedL ls)
-  owed (connS k o b)           = csW k + owed o + owed b
+  owed (flatS op f true n q o ls)  = owedL ls + (length q + owed o)
+  owed (flatS op f false n q o ls) = suc (owedL ls + (length q + owed o))
+  owed (connS k o b)           = csW k + fan b * owed o + owed b
   owed (joinS j g x ib)        = length ib
 
   owedL : ∀ {Γ A} → List (St Γ A) → ℕ
   owedL []       = 0
   owedL (s ∷ ls) = owed s + owedL ls
+
+-- A connect's teardown owed once its body completed.  Counted apart:
+-- the completion that owes it spends height, not what the tree owes.
+tornC : CS → ℕ
+tornC k = just? 1 (CS.owedAt k)
+
+mutual
+  torn : ∀ {Γ A} → St Γ A → ℕ
+  torn (mapS f s)              = torn s
+  torn (scanS f z s)           = torn s
+  torn (cutS l a s)            = torn s
+  torn (lnS b s)               = torn s
+  torn (takeS i q w s)         = torn s
+  torn (flatS op f d n q o ls) = tornL ls + torn o
+  torn (connS k o b)           = tornC k + torn o + torn b
+  torn _                       = 0
+
+  tornL : ∀ {Γ A} → List (St Γ A) → ℕ
+  tornL []       = 0
+  tornL (s ∷ ls) = torn s + tornL ls
 
 -- How far a context's hole lies below the root.
 height : ∀ {R Γ A} → Ctx R Γ A → ℕ
@@ -119,16 +184,33 @@ height (inLanes op f d n q o pre post c) = suc (height c)
 height (inSrc k b c)                     = suc (height c)
 height (inBody k o c)                    = suc (height c)
 
+-- How much an event rising at a context's hole owes: once, and once per
+-- joiner each source above it fans to.
+wt : ∀ {R Γ A} → Ctx R Γ A → ℕ
+wt top                               = 1
+wt (inMap f c)                       = wt c
+wt (inScan f z c)                    = wt c
+wt (inCut l a c)                     = wt c
+wt (inLn b c)                        = wt c
+wt (inTake i q w c)                  = wt c
+wt (inOuter op f d n q ls c)         = wt c
+wt (inLanes op f d n q o pre post c) = wt c
+wt (inSrc k b c)                     = fan b * wt c
+wt (inBody k o c)                    = wt c
+
 -- A configuration's counts: what the whole tree owes, an event in flight
 -- included; whether everything running is absorbed; how far an event in
--- flight has still to rise.
+-- flight has still to rise; the teardowns owed.
 owedᶜ : ∀ {R} → Conf R → ℕ
-owedᶜ ⟨ c , s , rising e , p ⟩ = suc (owed (plug c s))
+owedᶜ ⟨ c , s , rising e , p ⟩ = wt c + owed (plug c s)
 owedᶜ ⟨ c , s , _ , p ⟩        = owed (plug c s)
 
 calmᶜ : ∀ {R} → Conf R → ℕ
 calmᶜ ⟨ c , s , absorbed , p ⟩ = 1
 calmᶜ ⟨ c , s , _ , p ⟩        = 0
+
+tornᶜ : ∀ {R} → Conf R → ℕ
+tornᶜ ⟨ c , s , m , p ⟩ = torn (plug c s)
 
 flightᶜ : ∀ {R} → Conf R → ℕ
 flightᶜ ⟨ c , s , rising e , p ⟩ = height c

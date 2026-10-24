@@ -10,12 +10,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SILENT RUN
 
-Probed: `work` (owed counts, then calm, then flight height) falling on every
-silent step that keeps the configuration's meaning exactly. Open: whether an
-emission absorbed with the meaning unchanged can leave it level. Settled when
-`silent-work` is a body, or refuted.
+Each silent step lowers `work` or is a skipped step (an outer value, a lane's
+completion under a queue, a defer begun, a frame's stall or close); whether
+each skipped step drops a leading skip of the meaning. Settled when the five
+are bodies, or refuted.
 
-Members: `silent-work`.
+Members: `outer-drop`, `lane-drop`, `defer-drop`, `stall-drop`, `close-drop`.
 
 #### THE KEPT DEPTH
 

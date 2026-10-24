@@ -32,7 +32,7 @@ open import adequacy.Sorted using (_≤ᵖ_)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Strong using (module Strongly)
 open import adequacy.Stepper.Past using (afterᴱ)
-open import adequacy.Engine.Work using (owedᶜ; calmᶜ; flightᶜ)
+open import adequacy.Engine.Work using (owedᶜ; calmᶜ; flightᶜ; tornᶜ)
 open import adequacy.Engine.Meaning using (M; Has; atOut; atEnd; pastOut; pastSkip; _≅_; ≅-trans; agree-≅)
 open import denotation.Denote using (⟦_⟧)
 open import operation.PureObservable using (PureObs; module Driver; module Machine; module Pure)
@@ -278,9 +278,9 @@ module Ghosting (R : Set) where
 
   -- The work a configuration has left in its own control: what its tree
   -- owes, an event in flight included; then whether it is calm; then how
-  -- far its event in flight has to rise.
+  -- far its event in flight has to rise; then the teardowns it owes.
   work : Conf R → Measure
-  work m = (owedᶜ m , calmᶜ m , flightᶜ m , 0 , 0) , 0
+  work m = (owedᶜ m , calmᶜ m , flightᶜ m , tornᶜ m , 0) , 0
 
   -- Toward an item: the item's depth, then the configuration's work.
   _⋖_ : ℕ × Measure → ℕ × Measure → Set

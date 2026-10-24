@@ -571,18 +571,18 @@ module _ {R : Set} where
   runs c (takeS i x (cpAt q) s)  cpM  p cpO  v = lift-≅ c true (≋-by refl refl)
   runs c (takeS i x (cutAt q) s) cutM p cutO v with cutᴹ s in e
   ... | s′ , t = cut-rest c s e
-  runs c (connS (cs cl sl sa nothing as ow r e) o b) bodyM p bodyO v = ≅-refl
-  runs c (connS (cs cl sl sa (just q) as ow r e) o b) bodyM p bodyO v with proj₁ (opened c (cs cl sl sa (just q) as ow r e) o b v)
+  runs c (connS (cs cl sl sa nothing as ow r e) o b) bodyM p (bodyO _) v = ≅-refl
+  runs c (connS (cs cl sl sa (just q) as ow r e) o b) bodyM p (bodyO _) v with proj₁ (opened c (cs cl sl sa (just q) as ow r e) o b v)
   ... | refl = lift-≅ c true (conn-src ow sl r e (gh b) (subOr (q ⊕ [ ix 1 ]) o) (envAt c))
-  runs c (connS (cs cl sl sa ba nothing ow r e) o b)          srcAttM p srcAttO v = ≅-refl
-  runs c (connS (cs cl true sa ba (just q) ow r e) o b)       srcAttM p srcAttO v = ≅-refl
-  runs c (connS (cs cl false sa ba (just q) (just w) r e) o b) srcAttM p srcAttO v with unsub o in u
+  runs c (connS (cs cl sl sa ba nothing ow r e) o b)          srcAttM p (srcAttO _) v = ≅-refl
+  runs c (connS (cs cl true sa ba (just q) ow r e) o b)       srcAttM p (srcAttO _) v = ≅-refl
+  runs c (connS (cs cl false sa ba (just q) (just w) r e) o b) srcAttM p (srcAttO _) v with unsub o in u
   ... | o′ , t = conn-unsub c (cs cl false sa ba (just q) (just w) r e) b o u
-  runs c (connS (cs cl false sa ba (just q) nothing r e) o b)  srcAttM p srcAttO v with unsub o in u
+  runs c (connS (cs cl false sa ba (just q) nothing r e) o b)  srcAttM p (srcAttO _) v with unsub o in u
   ... | o′ , t = conn-unsub c (cs cl false sa ba (just q) nothing r e) b o u
-  runs c (connS (cs cl sl sa ba as nothing r e) o b)         owedM p owedO v = ≅-refl
-  runs c (connS (cs cl sl false ba as (just w) r e) o b)     owedM p owedO v = ≅-refl
-  runs c (connS (cs cl sl true ba as (just w) r e) o b)      owedM p owedO v with unsub o in u
+  runs c (connS (cs cl sl sa ba as nothing r e) o b)         owedM p (owedO _) v = ≅-refl
+  runs c (connS (cs cl sl false ba as (just w) r e) o b)     owedM p (owedO _) v = ≅-refl
+  runs c (connS (cs cl sl true ba as (just w) r e) o b)      owedM p (owedO _) v with unsub o in u
   ... | o′ , t = conn-unsub c (cs cl sl true ba as (just w) r e) b o u
   runs c (joinS j false x ((q , nx a) ∷ ib)) joinM p joinO v = ≅-refl
   runs c (joinS j false x ((q , cp) ∷ ib))   joinM p joinO v = ≅-refl
@@ -592,13 +592,13 @@ module _ {R : Set} where
   runs c (joinS j true  x ((q , nx a) ∷ ib)) joinM p joinO v with closed c in ce
   ... | false = join-nx c j x q a ib p v
   ... | true  = agree-≅ (closed-hides c true (stateᴺ (joinG true x j ((q , nx a) ∷ ib)) (envAt c)) (stateᴺ (joinG true x j ib) (envAt c)) ce (λ n → agreeᵀ-refl n idle))
-  runs c (coldS b (ending e))               leafM p leafO v = lift-≅ c true (≋-by refl refl)
-  runs c (coldS false (play τ u i t fr))    leafM p leafO v = ≅-refl
-  runs c (coldS false over)                 leafM p leafO v = ≅-refl
-  runs c (coldS true over)                  leafM p leafO v with closed c
+  runs c (coldS b (ending e))               leafM p (leafO _) v = lift-≅ c true (≋-by refl refl)
+  runs c (coldS false (play τ u i t fr))    leafM p (leafO _) v = ≅-refl
+  runs c (coldS false over)                 leafM p (leafO _) v = ≅-refl
+  runs c (coldS true over)                  leafM p (leafO _) v with closed c
   ... | true  = ≅-refl
   ... | false = ≅-refl
-  runs c (coldS true (play τ u i t fr))     leafM p leafO v with closed c in ce
+  runs c (coldS true (play τ u i t fr))     leafM p (leafO _) v with closed c in ce
   ... | true  = agree-≅ (closed-hides c true (stateᴺ (burstᶜ τ u i fr) (envAt c)) (stateᴺ idleᶜ (envAt c)) ce (λ n → agreeᵀ-refl n idle))
   ... | false = playing c τ u i fr p
 
