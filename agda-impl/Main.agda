@@ -13,6 +13,10 @@ module Main where
 -- (`operation.Observable`).
 open import adequacy.Adequacy using (adequacy)
 
+-- THE THEOREM, PORTED (Tier 0): the same, over the pointer-free engine
+-- (`port.operation.PureObservable`).
+open import port.adequacy.Adequacy using (adequacy)
+
 -- THE MEANING IS A FOLD: the theorem's denotation is the limit of each
 -- operator's `MonotonicList` function applied to its children's.
 open import denotation.Denote using (folded)

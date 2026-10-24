@@ -116,7 +116,7 @@ horizon = 100
 pureTrace : ∀ {t} → ℕ → ℕ → Prog t → Trace ⟦ t ⟧ᵀ
 pureTrace u n p = traceML n (runᴾ (200 * n) horizon (toObs timeline u p [] [] []))
 
--- SPIKE: the pointer-free engine's pure semantics, under the same budget.
+-- The pointer-free engine's pure semantics (`port.operation.PureObservable`), under the same budget.
 marksTrace : ∀ {t} → ℕ → ℕ → Prog t → Trace ⟦ t ⟧ᵀ
 marksTrace u n p = traceML n (runᴹ (200 * n) horizon (toObs timeline u p [] [] []))
 
@@ -191,7 +191,7 @@ ioTraceWith {t} sub u p =
 ioTrace : ∀ {t} → ℕ → Prog t → IO (Trace ⟦ t ⟧ᵀ)
 ioTrace = ioTraceWith subscribe
 
--- SPIKE: the same, through the pointer-free engine's IO runtime.
+-- The same, through the pointer-free engine's IO runtime (`port.operation.Observable`).
 marksIoTrace : ∀ {t} → ℕ → Prog t → IO (Trace ⟦ t ⟧ᵀ)
 marksIoTrace = ioTraceWith subscribeᴹ
 
