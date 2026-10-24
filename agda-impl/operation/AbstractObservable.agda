@@ -27,7 +27,7 @@ open import operation.Key using (Key; at; after; _<ᴷ_)
 -- sees it, and every tie goes as the stepper's does.
 module operation.AbstractObservable (C L : Set → Set₁) (due : ∀ {A} → L A → Maybe Key) (peek : ∀ {A} → L A → Maybe (Maybe A)) where
 
-open import Data.List using (List; []; _∷_; _++_; [_]; length; null)
+open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; length; null; reverse)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; zero; suc; pred; _≡ᵇ_; _<ᵇ_)
@@ -112,7 +112,9 @@ alive (lnS b s) = b
 alive s         = true
 
 ------------------------------------------------------------------------
--- Contexts: one hole, at scope Γ and type A, in a root at [] and R.
+-- Contexts: one hole, at scope Γ and type A, in a root at [] and R.  A
+-- lane's context keeps the lanes before it nearest first, so a walk
+-- along a flatMap's list moves each lane across in one step.
 
 data Ctx (R : Set) : List Set → Set → Set₁ where
   top     : Ctx R [] R
@@ -134,7 +136,7 @@ plug (inCut l a c)                     s = plug c (cutS l a s)
 plug (inLn b c)                        s = plug c (lnS b s)
 plug (inTake i p w c)                  s = plug c (takeS i p w s)
 plug (inOuter op f d n q ls c)         s = plug c (flatS op f d n q s ls)
-plug (inLanes op f d n q o pre post c) s = plug c (flatS op f d n q o (pre ++ s ∷ post))
+plug (inLanes op f d n q o pre post c) s = plug c (flatS op f d n q o (pre ʳ++ s ∷ post))
 plug (inSrc k b c)                     s = plug c (connS k s b)
 plug (inBody k o c)                    s = plug c (connS k o s)
 
@@ -264,7 +266,7 @@ Focus R = Σ (List Set) λ Γ → Σ Set λ A → Ctx R Γ A × St Γ A
 pickL : ∀ {Γ B} → ℕ → List (St Γ B) → List (St Γ B) → Maybe (List (St Γ B) × St Γ B × List (St Γ B))
 pickL i       pre []         = nothing
 pickL zero    pre (s ∷ post) = just (pre , s , post)
-pickL (suc i) pre (s ∷ post) = pickL i (pre ++ [ s ]) post
+pickL (suc i) pre (s ∷ post) = pickL i (s ∷ pre) post
 
 down : ∀ {R Γ A} → ℕ → Ctx R Γ A → St Γ A → Maybe (Focus R)
 down zero          c (mapS f s)              = just (_ , _ , inMap f c , s)
@@ -437,7 +439,7 @@ mutual
   lanes : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → List (St Γ B) → Maybe (Cand R B)
   lanes c op f d n q o pre []         = nothing
   lanes c op f d n q o pre (s ∷ post) =
-    first (retag (cutT (alive s)) (seek (inLanes op f d n q o pre post c) s)) (lanes c op f d n q o (pre ++ [ s ]) post)
+    first (retag (cutT (alive s)) (seek (inLanes op f d n q o pre post c) s)) (lanes c op f d n q o (s ∷ pre) post)
 
 search : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Maybe (Found R)
 search c s = mapᴹ proj₁ (seek c s)
@@ -505,7 +507,7 @@ begin c (defer l)         p = ok ⟨ c , pend (Later.force l) , subscribing , p 
 start : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → A → Pos → Conf R
 start c op f d n q o ls a p with closed c
 ... | true  = ⟨ c , flatS op f d n q o ls , absorbed , p ⟩
-... | false = ⟨ inCut true (attAt (p ⊕ [ ix 1 ])) (inLn true (inLanes op f d (suc n) q o ls [] c)) , pend (f a) , subscribing , p ⊕ [ ix 1 ] ⟩
+... | false = ⟨ inCut true (attAt (p ⊕ [ ix 1 ])) (inLn true (inLanes op f d (suc n) q o (reverse ls) [] c)) , pend (f a) , subscribing , p ⊕ [ ix 1 ] ⟩
 
 -- The outer done, no lane running and, `e`, none waiting: complete.
 settle : ∀ {B} → Bool → ℕ → Bool → Mode B
@@ -555,9 +557,9 @@ rise (inOuter op f d n q ls c) o (nx a) p = admit c op f d n q o ls a p
 rise (inOuter op f d n q ls c) o cp     p = ok ⟨ c , flatS op f true n q o ls , settle true n (null q) , p ⟩
 -- a lane out of its flatMap's list is over, and absorbs what still reaches it
 rise (inLanes op f d n q o pre post c) s (nx b) p =
-  ok (if alive s then ⟨ c , flatS op f d n q o (pre ++ s ∷ post) , rising (nx b) , p ⟩ else ⟨ c , flatS op f d n q o (pre ++ s ∷ post) , absorbed , p ⟩)
+  ok (if alive s then ⟨ c , flatS op f d n q o (pre ʳ++ s ∷ post) , rising (nx b) , p ⟩ else ⟨ c , flatS op f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
 rise (inLanes op f d n q o pre post c) s cp     p =
-  ok (if alive s then dequeue c op f d (pred n) q o (pre ++ ended s ∷ post) p else ⟨ c , flatS op f d n q o (pre ++ s ∷ post) , absorbed , p ⟩)
+  ok (if alive s then dequeue c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p else ⟨ c , flatS op f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
 rise (inSrc k b c) s (nx a) p = ok ⟨ c , connS k s (feed (here refl) p (nx a) b) , absorbed , p ⟩
 rise (inSrc k b c) s cp     p = ok ⟨ c , connS (record k { closed = true ; endAt = p }) s (feed (here refl) p cp b) , absorbed , p ⟩
 rise (inBody k o c) s (nx b) p = ok ⟨ c , connS k o s , rising (nx b) , p ⟩

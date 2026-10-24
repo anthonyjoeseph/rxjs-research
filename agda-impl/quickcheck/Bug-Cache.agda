@@ -14,15 +14,15 @@ module quickcheck.Bug-Cache where
 
 open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_)
-open import Data.List.Relation.Unary.Any using (here)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_)
 open import Data.String using (String)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Tree using (mergeᶠ; exhaustᶠ)
+open import Tree using (mergeᶠ; exhaustᶠ; switchᶠ)
 open import quickcheck.Ty using (natᵗ)
-open import quickcheck.Code using (Prog; script; cold; of; map; flatMap; connect; connected; μ; defer)
+open import quickcheck.Code using (Prog; script; cold; empty; of; map; scan; flatMap; connect; connected; μ; defer)
 open import quickcheck.Tm using (var; nat; plus)
 
 cases : List (String × Prog natᵗ)
@@ -39,4 +39,9 @@ cases =
                     (cold (script ((1 , []) ∷ (0 , 0 ∷ 4 ∷ 3 ∷ []) ∷ (1 , 2 ∷ 3 ∷ 4 ∷ []) ∷ []) false false))))
       (flatMap (mergeᶠ (just 3)) (defer (connected (here refl)))
                (flatMap exhaustᶠ (of (plus (nat 3) (nat 4) ∷ plus (nat 3) (nat 4) ∷ [])) (of (nat 2 ∷ nat 1 ∷ []))))))
+  ∷ -- a switch over a looping outer, a lane per tick: the engine never finished the placing check
+  ("switch, a lane per tick of a looping outer" ,
+    connect (defer (μ (connect (empty {t = natᵗ}) (of (nat 4 ∷ nat 1 ∷ [])))))
+            (connect (scan (var (there (here refl))) (nat 5) (μ (empty {t = natᵗ})))
+                     (flatMap switchᶠ (μ (connected (here refl))) (cold (script ((0 , 3 ∷ []) ∷ []) false true)))))
   ∷ []
