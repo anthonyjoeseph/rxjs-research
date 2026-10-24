@@ -366,12 +366,65 @@ one clause per frame.
 1. `limited-sides`: for a bounded merge, switch or exhaust, the queue
    and the one-lane rule sit outside the race `race-steps` reads, so the
    merge clause's route does not carry over as written.
-2. `rise-src-nx` / `rise-body-nx` in `spike.MarkedKept`: `Clear` stops
-   at a connect's source and passes through its body unchanged, so
-   whatever order these relied on from `Ord` must now come from the
-   connect's own phase (`Conn`).
+2. `rise-src-nx` / `rise-body-nx` in `spike.MarkedKept`: settled below.
+   What remains is the source's race at `inSrc` as a `Won` clause, and
+   `_≅_` closed under a node gaining skips.
 3. `sides-link`: the stepper's head of each part is the meaning's. It may
    need `Base` for a joiner's buffer.
+
+## Findings: the connect's feed
+
+The engine fed every live joiner by inserting in position order. The
+meaning appends, and only to joiners that joined before the feed; any
+other joiner gets a skip. The two agreed only if (A) every live joiner
+joined before the feed position `p`, and (B) every inbox entry lies
+before the new one.
+
+**(A) is the grid as the engine stood.** A joiner with an empty inbox
+has no key, so neither the race nor `Won` can bound its join position
+against `p`. Its join is in the past and the feed is in the present, and
+relating the two is the births-against-a-cursor route. `spike.MarkedBorn`
+already found that route needs births to be distinct, which is a
+pairwise fact. The engine's own `shift` tie-break at a connect admits a
+body key equal to the source's key. Only distinctness of births rules
+that tie out.
+
+The regression of the position at `after`-marks is not the obstacle. All
+four `after`-marks only unsubscribe and land `absorbed`, and the next
+search runs at a node's own position.
+
+**The engine change.** The engine now makes the meaning's choice itself
+(`operation.Marked.queued`). It appends instead of inserting. It queues
+a value only for a joiner joined before `p`. It queues an end at
+`p ⊕ [sub j]`, or at `j ⊕ [last]` for a joiner joined at or after `p`.
+This is an engine-internals change. In reachable runs the guard should
+always hold, so the oracle should not move; CI will confirm. With it, (A)
+and (B) are no longer obligations: on every live joiner, both sides
+compute the same thing.
+
+**What remains for `rise-src-nx`.** The meaning also feeds what the
+engine has not started:
+
+- a flatMap's later lanes, because `feed` composes into its `g`;
+- a source not yet subscribed (`subOr`).
+
+Each of these joins at or under a position of the connect's body. Every
+key of the body is past `shift p` once the source wins its race, so the
+meaning feeds each of them only skips. The later lanes start at the
+outer's emissions, which are at or past its head key (`head-agrees`)
+and monotone in the meaning.
+
+Two things are owed:
+
+- the source's race at `inSrc`, as a `Won` clause like `LaneWon`. This
+  compares keys with the position.
+- `_≅_` closed under a node gaining skips. This is compositionality of
+  the meaning.
+
+Neither is a fact about a pair of nodes. `rise-body-nx` needs the same
+race the other way, at `inBody` (the source not strictly before).
+
+**Verdict: firm ground.** No pairwise fact returns.
 
 ## Where the spike stands
 
@@ -380,4 +433,5 @@ connect, the joiner and colds. It is a leaf per former for scan,
 takeWhile, a bounded merge, and switch and exhaust as flatMaps. The order
 the preservation half consumes is local: `Order` is a shape fact plus
 per-frame race facts. The pick discharges the race facts from H, and a
-rise carries them by definition. Next: `limited-sides`.
+rise carries them by definition. The connect's feed needs no pairwise
+fact once the engine makes the meaning's choice. Next: `limited-sides`.

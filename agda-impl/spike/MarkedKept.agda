@@ -278,11 +278,13 @@ module _ {R : Set} where
     rise-lanes-cp : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (c : Ctx R Γ B) (s : St Γ B) p
                   → Inv ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → flagOf s ≡ true
                   → up (inLanes op f d n q o pre post c) true (risen (gh s) (envAt c) cp p) ≅ M (Machine.dequeue c op f d (pred n) q o (pre ++ Machine.ended s ∷ post) p)
-    -- The body fed: `operation.Marked.feed` inserts into every live
-    -- joiner, `denotation.Unfold.feed` appends to those joined before the
-    -- feed.  They agree only if every live joiner joined before `p`, and
-    -- every inbox entry is before the new one, which scoping alone
-    -- guarantees (a body never reaches its own source).
+    -- The body fed.  On a live joiner `operation.Marked.queued` makes
+    -- the meaning's choice, so the feeds differ only where the meaning
+    -- feeds what the engine has not started: a flatMap's later lanes, a
+    -- source not yet subscribed.  Each joins under a key of the body,
+    -- every one of them past `shift p` once the source wins its race, so
+    -- the meaning feeds it only skips.  Owed: that race as a `Won` clause
+    -- at `inSrc`, and `_≅_` closed under a node gaining skips.
     rise-src-nx : ∀ {Γ X B} k (b : St (X ∷ Γ) B) (c : Ctx R Γ B) (s : St Γ X) a p
                 → Inv ⟨ inSrc k b c , s , rising (nx a) , p ⟩ → Kept ⟨ inSrc k b c , s , rising (nx a) , p ⟩
     rise-src-cp : ∀ {Γ X B} k (b : St (X ∷ Γ) B) (c : Ctx R Γ B) (s : St Γ X) p

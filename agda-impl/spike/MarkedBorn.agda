@@ -16,8 +16,8 @@
 --
 -- Nor is the per-node half of the route there: a key under its node's
 -- own birth is false of reachable configurations.  A joiner shows its
--- feed under its source's emission (`operation.Marked.feed` inserts at
--- the source's position, tagged with the joiner's), and a cold's later
+-- feed under its source's emission (`operation.Marked.queued` queues it
+-- at the source's position, tagged with the joiner's), and a cold's later
 -- frames sit in a cascade keyed by tick at the root
 -- (`operation.MarkedPure.rest`).  Both zones are made by something other
 -- than the node.

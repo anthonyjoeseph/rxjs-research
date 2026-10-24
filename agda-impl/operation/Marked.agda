@@ -235,17 +235,19 @@ same? (here refl) (here refl) = just refl
 same? (there i)   (there j)   = same? i j
 same? _           _           = nothing
 
--- In position order.
-insert : ∀ {A} → Pos → Ev A → List (Pos × Ev A) → List (Pos × Ev A)
-insert q e []               = [ (q , e) ]
-insert q e ((q′ , e′) ∷ ib) = if q <ᵖ q′ then (q , e) ∷ (q′ , e′) ∷ ib else (q′ , e′) ∷ insert q e ib
+-- A step at `p` queued last for a joiner joined at `j`, as
+-- `denotation.Unfold.fed` and `denotation.Unfold.told` queue it: under
+-- where it joined if it joined before; else a value is not its, and an
+-- end is at once.
+queued : ∀ {A} → Pos → Pos → Ev A → List (Pos × Ev A) → List (Pos × Ev A)
+queued j p (nx a) ib = if j <ᵖ p then ib ++ [ (p ⊕ [ subᴾ j ] , nx a) ] else ib
+queued j p cp     ib = ib ++ [ (if j <ᵖ p then p ⊕ [ subᴾ j ] else j ⊕ [ last ]) , cp ]
 
--- Binder `i`'s step at `p`, fed to every joiner of it still live, under
--- where the joiner joined.
+-- Binder `i`'s step at `p`, fed to every joiner of it still live.
 mutual
   feed : ∀ {Γ X A} → X ∈ Γ → Pos → Ev X → St Γ A → St Γ A
   feed i p e (joinS j true x ib) with same? i x
-  ... | just refl = joinS j true x (insert (p ⊕ [ subᴾ j ]) e ib)
+  ... | just refl = joinS j true x (queued j p e ib)
   ... | nothing   = joinS j true x ib
   feed i p e (mapS f s)              = mapS f (feed i p e s)
   feed i p e (scanS f z s)           = scanS f z (feed i p e s)
