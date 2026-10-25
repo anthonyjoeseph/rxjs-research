@@ -396,13 +396,12 @@ private
     placedLᵇ v q (l ∷ ls) ρ = placedᵇ v q l ρ ∧ placedLᵇ v q ls ρ
 
   -- Unchecked; trails in the run's environment; in the rest's where the
-  -- run's holds; placed likewise.
+  -- run's holds; placed in the rest's, as the facts are stated.
   trailedᵇ : ∀ {Δ A} → ℕ → Bool → Pos → St Δ A → U.NEnv Δ → U.NEnv Δ → Bool
-  trailedᵇ zero                      v q b ρ ρ′ = true
-  trailedᵇ (suc zero)                v q b ρ ρ′ = innerᵇ b ρ
-  trailedᵇ (suc (suc zero))          v q b ρ ρ′ = not (innerᵇ b ρ) ∨ innerᵇ b ρ′
-  trailedᵇ (suc (suc (suc zero)))    v q b ρ ρ′ = placedᵇ v q b ρ
-  trailedᵇ (suc (suc (suc (suc _)))) v q b ρ ρ′ = not (placedᵇ v q b ρ) ∨ placedᵇ v q b ρ′
+  trailedᵇ zero               v q b ρ ρ′ = true
+  trailedᵇ (suc zero)         v q b ρ ρ′ = innerᵇ b ρ
+  trailedᵇ (suc (suc zero))   v q b ρ ρ′ = not (innerᵇ b ρ) ∨ innerᵇ b ρ′
+  trailedᵇ (suc (suc (suc _))) v q b ρ ρ′ = placedᵇ v q b ρ′
 
   -- `adequacy.Engine.Shown.Links`, decided.
   linksᵇ : ∀ {R Γ A} → ℕ → Bool → Pos → Ctx R Γ A → Bool → Events∞ A → Events∞ A → Bool
@@ -486,8 +485,7 @@ private
       else if not (linkedᵇ 0 m) then no (best ⊔ run) ("\n  unlinked: a pass not fed past a live source's skips, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (linkedᵇ 1 m) then no (best ⊔ run) ("\n  untrailed: an inner source fed the run not trailing, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (linkedᵇ 2 m) then no (best ⊔ run) ("\n  untrailed: an inner source fed the rest not trailing, " ++ showMode m ++ " at " ++ showSpot (spot m))
-      else if not (linkedᵇ 3 m) then no (best ⊔ run) ("\n  unplaced: an inner source fed the run before a position asked of, " ++ showMode m ++ " at " ++ showSpot (spot m))
-      else if not (linkedᵇ 4 m) then no (best ⊔ run) ("\n  unplaced: an inner source fed the rest before a position asked of, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (linkedᵇ 3 m) then no (best ⊔ run) ("\n  unplaced: an inner source fed the rest before a position asked of, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else next n run best (ls + linkCount m) m (step m)
 
     next : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict

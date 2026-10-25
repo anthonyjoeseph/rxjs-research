@@ -10,12 +10,21 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SILENT RUN
 
-Probed by `quickcheck.KeptDepth`: an inner connect's source, fed the rest,
-leaves running what trails it. It is the run of no configuration given, so
-the trail must come from a fact over environments, as `body-src-trails` is
-over the stepped one's. Settled when a body, or refuted.
+Probed by `quickcheck.KeptDepth` (trail and flatness only): a node mid-run,
+read in an environment thinned from its own, keeps its run in order and its
+tail trailing it. Built against the unthinned environment, a merge, a
+connect, a joiner or a take must not rest on a skip the thinning erased.
+Settled when bodies, or refuted.
 
-Members: `fed-trail`.
+Members: `shape-conn`, `shape-flat`, `shape-join`, `shape-take`, `shape-sub`.
+
+#### THE THINNED ENVIRONMENT
+
+Untried: a sorted environment thinned is sorted; a source's run in a
+thinned environment is its run there thinned; the source's run fed the
+rest is its stepped run thinned. Settled when bodies, or refuted.
+
+Members: `sorted-thin`, `thin-src`, `thin-fed`.
 
 #### THE FED MERGE
 
@@ -63,12 +72,12 @@ Members: `lane-begins-shut`.
 #### THE SORTED TAILS
 
 Probed: a lane's tail, at its flatMap's environment, is in position order;
-a connect's source runs in order, its tail trailing it. Both are proven only
-for a finite program's subscription (`trailing-subᶠ`); nothing ties a lane's
-or a source's state to a residual of its own subscription. Settled when
-these are bodies or refuted.
+a tape mid-play, an of part-way, an ended source and a run read through its
+tail keep their shape. Proven only for a finite program's subscription
+(`trailing-subᶠ`); nothing ties a state to a residual of its own
+subscription. Settled when these are bodies or refuted.
 
-Members: `lanes-sorted`, `src-trails`, `body-src-trails`.
+Members: `lanes-sorted`, `shape-cold`, `shape-of`, `shape-rest`, `ended-sorted`.
 
 #### THE SWITCH'S KILL
 

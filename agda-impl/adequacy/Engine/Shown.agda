@@ -50,6 +50,7 @@ open import adequacy.Engine.Beside using (Sourced; sourced; sourced-≋)
 open import adequacy.Placed.Order using (Atop; Ordered)
 open import adequacy.Placed.Trail using (Trailing)
 open import adequacy.Engine.FedWalk using (Sought; src-fed)
+open import adequacy.Engine.Trails using (shape-st; shape-src; thinᴱ-refl; envAt-sorted)
 open import adequacy.Engine.Kept using (outer-plug; lanes-plugʳ; body-plug; live-plug)
 open Agreeˢ
 
@@ -79,20 +80,11 @@ postulate
   src-atop : ∀ {R Γ X B} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
            → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
            → Atop r (Events∞.force (stateᴺ (gh o) (envAt c)))
-  -- Its run in order, what it leaves running trailing it.
-  src-trails : ∀ {R Γ X B} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
-             → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
-             → Ordered (Events∞.force (stateᴺ (gh o) (envAt c))) × Trailing (stateᴺ (gh o) (envAt c))
   -- A SOURCE BESIDE ITS BODY, live or closed: its next no earlier than
   -- where it subscribed.
   body-src-atop : ∀ {R Γ X B} (c : Ctx R Γ B) cl sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
                 → Frag (plug c (connS (cs cl true sa ba as nothing r en) o b))
                 → Atop r (Events∞.force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)))
-  -- Its run in order, what it leaves running trailing it.
-  body-src-trails : ∀ {R Γ X B} (c : Ctx R Γ B) cl sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
-                  → Frag (plug c (connS (cs cl true sa ba as nothing r en) o b))
-                  → Ordered (Events∞.force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)))
-                    × Trailing (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c))
   -- The body fed the rest comes after each source skip shows.
   src-body-on : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h h′ : Events∞ X}
               → Sought v q P → KAfter (after q) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
@@ -100,6 +92,24 @@ postulate
               → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
               → h ≋ stateᴺ (gh o) (envAt c) → Dropsˢ P h h′
               → ∀ k → P k → After (k ++ [ ix 0 ]) (head (Events∞.force (stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c))))
+
+-- A LIVE SOURCE, AT ITS CONNECT: its run in order, what it leaves running
+-- trailing it.
+src-trails : ∀ {R Γ X B} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
+           → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
+           → Ordered (Events∞.force (stateᴺ (gh o) (envAt c))) × Trailing (stateᴺ (gh o) (envAt c))
+src-trails c sa ba as r en o b ft = proj₁ (proj₁ (proj₁ sh)) , proj₂ sh
+  where sh = shape-st (inSrc (cs false true sa ba as nothing r en) b c) o ft (thinᴱ-refl (envAt c))
+               (envAt-sorted c (connS (cs false true sa ba as nothing r en) o b) ft)
+
+-- A SOURCE BESIDE ITS BODY, live or closed, likewise.
+body-src-trails : ∀ {R Γ X B} (c : Ctx R Γ B) cl sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
+                → Frag (plug c (connS (cs cl true sa ba as nothing r en) o b))
+                → Ordered (Events∞.force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)))
+                  × Trailing (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c))
+body-src-trails c cl sa ba as r en o b ft = proj₁ (proj₁ (proj₁ sh)) , proj₂ sh
+  where sh = shape-src c (cs cl true sa ba as nothing r en) o b ft (thinᴱ-refl (envAt c))
+               (envAt-sorted c (connS (cs cl true sa ba as nothing r en) o b) ft)
 
 -- A SOURCE'S OWN PASS: its body fed, its own next, the body's next,
 -- and what the run it skips to leaves running trailing it.

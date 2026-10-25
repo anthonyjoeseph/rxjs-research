@@ -41,6 +41,7 @@ open import adequacy.Engine.Race using (After; NotBefore)
 open import adequacy.Engine.Ahead using (Under; shown)
 open import adequacy.Engine.Beside using (Sourced; body-⊒)
 open import adequacy.Placed.Trail using (Trailing)
+open import adequacy.Engine.Trails using (Thin; Thinᴱ; thinᴱ-refl; thin-src; sorted-thin; shape-src; envAt-sorted)
 open import adequacy.Engine.Drop using (Dropsˢ; dropˢ; dropsˢ; Fed; src-alone; body-alone; both; ≋-⊒; mapped-⊒; scanned-⊒; took-⊒; mapped-drops; scanned-drops; took-drops)
 open Events∞
 
@@ -200,14 +201,9 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
     fed-sourced : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa ba as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
                 → Frag (plug e (connS (cs cl true sa ba as nothing r en) s t))
                 → Sourced r (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h) dd))
-    -- AN INNER SOURCE FED THE REST: what it leaves running trails it.  It
-    -- is the run of no configuration given here: the stepped
-    -- configuration's, or a relation that cannot erase forever.
-    --
-    -- DEAD ROUTE: the fed inner source's trail read off its relation to the current one, which trails: an erased step spends depth, so endless erased skips leave the rest unconstrained (refuted at f1f7d119).
-    fed-trail : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa ba as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
-              → Frag (plug e (connS (cs cl true sa ba as nothing r en) s t))
-              → Trailing (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd))
+    -- THE SOURCE'S RUN FED THE REST is its run in the stepped
+    -- environment, thinned.
+    thin-fed : Thin (srcRun (srcG (cs false true sa ba as nothing r en) o) (envAt c)) (force h′)
     -- Hushed, it leaves nothing running; its next shows no earlier than
     -- any position asked of (as `adequacy.Engine.Shown.src-next` at the
     -- fed source).
@@ -222,6 +218,30 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
                 → Frag (plug e (connS (cs cl true sa ba as nothing r en) s t))
                 → ∀ k → Under P k → After (k ++ [ ix 0 ])
                     (head (force (stateᴺ (gh t) (srcRun (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd) ∷ᴬ envOf (force h′) dd))))
+
+  -- The environment fed the rest, the stepped one's thinned.
+  thin-env : ∀ {Δ C} {e : Ctx R Δ C} (dd : Down e) (s : St Δ C) → Frag (plug e s) → Thinᴱ (envAt e) (envOf (force h′) dd)
+  thin-env base                         s fs = thin-fed , thinᴱ-refl (envAt c)
+  thin-env (dMap {f = f} dd)            s fs = thin-env dd (mapS f s) fs
+  thin-env (dScan {f = f} {z = z} dd)       s fs = thin-env dd (scanS f z s) fs
+  thin-env (dCut {l = l} {a = a} dd)        s fs = thin-env dd (cutS l a s) fs
+  thin-env (dLn {l = l} dd)             s fs = thin-env dd (lnS l s) fs
+  thin-env (dTake {i = i} {p = p} {w = w} dd)   s fs = thin-env dd (takeS i p w s) fs
+  thin-env (dOuter {op = op} {f = f} {dn = dn} {n = n} {qs = qs} {ls = ls} dd) s fs = thin-env dd (flatS op f dn n qs s ls) fs
+  thin-env (dLanes {op = op} {f = f} {dn = dn} {n = n} {qs = qs} {s = o′} {pre = pre} {post = post} dd) s fs = thin-env dd (flatS op f dn n qs o′ (pre ʳ++ s ∷ post)) fs
+  thin-env (dSrc {k = k} {t = t} dd)        s fs = thin-env dd (connS k s t) fs
+  thin-env {e = inBody k o′ e} (dBody dd) s fs = thin-src e k o′ s fs th , th
+    where th = thin-env dd (connS k o′ s) fs
+
+  -- AN INNER SOURCE FED THE REST: what it leaves running trails it.
+  --
+  -- DEAD ROUTE: the fed inner source's trail read off its relation to the current one, which trails: an erased step spends depth, so endless erased skips leave the rest unconstrained (refuted at f1f7d119).
+  fed-trail : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa ba as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
+            → Frag (plug e (connS (cs cl true sa ba as nothing r en) s t))
+            → Trailing (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd))
+  fed-trail {e = e} dd cl sa ba as r en s t fs =
+    proj₂ (shape-src e (cs cl true sa ba as nothing r en) s t fs th (sorted-thin (envAt-sorted e (connS (cs cl true sa ba as nothing r en) s t) fs) th))
+    where th = thin-env dd (connS (cs cl true sa ba as nothing r en) s t) fs
 
   -- A source subscribed at its body's mark: fresh, or as it stands.
   sub-fed : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa p as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
