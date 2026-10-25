@@ -74,6 +74,13 @@ Sought true  q P = ∀ k → P k → Σ Pos λ y → k ≡ q ++ y
 -- is not asked.  A joiner of a connect inside the node joined past `q`
 -- shows its source's skip under `q` at its own subscription, neither
 -- under `q` nor erasable while it leads.
+
+-- NOR DOES THE NODE HOLD ANYTHING UNDER `q`.  A connect inside the node
+-- whose source merges a joiner of `i` with a cold held under `q`'s
+-- rejoined skip sees that skip, then the cold's value under it; a joiner
+-- of that connect, rekeying both under `sub`, puts the value before the
+-- skip, so a cold beside it, held there too and leading both, leaves the
+-- skip erased before an event it no longer comes before.
 mutual
   Caught : ∀ {Γ A B} → A ∈ Γ → Pos → U.Node Γ B → Set
   Caught i q (U.mapᶜ f n)                 = Caught i q n
@@ -81,12 +88,15 @@ mutual
   Caught i q (U.takeWhileᶜ w t n)         = Caught i q n
   Caught i q (U.flatMapᶜ op g o ls qs pl) = Caughtᴹ i q o × Caughtᴸ i q ls × Caught i q pl
   Caught i q (U.joinᶜ j p xs nothing)     = (is-just (U.same? i j) ≡ false ⊎ xs ≡ []) × p <ᵖ q ≡ true
-  Caught i q (U.connectᶜ r b s)           = Caught (there i) q b × Caughtˢ i q s
-  Caught i q (U.deferᶜ l p ns)            = Unnoticed i ns
-  Caught i q (U.endingᶜ p n)              = Caught i q n
+  Caught i q (U.framesᶜ τ e m)            = inside q e ≡ false
+  Caught i q (U.burstᶜ τ r k m)           = inside q r ≡ false
+  Caught i q (U.ofᶜ p k xs)               = inside q p ≡ false
+  Caught i q (U.connectᶜ r b s)           = inside q r ≡ false × Caught (there i) q b × Caughtˢ i q s
+  Caught i q (U.deferᶜ l p ns)            = inside q p ≡ false × Unnoticed i ns
+  Caught i q (U.endingᶜ p n)              = inside q p ≡ false × Caught i q n
   Caught i q (U.restᶜ n)                  = Caught i q n
   Caught i q (U.unionᶜ x y)               = Caught i q x × Caught i q y
-  Caught i q (U.burstingᶜ r t)            = Caught i q t
+  Caught i q (U.burstingᶜ r t)            = inside q r ≡ false × Caught i q t
   Caught i q (U.underᶜ s b)               = Caughtˢ i q s × Caught (there i) q b
   Caught i q _                            = ⊤
 
@@ -152,7 +162,8 @@ postulate
                   → Ordered (Events∞.force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)))
                     × Trailing (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c))
   -- NOTHING OWED A LIVE SOURCE: its body's joiners of it joined before
-  -- its skip and hold nothing fed, and no defer there a step of it.
+  -- its skip and hold nothing fed, no defer there a step of it, and
+  -- nothing there is held under the skip.
   caught : ∀ {R Γ X B} q (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
          → KAfter (after q) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
          → Before (after q) (own (connS (cs false true sa ba as nothing r en) o b))

@@ -288,12 +288,15 @@ private
     caughtᵇ i q (U.takeWhileᶜ w t n)         = caughtᵇ i q n
     caughtᵇ i q (U.flatMapᶜ op g o ls qs pl) = caughtᴹᵇ i q o ∧ caughtᴸᵇ i q ls ∧ caughtᵇ i q pl
     caughtᵇ i q (U.joinᶜ j p xs nothing)     = (not (atᵇ j ≡ᵇ i) ∨ null xs) ∧ (p <ᵖ q)
-    caughtᵇ i q (U.connectᶜ r b s)           = caughtᵇ (suc i) q b ∧ caughtˢᵇ i q s
-    caughtᵇ i q (U.deferᶜ l p ns)            = unnoticedᵇ i ns
-    caughtᵇ i q (U.endingᶜ p n)              = caughtᵇ i q n
+    caughtᵇ i q (U.framesᶜ τ e m)            = not (inside q e)
+    caughtᵇ i q (U.burstᶜ τ r k m)           = not (inside q r)
+    caughtᵇ i q (U.ofᶜ p k xs)               = not (inside q p)
+    caughtᵇ i q (U.connectᶜ r b s)           = not (inside q r) ∧ caughtᵇ (suc i) q b ∧ caughtˢᵇ i q s
+    caughtᵇ i q (U.deferᶜ l p ns)            = not (inside q p) ∧ unnoticedᵇ i ns
+    caughtᵇ i q (U.endingᶜ p n)              = not (inside q p) ∧ caughtᵇ i q n
     caughtᵇ i q (U.restᶜ n)                  = caughtᵇ i q n
     caughtᵇ i q (U.unionᶜ x y)               = caughtᵇ i q x ∧ caughtᵇ i q y
-    caughtᵇ i q (U.burstingᶜ r t)            = caughtᵇ i q t
+    caughtᵇ i q (U.burstingᶜ r t)            = not (inside q r) ∧ caughtᵇ i q t
     caughtᵇ i q (U.underᶜ s b)               = caughtˢᵇ i q s ∧ caughtᵇ (suc i) q b
     caughtᵇ i q _                            = true
 
