@@ -17,18 +17,16 @@ open import Data.List using (List; []; _∷_; _ʳ++_)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_; proj₁)
-open import Data.Sum using (_⊎_; inj₁)
-open import Data.Unit using (⊤; tt)
-open import Data.Nat using (zero; suc)
+open import Data.Unit using (tt)
 
-open import denotation.MonotonicList.Events using (Events; Events∞; ix; out; skip; end; hush)
+open import denotation.MonotonicList.Events using (Events; Events∞; ix; end)
 open import denotation.Unfold using (NEnv; stateᴺ; idleᶜ; restᶜ)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ctx; top; inMap; inScan; inCut; inLn;
   inTake; inOuter; inLanes; inSrc; inBody; plug; cs; CS; _⊕_)
 open import adequacy.Engine.Meaning using (gh; envAt; srcRun; srcG; srcState; subOr)
 open import adequacy.Engine.Head using (Frag)
-open import adequacy.Engine.Drop using (Eraseᴱ; stopᴱ; outᴱ; skipᴱ; endᴱ; hushᴱ; Drops)
+open import adequacy.Engine.Thin using (Thin; Thinᴱ; thinᴱ-refl)
 open import adequacy.Placed.Order using (Ordered; Steady; Every; Headed; Sorted; ordered-map; ordered-scan; steady-map; steady-scan)
 open import adequacy.Placed.Keys using (every-map; every-scan)
 open import adequacy.Placed.Trail using (Trailing; trail-idle; trail-map; trail-scan)
@@ -40,26 +38,6 @@ open Events∞
 -- A run in order, steady and headed, what it leaves running trailing it.
 Shape : ∀ {A} → Events∞ A → Set
 Shape σ = ((Ordered (force σ) × Steady (force σ)) × Every Headed (force σ)) × Trailing σ
-
--- A source's run thinned: its skips erased, or past its leading skips.
-Thin : ∀ {A} → Events A → Events A → Set
-Thin e e′ = (∀ n → Eraseᴱ n e e′) ⊎ Drops e e′
-
--- Each source's run thinned.
-Thinᴱ : ∀ {Γ} → NEnv Γ → NEnv Γ → Set
-Thinᴱ []ᴬ       []ᴬ        = ⊤
-Thinᴱ (e ∷ᴬ ρ) (e′ ∷ᴬ ρ′) = Thin e e′ × Thinᴱ ρ ρ′
-
-eraseᴱ-refl : ∀ {A} n (e : Events A) → Eraseᴱ n e e
-eraseᴱ-refl zero    e              = stopᴱ
-eraseᴱ-refl (suc n) (out p a r) = outᴱ (eraseᴱ-refl n (force r))
-eraseᴱ-refl (suc n) (skip p r)  = skipᴱ (eraseᴱ-refl n (force r))
-eraseᴱ-refl (suc n) (end p)     = endᴱ
-eraseᴱ-refl (suc n) hush        = hushᴱ
-
-thinᴱ-refl : ∀ {Γ} (ρ : NEnv Γ) → Thinᴱ ρ ρ
-thinᴱ-refl []ᴬ      = tt
-thinᴱ-refl (e ∷ᴬ ρ) = inj₁ (λ n → eraseᴱ-refl n e) , thinᴱ-refl ρ
 
 -- Nothing running.
 shape-idle : ∀ {Γ A} (ρ : NEnv Γ) → Shape {A} (stateᴺ idleᶜ ρ)

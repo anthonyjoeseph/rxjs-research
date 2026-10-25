@@ -50,7 +50,8 @@ open import adequacy.Engine.Beside using (Sourced; sourced; sourced-≋)
 open import adequacy.Placed.Order using (Atop; Ordered)
 open import adequacy.Placed.Trail using (Trailing)
 open import adequacy.Engine.FedWalk using (Sought; src-fed)
-open import adequacy.Engine.Trails using (shape-st; shape-src; thinᴱ-refl; envAt-sorted)
+open import adequacy.Engine.Trails using (shape-st; shape-src; envAt-sorted)
+open import adequacy.Engine.Thin using (thinᴱ-refl)
 open import adequacy.Engine.Kept using (outer-plug; lanes-plugʳ; body-plug; live-plug)
 open Agreeˢ
 

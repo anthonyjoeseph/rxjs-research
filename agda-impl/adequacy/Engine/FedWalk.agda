@@ -26,7 +26,7 @@ open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans)
 
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; hush; idle; ix)
-open import denotation.MonotonicList using (head; Agree; Agreeᵀ; agree-refl; agree-sym; agree-trans)
+open import denotation.MonotonicList using (head; Agree; Agreeᵀ; agree-sym)
 open import denotation.NonExpansive using (Agreeˢ)
 open import denotation.Unfold using (Node; NEnv; meaning; stateᴺ)
 open import operation.Key using (after)
@@ -37,13 +37,15 @@ open import operation.PureObservable using (ending; play; over)
 open import adequacy.Engine.Meaning using (_≋_; ≋-by; gh; envAt; srcRun; srcG; srcState; subOr; bodyConn; mapped; scanned; took)
 open import adequacy.Engine.Head using (Frag; cand)
 open import adequacy.Engine.Pick using (KAfter; Before)
-open import adequacy.Engine.Erase using (Eraseˢ; _,ᵉ_; nowᵉ; Eraseᵀ; Erase; Lead⁼; _⊒_)
+open import adequacy.Engine.Erase using (Eraseˢ; _,ᵉ_; Eraseᵀ; Erase; Lead⁼; _⊒_)
 open import adequacy.Engine.Race using (After; NotBefore)
 open import adequacy.Engine.Ahead using (Under; shown)
 open import adequacy.Engine.Beside using (Sourced; body-⊒)
 open import adequacy.Placed.Trail using (Trailing)
-open import adequacy.Engine.Trails using (Thin; Thinᴱ; thinᴱ-refl; thin-src; sorted-thin; shape-src; envAt-sorted)
-open import adequacy.Engine.Drop using (Drops; drop; drops; erase-events; Dropsˢ; dropˢ; dropsˢ; Fed; src-alone; body-alone; both; ≋-⊒; mapped-⊒; scanned-⊒; took-⊒; mapped-drops; scanned-drops; took-drops)
+open import adequacy.Engine.Thin using (Thin; Thinᴱ; thinᴱ-refl; drops-thin)
+open import adequacy.Engine.Trails using (thin-src; sorted-thin; shape-src; envAt-sorted)
+open import adequacy.Engine.Drop using (Dropsˢ; dropˢ; dropsˢ; Fed; src-alone; body-alone; both; ≋-⊒; mapped-⊒; scanned-⊒; took-⊒;
+  mapped-drops; scanned-drops; took-drops)
 open Events∞
 open Agreeˢ
 
@@ -109,14 +111,9 @@ drops-mono : ∀ {A} {Q Q′ : Pos → Set} → (∀ {k} → Q k → Q′ k) →
 drops-mono m (dropˢ p a r)  = dropˢ (m p) a r
 drops-mono m (dropsˢ p a d) = dropsˢ (m p) a (drops-mono m d)
 
--- Past leading skips, with its tail, is past them without.
-drops-thin : ∀ {A P} {e : Events A} {h h′ : Events∞ A} → (∀ n → Agree n e (force h)) → Dropsˢ P h h′ → Drops e (force h′)
-drops-thin y (dropˢ _ a r)  = drop (λ n → agree-trans (y n) (a n)) (λ n → erase-events (nowᵉ (proj₂ (proj₂ r) n)))
-drops-thin y (dropsˢ _ a d) = drops (λ n → agree-trans (y n) (a n)) (drops-thin (λ n → agree-refl n _) d)
-
 -- A node's run past leading skips is its run thinned.
 drops-meaning : ∀ {Γ X P} (n : Node Γ X) {ρ} {h h′ : Events∞ X} → h ≋ stateᴺ n ρ → Dropsˢ P h h′ → Thin (meaning n ρ) (force h′)
-drops-meaning n x d = inj₂ (drops-thin (λ k → agree-sym (nowˢ (x k))) d)
+drops-meaning n x d = drops-thin (λ k → agree-sym (nowˢ (x k))) d
 
 -- A live source's run past leading skips is its run thinned, unless it is
 -- still pending under a body that has subscribed it.

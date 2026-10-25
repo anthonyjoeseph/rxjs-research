@@ -450,7 +450,7 @@ private
     shapedLᵇ []       ρ = true
     shapedLᵇ (l ∷ ls) ρ = shapedᵇ l ρ ∧ shapedLᵇ ls ρ
 
-  -- `adequacy.Engine.Trails.Thin`, decided, values unread: `e′` is `e` with
+  -- `adequacy.Engine.Thin.Thin`, decided, values and tails unread: `e′` is `e` with
   -- skips erased, a skip kept where its position comes next.
   thinᵇ : ∀ {A} → ℕ → Events A → Events A → Bool
   thinᵇ zero    _           _            = true

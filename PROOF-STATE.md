@@ -23,7 +23,7 @@ Members: `shape-conn`, `shape-flat`, `shape-join`, `shape-take`, `shape-sub`.
 
 Probed by `quickcheck.KeptDepth` in the body fed the rest: a source's run
 in a thinned environment is its run there thinned. Untried: a sorted
-environment thinned is sorted; a source still pending under
+environment thinned (tails unpinned in order, so headed still) is sorted; a source still pending under
 a body that has subscribed it, fed the rest, is its subscribed run thinned.
 Settled when bodies, or refuted.
 
