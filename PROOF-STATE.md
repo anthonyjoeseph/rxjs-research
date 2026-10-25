@@ -8,6 +8,18 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE ERASURE
+
+Refuted for a skip or a pin erased out of order (`adequacy.Engine.Drop`'s
+`Erase`, `Eraseᵀ`); restated: each erased one comes no later than the other's
+next.
+Open: a merge fed a part so erased runs so erased, its tail agreeing. The
+proof walks `go` against both sides' heads: a pin emits once ahead of every
+head, a switch adds killed lanes' tails. Settled when the three are bodies,
+or refuted again.
+
+Members: `lanes-⊒`, `outer-⊒`, `body-⊒`.
+
 #### THE SILENT RUN
 
 Refuted as one dropped skip (`quickcheck.KeptDepth`: a lane joined after its
@@ -18,17 +30,6 @@ and a defer's fresh source among them. Settled when these are bodies, or
 refuted again.
 
 Members: `src-fed`, `src-body-on`, `defer-links`.
-
-#### THE ERASURE
-
-Untried: a merge fed a part with skips erased runs with skips erased, its
-tail agreeing. The merge reads tails: a pin in what ended parts left emits
-once ahead of every part's head, and a switch adds its killed lanes' tails,
-so an erased skip in one part must leave the others' pins in order
-(`quickcheck.KeptDepth` checks tails at the root). Settled when the three
-are bodies, or one is refuted (then `_⊒_` reads tails more loosely).
-
-Members: `lanes-⊒`, `outer-⊒`, `body-⊒`.
 
 #### THE CLOSED LANE
 
