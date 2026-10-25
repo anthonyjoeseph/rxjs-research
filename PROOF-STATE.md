@@ -10,24 +10,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SILENT RUN
 
-Probed by `quickcheck.KeptDepth` at every node, as configured and fed the
-rest: a node mid-run,
-read in an environment thinned from its own, keeps its run in order and its
-tail trailing it. Built against the unthinned environment, a merge, a
-connect, a joiner or a take must not rest on a skip the thinning erased.
+Probed by `quickcheck.KeptDepth` at every node of every configuration
+reached: a node mid-run, in the environment its connects give it, keeps
+its run in order, steady and headed, and its tail trailing it. Untried as
+bodies: a merge, a connect, a joiner, a take, a source subscribed fresh.
 Settled when bodies, or refuted.
 
 Members: `shape-conn`, `shape-flat`, `shape-join`, `shape-take`, `shape-sub`.
-
-#### THE THINNED ENVIRONMENT
-
-Probed by `quickcheck.KeptDepth` in the body fed the rest: a source's run
-in a thinned environment is its run there thinned. Untried: a sorted
-environment thinned is sorted; a source still pending under
-a body that has subscribed it, fed the rest, is its subscribed run thinned.
-Settled when bodies, or refuted.
-
-Members: `sorted-thin`, `thin-src`, `thin-fed-sub`.
 
 #### THE FED MERGE
 
@@ -80,7 +69,7 @@ tail keep their shape. Proven only for a finite program's subscription
 (`trailing-subᶠ`); nothing ties a state to a residual of its own
 subscription. Settled when these are bodies or refuted.
 
-Members: `lanes-sorted`, `shape-cold`, `shape-of`, `shape-rest`, `ended-sorted`.
+Members: `lanes-sorted`, `shape-cold`, `shape-of`, `shape-rest`.
 
 #### THE SWITCH'S KILL
 

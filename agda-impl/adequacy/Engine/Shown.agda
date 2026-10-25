@@ -50,7 +50,7 @@ open import adequacy.Engine.Beside using (Sourced; sourced; sourced-≋)
 open import adequacy.Placed.Order using (Atop; Ordered)
 open import adequacy.Placed.Trail using (Trailing)
 open import adequacy.Engine.FedWalk using (Sought; src-fed)
-open import adequacy.Engine.Trails using (shape-st; shape-src; thinᴱ-refl; envAt-sorted)
+open import adequacy.Engine.Trails using (shape-st; shape-src)
 open import adequacy.Engine.Kept using (outer-plug; lanes-plugʳ; body-plug; live-plug)
 open Agreeˢ
 
@@ -99,8 +99,7 @@ src-trails : ∀ {R Γ X B} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St
            → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
            → Ordered (Events∞.force (stateᴺ (gh o) (envAt c))) × Trailing (stateᴺ (gh o) (envAt c))
 src-trails c sa ba as r en o b ft = proj₁ (proj₁ (proj₁ sh)) , proj₂ sh
-  where sh = shape-st (inSrc (cs false true sa ba as nothing r en) b c) o ft (thinᴱ-refl (envAt c))
-               (envAt-sorted c (connS (cs false true sa ba as nothing r en) o b) ft)
+  where sh = shape-st (inSrc (cs false true sa ba as nothing r en) b c) o ft
 
 -- A SOURCE BESIDE ITS BODY, live or closed, likewise.
 body-src-trails : ∀ {R Γ X B} (c : Ctx R Γ B) cl sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
@@ -108,8 +107,7 @@ body-src-trails : ∀ {R Γ X B} (c : Ctx R Γ B) cl sa ba as r en (o : St Γ X)
                 → Ordered (Events∞.force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)))
                   × Trailing (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c))
 body-src-trails c cl sa ba as r en o b ft = proj₁ (proj₁ (proj₁ sh)) , proj₂ sh
-  where sh = shape-src c (cs cl true sa ba as nothing r en) o b ft (thinᴱ-refl (envAt c))
-               (envAt-sorted c (connS (cs cl true sa ba as nothing r en) o b) ft)
+  where sh = shape-src c (cs cl true sa ba as nothing r en) o b ft
 
 -- A SOURCE'S OWN PASS: its body fed, its own next, the body's next,
 -- and what the run it skips to leaves running trailing it.
@@ -118,9 +116,10 @@ src-pass : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (
          → Before (after q) (own (connS (cs false true sa ba as nothing r en) o b))
          → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
          → h ≋ stateᴺ (gh o) (envAt c) → Dropsˢ P h h′ → Trailing h′
+         → (o′ : St Γ X) → Frag (plug c (connS (cs false true sa ba as nothing r en) o′ b)) → Unpended o′ → h′ ≋ stateᴺ (gh o′) (envAt c)
          → SrcPass P (stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c)) h′
-src-pass v q c sa ba as r en o b so ka bf ft x d t = record
-  { fed     = src-fed v q c sa ba as r en o b so ka bf ft x d
+src-pass v q c sa ba as r en o b so ka bf ft x d t o′ ft′ u′ x′ = record
+  { fed     = src-fed v q c sa ba as r en o b so ka bf ft x d o′ ft′ u′ x′
   ; srcOn   = proj₂ (src-next v q c sa ba as r en o b so ft x d)
   ; srcHush = proj₁ (src-next v q c sa ba as r en o b so ft x d)
   ; bodyOn  = src-body-on v q c sa ba as r en o b so ka bf ft x d
@@ -277,7 +276,7 @@ beat-pass v q {P} (inSrc (cs false true sa ba as nothing r en) b c) s f so (ka ,
     kk = cs false true sa ba as nothing r en
     sp = src-pass v q c sa ba as r en s b so (subst (λ K → KAfter K (cand (inBody kk s c) b)) (past-key v q) ka)
            (subst (λ K → Before K (own (connS kk s b))) (past-key v q) bf) ft x d
-           (Sourced.srcTrail (sourced-≋ x′ (src-sourced c sa ba as r en s′ b ft′)))
+           (Sourced.srcTrail (sourced-≋ x′ (src-sourced c sa ba as r en s′ b ft′))) s′ ft′ u′ x′
 beat-pass v q (inSrc (cs false true sa ba as (just _) r en) b c) s f so w ft u () fl x d s′ ft′ u′ fl′ x′
 beat-pass v q (inSrc (cs false false sa ba as ow r en) b c) s f so w ft u () fl x d s′ ft′ u′ fl′ x′
 beat-pass v q (inSrc (cs true sl sa ba as ow r en) b c) s f so w ft u () fl x d s′ ft′ u′ fl′ x′
