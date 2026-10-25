@@ -33,6 +33,7 @@ open import adequacy.Engine.Above using (Flight; above-≋; keys-above; take-exc
 open import adequacy.Engine.Ahead using (Under; shown; ahead-mono; under-sub)
 open import adequacy.Engine.Race using (NotBefore)
 open import adequacy.Engine.Meaning using (envAt; gh; risen; lane; lanesL; laneRuns; poolRuns; outerT; outerG; poolG; deadL)
+open import adequacy.Engine.Flown using (Owed; NextOwed; rise-owed; sub-owed)
 open import adequacy.Engine.Pick using (Order; order; module Order; whole; KeysAt; Shaped; Lead; Clear; Ends; EndsIf; Won; won-clear; won-ends; search-won; Apart; Searched)
 open import operation.PureObservable using (Tape; due; play; ending; over; module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
@@ -565,13 +566,7 @@ module _ {R : Set} where
   NextInv (complete p)    = ⊤
   NextInv drained         = ⊤
 
-  -- What a configuration owes of its flight beyond what its shape gives:
-  -- a settled node's is read off the whole tree.
-  Owed : Conf R → Set
-  Owed ⟨ c , s , absorbed , p ⟩ = ⊤
-  Owed k                        = Flight k
-
-  NextFrag NextKeys NextShape NextFlight NextOwed NextLead NextApart : Step → Set
+  NextFrag NextKeys NextShape NextFlight NextLead NextApart : Step → Set
   NextFrag (silent t k)    = Frag (whole k)
   NextFrag (value t p a k) = Frag (whole k)
   NextFrag (complete p)    = ⊤
@@ -588,10 +583,6 @@ module _ {R : Set} where
   NextFlight (value t p a k) = Flight k
   NextFlight (complete p)    = ⊤
   NextFlight drained         = ⊤
-  NextOwed (silent t k)    = Owed k
-  NextOwed (value t p a k) = Owed k
-  NextOwed (complete p)    = ⊤
-  NextOwed drained         = ⊤
   NextLead (silent t k)    = Lead k
   NextLead (value t p a k) = Lead k
   NextLead (complete p)    = ⊤
@@ -628,9 +619,10 @@ module _ {R : Set} where
     begin-keys : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Inv ⟨ c , pend o , subscribing , p ⟩
                → NextKeys (step ⟨ c , pend o , subscribing , p ⟩)
     run-keys : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , absorbed , p ⟩ → NextKeys (step ⟨ c , s , absorbed , p ⟩)
-    -- A step to a value in flight or a subscription keeps its hole's run
-    -- in shape, and what every frame above keeps of it.
-    flight-owed : ∀ k → Base k → Order k → NextOwed (step k)
+    -- THE FLIGHT KEPT: a mark run rising or subscribing what it ran
+    -- leaves its hole's run in shape, and every frame above keeping its
+    -- share.
+    run-flight : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , absorbed , p ⟩ → NextOwed (step ⟨ c , s , absorbed , p ⟩)
     -- A tree's first subscription is in shape.
     flight-load : (o : Obs Timeline [] R) → Flight (Machine.load o)
     -- A settled node anywhere in a tree the shape holds of: its run, and
@@ -895,6 +887,13 @@ module _ {R : Set} where
 
   shape-next : ∀ k → Base k → Order k → NextShape (step k)
   shape-next k b o = held (step k) (frag-next k b (proj₁ (Order.shape o))) (keys-next k b o)
+
+  -- A step to a value in flight or a subscription keeps its hole's run
+  -- in shape, and what every frame above keeps of it.
+  flight-owed : ∀ k → Base k → Order k → NextOwed (step k)
+  flight-owed ⟨ c , s , rising e , p ⟩    b o = rise-owed c s e p o
+  flight-owed ⟨ c , s , subscribing , p ⟩ b o = sub-owed c s p o
+  flight-owed ⟨ c , s , absorbed , p ⟩    b o = run-flight c s p (b & o)
 
   flight-of : ∀ k → Shaped k → Owed k → Flight k
   flight-of ⟨ c , s , absorbed , p ⟩    h _ = flight-held c s p h
