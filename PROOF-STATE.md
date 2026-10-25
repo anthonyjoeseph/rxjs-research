@@ -10,13 +10,24 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SILENT RUN
 
-Each skipped step drops a skip at one position of its hole; whether every
-frame above passes it there. Away from a live source the search's race
-settles it (`Ahead`), a subscription's by the lead it carries. Open: each
-live source's link, its body fed the source's skips dropping its own, and
-a defer's fresh source among them. Settled when these are bodies, or refuted.
+Refuted as one dropped skip (`quickcheck.KeptDepth`: a lane joined after its
+source's skip sees a later skip erased); restated: a skipped step drops its
+hole's leading skips and erases none or more past them. Open: each live
+source's link, its body fed the source's skips dropping and erasing its own,
+and a defer's fresh source among them. Settled when these are bodies, or
+refuted again.
 
 Members: `src-fed`, `src-body-on`, `defer-links`.
+
+#### THE ERASURE
+
+Untried, and unchecked by any harness on tails: each frame fed a run with
+skips erased runs with skips erased, its tail agreeing. A merge's tail is
+what its parts leave running, so an erased skip in one part must not move
+another's pin. Settled when the six are bodies, or one is refuted (then `_⊒_`
+reads tails more loosely).
+
+Members: `mapped-⊒`, `scanned-⊒`, `took-⊒`, `lanes-⊒`, `outer-⊒`, `body-⊒`.
 
 #### THE CLOSED LANE
 
@@ -47,8 +58,8 @@ Members: `kill-pool`.
 #### THE STILL'S SUBTREE
 
 Untried: a still skip leads every race above it past each live source's
-skips: nothing above is due under the skip's position, and every joiner
-joined before it. Both what the search finds (`Apart`; `quickcheck.KeptDepth` checks every absorbed configuration)
+skips: nothing above is due under the skip's position. Both what the search
+finds (`Apart`; `quickcheck.KeptDepth` checks every absorbed configuration)
 and the skip a value or a lane's end leaves just past itself, where the race
 `Won` records only the shifted key, and the lane a value or an end begins,
 whose frames above must pass every skip under its position. Settled when

@@ -1,8 +1,8 @@
 {-# OPTIONS --guardedness #-}
 
 -- A SKIP DROPPED AT A HOLE IS DROPPED AT THE ROOT, when every frame on
--- the way up shows it next (`Pass`): a run past leading skips at the hole
--- (`Dropsˢ`) is a run past leading skips at the root (`lift-drops`).
+-- the way up shows it next (`Pass`): a run past leading skips at the hole,
+-- the rest with skips erased (`Dropsˢ`), is one at the root (`lift-drops`).
 --
 -- A frame with one child passes a skip as it is.  A switched-off cut, a
 -- takeWhile past its decision, a connect that is over or whose source is
@@ -11,7 +11,19 @@
 -- the skip when it comes first among them.  A connect's source passes it
 -- with what its joiners saw of it, each under the skip's position
 -- (`Under`): the body fed the run drops its own skips to the body fed
--- the rest (`Fed`).
+-- the rest, or erases them (`Fed`).
+
+-- ERASURE IS WHAT A JOINER JOINED LATE SEES.  A lane a source's value
+-- opens reads the source's run from where it joins, a skip before that
+-- shown as one of its own (`denotation.Unfold`'s `rejoin`); past a
+-- source's skip, the lanes not yet joined no longer see it, wherever
+-- their own skips stand among the body's.  So the run past leading skips
+-- is not the rest alike but the rest with skips erased (`_⊒_`), each
+-- tail erased alike, its next the same.
+--
+-- REFUTED: c4f9b49e the rest alike, by `quickcheck.KeptDepth`'s lane joined
+--   after its source's skip: the step drops the source's skip and erases
+--   a later lane's, a kept body skip between them.
 module adequacy.Engine.Drop where
 
 open import Data.Bool using (Bool; true; false)
@@ -21,40 +33,167 @@ import Data.List as L
 import denotation.MonotonicList as M′
 open import Data.List.Relation.Unary.All using (All) renaming (_∷_ to _∷ᴬ_)
 open import Data.Maybe using (just; nothing)
-open import Data.Nat using (zero; suc)
+open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
 
-open import denotation.MonotonicList.Events using (Events; Events∞; Pos; out; skip; end; hush; idle; _∪_; ix; _<ᵖ_)
-open import denotation.MonotonicList using (head; Agree; Agreeᵀ; stop; skip⁼; agree-refl; agree-trans; agree-sym; agreeᵀ-refl;
-  agreeᵀ-sym)
+open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Tail∞; pin; Pos; out; skip; end; hush; idle; _∪_; ix; _<ᵖ_)
+open import denotation.MonotonicList using (head; Agree; Agreeᵀ; stop; stopᵀ; pin⁼; idle⁼; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agree-trans;
+  agree-sym; agreeᵀ-refl; agreeᵀ-sym; agreeᵀ-trans; agreeᵀ-pred; agree-pred)
 open import denotation.NonExpansive using (_,ˢ_; mapᴱ-ne; scanᴱ-ne; takeWhileᴱ-ne; ∪-ne; beside-ne; burstOn-ne; Outerᴿ; liveᴼ; whole-ne; go-ne; mapᴱ-neᴹ; Lanes)
 open import denotation.Unfold using (Node; NEnv; stateᴺ; states; outerᴺ; meaning; cutᴺ; outer∞)
 open import denotation.Denote using (flatOp)
 open import operation.PureObservable using (module Machine)
 open Machine using (nx; cp; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; cs; free; cpAt; cutAt; overAt; closed)
-open import adequacy.Engine.Meaning using (_≋_; ≋-by; ≋-trans; same; up; mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn; srcState;
-  srcG; envAt; gh; lane; lanesL; deadL; outerG; outerT; poolRuns; poolT; laneᴹ; lanesFrame-ne;
-  outerFrame-ne; outerOf; lanes-refl; queue-refl; outer-refl; ≈-refl; risen)
+open import adequacy.Engine.Meaning using (_≋_; ≋-by; same; up; mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn;
+  srcState; srcG; envAt; gh; lane; lanesL; deadL; outerG; outerT; poolRuns; poolT; laneᴹ;
+  lanesFrame-ne; outerFrame-ne; outerOf; lanes-refl; queue-refl; outer-refl; ≈-refl; risen)
 open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore; go-rise; go-outer)
 open import adequacy.Engine.Ahead using (Under; shown)
 open Events∞
+open Tail∞
 open import denotation.NonExpansive using (Agreeˢ)
 open Agreeˢ
 
 ------------------------------------------------------------------------
+-- Runs with skips erased
+
+-- A tail with none or more of its pins erased.
+data Eraseᵀ : ℕ → Tail → Tail → Set where
+  stopᵉ : ∀ {x y} → Eraseᵀ zero x y
+  pinᵉ  : ∀ {k p l r} → Eraseᵀ k (later l) (later r) → Eraseᵀ (suc k) (pin p l) (pin p r)
+  unpin : ∀ {k p l r} → Eraseᵀ k (later l) r → Eraseᵀ (suc k) (pin p l) r
+  idleᵉ : ∀ {k} → Eraseᵀ (suc k) idle idle
+
+-- A run with none or more of its skips erased, `t` what the other leaves
+-- running where it stands: each event kept alike, each tail beside one
+-- erased alike, the tail past an erased skip beside the other's.
+data Erase {A : Set} : ℕ → Events A → Tail → Events A → Set where
+  stopᵉ  : ∀ {x t y} → Erase zero x t y
+  outᵉ   : ∀ {k p a l r t} → Eraseᵀ k (cut l) (cut r) → Erase k (force l) (cut r) (force r) → Erase (suc k) (out p a l) t (out p a r)
+  skipᵉ  : ∀ {k p l r t} → Eraseᵀ k (cut l) (cut r) → Erase k (force l) (cut r) (force r) → Erase (suc k) (skip p l) t (skip p r)
+  erased : ∀ {k p l t e} → Eraseᵀ k (cut l) t → Erase k (force l) t e → Erase (suc k) (skip p l) t e
+  endᵉ   : ∀ {k p t} → Erase (suc k) (end p) t (end p)
+  hushᵉ  : ∀ {k t} → Erase (suc k) hush t hush
+
+-- The same with no tails, at the root.
+data Eraseᴱ {A : Set} : ℕ → Events A → Events A → Set where
+  stopᴱ   : ∀ {x y} → Eraseᴱ zero x y
+  outᴱ    : ∀ {k p a l r} → Eraseᴱ k (force l) (force r) → Eraseᴱ (suc k) (out p a l) (out p a r)
+  skipᴱ   : ∀ {k p l r} → Eraseᴱ k (force l) (force r) → Eraseᴱ (suc k) (skip p l) (skip p r)
+  erasedᴱ : ∀ {k p l e} → Eraseᴱ k (force l) e → Eraseᴱ (suc k) (skip p l) e
+  endᴱ    : ∀ {k p} → Eraseᴱ (suc k) (end p) (end p)
+  hushᴱ   : ∀ {k} → Eraseᴱ (suc k) hush hush
+
+-- Two runs with the same next.
+data Lead⁼ {A : Set} : Events A → Events A → Set where
+  outᴸ  : ∀ {p a l r} → Lead⁼ (out p a l) (out p a r)
+  skipᴸ : ∀ {p l r} → Lead⁼ (skip p l) (skip p r)
+  endᴸ  : ∀ {p} → Lead⁼ (end p) (end p)
+  hushᴸ : Lead⁼ hush hush
+
+record Eraseˢ {A : Set} (m : ℕ) (l l′ : Events∞ A) : Set where
+  constructor _,ᵉ_
+  field
+    cutᵉ : Eraseᵀ m (cut l) (cut l′)
+    nowᵉ : Erase m (force l) (cut l′) (force l′)
+open Eraseˢ
+
+-- THE REST, ERASED: `h′` is `h` with skips erased, its next kept, and,
+-- hushed, leaving the same running.
+_⊒_ : ∀ {A} → Events∞ A → Events∞ A → Set
+h ⊒ h′ = Lead⁼ (force h) (force h′) × (force h ≡ hush → ∀ d → Agreeᵀ d (cut h) (cut h′)) × (∀ n → Eraseˢ n h h′)
+
+private
+  eraseᵀ-agree : ∀ {k} {x y : Tail} → Agreeᵀ k x y → Eraseᵀ k x y
+  eraseᵀ-agree stopᵀ    = stopᵉ
+  eraseᵀ-agree (pin⁼ a) = pinᵉ (eraseᵀ-agree a)
+  eraseᵀ-agree idle⁼    = idleᵉ
+
+  erase-agree : ∀ {A k} {x y : Events A} {t} → Agree k x y → Erase k x t y
+  erase-agree stop        = stopᵉ
+  erase-agree (out⁼ t a)  = outᵉ (eraseᵀ-agree t) (erase-agree a)
+  erase-agree (skip⁼ t a) = skipᵉ (eraseᵀ-agree t) (erase-agree a)
+  erase-agree end⁼        = endᵉ
+  erase-agree hush⁼       = hushᵉ
+
+  lead-agree : ∀ {A} {x y : Events A} → Agree 1 x y → Lead⁼ x y
+  lead-agree (out⁼ _ _)  = outᴸ
+  lead-agree (skip⁼ _ _) = skipᴸ
+  lead-agree end⁼        = endᴸ
+  lead-agree hush⁼       = hushᴸ
+
+  eraseᵀ-then : ∀ {k} {x y z : Tail} → Eraseᵀ k x y → Agreeᵀ k y z → Eraseᵀ k x z
+  eraseᵀ-then stopᵉ     a        = stopᵉ
+  eraseᵀ-then (pinᵉ e)  (pin⁼ a) = pinᵉ (eraseᵀ-then e a)
+  eraseᵀ-then (unpin e) a        = unpin (eraseᵀ-then e (agreeᵀ-pred a))
+  eraseᵀ-then idleᵉ     idle⁼    = idleᵉ
+
+  erase-then : ∀ {A k} {x y z : Events A} {t t′} → Erase k x t y → Agreeᵀ k t t′ → Agree k y z → Erase k x t′ z
+  erase-then stopᵉ        u a           = stopᵉ
+  erase-then (outᵉ e x)   u (out⁼ t a)  = outᵉ (eraseᵀ-then e t) (erase-then x t a)
+  erase-then (skipᵉ e x)  u (skip⁼ t a) = skipᵉ (eraseᵀ-then e t) (erase-then x t a)
+  erase-then (erased e x) u a           = erased (eraseᵀ-then e (agreeᵀ-pred u)) (erase-then x (agreeᵀ-pred u) (agree-pred a))
+  erase-then endᵉ         u end⁼        = endᵉ
+  erase-then hushᵉ        u hush⁼       = hushᵉ
+
+  lead-then : ∀ {A} {x y z : Events A} → Lead⁼ x y → Agree 1 y z → Lead⁼ x z
+  lead-then outᴸ  (out⁼ _ _)  = outᴸ
+  lead-then skipᴸ (skip⁼ _ _) = skipᴸ
+  lead-then endᴸ  end⁼        = endᴸ
+  lead-then hushᴸ hush⁼       = hushᴸ
+
+-- Runs alike, one the other erased of nothing.
+≋-⊒ : ∀ {A} {h h′ : Events∞ A} → h ≋ h′ → h ⊒ h′
+≋-⊒ x = lead-agree (nowˢ (x 1)) , (λ _ d → cutˢ (x d)) , λ n → eraseᵀ-agree (cutˢ (x n)) ,ᵉ erase-agree (nowˢ (x n))
+
+-- Erased, then alike.
+⊒-≋ : ∀ {A} {h h₀ h′ : Events∞ A} → h ⊒ h₀ → h₀ ≋ h′ → h ⊒ h′
+⊒-≋ (l , u , e) x =
+  lead-then l (nowˢ (x 1)) , (λ eq d → agreeᵀ-trans (u eq d) (cutˢ (x d))) ,
+  λ n → eraseᵀ-then (cutᵉ (e n)) (cutˢ (x n)) ,ᵉ erase-then (nowᵉ (e n)) (cutˢ (x n)) (nowˢ (x n))
+
+-- The next of a run erased is the next of the run.
+lead-head : ∀ {A} {x y : Events A} → Lead⁼ x y → head x ≡ head y
+lead-head outᴸ  = refl
+lead-head skipᴸ = refl
+lead-head endᴸ  = refl
+lead-head hushᴸ = refl
+
+lead-shown : ∀ {A} {x y : Events A} → Lead⁼ x y → shown x ≡ shown y
+lead-shown outᴸ  = refl
+lead-shown skipᴸ = refl
+lead-shown endᴸ  = refl
+lead-shown hushᴸ = refl
+
+-- Hushed erased, hushed alike: what it leaves running is the other's.
+lead-hush : ∀ {A} {h h′ : Events∞ A} → h ⊒ h′ → (force h′ ≡ hush → ∀ d → Agreeᵀ d (cut h′) idle) → force h ≡ hush → ∀ d → Agreeᵀ d (cut h) idle
+lead-hush {h = h} (l , u , e) hc eq d = agreeᵀ-trans (u eq d) (hc (hushed (subst (λ x → Lead⁼ x _) eq l)) d)
+  where hushed : ∀ {A} {y : Events A} → Lead⁼ hush y → y ≡ hush
+        hushed hushᴸ = refl
+
+-- No tails.
+erase-events : ∀ {A k} {x y : Events A} {t} → Erase k x t y → Eraseᴱ k x y
+erase-events stopᵉ        = stopᴱ
+erase-events (outᵉ _ e)   = outᴱ (erase-events e)
+erase-events (skipᵉ _ e)  = skipᴱ (erase-events e)
+erase-events (erased _ e) = erasedᴱ (erase-events e)
+erase-events endᵉ         = endᴱ
+erase-events hushᵉ        = hushᴱ
+
+------------------------------------------------------------------------
 -- Runs past their leading skips
 
--- A run past one or more of its leading skips.
+-- A run past one or more of its leading skips, the rest with skips erased.
 data Drops {A : Set} (e e′ : Events A) : Set where
-  drop  : ∀ {k r} → (∀ n → Agree n e (skip k r)) → (∀ n → Agree n (force r) e′) → Drops e e′
+  drop  : ∀ {k r} → (∀ n → Agree n e (skip k r)) → (∀ n → Eraseᴱ n (force r) e′) → Drops e e′
   drops : ∀ {k r} → (∀ n → Agree n e (skip k r)) → Drops (force r) e′ → Drops e e′
 
 -- And with its tail: each skip at a position `P` holds of.
 data Dropsˢ {A : Set} (P : Pos → Set) (h h′ : Events∞ A) : Set where
-  dropˢ  : ∀ {k r} → P k → (∀ n → Agree n (force h) (skip k r)) → r ≋ h′ → Dropsˢ P h h′
+  dropˢ  : ∀ {k r} → P k → (∀ n → Agree n (force h) (skip k r)) → r ⊒ h′ → Dropsˢ P h h′
   dropsˢ : ∀ {k r} → P k → (∀ n → Agree n (force h) (skip k r)) → Dropsˢ P r h′ → Dropsˢ P h h′
 
 -- A skip alike past it.
@@ -65,10 +204,11 @@ skip-≋ x (suc n) = skip⁼ (cutˢ (x n)) (nowˢ (x n))
 ------------------------------------------------------------------------
 -- What each frame asks of the skips it passes
 
--- The body fed the run and the body fed the rest: alike, or the one past
--- its leading skips, each under one of the source's.
+-- The body fed the run and the body fed the rest: the one the other with
+-- skips erased, or past its leading skips first, each under one of the
+-- source's.
 Fed : ∀ {B} → (Pos → Set) → Events∞ B → Events∞ B → Set
-Fed P β β′ = β ≋ β′ ⊎ Dropsˢ (Under P) β β′
+Fed P β β′ = β ⊒ β′ ⊎ Dropsˢ (Under P) β β′
 
 mutual
   Pass : ∀ {R Γ A} → (Pos → Set) → Ctx R Γ A → Bool → Events∞ A → Events∞ A → Set
@@ -120,6 +260,23 @@ mutual
       bodyOn  : ∀ k → P k → After (k ++ [ ix 0 ]) (head (force β′))
 
 ------------------------------------------------------------------------
+-- Each frame keeps an erasure
+
+-- THE ERASURE, FRAME BY FRAME: a frame fed a run with skips erased runs
+-- with skips erased, its next kept.  A frame with one child maps each
+-- event alone; a merge keeps its parts' order, and what the parts leave
+-- running is the merge's tail.
+postulate
+  mapped-⊒  : ∀ {A B} (g : A → B) {h h′ : Events∞ A} → h ⊒ h′ → mapped g h ⊒ mapped g h′
+  scanned-⊒ : ∀ {A B} (g : B → A → B) z {h h′ : Events∞ A} → h ⊒ h′ → scanned g z h ⊒ scanned g z h′
+  took-⊒    : ∀ {A} i (q : A → Bool) {h h′ : Events∞ A} → h ⊒ h′ → took i q h ⊒ took i q h′
+  lanes-⊒   : ∀ {Γ A B} op (g : A → Pos → Node Γ B) d q (o : Node Γ A) pre post (ρ : NEnv Γ) {h h′ : Events∞ B}
+            → h ⊒ h′ → lanesFrame op g d q o pre post true ρ h ⊒ lanesFrame op g d q o pre post true ρ h′
+  outer-⊒   : ∀ {Γ A B} op (g : A → Pos → Node Γ B) q ls ds (ρ : NEnv Γ) {h h′ : Events∞ A}
+            → h ⊒ h′ → outerFrame op g false q ls ds ρ h ⊒ outerFrame op g false q ls ds ρ h′
+  body-⊒    : ∀ {X B} r {σ σ′ : Events∞ X} {β β′ : Events∞ B} → σ ⊒ σ′ → β ⊒ β′ → bodyConn r σ β ⊒ bodyConn r σ′ β′
+
+------------------------------------------------------------------------
 -- Each frame passes the skips
 
 private
@@ -133,19 +290,19 @@ private
 
 mapped-drops : ∀ {A B P} (g : A → B) {h h′ : Events∞ A} → Dropsˢ P h h′ → Dropsˢ P (mapped g h) (mapped g h′)
 mapped-drops g (dropˢ {r = r} pk ag x) =
-  dropˢ {r = (mapped g r)} pk (λ n → agree-trans {y = M′.mapᴱ g (skip _ r)} (mapᴱ-ne g (ag n)) (skip-≋ (≋-by refl refl) n)) (λ n → cutˢ (x n) ,ˢ mapᴱ-ne g (nowˢ (x n)))
+  dropˢ {r = (mapped g r)} pk (λ n → agree-trans {y = M′.mapᴱ g (skip _ r)} (mapᴱ-ne g (ag n)) (skip-≋ (≋-by refl refl) n)) (mapped-⊒ g x)
 mapped-drops g (dropsˢ {r = r} pk ag d) =
   dropsˢ {r = (mapped g r)} pk (λ n → agree-trans {y = M′.mapᴱ g (skip _ r)} (mapᴱ-ne g (ag n)) (skip-≋ (≋-by refl refl) n)) (mapped-drops g d)
 
 scanned-drops : ∀ {A B P} (g : B → A → B) z {h h′ : Events∞ A} → Dropsˢ P h h′ → Dropsˢ P (scanned g z h) (scanned g z h′)
 scanned-drops g z (dropˢ {r = r} pk ag x) =
-  dropˢ {r = (scanned g z r)} pk (λ n → agree-trans {y = M′.scanᴱ g z (skip _ r)} (scanᴱ-ne g z (ag n)) (skip-≋ (≋-by refl refl) n)) (λ n → cutˢ (x n) ,ˢ scanᴱ-ne g z (nowˢ (x n)))
+  dropˢ {r = (scanned g z r)} pk (λ n → agree-trans {y = M′.scanᴱ g z (skip _ r)} (scanᴱ-ne g z (ag n)) (skip-≋ (≋-by refl refl) n)) (scanned-⊒ g z x)
 scanned-drops g z (dropsˢ {r = r} pk ag d) =
   dropsˢ {r = (scanned g z r)} pk (λ n → agree-trans {y = M′.scanᴱ g z (skip _ r)} (scanᴱ-ne g z (ag n)) (skip-≋ (≋-by refl refl) n)) (scanned-drops g z d)
 
 took-drops : ∀ {A P} i (q : A → Bool) {h h′ : Events∞ A} → Dropsˢ P h h′ → Dropsˢ P (took i q h) (took i q h′)
 took-drops i q (dropˢ {r = r} pk ag x) =
-  dropˢ {r = (took i q r)} pk (λ n → agree-trans {y = M′.takeWhileᴱ i q (skip _ r)} (takeWhileᴱ-ne i q (ag n)) (skip-≋ (≋-by refl refl) n)) (λ n → cutˢ (x n) ,ˢ takeWhileᴱ-ne i q (nowˢ (x n)))
+  dropˢ {r = (took i q r)} pk (λ n → agree-trans {y = M′.takeWhileᴱ i q (skip _ r)} (takeWhileᴱ-ne i q (ag n)) (skip-≋ (≋-by refl refl) n)) (took-⊒ i q x)
 took-drops i q (dropsˢ {r = r} pk ag d) =
   dropsˢ {r = (took i q r)} pk (λ n → agree-trans {y = M′.takeWhileᴱ i q (skip _ r)} (takeWhileᴱ-ne i q (ag n)) (skip-≋ (≋-by refl refl) n)) (took-drops i q d)
 
@@ -166,7 +323,7 @@ lanes-drops : ∀ {Γ A B P} op (g : A → Pos → Node Γ B) d q (o : Node Γ A
             → (∀ k → P k → First k (outerᴺ g (outerG d o) ρ) (states (lanesL post) ρ) (states (lanesL pre) ρ) (outerT d o ρ (poolRuns pre post true ρ h)))
             → Dropsˢ P h h′ → Dropsˢ P (lanesFrame op g d q o pre post true ρ h) (lanesFrame op g d q o pre post true ρ h′)
 lanes-drops op g d q o pre post ρ {h} fi (dropˢ {k} {r} pk ag x) =
-  dropˢ pk (at-skip op g d q o pre post ρ (fi k pk) ag) (λ n → lanesFrame-ne op g d q o pre post true ρ (x n))
+  dropˢ pk (at-skip op g d q o pre post ρ (fi k pk) ag) (lanes-⊒ op g d q o pre post ρ x)
 lanes-drops op g d q o pre post ρ {h} fi (dropsˢ {k} {r} pk ag e) =
   dropsˢ pk (at-skip op g d q o pre post ρ (fi k pk) ag) (lanes-drops op g d q o pre post ρ fi e)
 
@@ -197,7 +354,7 @@ outer-drops : ∀ {Γ A B P} op (g : A → Pos → Node Γ B) q ls ds (ρ : NEnv
             → (∀ k → P k → All (λ l → After k (head (force l))) (states ls ρ) × TailNotBefore k (poolT ds ρ))
             → Dropsˢ P h h′ → Dropsˢ P (outerFrame op g false q ls ds ρ h) (outerFrame op g false q ls ds ρ h′)
 outer-drops op g q ls ds ρ fi (dropˢ {k} pk ag x) =
-  dropˢ pk (at-outer op g q ls ds ρ (proj₁ (fi k pk)) (proj₂ (fi k pk)) ag) (λ n → outerFrame-ne op g false q ls ds ρ (x n))
+  dropˢ pk (at-outer op g q ls ds ρ (proj₁ (fi k pk)) (proj₂ (fi k pk)) ag) (outer-⊒ op g q ls ds ρ x)
 outer-drops op g q ls ds ρ fi (dropsˢ {k} pk ag d) =
   dropsˢ pk (at-outer op g q ls ds ρ (proj₁ (fi k pk)) (proj₂ (fi k pk)) ag) (outer-drops op g q ls ds ρ fi d)
 
@@ -214,7 +371,7 @@ outer-admits op g q ls ds ρ o a p {Qs = Qs} Y ad ef ec la ta al tn =
   dropˢ refl
     (λ n → subst (λ x → Agree n x (skip (p ++ [ ix 0 ]) Y))
              (sym (go-outer (flatOp op) (outerOf g ρ (risen o ρ (nx a) p)) (states ls ρ) (L.map (laneᴹ g ρ) q) (poolT ds ρ) refl al tn)) (held n))
-    (≋-by refl refl)
+    (≋-⊒ (≋-by refl refl))
   where
     held : ∀ n → Agree n (M′.outer (flatOp op) (outerOf g ρ (risen o ρ (nx a) p)) (states ls ρ) (L.map (laneᴹ g ρ) q) (poolT ds ρ)
                             (force (outerOf g ρ (risen o ρ (nx a) p))))
@@ -240,7 +397,7 @@ lane-admits op g d a q o pre post ρ s p Y fi ef ec la ta =
              (sym (go-rise (flatOp op) (outerᴺ g (outerG d o) ρ) (states (lanesL post) ρ) (risen s ρ cp p) (states (lanesL pre) ρ)
                      (L.map (laneᴹ g ρ) (a ∷ q)) (outerT d o ρ (poolRuns pre post true ρ (risen s ρ cp p))) refl fi))
              (held n))
-    (≋-by refl refl)
+    (≋-⊒ (≋-by refl refl))
   where
     held : ∀ n → Agree n (M′.lane (flatOp op) (outerᴺ g (outerG d o) ρ) (states (lanesL post) ρ) (risen s ρ cp p) (states (lanesL pre) ρ)
                             (L.map (laneᴹ g ρ) (a ∷ q)) (outerT d o ρ (poolRuns pre post true ρ (risen s ρ cp p))) (end p))
@@ -277,14 +434,13 @@ private
     agree-trans (beside-ne r (skipped-≋ ag n) (same n σ))
       (agree-trans (side-skip r σ (force σ) r₁ h refl hc nb n) (skip-≋ {r = sideC r σ (force σ) r₁} {r′ = bodyConn r σ r₁} (≋-by refl refl) n))
 
--- A BODY'S SKIPS, THE SOURCE'S NEXT NO EARLIER, pass its connect.
-body-drops : ∀ {X B P} r (σ : Events∞ X) {h h′ : Events∞ B}
+-- A BODY'S SKIPS, THE SOURCE'S NEXT NO EARLIER, pass its connect, the
+-- source beside it erased alike.
+body-drops : ∀ {X B P} r {σ σ′ : Events∞ X} {h h′ : Events∞ B}
            → (force σ ≡ hush → ∀ d → Agreeᵀ d (cut σ) idle) → (∀ k → P k → NotBefore k (shown (force σ)))
-           → Dropsˢ P h h′ → Dropsˢ P (bodyConn r σ h) (bodyConn r σ h′)
-body-drops r σ hc nb (dropˢ {k} {r₁} pk ag x) =
-  dropˢ pk (body-skip r σ hc (nb k pk) ag) (λ n → ∪-ne (agreeᵀ-refl n (M′.burstOn r σ)) (cutˢ (x n)) ,ˢ beside-ne r (x n) (same n σ))
-body-drops r σ hc nb (dropsˢ {k} {r₁} pk ag d) =
-  dropsˢ pk (body-skip r σ hc (nb k pk) ag) (body-drops r σ hc nb d)
+           → σ ⊒ σ′ → Dropsˢ P h h′ → Dropsˢ P (bodyConn r σ h) (bodyConn r σ′ h′)
+body-drops r {σ} hc nb y (dropˢ {k} {r₁} pk ag x) = dropˢ pk (body-skip r σ hc (nb k pk) ag) (body-⊒ r y x)
+body-drops r {σ} hc nb y (dropsˢ {k} {r₁} pk ag d) = dropsˢ pk (body-skip r σ hc (nb k pk) ag) (body-drops r hc nb y d)
 
 private
   ≋-sym : ∀ {A} {h h′ : Events∞ A} → h ≋ h′ → h′ ≋ h
@@ -299,8 +455,11 @@ private
   drops-from e (dropsˢ pk ag d) = dropsˢ pk (λ n → agree-trans (nowˢ (e n)) (ag n)) d
 
   drops-to : ∀ {A P} {h h₀ h′ : Events∞ A} → Dropsˢ P h h₀ → h₀ ≋ h′ → Dropsˢ P h h′
-  drops-to (dropˢ pk ag x)  e = dropˢ pk ag (≋-trans x e)
+  drops-to (dropˢ pk ag x)  e = dropˢ pk ag (⊒-≋ x e)
   drops-to (dropsˢ pk ag d) e = dropsˢ pk ag (drops-to d e)
+
+  on-head : ∀ {B q} {β β′ : Events∞ B} → β ⊒ β′ → After q (head (force β′)) → After q (head (force β))
+  on-head {q = q} x a = subst (After q) (sym (lead-head (proj₁ x))) a
 
   after-before : ∀ {B} q (e : Events B) → After q (head e) → M′.before q e ≡ true
   after-before q (out k a r) a′ = a′
@@ -331,19 +490,22 @@ private
   under-shown : ∀ {P : Pos → Set} {k} → P k → Under P (k ++ [ ix 0 ])
   under-shown {k = k} pk = k , pk , [ ix 0 ] , refl
 
-  -- The body done dropping: each source skip shows ahead of its next.
-  src-alone : ∀ {X B P} r (β′ : Events∞ B) {σ σ′ : Events∞ X} → (∀ k → P k → After (k ++ [ ix 0 ]) (head (force β′)))
-            → Dropsˢ P σ σ′ → Dropsˢ (Under P) (bodyConn r σ β′) (bodyConn r σ′ β′)
-  src-alone r β′ {σ} bo (dropˢ {k} pk ag x) =
-    dropˢ (under-shown pk) (src-first r β′ {σ} ag (after-before (k ++ [ ix 0 ]) (force β′) (bo k pk))) (bc-≋ r x (λ n → same n β′))
-  src-alone r β′ {σ} bo (dropsˢ {k} pk ag d) =
-    dropsˢ (under-shown pk) (src-first r β′ {σ} ag (after-before (k ++ [ ix 0 ]) (force β′) (bo k pk))) (src-alone r β′ bo d)
+  -- The body done dropping: each source skip shows ahead of its next,
+  -- the body's next that of the body it erases to.
+  src-alone : ∀ {X B P} r {β β′ : Events∞ B} {σ σ′ : Events∞ X} → β ⊒ β′ → (∀ k → P k → After (k ++ [ ix 0 ]) (head (force β′)))
+            → Dropsˢ P σ σ′ → Dropsˢ (Under P) (bodyConn r σ β) (bodyConn r σ′ β′)
+  src-alone r {β} {σ = σ} e bo (dropˢ {k} pk ag x) =
+    dropˢ (under-shown pk) (src-first r β {σ} ag (after-before (k ++ [ ix 0 ]) (force β) (on-head e (bo k pk)))) (body-⊒ r x e)
+  src-alone r {β} {σ = σ} e bo (dropsˢ {k} pk ag d) =
+    dropsˢ (under-shown pk) (src-first r β {σ} ag (after-before (k ++ [ ix 0 ]) (force β) (on-head e (bo k pk)))) (src-alone r e bo d)
 
-  -- The source done dropping: its connect is the body beside it.
+  -- The source done dropping: its connect is the body beside it, the
+  -- source's next that of the source it erases to.
   body-alone : ∀ {X B P} r {σ σ′ : Events∞ X} {β β′ : Events∞ B}
              → (force σ′ ≡ hush → ∀ d → Agreeᵀ d (cut σ′) idle) → (∀ k → Under P k → NotBefore k (shown (force σ′)))
-             → σ ≋ σ′ → Dropsˢ (Under P) β β′ → Dropsˢ (Under P) (bodyConn r σ β) (bodyConn r σ′ β′)
-  body-alone r {σ′ = σ′} {β} hc nb x d = drops-from (bc-≋ r x (λ n → same n β)) (body-drops r σ′ hc nb d)
+             → σ ⊒ σ′ → Dropsˢ (Under P) β β′ → Dropsˢ (Under P) (bodyConn r σ β) (bodyConn r σ′ β′)
+  body-alone r {σ} hc nb x d =
+    body-drops r (lead-hush x hc) (λ k u → subst (NotBefore k) (sym (lead-shown (proj₁ x))) (nb k u)) x d
 
   first-src : ∀ {X B} r {σ : Events∞ X} {β : Events∞ B} k σ₁ k′ β₁
             → (∀ n → Agree n (force σ) (skip k σ₁)) → (∀ n → Agree n (force β) (skip k′ β₁)) → (k ++ [ ix 0 ]) <ᵖ k′ ≡ true
@@ -369,7 +531,7 @@ private
   both r {σ} {β = β} {β′ = β′} hc nb bo dσ@(dropˢ {k} {σ₁} pk ag x) dβ@(dropˢ {k′} {β₁} pk′ ag′ x′) =
     choose ((k ++ [ ix 0 ]) <ᵖ k′)
       (λ eq → dropsˢ (under-shown pk) (first-src r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (body-alone r hc nb x dβ))
-      (λ eq → dropsˢ pk′ (first-body r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (drops-from (bc-≋ r (λ n → same n σ) x′) (src-alone r β′ bo dσ)))
+      (λ eq → dropsˢ pk′ (first-body r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (src-alone r x′ bo dσ))
   both r {σ} {β = β} {β′ = β′} hc nb bo dσ@(dropˢ {k} {σ₁} pk ag x) dβ@(dropsˢ {k′} {β₁} pk′ ag′ d′) =
     choose ((k ++ [ ix 0 ]) <ᵖ k′)
       (λ eq → dropsˢ (under-shown pk) (first-src r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (body-alone r hc nb x dβ))
@@ -377,7 +539,7 @@ private
   both r {σ} {β = β} {β′ = β′} hc nb bo dσ@(dropsˢ {k} {σ₁} pk ag d) dβ@(dropˢ {k′} {β₁} pk′ ag′ x′) =
     choose ((k ++ [ ix 0 ]) <ᵖ k′)
       (λ eq → dropsˢ (under-shown pk) (first-src r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (both r hc nb bo d dβ))
-      (λ eq → dropsˢ pk′ (first-body r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (drops-from (bc-≋ r (λ n → same n σ) x′) (src-alone r β′ bo dσ)))
+      (λ eq → dropsˢ pk′ (first-body r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (src-alone r x′ bo dσ))
   both r {σ} {β = β} {β′ = β′} hc nb bo dσ@(dropsˢ {k} {σ₁} pk ag d) dβ@(dropsˢ {k′} {β₁} pk′ ag′ d′) =
     choose ((k ++ [ ix 0 ]) <ᵖ k′)
       (λ eq → dropsˢ (under-shown pk) (first-src r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (both r hc nb bo d dβ))
@@ -390,15 +552,14 @@ src-drops : ∀ {Γ X B P} r en (b : Node (X ∷ Γ) B) (ρ : NEnv Γ) {h h′ :
           → SrcPass P (stateᴺ b (force h ∷ᴬ ρ)) (stateᴺ b (force h′ ∷ᴬ ρ)) h′
           → Dropsˢ P h h′ → Dropsˢ (Under P) (connSrc false r en b ρ h) (connSrc false r en b ρ h′)
 src-drops r en b ρ {h} {h′} sp d with SrcPass.fed sp
-... | inj₁ x  = drops-from (≋-trans (≋-by refl refl) (bc-≋ r (λ n → same n h) x))
-                 (drops-to (src-alone r (stateᴺ b (force h′ ∷ᴬ ρ)) (SrcPass.bodyOn sp) d) (≋-by refl refl))
+... | inj₁ x  = drops-from (≋-by refl refl) (drops-to (src-alone r x (SrcPass.bodyOn sp) d) (≋-by refl refl))
 ... | inj₂ dβ = drops-from (≋-by refl refl) (drops-to (both r (SrcPass.srcHush sp) (SrcPass.srcOn sp) (SrcPass.bodyOn sp) d dβ) (≋-by refl refl))
 
 ------------------------------------------------------------------------
 -- Up to the root
 
 top-drops : ∀ {A P} {h h′ : Events∞ A} → Dropsˢ P h h′ → Drops (force h) (force h′)
-top-drops (dropˢ pk ag x)  = drop ag (λ n → nowˢ (x n))
+top-drops (dropˢ pk ag x)  = drop ag (λ n → erase-events (nowᵉ (proj₂ (proj₂ x) n)))
 top-drops (dropsˢ pk ag d) = drops ag (top-drops d)
 
 -- THE LIFT: skips dropped at the hole, each passed by every frame above,
@@ -417,4 +578,4 @@ lift-drops P (inLanes op g d′ n q o pre post c) true d (fi , ps) =
 lift-drops P (inSrc (cs false true sa ba as nothing r en) b c) f d (sp , ps) =
   lift-drops (Under P) c true (src-drops r en (gh b) (envAt c) sp d) ps
 lift-drops P (inBody (cs cl true sa ba as nothing r en) o c) f d (hc , bp , ps) =
-  lift-drops P c true (body-drops r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) hc bp d) ps
+  lift-drops P c true (body-drops r hc bp (≋-⊒ (λ n → same n (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)))) d) ps

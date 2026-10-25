@@ -34,17 +34,17 @@ open import operation.Key using (Key; at; after; _<ᴷ_)
 open import operation.PureObservable using (play; module Machine)
 open Machine using (St; mapS; scanS; cutS; lnS; takeS; flatS; connS; coldS; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter;
   inLanes; inSrc; inBody; plug; closed; Out; search; found; leafM; own; cs; free; cpAt; cutAt; overAt; over)
-open import adequacy.Engine.Meaning using (_≋_; ≋-trans; ≋-tr; mapped; scanned; took; outerFrame; connSrc; bodyConn; gh; lane; lanesL; deadL; outerG; poolRuns; envAt;
+open import adequacy.Engine.Meaning using (_≋_; ≋-trans; same; ≋-tr; mapped; scanned; took; outerFrame; connSrc; bodyConn; gh; lane; lanesL; deadL; outerG; poolRuns; envAt;
   flagOf; lanesFrame; outerFrame-ne; lanesFrame-ne; bodyFrame-ne; connSrc-ne; taking∞-ne;
   srcState; srcG; poolT; outerT)
 open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore)
 open import adequacy.Engine.Head using (Frag; cand; pool-step; <ᴷ-irrefl; ≮ᴷ-trans; ≮<ᴷ; ext-≮)
 open import adequacy.Engine.Inv using (Unpended)
-open import adequacy.Engine.Pick using (Beat; Joins; past; KAfter; KNotBefore; Lost; body-link; Before; Race; LaneWon; lane-won; race-steps; after-step;
+open import adequacy.Engine.Pick using (Beat; past; KAfter; KNotBefore; Lost; body-link; Before; Race; LaneWon; lane-won; race-steps; after-step;
   lane-sides; frag-flat; frag-parts; outer-link)
 open import adequacy.Engine.Ahead using (Ahead; Under; shows; shows-open; shown)
 open import adequacy.Engine.Drop using (Dropsˢ; Pass; SrcPass; Fed; mapped-drops; scanned-drops;
-  took-drops; lanes-drops; body-drops; outer-drops; src-drops)
+  took-drops; lanes-drops; body-drops; outer-drops; src-drops; ≋-⊒)
 open import adequacy.Engine.Kept using (outer-plug; lanes-plugʳ; body-plug; live-plug)
 open Agreeˢ
 
@@ -75,13 +75,11 @@ postulate
            → h ≋ stateᴺ (gh o) (envAt c) → Dropsˢ P h h′
            → (Events∞.force h′ ≡ hush → ∀ d → Agreeᵀ d (Events∞.cut h′) idle) × (∀ k → Under P k → NotBefore k (shown (Events∞.force h′)))
   -- A SOURCE'S SKIPS FED ITS BODY: the body fed a live source's skips
-  -- drops its own skips, each under one of them, to the body fed the rest.
-  -- Only with every joiner in the tree joined before the skip (`Joins`):
-  -- one joined at or after it sees it at its own position, not under it.
+  -- drops its own leading skips, each under one of them, and erases
+  -- none or more past them, to the body fed the rest.
   src-fed : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h h′ : Events∞ X}
           → Sought v q P → KAfter (after q) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
           → Before (after q) (own (connS (cs false true sa ba as nothing r en) o b))
-          → Joins (at q) (plug c (connS (cs false true sa ba as nothing r en) o b))
           → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
           → h ≋ stateᴺ (gh o) (envAt c) → Dropsˢ P h h′
           → Fed P (stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c))
@@ -97,12 +95,11 @@ postulate
 src-pass : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h h′ : Events∞ X}
          → Sought v q P → KAfter (after q) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
          → Before (after q) (own (connS (cs false true sa ba as nothing r en) o b))
-         → Joins (at q) (plug c (connS (cs false true sa ba as nothing r en) o b))
          → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
          → h ≋ stateᴺ (gh o) (envAt c) → Dropsˢ P h h′
          → SrcPass P (stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c)) h′
-src-pass v q c sa ba as r en o b so ka bf jn ft x d = record
-  { fed     = src-fed v q c sa ba as r en o b so ka bf jn ft x d
+src-pass v q c sa ba as r en o b so ka bf ft x d = record
+  { fed     = src-fed v q c sa ba as r en o b so ka bf ft x d
   ; srcOn   = proj₂ (src-next v q c sa ba as r en o b so ft x d)
   ; srcHush = proj₁ (src-next v q c sa ba as r en o b so ft x d)
   ; bodyOn  = src-body-on v q c sa ba as r en o b so ka bf ft x d
@@ -177,27 +174,27 @@ cold-key t e with found-own t e
 -- THE WALK: every frame above the found node passes the skip it drops,
 -- each position asked of read off the race there.
 beat-pass : ∀ {R Γ A} v q {P : Pos → Set} (c : Ctx R Γ A) (s : St Γ A) f {h h′ : Events∞ A}
-          → Sought v q P → Beat (keyAt v q) c s → Joins (at q) (plug c s) → Frag (plug c s) → Unpended s
+          → Sought v q P → Beat (keyAt v q) c s → Frag (plug c s) → Unpended s
           → shows c f ≡ true → flagOf s ≡ f → h ≋ stateᴺ (gh s) (envAt c) → Dropsˢ P h h′
           → Pass P c f h h′
-beat-pass v q top s f so w jn ft u sh fl x d = tt
-beat-pass v q (inMap g c) s f so w jn ft u sh fl x d =
-  beat-pass v q c (mapS g s) true so w jn ft tt sh refl
+beat-pass v q top s f so w ft u sh fl x d = tt
+beat-pass v q (inMap g c) s f so w ft u sh fl x d =
+  beat-pass v q c (mapS g s) true so w ft tt sh refl
     (≋-tr {h′ = mapped g (stateᴺ (gh s) (envAt c))} (λ m → cutˢ (x m) ,ˢ mapᴱ-ne g (nowˢ (x m))) refl refl) (mapped-drops g d)
-beat-pass v q (inScan g z c) s f so w jn ft u sh fl x d =
-  beat-pass v q c (scanS g z s) true so w jn ft tt sh refl
+beat-pass v q (inScan g z c) s f so w ft u sh fl x d =
+  beat-pass v q c (scanS g z s) true so w ft tt sh refl
     (≋-tr {h′ = scanned g z (stateᴺ (gh s) (envAt c))} (λ m → cutˢ (x m) ,ˢ scanᴱ-ne g z (nowˢ (x m))) refl refl) (scanned-drops g z d)
-beat-pass v q (inCut true a c) s f so w jn ft u sh fl x d = beat-pass v q c (cutS true a s) true so w jn ft tt sh refl x d
-beat-pass v q (inCut false a c) s f so w jn ft u () fl x d
-beat-pass v q (inLn b c) s f so w jn ft u sh fl x d = beat-pass v q c (lnS b s) b so w jn ft tt sh refl x d
-beat-pass v q (inTake i p free c) s f so w jn ft u sh fl x d =
-  beat-pass v q c (takeS i p free s) true so w jn ft tt sh refl (≋-tr (λ m → taking∞-ne i p free (x m)) refl refl) (took-drops i p d)
-beat-pass v q (inTake i p (cpAt _) c) s f so w jn ft u () fl x d
-beat-pass v q (inTake i p (cutAt _) c) s f so w jn ft u () fl x d
-beat-pass v q (inTake i p (overAt _) c) s f so w jn ft u () fl x d
-beat-pass v q (inOuter op g true n p ls c) s f so w jn ft u () fl x d
-beat-pass v q {P} (inOuter op g false n p ls c) s f so (r , w) jn ft u sh fl x d =
-  ol , beat-pass v q c (flatS op g false n p s ls) true so w jn ft tt sh refl
+beat-pass v q (inCut true a c) s f so w ft u sh fl x d = beat-pass v q c (cutS true a s) true so w ft tt sh refl x d
+beat-pass v q (inCut false a c) s f so w ft u () fl x d
+beat-pass v q (inLn b c) s f so w ft u sh fl x d = beat-pass v q c (lnS b s) b so w ft tt sh refl x d
+beat-pass v q (inTake i p free c) s f so w ft u sh fl x d =
+  beat-pass v q c (takeS i p free s) true so w ft tt sh refl (≋-tr (λ m → taking∞-ne i p free (x m)) refl refl) (took-drops i p d)
+beat-pass v q (inTake i p (cpAt _) c) s f so w ft u () fl x d
+beat-pass v q (inTake i p (cutAt _) c) s f so w ft u () fl x d
+beat-pass v q (inTake i p (overAt _) c) s f so w ft u () fl x d
+beat-pass v q (inOuter op g true n p ls c) s f so w ft u () fl x d
+beat-pass v q {P} (inOuter op g false n p ls c) s f so (r , w) ft u sh fl x d =
+  ol , beat-pass v q c (flatS op g false n p s ls) true so w ft tt sh refl
          (≋-trans (λ m → outerFrame-ne op (lane g) false p (lanesL ls) (deadL ls) (envAt c) (x m)) (outer-plug op g false n p ls s (envAt c)))
          (outer-drops op (lane g) p (lanesL ls) (deadL ls) (envAt c) ol d)
   where
@@ -208,9 +205,9 @@ beat-pass v q {P} (inOuter op g false n p ls c) s f so (r , w) jn ft u sh fl x d
         (race-steps KAfter (After k) (keyAt v q) (λ y st a ag → after-step k y st (kafter-≤ (keyAt v q) k y (cover v q so k pk) a) ag)
            c op g false n p s [] ls [] (shows-open c true sh) (proj₂ parts) r)
         (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
-beat-pass v q (inLanes op g dd n p o pre post c) s false so w jn ft u () fl x d
-beat-pass v q {P} (inLanes op g dd n p o pre post c) s true {h} so (l , w) jn ft u sh fl x d =
-  fi , beat-pass v q c (flatS op g dd n p o (pre ʳ++ s ∷ post)) true so w jn ft tt sh refl
+beat-pass v q (inLanes op g dd n p o pre post c) s false so w ft u () fl x d
+beat-pass v q {P} (inLanes op g dd n p o pre post c) s true {h} so (l , w) ft u sh fl x d =
+  fi , beat-pass v q c (flatS op g dd n p o (pre ʳ++ s ∷ post)) true so w ft tt sh refl
          (≋-trans (λ m → lanesFrame-ne op (lane g) dd p (gh o) (reverse pre) post true (envAt c) (x m))
            (subst (λ b → lanesFrame op (lane g) dd p (gh o) (reverse pre) post b (envAt c) (stateᴺ (gh s) (envAt c))
                          ≋ stateᴺ (gh (flatS op g dd n p o (pre ʳ++ s ∷ post))) (envAt c))
@@ -221,21 +218,21 @@ beat-pass v q {P} (inLanes op g dd n p o pre post c) s true {h} so (l , w) jn ft
                        (states (lanesL (reverse pre)) (envAt c)) (outerT dd (gh o) (envAt c) (poolRuns (reverse pre) post true (envAt c) h))
     fi k pk = lane-sides k c op g dd n p o pre post s (shows-open c true sh)
                 (lanewon-≤ (keyAt v q) k c op g dd n p o pre post s (cover v q so k pk) l) ft (frag-flat c op g dd n p o (pre ʳ++ s ∷ post) ft)
-beat-pass v q {P} (inSrc (cs false true sa ba as nothing r en) b c) s f so (ka , bf , bt) jn ft u sh fl x d =
-  sp , beat-pass true q c (connS kk s b) true (sought-under v q so) (subst (λ K → Beat K c (connS kk s b)) (past-key v q) bt) jn ft tt sh refl
+beat-pass v q {P} (inSrc (cs false true sa ba as nothing r en) b c) s f so (ka , bf , bt) ft u sh fl x d =
+  sp , beat-pass true q c (connS kk s b) true (sought-under v q so) (subst (λ K → Beat K c (connS kk s b)) (past-key v q) bt) ft tt sh refl
          (≋-trans (λ m → connSrc-ne false r en (gh b) (envAt c) (x m)) (live-plug sa ba as r en b s (envAt c) u))
          (src-drops r en (gh b) (envAt c) sp d)
   where
     kk = cs false true sa ba as nothing r en
     sp = src-pass v q c sa ba as r en s b so (subst (λ K → KAfter K (cand (inBody kk s c) b)) (past-key v q) ka)
-           (subst (λ K → Before K (own (connS kk s b))) (past-key v q) bf) jn ft x d
-beat-pass v q (inSrc (cs false true sa ba as (just _) r en) b c) s f so w jn ft u () fl x d
-beat-pass v q (inSrc (cs false false sa ba as ow r en) b c) s f so w jn ft u () fl x d
-beat-pass v q (inSrc (cs true sl sa ba as ow r en) b c) s f so w jn ft u () fl x d
-beat-pass v q {P} (inBody (cs cl true sa ba as nothing r en) o c) s f so (nb , ob , w) jn ft u sh fl x d =
-  hu , nbk , beat-pass v q c (connS kk o s) true so w jn ft tt sh refl
+           (subst (λ K → Before K (own (connS kk s b))) (past-key v q) bf) ft x d
+beat-pass v q (inSrc (cs false true sa ba as (just _) r en) b c) s f so w ft u () fl x d
+beat-pass v q (inSrc (cs false false sa ba as ow r en) b c) s f so w ft u () fl x d
+beat-pass v q (inSrc (cs true sl sa ba as ow r en) b c) s f so w ft u () fl x d
+beat-pass v q {P} (inBody (cs cl true sa ba as nothing r en) o c) s f so (nb , ob , w) ft u sh fl x d =
+  hu , nbk , beat-pass v q c (connS kk o s) true so w ft tt sh refl
                (≋-trans (λ m → bodyFrame-ne kk o (envAt c) (x m)) (body-plug kk o s (envAt c)))
-               (body-drops r (srcState (srcG kk o) (envAt c)) hu nbk d)
+               (body-drops r hu nbk (≋-⊒ (λ m → same m (srcState (srcG kk o) (envAt c)))) d)
   where
     kk = cs cl true sa ba as nothing r en
     bl : ∀ k → keyAt v q <ᴷ at k ≡ false
@@ -246,8 +243,8 @@ beat-pass v q {P} (inBody (cs cl true sa ba as nothing r en) o c) s f so (nb , o
     hu = proj₁ (bl q (cover-own v q))
     nbk : ∀ k → P k → NotBefore k (shown (Events∞.force (srcState (srcG kk o) (envAt c))))
     nbk k pk = proj₂ (bl k (cover v q so k pk))
-beat-pass v q (inBody (cs cl true sa ba as (just _) r en) o c) s f so w jn ft u () fl x d
-beat-pass v q (inBody (cs cl false sa ba as ow r en) o c) s f so w jn ft u () fl x d
+beat-pass v q (inBody (cs cl true sa ba as (just _) r en) o c) s f so w ft u () fl x d
+beat-pass v q (inBody (cs cl false sa ba as ow r en) o c) s f so w ft u () fl x d
 
 ------------------------------------------------------------------------
 -- A pass, apart from what the frames ask
