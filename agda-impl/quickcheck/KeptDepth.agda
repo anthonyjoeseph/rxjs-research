@@ -379,7 +379,8 @@ private
   inLane : Code [] [] [] (natᵗ ∷ []) natᵗ → Prog natᵗ
   inLane l = flatMap (mergeᶠ nothing) l (of (nat 0 ∷ nat 1 ∷ []))
 
-  -- Steps drawn programs rarely take: a step begun under a closed cut.
+  -- Steps drawn programs rarely take: a step begun under a closed cut, and
+  -- a source's skips shown to several joiners and defers at once.
   hands : List (String × Prog natᵗ)
   hands =
       ("a deferred source begun under a closed cut" , inLane (closedSrc false (deferᶜ (of (nat 5 ∷ [])))))
@@ -390,8 +391,16 @@ private
       , inLane (closedSrc false (deferᶜ (flatMap (mergeᶠ nothing) (deferᶜ (of (var (here refl) ∷ []))) (of (nat 5 ∷ nat 6 ∷ []))))))
     ∷ ("a lane joined after its source's skip" , connect (cold (script ((1 , 1 ∷ []) ∷ []) false false)) rejoins)
     ∷ ("a lane joined after its source's skips" , connect (cold (script ((2 , 1 ∷ []) ∷ (1 , 2 ∷ []) ∷ []) false false)) rejoins)
+    ∷ ("two joiners at once" , connect skipping (flatMap (mergeᶠ nothing) (connected (here refl)) (of (nat 0 ∷ nat 1 ∷ []))))
+    ∷ ("a defer joining a live source" , connect skipping (deferᶜ (connected (here refl))))
+    ∷ ("two defers joining at once" , connect skipping (flatMap (mergeᶠ nothing) (deferᶜ (connected (here refl))) (of (nat 0 ∷ nat 1 ∷ []))))
+    ∷ ("a defer beside a joiner" , connect skipping (flatMap (mergeᶠ nothing) (deferᶜ (connected (here refl))) (connected (here refl))))
     ∷ []
     where
+    -- A source skipping before each of its values.
+    skipping : Code [] [] [] [] natᵗ
+    skipping = cold (script ((2 , 1 ∷ []) ∷ (1 , 2 ∷ []) ∷ (2 , 3 ∷ []) ∷ []) false false)
+
     -- Every value of the source opens a lane joining it again.
     rejoins : Code (natᵗ ∷ []) [] [] [] natᵗ
     rejoins = flatMap (mergeᶠ nothing) (connected (here refl)) (connected (here refl))
