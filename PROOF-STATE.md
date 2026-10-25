@@ -12,10 +12,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 Refuted for a skip or a pin erased out of order (`adequacy.Engine.Erase`'s
 `Erase`, `Eraseᵀ`); restated: each erased one comes no later than the other's
-next. A merge so fed runs so erased (`adequacy.Engine.Merge`).
-Open: a connect whose body and source are each so erased runs so erased; the
-source beside the body reads both heads at once, the merge one at a time.
-Settled when `body-⊒` is a body, or refuted again.
+next. A merge so fed runs so erased (`adequacy.Engine.Merge`). Refuted at a
+connect fed any source; restated over a source subscribed where the connect
+is (`Sourced`). Open: whether that suffices. The burst pins the source's
+events inside the subscription, then its tail; an erased one must lead the
+other's next pin, and a tail may sit before a skip that marks it. Settled
+when `body-⊒` is a body, or refuted again.
 
 Members: `body-⊒`.
 
@@ -41,12 +43,13 @@ Members: `lane-begins-shut`.
 
 #### THE SORTED TAILS
 
-Probed: a lane's tail, at its flatMap's environment, is in position order.
-Sorted tails are proven only for a finite program's subscription
-(`trailing-subᶠ`); nothing ties a lane's state to a residual of its own
-subscription. Settled when `lanes-sorted` is a body or refuted.
+Probed: a lane's tail, at its flatMap's environment, is in position order;
+a connect's source runs in order, its tail trailing it. Both are proven only
+for a finite program's subscription (`trailing-subᶠ`); nothing ties a lane's
+or a source's state to a residual of its own subscription. Settled when
+these are bodies or refuted.
 
-Members: `lanes-sorted`.
+Members: `lanes-sorted`, `src-trails`, `body-src-trails`.
 
 #### THE SWITCH'S KILL
 
@@ -140,7 +143,8 @@ Each operator's state heads no earlier than its subscription, and a
 subscription's burst leaves nothing earlier. Settled when each is a body.
 
 Members: `sub-head`, `sub-bursts`, `scanS-head`, `takeS-head`, `limit-head`,
-`switch-head`, `exhaust-head`, `fresh-src`, `src-next`.
+`switch-head`, `exhaust-head`, `fresh-src`, `src-next`, `src-atop`,
+`body-src-atop`.
 
 #### THE KEY ORDER
 

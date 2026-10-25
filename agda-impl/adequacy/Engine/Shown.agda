@@ -44,7 +44,9 @@ open import adequacy.Engine.Pick using (Beat; past; KAfter; KNotBefore; Lost; bo
   lane-sides; frag-flat; frag-parts; outer-link)
 open import adequacy.Engine.Ahead using (Ahead; Under; shows; shows-open; shown)
 open import adequacy.Engine.Drop using (Dropsˢ; Pass; SrcPass; Fed; mapped-drops; scanned-drops;
-  took-drops; lanes-drops; body-drops; outer-drops; src-drops; ≋-⊒)
+  took-drops; lanes-drops; body-drops; outer-drops; src-drops; ≋-⊒; Sourced; sourced; sourced-≋)
+open import adequacy.Placed.Order using (Atop; Ordered)
+open import adequacy.Placed.Trail using (Trailing)
 open import adequacy.Engine.Kept using (outer-plug; lanes-plugʳ; body-plug; live-plug)
 open Agreeˢ
 
@@ -74,6 +76,25 @@ postulate
            → Sought v q P → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
            → h ≋ stateᴺ (gh o) (envAt c) → Dropsˢ P h h′
            → (Events∞.force h′ ≡ hush → ∀ d → Agreeᵀ d (Events∞.cut h′) idle) × (∀ k → Under P k → NotBefore k (shown (Events∞.force h′)))
+  -- A LIVE SOURCE, AT ITS CONNECT: its next no earlier than where it
+  -- subscribed.
+  src-atop : ∀ {R Γ X B} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
+           → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
+           → Atop r (Events∞.force (stateᴺ (gh o) (envAt c)))
+  -- Its run in order, what it leaves running trailing it.
+  src-trails : ∀ {R Γ X B} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
+             → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
+             → Ordered (Events∞.force (stateᴺ (gh o) (envAt c))) × Trailing (stateᴺ (gh o) (envAt c))
+  -- A SOURCE BESIDE ITS BODY, live or closed: its next no earlier than
+  -- where it subscribed.
+  body-src-atop : ∀ {R Γ X B} (c : Ctx R Γ B) cl sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
+                → Frag (plug c (connS (cs cl true sa ba as nothing r en) o b))
+                → Atop r (Events∞.force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)))
+  -- Its run in order, what it leaves running trailing it.
+  body-src-trails : ∀ {R Γ X B} (c : Ctx R Γ B) cl sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
+                  → Frag (plug c (connS (cs cl true sa ba as nothing r en) o b))
+                  → Ordered (Events∞.force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)))
+                    × Trailing (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c))
   -- A SOURCE'S SKIPS FED ITS BODY: the body fed a live source's skips
   -- drops its own leading skips, each under one of them, and erases
   -- none or more past them, to the body fed the rest.
@@ -104,6 +125,19 @@ src-pass v q c sa ba as r en o b so ka bf ft x d = record
   ; srcHush = proj₁ (src-next v q c sa ba as r en o b so ft x d)
   ; bodyOn  = src-body-on v q c sa ba as r en o b so ka bf ft x d
   }
+
+-- A live source is subscribed where its connect is.
+src-sourced : ∀ {R Γ X B} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
+            → Frag (plug c (connS (cs false true sa ba as nothing r en) o b)) → Sourced r (stateᴺ (gh o) (envAt c))
+src-sourced c sa ba as r en o b ft = sourced (src-atop c sa ba as r en o b ft) (proj₁ tr) (proj₂ tr)
+  where tr = src-trails c sa ba as r en o b ft
+
+-- So is one beside its body.
+body-sourced : ∀ {R Γ X B} (c : Ctx R Γ B) cl sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
+             → Frag (plug c (connS (cs cl true sa ba as nothing r en) o b))
+             → Sourced r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c))
+body-sourced c cl sa ba as r en o b ft = sourced (body-src-atop c cl sa ba as r en o b ft) (proj₁ tr) (proj₂ tr)
+  where tr = body-src-trails c cl sa ba as r en o b ft
 
 -- Every position asked of is no later than the race's key.
 cover : ∀ v q {P} → Sought v q P → ∀ k → P k → keyAt v q <ᴷ at k ≡ false
@@ -219,9 +253,9 @@ beat-pass v q {P} (inLanes op g dd n p o pre post c) s true {h} so (l , w) ft u 
     fi k pk = lane-sides k c op g dd n p o pre post s (shows-open c true sh)
                 (lanewon-≤ (keyAt v q) k c op g dd n p o pre post s (cover v q so k pk) l) ft (frag-flat c op g dd n p o (pre ʳ++ s ∷ post) ft)
 beat-pass v q {P} (inSrc (cs false true sa ba as nothing r en) b c) s f so (ka , bf , bt) ft u sh fl x d =
-  sp , beat-pass true q c (connS kk s b) true (sought-under v q so) (subst (λ K → Beat K c (connS kk s b)) (past-key v q) bt) ft tt sh refl
+  sourced-≋ x (src-sourced c sa ba as r en s b ft) , sp , beat-pass true q c (connS kk s b) true (sought-under v q so) (subst (λ K → Beat K c (connS kk s b)) (past-key v q) bt) ft tt sh refl
          (≋-trans (λ m → connSrc-ne false r en (gh b) (envAt c) (x m)) (live-plug sa ba as r en b s (envAt c) u))
-         (src-drops r en (gh b) (envAt c) sp d)
+         (src-drops r en (gh b) (envAt c) (sourced-≋ x (src-sourced c sa ba as r en s b ft)) sp d)
   where
     kk = cs false true sa ba as nothing r en
     sp = src-pass v q c sa ba as r en s b so (subst (λ K → KAfter K (cand (inBody kk s c) b)) (past-key v q) ka)
@@ -230,11 +264,12 @@ beat-pass v q (inSrc (cs false true sa ba as (just _) r en) b c) s f so w ft u (
 beat-pass v q (inSrc (cs false false sa ba as ow r en) b c) s f so w ft u () fl x d
 beat-pass v q (inSrc (cs true sl sa ba as ow r en) b c) s f so w ft u () fl x d
 beat-pass v q {P} (inBody (cs cl true sa ba as nothing r en) o c) s f so (nb , ob , w) ft u sh fl x d =
-  hu , nbk , beat-pass v q c (connS kk o s) true so w ft tt sh refl
+  hu , nbk , sd , beat-pass v q c (connS kk o s) true so w ft tt sh refl
                (≋-trans (λ m → bodyFrame-ne kk o (envAt c) (x m)) (body-plug kk o s (envAt c)))
-               (body-drops r hu nbk (≋-⊒ (λ m → same m (srcState (srcG kk o) (envAt c)))) d)
+               (body-drops r hu nbk sd (≋-⊒ (λ m → same m (srcState (srcG kk o) (envAt c)))) d)
   where
     kk = cs cl true sa ba as nothing r en
+    sd = body-sourced c cl sa ba as r en o s ft
     bl : ∀ k → keyAt v q <ᴷ at k ≡ false
        → (Events∞.force (srcState (srcG kk o) (envAt c)) ≡ hush → ∀ d → Agreeᵀ d (Events∞.cut (srcState (srcG kk o) (envAt c))) idle)
          × NotBefore k (shown (Events∞.force (srcState (srcG kk o) (envAt c))))
@@ -266,13 +301,14 @@ Links P (inOuter op g d n q ls c)                           f h h′ =
 Links P (inLanes op g d n q o pre post c)                   f h h′ =
   Links P c true (lanesFrame op (lane g) d q (gh o) (reverse pre) post f (envAt c) h) (lanesFrame op (lane g) d q (gh o) (reverse pre) post f (envAt c) h′)
 Links P (inSrc (cs false true sa ba as nothing r en) b c)   f h h′ =
-  SrcPass P (stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c)) h′
+  Sourced r h × SrcPass P (stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c)) h′
   × Links (Under P) c true (connSrc false r en (gh b) (envAt c) h) (connSrc false r en (gh b) (envAt c) h′)
 Links P (inSrc (cs false true sa ba as (just _) r en) b c)  f h h′ = ⊤
 Links P (inSrc (cs false false sa ba as ow r en) b c)       f h h′ = ⊤
 Links P (inSrc (cs true sl sa ba as ow r en) b c)           f h h′ = ⊤
 Links P (inBody (cs cl true sa ba as nothing r en) o c)     f h h′ =
-  Links P c true (bodyConn r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) h)
+  Sourced r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c))
+  × Links P c true (bodyConn r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) h)
                  (bodyConn r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) h′)
 Links P (inBody (cs cl true sa ba as (just _) r en) o c)    f h h′ = ⊤
 Links P (inBody (cs cl false sa ba as ow r en) o c)         f h h′ = ⊤
@@ -293,10 +329,10 @@ pass-of P (inOuter op g true n q ls c)                        f () l
 pass-of P (inOuter op g false n q ls c)                       f (o , a) l = o , pass-of P c true a l
 pass-of P (inLanes op g d n q o pre post c)                   false () l
 pass-of P (inLanes op g d n q o pre post c)                   true (s , a) l = s , pass-of P c true a l
-pass-of P (inSrc (cs false true sa ba as nothing r en) b c)   f a (sp , l) = sp , pass-of (Under P) c true a l
+pass-of P (inSrc (cs false true sa ba as nothing r en) b c)   f a (sd , sp , l) = sd , sp , pass-of (Under P) c true a l
 pass-of P (inSrc (cs false true sa ba as (just _) r en) b c)  f () l
 pass-of P (inSrc (cs false false sa ba as ow r en) b c)       f () l
 pass-of P (inSrc (cs true sl sa ba as ow r en) b c)           f () l
-pass-of P (inBody (cs cl true sa ba as nothing r en) o c)     f (hu , nb , a) l = hu , nb , pass-of P c true a l
+pass-of P (inBody (cs cl true sa ba as nothing r en) o c)     f (hu , nb , a) (sd , l) = hu , nb , sd , pass-of P c true a l
 pass-of P (inBody (cs cl true sa ba as (just _) r en) o c)    f () l
 pass-of P (inBody (cs cl false sa ba as ow r en) o c)         f () l
