@@ -26,8 +26,9 @@ open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans)
 
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; hush; idle; ix)
-open import denotation.MonotonicList using (head; Agree; Agreeᵀ)
-open import denotation.Unfold using (NEnv; stateᴺ)
+open import denotation.MonotonicList using (head; Agree; Agreeᵀ; agree-refl; agree-sym; agree-trans)
+open import denotation.NonExpansive using (Agreeˢ)
+open import denotation.Unfold using (Node; NEnv; meaning; stateᴺ)
 open import operation.Key using (after)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ctx; inMap; inScan; inCut; inLn;
@@ -36,14 +37,15 @@ open import operation.PureObservable using (ending; play; over)
 open import adequacy.Engine.Meaning using (_≋_; ≋-by; gh; envAt; srcRun; srcG; srcState; subOr; bodyConn; mapped; scanned; took)
 open import adequacy.Engine.Head using (Frag; cand)
 open import adequacy.Engine.Pick using (KAfter; Before)
-open import adequacy.Engine.Erase using (Eraseˢ; _,ᵉ_; Eraseᵀ; Erase; Lead⁼; _⊒_)
+open import adequacy.Engine.Erase using (Eraseˢ; _,ᵉ_; nowᵉ; Eraseᵀ; Erase; Lead⁼; _⊒_)
 open import adequacy.Engine.Race using (After; NotBefore)
 open import adequacy.Engine.Ahead using (Under; shown)
 open import adequacy.Engine.Beside using (Sourced; body-⊒)
 open import adequacy.Placed.Trail using (Trailing)
 open import adequacy.Engine.Trails using (Thin; Thinᴱ; thinᴱ-refl; thin-src; sorted-thin; shape-src; envAt-sorted)
-open import adequacy.Engine.Drop using (Dropsˢ; dropˢ; dropsˢ; Fed; src-alone; body-alone; both; ≋-⊒; mapped-⊒; scanned-⊒; took-⊒; mapped-drops; scanned-drops; took-drops)
+open import adequacy.Engine.Drop using (Drops; drop; drops; erase-events; Dropsˢ; dropˢ; dropsˢ; Fed; src-alone; body-alone; both; ≋-⊒; mapped-⊒; scanned-⊒; took-⊒; mapped-drops; scanned-drops; took-drops)
 open Events∞
+open Agreeˢ
 
 ------------------------------------------------------------------------
 -- Where a pass is asked
@@ -106,6 +108,34 @@ under-self {k = k} p = k , p , [] , sym (++-identityʳ k)
 drops-mono : ∀ {A} {Q Q′ : Pos → Set} → (∀ {k} → Q k → Q′ k) → {h h′ : Events∞ A} → Dropsˢ Q h h′ → Dropsˢ Q′ h h′
 drops-mono m (dropˢ p a r)  = dropˢ (m p) a r
 drops-mono m (dropsˢ p a d) = dropsˢ (m p) a (drops-mono m d)
+
+-- Past leading skips, with its tail, is past them without.
+drops-thin : ∀ {A P} {e : Events A} {h h′ : Events∞ A} → (∀ n → Agree n e (force h)) → Dropsˢ P h h′ → Drops e (force h′)
+drops-thin y (dropˢ _ a r)  = drop (λ n → agree-trans (y n) (a n)) (λ n → erase-events (nowᵉ (proj₂ (proj₂ r) n)))
+drops-thin y (dropsˢ _ a d) = drops (λ n → agree-trans (y n) (a n)) (drops-thin (λ n → agree-refl n _) d)
+
+-- A node's run past leading skips is its run thinned.
+drops-meaning : ∀ {Γ X P} (n : Node Γ X) {ρ} {h h′ : Events∞ X} → h ≋ stateᴺ n ρ → Dropsˢ P h h′ → Thin (meaning n ρ) (force h′)
+drops-meaning n x d = inj₂ (drops-thin (λ k → agree-sym (nowˢ (x k))) d)
+
+-- A live source's run past leading skips is its run thinned, unless it is
+-- still pending under a body that has subscribed it.
+thin-gh : ∀ {Γ X P} sa ba as r en (o : St Γ X) {ρ} {h h′ : Events∞ X}
+        → (∀ p l → ba ≡ just p → o ≡ pend l → Thin (srcRun (srcG (cs false true sa ba as nothing r en) o) ρ) (force h′))
+        → h ≋ stateᴺ (gh o) ρ → Dropsˢ P h h′ → Thin (srcRun (srcG (cs false true sa ba as nothing r en) o) ρ) (force h′)
+thin-gh sa nothing  as r en o                     f x d = drops-meaning (gh o) x d
+thin-gh sa (just p) as r en (pend l)              f x d = f p l refl refl
+thin-gh sa (just p) as r en (coldS l τ)           f x d = drops-meaning (gh (coldS l τ)) x d
+thin-gh sa (just p) as r en (ofS i q xs)          f x d = drops-meaning (gh (ofS i q xs)) x d
+thin-gh sa (just p) as r en doneS                 f x d = drops-meaning (gh doneS) x d
+thin-gh sa (just p) as r en (mapS g s)            f x d = drops-meaning (gh (mapS g s)) x d
+thin-gh sa (just p) as r en (scanS g z s)         f x d = drops-meaning (gh (scanS g z s)) x d
+thin-gh sa (just p) as r en (cutS l a s)          f x d = drops-meaning (gh (cutS l a s)) x d
+thin-gh sa (just p) as r en (lnS l s)             f x d = drops-meaning (gh (lnS l s)) x d
+thin-gh sa (just p) as r en (takeS i q w s)       f x d = drops-meaning (gh (takeS i q w s)) x d
+thin-gh sa (just p) as r en (flatS op g dn n qs s ls) f x d = drops-meaning (gh (flatS op g dn n qs s ls)) x d
+thin-gh sa (just p) as r en (connS k s t)         f x d = drops-meaning (gh (connS k s t)) x d
+thin-gh sa (just p) as r en (joinS j l y ib)      f x d = drops-meaning (gh (joinS j l y ib)) x d
 
 -- A connect passes its source's relation and its body's, the source
 -- subscribed where it is, the one fed the rest trailing, past every
@@ -201,12 +231,12 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
     fed-sourced : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa ba as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
                 → Frag (plug e (connS (cs cl true sa ba as nothing r en) s t))
                 → Sourced r (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h) dd))
-    -- THE SOURCE'S RUN FED THE REST is its run in the stepped
-    -- environment, thinned.
-    thin-fed : Thin (srcRun (srcG (cs false true sa ba as nothing r en) o) (envAt c)) (force h′)
     -- Hushed, it leaves nothing running; its next shows no earlier than
     -- any position asked of (as `adequacy.Engine.Shown.src-next` at the
     -- fed source).
+    -- A SOURCE STILL PENDING under a body that has subscribed it: the
+    -- connect reads it subscribed, though the run it fed was the pending one's.
+    thin-fed-sub : ∀ p l → ba ≡ just p → o ≡ pend l → Thin (srcRun (srcG (cs false true sa ba as nothing r en) o) (envAt c)) (force h′)
     fed-src-next : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa ba as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
                  → Frag (plug e (connS (cs cl true sa ba as nothing r en) s t))
                  → (force (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd)) ≡ hush
@@ -218,6 +248,11 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
                 → Frag (plug e (connS (cs cl true sa ba as nothing r en) s t))
                 → ∀ k → Under P k → After (k ++ [ ix 0 ])
                     (head (force (stateᴺ (gh t) (srcRun (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd) ∷ᴬ envOf (force h′) dd))))
+
+  -- THE SOURCE'S RUN FED THE REST is its run in the stepped environment,
+  -- thinned.
+  thin-fed : Thin (srcRun (srcG (cs false true sa ba as nothing r en) o) (envAt c)) (force h′)
+  thin-fed = thin-gh sa ba as r en o thin-fed-sub x d
 
   -- The environment fed the rest, the stepped one's thinned.
   thin-env : ∀ {Δ C} {e : Ctx R Δ C} (dd : Down e) (s : St Δ C) → Frag (plug e s) → Thinᴱ (envAt e) (envOf (force h′) dd)

@@ -67,24 +67,6 @@ private
   inside : Pos → Pos → Bool
   inside k h = (length k <ᵇ length h) ∧ samePos (take (length k) h) k
 
-  pastᵇ : Pos → Events ℕ → Bool
-  pastᵇ k (out h _ _) = (k <ᵖ h) ∧ not (inside k h)
-  pastᵇ k (skip h _)  = (k <ᵖ h) ∧ not (inside k h)
-  pastᵇ k (end h)     = (k <ᵖ h) ∧ not (inside k h)
-  pastᵇ k hush        = true
-
-  clearᵇ : Pos → Events ℕ → Bool
-  clearᵇ k (out h _ _) = (k <ᵖ h) ∧ not (inside k h)
-  clearᵇ k (skip h _)  = not (inside k h)
-  clearᵇ k (end h)     = (k <ᵖ h) ∧ not (inside k h)
-  clearᵇ k hush        = true
-
-  steadyᵇ : ℕ → Events ℕ → Bool
-  steadyᵇ zero    _           = true
-  steadyᵇ (suc n) (out k _ r) = pastᵇ k (Events∞.force r) ∧ steadyᵇ n (Events∞.force r)
-  steadyᵇ (suc n) (skip k r)  = clearᵇ k (Events∞.force r) ∧ steadyᵇ n (Events∞.force r)
-  steadyᵇ (suc n) _           = true
-
   prefixᵇ : Pos → Pos → Bool
   prefixᵇ k h = not (length h <ᵇ length k) ∧ samePos (take (length k) h) k
 
@@ -125,6 +107,25 @@ private
           zeros _                  = false
   marksᵇ (a ∷ k) []      = false
   marksᵇ (a ∷ k) (b ∷ n) = samePos (a ∷ []) (b ∷ []) ∧ marksᵇ k n
+
+-- `adequacy.Placed.Order.Steady`, decided.
+pastᵇ : ∀ {A} → Pos → Events A → Bool
+pastᵇ k (out h _ _) = (k <ᵖ h) ∧ not (inside k h)
+pastᵇ k (skip h _)  = (k <ᵖ h) ∧ not (inside k h)
+pastᵇ k (end h)     = (k <ᵖ h) ∧ not (inside k h)
+pastᵇ k hush        = true
+
+clearᵇ : ∀ {A} → Pos → Events A → Bool
+clearᵇ k (out h _ _) = (k <ᵖ h) ∧ not (inside k h)
+clearᵇ k (skip h _)  = not (inside k h)
+clearᵇ k (end h)     = (k <ᵖ h) ∧ not (inside k h)
+clearᵇ k hush        = true
+
+steadyᵇ : ∀ {A} → ℕ → Events A → Bool
+steadyᵇ zero    _           = true
+steadyᵇ (suc n) (out k _ r) = pastᵇ k (Events∞.force r) ∧ steadyᵇ n (Events∞.force r)
+steadyᵇ (suc n) (skip k r)  = clearᵇ k (Events∞.force r) ∧ steadyᵇ n (Events∞.force r)
+steadyᵇ (suc n) _           = true
 
 -- What a cut leaves running trails the run: its steps in order, none
 -- before a value coming next nor keyed with it, nor before a skip but

@@ -10,7 +10,8 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SILENT RUN
 
-Probed by `quickcheck.KeptDepth` (trail and flatness only): a node mid-run,
+Probed by `quickcheck.KeptDepth` at every node, as configured and fed the
+rest: a node mid-run,
 read in an environment thinned from its own, keeps its run in order and its
 tail trailing it. Built against the unthinned environment, a merge, a
 connect, a joiner or a take must not rest on a skip the thinning erased.
@@ -20,11 +21,13 @@ Members: `shape-conn`, `shape-flat`, `shape-join`, `shape-take`, `shape-sub`.
 
 #### THE THINNED ENVIRONMENT
 
-Untried: a sorted environment thinned is sorted; a source's run in a
-thinned environment is its run there thinned; the source's run fed the
-rest is its stepped run thinned. Settled when bodies, or refuted.
+Probed by `quickcheck.KeptDepth` in the body fed the rest: a source's run
+in a thinned environment is its run there thinned. Untried: a sorted
+environment thinned is sorted; a source still pending under
+a body that has subscribed it, fed the rest, is its subscribed run thinned.
+Settled when bodies, or refuted.
 
-Members: `sorted-thin`, `thin-src`, `thin-fed`.
+Members: `sorted-thin`, `thin-src`, `thin-fed-sub`.
 
 #### THE FED MERGE
 
