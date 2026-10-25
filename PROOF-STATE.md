@@ -10,15 +10,17 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE FLIGHT KEPT
 
-Untried: the frames above a merge keep their share past the skip it drops
-when a lane's end dequeues; an outer's value or end, a subscribe beginning a
+Untried: a merge's or a connect's keys read past a skip its run drops
+first (`adequacy.Engine.Passed`), and where only the tail is read, past the
+tail a dequeue grows. An outer's value or end, a subscribe beginning a
 former, and a mark run each leave the hole's run in shape and every frame
-above keyed against it (`adequacy.Engine.Above.Flight`). The dequeuing
-merge's own frame is proven. Settled by the frames above a dequeue keeping
-their share past the dropped skip.
+above keyed against it (`adequacy.Engine.Above.Flight`). Settled by the
+per-frame keys past a dropped skip.
 
-Members: `lane-begin-above`, `rise-admit-flight`, `rise-outer-end-flight`,
-`begin-flight`, `run-flight`, `flight-load`, `flight-held`.
+Members: `outer-flat-drops`, `lanes-flat-drops`, `src-at-drops`,
+`body-at-drops`, `lane-begin-tail`, `rise-admit-flight`,
+`rise-outer-end-flight`, `begin-flight`, `run-flight`, `flight-load`,
+`flight-held`.
 
 #### THE KEYS KEPT
 
@@ -81,7 +83,7 @@ heads, so the end may not lead a sibling lane or the connect's source.
 Settled when both are bodies, or refuted (then each reads the open frame
 `lane-drop` reaches).
 
-Members: `lane-begins-shut`, `rise-body-end-shut`, `rise-lane-end-shut`.
+Members: `rise-body-end-shut`, `rise-lane-end-shut`.
 
 #### THE SORTED TAILS
 
@@ -112,7 +114,7 @@ whose frames above must pass every skip under its position. Settled when
 these are bodies, or refuted.
 
 Members: `apart-next`, `won-src`, `outer-begins-links`, `outer-queues-links`,
-`outer-ignores-links`, `lane-begins-links`, `outer-begun`, `switch-begun`,
+`outer-ignores-links`, `lane-begin-links`, `outer-begun`, `switch-begun`,
 `lane-begun`.
 
 #### THE TAIL'S SKIP
