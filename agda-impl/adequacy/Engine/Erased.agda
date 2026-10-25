@@ -5,7 +5,7 @@
 -- and what it leaves running after each step is as fresh.  Read a depth
 -- at a time (`Upto`), each depth off one derivation of `Erase`, and in
 -- the limit off them all, since `_⊒_` holds at each depth on its own.
--- Past dropped skips, alike (`every-drops`), and the last skip dropped
+-- Past dropped skips, alike (`every-drops`, `spread-drops`), and the last skip dropped
 -- witnesses where what is left running is fresh (`drops-fresh`).
 module adequacy.Engine.Erased where
 
@@ -20,6 +20,7 @@ open import adequacy.Engine.Drop using (Dropsˢ; dropˢ; dropsˢ)
 open import adequacy.Placed.Order using (Every; EveryT; Every∞; every; everyᵀ)
 open import adequacy.Placed.Keys using (every-≈)
 open import adequacy.Placed.Burst using (Fresh; FreshRun; freshᴿ)
+open import adequacy.Placed.Trail using (Spread; Sp; spread)
 open Events∞
 open Tail∞
 
@@ -45,6 +46,13 @@ FreshUpto (suc n) p (skip m s)  = UptoT n (Fresh p m) (cut s) × FreshUpto n p (
 FreshUpto (suc n) p (end _)     = ⊤
 FreshUpto (suc n) p hush        = ⊤
 
+SpreadUpto : ∀ {A} → ℕ → Events A → Set
+SpreadUpto zero    e           = ⊤
+SpreadUpto (suc n) (out x _ r) = (Upto n (Sp x) (force r) × UptoT n (Sp x) (cut r)) × SpreadUpto n (force r)
+SpreadUpto (suc n) (skip _ r)  = SpreadUpto n (force r)
+SpreadUpto (suc n) (end _)     = ⊤
+SpreadUpto (suc n) hush        = ⊤
+
 ------------------------------------------------------------------------
 -- Every depth, every step
 
@@ -65,6 +73,14 @@ freshᴿ (fresh-upto p (out m _ s) f) = everyT-upto (cut s) (λ n → proj₁ (f
 freshᴿ (fresh-upto p (skip m s)  f) = everyT-upto (cut s) (λ n → proj₁ (f (suc n))) , fresh-upto p (force s) (λ n → proj₂ (f (suc n)))
 freshᴿ (fresh-upto p (end _)     f) = tt
 freshᴿ (fresh-upto p hush        f) = tt
+
+spread-upto : ∀ {A} (e : Events A) → (∀ n → SpreadUpto n e) → Spread e
+spread (spread-upto (out x _ r) f) =
+  (every-upto (force r) (λ n → proj₁ (proj₁ (f (suc n)))) , everyT-upto (cut r) (λ n → proj₂ (proj₁ (f (suc n)))))
+  , spread-upto (force r) (λ n → proj₂ (f (suc n)))
+spread (spread-upto (skip _ r)  f) = spread-upto (force r) (λ n → f (suc n))
+spread (spread-upto (end _)     f) = tt
+spread (spread-upto hush        f) = tt
 
 ------------------------------------------------------------------------
 -- Read off one derivation
@@ -91,6 +107,15 @@ freshUpto-erase fx (erased o e x) = freshUpto-erase (proj₂ (freshᴿ fx)) x
 freshUpto-erase fx endᵉ           = tt
 freshUpto-erase fx hushᵉ          = tt
 
+spreadUpto-erase : ∀ {A} {k} {x y : Events A} {t} → Spread x → Erase k x t y → SpreadUpto k y
+spreadUpto-erase sx stopᵉ          = tt
+spreadUpto-erase sx (outᵉ e x)     =
+  (upto-erase (proj₁ (proj₁ (spread sx))) x , uptoT-erase (proj₂ (proj₁ (spread sx))) e) , spreadUpto-erase (proj₂ (spread sx)) x
+spreadUpto-erase sx (skipᵉ e x)    = spreadUpto-erase (spread sx) x
+spreadUpto-erase sx (erased o e x) = spreadUpto-erase (spread sx) x
+spreadUpto-erase sx endᵉ           = tt
+spreadUpto-erase sx hushᵉ          = tt
+
 ------------------------------------------------------------------------
 -- Erased, and alike
 
@@ -105,6 +130,12 @@ fresh-⊒ {p = p} {h′ = h′} fr (_ , _ , e) = fresh-upto p (force h′) (λ n
 
 fresh-≈ : ∀ {A} {p} {x y : Events A} → (∀ n → Agree n x y) → FreshRun p x → FreshRun p y
 fresh-≈ {p = p} {y = y} ag fx = fresh-upto p y (λ n → freshUpto-erase fx (erase-agree {t = idle} (ag n)))
+
+spread-⊒ : ∀ {A} {h h′ : Events∞ A} → Spread (force h) → h ⊒ h′ → Spread (force h′)
+spread-⊒ {h′ = h′} sp (_ , _ , e) = spread-upto (force h′) (λ n → spreadUpto-erase sp (nowᵉ (e n)))
+
+spread-≈ : ∀ {A} {x y : Events A} → (∀ n → Agree n x y) → Spread x → Spread y
+spread-≈ {y = y} ag sx = spread-upto y (λ n → spreadUpto-erase sx (erase-agree {t = idle} (ag n)))
 
 ------------------------------------------------------------------------
 -- Past dropped skips
@@ -125,3 +156,7 @@ drops-fresh (dropˢ {k = k} q ag d) (pe , _) fr =
   k , q , proj₁ (every (every-≈ _ _ ag pe)) , everyT-⊒ (proj₁ (freshᴿ (fresh-≈ ag fr))) d
 drops-fresh (dropsˢ q ag d) (pe , _) fr =
   drops-fresh d (proj₂ (every (every-≈ _ _ ag pe))) (proj₂ (freshᴿ (fresh-≈ ag fr)))
+
+spread-drops : ∀ {A} {Q : Pos → Set} {h h′ : Events∞ A} → Spread (force h) → Dropsˢ Q h h′ → Spread (force h′)
+spread-drops sp (dropˢ q ag d)  = spread-⊒ (spread (spread-≈ ag sp)) d
+spread-drops sp (dropsˢ q ag d) = spread-drops (spread (spread-≈ ag sp)) d
