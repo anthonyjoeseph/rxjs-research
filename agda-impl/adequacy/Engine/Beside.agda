@@ -169,12 +169,12 @@ module _ (r : Pos) where
       kept : ∀ b → Eraseᵀ k (M′.burstOn r l) (M′.burstOn r l′) → Eraseᵀ (suc k) (M′.pinned r p l cL b) (M′.pinned r p l′ t b)
       kept true  e = pinᵉ e
       kept false e = c
-  run-erase {k = suc k} {y = y} {cL} {t} a o tr c (erased {p = p} {l = l} n et ex) =
+  run-erase {k = k} {y = y} {cL} {t} a o tr c (erased {p = p} {l = l} n et ex) =
     gone (inside r p) refl (run-erase (atop-weaken p r (force l) a (proj₁ (ordered o))) (proj₂ (ordered o)) tr et ex)
     where
-      gone : ∀ b → inside r p ≡ b → Eraseᵀ k (M′.burstOn r l) (M′.runOn r y t) → Eraseᵀ (suc k) (M′.pinned r p l cL b) (M′.runOn r y t)
+      gone : ∀ b → inside r p ≡ b → Eraseᵀ k (M′.burstOn r l) (M′.runOn r y t) → Eraseᵀ k (M′.pinned r p l cL b) (M′.runOn r y t)
       gone true  ib e = unpin (atopT-tnb (M′.runOn r y t) (atopT-run p y t (nb-atop y n) tr ib)) e
-      gone false ib e = subst (Eraseᵀ (suc k) cL) (sym (run-outside y t ib a n)) c
+      gone false ib e = subst (Eraseᵀ k cL) (sym (run-outside y t ib a n)) c
   run-erase a o tr c endᵉ  = c
   run-erase a o tr c hushᵉ = c
 
