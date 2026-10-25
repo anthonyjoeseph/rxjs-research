@@ -53,13 +53,16 @@ open import adequacy.Engine.Meaning using (M; flagOf; envAt; risen; gh; lane; la
 open import adequacy.Engine.Inv using (Inv; module Inv; module Base; wfI; search-hit; NextInv; inv-next)
 open import adequacy.Engine.Spent using (module Spending)
 open import adequacy.Engine.Kept using (KeptFrom; refocus-agree) renaming (kept to engine-kept)
+open import adequacy.Engine.Head using (Frag)
+open import adequacy.Engine.Pick using (Won; Untied; module Order; search-won)
+open import adequacy.Engine.Shown using (won-pass; cold-key)
 open import adequacy.Strong using (module Strongly)
 open Events∞ using (force)
 
 module Honesty (R : Set) where
   open Driver R using (Step; silent; value; complete; drained; step; reading; Read; read; later; played; took)
   open Machine using (Conf; ⟨_,_,_,_⟩; load; moved; starting; turn; quiet; gone; leaf; nx; cp; St; pend; coldS; Ctx; top; inOuter; inLanes;
-    plug; closed; alive; search; found; leafM; subscribing; absorbed; rising; _⊕_; inCut; inLn; attAt; flatS; killAll) renaming (step to stepᴹ; ended to endedˢ)
+    plug; closed; alive; search; found; leafM; still; subscribing; absorbed; rising; _⊕_; inCut; inLn; attAt; flatS; killAll) renaming (step to stepᴹ; ended to endedˢ)
   open Spending R using (Skipped; outerᵏ; laneᵏ; deferᵏ; stallᵏ; closeᵏ; silent-spent)
   open Pure R using (End; finished; dry; cutOff)
   open Unsubbing R using (_⇝_; now; then)
@@ -232,18 +235,6 @@ module Honesty (R : Set) where
     -- EACH STEP WHOSE WORK MAY GROW DROPS A SKIP (`adequacy.Engine.Spent`'s
     -- `Skipped`): what the step leaves means less by at least one leading
     -- skip, never the same.  Every other silent step lowers its work.
-    -- A STALL OR A CLOSE WHERE IT IS SHOWN IS SHOWN NEXT: every frame
-    -- above the cold searched out passes its lead skip.
-    stall-pass : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p}
-               → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (stall k))) leafM key)
-               → shows c′ true ≡ true → Inv ⟨ c , s , absorbed , p ⟩
-               → Pass (_≡ u ++ [ ix i ]) c′ true (U.stateᴺ (gh (coldS true (play τ u i t₀ (stall k)))) (envAt c′))
-                   (U.stateᴺ (gh (coldS true (play τ u (suc i) t₀ (Frame∞.force k)))) (envAt c′))
-    close-pass : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p}
-               → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (close k))) leafM key)
-               → shows c′ true ≡ true → Inv ⟨ c , s , absorbed , p ⟩
-               → Pass (_≡ u ++ [ ix i ]) c′ true (U.stateᴺ (gh (coldS true (play τ u i t₀ (close k)))) (envAt c′))
-                   (U.stateᴺ (gh (coldS true (restᵀ τ (u ++ [ last ]) (From∞.force k)))) (envAt c′))
     -- A STALL OR A CLOSE WHERE ONLY TAILS ARE READ, as `defer-tail`.
     stall-tail : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p t m′}
                → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (stall k))) leafM key)
@@ -445,6 +436,32 @@ module Honesty (R : Set) where
   close-next eq ce rewrite eq | ce = λ { refl → refl }
 
   -- A stall drops its skip: the tree refocused at the cold searched out.
+  -- A STALL OR A CLOSE WHERE IT IS SHOWN IS SHOWN NEXT: every frame
+  -- above the cold searched out passes its lead skip, its key the cold's.
+  stall-pass : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p}
+             → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (stall k))) leafM key)
+             → shows c′ true ≡ true → Inv ⟨ c , s , absorbed , p ⟩
+             → Pass (_≡ u ++ [ ix i ]) c′ true (U.stateᴺ (gh (coldS true (play τ u i t₀ (stall k)))) (envAt c′))
+                 (U.stateᴺ (gh (coldS true (play τ u (suc i) t₀ (Frame∞.force k)))) (envAt c′))
+  stall-pass {c = c} {s} {c′} {τ} {u} {i} {t₀} {k} eq sh iv =
+    won-pass (u ++ [ ix i ]) c′ (coldS true (play τ u i t₀ (stall k))) true
+      (subst (λ x → Won (x , still) c′ (coldS true (play τ u i t₀ (stall k)))) (cold-key (plug c s) eq) (search-won (plug c s) eq))
+      (subst Frag (sym (proj₁ (search-hit (plug c s) eq))) (Order.shape (Inv.ord iv)))
+      (subst (Untied top) (sym (proj₁ (search-hit (plug c s) eq))) (Order.untied (Inv.ord iv)))
+      sh refl (≋-by refl refl) (stall-hole (envAt c′))
+
+  close-pass : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p}
+             → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (close k))) leafM key)
+             → shows c′ true ≡ true → Inv ⟨ c , s , absorbed , p ⟩
+             → Pass (_≡ u ++ [ ix i ]) c′ true (U.stateᴺ (gh (coldS true (play τ u i t₀ (close k)))) (envAt c′))
+                 (U.stateᴺ (gh (coldS true (restᵀ τ (u ++ [ last ]) (From∞.force k)))) (envAt c′))
+  close-pass {c = c} {s} {c′} {τ} {u} {i} {t₀} {k} eq sh iv =
+    won-pass (u ++ [ ix i ]) c′ (coldS true (play τ u i t₀ (close k))) true
+      (subst (λ x → Won (x , still) c′ (coldS true (play τ u i t₀ (close k)))) (cold-key (plug c s) eq) (search-won (plug c s) eq))
+      (subst Frag (sym (proj₁ (search-hit (plug c s) eq))) (Order.shape (Inv.ord iv)))
+      (subst (Untied top) (sym (proj₁ (search-hit (plug c s) eq))) (Order.untied (Inv.ord iv)))
+      sh refl (≋-by refl refl) (close-hole (envAt c′))
+
   stall-drop : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p t m′}
              → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (stall k))) leafM key)
              → closed c′ ≡ false → Inv ⟨ c , s , absorbed , p ⟩ → step ⟨ c , s , absorbed , p ⟩ ≡ silent t m′

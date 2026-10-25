@@ -59,7 +59,7 @@ open import adequacy.Engine.Inv using (Unpended; Opened; Wf; Base; module Base; 
   attO; cpO; cutO; bodyO; srcAttO; owedO; joinO; leafO; owned; search-hit)
 open import adequacy.Engine.Race using (First; go-rise; cuts-swap)
 open import adequacy.Engine.Head using (Frag)
-open import adequacy.Engine.Pick using (module Order; Clear)
+open import adequacy.Engine.Pick using (module Order; Clear; Untied)
 
 open Events∞
 
@@ -144,41 +144,48 @@ pool-runs {B = B} pre s post ρ =
 toʳ : ∀ {ℓ Γ B} (P : List (St Γ B) → Set ℓ) pre {s : St Γ B} {post} → P (reverse pre ++ s ∷ post) → P (pre ʳ++ s ∷ post)
 toʳ P pre = subst P (sym (ʳ++-defn pre))
 
+-- Each frame read over its hole's state is the state of the node it frames.
+take-plug : ∀ {Γ A} i (q : A → Bool) w (n : Node Γ A) (ρ : NEnv Γ) → taking∞ i q w (stateᴺ n ρ) ≋ stateᴺ (taken i q w n) ρ
+take-plug i q free       n ρ = ≋-by refl refl
+take-plug i q (cpAt p)   n ρ = ≋-by refl refl
+take-plug i q (cutAt p)  n ρ = ≋-by refl refl
+take-plug i q (overAt p) n ρ = ≋-by refl refl
+
+outer-plug : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d m q ls (o : St Γ A) (ρ : NEnv Γ)
+           → outerFrame op (lane f) d q (lanesL ls) (deadL ls) ρ (stateᴺ (gh o) ρ) ≋ stateᴺ (gh (flatS op f d m q o ls)) ρ
+outer-plug op f true  m q ls o ρ = ≋-by refl refl
+outer-plug {B = B} op f false m q ls o ρ k = agreeᵀ-refl k _ ,ˢ
+  go-ne (flatOp op) (liveᴼ {e = outerOf (lane f) ρ (stateᴺ (gh o) ρ)} {outer∞ (lane f) (gh o) ρ} (agreeᵀ-refl k _) (mapᴱ-neᴹ (λ a → ≈-refl _) (agree-refl k _)))
+    (lanes-refl k (states (lanesL ls) ρ)) (queue-refl k (Data.List.map (laneᴹ (lane f) ρ) q)) (agreeᵀ-refl k (cutᴺ (restsᶜ {B = B} (deadL ls)) ρ))
+
+lanes-plug : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d m q (o : St Γ A) pre post (s : St Γ B) (ρ : NEnv Γ)
+           → lanesFrame op (lane f) d q (gh o) pre post (flagOf s) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (gh (flatS op f d m q o (pre ++ s ∷ post))) ρ
+lanes-plug op f d m q o pre post s ρ =
+  ≋-by (cong₂ (λ ls t → M′.go (flatOp op) (outerᴺ (lane f) (outerG d (gh o)) ρ) ls (Data.List.map (laneᴹ (lane f) ρ) q) t) (sym (lanes-runs pre s post ρ)) (pool d))
+       (cong₂ (M′.whole (outerᴺ (lane f) (outerG d (gh o)) ρ)) (sym (lanes-runs pre s post ρ)) (pool d))
+  where
+    pool : ∀ d → outerT d (gh o) ρ (poolRuns pre post (flagOf s) ρ (stateᴺ (gh s) ρ)) ≡ cutᴺ (poolG d (gh o) (deadL (pre ++ s ∷ post))) ρ
+    pool false = sym (pool-runs pre s post ρ)
+    pool true  = cong (cutᴺ (gh o) ρ ∪_) (sym (pool-runs pre s post ρ))
+
+lanes-plugʳ : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d m q (o : St Γ A) pre post (s : St Γ B) (ρ : NEnv Γ)
+            → lanesFrame op (lane f) d q (gh o) (reverse pre) post (flagOf s) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (gh (flatS op f d m q o (pre ʳ++ s ∷ post))) ρ
+lanes-plugʳ op f d m q o pre post s ρ =
+  toʳ (λ ls → lanesFrame op (lane f) d q (gh o) (reverse pre) post (flagOf s) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (gh (flatS op f d m q o ls)) ρ) pre
+    (lanes-plug op f d m q o (reverse pre) post s ρ)
+
+done-plug : ∀ {Γ A} ow sl {h : Events∞ A} (n : Node Γ A) (ρ : NEnv Γ) → h ≋ stateᴺ n ρ → doneE ow sl h ≋ stateᴺ (doneG ow sl n) ρ
+done-plug (just w) l     n ρ x = ≋-tr (λ k → doneE-ne (just w) l (x k)) refl refl
+done-plug nothing  false n ρ x = ≋-tr (λ k → doneE-ne nothing false (x k)) refl refl
+done-plug nothing  true  n ρ x = x
+
+body-plug : ∀ {Γ X B} k (o : St Γ X) (s : St (X ∷ Γ) B) (ρ : NEnv Γ)
+          → bodyFrame k o ρ (stateᴺ (gh s) (srcRun (srcG k o) ρ ∷ᴬ ρ)) ≋ stateᴺ (gh (connS k o s)) ρ
+body-plug (cs cl sl sa (just p) as ow r e)  o s ρ = done-plug ow sl _ ρ (≋-by refl refl)
+body-plug (cs false sl sa nothing as ow r e) o s ρ = done-plug ow sl _ ρ (≋-by refl refl)
+body-plug (cs true sl sa nothing as ow r e)  o s ρ = done-plug ow sl _ ρ (≋-by refl refl)
+
 private
-  take-plug : ∀ {Γ A} i (q : A → Bool) w (n : Node Γ A) (ρ : NEnv Γ) → taking∞ i q w (stateᴺ n ρ) ≋ stateᴺ (taken i q w n) ρ
-  take-plug i q free       n ρ = ≋-by refl refl
-  take-plug i q (cpAt p)   n ρ = ≋-by refl refl
-  take-plug i q (cutAt p)  n ρ = ≋-by refl refl
-  take-plug i q (overAt p) n ρ = ≋-by refl refl
-
-  outer-plug : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d m q ls (o : St Γ A) (ρ : NEnv Γ)
-             → outerFrame op (lane f) d q (lanesL ls) (deadL ls) ρ (stateᴺ (gh o) ρ) ≋ stateᴺ (gh (flatS op f d m q o ls)) ρ
-  outer-plug op f true  m q ls o ρ = ≋-by refl refl
-  outer-plug {B = B} op f false m q ls o ρ k = agreeᵀ-refl k _ ,ˢ
-    go-ne (flatOp op) (liveᴼ {e = outerOf (lane f) ρ (stateᴺ (gh o) ρ)} {outer∞ (lane f) (gh o) ρ} (agreeᵀ-refl k _) (mapᴱ-neᴹ (λ a → ≈-refl _) (agree-refl k _)))
-      (lanes-refl k (states (lanesL ls) ρ)) (queue-refl k (Data.List.map (laneᴹ (lane f) ρ) q)) (agreeᵀ-refl k (cutᴺ (restsᶜ {B = B} (deadL ls)) ρ))
-
-  lanes-plug : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d m q (o : St Γ A) pre post (s : St Γ B) (ρ : NEnv Γ)
-             → lanesFrame op (lane f) d q (gh o) pre post (flagOf s) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (gh (flatS op f d m q o (pre ++ s ∷ post))) ρ
-  lanes-plug op f d m q o pre post s ρ =
-    ≋-by (cong₂ (λ ls t → M′.go (flatOp op) (outerᴺ (lane f) (outerG d (gh o)) ρ) ls (Data.List.map (laneᴹ (lane f) ρ) q) t) (sym (lanes-runs pre s post ρ)) (pool d))
-         (cong₂ (M′.whole (outerᴺ (lane f) (outerG d (gh o)) ρ)) (sym (lanes-runs pre s post ρ)) (pool d))
-    where
-      pool : ∀ d → outerT d (gh o) ρ (poolRuns pre post (flagOf s) ρ (stateᴺ (gh s) ρ)) ≡ cutᴺ (poolG d (gh o) (deadL (pre ++ s ∷ post))) ρ
-      pool false = sym (pool-runs pre s post ρ)
-      pool true  = cong (cutᴺ (gh o) ρ ∪_) (sym (pool-runs pre s post ρ))
-
-  lanes-plugʳ : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d m q (o : St Γ A) pre post (s : St Γ B) (ρ : NEnv Γ)
-              → lanesFrame op (lane f) d q (gh o) (reverse pre) post (flagOf s) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (gh (flatS op f d m q o (pre ʳ++ s ∷ post))) ρ
-  lanes-plugʳ op f d m q o pre post s ρ =
-    toʳ (λ ls → lanesFrame op (lane f) d q (gh o) (reverse pre) post (flagOf s) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (gh (flatS op f d m q o ls)) ρ) pre
-      (lanes-plug op f d m q o (reverse pre) post s ρ)
-
-  done-plug : ∀ {Γ A} ow sl {h : Events∞ A} (n : Node Γ A) (ρ : NEnv Γ) → h ≋ stateᴺ n ρ → doneE ow sl h ≋ stateᴺ (doneG ow sl n) ρ
-  done-plug (just w) l     n ρ x = ≋-tr (λ k → doneE-ne (just w) l (x k)) refl refl
-  done-plug nothing  false n ρ x = ≋-tr (λ k → doneE-ne nothing false (x k)) refl refl
-  done-plug nothing  true  n ρ x = x
-
   sub-settled : ∀ {Γ A} p (s : St Γ A) → Unpended s → subOr p s ≡ gh s
   sub-settled p (coldS b l)             u = refl
   sub-settled p (ofS i q xs)            u = refl
@@ -206,12 +213,6 @@ private
   src-plug : ∀ {Γ X B} k (b : St (X ∷ Γ) B) (s : St Γ X) (ρ : NEnv Γ) → Unpended s → Opened k s
            → srcFrame k (gh b) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (gh (connS k s b)) ρ
   src-plug k b s ρ u o = done-plug (CS.owedAt k) (CS.srcLive k) _ ρ (conn-plug k b s ρ u o)
-
-  body-plug : ∀ {Γ X B} k (o : St Γ X) (s : St (X ∷ Γ) B) (ρ : NEnv Γ)
-            → bodyFrame k o ρ (stateᴺ (gh s) (srcRun (srcG k o) ρ ∷ᴬ ρ)) ≋ stateᴺ (gh (connS k o s)) ρ
-  body-plug (cs cl sl sa (just p) as ow r e)  o s ρ = done-plug ow sl _ ρ (≋-by refl refl)
-  body-plug (cs false sl sa nothing as ow r e) o s ρ = done-plug ow sl _ ρ (≋-by refl refl)
-  body-plug (cs true sl sa nothing as ow r e)  o s ρ = done-plug ow sl _ ρ (≋-by refl refl)
 
   take-true : ∀ {Γ A} i (q : A → Bool) (n : Node Γ A) (ρ : NEnv Γ) a p → q a ≡ true
             → took i q (risen n ρ (nx a) p) ≋ risen (takeWhileᶜ i q n) ρ (nx a) p
@@ -633,5 +634,5 @@ module _ {R : Set} where
   ... | nothing = quiet-empty c s p v e
   ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
   ...   | pl , own = kept-pre (tookᴰ (run c′ s′ m p)) (refocus c s c′ s′ p (Base.settled (Inv.base v)) (owned own) (wfI (Inv.base v)) pl)
-                       (runs c′ s′ m p own (inv-at c′ s′ p (owned own) (subst Wf (sym pl) (wfI (Inv.base v))) (subst Frag (sym pl) (Order.shape (Inv.ord v)))))
+                       (runs c′ s′ m p own (inv-at c′ s′ p (owned own) (subst Wf (sym pl) (wfI (Inv.base v))) (subst Frag (sym pl) (Order.shape (Inv.ord v))) (subst (Untied top) (sym pl) (Order.untied (Inv.ord v)))))
 
