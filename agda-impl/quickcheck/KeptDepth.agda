@@ -60,9 +60,10 @@ open import denotation.MonotonicList.Events using (Frame∞; From∞; last)
 import denotation.Unfold as U
 
 private
-  -- A run's verdict, carrying its longest run of steps meaning the same.
+  -- A run's verdict, carrying its longest run of steps meaning the same
+  -- and how many live sources' links it checked.
   data Verdict : Set where
-    yes : ℕ → Verdict
+    yes : ℕ → ℕ → Verdict
     no  : ℕ → String → Verdict
 
   -- The first `k` events of a run, printed.
@@ -298,6 +299,29 @@ private
   linksᵇ v q (inBody (cs cl true sa ba as (just _) r en) o c)   f h h′ = true
   linksᵇ v q (inBody (cs cl false sa ba as ow r en) o c)        f h h′ = true
 
+  -- The live sources a pass links past.
+  liveᵇ : ∀ {R Γ A} → Ctx R Γ A → ℕ
+  liveᵇ top                                                = 0
+  liveᵇ (inMap g c)                                        = liveᵇ c
+  liveᵇ (inScan g z c)                                     = liveᵇ c
+  liveᵇ (inCut l a c)                                      = liveᵇ c
+  liveᵇ (inLn b c)                                         = liveᵇ c
+  liveᵇ (inTake i w x c)                                   = liveᵇ c
+  liveᵇ (inOuter op g d n w ls c)                          = liveᵇ c
+  liveᵇ (inLanes op g d n w o pre post c)                  = liveᵇ c
+  liveᵇ (inSrc (cs false true sa ba as nothing r en) b c)  = suc (liveᵇ c)
+  liveᵇ (inSrc k b c)                                      = liveᵇ c
+  liveᵇ (inBody k o c)                                     = liveᵇ c
+
+  -- How many a step links past, where it is shown.
+  linkCount : Conf ℕ → ℕ
+  linkCount ⟨ c , pend (defer l) , subscribing , p ⟩ = if showsᵃ c true then liveᵇ c else 0
+  linkCount ⟨ c , s , absorbed , p ⟩ with search top (plug c s)
+  ... | just (found (Γ′ , A′ , c′ , coldS true (play τ u i t (stall k))) leafM key) = if closed c′ ∨ not (showsᵃ c′ true) then 0 else liveᵇ c′
+  ... | just (found (Γ′ , A′ , c′ , coldS true (play τ u i t (close k))) leafM key) = if closed c′ ∨ not (showsᵃ c′ true) then 0 else liveᵇ c′
+  ... | _ = 0
+  linkCount _ = 0
+
   -- Each step `adequacy.Content` passes, linked where it is shown: an
   -- absorbed stall or close (`stall-pass`, `close-pass`), and a defer
   -- (`defer-links`).
@@ -321,28 +345,28 @@ private
   -- Whether every silent step keeps its meaning so, and the longest run
   -- meaning the same.
   mutual
-    walk : ℕ → ℕ → ℕ → Conf ℕ → Verdict
-    walk zero    run best m = yes (best ⊔ run)
-    walk (suc n) run best m =
+    walk : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Verdict
+    walk zero    run best ls m = yes (best ⊔ run) ls
+    walk (suc n) run best ls m =
       if not (searchedᵇ m) then no (best ⊔ run) ("\n  beaten: a still find not first past a live source's skips, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (linkedᵇ m) then no (best ⊔ run) ("\n  unlinked: a pass not fed past a live source's skips, " ++ showMode m ++ " at " ++ showSpot (spot m))
-      else next n run best m (step m)
+      else next n run best (ls + linkCount m) m (step m)
 
-    next : ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict
-    next n run best m (silent t m′)     = after n run best m m′ (kind m m′)
-    next n run best m (value t p a m′)  = walk n 0 (best ⊔ run) m′
-    next n run best m (complete p)      = yes (best ⊔ run)
-    next n run best m drained           = yes (best ⊔ run)
+    next : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict
+    next n run best ls m (silent t m′)     = after n run best ls m m′ (kind m m′)
+    next n run best ls m (value t p a m′)  = walk n 0 (best ⊔ run) ls m′
+    next n run best ls m (complete p)      = yes (best ⊔ run) ls
+    next n run best ls m drained           = yes (best ⊔ run) ls
 
-    after : ℕ → ℕ → ℕ → Conf ℕ → Conf ℕ → ℕ → Verdict
-    after n run best m m′ zero          = no (best ⊔ run) (why m m′)
-    after n run best m m′ (suc zero)    = walk n (suc run) best m′
-    after n run best m m′ (suc (suc _)) = walk n 0 (best ⊔ run) m′
+    after : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Conf ℕ → ℕ → Verdict
+    after n run best ls m m′ zero          = no (best ⊔ run) (why m m′)
+    after n run best ls m m′ (suc zero)    = walk n (suc run) best ls m′
+    after n run best ls m m′ (suc (suc _)) = walk n 0 (best ⊔ run) ls m′
 
 -- One program's verdict, under a label.
 keptLine : String → Prog natᵗ → String
-keptLine n p with walk 400 0 0 (load (toObs timeline 3 p []ᴬ []ᴬ []ᴬ))
-... | yes l = "kept-depth: ok   " ++ n ++ " longest " ++ showℕ l
+keptLine n p with walk 400 0 0 0 (load (toObs timeline 3 p []ᴬ []ᴬ []ᴬ))
+... | yes l ls = "kept-depth: ok   " ++ n ++ " longest " ++ showℕ l ++ " links " ++ showℕ ls
 ... | no l w = "kept-depth: FAIL " ++ n ++ " longest " ++ showℕ l ++ "\n  program " ++ showCode natᵗ p ++ w
 
 private
