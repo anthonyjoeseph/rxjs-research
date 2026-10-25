@@ -17,10 +17,10 @@ module adequacy.Content where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_; [_]; length; reverse; _ʳ++_; map)
-open import Data.List.Properties using (++-assoc; ++-identityʳ; map-++)
+open import Data.List.Properties using (++-assoc; ++-identityʳ; map-++; reverse-involutive)
 open import Data.List.Relation.Unary.Any using (Any; here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ; ++⁻)
-open import Data.List.Relation.Unary.All using ([])
+open import Data.List.Relation.Unary.All using (All; [])
 import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
@@ -33,9 +33,9 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Tree using (Obs; Later; defer; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.MonotonicList.Events using (Timeline; Events; Events∞; Pos; Time; tick; root; out; end; hush; ix; _<ᵖ_; <ᵖ-irrefl;
-  <ᵖ-asym; emit; stall; close; last; Frame∞; From; From∞; idle; done; at) renaming (quiet to silentᶠ)
-open import denotation.MonotonicList using (MonotonicList; admit; observe; Agree; agree-refl; agree-sym; agree-trans; agreeᵀ-sym; frames; _≈[_]_)
-open import denotation.NonExpansive using (_,ˢ_)
+  <ᵖ-asym; emit; stall; close; last; Frame∞; From; From∞; idle; done; at; _∪_) renaming (quiet to silentᶠ)
+open import denotation.MonotonicList using (MonotonicList; admit; enter; head; cuts; Agreeᵀ; observe; Agree; agree-refl; agree-sym; agree-trans; agreeᵀ-sym; frames; _≈[_]_)
+open import denotation.NonExpansive using (_,ˢ_; Lanes)
 open import denotation.Compositional using (env-refl)
 open import adequacy.Record using (Ahead; outᵃ; skipᵃ) renaming (none to noneᵃ)
 import denotation.Unfold as U
@@ -50,13 +50,14 @@ open import adequacy.Stepper.Within using (placed-after)
 open import adequacy.Stepper using (step-skips)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Ghost using (module Ghosting)
-open import adequacy.Engine.Drop using (Drops; drop; drops; Dropsˢ; dropˢ; Pass; shows; shows-open; lift-drops; outer-held)
-open import adequacy.Engine.Meaning using (M; flagOf; envAt; risen; gh; lane; laneᴹ; lanesL; deadL; outerFrame; lanesFrame; Has; atOut; atEnd; pastOut; _≅_; ≅-refl; ≅-sym; ≅-trans; agree-≅; ≋-by)
+open import adequacy.Engine.Drop using (Drops; drop; drops; Dropsˢ; dropˢ; Pass; shows; shows-open; lift-drops; outer-admits; ∪-idleᵀ)
+open import adequacy.Engine.Meaning using (M; flagOf; envAt; risen; gh; lane; laneᴹ; lanesL; deadL; outerFrame; lanesFrame; laneRuns; poolRuns; poolT; lanes-refl; Has; atOut; atEnd; pastOut; _≅_; ≅-refl; ≅-sym; ≅-trans; agree-≅; ≋-by)
 open import adequacy.Engine.Inv using (Inv; module Inv; module Base; wfI; search-hit; NextInv; inv-next)
 open import adequacy.Engine.Spent using (module Spending)
-open import adequacy.Engine.Kept using (KeptFrom; refocus-agree) renaming (kept to engine-kept)
-open import adequacy.Engine.Head using (Frag)
+open import adequacy.Engine.Kept using (KeptFrom; refocus-agree; rests-++) renaming (kept to engine-kept)
+open import adequacy.Engine.Head using (Frag) renaming (Lanes to Lanesᴴ)
 open import adequacy.Engine.Pick using (Beat; Beats; module Order; frag-flat)
+open import adequacy.Engine.Race using (After; TailNotBefore)
 open import adequacy.Engine.Shown using (beat-pass; cold-key)
 open import adequacy.Strong using (module Strongly)
 open Events∞ using (force)
@@ -64,7 +65,7 @@ open Events∞ using (force)
 module Honesty (R : Set) where
   open Driver R using (Step; silent; value; complete; drained; step; reading; Read; read; later; played; took)
   open Machine using (Conf; ⟨_,_,_,_⟩; load; moved; starting; turn; quiet; gone; leaf; nx; cp; St; pend; coldS; Ctx; top; inOuter; inLanes;
-    plug; closed; alive; search; found; leafM; still; subscribing; absorbed; rising; _⊕_; inCut; inLn; attAt; flatS; killAll) renaming (step to stepᴹ; ended to endedˢ)
+    plug; closed; alive; search; found; leafM; still; subscribing; absorbed; rising; _⊕_; inCut; inLn; attAt; flatS; killAll; lnS; cutS) renaming (step to stepᴹ; ended to endedˢ)
   open Spending R using (Skipped; outerᵏ; laneᵏ; deferᵏ; stallᵏ; closeᵏ; silent-spent)
   open Pure R using (End; finished; dry; cutOff)
   open Unsubbing R using (_⇝_; now; then)
@@ -349,11 +350,6 @@ module Honesty (R : Set) where
     lanesFrame op (lane f) d q (gh o) (reverse (reverse ls)) [] true (envAt c) (U.stateᴺ (U.subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c))
 
   postulate
-    -- AN OUTER'S VALUE BEGINS ITS LANE PAST ONE SKIP: the flatMap shows
-    -- the value as a skip, then the lane subscribed just past it.
-    outer-begins : ∀ {Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
-                 → Begins op n → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
-                 → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (outerX c op f d q ls o a p) (begunY c op f d q o (keptLanes op ls) a p)
     -- AN OUTER'S VALUE ADMITTED WHERE IT IS SHOWN IS SHOWN NEXT: every
     -- frame above passes its skip, whatever the admission left.
     outer-begins-pass : ∀ {Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
@@ -393,11 +389,11 @@ module Honesty (R : Set) where
   outer-queues {op = mergeᶠ (just k)} {true} b iv = ⊥-elim (Order.lead (Inv.ord iv))
   outer-queues {c = c} {mergeᶠ (just k)} {false} {n} {q} {ls} {f} {o} {a} {p} b iv with Order.lead (Inv.ord iv)
   ... | _ , al , tn =
-    outer-held (mergeᶠ (just k)) (lane f) q (q ++ [ a ]) (lanesL ls) (deadL ls) (envAt c) (gh o) a p
+    outer-admits (mergeᶠ (just k)) (lane f) q (lanesL ls) (deadL ls) (envAt c) (gh o) a p _
       (trans (queue-admits k (laneᴹ (lane f) (envAt c) a) (U.states (lanesL ls) (envAt c)) (map (laneᴹ (lane f) (envAt c)) q) (p ⊕ [ ix 1 ])
                 (subst (λ x → (x <ᵇ k) ≡ false) (trans en (sym (states-length (lanesL ls) (envAt c)))) b))
              (cong (λ x → U.states (lanesL ls) (envAt c) , x , idle) (sym (map-++ (laneᴹ (lane f) (envAt c)) q [ a ]))))
-      al tn
+      refl refl (λ m → lanes-refl m _) (λ m → ∪-idleᵀ m _) al tn
     where en = proj₁ (proj₂ (proj₂ (frag-flat c (mergeᶠ (just k)) f false n q o ls (Order.shape (Inv.ord iv)))))
   outer-queues {op = mergeᶠ nothing} ()
   outer-queues {op = switchᶠ}        ()
@@ -409,13 +405,87 @@ module Honesty (R : Set) where
   outer-ignores {op = exhaustᶠ} {true} b iv = ⊥-elim (Order.lead (Inv.ord iv))
   outer-ignores {c = c} {exhaustᶠ} {false} {n} {q} {ls} {f} {o} {a} {p} b iv with Order.lead (Inv.ord iv)
   ... | _ , al , tn =
-    outer-held exhaustᶠ (lane f) q q (lanesL ls) (deadL ls) (envAt c) (gh o) a p
+    outer-admits exhaustᶠ (lane f) q (lanesL ls) (deadL ls) (envAt c) (gh o) a p _
       (ignore-admits (laneᴹ (lane f) (envAt c) a) (U.states (lanesL ls) (envAt c)) (map (laneᴹ (lane f) (envAt c)) q) (p ⊕ [ ix 1 ])
          (subst (λ x → (x ≡ᵇ 0) ≡ false) (trans en (sym (states-length (lanesL ls) (envAt c)))) b))
-      al tn
+      refl refl (λ m → lanes-refl m _) (λ m → ∪-idleᵀ m _) al tn
     where en = proj₁ (proj₂ (proj₂ (frag-flat c exhaustᶠ f false n q o ls (Order.shape (Inv.ord iv)))))
   outer-ignores {op = mergeᶠ m} ()
   outer-ignores {op = switchᶠ}  ()
+
+  -- A merge with room, or an idle exhaust, begins the lane it admits.
+  begin-admits : ∀ {B} k (m : MonotonicList B) ls qs r → (length ls <ᵇ k) ≡ true → admit (flatOp (mergeᶠ (just k))) r m ls qs ≡ (enter m r ∷ ls , qs , idle)
+  begin-admits k m ls qs r e rewrite e = refl
+
+  exhaust-admits : ∀ {B} (m : MonotonicList B) ls qs r → (length ls ≡ᵇ 0) ≡ true → admit (flatOp exhaustᶠ) r m ls qs ≡ (enter m r ∷ ls , qs , idle)
+  exhaust-admits m []       qs r e = refl
+  exhaust-admits m (l ∷ ls) qs r ()
+
+  -- A lane begun ahead of those kept: the merge's lanes, newest first,
+  -- and the pool the kept leave.
+  begun-runs : ∀ {Γ B} (ls : List (St Γ B)) (ρ : U.NEnv Γ) h → h ∷ U.states (lanesL ls) ρ ≡ laneRuns (reverse (reverse ls)) [] true ρ h
+  begun-runs ls ρ h = cong (λ x → h ∷ U.states (lanesL x) ρ) (sym (reverse-involutive ls))
+
+  begun-pool : ∀ {Γ B} (ls : List (St Γ B)) (ρ : U.NEnv Γ) h → poolT (deadL ls) ρ ≡ poolRuns (reverse (reverse ls)) [] true ρ h
+  begun-pool {B = B} ls ρ h rewrite reverse-involutive ls =
+    trans (cong (λ x → U.cutᴺ (U.restsᶜ {B = B} x) ρ) (sym (++-identityʳ (deadL ls)))) (rests-++ (deadL ls) [] ρ)
+
+  -- A switch's kill leaves no lane live.
+  kill-lanes : ∀ {Γ B} (ls : List (St Γ B)) → Lanesᴴ ls → lanesL (proj₁ (killAll ls)) ≡ []
+  kill-lanes []                                _        = refl
+  kill-lanes (lnS true (cutS true a s) ∷ ls)   (_ , fl) with Machine.cut (cutS true a s) | killAll ls | kill-lanes ls fl
+  ... | s′ , u | ls′ , t | e = cong (_++ []) e
+  kill-lanes (lnS false (cutS false a s) ∷ ls) (_ , fl) with killAll ls | kill-lanes ls fl
+  ... | ls′ , t | e = cong (_++ []) e
+
+  postulate
+    -- A SWITCH'S KILL POOLS WHAT IT KILLED: each lane it switches off
+    -- leaves in the pool the tail the merge's `cuts` reads of it.
+    kill-pool : ∀ {Γ B} (ls : List (St Γ B)) (ρ : U.NEnv Γ) → Lanesᴴ ls
+              → ∀ n → Agreeᵀ n (poolT (deadL ls) ρ ∪ cuts (U.states (lanesL ls) ρ)) (poolT (deadL (proj₁ (killAll ls))) ρ)
+
+  -- An outer's value begun past its skip, as `admit` begins it.
+  begun-drops : ∀ {Γ A B} (c : Ctx R Γ B) op q ls (f : A → Obs Timeline Γ B) (o : St Γ A) a p ls′ {Ls t′}
+              → admit (flatOp op) (p ⊕ [ ix 1 ]) (laneᴹ (lane f) (envAt c) a) (U.states (lanesL ls) (envAt c)) (map (laneᴹ (lane f) (envAt c)) q)
+                  ≡ (Ls , map (laneᴹ (lane f) (envAt c)) q , t′)
+              → (∀ n → Lanes n Ls (U.stateᴺ (U.subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c) ∷ U.states (lanesL ls′) (envAt c)))
+              → (∀ n → Agreeᵀ n (poolT (deadL ls) (envAt c) ∪ t′) (poolT (deadL ls′) (envAt c)))
+              → All (λ l → After p (head (force l))) (U.states (lanesL ls) (envAt c)) → TailNotBefore p (poolT (deadL ls) (envAt c))
+              → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (outerX c op f false q ls o a p) (begunY c op f false q o ls′ a p)
+  begun-drops c op q ls f o a p ls′ ad la ta al tn =
+    outer-admits op (lane f) q (lanesL ls) (deadL ls) (envAt c) (gh o) a p (begunY c op f false q o ls′ a p) ad refl refl
+      (λ n → subst (Lanes n _) (begun-runs ls′ (envAt c) h) (la n)) (λ n → subst (Agreeᵀ n _) (begun-pool ls′ (envAt c) h) (ta n)) al tn
+    where h = U.stateᴺ (U.subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c)
+
+  -- AN OUTER'S VALUE BEGINS ITS LANE PAST ONE SKIP: the flatMap shows
+  -- the value as a skip, then the lane subscribed just past it.
+  outer-begins : ∀ {Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
+               → Begins op n → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
+               → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (outerX c op f d q ls o a p) (begunY c op f d q o (keptLanes op ls) a p)
+  outer-begins {d = true} b iv = ⊥-elim (Order.lead (Inv.ord iv))
+  outer-begins {c = c} {mergeᶠ nothing} {false} {n} {q} {ls} {f} {o} {a} {p} b iv with Order.lead (Inv.ord iv)
+  ... | _ , al , tn = begun-drops c (mergeᶠ nothing) q ls f o a p ls refl (λ m → lanes-refl m _) (λ m → ∪-idleᵀ m _) al tn
+  outer-begins {c = c} {mergeᶠ (just k)} {false} {n} {q} {ls} {f} {o} {a} {p} b iv with Order.lead (Inv.ord iv)
+  ... | _ , al , tn =
+    begun-drops c (mergeᶠ (just k)) q ls f o a p ls
+      (begin-admits k (laneᴹ (lane f) (envAt c) a) (U.states (lanesL ls) (envAt c)) (map (laneᴹ (lane f) (envAt c)) q) (p ⊕ [ ix 1 ])
+         (subst (λ x → (x <ᵇ k) ≡ true) (trans en (sym (states-length (lanesL ls) (envAt c)))) b))
+      (λ m → lanes-refl m _) (λ m → ∪-idleᵀ m _) al tn
+    where en = proj₁ (proj₂ (proj₂ (frag-flat c (mergeᶠ (just k)) f false n q o ls (Order.shape (Inv.ord iv)))))
+  outer-begins {c = c} {exhaustᶠ} {false} {n} {q} {ls} {f} {o} {a} {p} b iv with Order.lead (Inv.ord iv)
+  ... | _ , al , tn =
+    begun-drops c exhaustᶠ q ls f o a p ls
+      (exhaust-admits (laneᴹ (lane f) (envAt c) a) (U.states (lanesL ls) (envAt c)) (map (laneᴹ (lane f) (envAt c)) q) (p ⊕ [ ix 1 ])
+         (subst (λ x → (x ≡ᵇ 0) ≡ true) (trans en (sym (states-length (lanesL ls) (envAt c)))) b))
+      (λ m → lanes-refl m _) (λ m → ∪-idleᵀ m _) al tn
+    where en = proj₁ (proj₂ (proj₂ (frag-flat c exhaustᶠ f false n q o ls (Order.shape (Inv.ord iv)))))
+  outer-begins {c = c} {switchᶠ} {false} {n} {q} {ls} {f} {o} {a} {p} b iv with Order.lead (Inv.ord iv)
+  ... | _ , al , tn =
+    begun-drops c switchᶠ q ls f o a p (proj₁ (killAll ls)) refl
+      (λ m → subst (λ x → Lanes m (h ∷ []) (h ∷ U.states x (envAt c))) (sym (kill-lanes ls fl)) (lanes-refl m (h ∷ [])))
+      (kill-pool ls (envAt c) fl) al tn
+    where fl = proj₁ (proj₂ (frag-flat c switchᶠ f false n q o ls (Order.shape (Inv.ord iv))))
+          h  = U.stateᴺ (U.subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c)
 
   -- An outer's value admitted drops its skip.
   outer-drop : ∀ {Γ A B op d n q ls} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {a p t m′}
