@@ -87,7 +87,13 @@ Clear p a (inOuter op f false n q ls c)     s =
 Clear p a (inLanes op f d n q o pre post c) s =
   alive s ≡ true → (closed c ≡ false → Sides p f d o (reverse pre) post (envAt c)) × Clear p a c (flatS op f d n q o (pre ʳ++ s ∷ post))
 Clear p a (inSrc k b c)                     s = over k ≡ false → closed c ≡ false → After (p ⊕ [ ix 0 ]) (headˢ (step (gh b)))
-Clear p a (inBody k o c)                    s = Clear p a c (connS k o s)
+Clear p a (inBody (cs cl true sa ba as nothing r en) o c) s =
+  (Events∞.force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) ≡ hush
+     → ∀ d → Agreeᵀ d (Events∞.cut (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c))) idle)
+  × NotBefore p (shown (Events∞.force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c))))
+  × Clear p a c (connS (cs cl true sa ba as nothing r en) o s)
+Clear p a (inBody (cs cl true sa ba as (just _) r en) o c) s = ⊥
+Clear p a (inBody (cs cl false sa ba as ow r en) o c)      s = ⊥
 
 -- Where a lane's end begins a queued value: the frames above, at the
 -- skip just past the end.
@@ -196,6 +202,11 @@ Lost : ∀ {A} → Bool → Key → Maybe (Key × Out A) → Set
 Lost v k nothing        = ⊤
 Lost v k (just (h , _)) = (if v then h else shift h) <ᴷ k ≡ false
 
+-- A body shows only while its connect is not over.
+Showing : ∀ {A} → Bool → Out A → Set
+Showing v still     = ⊤
+Showing v (shows _) = v ≡ false
+
 -- Every flatMap above the found node raced it in, each at the key and
 -- event its candidate has there, and a value reaches its outer frame only
 -- shown and before the outer completes, a lane's frame only from a live
@@ -214,7 +225,7 @@ Won (k , o) (inLanes op f d n q o′ pre post c) s =
 Won (k , o) (inSrc kk b c)                     s =
   KAfter (if over kk then k else shift k) (cand (inBody kk s c) b) × Before (if over kk then k else shift k) (own (connS kk s b))
   × Won ((if over kk then k else shift k) , still) c (connS kk s b)
-Won (k , o) (inBody kk o′ c)                   s = Lost (over kk) k (cand (inSrc kk s c) o′) × Before k (own (connS kk o′ s)) × Won (k , o) c (connS kk o′ s)
+Won (k , o) (inBody kk o′ c)                   s = Showing (over kk) o × Lost (over kk) k (cand (inSrc kk s c) o′) × Before k (own (connS kk o′ s)) × Won (k , o) c (connS kk o′ s)
 
 -- A key past a live source's skips: after every position under it.
 past : Bool → Key → Key
@@ -263,13 +274,16 @@ record Order {R} (k : Conf R) : Set where
 
 postulate
   -- The engine's search: the found node's key leads every race above it.
-  search-won : ∀ {R} (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} → search top t ≡ just (found (Γ , A , c , s) m key)
+  search-won : ∀ {R} (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} → Frag t → search top t ≡ just (found (Γ , A , c , s) m key)
              → Won (key , outOf c s m) c s
   -- A flatMap of a fragment tree is of the fragment.
   frag-flat : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls
             → Frag (plug c (flatS op f d n q o ls)) → Frag (flatS op f d n q o ls)
   -- A connect's body in a fragment tree is of the fragment.
   frag-body : ∀ {R Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) → Frag (plug c (connS k o b)) → Frag b
+  -- A connect in a fragment tree is under no closed frame: a cut off lane
+  -- and a completed source hold none.
+  frag-open : ∀ {R Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) → Frag (plug c (connS k o b)) → closed c ≡ false
 
 ------------------------------------------------------------------------
 -- From the race to the stepper's heads
@@ -433,7 +447,7 @@ won-ahead k (inSrc (cs false true sa ba as nothing r en) b c) s f (ka , _ , w) f
 won-ahead k (inSrc (cs false true sa ba as (just _) r en) b c) s f w ft ()
 won-ahead k (inSrc (cs false false sa ba as ow r en) b c)      s f w ft ()
 won-ahead k (inSrc (cs true sl sa ba as ow r en) b c)          s f w ft ()
-won-ahead k (inBody (cs cl true sa ba as nothing r en) o c) s f (lo , bf , w) ft sh =
+won-ahead k (inBody (cs cl true sa ba as nothing r en) o c) s f (_ , lo , bf , w) ft sh =
   proj₁ bb , (λ { _ refl → proj₂ bb }) , won-ahead k c (connS (cs cl true sa ba as nothing r en) o s) true w ft sh
   where bb = body-link k c (cs cl true sa ba as nothing r en) o s ft (shows-open c true sh) refl lo bf
 won-ahead k (inBody (cs cl true sa ba as (just _) r en) o c) s f w ft ()
@@ -471,7 +485,12 @@ won-clear p a (inLanes op f d n q o pre post c) s s′ al (l , _ , w) ft lv =
 won-clear p a (inSrc kk b c)                    s s′ al (w , _) ft with over kk
 ... | true  = λ ()
 ... | false = λ _ cl → after-step (p ⊕ [ ix 0 ]) (cand (inBody kk s c) b) (step (gh b)) w (open-agrees (inBody kk s c) b cl (frag-body c kk s b ft))
-won-clear p a (inBody kk o c)                   s s′ al (_ , _ , w) ft = won-clear p a c (connS kk o s) (connS kk o s′) refl w ft
+won-clear p a (inBody (cs cl true sa ba as nothing r en) o c) s s′ al (_ , lo , bf , w) ft =
+  proj₁ bb , proj₂ bb , won-clear p a c (connS (cs cl true sa ba as nothing r en) o s) (connS (cs cl true sa ba as nothing r en) o s′) refl w ft
+  where bb = body-link p c (cs cl true sa ba as nothing r en) o s ft (frag-open c (cs cl true sa ba as nothing r en) o s ft) refl lo bf
+won-clear p a (inBody (cs cl true sa ba as (just _) r en) o c)  s s′ al (() , _) ft
+won-clear p a (inBody (cs cl false sa ba as (just _) r en) o c) s s′ al (() , _) ft
+won-clear p a (inBody (cs cl false sa ba as nothing r en) o c)  s s′ al (() , _) ft
 
 -- A lane's completion passes its flatMap's retag as the lane's end.
 lane-off : ∀ {R Γ A B} d n (q : List A) {b} {k} {c : Ctx R Γ B} {t} → b ≡ true
@@ -520,7 +539,7 @@ mutual
     , λ sh → won-ahead (p ⊕ [ ix 0 ]) c (flatS op f d n (a ∷ q) o (pre ʳ++ s ∷ post)) true (lane-shift d n a q {alive s} {at p} {c} lv w) ft sh
     where lv = pooled-live (alive s) u
   won-ends p (inSrc kk b c)                    s s′ al w ft = tt
-  won-ends p (inBody kk o c)                   s s′ al (_ , _ , w) ft = λ k′ → won-ends p c (connS kk o s) (connS k′ o s′) refl w ft
+  won-ends p (inBody kk o c)                   s s′ al (_ , _ , _ , w) ft = λ k′ → won-ends p c (connS kk o s) (connS k′ o s′) refl w ft
 
   ends-if : ∀ {R Γ A} p (c : Ctx R Γ A) b (s s′ : St Γ A) → alive s ≡ alive s′
           → Won (at p , (if b then shows cp else still)) c s → Frag (plug c s) → EndsIf b p c s′

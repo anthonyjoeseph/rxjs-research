@@ -68,8 +68,8 @@ srcRunning : ∀ {X} → Bool → Events∞ X → Events∞ X
 srcRunning false h = h
 srcRunning {X} true h = rested {B = X} h
 
--- Every frame above the hole keeping its own, its siblings keyed, the
--- hole's run `h` in its child's place.
+-- Every frame above the hole keeping its own, its siblings keyed and a
+-- connect's source in shape, the hole's run `h` in its child's place.
 Above : ∀ {R Γ A} → Ctx R Γ A → Bool → Events∞ A → Set
 Above top                               f h = ⊤
 Above (inMap g c)                       f h = Above c true (mapped g h)
@@ -90,7 +90,7 @@ Above (inSrc k b c)                     f h =
    × Keyed b (fedRun (CS.closed k) (CS.endAt k) h ∷ᴬ envAt c))
   × Above c true (srcFrame k (gh b) (envAt c) h)
 Above (inBody k o c)                    f h =
-  (ConnAt k h (srcIn k o (envAt c)) (envAt c) × Keyed o (envAt c))
+  (ConnAt k h (srcIn k o (envAt c)) (envAt c) × Keyed o (envAt c) × Shape (srcIn k o (envAt c)))
   × Above c true (bodyFrame k o (envAt c) h)
 
 -- A configuration's hole's run in shape, and every frame above it keeping

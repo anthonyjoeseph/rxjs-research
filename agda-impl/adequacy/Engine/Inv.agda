@@ -739,7 +739,9 @@ module _ {R : Set} where
   ... | false = tt
   rise-lead (inSrc k b c)                     s (nx a) p l iv = tt
   rise-lead (inSrc k b c)                     s cp     p l iv = tt
-  rise-lead (inBody k o c)                    s (nx b) p l iv = l
+  rise-lead (inBody (cs cl true sa ba as nothing r en) o c) s (nx b) p l iv = proj₂ (proj₂ l)
+  rise-lead (inBody (cs cl true sa ba as (just _) r en) o c) s (nx b) p () iv
+  rise-lead (inBody (cs cl false sa ba as ow r en) o c)      s (nx b) p () iv
   rise-lead (inBody k o c)                    s cp     p l iv = l _
 
   -- A subscribe rises nothing, and carries its lead down.
@@ -778,9 +780,9 @@ module _ {R : Set} where
   ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
   ...   | pl , _ = run-lead (plug c s) p e
                      (λ q a s″ kq oa al → won-clear q a c′ s′ s″ al
-                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oa (search-won (plug c s) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))))
+                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oa (search-won (plug c s) (proj₁ (Order.shape o)) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))))
                      (λ q s″ kq oc al → won-ends q c′ s′ s″ al
-                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oc (search-won (plug c s) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))))
+                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oc (search-won (plug c s) (proj₁ (Order.shape o)) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))))
 
   -- A takeWhile failing a value ends one past it, what the frames above
   -- saw of the value's run.
@@ -821,7 +823,7 @@ module _ {R : Set} where
                  → Keyed (connS k o s) (envAt c)
   rise-body-keys c k o s b p v =
     conn-drop k (gh s) (envAt (inBody k o c)) b p (proj₁ (proj₁ (proj₂ (Order.flight (Inv.ord v)))))
-    , proj₂ (proj₁ (proj₂ (Order.flight (Inv.ord v)))) , proj₂ (Order.shape (Inv.ord v))
+    , proj₁ (proj₂ (proj₁ (proj₂ (Order.flight (Inv.ord v))))) , proj₂ (Order.shape (Inv.ord v))
 
   -- A rise through any other frame keeps its node's own; one absorbed
   -- leaves the frames above keyed of what it leaves running.

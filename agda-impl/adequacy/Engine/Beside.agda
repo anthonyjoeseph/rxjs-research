@@ -214,11 +214,12 @@ module _ (r : Pos) where
     gone-on {n = n} {σ = σ} {σ′} {l} eq eq′ et ex =
       subst (λ z → Eraseˢ n (M′.onward∞ σ z) σ′) (sym eq) (et ,ᵉ subst (Erase n (force l) (cut σ′)) (sym eq′) ex)
 
-    burst-hush : ∀ {X} {σ : Events∞ X} → force σ ≡ hush → M′.burstOn r σ ≡ cut σ
-    burst-hush {σ = σ} eq = cong (λ z → M′.runOn r z (cut σ)) eq
+  -- A hushed source bursts nothing.
+  burst-hush : ∀ {X} {σ : Events∞ X} → force σ ≡ hush → M′.burstOn r σ ≡ cut σ
+  burst-hush {σ = σ} eq = cong (λ z → M′.runOn r z (cut σ)) eq
 
-    burst-hushed : ∀ {X} {σ : Events∞ X} → Trailing σ → force σ ≡ hush → M′.burstOn r σ ≡ idle
-    burst-hushed {X} {σ} tr eq = trans (burst-hush {σ = σ} eq) (hush-idle {X} (cut σ) (subst (λ z → Trail z (cut σ)) eq tr))
+  burst-hushed : ∀ {X} {σ : Events∞ X} → Trailing σ → force σ ≡ hush → M′.burstOn r σ ≡ idle
+  burst-hushed {X} {σ} tr eq = trans (burst-hush {σ = σ} eq) (hush-idle {X} (cut σ) (subst (λ z → Trail z (cut σ)) eq tr))
 
   ------------------------------------------------------------------------
   -- The source's step and the body's
