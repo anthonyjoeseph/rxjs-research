@@ -10,13 +10,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE KEYS KEPT
 
-Untried: a step keeps every node's positional facts (`adequacy.Engine.Keys`),
-each in its connects' environment: a merge's mark alien, a joiner's feed ahead
-of its rejoined source, a connect's source one past a head, a take's owed end
-ahead of its tail. Read off positions alone, these were refuted. Settled by a
-body by step case, or a probe of `Keys` itself refuting one.
+Untried: a node rewritten by a rise, a begin or a mark run keeps every node's
+positional facts (`adequacy.Engine.Keys`). A begin turns an idle hole into a
+subscription every ancestor's facts must cover; a rewrite changes each
+ancestor's state. Probed in kept-depth, except a merge's mark. Settled by
+bodies, or a probe refuting a clause.
 
-Members: `keys-next`.
+Members: `rise-scan-keys`, `rise-take-keys`, `rise-admit-keys`,
+`rise-outer-end-keys`, `rise-lane-end-keys`, `rise-src-keys`,
+`rise-body-end-keys`, `begin-keys`, `run-keys`.
 
 #### THE ENDLESS SUBSCRIPTION
 
