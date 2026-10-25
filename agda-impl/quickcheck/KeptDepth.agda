@@ -12,9 +12,8 @@
 -- close and defer where it is shown links past every live source above
 -- it (`adequacy.Engine.Shown.Links`): the body fed the rest erased of the
 -- body fed the run, or past skips under the source's
--- (`adequacy.Engine.Shown.src-fed`), owing the source nothing
--- (`adequacy.Engine.Shown.caught`), its source's run nesting nothing
--- (`adequacy.Engine.Shown.src-flat`), and after each source skip shows
+-- (`adequacy.Engine.Shown.src-fed`), owing the source nothing, its
+-- source's run nesting nothing, and after each source skip shows
 -- (`adequacy.Engine.Shown.src-body-on`).
 module quickcheck.KeptDepth where
 
@@ -280,7 +279,9 @@ private
   atᵇ (here _)  = 0
   atᵇ (there j) = suc (atᵇ j)
 
-  -- `adequacy.Engine.Shown.Caught`, decided, `i` counted as `atᵇ` counts.
+  -- Nothing owed a source: each joiner of connect `i` not yet told its
+  -- end joined before `q` and holds nothing fed, no defer holds a step of
+  -- it, nothing is held under `q`; `i` counted as `atᵇ` counts.
   mutual
     caughtᵇ : ∀ {Γ B} → ℕ → Pos → U.Node Γ B → Bool
     caughtᵇ i q (U.mapᶜ f n)                 = caughtᵇ i q n
@@ -316,7 +317,7 @@ private
     unnoticedᵇ i []                   = true
     unnoticedᵇ i (U.notice j q a ∷ ns) = not (atᵇ j ≡ᵇ i) ∧ unnoticedᵇ i ns
 
-  -- `adequacy.Engine.Shown.Flat`, decided.
+  -- A run nothing nests in: no event under the skip just before it.
   flatᵇ : ∀ {A} → ℕ → Events A → Bool
   flatᵇ (suc k) (out p a r) = flatᵇ k (Events∞.force r)
   flatᵇ (suc k) (skip p r)  = unnested (head (Events∞.force r)) ∧ flatᵇ k (Events∞.force r)
