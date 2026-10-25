@@ -10,14 +10,16 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE FLIGHT KEPT
 
-Untried: a lane's end, an outer's value or end, a subscribe beginning a
-former, and a mark run each leave the hole's run in shape and every frame
-above keyed against it (`adequacy.Engine.Above.Flight`). A frame of one
-child, a lane's or a body's value and a body's end under an open observer are
-proven. Settled by a lane's end dequeuing as the merge's run does.
+Untried: a last lane's end, a lane's end dequeuing, an outer's value or end,
+a subscribe beginning a former, and a mark run each leave the hole's run in
+shape and every frame above keyed against it (`adequacy.Engine.Above.Flight`).
+A frame of one child, a lane's or a body's value and a body's end under an
+open observer are proven. Settled by a lane's end dequeuing as the merge's run
+does.
 
-Members: `rise-lane-end-flight`, `rise-admit-flight`, `rise-outer-end-flight`,
-`begin-flight`, `run-flight`, `flight-load`, `flight-held`.
+Members: `lane-last-flight`, `lane-begin-flight`, `rise-admit-flight`,
+`rise-outer-end-flight`, `begin-flight`, `run-flight`, `flight-load`,
+`flight-held`.
 
 #### THE KEYS KEPT
 
@@ -80,7 +82,7 @@ heads, so the end may not lead a sibling lane or the connect's source.
 Settled when both are bodies, or refuted (then each reads the open frame
 `lane-drop` reaches).
 
-Members: `lane-begins-shut`, `rise-body-end-shut`.
+Members: `lane-begins-shut`, `rise-body-end-shut`, `rise-lane-end-shut`.
 
 #### THE SORTED TAILS
 

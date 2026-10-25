@@ -12,14 +12,14 @@
 -- event, is in shape as the frame's node's run is.
 module adequacy.Engine.Flown where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Empty using (⊥-elim)
-open import Data.List using (_∷_; _++_; _ʳ++_; [_]; null; reverse)
+open import Data.List using ([]; _∷_; _++_; _ʳ++_; [_]; null; reverse)
 import Data.List as L
 open import Data.List.Relation.Unary.All using (All) renaming (_∷_ to _∷ᴬ_)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to All++⁺)
 open import Data.Maybe using (just; nothing)
-open import Data.Nat using (pred)
+open import Data.Nat using (suc; pred; _≡ᵇ_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
@@ -47,7 +47,7 @@ open import adequacy.Placed.FlatAfter using (trail-take)
 open import operation.PureObservable using (module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ctx; top; inMap; inScan; inCut;
   inLn; inTake; inOuter; inLanes; inSrc; inBody; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; nx; cp; free; cpAt; cutAt; overAt;
-  CS; cs; closed; rise; begin; admit; dequeue; settle; ended; alive; _⊕_)
+  CS; cs; closed; attAt; start; rise; begin; admit; dequeue; settle; ended; alive; _⊕_)
 open Events∞
 
 ------------------------------------------------------------------------
@@ -214,9 +214,20 @@ module _ {R : Set} where
                       → Order ⟨ inOuter op f d n q ls c , s , rising (nx a) , p ⟩ → NextOwed (took (admit c op f d n q s ls a p))
     rise-outer-end-flight : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q ls (s : St Γ A) p
                           → Order ⟨ inOuter op f d n q ls c , s , rising cp , p ⟩ → Owed ⟨ c , flatS op f true n q s ls , settle true n (null q) , p ⟩
-    rise-lane-end-flight : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) p
-                         → Order ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → alive s ≡ true
-                         → Owed (dequeue c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p)
+    -- A lane's end under an open observer: the last of its flatMap's
+    -- parts ends the flatMap; else a queued value's lane begins, past the
+    -- skip the merge's run drops just after the end.
+    lane-last-flight : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n (o : St Γ A) pre post (s : St Γ B) p
+                     → Order ⟨ inLanes op f d n [] o pre post c , s , rising cp , p ⟩ → alive s ≡ true → closed c ≡ false
+                     → d ∧ (pred n ≡ᵇ 0) ∧ true ≡ true → Flight ⟨ c , flatS op f d (pred n) [] o (pre ʳ++ ended s ∷ post) , rising cp , p ⟩
+    lane-begin-flight : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n a q (o : St Γ A) pre post (s : St Γ B) p
+                      → Order ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ → alive s ≡ true → closed c ≡ false
+                      → Flight ⟨ inCut true (attAt (p ⊕ [ ix 1 ])) (inLn true (inLanes op f d (suc (pred n)) q o (reverse (pre ʳ++ ended s ∷ post)) [] c))
+                               , pend (f a) , subscribing , p ⊕ [ ix 1 ] ⟩
+    -- THE CLOSED LANE: a lane's end under a closed observer.
+    rise-lane-end-shut : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) p
+                       → Order ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → alive s ≡ true → closed c ≡ true
+                       → Owed (dequeue c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p)
     -- THE CLOSED LANE: a body's end under a closed observer, where the
     -- race need not have read its source's head.
     rise-body-end-shut : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (s : St (X ∷ Γ) B) p → Order ⟨ inBody k o c , s , rising cp , p ⟩
@@ -279,6 +290,35 @@ module _ {R : Set} where
                 (ConnAt.kb ca) (ConnAt.kr ca) (ConnAt.fr ca) (ConnAt.cue ca) (ConnAt.ks ca) (ConnAt.rs ca) (ConnAt.ub ca))
   rise-body-flight c (cs cl true sa ba as (just _) r en) o s b p od = ⊥-elim (Order.lead od)
   rise-body-flight c (cs cl false sa ba as ow r en) o s b p od      = ⊥-elim (Order.lead od)
+
+  -- A merge settled: an end rising, else nothing owed.
+  settled : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p b → (b ≡ true → Flight ⟨ c , s , rising cp , p ⟩)
+          → Owed ⟨ c , s , (if b then rising cp else absorbed) , p ⟩
+  settled c s p true  fl = fl refl
+  settled c s p false fl = tt
+
+  -- A lane begun under an open observer.
+  begun : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p → closed c ≡ false
+        → Flight ⟨ inCut true (attAt (p ⊕ [ ix 1 ])) (inLn true (inLanes op f d (suc n) q o (reverse ls) [] c)) , pend (f a) , subscribing , p ⊕ [ ix 1 ] ⟩
+        → Owed (start c op f d n q o ls a p)
+  begun c op f d n q o ls a p ce fl with closed c | ce
+  ... | false | refl = fl
+
+  -- A lane's end frees its slot: the merge settles or dequeues.
+  rise-lane-end-open : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) p
+                     → Order ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → alive s ≡ true → closed c ≡ false
+                     → Owed (dequeue c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p)
+  rise-lane-end-open c op f d n []      o pre post s p od al ce =
+    settled c _ p (d ∧ (pred n ≡ᵇ 0) ∧ true) (lane-last-flight c op f d n o pre post s p od al ce)
+  rise-lane-end-open c op f d n (a ∷ q) o pre post s p od al ce =
+    begun c op f d (pred n) q o (pre ʳ++ ended s ∷ post) a p ce (lane-begin-flight c op f d n a q o pre post s p od al ce)
+
+  rise-lane-end-flight : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) p
+                       → Order ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → alive s ≡ true
+                       → Owed (dequeue c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p)
+  rise-lane-end-flight c op f d n q o pre post s p od al with closed c in ce
+  ... | true  = rise-lane-end-shut c op f d n q o pre post s p od al ce
+  ... | false = rise-lane-end-open c op f d n q o pre post s p od al ce
 
   -- A body's end ends its live connect, its source no earlier under an
   -- open observer: the connect's run ends there.
