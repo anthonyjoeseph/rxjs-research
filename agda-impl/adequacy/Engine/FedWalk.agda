@@ -16,27 +16,32 @@
 module adequacy.Engine.FedWalk where
 
 open import Data.Bool using (Bool; true; false)
-open import Data.List using (List; []; _∷_; _++_; _ʳ++_)
+open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_])
+open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
-open import Data.Maybe using (Maybe; nothing)
-open import Data.Product using (Σ; _×_; _,_)
+open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans)
 
-open import denotation.MonotonicList.Events using (Events; Events∞; Pos)
-open import denotation.MonotonicList using (Agree; Agreeᵀ)
+open import denotation.MonotonicList.Events using (Events; Events∞; Pos; hush; idle; ix)
+open import denotation.MonotonicList using (head; Agree; Agreeᵀ)
 open import denotation.Unfold using (NEnv; stateᴺ)
 open import operation.Key using (after)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ctx; inMap; inScan; inCut; inLn;
-  inTake; inOuter; inLanes; inSrc; inBody; plug; own; cs; CS; Owe; free; cpAt; cutAt; overAt; Att; Ev)
+  inTake; inOuter; inLanes; inSrc; inBody; plug; own; cs; CS; Owe; free; cpAt; cutAt; overAt; Att; Ev; _⊕_)
 open import operation.PureObservable using (ending; play; over)
-open import adequacy.Engine.Meaning using (_≋_; ≋-by; gh; envAt; srcRun; srcG; mapped; scanned; took)
+open import adequacy.Engine.Meaning using (_≋_; ≋-by; gh; envAt; srcRun; srcG; srcState; subOr; bodyConn; mapped; scanned; took)
 open import adequacy.Engine.Head using (Frag; cand)
 open import adequacy.Engine.Pick using (KAfter; Before)
 open import adequacy.Engine.Erase using (Eraseˢ; _,ᵉ_; Eraseᵀ; Erase; Lead⁼; _⊒_)
-open import adequacy.Engine.Drop using (Dropsˢ; dropˢ; dropsˢ; Fed; ≋-⊒; mapped-⊒; scanned-⊒; took-⊒; mapped-drops; scanned-drops; took-drops)
+open import adequacy.Engine.Race using (After; NotBefore)
+open import adequacy.Engine.Ahead using (Under; shown)
+open import adequacy.Engine.Beside using (Sourced; body-⊒)
+open import adequacy.Placed.Trail using (Trailing)
+open import adequacy.Engine.Drop using (Dropsˢ; dropˢ; dropsˢ; Fed; src-alone; body-alone; both; ≋-⊒; mapped-⊒; scanned-⊒; took-⊒; mapped-drops; scanned-drops; took-drops)
 open Events∞
 
 ------------------------------------------------------------------------
@@ -89,6 +94,37 @@ fed-scan g z (inj₂ x) = inj₂ (scanned-drops g z x)
 fed-took : ∀ {A P} i (q : A → Bool) {h h′ : Events∞ A} → Fed P h h′ → Fed P (took i q h) (took i q h′)
 fed-took i q (inj₁ x) = inj₁ (took-⊒ i q x)
 fed-took i q (inj₂ x) = inj₂ (took-drops i q x)
+
+-- Positions under a position under one are under it.
+under-under : ∀ {P : Pos → Set} {k} → Under (Under P) k → Under P k
+under-under (_ , (k₀ , p₀ , y₀ , refl) , y , refl) = k₀ , p₀ , y₀ ++ y , ++-assoc k₀ y₀ y
+
+under-self : ∀ {P : Pos → Set} {k} → P k → Under P k
+under-self {k = k} p = k , p , [] , sym (++-identityʳ k)
+
+drops-mono : ∀ {A} {Q Q′ : Pos → Set} → (∀ {k} → Q k → Q′ k) → {h h′ : Events∞ A} → Dropsˢ Q h h′ → Dropsˢ Q′ h h′
+drops-mono m (dropˢ p a r)  = dropˢ (m p) a r
+drops-mono m (dropsˢ p a d) = dropsˢ (m p) a (drops-mono m d)
+
+-- A connect passes its source's relation and its body's, the source
+-- subscribed where it is, the one fed the rest trailing, past every
+-- position asked of, and leaving nothing running hushed, and the body
+-- fed the rest past each.
+conn-fed : ∀ {Y C P} r {σ σ′ : Events∞ Y} {β β′ : Events∞ C} → Sourced r σ → Trailing σ′
+         → (force σ′ ≡ hush → ∀ d → Agreeᵀ d (cut σ′) idle) → (∀ k → Under P k → NotBefore k (shown (force σ′)))
+         → (∀ k → Under P k → After (k ++ [ ix 0 ]) (head (force β′)))
+         → Fed P σ σ′ → Fed P β β′ → Fed P (bodyConn r σ β) (bodyConn r σ′ β′)
+conn-fed r so t hc nb bo (inj₁ x) (inj₁ y) = inj₁ (body-⊒ r so t x y)
+conn-fed r so t hc nb bo (inj₁ x) (inj₂ d) = inj₂ (body-alone r hc nb so t x d)
+conn-fed r so t hc nb bo (inj₂ d) (inj₁ y) = inj₂ (drops-mono under-under (src-alone r y bo so t d))
+conn-fed r so t hc nb bo (inj₂ d) (inj₂ e) =
+  inj₂ (drops-mono under-under (both r hc (λ k u → nb k (under-under u)) bo so t d (drops-mono under-self e)))
+
+-- A connect whose run is read through its tail: its source's teardown
+-- owed, or its source gone.
+data Rests : Maybe Pos → Bool → Set where
+  owed : ∀ {w l} → Rests (just w) l
+  off  : Rests nothing false
 
 ------------------------------------------------------------------------
 -- The walk
@@ -147,16 +183,89 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
     -- RECOVERY: git show 413cf07a^:agda-impl/adequacy/Engine/Shown.agda restores a node owing its source nothing and a run nesting nothing, as definitions over a node, and the node-level statement
     fed-flat : ∀ {Δ A C} {e : Ctx R Δ C} (dd : Down e) op (f : A → _) dn n qs (s : St Δ A) (ls : List (St Δ C))
              → Frag (plug e (flatS op f dn n qs s ls)) → FedAt dd s → All (FedAt dd) ls → FedAt dd (flatS op f dn n qs s ls)
-    -- A CONNECT feeds its body its own source's relation, by the erasure
-    -- beside a source (`adequacy.Engine.Beside.body-⊒`), which asks the
-    -- current inner source's place and the fed one's trail.  The fed inner
-    -- source is the run of no configuration given here, so its trail is
-    -- the open part: the stepped configuration's, or a relation that
-    -- cannot erase forever.
+    -- A CONNECT READ THROUGH ITS TAIL.
+    fed-done : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) k (s : St Δ Y) (t : St (Y ∷ Δ) C) → Rests (CS.owedAt k) (CS.srcLive k)
+             → Frag (plug e (connS k s t)) → FedAt dd s → FedAt (dBody {k = k} {s} dd) t → FedAt dd (connS k s t)
+    -- A CLOSED SOURCE beside its body, read through its tail.
+    fed-ended : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) sa as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
+              → Frag (plug e (connS (cs true true sa nothing as nothing r en) s t)) → FedAt dd s
+              → Fed P (srcState (srcG (cs true true sa nothing as nothing r en) s) (envOf (force h) dd))
+                      (srcState (srcG (cs true true sa nothing as nothing r en) s) (envOf (force h′) dd))
+    -- A SOURCE SUBSCRIBED beside its body, fresh.
+    fed-fresh : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa p as r en o (t : St (Y ∷ Δ) C)
+              → Frag (plug e (connS (cs cl true sa (just p) as nothing r en) (pend o) t))
+              → Fed P (stateᴺ (subOr (p ⊕ [ ix 1 ]) (pend o)) (envOf (force h) dd)) (stateᴺ (subOr (p ⊕ [ ix 1 ]) (pend o)) (envOf (force h′) dd))
+    -- AN INNER SOURCE, fed the source's run, is subscribed where its
+    -- connect is.
+    fed-sourced : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa ba as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
+                → Frag (plug e (connS (cs cl true sa ba as nothing r en) s t))
+                → Sourced r (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h) dd))
+    -- AN INNER SOURCE FED THE REST: what it leaves running trails it.  It
+    -- is the run of no configuration given here: the stepped
+    -- configuration's, or a relation that cannot erase forever.
     --
     -- DEAD ROUTE: the fed inner source's trail read off its relation to the current one, which trails: an erased step spends depth, so endless erased skips leave the rest unconstrained (refuted at f1f7d119).
-    fed-conn : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) k (s : St Δ Y) (t : St (Y ∷ Δ) C) → Frag (plug e (connS k s t))
-             → FedAt dd s → FedAt (dBody {k = k} {s} dd) t → FedAt dd (connS k s t)
+    fed-trail : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa ba as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
+              → Frag (plug e (connS (cs cl true sa ba as nothing r en) s t))
+              → Trailing (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd))
+    -- Hushed, it leaves nothing running; its next shows no earlier than
+    -- any position asked of (as `adequacy.Engine.Shown.src-next` at the
+    -- fed source).
+    fed-src-next : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa ba as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
+                 → Frag (plug e (connS (cs cl true sa ba as nothing r en) s t))
+                 → (force (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd)) ≡ hush
+                     → ∀ d → Agreeᵀ d (cut (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd))) idle)
+                   × (∀ k → Under P k → NotBefore k (shown (force (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd)))))
+    -- Its body fed the rest comes after each position asked of shows (as
+    -- `adequacy.Engine.Shown.src-body-on` at the fed source).
+    fed-body-on : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa ba as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
+                → Frag (plug e (connS (cs cl true sa ba as nothing r en) s t))
+                → ∀ k → Under P k → After (k ++ [ ix 0 ])
+                    (head (force (stateᴺ (gh t) (srcRun (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd) ∷ᴬ envOf (force h′) dd))))
+
+  -- A source subscribed at its body's mark: fresh, or as it stands.
+  sub-fed : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa p as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
+          → Frag (plug e (connS (cs cl true sa (just p) as nothing r en) s t)) → FedAt dd s
+          → Fed P (stateᴺ (subOr (p ⊕ [ ix 1 ]) s) (envOf (force h) dd)) (stateᴺ (subOr (p ⊕ [ ix 1 ]) s) (envOf (force h′) dd))
+  sub-fed dd cl sa p as r en (pend o)                t fs is = fed-fresh dd cl sa p as r en o t fs
+  sub-fed dd cl sa p as r en (coldS b l)             t fs is = is
+  sub-fed dd cl sa p as r en (ofS i q xs)            t fs is = is
+  sub-fed dd cl sa p as r en doneS                   t fs is = is
+  sub-fed dd cl sa p as r en (mapS f s)              t fs is = is
+  sub-fed dd cl sa p as r en (scanS f z s)           t fs is = is
+  sub-fed dd cl sa p as r en (cutS l a s)            t fs is = is
+  sub-fed dd cl sa p as r en (lnS l s)               t fs is = is
+  sub-fed dd cl sa p as r en (takeS i q w s)         t fs is = is
+  sub-fed dd cl sa p as r en (flatS op f dn n q o ls) t fs is = is
+  sub-fed dd cl sa p as r en (connS k o b)           t fs is = is
+  sub-fed dd cl sa p as r en (joinS j l y ib)        t fs is = is
+
+  -- A live connect, its source live or closed, beside its body.
+  live-fed : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa ba as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
+           → Frag (plug e (connS (cs cl true sa ba as nothing r en) s t))
+           → Fed P (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h) dd))
+                   (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd))
+           → FedAt (dBody {k = cs cl true sa ba as nothing r en} {s} dd) t
+           → Fed P (bodyConn r (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h) dd))
+                     (stateᴺ (gh t) (envOf (force h) (dBody {k = cs cl true sa ba as nothing r en} {s} dd))))
+                   (bodyConn r (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd))
+                     (stateᴺ (gh t) (envOf (force h′) (dBody {k = cs cl true sa ba as nothing r en} {s} dd))))
+  live-fed dd cl sa ba as r en s t fs σ β =
+    conn-fed r (fed-sourced dd cl sa ba as r en s t fs) (fed-trail dd cl sa ba as r en s t fs)
+      (proj₁ nx) (proj₂ nx) (fed-body-on dd cl sa ba as r en s t fs) σ β
+    where nx = fed-src-next dd cl sa ba as r en s t fs
+
+  -- A CONNECT feeds its body its own source's relation.
+  fed-conn : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) k (s : St Δ Y) (t : St (Y ∷ Δ) C) → Frag (plug e (connS k s t))
+           → FedAt dd s → FedAt (dBody {k = k} {s} dd) t → FedAt dd (connS k s t)
+  fed-conn dd k@(cs cl sl sa ba as (just w) r en) s t fs is it = fed-done dd k s t owed fs is it
+  fed-conn dd k@(cs cl false sa ba as nothing r en) s t fs is it = fed-done dd k s t off fs is it
+  fed-conn dd (cs false true sa nothing as nothing r en) s t fs is it =
+    fed-by refl refl refl refl (live-fed dd false sa nothing as r en s t fs is it)
+  fed-conn dd (cs true true sa nothing as nothing r en) s t fs is it =
+    fed-by refl refl refl refl (live-fed dd true sa nothing as r en s t fs (fed-ended dd sa as r en s t fs is) it)
+  fed-conn dd (cs cl true sa (just p) as nothing r en) s t fs is it =
+    fed-by refl refl refl refl (live-fed dd cl sa (just p) as r en s t fs (sub-fed dd cl sa p as r en s t fs is) it)
 
   mutual
     walk : ∀ {Δ C} {e : Ctx R Δ C} (dd : Down e) (s : St Δ C) → Frag (plug e s) → FedAt dd s
