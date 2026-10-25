@@ -6,7 +6,9 @@
 -- (`adequacy.Content.silent-exact`), with less work left
 -- (`adequacy.Engine.Spent.Spending.silent-spent`), and never the same
 -- when the step is one whose work may grow (`adequacy.Content`'s drops).
--- Also the longest run of silent steps meaning the same.
+-- Also the longest run of silent steps meaning the same, and that no
+-- configuration puts a live connect's body just past its source
+-- (`adequacy.Engine.Pick.Untied`).
 module quickcheck.KeptDepth where
 
 open import Data.Bool using (Bool; true; false; not; _∧_; _∨_; if_then_else_)
@@ -37,7 +39,13 @@ open import quickcheck.Spin using (showP)
 open Driver ℕ using (Step; step; silent; value; complete; drained)
 open Ghosting ℕ using (work; Measure)
 open Machine using (Conf; ⟨_,_,_,_⟩; load; spot; subscribing; absorbed; rising; nx; cp; pend; coldS; top; inOuter; inLanes;
-  plug; closed; alive; search; found; leafM)
+  plug; closed; alive; search; found; leafM; St; Ctx; Out; mapS; scanS; cutS; lnS; takeS; flatS; connS; inMap; inScan; inCut; inLn;
+  inTake; inSrc; inBody; over; shift)
+open import Data.Maybe using (Maybe)
+open import operation.Key using (Key; _<ᴷ_)
+open import Tree using (Obs; FlatOp)
+open import denotation.MonotonicList.Events using (Timeline)
+open import adequacy.Engine.Head using (cand)
 
 private
   -- A run's verdict, carrying its longest run of steps meaning the same.
@@ -84,6 +92,29 @@ private
   ... | _ = false
   skippedᵇ _ = false
 
+  -- `adequacy.Engine.Pick.Untied`, decided: keys order totally, so alike
+  -- is neither before the other.
+  untieᵇ : ∀ {A B} → Maybe (Key × Out A) → Maybe (Key × Out B) → Bool
+  untieᵇ (just (h , _)) (just (k , _)) = (shift h <ᴷ k) ∨ (k <ᴷ shift h)
+  untieᵇ _              _              = true
+
+  mutual
+    untiedᵇ : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Bool
+    untiedᵇ c (mapS f s)              = untiedᵇ (inMap f c) s
+    untiedᵇ c (scanS f z s)           = untiedᵇ (inScan f z c) s
+    untiedᵇ c (cutS l a s)            = untiedᵇ (inCut l a c) s
+    untiedᵇ c (lnS b s)               = untiedᵇ (inLn b c) s
+    untiedᵇ c (takeS i q w s)         = untiedᵇ (inTake i q w c) s
+    untiedᵇ c (flatS op f d n q o ls) = untiedᵇ (inOuter op f d n q ls c) o ∧ untiedsᵇ c op f d n q o [] ls
+    untiedᵇ c (connS k o b)           =
+      (over k ∨ untieᵇ (cand (inSrc k b c) o) (cand (inBody k o c) b)) ∧ untiedᵇ (inSrc k b c) o ∧ untiedᵇ (inBody k o c) b
+    untiedᵇ c _                       = true
+
+    untiedsᵇ : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → ℕ → List A → St Γ A
+             → List (St Γ B) → List (St Γ B) → Bool
+    untiedsᵇ c op f d n q o pre []         = true
+    untiedsᵇ c op f d n q o pre (s ∷ post) = untiedᵇ (inLanes op f d n q o pre post c) s ∧ untiedsᵇ c op f d n q o (s ∷ pre) post
+
   -- What a silent step neither dropping nor keeping its meaning did.
   why : Conf ℕ → Conf ℕ → String
   why m m′ = "\n  from " ++ showMode m ++ " at " ++ showSpot (spot m) ++ " to " ++ showMode m′ ++ " at " ++ showSpot (spot m′)
@@ -110,7 +141,8 @@ private
   mutual
     walk : ℕ → ℕ → ℕ → Conf ℕ → Verdict
     walk zero    run best m = yes (best ⊔ run)
-    walk (suc n) run best m = next n run best m (step m)
+    walk (suc n) run best m = if untiedᵇ top (plug (Conf.ctx m) (Conf.foc m)) then next n run best m (step m)
+                              else no (best ⊔ run) ("\n  tied: a connect's body due just past its source, " ++ showMode m ++ " at " ++ showSpot (spot m))
 
     next : ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict
     next n run best m (silent t m′)     = after n run best m m′ (kind m m′)

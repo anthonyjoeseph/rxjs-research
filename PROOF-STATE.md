@@ -11,16 +11,24 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE SILENT RUN
 
 Each skipped step drops a skip at one position of its hole; whether every
-frame above passes it there. The race facts come from the search (`Won`) or
-a rise (`Clear`), but a subscribing configuration's order carries nothing,
-so a defer's and a begun lane's pass have no source yet. Also an outer
-frame, and a connect's source (joiners' images drop too). Settled when these
-are bodies, or refuted.
+frame above passes it there. Above a connect's source the frames are asked
+of every position under the skip, the race read at one. A subscribing
+configuration's order carries nothing, so a defer's and a begun lane's pass
+have no source yet. Also an outer frame's and a source's drops (joiners'
+images drop too). Settled when these are bodies, or refuted.
 
 Members: `outer-begins`, `outer-queues`, `outer-ignores`, `outer-begins-pass`,
 `outer-queues-pass`, `outer-ignores-pass`, `lane-begins`, `lane-begins-pass`,
-`stall-pass`, `close-pass`, `defer-hole`, `defer-pass`, `outer-drops`,
-`src-drops`.
+`src-climb`, `defer-hole`, `defer-pass`, `outer-drops`, `src-drops`.
+
+#### THE TIE
+
+Untried: no step leaves a live connect's body due just past its source
+(`Untied`), where the engine's tie-break and the meaning's disagree;
+`quickcheck.KeptDepth` checks every configuration. Settled when
+`untied-next` is a body, or refuted.
+
+Members: `untied-next`.
 
 #### THE TAIL'S SKIP
 
@@ -82,8 +90,9 @@ Members: `quiet-empty`, `lift-skip`, `unsub-rest`, `conn-unsub`,
 The search's found node leads every race above it, and a step keeps the tree
 in the fragment. Probed on the spike engine. Settled when each is a body.
 
-Members: `search-hit`, `search-won`, `shape-next`, `run-lead`, `frag-flat`,
-`frag-body`, `sides-link`, `limited-sides`.
+Members: `search-hit`, `search-won`, `found-own`, `shape-next`, `run-lead`,
+`frag-flat`, `frag-body`, `sides-link`, `limited-sides`, `outer-link`,
+`body-link`.
 
 #### THE HEADS
 
@@ -98,7 +107,7 @@ Members: `sub-head`, `sub-bursts`, `scanS-head`, `takeS-head`, `limit-head`,
 Keys are a strict order agreeing with positions. Believed unfoldings.
 Settled when each is a body.
 
-Members: `<ᴷ-trans`, `<ᴷ-irrefl`, `≮ᴷ-trans`, `at-<ᵖ`, `ext-≮`.
+Members: `<ᴷ-trans`, `<ᴷ-irrefl`, `≮ᴷ-trans`, `at-<ᵖ`, `ext-≮`, `shift-between`.
 
 #### THE LINK
 
