@@ -15,6 +15,7 @@
 module adequacy.Engine.Shown where
 
 open import Data.Bool using (Bool; true; false)
+open import Data.Nat using (ℕ; zero; suc)
 open import Data.List using (List; []; _∷_; _++_; [_]; reverse; _ʳ++_)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -27,7 +28,7 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 
 open import Tree using (Obs)
-open import denotation.MonotonicList.Events using (Events∞; Timeline; Pos; ix; idle; hush; _<ᵖ_)
+open import denotation.MonotonicList.Events using (Events; Events∞; Timeline; Pos; ix; idle; hush; _<ᵖ_; out; skip; end; inside)
 open import denotation.MonotonicList using (head; Agreeᵀ)
 open import denotation.NonExpansive using (_,ˢ_; mapᴱ-ne; scanᴱ-ne; Agreeˢ)
 open import denotation.Unfold using (stateᴺ; states; outerᴺ; NEnv)
@@ -103,6 +104,20 @@ mutual
   Unnoticed i []                   = ⊤
   Unnoticed i (U.notice j q a ∷ ns) = is-just (U.same? i j) ≡ false × Unnoticed i ns
 
+-- A RUN NOTHING NESTS IN: no event lies under the skip just before it,
+-- to `n` events.  Rejoined, an event under a skip comes before it (an
+-- `ix` mark is below a `sub` one), so a skip erased before an event under
+-- it is no longer erasable.
+Flat : ∀ {A} → ℕ → Events A → Set
+Flat zero    e           = ⊤
+Flat (suc n) (out p a r) = Flat n (Events∞.force r)
+Flat (suc n) (skip p r)  = Unnested p (head (Events∞.force r)) × Flat n (Events∞.force r)
+  where Unnested : Pos → Maybe Pos → Set
+        Unnested p nothing  = ⊤
+        Unnested p (just y) = inside p y ≡ false
+Flat (suc n) (end p)     = ⊤
+Flat (suc n) hush        = ⊤
+
 postulate
   -- The search finds a node by one of its own marks.
   found-own : ∀ {R} (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} → search top t ≡ just (found (Γ , A , c , s) m key)
@@ -141,11 +156,15 @@ postulate
          → Before (after q) (own (connS (cs false true sa ba as nothing r en) o b))
          → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
          → Caught (here refl) q (gh b)
+  -- A LIVE SOURCE'S RUN nests nothing.
+  src-flat : ∀ {R Γ X B} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h : Events∞ X}
+           → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
+           → h ≋ stateᴺ (gh o) (envAt c) → ∀ m → Flat m (Events∞.force h)
   -- A NODE FED A SOURCE'S SKIPS, owing it nothing: it drops its own
   -- leading skips, each under one of them, and erases none or more past
   -- them, to the node fed the rest.
   node-fed : ∀ {Γ X B} v q {P} (n : U.Node (X ∷ Γ) B) (ρ : NEnv Γ) {h h′ : Events∞ X}
-           → Sought v q P → Caught (here refl) q n → Dropsˢ P h h′
+           → Sought v q P → Caught (here refl) q n → (∀ m → Flat m (Events∞.force h)) → Dropsˢ P h h′
            → Fed P (stateᴺ n (Events∞.force h ∷ᴬ ρ)) (stateᴺ n (Events∞.force h′ ∷ᴬ ρ))
   -- The body fed the rest comes after each source skip shows.
   src-body-on : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h h′ : Events∞ X}
@@ -164,7 +183,8 @@ src-fed : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b
         → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
         → h ≋ stateᴺ (gh o) (envAt c) → Dropsˢ P h h′
         → Fed P (stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c))
-src-fed v q c sa ba as r en o b so ka bf ft x d = node-fed v q (gh b) (envAt c) so (caught q c sa ba as r en o b ka bf ft) d
+src-fed v q c sa ba as r en o b so ka bf ft x d =
+  node-fed v q (gh b) (envAt c) so (caught q c sa ba as r en o b ka bf ft) (src-flat c sa ba as r en o b ft x) d
 
 -- A SOURCE'S OWN PASS: its body fed, its own next, the body's next,
 -- and what the run it skips to leaves running trailing it.

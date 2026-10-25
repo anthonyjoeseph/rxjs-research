@@ -12,11 +12,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 Probed (`quickcheck.KeptDepth` checks every link): a live source's body,
 owing the source nothing, fed its skips drops its own leading skips and
-erases none or more past them; whether nothing is owed, from the race, and
-the node-level lift through nested connects and lanes; a defer's fresh
-source among them. Settled when these are bodies, or refuted.
+erases none or more past them; untried: whether a source's run nests
+nothing under a skip (else a rejoined erased skip lands past its next);
+whether nothing is owed, from the race; the node-level lift through nested
+connects and lanes; a defer's fresh source. Settled when bodies, or refuted.
 
-Members: `caught`, `node-fed`, `src-body-on`, `defer-links`.
+Members: `src-flat`, `caught`, `node-fed`, `src-body-on`, `defer-links`.
 
 #### THE CLOSED LANE
 

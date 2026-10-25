@@ -13,7 +13,8 @@
 -- it (`adequacy.Engine.Shown.Links`): the body fed the rest erased of the
 -- body fed the run, or past skips under the source's
 -- (`adequacy.Engine.Shown.src-fed`), owing the source nothing
--- (`adequacy.Engine.Shown.caught`), and after each source skip shows
+-- (`adequacy.Engine.Shown.caught`), its source's run nesting nothing
+-- (`adequacy.Engine.Shown.src-flat`), and after each source skip shows
 -- (`adequacy.Engine.Shown.src-body-on`).
 module quickcheck.KeptDepth where
 
@@ -312,6 +313,15 @@ private
     unnoticedᵇ i []                   = true
     unnoticedᵇ i (U.notice j q a ∷ ns) = not (atᵇ j ≡ᵇ i) ∧ unnoticedᵇ i ns
 
+  -- `adequacy.Engine.Shown.Flat`, decided.
+  flatᵇ : ∀ {A} → ℕ → Events A → Bool
+  flatᵇ (suc k) (out p a r) = flatᵇ k (Events∞.force r)
+  flatᵇ (suc k) (skip p r)  = unnested (head (Events∞.force r)) ∧ flatᵇ k (Events∞.force r)
+    where unnested : Maybe Pos → Bool
+          unnested nothing  = true
+          unnested (just y) = not (inside p y)
+  flatᵇ _       _           = true
+
   -- `adequacy.Engine.Shown.Links`, decided.
   linksᵇ : ∀ {R Γ A} → Bool → Pos → Ctx R Γ A → Bool → Events∞ A → Events∞ A → Bool
   linksᵇ v q top                          f h h′ = true
@@ -329,7 +339,7 @@ private
     linksᵇ v q c true (lanesFrame op (lane g) d w (gh o) (reverseL pre) post f (envAt c) h) (lanesFrame op (lane g) d w (gh o) (reverseL pre) post f (envAt c) h′)
   linksᵇ v q (inSrc (cs false true sa ba as nothing r en) b c) f h h′ =
     srcPassᵇ v q (U.stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (U.stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c)) h′
-    ∧ caughtᵇ 0 q (gh b) ∧ linksᵇ true q c true (connSrc false r en (gh b) (envAt c) h) (connSrc false r en (gh b) (envAt c) h′)
+    ∧ caughtᵇ 0 q (gh b) ∧ flatᵇ depth (Events∞.force h) ∧ linksᵇ true q c true (connSrc false r en (gh b) (envAt c) h) (connSrc false r en (gh b) (envAt c) h′)
   linksᵇ v q (inSrc (cs false true sa ba as (just _) r en) b c) f h h′ = true
   linksᵇ v q (inSrc (cs false false sa ba as ow r en) b c)      f h h′ = true
   linksᵇ v q (inSrc (cs true sl sa ba as ow r en) b c)          f h h′ = true
