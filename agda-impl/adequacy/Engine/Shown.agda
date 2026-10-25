@@ -22,7 +22,7 @@ open import Data.List.Relation.Unary.All using (All) renaming (map to allMap; _�
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Unit using (⊤; tt)
+open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 
 open import Tree using (Obs)
@@ -35,7 +35,7 @@ open import operation.Key using (Key; at; after; _<ᴷ_)
 open import operation.PureObservable using (play; module Machine)
 open Machine using (St; mapS; scanS; cutS; lnS; takeS; flatS; connS; coldS; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter;
   inLanes; inSrc; inBody; plug; closed; Out; search; found; leafM; own; cs; free; cpAt; cutAt; overAt; over)
-open import adequacy.Engine.Meaning using (_≋_; ≋-trans; same; ≋-tr; mapped; scanned; took; outerFrame; connSrc; bodyConn; gh; lane; lanesL; deadL; outerG; poolRuns; envAt;
+open import adequacy.Engine.Meaning using (_≋_; ≋-trans; same; ≋-tr; mapped; scanned; gh; lane; lanesL; deadL; outerG; poolRuns; envAt;
   flagOf; lanesFrame; outerFrame-ne; lanesFrame-ne; bodyFrame-ne; connSrc-ne; taking∞-ne;
   srcState; srcG; poolT; outerT)
 open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore)
@@ -44,7 +44,7 @@ open import adequacy.Engine.Keys using (Held)
 open import adequacy.Engine.Inv using (Unpended)
 open import adequacy.Engine.Pick using (Beat; past; KAfter; KNotBefore; Lost; body-link; Before; Race; LaneWon; lane-won; race-steps; after-step;
   lane-sides; frag-flat; frag-parts; outer-link)
-open import adequacy.Engine.Ahead using (Ahead; Under; shows; shows-open; shown)
+open import adequacy.Engine.Ahead using (Under; shows; shows-open; shown)
 open import adequacy.Engine.Drop using (Dropsˢ; Pass; SrcPass; mapped-drops; scanned-drops; took-drops; lanes-drops; body-drops;
   outer-drops; src-drops; ≋-⊒)
 open import adequacy.Engine.Beside using (Sourced; sourced; sourced-≋)
@@ -300,59 +300,3 @@ beat-pass v q {P} (inBody (cs cl true sa ba as nothing r en) o c) s f so (nb , o
     nbk k pk = proj₂ (bl k (cover v q so k pk))
 beat-pass v q (inBody (cs cl true sa ba as (just _) r en) o c) s f so w ft u () fl x d s′ ft′ u′ fl′ x′
 beat-pass v q (inBody (cs cl false sa ba as ow r en) o c) s f so w ft u () fl x d s′ ft′ u′ fl′ x′
-
-------------------------------------------------------------------------
--- A pass, apart from what the frames ask
-
--- What a pass asks of the run itself: at each live source above, that
--- the source's skips pass its connect.
-Links : ∀ {R Γ A} → (Pos → Set) → Ctx R Γ A → Bool → Events∞ A → Events∞ A → Set
-Links P top                                                 f h h′ = ⊤
-Links P (inMap g c)                                         f h h′ = Links P c true (mapped g h) (mapped g h′)
-Links P (inScan g z c)                                      f h h′ = Links P c true (scanned g z h) (scanned g z h′)
-Links P (inCut l a c)                                       f h h′ = Links P c true h h′
-Links P (inLn b c)                                          f h h′ = Links P c b h h′
-Links P (inTake i q free c)                                 f h h′ = Links P c true (took i q h) (took i q h′)
-Links P (inTake i q (cpAt _) c)                             f h h′ = ⊤
-Links P (inTake i q (cutAt _) c)                            f h h′ = ⊤
-Links P (inTake i q (overAt _) c)                           f h h′ = ⊤
-Links P (inOuter op g d n q ls c)                           f h h′ =
-  Links P c true (outerFrame op (lane g) d q (lanesL ls) (deadL ls) (envAt c) h) (outerFrame op (lane g) d q (lanesL ls) (deadL ls) (envAt c) h′)
-Links P (inLanes op g d n q o pre post c)                   f h h′ =
-  Links P c true (lanesFrame op (lane g) d q (gh o) (reverse pre) post f (envAt c) h) (lanesFrame op (lane g) d q (gh o) (reverse pre) post f (envAt c) h′)
-Links P (inSrc (cs false true sa ba as nothing r en) b c)   f h h′ =
-  Sourced r h × SrcPass P (stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c)) h′
-  × Links (Under P) c true (connSrc false r en (gh b) (envAt c) h) (connSrc false r en (gh b) (envAt c) h′)
-Links P (inSrc (cs false true sa ba as (just _) r en) b c)  f h h′ = ⊤
-Links P (inSrc (cs false false sa ba as ow r en) b c)       f h h′ = ⊤
-Links P (inSrc (cs true sl sa ba as ow r en) b c)           f h h′ = ⊤
-Links P (inBody (cs cl true sa ba as nothing r en) o c)     f h h′ =
-  Sourced r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c))
-  × Links P c true (bodyConn r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) h)
-                 (bodyConn r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) h′)
-Links P (inBody (cs cl true sa ba as (just _) r en) o c)    f h h′ = ⊤
-Links P (inBody (cs cl false sa ba as ow r en) o c)         f h h′ = ⊤
-
--- A pass is what the frames ask and what the run links.
-pass-of : ∀ {R Γ A} P (c : Ctx R Γ A) f {h h′ : Events∞ A} → Ahead P c f → Links P c f h h′ → Pass P c f h h′
-pass-of P top                                                 f a l = tt
-pass-of P (inMap g c)                                         f a l = pass-of P c true a l
-pass-of P (inScan g z c)                                      f a l = pass-of P c true a l
-pass-of P (inCut true x c)                                    f a l = pass-of P c true a l
-pass-of P (inCut false x c)                                   f () l
-pass-of P (inLn b c)                                          f a l = pass-of P c b a l
-pass-of P (inTake i q free c)                                 f a l = pass-of P c true a l
-pass-of P (inTake i q (cpAt _) c)                             f () l
-pass-of P (inTake i q (cutAt _) c)                            f () l
-pass-of P (inTake i q (overAt _) c)                           f () l
-pass-of P (inOuter op g true n q ls c)                        f () l
-pass-of P (inOuter op g false n q ls c)                       f (o , a) l = o , pass-of P c true a l
-pass-of P (inLanes op g d n q o pre post c)                   false () l
-pass-of P (inLanes op g d n q o pre post c)                   true (s , a) l = s , pass-of P c true a l
-pass-of P (inSrc (cs false true sa ba as nothing r en) b c)   f a (sd , sp , l) = sd , sp , pass-of (Under P) c true a l
-pass-of P (inSrc (cs false true sa ba as (just _) r en) b c)  f () l
-pass-of P (inSrc (cs false false sa ba as ow r en) b c)       f () l
-pass-of P (inSrc (cs true sl sa ba as ow r en) b c)           f () l
-pass-of P (inBody (cs cl true sa ba as nothing r en) o c)     f (hu , nb , a) (sd , l) = hu , nb , sd , pass-of P c true a l
-pass-of P (inBody (cs cl true sa ba as (just _) r en) o c)    f () l
-pass-of P (inBody (cs cl false sa ba as ow r en) o c)         f () l

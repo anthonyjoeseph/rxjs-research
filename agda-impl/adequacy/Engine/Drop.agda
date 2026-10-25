@@ -36,7 +36,7 @@ open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit using (⊤)
+open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
 
 open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Tail∞; Pos; out; skip; end; hush; idle; _∪_; ix; last; _<ᵖ_)
@@ -52,7 +52,7 @@ open import adequacy.Engine.Meaning using (_≋_; ≋-by; same; up; mapped; scan
   srcState; srcG; envAt; gh; lane; lanesL; deadL; outerG; outerT; poolRuns; poolT; laneᴹ;
   lanesFrame-ne; outerFrame-ne; outerOf; lanes-refl; queue-refl; outer-refl; ≈-refl; risen)
 open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore; go-rise; go-outer)
-open import adequacy.Engine.Ahead using (Under; shown)
+open import adequacy.Engine.Ahead using (Ahead; Under; shown)
 open import adequacy.Engine.Erase using (Eraseᵀ; Erase; Lead⁼; _,ᵉ_; cutᵉ; nowᵉ; _⊒_; stopᵉ; pinᵉ; unpin; idleᵉ; outᵉ; skipᵉ; erased;
   endᵉ; hushᵉ; outᴸ; skipᴸ; endᴸ; hushᴸ; eraseᵀ-agree; erase-agree; lead-agree; lead-head;
   below-on; map-erase; map-lead)
@@ -599,3 +599,59 @@ lift-drops P (inSrc (cs false true sa ba as nothing r en) b c) f d (so , sp , ps
   lift-drops (Under P) c true (src-drops r en (gh b) (envAt c) so sp d) ps
 lift-drops P (inBody (cs cl true sa ba as nothing r en) o c) f d (hc , bp , so , ps) =
   lift-drops P c true (body-drops r hc bp so (Sourced.srcTrail so) (≋-⊒ (λ n → same n (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)))) d) ps
+
+------------------------------------------------------------------------
+-- A pass, apart from what the frames ask
+
+-- What a pass asks of the run itself: at each live source above, that
+-- the source's skips pass its connect.
+Links : ∀ {R Γ A} → (Pos → Set) → Ctx R Γ A → Bool → Events∞ A → Events∞ A → Set
+Links P top                                                 f h h′ = ⊤
+Links P (inMap g c)                                         f h h′ = Links P c true (mapped g h) (mapped g h′)
+Links P (inScan g z c)                                      f h h′ = Links P c true (scanned g z h) (scanned g z h′)
+Links P (inCut l a c)                                       f h h′ = Links P c true h h′
+Links P (inLn b c)                                          f h h′ = Links P c b h h′
+Links P (inTake i q free c)                                 f h h′ = Links P c true (took i q h) (took i q h′)
+Links P (inTake i q (cpAt _) c)                             f h h′ = ⊤
+Links P (inTake i q (cutAt _) c)                            f h h′ = ⊤
+Links P (inTake i q (overAt _) c)                           f h h′ = ⊤
+Links P (inOuter op g d n q ls c)                           f h h′ =
+  Links P c true (outerFrame op (lane g) d q (lanesL ls) (deadL ls) (envAt c) h) (outerFrame op (lane g) d q (lanesL ls) (deadL ls) (envAt c) h′)
+Links P (inLanes op g d n q o pre post c)                   f h h′ =
+  Links P c true (lanesFrame op (lane g) d q (gh o) (reverse pre) post f (envAt c) h) (lanesFrame op (lane g) d q (gh o) (reverse pre) post f (envAt c) h′)
+Links P (inSrc (cs false true sa ba as nothing r en) b c)   f h h′ =
+  Sourced r h × SrcPass P (stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c)) h′
+  × Links (Under P) c true (connSrc false r en (gh b) (envAt c) h) (connSrc false r en (gh b) (envAt c) h′)
+Links P (inSrc (cs false true sa ba as (just _) r en) b c)  f h h′ = ⊤
+Links P (inSrc (cs false false sa ba as ow r en) b c)       f h h′ = ⊤
+Links P (inSrc (cs true sl sa ba as ow r en) b c)           f h h′ = ⊤
+Links P (inBody (cs cl true sa ba as nothing r en) o c)     f h h′ =
+  Sourced r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c))
+  × Links P c true (bodyConn r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) h)
+                 (bodyConn r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) h′)
+Links P (inBody (cs cl true sa ba as (just _) r en) o c)    f h h′ = ⊤
+Links P (inBody (cs cl false sa ba as ow r en) o c)         f h h′ = ⊤
+
+-- A pass is what the frames ask and what the run links.
+pass-of : ∀ {R Γ A} P (c : Ctx R Γ A) f {h h′ : Events∞ A} → Ahead P c f → Links P c f h h′ → Pass P c f h h′
+pass-of P top                                                 f a l = tt
+pass-of P (inMap g c)                                         f a l = pass-of P c true a l
+pass-of P (inScan g z c)                                      f a l = pass-of P c true a l
+pass-of P (inCut true x c)                                    f a l = pass-of P c true a l
+pass-of P (inCut false x c)                                   f () l
+pass-of P (inLn b c)                                          f a l = pass-of P c b a l
+pass-of P (inTake i q free c)                                 f a l = pass-of P c true a l
+pass-of P (inTake i q (cpAt _) c)                             f () l
+pass-of P (inTake i q (cutAt _) c)                            f () l
+pass-of P (inTake i q (overAt _) c)                           f () l
+pass-of P (inOuter op g true n q ls c)                        f () l
+pass-of P (inOuter op g false n q ls c)                       f (o , a) l = o , pass-of P c true a l
+pass-of P (inLanes op g d n q o pre post c)                   false () l
+pass-of P (inLanes op g d n q o pre post c)                   true (s , a) l = s , pass-of P c true a l
+pass-of P (inSrc (cs false true sa ba as nothing r en) b c)   f a (sd , sp , l) = sd , sp , pass-of (Under P) c true a l
+pass-of P (inSrc (cs false true sa ba as (just _) r en) b c)  f () l
+pass-of P (inSrc (cs false false sa ba as ow r en) b c)       f () l
+pass-of P (inSrc (cs true sl sa ba as ow r en) b c)           f () l
+pass-of P (inBody (cs cl true sa ba as nothing r en) o c)     f (hu , nb , a) (sd , l) = hu , nb , sd , pass-of P c true a l
+pass-of P (inBody (cs cl true sa ba as (just _) r en) o c)    f () l
+pass-of P (inBody (cs cl false sa ba as ow r en) o c)         f () l

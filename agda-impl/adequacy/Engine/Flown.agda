@@ -29,19 +29,21 @@ open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Timeline; out; skip; end; hush; idle; ix; _∪_)
 import denotation.MonotonicList as M′
 open import denotation.MonotonicList using (MonotonicList; Agreeᵀ; Agree; agree-refl; agreeᵀ-refl; agreeᵀ-trans)
-open import denotation.NonExpansive using (_,ˢ_; ∪-ne)
+open import denotation.NonExpansive using (_,ˢ_; ∪-ne; Lanes)
 open import denotation.Unfold using (NEnv; Node; Source; live; meaning; connectᶜ; stateᴺ; cutᴺ; states; outerᴺ; restsᶜ; subscribe)
 open import denotation.Denote using (flatOp)
 open import adequacy.Engine.Meaning using (_≋_; ≋-by; ≋-out; envAt; gh; srcG; srcRun; srcState; risen; lanesFrame; lane; lanesL; outerG; outerT;
-  poolRuns; laneRuns; laneᴹ; flagOf; tailsOn; holeT; poolT; deadL; deadOne)
+  poolRuns; laneRuns; laneᴹ; flagOf; tailsOn; holeT; poolT; deadL; deadOne; lanes-refl)
 open import adequacy.Engine.Union using (∪-idleᵀ; ∪-assocᵀ; ∪-commᵀ)
 open import adequacy.Engine.Keys using (Shape; Shape′; module ConnAt; LaneKeys; []ᴷ; _∷ᴷ_; FlatKeys; Keyed)
 open import adequacy.Engine.Trails using (beside-go; module FlatShape; gen-queue; gen-sub; held-of)
 open import adequacy.Engine.Beside using (burst-hushed)
 open import adequacy.Engine.Race using (NotBefore; First; go-rise; cuts-swap)
-open import adequacy.Engine.Ahead using (shown)
+open import adequacy.Engine.Ahead using (shown; Sides) renaming (shows to showsᶜ)
 open import adequacy.Engine.Above using (Above; Flight; above-≋; take-true; take-incl; toʳ; lanes-L; lanes-P; rests-++; dead-hole; lanes-runs; pool-runs; keyedL-ʳ++)
 open import adequacy.Engine.Head using (Frag; Lane)
+open import adequacy.Engine.Drop using (Dropsˢ; Pass; Links; pass-of; lane-admits)
+open import adequacy.Engine.Passed using (above-drops)
 open import adequacy.Engine.Pick using (Order; module Order; frag-flat; frag-parts; lanes-ʳsplit)
 open import adequacy.Placed.Order using (Ordered; Steady; Every; EveryT; Headed; Atop; Past; Disjoint; ordered; steady; every; every∞-mono;
   ordered-map; ordered-scan; steady-map; steady-scan)
@@ -351,13 +353,21 @@ module _ {R : Set} where
                       → Order ⟨ inOuter op f d n q ls c , s , rising (nx a) , p ⟩ → NextOwed (took (admit c op f d n q s ls a p))
     rise-outer-end-flight : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q ls (s : St Γ A) p
                           → Order ⟨ inOuter op f d n q ls c , s , rising cp , p ⟩ → Owed ⟨ c , flatS op f true n q s ls , settle true n (null q) , p ⟩
-    -- A lane's end under an open observer, a value queued: every frame
-    -- above the merge keeps its share past the skip the merge's run drops
-    -- just after the end, the queued lane begun.
-    lane-begin-above : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n a q (o : St Γ A) pre post (s : St Γ B) p
-                     → Order ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ → alive s ≡ true → closed c ≡ false
-                     → Above c true (lanesFrame op (lane f) d q (gh o) (reverse (reverse (pre ʳ++ ended s ∷ post))) [] true (envAt c)
-                                       (stateᴺ (subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c)))
+    -- THE STILL'S SUBTREE: a lane's end under a queue, where it is shown,
+    -- passes every live source above.
+    lane-begin-links : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n a q (o : St Γ A) pre post (s : St Γ B) p
+                     → showsᶜ c true ≡ true → Order ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
+                     → Links (_≡ p ⊕ [ ix 0 ]) c true (lanesFrame op (lane f) d (a ∷ q) (gh o) (reverse pre) post true (envAt c) (risen (gh s) (envAt c) cp p))
+                             (lanesFrame op (lane f) d q (gh o) (reverse (reverse (pre ʳ++ ended s ∷ post))) [] true (envAt c)
+                                (stateᴺ (subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c)))
+    -- THE FLIGHT KEPT: a lane's end under an open observer, a value
+    -- queued, where only tails are read: every frame above the merge keeps
+    -- its share of the merge's run, the queued lane begun.
+    lane-begin-tail : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n a q (o : St Γ A) pre post (s : St Γ B) p
+                    → Order ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ → alive s ≡ true → closed c ≡ false
+                    → showsᶜ c true ≡ false
+                    → Above c true (lanesFrame op (lane f) d q (gh o) (reverse (reverse (pre ʳ++ ended s ∷ post))) [] true (envAt c)
+                                      (stateᴺ (subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c)))
     -- THE CLOSED LANE: a lane's end under a closed observer.
     rise-lane-end-shut : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) p
                        → Order ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → alive s ≡ true → closed c ≡ true
@@ -468,6 +478,67 @@ module _ {R : Set} where
           (subst (Agreeᵀ k _) (sym (cong₂ (λ ls′ t → M′.cuts ls′ ∪ (cutᴺ (gh o) ρ ∪ t)) L1 P1))
             (agreeᵀ-trans (∪-ne (∪-idleᵀ k (cutᴺ (gh s) ρ)) (agreeᵀ-refl k T))
               (agreeᵀ-trans (∪-commᵀ k (cutᴺ (gh s) ρ) T sh sT) (pool-ended k true (gh o) Dp ρ Pp (cutᴺ (gh s) ρ) sP sh))))
+
+  -- A lane ended under a queue: its end a skip, past it the queue's next
+  -- lane begun ahead of the rest, the ended lane's tail in the pool where
+  -- the lane sat.
+  ended-begins : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d a q (o : St Γ A) pre post (s : St Γ B) p
+               → Lane s → alive s ≡ true → SortedT (cutᴺ (gh s) (envAt c)) → SortedT (poolT (deadL post) (envAt c))
+               → Sides p f d o (reverse pre) post (envAt c)
+               → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (lanesFrame op (lane f) d (a ∷ q) (gh o) (reverse pre) post true (envAt c) (risen (gh s) (envAt c) cp p))
+                  (lanesFrame op (lane f) d q (gh o) (reverse (reverse (pre ʳ++ ended s ∷ post))) [] true (envAt c) (stateᴺ (subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c)))
+  ended-begins c op f d a q o pre post (lnS true (cutS true x s₀)) p fs al ss sp sd =
+    lane-admits op (lane f) d a q (gh o) (reverse pre) post ρ (gh s₀) p (lanesFrame op (lane f) d q (gh o) (reverse (reverse L)) [] true ρ h) sd refl refl
+      (λ m → subst (Lanes m _) (begun-runs L ρ h)
+               (subst (λ z → Lanes m (h ∷ states (lanesL post) ρ ++ states (lanesL (reverse pre)) ρ) (h ∷ z)) runs
+                  (lanes-refl m (h ∷ states (lanesL post) ρ ++ states (lanesL (reverse pre)) ρ))))
+      (λ m → subst (λ z → Agreeᵀ m (outerT d (gh o) ρ (tailsOn (deadL (reverse pre)) ρ (poolT (deadL post) ρ)) ∪ cutᴺ (gh s₀) ρ) (outerT d (gh o) ρ z)) pool
+               (pool-ended m d (gh o) (deadL (reverse pre)) ρ (poolT (deadL post) ρ) (cutᴺ (gh s₀) ρ) sp ss))
+    where
+      ρ = envAt c
+      e = lnS false (cutS false x s₀)
+      L = pre ʳ++ e ∷ post
+      h = stateᴺ (subscribe (f a) (p ⊕ [ ix 1 ])) ρ
+      runs : states (lanesL post) ρ ++ states (lanesL (reverse pre)) ρ ≡ states (lanesL L) ρ
+      runs = trans (sym (lanes-runs (reverse pre) e post ρ)) (cong (λ z → states (lanesL z) ρ) (sym (ʳ++-defn pre)))
+      pool : tailsOn (deadL (reverse pre)) ρ (cutᴺ (gh s₀) ρ ∪ poolT (deadL post) ρ) ≡ poolRuns (reverse (reverse L)) [] true ρ h
+      pool = trans (sym (pool-runs (reverse pre) e post ρ)) (trans (cong (λ z → poolT (deadL z) ρ) (sym (ʳ++-defn pre))) (begun-pool L ρ h))
+  ended-begins c op f d a q o pre post (lnS false (cutS false x s₀)) p fs () ss sp sd
+
+
+  -- A lane's end under an open observer, a value queued, drops the skip
+  -- just past the end.
+  lane-begins-open : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n a q (o : St Γ A) pre post (s : St Γ B) p
+                   → Order ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ → alive s ≡ true → closed c ≡ false
+                   → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (lanesFrame op (lane f) d (a ∷ q) (gh o) (reverse pre) post true (envAt c) (risen (gh s) (envAt c) cp p))
+                       (lanesFrame op (lane f) d q (gh o) (reverse (reverse (pre ʳ++ ended s ∷ post))) [] true (envAt c) (stateᴺ (subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c)))
+  lane-begins-open c op f d n a q o pre post s p od al ce =
+    ended-begins c op f d a q o pre post s p (proj₁ (proj₂ (lanes-ʳsplit pre fl))) al (proj₁ ss) (pool-sorted post (envAt c) (proj₂ ss))
+      (proj₁ (proj₂ (Order.lead od)) ce)
+    where
+      ft = proj₁ (Order.shape od)
+      fl = proj₂ (frag-parts op f d n (a ∷ q) o (pre ʳ++ s ∷ post) (frag-flat c op f d n (a ∷ q) o (pre ʳ++ s ∷ post) ft))
+      ss = all-at pre (lanes-sorted c op f d n (a ∷ q) o (pre ʳ++ s ∷ post) ft)
+
+  -- And where it is shown, every frame above shows it next.
+  lane-begin-pass : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n a q (o : St Γ A) pre post (s : St Γ B) p
+                  → showsᶜ c true ≡ true → Order ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
+                  → Pass (_≡ p ⊕ [ ix 0 ]) c true (lanesFrame op (lane f) d (a ∷ q) (gh o) (reverse pre) post true (envAt c) (risen (gh s) (envAt c) cp p))
+                      (lanesFrame op (lane f) d q (gh o) (reverse (reverse (pre ʳ++ ended s ∷ post))) [] true (envAt c) (stateᴺ (subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c)))
+  lane-begin-pass c op f d n a q o pre post s p sh od =
+    pass-of (_≡ p ⊕ [ ix 0 ]) c true (proj₂ (proj₂ (proj₂ (Order.lead od))) sh) (lane-begin-links c op f d n a q o pre post s p sh od)
+
+  -- A lane's end under an open observer, a value queued: every frame
+  -- above the merge keeps its share past the skip the merge's run drops
+  -- just after the end, the queued lane begun; where only tails are read,
+  -- of the merge's tail.
+  lane-begin-above : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n a q (o : St Γ A) pre post (s : St Γ B) p
+                   → Order ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ → alive s ≡ true → closed c ≡ false
+                   → Above c true (lanesFrame op (lane f) d q (gh o) (reverse (reverse (pre ʳ++ ended s ∷ post))) [] true (envAt c) (stateᴺ (subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c)))
+  lane-begin-above c op f d n a q o pre post s p od al ce with showsᶜ c true in sh
+  ... | true  = above-drops (_≡ p ⊕ [ ix 0 ]) c true (lane-begins-open c op f d n a q o pre post s p od al ce)
+                  (lane-begin-pass c op f d n a q o pre post s p sh od) (proj₂ (frame-at c op f d n (a ∷ q) o pre post s cp p od al))
+  ... | false = lane-begin-tail c op f d n a q o pre post s p od al ce sh
 
   -- A lane's end under an open observer, a value queued: its lane begins
   -- just past the end, in shape, the merge keyed with it in the ended

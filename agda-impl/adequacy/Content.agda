@@ -16,8 +16,8 @@
 module adequacy.Content where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
-open import Data.List using (List; []; _∷_; _++_; [_]; length; reverse; _ʳ++_; map)
-open import Data.List.Properties using (map-++; ʳ++-defn)
+open import Data.List using (List; []; _∷_; _++_; [_]; length; reverse; map)
+open import Data.List.Properties using (map-++)
 open import Data.List.Relation.Unary.Any using (Any)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 import Data.List.Relation.Unary.Any as Any
@@ -44,29 +44,27 @@ open import operation.PureObservable using (PureObs; module Driver; module Machi
 open import adequacy.Sorted using (_≤ᵖ_)
 open import adequacy.Sane using (Sane; SaneS; step-sane; sane-out)
 open import adequacy.Placed.Order using (Placed)
-open import adequacy.Placed.Trail using (t≢f; SortedT)
+open import adequacy.Placed.Trail using (t≢f)
 open import adequacy.Stepper.Past using (_≃_; Placedˢ)
 open import adequacy.Stepper.Within using (placed-after)
 open import adequacy.Stepper using (step-skips)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Ghost using (module Ghosting)
-open import adequacy.Engine.Drop using (Drops; drop; drops; Dropsˢ; dropˢ; Pass; lift-drops; outer-admits; lane-admits; ≋-⊒; Eraseᴱ; stopᴱ; outᴱ;
-  skipᴱ; erasedᴱ; endᴱ; hushᴱ)
+open import adequacy.Engine.Drop using (Drops; drop; drops; Dropsˢ; dropˢ; Pass; Links; pass-of; lift-drops; outer-admits; ≋-⊒;
+  Eraseᴱ; stopᴱ; outᴱ; skipᴱ; erasedᴱ; endᴱ; hushᴱ)
 open import adequacy.Engine.Union using (∪-idleᵀ)
-open import adequacy.Engine.Meaning using (M; flagOf; envAt; risen; gh; lane; laneᴹ; lanesL; deadL; outerFrame; lanesFrame; poolRuns;
-  poolT; tailsOn; outerT; lanes-refl; Has; atOut; atEnd; pastOut; _≅_; ≅-refl; ≅-sym; ≅-trans;
-  agree-≅; ≋-by)
-open import adequacy.Engine.Flown using (pool-ended; pool-sorted; all-at; states-length; lanes-sorted; begun-runs; begun-pool)
+open import adequacy.Engine.Meaning using (M; flagOf; envAt; risen; gh; lane; laneᴹ; lanesL; deadL; outerFrame; lanesFrame; poolT;
+  lanes-refl; Has; atOut; atEnd; pastOut; _≅_; ≅-refl; ≅-sym; ≅-trans; agree-≅; ≋-by)
+open import adequacy.Engine.Flown using (states-length; begun-runs; begun-pool; lane-begins-open; lane-begin-pass)
 open import adequacy.Engine.Inv using (Inv; module Inv; module Base; wfI; search-hit; NextInv; inv-next)
 open import adequacy.Engine.Spent using (module Spending)
 open import adequacy.Engine.Kept using (KeptFrom; refocus-agree) renaming (kept to engine-kept)
-open import adequacy.Engine.Above using (lanes-runs; pool-runs)
 open import adequacy.Engine.Head using (Frag; Lane) renaming (Lanes to Lanesᴴ)
 open import adequacy.Engine.Keys using (Held)
-open import adequacy.Engine.Pick using (Beat; Beats; module Order; frag-flat; frag-parts; lanes-ʳsplit)
+open import adequacy.Engine.Pick using (Beat; Beats; module Order; frag-flat)
 open import adequacy.Engine.Ahead using (Sides; shows; shows-open; ahead-mono) renaming (Ahead to Aheadᶠ)
 open import adequacy.Engine.Race using (After; TailNotBefore)
-open import adequacy.Engine.Shown using (beat-pass; cold-key; Links; pass-of)
+open import adequacy.Engine.Shown using (beat-pass; cold-key)
 open import adequacy.Strong using (module Strongly)
 open Events∞ using (force)
 
@@ -532,75 +530,13 @@ module Honesty (R : Set) where
   ...   | queued b     = lift-drops (_≡ p ⊕ [ ix 0 ]) c true (outer-queues b iv) (outer-queues-pass sh iv)
   ...   | ignored b    = lift-drops (_≡ p ⊕ [ ix 0 ]) c true (outer-ignores b iv) (outer-ignores-pass sh iv)
 
-  -- A lane's completion under a queue, and the queue's next lane begun.
-  laneX : ∀ {Γ A B} → Ctx R Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → List A → St Γ A → List (St Γ B) → List (St Γ B) → St Γ B → Pos → Events∞ B
-  laneX c op f d q o pre post s p = lanesFrame op (lane f) d q (gh o) (reverse pre) post true (envAt c) (risen (gh s) (envAt c) cp p)
-
-  -- A lane ended under a queue: its end a skip, past it the queue's next
-  -- lane begun ahead of the rest, the ended lane's tail in the pool where
-  -- the lane sat.
-  ended-begins : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d a q (o : St Γ A) pre post (s : St Γ B) p
-               → Lane s → alive s ≡ true → SortedT (U.cutᴺ (gh s) (envAt c)) → SortedT (poolT (deadL post) (envAt c))
-               → Sides p f d o (reverse pre) post (envAt c)
-               → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (laneX c op f d (a ∷ q) o pre post s p) (begunY c op f d q o (pre ʳ++ endedˢ s ∷ post) a p)
-  ended-begins c op f d a q o pre post (lnS true (cutS true x s₀)) p fs al ss sp sd =
-    lane-admits op (lane f) d a q (gh o) (reverse pre) post ρ (gh s₀) p (begunY c op f d q o L a p) sd refl refl
-      (λ m → subst (Lanes m _) (begun-runs L ρ h)
-               (subst (λ z → Lanes m (h ∷ U.states (lanesL post) ρ ++ U.states (lanesL (reverse pre)) ρ) (h ∷ z)) runs
-                  (lanes-refl m (h ∷ U.states (lanesL post) ρ ++ U.states (lanesL (reverse pre)) ρ))))
-      (λ m → subst (λ z → Agreeᵀ m (outerT d (gh o) ρ (tailsOn (deadL (reverse pre)) ρ (poolT (deadL post) ρ)) ∪ U.cutᴺ (gh s₀) ρ) (outerT d (gh o) ρ z)) pool
-               (pool-ended m d (gh o) (deadL (reverse pre)) ρ (poolT (deadL post) ρ) (U.cutᴺ (gh s₀) ρ) sp ss))
-    where
-      ρ = envAt c
-      e = lnS false (cutS false x s₀)
-      L = pre ʳ++ e ∷ post
-      h = U.stateᴺ (U.subscribe (f a) (p ⊕ [ ix 1 ])) ρ
-      runs : U.states (lanesL post) ρ ++ U.states (lanesL (reverse pre)) ρ ≡ U.states (lanesL L) ρ
-      runs = trans (sym (lanes-runs (reverse pre) e post ρ)) (cong (λ z → U.states (lanesL z) ρ) (sym (ʳ++-defn pre)))
-      pool : tailsOn (deadL (reverse pre)) ρ (U.cutᴺ (gh s₀) ρ ∪ poolT (deadL post) ρ) ≡ poolRuns (reverse (reverse L)) [] true ρ h
-      pool = trans (sym (pool-runs (reverse pre) e post ρ)) (trans (cong (λ z → poolT (deadL z) ρ) (sym (ʳ++-defn pre))) (begun-pool L ρ h))
-  ended-begins c op f d a q o pre post (lnS false (cutS false x s₀)) p fs () ss sp sd
-
   postulate
-    -- A LANE'S COMPLETION UNDER A CLOSED FRAME, as `lane-begins` under an open one.
-    lane-begins-shut : ∀ {Γ A B op d n a q pre post} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {s : St Γ B} {p}
-                     → alive s ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ → closed c ≡ true
-                     → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (laneX c op f d (a ∷ q) o pre post s p) (begunY c op f d q o (pre ʳ++ endedˢ s ∷ post) a p)
-
-  -- A LANE'S COMPLETION UNDER A QUEUE BEGINS THE NEXT LANE PAST ONE SKIP:
-  -- the lane's end is first among its flatMap's parts (`Ends`).
-  lane-begins : ∀ {Γ A B op d n a q pre post} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {s : St Γ B} {p}
-              → alive s ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
-              → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (laneX c op f d (a ∷ q) o pre post s p) (begunY c op f d q o (pre ʳ++ endedˢ s ∷ post) a p)
-  lane-begins {op = op} {d} {n} {a} {q} {pre} {post} {f} {c} {o} {s} {p} al iv with closed c in cl
-  ... | true  = lane-begins-shut al iv cl
-  ... | false =
-    ended-begins c op f d a q o pre post s p (proj₁ (proj₂ (lanes-ʳsplit pre fl))) al (proj₁ ss) (pool-sorted post (envAt c) (proj₂ ss))
-      (proj₁ (proj₂ (Order.lead (Inv.ord iv))) cl)
-    where
-      ft = proj₁ (Order.shape (Inv.ord iv))
-      fl = proj₂ (frag-parts op f d n (a ∷ q) o (pre ʳ++ s ∷ post) (frag-flat c op f d n (a ∷ q) o (pre ʳ++ s ∷ post) ft))
-      ss = all-at pre (lanes-sorted c op f d n (a ∷ q) o (pre ʳ++ s ∷ post) ft)
-
-  postulate
-    -- AND WHERE IT IS SHOWN PASSES EVERY LIVE SOURCE ABOVE.
-    lane-begins-links : ∀ {Γ A B op d n a q pre post} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {s : St Γ B} {p}
-                      → shows (inLanes op f d n (a ∷ q) o pre post c) true ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
-                      → Links (_≡ p ⊕ [ ix 0 ]) c true (laneX c op f d (a ∷ q) o pre post s p) (begunY c op f d q o (pre ʳ++ endedˢ s ∷ post) a p)
     -- A LANE'S COMPLETION WHERE ONLY TAILS ARE READ, as `defer-tail`.
     lane-tail : ∀ {Γ A B op d n a q pre post} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {s : St Γ B} {p t m′}
               → alive s ≡ true → shows (inLanes op f d n (a ∷ q) o pre post c) true ≡ false
               → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
               → step ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ ≡ silent t m′
               → Drop ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ m′
-
-  -- AND WHERE IT IS SHOWN IS SHOWN NEXT: the frames above are ahead of
-  -- the skip just past the lane's end (`Ends`).
-  lane-begins-pass : ∀ {Γ A B op d n a q pre post} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {s : St Γ B} {p}
-                   → shows (inLanes op f d n (a ∷ q) o pre post c) true ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
-                   → Pass (_≡ p ⊕ [ ix 0 ]) c true (laneX c op f d (a ∷ q) o pre post s p) (begunY c op f d q o (pre ʳ++ endedˢ s ∷ post) a p)
-  lane-begins-pass {c = c} {p = p} sh iv =
-    pass-of (_≡ p ⊕ [ ix 0 ]) c true (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv)))) sh) (lane-begins-links sh iv)
 
   -- A lane's completion under a queue drops its skip.
   lane-drop : ∀ {Γ A B op d n a q pre post} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {s : St Γ B} {p t m′}
@@ -610,7 +546,8 @@ module Honesty (R : Set) where
   lane-drop {op = op} {d} {n} {a} {q} {pre} {post} {f} {c} {o} {s} {p} al iv e with shows (inLanes op f d n (a ∷ q) o pre post c) true in sh
   ... | false = lane-tail al sh iv e
   ... | true with alive s | al | closed c | shows-open (inLanes op f d n (a ∷ q) o pre post c) true sh | e
-  ...   | true | refl | false | refl | refl = lift-drops (_≡ p ⊕ [ ix 0 ]) c true (lane-begins al iv) (lane-begins-pass sh iv)
+  ...   | true | refl | false | refl | refl = lift-drops (_≡ p ⊕ [ ix 0 ]) c true (lane-begins-open c op f d n a q o pre post s p (Inv.ord iv) al (shows-open c true sh))
+                                              (lane-begin-pass c op f d n a q o pre post s p sh (Inv.ord iv))
 
   -- Drops past a meaning alike at every depth.
   drops-agree : ∀ {A} {e e₀ e′ : Events A} → (∀ n → Agree n e e₀) → Drops e₀ e′ → Drops e e′
