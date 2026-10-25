@@ -68,17 +68,19 @@ Sought : Bool → Pos → (Pos → Set) → Set
 Sought false q P = ∀ k → P k → k ≡ q
 Sought true  q P = ∀ k → P k → Σ Pos λ y → k ≡ q ++ y
 
--- NOTHING OWED A SOURCE: each joiner of connect `i` in a node, not yet
--- told its end, joined before `q` and holds nothing it was fed, and no
--- defer holds a step of `i` still to be fed.  A lane not yet begun is not
--- asked.
+-- NOTHING OWED A SOURCE: each joiner in a node not yet told its end, of
+-- any connect, joined before `q`, one of `i` holding nothing it was fed,
+-- and no defer holds a step of `i` still to be fed.  A lane not yet begun
+-- is not asked.  A joiner of a connect inside the node joined past `q`
+-- shows its source's skip under `q` at its own subscription, neither
+-- under `q` nor erasable while it leads.
 mutual
   Caught : ∀ {Γ A B} → A ∈ Γ → Pos → U.Node Γ B → Set
   Caught i q (U.mapᶜ f n)                 = Caught i q n
   Caught i q (U.scanᶜ f z n)              = Caught i q n
   Caught i q (U.takeWhileᶜ w t n)         = Caught i q n
   Caught i q (U.flatMapᶜ op g o ls qs pl) = Caughtᴹ i q o × Caughtᴸ i q ls × Caught i q pl
-  Caught i q (U.joinᶜ j p xs nothing)     = is-just (U.same? i j) ≡ false ⊎ (xs ≡ [] × p <ᵖ q ≡ true)
+  Caught i q (U.joinᶜ j p xs nothing)     = (is-just (U.same? i j) ≡ false ⊎ xs ≡ []) × p <ᵖ q ≡ true
   Caught i q (U.connectᶜ r b s)           = Caught (there i) q b × Caughtˢ i q s
   Caught i q (U.deferᶜ l p ns)            = Unnoticed i ns
   Caught i q (U.endingᶜ p n)              = Caught i q n

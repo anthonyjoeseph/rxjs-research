@@ -287,7 +287,7 @@ private
     caughtᵇ i q (U.scanᶜ f z n)              = caughtᵇ i q n
     caughtᵇ i q (U.takeWhileᶜ w t n)         = caughtᵇ i q n
     caughtᵇ i q (U.flatMapᶜ op g o ls qs pl) = caughtᴹᵇ i q o ∧ caughtᴸᵇ i q ls ∧ caughtᵇ i q pl
-    caughtᵇ i q (U.joinᶜ j p xs nothing)     = not (atᵇ j ≡ᵇ i) ∨ (null xs ∧ (p <ᵖ q))
+    caughtᵇ i q (U.joinᶜ j p xs nothing)     = (not (atᵇ j ≡ᵇ i) ∨ null xs) ∧ (p <ᵖ q)
     caughtᵇ i q (U.connectᶜ r b s)           = caughtᵇ (suc i) q b ∧ caughtˢᵇ i q s
     caughtᵇ i q (U.deferᶜ l p ns)            = unnoticedᵇ i ns
     caughtᵇ i q (U.endingᶜ p n)              = caughtᵇ i q n
@@ -448,6 +448,10 @@ private
     ∷ ("a defer begun past a merged source's skip"
       , connect merged (flatMap (mergeᶠ nothing) (deferᶜ (connected (here refl))) (connected (here refl))))
     ∷ ("a lane joined past a merged source's skips" , connect merged rejoins)
+    ∷ ("a connect in the body over its source, its lanes joining it"
+      , connect skipping (connect (connected (here refl)) (flatMap (mergeᶠ nothing) (connected (here refl)) (connected (here refl)))))
+    ∷ ("a connect in the body over a merged source, its lanes joining it"
+      , connect merged (connect (connected (here refl)) (flatMap (mergeᶠ nothing) (connected (here refl)) (connected (here refl)))))
     ∷ []
     where
     -- A source skipping before each of its values.
