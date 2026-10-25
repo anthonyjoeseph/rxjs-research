@@ -59,7 +59,7 @@ open import adequacy.Engine.Spent using (module Spending)
 open import adequacy.Engine.Kept using (KeptFrom; refocus-agree; rests-++; lanes-runs; pool-runs; dead-hole) renaming (kept to engine-kept)
 open import adequacy.Engine.Head using (Frag; Lane) renaming (Lanes to Lanesᴴ)
 open import adequacy.Engine.Pick using (Beat; Beats; module Order; frag-flat; frag-parts; lanes-ʳsplit)
-open import adequacy.Engine.Ahead using (Sides; shows; shows-open) renaming (Ahead to Aheadᶠ)
+open import adequacy.Engine.Ahead using (Sides; shows; shows-open; ahead-mono) renaming (Ahead to Aheadᶠ)
 open import adequacy.Engine.Race using (After; TailNotBefore)
 open import adequacy.Engine.Shown using (beat-pass; cold-key; Links; pass-of)
 open import adequacy.Strong using (module Strongly)
@@ -251,14 +251,11 @@ module Honesty (R : Set) where
                → shows c′ true ≡ false → Inv ⟨ c , s , absorbed , p ⟩ → step ⟨ c , s , absorbed , p ⟩ ≡ silent t m′
                → Drop ⟨ c , s , absorbed , p ⟩ m′
 
-    -- A DEFER BEGUN WHERE IT IS SHOWN IS SHOWN NEXT: every frame above it
-    -- passes its skip, at the skip's own position.  Asked at every
-    -- position, a lane's frame beside an older lane with a pending head
-    -- refutes it, so each pass here is asked at the position its hole
-    -- skips.
-    defer-pass : ∀ {Γ A} {c : Ctx R Γ A} {l p} → shows c true ≡ true → Inv ⟨ c , pend (defer l) , subscribing , p ⟩
-               → Pass (_≡ p ⊕ [ ix 0 ]) c (flagOf (pend (defer l))) (U.stateᴺ (U.deferᶜ l p []) (envAt c))
-                   (U.stateᴺ (U.subscribe (Later.force l) (p ⊕ [ ix 1 ])) (envAt c))
+    -- A DEFER BEGUN WHERE IT IS SHOWN: every live source above passes
+    -- its skip, as `outer-begins-links`.
+    defer-links : ∀ {Γ A} {c : Ctx R Γ A} {l p} → shows c true ≡ true → Inv ⟨ c , pend (defer l) , subscribing , p ⟩
+                → Links (_≡ p ⊕ [ ix 0 ]) c true (U.stateᴺ (U.deferᶜ l p []) (envAt c))
+                    (U.stateᴺ (U.subscribe (Later.force l) (p ⊕ [ ix 1 ])) (envAt c))
 
     -- A DEFER BEGUN WHERE ONLY TAILS ARE READ drops its skip through the
     -- tail that pins it: a takeWhile past its decision above a connect
@@ -282,6 +279,16 @@ module Honesty (R : Set) where
     dropˢ refl (λ n → agree-refl n _)
       (λ n → agreeᵀ-sym (_≈[_]_.agreeᵀ (s n) (p ⊕ [ ix 1 ])) ,ˢ agree-sym (_≈[_]_.agree (s n) (p ⊕ [ ix 1 ])))
     where s = λ n → U.subscribed (Later.force l) {ρ} (env-refl {n} (U.hots ρ))
+
+  -- A DEFER BEGUN WHERE IT IS SHOWN IS SHOWN NEXT: every frame above it
+  -- passes its skip, at the skip's own position, under the subscription
+  -- the order leads.  Asked at every position, a lane's frame beside an
+  -- older lane with a pending head refutes it.
+  defer-pass : ∀ {Γ A} {c : Ctx R Γ A} {l p} → shows c true ≡ true → Inv ⟨ c , pend (defer l) , subscribing , p ⟩
+             → Pass (_≡ p ⊕ [ ix 0 ]) c (flagOf (pend (defer l))) (U.stateᴺ (U.deferᶜ l p []) (envAt c))
+                 (U.stateᴺ (U.subscribe (Later.force l) (p ⊕ [ ix 1 ])) (envAt c))
+  defer-pass {c = c} {p = p} sh iv =
+    pass-of (_≡ p ⊕ [ ix 0 ]) c true (ahead-mono (λ k e → p , refl , [ ix 0 ] , e) c true (Order.lead (Inv.ord iv) sh)) (defer-links sh iv)
 
   -- A defer begun drops its skip.
   defer-drop : ∀ {Γ A} {c : Ctx R Γ A} {l p t m′}
