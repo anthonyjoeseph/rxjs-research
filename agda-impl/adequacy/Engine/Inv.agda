@@ -34,7 +34,7 @@ open import adequacy.Engine.Ahead using (Under; shown; ahead-mono; under-sub)
 open import adequacy.Engine.Race using (NotBefore)
 open import adequacy.Engine.Meaning using (envAt; gh; risen; lane; lanesL; laneRuns; poolRuns; outerT; outerG; poolG; deadL)
 open import adequacy.Engine.Flown using (Owed; NextOwed; rise-owed; sub-owed)
-open import adequacy.Engine.Pick using (Order; order; module Order; whole; KeysAt; Shaped; Lead; Clear; Ends; EndsIf; Won; won-clear; won-ends; search-won; Apart; Searched)
+open import adequacy.Engine.Pick using (Order; order; module Order; whole; KeysAt; Shaped; Lead; Clear; Ends; EndsIf; Won; won-clear; won-ends; out-open; search-won; Apart; Searched)
 open import operation.PureObservable using (Tape; due; play; ending; over; module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; closed; closedUp;
@@ -779,7 +779,7 @@ module _ {R : Set} where
   ... | nothing = tt
   ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
   ...   | pl , _ = run-lead (plug c s) p e
-                     (λ q a s″ kq oa al → won-clear q a c′ s′ s″ al
+                     (λ q a s″ kq oa al → won-clear q a c′ s′ s″ al (out-open c′ s′ m oa)
                         (subst₂ (λ k x → Won (k , x) c′ s′) kq oa (search-won (plug c s) (proj₁ (Order.shape o)) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))))
                      (λ q s″ kq oc al → won-ends q c′ s′ s″ al
                         (subst₂ (λ k x → Won (k , x) c′ s′) kq oc (search-won (plug c s) (proj₁ (Order.shape o)) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))))
@@ -802,7 +802,7 @@ module _ {R : Set} where
   rise-lane-keys c op f d n q o pre post s b p v a =
     subst₂ (FlatAt ρ O) (sym L) P (flat-drop (states (lanesL post) ρ) (gh s) ρ b p fa)
     , proj₁ (proj₂ (proj₁ (proj₂ fl)))
-    , keyedL-ʳ++ pre (proj₁ (proj₂ (proj₂ (proj₁ (proj₂ fl))))) (proj₂ (Order.shape (Inv.ord v)) , proj₂ (proj₂ (proj₂ (proj₁ (proj₂ fl)))))
+    , keyedL-ʳ++ pre (proj₁ (proj₂ (proj₂ (proj₁ (proj₂ fl))))) (proj₂ (Order.shape (Inv.ord v)) , proj₁ (proj₂ (proj₂ (proj₂ (proj₁ (proj₂ fl))))))
     where
       ρ  = envAt c
       O  = outerᴺ (lane f) (outerG d (gh o)) ρ
