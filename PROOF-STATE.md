@@ -11,15 +11,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE SILENT RUN
 
 Each skipped step drops a skip at one position of its hole; whether every
-frame above passes it there. Away from a connect the search's race settles
-it (`Ahead`); what is open is a live source above: its next events after
-the skip, and its body fed past it, later — what the search saw of the
-source against what the step leaves. A subscribing configuration's order
-carries nothing, so a defer's and a begun lane's pass have no source yet.
-Settled when these are bodies, or refuted.
+frame above passes it there. Away from a live source the search's race
+settles it (`Ahead`). Open: a live source's own pass, its body fed the
+source's skips dropping its own; and a subscribing configuration, whose
+order carries nothing, so a defer's and a begun lane's pass have no source
+yet. Settled when these are bodies, or refuted.
 
-Members: `won-src`, `won-body`, `outer-begins-links`, `outer-queues-links`,
-`outer-ignores-links`, `lane-begins-links`, `src-pass`, `defer-pass`.
+Members: `src-pass`, `defer-pass`.
 
 #### THE CLOSED LANE
 
@@ -49,12 +47,15 @@ Members: `kill-pool`.
 
 #### THE STILL'S SUBTREE
 
-Untried: what the search finds still leads every race above it past each
-live source's skips (`Apart`): nothing above is due under the skip's
-position. `quickcheck.KeptDepth` checks every absorbed configuration.
-Settled when `apart-next` is a body, or refuted.
+Untried: a still skip leads every race above it past each live source's
+skips: nothing above is due under the skip's position. Both what the search
+finds (`Apart`; `quickcheck.KeptDepth` checks every absorbed configuration)
+and the skip a value or a lane's end leaves just past itself, where the race
+`Won` records only the shifted key. Settled when these are bodies, or
+refuted.
 
-Members: `apart-next`.
+Members: `apart-next`, `won-src`, `outer-begins-links`, `outer-queues-links`,
+`outer-ignores-links`, `lane-begins-links`.
 
 #### THE TAIL'S SKIP
 
