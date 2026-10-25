@@ -17,10 +17,11 @@ module adequacy.Content where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_; [_]; length; reverse; _ʳ++_; map)
-open import Data.List.Properties using (++-assoc; ++-identityʳ; map-++; reverse-involutive)
+open import Data.List.Properties using (++-assoc; ++-identityʳ; map-++; reverse-involutive; ʳ++-defn)
 open import Data.List.Relation.Unary.Any using (Any; here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ; ++⁻)
-open import Data.List.Relation.Unary.All using (All; [])
+open import Data.List.Relation.Unary.All using (All; []; _∷_)
+open import Data.List.Relation.Unary.All.Properties using (++⁻ʳ)
 import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
@@ -34,8 +35,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Tree using (Obs; Later; defer; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.MonotonicList.Events using (Timeline; Events; Events∞; Pos; Time; tick; root; out; end; hush; ix; _<ᵖ_; <ᵖ-irrefl;
   <ᵖ-asym; emit; stall; close; last; Frame∞; From; From∞; idle; done; at; _∪_) renaming (quiet to silentᶠ)
-open import denotation.MonotonicList using (MonotonicList; admit; enter; head; cuts; Agreeᵀ; observe; Agree; agree-refl; agree-sym; agree-trans; agreeᵀ-sym; frames; _≈[_]_)
-open import denotation.NonExpansive using (_,ˢ_; Lanes)
+open import denotation.MonotonicList using (MonotonicList; admit; enter; head; cuts; Agreeᵀ; observe; Agree; agree-refl; agree-sym; agree-trans; agreeᵀ-refl; agreeᵀ-sym; agreeᵀ-trans; frames; _≈[_]_)
+open import denotation.NonExpansive using (_,ˢ_; Lanes; ∪-ne)
 open import denotation.Compositional using (env-refl)
 open import adequacy.Record using (Ahead; outᵃ; skipᵃ) renaming (none to noneᵃ)
 import denotation.Unfold as U
@@ -44,20 +45,20 @@ open import operation.PureObservable using (PureObs; module Driver; module Machi
 open import adequacy.Sorted using (_≤ᵖ_)
 open import adequacy.Sane using (Sane; SaneS; step-sane; sane-out)
 open import adequacy.Placed.Order using (Placed)
-open import adequacy.Placed.Trail using (t≢f)
+open import adequacy.Placed.Trail using (t≢f; SortedT; sortedT-idle; sortedT-∪)
 open import adequacy.Stepper.Past using (_≃_; Placedˢ)
 open import adequacy.Stepper.Within using (placed-after)
 open import adequacy.Stepper using (step-skips)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Ghost using (module Ghosting)
-open import adequacy.Engine.Drop using (Drops; drop; drops; Dropsˢ; dropˢ; Pass; shows; shows-open; lift-drops; outer-admits)
-open import adequacy.Engine.Union using (∪-idleᵀ)
-open import adequacy.Engine.Meaning using (M; flagOf; envAt; risen; gh; lane; laneᴹ; lanesL; deadL; outerFrame; lanesFrame; laneRuns; poolRuns; poolT; lanes-refl; Has; atOut; atEnd; pastOut; _≅_; ≅-refl; ≅-sym; ≅-trans; agree-≅; ≋-by)
+open import adequacy.Engine.Drop using (Drops; drop; drops; Dropsˢ; dropˢ; Pass; shows; shows-open; lift-drops; outer-admits; lane-admits)
+open import adequacy.Engine.Union using (∪-idleᵀ; ∪-assocᵀ; ∪-commᵀ)
+open import adequacy.Engine.Meaning using (M; flagOf; envAt; risen; gh; lane; laneᴹ; lanesL; deadL; deadOne; outerFrame; lanesFrame; laneRuns; poolRuns; poolT; tailsOn; outerT; holeT; lanes-refl; Has; atOut; atEnd; pastOut; _≅_; ≅-refl; ≅-sym; ≅-trans; agree-≅; ≋-by)
 open import adequacy.Engine.Inv using (Inv; module Inv; module Base; wfI; search-hit; NextInv; inv-next)
 open import adequacy.Engine.Spent using (module Spending)
-open import adequacy.Engine.Kept using (KeptFrom; refocus-agree; rests-++) renaming (kept to engine-kept)
-open import adequacy.Engine.Head using (Frag) renaming (Lanes to Lanesᴴ)
-open import adequacy.Engine.Pick using (Beat; Beats; module Order; frag-flat)
+open import adequacy.Engine.Kept using (KeptFrom; refocus-agree; rests-++; lanes-runs; pool-runs; dead-hole) renaming (kept to engine-kept)
+open import adequacy.Engine.Head using (Frag; Lane) renaming (Lanes to Lanesᴴ)
+open import adequacy.Engine.Pick using (Beat; Beats; module Order; frag-flat; frag-parts; lanes-ʳsplit; Sides)
 open import adequacy.Engine.Race using (After; TailNotBefore)
 open import adequacy.Engine.Shown using (beat-pass; cold-key)
 open import adequacy.Strong using (module Strongly)
@@ -504,11 +505,84 @@ module Honesty (R : Set) where
   laneX : ∀ {Γ A B} → Ctx R Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → List A → St Γ A → List (St Γ B) → List (St Γ B) → St Γ B → Pos → Events∞ B
   laneX c op f d q o pre post s p = lanesFrame op (lane f) d q (gh o) (reverse pre) post true (envAt c) (risen (gh s) (envAt c) cp p)
 
+  -- A tail joined behind a pool joins it at the pool's end.
+  tails-ended : ∀ {Γ B} n (ds : List (U.Node Γ B)) (ρ : U.NEnv Γ) t u → SortedT t → SortedT u → Agreeᵀ n (tailsOn ds ρ t ∪ u) (tailsOn ds ρ (u ∪ t))
+  tails-ended n []       ρ t u st su = ∪-commᵀ n t u st su
+  tails-ended n (x ∷ ds) ρ t u st su =
+    agreeᵀ-trans (∪-assocᵀ n (U.cutᴺ x ρ) (tailsOn ds ρ t) u) (∪-ne (agreeᵀ-refl n (U.cutᴺ x ρ)) (tails-ended n ds ρ t u st su))
+
+  pool-ended : ∀ {Γ A B} n d (o : U.Node Γ A) (ds : List (U.Node Γ B)) (ρ : U.NEnv Γ) t u → SortedT t → SortedT u
+             → Agreeᵀ n (outerT d o ρ (tailsOn ds ρ t) ∪ u) (outerT d o ρ (tailsOn ds ρ (u ∪ t)))
+  pool-ended n false o ds ρ t u st su = tails-ended n ds ρ t u st su
+  pool-ended n true  o ds ρ t u st su =
+    agreeᵀ-trans (∪-assocᵀ n (U.cutᴺ o ρ) (tailsOn ds ρ t) u) (∪-ne (agreeᵀ-refl n (U.cutᴺ o ρ)) (tails-ended n ds ρ t u st su))
+
+  -- A pool of tails each in position order is.
+  hole-sorted : ∀ {B} b (h : Events∞ B) t → SortedT (Events∞.cut h) → SortedT t → SortedT (holeT b h ∪ t)
+  hole-sorted true  h t sh st = st
+  hole-sorted false h t sh st = sortedT-∪ (Events∞.cut h) t sh st
+
+  pool-sorted : ∀ {Γ B} (ls : List (St Γ B)) (ρ : U.NEnv Γ) → All (λ s → SortedT (U.cutᴺ (gh s) ρ)) ls → SortedT (poolT (deadL ls) ρ)
+  pool-sorted []       ρ []       = sortedT-idle
+  pool-sorted (x ∷ ls) ρ (sx ∷ sl) =
+    subst SortedT (sym (trans (rests-++ (deadOne x) (deadL ls) ρ) (dead-hole x ρ _)))
+      (hole-sorted (flagOf x) (U.stateᴺ (gh x) ρ) _ sx (pool-sorted ls ρ sl))
+
+  -- A lane's context keeps the lanes before it nearest first.
+  all-at : ∀ {Γ B} {P : St Γ B → Set} pre {s post} → All P (pre ʳ++ s ∷ post) → P s × All P post
+  all-at pre a with ++⁻ʳ (reverse pre) (subst (All _) (ʳ++-defn pre) a)
+  ... | x ∷ xs = x , xs
+
+  -- A lane ended under a queue: its end a skip, past it the queue's next
+  -- lane begun ahead of the rest, the ended lane's tail in the pool where
+  -- the lane sat.
+  ended-begins : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d a q (o : St Γ A) pre post (s : St Γ B) p
+               → Lane s → alive s ≡ true → SortedT (U.cutᴺ (gh s) (envAt c)) → SortedT (poolT (deadL post) (envAt c))
+               → Sides p f d o (reverse pre) post (envAt c)
+               → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (laneX c op f d (a ∷ q) o pre post s p) (begunY c op f d q o (pre ʳ++ endedˢ s ∷ post) a p)
+  ended-begins c op f d a q o pre post (lnS true (cutS true x s₀)) p fs al ss sp sd =
+    lane-admits op (lane f) d a q (gh o) (reverse pre) post ρ (gh s₀) p (begunY c op f d q o L a p) sd refl refl
+      (λ m → subst (Lanes m _) (begun-runs L ρ h)
+               (subst (λ z → Lanes m (h ∷ U.states (lanesL post) ρ ++ U.states (lanesL (reverse pre)) ρ) (h ∷ z)) runs
+                  (lanes-refl m (h ∷ U.states (lanesL post) ρ ++ U.states (lanesL (reverse pre)) ρ))))
+      (λ m → subst (λ z → Agreeᵀ m _ (outerT d (gh o) ρ z)) pool
+               (pool-ended m d (gh o) (deadL (reverse pre)) ρ (poolT (deadL post) ρ) (U.cutᴺ (gh s₀) ρ) sp ss))
+    where
+      ρ = envAt c
+      e = lnS false (cutS false x s₀)
+      L = pre ʳ++ e ∷ post
+      h = U.stateᴺ (U.subscribe (f a) (p ⊕ [ ix 1 ])) ρ
+      runs : U.states (lanesL post) ρ ++ U.states (lanesL (reverse pre)) ρ ≡ U.states (lanesL L) ρ
+      runs = trans (sym (lanes-runs (reverse pre) e post ρ)) (cong (λ z → U.states (lanesL z) ρ) (sym (ʳ++-defn pre)))
+      pool : tailsOn (deadL (reverse pre)) ρ (U.cutᴺ (gh s₀) ρ ∪ poolT (deadL post) ρ) ≡ poolRuns (reverse (reverse L)) [] true ρ h
+      pool = trans (sym (pool-runs (reverse pre) e post ρ)) (trans (cong (λ z → poolT (deadL z) ρ) (sym (ʳ++-defn pre))) (begun-pool L ρ h))
+  ended-begins c op f d a q o pre post (lnS false (cutS false x s₀)) p fs () ss sp sd
+
   postulate
-    -- A LANE'S COMPLETION UNDER A QUEUE BEGINS THE NEXT LANE PAST ONE SKIP.
-    lane-begins : ∀ {Γ A B op d n a q pre post} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {s : St Γ B} {p}
-                → alive s ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
-                → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (laneX c op f d (a ∷ q) o pre post s p) (begunY c op f d q o (pre ʳ++ endedˢ s ∷ post) a p)
+    -- EVERY LANE OF A FRAGMENT'S FLATMAP LEAVES ITS TAIL IN POSITION ORDER.
+    lanes-sorted : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls
+                 → Frag (plug c (flatS op f d n q o ls)) → All (λ s → SortedT (U.cutᴺ (gh s) (envAt c))) ls
+    -- A LANE'S COMPLETION UNDER A CLOSED FRAME, as `lane-begins` under an open one.
+    lane-begins-shut : ∀ {Γ A B op d n a q pre post} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {s : St Γ B} {p}
+                     → alive s ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ → closed c ≡ true
+                     → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (laneX c op f d (a ∷ q) o pre post s p) (begunY c op f d q o (pre ʳ++ endedˢ s ∷ post) a p)
+
+  -- A LANE'S COMPLETION UNDER A QUEUE BEGINS THE NEXT LANE PAST ONE SKIP:
+  -- the lane's end is first among its flatMap's parts (`Ends`).
+  lane-begins : ∀ {Γ A B op d n a q pre post} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {s : St Γ B} {p}
+              → alive s ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
+              → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (laneX c op f d (a ∷ q) o pre post s p) (begunY c op f d q o (pre ʳ++ endedˢ s ∷ post) a p)
+  lane-begins {op = op} {d} {n} {a} {q} {pre} {post} {f} {c} {o} {s} {p} al iv with closed c in cl
+  ... | true  = lane-begins-shut al iv cl
+  ... | false =
+    ended-begins c op f d a q o pre post s p (proj₁ (proj₂ (lanes-ʳsplit pre fl))) al (proj₁ ss) (pool-sorted post (envAt c) (proj₂ ss))
+      (proj₁ (Order.lead (Inv.ord iv) al) cl)
+    where
+      ft = Order.shape (Inv.ord iv)
+      fl = proj₂ (frag-parts op f d n (a ∷ q) o (pre ʳ++ s ∷ post) (frag-flat c op f d n (a ∷ q) o (pre ʳ++ s ∷ post) ft))
+      ss = all-at pre (lanes-sorted c op f d n (a ∷ q) o (pre ʳ++ s ∷ post) ft)
+
+  postulate
     -- AND WHERE IT IS SHOWN IS SHOWN NEXT.
     lane-begins-pass : ∀ {Γ A B op d n a q pre post} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {s : St Γ B} {p}
                      → shows (inLanes op f d n (a ∷ q) o pre post c) true ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩

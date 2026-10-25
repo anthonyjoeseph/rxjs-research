@@ -17,7 +17,32 @@ carries nothing, so a defer's and a begun lane's pass have no source yet.
 Settled when these are bodies, or refuted.
 
 Members: `outer-begins-pass`, `outer-queues-pass`, `outer-ignores-pass`,
-`lane-begins`, `lane-begins-pass`, `src-pass`, `defer-pass`.
+`lane-begins-pass`, `src-pass`, `defer-pass`.
+
+#### THE CLOSED LANE
+
+Untried: a lane completing under a closed frame. The race that picked it
+still ran, but a closed frame's candidates need not be its parts' heads, so
+the lane's end may not lead them. Settled when `lane-begins-shut` is a body,
+or refuted (then `lane-begins` reads the open frame `lane-drop` reaches).
+
+Members: `lane-begins-shut`.
+
+#### THE SORTED TAILS
+
+Untried: a lane's tail, at its flatMap's environment, is in position order,
+so the pool takes an ended lane's tail at the lane's place whatever the
+order it is joined in. Settled when `lanes-sorted` is a body or refuted.
+
+Members: `lanes-sorted`.
+
+#### THE UNION
+
+Untried in Agda (brute-forced on small tails): joined tails regroup, and two
+in position order join the same either way round. Settled when both are
+bodies or one is refuted.
+
+Members: `∪-assocᵀ`, `∪-commᵀ`.
 
 #### THE SWITCH'S KILL
 

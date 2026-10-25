@@ -8,18 +8,11 @@
 -- with `2 1` is not `2 1` joined with `2 2`.
 module adequacy.Engine.Union where
 
-open import Data.Bool using (true; false)
-open import Data.Empty using (⊥-elim)
 open import Data.Nat using (zero; suc)
-open import Data.Product using (_,_; proj₁; proj₂)
-open import Data.Sum using (inj₁; inj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
-open import denotation.MonotonicList.Events using (Pos; Tail; Tail∞; pin; idle; _∪_; _<ᵖ_; <ᵖ-trans; <ᵖ-asym; <ᵖ-split; ≮-trans)
-open import denotation.MonotonicList using (Agreeᵀ; stopᵀ; pin⁼; idle⁼; agreeᵀ-refl; agreeᵀ-sym; agreeᵀ-trans)
-open import denotation.NonExpansive using (∪-ne)
-open import adequacy.Placed.Trail using (SortedT; sortedᵀ; t≢f)
-open import adequacy.Placed.Rising using (AtopT)
+open import denotation.MonotonicList.Events using (Tail; Tail∞; pin; idle; _∪_)
+open import denotation.MonotonicList using (Agreeᵀ; stopᵀ; pin⁼; idle⁼)
+open import adequacy.Placed.Trail using (SortedT)
 open Tail∞
 
 -- A tail joined to none.
