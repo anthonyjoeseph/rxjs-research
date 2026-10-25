@@ -61,7 +61,7 @@ open Agreeˢ
 -- Runs with skips erased
 
 -- A tail with none or more of its pins erased, each no later than the
--- pin after it: a merge of tails reads each by its next.
+-- other's next: a merge of tails reads each by its next.
 --
 -- REFUTED: 5a5d1bd0 any pin erased, by an outer's tail `[5, 1]` erased of
 --   its `5` beside a pool pinned at `[3]`: the merge's tails are `[3, 5, 1]`
@@ -69,13 +69,13 @@ open Agreeˢ
 data Eraseᵀ : ℕ → Tail → Tail → Set where
   stopᵉ : ∀ {x y} → Eraseᵀ zero x y
   pinᵉ  : ∀ {k p l r} → Eraseᵀ k (later l) (later r) → Eraseᵀ (suc k) (pin p l) (pin p r)
-  unpin : ∀ {k p l r} → TailNotBefore p (later l) → Eraseᵀ k (later l) r → Eraseᵀ (suc k) (pin p l) r
+  unpin : ∀ {k p l r} → TailNotBefore p r → Eraseᵀ k (later l) r → Eraseᵀ (suc k) (pin p l) r
   idleᵉ : ∀ {k} → Eraseᵀ (suc k) idle idle
 
 -- A run with none or more of its skips erased, `t` what the other leaves
 -- running where it stands: each event kept alike, each tail beside one
 -- erased alike, the tail past an erased skip beside the other's.  An
--- erased skip comes no later than what follows it: a merge reads its
+-- erased skip comes no later than the other's next: a merge reads its
 -- parts by their next, so a skip erased out of order moves a sibling
 -- across the outer's next.
 --
@@ -86,7 +86,7 @@ data Erase {A : Set} : ℕ → Events A → Tail → Events A → Set where
   stopᵉ  : ∀ {x t y} → Erase zero x t y
   outᵉ   : ∀ {k p a l r t} → Eraseᵀ k (cut l) (cut r) → Erase k (force l) (cut r) (force r) → Erase (suc k) (out p a l) t (out p a r)
   skipᵉ  : ∀ {k p l r t} → Eraseᵀ k (cut l) (cut r) → Erase k (force l) (cut r) (force r) → Erase (suc k) (skip p l) t (skip p r)
-  erased : ∀ {k p l t e} → NotBefore p (head (force l)) → Eraseᵀ k (cut l) t → Erase k (force l) t e → Erase (suc k) (skip p l) t e
+  erased : ∀ {k p l t e} → NotBefore p (head e) → Eraseᵀ k (cut l) t → Erase k (force l) t e → Erase (suc k) (skip p l) t e
   endᵉ   : ∀ {k p t} → Erase (suc k) (end p) t (end p)
   hushᵉ  : ∀ {k t} → Erase (suc k) hush t hush
 
@@ -137,17 +137,27 @@ private
   lead-agree end⁼        = endᴸ
   lead-agree hush⁼       = hushᴸ
 
+  agreeᵀ-on : ∀ {k p} {y z : Tail} → Agreeᵀ (suc k) y z → TailNotBefore p y → TailNotBefore p z
+  agreeᵀ-on (pin⁼ _) o = o
+  agreeᵀ-on idle⁼    o = o
+
+  agree-on : ∀ {A k p} {y z : Events A} → Agree (suc k) y z → NotBefore p (head y) → NotBefore p (head z)
+  agree-on (out⁼ _ _)  o = o
+  agree-on (skip⁼ _ _) o = o
+  agree-on end⁼        o = o
+  agree-on hush⁼       o = o
+
   eraseᵀ-then : ∀ {k} {x y z : Tail} → Eraseᵀ k x y → Agreeᵀ k y z → Eraseᵀ k x z
   eraseᵀ-then stopᵉ     a        = stopᵉ
   eraseᵀ-then (pinᵉ e)  (pin⁼ a) = pinᵉ (eraseᵀ-then e a)
-  eraseᵀ-then (unpin o e) a      = unpin o (eraseᵀ-then e (agreeᵀ-pred a))
+  eraseᵀ-then (unpin o e) a      = unpin (agreeᵀ-on a o) (eraseᵀ-then e (agreeᵀ-pred a))
   eraseᵀ-then idleᵉ     idle⁼    = idleᵉ
 
   erase-then : ∀ {A k} {x y z : Events A} {t t′} → Erase k x t y → Agreeᵀ k t t′ → Agree k y z → Erase k x t′ z
   erase-then stopᵉ        u a           = stopᵉ
   erase-then (outᵉ e x)   u (out⁼ t a)  = outᵉ (eraseᵀ-then e t) (erase-then x t a)
   erase-then (skipᵉ e x)  u (skip⁼ t a) = skipᵉ (eraseᵀ-then e t) (erase-then x t a)
-  erase-then (erased o e x) u a         = erased o (eraseᵀ-then e (agreeᵀ-pred u)) (erase-then x (agreeᵀ-pred u) (agree-pred a))
+  erase-then (erased o e x) u a         = erased (agree-on a o) (eraseᵀ-then e (agreeᵀ-pred u)) (erase-then x (agreeᵀ-pred u) (agree-pred a))
   erase-then endᵉ         u end⁼        = endᵉ
   erase-then hushᵉ        u hush⁼       = hushᵉ
 

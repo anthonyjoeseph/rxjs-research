@@ -11,7 +11,8 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE ERASURE
 
 Refuted for a skip or a pin erased out of order (`adequacy.Engine.Drop`'s
-`Erase`, `Eraseᵀ`); restated: each erased one comes no later than its next.
+`Erase`, `Eraseᵀ`); restated: each erased one comes no later than the other's
+next.
 Open: a merge fed a part so erased runs so erased, its tail agreeing. The
 proof walks `go` against both sides' heads: a pin emits once ahead of every
 head, a switch adds killed lanes' tails. Settled when the three are bodies,
