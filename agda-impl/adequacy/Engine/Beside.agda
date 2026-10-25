@@ -71,11 +71,6 @@ sourced-≋ {σ = σ} {σ′} x (sourced a o t) =
   sourced (atop-agree (agree-sym (nowˢ (x 1))) a) (ordered-≈ (force σ′) (force σ) (λ n → agree-sym (nowˢ (x n))) o)
     (trail-≈ (force σ′) (force σ) (cut σ′) (cut σ) (λ n → agree-sym (nowˢ (x n))) (λ n → agreeᵀ-sym (cutˢ (x n))) t)
 
--- THE TRAIL, ERASED: a run with skips erased leaves running only what
--- the run leaves at its next kept step, so what it leaves trails it.
-postulate
-  erase-trail : ∀ {X} {σ σ′ : Events∞ X} → Trailing σ → σ ⊒ σ′ → Trailing σ′
-
 ------------------------------------------------------------------------
 -- Positions
 
@@ -434,16 +429,19 @@ module _ (r : Pos) where
 
 -- THE ERASURE, AT A CONNECT: a body and its source each fed a run with
 -- skips erased run with skips erased, the next kept, the source fed one
--- subscribed where the connect is.
+-- subscribed where the connect is, and the run it is fed trailing too.
 --
 -- REFUTED: 71fa7920 without each premise of `Sourced`: a tail pinned
 --   before an erased skip, an erased skip outside the burst between two
 --   inside it, and an erased skip before the subscription.
-body-⊒ : ∀ {X B} r {σ σ′ : Events∞ X} {β β′ : Events∞ B} → Sourced r σ → σ ⊒ σ′ → β ⊒ β′ → bodyConn r σ β ⊒ bodyConn r σ′ β′
-body-⊒ r {σ} {σ′} {β} {β′} so s@(lσ , hσ , eσ) (lβ , hβ , eβ) =
+-- REFUTED: f1f7d119 without the other's trail (`body-untrailed`): an
+--   erased step spends depth, so infinitely many erased skips satisfy
+--   every depth before a kept one that pins past them.  Nor does a run
+--   with skips erased trail because the run does (`erase-untrailed`).
+body-⊒ : ∀ {X B} r {σ σ′ : Events∞ X} {β β′ : Events∞ B} → Sourced r σ → Trailing σ′ → σ ⊒ σ′ → β ⊒ β′ → bodyConn r σ β ⊒ bodyConn r σ′ β′
+body-⊒ r {σ} {σ′} {β} {β′} so tr (lσ , hσ , eσ) (lβ , hβ , eβ) =
   side-lead r {σ = σ} {σ′} {β} {β′} lσ lβ , hushed , λ n → ∪-erase (burst-erase r so tr (eσ n)) (cutᵉ (eβ n)) ,ᵉ beside-erase r so tr (eσ n) (eβ n)
   where
-    tr = erase-trail (Sourced.srcTrail so) s
     hushed : M′.beside r β σ ≡ hush → ∀ d → Agreeᵀ d (M′.burstOn r σ ∪ cut β) (M′.burstOn r σ′ ∪ cut β′)
     hushed h d with side-hush r β σ (force σ) h
     ... | hs , hb = subst₂ (λ u u′ → Agreeᵀ d (u ∪ cut β) (u′ ∪ cut β′))

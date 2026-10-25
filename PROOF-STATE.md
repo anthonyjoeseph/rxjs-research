@@ -8,17 +8,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE ERASURE
-
-A connect fed a run with skips erased runs so erased, given a source that
-trails (`adequacy.Engine.Beside`). Open: whether a run with skips erased
-still trails, its tail no earlier than its next kept step. The erasing side
-keeps a subset of the other's pins at each kept step, but a pin it erased
-may be the one the other's tail pins. Settled when `erase-trail` is a body,
-or refuted.
-
-Members: `erase-trail`.
-
 #### THE SILENT RUN
 
 Refuted as one dropped skip (`quickcheck.KeptDepth`: a lane joined after its

@@ -58,6 +58,7 @@ open import adequacy.Engine.Erase using (Eraseᵀ; Erase; Lead⁼; _,ᵉ_; cut�
   below-on; map-erase; map-lead)
 open import adequacy.Engine.Merge using (lanes-⊒; outer-⊒)
 open import adequacy.Engine.Beside using (Sourced; sourced-skip; body-⊒; after-before)
+open import adequacy.Placed.Trail using (Trailing)
 open Events∞
 open Tail∞
 open import denotation.NonExpansive using (Agreeˢ)
@@ -204,8 +205,8 @@ mutual
 
   -- A source's skips pass its connect: the body drops what its joiners
   -- saw of them; the source's next shows no earlier than any of those,
-  -- and, hushed, leaves nothing running; the body's next comes after
-  -- each source skip shows.
+  -- and, hushed, leaves nothing running, and what it leaves running
+  -- trails it; the body's next comes after each source skip shows.
   record SrcPass {X B} (P : Pos → Set) (β β′ : Events∞ B) (h′ : Events∞ X) : Set where
     inductive
     field
@@ -213,6 +214,7 @@ mutual
       srcOn   : ∀ k → Under P k → NotBefore k (shown (force h′))
       srcHush : force h′ ≡ hush → ∀ d → Agreeᵀ d (cut h′) idle
       bodyOn  : ∀ k → P k → After (k ++ [ ix 0 ]) (head (force β′))
+      srcTrail : Trailing h′
 
 ------------------------------------------------------------------------
 -- Each frame keeps an erasure
@@ -463,9 +465,9 @@ private
 -- source beside it erased alike.
 body-drops : ∀ {X B P} r {σ σ′ : Events∞ X} {h h′ : Events∞ B}
            → (force σ ≡ hush → ∀ d → Agreeᵀ d (cut σ) idle) → (∀ k → P k → NotBefore k (shown (force σ)))
-           → Sourced r σ → σ ⊒ σ′ → Dropsˢ P h h′ → Dropsˢ P (bodyConn r σ h) (bodyConn r σ′ h′)
-body-drops r {σ} hc nb so y (dropˢ {k} {r₁} pk ag x) = dropˢ pk (body-skip r σ hc (nb k pk) ag) (body-⊒ r so y x)
-body-drops r {σ} hc nb so y (dropsˢ {k} {r₁} pk ag d) = dropsˢ pk (body-skip r σ hc (nb k pk) ag) (body-drops r hc nb so y d)
+           → Sourced r σ → Trailing σ′ → σ ⊒ σ′ → Dropsˢ P h h′ → Dropsˢ P (bodyConn r σ h) (bodyConn r σ′ h′)
+body-drops r {σ} hc nb so t y (dropˢ {k} {r₁} pk ag x) = dropˢ pk (body-skip r σ hc (nb k pk) ag) (body-⊒ r so t y x)
+body-drops r {σ} hc nb so t y (dropsˢ {k} {r₁} pk ag d) = dropsˢ pk (body-skip r σ hc (nb k pk) ag) (body-drops r hc nb so t y d)
 
 private
   ≋-sym : ∀ {A} {h h′ : Events∞ A} → h ≋ h′ → h′ ≋ h
@@ -512,19 +514,19 @@ private
   -- The body done dropping: each source skip shows ahead of its next,
   -- the body's next that of the body it erases to.
   src-alone : ∀ {X B P} r {β β′ : Events∞ B} {σ σ′ : Events∞ X} → β ⊒ β′ → (∀ k → P k → After (k ++ [ ix 0 ]) (head (force β′)))
-            → Sourced r σ → Dropsˢ P σ σ′ → Dropsˢ (Under P) (bodyConn r σ β) (bodyConn r σ′ β′)
-  src-alone r {β} {σ = σ} e bo so (dropˢ {k} pk ag x) =
-    dropˢ (under-shown pk) (src-first r β {σ} ag (after-before (k ++ [ ix 0 ]) (force β) (on-head e (bo k pk)))) (body-⊒ r (sourced-skip so ag) x e)
-  src-alone r {β} {σ = σ} e bo so (dropsˢ {k} pk ag d) =
-    dropsˢ (under-shown pk) (src-first r β {σ} ag (after-before (k ++ [ ix 0 ]) (force β) (on-head e (bo k pk)))) (src-alone r e bo (sourced-skip so ag) d)
+            → Sourced r σ → Trailing σ′ → Dropsˢ P σ σ′ → Dropsˢ (Under P) (bodyConn r σ β) (bodyConn r σ′ β′)
+  src-alone r {β} {σ = σ} e bo so t (dropˢ {k} pk ag x) =
+    dropˢ (under-shown pk) (src-first r β {σ} ag (after-before (k ++ [ ix 0 ]) (force β) (on-head e (bo k pk)))) (body-⊒ r (sourced-skip so ag) t x e)
+  src-alone r {β} {σ = σ} e bo so t (dropsˢ {k} pk ag d) =
+    dropsˢ (under-shown pk) (src-first r β {σ} ag (after-before (k ++ [ ix 0 ]) (force β) (on-head e (bo k pk)))) (src-alone r e bo (sourced-skip so ag) t d)
 
   -- The source done dropping: its connect is the body beside it, the
   -- source's next that of the source it erases to.
   body-alone : ∀ {X B P} r {σ σ′ : Events∞ X} {β β′ : Events∞ B}
              → (force σ′ ≡ hush → ∀ d → Agreeᵀ d (cut σ′) idle) → (∀ k → Under P k → NotBefore k (shown (force σ′)))
-             → Sourced r σ → σ ⊒ σ′ → Dropsˢ (Under P) β β′ → Dropsˢ (Under P) (bodyConn r σ β) (bodyConn r σ′ β′)
-  body-alone r {σ} hc nb so x d =
-    body-drops r (lead-hush x hc) (λ k u → subst (NotBefore k) (sym (lead-shown (proj₁ x))) (nb k u)) so x d
+             → Sourced r σ → Trailing σ′ → σ ⊒ σ′ → Dropsˢ (Under P) β β′ → Dropsˢ (Under P) (bodyConn r σ β) (bodyConn r σ′ β′)
+  body-alone r {σ} hc nb so t x d =
+    body-drops r (lead-hush x hc) (λ k u → subst (NotBefore k) (sym (lead-shown (proj₁ x))) (nb k u)) so t x d
 
   first-src : ∀ {X B} r {σ : Events∞ X} {β : Events∞ B} k σ₁ k′ β₁
             → (∀ n → Agree n (force σ) (skip k σ₁)) → (∀ n → Agree n (force β) (skip k′ β₁)) → (k ++ [ ix 0 ]) <ᵖ k′ ≡ true
@@ -546,23 +548,23 @@ private
   both : ∀ {X B P} r {σ σ′ : Events∞ X} {β β′ : Events∞ B}
        → (force σ′ ≡ hush → ∀ d → Agreeᵀ d (cut σ′) idle) → (∀ k → Under P k → NotBefore k (shown (force σ′)))
        → (∀ k → P k → After (k ++ [ ix 0 ]) (head (force β′)))
-       → Sourced r σ → Dropsˢ P σ σ′ → Dropsˢ (Under P) β β′ → Dropsˢ (Under P) (bodyConn r σ β) (bodyConn r σ′ β′)
-  both r {σ} {β = β} {β′ = β′} hc nb bo so dσ@(dropˢ {k} {σ₁} pk ag x) dβ@(dropˢ {k′} {β₁} pk′ ag′ x′) =
+       → Sourced r σ → Trailing σ′ → Dropsˢ P σ σ′ → Dropsˢ (Under P) β β′ → Dropsˢ (Under P) (bodyConn r σ β) (bodyConn r σ′ β′)
+  both r {σ} {β = β} {β′ = β′} hc nb bo so t dσ@(dropˢ {k} {σ₁} pk ag x) dβ@(dropˢ {k′} {β₁} pk′ ag′ x′) =
     choose ((k ++ [ ix 0 ]) <ᵖ k′)
-      (λ eq → dropsˢ (under-shown pk) (first-src r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (body-alone r hc nb (sourced-skip so ag) x dβ))
-      (λ eq → dropsˢ pk′ (first-body r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (src-alone r x′ bo so dσ))
-  both r {σ} {β = β} {β′ = β′} hc nb bo so dσ@(dropˢ {k} {σ₁} pk ag x) dβ@(dropsˢ {k′} {β₁} pk′ ag′ d′) =
+      (λ eq → dropsˢ (under-shown pk) (first-src r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (body-alone r hc nb (sourced-skip so ag) t x dβ))
+      (λ eq → dropsˢ pk′ (first-body r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (src-alone r x′ bo so t dσ))
+  both r {σ} {β = β} {β′ = β′} hc nb bo so t dσ@(dropˢ {k} {σ₁} pk ag x) dβ@(dropsˢ {k′} {β₁} pk′ ag′ d′) =
     choose ((k ++ [ ix 0 ]) <ᵖ k′)
-      (λ eq → dropsˢ (under-shown pk) (first-src r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (body-alone r hc nb (sourced-skip so ag) x dβ))
-      (λ eq → dropsˢ pk′ (first-body r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (both r hc nb bo so dσ d′))
-  both r {σ} {β = β} {β′ = β′} hc nb bo so dσ@(dropsˢ {k} {σ₁} pk ag d) dβ@(dropˢ {k′} {β₁} pk′ ag′ x′) =
+      (λ eq → dropsˢ (under-shown pk) (first-src r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (body-alone r hc nb (sourced-skip so ag) t x dβ))
+      (λ eq → dropsˢ pk′ (first-body r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (both r hc nb bo so t dσ d′))
+  both r {σ} {β = β} {β′ = β′} hc nb bo so t dσ@(dropsˢ {k} {σ₁} pk ag d) dβ@(dropˢ {k′} {β₁} pk′ ag′ x′) =
     choose ((k ++ [ ix 0 ]) <ᵖ k′)
-      (λ eq → dropsˢ (under-shown pk) (first-src r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (both r hc nb bo (sourced-skip so ag) d dβ))
-      (λ eq → dropsˢ pk′ (first-body r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (src-alone r x′ bo so dσ))
-  both r {σ} {β = β} {β′ = β′} hc nb bo so dσ@(dropsˢ {k} {σ₁} pk ag d) dβ@(dropsˢ {k′} {β₁} pk′ ag′ d′) =
+      (λ eq → dropsˢ (under-shown pk) (first-src r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (both r hc nb bo (sourced-skip so ag) t d dβ))
+      (λ eq → dropsˢ pk′ (first-body r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (src-alone r x′ bo so t dσ))
+  both r {σ} {β = β} {β′ = β′} hc nb bo so t dσ@(dropsˢ {k} {σ₁} pk ag d) dβ@(dropsˢ {k′} {β₁} pk′ ag′ d′) =
     choose ((k ++ [ ix 0 ]) <ᵖ k′)
-      (λ eq → dropsˢ (under-shown pk) (first-src r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (both r hc nb bo (sourced-skip so ag) d dβ))
-      (λ eq → dropsˢ pk′ (first-body r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (both r hc nb bo so dσ d′))
+      (λ eq → dropsˢ (under-shown pk) (first-src r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (both r hc nb bo (sourced-skip so ag) t d dβ))
+      (λ eq → dropsˢ pk′ (first-body r {σ} {β} k σ₁ k′ β₁ ag ag′ eq) (both r hc nb bo so t dσ d′))
 
 -- A SOURCE'S SKIPS AND ITS JOINERS': each source skip shows just past
 -- itself, each joiner's image of it under it, and what follows is later;
@@ -571,8 +573,8 @@ src-drops : ∀ {Γ X B P} r en (b : Node (X ∷ Γ) B) (ρ : NEnv Γ) {h h′ :
           → Sourced r h → SrcPass P (stateᴺ b (force h ∷ᴬ ρ)) (stateᴺ b (force h′ ∷ᴬ ρ)) h′
           → Dropsˢ P h h′ → Dropsˢ (Under P) (connSrc false r en b ρ h) (connSrc false r en b ρ h′)
 src-drops r en b ρ {h} {h′} so sp d with SrcPass.fed sp
-... | inj₁ x  = drops-from (≋-by refl refl) (drops-to (src-alone r x (SrcPass.bodyOn sp) so d) (≋-by refl refl))
-... | inj₂ dβ = drops-from (≋-by refl refl) (drops-to (both r (SrcPass.srcHush sp) (SrcPass.srcOn sp) (SrcPass.bodyOn sp) so d dβ) (≋-by refl refl))
+... | inj₁ x  = drops-from (≋-by refl refl) (drops-to (src-alone r x (SrcPass.bodyOn sp) so (SrcPass.srcTrail sp) d) (≋-by refl refl))
+... | inj₂ dβ = drops-from (≋-by refl refl) (drops-to (both r (SrcPass.srcHush sp) (SrcPass.srcOn sp) (SrcPass.bodyOn sp) so (SrcPass.srcTrail sp) d dβ) (≋-by refl refl))
 
 ------------------------------------------------------------------------
 -- Up to the root
@@ -597,4 +599,4 @@ lift-drops P (inLanes op g d′ n q o pre post c) true d (fi , ps) =
 lift-drops P (inSrc (cs false true sa ba as nothing r en) b c) f d (so , sp , ps) =
   lift-drops (Under P) c true (src-drops r en (gh b) (envAt c) so sp d) ps
 lift-drops P (inBody (cs cl true sa ba as nothing r en) o c) f d (hc , bp , so , ps) =
-  lift-drops P c true (body-drops r hc bp so (≋-⊒ (λ n → same n (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)))) d) ps
+  lift-drops P c true (body-drops r hc bp so (Sourced.srcTrail so) (≋-⊒ (λ n → same n (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)))) d) ps
