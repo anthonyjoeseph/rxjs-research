@@ -15,21 +15,24 @@
 module adequacy.Engine.Shown where
 
 open import Data.Bool using (Bool; true; false)
-open import Data.List using ([]; _∷_; _++_; [_]; reverse; _ʳ++_)
+open import Data.Nat using (ℕ; zero; suc)
+open import Data.List using (List; []; _∷_; _++_; [_]; reverse; _ʳ++_)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All) renaming (map to allMap; _∷_ to _∷ᴬ_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (Maybe; just; nothing; is-just)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Sum using (_⊎_)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 
 open import Tree using (Obs)
-open import denotation.MonotonicList.Events using (Events∞; Timeline; Pos; ix; idle; hush)
+open import denotation.MonotonicList.Events using (Events; Events∞; Timeline; Pos; ix; idle; hush; _<ᵖ_; out; skip; end; inside)
 open import denotation.MonotonicList using (head; Agreeᵀ)
 open import denotation.NonExpansive using (_,ˢ_; mapᴱ-ne; scanᴱ-ne; Agreeˢ)
-open import denotation.Unfold using (stateᴺ; states; outerᴺ)
+open import denotation.Unfold using (stateᴺ; states; outerᴺ; NEnv)
+import denotation.Unfold as U
 open import operation.Key using (Key; at; after; _<ᴷ_)
 open import operation.PureObservable using (play; module Machine)
 open Machine using (St; mapS; scanS; cutS; lnS; takeS; flatS; connS; coldS; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter;
@@ -65,6 +68,56 @@ Sought : Bool → Pos → (Pos → Set) → Set
 Sought false q P = ∀ k → P k → k ≡ q
 Sought true  q P = ∀ k → P k → Σ Pos λ y → k ≡ q ++ y
 
+-- NOTHING OWED A SOURCE: each joiner of connect `i` in a node, not yet
+-- told its end, joined before `q` and holds nothing it was fed, and no
+-- defer holds a step of `i` still to be fed.  A lane not yet begun is not
+-- asked.
+mutual
+  Caught : ∀ {Γ A B} → A ∈ Γ → Pos → U.Node Γ B → Set
+  Caught i q (U.mapᶜ f n)                 = Caught i q n
+  Caught i q (U.scanᶜ f z n)              = Caught i q n
+  Caught i q (U.takeWhileᶜ w t n)         = Caught i q n
+  Caught i q (U.flatMapᶜ op g o ls qs pl) = Caughtᴹ i q o × Caughtᴸ i q ls × Caught i q pl
+  Caught i q (U.joinᶜ j p xs nothing)     = is-just (U.same? i j) ≡ false ⊎ (xs ≡ [] × p <ᵖ q ≡ true)
+  Caught i q (U.connectᶜ r b s)           = Caught (there i) q b × Caughtˢ i q s
+  Caught i q (U.deferᶜ l p ns)            = Unnoticed i ns
+  Caught i q (U.endingᶜ p n)              = Caught i q n
+  Caught i q (U.restᶜ n)                  = Caught i q n
+  Caught i q (U.unionᶜ x y)               = Caught i q x × Caught i q y
+  Caught i q (U.burstingᶜ r t)            = Caught i q t
+  Caught i q (U.underᶜ s b)               = Caughtˢ i q s × Caught (there i) q b
+  Caught i q _                            = ⊤
+
+  Caughtᴹ : ∀ {Γ A B} → A ∈ Γ → Pos → Maybe (U.Node Γ B) → Set
+  Caughtᴹ i q nothing  = ⊤
+  Caughtᴹ i q (just n) = Caught i q n
+
+  Caughtᴸ : ∀ {Γ A B} → A ∈ Γ → Pos → List (U.Node Γ B) → Set
+  Caughtᴸ i q []       = ⊤
+  Caughtᴸ i q (n ∷ ns) = Caught i q n × Caughtᴸ i q ns
+
+  Caughtˢ : ∀ {Γ A B} → A ∈ Γ → Pos → U.Source Γ B → Set
+  Caughtˢ i q (U.live s)    = Caught i q s
+  Caughtˢ i q (U.ended c t) = Caught i q t
+
+  Unnoticed : ∀ {Γ A} → A ∈ Γ → List (U.Notice Γ) → Set
+  Unnoticed i []                   = ⊤
+  Unnoticed i (U.notice j q a ∷ ns) = is-just (U.same? i j) ≡ false × Unnoticed i ns
+
+-- A RUN NOTHING NESTS IN: no event lies under the skip just before it,
+-- to `n` events.  Rejoined, an event under a skip comes before it (an
+-- `ix` mark is below a `sub` one), so a skip erased before an event under
+-- it is no longer erasable.
+Flat : ∀ {A} → ℕ → Events A → Set
+Flat zero    e           = ⊤
+Flat (suc n) (out p a r) = Flat n (Events∞.force r)
+Flat (suc n) (skip p r)  = Unnested p (head (Events∞.force r)) × Flat n (Events∞.force r)
+  where Unnested : Pos → Maybe Pos → Set
+        Unnested p nothing  = ⊤
+        Unnested p (just y) = inside p y ≡ false
+Flat (suc n) (end p)     = ⊤
+Flat (suc n) hush        = ⊤
+
 postulate
   -- The search finds a node by one of its own marks.
   found-own : ∀ {R} (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} → search top t ≡ just (found (Γ , A , c , s) m key)
@@ -96,15 +149,23 @@ postulate
                   → Frag (plug c (connS (cs cl true sa ba as nothing r en) o b))
                   → Ordered (Events∞.force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)))
                     × Trailing (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c))
-  -- A SOURCE'S SKIPS FED ITS BODY: the body fed a live source's skips
-  -- drops its own leading skips, each under one of them, and erases
-  -- none or more past them, to the body fed the rest.
-  src-fed : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h h′ : Events∞ X}
-          → Sought v q P → KAfter (after q) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
-          → Before (after q) (own (connS (cs false true sa ba as nothing r en) o b))
-          → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
-          → h ≋ stateᴺ (gh o) (envAt c) → Dropsˢ P h h′
-          → Fed P (stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c))
+  -- NOTHING OWED A LIVE SOURCE: its body's joiners of it joined before
+  -- its skip and hold nothing fed, and no defer there a step of it.
+  caught : ∀ {R Γ X B} q (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
+         → KAfter (after q) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
+         → Before (after q) (own (connS (cs false true sa ba as nothing r en) o b))
+         → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
+         → Caught (here refl) q (gh b)
+  -- A LIVE SOURCE'S RUN nests nothing.
+  src-flat : ∀ {R Γ X B} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h : Events∞ X}
+           → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
+           → h ≋ stateᴺ (gh o) (envAt c) → ∀ m → Flat m (Events∞.force h)
+  -- A NODE FED A SOURCE'S SKIPS, owing it nothing: it drops its own
+  -- leading skips, each under one of them, and erases none or more past
+  -- them, to the node fed the rest.
+  node-fed : ∀ {Γ X B} v q {P} (n : U.Node (X ∷ Γ) B) (ρ : NEnv Γ) {h h′ : Events∞ X}
+           → Sought v q P → Caught (here refl) q n → (∀ m → Flat m (Events∞.force h)) → Dropsˢ P h h′
+           → Fed P (stateᴺ n (Events∞.force h ∷ᴬ ρ)) (stateᴺ n (Events∞.force h′ ∷ᴬ ρ))
   -- The body fed the rest comes after each source skip shows.
   src-body-on : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h h′ : Events∞ X}
               → Sought v q P → KAfter (after q) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
@@ -112,6 +173,18 @@ postulate
               → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
               → h ≋ stateᴺ (gh o) (envAt c) → Dropsˢ P h h′
               → ∀ k → P k → After (k ++ [ ix 0 ]) (head (Events∞.force (stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c))))
+
+-- A SOURCE'S SKIPS FED ITS BODY: the body fed a live source's skips
+-- drops its own leading skips, each under one of them, and erases none
+-- or more past them, to the body fed the rest.
+src-fed : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h h′ : Events∞ X}
+        → Sought v q P → KAfter (after q) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
+        → Before (after q) (own (connS (cs false true sa ba as nothing r en) o b))
+        → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
+        → h ≋ stateᴺ (gh o) (envAt c) → Dropsˢ P h h′
+        → Fed P (stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c))
+src-fed v q c sa ba as r en o b so ka bf ft x d =
+  node-fed v q (gh b) (envAt c) so (caught q c sa ba as r en o b ka bf ft) (src-flat c sa ba as r en o b ft x) d
 
 -- A SOURCE'S OWN PASS: its body fed, its own next, the body's next,
 -- and what the run it skips to leaves running trailing it.
