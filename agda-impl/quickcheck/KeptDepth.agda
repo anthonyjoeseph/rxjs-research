@@ -8,7 +8,12 @@
 -- when the step is one whose work may grow (`adequacy.Content`'s drops).
 -- Also the longest run of silent steps meaning the same, and that what
 -- the search finds still leads every race above it past each live
--- source's skips (`adequacy.Engine.Pick.Beat`).
+-- source's skips (`adequacy.Engine.Pick.Beat`).  And that each stall,
+-- close and defer where it is shown links past every live source above
+-- it (`adequacy.Engine.Shown.Links`): the body fed the rest erased of the
+-- body fed the run, or past skips under the source's
+-- (`adequacy.Engine.Shown.src-fed`), and after each source skip shows
+-- (`adequacy.Engine.Shown.src-body-on`).
 module quickcheck.KeptDepth where
 
 open import Data.Bool using (Bool; true; false; not; _∧_; _∨_; if_then_else_)
@@ -20,8 +25,8 @@ open import Data.Maybe using (just; nothing)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.String using (String; _++_)
 
-open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Tail∞; pin; idle; out; skip; end; hush; Pos; _<ᵖ_)
-open import Tree using (defer; mergeᶠ)
+open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Tail∞; pin; idle; out; skip; end; hush; Pos; _<ᵖ_; inside; ix)
+open import Tree using (defer; mergeᶠ; Later)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 open import quickcheck.Tm using (nat; bool; var)
@@ -39,18 +44,26 @@ open Driver ℕ using (Step; step; silent; value; complete; drained)
 open Ghosting ℕ using (work; Measure)
 open Machine using (Conf; ⟨_,_,_,_⟩; load; spot; subscribing; absorbed; rising; nx; cp; pend; coldS; top; inOuter; inLanes;
   plug; closed; alive; search; found; leafM; St; Ctx; Out; mapS; scanS; cutS; lnS; takeS; flatS; connS; inMap; inScan; inCut; inLn;
-  inTake; inSrc; inBody; over; own; Mark; outOf; still; shows)
+  inTake; inSrc; inBody; over; own; Mark; outOf; still; shows; cs; free; cpAt; cutAt; overAt; _⊕_)
 open import Data.Maybe using (Maybe)
 open import operation.Key using (Key; _<ᴷ_)
 open import Tree using (Obs; FlatOp)
 open import denotation.MonotonicList.Events using (Timeline)
 open import adequacy.Engine.Head using (cand)
 open import adequacy.Engine.Pick using (past)
+open import adequacy.Engine.Meaning using (mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn; srcState; srcG; gh; lane; lanesL; deadL; envAt)
+open import adequacy.Engine.Ahead using (shown) renaming (shows to showsᵃ)
+open import denotation.MonotonicList using (head)
+open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
+open import operation.PureObservable using () renaming (rest to restᵀ)
+open import denotation.MonotonicList.Events using (Frame∞; From∞; last)
+import denotation.Unfold as U
 
 private
-  -- A run's verdict, carrying its longest run of steps meaning the same.
+  -- A run's verdict, carrying its longest run of steps meaning the same
+  -- and how many live sources' links it checked.
   data Verdict : Set where
-    yes : ℕ → Verdict
+    yes : ℕ → ℕ → Verdict
     no  : ℕ → String → Verdict
 
   -- The first `k` events of a run, printed.
@@ -150,7 +163,7 @@ private
   tailOnᵇ p idle      = true
   tailOnᵇ p (pin k _) = not (k <ᵖ p)
 
-  onᵇ : Pos → Events ℕ → Bool
+  onᵇ : ∀ {A} → Pos → Events A → Bool
   onᵇ p (out k _ _) = not (k <ᵖ p)
   onᵇ p (skip k _)  = not (k <ᵖ p)
   onᵇ p (end k)     = not (k <ᵖ p)
@@ -177,18 +190,19 @@ private
   -- (`adequacy.Engine.Drop.Erase`): each tail beside a kept
   -- event erased to the other's, the tail past an erased skip to what the
   -- other leaves running there, `t` (unknown at the root).  Positions
-  -- strictly rise, so a skip at the other's position is never one to erase.
-  erasedᵇ : ℕ → Maybe Tail → Events ℕ → Events ℕ → Bool
-  erasedᵇ zero    t _           _            = true
-  erasedᵇ (suc k) t (out p a r) (out q b r′) =
-    samePos p q ∧ (a ≡ᵇ b) ∧ unpinnedᵇ k (Events∞.cut r) (Events∞.cut r′) ∧ erasedᵇ k (just (Events∞.cut r′)) (Events∞.force r) (Events∞.force r′)
-  erasedᵇ (suc k) t (skip p r)  (skip q r′)  =
-    if samePos p q then unpinnedᵇ k (Events∞.cut r) (Events∞.cut r′) ∧ erasedᵇ k (just (Events∞.cut r′)) (Events∞.force r) (Events∞.force r′)
-    else onᵇ p (skip q r′) ∧ pastᵇ k (Events∞.cut r) t ∧ erasedᵇ k t (Events∞.force r) (skip q r′)
-  erasedᵇ (suc k) t (skip p r)  e′           = onᵇ p e′ ∧ pastᵇ k (Events∞.cut r) t ∧ erasedᵇ k t (Events∞.force r) e′
-  erasedᵇ (suc k) t (end p)     (end q)      = samePos p q
-  erasedᵇ (suc k) t hush        hush         = true
-  erasedᵇ (suc k) t _           _            = false
+  -- strictly rise, so a skip at the other's position is never one to
+  -- erase.  Values compared by `eq`.
+  erasedᵇ : ∀ {A} → (A → A → Bool) → ℕ → Maybe Tail → Events A → Events A → Bool
+  erasedᵇ eq zero    t _           _            = true
+  erasedᵇ eq (suc k) t (out p a r) (out q b r′) =
+    samePos p q ∧ eq a b ∧ unpinnedᵇ k (Events∞.cut r) (Events∞.cut r′) ∧ erasedᵇ eq k (just (Events∞.cut r′)) (Events∞.force r) (Events∞.force r′)
+  erasedᵇ eq (suc k) t (skip p r)  (skip q r′)  =
+    if samePos p q then unpinnedᵇ k (Events∞.cut r) (Events∞.cut r′) ∧ erasedᵇ eq k (just (Events∞.cut r′)) (Events∞.force r) (Events∞.force r′)
+    else onᵇ p (skip q r′) ∧ pastᵇ k (Events∞.cut r) t ∧ erasedᵇ eq k t (Events∞.force r) (skip q r′)
+  erasedᵇ eq (suc k) t (skip p r)  e′           = onᵇ p e′ ∧ pastᵇ k (Events∞.cut r) t ∧ erasedᵇ eq k t (Events∞.force r) e′
+  erasedᵇ eq (suc k) t (end p)     (end q)      = samePos p q
+  erasedᵇ eq (suc k) t hush        hush         = true
+  erasedᵇ eq (suc k) t _           _            = false
 
   sameᵀ : ℕ → Tail → Tail → Bool
   sameᵀ zero    _         _         = true
@@ -207,7 +221,7 @@ private
 
   -- Whether `e′` is `e` past its leading skip, the rest with skips erased.
   dropped : Events ℕ → Events ℕ → Bool
-  dropped (skip p r) e′ = erasedᵇ depth nothing (Events∞.force r) e′
+  dropped (skip p r) e′ = erasedᵇ _≡ᵇ_ depth nothing (Events∞.force r) e′
   dropped _          e′ = false
 
   -- A silent step from `m` to `m′`: 2 dropped leading skips, 1 meant the
@@ -216,29 +230,143 @@ private
   kind m m′ = if exactᵗ depth (M m) (M m′) then (if lowerᵇ (work m′) (work m) ∧ not (skippedᵇ m) then 1 else 0)
               else (if dropped (M m) (M m′) then 2 else 0)
 
+  -- `adequacy.Engine.Erase._⊒_`, decided, values unread.
+  leadᵇ : ∀ {A} → Events A → Events A → Bool
+  leadᵇ (out p _ _) (out q _ _) = samePos p q
+  leadᵇ (skip p _)  (skip q _)  = samePos p q
+  leadᵇ (end p)     (end q)     = samePos p q
+  leadᵇ hush        hush        = true
+  leadᵇ _           _           = false
+
+  hushedᵇ : ∀ {A} → Events A → Tail → Tail → Bool
+  hushedᵇ hush t t′ = sameᵀ depth t t′
+  hushedᵇ _    t t′ = true
+
+  restᵇ : ∀ {A} → Events∞ A → Events∞ A → Bool
+  restᵇ h h′ = leadᵇ (Events∞.force h) (Events∞.force h′) ∧ hushedᵇ (Events∞.force h) (Events∞.cut h) (Events∞.cut h′)
+               ∧ unpinnedᵇ depth (Events∞.cut h) (Events∞.cut h′) ∧ erasedᵇ (λ _ _ → true) depth (just (Events∞.cut h′)) (Events∞.force h) (Events∞.force h′)
+
+  -- `adequacy.Engine.Drop.Dropsˢ` and `Fed`, decided: past leading skips
+  -- under `q`, the rest erased of the other.
+  fedᵇ : ∀ {A} → ℕ → Pos → Events∞ A → Events∞ A → Bool
+  fedᵇ k q β β′ = restᵇ β β′ ∨ dropsᵇ k q (Events∞.force β) β′
+    where dropsᵇ : ∀ {A} → ℕ → Pos → Events A → Events∞ A → Bool
+          dropsᵇ (suc k) q (skip p r) β′ = inside q p ∧ (restᵇ r β′ ∨ dropsᵇ k q (Events∞.force r) β′)
+          dropsᵇ _       q _          β′ = false
+
+  -- Every position a pass is asked of (`adequacy.Engine.Shown.Sought`:
+  -- `q`'s own, or any under it) comes before `x`, one deeper.
+  afterAllᵇ : Bool → Pos → Maybe Pos → Bool
+  afterAllᵇ v     q nothing  = true
+  afterAllᵇ false q (just x) = (q ++L (ix 0 ∷ [])) <ᵖ x
+  afterAllᵇ true  q (just x) = (q <ᵖ x) ∧ not (inside q x)
+
+  -- `x` before no position under `q`.
+  notUnderᵇ : Pos → Maybe Pos → Bool
+  notUnderᵇ q nothing  = true
+  notUnderᵇ q (just x) = not (x <ᵖ q) ∧ not (inside q x)
+
+  -- `adequacy.Engine.Drop.SrcPass`, decided, but for its trail.
+  srcPassᵇ : ∀ {X B} → Bool → Pos → Events∞ B → Events∞ B → Events∞ X → Bool
+  srcPassᵇ v q β β′ h′ =
+    fedᵇ depth q β β′ ∧ afterAllᵇ v q (head (Events∞.force β′)) ∧ notUnderᵇ q (shown (Events∞.force h′))
+    ∧ hushedᵇ (Events∞.force h′) (Events∞.cut h′) idle
+
+  -- `adequacy.Engine.Shown.Links`, decided.
+  linksᵇ : ∀ {R Γ A} → Bool → Pos → Ctx R Γ A → Bool → Events∞ A → Events∞ A → Bool
+  linksᵇ v q top                          f h h′ = true
+  linksᵇ v q (inMap g c)                  f h h′ = linksᵇ v q c true (mapped g h) (mapped g h′)
+  linksᵇ v q (inScan g z c)               f h h′ = linksᵇ v q c true (scanned g z h) (scanned g z h′)
+  linksᵇ v q (inCut l a c)                f h h′ = linksᵇ v q c true h h′
+  linksᵇ v q (inLn b c)                   f h h′ = linksᵇ v q c b h h′
+  linksᵇ v q (inTake i w free c)          f h h′ = linksᵇ v q c true (took i w h) (took i w h′)
+  linksᵇ v q (inTake i w (cpAt _) c)      f h h′ = true
+  linksᵇ v q (inTake i w (cutAt _) c)     f h h′ = true
+  linksᵇ v q (inTake i w (overAt _) c)    f h h′ = true
+  linksᵇ v q (inOuter op g d n w ls c)    f h h′ =
+    linksᵇ v q c true (outerFrame op (lane g) d w (lanesL ls) (deadL ls) (envAt c) h) (outerFrame op (lane g) d w (lanesL ls) (deadL ls) (envAt c) h′)
+  linksᵇ v q (inLanes op g d n w o pre post c) f h h′ =
+    linksᵇ v q c true (lanesFrame op (lane g) d w (gh o) (reverseL pre) post f (envAt c) h) (lanesFrame op (lane g) d w (gh o) (reverseL pre) post f (envAt c) h′)
+  linksᵇ v q (inSrc (cs false true sa ba as nothing r en) b c) f h h′ =
+    srcPassᵇ v q (U.stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (U.stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c)) h′
+    ∧ linksᵇ true q c true (connSrc false r en (gh b) (envAt c) h) (connSrc false r en (gh b) (envAt c) h′)
+  linksᵇ v q (inSrc (cs false true sa ba as (just _) r en) b c) f h h′ = true
+  linksᵇ v q (inSrc (cs false false sa ba as ow r en) b c)      f h h′ = true
+  linksᵇ v q (inSrc (cs true sl sa ba as ow r en) b c)          f h h′ = true
+  linksᵇ v q (inBody (cs cl true sa ba as nothing r en) o c)    f h h′ =
+    linksᵇ v q c true (bodyConn r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) h)
+                      (bodyConn r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) h′)
+  linksᵇ v q (inBody (cs cl true sa ba as (just _) r en) o c)   f h h′ = true
+  linksᵇ v q (inBody (cs cl false sa ba as ow r en) o c)        f h h′ = true
+
+  -- The live sources a pass links past.
+  liveᵇ : ∀ {R Γ A} → Ctx R Γ A → ℕ
+  liveᵇ top                                                = 0
+  liveᵇ (inMap g c)                                        = liveᵇ c
+  liveᵇ (inScan g z c)                                     = liveᵇ c
+  liveᵇ (inCut l a c)                                      = liveᵇ c
+  liveᵇ (inLn b c)                                         = liveᵇ c
+  liveᵇ (inTake i w x c)                                   = liveᵇ c
+  liveᵇ (inOuter op g d n w ls c)                          = liveᵇ c
+  liveᵇ (inLanes op g d n w o pre post c)                  = liveᵇ c
+  liveᵇ (inSrc (cs false true sa ba as nothing r en) b c)  = suc (liveᵇ c)
+  liveᵇ (inSrc k b c)                                      = liveᵇ c
+  liveᵇ (inBody k o c)                                     = liveᵇ c
+
+  -- How many a step links past, where it is shown.
+  linkCount : Conf ℕ → ℕ
+  linkCount ⟨ c , pend (defer l) , subscribing , p ⟩ = if showsᵃ c true then liveᵇ c else 0
+  linkCount ⟨ c , s , absorbed , p ⟩ with search top (plug c s)
+  ... | just (found (Γ′ , A′ , c′ , coldS true (play τ u i t (stall k))) leafM key) = if closed c′ ∨ not (showsᵃ c′ true) then 0 else liveᵇ c′
+  ... | just (found (Γ′ , A′ , c′ , coldS true (play τ u i t (close k))) leafM key) = if closed c′ ∨ not (showsᵃ c′ true) then 0 else liveᵇ c′
+  ... | _ = 0
+  linkCount _ = 0
+
+  -- Each step `adequacy.Content` passes, linked where it is shown: an
+  -- absorbed stall or close (`stall-pass`, `close-pass`), and a defer
+  -- (`defer-links`).
+  linkedᵇ : Conf ℕ → Bool
+  linkedᵇ ⟨ c , pend (defer l) , subscribing , p ⟩ =
+    if showsᵃ c true
+    then linksᵇ false (p ⊕ (ix 0 ∷ [])) c true (U.stateᴺ (U.deferᶜ l p []) (envAt c)) (U.stateᴺ (U.subscribe (Later.force l) (p ⊕ (ix 1 ∷ []))) (envAt c))
+    else true
+  linkedᵇ ⟨ c , s , absorbed , p ⟩ with search top (plug c s)
+  ... | just (found (Γ′ , A′ , c′ , coldS true (play τ u i t (stall k))) leafM key) =
+    closed c′ ∨ not (showsᵃ c′ true)
+    ∨ linksᵇ false (u ++L (ix i ∷ [])) c′ true (U.stateᴺ (gh (coldS true (play τ u i t (stall k)))) (envAt c′))
+                                               (U.stateᴺ (gh (coldS true (play τ u (suc i) t (Frame∞.force k)))) (envAt c′))
+  ... | just (found (Γ′ , A′ , c′ , coldS true (play τ u i t (close k))) leafM key) =
+    closed c′ ∨ not (showsᵃ c′ true)
+    ∨ linksᵇ false (u ++L (ix i ∷ [])) c′ true (U.stateᴺ (gh (coldS true (play τ u i t (close k)))) (envAt c′))
+                                               (U.stateᴺ (gh (coldS true (restᵀ τ (u ++L (last ∷ [])) (From∞.force k)))) (envAt c′))
+  ... | _ = true
+  linkedᵇ _ = true
+
   -- Whether every silent step keeps its meaning so, and the longest run
   -- meaning the same.
   mutual
-    walk : ℕ → ℕ → ℕ → Conf ℕ → Verdict
-    walk zero    run best m = yes (best ⊔ run)
-    walk (suc n) run best m = if searchedᵇ m then next n run best m (step m)
-                              else no (best ⊔ run) ("\n  beaten: a still find not first past a live source's skips, " ++ showMode m ++ " at " ++ showSpot (spot m))
+    walk : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Verdict
+    walk zero    run best ls m = yes (best ⊔ run) ls
+    walk (suc n) run best ls m =
+      if not (searchedᵇ m) then no (best ⊔ run) ("\n  beaten: a still find not first past a live source's skips, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (linkedᵇ m) then no (best ⊔ run) ("\n  unlinked: a pass not fed past a live source's skips, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else next n run best (ls + linkCount m) m (step m)
 
-    next : ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict
-    next n run best m (silent t m′)     = after n run best m m′ (kind m m′)
-    next n run best m (value t p a m′)  = walk n 0 (best ⊔ run) m′
-    next n run best m (complete p)      = yes (best ⊔ run)
-    next n run best m drained           = yes (best ⊔ run)
+    next : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict
+    next n run best ls m (silent t m′)     = after n run best ls m m′ (kind m m′)
+    next n run best ls m (value t p a m′)  = walk n 0 (best ⊔ run) ls m′
+    next n run best ls m (complete p)      = yes (best ⊔ run) ls
+    next n run best ls m drained           = yes (best ⊔ run) ls
 
-    after : ℕ → ℕ → ℕ → Conf ℕ → Conf ℕ → ℕ → Verdict
-    after n run best m m′ zero          = no (best ⊔ run) (why m m′)
-    after n run best m m′ (suc zero)    = walk n (suc run) best m′
-    after n run best m m′ (suc (suc _)) = walk n 0 (best ⊔ run) m′
+    after : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Conf ℕ → ℕ → Verdict
+    after n run best ls m m′ zero          = no (best ⊔ run) (why m m′)
+    after n run best ls m m′ (suc zero)    = walk n (suc run) best ls m′
+    after n run best ls m m′ (suc (suc _)) = walk n 0 (best ⊔ run) ls m′
 
 -- One program's verdict, under a label.
 keptLine : String → Prog natᵗ → String
-keptLine n p with walk 400 0 0 (load (toObs timeline 3 p []ᴬ []ᴬ []ᴬ))
-... | yes l = "kept-depth: ok   " ++ n ++ " longest " ++ showℕ l
+keptLine n p with walk 400 0 0 0 (load (toObs timeline 3 p []ᴬ []ᴬ []ᴬ))
+... | yes l ls = "kept-depth: ok   " ++ n ++ " longest " ++ showℕ l ++ " links " ++ showℕ ls
 ... | no l w = "kept-depth: FAIL " ++ n ++ " longest " ++ showℕ l ++ "\n  program " ++ showCode natᵗ p ++ w
 
 private
@@ -251,7 +379,8 @@ private
   inLane : Code [] [] [] (natᵗ ∷ []) natᵗ → Prog natᵗ
   inLane l = flatMap (mergeᶠ nothing) l (of (nat 0 ∷ nat 1 ∷ []))
 
-  -- Steps drawn programs rarely take: a step begun under a closed cut.
+  -- Steps drawn programs rarely take: a step begun under a closed cut, and
+  -- a source's skips shown to several joiners and defers at once.
   hands : List (String × Prog natᵗ)
   hands =
       ("a deferred source begun under a closed cut" , inLane (closedSrc false (deferᶜ (of (nat 5 ∷ [])))))
@@ -262,8 +391,16 @@ private
       , inLane (closedSrc false (deferᶜ (flatMap (mergeᶠ nothing) (deferᶜ (of (var (here refl) ∷ []))) (of (nat 5 ∷ nat 6 ∷ []))))))
     ∷ ("a lane joined after its source's skip" , connect (cold (script ((1 , 1 ∷ []) ∷ []) false false)) rejoins)
     ∷ ("a lane joined after its source's skips" , connect (cold (script ((2 , 1 ∷ []) ∷ (1 , 2 ∷ []) ∷ []) false false)) rejoins)
+    ∷ ("two joiners at once" , connect skipping (flatMap (mergeᶠ nothing) (connected (here refl)) (of (nat 0 ∷ nat 1 ∷ []))))
+    ∷ ("a defer joining a live source" , connect skipping (deferᶜ (connected (here refl))))
+    ∷ ("two defers joining at once" , connect skipping (flatMap (mergeᶠ nothing) (deferᶜ (connected (here refl))) (of (nat 0 ∷ nat 1 ∷ []))))
+    ∷ ("a defer beside a joiner" , connect skipping (flatMap (mergeᶠ nothing) (deferᶜ (connected (here refl))) (connected (here refl))))
     ∷ []
     where
+    -- A source skipping before each of its values.
+    skipping : Code [] [] [] [] natᵗ
+    skipping = cold (script ((2 , 1 ∷ []) ∷ (1 , 2 ∷ []) ∷ (2 , 3 ∷ []) ∷ []) false false)
+
     -- Every value of the source opens a lane joining it again.
     rejoins : Code (natᵗ ∷ []) [] [] [] natᵗ
     rejoins = flatMap (mergeᶠ nothing) (connected (here refl)) (connected (here refl))
