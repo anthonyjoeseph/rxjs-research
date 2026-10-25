@@ -12,12 +12,32 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 Probed by `quickcheck.KeptDepth` at every node of every configuration
 reached: a node mid-run, in the environment its connects give it, keeps
-its run in order, steady and headed, and its tail trailing it. Untried as
-bodies: a merge, a connect, a joiner, a take's owed end; a fresh source's
-head and mark, apart from its environment. Settled when bodies, or refuted.
+its run in order, steady and headed, it and its tail headed, its tail
+trailing it. Untried as bodies: a merge, a joiner. Settled when bodies,
+or refuted.
 
-Members: `shape-conn`, `shape-flat`, `shape-join`, `shape-ending`, `sub-headed`, `sub-alien`,
-`trailing-sub`, `ended-headed`.
+Members: `shape-flat`, `shape-join`.
+
+#### THE KEYS
+
+Unprobed: where a node mid-run sits in the tree's positions. A connect's
+source one past a head, its body keyed under its mark and rising past the
+source, the source apart, no body step under a source step's; a fresh
+source's head and environment; a take's owed end ahead of its source's
+tail; an ended source's end headed. Settled when bodies over an invariant
+the engine keeps, or refuted by a probe.
+
+Members: `conn-mark`, `conn-kb`, `conn-kr`, `conn-fr`, `conn-cue`, `conn-ks`,
+`conn-rs`, `conn-ub`, `sub-headed`, `sub-alien`, `ending-headed`,
+`ending-trails`, `ended-headed`.
+
+#### THE ENDLESS SUBSCRIPTION
+
+A subscription's cut trails its run and is headed, finite or not: a limit
+over the finite case, once a truncation's cut agrees as its run does.
+Settled when bodies, or refuted.
+
+Members: `trailing-sub`, `headed-sub-cut`.
 
 #### THE FED MERGE
 
@@ -70,7 +90,7 @@ tail keep their shape. Proven only for a finite program's subscription
 (`trailing-subᶠ`); nothing ties a state to a residual of its own
 subscription. Settled when these are bodies or refuted.
 
-Members: `lanes-sorted`, `shape-cold`, `shape-of`, `shape-rest`.
+Members: `lanes-sorted`, `shape-cold`, `shape-of`.
 
 #### THE SWITCH'S KILL
 
