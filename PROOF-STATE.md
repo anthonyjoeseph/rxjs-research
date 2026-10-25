@@ -11,14 +11,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE FLIGHT KEPT
 
 Untried: every frame above a hole keeps its positional facts against the
-hole's run, its event in flight put back (`adequacy.Engine.Above.Flight`); a
-rising configuration keeps only its hole's own beside it
-(`adequacy.Engine.Pick.KeysAt`). Holds only if a value leaving a lane or a
-body leaves its merge or connect keyed without it, and a rise re-reads every
-frame above at the run it moves to. Settled by `rise-body-keys` as a body
-(its connect's facts over a body losing its head), then `flight-next`.
+hole's run, its event in flight put back (`adequacy.Engine.Above.Flight`).
+Holds only if a rise re-reads every frame above at the run it moves to, and
+a load and a refocus find the frames above keyed. Settled by `flight-next`
+as a body by step case.
 
-Members: `rise-lane-keys`, `rise-body-keys`, `flight-next`, `flight-load`, `flight-held`.
+Members: `flight-next`, `flight-load`, `flight-held`.
 
 #### THE KEYS KEPT
 
