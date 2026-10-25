@@ -589,9 +589,13 @@ module _ {R : Set} where
   postulate
     -- THE SHAPE: a step keeps the whole tree in the fragment.
     frag-next : ∀ k → Base k → Frag (whole k) → NextFrag (step k)
-    -- THE KEYS KEPT: a step keeps every node's own positional facts, each
-    -- in the environment its connects give it.
-    keys-next : ∀ k → Base k → Order k → NextKeys (step k)
+    -- THE KEYS KEPT: a rise keeps every node's own positional facts, each
+    -- in the environment its connects give it; and so does a subscribe
+    -- beginning a former, and a mark run.
+    rise-keys : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Inv ⟨ c , s , rising e , p ⟩ → NextKeys (step ⟨ c , s , rising e , p ⟩)
+    begin-keys : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Inv ⟨ c , pend o , subscribing , p ⟩
+               → NextKeys (step ⟨ c , pend o , subscribing , p ⟩)
+    run-keys : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , absorbed , p ⟩ → NextKeys (step ⟨ c , s , absorbed , p ⟩)
     -- THE STILL'S SUBTREE: where the search runs after a step, what it
     -- finds still leads every race above it past each live source's skips.
     apart-next : ∀ k → Base k → Order k → NextApart (step k)
@@ -745,6 +749,27 @@ module _ {R : Set} where
                         (subst₂ (λ k x → Won (k , x) c′ s′) kq oa (search-won (plug c s) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))))
                      (λ q s″ kq oc al → won-ends q c′ s′ s″ al
                         (subst₂ (λ k x → Won (k , x) c′ s′) kq oc (search-won (plug c s) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))))
+
+  -- A subscribe of a settled node leaves the tree as it was.
+  sub-keys : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , subscribing , p ⟩ → NextKeys (step ⟨ c , s , subscribing , p ⟩)
+  sub-keys c (pend x)                p v = begin-keys c x p v
+  sub-keys c (coldS b l)             p v = proj₂ (Order.shape (Inv.ord v))
+  sub-keys c (ofS i q xs)            p v = proj₂ (Order.shape (Inv.ord v))
+  sub-keys c doneS                   p v = proj₂ (Order.shape (Inv.ord v))
+  sub-keys c (mapS f s)              p v = proj₂ (Order.shape (Inv.ord v))
+  sub-keys c (scanS f z s)           p v = proj₂ (Order.shape (Inv.ord v))
+  sub-keys c (cutS l a s)            p v = proj₂ (Order.shape (Inv.ord v))
+  sub-keys c (lnS b s)               p v = proj₂ (Order.shape (Inv.ord v))
+  sub-keys c (takeS i q w s)         p v = proj₂ (Order.shape (Inv.ord v))
+  sub-keys c (flatS op f d n q o ls) p v = proj₂ (Order.shape (Inv.ord v))
+  sub-keys c (connS k o b)           p v = proj₂ (Order.shape (Inv.ord v))
+  sub-keys c (joinS j g x ib)        p v = proj₂ (Order.shape (Inv.ord v))
+
+  -- A step keeps every node's own positional facts.
+  keys-next : ∀ k → Base k → Order k → NextKeys (step k)
+  keys-next ⟨ c , s , rising e , p ⟩    b o = rise-keys c s e p (b & o)
+  keys-next ⟨ c , s , subscribing , p ⟩ b o = sub-keys c s p (b & o)
+  keys-next ⟨ c , s , absorbed , p ⟩    b o = run-keys c s p (b & o)
 
   held : ∀ x → NextFrag x → NextKeys x → NextShape x
   held (silent t k)    f h = f , h
