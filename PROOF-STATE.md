@@ -36,14 +36,6 @@ order it is joined in. Settled when `lanes-sorted` is a body or refuted.
 
 Members: `lanes-sorted`.
 
-#### THE UNION
-
-Untried in Agda (brute-forced on small tails): joined tails regroup, and two
-in position order join the same either way round. Settled when both are
-bodies or one is refuted.
-
-Members: `∪-assocᵀ`, `∪-commᵀ`.
-
 #### THE SWITCH'S KILL
 
 Untried: a lane a switch kills, switched off, leaves in the pool the tail the
