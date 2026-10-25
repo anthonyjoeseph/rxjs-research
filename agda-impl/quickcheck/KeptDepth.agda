@@ -25,7 +25,7 @@ open import Tree using (defer; mergeᶠ)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 open import quickcheck.Tm using (nat; bool; var)
-open import quickcheck.Code using (Code; Prog; of; takeWhile; flatMap; connect; connected) renaming (defer to deferᶜ)
+open import quickcheck.Code using (Code; Prog; of; takeWhile; flatMap; connect; connected; cold; script) renaming (defer to deferᶜ)
 open import denotation.MonotonicList.Events using (stall; close)
 open import operation.PureObservable using (play; module Driver; module Machine)
 open import adequacy.Engine.Meaning using (M)
@@ -216,7 +216,13 @@ private
       , inLane (closedSrc false (deferᶜ (connect (of (nat 5 ∷ [])) (connected (here refl))))))
     ∷ ("a deferred merge begun under a closed cut"
       , inLane (closedSrc false (deferᶜ (flatMap (mergeᶠ nothing) (deferᶜ (of (var (here refl) ∷ []))) (of (nat 5 ∷ nat 6 ∷ []))))))
+    ∷ ("a lane joined after its source's skip" , connect (cold (script ((1 , 1 ∷ []) ∷ []) false false)) rejoins)
+    ∷ ("a lane joined after its source's skips" , connect (cold (script ((2 , 1 ∷ []) ∷ (1 , 2 ∷ []) ∷ []) false false)) rejoins)
     ∷ []
+    where
+    -- Every value of the source opens a lane joining it again.
+    rejoins : Code (natᵗ ∷ []) [] [] [] natᵗ
+    rejoins = flatMap (mergeᶠ nothing) (connected (here refl)) (connected (here refl))
 
 -- The verdicts on seeds from f, then on the hand programs.
 keptLines : ℕ → ℕ → List String
