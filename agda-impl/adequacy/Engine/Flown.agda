@@ -13,19 +13,25 @@
 module adequacy.Engine.Flown where
 
 open import Data.Bool using (Bool; true; false)
+open import Data.Empty using (⊥-elim)
 open import Data.List using (_∷_; _ʳ++_; [_]; null)
-open import Data.Maybe using (just)
+open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
+open import Data.Maybe using (just; nothing)
 open import Data.Nat using (pred)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
 
 open import Tree using (Obs)
-open import denotation.MonotonicList.Events using (Events; Events∞; Timeline; out; end; ix)
+open import denotation.MonotonicList.Events using (Events; Events∞; Timeline; out; skip; end; hush; idle; ix; _∪_)
 import denotation.MonotonicList as M′
-open import denotation.Unfold using (stateᴺ; cutᴺ)
-open import adequacy.Engine.Meaning using (≋-by; ≋-out; envAt; gh)
-open import adequacy.Engine.Keys using (Shape′)
+open import denotation.Unfold using (NEnv; Node; Source; live; meaning; connectᶜ; stateᴺ; cutᴺ)
+open import adequacy.Engine.Meaning using (≋-by; ≋-out; envAt; gh; srcG; srcRun; srcState; risen)
+open import adequacy.Engine.Keys using (Shape′; module ConnAt)
+open import adequacy.Engine.Trails using (beside-go)
+open import adequacy.Engine.Beside using (burst-hushed)
+open import adequacy.Engine.Race using (NotBefore)
+open import adequacy.Engine.Ahead using (shown)
 open import adequacy.Engine.Above using (Flight; above-≋; take-true; take-incl)
 open import adequacy.Engine.Pick using (Order; module Order)
 open import adequacy.Placed.Order using (Ordered; Steady; Every; EveryT; Headed; Atop; Past; Disjoint; ordered; steady; every;
@@ -37,7 +43,7 @@ open import adequacy.Placed.FlatAfter using (trail-take)
 open import operation.PureObservable using (module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ctx; top; inMap; inScan; inCut;
   inLn; inTake; inOuter; inLanes; inSrc; inBody; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; nx; cp; free; cpAt; cutAt; overAt;
-  CS; rise; begin; admit; dequeue; settle; ended; alive; _⊕_)
+  CS; cs; rise; begin; admit; dequeue; settle; ended; alive; _⊕_)
 open Events∞
 
 ------------------------------------------------------------------------
@@ -53,6 +59,29 @@ shape-out p a {r} {r′} ef ec (((o , st) , ev , et) , tr) =
     tr′ : Trail (out p a r′) _
     trail  tr′ = proj₁ (trail tr) , proj₁ (proj₂ (trail tr)) , subst₂ (λ x t → Trail x t × EveryT (Disjoint p) t) ef ec (proj₂ (proj₂ (trail tr)))
     trailᶠ tr′ = trailᶠ tr
+
+-- A connect's run: its body's beside its source's, and what both leave
+-- running.
+conn-run : ∀ {Γ X B} r (n : Node (X ∷ Γ) B) (σ : Source Γ X) (ρ : NEnv Γ)
+         → meaning (connectᶜ r n σ) ρ ≡ M′.beside r (stateᴺ n (srcRun σ ρ ∷ᴬ ρ)) (srcState σ ρ)
+         × cutᴺ (connectᶜ r n σ) ρ ≡ M′.burstOn r (srcState σ ρ) ∪ cutᴺ n (srcRun σ ρ ∷ᴬ ρ)
+conn-run r n (live s)    ρ = refl , refl
+conn-run r n (Source.ended c t) ρ = refl , refl
+
+-- The body's value first, the connect's run behind it.
+body-out : ∀ {X B} r (σ : Events∞ X) q {y : Events B} {p b β} → y ≡ out p b β
+         → Σ (Events∞ B) λ t → M′.body r σ q y ≡ out p b t × force t ≡ M′.ahead r β σ q (M′.before q (force β)) × cut t ≡ M′.burstOn r σ ∪ cut β
+body-out r σ q refl = _ , refl , refl , refl
+
+-- A body's value its source is no earlier than shows first, the
+-- connect's run behind it.
+side-out : ∀ {X B} r (σ : Events∞ X) (x : Events X) {h β : Events∞ B} p b → force h ≡ out p b β
+         → (x ≡ hush → M′.burstOn r σ ≡ idle) → NotBefore p (shown x)
+         → Σ (Events∞ B) λ t → M′.side r h σ x ≡ out p b t × force t ≡ M′.side r β σ x × cut t ≡ M′.burstOn r σ ∪ cut β
+side-out r σ hush        {β = β} p b e bi nb = β , e , refl , cong (_∪ cut β) (sym (bi refl))
+side-out r σ (out q a l) p b e bi nb rewrite e | nb = body-out r σ _ e
+side-out r σ (skip q l)  p b e bi nb rewrite e | nb = body-out r σ _ e
+side-out r σ (end q)     p b e bi nb rewrite e | nb = body-out r σ _ e
 
 -- An end, whatever it would have carried.
 shape-end : ∀ {A B} p {c} → Shape′ {A} (end p) c → Shape′ {B} (end p) c
@@ -139,12 +168,35 @@ module _ {R : Set} where
     rise-lane-end-flight : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) p
                          → Order ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → alive s ≡ true
                          → Owed (dequeue c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p)
-    rise-body-flight : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (s : St (X ∷ Γ) B) b p → Order ⟨ inBody k o c , s , rising (nx b) , p ⟩
-                     → Flight ⟨ c , connS k o s , rising (nx b) , p ⟩
     rise-body-end-flight : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (s : St (X ∷ Γ) B) p → Order ⟨ inBody k o c , s , rising cp , p ⟩
                          → Flight ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
     begin-flight : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Order ⟨ c , pend o , subscribing , p ⟩
                  → NextOwed (step ⟨ c , pend o , subscribing , p ⟩)
+
+  -- A body's value rises out of its connect only while the connect is
+  -- live, its source no earlier: the connect's run shows it first.
+  rise-body-flight : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (s : St (X ∷ Γ) B) b p → Order ⟨ inBody k o c , s , rising (nx b) , p ⟩
+                   → Flight ⟨ c , connS k o s , rising (nx b) , p ⟩
+  rise-body-flight c (cs cl true sa ba as nothing r en) o s b p od =
+    subst (Shape′ (out p b (stateᴺ (gh (connS k o s)) ρ))) (sym (proj₂ cr))
+      (shape-out p b ft ct (subst (λ x → Shape′ x (M′.burstOn r σ ∪ cut h)) (proj₁ (proj₂ so)) bs))
+    , above-≋ c true (≋-out (proj₁ (proj₂ so)) refl ft ct (sym (proj₂ cr))) (proj₂ (proj₂ (Order.flight od)))
+    where
+      k  = cs cl true sa ba as nothing r en
+      ρ  = envAt c
+      σ  = srcState (srcG k o) ρ
+      h  = risen (gh s) (envAt (inBody k o c)) (nx b) p
+      ca = proj₁ (proj₁ (proj₂ (Order.flight od)))
+      sσ = proj₂ (proj₂ (proj₁ (proj₂ (Order.flight od))))
+      cr = conn-run r (gh s) (srcG k o) ρ
+      so = side-out r σ (force σ) {h = h} p b refl (burst-hushed r {σ = σ} (proj₂ sσ)) (proj₁ (proj₂ (Order.lead od)))
+      ft = trans (proj₁ (proj₂ (proj₂ so))) (sym (proj₁ cr))
+      ct = trans (proj₂ (proj₂ (proj₂ so))) (sym (proj₂ cr))
+      bs = subst (λ r′ → Shape′ (M′.beside r′ h σ) (M′.burstOn r′ σ ∪ cut h)) (sym (ConnAt.at ca))
+             (beside-go (ConnAt.mark ca) (ConnAt.hm ca) h σ sσ (proj₁ (Order.flight od))
+                (ConnAt.kb ca) (ConnAt.kr ca) (ConnAt.fr ca) (ConnAt.cue ca) (ConnAt.ks ca) (ConnAt.rs ca) (ConnAt.ub ca))
+  rise-body-flight c (cs cl true sa ba as (just _) r en) o s b p od = ⊥-elim (Order.lead od)
+  rise-body-flight c (cs cl false sa ba as ow r en) o s b p od      = ⊥-elim (Order.lead od)
 
   -- A rise through a frame of one child passes its run up; one absorbed
   -- owes nothing.
