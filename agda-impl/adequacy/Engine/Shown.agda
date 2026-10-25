@@ -34,7 +34,7 @@ open import operation.Key using (Key; at; after; _<ᴷ_)
 open import operation.PureObservable using (play; module Machine)
 open Machine using (St; mapS; scanS; cutS; lnS; takeS; flatS; connS; coldS; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter;
   inLanes; inSrc; inBody; plug; closed; Out; search; found; leafM; own; cs; free; cpAt; cutAt; overAt; over)
-open import adequacy.Engine.Meaning using (_≋_; ≋-trans; ≋-tr; mapped; scanned; took; outerFrame; connSrc; bodyConn; gh; lane; lanesL; deadL; outerG; poolRuns; envAt;
+open import adequacy.Engine.Meaning using (_≋_; ≋-trans; same; ≋-tr; mapped; scanned; took; outerFrame; connSrc; bodyConn; gh; lane; lanesL; deadL; outerG; poolRuns; envAt;
   flagOf; lanesFrame; outerFrame-ne; lanesFrame-ne; bodyFrame-ne; connSrc-ne; taking∞-ne;
   srcState; srcG; poolT; outerT)
 open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore)
@@ -43,8 +43,8 @@ open import adequacy.Engine.Inv using (Unpended)
 open import adequacy.Engine.Pick using (Beat; past; KAfter; KNotBefore; Lost; body-link; Before; Race; LaneWon; lane-won; race-steps; after-step;
   lane-sides; frag-flat; frag-parts; outer-link)
 open import adequacy.Engine.Ahead using (Ahead; Under; shows; shows-open; shown)
-open import adequacy.Engine.Drop using (Dropsˢ; Pass; SrcPass; mapped-drops; scanned-drops;
-  took-drops; lanes-drops; body-drops; outer-drops; src-drops)
+open import adequacy.Engine.Drop using (Dropsˢ; Pass; SrcPass; Fed; mapped-drops; scanned-drops;
+  took-drops; lanes-drops; body-drops; outer-drops; src-drops; ≋-⊒)
 open import adequacy.Engine.Kept using (outer-plug; lanes-plugʳ; body-plug; live-plug)
 open Agreeˢ
 
@@ -68,16 +68,42 @@ postulate
             → (m , key) ∈ own s
   -- Past a position is after every position under it.
   under-after : ∀ q y → after q <ᴷ at (q ++ y) ≡ false
-  -- A SOURCE'S OWN PASS: the body fed a live source's skips drops its own
-  -- skips, each under one of them, to the body fed the rest; the source's
-  -- next shows no earlier than any of those and, hushed, leaves nothing
-  -- running; the body's next comes after each source skip shows.
-  src-pass : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h h′ : Events∞ X}
-           → Sought v q P → KAfter (after q) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
-           → Before (after q) (own (connS (cs false true sa ba as nothing r en) o b))
-           → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
+  -- A SOURCE PAST ITS SKIPS shows no earlier than any position under
+  -- them and, hushed, leaves nothing running.
+  src-next : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h h′ : Events∞ X}
+           → Sought v q P → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
            → h ≋ stateᴺ (gh o) (envAt c) → Dropsˢ P h h′
-           → SrcPass P (stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c)) h′
+           → (Events∞.force h′ ≡ hush → ∀ d → Agreeᵀ d (Events∞.cut h′) idle) × (∀ k → Under P k → NotBefore k (shown (Events∞.force h′)))
+  -- A SOURCE'S SKIPS FED ITS BODY: the body fed a live source's skips
+  -- drops its own leading skips, each under one of them, and erases
+  -- none or more past them, to the body fed the rest.
+  src-fed : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h h′ : Events∞ X}
+          → Sought v q P → KAfter (after q) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
+          → Before (after q) (own (connS (cs false true sa ba as nothing r en) o b))
+          → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
+          → h ≋ stateᴺ (gh o) (envAt c) → Dropsˢ P h h′
+          → Fed P (stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c))
+  -- The body fed the rest comes after each source skip shows.
+  src-body-on : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h h′ : Events∞ X}
+              → Sought v q P → KAfter (after q) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
+              → Before (after q) (own (connS (cs false true sa ba as nothing r en) o b))
+              → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
+              → h ≋ stateᴺ (gh o) (envAt c) → Dropsˢ P h h′
+              → ∀ k → P k → After (k ++ [ ix 0 ]) (head (Events∞.force (stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c))))
+
+-- A SOURCE'S OWN PASS: its body fed, its own next, the body's next.
+src-pass : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h h′ : Events∞ X}
+         → Sought v q P → KAfter (after q) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
+         → Before (after q) (own (connS (cs false true sa ba as nothing r en) o b))
+         → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
+         → h ≋ stateᴺ (gh o) (envAt c) → Dropsˢ P h h′
+         → SrcPass P (stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c)) h′
+src-pass v q c sa ba as r en o b so ka bf ft x d = record
+  { fed     = src-fed v q c sa ba as r en o b so ka bf ft x d
+  ; srcOn   = proj₂ (src-next v q c sa ba as r en o b so ft x d)
+  ; srcHush = proj₁ (src-next v q c sa ba as r en o b so ft x d)
+  ; bodyOn  = src-body-on v q c sa ba as r en o b so ka bf ft x d
+  }
 
 -- Every position asked of is no later than the race's key.
 cover : ∀ v q {P} → Sought v q P → ∀ k → P k → keyAt v q <ᴷ at k ≡ false
@@ -206,7 +232,7 @@ beat-pass v q (inSrc (cs true sl sa ba as ow r en) b c) s f so w ft u () fl x d
 beat-pass v q {P} (inBody (cs cl true sa ba as nothing r en) o c) s f so (nb , ob , w) ft u sh fl x d =
   hu , nbk , beat-pass v q c (connS kk o s) true so w ft tt sh refl
                (≋-trans (λ m → bodyFrame-ne kk o (envAt c) (x m)) (body-plug kk o s (envAt c)))
-               (body-drops r (srcState (srcG kk o) (envAt c)) hu nbk d)
+               (body-drops r hu nbk (≋-⊒ (λ m → same m (srcState (srcG kk o) (envAt c)))) d)
   where
     kk = cs cl true sa ba as nothing r en
     bl : ∀ k → keyAt v q <ᴷ at k ≡ false

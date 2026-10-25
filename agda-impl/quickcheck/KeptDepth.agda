@@ -1,14 +1,14 @@
 {-# OPTIONS --guardedness #-}
 
--- THE KEPT DEPTH, TESTED: every silent step of the engine drops leading
--- skips of what its configuration means (`adequacy.Engine.Meaning.M`), or
--- means the same, event for event, skips and positions included
+-- THE KEPT DEPTH, TESTED: every silent step of the engine drops the
+-- leading skip of what its configuration means (`adequacy.Engine.Meaning.M`)
+-- and erases none or more of the skips past it, or means the same, event for event, skips and positions included
 -- (`adequacy.Content.silent-exact`), with less work left
 -- (`adequacy.Engine.Spent.Spending.silent-spent`), and never the same
 -- when the step is one whose work may grow (`adequacy.Content`'s drops).
 -- Also the longest run of silent steps meaning the same, and that what
 -- the search finds still leads every race above it past each live
--- source's skips (`adequacy.Engine.Pick.Searched`).
+-- source's skips (`adequacy.Engine.Pick.Beat`).
 module quickcheck.KeptDepth where
 
 open import Data.Bool using (Bool; true; false; not; _∧_; _∨_; if_then_else_)
@@ -20,12 +20,12 @@ open import Data.Maybe using (just; nothing)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.String using (String; _++_)
 
-open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush)
+open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush; Pos; _<ᵖ_)
 open import Tree using (defer; mergeᶠ)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 open import quickcheck.Tm using (nat; bool; var)
-open import quickcheck.Code using (Code; Prog; of; takeWhile; flatMap; connect; connected) renaming (defer to deferᶜ)
+open import quickcheck.Code using (Code; Prog; of; takeWhile; flatMap; connect; connected; cold; script) renaming (defer to deferᶜ)
 open import denotation.MonotonicList.Events using (stall; close)
 open import operation.PureObservable using (play; module Driver; module Machine)
 open import adequacy.Engine.Meaning using (M)
@@ -125,7 +125,7 @@ private
     ∧ beatᵇ (past (over kk) k) c (connS kk s b)
   beatᵇ k (inBody kk o c)                   s = knotᵇ k (cand (inSrc kk s c) o) ∧ beforeᵇ k (own (connS kk o s)) ∧ beatᵇ k c (connS kk o s)
 
-  -- `adequacy.Engine.Pick.Searched`, decided.
+  -- `adequacy.Engine.Pick.Beats`, decided.
   searchedᵇ : Conf ℕ → Bool
   searchedᵇ ⟨ c , s , absorbed , p ⟩ with search top (plug c s)
   ... | nothing = true
@@ -143,17 +143,32 @@ private
   depth : ℕ
   depth = 60
 
-  -- Whether `e′` is `e` past one or more of its first `k` leading skips.
-  dropped : ℕ → Events ℕ → Events ℕ → Bool
-  dropped zero    e          e′ = false
-  dropped (suc k) (skip p r) e′ = exactᵇ depth (Events∞.force r) e′ ∨ dropped k (Events∞.force r) e′
-  dropped (suc k) _          e′ = false
+  samePos : Pos → Pos → Bool
+  samePos p q = not (p <ᵖ q) ∧ not (q <ᵖ p)
+
+  -- Whether `e′` is `e`, to `k` events of `e`, with none or more of its
+  -- skips erased (`adequacy.Engine.Drop.Erase`).  Positions strictly
+  -- rise, so a skip at the other's position is never one to erase.
+  erasedᵇ : ℕ → Events ℕ → Events ℕ → Bool
+  erasedᵇ zero    _           _            = true
+  erasedᵇ (suc k) (out p a r) (out q b r′) = samePos p q ∧ (a ≡ᵇ b) ∧ erasedᵇ k (Events∞.force r) (Events∞.force r′)
+  erasedᵇ (suc k) (skip p r)  (skip q r′)  =
+    if samePos p q then erasedᵇ k (Events∞.force r) (Events∞.force r′) else erasedᵇ k (Events∞.force r) (skip q r′)
+  erasedᵇ (suc k) (skip p r)  e′           = erasedᵇ k (Events∞.force r) e′
+  erasedᵇ (suc k) (end p)     (end q)      = samePos p q
+  erasedᵇ (suc k) hush        hush         = true
+  erasedᵇ (suc k) _           _            = false
+
+  -- Whether `e′` is `e` past its leading skip, the rest with skips erased.
+  dropped : Events ℕ → Events ℕ → Bool
+  dropped (skip p r) e′ = erasedᵇ depth (Events∞.force r) e′
+  dropped _          e′ = false
 
   -- A silent step from `m` to `m′`: 2 dropped leading skips, 1 meant the
   -- same with less work left and not skipped, 0 neither.
   kind : Conf ℕ → Conf ℕ → ℕ
   kind m m′ = if exactᵇ depth (M m) (M m′) then (if lowerᵇ (work m′) (work m) ∧ not (skippedᵇ m) then 1 else 0)
-              else (if dropped 64 (M m) (M m′) then 2 else 0)
+              else (if dropped (M m) (M m′) then 2 else 0)
 
   -- Whether every silent step keeps its meaning so, and the longest run
   -- meaning the same.
@@ -199,7 +214,13 @@ private
       , inLane (closedSrc false (deferᶜ (connect (of (nat 5 ∷ [])) (connected (here refl))))))
     ∷ ("a deferred merge begun under a closed cut"
       , inLane (closedSrc false (deferᶜ (flatMap (mergeᶠ nothing) (deferᶜ (of (var (here refl) ∷ []))) (of (nat 5 ∷ nat 6 ∷ []))))))
+    ∷ ("a lane joined after its source's skip" , connect (cold (script ((1 , 1 ∷ []) ∷ []) false false)) rejoins)
+    ∷ ("a lane joined after its source's skips" , connect (cold (script ((2 , 1 ∷ []) ∷ (1 , 2 ∷ []) ∷ []) false false)) rejoins)
     ∷ []
+    where
+    -- Every value of the source opens a lane joining it again.
+    rejoins : Code (natᵗ ∷ []) [] [] [] natᵗ
+    rejoins = flatMap (mergeᶠ nothing) (connected (here refl)) (connected (here refl))
 
 -- The verdicts on seeds from f, then on the hand programs.
 keptLines : ℕ → ℕ → List String

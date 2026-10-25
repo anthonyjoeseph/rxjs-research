@@ -25,7 +25,7 @@ open import adequacy.Record using (Up; Placed; ahead; framed; shows; placed-⊑;
 open import operation.PureObservable using (PureObs; module Driver; module Machine; module Pure) renaming (run to prefix)
 open import adequacy.Sorted using (module Sorting)
 open import adequacy.Sorted.Walk using (module SortingWalk)
-open import adequacy.Content using (module Honesty)
+open import adequacy.Content.Log using (module HonestLog)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Progress using (module Progressing)
 open import denotation.MonotonicList.Events using (ML; Time; root)
@@ -46,7 +46,7 @@ module Link (R : Set) where
   open Sorting R using (Ascending; ascending)
   open SortingWalk R using (sorted)
   open Ghosting R using (Alike)
-  open Honesty R using (content)
+  open HonestLog R using (content)
   open Progressing R using (reached)
 
   -- The first n steps up to tick h, read.
