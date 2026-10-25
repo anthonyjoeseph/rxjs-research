@@ -20,7 +20,6 @@ open import Data.List using (List; []; _∷_; _++_; [_]; length; reverse; _ʳ++_
 open import Data.List.Properties using (++-identityʳ; map-++; reverse-involutive; ʳ++-defn)
 open import Data.List.Relation.Unary.Any using (Any)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
-open import Data.List.Relation.Unary.All.Properties using (++⁻ʳ)
 import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
@@ -35,8 +34,8 @@ open import Tree using (Obs; Later; defer; FlatOp; mergeᶠ; switchᶠ; exhaust�
 open import denotation.MonotonicList.Events using (Timeline; Events; Events∞; Pos; Time; tick; root; out; end; hush; ix; _<ᵖ_; <ᵖ-irrefl;
   <ᵖ-asym; emit; stall; close; last; Frame∞; From; From∞; idle; done; at; _∪_) renaming (quiet to silentᶠ)
 open import denotation.MonotonicList using (MonotonicList; admit; enter; head; cuts; Agreeᵀ; Agree; agree-refl; agree-sym; agree-trans;
-  agreeᵀ-refl; agreeᵀ-sym; agreeᵀ-trans; frames; _≈[_]_)
-open import denotation.NonExpansive using (_,ˢ_; Lanes; ∪-ne)
+  agreeᵀ-sym; frames; _≈[_]_)
+open import denotation.NonExpansive using (_,ˢ_; Lanes)
 open import denotation.Compositional using (env-refl)
 open import adequacy.Record using (Ahead; outᵃ; skipᵃ; endᵃ; hushᵃ) renaming (none to noneᵃ)
 import denotation.Unfold as U
@@ -45,7 +44,7 @@ open import operation.PureObservable using (PureObs; module Driver; module Machi
 open import adequacy.Sorted using (_≤ᵖ_)
 open import adequacy.Sane using (Sane; SaneS; step-sane; sane-out)
 open import adequacy.Placed.Order using (Placed)
-open import adequacy.Placed.Trail using (t≢f; SortedT; sortedT-idle; sortedT-∪)
+open import adequacy.Placed.Trail using (t≢f; SortedT)
 open import adequacy.Stepper.Past using (_≃_; Placedˢ)
 open import adequacy.Stepper.Within using (placed-after)
 open import adequacy.Stepper using (step-skips)
@@ -53,12 +52,15 @@ open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Engine.Drop using (Drops; drop; drops; Dropsˢ; dropˢ; Pass; lift-drops; outer-admits; lane-admits; ≋-⊒; Eraseᴱ; stopᴱ; outᴱ;
   skipᴱ; erasedᴱ; endᴱ; hushᴱ)
-open import adequacy.Engine.Union using (∪-idleᵀ; ∪-assocᵀ; ∪-commᵀ)
-open import adequacy.Engine.Meaning using (M; flagOf; envAt; risen; gh; lane; laneᴹ; lanesL; deadL; deadOne; outerFrame; lanesFrame; laneRuns; poolRuns; poolT; tailsOn; outerT; holeT; lanes-refl; Has; atOut; atEnd; pastOut; _≅_; ≅-refl; ≅-sym; ≅-trans; agree-≅; ≋-by)
+open import adequacy.Engine.Union using (∪-idleᵀ)
+open import adequacy.Engine.Meaning using (M; flagOf; envAt; risen; gh; lane; laneᴹ; lanesL; deadL; outerFrame; lanesFrame; laneRuns;
+  poolRuns; poolT; tailsOn; outerT; lanes-refl; Has; atOut; atEnd; pastOut; _≅_; ≅-refl; ≅-sym;
+  ≅-trans; agree-≅; ≋-by)
+open import adequacy.Engine.Flown using (pool-ended; pool-sorted; all-at; states-length; lanes-sorted)
 open import adequacy.Engine.Inv using (Inv; module Inv; module Base; wfI; search-hit; NextInv; inv-next)
 open import adequacy.Engine.Spent using (module Spending)
 open import adequacy.Engine.Kept using (KeptFrom; refocus-agree) renaming (kept to engine-kept)
-open import adequacy.Engine.Above using (rests-++; lanes-runs; pool-runs; dead-hole)
+open import adequacy.Engine.Above using (rests-++; lanes-runs; pool-runs)
 open import adequacy.Engine.Head using (Frag; Lane) renaming (Lanes to Lanesᴴ)
 open import adequacy.Engine.Keys using (Held)
 open import adequacy.Engine.Pick using (Beat; Beats; module Order; frag-flat; frag-parts; lanes-ʳsplit)
@@ -413,11 +415,6 @@ module Honesty (R : Set) where
                → step ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ ≡ silent t m′
                → Drop ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ m′
 
-  -- The lanes a flatMap counts, the lanes its meaning holds.
-  states-length : ∀ {Γ B} (ls : List (U.Node Γ B)) (ρ : U.NEnv Γ) → length (U.states ls ρ) ≡ length ls
-  states-length []       ρ = refl
-  states-length (l ∷ ls) ρ = cong suc (states-length ls ρ)
-
   -- A full merge queues what arrives; a busy exhaust drops it.
   queue-admits : ∀ {B} k (m : MonotonicList B) ls qs r → (length ls <ᵇ k) ≡ false → admit (flatOp (mergeᶠ (just k))) r m ls qs ≡ (ls , qs ++ [ m ] , idle)
   queue-admits k m ls qs r e rewrite e = refl
@@ -548,34 +545,6 @@ module Honesty (R : Set) where
   laneX : ∀ {Γ A B} → Ctx R Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → List A → St Γ A → List (St Γ B) → List (St Γ B) → St Γ B → Pos → Events∞ B
   laneX c op f d q o pre post s p = lanesFrame op (lane f) d q (gh o) (reverse pre) post true (envAt c) (risen (gh s) (envAt c) cp p)
 
-  -- A tail joined behind a pool joins it at the pool's end.
-  tails-ended : ∀ {Γ B} n (ds : List (U.Node Γ B)) (ρ : U.NEnv Γ) t u → SortedT t → SortedT u → Agreeᵀ n (tailsOn ds ρ t ∪ u) (tailsOn ds ρ (u ∪ t))
-  tails-ended n []       ρ t u st su = ∪-commᵀ n t u st su
-  tails-ended n (x ∷ ds) ρ t u st su =
-    agreeᵀ-trans (∪-assocᵀ n (U.cutᴺ x ρ) (tailsOn ds ρ t) u) (∪-ne (agreeᵀ-refl n (U.cutᴺ x ρ)) (tails-ended n ds ρ t u st su))
-
-  pool-ended : ∀ {Γ A B} n d (o : U.Node Γ A) (ds : List (U.Node Γ B)) (ρ : U.NEnv Γ) t u → SortedT t → SortedT u
-             → Agreeᵀ n (outerT d o ρ (tailsOn ds ρ t) ∪ u) (outerT d o ρ (tailsOn ds ρ (u ∪ t)))
-  pool-ended n false o ds ρ t u st su = tails-ended n ds ρ t u st su
-  pool-ended n true  o ds ρ t u st su =
-    agreeᵀ-trans (∪-assocᵀ n (U.cutᴺ o ρ) (tailsOn ds ρ t) u) (∪-ne (agreeᵀ-refl n (U.cutᴺ o ρ)) (tails-ended n ds ρ t u st su))
-
-  -- A pool of tails each in position order is.
-  hole-sorted : ∀ {B} b (h : Events∞ B) t → SortedT (Events∞.cut h) → SortedT t → SortedT (holeT b h ∪ t)
-  hole-sorted true  h t sh st = st
-  hole-sorted false h t sh st = sortedT-∪ (Events∞.cut h) t sh st
-
-  pool-sorted : ∀ {Γ B} (ls : List (St Γ B)) (ρ : U.NEnv Γ) → All (λ s → SortedT (U.cutᴺ (gh s) ρ)) ls → SortedT (poolT (deadL ls) ρ)
-  pool-sorted []       ρ []       = sortedT-idle
-  pool-sorted (x ∷ ls) ρ (sx ∷ sl) =
-    subst SortedT (sym (trans (rests-++ (deadOne x) (deadL ls) ρ) (dead-hole x ρ _)))
-      (hole-sorted (flagOf x) (U.stateᴺ (gh x) ρ) _ sx (pool-sorted ls ρ sl))
-
-  -- A lane's context keeps the lanes before it nearest first.
-  all-at : ∀ {Γ B} {P : St Γ B → Set} pre {s post} → All P (pre ʳ++ s ∷ post) → P s × All P post
-  all-at pre a with ++⁻ʳ (reverse pre) (subst (All _) (ʳ++-defn pre) a)
-  ... | x ∷ xs = x , xs
-
   -- A lane ended under a queue: its end a skip, past it the queue's next
   -- lane begun ahead of the rest, the ended lane's tail in the pool where
   -- the lane sat.
@@ -602,9 +571,6 @@ module Honesty (R : Set) where
   ended-begins c op f d a q o pre post (lnS false (cutS false x s₀)) p fs () ss sp sd
 
   postulate
-    -- EVERY LANE OF A FRAGMENT'S FLATMAP LEAVES ITS TAIL IN POSITION ORDER.
-    lanes-sorted : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls
-                 → Frag (plug c (flatS op f d n q o ls)) → All (λ s → SortedT (U.cutᴺ (gh s) (envAt c))) ls
     -- A LANE'S COMPLETION UNDER A CLOSED FRAME, as `lane-begins` under an open one.
     lane-begins-shut : ∀ {Γ A B op d n a q pre post} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {s : St Γ B} {p}
                      → alive s ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ → closed c ≡ true
