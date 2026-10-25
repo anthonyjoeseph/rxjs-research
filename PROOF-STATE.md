@@ -8,19 +8,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE ERASURE
-
-Refuted for a skip or a pin erased out of order (`adequacy.Engine.Erase`'s
-`Erase`, `Eraseᵀ`); restated: each erased one comes no later than the other's
-next. A merge so fed runs so erased (`adequacy.Engine.Merge`). Refuted at a
-connect fed any source; restated over a source subscribed where the connect
-is (`Sourced`). Open: whether that suffices. The burst pins the source's
-events inside the subscription, then its tail; an erased one must lead the
-other's next pin, and a tail may sit before a skip that marks it. Settled
-when `body-⊒` is a body, or refuted again.
-
-Members: `body-⊒`.
-
 #### THE SILENT RUN
 
 Refuted as one dropped skip (`quickcheck.KeptDepth`: a lane joined after its

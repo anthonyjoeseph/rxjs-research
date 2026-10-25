@@ -480,6 +480,11 @@ inside-cons a r b k i with cmpLabel a b in e
 ... | eq = eq-label a b e , i
 ... | gt with () ← i
 
+-- Under itself.
+inside-self : ∀ r → inside r r ≡ true
+inside-self []      = refl
+inside-self (a ∷ r) rewrite refl-label a = inside-self r
+
 ------------------------------------------------------------------------
 -- What a subscriber sees
 

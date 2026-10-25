@@ -693,28 +693,31 @@ module Honesty (R : Set) where
 
   -- A stall drops its skip: the tree refocused at the cold searched out.
   -- A STALL OR A CLOSE WHERE IT IS SHOWN IS SHOWN NEXT: every frame
-  -- above the cold searched out passes its lead skip, its key the cold's.
+  -- above the cold searched out passes its lead skip, its key the cold's,
+  -- toward the machine it steps to.
   stall-pass : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p}
              → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (stall k))) leafM key)
-             → shows c′ true ≡ true → Inv ⟨ c , s , absorbed , p ⟩
+             → shows c′ true ≡ true → Inv ⟨ c , s , absorbed , p ⟩ → Inv ⟨ c′ , coldS true (play τ u (suc i) t₀ (Frame∞.force k)) , absorbed , p ⟩
              → Pass (_≡ u ++ [ ix i ]) c′ true (U.stateᴺ (gh (coldS true (play τ u i t₀ (stall k)))) (envAt c′))
                  (U.stateᴺ (gh (coldS true (play τ u (suc i) t₀ (Frame∞.force k)))) (envAt c′))
-  stall-pass {c = c} {s} {c′} {τ} {u} {i} {t₀} {k} eq sh iv =
+  stall-pass {c = c} {s} {c′} {τ} {u} {i} {t₀} {k} eq sh iv iv′ =
     beat-pass false (u ++ [ ix i ]) c′ (coldS true (play τ u i t₀ (stall k))) true (λ _ e → e)
       (subst (λ x → Beat x c′ (coldS true (play τ u i t₀ (stall k)))) (cold-key (plug c s) eq) (subst Beats eq (Order.apart (Inv.ord iv)) refl))
       (subst Frag (sym (proj₁ (search-hit (plug c s) eq))) (Order.shape (Inv.ord iv))) tt
       sh refl (≋-by refl refl) (stall-hole (envAt c′))
+      (coldS true (play τ u (suc i) t₀ (Frame∞.force k))) (Order.shape (Inv.ord iv′)) tt refl (≋-by refl refl)
 
   close-pass : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p}
              → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (close k))) leafM key)
-             → shows c′ true ≡ true → Inv ⟨ c , s , absorbed , p ⟩
+             → shows c′ true ≡ true → Inv ⟨ c , s , absorbed , p ⟩ → Inv ⟨ c′ , coldS true (restᵀ τ (u ++ [ last ]) (From∞.force k)) , absorbed , p ⟩
              → Pass (_≡ u ++ [ ix i ]) c′ true (U.stateᴺ (gh (coldS true (play τ u i t₀ (close k)))) (envAt c′))
                  (U.stateᴺ (gh (coldS true (restᵀ τ (u ++ [ last ]) (From∞.force k)))) (envAt c′))
-  close-pass {c = c} {s} {c′} {τ} {u} {i} {t₀} {k} eq sh iv =
+  close-pass {c = c} {s} {c′} {τ} {u} {i} {t₀} {k} eq sh iv iv′ =
     beat-pass false (u ++ [ ix i ]) c′ (coldS true (play τ u i t₀ (close k))) true (λ _ e → e)
       (subst (λ x → Beat x c′ (coldS true (play τ u i t₀ (close k)))) (cold-key (plug c s) eq) (subst Beats eq (Order.apart (Inv.ord iv)) refl))
       (subst Frag (sym (proj₁ (search-hit (plug c s) eq))) (Order.shape (Inv.ord iv))) tt
       sh refl (≋-by refl refl) (close-hole (envAt c′))
+      (coldS true (restᵀ τ (u ++ [ last ]) (From∞.force k))) (Order.shape (Inv.ord iv′)) tt refl (≋-by refl refl)
 
   stall-drop : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p t m′}
              → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (stall k))) leafM key)
@@ -724,7 +727,7 @@ module Honesty (R : Set) where
   ... | false = stall-tail eq sh iv e
   ... | true with stall-next {c = c} {s = s} {p = p} eq ce e
   ...   | refl = drops-agree (refocus-agree c s c′ (coldS true (play τ u i t₀ (stall k))) p (Base.settled (Inv.base iv)) tt (wfI (Inv.base iv)) (proj₁ (search-hit (plug c s) eq)))
-                   (lift-drops (_≡ u ++ [ ix i ]) c′ true (stall-hole (envAt c′)) (stall-pass eq sh iv))
+                   (lift-drops (_≡ u ++ [ ix i ]) c′ true (stall-hole (envAt c′)) (stall-pass eq sh iv (subst NextInv e (inv-next _ iv))))
 
   -- A close drops its skip, as a stall does.
   close-drop : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p t m′}
@@ -735,7 +738,7 @@ module Honesty (R : Set) where
   ... | false = close-tail eq sh iv e
   ... | true with close-next {c = c} {s = s} {p = p} eq ce e
   ...   | refl = drops-agree (refocus-agree c s c′ (coldS true (play τ u i t₀ (close k))) p (Base.settled (Inv.base iv)) tt (wfI (Inv.base iv)) (proj₁ (search-hit (plug c s) eq)))
-                   (lift-drops (_≡ u ++ [ ix i ]) c′ true (close-hole (envAt c′)) (close-pass eq sh iv))
+                   (lift-drops (_≡ u ++ [ ix i ]) c′ true (close-hole (envAt c′)) (close-pass eq sh iv (subst NextInv e (inv-next _ iv))))
 
   -- A step whose work may grow drops a skip.
   skipped-drop : ∀ {m t m′} → Inv m → step m ≡ silent t m′ → Skipped m → Drop m m′
