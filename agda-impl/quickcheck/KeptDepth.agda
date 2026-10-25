@@ -12,9 +12,8 @@
 -- close and defer where it is shown links past every live source above
 -- it (`adequacy.Engine.Shown.Links`): the body fed the rest erased of the
 -- body fed the run, or past skips under the source's
--- (`adequacy.Engine.Shown.src-fed`), owing the source nothing
--- (`adequacy.Engine.Shown.caught`), its source's run nesting nothing
--- (`adequacy.Engine.Shown.src-flat`), and after each source skip shows
+-- (`adequacy.Engine.Shown.src-fed`), and so every node of it, owing the source nothing, its
+-- source's run nesting nothing, and after each source skip shows
 -- (`adequacy.Engine.Shown.src-body-on`).
 module quickcheck.KeptDepth where
 
@@ -53,7 +52,7 @@ open import Tree using (Obs; FlatOp)
 open import denotation.MonotonicList.Events using (Timeline)
 open import adequacy.Engine.Head using (cand)
 open import adequacy.Engine.Pick using (past)
-open import adequacy.Engine.Meaning using (mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn; srcState; srcG; gh; lane; lanesL; deadL; envAt)
+open import adequacy.Engine.Meaning using (mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn; srcState; srcG; srcRun; gh; lane; lanesL; deadL; envAt)
 open import adequacy.Engine.Ahead using (shown) renaming (shows to showsᵃ)
 open import denotation.MonotonicList using (head)
 open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
@@ -280,7 +279,9 @@ private
   atᵇ (here _)  = 0
   atᵇ (there j) = suc (atᵇ j)
 
-  -- `adequacy.Engine.Shown.Caught`, decided, `i` counted as `atᵇ` counts.
+  -- Nothing owed a source: each joiner of connect `i` not yet told its
+  -- end joined before `q` and holds nothing fed, no defer holds a step of
+  -- it, nothing is held under `q`; `i` counted as `atᵇ` counts.
   mutual
     caughtᵇ : ∀ {Γ B} → ℕ → Pos → U.Node Γ B → Bool
     caughtᵇ i q (U.mapᶜ f n)                 = caughtᵇ i q n
@@ -316,7 +317,7 @@ private
     unnoticedᵇ i []                   = true
     unnoticedᵇ i (U.notice j q a ∷ ns) = not (atᵇ j ≡ᵇ i) ∧ unnoticedᵇ i ns
 
-  -- `adequacy.Engine.Shown.Flat`, decided.
+  -- A run nothing nests in: no event under the skip just before it.
   flatᵇ : ∀ {A} → ℕ → Events A → Bool
   flatᵇ (suc k) (out p a r) = flatᵇ k (Events∞.force r)
   flatᵇ (suc k) (skip p r)  = unnested (head (Events∞.force r)) ∧ flatᵇ k (Events∞.force r)
@@ -324,6 +325,27 @@ private
           unnested nothing  = true
           unnested (just y) = not (inside p y)
   flatᵇ _       _           = true
+
+  -- Every node of a body fed, not only the body: each inner source fed
+  -- by the sources above it, each inner body by its source as well.
+  mutual
+    fedWalkᵇ : ∀ {Δ A} → Pos → St Δ A → U.NEnv Δ → U.NEnv Δ → Bool
+    fedWalkᵇ q s ρ ρ′ = fedᵇ depth q (U.stateᴺ (gh s) ρ) (U.stateᴺ (gh s) ρ′) ∧ fedKidsᵇ q s ρ ρ′
+
+    fedKidsᵇ : ∀ {Δ A} → Pos → St Δ A → U.NEnv Δ → U.NEnv Δ → Bool
+    fedKidsᵇ q (mapS f s)              ρ ρ′ = fedWalkᵇ q s ρ ρ′
+    fedKidsᵇ q (scanS f z s)           ρ ρ′ = fedWalkᵇ q s ρ ρ′
+    fedKidsᵇ q (cutS l a s)            ρ ρ′ = fedWalkᵇ q s ρ ρ′
+    fedKidsᵇ q (lnS b s)               ρ ρ′ = fedWalkᵇ q s ρ ρ′
+    fedKidsᵇ q (takeS i w x s)         ρ ρ′ = fedWalkᵇ q s ρ ρ′
+    fedKidsᵇ q (flatS op f d n p o ls) ρ ρ′ = fedWalkᵇ q o ρ ρ′ ∧ fedLanesᵇ q ls ρ ρ′
+    fedKidsᵇ q (connS k o b)           ρ ρ′ =
+      fedWalkᵇ q o ρ ρ′ ∧ fedWalkᵇ q b (srcRun (srcG k o) ρ ∷ᴬ ρ) (srcRun (srcG k o) ρ′ ∷ᴬ ρ′)
+    fedKidsᵇ q _                       ρ ρ′ = true
+
+    fedLanesᵇ : ∀ {Δ A} → Pos → List (St Δ A) → U.NEnv Δ → U.NEnv Δ → Bool
+    fedLanesᵇ q []       ρ ρ′ = true
+    fedLanesᵇ q (l ∷ ls) ρ ρ′ = fedWalkᵇ q l ρ ρ′ ∧ fedLanesᵇ q ls ρ ρ′
 
   -- `adequacy.Engine.Shown.Links`, decided.
   linksᵇ : ∀ {R Γ A} → Bool → Pos → Ctx R Γ A → Bool → Events∞ A → Events∞ A → Bool
@@ -342,7 +364,8 @@ private
     linksᵇ v q c true (lanesFrame op (lane g) d w (gh o) (reverseL pre) post f (envAt c) h) (lanesFrame op (lane g) d w (gh o) (reverseL pre) post f (envAt c) h′)
   linksᵇ v q (inSrc (cs false true sa ba as nothing r en) b c) f h h′ =
     srcPassᵇ v q (U.stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (U.stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c)) h′
-    ∧ caughtᵇ 0 q (gh b) ∧ flatᵇ depth (Events∞.force h) ∧ linksᵇ true q c true (connSrc false r en (gh b) (envAt c) h) (connSrc false r en (gh b) (envAt c) h′)
+    ∧ caughtᵇ 0 q (gh b) ∧ flatᵇ depth (Events∞.force h) ∧ fedWalkᵇ q b (Events∞.force h ∷ᴬ envAt c) (Events∞.force h′ ∷ᴬ envAt c)
+    ∧ linksᵇ true q c true (connSrc false r en (gh b) (envAt c) h) (connSrc false r en (gh b) (envAt c) h′)
   linksᵇ v q (inSrc (cs false true sa ba as (just _) r en) b c) f h h′ = true
   linksᵇ v q (inSrc (cs false false sa ba as ow r en) b c)      f h h′ = true
   linksᵇ v q (inSrc (cs true sl sa ba as ow r en) b c)          f h h′ = true
@@ -455,9 +478,9 @@ private
       , connect skipping (connect (connected (here refl)) (flatMap (mergeᶠ nothing) (connected (here refl)) (connected (here refl)))))
     ∷ ("a connect in the body over a merged source, its lanes joining it"
       , connect merged (connect (connected (here refl)) (flatMap (mergeᶠ nothing) (connected (here refl)) (connected (here refl)))))
-    ∷ ("a source running out a closed connect's nested burst, two joiners on it"
+    ∷ ("a source running out a closed connect's nested burst past a stall, two joiners on it"
       , connect burstOut (flatMap (mergeᶠ nothing) (connected (here refl)) (of (nat 0 ∷ nat 1 ∷ []))))
-    ∷ ("a source running out a closed connect's nested burst, its lanes joining it" , connect burstOut rejoins)
+    ∷ ("a source running out a closed connect's nested burst past a stall, its lanes joining it" , connect burstOut rejoins)
     ∷ []
     where
     -- A source skipping before each of its values.
@@ -469,10 +492,11 @@ private
     merged : Code [] [] [] [] natᵗ
     merged = flatMap (mergeᶠ nothing) (cold (script ((2 , 1 ∷ []) ∷ (1 , 2 ∷ []) ∷ []) false false)) (of (nat 0 ∷ nat 1 ∷ []))
 
-    -- A merge whose lane is a connect its body ends at once: its source's
-    -- subscribe burst, each value with a lane under it, runs out as skips.
+    -- A merge whose lanes, opened by a timed cold so past a stall, are each
+    -- a connect its body ends at once: its source's subscribe burst, each
+    -- value with a lane under it, runs out as skips.
     burstOut : Code [] [] [] [] natᵗ
-    burstOut = flatMap (mergeᶠ nothing) (connect nests (of [])) (of (nat 0 ∷ []))
+    burstOut = flatMap (mergeᶠ nothing) (connect nests (of [])) (cold (script ((2 , 1 ∷ []) ∷ (1 , 2 ∷ []) ∷ []) false false))
       where nests : Code [] [] [] (natᵗ ∷ []) natᵗ
             nests = flatMap (mergeᶠ nothing) (of (var (here refl) ∷ var (here refl) ∷ [])) (of (nat 0 ∷ nat 1 ∷ []))
 
