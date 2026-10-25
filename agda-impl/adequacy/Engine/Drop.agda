@@ -27,7 +27,7 @@
 module adequacy.Engine.Drop where
 
 open import Data.Bool using (Bool; true; false)
-open import Data.Empty using (⊥)
+open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (_∷_; _++_; [_]; reverse)
 import Data.List as L
 import denotation.MonotonicList as M′
@@ -40,7 +40,7 @@ open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
 
 open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Tail∞; pin; Pos; out; skip; end; hush; idle; _∪_; ix; _<ᵖ_)
-open import denotation.MonotonicList using (head; Agree; Agreeᵀ; stop; stopᵀ; pin⁼; idle⁼; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agree-trans;
+open import denotation.MonotonicList using (head; mapᴱ; scanᴱ; takeWhileᴱ; taking; Agree; Agreeᵀ; stop; stopᵀ; pin⁼; idle⁼; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agree-trans;
   agree-sym; agreeᵀ-refl; agreeᵀ-sym; agreeᵀ-trans; agreeᵀ-pred; agree-pred)
 open import denotation.NonExpansive using (_,ˢ_; mapᴱ-ne; scanᴱ-ne; takeWhileᴱ-ne; ∪-ne; beside-ne; burstOn-ne; Outerᴿ; liveᴼ; whole-ne; go-ne; mapᴱ-neᴹ; Lanes)
 open import denotation.Unfold using (Node; NEnv; stateᴺ; states; outerᴺ; meaning; cutᴺ; outer∞)
@@ -262,14 +262,92 @@ mutual
 ------------------------------------------------------------------------
 -- Each frame keeps an erasure
 
--- THE ERASURE, FRAME BY FRAME: a frame fed a run with skips erased runs
--- with skips erased, its next kept.  A frame with one child maps each
--- event alone; a merge keeps its parts' order, and what the parts leave
--- running is the merge's tail.
+-- A frame with one child maps each event alone, its tail the child's.
+private
+  map-erase : ∀ {A B} (g : A → B) {k x t y} → Erase k x t y → Erase k (mapᴱ g x) t (mapᴱ g y)
+  map-erase g stopᵉ        = stopᵉ
+  map-erase g (outᵉ e x)   = outᵉ e (map-erase g x)
+  map-erase g (skipᵉ e x)  = skipᵉ e (map-erase g x)
+  map-erase g (erased e x) = erased e (map-erase g x)
+  map-erase g endᵉ         = endᵉ
+  map-erase g hushᵉ        = hushᵉ
+
+  map-lead : ∀ {A B} (g : A → B) {x y} → Lead⁼ x y → Lead⁼ (mapᴱ g x) (mapᴱ g y)
+  map-lead g outᴸ  = outᴸ
+  map-lead g skipᴸ = skipᴸ
+  map-lead g endᴸ  = endᴸ
+  map-lead g hushᴸ = hushᴸ
+
+  map-hush : ∀ {A B} (g : A → B) x → mapᴱ g x ≡ hush → x ≡ hush
+  map-hush g hush eq = refl
+
+  scan-erase : ∀ {A B} (g : B → A → B) z {k x t y} → Erase k x t y → Erase k (scanᴱ g z x) t (scanᴱ g z y)
+  scan-erase g z stopᵉ                = stopᵉ
+  scan-erase g z (outᵉ {a = a} e x)   = outᵉ e (scan-erase g (g z a) x)
+  scan-erase g z (skipᵉ e x)          = skipᵉ e (scan-erase g z x)
+  scan-erase g z (erased e x)         = erased e (scan-erase g z x)
+  scan-erase g z endᵉ                 = endᵉ
+  scan-erase g z hushᵉ                = hushᵉ
+
+  scan-lead : ∀ {A B} (g : B → A → B) z {x y} → Lead⁼ x y → Lead⁼ (scanᴱ g z x) (scanᴱ g z y)
+  scan-lead g z outᴸ  = outᴸ
+  scan-lead g z skipᴸ = skipᴸ
+  scan-lead g z endᴸ  = endᴸ
+  scan-lead g z hushᴸ = hushᴸ
+
+  scan-hush : ∀ {A B} (g : B → A → B) z x → scanᴱ g z x ≡ hush → x ≡ hush
+  scan-hush g z hush eq = refl
+
+  end-erase : ∀ {A} k {p t} → Erase {A} k (end p) t (end p)
+  end-erase zero    = stopᵉ
+  end-erase (suc k) = endᵉ
+
+  mutual
+    took-erase : ∀ {A} i (q : A → Bool) {k x t y} → Erase k x t y → Erase k (takeWhileᴱ i q x) t (takeWhileᴱ i q y)
+    took-erase i q stopᵉ                = stopᵉ
+    took-erase i q (outᵉ {a = a} e x)   = taking-erase i q (q a) e x
+    took-erase i q (skipᵉ e x)          = skipᵉ e (took-erase i q x)
+    took-erase i q (erased e x)         = erased e (took-erase i q x)
+    took-erase i q endᵉ                 = endᵉ
+    took-erase i q hushᵉ                = hushᵉ
+
+    taking-erase : ∀ {A} i (q : A → Bool) b {k p a t} {l r : Events∞ A} → Eraseᵀ k (cut l) (cut r) → Erase k (force l) (cut r) (force r)
+                 → Erase (suc k) (taking i q p a b l) t (taking i q p a b r)
+    taking-erase i     q true  e x = outᵉ e (took-erase i q x)
+    taking-erase true  q false {k} e x = outᵉ e (end-erase k)
+    taking-erase false q false e x = endᵉ
+
+  took-lead : ∀ {A} i (q : A → Bool) {x y} → Lead⁼ x y → Lead⁼ (takeWhileᴱ i q x) (takeWhileᴱ i q y)
+  took-lead i q (outᴸ {a = a}) = taking-lead i (q a)
+    where taking-lead : ∀ i b {p l r} → Lead⁼ (taking i q p a b l) (taking i q p a b r)
+          taking-lead i     true  = outᴸ
+          taking-lead true  false = outᴸ
+          taking-lead false false = endᴸ
+  took-lead i q skipᴸ = skipᴸ
+  took-lead i q endᴸ  = endᴸ
+  took-lead i q hushᴸ = hushᴸ
+
+  took-hush : ∀ {A} i (q : A → Bool) x → takeWhileᴱ i q x ≡ hush → x ≡ hush
+  took-hush i q (out p a l) eq = ⊥-elim (taking-hush i (q a) eq)
+    where taking-hush : ∀ i b → taking i q p a b l ≡ hush → ⊥
+          taking-hush i     true  ()
+          taking-hush true  false ()
+          taking-hush false false ()
+  took-hush i q hush eq = refl
+
+mapped-⊒ : ∀ {A B} (g : A → B) {h h′ : Events∞ A} → h ⊒ h′ → mapped g h ⊒ mapped g h′
+mapped-⊒ g {h} (l , u , e) = map-lead g l , (λ eq → u (map-hush g (force h) eq)) , λ n → cutᵉ (e n) ,ᵉ map-erase g (nowᵉ (e n))
+
+scanned-⊒ : ∀ {A B} (g : B → A → B) z {h h′ : Events∞ A} → h ⊒ h′ → scanned g z h ⊒ scanned g z h′
+scanned-⊒ g z {h} (l , u , e) = scan-lead g z l , (λ eq → u (scan-hush g z (force h) eq)) , λ n → cutᵉ (e n) ,ᵉ scan-erase g z (nowᵉ (e n))
+
+took-⊒ : ∀ {A} i (q : A → Bool) {h h′ : Events∞ A} → h ⊒ h′ → took i q h ⊒ took i q h′
+took-⊒ i q {h} (l , u , e) = took-lead i q l , (λ eq → u (took-hush i q (force h) eq)) , λ n → cutᵉ (e n) ,ᵉ took-erase i q (nowᵉ (e n))
+
+-- THE ERASURE, FRAME BY FRAME: a merge fed a run with skips erased runs
+-- with skips erased, its next kept: it keeps its parts' order, and what
+-- the parts leave running is the merge's tail.
 postulate
-  mapped-⊒  : ∀ {A B} (g : A → B) {h h′ : Events∞ A} → h ⊒ h′ → mapped g h ⊒ mapped g h′
-  scanned-⊒ : ∀ {A B} (g : B → A → B) z {h h′ : Events∞ A} → h ⊒ h′ → scanned g z h ⊒ scanned g z h′
-  took-⊒    : ∀ {A} i (q : A → Bool) {h h′ : Events∞ A} → h ⊒ h′ → took i q h ⊒ took i q h′
   lanes-⊒   : ∀ {Γ A B} op (g : A → Pos → Node Γ B) d q (o : Node Γ A) pre post (ρ : NEnv Γ) {h h′ : Events∞ B}
             → h ⊒ h′ → lanesFrame op g d q o pre post true ρ h ⊒ lanesFrame op g d q o pre post true ρ h′
   outer-⊒   : ∀ {Γ A B} op (g : A → Pos → Node Γ B) q ls ds (ρ : NEnv Γ) {h h′ : Events∞ A}
