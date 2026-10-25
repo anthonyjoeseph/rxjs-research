@@ -11,13 +11,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE SILENT RUN
 
 Each skipped step drops a skip at one position of its hole; whether every
-frame above passes it there. A live source's own pass: its next events, and
-its body fed past the skip, later. A subscribing configuration's order
+frame above passes it there. Away from a connect the search's race settles
+it (`Ahead`); what is open is a live source above: its next events after
+the skip, and its body fed past it, later — what the search saw of the
+source against what the step leaves. A subscribing configuration's order
 carries nothing, so a defer's and a begun lane's pass have no source yet.
 Settled when these are bodies, or refuted.
 
-Members: `outer-begins-pass`, `outer-queues-pass`, `outer-ignores-pass`,
-`lane-begins-pass`, `src-pass`, `defer-pass`.
+Members: `won-src`, `won-body`, `outer-begins-links`, `outer-queues-links`,
+`outer-ignores-links`, `lane-begins-links`, `src-pass`, `defer-pass`.
 
 #### THE CLOSED LANE
 
@@ -30,9 +32,10 @@ Members: `lane-begins-shut`.
 
 #### THE SORTED TAILS
 
-Untried: a lane's tail, at its flatMap's environment, is in position order,
-so the pool takes an ended lane's tail at the lane's place whatever the
-order it is joined in. Settled when `lanes-sorted` is a body or refuted.
+Probed: a lane's tail, at its flatMap's environment, is in position order.
+Sorted tails are proven only for a finite program's subscription
+(`trailing-subᶠ`); nothing ties a lane's state to a residual of its own
+subscription. Settled when `lanes-sorted` is a body or refuted.
 
 Members: `lanes-sorted`.
 

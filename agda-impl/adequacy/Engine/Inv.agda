@@ -648,7 +648,7 @@ module _ {R : Set} where
   ... | true  = proj₂ (l refl)
   ... | false = tt
   rise-lead (inLanes op f d n q o pre post c) s cp     p l with alive s
-  ... | true  = dequeue-lead c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p (proj₂ (l refl))
+  ... | true  = dequeue-lead c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p (proj₁ (proj₂ (proj₂ l)))
   ... | false = tt
   rise-lead (inSrc k b c)                     s (nx a) p l = tt
   rise-lead (inSrc k b c)                     s cp     p l = tt
