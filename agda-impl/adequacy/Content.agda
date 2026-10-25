@@ -33,12 +33,12 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Tree using (Obs; Later; defer; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.MonotonicList.Events using (Timeline; Events; Events∞; Pos; Time; tick; root; out; end; hush; ix; _<ᵖ_; <ᵖ-irrefl;
-  <ᵖ-asym; emit; stall; close)
-open import denotation.MonotonicList using (observe; Agree; agree-refl; agree-sym)
+  <ᵖ-asym; emit; stall; close; last; Frame∞; From; From∞; idle; done; at) renaming (quiet to silentᶠ)
+open import denotation.MonotonicList using (observe; Agree; agree-refl; agree-sym; agree-trans; frames)
 open import adequacy.Record using (Ahead; outᵃ; skipᵃ) renaming (none to noneᵃ)
 import denotation.Unfold as U
 open import denotation.Denote using (⟦_⟧)
-open import operation.PureObservable using (PureObs; module Driver; module Machine; module Pure; play; ending; over)
+open import operation.PureObservable using (PureObs; module Driver; module Machine; module Pure; play; ending; over) renaming (rest to restᵀ)
 open import adequacy.Sorted using (_≤ᵖ_)
 open import adequacy.Sane using (Sane; SaneS; step-sane; sane-out)
 open import adequacy.Placed.Order using (Placed)
@@ -48,11 +48,11 @@ open import adequacy.Stepper.Within using (placed-after)
 open import adequacy.Stepper using (step-skips)
 open import adequacy.Unsub using (module Unsubbing)
 open import adequacy.Ghost using (module Ghosting)
-open import adequacy.Engine.Drop using (Drops; drop; drops; Dropsˢ; Pass; shows; shows-open; lift-drops)
-open import adequacy.Engine.Meaning using (M; flagOf; envAt; risen; gh; lane; lanesL; deadL; outerFrame; lanesFrame; Has; atOut; atEnd; pastOut; _≅_; ≅-refl; ≅-sym; ≅-trans; agree-≅)
-open import adequacy.Engine.Inv using (Inv; NextInv; inv-next)
+open import adequacy.Engine.Drop using (Drops; drop; drops; Dropsˢ; dropˢ; Pass; shows; shows-open; lift-drops)
+open import adequacy.Engine.Meaning using (M; flagOf; envAt; risen; gh; lane; lanesL; deadL; outerFrame; lanesFrame; Has; atOut; atEnd; pastOut; _≅_; ≅-refl; ≅-sym; ≅-trans; agree-≅; ≋-by)
+open import adequacy.Engine.Inv using (Inv; module Inv; module Base; wfI; search-hit; NextInv; inv-next)
 open import adequacy.Engine.Spent using (module Spending)
-open import adequacy.Engine.Kept using (KeptFrom) renaming (kept to engine-kept)
+open import adequacy.Engine.Kept using (KeptFrom; refocus-agree) renaming (kept to engine-kept)
 open import adequacy.Strong using (module Strongly)
 open Events∞ using (force)
 
@@ -232,13 +232,26 @@ module Honesty (R : Set) where
     -- EACH STEP WHOSE WORK MAY GROW DROPS A SKIP (`adequacy.Engine.Spent`'s
     -- `Skipped`): what the step leaves means less by at least one leading
     -- skip, never the same.  Every other silent step lowers its work.
-    stall-drop : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p t m′}
+    -- A STALL OR A CLOSE WHERE IT IS SHOWN IS SHOWN NEXT: every frame
+    -- above the cold searched out passes its lead skip.
+    stall-pass : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p}
                → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (stall k))) leafM key)
-               → closed c′ ≡ false → Inv ⟨ c , s , absorbed , p ⟩ → step ⟨ c , s , absorbed , p ⟩ ≡ silent t m′
-               → Drop ⟨ c , s , absorbed , p ⟩ m′
-    close-drop : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p t m′}
+               → shows c′ true ≡ true → Inv ⟨ c , s , absorbed , p ⟩
+               → Pass (λ _ → ⊤) c′ true (U.stateᴺ (gh (coldS true (play τ u i t₀ (stall k)))) (envAt c′))
+                   (U.stateᴺ (gh (coldS true (play τ u (suc i) t₀ (Frame∞.force k)))) (envAt c′))
+    close-pass : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p}
                → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (close k))) leafM key)
-               → closed c′ ≡ false → Inv ⟨ c , s , absorbed , p ⟩ → step ⟨ c , s , absorbed , p ⟩ ≡ silent t m′
+               → shows c′ true ≡ true → Inv ⟨ c , s , absorbed , p ⟩
+               → Pass (λ _ → ⊤) c′ true (U.stateᴺ (gh (coldS true (play τ u i t₀ (close k)))) (envAt c′))
+                   (U.stateᴺ (gh (coldS true (restᵀ τ (u ++ [ last ]) (From∞.force k)))) (envAt c′))
+    -- A STALL OR A CLOSE WHERE ONLY TAILS ARE READ, as `defer-tail`.
+    stall-tail : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p t m′}
+               → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (stall k))) leafM key)
+               → shows c′ true ≡ false → Inv ⟨ c , s , absorbed , p ⟩ → step ⟨ c , s , absorbed , p ⟩ ≡ silent t m′
+               → Drop ⟨ c , s , absorbed , p ⟩ m′
+    close-tail : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p t m′}
+               → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (close k))) leafM key)
+               → shows c′ true ≡ false → Inv ⟨ c , s , absorbed , p ⟩ → step ⟨ c , s , absorbed , p ⟩ ≡ silent t m′
                → Drop ⟨ c , s , absorbed , p ⟩ m′
 
     -- A DEFER'S HOLE IS THE PROGRAM IT DEFERS PAST ONE SKIP: the
@@ -389,6 +402,66 @@ module Honesty (R : Set) where
   ... | false = lane-tail al sh iv e
   ... | true with alive s | al | closed c | shows-open (inLanes op f d n (a ∷ q) o pre post c) true sh | e
   ...   | true | refl | false | refl | refl = lift-drops (λ _ → ⊤) c true (lane-begins al iv) (lane-begins-pass sh iv)
+
+  -- Drops past a meaning alike at every depth.
+  drops-agree : ∀ {A} {e e₀ e′ : Events A} → (∀ n → Agree n e e₀) → Drops e₀ e′ → Drops e e′
+  drops-agree x (drop ag ag′) = drop (λ n → agree-trans (x n) (ag n)) ag′
+  drops-agree x (drops ag d)  = drops (λ n → agree-trans (x n) (ag n)) d
+
+  -- A stall's hole: its lead skip, then the frame's rest.
+  stall-hole : ∀ {Γ A τ u i t₀ k} (ρ : U.NEnv Γ)
+             → Dropsˢ {A} (λ _ → ⊤) (U.stateᴺ (gh (coldS true (play τ u i t₀ (stall k)))) ρ) (U.stateᴺ (gh (coldS true (play τ u (suc i) t₀ (Frame∞.force k)))) ρ)
+  stall-hole ρ = dropˢ tt (λ n → agree-refl n _) (≋-by refl refl)
+
+  -- A close's hole: its lead skip, then the frames after it.
+  close-hole : ∀ {Γ A τ u i t₀ k} (ρ : U.NEnv Γ)
+             → Dropsˢ {A} (λ _ → ⊤) (U.stateᴺ (gh (coldS true (play τ u i t₀ (close k)))) ρ) (U.stateᴺ (gh (coldS true (restᵀ τ (u ++ [ last ]) (From∞.force k)))) ρ)
+  close-hole {A = A} {τ = τ} {u} {k = k} ρ = dropˢ tt (λ n → agree-refl n _) (≋-by (rest-frames (From∞.force k)) (rest-cut (From∞.force k)))
+    where
+    rest-frames : ∀ {t} (m : From A t) → frames τ (u ++ [ last ]) m ≡ U.meaning (gh (coldS true (restᵀ τ (u ++ [ last ]) m))) ρ
+    rest-frames done        = refl
+    rest-frames silentᶠ     = refl
+    rest-frames (at _ _ _)  = refl
+    rest-cut : ∀ {t} (m : From A t) → idle ≡ U.cutᴺ (gh (coldS true (restᵀ τ (u ++ [ last ]) m))) ρ
+    rest-cut done        = refl
+    rest-cut silentᶠ     = refl
+    rest-cut (at _ _ _)  = refl
+
+  -- What a stall leaves: its cold one frame on, still absorbed.
+  stall-next : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p}
+             → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (stall k))) leafM key)
+             → closed c′ ≡ false → ∀ {t m′} → step ⟨ c , s , absorbed , p ⟩ ≡ silent t m′
+             → m′ ≡ ⟨ c′ , coldS true (play τ u (suc i) t₀ (Frame∞.force k)) , absorbed , p ⟩
+  stall-next eq ce rewrite eq | ce = λ { refl → refl }
+
+  -- What a close leaves: its cold rekeyed to the frames after it.
+  close-next : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p}
+             → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (close k))) leafM key)
+             → closed c′ ≡ false → ∀ {t m′} → step ⟨ c , s , absorbed , p ⟩ ≡ silent t m′
+             → m′ ≡ ⟨ c′ , coldS true (restᵀ τ (u ++ [ last ]) (From∞.force k)) , absorbed , p ⟩
+  close-next eq ce rewrite eq | ce = λ { refl → refl }
+
+  -- A stall drops its skip: the tree refocused at the cold searched out.
+  stall-drop : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p t m′}
+             → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (stall k))) leafM key)
+             → closed c′ ≡ false → Inv ⟨ c , s , absorbed , p ⟩ → step ⟨ c , s , absorbed , p ⟩ ≡ silent t m′
+             → Drop ⟨ c , s , absorbed , p ⟩ m′
+  stall-drop {c = c} {s} {c′} {τ} {u} {i} {t₀} {k} {p = p} eq ce iv e with shows c′ true in sh
+  ... | false = stall-tail eq sh iv e
+  ... | true with stall-next {c = c} {s = s} {p = p} eq ce e
+  ...   | refl = drops-agree (refocus-agree c s c′ (coldS true (play τ u i t₀ (stall k))) p (Base.settled (Inv.base iv)) tt (wfI (Inv.base iv)) (proj₁ (search-hit (plug c s) eq)))
+                   (lift-drops (λ _ → ⊤) c′ true (stall-hole (envAt c′)) (stall-pass eq sh iv))
+
+  -- A close drops its skip, as a stall does.
+  close-drop : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p t m′}
+             → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (close k))) leafM key)
+             → closed c′ ≡ false → Inv ⟨ c , s , absorbed , p ⟩ → step ⟨ c , s , absorbed , p ⟩ ≡ silent t m′
+             → Drop ⟨ c , s , absorbed , p ⟩ m′
+  close-drop {c = c} {s} {c′} {τ} {u} {i} {t₀} {k} {p = p} eq ce iv e with shows c′ true in sh
+  ... | false = close-tail eq sh iv e
+  ... | true with close-next {c = c} {s = s} {p = p} eq ce e
+  ...   | refl = drops-agree (refocus-agree c s c′ (coldS true (play τ u i t₀ (close k))) p (Base.settled (Inv.base iv)) tt (wfI (Inv.base iv)) (proj₁ (search-hit (plug c s) eq)))
+                   (lift-drops (λ _ → ⊤) c′ true (close-hole (envAt c′)) (close-pass eq sh iv))
 
   -- A step whose work may grow drops a skip.
   skipped-drop : ∀ {m t m′} → Inv m → step m ≡ silent t m′ → Skipped m → Drop m m′

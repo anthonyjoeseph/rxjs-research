@@ -9,7 +9,7 @@
 --
 -- A frame is read as `meaning` reads the node it is a hole of, with the
 -- hole's run in the child's place, so a configuration focused anywhere
--- means what its whole tree means (`adequacy.Engine.Kept.lift-plug`).
+-- means what its whole tree means (`adequacy.Engine.Kept.plug-agree`).
 --
 -- Congruence is by the existing non-expansiveness of every stream
 -- function (`denotation.NonExpansive`): runs alike to every depth at the
