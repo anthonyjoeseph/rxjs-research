@@ -12,7 +12,7 @@
 -- close and defer where it is shown links past every live source above
 -- it (`adequacy.Engine.Shown.Links`): the body fed the rest erased of the
 -- body fed the run, or past skips under the source's
--- (`adequacy.Engine.Shown.src-fed`), and so every node of it, owing the source nothing, its
+-- (`adequacy.Engine.FedWalk.src-fed`), and so every node of it, owing the source nothing, its
 -- source's run nesting nothing, and after each source skip shows
 -- (`adequacy.Engine.Shown.src-body-on`).
 module quickcheck.KeptDepth where
@@ -256,7 +256,7 @@ private
           dropsᵇ (suc k) q (skip p r) β′ = inside q p ∧ (restᵇ r β′ ∨ dropsᵇ k q (Events∞.force r) β′)
           dropsᵇ _       q _          β′ = false
 
-  -- Every position a pass is asked of (`adequacy.Engine.Shown.Sought`:
+  -- Every position a pass is asked of (`adequacy.Engine.FedWalk.Sought`:
   -- `q`'s own, or any under it) comes before `x`, one deeper.
   afterAllᵇ : Bool → Pos → Maybe Pos → Bool
   afterAllᵇ v     q nothing  = true
