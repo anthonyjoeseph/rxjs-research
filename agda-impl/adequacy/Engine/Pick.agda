@@ -121,7 +121,14 @@ mutual
     alive s ≡ true × (closed c ≡ false → Sides p f d o (reverse pre) post (envAt c))
                    × EndsIf (d ∧ (pred n ≡ᵇ 0) ∧ null q) p c (flatS op f d (pred n) q o (pre ʳ++ ended s ∷ post)) × Queued q p c
   Ends p (inSrc k b c)                     s = ⊤
-  Ends p (inBody k o c)                    s = ∀ k′ → Ends p c (connS k′ o s)
+  Ends p (inBody (cs cl true sa ba as nothing r en) o c) s =
+    (closed c ≡ false
+       → (Events∞.force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) ≡ hush
+            → ∀ d → Agreeᵀ d (Events∞.cut (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c))) idle)
+         × NotBefore p (shown (Events∞.force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)))))
+    × (∀ k′ → Ends p c (connS k′ o s))
+  Ends p (inBody (cs cl true sa ba as (just _) r en) o c) s = ⊥
+  Ends p (inBody (cs cl false sa ba as ow r en) o c)      s = ⊥
 
   EndsIf : ∀ {R Γ A} → Bool → Pos → Ctx R Γ A → St Γ A → Set
   EndsIf true  p c s = Ends p c s
@@ -600,7 +607,12 @@ mutual
     , λ sh → won-ahead (p ⊕ [ ix 0 ]) c (flatS op f d n (a ∷ q) o (pre ʳ++ s ∷ post)) true (lane-shift d n a q {alive s} {at p} {c} lv w) ft sh
     where lv = pooled-live (alive s) u
   won-ends p (inSrc kk b c)                    s s′ al w ft = tt
-  won-ends p (inBody kk o c)                   s s′ al (_ , _ , _ , w) ft = λ k′ → won-ends p c (connS kk o s) (connS k′ o s′) refl w ft
+  won-ends p (inBody (cs cl true sa ba as nothing r en) o c) s s′ al (_ , lo , bf , w) ft =
+    (λ ce → body-link p c (cs cl true sa ba as nothing r en) o s ft ce refl lo bf)
+    , λ k′ → won-ends p c (connS (cs cl true sa ba as nothing r en) o s) (connS k′ o s′) refl w ft
+  won-ends p (inBody (cs cl true sa ba as (just _) r en) o c)  s s′ al (() , _) ft
+  won-ends p (inBody (cs cl false sa ba as (just _) r en) o c) s s′ al (() , _) ft
+  won-ends p (inBody (cs cl false sa ba as nothing r en) o c)  s s′ al (() , _) ft
 
   ends-if : ∀ {R Γ A} p (c : Ctx R Γ A) b (s s′ : St Γ A) → alive s ≡ alive s′
           → Won (at p , (if b then shows cp else still)) c s → Frag (plug c s) → EndsIf b p c s′
