@@ -14,21 +14,21 @@
 -- the rest (`Fed`).
 module adequacy.Engine.Drop where
 
-open import Data.Bool using (Bool; true; false; not; _∧_)
+open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥)
 open import Data.List using (_∷_; _++_; [_]; reverse)
 import Data.List as L
 import denotation.MonotonicList as M′
 open import Data.List.Relation.Unary.All using (All) renaming (_∷_ to _∷ᴬ_)
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (just; nothing)
 open import Data.Nat using (zero; suc)
-open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
 
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; out; skip; end; hush; idle; _∪_; ix; _<ᵖ_)
-open import denotation.MonotonicList using (head; shownAt; Agree; Agreeᵀ; stop; skip⁼; agree-refl; agree-trans; agree-sym; agreeᵀ-refl;
+open import denotation.MonotonicList using (head; Agree; Agreeᵀ; stop; skip⁼; agree-refl; agree-trans; agree-sym; agreeᵀ-refl;
   agreeᵀ-sym)
 open import denotation.NonExpansive using (_,ˢ_; mapᴱ-ne; scanᴱ-ne; takeWhileᴱ-ne; ∪-ne; beside-ne; burstOn-ne; Outerᴿ; liveᴼ; whole-ne; go-ne; mapᴱ-neᴹ; Lanes)
 open import denotation.Unfold using (Node; NEnv; stateᴺ; states; outerᴺ; meaning; cutᴺ; outer∞)
@@ -39,6 +39,7 @@ open import adequacy.Engine.Meaning using (_≋_; ≋-by; ≋-trans; same; up; m
   srcG; envAt; gh; lane; lanesL; deadL; outerG; outerT; poolRuns; poolT; laneᴹ; lanesFrame-ne;
   outerFrame-ne; outerOf; lanes-refl; queue-refl; outer-refl; ≈-refl; risen)
 open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore; go-rise; go-outer)
+open import adequacy.Engine.Ahead using (Under; shown)
 open Events∞
 open import denotation.NonExpansive using (Agreeˢ)
 open Agreeˢ
@@ -61,15 +62,6 @@ skip-≋ : ∀ {A k} {r r′ : Events∞ A} → r ≋ r′ → ∀ n → Agree n
 skip-≋ x zero    = stop
 skip-≋ x (suc n) = skip⁼ (cutˢ (x n)) (nowˢ (x n))
 
--- The positions a skip at `P` puts under itself.
-Under : (Pos → Set) → Pos → Set
-Under P k′ = Σ Pos λ k → P k × Σ Pos λ y → k′ ≡ k ++ y
-
--- Where a source's next step shows, if it has one.
-shown : ∀ {A} → Events A → Maybe Pos
-shown hush = nothing
-shown e    = just (shownAt e)
-
 ------------------------------------------------------------------------
 -- What each frame asks of the skips it passes
 
@@ -77,52 +69,6 @@ shown e    = just (shownAt e)
 -- its leading skips, each under one of the source's.
 Fed : ∀ {B} → (Pos → Set) → Events∞ B → Events∞ B → Set
 Fed P β β′ = β ≋ β′ ⊎ Dropsˢ (Under P) β β′
-
--- Whether every frame up the context shows the hole's next step, rather
--- than reading only its tail: `Pass` is empty exactly where this fails.
-shows : ∀ {R Γ A} → Ctx R Γ A → Bool → Bool
-shows top                                                 f = true
-shows (inMap g c)                                         f = shows c true
-shows (inScan g z c)                                      f = shows c true
-shows (inCut l a c)                                       f = l ∧ shows c true
-shows (inLn b c)                                          f = shows c b
-shows (inTake i q free c)                                 f = shows c true
-shows (inTake i q (cpAt _) c)                             f = false
-shows (inTake i q (cutAt _) c)                            f = false
-shows (inTake i q (overAt _) c)                           f = false
-shows (inOuter op g d n q ls c)                           f = not d ∧ shows c true
-shows (inLanes op g d n q o pre post c)                   f = f ∧ shows c true
-shows (inSrc (cs false true sa ba as nothing r en) b c)   f = shows c true
-shows (inSrc (cs false true sa ba as (just _) r en) b c)  f = false
-shows (inSrc (cs false false sa ba as ow r en) b c)       f = false
-shows (inSrc (cs true sl sa ba as ow r en) b c)           f = false
-shows (inBody (cs cl true sa ba as nothing r en) o c)     f = shows c true
-shows (inBody (cs cl true sa ba as (just _) r en) o c)    f = false
-shows (inBody (cs cl false sa ba as ow r en) o c)         f = false
-
--- A context showing its hole's next step is not closed.
-shows-open : ∀ {R Γ A} (c : Ctx R Γ A) f → shows c f ≡ true → closed c ≡ false
-shows-open top                                                 f e = refl
-shows-open (inMap g c)                                         f e = shows-open c true e
-shows-open (inScan g z c)                                      f e = shows-open c true e
-shows-open (inCut true a c)                                    f e = shows-open c true e
-shows-open (inCut false a c)                                   f ()
-shows-open (inLn b c)                                          f e = shows-open c b e
-shows-open (inTake i q free c)                                 f e = shows-open c true e
-shows-open (inTake i q (cpAt _) c)                             f ()
-shows-open (inTake i q (cutAt _) c)                            f ()
-shows-open (inTake i q (overAt _) c)                           f ()
-shows-open (inOuter op g false n q ls c)                       f e = shows-open c true e
-shows-open (inOuter op g true n q ls c)                        f ()
-shows-open (inLanes op g d n q o pre post c)                   true  e = shows-open c true e
-shows-open (inLanes op g d n q o pre post c)                   false ()
-shows-open (inSrc (cs false true sa ba as nothing r en) b c)   f e = refl
-shows-open (inSrc (cs false true sa ba as (just _) r en) b c)  f ()
-shows-open (inSrc (cs false false sa ba as ow r en) b c)       f ()
-shows-open (inSrc (cs true sl sa ba as ow r en) b c)           f ()
-shows-open (inBody (cs cl true sa ba as nothing r en) o c)     f e = shows-open c true e
-shows-open (inBody (cs cl true sa ba as (just _) r en) o c)    f ()
-shows-open (inBody (cs cl false sa ba as ow r en) o c)         f ()
 
 mutual
   Pass : ∀ {R Γ A} → (Pos → Set) → Ctx R Γ A → Bool → Events∞ A → Events∞ A → Set
