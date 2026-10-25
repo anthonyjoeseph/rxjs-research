@@ -13,10 +13,11 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 Probed by `quickcheck.KeptDepth` at every node of every configuration
 reached: a node mid-run, in the environment its connects give it, keeps
 its run in order, steady and headed, and its tail trailing it. Untried as
-bodies: a merge, a connect, a joiner, a take, a source subscribed fresh.
-Settled when bodies, or refuted.
+bodies: a merge, a connect, a joiner, a take's owed end; a fresh source's
+head and mark, apart from its environment. Settled when bodies, or refuted.
 
-Members: `shape-conn`, `shape-flat`, `shape-join`, `shape-take`, `shape-sub`.
+Members: `shape-conn`, `shape-flat`, `shape-join`, `shape-ending`, `sub-headed`, `sub-alien`,
+`trailing-sub`, `ended-headed`.
 
 #### THE FED MERGE
 
