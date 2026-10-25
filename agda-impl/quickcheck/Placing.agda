@@ -33,10 +33,23 @@ open import quickcheck.Ty using (natᵗ)
 open Driver ℕ using (Trace; Trace∞; tau; out; end; idle; trace)
 open Machine using (load)
 
-private
-  samePos : Pos → Pos → Bool
-  samePos p q = not (p <ᵖ q) ∧ not (q <ᵖ p)
+samePos : Pos → Pos → Bool
+samePos p q = not (p <ᵖ q) ∧ not (q <ᵖ p)
 
+-- `h` keyed under `k`: `adequacy.Placed.Order.Owned`, decided.
+prefixᵇ : Pos → Pos → Bool
+prefixᵇ k h = not (length h <ᵇ length k) ∧ samePos (take (length k) h) k
+
+mutual
+  ownedᵇ : Pos → Pos → Bool
+  ownedᵇ k h = prefixᵇ k h ∨ taggedᵇ k h
+
+  taggedᵇ : Pos → Pos → Bool
+  taggedᵇ k []          = false
+  taggedᵇ k (sub j ∷ h) = ownedᵇ k j ∨ taggedᵇ k h
+  taggedᵇ k (_ ∷ h)     = taggedᵇ k h
+
+private
   drains : ℕ → Trace → Bool
   drains zero    _         = false
   drains (suc j) (tau _ l) = drains j (Trace∞.force l)
@@ -66,18 +79,6 @@ private
 
   inside : Pos → Pos → Bool
   inside k h = (length k <ᵇ length h) ∧ samePos (take (length k) h) k
-
-  prefixᵇ : Pos → Pos → Bool
-  prefixᵇ k h = not (length h <ᵇ length k) ∧ samePos (take (length k) h) k
-
-  mutual
-    ownedᵇ : Pos → Pos → Bool
-    ownedᵇ k h = prefixᵇ k h ∨ taggedᵇ k h
-
-    taggedᵇ : Pos → Pos → Bool
-    taggedᵇ k []          = false
-    taggedᵇ k (sub j ∷ h) = ownedᵇ k j ∨ taggedᵇ k h
-    taggedᵇ k (_ ∷ h)     = taggedᵇ k h
 
   positions : ℕ → Events ℕ → List Pos
   positions zero    _           = []

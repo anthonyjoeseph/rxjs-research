@@ -59,6 +59,7 @@ open import adequacy.Engine.Inv using (Inv; module Inv; module Base; wfI; search
 open import adequacy.Engine.Spent using (module Spending)
 open import adequacy.Engine.Kept using (KeptFrom; refocus-agree; rests-++; lanes-runs; pool-runs; dead-hole) renaming (kept to engine-kept)
 open import adequacy.Engine.Head using (Frag; Lane) renaming (Lanes to Lanesᴴ)
+open import adequacy.Engine.Keys using (Held)
 open import adequacy.Engine.Pick using (Beat; Beats; module Order; frag-flat; frag-parts; lanes-ʳsplit)
 open import adequacy.Engine.Ahead using (Sides; shows; shows-open; ahead-mono) renaming (Ahead to Aheadᶠ)
 open import adequacy.Engine.Race using (After; TailNotBefore)
@@ -437,7 +438,7 @@ module Honesty (R : Set) where
                 (subst (λ x → (x <ᵇ k) ≡ false) (trans en (sym (states-length (lanesL ls) (envAt c)))) b))
              (cong (λ x → U.states (lanesL ls) (envAt c) , x , idle) (sym (map-++ (laneᴹ (lane f) (envAt c)) q [ a ]))))
       refl refl (λ m → lanes-refl m _) (λ m → ∪-idleᵀ m _) al tn
-    where en = proj₁ (proj₂ (proj₂ (frag-flat c (mergeᶠ (just k)) f false n q o ls (Order.shape (Inv.ord iv)))))
+    where en = proj₁ (proj₂ (proj₂ (frag-flat c (mergeᶠ (just k)) f false n q o ls (proj₁ (Order.shape (Inv.ord iv))))))
   outer-queues {op = mergeᶠ nothing} ()
   outer-queues {op = switchᶠ}        ()
   outer-queues {op = exhaustᶠ}       ()
@@ -452,7 +453,7 @@ module Honesty (R : Set) where
       (ignore-admits (laneᴹ (lane f) (envAt c) a) (U.states (lanesL ls) (envAt c)) (map (laneᴹ (lane f) (envAt c)) q) (p ⊕ [ ix 1 ])
          (subst (λ x → (x ≡ᵇ 0) ≡ false) (trans en (sym (states-length (lanesL ls) (envAt c)))) b))
       refl refl (λ m → lanes-refl m _) (λ m → ∪-idleᵀ m _) al tn
-    where en = proj₁ (proj₂ (proj₂ (frag-flat c exhaustᶠ f false n q o ls (Order.shape (Inv.ord iv)))))
+    where en = proj₁ (proj₂ (proj₂ (frag-flat c exhaustᶠ f false n q o ls (proj₁ (Order.shape (Inv.ord iv))))))
   outer-ignores {op = mergeᶠ m} ()
   outer-ignores {op = switchᶠ}  ()
 
@@ -514,20 +515,20 @@ module Honesty (R : Set) where
       (begin-admits k (laneᴹ (lane f) (envAt c) a) (U.states (lanesL ls) (envAt c)) (map (laneᴹ (lane f) (envAt c)) q) (p ⊕ [ ix 1 ])
          (subst (λ x → (x <ᵇ k) ≡ true) (trans en (sym (states-length (lanesL ls) (envAt c)))) b))
       (λ m → lanes-refl m _) (λ m → ∪-idleᵀ m _) al tn
-    where en = proj₁ (proj₂ (proj₂ (frag-flat c (mergeᶠ (just k)) f false n q o ls (Order.shape (Inv.ord iv)))))
+    where en = proj₁ (proj₂ (proj₂ (frag-flat c (mergeᶠ (just k)) f false n q o ls (proj₁ (Order.shape (Inv.ord iv))))))
   outer-begins {c = c} {exhaustᶠ} {false} {n} {q} {ls} {f} {o} {a} {p} b iv with Order.lead (Inv.ord iv)
   ... | _ , al , tn , _ =
     begun-drops c exhaustᶠ q ls f o a p ls
       (exhaust-admits (laneᴹ (lane f) (envAt c) a) (U.states (lanesL ls) (envAt c)) (map (laneᴹ (lane f) (envAt c)) q) (p ⊕ [ ix 1 ])
          (subst (λ x → (x ≡ᵇ 0) ≡ true) (trans en (sym (states-length (lanesL ls) (envAt c)))) b))
       (λ m → lanes-refl m _) (λ m → ∪-idleᵀ m _) al tn
-    where en = proj₁ (proj₂ (proj₂ (frag-flat c exhaustᶠ f false n q o ls (Order.shape (Inv.ord iv)))))
+    where en = proj₁ (proj₂ (proj₂ (frag-flat c exhaustᶠ f false n q o ls (proj₁ (Order.shape (Inv.ord iv))))))
   outer-begins {c = c} {switchᶠ} {false} {n} {q} {ls} {f} {o} {a} {p} b iv with Order.lead (Inv.ord iv)
   ... | _ , al , tn , _ =
     begun-drops c switchᶠ q ls f o a p (proj₁ (killAll ls)) refl
       (λ m → subst (λ x → Lanes m (h ∷ []) (h ∷ U.states x (envAt c))) (sym (kill-lanes ls fl)) (lanes-refl m (h ∷ [])))
       (kill-pool ls (envAt c) fl) al tn
-    where fl = proj₁ (proj₂ (frag-flat c switchᶠ f false n q o ls (Order.shape (Inv.ord iv))))
+    where fl = proj₁ (proj₂ (frag-flat c switchᶠ f false n q o ls (proj₁ (Order.shape (Inv.ord iv)))))
           h  = U.stateᴺ (U.subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c)
 
   -- An outer's value admitted drops its skip.
@@ -619,7 +620,7 @@ module Honesty (R : Set) where
     ended-begins c op f d a q o pre post s p (proj₁ (proj₂ (lanes-ʳsplit pre fl))) al (proj₁ ss) (pool-sorted post (envAt c) (proj₂ ss))
       (proj₁ (proj₂ (Order.lead (Inv.ord iv))) cl)
     where
-      ft = Order.shape (Inv.ord iv)
+      ft = proj₁ (Order.shape (Inv.ord iv))
       fl = proj₂ (frag-parts op f d n (a ∷ q) o (pre ʳ++ s ∷ post) (frag-flat c op f d n (a ∷ q) o (pre ʳ++ s ∷ post) ft))
       ss = all-at pre (lanes-sorted c op f d n (a ∷ q) o (pre ʳ++ s ∷ post) ft)
 
@@ -703,7 +704,7 @@ module Honesty (R : Set) where
   stall-pass {c = c} {s} {c′} {τ} {u} {i} {t₀} {k} eq sh iv iv′ =
     beat-pass false (u ++ [ ix i ]) c′ (coldS true (play τ u i t₀ (stall k))) true (λ _ e → e)
       (subst (λ x → Beat x c′ (coldS true (play τ u i t₀ (stall k)))) (cold-key (plug c s) eq) (subst Beats eq (Order.apart (Inv.ord iv)) refl))
-      (subst Frag (sym (proj₁ (search-hit (plug c s) eq))) (Order.shape (Inv.ord iv))) tt
+      (subst Held (sym (proj₁ (search-hit (plug c s) eq))) (Order.shape (Inv.ord iv))) tt
       sh refl (≋-by refl refl) (stall-hole (envAt c′))
       (coldS true (play τ u (suc i) t₀ (Frame∞.force k))) (Order.shape (Inv.ord iv′)) tt refl (≋-by refl refl)
 
@@ -715,7 +716,7 @@ module Honesty (R : Set) where
   close-pass {c = c} {s} {c′} {τ} {u} {i} {t₀} {k} eq sh iv iv′ =
     beat-pass false (u ++ [ ix i ]) c′ (coldS true (play τ u i t₀ (close k))) true (λ _ e → e)
       (subst (λ x → Beat x c′ (coldS true (play τ u i t₀ (close k)))) (cold-key (plug c s) eq) (subst Beats eq (Order.apart (Inv.ord iv)) refl))
-      (subst Frag (sym (proj₁ (search-hit (plug c s) eq))) (Order.shape (Inv.ord iv))) tt
+      (subst Held (sym (proj₁ (search-hit (plug c s) eq))) (Order.shape (Inv.ord iv))) tt
       sh refl (≋-by refl refl) (close-hole (envAt c′))
       (coldS true (restᵀ τ (u ++ [ last ]) (From∞.force k))) (Order.shape (Inv.ord iv′)) tt refl (≋-by refl refl)
 
