@@ -28,7 +28,7 @@ open import Data.Nat using (ℕ; zero; suc; _<_; _<ᵇ_; _≡ᵇ_)
 open import Data.Nat.Properties using (suc-injective; ≤-refl; <-trans)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
-open import Data.Unit using (⊤; tt)
+open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import Tree using (Obs; Later; defer; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
@@ -237,12 +237,12 @@ module Honesty (R : Set) where
     stall-pass : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p}
                → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (stall k))) leafM key)
                → shows c′ true ≡ true → Inv ⟨ c , s , absorbed , p ⟩
-               → Pass (λ _ → ⊤) c′ true (U.stateᴺ (gh (coldS true (play τ u i t₀ (stall k)))) (envAt c′))
+               → Pass (_≡ u ++ [ ix i ]) c′ true (U.stateᴺ (gh (coldS true (play τ u i t₀ (stall k)))) (envAt c′))
                    (U.stateᴺ (gh (coldS true (play τ u (suc i) t₀ (Frame∞.force k)))) (envAt c′))
     close-pass : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p}
                → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t₀ (close k))) leafM key)
                → shows c′ true ≡ true → Inv ⟨ c , s , absorbed , p ⟩
-               → Pass (λ _ → ⊤) c′ true (U.stateᴺ (gh (coldS true (play τ u i t₀ (close k)))) (envAt c′))
+               → Pass (_≡ u ++ [ ix i ]) c′ true (U.stateᴺ (gh (coldS true (play τ u i t₀ (close k)))) (envAt c′))
                    (U.stateᴺ (gh (coldS true (restᵀ τ (u ++ [ last ]) (From∞.force k)))) (envAt c′))
     -- A STALL OR A CLOSE WHERE ONLY TAILS ARE READ, as `defer-tail`.
     stall-tail : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p t m′}
@@ -258,11 +258,14 @@ module Honesty (R : Set) where
     -- meaning's lead skip, then the program subscribed just past it, its
     -- tail with it (`denotation.Unfold.subscribed`).
     defer-hole : ∀ {Γ A} l p (ρ : U.NEnv Γ)
-               → Dropsˢ {A} (λ _ → ⊤) (U.stateᴺ (U.deferᶜ l p []) ρ) (U.stateᴺ (U.subscribe (Later.force l) (p ⊕ [ ix 1 ])) ρ)
+               → Dropsˢ {A} (_≡ p ⊕ [ ix 0 ]) (U.stateᴺ (U.deferᶜ l p []) ρ) (U.stateᴺ (U.subscribe (Later.force l) (p ⊕ [ ix 1 ])) ρ)
     -- A DEFER BEGUN WHERE IT IS SHOWN IS SHOWN NEXT: every frame above it
-    -- passes its skip.
+    -- passes its skip, at the skip's own position.  Asked at every
+    -- position, a lane's frame beside an older lane with a pending head
+    -- refutes it, so each pass here is asked at the position its hole
+    -- skips.
     defer-pass : ∀ {Γ A} {c : Ctx R Γ A} {l p} → shows c true ≡ true → Inv ⟨ c , pend (defer l) , subscribing , p ⟩
-               → Pass (λ _ → ⊤) c (flagOf (pend (defer l))) (U.stateᴺ (U.deferᶜ l p []) (envAt c))
+               → Pass (_≡ p ⊕ [ ix 0 ]) c (flagOf (pend (defer l))) (U.stateᴺ (U.deferᶜ l p []) (envAt c))
                    (U.stateᴺ (U.subscribe (Later.force l) (p ⊕ [ ix 1 ])) (envAt c))
 
     -- A DEFER BEGUN WHERE ONLY TAILS ARE READ drops its skip through the
@@ -283,7 +286,7 @@ module Honesty (R : Set) where
              → Inv ⟨ c , pend (defer l) , subscribing , p ⟩ → step ⟨ c , pend (defer l) , subscribing , p ⟩ ≡ silent t m′
              → Drop ⟨ c , pend (defer l) , subscribing , p ⟩ m′
   defer-drop {c = c} {l} {p} iv refl with shows c true in sh
-  ... | true  = lift-drops (λ _ → ⊤) c (flagOf (pend (defer l))) (defer-hole l p (envAt c)) (defer-pass sh iv)
+  ... | true  = lift-drops (_≡ p ⊕ [ ix 0 ]) c (flagOf (pend (defer l))) (defer-hole l p (envAt c)) (defer-pass sh iv)
   ... | false = defer-tail sh iv
 
   -- What a value admitted into a flatMap's lanes leaves running: the
@@ -335,25 +338,25 @@ module Honesty (R : Set) where
     -- the value as a skip, then the lane subscribed just past it.
     outer-begins : ∀ {Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
                  → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
-                 → Dropsˢ (λ _ → ⊤) (outerX c op f d q ls o a p) (begunY c op f d q o (keptLanes op ls) a p)
+                 → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (outerX c op f d q ls o a p) (begunY c op f d q o (keptLanes op ls) a p)
     -- AN OUTER'S VALUE QUEUED, OR DROPPED BY A BUSY EXHAUST, IS ITS SKIP.
     outer-queues : ∀ {Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
                  → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
-                 → Dropsˢ (λ _ → ⊤) (outerX c op f d q ls o a p) (U.stateᴺ (gh (flatS op f d n (q ++ [ a ]) o ls)) (envAt c))
+                 → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (outerX c op f d q ls o a p) (U.stateᴺ (gh (flatS op f d n (q ++ [ a ]) o ls)) (envAt c))
     outer-ignores : ∀ {Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
                   → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
-                  → Dropsˢ (λ _ → ⊤) (outerX c op f d q ls o a p) (U.stateᴺ (gh (flatS op f d n q o ls)) (envAt c))
+                  → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (outerX c op f d q ls o a p) (U.stateᴺ (gh (flatS op f d n q o ls)) (envAt c))
     -- AN OUTER'S VALUE ADMITTED WHERE IT IS SHOWN IS SHOWN NEXT: every
     -- frame above passes its skip, whatever the admission left.
     outer-begins-pass : ∀ {Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
                       → shows (inOuter op f d n q ls c) true ≡ true → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
-                      → Pass (λ _ → ⊤) c true (outerX c op f d q ls o a p) (begunY c op f d q o (keptLanes op ls) a p)
+                      → Pass (_≡ p ⊕ [ ix 0 ]) c true (outerX c op f d q ls o a p) (begunY c op f d q o (keptLanes op ls) a p)
     outer-queues-pass : ∀ {Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
                       → shows (inOuter op f d n q ls c) true ≡ true → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
-                      → Pass (λ _ → ⊤) c true (outerX c op f d q ls o a p) (U.stateᴺ (gh (flatS op f d n (q ++ [ a ]) o ls)) (envAt c))
+                      → Pass (_≡ p ⊕ [ ix 0 ]) c true (outerX c op f d q ls o a p) (U.stateᴺ (gh (flatS op f d n (q ++ [ a ]) o ls)) (envAt c))
     outer-ignores-pass : ∀ {Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
                        → shows (inOuter op f d n q ls c) true ≡ true → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
-                       → Pass (λ _ → ⊤) c true (outerX c op f d q ls o a p) (U.stateᴺ (gh (flatS op f d n q o ls)) (envAt c))
+                       → Pass (_≡ p ⊕ [ ix 0 ]) c true (outerX c op f d q ls o a p) (U.stateᴺ (gh (flatS op f d n q o ls)) (envAt c))
     -- AN OUTER'S VALUE ADMITTED WHERE ONLY TAILS ARE READ drops its skip
     -- through the tail that pins it, as `defer-tail`.
     outer-tail : ∀ {Γ A B op d n q ls} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {a p t m′}
@@ -369,9 +372,9 @@ module Honesty (R : Set) where
   outer-drop {op = op} {d} {n} {q} {ls} {f} {c} {o} {a} {p} iv e with shows (inOuter op f d n q ls c) true in sh
   ... | false = outer-tail sh iv e
   ... | true with admitted {c = c} {op = op} (shows-open (inOuter op f d n q ls c) true sh) e
-  ...   | begun refl = lift-drops (λ _ → ⊤) c true (outer-begins iv) (outer-begins-pass sh iv)
-  ...   | queued     = lift-drops (λ _ → ⊤) c true (outer-queues iv) (outer-queues-pass sh iv)
-  ...   | ignored    = lift-drops (λ _ → ⊤) c true (outer-ignores iv) (outer-ignores-pass sh iv)
+  ...   | begun refl = lift-drops (_≡ p ⊕ [ ix 0 ]) c true (outer-begins iv) (outer-begins-pass sh iv)
+  ...   | queued     = lift-drops (_≡ p ⊕ [ ix 0 ]) c true (outer-queues iv) (outer-queues-pass sh iv)
+  ...   | ignored    = lift-drops (_≡ p ⊕ [ ix 0 ]) c true (outer-ignores iv) (outer-ignores-pass sh iv)
 
   -- A lane's completion under a queue, and the queue's next lane begun.
   laneX : ∀ {Γ A B} → Ctx R Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → List A → St Γ A → List (St Γ B) → List (St Γ B) → St Γ B → Pos → Events∞ B
@@ -381,11 +384,11 @@ module Honesty (R : Set) where
     -- A LANE'S COMPLETION UNDER A QUEUE BEGINS THE NEXT LANE PAST ONE SKIP.
     lane-begins : ∀ {Γ A B op d n a q pre post} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {s : St Γ B} {p}
                 → alive s ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
-                → Dropsˢ (λ _ → ⊤) (laneX c op f d (a ∷ q) o pre post s p) (begunY c op f d q o (pre ʳ++ endedˢ s ∷ post) a p)
+                → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (laneX c op f d (a ∷ q) o pre post s p) (begunY c op f d q o (pre ʳ++ endedˢ s ∷ post) a p)
     -- AND WHERE IT IS SHOWN IS SHOWN NEXT.
     lane-begins-pass : ∀ {Γ A B op d n a q pre post} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {s : St Γ B} {p}
                      → shows (inLanes op f d n (a ∷ q) o pre post c) true ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
-                     → Pass (λ _ → ⊤) c true (laneX c op f d (a ∷ q) o pre post s p) (begunY c op f d q o (pre ʳ++ endedˢ s ∷ post) a p)
+                     → Pass (_≡ p ⊕ [ ix 0 ]) c true (laneX c op f d (a ∷ q) o pre post s p) (begunY c op f d q o (pre ʳ++ endedˢ s ∷ post) a p)
     -- A LANE'S COMPLETION WHERE ONLY TAILS ARE READ, as `defer-tail`.
     lane-tail : ∀ {Γ A B op d n a q pre post} {f : A → Obs Timeline Γ B} {c : Ctx R Γ B} {o : St Γ A} {s : St Γ B} {p t m′}
               → alive s ≡ true → shows (inLanes op f d n (a ∷ q) o pre post c) true ≡ false
@@ -401,7 +404,7 @@ module Honesty (R : Set) where
   lane-drop {op = op} {d} {n} {a} {q} {pre} {post} {f} {c} {o} {s} {p} al iv e with shows (inLanes op f d n (a ∷ q) o pre post c) true in sh
   ... | false = lane-tail al sh iv e
   ... | true with alive s | al | closed c | shows-open (inLanes op f d n (a ∷ q) o pre post c) true sh | e
-  ...   | true | refl | false | refl | refl = lift-drops (λ _ → ⊤) c true (lane-begins al iv) (lane-begins-pass sh iv)
+  ...   | true | refl | false | refl | refl = lift-drops (_≡ p ⊕ [ ix 0 ]) c true (lane-begins al iv) (lane-begins-pass sh iv)
 
   -- Drops past a meaning alike at every depth.
   drops-agree : ∀ {A} {e e₀ e′ : Events A} → (∀ n → Agree n e e₀) → Drops e₀ e′ → Drops e e′
@@ -410,13 +413,13 @@ module Honesty (R : Set) where
 
   -- A stall's hole: its lead skip, then the frame's rest.
   stall-hole : ∀ {Γ A τ u i t₀ k} (ρ : U.NEnv Γ)
-             → Dropsˢ {A} (λ _ → ⊤) (U.stateᴺ (gh (coldS true (play τ u i t₀ (stall k)))) ρ) (U.stateᴺ (gh (coldS true (play τ u (suc i) t₀ (Frame∞.force k)))) ρ)
-  stall-hole ρ = dropˢ tt (λ n → agree-refl n _) (≋-by refl refl)
+             → Dropsˢ {A} (_≡ u ++ [ ix i ]) (U.stateᴺ (gh (coldS true (play τ u i t₀ (stall k)))) ρ) (U.stateᴺ (gh (coldS true (play τ u (suc i) t₀ (Frame∞.force k)))) ρ)
+  stall-hole ρ = dropˢ refl (λ n → agree-refl n _) (≋-by refl refl)
 
   -- A close's hole: its lead skip, then the frames after it.
   close-hole : ∀ {Γ A τ u i t₀ k} (ρ : U.NEnv Γ)
-             → Dropsˢ {A} (λ _ → ⊤) (U.stateᴺ (gh (coldS true (play τ u i t₀ (close k)))) ρ) (U.stateᴺ (gh (coldS true (restᵀ τ (u ++ [ last ]) (From∞.force k)))) ρ)
-  close-hole {A = A} {τ = τ} {u} {k = k} ρ = dropˢ tt (λ n → agree-refl n _) (≋-by (rest-frames (From∞.force k)) (rest-cut (From∞.force k)))
+             → Dropsˢ {A} (_≡ u ++ [ ix i ]) (U.stateᴺ (gh (coldS true (play τ u i t₀ (close k)))) ρ) (U.stateᴺ (gh (coldS true (restᵀ τ (u ++ [ last ]) (From∞.force k)))) ρ)
+  close-hole {A = A} {τ = τ} {u} {k = k} ρ = dropˢ refl (λ n → agree-refl n _) (≋-by (rest-frames (From∞.force k)) (rest-cut (From∞.force k)))
     where
     rest-frames : ∀ {t} (m : From A t) → frames τ (u ++ [ last ]) m ≡ U.meaning (gh (coldS true (restᵀ τ (u ++ [ last ]) m))) ρ
     rest-frames done        = refl
@@ -450,7 +453,7 @@ module Honesty (R : Set) where
   ... | false = stall-tail eq sh iv e
   ... | true with stall-next {c = c} {s = s} {p = p} eq ce e
   ...   | refl = drops-agree (refocus-agree c s c′ (coldS true (play τ u i t₀ (stall k))) p (Base.settled (Inv.base iv)) tt (wfI (Inv.base iv)) (proj₁ (search-hit (plug c s) eq)))
-                   (lift-drops (λ _ → ⊤) c′ true (stall-hole (envAt c′)) (stall-pass eq sh iv))
+                   (lift-drops (_≡ u ++ [ ix i ]) c′ true (stall-hole (envAt c′)) (stall-pass eq sh iv))
 
   -- A close drops its skip, as a stall does.
   close-drop : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p t m′}
@@ -461,7 +464,7 @@ module Honesty (R : Set) where
   ... | false = close-tail eq sh iv e
   ... | true with close-next {c = c} {s = s} {p = p} eq ce e
   ...   | refl = drops-agree (refocus-agree c s c′ (coldS true (play τ u i t₀ (close k))) p (Base.settled (Inv.base iv)) tt (wfI (Inv.base iv)) (proj₁ (search-hit (plug c s) eq)))
-                   (lift-drops (λ _ → ⊤) c′ true (close-hole (envAt c′)) (close-pass eq sh iv))
+                   (lift-drops (_≡ u ++ [ ix i ]) c′ true (close-hole (envAt c′)) (close-pass eq sh iv))
 
   -- A step whose work may grow drops a skip.
   skipped-drop : ∀ {m t m′} → Inv m → step m ≡ silent t m′ → Skipped m → Drop m m′

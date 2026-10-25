@@ -10,12 +10,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SILENT RUN
 
-Each skipped step (an outer value, a lane's completion under a queue, a defer
-begun, a frame's stall or close) drops a leading skip at its hole; whether the
-frames above pass it up: an outer frame, a connect's source (joiners' images
-drop too), and every frame's `Pass` condition at a real configuration (a
-hushed connect source leaves nothing running). Settled when these are
-bodies, or refuted.
+Each skipped step drops a skip at one position of its hole; whether every
+frame above passes it there. The race facts come from the search (`Won`) or
+a rise (`Clear`), but a subscribing configuration's order carries nothing,
+so a defer's and a begun lane's pass have no source yet. Also an outer
+frame, and a connect's source (joiners' images drop too). Settled when these
+are bodies, or refuted.
 
 Members: `outer-begins`, `outer-queues`, `outer-ignores`, `outer-begins-pass`,
 `outer-queues-pass`, `outer-ignores-pass`, `lane-begins`, `lane-begins-pass`,
