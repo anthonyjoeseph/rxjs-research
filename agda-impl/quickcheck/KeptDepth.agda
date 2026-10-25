@@ -2,7 +2,7 @@
 
 -- THE KEPT DEPTH, TESTED: every silent step of the engine drops the
 -- leading skip of what its configuration means (`adequacy.Engine.Meaning.M`)
--- and erases none or more of the skips past it, or means the same, event for event, skips and positions included
+-- and erases none or more of the skips past it, or means the same, event for event, skips, positions and tails included
 -- (`adequacy.Content.silent-exact`), with less work left
 -- (`adequacy.Engine.Spent.Spending.silent-spent`), and never the same
 -- when the step is one whose work may grow (`adequacy.Content`'s drops).
@@ -20,7 +20,7 @@ open import Data.Maybe using (just; nothing)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.String using (String; _++_)
 
-open import denotation.MonotonicList.Events using (Events; Events∞; out; skip; end; hush; Pos; _<ᵖ_)
+open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Tail∞; pin; idle; out; skip; end; hush; Pos; _<ᵖ_)
 open import Tree using (defer; mergeᶠ)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
@@ -32,7 +32,6 @@ open import adequacy.Engine.Meaning using (M)
 open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Ty using (natᵗ)
 open import quickcheck.Quickcheck using (program)
-open import quickcheck.Stepping using (exactᵇ)
 open import adequacy.Ghost using (module Ghosting)
 open import quickcheck.Spin using (showP)
 
@@ -146,28 +145,62 @@ private
   samePos : Pos → Pos → Bool
   samePos p q = not (p <ᵖ q) ∧ not (q <ᵖ p)
 
+  -- Whether `u` is `t`, to `k` pins of `t`, with none or more of its pins
+  -- erased (`adequacy.Engine.Drop.Eraseᵀ`).
+  unpinnedᵇ : ℕ → Tail → Tail → Bool
+  unpinnedᵇ zero    _         _          = true
+  unpinnedᵇ (suc k) (pin p l) (pin q r)  =
+    if samePos p q then unpinnedᵇ k (Tail∞.later l) (Tail∞.later r) else unpinnedᵇ k (Tail∞.later l) (pin q r)
+  unpinnedᵇ (suc k) (pin p l) idle       = unpinnedᵇ k (Tail∞.later l) idle
+  unpinnedᵇ (suc k) idle      idle       = true
+  unpinnedᵇ (suc k) idle      (pin _ _)  = false
+
+  -- Past an erased skip, its tail erased to what the other leaves running.
+  pastᵇ : ℕ → Tail → Maybe Tail → Bool
+  pastᵇ k u nothing  = true
+  pastᵇ k u (just t) = unpinnedᵇ k u t
+
   -- Whether `e′` is `e`, to `k` events of `e`, with none or more of its
-  -- skips erased (`adequacy.Engine.Drop.Erase`).  Positions strictly
-  -- rise, so a skip at the other's position is never one to erase.
-  erasedᵇ : ℕ → Events ℕ → Events ℕ → Bool
-  erasedᵇ zero    _           _            = true
-  erasedᵇ (suc k) (out p a r) (out q b r′) = samePos p q ∧ (a ≡ᵇ b) ∧ erasedᵇ k (Events∞.force r) (Events∞.force r′)
-  erasedᵇ (suc k) (skip p r)  (skip q r′)  =
-    if samePos p q then erasedᵇ k (Events∞.force r) (Events∞.force r′) else erasedᵇ k (Events∞.force r) (skip q r′)
-  erasedᵇ (suc k) (skip p r)  e′           = erasedᵇ k (Events∞.force r) e′
-  erasedᵇ (suc k) (end p)     (end q)      = samePos p q
-  erasedᵇ (suc k) hush        hush         = true
-  erasedᵇ (suc k) _           _            = false
+  -- skips erased (`adequacy.Engine.Drop.Erase`): each tail beside a kept
+  -- event erased to the other's, the tail past an erased skip to what the
+  -- other leaves running there, `t` (unknown at the root).  Positions
+  -- strictly rise, so a skip at the other's position is never one to erase.
+  erasedᵇ : ℕ → Maybe Tail → Events ℕ → Events ℕ → Bool
+  erasedᵇ zero    t _           _            = true
+  erasedᵇ (suc k) t (out p a r) (out q b r′) =
+    samePos p q ∧ (a ≡ᵇ b) ∧ unpinnedᵇ k (Events∞.cut r) (Events∞.cut r′) ∧ erasedᵇ k (just (Events∞.cut r′)) (Events∞.force r) (Events∞.force r′)
+  erasedᵇ (suc k) t (skip p r)  (skip q r′)  =
+    if samePos p q then unpinnedᵇ k (Events∞.cut r) (Events∞.cut r′) ∧ erasedᵇ k (just (Events∞.cut r′)) (Events∞.force r) (Events∞.force r′)
+    else pastᵇ k (Events∞.cut r) t ∧ erasedᵇ k t (Events∞.force r) (skip q r′)
+  erasedᵇ (suc k) t (skip p r)  e′           = pastᵇ k (Events∞.cut r) t ∧ erasedᵇ k t (Events∞.force r) e′
+  erasedᵇ (suc k) t (end p)     (end q)      = samePos p q
+  erasedᵇ (suc k) t hush        hush         = true
+  erasedᵇ (suc k) t _           _            = false
+
+  sameᵀ : ℕ → Tail → Tail → Bool
+  sameᵀ zero    _         _         = true
+  sameᵀ (suc k) (pin p l) (pin q r) = samePos p q ∧ sameᵀ k (Tail∞.later l) (Tail∞.later r)
+  sameᵀ (suc k) idle      idle      = true
+  sameᵀ (suc k) _         _         = false
+
+  -- Whether `e′` is `e`, to `k` events, tails included.
+  exactᵗ : ℕ → Events ℕ → Events ℕ → Bool
+  exactᵗ zero    _           _            = true
+  exactᵗ (suc k) (out p a r) (out q b r′) = samePos p q ∧ (a ≡ᵇ b) ∧ sameᵀ k (Events∞.cut r) (Events∞.cut r′) ∧ exactᵗ k (Events∞.force r) (Events∞.force r′)
+  exactᵗ (suc k) (skip p r)  (skip q r′)  = samePos p q ∧ sameᵀ k (Events∞.cut r) (Events∞.cut r′) ∧ exactᵗ k (Events∞.force r) (Events∞.force r′)
+  exactᵗ (suc k) (end p)     (end q)      = samePos p q
+  exactᵗ (suc k) hush        hush         = true
+  exactᵗ (suc k) _           _            = false
 
   -- Whether `e′` is `e` past its leading skip, the rest with skips erased.
   dropped : Events ℕ → Events ℕ → Bool
-  dropped (skip p r) e′ = erasedᵇ depth (Events∞.force r) e′
+  dropped (skip p r) e′ = erasedᵇ depth nothing (Events∞.force r) e′
   dropped _          e′ = false
 
   -- A silent step from `m` to `m′`: 2 dropped leading skips, 1 meant the
   -- same with less work left and not skipped, 0 neither.
   kind : Conf ℕ → Conf ℕ → ℕ
-  kind m m′ = if exactᵇ depth (M m) (M m′) then (if lowerᵇ (work m′) (work m) ∧ not (skippedᵇ m) then 1 else 0)
+  kind m m′ = if exactᵗ depth (M m) (M m′) then (if lowerᵇ (work m′) (work m) ∧ not (skippedᵇ m) then 1 else 0)
               else (if dropped (M m) (M m′) then 2 else 0)
 
   -- Whether every silent step keeps its meaning so, and the longest run
