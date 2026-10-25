@@ -742,7 +742,9 @@ module _ {R : Set} where
   rise-lead (inBody (cs cl true sa ba as nothing r en) o c) s (nx b) p l iv = proj₂ (proj₂ l)
   rise-lead (inBody (cs cl true sa ba as (just _) r en) o c) s (nx b) p () iv
   rise-lead (inBody (cs cl false sa ba as ow r en) o c)      s (nx b) p () iv
-  rise-lead (inBody k o c)                    s cp     p l iv = l _
+  rise-lead (inBody (cs cl true sa ba as nothing r en) o c) s cp p l iv = proj₂ l _
+  rise-lead (inBody (cs cl true sa ba as (just _) r en) o c) s cp p () iv
+  rise-lead (inBody (cs cl false sa ba as ow r en) o c)      s cp p () iv
 
   -- A subscribe rises nothing, and carries its lead down.
   sub-lead : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Lead ⟨ c , s , subscribing , p ⟩ → NextLead (step ⟨ c , s , subscribing , p ⟩)

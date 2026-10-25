@@ -10,15 +10,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE FLIGHT KEPT
 
-Untried: a lane's end, an outer's value or end, a body's end, a subscribe
-beginning a former, and a mark run each leave the hole's run in shape and
-every frame above keyed against it (`adequacy.Engine.Above.Flight`). A frame
-of one child, a lane's value and a body's value are proven. Settled by a
-lane's end dequeuing as the merge's run does.
+Untried: a lane's end, an outer's value or end, a subscribe beginning a
+former, and a mark run each leave the hole's run in shape and every frame
+above keyed against it (`adequacy.Engine.Above.Flight`). A frame of one
+child, a lane's or a body's value and a body's end under an open observer are
+proven. Settled by a lane's end dequeuing as the merge's run does.
 
-Members: `rise-lane-end-flight`, `rise-body-end-flight`, `rise-admit-flight`,
-`rise-outer-end-flight`, `begin-flight`, `run-flight`, `flight-load`,
-`flight-held`.
+Members: `rise-lane-end-flight`, `rise-admit-flight`, `rise-outer-end-flight`,
+`begin-flight`, `run-flight`, `flight-load`, `flight-held`.
 
 #### THE KEYS KEPT
 
@@ -75,12 +74,13 @@ Members: `fed-fresh`, `fed-join`, `defer-links`, `fed-sourced`.
 
 #### THE CLOSED LANE
 
-Untried: a lane completing under a closed frame. The race that picked it
-still ran, but a closed frame's candidates need not be its parts' heads, so
-the lane's end may not lead them. Settled when `lane-begins-shut` is a body,
-or refuted (then `lane-begins` reads the open frame `lane-drop` reaches).
+Untried: a lane or a body completing under a closed frame. The race that
+picked it still ran, but a closed frame's candidates need not be its parts'
+heads, so the end may not lead a sibling lane or the connect's source.
+Settled when both are bodies, or refuted (then each reads the open frame
+`lane-drop` reaches).
 
-Members: `lane-begins-shut`.
+Members: `lane-begins-shut`, `rise-body-end-shut`.
 
 #### THE SORTED TAILS
 

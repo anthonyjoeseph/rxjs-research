@@ -47,7 +47,7 @@ open import adequacy.Placed.FlatAfter using (trail-take)
 open import operation.PureObservable using (module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ctx; top; inMap; inScan; inCut;
   inLn; inTake; inOuter; inLanes; inSrc; inBody; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; nx; cp; free; cpAt; cutAt; overAt;
-  CS; cs; rise; begin; admit; dequeue; settle; ended; alive; _⊕_)
+  CS; cs; closed; rise; begin; admit; dequeue; settle; ended; alive; _⊕_)
 open Events∞
 
 ------------------------------------------------------------------------
@@ -127,6 +127,13 @@ side-out r σ hush        {β = β} p b e bi nb = β , e , refl , cong (_∪ cut
 side-out r σ (out q a l) p b e bi nb rewrite e | nb = body-out r σ _ e
 side-out r σ (skip q l)  p b e bi nb rewrite e | nb = body-out r σ _ e
 side-out r σ (end q)     p b e bi nb rewrite e | nb = body-out r σ _ e
+
+-- A body's end its source is no earlier than is the connect's.
+side-end : ∀ {X B} r (σ : Events∞ X) (x : Events X) {h : Events∞ B} p → force h ≡ end p → NotBefore p (shown x) → M′.side r h σ x ≡ end p
+side-end r σ hush        p e nb = e
+side-end r σ (out q a l) p e nb rewrite e | nb = cong (M′.body r σ _) e
+side-end r σ (skip q l)  p e nb rewrite e | nb = cong (M′.body r σ _) e
+side-end r σ (end q)     p e nb rewrite e | nb = cong (M′.body r σ _) e
 
 -- An end, whatever it would have carried.
 shape-end : ∀ {A B} p {c} → Shape′ {A} (end p) c → Shape′ {B} (end p) c
@@ -210,8 +217,10 @@ module _ {R : Set} where
     rise-lane-end-flight : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) p
                          → Order ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → alive s ≡ true
                          → Owed (dequeue c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p)
-    rise-body-end-flight : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (s : St (X ∷ Γ) B) p → Order ⟨ inBody k o c , s , rising cp , p ⟩
-                         → Flight ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
+    -- THE CLOSED LANE: a body's end under a closed observer, where the
+    -- race need not have read its source's head.
+    rise-body-end-shut : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (s : St (X ∷ Γ) B) p → Order ⟨ inBody k o c , s , rising cp , p ⟩
+                       → closed c ≡ true → Flight ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
     begin-flight : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Order ⟨ c , pend o , subscribing , p ⟩
                  → NextOwed (step ⟨ c , pend o , subscribing , p ⟩)
 
@@ -270,6 +279,30 @@ module _ {R : Set} where
                 (ConnAt.kb ca) (ConnAt.kr ca) (ConnAt.fr ca) (ConnAt.cue ca) (ConnAt.ks ca) (ConnAt.rs ca) (ConnAt.ub ca))
   rise-body-flight c (cs cl true sa ba as (just _) r en) o s b p od = ⊥-elim (Order.lead od)
   rise-body-flight c (cs cl false sa ba as ow r en) o s b p od      = ⊥-elim (Order.lead od)
+
+  -- A body's end ends its live connect, its source no earlier under an
+  -- open observer: the connect's run ends there.
+  rise-body-end-flight : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (s : St (X ∷ Γ) B) p → Order ⟨ inBody k o c , s , rising cp , p ⟩
+                       → Flight ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
+  rise-body-end-flight c (cs cl true sa ba as nothing r en) o s p od with closed c in ce
+  ... | true  = rise-body-end-shut c (cs cl true sa ba as nothing r en) o s p od ce
+  ... | false =
+    subst (Shape′ (end p)) (sym (proj₂ cr)) (subst (λ x → Shape′ x (M′.burstOn r σ ∪ cut h)) se bs)
+    , above-≋ c true (≋-by se (sym (proj₂ cr))) (proj₂ (proj₂ (Order.flight od)))
+    where
+      k  = cs cl true sa ba as nothing r en
+      ρ  = envAt c
+      σ  = srcState (srcG k o) ρ
+      h  = risen (gh s) (envAt (inBody k o c)) cp p
+      ca = proj₁ (proj₁ (proj₂ (Order.flight od)))
+      sσ = proj₂ (proj₂ (proj₁ (proj₂ (Order.flight od))))
+      cr = conn-run r (gh s) (srcG k o) ρ
+      se = side-end r σ (force σ) {h = h} p refl (proj₂ (proj₁ (Order.lead od) ce))
+      bs = subst (λ r′ → Shape′ (M′.beside r′ h σ) (M′.burstOn r′ σ ∪ cut h)) (sym (ConnAt.at ca))
+             (beside-go (ConnAt.mark ca) (ConnAt.hm ca) h σ sσ (proj₁ (Order.flight od))
+                (ConnAt.kb ca) (ConnAt.kr ca) (ConnAt.fr ca) (ConnAt.cue ca) (ConnAt.ks ca) (ConnAt.rs ca) (ConnAt.ub ca))
+  rise-body-end-flight c (cs cl true sa ba as (just _) r en) o s p od = ⊥-elim (Order.lead od)
+  rise-body-end-flight c (cs cl false sa ba as ow r en) o s p od      = ⊥-elim (Order.lead od)
 
   -- A rise through a frame of one child passes its run up; one absorbed
   -- owes nothing.
