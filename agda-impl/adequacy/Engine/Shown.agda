@@ -108,7 +108,8 @@ postulate
   -- feeds its body its own source's, by the erasure beside a source
   -- (`adequacy.Engine.Beside.body-⊒`), which asks the current inner
   -- source's place and the fed one's trail.  The fed inner source is the
-  -- run of no configuration given here, so its trail is the open part.
+  -- run of no configuration given here, so its trail is the open part:
+  -- the stepped configuration's, or a relation that cannot erase forever.
   --
   -- What the walk reads off this configuration at each node: the body's
   -- joiners of the source joined before its skip and hold nothing fed, no
@@ -116,6 +117,7 @@ postulate
   -- and the source's run nests nothing under a skip.
   --
   -- REFUTED: 413cf07a over any node and any source, by a source whose value comes before the skip it follows, merged beside a lane that leads: the skip neither leads nor is erasable.
+  -- DEAD ROUTE: the fed inner source's trail read off its relation to the current one, which trails: an erased step spends depth, so endless erased skips leave the rest unconstrained (refuted at f1f7d119).
   -- RECOVERY: git show 413cf07a^:agda-impl/adequacy/Engine/Shown.agda restores a node owing its source nothing and a run nesting nothing, as definitions over a node, and the node-level statement
   src-fed : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h h′ : Events∞ X}
           → Sought v q P → KAfter (after q) (cand (inBody (cs false true sa ba as nothing r en) o c) b)

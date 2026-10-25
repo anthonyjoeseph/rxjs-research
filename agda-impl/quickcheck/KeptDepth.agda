@@ -12,7 +12,7 @@
 -- close and defer where it is shown links past every live source above
 -- it (`adequacy.Engine.Shown.Links`): the body fed the rest erased of the
 -- body fed the run, or past skips under the source's
--- (`adequacy.Engine.Shown.src-fed`), owing the source nothing, its
+-- (`adequacy.Engine.Shown.src-fed`), and so every node of it, owing the source nothing, its
 -- source's run nesting nothing, and after each source skip shows
 -- (`adequacy.Engine.Shown.src-body-on`).
 module quickcheck.KeptDepth where
@@ -52,7 +52,7 @@ open import Tree using (Obs; FlatOp)
 open import denotation.MonotonicList.Events using (Timeline)
 open import adequacy.Engine.Head using (cand)
 open import adequacy.Engine.Pick using (past)
-open import adequacy.Engine.Meaning using (mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn; srcState; srcG; gh; lane; lanesL; deadL; envAt)
+open import adequacy.Engine.Meaning using (mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn; srcState; srcG; srcRun; gh; lane; lanesL; deadL; envAt)
 open import adequacy.Engine.Ahead using (shown) renaming (shows to showsᵃ)
 open import denotation.MonotonicList using (head)
 open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
@@ -326,6 +326,27 @@ private
           unnested (just y) = not (inside p y)
   flatᵇ _       _           = true
 
+  -- Every node of a body fed, not only the body: each inner source fed
+  -- by the sources above it, each inner body by its source as well.
+  mutual
+    fedWalkᵇ : ∀ {Δ A} → Pos → St Δ A → U.NEnv Δ → U.NEnv Δ → Bool
+    fedWalkᵇ q s ρ ρ′ = fedᵇ depth q (U.stateᴺ (gh s) ρ) (U.stateᴺ (gh s) ρ′) ∧ fedKidsᵇ q s ρ ρ′
+
+    fedKidsᵇ : ∀ {Δ A} → Pos → St Δ A → U.NEnv Δ → U.NEnv Δ → Bool
+    fedKidsᵇ q (mapS f s)              ρ ρ′ = fedWalkᵇ q s ρ ρ′
+    fedKidsᵇ q (scanS f z s)           ρ ρ′ = fedWalkᵇ q s ρ ρ′
+    fedKidsᵇ q (cutS l a s)            ρ ρ′ = fedWalkᵇ q s ρ ρ′
+    fedKidsᵇ q (lnS b s)               ρ ρ′ = fedWalkᵇ q s ρ ρ′
+    fedKidsᵇ q (takeS i w x s)         ρ ρ′ = fedWalkᵇ q s ρ ρ′
+    fedKidsᵇ q (flatS op f d n p o ls) ρ ρ′ = fedWalkᵇ q o ρ ρ′ ∧ fedLanesᵇ q ls ρ ρ′
+    fedKidsᵇ q (connS k o b)           ρ ρ′ =
+      fedWalkᵇ q o ρ ρ′ ∧ fedWalkᵇ q b (srcRun (srcG k o) ρ ∷ᴬ ρ) (srcRun (srcG k o) ρ′ ∷ᴬ ρ′)
+    fedKidsᵇ q _                       ρ ρ′ = true
+
+    fedLanesᵇ : ∀ {Δ A} → Pos → List (St Δ A) → U.NEnv Δ → U.NEnv Δ → Bool
+    fedLanesᵇ q []       ρ ρ′ = true
+    fedLanesᵇ q (l ∷ ls) ρ ρ′ = fedWalkᵇ q l ρ ρ′ ∧ fedLanesᵇ q ls ρ ρ′
+
   -- `adequacy.Engine.Shown.Links`, decided.
   linksᵇ : ∀ {R Γ A} → Bool → Pos → Ctx R Γ A → Bool → Events∞ A → Events∞ A → Bool
   linksᵇ v q top                          f h h′ = true
@@ -343,7 +364,8 @@ private
     linksᵇ v q c true (lanesFrame op (lane g) d w (gh o) (reverseL pre) post f (envAt c) h) (lanesFrame op (lane g) d w (gh o) (reverseL pre) post f (envAt c) h′)
   linksᵇ v q (inSrc (cs false true sa ba as nothing r en) b c) f h h′ =
     srcPassᵇ v q (U.stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (U.stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c)) h′
-    ∧ caughtᵇ 0 q (gh b) ∧ flatᵇ depth (Events∞.force h) ∧ linksᵇ true q c true (connSrc false r en (gh b) (envAt c) h) (connSrc false r en (gh b) (envAt c) h′)
+    ∧ caughtᵇ 0 q (gh b) ∧ flatᵇ depth (Events∞.force h) ∧ fedWalkᵇ q b (Events∞.force h ∷ᴬ envAt c) (Events∞.force h′ ∷ᴬ envAt c)
+    ∧ linksᵇ true q c true (connSrc false r en (gh b) (envAt c) h) (connSrc false r en (gh b) (envAt c) h′)
   linksᵇ v q (inSrc (cs false true sa ba as (just _) r en) b c) f h h′ = true
   linksᵇ v q (inSrc (cs false false sa ba as ow r en) b c)      f h h′ = true
   linksᵇ v q (inSrc (cs true sl sa ba as ow r en) b c)          f h h′ = true
