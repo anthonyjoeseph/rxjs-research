@@ -10,9 +10,12 @@
 -- by `head-agrees` at the sibling); and the stepper's head is the
 -- meaning's (`sides-link`).
 --
--- So a configuration carries only the fragment's shape (`Frag` of its
--- whole tree) and, while a value rises, what that pick established about
--- the frames above it (`Clear`).  Nothing relates two nodes' keys.
+-- So a configuration carries the fragment's shape (`Frag` of its whole
+-- tree), while a value rises what that pick established about the frames
+-- above it (`Clear`), and where the search runs, that a still find leads
+-- every race above it past each live source's skips (`Apart`): the
+-- engine's race reads a source's skip at one key, while the frames above
+-- are asked of every position under it.
 --
 -- `Clear` follows the value up as `rise` carries it, each frame at the
 -- position the value has there: an inclusive takeWhile's failing value
@@ -32,7 +35,7 @@ module adequacy.Engine.Pick where
 open import Data.Empty using (⊥)
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; reverse)
-open import Data.List.Properties using (ʳ++-defn; ++-identityʳ; reverse-involutive)
+open import Data.List.Properties using (ʳ++-defn)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to all-++⁺)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -44,11 +47,11 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; tra
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.MonotonicList.Events using (Pos; Timeline; idle; _∪_; ix)
 open import denotation.Unfold using (Step; NEnv; states; outerᴺ; step; headˢ; hushˢ; outˢ; skipˢ; endˢ)
-open import operation.Key using (Key; at; _<ᴷ_)
+open import operation.Key using (Key; at; after; _<ᴷ_)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; mapS; scanS; cutS; lnS; takeS; flatS; connS; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes;
   inSrc; inBody; plug; closed; Out; still; shows; seek; search; found; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
-  Mark; own; nx; cp; alive; free; cpAt; cutAt; overAt; _⊕_; mapT; scanT; cutT; takeT; laneT; shift; over; outOf)
+  Mark; own; Found; nx; cp; alive; free; cpAt; cutAt; overAt; _⊕_; mapT; scanT; cutT; takeT; laneT; shift; over; outOf)
   renaming (outerT to outerK)
 open import adequacy.Engine.Meaning using (gh; lane; outerG; poolG; lanesL; deadL; poolT; tailsOn; outerT; envAt)
 open import adequacy.Engine.Race using (First; NotBefore; After)
@@ -84,7 +87,7 @@ Clear p a (inLanes op f d n q o pre post c) s =
 Clear p a (inSrc k b c)                     s = over k ≡ false → closed c ≡ false → After (p ⊕ [ ix 0 ]) (headˢ (step (gh b)))
 Clear p a (inBody k o c)                    s = Clear p a c (connS k o s)
 
--- The configuration's order: the whole tree's shape, and a rise's lead.
+-- A rise's lead.
 Lead : ∀ {R} → Conf R → Set
 Lead ⟨ c , s , rising (nx a) , p ⟩ = Clear p a c s
 Lead ⟨ c , s , rising cp , p ⟩     = ⊤
@@ -93,60 +96,6 @@ Lead ⟨ c , s , absorbed , p ⟩      = ⊤
 
 whole : ∀ {R} → Conf R → St [] R
 whole ⟨ c , s , m , p ⟩ = plug c s
-
--- A source's candidate and its body's, the body not just past the
--- source: nothing lies strictly between a key and its `shift`, so a body
--- there would beat a source the meaning puts first.
-Untie : ∀ {A B} → Maybe (Key × Out A) → Maybe (Key × Out B) → Set
-Untie (just (h , _)) (just (k , _)) = shift h ≡ k → ⊥
-Untie _              _              = ⊤
-
--- Every live connect of a tree, untied.
-mutual
-  Untied : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Set
-  Untied c (mapS f s)              = Untied (inMap f c) s
-  Untied c (scanS f z s)           = Untied (inScan f z c) s
-  Untied c (cutS l a s)            = Untied (inCut l a c) s
-  Untied c (lnS b s)               = Untied (inLn b c) s
-  Untied c (takeS i q w s)         = Untied (inTake i q w c) s
-  Untied c (flatS op f d n q o ls) = Untied (inOuter op f d n q ls c) o × Untieds c op f d n q o [] ls
-  Untied c (connS k o b)           =
-    (over k ≡ false → Untie (cand (inSrc k b c) o) (cand (inBody k o c) b)) × Untied (inSrc k b c) o × Untied (inBody k o c) b
-  Untied c _                       = ⊤
-
-  Untieds : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → ℕ → List A → St Γ A
-          → List (St Γ B) → List (St Γ B) → Set
-  Untieds c op f d n q o pre []         = ⊤
-  Untieds c op f d n q o pre (s ∷ post) = Untied (inLanes op f d n q o pre post c) s × Untieds c op f d n q o (s ∷ pre) post
-
-untieds-at : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) acc ys (s : St Γ B) post
-           → Untieds c op f d n q o acc (ys ++ s ∷ post) → Untied (inLanes op f d n q o (ys ʳ++ acc) post c) s
-untieds-at c op f d n q o acc []       s post (u , _)  = u
-untieds-at c op f d n q o acc (y ∷ ys) s post (_ , us) = untieds-at c op f d n q o (y ∷ acc) ys s post us
-
--- A node of an untied tree, untied where it sits.
-untied-at : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Untied top (plug c s) → Untied c s
-untied-at top                               s u = u
-untied-at (inMap f c)                       s u = untied-at c (mapS f s) u
-untied-at (inScan f z c)                    s u = untied-at c (scanS f z s) u
-untied-at (inCut l a c)                     s u = untied-at c (cutS l a s) u
-untied-at (inLn b c)                        s u = untied-at c (lnS b s) u
-untied-at (inTake i q w c)                  s u = untied-at c (takeS i q w s) u
-untied-at (inOuter op f d n q ls c)         s u = proj₁ (untied-at c (flatS op f d n q s ls) u)
-untied-at (inLanes op f d n q o pre post c) s u =
-  subst (λ ps → Untied (inLanes op f d n q o ps post c) s)
-    (trans (ʳ++-defn (reverse pre)) (trans (++-identityʳ _) (reverse-involutive pre)))
-    (untieds-at c op f d n q o [] (reverse pre) s post
-      (subst (Untieds c op f d n q o []) (ʳ++-defn pre) (proj₂ (untied-at c (flatS op f d n q o (pre ʳ++ s ∷ post)) u))))
-untied-at (inSrc k b c)                     s u = proj₁ (proj₂ (untied-at c (connS k s b) u))
-untied-at (inBody k o c)                    s u = proj₂ (proj₂ (untied-at c (connS k o s) u))
-
-record Order {R} (k : Conf R) : Set where
-  constructor order
-  field
-    shape  : Frag (whole k)
-    lead   : Lead k
-    untied : Untied top (whole k)
 
 ------------------------------------------------------------------------
 -- The engine's race, as the winner's frames saw it
@@ -157,11 +106,6 @@ KAfter     k nothing        = ⊤
 KAfter     k (just (h , _)) = k <ᴷ h ≡ true
 KNotBefore k nothing        = ⊤
 KNotBefore k (just (h , _)) = h <ᴷ k ≡ false
-
--- A source the body beat: its event, as the connect reads it, not before.
-SrcBehind : ∀ {A} → Bool → Key → Maybe (Key × Out A) → Set
-SrcBehind v k nothing        = ⊤
-SrcBehind v k (just (h , _)) = (if v then h else shift h) <ᴷ k ≡ false
 
 -- Strictly before each of a node's own marks.
 Before : Key → List (Mark × Key) → Set
@@ -184,8 +128,7 @@ record LaneWon {R Γ A B} (k : Key) (c : Ctx R Γ B) op (f : A → Obs Timeline 
     newerW : Race KNotBefore k c op f d n q o (s ∷ pre) post []
 
 -- Every flatMap above the found node raced it in, each at the key and
--- event its candidate has there; every connect's own marks and other
--- side lost to it.
+-- event its candidate has there; every connect's body lost to its source.
 Won : ∀ {R Γ A} → Key × Out A → Ctx R Γ A → St Γ A → Set
 Won h       top                                s = ⊤
 Won (k , o) (inMap f c)                        s = Won (mapT f k o) c (mapS f s)
@@ -193,15 +136,56 @@ Won (k , o) (inScan f z c)                     s = Won (scanT f z k o) c (scanS 
 Won (k , o) (inCut l a c)                      s = Won (cutT l k o) c (cutS l a s)
 Won h       (inLn b c)                         s = Won h c (lnS b s)
 Won (k , o) (inTake i q w c)                   s = Won (takeT i q w k o) c (takeS i q w s)
-Won (k , o) (inOuter op f d n q ls c)          s = Race KAfter k c op f d n q s [] ls [] × Won (outerK n q k o) c (flatS op f d n q s ls)
+Won (k , o) (inOuter op f d n q ls c)          s = Won (outerK n q k o) c (flatS op f d n q s ls)
 Won (k , o) (inLanes op f d n q o′ pre post c) s =
   LaneWon k c op f d n q o′ pre post s × Won (uncurry (laneT d n q) (cutT (alive s) k o)) c (flatS op f d n q o′ (pre ʳ++ s ∷ post))
 Won (k , o) (inSrc kk b c)                     s =
-  KAfter (if over kk then k else shift k) (cand (inBody kk s c) b) × Before (if over kk then k else shift k) (own (connS kk s b))
-  × Won ((if over kk then k else shift k) , still) c (connS kk s b)
-Won (k , x) (inBody kk o c)                    s =
-  cand (inBody kk o c) s ≡ just (k , x) × SrcBehind (over kk) k (cand (inSrc kk s c) o) × Before k (own (connS kk o s))
-  × Won (k , x) c (connS kk o s)
+  KAfter (if over kk then k else shift k) (cand (inBody kk s c) b) × Won ((if over kk then k else shift k) , still) c (connS kk s b)
+Won h       (inBody kk o c)                    s = Won h c (connS kk o s)
+
+-- A key past a live source's skips: after every position under it.
+past : Bool → Key → Key
+past true  k         = k
+past false (at p)    = after p
+past false (after p) = after p
+
+-- Every race above a still found node, at its key read past each live
+-- source's skips: every flatMap's as `Won` reads it; at a connect's
+-- source, its body and its own marks after; at its body, its source no
+-- earlier and its own marks after.
+Beat : ∀ {R Γ A} → Key → Ctx R Γ A → St Γ A → Set
+Beat k top                                s = ⊤
+Beat k (inMap f c)                        s = Beat k c (mapS f s)
+Beat k (inScan f z c)                     s = Beat k c (scanS f z s)
+Beat k (inCut l a c)                      s = Beat k c (cutS l a s)
+Beat k (inLn b c)                         s = Beat k c (lnS b s)
+Beat k (inTake i q w c)                   s = Beat k c (takeS i q w s)
+Beat k (inOuter op f d n q ls c)          s = Race KAfter k c op f d n q s [] ls [] × Beat k c (flatS op f d n q s ls)
+Beat k (inLanes op f d n q o pre post c)  s = LaneWon k c op f d n q o pre post s × Beat k c (flatS op f d n q o (pre ʳ++ s ∷ post))
+Beat k (inSrc kk b c)                     s =
+  KAfter (past (over kk) k) (cand (inBody kk s c) b) × Before (past (over kk) k) (own (connS kk s b)) × Beat (past (over kk) k) c (connS kk s b)
+Beat k (inBody kk o c)                    s = KNotBefore k (cand (inSrc kk s c) o) × Before k (own (connS kk o s)) × Beat k c (connS kk o s)
+
+-- What the search finds still beats every race above it.
+Beats : ∀ {R} → Maybe (Found R) → Set
+Beats nothing                                  = ⊤
+Beats (just (found (Γ , A , c , s) m key)) = outOf c s m ≡ still → Beat key c s
+
+Apart : ∀ {R} → St [] R → Set
+Apart t = Beats (search top t)
+
+-- Where the search runs, the tree is apart.
+Searched : ∀ {R} → Conf R → Set
+Searched ⟨ c , s , subscribing , p ⟩ = ⊤
+Searched ⟨ c , s , absorbed , p ⟩    = Apart (plug c s)
+Searched ⟨ c , s , rising e , p ⟩    = ⊤
+
+record Order {R} (k : Conf R) : Set where
+  constructor order
+  field
+    shape : Frag (whole k)
+    lead  : Lead k
+    apart : Searched k
 
 postulate
   -- The engine's search: the found node's key leads every race above it.
@@ -332,4 +316,4 @@ won-clear p a (inLanes op f d n q o pre post c) s s′ al (l , w) ft lv =
 won-clear p a (inSrc kk b c)                    s s′ al (w , _) ft with over kk
 ... | true  = λ ()
 ... | false = λ _ cl → after-step (p ⊕ [ ix 0 ]) (cand (inBody kk s c) b) (step (gh b)) w (open-agrees (inBody kk s c) b cl (frag-body c kk s b ft))
-won-clear p a (inBody kk o c)                   s s′ al (_ , _ , _ , w) ft = won-clear p a c (connS kk o s) (connS kk o s′) refl w ft
+won-clear p a (inBody kk o c)                   s s′ al w ft = won-clear p a c (connS kk o s) (connS kk o s′) refl w ft
