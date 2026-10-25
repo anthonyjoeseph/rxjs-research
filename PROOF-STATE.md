@@ -10,16 +10,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE FLIGHT KEPT
 
-Untried: a last lane's end, a lane's end dequeuing, an outer's value or end,
-a subscribe beginning a former, and a mark run each leave the hole's run in
-shape and every frame above keyed against it (`adequacy.Engine.Above.Flight`).
-A frame of one child, a lane's or a body's value and a body's end under an
-open observer are proven. Settled by a lane's end dequeuing as the merge's run
-does.
+Untried: the frames above a merge keep their share past the skip it drops
+when a lane's end dequeues; an outer's value or end, a subscribe beginning a
+former, and a mark run each leave the hole's run in shape and every frame
+above keyed against it (`adequacy.Engine.Above.Flight`). The dequeuing
+merge's own frame is proven. Settled by the frames above a dequeue keeping
+their share past the dropped skip.
 
-Members: `lane-last-flight`, `lane-begin-flight`, `rise-admit-flight`,
-`rise-outer-end-flight`, `begin-flight`, `run-flight`, `flight-load`,
-`flight-held`.
+Members: `lane-begin-above`, `rise-admit-flight`, `rise-outer-end-flight`,
+`begin-flight`, `run-flight`, `flight-load`, `flight-held`.
 
 #### THE KEYS KEPT
 
