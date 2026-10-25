@@ -10,7 +10,8 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SILENT RUN
 
-Probed by `quickcheck.KeptDepth` (trail and flatness only): a node mid-run,
+Probed by `quickcheck.KeptDepth` at every node, as configured and fed the
+rest: a node mid-run,
 read in an environment thinned from its own, keeps its run in order and its
 tail trailing it. Built against the unthinned environment, a merge, a
 connect, a joiner or a take must not rest on a skip the thinning erased.

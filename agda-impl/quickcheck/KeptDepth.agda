@@ -40,7 +40,7 @@ open import quickcheck.Ty using (natᵗ)
 open import quickcheck.Quickcheck using (program)
 open import adequacy.Ghost using (module Ghosting)
 open import quickcheck.Spin using (showP)
-open import quickcheck.Placing using (trailsᵇ; flatsᵇ)
+open import quickcheck.Placing using (trailsᵇ; flatsᵇ; steadyᵇ; pinsᵇ)
 
 open Driver ℕ using (Step; step; silent; value; complete; drained)
 open Ghosting ℕ using (work; Measure)
@@ -395,13 +395,69 @@ private
     placedLᵇ v q []       ρ = true
     placedLᵇ v q (l ∷ ls) ρ = placedᵇ v q l ρ ∧ placedLᵇ v q ls ρ
 
+  -- `adequacy.Engine.Trails.Shape`, decided: in order, steady, headed, and
+  -- trailing.
+  shapeᵇ : ∀ {A} → Events∞ A → Bool
+  shapeᵇ σ = orderedᵇ 30 (Events∞.force σ) ∧ steadyᵇ 30 (Events∞.force σ) ∧ headedᵇ 30 σ ∧ trailsᵇ 30 σ
+    where
+      hd : Pos → Bool
+      hd (ix _ ∷ _) = true
+      hd _          = false
+
+      atopᵇ : ∀ {A} → Pos → Events A → Bool
+      atopᵇ k (out h _ _) = not (h <ᵖ k)
+      atopᵇ k (skip h _)  = not (h <ᵖ k)
+      atopᵇ k (end h)     = not (h <ᵖ k)
+      atopᵇ k hush        = true
+
+      orderedᵇ : ∀ {A} → ℕ → Events A → Bool
+      orderedᵇ (suc n) (out k _ r) = atopᵇ k (Events∞.force r) ∧ orderedᵇ n (Events∞.force r)
+      orderedᵇ (suc n) (skip k r)  = atopᵇ k (Events∞.force r) ∧ orderedᵇ n (Events∞.force r)
+      orderedᵇ _       _           = true
+
+      allHd : List Pos → Bool
+      allHd []       = true
+      allHd (k ∷ ks) = hd k ∧ allHd ks
+
+      headedᵇ : ∀ {A} → ℕ → Events∞ A → Bool
+      headedᵇ zero    σ = true
+      headedᵇ (suc n) σ = allHd (pinsᵇ 12 (Events∞.cut σ)) ∧ now (Events∞.force σ)
+        where now : _ → Bool
+              now (out h _ r) = hd h ∧ headedᵇ n r
+              now (skip h r)  = hd h ∧ headedᵇ n r
+              now (end h)     = hd h
+              now hush        = true
+
+  -- Every node's state shaped, as `adequacy.Engine.Trails.shape-st` walks
+  -- it: a subscribing source shaped whole, its insides unread.
+  mutual
+    shapedᵇ : ∀ {Δ A} → St Δ A → U.NEnv Δ → Bool
+    shapedᵇ s ρ = shapeᵇ (U.stateᴺ (gh s) ρ) ∧ shapedKidsᵇ s ρ
+
+    shapedKidsᵇ : ∀ {Δ A} → St Δ A → U.NEnv Δ → Bool
+    shapedKidsᵇ (mapS f s)              ρ = shapedᵇ s ρ
+    shapedKidsᵇ (scanS f z s)           ρ = shapedᵇ s ρ
+    shapedKidsᵇ (cutS l a s)            ρ = shapedᵇ s ρ
+    shapedKidsᵇ (lnS b s)               ρ = shapedᵇ s ρ
+    shapedKidsᵇ (takeS i w x s)         ρ = shapedᵇ s ρ
+    shapedKidsᵇ (flatS op f d n p o ls) ρ = shapedᵇ o ρ ∧ shapedLᵇ ls ρ
+    shapedKidsᵇ (connS (cs cl sl sa (just p) as ow r en) o b) ρ =
+      shapeᵇ (srcState (srcG (cs cl sl sa (just p) as ow r en) o) ρ) ∧ shapedᵇ b (srcRun (srcG (cs cl sl sa (just p) as ow r en) o) ρ ∷ᴬ ρ)
+    shapedKidsᵇ (connS k o b)           ρ = shapedᵇ o ρ ∧ shapedᵇ b (srcRun (srcG k o) ρ ∷ᴬ ρ)
+    shapedKidsᵇ _                       ρ = true
+
+    shapedLᵇ : ∀ {Δ A} → List (St Δ A) → U.NEnv Δ → Bool
+    shapedLᵇ []       ρ = true
+    shapedLᵇ (l ∷ ls) ρ = shapedᵇ l ρ ∧ shapedLᵇ ls ρ
+
   -- Unchecked; trails in the run's environment; in the rest's where the
-  -- run's holds; placed in the rest's, as the facts are stated.
+  -- run's holds; placed and shaped in the rest's, as the facts are stated.
   trailedᵇ : ∀ {Δ A} → ℕ → Bool → Pos → St Δ A → U.NEnv Δ → U.NEnv Δ → Bool
   trailedᵇ zero               v q b ρ ρ′ = true
   trailedᵇ (suc zero)         v q b ρ ρ′ = innerᵇ b ρ
   trailedᵇ (suc (suc zero))   v q b ρ ρ′ = not (innerᵇ b ρ) ∨ innerᵇ b ρ′
-  trailedᵇ (suc (suc (suc _))) v q b ρ ρ′ = placedᵇ v q b ρ′
+  trailedᵇ (suc (suc (suc zero))) v q b ρ ρ′ = placedᵇ v q b ρ′
+  trailedᵇ (suc (suc (suc (suc _)))) v q b ρ ρ′ = shapedᵇ b ρ′
 
   -- `adequacy.Engine.Shown.Links`, decided.
   linksᵇ : ∀ {R Γ A} → ℕ → Bool → Pos → Ctx R Γ A → Bool → Events∞ A → Events∞ A → Bool
@@ -475,6 +531,10 @@ private
   ... | _ = true
   linkedᵇ t _ = true
 
+  -- Every node of the configuration shaped.
+  rootShapedᵇ : Conf ℕ → Bool
+  rootShapedᵇ ⟨ c , s , _ , _ ⟩ = shapedᵇ (plug c s) []ᴬ
+
   -- Whether every silent step keeps its meaning so, and the longest run
   -- meaning the same.
   mutual
@@ -486,6 +546,8 @@ private
       else if not (linkedᵇ 1 m) then no (best ⊔ run) ("\n  untrailed: an inner source fed the run not trailing, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (linkedᵇ 2 m) then no (best ⊔ run) ("\n  untrailed: an inner source fed the rest not trailing, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (linkedᵇ 3 m) then no (best ⊔ run) ("\n  unplaced: an inner source fed the rest before a position asked of, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (linkedᵇ 4 m) then no (best ⊔ run) ("\n  unshaped: a node fed the rest out of shape, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (rootShapedᵇ m) then no (best ⊔ run) ("\n  unshaped: a node out of shape, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else next n run best (ls + linkCount m) m (step m)
 
     next : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict
