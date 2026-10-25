@@ -14,12 +14,12 @@ Each skipped step drops a skip at one position of its hole; whether every
 frame above passes it there. A live source's own pass: its next events, and
 its body fed past the skip, later. A subscribing configuration's order
 carries nothing, so a defer's and a begun lane's pass have no source yet.
-Also an outer frame's and a source's drops (joiners' images drop too).
+Also a source's drops (joiners' images drop too).
 Settled when these are bodies, or refuted.
 
 Members: `outer-begins`, `outer-queues`, `outer-ignores`, `outer-begins-pass`,
 `outer-queues-pass`, `outer-ignores-pass`, `lane-begins`, `lane-begins-pass`,
-`src-pass`, `defer-hole`, `defer-pass`, `outer-drops`, `src-drops`.
+`src-pass`, `defer-hole`, `defer-pass`, `src-drops`.
 
 #### THE STILL'S SUBTREE
 

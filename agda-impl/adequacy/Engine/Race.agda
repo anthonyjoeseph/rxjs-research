@@ -14,10 +14,10 @@ open import Data.List using (List; []; _∷_; _++_)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym; trans)
 
 open import denotation.MonotonicList.Events using (Events∞; Pos; Tail; idle; pin; _∪_; _<ᵖ_)
-open import denotation.MonotonicList using (MonotonicList; head; headᴼ; Earliest; none; found; earliest; clear; clears; cuts; go; parts; race; lane)
+open import denotation.MonotonicList using (MonotonicList; head; headᴼ; Earliest; none; found; earliest; clear; clears; cuts; go; parts; race; lane; outer)
 
 open Events∞
 
@@ -92,6 +92,40 @@ go-rise : ∀ {B} op (o : Maybe (Events∞ (MonotonicList B))) ls (h : Events∞
 go-rise op o ls h rs qs idle      e (first ns as on tn) = parts-rise op o ls h rs qs idle e ns as on
 go-rise op o ls h rs qs (pin k u) {p} e (first ns as on tn)
   rewrite clears-hole k p ls h rs e tn | ∧-zeroʳ (clear k (headᴼ o)) = parts-rise op o ls h rs qs (pin k u) e ns as on
+
+private
+  -- A found lane splits the list around itself.
+  Splits : ∀ {B} → List (Events∞ B) → Earliest B → Set
+  Splits ls none              = ⊤
+  Splits ls (found k bs l as) = ls ≡ bs ++ l ∷ as
+
+  earliest-splits : ∀ {B} (ls : List (Events∞ B)) → Splits ls (earliest ls)
+  earliest-splits []       = tt
+  earliest-splits (l ∷ ls) with head (force l) | earliest ls | earliest-splits ls
+  ... | nothing | none             | _  = tt
+  ... | nothing | found k bs c as  | eq = cong (l ∷_) eq
+  ... | just k  | none             | _  = refl
+  ... | just k  | found k′ bs c as | eq with k <ᵖ k′
+  ...   | true  = refl
+  ...   | false = cong (l ∷_) eq
+
+  race-outer : ∀ {B} op (e : Events∞ (MonotonicList B)) k bs (l : Events∞ B) as qs t {p} → head (force e) ≡ just p → p <ᵖ k ≡ true
+             → race op (just e) k bs l as qs t ≡ outer op e (bs ++ l ∷ as) qs t (force e)
+  race-outer op e k bs l as qs t he a rewrite he | a = refl
+
+  parts-outer : ∀ {B} op (e : Events∞ (MonotonicList B)) ls qs t {p} → head (force e) ≡ just p
+              → All (λ l → After p (head (force l))) ls → parts op (just e) ls qs t ≡ outer op e ls qs t (force e)
+  parts-outer op e ls qs t {p} he al with earliest ls | earliest-after p ls al | earliest-splits ls
+  ... | none             | _ | _  = refl
+  ... | found k bs l as′ | a | eq =
+    trans (race-outer op e k bs l as′ qs t he a) (cong (λ x → outer op e x qs t (force e)) (sym eq))
+
+-- THE OUTER FIRST: an outer headed before every lane, and no earlier than
+-- what ended parts left, gives the merge's next.
+go-outer : ∀ {B} op (e : Events∞ (MonotonicList B)) ls qs t {p} → head (force e) ≡ just p
+         → All (λ l → After p (head (force l))) ls → TailNotBefore p t → go op (just e) ls qs t ≡ outer op e ls qs t (force e)
+go-outer op e ls qs idle      he al tn = parts-outer op e ls qs idle he al
+go-outer op e ls qs (pin k u) he al tn rewrite he | tn = parts-outer op e ls qs (pin k u) he al
 
 -- A lane's tail is all a merge's tail reads of it.
 cuts-swap : ∀ {B} (ls : List (Events∞ B)) (h h′ : Events∞ B) rs → cut h ≡ cut h′ → cuts (ls ++ h ∷ rs) ≡ cuts (ls ++ h′ ∷ rs)

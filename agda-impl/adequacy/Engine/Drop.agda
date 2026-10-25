@@ -22,21 +22,22 @@ import denotation.MonotonicList as M′
 open import Data.List.Relation.Unary.All using (All) renaming (_∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (zero; suc)
-open import Data.Product using (_×_; _,_; Σ)
+open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Sum using (_⊎_)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
 
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; out; skip; end; hush; idle; _∪_)
 open import denotation.MonotonicList using (head; shownAt; Agree; Agreeᵀ; stop; skip⁼; agree-refl; agree-trans; agreeᵀ-refl; agreeᵀ-sym)
-open import denotation.NonExpansive using (_,ˢ_; mapᴱ-ne; scanᴱ-ne; takeWhileᴱ-ne; ∪-ne; beside-ne)
+open import denotation.NonExpansive using (_,ˢ_; mapᴱ-ne; scanᴱ-ne; takeWhileᴱ-ne; ∪-ne; beside-ne; Outerᴿ; liveᴼ; whole-ne; go-ne; mapᴱ-neᴹ)
 open import denotation.Unfold using (Node; NEnv; stateᴺ; states; outerᴺ)
 open import denotation.Denote using (flatOp)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; cs; free; cpAt; cutAt; overAt; closed)
 open import adequacy.Engine.Meaning using (_≋_; ≋-by; same; up; mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn; srcState;
-  srcG; envAt; gh; lane; lanesL; deadL; outerG; outerT; poolRuns; poolT; laneᴹ; lanesFrame-ne)
-open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore; go-rise)
+  srcG; envAt; gh; lane; lanesL; deadL; outerG; outerT; poolRuns; poolT; laneᴹ; lanesFrame-ne;
+  outerFrame-ne; outerOf; lanes-refl; queue-refl; ≈-refl)
+open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore; go-rise; go-outer)
 open Events∞
 open import denotation.NonExpansive using (Agreeˢ)
 open Agreeˢ
@@ -219,12 +220,38 @@ lanes-drops op g d q o pre post ρ {h} fi (dropˢ {k} {r} pk ag x) =
 lanes-drops op g d q o pre post ρ {h} fi (dropsˢ {k} {r} pk ag e) =
   dropsˢ pk (at-skip op g d q o pre post ρ (fi k pk) ag) (lanes-drops op g d q o pre post ρ fi e)
 
+private
+  -- The outer's skip, the outer's rest alike past it.
+  outer-skip : ∀ {B} op (x : Events∞ (M′.MonotonicList B)) ls qs t k (e e′ : Events∞ (M′.MonotonicList B))
+             → (∀ m → Outerᴿ m (just e) (just e′)) → ∀ n → Agree n (M′.outer op x ls qs t (skip k e)) (M′.outer op x ls qs t (skip k e′))
+  outer-skip op x ls qs t k e e′ o zero    = stop
+  outer-skip op x ls qs t k e e′ o (suc n) =
+    skip⁼ (whole-ne (o n) (lanes-refl n ls) (agreeᵀ-refl n t)) (go-ne op (o n) (lanes-refl n ls) (queue-refl n qs) (agreeᵀ-refl n t))
+
+  -- The outer's skip, first: the merge's next, the outer's rest in its place.
+  at-outer : ∀ {Γ A B} op (g : A → Pos → Node Γ B) q ls ds (ρ : NEnv Γ) {h r : Events∞ A} {k}
+           → All (λ l → After k (head (force l))) (states ls ρ) → TailNotBefore k (poolT ds ρ)
+           → (∀ n → Agree n (force h) (skip k r))
+           → ∀ n → Agree n (force (outerFrame op g false q ls ds ρ h)) (skip k (outerFrame op g false q ls ds ρ r))
+  at-outer op g q ls ds ρ {h} {r} {k} al tn ag n =
+    agree-trans (nowˢ (outerFrame-ne op g false q ls ds ρ (skipped-≋ {r = r} {h = h} ag n)))
+      (subst (λ x → Agree n x (skip k (outerFrame op g false q ls ds ρ r)))
+        (sym (go-outer (flatOp op) (outerOf g ρ (skipped k r h)) (states ls ρ) (L.map (laneᴹ g ρ) q) (poolT ds ρ) refl al tn))
+        (agree-trans (outer-skip (flatOp op) (outerOf g ρ (skipped k r h)) (states ls ρ) (L.map (laneᴹ g ρ) q) (poolT ds ρ) k _ (outerOf g ρ r)
+                        (λ m → liveᴼ (agreeᵀ-refl m (cut r)) (mapᴱ-neᴹ (λ x → ≈-refl (laneᴹ g ρ x)) (agree-refl m (force r)))) n)
+                     (skip-≋ (≋-by refl refl) n)))
+
+-- THE OUTER FIRST: an outer whose skips come before every lane's next
+-- and every tail its ended parts left passes them.
+outer-drops : ∀ {Γ A B P} op (g : A → Pos → Node Γ B) q ls ds (ρ : NEnv Γ) {h h′ : Events∞ A}
+            → (∀ k → P k → All (λ l → After k (head (force l))) (states ls ρ) × TailNotBefore k (poolT ds ρ))
+            → Dropsˢ P h h′ → Dropsˢ P (outerFrame op g false q ls ds ρ h) (outerFrame op g false q ls ds ρ h′)
+outer-drops op g q ls ds ρ fi (dropˢ {k} pk ag x) =
+  dropˢ pk (at-outer op g q ls ds ρ (proj₁ (fi k pk)) (proj₂ (fi k pk)) ag) (λ n → outerFrame-ne op g false q ls ds ρ (x n))
+outer-drops op g q ls ds ρ fi (dropsˢ {k} pk ag d) =
+  dropsˢ pk (at-outer op g q ls ds ρ (proj₁ (fi k pk)) (proj₂ (fi k pk)) ag) (outer-drops op g q ls ds ρ fi d)
+
 postulate
-  -- THE OUTER FIRST: an outer whose skips come before every lane's next
-  -- and every tail its ended parts left passes them.
-  outer-drops : ∀ {Γ A B P} op (g : A → Pos → Node Γ B) q ls ds (ρ : NEnv Γ) {h h′ : Events∞ A}
-              → (∀ k → P k → All (λ l → After k (head (force l))) (states ls ρ) × TailNotBefore k (poolT ds ρ))
-              → Dropsˢ P h h′ → Dropsˢ P (outerFrame op g false q ls ds ρ h) (outerFrame op g false q ls ds ρ h′)
   -- A SOURCE'S SKIPS AND ITS JOINERS': each source skip shows just past
   -- itself, each joiner's image of it under it, and what follows is
   -- later; so the connect drops them all, leading.
