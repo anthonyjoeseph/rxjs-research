@@ -10,10 +10,10 @@
 -- rewrites, and the context's share rides along.
 module adequacy.Engine.Inv where
 
-open import Data.Bool using (true; false; not; if_then_else_; _∧_)
-open import Data.List using (List; []; _∷_; _ʳ++_; null)
+open import Data.Bool using (Bool; true; false; not; if_then_else_; _∧_)
+open import Data.List using (List; []; _∷_; _ʳ++_; null; [_]; reverse)
 open import Data.Maybe using (just; nothing)
-open import Data.Nat using (pred; _<ᵇ_; _≡ᵇ_)
+open import Data.Nat using (ℕ; suc; pred; _<ᵇ_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -22,11 +22,15 @@ import Data.List.Relation.Unary.All
 open import Data.Empty using (⊥)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; subst₂; sym)
 
-open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList.Events using (Timeline; emit; stall; close)
+open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+open import denotation.MonotonicList.Events using (Pos; Timeline; emit; stall; close; Events∞; hush; idle; ix)
+open import denotation.MonotonicList using (Agreeᵀ)
 open import operation.Key using (at)
-open import denotation.Unfold using (same?)
+open import denotation.Unfold using (same?; NEnv; stateᴺ; subscribe)
 open import adequacy.Engine.Head using (Frag)
+open import adequacy.Engine.Ahead using (Under; shown; ahead-mono; under-sub)
+open import adequacy.Engine.Race using (NotBefore)
+open import adequacy.Engine.Meaning using (envAt)
 open import adequacy.Engine.Pick using (Order; order; module Order; whole; Lead; Clear; Ends; EndsIf; Won; won-clear; won-ends; search-won; Apart; Searched)
 open import operation.PureObservable using (Tape; due; play; ending; over; module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
@@ -34,7 +38,7 @@ open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; 
   CS; cs; shows; outOf; attAt; attached; free; cpAt; cutAt; overAt; nx; cp;
   Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising;
   Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM; search; found; leaf;
-  rise; run; begin; start; admit; dequeue; settle; ended; alive; feed; feedL; unsub; killAll; unsubIf)
+  rise; run; begin; start; admit; dequeue; settle; ended; alive; feed; feedL; unsub; killAll; unsubIf; _⊕_)
   renaming (cut to cutᴹ)
 
 ------------------------------------------------------------------------
@@ -586,12 +590,45 @@ module _ {R : Set} where
              → (∀ q (s′ : St Γ A) → key ≡ at q → outOf c s m ≡ shows cp → alive s ≡ alive s′ → Ends q c s′)
              → NextLead (took (run c s m p))
 
+  -- Where a lane begins, every frame above it, its flatMap's other parts
+  -- among them, passes every skip under it.
+  Begun : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p → Set
+  Begun c op f d n q o ls a p =
+    closed c ≡ false → Lead ⟨ inCut true (attAt (p ⊕ [ ix 1 ])) (inLn true (inLanes op f d (suc n) q o (reverse ls) [] c)) , pend (f a) , subscribing , p ⊕ [ ix 1 ] ⟩
+
+  Dequeues : ∀ {Γ A B} (c : Ctx R Γ B) (op : FlatOp) (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (q : List A) (o : St Γ A) (ls : List (St Γ B)) (p : Pos) → Set
+  Dequeues c op f d n []      o ls p = ⊤
+  Dequeues c op f d n (a ∷ q) o ls p = Begun c op f d n q o ls a p
+
+  postulate
+    -- A LANE BEGUN IS CLEAR BENEATH: what an admitted value or a lane's end
+    -- leaves the frames above, it leaves under the lane it begins.
+    outer-begun : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p
+                → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ → Begun c op f d n q o ls a p
+    switch-begun : ∀ {Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p
+                 → Inv ⟨ inOuter switchᶠ f d n q ls c , o , rising (nx a) , p ⟩ → Begun c switchᶠ f d 0 q o (proj₁ (killAll ls)) a p
+    lane-begun : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n a q (o : St Γ A) pre post (s : St Γ B) p
+               → alive s ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
+               → Begun c op f d (pred n) q o (pre ʳ++ ended s ∷ post) a p
+    -- A SOURCE ABOUT TO BE SUBSCRIBED shows no earlier than its body's
+    -- subscription and, hushed, leaves nothing running.
+    fresh-src : ∀ {Γ X} (o : Obs Timeline Γ X) p (ρ : NEnv Γ)
+              → (Events∞.force (stateᴺ (subscribe o (p ⊕ [ ix 1 ])) ρ) ≡ hush
+                   → ∀ d → Agreeᵀ d (Events∞.cut (stateᴺ (subscribe o (p ⊕ [ ix 1 ])) ρ)) idle)
+              × (∀ k → Under (_≡ p ⊕ [ ix 0 ]) k → NotBefore k (shown (Events∞.force (stateᴺ (subscribe o (p ⊕ [ ix 1 ])) ρ))))
+
+  dequeues : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) p
+           → alive s ≡ true → Inv ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → Dequeues c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p
+  dequeues c op f d n []      o pre post s p al iv = tt
+  dequeues c op f d n (a ∷ q) o pre post s p al iv = lane-begun c op f d n a q o pre post s p al iv
+
   -- Nothing a subscription starts or a slot frees rises a value; an
   -- outer completing rises its flatMap's end with the end's lead.
-  start-lead : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p → Lead (start c op f d n q o ls a p)
-  start-lead c op f d n q o ls a p with closed c
+  start-lead : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p → Begun c op f d n q o ls a p
+             → Lead (start c op f d n q o ls a p)
+  start-lead c op f d n q o ls a p b with closed c
   ... | true  = tt
-  ... | false = tt
+  ... | false = b refl
 
   lead-if : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p b → EndsIf b p c s → Lead ⟨ c , s , (if b then rising cp else absorbed) , p ⟩
   lead-if c s p true  l = l
@@ -601,90 +638,93 @@ module _ {R : Set} where
   settle-lead c s d n e p l = lead-if c s p (d ∧ (n ≡ᵇ 0) ∧ e) l
 
   dequeue-lead : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls p
-               → EndsIf (d ∧ (n ≡ᵇ 0) ∧ null q) p c (flatS op f d n q o ls) → Lead (dequeue c op f d n q o ls p)
-  dequeue-lead c op f d n []      o ls p l = settle-lead c (flatS op f d n [] o ls) d n true p l
-  dequeue-lead c op f d n (a ∷ q) o ls p l = start-lead c op f d n q o ls a p
+               → EndsIf (d ∧ (n ≡ᵇ 0) ∧ null q) p c (flatS op f d n q o ls) → Dequeues c op f d n q o ls p → Lead (dequeue c op f d n q o ls p)
+  dequeue-lead c op f d n []      o ls p l b = settle-lead c (flatS op f d n [] o ls) d n true p l
+  dequeue-lead c op f d n (a ∷ q) o ls p l b = start-lead c op f d n q o ls a p b
 
-  admit-lead : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p → NextLead (took (admit c op f d n q o ls a p))
-  admit-lead c (mergeᶠ nothing)  f d n q o ls a p = start-lead c (mergeᶠ nothing) f d n q o ls a p
-  admit-lead c (mergeᶠ (just m)) f d n q o ls a p with n <ᵇ m
-  ... | true  = start-lead c (mergeᶠ (just m)) f d n q o ls a p
+  admit-lead : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
+             → NextLead (took (admit c op f d n q o ls a p))
+  admit-lead c (mergeᶠ nothing)  f d n q o ls a p iv = start-lead c (mergeᶠ nothing) f d n q o ls a p (outer-begun c (mergeᶠ nothing) f d n q o ls a p iv)
+  admit-lead c (mergeᶠ (just m)) f d n q o ls a p iv with n <ᵇ m
+  ... | true  = start-lead c (mergeᶠ (just m)) f d n q o ls a p (outer-begun c (mergeᶠ (just m)) f d n q o ls a p iv)
   ... | false = tt
-  admit-lead c switchᶠ           f d n q o ls a p with killAll ls
-  ... | ls′ , t = start-lead c switchᶠ f d 0 q o ls′ a p
-  admit-lead c exhaustᶠ          f d n q o ls a p with n ≡ᵇ 0
-  ... | true  = start-lead c exhaustᶠ f d n q o ls a p
+  admit-lead c switchᶠ           f d n q o ls a p iv with killAll ls | switch-begun c f d n q o ls a p iv
+  ... | ls′ , t | b = start-lead c switchᶠ f d 0 q o ls′ a p b
+  admit-lead c exhaustᶠ          f d n q o ls a p iv with n ≡ᵇ 0
+  ... | true  = start-lead c exhaustᶠ f d n q o ls a p (outer-begun c exhaustᶠ f d n q o ls a p iv)
   ... | false = tt
 
   -- A rise carries its lead: each frame was clear at the position the
   -- value reaches it.
-  rise-lead : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Lead ⟨ c , s , rising e , p ⟩ → NextLead (took (rise c s e p))
-  rise-lead top                               s (nx a) p l = tt
-  rise-lead top                               s cp     p l = tt
-  rise-lead (inMap f c)                       s (nx a) p l = l
-  rise-lead (inMap f c)                       s cp     p l = l
-  rise-lead (inScan f z c)                    s (nx a) p l = l
-  rise-lead (inScan f z c)                    s cp     p l = l
-  rise-lead (inCut true x c)                  s (nx a) p l = l refl
-  rise-lead (inCut true x c)                  s cp     p l = l refl
-  rise-lead (inCut false x c)                 s (nx a) p l = tt
-  rise-lead (inCut false x c)                 s cp     p l = tt
-  rise-lead (inLn b c)                        s (nx a) p l = l
-  rise-lead (inLn b c)                        s cp     p l = l
-  rise-lead (inTake i q free c)               s (nx a) p l with q a | i
+  rise-lead : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Lead ⟨ c , s , rising e , p ⟩ → Inv ⟨ c , s , rising e , p ⟩
+            → NextLead (took (rise c s e p))
+  rise-lead top                               s (nx a) p l iv = tt
+  rise-lead top                               s cp     p l iv = tt
+  rise-lead (inMap f c)                       s (nx a) p l iv = l
+  rise-lead (inMap f c)                       s cp     p l iv = l
+  rise-lead (inScan f z c)                    s (nx a) p l iv = l
+  rise-lead (inScan f z c)                    s cp     p l iv = l
+  rise-lead (inCut true x c)                  s (nx a) p l iv = l refl
+  rise-lead (inCut true x c)                  s cp     p l iv = l refl
+  rise-lead (inCut false x c)                 s (nx a) p l iv = tt
+  rise-lead (inCut false x c)                 s cp     p l iv = tt
+  rise-lead (inLn b c)                        s (nx a) p l iv = l
+  rise-lead (inLn b c)                        s cp     p l iv = l
+  rise-lead (inTake i q free c)               s (nx a) p l iv with q a | i
   ... | true  | _     = proj₁ l refl
   ... | false | true  = proj₂ l refl refl
   ... | false | false = tt
-  rise-lead (inTake i q free c)               s cp     p l = l
-  rise-lead (inTake i q (cpAt r) c)           s (nx a) p l = tt
-  rise-lead (inTake i q (cpAt r) c)           s cp     p l = tt
-  rise-lead (inTake i q (cutAt r) c)          s (nx a) p l = tt
-  rise-lead (inTake i q (cutAt r) c)          s cp     p l = tt
-  rise-lead (inTake i q (overAt r) c)         s (nx a) p l = tt
-  rise-lead (inTake i q (overAt r) c)         s cp     p l = tt
-  rise-lead (inOuter op f d n q ls c)         s (nx a) p l = admit-lead c op f d n q s ls a p
-  rise-lead (inOuter op f d n q ls c)         s cp     p l = settle-lead c (flatS op f true n q s ls) true n (null q) p l
-  rise-lead (inLanes op f d n q o pre post c) s (nx b) p l with alive s
+  rise-lead (inTake i q free c)               s cp     p l iv = l
+  rise-lead (inTake i q (cpAt r) c)           s (nx a) p l iv = tt
+  rise-lead (inTake i q (cpAt r) c)           s cp     p l iv = tt
+  rise-lead (inTake i q (cutAt r) c)          s (nx a) p l iv = tt
+  rise-lead (inTake i q (cutAt r) c)          s cp     p l iv = tt
+  rise-lead (inTake i q (overAt r) c)         s (nx a) p l iv = tt
+  rise-lead (inTake i q (overAt r) c)         s cp     p l iv = tt
+  rise-lead (inOuter op f d n q ls c)         s (nx a) p l iv = admit-lead c op f d n q s ls a p iv
+  rise-lead (inOuter op f d n q ls c)         s cp     p l iv = settle-lead c (flatS op f true n q s ls) true n (null q) p l
+  rise-lead (inLanes op f d n q o pre post c) s (nx b) p l iv with alive s
   ... | true  = proj₂ (l refl)
   ... | false = tt
-  rise-lead (inLanes op f d n q o pre post c) s cp     p l with alive s
-  ... | true  = dequeue-lead c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p (proj₁ (proj₂ (proj₂ l)))
+  rise-lead (inLanes op f d n q o pre post c) s cp     p l iv with alive s in al
+  ... | true  = dequeue-lead c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p (proj₁ (proj₂ (proj₂ l))) (dequeues c op f d n q o pre post s p al iv)
   ... | false = tt
-  rise-lead (inSrc k b c)                     s (nx a) p l = tt
-  rise-lead (inSrc k b c)                     s cp     p l = tt
-  rise-lead (inBody k o c)                    s (nx b) p l = l
-  rise-lead (inBody k o c)                    s cp     p l = l _
+  rise-lead (inSrc k b c)                     s (nx a) p l iv = tt
+  rise-lead (inSrc k b c)                     s cp     p l iv = tt
+  rise-lead (inBody k o c)                    s (nx b) p l iv = l
+  rise-lead (inBody k o c)                    s cp     p l iv = l _
 
-  -- A subscribe rises nothing.
-  sub-lead : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → NextLead (step ⟨ c , s , subscribing , p ⟩)
-  sub-lead c (pend (cold x))          p = tt
-  sub-lead c (pend empty)             p = tt
-  sub-lead c (pend (of xs))           p = tt
-  sub-lead c (pend (map f o))         p = tt
-  sub-lead c (pend (scan f z o))      p = tt
-  sub-lead c (pend (takeWhile i q o)) p = tt
-  sub-lead c (pend (flatMap op f o))  p = tt
-  sub-lead c (pend (connect o b))     p = tt
-  sub-lead c (pend (connected x))     p with closedUp c x
+  -- A subscribe rises nothing, and carries its lead down.
+  sub-lead : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Lead ⟨ c , s , subscribing , p ⟩ → NextLead (step ⟨ c , s , subscribing , p ⟩)
+  sub-lead c (pend (cold x))          p l = tt
+  sub-lead c (pend empty)             p l = tt
+  sub-lead c (pend (of xs))           p l = tt
+  sub-lead c (pend (map f o))         p l = l
+  sub-lead c (pend (scan f z o))      p l = l
+  sub-lead c (pend (takeWhile i q o)) p l = l
+  sub-lead c (pend (flatMap op f o))  p l = λ sh → (λ k _ → Data.List.Relation.Unary.All.[] , tt) , l sh
+  sub-lead c (pend (connect o b))     p l =
+    λ sh → proj₁ (fresh-src o p (envAt c)) , proj₂ (fresh-src o p (envAt c)) , ahead-mono (under-sub p [ ix 0 ]) c true (l sh)
+  sub-lead c (pend (connected x))     p l with closedUp c x
   ... | true  = tt
   ... | false = tt
-  sub-lead c (pend (defer l))         p = tt
-  sub-lead c (coldS b l)              p = tt
-  sub-lead c (ofS i q xs)             p = tt
-  sub-lead c doneS                    p = tt
-  sub-lead c (mapS f s)               p = tt
-  sub-lead c (scanS f z s)            p = tt
-  sub-lead c (cutS l a s)             p = tt
-  sub-lead c (lnS b s)                p = tt
-  sub-lead c (takeS i q w s)          p = tt
-  sub-lead c (flatS op f d n q o ls)  p = tt
-  sub-lead c (connS k o b)            p = tt
-  sub-lead c (joinS j g x ib)         p = tt
+  sub-lead c (pend (defer d))         p l = λ sh → ahead-mono (under-sub p [ ix 1 ]) c true (l sh)
+  sub-lead c (coldS b l′)             p l = l
+  sub-lead c (ofS i q xs)             p l = l
+  sub-lead c doneS                    p l = l
+  sub-lead c (mapS f s)               p l = l
+  sub-lead c (scanS f z s)            p l = l
+  sub-lead c (cutS l′ a s)            p l = l
+  sub-lead c (lnS b s)                p l = l
+  sub-lead c (takeS i q w s)          p l = l
+  sub-lead c (flatS op f d n q o ls)  p l = l
+  sub-lead c (connS k o b)            p l = l
+  sub-lead c (joinS j g x ib)         p l = l
 
   -- THE PICK: the run of the least mark leads every frame above it.
   lead-next : ∀ k → Base k → Order k → NextLead (step k)
-  lead-next ⟨ c , s , rising e , p ⟩    b o = rise-lead c s e p (Order.lead o)
-  lead-next ⟨ c , s , subscribing , p ⟩ b o = sub-lead c s p
+  lead-next ⟨ c , s , rising e , p ⟩    b o = rise-lead c s e p (Order.lead o) (b & o)
+  lead-next ⟨ c , s , subscribing , p ⟩ b o = sub-lead c s p (Order.lead o)
   lead-next ⟨ c , s , absorbed , p ⟩    b o with search top (plug c s) in e
   ... | nothing = tt
   ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
@@ -714,7 +754,7 @@ module _ {R : Set} where
   inv-next k (b & o) = both (step k) (base-next k b) (ord-next k b o)
 
   inv-load : (o : Obs Timeline [] R) → Inv (Machine.load o)
-  inv-load o = base-load o & order tt tt tt
+  inv-load o = base-load o & order tt (λ _ → tt) tt
 
   -- A settled node anywhere in a tree the invariant holds of, absorbed at
   -- the same position: the invariant at it.

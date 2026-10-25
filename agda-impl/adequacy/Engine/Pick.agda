@@ -119,11 +119,12 @@ mutual
   EndsIf true  p c s = Ends p c s
   EndsIf false p c s = ⊤
 
--- A rise's lead.
+-- A rise's lead; a subscription's, every frame above passing each skip
+-- under it.
 Lead : ∀ {R} → Conf R → Set
 Lead ⟨ c , s , rising (nx a) , p ⟩ = Clear p a c s
 Lead ⟨ c , s , rising cp , p ⟩     = Ends p c s
-Lead ⟨ c , s , subscribing , p ⟩   = ⊤
+Lead ⟨ c , s , subscribing , p ⟩   = showsᶜ c true ≡ true → Ahead (Under (_≡ p)) c true
 Lead ⟨ c , s , absorbed , p ⟩      = ⊤
 
 whole : ∀ {R} → Conf R → St [] R

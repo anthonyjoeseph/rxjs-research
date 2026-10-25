@@ -12,9 +12,10 @@ module adequacy.Engine.Ahead where
 open import Data.Bool using (Bool; true; false; not; _∧_)
 open import Data.Empty using (⊥)
 open import Data.List using (List; _++_; reverse)
+open import Data.List.Properties using (++-assoc)
 open import Data.List.Relation.Unary.All using (All)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (Σ; _×_)
+open import Data.Product using (Σ; _×_; _,_)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
@@ -120,3 +121,34 @@ Ahead P (inBody (cs cl true sa ba as nothing r en) o c)     f =
   × Ahead P c true
 Ahead P (inBody (cs cl true sa ba as (just _) r en) o c)    f = ⊥
 Ahead P (inBody (cs cl false sa ba as ow r en) o c)         f = ⊥
+
+-- Asked of fewer positions, the frames ask less.
+under-mono : ∀ {P P′ : Pos → Set} → (∀ k → P′ k → P k) → ∀ k → Under P′ k → Under P k
+under-mono m _ (k , pk , y , e) = k , m k pk , y , e
+
+ahead-mono : ∀ {R Γ A} {P P′ : Pos → Set} → (∀ k → P′ k → P k) → (c : Ctx R Γ A) (f : Bool) → Ahead P c f → Ahead P′ c f
+ahead-mono m top                                                 f a = a
+ahead-mono m (inMap g c)                                         f a = ahead-mono m c true a
+ahead-mono m (inScan g z c)                                      f a = ahead-mono m c true a
+ahead-mono m (inCut true x c)                                    f a = ahead-mono m c true a
+ahead-mono m (inCut false x c)                                   f ()
+ahead-mono m (inLn b c)                                          f a = ahead-mono m c b a
+ahead-mono m (inTake i q free c)                                 f a = ahead-mono m c true a
+ahead-mono m (inTake i q (cpAt _) c)                             f ()
+ahead-mono m (inTake i q (cutAt _) c)                            f ()
+ahead-mono m (inTake i q (overAt _) c)                           f ()
+ahead-mono m (inOuter op g true n q ls c)                        f ()
+ahead-mono m (inOuter op g false n q ls c)                       f (o , a) = (λ k pk → o k (m k pk)) , ahead-mono m c true a
+ahead-mono m (inLanes op g d n q o pre post c)                   false ()
+ahead-mono m (inLanes op g d n q o pre post c)                   true (s , a) = (λ k pk → s k (m k pk)) , ahead-mono m c true a
+ahead-mono m (inSrc (cs false true sa ba as nothing r en) b c)   f a = ahead-mono (under-mono m) c true a
+ahead-mono m (inSrc (cs false true sa ba as (just _) r en) b c)  f ()
+ahead-mono m (inSrc (cs false false sa ba as ow r en) b c)       f ()
+ahead-mono m (inSrc (cs true sl sa ba as ow r en) b c)           f ()
+ahead-mono m (inBody (cs cl true sa ba as nothing r en) o c)     f (hu , nb , a) = hu , (λ k pk → nb k (m k pk)) , ahead-mono m c true a
+ahead-mono m (inBody (cs cl true sa ba as (just _) r en) o c)    f ()
+ahead-mono m (inBody (cs cl false sa ba as ow r en) o c)         f ()
+
+-- What is under a position under `p` is under `p`.
+under-sub : ∀ p y k → Under (_≡ p ++ y) k → Under (_≡ p) k
+under-sub p y _ (_ , refl , y′ , refl) = p , refl , y ++ y′ , ++-assoc p y y′
