@@ -81,9 +81,10 @@ postulate
             → KNotBefore (at q) (cand (inSrc kk b c) o) → Before (at q) (own (connS kk o b))
             → (Events∞.force (srcState (srcG kk o) (envAt c)) ≡ hush → ∀ d → Agreeᵀ d (Events∞.cut (srcState (srcG kk o) (envAt c))) idle)
               × NotBefore q (shown (Events∞.force (srcState (srcG kk o) (envAt c))))
-  -- A SOURCE'S OWN PASS: a live source's skips, its body and its own
-  -- marks past them, are followed by later source events; the body fed
-  -- them runs later, and drops its own skips to the body fed the rest.
+  -- A SOURCE'S OWN PASS: the body fed a live source's skips drops its own
+  -- skips, each under one of them, to the body fed the rest; the source's
+  -- next shows no earlier than any of those and, hushed, leaves nothing
+  -- running; the body's next comes after each source skip shows.
   src-pass : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h h′ : Events∞ X}
            → Sought v q P → KAfter (after q) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
            → Before (after q) (own (connS (cs false true sa ba as nothing r en) o b))
