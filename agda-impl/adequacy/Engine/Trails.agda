@@ -35,13 +35,14 @@ open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; 
 open import adequacy.Engine.Meaning using (vals; endOf; gh; envAt; srcG; srcRun; srcState; subOr; lane; outerG; poolG; deadL; lanesL; liveL; holeL; flagOf)
 open import adequacy.Engine.Kept using (states-++; live-hole)
 open import adequacy.Engine.Head using (Frag)
-open import adequacy.Placed.Order using (Alien; Atop; Past; Clear; every-lookup; sorted-headed; sorted-lookup; ordered-rejoin; steady-rejoin; Alienᴱ; Disjoint; Ordered; Owned; Sorted; Steady; Every; Every∞; EveryT; Headed; every-mono; everyT-mono; prefix-++; every-tail; everyT-burstOn; everyT-idle; everyT-∪; every∞-mono; headed-snoc; ordered-map; ordered-scan; steady-map; steady-scan)
-open import adequacy.Placed using (ordered-sub; steady-sub)
-open import adequacy.Placed.Keys using (module Merge; Values; owned-trans; values-mono; every-beside; every-map; every-scan)
-open import adequacy.Placed.Trail using (Parted; Spread; trail-map; Trail; TrailE; Trailing; trail; trailᶠ; trail-idle; trail-scan; trail-rejoin; sortedT-idle; flatT-idle)
+open import adequacy.Placed.Order using (Alien; Atop; Past; Clear; every-lookup; sorted-headed; sorted-lookup; ordered-rejoin; steady-rejoin; Alienᴱ; Disjoint; Ordered; Owned; Sorted; Steady; Every; Every∞; EveryT; Everyᴱ; every-monoᴱ; Headed; every-mono; everyT-mono; prefix-++; every-tail; everyT-burstOn; everyT-idle; everyT-∪; every∞-mono; headed-snoc; ordered-map; ordered-scan; steady-map; steady-scan)
+open import adequacy.Placed using (ordered-sub; steady-sub; spread-subᶠ)
+open import adequacy.Finite using (trunc; finite-trunc; trunc-agree)
+open import adequacy.Placed.Keys using (module Merge; alienᴱ-owned; beneath-owned; prefix-refl; values-map; owned-trans; values-mono; every-beside; every-map; every-scan)
+open import adequacy.Placed.Trail using (Parted; Spread; spread-lim; tick-beneath; trail-map; Trail; TrailE; Trailing; trail; trailᶠ; trail-idle; trail-scan; trail-rejoin; sortedT-idle; flatT-idle)
 open import adequacy.Placed.Burst using (module Bursting; Fresh; FreshRun; ordered-tail; steady-tail; trail-tail)
 open import adequacy.Placed.Walk using (module Walk)
-open import adequacy.Placed.Rising using (Rise; module Reach; headed-sub; headedRules; ordered-take; steady-take)
+open import adequacy.Placed.Rising using (Rise; Rules; module Reach; apartRules; keyedRules; rise-sub; headed-sub; headedRules; ordered-take; steady-take)
 open import adequacy.Placed.FlatAfter using (module FlatAfter; trail-take)
 open import adequacy.Placed.FlatOrder using (module FlatOrder)
 open import adequacy.Placed.Calm using (calm-steady; calm-trail)
@@ -75,8 +76,10 @@ postulate
   -- run does (`adequacy.Finite.trunc-agree`).
   trailing-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
                → Trailing (stateᴺ (subscribe o p) ρ)
-  -- A SUBSCRIPTION LEAVES RUNNING ONLY WHAT IS HEADED, finite or not.
-  headed-sub-cut : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → EveryT Headed (cutᴺ (subscribe o p) ρ)
+  -- WHAT A SUBSCRIPTION LEAVES RUNNING KEEPS ANY RULES ITS RUN KEEPS,
+  -- finite or not: a limit over `adequacy.Placed.Rising.Reach.reachᶠ`.
+  reach-cut : ∀ (Rs : Rules) {Γ A} (o : Obs Timeline Γ A) k (ρ : NEnv Γ) → Rules.S Rs k → Everyᴱ (Rules.Src Rs) ρ
+            → EveryT (Rules.P Rs) (cutᴺ (subscribe o k) ρ)
   -- AN ENDED SOURCE ended under a head.
   ended-headed : ∀ {R Γ X B} (e : Ctx R Γ B) sl sa as ow r en (o : St Γ X) (b : St (X ∷ Γ) B)
                → Frag (plug e (connS (cs true sl sa nothing as ow r en) o b)) → Headed en
@@ -216,12 +219,12 @@ module FlatShape (p : Pos) where
   -- The outer keyed under the merge, beyond its shape, its values lanes.
   OuterKeys : ∀ {B} → Maybe (Events∞ (MonotonicList B)) → Set
   OuterKeys nothing  = ⊤
-  OuterKeys (just e) = Spread (force e) × Every∞ K e × Values Gen (force e)
+  OuterKeys (just e) = Spread (force e) × Every∞ K e
 
   -- A merge in flight: its lanes and its outer keyed, its lanes parted
-  -- and aside from the outer, its queue lanes, its pool.
-  FlatKeys : ∀ {B} → Maybe (Events∞ (MonotonicList B)) → List (Events∞ B) → List (MonotonicList B) → Tail → List Pos → Set
-  FlatKeys o ls qs t rs = LaneKeys ls rs × Parted rs × All (Aside o) rs × All Gen qs × OuterKeys o × Pool o rs t
+  -- and aside from the outer, its pool.
+  FlatKeys : ∀ {B} → Maybe (Events∞ (MonotonicList B)) → List (Events∞ B) → Tail → List Pos → Set
+  FlatKeys o ls t rs = LaneKeys ls rs × Parted rs × All (Aside o) rs × OuterKeys o × Pool o rs t
 
   roots-of : ∀ {B} {ls : List (Events∞ B)} {rs} → All Shape ls → LaneKeys ls rs → Roots ls rs
   roots-of []ᴬ []ᴷ = []ᴿ
@@ -260,11 +263,44 @@ outerOf : ∀ {Γ A C} (f : A → Obs Timeline Γ C) dn (s : St Γ A) (ρ : NEnv
 outerOf f dn s ρ = outerᴺ (lane f) (outerG dn (gh s)) ρ
 
 postulate
-  -- A MERGE IN FLIGHT IS KEYED UNDER ITS MARK.
+  -- A MERGE IN FLIGHT IS KEYED UNDER ITS MARK, a head where no source of
+  -- its environment has been.
   flat-keys : ∀ {R Γ A C} (e : Ctx R Γ C) op (f : A → Obs Timeline Γ C) dn n qs (s : St Γ A) (ls : List (St Γ C))
             → Frag (plug e (flatS op f dn n qs s ls))
-            → Σ Pos (λ p → Σ (List Pos) (FlatShape.FlatKeys p (outerOf f dn s (envAt e)) (states (lanesL ls) (envAt e))
-                (L.map (λ a → coldᴹ λ q → stateᴺ (lane f a q) (envAt e)) qs) (cutᴺ (poolG dn (gh s) (deadL ls)) (envAt e))))
+            → Σ Pos (λ p → Headed p × Alienᴱ p (envAt e) × Σ (List Pos) (FlatShape.FlatKeys p (outerOf f dn s (envAt e))
+                (states (lanesL ls) (envAt e)) (cutᴺ (poolG dn (gh s) (deadL ls)) (envAt e))))
+
+-- A SUBSCRIPTION SPREADS, finite or not.
+spread-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ → Spread (meaning (subscribe o p) ρ)
+spread-sub o p ρ hp so cl =
+  spread-lim (λ n → meaning (subscribe (trunc n o) p) ρ) _ (λ n → spread-subᶠ (trunc n o) (finite-trunc n o) p ρ hp so cl)
+    (λ n → trunc-agree n o p ρ)
+
+-- A subscription's run and what it leaves running, by any rules.
+reach∞ : ∀ (Rs : Rules) {Γ A} (o : Obs Timeline Γ A) k (ρ : NEnv Γ) → Rules.S Rs k → Everyᴱ (Rules.Src Rs) ρ
+       → Every∞ (Rules.P Rs) (stateᴺ (subscribe o k) ρ)
+reach∞ Rs o k ρ sk sρ = Reach.reach Rs o k ρ sk sρ , reach-cut Rs o k ρ sk sρ
+
+-- A MERGE'S LANE subscribed wherever a lane may fits there.
+gen-sub : ∀ {Γ A C} p (f : A → Obs Timeline Γ C) (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+        → ∀ a → FlatOrder.Gen p (coldᴹ λ q → stateᴺ (lane f a q) ρ)
+gen-sub p f ρ hp so cl a j (bj , hj) =
+  ordered-sub (f a) j ρ hj so cj , rise-sub (f a) j ρ hj , steady-sub (f a) j ρ hj so cj , trailing-sub (f a) j ρ hj so cj
+  , FlatAfter.under∞ p j L
+      (every∞-mono (beneath-owned j) L (reach∞ (keyedRules j) (f a) j ρ (inj₁ (prefix-refl j)) (every-monoᴱ (λ _ _ → tt) ρ cj)))
+      (reach∞ headedRules (f a) j ρ hj (sorted-headed ρ so))
+      (λ R okR d → every∞-mono (λ _ → proj₁) L
+         (reach∞ (apartRules R (tick-beneath p R hp (proj₁ okR))) (f a) j ρ d (alienᴱ-owned p R (beneath-owned p R (proj₁ okR)) ρ cl)))
+  , spread-sub (f a) j ρ hj so cj
+  where
+    L  = stateᴺ (subscribe (f a) j) ρ
+    cj = alienᴱ-owned p j (beneath-owned p j bj) ρ cl
+
+-- A merge's queue, each a lane its generator fits.
+gen-queue : ∀ {Γ A C} p (f : A → Obs Timeline Γ C) (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ
+          → ∀ qs → All (FlatOrder.Gen p) (L.map (λ a → coldᴹ λ q → stateᴺ (lane f a q) ρ) qs)
+gen-queue p f ρ hp so cl []       = []ᴬ
+gen-queue p f ρ hp so cl (a ∷ qs) = gen-sub p f ρ hp so cl a ∷ᴬ gen-queue p f ρ hp so cl qs
 
 -- The live lanes of a merge, newest first.
 lanes-shape : ∀ {Γ C} (ρ : NEnv Γ) (ls : List (St Γ C)) → All (λ l → Shape (stateᴺ (gh l) ρ)) ls → All Shape (states (lanesL ls) ρ)
@@ -277,22 +313,22 @@ lanes-shape ρ (l ∷ ls) (sh ∷ᴬ shs) =
         hole false sh = []ᴬ
 
 -- The outer of a merge, held.
-held-of : ∀ {Γ A C} p (f : A → Obs Timeline Γ C) dn (s : St Γ A) (ρ : NEnv Γ) → Shape (stateᴺ (gh s) ρ)
+held-of : ∀ {Γ A C} p (f : A → Obs Timeline Γ C) dn (s : St Γ A) (ρ : NEnv Γ) → Headed p → Sorted ρ → Alienᴱ p ρ → Shape (stateᴺ (gh s) ρ)
         → FlatShape.OuterKeys p (outerOf f dn s ρ) → FlatOrder.Heldᴹ p (outerOf f dn s ρ)
-held-of p f true  s ρ sh ok = tt
-held-of p f false s ρ (((os , ss) , _) , tr) (sp , (kx , kc) , gn) =
-  FlatOrder.outer (ordered-map F _ os) (steady-map F _ ss) (trail-map F _ _ tr) sp kx kc gn
+held-of p f true  s ρ hp so cl sh ok = tt
+held-of p f false s ρ hp so cl (((os , ss) , _) , tr) (sp , (kx , kc)) =
+  FlatOrder.outer (ordered-map F _ os) (steady-map F _ ss) (trail-map F _ _ tr) sp kx kc (values-map F _ (gen-sub p f ρ hp so cl))
   where F = λ a → coldᴹ λ q → stateᴺ (lane f a q) ρ
 
 -- A MERGE: its outer's run and its lanes', keyed under its mark.
 shape-flat : ∀ {R Γ A C} (e : Ctx R Γ C) op (f : A → Obs Timeline Γ C) dn n qs (s : St Γ A) (ls : List (St Γ C))
-           → Frag (plug e (flatS op f dn n qs s ls))
+           → Frag (plug e (flatS op f dn n qs s ls)) → Sorted (envAt e)
            → Shape (stateᴺ (gh s) (envAt e)) → All (λ l → Shape (stateᴺ (gh l) (envAt e))) ls
            → Shape (stateᴺ (gh (flatS op f dn n qs s ls)) (envAt e))
-shape-flat e op f dn n qs s ls fs sh shs with flat-keys e op f dn n qs s ls fs
-... | p , rs , lk , pt , asd , gq , ok , pl =
-  FlatShape.flat-shape p (flatOp op) _ _ _ _ (FlatShape.roots-of p (lanes-shape (envAt e) ls shs) lk) pt asd gq
-    (held-of p f dn s (envAt e) sh ok) pl
+shape-flat e op f dn n qs s ls fs so sh shs with flat-keys e op f dn n qs s ls fs
+... | p , hp , cl , rs , lk , pt , asd , ok , pl =
+  FlatShape.flat-shape p (flatOp op) _ _ _ _ (FlatShape.roots-of p (lanes-shape (envAt e) ls shs) lk) pt asd
+    (gen-queue p f (envAt e) hp so cl qs) (held-of p f dn s (envAt e) hp so cl sh ok) pl
 
 ------------------------------------------------------------------------
 -- A joiner
@@ -374,7 +410,7 @@ private module Go where
   shape-st e (lnS b s)       fs so = shape-st (inLn b e) s fs so
   shape-st e (takeS i p w s) fs so = shape-take e i p w s fs (shape-st (inTake i p w e) s fs so)
   shape-st e (flatS op f dn n qs s ls) fs so =
-    shape-flat e op f dn n qs s ls fs (shape-st (inOuter op f dn n qs ls e) s fs so) (shape-lanes e op f dn n qs s [] ls fs so)
+    shape-flat e op f dn n qs s ls fs so (shape-st (inOuter op f dn n qs ls e) s fs so) (shape-lanes e op f dn n qs s [] ls fs so)
   shape-st e (connS k o b)   fs so =
     shape-conn e k o b fs (shape-src e k o b fs so) (shape-st (inBody k o e) b fs (sorted-cons (src-sorted e k o b fs (shape-src e k o b fs so)) so))
   shape-st e (joinS j g y ib) fs so = shape-join e j g y ib fs so
@@ -400,7 +436,7 @@ private module Go where
             → Frag (plug e (connS (cs cl sl sa (just p) as ow r en) o b)) → Sorted (envAt e)
             → Shape (stateᴺ (subOr (p ⊕ (ix 1 ∷ [])) o) (envAt e))
   shape-sub e cl sl sa p as ow r en (pend o) b fs so =
-    ((ordered-sub o q (envAt e) hq so al , steady-sub o q (envAt e) hq so al) , headed-sub o q (envAt e) hq so , headed-sub-cut o q (envAt e) hq so)
+    ((ordered-sub o q (envAt e) hq so al , steady-sub o q (envAt e) hq so al) , headed-sub o q (envAt e) hq so , reach-cut headedRules o q (envAt e) hq (sorted-headed (envAt e) so))
     , trailing-sub o q (envAt e) hq so al
     where q  = p ⊕ (ix 1 ∷ [])
           hq = sub-headed e cl sl sa p as ow r en (pend o) b fs

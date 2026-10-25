@@ -10,8 +10,9 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SILENT RUN
 
-A merge mid-run keeps `FlatOrder`'s invariant under its mark (lanes
-rooted and parted, aside from the outer, its pool free of it); a joiner's
+A merge mid-run keeps `FlatOrder`'s invariant under a mark alien to its
+environment (lanes rooted and parted, aside from the outer, its pool free
+of it), though once its outer is done no state records the mark; a joiner's
 feed sits in order ahead of its rejoined source. Only the shape they imply
 is probed (`quickcheck.KeptDepth`). Settled when bodies over what the engine
 keeps, or refuted by a probe of the keys themselves.
@@ -33,11 +34,11 @@ Members: `conn-mark`, `conn-kb`, `conn-kr`, `conn-fr`, `conn-cue`, `conn-ks`,
 
 #### THE ENDLESS SUBSCRIPTION
 
-A subscription's cut trails its run and is headed, finite or not: a limit
-over the finite case, once a truncation's cut agrees as its run does.
-Settled when bodies, or refuted.
+A subscription's cut trails its run and keeps any rules its run keeps,
+finite or not: a limit over the finite case, once a truncation's cut
+agrees as its run does. Settled when bodies, or refuted.
 
-Members: `trailing-sub`, `headed-sub-cut`.
+Members: `trailing-sub`, `reach-cut`.
 
 #### THE FED MERGE
 
