@@ -37,6 +37,7 @@ open Machine using (nx; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; i
 open import adequacy.Engine.Meaning using (_≋_; ≋-by; ≋-trans; same; up; mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn; srcState;
   srcG; envAt; gh; lane; lanesL; deadL; outerG; outerT; poolRuns; poolT; laneᴹ; lanesFrame-ne;
   outerFrame-ne; outerOf; lanes-refl; queue-refl; ≈-refl; risen)
+open import adequacy.Engine.Union using (∪-idleᵀ)
 open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore; go-rise; go-outer)
 open Events∞
 open import denotation.NonExpansive using (Agreeˢ)
@@ -254,12 +255,6 @@ outer-drops op g q ls ds ρ fi (dropˢ {k} pk ag x) =
 outer-drops op g q ls ds ρ fi (dropsˢ {k} pk ag d) =
   dropsˢ pk (at-outer op g q ls ds ρ (proj₁ (fi k pk)) (proj₂ (fi k pk)) ag) (outer-drops op g q ls ds ρ fi d)
 
-
--- A tail joined to none.
-∪-idleᵀ : ∀ n (t : Tail) → Agreeᵀ n (t ∪ idle) t
-∪-idleᵀ zero    t         = stopᵀ
-∪-idleᵀ (suc n) idle      = idle⁼
-∪-idleᵀ (suc n) (pin k r) = pin⁼ (∪-idleᵀ n (Tail∞.later r))
 
 -- THE OUTER ADMITTED: an outer's value first among its flatMap's parts
 -- is a skip, and past it the merge running what `admit` leaves.
