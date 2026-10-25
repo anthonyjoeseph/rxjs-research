@@ -370,11 +370,39 @@ private
     innerLᵇ []       ρ = true
     innerLᵇ (l ∷ ls) ρ = innerᵇ l ρ ∧ innerLᵇ ls ρ
 
-  -- Unchecked; in the run's environment; in the rest's where the run's holds.
-  trailedᵇ : ∀ {Δ A} → ℕ → St Δ A → U.NEnv Δ → U.NEnv Δ → Bool
-  trailedᵇ zero          b ρ ρ′ = true
-  trailedᵇ (suc zero)    b ρ ρ′ = innerᵇ b ρ
-  trailedᵇ (suc (suc _)) b ρ ρ′ = not (innerᵇ b ρ) ∨ innerᵇ b ρ′
+  -- Every live inner connect's source shows no earlier than any position
+  -- asked of and, hushed, leaves nothing running; its body comes after
+  -- each (`adequacy.Engine.FedWalk.fed-src-next`, `.fed-body-on`).
+  livePosᵇ : ∀ {X B} → Bool → Pos → CS → Events∞ X → Events∞ B → Bool
+  livePosᵇ v q (cs cl true sa ba as nothing r en) σ β =
+    notUnderᵇ q (shown (Events∞.force σ)) ∧ hushedᵇ (Events∞.force σ) (Events∞.cut σ) idle ∧ afterAllᵇ v q (head (Events∞.force β))
+  livePosᵇ v q _ σ β = true
+
+  mutual
+    placedᵇ : ∀ {Δ A} → Bool → Pos → St Δ A → U.NEnv Δ → Bool
+    placedᵇ v q (mapS f s)              ρ = placedᵇ v q s ρ
+    placedᵇ v q (scanS f z s)           ρ = placedᵇ v q s ρ
+    placedᵇ v q (cutS l a s)            ρ = placedᵇ v q s ρ
+    placedᵇ v q (lnS b s)               ρ = placedᵇ v q s ρ
+    placedᵇ v q (takeS i w x s)         ρ = placedᵇ v q s ρ
+    placedᵇ v q (flatS op f d n p o ls) ρ = placedᵇ v q o ρ ∧ placedLᵇ v q ls ρ
+    placedᵇ v q (connS k o b)           ρ =
+      livePosᵇ v q k (srcState (srcG k o) ρ) (U.stateᴺ (gh b) (srcRun (srcG k o) ρ ∷ᴬ ρ))
+      ∧ placedᵇ v q o ρ ∧ placedᵇ v q b (srcRun (srcG k o) ρ ∷ᴬ ρ)
+    placedᵇ v q _                       ρ = true
+
+    placedLᵇ : ∀ {Δ A} → Bool → Pos → List (St Δ A) → U.NEnv Δ → Bool
+    placedLᵇ v q []       ρ = true
+    placedLᵇ v q (l ∷ ls) ρ = placedᵇ v q l ρ ∧ placedLᵇ v q ls ρ
+
+  -- Unchecked; trails in the run's environment; in the rest's where the
+  -- run's holds; placed likewise.
+  trailedᵇ : ∀ {Δ A} → ℕ → Bool → Pos → St Δ A → U.NEnv Δ → U.NEnv Δ → Bool
+  trailedᵇ zero                      v q b ρ ρ′ = true
+  trailedᵇ (suc zero)                v q b ρ ρ′ = innerᵇ b ρ
+  trailedᵇ (suc (suc zero))          v q b ρ ρ′ = not (innerᵇ b ρ) ∨ innerᵇ b ρ′
+  trailedᵇ (suc (suc (suc zero)))    v q b ρ ρ′ = placedᵇ v q b ρ
+  trailedᵇ (suc (suc (suc (suc _)))) v q b ρ ρ′ = not (placedᵇ v q b ρ) ∨ placedᵇ v q b ρ′
 
   -- `adequacy.Engine.Shown.Links`, decided.
   linksᵇ : ∀ {R Γ A} → ℕ → Bool → Pos → Ctx R Γ A → Bool → Events∞ A → Events∞ A → Bool
@@ -394,7 +422,7 @@ private
   linksᵇ t v q (inSrc (cs false true sa ba as nothing r en) b c) f h h′ =
     srcPassᵇ v q (U.stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (U.stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c)) h′
     ∧ caughtᵇ 0 q (gh b) ∧ flatᵇ depth (Events∞.force h) ∧ fedWalkᵇ q b (Events∞.force h ∷ᴬ envAt c) (Events∞.force h′ ∷ᴬ envAt c)
-    ∧ trailedᵇ t b (Events∞.force h ∷ᴬ envAt c) (Events∞.force h′ ∷ᴬ envAt c)
+    ∧ trailedᵇ t v q b (Events∞.force h ∷ᴬ envAt c) (Events∞.force h′ ∷ᴬ envAt c)
     ∧ linksᵇ t true q c true (connSrc false r en (gh b) (envAt c) h) (connSrc false r en (gh b) (envAt c) h′)
   linksᵇ t v q (inSrc (cs false true sa ba as (just _) r en) b c) f h h′ = true
   linksᵇ t v q (inSrc (cs false false sa ba as ow r en) b c)      f h h′ = true
@@ -458,6 +486,8 @@ private
       else if not (linkedᵇ 0 m) then no (best ⊔ run) ("\n  unlinked: a pass not fed past a live source's skips, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (linkedᵇ 1 m) then no (best ⊔ run) ("\n  untrailed: an inner source fed the run not trailing, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (linkedᵇ 2 m) then no (best ⊔ run) ("\n  untrailed: an inner source fed the rest not trailing, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (linkedᵇ 3 m) then no (best ⊔ run) ("\n  unplaced: an inner source fed the run before a position asked of, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (linkedᵇ 4 m) then no (best ⊔ run) ("\n  unplaced: an inner source fed the rest before a position asked of, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else next n run best (ls + linkCount m) m (step m)
 
     next : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict
