@@ -10,15 +10,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ERASURE
 
-Refuted for a skip or a pin erased out of order (`adequacy.Engine.Drop`'s
+Refuted for a skip or a pin erased out of order (`adequacy.Engine.Erase`'s
 `Erase`, `Eraseᵀ`); restated: each erased one comes no later than the other's
-next.
-Open: a merge fed a part so erased runs so erased, its tail agreeing. The
-proof walks `go` against both sides' heads: a pin emits once ahead of every
-head, a switch adds killed lanes' tails. Settled when the three are bodies,
-or refuted again.
+next. A merge so fed runs so erased (`adequacy.Engine.Merge`).
+Open: a connect whose body and source are each so erased runs so erased; the
+source beside the body reads both heads at once, the merge one at a time.
+Settled when `body-⊒` is a body, or refuted again.
 
-Members: `lanes-⊒`, `outer-⊒`, `body-⊒`.
+Members: `body-⊒`.
 
 #### THE SILENT RUN
 

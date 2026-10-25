@@ -28,7 +28,7 @@ module adequacy.Engine.Drop where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using ([]; _∷_; _++_; [_]; reverse)
+open import Data.List using (_∷_; _++_; [_]; reverse)
 import Data.List as L
 import denotation.MonotonicList as M′
 open import Data.List.Relation.Unary.All using (All) renaming (_∷_ to _∷ᴬ_)
@@ -39,9 +39,10 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
 
-open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Tail∞; pin; Pos; out; skip; end; hush; idle; _∪_; ix; last; _<ᵖ_; <ᵖ-split; <ᵖ-asym; <ᵖ-trans; <ᵖ-below)
-open import denotation.MonotonicList using (head; mapᴱ; scanᴱ; takeWhileᴱ; taking; Agree; Agreeᵀ; stop; stopᵀ; pin⁼; idle⁼; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agree-trans;
-  agree-sym; agreeᵀ-refl; agreeᵀ-sym; agreeᵀ-trans; agreeᵀ-pred; agree-pred)
+open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Tail∞; Pos; out; skip; end; hush; idle; _∪_; ix; last; _<ᵖ_)
+open import denotation.MonotonicList using (head; mapᴱ; scanᴱ; takeWhileᴱ; taking; Agree; Agreeᵀ; stop; pin⁼; idle⁼; out⁼; skip⁼; end⁼;
+  hush⁼; agree-refl; agree-trans; agree-sym; agreeᵀ-refl; agreeᵀ-sym; agreeᵀ-trans;
+  agreeᵀ-pred; agree-pred)
 open import denotation.NonExpansive using (_,ˢ_; mapᴱ-ne; scanᴱ-ne; takeWhileᴱ-ne; ∪-ne; beside-ne; burstOn-ne; Outerᴿ; liveᴼ; whole-ne; go-ne; mapᴱ-neᴹ; Lanes)
 open import denotation.Unfold using (Node; NEnv; stateᴺ; states; outerᴺ; meaning; cutᴺ; outer∞)
 open import denotation.Denote using (flatOp)
@@ -52,6 +53,10 @@ open import adequacy.Engine.Meaning using (_≋_; ≋-by; same; up; mapped; scan
   lanesFrame-ne; outerFrame-ne; outerOf; lanes-refl; queue-refl; outer-refl; ≈-refl; risen)
 open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore; go-rise; go-outer)
 open import adequacy.Engine.Ahead using (Under; shown)
+open import adequacy.Engine.Erase using (Eraseᵀ; Erase; Lead⁼; _,ᵉ_; cutᵉ; nowᵉ; _⊒_; stopᵉ; pinᵉ; unpin; idleᵉ; outᵉ; skipᵉ; erased;
+  endᵉ; hushᵉ; outᴸ; skipᴸ; endᴸ; hushᴸ; eraseᵀ-agree; erase-agree; lead-agree; lead-head;
+  below-on; map-erase; map-lead)
+open import adequacy.Engine.Merge using (lanes-⊒; outer-⊒)
 open Events∞
 open Tail∞
 open import denotation.NonExpansive using (Agreeˢ)
@@ -60,37 +65,7 @@ open Agreeˢ
 ------------------------------------------------------------------------
 -- Runs with skips erased
 
--- A tail with none or more of its pins erased, each no later than the
--- other's next: a merge of tails reads each by its next.
---
--- REFUTED: 5a5d1bd0 any pin erased, by an outer's tail `[5, 1]` erased of
---   its `5` beside a pool pinned at `[3]`: the merge's tails are `[3, 5, 1]`
---   and `[1, 3]`.
-data Eraseᵀ : ℕ → Tail → Tail → Set where
-  stopᵉ : ∀ {x y} → Eraseᵀ zero x y
-  pinᵉ  : ∀ {k p l r} → Eraseᵀ k (later l) (later r) → Eraseᵀ (suc k) (pin p l) (pin p r)
-  unpin : ∀ {k p l r} → TailNotBefore p r → Eraseᵀ k (later l) r → Eraseᵀ (suc k) (pin p l) r
-  idleᵉ : ∀ {k} → Eraseᵀ (suc k) idle idle
-
--- A run with none or more of its skips erased, `t` what the other leaves
--- running where it stands: each event kept alike, each tail beside one
--- erased alike, the tail past an erased skip beside the other's.  An
--- erased skip comes no later than the other's next: a merge reads its
--- parts by their next, so a skip erased out of order moves a sibling
--- across the outer's next.
---
--- REFUTED: 01726160 any skip erased, by an outer's `skip [5]` erased
---   before its `skip [1]`: a lane at `[3]` merges before the outer's next
---   on the one side, after it on the other.
-data Erase {A : Set} : ℕ → Events A → Tail → Events A → Set where
-  stopᵉ  : ∀ {x t y} → Erase zero x t y
-  outᵉ   : ∀ {k p a l r t} → Eraseᵀ k (cut l) (cut r) → Erase k (force l) (cut r) (force r) → Erase (suc k) (out p a l) t (out p a r)
-  skipᵉ  : ∀ {k p l r t} → Eraseᵀ k (cut l) (cut r) → Erase k (force l) (cut r) (force r) → Erase (suc k) (skip p l) t (skip p r)
-  erased : ∀ {k p l t e} → NotBefore p (head e) → Eraseᵀ k (cut l) t → Erase k (force l) t e → Erase (suc k) (skip p l) t e
-  endᵉ   : ∀ {k p t} → Erase (suc k) (end p) t (end p)
-  hushᵉ  : ∀ {k t} → Erase (suc k) hush t hush
-
--- The same with no tails, at the root.
+-- A run with skips erased, with no tails, at the root.
 data Eraseᴱ {A : Set} : ℕ → Events A → Events A → Set where
   stopᴱ   : ∀ {x y} → Eraseᴱ zero x y
   outᴱ    : ∀ {k p a l r} → Eraseᴱ k (force l) (force r) → Eraseᴱ (suc k) (out p a l) (out p a r)
@@ -99,44 +74,7 @@ data Eraseᴱ {A : Set} : ℕ → Events A → Events A → Set where
   endᴱ    : ∀ {k p} → Eraseᴱ (suc k) (end p) (end p)
   hushᴱ   : ∀ {k} → Eraseᴱ (suc k) hush hush
 
--- Two runs with the same next.
-data Lead⁼ {A : Set} : Events A → Events A → Set where
-  outᴸ  : ∀ {p a l r} → Lead⁼ (out p a l) (out p a r)
-  skipᴸ : ∀ {p l r} → Lead⁼ (skip p l) (skip p r)
-  endᴸ  : ∀ {p} → Lead⁼ (end p) (end p)
-  hushᴸ : Lead⁼ hush hush
-
-record Eraseˢ {A : Set} (m : ℕ) (l l′ : Events∞ A) : Set where
-  constructor _,ᵉ_
-  field
-    cutᵉ : Eraseᵀ m (cut l) (cut l′)
-    nowᵉ : Erase m (force l) (cut l′) (force l′)
-open Eraseˢ
-
--- THE REST, ERASED: `h′` is `h` with skips erased, its next kept, and,
--- hushed, leaving the same running.
-_⊒_ : ∀ {A} → Events∞ A → Events∞ A → Set
-h ⊒ h′ = Lead⁼ (force h) (force h′) × (force h ≡ hush → ∀ d → Agreeᵀ d (cut h) (cut h′)) × (∀ n → Eraseˢ n h h′)
-
 private
-  eraseᵀ-agree : ∀ {k} {x y : Tail} → Agreeᵀ k x y → Eraseᵀ k x y
-  eraseᵀ-agree stopᵀ    = stopᵉ
-  eraseᵀ-agree (pin⁼ a) = pinᵉ (eraseᵀ-agree a)
-  eraseᵀ-agree idle⁼    = idleᵉ
-
-  erase-agree : ∀ {A k} {x y : Events A} {t} → Agree k x y → Erase k x t y
-  erase-agree stop        = stopᵉ
-  erase-agree (out⁼ t a)  = outᵉ (eraseᵀ-agree t) (erase-agree a)
-  erase-agree (skip⁼ t a) = skipᵉ (eraseᵀ-agree t) (erase-agree a)
-  erase-agree end⁼        = endᵉ
-  erase-agree hush⁼       = hushᵉ
-
-  lead-agree : ∀ {A} {x y : Events A} → Agree 1 x y → Lead⁼ x y
-  lead-agree (out⁼ _ _)  = outᴸ
-  lead-agree (skip⁼ _ _) = skipᴸ
-  lead-agree end⁼        = endᴸ
-  lead-agree hush⁼       = hushᴸ
-
   agreeᵀ-on : ∀ {k p} {y z : Tail} → Agreeᵀ (suc k) y z → TailNotBefore p y → TailNotBefore p z
   agreeᵀ-on (pin⁼ _) o = o
   agreeᵀ-on idle⁼    o = o
@@ -176,13 +114,6 @@ private
 ⊒-≋ (l , u , e) x =
   lead-then l (nowˢ (x 1)) , (λ eq d → agreeᵀ-trans (u eq d) (cutˢ (x d))) ,
   λ n → eraseᵀ-then (cutᵉ (e n)) (cutˢ (x n)) ,ᵉ erase-then (nowᵉ (e n)) (cutˢ (x n)) (nowˢ (x n))
-
--- The next of a run erased is the next of the run.
-lead-head : ∀ {A} {x y : Events A} → Lead⁼ x y → head x ≡ head y
-lead-head outᴸ  = refl
-lead-head skipᴸ = refl
-lead-head endᴸ  = refl
-lead-head hushᴸ = refl
 
 lead-shown : ∀ {A} {x y : Events A} → Lead⁼ x y → shown x ≡ shown y
 lead-shown outᴸ  = refl
@@ -286,26 +217,6 @@ mutual
 
 -- A frame with one child maps each event alone, its tail the child's.
 private
-  map-on : ∀ {A B} (g : A → B) {p} x → NotBefore p (head x) → NotBefore p (head (mapᴱ g x))
-  map-on g (out _ _ _) o = o
-  map-on g (skip _ _)  o = o
-  map-on g (end _)     o = o
-  map-on g hush        o = o
-
-  map-erase : ∀ {A B} (g : A → B) {k x t y} → Erase k x t y → Erase k (mapᴱ g x) t (mapᴱ g y)
-  map-erase g stopᵉ        = stopᵉ
-  map-erase g (outᵉ e x)   = outᵉ e (map-erase g x)
-  map-erase g (skipᵉ e x)  = skipᵉ e (map-erase g x)
-  map-erase g (erased o e x) = erased (map-on g _ o) e (map-erase g x)
-  map-erase g endᵉ         = endᵉ
-  map-erase g hushᵉ        = hushᵉ
-
-  map-lead : ∀ {A B} (g : A → B) {x y} → Lead⁼ x y → Lead⁼ (mapᴱ g x) (mapᴱ g y)
-  map-lead g outᴸ  = outᴸ
-  map-lead g skipᴸ = skipᴸ
-  map-lead g endᴸ  = endᴸ
-  map-lead g hushᴸ = hushᴸ
-
   map-hush : ∀ {A B} (g : A → B) x → mapᴱ g x ≡ hush → x ≡ hush
   map-hush g hush eq = refl
 
@@ -335,12 +246,6 @@ private
   end-erase : ∀ {A} k {p t} → Erase {A} k (end p) t (end p)
   end-erase zero    = stopᵉ
   end-erase (suc k) = endᵉ
-
-  -- Past a position, its subtree too.
-  below-on : ∀ {p} k x → NotBefore p (just k) → NotBefore p (just (k ++ [ x ]))
-  below-on {p} k x o with <ᵖ-split p k o
-  ... | inj₁ lt   = <ᵖ-asym p (k ++ [ x ]) (<ᵖ-trans p k (k ++ [ x ]) lt (<ᵖ-below k []))
-  ... | inj₂ refl = <ᵖ-asym k (k ++ [ x ]) (<ᵖ-below k [])
 
   took-on : ∀ {A} i (q : A → Bool) {p} x → NotBefore p (head x) → NotBefore p (head (takeWhileᴱ i q x))
   took-on i q (out k a r) o = taking-on i (q a) o
@@ -394,14 +299,9 @@ scanned-⊒ g z {h} (l , u , e) = scan-lead g z l , (λ eq → u (scan-hush g z 
 took-⊒ : ∀ {A} i (q : A → Bool) {h h′ : Events∞ A} → h ⊒ h′ → took i q h ⊒ took i q h′
 took-⊒ i q {h} (l , u , e) = took-lead i q l , (λ eq → u (took-hush i q (force h) eq)) , λ n → cutᵉ (e n) ,ᵉ took-erase i q (nowᵉ (e n))
 
--- THE ERASURE, FRAME BY FRAME: a merge fed a run with skips erased runs
--- with skips erased, its next kept: it keeps its parts' order, and what
--- the parts leave running is the merge's tail.
+-- THE ERASURE, AT A CONNECT: a body and its source each fed a run with
+-- skips erased run with skips erased, the next kept.
 postulate
-  lanes-⊒   : ∀ {Γ A B} op (g : A → Pos → Node Γ B) d q (o : Node Γ A) pre post (ρ : NEnv Γ) {h h′ : Events∞ B}
-            → h ⊒ h′ → lanesFrame op g d q o pre post true ρ h ⊒ lanesFrame op g d q o pre post true ρ h′
-  outer-⊒   : ∀ {Γ A B} op (g : A → Pos → Node Γ B) q ls ds (ρ : NEnv Γ) {h h′ : Events∞ A}
-            → h ⊒ h′ → outerFrame op g false q ls ds ρ h ⊒ outerFrame op g false q ls ds ρ h′
   body-⊒    : ∀ {X B} r {σ σ′ : Events∞ X} {β β′ : Events∞ B} → σ ⊒ σ′ → β ⊒ β′ → bodyConn r σ β ⊒ bodyConn r σ′ β′
 
 ------------------------------------------------------------------------
