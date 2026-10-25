@@ -60,6 +60,7 @@ open import adequacy.Engine.Race using (NotBefore; After; TailNotBefore)
 open import adequacy.Engine.Head using (Frag; Lanes; Lane; Agrees; exact; early; HeadAt; cand; pool-step; at-<ᵖ; <≮ᴷ; ≮ᴷ-trans)
 open import adequacy.Engine.Head.Agrees using (head-agrees)
 open import adequacy.Engine.Keys using (Held)
+open import adequacy.Engine.Above using (Flight)
 open import adequacy.Engine.Ahead using (Sides; Ahead; Under; shown; shows-open) renaming (shows to showsᶜ)
 
 ------------------------------------------------------------------------
@@ -244,9 +245,10 @@ Searched ⟨ c , s , rising e , p ⟩    = ⊤
 record Order {R} (k : Conf R) : Set where
   constructor order
   field
-    shape : Held (whole k)
-    lead  : Lead k
-    apart : Searched k
+    shape  : Held (whole k)
+    flight : Flight k
+    lead   : Lead k
+    apart  : Searched k
 
 postulate
   -- The engine's search: the found node's key leads every race above it.

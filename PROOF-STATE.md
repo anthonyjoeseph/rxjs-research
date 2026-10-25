@@ -8,17 +8,27 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE FLIGHT KEPT
+
+Untried: every frame above a hole keeps its positional facts against the
+hole's run, its event in flight put back (`adequacy.Engine.Above.Flight`),
+and still against the ghost once a value in flight is dropped. Holds only if
+each ancestor's facts survive its child's run losing its head. Settled by
+`keys-past` as a body, or a kept-depth probe of it.
+
+Members: `keys-past`, `flight-next`, `flight-load`, `flight-held`.
+
 #### THE KEYS KEPT
 
 Untried: a node rewritten by a rise, a begin or a mark run keeps every node's
-positional facts (`adequacy.Engine.Keys`). A begin turns an idle hole into a
-subscription every ancestor's facts must cover; a rewrite changes each
-ancestor's state. Probed in kept-depth, except a merge's mark. Settled by
+positional facts (`adequacy.Engine.Keys`), reading the event in flight from
+the flight. A begin turns an idle hole into a subscription every ancestor's
+facts must cover. Probed in kept-depth, except a merge's mark. Settled by
 bodies, or a probe refuting a clause.
 
-Members: `rise-scan-keys`, `rise-take-keys`, `rise-admit-keys`,
-`rise-outer-end-keys`, `rise-lane-end-keys`, `rise-src-keys`,
-`rise-body-end-keys`, `begin-keys`, `run-keys`.
+Members: `rise-scan-keys`, `rise-admit-keys`, `rise-outer-end-keys`,
+`rise-lane-end-keys`, `rise-src-keys`, `rise-body-end-keys`, `begin-keys`,
+`run-keys`.
 
 #### THE ENDLESS SUBSCRIPTION
 
@@ -201,6 +211,14 @@ Members: `after-map`, `after-scan`, `after-take`, `clear-take`,
 `feed-alikeⁱ`, `shut-alikeⁱ`, `defer-skips`, `rest-skips`, `union-skips`,
 `bursting-skips`, `under-skips`, `first-defer`, `first-rest`, `first-union`,
 `first-bursting`, `first-under`.
+
+#### THE FLIGHT, READ
+
+Untried, mechanical: what the frames above keep is read alike off runs alike,
+and off the ghost as the whole tree's keys; a position past a disjoint one is
+past its last child. Settled by bodies.
+
+Members: `above-≋`, `keys-above`, `past-last`.
 
 ## Tier 2 — the simultaneous spec
 
