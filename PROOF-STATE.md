@@ -10,9 +10,9 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE FLIGHT KEPT
 
-Untried: a merge's or a connect's keys read past a skip its run drops
-first (`adequacy.Engine.Passed`), and where only the tail is read, past the
-tail a dequeue grows. An outer's value or end, a subscribe beginning a
+Suspect fact: a merge's or a connect's keys read past a skip its run drops
+first (`adequacy.Engine.Passed`), when `⊒` may erase endlessly; and where
+only the tail is read, past the tail a dequeue grows. An outer's value or end, a subscribe beginning a
 former, and a mark run each leave the hole's run in shape and every frame
 above keyed against it (`adequacy.Engine.Above.Flight`). Settled by the
 per-frame keys past a dropped skip.

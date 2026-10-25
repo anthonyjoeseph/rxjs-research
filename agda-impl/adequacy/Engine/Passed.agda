@@ -10,6 +10,14 @@
 -- outer's run or its lane's run, a connect its body fed the source's run
 -- and its body's run: each of those drops the skip, and the facts the
 -- frame keeps of it are read past the skip.
+--
+-- The leaves are suspect through `adequacy.Engine.Drop.Dropsˢ`'s last
+-- conjunct: `⊒` erases at every finite depth, so an endless run of erased
+-- skips under a lane's root relates to a run whose later events leave it,
+-- and `Every∞ (Under r)` and `Spread` are not read across.  Below every
+-- connect's source the drop is exact (`≋-⊒`); a source frame's
+-- `SrcPass` is where a genuine erasure enters.  Either `⊒` erases only
+-- finitely often, or the leaves keep the drop exact below the source.
 module adequacy.Engine.Passed where
 
 open import Data.Bool using (true; false)
