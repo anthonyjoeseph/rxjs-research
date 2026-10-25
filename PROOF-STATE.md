@@ -14,10 +14,9 @@ Each skipped step drops a skip at one position of its hole; whether every
 frame above passes it there. Away from a live source the search's race
 settles it (`Ahead`), a subscription's by the lead it carries. Open: each
 live source's link, its body fed the source's skips dropping its own, and
-a defer's fresh source among them. Settled when these are bodies, or
-refuted.
+a defer's fresh source among them. Settled when these are bodies, or refuted.
 
-Members: `src-pass`, `defer-links`.
+Members: `src-fed`, `src-body-on`, `defer-links`.
 
 #### THE CLOSED LANE
 
@@ -129,7 +128,7 @@ Each operator's state heads no earlier than its subscription, and a
 subscription's burst leaves nothing earlier. Settled when each is a body.
 
 Members: `sub-head`, `sub-bursts`, `scanS-head`, `takeS-head`, `limit-head`,
-`switch-head`, `exhaust-head`, `fresh-src`.
+`switch-head`, `exhaust-head`, `fresh-src`, `src-next`.
 
 #### THE KEY ORDER
 
