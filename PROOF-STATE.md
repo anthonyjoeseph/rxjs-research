@@ -10,11 +10,21 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SILENT RUN
 
-Untried: an inner connect's source, fed the rest, leaves running what
-trails it. It is the run of no configuration given: the stepped one's, or
-a relation that cannot erase forever. Settled when a body, or refuted.
+Probed by `quickcheck.KeptDepth` (trail and flatness only): a node mid-run,
+read in an environment thinned from its own, keeps its run in order and its
+tail trailing it. Built against the unthinned environment, a merge, a
+connect, a joiner or a take must not rest on a skip the thinning erased.
+Settled when bodies, or refuted.
 
-Members: `fed-trail`.
+Members: `shape-conn`, `shape-flat`, `shape-join`, `shape-take`, `shape-sub`.
+
+#### THE THINNED ENVIRONMENT
+
+Untried: a sorted environment thinned is sorted; a source's run in a
+thinned environment is its run there thinned; the source's run fed the
+rest is its stepped run thinned. Settled when bodies, or refuted.
+
+Members: `sorted-thin`, `thin-src`, `thin-fed`.
 
 #### THE FED MERGE
 
@@ -26,25 +36,27 @@ Members: `fed-flat`.
 
 #### THE FED TAILS
 
-Untried: a run read through its tail, fed the rest. An erased skip erases
-tail pins too, so the tails' heads need not match; the configuration must
-keep erased pins out of a rested node. Settled when bodies, or refuted.
+Probed at every node by `quickcheck.KeptDepth`: a run read through its tail,
+fed the rest. An erased skip erases tail pins too, so the tails' heads need
+not match; the configuration must keep erased pins out of a rested node.
+Settled when bodies, or refuted.
 
 Members: `fed-cut`, `fed-taken`, `fed-done`, `fed-ended`.
 
 #### THE FED POSITIONS
 
-Untried: the body fed the rest, and each inner source, come after each
-position asked of, and a hushed inner source leaves nothing running.
-Settled when bodies, or refuted.
+Probed by `quickcheck.KeptDepth`: the body fed the rest, and each inner
+source, come after each position asked of, and a hushed inner source leaves
+nothing running. Settled when bodies, or refuted.
 
 Members: `src-body-on`, `fed-body-on`, `fed-src-next`.
 
 #### THE FRESH FEED
 
-Untried: a source subscribed fresh, a joiner, and a defer's fresh source,
-fed the rest, relate as the fed source does; an inner source fed the run
-is subscribed where its connect is. Settled when bodies, or refuted.
+Probed by `quickcheck.KeptDepth`: a source subscribed fresh, a joiner, and a
+defer's fresh source, fed the rest, relate as the fed source does; an inner
+source fed the run is subscribed where its connect is. Settled when bodies,
+or refuted.
 
 Members: `fed-fresh`, `fed-join`, `defer-links`, `fed-sourced`.
 
@@ -60,12 +72,12 @@ Members: `lane-begins-shut`.
 #### THE SORTED TAILS
 
 Probed: a lane's tail, at its flatMap's environment, is in position order;
-a connect's source runs in order, its tail trailing it. Both are proven only
-for a finite program's subscription (`trailing-subᶠ`); nothing ties a lane's
-or a source's state to a residual of its own subscription. Settled when
-these are bodies or refuted.
+a tape mid-play, an of part-way, an ended source and a run read through its
+tail keep their shape. Proven only for a finite program's subscription
+(`trailing-subᶠ`); nothing ties a state to a residual of its own
+subscription. Settled when these are bodies or refuted.
 
-Members: `lanes-sorted`, `src-trails`, `body-src-trails`.
+Members: `lanes-sorted`, `shape-cold`, `shape-of`, `shape-rest`, `ended-sorted`.
 
 #### THE SWITCH'S KILL
 
