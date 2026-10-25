@@ -17,7 +17,8 @@ import Data.List as L
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.All.Properties using (++⁺; ++⁻ʳ)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; _<ᵇ_)
+open import Data.Nat using (ℕ; suc; _<ᵇ_; _+_; _≤_)
+open import Data.Nat.Properties using (+-suc; +-assoc; ≤-pred; ≤-refl)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans; cong)
@@ -168,6 +169,27 @@ data LanesE {B : Set} (m : ℕ) : List (Events∞ B) → List (Events∞ B) → 
 
 infixr 5 _∷ᴱ_
 
+-- How many erased steps each part leads with: an erased step spends no
+-- depth, so the merge walks a run of them on this fuel.
+gapᵉ : ∀ {A k} {x : Events A} {t y} → Erase k x t y → ℕ
+gapᵉ (erased _ _ x) = suc (gapᵉ x)
+gapᵉ _              = 0
+
+gapᵀ : ∀ {k} {x y : Tail} → Eraseᵀ k x y → ℕ
+gapᵀ (unpin _ e) = suc (gapᵀ e)
+gapᵀ _           = 0
+
+gapᴼ : ∀ {B m} {o o′ : Maybe (Events∞ (MonotonicList B))} → OuterE m o o′ → ℕ
+gapᴼ doneᴱ     = 0
+gapᴼ (liveᴱ x) = gapᵉ (nowᵉ x)
+
+gapᴸ : ∀ {B m} {ls ls′ : List (Events∞ B)} → LanesE m ls ls′ → ℕ
+gapᴸ []ᴱ      = 0
+gapᴸ (x ∷ᴱ l) = gapᵉ (nowᵉ x) + gapᴸ l
+
+Gaps : ∀ {B m} {o o′ : Maybe (Events∞ (MonotonicList B))} {ls ls′ : List (Events∞ B)} {t t′} → OuterE m o o′ → LanesE m ls ls′ → Eraseᵀ m t t′ → ℕ
+Gaps r l te = gapᴼ r + gapᴸ l + gapᵀ te
+
 private
   outerE-pred : ∀ {B m} {o o′ : Maybe (Events∞ (MonotonicList B))} → OuterE (suc m) o o′ → OuterE m o o′
   outerE-pred doneᴱ     = doneᴱ
@@ -180,6 +202,39 @@ private
   lanesE-++ : ∀ {B m} {as as′ bs bs′ : List (Events∞ B)} → LanesE m as as′ → LanesE m bs bs′ → LanesE m (as ++ bs) (as′ ++ bs′)
   lanesE-++ []ᴱ      b = b
   lanesE-++ (x ∷ᴱ l) b = x ∷ᴱ lanesE-++ l b
+
+  gap-++ : ∀ {B m} {as as′ bs bs′ : List (Events∞ B)} (a : LanesE m as as′) (b : LanesE m bs bs′) → gapᴸ (lanesE-++ a b) ≡ gapᴸ a + gapᴸ b
+  gap-++ []ᴱ      b = refl
+  gap-++ (x ∷ᴱ l) b = trans (cong (gapᵉ (nowᵉ x) +_) (gap-++ l b)) (sym (+-assoc (gapᵉ (nowᵉ x)) (gapᴸ l) (gapᴸ b)))
+
+  -- A lane leading the run, read off the lanes it splits into.
+  to-lane : ∀ {B m} {o o′ : Maybe (Events∞ (MonotonicList B))} {bs bs′ : List (Events∞ B)} {c c′ : Events∞ B} {as as′ : List (Events∞ B)} {t t′ g} (r : OuterE m o o′) (lb : LanesE m bs bs′)
+            (lc : Eraseˢ m c c′) (la : LanesE m as as′) (te : Eraseᵀ m t t′)
+          → Gaps r (lanesE-++ lb (lc ∷ᴱ la)) te ≤ g → gapᴼ r + (gapᴸ lb + (gapᵉ (nowᵉ lc) + gapᴸ la)) + gapᵀ te ≤ g
+  to-lane {g = g} r lb lc la te = subst (λ z → gapᴼ r + z + gapᵀ te ≤ g) (gap-++ lb (lc ∷ᴱ la))
+
+  lane-gap : ∀ a b c e → a + (b + suc c) + e ≡ suc (a + (b + c) + e)
+  lane-gap a b c e = cong (_+ e) (trans (cong (a +_) (+-suc b c)) (+-suc a (b + c)))
+
+  -- A lane's erased step burns one unit of fuel.
+  lane-fuel : ∀ {B m} {o o′ : Maybe (Events∞ (MonotonicList B))} {bs bs′ : List (Events∞ B)} {c c′ : Events∞ B} {as as′ : List (Events∞ B)} {t t′ g} (r : OuterE m o o′) (lb : LanesE m bs bs′)
+              (lc : Eraseˢ m c c′) (la : LanesE m as as′) (te : Eraseᵀ m t t′)
+            → gapᴼ r + (gapᴸ lb + suc (gapᵉ (nowᵉ lc) + gapᴸ la)) + gapᵀ te ≤ suc g → Gaps r (lanesE-++ lb (lc ∷ᴱ la)) te ≤ g
+  lane-fuel {g = g} r lb lc la te p =
+    subst (λ z → gapᴼ r + z + gapᵀ te ≤ g) (sym (gap-++ lb (lc ∷ᴱ la)))
+      (≤-pred (subst (_≤ suc g) (lane-gap (gapᴼ r) (gapᴸ lb) (gapᵉ (nowᵉ lc) + gapᴸ la) (gapᵀ te)) p))
+
+  lane-none : ∀ a b c e → a + (b + suc c) + e ≤ 0 → ⊥
+  lane-none a b c e p with subst (_≤ 0) (lane-gap a b c e) p
+  ... | ()
+
+  -- A tail's erased step burns one unit of fuel.
+  tail-fuel : ∀ a c {g} → a + suc c ≤ suc g → a + c ≤ g
+  tail-fuel a c {g} p = ≤-pred (subst (_≤ suc g) (+-suc a c) p)
+
+  tail-none : ∀ a c → a + suc c ≤ 0 → ⊥
+  tail-none a c p with subst (_≤ 0) (+-suc a c) p
+  ... | ()
 
   lanesE-length : ∀ {B m} {ls ls′ : List (Events∞ B)} → LanesE m ls ls′ → length ls ≡ length ls′
   lanesE-length []ᴱ      = refl
@@ -219,13 +274,14 @@ private
   first-erase r lb la te (first nb af on tn) = first (lanes-nb lb nb) (lanes-after la af) (outer-nb r on) (tnb-erase te tn)
 
 -- A lane in the list, its counterpart in the other.
-data Split {B : Set} (m : ℕ) (bs : List (Events∞ B)) (c : Events∞ B) (as : List (Events∞ B)) : List (Events∞ B) → Set where
-  split : ∀ {bs′ c′ as′} → LanesE m bs bs′ → Eraseˢ m c c′ → LanesE m as as′ → Split m bs c as (bs′ ++ c′ ∷ as′)
+data Split {B : Set} (m : ℕ) (bs : List (Events∞ B)) (c : Events∞ B) (as : List (Events∞ B)) (g : ℕ) : List (Events∞ B) → Set where
+  split : ∀ {bs′ c′ as′} (lb : LanesE m bs bs′) (lc : Eraseˢ m c c′) (la : LanesE m as as′) → gapᴸ (lanesE-++ lb (lc ∷ᴱ la)) ≡ g
+        → Split m bs c as g (bs′ ++ c′ ∷ as′)
 
-lanesE-split : ∀ {B m} (bs : List (Events∞ B)) {c as ls′} → LanesE m (bs ++ c ∷ as) ls′ → Split m bs c as ls′
-lanesE-split []       (x ∷ᴱ l) = split []ᴱ x l
+lanesE-split : ∀ {B m} (bs : List (Events∞ B)) {c as ls′} (l : LanesE m (bs ++ c ∷ as) ls′) → Split m bs c as (gapᴸ l) ls′
+lanesE-split []       (x ∷ᴱ l) = split []ᴱ x l refl
 lanesE-split (b ∷ bs) (x ∷ᴱ l) with lanesE-split bs l
-... | split lb lc la = split (x ∷ᴱ lb) lc la
+... | split lb lc la e = split (x ∷ᴱ lb) lc la (cong (gapᵉ (nowᵉ x) +_) e)
 
 cuts-erase : ∀ {B m} {ls ls′ : List (Events∞ B)} → LanesE m ls ls′ → Eraseᵀ m (cuts ls) (cuts ls′)
 cuts-erase {m = m} []ᴱ = idle-erase m
@@ -320,122 +376,137 @@ module _ {B : Set} (op : FlatOp) where
 
   -- THE MERGE, ERASED.
   mutual
-    go-erase : ∀ {m} {o o′ : Maybe (Events∞ (MonotonicList B))} {ls ls′} qs {t t′} → OuterE m o o′ → LanesE m ls ls′ → Eraseᵀ m t t′
-             → Erase m (go op o ls qs t) (whole o′ ls′ t′) (go op o′ ls′ qs t′)
-    go-erase {0} qs _ _ _ = stopᵉ
-    go-erase {suc m} qs r l idleᵉ = parts-erase qs r l idleᵉ tt
-    go-erase {suc m} {o} {o′} {ls} {ls′} qs r l (pinᵉ {p = k} e) with ahead-of k o ls in eq
+    go-erase : ∀ {m} {o o′ : Maybe (Events∞ (MonotonicList B))} {ls ls′ : List (Events∞ B)} qs {t t′ g} (r : OuterE m o o′) (l : LanesE m ls ls′) (te : Eraseᵀ m t t′)
+             → Gaps r l te ≤ g → Erase m (go op o ls qs t) (whole o′ ls′ t′) (go op o′ ls′ qs t′)
+    go-erase {0}     qs r l te b = stopᵉ
+    go-erase {suc m} qs r l te b = go-erase⁺ _ qs r l te b
+
+    -- Past a kept step, at the depth left; past an erased one, at the same.
+    go-erase⁺ : ∀ {m} {o o′ : Maybe (Events∞ (MonotonicList B))} {ls ls′ : List (Events∞ B)} g qs {t t′} (r : OuterE (suc m) o o′)
+                (l : LanesE (suc m) ls ls′) (te : Eraseᵀ (suc m) t t′)
+              → Gaps r l te ≤ g → Erase (suc m) (go op o ls qs t) (whole o′ ls′ t′) (go op o′ ls′ qs t′)
+    go-erase⁺ g qs r l idleᵉ b = parts-erase g qs r l idleᵉ tt b
+    go-erase⁺ {o = o} {o′} {ls} {ls′} g qs r l (pinᵉ {p = k} e) b with ahead-of k o ls in eq
     ... | true rewrite ahead-mono {k = k} r l eq =
-      skipᵉ (whole-erase (outerE-pred r) (lanesE-pred l) e) (go-erase qs (outerE-pred r) (lanesE-pred l) e)
-    ... | false = parts-erase qs r l (pinᵉ e) eq
-    go-erase {suc m} {o} {o′} {ls} {ls′} qs {t′ = t′} r l (unpin {p = k} tn e) with ahead-of k o ls in eq
-    ... | true with ahead-split k o ls eq
-    ...   | a , al = erased (head-go o′ ls′ qs t′ (after-nb (headᴼ o′) (outer-after r a)) (afters-nb (lanes-after l al)) tn)
-                            (whole-erase (outerE-pred r) (lanesE-pred l) e) (go-erase qs (outerE-pred r) (lanesE-pred l) e)
-    go-erase {suc m} {o} {o′} {ls} {ls′} qs r l (unpin tn e) | false = parts-erase qs r l (unpin tn e) eq
+      skipᵉ (whole-erase (outerE-pred r) (lanesE-pred l) e) (go-erase qs (outerE-pred r) (lanesE-pred l) e ≤-refl)
+    ... | false = parts-erase g qs r l (pinᵉ e) eq b
+    go-erase⁺ {o = o} {o′} {ls} {ls′} g qs {t′ = t′} r l (unpin {p = k} tn e) b with ahead-of k o ls in eq
+    go-erase⁺ 0 qs r l (unpin tn e) b | true = ⊥-elim (tail-none (gapᴼ r + gapᴸ l) (gapᵀ e) b)
+    go-erase⁺ {o = o} {o′} {ls} {ls′} (suc g) qs {t′ = t′} r l (unpin {p = k} tn e) b | true with ahead-split k o ls eq
+    ... | a , al = erased (head-go o′ ls′ qs t′ (after-nb (headᴼ o′) (outer-after r a)) (afters-nb (lanes-after l al)) tn)
+                          (whole-erase r l e) (go-erase⁺ g qs r l e (tail-fuel (gapᴼ r + gapᴸ l) (gapᵀ e) b))
+    go-erase⁺ g qs r l (unpin tn e) b | false = parts-erase g qs r l (unpin tn e) eq b
 
-    parts-erase : ∀ {m} {o o′ : Maybe (Events∞ (MonotonicList B))} {ls ls′} qs {t t′} → OuterE (suc m) o o′ → LanesE (suc m) ls ls′
-                → Eraseᵀ (suc m) t t′ → Low o ls t → Erase (suc m) (parts op o ls qs t) (whole o′ ls′ t′) (go op o′ ls′ qs t′)
-    parts-erase {ls = ls} qs r l te lo with earliest ls | earliest-found ls
-    ... | none            | hs                   = via-erase qs r l te lo hs
+    parts-erase : ∀ {m} {o o′ : Maybe (Events∞ (MonotonicList B))} {ls ls′ : List (Events∞ B)} g qs {t t′} (r : OuterE (suc m) o o′) (l : LanesE (suc m) ls ls′)
+                  (te : Eraseᵀ (suc m) t t′) → Low o ls t → Gaps r l te ≤ g
+                → Erase (suc m) (parts op o ls qs t) (whole o′ ls′ t′) (go op o′ ls′ qs t′)
+    parts-erase {ls = ls} g qs r l te lo b with earliest ls | earliest-found ls
+    ... | none            | hs                   = via-erase g qs r l te lo hs b
     ... | found p bs c as | (refl , hc , nb , af) with lanesE-split bs l
-    ...   | split lb lc la = race-erase qs r lb lc la te lo hc nb af
+    ...   | split lb lc la e = race-erase g qs r lb lc la te lo hc nb af (subst (λ z → gapᴼ r + z + gapᵀ te ≤ _) (sym e) b)
 
-    via-erase : ∀ {m} {o o′ : Maybe (Events∞ (MonotonicList B))} {ls ls′} qs {t t′} → OuterE (suc m) o o′ → LanesE (suc m) ls ls′
-              → Eraseᵀ (suc m) t t′ → Low o ls t → All Hushed ls → Erase (suc m) (viaOuter op o ls qs t) (whole o′ ls′ t′) (go op o′ ls′ qs t′)
-    via-erase {ls′ = ls′} qs doneᴱ l idleᵉ lo hs rewrite earliest-hushed ls′ (lanes-hushed l hs) = hushᵉ
-    via-erase {ls = ls} qs doneᴱ l (pinᵉ {p = k} e)    lo hs = ⊥-elim (low-hushed nothing ls k lo refl hs)
-    via-erase {ls = ls} qs doneᴱ l (unpin {p = k} o e) lo hs = ⊥-elim (low-hushed nothing ls k lo refl hs)
-    via-erase {ls = ls} qs {t} (liveᴱ {e} (ct ,ᵉ x)) l te lo hs = outer-erase qs ct refl x l te (via-guard e ls t lo hs)
+    via-erase : ∀ {m} {o o′ : Maybe (Events∞ (MonotonicList B))} {ls ls′ : List (Events∞ B)} g qs {t t′} (r : OuterE (suc m) o o′) (l : LanesE (suc m) ls ls′)
+                (te : Eraseᵀ (suc m) t t′) → Low o ls t → All Hushed ls → Gaps r l te ≤ g
+              → Erase (suc m) (viaOuter op o ls qs t) (whole o′ ls′ t′) (go op o′ ls′ qs t′)
+    via-erase {ls′ = ls′} g qs doneᴱ l idleᵉ lo hs b rewrite earliest-hushed ls′ (lanes-hushed l hs) = hushᵉ
+    via-erase {ls = ls} g qs doneᴱ l (pinᵉ {p = k} e)    lo hs b = ⊥-elim (low-hushed nothing ls k lo refl hs)
+    via-erase {ls = ls} g qs doneᴱ l (unpin {p = k} o e) lo hs b = ⊥-elim (low-hushed nothing ls k lo refl hs)
+    via-erase {ls = ls} g qs {t} (liveᴱ {e} (ct ,ᵉ x)) l te lo hs b = outer-erase g qs ct refl x l te (via-guard e ls t lo hs) b
 
-    race-erase : ∀ {m} {o o′ : Maybe (Events∞ (MonotonicList B))} {p bs bs′} {c c′ : Events∞ B} {as as′} qs {t t′}
-               → OuterE (suc m) o o′ → LanesE (suc m) bs bs′ → Eraseˢ (suc m) c c′ → LanesE (suc m) as as′ → Eraseᵀ (suc m) t t′
-               → Low o (bs ++ c ∷ as) t → head (force c) ≡ just p → All (NBₗ p) bs → All (Afterₗ p) as
+    race-erase : ∀ {m} {o o′ : Maybe (Events∞ (MonotonicList B))} {p bs bs′} {c c′ : Events∞ B} {as as′} g qs {t t′}
+                 (r : OuterE (suc m) o o′) (lb : LanesE (suc m) bs bs′) (lc : Eraseˢ (suc m) c c′) (la : LanesE (suc m) as as′) (te : Eraseᵀ (suc m) t t′)
+               → Low o (bs ++ c ∷ as) t → head (force c) ≡ just p → All (NBₗ p) bs → All (Afterₗ p) as → Gaps r (lanesE-++ lb (lc ∷ᴱ la)) te ≤ g
                → Erase (suc m) (race op o p bs c as qs t) (whole o′ (bs′ ++ c′ ∷ as′) t′) (go op o′ (bs′ ++ c′ ∷ as′) qs t′)
-    race-erase {o = nothing} {p = p} {bs = bs} {c = c} {as = as} qs {t} doneᴱ lb (ct ,ᵉ x) la te lo hc nb af =
-      lane-erase qs doneᴱ lb ct refl x la te hc (first nb af tt (low-tail nothing (bs ++ c ∷ as) t lo tt (all-mid {P = NBₗ p} nb (nb-self {l = c} hc) (afters-nb af))))
-    race-erase {o = just e} {p = p} {bs} {c = c} {as = as} qs {t} (liveᴱ (ot ,ᵉ ox)) lb (ct ,ᵉ x) la te lo hc nb af with head (force e) in he
+    race-erase {o = nothing} {p = p} {bs = bs} {c = c} {as = as} g qs {t} doneᴱ lb (ct ,ᵉ x) la te lo hc nb af b =
+      lane-erase g qs doneᴱ lb ct refl x la te hc (first nb af tt (low-tail nothing (bs ++ c ∷ as) t lo tt (all-mid {P = NBₗ p} nb (nb-self {l = c} hc) (afters-nb af))))
+        (to-lane doneᴱ lb (ct ,ᵉ x) la te b)
+    race-erase {o = just e} {just e′} {p = p} {bs} {c = c} {as = as} g qs {t} (liveᴱ (ot ,ᵉ ox)) lb (ct ,ᵉ x) la te lo hc nb af b with head (force e) in he
     ... | nothing =
-      lane-erase qs (liveᴱ (ot ,ᵉ ox)) lb ct refl x la te hc
+      lane-erase g qs (liveᴱ (ot ,ᵉ ox)) lb ct refl x la te hc
         (first nb af (subst (NotBefore p) (sym he) tt) (low-tail (just e) (bs ++ c ∷ as) t lo (subst (NotBefore p) (sym he) tt) (all-mid {P = NBₗ p} nb (nb-self {l = c} hc) (afters-nb af))))
+        (to-lane {o = just e} {just e′} (liveᴱ (ot ,ᵉ ox)) lb (ct ,ᵉ x) la te b)
     ... | just p′ with p′ <ᵖ p in lt
-    ...   | true  = outer-erase qs ot refl ox (lanesE-++ lb ((ct ,ᵉ x) ∷ᴱ la)) te
-                      (subst (Guard (bs ++ c ∷ as) t) (sym he) (ledᴳ ALL (low-tail (just e) (bs ++ c ∷ as) t lo (subst (NotBefore p′) (sym he) (<ᵖ-irrefl p′)) (afters-nb ALL))))
+    ...   | true  = outer-erase {e = e} {e′} g qs ot refl ox (lanesE-++ lb ((ct ,ᵉ x) ∷ᴱ la)) te
+                      (subst (Guard (bs ++ c ∷ as) t) (sym he) (ledᴳ ALL (low-tail (just e) (bs ++ c ∷ as) t lo (subst (NotBefore p′) (sym he) (<ᵖ-irrefl p′)) (afters-nb ALL)))) b
       where ALL = all-mid (nbs-after lt nb) (subst (After p′) (sym hc) lt) (afters-lt lt af)
     ...   | false =
-      lane-erase qs (liveᴱ (ot ,ᵉ ox)) lb ct refl x la te hc
+      lane-erase g qs (liveᴱ (ot ,ᵉ ox)) lb ct refl x la te hc
         (first nb af (subst (NotBefore p) (sym he) lt) (low-tail (just e) (bs ++ c ∷ as) t lo (subst (NotBefore p) (sym he) lt) (all-mid {P = NBₗ p} nb (nb-self {l = c} hc) (afters-nb af))))
+        (to-lane {o = just e} {just e′} (liveᴱ (ot ,ᵉ ox)) lb (ct ,ᵉ x) la te b)
 
-    outer-erase : ∀ {m} {e e′ : Events∞ (MonotonicList B)} {ls ls′} qs {t t′ ev ev′} → Eraseᵀ (suc m) (cut e) (cut e′) → force e′ ≡ ev′
-                → Erase (suc m) ev (cut e′) ev′ → LanesE (suc m) ls ls′ → Eraseᵀ (suc m) t t′ → Guard ls t (head ev)
+    outer-erase : ∀ {m} {e e′ : Events∞ (MonotonicList B)} {ls ls′ : List (Events∞ B)} g qs {t t′ ev ev′} → Eraseᵀ (suc m) (cut e) (cut e′) → force e′ ≡ ev′
+                → (ex : Erase (suc m) ev (cut e′) ev′) (l : LanesE (suc m) ls ls′) (te : Eraseᵀ (suc m) t t′) → Guard ls t (head ev)
+                → gapᵉ ex + gapᴸ l + gapᵀ te ≤ g
                 → Erase (suc m) (outer op e ls qs t ev) (whole (just e′) ls′ t′) (go op (just e′) ls′ qs t′)
-    outer-erase {e′ = e′} {ls} {ls′} qs {t} {t′} ct eq′ (outᵉ {p = q} {a = x} {l = r} {r = r′} et ex) l te (ledᴳ al tn)
+    outer-erase {e′ = e′} {ls} {ls′} g qs {t} {t′} ct eq′ (outᵉ {p = q} {a = x} {l = r} {r = r′} et ex) l te (ledᴳ al tn) b
       rewrite go-outer op e′ ls′ qs t′ (cong head eq′) (lanes-after l al) (tnb-erase te tn) | eq′
       with admit op (q ++ [ ix 1 ]) x ls qs | admit op (q ++ [ ix 1 ]) x ls′ qs | admit-erase op (q ++ [ ix 1 ]) x qs (lanesE-pred l)
     ... | ls₁ , qs₁ , d₁ | ls₁′ , .qs₁ , d₁′ | l₁ , refl , d =
       skipᵉ (whole-erase {o = just r} {just r′} {ls₁} {ls₁′} (liveᴱ (et ,ᵉ ex)) l₁ (∪-erase (eraseᵀ-pred te) d))
-            (go-erase {o = just r} {just r′} {ls₁} {ls₁′} qs₁ (liveᴱ (et ,ᵉ ex)) l₁ (∪-erase (eraseᵀ-pred te) d))
-    outer-erase {e′ = e′} {ls} {ls′} qs {t′ = t′} ct eq′ (skipᵉ {l = r} {r = r′} et ex) l te (ledᴳ al tn)
+            (go-erase {o = just r} {just r′} {ls₁} {ls₁′} qs₁ (liveᴱ (et ,ᵉ ex)) l₁ (∪-erase (eraseᵀ-pred te) d) ≤-refl)
+    outer-erase {e′ = e′} {ls} {ls′} g qs {t′ = t′} ct eq′ (skipᵉ {l = r} {r = r′} et ex) l te (ledᴳ al tn) b
       rewrite go-outer op e′ ls′ qs t′ (cong head eq′) (lanes-after l al) (tnb-erase te tn) | eq′ =
       skipᵉ (whole-erase {o = just r} {just r′} {ls} {ls′} (liveᴱ (et ,ᵉ ex)) (lanesE-pred l) (eraseᵀ-pred te))
-            (go-erase {o = just r} {just r′} {ls} {ls′} qs (liveᴱ (et ,ᵉ ex)) (lanesE-pred l) (eraseᵀ-pred te))
-    outer-erase {m} {e′ = e′} {ls′ = ls′} qs {t′ = t′} ct eq′ (erased {p = q} {l = r} o et ex) l te (ledᴳ al tn) =
-      erased (head-go (just e′) ls′ qs t′ (subst (λ z → NotBefore q (head z)) (sym eq′) o) (afters-nb (lanes-after l al)) (tnb-erase te tn))
-             (whole-erase R (lanesE-pred l) (eraseᵀ-pred te)) (go-erase qs R (lanesE-pred l) (eraseᵀ-pred te))
-      where R = liveᴱ (et ,ᵉ subst (Erase m (force r) (cut e′)) (sym eq′) ex)
-    outer-erase {e′ = e′} {ls′ = ls′} qs {t′ = t′} ct eq′ endᵉ []ᴱ te (ledᴳ al tn)
+            (go-erase {o = just r} {just r′} {ls} {ls′} qs (liveᴱ (et ,ᵉ ex)) (lanesE-pred l) (eraseᵀ-pred te) ≤-refl)
+    outer-erase 0 qs ct eq′ (erased o et ex) l te gd ()
+    outer-erase {e′ = e′} {ls} {ls′} (suc g) qs {t′ = t′} ct refl (erased {l = r} o et ex) l te (ledᴳ al tn) b =
+      erased (head-go (just e′) ls′ qs t′ o (afters-nb (lanes-after l al)) (tnb-erase te tn))
+             (whole-erase {o = just r} {just e′} {ls} {ls′} (liveᴱ (et ,ᵉ ex)) l te) (go-erase⁺ g qs (liveᴱ (et ,ᵉ ex)) l te (≤-pred b))
+    outer-erase {e′ = e′} {ls′ = ls′} g qs {t′ = t′} ct eq′ endᵉ []ᴱ te (ledᴳ al tn) b
       with qs
     ... | [] rewrite go-outer op e′ [] [] t′ (cong head eq′) [] (tnb-erase te tn) | eq′ = endᵉ
     ... | x ∷ qs′ rewrite go-outer op e′ [] (x ∷ qs′) t′ (cong head eq′) [] (tnb-erase te tn) | eq′ =
-      skipᵉ (whole-erase {B} doneᴱ []ᴱ T) (go-erase (x ∷ qs′) doneᴱ []ᴱ T)
+      skipᵉ (whole-erase {B} doneᴱ []ᴱ T) (go-erase (x ∷ qs′) doneᴱ []ᴱ T ≤-refl)
       where T = ∪-erase (eraseᵀ-pred te) (eraseᵀ-pred ct)
-    outer-erase {e′ = e′} {ls′ = ls′} qs {t′ = t′} ct eq′ endᵉ (y ∷ᴱ l) te (ledᴳ al tn)
+    outer-erase {e′ = e′} {ls′ = ls′} g qs {t′ = t′} ct eq′ endᵉ (y ∷ᴱ l) te (ledᴳ al tn) b
       rewrite go-outer op e′ ls′ qs t′ (cong head eq′) (lanes-after (y ∷ᴱ l) al) (tnb-erase te tn) | eq′ =
-      skipᵉ (whole-erase doneᴱ (lanesE-pred (y ∷ᴱ l)) T) (go-erase qs doneᴱ (lanesE-pred (y ∷ᴱ l)) T)
+      skipᵉ (whole-erase doneᴱ (lanesE-pred (y ∷ᴱ l)) T) (go-erase qs doneᴱ (lanesE-pred (y ∷ᴱ l)) T ≤-refl)
       where T = ∪-erase (eraseᵀ-pred te) (eraseᵀ-pred ct)
-    outer-erase {e′ = e′} {ls′ = ls′} qs ct eq′ hushᵉ l idleᵉ (hushedᴳ hs refl)
+    outer-erase {e′ = e′} {ls′ = ls′} g qs ct eq′ hushᵉ l idleᵉ (hushedᴳ hs refl) b
       rewrite go-hushed e′ ls′ qs (lanes-hushed l hs) eq′ = hushᵉ
 
-    lane-erase : ∀ {m} {o o′ : Maybe (Events∞ (MonotonicList B))} {p bs bs′} {c c′ : Events∞ B} {as as′} qs {t t′ ev ev′}
-               → OuterE (suc m) o o′ → LanesE (suc m) bs bs′ → Eraseᵀ (suc m) (cut c) (cut c′) → force c′ ≡ ev′ → Erase (suc m) ev (cut c′) ev′
-               → LanesE (suc m) as as′ → Eraseᵀ (suc m) t t′ → head ev ≡ just p → First p o bs as t
+    lane-erase : ∀ {m} {o o′ : Maybe (Events∞ (MonotonicList B))} {p bs bs′} {c c′ : Events∞ B} {as as′} g qs {t t′ ev ev′}
+                 (r : OuterE (suc m) o o′) (lb : LanesE (suc m) bs bs′) → Eraseᵀ (suc m) (cut c) (cut c′) → force c′ ≡ ev′
+               → (ex : Erase (suc m) ev (cut c′) ev′) (la : LanesE (suc m) as as′) (te : Eraseᵀ (suc m) t t′) → head ev ≡ just p → First p o bs as t
+               → gapᴼ r + (gapᴸ lb + (gapᵉ ex + gapᴸ la)) + gapᵀ te ≤ g
                → Erase (suc m) (lane op o bs c as qs t ev) (whole o′ (bs′ ++ c′ ∷ as′) t′) (go op o′ (bs′ ++ c′ ∷ as′) qs t′)
-    lane-erase {o′ = o′} {bs′ = bs′} {c′ = c′} {as′ = as′} qs {t′ = t′} r lb ct eq′ (outᵉ et ex) la te refl F
+    lane-erase {o′ = o′} {bs′ = bs′} {c′ = c′} {as′ = as′} g qs {t′ = t′} r lb ct eq′ (outᵉ et ex) la te refl F b
       rewrite go-rise op o′ bs′ c′ as′ qs t′ (cong head eq′) (first-erase r lb la te F) | eq′ =
-      outᵉ (whole-erase (outerE-pred r) L (eraseᵀ-pred te)) (go-erase qs (outerE-pred r) L (eraseᵀ-pred te))
+      outᵉ (whole-erase (outerE-pred r) L (eraseᵀ-pred te)) (go-erase qs (outerE-pred r) L (eraseᵀ-pred te) ≤-refl)
       where L = lanesE-++ (lanesE-pred lb) ((et ,ᵉ ex) ∷ᴱ lanesE-pred la)
-    lane-erase {o′ = o′} {bs′ = bs′} {c′ = c′} {as′ = as′} qs {t′ = t′} r lb ct eq′ (skipᵉ et ex) la te refl F
+    lane-erase {o′ = o′} {bs′ = bs′} {c′ = c′} {as′ = as′} g qs {t′ = t′} r lb ct eq′ (skipᵉ et ex) la te refl F b
       rewrite go-rise op o′ bs′ c′ as′ qs t′ (cong head eq′) (first-erase r lb la te F) | eq′ =
-      skipᵉ (whole-erase (outerE-pred r) L (eraseᵀ-pred te)) (go-erase qs (outerE-pred r) L (eraseᵀ-pred te))
+      skipᵉ (whole-erase (outerE-pred r) L (eraseᵀ-pred te)) (go-erase qs (outerE-pred r) L (eraseᵀ-pred te) ≤-refl)
       where L = lanesE-++ (lanesE-pred lb) ((et ,ᵉ ex) ∷ᴱ lanesE-pred la)
-    lane-erase {m} {o′ = o′} {p} {bs′ = bs′} {c′ = c′} {as′ = as′} qs {t′ = t′} r lb ct eq′ (erased {l = rl} o et ex) la te refl F
+    lane-erase 0 qs r lb ct eq′ (erased o et ex) la te refl F b = ⊥-elim (lane-none (gapᴼ r) (gapᴸ lb) (gapᵉ ex + gapᴸ la) (gapᵀ te) b)
+    lane-erase {o′ = o′} {p} {bs′ = bs′} {c′ = c′} {as′ = as′} (suc g) qs {t′ = t′} r lb ct refl (erased o et ex) la te refl F b
       with first-erase r lb la te F
     ... | first nb′ af′ on′ tn′ =
-      erased (head-go o′ (bs′ ++ c′ ∷ as′) qs t′ on′ (all-mid nb′ (subst (λ z → NotBefore p (head z)) (sym eq′) o) (afters-nb af′)) tn′)
-             (whole-erase (outerE-pred r) L (eraseᵀ-pred te)) (go-erase qs (outerE-pred r) L (eraseᵀ-pred te))
-      where L = lanesE-++ (lanesE-pred lb) ((et ,ᵉ subst (Erase m (force rl) (cut c′)) (sym eq′) ex) ∷ᴱ lanesE-pred la)
-    lane-erase {m} {o′ = o′} {bs′ = bs′} {c′ = c′} {as′ = as′} qs {t′ = t′} r lb ct eq′ endᵉ la te refl F
+      erased (head-go o′ (bs′ ++ c′ ∷ as′) qs t′ on′ (all-mid nb′ o (afters-nb af′)) tn′)
+             (whole-erase r L te) (go-erase⁺ g qs r L te (lane-fuel r lb (et ,ᵉ ex) la te b))
+      where L = lanesE-++ lb ((et ,ᵉ ex) ∷ᴱ la)
+    lane-erase {m} {o′ = o′} {bs′ = bs′} {c′ = c′} {as′ = as′} g qs {t′ = t′} r lb ct eq′ endᵉ la te refl F b
       rewrite go-rise op o′ bs′ c′ as′ qs t′ (cong head eq′) (first-erase r lb la te F) | eq′ = lane-end qs r lb ct la te
-    lane-erase qs r lb ct eq′ hushᵉ la te () F
+    lane-erase g qs r lb ct eq′ hushᵉ la te () F b
 
     lane-end : ∀ {m} {o o′ : Maybe (Events∞ (MonotonicList B))} {bs bs′} {c c′ : Events∞ B} {as as′} qs {t t′ p}
              → OuterE (suc m) o o′ → LanesE (suc m) bs bs′ → Eraseᵀ (suc m) (cut c) (cut c′) → LanesE (suc m) as as′ → Eraseᵀ (suc m) t t′
              → Erase (suc m) (lane op o bs c as qs t (end p)) (whole o′ (bs′ ++ c′ ∷ as′) t′) (lane op o′ bs′ c′ as′ qs t′ (end p))
     lane-end {m} (x ∷ qs) {p = p} r lb ct la te =
-      skipᵉ (whole-erase (outerE-pred r) L T) (go-erase qs (outerE-pred r) L T)
+      skipᵉ (whole-erase (outerE-pred r) L T) (go-erase qs (outerE-pred r) L T ≤-refl)
       where L = eraseˢ-refl m (enter x (p ++ [ ix 1 ])) ∷ᴱ lanesE-pred (lanesE-++ lb la)
             T = ∪-erase (eraseᵀ-pred te) (eraseᵀ-pred ct)
     lane-end [] doneᴱ []ᴱ ct []ᴱ te = endᵉ
     lane-end [] doneᴱ []ᴱ ct (y ∷ᴱ la) te =
-      skipᵉ (whole-erase doneᴱ L T) (go-erase [] doneᴱ L T)
+      skipᵉ (whole-erase doneᴱ L T) (go-erase [] doneᴱ L T ≤-refl)
       where L = lanesE-pred (y ∷ᴱ la)
             T = ∪-erase (eraseᵀ-pred te) (eraseᵀ-pred ct)
     lane-end [] doneᴱ (y ∷ᴱ lb) ct la te =
-      skipᵉ (whole-erase doneᴱ L T) (go-erase [] doneᴱ L T)
+      skipᵉ (whole-erase doneᴱ L T) (go-erase [] doneᴱ L T ≤-refl)
       where L = lanesE-pred (lanesE-++ (y ∷ᴱ lb) la)
             T = ∪-erase (eraseᵀ-pred te) (eraseᵀ-pred ct)
     lane-end [] r@(liveᴱ _) lb ct la te =
-      skipᵉ (whole-erase (outerE-pred r) L T) (go-erase [] (outerE-pred r) L T)
+      skipᵉ (whole-erase (outerE-pred r) L T) (go-erase [] (outerE-pred r) L T ≤-refl)
       where L = lanesE-pred (lanesE-++ lb la)
             T = ∪-erase (eraseᵀ-pred te) (eraseᵀ-pred ct)
 
@@ -612,7 +683,7 @@ outer-⊒ op g q ls ds ρ {h} {h′} (ld , hu , er) =
   (λ eq d → ∪-ne (hu (map-hush (laneᴹ g ρ) (force h) (proj₁ (go-hush (flatOp op) (just (outerOf g ρ h)) (states ls ρ) Q (poolT ds ρ) eq))) d)
                  (agreeᵀ-refl d (cuts (states ls ρ) ∪ poolT ds ρ))) ,
   λ n → whole-erase (O n) (lanesE-refl n (states ls ρ)) (eraseᵀ-refl n (poolT ds ρ)) ,ᵉ
-        go-erase (flatOp op) Q (O n) (lanesE-refl n (states ls ρ)) (eraseᵀ-refl n (poolT ds ρ))
+        go-erase (flatOp op) Q (O n) (lanesE-refl n (states ls ρ)) (eraseᵀ-refl n (poolT ds ρ)) ≤-refl
   where
     Q = L.map (laneᴹ g ρ) q
     O = λ n → liveᴱ {e = outerOf g ρ h} {outerOf g ρ h′} (cutᵉ (er n) ,ᵉ map-erase (laneᴹ g ρ) (nowᵉ (er n)))
@@ -624,7 +695,7 @@ lanes-⊒ op g d q o pre post ρ {h} {h′} (ld , hu , er) =
   (λ eq n → ∪-ne (agreeᵀ-refl n (cutᴼ Oᴺ))
                  (∪-ne (cuts-hole Post true Pre h h′ (hu (head-hush (force h) (hole (proj₂ (go-hush (flatOp op) Oᴺ (Post ++ h ∷ Pre) Q T eq))) ) n))
                        (agreeᵀ-refl n T))) ,
-  λ n → whole-erase (outerE-refl n Oᴺ) (R n) (eraseᵀ-refl n T) ,ᵉ go-erase (flatOp op) Q (outerE-refl n Oᴺ) (R n) (eraseᵀ-refl n T)
+  λ n → whole-erase (outerE-refl n Oᴺ) (R n) (eraseᵀ-refl n T) ,ᵉ go-erase (flatOp op) Q (outerE-refl n Oᴺ) (R n) (eraseᵀ-refl n T) ≤-refl
   where
     Q    = L.map (laneᴹ g ρ) q
     Oᴺ   = outerᴺ g (outerG d o) ρ

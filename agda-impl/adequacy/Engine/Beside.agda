@@ -35,7 +35,7 @@ open import denotation.NonExpansive using (Agreeˢ; ∪-ne)
 open import adequacy.Engine.Meaning using (_≋_; bodyConn)
 open import adequacy.Engine.Race using (After; NotBefore; TailNotBefore)
 open import adequacy.Engine.Erase using (Eraseᵀ; Erase; Lead⁼; Eraseˢ; _,ᵉ_; cutᵉ; nowᵉ; _⊒_; stopᵉ; pinᵉ; unpin; idleᵉ; outᵉ; skipᵉ;
-  erased; endᵉ; hushᵉ; outᴸ; skipᴸ; endᴸ; hushᴸ; eraseᵀ-pred; eraseˢ-pred; after-nb; after-erase; ∪-erase)
+  erased; endᵉ; hushᵉ; outᴸ; skipᴸ; endᴸ; hushᴸ; eraseᵀ-pred; erase-pred; eraseˢ-pred; after-nb; after-erase; ∪-erase)
 open import adequacy.Placed.Order using (Atop; Ordered; ordered; EveryT; everyᵀ)
 open import adequacy.Placed.Trail using (Trail; TrailE; Trailing; trail; trailᶠ; trail-≈; inside-under)
 open import adequacy.Placed.Keys using (atop-agree; ordered-≈)
@@ -209,10 +209,14 @@ module _ (r : Pos) where
              → Eraseˢ n (M′.onward∞ σ (force σ)) (M′.onward∞ σ′ (force σ′))
     onward-≡ {n = n} {σ} {σ′} eq eq′ e = subst₂ (Eraseˢ n) (cong (M′.onward∞ σ) (sym eq)) (cong (M′.onward∞ σ′) (sym eq′)) e
 
-    gone-on : ∀ {X n p} {σ σ′ : Events∞ X} {l x′} → force σ ≡ skip p l → force σ′ ≡ x′ → Eraseᵀ n (cut l) (cut σ′)
-            → Erase n (force l) (cut σ′) x′ → Eraseˢ n (M′.onward∞ σ (force σ)) σ′
-    gone-on {n = n} {σ = σ} {σ′} {l} eq eq′ et ex =
-      subst (λ z → Eraseˢ n (M′.onward∞ σ z) σ′) (sym eq) (et ,ᵉ subst (Erase n (force l) (cut σ′)) (sym eq′) ex)
+    gone-cut : ∀ {X k p} {σ : Events∞ X} {l t} → force σ ≡ skip p l → Eraseᵀ k (cut l) t → Eraseᵀ k (cut (M′.onward∞ σ (force σ))) t
+    gone-cut {k = k} {σ = σ} {t = t} eq e = subst (λ z → Eraseᵀ k (cut (M′.onward∞ σ z)) t) (sym eq) e
+
+    gone-eq : ∀ {X p} {σ : Events∞ X} {l} → force σ ≡ skip p l → force (M′.onward∞ σ (force σ)) ≡ force l
+    gone-eq {σ = σ} eq = cong (λ z → force (M′.onward∞ σ z)) eq
+
+    glue : ∀ {A k} {h h′ : Events∞ A} {y y′} → Eraseᵀ k (cut h) (cut h′) → force h ≡ y → force h′ ≡ y′ → Erase k y (cut h′) y′ → Eraseˢ k h h′
+    glue c refl refl x = c ,ᵉ x
 
   -- A hushed source bursts nothing.
   burst-hush : ∀ {X} {σ : Events∞ X} → force σ ≡ hush → M′.burstOn r σ ≡ cut σ
@@ -242,55 +246,58 @@ module _ (r : Pos) where
     ahead-body {q = q} {true} eq bq bf with () ← trans (sym bq) (trans (cong (M′.before q) eq) bf)
     ahead-body {β = β} {σ} {q} {false} eq bq bf = cong (M′.body r σ q) eq
 
-  -- THE CONNECT, ERASED.
+  -- THE CONNECT, ERASED.  An erased step spends no depth, so a walk
+  -- reads each run's derivation as it stands: a source step erased walks
+  -- on the source's rest, a body step erased on the body's.
   mutual
     beside-erase : ∀ {X B n} {σ σ′ : Events∞ X} {β β′ : Events∞ B} → Sourced r σ → Trailing σ′ → Eraseˢ n σ σ′ → Eraseˢ n β β′
                  → Erase n (M′.beside r β σ) (M′.burstOn r σ′ ∪ cut β′) (M′.beside r β′ σ′)
     beside-erase {n = zero}  so tr es eb = stopᵉ
     beside-erase {n = suc n} {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} so tr es eb =
-      side-erase {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} so tr es eb refl refl (nowᵉ es)
+      side-erase {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} so tr (cutᵉ es) eb refl refl (nowᵉ es)
 
-    side-erase : ∀ {X B n} {σ σ′ : Events∞ X} {β β′ : Events∞ B} {x x′} → Sourced r σ → Trailing σ′ → Eraseˢ (suc n) σ σ′
+    side-erase : ∀ {X B n} {σ σ′ : Events∞ X} {β β′ : Events∞ B} {x x′} → Sourced r σ → Trailing σ′ → Eraseᵀ (suc n) (cut σ) (cut σ′)
                → Eraseˢ (suc n) β β′ → force σ ≡ x → force σ′ ≡ x′ → Erase (suc n) x (cut σ′) x′
                → Erase (suc n) (M′.side r β σ x) (M′.burstOn r σ′ ∪ cut β′) (M′.side r β′ σ′ x′)
-    side-erase {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} so tr es eb eq eq′ hushᵉ =
+    side-erase {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} so tr ct eb eq eq′ hushᵉ =
       subst (λ T → Erase _ (force β) (T ∪ cut β′) (force β′)) (sym (burst-hushed {σ = σ′} tr eq′)) (nowᵉ eb)
-    side-erase {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} so tr es eb eq eq′ (outᵉ {p = p} et ex) =
-      walkK {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} (p ++ [ ix 0 ]) refl refl (burst-erase so tr es) (sourced-on so) (trailing-on {σ = σ′} tr)
-        (onward-≡ {σ = σ} {σ′ = σ′} eq eq′ (et ,ᵉ ex)) eb
-    side-erase {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} so tr es eb eq eq′ (skipᵉ {p = p} et ex) =
-      walkK {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} (p ++ [ ix 0 ]) refl refl (burst-erase so tr es) (sourced-on so) (trailing-on {σ = σ′} tr)
-        (onward-≡ {σ = σ} {σ′ = σ′} eq eq′ (et ,ᵉ ex)) eb
-    side-erase {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} so tr es eb eq eq′ (endᵉ {p = c}) =
-      walkK {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} (c ++ [ ix 0 ]) refl refl (burst-erase so tr es) (sourced-on so) (trailing-on {σ = σ′} tr)
-        (onward-≡ {σ = σ} {σ′ = σ′} eq eq′ (eraseᵀ-pred (cutᵉ es) ,ᵉ tail-erase (eraseᵀ-pred (cutᵉ es)))) eb
-    side-erase {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} so tr es eb eq eq′ (erased {p = p} {e = hush} o et ex) =
+    side-erase {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} so tr ct eb eq eq′ d@(outᵉ {p = p} et ex) =
+      walkK {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} (p ++ [ ix 0 ]) refl refl (burst-erase so tr (glue {h = σ} {h′ = σ′} ct eq eq′ d)) (sourced-on so)
+        (trailing-on {σ = σ′} tr) (onward-≡ {σ = σ} {σ′ = σ′} eq eq′ (et ,ᵉ ex)) (cutᵉ eb) refl refl (nowᵉ eb)
+    side-erase {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} so tr ct eb eq eq′ d@(skipᵉ {p = p} et ex) =
+      walkK {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} (p ++ [ ix 0 ]) refl refl (burst-erase so tr (glue {h = σ} {h′ = σ′} ct eq eq′ d)) (sourced-on so)
+        (trailing-on {σ = σ′} tr) (onward-≡ {σ = σ} {σ′ = σ′} eq eq′ (et ,ᵉ ex)) (cutᵉ eb) refl refl (nowᵉ eb)
+    side-erase {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} so tr ct eb eq eq′ d@(endᵉ {p = c}) =
+      walkK {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} (c ++ [ ix 0 ]) refl refl (burst-erase so tr (glue {h = σ} {h′ = σ′} ct eq eq′ d)) (sourced-on so)
+        (trailing-on {σ = σ′} tr) (onward-≡ {σ = σ} {σ′ = σ′} eq eq′ (eraseᵀ-pred ct ,ᵉ tail-erase (eraseᵀ-pred ct))) (cutᵉ eb) refl refl (nowᵉ eb)
+    side-erase {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} so tr ct eb eq eq′ d@(erased {p = p} {e = hush} o et ex) =
       subst (λ T → Erase _ _ (T ∪ cut β′) (force β′)) (sym bi)
-        (walkH {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} (p ++ [ ix 0 ]) bi (λ {β″} → cong (M′.side r β″ σ′) eq′) refl (burst-erase so tr es)
-          (sourced-on so) tr (gone-on {σ = σ} {σ′ = σ′} eq eq′ et ex) eb)
+        (walkH {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} (p ++ [ ix 0 ]) bi (λ {β″} → cong (M′.side r β″ σ′) eq′) refl
+          (burst-erase so tr (glue {h = σ} {h′ = σ′} ct eq eq′ d)) (sourced-on so) tr (gone-cut {σ = σ} eq et) (gone-eq {σ = σ} eq) eq′ ex (cutᵉ eb) refl refl (nowᵉ eb))
       where bi = burst-hushed {σ = σ′} tr eq′
-    side-erase {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} so tr es eb eq eq′ (erased {p = p} {e = out h _ _} o et ex) =
+    side-erase {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} so tr ct eb eq eq′ d@(erased {p = p} {e = out h _ _} o et ex) =
       walkA {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} (p ++ [ ix 0 ]) (h ++ [ ix 0 ]) (<ᵖ-shift h p o) (λ {β″} → cong (M′.side r β″ σ′) eq′) refl refl
-        (burst-erase so tr es) (sourced-on so) tr (gone-on {σ = σ} {σ′ = σ′} eq eq′ et ex) eb
-    side-erase {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} so tr es eb eq eq′ (erased {p = p} {e = skip h _} o et ex) =
+        (burst-erase so tr (glue {h = σ} {h′ = σ′} ct eq eq′ d)) (sourced-on so) tr (gone-cut {σ = σ} eq et) (gone-eq {σ = σ} eq) eq′ ex (cutᵉ eb) refl refl (nowᵉ eb)
+    side-erase {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} so tr ct eb eq eq′ d@(erased {p = p} {e = skip h _} o et ex) =
       walkA {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} (p ++ [ ix 0 ]) (h ++ [ ix 0 ]) (<ᵖ-shift h p o) (λ {β″} → cong (M′.side r β″ σ′) eq′) refl refl
-        (burst-erase so tr es) (sourced-on so) tr (gone-on {σ = σ} {σ′ = σ′} eq eq′ et ex) eb
-    side-erase {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} so tr es eb eq eq′ (erased {p = p} {e = end h} o et ex) =
+        (burst-erase so tr (glue {h = σ} {h′ = σ′} ct eq eq′ d)) (sourced-on so) tr (gone-cut {σ = σ} eq et) (gone-eq {σ = σ} eq) eq′ ex (cutᵉ eb) refl refl (nowᵉ eb)
+    side-erase {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} so tr ct eb eq eq′ d@(erased {p = p} {e = end h} o et ex) =
       walkA {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} (p ++ [ ix 0 ]) (h ++ [ ix 0 ]) (<ᵖ-shift h p o) (λ {β″} → cong (M′.side r β″ σ′) eq′) refl refl
-        (burst-erase so tr es) (sourced-on so) tr (gone-on {σ = σ} {σ′ = σ′} eq eq′ et ex) eb
+        (burst-erase so tr (glue {h = σ} {h′ = σ′} ct eq eq′ d)) (sourced-on so) tr (gone-cut {σ = σ} eq et) (gone-eq {σ = σ} eq) eq′ ex (cutᵉ eb) refl refl (nowᵉ eb)
 
     -- A source step kept, shown at `q` on both sides.
-    walkK : ∀ {X B m} {σ σ′ : Events∞ X} {β β′ : Events∞ B} q {b b′} → M′.before q (force β) ≡ b → M′.before q (force β′) ≡ b′
+    walkK : ∀ {X B m} {σ σ′ : Events∞ X} {β β′ : Events∞ B} q {b b′ y y′} → M′.before q (force β) ≡ b → M′.before q (force β′) ≡ b′
           → Eraseᵀ (suc m) (M′.burstOn r σ) (M′.burstOn r σ′) → Sourced r (M′.onward∞ σ (force σ)) → Trailing (M′.onward∞ σ′ (force σ′))
-          → Eraseˢ m (M′.onward∞ σ (force σ)) (M′.onward∞ σ′ (force σ′)) → Eraseˢ (suc m) β β′
+          → Eraseˢ m (M′.onward∞ σ (force σ)) (M′.onward∞ σ′ (force σ′))
+          → Eraseᵀ (suc m) (cut β) (cut β′) → force β ≡ y → force β′ ≡ y′ → Erase (suc m) y (cut β′) y′
           → Erase (suc m) (M′.ahead r β σ q b) (M′.burstOn r σ′ ∪ cut β′) (M′.ahead r β′ σ′ q b′)
-    walkK {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q {true} {true} bq bq′ bu so tr oe eb =
-      skipᵉ (∪-erase (burst-erase so tr oe) (eraseᵀ-pred (cutᵉ eb)))
-        (beside-erase {σ = M′.onward∞ σ (force σ)} {σ′ = M′.onward∞ σ′ (force σ′)} {β = β} {β′ = β′} so tr oe (eraseˢ-pred eb))
-    walkK {β = β} {β′ = β′} q {true} {false} bq bq′ bu so tr oe eb
-      with () ← trans (sym (after-before q (force β′) (after-erase (nowᵉ eb) (before-after q (force β) bq)))) bq′
-    walkK {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q {false} bq bq′ bu so tr oe eb =
-      bodyK {σ = σ} {σ′ = σ′} {β′ = β′} q refl bq′ bq bu so tr oe (nowᵉ eb)
+    walkK {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q {true} {true} bq bq′ bu so tr oe bt be be′ bx =
+      skipᵉ (∪-erase (burst-erase so tr oe) (eraseᵀ-pred bt))
+        (beside-erase {σ = M′.onward∞ σ (force σ)} {σ′ = M′.onward∞ σ′ (force σ′)} {β = β} {β′ = β′} so tr oe (eraseˢ-pred (glue {h = β} {h′ = β′} bt be be′ bx)))
+    walkK {β = β} {β′ = β′} q {true} {false} bq bq′ bu so tr oe bt be be′ bx
+      with () ← trans (sym (after-before q (force β′) (after-erase (nowᵉ (glue {h = β} {h′ = β′} bt be be′ bx)) (before-after q (force β) bq)))) bq′
+    walkK {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q {false} bq bq′ bu so tr oe bt refl be′ bx =
+      bodyK {σ = σ} {σ′ = σ′} {β′ = β′} q be′ bq′ bq bu so tr oe bx
 
     walk↓K : ∀ {X B m} {σ σ′ : Events∞ X} {β β′ : Events∞ B} q {b b′} → M′.before q (force β) ≡ b → M′.before q (force β′) ≡ b′
            → Eraseᵀ m (M′.burstOn r σ) (M′.burstOn r σ′) → Sourced r (M′.onward∞ σ (force σ)) → Trailing (M′.onward∞ σ′ (force σ′))
@@ -298,7 +305,7 @@ module _ (r : Pos) where
            → Erase m (M′.ahead r β σ q b) (M′.burstOn r σ′ ∪ cut β′) (M′.ahead r β′ σ′ q b′)
     walk↓K {m = zero}  q bq bq′ bu so tr oe eb = stopᵉ
     walk↓K {m = suc m} {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q bq bq′ bu so tr oe eb =
-      walkK {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q bq bq′ bu so tr (eraseˢ-pred oe) eb
+      walkK {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q bq bq′ bu so tr (eraseˢ-pred oe) (cutᵉ eb) refl refl (nowᵉ eb)
 
     bodyK : ∀ {X B m} {σ σ′ : Events∞ X} {β′ : Events∞ B} q {b′ y y′} → force β′ ≡ y′ → M′.before q (force β′) ≡ b′ → M′.before q y ≡ false
           → Eraseᵀ (suc m) (M′.burstOn r σ) (M′.burstOn r σ′) → Sourced r (M′.onward∞ σ (force σ)) → Trailing (M′.onward∞ σ′ (force σ′))
@@ -313,94 +320,100 @@ module _ (r : Pos) where
     bodyK {σ′ = σ′} {β′ = β′} q eq bq′ bf bu so tr oe endᵉ = subst (Erase _ _ _) (sym (ahead-body {β = β′} {σ = σ′} {q = q} eq bq′ bf)) endᵉ
     bodyK q eq bq′ () bu so tr oe hushᵉ
     bodyK {σ = σ} {σ′ = σ′} {β′ = β′} q {b′} eq bq′ bf bu so tr oe (erased {p = k} {l = β₁} o et ex) =
-      erased (head-ahead β′ σ′ q b′ bf (subst (λ z → NotBefore k (head z)) (sym eq) o)) (∪-erase (eraseᵀ-pred bu) et)
-        (walk↓K {σ = σ} {σ′ = σ′} {β = β₁} {β′ = β′} q refl bq′ (eraseᵀ-pred bu) so tr oe (et ,ᵉ subst (Erase _ (force β₁) (cut β′)) (sym eq) ex))
+      erased (head-ahead β′ σ′ q b′ bf (subst (λ z → NotBefore k (head z)) (sym eq) o)) (∪-erase bu et)
+        (walkK {σ = σ} {σ′ = σ′} {β = β₁} {β′ = β′} q refl bq′ bu so tr oe et refl eq ex)
 
     -- A source step erased, the other's at `q′` at or past it.
-    walkA : ∀ {X B m} {σ σ′ : Events∞ X} {β β′ : Events∞ B} q q′ {b b′} → q′ <ᵖ q ≡ false
+    walkA : ∀ {X B m} {σ σ′ : Events∞ X} {β β′ : Events∞ B} q q′ {b b′ x x′ y y′} → q′ <ᵖ q ≡ false
           → (∀ {β″ : Events∞ B} → M′.beside r β″ σ′ ≡ M′.ahead r β″ σ′ q′ (M′.before q′ (force β″)))
           → M′.before q (force β) ≡ b → M′.before q′ (force β′) ≡ b′
           → Eraseᵀ (suc m) (M′.burstOn r σ) (M′.burstOn r σ′) → Sourced r (M′.onward∞ σ (force σ)) → Trailing σ′
-          → Eraseˢ m (M′.onward∞ σ (force σ)) σ′ → Eraseˢ (suc m) β β′
+          → Eraseᵀ (suc m) (cut (M′.onward∞ σ (force σ))) (cut σ′) → force (M′.onward∞ σ (force σ)) ≡ x → force σ′ ≡ x′ → Erase (suc m) x (cut σ′) x′
+          → Eraseᵀ (suc m) (cut β) (cut β′) → force β ≡ y → force β′ ≡ y′ → Erase (suc m) y (cut β′) y′
           → Erase (suc m) (M′.ahead r β σ q b) (M′.burstOn r σ′ ∪ cut β′) (M′.ahead r β′ σ′ q′ b′)
-    walkA {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q q′ {true} {b′} qq′ sa bq bq′ bu so tr oe eb =
-      erased (head-ahead β′ σ′ q′ b′ qq′ (after-nb (head (force β′)) (after-erase (nowᵉ eb) (before-after q (force β) bq))))
-        (∪-erase (burst-erase so tr oe) (eraseᵀ-pred (cutᵉ eb)))
+    walkA {m = m} {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q q′ {true} {b′} qq′ sa bq bq′ bu so tr ot oe oe′ ox bt be be′ bx =
+      erased (head-ahead β′ σ′ q′ b′ qq′ (after-nb (head (force β′)) (after-erase (nowᵉ (glue {h = β} {h′ = β′} bt be be′ bx)) (before-after q (force β) bq))))
+        (∪-erase (burst-erase so tr (glue {h = M′.onward∞ σ (force σ)} {h′ = σ′} ot oe oe′ ox)) bt)
         (subst (Erase _ _ _) (trans (sa {β′}) (cong (M′.ahead r β′ σ′ q′) bq′))
-          (beside-erase {σ = M′.onward∞ σ (force σ)} {σ′ = σ′} {β = β} {β′ = β′} so tr oe (eraseˢ-pred eb)))
-    walkA {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q q′ {false} qq′ sa bq bq′ bu so tr oe eb =
-      bodyA {σ = σ} {σ′ = σ′} {β′ = β′} q q′ qq′ sa refl bq′ bq bu so tr oe (nowᵉ eb)
+          (subst₂ (λ z z′ → Erase (suc m) (M′.side r β (M′.onward∞ σ (force σ)) z) (M′.burstOn r σ′ ∪ cut β′) (M′.side r β′ σ′ z′)) (sym oe) (sym oe′)
+            (side-erase {σ = M′.onward∞ σ (force σ)} {σ′ = σ′} {β = β} {β′ = β′} so tr ot (glue {h = β} {h′ = β′} bt be be′ bx) oe oe′ ox)))
+    walkA {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q q′ {false} qq′ sa bq bq′ bu so tr ot oe oe′ ox bt refl be′ bx =
+      bodyA {σ = σ} {σ′ = σ′} {β′ = β′} q q′ qq′ sa be′ bq′ bq bu so tr ot oe oe′ ox bx
 
-    walk↓A : ∀ {X B m} {σ σ′ : Events∞ X} {β β′ : Events∞ B} q q′ {b b′} → q′ <ᵖ q ≡ false
+    walk↓A : ∀ {X B m} {σ σ′ : Events∞ X} {β β′ : Events∞ B} q q′ {b b′ x x′} → q′ <ᵖ q ≡ false
            → (∀ {β″ : Events∞ B} → M′.beside r β″ σ′ ≡ M′.ahead r β″ σ′ q′ (M′.before q′ (force β″)))
            → M′.before q (force β) ≡ b → M′.before q′ (force β′) ≡ b′
            → Eraseᵀ m (M′.burstOn r σ) (M′.burstOn r σ′) → Sourced r (M′.onward∞ σ (force σ)) → Trailing σ′
-           → Eraseˢ m (M′.onward∞ σ (force σ)) σ′ → Eraseˢ m β β′
+           → Eraseᵀ m (cut (M′.onward∞ σ (force σ))) (cut σ′) → force (M′.onward∞ σ (force σ)) ≡ x → force σ′ ≡ x′ → Erase m x (cut σ′) x′ → Eraseˢ m β β′
            → Erase m (M′.ahead r β σ q b) (M′.burstOn r σ′ ∪ cut β′) (M′.ahead r β′ σ′ q′ b′)
-    walk↓A {m = zero}  q q′ qq′ sa bq bq′ bu so tr oe eb = stopᵉ
-    walk↓A {m = suc m} {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q q′ qq′ sa bq bq′ bu so tr oe eb =
-      walkA {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q q′ qq′ sa bq bq′ bu so tr (eraseˢ-pred oe) eb
+    walk↓A {m = zero}  q q′ qq′ sa bq bq′ bu so tr ot oe oe′ ox eb = stopᵉ
+    walk↓A {m = suc m} {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q q′ qq′ sa bq bq′ bu so tr ot oe oe′ ox eb =
+      walkA {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q q′ qq′ sa bq bq′ bu so tr ot oe oe′ ox (cutᵉ eb) refl refl (nowᵉ eb)
 
-    bodyA : ∀ {X B m} {σ σ′ : Events∞ X} {β′ : Events∞ B} q q′ {b′ y y′} → q′ <ᵖ q ≡ false
+    bodyA : ∀ {X B m} {σ σ′ : Events∞ X} {β′ : Events∞ B} q q′ {b′ x x′ y y′} → q′ <ᵖ q ≡ false
           → (∀ {β″ : Events∞ B} → M′.beside r β″ σ′ ≡ M′.ahead r β″ σ′ q′ (M′.before q′ (force β″)))
           → force β′ ≡ y′ → M′.before q′ (force β′) ≡ b′ → M′.before q y ≡ false
           → Eraseᵀ (suc m) (M′.burstOn r σ) (M′.burstOn r σ′) → Sourced r (M′.onward∞ σ (force σ)) → Trailing σ′
-          → Eraseˢ m (M′.onward∞ σ (force σ)) σ′ → Erase (suc m) y (cut β′) y′
+          → Eraseᵀ (suc m) (cut (M′.onward∞ σ (force σ))) (cut σ′) → force (M′.onward∞ σ (force σ)) ≡ x → force σ′ ≡ x′ → Erase (suc m) x (cut σ′) x′
+          → Erase (suc m) y (cut β′) y′
           → Erase (suc m) (M′.body r σ q y) (M′.burstOn r σ′ ∪ cut β′) (M′.ahead r β′ σ′ q′ b′)
-    bodyA {σ = σ} {σ′ = σ′} {β′ = β′} q q′ qq′ sa eq bq′ bf bu so tr oe (outᵉ {p = k} {l = β₁} {r = β₁′} et ex) =
+    bodyA {σ = σ} {σ′ = σ′} {β′ = β′} q q′ qq′ sa eq bq′ bf bu so tr ot oe oe′ ox (outᵉ {p = k} {l = β₁} {r = β₁′} et ex) =
       subst (Erase _ _ _) (sym (ahead-body {β = β′} {σ = σ′} {q = q′} eq bq′ (≮-trans k q q′ bf qq′)))
-        (outᵉ (∪-erase (eraseᵀ-pred bu) et) (walk↓A {σ = σ} {σ′ = σ′} {β = β₁} {β′ = β₁′} q q′ qq′ sa refl refl (eraseᵀ-pred bu) so tr oe (et ,ᵉ ex)))
-    bodyA {σ = σ} {σ′ = σ′} {β′ = β′} q q′ qq′ sa eq bq′ bf bu so tr oe (skipᵉ {p = k} {l = β₁} {r = β₁′} et ex) =
+        (outᵉ (∪-erase (eraseᵀ-pred bu) et) (walk↓A {σ = σ} {σ′ = σ′} {β = β₁} {β′ = β₁′} q q′ qq′ sa refl refl (eraseᵀ-pred bu) so tr
+          (eraseᵀ-pred ot) oe oe′ (erase-pred ox) (et ,ᵉ ex)))
+    bodyA {σ = σ} {σ′ = σ′} {β′ = β′} q q′ qq′ sa eq bq′ bf bu so tr ot oe oe′ ox (skipᵉ {p = k} {l = β₁} {r = β₁′} et ex) =
       subst (Erase _ _ _) (sym (ahead-body {β = β′} {σ = σ′} {q = q′} eq bq′ (≮-trans k q q′ bf qq′)))
-        (skipᵉ (∪-erase (eraseᵀ-pred bu) et) (walk↓A {σ = σ} {σ′ = σ′} {β = β₁} {β′ = β₁′} q q′ qq′ sa refl refl (eraseᵀ-pred bu) so tr oe (et ,ᵉ ex)))
-    bodyA {σ′ = σ′} {β′ = β′} q q′ qq′ sa eq bq′ bf bu so tr oe (endᵉ {p = c}) =
+        (skipᵉ (∪-erase (eraseᵀ-pred bu) et) (walk↓A {σ = σ} {σ′ = σ′} {β = β₁} {β′ = β₁′} q q′ qq′ sa refl refl (eraseᵀ-pred bu) so tr
+          (eraseᵀ-pred ot) oe oe′ (erase-pred ox) (et ,ᵉ ex)))
+    bodyA {σ′ = σ′} {β′ = β′} q q′ qq′ sa eq bq′ bf bu so tr ot oe oe′ ox (endᵉ {p = c}) =
       subst (Erase _ _ _) (sym (ahead-body {β = β′} {σ = σ′} {q = q′} eq bq′ (≮-trans c q q′ bf qq′))) endᵉ
-    bodyA q q′ qq′ sa eq bq′ () bu so tr oe hushᵉ
-    bodyA {σ = σ} {σ′ = σ′} {β′ = β′} q q′ {b′} qq′ sa eq bq′ bf bu so tr oe (erased {p = k} {l = β₁} o et ex) =
-      erased (head-ahead β′ σ′ q′ b′ (≮-trans k q q′ bf qq′) (subst (λ z → NotBefore k (head z)) (sym eq) o)) (∪-erase (eraseᵀ-pred bu) et)
-        (walk↓A {σ = σ} {σ′ = σ′} {β = β₁} {β′ = β′} q q′ qq′ sa refl bq′ (eraseᵀ-pred bu) so tr oe
-          (et ,ᵉ subst (Erase _ (force β₁) (cut β′)) (sym eq) ex))
+    bodyA q q′ qq′ sa eq bq′ () bu so tr ot oe oe′ ox hushᵉ
+    bodyA {σ = σ} {σ′ = σ′} {β′ = β′} q q′ {b′} qq′ sa eq bq′ bf bu so tr ot oe oe′ ox (erased {p = k} {l = β₁} o et ex) =
+      erased (head-ahead β′ σ′ q′ b′ (≮-trans k q q′ bf qq′) (subst (λ z → NotBefore k (head z)) (sym eq) o)) (∪-erase bu et)
+        (walkA {σ = σ} {σ′ = σ′} {β = β₁} {β′ = β′} q q′ qq′ sa refl bq′ bu so tr ot oe oe′ ox et refl eq ex)
 
     -- A source step erased, the other's source hushed.
-    walkH : ∀ {X B m} {σ σ′ : Events∞ X} {β β′ : Events∞ B} q {b} → M′.burstOn r σ′ ≡ idle
+    walkH : ∀ {X B m} {σ σ′ : Events∞ X} {β β′ : Events∞ B} q {b x x′ y y′} → M′.burstOn r σ′ ≡ idle
           → (∀ {β″ : Events∞ B} → M′.beside r β″ σ′ ≡ force β″) → M′.before q (force β) ≡ b
           → Eraseᵀ (suc m) (M′.burstOn r σ) (M′.burstOn r σ′) → Sourced r (M′.onward∞ σ (force σ)) → Trailing σ′
-          → Eraseˢ m (M′.onward∞ σ (force σ)) σ′ → Eraseˢ (suc m) β β′
+          → Eraseᵀ (suc m) (cut (M′.onward∞ σ (force σ))) (cut σ′) → force (M′.onward∞ σ (force σ)) ≡ x → force σ′ ≡ x′ → Erase (suc m) x (cut σ′) x′
+          → Eraseᵀ (suc m) (cut β) (cut β′) → force β ≡ y → force β′ ≡ y′ → Erase (suc m) y (cut β′) y′
           → Erase (suc m) (M′.ahead r β σ q b) (cut β′) (force β′)
-    walkH {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q {true} bi sh bq bu so tr oe eb =
-      erased (after-nb (head (force β′)) (after-erase (nowᵉ eb) (before-after q (force β) bq)))
-        (subst (λ T → Eraseᵀ _ _ (T ∪ cut β′)) bi (∪-erase (burst-erase so tr oe) (eraseᵀ-pred (cutᵉ eb))))
+    walkH {m = m} {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q {true} bi sh bq bu so tr ot oe oe′ ox bt be be′ bx =
+      erased (after-nb (head (force β′)) (after-erase (nowᵉ (glue {h = β} {h′ = β′} bt be be′ bx)) (before-after q (force β) bq)))
+        (subst (λ T → Eraseᵀ _ _ (T ∪ cut β′)) bi (∪-erase (burst-erase so tr (glue {h = M′.onward∞ σ (force σ)} {h′ = σ′} ot oe oe′ ox)) bt))
         (subst₂ (Erase _ _) (cong (_∪ cut β′) bi) (sh {β′})
-          (beside-erase {σ = M′.onward∞ σ (force σ)} {σ′ = σ′} {β = β} {β′ = β′} so tr oe (eraseˢ-pred eb)))
-    walkH {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q {false} bi sh bq bu so tr oe eb =
-      bodyH {σ = σ} {σ′ = σ′} {β′ = β′} q bi sh refl bq bu so tr oe (nowᵉ eb)
+          (subst₂ (λ z z′ → Erase (suc m) (M′.side r β (M′.onward∞ σ (force σ)) z) (M′.burstOn r σ′ ∪ cut β′) (M′.side r β′ σ′ z′)) (sym oe) (sym oe′)
+            (side-erase {σ = M′.onward∞ σ (force σ)} {σ′ = σ′} {β = β} {β′ = β′} so tr ot (glue {h = β} {h′ = β′} bt be be′ bx) oe oe′ ox)))
+    walkH {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q {false} bi sh bq bu so tr ot oe oe′ ox bt refl be′ bx =
+      subst (Erase _ _ _) (sym be′) (bodyH {σ = σ} {σ′ = σ′} {β′ = β′} q bi sh be′ bq bu so tr ot oe oe′ ox bx)
 
-    walk↓H : ∀ {X B m} {σ σ′ : Events∞ X} {β β′ : Events∞ B} q {b} → M′.burstOn r σ′ ≡ idle
+    walk↓H : ∀ {X B m} {σ σ′ : Events∞ X} {β β′ : Events∞ B} q {b x x′} → M′.burstOn r σ′ ≡ idle
            → (∀ {β″ : Events∞ B} → M′.beside r β″ σ′ ≡ force β″) → M′.before q (force β) ≡ b
            → Eraseᵀ m (M′.burstOn r σ) (M′.burstOn r σ′) → Sourced r (M′.onward∞ σ (force σ)) → Trailing σ′
-           → Eraseˢ m (M′.onward∞ σ (force σ)) σ′ → Eraseˢ m β β′
+           → Eraseᵀ m (cut (M′.onward∞ σ (force σ))) (cut σ′) → force (M′.onward∞ σ (force σ)) ≡ x → force σ′ ≡ x′ → Erase m x (cut σ′) x′ → Eraseˢ m β β′
            → Erase m (M′.ahead r β σ q b) (cut β′) (force β′)
-    walk↓H {m = zero}  q bi sh bq bu so tr oe eb = stopᵉ
-    walk↓H {m = suc m} {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q bi sh bq bu so tr oe eb =
-      walkH {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q bi sh bq bu so tr (eraseˢ-pred oe) eb
+    walk↓H {m = zero}  q bi sh bq bu so tr ot oe oe′ ox eb = stopᵉ
+    walk↓H {m = suc m} {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q bi sh bq bu so tr ot oe oe′ ox eb =
+      walkH {σ = σ} {σ′ = σ′} {β = β} {β′ = β′} q bi sh bq bu so tr ot oe oe′ ox (cutᵉ eb) refl refl (nowᵉ eb)
 
-    bodyH : ∀ {X B m} {σ σ′ : Events∞ X} {β′ : Events∞ B} q {y y′} → M′.burstOn r σ′ ≡ idle
+    bodyH : ∀ {X B m} {σ σ′ : Events∞ X} {β′ : Events∞ B} q {x x′ y y′} → M′.burstOn r σ′ ≡ idle
           → (∀ {β″ : Events∞ B} → M′.beside r β″ σ′ ≡ force β″) → force β′ ≡ y′ → M′.before q y ≡ false
           → Eraseᵀ (suc m) (M′.burstOn r σ) (M′.burstOn r σ′) → Sourced r (M′.onward∞ σ (force σ)) → Trailing σ′
-          → Eraseˢ m (M′.onward∞ σ (force σ)) σ′ → Erase (suc m) y (cut β′) y′
+          → Eraseᵀ (suc m) (cut (M′.onward∞ σ (force σ))) (cut σ′) → force (M′.onward∞ σ (force σ)) ≡ x → force σ′ ≡ x′ → Erase (suc m) x (cut σ′) x′
+          → Erase (suc m) y (cut β′) y′
           → Erase (suc m) (M′.body r σ q y) (cut β′) y′
-    bodyH {σ = σ} {σ′ = σ′} q bi sh eq bf bu so tr oe (outᵉ {l = β₁} {r = β₁′} et ex) =
+    bodyH {σ = σ} {σ′ = σ′} q bi sh eq bf bu so tr ot oe oe′ ox (outᵉ {l = β₁} {r = β₁′} et ex) =
       outᵉ (subst (λ T → Eraseᵀ _ _ (T ∪ cut β₁′)) bi (∪-erase (eraseᵀ-pred bu) et))
-        (walk↓H {σ = σ} {σ′ = σ′} {β = β₁} {β′ = β₁′} q bi sh refl (eraseᵀ-pred bu) so tr oe (et ,ᵉ ex))
-    bodyH {σ = σ} {σ′ = σ′} q bi sh eq bf bu so tr oe (skipᵉ {l = β₁} {r = β₁′} et ex) =
+        (walk↓H {σ = σ} {σ′ = σ′} {β = β₁} {β′ = β₁′} q bi sh refl (eraseᵀ-pred bu) so tr (eraseᵀ-pred ot) oe oe′ (erase-pred ox) (et ,ᵉ ex))
+    bodyH {σ = σ} {σ′ = σ′} q bi sh eq bf bu so tr ot oe oe′ ox (skipᵉ {l = β₁} {r = β₁′} et ex) =
       skipᵉ (subst (λ T → Eraseᵀ _ _ (T ∪ cut β₁′)) bi (∪-erase (eraseᵀ-pred bu) et))
-        (walk↓H {σ = σ} {σ′ = σ′} {β = β₁} {β′ = β₁′} q bi sh refl (eraseᵀ-pred bu) so tr oe (et ,ᵉ ex))
-    bodyH q bi sh eq bf bu so tr oe endᵉ = endᵉ
-    bodyH q bi sh eq () bu so tr oe hushᵉ
-    bodyH {σ = σ} {σ′ = σ′} {β′ = β′} q bi sh eq bf bu so tr oe (erased {l = β₁} o et ex) =
-      erased o (subst (λ T → Eraseᵀ _ _ (T ∪ cut β′)) bi (∪-erase (eraseᵀ-pred bu) et))
-        (subst (Erase _ _ _) eq (walk↓H {σ = σ} {σ′ = σ′} {β = β₁} {β′ = β′} q bi sh refl (eraseᵀ-pred bu) so tr oe
-          (et ,ᵉ subst (Erase _ (force β₁) (cut β′)) (sym eq) ex)))
+        (walk↓H {σ = σ} {σ′ = σ′} {β = β₁} {β′ = β₁′} q bi sh refl (eraseᵀ-pred bu) so tr (eraseᵀ-pred ot) oe oe′ (erase-pred ox) (et ,ᵉ ex))
+    bodyH q bi sh eq bf bu so tr ot oe oe′ ox endᵉ = endᵉ
+    bodyH q bi sh eq () bu so tr ot oe oe′ ox hushᵉ
+    bodyH {σ = σ} {σ′ = σ′} {β′ = β′} q bi sh eq bf bu so tr ot oe oe′ ox (erased {l = β₁} o et ex) =
+      erased o (subst (λ T → Eraseᵀ _ _ (T ∪ cut β′)) bi (∪-erase bu et))
+        (subst (Erase _ _ _) eq (walkH {σ = σ} {σ′ = σ′} {β = β₁} {β′ = β′} q bi sh refl bu so tr ot oe oe′ ox et refl eq ex))
 
   ------------------------------------------------------------------------
   -- The same next
