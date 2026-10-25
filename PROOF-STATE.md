@@ -17,8 +17,10 @@ drop too), and every frame's `Pass` condition at a real configuration (a
 hushed connect source leaves nothing running). Settled when these are
 bodies, or refuted.
 
-Members: `outer-drop`, `lane-drop`, `stall-drop`, `close-drop`, `defer-hole`,
-`defer-pass`, `outer-drops`, `src-drops`.
+Members: `outer-begins`, `outer-queues`, `outer-ignores`, `outer-begins-pass`,
+`outer-queues-pass`, `outer-ignores-pass`, `lane-begins`, `lane-begins-pass`,
+`stall-drop`, `close-drop`, `defer-hole`, `defer-pass`, `outer-drops`,
+`src-drops`.
 
 #### THE TAIL'S SKIP
 
@@ -28,7 +30,7 @@ the connect's burst leaves. Whether every such skip is pinned, and a lift
 carrying each skip with its pin. Settled when the lift is a body, or a
 skipped step there is refuted.
 
-Members: `defer-tail`.
+Members: `defer-tail`, `outer-tail`, `lane-tail`.
 
 #### THE KEPT DEPTH
 
