@@ -40,6 +40,7 @@ open import adequacy.Engine.Meaning using (_≋_; ≋-trans; same; ≋-tr; mappe
   srcState; srcG; poolT; outerT)
 open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore)
 open import adequacy.Engine.Head using (Frag; cand; pool-step; <ᴷ-irrefl; ≮ᴷ-trans; ≮<ᴷ; ext-≮)
+open import adequacy.Engine.Keys using (Held)
 open import adequacy.Engine.Inv using (Unpended)
 open import adequacy.Engine.Pick using (Beat; past; KAfter; KNotBefore; Lost; body-link; Before; Race; LaneWon; lane-won; race-steps; after-step;
   lane-sides; frag-flat; frag-parts; outer-link)
@@ -96,14 +97,14 @@ postulate
 -- A LIVE SOURCE, AT ITS CONNECT: its run in order, what it leaves running
 -- trailing it.
 src-trails : ∀ {R Γ X B} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
-           → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
+           → Held (plug c (connS (cs false true sa ba as nothing r en) o b))
            → Ordered (Events∞.force (stateᴺ (gh o) (envAt c))) × Trailing (stateᴺ (gh o) (envAt c))
 src-trails c sa ba as r en o b ft = proj₁ (proj₁ (proj₁ sh)) , proj₂ sh
   where sh = shape-st (inSrc (cs false true sa ba as nothing r en) b c) o ft
 
 -- A SOURCE BESIDE ITS BODY, live or closed, likewise.
 body-src-trails : ∀ {R Γ X B} (c : Ctx R Γ B) cl sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
-                → Frag (plug c (connS (cs cl true sa ba as nothing r en) o b))
+                → Held (plug c (connS (cs cl true sa ba as nothing r en) o b))
                 → Ordered (Events∞.force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)))
                   × Trailing (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c))
 body-src-trails c cl sa ba as r en o b ft = proj₁ (proj₁ (proj₁ sh)) , proj₂ sh
@@ -114,29 +115,29 @@ body-src-trails c cl sa ba as r en o b ft = proj₁ (proj₁ (proj₁ sh)) , pro
 src-pass : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h h′ : Events∞ X}
          → Sought v q P → KAfter (after q) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
          → Before (after q) (own (connS (cs false true sa ba as nothing r en) o b))
-         → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
+         → Held (plug c (connS (cs false true sa ba as nothing r en) o b))
          → h ≋ stateᴺ (gh o) (envAt c) → Dropsˢ P h h′ → Trailing h′
-         → (o′ : St Γ X) → Frag (plug c (connS (cs false true sa ba as nothing r en) o′ b)) → Unpended o′ → h′ ≋ stateᴺ (gh o′) (envAt c)
+         → (o′ : St Γ X) → Held (plug c (connS (cs false true sa ba as nothing r en) o′ b)) → Unpended o′ → h′ ≋ stateᴺ (gh o′) (envAt c)
          → SrcPass P (stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c)) h′
 src-pass v q c sa ba as r en o b so ka bf ft x d t o′ ft′ u′ x′ = record
   { fed     = src-fed v q c sa ba as r en o b so ka bf ft x d o′ ft′ u′ x′
-  ; srcOn   = proj₂ (src-next v q c sa ba as r en o b so ft x d)
-  ; srcHush = proj₁ (src-next v q c sa ba as r en o b so ft x d)
-  ; bodyOn  = src-body-on v q c sa ba as r en o b so ka bf ft x d
+  ; srcOn   = proj₂ (src-next v q c sa ba as r en o b so (proj₁ ft) x d)
+  ; srcHush = proj₁ (src-next v q c sa ba as r en o b so (proj₁ ft) x d)
+  ; bodyOn  = src-body-on v q c sa ba as r en o b so ka bf (proj₁ ft) x d
   ; srcTrail = t
   }
 
 -- A live source is subscribed where its connect is.
 src-sourced : ∀ {R Γ X B} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
-            → Frag (plug c (connS (cs false true sa ba as nothing r en) o b)) → Sourced r (stateᴺ (gh o) (envAt c))
-src-sourced c sa ba as r en o b ft = sourced (src-atop c sa ba as r en o b ft) (proj₁ tr) (proj₂ tr)
+            → Held (plug c (connS (cs false true sa ba as nothing r en) o b)) → Sourced r (stateᴺ (gh o) (envAt c))
+src-sourced c sa ba as r en o b ft = sourced (src-atop c sa ba as r en o b (proj₁ ft)) (proj₁ tr) (proj₂ tr)
   where tr = src-trails c sa ba as r en o b ft
 
 -- So is one beside its body.
 body-sourced : ∀ {R Γ X B} (c : Ctx R Γ B) cl sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
-             → Frag (plug c (connS (cs cl true sa ba as nothing r en) o b))
+             → Held (plug c (connS (cs cl true sa ba as nothing r en) o b))
              → Sourced r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c))
-body-sourced c cl sa ba as r en o b ft = sourced (body-src-atop c cl sa ba as r en o b ft) (proj₁ tr) (proj₂ tr)
+body-sourced c cl sa ba as r en o b ft = sourced (body-src-atop c cl sa ba as r en o b (proj₁ ft)) (proj₁ tr) (proj₂ tr)
   where tr = body-src-trails c cl sa ba as r en o b ft
 
 -- Every position asked of is no later than the race's key.
@@ -209,9 +210,9 @@ cold-key t e with found-own t e
 -- each position asked of read off the race there, the run it drops to
 -- the meaning of the node it steps to.
 beat-pass : ∀ {R Γ A} v q {P : Pos → Set} (c : Ctx R Γ A) (s : St Γ A) f {h h′ : Events∞ A}
-          → Sought v q P → Beat (keyAt v q) c s → Frag (plug c s) → Unpended s
+          → Sought v q P → Beat (keyAt v q) c s → Held (plug c s) → Unpended s
           → shows c f ≡ true → flagOf s ≡ f → h ≋ stateᴺ (gh s) (envAt c) → Dropsˢ P h h′
-          → (s′ : St Γ A) → Frag (plug c s′) → Unpended s′ → flagOf s′ ≡ f → h′ ≋ stateᴺ (gh s′) (envAt c)
+          → (s′ : St Γ A) → Held (plug c s′) → Unpended s′ → flagOf s′ ≡ f → h′ ≋ stateᴺ (gh s′) (envAt c)
           → Pass P c f h h′
 beat-pass v q top s f so w ft u sh fl x d s′ ft′ u′ fl′ x′ = tt
 beat-pass v q (inMap g c) s f so w ft u sh fl x d s′ ft′ u′ fl′ x′ =
@@ -241,10 +242,10 @@ beat-pass v q {P} (inOuter op g false n p ls c) s f so (r , w) ft u sh fl x d s�
          (flatS op g false n p s′ ls) ft′ tt refl
          (≋-trans (λ m → outerFrame-ne op (lane g) false p (lanesL ls) (deadL ls) (envAt c) (x′ m)) (outer-plug op g false n p ls s′ (envAt c)))
   where
-    parts = frag-parts op g false n p s ls (frag-flat c op g false n p s ls ft)
+    parts = frag-parts op g false n p s ls (frag-flat c op g false n p s ls (proj₁ ft))
     ol : ∀ k → P k → All (λ l → After k (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore k (poolT (deadL ls) (envAt c))
     ol k pk =
-      outer-link c k op g n p s ls ft
+      outer-link c k op g n p s ls (proj₁ ft)
         (race-steps KAfter (After k) (keyAt v q) (λ y st a ag → after-step k y st (kafter-≤ (keyAt v q) k y (cover v q so k pk) a) ag)
            c op g false n p s [] ls [] (shows-open c true sh) (proj₂ parts) r)
         (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
@@ -265,7 +266,7 @@ beat-pass v q {P} (inLanes op g dd n p o pre post c) s true {h} so (l , w) ft u 
     fi : ∀ k → P k → First k (outerᴺ (lane g) (outerG dd (gh o)) (envAt c)) (states (lanesL post) (envAt c))
                        (states (lanesL (reverse pre)) (envAt c)) (outerT dd (gh o) (envAt c) (poolRuns (reverse pre) post true (envAt c) h))
     fi k pk = lane-sides k c op g dd n p o pre post s (shows-open c true sh)
-                (lanewon-≤ (keyAt v q) k c op g dd n p o pre post s (cover v q so k pk) l) ft (frag-flat c op g dd n p o (pre ʳ++ s ∷ post) ft)
+                (lanewon-≤ (keyAt v q) k c op g dd n p o pre post s (cover v q so k pk) l) (proj₁ ft) (frag-flat c op g dd n p o (pre ʳ++ s ∷ post) (proj₁ ft))
 beat-pass v q {P} (inSrc (cs false true sa ba as nothing r en) b c) s f so (ka , bf , bt) ft u sh fl x d s′ ft′ u′ fl′ x′ =
   sourced-≋ x (src-sourced c sa ba as r en s b ft) , sp , beat-pass true q c (connS kk s b) true (sought-under v q so) (subst (λ K → Beat K c (connS kk s b)) (past-key v q) bt) ft tt sh refl
          (≋-trans (λ m → connSrc-ne false r en (gh b) (envAt c) (x m)) (live-plug sa ba as r en b s (envAt c) u))
@@ -292,7 +293,7 @@ beat-pass v q {P} (inBody (cs cl true sa ba as nothing r en) o c) s f so (nb , o
     bl : ∀ k → keyAt v q <ᴷ at k ≡ false
        → (Events∞.force (srcState (srcG kk o) (envAt c)) ≡ hush → ∀ d → Agreeᵀ d (Events∞.cut (srcState (srcG kk o) (envAt c))) idle)
          × NotBefore k (shown (Events∞.force (srcState (srcG kk o) (envAt c))))
-    bl k le = body-link k c kk o s ft (shows-open c true sh) refl (knot-lost (at k) (cand (inSrc kk s c) o) (knot-≤ (keyAt v q) k (cand (inSrc kk s c) o) le nb))
+    bl k le = body-link k c kk o s (proj₁ ft) (shows-open c true sh) refl (knot-lost (at k) (cand (inSrc kk s c) o) (knot-≤ (keyAt v q) k (cand (inSrc kk s c) o) le nb))
                 (before-≤ (keyAt v q) k (own (connS kk o s)) le ob)
     hu = proj₁ (bl q (cover-own v q))
     nbk : ∀ k → P k → NotBefore k (shown (Events∞.force (srcState (srcG kk o) (envAt c))))

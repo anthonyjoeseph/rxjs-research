@@ -28,6 +28,7 @@ open import denotation.MonotonicList using (Agreeᵀ)
 open import operation.Key using (at)
 open import denotation.Unfold using (same?; NEnv; stateᴺ; subscribe)
 open import adequacy.Engine.Head using (Frag)
+open import adequacy.Engine.Keys using (Keys; Held)
 open import adequacy.Engine.Ahead using (Under; shown; ahead-mono; under-sub)
 open import adequacy.Engine.Race using (NotBefore)
 open import adequacy.Engine.Meaning using (envAt)
@@ -563,9 +564,17 @@ module _ {R : Set} where
   NextInv (complete p)    = ⊤
   NextInv drained         = ⊤
 
-  NextShape NextLead NextApart : Step → Set
-  NextShape (silent t k)    = Frag (whole k)
-  NextShape (value t p a k) = Frag (whole k)
+  NextFrag NextKeys NextShape NextLead NextApart : Step → Set
+  NextFrag (silent t k)    = Frag (whole k)
+  NextFrag (value t p a k) = Frag (whole k)
+  NextFrag (complete p)    = ⊤
+  NextFrag drained         = ⊤
+  NextKeys (silent t k)    = Keys (whole k)
+  NextKeys (value t p a k) = Keys (whole k)
+  NextKeys (complete p)    = ⊤
+  NextKeys drained         = ⊤
+  NextShape (silent t k)    = Held (whole k)
+  NextShape (value t p a k) = Held (whole k)
   NextShape (complete p)    = ⊤
   NextShape drained         = ⊤
   NextLead (silent t k)    = Lead k
@@ -579,7 +588,10 @@ module _ {R : Set} where
 
   postulate
     -- THE SHAPE: a step keeps the whole tree in the fragment.
-    shape-next : ∀ k → Base k → Frag (whole k) → NextShape (step k)
+    frag-next : ∀ k → Base k → Frag (whole k) → NextFrag (step k)
+    -- THE KEYS KEPT: a step keeps every node's own positional facts, each
+    -- in the environment its connects give it.
+    keys-next : ∀ k → Base k → Order k → NextKeys (step k)
     -- THE STILL'S SUBTREE: where the search runs after a step, what it
     -- finds still leads every race above it past each live source's skips.
     apart-next : ∀ k → Base k → Order k → NextApart (step k)
@@ -730,9 +742,18 @@ module _ {R : Set} where
   ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
   ...   | pl , _ = run-lead (plug c s) p e
                      (λ q a s″ kq oa al → won-clear q a c′ s′ s″ al
-                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oa (search-won (plug c s) e)) (subst Frag (sym pl) (Order.shape o)))
+                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oa (search-won (plug c s) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))))
                      (λ q s″ kq oc al → won-ends q c′ s′ s″ al
-                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oc (search-won (plug c s) e)) (subst Frag (sym pl) (Order.shape o)))
+                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oc (search-won (plug c s) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))))
+
+  held : ∀ x → NextFrag x → NextKeys x → NextShape x
+  held (silent t k)    f h = f , h
+  held (value t p a k) f h = f , h
+  held (complete p)    f h = tt
+  held drained         f h = tt
+
+  shape-next : ∀ k → Base k → Order k → NextShape (step k)
+  shape-next k b o = held (step k) (frag-next k b (proj₁ (Order.shape o))) (keys-next k b o)
 
   joined : ∀ x → NextShape x → NextLead x → NextApart x → NextOrd x
   joined (silent t k)    f l u = order f l u
@@ -742,7 +763,7 @@ module _ {R : Set} where
 
   -- EVERY STEP KEEPS THE ORDER.
   ord-next : ∀ k → Base k → Order k → NextOrd (step k)
-  ord-next k b o = joined (step k) (shape-next k b (Order.shape o)) (lead-next k b o) (apart-next k b o)
+  ord-next k b o = joined (step k) (shape-next k b o) (lead-next k b o) (apart-next k b o)
 
   both : ∀ x → NextBase x → NextOrd x → NextInv x
   both (silent t k)    b o = b & o
@@ -754,10 +775,10 @@ module _ {R : Set} where
   inv-next k (b & o) = both (step k) (base-next k b) (ord-next k b o)
 
   inv-load : (o : Obs Timeline [] R) → Inv (Machine.load o)
-  inv-load o = base-load o & order tt (λ _ → tt) tt
+  inv-load o = base-load o & order (tt , tt , tt) (λ _ → tt) tt
 
   -- A settled node anywhere in a tree the invariant holds of, absorbed at
   -- the same position: the invariant at it.
-  inv-at : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Unpended s → Wf (plug c s) → Frag (plug c s) → Apart (plug c s)
+  inv-at : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Unpended s → Wf (plug c s) → Held (plug c s) → Apart (plug c s)
          → Inv ⟨ c , s , absorbed , p ⟩
   inv-at c s p u w f t = base-at c s p u w & order f tt t

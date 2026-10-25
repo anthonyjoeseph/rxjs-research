@@ -8,29 +8,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE SILENT RUN
+#### THE KEYS KEPT
 
-A merge mid-run keeps `FlatOrder`'s invariant under a mark alien to its
-environment (lanes rooted and parted, aside from the outer, its pool free
-of it), though once its outer is done no state records the mark; a joiner's
-feed sits in order ahead of its rejoined source. Only the shape they imply
-is probed (`quickcheck.KeptDepth`). Settled when bodies over what the engine
-keeps, or refuted by a probe of the keys themselves.
+Untried: a step keeps every node's positional facts (`adequacy.Engine.Keys`),
+each in its connects' environment: a merge's mark alien, a joiner's feed ahead
+of its rejoined source, a connect's source one past a head, a take's owed end
+ahead of its tail. Read off positions alone, these were refuted. Settled by a
+body by step case, or a probe of `Keys` itself refuting one.
 
-Members: `flat-keys`, `join-fed`.
-
-#### THE KEYS
-
-Unprobed: where a node mid-run sits in the tree's positions. A connect's
-source one past a head, its body keyed under its mark and rising past the
-source, the source apart, no body step under a source step's; a fresh
-source's head and environment; a take's owed end ahead of its source's
-tail; an ended source's end headed. Settled when bodies over an invariant
-the engine keeps, or refuted by a probe.
-
-Members: `conn-mark`, `conn-kb`, `conn-kr`, `conn-fr`, `conn-cue`, `conn-ks`,
-`conn-rs`, `conn-ub`, `sub-headed`, `sub-alien`, `ending-headed`,
-`ending-trails`, `ended-headed`.
+Members: `keys-next`.
 
 #### THE ENDLESS SUBSCRIPTION
 
@@ -91,7 +77,7 @@ tail keep their shape. Proven only for a finite program's subscription
 (`trailing-subᶠ`); nothing ties a state to a residual of its own
 subscription. Settled when these are bodies or refuted.
 
-Members: `lanes-sorted`, `shape-cold`, `shape-of`.
+Members: `lanes-sorted`.
 
 #### THE SWITCH'S KILL
 
@@ -175,9 +161,8 @@ Members: `quiet-empty`, `lift-skip`, `unsub-rest`, `conn-unsub`,
 The search's found node leads every race above it, and a step keeps the tree
 in the fragment. Probed on the spike engine. Settled when each is a body.
 
-Members: `search-hit`, `search-won`, `found-own`, `shape-next`, `run-lead`,
-`frag-flat`, `frag-body`, `sides-link`, `limited-sides`, `outer-link`,
-`body-link`.
+Members: `search-hit`, `search-won`, `found-own`, `frag-next`, `run-lead`, `frag-flat`,
+`frag-body`, `sides-link`, `limited-sides`, `outer-link`, `body-link`.
 
 #### THE HEADS
 

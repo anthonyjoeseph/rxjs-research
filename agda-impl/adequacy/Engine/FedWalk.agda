@@ -36,6 +36,7 @@ open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; 
 open import operation.PureObservable using (ending; play; over)
 open import adequacy.Engine.Meaning using (_≋_; ≋-by; gh; envAt; srcRun; srcG; srcState; subOr; bodyConn; mapped; scanned; took)
 open import adequacy.Engine.Head using (Frag; cand)
+open import adequacy.Engine.Keys using (Held)
 open import adequacy.Engine.Pick using (KAfter; Before)
 open import adequacy.Engine.Erase using (Eraseˢ; _,ᵉ_; Eraseᵀ; Erase; Lead⁼; _⊒_)
 open import adequacy.Engine.Race using (After; NotBefore)
@@ -157,9 +158,9 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
             (o : St Γ X) (b : St (X ∷ Γ) B) {h h′ : Events∞ X}
             (so : Sought v q P) (ka : KAfter (after q) (cand (inBody (cs false true sa ba as nothing r en) o c) b))
             (bf : Before (after q) (own (connS (cs false true sa ba as nothing r en) o b)))
-            (ft : Frag (plug c (connS (cs false true sa ba as nothing r en) o b)))
+            (ft : Held (plug c (connS (cs false true sa ba as nothing r en) o b)))
             (x : h ≋ stateᴺ (gh o) (envAt c)) (d : Dropsˢ P h h′)
-            (o′ : St Γ X) (ft′ : Frag (plug c (connS (cs false true sa ba as nothing r en) o′ b))) (u′ : Unpended o′)
+            (o′ : St Γ X) (ft′ : Held (plug c (connS (cs false true sa ba as nothing r en) o′ b))) (u′ : Unpended o′)
             (x′ : h′ ≋ stateᴺ (gh o′) (envAt c)) where
 
   -- A context below the fed body.
@@ -277,7 +278,7 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
   --
   -- DEAD ROUTE: the fed inner source's trail read off its relation to the current one, which trails: an erased step spends depth, so endless erased skips leave the rest unconstrained (refuted at f1f7d119); likewise read off the current environment thinned.
   fed-trail : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa ba as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
-            → Frag (plug (rebase dd) (connS (cs cl true sa ba as nothing r en) s t))
+            → Held (plug (rebase dd) (connS (cs cl true sa ba as nothing r en) s t))
             → Trailing (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd))
   fed-trail dd cl sa ba as r en s t fs′ =
     trail-≈ _ _ _ _ (λ n → agree-sym (nowˢ (g n))) (λ n → agreeᵀ-sym (cutˢ (g n))) (proj₂ (shape-src (rebase dd) k s t fs′))
@@ -286,9 +287,9 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
 
   -- A source subscribed at its body's mark: fresh, or as it stands.
   sub-fed : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa p as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
-          → Frag (plug e (connS (cs cl true sa (just p) as nothing r en) s t)) → FedAt dd s
+          → Held (plug e (connS (cs cl true sa (just p) as nothing r en) s t)) → FedAt dd s
           → Fed P (stateᴺ (subOr (p ⊕ [ ix 1 ]) s) (envOf (force h) dd)) (stateᴺ (subOr (p ⊕ [ ix 1 ]) s) (envOf (force h′) dd))
-  sub-fed dd cl sa p as r en (pend o)                t fs is = fed-fresh dd cl sa p as r en o t fs
+  sub-fed dd cl sa p as r en (pend o)                t fs is = fed-fresh dd cl sa p as r en o t (proj₁ fs)
   sub-fed dd cl sa p as r en (coldS b l)             t fs is = is
   sub-fed dd cl sa p as r en (ofS i q xs)            t fs is = is
   sub-fed dd cl sa p as r en doneS                   t fs is = is
@@ -303,8 +304,8 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
 
   -- A live connect, its source live or closed, beside its body.
   live-fed : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa ba as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
-           → Frag (plug e (connS (cs cl true sa ba as nothing r en) s t))
-           → Frag (plug (rebase dd) (connS (cs cl true sa ba as nothing r en) s t))
+           → Held (plug e (connS (cs cl true sa ba as nothing r en) s t))
+           → Held (plug (rebase dd) (connS (cs cl true sa ba as nothing r en) s t))
            → Fed P (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h) dd))
                    (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd))
            → FedAt (dBody {k = cs cl true sa ba as nothing r en} {s} dd) t
@@ -313,25 +314,25 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
                    (bodyConn r (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd))
                      (stateᴺ (gh t) (envOf (force h′) (dBody {k = cs cl true sa ba as nothing r en} {s} dd))))
   live-fed dd cl sa ba as r en s t fs fs′ σ β =
-    conn-fed r (fed-sourced dd cl sa ba as r en s t fs) (fed-trail dd cl sa ba as r en s t fs′)
-      (proj₁ nx) (proj₂ nx) (fed-body-on dd cl sa ba as r en s t fs) σ β
-    where nx = fed-src-next dd cl sa ba as r en s t fs
+    conn-fed r (fed-sourced dd cl sa ba as r en s t (proj₁ fs)) (fed-trail dd cl sa ba as r en s t fs′)
+      (proj₁ nx) (proj₂ nx) (fed-body-on dd cl sa ba as r en s t (proj₁ fs)) σ β
+    where nx = fed-src-next dd cl sa ba as r en s t (proj₁ fs)
 
   -- A CONNECT feeds its body its own source's relation.
-  fed-conn : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) k (s : St Δ Y) (t : St (Y ∷ Δ) C) → Frag (plug e (connS k s t))
-           → Frag (plug (rebase dd) (connS k s t))
+  fed-conn : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) k (s : St Δ Y) (t : St (Y ∷ Δ) C) → Held (plug e (connS k s t))
+           → Held (plug (rebase dd) (connS k s t))
            → FedAt dd s → FedAt (dBody {k = k} {s} dd) t → FedAt dd (connS k s t)
-  fed-conn dd k@(cs cl sl sa ba as (just w) r en) s t fs fs′ is it = fed-done dd k s t owed fs is it
-  fed-conn dd k@(cs cl false sa ba as nothing r en) s t fs fs′ is it = fed-done dd k s t off fs is it
+  fed-conn dd k@(cs cl sl sa ba as (just w) r en) s t fs fs′ is it = fed-done dd k s t owed (proj₁ fs) is it
+  fed-conn dd k@(cs cl false sa ba as nothing r en) s t fs fs′ is it = fed-done dd k s t off (proj₁ fs) is it
   fed-conn dd (cs false true sa nothing as nothing r en) s t fs fs′ is it =
     fed-by refl refl refl refl (live-fed dd false sa nothing as r en s t fs fs′ is it)
   fed-conn dd (cs true true sa nothing as nothing r en) s t fs fs′ is it =
-    fed-by refl refl refl refl (live-fed dd true sa nothing as r en s t fs fs′ (fed-ended dd sa as r en s t fs is) it)
+    fed-by refl refl refl refl (live-fed dd true sa nothing as r en s t fs fs′ (fed-ended dd sa as r en s t (proj₁ fs) is) it)
   fed-conn dd (cs cl true sa (just p) as nothing r en) s t fs fs′ is it =
     fed-by refl refl refl refl (live-fed dd cl sa (just p) as r en s t fs fs′ (sub-fed dd cl sa p as r en s t fs is) it)
 
   mutual
-    walk : ∀ {Δ C} {e : Ctx R Δ C} (dd : Down e) (s : St Δ C) → Frag (plug e s) → Frag (plug (rebase dd) s) → FedAt dd s
+    walk : ∀ {Δ C} {e : Ctx R Δ C} (dd : Down e) (s : St Δ C) → Held (plug e s) → Held (plug (rebase dd) s) → FedAt dd s
     walk dd (pend p)                  fs fs′ = inj₁ (≋-⊒ (≋-by refl refl))
     walk dd (coldS l (ending p))      fs fs′ = inj₁ (≋-⊒ (≋-by refl refl))
     walk dd (coldS true (play τ u i t fr)) fs fs′ = inj₁ (≋-⊒ (≋-by refl refl))
@@ -342,20 +343,20 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
     walk dd (mapS f s)                fs fs′ = fed-by refl refl refl refl (fed-map f (walk (dMap dd) s fs fs′))
     walk dd (scanS f z s)             fs fs′ = fed-by refl refl refl refl (fed-scan f z (walk (dScan dd) s fs fs′))
     walk dd (cutS true a s)           fs fs′ = walk (dCut dd) s fs fs′
-    walk dd (cutS false a s)          fs fs′ = fed-cut dd a s fs (walk (dCut dd) s fs fs′)
+    walk dd (cutS false a s)          fs fs′ = fed-cut dd a s (proj₁ fs) (walk (dCut dd) s fs fs′)
     walk dd (lnS l s)                 fs fs′ = walk (dLn dd) s fs fs′
     walk dd (takeS i p free s)        fs fs′ = fed-by refl refl refl refl (fed-took i p (walk (dTake dd) s fs fs′))
-    walk dd (takeS i p (cpAt k) s)    fs fs′ = fed-taken dd i p (cpAt k) s fs (walk (dTake dd) s fs fs′)
-    walk dd (takeS i p (cutAt k) s)   fs fs′ = fed-taken dd i p (cutAt k) s fs (walk (dTake dd) s fs fs′)
-    walk dd (takeS i p (overAt k) s)  fs fs′ = fed-taken dd i p (overAt k) s fs (walk (dTake dd) s fs fs′)
-    walk dd (flatS op f dn n qs s ls) fs fs′ = fed-flat dd op f dn n qs s ls fs (walk (dOuter dd) s fs fs′) (walkLanes dd op f dn n qs s [] ls fs fs′)
+    walk dd (takeS i p (cpAt k) s)    fs fs′ = fed-taken dd i p (cpAt k) s (proj₁ fs) (walk (dTake dd) s fs fs′)
+    walk dd (takeS i p (cutAt k) s)   fs fs′ = fed-taken dd i p (cutAt k) s (proj₁ fs) (walk (dTake dd) s fs fs′)
+    walk dd (takeS i p (overAt k) s)  fs fs′ = fed-taken dd i p (overAt k) s (proj₁ fs) (walk (dTake dd) s fs fs′)
+    walk dd (flatS op f dn n qs s ls) fs fs′ = fed-flat dd op f dn n qs s ls (proj₁ fs) (walk (dOuter dd) s fs fs′) (walkLanes dd op f dn n qs s [] ls fs fs′)
     walk dd (connS k s t)             fs fs′ = fed-conn dd k s t fs fs′ (walk (dSrc dd) s fs fs′) (walk (dBody dd) t fs fs′)
     walk dd (joinS j false y ib)      fs fs′ = inj₁ (≋-⊒ (≋-by refl refl))
-    walk dd (joinS j true y ib)       fs fs′ = fed-join dd j y ib fs
+    walk dd (joinS j true y ib)       fs fs′ = fed-join dd j y ib (proj₁ fs)
 
     -- A flatMap's lanes, those before nearest first.
     walkLanes : ∀ {Δ A C} {e : Ctx R Δ C} (dd : Down e) op (f : A → _) dn n qs (s : St Δ A) (pre post : List (St Δ C))
-              → Frag (plug e (flatS op f dn n qs s (pre ʳ++ post))) → Frag (plug (rebase dd) (flatS op f dn n qs s (pre ʳ++ post)))
+              → Held (plug e (flatS op f dn n qs s (pre ʳ++ post))) → Held (plug (rebase dd) (flatS op f dn n qs s (pre ʳ++ post)))
               → All (FedAt dd) post
     walkLanes dd op f dn n qs s pre []         fs fs′ = []ᴬ
     walkLanes dd op f dn n qs s pre (l ∷ post) fs fs′ =
@@ -367,9 +368,9 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
 src-fed : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h h′ : Events∞ X}
         → Sought v q P → KAfter (after q) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
         → Before (after q) (own (connS (cs false true sa ba as nothing r en) o b))
-        → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
+        → Held (plug c (connS (cs false true sa ba as nothing r en) o b))
         → h ≋ stateᴺ (gh o) (envAt c) → Dropsˢ P h h′
-        → (o′ : St Γ X) → Frag (plug c (connS (cs false true sa ba as nothing r en) o′ b)) → Unpended o′ → h′ ≋ stateᴺ (gh o′) (envAt c)
+        → (o′ : St Γ X) → Held (plug c (connS (cs false true sa ba as nothing r en) o′ b)) → Unpended o′ → h′ ≋ stateᴺ (gh o′) (envAt c)
         → Fed P (stateᴺ (gh b) (force h ∷ᴬ envAt c)) (stateᴺ (gh b) (force h′ ∷ᴬ envAt c))
 src-fed v q c sa ba as r en o b so ka bf ft x d o′ ft′ u′ x′ =
   Walk.walk v q c sa ba as r en o b so ka bf ft x d o′ ft′ u′ x′ (Walk.base) b ft ft′

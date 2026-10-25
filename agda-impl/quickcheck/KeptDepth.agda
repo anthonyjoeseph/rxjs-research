@@ -16,7 +16,7 @@
 -- source's run nesting nothing, and after each source skip shows
 -- (`adequacy.Engine.Shown.src-body-on`).  And each live joiner fed in
 -- order ahead of its rejoined source, joined where its source never keys
--- (`adequacy.Engine.Trails.join-fed`).
+-- (`adequacy.Engine.Keys.Here`).
 module quickcheck.KeptDepth where
 
 open import Data.Bool using (Bool; true; false; not; _∧_; _∨_; if_then_else_)
@@ -452,7 +452,7 @@ private
     shapedLᵇ []       ρ = true
     shapedLᵇ (l ∷ ls) ρ = shapedᵇ l ρ ∧ shapedLᵇ ls ρ
 
-  -- `adequacy.Engine.Trails.join-fed`, decided at a live joiner: told its
+  -- `adequacy.Engine.Keys.Here`, decided at a live joiner: told its
   -- end under a head, else joined under a head its source never keys
   -- under; each value fed headed, at or after what follows it, and past
   -- it, or clear of it if what follows is a skip.

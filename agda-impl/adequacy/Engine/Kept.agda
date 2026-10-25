@@ -58,7 +58,7 @@ open import adequacy.Engine.Meaning using (Has; M; _≅_; _≋_; agree-≅; atOu
 open import adequacy.Engine.Inv using (Unpended; Opened; Wf; Base; module Base; Inv; module Inv; inv-at; wfI; wf-split; Owns; ofO;
   attO; cpO; cutO; bodyO; srcAttO; owedO; joinO; leafO; owned; search-hit)
 open import adequacy.Engine.Race using (First; go-rise; cuts-swap)
-open import adequacy.Engine.Head using (Frag)
+open import adequacy.Engine.Keys using (Held)
 open import adequacy.Engine.Pick using (module Order; Clear; Apart)
 
 open Events∞
@@ -641,5 +641,5 @@ module _ {R : Set} where
   ... | nothing = quiet-empty c s p v e
   ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
   ...   | pl , own = kept-pre (tookᴰ (run c′ s′ m p)) (refocus c s c′ s′ p (Base.settled (Inv.base v)) (owned own) (wfI (Inv.base v)) pl)
-                       (runs c′ s′ m p own (inv-at c′ s′ p (owned own) (subst Wf (sym pl) (wfI (Inv.base v))) (subst Frag (sym pl) (Order.shape (Inv.ord v))) (subst (λ t → Apart t) (sym pl) (Order.apart (Inv.ord v)))))
+                       (runs c′ s′ m p own (inv-at c′ s′ p (owned own) (subst Wf (sym pl) (wfI (Inv.base v))) (subst Held (sym pl) (Order.shape (Inv.ord v))) (subst (λ t → Apart t) (sym pl) (Order.apart (Inv.ord v)))))
 
