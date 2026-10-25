@@ -47,9 +47,9 @@ mutual
   head-agrees c (lnS b s)       ()
   head-agrees c (takeS i q w s) fs = takeS-head c i q w s (head-agrees (inTake i q w c) s fs)
   head-agrees c (flatS (mergeᶠ nothing) f d n (_ ∷ _) o ls) ()
-  head-agrees c (flatS (mergeᶠ (just m)) f d n q o ls) (fo , fl , dd) = limit-head c m f d n q o ls fo fl dd
-  head-agrees c (flatS switchᶠ f d n q o ls) (fo , fl , dd) = switch-head c f d n q o ls fo fl dd
-  head-agrees c (flatS exhaustᶠ f d n q o ls) (fo , fl , dd) = exhaust-head c f d n q o ls fo fl dd
+  head-agrees c (flatS (mergeᶠ (just m)) f d n q o ls) (fo , fl , _ , dd) = limit-head c m f d n q o ls fo fl dd
+  head-agrees c (flatS switchᶠ f d n q o ls) (fo , fl , _ , dd) = switch-head c f d n q o ls fo fl dd
+  head-agrees c (flatS exhaustᶠ f d n q o ls) (fo , fl , _ , dd) = exhaust-head c f d n q o ls fo fl dd
 
   -- A merge: the outer against its lanes, as the stepper races them.
   flat-at : ∀ {R Γ A B} b (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) d n (o : St Γ A) ls → closed c ≡ b

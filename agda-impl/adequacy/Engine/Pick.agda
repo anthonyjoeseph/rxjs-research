@@ -33,7 +33,7 @@
 module adequacy.Engine.Pick where
 
 open import Data.Empty using (⊥)
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (Bool; true; false; if_then_else_; _∨_)
 open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; reverse)
 open import Data.List.Properties using (ʳ++-defn)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
@@ -45,7 +45,8 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; trans)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.MonotonicList.Events using (Pos; Timeline; idle; _∪_; ix)
+open import denotation.MonotonicList.Events using (Pos; Timeline; Events∞; idle; _∪_; ix)
+open import denotation.MonotonicList using (head)
 open import denotation.Unfold using (Step; NEnv; states; outerᴺ; step; headˢ; hushˢ; outˢ; skipˢ; endˢ)
 open import operation.Key using (Key; at; after; _<ᴷ_)
 open import operation.PureObservable using (module Machine)
@@ -54,7 +55,7 @@ open Machine using (St; mapS; scanS; cutS; lnS; takeS; flatS; connS; Ctx; top; i
   Mark; own; Found; nx; cp; alive; free; cpAt; cutAt; overAt; _⊕_; mapT; scanT; cutT; takeT; laneT; shift; over; outOf)
   renaming (outerT to outerK)
 open import adequacy.Engine.Meaning using (gh; lane; outerG; poolG; lanesL; deadL; poolT; tailsOn; outerT; envAt)
-open import adequacy.Engine.Race using (First; NotBefore; After)
+open import adequacy.Engine.Race using (First; NotBefore; After; TailNotBefore)
 open import adequacy.Engine.Head using (Frag; Lanes; Lane; Agrees; exact; early; HeadAt; cand; pool-step; at-<ᵖ; <≮ᴷ; ≮ᴷ-trans)
 open import adequacy.Engine.Head.Agrees using (head-agrees)
 
@@ -81,7 +82,9 @@ Clear p a (inTake i q free c)               s = (q a ≡ true → Clear p a c (t
 Clear p a (inTake i q (cpAt r) c)           s = ⊤
 Clear p a (inTake i q (cutAt r) c)          s = ⊤
 Clear p a (inTake i q (overAt r) c)         s = ⊤
-Clear p a (inOuter op f d n q ls c)         s = ⊤
+Clear p a (inOuter op f true n q ls c)      s = ⊥
+Clear p a (inOuter op f false n q ls c)     s =
+  closed c ≡ false × All (λ l → After p (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore p (poolT (deadL ls) (envAt c))
 Clear p a (inLanes op f d n q o pre post c) s =
   alive s ≡ true → (closed c ≡ false → Sides p f d o (reverse pre) post (envAt c)) × Clear p a c (flatS op f d n q o (pre ʳ++ s ∷ post))
 Clear p a (inSrc k b c)                     s = over k ≡ false → closed c ≡ false → After (p ⊕ [ ix 0 ]) (headˢ (step (gh b)))
@@ -127,8 +130,19 @@ record LaneWon {R Γ A B} (k : Key) (c : Ctx R Γ B) op (f : A → Obs Timeline 
     olderW : Race KAfter k c op f d n q o [] (reverse pre) (s ∷ post)
     newerW : Race KNotBefore k c op f d n q o (s ∷ pre) post []
 
+-- What runs under a completed outer, or where nothing is shown, rises
+-- no value.
+Unrisen : ∀ {A} → Bool → Out A → Set
+Unrisen true (shows (nx a)) = ⊥
+Unrisen _    _              = ⊤
+
+unrisen-open : ∀ {A} b {a : A} → Unrisen b (shows (nx a)) → b ≡ false
+unrisen-open false u = refl
+
 -- Every flatMap above the found node raced it in, each at the key and
--- event its candidate has there; every connect's body lost to its source.
+-- event its candidate has there, and a value reaches its outer frame only
+-- shown and before the outer completes; every connect's body lost to its
+-- source.
 Won : ∀ {R Γ A} → Key × Out A → Ctx R Γ A → St Γ A → Set
 Won h       top                                s = ⊤
 Won (k , o) (inMap f c)                        s = Won (mapT f k o) c (mapS f s)
@@ -136,7 +150,7 @@ Won (k , o) (inScan f z c)                     s = Won (scanT f z k o) c (scanS 
 Won (k , o) (inCut l a c)                      s = Won (cutT l k o) c (cutS l a s)
 Won h       (inLn b c)                         s = Won h c (lnS b s)
 Won (k , o) (inTake i q w c)                   s = Won (takeT i q w k o) c (takeS i q w s)
-Won (k , o) (inOuter op f d n q ls c)          s = Won (outerK n q k o) c (flatS op f d n q s ls)
+Won (k , o) (inOuter op f d n q ls c)          s = Race KAfter k c op f d n q s [] ls [] × Won (outerK n q k o) c (flatS op f d n q s ls) × Unrisen (d ∨ closed c) o
 Won (k , o) (inLanes op f d n q o′ pre post c) s =
   LaneWon k c op f d n q o′ pre post s × Won (uncurry (laneT d n q) (cutT (alive s) k o)) c (flatS op f d n q o′ (pre ʳ++ s ∷ post))
 Won (k , o) (inSrc kk b c)                     s =
@@ -256,6 +270,13 @@ record StepSides {Γ A B} (p : Pos) d (o : St Γ A) (pre post : List (St Γ B)) 
     poolS  : step (poolG d (gh o) (deadL (pre ++ s ∷ post))) ≡ hushˢ
 
 postulate
+  -- An outer first: its flatMap's lanes, each after it as the race read
+  -- them, are after it in the meaning; a pool the stepper hushes leaves
+  -- nothing running before it.
+  outer-link : ∀ {R Γ A B} (c : Ctx R Γ B) q op (f : A → Obs Timeline Γ B) n q′ (o : St Γ A) ls
+             → Frag (plug c (flatS op f false n q′ o ls))
+             → All (λ m → After q (headˢ (step m))) (lanesL ls) → step (poolG false (gh o) (deadL ls)) ≡ hushˢ
+             → All (λ l → After q (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore q (poolT (deadL ls) (envAt c))
   -- The meaning's heads are the stepper's; a pool the stepper hushes
   -- leaves nothing running.
   sides-link : ∀ {R Γ A B} (c : Ctx R Γ B) p (f : A → Obs Timeline Γ B) d n (o : St Γ A) pre post (s : St Γ B)
@@ -291,6 +312,14 @@ lane-on : ∀ {R Γ A B} d n (q : List A) {b} {k} (a : B) {c : Ctx R Γ B} {t} �
 lane-on d n []      a refl w = w
 lane-on d n (_ ∷ _) a refl w = w
 
+-- A flatMap of the fragment: its outer and its lanes are.
+frag-parts : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls → Frag (flatS op f d n q o ls) → Frag o × Lanes ls
+frag-parts (mergeᶠ nothing)  f d n []      o ls (fo , fl , _) = fo , fl
+frag-parts (mergeᶠ nothing)  f d n (_ ∷ _) o ls ()
+frag-parts (mergeᶠ (just m)) f d n q       o ls (fo , fl , _) = fo , fl
+frag-parts switchᶠ           f d n q       o ls (fo , fl , _) = fo , fl
+frag-parts exhaustᶠ          f d n q       o ls (fo , fl , _) = fo , fl
+
 -- Up the found node's frames: each one the value reaches is clear there.
 -- `s` is the node the search saw, `s′` the one the rise leaves.
 won-clear : ∀ {R Γ A} p (a : A) (c : Ctx R Γ A) (s s′ : St Γ A) → alive s ≡ alive s′
@@ -308,7 +337,13 @@ won-clear p a (inTake i q free c)               s s′ al w ft with q a | i
 won-clear p a (inTake i q (cpAt r) c)           s s′ al w ft = tt
 won-clear p a (inTake i q (cutAt r) c)          s s′ al w ft = tt
 won-clear p a (inTake i q (overAt r) c)         s s′ al w ft = tt
-won-clear p a (inOuter op f d n q ls c)         s s′ al w ft = tt
+won-clear p a (inOuter op f true n q ls c)      s s′ al (_ , _ , ()) ft
+won-clear p a (inOuter op f false n q ls c)     s s′ al (r , _ , u) ft =
+  cl , outer-link c p op f n q s ls ft (race-steps KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) r)
+         (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
+  where
+    cl    = unrisen-open (closed c) u
+    parts = frag-parts op f false n q s ls (frag-flat c op f false n q s ls ft)
 won-clear p a (inLanes op f d n q o pre post c) s s′ al (l , w) ft lv =
   (λ cl → lane-sides p c op f d n q o pre post s cl l ft (frag-flat c op f d n q o (pre ʳ++ s ∷ post) ft))
   , won-clear p a c (flatS op f d n q o (pre ʳ++ s ∷ post)) (flatS op f d n q o (pre ʳ++ s′ ∷ post)) refl

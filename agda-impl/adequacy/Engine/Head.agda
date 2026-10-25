@@ -109,9 +109,9 @@ mutual
   Frag (pend o)                               = ⊤
   Frag (scanS f z s)                          = Frag s
   Frag (takeS i q w s)                        = Frag s
-  Frag (flatS (mergeᶠ (just m)) f d n q o ls) = Frag o × Lanes ls × (d ≡ true → Done o × NoConn o)
-  Frag (flatS switchᶠ f d n q o ls)           = Frag o × Lanes ls × (d ≡ true → Done o × NoConn o)
-  Frag (flatS exhaustᶠ f d n q o ls)          = Frag o × Lanes ls × (d ≡ true → Done o × NoConn o)
+  Frag (flatS (mergeᶠ (just m)) f d n q o ls) = Frag o × Lanes ls × n ≡ length (lanesL ls) × (d ≡ true → Done o × NoConn o)
+  Frag (flatS switchᶠ f d n q o ls)           = Frag o × Lanes ls × n ≡ length (lanesL ls) × (d ≡ true → Done o × NoConn o)
+  Frag (flatS exhaustᶠ f d n q o ls)          = Frag o × Lanes ls × n ≡ length (lanesL ls) × (d ≡ true → Done o × NoConn o)
   Frag _                                      = ⊥
 
   -- A connect whose source waits on its subscription mark, subscribed at
