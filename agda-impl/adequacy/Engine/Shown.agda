@@ -25,22 +25,23 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 
-open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
+open import Tree using (Obs)
 open import denotation.MonotonicList.Events using (Events∞; Timeline; Pos; ix; idle; hush)
 open import denotation.MonotonicList using (head; Agreeᵀ)
 open import denotation.NonExpansive using (_,ˢ_; mapᴱ-ne; scanᴱ-ne; Agreeˢ)
-open import denotation.Unfold using (stateᴺ; states; outerᴺ; step; headˢ; hushˢ)
+open import denotation.Unfold using (stateᴺ; states; outerᴺ)
 open import operation.Key using (Key; at; after; _<ᴷ_)
 open import operation.PureObservable using (play; module Machine)
 open Machine using (St; mapS; scanS; cutS; lnS; takeS; flatS; connS; coldS; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter;
   inLanes; inSrc; inBody; plug; closed; Out; search; found; leafM; own; cs; free; cpAt; cutAt; overAt; over)
-open import adequacy.Engine.Meaning using (_≋_; ≋-trans; ≋-tr; mapped; scanned; gh; lane; lanesL; deadL; poolG; outerG; poolRuns;
-  envAt; flagOf; lanesFrame; outerFrame-ne; lanesFrame-ne; bodyFrame-ne; connSrc-ne; taking∞-ne; srcState; srcG; poolT; outerT)
+open import adequacy.Engine.Meaning using (_≋_; ≋-trans; ≋-tr; mapped; scanned; gh; lane; lanesL; deadL; outerG; poolRuns; envAt;
+  flagOf; lanesFrame; outerFrame-ne; lanesFrame-ne; bodyFrame-ne; connSrc-ne; taking∞-ne;
+  srcState; srcG; poolT; outerT)
 open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore)
-open import adequacy.Engine.Head using (Frag; Lanes; cand; pool-step; <ᴷ-irrefl; ≮ᴷ-trans; ≮<ᴷ)
+open import adequacy.Engine.Head using (Frag; cand; pool-step; <ᴷ-irrefl; ≮ᴷ-trans; ≮<ᴷ)
 open import adequacy.Engine.Inv using (Unpended)
 open import adequacy.Engine.Pick using (Beat; past; KAfter; KNotBefore; Before; Race; LaneWon; lane-won; race-steps; after-step;
-  lane-sides; frag-flat)
+  lane-sides; frag-flat; frag-parts; outer-link)
 open import adequacy.Engine.Drop using (Dropsˢ; Pass; SrcPass; Under; shows; shows-open; shown; mapped-drops; scanned-drops;
   took-drops; lanes-drops; body-drops; outer-drops; src-drops)
 open import adequacy.Engine.Kept using (outer-plug; lanes-plugʳ; body-plug; live-plug)
@@ -66,13 +67,6 @@ postulate
             → (m , key) ∈ own s
   -- Past a position is after every position under it.
   under-after : ∀ q y → after q <ᴷ at (q ++ y) ≡ false
-  -- An outer first: its flatMap's lanes, each after it as the race read
-  -- them, are after it in the meaning; a pool the stepper hushes leaves
-  -- nothing running before it.
-  outer-link : ∀ {R Γ A B} (c : Ctx R Γ B) q op (f : A → Obs Timeline Γ B) n q′ (o : St Γ A) ls
-             → Frag (plug c (flatS op f false n q′ o ls))
-             → All (λ m → After q (headˢ (step m))) (lanesL ls) → step (poolG false (gh o) (deadL ls)) ≡ hushˢ
-             → All (λ l → After q (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore q (poolT (deadL ls) (envAt c))
   -- A body first: the source's candidate, no earlier than it, and the
   -- connect's own marks, after it, put the source's meaning no earlier;
   -- a source hushed leaves nothing running.
@@ -151,14 +145,6 @@ cold-key : ∀ {R} (t : St [] R) {Γ A} {c : Ctx R Γ A} {τ u i t₀ fr key}
 cold-key t e with found-own t e
 ... | here refl = refl
 ... | there ()
-
--- A flatMap of the fragment: its outer and its lanes are.
-frag-parts : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls → Frag (flatS op f d n q o ls) → Frag o × Lanes ls
-frag-parts (mergeᶠ nothing)  f d n []      o ls (fo , fl , _) = fo , fl
-frag-parts (mergeᶠ nothing)  f d n (_ ∷ _) o ls ()
-frag-parts (mergeᶠ (just m)) f d n q       o ls (fo , fl , _) = fo , fl
-frag-parts switchᶠ           f d n q       o ls (fo , fl , _) = fo , fl
-frag-parts exhaustᶠ          f d n q       o ls (fo , fl , _) = fo , fl
 
 -- THE WALK: every frame above the found node passes the skip it drops,
 -- each position asked of read off the race there.
