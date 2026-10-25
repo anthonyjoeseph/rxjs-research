@@ -17,12 +17,13 @@
 module adequacy.Engine.Passed where
 
 open import Data.Bool using (true; false)
-open import Data.List using (List; _∷_; reverse)
+open import Data.List using (List; _∷_; _++_; [_]; reverse)
 open import Data.List.Relation.Unary.All using (All) renaming (_∷_ to _∷ᴬ_)
 open import Data.Maybe using (just; nothing)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (Σ; _×_; _,_)
 
-open import denotation.MonotonicList.Events using (Events∞; Pos)
+open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Tail; out; skip; end; hush; ix)
+open import Data.Unit using (tt)
 open import denotation.MonotonicList using (head)
 open import denotation.Unfold using (Node; NEnv; stateᴺ; states; outerᴺ)
 open import operation.PureObservable using (module Machine)
@@ -31,7 +32,10 @@ open import adequacy.Engine.Meaning using (same; srcState; srcG; envAt; gh; lane
   laneRuns; outerOf)
 open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore)
 open import adequacy.Engine.Ahead using (Under; shown)
-open import adequacy.Engine.Keys using (FlatAt; ConnAt; Keyed)
+open import adequacy.Engine.Keys using (FlatAt; ConnAt; module ConnAt; Keyed)
+open import adequacy.Engine.Erased using (every-drops; fresh-drops; drops-fresh)
+open import adequacy.Placed.Order using (Owned; EveryT)
+open import adequacy.Placed.Burst using (Fresh; module Bursting)
 open import adequacy.Engine.Above using (Above)
 open import adequacy.Engine.Drop using (Dropsˢ; Pass; SrcPass; mapped-drops; scanned-drops; took-drops; lanes-drops; outer-drops; src-drops;
   body-drops; ≋-⊒)
@@ -60,11 +64,29 @@ postulate
                → Dropsˢ P h h′
                → ConnAt k (stateᴺ (gh b) (force h ∷ᴬ ρ)) h ρ × Keyed b (force h ∷ᴬ ρ)
                → ConnAt k (stateᴺ (gh b) (force h′ ∷ᴬ ρ)) h′ ρ × Keyed b (force h′ ∷ᴬ ρ)
-  -- THE FLIGHT KEPT: a live connect's body dropping a skip no earlier
-  -- than its source shows keeps the connect's keys.
-  body-at-drops : ∀ {Γ X B P} k (σ : Events∞ X) (ρ : NEnv Γ) {h h′ : Events∞ B}
-                → (∀ q → P q → NotBefore q (shown (force σ))) → Dropsˢ P h h′
-                → ConnAt k h σ ρ → ConnAt k h′ σ ρ
+
+-- A source no earlier than a skip cues a body fresh past it.
+nb-cue : ∀ {A} r k (e : Events A) → NotBefore k (shown e) → Bursting.Cue r k e
+nb-cue r k (out _ _ _) n = n
+nb-cue r k (skip _ _)  n = n
+nb-cue r k (end _)     n = n
+nb-cue r k hush        n = tt
+
+conn-cue : ∀ {A : Set} {P : Pos → Set} r p (σ : Events∞ A) {t : Tail} → (∀ q → P q → NotBefore q (shown (force σ)))
+         → Σ Pos (λ l → P l × Owned p l × EveryT (Fresh p l) t) → Σ Pos (λ l → Owned p l × Bursting.Cue r l (force σ) × EveryT (Fresh p l) t)
+conn-cue r p σ nb (l , q , o , f) = l , o , nb-cue r l (force σ) (nb l q) , f
+
+-- A live connect's body dropping skips no earlier than its source shows
+-- keeps the connect's keys: each is read past the drop, and the body is
+-- cued fresh past the last skip dropped.
+body-at-drops : ∀ {Γ X B P} k (σ : Events∞ X) (ρ : NEnv Γ) {h h′ : Events∞ B}
+              → (∀ q → P q → NotBefore q (shown (force σ))) → Dropsˢ P h h′
+              → ConnAt k h σ ρ → ConnAt k h′ σ ρ
+body-at-drops k σ ρ nb d ca = record
+  { mark = mark ; hm = hm ; at = at ; kb = every-drops kb d ; kr = every-drops kr d ; fr = fresh-drops fr d
+  ; cue = conn-cue (mark ++ [ ix 1 ]) (mark ++ [ ix 0 ]) σ nb (drops-fresh d kb fr)
+  ; ks = ks ; rs = rs ; ub = every-drops ub d ; sub = sub ; ends = ends }
+  where open ConnAt ca
 
 -- THE FRAMES ABOVE, PAST THE SKIP: skips dropped at the hole, each passed
 -- by every frame above, leave every frame's own facts standing.

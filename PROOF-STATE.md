@@ -18,7 +18,7 @@ above keyed against it (`adequacy.Engine.Above.Flight`). Settled by the
 per-frame keys past a dropped skip.
 
 Members: `outer-flat-drops`, `lanes-flat-drops`, `src-at-drops`,
-`body-at-drops`, `lane-begin-tail`, `rise-admit-flight`,
+`lane-begin-tail`, `rise-admit-flight`,
 `rise-outer-end-flight`, `begin-flight`, `run-flight`, `flight-load`,
 `flight-held`.
 
