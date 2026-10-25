@@ -82,7 +82,7 @@ Clear p a (inTake i q free c)               s = (q a ≡ true → Clear p a c (t
 Clear p a (inTake i q (cpAt r) c)           s = ⊤
 Clear p a (inTake i q (cutAt r) c)          s = ⊤
 Clear p a (inTake i q (overAt r) c)         s = ⊤
-Clear p a (inOuter op f true n q ls c)      s = ⊤
+Clear p a (inOuter op f true n q ls c)      s = ⊥
 Clear p a (inOuter op f false n q ls c)     s =
   closed c ≡ false → All (λ l → After p (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore p (poolT (deadL ls) (envAt c))
 Clear p a (inLanes op f d n q o pre post c) s =
@@ -130,8 +130,14 @@ record LaneWon {R Γ A B} (k : Key) (c : Ctx R Γ B) op (f : A → Obs Timeline 
     olderW : Race KAfter k c op f d n q o [] (reverse pre) (s ∷ post)
     newerW : Race KNotBefore k c op f d n q o (s ∷ pre) post []
 
+-- What a completed outer's subtree runs rises no value.
+Unrisen : ∀ {A} → Bool → Out A → Set
+Unrisen true (shows (nx a)) = ⊥
+Unrisen _    _              = ⊤
+
 -- Every flatMap above the found node raced it in, each at the key and
--- event its candidate has there; every connect's body lost to its source.
+-- event its candidate has there, and none of them had completed its
+-- outer; every connect's body lost to its source.
 Won : ∀ {R Γ A} → Key × Out A → Ctx R Γ A → St Γ A → Set
 Won h       top                                s = ⊤
 Won (k , o) (inMap f c)                        s = Won (mapT f k o) c (mapS f s)
@@ -139,7 +145,7 @@ Won (k , o) (inScan f z c)                     s = Won (scanT f z k o) c (scanS 
 Won (k , o) (inCut l a c)                      s = Won (cutT l k o) c (cutS l a s)
 Won h       (inLn b c)                         s = Won h c (lnS b s)
 Won (k , o) (inTake i q w c)                   s = Won (takeT i q w k o) c (takeS i q w s)
-Won (k , o) (inOuter op f d n q ls c)          s = Race KAfter k c op f d n q s [] ls [] × Won (outerK n q k o) c (flatS op f d n q s ls)
+Won (k , o) (inOuter op f d n q ls c)          s = Race KAfter k c op f d n q s [] ls [] × Won (outerK n q k o) c (flatS op f d n q s ls) × Unrisen d o
 Won (k , o) (inLanes op f d n q o′ pre post c) s =
   LaneWon k c op f d n q o′ pre post s × Won (uncurry (laneT d n q) (cutT (alive s) k o)) c (flatS op f d n q o′ (pre ʳ++ s ∷ post))
 Won (k , o) (inSrc kk b c)                     s =
@@ -326,8 +332,8 @@ won-clear p a (inTake i q free c)               s s′ al w ft with q a | i
 won-clear p a (inTake i q (cpAt r) c)           s s′ al w ft = tt
 won-clear p a (inTake i q (cutAt r) c)          s s′ al w ft = tt
 won-clear p a (inTake i q (overAt r) c)         s s′ al w ft = tt
-won-clear p a (inOuter op f true n q ls c)      s s′ al w ft = tt
-won-clear p a (inOuter op f false n q ls c)     s s′ al (r , w) ft cl =
+won-clear p a (inOuter op f true n q ls c)      s s′ al (_ , _ , ()) ft
+won-clear p a (inOuter op f false n q ls c)     s s′ al (r , _) ft cl =
   outer-link c p op f n q s ls ft (race-steps KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) r)
     (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
   where parts = frag-parts op f false n q s ls (frag-flat c op f false n q s ls ft)

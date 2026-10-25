@@ -28,7 +28,7 @@ open import Data.Nat using (ℕ; zero; suc; _<_; _<ᵇ_; _≡ᵇ_)
 open import Data.Nat.Properties using (suc-injective; ≤-refl; <-trans)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
-open import Data.Unit using (tt)
+open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import Tree using (Obs; Later; defer; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
@@ -299,29 +299,46 @@ module Honesty (R : Set) where
   running (mergeᶠ m) n = n
   running exhaustᶠ   n = n
 
+  -- As `admit` decides on the count of lanes running: an outer's value
+  -- begins its lane, is queued behind a full merge, or is dropped by a
+  -- busy exhaust.
+  Begins : FlatOp → ℕ → Set
+  Begins (mergeᶠ nothing)  n = ⊤
+  Begins (mergeᶠ (just k)) n = (n <ᵇ k) ≡ true
+  Begins switchᶠ           n = ⊤
+  Begins exhaustᶠ          n = (n ≡ᵇ 0) ≡ true
+
+  Queues : FlatOp → ℕ → Set
+  Queues (mergeᶠ (just k)) n = (n <ᵇ k) ≡ false
+  Queues _                 n = ⊥
+
+  Ignores : FlatOp → ℕ → Set
+  Ignores exhaustᶠ n = (n ≡ᵇ 0) ≡ false
+  Ignores _        n = ⊥
+
   -- An outer's value admitted: its lane begun, or queued, or dropped by
   -- a busy exhaust.
   data Admitted {Γ A B} (c : Ctx R Γ B) (op : FlatOp) (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (q : List A) (o : St Γ A)
                 (ls : List (St Γ B)) (a : A) (p : Pos) : Conf R → Set₁ where
-    begun   : ∀ {ls′} → ls′ ≡ keptLanes op ls
+    begun   : ∀ {ls′} → Begins op n → ls′ ≡ keptLanes op ls
             → Admitted c op f d n q o ls a p
                 ⟨ inCut true (attAt (p ⊕ [ ix 1 ])) (inLn true (inLanes op f d (suc (running op n)) q o (reverse ls′) [] c)) , pend (f a) , subscribing , p ⊕ [ ix 1 ] ⟩
-    queued  : Admitted c op f d n q o ls a p ⟨ c , flatS op f d n (q ++ [ a ]) o ls , absorbed , p ⟩
-    ignored : Admitted c op f d n q o ls a p ⟨ c , flatS op f d n q o ls , absorbed , p ⟩
+    queued  : Queues op n → Admitted c op f d n q o ls a p ⟨ c , flatS op f d n (q ++ [ a ]) o ls , absorbed , p ⟩
+    ignored : Ignores op n → Admitted c op f d n q o ls a p ⟨ c , flatS op f d n q o ls , absorbed , p ⟩
 
   admitted : ∀ {Γ A B} {c : Ctx R Γ B} {op f d n q} {o : St Γ A} {ls a p t m′} → closed c ≡ false
            → step ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ ≡ silent t m′ → Admitted c op f d n q o ls a p m′
   admitted {c = c} {op = mergeᶠ nothing} cl e with closed c | cl | e
-  ... | false | refl | refl = begun refl
-  admitted {c = c} {op = mergeᶠ (just k)} {n = n} cl e with n <ᵇ k | closed c | cl | e
-  ... | true  | false | refl | refl = begun refl
-  ... | false | _     | _    | refl = queued
+  ... | false | refl | refl = begun tt refl
+  admitted {c = c} {op = mergeᶠ (just k)} {n = n} cl e with n <ᵇ k in b | closed c | cl | e
+  ... | true  | false | refl | refl = begun b refl
+  ... | false | _     | _    | refl = queued b
   admitted {c = c} {op = switchᶠ} {ls = ls} cl e with killAll ls in ek | closed c | cl | e
-  ... | ls′ , _ | false | refl | refl = begun (cong proj₁ (sym ek))
-  admitted {c = c} {op = exhaustᶠ} {n = n} cl e with n ≡ᵇ 0 | e
-  ... | false | refl = ignored
+  ... | ls′ , _ | false | refl | refl = begun tt (cong proj₁ (sym ek))
+  admitted {c = c} {op = exhaustᶠ} {n = n} cl e with n ≡ᵇ 0 in b | e
+  ... | false | refl = ignored b
   ... | true  | e′ with closed c | cl | e′
-  ...   | false | refl | refl = begun refl
+  ...   | false | refl | refl = begun b refl
 
   -- The outer frame with its value risen, and what each admission leaves.
   outerX : ∀ {Γ A B} → Ctx R Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → List A → List (St Γ B) → St Γ A → A → Pos → Events∞ B
@@ -335,14 +352,14 @@ module Honesty (R : Set) where
     -- AN OUTER'S VALUE BEGINS ITS LANE PAST ONE SKIP: the flatMap shows
     -- the value as a skip, then the lane subscribed just past it.
     outer-begins : ∀ {Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
-                 → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
+                 → Begins op n → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
                  → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (outerX c op f d q ls o a p) (begunY c op f d q o (keptLanes op ls) a p)
     -- AN OUTER'S VALUE QUEUED, OR DROPPED BY A BUSY EXHAUST, IS ITS SKIP.
     outer-queues : ∀ {Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
-                 → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
+                 → Queues op n → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
                  → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (outerX c op f d q ls o a p) (U.stateᴺ (gh (flatS op f d n (q ++ [ a ]) o ls)) (envAt c))
     outer-ignores : ∀ {Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
-                  → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
+                  → Ignores op n → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
                   → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (outerX c op f d q ls o a p) (U.stateᴺ (gh (flatS op f d n q o ls)) (envAt c))
     -- AN OUTER'S VALUE ADMITTED WHERE IT IS SHOWN IS SHOWN NEXT: every
     -- frame above passes its skip, whatever the admission left.
@@ -370,9 +387,9 @@ module Honesty (R : Set) where
   outer-drop {op = op} {d} {n} {q} {ls} {f} {c} {o} {a} {p} iv e with shows (inOuter op f d n q ls c) true in sh
   ... | false = outer-tail sh iv e
   ... | true with admitted {c = c} {op = op} (shows-open (inOuter op f d n q ls c) true sh) e
-  ...   | begun refl = lift-drops (_≡ p ⊕ [ ix 0 ]) c true (outer-begins iv) (outer-begins-pass sh iv)
-  ...   | queued     = lift-drops (_≡ p ⊕ [ ix 0 ]) c true (outer-queues iv) (outer-queues-pass sh iv)
-  ...   | ignored    = lift-drops (_≡ p ⊕ [ ix 0 ]) c true (outer-ignores iv) (outer-ignores-pass sh iv)
+  ...   | begun b refl = lift-drops (_≡ p ⊕ [ ix 0 ]) c true (outer-begins b iv) (outer-begins-pass sh iv)
+  ...   | queued b     = lift-drops (_≡ p ⊕ [ ix 0 ]) c true (outer-queues b iv) (outer-queues-pass sh iv)
+  ...   | ignored b    = lift-drops (_≡ p ⊕ [ ix 0 ]) c true (outer-ignores b iv) (outer-ignores-pass sh iv)
 
   -- A lane's completion under a queue, and the queue's next lane begun.
   laneX : ∀ {Γ A B} → Ctx R Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → List A → St Γ A → List (St Γ B) → List (St Γ B) → St Γ B → Pos → Events∞ B
