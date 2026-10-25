@@ -12,13 +12,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 Untried: a connect's body keyed under its source's environment entry, past
 skips the source drops (`adequacy.Engine.Passed`); and where only the tail
-is read, past the tail a dequeue grows. An outer's value or end, a subscribe beginning a
-former, and a mark run each leave the hole's run in shape and every frame
-above keyed against it (`adequacy.Engine.Above.Flight`). Settled by the
-per-frame keys past a dropped skip.
+is read, past the tail a dequeue grows. An outer's value, a subscribe
+beginning a former, and a mark run each leave the hole's run in shape and
+every frame above keyed against it (`adequacy.Engine.Above.Flight`). Settled
+by the per-frame keys past a dropped skip.
 
 Members: `body-keyed-drops`, `lane-begin-tail`, `rise-admit-flight`,
-`rise-outer-end-flight`, `begin-flight`, `run-flight`, `flight-load`.
+`begin-flight`, `run-flight`, `flight-load`.
 
 #### THE IDLE SOURCE
 
@@ -28,6 +28,15 @@ the subscription. No settled configuration absorbs one (`Settled`). Settled
 by a body, or refuted (then `flight-held` reads `Unpended`).
 
 Members: `pend-src-above`.
+
+#### THE DONE OUTER
+
+Untried: an outer already done rising its end. Its merge's run reads no
+outer, so the merge need not end there; only the search excludes it (a done
+node shows nothing, `outOf`), which `Order` does not carry. Settled by a
+body, or the configuration shown unreachable.
+
+Members: `rise-outer-done`.
 
 #### THE KEYS KEPT
 
@@ -84,13 +93,13 @@ Members: `fed-fresh`, `fed-join`, `defer-links`, `fed-sourced`.
 
 #### THE CLOSED LANE
 
-Untried: a lane or a body completing under a closed frame. The race that
-picked it still ran, but a closed frame's candidates need not be its parts'
-heads, so the end may not lead a sibling lane or the connect's source.
-Settled when both are bodies, or refuted (then each reads the open frame
-`lane-drop` reaches).
+Untried: a lane, a body or an outer completing under a closed frame. The
+race that picked it still ran, but a closed frame's candidates need not be
+its parts' heads, so the end may not lead a sibling lane, the pool or the
+connect's source. Settled when all are bodies, or refuted (then each reads
+the open frame `lane-drop` reaches).
 
-Members: `rise-body-end-shut`, `rise-lane-end-shut`.
+Members: `rise-body-end-shut`, `rise-lane-end-shut`, `rise-outer-end-shut`.
 
 #### THE SORTED TAILS
 

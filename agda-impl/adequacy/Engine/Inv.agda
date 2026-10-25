@@ -728,7 +728,7 @@ module _ {R : Set} where
   rise-lead (inTake i q (overAt r) c)         s (nx a) p l iv = tt
   rise-lead (inTake i q (overAt r) c)         s cp     p l iv = tt
   rise-lead (inOuter op f d n q ls c)         s (nx a) p l iv = admit-lead c op f d n q s ls a p iv
-  rise-lead (inOuter op f d n q ls c)         s cp     p l iv = settle-lead c (flatS op f true n q s ls) true n (null q) p l
+  rise-lead (inOuter op f d n q ls c)         s cp     p l iv = settle-lead c (flatS op f true n q s ls) true n (null q) p (proj₂ l)
   rise-lead (inLanes op f d n q o pre post c) s (nx b) p l iv with alive s
   ... | true  = proj₂ (l refl)
   ... | false = tt

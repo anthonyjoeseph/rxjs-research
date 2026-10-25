@@ -117,7 +117,10 @@ mutual
   Ends p (inTake i q (cpAt r) c)           s = ⊤
   Ends p (inTake i q (cutAt r) c)          s = ⊤
   Ends p (inTake i q (overAt r) c)         s = ⊤
-  Ends p (inOuter op f d n q ls c)         s = EndsIf ((n ≡ᵇ 0) ∧ null q) p c (flatS op f true n q s ls)
+  Ends p (inOuter op f d n q ls c)         s =
+    (d ≡ false → closed c ≡ false
+       → All (λ l → After p (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore p (poolT (deadL ls) (envAt c)))
+    × EndsIf ((n ≡ᵇ 0) ∧ null q) p c (flatS op f true n q s ls)
   Ends p (inLanes op f d n q o pre post c) s =
     alive s ≡ true × (closed c ≡ false → Sides p f d o (reverse pre) post (envAt c))
                    × EndsIf (d ∧ (pred n ≡ᵇ 0) ∧ null q) p c (flatS op f d (pred n) q o (pre ʳ++ ended s ∷ post)) × Queued q p c
@@ -565,6 +568,15 @@ ends-queued false x     p c s = tt
 ends-queued true  false p c s = tt
 ends-queued true  true  p c s = tt
 
+-- An open outer's end, won, leads its lanes and its pool.
+outer-ends : ∀ {R Γ A B} p (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (s : St Γ A) ls
+           → Race KAfter (at p) c op f d n q s [] ls [] → Frag (plug c (flatS op f d n q s ls)) → d ≡ false → closed c ≡ false
+           → All (λ l → After p (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore p (poolT (deadL ls) (envAt c))
+outer-ends p c op f d n q s ls r ft refl cl =
+  outer-link c p op f n q s ls ft (race-steps KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) r)
+    (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
+  where parts = frag-parts op f false n q s ls (frag-flat c op f false n q s ls ft)
+
 -- Up the found node's frames: each one the completion reaches is clear
 -- there, as `won-clear` for a value.
 mutual
@@ -580,8 +592,8 @@ mutual
   won-ends p (inTake i q (cpAt r) c)           s s′ al w ft = tt
   won-ends p (inTake i q (cutAt r) c)          s s′ al w ft = tt
   won-ends p (inTake i q (overAt r) c)         s s′ al w ft = tt
-  won-ends p (inOuter op f d n q ls c)         s s′ al (_ , w , _) ft =
-    ends-if p c ((n ≡ᵇ 0) ∧ null q) (flatS op f d n q s ls) (flatS op f true n q s′ ls) refl w ft
+  won-ends p (inOuter op f d n q ls c)         s s′ al (r , w , _) ft =
+    outer-ends p c op f d n q s ls r ft , ends-if p c ((n ≡ᵇ 0) ∧ null q) (flatS op f d n q s ls) (flatS op f true n q s′ ls) refl w ft
   won-ends p (inLanes op f d n [] o pre post c) s s′ al (l , u , w) ft =
     trans (sym al) lv , (λ cl → lane-sides p c op f d n [] o pre post s cl l ft (frag-flat c op f d n [] o (pre ʳ++ s ∷ post) ft))
     , subst (λ b → EndsIf (d ∧ b) p c (flatS op f d (pred n) [] o (pre ʳ++ ended s′ ∷ post))) (sym (∧-identityʳ (pred n ≡ᵇ 0)))
