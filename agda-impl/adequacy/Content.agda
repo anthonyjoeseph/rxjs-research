@@ -17,7 +17,7 @@ module adequacy.Content where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_; [_]; length; reverse; _ʳ++_; map)
-open import Data.List.Properties using (++-identityʳ; map-++; reverse-involutive; ʳ++-defn)
+open import Data.List.Properties using (map-++; ʳ++-defn)
 open import Data.List.Relation.Unary.Any using (Any)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 import Data.List.Relation.Unary.Any as Any
@@ -53,14 +53,14 @@ open import adequacy.Ghost using (module Ghosting)
 open import adequacy.Engine.Drop using (Drops; drop; drops; Dropsˢ; dropˢ; Pass; lift-drops; outer-admits; lane-admits; ≋-⊒; Eraseᴱ; stopᴱ; outᴱ;
   skipᴱ; erasedᴱ; endᴱ; hushᴱ)
 open import adequacy.Engine.Union using (∪-idleᵀ)
-open import adequacy.Engine.Meaning using (M; flagOf; envAt; risen; gh; lane; laneᴹ; lanesL; deadL; outerFrame; lanesFrame; laneRuns;
-  poolRuns; poolT; tailsOn; outerT; lanes-refl; Has; atOut; atEnd; pastOut; _≅_; ≅-refl; ≅-sym;
-  ≅-trans; agree-≅; ≋-by)
-open import adequacy.Engine.Flown using (pool-ended; pool-sorted; all-at; states-length; lanes-sorted)
+open import adequacy.Engine.Meaning using (M; flagOf; envAt; risen; gh; lane; laneᴹ; lanesL; deadL; outerFrame; lanesFrame; poolRuns;
+  poolT; tailsOn; outerT; lanes-refl; Has; atOut; atEnd; pastOut; _≅_; ≅-refl; ≅-sym; ≅-trans;
+  agree-≅; ≋-by)
+open import adequacy.Engine.Flown using (pool-ended; pool-sorted; all-at; states-length; lanes-sorted; begun-runs; begun-pool)
 open import adequacy.Engine.Inv using (Inv; module Inv; module Base; wfI; search-hit; NextInv; inv-next)
 open import adequacy.Engine.Spent using (module Spending)
 open import adequacy.Engine.Kept using (KeptFrom; refocus-agree) renaming (kept to engine-kept)
-open import adequacy.Engine.Above using (rests-++; lanes-runs; pool-runs)
+open import adequacy.Engine.Above using (lanes-runs; pool-runs)
 open import adequacy.Engine.Head using (Frag; Lane) renaming (Lanes to Lanesᴴ)
 open import adequacy.Engine.Keys using (Held)
 open import adequacy.Engine.Pick using (Beat; Beats; module Order; frag-flat; frag-parts; lanes-ʳsplit)
@@ -462,15 +462,6 @@ module Honesty (R : Set) where
   exhaust-admits : ∀ {B} (m : MonotonicList B) ls qs r → (length ls ≡ᵇ 0) ≡ true → admit (flatOp exhaustᶠ) r m ls qs ≡ (enter m r ∷ ls , qs , idle)
   exhaust-admits m []       qs r e = refl
   exhaust-admits m (l ∷ ls) qs r ()
-
-  -- A lane begun ahead of those kept: the merge's lanes, newest first,
-  -- and the pool the kept leave.
-  begun-runs : ∀ {Γ B} (ls : List (St Γ B)) (ρ : U.NEnv Γ) h → h ∷ U.states (lanesL ls) ρ ≡ laneRuns (reverse (reverse ls)) [] true ρ h
-  begun-runs ls ρ h = cong (λ x → h ∷ U.states (lanesL x) ρ) (sym (reverse-involutive ls))
-
-  begun-pool : ∀ {Γ B} (ls : List (St Γ B)) (ρ : U.NEnv Γ) h → poolT (deadL ls) ρ ≡ poolRuns (reverse (reverse ls)) [] true ρ h
-  begun-pool {B = B} ls ρ h rewrite reverse-involutive ls =
-    trans (cong (λ x → U.cutᴺ (U.restsᶜ {B = B} x) ρ) (sym (++-identityʳ (deadL ls)))) (rests-++ (deadL ls) [] ρ)
 
   -- A switch's kill leaves no lane live.
   kill-lanes : ∀ {Γ B} (ls : List (St Γ B)) → Lanesᴴ ls → lanesL (proj₁ (killAll ls)) ≡ []
