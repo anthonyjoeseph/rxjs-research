@@ -14,12 +14,14 @@
 -- body fed the run, or past skips under the source's
 -- (`adequacy.Engine.FedWalk.src-fed`), and so every node of it, owing the source nothing, its
 -- source's run nesting nothing, and after each source skip shows
--- (`adequacy.Engine.Shown.src-body-on`).
+-- (`adequacy.Engine.Shown.src-body-on`).  And each live joiner fed in
+-- order ahead of its rejoined source, joined where its source never keys
+-- (`adequacy.Engine.Trails.join-fed`).
 module quickcheck.KeptDepth where
 
 open import Data.Bool using (Bool; true; false; not; _∧_; _∨_; if_then_else_)
 open import Data.List using (List; []; _∷_; upTo; null) renaming (map to mapL; _++_ to _++L_; _ʳ++_ to _ʳ++L_; reverse to reverseL)
-open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
+open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ; lookup to lookupᴬ)
 open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_; _<ᵇ_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_)
 open import Data.Maybe using (just; nothing)
@@ -40,12 +42,12 @@ open import quickcheck.Ty using (natᵗ)
 open import quickcheck.Quickcheck using (program)
 open import adequacy.Ghost using (module Ghosting)
 open import quickcheck.Spin using (showP)
-open import quickcheck.Placing using (trailsᵇ; flatsᵇ; steadyᵇ; pinsᵇ)
+open import quickcheck.Placing using (trailsᵇ; flatsᵇ; steadyᵇ; pinsᵇ; ownedᵇ; prefixᵇ)
 
 open Driver ℕ using (Step; step; silent; value; complete; drained)
 open Ghosting ℕ using (work; Measure)
 open Machine using (Conf; ⟨_,_,_,_⟩; load; spot; subscribing; absorbed; rising; nx; cp; pend; coldS; top; inOuter; inLanes;
-  plug; closed; alive; search; found; leafM; St; Ctx; Out; mapS; scanS; cutS; lnS; takeS; flatS; connS; inMap; inScan; inCut; inLn;
+  plug; closed; alive; search; found; leafM; St; Ctx; Out; Ev; joinS; mapS; scanS; cutS; lnS; takeS; flatS; connS; inMap; inScan; inCut; inLn;
   inTake; inSrc; inBody; over; own; Mark; outOf; still; shows; cs; CS; free; cpAt; cutAt; overAt; _⊕_)
 open import Data.Maybe using (Maybe)
 open import operation.Key using (Key; _<ᴷ_)
@@ -53,7 +55,7 @@ open import Tree using (Obs; FlatOp)
 open import denotation.MonotonicList.Events using (Timeline)
 open import adequacy.Engine.Head using (cand)
 open import adequacy.Engine.Pick using (past)
-open import adequacy.Engine.Meaning using (mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn; srcState; srcG; srcRun; gh; lane; lanesL; deadL; envAt)
+open import adequacy.Engine.Meaning using (vals; endOf; mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn; srcState; srcG; srcRun; gh; lane; lanesL; deadL; envAt)
 open import adequacy.Engine.Ahead using (shown) renaming (shows to showsᵃ)
 open import denotation.MonotonicList using (head)
 open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
@@ -450,6 +452,79 @@ private
     shapedLᵇ []       ρ = true
     shapedLᵇ (l ∷ ls) ρ = shapedᵇ l ρ ∧ shapedLᵇ ls ρ
 
+  -- `adequacy.Engine.Trails.join-fed`, decided at a live joiner: told its
+  -- end under a head, else joined under a head its source never keys
+  -- under; each value fed headed, at or after what follows it, and past
+  -- it, or clear of it if what follows is a skip.
+  joinFedᵇ : ∀ {Γ A} → Pos → A ∈ Γ → List (Pos × Ev A) → U.NEnv Γ → Bool
+  joinFedᵇ j y ib ρ = joinsᵇ (endOf ib) ∧ fedᵇ′ (vals ib)
+    where
+      hd : Pos → Bool
+      hd (ix _ ∷ _) = true
+      hd _          = false
+
+      extᵇ : Pos → Pos → Bool
+      extᵇ k h = prefixᵇ k h ∧ not (prefixᵇ h k)
+
+      alienPinsᵇ : List Pos → Bool
+      alienPinsᵇ []       = true
+      alienPinsᵇ (k ∷ ks) = not (ownedᵇ j k) ∧ alienPinsᵇ ks
+
+      alienᵇ : ∀ {B} → ℕ → Events B → Bool
+      alienᵇ zero    _           = true
+      alienᵇ (suc n) (out h _ r) = not (ownedᵇ j h) ∧ alienPinsᵇ (pinsᵇ 12 (Events∞.cut r)) ∧ alienᵇ n (Events∞.force r)
+      alienᵇ (suc n) (skip h r)  = not (ownedᵇ j h) ∧ alienPinsᵇ (pinsᵇ 12 (Events∞.cut r)) ∧ alienᵇ n (Events∞.force r)
+      alienᵇ (suc n) (end h)     = not (ownedᵇ j h)
+      alienᵇ (suc n) hush        = true
+
+      joinsᵇ : Maybe Pos → Bool
+      joinsᵇ (just c) = hd c
+      joinsᵇ nothing  = hd j ∧ alienᵇ 30 (lookupᴬ ρ y)
+
+      atopᵇ : ∀ {B} → Pos → Events B → Bool
+      atopᵇ k (out h _ _) = not (h <ᵖ k)
+      atopᵇ k (skip h _)  = not (h <ᵖ k)
+      atopᵇ k (end h)     = not (h <ᵖ k)
+      atopᵇ k hush        = true
+
+      beyondᵇ : ∀ {B} → Pos → Events B → Bool
+      beyondᵇ k (out h _ _) = (k <ᵖ h) ∧ not (extᵇ k h)
+      beyondᵇ k (skip h _)  = (k <ᵖ h) ∧ not (extᵇ k h)
+      beyondᵇ k (end h)     = (k <ᵖ h) ∧ not (extᵇ k h)
+      beyondᵇ k hush        = true
+
+      clearᵇ : ∀ {B} → Pos → Events B → Bool
+      clearᵇ k (out h _ _) = (k <ᵖ h) ∧ not (extᵇ k h)
+      clearᵇ k (skip h _)  = not (extᵇ k h)
+      clearᵇ k (end h)     = (k <ᵖ h) ∧ not (extᵇ k h)
+      clearᵇ k hush        = true
+
+      stepsᵇ : ∀ {B} → Pos → Maybe B → Events B → Bool
+      stepsᵇ q (just _) x = beyondᵇ q x
+      stepsᵇ q nothing  x = clearᵇ q x
+
+      fedᵇ′ : List (Pos × Maybe _) → Bool
+      fedᵇ′ []             = true
+      fedᵇ′ ((q , a) ∷ xs) = hd q ∧ atopᵇ q x ∧ stepsᵇ q a x ∧ fedᵇ′ xs
+        where x = U.fedᴺ xs (U.joined y j (endOf ib) ρ)
+
+  -- Every live joiner fed as `joinFedᵇ` decides, in its environment.
+  mutual
+    joinsWalkᵇ : ∀ {Δ A} → St Δ A → U.NEnv Δ → Bool
+    joinsWalkᵇ (mapS f s)              ρ = joinsWalkᵇ s ρ
+    joinsWalkᵇ (scanS f z s)           ρ = joinsWalkᵇ s ρ
+    joinsWalkᵇ (cutS l a s)            ρ = joinsWalkᵇ s ρ
+    joinsWalkᵇ (lnS b s)               ρ = joinsWalkᵇ s ρ
+    joinsWalkᵇ (takeS i w x s)         ρ = joinsWalkᵇ s ρ
+    joinsWalkᵇ (flatS op f d n p o ls) ρ = joinsWalkᵇ o ρ ∧ joinsWalkLᵇ ls ρ
+    joinsWalkᵇ (connS k o b)           ρ = joinsWalkᵇ o ρ ∧ joinsWalkᵇ b (srcRun (srcG k o) ρ ∷ᴬ ρ)
+    joinsWalkᵇ (joinS j true y ib)     ρ = joinFedᵇ j y ib ρ
+    joinsWalkᵇ _                       ρ = true
+
+    joinsWalkLᵇ : ∀ {Δ A} → List (St Δ A) → U.NEnv Δ → Bool
+    joinsWalkLᵇ []       ρ = true
+    joinsWalkLᵇ (l ∷ ls) ρ = joinsWalkᵇ l ρ ∧ joinsWalkLᵇ ls ρ
+
   -- Unchecked; trails in the run's environment; in the rest's where the
   -- run's holds; placed in the rest's, as the facts are stated.
   trailedᵇ : ∀ {Δ A} → ℕ → Bool → Pos → St Δ A → U.NEnv Δ → U.NEnv Δ → Bool
@@ -534,6 +609,10 @@ private
   rootShapedᵇ : Conf ℕ → Bool
   rootShapedᵇ ⟨ c , s , _ , _ ⟩ = shapedᵇ (plug c s) []ᴬ
 
+  -- Every live joiner of the configuration fed in order.
+  rootJoinsᵇ : Conf ℕ → Bool
+  rootJoinsᵇ ⟨ c , s , _ , _ ⟩ = joinsWalkᵇ (plug c s) []ᴬ
+
   -- Whether every silent step keeps its meaning so, and the longest run
   -- meaning the same.
   mutual
@@ -546,6 +625,7 @@ private
       else if not (linkedᵇ 2 m) then no (best ⊔ run) ("\n  untrailed: an inner source fed the rest not trailing, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (linkedᵇ 3 m) then no (best ⊔ run) ("\n  unplaced: an inner source fed the rest before a position asked of, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (rootShapedᵇ m) then no (best ⊔ run) ("\n  unshaped: a node out of shape, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (rootJoinsᵇ m) then no (best ⊔ run) ("\n  unfed: a joiner's feed out of order or its join not alien, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else next n run best (ls + linkCount m) m (step m)
 
     next : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict
