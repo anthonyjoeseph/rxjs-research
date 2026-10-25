@@ -126,36 +126,37 @@ private
   marksᵇ (a ∷ k) []      = false
   marksᵇ (a ∷ k) (b ∷ n) = samePos (a ∷ []) (b ∷ []) ∧ marksᵇ k n
 
-  -- What a cut leaves running trails the run: its steps in order, none
-  -- before a value coming next nor keyed with it, nor before a skip but
-  -- a step it marks; all past an end and
-  -- none inside it, none keyed where that end would subscribe a lane,
-  -- nor over it; nothing left behind silence.
-  trailᵇ : Events ℕ → Pos → Bool
-  trailᵇ (out n _ _) k = not (k <ᵖ n) ∧ apartᵇ n k
-  trailᵇ (skip n _)  k = not (k <ᵖ n) ∨ marksᵇ k n
-  trailᵇ (end n)     k = (n <ᵖ k) ∧ not (inside n k) ∧ apartᵇ (n ++ [ ix 1 ]) k
-  trailᵇ hush        k = false
+-- What a cut leaves running trails the run: its steps in order, none
+-- before a value coming next nor keyed with it, nor before a skip but
+-- a step it marks; all past an end and
+-- none inside it, none keyed where that end would subscribe a lane,
+-- nor over it; nothing left behind silence.
+trailᵇ : ∀ {A} → Events A → Pos → Bool
+trailᵇ (out n _ _) k = not (k <ᵖ n) ∧ apartᵇ n k
+trailᵇ (skip n _)  k = not (k <ᵖ n) ∨ marksᵇ k n
+trailᵇ (end n)     k = (n <ᵖ k) ∧ not (inside n k) ∧ apartᵇ (n ++ [ ix 1 ]) k
+trailᵇ hush        k = false
 
-  pinsᵇ : ℕ → Tail → List Pos
-  pinsᵇ zero    _         = []
-  pinsᵇ (suc n) (pin k u) = k ∷ pinsᵇ n (Tail∞.later u)
-  pinsᵇ (suc n) idle      = []
+pinsᵇ : ℕ → Tail → List Pos
+pinsᵇ zero    _         = []
+pinsᵇ (suc n) (pin k u) = k ∷ pinsᵇ n (Tail∞.later u)
+pinsᵇ (suc n) idle      = []
 
-  sortedᵇ : List Pos → Bool
-  sortedᵇ (x ∷ y ∷ xs) = not (y <ᵖ x) ∧ sortedᵇ (y ∷ xs)
-  sortedᵇ _            = true
+sortedᵇ : List Pos → Bool
+sortedᵇ (x ∷ y ∷ xs) = not (y <ᵖ x) ∧ sortedᵇ (y ∷ xs)
+sortedᵇ _            = true
 
-  -- And after a value, nothing left running keyed with it.
-  trailsᵇ : ℕ → Events∞ ℕ → Bool
-  trailsᵇ zero    r = true
-  trailsᵇ (suc n) r = sortedᵇ ks ∧ allᵇ (trailᵇ (Events∞.force r)) ks ∧ next (Events∞.force r)
-    where ks = pinsᵇ 12 (Events∞.cut r)
-          next : Events ℕ → Bool
-          next (out x _ r′) = allᵇ (apartᵇ x) (pinsᵇ 12 (Events∞.cut r′)) ∧ trailsᵇ n r′
-          next (skip _ r′)  = trailsᵇ n r′
-          next _            = true
+-- And after a value, nothing left running keyed with it.
+trailsᵇ : ∀ {A} → ℕ → Events∞ A → Bool
+trailsᵇ zero    r = true
+trailsᵇ (suc n) r = sortedᵇ ks ∧ allᵇ (trailᵇ (Events∞.force r)) ks ∧ next (Events∞.force r)
+  where ks = pinsᵇ 12 (Events∞.cut r)
+        next : Events _ → Bool
+        next (out x _ r′) = allᵇ (apartᵇ x) (pinsᵇ 12 (Events∞.cut r′)) ∧ trailsᵇ n r′
+        next (skip _ r′)  = trailsᵇ n r′
+        next _            = true
 
+private
   -- After a value at `x`, nothing later, shown or left running, keys
   -- where a lane admitted at `x` would, nor under it, nor over it.
 
@@ -174,18 +175,18 @@ private
   spreadᵇ (suc n) (skip _ r)  = spreadᵇ n (Events∞.force r)
   spreadᵇ (suc n) _           = true
 
-  -- What a cut leaves running: nothing inside a step before it.
-  flatᵇ : List Pos → Bool
-  flatᵇ []       = true
-  flatᵇ (x ∷ xs) = allᵇ (λ y → not (inside x y)) xs ∧ flatᵇ xs
+-- What a cut leaves running: nothing inside a step before it.
+flatᵇ : List Pos → Bool
+flatᵇ []       = true
+flatᵇ (x ∷ xs) = allᵇ (λ y → not (inside x y)) xs ∧ flatᵇ xs
 
-  flatsᵇ : ℕ → Events∞ ℕ → Bool
-  flatsᵇ zero    r = true
-  flatsᵇ (suc n) r = flatᵇ (pinsᵇ 12 (Events∞.cut r)) ∧ next (Events∞.force r)
-    where next : Events ℕ → Bool
-          next (out _ _ r′) = flatsᵇ n r′
-          next (skip _ r′)  = flatsᵇ n r′
-          next _            = true
+flatsᵇ : ∀ {A} → ℕ → Events∞ A → Bool
+flatsᵇ zero    r = true
+flatsᵇ (suc n) r = flatᵇ (pinsᵇ 12 (Events∞.cut r)) ∧ next (Events∞.force r)
+  where next : Events _ → Bool
+        next (out _ _ r′) = flatsᵇ n r′
+        next (skip _ r′)  = flatsᵇ n r′
+        next _            = true
 
 -- The machine's trace placed against the meaning, and the meaning rising,
 -- steady and keying nothing just past its own events; and what a cut

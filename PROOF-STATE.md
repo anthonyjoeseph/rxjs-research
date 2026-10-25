@@ -10,13 +10,43 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SILENT RUN
 
-Probed (`quickcheck.KeptDepth` checks every link): a live source's body,
-fed its skips, drops leading skips and erases later ones. Refuted over any
-node, so it is the body walked by configuration; untried: that walk's
-connect, asking the trail of an inner source fed the rest, the run of no
-configuration given; a defer's fresh source. Settled when bodies, or refuted.
+Untried: an inner connect's source, fed the rest, leaves running what
+trails it. It is the run of no configuration given: the stepped one's, or
+a relation that cannot erase forever. Settled when a body, or refuted.
 
-Members: `src-fed`, `src-body-on`, `defer-links`.
+Members: `fed-trail`.
+
+#### THE FED MERGE
+
+Refuted over any node: a merge interleaves its parts' relations, and a
+lane it subscribes is related as its outer's value. Probed at every node by
+`quickcheck.KeptDepth`. Settled when a body, or refuted.
+
+Members: `fed-flat`.
+
+#### THE FED TAILS
+
+Untried: a run read through its tail, fed the rest. An erased skip erases
+tail pins too, so the tails' heads need not match; the configuration must
+keep erased pins out of a rested node. Settled when bodies, or refuted.
+
+Members: `fed-cut`, `fed-taken`, `fed-done`, `fed-ended`.
+
+#### THE FED POSITIONS
+
+Untried: the body fed the rest, and each inner source, come after each
+position asked of, and a hushed inner source leaves nothing running.
+Settled when bodies, or refuted.
+
+Members: `src-body-on`, `fed-body-on`, `fed-src-next`.
+
+#### THE FRESH FEED
+
+Untried: a source subscribed fresh, a joiner, and a defer's fresh source,
+fed the rest, relate as the fed source does; an inner source fed the run
+is subscribed where its connect is. Settled when bodies, or refuted.
+
+Members: `fed-fresh`, `fed-join`, `defer-links`, `fed-sourced`.
 
 #### THE CLOSED LANE
 

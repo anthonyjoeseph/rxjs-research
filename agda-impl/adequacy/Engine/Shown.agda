@@ -21,7 +21,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All) renaming (map to allMap; _∷_ to _∷ᴬ_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 
@@ -44,11 +44,12 @@ open import adequacy.Engine.Inv using (Unpended)
 open import adequacy.Engine.Pick using (Beat; past; KAfter; KNotBefore; Lost; body-link; Before; Race; LaneWon; lane-won; race-steps; after-step;
   lane-sides; frag-flat; frag-parts; outer-link)
 open import adequacy.Engine.Ahead using (Ahead; Under; shows; shows-open; shown)
-open import adequacy.Engine.Drop using (Dropsˢ; Pass; SrcPass; Fed; mapped-drops; scanned-drops;
-  took-drops; lanes-drops; body-drops; outer-drops; src-drops; ≋-⊒)
+open import adequacy.Engine.Drop using (Dropsˢ; Pass; SrcPass; mapped-drops; scanned-drops; took-drops; lanes-drops; body-drops;
+  outer-drops; src-drops; ≋-⊒)
 open import adequacy.Engine.Beside using (Sourced; sourced; sourced-≋)
 open import adequacy.Placed.Order using (Atop; Ordered)
 open import adequacy.Placed.Trail using (Trailing)
+open import adequacy.Engine.FedWalk using (Sought; src-fed)
 open import adequacy.Engine.Kept using (outer-plug; lanes-plugʳ; body-plug; live-plug)
 open Agreeˢ
 
@@ -60,11 +61,6 @@ open Agreeˢ
 keyAt : Bool → Pos → Key
 keyAt false q = at q
 keyAt true  q = after q
-
--- The positions a pass is asked of: the skip's own, or any under it.
-Sought : Bool → Pos → (Pos → Set) → Set
-Sought false q P = ∀ k → P k → k ≡ q
-Sought true  q P = ∀ k → P k → Σ Pos λ y → k ≡ q ++ y
 
 postulate
   -- The search finds a node by one of its own marks.
@@ -97,34 +93,6 @@ postulate
                   → Frag (plug c (connS (cs cl true sa ba as nothing r en) o b))
                   → Ordered (Events∞.force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)))
                     × Trailing (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c))
-  -- A SOURCE'S SKIPS FED ITS BODY: the body fed a live source's skips
-  -- drops its own leading skips, each under one of them, and erases none
-  -- or more past them, to the body fed the rest.
-  --
-  -- The route, unwritten: walk the body, every source in scope related,
-  -- the fed one by its drops and each inner one by what the walk proves of
-  -- it.  A joiner rejoins its source's relation under its own position,
-  -- its tails idle; a merge interleaves its parts' relations; a connect
-  -- feeds its body its own source's, by the erasure beside a source
-  -- (`adequacy.Engine.Beside.body-⊒`), which asks the current inner
-  -- source's place and the fed one's trail.  The fed inner source is the
-  -- run of no configuration given here, so its trail is the open part:
-  -- the stepped configuration's, or a relation that cannot erase forever.
-  --
-  -- What the walk reads off this configuration at each node: the body's
-  -- joiners of the source joined before its skip and hold nothing fed, no
-  -- defer there holds a step of it, nothing there is held under the skip,
-  -- and the source's run nests nothing under a skip.
-  --
-  -- REFUTED: 413cf07a over any node and any source, by a source whose value comes before the skip it follows, merged beside a lane that leads: the skip neither leads nor is erasable.
-  -- DEAD ROUTE: the fed inner source's trail read off its relation to the current one, which trails: an erased step spends depth, so endless erased skips leave the rest unconstrained (refuted at f1f7d119).
-  -- RECOVERY: git show 413cf07a^:agda-impl/adequacy/Engine/Shown.agda restores a node owing its source nothing and a run nesting nothing, as definitions over a node, and the node-level statement
-  src-fed : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h h′ : Events∞ X}
-          → Sought v q P → KAfter (after q) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
-          → Before (after q) (own (connS (cs false true sa ba as nothing r en) o b))
-          → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
-          → h ≋ stateᴺ (gh o) (envAt c) → Dropsˢ P h h′
-          → Fed P (stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c))
   -- The body fed the rest comes after each source skip shows.
   src-body-on : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h h′ : Events∞ X}
               → Sought v q P → KAfter (after q) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
