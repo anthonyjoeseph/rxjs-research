@@ -33,7 +33,7 @@
 module adequacy.Engine.Pick where
 
 open import Data.Empty using (⊥)
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (Bool; true; false; if_then_else_; _∨_)
 open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; reverse)
 open import Data.List.Properties using (ʳ++-defn)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
@@ -84,7 +84,7 @@ Clear p a (inTake i q (cutAt r) c)          s = ⊤
 Clear p a (inTake i q (overAt r) c)         s = ⊤
 Clear p a (inOuter op f true n q ls c)      s = ⊥
 Clear p a (inOuter op f false n q ls c)     s =
-  closed c ≡ false → All (λ l → After p (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore p (poolT (deadL ls) (envAt c))
+  closed c ≡ false × All (λ l → After p (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore p (poolT (deadL ls) (envAt c))
 Clear p a (inLanes op f d n q o pre post c) s =
   alive s ≡ true → (closed c ≡ false → Sides p f d o (reverse pre) post (envAt c)) × Clear p a c (flatS op f d n q o (pre ʳ++ s ∷ post))
 Clear p a (inSrc k b c)                     s = over k ≡ false → closed c ≡ false → After (p ⊕ [ ix 0 ]) (headˢ (step (gh b)))
@@ -130,14 +130,19 @@ record LaneWon {R Γ A B} (k : Key) (c : Ctx R Γ B) op (f : A → Obs Timeline 
     olderW : Race KAfter k c op f d n q o [] (reverse pre) (s ∷ post)
     newerW : Race KNotBefore k c op f d n q o (s ∷ pre) post []
 
--- What a completed outer's subtree runs rises no value.
+-- What runs under a completed outer, or where nothing is shown, rises
+-- no value.
 Unrisen : ∀ {A} → Bool → Out A → Set
 Unrisen true (shows (nx a)) = ⊥
 Unrisen _    _              = ⊤
 
+unrisen-open : ∀ {A} b {a : A} → Unrisen b (shows (nx a)) → b ≡ false
+unrisen-open false u = refl
+
 -- Every flatMap above the found node raced it in, each at the key and
--- event its candidate has there, and none of them had completed its
--- outer; every connect's body lost to its source.
+-- event its candidate has there, and a value reaches its outer frame only
+-- shown and before the outer completes; every connect's body lost to its
+-- source.
 Won : ∀ {R Γ A} → Key × Out A → Ctx R Γ A → St Γ A → Set
 Won h       top                                s = ⊤
 Won (k , o) (inMap f c)                        s = Won (mapT f k o) c (mapS f s)
@@ -145,7 +150,7 @@ Won (k , o) (inScan f z c)                     s = Won (scanT f z k o) c (scanS 
 Won (k , o) (inCut l a c)                      s = Won (cutT l k o) c (cutS l a s)
 Won h       (inLn b c)                         s = Won h c (lnS b s)
 Won (k , o) (inTake i q w c)                   s = Won (takeT i q w k o) c (takeS i q w s)
-Won (k , o) (inOuter op f d n q ls c)          s = Race KAfter k c op f d n q s [] ls [] × Won (outerK n q k o) c (flatS op f d n q s ls) × Unrisen d o
+Won (k , o) (inOuter op f d n q ls c)          s = Race KAfter k c op f d n q s [] ls [] × Won (outerK n q k o) c (flatS op f d n q s ls) × Unrisen (d ∨ closed c) o
 Won (k , o) (inLanes op f d n q o′ pre post c) s =
   LaneWon k c op f d n q o′ pre post s × Won (uncurry (laneT d n q) (cutT (alive s) k o)) c (flatS op f d n q o′ (pre ʳ++ s ∷ post))
 Won (k , o) (inSrc kk b c)                     s =
@@ -333,10 +338,12 @@ won-clear p a (inTake i q (cpAt r) c)           s s′ al w ft = tt
 won-clear p a (inTake i q (cutAt r) c)          s s′ al w ft = tt
 won-clear p a (inTake i q (overAt r) c)         s s′ al w ft = tt
 won-clear p a (inOuter op f true n q ls c)      s s′ al (_ , _ , ()) ft
-won-clear p a (inOuter op f false n q ls c)     s s′ al (r , _) ft cl =
-  outer-link c p op f n q s ls ft (race-steps KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) r)
-    (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
-  where parts = frag-parts op f false n q s ls (frag-flat c op f false n q s ls ft)
+won-clear p a (inOuter op f false n q ls c)     s s′ al (r , _ , u) ft =
+  cl , outer-link c p op f n q s ls ft (race-steps KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) r)
+         (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
+  where
+    cl    = unrisen-open (closed c) u
+    parts = frag-parts op f false n q s ls (frag-flat c op f false n q s ls ft)
 won-clear p a (inLanes op f d n q o pre post c) s s′ al (l , w) ft lv =
   (λ cl → lane-sides p c op f d n q o pre post s cl l ft (frag-flat c op f d n q o (pre ʳ++ s ∷ post) ft))
   , won-clear p a c (flatS op f d n q o (pre ʳ++ s ∷ post)) (flatS op f d n q o (pre ʳ++ s′ ∷ post)) refl

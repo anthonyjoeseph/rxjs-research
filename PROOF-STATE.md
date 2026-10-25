@@ -16,9 +16,9 @@ its body fed past the skip, later. A subscribing configuration's order
 carries nothing, so a defer's and a begun lane's pass have no source yet.
 Settled when these are bodies, or refuted.
 
-Members: `outer-begins`, `outer-queues`, `outer-ignores`, `outer-begins-pass`,
-`outer-queues-pass`, `outer-ignores-pass`, `lane-begins`, `lane-begins-pass`,
-`src-pass`, `defer-pass`.
+Members: `outer-begins`, `outer-begins-pass`, `outer-queues-pass`,
+`outer-ignores-pass`, `lane-begins`, `lane-begins-pass`, `src-pass`,
+`defer-pass`.
 
 #### THE STILL'S SUBTREE
 
