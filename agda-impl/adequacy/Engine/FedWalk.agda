@@ -26,9 +26,9 @@ open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans)
 
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; hush; idle; ix)
-open import denotation.MonotonicList using (head; Agree; Agreeᵀ; agree-sym)
+open import denotation.MonotonicList using (head; Agree; Agreeᵀ; agree-sym; agreeᵀ-sym; agree-refl)
 open import denotation.NonExpansive using (Agreeˢ)
-open import denotation.Unfold using (Node; NEnv; meaning; stateᴺ)
+open import denotation.Unfold using (NEnv; meaning; stateᴺ; Source; live; ended)
 open import operation.Key using (after)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ctx; inMap; inScan; inCut; inLn;
@@ -42,8 +42,11 @@ open import adequacy.Engine.Race using (After; NotBefore)
 open import adequacy.Engine.Ahead using (Under; shown)
 open import adequacy.Engine.Beside using (Sourced; body-⊒)
 open import adequacy.Placed.Trail using (Trailing)
-open import adequacy.Engine.Thin using (Thin; Thinᴱ; thinᴱ-refl; drops-thin)
-open import adequacy.Engine.Trails using (thin-src; sorted-thin; shape-src; envAt-sorted)
+open import adequacy.Engine.Trails using (shape-src)
+open import adequacy.Engine.Kept using (sub-settled)
+open import adequacy.Engine.Inv using (Unpended)
+open import adequacy.Env using (NAgree; nagree-refl; meaning-ne; state-ne)
+open import adequacy.Placed.Trail using (trail-≈)
 open import adequacy.Engine.Drop using (Dropsˢ; dropˢ; dropsˢ; Fed; src-alone; body-alone; both; ≋-⊒; mapped-⊒; scanned-⊒; took-⊒;
   mapped-drops; scanned-drops; took-drops)
 open Events∞
@@ -111,28 +114,21 @@ drops-mono : ∀ {A} {Q Q′ : Pos → Set} → (∀ {k} → Q k → Q′ k) →
 drops-mono m (dropˢ p a r)  = dropˢ (m p) a r
 drops-mono m (dropsˢ p a d) = dropsˢ (m p) a (drops-mono m d)
 
--- A node's run past leading skips is its run thinned.
-drops-meaning : ∀ {Γ X P} (n : Node Γ X) {ρ} {h h′ : Events∞ X} → h ≋ stateᴺ n ρ → Dropsˢ P h h′ → Thin (meaning n ρ) (force h′)
-drops-meaning n x d = drops-thin (λ k → agree-sym (nowˢ (x k))) d
+-- A live source not pending runs as its node does, however its body
+-- subscribed it.
+settled-run : ∀ {Γ X} sa ba as r en (o : St Γ X) (ρ : NEnv Γ) → Unpended o
+            → srcRun (srcG (cs false true sa ba as nothing r en) o) ρ ≡ meaning (gh o) ρ
+settled-run sa nothing  as r en o ρ u = refl
+settled-run sa (just p) as r en o ρ u rewrite sub-settled (p ⊕ [ ix 1 ]) o u = refl
 
--- A live source's run past leading skips is its run thinned, unless it is
--- still pending under a body that has subscribed it.
-thin-gh : ∀ {Γ X P} sa ba as r en (o : St Γ X) {ρ} {h h′ : Events∞ X}
-        → (∀ p l → ba ≡ just p → o ≡ pend l → Thin (srcRun (srcG (cs false true sa ba as nothing r en) o) ρ) (force h′))
-        → h ≋ stateᴺ (gh o) ρ → Dropsˢ P h h′ → Thin (srcRun (srcG (cs false true sa ba as nothing r en) o) ρ) (force h′)
-thin-gh sa nothing  as r en o                     f x d = drops-meaning (gh o) x d
-thin-gh sa (just p) as r en (pend l)              f x d = f p l refl refl
-thin-gh sa (just p) as r en (coldS l τ)           f x d = drops-meaning (gh (coldS l τ)) x d
-thin-gh sa (just p) as r en (ofS i q xs)          f x d = drops-meaning (gh (ofS i q xs)) x d
-thin-gh sa (just p) as r en doneS                 f x d = drops-meaning (gh doneS) x d
-thin-gh sa (just p) as r en (mapS g s)            f x d = drops-meaning (gh (mapS g s)) x d
-thin-gh sa (just p) as r en (scanS g z s)         f x d = drops-meaning (gh (scanS g z s)) x d
-thin-gh sa (just p) as r en (cutS l a s)          f x d = drops-meaning (gh (cutS l a s)) x d
-thin-gh sa (just p) as r en (lnS l s)             f x d = drops-meaning (gh (lnS l s)) x d
-thin-gh sa (just p) as r en (takeS i q w s)       f x d = drops-meaning (gh (takeS i q w s)) x d
-thin-gh sa (just p) as r en (flatS op g dn n qs s ls) f x d = drops-meaning (gh (flatS op g dn n qs s ls)) x d
-thin-gh sa (just p) as r en (connS k s t)         f x d = drops-meaning (gh (connS k s t)) x d
-thin-gh sa (just p) as r en (joinS j l y ib)      f x d = drops-meaning (gh (joinS j l y ib)) x d
+-- A source, in environments alike, runs alike.
+srcRun-ne : ∀ {Γ X m} (σ : Source Γ X) {ρ ρ′ : NEnv Γ} → NAgree m ρ ρ′ → Agree m (srcRun σ ρ) (srcRun σ ρ′)
+srcRun-ne (live s)    a = meaning-ne s a
+srcRun-ne (ended e t) a = agree-refl _ _
+
+srcState-ne : ∀ {Γ X m} (σ : Source Γ X) {ρ ρ′ : NEnv Γ} → NAgree m ρ ρ′ → Agreeˢ m (srcState σ ρ) (srcState σ ρ′)
+srcState-ne (live s)    a = state-ne s a
+srcState-ne (ended e t) a = state-ne t a
 
 -- A connect passes its source's relation and its body's, the source
 -- subscribed where it is, the one fed the rest trailing, past every
@@ -162,7 +158,9 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
             (so : Sought v q P) (ka : KAfter (after q) (cand (inBody (cs false true sa ba as nothing r en) o c) b))
             (bf : Before (after q) (own (connS (cs false true sa ba as nothing r en) o b)))
             (ft : Frag (plug c (connS (cs false true sa ba as nothing r en) o b)))
-            (x : h ≋ stateᴺ (gh o) (envAt c)) (d : Dropsˢ P h h′) where
+            (x : h ≋ stateᴺ (gh o) (envAt c)) (d : Dropsˢ P h h′)
+            (o′ : St Γ X) (ft′ : Frag (plug c (connS (cs false true sa ba as nothing r en) o′ b))) (u′ : Unpended o′)
+            (x′ : h′ ≋ stateᴺ (gh o′) (envAt c)) where
 
   -- A context below the fed body.
   data Down : ∀ {Δ C} → Ctx R Δ C → Set₁ where
@@ -176,6 +174,21 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
     dLanes : ∀ {Δ A C op f dn n qs s pre post} {e : Ctx R Δ C} → Down e → Down (inLanes {A = A} op f dn n qs s pre post e)
     dSrc   : ∀ {Δ Y C k t} {e : Ctx R Δ C} → Down e → Down (inSrc {X = Y} k t e)
     dBody  : ∀ {Δ Y C k s} {e : Ctx R Δ C} → Down e → Down (inBody {X = Y} k s e)
+
+  -- The context below in the stepped tree: the source stepped, the body
+  -- as it stands.
+  rebase : ∀ {Δ C} {e : Ctx R Δ C} → Down e → Ctx R Δ C
+  rebase base                                                         = inBody (cs false true sa ba as nothing r en) o′ c
+  rebase (dMap {f = f} dd)                                            = inMap f (rebase dd)
+  rebase (dScan {f = f} {z = z} dd)                                   = inScan f z (rebase dd)
+  rebase (dCut {l = l} {a = a} dd)                                    = inCut l a (rebase dd)
+  rebase (dLn {l = l} dd)                                             = inLn l (rebase dd)
+  rebase (dTake {i = i} {p = p} {w = w} dd)                           = inTake i p w (rebase dd)
+  rebase (dOuter {op = op} {f = f} {dn = dn} {n = n} {qs = qs} {ls = ls} dd) = inOuter op f dn n qs ls (rebase dd)
+  rebase (dLanes {op = op} {f = f} {dn = dn} {n = n} {qs = qs} {s = s} {pre = pre} {post = post} dd) =
+    inLanes op f dn n qs s pre post (rebase dd)
+  rebase (dSrc {k = k} {t = t} dd)                                    = inSrc k t (rebase dd)
+  rebase (dBody {k = k} {s = s} dd)                                   = inBody k s (rebase dd)
 
   -- The environment below, the fed source's run given.
   envOf : ∀ {Δ C} {e : Ctx R Δ C} → Events X → Down e → NEnv Δ
@@ -231,9 +244,6 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
     -- Hushed, it leaves nothing running; its next shows no earlier than
     -- any position asked of (as `adequacy.Engine.Shown.src-next` at the
     -- fed source).
-    -- A SOURCE STILL PENDING under a body that has subscribed it: the
-    -- connect reads it subscribed, though the run it fed was the pending one's.
-    thin-fed-sub : ∀ p l → ba ≡ just p → o ≡ pend l → Thin (srcRun (srcG (cs false true sa ba as nothing r en) o) (envAt c)) (force h′)
     fed-src-next : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa ba as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
                  → Frag (plug e (connS (cs cl true sa ba as nothing r en) s t))
                  → (force (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd)) ≡ hush
@@ -246,34 +256,33 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
                 → ∀ k → Under P k → After (k ++ [ ix 0 ])
                     (head (force (stateᴺ (gh t) (srcRun (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd) ∷ᴬ envOf (force h′) dd))))
 
-  -- THE SOURCE'S RUN FED THE REST is its run in the stepped environment,
-  -- thinned.
-  thin-fed : Thin (srcRun (srcG (cs false true sa ba as nothing r en) o) (envAt c)) (force h′)
-  thin-fed = thin-gh sa ba as r en o thin-fed-sub x d
-
-  -- The environment fed the rest, the stepped one's thinned.
-  thin-env : ∀ {Δ C} {e : Ctx R Δ C} (dd : Down e) (s : St Δ C) → Frag (plug e s) → Thinᴱ (envAt e) (envOf (force h′) dd)
-  thin-env base                         s fs = thin-fed , thinᴱ-refl (envAt c)
-  thin-env (dMap {f = f} dd)            s fs = thin-env dd (mapS f s) fs
-  thin-env (dScan {f = f} {z = z} dd)       s fs = thin-env dd (scanS f z s) fs
-  thin-env (dCut {l = l} {a = a} dd)        s fs = thin-env dd (cutS l a s) fs
-  thin-env (dLn {l = l} dd)             s fs = thin-env dd (lnS l s) fs
-  thin-env (dTake {i = i} {p = p} {w = w} dd)   s fs = thin-env dd (takeS i p w s) fs
-  thin-env (dOuter {op = op} {f = f} {dn = dn} {n = n} {qs = qs} {ls = ls} dd) s fs = thin-env dd (flatS op f dn n qs s ls) fs
-  thin-env (dLanes {op = op} {f = f} {dn = dn} {n = n} {qs = qs} {s = o′} {pre = pre} {post = post} dd) s fs = thin-env dd (flatS op f dn n qs o′ (pre ʳ++ s ∷ post)) fs
-  thin-env (dSrc {k = k} {t = t} dd)        s fs = thin-env dd (connS k s t) fs
-  thin-env {e = inBody k o′ e} (dBody dd) s fs = thin-src e k o′ s fs th , th
-    where th = thin-env dd (connS k o′ s) fs
+  -- THE ENVIRONMENT FED THE REST is the stepped tree's.
+  env-agree : ∀ m {Δ C} {e : Ctx R Δ C} (dd : Down e) → NAgree m (envOf (force h′) dd) (envAt (rebase dd))
+  env-agree m base =
+    subst (Agree m (force h′)) (sym (settled-run sa ba as r en o′ (envAt c) u′)) (nowˢ (x′ m)) , nagree-refl m (envAt c)
+  env-agree m (dMap dd)                 = env-agree m dd
+  env-agree m (dScan dd)                = env-agree m dd
+  env-agree m (dCut dd)                 = env-agree m dd
+  env-agree m (dLn dd)                  = env-agree m dd
+  env-agree m (dTake dd)                = env-agree m dd
+  env-agree m (dOuter dd)               = env-agree m dd
+  env-agree m (dLanes dd)               = env-agree m dd
+  env-agree m (dSrc dd)                 = env-agree m dd
+  env-agree m (dBody {k = k} {s = s} dd) = srcRun-ne (srcG k s) (env-agree m dd) , env-agree m dd
 
   -- AN INNER SOURCE FED THE REST: what it leaves running trails it.
   --
-  -- DEAD ROUTE: the fed inner source's trail read off its relation to the current one, which trails: an erased step spends depth, so endless erased skips leave the rest unconstrained (refuted at f1f7d119).
+  -- It is the stepped tree's inner source, read in that tree's own
+  -- environment.
+  --
+  -- DEAD ROUTE: the fed inner source's trail read off its relation to the current one, which trails: an erased step spends depth, so endless erased skips leave the rest unconstrained (refuted at f1f7d119); likewise read off the current environment thinned.
   fed-trail : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa ba as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
-            → Frag (plug e (connS (cs cl true sa ba as nothing r en) s t))
+            → Frag (plug (rebase dd) (connS (cs cl true sa ba as nothing r en) s t))
             → Trailing (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd))
-  fed-trail {e = e} dd cl sa ba as r en s t fs =
-    proj₂ (shape-src e (cs cl true sa ba as nothing r en) s t fs th (sorted-thin (envAt-sorted e (connS (cs cl true sa ba as nothing r en) s t) fs) th))
-    where th = thin-env dd (connS (cs cl true sa ba as nothing r en) s t) fs
+  fed-trail dd cl sa ba as r en s t fs′ =
+    trail-≈ _ _ _ _ (λ n → agree-sym (nowˢ (g n))) (λ n → agreeᵀ-sym (cutˢ (g n))) (proj₂ (shape-src (rebase dd) k s t fs′))
+    where k = cs cl true sa ba as nothing r en
+          g = λ n → srcState-ne (srcG k s) (env-agree n dd)
 
   -- A source subscribed at its body's mark: fresh, or as it stands.
   sub-fed : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa p as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
@@ -295,6 +304,7 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
   -- A live connect, its source live or closed, beside its body.
   live-fed : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa ba as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
            → Frag (plug e (connS (cs cl true sa ba as nothing r en) s t))
+           → Frag (plug (rebase dd) (connS (cs cl true sa ba as nothing r en) s t))
            → Fed P (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h) dd))
                    (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd))
            → FedAt (dBody {k = cs cl true sa ba as nothing r en} {s} dd) t
@@ -302,52 +312,54 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
                      (stateᴺ (gh t) (envOf (force h) (dBody {k = cs cl true sa ba as nothing r en} {s} dd))))
                    (bodyConn r (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd))
                      (stateᴺ (gh t) (envOf (force h′) (dBody {k = cs cl true sa ba as nothing r en} {s} dd))))
-  live-fed dd cl sa ba as r en s t fs σ β =
-    conn-fed r (fed-sourced dd cl sa ba as r en s t fs) (fed-trail dd cl sa ba as r en s t fs)
+  live-fed dd cl sa ba as r en s t fs fs′ σ β =
+    conn-fed r (fed-sourced dd cl sa ba as r en s t fs) (fed-trail dd cl sa ba as r en s t fs′)
       (proj₁ nx) (proj₂ nx) (fed-body-on dd cl sa ba as r en s t fs) σ β
     where nx = fed-src-next dd cl sa ba as r en s t fs
 
   -- A CONNECT feeds its body its own source's relation.
   fed-conn : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) k (s : St Δ Y) (t : St (Y ∷ Δ) C) → Frag (plug e (connS k s t))
+           → Frag (plug (rebase dd) (connS k s t))
            → FedAt dd s → FedAt (dBody {k = k} {s} dd) t → FedAt dd (connS k s t)
-  fed-conn dd k@(cs cl sl sa ba as (just w) r en) s t fs is it = fed-done dd k s t owed fs is it
-  fed-conn dd k@(cs cl false sa ba as nothing r en) s t fs is it = fed-done dd k s t off fs is it
-  fed-conn dd (cs false true sa nothing as nothing r en) s t fs is it =
-    fed-by refl refl refl refl (live-fed dd false sa nothing as r en s t fs is it)
-  fed-conn dd (cs true true sa nothing as nothing r en) s t fs is it =
-    fed-by refl refl refl refl (live-fed dd true sa nothing as r en s t fs (fed-ended dd sa as r en s t fs is) it)
-  fed-conn dd (cs cl true sa (just p) as nothing r en) s t fs is it =
-    fed-by refl refl refl refl (live-fed dd cl sa (just p) as r en s t fs (sub-fed dd cl sa p as r en s t fs is) it)
+  fed-conn dd k@(cs cl sl sa ba as (just w) r en) s t fs fs′ is it = fed-done dd k s t owed fs is it
+  fed-conn dd k@(cs cl false sa ba as nothing r en) s t fs fs′ is it = fed-done dd k s t off fs is it
+  fed-conn dd (cs false true sa nothing as nothing r en) s t fs fs′ is it =
+    fed-by refl refl refl refl (live-fed dd false sa nothing as r en s t fs fs′ is it)
+  fed-conn dd (cs true true sa nothing as nothing r en) s t fs fs′ is it =
+    fed-by refl refl refl refl (live-fed dd true sa nothing as r en s t fs fs′ (fed-ended dd sa as r en s t fs is) it)
+  fed-conn dd (cs cl true sa (just p) as nothing r en) s t fs fs′ is it =
+    fed-by refl refl refl refl (live-fed dd cl sa (just p) as r en s t fs fs′ (sub-fed dd cl sa p as r en s t fs is) it)
 
   mutual
-    walk : ∀ {Δ C} {e : Ctx R Δ C} (dd : Down e) (s : St Δ C) → Frag (plug e s) → FedAt dd s
-    walk dd (pend p)                  fs = inj₁ (≋-⊒ (≋-by refl refl))
-    walk dd (coldS l (ending p))      fs = inj₁ (≋-⊒ (≋-by refl refl))
-    walk dd (coldS true (play τ u i t fr)) fs = inj₁ (≋-⊒ (≋-by refl refl))
-    walk dd (coldS false (play τ u i t fr)) fs = inj₁ (≋-⊒ (≋-by refl refl))
-    walk dd (coldS l over)            fs = inj₁ (≋-⊒ (≋-by refl refl))
-    walk dd (ofS i p xs)              fs = inj₁ (≋-⊒ (≋-by refl refl))
-    walk dd doneS                     fs = inj₁ (≋-⊒ (≋-by refl refl))
-    walk dd (mapS f s)                fs = fed-by refl refl refl refl (fed-map f (walk (dMap dd) s fs))
-    walk dd (scanS f z s)             fs = fed-by refl refl refl refl (fed-scan f z (walk (dScan dd) s fs))
-    walk dd (cutS true a s)           fs = walk (dCut dd) s fs
-    walk dd (cutS false a s)          fs = fed-cut dd a s fs (walk (dCut dd) s fs)
-    walk dd (lnS l s)                 fs = walk (dLn dd) s fs
-    walk dd (takeS i p free s)        fs = fed-by refl refl refl refl (fed-took i p (walk (dTake dd) s fs))
-    walk dd (takeS i p (cpAt k) s)    fs = fed-taken dd i p (cpAt k) s fs (walk (dTake dd) s fs)
-    walk dd (takeS i p (cutAt k) s)   fs = fed-taken dd i p (cutAt k) s fs (walk (dTake dd) s fs)
-    walk dd (takeS i p (overAt k) s)  fs = fed-taken dd i p (overAt k) s fs (walk (dTake dd) s fs)
-    walk dd (flatS op f dn n qs s ls) fs = fed-flat dd op f dn n qs s ls fs (walk (dOuter dd) s fs) (walkLanes dd op f dn n qs s [] ls fs)
-    walk dd (connS k s t)             fs = fed-conn dd k s t fs (walk (dSrc dd) s fs) (walk (dBody dd) t fs)
-    walk dd (joinS j false y ib)      fs = inj₁ (≋-⊒ (≋-by refl refl))
-    walk dd (joinS j true y ib)       fs = fed-join dd j y ib fs
+    walk : ∀ {Δ C} {e : Ctx R Δ C} (dd : Down e) (s : St Δ C) → Frag (plug e s) → Frag (plug (rebase dd) s) → FedAt dd s
+    walk dd (pend p)                  fs fs′ = inj₁ (≋-⊒ (≋-by refl refl))
+    walk dd (coldS l (ending p))      fs fs′ = inj₁ (≋-⊒ (≋-by refl refl))
+    walk dd (coldS true (play τ u i t fr)) fs fs′ = inj₁ (≋-⊒ (≋-by refl refl))
+    walk dd (coldS false (play τ u i t fr)) fs fs′ = inj₁ (≋-⊒ (≋-by refl refl))
+    walk dd (coldS l over)            fs fs′ = inj₁ (≋-⊒ (≋-by refl refl))
+    walk dd (ofS i p xs)              fs fs′ = inj₁ (≋-⊒ (≋-by refl refl))
+    walk dd doneS                     fs fs′ = inj₁ (≋-⊒ (≋-by refl refl))
+    walk dd (mapS f s)                fs fs′ = fed-by refl refl refl refl (fed-map f (walk (dMap dd) s fs fs′))
+    walk dd (scanS f z s)             fs fs′ = fed-by refl refl refl refl (fed-scan f z (walk (dScan dd) s fs fs′))
+    walk dd (cutS true a s)           fs fs′ = walk (dCut dd) s fs fs′
+    walk dd (cutS false a s)          fs fs′ = fed-cut dd a s fs (walk (dCut dd) s fs fs′)
+    walk dd (lnS l s)                 fs fs′ = walk (dLn dd) s fs fs′
+    walk dd (takeS i p free s)        fs fs′ = fed-by refl refl refl refl (fed-took i p (walk (dTake dd) s fs fs′))
+    walk dd (takeS i p (cpAt k) s)    fs fs′ = fed-taken dd i p (cpAt k) s fs (walk (dTake dd) s fs fs′)
+    walk dd (takeS i p (cutAt k) s)   fs fs′ = fed-taken dd i p (cutAt k) s fs (walk (dTake dd) s fs fs′)
+    walk dd (takeS i p (overAt k) s)  fs fs′ = fed-taken dd i p (overAt k) s fs (walk (dTake dd) s fs fs′)
+    walk dd (flatS op f dn n qs s ls) fs fs′ = fed-flat dd op f dn n qs s ls fs (walk (dOuter dd) s fs fs′) (walkLanes dd op f dn n qs s [] ls fs fs′)
+    walk dd (connS k s t)             fs fs′ = fed-conn dd k s t fs fs′ (walk (dSrc dd) s fs fs′) (walk (dBody dd) t fs fs′)
+    walk dd (joinS j false y ib)      fs fs′ = inj₁ (≋-⊒ (≋-by refl refl))
+    walk dd (joinS j true y ib)       fs fs′ = fed-join dd j y ib fs
 
     -- A flatMap's lanes, those before nearest first.
     walkLanes : ∀ {Δ A C} {e : Ctx R Δ C} (dd : Down e) op (f : A → _) dn n qs (s : St Δ A) (pre post : List (St Δ C))
-              → Frag (plug e (flatS op f dn n qs s (pre ʳ++ post))) → All (FedAt dd) post
-    walkLanes dd op f dn n qs s pre []         fs = []ᴬ
-    walkLanes dd op f dn n qs s pre (l ∷ post) fs =
-      walk (dLanes {pre = pre} {post} dd) l fs ∷ᴬ walkLanes dd op f dn n qs s (l ∷ pre) post fs
+              → Frag (plug e (flatS op f dn n qs s (pre ʳ++ post))) → Frag (plug (rebase dd) (flatS op f dn n qs s (pre ʳ++ post)))
+              → All (FedAt dd) post
+    walkLanes dd op f dn n qs s pre []         fs fs′ = []ᴬ
+    walkLanes dd op f dn n qs s pre (l ∷ post) fs fs′ =
+      walk (dLanes {pre = pre} {post} dd) l fs fs′ ∷ᴬ walkLanes dd op f dn n qs s (l ∷ pre) post fs fs′
 
 -- A SOURCE'S SKIPS FED ITS BODY: the body fed a live source's skips
 -- drops its own leading skips, each under one of them, and erases none
@@ -357,5 +369,7 @@ src-fed : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b
         → Before (after q) (own (connS (cs false true sa ba as nothing r en) o b))
         → Frag (plug c (connS (cs false true sa ba as nothing r en) o b))
         → h ≋ stateᴺ (gh o) (envAt c) → Dropsˢ P h h′
+        → (o′ : St Γ X) → Frag (plug c (connS (cs false true sa ba as nothing r en) o′ b)) → Unpended o′ → h′ ≋ stateᴺ (gh o′) (envAt c)
         → Fed P (stateᴺ (gh b) (force h ∷ᴬ envAt c)) (stateᴺ (gh b) (force h′ ∷ᴬ envAt c))
-src-fed v q c sa ba as r en o b so ka bf ft x d = Walk.walk v q c sa ba as r en o b so ka bf ft x d (Walk.base) b ft
+src-fed v q c sa ba as r en o b so ka bf ft x d o′ ft′ u′ x′ =
+  Walk.walk v q c sa ba as r en o b so ka bf ft x d o′ ft′ u′ x′ (Walk.base) b ft ft′
