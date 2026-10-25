@@ -21,10 +21,11 @@ Members: `shape-conn`, `shape-flat`, `shape-join`, `shape-take`, `shape-sub`.
 #### THE THINNED ENVIRONMENT
 
 Untried: a sorted environment thinned is sorted; a source's run in a
-thinned environment is its run there thinned; the source's run fed the
-rest is its stepped run thinned. Settled when bodies, or refuted.
+thinned environment is its run there thinned; a source still pending under
+a body that has subscribed it, fed the rest, is its subscribed run thinned.
+Settled when bodies, or refuted.
 
-Members: `sorted-thin`, `thin-src`, `thin-fed`.
+Members: `sorted-thin`, `thin-src`, `thin-fed-sub`.
 
 #### THE FED MERGE
 
