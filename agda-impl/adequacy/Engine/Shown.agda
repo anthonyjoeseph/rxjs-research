@@ -44,7 +44,8 @@ open import adequacy.Engine.Pick using (Beat; past; KAfter; KNotBefore; Lost; bo
   lane-sides; frag-flat; frag-parts; outer-link)
 open import adequacy.Engine.Ahead using (Ahead; Under; shows; shows-open; shown)
 open import adequacy.Engine.Drop using (Dropsˢ; Pass; SrcPass; Fed; mapped-drops; scanned-drops;
-  took-drops; lanes-drops; body-drops; outer-drops; src-drops; ≋-⊒; Sourced; sourced; sourced-≋)
+  took-drops; lanes-drops; body-drops; outer-drops; src-drops; ≋-⊒)
+open import adequacy.Engine.Beside using (Sourced; sourced; sourced-≋)
 open import adequacy.Placed.Order using (Atop; Ordered)
 open import adequacy.Placed.Trail using (Trailing)
 open import adequacy.Engine.Kept using (outer-plug; lanes-plugʳ; body-plug; live-plug)

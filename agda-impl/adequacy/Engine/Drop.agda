@@ -57,10 +57,7 @@ open import adequacy.Engine.Erase using (Eraseᵀ; Erase; Lead⁼; _,ᵉ_; cut�
   endᵉ; hushᵉ; outᴸ; skipᴸ; endᴸ; hushᴸ; eraseᵀ-agree; erase-agree; lead-agree; lead-head;
   below-on; map-erase; map-lead)
 open import adequacy.Engine.Merge using (lanes-⊒; outer-⊒)
-open import adequacy.Placed.Order using (Atop; Ordered; ordered)
-open import adequacy.Placed.Trail using (Trailing; trail; trail-≈)
-open import adequacy.Placed.Keys using (atop-agree; ordered-≈)
-open import adequacy.Placed.Rising using (atop-weaken)
+open import adequacy.Engine.Beside using (Sourced; sourced-skip; body-⊒; after-before)
 open Events∞
 open Tail∞
 open import denotation.NonExpansive using (Agreeˢ)
@@ -160,29 +157,6 @@ skip-≋ x (suc n) = skip⁼ (cutˢ (x n)) (nowˢ (x n))
 
 ------------------------------------------------------------------------
 -- What each frame asks of the skips it passes
-
--- A source subscribed at `r`: its next no earlier, its run in order, and
--- what it leaves running trailing it.
-record Sourced {X : Set} (r : Pos) (σ : Events∞ X) : Set where
-  constructor sourced
-  field
-    srcAtop  : Atop r (force σ)
-    srcOrd   : Ordered (force σ)
-    srcTrail : Trailing σ
-
--- So past a skip it agrees with.
-sourced-skip : ∀ {X r k} {σ σ₁ : Events∞ X} → Sourced r σ → (∀ n → Agree n (force σ) (skip k σ₁)) → Sourced r σ₁
-sourced-skip {r = r} {k} {σ} {σ₁} (sourced a o t) ag =
-  sourced (atop-weaken k r (force σ₁) (atop-agree (ag 1) a) (proj₁ (ordered o′))) (proj₂ (ordered o′)) (proj₂ (proj₂ (trail t′)))
-  where
-    o′ = ordered-≈ (force σ) (skip k σ₁) ag o
-    t′ = trail-≈ (force σ) (skip k σ₁) (cut σ) (cut σ) ag (λ n → agreeᵀ-refl n (cut σ)) t
-
--- And so is what agrees with one.
-sourced-≋ : ∀ {X r} {σ σ′ : Events∞ X} → σ ≋ σ′ → Sourced r σ′ → Sourced r σ
-sourced-≋ {σ = σ} {σ′} x (sourced a o t) =
-  sourced (atop-agree (agree-sym (nowˢ (x 1))) a) (ordered-≈ (force σ′) (force σ) (λ n → agree-sym (nowˢ (x n))) o)
-    (trail-≈ (force σ′) (force σ) (cut σ′) (cut σ) (λ n → agree-sym (nowˢ (x n))) (λ n → agreeᵀ-sym (cutˢ (x n))) t)
 
 -- The body fed the run and the body fed the rest: the one the other with
 -- skips erased, or past its leading skips first, each under one of the
@@ -326,16 +300,6 @@ scanned-⊒ g z {h} (l , u , e) = scan-lead g z l , (λ eq → u (scan-hush g z 
 
 took-⊒ : ∀ {A} i (q : A → Bool) {h h′ : Events∞ A} → h ⊒ h′ → took i q h ⊒ took i q h′
 took-⊒ i q {h} (l , u , e) = took-lead i q l , (λ eq → u (took-hush i q (force h) eq)) , λ n → cutᵉ (e n) ,ᵉ took-erase i q (nowᵉ (e n))
-
--- THE ERASURE, AT A CONNECT: a body and its source each fed a run with
--- skips erased run with skips erased, the next kept, the source fed one
--- subscribed where the connect is.
---
--- REFUTED: 71fa7920 without each premise of `Sourced`: a tail pinned
---   before an erased skip, an erased skip outside the burst between two
---   inside it, and an erased skip before the subscription.
-postulate
-  body-⊒    : ∀ {X B} r {σ σ′ : Events∞ X} {β β′ : Events∞ B} → Sourced r σ → σ ⊒ σ′ → β ⊒ β′ → bodyConn r σ β ⊒ bodyConn r σ′ β′
 
 ------------------------------------------------------------------------
 -- Each frame passes the skips
@@ -521,12 +485,6 @@ private
 
   on-head : ∀ {B q} {β β′ : Events∞ B} → β ⊒ β′ → After q (head (force β′)) → After q (head (force β))
   on-head {q = q} x a = subst (After q) (sym (lead-head (proj₁ x))) a
-
-  after-before : ∀ {B} q (e : Events B) → After q (head e) → M′.before q e ≡ true
-  after-before q (out k a r) a′ = a′
-  after-before q (skip k r)  a′ = a′
-  after-before q (end k)     a′ = a′
-  after-before q hush        a′ = refl
 
   -- The source's skip shows first.
   src-ahead : ∀ {X B} r (β : Events∞ B) (σ : Events∞ X) k σ₁ b → b ≡ true
