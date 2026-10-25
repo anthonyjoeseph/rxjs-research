@@ -26,11 +26,11 @@ open import Relation.Nullary using (¬_)
 open import Tree using (Obs)
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Tail; Timeline; out; end; ix; last; _<ᵖ_; _∪_)
 open import denotation.MonotonicList using (MonotonicList; taking)
-open import denotation.Unfold using (Node; NEnv; stateᴺ; states; outerᴺ; endingᶜ; takeWhileᶜ)
+open import denotation.Unfold using (Node; NEnv; stateᴺ; states; outerᴺ; endingᶜ; takeWhileᶜ; restᶜ)
 open import operation.PureObservable using (module Machine)
-open Machine using (St; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; CS; Conf; ⟨_,_,_,_⟩; nx; cpAt; _⊕_)
+open Machine using (St; Ev; nx; cp; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; CS; Conf; ⟨_,_,_,_⟩; free; cpAt; cutAt; overAt; _⊕_)
 open import adequacy.Engine.Meaning using (_≋_; ≋-by; ≋-out; mapped; scanned; switched; taking∞; took; rested; outerFrame; lanesFrame; srcFrame; bodyFrame;
-  lane; lanesL; deadL; poolT; outerT; outerG; laneRuns; poolRuns; gh; envAt; hole; flagOf; risen)
+  lane; lanesL; deadL; poolT; outerT; outerG; laneRuns; poolRuns; gh; envAt; hole; flagOf; risen; endingAt)
   renaming (outerOf to outerOfᴹ)
 open import adequacy.Engine.Keys using (Shape; Shape′; TakeAt; FlatAt; ConnAt; Keyed; KeyedL; Keys; srcIn)
 open import adequacy.Placed.Order using (Headed; Disjoint; Ext; every; everyT-mono)
@@ -100,10 +100,6 @@ postulate
   -- Every frame above a hole keeping its own of the run the hole's ghost
   -- gives it, and the hole its own: the whole tree keyed.
   keys-above : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Above c (flagOf s) (stateᴺ (gh s) (envAt c)) → Keyed s (envAt c) → Keys (plug c s)
-  -- Every frame above a hole keeping its own of a value rising out of it
-  -- keeps its own of the hole's ghost past the value.
-  keys-past : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) a p → Above c (flagOf s) (risen (gh s) (envAt c) (nx a) p) → Keyed s (envAt c)
-            → Keys (plug c s)
   -- A position not before a disjoint one: one past its last child is
   -- after it, apart from it, and no prefix of it.
   past-last : ∀ p k → k <ᵖ p ≡ false → Disjoint p k → (p ++ [ last ]) <ᵖ k ≡ true × Disjoint ((p ++ [ last ]) ++ [ ix 1 ]) k × ¬ Ext (p ++ [ last ]) k
@@ -132,3 +128,24 @@ take-incl q n ρ a p e = ≋-out (cong (λ b → taking true q p a b (stateᴺ n
 take-excl : ∀ {Γ A} (q : A → Bool) (n : Node Γ A) (ρ : NEnv Γ) a p → q a ≡ false
           → took false q (risen n ρ (nx a) p) ≋ stateᴺ (endingᶜ (p ⊕ [ last ]) n) ρ
 take-excl q n ρ a p e = ≋-by (cong (λ b → taking false q p a b (stateᴺ n ρ)) e) refl
+
+------------------------------------------------------------------------
+-- A frame already over
+
+-- What a node leaves running, read past a value rising out of it, is
+-- what it leaves running.
+rested-risen : ∀ {Γ A B} (n : Node Γ A) (ρ : NEnv Γ) e p → rested {B = B} (risen n ρ e p) ≋ stateᴺ (restᶜ n) ρ
+rested-risen n ρ (nx a) p = ≋-by refl refl
+rested-risen n ρ cp     p = ≋-by refl refl
+
+ending-risen : ∀ {Γ A} q (n : Node Γ A) (ρ : NEnv Γ) (e : Ev A) p → endingAt q (risen n ρ e p) ≋ stateᴺ (endingᶜ q n) ρ
+ending-risen q n ρ (nx a) p = ≋-by refl refl
+ending-risen q n ρ cp     p = ≋-by refl refl
+
+-- A takeWhile's own reads only what its source leaves running.
+takeAt-risen : ∀ {Γ A} w (n : Node Γ A) (ρ : NEnv Γ) e p → TakeAt w (risen n ρ e p) → TakeAt w (stateᴺ n ρ)
+takeAt-risen (cpAt k)   n ρ (nx a) p t = t
+takeAt-risen (cpAt k)   n ρ cp     p t = t
+takeAt-risen free       n ρ e      p t = tt
+takeAt-risen (cutAt k)  n ρ e      p t = tt
+takeAt-risen (overAt k) n ρ e      p t = tt

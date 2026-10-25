@@ -59,7 +59,7 @@ open import adequacy.Engine.Meaning using (gh; poolG; lanesL; deadL; poolT; oute
 open import adequacy.Engine.Race using (NotBefore; After; TailNotBefore)
 open import adequacy.Engine.Head using (Frag; Lanes; Lane; Agrees; exact; early; HeadAt; cand; pool-step; at-<ᵖ; <≮ᴷ; ≮ᴷ-trans)
 open import adequacy.Engine.Head.Agrees using (head-agrees)
-open import adequacy.Engine.Keys using (Held)
+open import adequacy.Engine.Keys using (Keyed; Keys)
 open import adequacy.Engine.Above using (Flight)
 open import adequacy.Engine.Ahead using (Sides; Ahead; Under; shown; shows-open) renaming (shows to showsᶜ)
 
@@ -131,6 +131,17 @@ Lead ⟨ c , s , absorbed , p ⟩      = ⊤
 
 whole : ∀ {R} → Conf R → St [] R
 whole ⟨ c , s , m , p ⟩ = plug c s
+
+-- What a configuration keeps of its positions: where a value rises, its
+-- hole's own, the frames above keeping theirs of the run the value is in
+-- (`Flight`), not of the ghost that has dropped it; else the whole tree's.
+KeysAt : ∀ {R} → Conf R → Set
+KeysAt ⟨ c , s , rising e , p ⟩    = Keyed s (envAt c)
+KeysAt ⟨ c , s , subscribing , p ⟩ = Keys (plug c s)
+KeysAt ⟨ c , s , absorbed , p ⟩    = Keys (plug c s)
+
+Shaped : ∀ {R} → Conf R → Set
+Shaped k = Frag (whole k) × KeysAt k
 
 ------------------------------------------------------------------------
 -- The engine's race, as the winner's frames saw it
@@ -245,7 +256,7 @@ Searched ⟨ c , s , rising e , p ⟩    = ⊤
 record Order {R} (k : Conf R) : Set where
   constructor order
   field
-    shape  : Held (whole k)
+    shape  : Shaped k
     flight : Flight k
     lead   : Lead k
     apart  : Searched k

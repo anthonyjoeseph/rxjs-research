@@ -11,12 +11,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE FLIGHT KEPT
 
 Untried: every frame above a hole keeps its positional facts against the
-hole's run, its event in flight put back (`adequacy.Engine.Above.Flight`),
-and still against the ghost once a value in flight is dropped. Holds only if
-each ancestor's facts survive its child's run losing its head. Settled by
-`keys-past` as a body, or a kept-depth probe of it.
+hole's run, its event in flight put back (`adequacy.Engine.Above.Flight`); a
+rising configuration keeps only its hole's own beside it
+(`adequacy.Engine.Pick.KeysAt`). Holds only if a value leaving a lane or a
+body leaves its merge or connect keyed without it, and a rise re-reads every
+frame above at the run it moves to. Settled by `rise-body-keys` as a body
+(its connect's facts over a body losing its head), then `flight-next`.
 
-Members: `keys-past`, `flight-next`, `flight-load`, `flight-held`.
+Members: `rise-lane-keys`, `rise-body-keys`, `flight-next`, `flight-load`, `flight-held`.
 
 #### THE KEYS KEPT
 
@@ -26,9 +28,8 @@ the flight. A begin turns an idle hole into a subscription every ancestor's
 facts must cover. Probed in kept-depth, except a merge's mark. Settled by
 bodies, or a probe refuting a clause.
 
-Members: `rise-scan-keys`, `rise-admit-keys`, `rise-outer-end-keys`,
-`rise-lane-end-keys`, `rise-src-keys`, `rise-body-end-keys`, `begin-keys`,
-`run-keys`.
+Members: `rise-admit-keys`, `rise-outer-end-keys`, `rise-lane-end-keys`,
+`rise-src-keys`, `rise-body-end-keys`, `begin-keys`, `run-keys`.
 
 #### THE ENDLESS SUBSCRIPTION
 
@@ -215,10 +216,11 @@ Members: `after-map`, `after-scan`, `after-take`, `clear-take`,
 #### THE FLIGHT, READ
 
 Untried, mechanical: what the frames above keep is read alike off runs alike,
-and off the ghost as the whole tree's keys; a position past a disjoint one is
-past its last child. Settled by bodies.
+and off the ghost as the whole tree's keys, a dead lane's read only through
+what it leaves running; a position past a disjoint one is past its last
+child. Settled by bodies.
 
-Members: `above-≋`, `keys-above`, `past-last`.
+Members: `above-≋`, `keys-above`, `past-last`, `rise-dead-keys`.
 
 ## Tier 2 — the simultaneous spec
 
