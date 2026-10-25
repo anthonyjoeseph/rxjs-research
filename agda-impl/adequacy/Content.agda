@@ -545,7 +545,7 @@ module Honesty (R : Set) where
       (λ m → subst (Lanes m _) (begun-runs L ρ h)
                (subst (λ z → Lanes m (h ∷ U.states (lanesL post) ρ ++ U.states (lanesL (reverse pre)) ρ) (h ∷ z)) runs
                   (lanes-refl m (h ∷ U.states (lanesL post) ρ ++ U.states (lanesL (reverse pre)) ρ))))
-      (λ m → subst (λ z → Agreeᵀ m _ (outerT d (gh o) ρ z)) pool
+      (λ m → subst (λ z → Agreeᵀ m (outerT d (gh o) ρ (tailsOn (deadL (reverse pre)) ρ (poolT (deadL post) ρ)) ∪ U.cutᴺ (gh s₀) ρ) (outerT d (gh o) ρ z)) pool
                (pool-ended m d (gh o) (deadL (reverse pre)) ρ (poolT (deadL post) ρ) (U.cutᴺ (gh s₀) ρ) sp ss))
     where
       ρ = envAt c

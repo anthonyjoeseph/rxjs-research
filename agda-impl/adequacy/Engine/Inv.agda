@@ -593,12 +593,12 @@ module _ {R : Set} where
   ... | true  = tt
   ... | false = tt
 
-  settle-lead : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) d n e p → EndsIf (d ∧ (n ≡ᵇ 0) ∧ e) p c s → Lead ⟨ c , s , settle d n e , p ⟩
-  settle-lead c s d n e p l = settled c s p (d ∧ (n ≡ᵇ 0) ∧ e) l
+  lead-if : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p b → EndsIf b p c s → Lead ⟨ c , s , (if b then rising cp else absorbed) , p ⟩
+  lead-if c s p true  l = l
+  lead-if c s p false l = tt
 
-  settled : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p b → EndsIf b p c s → Lead ⟨ c , s , (if b then rising cp else absorbed) , p ⟩
-  settled c s p true  l = l
-  settled c s p false l = tt
+  settle-lead : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) d n e p → EndsIf (d ∧ (n ≡ᵇ 0) ∧ e) p c s → Lead ⟨ c , s , settle d n e , p ⟩
+  settle-lead c s d n e p l = lead-if c s p (d ∧ (n ≡ᵇ 0) ∧ e) l
 
   dequeue-lead : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls p
                → EndsIf (d ∧ (n ≡ᵇ 0) ∧ null q) p c (flatS op f d n q o ls) → Lead (dequeue c op f d n q o ls p)

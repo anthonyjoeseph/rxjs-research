@@ -43,7 +43,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; pred; _≡ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂; uncurry)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; trans)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.MonotonicList.Events using (Pos; Timeline; Events∞; idle; _∪_; ix)
