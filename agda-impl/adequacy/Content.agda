@@ -54,8 +54,8 @@ open import adequacy.Engine.Inv using (Inv; module Inv; module Base; wfI; search
 open import adequacy.Engine.Spent using (module Spending)
 open import adequacy.Engine.Kept using (KeptFrom; refocus-agree) renaming (kept to engine-kept)
 open import adequacy.Engine.Head using (Frag)
-open import adequacy.Engine.Pick using (Won; Untied; module Order; search-won)
-open import adequacy.Engine.Shown using (won-pass; cold-key)
+open import adequacy.Engine.Pick using (Beat; Beats; module Order)
+open import adequacy.Engine.Shown using (beat-pass; cold-key)
 open import adequacy.Strong using (module Strongly)
 open Events∞ using (force)
 
@@ -444,10 +444,9 @@ module Honesty (R : Set) where
              → Pass (_≡ u ++ [ ix i ]) c′ true (U.stateᴺ (gh (coldS true (play τ u i t₀ (stall k)))) (envAt c′))
                  (U.stateᴺ (gh (coldS true (play τ u (suc i) t₀ (Frame∞.force k)))) (envAt c′))
   stall-pass {c = c} {s} {c′} {τ} {u} {i} {t₀} {k} eq sh iv =
-    won-pass (u ++ [ ix i ]) c′ (coldS true (play τ u i t₀ (stall k))) true
-      (subst (λ x → Won (x , still) c′ (coldS true (play τ u i t₀ (stall k)))) (cold-key (plug c s) eq) (search-won (plug c s) eq))
-      (subst Frag (sym (proj₁ (search-hit (plug c s) eq))) (Order.shape (Inv.ord iv)))
-      (subst (Untied top) (sym (proj₁ (search-hit (plug c s) eq))) (Order.untied (Inv.ord iv)))
+    beat-pass false (u ++ [ ix i ]) c′ (coldS true (play τ u i t₀ (stall k))) true (λ _ e → e)
+      (subst (λ x → Beat x c′ (coldS true (play τ u i t₀ (stall k)))) (cold-key (plug c s) eq) (subst Beats eq (Order.apart (Inv.ord iv)) refl))
+      (subst Frag (sym (proj₁ (search-hit (plug c s) eq))) (Order.shape (Inv.ord iv))) tt
       sh refl (≋-by refl refl) (stall-hole (envAt c′))
 
   close-pass : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p}
@@ -456,10 +455,9 @@ module Honesty (R : Set) where
              → Pass (_≡ u ++ [ ix i ]) c′ true (U.stateᴺ (gh (coldS true (play τ u i t₀ (close k)))) (envAt c′))
                  (U.stateᴺ (gh (coldS true (restᵀ τ (u ++ [ last ]) (From∞.force k)))) (envAt c′))
   close-pass {c = c} {s} {c′} {τ} {u} {i} {t₀} {k} eq sh iv =
-    won-pass (u ++ [ ix i ]) c′ (coldS true (play τ u i t₀ (close k))) true
-      (subst (λ x → Won (x , still) c′ (coldS true (play τ u i t₀ (close k)))) (cold-key (plug c s) eq) (search-won (plug c s) eq))
-      (subst Frag (sym (proj₁ (search-hit (plug c s) eq))) (Order.shape (Inv.ord iv)))
-      (subst (Untied top) (sym (proj₁ (search-hit (plug c s) eq))) (Order.untied (Inv.ord iv)))
+    beat-pass false (u ++ [ ix i ]) c′ (coldS true (play τ u i t₀ (close k))) true (λ _ e → e)
+      (subst (λ x → Beat x c′ (coldS true (play τ u i t₀ (close k)))) (cold-key (plug c s) eq) (subst Beats eq (Order.apart (Inv.ord iv)) refl))
+      (subst Frag (sym (proj₁ (search-hit (plug c s) eq))) (Order.shape (Inv.ord iv))) tt
       sh refl (≋-by refl refl) (close-hole (envAt c′))
 
   stall-drop : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s : St Γ A} {c′ : Ctx R Γ′ A′} {τ u i t₀ k key p t m′}

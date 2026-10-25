@@ -27,7 +27,7 @@ open import denotation.MonotonicList.Events using (Timeline; emit; stall; close)
 open import operation.Key using (at)
 open import denotation.Unfold using (same?)
 open import adequacy.Engine.Head using (Frag)
-open import adequacy.Engine.Pick using (Order; order; module Order; whole; Lead; Clear; Won; won-clear; search-won; Untied)
+open import adequacy.Engine.Pick using (Order; order; module Order; whole; Lead; Clear; Won; won-clear; search-won; Apart; Searched)
 open import operation.PureObservable using (Tape; due; play; ending; over; module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; closed; closedUp;
@@ -559,7 +559,7 @@ module _ {R : Set} where
   NextInv (complete p)    = ⊤
   NextInv drained         = ⊤
 
-  NextShape NextLead NextUntied : Step → Set
+  NextShape NextLead NextApart : Step → Set
   NextShape (silent t k)    = Frag (whole k)
   NextShape (value t p a k) = Frag (whole k)
   NextShape (complete p)    = ⊤
@@ -568,16 +568,17 @@ module _ {R : Set} where
   NextLead (value t p a k) = Lead k
   NextLead (complete p)    = ⊤
   NextLead drained         = ⊤
-  NextUntied (silent t k)    = Untied top (whole k)
-  NextUntied (value t p a k) = Untied top (whole k)
-  NextUntied (complete p)    = ⊤
-  NextUntied drained         = ⊤
+  NextApart (silent t k)    = Searched k
+  NextApart (value t p a k) = Searched k
+  NextApart (complete p)    = ⊤
+  NextApart drained         = ⊤
 
   postulate
     -- THE SHAPE: a step keeps the whole tree in the fragment.
     shape-next : ∀ k → Base k → Frag (whole k) → NextShape (step k)
-    -- THE TIE: a step leaves no live connect's body just past its source.
-    untied-next : ∀ k → Base k → Order k → NextUntied (step k)
+    -- THE STILL'S SUBTREE: where the search runs after a step, what it
+    -- finds still leads every race above it past each live source's skips.
+    apart-next : ∀ k → Base k → Order k → NextApart (step k)
     -- A mark run rises, if at all, the event it showed, at its own key,
     -- leaving a node as live as the one it ran.
     run-lead : ∀ (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} p → search top t ≡ just (found (Γ , A , c , s) m key)
@@ -687,7 +688,7 @@ module _ {R : Set} where
                      (λ q a s″ kq oa al → won-clear q a c′ s′ s″ al
                         (subst₂ (λ k x → Won (k , x) c′ s′) kq oa (search-won (plug c s) e)) (subst Frag (sym pl) (Order.shape o)))
 
-  joined : ∀ x → NextShape x → NextLead x → NextUntied x → NextOrd x
+  joined : ∀ x → NextShape x → NextLead x → NextApart x → NextOrd x
   joined (silent t k)    f l u = order f l u
   joined (value t p a k) f l u = order f l u
   joined (complete p)    f l u = tt
@@ -695,7 +696,7 @@ module _ {R : Set} where
 
   -- EVERY STEP KEEPS THE ORDER.
   ord-next : ∀ k → Base k → Order k → NextOrd (step k)
-  ord-next k b o = joined (step k) (shape-next k b (Order.shape o)) (lead-next k b o) (untied-next k b o)
+  ord-next k b o = joined (step k) (shape-next k b (Order.shape o)) (lead-next k b o) (apart-next k b o)
 
   both : ∀ x → NextBase x → NextOrd x → NextInv x
   both (silent t k)    b o = b & o
@@ -711,6 +712,6 @@ module _ {R : Set} where
 
   -- A settled node anywhere in a tree the invariant holds of, absorbed at
   -- the same position: the invariant at it.
-  inv-at : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Unpended s → Wf (plug c s) → Frag (plug c s) → Untied top (plug c s)
+  inv-at : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Unpended s → Wf (plug c s) → Frag (plug c s) → Apart (plug c s)
          → Inv ⟨ c , s , absorbed , p ⟩
   inv-at c s p u w f t = base-at c s p u w & order f tt t

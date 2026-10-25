@@ -6,13 +6,13 @@
 -- (`adequacy.Content.silent-exact`), with less work left
 -- (`adequacy.Engine.Spent.Spending.silent-spent`), and never the same
 -- when the step is one whose work may grow (`adequacy.Content`'s drops).
--- Also the longest run of silent steps meaning the same, and that no
--- configuration puts a live connect's body just past its source
--- (`adequacy.Engine.Pick.Untied`).
+-- Also the longest run of silent steps meaning the same, and that what
+-- the search finds still leads every race above it past each live
+-- source's skips (`adequacy.Engine.Pick.Searched`).
 module quickcheck.KeptDepth where
 
 open import Data.Bool using (Bool; true; false; not; _∧_; _∨_; if_then_else_)
-open import Data.List using (List; []; _∷_; upTo) renaming (map to mapL; _++_ to _++L_)
+open import Data.List using (List; []; _∷_; upTo) renaming (map to mapL; _++_ to _++L_; _ʳ++_ to _ʳ++L_; reverse to reverseL)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_; _<ᵇ_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_)
@@ -40,12 +40,13 @@ open Driver ℕ using (Step; step; silent; value; complete; drained)
 open Ghosting ℕ using (work; Measure)
 open Machine using (Conf; ⟨_,_,_,_⟩; load; spot; subscribing; absorbed; rising; nx; cp; pend; coldS; top; inOuter; inLanes;
   plug; closed; alive; search; found; leafM; St; Ctx; Out; mapS; scanS; cutS; lnS; takeS; flatS; connS; inMap; inScan; inCut; inLn;
-  inTake; inSrc; inBody; over; shift)
+  inTake; inSrc; inBody; over; own; Mark; outOf; still; shows)
 open import Data.Maybe using (Maybe)
 open import operation.Key using (Key; _<ᴷ_)
 open import Tree using (Obs; FlatOp)
 open import denotation.MonotonicList.Events using (Timeline)
 open import adequacy.Engine.Head using (cand)
+open import adequacy.Engine.Pick using (past)
 
 private
   -- A run's verdict, carrying its longest run of steps meaning the same.
@@ -92,28 +93,46 @@ private
   ... | _ = false
   skippedᵇ _ = false
 
-  -- `adequacy.Engine.Pick.Untied`, decided: keys order totally, so alike
-  -- is neither before the other.
-  untieᵇ : ∀ {A B} → Maybe (Key × Out A) → Maybe (Key × Out B) → Bool
-  untieᵇ (just (h , _)) (just (k , _)) = (shift h <ᴷ k) ∨ (k <ᴷ shift h)
-  untieᵇ _              _              = true
+  -- `adequacy.Engine.Pick.Beat`, decided.
+  kafterᵇ knotᵇ : ∀ {A} → Key → Maybe (Key × Out A) → Bool
+  kafterᵇ k nothing        = true
+  kafterᵇ k (just (h , _)) = k <ᴷ h
+  knotᵇ k nothing        = true
+  knotᵇ k (just (h , _)) = not (h <ᴷ k)
 
-  mutual
-    untiedᵇ : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Bool
-    untiedᵇ c (mapS f s)              = untiedᵇ (inMap f c) s
-    untiedᵇ c (scanS f z s)           = untiedᵇ (inScan f z c) s
-    untiedᵇ c (cutS l a s)            = untiedᵇ (inCut l a c) s
-    untiedᵇ c (lnS b s)               = untiedᵇ (inLn b c) s
-    untiedᵇ c (takeS i q w s)         = untiedᵇ (inTake i q w c) s
-    untiedᵇ c (flatS op f d n q o ls) = untiedᵇ (inOuter op f d n q ls c) o ∧ untiedsᵇ c op f d n q o [] ls
-    untiedᵇ c (connS k o b)           =
-      (over k ∨ untieᵇ (cand (inSrc k b c) o) (cand (inBody k o c) b)) ∧ untiedᵇ (inSrc k b c) o ∧ untiedᵇ (inBody k o c) b
-    untiedᵇ c _                       = true
+  beforeᵇ : Key → List (Mark × Key) → Bool
+  beforeᵇ k []             = true
+  beforeᵇ k ((_ , h) ∷ ms) = (k <ᴷ h) ∧ beforeᵇ k ms
 
-    untiedsᵇ : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → ℕ → List A → St Γ A
-             → List (St Γ B) → List (St Γ B) → Bool
-    untiedsᵇ c op f d n q o pre []         = true
-    untiedsᵇ c op f d n q o pre (s ∷ post) = untiedᵇ (inLanes op f d n q o pre post c) s ∧ untiedsᵇ c op f d n q o (s ∷ pre) post
+  raceᵇ : ∀ {R Γ A B} → (Key → Maybe (Key × Out B) → Bool) → Key → Ctx R Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → ℕ
+        → List A → St Γ A → List (St Γ B) → List (St Γ B) → List (St Γ B) → Bool
+  raceᵇ P k c op f d n q o acc []       tl = true
+  raceᵇ P k c op f d n q o acc (x ∷ xs) tl = P k (cand (inLanes op f d n q o acc (xs ++L tl) c) x) ∧ raceᵇ P k c op f d n q o (x ∷ acc) xs tl
+
+  beatᵇ : ∀ {R Γ A} → Key → Ctx R Γ A → St Γ A → Bool
+  beatᵇ k top                               s = true
+  beatᵇ k (inMap f c)                       s = beatᵇ k c (mapS f s)
+  beatᵇ k (inScan f z c)                    s = beatᵇ k c (scanS f z s)
+  beatᵇ k (inCut l a c)                     s = beatᵇ k c (cutS l a s)
+  beatᵇ k (inLn b c)                        s = beatᵇ k c (lnS b s)
+  beatᵇ k (inTake i q w c)                  s = beatᵇ k c (takeS i q w s)
+  beatᵇ k (inOuter op f d n q ls c)         s = raceᵇ kafterᵇ k c op f d n q s [] ls [] ∧ beatᵇ k c (flatS op f d n q s ls)
+  beatᵇ k (inLanes op f d n q o pre post c) s =
+    knotᵇ k (cand (inOuter op f d n q (pre ʳ++L s ∷ post) c) o) ∧ raceᵇ kafterᵇ k c op f d n q o [] (reverseL pre) (s ∷ post)
+    ∧ raceᵇ knotᵇ k c op f d n q o (s ∷ pre) post [] ∧ beatᵇ k c (flatS op f d n q o (pre ʳ++L s ∷ post))
+  beatᵇ k (inSrc kk b c)                    s =
+    kafterᵇ (past (over kk) k) (cand (inBody kk s c) b) ∧ beforeᵇ (past (over kk) k) (own (connS kk s b))
+    ∧ beatᵇ (past (over kk) k) c (connS kk s b)
+  beatᵇ k (inBody kk o c)                   s = knotᵇ k (cand (inSrc kk s c) o) ∧ beforeᵇ k (own (connS kk o s)) ∧ beatᵇ k c (connS kk o s)
+
+  -- `adequacy.Engine.Pick.Searched`, decided.
+  searchedᵇ : Conf ℕ → Bool
+  searchedᵇ ⟨ c , s , absorbed , p ⟩ with search top (plug c s)
+  ... | nothing = true
+  ... | just (found (Γ′ , A′ , c′ , s′) m key) with outOf c′ s′ m
+  ...   | still   = beatᵇ key c′ s′
+  ...   | shows _ = true
+  searchedᵇ _ = true
 
   -- What a silent step neither dropping nor keeping its meaning did.
   why : Conf ℕ → Conf ℕ → String
@@ -141,8 +160,8 @@ private
   mutual
     walk : ℕ → ℕ → ℕ → Conf ℕ → Verdict
     walk zero    run best m = yes (best ⊔ run)
-    walk (suc n) run best m = if untiedᵇ top (plug (Conf.ctx m) (Conf.foc m)) then next n run best m (step m)
-                              else no (best ⊔ run) ("\n  tied: a connect's body due just past its source, " ++ showMode m ++ " at " ++ showSpot (spot m))
+    walk (suc n) run best m = if searchedᵇ m then next n run best m (step m)
+                              else no (best ⊔ run) ("\n  beaten: a still find not first past a live source's skips, " ++ showMode m ++ " at " ++ showSpot (spot m))
 
     next : ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict
     next n run best m (silent t m′)     = after n run best m m′ (kind m m′)

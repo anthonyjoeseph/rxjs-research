@@ -59,7 +59,7 @@ open import adequacy.Engine.Inv using (Unpended; Opened; Wf; Base; module Base; 
   attO; cpO; cutO; bodyO; srcAttO; owedO; joinO; leafO; owned; search-hit)
 open import adequacy.Engine.Race using (First; go-rise; cuts-swap)
 open import adequacy.Engine.Head using (Frag)
-open import adequacy.Engine.Pick using (module Order; Clear; Untied)
+open import adequacy.Engine.Pick using (module Order; Clear; Apart)
 
 open Events∞
 
@@ -185,20 +185,27 @@ body-plug (cs cl sl sa (just p) as ow r e)  o s ρ = done-plug ow sl _ ρ (≋-b
 body-plug (cs false sl sa nothing as ow r e) o s ρ = done-plug ow sl _ ρ (≋-by refl refl)
 body-plug (cs true sl sa nothing as ow r e)  o s ρ = done-plug ow sl _ ρ (≋-by refl refl)
 
-private
-  sub-settled : ∀ {Γ A} p (s : St Γ A) → Unpended s → subOr p s ≡ gh s
-  sub-settled p (coldS b l)             u = refl
-  sub-settled p (ofS i q xs)            u = refl
-  sub-settled p doneS                   u = refl
-  sub-settled p (mapS f s)              u = refl
-  sub-settled p (scanS f z s)           u = refl
-  sub-settled p (cutS l a s)            u = refl
-  sub-settled p (lnS b s)               u = refl
-  sub-settled p (takeS i q w s)         u = refl
-  sub-settled p (flatS op f d n q o ls) u = refl
-  sub-settled p (connS k o b)           u = refl
-  sub-settled p (joinS j g x ib)        u = refl
+-- A settled node subscribes as it stands.
+sub-settled : ∀ {Γ A} p (s : St Γ A) → Unpended s → subOr p s ≡ gh s
+sub-settled p (coldS b l)             u = refl
+sub-settled p (ofS i q xs)            u = refl
+sub-settled p doneS                   u = refl
+sub-settled p (mapS f s)              u = refl
+sub-settled p (scanS f z s)           u = refl
+sub-settled p (cutS l a s)            u = refl
+sub-settled p (lnS b s)               u = refl
+sub-settled p (takeS i q w s)         u = refl
+sub-settled p (flatS op f d n q o ls) u = refl
+sub-settled p (connS k o b)           u = refl
+sub-settled p (joinS j g x ib)        u = refl
 
+-- A live source's frame read over its state is its connect's.
+live-plug : ∀ {Γ X B} sa ba as r e (b : St (X ∷ Γ) B) (s : St Γ X) (ρ : NEnv Γ) → Unpended s
+          → connSrc false r e (gh b) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (gh (connS (cs false true sa ba as nothing r e) s b)) ρ
+live-plug sa (just p) as r e b s ρ u rewrite sub-settled (p ⊕ [ ix 1 ]) s u = ≋-by refl refl
+live-plug sa nothing  as r e b s ρ u = ≋-by refl refl
+
+private
   conn-plug : ∀ {Γ X B} k (b : St (X ∷ Γ) B) (s : St Γ X) (ρ : NEnv Γ) → Unpended s → Opened k s
             → connSrc (CS.closed k) (CS.srcAt k) (CS.endAt k) (gh b) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (connectᶜ (CS.srcAt k) (gh b) (srcG k s)) ρ
   conn-plug (cs false sl sa (just p) as ow r e) b s ρ u o rewrite sub-settled (p ⊕ [ ix 1 ]) s u = ≋-by refl refl
@@ -634,5 +641,5 @@ module _ {R : Set} where
   ... | nothing = quiet-empty c s p v e
   ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
   ...   | pl , own = kept-pre (tookᴰ (run c′ s′ m p)) (refocus c s c′ s′ p (Base.settled (Inv.base v)) (owned own) (wfI (Inv.base v)) pl)
-                       (runs c′ s′ m p own (inv-at c′ s′ p (owned own) (subst Wf (sym pl) (wfI (Inv.base v))) (subst Frag (sym pl) (Order.shape (Inv.ord v))) (subst (Untied top) (sym pl) (Order.untied (Inv.ord v)))))
+                       (runs c′ s′ m p own (inv-at c′ s′ p (owned own) (subst Wf (sym pl) (wfI (Inv.base v))) (subst Frag (sym pl) (Order.shape (Inv.ord v))) (subst (λ t → Apart t) (sym pl) (Order.apart (Inv.ord v)))))
 

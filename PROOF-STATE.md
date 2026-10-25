@@ -11,24 +11,24 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE SILENT RUN
 
 Each skipped step drops a skip at one position of its hole; whether every
-frame above passes it there. Above a connect's source the frames are asked
-of every position under the skip, the race read at one. A subscribing
-configuration's order carries nothing, so a defer's and a begun lane's pass
-have no source yet. Also an outer frame's and a source's drops (joiners'
-images drop too). Settled when these are bodies, or refuted.
+frame above passes it there. A live source's own pass: its next events, and
+its body fed past the skip, later. A subscribing configuration's order
+carries nothing, so a defer's and a begun lane's pass have no source yet.
+Also an outer frame's and a source's drops (joiners' images drop too).
+Settled when these are bodies, or refuted.
 
 Members: `outer-begins`, `outer-queues`, `outer-ignores`, `outer-begins-pass`,
 `outer-queues-pass`, `outer-ignores-pass`, `lane-begins`, `lane-begins-pass`,
-`src-climb`, `defer-hole`, `defer-pass`, `outer-drops`, `src-drops`.
+`src-pass`, `defer-hole`, `defer-pass`, `outer-drops`, `src-drops`.
 
-#### THE TIE
+#### THE STILL'S SUBTREE
 
-Untried: no step leaves a live connect's body due just past its source
-(`Untied`), where the engine's tie-break and the meaning's disagree;
-`quickcheck.KeptDepth` checks every configuration. Settled when
-`untied-next` is a body, or refuted.
+Untried: what the search finds still leads every race above it past each
+live source's skips (`Apart`): nothing above is due under the skip's
+position. `quickcheck.KeptDepth` checks every absorbed configuration.
+Settled when `apart-next` is a body, or refuted.
 
-Members: `untied-next`.
+Members: `apart-next`.
 
 #### THE TAIL'S SKIP
 
@@ -107,7 +107,7 @@ Members: `sub-head`, `sub-bursts`, `scanS-head`, `takeS-head`, `limit-head`,
 Keys are a strict order agreeing with positions. Believed unfoldings.
 Settled when each is a body.
 
-Members: `<ᴷ-trans`, `<ᴷ-irrefl`, `≮ᴷ-trans`, `at-<ᵖ`, `ext-≮`, `shift-between`.
+Members: `<ᴷ-trans`, `<ᴷ-irrefl`, `≮ᴷ-trans`, `at-<ᵖ`, `ext-≮`, `under-after`.
 
 #### THE LINK
 
