@@ -33,16 +33,17 @@
 module adequacy.Engine.Pick where
 
 open import Data.Empty using (⊥)
-open import Data.Bool using (Bool; true; false; if_then_else_; _∨_)
-open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; reverse)
+open import Data.Bool using (Bool; true; false; if_then_else_; _∨_; _∧_)
+open import Data.Bool.Properties using (∧-identityʳ)
+open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; reverse; null)
 open import Data.List.Properties using (ʳ++-defn)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to all-++⁺)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ)
+open import Data.Nat using (ℕ; pred; _≡ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂; uncurry)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; trans)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.MonotonicList.Events using (Pos; Timeline; Events∞; idle; _∪_; ix)
@@ -52,7 +53,7 @@ open import operation.Key using (Key; at; after; _<ᴷ_)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; mapS; scanS; cutS; lnS; takeS; flatS; connS; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes;
   inSrc; inBody; plug; closed; Out; still; shows; seek; search; found; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
-  Mark; own; Found; nx; cp; alive; free; cpAt; cutAt; overAt; _⊕_; mapT; scanT; cutT; takeT; laneT; shift; over; outOf)
+  Mark; own; Found; nx; cp; alive; ended; free; cpAt; cutAt; overAt; _⊕_; mapT; scanT; cutT; takeT; laneT; shift; over; outOf)
   renaming (outerT to outerK)
 open import adequacy.Engine.Meaning using (gh; lane; outerG; poolG; lanesL; deadL; poolT; tailsOn; outerT; envAt)
 open import adequacy.Engine.Race using (First; NotBefore; After; TailNotBefore)
@@ -90,10 +91,35 @@ Clear p a (inLanes op f d n q o pre post c) s =
 Clear p a (inSrc k b c)                     s = over k ≡ false → closed c ≡ false → After (p ⊕ [ ix 0 ]) (headˢ (step (gh b)))
 Clear p a (inBody k o c)                    s = Clear p a c (connS k o s)
 
+-- Every frame a completion rising at `p` passes, and the node `rise`
+-- leaves below: a lane's flatMap while its parts are open, and above it
+-- only where the lane's end ends the flatMap.
+mutual
+  Ends : ∀ {R Γ A} → Pos → Ctx R Γ A → St Γ A → Set
+  Ends p top                               s = ⊤
+  Ends p (inMap f c)                       s = Ends p c (mapS f s)
+  Ends p (inScan f z c)                    s = Ends p c (scanS f z s)
+  Ends p (inCut l x c)                     s = l ≡ true → Ends p c (cutS l x s)
+  Ends p (inLn b c)                        s = Ends p c (lnS b s)
+  Ends p (inTake i q free c)               s = Ends p c (takeS i q free s)
+  Ends p (inTake i q (cpAt r) c)           s = ⊤
+  Ends p (inTake i q (cutAt r) c)          s = ⊤
+  Ends p (inTake i q (overAt r) c)         s = ⊤
+  Ends p (inOuter op f d n q ls c)         s = EndsIf ((n ≡ᵇ 0) ∧ null q) p c (flatS op f true n q s ls)
+  Ends p (inLanes op f d n q o pre post c) s =
+    alive s ≡ true → (closed c ≡ false → Sides p f d o (reverse pre) post (envAt c))
+                   × EndsIf (d ∧ (pred n ≡ᵇ 0) ∧ null q) p c (flatS op f d (pred n) q o (pre ʳ++ ended s ∷ post))
+  Ends p (inSrc k b c)                     s = ⊤
+  Ends p (inBody k o c)                    s = ∀ k′ → Ends p c (connS k′ o s)
+
+  EndsIf : ∀ {R Γ A} → Bool → Pos → Ctx R Γ A → St Γ A → Set
+  EndsIf true  p c s = Ends p c s
+  EndsIf false p c s = ⊤
+
 -- A rise's lead.
 Lead : ∀ {R} → Conf R → Set
 Lead ⟨ c , s , rising (nx a) , p ⟩ = Clear p a c s
-Lead ⟨ c , s , rising cp , p ⟩     = ⊤
+Lead ⟨ c , s , rising cp , p ⟩     = Ends p c s
 Lead ⟨ c , s , subscribing , p ⟩   = ⊤
 Lead ⟨ c , s , absorbed , p ⟩      = ⊤
 
@@ -352,3 +378,47 @@ won-clear p a (inSrc kk b c)                    s s′ al (w , _) ft with over k
 ... | true  = λ ()
 ... | false = λ _ cl → after-step (p ⊕ [ ix 0 ]) (cand (inBody kk s c) b) (step (gh b)) w (open-agrees (inBody kk s c) b cl (frag-body c kk s b ft))
 won-clear p a (inBody kk o c)                   s s′ al w ft = won-clear p a c (connS kk o s) (connS kk o s′) refl w ft
+
+-- A lane's completion passes its flatMap's retag as the lane's end.
+lane-off : ∀ {R Γ A B} d n (q : List A) {b} {k} {c : Ctx R Γ B} {t} → b ≡ true
+         → Won (uncurry (laneT d n q) (cutT b k (shows cp))) c t → Won (laneT d n q k (shows cp)) c t
+lane-off d n q refl w = w
+
+-- No end waits where a lane is queued.
+ends-queued : ∀ {R Γ A} d x p (c : Ctx R Γ A) s → EndsIf (d ∧ x ∧ false) p c s
+ends-queued false x     p c s = tt
+ends-queued true  false p c s = tt
+ends-queued true  true  p c s = tt
+
+-- Up the found node's frames: each one the completion reaches is clear
+-- there, as `won-clear` for a value.
+mutual
+  won-ends : ∀ {R Γ A} p (c : Ctx R Γ A) (s s′ : St Γ A) → alive s ≡ alive s′
+           → Won (at p , shows cp) c s → Frag (plug c s) → Ends p c s′
+  won-ends p top                               s s′ al w ft = tt
+  won-ends p (inMap f c)                       s s′ al w ft = won-ends p c (mapS f s) (mapS f s′) refl w ft
+  won-ends p (inScan f z c)                    s s′ al w ft = won-ends p c (scanS f z s) (scanS f z s′) refl w ft
+  won-ends p (inCut true x c)                  s s′ al w ft = λ _ → won-ends p c (cutS true x s) (cutS true x s′) refl w ft
+  won-ends p (inCut false x c)                 s s′ al w ft = λ ()
+  won-ends p (inLn b c)                        s s′ al w ft = won-ends p c (lnS b s) (lnS b s′) refl w ft
+  won-ends p (inTake i q free c)               s s′ al w ft = won-ends p c (takeS i q free s) (takeS i q free s′) refl w ft
+  won-ends p (inTake i q (cpAt r) c)           s s′ al w ft = tt
+  won-ends p (inTake i q (cutAt r) c)          s s′ al w ft = tt
+  won-ends p (inTake i q (overAt r) c)         s s′ al w ft = tt
+  won-ends p (inOuter op f d n q ls c)         s s′ al (_ , w , _) ft =
+    ends-if p c ((n ≡ᵇ 0) ∧ null q) (flatS op f d n q s ls) (flatS op f true n q s′ ls) refl w ft
+  won-ends p (inLanes op f d n [] o pre post c) s s′ al (l , w) ft lv =
+    (λ cl → lane-sides p c op f d n [] o pre post s cl l ft (frag-flat c op f d n [] o (pre ʳ++ s ∷ post) ft))
+    , subst (λ b → EndsIf (d ∧ b) p c (flatS op f d (pred n) [] o (pre ʳ++ ended s′ ∷ post))) (sym (∧-identityʳ (pred n ≡ᵇ 0)))
+        (ends-if p c (d ∧ (pred n ≡ᵇ 0)) (flatS op f d n [] o (pre ʳ++ s ∷ post)) (flatS op f d (pred n) [] o (pre ʳ++ ended s′ ∷ post)) refl
+           (lane-off d n [] {alive s} {at p} {c} (trans al lv) w) ft)
+  won-ends p (inLanes op f d n (a ∷ q) o pre post c) s s′ al (l , w) ft lv =
+    (λ cl → lane-sides p c op f d n (a ∷ q) o pre post s cl l ft (frag-flat c op f d n (a ∷ q) o (pre ʳ++ s ∷ post) ft))
+    , ends-queued d (pred n ≡ᵇ 0) p c (flatS op f d (pred n) (a ∷ q) o (pre ʳ++ ended s′ ∷ post))
+  won-ends p (inSrc kk b c)                    s s′ al w ft = tt
+  won-ends p (inBody kk o c)                   s s′ al w ft = λ k′ → won-ends p c (connS kk o s) (connS k′ o s′) refl w ft
+
+  ends-if : ∀ {R Γ A} p (c : Ctx R Γ A) b (s s′ : St Γ A) → alive s ≡ alive s′
+          → Won (at p , (if b then shows cp else still)) c s → Frag (plug c s) → EndsIf b p c s′
+  ends-if p c true  s s′ al w ft = won-ends p c s s′ al w ft
+  ends-if p c false s s′ al w ft = tt

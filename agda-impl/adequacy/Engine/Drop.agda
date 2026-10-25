@@ -27,16 +27,17 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
 
-open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Tail; Tail∞; out; skip; end; hush; idle; pin; _∪_; ix; _<ᵖ_)
-open import denotation.MonotonicList using (head; shownAt; Agree; Agreeᵀ; stop; stopᵀ; pin⁼; idle⁼; skip⁼; agree-refl; agree-trans; agree-sym; agreeᵀ-refl; agreeᵀ-sym)
+open import denotation.MonotonicList.Events using (Events; Events∞; Pos; out; skip; end; hush; idle; _∪_; ix; _<ᵖ_)
+open import denotation.MonotonicList using (head; shownAt; Agree; Agreeᵀ; stop; skip⁼; agree-refl; agree-trans; agree-sym; agreeᵀ-refl;
+  agreeᵀ-sym)
 open import denotation.NonExpansive using (_,ˢ_; mapᴱ-ne; scanᴱ-ne; takeWhileᴱ-ne; ∪-ne; beside-ne; burstOn-ne; Outerᴿ; liveᴼ; whole-ne; go-ne; mapᴱ-neᴹ; Lanes)
 open import denotation.Unfold using (Node; NEnv; stateᴺ; states; outerᴺ; meaning; cutᴺ; outer∞)
 open import denotation.Denote using (flatOp)
 open import operation.PureObservable using (module Machine)
-open Machine using (nx; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; cs; free; cpAt; cutAt; overAt; closed)
+open Machine using (nx; cp; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; cs; free; cpAt; cutAt; overAt; closed)
 open import adequacy.Engine.Meaning using (_≋_; ≋-by; ≋-trans; same; up; mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn; srcState;
   srcG; envAt; gh; lane; lanesL; deadL; outerG; outerT; poolRuns; poolT; laneᴹ; lanesFrame-ne;
-  outerFrame-ne; outerOf; lanes-refl; queue-refl; ≈-refl; risen)
+  outerFrame-ne; outerOf; lanes-refl; queue-refl; outer-refl; ≈-refl; risen)
 open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore; go-rise; go-outer)
 open Events∞
 open import denotation.NonExpansive using (Agreeˢ)
@@ -255,12 +256,6 @@ outer-drops op g q ls ds ρ fi (dropsˢ {k} pk ag d) =
   dropsˢ pk (at-outer op g q ls ds ρ (proj₁ (fi k pk)) (proj₂ (fi k pk)) ag) (outer-drops op g q ls ds ρ fi d)
 
 
--- A tail joined to none.
-∪-idleᵀ : ∀ n (t : Tail) → Agreeᵀ n (t ∪ idle) t
-∪-idleᵀ zero    t         = stopᵀ
-∪-idleᵀ (suc n) idle      = idle⁼
-∪-idleᵀ (suc n) (pin k r) = pin⁼ (∪-idleᵀ n (Tail∞.later r))
-
 -- THE OUTER ADMITTED: an outer's value first among its flatMap's parts
 -- is a skip, and past it the merge running what `admit` leaves.
 outer-admits : ∀ {Γ A B} op (g : A → Pos → Node Γ B) q ls ds (ρ : NEnv Γ) (o : Node Γ A) a p {Ls Qs t′ Ls′ T} (Y : Events∞ B)
@@ -283,6 +278,31 @@ outer-admits op g q ls ds ρ o a p {Qs = Qs} Y ad ef ec la ta al tn =
       skip⁼ (subst (Agreeᵀ n _) (sym ec) (whole-ne r (la n) (ta n)))
             (subst (Agree n _) (sym ef) (go-ne (flatOp op) r (la n) (queue-refl n Qs) (ta n)))
       where r = liveᴼ (agreeᵀ-refl n (cutᴺ o ρ)) (mapᴱ-neᴹ (λ x → ≈-refl (laneᴹ g ρ x)) (agree-refl n (meaning o ρ)))
+
+-- THE LANE ENDED: a lane's end first among its flatMap's parts, a lane
+-- waiting, is a skip, and past it the merge running the waiting lane
+-- begun ahead of the rest, the ended lane's tail behind the pool.
+lane-admits : ∀ {Γ A B} op (g : A → Pos → Node Γ B) d a q (o : Node Γ A) pre post (ρ : NEnv Γ) (s : Node Γ B) p {Ls T} (Y : Events∞ B)
+            → First p (outerᴺ g (outerG d o) ρ) (states (lanesL post) ρ) (states (lanesL pre) ρ) (outerT d o ρ (poolRuns pre post true ρ (risen s ρ cp p)))
+            → force Y ≡ M′.go (flatOp op) (outerᴺ g (outerG d o) ρ) Ls (L.map (laneᴹ g ρ) q) T → cut Y ≡ M′.whole (outerᴺ g (outerG d o) ρ) Ls T
+            → (∀ n → Lanes n (M′.enter (laneᴹ g ρ a) (p ++ [ ix 1 ]) ∷ states (lanesL post) ρ ++ states (lanesL pre) ρ) Ls)
+            → (∀ n → Agreeᵀ n (outerT d o ρ (poolRuns pre post true ρ (risen s ρ cp p)) ∪ cutᴺ s ρ) T)
+            → Dropsˢ (_≡ p ++ [ ix 0 ]) (lanesFrame op g d (a ∷ q) o pre post true ρ (risen s ρ cp p)) Y
+lane-admits op g d a q o pre post ρ s p Y fi ef ec la ta =
+  dropˢ refl
+    (λ n → subst (λ x → Agree n x (skip (p ++ [ ix 0 ]) Y))
+             (sym (go-rise (flatOp op) (outerᴺ g (outerG d o) ρ) (states (lanesL post) ρ) (risen s ρ cp p) (states (lanesL pre) ρ)
+                     (L.map (laneᴹ g ρ) (a ∷ q)) (outerT d o ρ (poolRuns pre post true ρ (risen s ρ cp p))) refl fi))
+             (held n))
+    (≋-by refl refl)
+  where
+    held : ∀ n → Agree n (M′.lane (flatOp op) (outerᴺ g (outerG d o) ρ) (states (lanesL post) ρ) (risen s ρ cp p) (states (lanesL pre) ρ)
+                            (L.map (laneᴹ g ρ) (a ∷ q)) (outerT d o ρ (poolRuns pre post true ρ (risen s ρ cp p))) (end p))
+                         (skip (p ++ [ ix 0 ]) Y)
+    held zero    = stop
+    held (suc n) =
+      skip⁼ (subst (Agreeᵀ n _) (sym ec) (whole-ne (outer-refl n g (outerG d o) ρ) (la n) (ta n)))
+            (subst (Agree n _) (sym ef) (go-ne (flatOp op) (outer-refl n g (outerG d o) ρ) (la n) (queue-refl n (L.map (laneᴹ g ρ) q)) (ta n)))
 
 private
   -- The body past its skip, the source beside it as it stands.
