@@ -158,7 +158,7 @@ private
 
   -- Whether `u` is `t`, to `k` pins of `t`, with none or more of its pins
   -- erased, each no later than the other's next
-  -- (`adequacy.Engine.Drop.Eraseᵀ`).
+  -- (`adequacy.Engine.Erase.Eraseᵀ`).
   unpinnedᵇ : ℕ → Tail → Tail → Bool
   unpinnedᵇ zero    _         _          = true
   unpinnedᵇ (suc k) (pin p l) (pin q r)  =
