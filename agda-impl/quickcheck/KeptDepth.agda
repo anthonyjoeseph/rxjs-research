@@ -445,11 +445,19 @@ private
     ∷ ("a defer joining a live source" , connect skipping (deferᶜ (connected (here refl))))
     ∷ ("two defers joining at once" , connect skipping (flatMap (mergeᶠ nothing) (deferᶜ (connected (here refl))) (of (nat 0 ∷ nat 1 ∷ []))))
     ∷ ("a defer beside a joiner" , connect skipping (flatMap (mergeᶠ nothing) (deferᶜ (connected (here refl))) (connected (here refl))))
+    ∷ ("a defer begun past a merged source's skip"
+      , connect merged (flatMap (mergeᶠ nothing) (deferᶜ (connected (here refl))) (connected (here refl))))
+    ∷ ("a lane joined past a merged source's skips" , connect merged rejoins)
     ∷ []
     where
     -- A source skipping before each of its values.
     skipping : Code [] [] [] [] natᵗ
     skipping = cold (script ((2 , 1 ∷ []) ∷ (1 , 2 ∷ []) ∷ (2 , 3 ∷ []) ∷ []) false false)
+
+    -- Two skipping lanes merged, so a source whose steps nest under the
+    -- values that began them.
+    merged : Code [] [] [] [] natᵗ
+    merged = flatMap (mergeᶠ nothing) (cold (script ((2 , 1 ∷ []) ∷ (1 , 2 ∷ []) ∷ []) false false)) (of (nat 0 ∷ nat 1 ∷ []))
 
     -- Every value of the source opens a lane joining it again.
     rejoins : Code (natᵗ ∷ []) [] [] [] natᵗ
