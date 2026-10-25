@@ -50,10 +50,10 @@ open import denotation.MonotonicList.Events using (Pos; Timeline; Events∞; idl
 open import denotation.MonotonicList using (head; Agreeᵀ)
 open import denotation.Unfold using (Step; states; step; headˢ; hushˢ; outˢ; skipˢ; endˢ)
 open import operation.Key using (Key; at; after; _<ᴷ_)
-open import operation.PureObservable using (module Machine)
+open import operation.PureObservable using (peek; module Machine)
 open Machine using (St; cs; mapS; scanS; cutS; lnS; takeS; flatS; connS; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes;
   inSrc; inBody; plug; closed; Out; still; shows; seek; search; found; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
-  Mark; own; Found; nx; cp; alive; ended; free; cpAt; cutAt; overAt; _⊕_; mapT; scanT; cutT; takeT; laneT; shift; over; outOf)
+  Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM; pend; coldS; ofS; doneS; joinS; own; Found; nx; cp; alive; ended; free; cpAt; cutAt; overAt; _⊕_; mapT; scanT; cutT; takeT; laneT; shift; over; outOf)
   renaming (outerT to outerK)
 open import adequacy.Engine.Meaning using (gh; poolG; lanesL; deadL; poolT; outerT; envAt; srcState; srcG)
 open import adequacy.Engine.Race using (NotBefore; After; TailNotBefore)
@@ -85,7 +85,7 @@ Clear p a (inOuter op f false n q ls c)     s =
   closed c ≡ false × All (λ l → After p (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore p (poolT (deadL ls) (envAt c))
   × (showsᶜ c true ≡ true → Ahead (_≡ p ⊕ [ ix 0 ]) c true)
 Clear p a (inLanes op f d n q o pre post c) s =
-  alive s ≡ true → (closed c ≡ false → Sides p f d o (reverse pre) post (envAt c)) × Clear p a c (flatS op f d n q o (pre ʳ++ s ∷ post))
+  alive s ≡ true → Sides p f d o (reverse pre) post (envAt c) × Clear p a c (flatS op f d n q o (pre ʳ++ s ∷ post))
 Clear p a (inSrc k b c)                     s = over k ≡ false → closed c ≡ false → After (p ⊕ [ ix 0 ]) (headˢ (step (gh b)))
 Clear p a (inBody (cs cl true sa ba as nothing r en) o c) s =
   (Events∞.force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) ≡ hush
@@ -134,6 +134,70 @@ Lead ⟨ c , s , rising (nx a) , p ⟩ = Clear p a c s
 Lead ⟨ c , s , rising cp , p ⟩     = Ends p c s
 Lead ⟨ c , s , subscribing , p ⟩   = showsᶜ c true ≡ true → Ahead (Under (_≡ p)) c true
 Lead ⟨ c , s , absorbed , p ⟩      = ⊤
+
+-- A value shows only under an open observer.
+out-open : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) m {a : A} → outOf c s m ≡ shows (nx a) → closed c ≡ false
+out-open c (pend o)                        m = λ ()
+out-open c (coldS b l)                     leafM with peek l
+... | nothing        = λ ()
+... | just nothing   with closed c
+...   | false = λ _ → refl
+...   | true  = λ ()
+out-open c (coldS b l)                     leafM | just (just _) with b | closed c
+...   | true  | false = λ _ → refl
+...   | true  | true  = λ ()
+...   | false | _     = λ ()
+out-open c (coldS b l)                     ofM = λ ()
+out-open c (coldS b l)                     attM = λ ()
+out-open c (coldS b l)                     bodyM = λ ()
+out-open c (coldS b l)                     srcAttM = λ ()
+out-open c (coldS b l)                     owedM = λ ()
+out-open c (coldS b l)                     cpM = λ ()
+out-open c (coldS b l)                     cutM = λ ()
+out-open c (coldS b l)                     joinM = λ ()
+out-open c (ofS i p xs)                    ofM with closed c
+... | false = λ _ → refl
+... | true  = λ ()
+out-open c (ofS i p xs)                    attM = λ ()
+out-open c (ofS i p xs)                    bodyM = λ ()
+out-open c (ofS i p xs)                    srcAttM = λ ()
+out-open c (ofS i p xs)                    owedM = λ ()
+out-open c (ofS i p xs)                    cpM = λ ()
+out-open c (ofS i p xs)                    cutM = λ ()
+out-open c (ofS i p xs)                    joinM = λ ()
+out-open c (ofS i p xs)                    leafM = λ ()
+out-open c doneS                                    m = λ ()
+out-open c (mapS f s)                               m = λ ()
+out-open c (scanS f z s)                            m = λ ()
+out-open c (cutS l x s)                             m = λ ()
+out-open c (lnS b s)                                m = λ ()
+out-open c (takeS i q free s)                       m = λ ()
+out-open c (takeS i q (cutAt r) s)                  m = λ ()
+out-open c (takeS i q (overAt r) s)                 m = λ ()
+out-open c (flatS op f d n q o ls)                  m = λ ()
+out-open c (connS k o b)                            m = λ ()
+out-open c (joinS j g x [])                         m = λ ()
+out-open c (takeS i q (cpAt r) s)          ofM = λ ()
+out-open c (takeS i q (cpAt r) s)          attM = λ ()
+out-open c (takeS i q (cpAt r) s)          bodyM = λ ()
+out-open c (takeS i q (cpAt r) s)          srcAttM = λ ()
+out-open c (takeS i q (cpAt r) s)          owedM = λ ()
+out-open c (takeS i q (cpAt r) s)          cpM = λ ()
+out-open c (takeS i q (cpAt r) s)          cutM = λ ()
+out-open c (takeS i q (cpAt r) s)          joinM = λ ()
+out-open c (takeS i q (cpAt r) s)          leafM = λ ()
+out-open c (joinS j false x (_ ∷ ib))      joinM = λ ()
+out-open c (joinS j true x (_ ∷ ib))       joinM with closed c
+... | false = λ _ → refl
+... | true  = λ ()
+out-open c (joinS j g x (_ ∷ ib))          ofM = λ ()
+out-open c (joinS j g x (_ ∷ ib))          attM = λ ()
+out-open c (joinS j g x (_ ∷ ib))          bodyM = λ ()
+out-open c (joinS j g x (_ ∷ ib))          srcAttM = λ ()
+out-open c (joinS j g x (_ ∷ ib))          owedM = λ ()
+out-open c (joinS j g x (_ ∷ ib))          cpM = λ ()
+out-open c (joinS j g x (_ ∷ ib))          cutM = λ ()
+out-open c (joinS j g x (_ ∷ ib))          leafM = λ ()
 
 whole : ∀ {R} → Conf R → St [] R
 whole ⟨ c , s , m , p ⟩ = plug c s
@@ -281,9 +345,6 @@ postulate
             → Frag (plug c (flatS op f d n q o ls)) → Frag (flatS op f d n q o ls)
   -- A connect's body in a fragment tree is of the fragment.
   frag-body : ∀ {R Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) → Frag (plug c (connS k o b)) → Frag b
-  -- A connect in a fragment tree is under no closed frame: a cut off lane
-  -- and a completed source hold none.
-  frag-open : ∀ {R Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) → Frag (plug c (connS k o b)) → closed c ≡ false
 
 ------------------------------------------------------------------------
 -- From the race to the stepper's heads
@@ -455,42 +516,42 @@ won-ahead k (inBody (cs cl false sa ba as ow r en) o c)      s f w ft ()
 
 -- Up the found node's frames: each one the value reaches is clear there.
 -- `s` is the node the search saw, `s′` the one the rise leaves.
-won-clear : ∀ {R Γ A} p (a : A) (c : Ctx R Γ A) (s s′ : St Γ A) → alive s ≡ alive s′
+won-clear : ∀ {R Γ A} p (a : A) (c : Ctx R Γ A) (s s′ : St Γ A) → alive s ≡ alive s′ → closed c ≡ false
           → Won (at p , shows (nx a)) c s → Frag (plug c s) → Clear p a c s′
-won-clear p a top                               s s′ al w ft = tt
-won-clear p a (inMap f c)                       s s′ al w ft = won-clear p (f a) c (mapS f s) (mapS f s′) refl w ft
-won-clear p a (inScan f z c)                    s s′ al w ft = won-clear p (f z a) c (scanS f z s) (scanS f (f z a) s′) refl w ft
-won-clear p a (inCut true x c)                  s s′ al w ft = λ _ → won-clear p a c (cutS true x s) (cutS true x s′) refl w ft
-won-clear p a (inCut false x c)                 s s′ al w ft = λ ()
-won-clear p a (inLn b c)                        s s′ al w ft = won-clear p a c (lnS b s) (lnS b s′) refl w ft
-won-clear p a (inTake i q free c)               s s′ al w ft with q a | i
-... | true  | _     = (λ _ → won-clear p a c (takeS _ q free s) (takeS _ q free s′) refl w ft) , (λ ())
-... | false | true  = (λ ()) , (λ _ _ → won-clear (p ⊕ [ ix 0 ]) a c (takeS true q free s) (takeS true q (cpAt p) s′) refl w ft)
+won-clear p a top                               s s′ al ce w ft = tt
+won-clear p a (inMap f c)                       s s′ al ce w ft = won-clear p (f a) c (mapS f s) (mapS f s′) refl ce w ft
+won-clear p a (inScan f z c)                    s s′ al ce w ft = won-clear p (f z a) c (scanS f z s) (scanS f (f z a) s′) refl ce w ft
+won-clear p a (inCut true x c)                  s s′ al ce w ft = λ _ → won-clear p a c (cutS true x s) (cutS true x s′) refl ce w ft
+won-clear p a (inCut false x c)                 s s′ al ce w ft = λ ()
+won-clear p a (inLn b c)                        s s′ al ce w ft = won-clear p a c (lnS b s) (lnS b s′) refl ce w ft
+won-clear p a (inTake i q free c)               s s′ al ce w ft with q a | i
+... | true  | _     = (λ _ → won-clear p a c (takeS _ q free s) (takeS _ q free s′) refl ce w ft) , (λ ())
+... | false | true  = (λ ()) , (λ _ _ → won-clear (p ⊕ [ ix 0 ]) a c (takeS true q free s) (takeS true q (cpAt p) s′) refl ce w ft)
 ... | false | false = (λ ()) , (λ _ ())
-won-clear p a (inTake i q (cpAt r) c)           s s′ al w ft = tt
-won-clear p a (inTake i q (cutAt r) c)          s s′ al w ft = tt
-won-clear p a (inTake i q (overAt r) c)         s s′ al w ft = tt
-won-clear p a (inOuter op f true n q ls c)      s s′ al (_ , _ , ()) ft
-won-clear p a (inOuter op f false n q ls c)     s s′ al (r , w , u) ft =
+won-clear p a (inTake i q (cpAt r) c)           s s′ al ce w ft = tt
+won-clear p a (inTake i q (cutAt r) c)          s s′ al ce w ft = tt
+won-clear p a (inTake i q (overAt r) c)         s s′ al ce w ft = tt
+won-clear p a (inOuter op f true n q ls c)      s s′ al ce (_ , _ , ()) ft
+won-clear p a (inOuter op f false n q ls c)     s s′ al ce (r , w , u) ft =
   cl , proj₁ ol , proj₂ ol , won-ahead (p ⊕ [ ix 0 ]) c (flatS op f false n q s ls) true w ft
   where
     cl    = unrisen-open (closed c) u
     parts = frag-parts op f false n q s ls (frag-flat c op f false n q s ls ft)
     ol    = outer-link c p op f n q s ls ft (race-steps KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) r)
               (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
-won-clear p a (inLanes op f d n q o pre post c) s s′ al (l , _ , w) ft lv =
-  (λ cl → lane-sides p c op f d n q o pre post s cl l ft (frag-flat c op f d n q o (pre ʳ++ s ∷ post) ft))
-  , won-clear p a c (flatS op f d n q o (pre ʳ++ s ∷ post)) (flatS op f d n q o (pre ʳ++ s′ ∷ post)) refl
+won-clear p a (inLanes op f d n q o pre post c) s s′ al ce (l , _ , w) ft lv =
+  lane-sides p c op f d n q o pre post s ce l ft (frag-flat c op f d n q o (pre ʳ++ s ∷ post) ft)
+  , won-clear p a c (flatS op f d n q o (pre ʳ++ s ∷ post)) (flatS op f d n q o (pre ʳ++ s′ ∷ post)) refl ce
       (lane-on d n q {alive s} {at p} a {c} {flatS op f d n q o (pre ʳ++ s ∷ post)} (trans al lv) w) ft
-won-clear p a (inSrc kk b c)                    s s′ al (w , _) ft with over kk
+won-clear p a (inSrc kk b c)                    s s′ al ce (w , _) ft with over kk
 ... | true  = λ ()
 ... | false = λ _ cl → after-step (p ⊕ [ ix 0 ]) (cand (inBody kk s c) b) (step (gh b)) w (open-agrees (inBody kk s c) b cl (frag-body c kk s b ft))
-won-clear p a (inBody (cs cl true sa ba as nothing r en) o c) s s′ al (_ , lo , bf , w) ft =
-  proj₁ bb , proj₂ bb , won-clear p a c (connS (cs cl true sa ba as nothing r en) o s) (connS (cs cl true sa ba as nothing r en) o s′) refl w ft
-  where bb = body-link p c (cs cl true sa ba as nothing r en) o s ft (frag-open c (cs cl true sa ba as nothing r en) o s ft) refl lo bf
-won-clear p a (inBody (cs cl true sa ba as (just _) r en) o c)  s s′ al (() , _) ft
-won-clear p a (inBody (cs cl false sa ba as (just _) r en) o c) s s′ al (() , _) ft
-won-clear p a (inBody (cs cl false sa ba as nothing r en) o c)  s s′ al (() , _) ft
+won-clear p a (inBody (cs cl true sa ba as nothing r en) o c) s s′ al ce (_ , lo , bf , w) ft =
+  proj₁ bb , proj₂ bb , won-clear p a c (connS (cs cl true sa ba as nothing r en) o s) (connS (cs cl true sa ba as nothing r en) o s′) refl ce w ft
+  where bb = body-link p c (cs cl true sa ba as nothing r en) o s ft ce refl lo bf
+won-clear p a (inBody (cs cl true sa ba as (just _) r en) o c)  s s′ al ce (() , _) ft
+won-clear p a (inBody (cs cl false sa ba as (just _) r en) o c) s s′ al ce (() , _) ft
+won-clear p a (inBody (cs cl false sa ba as nothing r en) o c)  s s′ al ce (() , _) ft
 
 -- A lane's completion passes its flatMap's retag as the lane's end.
 lane-off : ∀ {R Γ A B} d n (q : List A) {b} {k} {c : Ctx R Γ B} {t} → b ≡ true

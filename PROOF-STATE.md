@@ -10,15 +10,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE FLIGHT KEPT
 
-Untried: a rise through a merge or an outer, a body's end, a subscribe
+Untried: a lane's end, an outer's value or end, a body's end, a subscribe
 beginning a former, and a mark run each leave the hole's run in shape and
 every frame above keyed against it (`adequacy.Engine.Above.Flight`). A frame
-of one child and a body's value are proven. Settled by the merge's run rising
-as its lane's does.
+of one child, a lane's value and a body's value are proven. Settled by a
+lane's end dequeuing as the merge's run does.
 
-Members: `rise-lane-flight`, `rise-lane-end-flight`,
-`rise-body-end-flight`, `rise-admit-flight`, `rise-outer-end-flight`,
-`begin-flight`, `run-flight`, `flight-load`, `flight-held`.
+Members: `rise-lane-end-flight`, `rise-body-end-flight`, `rise-admit-flight`,
+`rise-outer-end-flight`, `begin-flight`, `run-flight`, `flight-load`,
+`flight-held`.
 
 #### THE KEYS KEPT
 
@@ -175,8 +175,9 @@ The search's found node leads every race above it, and shows out of no body
 whose connect is over; a step keeps the tree in the fragment. Probed on the
 spike engine. Settled when each is a body.
 
-Members: `search-hit`, `search-won`, `found-own`, `frag-next`, `run-lead`, `frag-flat`,
-`frag-body`, `frag-open`, `sides-link`, `limited-sides`, `outer-link`, `body-link`.
+Members: `search-hit`, `search-won`, `found-own`, `frag-next`, `run-lead`,
+`frag-flat`, `frag-body`, `sides-link`, `limited-sides`, `outer-link`,
+`body-link`.
 
 #### THE HEADS
 

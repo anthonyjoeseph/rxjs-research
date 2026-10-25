@@ -18,7 +18,7 @@ open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; reverse)
 open import Data.List.Properties using (++-assoc; ++-identityʳ; ʳ++-defn)
-open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
+open import Data.List.Relation.Unary.All using (All) renaming (_∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
@@ -36,7 +36,7 @@ open import adequacy.Engine.Meaning using (_≋_; ≋-by; ≋-out; mapped; scann
   lane; lanesL; liveL; deadL; deadOne; holeL; holeT; tailsOn; poolG; poolT; outerT; outerG; laneRuns; poolRuns; gh; envAt; hole; flagOf; risen; endingAt)
   renaming (outerOf to outerOfᴹ)
 open import adequacy.Engine.Keys using (Shape; Shape′; TakeAt; FlatAt; LaneKeys; _∷ᴷ_; ConnAt; Keyed; KeyedL; Keys; srcIn)
-open import adequacy.Placed.Order using (Headed; Disjoint; Ext; Owned; Prefix; every; everyT-mono; ext; owned-ext; prefix-++)
+open import adequacy.Placed.Order using (Sorted; Headed; Disjoint; Ext; Owned; Prefix; every; everyT-mono; ext; owned-ext; prefix-++)
 open import adequacy.Placed.Keys using (ix-mark; last-mark; prefix-refl; prefix-plus; prefix-lane; tagged-mark)
 open import adequacy.Placed.Burst using (owned-drop; freshᴿ)
 open import adequacy.Placed.Trail using (trail; spread)
@@ -68,8 +68,9 @@ srcRunning : ∀ {X} → Bool → Events∞ X → Events∞ X
 srcRunning false h = h
 srcRunning {X} true h = rested {B = X} h
 
--- Every frame above the hole keeping its own, its siblings keyed and a
--- connect's source in shape, the hole's run `h` in its child's place.
+-- Every frame above the hole keeping its own, its siblings keyed, a
+-- lane's siblings and a connect's source in shape, the hole's run `h` in
+-- its child's place.
 Above : ∀ {R Γ A} → Ctx R Γ A → Bool → Events∞ A → Set
 Above top                               f h = ⊤
 Above (inMap g c)                       f h = Above c true (mapped g h)
@@ -83,7 +84,9 @@ Above (inOuter op g d n q ls c)         f h =
 Above (inLanes op g d n q o pre post c) f h =
   (FlatAt (envAt c) (outerᴺ (lane g) (outerG d (gh o)) (envAt c)) (laneRuns (reverse pre) post f (envAt c) h)
           (outerT d (gh o) (envAt c) (poolRuns (reverse pre) post f (envAt c) h))
-   × Keyed o (envAt c) × KeyedL pre (envAt c) × KeyedL post (envAt c))
+   × Keyed o (envAt c) × KeyedL pre (envAt c) × KeyedL post (envAt c)
+   × Sorted (envAt c) × Shape (stateᴺ (gh o) (envAt c)) × All Shape (states (lanesL (reverse pre)) (envAt c))
+   × All Shape (states (lanesL post) (envAt c)))
   × Above c true (lanesFrame op (lane g) d q (gh o) (reverse pre) post f (envAt c) h)
 Above (inSrc k b c)                     f h =
   (ConnAt k (stateᴺ (gh b) (fedRun (CS.closed k) (CS.endAt k) h ∷ᴬ envAt c)) (srcRunning (CS.closed k) h) (envAt c)

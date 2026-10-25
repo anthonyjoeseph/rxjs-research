@@ -14,25 +14,29 @@ module adequacy.Engine.Flown where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥-elim)
-open import Data.List using (_∷_; _ʳ++_; [_]; null)
-open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
+open import Data.List using (_∷_; _++_; _ʳ++_; [_]; null; reverse)
+import Data.List as L
+open import Data.List.Relation.Unary.All using (All) renaming (_∷_ to _∷ᴬ_)
+open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to All++⁺)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (pred)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
 open import Tree using (Obs)
 open import denotation.MonotonicList.Events using (Events; Events∞; Timeline; out; skip; end; hush; idle; ix; _∪_)
 import denotation.MonotonicList as M′
-open import denotation.Unfold using (NEnv; Node; Source; live; meaning; connectᶜ; stateᴺ; cutᴺ)
-open import adequacy.Engine.Meaning using (≋-by; ≋-out; envAt; gh; srcG; srcRun; srcState; risen)
-open import adequacy.Engine.Keys using (Shape′; module ConnAt)
-open import adequacy.Engine.Trails using (beside-go)
+open import denotation.Unfold using (NEnv; Node; Source; live; meaning; connectᶜ; stateᴺ; cutᴺ; states; outerᴺ)
+open import denotation.Denote using (flatOp)
+open import adequacy.Engine.Meaning using (_≋_; ≋-by; ≋-out; envAt; gh; srcG; srcRun; srcState; risen; lanesFrame; lane; lanesL; outerG; outerT;
+  poolRuns; laneRuns; laneᴹ; flagOf)
+open import adequacy.Engine.Keys using (Shape; Shape′; module ConnAt)
+open import adequacy.Engine.Trails using (beside-go; module FlatShape; gen-queue; held-of)
 open import adequacy.Engine.Beside using (burst-hushed)
-open import adequacy.Engine.Race using (NotBefore)
+open import adequacy.Engine.Race using (NotBefore; First; go-rise; cuts-swap)
 open import adequacy.Engine.Ahead using (shown)
-open import adequacy.Engine.Above using (Flight; above-≋; take-true; take-incl)
+open import adequacy.Engine.Above using (Above; Flight; above-≋; take-true; take-incl; toʳ; lanes-L; lanes-P)
 open import adequacy.Engine.Pick using (Order; module Order)
 open import adequacy.Placed.Order using (Ordered; Steady; Every; EveryT; Headed; Atop; Past; Disjoint; ordered; steady; every;
   ordered-map; ordered-scan; steady-map; steady-scan)
@@ -72,6 +76,47 @@ conn-run r n (Source.ended c t) ρ = refl , refl
 body-out : ∀ {X B} r (σ : Events∞ X) q {y : Events B} {p b β} → y ≡ out p b β
          → Σ (Events∞ B) λ t → M′.body r σ q y ≡ out p b t × force t ≡ M′.ahead r β σ q (M′.before q (force β)) × cut t ≡ M′.burstOn r σ ∪ cut β
 body-out r σ q refl = _ , refl , refl , refl
+
+-- What the flatMap leaves running is what it left: the lane's tail is
+-- its rise's.
+lanes-cut : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) (ρ : NEnv Γ) b p → flagOf s ≡ true
+          → cut (lanesFrame op (lane f) d q (gh o) pre post true ρ (risen (gh s) ρ (nx b) p)) ≡ cutᴺ (gh (flatS op f d n q o (pre ++ s ∷ post))) ρ
+lanes-cut op f d n q o pre post s ρ b p fl =
+  trans (cong (λ z → M′.cutᴼ O ∪ z ∪ T) (cuts-swap Ls (risen (gh s) ρ (nx b) p) (stateᴺ (gh s) ρ) Rs refl))
+    (cong₂ (M′.whole O) (sym (lanes-L pre s post ρ fl)) (lanes-P d o pre s post ρ fl))
+  where
+    O  = outerᴺ (lane f) (outerG d (gh o)) ρ
+    Ls = states (lanesL post) ρ
+    Rs = states (lanesL pre) ρ
+    T  = outerT d (gh o) ρ (poolRuns pre post true ρ (stateᴺ (gh s) ρ))
+
+-- A lane's value, first among its flatMap's parts, is the flatMap's: the
+-- merge's run shows it, the flatMap's run behind it.
+lanes-out : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) (ρ : NEnv Γ) b p → flagOf s ≡ true
+          → First p (outerᴺ (lane f) (outerG d (gh o)) ρ) (states (lanesL post) ρ) (states (lanesL pre) ρ)
+              (outerT d (gh o) ρ (poolRuns pre post true ρ (stateᴺ (gh s) ρ)))
+          → Σ (Events∞ B) λ t → force (lanesFrame op (lane f) d q (gh o) pre post true ρ (risen (gh s) ρ (nx b) p)) ≡ out p b t
+              × force t ≡ force (stateᴺ (gh (flatS op f d n q o (pre ++ s ∷ post))) ρ)
+              × cut t ≡ cut (stateᴺ (gh (flatS op f d n q o (pre ++ s ∷ post))) ρ)
+lanes-out op f d n q o pre post s ρ b p fl fi =
+  _ , go-rise (flatOp op) O Ls (risen (gh s) ρ (nx b) p) Rs Q T refl fi
+    , cong₂ (λ ls t → M′.go (flatOp op) O ls Q t) (sym L) P , cong₂ (M′.whole O) (sym L) P
+  where
+    O  = outerᴺ (lane f) (outerG d (gh o)) ρ
+    Ls = states (lanesL post) ρ
+    Rs = states (lanesL pre) ρ
+    Q  = L.map (laneᴹ (lane f) ρ) q
+    T  = outerT d (gh o) ρ (poolRuns pre post true ρ (stateᴺ (gh s) ρ))
+    L  = lanes-L pre s post ρ fl
+    P  = lanes-P d o pre s post ρ fl
+
+lanes-rise : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) (ρ : NEnv Γ) b p → flagOf s ≡ true
+           → First p (outerᴺ (lane f) (outerG d (gh o)) ρ) (states (lanesL post) ρ) (states (lanesL pre) ρ)
+               (outerT d (gh o) ρ (poolRuns pre post true ρ (stateᴺ (gh s) ρ)))
+           → lanesFrame op (lane f) d q (gh o) pre post true ρ (risen (gh s) ρ (nx b) p) ≋ risen (gh (flatS op f d n q o (pre ++ s ∷ post))) ρ (nx b) p
+lanes-rise op f d n q o pre post s ρ b p fl fi =
+  ≋-out (proj₁ (proj₂ lo)) refl (proj₁ (proj₂ (proj₂ lo))) (proj₂ (proj₂ (proj₂ lo))) (lanes-cut op f d n q o pre post s ρ b p fl)
+  where lo = lanes-out op f d n q o pre post s ρ b p fl fi
 
 -- A body's value its source is no earlier than shows first, the
 -- connect's run behind it.
@@ -162,9 +207,6 @@ module _ {R : Set} where
                       → Order ⟨ inOuter op f d n q ls c , s , rising (nx a) , p ⟩ → NextOwed (took (admit c op f d n q s ls a p))
     rise-outer-end-flight : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q ls (s : St Γ A) p
                           → Order ⟨ inOuter op f d n q ls c , s , rising cp , p ⟩ → Owed ⟨ c , flatS op f true n q s ls , settle true n (null q) , p ⟩
-    rise-lane-flight : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) b p
-                     → Order ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩ → alive s ≡ true
-                     → Flight ⟨ c , flatS op f d n q o (pre ʳ++ s ∷ post) , rising (nx b) , p ⟩
     rise-lane-end-flight : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) p
                          → Order ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → alive s ≡ true
                          → Owed (dequeue c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p)
@@ -172,6 +214,37 @@ module _ {R : Set} where
                          → Flight ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
     begin-flight : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Order ⟨ c , pend o , subscribing , p ⟩
                  → NextOwed (step ⟨ c , pend o , subscribing , p ⟩)
+
+  -- A lane's value rises out of its flatMap first among the merge's
+  -- parts, its siblings in shape: the merge's run shows it first.
+  rise-lane-flight : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) b p
+                   → Order ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩ → alive s ≡ true
+                   → Flight ⟨ c , flatS op f d n q o (pre ʳ++ s ∷ post) , rising (nx b) , p ⟩
+  rise-lane-flight c op f d n q o pre post s b p od a =
+    toʳ (λ ls → Flight ⟨ c , flatS op f d n q o ls , rising (nx b) , p ⟩) pre
+      ( subst (Shape′ (out p b (stateᴺ (gh F) ρ))) (lanes-cut op f d n q o (reverse pre) post s ρ b p a)
+          (shape-out p b (proj₁ (proj₂ (proj₂ lo))) (proj₂ (proj₂ (proj₂ lo))) (subst (λ x → Shape′ x (cut H)) (proj₁ (proj₂ lo)) sh))
+      , above-≋ c true (lanes-rise op f d n q o (reverse pre) post s ρ b p a fi) (proj₂ ab))
+    where
+      ρ  = envAt c
+      h  = risen (gh s) ρ (nx b) p
+      F  = flatS op f d n q o (reverse pre ++ s ∷ post)
+      H  = lanesFrame op (lane f) d q (gh o) (reverse pre) post true ρ h
+      ab = subst (λ x → Above (inLanes op f d n q o pre post c) x h) a (proj₂ (Order.flight od))
+      fi = proj₁ (Order.lead od a)
+      lo = lanes-out op f d n q o (reverse pre) post s ρ b p a fi
+      fa = proj₁ (proj₁ ab)
+      so′ = proj₂ (proj₂ (proj₂ (proj₂ (proj₁ ab))))
+      pk = proj₁ fa
+      hp = proj₁ (proj₂ fa)
+      cl = proj₁ (proj₂ (proj₂ fa))
+      ks = proj₂ (proj₂ (proj₂ (proj₂ fa)))
+      shs : All Shape (laneRuns (reverse pre) post true ρ h)
+      shs = All++⁺ (proj₂ (proj₂ (proj₂ so′))) (proj₁ (Order.flight od) ∷ᴬ proj₁ (proj₂ (proj₂ so′)))
+      sh : Shape′ (force H) (cut H)
+      sh = FlatShape.flat-shape pk (flatOp op) _ _ _ _ (FlatShape.roots-of pk shs (proj₁ ks)) (proj₁ (proj₂ ks)) (proj₁ (proj₂ (proj₂ ks)))
+             (gen-queue pk f ρ hp (proj₁ so′) cl q) (held-of pk f d o ρ hp (proj₁ so′) cl (proj₁ (proj₂ so′)) (proj₁ (proj₂ (proj₂ (proj₂ ks)))))
+             (proj₂ (proj₂ (proj₂ (proj₂ ks))))
 
   -- A body's value rises out of its connect only while the connect is
   -- live, its source no earlier: the connect's run shows it first.

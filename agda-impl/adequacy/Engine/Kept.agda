@@ -29,7 +29,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Unit using (tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; cong; cong₂; trans)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; cong; cong₂)
 
 open import Tree using (Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Time; Frame; From; From∞; Timeline; timelineAt;
@@ -53,11 +53,12 @@ open import adequacy.Engine.Meaning using (Has; M; _≅_; _≋_; agree-≅; atOu
   lift-≅; outerFrame; outerG; outerOf; outerT; pastOut; poolG; poolRuns; queue-refl; rested;
   risen; same; srcFrame; srcG; srcRun; subOr; taken; taking∞; tape; took; up; lift-ne; ≅-refl;
   ≅-trans; ≈-refl; ≋-by; ≋-out; ≋-tr; ≋-trans)
+open import adequacy.Engine.Flown using (lanes-cut; lanes-rise)
 open import adequacy.Engine.Inv using (Unpended; Opened; Wf; Base; module Base; Inv; module Inv; inv-at; wfI; wf-split; Owns; ofO;
   attO; cpO; cutO; bodyO; srcAttO; owedO; joinO; leafO; owned; search-hit)
-open import adequacy.Engine.Race using (First; go-rise; cuts-swap)
+open import adequacy.Engine.Race using (First)
 open import adequacy.Engine.Keys using (Held)
-open import adequacy.Engine.Above using (take-true; take-incl; take-excl; lanes-runs; pool-runs; toʳ; lanes-L; lanes-P)
+open import adequacy.Engine.Above using (take-true; take-incl; take-excl; lanes-runs; pool-runs; toʳ)
 open import adequacy.Engine.Pick using (module Order; Clear; Apart)
 
 open Events∞
@@ -260,10 +261,10 @@ module _ {R : Set} where
 
   -- THE ORDER: a lane's value rises first among its flatMap's parts.
   lanes-first : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (c : Ctx R Γ B) (s : St Γ B) b p
-              → Inv ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩ → flagOf s ≡ true → closed c ≡ false
+              → Inv ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩ → flagOf s ≡ true
               → First p (outerᴺ (lane f) (outerG d (gh o)) (envAt c)) (states (lanesL post) (envAt c)) (states (lanesL (reverse pre)) (envAt c))
                   (outerT d (gh o) (envAt c) (poolRuns (reverse pre) post true (envAt c) (stateᴺ (gh s) (envAt c))))
-  lanes-first op f d n q o pre post c s b p v fl ce = proj₁ (Order.lead (Inv.ord v) fl) ce
+  lanes-first op f d n q o pre post c s b p v fl = proj₁ (Order.lead (Inv.ord v) fl)
 
   ----------------------------------------------------------------------
   -- A configuration focused anywhere means what its whole tree means
@@ -295,19 +296,6 @@ module _ {R : Set} where
   ----------------------------------------------------------------------
   -- A rise, by the frame it passes
 
-  -- What the flatMap leaves running is what it left: the lane's tail is
-  -- its rise's.
-  lanes-cut : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) (ρ : NEnv Γ) b p → flagOf s ≡ true
-            → cut (lanesFrame op (lane f) d q (gh o) pre post true ρ (risen (gh s) ρ (nx b) p)) ≡ cutᴺ (gh (flatS op f d n q o (pre ++ s ∷ post))) ρ
-  lanes-cut op f d n q o pre post s ρ b p fl =
-    trans (cong (λ z → M′.cutᴼ O ∪ z ∪ T) (cuts-swap Ls (risen (gh s) ρ (nx b) p) (stateᴺ (gh s) ρ) Rs refl))
-      (cong₂ (M′.whole O) (sym (lanes-L pre s post ρ fl)) (lanes-P d o pre s post ρ fl))
-    where
-      O  = outerᴺ (lane f) (outerG d (gh o)) ρ
-      Ls = states (lanesL post) ρ
-      Rs = states (lanesL pre) ρ
-      T  = outerT d (gh o) ρ (poolRuns pre post true ρ (stateᴺ (gh s) ρ))
-
   -- A lane's value, first among its flatMap's parts, is the flatMap's.
   rise-lanes-true : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (c : Ctx R Γ B) (s : St Γ B) b p
                   → flagOf s ≡ true
@@ -315,20 +303,7 @@ module _ {R : Set} where
                       (outerT d (gh o) (envAt c) (poolRuns pre post true (envAt c) (stateᴺ (gh s) (envAt c))))
                   → up c true (lanesFrame op (lane f) d q (gh o) pre post true (envAt c) (risen (gh s) (envAt c) (nx b) p))
                   ≅ up c true (risen (gh (flatS op f d n q o (pre ++ s ∷ post))) (envAt c) (nx b) p)
-  rise-lanes-true op f d n q o pre post c s b p fl fi =
-    lift-≅ c true (≋-out (go-rise (flatOp op) O Ls (risen (gh s) ρ (nx b) p) Rs Q T refl fi) refl
-      (cong₂ (λ ls t → M′.go (flatOp op) O ls Q t) (sym L) P)
-      (cong₂ (M′.whole O) (sym L) P)
-      (lanes-cut op f d n q o pre post s ρ b p fl))
-    where
-      ρ  = envAt c
-      O  = outerᴺ (lane f) (outerG d (gh o)) ρ
-      Ls = states (lanesL post) ρ
-      Rs = states (lanesL pre) ρ
-      Q  = Data.List.map (laneᴹ (lane f) ρ) q
-      T  = outerT d (gh o) ρ (poolRuns pre post true ρ (stateᴺ (gh s) ρ))
-      L  = lanes-L pre s post ρ fl
-      P  = lanes-P d o pre s post ρ fl
+  rise-lanes-true op f d n q o pre post c s b p fl fi = lift-≅ c true (lanes-rise op f d n q o pre post s (envAt c) b p fl fi)
 
   -- A lane's value under a closed observer: the flatMap is read through
   -- its tail alone, and the lane's tail is its rise's.
@@ -369,7 +344,7 @@ module _ {R : Set} where
   rise-lanes-nx op f d n q o pre post c s b p v with flagOf s in fl | closed c in ce
   ... | true  | true  = toʳ (Rose op f d n q o pre post c s b p) pre (lanes-closed op f d n q o (reverse pre) post c s b p fl ce)
   ... | true  | false = toʳ (Rose op f d n q o pre post c s b p) pre
-                          (rise-lanes-true op f d n q o (reverse pre) post c s b p fl (lanes-first op f d n q o pre post c s b p v fl ce))
+                          (rise-lanes-true op f d n q o (reverse pre) post c s b p fl (lanes-first op f d n q o pre post c s b p v fl))
   ... | false | _     = toʳ (Dead op f d n q o pre post c s (nx b) p) pre (lane-dead op f d n q o (reverse pre) post c s (nx b) p fl)
 
   rise-lanes : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (c : Ctx R Γ B) (s : St Γ B) p
