@@ -12,12 +12,13 @@
 -- close and defer where it is shown links past every live source above
 -- it (`adequacy.Engine.Shown.Links`): the body fed the rest erased of the
 -- body fed the run, or past skips under the source's
--- (`adequacy.Engine.Shown.src-fed`), and after each source skip shows
+-- (`adequacy.Engine.Shown.src-fed`), owing the source nothing
+-- (`adequacy.Engine.Shown.caught`), and after each source skip shows
 -- (`adequacy.Engine.Shown.src-body-on`).
 module quickcheck.KeptDepth where
 
 open import Data.Bool using (Bool; true; false; not; _∧_; _∨_; if_then_else_)
-open import Data.List using (List; []; _∷_; upTo) renaming (map to mapL; _++_ to _++L_; _ʳ++_ to _ʳ++L_; reverse to reverseL)
+open import Data.List using (List; []; _∷_; upTo; null) renaming (map to mapL; _++_ to _++L_; _ʳ++_ to _ʳ++L_; reverse to reverseL)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_; _<ᵇ_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_)
@@ -27,7 +28,7 @@ open import Data.String using (String; _++_)
 
 open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Tail∞; pin; idle; out; skip; end; hush; Pos; _<ᵖ_; inside; ix)
 open import Tree using (defer; mergeᶠ; Later)
-open import Data.List.Relation.Unary.Any using (here)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (refl)
 open import quickcheck.Tm using (nat; bool; var)
 open import quickcheck.Code using (Code; Prog; of; takeWhile; flatMap; connect; connected; cold; script) renaming (defer to deferᶜ)
@@ -58,6 +59,7 @@ open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
 open import operation.PureObservable using () renaming (rest to restᵀ)
 open import denotation.MonotonicList.Events using (Frame∞; From∞; last)
 import denotation.Unfold as U
+open import Data.List.Membership.Propositional using (_∈_)
 
 private
   -- A run's verdict, carrying its longest run of steps meaning the same
@@ -272,6 +274,44 @@ private
     fedᵇ depth q β β′ ∧ afterAllᵇ v q (head (Events∞.force β′)) ∧ notUnderᵇ q (shown (Events∞.force h′))
     ∧ hushedᵇ (Events∞.force h′) (Events∞.cut h′) idle
 
+  -- Where connect `i` sits in scope, innermost first.
+  atᵇ : ∀ {Γ : List Set} {A : Set} → A ∈ Γ → ℕ
+  atᵇ (here _)  = 0
+  atᵇ (there j) = suc (atᵇ j)
+
+  -- `adequacy.Engine.Shown.Caught`, decided, `i` counted as `atᵇ` counts.
+  mutual
+    caughtᵇ : ∀ {Γ B} → ℕ → Pos → U.Node Γ B → Bool
+    caughtᵇ i q (U.mapᶜ f n)                 = caughtᵇ i q n
+    caughtᵇ i q (U.scanᶜ f z n)              = caughtᵇ i q n
+    caughtᵇ i q (U.takeWhileᶜ w t n)         = caughtᵇ i q n
+    caughtᵇ i q (U.flatMapᶜ op g o ls qs pl) = caughtᴹᵇ i q o ∧ caughtᴸᵇ i q ls ∧ caughtᵇ i q pl
+    caughtᵇ i q (U.joinᶜ j p xs nothing)     = not (atᵇ j ≡ᵇ i) ∨ (null xs ∧ (p <ᵖ q))
+    caughtᵇ i q (U.connectᶜ r b s)           = caughtᵇ (suc i) q b ∧ caughtˢᵇ i q s
+    caughtᵇ i q (U.deferᶜ l p ns)            = unnoticedᵇ i ns
+    caughtᵇ i q (U.endingᶜ p n)              = caughtᵇ i q n
+    caughtᵇ i q (U.restᶜ n)                  = caughtᵇ i q n
+    caughtᵇ i q (U.unionᶜ x y)               = caughtᵇ i q x ∧ caughtᵇ i q y
+    caughtᵇ i q (U.burstingᶜ r t)            = caughtᵇ i q t
+    caughtᵇ i q (U.underᶜ s b)               = caughtˢᵇ i q s ∧ caughtᵇ (suc i) q b
+    caughtᵇ i q _                            = true
+
+    caughtᴹᵇ : ∀ {Γ B} → ℕ → Pos → Maybe (U.Node Γ B) → Bool
+    caughtᴹᵇ i q nothing  = true
+    caughtᴹᵇ i q (just n) = caughtᵇ i q n
+
+    caughtᴸᵇ : ∀ {Γ B} → ℕ → Pos → List (U.Node Γ B) → Bool
+    caughtᴸᵇ i q []       = true
+    caughtᴸᵇ i q (n ∷ ns) = caughtᵇ i q n ∧ caughtᴸᵇ i q ns
+
+    caughtˢᵇ : ∀ {Γ B} → ℕ → Pos → U.Source Γ B → Bool
+    caughtˢᵇ i q (U.live s)    = caughtᵇ i q s
+    caughtˢᵇ i q (U.ended c t) = caughtᵇ i q t
+
+    unnoticedᵇ : ∀ {Γ} → ℕ → List (U.Notice Γ) → Bool
+    unnoticedᵇ i []                   = true
+    unnoticedᵇ i (U.notice j q a ∷ ns) = not (atᵇ j ≡ᵇ i) ∧ unnoticedᵇ i ns
+
   -- `adequacy.Engine.Shown.Links`, decided.
   linksᵇ : ∀ {R Γ A} → Bool → Pos → Ctx R Γ A → Bool → Events∞ A → Events∞ A → Bool
   linksᵇ v q top                          f h h′ = true
@@ -289,7 +329,7 @@ private
     linksᵇ v q c true (lanesFrame op (lane g) d w (gh o) (reverseL pre) post f (envAt c) h) (lanesFrame op (lane g) d w (gh o) (reverseL pre) post f (envAt c) h′)
   linksᵇ v q (inSrc (cs false true sa ba as nothing r en) b c) f h h′ =
     srcPassᵇ v q (U.stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (U.stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c)) h′
-    ∧ linksᵇ true q c true (connSrc false r en (gh b) (envAt c) h) (connSrc false r en (gh b) (envAt c) h′)
+    ∧ caughtᵇ 0 q (gh b) ∧ linksᵇ true q c true (connSrc false r en (gh b) (envAt c) h) (connSrc false r en (gh b) (envAt c) h′)
   linksᵇ v q (inSrc (cs false true sa ba as (just _) r en) b c) f h h′ = true
   linksᵇ v q (inSrc (cs false false sa ba as ow r en) b c)      f h h′ = true
   linksᵇ v q (inSrc (cs true sl sa ba as ow r en) b c)          f h h′ = true

@@ -10,14 +10,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SILENT RUN
 
-Refuted as one dropped skip (`quickcheck.KeptDepth`: a lane joined after its
-source's skip sees a later skip erased); restated: a skipped step drops its
-hole's leading skips and erases none or more past them. Open: each live
-source's link, its body fed the source's skips dropping and erasing its own,
-and a defer's fresh source among them. Settled when these are bodies, or
-refuted again.
+Probed (`quickcheck.KeptDepth` checks every link): a live source's body,
+owing the source nothing, fed its skips drops its own leading skips and
+erases none or more past them; whether nothing is owed, from the race, and
+the node-level lift through nested connects and lanes; a defer's fresh
+source among them. Settled when these are bodies, or refuted.
 
-Members: `src-fed`, `src-body-on`, `defer-links`.
+Members: `caught`, `node-fed`, `src-body-on`, `defer-links`.
 
 #### THE CLOSED LANE
 
