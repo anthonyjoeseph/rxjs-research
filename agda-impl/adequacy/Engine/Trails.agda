@@ -34,8 +34,9 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ctx; top; inMap; inScan; inCut; inLn;
   inTake; inOuter; inLanes; inSrc; inBody; plug; cs; CS; _⊕_)
 open import adequacy.Engine.Meaning using (vals; endOf; gh; envAt; srcG; srcRun; srcState; subOr; lane; lanesL; liveL; holeL; flagOf)
-open import adequacy.Engine.Above using (states-++; live-hole)
-open import adequacy.Engine.Keys using (Shape′; Shape; LaneKeys; []ᴷ; _∷ᴷ_; OuterKeys; outerOf; Fed; Joins; ConnAt; Held; here-at)
+open import adequacy.Engine.Above using (Above; states-++; live-hole)
+open import adequacy.Engine.Keys using (Shape′; Shape; LaneKeys; []ᴷ; _∷ᴷ_; OuterKeys; outerOf; Fed; Joins; ConnAt; Held; Here; Keyed; KeyedL; SubKeys; EndKeys;
+  keyed-at; keyedL-ʳ++)
 open import adequacy.Placed.Order using (every-lookup; sorted-headed; sorted-lookup; ordered-rejoin; steady-rejoin; Alienᴱ; Disjoint;
   Ordered; Owned; Sorted; Steady; Every; Every∞; EveryT; Everyᴱ; every-monoᴱ; Headed;
   every-mono; everyT-mono; prefix-++; every-tail; everyT-burstOn; everyT-idle; everyT-∪;
@@ -72,21 +73,6 @@ postulate
   reach-cut : ∀ (Rs : Rules) {Γ A} (o : Obs Timeline Γ A) k (ρ : NEnv Γ) → Rules.S Rs k → Everyᴱ (Rules.Src Rs) ρ
             → EveryT (Rules.P Rs) (cutᴺ (subscribe o k) ρ)
 
--- A SOURCE SUBSCRIBED AT ITS BODY'S MARK is subscribed under a head,
--- where no source of its environment has been.
-sub-headed : ∀ {R Γ X B} (e : Ctx R Γ B) cl sl sa p as ow r en (o : St Γ X) (b : St (X ∷ Γ) B)
-           → Held (plug e (connS (cs cl sl sa (just p) as ow r en) o b)) → Headed (p ⊕ (ix 1 ∷ []))
-sub-headed e cl sl sa p as ow r en o b h = proj₁ (ConnAt.sub (here-at e (connS (cs cl sl sa (just p) as ow r en) o b) h))
-
-sub-alien : ∀ {R Γ X B} (e : Ctx R Γ B) cl sl sa p as ow r en (o : St Γ X) (b : St (X ∷ Γ) B)
-          → Held (plug e (connS (cs cl sl sa (just p) as ow r en) o b)) → Alienᴱ (p ⊕ (ix 1 ∷ [])) (envAt e)
-sub-alien e cl sl sa p as ow r en o b h = proj₂ (ConnAt.sub (here-at e (connS (cs cl sl sa (just p) as ow r en) o b) h))
-
--- AN ENDED SOURCE ended under a head.
-ended-headed : ∀ {R Γ X B} (e : Ctx R Γ B) sl sa as ow r en (o : St Γ X) (b : St (X ∷ Γ) B)
-             → Held (plug e (connS (cs true sl sa nothing as ow r en) o b)) → Headed en
-ended-headed e sl sa as ow r en o b h = ConnAt.ends (here-at e (connS (cs true sl sa nothing as ow r en) o b) h)
-
 -- A RUN READ THROUGH ITS TAIL: what it leaves running, in order, steady
 -- and headed, trailing itself.
 shape-rest : ∀ {Γ A B} (n : Node Γ A) (ρ : NEnv Γ) → Shape (stateᴺ n ρ) → Shape (stateᴺ (restᶜ {B = B} n) ρ)
@@ -96,23 +82,23 @@ shape-rest n ρ ((_ , _ , et) , _) | c | st , _ | ft =
 
 -- A TAKEWHILE OWING ITS COMPLETION: its end, ahead of what its source
 -- leaves running.
-shape-ending : ∀ {R Γ A} (e : Ctx R Γ A) i p k (s : St Γ A) → Held (plug e (takeS i p (cpAt k) s))
-             → Shape (stateᴺ (gh s) (envAt e)) → Shape (stateᴺ (gh (takeS i p (cpAt k) s)) (envAt e))
-shape-ending e i p k s fs ((_ , _ , et) , tr) =
-  ((record { ordered = tt } , record { steady = tt }) , record { every = proj₁ (here-at e (takeS i p (cpAt k) s) fs) } , et) , tr′
-  where tr′ : Trail (end (k ⊕ (last ∷ []))) (cutᴺ (gh s) (envAt e))
-        trail  tr′ = proj₁ (trail tr) , proj₂ (here-at e (takeS i p (cpAt k) s) fs) , tt
+shape-ending : ∀ {Γ A} i p k (s : St Γ A) (ρ : NEnv Γ) → Here (takeS i p (cpAt k) s) ρ
+             → Shape (stateᴺ (gh s) ρ) → Shape (stateᴺ (gh (takeS i p (cpAt k) s)) ρ)
+shape-ending i p k s ρ hr ((_ , _ , et) , tr) =
+  ((record { ordered = tt } , record { steady = tt }) , record { every = proj₁ hr } , et) , tr′
+  where tr′ : Trail (end (k ⊕ (last ∷ []))) (cutᴺ (gh s) ρ)
+        trail  tr′ = proj₁ (trail tr) , proj₂ hr , tt
         trailᶠ tr′ = trailᶠ tr
 
 -- A TAKEWHILE: owing nothing, its source's run cut at the first value
 -- failing; cut or over, its source's tail.
-shape-take : ∀ {R Γ A} (e : Ctx R Γ A) i p w (s : St Γ A) → Held (plug e (takeS i p w s))
-           → Shape (stateᴺ (gh s) (envAt e)) → Shape (stateᴺ (gh (takeS i p w s)) (envAt e))
-shape-take e i p free       s fs (((o , st) , ev , et) , tr) =
+shape-take : ∀ {Γ A} i p w (s : St Γ A) (ρ : NEnv Γ) → Here (takeS i p w s) ρ
+           → Shape (stateᴺ (gh s) ρ) → Shape (stateᴺ (gh (takeS i p w s)) ρ)
+shape-take i p free       s ρ hr (((o , st) , ev , et) , tr) =
   ((ordered-take i p _ o , steady-take i p _ st) , Reach.every-take headedRules i p _ ev , et) , trail-take i p _ _ o st tr
-shape-take e i p (cpAt k)   s fs sh = shape-ending e i p k s fs sh
-shape-take e i p (cutAt k)  s fs sh = shape-rest (gh s) (envAt e) sh
-shape-take e i p (overAt k) s fs sh = shape-rest (gh s) (envAt e) sh
+shape-take i p (cpAt k)   s ρ hr sh = shape-ending i p k s ρ hr sh
+shape-take i p (cutAt k)  s ρ hr sh = shape-rest (gh s) ρ sh
+shape-take i p (overAt k) s ρ hr sh = shape-rest (gh s) ρ sh
 
 -- A connect's run and cut, read off its body's state and its source's.
 beside-go : ∀ {X B} p (hp : Headed p) (β : Events∞ B) (σ : Events∞ X) → Shape σ → Shape β
@@ -145,23 +131,22 @@ beside-shape p hp n (ended c t) ρ shS shB kb kr fr cu ks rs ub =
   beside-go p hp (stateᴺ n (end c ∷ᴬ ρ)) (stateᴺ t ρ) shS shB kb kr fr cu ks rs ub
 
 -- A connect done with neither, at its source's mark.
-conn-core : ∀ {R Γ X B} (e : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) (fs : Held (plug e (connS k o b)))
-     → Shape (srcState (srcG k o) (envAt e)) → Shape (stateᴺ (gh b) (envAt (inBody k o e)))
-     → Shape (stateᴺ (connectᶜ (CS.srcAt k) (gh b) (srcG k o)) (envAt e))
-conn-core e k o b fs shS shB =
-  subst (λ r → Shape (stateᴺ (connectᶜ r (gh b) (srcG k o)) (envAt e))) (sym (ConnAt.at m))
-    (beside-shape (ConnAt.mark m) (ConnAt.hm m) (gh b) (srcG k o) (envAt e) shS shB
+conn-core : ∀ {Γ X B} k (o : St Γ X) (b : St (X ∷ Γ) B) (ρ : NEnv Γ) (m : Here (connS k o b) ρ)
+     → Shape (srcState (srcG k o) ρ) → Shape (stateᴺ (gh b) (srcRun (srcG k o) ρ ∷ᴬ ρ))
+     → Shape (stateᴺ (connectᶜ (CS.srcAt k) (gh b) (srcG k o)) ρ)
+conn-core k o b ρ m shS shB =
+  subst (λ r → Shape (stateᴺ (connectᶜ r (gh b) (srcG k o)) ρ)) (sym (ConnAt.at m))
+    (beside-shape (ConnAt.mark m) (ConnAt.hm m) (gh b) (srcG k o) ρ shS shB
       (ConnAt.kb m) (ConnAt.kr m) (ConnAt.fr m) (ConnAt.cue m) (ConnAt.ks m) (ConnAt.rs m) (ConnAt.ub m))
-  where m = here-at e (connS k o b) fs
 
 -- A CONNECT: its body beside its source, read through its tail once it
 -- owes its completion or its source has gone.
-shape-conn : ∀ {R Γ X B} (e : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) → Held (plug e (connS k o b))
-           → Shape (srcState (srcG k o) (envAt e)) → Shape (stateᴺ (gh b) (envAt (inBody k o e)))
-           → Shape (stateᴺ (gh (connS k o b)) (envAt e))
-shape-conn e k@(cs cl sl sa ba as (just q) r en) o b fs shS shB = shape-rest (connectᶜ r (gh b) (srcG k o)) (envAt e) (conn-core e k o b fs shS shB)
-shape-conn e k@(cs cl false sa ba as nothing r en) o b fs shS shB = shape-rest (connectᶜ r (gh b) (srcG k o)) (envAt e) (conn-core e k o b fs shS shB)
-shape-conn e k@(cs cl true sa ba as nothing r en) o b fs shS shB = conn-core e k o b fs shS shB
+shape-conn : ∀ {Γ X B} k (o : St Γ X) (b : St (X ∷ Γ) B) (ρ : NEnv Γ) → Here (connS k o b) ρ
+           → Shape (srcState (srcG k o) ρ) → Shape (stateᴺ (gh b) (srcRun (srcG k o) ρ ∷ᴬ ρ))
+           → Shape (stateᴺ (gh (connS k o b)) ρ)
+shape-conn k@(cs cl sl sa ba as (just q) r en) o b ρ m shS shB = shape-rest (connectᶜ r (gh b) (srcG k o)) ρ (conn-core k o b ρ m shS shB)
+shape-conn k@(cs cl false sa ba as nothing r en) o b ρ m shS shB = shape-rest (connectᶜ r (gh b) (srcG k o)) ρ (conn-core k o b ρ m shS shB)
+shape-conn k@(cs cl true sa ba as nothing r en) o b ρ m shS shB = conn-core k o b ρ m shS shB
 
 ------------------------------------------------------------------------
 -- A merge
@@ -253,14 +238,13 @@ held-of p f false s ρ hp so cl (((os , ss) , _) , tr) (sp , (kx , kc)) =
   where F = λ a → coldᴹ λ q → stateᴺ (lane f a q) ρ
 
 -- A MERGE: its outer's run and its lanes', keyed under its mark.
-shape-flat : ∀ {R Γ A C} (e : Ctx R Γ C) op (f : A → Obs Timeline Γ C) dn n qs (s : St Γ A) (ls : List (St Γ C))
-           → Held (plug e (flatS op f dn n qs s ls)) → Sorted (envAt e)
-           → Shape (stateᴺ (gh s) (envAt e)) → All (λ l → Shape (stateᴺ (gh l) (envAt e))) ls
-           → Shape (stateᴺ (gh (flatS op f dn n qs s ls)) (envAt e))
-shape-flat e op f dn n qs s ls fs so sh shs with here-at e (flatS op f dn n qs s ls) fs
-... | p , hp , cl , rs , lk , pt , asd , ok , pl =
-  FlatShape.flat-shape p (flatOp op) _ _ _ _ (FlatShape.roots-of p (lanes-shape (envAt e) ls shs) lk) pt asd
-    (gen-queue p f (envAt e) hp so cl qs) (held-of p f dn s (envAt e) hp so cl sh ok) pl
+shape-flat : ∀ {Γ A C} op (f : A → Obs Timeline Γ C) dn n qs (s : St Γ A) (ls : List (St Γ C)) (ρ : NEnv Γ)
+           → Here (flatS op f dn n qs s ls) ρ → Sorted ρ
+           → Shape (stateᴺ (gh s) ρ) → All (λ l → Shape (stateᴺ (gh l) ρ)) ls
+           → Shape (stateᴺ (gh (flatS op f dn n qs s ls)) ρ)
+shape-flat op f dn n qs s ls ρ (p , hp , cl , rs , lk , pt , asd , ok , pl) so sh shs =
+  FlatShape.flat-shape p (flatOp op) _ _ _ _ (FlatShape.roots-of p (lanes-shape ρ ls shs) lk) pt asd
+    (gen-queue p f ρ hp so cl qs) (held-of p f dn s ρ hp so cl sh ok) pl
 
 ------------------------------------------------------------------------
 -- A joiner
@@ -291,12 +275,10 @@ fed-shape ((q , nothing) ∷ xs) x ((hq , at , cl) , fd) sh with fed-shape xs x 
         trailᶠ tr′ = flatT-idle
 
 -- A JOINER: its feed, then its source's run rejoined or its told end.
-shape-join : ∀ {R Γ A} (e : Ctx R Γ A) j g y ib → Held (plug e (joinS j g y ib)) → Sorted (envAt e)
-           → Shape (stateᴺ (gh (joinS j g y ib)) (envAt e))
-shape-join e j false y ib fs so = shape-idle (envAt e)
-shape-join e j true  y ib fs so =
-  fed-shape (vals ib) _ (proj₂ h) (joined-shape y j (endOf ib) (envAt e) so (proj₁ h))
-  where h = here-at e (joinS j true y ib) fs
+shape-join : ∀ {Γ A} j g y ib (ρ : NEnv Γ) → Here {A = A} (joinS j g y ib) ρ → Sorted ρ
+           → Shape (stateᴺ (gh (joinS j g y ib)) ρ)
+shape-join j false y ib ρ h so = shape-idle ρ
+shape-join j true  y ib ρ h so = fed-shape (vals ib) _ (proj₂ h) (joined-shape y j (endOf ib) ρ so (proj₁ h))
 
 ------------------------------------------------------------------------
 -- The walk
@@ -304,74 +286,66 @@ shape-join e j true  y ib fs so =
 sorted-cons : ∀ {Γ X} {e : Events X} {ρ : NEnv Γ} → (Ordered e × Steady e) × Every Headed e → Sorted ρ → Sorted (e ∷ᴬ ρ)
 sorted-cons (os , ev) so = os , ev , so
 
--- Read in an environment in order.
-private module Go where
- mutual
-  shape-st : ∀ {R Γ A} (e : Ctx R Γ A) (s : St Γ A) → Held (plug e s) → Sorted (envAt e) → Shape (stateᴺ (gh s) (envAt e))
-  shape-st e (pend o)        fs so = shape-idle (envAt e)
-  shape-st e (coldS b l)     fs so = here-at e (coldS b l) fs
-  shape-st e (ofS i p xs)    fs so = here-at e (ofS i p xs) fs
-  shape-st e doneS           fs so = shape-idle (envAt e)
-  shape-st e (mapS f s)      fs so with shape-st (inMap f e) s fs so
-  ... | ((o , st) , ev , et) , tr = ((ordered-map f _ o , steady-map f _ st) , every-map f _ ev , et) , trail-map f _ _ tr
-  shape-st e (scanS f z s)   fs so with shape-st (inScan f z e) s fs so
-  ... | ((o , st) , ev , et) , tr = ((ordered-scan f z _ o , steady-scan f z _ st) , every-scan f z _ ev , et) , trail-scan f z _ _ tr
-  shape-st e (cutS true a s)  fs so = shape-st (inCut true a e) s fs so
-  shape-st e (cutS false a s) fs so = shape-rest (gh s) (envAt e) (shape-st (inCut false a e) s fs so)
-  shape-st e (lnS b s)       fs so = shape-st (inLn b e) s fs so
-  shape-st e (takeS i p w s) fs so = shape-take e i p w s fs (shape-st (inTake i p w e) s fs so)
-  shape-st e (flatS op f dn n qs s ls) fs so =
-    shape-flat e op f dn n qs s ls fs so (shape-st (inOuter op f dn n qs ls e) s fs so) (shape-lanes e op f dn n qs s [] ls fs so)
-  shape-st e (connS k o b)   fs so =
-    shape-conn e k o b fs (shape-src e k o b fs so) (shape-st (inBody k o e) b fs (sorted-cons (src-sorted e k o b fs (shape-src e k o b fs so)) so))
-  shape-st e (joinS j g y ib) fs so = shape-join e j g y ib fs so
+-- What a connect's source has run, in order and headed: its run, else
+-- an end under a head.
+src-sorted : ∀ {Γ X} k (o : St Γ X) (ρ : NEnv Γ) → EndKeys k → Shape (srcState (srcG k o) ρ)
+           → (Ordered (srcRun (srcG k o) ρ) × Steady (srcRun (srcG k o) ρ)) × Every Headed (srcRun (srcG k o) ρ)
+src-sorted (cs cl sl sa (just p) as ow r en) o ρ ek (((o′ , st) , ev , _) , _) = (o′ , st) , ev
+src-sorted (cs false sl sa nothing as ow r en) o ρ ek (((o′ , st) , ev , _) , _) = (o′ , st) , ev
+src-sorted (cs true sl sa nothing as ow r en) o ρ ek sh = (record { ordered = tt } , record { steady = tt }) , record { every = ek }
 
-  -- Each lane of a merge, those before it passed.
-  shape-lanes : ∀ {R Γ A C} (e : Ctx R Γ C) op (f : A → _) dn n qs (s : St Γ A) (pre post : List (St Γ C))
-              → Held (plug e (flatS op f dn n qs s (pre ʳ++ post))) → Sorted (envAt e) → All (λ l → Shape (stateᴺ (gh l) (envAt e))) post
-  shape-lanes e op f dn n qs s pre []         fs so = []ᴬ
-  shape-lanes e op f dn n qs s pre (l ∷ post) fs so =
-    shape-st (inLanes op f dn n qs s pre post e) l fs so ∷ᴬ shape-lanes e op f dn n qs s (l ∷ pre) post fs so
+-- EVERY NODE KEEPING ITS OWN IS IN SHAPE, read in an environment in order.
+mutual
+  shape-keyed : ∀ {Γ A} (s : St Γ A) (ρ : NEnv Γ) → Keyed s ρ → Sorted ρ → Shape (stateᴺ (gh s) ρ)
+  shape-keyed (pend o)        ρ ky so = shape-idle ρ
+  shape-keyed (coldS b l)     ρ ky so = proj₁ ky
+  shape-keyed (ofS i p xs)    ρ ky so = proj₁ ky
+  shape-keyed doneS           ρ ky so = shape-idle ρ
+  shape-keyed (mapS f s)      ρ ky so with shape-keyed s ρ (proj₂ ky) so
+  ... | ((o , st) , ev , et) , tr = ((ordered-map f _ o , steady-map f _ st) , every-map f _ ev , et) , trail-map f _ _ tr
+  shape-keyed (scanS f z s)   ρ ky so with shape-keyed s ρ (proj₂ ky) so
+  ... | ((o , st) , ev , et) , tr = ((ordered-scan f z _ o , steady-scan f z _ st) , every-scan f z _ ev , et) , trail-scan f z _ _ tr
+  shape-keyed (cutS true a s)  ρ ky so = shape-keyed s ρ (proj₂ ky) so
+  shape-keyed (cutS false a s) ρ ky so = shape-rest (gh s) ρ (shape-keyed s ρ (proj₂ ky) so)
+  shape-keyed (lnS b s)       ρ ky so = shape-keyed s ρ (proj₂ ky) so
+  shape-keyed (takeS i p w s) ρ ky so = shape-take i p w s ρ (proj₁ ky) (shape-keyed s ρ (proj₂ ky) so)
+  shape-keyed (flatS op f dn n qs s ls) ρ ky so =
+    shape-flat op f dn n qs s ls ρ (proj₁ ky) so (shape-keyed s ρ (proj₁ (proj₂ ky)) so) (shape-keyedL ls ρ (proj₂ (proj₂ ky)) so)
+  shape-keyed (connS k o b)   ρ ky so =
+    shape-conn k o b ρ (proj₁ ky) shS (shape-keyed b (srcRun (srcG k o) ρ ∷ᴬ ρ) (proj₂ (proj₂ ky)) (sorted-cons (src-sorted k o ρ (ConnAt.ends (proj₁ ky)) shS) so))
+    where shS = src-shape k o b ρ (proj₁ ky) (proj₁ (proj₂ ky)) so
+  shape-keyed (joinS j g y ib) ρ ky so = shape-join j g y ib ρ (proj₁ ky) so
+
+  shape-keyedL : ∀ {Γ A} (ls : List (St Γ A)) (ρ : NEnv Γ) → KeyedL ls ρ → Sorted ρ → All (λ l → Shape (stateᴺ (gh l) ρ)) ls
+  shape-keyedL []       ρ ky so = []ᴬ
+  shape-keyedL (l ∷ ls) ρ ky so = shape-keyed l ρ (proj₁ ky) so ∷ᴬ shape-keyedL ls ρ (proj₂ ky) so
 
   -- A connect's source, subscribed at its body's mark, running, or ended.
-  shape-src : ∀ {R Γ X B} (e : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) → Held (plug e (connS k o b)) → Sorted (envAt e)
-            → Shape (srcState (srcG k o) (envAt e))
-  shape-src e (cs cl sl sa (just p) as ow r en) o b fs so = shape-sub e cl sl sa p as ow r en o b fs so
-  shape-src e (cs false sl sa nothing as ow r en) o b fs so = shape-st (inSrc (cs false sl sa nothing as ow r en) b e) o fs so
-  shape-src e (cs true sl sa nothing as ow r en) o b fs so =
-    shape-rest (gh o) (envAt e) (shape-st (inSrc (cs true sl sa nothing as ow r en) b e) o fs so)
+  src-shape : ∀ {Γ X B} k (o : St Γ X) (b : St (X ∷ Γ) B) (ρ : NEnv Γ) → Here (connS k o b) ρ → Keyed o ρ → Sorted ρ
+            → Shape (srcState (srcG k o) ρ)
+  src-shape (cs cl sl sa (just p) as ow r en) o b ρ m ko so = shape-sub p o ρ (ConnAt.sub m) ko so
+  src-shape (cs false sl sa nothing as ow r en) o b ρ m ko so = shape-keyed o ρ ko so
+  src-shape (cs true sl sa nothing as ow r en) o b ρ m ko so = shape-rest (gh o) ρ (shape-keyed o ρ ko so)
 
   -- A source subscribed at its body's mark: fresh, by the subscription's
   -- own order; else as it runs.
-  shape-sub : ∀ {R Γ X B} (e : Ctx R Γ B) cl sl sa p as ow r en (o : St Γ X) (b : St (X ∷ Γ) B)
-            → Held (plug e (connS (cs cl sl sa (just p) as ow r en) o b)) → Sorted (envAt e)
-            → Shape (stateᴺ (subOr (p ⊕ (ix 1 ∷ [])) o) (envAt e))
-  shape-sub e cl sl sa p as ow r en (pend o) b fs so =
-    ((ordered-sub o q (envAt e) hq so al , steady-sub o q (envAt e) hq so al) , headed-sub o q (envAt e) hq so , reach-cut headedRules o q (envAt e) hq (sorted-headed (envAt e) so))
-    , trailing-sub o q (envAt e) hq so al
-    where q  = p ⊕ (ix 1 ∷ [])
-          hq = sub-headed e cl sl sa p as ow r en (pend o) b fs
-          al = sub-alien e cl sl sa p as ow r en (pend o) b fs
-  shape-sub e cl sl sa p as ow r en o@(coldS _ _)   b fs so = shape-st (inSrc (cs cl sl sa (just p) as ow r en) b e) o fs so
-  shape-sub e cl sl sa p as ow r en o@(ofS _ _ _)   b fs so = shape-st (inSrc (cs cl sl sa (just p) as ow r en) b e) o fs so
-  shape-sub e cl sl sa p as ow r en o@doneS         b fs so = shape-st (inSrc (cs cl sl sa (just p) as ow r en) b e) o fs so
-  shape-sub e cl sl sa p as ow r en o@(mapS _ _)    b fs so = shape-st (inSrc (cs cl sl sa (just p) as ow r en) b e) o fs so
-  shape-sub e cl sl sa p as ow r en o@(scanS _ _ _) b fs so = shape-st (inSrc (cs cl sl sa (just p) as ow r en) b e) o fs so
-  shape-sub e cl sl sa p as ow r en o@(cutS _ _ _)  b fs so = shape-st (inSrc (cs cl sl sa (just p) as ow r en) b e) o fs so
-  shape-sub e cl sl sa p as ow r en o@(lnS _ _)     b fs so = shape-st (inSrc (cs cl sl sa (just p) as ow r en) b e) o fs so
-  shape-sub e cl sl sa p as ow r en o@(takeS _ _ _ _) b fs so = shape-st (inSrc (cs cl sl sa (just p) as ow r en) b e) o fs so
-  shape-sub e cl sl sa p as ow r en o@(flatS _ _ _ _ _ _ _) b fs so = shape-st (inSrc (cs cl sl sa (just p) as ow r en) b e) o fs so
-  shape-sub e cl sl sa p as ow r en o@(connS _ _ _) b fs so = shape-st (inSrc (cs cl sl sa (just p) as ow r en) b e) o fs so
-  shape-sub e cl sl sa p as ow r en o@(joinS _ _ _ _) b fs so = shape-st (inSrc (cs cl sl sa (just p) as ow r en) b e) o fs so
-
-  -- What a connect's source has run, in order and headed.
-  src-sorted : ∀ {R Γ X B} (e : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) → Held (plug e (connS k o b))
-             → Shape (srcState (srcG k o) (envAt e))
-             → (Ordered (srcRun (srcG k o) (envAt e)) × Steady (srcRun (srcG k o) (envAt e))) × Every Headed (srcRun (srcG k o) (envAt e))
-  src-sorted e (cs cl sl sa (just p) as ow r en) o b fs (((o′ , st) , ev , _) , _) = (o′ , st) , ev
-  src-sorted e (cs false sl sa nothing as ow r en) o b fs (((o′ , st) , ev , _) , _) = (o′ , st) , ev
-  src-sorted e (cs true sl sa nothing as ow r en) o b fs sh =
-    (record { ordered = tt } , record { steady = tt }) , record { every = ended-headed e sl sa as ow r en o b fs }
+  shape-sub : ∀ {Γ X} p (o : St Γ X) (ρ : NEnv Γ) → SubKeys (just p) ρ → Keyed o ρ → Sorted ρ
+            → Shape (stateᴺ (subOr (p ⊕ (ix 1 ∷ [])) o) ρ)
+  shape-sub p (pend o) ρ (hq , al) ko so =
+    ((ordered-sub o q ρ hq so al , steady-sub o q ρ hq so al) , headed-sub o q ρ hq so , reach-cut headedRules o q ρ hq (sorted-headed ρ so))
+    , trailing-sub o q ρ hq so al
+    where q = p ⊕ (ix 1 ∷ [])
+  shape-sub p o@(coldS _ _)   ρ sk ko so = shape-keyed o ρ ko so
+  shape-sub p o@(ofS _ _ _)   ρ sk ko so = shape-keyed o ρ ko so
+  shape-sub p o@doneS         ρ sk ko so = shape-keyed o ρ ko so
+  shape-sub p o@(mapS _ _)    ρ sk ko so = shape-keyed o ρ ko so
+  shape-sub p o@(scanS _ _ _) ρ sk ko so = shape-keyed o ρ ko so
+  shape-sub p o@(cutS _ _ _)  ρ sk ko so = shape-keyed o ρ ko so
+  shape-sub p o@(lnS _ _)     ρ sk ko so = shape-keyed o ρ ko so
+  shape-sub p o@(takeS _ _ _ _) ρ sk ko so = shape-keyed o ρ ko so
+  shape-sub p o@(flatS _ _ _ _ _ _ _) ρ sk ko so = shape-keyed o ρ ko so
+  shape-sub p o@(connS _ _ _) ρ sk ko so = shape-keyed o ρ ko so
+  shape-sub p o@(joinS _ _ _ _) ρ sk ko so = shape-keyed o ρ ko so
 
 -- The environment a hole's connects give it is in order.
 envAt-sorted : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Held (plug c s) → Sorted (envAt c)
@@ -385,19 +359,42 @@ envAt-sorted (inOuter op f d n q ls c)         s fs = envAt-sorted c (flatS op f
 envAt-sorted (inLanes op f d n q o pre post c) s fs = envAt-sorted c (flatS op f d n q o (pre ʳ++ s ∷ post)) fs
 envAt-sorted (inSrc k b c)                     s fs = envAt-sorted c (connS k s b) fs
 envAt-sorted (inBody k o c)                    s fs =
-  sorted-cons (Go.src-sorted c k o s fs (Go.shape-src c k o s fs so)) so
+  sorted-cons (src-sorted k o (envAt c) (ConnAt.ends (proj₁ ky)) (src-shape k o s (envAt c) (proj₁ ky) (proj₁ (proj₂ ky)) so)) so
   where so = envAt-sorted c (connS k o s) fs
+        ky = keyed-at c (connS k o s) (proj₂ fs)
 
 -- Each lane of a merge, those before it passed.
 lanes-held : ∀ {R Γ A C} (e : Ctx R Γ C) op (f : A → Obs Timeline Γ C) dn n qs (s : St Γ A) (pre post : List (St Γ C))
            → Held (plug e (flatS op f dn n qs s (pre ʳ++ post))) → All (λ l → Shape (stateᴺ (gh l) (envAt e))) post
-lanes-held e op f dn n qs s pre post fs = Go.shape-lanes e op f dn n qs s pre post fs (envAt-sorted e (flatS op f dn n qs s (pre ʳ++ post)) fs)
+lanes-held e op f dn n qs s pre post fs =
+  shape-keyedL post (envAt e) (keyedL-ʳ++ pre (proj₂ (proj₂ (keyed-at e (flatS op f dn n qs s (pre ʳ++ post)) (proj₂ fs)))))
+    (envAt-sorted e (flatS op f dn n qs s (pre ʳ++ post)) fs)
 
 -- A node, in the environment its connects give it.
 shape-st : ∀ {R Γ A} (e : Ctx R Γ A) (s : St Γ A) → Held (plug e s) → Shape (stateᴺ (gh s) (envAt e))
-shape-st e s fs = Go.shape-st e s fs (envAt-sorted e s fs)
+shape-st e s fs = shape-keyed s (envAt e) (keyed-at e s (proj₂ fs)) (envAt-sorted e s fs)
 
 -- A connect's source, likewise.
 shape-src : ∀ {R Γ X B} (e : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) → Held (plug e (connS k o b))
-          → Shape (srcState (srcG k o) (envAt e))
-shape-src e k o b fs = Go.shape-src e k o b fs (envAt-sorted e (connS k o b) fs)
+           → Shape (srcState (srcG k o) (envAt e))
+shape-src e k o b fs = src-shape k o b (envAt e) (proj₁ ky) (proj₁ (proj₂ ky)) (envAt-sorted e (connS k o b) fs)
+  where ky = keyed-at e (connS k o b) (proj₂ fs)
+
+-- What the frames above a hole keep, its environment in order: each
+-- connect above keeps its source's shape.
+above-sorted : ∀ {R Γ A} (c : Ctx R Γ A) f {h : Events∞ A} → Above c f h → Sorted (envAt c)
+above-sorted top                               f ab = tt
+above-sorted (inMap g c)                       f ab = above-sorted c true ab
+above-sorted (inScan g z c)                    f ab = above-sorted c true ab
+above-sorted (inCut l a c)                     f ab = above-sorted c true ab
+above-sorted (inLn b c)                        f ab = above-sorted c b ab
+above-sorted (inTake i q w c)                  f ab = above-sorted c true (proj₂ ab)
+above-sorted (inOuter op g d n q ls c)         f ab = above-sorted c true (proj₂ ab)
+above-sorted (inLanes op g d n q o pre post c) f ab = above-sorted c true (proj₂ ab)
+above-sorted (inSrc k b c)                     f ab = above-sorted c true (proj₂ ab)
+above-sorted (inBody k o c)                    f ((ca , ko , sh) , ab) =
+  sorted-cons (src-sorted k o (envAt c) (ConnAt.ends ca) sh) (above-sorted c true ab)
+
+-- A merge's live lanes, each keeping its own, in shape.
+keyedL-shape : ∀ {Γ A} (ls : List (St Γ A)) (ρ : NEnv Γ) → KeyedL ls ρ → Sorted ρ → All Shape (states (lanesL ls) ρ)
+keyedL-shape ls ρ kl so = lanes-shape ρ ls (shape-keyedL ls ρ kl so)

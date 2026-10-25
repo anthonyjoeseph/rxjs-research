@@ -17,7 +17,7 @@ beginning a former, and a mark run each leave the hole's run in shape and
 every frame above keyed against it (`adequacy.Engine.Above.Flight`). Settled
 by the per-frame keys past a dropped skip.
 
-Members: `body-keyed-drops`, `lane-begin-tail`, `rise-admit-flight`,
+Members: `body-keyed-drops`, `lane-begin-tail`, `outer-begin-tail`,
 `begin-flight`, `run-flight`, `flight-load`.
 
 #### THE IDLE SOURCE
@@ -40,13 +40,13 @@ Members: `rise-outer-done`.
 
 #### THE KEYS KEPT
 
-Untried: a node rewritten by a rise, a begin or a mark run keeps every node's
-positional facts (`adequacy.Engine.Keys`), reading the event in flight from
-the flight. A begin turns an idle hole into a subscription every ancestor's
-facts must cover. Probed in kept-depth, except a merge's mark. Settled by
-bodies, or a probe refuting a clause.
+Untried: a node rewritten by a rise, a begin, a mark run or an unsubscribe
+keeps every node's positional facts (`adequacy.Engine.Keys`), reading the
+event in flight from the flight. A begin turns an idle hole into a
+subscription every ancestor's facts must cover. Probed in kept-depth, except
+a merge's mark. Settled by bodies, or a probe refuting a clause.
 
-Members: `rise-admit-keys`, `rise-outer-end-keys`, `rise-lane-end-keys`,
+Members: `unsub-keyed`, `rise-admit-keys`, `rise-outer-end-keys`, `rise-lane-end-keys`,
 `rise-src-keys`, `rise-body-end-keys`, `begin-keys`, `run-keys`.
 
 #### THE ENDLESS SUBSCRIPTION
