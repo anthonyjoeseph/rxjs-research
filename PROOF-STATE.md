@@ -10,13 +10,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SILENT RUN
 
-Probed by `quickcheck.KeptDepth` at every node of every configuration
-reached: a node mid-run, in the environment its connects give it, keeps
-its run in order, steady and headed, it and its tail headed, its tail
-trailing it. Untried as bodies: a merge, a joiner. Settled when bodies,
-or refuted.
+A merge mid-run keeps `FlatOrder`'s invariant under its mark (lanes
+rooted and parted, aside from the outer, its pool free of it); a joiner's
+feed sits in order ahead of its rejoined source. Only the shape they imply
+is probed (`quickcheck.KeptDepth`). Settled when bodies over what the engine
+keeps, or refuted by a probe of the keys themselves.
 
-Members: `shape-flat`, `shape-join`.
+Members: `flat-keys`, `join-fed`.
 
 #### THE KEYS
 

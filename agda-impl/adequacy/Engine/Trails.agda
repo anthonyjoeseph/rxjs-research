@@ -11,30 +11,40 @@ module adequacy.Engine.Trails where
 
 open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_; _++_; [_]; _ʳ++_)
-open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
-open import Data.Maybe using (just; nothing)
+import Data.List as L
+open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_; map to mapᴬ)
+open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to All++⁺)
+open import Data.Sum using (inj₁)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; subst; sym)
 open import Tree using (Obs)
 open import denotation.MonotonicList.Events using (Events; Timeline)
-open import Data.Unit using (tt)
+open import Data.Unit using (⊤; tt)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.All using (lookup)
 
-open import denotation.MonotonicList.Events using (Events∞; Pos; Tail; ix; last; end; _∪_)
+open import denotation.MonotonicList.Events using (Events∞; Pos; Tail; idle; ix; last; end; _∪_)
+open import denotation.MonotonicList using (MonotonicList) renaming (cold to coldᴹ)
 import denotation.MonotonicList as M′
-open import denotation.Unfold using (NEnv; Node; meaning; Source; live; ended; stateᴺ; cutᴺ; idleᶜ; restᶜ; connectᶜ; subscribe)
+open import denotation.Denote using (flatOp)
+open import denotation.Unfold using (NEnv; Node; meaning; Source; live; ended; stateᴺ; cutᴺ; idleᶜ; restᶜ; connectᶜ; subscribe; states; outerᴺ; joined; fedᴺ; put)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ctx; top; inMap; inScan; inCut; inLn;
   inTake; inOuter; inLanes; inSrc; inBody; plug; cs; CS; _⊕_)
-open import adequacy.Engine.Meaning using (gh; envAt; srcG; srcRun; srcState; subOr)
+open import adequacy.Engine.Meaning using (vals; endOf; gh; envAt; srcG; srcRun; srcState; subOr; lane; outerG; poolG; deadL; lanesL; liveL; holeL; flagOf)
+open import adequacy.Engine.Kept using (states-++; live-hole)
 open import adequacy.Engine.Head using (Frag)
-open import adequacy.Placed.Order using (Alienᴱ; Disjoint; Ordered; Owned; Sorted; Steady; Every; Every∞; EveryT; Headed; every-tail; everyT-burstOn; everyT-idle; everyT-∪; every∞-mono; headed-snoc; ordered-map; ordered-scan; steady-map; steady-scan)
+open import adequacy.Placed.Order using (Alien; Atop; Past; Clear; every-lookup; sorted-headed; sorted-lookup; ordered-rejoin; steady-rejoin; Alienᴱ; Disjoint; Ordered; Owned; Sorted; Steady; Every; Every∞; EveryT; Headed; every-mono; everyT-mono; prefix-++; every-tail; everyT-burstOn; everyT-idle; everyT-∪; every∞-mono; headed-snoc; ordered-map; ordered-scan; steady-map; steady-scan)
 open import adequacy.Placed using (ordered-sub; steady-sub)
-open import adequacy.Placed.Keys using (every-beside; every-map; every-scan)
-open import adequacy.Placed.Trail using (Trail; TrailE; Trailing; trail; trailᶠ; trail-idle; trail-map; trail-scan)
+open import adequacy.Placed.Keys using (module Merge; Values; owned-trans; values-mono; every-beside; every-map; every-scan)
+open import adequacy.Placed.Trail using (Parted; Spread; trail-map; Trail; TrailE; Trailing; trail; trailᶠ; trail-idle; trail-scan; trail-rejoin; sortedT-idle; flatT-idle)
 open import adequacy.Placed.Burst using (module Bursting; Fresh; FreshRun; ordered-tail; steady-tail; trail-tail)
 open import adequacy.Placed.Walk using (module Walk)
 open import adequacy.Placed.Rising using (Rise; module Reach; headed-sub; headedRules; ordered-take; steady-take)
-open import adequacy.Placed.FlatAfter using (trail-take)
+open import adequacy.Placed.FlatAfter using (module FlatAfter; trail-take)
+open import adequacy.Placed.FlatOrder using (module FlatOrder)
+open import adequacy.Placed.Calm using (calm-steady; calm-trail)
 open import operation.AbstractObservable using (free; cpAt; cutAt; overAt)
 open Events∞
 
@@ -73,21 +83,11 @@ postulate
   -- A TAPE MID-PLAY, an of part-way through.
   shape-cold : ∀ {R Γ A} (e : Ctx R Γ A) b l → Frag (plug e (coldS b l)) → ∀ (ρ : NEnv Γ) → Shape (stateᴺ (gh (coldS b l)) ρ)
   shape-of   : ∀ {R Γ A} (e : Ctx R Γ A) i p xs → Frag (plug e (ofS i p xs)) → ∀ (ρ : NEnv Γ) → Shape (stateᴺ (gh (ofS i p xs)) ρ)
-  -- A JOINER, its feed then its source's run rejoined.
-  --
-  -- RECOVERY: git show 74865a1a:agda-impl/adequacy/Engine/Trails.agda restores `envAt-sorted`, each source of a hole's environment in order, over a leaf for an ended source's end
-  shape-join : ∀ {R Γ A} (e : Ctx R Γ A) j g y ib → Frag (plug e (joinS j g y ib))
-             → Shape (stateᴺ (gh (joinS j g y ib)) (envAt e))
   -- A TAKEWHILE OWING ITS COMPLETION owes it under a head, ahead of all
   -- its source leaves running.
   ending-headed : ∀ {R Γ A} (e : Ctx R Γ A) i p k (s : St Γ A) → Frag (plug e (takeS i p (cpAt k) s)) → Headed (k ⊕ (last ∷ []))
   ending-trails : ∀ {R Γ A} (e : Ctx R Γ A) i p k (s : St Γ A) → Frag (plug e (takeS i p (cpAt k) s))
                 → EveryT (TrailE (end {A} (k ⊕ (last ∷ [])))) (cutᴺ (gh s) (envAt e))
-  -- A MERGE of its outer's run and its lanes'.
-  shape-flat : ∀ {R Γ A C} (e : Ctx R Γ C) op (f : A → _) dn n qs (s : St Γ A) (ls : List (St Γ C))
-             → Frag (plug e (flatS op f dn n qs s ls))
-             → Shape (stateᴺ (gh s) (envAt e)) → All (λ l → Shape (stateᴺ (gh l) (envAt e))) ls
-             → Shape (stateᴺ (gh (flatS op f dn n qs s ls)) (envAt e))
   -- A CONNECT'S SOURCE SUBSCRIBED one past a head.
   conn-mark : ∀ {R Γ X B} (e : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) → Frag (plug e (connS k o b))
             → Σ Pos (λ p → Headed p × CS.srcAt k ≡ p ++ [ ix 1 ])
@@ -202,6 +202,156 @@ shape-conn e k@(cs cl false sa ba as nothing r en) o b fs shS shB = shape-rest (
 shape-conn e k@(cs cl true sa ba as nothing r en) o b fs shS shB = conn-core e k o b fs shS shB
 
 ------------------------------------------------------------------------
+-- A merge
+
+module FlatShape (p : Pos) where
+  open module O = FlatOrder p using (K; Ok; Under; Gen; Heldᴹ; Aside; Pool; Roots; []ᴿ; _∷ᴿ_; under-k; lane-ok)
+  module KM = Merge K Ok (λ h kh → owned-trans p h (h ++ [ ix 0 ]) (proj₁ kh) (inj₁ (prefix-++ h [ ix 0 ])) , headed-snoc h (proj₂ kh)) lane-ok
+
+  -- A lane in flight keyed under its root, beyond its shape.
+  data LaneKeys {B} : List (Events∞ B) → List Pos → Set where
+    []ᴷ  : LaneKeys [] []
+    _∷ᴷ_ : ∀ {r l ls rs} → Every∞ (Under r) l × Ok r × Spread (force l) → LaneKeys ls rs → LaneKeys (l ∷ ls) (r ∷ rs)
+
+  -- The outer keyed under the merge, beyond its shape, its values lanes.
+  OuterKeys : ∀ {B} → Maybe (Events∞ (MonotonicList B)) → Set
+  OuterKeys nothing  = ⊤
+  OuterKeys (just e) = Spread (force e) × Every∞ K e × Values Gen (force e)
+
+  -- A merge in flight: its lanes and its outer keyed, its lanes parted
+  -- and aside from the outer, its queue lanes, its pool.
+  FlatKeys : ∀ {B} → Maybe (Events∞ (MonotonicList B)) → List (Events∞ B) → List (MonotonicList B) → Tail → List Pos → Set
+  FlatKeys o ls qs t rs = LaneKeys ls rs × Parted rs × All (Aside o) rs × All Gen qs × OuterKeys o × Pool o rs t
+
+  roots-of : ∀ {B} {ls : List (Events∞ B)} {rs} → All Shape ls → LaneKeys ls rs → Roots ls rs
+  roots-of []ᴬ []ᴷ = []ᴿ
+  roots-of ((((os , ss) , _) , tr) ∷ᴬ shs) (((kx , kc) , ok , sp) ∷ᴷ lk) = O.lane os ss tr kx kc ok sp ∷ᴿ roots-of shs lk
+
+  roots-k : ∀ {B} {ls : List (Events∞ B)} {rs} → Roots ls rs → All (Every∞ K) ls
+  roots-k []ᴿ = []ᴬ
+  roots-k (_∷ᴿ_ {r = r} st R) =
+    (every-mono (λ h u → under-k r h (O.Lane.ok st) u) _ (O.Lane.kx st) , everyT-mono (λ h u → under-k r h (O.Lane.ok st) u) _ (O.Lane.kc st)) ∷ᴬ roots-k R
+
+  gen-k : ∀ {B} (m : MonotonicList B) → Gen m → KM.Lane m
+  gen-k m g j ok = every∞-mono (λ h u → under-k j h ok u) (M′.enter m j) (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (g j ok))))))
+
+  held-k : ∀ {B} (o : Maybe (Events∞ (MonotonicList B))) → Heldᴹ o → KM.Outerᴹ o
+  held-k nothing  h = tt
+  held-k (just e) h = KM.outer-of (force e) (O.Outer.kx h) (values-mono gen-k (force e) (O.Outer.spn h)) , O.Outer.kc h
+
+  -- A MERGE IN FLIGHT: in order, steady, headed, trailed by what it
+  -- leaves running.
+  flat-shape : ∀ {B} op (o : Maybe (Events∞ (MonotonicList B))) ls qs t {rs} → Roots ls rs → Parted rs → All (Aside o) rs → All Gen qs
+             → Heldᴹ o → Pool o rs t → Shape′ (M′.go op o ls qs t) (M′.whole o ls t)
+  flat-shape op o ls qs t R pt asd gq h pl =
+    ((O.ordered-go op o ls qs t R pt asd gq h pl , calm-steady _ (proj₂ c))
+    , every-mono (λ _ → proj₂) _ (KM.every-go op o ls qs t ho hl hq hp)
+    , everyT-mono (λ _ → proj₂) _ (KM.everyT-whole o ls t ho hl hp))
+    , calm-trail _ _ (proj₁ c) (proj₂ c)
+    where
+      c  = FlatAfter.calm-at p op o ls qs t R pt asd gq h pl
+      ho = held-k o h
+      hl = roots-k R
+      hq = mapᴬ (λ {m} → gen-k m) gq
+      hp = everyT-mono (λ _ → proj₂) t (proj₁ (proj₂ (proj₂ pl)))
+
+-- A merge's outer, as its lanes' generator reads it.
+outerOf : ∀ {Γ A C} (f : A → Obs Timeline Γ C) dn (s : St Γ A) (ρ : NEnv Γ) → Maybe (Events∞ (MonotonicList C))
+outerOf f dn s ρ = outerᴺ (lane f) (outerG dn (gh s)) ρ
+
+postulate
+  -- A MERGE IN FLIGHT IS KEYED UNDER ITS MARK.
+  flat-keys : ∀ {R Γ A C} (e : Ctx R Γ C) op (f : A → Obs Timeline Γ C) dn n qs (s : St Γ A) (ls : List (St Γ C))
+            → Frag (plug e (flatS op f dn n qs s ls))
+            → Σ Pos (λ p → Σ (List Pos) (FlatShape.FlatKeys p (outerOf f dn s (envAt e)) (states (lanesL ls) (envAt e))
+                (L.map (λ a → coldᴹ λ q → stateᴺ (lane f a q) (envAt e)) qs) (cutᴺ (poolG dn (gh s) (deadL ls)) (envAt e))))
+
+-- The live lanes of a merge, newest first.
+lanes-shape : ∀ {Γ C} (ρ : NEnv Γ) (ls : List (St Γ C)) → All (λ l → Shape (stateᴺ (gh l) ρ)) ls → All Shape (states (lanesL ls) ρ)
+lanes-shape ρ []       []ᴬ        = []ᴬ
+lanes-shape ρ (l ∷ ls) (sh ∷ᴬ shs) =
+  subst (All Shape) (sym (states-++ (lanesL ls) (liveL l) ρ))
+    (All++⁺ (lanes-shape ρ ls shs) (subst (All Shape) (sym (live-hole l ρ)) (hole (flagOf l) sh)))
+  where hole : ∀ b → Shape (stateᴺ (gh l) ρ) → All Shape (holeL b (stateᴺ (gh l) ρ))
+        hole true  sh = sh ∷ᴬ []ᴬ
+        hole false sh = []ᴬ
+
+-- The outer of a merge, held.
+held-of : ∀ {Γ A C} p (f : A → Obs Timeline Γ C) dn (s : St Γ A) (ρ : NEnv Γ) → Shape (stateᴺ (gh s) ρ)
+        → FlatShape.OuterKeys p (outerOf f dn s ρ) → FlatOrder.Heldᴹ p (outerOf f dn s ρ)
+held-of p f true  s ρ sh ok = tt
+held-of p f false s ρ (((os , ss) , _) , tr) (sp , (kx , kc) , gn) =
+  FlatOrder.outer (ordered-map F _ os) (steady-map F _ ss) (trail-map F _ _ tr) sp kx kc gn
+  where F = λ a → coldᴹ λ q → stateᴺ (lane f a q) ρ
+
+-- A MERGE: its outer's run and its lanes', keyed under its mark.
+shape-flat : ∀ {R Γ A C} (e : Ctx R Γ C) op (f : A → Obs Timeline Γ C) dn n qs (s : St Γ A) (ls : List (St Γ C))
+           → Frag (plug e (flatS op f dn n qs s ls))
+           → Shape (stateᴺ (gh s) (envAt e)) → All (λ l → Shape (stateᴺ (gh l) (envAt e))) ls
+           → Shape (stateᴺ (gh (flatS op f dn n qs s ls)) (envAt e))
+shape-flat e op f dn n qs s ls fs sh shs with flat-keys e op f dn n qs s ls fs
+... | p , rs , lk , pt , asd , gq , ok , pl =
+  FlatShape.flat-shape p (flatOp op) _ _ _ _ (FlatShape.roots-of p (lanes-shape (envAt e) ls shs) lk) pt asd gq
+    (held-of p f dn s (envAt e) sh ok) pl
+
+------------------------------------------------------------------------
+-- A joiner
+
+-- Each step fed a joiner and not yet shown, headed, at or before the
+-- next and steady past it.
+Steps : ∀ {A} → Pos → Maybe A → Events A → Set
+Steps q (just _) x = Past q x
+Steps q nothing  x = Clear q x
+
+Fed : ∀ {A} → List (Pos × Maybe A) → Events A → Set
+Fed []             x = ⊤
+Fed ((q , a) ∷ xs) x = (Headed q × Atop q (fedᴺ xs x) × Steps q a (fedᴺ xs x)) × Fed xs x
+
+-- Its end told under a head; else joined under a head where its source
+-- has not been.
+Joins : ∀ {Γ A} → A ∈ Γ → Pos → Maybe Pos → NEnv Γ → Set
+Joins i p (just c) ρ = Headed c
+Joins i p nothing  ρ = Headed p × Alien p (lookup ρ i)
+
+postulate
+  -- A JOINER'S FEED is in order ahead of its rejoined source, and it
+  -- joined under a head where its source has not been.
+  join-fed : ∀ {R Γ A} (e : Ctx R Γ A) j y ib → Frag (plug e (joinS j true y ib))
+           → Joins y j (endOf ib) (envAt e) × Fed (vals ib) (joined y j (endOf ib) (envAt e))
+
+-- What a joiner shows after its feed.
+joined-shape : ∀ {Γ A} (i : A ∈ Γ) p c (ρ : NEnv Γ) → Sorted ρ → Joins i p c ρ → Shape′ (joined i p c ρ) idle
+joined-shape i p (just c) ρ so hc =
+  ((record { ordered = tt } , record { steady = tt }) , record { every = hc } , everyT-idle) , trail-idle (end c) tt
+joined-shape i p nothing  ρ so (hp , al) =
+  ((ordered-rejoin p E os ss , steady-rejoin p E os ss al) , Reach.every-rejoin headedRules p E hp (every-lookup Headed ρ (sorted-headed ρ so) i) , everyT-idle)
+  , trail-rejoin p E
+  where E = lookup ρ i
+        os = proj₁ (sorted-lookup ρ so i)
+        ss = proj₂ (sorted-lookup ρ so i)
+
+-- A feed shown ahead of the rest.
+fed-shape : ∀ {A} xs (x : Events A) → Fed xs x → Shape′ x idle → Shape′ (fedᴺ xs x) idle
+fed-shape []                 x fd        sh = sh
+fed-shape ((q , just a) ∷ xs) x ((hq , at , ps) , fd) sh with fed-shape xs x fd sh
+... | ((os , ss) , ev , _) , tr = ((record { ordered = at , os } , record { steady = ps , ss }) , record { every = hq , ev , everyT-idle } , everyT-idle) , tr′
+  where tr′ : Trail (put q (just a) (fedᴺ xs x)) idle
+        trail  tr′ = sortedT-idle , everyT-idle , tr , everyT-idle
+        trailᶠ tr′ = flatT-idle
+fed-shape ((q , nothing) ∷ xs) x ((hq , at , cl) , fd) sh with fed-shape xs x fd sh
+... | ((os , ss) , ev , _) , tr = ((record { ordered = at , os } , record { steady = cl , ss }) , record { every = hq , ev , everyT-idle } , everyT-idle) , tr′
+  where tr′ : Trail (put q nothing (fedᴺ xs x)) idle
+        trail  tr′ = sortedT-idle , everyT-idle , tr
+        trailᶠ tr′ = flatT-idle
+
+-- A JOINER: its feed, then its source's run rejoined or its told end.
+shape-join : ∀ {R Γ A} (e : Ctx R Γ A) j g y ib → Frag (plug e (joinS j g y ib)) → Sorted (envAt e)
+           → Shape (stateᴺ (gh (joinS j g y ib)) (envAt e))
+shape-join e j false y ib fs so = shape-idle (envAt e)
+shape-join e j true  y ib fs so =
+  fed-shape (vals ib) _ (proj₂ (join-fed e j y ib fs)) (joined-shape y j (endOf ib) (envAt e) so (proj₁ (join-fed e j y ib fs)))
+
+------------------------------------------------------------------------
 -- The walk
 
 sorted-cons : ∀ {Γ X} {e : Events X} {ρ : NEnv Γ} → (Ordered e × Steady e) × Every Headed e → Sorted ρ → Sorted (e ∷ᴬ ρ)
@@ -227,7 +377,7 @@ private module Go where
     shape-flat e op f dn n qs s ls fs (shape-st (inOuter op f dn n qs ls e) s fs so) (shape-lanes e op f dn n qs s [] ls fs so)
   shape-st e (connS k o b)   fs so =
     shape-conn e k o b fs (shape-src e k o b fs so) (shape-st (inBody k o e) b fs (sorted-cons (src-sorted e k o b fs (shape-src e k o b fs so)) so))
-  shape-st e (joinS j g y ib) fs so = shape-join e j g y ib fs
+  shape-st e (joinS j g y ib) fs so = shape-join e j g y ib fs so
 
   -- Each lane of a merge, those before it passed.
   shape-lanes : ∀ {R Γ A C} (e : Ctx R Γ C) op (f : A → _) dn n qs (s : St Γ A) (pre post : List (St Γ C))
