@@ -35,7 +35,7 @@ open Tail∞
 data Eraseᵀ : ℕ → Tail → Tail → Set where
   stopᵉ : ∀ {x y} → Eraseᵀ zero x y
   pinᵉ  : ∀ {k p l r} → Eraseᵀ k (later l) (later r) → Eraseᵀ (suc k) (pin p l) (pin p r)
-  unpin : ∀ {k p l r} → TailNotBefore p r → Eraseᵀ k (later l) r → Eraseᵀ (suc k) (pin p l) r
+  unpin : ∀ {k p l r} → TailNotBefore p r → Eraseᵀ k (later l) r → Eraseᵀ k (pin p l) r
   idleᵉ : ∀ {k} → Eraseᵀ (suc k) idle idle
 
 -- A run with none or more of its skips erased, `t` what the other leaves
@@ -52,7 +52,7 @@ data Erase {A : Set} : ℕ → Events A → Tail → Events A → Set where
   stopᵉ  : ∀ {x t y} → Erase zero x t y
   outᵉ   : ∀ {k p a l r t} → Eraseᵀ k (cut l) (cut r) → Erase k (force l) (cut r) (force r) → Erase (suc k) (out p a l) t (out p a r)
   skipᵉ  : ∀ {k p l r t} → Eraseᵀ k (cut l) (cut r) → Erase k (force l) (cut r) (force r) → Erase (suc k) (skip p l) t (skip p r)
-  erased : ∀ {k p l t e} → NotBefore p (head e) → Eraseᵀ k (cut l) t → Erase k (force l) t e → Erase (suc k) (skip p l) t e
+  erased : ∀ {k p l t e} → NotBefore p (head e) → Eraseᵀ k (cut l) t → Erase k (force l) t e → Erase k (skip p l) t e
   endᵉ   : ∀ {k p t} → Erase (suc k) (end p) t (end p)
   hushᵉ  : ∀ {k t} → Erase (suc k) hush t hush
 
@@ -197,28 +197,27 @@ mutual
   ∪-erase : ∀ {n} {x x′ y y′ : Tail} → Eraseᵀ n x x′ → Eraseᵀ n y y′ → Eraseᵀ n (x ∪ y) (x′ ∪ y′)
   ∪-erase {zero}  _ _ = stopᵉ
   ∪-erase {suc n} idleᵉ b = b
-  ∪-erase {suc n} {y = y} (pinᵉ {p = k} a)    b = first-kept {s = sooner k y} refl a b
-  ∪-erase {suc n} {y = y} (unpin {p = k} o a) b = first-gone {s = sooner k y} refl o a b
+  ∪-erase {suc n} {y = y} w@(pinᵉ {p = k} a)    b = first-erase {s = sooner k y} refl w b
+  ∪-erase {suc n} {y = y} w@(unpin {p = k} o a) b = first-erase {s = sooner k y} refl w b
 
-  first-kept : ∀ {n k l r} {y y′ : Tail} {s} → sooner k y ≡ s → Eraseᵀ n (later l) (later r) → Eraseᵀ (suc n) y y′
-             → Eraseᵀ (suc n) (first k l y s) (pin k r ∪ y′)
-  first-kept {s = true}  ss a idleᵉ = pinᵉ (∪-erase a (eraseᵀ-pred idleᵉ))
-  first-kept {s = true}  ss a (pinᵉ b) rewrite ss = pinᵉ (∪-erase a (eraseᵀ-pred (pinᵉ b)))
-  first-kept {k = k} {y′ = y′} {s = true} ss a (unpin {p = q} o b) rewrite sooner-on {k} {q} y′ ss o = pinᵉ (∪-erase a (eraseᵀ-pred (unpin o b)))
-  first-kept {s = false} () a idleᵉ
-  first-kept {s = false} ss a (pinᵉ b) rewrite ss = pinᵉ (∪-erase (eraseᵀ-pred (pinᵉ a)) b)
-  first-kept {s = false} ss a (unpin o b) = unpin (tnb-∪ ss o) (∪-erase (eraseᵀ-pred (pinᵉ a)) b)
-
-  first-gone : ∀ {n k l} {x′ y y′ : Tail} {s} → sooner k y ≡ s → TailNotBefore k x′ → Eraseᵀ n (later l) x′ → Eraseᵀ (suc n) y y′
-             → Eraseᵀ (suc n) (first k l y s) (x′ ∪ y′)
-  first-gone {s = true} ss o a idleᵉ = unpin (tnb-∪ o tt) (∪-erase a (eraseᵀ-pred idleᵉ))
-  first-gone {k = k} {s = true} ss o a (pinᵉ {p = q} b) = unpin (tnb-∪ o (<ᵖ-asym k q ss)) (∪-erase a (eraseᵀ-pred (pinᵉ b)))
-  first-gone {y′ = y′} {s = true} ss o a (unpin o′ b) = unpin (tnb-∪ o (tnb-lt y′ ss o′)) (∪-erase a (eraseᵀ-pred (unpin o′ b)))
-  first-gone {s = false} () o a idleᵉ
-  first-gone {x′ = idle} {s = false} ss o a (pinᵉ b) = pinᵉ (∪-erase (eraseᵀ-pred (unpin o a)) b)
-  first-gone {k = k} {x′ = pin k′ r′} {s = false} ss o a (pinᵉ {p = q} b) rewrite ≮-trans q k k′ ss o =
-    pinᵉ (∪-erase (eraseᵀ-pred (unpin o a)) b)
-  first-gone {x′ = x′} {s = false} ss o a (unpin o′ b) = unpin (tnb-∪ (tnb-le x′ ss o) o′) (∪-erase (eraseᵀ-pred (unpin o a)) b)
+  first-erase : ∀ {m k l} {x′ y y′ : Tail} {s} → sooner k y ≡ s → Eraseᵀ m (pin k l) x′ → Eraseᵀ m y y′
+              → Eraseᵀ m (first k l y s) (x′ ∪ y′)
+  first-erase {zero} _ _ _ = stopᵉ
+  first-erase {suc _} {s = true}  ss (pinᵉ a) idleᵉ = pinᵉ (∪-erase a (eraseᵀ-pred idleᵉ))
+  first-erase {suc _} {s = true}  ss (pinᵉ a) (pinᵉ b) rewrite ss = pinᵉ (∪-erase a (eraseᵀ-pred (pinᵉ b)))
+  first-erase {suc _} {k = k} {y′ = y′} {s = true} ss (pinᵉ a) (unpin {p = q} o b) rewrite sooner-on {k} {q} y′ ss o =
+    pinᵉ (∪-erase a (eraseᵀ-pred (unpin o b)))
+  first-erase {suc _} {s = false} () (pinᵉ a) idleᵉ
+  first-erase {suc _} {s = false} ss (pinᵉ a) (pinᵉ b) rewrite ss = pinᵉ (∪-erase (eraseᵀ-pred (pinᵉ a)) b)
+  first-erase {suc _} {s = false} ss w@(pinᵉ _) (unpin o b) = unpin (tnb-∪ ss o) (∪-erase w b)
+  first-erase {suc _} {s = true} ss (unpin o a) idleᵉ = unpin (tnb-∪ o tt) (∪-erase a idleᵉ)
+  first-erase {suc _} {k = k} {s = true} ss (unpin o a) (pinᵉ {p = q} b) = unpin (tnb-∪ o (<ᵖ-asym k q ss)) (∪-erase a (pinᵉ b))
+  first-erase {suc _} {y′ = y′} {s = true} ss (unpin o a) (unpin o′ b) = unpin (tnb-∪ o (tnb-lt y′ ss o′)) (∪-erase a (unpin o′ b))
+  first-erase {suc _} {s = false} () (unpin o a) idleᵉ
+  first-erase {suc _} {x′ = idle} {s = false} ss (unpin o a) (pinᵉ b) = pinᵉ (∪-erase (unpin o (eraseᵀ-pred a)) b)
+  first-erase {suc _} {k = k} {x′ = pin k′ r′} {s = false} ss (unpin o a) (pinᵉ {p = q} b) rewrite ≮-trans q k k′ ss o =
+    pinᵉ (∪-erase (unpin o (eraseᵀ-pred a)) b)
+  first-erase {suc _} {x′ = x′} {s = false} ss w@(unpin o a) (unpin o′ b) = unpin (tnb-∪ (tnb-le x′ ss o) o′) (∪-erase w b)
 
 ------------------------------------------------------------------------
 -- Mapped, erased alike

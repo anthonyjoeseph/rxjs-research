@@ -10,6 +10,10 @@
 -- outer's run or its lane's run, a connect its body fed the source's run
 -- and its body's run: each of those drops the skip, and the facts the
 -- frame keeps of it are read past the skip.
+--
+-- Below every connect's source the drop is exact (`≋-⊒`); a source
+-- frame's `SrcPass` is where a genuine erasure enters, and `⊒` erases
+-- only finitely many skips between two it keeps.
 module adequacy.Engine.Passed where
 
 open import Data.Bool using (true; false)
