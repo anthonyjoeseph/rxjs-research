@@ -40,12 +40,13 @@ open import quickcheck.Ty using (natᵗ)
 open import quickcheck.Quickcheck using (program)
 open import adequacy.Ghost using (module Ghosting)
 open import quickcheck.Spin using (showP)
+open import quickcheck.Placing using (trailsᵇ; flatsᵇ)
 
 open Driver ℕ using (Step; step; silent; value; complete; drained)
 open Ghosting ℕ using (work; Measure)
 open Machine using (Conf; ⟨_,_,_,_⟩; load; spot; subscribing; absorbed; rising; nx; cp; pend; coldS; top; inOuter; inLanes;
   plug; closed; alive; search; found; leafM; St; Ctx; Out; mapS; scanS; cutS; lnS; takeS; flatS; connS; inMap; inScan; inCut; inLn;
-  inTake; inSrc; inBody; over; own; Mark; outOf; still; shows; cs; free; cpAt; cutAt; overAt; _⊕_)
+  inTake; inSrc; inBody; over; own; Mark; outOf; still; shows; cs; CS; free; cpAt; cutAt; overAt; _⊕_)
 open import Data.Maybe using (Maybe)
 open import operation.Key using (Key; _<ᴷ_)
 open import Tree using (Obs; FlatOp)
@@ -347,33 +348,62 @@ private
     fedLanesᵇ q []       ρ ρ′ = true
     fedLanesᵇ q (l ∷ ls) ρ ρ′ = fedWalkᵇ q l ρ ρ′ ∧ fedLanesᵇ q ls ρ ρ′
 
+  -- Every live inner connect's source leaves running what trails it
+  -- (`adequacy.Engine.FedWalk.fed-trail`): in the run's environment, and
+  -- in the rest's wherever the run's does.
+  liveTrailᵇ : ∀ {X} → CS → Events∞ X → Bool
+  liveTrailᵇ (cs cl true sa ba as nothing r en) σ = trailsᵇ 30 σ ∧ flatsᵇ 30 σ
+  liveTrailᵇ _                                  σ = true
+
+  mutual
+    innerᵇ : ∀ {Δ A} → St Δ A → U.NEnv Δ → Bool
+    innerᵇ (mapS f s)              ρ = innerᵇ s ρ
+    innerᵇ (scanS f z s)           ρ = innerᵇ s ρ
+    innerᵇ (cutS l a s)            ρ = innerᵇ s ρ
+    innerᵇ (lnS b s)               ρ = innerᵇ s ρ
+    innerᵇ (takeS i w x s)         ρ = innerᵇ s ρ
+    innerᵇ (flatS op f d n p o ls) ρ = innerᵇ o ρ ∧ innerLᵇ ls ρ
+    innerᵇ (connS k o b)           ρ = liveTrailᵇ k (srcState (srcG k o) ρ) ∧ innerᵇ o ρ ∧ innerᵇ b (srcRun (srcG k o) ρ ∷ᴬ ρ)
+    innerᵇ _                       ρ = true
+
+    innerLᵇ : ∀ {Δ A} → List (St Δ A) → U.NEnv Δ → Bool
+    innerLᵇ []       ρ = true
+    innerLᵇ (l ∷ ls) ρ = innerᵇ l ρ ∧ innerLᵇ ls ρ
+
+  -- Unchecked; in the run's environment; in the rest's where the run's holds.
+  trailedᵇ : ∀ {Δ A} → ℕ → St Δ A → U.NEnv Δ → U.NEnv Δ → Bool
+  trailedᵇ zero          b ρ ρ′ = true
+  trailedᵇ (suc zero)    b ρ ρ′ = innerᵇ b ρ
+  trailedᵇ (suc (suc _)) b ρ ρ′ = not (innerᵇ b ρ) ∨ innerᵇ b ρ′
+
   -- `adequacy.Engine.Shown.Links`, decided.
-  linksᵇ : ∀ {R Γ A} → Bool → Pos → Ctx R Γ A → Bool → Events∞ A → Events∞ A → Bool
-  linksᵇ v q top                          f h h′ = true
-  linksᵇ v q (inMap g c)                  f h h′ = linksᵇ v q c true (mapped g h) (mapped g h′)
-  linksᵇ v q (inScan g z c)               f h h′ = linksᵇ v q c true (scanned g z h) (scanned g z h′)
-  linksᵇ v q (inCut l a c)                f h h′ = linksᵇ v q c true h h′
-  linksᵇ v q (inLn b c)                   f h h′ = linksᵇ v q c b h h′
-  linksᵇ v q (inTake i w free c)          f h h′ = linksᵇ v q c true (took i w h) (took i w h′)
-  linksᵇ v q (inTake i w (cpAt _) c)      f h h′ = true
-  linksᵇ v q (inTake i w (cutAt _) c)     f h h′ = true
-  linksᵇ v q (inTake i w (overAt _) c)    f h h′ = true
-  linksᵇ v q (inOuter op g d n w ls c)    f h h′ =
-    linksᵇ v q c true (outerFrame op (lane g) d w (lanesL ls) (deadL ls) (envAt c) h) (outerFrame op (lane g) d w (lanesL ls) (deadL ls) (envAt c) h′)
-  linksᵇ v q (inLanes op g d n w o pre post c) f h h′ =
-    linksᵇ v q c true (lanesFrame op (lane g) d w (gh o) (reverseL pre) post f (envAt c) h) (lanesFrame op (lane g) d w (gh o) (reverseL pre) post f (envAt c) h′)
-  linksᵇ v q (inSrc (cs false true sa ba as nothing r en) b c) f h h′ =
+  linksᵇ : ∀ {R Γ A} → ℕ → Bool → Pos → Ctx R Γ A → Bool → Events∞ A → Events∞ A → Bool
+  linksᵇ t v q top                          f h h′ = true
+  linksᵇ t v q (inMap g c)                  f h h′ = linksᵇ t v q c true (mapped g h) (mapped g h′)
+  linksᵇ t v q (inScan g z c)               f h h′ = linksᵇ t v q c true (scanned g z h) (scanned g z h′)
+  linksᵇ t v q (inCut l a c)                f h h′ = linksᵇ t v q c true h h′
+  linksᵇ t v q (inLn b c)                   f h h′ = linksᵇ t v q c b h h′
+  linksᵇ t v q (inTake i w free c)          f h h′ = linksᵇ t v q c true (took i w h) (took i w h′)
+  linksᵇ t v q (inTake i w (cpAt _) c)      f h h′ = true
+  linksᵇ t v q (inTake i w (cutAt _) c)     f h h′ = true
+  linksᵇ t v q (inTake i w (overAt _) c)    f h h′ = true
+  linksᵇ t v q (inOuter op g d n w ls c)    f h h′ =
+    linksᵇ t v q c true (outerFrame op (lane g) d w (lanesL ls) (deadL ls) (envAt c) h) (outerFrame op (lane g) d w (lanesL ls) (deadL ls) (envAt c) h′)
+  linksᵇ t v q (inLanes op g d n w o pre post c) f h h′ =
+    linksᵇ t v q c true (lanesFrame op (lane g) d w (gh o) (reverseL pre) post f (envAt c) h) (lanesFrame op (lane g) d w (gh o) (reverseL pre) post f (envAt c) h′)
+  linksᵇ t v q (inSrc (cs false true sa ba as nothing r en) b c) f h h′ =
     srcPassᵇ v q (U.stateᴺ (gh b) (Events∞.force h ∷ᴬ envAt c)) (U.stateᴺ (gh b) (Events∞.force h′ ∷ᴬ envAt c)) h′
     ∧ caughtᵇ 0 q (gh b) ∧ flatᵇ depth (Events∞.force h) ∧ fedWalkᵇ q b (Events∞.force h ∷ᴬ envAt c) (Events∞.force h′ ∷ᴬ envAt c)
-    ∧ linksᵇ true q c true (connSrc false r en (gh b) (envAt c) h) (connSrc false r en (gh b) (envAt c) h′)
-  linksᵇ v q (inSrc (cs false true sa ba as (just _) r en) b c) f h h′ = true
-  linksᵇ v q (inSrc (cs false false sa ba as ow r en) b c)      f h h′ = true
-  linksᵇ v q (inSrc (cs true sl sa ba as ow r en) b c)          f h h′ = true
-  linksᵇ v q (inBody (cs cl true sa ba as nothing r en) o c)    f h h′ =
-    linksᵇ v q c true (bodyConn r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) h)
+    ∧ trailedᵇ t b (Events∞.force h ∷ᴬ envAt c) (Events∞.force h′ ∷ᴬ envAt c)
+    ∧ linksᵇ t true q c true (connSrc false r en (gh b) (envAt c) h) (connSrc false r en (gh b) (envAt c) h′)
+  linksᵇ t v q (inSrc (cs false true sa ba as (just _) r en) b c) f h h′ = true
+  linksᵇ t v q (inSrc (cs false false sa ba as ow r en) b c)      f h h′ = true
+  linksᵇ t v q (inSrc (cs true sl sa ba as ow r en) b c)          f h h′ = true
+  linksᵇ t v q (inBody (cs cl true sa ba as nothing r en) o c)    f h h′ =
+    linksᵇ t v q c true (bodyConn r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) h)
                       (bodyConn r (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) h′)
-  linksᵇ v q (inBody (cs cl true sa ba as (just _) r en) o c)   f h h′ = true
-  linksᵇ v q (inBody (cs cl false sa ba as ow r en) o c)        f h h′ = true
+  linksᵇ t v q (inBody (cs cl true sa ba as (just _) r en) o c)   f h h′ = true
+  linksᵇ t v q (inBody (cs cl false sa ba as ow r en) o c)        f h h′ = true
 
   -- The live sources a pass links past.
   liveᵇ : ∀ {R Γ A} → Ctx R Γ A → ℕ
@@ -401,22 +431,22 @@ private
   -- Each step `adequacy.Content` passes, linked where it is shown: an
   -- absorbed stall or close (`stall-pass`, `close-pass`), and a defer
   -- (`defer-links`).
-  linkedᵇ : Conf ℕ → Bool
-  linkedᵇ ⟨ c , pend (defer l) , subscribing , p ⟩ =
+  linkedᵇ : ℕ → Conf ℕ → Bool
+  linkedᵇ t ⟨ c , pend (defer l) , subscribing , p ⟩ =
     if showsᵃ c true
-    then linksᵇ false (p ⊕ (ix 0 ∷ [])) c true (U.stateᴺ (U.deferᶜ l p []) (envAt c)) (U.stateᴺ (U.subscribe (Later.force l) (p ⊕ (ix 1 ∷ []))) (envAt c))
+    then linksᵇ t false (p ⊕ (ix 0 ∷ [])) c true (U.stateᴺ (U.deferᶜ l p []) (envAt c)) (U.stateᴺ (U.subscribe (Later.force l) (p ⊕ (ix 1 ∷ []))) (envAt c))
     else true
-  linkedᵇ ⟨ c , s , absorbed , p ⟩ with search top (plug c s)
+  linkedᵇ t ⟨ c , s , absorbed , p ⟩ with search top (plug c s)
   ... | just (found (Γ′ , A′ , c′ , coldS true (play τ u i t (stall k))) leafM key) =
     closed c′ ∨ not (showsᵃ c′ true)
-    ∨ linksᵇ false (u ++L (ix i ∷ [])) c′ true (U.stateᴺ (gh (coldS true (play τ u i t (stall k)))) (envAt c′))
+    ∨ linksᵇ t false (u ++L (ix i ∷ [])) c′ true (U.stateᴺ (gh (coldS true (play τ u i t (stall k)))) (envAt c′))
                                                (U.stateᴺ (gh (coldS true (play τ u (suc i) t (Frame∞.force k)))) (envAt c′))
   ... | just (found (Γ′ , A′ , c′ , coldS true (play τ u i t (close k))) leafM key) =
     closed c′ ∨ not (showsᵃ c′ true)
-    ∨ linksᵇ false (u ++L (ix i ∷ [])) c′ true (U.stateᴺ (gh (coldS true (play τ u i t (close k)))) (envAt c′))
+    ∨ linksᵇ t false (u ++L (ix i ∷ [])) c′ true (U.stateᴺ (gh (coldS true (play τ u i t (close k)))) (envAt c′))
                                                (U.stateᴺ (gh (coldS true (restᵀ τ (u ++L (last ∷ [])) (From∞.force k)))) (envAt c′))
   ... | _ = true
-  linkedᵇ _ = true
+  linkedᵇ t _ = true
 
   -- Whether every silent step keeps its meaning so, and the longest run
   -- meaning the same.
@@ -425,7 +455,9 @@ private
     walk zero    run best ls m = yes (best ⊔ run) ls
     walk (suc n) run best ls m =
       if not (searchedᵇ m) then no (best ⊔ run) ("\n  beaten: a still find not first past a live source's skips, " ++ showMode m ++ " at " ++ showSpot (spot m))
-      else if not (linkedᵇ m) then no (best ⊔ run) ("\n  unlinked: a pass not fed past a live source's skips, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (linkedᵇ 0 m) then no (best ⊔ run) ("\n  unlinked: a pass not fed past a live source's skips, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (linkedᵇ 1 m) then no (best ⊔ run) ("\n  untrailed: an inner source fed the run not trailing, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (linkedᵇ 2 m) then no (best ⊔ run) ("\n  untrailed: an inner source fed the rest not trailing, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else next n run best (ls + linkCount m) m (step m)
 
     next : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict
