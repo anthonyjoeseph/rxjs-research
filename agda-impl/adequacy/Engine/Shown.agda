@@ -38,9 +38,9 @@ open import adequacy.Engine.Meaning using (_≋_; ≋-trans; ≋-tr; mapped; sca
   flagOf; lanesFrame; outerFrame-ne; lanesFrame-ne; bodyFrame-ne; connSrc-ne; taking∞-ne;
   srcState; srcG; poolT; outerT)
 open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore)
-open import adequacy.Engine.Head using (Frag; cand; pool-step; <ᴷ-irrefl; ≮ᴷ-trans; ≮<ᴷ)
+open import adequacy.Engine.Head using (Frag; cand; pool-step; <ᴷ-irrefl; ≮ᴷ-trans; ≮<ᴷ; ext-≮)
 open import adequacy.Engine.Inv using (Unpended)
-open import adequacy.Engine.Pick using (Beat; past; KAfter; KNotBefore; Before; Race; LaneWon; lane-won; race-steps; after-step;
+open import adequacy.Engine.Pick using (Beat; past; KAfter; KNotBefore; Lost; body-link; Before; Race; LaneWon; lane-won; race-steps; after-step;
   lane-sides; frag-flat; frag-parts; outer-link)
 open import adequacy.Engine.Ahead using (Ahead; Under; shows; shows-open; shown)
 open import adequacy.Engine.Drop using (Dropsˢ; Pass; SrcPass; mapped-drops; scanned-drops;
@@ -68,14 +68,6 @@ postulate
             → (m , key) ∈ own s
   -- Past a position is after every position under it.
   under-after : ∀ q y → after q <ᴷ at (q ++ y) ≡ false
-  -- A body first: the source's candidate, no earlier than it, and the
-  -- connect's own marks, after it, put the source's meaning no earlier;
-  -- a source hushed leaves nothing running.
-  body-link : ∀ {R Γ X B} q (c : Ctx R Γ B) kk (o : St Γ X) (b : St (X ∷ Γ) B)
-            → Frag (plug c (connS kk o b)) → closed c ≡ false → over kk ≡ false
-            → KNotBefore (at q) (cand (inSrc kk b c) o) → Before (at q) (own (connS kk o b))
-            → (Events∞.force (srcState (srcG kk o) (envAt c)) ≡ hush → ∀ d → Agreeᵀ d (Events∞.cut (srcState (srcG kk o) (envAt c))) idle)
-              × NotBefore q (shown (Events∞.force (srcState (srcG kk o) (envAt c))))
   -- A SOURCE'S OWN PASS: the body fed a live source's skips drops its own
   -- skips, each under one of them, to the body fed the rest; the source's
   -- next shows no earlier than any of those and, hushed, leaves nothing
@@ -120,6 +112,12 @@ kafter-≤ K k (just (h , _)) c w = ≮<ᴷ (at k) K h c w
 knot-≤ : ∀ {A} K k (x : Maybe (Key × Out A)) → K <ᴷ at k ≡ false → KNotBefore K x → KNotBefore (at k) x
 knot-≤ K k nothing        c w = tt
 knot-≤ K k (just (h , _)) c w = ≮ᴷ-trans h K (at k) w c
+
+-- A candidate no earlier than a key shows no earlier than it either.
+knot-lost : ∀ {A} k (x : Maybe (Key × Out A)) → KNotBefore k x → Lost false k x
+knot-lost k nothing                w = tt
+knot-lost k (just (at h , _))    w = ≮ᴷ-trans (at (h ++ [ ix 0 ])) (at h) k (ext-≮ h [ ix 0 ]) w
+knot-lost k (just (after h , _)) w = w
 
 before-≤ : ∀ K k ms → K <ᴷ at k ≡ false → Before K ms → Before (at k) ms
 before-≤ K k ms c = allMap (λ {mk} w → ≮<ᴷ (at k) K (proj₂ mk) c w)
@@ -214,7 +212,7 @@ beat-pass v q {P} (inBody (cs cl true sa ba as nothing r en) o c) s f so (nb , o
     bl : ∀ k → keyAt v q <ᴷ at k ≡ false
        → (Events∞.force (srcState (srcG kk o) (envAt c)) ≡ hush → ∀ d → Agreeᵀ d (Events∞.cut (srcState (srcG kk o) (envAt c))) idle)
          × NotBefore k (shown (Events∞.force (srcState (srcG kk o) (envAt c))))
-    bl k le = body-link k c kk o s ft (shows-open c true sh) refl (knot-≤ (keyAt v q) k (cand (inSrc kk s c) o) le nb)
+    bl k le = body-link k c kk o s ft (shows-open c true sh) refl (knot-lost (at k) (cand (inSrc kk s c) o) (knot-≤ (keyAt v q) k (cand (inSrc kk s c) o) le nb))
                 (before-≤ (keyAt v q) k (own (connS kk o s)) le ob)
     hu = proj₁ (bl q (cover-own v q))
     nbk : ∀ k → P k → NotBefore k (shown (Events∞.force (srcState (srcG kk o) (envAt c))))

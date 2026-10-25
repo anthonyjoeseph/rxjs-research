@@ -198,8 +198,9 @@ Won (k , o) (inOuter op f d n q ls c)          s = Race KAfter k c op f d n q s 
 Won (k , o) (inLanes op f d n q o′ pre post c) s =
   LaneWon k c op f d n q o′ pre post s × Pooled (alive s) o × Won (uncurry (laneT d n q) (cutT (alive s) k o)) c (flatS op f d n q o′ (pre ʳ++ s ∷ post))
 Won (k , o) (inSrc kk b c)                     s =
-  KAfter (if over kk then k else shift k) (cand (inBody kk s c) b) × Won ((if over kk then k else shift k) , still) c (connS kk s b)
-Won (k , o) (inBody kk o′ c)                   s = Lost (over kk) k (cand (inSrc kk s c) o′) × Won (k , o) c (connS kk o′ s)
+  KAfter (if over kk then k else shift k) (cand (inBody kk s c) b) × Before (if over kk then k else shift k) (own (connS kk s b))
+  × Won ((if over kk then k else shift k) , still) c (connS kk s b)
+Won (k , o) (inBody kk o′ c)                   s = Lost (over kk) k (cand (inSrc kk s c) o′) × Before k (own (connS kk o′ s)) × Won (k , o) c (connS kk o′ s)
 
 -- A key past a live source's skips: after every position under it.
 past : Bool → Key → Key
@@ -378,15 +379,14 @@ postulate
           → KAfter (shift (at k)) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
           → Won (shift (at k) , still) c (connS (cs false true sa ba as nothing r en) o b)
           → Frag (plug c (connS (cs false true sa ba as nothing r en) o b)) → showsᶜ c true ≡ true → Ahead (Under (_≡ k)) c true
-  -- A BODY'S WON SKIP IS AHEAD OF ITS SOURCE: the source, which lost to
-  -- the body at `k`, shows no earlier and, hushed, leaves nothing running.
-  won-body : ∀ {R Γ X B} k (c : Ctx R Γ B) cl sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
-           → Lost false (at k) (cand (inSrc (cs cl true sa ba as nothing r en) b c) o)
-           → Won (at k , still) c (connS (cs cl true sa ba as nothing r en) o b)
-           → Frag (plug c (connS (cs cl true sa ba as nothing r en) o b)) → showsᶜ c true ≡ true
-           → (Events∞.force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)) ≡ hush
-                → ∀ d → Agreeᵀ d (Events∞.cut (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c))) idle)
-             × NotBefore k (shown (Events∞.force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c))))
+  -- A body first: the source's candidate, which its connect's race did not
+  -- put before it, and the connect's own marks, after it, put the source's
+  -- meaning no earlier; a source hushed leaves nothing running.
+  body-link : ∀ {R Γ X B} q (c : Ctx R Γ B) kk (o : St Γ X) (b : St (X ∷ Γ) B)
+            → Frag (plug c (connS kk o b)) → closed c ≡ false → over kk ≡ false
+            → Lost false (at q) (cand (inSrc kk b c) o) → Before (at q) (own (connS kk o b))
+            → (Events∞.force (srcState (srcG kk o) (envAt c)) ≡ hush → ∀ d → Agreeᵀ d (Events∞.cut (srcState (srcG kk o) (envAt c))) idle)
+              × NotBefore q (shown (Events∞.force (srcState (srcG kk o) (envAt c))))
 
 -- A still candidate that won is ahead at its key in every frame above
 -- it that shows it.
@@ -414,13 +414,13 @@ won-ahead k (inLanes op g d n q o pre post c) s false w ft ()
 won-ahead k (inLanes op g d n q o pre post c) s true (l , _ , w) ft sh =
   (λ { _ refl → lane-sides k c op g d n q o pre post s (shows-open c true sh) l ft (frag-flat c op g d n q o (pre ʳ++ s ∷ post) ft) })
   , won-ahead k c (flatS op g d n q o (pre ʳ++ s ∷ post)) true (lane-still d n q (alive s) {at k} {c} w) ft sh
-won-ahead k (inSrc (cs false true sa ba as nothing r en) b c) s f (ka , w) ft sh = won-src k c sa ba as r en s b ka w ft sh
+won-ahead k (inSrc (cs false true sa ba as nothing r en) b c) s f (ka , _ , w) ft sh = won-src k c sa ba as r en s b ka w ft sh
 won-ahead k (inSrc (cs false true sa ba as (just _) r en) b c) s f w ft ()
 won-ahead k (inSrc (cs false false sa ba as ow r en) b c)      s f w ft ()
 won-ahead k (inSrc (cs true sl sa ba as ow r en) b c)          s f w ft ()
-won-ahead k (inBody (cs cl true sa ba as nothing r en) o c) s f (lo , w) ft sh =
+won-ahead k (inBody (cs cl true sa ba as nothing r en) o c) s f (lo , bf , w) ft sh =
   proj₁ bb , (λ { _ refl → proj₂ bb }) , won-ahead k c (connS (cs cl true sa ba as nothing r en) o s) true w ft sh
-  where bb = won-body k c cl sa ba as r en o s lo w ft sh
+  where bb = body-link k c (cs cl true sa ba as nothing r en) o s ft (shows-open c true sh) refl lo bf
 won-ahead k (inBody (cs cl true sa ba as (just _) r en) o c) s f w ft ()
 won-ahead k (inBody (cs cl false sa ba as ow r en) o c)      s f w ft ()
 
@@ -456,7 +456,7 @@ won-clear p a (inLanes op f d n q o pre post c) s s′ al (l , _ , w) ft lv =
 won-clear p a (inSrc kk b c)                    s s′ al (w , _) ft with over kk
 ... | true  = λ ()
 ... | false = λ _ cl → after-step (p ⊕ [ ix 0 ]) (cand (inBody kk s c) b) (step (gh b)) w (open-agrees (inBody kk s c) b cl (frag-body c kk s b ft))
-won-clear p a (inBody kk o c)                   s s′ al (_ , w) ft = won-clear p a c (connS kk o s) (connS kk o s′) refl w ft
+won-clear p a (inBody kk o c)                   s s′ al (_ , _ , w) ft = won-clear p a c (connS kk o s) (connS kk o s′) refl w ft
 
 -- A lane's completion passes its flatMap's retag as the lane's end.
 lane-off : ∀ {R Γ A B} d n (q : List A) {b} {k} {c : Ctx R Γ B} {t} → b ≡ true
@@ -505,7 +505,7 @@ mutual
     , λ sh → won-ahead (p ⊕ [ ix 0 ]) c (flatS op f d n (a ∷ q) o (pre ʳ++ s ∷ post)) true (lane-shift d n a q {alive s} {at p} {c} lv w) ft sh
     where lv = pooled-live (alive s) u
   won-ends p (inSrc kk b c)                    s s′ al w ft = tt
-  won-ends p (inBody kk o c)                   s s′ al (_ , w) ft = λ k′ → won-ends p c (connS kk o s) (connS k′ o s′) refl w ft
+  won-ends p (inBody kk o c)                   s s′ al (_ , _ , w) ft = λ k′ → won-ends p c (connS kk o s) (connS k′ o s′) refl w ft
 
   ends-if : ∀ {R Γ A} p (c : Ctx R Γ A) b (s s′ : St Γ A) → alive s ≡ alive s′
           → Won (at p , (if b then shows cp else still)) c s → Frag (plug c s) → EndsIf b p c s′
