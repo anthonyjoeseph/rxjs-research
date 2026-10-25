@@ -13,10 +13,10 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 Untried: every frame above a hole keeps its positional facts against the
 hole's run, its event in flight put back (`adequacy.Engine.Above.Flight`).
 Holds only if a rise re-reads every frame above at the run it moves to, and
-a load and a refocus find the frames above keyed. Settled by `flight-next`
-as a body by step case.
+a load and a refocus find the frames above keyed. Settled by `flight-owed`
+as a body by step case: a step staying rising or subscribing.
 
-Members: `flight-next`, `flight-load`, `flight-held`.
+Members: `flight-owed`, `flight-load`, `flight-held`.
 
 #### THE KEYS KEPT
 

@@ -565,7 +565,13 @@ module _ {R : Set} where
   NextInv (complete p)    = ⊤
   NextInv drained         = ⊤
 
-  NextFrag NextKeys NextShape NextFlight NextLead NextApart : Step → Set
+  -- What a configuration owes of its flight beyond what its shape gives:
+  -- a settled node's is read off the whole tree.
+  Owed : Conf R → Set
+  Owed ⟨ c , s , absorbed , p ⟩ = ⊤
+  Owed k                        = Flight k
+
+  NextFrag NextKeys NextShape NextFlight NextOwed NextLead NextApart : Step → Set
   NextFrag (silent t k)    = Frag (whole k)
   NextFrag (value t p a k) = Frag (whole k)
   NextFrag (complete p)    = ⊤
@@ -582,6 +588,10 @@ module _ {R : Set} where
   NextFlight (value t p a k) = Flight k
   NextFlight (complete p)    = ⊤
   NextFlight drained         = ⊤
+  NextOwed (silent t k)    = Owed k
+  NextOwed (value t p a k) = Owed k
+  NextOwed (complete p)    = ⊤
+  NextOwed drained         = ⊤
   NextLead (silent t k)    = Lead k
   NextLead (value t p a k) = Lead k
   NextLead (complete p)    = ⊤
@@ -618,9 +628,9 @@ module _ {R : Set} where
     begin-keys : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Inv ⟨ c , pend o , subscribing , p ⟩
                → NextKeys (step ⟨ c , pend o , subscribing , p ⟩)
     run-keys : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , absorbed , p ⟩ → NextKeys (step ⟨ c , s , absorbed , p ⟩)
-    -- A step keeps its hole's run in shape, and what every frame above
-    -- keeps of it.
-    flight-next : ∀ k → Base k → Order k → NextFlight (step k)
+    -- A step to a value in flight or a subscription keeps its hole's run
+    -- in shape, and what every frame above keeps of it.
+    flight-owed : ∀ k → Base k → Order k → NextOwed (step k)
     -- A tree's first subscription is in shape.
     flight-load : (o : Obs Timeline [] R) → Flight (Machine.load o)
     -- A settled node anywhere in a tree the shape holds of: its run, and
@@ -885,6 +895,22 @@ module _ {R : Set} where
 
   shape-next : ∀ k → Base k → Order k → NextShape (step k)
   shape-next k b o = held (step k) (frag-next k b (proj₁ (Order.shape o))) (keys-next k b o)
+
+  flight-of : ∀ k → Shaped k → Owed k → Flight k
+  flight-of ⟨ c , s , absorbed , p ⟩    h _ = flight-held c s p h
+  flight-of ⟨ c , s , subscribing , p ⟩ _ f = f
+  flight-of ⟨ c , s , rising e , p ⟩    _ f = f
+
+  flown : ∀ x → NextShape x → NextOwed x → NextFlight x
+  flown (silent t k)    h f = flight-of k h f
+  flown (value t p a k) h f = flight-of k h f
+  flown (complete p)    h f = tt
+  flown drained         h f = tt
+
+  -- A step keeps its hole's run in shape, and what every frame above
+  -- keeps of it.
+  flight-next : ∀ k → Base k → Order k → NextFlight (step k)
+  flight-next k b o = flown (step k) (shape-next k b o) (flight-owed k b o)
 
   joined : ∀ x → NextShape x → NextFlight x → NextLead x → NextApart x → NextOrd x
   joined (silent t k)    f g l u = order f g l u
