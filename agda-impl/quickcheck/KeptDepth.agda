@@ -287,13 +287,16 @@ private
     caughtᵇ i q (U.scanᶜ f z n)              = caughtᵇ i q n
     caughtᵇ i q (U.takeWhileᶜ w t n)         = caughtᵇ i q n
     caughtᵇ i q (U.flatMapᶜ op g o ls qs pl) = caughtᴹᵇ i q o ∧ caughtᴸᵇ i q ls ∧ caughtᵇ i q pl
-    caughtᵇ i q (U.joinᶜ j p xs nothing)     = not (atᵇ j ≡ᵇ i) ∨ (null xs ∧ (p <ᵖ q))
-    caughtᵇ i q (U.connectᶜ r b s)           = caughtᵇ (suc i) q b ∧ caughtˢᵇ i q s
-    caughtᵇ i q (U.deferᶜ l p ns)            = unnoticedᵇ i ns
-    caughtᵇ i q (U.endingᶜ p n)              = caughtᵇ i q n
+    caughtᵇ i q (U.joinᶜ j p xs nothing)     = (not (atᵇ j ≡ᵇ i) ∨ null xs) ∧ (p <ᵖ q)
+    caughtᵇ i q (U.framesᶜ τ e m)            = not (inside q e)
+    caughtᵇ i q (U.burstᶜ τ r k m)           = not (inside q r)
+    caughtᵇ i q (U.ofᶜ p k xs)               = not (inside q p)
+    caughtᵇ i q (U.connectᶜ r b s)           = not (inside q r) ∧ caughtᵇ (suc i) q b ∧ caughtˢᵇ i q s
+    caughtᵇ i q (U.deferᶜ l p ns)            = not (inside q p) ∧ unnoticedᵇ i ns
+    caughtᵇ i q (U.endingᶜ p n)              = not (inside q p) ∧ caughtᵇ i q n
     caughtᵇ i q (U.restᶜ n)                  = caughtᵇ i q n
     caughtᵇ i q (U.unionᶜ x y)               = caughtᵇ i q x ∧ caughtᵇ i q y
-    caughtᵇ i q (U.burstingᶜ r t)            = caughtᵇ i q t
+    caughtᵇ i q (U.burstingᶜ r t)            = not (inside q r) ∧ caughtᵇ i q t
     caughtᵇ i q (U.underᶜ s b)               = caughtˢᵇ i q s ∧ caughtᵇ (suc i) q b
     caughtᵇ i q _                            = true
 
@@ -448,6 +451,13 @@ private
     ∷ ("a defer begun past a merged source's skip"
       , connect merged (flatMap (mergeᶠ nothing) (deferᶜ (connected (here refl))) (connected (here refl))))
     ∷ ("a lane joined past a merged source's skips" , connect merged rejoins)
+    ∷ ("a connect in the body over its source, its lanes joining it"
+      , connect skipping (connect (connected (here refl)) (flatMap (mergeᶠ nothing) (connected (here refl)) (connected (here refl)))))
+    ∷ ("a connect in the body over a merged source, its lanes joining it"
+      , connect merged (connect (connected (here refl)) (flatMap (mergeᶠ nothing) (connected (here refl)) (connected (here refl)))))
+    ∷ ("a source running out a closed connect's nested burst, two joiners on it"
+      , connect burstOut (flatMap (mergeᶠ nothing) (connected (here refl)) (of (nat 0 ∷ nat 1 ∷ []))))
+    ∷ ("a source running out a closed connect's nested burst, its lanes joining it" , connect burstOut rejoins)
     ∷ []
     where
     -- A source skipping before each of its values.
@@ -458,6 +468,13 @@ private
     -- values that began them.
     merged : Code [] [] [] [] natᵗ
     merged = flatMap (mergeᶠ nothing) (cold (script ((2 , 1 ∷ []) ∷ (1 , 2 ∷ []) ∷ []) false false)) (of (nat 0 ∷ nat 1 ∷ []))
+
+    -- A merge whose lane is a connect its body ends at once: its source's
+    -- subscribe burst, each value with a lane under it, runs out as skips.
+    burstOut : Code [] [] [] [] natᵗ
+    burstOut = flatMap (mergeᶠ nothing) (connect nests (of [])) (of (nat 0 ∷ []))
+      where nests : Code [] [] [] (natᵗ ∷ []) natᵗ
+            nests = flatMap (mergeᶠ nothing) (of (var (here refl) ∷ var (here refl) ∷ [])) (of (nat 0 ∷ nat 1 ∷ []))
 
     -- Every value of the source opens a lane joining it again.
     rejoins : Code (natᵗ ∷ []) [] [] [] natᵗ
