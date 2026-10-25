@@ -217,10 +217,9 @@ Members: `after-map`, `after-scan`, `after-take`, `clear-take`,
 
 Untried, mechanical: what the frames above keep is read alike off runs alike,
 and off the ghost as the whole tree's keys, a dead lane's read only through
-what it leaves running; a position past a disjoint one is past its last
-child. Settled by bodies.
+what it leaves running. Settled by bodies.
 
-Members: `above-≋`, `keys-above`, `past-last`, `rise-dead-keys`.
+Members: `above-≋`, `keys-above`, `rise-dead-keys`.
 
 ## Tier 2 — the simultaneous spec
 

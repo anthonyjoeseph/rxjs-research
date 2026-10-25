@@ -15,16 +15,19 @@
 module adequacy.Engine.Above where
 
 open import Data.Bool using (Bool; true; false)
-open import Data.List using (List; _∷_; _++_; [_]; reverse)
+open import Data.Empty using (⊥; ⊥-elim)
+open import Data.List using (List; []; _∷_; _++_; [_]; reverse)
+open import Data.List.Properties using (++-assoc)
 open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; cong)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs)
-open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Tail; Timeline; out; end; ix; last; _<ᵖ_; _∪_)
+open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Tail; Timeline; out; end; ix; last; _<ᵖ_; <ᵖ-split; <ᵖ-apart; _∪_)
 open import denotation.MonotonicList using (MonotonicList; taking)
 open import denotation.Unfold using (Node; NEnv; stateᴺ; states; outerᴺ; endingᶜ; takeWhileᶜ; restᶜ)
 open import operation.PureObservable using (module Machine)
@@ -33,7 +36,9 @@ open import adequacy.Engine.Meaning using (_≋_; ≋-by; ≋-out; mapped; scann
   lane; lanesL; deadL; poolT; outerT; outerG; laneRuns; poolRuns; gh; envAt; hole; flagOf; risen; endingAt)
   renaming (outerOf to outerOfᴹ)
 open import adequacy.Engine.Keys using (Shape; Shape′; TakeAt; FlatAt; ConnAt; Keyed; KeyedL; Keys; srcIn)
-open import adequacy.Placed.Order using (Headed; Disjoint; Ext; every; everyT-mono)
+open import adequacy.Placed.Order using (Headed; Disjoint; Ext; Owned; Prefix; every; everyT-mono; ext; owned-ext; prefix-++)
+open import adequacy.Placed.Keys using (ix-mark; last-mark; prefix-refl; prefix-plus; prefix-lane; tagged-mark)
+open import adequacy.Placed.Burst using (owned-drop)
 open import adequacy.Placed.Trail using (trail)
 
 open Events∞
@@ -100,9 +105,31 @@ postulate
   -- Every frame above a hole keeping its own of the run the hole's ghost
   -- gives it, and the hole its own: the whole tree keyed.
   keys-above : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Above c (flagOf s) (stateᴺ (gh s) (envAt c)) → Keyed s (envAt c) → Keys (plug c s)
-  -- A position not before a disjoint one: one past its last child is
-  -- after it, apart from it, and no prefix of it.
-  past-last : ∀ p k → k <ᵖ p ≡ false → Disjoint p k → (p ++ [ last ]) <ᵖ k ≡ true × Disjoint ((p ++ [ last ]) ++ [ ix 1 ]) k × ¬ Ext (p ++ [ last ]) k
+
+-- A position not before a disjoint one: one past its last child is
+-- after it, apart from it, and no prefix of it.
+past-last : ∀ p k → k <ᵖ p ≡ false → Disjoint p k → (p ++ [ last ]) <ᵖ k ≡ true × Disjoint ((p ++ [ last ]) ++ [ ix 1 ]) k × ¬ Ext (p ++ [ last ]) k
+past-last p k h (np , nk) = goal1 , (goal2-fwd , goal2-bwd) , goal3
+  where
+    p<k : p <ᵖ k ≡ true
+    p<k with <ᵖ-split p k h
+    ... | inj₁ lt   = lt
+    ... | inj₂ refl = ⊥-elim (np (inj₁ (prefix-refl p)))
+    ne : ∀ ys → k ≡ p ++ ys → ⊥
+    ne ys e = np (inj₁ (subst (Prefix p) (sym e) (prefix-++ p ys)))
+    goal1 : (p ++ [ last ]) <ᵖ k ≡ true
+    goal1 = <ᵖ-apart p k [ last ] p<k ne
+    goal3 : ¬ Ext (p ++ [ last ]) k
+    goal3 (ext l ls) = np (owned-drop p [ last ] _ (owned-ext (ext l ls)))
+    goal2-fwd : ¬ Owned ((p ++ [ last ]) ++ [ ix 1 ]) k
+    goal2-fwd o = np (owned-drop p [ last ] k (owned-drop (p ++ [ last ]) [ ix 1 ] k o))
+    goal2-bwd : ¬ Owned k ((p ++ [ last ]) ++ [ ix 1 ])
+    goal2-bwd (inj₂ t) = nk (inj₂ (tagged-mark k p last last-mark (tagged-mark k (p ++ [ last ]) (ix 1) (ix-mark 1) t)))
+    goal2-bwd (inj₁ q) with prefix-plus k ((p ++ [ last ]) ++ [ ix 1 ]) q
+    ... | inj₁ refl = ne (last ∷ ix 1 ∷ []) (++-assoc p [ last ] [ ix 1 ])
+    ... | inj₂ q⁺   with prefix-plus k (p ++ [ last ]) (prefix-lane k (p ++ [ last ]) (ix 1) q⁺)
+    ...   | inj₁ refl = ne (last ∷ []) refl
+    ...   | inj₂ q⁺'  = nk (inj₁ (prefix-lane k p last q⁺'))
 
 ------------------------------------------------------------------------
 -- A takeWhile failing a value
