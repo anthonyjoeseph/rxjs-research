@@ -47,8 +47,8 @@ Members: `kill-pool`.
 #### THE STILL'S SUBTREE
 
 Untried: a still skip leads every race above it past each live source's
-skips: nothing above is due under the skip's position. Both what the search
-finds (`Apart`; `quickcheck.KeptDepth` checks every absorbed configuration)
+skips: nothing above is due under the skip's position, and every joiner
+joined before it. Both what the search finds (`Apart`; `quickcheck.KeptDepth` checks every absorbed configuration)
 and the skip a value or a lane's end leaves just past itself, where the race
 `Won` records only the shifted key, and the lane a value or an end begins,
 whose frames above must pass every skip under its position. Settled when

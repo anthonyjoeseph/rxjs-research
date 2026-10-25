@@ -40,9 +40,9 @@ open Driver ℕ using (Step; step; silent; value; complete; drained)
 open Ghosting ℕ using (work; Measure)
 open Machine using (Conf; ⟨_,_,_,_⟩; load; spot; subscribing; absorbed; rising; nx; cp; pend; coldS; top; inOuter; inLanes;
   plug; closed; alive; search; found; leafM; St; Ctx; Out; mapS; scanS; cutS; lnS; takeS; flatS; connS; inMap; inScan; inCut; inLn;
-  inTake; inSrc; inBody; over; own; Mark; outOf; still; shows)
+  inTake; inSrc; inBody; joinS; over; own; Mark; outOf; still; shows)
 open import Data.Maybe using (Maybe)
-open import operation.Key using (Key; _<ᴷ_)
+open import operation.Key using (Key; at; _<ᴷ_)
 open import Tree using (Obs; FlatOp)
 open import denotation.MonotonicList.Events using (Timeline)
 open import adequacy.Engine.Head using (cand)
@@ -125,12 +125,29 @@ private
     ∧ beatᵇ (past (over kk) k) c (connS kk s b)
   beatᵇ k (inBody kk o c)                   s = knotᵇ k (cand (inSrc kk s c) o) ∧ beforeᵇ k (own (connS kk o s)) ∧ beatᵇ k c (connS kk o s)
 
+  -- `adequacy.Engine.Pick.Joins`, decided.
+  mutual
+    joinsᵇ : ∀ {Γ A} → Key → St Γ A → Bool
+    joinsᵇ k (mapS f s)              = joinsᵇ k s
+    joinsᵇ k (scanS f z s)           = joinsᵇ k s
+    joinsᵇ k (cutS l a s)            = joinsᵇ k s
+    joinsᵇ k (lnS b s)               = joinsᵇ k s
+    joinsᵇ k (takeS i p w s)         = joinsᵇ k s
+    joinsᵇ k (flatS op f d n q o ls) = joinsᵇ k o ∧ joinsᴸᵇ k ls
+    joinsᵇ k (connS kk o b)          = joinsᵇ k o ∧ joinsᵇ k b
+    joinsᵇ k (joinS j g x ib)        = at j <ᴷ k
+    joinsᵇ k _                       = true
+
+    joinsᴸᵇ : ∀ {Γ A} → Key → List (St Γ A) → Bool
+    joinsᴸᵇ k []       = true
+    joinsᴸᵇ k (s ∷ ls) = joinsᵇ k s ∧ joinsᴸᵇ k ls
+
   -- `adequacy.Engine.Pick.Searched`, decided.
   searchedᵇ : Conf ℕ → Bool
   searchedᵇ ⟨ c , s , absorbed , p ⟩ with search top (plug c s)
   ... | nothing = true
   ... | just (found (Γ′ , A′ , c′ , s′) m key) with outOf c′ s′ m
-  ...   | still   = beatᵇ key c′ s′
+  ...   | still   = beatᵇ key c′ s′ ∧ joinsᵇ key (plug c′ s′)
   ...   | shows _ = true
   searchedᵇ _ = true
 
@@ -161,7 +178,7 @@ private
     walk : ℕ → ℕ → ℕ → Conf ℕ → Verdict
     walk zero    run best m = yes (best ⊔ run)
     walk (suc n) run best m = if searchedᵇ m then next n run best m (step m)
-                              else no (best ⊔ run) ("\n  beaten: a still find not first past a live source's skips, " ++ showMode m ++ " at " ++ showSpot (spot m))
+                              else no (best ⊔ run) ("\n  beaten: a still find not first past a live source's skips, or a joiner not joined before it, " ++ showMode m ++ " at " ++ showSpot (spot m))
 
     next : ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict
     next n run best m (silent t m′)     = after n run best m m′ (kind m m′)

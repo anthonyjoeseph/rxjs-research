@@ -52,7 +52,7 @@ open import denotation.Unfold using (Step; states; step; headˢ; hushˢ; outˢ; 
 open import operation.Key using (Key; at; after; _<ᴷ_)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; cs; mapS; scanS; cutS; lnS; takeS; flatS; connS; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes;
-  inSrc; inBody; plug; closed; Out; still; shows; seek; search; found; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
+  inSrc; inBody; joinS; plug; closed; Out; still; shows; seek; search; found; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
   Mark; own; Found; nx; cp; alive; ended; free; cpAt; cutAt; overAt; _⊕_; mapT; scanT; cutT; takeT; laneT; shift; over; outOf)
   renaming (outerT to outerK)
 open import adequacy.Engine.Meaning using (gh; poolG; lanesL; deadL; poolT; outerT; envAt; srcState; srcG)
@@ -226,10 +226,32 @@ Beat k (inSrc kk b c)                     s =
   KAfter (past (over kk) k) (cand (inBody kk s c) b) × Before (past (over kk) k) (own (connS kk s b)) × Beat (past (over kk) k) c (connS kk s b)
 Beat k (inBody kk o c)                    s = KNotBefore k (cand (inSrc kk s c) o) × Before k (own (connS kk o s)) × Beat k c (connS kk o s)
 
--- What the search finds still beats every race above it.
+-- Every joiner in a tree joined before a key.  A joiner joined at `j`
+-- sees a source event at `q` under itself only when `j` is before `q`:
+-- one joined at or after a skip sees it at its own position instead, so
+-- the body fed a source's skips drops them under them only when every
+-- joiner in it joined before the search's key.
+mutual
+  Joins : ∀ {Γ A} → Key → St Γ A → Set
+  Joins k (mapS f s)             = Joins k s
+  Joins k (scanS f z s)          = Joins k s
+  Joins k (cutS l a s)           = Joins k s
+  Joins k (lnS b s)              = Joins k s
+  Joins k (takeS i p w s)        = Joins k s
+  Joins k (flatS op f d n q o ls) = Joins k o × Joinsᴸ k ls
+  Joins k (connS kk o b)         = Joins k o × Joins k b
+  Joins k (joinS j g x ib)       = at j <ᴷ k ≡ true
+  Joins k _                      = ⊤
+
+  Joinsᴸ : ∀ {Γ A} → Key → List (St Γ A) → Set
+  Joinsᴸ k []       = ⊤
+  Joinsᴸ k (s ∷ ls) = Joins k s × Joinsᴸ k ls
+
+-- What the search finds still beats every race above it, every joiner
+-- in the tree joined before it.
 Beats : ∀ {R} → Maybe (Found R) → Set
 Beats nothing                                  = ⊤
-Beats (just (found (Γ , A , c , s) m key)) = outOf c s m ≡ still → Beat key c s
+Beats (just (found (Γ , A , c , s) m key)) = outOf c s m ≡ still → Beat key c s × Joins key (plug c s)
 
 Apart : ∀ {R} → St [] R → Set
 Apart t = Beats (search top t)

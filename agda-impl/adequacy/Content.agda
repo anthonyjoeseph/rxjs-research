@@ -58,7 +58,7 @@ open import adequacy.Engine.Inv using (Inv; module Inv; module Base; wfI; search
 open import adequacy.Engine.Spent using (module Spending)
 open import adequacy.Engine.Kept using (KeptFrom; refocus-agree; rests-++; lanes-runs; pool-runs; dead-hole) renaming (kept to engine-kept)
 open import adequacy.Engine.Head using (Frag; Lane) renaming (Lanes to Lanesᴴ)
-open import adequacy.Engine.Pick using (Beat; Beats; module Order; frag-flat; frag-parts; lanes-ʳsplit)
+open import adequacy.Engine.Pick using (Beat; Beats; Joins; module Order; frag-flat; frag-parts; lanes-ʳsplit)
 open import adequacy.Engine.Ahead using (Sides; shows; shows-open; ahead-mono) renaming (Ahead to Aheadᶠ)
 open import adequacy.Engine.Race using (After; TailNotBefore)
 open import adequacy.Engine.Shown using (beat-pass; cold-key; Links; pass-of)
@@ -696,7 +696,8 @@ module Honesty (R : Set) where
                  (U.stateᴺ (gh (coldS true (play τ u (suc i) t₀ (Frame∞.force k)))) (envAt c′))
   stall-pass {c = c} {s} {c′} {τ} {u} {i} {t₀} {k} eq sh iv =
     beat-pass false (u ++ [ ix i ]) c′ (coldS true (play τ u i t₀ (stall k))) true (λ _ e → e)
-      (subst (λ x → Beat x c′ (coldS true (play τ u i t₀ (stall k)))) (cold-key (plug c s) eq) (subst Beats eq (Order.apart (Inv.ord iv)) refl))
+      (subst (λ x → Beat x c′ (coldS true (play τ u i t₀ (stall k)))) (cold-key (plug c s) eq) (proj₁ (subst Beats eq (Order.apart (Inv.ord iv)) refl)))
+      (subst (λ x → Joins x (plug c′ (coldS true (play τ u i t₀ (stall k))))) (cold-key (plug c s) eq) (proj₂ (subst Beats eq (Order.apart (Inv.ord iv)) refl)))
       (subst Frag (sym (proj₁ (search-hit (plug c s) eq))) (Order.shape (Inv.ord iv))) tt
       sh refl (≋-by refl refl) (stall-hole (envAt c′))
 
@@ -707,7 +708,8 @@ module Honesty (R : Set) where
                  (U.stateᴺ (gh (coldS true (restᵀ τ (u ++ [ last ]) (From∞.force k)))) (envAt c′))
   close-pass {c = c} {s} {c′} {τ} {u} {i} {t₀} {k} eq sh iv =
     beat-pass false (u ++ [ ix i ]) c′ (coldS true (play τ u i t₀ (close k))) true (λ _ e → e)
-      (subst (λ x → Beat x c′ (coldS true (play τ u i t₀ (close k)))) (cold-key (plug c s) eq) (subst Beats eq (Order.apart (Inv.ord iv)) refl))
+      (subst (λ x → Beat x c′ (coldS true (play τ u i t₀ (close k)))) (cold-key (plug c s) eq) (proj₁ (subst Beats eq (Order.apart (Inv.ord iv)) refl)))
+      (subst (λ x → Joins x (plug c′ (coldS true (play τ u i t₀ (close k))))) (cold-key (plug c s) eq) (proj₂ (subst Beats eq (Order.apart (Inv.ord iv)) refl)))
       (subst Frag (sym (proj₁ (search-hit (plug c s) eq))) (Order.shape (Inv.ord iv))) tt
       sh refl (≋-by refl refl) (close-hole (envAt c′))
 
