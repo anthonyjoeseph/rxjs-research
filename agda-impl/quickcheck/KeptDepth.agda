@@ -145,13 +145,25 @@ private
   samePos : Pos → Pos → Bool
   samePos p q = not (p <ᵖ q) ∧ not (q <ᵖ p)
 
+  -- Whether what follows comes no earlier than `p`.
+  tailOnᵇ : Pos → Tail → Bool
+  tailOnᵇ p idle      = true
+  tailOnᵇ p (pin k _) = not (k <ᵖ p)
+
+  onᵇ : Pos → Events ℕ → Bool
+  onᵇ p (out k _ _) = not (k <ᵖ p)
+  onᵇ p (skip k _)  = not (k <ᵖ p)
+  onᵇ p (end k)     = not (k <ᵖ p)
+  onᵇ p hush        = true
+
   -- Whether `u` is `t`, to `k` pins of `t`, with none or more of its pins
-  -- erased (`adequacy.Engine.Drop.Eraseᵀ`).
+  -- erased, each no later than the pin after it
+  -- (`adequacy.Engine.Drop.Eraseᵀ`).
   unpinnedᵇ : ℕ → Tail → Tail → Bool
   unpinnedᵇ zero    _         _          = true
   unpinnedᵇ (suc k) (pin p l) (pin q r)  =
-    if samePos p q then unpinnedᵇ k (Tail∞.later l) (Tail∞.later r) else unpinnedᵇ k (Tail∞.later l) (pin q r)
-  unpinnedᵇ (suc k) (pin p l) idle       = unpinnedᵇ k (Tail∞.later l) idle
+    if samePos p q then unpinnedᵇ k (Tail∞.later l) (Tail∞.later r) else tailOnᵇ p (Tail∞.later l) ∧ unpinnedᵇ k (Tail∞.later l) (pin q r)
+  unpinnedᵇ (suc k) (pin p l) idle       = tailOnᵇ p (Tail∞.later l) ∧ unpinnedᵇ k (Tail∞.later l) idle
   unpinnedᵇ (suc k) idle      idle       = true
   unpinnedᵇ (suc k) idle      (pin _ _)  = false
 
@@ -161,7 +173,8 @@ private
   pastᵇ k u (just t) = unpinnedᵇ k u t
 
   -- Whether `e′` is `e`, to `k` events of `e`, with none or more of its
-  -- skips erased (`adequacy.Engine.Drop.Erase`): each tail beside a kept
+  -- skips erased, each no later than what follows it
+  -- (`adequacy.Engine.Drop.Erase`): each tail beside a kept
   -- event erased to the other's, the tail past an erased skip to what the
   -- other leaves running there, `t` (unknown at the root).  Positions
   -- strictly rise, so a skip at the other's position is never one to erase.
@@ -171,8 +184,8 @@ private
     samePos p q ∧ (a ≡ᵇ b) ∧ unpinnedᵇ k (Events∞.cut r) (Events∞.cut r′) ∧ erasedᵇ k (just (Events∞.cut r′)) (Events∞.force r) (Events∞.force r′)
   erasedᵇ (suc k) t (skip p r)  (skip q r′)  =
     if samePos p q then unpinnedᵇ k (Events∞.cut r) (Events∞.cut r′) ∧ erasedᵇ k (just (Events∞.cut r′)) (Events∞.force r) (Events∞.force r′)
-    else pastᵇ k (Events∞.cut r) t ∧ erasedᵇ k t (Events∞.force r) (skip q r′)
-  erasedᵇ (suc k) t (skip p r)  e′           = pastᵇ k (Events∞.cut r) t ∧ erasedᵇ k t (Events∞.force r) e′
+    else onᵇ p (Events∞.force r) ∧ pastᵇ k (Events∞.cut r) t ∧ erasedᵇ k t (Events∞.force r) (skip q r′)
+  erasedᵇ (suc k) t (skip p r)  e′           = onᵇ p (Events∞.force r) ∧ pastᵇ k (Events∞.cut r) t ∧ erasedᵇ k t (Events∞.force r) e′
   erasedᵇ (suc k) t (end p)     (end q)      = samePos p q
   erasedᵇ (suc k) t hush        hush         = true
   erasedᵇ (suc k) t _           _            = false

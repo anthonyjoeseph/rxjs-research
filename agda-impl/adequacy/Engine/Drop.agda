@@ -60,11 +60,16 @@ open Agreeˢ
 ------------------------------------------------------------------------
 -- Runs with skips erased
 
--- A tail with none or more of its pins erased.
+-- A tail with none or more of its pins erased, each no later than the
+-- pin after it: a merge of tails reads each by its next.
+--
+-- REFUTED: 5a5d1bd0 any pin erased, by an outer's tail `[5, 1]` erased of
+--   its `5` beside a pool pinned at `[3]`: the merge's tails are `[3, 5, 1]`
+--   and `[1, 3]`.
 data Eraseᵀ : ℕ → Tail → Tail → Set where
   stopᵉ : ∀ {x y} → Eraseᵀ zero x y
   pinᵉ  : ∀ {k p l r} → Eraseᵀ k (later l) (later r) → Eraseᵀ (suc k) (pin p l) (pin p r)
-  unpin : ∀ {k p l r} → Eraseᵀ k (later l) r → Eraseᵀ (suc k) (pin p l) r
+  unpin : ∀ {k p l r} → TailNotBefore p (later l) → Eraseᵀ k (later l) r → Eraseᵀ (suc k) (pin p l) r
   idleᵉ : ∀ {k} → Eraseᵀ (suc k) idle idle
 
 -- A run with none or more of its skips erased, `t` what the other leaves
@@ -135,7 +140,7 @@ private
   eraseᵀ-then : ∀ {k} {x y z : Tail} → Eraseᵀ k x y → Agreeᵀ k y z → Eraseᵀ k x z
   eraseᵀ-then stopᵉ     a        = stopᵉ
   eraseᵀ-then (pinᵉ e)  (pin⁼ a) = pinᵉ (eraseᵀ-then e a)
-  eraseᵀ-then (unpin e) a        = unpin (eraseᵀ-then e (agreeᵀ-pred a))
+  eraseᵀ-then (unpin o e) a      = unpin o (eraseᵀ-then e (agreeᵀ-pred a))
   eraseᵀ-then idleᵉ     idle⁼    = idleᵉ
 
   erase-then : ∀ {A k} {x y z : Events A} {t t′} → Erase k x t y → Agreeᵀ k t t′ → Agree k y z → Erase k x t′ z
