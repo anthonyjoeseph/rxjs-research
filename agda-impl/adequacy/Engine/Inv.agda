@@ -20,20 +20,20 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 import Data.List.Relation.Unary.All
 open import Data.Empty using (⊥)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; subst₂; sym)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; subst₂; sym; trans; cong)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList.Events using (Pos; Timeline; emit; stall; close; Events∞; hush; idle; ix)
+open import denotation.MonotonicList.Events using (Pos; Timeline; emit; stall; close; Events∞; hush; idle; ix; last)
 open import denotation.MonotonicList using (Agreeᵀ)
 open import operation.Key using (at)
-open import denotation.Unfold using (same?; NEnv; stateᴺ; subscribe)
+open import denotation.Unfold using (same?; NEnv; stateᴺ; cutᴺ; states; outerᴺ; subscribe)
 open import adequacy.Engine.Head using (Frag)
-open import adequacy.Engine.Keys using (Keys; Held; keyed-at)
-open import adequacy.Engine.Above using (Flight; above-≋; keys-above; keys-past; take-incl; take-excl; take-here)
+open import adequacy.Engine.Keys using (Keys; Keyed; Held; FlatAt)
+open import adequacy.Engine.Above using (Flight; above-≋; keys-above; take-excl; take-here; conn-drop; flat-drop; keyedL-ʳ++; toʳ; lanes-runs; lanes-P; rested-risen; ending-risen; takeAt-risen)
 open import adequacy.Engine.Ahead using (Under; shown; ahead-mono; under-sub)
 open import adequacy.Engine.Race using (NotBefore)
-open import adequacy.Engine.Meaning using (envAt; gh)
-open import adequacy.Engine.Pick using (Order; order; module Order; whole; Lead; Clear; Ends; EndsIf; Won; won-clear; won-ends; search-won; Apart; Searched)
+open import adequacy.Engine.Meaning using (envAt; gh; risen; lane; lanesL; laneRuns; poolRuns; outerT; outerG; poolG; deadL)
+open import adequacy.Engine.Pick using (Order; order; module Order; whole; KeysAt; Shaped; Lead; Clear; Ends; EndsIf; Won; won-clear; won-ends; search-won; Apart; Searched)
 open import operation.PureObservable using (Tape; due; play; ending; over; module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; closed; closedUp;
@@ -570,12 +570,12 @@ module _ {R : Set} where
   NextFrag (value t p a k) = Frag (whole k)
   NextFrag (complete p)    = ⊤
   NextFrag drained         = ⊤
-  NextKeys (silent t k)    = Keys (whole k)
-  NextKeys (value t p a k) = Keys (whole k)
+  NextKeys (silent t k)    = KeysAt k
+  NextKeys (value t p a k) = KeysAt k
   NextKeys (complete p)    = ⊤
   NextKeys drained         = ⊤
-  NextShape (silent t k)    = Held (whole k)
-  NextShape (value t p a k) = Held (whole k)
+  NextShape (silent t k)    = Shaped k
+  NextShape (value t p a k) = Shaped k
   NextShape (complete p)    = ⊤
   NextShape drained         = ⊤
   NextFlight (silent t k)    = Flight k
@@ -596,22 +596,25 @@ module _ {R : Set} where
     frag-next : ∀ k → Base k → Frag (whole k) → NextFrag (step k)
     -- THE KEYS KEPT: every node's own positional facts, each in the
     -- environment its connects give it, kept by a rise through a frame
-    -- that rewrites its node: a scan's value, a takeWhile's failing one,
-    -- an outer's value or end, a lane's end, a source's value or end, a
-    -- body's end; by a subscribe beginning a former; and by a mark run.
-    rise-scan-keys : ∀ {Γ A B} (c : Ctx R Γ B) (f : B → A → B) z (s : St Γ A) a p → Inv ⟨ inScan f z c , s , rising (nx a) , p ⟩
-                   → Keys (plug c (scanS f (f z a) s))
+    -- that rewrites its node: an outer's value or end, a lane's end, a
+    -- source's value or end, a body's end; by a subscribe beginning a
+    -- former; and by a mark run.
     rise-admit-keys : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q ls (s : St Γ A) a p
                     → Inv ⟨ inOuter op f d n q ls c , s , rising (nx a) , p ⟩ → NextKeys (step ⟨ inOuter op f d n q ls c , s , rising (nx a) , p ⟩)
     rise-outer-end-keys : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q ls (s : St Γ A) p
-                        → Inv ⟨ inOuter op f d n q ls c , s , rising cp , p ⟩ → Keys (plug c (flatS op f true n q s ls))
+                        → Inv ⟨ inOuter op f d n q ls c , s , rising cp , p ⟩ → NextKeys (step ⟨ inOuter op f d n q ls c , s , rising cp , p ⟩)
     rise-lane-end-keys : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) p
                        → Inv ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩
-                       → Keys (whole (dequeue c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p))
+                       → KeysAt (dequeue c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p)
     rise-src-keys : ∀ {Γ X B} (c : Ctx R Γ B) k (b : St (X ∷ Γ) B) (s : St Γ X) e p → Inv ⟨ inSrc k b c , s , rising e , p ⟩
                   → NextKeys (step ⟨ inSrc k b c , s , rising e , p ⟩)
     rise-body-end-keys : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (s : St (X ∷ Γ) B) p → Inv ⟨ inBody k o c , s , rising cp , p ⟩
-                       → Keys (plug c (connS (record k { owedAt = just p }) o s))
+                       → Keyed (connS (record k { owedAt = just p }) o s) (envAt c)
+    -- THE FLIGHT, READ: a lane already over absorbing what reaches it
+    -- leaves the whole tree keyed.
+    rise-dead-keys : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) e p
+                   → Inv ⟨ inLanes op f d n q o pre post c , s , rising e , p ⟩ → alive s ≡ false
+                   → Keys (plug c (flatS op f d n q o (pre ʳ++ s ∷ post)))
     begin-keys : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Inv ⟨ c , pend o , subscribing , p ⟩
                → NextKeys (step ⟨ c , pend o , subscribing , p ⟩)
     run-keys : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , absorbed , p ⟩ → NextKeys (step ⟨ c , s , absorbed , p ⟩)
@@ -782,41 +785,75 @@ module _ {R : Set} where
   rise-take-keys : ∀ {Γ A} (c : Ctx R Γ A) i q (s : St Γ A) a p → Inv ⟨ inTake i q free c , s , rising (nx a) , p ⟩
                  → NextKeys (step ⟨ inTake i q free c , s , rising (nx a) , p ⟩)
   rise-take-keys c i q s a p v with q a in e | i
-  ... | true  | _     = proj₂ (Order.shape (Inv.ord v))
-  ... | false | true  = keys-past c (takeS true q (cpAt p) s) a (p ⊕ [ ix 0 ])
-                          (above-≋ c true (take-incl q (gh s) (envAt c) a p e) (proj₂ (proj₂ (Order.flight (Inv.ord v)))))
-                          (take-here p a (stateᴺ (gh s) (envAt c)) (proj₁ (Order.flight (Inv.ord v))) , kids)
-    where kids = keyed-at (inTake true q free c) s (proj₂ (Order.shape (Inv.ord v)))
+  ... | true  | _     = tt , proj₂ (Order.shape (Inv.ord v))
+  ... | false | true  = take-here p a (stateᴺ (gh s) (envAt c)) (proj₁ (Order.flight (Inv.ord v))) , proj₂ (Order.shape (Inv.ord v))
   ... | false | false = keys-above c (takeS false q (cpAt p) s)
                           (above-≋ c true (take-excl q (gh s) (envAt c) a p e) (proj₂ (proj₂ (Order.flight (Inv.ord v)))))
-                          (take-here p a (stateᴺ (gh s) (envAt c)) (proj₁ (Order.flight (Inv.ord v))) , kids)
-    where kids = keyed-at (inTake false q free c) s (proj₂ (Order.shape (Inv.ord v)))
+                          (take-here p a (stateᴺ (gh s) (envAt c)) (proj₁ (Order.flight (Inv.ord v))) , proj₂ (Order.shape (Inv.ord v)))
 
-  -- A rise through any other frame leaves the tree as it was.
+  -- A value a lane passes on leaves its merge keyed without it.
+  rise-lane-keys : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) b p
+                 → Inv ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩ → alive s ≡ true
+                 → Keyed (flatS op f d n q o (pre ʳ++ s ∷ post)) (envAt c)
+  rise-lane-keys c op f d n q o pre post s b p v a =
+    subst₂ (FlatAt ρ O) (sym L) P (flat-drop (states (lanesL post) ρ) (gh s) ρ b p fa)
+    , proj₁ (proj₂ (proj₁ (proj₂ fl)))
+    , keyedL-ʳ++ pre (proj₁ (proj₂ (proj₂ (proj₁ (proj₂ fl))))) (proj₂ (Order.shape (Inv.ord v)) , proj₂ (proj₂ (proj₂ (proj₁ (proj₂ fl)))))
+    where
+      ρ  = envAt c
+      O  = outerᴺ (lane f) (outerG d (gh o)) ρ
+      h  = risen (gh s) ρ (nx b) p
+      fl = Order.flight (Inv.ord v)
+      fa : FlatAt ρ O (laneRuns (reverse pre) post true ρ h) (outerT d (gh o) ρ (poolRuns (reverse pre) post true ρ h))
+      fa = subst (λ x → FlatAt ρ O (laneRuns (reverse pre) post x ρ h) (outerT d (gh o) ρ (poolRuns (reverse pre) post x ρ h))) a
+             (proj₁ (proj₁ (proj₂ fl)))
+      L : states (lanesL (pre ʳ++ s ∷ post)) ρ ≡ laneRuns (reverse pre) post true ρ (stateᴺ (gh s) ρ)
+      L = toʳ (λ ls → states (lanesL ls) ρ ≡ laneRuns (reverse pre) post true ρ (stateᴺ (gh s) ρ)) pre
+            (trans (lanes-runs (reverse pre) s post ρ) (cong (λ x → laneRuns (reverse pre) post x ρ (stateᴺ (gh s) ρ)) a))
+      P : outerT d (gh o) ρ (poolRuns (reverse pre) post true ρ (stateᴺ (gh s) ρ)) ≡ cutᴺ (poolG d (gh o) (deadL (pre ʳ++ s ∷ post))) ρ
+      P = toʳ (λ ls → outerT d (gh o) ρ (poolRuns (reverse pre) post true ρ (stateᴺ (gh s) ρ)) ≡ cutᴺ (poolG d (gh o) (deadL ls)) ρ) pre
+            (lanes-P d o (reverse pre) s post ρ a)
+
+  -- A value a body passes on leaves its connect keyed without it.
+  rise-body-keys : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (s : St (X ∷ Γ) B) b p → Inv ⟨ inBody k o c , s , rising (nx b) , p ⟩
+                 → Keyed (connS k o s) (envAt c)
+  rise-body-keys c k o s b p v =
+    conn-drop k (gh s) (envAt (inBody k o c)) b p (proj₁ (proj₁ (proj₂ (Order.flight (Inv.ord v)))))
+    , proj₂ (proj₁ (proj₂ (Order.flight (Inv.ord v)))) , proj₂ (Order.shape (Inv.ord v))
+
+  -- A rise through any other frame keeps its node's own; one absorbed
+  -- leaves the frames above keyed of what it leaves running.
   rise-keys : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Inv ⟨ c , s , rising e , p ⟩ → NextKeys (step ⟨ c , s , rising e , p ⟩)
   rise-keys top                               s (nx a) p v = proj₂ (Order.shape (Inv.ord v))
   rise-keys top                               s cp     p v = tt
-  rise-keys (inMap f c)                       s e      p v = proj₂ (Order.shape (Inv.ord v))
-  rise-keys (inScan f z c)                    s (nx a) p v = rise-scan-keys c f z s a p v
-  rise-keys (inScan f z c)                    s cp     p v = proj₂ (Order.shape (Inv.ord v))
-  rise-keys (inCut true a c)                  s e      p v = proj₂ (Order.shape (Inv.ord v))
-  rise-keys (inCut false a c)                 s e      p v = proj₂ (Order.shape (Inv.ord v))
-  rise-keys (inLn b c)                        s e      p v = proj₂ (Order.shape (Inv.ord v))
+  rise-keys (inMap f c)                       s e      p v = tt , proj₂ (Order.shape (Inv.ord v))
+  rise-keys (inScan f z c)                    s (nx a) p v = tt , proj₂ (Order.shape (Inv.ord v))
+  rise-keys (inScan f z c)                    s cp     p v = tt , proj₂ (Order.shape (Inv.ord v))
+  rise-keys (inCut true a c)                  s e      p v = tt , proj₂ (Order.shape (Inv.ord v))
+  rise-keys (inCut false a c)                 s e      p v =
+    keys-above c (cutS false a s) (above-≋ c true (rested-risen (gh s) (envAt c) e p) (proj₂ (Order.flight (Inv.ord v)))) (tt , proj₂ (Order.shape (Inv.ord v)))
+  rise-keys (inLn b c)                        s e      p v = tt , proj₂ (Order.shape (Inv.ord v))
   rise-keys (inTake i q free c)               s (nx a) p v = rise-take-keys c i q s a p v
-  rise-keys (inTake i q free c)               s cp     p v = proj₂ (Order.shape (Inv.ord v))
-  rise-keys (inTake i q (cpAt r) c)           s e      p v = proj₂ (Order.shape (Inv.ord v))
-  rise-keys (inTake i q (cutAt r) c)          s e      p v = proj₂ (Order.shape (Inv.ord v))
-  rise-keys (inTake i q (overAt r) c)         s e      p v = proj₂ (Order.shape (Inv.ord v))
+  rise-keys (inTake i q free c)               s cp     p v = tt , proj₂ (Order.shape (Inv.ord v))
+  -- a takeWhile already over absorbs what reaches it: the frames above
+  -- saw only what it leaves running
+  rise-keys (inTake i q (cpAt r) c)           s e      p v =
+    keys-above c (takeS i q (cpAt r) s) (above-≋ c true (ending-risen (r ⊕ [ last ]) (gh s) (envAt c) e p) (proj₂ (proj₂ (Order.flight (Inv.ord v)))))
+      (takeAt-risen (cpAt r) (gh s) (envAt c) e p (proj₁ (proj₂ (Order.flight (Inv.ord v)))) , proj₂ (Order.shape (Inv.ord v)))
+  rise-keys (inTake i q (cutAt r) c)          s e      p v =
+    keys-above c (takeS i q (cutAt r) s) (above-≋ c true (rested-risen (gh s) (envAt c) e p) (proj₂ (proj₂ (Order.flight (Inv.ord v))))) (tt , proj₂ (Order.shape (Inv.ord v)))
+  rise-keys (inTake i q (overAt r) c)         s e      p v =
+    keys-above c (takeS i q (overAt r) s) (above-≋ c true (rested-risen (gh s) (envAt c) e p) (proj₂ (proj₂ (Order.flight (Inv.ord v))))) (tt , proj₂ (Order.shape (Inv.ord v)))
   rise-keys (inOuter op f d n q ls c)         s (nx a) p v = rise-admit-keys c op f d n q ls s a p v
   rise-keys (inOuter op f d n q ls c)         s cp     p v = rise-outer-end-keys c op f d n q ls s p v
-  rise-keys (inLanes op f d n q o pre post c) s (nx b) p v with alive s
-  ... | true  = proj₂ (Order.shape (Inv.ord v))
-  ... | false = proj₂ (Order.shape (Inv.ord v))
-  rise-keys (inLanes op f d n q o pre post c) s cp     p v with alive s
+  rise-keys (inLanes op f d n q o pre post c) s (nx b) p v with alive s in a
+  ... | true  = rise-lane-keys c op f d n q o pre post s b p v a
+  ... | false = rise-dead-keys c op f d n q o pre post s (nx b) p v a
+  rise-keys (inLanes op f d n q o pre post c) s cp     p v with alive s in a
   ... | true  = rise-lane-end-keys c op f d n q o pre post s p v
-  ... | false = proj₂ (Order.shape (Inv.ord v))
+  ... | false = rise-dead-keys c op f d n q o pre post s cp p v a
   rise-keys (inSrc k b c)                     s e      p v = rise-src-keys c k b s e p v
-  rise-keys (inBody k o c)                    s (nx b) p v = proj₂ (Order.shape (Inv.ord v))
+  rise-keys (inBody k o c)                    s (nx b) p v = rise-body-keys c k o s b p v
   rise-keys (inBody k o c)                    s cp     p v = rise-body-end-keys c k o s p v
 
   -- A subscribe of a settled node leaves the tree as it was.

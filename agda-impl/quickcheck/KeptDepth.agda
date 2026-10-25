@@ -19,9 +19,10 @@
 -- (`adequacy.Engine.Keys.Here`); and every node's positional invariant
 -- held (`adequacy.Engine.Keys.Keys`): shape for cold and of nodes, a
 -- takeWhile cut subscribed under a head, a connect's mark and source
--- and body ownership.  A merge's mark and its lanes' roots are not in
--- the state, so its clause is not decided; nor a connect's rise, fresh
--- run, cue and bound.
+-- and body ownership.  A merge's mark and its lanes' roots are decided
+-- by candidate search over ghost positions; Spread and Pool's EveryT
+-- and Wide are omitted (err toward true).  A connect's rise, fresh run,
+-- cue and bound are not decided.
 module quickcheck.KeptDepth where
 
 open import Data.Bool using (Bool; true; false; not; _∧_; _∨_; if_then_else_)
@@ -33,7 +34,7 @@ open import Data.Maybe using (just; nothing)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.String using (String; _++_)
 
-open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Tail∞; pin; idle; out; skip; end; hush; Pos; _<ᵖ_; inside; ix)
+open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Tail∞; pin; idle; out; skip; end; hush; Pos; _<ᵖ_; inside; ix; sub)
 open import Tree using (defer; mergeᶠ; Later)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (refl)
@@ -60,7 +61,7 @@ open import Tree using (Obs; FlatOp)
 open import denotation.MonotonicList.Events using (Timeline)
 open import adequacy.Engine.Head using (cand)
 open import adequacy.Engine.Pick using (past)
-open import adequacy.Engine.Meaning using (vals; endOf; mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn; srcState; srcG; srcRun; gh; lane; lanesL; deadL; envAt)
+open import adequacy.Engine.Meaning using (vals; endOf; mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn; srcState; srcG; srcRun; gh; lane; lanesL; deadL; envAt; outerG; poolG)
 open import adequacy.Engine.Ahead using (shown) renaming (shows to showsᵃ)
 open import denotation.MonotonicList using (head)
 open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
@@ -596,9 +597,152 @@ private
   trailEndTailᵇ : Pos → Tail → Bool
   trailEndTailᵇ n t = pinsAllᵇ (trailEndᵇ n) (pinsᵇ 12 t)
 
+  -- Helpers for the flatS clause of `adequacy.Engine.Keys.Here`.
+  -- Positions at depth n from Events A.
+  posOfEvents : ∀ {A} → ℕ → Events A → List Pos
+  posOfEvents (suc n) (out k _ r) = k ∷ posOfEvents n (Events∞.force r)
+  posOfEvents (suc n) (skip k r)  = k ∷ posOfEvents n (Events∞.force r)
+  posOfEvents (suc n) (end k)     = k ∷ []
+  posOfEvents _       _           = []
+
+  -- All prefixes of a position, shortest first.
+  pfxs : Pos → List Pos
+  pfxs []      = [] ∷ []
+  pfxs (h ∷ p) = [] ∷ mapL (h ∷_) (pfxs p)
+
+  -- The positions a position carries in its tags: a joiner's own
+  -- subscription sits inside the tag of every step it is fed.
+  tagsIn : Pos → List Pos
+  tagsIn []          = []
+  tagsIn (sub t ∷ h) = (t ∷ tagsIn t) ++L tagsIn h
+  tagsIn (ix _ ∷ h)  = tagsIn h
+  tagsIn (last ∷ h)  = tagsIn h
+
+  withTags : List Pos → List Pos
+  withTags []       = []
+  withTags (h ∷ hs) = (h ∷ tagsIn h) ++L withTags hs
+
+  -- Flatten a list of lists of positions.
+  concatL : List (List Pos) → List Pos
+  concatL []         = []
+  concatL (xs ∷ xss) = xs ++L concatL xss
+
+  -- Keep positions satisfying P.
+  filterP : (Pos → Bool) → List Pos → List Pos
+  filterP _ []       = []
+  filterP P (x ∷ xs) = if P x then x ∷ filterP P xs else filterP P xs
+
+  -- Each position once.
+  nubP : List Pos → List Pos
+  nubP = go []
+    where
+      seen : Pos → List Pos → Bool
+      seen p []       = false
+      seen p (q ∷ qs) = samePos p q ∨ seen p qs
+      go : List Pos → List Pos → List Pos
+      go s []       = []
+      go s (p ∷ ps) = if seen p s then go s ps else p ∷ go (p ∷ s) ps
+
+  -- Owned p h and h ≠ p: approximation of Beneath p h (Prefix⁺ or Tagged, not self).
+  beneathᵇ : Pos → Pos → Bool
+  beneathᵇ p h = ownedᵇ p h ∧ not (samePos p h)
+
+  -- Ok r (in FlatOrder p): Beneath p r × Headed r.
+  okFlatᵇ : Pos → Pos → Bool
+  okFlatᵇ p r = beneathᵇ p r ∧ hdᵇ r
+
+  -- Approximation of Every∞ (Under r) l: Owned r h × Headed h, universal omitted.
+  underApprox∞ : ∀ {A} → Pos → Events∞ A → Bool
+  underApprox∞ r e = every∞Pᵇ (λ h → ownedᵇ r h ∧ hdᵇ h) e
+
+  -- LaneKeys ls rs: each lane's events under its root; root Ok under p.
+  laneKeysᵇ : ∀ {A} → Pos → List Pos → List (Events∞ A) → Bool
+  laneKeysᵇ _ []       []       = true
+  laneKeysᵇ p (r ∷ rs) (l ∷ ls) = underApprox∞ r l ∧ okFlatᵇ p r ∧ laneKeysᵇ p rs ls
+  laneKeysᵇ _ _        _        = false
+
+  -- Parted rs: pairwise disjoint roots.
+  partedᵇ : List Pos → Bool
+  partedᵇ []       = true
+  partedᵇ (r ∷ rs) = pinsAllᵇ (disjointPᵇ r) rs ∧ partedᵇ rs
+
+  -- Aside (just e) r = Every∞ (D r) e; D r y = Disjoint (y ++ [ix 1]) r × ¬ Owned y r.
+  asideOneᵇ : ∀ {A} → Pos → Maybe (Events∞ A) → Bool
+  asideOneᵇ _ nothing  = true
+  asideOneᵇ r (just e) = every∞Pᵇ (λ h → disjointPᵇ (h ++L (ix 1 ∷ [])) r ∧ not (ownedᵇ h r)) e
+
+  asideAllᵇ : ∀ {A} → List Pos → Maybe (Events∞ A) → Bool
+  asideAllᵇ []       _ = true
+  asideAllᵇ (r ∷ rs) o = asideOneᵇ r o ∧ asideAllᵇ rs o
+
+  -- OuterKeys (just e) = Every∞ K e; K y = Owned p y × Headed y; Spread omitted.
+  outerKeysᵇ : ∀ {A} → Pos → Maybe (Events∞ A) → Bool
+  outerKeysᵇ _ nothing  = true
+  outerKeysᵇ p (just e) = every∞Pᵇ (λ h → ownedᵇ p h ∧ hdᵇ h) e
+
+  -- Pool approximation: SortedT via sorted pins; Wide and EveryT conditions omitted.
+  sortedPinsᵇ : List Pos → Bool
+  sortedPinsᵇ (x ∷ y ∷ xs) = not (y <ᵖ x) ∧ sortedPinsᵇ (y ∷ xs)
+  sortedPinsᵇ _             = true
+
+  poolApproxᵇ : Tail → Bool
+  poolApproxᵇ t = sortedPinsᵇ (pinsᵇ 12 t)
+
+  -- FlatKeys p o ls t rs: all five conjuncts decided or approximated.
+  flatKeysᵇ : ∀ {A B} → Pos → Maybe (Events∞ A) → List (Events∞ B) → Tail → List Pos → Bool
+  flatKeysᵇ p o ls t rs =
+    laneKeysᵇ p rs ls ∧ partedᵇ rs ∧ asideAllᵇ rs o ∧ outerKeysᵇ p o ∧ poolApproxᵇ t
+
+  -- Positions from Maybe (Events∞ A).
+  posOfOuter : ∀ {A} → Maybe (Events∞ A) → List Pos
+  posOfOuter nothing  = []
+  posOfOuter (just e) = posOfEvents depth (Events∞.force e) ++L pinsᵇ 12 (Events∞.cut e)
+
+  -- Positions from a list of Events∞ A.
+  posOfLanes : ∀ {A} → List (Events∞ A) → List Pos
+  posOfLanes []       = []
+  posOfLanes (l ∷ ls) = (posOfEvents depth (Events∞.force l) ++L pinsᵇ 12 (Events∞.cut l)) ++L posOfLanes ls
+
+  -- Candidate roots for the `n`th lane under mark p: prefixes of its event
+  -- positions and of their tags ending in ix 1, and one root fresh to it.
+  rootCands : ∀ {A} → ℕ → Pos → Events∞ A → List Pos
+  rootCands n p e =
+    nubP (filterP (λ r → lastIx1ᵇ r ∧ okFlatᵇ p r)
+            (concatL (mapL pfxs (withTags (posOfEvents depth (Events∞.force e) ++L pinsᵇ 12 (Events∞.cut e))))))
+    ++L (p ++L (ix (100 + n) ∷ ix 1 ∷ [])) ∷ []
+
+  -- Per-lane candidate roots.
+  rootCandsAll : ∀ {A} → ℕ → Pos → List (Events∞ A) → List (List Pos)
+  rootCandsAll _ _ []       = []
+  rootCandsAll n p (l ∷ ls) = rootCands n p l ∷ rootCandsAll (suc n) p ls
+
+  -- Candidate marks: headed prefixes of all outer and lane positions, alien to ρ.
+  candPs : ∀ {Γ A B} → Maybe (Events∞ A) → List (Events∞ B) → U.NEnv Γ → List Pos
+  candPs o ls ρ =
+    filterP (λ p → hdᵇ p ∧ alienEnvᵇ p ρ)
+            (nubP (concatL (mapL pfxs (withTags (posOfOuter o ++L posOfLanes ls)))) ++L (ix 999 ∷ []) ∷ [])
+
+  -- Search all root combinations (one per lane), accumulating in reverse.
+  searchRoots : ∀ {A B} → Pos → Maybe (Events∞ A) → List (Events∞ B) → Tail
+              → List (List Pos) → List Pos → Bool
+  searchRoots p o ls t []           sel = flatKeysᵇ p o ls t (reverseL sel)
+  searchRoots p o ls t (rcs ∷ cands) sel = anyRoot rcs
+    where
+      anyRoot : List Pos → Bool
+      anyRoot []       = false
+      anyRoot (r ∷ rs) = searchRoots p o ls t cands (r ∷ sel) ∨ anyRoot rs
+
+  -- FlatAt decider: search for a valid (p, rs) pair.
+  -- Conjuncts not fully decided: Spread (outer/lanes), and Pool's EveryT and Wide.
+  -- All omissions err toward true.
+  searchFlat : ∀ {Γ A B} → Maybe (Events∞ A) → List (Events∞ B) → Tail → U.NEnv Γ → Bool
+  searchFlat o ls t ρ = anyMark (candPs o ls ρ)
+    where
+      anyMark : List Pos → Bool
+      anyMark []       = false
+      anyMark (p ∷ ps) = searchRoots p o ls t (rootCandsAll 0 p ls) [] ∨ anyMark ps
+
   -- `adequacy.Engine.Keys.Here`, decided.
-  -- For `flatS`: the merge position and lane roots are existential witnesses
-  -- not stored in the state after attachment, so this clause is not decided.
   hereᵇ : ∀ {Δ A} → St Δ A → U.NEnv Δ → Bool
   hereᵇ s@(coldS _ _)              ρ = shapeᵇ (U.stateᴺ (gh s) ρ)
   hereᵇ s@(ofS _ _ _)              ρ = shapeᵇ (U.stateᴺ (gh s) ρ)
@@ -607,7 +751,11 @@ private
     hdᵇ (k ⊕ (last ∷ []))
     ∧ trailEndTailᵇ (k ⊕ (last ∷ [])) (Events∞.cut (U.stateᴺ (gh s) ρ))
   hereᵇ (connS k o b)              ρ = connKeysᵇ k o b ρ
-  hereᵇ (flatS _ _ _ _ _ _ _)      ρ = true
+  hereᵇ (flatS op f d n q s ls)    ρ =
+    searchFlat (U.outerᴺ (lane f) (outerG d (gh s)) ρ)
+               (U.states (lanesL ls) ρ)
+               (U.cutᴺ (poolG d (gh s) (deadL ls)) ρ)
+               ρ
   hereᵇ (joinS j true y ib)        ρ = joinFedᵇ j y ib ρ
   hereᵇ _                          ρ = true
 

@@ -29,7 +29,6 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Unit using (tt)
-open import Data.List.Properties using (++-assoc; ++-identityʳ; ʳ++-defn)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; cong; cong₂; trans)
 
 open import Tree using (Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
@@ -49,17 +48,16 @@ open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; 
   Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load;
   Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM; search; found; run; unsub; leaf; feed)
   renaming (cut to cutᴹ)
-open import adequacy.Engine.Meaning using (Has; M; _≅_; _≋_; agree-≅; atOut; bodyFrame; closed-hides; connSrc; deadL; deadOne; doneE;
-  doneE-ne; doneG; envAt; flagOf; gh; holeL; holeT; joinG; lane; laneRuns; lanes-dead;
-  lanes-refl; lanesFrame; lanesL; laneᴹ; lift-≅; liveL; outerFrame; outerG; outerOf; outerT;
-  pastOut; poolG; poolRuns; queue-refl; rested; risen; same; srcFrame; srcG; srcRun; subOr;
-  tailsOn; taken; taking∞; tape; took; up; lift-ne; ≅-refl; ≅-trans; ≈-refl; ≋-by; ≋-out; ≋-tr;
-  ≋-trans)
+open import adequacy.Engine.Meaning using (Has; M; _≅_; _≋_; agree-≅; atOut; bodyFrame; closed-hides; connSrc; deadL; doneE; doneE-ne;
+  doneG; envAt; flagOf; gh; joinG; lane; lanes-dead; lanes-refl; lanesFrame; lanesL; laneᴹ;
+  lift-≅; outerFrame; outerG; outerOf; outerT; pastOut; poolG; poolRuns; queue-refl; rested;
+  risen; same; srcFrame; srcG; srcRun; subOr; taken; taking∞; tape; took; up; lift-ne; ≅-refl;
+  ≅-trans; ≈-refl; ≋-by; ≋-out; ≋-tr; ≋-trans)
 open import adequacy.Engine.Inv using (Unpended; Opened; Wf; Base; module Base; Inv; module Inv; inv-at; wfI; wf-split; Owns; ofO;
   attO; cpO; cutO; bodyO; srcAttO; owedO; joinO; leafO; owned; search-hit)
 open import adequacy.Engine.Race using (First; go-rise; cuts-swap)
 open import adequacy.Engine.Keys using (Held)
-open import adequacy.Engine.Above using (take-true; take-incl; take-excl)
+open import adequacy.Engine.Above using (take-true; take-incl; take-excl; lanes-runs; pool-runs; toʳ; lanes-L; lanes-P)
 open import adequacy.Engine.Pick using (module Order; Clear; Apart)
 
 open Events∞
@@ -78,72 +76,6 @@ out-≅ {r = r} {r′} e = to e , to (sym e)
 
 ------------------------------------------------------------------------
 -- Each frame is the node it is a hole of
-
-states-++ : ∀ {Γ A} (xs ys : List (Node Γ A)) (ρ : NEnv Γ) → states (xs ++ ys) ρ ≡ states xs ρ ++ states ys ρ
-states-++ []       ys ρ = refl
-states-++ (x ∷ xs) ys ρ = cong (stateᴺ x ρ ∷_) (states-++ xs ys ρ)
-
-lanesL-++ : ∀ {Γ B} (xs ys : List (St Γ B)) → lanesL (xs ++ ys) ≡ lanesL ys ++ lanesL xs
-lanesL-++ []       ys = sym (++-identityʳ (lanesL ys))
-lanesL-++ (x ∷ xs) ys = trans (cong (_++ liveL x) (lanesL-++ xs ys)) (++-assoc (lanesL ys) (lanesL xs) (liveL x))
-
-deadL-++ : ∀ {Γ B} (xs ys : List (St Γ B)) → deadL (xs ++ ys) ≡ deadL xs ++ deadL ys
-deadL-++ []       ys = refl
-deadL-++ (x ∷ xs) ys = trans (cong (deadOne x ++_) (deadL-++ xs ys)) (sym (++-assoc (deadOne x) (deadL xs) (deadL ys)))
-
-rests-++ : ∀ {Γ B} (xs ys : List (Node Γ B)) (ρ : NEnv Γ) → cutᴺ (restsᶜ {B = B} (xs ++ ys)) ρ ≡ tailsOn xs ρ (cutᴺ (restsᶜ {B = B} ys) ρ)
-rests-++ []       ys ρ = refl
-rests-++ (x ∷ xs) ys ρ = cong (cutᴺ x ρ ∪_) (rests-++ xs ys ρ)
-
-live-hole : ∀ {Γ B} (s : St Γ B) (ρ : NEnv Γ) → states (liveL s) ρ ≡ holeL (flagOf s) (stateᴺ (gh s) ρ)
-live-hole (pend o)                ρ = refl
-live-hole (coldS b l)             ρ = refl
-live-hole (ofS i p xs)            ρ = refl
-live-hole doneS                   ρ = refl
-live-hole (mapS f s)              ρ = refl
-live-hole (scanS f z s)           ρ = refl
-live-hole (cutS l a s)            ρ = refl
-live-hole (lnS true s)            ρ = refl
-live-hole (lnS false s)           ρ = refl
-live-hole (takeS i q w s)         ρ = refl
-live-hole (flatS op f d n q o ls) ρ = refl
-live-hole (connS k o b)           ρ = refl
-live-hole (joinS j g x ib)        ρ = refl
-
-dead-hole : ∀ {Γ B} (s : St Γ B) (ρ : NEnv Γ) t → tailsOn (deadOne s) ρ t ≡ holeT (flagOf s) (stateᴺ (gh s) ρ) ∪ t
-dead-hole (pend o)                ρ t = refl
-dead-hole (coldS b l)             ρ t = refl
-dead-hole (ofS i p xs)            ρ t = refl
-dead-hole doneS                   ρ t = refl
-dead-hole (mapS f s)              ρ t = refl
-dead-hole (scanS f z s)           ρ t = refl
-dead-hole (cutS l a s)            ρ t = refl
-dead-hole (lnS true s)            ρ t = refl
-dead-hole (lnS false s)           ρ t = refl
-dead-hole (takeS i q w s)         ρ t = refl
-dead-hole (flatS op f d n q o ls) ρ t = refl
-dead-hole (connS k o b)           ρ t = refl
-dead-hole (joinS j g x ib)        ρ t = refl
-
-lanes-runs : ∀ {Γ B} (pre : List (St Γ B)) s post (ρ : NEnv Γ) → states (lanesL (pre ++ s ∷ post)) ρ ≡ laneRuns pre post (flagOf s) ρ (stateᴺ (gh s) ρ)
-lanes-runs pre s post ρ =
-  trans (cong (λ l → states l ρ) (lanesL-++ pre (s ∷ post)))
-  (trans (states-++ (lanesL post ++ liveL s) (lanesL pre) ρ)
-  (trans (cong (_++ states (lanesL pre) ρ) (states-++ (lanesL post) (liveL s) ρ))
-  (trans (++-assoc (states (lanesL post) ρ) (states (liveL s) ρ) (states (lanesL pre) ρ))
-  (cong (λ z → states (lanesL post) ρ ++ (z ++ states (lanesL pre) ρ)) (live-hole s ρ)))))
-
-pool-runs : ∀ {Γ B} (pre : List (St Γ B)) s post (ρ : NEnv Γ) → cutᴺ (restsᶜ {B = B} (deadL (pre ++ s ∷ post))) ρ ≡ poolRuns pre post (flagOf s) ρ (stateᴺ (gh s) ρ)
-pool-runs {B = B} pre s post ρ =
-  trans (cong (λ l → cutᴺ (restsᶜ {B = B} l) ρ) (deadL-++ pre (s ∷ post)))
-  (trans (rests-++ (deadL pre) (deadOne s ++ deadL post) ρ)
-  (trans (cong (tailsOn (deadL pre) ρ) (rests-++ (deadOne s) (deadL post) ρ))
-  (cong (tailsOn (deadL pre) ρ) (dead-hole s ρ _))))
-
--- A lane's context keeps the lanes before it nearest first; the meaning
--- reads them in order.
-toʳ : ∀ {ℓ Γ B} (P : List (St Γ B) → Set ℓ) pre {s : St Γ B} {post} → P (reverse pre ++ s ∷ post) → P (pre ʳ++ s ∷ post)
-toʳ P pre = subst P (sym (ʳ++-defn pre))
 
 -- Each frame read over its hole's state is the state of the node it frames.
 take-plug : ∀ {Γ A} i (q : A → Bool) w (n : Node Γ A) (ρ : NEnv Γ) → taking∞ i q w (stateᴺ n ρ) ≋ stateᴺ (taken i q w n) ρ
@@ -362,17 +294,6 @@ module _ {R : Set} where
 
   ----------------------------------------------------------------------
   -- A rise, by the frame it passes
-
-  -- A lane in the list is one of its flatMap's runs, between the lanes
-  -- after it and before it; its pool, the lanes ended around it.
-  lanes-L : ∀ {Γ B} pre (s : St Γ B) post (ρ : NEnv Γ) → flagOf s ≡ true
-          → states (lanesL (pre ++ s ∷ post)) ρ ≡ states (lanesL post) ρ ++ stateᴺ (gh s) ρ ∷ states (lanesL pre) ρ
-  lanes-L pre s post ρ fl = trans (lanes-runs pre s post ρ) (cong (λ x → laneRuns pre post x ρ (stateᴺ (gh s) ρ)) fl)
-
-  lanes-P : ∀ {Γ A B} d (o : St Γ A) pre (s : St Γ B) post (ρ : NEnv Γ) → flagOf s ≡ true
-          → outerT d (gh o) ρ (poolRuns pre post true ρ (stateᴺ (gh s) ρ)) ≡ cutᴺ (poolG d (gh o) (deadL (pre ++ s ∷ post))) ρ
-  lanes-P false o pre s post ρ fl = sym (trans (pool-runs pre s post ρ) (cong (λ x → poolRuns pre post x ρ (stateᴺ (gh s) ρ)) fl))
-  lanes-P true  o pre s post ρ fl = cong (cutᴺ (gh o) ρ ∪_) (lanes-P false o pre s post ρ fl)
 
   -- What the flatMap leaves running is what it left: the lane's tail is
   -- its rise's.
