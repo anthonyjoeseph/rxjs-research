@@ -34,7 +34,9 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Tree using (Obs; Later; defer; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.MonotonicList.Events using (Timeline; Events; Events∞; Pos; Time; tick; root; out; end; hush; ix; _<ᵖ_; <ᵖ-irrefl;
   <ᵖ-asym; emit; stall; close; last; Frame∞; From; From∞; idle; done; at) renaming (quiet to silentᶠ)
-open import denotation.MonotonicList using (observe; Agree; agree-refl; agree-sym; agree-trans; frames)
+open import denotation.MonotonicList using (observe; Agree; agree-refl; agree-sym; agree-trans; agreeᵀ-sym; frames; _≈[_]_)
+open import denotation.NonExpansive using (_,ˢ_)
+open import denotation.Compositional using (env-refl)
 open import adequacy.Record using (Ahead; outᵃ; skipᵃ) renaming (none to noneᵃ)
 import denotation.Unfold as U
 open import denotation.Denote using (⟦_⟧)
@@ -245,11 +247,6 @@ module Honesty (R : Set) where
                → shows c′ true ≡ false → Inv ⟨ c , s , absorbed , p ⟩ → step ⟨ c , s , absorbed , p ⟩ ≡ silent t m′
                → Drop ⟨ c , s , absorbed , p ⟩ m′
 
-    -- A DEFER'S HOLE IS THE PROGRAM IT DEFERS PAST ONE SKIP: the
-    -- meaning's lead skip, then the program subscribed just past it, its
-    -- tail with it (`denotation.Unfold.subscribed`).
-    defer-hole : ∀ {Γ A} l p (ρ : U.NEnv Γ)
-               → Dropsˢ {A} (_≡ p ⊕ [ ix 0 ]) (U.stateᴺ (U.deferᶜ l p []) ρ) (U.stateᴺ (U.subscribe (Later.force l) (p ⊕ [ ix 1 ])) ρ)
     -- A DEFER BEGUN WHERE IT IS SHOWN IS SHOWN NEXT: every frame above it
     -- passes its skip, at the skip's own position.  Asked at every
     -- position, a lane's frame beside an older lane with a pending head
@@ -271,6 +268,16 @@ module Honesty (R : Set) where
     --   carried with the pin it leaves in the tail.
     defer-tail : ∀ {Γ A} {c : Ctx R Γ A} {l p} → shows c true ≡ false → Inv ⟨ c , pend (defer l) , subscribing , p ⟩
                → Drop ⟨ c , pend (defer l) , subscribing , p ⟩ ⟨ c , pend (Later.force l) , subscribing , p ⊕ [ ix 1 ] ⟩
+
+  -- A DEFER'S HOLE IS THE PROGRAM IT DEFERS PAST ONE SKIP: the
+  -- meaning's lead skip, then the program subscribed just past it, its
+  -- tail with it (`denotation.Unfold.subscribed`).
+  defer-hole : ∀ {Γ A} l p (ρ : U.NEnv Γ)
+             → Dropsˢ {A} (_≡ p ⊕ [ ix 0 ]) (U.stateᴺ (U.deferᶜ l p []) ρ) (U.stateᴺ (U.subscribe (Later.force l) (p ⊕ [ ix 1 ])) ρ)
+  defer-hole l p ρ =
+    dropˢ refl (λ n → agree-refl n _)
+      (λ n → agreeᵀ-sym (_≈[_]_.agreeᵀ (s n) (p ⊕ [ ix 1 ])) ,ˢ agree-sym (_≈[_]_.agree (s n) (p ⊕ [ ix 1 ])))
+    where s = λ n → U.subscribed (Later.force l) {ρ} (env-refl {n} (U.hots ρ))
 
   -- A defer begun drops its skip.
   defer-drop : ∀ {Γ A} {c : Ctx R Γ A} {l p t m′}

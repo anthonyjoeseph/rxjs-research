@@ -18,7 +18,7 @@ Settled when these are bodies, or refuted.
 
 Members: `outer-begins`, `outer-queues`, `outer-ignores`, `outer-begins-pass`,
 `outer-queues-pass`, `outer-ignores-pass`, `lane-begins`, `lane-begins-pass`,
-`src-pass`, `defer-hole`, `defer-pass`.
+`src-pass`, `defer-pass`.
 
 #### THE STILL'S SUBTREE
 
