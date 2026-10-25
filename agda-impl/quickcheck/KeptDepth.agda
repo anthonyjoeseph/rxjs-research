@@ -455,6 +455,9 @@ private
       , connect skipping (connect (connected (here refl)) (flatMap (mergeᶠ nothing) (connected (here refl)) (connected (here refl)))))
     ∷ ("a connect in the body over a merged source, its lanes joining it"
       , connect merged (connect (connected (here refl)) (flatMap (mergeᶠ nothing) (connected (here refl)) (connected (here refl)))))
+    ∷ ("a source running out a closed connect's nested burst, two joiners on it"
+      , connect burstOut (flatMap (mergeᶠ nothing) (connected (here refl)) (of (nat 0 ∷ nat 1 ∷ []))))
+    ∷ ("a source running out a closed connect's nested burst, its lanes joining it" , connect burstOut rejoins)
     ∷ []
     where
     -- A source skipping before each of its values.
@@ -465,6 +468,13 @@ private
     -- values that began them.
     merged : Code [] [] [] [] natᵗ
     merged = flatMap (mergeᶠ nothing) (cold (script ((2 , 1 ∷ []) ∷ (1 , 2 ∷ []) ∷ []) false false)) (of (nat 0 ∷ nat 1 ∷ []))
+
+    -- A merge whose lane is a connect its body ends at once: its source's
+    -- subscribe burst, each value with a lane under it, runs out as skips.
+    burstOut : Code [] [] [] [] natᵗ
+    burstOut = flatMap (mergeᶠ nothing) (connect nests (of [])) (of (nat 0 ∷ []))
+      where nests : Code [] [] [] (natᵗ ∷ []) natᵗ
+            nests = flatMap (mergeᶠ nothing) (of (var (here refl) ∷ var (here refl) ∷ [])) (of (nat 0 ∷ nat 1 ∷ []))
 
     -- Every value of the source opens a lane joining it again.
     rejoins : Code (natᵗ ∷ []) [] [] [] natᵗ
