@@ -176,6 +176,15 @@ postulate
   -- A NODE FED A SOURCE'S SKIPS, owing it nothing: it drops its own
   -- leading skips, each under one of them, and erases none or more past
   -- them, to the node fed the rest.
+  --
+  -- The route, unwritten: by the node, every source in scope related, not
+  -- only this one.  A joiner rejoins its source's relation under its own
+  -- position, and a rejoined run's tails are idle, so nothing is asked of
+  -- them; a merge interleaves its parts' relations; a connect feeds its
+  -- body its own source's.  The connect is the obstacle: erasing beside a
+  -- source asks the other's trail (`adequacy.Engine.Beside.body-⊒`), and
+  -- an inner source fed the rest is the run of no configuration, so no
+  -- fragment gives it.
   node-fed : ∀ {Γ X B} v q {P} (n : U.Node (X ∷ Γ) B) (ρ : NEnv Γ) {h h′ : Events∞ X}
            → Sought v q P → Caught (here refl) q n → (∀ m → Flat m (Events∞.force h)) → Dropsˢ P h h′
            → Fed P (stateᴺ n (Events∞.force h ∷ᴬ ρ)) (stateᴺ n (Events∞.force h′ ∷ᴬ ρ))

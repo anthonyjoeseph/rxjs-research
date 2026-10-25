@@ -11,11 +11,11 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE SILENT RUN
 
 Probed (`quickcheck.KeptDepth` checks every link): a live source's body,
-owing the source nothing, fed its skips drops its own leading skips and
-erases none or more past them; untried: whether a source's run nests
-nothing under a skip (else a rejoined erased skip lands past its next);
-whether nothing is owed, from the race; the node-level lift through nested
-connects and lanes; a defer's fresh source. Settled when bodies, or refuted.
+owing it nothing, fed its skips drops leading skips and erases later ones;
+a live source's run nests nothing under a skip, nested bursts included.
+Untried: the node-level lift, whose connect case asks a trail of an inner
+source fed the rest, the run of no configuration; whether nothing is owed,
+from the race; a defer's fresh source. Settled when bodies, or refuted.
 
 Members: `src-flat`, `caught`, `node-fed`, `src-body-on`, `defer-links`.
 
