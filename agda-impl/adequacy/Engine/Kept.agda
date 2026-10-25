@@ -59,6 +59,7 @@ open import adequacy.Engine.Inv using (Unpended; Opened; Wf; Base; module Base; 
   attO; cpO; cutO; bodyO; srcAttO; owedO; joinO; leafO; owned; search-hit)
 open import adequacy.Engine.Race using (First; go-rise; cuts-swap)
 open import adequacy.Engine.Keys using (Held)
+open import adequacy.Engine.Above using (take-true; take-incl; take-excl)
 open import adequacy.Engine.Pick using (module Order; Clear; Apart)
 
 open Events∞
@@ -220,18 +221,6 @@ private
   src-plug : ∀ {Γ X B} k (b : St (X ∷ Γ) B) (s : St Γ X) (ρ : NEnv Γ) → Unpended s → Opened k s
            → srcFrame k (gh b) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (gh (connS k s b)) ρ
   src-plug k b s ρ u o = done-plug (CS.owedAt k) (CS.srcLive k) _ ρ (conn-plug k b s ρ u o)
-
-  take-true : ∀ {Γ A} i (q : A → Bool) (n : Node Γ A) (ρ : NEnv Γ) a p → q a ≡ true
-            → took i q (risen n ρ (nx a) p) ≋ risen (takeWhileᶜ i q n) ρ (nx a) p
-  take-true i q n ρ a p e = ≋-out (cong (λ b → M′.taking i q p a b (stateᴺ n ρ)) e) refl refl refl refl
-
-  take-incl : ∀ {Γ A} (q : A → Bool) (n : Node Γ A) (ρ : NEnv Γ) a p → q a ≡ false
-            → took true q (risen n ρ (nx a) p) ≋ risen (endingᶜ (p ⊕ [ last ]) n) ρ (nx a) (p ⊕ [ ix 0 ])
-  take-incl q n ρ a p e = ≋-out (cong (λ b → M′.taking true q p a b (stateᴺ n ρ)) e) refl refl refl refl
-
-  take-excl : ∀ {Γ A} (q : A → Bool) (n : Node Γ A) (ρ : NEnv Γ) a p → q a ≡ false
-            → took false q (risen n ρ (nx a) p) ≋ stateᴺ (endingᶜ (p ⊕ [ last ]) n) ρ
-  take-excl q n ρ a p e = ≋-by (cong (λ b → M′.taking false q p a b (stateᴺ n ρ)) e) refl
 
   -- A connect, its source subscribed now, is the source's frame read
   -- with the body over it.

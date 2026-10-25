@@ -27,7 +27,7 @@ open import Tree using (Obs)
 open import denotation.MonotonicList using (MonotonicList)
 open import denotation.Unfold using (NEnv; stateᴺ; cutᴺ; states; outerᴺ; joined; fedᴺ)
 open import operation.PureObservable using (module Machine)
-open Machine using (St; coldS; ofS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ctx; top; inMap; inScan; inCut; inLn;
+open Machine using (Owe; St; coldS; ofS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ctx; top; inMap; inScan; inCut; inLn;
   inTake; inOuter; inLanes; inSrc; inBody; plug; cs; CS; _⊕_)
 open import operation.AbstractObservable using (cpAt)
 open import adequacy.Engine.Meaning using (vals; endOf; gh; envAt; srcG; srcRun; srcState; lane; outerG; poolG; deadL; lanesL)
@@ -116,25 +116,41 @@ EndKeys : CS → Set
 EndKeys (cs true sl sa nothing as ow r en) = Headed en
 EndKeys _                                  = ⊤
 
--- Its source subscribed one past a head, its mark; its body keyed under
--- the mark, rising past the source's subscription, fresh where the
--- source cues it; the source keyed under its own subscription, apart from
--- the body's; no body step under where a source step shows.
-record ConnKeys {Γ X B} (k : CS) (o : St Γ X) (b : St (X ∷ Γ) B) (ρ : NEnv Γ) : Set where
+-- Its source subscribed one past a head, its mark; its body `β` keyed
+-- under the mark, rising past the source's subscription, fresh where the
+-- source `σ` cues it; the source keyed under its own subscription, apart
+-- from the body's; no body step under where a source step shows.
+record ConnAt {Γ X B} (k : CS) (β : Events∞ B) (σ : Events∞ X) (ρ : NEnv Γ) : Set where
   field
     mark : Pos
     hm   : Headed mark
     at   : CS.srcAt k ≡ mark ++ [ ix 1 ]
-    kb   : Every∞ (Owned (mark ++ [ ix 0 ])) (bodyIn k o b ρ)
-    kr   : Every∞ (Rise (mark ++ [ ix 1 ])) (bodyIn k o b ρ)
-    fr   : FreshRun (mark ++ [ ix 0 ]) (force (bodyIn k o b ρ))
-    cue  : Σ Pos (λ l → Owned (mark ++ [ ix 0 ]) l × Bursting.Cue (mark ++ [ ix 1 ]) l (force (srcIn k o ρ))
-                      × EveryT (Fresh (mark ++ [ ix 0 ]) l) (cut (bodyIn k o b ρ)))
-    ks   : Every∞ (Disjoint (mark ++ [ ix 0 ])) (srcIn k o ρ)
-    rs   : Every∞ (Owned (mark ++ [ ix 1 ])) (srcIn k o ρ)
-    ub   : Walk.UB mark hm (bodyIn k o b ρ) (srcIn k o ρ)
+    kb   : Every∞ (Owned (mark ++ [ ix 0 ])) β
+    kr   : Every∞ (Rise (mark ++ [ ix 1 ])) β
+    fr   : FreshRun (mark ++ [ ix 0 ]) (force β)
+    cue  : Σ Pos (λ l → Owned (mark ++ [ ix 0 ]) l × Bursting.Cue (mark ++ [ ix 1 ]) l (force σ)
+                      × EveryT (Fresh (mark ++ [ ix 0 ]) l) (cut β))
+    ks   : Every∞ (Disjoint (mark ++ [ ix 0 ])) σ
+    rs   : Every∞ (Owned (mark ++ [ ix 1 ])) σ
+    ub   : Walk.UB mark hm β σ
     sub  : SubKeys (CS.bodyAt k) ρ
     ends : EndKeys k
+
+ConnKeys : ∀ {Γ X B} (k : CS) (o : St Γ X) (b : St (X ∷ Γ) B) (ρ : NEnv Γ) → Set
+ConnKeys k o b ρ = ConnAt k (bodyIn k o b ρ) (srcIn k o ρ) ρ
+
+------------------------------------------------------------------------
+-- A takeWhile and a merge, their child read as a run
+
+-- A takeWhile owing its end owing it under a head, ahead of what its
+-- source `h` leaves running.
+TakeAt : ∀ {A} → Owe → Events∞ A → Set
+TakeAt {A} (cpAt k) h = Headed (k ⊕ (last ∷ [])) × EveryT (TrailE (end {A} (k ⊕ (last ∷ [])))) (cut h)
+TakeAt          _   h = ⊤
+
+-- A merge keyed under a mark alien to its environment.
+FlatAt : ∀ {Γ B} → NEnv Γ → Maybe (Events∞ (MonotonicList B)) → List (Events∞ B) → Tail → Set
+FlatAt ρ o ls t = Σ Pos (λ p → Headed p × Alienᴱ p ρ × Σ (List Pos) (FlatKeys p o ls t))
 
 ------------------------------------------------------------------------
 -- The tree
@@ -143,11 +159,9 @@ record ConnKeys {Γ X B} (k : CS) (o : St Γ X) (b : St (X ∷ Γ) B) (ρ : NEnv
 Here : ∀ {Γ A} → St Γ A → NEnv Γ → Set
 Here (coldS b l)               ρ = Shape (stateᴺ (gh (coldS b l)) ρ)
 Here (ofS i p xs)              ρ = Shape (stateᴺ (gh (ofS i p xs)) ρ)
-Here {A = A} (takeS i p (cpAt k) s) ρ =
-  Headed (k ⊕ (last ∷ [])) × EveryT (TrailE (end {A} (k ⊕ (last ∷ [])))) (cutᴺ (gh s) ρ)
+Here (takeS i p w s)           ρ = TakeAt w (stateᴺ (gh s) ρ)
 Here (connS k o b)             ρ = ConnKeys k o b ρ
-Here (flatS op f dn n qs s ls) ρ =
-  Σ Pos (λ p → Headed p × Alienᴱ p ρ × Σ (List Pos) (FlatKeys p (outerOf f dn s ρ) (states (lanesL ls) ρ) (cutᴺ (poolG dn (gh s) (deadL ls)) ρ)))
+Here (flatS op f dn n qs s ls) ρ = FlatAt ρ (outerOf f dn s ρ) (states (lanesL ls) ρ) (cutᴺ (poolG dn (gh s) (deadL ls)) ρ)
 Here (joinS j true y ib)       ρ = Joins y j (endOf ib) ρ × Fed (vals ib) (joined y j (endOf ib) ρ)
 Here _                         ρ = ⊤
 

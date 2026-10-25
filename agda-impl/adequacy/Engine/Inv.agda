@@ -28,10 +28,11 @@ open import denotation.MonotonicList using (Agreeᵀ)
 open import operation.Key using (at)
 open import denotation.Unfold using (same?; NEnv; stateᴺ; subscribe)
 open import adequacy.Engine.Head using (Frag)
-open import adequacy.Engine.Keys using (Keys; Held)
+open import adequacy.Engine.Keys using (Keys; Held; keyed-at)
+open import adequacy.Engine.Above using (Flight; above-≋; keys-above; keys-past; take-incl; take-excl; take-here)
 open import adequacy.Engine.Ahead using (Under; shown; ahead-mono; under-sub)
 open import adequacy.Engine.Race using (NotBefore)
-open import adequacy.Engine.Meaning using (envAt)
+open import adequacy.Engine.Meaning using (envAt; gh)
 open import adequacy.Engine.Pick using (Order; order; module Order; whole; Lead; Clear; Ends; EndsIf; Won; won-clear; won-ends; search-won; Apart; Searched)
 open import operation.PureObservable using (Tape; due; play; ending; over; module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
@@ -564,7 +565,7 @@ module _ {R : Set} where
   NextInv (complete p)    = ⊤
   NextInv drained         = ⊤
 
-  NextFrag NextKeys NextShape NextLead NextApart : Step → Set
+  NextFrag NextKeys NextShape NextFlight NextLead NextApart : Step → Set
   NextFrag (silent t k)    = Frag (whole k)
   NextFrag (value t p a k) = Frag (whole k)
   NextFrag (complete p)    = ⊤
@@ -577,6 +578,10 @@ module _ {R : Set} where
   NextShape (value t p a k) = Held (whole k)
   NextShape (complete p)    = ⊤
   NextShape drained         = ⊤
+  NextFlight (silent t k)    = Flight k
+  NextFlight (value t p a k) = Flight k
+  NextFlight (complete p)    = ⊤
+  NextFlight drained         = ⊤
   NextLead (silent t k)    = Lead k
   NextLead (value t p a k) = Lead k
   NextLead (complete p)    = ⊤
@@ -596,8 +601,6 @@ module _ {R : Set} where
     -- body's end; by a subscribe beginning a former; and by a mark run.
     rise-scan-keys : ∀ {Γ A B} (c : Ctx R Γ B) (f : B → A → B) z (s : St Γ A) a p → Inv ⟨ inScan f z c , s , rising (nx a) , p ⟩
                    → Keys (plug c (scanS f (f z a) s))
-    rise-take-keys : ∀ {Γ A} (c : Ctx R Γ A) i q (s : St Γ A) a p → Inv ⟨ inTake i q free c , s , rising (nx a) , p ⟩
-                   → Keys (plug c (takeS i q (cpAt p) s))
     rise-admit-keys : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q ls (s : St Γ A) a p
                     → Inv ⟨ inOuter op f d n q ls c , s , rising (nx a) , p ⟩ → NextKeys (step ⟨ inOuter op f d n q ls c , s , rising (nx a) , p ⟩)
     rise-outer-end-keys : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q ls (s : St Γ A) p
@@ -612,6 +615,14 @@ module _ {R : Set} where
     begin-keys : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Inv ⟨ c , pend o , subscribing , p ⟩
                → NextKeys (step ⟨ c , pend o , subscribing , p ⟩)
     run-keys : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , absorbed , p ⟩ → NextKeys (step ⟨ c , s , absorbed , p ⟩)
+    -- A step keeps its hole's run in shape, and what every frame above
+    -- keeps of it.
+    flight-next : ∀ k → Base k → Order k → NextFlight (step k)
+    -- A tree's first subscription is in shape.
+    flight-load : (o : Obs Timeline [] R) → Flight (Machine.load o)
+    -- A settled node anywhere in a tree the shape holds of: its run, and
+    -- every frame above, kept.
+    flight-held : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Held (plug c s) → Flight ⟨ c , s , absorbed , p ⟩
     -- THE STILL'S SUBTREE: where the search runs after a step, what it
     -- finds still leads every race above it past each live source's skips.
     apart-next : ∀ k → Base k → Order k → NextApart (step k)
@@ -766,6 +777,21 @@ module _ {R : Set} where
                      (λ q s″ kq oc al → won-ends q c′ s′ s″ al
                         (subst₂ (λ k x → Won (k , x) c′ s′) kq oc (search-won (plug c s) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))))
 
+  -- A takeWhile failing a value ends one past it, what the frames above
+  -- saw of the value's run.
+  rise-take-keys : ∀ {Γ A} (c : Ctx R Γ A) i q (s : St Γ A) a p → Inv ⟨ inTake i q free c , s , rising (nx a) , p ⟩
+                 → NextKeys (step ⟨ inTake i q free c , s , rising (nx a) , p ⟩)
+  rise-take-keys c i q s a p v with q a in e | i
+  ... | true  | _     = proj₂ (Order.shape (Inv.ord v))
+  ... | false | true  = keys-past c (takeS true q (cpAt p) s) a (p ⊕ [ ix 0 ])
+                          (above-≋ c true (take-incl q (gh s) (envAt c) a p e) (proj₂ (proj₂ (Order.flight (Inv.ord v)))))
+                          (take-here p a (stateᴺ (gh s) (envAt c)) (proj₁ (Order.flight (Inv.ord v))) , kids)
+    where kids = keyed-at (inTake true q free c) s (proj₂ (Order.shape (Inv.ord v)))
+  ... | false | false = keys-above c (takeS false q (cpAt p) s)
+                          (above-≋ c true (take-excl q (gh s) (envAt c) a p e) (proj₂ (proj₂ (Order.flight (Inv.ord v)))))
+                          (take-here p a (stateᴺ (gh s) (envAt c)) (proj₁ (Order.flight (Inv.ord v))) , kids)
+    where kids = keyed-at (inTake false q free c) s (proj₂ (Order.shape (Inv.ord v)))
+
   -- A rise through any other frame leaves the tree as it was.
   rise-keys : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Inv ⟨ c , s , rising e , p ⟩ → NextKeys (step ⟨ c , s , rising e , p ⟩)
   rise-keys top                               s (nx a) p v = proj₂ (Order.shape (Inv.ord v))
@@ -776,10 +802,7 @@ module _ {R : Set} where
   rise-keys (inCut true a c)                  s e      p v = proj₂ (Order.shape (Inv.ord v))
   rise-keys (inCut false a c)                 s e      p v = proj₂ (Order.shape (Inv.ord v))
   rise-keys (inLn b c)                        s e      p v = proj₂ (Order.shape (Inv.ord v))
-  rise-keys (inTake i q free c)               s (nx a) p v with q a | i
-  ... | true  | _     = proj₂ (Order.shape (Inv.ord v))
-  ... | false | true  = rise-take-keys c true q s a p v
-  ... | false | false = rise-take-keys c false q s a p v
+  rise-keys (inTake i q free c)               s (nx a) p v = rise-take-keys c i q s a p v
   rise-keys (inTake i q free c)               s cp     p v = proj₂ (Order.shape (Inv.ord v))
   rise-keys (inTake i q (cpAt r) c)           s e      p v = proj₂ (Order.shape (Inv.ord v))
   rise-keys (inTake i q (cutAt r) c)          s e      p v = proj₂ (Order.shape (Inv.ord v))
@@ -826,15 +849,15 @@ module _ {R : Set} where
   shape-next : ∀ k → Base k → Order k → NextShape (step k)
   shape-next k b o = held (step k) (frag-next k b (proj₁ (Order.shape o))) (keys-next k b o)
 
-  joined : ∀ x → NextShape x → NextLead x → NextApart x → NextOrd x
-  joined (silent t k)    f l u = order f l u
-  joined (value t p a k) f l u = order f l u
-  joined (complete p)    f l u = tt
-  joined drained         f l u = tt
+  joined : ∀ x → NextShape x → NextFlight x → NextLead x → NextApart x → NextOrd x
+  joined (silent t k)    f g l u = order f g l u
+  joined (value t p a k) f g l u = order f g l u
+  joined (complete p)    f g l u = tt
+  joined drained         f g l u = tt
 
   -- EVERY STEP KEEPS THE ORDER.
   ord-next : ∀ k → Base k → Order k → NextOrd (step k)
-  ord-next k b o = joined (step k) (shape-next k b o) (lead-next k b o) (apart-next k b o)
+  ord-next k b o = joined (step k) (shape-next k b o) (flight-next k b o) (lead-next k b o) (apart-next k b o)
 
   both : ∀ x → NextBase x → NextOrd x → NextInv x
   both (silent t k)    b o = b & o
@@ -846,10 +869,10 @@ module _ {R : Set} where
   inv-next k (b & o) = both (step k) (base-next k b) (ord-next k b o)
 
   inv-load : (o : Obs Timeline [] R) → Inv (Machine.load o)
-  inv-load o = base-load o & order (tt , tt , tt) (λ _ → tt) tt
+  inv-load o = base-load o & order (tt , tt , tt) (flight-load o) (λ _ → tt) tt
 
   -- A settled node anywhere in a tree the invariant holds of, absorbed at
   -- the same position: the invariant at it.
   inv-at : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Unpended s → Wf (plug c s) → Held (plug c s) → Apart (plug c s)
          → Inv ⟨ c , s , absorbed , p ⟩
-  inv-at c s p u w f t = base-at c s p u w & order f tt t
+  inv-at c s p u w f t = base-at c s p u w & order f (flight-held c s p f) tt t

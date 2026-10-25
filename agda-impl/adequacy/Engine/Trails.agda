@@ -35,7 +35,7 @@ open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; 
   inTake; inOuter; inLanes; inSrc; inBody; plug; cs; CS; _⊕_)
 open import adequacy.Engine.Meaning using (vals; endOf; gh; envAt; srcG; srcRun; srcState; subOr; lane; lanesL; liveL; holeL; flagOf)
 open import adequacy.Engine.Kept using (states-++; live-hole)
-open import adequacy.Engine.Keys using (Shape′; Shape; LaneKeys; []ᴷ; _∷ᴷ_; OuterKeys; outerOf; Fed; Joins; ConnKeys; Held; here-at)
+open import adequacy.Engine.Keys using (Shape′; Shape; LaneKeys; []ᴷ; _∷ᴷ_; OuterKeys; outerOf; Fed; Joins; ConnAt; Held; here-at)
 open import adequacy.Placed.Order using (every-lookup; sorted-headed; sorted-lookup; ordered-rejoin; steady-rejoin; Alienᴱ; Disjoint;
   Ordered; Owned; Sorted; Steady; Every; Every∞; EveryT; Everyᴱ; every-monoᴱ; Headed;
   every-mono; everyT-mono; prefix-++; every-tail; everyT-burstOn; everyT-idle; everyT-∪;
@@ -76,16 +76,16 @@ postulate
 -- where no source of its environment has been.
 sub-headed : ∀ {R Γ X B} (e : Ctx R Γ B) cl sl sa p as ow r en (o : St Γ X) (b : St (X ∷ Γ) B)
            → Held (plug e (connS (cs cl sl sa (just p) as ow r en) o b)) → Headed (p ⊕ (ix 1 ∷ []))
-sub-headed e cl sl sa p as ow r en o b h = proj₁ (ConnKeys.sub (here-at e (connS (cs cl sl sa (just p) as ow r en) o b) h))
+sub-headed e cl sl sa p as ow r en o b h = proj₁ (ConnAt.sub (here-at e (connS (cs cl sl sa (just p) as ow r en) o b) h))
 
 sub-alien : ∀ {R Γ X B} (e : Ctx R Γ B) cl sl sa p as ow r en (o : St Γ X) (b : St (X ∷ Γ) B)
           → Held (plug e (connS (cs cl sl sa (just p) as ow r en) o b)) → Alienᴱ (p ⊕ (ix 1 ∷ [])) (envAt e)
-sub-alien e cl sl sa p as ow r en o b h = proj₂ (ConnKeys.sub (here-at e (connS (cs cl sl sa (just p) as ow r en) o b) h))
+sub-alien e cl sl sa p as ow r en o b h = proj₂ (ConnAt.sub (here-at e (connS (cs cl sl sa (just p) as ow r en) o b) h))
 
 -- AN ENDED SOURCE ended under a head.
 ended-headed : ∀ {R Γ X B} (e : Ctx R Γ B) sl sa as ow r en (o : St Γ X) (b : St (X ∷ Γ) B)
              → Held (plug e (connS (cs true sl sa nothing as ow r en) o b)) → Headed en
-ended-headed e sl sa as ow r en o b h = ConnKeys.ends (here-at e (connS (cs true sl sa nothing as ow r en) o b) h)
+ended-headed e sl sa as ow r en o b h = ConnAt.ends (here-at e (connS (cs true sl sa nothing as ow r en) o b) h)
 
 -- A RUN READ THROUGH ITS TAIL: what it leaves running, in order, steady
 -- and headed, trailing itself.
@@ -149,9 +149,9 @@ conn-core : ∀ {R Γ X B} (e : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B
      → Shape (srcState (srcG k o) (envAt e)) → Shape (stateᴺ (gh b) (envAt (inBody k o e)))
      → Shape (stateᴺ (connectᶜ (CS.srcAt k) (gh b) (srcG k o)) (envAt e))
 conn-core e k o b fs shS shB =
-  subst (λ r → Shape (stateᴺ (connectᶜ r (gh b) (srcG k o)) (envAt e))) (sym (ConnKeys.at m))
-    (beside-shape (ConnKeys.mark m) (ConnKeys.hm m) (gh b) (srcG k o) (envAt e) shS shB
-      (ConnKeys.kb m) (ConnKeys.kr m) (ConnKeys.fr m) (ConnKeys.cue m) (ConnKeys.ks m) (ConnKeys.rs m) (ConnKeys.ub m))
+  subst (λ r → Shape (stateᴺ (connectᶜ r (gh b) (srcG k o)) (envAt e))) (sym (ConnAt.at m))
+    (beside-shape (ConnAt.mark m) (ConnAt.hm m) (gh b) (srcG k o) (envAt e) shS shB
+      (ConnAt.kb m) (ConnAt.kr m) (ConnAt.fr m) (ConnAt.cue m) (ConnAt.ks m) (ConnAt.rs m) (ConnAt.ub m))
   where m = here-at e (connS k o b) fs
 
 -- A CONNECT: its body beside its source, read through its tail once it
