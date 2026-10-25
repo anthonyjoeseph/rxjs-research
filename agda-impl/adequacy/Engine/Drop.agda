@@ -41,13 +41,13 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym
 
 open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Tail∞; Pos; out; skip; end; hush; idle; _∪_; ix; last; _<ᵖ_)
 open import denotation.MonotonicList using (head; mapᴱ; scanᴱ; takeWhileᴱ; taking; Agree; Agreeᵀ; stop; pin⁼; idle⁼; out⁼; skip⁼; end⁼;
-  hush⁼; agree-refl; agree-trans; agree-sym; agreeᵀ-refl; agreeᵀ-sym; agreeᵀ-trans)
+  hush⁼; agree-refl; agree-trans; agreeᵀ-refl; agreeᵀ-sym; agreeᵀ-trans)
 open import denotation.NonExpansive using (_,ˢ_; mapᴱ-ne; scanᴱ-ne; takeWhileᴱ-ne; ∪-ne; beside-ne; burstOn-ne; Outerᴿ; liveᴼ; whole-ne; go-ne; mapᴱ-neᴹ; Lanes)
 open import denotation.Unfold using (Node; NEnv; stateᴺ; states; outerᴺ; meaning; cutᴺ; outer∞)
 open import denotation.Denote using (flatOp)
 open import operation.PureObservable using (module Machine)
 open Machine using (nx; cp; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; cs; free; cpAt; cutAt; overAt; closed)
-open import adequacy.Engine.Meaning using (_≋_; ≋-by; same; up; mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn;
+open import adequacy.Engine.Meaning using (_≋_; ≋-by; ≋-sym; same; up; mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn;
   srcState; srcG; envAt; gh; lane; lanesL; deadL; outerG; outerT; poolRuns; poolT; laneᴹ;
   lanesFrame-ne; outerFrame-ne; outerOf; lanes-refl; queue-refl; outer-refl; ≈-refl; risen)
 open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore; go-rise; go-outer)
@@ -468,8 +468,6 @@ body-drops : ∀ {X B P} r {σ σ′ : Events∞ X} {h h′ : Events∞ B}
 body-drops r {σ} hc nb so t y (dropˢ {k} {r₁} pk ag x) = dropˢ pk (body-skip r σ hc (nb k pk) ag) (body-⊒ r so t y x)
 body-drops r {σ} hc nb so t y (dropsˢ {k} {r₁} pk ag d) = dropsˢ pk (body-skip r σ hc (nb k pk) ag) (body-drops r hc nb so t y d)
 
-≋-sym : ∀ {A} {h h′ : Events∞ A} → h ≋ h′ → h′ ≋ h
-≋-sym x n = agreeᵀ-sym (cutˢ (x n)) ,ˢ agree-sym (nowˢ (x n))
 
 bc-≋ : ∀ {X B} r {σ σ′ : Events∞ X} {β β′ : Events∞ B} → σ ≋ σ′ → β ≋ β′ → bodyConn r σ β ≋ bodyConn r σ′ β′
 bc-≋ r y x n = ∪-ne (burstOn-ne r (y n)) (cutˢ (x n)) ,ˢ beside-ne r (x n) (y n)

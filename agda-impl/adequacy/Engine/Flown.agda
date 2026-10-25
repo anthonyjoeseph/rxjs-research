@@ -44,7 +44,8 @@ open import adequacy.Engine.Above using (Above; Flight; above-≋; take-true; ta
 open import adequacy.Engine.Head using (Frag; Lane)
 open import adequacy.Engine.Drop using (Dropsˢ; Pass; Links; pass-of; lane-admits)
 open import adequacy.Engine.Passed using (above-drops)
-open import adequacy.Engine.Pick using (Order; module Order; frag-flat; frag-parts; lanes-ʳsplit)
+open import adequacy.Engine.Pick using (Order; module Order; lanes-ʳsplit)
+open import adequacy.Engine.Head.Within using (frag-flat; frag-parts)
 open import adequacy.Placed.Order using (Ordered; Steady; Every; EveryT; Headed; Atop; Past; Disjoint; ordered; steady; every; every∞-mono;
   ordered-map; ordered-scan; steady-map; steady-scan)
 open import adequacy.Placed.Keys using (every-map; every-scan; everyT-≈)

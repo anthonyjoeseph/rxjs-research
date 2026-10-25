@@ -388,6 +388,11 @@ envAt-sorted (inBody k o c)                    s fs =
   sorted-cons (Go.src-sorted c k o s fs (Go.shape-src c k o s fs so)) so
   where so = envAt-sorted c (connS k o s) fs
 
+-- Each lane of a merge, those before it passed.
+lanes-held : ∀ {R Γ A C} (e : Ctx R Γ C) op (f : A → Obs Timeline Γ C) dn n qs (s : St Γ A) (pre post : List (St Γ C))
+           → Held (plug e (flatS op f dn n qs s (pre ʳ++ post))) → All (λ l → Shape (stateᴺ (gh l) (envAt e))) post
+lanes-held e op f dn n qs s pre post fs = Go.shape-lanes e op f dn n qs s pre post fs (envAt-sorted e (flatS op f dn n qs s (pre ʳ++ post)) fs)
+
 -- A node, in the environment its connects give it.
 shape-st : ∀ {R Γ A} (e : Ctx R Γ A) (s : St Γ A) → Held (plug e s) → Shape (stateᴺ (gh s) (envAt e))
 shape-st e s fs = Go.shape-st e s fs (envAt-sorted e s fs)

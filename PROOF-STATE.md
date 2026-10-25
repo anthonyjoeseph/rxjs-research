@@ -18,8 +18,16 @@ above keyed against it (`adequacy.Engine.Above.Flight`). Settled by the
 per-frame keys past a dropped skip.
 
 Members: `body-keyed-drops`, `lane-begin-tail`, `rise-admit-flight`,
-`rise-outer-end-flight`, `begin-flight`, `run-flight`, `flight-load`,
-`flight-held`.
+`rise-outer-end-flight`, `begin-flight`, `run-flight`, `flight-load`.
+
+#### THE IDLE SOURCE
+
+Untried: a source still to subscribe under a body already subscribed, read
+idle, every frame above keeping its own of it, where the tree's keys hold of
+the subscription. No settled configuration absorbs one (`Settled`). Settled
+by a body, or refuted (then `flight-held` reads `Unpended`).
+
+Members: `pend-src-above`.
 
 #### THE KEYS KEPT
 
@@ -178,8 +186,7 @@ whose connect is over; a step keeps the tree in the fragment. Probed on the
 spike engine. Settled when each is a body.
 
 Members: `search-hit`, `search-won`, `found-own`, `frag-next`, `run-lead`,
-`frag-flat`, `frag-body`, `sides-link`, `limited-sides`, `outer-link`,
-`body-link`.
+`sides-link`, `limited-sides`, `outer-link`, `body-link`.
 
 #### THE HEADS
 

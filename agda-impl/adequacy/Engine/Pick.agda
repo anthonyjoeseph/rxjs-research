@@ -59,6 +59,7 @@ open import adequacy.Engine.Meaning using (gh; poolG; lanesL; deadL; poolT; oute
 open import adequacy.Engine.Race using (NotBefore; After; TailNotBefore)
 open import adequacy.Engine.Head using (Frag; Lanes; Lane; Agrees; exact; early; HeadAt; cand; pool-step; at-<ᵖ; <≮ᴷ; ≮ᴷ-trans)
 open import adequacy.Engine.Head.Agrees using (head-agrees)
+open import adequacy.Engine.Head.Within using (frag-flat; frag-body; frag-parts)
 open import adequacy.Engine.Keys using (Keyed; Keys)
 open import adequacy.Engine.Above using (Flight)
 open import adequacy.Engine.Ahead using (Sides; Ahead; Under; shown; shows-open) renaming (shows to showsᶜ)
@@ -347,11 +348,6 @@ postulate
   -- The engine's search: the found node's key leads every race above it.
   search-won : ∀ {R} (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} → Frag t → search top t ≡ just (found (Γ , A , c , s) m key)
              → Won (key , outOf c s m) c s
-  -- A flatMap of a fragment tree is of the fragment.
-  frag-flat : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls
-            → Frag (plug c (flatS op f d n q o ls)) → Frag (flatS op f d n q o ls)
-  -- A connect's body in a fragment tree is of the fragment.
-  frag-body : ∀ {R Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) → Frag (plug c (connS k o b)) → Frag b
 
 ------------------------------------------------------------------------
 -- From the race to the stepper's heads
@@ -453,14 +449,6 @@ lane-on : ∀ {R Γ A B} d n (q : List A) {b} {k} (a : B) {c : Ctx R Γ B} {t} �
         → Won (uncurry (laneT d n q) (cutT b k (shows (nx a)))) c t → Won (k , shows (nx a)) c t
 lane-on d n []      a refl w = w
 lane-on d n (_ ∷ _) a refl w = w
-
--- A flatMap of the fragment: its outer and its lanes are.
-frag-parts : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls → Frag (flatS op f d n q o ls) → Frag o × Lanes ls
-frag-parts (mergeᶠ nothing)  f d n []      o ls (fo , fl , _) = fo , fl
-frag-parts (mergeᶠ nothing)  f d n (_ ∷ _) o ls ()
-frag-parts (mergeᶠ (just m)) f d n q       o ls (fo , fl , _) = fo , fl
-frag-parts switchᶠ           f d n q       o ls (fo , fl , _) = fo , fl
-frag-parts exhaustᶠ          f d n q       o ls (fo , fl , _) = fo , fl
 
 -- A still candidate's lane passes its flatMap's retag as it is.
 lane-still : ∀ {R Γ A B} d n (q : List A) b {k} {c : Ctx R Γ B} {t} → Won (uncurry (laneT d n q) (cutT b k still)) c t → Won (k , still) c t
