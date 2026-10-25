@@ -41,8 +41,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym
 
 open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Tail∞; Pos; out; skip; end; hush; idle; _∪_; ix; last; _<ᵖ_)
 open import denotation.MonotonicList using (head; mapᴱ; scanᴱ; takeWhileᴱ; taking; Agree; Agreeᵀ; stop; pin⁼; idle⁼; out⁼; skip⁼; end⁼;
-  hush⁼; agree-refl; agree-trans; agree-sym; agreeᵀ-refl; agreeᵀ-sym; agreeᵀ-trans;
-  agreeᵀ-pred; agree-pred)
+  hush⁼; agree-refl; agree-trans; agree-sym; agreeᵀ-refl; agreeᵀ-sym; agreeᵀ-trans)
 open import denotation.NonExpansive using (_,ˢ_; mapᴱ-ne; scanᴱ-ne; takeWhileᴱ-ne; ∪-ne; beside-ne; burstOn-ne; Outerᴿ; liveᴼ; whole-ne; go-ne; mapᴱ-neᴹ; Lanes)
 open import denotation.Unfold using (Node; NEnv; stateᴺ; states; outerᴺ; meaning; cutᴺ; outer∞)
 open import denotation.Denote using (flatOp)
@@ -72,7 +71,7 @@ data Eraseᴱ {A : Set} : ℕ → Events A → Events A → Set where
   stopᴱ   : ∀ {x y} → Eraseᴱ zero x y
   outᴱ    : ∀ {k p a l r} → Eraseᴱ k (force l) (force r) → Eraseᴱ (suc k) (out p a l) (out p a r)
   skipᴱ   : ∀ {k p l r} → Eraseᴱ k (force l) (force r) → Eraseᴱ (suc k) (skip p l) (skip p r)
-  erasedᴱ : ∀ {k p l e} → Eraseᴱ k (force l) e → Eraseᴱ (suc k) (skip p l) e
+  erasedᴱ : ∀ {k p l e} → Eraseᴱ k (force l) e → Eraseᴱ k (skip p l) e
   endᴱ    : ∀ {k p} → Eraseᴱ (suc k) (end p) (end p)
   hushᴱ   : ∀ {k} → Eraseᴱ (suc k) hush hush
 
@@ -88,16 +87,16 @@ private
   agree-on hush⁼       o = o
 
   eraseᵀ-then : ∀ {k} {x y z : Tail} → Eraseᵀ k x y → Agreeᵀ k y z → Eraseᵀ k x z
-  eraseᵀ-then stopᵉ     a        = stopᵉ
+  eraseᵀ-then {zero} e a         = stopᵉ
   eraseᵀ-then (pinᵉ e)  (pin⁼ a) = pinᵉ (eraseᵀ-then e a)
-  eraseᵀ-then (unpin o e) a      = unpin (agreeᵀ-on a o) (eraseᵀ-then e (agreeᵀ-pred a))
+  eraseᵀ-then {suc k} (unpin o e) a = unpin (agreeᵀ-on a o) (eraseᵀ-then e a)
   eraseᵀ-then idleᵉ     idle⁼    = idleᵉ
 
   erase-then : ∀ {A k} {x y z : Events A} {t t′} → Erase k x t y → Agreeᵀ k t t′ → Agree k y z → Erase k x t′ z
-  erase-then stopᵉ        u a           = stopᵉ
+  erase-then {k = zero} x u a           = stopᵉ
   erase-then (outᵉ e x)   u (out⁼ t a)  = outᵉ (eraseᵀ-then e t) (erase-then x t a)
   erase-then (skipᵉ e x)  u (skip⁼ t a) = skipᵉ (eraseᵀ-then e t) (erase-then x t a)
-  erase-then (erased o e x) u a         = erased (agree-on a o) (eraseᵀ-then e (agreeᵀ-pred u)) (erase-then x (agreeᵀ-pred u) (agree-pred a))
+  erase-then {k = suc k} (erased o e x) u a = erased (agree-on a o) (eraseᵀ-then e u) (erase-then x u a)
   erase-then endᵉ         u end⁼        = endᵉ
   erase-then hushᵉ        u hush⁼       = hushᵉ
 

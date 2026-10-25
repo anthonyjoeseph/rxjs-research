@@ -276,7 +276,7 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
   -- It is the stepped tree's inner source, read in that tree's own
   -- environment.
   --
-  -- DEAD ROUTE: the fed inner source's trail read off its relation to the current one, which trails: an erased step spends depth, so endless erased skips leave the rest unconstrained (refuted at f1f7d119); likewise read off the current environment thinned.
+  -- DEAD ROUTE: the fed inner source's trail read off the current environment thinned.
   fed-trail : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa ba as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
             → Held (plug (rebase dd) (connS (cs cl true sa ba as nothing r en) s t))
             → Trailing (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd))

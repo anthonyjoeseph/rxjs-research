@@ -24,7 +24,7 @@ import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; z≤n; s≤s; _<ᵇ_; _≡ᵇ_)
-open import Data.Nat.Properties using (≤-refl; <-trans; ≤-<-trans; m≤n⇒m≤1+n)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; <-trans; ≤-<-trans; m≤n⇒m≤1+n; n≤1+n)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_; Σ; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
@@ -655,7 +655,7 @@ module Honesty (R : Set) where
   ... | b , le = outᵃ b , s≤s le
   ahead-erase (skipᴱ e) (skipᵃ a) (s≤s lt) with ahead-erase e a lt
   ... | b , le = skipᵃ b , s≤s le
-  ahead-erase (erasedᴱ e) (skipᵃ a) (s≤s lt) with ahead-erase e a lt
+  ahead-erase (erasedᴱ e) (skipᵃ a) lt with ahead-erase e a (≤-trans (n≤1+n (suc (depth a))) lt)
   ... | b , le = b , m≤n⇒m≤1+n le
   ahead-erase endᴱ endᵃ lt = endᵃ , z≤n
   ahead-erase hushᴱ hushᵃ lt = hushᵃ , z≤n

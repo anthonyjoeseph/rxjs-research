@@ -448,10 +448,6 @@ module _ (r : Pos) where
 -- REFUTED: 71fa7920 without each premise of `Sourced`: a tail pinned
 --   before an erased skip, an erased skip outside the burst between two
 --   inside it, and an erased skip before the subscription.
--- REFUTED: f1f7d119 without the other's trail (`body-untrailed`): an
---   erased step spends depth, so infinitely many erased skips satisfy
---   every depth before a kept one that pins past them.  Nor does a run
---   with skips erased trail because the run does (`erase-untrailed`).
 body-⊒ : ∀ {X B} r {σ σ′ : Events∞ X} {β β′ : Events∞ B} → Sourced r σ → Trailing σ′ → σ ⊒ σ′ → β ⊒ β′ → bodyConn r σ β ⊒ bodyConn r σ′ β′
 body-⊒ r {σ} {σ′} {β} {β′} so tr (lσ , hσ , eσ) (lβ , hβ , eβ) =
   side-lead r {σ = σ} {σ′} {β} {β′} lσ lβ , hushed , λ n → ∪-erase (burst-erase r so tr (eσ n)) (cutᵉ (eβ n)) ,ᵉ beside-erase r so tr (eσ n) (eβ n)
