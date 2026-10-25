@@ -450,14 +450,47 @@ private
     shapedLᵇ []       ρ = true
     shapedLᵇ (l ∷ ls) ρ = shapedᵇ l ρ ∧ shapedLᵇ ls ρ
 
+  -- `adequacy.Engine.Trails.Thin`, decided, values unread: `e′` is `e` with
+  -- skips erased, a skip kept where its position comes next.
+  thinᵇ : ∀ {A} → ℕ → Events A → Events A → Bool
+  thinᵇ zero    _           _            = true
+  thinᵇ (suc k) (out p _ r) (out q _ r′) = samePos p q ∧ thinᵇ k (Events∞.force r) (Events∞.force r′)
+  thinᵇ (suc k) (skip p r)  (skip q r′)  =
+    if samePos p q then thinᵇ k (Events∞.force r) (Events∞.force r′) else thinᵇ k (Events∞.force r) (skip q r′)
+  thinᵇ (suc k) (skip p r)  e′           = thinᵇ k (Events∞.force r) e′
+  thinᵇ (suc k) (end p)     (end q)      = samePos p q
+  thinᵇ (suc k) hush        hush         = true
+  thinᵇ (suc k) _           _            = false
+
+  -- Every connect's source, in a thinned environment, runs thinned
+  -- (`adequacy.Engine.Trails.thin-src`).
+  mutual
+    thinnedᵇ : ∀ {Δ A} → St Δ A → U.NEnv Δ → U.NEnv Δ → Bool
+    thinnedᵇ (mapS f s)              ρ ρ′ = thinnedᵇ s ρ ρ′
+    thinnedᵇ (scanS f z s)           ρ ρ′ = thinnedᵇ s ρ ρ′
+    thinnedᵇ (cutS l a s)            ρ ρ′ = thinnedᵇ s ρ ρ′
+    thinnedᵇ (lnS b s)               ρ ρ′ = thinnedᵇ s ρ ρ′
+    thinnedᵇ (takeS i w x s)         ρ ρ′ = thinnedᵇ s ρ ρ′
+    thinnedᵇ (flatS op f d n p o ls) ρ ρ′ = thinnedᵇ o ρ ρ′ ∧ thinnedLᵇ ls ρ ρ′
+    thinnedᵇ (connS k o b)           ρ ρ′ =
+      thinᵇ 30 (srcRun (srcG k o) ρ) (srcRun (srcG k o) ρ′) ∧ thinnedᵇ o ρ ρ′
+      ∧ thinnedᵇ b (srcRun (srcG k o) ρ ∷ᴬ ρ) (srcRun (srcG k o) ρ′ ∷ᴬ ρ′)
+    thinnedᵇ _                       ρ ρ′ = true
+
+    thinnedLᵇ : ∀ {Δ A} → List (St Δ A) → U.NEnv Δ → U.NEnv Δ → Bool
+    thinnedLᵇ []       ρ ρ′ = true
+    thinnedLᵇ (l ∷ ls) ρ ρ′ = thinnedᵇ l ρ ρ′ ∧ thinnedLᵇ ls ρ ρ′
+
   -- Unchecked; trails in the run's environment; in the rest's where the
-  -- run's holds; placed and shaped in the rest's, as the facts are stated.
+  -- run's holds; placed, shaped and thinned in the rest's, as the facts are
+  -- stated.
   trailedᵇ : ∀ {Δ A} → ℕ → Bool → Pos → St Δ A → U.NEnv Δ → U.NEnv Δ → Bool
   trailedᵇ zero               v q b ρ ρ′ = true
   trailedᵇ (suc zero)         v q b ρ ρ′ = innerᵇ b ρ
   trailedᵇ (suc (suc zero))   v q b ρ ρ′ = not (innerᵇ b ρ) ∨ innerᵇ b ρ′
   trailedᵇ (suc (suc (suc zero))) v q b ρ ρ′ = placedᵇ v q b ρ′
-  trailedᵇ (suc (suc (suc (suc _)))) v q b ρ ρ′ = shapedᵇ b ρ′
+  trailedᵇ (suc (suc (suc (suc zero)))) v q b ρ ρ′ = shapedᵇ b ρ′
+  trailedᵇ (suc (suc (suc (suc (suc _))))) v q b ρ ρ′ = thinnedᵇ b ρ ρ′
 
   -- `adequacy.Engine.Shown.Links`, decided.
   linksᵇ : ∀ {R Γ A} → ℕ → Bool → Pos → Ctx R Γ A → Bool → Events∞ A → Events∞ A → Bool
@@ -547,6 +580,7 @@ private
       else if not (linkedᵇ 2 m) then no (best ⊔ run) ("\n  untrailed: an inner source fed the rest not trailing, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (linkedᵇ 3 m) then no (best ⊔ run) ("\n  unplaced: an inner source fed the rest before a position asked of, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (linkedᵇ 4 m) then no (best ⊔ run) ("\n  unshaped: a node fed the rest out of shape, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (linkedᵇ 5 m) then no (best ⊔ run) ("\n  unthinned: a source in a thinned environment not run thinned, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (rootShapedᵇ m) then no (best ⊔ run) ("\n  unshaped: a node out of shape, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else next n run best (ls + linkCount m) m (step m)
 
