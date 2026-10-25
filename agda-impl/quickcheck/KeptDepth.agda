@@ -34,7 +34,7 @@ open import Data.Maybe using (just; nothing)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.String using (String; _++_)
 
-open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Tail∞; pin; idle; out; skip; end; hush; Pos; _<ᵖ_; inside; ix)
+open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Tail∞; pin; idle; out; skip; end; hush; Pos; _<ᵖ_; inside; ix; sub)
 open import Tree using (defer; mergeᶠ; Later)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (refl)
@@ -605,10 +605,22 @@ private
   posOfEvents (suc n) (end k)     = k ∷ []
   posOfEvents _       _           = []
 
-  -- All prefixes of a position, longest first.
+  -- All prefixes of a position, shortest first.
   pfxs : Pos → List Pos
   pfxs []      = [] ∷ []
-  pfxs (h ∷ p) = (h ∷ p) ∷ pfxs p
+  pfxs (h ∷ p) = [] ∷ mapL (h ∷_) (pfxs p)
+
+  -- The positions a position carries in its tags: a joiner's own
+  -- subscription sits inside the tag of every step it is fed.
+  tagsIn : Pos → List Pos
+  tagsIn []          = []
+  tagsIn (sub t ∷ h) = (t ∷ tagsIn t) ++L tagsIn h
+  tagsIn (ix _ ∷ h)  = tagsIn h
+  tagsIn (last ∷ h)  = tagsIn h
+
+  withTags : List Pos → List Pos
+  withTags []       = []
+  withTags (h ∷ hs) = (h ∷ tagsIn h) ++L withTags hs
 
   -- Flatten a list of lists of positions.
   concatL : List (List Pos) → List Pos
@@ -619,6 +631,17 @@ private
   filterP : (Pos → Bool) → List Pos → List Pos
   filterP _ []       = []
   filterP P (x ∷ xs) = if P x then x ∷ filterP P xs else filterP P xs
+
+  -- Each position once.
+  nubP : List Pos → List Pos
+  nubP = go []
+    where
+      seen : Pos → List Pos → Bool
+      seen p []       = false
+      seen p (q ∷ qs) = samePos p q ∨ seen p qs
+      go : List Pos → List Pos → List Pos
+      go s []       = []
+      go s (p ∷ ps) = if seen p s then go s ps else p ∷ go (p ∷ s) ps
 
   -- Owned p h and h ≠ p: approximation of Beneath p h (Prefix⁺ or Tagged, not self).
   beneathᵇ : Pos → Pos → Bool
@@ -680,22 +703,24 @@ private
   posOfLanes []       = []
   posOfLanes (l ∷ ls) = (posOfEvents depth (Events∞.force l) ++L pinsᵇ 12 (Events∞.cut l)) ++L posOfLanes ls
 
-  -- Candidate roots for one lane under mark p: prefixes of event positions ending in ix 1.
-  rootCands : ∀ {A} → Pos → Events∞ A → List Pos
-  rootCands p e =
-    filterP (λ r → lastIx1ᵇ r ∧ okFlatᵇ p r)
-            (concatL (mapL pfxs (posOfEvents depth (Events∞.force e) ++L pinsᵇ 12 (Events∞.cut e))))
+  -- Candidate roots for the `n`th lane under mark p: prefixes of its event
+  -- positions and of their tags ending in ix 1, and one root fresh to it.
+  rootCands : ∀ {A} → ℕ → Pos → Events∞ A → List Pos
+  rootCands n p e =
+    nubP (filterP (λ r → lastIx1ᵇ r ∧ okFlatᵇ p r)
+            (concatL (mapL pfxs (withTags (posOfEvents depth (Events∞.force e) ++L pinsᵇ 12 (Events∞.cut e))))))
+    ++L (p ++L (ix (100 + n) ∷ ix 1 ∷ [])) ∷ []
 
   -- Per-lane candidate roots.
-  rootCandsAll : ∀ {A} → Pos → List (Events∞ A) → List (List Pos)
-  rootCandsAll _ []       = []
-  rootCandsAll p (l ∷ ls) = rootCands p l ∷ rootCandsAll p ls
+  rootCandsAll : ∀ {A} → ℕ → Pos → List (Events∞ A) → List (List Pos)
+  rootCandsAll _ _ []       = []
+  rootCandsAll n p (l ∷ ls) = rootCands n p l ∷ rootCandsAll (suc n) p ls
 
   -- Candidate marks: headed prefixes of all outer and lane positions, alien to ρ.
   candPs : ∀ {Γ A B} → Maybe (Events∞ A) → List (Events∞ B) → U.NEnv Γ → List Pos
   candPs o ls ρ =
     filterP (λ p → hdᵇ p ∧ alienEnvᵇ p ρ)
-            (concatL (mapL pfxs (posOfOuter o ++L posOfLanes ls)))
+            (nubP (concatL (mapL pfxs (withTags (posOfOuter o ++L posOfLanes ls)))) ++L (ix 999 ∷ []) ∷ [])
 
   -- Search all root combinations (one per lane), accumulating in reverse.
   searchRoots : ∀ {A B} → Pos → Maybe (Events∞ A) → List (Events∞ B) → Tail
@@ -715,7 +740,7 @@ private
     where
       anyMark : List Pos → Bool
       anyMark []       = false
-      anyMark (p ∷ ps) = searchRoots p o ls t (rootCandsAll p ls) [] ∨ anyMark ps
+      anyMark (p ∷ ps) = searchRoots p o ls t (rootCandsAll 0 p ls) [] ∨ anyMark ps
 
   -- `adequacy.Engine.Keys.Here`, decided.
   hereᵇ : ∀ {Δ A} → St Δ A → U.NEnv Δ → Bool
