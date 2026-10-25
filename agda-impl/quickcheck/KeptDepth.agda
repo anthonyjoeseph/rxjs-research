@@ -16,7 +16,12 @@
 -- source's run nesting nothing, and after each source skip shows
 -- (`adequacy.Engine.Shown.src-body-on`).  And each live joiner fed in
 -- order ahead of its rejoined source, joined where its source never keys
--- (`adequacy.Engine.Keys.Here`).
+-- (`adequacy.Engine.Keys.Here`); and every node's positional invariant
+-- held (`adequacy.Engine.Keys.Keys`): shape for cold and of nodes, a
+-- takeWhile cut subscribed under a head, a connect's mark and source
+-- and body ownership.  A merge's mark and its lanes' roots are not in
+-- the state, so its clause is not decided; nor a connect's rise, fresh
+-- run, cue and bound.
 module quickcheck.KeptDepth where
 
 open import Data.Bool using (Bool; true; false; not; _∧_; _∨_; if_then_else_)
@@ -46,7 +51,7 @@ open import quickcheck.Placing using (trailsᵇ; flatsᵇ; steadyᵇ; pinsᵇ; o
 
 open Driver ℕ using (Step; step; silent; value; complete; drained)
 open Ghosting ℕ using (work; Measure)
-open Machine using (Conf; ⟨_,_,_,_⟩; load; spot; subscribing; absorbed; rising; nx; cp; pend; coldS; top; inOuter; inLanes;
+open Machine using (Conf; ⟨_,_,_,_⟩; load; spot; subscribing; absorbed; rising; nx; cp; pend; coldS; ofS; top; inOuter; inLanes;
   plug; closed; alive; search; found; leafM; St; Ctx; Out; Ev; joinS; mapS; scanS; cutS; lnS; takeS; flatS; connS; inMap; inScan; inCut; inLn;
   inTake; inSrc; inBody; over; own; Mark; outOf; still; shows; cs; CS; free; cpAt; cutAt; overAt; _⊕_)
 open import Data.Maybe using (Maybe)
@@ -508,22 +513,122 @@ private
       fedᵇ′ ((q , a) ∷ xs) = hd q ∧ atopᵇ q x ∧ stepsᵇ q a x ∧ fedᵇ′ xs
         where x = U.fedᴺ xs (U.joined y j (endOf ib) ρ)
 
-  -- Every live joiner fed as `joinFedᵇ` decides, in its environment.
-  mutual
-    joinsWalkᵇ : ∀ {Δ A} → St Δ A → U.NEnv Δ → Bool
-    joinsWalkᵇ (mapS f s)              ρ = joinsWalkᵇ s ρ
-    joinsWalkᵇ (scanS f z s)           ρ = joinsWalkᵇ s ρ
-    joinsWalkᵇ (cutS l a s)            ρ = joinsWalkᵇ s ρ
-    joinsWalkᵇ (lnS b s)               ρ = joinsWalkᵇ s ρ
-    joinsWalkᵇ (takeS i w x s)         ρ = joinsWalkᵇ s ρ
-    joinsWalkᵇ (flatS op f d n p o ls) ρ = joinsWalkᵇ o ρ ∧ joinsWalkLᵇ ls ρ
-    joinsWalkᵇ (connS k o b)           ρ = joinsWalkᵇ o ρ ∧ joinsWalkᵇ b (srcRun (srcG k o) ρ ∷ᴬ ρ)
-    joinsWalkᵇ (joinS j true y ib)     ρ = joinFedᵇ j y ib ρ
-    joinsWalkᵇ _                       ρ = true
+  -- Position starts with `ix _`.
+  hdᵇ : Pos → Bool
+  hdᵇ (ix _ ∷ _) = true
+  hdᵇ _           = false
 
-    joinsWalkLᵇ : ∀ {Δ A} → List (St Δ A) → U.NEnv Δ → Bool
-    joinsWalkLᵇ []       ρ = true
-    joinsWalkLᵇ (l ∷ ls) ρ = joinsWalkᵇ l ρ ∧ joinsWalkLᵇ ls ρ
+  -- Strict prefix: `h = k ++ l :: ls` for some `l`, `ls`.
+  extPᵇ : Pos → Pos → Bool
+  extPᵇ k h = prefixᵇ k h ∧ not (samePos k h)
+
+  -- Neither owned by the other.
+  disjointPᵇ : Pos → Pos → Bool
+  disjointPᵇ p h = not (ownedᵇ p h) ∧ not (ownedᵇ h p)
+
+  -- Last label of a position is `ix 1`.
+  lastIx1ᵇ : Pos → Bool
+  lastIx1ᵇ []               = false
+  lastIx1ᵇ (h ∷ [])         = samePos (h ∷ []) (ix 1 ∷ [])
+  lastIx1ᵇ (_ ∷ h′ ∷ rest)  = lastIx1ᵇ (h′ ∷ rest)
+
+  -- Remove the last label.
+  markOf : Pos → Pos
+  markOf []               = []
+  markOf (_ ∷ [])         = []
+  markOf (h ∷ h′ ∷ rest)  = h ∷ markOf (h′ ∷ rest)
+
+  -- Check `P` at every position in a list.
+  pinsAllᵇ : (Pos → Bool) → List Pos → Bool
+  pinsAllᵇ P []       = true
+  pinsAllᵇ P (h ∷ hs) = P h ∧ pinsAllᵇ P hs
+
+  -- Check `P` at every event position in `Events A` to depth `n`.
+  eventsAllPᵇ : ∀ {A} → (Pos → Bool) → ℕ → Events A → Bool
+  eventsAllPᵇ P (suc n) (out h _ r) = P h ∧ eventsAllPᵇ P n (Events∞.force r)
+  eventsAllPᵇ P (suc n) (skip h r)  = P h ∧ eventsAllPᵇ P n (Events∞.force r)
+  eventsAllPᵇ P (suc n) (end h)     = P h
+  eventsAllPᵇ P _       _           = true
+
+  -- Check `P` at every event and cut-pin of `Events∞ A`, to `depth`.
+  every∞Pᵇ : ∀ {A} → (Pos → Bool) → Events∞ A → Bool
+  every∞Pᵇ P e =
+    eventsAllPᵇ P depth (Events∞.force e) ∧ pinsAllᵇ P (pinsᵇ 12 (Events∞.cut e))
+
+  -- Check that no source in the environment (each element `Events A`) is owned by `p`.
+  alienEnvᵇ : ∀ {Γ} → Pos → U.NEnv Γ → Bool
+  alienEnvᵇ p []ᴬ      = true
+  alienEnvᵇ p (e ∷ᴬ ρ) = eventsAllPᵇ (λ h → not (ownedᵇ p h)) depth e ∧ alienEnvᵇ p ρ
+
+  -- `adequacy.Engine.Keys.EndKeys`, decided.
+  endKeysᵇ : CS → Bool
+  endKeysᵇ (cs true _ _ nothing _ _ _ en) = hdᵇ en
+  endKeysᵇ _                              = true
+
+  -- `adequacy.Engine.Keys.SubKeys`, decided.
+  subKeysᵇ : ∀ {Γ} → Maybe Pos → U.NEnv Γ → Bool
+  subKeysᵇ nothing  ρ = true
+  subKeysᵇ (just p) ρ = hdᵇ (p ⊕ (ix 1 ∷ [])) ∧ alienEnvᵇ (p ⊕ (ix 1 ∷ [])) ρ
+
+  -- `adequacy.Engine.Keys.ConnKeys` partially decided: mark recovered from
+  -- `CS.srcAt` (which equals `mark ++ [ix 1]`), heading and ownership of body
+  -- and source checked; `kr` (Rise), `fr` (FreshRun), `cue`, and `ub` (Walk.UB)
+  -- are not decided (witnesses and coinductive predicates not feasibly recovered).
+  connKeysᵇ : ∀ {Γ X B} → CS → St Γ X → St (X ∷ Γ) B → U.NEnv Γ → Bool
+  connKeysᵇ k o b ρ =
+    let m    = markOf (CS.srcAt k)
+        body = U.stateᴺ (gh b) (srcRun (srcG k o) ρ ∷ᴬ ρ)
+        src  = srcState (srcG k o) ρ
+    in
+    lastIx1ᵇ (CS.srcAt k)
+    ∧ hdᵇ m
+    ∧ every∞Pᵇ (ownedᵇ (m ++L (ix 0 ∷ []))) body
+    ∧ every∞Pᵇ (ownedᵇ (m ++L (ix 1 ∷ []))) src
+    ∧ every∞Pᵇ (disjointPᵇ (m ++L (ix 0 ∷ []))) src
+    ∧ endKeysᵇ k
+    ∧ subKeysᵇ (CS.bodyAt k) ρ
+
+  -- TrailE (end n) h decided: n < h, Disjoint (n ++ [ix 1]) h, ¬ Ext n h.
+  trailEndᵇ : Pos → Pos → Bool
+  trailEndᵇ n h = (n <ᵖ h) ∧ disjointPᵇ (n ++L (ix 1 ∷ [])) h ∧ not (extPᵇ n h)
+
+  -- EveryT (TrailE (end n)) t decided up to 12 pins.
+  trailEndTailᵇ : Pos → Tail → Bool
+  trailEndTailᵇ n t = pinsAllᵇ (trailEndᵇ n) (pinsᵇ 12 t)
+
+  -- `adequacy.Engine.Keys.Here`, decided.
+  -- For `flatS`: the merge position and lane roots are existential witnesses
+  -- not stored in the state after attachment, so this clause is not decided.
+  hereᵇ : ∀ {Δ A} → St Δ A → U.NEnv Δ → Bool
+  hereᵇ s@(coldS _ _)              ρ = shapeᵇ (U.stateᴺ (gh s) ρ)
+  hereᵇ s@(ofS _ _ _)              ρ = shapeᵇ (U.stateᴺ (gh s) ρ)
+
+  hereᵇ (takeS _ _ (cpAt k) s)     ρ =
+    hdᵇ (k ⊕ (last ∷ []))
+    ∧ trailEndTailᵇ (k ⊕ (last ∷ [])) (Events∞.cut (U.stateᴺ (gh s) ρ))
+  hereᵇ (connS k o b)              ρ = connKeysᵇ k o b ρ
+  hereᵇ (flatS _ _ _ _ _ _ _)      ρ = true
+  hereᵇ (joinS j true y ib)        ρ = joinFedᵇ j y ib ρ
+  hereᵇ _                          ρ = true
+
+  -- `adequacy.Engine.Keys.Keys`, decided clause for clause.
+  mutual
+    keysWalkᵇ : ∀ {Δ A} → St Δ A → U.NEnv Δ → Bool
+    keysWalkᵇ s ρ = hereᵇ s ρ ∧ keysKidsᵇ s ρ
+
+    keysKidsᵇ : ∀ {Δ A} → St Δ A → U.NEnv Δ → Bool
+    keysKidsᵇ (mapS f s)              ρ = keysWalkᵇ s ρ
+    keysKidsᵇ (scanS f z s)           ρ = keysWalkᵇ s ρ
+    keysKidsᵇ (cutS l a s)            ρ = keysWalkᵇ s ρ
+    keysKidsᵇ (lnS b s)               ρ = keysWalkᵇ s ρ
+    keysKidsᵇ (takeS i w x s)         ρ = keysWalkᵇ s ρ
+    keysKidsᵇ (flatS op f d n q o ls) ρ = keysWalkᵇ o ρ ∧ keysWalkLᵇ ls ρ
+    keysKidsᵇ (connS k o b)           ρ = keysWalkᵇ o ρ ∧ keysWalkᵇ b (srcRun (srcG k o) ρ ∷ᴬ ρ)
+    keysKidsᵇ _                       ρ = true
+
+    keysWalkLᵇ : ∀ {Δ A} → List (St Δ A) → U.NEnv Δ → Bool
+    keysWalkLᵇ []       ρ = true
+    keysWalkLᵇ (l ∷ ls) ρ = keysWalkᵇ l ρ ∧ keysWalkLᵇ ls ρ
 
   -- Unchecked; trails in the run's environment; in the rest's where the
   -- run's holds; placed in the rest's, as the facts are stated.
@@ -609,9 +714,9 @@ private
   rootShapedᵇ : Conf ℕ → Bool
   rootShapedᵇ ⟨ c , s , _ , _ ⟩ = shapedᵇ (plug c s) []ᴬ
 
-  -- Every live joiner of the configuration fed in order.
-  rootJoinsᵇ : Conf ℕ → Bool
-  rootJoinsᵇ ⟨ c , s , _ , _ ⟩ = joinsWalkᵇ (plug c s) []ᴬ
+  -- Every node of the configuration's positional invariant held.
+  rootKeysᵇ : Conf ℕ → Bool
+  rootKeysᵇ ⟨ c , s , _ , _ ⟩ = keysWalkᵇ (plug c s) []ᴬ
 
   -- Whether every silent step keeps its meaning so, and the longest run
   -- meaning the same.
@@ -625,7 +730,7 @@ private
       else if not (linkedᵇ 2 m) then no (best ⊔ run) ("\n  untrailed: an inner source fed the rest not trailing, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (linkedᵇ 3 m) then no (best ⊔ run) ("\n  unplaced: an inner source fed the rest before a position asked of, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (rootShapedᵇ m) then no (best ⊔ run) ("\n  unshaped: a node out of shape, " ++ showMode m ++ " at " ++ showSpot (spot m))
-      else if not (rootJoinsᵇ m) then no (best ⊔ run) ("\n  unfed: a joiner's feed out of order or its join not alien, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (rootKeysᵇ m) then no (best ⊔ run) ("\n  unkeyed: a node's positional invariant not held, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else next n run best (ls + linkCount m) m (step m)
 
     next : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict
