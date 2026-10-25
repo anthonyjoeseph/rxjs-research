@@ -589,10 +589,26 @@ module _ {R : Set} where
   postulate
     -- THE SHAPE: a step keeps the whole tree in the fragment.
     frag-next : ∀ k → Base k → Frag (whole k) → NextFrag (step k)
-    -- THE KEYS KEPT: a rise keeps every node's own positional facts, each
-    -- in the environment its connects give it; and so does a subscribe
-    -- beginning a former, and a mark run.
-    rise-keys : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Inv ⟨ c , s , rising e , p ⟩ → NextKeys (step ⟨ c , s , rising e , p ⟩)
+    -- THE KEYS KEPT: every node's own positional facts, each in the
+    -- environment its connects give it, kept by a rise through a frame
+    -- that rewrites its node: a scan's value, a takeWhile's failing one,
+    -- an outer's value or end, a lane's end, a source's value or end, a
+    -- body's end; by a subscribe beginning a former; and by a mark run.
+    rise-scan-keys : ∀ {Γ A B} (c : Ctx R Γ B) (f : B → A → B) z (s : St Γ A) a p → Inv ⟨ inScan f z c , s , rising (nx a) , p ⟩
+                   → Keys (plug c (scanS f (f z a) s))
+    rise-take-keys : ∀ {Γ A} (c : Ctx R Γ A) i q (s : St Γ A) a p → Inv ⟨ inTake i q free c , s , rising (nx a) , p ⟩
+                   → Keys (plug c (takeS i q (cpAt p) s))
+    rise-admit-keys : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q ls (s : St Γ A) a p
+                    → Inv ⟨ inOuter op f d n q ls c , s , rising (nx a) , p ⟩ → NextKeys (step ⟨ inOuter op f d n q ls c , s , rising (nx a) , p ⟩)
+    rise-outer-end-keys : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q ls (s : St Γ A) p
+                        → Inv ⟨ inOuter op f d n q ls c , s , rising cp , p ⟩ → Keys (plug c (flatS op f true n q s ls))
+    rise-lane-end-keys : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) p
+                       → Inv ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩
+                       → Keys (whole (dequeue c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p))
+    rise-src-keys : ∀ {Γ X B} (c : Ctx R Γ B) k (b : St (X ∷ Γ) B) (s : St Γ X) e p → Inv ⟨ inSrc k b c , s , rising e , p ⟩
+                  → NextKeys (step ⟨ inSrc k b c , s , rising e , p ⟩)
+    rise-body-end-keys : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (s : St (X ∷ Γ) B) p → Inv ⟨ inBody k o c , s , rising cp , p ⟩
+                       → Keys (plug c (connS (record k { owedAt = just p }) o s))
     begin-keys : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Inv ⟨ c , pend o , subscribing , p ⟩
                → NextKeys (step ⟨ c , pend o , subscribing , p ⟩)
     run-keys : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , absorbed , p ⟩ → NextKeys (step ⟨ c , s , absorbed , p ⟩)
@@ -749,6 +765,36 @@ module _ {R : Set} where
                         (subst₂ (λ k x → Won (k , x) c′ s′) kq oa (search-won (plug c s) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))))
                      (λ q s″ kq oc al → won-ends q c′ s′ s″ al
                         (subst₂ (λ k x → Won (k , x) c′ s′) kq oc (search-won (plug c s) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))))
+
+  -- A rise through any other frame leaves the tree as it was.
+  rise-keys : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Inv ⟨ c , s , rising e , p ⟩ → NextKeys (step ⟨ c , s , rising e , p ⟩)
+  rise-keys top                               s (nx a) p v = proj₂ (Order.shape (Inv.ord v))
+  rise-keys top                               s cp     p v = tt
+  rise-keys (inMap f c)                       s e      p v = proj₂ (Order.shape (Inv.ord v))
+  rise-keys (inScan f z c)                    s (nx a) p v = rise-scan-keys c f z s a p v
+  rise-keys (inScan f z c)                    s cp     p v = proj₂ (Order.shape (Inv.ord v))
+  rise-keys (inCut true a c)                  s e      p v = proj₂ (Order.shape (Inv.ord v))
+  rise-keys (inCut false a c)                 s e      p v = proj₂ (Order.shape (Inv.ord v))
+  rise-keys (inLn b c)                        s e      p v = proj₂ (Order.shape (Inv.ord v))
+  rise-keys (inTake i q free c)               s (nx a) p v with q a | i
+  ... | true  | _     = proj₂ (Order.shape (Inv.ord v))
+  ... | false | true  = rise-take-keys c true q s a p v
+  ... | false | false = rise-take-keys c false q s a p v
+  rise-keys (inTake i q free c)               s cp     p v = proj₂ (Order.shape (Inv.ord v))
+  rise-keys (inTake i q (cpAt r) c)           s e      p v = proj₂ (Order.shape (Inv.ord v))
+  rise-keys (inTake i q (cutAt r) c)          s e      p v = proj₂ (Order.shape (Inv.ord v))
+  rise-keys (inTake i q (overAt r) c)         s e      p v = proj₂ (Order.shape (Inv.ord v))
+  rise-keys (inOuter op f d n q ls c)         s (nx a) p v = rise-admit-keys c op f d n q ls s a p v
+  rise-keys (inOuter op f d n q ls c)         s cp     p v = rise-outer-end-keys c op f d n q ls s p v
+  rise-keys (inLanes op f d n q o pre post c) s (nx b) p v with alive s
+  ... | true  = proj₂ (Order.shape (Inv.ord v))
+  ... | false = proj₂ (Order.shape (Inv.ord v))
+  rise-keys (inLanes op f d n q o pre post c) s cp     p v with alive s
+  ... | true  = rise-lane-end-keys c op f d n q o pre post s p v
+  ... | false = proj₂ (Order.shape (Inv.ord v))
+  rise-keys (inSrc k b c)                     s e      p v = rise-src-keys c k b s e p v
+  rise-keys (inBody k o c)                    s (nx b) p v = proj₂ (Order.shape (Inv.ord v))
+  rise-keys (inBody k o c)                    s cp     p v = rise-body-end-keys c k o s p v
 
   -- A subscribe of a settled node leaves the tree as it was.
   sub-keys : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , subscribing , p ⟩ → NextKeys (step ⟨ c , s , subscribing , p ⟩)
