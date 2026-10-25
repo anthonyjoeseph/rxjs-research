@@ -36,7 +36,7 @@ open import Tree using (Obs; cold; empty; of; map; scan; takeWhile; flatMap; con
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Time; Frame; From; From∞; Timeline; timelineAt;
   out; skip; end; hush; idle; _∪_; ix; last; root; at; done; emit; stall; close)
   renaming (quiet to silentᶠ)
-open import denotation.MonotonicList using (Agreeᵀ; agreeᵀ-refl; agree-refl; _≈[_]_)
+open import denotation.MonotonicList using (Agree; Agreeᵀ; agreeᵀ-refl; agree-refl; agree-sym; agree-trans; _≈[_]_)
 import denotation.MonotonicList as M′
 open import denotation.NonExpansive using (_,ˢ_; liveᴼ; []ᴸ; []ᑫ; go-ne; mapᴱ-neᴹ; ∪-ne; burstOn-ne; beside-ne)
 open import denotation.Unfold using (Node; idleᶜ; ofᶜ; restsᶜ; states; ended; outerᴺ; restᶜ; takeWhileᶜ; endingᶜ; burstᶜ;
@@ -49,10 +49,12 @@ open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; 
   Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load;
   Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM; search; found; run; unsub; leaf; feed)
   renaming (cut to cutᴹ)
-open import adequacy.Engine.Meaning using (Has; M; _≅_; _≋_; agree-≅; atOut; bodyFrame; closed-hides; connSrc; deadL; deadOne; doneE; doneE-ne;
-  doneG; envAt; flagOf; gh; holeL; holeT; joinG; lane; laneRuns; lanes-dead; lanes-refl; lanesFrame; lanesL; laneᴹ; lift-≅; liveL;
-  outerFrame; outerG; outerOf; outerT; pastOut; poolG; poolRuns; queue-refl; rested; risen; same; srcFrame; srcG; srcRun; subOr;
-  tailsOn; taken; taking∞; tape; took; up; ≅-refl; ≅-sym; ≅-trans; ≈-refl; ≋-by; ≋-out; ≋-tr; ≋-trans)
+open import adequacy.Engine.Meaning using (Has; M; _≅_; _≋_; agree-≅; atOut; bodyFrame; closed-hides; connSrc; deadL; deadOne; doneE;
+  doneE-ne; doneG; envAt; flagOf; gh; holeL; holeT; joinG; lane; laneRuns; lanes-dead;
+  lanes-refl; lanesFrame; lanesL; laneᴹ; lift-≅; liveL; outerFrame; outerG; outerOf; outerT;
+  pastOut; poolG; poolRuns; queue-refl; rested; risen; same; srcFrame; srcG; srcRun; subOr;
+  tailsOn; taken; taking∞; tape; took; up; lift-ne; ≅-refl; ≅-trans; ≈-refl; ≋-by; ≋-out; ≋-tr;
+  ≋-trans)
 open import adequacy.Engine.Inv using (Unpended; Opened; Wf; Base; module Base; Inv; module Inv; inv-at; wfI; wf-split; Owns; ofO;
   attO; cpO; cutO; bodyO; srcAttO; owedO; joinO; leafO; owned; search-hit)
 open import adequacy.Engine.Race using (First; go-rise; cuts-swap)
@@ -337,25 +339,29 @@ module _ {R : Set} where
   ----------------------------------------------------------------------
   -- A configuration focused anywhere means what its whole tree means
 
-  plug-up : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) → Unpended s → Wf (plug c s)
-          → up c (flagOf s) (stateᴺ (gh s) (envAt c)) ≅ meaning (gh (plug c s)) []ᴬ
-  plug-up top                               s u w = ≅-refl
-  plug-up (inMap f c)                       s u w = ≅-trans (lift-≅ c true (≋-by refl refl)) (plug-up c (mapS f s) tt w)
-  plug-up (inScan f z c)                    s u w = ≅-trans (lift-≅ c true (≋-by refl refl)) (plug-up c (scanS f z s) tt w)
-  plug-up (inCut true a c)                  s u w = plug-up c (cutS true a s) tt w
-  plug-up (inCut false a c)                 s u w = ≅-trans (lift-≅ c true (≋-by refl refl)) (plug-up c (cutS false a s) tt w)
-  plug-up (inLn b c)                        s u w = plug-up c (lnS b s) tt w
-  plug-up (inTake i q x c)                  s u w = ≅-trans (lift-≅ c true (take-plug i q x (gh s) (envAt c))) (plug-up c (takeS i q x s) tt w)
-  plug-up (inOuter op f d n q ls c)         s u w =
-    ≅-trans (lift-≅ c true (outer-plug op f d n q ls s (envAt c))) (plug-up c (flatS op f d n q s ls) tt w)
-  plug-up (inLanes op f d n q o pre post c) s u w =
-    ≅-trans (lift-≅ c true (lanes-plugʳ op f d n q o pre post s (envAt c))) (plug-up c (flatS op f d n q o (pre ʳ++ s ∷ post)) tt w)
-  plug-up (inSrc k b c)                     s u w =
-    ≅-trans (lift-≅ c true (src-plug k b s (envAt c) u (proj₁ (proj₂ (wf-split c (connS k s b) tt w))))) (plug-up c (connS k s b) tt w)
-  plug-up (inBody k o c)                    s u w = ≅-trans (lift-≅ c true (body-plug k o s (envAt c))) (plug-up c (connS k o s) tt w)
+  plug-agree : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) → Unpended s → Wf (plug c s)
+             → ∀ n → Agree n (up c (flagOf s) (stateᴺ (gh s) (envAt c))) (meaning (gh (plug c s)) []ᴬ)
+  plug-agree top                               s u w n = agree-refl n _
+  plug-agree (inMap f c)                       s u w n = agree-trans (lift-ne c true (≋-by refl refl) n) (plug-agree c (mapS f s) tt w n)
+  plug-agree (inScan f z c)                    s u w n = agree-trans (lift-ne c true (≋-by refl refl) n) (plug-agree c (scanS f z s) tt w n)
+  plug-agree (inCut true a c)                  s u w n = plug-agree c (cutS true a s) tt w n
+  plug-agree (inCut false a c)                 s u w n = agree-trans (lift-ne c true (≋-by refl refl) n) (plug-agree c (cutS false a s) tt w n)
+  plug-agree (inLn b c)                        s u w n = plug-agree c (lnS b s) tt w n
+  plug-agree (inTake i q x c)                  s u w n = agree-trans (lift-ne c true (take-plug i q x (gh s) (envAt c)) n) (plug-agree c (takeS i q x s) tt w n)
+  plug-agree (inOuter op f d m q ls c)         s u w n =
+    agree-trans (lift-ne c true (outer-plug op f d m q ls s (envAt c)) n) (plug-agree c (flatS op f d m q s ls) tt w n)
+  plug-agree (inLanes op f d m q o pre post c) s u w n =
+    agree-trans (lift-ne c true (lanes-plugʳ op f d m q o pre post s (envAt c)) n) (plug-agree c (flatS op f d m q o (pre ʳ++ s ∷ post)) tt w n)
+  plug-agree (inSrc k b c)                     s u w n =
+    agree-trans (lift-ne c true (src-plug k b s (envAt c) u (proj₁ (proj₂ (wf-split c (connS k s b) tt w)))) n) (plug-agree c (connS k s b) tt w n)
+  plug-agree (inBody k o c)                    s u w n = agree-trans (lift-ne c true (body-plug k o s (envAt c)) n) (plug-agree c (connS k o s) tt w n)
 
-  lift-plug : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Unpended s → Wf (plug c s) → M ⟨ c , s , absorbed , p ⟩ ≅ meaning (gh (plug c s)) []ᴬ
-  lift-plug c s p = plug-up c s
+  -- Two foci of one tree, both settled, mean alike at every depth.
+  refocus-agree : ∀ {Γ A Γ′ A′} (c : Ctx R Γ A) (s : St Γ A) (c′ : Ctx R Γ′ A′) (s′ : St Γ′ A′) p → Unpended s → Unpended s′ → Wf (plug c s)
+                → plug c′ s′ ≡ plug c s → ∀ n → Agree n (M ⟨ c , s , absorbed , p ⟩) (M ⟨ c′ , s′ , absorbed , p ⟩)
+  refocus-agree c s c′ s′ p u u′ w e n =
+    agree-trans (plug-agree c s u w n)
+      (subst (λ t → Agree n (meaning (gh t) []ᴬ) (M ⟨ c′ , s′ , absorbed , p ⟩)) e (agree-sym (plug-agree c′ s′ u′ (subst Wf (sym e) w) n)))
 
   ----------------------------------------------------------------------
   -- A rise, by the frame it passes
@@ -607,8 +613,7 @@ module _ {R : Set} where
 
   refocus : ∀ {Γ A Γ′ A′} (c : Ctx R Γ A) (s : St Γ A) (c′ : Ctx R Γ′ A′) (s′ : St Γ′ A′) p → Unpended s → Unpended s′ → Wf (plug c s)
           → plug c′ s′ ≡ plug c s → M ⟨ c , s , absorbed , p ⟩ ≅ M ⟨ c′ , s′ , absorbed , p ⟩
-  refocus c s c′ s′ p u u′ w e =
-    ≅-trans (lift-plug c s p u w) (subst (λ t → meaning (gh t) []ᴬ ≅ M ⟨ c′ , s′ , absorbed , p ⟩) e (≅-sym (lift-plug c′ s′ p u′ (subst Wf (sym e) w))))
+  refocus c s c′ s′ p u u′ w e = agree-≅ (refocus-agree c s c′ s′ p u u′ w e)
 
   kept : ∀ k → Inv k → Kept k
   kept ⟨ c , s , rising e , p ⟩                          v = rises c s e p v
