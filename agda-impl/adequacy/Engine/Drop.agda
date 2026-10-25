@@ -28,7 +28,7 @@ module adequacy.Engine.Drop where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (_∷_; _++_; [_]; reverse)
+open import Data.List using ([]; _∷_; _++_; [_]; reverse)
 import Data.List as L
 import denotation.MonotonicList as M′
 open import Data.List.Relation.Unary.All using (All) renaming (_∷_ to _∷ᴬ_)
@@ -39,7 +39,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
 
-open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Tail∞; pin; Pos; out; skip; end; hush; idle; _∪_; ix; _<ᵖ_)
+open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Tail∞; pin; Pos; out; skip; end; hush; idle; _∪_; ix; last; _<ᵖ_; <ᵖ-split; <ᵖ-asym; <ᵖ-trans; <ᵖ-below)
 open import denotation.MonotonicList using (head; mapᴱ; scanᴱ; takeWhileᴱ; taking; Agree; Agreeᵀ; stop; stopᵀ; pin⁼; idle⁼; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agree-trans;
   agree-sym; agreeᵀ-refl; agreeᵀ-sym; agreeᵀ-trans; agreeᵀ-pred; agree-pred)
 open import denotation.NonExpansive using (_,ˢ_; mapᴱ-ne; scanᴱ-ne; takeWhileᴱ-ne; ∪-ne; beside-ne; burstOn-ne; Outerᴿ; liveᴼ; whole-ne; go-ne; mapᴱ-neᴹ; Lanes)
@@ -69,12 +69,19 @@ data Eraseᵀ : ℕ → Tail → Tail → Set where
 
 -- A run with none or more of its skips erased, `t` what the other leaves
 -- running where it stands: each event kept alike, each tail beside one
--- erased alike, the tail past an erased skip beside the other's.
+-- erased alike, the tail past an erased skip beside the other's.  An
+-- erased skip comes no later than what follows it: a merge reads its
+-- parts by their next, so a skip erased out of order moves a sibling
+-- across the outer's next.
+--
+-- REFUTED: 01726160 any skip erased, by an outer's `skip [5]` erased
+--   before its `skip [1]`: a lane at `[3]` merges before the outer's next
+--   on the one side, after it on the other.
 data Erase {A : Set} : ℕ → Events A → Tail → Events A → Set where
   stopᵉ  : ∀ {x t y} → Erase zero x t y
   outᵉ   : ∀ {k p a l r t} → Eraseᵀ k (cut l) (cut r) → Erase k (force l) (cut r) (force r) → Erase (suc k) (out p a l) t (out p a r)
   skipᵉ  : ∀ {k p l r t} → Eraseᵀ k (cut l) (cut r) → Erase k (force l) (cut r) (force r) → Erase (suc k) (skip p l) t (skip p r)
-  erased : ∀ {k p l t e} → Eraseᵀ k (cut l) t → Erase k (force l) t e → Erase (suc k) (skip p l) t e
+  erased : ∀ {k p l t e} → NotBefore p (head (force l)) → Eraseᵀ k (cut l) t → Erase k (force l) t e → Erase (suc k) (skip p l) t e
   endᵉ   : ∀ {k p t} → Erase (suc k) (end p) t (end p)
   hushᵉ  : ∀ {k t} → Erase (suc k) hush t hush
 
@@ -135,7 +142,7 @@ private
   erase-then stopᵉ        u a           = stopᵉ
   erase-then (outᵉ e x)   u (out⁼ t a)  = outᵉ (eraseᵀ-then e t) (erase-then x t a)
   erase-then (skipᵉ e x)  u (skip⁼ t a) = skipᵉ (eraseᵀ-then e t) (erase-then x t a)
-  erase-then (erased e x) u a           = erased (eraseᵀ-then e (agreeᵀ-pred u)) (erase-then x (agreeᵀ-pred u) (agree-pred a))
+  erase-then (erased o e x) u a         = erased o (eraseᵀ-then e (agreeᵀ-pred u)) (erase-then x (agreeᵀ-pred u) (agree-pred a))
   erase-then endᵉ         u end⁼        = endᵉ
   erase-then hushᵉ        u hush⁼       = hushᵉ
 
@@ -179,7 +186,7 @@ erase-events : ∀ {A k} {x y : Events A} {t} → Erase k x t y → Eraseᴱ k x
 erase-events stopᵉ        = stopᴱ
 erase-events (outᵉ _ e)   = outᴱ (erase-events e)
 erase-events (skipᵉ _ e)  = skipᴱ (erase-events e)
-erase-events (erased _ e) = erasedᴱ (erase-events e)
+erase-events (erased _ _ e) = erasedᴱ (erase-events e)
 erase-events endᵉ         = endᴱ
 erase-events hushᵉ        = hushᴱ
 
@@ -264,11 +271,17 @@ mutual
 
 -- A frame with one child maps each event alone, its tail the child's.
 private
+  map-on : ∀ {A B} (g : A → B) {p} x → NotBefore p (head x) → NotBefore p (head (mapᴱ g x))
+  map-on g (out _ _ _) o = o
+  map-on g (skip _ _)  o = o
+  map-on g (end _)     o = o
+  map-on g hush        o = o
+
   map-erase : ∀ {A B} (g : A → B) {k x t y} → Erase k x t y → Erase k (mapᴱ g x) t (mapᴱ g y)
   map-erase g stopᵉ        = stopᵉ
   map-erase g (outᵉ e x)   = outᵉ e (map-erase g x)
   map-erase g (skipᵉ e x)  = skipᵉ e (map-erase g x)
-  map-erase g (erased e x) = erased e (map-erase g x)
+  map-erase g (erased o e x) = erased (map-on g _ o) e (map-erase g x)
   map-erase g endᵉ         = endᵉ
   map-erase g hushᵉ        = hushᵉ
 
@@ -281,11 +294,17 @@ private
   map-hush : ∀ {A B} (g : A → B) x → mapᴱ g x ≡ hush → x ≡ hush
   map-hush g hush eq = refl
 
+  scan-on : ∀ {A B} (g : B → A → B) z {p} x → NotBefore p (head x) → NotBefore p (head (scanᴱ g z x))
+  scan-on g z (out _ _ _) o = o
+  scan-on g z (skip _ _)  o = o
+  scan-on g z (end _)     o = o
+  scan-on g z hush        o = o
+
   scan-erase : ∀ {A B} (g : B → A → B) z {k x t y} → Erase k x t y → Erase k (scanᴱ g z x) t (scanᴱ g z y)
   scan-erase g z stopᵉ                = stopᵉ
   scan-erase g z (outᵉ {a = a} e x)   = outᵉ e (scan-erase g (g z a) x)
   scan-erase g z (skipᵉ e x)          = skipᵉ e (scan-erase g z x)
-  scan-erase g z (erased e x)         = erased e (scan-erase g z x)
+  scan-erase g z (erased o e x)       = erased (scan-on g z _ o) e (scan-erase g z x)
   scan-erase g z endᵉ                 = endᵉ
   scan-erase g z hushᵉ                = hushᵉ
 
@@ -302,12 +321,28 @@ private
   end-erase zero    = stopᵉ
   end-erase (suc k) = endᵉ
 
+  -- Past a position, its subtree too.
+  below-on : ∀ {p} k x → NotBefore p (just k) → NotBefore p (just (k ++ [ x ]))
+  below-on {p} k x o with <ᵖ-split p k o
+  ... | inj₁ lt   = <ᵖ-asym p (k ++ [ x ]) (<ᵖ-trans p k (k ++ [ x ]) lt (<ᵖ-below k []))
+  ... | inj₂ refl = <ᵖ-asym k (k ++ [ x ]) (<ᵖ-below k [])
+
+  took-on : ∀ {A} i (q : A → Bool) {p} x → NotBefore p (head x) → NotBefore p (head (takeWhileᴱ i q x))
+  took-on i q (out k a r) o = taking-on i (q a) o
+    where taking-on : ∀ i b → NotBefore _ (just k) → NotBefore _ (head (taking i q k a b r))
+          taking-on i     true  o = o
+          taking-on true  false o = below-on k (ix 0) o
+          taking-on false false o = below-on k last o
+  took-on i q (skip _ _)  o = o
+  took-on i q (end _)     o = o
+  took-on i q hush        o = o
+
   mutual
     took-erase : ∀ {A} i (q : A → Bool) {k x t y} → Erase k x t y → Erase k (takeWhileᴱ i q x) t (takeWhileᴱ i q y)
     took-erase i q stopᵉ                = stopᵉ
     took-erase i q (outᵉ {a = a} e x)   = taking-erase i q (q a) e x
     took-erase i q (skipᵉ e x)          = skipᵉ e (took-erase i q x)
-    took-erase i q (erased e x)         = erased e (took-erase i q x)
+    took-erase i q (erased o e x)       = erased (took-on i q _ o) e (took-erase i q x)
     took-erase i q endᵉ                 = endᵉ
     took-erase i q hushᵉ                = hushᵉ
 
