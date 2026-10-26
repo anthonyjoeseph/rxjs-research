@@ -14,8 +14,7 @@ open import Data.Bool using (Bool; true; false)
 open import Data.Nat using (ℕ)
 open import Data.List using (List; []; _∷_; [_]; _++_; _ʳ++_; reverse; map)
 open import Data.List.Properties using (ʳ++-defn; reverse-involutive)
-open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.Any using (here)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -27,18 +26,19 @@ open import denotation.MonotonicList using (Agree; out⁼; skip⁼; end⁼; hush
 open import denotation.NonExpansive using (Agreeˢ)
 open import denotation.MonotonicList.Events using (Pos; Timeline; Events; Events∞; out; skip; end; hush; ix; _<ᵖ_; <ᵖ-trans; <ᵖ-asym; <ᵖ-below)
 import denotation.MonotonicList as M′
-open import denotation.Unfold using (NEnv; Node; Source; live; ended; Step; outˢ; skipˢ; endˢ; hushˢ; states; step; headˢ; meaning; subscribe; shut)
+open import denotation.Unfold using (NEnv; Node; Source; live; ended; Step; outˢ; skipˢ; endˢ; hushˢ; states; step; headˢ; meaning; subscribe)
 open import Tree using (Obs; FlatOp)
 open import operation.PureObservable using (module Machine)
-open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; CS; cs; mapS; scanS; cutS; lnS; takeS; flatS; connS; plug)
+open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; CS; cs; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; plug)
 open import adequacy.Sane using (Mode; runs; over; loose; Sane; Saneᴸ)
 open import adequacy.Placed.Order using (Placed; Placedᴸ)
 open import adequacy.Stepper.Past using (Floor; Floorᴱ; floorᴱ-agree; First; Firstᴸ; afterᴱ; above; _≃_; alike)
 open import adequacy.Stepper.Parts using (shut-alikeⁱ)
 open import adequacy.Env using (nagree-refl)
 open import adequacy.Stepper.Flat using (agree-head)
-open import adequacy.Engine.Meaning using (gh; lanesL; envAt; srcG; srcRun)
+open import adequacy.Engine.Meaning using (gh; lanesL; envAt; srcG; srcRun; endOf)
 open import adequacy.Engine.Race using (After)
+open import adequacy.Engine.Shuts using (Shuts; none; shutAt; upˢ; shutAll; Told; Toldˢ; Toldᴸ; told-drop)
 
 modeᴳ : ∀ {Γ X} → Source Γ X → Mode
 modeᴳ (live s)    = runs
@@ -129,14 +129,6 @@ scope-src ν q (ended e t) ρ fs f = f
 -- an ended connect's body (`Unfold.shutˢᵗ`), telling every joiner of it,
 -- one a later subscription made too.  A node read through them is the
 -- one `Unfold` would hold there, alike in meaning (`shut-floor`).
-data Shuts : List Set → Set₁ where
-  none   : ∀ {Γ} → Shuts Γ
-  shutAt : ∀ {Γ X} → X ∈ Γ → Pos → Shuts Γ → Shuts Γ
-
-upˢ : ∀ {Γ X} → Shuts Γ → Shuts (X ∷ Γ)
-upˢ none           = none
-upˢ (shutAt i c s) = shutAt (there i) c (upˢ s)
-
 closeOf : ∀ {Γ X} → Source Γ X → Shuts (X ∷ Γ) → Shuts (X ∷ Γ)
 closeOf (live s)    ss = ss
 closeOf (ended e t) ss = shutAt (here refl) e ss
@@ -152,10 +144,6 @@ closures (inOuter op f d n q ls c)         = closures c
 closures (inLanes op f d n q o pre post c) = closures c
 closures (inSrc k b c)                     = closures c
 closures (inBody k o c)                    = closeOf (srcG k o) (upˢ (closures c))
-
-shutAll : ∀ {Γ B} → Shuts Γ → Node Γ B → Node Γ B
-shutAll none           n = n
-shutAll (shutAt i c s) n = shut i c (shutAll s n)
 
 -- Each shut connect ended where it says.
 Ended : ∀ {Γ} → Shuts Γ → NEnv Γ → Set
@@ -210,7 +198,8 @@ shut-states q s (m ∷ ms) ρ t (a ∷ᴬ as) = shut-after q s m ρ t a ∷ᴬ s
 -- WHAT THE INVARIANT KEEPS OF EACH SUBSCRIBED CONNECT'S SOURCE, at the
 -- frame it sits in: its ghost read through the ended connects in scope
 -- is a run's configuration there, placed in the environment the frame
--- reads, and so of each flatMap's lanes (`Lns`).  A lane at its place in
+-- reads, and so of each flatMap's lanes (`Lns`); of each live joiner,
+-- that a shut connect told it its end (`Told`).  A lane at its place in
 -- its list (`Ghᴸ`, the lanes before it reversed, as `inLanes` holds them).
 --
 -- DEAD ROUTE: the plain ghost: a source subscribing inside an ended
@@ -232,6 +221,7 @@ mutual
   Gh c (takeS i q w s)         = Gh (inTake i q w c) s
   Gh c (flatS op f d n q o ls) = Lns c (lanesL ls) × Gh (inOuter op f d n q ls c) o × Ghᴸ c op f d n q o [] ls
   Gh c (connS k o b)           = Src c k o × Gh (inSrc k b c) o × Gh (inBody k o c) b
+  Gh c (joinS j true x ib)     = Told (closures c) x (endOf ib)
   Gh c _                       = ⊤
 
   Ghᴸ : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → List (St Γ B) → Set
@@ -242,6 +232,32 @@ ghᴸ-at : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n 
        → Ghᴸ c op f d n q o acc (xs ++ s ∷ post) → Gh (inLanes op f d n q o (xs ʳ++ acc) post c) s
 ghᴸ-at c op f d n q o []       acc s post (g , _)  = g
 ghᴸ-at c op f d n q o (x ∷ xs) acc s post (_ , gs) = ghᴸ-at c op f d n q o xs (x ∷ acc) s post gs
+
+-- Each live joiner told by every connect in scope that has ended: an
+-- ended source's own shut, one frame down, told it already.
+close-told : ∀ {Γ X A} (g : Source Γ X) (V : Shuts (X ∷ Γ)) (s : St (X ∷ Γ) A) → Toldˢ (closeOf g V) s → Toldˢ V s
+close-told (live n)    V s t = t
+close-told (ended e n) V s t = told-drop (here refl) e V s t
+
+mutual
+  gh-told : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Gh c s → Toldˢ (closures c) s
+  gh-told c (pend o)                g            = tt
+  gh-told c (coldS b l)             g            = tt
+  gh-told c (ofS i p xs)            g            = tt
+  gh-told c doneS                   g            = tt
+  gh-told c (mapS f s)              g            = gh-told (inMap f c) s g
+  gh-told c (scanS f z s)           g            = gh-told (inScan f z c) s g
+  gh-told c (cutS l a s)            g            = gh-told (inCut l a c) s g
+  gh-told c (lnS b s)               g            = gh-told (inLn b c) s g
+  gh-told c (takeS i q w s)         g            = gh-told (inTake i q w c) s g
+  gh-told c (flatS op f d n q o ls) (_ , go , gl) = gh-told (inOuter op f d n q ls c) o go , gh-toldᴸ c op f d n q o [] ls gl
+  gh-told c (connS k o b)           (_ , go , gb) = gh-told (inSrc k b c) o go , close-told (srcG k o) (upˢ (closures c)) b (gh-told (inBody k o c) b gb)
+  gh-told c (joinS j true x ib)     g            = g
+  gh-told c (joinS j false x ib)    g            = tt
+
+  gh-toldᴸ : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre ls → Ghᴸ c op f d n q o pre ls → Toldᴸ (closures c) ls
+  gh-toldᴸ c op f d n q o pre []         g        = tt
+  gh-toldᴸ c op f d n q o pre (s ∷ post) (g , gs) = gh-told (inLanes op f d n q o pre post c) s g , gh-toldᴸ c op f d n q o (s ∷ pre) post gs
 
 -- Kept of the whole tree, kept at every frame.
 gh-at : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Gh top (plug c s) → Gh c s

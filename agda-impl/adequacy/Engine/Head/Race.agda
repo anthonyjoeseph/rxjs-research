@@ -24,7 +24,8 @@ open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; 
   Out; still; shows; Cand; seek; first; retag; mapT; cutT; nx; cp; attached; attAt; raceT; outerT; laneT; lanes; inOuter; inLanes; inLn;
   CS; cs; inSrc; inBody; own; ownBest; shift; over; sourceT; bodyM; owedM) renaming (found to foundᴹ)
 open import adequacy.Engine.Meaning using (gh; outerG)
-open import adequacy.Engine.Head using (<-≮ᴷ; <≮ᴷ; Agrees; Done; Frag; NoConn; Quiet; Upto; []; _∷_; agrees-upto; at-<ᵖ; calm; clash; done-step; early; exact; ext-≮; head-hush; hush-quiet; none; none-head; quiet-first; quiet-hush; silent-first; upto-step; view; view-key; ≮<ᴷ; ≮ᴷ-trans)
+open import adequacy.Engine.Shuts using (Shuts; shutAll; Toldˢ)
+open import adequacy.Engine.Head using (<-≮ᴷ; <≮ᴷ; Agrees; Done; Frag; NoConn; Quiet; Upto; []; _∷_; agrees-upto; at-<ᵖ; calm; clash; done-step; shut-fixed; early; exact; ext-≮; head-hush; hush-quiet; none; none-head; quiet-first; quiet-hush; silent-first; upto-step; view; view-key; ≮<ᴷ; ≮ᴷ-trans)
 
 ------------------------------------------------------------------------
 -- The earliest lane, as the stepper finds it
@@ -317,10 +318,11 @@ race g d n (runᵒ O (skipˢ q o″)) LS P (found k bs l s as) (just (f , h , o)
 race g d n (runᵒ O (endˢ c)) LS P (found k bs l s as) (just (f , h , o)) (just (g′ , k′ , o′)) (runs ax) (ay , hd) e le =
   race-run g n O (endˢ c) c refl LS P k bs l s as f h o g′ k′ o′ ax ay hd e le
 
-outer-at : ∀ {R Γ A} d (o : St Γ A) (x : Maybe (Cand R A)) → Frag o → (d ≡ true → Done o × NoConn o) → Agrees (mapᴹ proj₂ x) (step (gh o))
-         → Outer≈ d x (outerOf (outerG d (gh o)))
-outer-at true  o x fo dd a = gone (hush-quiet (subst (Agrees (mapᴹ proj₂ x)) (done-step o fo (proj₁ (dd refl))) a))
-outer-at false o x fo dd a = runs a
+outer-at : ∀ {R Γ A} d (o : St Γ A) (V : Shuts Γ) (x : Maybe (Cand R A)) → Frag o → Toldˢ V o → (d ≡ true → Done o × NoConn o)
+         → Agrees (mapᴹ proj₂ x) (step (shutAll V (gh o))) → Outer≈ d x (outerOf (mapᴹ (shutAll V) (outerG d (gh o))))
+outer-at true  o V x fo to dd a =
+  gone (hush-quiet (subst (Agrees (mapᴹ proj₂ x)) (trans (cong step (shut-fixed V o to fo (proj₂ (dd refl)))) (done-step o fo (proj₁ (dd refl)))) a))
+outer-at false o V x fo to dd a = runs a
 
 ------------------------------------------------------------------------
 -- The connect's race
@@ -331,11 +333,14 @@ shift-≮ q (at p)    u = trans (at-<ᵖ (q ++ [ ix 0 ]) (p ++ [ ix 0 ])) (<ᵖ-
 shift-≮ q (after p) u = ≮ᴷ-trans (at (q ++ [ ix 0 ])) (at q) (after p) (ext-≮ q [ ix 0 ]) u
 
 postulate
-  -- A subscription at `p` heads at `p` or past it.
-  sub-head   : ∀ {Γ A} (o : Obs Timeline Γ A) p → Upto (at p) (headˢ (step (subscribe o p)))
+  -- A subscription at `p` heads at `p` or past it, read through any
+  -- shuts: a shut ends a joiner it makes at or past the joiner's own
+  -- position, and that lies under `p`.
+  sub-head   : ∀ {Γ A} (V : Shuts Γ) (o : Obs Timeline Γ A) p → Upto (at p) (headˢ (step (shutAll V (subscribe o p))))
   -- Run as its burst under `p`, what a subscription at `p` leaves running
   -- heads at `p` or past it.
-  sub-bursts : ∀ {Γ A B} (o : Obs Timeline Γ A) p → Upto (at p) (headˢ (burstsˢ {B = B} p (subscribe o p) (step (subscribe o p))))
+  sub-bursts : ∀ {Γ A B} (V : Shuts Γ) (o : Obs Timeline Γ A) p
+             → Upto (at p) (headˢ (burstsˢ {B = B} p (shutAll V (subscribe o p)) (step (shutAll V (subscribe o p)))))
 
 -- No later than a head, before something strictly later: no later.
 upto-lt : ∀ m {h k} → Upto h m → k <ᴷ h ≡ true → Upto k m

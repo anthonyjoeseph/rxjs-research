@@ -36,7 +36,7 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∨_; _∧_)
 open import Data.Bool.Properties using (∧-identityʳ)
 open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; reverse; null; map)
-open import Data.List.Properties using (ʳ++-defn)
+open import Data.List.Properties using (ʳ++-defn; ++-identityʳ)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import denotation.Unfold using (NEnv)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to all-++⁺; map⁺ to all-map⁺)
@@ -58,14 +58,15 @@ open Machine using (St; cs; mapS; scanS; cutS; lnS; takeS; flatS; connS; Ctx; to
   renaming (outerT to outerK)
 open import adequacy.Engine.Meaning using (gh; poolG; lanesL; deadL; poolT; outerT; envAt; srcState; srcG)
 open import adequacy.Engine.Race using (NotBefore; After; TailNotBefore)
-open import adequacy.Engine.Head using (Frag; Lanes; Lane; Agrees; exact; early; HeadAt; cand; pool-step; at-<ᵖ; <≮ᴷ; ≮ᴷ-trans; ext-≮)
+open import adequacy.Engine.Head using (Frag; Lanes; Lane; Agrees; exact; early; HeadAt; HeadAtⁿ; cand; pool-step; at-<ᵖ; <≮ᴷ; ≮ᴷ-trans; ext-≮)
 open import adequacy.Engine.Head.Race using (shift-≮)
-open import adequacy.Engine.Head.Agrees using (head-agrees)
+open import adequacy.Engine.Head.Agrees using (head-agrees; head-agreesⱽ)
+open import adequacy.Engine.Shuts using (shutAll)
 open import adequacy.Engine.Head.Within using (frag-flat; frag-body; frag-parts; fr-at; conn-src)
 open import adequacy.Engine.Keys using (Keyed; Keys)
 open import adequacy.Engine.Above using (Flight)
 open import adequacy.Engine.Ahead using (Sides; Ahead; Under; shown; shows-open) renaming (shows to showsᶜ)
-open import adequacy.Engine.Scope using (Scope; modes; firsts-after; FloorAt; FloorSrc; first-floor; floor-lower; scope-src; sub-meaning; closures; shutAll; ended-at; shut-floor; shut-states; Gh; gh-at)
+open import adequacy.Engine.Scope using (Scope; modes; firsts-after; FloorAt; FloorSrc; first-floor; floor-lower; scope-src; sub-meaning; closures; ended-at; shut-floor; shut-states; Gh; Ghᴸ; gh-at; gh-told)
 open import adequacy.Sane using (Mode)
 open import adequacy.Stepper using (first; firstᴸ)
 open import adequacy.Stepper.Past using (Floor)
@@ -406,34 +407,42 @@ race-steps P Q k h c op f d n q o acc (lnS true (cutS true a y) ∷ xs) tl cl (f
 race-steps P Q k h c op f d n q o acc (lnS false (cutS false a y) ∷ xs) tl cl (fy , fl) (r , rs) =
   all-++⁺ (race-steps P Q k h c op f d n q o (lnS false (cutS false a y) ∷ acc) xs tl cl fl rs) []
 
-postulate
-  -- An open frame's node read through the ended connects in scope
-  -- (`Scope.closures`) steps as its candidate, as the plain node does
-  -- (`head-agrees`): a shut tells only a joiner a pending subscription
-  -- makes, under that subscription's mark, which its candidate holds.
-  -- The plain step's head alone does not carry over: such a joiner hushes
-  -- plainly and ends once shut.
-  shut-head : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → closed c ≡ false → Frag s
-            → Agrees (cand c s) (step (shutAll (closures c) (gh s)))
+-- An open frame's node read through the ended connects in scope
+-- (`Scope.closures`) steps as its candidate, as the plain node does: a
+-- shut tells only a joiner a pending subscription makes, under that
+-- subscription's mark (`Head.Race.sub-head`).  Over `Frag` alone it is
+-- false: a live joiner of an ended connect, nothing queued, has no
+-- candidate and ends once shut.  The machine feeds every live joiner its
+-- connect's end (`Machine.rise`), which `Scope.Gh` keeps (`Scope.gh-told`).
+shut-head : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → closed c ≡ false → Frag s → Gh c s
+          → Agrees (cand c s) (step (shutAll (closures c) (gh s)))
+shut-head c s cl fs g = subst (λ b → HeadAtⁿ b (cand c s) (shutAll (closures c) (gh s))) cl (head-agreesⱽ c s (closures c) (gh-told c s g) fs)
 
 -- Likewise, each read through the ended connects in scope.
 race-shut : ∀ {R Γ A B} (P : Key → Maybe (Key × Out B) → Set) (Q : Maybe Pos → Set) (k : Key)
           → (∀ {Γ′} (x : Maybe (Key × Out B)) (st : Step Γ′ B) → P k x → Agrees x st → Q (headˢ st))
           → ∀ (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) acc ls tl → closed c ≡ false → Lanes ls
+          → Ghᴸ c op f d n q o acc (ls ++ tl)
           → Race P k c op f d n q o acc ls tl → All (λ m → Q (headˢ (step (shutAll (closures c) m)))) (lanesL ls)
-race-shut P Q k h c op f d n q o acc [] tl cl _ _ = []
-race-shut P Q k h c op f d n q o acc (lnS true (cutS true a y) ∷ xs) tl cl (fy , fl) (r , rs) =
-  all-++⁺ (race-shut P Q k h c op f d n q o (lnS true (cutS true a y) ∷ acc) xs tl cl fl rs)
-          (h _ (step (shutAll (closures c) (gh y))) r (shut-head (inLn true (inLanes op f d n q o acc (xs ++ tl) c)) (cutS true a y) cl fy) ∷ [])
-race-shut P Q k h c op f d n q o acc (lnS false (cutS false a y) ∷ xs) tl cl (fy , fl) (r , rs) =
-  all-++⁺ (race-shut P Q k h c op f d n q o (lnS false (cutS false a y) ∷ acc) xs tl cl fl rs) []
+race-shut P Q k h c op f d n q o acc [] tl cl _ _ _ = []
+race-shut P Q k h c op f d n q o acc (lnS true (cutS true a y) ∷ xs) tl cl (fy , fl) (gy , gl) (r , rs) =
+  all-++⁺ (race-shut P Q k h c op f d n q o (lnS true (cutS true a y) ∷ acc) xs tl cl fl gl rs)
+          (h _ (step (shutAll (closures c) (gh y))) r (shut-head (inLn true (inLanes op f d n q o acc (xs ++ tl) c)) (cutS true a y) cl fy gy) ∷ [])
+race-shut P Q k h c op f d n q o acc (lnS false (cutS false a y) ∷ xs) tl cl (fy , fl) (_ , gl) (r , rs) =
+  all-++⁺ (race-shut P Q k h c op f d n q o (lnS false (cutS false a y) ∷ acc) xs tl cl fl gl rs) []
+
+-- A flatMap's lanes, at their places in the list.
+lanes-gh : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls
+         → Gh top (plug c (flatS op f d n q o ls)) → Ghᴸ c op f d n q o [] (ls ++ [])
+lanes-gh c op f d n q o ls gt =
+  subst (Ghᴸ c op f d n q o []) (sym (++-identityʳ ls)) (proj₂ (proj₂ (gh-at c (flatS op f d n q o ls) gt)))
 
 -- A subscribed connect's source, read so, steps as its candidate.
 shut-agrees : ∀ {R Γ X B} (c : Ctx R Γ B) sl sa as ow r en (o : St Γ X) (b : St (X ∷ Γ) B)
-            → Frag (plug c (connS (cs false sl sa nothing as ow r en) o b))
+            → Frag (plug c (connS (cs false sl sa nothing as ow r en) o b)) → Gh top (plug c (connS (cs false sl sa nothing as ow r en) o b))
             → Agrees (cand (inSrc (cs false sl sa nothing as ow r en) b c) o) (step (shutAll (closures c) (gh o)))
-shut-agrees c sl sa as ow r en o b ft =
-  shut-head (inSrc K b c) o refl (conn-src K o b (fr-at c (connS K o b) ft))
+shut-agrees c sl sa as ow r en o b ft gt =
+  shut-head (inSrc K b c) o refl (conn-src K o b (fr-at c (connS K o b) ft)) (proj₁ (proj₂ (gh-at c (connS K o b) gt)))
   where K = cs false sl sa nothing as ow r en
 
 lanes-split : ∀ {Γ A} (pre : List (St Γ A)) {s post} → Lanes (pre ++ s ∷ post) → Lanes pre × Lane s × Lanes post
@@ -515,7 +524,7 @@ src-floor p c (cs false sl sa nothing as ow r en) o b lo bf ft gt sc =
   shut-floor p (closures c) (gh o) (envAt c) (ended-at c)
     (first-floor (modes c) (envAt c) p (step V) (meaning V (envAt c)) sc
       (first {ν = modes c} V (envAt c) (proj₁ G) (proj₂ G))
-      (lost-floor p (cand (inSrc K b c) o) (step V) lo (shut-agrees c sl sa as ow r en o b ft)))
+      (lost-floor p (cand (inSrc K b c) o) (step V) lo (shut-agrees c sl sa as ow r en o b ft gt)))
   where K = cs false sl sa nothing as ow r en
         V = shutAll (closures c) (gh o)
         G = proj₁ (gh-at c (connS K o b) gt)
@@ -703,7 +712,7 @@ won-ahead k (inTake i q (overAt _) c) s f w ft gt ()
 won-ahead k (inOuter op g true n q ls c) s f w ft gt ()
 won-ahead k (inOuter op g false n q ls c) s f wn@(r , w , _) ft gt sh =
   (λ { _ refl → outer-link c k op g n q s ls ft gt (won-scope k still (inOuter op g false n q ls c) s wn ft gt)
-                  (race-shut KAfter (After k) (at k) (after-step k) c op g false n q s [] ls [] cl (proj₂ parts) r)
+                  (race-shut KAfter (After k) (at k) (after-step k) c op g false n q s [] ls [] cl (proj₂ parts) (lanes-gh c op g false n q s ls gt) r)
                   (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ())) })
   , won-ahead k c (flatS op g false n q s ls) true w ft gt sh
   where
@@ -747,7 +756,7 @@ won-clear p a (inOuter op f false n q ls c)     s s′ al ce wn@(r , w , u) ft g
   where
     cl    = unrisen-open (closed c) u
     parts = frag-parts op f false n q s ls (frag-flat c op f false n q s ls ft)
-    ol    = outer-link c p op f n q s ls ft gt (won-scope p (shows (nx a)) (inOuter op f false n q ls c) s wn ft gt) (race-shut KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) r)
+    ol    = outer-link c p op f n q s ls ft gt (won-scope p (shows (nx a)) (inOuter op f false n q ls c) s wn ft gt) (race-shut KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) (lanes-gh c op f false n q s ls gt) r)
               (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
 won-clear p a (inLanes op f d n q o pre post c) s s′ al ce wn@(l , _ , w) ft gt lv =
   lane-sides p c op f d n q o pre post s ce (won-scope p (shows (nx a)) (inLanes op f d n q o pre post c) s wn ft gt) l ft (frag-flat c op f d n q o (pre ʳ++ s ∷ post) ft)
@@ -786,7 +795,7 @@ outer-ends : ∀ {R Γ A B} p (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) 
            → All (λ l → After p (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore p (poolT (deadL ls) (envAt c))
 outer-ends p c op f d n q s ls wn ft gt refl cl =
   outer-link c p op f n q s ls ft gt (won-scope p (shows cp) (inOuter op f false n q ls c) s wn ft gt)
-    (race-shut KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) (proj₁ wn))
+    (race-shut KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) (lanes-gh c op f false n q s ls gt) (proj₁ wn))
     (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
   where parts = frag-parts op f false n q s ls (frag-flat c op f false n q s ls ft)
 

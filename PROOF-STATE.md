@@ -14,12 +14,11 @@ A frame's link to the meaning reads every connect above it: each running
 source at or past the pick, derived per connect from its lost race through
 `Stepper.first`, or for a source still pending, from where it subscribes.
 Open: a step keeping each subscribed source's and each lane's shut view
-`Sane`/`Placed` (`Scope.Gh`, carried in `Order`); an open frame's shut
-view stepping as its candidate; a subscription's first event past its
-position; a pool the stepper hushes. Settled by their steps, or a
-refutation.
+`Sane`/`Placed`, and each live joiner told (`Scope.Gh`, carried in
+`Order`); a subscription's first event past its position; a pool the
+stepper hushes. Settled by their steps, or a refutation.
 
-Members: `ghost-next`, `shut-head`, `pool-link`, `sub-meaning`.
+Members: `ghost-next`, `pool-link`, `sub-meaning`.
 
 #### THE FLIGHT KEPT
 
@@ -185,8 +184,9 @@ Members: `search-hit`, `search-won`, `found-own`, `frag-next`, `run-lead`,
 
 #### THE HEADS
 
-Each operator's state heads no earlier than its subscription, and a
-subscription's burst leaves nothing earlier. Settled when each is a body.
+Each operator's state, read through the shuts that told it, heads no
+earlier than its subscription, and a subscription's burst leaves nothing
+earlier. Settled when each is a body.
 
 Members: `sub-head`, `sub-bursts`, `scanS-head`, `takeS-head`, `limit-head`,
 `switch-head`, `exhaust-head`, `fresh-src`, `src-next`, `src-atop`,
