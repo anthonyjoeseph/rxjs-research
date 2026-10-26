@@ -61,11 +61,11 @@ open import adequacy.Engine.Race using (NotBefore; After; TailNotBefore)
 open import adequacy.Engine.Head using (Frag; Lanes; Lane; Agrees; exact; early; HeadAt; cand; pool-step; at-<ᵖ; <≮ᴷ; ≮ᴷ-trans; ext-≮)
 open import adequacy.Engine.Head.Race using (shift-≮)
 open import adequacy.Engine.Head.Agrees using (head-agrees)
-open import adequacy.Engine.Head.Within using (frag-flat; frag-body; frag-parts; fr-at; conn-src)
+open import adequacy.Engine.Head.Within using (frag-flat; frag-body; frag-parts; fr-at)
 open import adequacy.Engine.Keys using (Keyed; Keys)
 open import adequacy.Engine.Above using (Flight)
 open import adequacy.Engine.Ahead using (Sides; Ahead; Under; shown; shows-open) renaming (shows to showsᶜ)
-open import adequacy.Engine.Scope using (Scope; modes; firsts-after; FloorAt; FloorSrc; first-floor; floor-lower; scope-src; sub-meaning)
+open import adequacy.Engine.Scope using (Scope; modes; firsts-after; FloorAt; FloorSrc; first-floor; floor-lower; scope-src; sub-meaning; closures; shutAll; ended-at; shut-floor)
 open import adequacy.Sane using (Mode; Sane; Saneᴸ)
 open import adequacy.Placed.Order using (Placed; Placedᴸ)
 open import adequacy.Stepper using (first; firstᴸ)
@@ -439,21 +439,27 @@ postulate
   pool-link : ∀ {R Γ A B} (c : Ctx R Γ B) q op (f : A → Obs Timeline Γ B) n q′ (o : St Γ A) ls
             → Frag (plug c (flatS op f false n q′ o ls)) → step (poolG false (gh o) (deadL ls)) ≡ hushˢ
             → TailNotBefore q (poolT (deadL ls) (envAt c))
-  -- A connect's source is a run's configuration where its frame sits,
-  -- placed in the environment the frame reads.  The machine tells a
-  -- connect's joiners in the very rise that closes it, so a ghost-wide
-  -- `Sane` kept by the invariant would reach every frame.
-  --
-  -- Only a subscribed source: one still pending is ghosted by
-  -- `Unfold.subscribe`, whose joiner of an ended connect is untold where
-  -- `over` demands told (`sub-meaning` floors it instead).
+  -- A subscribed connect's source, read through the connects in scope
+  -- that have ended (`Scope.closures`), is a run's configuration where
+  -- its frame sits, placed in the environment the frame reads.  The
+  -- machine tells a connect's joiners in the rise that closes it; the
+  -- shuts tell the ones a pending subscription has yet to make.
   --
   -- DEAD ROUTE: from `Frag` alone: it reads nothing of a joiner, so it
   --   cannot say which are told.
+  --
+  -- DEAD ROUTE: the plain ghost: a source subscribing inside an ended
+  --   connect's body, its own body emitting before its source subscribes,
+  --   shows past the pick while ghosting that pending source untold.
   src-sane : ∀ {R Γ X B} (c : Ctx R Γ B) sl sa as ow r en (o : St Γ X) (b : St (X ∷ Γ) B)
-           → Frag (plug c (connS (cs false sl sa nothing as ow r en) o b)) → Sane (modes c) (gh o)
+           → Frag (plug c (connS (cs false sl sa nothing as ow r en) o b)) → Sane (modes c) (shutAll (closures c) (gh o))
   src-placed : ∀ {R Γ X B} (c : Ctx R Γ B) sl sa as ow r en (o : St Γ X) (b : St (X ∷ Γ) B)
-             → Frag (plug c (connS (cs false sl sa nothing as ow r en) o b)) → Placed (gh o) (envAt c)
+             → Frag (plug c (connS (cs false sl sa nothing as ow r en) o b)) → Placed (shutAll (closures c) (gh o)) (envAt c)
+  -- Read so, its step still agrees with its candidate: a shut tells only
+  -- a joiner a pending subscription makes, under that subscription's mark.
+  shut-agrees : ∀ {R Γ X B} (c : Ctx R Γ B) sl sa as ow r en (o : St Γ X) (b : St (X ∷ Γ) B)
+              → Frag (plug c (connS (cs false sl sa nothing as ow r en) o b))
+              → Agrees (cand (inSrc (cs false sl sa nothing as ow r en) b c) o) (step (shutAll (closures c) (gh o)))
   -- The meaning's heads are the stepper's, every running source in scope
   -- clear of `p`; a pool the stepper hushes leaves nothing running.
   --
@@ -504,10 +510,12 @@ src-floor : ∀ {R Γ X B} p (c : Ctx R Γ B) kk (o : St Γ X) (b : St (X ∷ Γ
           → Lost false (at p) (cand (inSrc kk b c) o) → Before (at p) (own (connS kk o b)) → Frag (plug c (connS kk o b)) → Scope p c
           → FloorSrc p (srcG kk o) (envAt c)
 src-floor p c (cs false sl sa nothing as ow r en) o b lo bf ft sc =
-  first-floor (modes c) (envAt c) p (step (gh o)) (meaning (gh o) (envAt c)) sc
-    (first {ν = modes c} (gh o) (envAt c) (src-sane c sl sa as ow r en o b ft) (src-placed c sl sa as ow r en o b ft))
-    (lost-floor p (cand (inSrc K b c) o) (step (gh o)) lo (open-agrees (inSrc K b c) o refl (conn-src K o b (fr-at c (connS K o b) ft))))
+  shut-floor p (closures c) (gh o) (envAt c) (ended-at c)
+    (first-floor (modes c) (envAt c) p (step V) (meaning V (envAt c)) sc
+      (first {ν = modes c} V (envAt c) (src-sane c sl sa as ow r en o b ft) (src-placed c sl sa as ow r en o b ft))
+      (lost-floor p (cand (inSrc K b c) o) (step V) lo (shut-agrees c sl sa as ow r en o b ft)))
   where K = cs false sl sa nothing as ow r en
+        V = shutAll (closures c) (gh o)
 src-floor p c (cs true sl sa nothing as ow r en) o b lo bf ft sc = tt
 src-floor p c (cs cl sl sa (just q) nothing ow r en) (pend o) b lo (bm ∷ _) ft sc =
   sub-meaning o (q ⊕ [ ix 1 ]) (envAt c) p (subst (λ b → b ≡ true) (at-<ᵖ p (q ⊕ [ ix 1 ])) bm)

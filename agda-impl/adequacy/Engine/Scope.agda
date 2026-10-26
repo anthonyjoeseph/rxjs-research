@@ -12,22 +12,27 @@ module adequacy.Engine.Scope where
 
 open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_; [_]; _++_)
-open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (_,_)
+open import Data.Product using (_×_; _,_)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans)
 
-open import denotation.MonotonicList using (Agree; out⁼; skip⁼; end⁼; hush⁼)
+open import denotation.MonotonicList using (Agree; out⁼; skip⁼; end⁼; hush⁼; agree-refl)
+open import denotation.NonExpansive using (Agreeˢ)
 open import denotation.MonotonicList.Events using (Pos; Timeline; Events; Events∞; out; skip; end; hush; ix; _<ᵖ_; <ᵖ-trans; <ᵖ-asym; <ᵖ-below)
 import denotation.MonotonicList as M′
-open import denotation.Unfold using (NEnv; Node; Source; live; ended; Step; outˢ; skipˢ; endˢ; hushˢ; states; step; headˢ; meaning; subscribe)
+open import denotation.Unfold using (NEnv; Node; Source; live; ended; Step; outˢ; skipˢ; endˢ; hushˢ; states; step; headˢ; meaning; subscribe; shut)
 open import Tree using (Obs)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Sane using (Mode; runs; over; loose)
-open import adequacy.Stepper.Past using (Floor; Floorᴱ; First; Firstᴸ; afterᴱ; above)
+open import adequacy.Stepper.Past using (Floor; Floorᴱ; First; Firstᴸ; afterᴱ; above; _≃_; alike)
+open import adequacy.Stepper.Parts using (shut-alikeⁱ)
+open import adequacy.Env using (nagree-refl)
 open import adequacy.Stepper.Flat using (agree-head)
 open import adequacy.Engine.Meaning using (envAt; srcG; srcRun)
 open import adequacy.Engine.Race using (After)
@@ -116,6 +121,77 @@ scope-src : ∀ {Γ X} (ν : All (λ _ → Mode) Γ) q (g : Source Γ X) (ρ : N
           → Floor (modeᴳ g ∷ᴬ ν) q (srcRun g ρ ∷ᴬ ρ)
 scope-src ν q (live s)    ρ fs f = fs , f
 scope-src ν q (ended e t) ρ fs f = f
+
+-- THE CONNECTS IN SCOPE THAT HAVE ENDED, each with where: `Unfold` shuts
+-- an ended connect's body (`Unfold.shutˢᵗ`), telling every joiner of it,
+-- one a later subscription made too.  A node read through them is the
+-- one `Unfold` would hold there, alike in meaning (`shut-floor`).
+data Shuts : List Set → Set₁ where
+  none   : ∀ {Γ} → Shuts Γ
+  shutAt : ∀ {Γ X} → X ∈ Γ → Pos → Shuts Γ → Shuts Γ
+
+upˢ : ∀ {Γ X} → Shuts Γ → Shuts (X ∷ Γ)
+upˢ none           = none
+upˢ (shutAt i c s) = shutAt (there i) c (upˢ s)
+
+closeOf : ∀ {Γ X} → Source Γ X → Shuts (X ∷ Γ) → Shuts (X ∷ Γ)
+closeOf (live s)    ss = ss
+closeOf (ended e t) ss = shutAt (here refl) e ss
+
+closures : ∀ {R Γ A} → Ctx R Γ A → Shuts Γ
+closures top                               = none
+closures (inMap f c)                       = closures c
+closures (inScan f z c)                    = closures c
+closures (inCut l a c)                     = closures c
+closures (inLn b c)                        = closures c
+closures (inTake i q w c)                  = closures c
+closures (inOuter op f d n q ls c)         = closures c
+closures (inLanes op f d n q o pre post c) = closures c
+closures (inSrc k b c)                     = closures c
+closures (inBody k o c)                    = closeOf (srcG k o) (upˢ (closures c))
+
+shutAll : ∀ {Γ B} → Shuts Γ → Node Γ B → Node Γ B
+shutAll none           n = n
+shutAll (shutAt i c s) n = shut i c (shutAll s n)
+
+-- Each shut connect ended where it says.
+Ended : ∀ {Γ} → Shuts Γ → NEnv Γ → Set
+Ended none           ρ = ⊤
+Ended (shutAt i c s) ρ = lookup ρ i ≃ end c × Ended s ρ
+
+ended-up : ∀ {Γ X} (s : Shuts Γ) (e : Events X) (ρ : NEnv Γ) → Ended s ρ → Ended (upˢ s) (e ∷ᴬ ρ)
+ended-up none           e ρ t        = tt
+ended-up (shutAt i c s) e ρ (a , t) = a , ended-up s e ρ t
+
+ended-close : ∀ {Γ X} (g : Source Γ X) (ρ : NEnv Γ) (s : Shuts (X ∷ Γ)) → Ended s (srcRun g ρ ∷ᴬ ρ) → Ended (closeOf g s) (srcRun g ρ ∷ᴬ ρ)
+ended-close (live x)    ρ s t = t
+ended-close (ended e x) ρ s t = alike (λ n → agree-refl n (end e)) , t
+
+ended-at : ∀ {R Γ A} (c : Ctx R Γ A) → Ended (closures c) (envAt c)
+ended-at top                               = tt
+ended-at (inMap f c)                       = ended-at c
+ended-at (inScan f z c)                    = ended-at c
+ended-at (inCut l a c)                     = ended-at c
+ended-at (inLn b c)                        = ended-at c
+ended-at (inTake i q w c)                  = ended-at c
+ended-at (inOuter op f d n q ls c)         = ended-at c
+ended-at (inLanes op f d n q o pre post c) = ended-at c
+ended-at (inSrc k b c)                     = ended-at c
+ended-at (inBody k o c)                    =
+  ended-close (srcG k o) (envAt c) (upˢ (closures c)) (ended-up (closures c) (srcRun (srcG k o) (envAt c)) (envAt c) (ended-at c))
+
+-- Alike at the first event, alike in where it shows.
+floor-back : ∀ {A} q (x y : Events A) → Agree 1 x y → Floorᴱ q y → Floorᴱ q x
+floor-back q (out h a k) _ (out⁼ _ _)  f = f
+floor-back q (skip h k)  _ (skip⁼ _ _) f = f
+floor-back q (end h)     _ end⁼        f = f
+floor-back q hush        _ hush⁼       f = f
+
+shut-floor : ∀ {Γ B} q (s : Shuts Γ) (n : Node Γ B) (ρ : NEnv Γ) → Ended s ρ → Floorᴱ q (meaning (shutAll s n) ρ) → Floorᴱ q (meaning n ρ)
+shut-floor q none           n ρ t       f = f
+shut-floor q (shutAt i c s) n ρ (a , t) f =
+  shut-floor q s n ρ t (floor-back q (meaning (shutAll s n) ρ) (meaning (shut i c (shutAll s n)) ρ)
+    (Agreeˢ.nowˢ (shut-alikeⁱ i c (shutAll s n) {ρ} {ρ} a (λ m → nagree-refl m ρ) 1)) f)
 
 postulate
   -- A subscription at `r` shows at or past anything before `r`: each
