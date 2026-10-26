@@ -21,7 +21,8 @@
 -- (`adequacy.Engine.Keys.Here`); and every node's positional invariant
 -- held (`adequacy.Engine.Keys.Keys`): shape for cold and of nodes, a
 -- takeWhile cut subscribed under a head, a connect's mark and source
--- and body ownership.  A merge's mark and its lanes' roots are decided
+-- and body ownership; and the ghost's scope in order
+-- (`quickcheck.Scoped`), rising configurations included.  A merge's mark and its lanes' roots are decided
 -- by candidate search over ghost positions; Spread and Pool's EveryT
 -- and Wide are omitted (err toward true).  A connect's rise, fresh run,
 -- cue and bound are not decided.
@@ -50,6 +51,7 @@ open import quickcheck.Ty using (natᵗ)
 open import quickcheck.Quickcheck using (program)
 open import adequacy.Ghost using (module Ghosting)
 open import quickcheck.Spin using (showP)
+open import quickcheck.Scoped using (scopedᵇ)
 open import quickcheck.Placing using (trailsᵇ; flatsᵇ; steadyᵇ; pinsᵇ; ownedᵇ; prefixᵇ)
 
 open Driver ℕ using (Step; step; silent; value; complete; drained)
@@ -902,6 +904,7 @@ private
       else if not (rootKeysᵇ m) then no (best ⊔ run) ("\n  unkeyed: a node's positional invariant not held, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (flightᵇ false m) then no (best ⊔ run) ("\n  unflown: a hole's run out of shape under an open observer, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (flightᵇ true m) then no (best ⊔ run) ("\n  unflown: a hole's run out of shape under a closed observer, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (scopedᵇ m) then no (best ⊔ run) ("\n  unscoped: a subscribed source's or lane's shut ghost out of order, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else next n run best (ls + linkCount m) m (step m)
 
     next : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict
