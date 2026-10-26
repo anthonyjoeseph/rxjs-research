@@ -29,15 +29,6 @@ by a body, or refuted (then `flight-held` reads `Unpended`).
 
 Members: `pend-src-above`.
 
-#### THE DONE OUTER
-
-Untried: an outer already done rising its end. Its merge's run reads no
-outer, so the merge need not end there; only the search excludes it (a done
-node shows nothing, `outOf`), which `Order` does not carry. Settled by a
-body, or the configuration shown unreachable.
-
-Members: `rise-outer-done`.
-
 #### THE KEYS KEPT
 
 Untried: a node rewritten by a rise, a begin, a mark run or an unsubscribe
@@ -90,16 +81,6 @@ source fed the run is subscribed where its connect is. Settled when bodies,
 or refuted.
 
 Members: `fed-fresh`, `fed-join`, `defer-links`, `fed-sourced`.
-
-#### THE CLOSED LANE
-
-Untried: a lane, a body or an outer completing under a closed frame. The
-race that picked it still ran, but a closed frame's candidates need not be
-its parts' heads, so the end may not lead a sibling lane, the pool or the
-connect's source. Settled when all are bodies, or refuted (then each reads
-the open frame `lane-drop` reaches).
-
-Members: `rise-body-end-shut`, `rise-lane-end-shut`, `rise-outer-end-shut`.
 
 #### THE SORTED TAILS
 

@@ -14,7 +14,9 @@
 -- body fed the run, or past skips under the source's
 -- (`adequacy.Engine.FedWalk.src-fed`), and so every node of it, owing the source nothing, its
 -- source's run nesting nothing, and after each source skip shows
--- (`adequacy.Engine.Shown.src-body-on`).  And each live joiner fed in
+-- (`adequacy.Engine.Shown.src-body-on`).  And each hole's run in flight
+-- in shape, under an open observer and a closed one alike
+-- (`adequacy.Engine.Above.Flight`).  And each live joiner fed in
 -- order ahead of its rejoined source, joined where its source never keys
 -- (`adequacy.Engine.Keys.Here`); and every node's positional invariant
 -- held (`adequacy.Engine.Keys.Keys`): shape for cold and of nodes, a
@@ -61,7 +63,7 @@ open import Tree using (Obs; FlatOp)
 open import denotation.MonotonicList.Events using (Timeline)
 open import adequacy.Engine.Head using (cand)
 open import adequacy.Engine.Pick using (past)
-open import adequacy.Engine.Meaning using (vals; endOf; mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn; srcState; srcG; srcRun; gh; lane; lanesL; deadL; envAt; outerG; poolG)
+open import adequacy.Engine.Meaning using (vals; endOf; mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn; srcState; srcG; srcRun; gh; lane; lanesL; deadL; envAt; outerG; poolG; hole)
 open import adequacy.Engine.Ahead using (shown) renaming (shows to showsᵃ)
 open import denotation.MonotonicList using (head)
 open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
@@ -74,7 +76,7 @@ private
   -- A run's verdict, carrying its longest run of steps meaning the same
   -- and how many live sources' links it checked.
   data Verdict : Set where
-    yes : ℕ → ℕ → Verdict
+    yes : ℕ → ℕ → ℕ → Verdict
     no  : ℕ → String → Verdict
 
   -- The first `k` events of a run, printed.
@@ -866,12 +868,31 @@ private
   rootKeysᵇ : Conf ℕ → Bool
   rootKeysᵇ ⟨ c , s , _ , _ ⟩ = keysWalkᵇ (plug c s) []ᴬ
 
+  -- A rising or subscribing configuration's hole's run in shape
+  -- (`adequacy.Engine.Above.Flight`), its observer closed as `b` says.
+  flightᵇ : Bool → Conf ℕ → Bool
+  flightᵇ b ⟨ c , s , absorbed , p ⟩ = true
+  flightᵇ b ⟨ c , s , m        , p ⟩ = (if b then not (closed c) else closed c) ∨ shapeᵇ (hole c s m p)
+
+  -- How many of those a closed observer reads: a subscribe, as no rise
+  -- is (`adequacy.Engine.Pick.Heard`).
+  shutCount : Conf ℕ → ℕ
+  shutCount ⟨ c , s , subscribing , p ⟩ = if closed c then 1 else 0
+  shutCount _                           = 0
+
   -- Whether every silent step keeps its meaning so, and the longest run
   -- meaning the same.
   mutual
     walk : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Verdict
-    walk zero    run best ls m = yes (best ⊔ run) ls
-    walk (suc n) run best ls m =
+    walk zero    run best ls m = yes (best ⊔ run) ls 0
+    walk (suc n) run best ls m = counted (shutCount m) (walk′ n run best ls m)
+
+    counted : ℕ → Verdict → Verdict
+    counted k (yes l ls sh) = yes l ls (k + sh)
+    counted k v             = v
+
+    walk′ : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Verdict
+    walk′ n run best ls m =
       if not (searchedᵇ m) then no (best ⊔ run) ("\n  beaten: a still find not first past a live source's skips, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (linkedᵇ 0 m) then no (best ⊔ run) ("\n  unlinked: a pass not fed past a live source's skips, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (linkedᵇ 1 m) then no (best ⊔ run) ("\n  untrailed: an inner source fed the run not trailing, " ++ showMode m ++ " at " ++ showSpot (spot m))
@@ -879,13 +900,15 @@ private
       else if not (linkedᵇ 3 m) then no (best ⊔ run) ("\n  unplaced: an inner source fed the rest before a position asked of, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (rootShapedᵇ m) then no (best ⊔ run) ("\n  unshaped: a node out of shape, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (rootKeysᵇ m) then no (best ⊔ run) ("\n  unkeyed: a node's positional invariant not held, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (flightᵇ false m) then no (best ⊔ run) ("\n  unflown: a hole's run out of shape under an open observer, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (flightᵇ true m) then no (best ⊔ run) ("\n  unflown: a hole's run out of shape under a closed observer, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else next n run best (ls + linkCount m) m (step m)
 
     next : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict
     next n run best ls m (silent t m′)     = after n run best ls m m′ (kind m m′)
     next n run best ls m (value t p a m′)  = walk n 0 (best ⊔ run) ls m′
-    next n run best ls m (complete p)      = yes (best ⊔ run) ls
-    next n run best ls m drained           = yes (best ⊔ run) ls
+    next n run best ls m (complete p)      = yes (best ⊔ run) ls 0
+    next n run best ls m drained           = yes (best ⊔ run) ls 0
 
     after : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Conf ℕ → ℕ → Verdict
     after n run best ls m m′ zero          = no (best ⊔ run) (why m m′)
@@ -895,7 +918,7 @@ private
 -- One program's verdict, under a label.
 keptLine : String → Prog natᵗ → String
 keptLine n p with walk 400 0 0 0 (load (toObs timeline 3 p []ᴬ []ᴬ []ᴬ))
-... | yes l ls = "kept-depth: ok   " ++ n ++ " longest " ++ showℕ l ++ " links " ++ showℕ ls
+... | yes l ls ss = "kept-depth: ok   " ++ n ++ " longest " ++ showℕ l ++ " links " ++ showℕ ls ++ " shut subscribes " ++ showℕ ss
 ... | no l w = "kept-depth: FAIL " ++ n ++ " longest " ++ showℕ l ++ "\n  program " ++ showCode natᵗ p ++ w
 
 private
@@ -908,6 +931,15 @@ private
   inLane : Code [] [] [] (natᵗ ∷ []) natᵗ → Prog natᵗ
   inLane l = flatMap (mergeᶠ nothing) l (of (nat 0 ∷ nat 1 ∷ []))
 
+  -- An inclusive takeWhile its value ends, so its end is owed; and a
+  -- takeWhile above that value ends first, its end owed nearer, so the
+  -- frame above it is closed when the owed end below is due.
+  owing : ∀ {Γ Δᵍ Δ Θ} → Code Γ Δᵍ Δ Θ natᵗ
+  owing = takeWhile true (bool false) (of (nat 5 ∷ []))
+
+  closedBy : ∀ {Γ Δᵍ Δ Θ} → Code Γ Δᵍ Δ Θ natᵗ → Code Γ Δᵍ Δ Θ natᵗ
+  closedBy = takeWhile false (bool false)
+
   -- Steps drawn programs rarely take: a step begun under a closed cut, and
   -- a source's skips shown to several joiners and defers at once.
   hands : List (String × Prog natᵗ)
@@ -918,6 +950,16 @@ private
       , inLane (closedSrc false (deferᶜ (connect (of (nat 5 ∷ [])) (connected (here refl))))))
     ∷ ("a deferred merge begun under a closed cut"
       , inLane (closedSrc false (deferᶜ (flatMap (mergeᶠ nothing) (deferᶜ (of (var (here refl) ∷ []))) (of (nat 5 ∷ nat 6 ∷ []))))))
+    ∷ ("an owed end due under a merge's lanes past the lane above it ending"
+      , inLane (closedBy (flatMap (mergeᶠ nothing) owing (of (nat 0 ∷ [])))))
+    ∷ ("an owed end due under a connect's body past the lane above it ending"
+      , inLane (closedBy (connect (of (nat 0 ∷ [])) owing)))
+    ∷ ("an owed end due under a merge's outer past the lane above it ending"
+      , inLane (closedBy (flatMap (mergeᶠ nothing) (of (var (here refl) ∷ [])) owing)))
+    ∷ ("an owed end due under a merge's lanes past the source above it ending"
+      , connect (closedBy (flatMap (mergeᶠ nothing) owing (of (nat 0 ∷ [])))) (connected (here refl)))
+    ∷ ("an owed end due under a connect's body past the source above it ending"
+      , connect (closedBy (connect (of (nat 0 ∷ [])) owing)) (connected (here refl)))
     ∷ ("a lane joined after its source's skip" , connect (cold (script ((1 , 1 ∷ []) ∷ []) false false)) rejoins)
     ∷ ("a lane joined after its source's skips" , connect (cold (script ((2 , 1 ∷ []) ∷ (1 , 2 ∷ []) ∷ []) false false)) rejoins)
     ∷ ("two joiners at once" , connect skipping (flatMap (mergeᶠ nothing) (connected (here refl)) (of (nat 0 ∷ nat 1 ∷ []))))

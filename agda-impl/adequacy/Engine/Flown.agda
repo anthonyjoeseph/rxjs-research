@@ -415,15 +415,6 @@ module _ {R : Set} where
                      → showsᶜ c true ≡ false
                      → Above c true (lanesFrame op (lane f) false q (gh s) (reverse (reverse (keptLanes op ls))) [] true (envAt c)
                                        (stateᴺ (subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c)))
-    -- THE DONE OUTER: an outer already done, rising its end, ends its
-    -- merge in shape.
-    rise-outer-done : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) ls (s : St Γ A) p
-                    → Order ⟨ inOuter op f true zero [] ls c , s , rising cp , p ⟩ → Flight ⟨ c , flatS op f true zero [] s ls , rising cp , p ⟩
-    -- THE CLOSED LANE: an outer's end, nothing running or waiting, under a
-    -- closed observer.
-    rise-outer-end-shut : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) ls (s : St Γ A) p
-                        → Order ⟨ inOuter op f false zero [] ls c , s , rising cp , p ⟩ → closed c ≡ true
-                        → Flight ⟨ c , flatS op f true zero [] s ls , rising cp , p ⟩
     -- THE STILL'S SUBTREE: a lane's end under a queue, where it is shown,
     -- passes every live source above.
     lane-begin-links : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n a q (o : St Γ A) pre post (s : St Γ B) p
@@ -439,14 +430,6 @@ module _ {R : Set} where
                     → showsᶜ c true ≡ false
                     → Above c true (lanesFrame op (lane f) d q (gh o) (reverse (reverse (pre ʳ++ ended s ∷ post))) [] true (envAt c)
                                       (stateᴺ (subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c)))
-    -- THE CLOSED LANE: a lane's end under a closed observer.
-    rise-lane-end-shut : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) p
-                       → Order ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → alive s ≡ true → closed c ≡ true
-                       → Owed (dequeue c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p)
-    -- THE CLOSED LANE: a body's end under a closed observer, where the
-    -- race need not have read its source's head.
-    rise-body-end-shut : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (s : St (X ∷ Γ) B) p → Order ⟨ inBody k o c , s , rising cp , p ⟩
-                       → closed c ≡ true → Flight ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
     begin-flight : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Order ⟨ c , pend o , subscribing , p ⟩
                  → NextOwed (step ⟨ c , pend o , subscribing , p ⟩)
     -- THE SORTED TAILS: every lane of a fragment's flatMap leaves its
@@ -719,6 +702,7 @@ module _ {R : Set} where
     , above-≋ c true (≋-out (proj₁ (proj₂ so)) refl ft ct (sym (proj₂ cr))) (proj₂ (proj₂ (Order.flight od)))
     where
       k  = cs cl true sa ba as nothing r en
+      ce = Order.heard od
       ρ  = envAt c
       σ  = srcState (srcG k o) ρ
       h  = risen (gh s) (envAt (inBody k o c)) (nx b) p
@@ -848,21 +832,18 @@ module _ {R : Set} where
   rise-lane-end-flight : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) p
                        → Order ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → alive s ≡ true
                        → Owed (dequeue c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p)
-  rise-lane-end-flight c op f d n q o pre post s p od al with closed c in ce
-  ... | true  = rise-lane-end-shut c op f d n q o pre post s p od al ce
-  ... | false = rise-lane-end-open c op f d n q o pre post s p od al ce
+  rise-lane-end-flight c op f d n q o pre post s p od al = rise-lane-end-open c op f d n q o pre post s p od al (Order.heard od)
 
   -- A body's end ends its live connect, its source no earlier under an
   -- open observer: the connect's run ends there.
   rise-body-end-flight : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (s : St (X ∷ Γ) B) p → Order ⟨ inBody k o c , s , rising cp , p ⟩
                        → Flight ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
-  rise-body-end-flight c (cs cl true sa ba as nothing r en) o s p od with closed c in ce
-  ... | true  = rise-body-end-shut c (cs cl true sa ba as nothing r en) o s p od ce
-  ... | false =
+  rise-body-end-flight c (cs cl true sa ba as nothing r en) o s p od =
     subst (Shape′ (end p)) (sym (proj₂ cr)) (subst (λ x → Shape′ x (M′.burstOn r σ ∪ cut h)) se bs)
     , above-≋ c true (≋-by se (sym (proj₂ cr))) (proj₂ (proj₂ (Order.flight od)))
     where
       k  = cs cl true sa ba as nothing r en
+      ce = Order.heard od
       ρ  = envAt c
       σ  = srcState (srcG k o) ρ
       h  = risen (gh s) (envAt (inBody k o c)) cp p
@@ -896,12 +877,10 @@ module _ {R : Set} where
   rise-owed (inTake i q (cutAt r) c)          s e      p o = tt
   rise-owed (inTake i q (overAt r) c)         s e      p o = tt
   rise-owed (inOuter op f d n q ls c)         s (nx a) p o = rise-admit-flight c op f d n q ls s a p o
-  rise-owed (inOuter op f d (suc n) q ls c)       s cp p o = tt
-  rise-owed (inOuter op f d zero (_ ∷ _) ls c)    s cp p o = tt
-  rise-owed (inOuter op f true zero [] ls c)      s cp p o = rise-outer-done c op f ls s p o
-  rise-owed (inOuter op f false zero [] ls c)     s cp p o with closed c in ce
-  ... | true  = rise-outer-end-shut c op f ls s p o ce
-  ... | false = outer-end-flight c op f ls s p o ce
+  rise-owed (inOuter op f true n q ls c)          s cp p o = tt
+  rise-owed (inOuter op f false (suc n) q ls c)   s cp p o = tt
+  rise-owed (inOuter op f false zero (_ ∷ _) ls c) s cp p o = tt
+  rise-owed (inOuter op f false zero [] ls c)     s cp p o = outer-end-flight c op f ls s p o (Order.heard o)
   rise-owed (inLanes op f d n q o′ pre post c) s (nx b) p o with alive s in a
   ... | true  = rise-lane-flight c op f d n q o′ pre post s b p o a
   ... | false = tt

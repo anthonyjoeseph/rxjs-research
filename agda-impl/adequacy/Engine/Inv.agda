@@ -35,7 +35,7 @@ open import adequacy.Engine.Race using (NotBefore)
 open import adequacy.Engine.Meaning using (envAt; gh; risen; lane; lanesL; laneRuns; poolRuns; outerT; outerG; poolG; deadL)
 open import adequacy.Engine.Flown using (Owed; NextOwed; rise-owed; sub-owed)
 open import adequacy.Engine.Plug using (flight-held)
-open import adequacy.Engine.Pick using (Order; order; module Order; whole; KeysAt; Shaped; Lead; Clear; Ends; EndsIf; Won; won-clear; won-ends; out-open; search-won; Apart; Searched)
+open import adequacy.Engine.Pick using (Order; order; module Order; Heard; whole; KeysAt; Shaped; Lead; Clear; Ends; EndsIf; Won; won-clear; won-ends; out-open; search-won; Apart; Searched)
 open import operation.PureObservable using (Tape; due; play; ending; over; module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; closed; closedUp;
@@ -459,7 +459,8 @@ module _ {R : Set} where
   rise-inv (inTake i q (cutAt r) c)          s e      p (inv u v w) = inv tt v w
   rise-inv (inTake i q (overAt r) c)         s e      p (inv u v w) = inv tt v w
   rise-inv (inOuter op f d n q ls c)         s (nx a) p (inv u (ws , v) w) = admit-inv c op f d n q s ls a p v w ws
-  rise-inv (inOuter op f d n q ls c)         s cp     p (inv u (ws , v) w) =
+  rise-inv (inOuter op f true n q ls c)      s cp     p (inv u (ws , v) w) = inv tt v (w , ws)
+  rise-inv (inOuter op f false n q ls c)     s cp     p (inv u (ws , v) w) =
     inv (settle-settled true n (Data.List.null q) tt) v (w , ws)
   rise-inv (inLanes op f d n q o pre post c) s (nx b) p (inv u (wo , wp , wq , v) w) =
     if-inv Base (alive s) (inv tt v (wo , wfs-++ pre wp w wq)) (inv tt v (wo , wfs-++ pre wp w wq))
@@ -496,7 +497,9 @@ module _ {R : Set} where
   ... | false | x ∷ xs′ = inv tt v tt
   run-inv c p (attO {l = l} {s = s}) v w with unsubIf (not l) s | wf-unsubIf (not l) s w
   ... | s′ , t | w′ = inv tt v w′
-  run-inv c p cpO v w = inv tt v w
+  run-inv c p cpO v w with closed c
+  ... | true  = inv tt v w
+  ... | false = inv tt v w
   run-inv c p (cutO {s = s}) v w with cutᴹ s | wf-cut s w
   ... | s′ , t | w′ = inv tt v w′
   run-inv c p (bodyO {k = cs cl sl sa (just q) as ow r e} _) v (op , wo , wb) = inv (proj₂ op) (refl , wb , v) wo
@@ -518,8 +521,12 @@ module _ {R : Set} where
   run-inv c p (joinO {g = false} {e = nx a}) v w = inv tt v tt
   run-inv c p (joinO {g = false} {e = cp})   v w = inv tt v tt
   run-inv c p (leafO {b = b} {l = l} _) v w =
-    played-inv b l (closed c) (λ e l′ b′ p′ → ⟨ c , coldS b′ l′ , rising e , p′ ⟩) (λ l′ → ⟨ c , coldS b l′ , absorbed , p ⟩)
-      (λ e l′ b′ p′ → inv tt v tt) (λ l′ → inv tt v tt)
+    played-inv b l (closed c) (λ e l′ b′ p′ → ⟨ c , coldS b′ l′ , (if not (closed c) then rising e else absorbed) , p′ ⟩) (λ l′ → ⟨ c , coldS b l′ , absorbed , p ⟩)
+      (λ e l′ b′ p′ → cold-inv (closed c) e l′ b′ p′) (λ l′ → inv tt v tt)
+    where
+      cold-inv : ∀ cl e l′ b′ p′ → Base ⟨ c , coldS b′ l′ , (if not cl then rising e else absorbed) , p′ ⟩
+      cold-inv true  e l′ b′ p′ = inv tt v tt
+      cold-inv false e l′ b′ p′ = inv tt v tt
 
   -- EVERY STEP KEEPS THE INVARIANT.
   base-next : ∀ k → Base k → NextBase (step k)
@@ -545,6 +552,131 @@ module _ {R : Set} where
 
   base-load : (o : Obs Timeline [] R) → Base (Machine.load o)
   base-load o = inv tt tt tt
+
+  ----------------------------------------------------------------------
+  -- EVERY RISE IS READ BY AN OPEN OBSERVER
+
+  NextHeard : Step → Set
+  NextHeard (silent t k)    = Heard k
+  NextHeard (value t p a k) = Heard k
+  NextHeard (complete p)    = ⊤
+  NextHeard drained         = ⊤
+
+  start-heard : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p → Heard (start c op f d n q o ls a p)
+  start-heard c op f d n q o ls a p with closed c
+  ... | true  = tt
+  ... | false = tt
+
+  settle-heard : ∀ {Γ B} (c : Ctx R Γ B) (s : St Γ B) d n e p → closed c ≡ false → Heard ⟨ c , s , settle d n e , p ⟩
+  settle-heard c s d n e p ce with d ∧ (n ≡ᵇ 0) ∧ e
+  ... | true  = ce
+  ... | false = tt
+
+  dequeue-heard : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls p → closed c ≡ false
+                 → Heard (dequeue c op f d n q o ls p)
+  dequeue-heard c op f d n []      o ls p ce = settle-heard c (flatS op f d n [] o ls) d n true p ce
+  dequeue-heard c op f d n (a ∷ q) o ls p ce = start-heard c op f d n q o ls a p
+
+  admit-heard : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p
+               → NextHeard (took (admit c op f d n q o ls a p))
+  admit-heard c (mergeᶠ nothing)  f d n q o ls a p = start-heard c (mergeᶠ nothing) f d n q o ls a p
+  admit-heard c (mergeᶠ (just m)) f d n q o ls a p = if-inv Heard (n <ᵇ m) (start-heard c (mergeᶠ (just m)) f d n q o ls a p) tt
+  admit-heard c switchᶠ           f d n q o ls a p with killAll ls
+  ... | ls′ , t = start-heard c switchᶠ f d 0 q o ls′ a p
+  admit-heard c exhaustᶠ          f d n q o ls a p with n ≡ᵇ 0
+  ... | true  = start-heard c exhaustᶠ f d n q o ls a p
+  ... | false = tt
+
+  -- A rise passes to a frame no more closed than the one it leaves.
+  rise-heard : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → closed c ≡ false → NextHeard (took (rise c s e p))
+  rise-heard top                               s (nx a) p ce = tt
+  rise-heard top                               s cp     p ce = tt
+  rise-heard (inMap f c)                       s e      p ce = ce
+  rise-heard (inScan f z c)                    s (nx a) p ce = ce
+  rise-heard (inScan f z c)                    s cp     p ce = ce
+  rise-heard (inCut true a c)                  s e      p ce = ce
+  rise-heard (inCut false a c)                 s e      p ce = tt
+  rise-heard (inLn b c)                        s e      p ce = ce
+  rise-heard (inTake i q free c)               s (nx a) p ce with q a | i
+  ... | true  | _     = ce
+  ... | false | true  = ce
+  ... | false | false = tt
+  rise-heard (inTake i q free c)               s cp     p ce = ce
+  rise-heard (inTake i q (cpAt r) c)           s e      p ce = tt
+  rise-heard (inTake i q (cutAt r) c)          s e      p ce = tt
+  rise-heard (inTake i q (overAt r) c)         s e      p ce = tt
+  rise-heard (inOuter op f d n q ls c)         s (nx a) p ce = admit-heard c op f d n q s ls a p
+  rise-heard (inOuter op f true n q ls c)      s cp     p ce = tt
+  rise-heard (inOuter op f false n q ls c)     s cp     p ce = settle-heard c (flatS op f true n q s ls) true n (Data.List.null q) p ce
+  rise-heard (inLanes op f d n q o pre post c) s (nx b) p ce = if-inv Heard (alive s) ce tt
+  rise-heard (inLanes op f d n q o pre post c) s cp     p ce =
+    if-inv Heard (alive s) (dequeue-heard c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p ce) tt
+  rise-heard (inSrc k b c)                     s (nx a) p ce = tt
+  rise-heard (inSrc k b c)                     s cp     p ce = tt
+  rise-heard (inBody k o c)                    s (nx b) p ce = ce
+  rise-heard (inBody k o c)                    s cp     p ce = ce
+
+  begin-heard : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → NextHeard (took (begin c o p))
+  begin-heard c (cold x)          p = tt
+  begin-heard c empty             p = tt
+  begin-heard c (of xs)           p = tt
+  begin-heard c (map f s)         p = tt
+  begin-heard c (scan f z s)      p = tt
+  begin-heard c (takeWhile i q s) p = tt
+  begin-heard c (flatMap op f s)  p = tt
+  begin-heard c (connect s b)     p = tt
+  begin-heard c (connected x)     p with closedUp c x
+  ... | true  = tt
+  ... | false = tt
+  begin-heard c (defer l)         p = tt
+
+  played-heard : ∀ {A} b (l : Tape A) cl dv st → (∀ e l′ b′ p′ → Heard (dv e l′ b′ p′)) → (∀ l′ → Heard (st l′))
+                → NextHeard (played (leaf b l cl dv st))
+  played-heard b     (ending e)                  cl    dv st d s = d cp over false e
+  played-heard false (play τ u i t fr)           cl    dv st d s = s over
+  played-heard false over                        cl    dv st d s = s over
+  played-heard true  (play τ u i t fr)           true  dv st d s = s over
+  played-heard true  over                        true  dv st d s = s over
+  played-heard true  (play τ u i t (emit a k))   false dv st d s = d _ _ _ _
+  played-heard true  (play τ u i t (stall k))    false dv st d s = s _
+  played-heard true  (play τ u i t (close k))    false dv st d s = s _
+  played-heard true  over                        false dv st d s = s over
+
+  -- A mark run rises only what its node shows, and asks first.
+  run-heard : ∀ {Γ A} (c : Ctx R Γ A) {s : St Γ A} {m} p → Owns s m → NextHeard (took (run c s m p))
+  run-heard c p (ofO {xs = xs}) with closed c in ce | xs
+  ... | true  | _       = tt
+  ... | false | []      = ce
+  ... | false | x ∷ xs′ = ce
+  run-heard c p (attO {l = l} {s = s}) with unsubIf (not l) s
+  ... | s′ , t = tt
+  run-heard c p cpO with closed c in ce
+  ... | true  = tt
+  ... | false = ce
+  run-heard c p (cutO {s = s}) with cutᴹ s
+  ... | s′ , t = tt
+  run-heard c p (bodyO {k = cs cl sl sa (just q) as ow r e} _) = tt
+  run-heard c p (bodyO {k = cs cl sl sa nothing as ow r e} ())
+  run-heard c p (srcAttO {k = cs cl sl sa ba (just q) ow r e} {o = o} _) with unsubIf (not sl) o
+  ... | o′ , t = tt
+  run-heard c p (srcAttO {k = cs cl sl sa ba nothing ow r e} ())
+  run-heard c p (owedO {k = cs cl sl sa ba as (just q) r e} {o = o} _) with unsubIf sa o
+  ... | o′ , t = tt
+  run-heard c p (owedO {k = cs cl sl sa ba as nothing r e} ())
+  run-heard c p (joinO {g = true}  {e = nx a}) with closed c in ce
+  ... | true  = tt
+  ... | false = ce
+  run-heard c p (joinO {g = true}  {e = cp})   with closed c in ce
+  ... | true  = tt
+  ... | false = ce
+  run-heard c p (joinO {g = false} {e = nx a}) = tt
+  run-heard c p (joinO {g = false} {e = cp})   = tt
+  run-heard c p (leafO {b = b} {l = l} _) = played-heard b l (closed c) _ _ delivered (λ l′ → tt)
+    where
+      delivered : ∀ e l′ b′ p′ → Heard ⟨ c , coldS b′ l′ , (if not (closed c) then rising e else absorbed) , p′ ⟩
+      delivered e l′ b′ p′ with closed c in ce
+      ... | true  = tt
+      ... | false = ce
 
   ----------------------------------------------------------------------
   -- The whole invariant: the fold and the order
@@ -728,7 +860,8 @@ module _ {R : Set} where
   rise-lead (inTake i q (overAt r) c)         s (nx a) p l iv = tt
   rise-lead (inTake i q (overAt r) c)         s cp     p l iv = tt
   rise-lead (inOuter op f d n q ls c)         s (nx a) p l iv = admit-lead c op f d n q s ls a p iv
-  rise-lead (inOuter op f d n q ls c)         s cp     p l iv = settle-lead c (flatS op f true n q s ls) true n (null q) p (proj₂ l)
+  rise-lead (inOuter op f true n q ls c)      s cp     p l iv = tt
+  rise-lead (inOuter op f false n q ls c)     s cp     p l iv = settle-lead c (flatS op f true n q s ls) true n (null q) p (proj₂ l)
   rise-lead (inLanes op f d n q o pre post c) s (nx b) p l iv with alive s
   ... | true  = proj₂ (l refl)
   ... | false = tt
@@ -913,15 +1046,33 @@ module _ {R : Set} where
   flight-next : ∀ k → Base k → Order k → NextFlight (step k)
   flight-next k b o = flown (step k) (shape-next k b o) (flight-owed k b o)
 
-  joined : ∀ x → NextShape x → NextFlight x → NextLead x → NextApart x → NextOrd x
-  joined (silent t k)    f g l u = order f g l u
-  joined (value t p a k) f g l u = order f g l u
-  joined (complete p)    f g l u = tt
-  joined drained         f g l u = tt
+  joined : ∀ x → NextShape x → NextFlight x → NextLead x → NextApart x → NextHeard x → NextOrd x
+  joined (silent t k)    f g l u e = order f g l u e
+  joined (value t p a k) f g l u e = order f g l u e
+  joined (complete p)    f g l u e = tt
+  joined drained         f g l u e = tt
 
   -- EVERY STEP KEEPS THE ORDER.
+  heard-next : ∀ k → Order k → NextHeard (step k)
+  heard-next ⟨ c , s , rising e , p ⟩ o = rise-heard c s e p (Order.heard o)
+  heard-next ⟨ c , pend o′ , subscribing , p ⟩ o = begin-heard c o′ p
+  heard-next ⟨ c , (coldS xb xl) , subscribing , p ⟩ o = tt
+  heard-next ⟨ c , (ofS xi xp xxs) , subscribing , p ⟩ o = tt
+  heard-next ⟨ c , doneS , subscribing , p ⟩ o = tt
+  heard-next ⟨ c , (mapS xf xs) , subscribing , p ⟩ o = tt
+  heard-next ⟨ c , (scanS xf xz xs) , subscribing , p ⟩ o = tt
+  heard-next ⟨ c , (cutS xl xa xs) , subscribing , p ⟩ o = tt
+  heard-next ⟨ c , (lnS xb xs) , subscribing , p ⟩ o = tt
+  heard-next ⟨ c , (takeS xi xq xw xs) , subscribing , p ⟩ o = tt
+  heard-next ⟨ c , (flatS xop xf xd xn xq xo xls) , subscribing , p ⟩ o = tt
+  heard-next ⟨ c , (connS xk xo xb) , subscribing , p ⟩ o = tt
+  heard-next ⟨ c , (joinS xj xg xx xib) , subscribing , p ⟩ o = tt
+  heard-next ⟨ c , s , absorbed , p ⟩ o with search top (plug c s) in e
+  ... | nothing = tt
+  ... | just (found (_ , _ , c′ , s′) m key) = run-heard c′ p (proj₂ (search-hit (plug c s) e))
+
   ord-next : ∀ k → Base k → Order k → NextOrd (step k)
-  ord-next k b o = joined (step k) (shape-next k b o) (flight-next k b o) (lead-next k b o) (apart-next k b o)
+  ord-next k b o = joined (step k) (shape-next k b o) (flight-next k b o) (lead-next k b o) (apart-next k b o) (heard-next k o)
 
   both : ∀ x → NextBase x → NextOrd x → NextInv x
   both (silent t k)    b o = b & o
@@ -933,10 +1084,10 @@ module _ {R : Set} where
   inv-next k (b & o) = both (step k) (base-next k b) (ord-next k b o)
 
   inv-load : (o : Obs Timeline [] R) → Inv (Machine.load o)
-  inv-load o = base-load o & order (tt , tt , tt) (flight-load o) (λ _ → tt) tt
+  inv-load o = base-load o & order (tt , tt , tt) (flight-load o) (λ _ → tt) tt tt
 
   -- A settled node anywhere in a tree the invariant holds of, absorbed at
   -- the same position: the invariant at it.
   inv-at : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Unpended s → Wf (plug c s) → Held (plug c s) → Apart (plug c s)
          → Inv ⟨ c , s , absorbed , p ⟩
-  inv-at c s p u w f t = base-at c s p u w & order f (flight-held c s p f) tt t
+  inv-at c s p u w f t = base-at c s p u w & order f (flight-held c s p f) tt t tt

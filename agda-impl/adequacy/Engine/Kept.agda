@@ -418,7 +418,9 @@ module _ {R : Set} where
   runs c (cutS true (attAt q) s)  attM p attO v = ≅-refl
   runs c (cutS false (attAt q) s) attM p attO v with unsub s in e
   ... | s′ , t = unsub-rest c s e
-  runs c (takeS i x (cpAt q) s)  cpM  p cpO  v = lift-≅ c true (≋-by refl refl)
+  runs c (takeS i x (cpAt q) s)  cpM  p cpO  v with closed c in ce
+  ... | false = lift-≅ c true (≋-by refl refl)
+  ... | true  = agree-≅ (closed-hides c true (stateᴺ (gh (takeS i x (cpAt q) s)) (envAt c)) (stateᴺ (gh (takeS i x (cutAt q) s)) (envAt c)) ce (λ n → agreeᵀ-refl n _))
   runs c (takeS i x (cutAt q) s) cutM p cutO v with cutᴹ s in e
   ... | s′ , t = cut-rest c s e
   runs c (connS (cs cl sl sa nothing as ow r e) o b) bodyM p (bodyO _) v = ≅-refl
@@ -442,7 +444,9 @@ module _ {R : Set} where
   runs c (joinS j true  x ((q , nx a) ∷ ib)) joinM p joinO v with closed c in ce
   ... | false = join-nx c j x q a ib p v
   ... | true  = agree-≅ (closed-hides c true (stateᴺ (joinG true x j ((q , nx a) ∷ ib)) (envAt c)) (stateᴺ (joinG true x j ib) (envAt c)) ce (λ n → agreeᵀ-refl n idle))
-  runs c (coldS b (ending e))               leafM p (leafO _) v = lift-≅ c true (≋-by refl refl)
+  runs c (coldS b (ending e))               leafM p (leafO _) v with closed c in ce
+  ... | false = lift-≅ c true (≋-by refl refl)
+  ... | true  = agree-≅ (closed-hides c true (stateᴺ (gh (coldS b (ending e))) (envAt c)) (stateᴺ (gh (coldS false over)) (envAt c)) ce (λ n → agreeᵀ-refl n _))
   runs c (coldS false (play τ u i t fr))    leafM p (leafO _) v = ≅-refl
   runs c (coldS false over)                 leafM p (leafO _) v = ≅-refl
   runs c (coldS true over)                  leafM p (leafO _) v with closed c
