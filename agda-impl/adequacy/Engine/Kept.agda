@@ -59,6 +59,7 @@ open import adequacy.Engine.Race using (First)
 open import adequacy.Engine.Keys using (Held)
 open import adequacy.Engine.Above using (take-true; take-incl; take-excl; toʳ)
 open import adequacy.Engine.Pick using (module Order; Clear; Apart)
+open import adequacy.Engine.Scope using (Gh)
 open import adequacy.Engine.Plug using (take-plug; outer-plug; lanes-plug; lanes-plugʳ; done-plug; body-plug; conn-plugⁿ)
 
 open Events∞
@@ -481,5 +482,5 @@ module _ {R : Set} where
   ... | nothing = quiet-empty c s p v e
   ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
   ...   | pl , own = kept-pre (tookᴰ (run c′ s′ m p)) (refocus c s c′ s′ p (Base.settled (Inv.base v)) (owned own) (wfI (Inv.base v)) pl)
-                       (runs c′ s′ m p own (inv-at c′ s′ p (owned own) (subst Wf (sym pl) (wfI (Inv.base v))) (subst Held (sym pl) (Order.shape (Inv.ord v))) (subst (λ t → Apart t) (sym pl) (Order.apart (Inv.ord v)))))
+                       (runs c′ s′ m p own (inv-at c′ s′ p (owned own) (subst Wf (sym pl) (wfI (Inv.base v))) (subst Held (sym pl) (Order.shape (Inv.ord v))) (subst (λ t → Apart t) (sym pl) (Order.apart (Inv.ord v))) (subst (Gh top) (sym pl) (Order.ghosted (Inv.ord v)))))
 
