@@ -16,7 +16,7 @@ source at or past the pick, derived per connect from its lost race through
 at a frame, or the invariant must carry them; a source not yet subscribed;
 a pool the stepper hushes. Settled by bodies, or a refutation of either.
 
-Members: `src-sane`, `src-placed`, `sub-floor`, `lanes-sane`,
+Members: `src-sane`, `src-placed`, `lanes-sane`,
 `lanes-placed`, `pool-link`.
 
 #### THE FLIGHT KEPT

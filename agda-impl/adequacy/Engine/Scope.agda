@@ -25,7 +25,9 @@ import denotation.MonotonicList as M′
 open import denotation.Unfold using (NEnv; Node; Source; live; ended; Step; outˢ; skipˢ; endˢ; hushˢ; states; step; headˢ; meaning)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Sane using (Mode; runs; over; loose)
+open import adequacy.Sane using (Mode; runs; over; loose; Sane)
+open import adequacy.Placed.Order using (Placed)
+open import adequacy.Stepper using (first)
 open import adequacy.Stepper.Past using (Floor; Floorᴱ; First; Firstᴸ; afterᴱ; above)
 open import adequacy.Stepper.Flat using (agree-head)
 open import adequacy.Engine.Meaning using (envAt; srcG; srcRun)
@@ -115,3 +117,23 @@ scope-src : ∀ {Γ X} (ν : All (λ _ → Mode) Γ) q (g : Source Γ X) (ρ : N
           → Floor (modeᴳ g ∷ᴬ ν) q (srcRun g ρ ∷ᴬ ρ)
 scope-src ν q (live s)    ρ fs f = fs , f
 scope-src ν q (ended e t) ρ fs f = f
+
+-- A connect's source, if it runs: of the stepper's invariants, its step
+-- at or past `q`.
+SaneSrc : ∀ {Γ X} → All (λ _ → Mode) Γ → Source Γ X → Set
+SaneSrc ν (live s)    = Sane ν s
+SaneSrc ν (ended e t) = ⊤
+
+PlacedSrc : ∀ {Γ X} → Source Γ X → NEnv Γ → Set
+PlacedSrc (live s)    ρ = Placed s ρ
+PlacedSrc (ended e t) ρ = ⊤
+
+HeadFloor : ∀ {Γ X} → Pos → Source Γ X → Set
+HeadFloor q (live s)    = FloorAt q (headˢ (step s))
+HeadFloor q (ended e t) = ⊤
+
+-- Its step at or past `q`, every running source above too: its meaning.
+live-floor : ∀ {Γ X} (ν : All (λ _ → Mode) Γ) q (g : Source Γ X) (ρ : NEnv Γ) → SaneSrc ν g → PlacedSrc g ρ → HeadFloor q g → Floor ν q ρ
+           → FloorSrc q g ρ
+live-floor ν q (live s)    ρ sn pl hf fl = first-floor ν ρ q (step s) (meaning s ρ) fl (first {ν = ν} s ρ sn pl) hf
+live-floor ν q (ended e t) ρ sn pl hf fl = tt
