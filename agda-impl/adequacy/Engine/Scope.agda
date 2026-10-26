@@ -205,28 +205,37 @@ shut-states q s (m ∷ ms) ρ t (a ∷ᴬ as) = shut-after q s m ρ t a ∷ᴬ s
 -- DEAD ROUTE: the plain ghost: a source subscribing inside an ended
 --   connect's body, its own body emitting before its source subscribes,
 --   shows past the pick while ghosting that pending source untold.
-Src : ∀ {R Γ X B} → Ctx R Γ B → CS → St Γ X → Set
-Src c (cs false sl sa nothing as ow r en) o = Sane (modes c) (shutAll (closures c) (gh o)) × Placed (shutAll (closures c) (gh o)) (envAt c)
-Src c k                                   o = ⊤
+Src : ∀ {Γ X} → All (λ _ → Mode) Γ → Shuts Γ → NEnv Γ → CS → St Γ X → Set
+Src ν V ρ (cs false sl sa nothing as ow r en) o = Sane ν (shutAll V (gh o)) × Placed (shutAll V (gh o)) ρ
+Src ν V ρ k                                   o = ⊤
 
-Lns : ∀ {R Γ B} → Ctx R Γ B → List (Node Γ B) → Set
-Lns c ms = Saneᴸ (modes c) (map (shutAll (closures c)) ms) × Placedᴸ (map (shutAll (closures c)) ms) (envAt c)
+Lns : ∀ {Γ B} → All (λ _ → Mode) Γ → Shuts Γ → NEnv Γ → List (Node Γ B) → Set
+Lns ν V ρ ms = Saneᴸ ν (map (shutAll V) ms) × Placedᴸ (map (shutAll V) ms) ρ
 
+-- The scope read off the modes, shuts and environment in scope alone,
+-- whichever frames hold them.
 mutual
-  Gh : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Set
-  Gh c (mapS f s)              = Gh (inMap f c) s
-  Gh c (scanS f z s)           = Gh (inScan f z c) s
-  Gh c (cutS l a s)            = Gh (inCut l a c) s
-  Gh c (lnS b s)               = Gh (inLn b c) s
-  Gh c (takeS i q w s)         = Gh (inTake i q w c) s
-  Gh c (flatS op f d n q o ls) = Lns c (lanesL ls) × Gh (inOuter op f d n q ls c) o × Ghᴸ c op f d n q o [] ls
-  Gh c (connS k o b)           = Src c k o × Gh (inSrc k b c) o × Gh (inBody k o c) b
-  Gh c (joinS j true x ib)     = Told (closures c) x (endOf ib)
-  Gh c _                       = ⊤
+  GhE : ∀ {Γ A} → All (λ _ → Mode) Γ → Shuts Γ → NEnv Γ → St Γ A → Set
+  GhE ν V ρ (mapS f s)              = GhE ν V ρ s
+  GhE ν V ρ (scanS f z s)           = GhE ν V ρ s
+  GhE ν V ρ (cutS l a s)            = GhE ν V ρ s
+  GhE ν V ρ (lnS b s)               = GhE ν V ρ s
+  GhE ν V ρ (takeS i q w s)         = GhE ν V ρ s
+  GhE ν V ρ (flatS op f d n q o ls) = Lns ν V ρ (lanesL ls) × GhE ν V ρ o × GhEᴸ ν V ρ ls
+  GhE ν V ρ (connS k o b)           =
+    Src ν V ρ k o × GhE ν V ρ o × GhE (modeᴳ (srcG k o) ∷ᴬ ν) (closeOf (srcG k o) (upˢ V)) (srcRun (srcG k o) ρ ∷ᴬ ρ) b
+  GhE ν V ρ (joinS j true x ib)     = Told V x (endOf ib)
+  GhE ν V ρ _                       = ⊤
 
-  Ghᴸ : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → List (St Γ B) → Set
-  Ghᴸ c op f d n q o pre []         = ⊤
-  Ghᴸ c op f d n q o pre (s ∷ post) = Gh (inLanes op f d n q o pre post c) s × Ghᴸ c op f d n q o (s ∷ pre) post
+  GhEᴸ : ∀ {Γ B} → All (λ _ → Mode) Γ → Shuts Γ → NEnv Γ → List (St Γ B) → Set
+  GhEᴸ ν V ρ []       = ⊤
+  GhEᴸ ν V ρ (s ∷ ls) = GhE ν V ρ s × GhEᴸ ν V ρ ls
+
+Gh : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Set
+Gh c = GhE (modes c) (closures c) (envAt c)
+
+Ghᴸ : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → List (St Γ B) → Set
+Ghᴸ c op f d n q o pre = GhEᴸ (modes c) (closures c) (envAt c)
 
 ghᴸ-at : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q o xs acc (s : St Γ B) post
        → Ghᴸ c op f d n q o acc (xs ++ s ∷ post) → Gh (inLanes op f d n q o (xs ʳ++ acc) post c) s
