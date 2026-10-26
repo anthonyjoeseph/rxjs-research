@@ -43,10 +43,10 @@ open import adequacy.Engine.Head using (Frag; cand; pool-step; <ᴷ-irrefl; ≮�
 open import adequacy.Engine.Keys using (Held)
 open import adequacy.Engine.Inv using (Unpended)
 open import adequacy.Engine.Pick using (Beat; past; KAfter; KNotBefore; Lost; body-link; Before; Race; LaneWon; lane-won; race-steps; after-step;
-  lane-sides; outer-link)
+  lane-sides; outer-link; src-floor)
 open import adequacy.Engine.Head.Within using (frag-flat; frag-parts)
 open import adequacy.Engine.Ahead using (Under; shows; shows-open; shown)
-open import adequacy.Engine.Scope using (Scope)
+open import adequacy.Engine.Scope using (Scope; modes; scope-src)
 open import adequacy.Engine.Drop using (Dropsˢ; Pass; SrcPass; mapped-drops; scanned-drops; took-drops; lanes-drops; body-drops;
   outer-drops; src-drops; ≋-⊒)
 open import adequacy.Engine.Beside using (Sourced; sourced; sourced-≋)
@@ -68,9 +68,6 @@ keyAt false q = at q
 keyAt true  q = after q
 
 postulate
-  -- Every connect a still find beats on its way up runs its source clear
-  -- of each position the find's key covers.
-  beat-scope : ∀ {R Γ A} key k (c : Ctx R Γ A) (s : St Γ A) → Beat key c s → key <ᴷ at k ≡ false → Frag (plug c s) → closed c ≡ false → Scope k c
   -- The search finds a node by one of its own marks.
   found-own : ∀ {R} (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} → search top t ≡ just (found (Γ , A , c , s) m key)
             → (m , key) ∈ own s
@@ -189,6 +186,30 @@ knot-lost k (just (after h , _)) w = w
 before-≤ : ∀ K k ms → K <ᴷ at k ≡ false → Before K ms → Before (at k) ms
 before-≤ K k ms c = allMap (λ {mk} w → ≮<ᴷ (at k) K (proj₂ mk) c w)
 
+-- A key read past a live source's skips is no earlier than it.
+past-≮ : ∀ v key k → key <ᴷ at k ≡ false → past v key <ᴷ at k ≡ false
+past-≮ true  key       k c = c
+past-≮ false (at p)    k c = ≮ᴷ-trans (after p) (at p) (at k) (subst (λ q → after p <ᴷ at q ≡ false) (++-identityʳ p) (under-after p [])) c
+past-≮ false (after p) k c = c
+
+-- Every connect a still find beats on its way up runs its source at or
+-- past each position the find's key covers.
+beat-scope : ∀ {R Γ A} key k (c : Ctx R Γ A) (s : St Γ A) → Beat key c s → key <ᴷ at k ≡ false → Frag (plug c s) → Scope k c
+beat-scope key k top                               s b ck ft = tt
+beat-scope key k (inMap f c)                       s b ck ft = beat-scope key k c (mapS f s) b ck ft
+beat-scope key k (inScan f z c)                    s b ck ft = beat-scope key k c (scanS f z s) b ck ft
+beat-scope key k (inCut l a c)                     s b ck ft = beat-scope key k c (cutS l a s) b ck ft
+beat-scope key k (inLn b′ c)                       s b ck ft = beat-scope key k c (lnS b′ s) b ck ft
+beat-scope key k (inTake i q w c)                  s b ck ft = beat-scope key k c (takeS i q w s) b ck ft
+beat-scope key k (inOuter op f d n q ls c)         s (_ , b) ck ft = beat-scope key k c (flatS op f d n q s ls) b ck ft
+beat-scope key k (inLanes op f d n q o pre post c) s (_ , b) ck ft = beat-scope key k c (flatS op f d n q o (pre ʳ++ s ∷ post)) b ck ft
+beat-scope key k (inSrc kk b′ c)                   s (_ , _ , b) ck ft =
+  beat-scope (past (over kk) key) k c (connS kk s b′) b (past-≮ (over kk) key k ck) ft
+beat-scope key k (inBody kk o c)                   s (nb , bf , b) ck ft =
+  scope-src (modes c) k (srcG kk o) (envAt c)
+    (src-floor k c kk o s (knot-lost (at k) (cand (inSrc kk s c) o) (knot-≤ key k (cand (inSrc kk s c) o) ck nb)) (before-≤ key k (own (connS kk o s)) ck bf) ft sc) sc
+  where sc = beat-scope key k c (connS kk o s) b ck ft
+
 race-map : ∀ {R Γ A B} {P P′ : Key → Maybe (Key × Out B) → Set} {k k′} → (∀ x → P k x → P′ k′ x)
          → ∀ (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) acc ls tl
          → Race P k c op f d n q o acc ls tl → Race P′ k′ c op f d n q o acc ls tl
@@ -251,7 +272,7 @@ beat-pass v q {P} (inOuter op g false n p ls c) s f so bw@(r , w) ft u sh fl x d
     parts = frag-parts op g false n p s ls (frag-flat c op g false n p s ls (proj₁ ft))
     ol : ∀ k → P k → All (λ l → After k (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore k (poolT (deadL ls) (envAt c))
     ol k pk =
-      outer-link c k op g n p s ls (proj₁ ft) (beat-scope (keyAt v q) k (inOuter op g false n p ls c) s bw (cover v q so k pk) (proj₁ ft) (shows-open c true sh))
+      outer-link c k op g n p s ls (proj₁ ft) (beat-scope (keyAt v q) k (inOuter op g false n p ls c) s bw (cover v q so k pk) (proj₁ ft))
         (race-steps KAfter (After k) (keyAt v q) (λ y st a ag → after-step k y st (kafter-≤ (keyAt v q) k y (cover v q so k pk) a) ag)
            c op g false n p s [] ls [] (shows-open c true sh) (proj₂ parts) r)
         (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
@@ -272,7 +293,7 @@ beat-pass v q {P} (inLanes op g dd n p o pre post c) s true {h} so bw@(l , w) ft
     fi : ∀ k → P k → First k (outerᴺ (lane g) (outerG dd (gh o)) (envAt c)) (states (lanesL post) (envAt c))
                        (states (lanesL (reverse pre)) (envAt c)) (outerT dd (gh o) (envAt c) (poolRuns (reverse pre) post true (envAt c) h))
     fi k pk = lane-sides k c op g dd n p o pre post s (shows-open c true sh)
-                (beat-scope (keyAt v q) k (inLanes op g dd n p o pre post c) s bw (cover v q so k pk) (proj₁ ft) (shows-open c true sh))
+                (beat-scope (keyAt v q) k (inLanes op g dd n p o pre post c) s bw (cover v q so k pk) (proj₁ ft))
                 (lanewon-≤ (keyAt v q) k c op g dd n p o pre post s (cover v q so k pk) l) (proj₁ ft) (frag-flat c op g dd n p o (pre ʳ++ s ∷ post) (proj₁ ft))
 beat-pass v q {P} (inSrc (cs false true sa ba as nothing r en) b c) s f so (ka , bf , bt) ft u sh fl x d s′ ft′ u′ fl′ x′ =
   sourced-≋ x (src-sourced c sa ba as r en s b ft) , sp , beat-pass true q c (connS kk s b) true (sought-under v q so) (subst (λ K → Beat K c (connS kk s b)) (past-key v q) bt) ft tt sh refl
