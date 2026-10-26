@@ -207,13 +207,6 @@ shut-states : ∀ {Γ B} q (s : Shuts Γ) (ms : List (Node Γ B)) (ρ : NEnv Γ)
 shut-states q s []       ρ t []ᴬ       = []ᴬ
 shut-states q s (m ∷ ms) ρ t (a ∷ᴬ as) = shut-after q s m ρ t a ∷ᴬ shut-states q s ms ρ t as
 
--- Nodes stepping as their shut views, after `q` read through them.
-shut-steps : ∀ {Γ B} q (s : Shuts Γ) (ms : List (Node Γ B))
-           → All (λ m → headˢ (step (shutAll s m)) ≡ headˢ (step m)) ms → All (λ m → After q (headˢ (step m))) ms
-           → All (λ m → After q (headˢ (step m))) (map (shutAll s) ms)
-shut-steps q s []       []ᴬ       []ᴬ       = []ᴬ
-shut-steps q s (m ∷ ms) (e ∷ᴬ es) (a ∷ᴬ as) = subst (After q) (sym e) a ∷ᴬ shut-steps q s ms es as
-
 -- WHAT THE INVARIANT KEEPS OF EACH SUBSCRIBED CONNECT'S SOURCE, at the
 -- frame it sits in: its ghost read through the ended connects in scope
 -- is a run's configuration there, placed in the environment the frame

@@ -42,8 +42,8 @@ open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore)
 open import adequacy.Engine.Head using (Frag; cand; pool-step; <ᴷ-irrefl; ≮ᴷ-trans; ≮<ᴷ; ext-≮)
 open import adequacy.Engine.Keys using (Held)
 open import adequacy.Engine.Inv using (Unpended)
-open import adequacy.Engine.Pick using (Beat; past; KAfter; KNotBefore; Lost; body-link; Before; Race; LaneWon; lane-won; race-steps; after-step;
-  lane-sides; outer-link; src-floor)
+open import adequacy.Engine.Pick using (Beat; past; KAfter; KNotBefore; Lost; body-link; Before; Race; LaneWon; lane-won; race-shut;
+  after-step; lane-sides; outer-link; src-floor)
 open import adequacy.Engine.Head.Within using (frag-flat; frag-parts)
 open import adequacy.Engine.Ahead using (Under; shows; shows-open; shown)
 open import adequacy.Engine.Scope using (Scope; modes; scope-src; Gh)
@@ -273,7 +273,7 @@ beat-pass v q {P} (inOuter op g false n p ls c) s f so bw@(r , w) ft gt u sh fl 
     ol : ∀ k → P k → All (λ l → After k (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore k (poolT (deadL ls) (envAt c))
     ol k pk =
       outer-link c k op g n p s ls (proj₁ ft) gt (beat-scope (keyAt v q) k (inOuter op g false n p ls c) s bw (cover v q so k pk) (proj₁ ft) gt)
-        (race-steps KAfter (After k) (keyAt v q) (λ y st a ag → after-step k y st (kafter-≤ (keyAt v q) k y (cover v q so k pk) a) ag)
+        (race-shut KAfter (After k) (keyAt v q) (λ y st a ag → after-step k y st (kafter-≤ (keyAt v q) k y (cover v q so k pk) a) ag)
            c op g false n p s [] ls [] (shows-open c true sh) (proj₂ parts) r)
         (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
 beat-pass v q (inLanes op g dd n p o pre post c) s false so w ft gt u () fl x d s′ ft′ u′ fl′ x′
