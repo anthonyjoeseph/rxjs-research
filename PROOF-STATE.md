@@ -91,16 +91,6 @@ or refuted.
 
 Members: `fed-fresh`, `fed-join`, `defer-links`, `fed-sourced`.
 
-#### THE CLOSED LANE
-
-Untried: a lane, a body or an outer completing under a closed frame. The
-race that picked it still ran, but a closed frame's candidates need not be
-its parts' heads, so the end may not lead a sibling lane, the pool or the
-connect's source. Settled when all are bodies, or refuted (then each reads
-the open frame `lane-drop` reaches).
-
-Members: `rise-body-end-shut`, `rise-lane-end-shut`, `rise-outer-end-shut`.
-
 #### THE SORTED TAILS
 
 Probed: a lane's tail, at its flatMap's environment, is in position order;

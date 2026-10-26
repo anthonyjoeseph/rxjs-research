@@ -353,7 +353,7 @@ outOf c (ofS i p xs) ofM with closed c | xs
 ... | true  | _     = still
 ... | false | []    = shows cp
 ... | false | x ∷ _ = shows (nx x)
-outOf c (takeS i q (cpAt p) s) cpM = shows cp
+outOf c (takeS i q (cpAt p) s) cpM = if not (closed c) then shows cp else still
 outOf c (joinS j g x ((q , e) ∷ ib)) joinM = if g ∧ not (closed c) then shows e else still
 outOf c (coldS b l) leafM with peek l
 ... | just nothing  = if not (closed c) then shows cp else still
@@ -574,7 +574,7 @@ run c (ofS i p xs) ofM _ with closed c | xs
 ... | false | x ∷ xs′ = ok ⟨ c , ofS (suc i) p xs′ , rising (nx x) , p ⊕ [ ix i ] ⟩
 run c (cutS l (attAt p) s) attM _ with unsubIf (not l) s
 ... | s′ , t = moved ⟨ c , cutS l attached s′ , absorbed , p ⟩ [] t
-run c (takeS i q (cpAt p) s) cpM _ = ok ⟨ c , takeS i q (cutAt p) s , rising cp , p ⊕ [ last ] ⟩
+run c (takeS i q (cpAt p) s) cpM _ = ok ⟨ c , takeS i q (cutAt p) s , (if not (closed c) then rising cp else absorbed) , p ⊕ [ last ] ⟩
 run c (takeS i q (cutAt p) s) cutM _ with cut s
 ... | s′ , t = moved ⟨ c , takeS i q (overAt p) s′ , absorbed , p ⟩ [] t
 run c (connS k o b) bodyM r with CS.bodyAt k
@@ -590,7 +590,7 @@ run c (connS k o b) owedM r with CS.owedAt k | unsubIf (CS.srcAtt k) o
 run c (joinS j g x ((q , nx a) ∷ ib)) joinM _ = ok ⟨ c , joinS j g x ib , (if g ∧ not (closed c) then rising (nx a) else absorbed) , q ⟩
 run c (joinS j g x ((q , cp) ∷ ib))   joinM _ = ok ⟨ c , joinS j false x ib , (if g ∧ not (closed c) then rising cp else absorbed) , q ⟩
 run c (coldS b l) leafM r =
-  turn (leaf b l (closed c) (λ e l′ b′ p′ → ⟨ c , coldS b′ l′ , rising e , p′ ⟩) (λ l′ → ⟨ c , coldS b l′ , absorbed , r ⟩))
+  turn (leaf b l (closed c) (λ e l′ b′ p′ → ⟨ c , coldS b′ l′ , (if not (closed c) then rising e else absorbed) , p′ ⟩) (λ l′ → ⟨ c , coldS b l′ , absorbed , r ⟩))
 run c s m r = ok ⟨ c , s , absorbed , r ⟩
 
 -- By the mode first, so a fact about a step splits on the mode alone.
@@ -633,5 +633,5 @@ next ⟨ c , s , m , p ⟩ with search top (plug c s)
 poke : ∀ {R} → List ℕ → Conf R → Poke R
 poke π ⟨ c , s , m , p ⟩ with downs π top (plug c s)
 ... | just (_ , _ , c′ , coldS b l) =
-  leaf b l (closed c′) (λ e l′ b′ p′ → ⟨ c′ , coldS b′ l′ , rising e , p′ ⟩) (λ l′ → ⟨ c′ , coldS b l′ , absorbed , p ⟩)
+  leaf b l (closed c′) (λ e l′ b′ p′ → ⟨ c′ , coldS b′ l′ , (if not (closed c′) then rising e else absorbed) , p′ ⟩) (λ l′ → ⟨ c′ , coldS b l′ , absorbed , p ⟩)
 ... | _ = gone

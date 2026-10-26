@@ -193,7 +193,9 @@ out-open c (takeS i q (cpAt r) s)          attM = λ ()
 out-open c (takeS i q (cpAt r) s)          bodyM = λ ()
 out-open c (takeS i q (cpAt r) s)          srcAttM = λ ()
 out-open c (takeS i q (cpAt r) s)          owedM = λ ()
-out-open c (takeS i q (cpAt r) s)          cpM = λ ()
+out-open c (takeS i q (cpAt r) s)          cpM with closed c
+... | false = λ ()
+... | true  = λ ()
 out-open c (takeS i q (cpAt r) s)          cutM = λ ()
 out-open c (takeS i q (cpAt r) s)          joinM = λ ()
 out-open c (takeS i q (cpAt r) s)          leafM = λ ()
@@ -339,6 +341,13 @@ Searched ⟨ c , s , subscribing , p ⟩ = ⊤
 Searched ⟨ c , s , absorbed , p ⟩    = Apart (plug c s)
 Searched ⟨ c , s , rising e , p ⟩    = ⊤
 
+-- A rise is read by an open observer: every leaf and every owed end asks
+-- before it rises, and a frame's rise passes only to one no more closed.
+Heard : ∀ {R} → Conf R → Set
+Heard ⟨ c , s , rising e , p ⟩   = closed c ≡ false
+Heard ⟨ c , s , subscribing , p ⟩ = ⊤
+Heard ⟨ c , s , absorbed , p ⟩    = ⊤
+
 record Order {R} (k : Conf R) : Set where
   constructor order
   field
@@ -346,6 +355,7 @@ record Order {R} (k : Conf R) : Set where
     flight : Flight k
     lead   : Lead k
     apart  : Searched k
+    heard  : Heard k
 
 postulate
   -- The engine's search: the found node's key leads every race above it.
