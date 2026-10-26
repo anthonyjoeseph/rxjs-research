@@ -152,14 +152,6 @@ when a depth-aware Kept dispatch proves both, or refuted.
 
 Members: `silent-exact`, `value-ahead`.
 
-#### THE WALK
-
-Untried: the old well-configuration invariant was a well heap over the CPS
-machine's states, so a state-tree `WellMach` is unwritten. Settled when it is
-a definition and `preserve` a body or refuted.
-
-Members: `WellMach`, `preserve`, `begin-well`.
-
 #### THE VALUE'S PLACE
 
 Untried: a value the engine shows is the ghost's least, unique at its
