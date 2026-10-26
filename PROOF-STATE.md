@@ -13,12 +13,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 A frame's link to the meaning reads every connect above it: each running
 source at or past the pick, derived per connect from its lost race through
 `Stepper.first`, or for a source still pending, from where it subscribes.
-Open: the ghost's `Sane`/`Placed` at a subscribed source or lane, which the
-invariant must carry ghost-wide; a subscription's first event past its
-position; a pool the stepper hushes. Settled by an invariant field and its
-step, or a refutation.
+Open: a step keeping each subscribed source's shut view `Sane`/`Placed`
+(`Scope.Gh`, carried in `Order`); a lane's, not yet carried; the shut
+view's step agreeing with its candidate; a subscription's first event past
+its position; a pool the stepper hushes. Settled by their steps, or a
+refutation.
 
-Members: `src-sane`, `src-placed`, `lanes-sane`,
+Members: `ghost-next`, `shut-agrees`, `lanes-sane`,
 `lanes-placed`, `pool-link`, `sub-meaning`.
 
 #### THE FLIGHT KEPT

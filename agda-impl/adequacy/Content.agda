@@ -58,6 +58,7 @@ open import adequacy.Engine.Kept using (KeptFrom; refocus-agree) renaming (kept 
 open import adequacy.Engine.Head using (Frag; Lane) renaming (Lanes to Lanesᴴ)
 open import adequacy.Engine.Keys using (Held)
 open import adequacy.Engine.Pick using (Beat; Beats; module Order)
+open import adequacy.Engine.Scope using (Gh)
 open import adequacy.Engine.Ahead using (Sides; shows; shows-open; ahead-mono) renaming (Ahead to Aheadᶠ)
 open import adequacy.Engine.Shown using (beat-pass; cold-key)
 open import adequacy.Strong using (module Strongly)
@@ -413,7 +414,8 @@ module Honesty (R : Set) where
   stall-pass {c = c} {s} {c′} {τ} {u} {i} {t₀} {k} eq sh iv iv′ =
     beat-pass false (u ++ [ ix i ]) c′ (coldS true (play τ u i t₀ (stall k))) true (λ _ e → e)
       (subst (λ x → Beat x c′ (coldS true (play τ u i t₀ (stall k)))) (cold-key (plug c s) eq) (subst Beats eq (Order.apart (Inv.ord iv)) refl))
-      (subst Held (sym (proj₁ (search-hit (plug c s) eq))) (Order.shape (Inv.ord iv))) tt
+      (subst Held (sym (proj₁ (search-hit (plug c s) eq))) (Order.shape (Inv.ord iv)))
+      (subst (Gh top) (sym (proj₁ (search-hit (plug c s) eq))) (Order.ghosted (Inv.ord iv))) tt
       sh refl (≋-by refl refl) (stall-hole (envAt c′))
       (coldS true (play τ u (suc i) t₀ (Frame∞.force k))) (Order.shape (Inv.ord iv′)) tt refl (≋-by refl refl)
 
@@ -425,7 +427,8 @@ module Honesty (R : Set) where
   close-pass {c = c} {s} {c′} {τ} {u} {i} {t₀} {k} eq sh iv iv′ =
     beat-pass false (u ++ [ ix i ]) c′ (coldS true (play τ u i t₀ (close k))) true (λ _ e → e)
       (subst (λ x → Beat x c′ (coldS true (play τ u i t₀ (close k)))) (cold-key (plug c s) eq) (subst Beats eq (Order.apart (Inv.ord iv)) refl))
-      (subst Held (sym (proj₁ (search-hit (plug c s) eq))) (Order.shape (Inv.ord iv))) tt
+      (subst Held (sym (proj₁ (search-hit (plug c s) eq))) (Order.shape (Inv.ord iv)))
+      (subst (Gh top) (sym (proj₁ (search-hit (plug c s) eq))) (Order.ghosted (Inv.ord iv))) tt
       sh refl (≋-by refl refl) (close-hole (envAt c′))
       (coldS true (restᵀ τ (u ++ [ last ]) (From∞.force k))) (Order.shape (Inv.ord iv′)) tt refl (≋-by refl refl)
 

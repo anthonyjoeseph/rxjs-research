@@ -10,26 +10,34 @@
 -- scope above it (`scope-src`).
 module adequacy.Engine.Scope where
 
-open import Data.Bool using (true; false)
-open import Data.List using (List; []; _∷_; [_]; _++_)
-open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
+open import Data.Bool using (Bool; true; false)
+open import Data.Nat using (ℕ)
+open import Data.List using (List; []; _∷_; [_]; _++_; _ʳ++_; reverse)
+open import Data.List.Properties using (ʳ++-defn; reverse-involutive)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (_,_)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans)
 
-open import denotation.MonotonicList using (Agree; out⁼; skip⁼; end⁼; hush⁼)
+open import denotation.MonotonicList using (Agree; out⁼; skip⁼; end⁼; hush⁼; agree-refl)
+open import denotation.NonExpansive using (Agreeˢ)
 open import denotation.MonotonicList.Events using (Pos; Timeline; Events; Events∞; out; skip; end; hush; ix; _<ᵖ_; <ᵖ-trans; <ᵖ-asym; <ᵖ-below)
 import denotation.MonotonicList as M′
-open import denotation.Unfold using (NEnv; Node; Source; live; ended; Step; outˢ; skipˢ; endˢ; hushˢ; states; step; headˢ; meaning; subscribe)
-open import Tree using (Obs)
+open import denotation.Unfold using (NEnv; Node; Source; live; ended; Step; outˢ; skipˢ; endˢ; hushˢ; states; step; headˢ; meaning; subscribe; shut)
+open import Tree using (Obs; FlatOp)
 open import operation.PureObservable using (module Machine)
-open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Sane using (Mode; runs; over; loose)
-open import adequacy.Stepper.Past using (Floor; Floorᴱ; First; Firstᴸ; afterᴱ; above)
+open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; CS; cs; mapS; scanS; cutS; lnS; takeS; flatS; connS; plug)
+open import adequacy.Sane using (Mode; runs; over; loose; Sane)
+open import adequacy.Placed.Order using (Placed)
+open import adequacy.Stepper.Past using (Floor; Floorᴱ; floorᴱ-agree; First; Firstᴸ; afterᴱ; above; _≃_; alike)
+open import adequacy.Stepper.Parts using (shut-alikeⁱ)
+open import adequacy.Env using (nagree-refl)
 open import adequacy.Stepper.Flat using (agree-head)
-open import adequacy.Engine.Meaning using (envAt; srcG; srcRun)
+open import adequacy.Engine.Meaning using (gh; envAt; srcG; srcRun)
 open import adequacy.Engine.Race using (After)
 
 modeᴳ : ∀ {Γ X} → Source Γ X → Mode
@@ -116,6 +124,119 @@ scope-src : ∀ {Γ X} (ν : All (λ _ → Mode) Γ) q (g : Source Γ X) (ρ : N
           → Floor (modeᴳ g ∷ᴬ ν) q (srcRun g ρ ∷ᴬ ρ)
 scope-src ν q (live s)    ρ fs f = fs , f
 scope-src ν q (ended e t) ρ fs f = f
+
+-- THE CONNECTS IN SCOPE THAT HAVE ENDED, each with where: `Unfold` shuts
+-- an ended connect's body (`Unfold.shutˢᵗ`), telling every joiner of it,
+-- one a later subscription made too.  A node read through them is the
+-- one `Unfold` would hold there, alike in meaning (`shut-floor`).
+data Shuts : List Set → Set₁ where
+  none   : ∀ {Γ} → Shuts Γ
+  shutAt : ∀ {Γ X} → X ∈ Γ → Pos → Shuts Γ → Shuts Γ
+
+upˢ : ∀ {Γ X} → Shuts Γ → Shuts (X ∷ Γ)
+upˢ none           = none
+upˢ (shutAt i c s) = shutAt (there i) c (upˢ s)
+
+closeOf : ∀ {Γ X} → Source Γ X → Shuts (X ∷ Γ) → Shuts (X ∷ Γ)
+closeOf (live s)    ss = ss
+closeOf (ended e t) ss = shutAt (here refl) e ss
+
+closures : ∀ {R Γ A} → Ctx R Γ A → Shuts Γ
+closures top                               = none
+closures (inMap f c)                       = closures c
+closures (inScan f z c)                    = closures c
+closures (inCut l a c)                     = closures c
+closures (inLn b c)                        = closures c
+closures (inTake i q w c)                  = closures c
+closures (inOuter op f d n q ls c)         = closures c
+closures (inLanes op f d n q o pre post c) = closures c
+closures (inSrc k b c)                     = closures c
+closures (inBody k o c)                    = closeOf (srcG k o) (upˢ (closures c))
+
+shutAll : ∀ {Γ B} → Shuts Γ → Node Γ B → Node Γ B
+shutAll none           n = n
+shutAll (shutAt i c s) n = shut i c (shutAll s n)
+
+-- Each shut connect ended where it says.
+Ended : ∀ {Γ} → Shuts Γ → NEnv Γ → Set
+Ended none           ρ = ⊤
+Ended (shutAt i c s) ρ = lookup ρ i ≃ end c × Ended s ρ
+
+ended-up : ∀ {Γ X} (s : Shuts Γ) (e : Events X) (ρ : NEnv Γ) → Ended s ρ → Ended (upˢ s) (e ∷ᴬ ρ)
+ended-up none           e ρ t        = tt
+ended-up (shutAt i c s) e ρ (a , t) = a , ended-up s e ρ t
+
+ended-close : ∀ {Γ X} (g : Source Γ X) (ρ : NEnv Γ) (s : Shuts (X ∷ Γ)) → Ended s (srcRun g ρ ∷ᴬ ρ) → Ended (closeOf g s) (srcRun g ρ ∷ᴬ ρ)
+ended-close (live x)    ρ s t = t
+ended-close (ended e x) ρ s t = alike (λ n → agree-refl n (end e)) , t
+
+ended-at : ∀ {R Γ A} (c : Ctx R Γ A) → Ended (closures c) (envAt c)
+ended-at top                               = tt
+ended-at (inMap f c)                       = ended-at c
+ended-at (inScan f z c)                    = ended-at c
+ended-at (inCut l a c)                     = ended-at c
+ended-at (inLn b c)                        = ended-at c
+ended-at (inTake i q w c)                  = ended-at c
+ended-at (inOuter op f d n q ls c)         = ended-at c
+ended-at (inLanes op f d n q o pre post c) = ended-at c
+ended-at (inSrc k b c)                     = ended-at c
+ended-at (inBody k o c)                    =
+  ended-close (srcG k o) (envAt c) (upˢ (closures c)) (ended-up (closures c) (srcRun (srcG k o) (envAt c)) (envAt c) (ended-at c))
+
+shut-floor : ∀ {Γ B} q (s : Shuts Γ) (n : Node Γ B) (ρ : NEnv Γ) → Ended s ρ → Floorᴱ q (meaning (shutAll s n) ρ) → Floorᴱ q (meaning n ρ)
+shut-floor q none           n ρ t       f = f
+shut-floor q (shutAt i c s) n ρ (a , t) f =
+  shut-floor q s n ρ t (floorᴱ-agree
+    (Agreeˢ.nowˢ (shut-alikeⁱ i c (shutAll s n) {ρ} {ρ} a (λ m → nagree-refl m ρ) 1)) f)
+
+-- WHAT THE INVARIANT KEEPS OF EACH SUBSCRIBED CONNECT'S SOURCE, at the
+-- frame it sits in: its ghost read through the ended connects in scope
+-- is a run's configuration there, placed in the environment the frame
+-- reads.  A lane at its place in its list (`Ghᴸ`, the lanes before it
+-- reversed, as `inLanes` holds them).
+--
+-- DEAD ROUTE: the plain ghost: a source subscribing inside an ended
+--   connect's body, its own body emitting before its source subscribes,
+--   shows past the pick while ghosting that pending source untold.
+Src : ∀ {R Γ X B} → Ctx R Γ B → CS → St Γ X → Set
+Src c (cs false sl sa nothing as ow r en) o = Sane (modes c) (shutAll (closures c) (gh o)) × Placed (shutAll (closures c) (gh o)) (envAt c)
+Src c k                                   o = ⊤
+
+mutual
+  Gh : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Set
+  Gh c (mapS f s)              = Gh (inMap f c) s
+  Gh c (scanS f z s)           = Gh (inScan f z c) s
+  Gh c (cutS l a s)            = Gh (inCut l a c) s
+  Gh c (lnS b s)               = Gh (inLn b c) s
+  Gh c (takeS i q w s)         = Gh (inTake i q w c) s
+  Gh c (flatS op f d n q o ls) = Gh (inOuter op f d n q ls c) o × Ghᴸ c op f d n q o [] ls
+  Gh c (connS k o b)           = Src c k o × Gh (inSrc k b c) o × Gh (inBody k o c) b
+  Gh c _                       = ⊤
+
+  Ghᴸ : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → List (St Γ B) → Set
+  Ghᴸ c op f d n q o pre []         = ⊤
+  Ghᴸ c op f d n q o pre (s ∷ post) = Gh (inLanes op f d n q o pre post c) s × Ghᴸ c op f d n q o (s ∷ pre) post
+
+ghᴸ-at : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q o xs acc (s : St Γ B) post
+       → Ghᴸ c op f d n q o acc (xs ++ s ∷ post) → Gh (inLanes op f d n q o (xs ʳ++ acc) post c) s
+ghᴸ-at c op f d n q o []       acc s post (g , _)  = g
+ghᴸ-at c op f d n q o (x ∷ xs) acc s post (_ , gs) = ghᴸ-at c op f d n q o xs (x ∷ acc) s post gs
+
+-- Kept of the whole tree, kept at every frame.
+gh-at : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Gh top (plug c s) → Gh c s
+gh-at top                               s g = g
+gh-at (inMap f c)                       s g = gh-at c (mapS f s) g
+gh-at (inScan f z c)                    s g = gh-at c (scanS f z s) g
+gh-at (inCut l a c)                     s g = gh-at c (cutS l a s) g
+gh-at (inLn b c)                        s g = gh-at c (lnS b s) g
+gh-at (inTake i q w c)                  s g = gh-at c (takeS i q w s) g
+gh-at (inOuter op f d n q ls c)         s g = proj₁ (gh-at c (flatS op f d n q s ls) g)
+gh-at (inLanes op f d n q o pre post c) s g =
+  subst (λ xs → Gh (inLanes op f d n q o xs post c) s) (reverse-involutive pre)
+    (ghᴸ-at c op f d n q o (reverse pre) [] s post
+      (subst (Ghᴸ c op f d n q o []) (ʳ++-defn pre) (proj₂ (gh-at c (flatS op f d n q o (pre ʳ++ s ∷ post)) g))))
+gh-at (inSrc k b c)                     s g = proj₁ (proj₂ (gh-at c (connS k s b) g))
+gh-at (inBody k o c)                    s g = proj₂ (proj₂ (gh-at c (connS k o s) g))
 
 postulate
   -- A subscription at `r` shows at or past anything before `r`: each

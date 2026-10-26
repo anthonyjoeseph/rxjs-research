@@ -36,6 +36,7 @@ open import adequacy.Engine.Meaning using (envAt; gh; risen; lane; lanesL; laneR
 open import adequacy.Engine.Flown using (Owed; NextOwed; rise-owed; sub-owed)
 open import adequacy.Engine.Plug using (flight-held)
 open import adequacy.Engine.Pick using (Order; order; module Order; Heard; whole; KeysAt; Shaped; Lead; Clear; Ends; EndsIf; Won; won-clear; won-ends; out-open; search-won; Apart; Searched)
+open import adequacy.Engine.Scope using (Gh)
 open import operation.PureObservable using (Tape; due; play; ending; over; module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; closed; closedUp;
@@ -699,7 +700,7 @@ module _ {R : Set} where
   NextInv (complete p)    = ⊤
   NextInv drained         = ⊤
 
-  NextFrag NextKeys NextShape NextFlight NextLead NextApart : Step → Set
+  NextFrag NextKeys NextShape NextFlight NextLead NextApart NextGhost : Step → Set
   NextFrag (silent t k)    = Frag (whole k)
   NextFrag (value t p a k) = Frag (whole k)
   NextFrag (complete p)    = ⊤
@@ -724,10 +725,18 @@ module _ {R : Set} where
   NextApart (value t p a k) = Searched k
   NextApart (complete p)    = ⊤
   NextApart drained         = ⊤
+  NextGhost (silent t k)    = Gh top (whole k)
+  NextGhost (value t p a k) = Gh top (whole k)
+  NextGhost (complete p)    = ⊤
+  NextGhost drained         = ⊤
 
   postulate
     -- THE SHAPE: a step keeps the whole tree in the fragment.
     frag-next : ∀ k → Base k → Frag (whole k) → NextFrag (step k)
+    -- THE SOURCES KEPT: a step keeps every subscribed connect's source,
+    -- read through the ended connects in scope, a run's configuration
+    -- placed in the environment its frame reads (`Scope.Gh`).
+    ghost-next : ∀ k → Base k → Order k → NextGhost (step k)
     -- THE KEYS KEPT: every node's own positional facts, each in the
     -- environment its connects give it, kept by a rise through a frame
     -- that rewrites its node: an outer's value or end, a lane's end, a
@@ -913,9 +922,9 @@ module _ {R : Set} where
   ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
   ...   | pl , _ = run-lead (plug c s) p e
                      (λ q a s″ kq oa al → won-clear q a c′ s′ s″ al (out-open c′ s′ m oa)
-                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oa (search-won (plug c s) (proj₁ (Order.shape o)) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))))
+                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oa (search-won (plug c s) (proj₁ (Order.shape o)) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))) (subst (Gh top) (sym pl) (Order.ghosted o)))
                      (λ q s″ kq oc al → won-ends q c′ s′ s″ al
-                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oc (search-won (plug c s) (proj₁ (Order.shape o)) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))))
+                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oc (search-won (plug c s) (proj₁ (Order.shape o)) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))) (subst (Gh top) (sym pl) (Order.ghosted o)))
 
   -- A takeWhile failing a value ends one past it, what the frames above
   -- saw of the value's run.
@@ -1046,11 +1055,11 @@ module _ {R : Set} where
   flight-next : ∀ k → Base k → Order k → NextFlight (step k)
   flight-next k b o = flown (step k) (shape-next k b o) (flight-owed k b o)
 
-  joined : ∀ x → NextShape x → NextFlight x → NextLead x → NextApart x → NextHeard x → NextOrd x
-  joined (silent t k)    f g l u e = order f g l u e
-  joined (value t p a k) f g l u e = order f g l u e
-  joined (complete p)    f g l u e = tt
-  joined drained         f g l u e = tt
+  joined : ∀ x → NextShape x → NextFlight x → NextLead x → NextApart x → NextHeard x → NextGhost x → NextOrd x
+  joined (silent t k)    f g l u e h = order f g l u e h
+  joined (value t p a k) f g l u e h = order f g l u e h
+  joined (complete p)    f g l u e h = tt
+  joined drained         f g l u e h = tt
 
   -- EVERY STEP KEEPS THE ORDER.
   heard-next : ∀ k → Order k → NextHeard (step k)
@@ -1072,7 +1081,7 @@ module _ {R : Set} where
   ... | just (found (_ , _ , c′ , s′) m key) = run-heard c′ p (proj₂ (search-hit (plug c s) e))
 
   ord-next : ∀ k → Base k → Order k → NextOrd (step k)
-  ord-next k b o = joined (step k) (shape-next k b o) (flight-next k b o) (lead-next k b o) (apart-next k b o) (heard-next k o)
+  ord-next k b o = joined (step k) (shape-next k b o) (flight-next k b o) (lead-next k b o) (apart-next k b o) (heard-next k o) (ghost-next k b o)
 
   both : ∀ x → NextBase x → NextOrd x → NextInv x
   both (silent t k)    b o = b & o
@@ -1084,10 +1093,10 @@ module _ {R : Set} where
   inv-next k (b & o) = both (step k) (base-next k b) (ord-next k b o)
 
   inv-load : (o : Obs Timeline [] R) → Inv (Machine.load o)
-  inv-load o = base-load o & order (tt , tt , tt) (flight-load o) (λ _ → tt) tt tt
+  inv-load o = base-load o & order (tt , tt , tt) (flight-load o) (λ _ → tt) tt tt tt
 
   -- A settled node anywhere in a tree the invariant holds of, absorbed at
   -- the same position: the invariant at it.
   inv-at : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Unpended s → Wf (plug c s) → Held (plug c s) → Apart (plug c s)
-         → Inv ⟨ c , s , absorbed , p ⟩
-  inv-at c s p u w f t = base-at c s p u w & order f (flight-held c s p f) tt t tt
+         → Gh top (plug c s) → Inv ⟨ c , s , absorbed , p ⟩
+  inv-at c s p u w f t g = base-at c s p u w & order f (flight-held c s p f) tt t tt g
