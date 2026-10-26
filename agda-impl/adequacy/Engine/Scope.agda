@@ -15,9 +15,9 @@ open import Data.Nat using (ℕ)
 open import Data.List using (List; []; _∷_; [_]; _++_; _ʳ++_; reverse; map)
 open import Data.List.Properties using (ʳ++-defn; reverse-involutive)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.Any using (here)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
-open import Data.Maybe using (Maybe; just; nothing; is-just)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
@@ -27,7 +27,7 @@ open import denotation.MonotonicList using (Agree; out⁼; skip⁼; end⁼; hush
 open import denotation.NonExpansive using (Agreeˢ)
 open import denotation.MonotonicList.Events using (Pos; Timeline; Events; Events∞; out; skip; end; hush; ix; _<ᵖ_; <ᵖ-trans; <ᵖ-asym; <ᵖ-below)
 import denotation.MonotonicList as M′
-open import denotation.Unfold using (NEnv; Node; Source; live; ended; Step; outˢ; skipˢ; endˢ; hushˢ; states; step; headˢ; meaning; subscribe; shut; same?)
+open import denotation.Unfold using (NEnv; Node; Source; live; ended; Step; outˢ; skipˢ; endˢ; hushˢ; states; step; headˢ; meaning; subscribe)
 open import Tree using (Obs; FlatOp)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; CS; cs; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; plug)
@@ -39,6 +39,7 @@ open import adequacy.Env using (nagree-refl)
 open import adequacy.Stepper.Flat using (agree-head)
 open import adequacy.Engine.Meaning using (gh; lanesL; envAt; srcG; srcRun; endOf)
 open import adequacy.Engine.Race using (After)
+open import adequacy.Engine.Shuts using (Shuts; none; shutAt; upˢ; shutAll; Told)
 
 modeᴳ : ∀ {Γ X} → Source Γ X → Mode
 modeᴳ (live s)    = runs
@@ -129,14 +130,6 @@ scope-src ν q (ended e t) ρ fs f = f
 -- an ended connect's body (`Unfold.shutˢᵗ`), telling every joiner of it,
 -- one a later subscription made too.  A node read through them is the
 -- one `Unfold` would hold there, alike in meaning (`shut-floor`).
-data Shuts : List Set → Set₁ where
-  none   : ∀ {Γ} → Shuts Γ
-  shutAt : ∀ {Γ X} → X ∈ Γ → Pos → Shuts Γ → Shuts Γ
-
-upˢ : ∀ {Γ X} → Shuts Γ → Shuts (X ∷ Γ)
-upˢ none           = none
-upˢ (shutAt i c s) = shutAt (there i) c (upˢ s)
-
 closeOf : ∀ {Γ X} → Source Γ X → Shuts (X ∷ Γ) → Shuts (X ∷ Γ)
 closeOf (live s)    ss = ss
 closeOf (ended e t) ss = shutAt (here refl) e ss
@@ -152,10 +145,6 @@ closures (inOuter op f d n q ls c)         = closures c
 closures (inLanes op f d n q o pre post c) = closures c
 closures (inSrc k b c)                     = closures c
 closures (inBody k o c)                    = closeOf (srcG k o) (upˢ (closures c))
-
-shutAll : ∀ {Γ B} → Shuts Γ → Node Γ B → Node Γ B
-shutAll none           n = n
-shutAll (shutAt i c s) n = shut i c (shutAll s n)
 
 -- Each shut connect ended where it says.
 Ended : ∀ {Γ} → Shuts Γ → NEnv Γ → Set
@@ -223,16 +212,6 @@ Src c k                                   o = ⊤
 
 Lns : ∀ {R Γ B} → Ctx R Γ B → List (Node Γ B) → Set
 Lns c ms = Saneᴸ (modes c) (map (shutAll (closures c)) ms) × Placedᴸ (map (shutAll (closures c)) ms) (envAt c)
-
--- A live joiner of a shut connect was fed its end when the connect's
--- source ended, so a shut leaves it as it is.
-Untold : ∀ {Γ X} → Shuts Γ → X ∈ Γ → Set
-Untold none           x = ⊤
-Untold (shutAt i c s) x = is-just (same? i x) ≡ false × Untold s x
-
-Told : ∀ {Γ X} → Shuts Γ → X ∈ Γ → Maybe Pos → Set
-Told s x (just _) = ⊤
-Told s x nothing  = Untold s x
 
 mutual
   Gh : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Set
