@@ -12,12 +12,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 A frame's link to the meaning reads every connect above it: each running
 source at or past the pick, derived per connect from its lost race through
-`Stepper.first`. Open: whether `Frag` reaches the ghost's `Sane`/`Placed`
-at a frame, or the invariant must carry them; a source not yet subscribed;
-a pool the stepper hushes. Settled by bodies, or a refutation of either.
+`Stepper.first`, or for a source still pending, from where it subscribes.
+Open: the ghost's `Sane`/`Placed` at a subscribed source or lane, which the
+invariant must carry ghost-wide; a subscription's first event past its
+position; a pool the stepper hushes. Settled by an invariant field and its
+step, or a refutation.
 
 Members: `src-sane`, `src-placed`, `lanes-sane`,
-`lanes-placed`, `pool-link`.
+`lanes-placed`, `pool-link`, `sub-meaning`.
 
 #### THE FLIGHT KEPT
 
