@@ -33,8 +33,8 @@ open import denotation.Unfold using (same?)
 open import denotation.MonotonicList.Events using (Timeline; fixed; fresh; timelineAt; done; quiet; at; emit; stall; close; ix; root; _<ᵖ_)
 open import operation.PureObservable using (play; ending; over; opening; module Machine; module Driver)
 open import adequacy.Engine.Work using (run; tapeW; coldW; size; one; attW; oweW; just?; csW; fedO; fed; fedL; fan; wt; owed; owedL; tornC; torn; tornL; height)
-open import adequacy.Engine.Inv using (Inv; module Inv; module Base; Owns; ofO; attO; cpO; cutO; bodyO; srcAttO; owedO; joinO;
-  leafO; search-hit)
+open import adequacy.Engine.Fold using (module Base; search-hit; Owns; ofO; attO; cpO; cutO; bodyO; srcAttO; owedO; joinO; leafO)
+open import adequacy.Engine.Inv using (Inv; module Inv)
 open import adequacy.Ghost using (module Ghosting)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; closed; closedUp;

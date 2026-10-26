@@ -53,8 +53,8 @@ open import adequacy.Engine.Meaning using (Has; M; _≅_; _≋_; agree-≅; atOu
   poolRuns; risen; srcFrame; srcG; subOr; tape; took; up; lift-ne; ≅-refl; ≅-trans; ≈-refl;
   ≋-by; ≋-out; ≋-trans)
 open import adequacy.Engine.Flown using (lanes-cut; lanes-rise)
-open import adequacy.Engine.Inv using (Unpended; Opened; Wf; Base; module Base; Inv; module Inv; inv-at; wfI; wf-split; Owns; ofO;
-  attO; cpO; cutO; bodyO; srcAttO; owedO; joinO; leafO; owned; search-hit)
+open import adequacy.Engine.Fold using (Unpended; Opened; Wf; Base; module Base; wfI; wf-split; search-hit; Owns; ofO; attO; cpO; cutO; bodyO; srcAttO; owedO; joinO; leafO; owned)
+open import adequacy.Engine.Inv using (Inv; module Inv; inv-at)
 open import adequacy.Engine.Race using (First)
 open import adequacy.Engine.Keys using (Held)
 open import adequacy.Engine.Above using (take-true; take-incl; take-excl; toʳ)

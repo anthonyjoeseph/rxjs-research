@@ -45,7 +45,7 @@ open import adequacy.Engine.Beside using (Sourced; body-⊒)
 open import adequacy.Placed.Trail using (Trailing)
 open import adequacy.Engine.Trails using (shape-src)
 open import adequacy.Engine.Kept using (sub-settled)
-open import adequacy.Engine.Inv using (Unpended)
+open import adequacy.Engine.Fold using (Unpended)
 open import adequacy.Env using (NAgree; nagree-refl; meaning-ne; state-ne)
 open import adequacy.Placed.Trail using (trail-≈)
 open import adequacy.Engine.Drop using (Dropsˢ; dropˢ; dropsˢ; Fed; src-alone; body-alone; both; ≋-⊒; mapped-⊒; scanned-⊒; took-⊒;
