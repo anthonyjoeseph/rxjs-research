@@ -272,7 +272,7 @@ beat-pass v q {P} (inOuter op g false n p ls c) s f so bw@(r , w) ft gt u sh fl 
     parts = frag-parts op g false n p s ls (frag-flat c op g false n p s ls (proj₁ ft))
     ol : ∀ k → P k → All (λ l → After k (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore k (poolT (deadL ls) (envAt c))
     ol k pk =
-      outer-link c k op g n p s ls (proj₁ ft) (beat-scope (keyAt v q) k (inOuter op g false n p ls c) s bw (cover v q so k pk) (proj₁ ft) gt)
+      outer-link c k op g n p s ls (proj₁ ft) gt (beat-scope (keyAt v q) k (inOuter op g false n p ls c) s bw (cover v q so k pk) (proj₁ ft) gt)
         (race-steps KAfter (After k) (keyAt v q) (λ y st a ag → after-step k y st (kafter-≤ (keyAt v q) k y (cover v q so k pk) a) ag)
            c op g false n p s [] ls [] (shows-open c true sh) (proj₂ parts) r)
         (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))

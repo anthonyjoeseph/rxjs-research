@@ -12,7 +12,7 @@ module adequacy.Engine.Scope where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Nat using (ℕ)
-open import Data.List using (List; []; _∷_; [_]; _++_; _ʳ++_; reverse)
+open import Data.List using (List; []; _∷_; [_]; _++_; _ʳ++_; reverse; map)
 open import Data.List.Properties using (ʳ++-defn; reverse-involutive)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -31,13 +31,13 @@ open import denotation.Unfold using (NEnv; Node; Source; live; ended; Step; out�
 open import Tree using (Obs; FlatOp)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; CS; cs; mapS; scanS; cutS; lnS; takeS; flatS; connS; plug)
-open import adequacy.Sane using (Mode; runs; over; loose; Sane)
-open import adequacy.Placed.Order using (Placed)
+open import adequacy.Sane using (Mode; runs; over; loose; Sane; Saneᴸ)
+open import adequacy.Placed.Order using (Placed; Placedᴸ)
 open import adequacy.Stepper.Past using (Floor; Floorᴱ; floorᴱ-agree; First; Firstᴸ; afterᴱ; above; _≃_; alike)
 open import adequacy.Stepper.Parts using (shut-alikeⁱ)
 open import adequacy.Env using (nagree-refl)
 open import adequacy.Stepper.Flat using (agree-head)
-open import adequacy.Engine.Meaning using (gh; envAt; srcG; srcRun)
+open import adequacy.Engine.Meaning using (gh; lanesL; envAt; srcG; srcRun)
 open import adequacy.Engine.Race using (After)
 
 modeᴳ : ∀ {Γ X} → Source Γ X → Mode
@@ -189,11 +189,36 @@ shut-floor q (shutAt i c s) n ρ (a , t) f =
   shut-floor q s n ρ t (floorᴱ-agree
     (Agreeˢ.nowˢ (shut-alikeⁱ i c (shutAll s n) {ρ} {ρ} a (λ m → nagree-refl m ρ) 1)) f)
 
+after-agree : ∀ {A} q {e e′ : Events A} → Agree 1 e e′ → After q (M′.head e′) → After q (M′.head e)
+after-agree q (out⁼ _ _)  a = a
+after-agree q (skip⁼ _ _) a = a
+after-agree q end⁼        a = a
+after-agree q hush⁼       a = a
+
+shut-after : ∀ {Γ B} q (s : Shuts Γ) (n : Node Γ B) (ρ : NEnv Γ) → Ended s ρ → After q (M′.head (meaning (shutAll s n) ρ)) → After q (M′.head (meaning n ρ))
+shut-after q none           n ρ t       a = a
+shut-after q (shutAt i c s) n ρ (e , t) a =
+  shut-after q s n ρ t (after-agree q
+    (Agreeˢ.nowˢ (shut-alikeⁱ i c (shutAll s n) {ρ} {ρ} e (λ m → nagree-refl m ρ) 1)) a)
+
+shut-states : ∀ {Γ B} q (s : Shuts Γ) (ms : List (Node Γ B)) (ρ : NEnv Γ) → Ended s ρ
+            → All (λ l → After q (M′.head (Events∞.force l))) (states (map (shutAll s) ms) ρ)
+            → All (λ l → After q (M′.head (Events∞.force l))) (states ms ρ)
+shut-states q s []       ρ t []ᴬ       = []ᴬ
+shut-states q s (m ∷ ms) ρ t (a ∷ᴬ as) = shut-after q s m ρ t a ∷ᴬ shut-states q s ms ρ t as
+
+-- Nodes stepping as their shut views, after `q` read through them.
+shut-steps : ∀ {Γ B} q (s : Shuts Γ) (ms : List (Node Γ B))
+           → All (λ m → headˢ (step (shutAll s m)) ≡ headˢ (step m)) ms → All (λ m → After q (headˢ (step m))) ms
+           → All (λ m → After q (headˢ (step m))) (map (shutAll s) ms)
+shut-steps q s []       []ᴬ       []ᴬ       = []ᴬ
+shut-steps q s (m ∷ ms) (e ∷ᴬ es) (a ∷ᴬ as) = subst (After q) (sym e) a ∷ᴬ shut-steps q s ms es as
+
 -- WHAT THE INVARIANT KEEPS OF EACH SUBSCRIBED CONNECT'S SOURCE, at the
 -- frame it sits in: its ghost read through the ended connects in scope
 -- is a run's configuration there, placed in the environment the frame
--- reads.  A lane at its place in its list (`Ghᴸ`, the lanes before it
--- reversed, as `inLanes` holds them).
+-- reads, and so of each flatMap's lanes (`Lns`).  A lane at its place in
+-- its list (`Ghᴸ`, the lanes before it reversed, as `inLanes` holds them).
 --
 -- DEAD ROUTE: the plain ghost: a source subscribing inside an ended
 --   connect's body, its own body emitting before its source subscribes,
@@ -202,6 +227,9 @@ Src : ∀ {R Γ X B} → Ctx R Γ B → CS → St Γ X → Set
 Src c (cs false sl sa nothing as ow r en) o = Sane (modes c) (shutAll (closures c) (gh o)) × Placed (shutAll (closures c) (gh o)) (envAt c)
 Src c k                                   o = ⊤
 
+Lns : ∀ {R Γ B} → Ctx R Γ B → List (Node Γ B) → Set
+Lns c ms = Saneᴸ (modes c) (map (shutAll (closures c)) ms) × Placedᴸ (map (shutAll (closures c)) ms) (envAt c)
+
 mutual
   Gh : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Set
   Gh c (mapS f s)              = Gh (inMap f c) s
@@ -209,7 +237,7 @@ mutual
   Gh c (cutS l a s)            = Gh (inCut l a c) s
   Gh c (lnS b s)               = Gh (inLn b c) s
   Gh c (takeS i q w s)         = Gh (inTake i q w c) s
-  Gh c (flatS op f d n q o ls) = Gh (inOuter op f d n q ls c) o × Ghᴸ c op f d n q o [] ls
+  Gh c (flatS op f d n q o ls) = Lns c (lanesL ls) × Gh (inOuter op f d n q ls c) o × Ghᴸ c op f d n q o [] ls
   Gh c (connS k o b)           = Src c k o × Gh (inSrc k b c) o × Gh (inBody k o c) b
   Gh c _                       = ⊤
 
@@ -230,11 +258,11 @@ gh-at (inScan f z c)                    s g = gh-at c (scanS f z s) g
 gh-at (inCut l a c)                     s g = gh-at c (cutS l a s) g
 gh-at (inLn b c)                        s g = gh-at c (lnS b s) g
 gh-at (inTake i q w c)                  s g = gh-at c (takeS i q w s) g
-gh-at (inOuter op f d n q ls c)         s g = proj₁ (gh-at c (flatS op f d n q s ls) g)
+gh-at (inOuter op f d n q ls c)         s g = proj₁ (proj₂ (gh-at c (flatS op f d n q s ls) g))
 gh-at (inLanes op f d n q o pre post c) s g =
   subst (λ xs → Gh (inLanes op f d n q o xs post c) s) (reverse-involutive pre)
     (ghᴸ-at c op f d n q o (reverse pre) [] s post
-      (subst (Ghᴸ c op f d n q o []) (ʳ++-defn pre) (proj₂ (gh-at c (flatS op f d n q o (pre ʳ++ s ∷ post)) g))))
+      (subst (Ghᴸ c op f d n q o []) (ʳ++-defn pre) (proj₂ (proj₂ (gh-at c (flatS op f d n q o (pre ʳ++ s ∷ post)) g)))))
 gh-at (inSrc k b c)                     s g = proj₁ (proj₂ (gh-at c (connS k s b) g))
 gh-at (inBody k o c)                    s g = proj₂ (proj₂ (gh-at c (connS k o s) g))
 
