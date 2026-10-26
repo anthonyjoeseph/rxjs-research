@@ -185,7 +185,7 @@ whose connect is over; a step keeps the tree in the fragment. Probed on the
 spike engine. Settled when each is a body.
 
 Members: `search-hit`, `search-won`, `found-own`, `frag-next`, `run-lead`,
-`limited-sides`, `body-link`.
+`body-link`.
 
 #### THE HEADS
 

@@ -293,7 +293,7 @@ beat-pass v q {P} (inLanes op g dd n p o pre post c) s true {h} so bw@(l , w) ft
                        (states (lanesL (reverse pre)) (envAt c)) (outerT dd (gh o) (envAt c) (poolRuns (reverse pre) post true (envAt c) h))
     fi k pk = lane-sides k c op g dd n p o pre post s (shows-open c true sh)
                 (beat-scope (keyAt v q) k (inLanes op g dd n p o pre post c) s bw (cover v q so k pk) (proj₁ ft) gt (proj₂ ft))
-                (lanewon-≤ (keyAt v q) k c op g dd n p o pre post s (cover v q so k pk) l) (proj₁ ft) gt (frag-flat c op g dd n p o (pre ʳ++ s ∷ post) (proj₁ ft))
+                (lanewon-≤ (keyAt v q) k c op g dd n p o pre post s (cover v q so k pk) l) gt (frag-flat c op g dd n p o (pre ʳ++ s ∷ post) (proj₁ ft))
 beat-pass v q {P} (inSrc (cs false true sa ba as nothing r en) b c) s f so (ka , bf , bt) ft gt u sh fl x d s′ ft′ u′ fl′ x′ =
   sourced-≋ x (src-sourced c sa ba as r en s b ft) , sp , beat-pass true q c (connS kk s b) true (sought-under v q so) (subst (λ K → Beat K c (connS kk s b)) (past-key v q) bt) ft gt tt sh refl
          (≋-trans (λ m → connSrc-ne false r en (gh b) (envAt c) (x m)) (live-plug sa ba as r en b s (envAt c) u))
