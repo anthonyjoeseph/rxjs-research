@@ -567,9 +567,9 @@ module _ {R : Set} where
   ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
   ...   | pl , _ = run-lead (plug c s) p e
                      (λ q a s″ kq oa al → won-clear q a c′ s′ s″ al (out-open c′ s′ m oa)
-                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oa (search-won (plug c s) (proj₁ (Order.shape o)) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))) (subst (Gh top) (sym pl) (Order.ghosted o)))
+                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oa (search-won (plug c s) (proj₁ (Order.shape o)) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))) (subst (Gh top) (sym pl) (Order.ghosted o)) (subst Keys (sym pl) (proj₂ (Order.shape o))))
                      (λ q s″ kq oc al → won-ends q c′ s′ s″ al
-                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oc (search-won (plug c s) (proj₁ (Order.shape o)) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))) (subst (Gh top) (sym pl) (Order.ghosted o)))
+                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oc (search-won (plug c s) (proj₁ (Order.shape o)) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))) (subst (Gh top) (sym pl) (Order.ghosted o)) (subst Keys (sym pl) (proj₂ (Order.shape o))))
 
   -- A takeWhile failing a value ends one past it, what the frames above
   -- saw of the value's run.

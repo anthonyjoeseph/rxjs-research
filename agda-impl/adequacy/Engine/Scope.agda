@@ -26,7 +26,8 @@ open import denotation.MonotonicList using (Agree; out⁼; skip⁼; end⁼; hush
 open import denotation.NonExpansive using (Agreeˢ)
 open import denotation.MonotonicList.Events using (Pos; Timeline; Events; Events∞; out; skip; end; hush; ix; _<ᵖ_; <ᵖ-trans; <ᵖ-asym; <ᵖ-below)
 import denotation.MonotonicList as M′
-open import denotation.Unfold using (NEnv; Node; Source; live; ended; Step; outˢ; skipˢ; endˢ; hushˢ; states; step; headˢ; meaning; subscribe)
+open import denotation.Unfold using (NEnv; Node; Source; live; ended; Step; outˢ; skipˢ; endˢ; hushˢ; states; step; headˢ;
+  meaning)
 open import Tree using (Obs; FlatOp)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; CS; cs; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; plug)
@@ -283,9 +284,3 @@ gh-at (inLanes op f d n q o pre post c) s g =
       (subst (Ghᴸ c op f d n q o []) (ʳ++-defn pre) (proj₂ (proj₂ (gh-at c (flatS op f d n q o (pre ʳ++ s ∷ post)) g)))))
 gh-at (inSrc k b c)                     s g = proj₁ (proj₂ (gh-at c (connS k s b) g))
 gh-at (inBody k o c)                    s g = proj₂ (proj₂ (gh-at c (connS k o s) g))
-
-postulate
-  -- A subscription at `r` shows at or past anything before `r`: each
-  -- former's first event lies under `r`, and a joiner rejoins its
-  -- source past `r`.
-  sub-meaning : ∀ {Γ A} (o : Obs Timeline Γ A) r (ρ : NEnv Γ) q → q <ᵖ r ≡ true → Floorᴱ q (meaning (subscribe o r) ρ)

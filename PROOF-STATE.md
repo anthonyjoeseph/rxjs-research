@@ -15,15 +15,15 @@ source at or past the pick, derived per connect from its lost race through
 `Stepper.first`, or for a source still pending, from where it subscribes.
 Open: a step rewriting a node keeping each subscribed source's and each
 lane's shut view `Sane`/`Placed`, and each live joiner told (`Scope.Gh`,
-carried in `Order`), the frames above included, mid-rise as well; a
-subscription's first event past its position; a pool the stepper hushes.
+carried in `Order`), the frames above included, mid-rise as well; a pool
+the stepper hushes.
 Settled by their steps, or a refutation.
 
 Members: `src-value-ghost`, `src-end-ghost`, `body-end-ghost`,
 `scan-ghost`, `take-fail-ghost`, `admit-ghost`, `outer-end-ghost`,
 `lane-end-ghost`, `begin-ghost`, `of-ghost`, `att-ghost`, `cp-ghost`,
 `cut-ghost`, `body-ghost`, `srcAtt-ghost`, `owed-ghost`, `join-ghost`,
-`leaf-ghost`, `pool-link`, `sub-meaning`.
+`leaf-ghost`, `pool-link`.
 
 #### THE FLIGHT KEPT
 

@@ -700,6 +700,32 @@ keyedRules p = record
 headed-sub : ∀ {Γ A} (o : Obs Timeline Γ A) p (ρ : NEnv Γ) → Headed p → Sorted ρ → Every Headed (U.meaning (U.subscribe o p) ρ)
 headed-sub o p ρ hp so = Reach.reach headedRules o p ρ hp (sorted-headed ρ so)
 
+-- A headed position's later frame lies past it.
+frame-past : ∀ n e → Headed e → tick e ≤ n → e <ᵖ (ix (suc n) ∷ sub e ∷ []) ≡ true
+frame-past n (ix t ∷ p) _ le = proj₁ (tick-past p (sub (ix t ∷ p) ∷ []) (s≤s le))
+
+-- Past `q`: subscribing headed past it, over sources headed.
+pastRules : Pos → Rules
+pastRules q = record
+  { S      = λ h → Headed h × q <ᵖ h ≡ true
+  ; P      = λ h → Headed h × q <ᵖ h ≡ true
+  ; Src    = Headed
+  ; child  = λ j l _ (hj , lt) → headed-snoc j hj , <ᵖ-trans q j (j ++ [ l ]) lt (<ᵖ-below j [])
+  ; deeper = λ h l _ (hh , lt) → headed-snoc h hh , <ᵖ-trans q h (h ++ [ l ]) lt (<ᵖ-below h [])
+  ; held   = λ _ x → x
+  ; frame  = λ n e (he , lt) le → tt , <ᵖ-trans q e (ix (suc n) ∷ sub e ∷ []) lt (frame-past n e he le)
+  ; join   = λ q′ j hq (_ , lt) jq →
+               headed-snoc q′ hq , <ᵖ-trans q j (q′ ++ [ sub j ]) lt (<ᵖ-trans j q′ (q′ ++ [ sub j ]) jq (<ᵖ-below q′ []))
+  ; source = λ _ → proj₁
+  }
+
+-- A subscription headed past `q`, its environment in order, shows only
+-- past `q`.  Unheaded, a timer's frame at a bare tick sorts before a `q`
+-- the subscription is past.
+past-sub : ∀ {Γ A} (o : Obs Timeline Γ A) q r (ρ : NEnv Γ) → Headed r → Sorted ρ → q <ᵖ r ≡ true
+         → Every (λ h → Headed h × q <ᵖ h ≡ true) (U.meaning (U.subscribe o r) ρ)
+past-sub o q r ρ hr so lt = Reach.reach (pastRules q) o r ρ (hr , lt) (sorted-headed ρ so)
+
 -- A flatMap's inner subscribe position is alienated from the environment.
 alien-shown : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p (ρ : NEnv Γ) → Alienᴱ p ρ
             → ∀ x → Reaches (x ++ [ ix 0 ]) (U.meaning (U.subscribe (flatMap op f s) p) ρ) → Alienᴱ (x ++ [ ix 1 ]) ρ
