@@ -58,7 +58,7 @@ open Machine using (St; cs; mapS; scanS; cutS; lnS; takeS; flatS; connS; Ctx; to
   renaming (outerT to outerK)
 open import adequacy.Engine.Meaning using (gh; poolG; lanesL; deadL; poolT; outerT; envAt; srcState; srcG)
 open import adequacy.Engine.Race using (NotBefore; After; TailNotBefore)
-open import adequacy.Engine.Head using (Frag; Lanes; Lane; Agrees; exact; early; HeadAt; HeadAtⁿ; cand; pool-step; at-<ᵖ; <≮ᴷ; ≮ᴷ-trans; ext-≮)
+open import adequacy.Engine.Head using (Frag; Lanes; Lane; Agrees; exact; early; HeadAt; HeadAtⁿ; cand; pool-step; dead-idle; at-<ᵖ; <≮ᴷ; ≮ᴷ-trans; ext-≮)
 open import adequacy.Engine.Head.Race using (shift-≮)
 open import adequacy.Engine.Head.Agrees using (head-agrees; head-agreesⱽ)
 open import adequacy.Engine.Shuts using (shutAll)
@@ -469,11 +469,14 @@ record StepSides {Γ A B} (p : Pos) d (o : St Γ A) (pre post : List (St Γ B)) 
     outerS : d ≡ false → NotBefore p (headˢ (step (gh o)))
     poolS  : step (poolG d (gh o) (deadL (pre ++ s ∷ post))) ≡ hushˢ
 
+-- A pool leaves nothing running before any position: its lanes are dead,
+-- and a dead lane has no connect.
+pool-link : ∀ {R Γ A B} (c : Ctx R Γ B) q op (f : A → Obs Timeline Γ B) n q′ (o : St Γ A) ls
+          → Frag (plug c (flatS op f false n q′ o ls)) → TailNotBefore q (poolT (deadL ls) (envAt c))
+pool-link {B = B} c q op f n q′ o ls ft =
+  subst (TailNotBefore q) (sym (dead-idle {B = B} ls (envAt c) (proj₂ (frag-parts op f false n q′ o ls (frag-flat c op f false n q′ o ls ft))))) tt
+
 postulate
-  -- A pool the stepper hushes leaves nothing running before any position.
-  pool-link : ∀ {R Γ A B} (c : Ctx R Γ B) q op (f : A → Obs Timeline Γ B) n q′ (o : St Γ A) ls
-            → Frag (plug c (flatS op f false n q′ o ls)) → step (poolG false (gh o) (deadL ls)) ≡ hushˢ
-            → TailNotBefore q (poolT (deadL ls) (envAt c))
   -- The meaning's heads are the stepper's, every running source in scope
   -- clear of `p`; a pool the stepper hushes leaves nothing running.
   --
@@ -655,13 +658,13 @@ won-scope p o c s w ft gt kt = won-floor (at p) o c s w ft gt kt
 --   source.
 outer-link : ∀ {R Γ A B} (c : Ctx R Γ B) q op (f : A → Obs Timeline Γ B) n q′ (o : St Γ A) ls
            → Frag (plug c (flatS op f false n q′ o ls)) → Gh top (plug c (flatS op f false n q′ o ls)) → Scope q c
-           → All (λ m → After q (headˢ (step (shutAll (closures c) m)))) (lanesL ls) → step (poolG false (gh o) (deadL ls)) ≡ hushˢ
+           → All (λ m → After q (headˢ (step (shutAll (closures c) m)))) (lanesL ls)
            → All (λ l → After q (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore q (poolT (deadL ls) (envAt c))
-outer-link c q op f n q′ o ls ft gt sc hs ph =
+outer-link c q op f n q′ o ls ft gt sc hs =
   shut-states q (closures c) (lanesL ls) (envAt c) (ended-at c)
     (firsts-after (modes c) (envAt c) q V sc (firstᴸ {ν = modes c} V (envAt c) (proj₁ L) (proj₂ L))
       (all-map⁺ hs))
-  , pool-link c q op f n q′ o ls ft ph
+  , pool-link c q op f n q′ o ls ft
   where V = map (shutAll (closures c)) (lanesL ls)
         L = proj₁ (gh-at c (flatS op f false n q′ o ls) gt)
 
@@ -726,8 +729,7 @@ won-ahead k (inTake i q (overAt _) c) s f w ft gt kt ()
 won-ahead k (inOuter op g true n q ls c) s f w ft gt kt ()
 won-ahead k (inOuter op g false n q ls c) s f wn@(r , w , _) ft gt kt sh =
   (λ { _ refl → outer-link c k op g n q s ls ft gt (won-scope k still (inOuter op g false n q ls c) s wn ft gt kt)
-                  (race-shut KAfter (After k) (at k) (after-step k) c op g false n q s [] ls [] cl (proj₂ parts) (lanes-gh c op g false n q s ls gt) r)
-                  (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ())) })
+                  (race-shut KAfter (After k) (at k) (after-step k) c op g false n q s [] ls [] cl (proj₂ parts) (lanes-gh c op g false n q s ls gt) r) })
   , won-ahead k c (flatS op g false n q s ls) true w ft gt kt sh
   where
     cl    = shows-open c true sh
@@ -771,7 +773,6 @@ won-clear p a (inOuter op f false n q ls c)     s s′ al ce wn@(r , w , u) ft g
     cl    = unrisen-open (closed c) u
     parts = frag-parts op f false n q s ls (frag-flat c op f false n q s ls ft)
     ol    = outer-link c p op f n q s ls ft gt (won-scope p (shows (nx a)) (inOuter op f false n q ls c) s wn ft gt kt) (race-shut KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) (lanes-gh c op f false n q s ls gt) r)
-              (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
 won-clear p a (inLanes op f d n q o pre post c) s s′ al ce wn@(l , _ , w) ft gt kt lv =
   lane-sides p c op f d n q o pre post s ce (won-scope p (shows (nx a)) (inLanes op f d n q o pre post c) s wn ft gt kt) l ft (frag-flat c op f d n q o (pre ʳ++ s ∷ post) ft)
   , won-clear p a c (flatS op f d n q o (pre ʳ++ s ∷ post)) (flatS op f d n q o (pre ʳ++ s′ ∷ post)) refl ce
@@ -810,7 +811,6 @@ outer-ends : ∀ {R Γ A B} p (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) 
 outer-ends p c op f d n q s ls wn ft gt kt refl cl =
   outer-link c p op f n q s ls ft gt (won-scope p (shows cp) (inOuter op f false n q ls c) s wn ft gt kt)
     (race-shut KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) (lanes-gh c op f false n q s ls gt) (proj₁ wn))
-    (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
   where parts = frag-parts op f false n q s ls (frag-flat c op f false n q s ls ft)
 
 -- Up the found node's frames: each one the completion reaches is clear

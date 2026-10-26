@@ -23,6 +23,8 @@ open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; _++_; [_]; length; map)
 open import Data.List.Properties using (map-++)
 open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.All using (All; []; _∷_)
+open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.Maybe using (Maybe; just; nothing) renaming (map to mapᴹ)
 open import Data.Nat using (zero)
 open import Data.Product using (_×_; _,_; proj₂)
@@ -31,10 +33,11 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong; cong₂)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.MonotonicList.Events using (Pos; Timeline; _<ᵖ_; ix; emit; stall; close)
+open import denotation.MonotonicList.Events using (Pos; Timeline; _<ᵖ_; ix; emit; stall; close; idle)
+open import denotation.MonotonicList using (cuts; whole)
 open import denotation.Unfold using (Node; Step; outˢ; skipˢ; endˢ; hushˢ; headˢ; step; restˢ; restsˢ; restᴹ; restsᶜ; restᶜ; unionˢ;
   Earliest; found; earliest; pick; Outer; doneᵒ; runᵒ; outerOf; goˢ; outerˢ; laneˢ; flatˢ;
-  Source; live; ended; connectᶜ; burstingᶜ; underᶜ; subscribe; sourceˢ; bodyˢ; shutˢᵗ; burstsˢ; beforeˢ; idleᶜ; mapᶜ; scanᶜ; unionᶜ; flatMapᶜ; shut) renaming (none to noneᴱ)
+  Source; live; ended; connectᶜ; burstingᶜ; underᶜ; subscribe; sourceˢ; bodyˢ; shutˢᵗ; burstsˢ; beforeˢ; idleᶜ; mapᶜ; scanᶜ; unionᶜ; flatMapᶜ; shut; NEnv; cutᴺ; states; outerᴺ) renaming (none to noneᴱ)
 open import operation.Key using (Key; at; after; _<ᴷ_)
 open import operation.PureObservable using (module Machine; Tape; play; ending) renaming (over to overᵀ)
 
@@ -264,6 +267,56 @@ mutual
             → restˢ {B = B} (poolG d (gh o) (deadL ls)) ≡ hushˢ
   pool-hush false o ls fo fl dn = restsᶜ-hush (dead-hush ls fl)
   pool-hush {B = B} true o ls fo fl dn rewrite rest-hush {B = B} o fo (dn refl) = restsᶜ-hush (dead-hush ls fl)
+
+-- A node with no connect leaves nothing running when cut: a burst is a
+-- connect's alone.
+cuts-idle : ∀ {Γ A} (ns : List (Node Γ A)) (ρ : NEnv Γ) → All (λ n → cutᴺ n ρ ≡ idle) ns → cuts (states ns ρ) ≡ idle
+cuts-idle []       ρ []       = refl
+cuts-idle (n ∷ ns) ρ (e ∷ es) rewrite e = cuts-idle ns ρ es
+
+mutual
+  conn-idle : ∀ {Γ A} (s : St Γ A) (ρ : NEnv Γ) → Frag s → NoConn s → cutᴺ (gh s) ρ ≡ idle
+  conn-idle (ofS i p xs) ρ _ _ = refl
+  conn-idle doneS        ρ _ _ = refl
+  conn-idle (mapS f s)   ρ fs ns = conn-idle s ρ fs ns
+  conn-idle (cutS true a s)  ρ fs       ns = conn-idle s ρ fs ns
+  conn-idle (cutS false a s) ρ (fs , _) ns = conn-idle s ρ fs ns
+  conn-idle (joinS j false x ib) ρ _ _ = refl
+  conn-idle (joinS j true x ib)  ρ _ _ = refl
+  conn-idle (connS k o b) ρ _ ()
+  conn-idle (pend o)        ρ _  _  = refl
+  conn-idle (scanS f z s)   ρ fs ns = conn-idle s ρ fs ns
+  conn-idle (takeS i q free s)       ρ fs ns = conn-idle s ρ fs ns
+  conn-idle (takeS i q (cpAt p) s)   ρ fs ns = conn-idle s ρ fs ns
+  conn-idle (takeS i q (cutAt p) s)  ρ fs ns = conn-idle s ρ fs ns
+  conn-idle (takeS i q (overAt p) s) ρ fs ns = conn-idle s ρ fs ns
+  conn-idle (flatS (mergeᶠ (just m)) f d n q o ls) ρ (fo , fl , _) (no , nls) = flat-idle d o ls ρ fo fl no nls
+  conn-idle (flatS switchᶠ f d n q o ls)           ρ (fo , fl , _) (no , nls) = flat-idle d o ls ρ fo fl no nls
+  conn-idle (flatS exhaustᶠ f d n q o ls)          ρ (fo , fl , _) (no , nls) = flat-idle d o ls ρ fo fl no nls
+  conn-idle (flatS (mergeᶠ nothing) f d n [] o ls) ρ (fo , fl , _) (no , nls) = flat-idle d o ls ρ fo fl no nls
+  conn-idle (coldS b (ending e))            ρ _ _ = refl
+  conn-idle (coldS b overᵀ)                 ρ _ _ = refl
+  conn-idle (coldS true  (play τ u i t fr)) ρ _ _ = refl
+  conn-idle (coldS false (play τ u i t fr)) ρ _ _ = refl
+
+  flat-idle : ∀ {Γ A B} d (o : St Γ A) (ls : List (St Γ B)) (ρ : NEnv Γ) {g : A → Pos → Node Γ B}
+            → Frag o → Lanes ls → NoConn o → NoConns ls
+            → whole (outerᴺ g (outerG d (gh o)) ρ) (states (lanesL ls) ρ) (cutᴺ (poolG d (gh o) (deadL ls)) ρ) ≡ idle
+  flat-idle true  o ls ρ fo fl no nls
+    rewrite cuts-idle (lanesL ls) ρ (lanes-idle ls ρ fl nls) | conn-idle o ρ fo no = dead-idle ls ρ fl
+  flat-idle false o ls ρ fo fl no nls
+    rewrite conn-idle o ρ fo no | cuts-idle (lanesL ls) ρ (lanes-idle ls ρ fl nls) = dead-idle ls ρ fl
+
+  lanes-idle : ∀ {Γ A} (ls : List (St Γ A)) (ρ : NEnv Γ) → Lanes ls → NoConns ls → All (λ n → cutᴺ n ρ ≡ idle) (lanesL ls)
+  lanes-idle []                                ρ _         _          = []
+  lanes-idle (lnS true (cutS true a s) ∷ ls)   ρ (fs , fl) (ns , nls) = ++⁺ (lanes-idle ls ρ fl nls) (conn-idle s ρ fs ns ∷ [])
+  lanes-idle (lnS false (cutS false a s) ∷ ls) ρ (fs , fl) (ns , nls) = ++⁺ (lanes-idle ls ρ fl nls) []
+
+  -- The pool: each dead lane's rest, connect-free by `Lane`.
+  dead-idle : ∀ {Γ A B} (ls : List (St Γ A)) (ρ : NEnv Γ) → Lanes ls → cutᴺ (restsᶜ {B = B} (deadL ls)) ρ ≡ idle
+  dead-idle []                                ρ _                = refl
+  dead-idle (lnS true (cutS true a s) ∷ ls)   ρ (fs , fl)        = dead-idle ls ρ fl
+  dead-idle (lnS false (cutS false a s) ∷ ls) ρ ((fs , ns) , fl) rewrite conn-idle s ρ fs ns = dead-idle ls ρ fl
 
 ------------------------------------------------------------------------
 -- The fragment's heads

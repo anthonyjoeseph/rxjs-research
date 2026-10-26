@@ -39,7 +39,7 @@ open import adequacy.Engine.Meaning using (_≋_; ≋-trans; same; ≋-tr; mappe
   flagOf; lanesFrame; outerFrame-ne; lanesFrame-ne; bodyFrame-ne; connSrc-ne; taking∞-ne;
   srcState; srcG; poolT; outerT)
 open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore)
-open import adequacy.Engine.Head using (Frag; cand; pool-step; <ᴷ-irrefl; ≮ᴷ-trans; ≮<ᴷ; ext-≮)
+open import adequacy.Engine.Head using (Frag; cand; <ᴷ-irrefl; ≮ᴷ-trans; ≮<ᴷ; ext-≮)
 open import adequacy.Engine.Keys using (Held; Keys)
 open import adequacy.Engine.Fold using (Unpended)
 open import adequacy.Engine.Pick using (Beat; past; KAfter; KNotBefore; Lost; body-link; Before; Race; LaneWon; lane-won; race-shut; lanes-gh;
@@ -275,7 +275,6 @@ beat-pass v q {P} (inOuter op g false n p ls c) s f so bw@(r , w) ft gt u sh fl 
       outer-link c k op g n p s ls (proj₁ ft) gt (beat-scope (keyAt v q) k (inOuter op g false n p ls c) s bw (cover v q so k pk) (proj₁ ft) gt (proj₂ ft))
         (race-shut KAfter (After k) (keyAt v q) (λ y st a ag → after-step k y st (kafter-≤ (keyAt v q) k y (cover v q so k pk) a) ag)
            c op g false n p s [] ls [] (shows-open c true sh) (proj₂ parts) (lanes-gh c op g false n p s ls gt) r)
-        (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
 beat-pass v q (inLanes op g dd n p o pre post c) s false so w ft gt u () fl x d s′ ft′ u′ fl′ x′
 beat-pass v q {P} (inLanes op g dd n p o pre post c) s true {h} so bw@(l , w) ft gt u sh fl x d s′ ft′ u′ fl′ x′ =
   fi , beat-pass v q c (flatS op g dd n p o (pre ʳ++ s ∷ post)) true so w ft gt tt sh refl
