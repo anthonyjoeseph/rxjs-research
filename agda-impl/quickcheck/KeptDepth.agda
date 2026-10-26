@@ -937,6 +937,15 @@ private
   inLane : Code [] [] [] (natᵗ ∷ []) natᵗ → Prog natᵗ
   inLane l = flatMap (mergeᶠ nothing) l (of (nat 0 ∷ nat 1 ∷ []))
 
+  -- An inclusive takeWhile its value ends, so its end is owed; and a
+  -- takeWhile above that value ends first, its end owed nearer, so the
+  -- frame above it is closed when the owed end below rises.
+  owing : ∀ {Γ Δᵍ Δ Θ} → Code Γ Δᵍ Δ Θ natᵗ
+  owing = takeWhile true (bool false) (of (nat 5 ∷ []))
+
+  closedBy : ∀ {Γ Δᵍ Δ Θ} → Code Γ Δᵍ Δ Θ natᵗ → Code Γ Δᵍ Δ Θ natᵗ
+  closedBy = takeWhile false (bool false)
+
   -- Steps drawn programs rarely take: a step begun under a closed cut, and
   -- a source's skips shown to several joiners and defers at once.
   hands : List (String × Prog natᵗ)
@@ -947,6 +956,16 @@ private
       , inLane (closedSrc false (deferᶜ (connect (of (nat 5 ∷ [])) (connected (here refl))))))
     ∷ ("a deferred merge begun under a closed cut"
       , inLane (closedSrc false (deferᶜ (flatMap (mergeᶠ nothing) (deferᶜ (of (var (here refl) ∷ []))) (of (nat 5 ∷ nat 6 ∷ []))))))
+    ∷ ("an owed end rising into a merge's lanes past the lane above it ending"
+      , inLane (closedBy (flatMap (mergeᶠ nothing) owing (of (nat 0 ∷ [])))))
+    ∷ ("an owed end rising into a connect's body past the lane above it ending"
+      , inLane (closedBy (connect (of (nat 0 ∷ [])) owing)))
+    ∷ ("an owed end rising into a merge's outer past the lane above it ending"
+      , inLane (closedBy (flatMap (mergeᶠ nothing) (of (var (here refl) ∷ [])) owing)))
+    ∷ ("an owed end rising into a merge's lanes past the source above it ending"
+      , connect (closedBy (flatMap (mergeᶠ nothing) owing (of (nat 0 ∷ [])))) (connected (here refl)))
+    ∷ ("an owed end rising into a connect's body past the source above it ending"
+      , connect (closedBy (connect (of (nat 0 ∷ [])) owing)) (connected (here refl)))
     ∷ ("a lane joined after its source's skip" , connect (cold (script ((1 , 1 ∷ []) ∷ []) false false)) rejoins)
     ∷ ("a lane joined after its source's skips" , connect (cold (script ((2 , 1 ∷ []) ∷ (1 , 2 ∷ []) ∷ []) false false)) rejoins)
     ∷ ("two joiners at once" , connect skipping (flatMap (mergeᶠ nothing) (connected (here refl)) (of (nat 0 ∷ nat 1 ∷ []))))
