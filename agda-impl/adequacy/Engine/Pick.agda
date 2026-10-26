@@ -440,7 +440,18 @@ postulate
             → Frag (plug c (flatS op f false n q′ o ls)) → step (poolG false (gh o) (deadL ls)) ≡ hushˢ
             → TailNotBefore q (poolT (deadL ls) (envAt c))
   -- A connect's source is a run's configuration where its frame sits,
-  -- placed in the environment the frame reads.
+  -- placed in the environment the frame reads.  The machine tells a
+  -- connect's joiners in the very rise that closes it, so a ghost-wide
+  -- `Sane` kept by the invariant would reach every frame.
+  --
+  -- Suspect for a source still pending: a lane `connect` begun after an
+  -- enclosing connect ended reads, while its body subscribes, a source
+  -- ghosted by `Unfold.subscribe`, whose joiner of the ended connect is
+  -- untold, where `over` demands told.  The machine would begin that
+  -- joiner as `ofS`; the ghost has not yet.
+  --
+  -- DEAD ROUTE: from `Frag` alone: it reads nothing of a joiner, so it
+  --   cannot say which are told.
   src-sane : ∀ {R Γ X B} (c : Ctx R Γ B) kk (o : St Γ X) (b : St (X ∷ Γ) B) → Frag (plug c (connS kk o b)) → SaneSrc (modes c) (srcG kk o)
   src-placed : ∀ {R Γ X B} (c : Ctx R Γ B) kk (o : St Γ X) (b : St (X ∷ Γ) B) → Frag (plug c (connS kk o b)) → PlacedSrc (srcG kk o) (envAt c)
   -- The meaning's heads are the stepper's, every running source in scope
