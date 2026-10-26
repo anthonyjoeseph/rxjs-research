@@ -713,7 +713,7 @@ module Spending (R : Set) where
   ran c s c′ (cutS l (attAt p₀) s₁) _ key p eq pl attO with unsubIf (not l) s₁ | unsubIf-≤ (not l) s₁ | unsubIf-F (not l) s₁
   ... | s₂ , t | le | F = lowers (at-abs c s c′ (cutS l (attAt p₀) s₁) (cutS l attached s₂) pl (s≤s le) F)
   ran c s c′ (takeS i q (cpAt p₀) s₁) _ key p eq pl cpO =
-    lowers (at-rise c s c′ (takeS i q (cpAt p₀) s₁) (takeS i q (cutAt p₀) s₁) pl ≤-refl (λ _ → ≤-refl))
+    lowers (at-if c s c′ (takeS i q (cpAt p₀) s₁) (takeS i q (cutAt p₀) s₁) (not (closed c′)) pl ≤-refl (λ _ → ≤-refl))
   ran c s c′ (takeS i q (cutAt p₀) s₁) _ key p eq pl cutO with cutᴹ s₁ | cut-≤ s₁ | cut-F s₁
   ... | s₂ , t | le | F = lowers (at-abs c s c′ (takeS i q (cutAt p₀) s₁) (takeS i q (overAt p₀) s₂) pl (s≤s le) F)
   ran c s c′ (connS (cs cl sl sa (just q) nothing ow r e) o b) _ key p eq pl (bodyO _) =
@@ -741,7 +741,7 @@ module Spending (R : Set) where
   ran c s c′ (joinS j g x ((q , cp) ∷ ib)) _ key p eq pl joinO =
     lowers (at-if c s c′ (joinS j g x ((q , cp) ∷ ib)) (joinS j false x ib) (g ∧ not (closed c′)) pl ≤-refl (λ _ → z≤n))
   ran c s c′ (coldS b (ending e₀)) _ key p eq pl (leafO _) =
-    lowers (at-rise c s c′ (coldS b (ending e₀)) (coldS false over) pl ≤-refl (λ _ → ≤-refl))
+    lowers (at-if c s c′ (coldS b (ending e₀)) (coldS false over) (not (closed c′)) pl ≤-refl (λ _ → ≤-refl))
   ran c s c′ (coldS b over) _ key p eq pl (leafO ())
   ran c s c′ (coldS false (play τ u i t fr)) _ key p eq pl (leafO _) =
     lowers (at-abs c s c′ (coldS false (play τ u i t fr)) (coldS false over) pl (s≤s z≤n) (λ _ → ≤-refl))
@@ -785,8 +785,7 @@ module Spending (R : Set) where
     lowers (up-abs c (takeS i q (overAt r) s) (takeS i q (overAt r) s) (inTake i q (overAt r) c) s refl ≤-refl (λ _ → ≤-refl))
   spends ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ iv = skips outerᵏ
   spends ⟨ inOuter op f true n q ls c , o , rising cp , p ⟩ iv =
-    lowers (up-if c (flatS op f true n q o ls) (flatS op f true n q o ls) (inOuter op f true n q ls c) o
-              ((n ≡ᵇ 0) ∧ null q) refl refl refl ≤-refl (λ _ → ≤-refl))
+    lowers (up-abs c (flatS op f true n q o ls) (flatS op f true n q o ls) (inOuter op f true n q ls c) o refl ≤-refl (λ _ → ≤-refl))
   spends ⟨ inOuter op f false n q ls c , o , rising cp , p ⟩ iv =
     lowers (up-if c (flatS op f false n q o ls) (flatS op f true n q o ls) (inOuter op f false n q ls c) o
               ((n ≡ᵇ 0) ∧ null q) refl refl refl (n≤1+n _) (λ _ → ≤-refl))

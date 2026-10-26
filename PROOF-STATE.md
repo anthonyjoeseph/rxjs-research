@@ -29,15 +29,6 @@ by a body, or refuted (then `flight-held` reads `Unpended`).
 
 Members: `pend-src-above`.
 
-#### THE DONE OUTER
-
-Untried: an outer already done rising its end. Its merge's run reads no
-outer, so the merge need not end there; only the search excludes it (a done
-node shows nothing, `outOf`), which `Order` does not carry. Settled by a
-body, or the configuration shown unreachable.
-
-Members: `rise-outer-done`.
-
 #### THE KEYS KEPT
 
 Untried: a node rewritten by a rise, a begin, a mark run or an unsubscribe

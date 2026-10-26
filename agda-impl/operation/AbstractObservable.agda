@@ -554,7 +554,8 @@ rise (inTake i q (cpAt r) c)  s e p = ok ⟨ c , takeS i q (cpAt r) s , absorbed
 rise (inTake i q (cutAt r) c) s e p = ok ⟨ c , takeS i q (cutAt r) s , absorbed , p ⟩
 rise (inTake i q (overAt r) c) s e p = ok ⟨ c , takeS i q (overAt r) s , absorbed , p ⟩
 rise (inOuter op f d n q ls c) o (nx a) p = admit c op f d n q o ls a p
-rise (inOuter op f d n q ls c) o cp     p = ok ⟨ c , flatS op f true n q o ls , settle true n (null q) , p ⟩
+-- A done outer's end is absorbed, as a stopped subscriber ignores it.
+rise (inOuter op f d n q ls c) o cp     p = ok ⟨ c , flatS op f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
 -- a lane out of its flatMap's list is over, and absorbs what still reaches it
 rise (inLanes op f d n q o pre post c) s (nx b) p =
   ok (if alive s then ⟨ c , flatS op f d n q o (pre ʳ++ s ∷ post) , rising (nx b) , p ⟩ else ⟨ c , flatS op f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)

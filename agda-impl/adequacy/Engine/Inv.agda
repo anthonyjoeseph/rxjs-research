@@ -459,7 +459,8 @@ module _ {R : Set} where
   rise-inv (inTake i q (cutAt r) c)          s e      p (inv u v w) = inv tt v w
   rise-inv (inTake i q (overAt r) c)         s e      p (inv u v w) = inv tt v w
   rise-inv (inOuter op f d n q ls c)         s (nx a) p (inv u (ws , v) w) = admit-inv c op f d n q s ls a p v w ws
-  rise-inv (inOuter op f d n q ls c)         s cp     p (inv u (ws , v) w) =
+  rise-inv (inOuter op f true n q ls c)      s cp     p (inv u (ws , v) w) = inv tt v (w , ws)
+  rise-inv (inOuter op f false n q ls c)     s cp     p (inv u (ws , v) w) =
     inv (settle-settled true n (Data.List.null q) tt) v (w , ws)
   rise-inv (inLanes op f d n q o pre post c) s (nx b) p (inv u (wo , wp , wq , v) w) =
     if-inv Base (alive s) (inv tt v (wo , wfs-++ pre wp w wq)) (inv tt v (wo , wfs-++ pre wp w wq))
@@ -605,7 +606,8 @@ module _ {R : Set} where
   rise-heard (inTake i q (cutAt r) c)          s e      p ce = tt
   rise-heard (inTake i q (overAt r) c)         s e      p ce = tt
   rise-heard (inOuter op f d n q ls c)         s (nx a) p ce = admit-heard c op f d n q s ls a p
-  rise-heard (inOuter op f d n q ls c)         s cp     p ce = settle-heard c (flatS op f true n q s ls) true n (Data.List.null q) p ce
+  rise-heard (inOuter op f true n q ls c)      s cp     p ce = tt
+  rise-heard (inOuter op f false n q ls c)     s cp     p ce = settle-heard c (flatS op f true n q s ls) true n (Data.List.null q) p ce
   rise-heard (inLanes op f d n q o pre post c) s (nx b) p ce = if-inv Heard (alive s) ce tt
   rise-heard (inLanes op f d n q o pre post c) s cp     p ce =
     if-inv Heard (alive s) (dequeue-heard c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p ce) tt
@@ -858,7 +860,8 @@ module _ {R : Set} where
   rise-lead (inTake i q (overAt r) c)         s (nx a) p l iv = tt
   rise-lead (inTake i q (overAt r) c)         s cp     p l iv = tt
   rise-lead (inOuter op f d n q ls c)         s (nx a) p l iv = admit-lead c op f d n q s ls a p iv
-  rise-lead (inOuter op f d n q ls c)         s cp     p l iv = settle-lead c (flatS op f true n q s ls) true n (null q) p (proj₂ l)
+  rise-lead (inOuter op f true n q ls c)      s cp     p l iv = tt
+  rise-lead (inOuter op f false n q ls c)     s cp     p l iv = settle-lead c (flatS op f true n q s ls) true n (null q) p (proj₂ l)
   rise-lead (inLanes op f d n q o pre post c) s (nx b) p l iv with alive s
   ... | true  = proj₂ (l refl)
   ... | false = tt
