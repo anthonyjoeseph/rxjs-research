@@ -8,6 +8,18 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE SCOPE
+
+Untried: a lane joined to a running source shows the source, whatever its
+step, so a flatMap frame's link to the meaning reads every connect above
+it. Open: whether the race the pick ran clears each running source of where
+it lands (strictly, at the source's shown position), and whether `Frag`
+reaches the ghost's `Sane`/`Placed` at a frame or the invariant must carry
+them. Settled by bodies, or a refutation of either.
+
+Members: `won-scope`, `beat-scope`, `lanes-sane`, `lanes-placed`,
+`pool-link`.
+
 #### THE FLIGHT KEPT
 
 Untried: a connect's body keyed under its source's environment entry, past
@@ -168,7 +180,7 @@ whose connect is over; a step keeps the tree in the fragment. Probed on the
 spike engine. Settled when each is a body.
 
 Members: `search-hit`, `search-won`, `found-own`, `frag-next`, `run-lead`,
-`sides-link`, `limited-sides`, `outer-link`, `body-link`.
+`sides-link`, `limited-sides`, `body-link`.
 
 #### THE HEADS
 

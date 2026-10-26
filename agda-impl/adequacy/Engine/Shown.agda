@@ -46,6 +46,7 @@ open import adequacy.Engine.Pick using (Beat; past; KAfter; KNotBefore; Lost; bo
   lane-sides; outer-link)
 open import adequacy.Engine.Head.Within using (frag-flat; frag-parts)
 open import adequacy.Engine.Ahead using (Under; shows; shows-open; shown)
+open import adequacy.Engine.Scope using (Scope)
 open import adequacy.Engine.Drop using (Dropsˢ; Pass; SrcPass; mapped-drops; scanned-drops; took-drops; lanes-drops; body-drops;
   outer-drops; src-drops; ≋-⊒)
 open import adequacy.Engine.Beside using (Sourced; sourced; sourced-≋)
@@ -67,6 +68,9 @@ keyAt false q = at q
 keyAt true  q = after q
 
 postulate
+  -- Every connect a still find beats on its way up runs its source clear
+  -- of each position the find's key covers.
+  beat-scope : ∀ {R Γ A} key k (c : Ctx R Γ A) (s : St Γ A) → Beat key c s → key <ᴷ at k ≡ false → Frag (plug c s) → closed c ≡ false → Scope k c
   -- The search finds a node by one of its own marks.
   found-own : ∀ {R} (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} → search top t ≡ just (found (Γ , A , c , s) m key)
             → (m , key) ∈ own s
@@ -237,7 +241,7 @@ beat-pass v q (inTake i p (cpAt _) c) s f so w ft u () fl x d s′ ft′ u′ fl
 beat-pass v q (inTake i p (cutAt _) c) s f so w ft u () fl x d s′ ft′ u′ fl′ x′
 beat-pass v q (inTake i p (overAt _) c) s f so w ft u () fl x d s′ ft′ u′ fl′ x′
 beat-pass v q (inOuter op g true n p ls c) s f so w ft u () fl x d s′ ft′ u′ fl′ x′
-beat-pass v q {P} (inOuter op g false n p ls c) s f so (r , w) ft u sh fl x d s′ ft′ u′ fl′ x′ =
+beat-pass v q {P} (inOuter op g false n p ls c) s f so bw@(r , w) ft u sh fl x d s′ ft′ u′ fl′ x′ =
   ol , beat-pass v q c (flatS op g false n p s ls) true so w ft tt sh refl
          (≋-trans (λ m → outerFrame-ne op (lane g) false p (lanesL ls) (deadL ls) (envAt c) (x m)) (outer-plug op g false n p ls s (envAt c)))
          (outer-drops op (lane g) p (lanesL ls) (deadL ls) (envAt c) ol d)
@@ -247,12 +251,12 @@ beat-pass v q {P} (inOuter op g false n p ls c) s f so (r , w) ft u sh fl x d s�
     parts = frag-parts op g false n p s ls (frag-flat c op g false n p s ls (proj₁ ft))
     ol : ∀ k → P k → All (λ l → After k (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore k (poolT (deadL ls) (envAt c))
     ol k pk =
-      outer-link c k op g n p s ls (proj₁ ft)
+      outer-link c k op g n p s ls (proj₁ ft) (beat-scope (keyAt v q) k (inOuter op g false n p ls c) s bw (cover v q so k pk) (proj₁ ft) (shows-open c true sh))
         (race-steps KAfter (After k) (keyAt v q) (λ y st a ag → after-step k y st (kafter-≤ (keyAt v q) k y (cover v q so k pk) a) ag)
            c op g false n p s [] ls [] (shows-open c true sh) (proj₂ parts) r)
         (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
 beat-pass v q (inLanes op g dd n p o pre post c) s false so w ft u () fl x d s′ ft′ u′ fl′ x′
-beat-pass v q {P} (inLanes op g dd n p o pre post c) s true {h} so (l , w) ft u sh fl x d s′ ft′ u′ fl′ x′ =
+beat-pass v q {P} (inLanes op g dd n p o pre post c) s true {h} so bw@(l , w) ft u sh fl x d s′ ft′ u′ fl′ x′ =
   fi , beat-pass v q c (flatS op g dd n p o (pre ʳ++ s ∷ post)) true so w ft tt sh refl
          (≋-trans (λ m → lanesFrame-ne op (lane g) dd p (gh o) (reverse pre) post true (envAt c) (x m))
            (subst (λ b → lanesFrame op (lane g) dd p (gh o) (reverse pre) post b (envAt c) (stateᴺ (gh s) (envAt c))
@@ -268,6 +272,7 @@ beat-pass v q {P} (inLanes op g dd n p o pre post c) s true {h} so (l , w) ft u 
     fi : ∀ k → P k → First k (outerᴺ (lane g) (outerG dd (gh o)) (envAt c)) (states (lanesL post) (envAt c))
                        (states (lanesL (reverse pre)) (envAt c)) (outerT dd (gh o) (envAt c) (poolRuns (reverse pre) post true (envAt c) h))
     fi k pk = lane-sides k c op g dd n p o pre post s (shows-open c true sh)
+                (beat-scope (keyAt v q) k (inLanes op g dd n p o pre post c) s bw (cover v q so k pk) (proj₁ ft) (shows-open c true sh))
                 (lanewon-≤ (keyAt v q) k c op g dd n p o pre post s (cover v q so k pk) l) (proj₁ ft) (frag-flat c op g dd n p o (pre ʳ++ s ∷ post) (proj₁ ft))
 beat-pass v q {P} (inSrc (cs false true sa ba as nothing r en) b c) s f so (ka , bf , bt) ft u sh fl x d s′ ft′ u′ fl′ x′ =
   sourced-≋ x (src-sourced c sa ba as r en s b ft) , sp , beat-pass true q c (connS kk s b) true (sought-under v q so) (subst (λ K → Beat K c (connS kk s b)) (past-key v q) bt) ft tt sh refl

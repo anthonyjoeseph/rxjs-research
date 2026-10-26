@@ -63,6 +63,10 @@ open import adequacy.Engine.Head.Within using (frag-flat; frag-body; frag-parts)
 open import adequacy.Engine.Keys using (Keyed; Keys)
 open import adequacy.Engine.Above using (Flight)
 open import adequacy.Engine.Ahead using (Sides; Ahead; Under; shown; shows-open) renaming (shows to showsᶜ)
+open import adequacy.Engine.Scope using (Scope; modes; firsts-after)
+open import adequacy.Sane using (Saneᴸ)
+open import adequacy.Placed.Order using (Placedᴸ)
+open import adequacy.Stepper using (firstᴸ)
 
 ------------------------------------------------------------------------
 -- What a rising lane leads
@@ -421,41 +425,72 @@ record StepSides {Γ A B} (p : Pos) d (o : St Γ A) (pre post : List (St Γ B)) 
     poolS  : step (poolG d (gh o) (deadL (pre ++ s ∷ post))) ≡ hushˢ
 
 postulate
-  -- An outer first: its flatMap's lanes, each after it as the race read
-  -- them, are after it in the meaning; a pool the stepper hushes leaves
-  -- nothing running before it.
-  outer-link : ∀ {R Γ A B} (c : Ctx R Γ B) q op (f : A → Obs Timeline Γ B) n q′ (o : St Γ A) ls
-             → Frag (plug c (flatS op f false n q′ o ls))
-             → All (λ m → After q (headˢ (step m))) (lanesL ls) → step (poolG false (gh o) (deadL ls)) ≡ hushˢ
-             → All (λ l → After q (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore q (poolT (deadL ls) (envAt c))
-  -- The meaning's heads are the stepper's; a pool the stepper hushes
-  -- leaves nothing running.
+  -- A flatMap's lanes are a run's configuration where its frame sits:
+  -- each joiner told exactly when its connect's source has ended.
+  lanes-sane : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls
+             → Frag (plug c (flatS op f d n q o ls)) → Saneᴸ (modes c) (lanesL ls)
+  -- Its lanes are placed in the environment the frame reads.
+  lanes-placed : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls
+               → Frag (plug c (flatS op f d n q o ls)) → Placedᴸ (lanesL ls) (envAt c)
+  -- A pool the stepper hushes leaves nothing running before any position.
+  pool-link : ∀ {R Γ A B} (c : Ctx R Γ B) q op (f : A → Obs Timeline Γ B) n q′ (o : St Γ A) ls
+            → Frag (plug c (flatS op f false n q′ o ls)) → step (poolG false (gh o) (deadL ls)) ≡ hushˢ
+            → TailNotBefore q (poolT (deadL ls) (envAt c))
+  -- Every connect the pick passes on its way up runs its source clear of
+  -- where the pick lands.
+  won-scope : ∀ {R Γ A} p o (c : Ctx R Γ A) (s : St Γ A) → Won (at p , o) c s → Frag (plug c s) → closed c ≡ false → Scope p c
+  -- The meaning's heads are the stepper's, every running source in scope
+  -- clear of `p`; a pool the stepper hushes leaves nothing running.
+  --
+  -- REFUTED: 74fd133e `sides-link` without `Scope`, by a newer lane joined to
+  --   a running source and fed nothing: its step hushes, its meaning shows
+  --   the source.
   sides-link : ∀ {R Γ A B} (c : Ctx R Γ B) p (f : A → Obs Timeline Γ B) d n (o : St Γ A) pre post (s : St Γ B)
-             → Frag (plug c (flatS (mergeᶠ nothing) f d n [] o (pre ʳ++ s ∷ post))) → StepSides p d o (reverse pre) post s
+             → Frag (plug c (flatS (mergeᶠ nothing) f d n [] o (pre ʳ++ s ∷ post))) → Scope p c → StepSides p d o (reverse pre) post s
              → Sides p f d o (reverse pre) post (envAt c)
 
   -- A bounded, switching or exhausting flatMap's lane that won: its
   -- queue and its one-lane rule sit outside the stepper's race, so the
   -- merge clause's route does not apply as written.
+  --
+  -- REFUTED: 07e6d07a `limited-sides` without `Scope`, by a switch whose outer
+  --   joins a running source and is fed nothing: no candidate, so the lane
+  --   wins, while the outer's meaning shows the source.
   limited-sides : ∀ {R Γ A B} p (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B)
-                → (op ≡ mergeᶠ nothing → ⊥) → closed c ≡ false → LaneWon (at p) c op f d n q o pre post s
+                → (op ≡ mergeᶠ nothing → ⊥) → closed c ≡ false → Scope p c → LaneWon (at p) c op f d n q o pre post s
                 → Frag (plug c (flatS op f d n q o (pre ʳ++ s ∷ post))) → Sides p f d o (reverse pre) post (envAt c)
+
+-- An outer first: its flatMap's lanes, each after it as the race read
+-- them and every running source in scope clear of it, are after it in
+-- the meaning.
+--
+-- REFUTED: 74fd133e `outer-link` without `Scope`, by a lane joined to a
+--   running source and fed nothing: its step hushes, its meaning shows the
+--   source.
+outer-link : ∀ {R Γ A B} (c : Ctx R Γ B) q op (f : A → Obs Timeline Γ B) n q′ (o : St Γ A) ls
+           → Frag (plug c (flatS op f false n q′ o ls)) → Scope q c
+           → All (λ m → After q (headˢ (step m))) (lanesL ls) → step (poolG false (gh o) (deadL ls)) ≡ hushˢ
+           → All (λ l → After q (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore q (poolT (deadL ls) (envAt c))
+outer-link c q op f n q′ o ls ft sc hs ph =
+  firsts-after (modes c) (envAt c) q (lanesL ls) sc
+    (firstᴸ (lanesL ls) (envAt c) (lanes-sane c op f false n q′ o ls ft) (lanes-placed c op f false n q′ o ls ft)) hs
+  , pool-link c q op f n q′ o ls ft ph
 
 -- The frame a lane won: what the pick establishes of its siblings.
 lane-sides : ∀ {R Γ A B} p (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B)
-           → closed c ≡ false → LaneWon (at p) c op f d n q o pre post s → Frag (plug c (flatS op f d n q o (pre ʳ++ s ∷ post)))
+           → closed c ≡ false → Scope p c → LaneWon (at p) c op f d n q o pre post s → Frag (plug c (flatS op f d n q o (pre ʳ++ s ∷ post)))
            → Frag (flatS op f d n q o (pre ʳ++ s ∷ post)) → Sides p f d o (reverse pre) post (envAt c)
-lane-sides p c (mergeᶠ nothing) f d n [] o pre post s cl (lane-won wo wold wnew) ft (fo , fl , en , dd) =
-  sides-link c p f d n o pre post s ft
+lane-sides p c (mergeᶠ nothing) f d n [] o pre post s cl sc (lane-won wo wold wnew) ft (fo , fl , en , dd) =
+  sides-link c p f d n o pre post s ft sc
     (step-sides (race-steps KNotBefore (NotBefore p) (at p) (not-before-step p) c (mergeᶠ nothing) f d n [] o (s ∷ pre) post [] cl
                   (proj₂ (proj₂ (lanes-ʳsplit pre fl))) wnew)
                 (race-steps KAfter (After p) (at p) (after-step p) c (mergeᶠ nothing) f d n [] o [] (reverse pre) (s ∷ post) cl
                   (proj₁ (lanes-ʳsplit pre fl)) wold)
                 (λ { refl → not-before-step p _ (step (gh o)) wo (open-agrees (inOuter (mergeᶠ nothing) f false n [] (pre ʳ++ s ∷ post) c) o cl fo) })
                 (subst (λ ls → step (poolG d (gh o) (deadL ls)) ≡ hushˢ) (ʳ++-defn pre) (pool-step d o (pre ʳ++ s ∷ post) fo fl (λ e → proj₂ (dd e)))))
-lane-sides p c (mergeᶠ (just m)) f d n q o pre post s cl w ft _ = limited-sides p c (mergeᶠ (just m)) f d n q o pre post s (λ ()) cl w ft
-lane-sides p c switchᶠ f d n q o pre post s cl w ft _ = limited-sides p c switchᶠ f d n q o pre post s (λ ()) cl w ft
-lane-sides p c exhaustᶠ f d n q o pre post s cl w ft _ = limited-sides p c exhaustᶠ f d n q o pre post s (λ ()) cl w ft
+lane-sides p c (mergeᶠ (just m)) f d n q o pre post s cl sc w ft _ = limited-sides p c (mergeᶠ (just m)) f d n q o pre post s (λ ()) cl sc w ft
+lane-sides p c switchᶠ f d n q o pre post s cl sc w ft _ = limited-sides p c switchᶠ f d n q o pre post s (λ ()) cl sc w ft
+lane-sides p c exhaustᶠ f d n q o pre post s cl sc w ft _ = limited-sides p c exhaustᶠ f d n q o pre post s (λ ()) cl sc w ft
 
 -- A live lane's value passes its flatMap's retag unchanged.
 lane-on : ∀ {R Γ A B} d n (q : List A) {b} {k} (a : B) {c : Ctx R Γ B} {t} → b ≡ true
@@ -500,8 +535,8 @@ won-ahead k (inTake i q (cpAt _) c)   s f w ft ()
 won-ahead k (inTake i q (cutAt _) c)  s f w ft ()
 won-ahead k (inTake i q (overAt _) c) s f w ft ()
 won-ahead k (inOuter op g true n q ls c) s f w ft ()
-won-ahead k (inOuter op g false n q ls c) s f (r , w , _) ft sh =
-  (λ { _ refl → outer-link c k op g n q s ls ft
+won-ahead k (inOuter op g false n q ls c) s f wn@(r , w , _) ft sh =
+  (λ { _ refl → outer-link c k op g n q s ls ft (won-scope k still (inOuter op g false n q ls c) s wn ft cl)
                   (race-steps KAfter (After k) (at k) (after-step k) c op g false n q s [] ls [] cl (proj₂ parts) r)
                   (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ())) })
   , won-ahead k c (flatS op g false n q s ls) true w ft sh
@@ -509,8 +544,9 @@ won-ahead k (inOuter op g false n q ls c) s f (r , w , _) ft sh =
     cl    = shows-open c true sh
     parts = frag-parts op g false n q s ls (frag-flat c op g false n q s ls ft)
 won-ahead k (inLanes op g d n q o pre post c) s false w ft ()
-won-ahead k (inLanes op g d n q o pre post c) s true (l , _ , w) ft sh =
-  (λ { _ refl → lane-sides k c op g d n q o pre post s (shows-open c true sh) l ft (frag-flat c op g d n q o (pre ʳ++ s ∷ post) ft) })
+won-ahead k (inLanes op g d n q o pre post c) s true wn@(l , _ , w) ft sh =
+  (λ { _ refl → lane-sides k c op g d n q o pre post s (shows-open c true sh)
+                  (won-scope k still (inLanes op g d n q o pre post c) s wn ft (shows-open c true sh)) l ft (frag-flat c op g d n q o (pre ʳ++ s ∷ post) ft) })
   , won-ahead k c (flatS op g d n q o (pre ʳ++ s ∷ post)) true (lane-still d n q (alive s) {at k} {c} w) ft sh
 won-ahead k (inSrc (cs false true sa ba as nothing r en) b c) s f (ka , _ , w) ft sh = won-src k c sa ba as r en s b ka w ft sh
 won-ahead k (inSrc (cs false true sa ba as (just _) r en) b c) s f w ft ()
@@ -540,15 +576,15 @@ won-clear p a (inTake i q (cpAt r) c)           s s′ al ce w ft = tt
 won-clear p a (inTake i q (cutAt r) c)          s s′ al ce w ft = tt
 won-clear p a (inTake i q (overAt r) c)         s s′ al ce w ft = tt
 won-clear p a (inOuter op f true n q ls c)      s s′ al ce (_ , _ , ()) ft
-won-clear p a (inOuter op f false n q ls c)     s s′ al ce (r , w , u) ft =
+won-clear p a (inOuter op f false n q ls c)     s s′ al ce wn@(r , w , u) ft =
   cl , proj₁ ol , proj₂ ol , won-ahead (p ⊕ [ ix 0 ]) c (flatS op f false n q s ls) true w ft
   where
     cl    = unrisen-open (closed c) u
     parts = frag-parts op f false n q s ls (frag-flat c op f false n q s ls ft)
-    ol    = outer-link c p op f n q s ls ft (race-steps KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) r)
+    ol    = outer-link c p op f n q s ls ft (won-scope p (shows (nx a)) (inOuter op f false n q ls c) s wn ft ce) (race-steps KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) r)
               (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
-won-clear p a (inLanes op f d n q o pre post c) s s′ al ce (l , _ , w) ft lv =
-  lane-sides p c op f d n q o pre post s ce l ft (frag-flat c op f d n q o (pre ʳ++ s ∷ post) ft)
+won-clear p a (inLanes op f d n q o pre post c) s s′ al ce wn@(l , _ , w) ft lv =
+  lane-sides p c op f d n q o pre post s ce (won-scope p (shows (nx a)) (inLanes op f d n q o pre post c) s wn ft ce) l ft (frag-flat c op f d n q o (pre ʳ++ s ∷ post) ft)
   , won-clear p a c (flatS op f d n q o (pre ʳ++ s ∷ post)) (flatS op f d n q o (pre ʳ++ s′ ∷ post)) refl ce
       (lane-on d n q {alive s} {at p} a {c} {flatS op f d n q o (pre ʳ++ s ∷ post)} (trans al lv) w) ft
 won-clear p a (inSrc kk b c)                    s s′ al ce (w , _) ft with over kk
@@ -580,10 +616,11 @@ ends-queued true  true  p c s = tt
 
 -- An open outer's end, won, leads its lanes and its pool.
 outer-ends : ∀ {R Γ A B} p (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (s : St Γ A) ls
-           → Race KAfter (at p) c op f d n q s [] ls [] → Frag (plug c (flatS op f d n q s ls)) → d ≡ false → closed c ≡ false
+           → Won (at p , shows cp) (inOuter op f d n q ls c) s → Frag (plug c (flatS op f d n q s ls)) → d ≡ false → closed c ≡ false
            → All (λ l → After p (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore p (poolT (deadL ls) (envAt c))
-outer-ends p c op f d n q s ls r ft refl cl =
-  outer-link c p op f n q s ls ft (race-steps KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) r)
+outer-ends p c op f d n q s ls wn ft refl cl =
+  outer-link c p op f n q s ls ft (won-scope p (shows cp) (inOuter op f false n q ls c) s wn ft cl)
+    (race-steps KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) (proj₁ wn))
     (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
   where parts = frag-parts op f false n q s ls (frag-flat c op f false n q s ls ft)
 
@@ -602,17 +639,17 @@ mutual
   won-ends p (inTake i q (cpAt r) c)           s s′ al w ft = tt
   won-ends p (inTake i q (cutAt r) c)          s s′ al w ft = tt
   won-ends p (inTake i q (overAt r) c)         s s′ al w ft = tt
-  won-ends p (inOuter op f d n q ls c)         s s′ al (r , w , _) ft =
-    outer-ends p c op f d n q s ls r ft , ends-if p c ((n ≡ᵇ 0) ∧ null q) (flatS op f d n q s ls) (flatS op f true n q s′ ls) refl w ft
-  won-ends p (inLanes op f d n [] o pre post c) s s′ al (l , u , w) ft =
-    trans (sym al) lv , (λ cl → lane-sides p c op f d n [] o pre post s cl l ft (frag-flat c op f d n [] o (pre ʳ++ s ∷ post) ft))
+  won-ends p (inOuter op f d n q ls c)         s s′ al wn@(r , w , _) ft =
+    outer-ends p c op f d n q s ls wn ft , ends-if p c ((n ≡ᵇ 0) ∧ null q) (flatS op f d n q s ls) (flatS op f true n q s′ ls) refl w ft
+  won-ends p (inLanes op f d n [] o pre post c) s s′ al wn@(l , u , w) ft =
+    trans (sym al) lv , (λ cl → lane-sides p c op f d n [] o pre post s cl (won-scope p (shows cp) (inLanes op f d n [] o pre post c) s wn ft cl) l ft (frag-flat c op f d n [] o (pre ʳ++ s ∷ post) ft))
     , subst (λ b → EndsIf (d ∧ b) p c (flatS op f d (pred n) [] o (pre ʳ++ ended s′ ∷ post))) (sym (∧-identityʳ (pred n ≡ᵇ 0)))
         (ends-if p c (d ∧ (pred n ≡ᵇ 0)) (flatS op f d n [] o (pre ʳ++ s ∷ post)) (flatS op f d (pred n) [] o (pre ʳ++ ended s′ ∷ post)) refl
            (lane-off d n [] {alive s} {at p} {c} lv w) ft)
     , tt
     where lv = pooled-live (alive s) u
-  won-ends p (inLanes op f d n (a ∷ q) o pre post c) s s′ al (l , u , w) ft =
-    trans (sym al) lv , (λ cl → lane-sides p c op f d n (a ∷ q) o pre post s cl l ft (frag-flat c op f d n (a ∷ q) o (pre ʳ++ s ∷ post) ft))
+  won-ends p (inLanes op f d n (a ∷ q) o pre post c) s s′ al wn@(l , u , w) ft =
+    trans (sym al) lv , (λ cl → lane-sides p c op f d n (a ∷ q) o pre post s cl (won-scope p (shows cp) (inLanes op f d n (a ∷ q) o pre post c) s wn ft cl) l ft (frag-flat c op f d n (a ∷ q) o (pre ʳ++ s ∷ post) ft))
     , ends-queued d (pred n ≡ᵇ 0) p c (flatS op f d (pred n) (a ∷ q) o (pre ʳ++ ended s′ ∷ post))
     , λ sh → won-ahead (p ⊕ [ ix 0 ]) c (flatS op f d n (a ∷ q) o (pre ʳ++ s ∷ post)) true (lane-shift d n a q {alive s} {at p} {c} lv w) ft sh
     where lv = pooled-live (alive s) u
