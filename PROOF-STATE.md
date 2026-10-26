@@ -10,15 +10,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SCOPE
 
-Untried: a lane joined to a running source shows the source, whatever its
-step, so a flatMap frame's link to the meaning reads every connect above
-it. Open: whether the race the pick ran clears each running source of where
-it lands (strictly, at the source's shown position), and whether `Frag`
-reaches the ghost's `Sane`/`Placed` at a frame or the invariant must carry
-them. Settled by bodies, or a refutation of either.
+A frame's link to the meaning reads every connect above it: each running
+source at or past the pick, derived per connect from its lost race through
+`Stepper.first`. Open: whether `Frag` reaches the ghost's `Sane`/`Placed`
+at a frame, or the invariant must carry them; a source not yet subscribed;
+a pool the stepper hushes. Settled by bodies, or a refutation of either.
 
-Members: `won-scope`, `beat-scope`, `lanes-sane`, `lanes-placed`,
-`pool-link`.
+Members: `src-sane`, `src-placed`, `lanes-sane`,
+`lanes-placed`, `pool-link`.
 
 #### THE FLIGHT KEPT
 

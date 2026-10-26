@@ -32,12 +32,13 @@
 --   is already at the shifted key.
 module adequacy.Engine.Pick where
 
-open import Data.Empty using (⊥)
+open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∨_; _∧_)
 open import Data.Bool.Properties using (∧-identityʳ)
 open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; reverse; null)
 open import Data.List.Properties using (ʳ++-defn)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
+open import denotation.Unfold using (NEnv)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to all-++⁺)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; pred; _≡ᵇ_)
@@ -46,9 +47,9 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.MonotonicList.Events using (Pos; Timeline; Events∞; idle; hush; ix)
+open import denotation.MonotonicList.Events using (Pos; Timeline; Events∞; idle; hush; ix; <ᵖ-below)
 open import denotation.MonotonicList using (head; Agreeᵀ)
-open import denotation.Unfold using (Step; states; step; headˢ; hushˢ; outˢ; skipˢ; endˢ)
+open import denotation.Unfold using (Step; states; step; headˢ; hushˢ; outˢ; skipˢ; endˢ; subscribe)
 open import operation.Key using (Key; at; after; _<ᴷ_)
 open import operation.PureObservable using (peek; module Machine)
 open Machine using (St; cs; mapS; scanS; cutS; lnS; takeS; flatS; connS; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes;
@@ -57,16 +58,18 @@ open Machine using (St; cs; mapS; scanS; cutS; lnS; takeS; flatS; connS; Ctx; to
   renaming (outerT to outerK)
 open import adequacy.Engine.Meaning using (gh; poolG; lanesL; deadL; poolT; outerT; envAt; srcState; srcG)
 open import adequacy.Engine.Race using (NotBefore; After; TailNotBefore)
-open import adequacy.Engine.Head using (Frag; Lanes; Lane; Agrees; exact; early; HeadAt; cand; pool-step; at-<ᵖ; <≮ᴷ; ≮ᴷ-trans)
+open import adequacy.Engine.Head using (Frag; Lanes; Lane; Agrees; exact; early; HeadAt; cand; pool-step; at-<ᵖ; <≮ᴷ; ≮ᴷ-trans; ext-≮)
+open import adequacy.Engine.Head.Race using (shift-≮; sub-head)
 open import adequacy.Engine.Head.Agrees using (head-agrees)
-open import adequacy.Engine.Head.Within using (frag-flat; frag-body; frag-parts)
+open import adequacy.Engine.Head.Within using (frag-flat; frag-body; frag-parts; fr-at; conn-src)
 open import adequacy.Engine.Keys using (Keyed; Keys)
 open import adequacy.Engine.Above using (Flight)
 open import adequacy.Engine.Ahead using (Sides; Ahead; Under; shown; shows-open) renaming (shows to showsᶜ)
-open import adequacy.Engine.Scope using (Scope; modes; firsts-after)
-open import adequacy.Sane using (Saneᴸ)
+open import adequacy.Engine.Scope using (Scope; modes; firsts-after; FloorAt; FloorSrc; floor-lower; scope-src; ≮-lower; SaneSrc; PlacedSrc; HeadFloor; live-floor)
+open import adequacy.Sane using (Mode; Saneᴸ)
 open import adequacy.Placed.Order using (Placedᴸ)
 open import adequacy.Stepper using (firstᴸ)
+open import adequacy.Stepper.Past using (Floor)
 
 ------------------------------------------------------------------------
 -- What a rising lane leads
@@ -436,9 +439,10 @@ postulate
   pool-link : ∀ {R Γ A B} (c : Ctx R Γ B) q op (f : A → Obs Timeline Γ B) n q′ (o : St Γ A) ls
             → Frag (plug c (flatS op f false n q′ o ls)) → step (poolG false (gh o) (deadL ls)) ≡ hushˢ
             → TailNotBefore q (poolT (deadL ls) (envAt c))
-  -- Every connect the pick passes on its way up runs its source clear of
-  -- where the pick lands.
-  won-scope : ∀ {R Γ A} p o (c : Ctx R Γ A) (s : St Γ A) → Won (at p , o) c s → Frag (plug c s) → closed c ≡ false → Scope p c
+  -- A connect's source is a run's configuration where its frame sits,
+  -- placed in the environment the frame reads.
+  src-sane : ∀ {R Γ X B} (c : Ctx R Γ B) kk (o : St Γ X) (b : St (X ∷ Γ) B) → Frag (plug c (connS kk o b)) → SaneSrc (modes c) (srcG kk o)
+  src-placed : ∀ {R Γ X B} (c : Ctx R Γ B) kk (o : St Γ X) (b : St (X ∷ Γ) B) → Frag (plug c (connS kk o b)) → PlacedSrc (srcG kk o) (envAt c)
   -- The meaning's heads are the stepper's, every running source in scope
   -- clear of `p`; a pool the stepper hushes leaves nothing running.
   --
@@ -459,6 +463,153 @@ postulate
   limited-sides : ∀ {R Γ A B} p (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B)
                 → (op ≡ mergeᶠ nothing → ⊥) → closed c ≡ false → Scope p c → LaneWon (at p) c op f d n q o pre post s
                 → Frag (plug c (flatS op f d n q o (pre ʳ++ s ∷ post))) → Sides p f d o (reverse pre) post (envAt c)
+
+-- A candidate lost to its body: lost where the race reads it past.
+lost-past : ∀ {A} v k (x : Maybe (Key × Out A)) → Lost v k x → Lost false k x
+lost-past false k x                    lo = lo
+lost-past true  k nothing              lo = tt
+lost-past true  k (just (at h , _))    lo = ≮ᴷ-trans (at (h ++ [ ix 0 ])) (at h) k (ext-≮ h [ ix 0 ]) lo
+lost-past true  k (just (after h , _)) lo = lo
+
+-- A source's step, its candidate lost to a body at `p`, shows at or past `p`.
+lost-floor : ∀ {Γ A} p (x : Maybe (Key × Out A)) (t : Step Γ A) → Lost false (at p) x → Agrees x t → FloorAt p (headˢ t)
+lost-floor p _ (outˢ h a n) lo (exact refl) = subst (λ b → b ≡ false) (at-<ᵖ (h ++ [ ix 0 ]) p) lo
+lost-floor p _ (skipˢ h n)  lo (exact refl) = subst (λ b → b ≡ false) (at-<ᵖ (h ++ [ ix 0 ]) p) lo
+lost-floor p _ (endˢ h)     lo (exact refl) = subst (λ b → b ≡ false) (at-<ᵖ (h ++ [ ix 0 ]) p) lo
+lost-floor p _ hushˢ        lo _            = tt
+lost-floor p (just (k , still)) (outˢ h a n) lo (early u) =
+  subst (λ b → b ≡ false) (at-<ᵖ (h ++ [ ix 0 ]) p) (≮ᴷ-trans (at (h ++ [ ix 0 ])) (shift k) (at p) (shift-≮ h k u) lo)
+lost-floor p (just (k , still)) (skipˢ h n)  lo (early u) =
+  subst (λ b → b ≡ false) (at-<ᵖ (h ++ [ ix 0 ]) p) (≮ᴷ-trans (at (h ++ [ ix 0 ])) (shift k) (at p) (shift-≮ h k u) lo)
+lost-floor p (just (k , still)) (endˢ h)     lo (early u) =
+  subst (λ b → b ≡ false) (at-<ᵖ (h ++ [ ix 0 ]) p) (≮ᴷ-trans (at (h ++ [ ix 0 ])) (shift k) (at p) (shift-≮ h k u) lo)
+
+-- A source subscribed at `r`, past the pick: its step shows at or past it.
+sub-floor : ∀ {Γ A} p r (o : Obs Timeline Γ A) → at p <ᴷ at r ≡ true → FloorAt p (headˢ (step (subscribe o r)))
+sub-floor p r o lt with headˢ (step (subscribe o r)) | sub-head o r
+... | nothing | _ = tt
+... | just h  | u = ≮-lower (h ++ [ ix 0 ]) p r (subst (λ b → b ≡ true) (at-<ᵖ p r) lt)
+                      (subst (λ b → b ≡ false) (at-<ᵖ (h ++ [ ix 0 ]) r) (≮ᴷ-trans (at (h ++ [ ix 0 ])) (at h) (at r) (ext-≮ h [ ix 0 ]) u))
+
+-- A connect's source, its race lost to a body at `p`, steps at or past
+-- `p`: subscribed, its step agrees with the candidate that lost; not
+-- yet, its subscription lies at the connect's own mark, after `p`.
+src-head : ∀ {R Γ X B} p (c : Ctx R Γ B) kk (o : St Γ X) (b : St (X ∷ Γ) B)
+         → Lost false (at p) (cand (inSrc kk b c) o) → Before (at p) (own (connS kk o b)) → Frag (plug c (connS kk o b)) → HeadFloor p (srcG kk o)
+src-head p c (cs false sl sa nothing as ow r en) o b lo bf ft =
+  lost-floor p (cand (inSrc K b c) o) (step (gh o)) lo (open-agrees (inSrc K b c) o refl (conn-src K o b (fr-at c (connS K o b) ft)))
+  where K = cs false sl sa nothing as ow r en
+src-head p c (cs true sl sa nothing as ow r en) o b lo bf ft = tt
+src-head p c (cs cl sl sa (just q) nothing ow r en) (pend o) b lo (bm ∷ _) ft = sub-floor p (q ⊕ [ ix 1 ]) o bm
+src-head p c (cs cl sl sa (just q) (just x) ow r en) o b lo bf ft = ⊥-elim (fr-at c (connS _ o b) ft)
+src-head p c (cs cl sl sa (just q) nothing ow r en) (coldS x y) b lo bf ft = ⊥-elim (fr-at c (connS _ (coldS x y) b) ft)
+src-head p c (cs cl sl sa (just q) nothing ow r en) (ofS x y z) b lo bf ft = ⊥-elim (fr-at c (connS _ (ofS x y z) b) ft)
+src-head p c (cs cl sl sa (just q) nothing ow r en) (doneS) b lo bf ft = ⊥-elim (fr-at c (connS _ (doneS) b) ft)
+src-head p c (cs cl sl sa (just q) nothing ow r en) (mapS x y) b lo bf ft = ⊥-elim (fr-at c (connS _ (mapS x y) b) ft)
+src-head p c (cs cl sl sa (just q) nothing ow r en) (scanS x y z) b lo bf ft = ⊥-elim (fr-at c (connS _ (scanS x y z) b) ft)
+src-head p c (cs cl sl sa (just q) nothing ow r en) (cutS x y z) b lo bf ft = ⊥-elim (fr-at c (connS _ (cutS x y z) b) ft)
+src-head p c (cs cl sl sa (just q) nothing ow r en) (lnS x y) b lo bf ft = ⊥-elim (fr-at c (connS _ (lnS x y) b) ft)
+src-head p c (cs cl sl sa (just q) nothing ow r en) (takeS x y z w) b lo bf ft = ⊥-elim (fr-at c (connS _ (takeS x y z w) b) ft)
+src-head p c (cs cl sl sa (just q) nothing ow r en) (flatS x y z w u v t) b lo bf ft = ⊥-elim (fr-at c (connS _ (flatS x y z w u v t) b) ft)
+src-head p c (cs cl sl sa (just q) nothing ow r en) (connS x y z) b lo bf ft = ⊥-elim (fr-at c (connS _ (connS x y z) b) ft)
+src-head p c (cs cl sl sa (just q) nothing ow r en) (joinS x y z w) b lo bf ft = ⊥-elim (fr-at c (connS _ (joinS x y z w) b) ft)
+
+-- A connect's source, its race lost to a body at `p` and every running
+-- source above at or past `p`, shows at or past `p`: its step does, and
+-- its meaning starts there or past a source above.
+src-floor : ∀ {R Γ X B} p (c : Ctx R Γ B) kk (o : St Γ X) (b : St (X ∷ Γ) B)
+          → Lost false (at p) (cand (inSrc kk b c) o) → Before (at p) (own (connS kk o b)) → Frag (plug c (connS kk o b)) → Scope p c
+          → FloorSrc p (srcG kk o) (envAt c)
+src-floor p c kk o b lo bf ft sc =
+  live-floor (modes c) p (srcG kk o) (envAt c) (src-sane c kk o b ft) (src-placed c kk o b ft) (src-head p c kk o b lo bf ft) sc
+
+-- Every running source in scope at or past a key's position; past an
+-- `after`, nothing asked.
+FloorK : ∀ {Γ} → Key → All (λ _ → Mode) Γ → NEnv Γ → Set
+FloorK (at p)    ν ρ = Floor ν p ρ
+FloorK (after p) ν ρ = ⊤
+
+-- The key a frame's retag passes up: the same, or just past it.
+data Rises (k : Key) : Key → Set where
+  same  : Rises k k
+  moved : Rises k (shift k)
+
+rises-floor : ∀ {Γ} {k k′} (ν : All (λ _ → Mode) Γ) (ρ : NEnv Γ) → Rises k k′ → FloorK k′ ν ρ → FloorK k ν ρ
+rises-floor               ν ρ same  f = f
+rises-floor {k = at p}    ν ρ moved f = floor-lower ν ρ p (p ++ [ ix 0 ]) (<ᵖ-below p []) f
+rises-floor {k = after p} ν ρ moved f = tt
+
+map-rises : ∀ {A B} (f : A → B) k (o : Out A) → Rises k (proj₁ (mapT f k o))
+map-rises f k still     = same
+map-rises f k (shows e) = same
+
+scan-rises : ∀ {A B} (f : B → A → B) z k (o : Out A) → Rises k (proj₁ (scanT f z k o))
+scan-rises f z k (shows (nx a)) = same
+scan-rises f z k (shows cp)     = same
+scan-rises f z k still          = same
+
+take-rises : ∀ {A} i (q : A → Bool) w k (o : Out A) → Rises k (proj₁ (takeT i q w k o))
+take-rises true  q free k (shows (nx a)) with q a
+... | true  = same
+... | false = moved
+take-rises false q free k (shows (nx a)) with q a
+... | true  = same
+... | false = same
+take-rises i q free       k (shows cp) = same
+take-rises i q free       k still      = same
+take-rises i q (cpAt r)   k o          = same
+take-rises i q (cutAt r)  k o          = same
+take-rises i q (overAt r) k o          = same
+
+outer-rises : ∀ {A B : Set} n (q : List A) k (o : Out A) → Rises k (proj₁ (outerK {B = B} n q k o))
+outer-rises n q k (shows cp)     = same
+outer-rises n q k (shows (nx a)) = moved
+outer-rises n q k still          = same
+
+lane-rises : ∀ {A B : Set} d n (q : List A) k (o : Out B) → Rises k (proj₁ (laneT d n q k o))
+lane-rises d n []      k (shows cp)     = same
+lane-rises d n (_ ∷ _) k (shows cp)     = moved
+lane-rises d n []      k (shows (nx a)) = same
+lane-rises d n (_ ∷ _) k (shows (nx a)) = same
+lane-rises d n []      k still          = same
+lane-rises d n (_ ∷ _) k still          = same
+
+src-rises : ∀ kk k → Rises k (if over kk then k else shift k)
+src-rises kk k with over kk
+... | true  = same
+... | false = moved
+
+-- Up the found node's frames: every connect the pick passes runs its
+-- source at or past where the pick lands there.
+won-floor : ∀ {R Γ A} k o (c : Ctx R Γ A) (s : St Γ A) → Won (k , o) c s → Frag (plug c s) → FloorK k (modes c) (envAt c)
+won-floor (at p)    o top s w ft = tt
+won-floor (after p) o top s w ft = tt
+won-floor k o (inMap f c) s w ft =
+  rises-floor (modes c) (envAt c) (map-rises f k o) (won-floor (proj₁ (mapT f k o)) (proj₂ (mapT f k o)) c (mapS f s) w ft)
+won-floor k o (inScan f z c) s w ft =
+  rises-floor (modes c) (envAt c) (scan-rises f z k o) (won-floor (proj₁ (scanT f z k o)) (proj₂ (scanT f z k o)) c (scanS f z s) w ft)
+won-floor k o (inCut l a c) s w ft = won-floor k (proj₂ (cutT l k o)) c (cutS l a s) w ft
+won-floor k o (inLn b c) s w ft = won-floor k o c (lnS b s) w ft
+won-floor k o (inTake i q w c) s wn ft =
+  rises-floor (modes c) (envAt c) (take-rises i q w k o) (won-floor (proj₁ (takeT i q w k o)) (proj₂ (takeT i q w k o)) c (takeS i q w s) wn ft)
+won-floor k o (inOuter op f d n q ls c) s (_ , w , _) ft =
+  rises-floor (modes c) (envAt c) (outer-rises n q k o) (won-floor (proj₁ (outerK n q k o)) (proj₂ (outerK n q k o)) c (flatS op f d n q s ls) w ft)
+won-floor k o (inLanes op f d n q o′ pre post c) s (_ , _ , w) ft =
+  rises-floor (modes c) (envAt c) (lane-rises d n q k o′′)
+    (won-floor (proj₁ (laneT d n q k o′′)) (proj₂ (laneT d n q k o′′)) c (flatS op f d n q o′ (pre ʳ++ s ∷ post)) w ft)
+  where o′′ = if alive s then o else still
+won-floor k o (inSrc kk b c) s (_ , _ , w) ft =
+  rises-floor (modes c) (envAt c) (src-rises kk k) (won-floor (if over kk then k else shift k) still c (connS kk s b) w ft)
+won-floor (after p) o (inBody kk o′ c) s w ft = tt
+won-floor (at p) o (inBody kk o′ c) s (_ , lo , bf , w) ft =
+  scope-src (modes c) p (srcG kk o′) (envAt c)
+    (src-floor p c kk o′ s (lost-past (over kk) (at p) (cand (inSrc kk s c) o′) lo) bf ft sc) sc
+  where sc = won-floor (at p) o c (connS kk o′ s) w ft
+
+-- Every connect the pick passes on its way up runs its source at or past
+-- where the pick lands.
+won-scope : ∀ {R Γ A} p o (c : Ctx R Γ A) (s : St Γ A) → Won (at p , o) c s → Frag (plug c s) → Scope p c
+won-scope p o c s w ft = won-floor (at p) o c s w ft
 
 -- An outer first: its flatMap's lanes, each after it as the race read
 -- them and every running source in scope clear of it, are after it in
@@ -536,7 +687,7 @@ won-ahead k (inTake i q (cutAt _) c)  s f w ft ()
 won-ahead k (inTake i q (overAt _) c) s f w ft ()
 won-ahead k (inOuter op g true n q ls c) s f w ft ()
 won-ahead k (inOuter op g false n q ls c) s f wn@(r , w , _) ft sh =
-  (λ { _ refl → outer-link c k op g n q s ls ft (won-scope k still (inOuter op g false n q ls c) s wn ft cl)
+  (λ { _ refl → outer-link c k op g n q s ls ft (won-scope k still (inOuter op g false n q ls c) s wn ft)
                   (race-steps KAfter (After k) (at k) (after-step k) c op g false n q s [] ls [] cl (proj₂ parts) r)
                   (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ())) })
   , won-ahead k c (flatS op g false n q s ls) true w ft sh
@@ -546,7 +697,7 @@ won-ahead k (inOuter op g false n q ls c) s f wn@(r , w , _) ft sh =
 won-ahead k (inLanes op g d n q o pre post c) s false w ft ()
 won-ahead k (inLanes op g d n q o pre post c) s true wn@(l , _ , w) ft sh =
   (λ { _ refl → lane-sides k c op g d n q o pre post s (shows-open c true sh)
-                  (won-scope k still (inLanes op g d n q o pre post c) s wn ft (shows-open c true sh)) l ft (frag-flat c op g d n q o (pre ʳ++ s ∷ post) ft) })
+                  (won-scope k still (inLanes op g d n q o pre post c) s wn ft) l ft (frag-flat c op g d n q o (pre ʳ++ s ∷ post) ft) })
   , won-ahead k c (flatS op g d n q o (pre ʳ++ s ∷ post)) true (lane-still d n q (alive s) {at k} {c} w) ft sh
 won-ahead k (inSrc (cs false true sa ba as nothing r en) b c) s f (ka , _ , w) ft sh = won-src k c sa ba as r en s b ka w ft sh
 won-ahead k (inSrc (cs false true sa ba as (just _) r en) b c) s f w ft ()
@@ -581,10 +732,10 @@ won-clear p a (inOuter op f false n q ls c)     s s′ al ce wn@(r , w , u) ft =
   where
     cl    = unrisen-open (closed c) u
     parts = frag-parts op f false n q s ls (frag-flat c op f false n q s ls ft)
-    ol    = outer-link c p op f n q s ls ft (won-scope p (shows (nx a)) (inOuter op f false n q ls c) s wn ft ce) (race-steps KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) r)
+    ol    = outer-link c p op f n q s ls ft (won-scope p (shows (nx a)) (inOuter op f false n q ls c) s wn ft) (race-steps KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) r)
               (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
 won-clear p a (inLanes op f d n q o pre post c) s s′ al ce wn@(l , _ , w) ft lv =
-  lane-sides p c op f d n q o pre post s ce (won-scope p (shows (nx a)) (inLanes op f d n q o pre post c) s wn ft ce) l ft (frag-flat c op f d n q o (pre ʳ++ s ∷ post) ft)
+  lane-sides p c op f d n q o pre post s ce (won-scope p (shows (nx a)) (inLanes op f d n q o pre post c) s wn ft) l ft (frag-flat c op f d n q o (pre ʳ++ s ∷ post) ft)
   , won-clear p a c (flatS op f d n q o (pre ʳ++ s ∷ post)) (flatS op f d n q o (pre ʳ++ s′ ∷ post)) refl ce
       (lane-on d n q {alive s} {at p} a {c} {flatS op f d n q o (pre ʳ++ s ∷ post)} (trans al lv) w) ft
 won-clear p a (inSrc kk b c)                    s s′ al ce (w , _) ft with over kk
@@ -619,7 +770,7 @@ outer-ends : ∀ {R Γ A B} p (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) 
            → Won (at p , shows cp) (inOuter op f d n q ls c) s → Frag (plug c (flatS op f d n q s ls)) → d ≡ false → closed c ≡ false
            → All (λ l → After p (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore p (poolT (deadL ls) (envAt c))
 outer-ends p c op f d n q s ls wn ft refl cl =
-  outer-link c p op f n q s ls ft (won-scope p (shows cp) (inOuter op f false n q ls c) s wn ft cl)
+  outer-link c p op f n q s ls ft (won-scope p (shows cp) (inOuter op f false n q ls c) s wn ft)
     (race-steps KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) (proj₁ wn))
     (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
   where parts = frag-parts op f false n q s ls (frag-flat c op f false n q s ls ft)
@@ -642,14 +793,14 @@ mutual
   won-ends p (inOuter op f d n q ls c)         s s′ al wn@(r , w , _) ft =
     outer-ends p c op f d n q s ls wn ft , ends-if p c ((n ≡ᵇ 0) ∧ null q) (flatS op f d n q s ls) (flatS op f true n q s′ ls) refl w ft
   won-ends p (inLanes op f d n [] o pre post c) s s′ al wn@(l , u , w) ft =
-    trans (sym al) lv , (λ cl → lane-sides p c op f d n [] o pre post s cl (won-scope p (shows cp) (inLanes op f d n [] o pre post c) s wn ft cl) l ft (frag-flat c op f d n [] o (pre ʳ++ s ∷ post) ft))
+    trans (sym al) lv , (λ cl → lane-sides p c op f d n [] o pre post s cl (won-scope p (shows cp) (inLanes op f d n [] o pre post c) s wn ft) l ft (frag-flat c op f d n [] o (pre ʳ++ s ∷ post) ft))
     , subst (λ b → EndsIf (d ∧ b) p c (flatS op f d (pred n) [] o (pre ʳ++ ended s′ ∷ post))) (sym (∧-identityʳ (pred n ≡ᵇ 0)))
         (ends-if p c (d ∧ (pred n ≡ᵇ 0)) (flatS op f d n [] o (pre ʳ++ s ∷ post)) (flatS op f d (pred n) [] o (pre ʳ++ ended s′ ∷ post)) refl
            (lane-off d n [] {alive s} {at p} {c} lv w) ft)
     , tt
     where lv = pooled-live (alive s) u
   won-ends p (inLanes op f d n (a ∷ q) o pre post c) s s′ al wn@(l , u , w) ft =
-    trans (sym al) lv , (λ cl → lane-sides p c op f d n (a ∷ q) o pre post s cl (won-scope p (shows cp) (inLanes op f d n (a ∷ q) o pre post c) s wn ft cl) l ft (frag-flat c op f d n (a ∷ q) o (pre ʳ++ s ∷ post) ft))
+    trans (sym al) lv , (λ cl → lane-sides p c op f d n (a ∷ q) o pre post s cl (won-scope p (shows cp) (inLanes op f d n (a ∷ q) o pre post c) s wn ft) l ft (frag-flat c op f d n (a ∷ q) o (pre ʳ++ s ∷ post) ft))
     , ends-queued d (pred n ≡ᵇ 0) p c (flatS op f d (pred n) (a ∷ q) o (pre ʳ++ ended s′ ∷ post))
     , λ sh → won-ahead (p ⊕ [ ix 0 ]) c (flatS op f d n (a ∷ q) o (pre ʳ++ s ∷ post)) true (lane-shift d n a q {alive s} {at p} {c} lv w) ft sh
     where lv = pooled-live (alive s) u
