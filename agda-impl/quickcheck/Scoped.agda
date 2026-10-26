@@ -75,7 +75,7 @@ private
     ghᵇ V ρ (cutS l a s)            = ghᵇ V ρ s
     ghᵇ V ρ (lnS b s)               = ghᵇ V ρ s
     ghᵇ V ρ (takeS i q w s)         = ghᵇ V ρ s
-    ghᵇ V ρ (flatS op f d n q o ls) = placeᴸᵇ (map (shutAll V) (lanesL ls)) ρ ∧ ghᵇ V ρ o ∧ ghᴸᵇ V ρ ls
+    ghᵇ V ρ (flatS op f d n q o ls) = (placeᴸᵇ (map (shutAll V) (lanesL ls)) ρ ∧ outᵇ V ρ d o) ∧ ghᵇ V ρ o ∧ ghᴸᵇ V ρ ls
     ghᵇ V ρ (connS k o b)           =
       srcᵇ V ρ k o ∧ ghᵇ V ρ o ∧ ghᵇ (closeOf (srcG k o) (upˢ V)) (srcRun (srcG k o) ρ ∷ᴬ ρ) b
     ghᵇ V ρ _                       = true
@@ -83,6 +83,10 @@ private
     ghᴸᵇ : ∀ {Γ B} → Shuts Γ → NEnv Γ → List (St Γ B) → Bool
     ghᴸᵇ V ρ []       = true
     ghᴸᵇ V ρ (s ∷ ls) = ghᵇ V ρ s ∧ ghᴸᵇ V ρ ls
+
+    outᵇ : ∀ {Γ X} → Shuts Γ → NEnv Γ → Bool → St Γ X → Bool
+    outᵇ V ρ false o = placeᵇ (shutAll V (gh o)) ρ
+    outᵇ V ρ true  o = true
 
     srcᵇ : ∀ {Γ X} → Shuts Γ → NEnv Γ → CS → St Γ X → Bool
     srcᵇ V ρ (cs false sl sa nothing as ow r en) o = placeᵇ (shutAll V (gh o)) ρ

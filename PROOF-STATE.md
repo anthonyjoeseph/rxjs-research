@@ -14,7 +14,7 @@ A frame's link to the meaning reads every connect above it: each running
 source at or past the pick, derived per connect from its lost race through
 `Stepper.first`, or for a source still pending, from where it subscribes.
 Open: a step rewriting a node keeping each subscribed source's and each
-lane's shut view `Sane`/`Placed`, and each live joiner told (`Scope.Gh`,
+lane's and running outer's shut view `Sane`/`Placed`, and each live joiner told (`Scope.Gh`,
 carried in `Order`), the frames above included, mid-rise as well. Its order
 is probed mid-rise (`quickcheck.Scoped`), unrefuted. Settled by their steps
 over one fold along the context, or a refutation.
@@ -185,7 +185,7 @@ whose connect is over; a step keeps the tree in the fragment. Probed on the
 spike engine. Settled when each is a body.
 
 Members: `search-hit`, `search-won`, `found-own`, `frag-next`, `run-lead`,
-`sides-link`, `limited-sides`, `body-link`.
+`limited-sides`, `body-link`.
 
 #### THE HEADS
 

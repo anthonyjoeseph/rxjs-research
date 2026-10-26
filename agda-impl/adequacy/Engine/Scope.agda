@@ -38,7 +38,7 @@ open import adequacy.Stepper.Parts using (shut-alikeⁱ)
 open import adequacy.Env using (nagree-refl)
 open import adequacy.Stepper.Flat using (agree-head)
 open import adequacy.Engine.Meaning using (gh; lanesL; envAt; srcG; srcRun; endOf)
-open import adequacy.Engine.Race using (After)
+open import adequacy.Engine.Race using (After; NotBefore)
 open import adequacy.Engine.Shuts using (Shuts; none; shutAt; upˢ; shutAll; Told; Toldˢ; Toldᴸ; told-drop)
 
 modeᴳ : ∀ {Γ X} → Source Γ X → Mode
@@ -91,6 +91,21 @@ firsts-after : ∀ {Γ A} (ν : All (λ _ → Mode) Γ) (ρ : NEnv Γ) q (ms : L
              → All (λ l → After q (M′.head (Events∞.force l))) (states ms ρ)
 firsts-after ν ρ q []       fl _        []ᴬ       = []ᴬ
 firsts-after ν ρ q (m ∷ ms) fl (f , fs) (a ∷ᴬ as) = first-after ν ρ q (step m) (meaning m ρ) fl f a ∷ᴬ firsts-after ν ρ q ms fl fs as
+
+-- At or past `q` likewise: a running source shown past `q` is past it.
+first-not-before : ∀ {Γ A} (ν : All (λ _ → Mode) Γ) (ρ : NEnv Γ) q (t : Step Γ A) (x : Events A)
+                 → Floor ν q ρ → First ν ρ t x → NotBefore q (headˢ t) → NotBefore q (M′.head x)
+first-not-before ν ρ q t x           fl (inj₁ ag) a = subst (NotBefore q) (agree-head ρ t x ag) a
+first-not-before ν ρ q t (out h _ _) fl (inj₂ pa) a = <ᵖ-asym q h (above ν ρ q h (headˢ t) fl pa)
+first-not-before ν ρ q t (skip h _)  fl (inj₂ pa) a = <ᵖ-asym q h (above ν ρ q h (headˢ t) fl pa)
+first-not-before ν ρ q t (end h)     fl (inj₂ pa) a = <ᵖ-asym q h (above ν ρ q h (headˢ t) fl pa)
+first-not-before ν ρ q t hush        fl (inj₂ ()) a
+
+firsts-not-before : ∀ {Γ A} (ν : All (λ _ → Mode) Γ) (ρ : NEnv Γ) q (ms : List (Node Γ A))
+                  → Floor ν q ρ → Firstᴸ ν ms ρ → All (λ m → NotBefore q (headˢ (step m))) ms
+                  → All (λ l → NotBefore q (M′.head (Events∞.force l))) (states ms ρ)
+firsts-not-before ν ρ q []       fl _        []ᴬ       = []ᴬ
+firsts-not-before ν ρ q (m ∷ ms) fl (f , fs) (a ∷ᴬ as) = first-not-before ν ρ q (step m) (meaning m ρ) fl f a ∷ᴬ firsts-not-before ν ρ q ms fl fs as
 
 -- Whatever is at `h` shows at or past `q`.
 FloorAt : Pos → Maybe Pos → Set
@@ -178,28 +193,29 @@ shut-floor q (shutAt i c s) n ρ (a , t) f =
   shut-floor q s n ρ t (floorᴱ-agree
     (Agreeˢ.nowˢ (shut-alikeⁱ i c (shutAll s n) {ρ} {ρ} a (λ m → nagree-refl m ρ) 1)) f)
 
-after-agree : ∀ {A} q {e e′ : Events A} → Agree 1 e e′ → After q (M′.head e′) → After q (M′.head e)
-after-agree q (out⁼ _ _)  a = a
-after-agree q (skip⁼ _ _) a = a
-after-agree q end⁼        a = a
-after-agree q hush⁼       a = a
+head-agree : ∀ {A} {e e′ : Events A} → Agree 1 e e′ → M′.head e ≡ M′.head e′
+head-agree (out⁼ _ _)  = refl
+head-agree (skip⁼ _ _) = refl
+head-agree end⁼        = refl
+head-agree hush⁼       = refl
 
-shut-after : ∀ {Γ B} q (s : Shuts Γ) (n : Node Γ B) (ρ : NEnv Γ) → Ended s ρ → After q (M′.head (meaning (shutAll s n) ρ)) → After q (M′.head (meaning n ρ))
-shut-after q none           n ρ t       a = a
-shut-after q (shutAt i c s) n ρ (e , t) a =
-  shut-after q s n ρ t (after-agree q
-    (Agreeˢ.nowˢ (shut-alikeⁱ i c (shutAll s n) {ρ} {ρ} e (λ m → nagree-refl m ρ) 1)) a)
+-- A node read through ended connects heads where it does.
+shut-head-eq : ∀ {Γ B} (s : Shuts Γ) (n : Node Γ B) (ρ : NEnv Γ) → Ended s ρ → M′.head (meaning (shutAll s n) ρ) ≡ M′.head (meaning n ρ)
+shut-head-eq none           n ρ t       = refl
+shut-head-eq (shutAt i c s) n ρ (e , t) =
+  trans (sym (head-agree (Agreeˢ.nowˢ (shut-alikeⁱ i c (shutAll s n) {ρ} {ρ} e (λ m → nagree-refl m ρ) 1)))) (shut-head-eq s n ρ t)
 
-shut-states : ∀ {Γ B} q (s : Shuts Γ) (ms : List (Node Γ B)) (ρ : NEnv Γ) → Ended s ρ
-            → All (λ l → After q (M′.head (Events∞.force l))) (states (map (shutAll s) ms) ρ)
-            → All (λ l → After q (M′.head (Events∞.force l))) (states ms ρ)
-shut-states q s []       ρ t []ᴬ       = []ᴬ
-shut-states q s (m ∷ ms) ρ t (a ∷ᴬ as) = shut-after q s m ρ t a ∷ᴬ shut-states q s ms ρ t as
+shut-states : ∀ {Γ B} (P : Maybe Pos → Set) (s : Shuts Γ) (ms : List (Node Γ B)) (ρ : NEnv Γ) → Ended s ρ
+            → All (λ l → P (M′.head (Events∞.force l))) (states (map (shutAll s) ms) ρ)
+            → All (λ l → P (M′.head (Events∞.force l))) (states ms ρ)
+shut-states P s []       ρ t []ᴬ       = []ᴬ
+shut-states P s (m ∷ ms) ρ t (a ∷ᴬ as) = subst P (shut-head-eq s m ρ t) a ∷ᴬ shut-states P s ms ρ t as
 
 -- WHAT THE INVARIANT KEEPS OF EACH SUBSCRIBED CONNECT'S SOURCE, at the
 -- frame it sits in: its ghost read through the ended connects in scope
 -- is a run's configuration there, placed in the environment the frame
--- reads, and so of each flatMap's lanes (`Lns`); of each live joiner,
+-- reads, and so of each flatMap's lanes (`Lns`) and running outer
+-- (`Outs`); of each live joiner,
 -- that a shut connect told it its end (`Told`).  A lane at its place in
 -- its list (`Ghᴸ`, the lanes before it reversed, as `inLanes` holds them).
 --
@@ -213,6 +229,10 @@ Src ν V ρ k                                   o = ⊤
 Lns : ∀ {Γ B} → All (λ _ → Mode) Γ → Shuts Γ → NEnv Γ → List (Node Γ B) → Set
 Lns ν V ρ ms = Saneᴸ ν (map (shutAll V) ms) × Placedᴸ (map (shutAll V) ms) ρ
 
+Outs : ∀ {Γ A} → All (λ _ → Mode) Γ → Shuts Γ → NEnv Γ → Bool → Node Γ A → Set
+Outs ν V ρ false n = Sane ν (shutAll V n) × Placed (shutAll V n) ρ
+Outs ν V ρ true  n = ⊤
+
 -- The scope read off the modes, shuts and environment in scope alone,
 -- whichever frames hold them.
 mutual
@@ -222,7 +242,7 @@ mutual
   GhE ν V ρ (cutS l a s)            = GhE ν V ρ s
   GhE ν V ρ (lnS b s)               = GhE ν V ρ s
   GhE ν V ρ (takeS i q w s)         = GhE ν V ρ s
-  GhE ν V ρ (flatS op f d n q o ls) = Lns ν V ρ (lanesL ls) × GhE ν V ρ o × GhEᴸ ν V ρ ls
+  GhE ν V ρ (flatS op f d n q o ls) = (Lns ν V ρ (lanesL ls) × Outs ν V ρ d (gh o)) × GhE ν V ρ o × GhEᴸ ν V ρ ls
   GhE ν V ρ (connS k o b)           =
     Src ν V ρ k o × GhE ν V ρ o × GhE (modeᴳ (srcG k o) ∷ᴬ ν) (closeOf (srcG k o) (upˢ V)) (srcRun (srcG k o) ρ ∷ᴬ ρ) b
   GhE ν V ρ (joinS j true x ib)     = Told V x (endOf ib)
