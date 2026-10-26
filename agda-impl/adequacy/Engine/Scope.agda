@@ -17,7 +17,7 @@ open import Data.List.Properties using (ʳ++-defn; reverse-involutive)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (Maybe; just; nothing; is-just)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
@@ -27,17 +27,17 @@ open import denotation.MonotonicList using (Agree; out⁼; skip⁼; end⁼; hush
 open import denotation.NonExpansive using (Agreeˢ)
 open import denotation.MonotonicList.Events using (Pos; Timeline; Events; Events∞; out; skip; end; hush; ix; _<ᵖ_; <ᵖ-trans; <ᵖ-asym; <ᵖ-below)
 import denotation.MonotonicList as M′
-open import denotation.Unfold using (NEnv; Node; Source; live; ended; Step; outˢ; skipˢ; endˢ; hushˢ; states; step; headˢ; meaning; subscribe; shut)
+open import denotation.Unfold using (NEnv; Node; Source; live; ended; Step; outˢ; skipˢ; endˢ; hushˢ; states; step; headˢ; meaning; subscribe; shut; same?)
 open import Tree using (Obs; FlatOp)
 open import operation.PureObservable using (module Machine)
-open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; CS; cs; mapS; scanS; cutS; lnS; takeS; flatS; connS; plug)
+open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; CS; cs; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; plug)
 open import adequacy.Sane using (Mode; runs; over; loose; Sane; Saneᴸ)
 open import adequacy.Placed.Order using (Placed; Placedᴸ)
 open import adequacy.Stepper.Past using (Floor; Floorᴱ; floorᴱ-agree; First; Firstᴸ; afterᴱ; above; _≃_; alike)
 open import adequacy.Stepper.Parts using (shut-alikeⁱ)
 open import adequacy.Env using (nagree-refl)
 open import adequacy.Stepper.Flat using (agree-head)
-open import adequacy.Engine.Meaning using (gh; lanesL; envAt; srcG; srcRun)
+open import adequacy.Engine.Meaning using (gh; lanesL; envAt; srcG; srcRun; endOf)
 open import adequacy.Engine.Race using (After)
 
 modeᴳ : ∀ {Γ X} → Source Γ X → Mode
@@ -210,7 +210,8 @@ shut-states q s (m ∷ ms) ρ t (a ∷ᴬ as) = shut-after q s m ρ t a ∷ᴬ s
 -- WHAT THE INVARIANT KEEPS OF EACH SUBSCRIBED CONNECT'S SOURCE, at the
 -- frame it sits in: its ghost read through the ended connects in scope
 -- is a run's configuration there, placed in the environment the frame
--- reads, and so of each flatMap's lanes (`Lns`).  A lane at its place in
+-- reads, and so of each flatMap's lanes (`Lns`); of each live joiner,
+-- that a shut connect told it its end (`Told`).  A lane at its place in
 -- its list (`Ghᴸ`, the lanes before it reversed, as `inLanes` holds them).
 --
 -- DEAD ROUTE: the plain ghost: a source subscribing inside an ended
@@ -223,6 +224,16 @@ Src c k                                   o = ⊤
 Lns : ∀ {R Γ B} → Ctx R Γ B → List (Node Γ B) → Set
 Lns c ms = Saneᴸ (modes c) (map (shutAll (closures c)) ms) × Placedᴸ (map (shutAll (closures c)) ms) (envAt c)
 
+-- A live joiner of a shut connect was fed its end when the connect's
+-- source ended, so a shut leaves it as it is.
+Untold : ∀ {Γ X} → Shuts Γ → X ∈ Γ → Set
+Untold none           x = ⊤
+Untold (shutAt i c s) x = is-just (same? i x) ≡ false × Untold s x
+
+Told : ∀ {Γ X} → Shuts Γ → X ∈ Γ → Maybe Pos → Set
+Told s x (just _) = ⊤
+Told s x nothing  = Untold s x
+
 mutual
   Gh : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Set
   Gh c (mapS f s)              = Gh (inMap f c) s
@@ -232,6 +243,7 @@ mutual
   Gh c (takeS i q w s)         = Gh (inTake i q w c) s
   Gh c (flatS op f d n q o ls) = Lns c (lanesL ls) × Gh (inOuter op f d n q ls c) o × Ghᴸ c op f d n q o [] ls
   Gh c (connS k o b)           = Src c k o × Gh (inSrc k b c) o × Gh (inBody k o c) b
+  Gh c (joinS j true x ib)     = Told (closures c) x (endOf ib)
   Gh c _                       = ⊤
 
   Ghᴸ : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → List (St Γ B) → Set
