@@ -43,7 +43,8 @@ open import adequacy.Engine.Head using (Frag; cand; pool-step; <ᴷ-irrefl; ≮�
 open import adequacy.Engine.Keys using (Held)
 open import adequacy.Engine.Inv using (Unpended)
 open import adequacy.Engine.Pick using (Beat; past; KAfter; KNotBefore; Lost; body-link; Before; Race; LaneWon; lane-won; race-steps; after-step;
-  lane-sides; frag-flat; frag-parts; outer-link)
+  lane-sides; outer-link)
+open import adequacy.Engine.Head.Within using (frag-flat; frag-parts)
 open import adequacy.Engine.Ahead using (Under; shows; shows-open; shown)
 open import adequacy.Engine.Drop using (Dropsˢ; Pass; SrcPass; mapped-drops; scanned-drops; took-drops; lanes-drops; body-drops;
   outer-drops; src-drops; ≋-⊒)
@@ -52,7 +53,8 @@ open import adequacy.Placed.Order using (Atop; Ordered)
 open import adequacy.Placed.Trail using (Trailing)
 open import adequacy.Engine.FedWalk using (Sought; src-fed)
 open import adequacy.Engine.Trails using (shape-st; shape-src)
-open import adequacy.Engine.Kept using (outer-plug; lanes-plugʳ; body-plug; live-plug)
+open import adequacy.Engine.Kept using (live-plug)
+open import adequacy.Engine.Plug using (outer-plug; lanes-plugʳ; body-plug)
 open Agreeˢ
 
 ------------------------------------------------------------------------

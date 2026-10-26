@@ -14,13 +14,13 @@ module adequacy.Engine.Flown where
 
 open import Data.Bool using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Empty using (⊥-elim)
-open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; null; reverse; length)
-open import Data.List.Properties using (ʳ++-defn; reverse-involutive; ++-identityʳ)
+open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; reverse; length)
+open import Data.List.Properties using (ʳ++-defn; reverse-involutive)
 import Data.List as L
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_; map to mapᴬ)
 open import Data.List.Relation.Unary.All.Properties using (++⁻ʳ) renaming (++⁺ to All++⁺)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (zero; suc; pred; _≡ᵇ_)
+open import Data.Nat using (zero; suc; pred; _≡ᵇ_; _<ᵇ_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
@@ -30,33 +30,36 @@ open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Timel
 import denotation.MonotonicList as M′
 open import denotation.MonotonicList using (MonotonicList; Agreeᵀ; Agree; agree-refl; agreeᵀ-refl; agreeᵀ-trans)
 open import denotation.NonExpansive using (_,ˢ_; ∪-ne; Lanes)
-open import denotation.Unfold using (NEnv; Node; Source; live; meaning; connectᶜ; stateᴺ; cutᴺ; states; outerᴺ; restsᶜ; subscribe)
+open import denotation.Unfold using (NEnv; Node; Source; live; meaning; connectᶜ; stateᴺ; cutᴺ; states; outerᴺ; outer∞; subscribe)
 open import denotation.Denote using (flatOp)
 open import adequacy.Engine.Meaning using (_≋_; ≋-by; ≋-out; envAt; gh; srcG; srcRun; srcState; risen; lanesFrame; lane; lanesL; outerG; outerT;
-  poolRuns; laneRuns; laneᴹ; flagOf; tailsOn; holeT; poolT; deadL; deadOne; lanes-refl)
+  poolRuns; laneRuns; laneᴹ; flagOf; tailsOn; holeT; poolT; deadL; deadOne; lanes-refl; outerFrame; outerOf; poolG)
 open import adequacy.Engine.Union using (∪-idleᵀ; ∪-assocᵀ; ∪-commᵀ)
-open import adequacy.Engine.Keys using (Shape; Shape′; module ConnAt; LaneKeys; []ᴷ; _∷ᴷ_; FlatKeys; Keyed)
-open import adequacy.Engine.Trails using (beside-go; module FlatShape; gen-queue; gen-sub; held-of)
+open import adequacy.Engine.Keys using (Shape; Shape′; module ConnAt; LaneKeys; []ᴷ; _∷ᴷ_; FlatKeys; Keyed; KeyedL)
+open import adequacy.Engine.Trails using (beside-go; module FlatShape; gen-queue; gen-sub; held-of; above-sorted; keyedL-shape)
 open import adequacy.Engine.Beside using (burst-hushed)
-open import adequacy.Engine.Race using (NotBefore; First; go-rise; cuts-swap)
+open import adequacy.Engine.Race using (NotBefore; First; After; go-rise; go-outer; cuts-swap)
 open import adequacy.Engine.Ahead using (shown; Sides) renaming (shows to showsᶜ)
 open import adequacy.Engine.Above using (Above; Flight; above-≋; take-true; take-incl; toʳ; lanes-L; lanes-P; rests-++; dead-hole; lanes-runs; pool-runs; keyedL-ʳ++)
-open import adequacy.Engine.Head using (Frag; Lane)
+open import adequacy.Engine.Head using (Frag; Lane; len0) renaming (Lanes to Lanesᴴ)
+open import adequacy.Engine.Admit using (states-length; begun-runs; begun-pool; Begins; keptLanes; running; outer-begins; outer-begins-pass;
+  kill-lanes; kill-pool)
 open import adequacy.Engine.Drop using (Dropsˢ; Pass; Links; pass-of; lane-admits)
 open import adequacy.Engine.Passed using (above-drops)
-open import adequacy.Engine.Pick using (Order; module Order; frag-flat; frag-parts; lanes-ʳsplit)
-open import adequacy.Placed.Order using (Ordered; Steady; Every; EveryT; Headed; Atop; Past; Disjoint; ordered; steady; every; every∞-mono;
+open import adequacy.Engine.Pick using (Order; module Order; lanes-ʳsplit)
+open import adequacy.Engine.Head.Within using (frag-flat; frag-parts)
+open import adequacy.Placed.Order using (Ordered; Steady; Every; EveryT; Every∞; Headed; Atop; Past; Disjoint; ordered; steady; every; every∞-mono; everyT-mono;
   ordered-map; ordered-scan; steady-map; steady-scan)
-open import adequacy.Placed.Keys using (every-map; every-scan; everyT-≈)
+open import adequacy.Placed.Keys using (every-map; every-scan; everyT-≈; values)
 open import adequacy.Placed.Trail using (Trail; trail; trailᶠ; trail-map; trail-scan; trail-≈; SortedT; sortedT-idle; sortedT-∪;
-  sortedT-≈; flatT-≈; parted-pick; all-pick; all-zip)
-open import adequacy.Placed.Rising using (module Reach; headedRules; ordered-take; steady-take)
+  sortedT-≈; flatT-≈; parted-pick; all-pick; all-zip; Spread; spread)
+open import adequacy.Placed.Rising using (module Reach; headedRules; ordered-take; steady-take; Beyond)
 open import adequacy.Placed.FlatAfter using (trail-take)
 open import adequacy.Placed.FlatOrder using (module FlatOrder)
 open import operation.PureObservable using (module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ctx; top; inMap; inScan; inCut;
   inLn; inTake; inOuter; inLanes; inSrc; inBody; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; nx; cp; free; cpAt; cutAt; overAt;
-  CS; cs; closed; attAt; start; plug; rise; begin; admit; dequeue; settle; ended; alive; _⊕_)
+  CS; cs; closed; attAt; attached; start; plug; rise; begin; admit; dequeue; settle; ended; alive; killAll; _⊕_)
 open Events∞
 
 ------------------------------------------------------------------------
@@ -197,11 +200,6 @@ all-at : ∀ {Γ B} {P : St Γ B → Set} pre {s post} → All P (pre ʳ++ s ∷
 all-at pre a with ++⁻ʳ (reverse pre) (subst (All _) (ʳ++-defn pre) a)
 ... | x ∷ᴬ xs = x , xs
 
--- The lanes a flatMap counts, the lanes its meaning holds.
-states-length : ∀ {Γ B} (ls : List (Node Γ B)) (ρ : NEnv Γ) → length (states ls ρ) ≡ length ls
-states-length []       ρ = refl
-states-length (l ∷ ls) ρ = cong suc (states-length ls ρ)
-
 -- A flatMap of the fragment counts its live lanes.
 frag-count : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n (o : St Γ A) ls → Frag (flatS op f d n [] o ls) → n ≡ length (lanesL ls)
 frag-count (mergeᶠ nothing)  f d n o ls (_ , _ , e , _) = e
@@ -237,14 +235,43 @@ keyed-ended : ∀ {Γ B} (s : St Γ B) (ρ : NEnv Γ) → Lane s → Keyed s ρ 
 keyed-ended (lnS true (cutS true a s))   ρ l k = k
 keyed-ended (lnS false (cutS false a s)) ρ l k = k
 
--- A lane begun ahead of those kept: the merge's lanes, newest first,
--- and the pool the kept leave.
-begun-runs : ∀ {Γ B} (ls : List (St Γ B)) (ρ : NEnv Γ) h → h ∷ states (lanesL ls) ρ ≡ laneRuns (reverse (reverse ls)) [] true ρ h
-begun-runs ls ρ h = cong (λ x → h ∷ states (lanesL x) ρ) (sym (reverse-involutive ls))
+postulate
+  -- THE KEYS KEPT: a node unsubscribed keeps its keys.
+  unsub-keyed : ∀ {Γ A} (s : St Γ A) (ρ : NEnv Γ) → Keyed s ρ → Keyed (proj₁ (Machine.unsub s)) ρ
 
-begun-pool : ∀ {Γ B} (ls : List (St Γ B)) (ρ : NEnv Γ) h → poolT (deadL ls) ρ ≡ poolRuns (reverse (reverse ls)) [] true ρ h
-begun-pool {B = B} ls ρ h rewrite reverse-involutive ls =
-  trans (cong (λ x → cutᴺ (restsᶜ {B = B} x) ρ) (sym (++-identityʳ (deadL ls)))) (rests-++ (deadL ls) [] ρ)
+-- The lanes a switch kills keep their keys.
+kill-keyed : ∀ {Γ B} (ls : List (St Γ B)) (ρ : NEnv Γ) → Lanesᴴ ls → KeyedL ls ρ → KeyedL (proj₁ (killAll ls)) ρ
+kill-keyed [] ρ _ k = tt
+kill-keyed (lnS true (cutS true attached s) ∷ ls) ρ (_ , fl) (k , kl)
+  with Machine.unsub s | unsub-keyed s ρ (proj₂ (proj₂ k)) | killAll ls | kill-keyed ls ρ fl kl
+... | s′ , u | ks | ls′ , t | kl′ = (tt , tt , ks) , kl′
+kill-keyed (lnS true (cutS true (attAt q) s) ∷ ls) ρ (_ , fl) (k , kl) with killAll ls | kill-keyed ls ρ fl kl
+... | ls′ , t | kl′ = k , kl′
+kill-keyed (lnS false (cutS false a s) ∷ ls) ρ (_ , fl) (k , kl) with killAll ls | kill-keyed ls ρ fl kl
+... | ls′ , t | kl′ = k , kl′
+
+kept-keyed : ∀ {Γ B} op (ls : List (St Γ B)) (ρ : NEnv Γ) → Lanesᴴ ls → KeyedL ls ρ → KeyedL (keptLanes op ls) ρ
+kept-keyed (mergeᶠ m) ls ρ fl k = k
+kept-keyed switchᶠ    ls ρ fl k = kill-keyed ls ρ fl k
+kept-keyed exhaustᶠ   ls ρ fl k = k
+
+-- A run whose head is after a position lies beyond it.
+after-beyond : ∀ {A} p (x : Events A) → After p (M′.head x) → Beyond p x
+after-beyond p (out h _ _) a = a
+after-beyond p (skip h _)  a = a
+after-beyond p (end h)     a = a
+after-beyond p hush        a = tt
+
+-- A run past its first value, in shape as the run was.
+shape-past : ∀ {A} p (a : A) (r : Events∞ A) → Shape′ (out p a r) (cut r) → Shape r
+shape-past p a r (((o , st) , ev , et) , tr) = ((proj₂ (ordered o) , proj₂ (steady st)) , proj₂ (every ev)) , proj₁ (proj₂ (proj₂ (trail tr)))
+
+-- The run after a value, else the default.
+tailᴱ : ∀ {A} → Events A → Events∞ A → Events∞ A
+tailᴱ (out _ _ r) d = r
+tailᴱ (skip _ _)  d = d
+tailᴱ (end _)     d = d
+tailᴱ hush        d = d
 
 ------------------------------------------------------------------------
 -- A merge under its mark `pk`, a queued lane begun
@@ -291,6 +318,40 @@ module _ (pk : Pos) where
       pp  = parted-pick rbs r ras pt
       ar  = proj₁ (all-pick rbs ras asd)
       oks = all-zip (FO.roots-ok (FO.roots-++ rb ra)) (proj₁ pp)
+
+  -- A merge's keys read off its outer's run and tail alone.
+  keys-≡ : ∀ {B} {w w′ : Events∞ (MonotonicList B)} {ls t rs} → force w ≡ force w′ → cut w ≡ cut w′
+         → FlatKeys pk (just w) ls t rs → FlatKeys pk (just w′) ls t rs
+  keys-≡ ef ec (lk , pt , asd , (sp , kx , kc) , st , ep , wd) =
+    lk , pt , mapᴬ (λ {r} x → subst (Every (FO.D r)) ef (proj₁ x) , subst (EveryT (FO.D r)) ec (proj₂ x)) asd
+    , (subst Spread ef sp , subst (Every FO.K) ef kx , subst (EveryT FO.K) ec kc)
+    , st , everyT-mono (λ k x → proj₁ x , subst₂ (λ y z → FO.FreeC y z k) ef ec (proj₂ x)) _ ep , wd
+
+  -- A lane begun ahead of those kept, out of what the merge holds after
+  -- its outer's value: the merge keyed with it.
+  begun-keys : ∀ {Γ B} {w : Events∞ (MonotonicList B)} {q t d} (ls′ : List (St Γ B)) (ρ : NEnv Γ) H qs
+             → Spread (force w) → Every∞ FO.K w → FO.Taken q w t (H ∷ states (lanesL ls′) ρ , qs , d)
+             → (∀ k → Agreeᵀ k (t ∪ d) (poolT (deadL ls′) ρ))
+             → Σ (List Pos) (FlatKeys pk (just w) (laneRuns (reverse (reverse ls′)) [] true ρ H) (poolRuns (reverse (reverse ls′)) [] true ρ H))
+  begun-keys {w = w} {t = t} {d} ls′ ρ H qs sw kw (FO.taken {rs = rs} R pt asd _ _ pl _) ag =
+    rs , subst₂ (λ ls u → FlatKeys pk (just w) ls u rs) (begun-runs ls′ ρ H) (begun-pool ls′ ρ H)
+           (keys-of R , pt , asd , (sw , kw) , pool-≈ (just w) rs (t ∪ d) (poolT (deadL ls′) ρ) ag pl)
+
+  -- As the flatMap admits: a merge or an idle exhaust begins the lane
+  -- ahead of the rest; a switch begins it alone, its killed lanes' tails
+  -- in the pool.
+  admit-keys : ∀ {Γ B} op (ls : List (St Γ B)) (ρ : NEnv Γ) {w : Events∞ (MonotonicList B)} {q} H qs → Lanesᴴ ls
+             → Spread (force w) → Every∞ FO.K w
+             → FO.Taken q w (poolT (deadL ls) ρ) (H ∷ states (lanesL ls) ρ , qs , idle)
+             → FO.Taken q w (poolT (deadL ls) ρ) ([ H ] , qs , M′.cuts (states (lanesL ls) ρ))
+             → Σ (List Pos) (FlatKeys pk (just w) (laneRuns (reverse (reverse (keptLanes op ls))) [] true ρ H)
+                                (poolRuns (reverse (reverse (keptLanes op ls))) [] true ρ H))
+  admit-keys (mergeᶠ m) ls ρ H qs fl sw kw tn ts = begun-keys ls ρ H qs sw kw tn (λ k → ∪-idleᵀ k _)
+  admit-keys exhaustᶠ   ls ρ H qs fl sw kw tn ts = begun-keys ls ρ H qs sw kw tn (λ k → ∪-idleᵀ k _)
+  admit-keys switchᶠ    ls ρ {w} {q} H qs fl sw kw tn ts =
+    begun-keys (proj₁ (killAll ls)) ρ H qs sw kw
+      (subst (λ x → FO.Taken q w (poolT (deadL ls) ρ) (H ∷ x , qs , M′.cuts (states (lanesL ls) ρ))) (sym (cong (λ x → states x ρ) (kill-lanes ls fl))) ts)
+      (kill-pool ls ρ fl)
 
 ------------------------------------------------------------------------
 -- A frame of one child, the value passed up
@@ -346,13 +407,23 @@ module _ {R : Set} where
   NextOwed drained         = ⊤
 
   postulate
-    -- THE FLIGHT KEPT: a value or an end rising out of a frame that
-    -- rewrites its node, or a subscribe beginning a former, leaves its
-    -- hole's run in shape and every frame above keeping its share.
-    rise-admit-flight : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q ls (s : St Γ A) a p
-                      → Order ⟨ inOuter op f d n q ls c , s , rising (nx a) , p ⟩ → NextOwed (took (admit c op f d n q s ls a p))
-    rise-outer-end-flight : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q ls (s : St Γ A) p
-                          → Order ⟨ inOuter op f d n q ls c , s , rising cp , p ⟩ → Owed ⟨ c , flatS op f true n q s ls , settle true n (null q) , p ⟩
+    -- THE FLIGHT KEPT: an outer's value beginning its lane under an open
+    -- observer, where only tails are read: every frame above the merge
+    -- keeps its share of the merge's run, the lane begun.
+    outer-begin-tail : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) n q ls (s : St Γ A) a p
+                     → Order ⟨ inOuter op f false n q ls c , s , rising (nx a) , p ⟩ → Begins op n → closed c ≡ false
+                     → showsᶜ c true ≡ false
+                     → Above c true (lanesFrame op (lane f) false q (gh s) (reverse (reverse (keptLanes op ls))) [] true (envAt c)
+                                       (stateᴺ (subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c)))
+    -- THE DONE OUTER: an outer already done, rising its end, ends its
+    -- merge in shape.
+    rise-outer-done : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) ls (s : St Γ A) p
+                    → Order ⟨ inOuter op f true zero [] ls c , s , rising cp , p ⟩ → Flight ⟨ c , flatS op f true zero [] s ls , rising cp , p ⟩
+    -- THE CLOSED LANE: an outer's end, nothing running or waiting, under a
+    -- closed observer.
+    rise-outer-end-shut : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) ls (s : St Γ A) p
+                        → Order ⟨ inOuter op f false zero [] ls c , s , rising cp , p ⟩ → closed c ≡ true
+                        → Flight ⟨ c , flatS op f true zero [] s ls , rising cp , p ⟩
     -- THE STILL'S SUBTREE: a lane's end under a queue, where it is shown,
     -- passes every live source above.
     lane-begin-links : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n a q (o : St Γ A) pre post (s : St Γ B) p
@@ -478,6 +549,43 @@ module _ {R : Set} where
           (subst (Agreeᵀ k _) (sym (cong₂ (λ ls′ t → M′.cuts ls′ ∪ (cutᴺ (gh o) ρ ∪ t)) L1 P1))
             (agreeᵀ-trans (∪-ne (∪-idleᵀ k (cutᴺ (gh s) ρ)) (agreeᵀ-refl k T))
               (agreeᵀ-trans (∪-commᵀ k (cutᴺ (gh s) ρ) T sh sT) (pool-ended k true (gh o) Dp ρ Pp (cutᴺ (gh s) ρ) sP sh))))
+
+  -- An open outer's end, nothing running or waiting, is its merge's: the
+  -- pool's pins no earlier, the outer's tail joined to the pool.
+  outer-end-flight : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) ls (s : St Γ A) p
+                   → Order ⟨ inOuter op f false zero [] ls c , s , rising cp , p ⟩ → closed c ≡ false
+                   → Flight ⟨ c , flatS op f true zero [] s ls , rising cp , p ⟩
+  outer-end-flight c op f ls s p od ce =
+    ( shape-cut (end p) (cut H) (cutᴺ (gh F) ρ) ag (subst (λ x → Shape′ x (cut H)) fe sh)
+    , above-≋ c true (λ k → ag k ,ˢ subst (λ x → Agree k x (end p)) (sym fe) (agree-refl k (end p))) (proj₂ (proj₂ (Order.flight od))))
+    where
+      ρ  = envAt c
+      h  = risen (gh s) ρ cp p
+      H  = outerFrame op (lane f) false [] (lanesL ls) (deadL ls) ρ h
+      F  = flatS op f true zero [] s ls
+      e  = outerOf (lane f) ρ h
+      Ls = states (lanesL ls) ρ
+      T  = poolT (deadL ls) ρ
+      ff = frag-flat c op f false zero [] s ls (proj₁ (Order.shape od))
+      L0 : Ls ≡ []
+      L0 = len0 Ls (trans (frag-count op f false zero s ls ff) (sym (states-length (lanesL ls) ρ)))
+      lt = proj₁ (Order.lead od) refl ce
+      fe : force H ≡ end p
+      fe = trans (go-outer (flatOp op) e Ls [] T refl (proj₁ lt) (proj₂ lt)) (cong (λ x → M′.outer (flatOp op) e x [] T (end p)) L0)
+      fl = proj₁ (proj₁ (proj₂ (Order.flight od)))
+      pk = proj₁ fl
+      fk = proj₂ (proj₂ (proj₂ (proj₂ fl)))
+      ok = proj₁ (proj₂ (proj₂ (proj₂ fk)))
+      se = shape-end p (proj₁ (Order.flight od))
+      hd : FlatOrder.Heldᴹ pk (just e)
+      hd = FlatOrder.outer (proj₁ (proj₁ (proj₁ se))) (proj₂ (proj₁ (proj₁ se))) (proj₂ se) (proj₁ ok) (proj₁ (proj₂ ok)) (proj₂ (proj₂ ok))
+             (record { values = tt })
+      sh : Shape′ (force H) (cut H)
+      sh = FlatShape.flat-shape pk (flatOp op) (just e) Ls [] T (FlatShape.roots-of pk (subst (All Shape) (sym L0) []ᴬ) (proj₁ fk))
+             (proj₁ (proj₂ fk)) (proj₁ (proj₂ (proj₂ fk))) []ᴬ hd (proj₂ (proj₂ (proj₂ (proj₂ fk))))
+      ag : ∀ k → Agreeᵀ k (cut H) (cutᴺ (gh F) ρ)
+      ag k = subst (λ x → Agreeᵀ k (cutᴺ (gh s) ρ ∪ (M′.cuts x ∪ T)) (M′.cuts x ∪ cutᴺ (poolG true (gh s) (deadL ls)) ρ)) (sym L0)
+               (agreeᵀ-refl k _)
 
   -- A lane ended under a queue: its end a skip, past it the queue's next
   -- lane begun ahead of the rest, the ended lane's tail in the pool where
@@ -639,6 +747,95 @@ module _ {R : Set} where
   begun c op f d n q o ls a p ce fl with closed c | ce
   ... | false | refl = fl
 
+  -- A lane begun under an open observer, else the value absorbed.
+  started : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p
+          → (closed c ≡ false → Flight ⟨ inCut true (attAt (p ⊕ [ ix 1 ])) (inLn true (inLanes op f d (suc n) q o (reverse ls) [] c))
+                                       , pend (f a) , subscribing , p ⊕ [ ix 1 ] ⟩)
+          → Owed (start c op f d n q o ls a p)
+  started c op f d n q o ls a p fl with closed c
+  ... | true  = tt
+  ... | false = fl refl
+
+  -- An outer's value under an open observer: every frame above the merge
+  -- keeps its share past the skip the merge's run drops for the value,
+  -- the lane begun; where only tails are read, of the merge's tail.
+  admit-above : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) n q ls (s : St Γ A) a p
+              → Order ⟨ inOuter op f false n q ls c , s , rising (nx a) , p ⟩ → Begins op n → closed c ≡ false
+              → Above c true (lanesFrame op (lane f) false q (gh s) (reverse (reverse (keptLanes op ls))) [] true (envAt c)
+                                (stateᴺ (subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c)))
+  admit-above c op f n q ls s a p od b ce with showsᶜ c true in sh
+  ... | true  = above-drops (_≡ p ⊕ [ ix 0 ]) c true (outer-begins b od) (outer-begins-pass sh od) (proj₂ (proj₂ (Order.flight od)))
+  ... | false = outer-begin-tail c op f n q ls s a p od b ce sh
+
+  -- An outer's value under an open observer begins its lane just past
+  -- the value, in shape, the merge keyed with it ahead of the lanes kept,
+  -- the lanes a switch kills in the pool.
+  admit-flight : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) n q ls (s : St Γ A) a p
+               → Order ⟨ inOuter op f false n q ls c , s , rising (nx a) , p ⟩ → Begins op n → closed c ≡ false
+               → Flight ⟨ inCut true (attAt (p ⊕ [ ix 1 ])) (inLn true (inLanes op f false (suc (running op n)) q s (reverse (keptLanes op ls)) [] c))
+                        , pend (f a) , subscribing , p ⊕ [ ix 1 ] ⟩
+  admit-flight c op f n q ls s a p od b ce =
+    fit-shape pk q₁ H (gm q₁ okq)
+    , ( ( (pk , hp , cl , proj₁ ks , keys-≡ pk {w = tailᴱ (force (outerOf (lane f) ρ (risen (gh s) ρ (nx a) p))) w′} {w′ = w′} refl refl (proj₂ ks))
+        , proj₂ (Order.shape od) , keyedL-ʳ++ Lk kL tt , tt , so , shape-past p a (stateᴺ (gh s) ρ) (proj₁ (Order.flight od))
+        , keyedL-shape (reverse (reverse Lk)) ρ (keyedL-ʳ++ (reverse Lk) (keyedL-ʳ++ Lk kL tt) tt) so , []ᴬ )
+      , admit-above c op f n q ls s a p od b ce )
+    where
+      ρ   = envAt c
+      Lk  = keptLanes op ls
+      w′  = outer∞ (lane f) (gh s) ρ
+      Ls  = states (lanesL ls) ρ
+      T   = poolT (deadL ls) ρ
+      m   = laneᴹ (lane f) ρ a
+      q₁  = p ⊕ [ ix 1 ]
+      H   = M′.enter m q₁
+      fa  = proj₁ (proj₁ (proj₂ (Order.flight od)))
+      kl  = proj₂ (proj₁ (proj₂ (Order.flight od)))
+      ab  = proj₂ (proj₂ (Order.flight od))
+      pk  = proj₁ fa
+      hp  = proj₁ (proj₂ fa)
+      cl  = proj₁ (proj₂ (proj₂ fa))
+      fk  = proj₂ (proj₂ (proj₂ (proj₂ fa)))
+      lk  = proj₁ fk
+      pt  = proj₁ (proj₂ fk)
+      asd = proj₁ (proj₂ (proj₂ fk))
+      ok  = proj₁ (proj₂ (proj₂ (proj₂ fk)))
+      pl  = proj₂ (proj₂ (proj₂ (proj₂ fk)))
+      so  = above-sorted c true ab
+      fl  = proj₂ (frag-parts op f false n q s ls (frag-flat c op f false n q s ls (proj₁ (Order.shape od))))
+      kL  = kept-keyed op ls ρ fl kl
+      gm  = gen-sub pk f ρ hp so cl a
+      okq = FlatOrder.lane-ok pk p (proj₁ (every (proj₁ (proj₂ ok))))
+      sp  = proj₁ (spread (proj₁ ok))
+      sw  = proj₂ (spread (proj₁ ok))
+      kw  = proj₂ (every (proj₁ (proj₂ ok)))
+      Rt  = FlatShape.roots-of pk (keyedL-shape ls ρ kl so) lk
+      gq  = gen-queue pk f ρ hp so cl q
+      bl  = mapᴬ (λ {l} → after-beyond p (force l)) (proj₁ (proj₂ (Order.lead od)))
+      ks  = admit-keys pk op ls ρ H (L.map (laneᴹ (lane f) ρ) q) fl sw kw
+              (FlatOrder.Admit.admit-new pk p m _ T (mapᴬ proj₁ asd) gm okq sp kw pl Ls _ Rt pt gq bl)
+              (FlatOrder.Admit.admit-switch pk p m _ T (mapᴬ proj₁ asd) gm okq sp kw pl Ls _ Rt pt gq bl)
+
+  -- An outer's value admitted: a lane begun under an open observer, else
+  -- the value queued, dropped by a busy exhaust, or absorbed under a
+  -- closed one.
+  rise-admit-flight : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q ls (s : St Γ A) a p
+                    → Order ⟨ inOuter op f d n q ls c , s , rising (nx a) , p ⟩ → NextOwed (took (admit c op f d n q s ls a p))
+  rise-admit-flight c op f true n q ls s a p od = ⊥-elim (Order.lead od)
+  rise-admit-flight c (mergeᶠ nothing) f false n q ls s a p od =
+    started c (mergeᶠ nothing) f false n q s ls a p (admit-flight c (mergeᶠ nothing) f n q ls s a p od tt)
+  rise-admit-flight c (mergeᶠ (just k)) f false n q ls s a p od with n <ᵇ k in b
+  ... | true  = started c (mergeᶠ (just k)) f false n q s ls a p (admit-flight c (mergeᶠ (just k)) f n q ls s a p od b)
+  ... | false = tt
+  rise-admit-flight c switchᶠ f false n q ls s a p od with killAll ls in ek
+  ... | ls′ , t = started c switchᶠ f false 0 q s ls′ a p
+                    (λ ce → subst (λ x → Flight ⟨ inCut true (attAt (p ⊕ [ ix 1 ])) (inLn true (inLanes switchᶠ f false 1 q s (reverse x) [] c))
+                                                , pend (f a) , subscribing , p ⊕ [ ix 1 ] ⟩)
+                                  (cong proj₁ ek) (admit-flight c switchᶠ f n q ls s a p od tt ce))
+  rise-admit-flight c exhaustᶠ f false n q ls s a p od with n ≡ᵇ 0 in b
+  ... | true  = started c exhaustᶠ f false n q s ls a p (admit-flight c exhaustᶠ f n q ls s a p od b)
+  ... | false = tt
+
   -- A lane's end frees its slot: the merge settles or dequeues.
   rise-lane-end-open : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) p
                      → Order ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → alive s ≡ true → closed c ≡ false
@@ -699,7 +896,12 @@ module _ {R : Set} where
   rise-owed (inTake i q (cutAt r) c)          s e      p o = tt
   rise-owed (inTake i q (overAt r) c)         s e      p o = tt
   rise-owed (inOuter op f d n q ls c)         s (nx a) p o = rise-admit-flight c op f d n q ls s a p o
-  rise-owed (inOuter op f d n q ls c)         s cp     p o = rise-outer-end-flight c op f d n q ls s p o
+  rise-owed (inOuter op f d (suc n) q ls c)       s cp p o = tt
+  rise-owed (inOuter op f d zero (_ ∷ _) ls c)    s cp p o = tt
+  rise-owed (inOuter op f true zero [] ls c)      s cp p o = rise-outer-done c op f ls s p o
+  rise-owed (inOuter op f false zero [] ls c)     s cp p o with closed c in ce
+  ... | true  = rise-outer-end-shut c op f ls s p o ce
+  ... | false = outer-end-flight c op f ls s p o ce
   rise-owed (inLanes op f d n q o′ pre post c) s (nx b) p o with alive s in a
   ... | true  = rise-lane-flight c op f d n q o′ pre post s b p o a
   ... | false = tt

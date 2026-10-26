@@ -59,6 +59,7 @@ open import adequacy.Engine.Meaning using (gh; poolG; lanesL; deadL; poolT; oute
 open import adequacy.Engine.Race using (NotBefore; After; TailNotBefore)
 open import adequacy.Engine.Head using (Frag; Lanes; Lane; Agrees; exact; early; HeadAt; cand; pool-step; at-<ᵖ; <≮ᴷ; ≮ᴷ-trans)
 open import adequacy.Engine.Head.Agrees using (head-agrees)
+open import adequacy.Engine.Head.Within using (frag-flat; frag-body; frag-parts)
 open import adequacy.Engine.Keys using (Keyed; Keys)
 open import adequacy.Engine.Above using (Flight)
 open import adequacy.Engine.Ahead using (Sides; Ahead; Under; shown; shows-open) renaming (shows to showsᶜ)
@@ -116,7 +117,10 @@ mutual
   Ends p (inTake i q (cpAt r) c)           s = ⊤
   Ends p (inTake i q (cutAt r) c)          s = ⊤
   Ends p (inTake i q (overAt r) c)         s = ⊤
-  Ends p (inOuter op f d n q ls c)         s = EndsIf ((n ≡ᵇ 0) ∧ null q) p c (flatS op f true n q s ls)
+  Ends p (inOuter op f d n q ls c)         s =
+    (d ≡ false → closed c ≡ false
+       → All (λ l → After p (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore p (poolT (deadL ls) (envAt c)))
+    × EndsIf ((n ≡ᵇ 0) ∧ null q) p c (flatS op f true n q s ls)
   Ends p (inLanes op f d n q o pre post c) s =
     alive s ≡ true × (closed c ≡ false → Sides p f d o (reverse pre) post (envAt c))
                    × EndsIf (d ∧ (pred n ≡ᵇ 0) ∧ null q) p c (flatS op f d (pred n) q o (pre ʳ++ ended s ∷ post)) × Queued q p c
@@ -347,11 +351,6 @@ postulate
   -- The engine's search: the found node's key leads every race above it.
   search-won : ∀ {R} (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} → Frag t → search top t ≡ just (found (Γ , A , c , s) m key)
              → Won (key , outOf c s m) c s
-  -- A flatMap of a fragment tree is of the fragment.
-  frag-flat : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls
-            → Frag (plug c (flatS op f d n q o ls)) → Frag (flatS op f d n q o ls)
-  -- A connect's body in a fragment tree is of the fragment.
-  frag-body : ∀ {R Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) → Frag (plug c (connS k o b)) → Frag b
 
 ------------------------------------------------------------------------
 -- From the race to the stepper's heads
@@ -453,14 +452,6 @@ lane-on : ∀ {R Γ A B} d n (q : List A) {b} {k} (a : B) {c : Ctx R Γ B} {t} �
         → Won (uncurry (laneT d n q) (cutT b k (shows (nx a)))) c t → Won (k , shows (nx a)) c t
 lane-on d n []      a refl w = w
 lane-on d n (_ ∷ _) a refl w = w
-
--- A flatMap of the fragment: its outer and its lanes are.
-frag-parts : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls → Frag (flatS op f d n q o ls) → Frag o × Lanes ls
-frag-parts (mergeᶠ nothing)  f d n []      o ls (fo , fl , _) = fo , fl
-frag-parts (mergeᶠ nothing)  f d n (_ ∷ _) o ls ()
-frag-parts (mergeᶠ (just m)) f d n q       o ls (fo , fl , _) = fo , fl
-frag-parts switchᶠ           f d n q       o ls (fo , fl , _) = fo , fl
-frag-parts exhaustᶠ          f d n q       o ls (fo , fl , _) = fo , fl
 
 -- A still candidate's lane passes its flatMap's retag as it is.
 lane-still : ∀ {R Γ A B} d n (q : List A) b {k} {c : Ctx R Γ B} {t} → Won (uncurry (laneT d n q) (cutT b k still)) c t → Won (k , still) c t
@@ -577,6 +568,15 @@ ends-queued false x     p c s = tt
 ends-queued true  false p c s = tt
 ends-queued true  true  p c s = tt
 
+-- An open outer's end, won, leads its lanes and its pool.
+outer-ends : ∀ {R Γ A B} p (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (s : St Γ A) ls
+           → Race KAfter (at p) c op f d n q s [] ls [] → Frag (plug c (flatS op f d n q s ls)) → d ≡ false → closed c ≡ false
+           → All (λ l → After p (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore p (poolT (deadL ls) (envAt c))
+outer-ends p c op f d n q s ls r ft refl cl =
+  outer-link c p op f n q s ls ft (race-steps KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) r)
+    (pool-step false s ls (proj₁ parts) (proj₂ parts) (λ ()))
+  where parts = frag-parts op f false n q s ls (frag-flat c op f false n q s ls ft)
+
 -- Up the found node's frames: each one the completion reaches is clear
 -- there, as `won-clear` for a value.
 mutual
@@ -592,8 +592,8 @@ mutual
   won-ends p (inTake i q (cpAt r) c)           s s′ al w ft = tt
   won-ends p (inTake i q (cutAt r) c)          s s′ al w ft = tt
   won-ends p (inTake i q (overAt r) c)         s s′ al w ft = tt
-  won-ends p (inOuter op f d n q ls c)         s s′ al (_ , w , _) ft =
-    ends-if p c ((n ≡ᵇ 0) ∧ null q) (flatS op f d n q s ls) (flatS op f true n q s′ ls) refl w ft
+  won-ends p (inOuter op f d n q ls c)         s s′ al (r , w , _) ft =
+    outer-ends p c op f d n q s ls r ft , ends-if p c ((n ≡ᵇ 0) ∧ null q) (flatS op f d n q s ls) (flatS op f true n q s′ ls) refl w ft
   won-ends p (inLanes op f d n [] o pre post c) s s′ al (l , u , w) ft =
     trans (sym al) lv , (λ cl → lane-sides p c op f d n [] o pre post s cl l ft (frag-flat c op f d n [] o (pre ʳ++ s ∷ post) ft))
     , subst (λ b → EndsIf (d ∧ b) p c (flatS op f d (pred n) [] o (pre ʳ++ ended s′ ∷ post))) (sym (∧-identityʳ (pred n ≡ᵇ 0)))

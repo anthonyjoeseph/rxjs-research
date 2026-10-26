@@ -29,7 +29,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; subst; sym; cong
 
 open import Tree using (Obs; FlatOp)
 open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Timeline; Pos; out; skip; end; idle; _∪_; ix; last)
-open import denotation.MonotonicList using (MonotonicList; tailᴱ; Agree; Agreeᵀ; stop; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agree-sym; agree-trans; agreeᵀ-refl; agreeᵀ-trans; _≈[_]_; agrees)
+open import denotation.MonotonicList using (MonotonicList; tailᴱ; Agree; Agreeᵀ; stop; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agree-sym; agree-trans; agreeᵀ-refl; agreeᵀ-sym; agreeᵀ-trans; _≈[_]_; agrees)
   renaming (cold to coldᴹ)
 import denotation.MonotonicList as M′
 open import denotation.NonExpansive using (Agreeˢ; _,ˢ_; Lanes; []ᴸ; _∷ᴸ_; Queue; []ᑫ; _∷ᑫ_; Outerᴿ; doneᴼ; liveᴼ;
@@ -377,6 +377,9 @@ agree-≅ a = has-agree a , has-agree (λ n → agree-sym (a n))
 -- Alike, then the same by definition.
 ≋-trans : ∀ {A} {h h′ h″ : Events∞ A} → h ≋ h′ → h′ ≋ h″ → h ≋ h″
 ≋-trans x y n = agreeᵀ-trans (cutˢ (x n)) (cutˢ (y n)) ,ˢ agree-trans (nowˢ (x n)) (nowˢ (y n))
+
+≋-sym : ∀ {A} {h h′ : Events∞ A} → h ≋ h′ → h′ ≋ h
+≋-sym x n = agreeᵀ-sym (cutˢ (x n)) ,ˢ agree-sym (nowˢ (x n))
 
 ≋-tr : ∀ {A} {h h′ h″ : Events∞ A} → h ≋ h′ → force h′ ≡ force h″ → cut h′ ≡ cut h″ → h ≋ h″
 ≋-tr {h = h} x e t n = subst (Agreeᵀ n (cut h)) t (cutˢ (x n)) ,ˢ subst (Agree n (force h)) e (nowˢ (x n))

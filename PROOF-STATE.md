@@ -12,24 +12,41 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 Untried: a connect's body keyed under its source's environment entry, past
 skips the source drops (`adequacy.Engine.Passed`); and where only the tail
-is read, past the tail a dequeue grows. An outer's value or end, a subscribe beginning a
-former, and a mark run each leave the hole's run in shape and every frame
-above keyed against it (`adequacy.Engine.Above.Flight`). Settled by the
-per-frame keys past a dropped skip.
+is read, past the tail a dequeue grows. An outer's value, a subscribe
+beginning a former, and a mark run each leave the hole's run in shape and
+every frame above keyed against it (`adequacy.Engine.Above.Flight`). Settled
+by the per-frame keys past a dropped skip.
 
-Members: `body-keyed-drops`, `lane-begin-tail`, `rise-admit-flight`,
-`rise-outer-end-flight`, `begin-flight`, `run-flight`, `flight-load`,
-`flight-held`.
+Members: `body-keyed-drops`, `lane-begin-tail`, `outer-begin-tail`,
+`begin-flight`, `run-flight`, `flight-load`.
+
+#### THE IDLE SOURCE
+
+Untried: a source still to subscribe under a body already subscribed, read
+idle, every frame above keeping its own of it, where the tree's keys hold of
+the subscription. No settled configuration absorbs one (`Settled`). Settled
+by a body, or refuted (then `flight-held` reads `Unpended`).
+
+Members: `pend-src-above`.
+
+#### THE DONE OUTER
+
+Untried: an outer already done rising its end. Its merge's run reads no
+outer, so the merge need not end there; only the search excludes it (a done
+node shows nothing, `outOf`), which `Order` does not carry. Settled by a
+body, or the configuration shown unreachable.
+
+Members: `rise-outer-done`.
 
 #### THE KEYS KEPT
 
-Untried: a node rewritten by a rise, a begin or a mark run keeps every node's
-positional facts (`adequacy.Engine.Keys`), reading the event in flight from
-the flight. A begin turns an idle hole into a subscription every ancestor's
-facts must cover. Probed in kept-depth, except a merge's mark. Settled by
-bodies, or a probe refuting a clause.
+Untried: a node rewritten by a rise, a begin, a mark run or an unsubscribe
+keeps every node's positional facts (`adequacy.Engine.Keys`), reading the
+event in flight from the flight. A begin turns an idle hole into a
+subscription every ancestor's facts must cover. Probed in kept-depth, except
+a merge's mark. Settled by bodies, or a probe refuting a clause.
 
-Members: `rise-admit-keys`, `rise-outer-end-keys`, `rise-lane-end-keys`,
+Members: `unsub-keyed`, `rise-admit-keys`, `rise-outer-end-keys`, `rise-lane-end-keys`,
 `rise-src-keys`, `rise-body-end-keys`, `begin-keys`, `run-keys`.
 
 #### THE ENDLESS SUBSCRIPTION
@@ -76,13 +93,13 @@ Members: `fed-fresh`, `fed-join`, `defer-links`, `fed-sourced`.
 
 #### THE CLOSED LANE
 
-Untried: a lane or a body completing under a closed frame. The race that
-picked it still ran, but a closed frame's candidates need not be its parts'
-heads, so the end may not lead a sibling lane or the connect's source.
-Settled when both are bodies, or refuted (then each reads the open frame
-`lane-drop` reaches).
+Untried: a lane, a body or an outer completing under a closed frame. The
+race that picked it still ran, but a closed frame's candidates need not be
+its parts' heads, so the end may not lead a sibling lane, the pool or the
+connect's source. Settled when all are bodies, or refuted (then each reads
+the open frame `lane-drop` reaches).
 
-Members: `rise-body-end-shut`, `rise-lane-end-shut`.
+Members: `rise-body-end-shut`, `rise-lane-end-shut`, `rise-outer-end-shut`.
 
 #### THE SORTED TAILS
 
@@ -178,8 +195,7 @@ whose connect is over; a step keeps the tree in the fragment. Probed on the
 spike engine. Settled when each is a body.
 
 Members: `search-hit`, `search-won`, `found-own`, `frag-next`, `run-lead`,
-`frag-flat`, `frag-body`, `sides-link`, `limited-sides`, `outer-link`,
-`body-link`.
+`sides-link`, `limited-sides`, `outer-link`, `body-link`.
 
 #### THE HEADS
 

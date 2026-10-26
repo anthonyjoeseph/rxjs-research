@@ -34,6 +34,7 @@ open import adequacy.Engine.Ahead using (Under; shown; ahead-mono; under-sub)
 open import adequacy.Engine.Race using (NotBefore)
 open import adequacy.Engine.Meaning using (envAt; gh; risen; lane; lanesL; laneRuns; poolRuns; outerT; outerG; poolG; deadL)
 open import adequacy.Engine.Flown using (Owed; NextOwed; rise-owed; sub-owed)
+open import adequacy.Engine.Plug using (flight-held)
 open import adequacy.Engine.Pick using (Order; order; module Order; whole; KeysAt; Shaped; Lead; Clear; Ends; EndsIf; Won; won-clear; won-ends; out-open; search-won; Apart; Searched)
 open import operation.PureObservable using (Tape; due; play; ending; over; module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
@@ -625,9 +626,6 @@ module _ {R : Set} where
     run-flight : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , absorbed , p ⟩ → NextOwed (step ⟨ c , s , absorbed , p ⟩)
     -- A tree's first subscription is in shape.
     flight-load : (o : Obs Timeline [] R) → Flight (Machine.load o)
-    -- A settled node anywhere in a tree the shape holds of: its run, and
-    -- every frame above, kept.
-    flight-held : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Held (plug c s) → Flight ⟨ c , s , absorbed , p ⟩
     -- THE STILL'S SUBTREE: where the search runs after a step, what it
     -- finds still leads every race above it past each live source's skips.
     apart-next : ∀ k → Base k → Order k → NextApart (step k)
@@ -730,7 +728,7 @@ module _ {R : Set} where
   rise-lead (inTake i q (overAt r) c)         s (nx a) p l iv = tt
   rise-lead (inTake i q (overAt r) c)         s cp     p l iv = tt
   rise-lead (inOuter op f d n q ls c)         s (nx a) p l iv = admit-lead c op f d n q s ls a p iv
-  rise-lead (inOuter op f d n q ls c)         s cp     p l iv = settle-lead c (flatS op f true n q s ls) true n (null q) p l
+  rise-lead (inOuter op f d n q ls c)         s cp     p l iv = settle-lead c (flatS op f true n q s ls) true n (null q) p (proj₂ l)
   rise-lead (inLanes op f d n q o pre post c) s (nx b) p l iv with alive s
   ... | true  = proj₂ (l refl)
   ... | false = tt
@@ -899,7 +897,7 @@ module _ {R : Set} where
   flight-owed ⟨ c , s , subscribing , p ⟩ b o = sub-owed c s p o
   flight-owed ⟨ c , s , absorbed , p ⟩    b o = run-flight c s p (b & o)
 
-  flight-of : ∀ k → Shaped k → Owed k → Flight k
+  flight-of : ∀ (k : Conf R) → Shaped k → Owed k → Flight k
   flight-of ⟨ c , s , absorbed , p ⟩    h _ = flight-held c s p h
   flight-of ⟨ c , s , subscribing , p ⟩ _ f = f
   flight-of ⟨ c , s , rising e , p ⟩    _ f = f

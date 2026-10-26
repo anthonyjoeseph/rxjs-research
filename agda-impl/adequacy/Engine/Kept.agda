@@ -29,7 +29,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Unit using (tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; cong; cong₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
 
 open import Tree using (Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Time; Frame; From; From∞; Timeline; timelineAt;
@@ -37,7 +37,7 @@ open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Time;
   renaming (quiet to silentᶠ)
 open import denotation.MonotonicList using (Agree; Agreeᵀ; agreeᵀ-refl; agree-refl; agree-sym; agree-trans; _≈[_]_)
 import denotation.MonotonicList as M′
-open import denotation.NonExpansive using (_,ˢ_; liveᴼ; []ᴸ; []ᑫ; go-ne; mapᴱ-neᴹ; ∪-ne; burstOn-ne; beside-ne)
+open import denotation.NonExpansive using (_,ˢ_; liveᴼ; []ᴸ; []ᑫ; go-ne; mapᴱ-neᴹ)
 open import denotation.Unfold using (Node; idleᶜ; ofᶜ; restsᶜ; states; ended; outerᴺ; restᶜ; takeWhileᶜ; endingᶜ; burstᶜ;
   connectᶜ; live; stateᴺ; cutᴺ; meaning; subscribe; outer∞; NEnv) renaming (feed to feedᵁ)
 open import denotation.Denote using (flatOp)
@@ -48,18 +48,18 @@ open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; 
   Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load;
   Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM; search; found; run; unsub; leaf; feed)
   renaming (cut to cutᴹ)
-open import adequacy.Engine.Meaning using (Has; M; _≅_; _≋_; agree-≅; atOut; bodyFrame; closed-hides; connSrc; deadL; doneE; doneE-ne;
-  doneG; envAt; flagOf; gh; joinG; lane; lanes-dead; lanes-refl; lanesFrame; lanesL; laneᴹ;
-  lift-≅; outerFrame; outerG; outerOf; outerT; pastOut; poolG; poolRuns; queue-refl; rested;
-  risen; same; srcFrame; srcG; srcRun; subOr; taken; taking∞; tape; took; up; lift-ne; ≅-refl;
-  ≅-trans; ≈-refl; ≋-by; ≋-out; ≋-tr; ≋-trans)
+open import adequacy.Engine.Meaning using (Has; M; _≅_; _≋_; agree-≅; atOut; closed-hides; connSrc; doneE; doneG; envAt; flagOf; gh;
+  joinG; lane; lanes-dead; lanesFrame; lanesL; lift-≅; outerG; outerOf; outerT; pastOut;
+  poolRuns; risen; srcFrame; srcG; subOr; tape; took; up; lift-ne; ≅-refl; ≅-trans; ≈-refl;
+  ≋-by; ≋-out; ≋-trans)
 open import adequacy.Engine.Flown using (lanes-cut; lanes-rise)
 open import adequacy.Engine.Inv using (Unpended; Opened; Wf; Base; module Base; Inv; module Inv; inv-at; wfI; wf-split; Owns; ofO;
   attO; cpO; cutO; bodyO; srcAttO; owedO; joinO; leafO; owned; search-hit)
 open import adequacy.Engine.Race using (First)
 open import adequacy.Engine.Keys using (Held)
-open import adequacy.Engine.Above using (take-true; take-incl; take-excl; lanes-runs; pool-runs; toʳ)
+open import adequacy.Engine.Above using (take-true; take-incl; take-excl; toʳ)
 open import adequacy.Engine.Pick using (module Order; Clear; Apart)
+open import adequacy.Engine.Plug using (take-plug; outer-plug; lanes-plug; lanes-plugʳ; done-plug; body-plug; conn-plugⁿ)
 
 open Events∞
 
@@ -74,50 +74,6 @@ out-≅ {r = r} {r′} e = to e , to (sym e)
     to : ∀ {x y : Events∞ _} → force x ≡ force y → ∀ {k b} → Has (out _ _ x) k b → Has (out _ _ y) k b
     to e atOut       = atOut
     to e (pastOut h) = pastOut (subst (λ z → Has z _ _) e h)
-
-------------------------------------------------------------------------
--- Each frame is the node it is a hole of
-
--- Each frame read over its hole's state is the state of the node it frames.
-take-plug : ∀ {Γ A} i (q : A → Bool) w (n : Node Γ A) (ρ : NEnv Γ) → taking∞ i q w (stateᴺ n ρ) ≋ stateᴺ (taken i q w n) ρ
-take-plug i q free       n ρ = ≋-by refl refl
-take-plug i q (cpAt p)   n ρ = ≋-by refl refl
-take-plug i q (cutAt p)  n ρ = ≋-by refl refl
-take-plug i q (overAt p) n ρ = ≋-by refl refl
-
-outer-plug : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d m q ls (o : St Γ A) (ρ : NEnv Γ)
-           → outerFrame op (lane f) d q (lanesL ls) (deadL ls) ρ (stateᴺ (gh o) ρ) ≋ stateᴺ (gh (flatS op f d m q o ls)) ρ
-outer-plug op f true  m q ls o ρ = ≋-by refl refl
-outer-plug {B = B} op f false m q ls o ρ k = agreeᵀ-refl k _ ,ˢ
-  go-ne (flatOp op) (liveᴼ {e = outerOf (lane f) ρ (stateᴺ (gh o) ρ)} {outer∞ (lane f) (gh o) ρ} (agreeᵀ-refl k _) (mapᴱ-neᴹ (λ a → ≈-refl _) (agree-refl k _)))
-    (lanes-refl k (states (lanesL ls) ρ)) (queue-refl k (Data.List.map (laneᴹ (lane f) ρ) q)) (agreeᵀ-refl k (cutᴺ (restsᶜ {B = B} (deadL ls)) ρ))
-
-lanes-plug : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d m q (o : St Γ A) pre post (s : St Γ B) (ρ : NEnv Γ)
-           → lanesFrame op (lane f) d q (gh o) pre post (flagOf s) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (gh (flatS op f d m q o (pre ++ s ∷ post))) ρ
-lanes-plug op f d m q o pre post s ρ =
-  ≋-by (cong₂ (λ ls t → M′.go (flatOp op) (outerᴺ (lane f) (outerG d (gh o)) ρ) ls (Data.List.map (laneᴹ (lane f) ρ) q) t) (sym (lanes-runs pre s post ρ)) (pool d))
-       (cong₂ (M′.whole (outerᴺ (lane f) (outerG d (gh o)) ρ)) (sym (lanes-runs pre s post ρ)) (pool d))
-  where
-    pool : ∀ d → outerT d (gh o) ρ (poolRuns pre post (flagOf s) ρ (stateᴺ (gh s) ρ)) ≡ cutᴺ (poolG d (gh o) (deadL (pre ++ s ∷ post))) ρ
-    pool false = sym (pool-runs pre s post ρ)
-    pool true  = cong (cutᴺ (gh o) ρ ∪_) (sym (pool-runs pre s post ρ))
-
-lanes-plugʳ : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d m q (o : St Γ A) pre post (s : St Γ B) (ρ : NEnv Γ)
-            → lanesFrame op (lane f) d q (gh o) (reverse pre) post (flagOf s) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (gh (flatS op f d m q o (pre ʳ++ s ∷ post))) ρ
-lanes-plugʳ op f d m q o pre post s ρ =
-  toʳ (λ ls → lanesFrame op (lane f) d q (gh o) (reverse pre) post (flagOf s) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (gh (flatS op f d m q o ls)) ρ) pre
-    (lanes-plug op f d m q o (reverse pre) post s ρ)
-
-done-plug : ∀ {Γ A} ow sl {h : Events∞ A} (n : Node Γ A) (ρ : NEnv Γ) → h ≋ stateᴺ n ρ → doneE ow sl h ≋ stateᴺ (doneG ow sl n) ρ
-done-plug (just w) l     n ρ x = ≋-tr (λ k → doneE-ne (just w) l (x k)) refl refl
-done-plug nothing  false n ρ x = ≋-tr (λ k → doneE-ne nothing false (x k)) refl refl
-done-plug nothing  true  n ρ x = x
-
-body-plug : ∀ {Γ X B} k (o : St Γ X) (s : St (X ∷ Γ) B) (ρ : NEnv Γ)
-          → bodyFrame k o ρ (stateᴺ (gh s) (srcRun (srcG k o) ρ ∷ᴬ ρ)) ≋ stateᴺ (gh (connS k o s)) ρ
-body-plug (cs cl sl sa (just p) as ow r e)  o s ρ = done-plug ow sl _ ρ (≋-by refl refl)
-body-plug (cs false sl sa nothing as ow r e) o s ρ = done-plug ow sl _ ρ (≋-by refl refl)
-body-plug (cs true sl sa nothing as ow r e)  o s ρ = done-plug ow sl _ ρ (≋-by refl refl)
 
 -- A settled node subscribes as it stands.
 sub-settled : ∀ {Γ A} p (s : St Γ A) → Unpended s → subOr p s ≡ gh s
@@ -144,12 +100,7 @@ private
             → connSrc (CS.closed k) (CS.srcAt k) (CS.endAt k) (gh b) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (connectᶜ (CS.srcAt k) (gh b) (srcG k s)) ρ
   conn-plug (cs false sl sa (just p) as ow r e) b s ρ u o rewrite sub-settled (p ⊕ [ ix 1 ]) s u = ≋-by refl refl
   conn-plug (cs true  sl sa (just p) as ow r e) b s ρ u (() , _)
-  conn-plug (cs false sl sa nothing as ow r e)  b s ρ u o = ≋-by refl refl
-  conn-plug {X = X} (cs true sl sa nothing as ow r e) b s ρ u o k =
-    ∪-ne (burstOn-ne r (R k)) (agreeᵀ-refl k _) ,ˢ beside-ne r (same k _) (R k)
-    where
-      R : rested {B = X} (stateᴺ (gh s) ρ) ≋ stateᴺ (restᶜ (gh s)) ρ
-      R = ≋-by refl refl
+  conn-plug (cs cl sl sa nothing as ow r e)     b s ρ u o = conn-plugⁿ cl sl sa as ow r e b s ρ
 
   src-plug : ∀ {Γ X B} k (b : St (X ∷ Γ) B) (s : St Γ X) (ρ : NEnv Γ) → Unpended s → Opened k s
            → srcFrame k (gh b) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (gh (connS k s b)) ρ
