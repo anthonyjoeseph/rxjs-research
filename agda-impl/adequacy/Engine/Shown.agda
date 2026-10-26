@@ -41,7 +41,7 @@ open import adequacy.Engine.Meaning using (_≋_; ≋-trans; same; ≋-tr; mappe
 open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore)
 open import adequacy.Engine.Head using (Frag; cand; pool-step; <ᴷ-irrefl; ≮ᴷ-trans; ≮<ᴷ; ext-≮)
 open import adequacy.Engine.Keys using (Held)
-open import adequacy.Engine.Inv using (Unpended)
+open import adequacy.Engine.Fold using (Unpended)
 open import adequacy.Engine.Pick using (Beat; past; KAfter; KNotBefore; Lost; body-link; Before; Race; LaneWon; lane-won; race-shut; lanes-gh;
   after-step; lane-sides; outer-link; src-floor)
 open import adequacy.Engine.Head.Within using (frag-flat; frag-parts)
