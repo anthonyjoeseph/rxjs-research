@@ -14,7 +14,9 @@
 -- body fed the run, or past skips under the source's
 -- (`adequacy.Engine.FedWalk.src-fed`), and so every node of it, owing the source nothing, its
 -- source's run nesting nothing, and after each source skip shows
--- (`adequacy.Engine.Shown.src-body-on`).  And each live joiner fed in
+-- (`adequacy.Engine.Shown.src-body-on`).  And each hole's run in flight
+-- in shape, under an open observer and a closed one alike
+-- (`adequacy.Engine.Above.Flight`).  And each live joiner fed in
 -- order ahead of its rejoined source, joined where its source never keys
 -- (`adequacy.Engine.Keys.Here`); and every node's positional invariant
 -- held (`adequacy.Engine.Keys.Keys`): shape for cold and of nodes, a
@@ -61,7 +63,7 @@ open import Tree using (Obs; FlatOp)
 open import denotation.MonotonicList.Events using (Timeline)
 open import adequacy.Engine.Head using (cand)
 open import adequacy.Engine.Pick using (past)
-open import adequacy.Engine.Meaning using (vals; endOf; mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn; srcState; srcG; srcRun; gh; lane; lanesL; deadL; envAt; outerG; poolG)
+open import adequacy.Engine.Meaning using (vals; endOf; mapped; scanned; took; outerFrame; lanesFrame; connSrc; bodyConn; srcState; srcG; srcRun; gh; lane; lanesL; deadL; envAt; outerG; poolG; hole)
 open import adequacy.Engine.Ahead using (shown) renaming (shows to showsᵃ)
 open import denotation.MonotonicList using (head)
 open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
@@ -866,6 +868,12 @@ private
   rootKeysᵇ : Conf ℕ → Bool
   rootKeysᵇ ⟨ c , s , _ , _ ⟩ = keysWalkᵇ (plug c s) []ᴬ
 
+  -- A rising or subscribing configuration's hole's run in shape
+  -- (`adequacy.Engine.Above.Flight`), its observer closed as `b` says.
+  flightᵇ : Bool → Conf ℕ → Bool
+  flightᵇ b ⟨ c , s , absorbed , p ⟩ = true
+  flightᵇ b ⟨ c , s , m        , p ⟩ = (if b then not (closed c) else closed c) ∨ shapeᵇ (hole c s m p)
+
   -- Whether every silent step keeps its meaning so, and the longest run
   -- meaning the same.
   mutual
@@ -879,6 +887,8 @@ private
       else if not (linkedᵇ 3 m) then no (best ⊔ run) ("\n  unplaced: an inner source fed the rest before a position asked of, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (rootShapedᵇ m) then no (best ⊔ run) ("\n  unshaped: a node out of shape, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (rootKeysᵇ m) then no (best ⊔ run) ("\n  unkeyed: a node's positional invariant not held, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (flightᵇ false m) then no (best ⊔ run) ("\n  unflown: a hole's run out of shape under an open observer, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (flightᵇ true m) then no (best ⊔ run) ("\n  unflown: a hole's run out of shape under a closed observer, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else next n run best (ls + linkCount m) m (step m)
 
     next : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict
