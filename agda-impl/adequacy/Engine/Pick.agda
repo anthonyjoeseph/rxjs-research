@@ -49,7 +49,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.MonotonicList.Events using (Pos; Timeline; Events∞; idle; hush; ix; <ᵖ-below)
 open import denotation.MonotonicList using (head; Agreeᵀ)
-open import denotation.Unfold using (Step; states; step; headˢ; hushˢ; outˢ; skipˢ; endˢ; subscribe)
+open import denotation.Unfold using (Step; states; step; headˢ; hushˢ; outˢ; skipˢ; endˢ; meaning)
 open import operation.Key using (Key; at; after; _<ᴷ_)
 open import operation.PureObservable using (peek; module Machine)
 open Machine using (St; cs; mapS; scanS; cutS; lnS; takeS; flatS; connS; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes;
@@ -59,16 +59,16 @@ open Machine using (St; cs; mapS; scanS; cutS; lnS; takeS; flatS; connS; Ctx; to
 open import adequacy.Engine.Meaning using (gh; poolG; lanesL; deadL; poolT; outerT; envAt; srcState; srcG)
 open import adequacy.Engine.Race using (NotBefore; After; TailNotBefore)
 open import adequacy.Engine.Head using (Frag; Lanes; Lane; Agrees; exact; early; HeadAt; cand; pool-step; at-<ᵖ; <≮ᴷ; ≮ᴷ-trans; ext-≮)
-open import adequacy.Engine.Head.Race using (shift-≮; sub-head)
+open import adequacy.Engine.Head.Race using (shift-≮)
 open import adequacy.Engine.Head.Agrees using (head-agrees)
 open import adequacy.Engine.Head.Within using (frag-flat; frag-body; frag-parts; fr-at; conn-src)
 open import adequacy.Engine.Keys using (Keyed; Keys)
 open import adequacy.Engine.Above using (Flight)
 open import adequacy.Engine.Ahead using (Sides; Ahead; Under; shown; shows-open) renaming (shows to showsᶜ)
-open import adequacy.Engine.Scope using (Scope; modes; firsts-after; FloorAt; FloorSrc; floor-lower; scope-src; ≮-lower; SaneSrc; PlacedSrc; HeadFloor; live-floor)
-open import adequacy.Sane using (Mode; Saneᴸ)
-open import adequacy.Placed.Order using (Placedᴸ)
-open import adequacy.Stepper using (firstᴸ)
+open import adequacy.Engine.Scope using (Scope; modes; firsts-after; FloorAt; FloorSrc; first-floor; floor-lower; scope-src; sub-meaning)
+open import adequacy.Sane using (Mode; Sane; Saneᴸ)
+open import adequacy.Placed.Order using (Placed; Placedᴸ)
+open import adequacy.Stepper using (first; firstᴸ)
 open import adequacy.Stepper.Past using (Floor)
 
 ------------------------------------------------------------------------
@@ -444,16 +444,16 @@ postulate
   -- connect's joiners in the very rise that closes it, so a ghost-wide
   -- `Sane` kept by the invariant would reach every frame.
   --
-  -- Suspect for a source still pending: a lane `connect` begun after an
-  -- enclosing connect ended reads, while its body subscribes, a source
-  -- ghosted by `Unfold.subscribe`, whose joiner of the ended connect is
-  -- untold, where `over` demands told.  The machine would begin that
-  -- joiner as `ofS`; the ghost has not yet.
+  -- Only a subscribed source: one still pending is ghosted by
+  -- `Unfold.subscribe`, whose joiner of an ended connect is untold where
+  -- `over` demands told (`sub-meaning` floors it instead).
   --
   -- DEAD ROUTE: from `Frag` alone: it reads nothing of a joiner, so it
   --   cannot say which are told.
-  src-sane : ∀ {R Γ X B} (c : Ctx R Γ B) kk (o : St Γ X) (b : St (X ∷ Γ) B) → Frag (plug c (connS kk o b)) → SaneSrc (modes c) (srcG kk o)
-  src-placed : ∀ {R Γ X B} (c : Ctx R Γ B) kk (o : St Γ X) (b : St (X ∷ Γ) B) → Frag (plug c (connS kk o b)) → PlacedSrc (srcG kk o) (envAt c)
+  src-sane : ∀ {R Γ X B} (c : Ctx R Γ B) sl sa as ow r en (o : St Γ X) (b : St (X ∷ Γ) B)
+           → Frag (plug c (connS (cs false sl sa nothing as ow r en) o b)) → Sane (modes c) (gh o)
+  src-placed : ∀ {R Γ X B} (c : Ctx R Γ B) sl sa as ow r en (o : St Γ X) (b : St (X ∷ Γ) B)
+             → Frag (plug c (connS (cs false sl sa nothing as ow r en) o b)) → Placed (gh o) (envAt c)
   -- The meaning's heads are the stepper's, every running source in scope
   -- clear of `p`; a pool the stepper hushes leaves nothing running.
   --
@@ -495,44 +495,34 @@ lost-floor p (just (k , still)) (skipˢ h n)  lo (early u) =
 lost-floor p (just (k , still)) (endˢ h)     lo (early u) =
   subst (λ b → b ≡ false) (at-<ᵖ (h ++ [ ix 0 ]) p) (≮ᴷ-trans (at (h ++ [ ix 0 ])) (shift k) (at p) (shift-≮ h k u) lo)
 
--- A source subscribed at `r`, past the pick: its step shows at or past it.
-sub-floor : ∀ {Γ A} p r (o : Obs Timeline Γ A) → at p <ᴷ at r ≡ true → FloorAt p (headˢ (step (subscribe o r)))
-sub-floor p r o lt with headˢ (step (subscribe o r)) | sub-head o r
-... | nothing | _ = tt
-... | just h  | u = ≮-lower (h ++ [ ix 0 ]) p r (subst (λ b → b ≡ true) (at-<ᵖ p r) lt)
-                      (subst (λ b → b ≡ false) (at-<ᵖ (h ++ [ ix 0 ]) r) (≮ᴷ-trans (at (h ++ [ ix 0 ])) (at h) (at r) (ext-≮ h [ ix 0 ]) u))
-
--- A connect's source, its race lost to a body at `p`, steps at or past
--- `p`: subscribed, its step agrees with the candidate that lost; not
--- yet, its subscription lies at the connect's own mark, after `p`.
-src-head : ∀ {R Γ X B} p (c : Ctx R Γ B) kk (o : St Γ X) (b : St (X ∷ Γ) B)
-         → Lost false (at p) (cand (inSrc kk b c) o) → Before (at p) (own (connS kk o b)) → Frag (plug c (connS kk o b)) → HeadFloor p (srcG kk o)
-src-head p c (cs false sl sa nothing as ow r en) o b lo bf ft =
-  lost-floor p (cand (inSrc K b c) o) (step (gh o)) lo (open-agrees (inSrc K b c) o refl (conn-src K o b (fr-at c (connS K o b) ft)))
-  where K = cs false sl sa nothing as ow r en
-src-head p c (cs true sl sa nothing as ow r en) o b lo bf ft = tt
-src-head p c (cs cl sl sa (just q) nothing ow r en) (pend o) b lo (bm ∷ _) ft = sub-floor p (q ⊕ [ ix 1 ]) o bm
-src-head p c (cs cl sl sa (just q) (just x) ow r en) o b lo bf ft = ⊥-elim (fr-at c (connS _ o b) ft)
-src-head p c (cs cl sl sa (just q) nothing ow r en) (coldS x y) b lo bf ft = ⊥-elim (fr-at c (connS _ (coldS x y) b) ft)
-src-head p c (cs cl sl sa (just q) nothing ow r en) (ofS x y z) b lo bf ft = ⊥-elim (fr-at c (connS _ (ofS x y z) b) ft)
-src-head p c (cs cl sl sa (just q) nothing ow r en) (doneS) b lo bf ft = ⊥-elim (fr-at c (connS _ (doneS) b) ft)
-src-head p c (cs cl sl sa (just q) nothing ow r en) (mapS x y) b lo bf ft = ⊥-elim (fr-at c (connS _ (mapS x y) b) ft)
-src-head p c (cs cl sl sa (just q) nothing ow r en) (scanS x y z) b lo bf ft = ⊥-elim (fr-at c (connS _ (scanS x y z) b) ft)
-src-head p c (cs cl sl sa (just q) nothing ow r en) (cutS x y z) b lo bf ft = ⊥-elim (fr-at c (connS _ (cutS x y z) b) ft)
-src-head p c (cs cl sl sa (just q) nothing ow r en) (lnS x y) b lo bf ft = ⊥-elim (fr-at c (connS _ (lnS x y) b) ft)
-src-head p c (cs cl sl sa (just q) nothing ow r en) (takeS x y z w) b lo bf ft = ⊥-elim (fr-at c (connS _ (takeS x y z w) b) ft)
-src-head p c (cs cl sl sa (just q) nothing ow r en) (flatS x y z w u v t) b lo bf ft = ⊥-elim (fr-at c (connS _ (flatS x y z w u v t) b) ft)
-src-head p c (cs cl sl sa (just q) nothing ow r en) (connS x y z) b lo bf ft = ⊥-elim (fr-at c (connS _ (connS x y z) b) ft)
-src-head p c (cs cl sl sa (just q) nothing ow r en) (joinS x y z w) b lo bf ft = ⊥-elim (fr-at c (connS _ (joinS x y z w) b) ft)
-
 -- A connect's source, its race lost to a body at `p` and every running
--- source above at or past `p`, shows at or past `p`: its step does, and
--- its meaning starts there or past a source above.
+-- source above at or past `p`, shows at or past `p`.  Subscribed, its
+-- step agrees with the candidate that lost, and its meaning starts there
+-- or past a source above; not yet, it subscribes at the connect's own
+-- mark, after `p`.
 src-floor : ∀ {R Γ X B} p (c : Ctx R Γ B) kk (o : St Γ X) (b : St (X ∷ Γ) B)
           → Lost false (at p) (cand (inSrc kk b c) o) → Before (at p) (own (connS kk o b)) → Frag (plug c (connS kk o b)) → Scope p c
           → FloorSrc p (srcG kk o) (envAt c)
-src-floor p c kk o b lo bf ft sc =
-  live-floor (modes c) p (srcG kk o) (envAt c) (src-sane c kk o b ft) (src-placed c kk o b ft) (src-head p c kk o b lo bf ft) sc
+src-floor p c (cs false sl sa nothing as ow r en) o b lo bf ft sc =
+  first-floor (modes c) (envAt c) p (step (gh o)) (meaning (gh o) (envAt c)) sc
+    (first {ν = modes c} (gh o) (envAt c) (src-sane c sl sa as ow r en o b ft) (src-placed c sl sa as ow r en o b ft))
+    (lost-floor p (cand (inSrc K b c) o) (step (gh o)) lo (open-agrees (inSrc K b c) o refl (conn-src K o b (fr-at c (connS K o b) ft))))
+  where K = cs false sl sa nothing as ow r en
+src-floor p c (cs true sl sa nothing as ow r en) o b lo bf ft sc = tt
+src-floor p c (cs cl sl sa (just q) nothing ow r en) (pend o) b lo (bm ∷ _) ft sc =
+  sub-meaning o (q ⊕ [ ix 1 ]) (envAt c) p (subst (λ b → b ≡ true) (at-<ᵖ p (q ⊕ [ ix 1 ])) bm)
+src-floor p c (cs cl sl sa (just q) (just x) ow r en) o b lo bf ft sc = ⊥-elim (fr-at c (connS _ o b) ft)
+src-floor p c (cs cl sl sa (just q) nothing ow r en) (coldS x y) b lo bf ft sc = ⊥-elim (fr-at c (connS _ (coldS x y) b) ft)
+src-floor p c (cs cl sl sa (just q) nothing ow r en) (ofS x y z) b lo bf ft sc = ⊥-elim (fr-at c (connS _ (ofS x y z) b) ft)
+src-floor p c (cs cl sl sa (just q) nothing ow r en) (doneS) b lo bf ft sc = ⊥-elim (fr-at c (connS _ (doneS) b) ft)
+src-floor p c (cs cl sl sa (just q) nothing ow r en) (mapS x y) b lo bf ft sc = ⊥-elim (fr-at c (connS _ (mapS x y) b) ft)
+src-floor p c (cs cl sl sa (just q) nothing ow r en) (scanS x y z) b lo bf ft sc = ⊥-elim (fr-at c (connS _ (scanS x y z) b) ft)
+src-floor p c (cs cl sl sa (just q) nothing ow r en) (cutS x y z) b lo bf ft sc = ⊥-elim (fr-at c (connS _ (cutS x y z) b) ft)
+src-floor p c (cs cl sl sa (just q) nothing ow r en) (lnS x y) b lo bf ft sc = ⊥-elim (fr-at c (connS _ (lnS x y) b) ft)
+src-floor p c (cs cl sl sa (just q) nothing ow r en) (takeS x y z w) b lo bf ft sc = ⊥-elim (fr-at c (connS _ (takeS x y z w) b) ft)
+src-floor p c (cs cl sl sa (just q) nothing ow r en) (flatS x y z w u v t) b lo bf ft sc = ⊥-elim (fr-at c (connS _ (flatS x y z w u v t) b) ft)
+src-floor p c (cs cl sl sa (just q) nothing ow r en) (connS x y z) b lo bf ft sc = ⊥-elim (fr-at c (connS _ (connS x y z) b) ft)
+src-floor p c (cs cl sl sa (just q) nothing ow r en) (joinS x y z w) b lo bf ft sc = ⊥-elim (fr-at c (connS _ (joinS x y z w) b) ft)
 
 -- Every running source in scope at or past a key's position; past an
 -- `after`, nothing asked.
