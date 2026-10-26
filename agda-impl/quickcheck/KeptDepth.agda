@@ -76,7 +76,7 @@ private
   -- A run's verdict, carrying its longest run of steps meaning the same
   -- and how many live sources' links it checked.
   data Verdict : Set where
-    yes : ℕ → ℕ → ℕ → Verdict
+    yes : ℕ → ℕ → ℕ × ℕ × ℕ → Verdict
     no  : ℕ → String → Verdict
 
   -- The first `k` events of a run, printed.
@@ -874,21 +874,26 @@ private
   flightᵇ b ⟨ c , s , absorbed , p ⟩ = true
   flightᵇ b ⟨ c , s , m        , p ⟩ = (if b then not (closed c) else closed c) ∨ shapeᵇ (hole c s m p)
 
-  -- How many of those a closed observer reads, rising an end: what the
-  -- closed check covers of THE CLOSED LANE.
-  shutCount : Conf ℕ → ℕ
-  shutCount ⟨ c , s , rising cp , p ⟩ = if closed c then 1 else 0
-  shutCount _                         = 0
+  -- How many of those a closed observer reads: rising an end (THE
+  -- CLOSED LANE), rising a value, and subscribing.
+  shutCount : Conf ℕ → ℕ × ℕ × ℕ
+  shutCount ⟨ c , s , rising cp     , p ⟩ = (if closed c then 1 else 0) , 0 , 0
+  shutCount ⟨ c , s , rising (nx a) , p ⟩ = 0 , (if closed c then 1 else 0) , 0
+  shutCount ⟨ c , s , subscribing   , p ⟩ = 0 , 0 , (if closed c then 1 else 0)
+  shutCount _                             = 0 , 0 , 0
+
+  add³ : ℕ × ℕ × ℕ → ℕ × ℕ × ℕ → ℕ × ℕ × ℕ
+  add³ (a , b , c) (x , y , z) = a + x , b + y , c + z
 
   -- Whether every silent step keeps its meaning so, and the longest run
   -- meaning the same.
   mutual
     walk : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Verdict
-    walk zero    run best ls m = yes (best ⊔ run) ls 0
+    walk zero    run best ls m = yes (best ⊔ run) ls (0 , 0 , 0)
     walk (suc n) run best ls m = counted (shutCount m) (walk′ n run best ls m)
 
-    counted : ℕ → Verdict → Verdict
-    counted k (yes l ls sh) = yes l ls (k + sh)
+    counted : ℕ × ℕ × ℕ → Verdict → Verdict
+    counted k (yes l ls sh) = yes l ls (add³ k sh)
     counted k v             = v
 
     walk′ : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Verdict
@@ -907,8 +912,8 @@ private
     next : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict
     next n run best ls m (silent t m′)     = after n run best ls m m′ (kind m m′)
     next n run best ls m (value t p a m′)  = walk n 0 (best ⊔ run) ls m′
-    next n run best ls m (complete p)      = yes (best ⊔ run) ls 0
-    next n run best ls m drained           = yes (best ⊔ run) ls 0
+    next n run best ls m (complete p)      = yes (best ⊔ run) ls (0 , 0 , 0)
+    next n run best ls m drained           = yes (best ⊔ run) ls (0 , 0 , 0)
 
     after : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Conf ℕ → ℕ → Verdict
     after n run best ls m m′ zero          = no (best ⊔ run) (why m m′)
@@ -918,7 +923,8 @@ private
 -- One program's verdict, under a label.
 keptLine : String → Prog natᵗ → String
 keptLine n p with walk 400 0 0 0 (load (toObs timeline 3 p []ᴬ []ᴬ []ᴬ))
-... | yes l ls sh = "kept-depth: ok   " ++ n ++ " longest " ++ showℕ l ++ " links " ++ showℕ ls ++ " shut ends " ++ showℕ sh
+... | yes l ls (se , sv , ss) = "kept-depth: ok   " ++ n ++ " longest " ++ showℕ l ++ " links " ++ showℕ ls
+                                 ++ " shut ends " ++ showℕ se ++ " shut values " ++ showℕ sv ++ " shut subscribes " ++ showℕ ss
 ... | no l w = "kept-depth: FAIL " ++ n ++ " longest " ++ showℕ l ++ "\n  program " ++ showCode natᵗ p ++ w
 
 private
