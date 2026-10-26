@@ -58,14 +58,15 @@ open Machine using (St; cs; mapS; scanS; cutS; lnS; takeS; flatS; connS; Ctx; to
   renaming (outerT to outerK)
 open import adequacy.Engine.Meaning using (gh; poolG; lanesL; deadL; poolT; outerT; envAt; srcState; srcG)
 open import adequacy.Engine.Race using (NotBefore; After; TailNotBefore)
-open import adequacy.Engine.Head using (Frag; Lanes; Lane; Agrees; exact; early; HeadAt; cand; pool-step; at-<ᵖ; <≮ᴷ; ≮ᴷ-trans; ext-≮)
+open import adequacy.Engine.Head using (Frag; Lanes; Lane; Agrees; exact; early; HeadAt; HeadAtⁿ; cand; pool-step; at-<ᵖ; <≮ᴷ; ≮ᴷ-trans; ext-≮)
 open import adequacy.Engine.Head.Race using (shift-≮)
-open import adequacy.Engine.Head.Agrees using (head-agrees)
+open import adequacy.Engine.Head.Agrees using (head-agrees; head-agreesⱽ)
+open import adequacy.Engine.Shuts using (shutAll)
 open import adequacy.Engine.Head.Within using (frag-flat; frag-body; frag-parts; fr-at; conn-src)
 open import adequacy.Engine.Keys using (Keyed; Keys)
 open import adequacy.Engine.Above using (Flight)
 open import adequacy.Engine.Ahead using (Sides; Ahead; Under; shown; shows-open) renaming (shows to showsᶜ)
-open import adequacy.Engine.Scope using (Scope; modes; firsts-after; FloorAt; FloorSrc; first-floor; floor-lower; scope-src; sub-meaning; closures; shutAll; ended-at; shut-floor; shut-states; Gh; Ghᴸ; gh-at)
+open import adequacy.Engine.Scope using (Scope; modes; firsts-after; FloorAt; FloorSrc; first-floor; floor-lower; scope-src; sub-meaning; closures; ended-at; shut-floor; shut-states; Gh; Ghᴸ; gh-at; gh-told)
 open import adequacy.Sane using (Mode)
 open import adequacy.Stepper using (first; firstᴸ)
 open import adequacy.Stepper.Past using (Floor)
@@ -406,20 +407,16 @@ race-steps P Q k h c op f d n q o acc (lnS true (cutS true a y) ∷ xs) tl cl (f
 race-steps P Q k h c op f d n q o acc (lnS false (cutS false a y) ∷ xs) tl cl (fy , fl) (r , rs) =
   all-++⁺ (race-steps P Q k h c op f d n q o (lnS false (cutS false a y) ∷ acc) xs tl cl fl rs) []
 
-postulate
-  -- An open frame's node read through the ended connects in scope
-  -- (`Scope.closures`) steps as its candidate, as the plain node does
-  -- (`head-agrees`): a shut tells only a joiner a pending subscription
-  -- makes, under that subscription's mark, which its candidate holds.
-  -- The plain step's head alone does not carry over: such a joiner hushes
-  -- plainly and ends once shut.
-  --
-  -- Over `Frag` alone it is false: a live joiner of an ended connect,
-  -- nothing queued, has no candidate and ends once shut.  The machine
-  -- feeds every live joiner its connect's end (`Machine.rise`), which
-  -- `Scope.Gh` keeps (`Scope.Told`).
-  shut-head : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → closed c ≡ false → Frag s → Gh c s
-            → Agrees (cand c s) (step (shutAll (closures c) (gh s)))
+-- An open frame's node read through the ended connects in scope
+-- (`Scope.closures`) steps as its candidate, as the plain node does: a
+-- shut tells only a joiner a pending subscription makes, under that
+-- subscription's mark (`Head.Race.sub-head`).  Over `Frag` alone it is
+-- false: a live joiner of an ended connect, nothing queued, has no
+-- candidate and ends once shut.  The machine feeds every live joiner its
+-- connect's end (`Machine.rise`), which `Scope.Gh` keeps (`Scope.gh-told`).
+shut-head : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → closed c ≡ false → Frag s → Gh c s
+          → Agrees (cand c s) (step (shutAll (closures c) (gh s)))
+shut-head c s cl fs g = subst (λ b → HeadAtⁿ b (cand c s) (shutAll (closures c) (gh s))) cl (head-agreesⱽ c s (closures c) (gh-told c s g) fs)
 
 -- Likewise, each read through the ended connects in scope.
 race-shut : ∀ {R Γ A B} (P : Key → Maybe (Key × Out B) → Set) (Q : Maybe Pos → Set) (k : Key)

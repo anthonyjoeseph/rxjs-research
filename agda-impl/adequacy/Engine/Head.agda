@@ -20,26 +20,29 @@
 module adequacy.Engine.Head where
 
 open import Data.Bool using (Bool; true; false)
-open import Data.List using (List; []; _∷_; _++_; [_]; length)
+open import Data.List using (List; []; _∷_; _++_; [_]; length; map)
+open import Data.List.Properties using (map-++)
+open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Maybe using (Maybe; just; nothing) renaming (map to mapᴹ)
 open import Data.Nat using (zero)
 open import Data.Product using (_×_; _,_; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong; cong₂)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.MonotonicList.Events using (Pos; Timeline; _<ᵖ_; ix; emit; stall; close)
 open import denotation.Unfold using (Node; Step; outˢ; skipˢ; endˢ; hushˢ; headˢ; step; restˢ; restsˢ; restᴹ; restsᶜ; restᶜ; unionˢ;
   Earliest; found; earliest; pick; Outer; doneᵒ; runᵒ; outerOf; goˢ; outerˢ; laneˢ; flatˢ;
-  Source; live; ended; connectᶜ; burstingᶜ; underᶜ; subscribe; sourceˢ; bodyˢ; shutˢᵗ; burstsˢ; beforeˢ) renaming (none to noneᴱ)
+  Source; live; ended; connectᶜ; burstingᶜ; underᶜ; subscribe; sourceˢ; bodyˢ; shutˢᵗ; burstsˢ; beforeˢ; idleᶜ; mapᶜ; scanᶜ; unionᶜ; flatMapᶜ; shut) renaming (none to noneᴱ)
 open import operation.Key using (Key; at; after; _<ᴷ_)
 open import operation.PureObservable using (module Machine; Tape; play; ending) renaming (over to overᵀ)
 
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ctx; closed; inMap; inCut;
   Out; still; shows; Cand; seek; first; retag; mapT; cutT; nx; cp; attached; attAt; raceT; outerT; laneT; lanes; inOuter; inLanes; inLn; inScan; inTake; free; cpAt; cutAt; overAt;
   CS; cs; inSrc; inBody; own; ownBest; shift; over; sourceT; bodyM; owedM) renaming (found to foundᴹ)
-open import adequacy.Engine.Meaning using (gh; lanesL; deadL; outerG; poolG)
+open import adequacy.Engine.Meaning using (gh; lanesL; deadL; outerG; poolG; lane; tape; taken; vals; endOf)
+open import adequacy.Engine.Shuts using (Shuts; shutAll; Toldˢ; Toldᴸ; shut-still; shut-comm; shut-union; shut-rest; shut-rests; shut-flat; shut-taken; told-shut)
 
 ------------------------------------------------------------------------
 -- The relation
@@ -69,9 +72,13 @@ data Quiet {A : Set} : Maybe (Key × Out A) → Set₁ where
 cand : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Maybe (Key × Out A)
 cand c s = mapᴹ proj₂ (seek c s)
 
+-- Of a node: under a closed observer, only silent marks.
+HeadAtⁿ : ∀ {Γ A} → Bool → Maybe (Key × Out A) → Node Γ A → Set₁
+HeadAtⁿ true  x n = Quiet x
+HeadAtⁿ false x n = Agrees x (step n)
+
 HeadAt : ∀ {Γ A} → Bool → Maybe (Key × Out A) → St Γ A → Set₁
-HeadAt true  x s = Quiet x
-HeadAt false x s = Agrees x (step (gh s))
+HeadAt b x s = HeadAtⁿ b x (gh s)
 
 Head : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Set₁
 Head c s = HeadAt (closed c) (cand c s) s
@@ -309,46 +316,52 @@ pend-head c o with closed c
 ... | true  = none
 ... | false = exact refl
 
--- The formers outside the merge fragment, one fact each.
+-- The formers outside the merge fragment, one fact each, read through
+-- shuts.
 postulate
-  scanS-head : ∀ {R Γ A B} (c : Ctx R Γ B) (f : B → A → B) z (s : St Γ A) → Head (inScan f z c) s → Head c (scanS f z s)
-  takeS-head : ∀ {R Γ A} (c : Ctx R Γ A) i q w (s : St Γ A) → Head (inTake i q w c) s → Head c (takeS i q w s)
-  limit-head : ∀ {R Γ A B} (c : Ctx R Γ B) m (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls
-             → Frag o → Lanes ls → (d ≡ true → Done o × NoConn o) → Head c (flatS (mergeᶠ (just m)) f d n q o ls)
-  switch-head : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls
-              → Frag o → Lanes ls → (d ≡ true → Done o × NoConn o) → Head c (flatS switchᶠ f d n q o ls)
-  exhaust-head : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls
-               → Frag o → Lanes ls → (d ≡ true → Done o × NoConn o) → Head c (flatS exhaustᶠ f d n q o ls)
+  scanS-head : ∀ {R Γ A B} (c : Ctx R Γ B) (f : B → A → B) z (s : St Γ A) (V : Shuts Γ)
+             → HeadAtⁿ (closed (inScan f z c)) (cand (inScan f z c) s) (shutAll V (gh s)) → HeadAtⁿ (closed c) (cand c (scanS f z s)) (scanᶜ f z (shutAll V (gh s)))
+  takeS-head : ∀ {R Γ A} (c : Ctx R Γ A) i q w (s : St Γ A) (V : Shuts Γ)
+             → HeadAtⁿ (closed (inTake i q w c)) (cand (inTake i q w c) s) (shutAll V (gh s)) → HeadAtⁿ (closed c) (cand c (takeS i q w s)) (taken i q w (shutAll V (gh s)))
+  limit-head : ∀ {R Γ A B} (c : Ctx R Γ B) m (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls (V : Shuts Γ) → Toldˢ V (flatS (mergeᶠ (just m)) f d n q o ls)
+             → Frag o → Lanes ls → (d ≡ true → Done o × NoConn o)
+             → HeadAtⁿ (closed c) (cand c (flatS (mergeᶠ (just m)) f d n q o ls)) (shutAll V (gh (flatS (mergeᶠ (just m)) f d n q o ls)))
+  switch-head : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls (V : Shuts Γ) → Toldˢ V (flatS switchᶠ f d n q o ls)
+              → Frag o → Lanes ls → (d ≡ true → Done o × NoConn o)
+              → HeadAtⁿ (closed c) (cand c (flatS switchᶠ f d n q o ls)) (shutAll V (gh (flatS switchᶠ f d n q o ls)))
+  exhaust-head : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls (V : Shuts Γ) → Toldˢ V (flatS exhaustᶠ f d n q o ls)
+               → Frag o → Lanes ls → (d ≡ true → Done o × NoConn o)
+               → HeadAtⁿ (closed c) (cand c (flatS exhaustᶠ f d n q o ls)) (shutAll V (gh (flatS exhaustᶠ f d n q o ls)))
 
-map-head : ∀ {R Γ A B} b (f : A → B) (y : Maybe (Cand R A)) (s : St Γ A)
-         → HeadAt b (mapᴹ proj₂ y) s → HeadAt b (mapᴹ proj₂ (retag (mapT f) y)) (mapS f s)
-map-head true  f nothing            s none = none
-map-head true  f (just (g , h , o)) s calm = calm
-map-head false f nothing            s (exact e) with step (gh s) | e
+map-head : ∀ {R Γ A B} b (f : A → B) (y : Maybe (Cand R A)) (n : Node Γ A)
+         → HeadAtⁿ b (mapᴹ proj₂ y) n → HeadAtⁿ b (mapᴹ proj₂ (retag (mapT f) y)) (mapᶜ f n)
+map-head true  f nothing            n none = none
+map-head true  f (just (g , h , o)) n calm = calm
+map-head false f nothing            n (exact e) with step n | e
 ... | hushˢ | refl = exact refl
-map-head false f (just (g , h , o)) s (exact e) with step (gh s) | e
-... | outˢ k a n | refl = exact refl
-... | skipˢ k n  | refl = exact refl
+map-head false f (just (g , h , o)) n (exact e) with step n | e
+... | outˢ k a m | refl = exact refl
+... | skipˢ k m  | refl = exact refl
 ... | endˢ k     | refl = exact refl
-map-head false f (just (g , h , .still)) s (early u) with step (gh s) | u
-... | outˢ k a n | u′ = early u′
-... | skipˢ k n  | u′ = early u′
+map-head false f (just (g , h , .still)) n (early u) with step n | u
+... | outˢ k a m | u′ = early u′
+... | skipˢ k m  | u′ = early u′
 ... | endˢ k     | u′ = early u′
 ... | hushˢ      | u′ = early u′
 
 -- A switch on passes its child's mark; one not yet attached runs its
 -- attach first on a tie.
-on-head : ∀ {R Γ A} b a (y : Maybe (Cand R A)) (s : St Γ A)
-        → HeadAt b (mapᴹ proj₂ y) s → HeadAt b (mapᴹ proj₂ (retag (cutT true) y)) (cutS true a s)
-on-head true  a nothing            s q = q
-on-head true  a (just (g , h , o)) s q = q
-on-head false a nothing            s q = q
-on-head false a (just (g , h , o)) s q = q
+on-head : ∀ {R Γ A} b (y : Maybe (Cand R A)) (n : Node Γ A)
+        → HeadAtⁿ b (mapᴹ proj₂ y) n → HeadAtⁿ b (mapᴹ proj₂ (retag (cutT true) y)) n
+on-head true  nothing            n q = q
+on-head true  (just (g , h , o)) n q = q
+on-head false nothing            n q = q
+on-head false (just (g , h , o)) n q = q
 
-att-head : ∀ {R Γ A} b (F : Machine.Found R) p (y : Maybe (Cand R A)) (s : St Γ A)
-         → HeadAt b (mapᴹ proj₂ y) s → HeadAt b (mapᴹ proj₂ (first (just (F , after p , still)) (retag (cutT true) y))) (cutS true (attAt p) s)
-att-head true  F p y s q = quiet-first (just (F , after p , still)) (retag (cutT true) y) calm (on-head true (attAt p) y s q)
-att-head false F p y s a = silent-first F (after p) (retag (cutT true) y) (step (gh s)) (on-head false (attAt p) y s a)
+att-head : ∀ {R Γ A} b (F : Machine.Found R) p (y : Maybe (Cand R A)) (n : Node Γ A)
+         → HeadAtⁿ b (mapᴹ proj₂ y) n → HeadAtⁿ b (mapᴹ proj₂ (first (just (F , after p , still)) (retag (cutT true) y))) n
+att-head true  F p y n q = quiet-first (just (F , after p , still)) (retag (cutT true) y) calm (on-head true y n q)
+att-head false F p y n a = silent-first F (after p) (retag (cutT true) y) (step n) (on-head false y n a)
 
 -- A switch off shows nothing.
 off-quiet : ∀ {R A} (y : Maybe (Cand R A)) → Quiet (mapᴹ proj₂ (retag (cutT false) y))
@@ -440,3 +453,68 @@ done-step {A = A} (cutS false a s) (fs , ns) ds = rest-hush {B = A} s fs ns
 done-step (joinS j false x ib) _ _ = refl
 done-step (flatS (mergeᶠ nothing) f true zero [] o ls) (fo , fl , n0 , dd) ds
   rewrite pool-step true o ls fo fl (λ _ → proj₂ (dd refl)) | len0 (lanesL ls) n0 = refl
+
+------------------------------------------------------------------------
+-- Read through the shuts that told it, a state with no connect is itself
+
+tape-still : ∀ {Γ A X} b (l : Tape A) (i : X ∈ Γ) c → shut i c (tape {Γ} b l) ≡ tape b l
+tape-still b     (ending e)        i c = refl
+tape-still true  (play τ u j t fr) i c = refl
+tape-still false (play τ u j t fr) i c = refl
+tape-still b     overᵀ             i c = refl
+
+mutual
+  shut-fixed : ∀ {Γ A} (V : Shuts Γ) (s : St Γ A) → Toldˢ V s → Frag s → NoConn s → shutAll V (gh s) ≡ gh s
+  shut-fixed V (ofS i p xs)        t fs ns = shut-still V _ (λ _ _ → refl)
+  shut-fixed V doneS               t fs ns = shut-still V idleᶜ (λ _ _ → refl)
+  shut-fixed V (pend o)            t fs ns = shut-still V idleᶜ (λ _ _ → refl)
+  shut-fixed V (coldS b l)         t fs ns = shut-still V (tape b l) (λ i c → tape-still b l i c)
+  shut-fixed V (joinS j false x ib) t fs ns = shut-still V idleᶜ (λ _ _ → refl)
+  shut-fixed V (joinS j true x ib) t fs ns = told-shut V x j (vals ib) (endOf ib) t
+  shut-fixed V (mapS f s)          t fs ns = trans (shut-comm (mapᶜ f) (λ _ _ _ → refl) V (gh s)) (cong (mapᶜ f) (shut-fixed V s t fs ns))
+  shut-fixed V (scanS f z s)       t fs ns = trans (shut-comm (scanᶜ f z) (λ _ _ _ → refl) V (gh s)) (cong (scanᶜ f z) (shut-fixed V s t fs ns))
+  shut-fixed V (cutS true a s)     t fs ns = shut-fixed V s t fs ns
+  shut-fixed V (cutS false a s)    t (fs , _) ns = trans (shut-rest V (gh s)) (cong restᶜ (shut-fixed V s t fs ns))
+  shut-fixed V (takeS i q w s)     t fs ns = trans (shut-taken V i q w (gh s)) (cong (taken i q w) (shut-fixed V s t fs ns))
+  shut-fixed V (connS k o b)       t fs ()
+  shut-fixed V (lnS b s)           t () ns
+  shut-fixed V (flatS (mergeᶠ nothing) f d n [] o ls) (to , tl) (fo , fl , _) (no , nls) = shut-flatS V _ f d n [] o ls to tl fo fl no nls
+  shut-fixed V (flatS (mergeᶠ nothing) f d n (_ ∷ _) o ls) t () ns
+  shut-fixed V (flatS (mergeᶠ (just m)) f d n q o ls) (to , tl) (fo , fl , _) (no , nls) = shut-flatS V _ f d n q o ls to tl fo fl no nls
+  shut-fixed V (flatS switchᶠ f d n q o ls) (to , tl) (fo , fl , _) (no , nls) = shut-flatS V _ f d n q o ls to tl fo fl no nls
+  shut-fixed V (flatS exhaustᶠ f d n q o ls) (to , tl) (fo , fl , _) (no , nls) = shut-flatS V _ f d n q o ls to tl fo fl no nls
+
+  shut-flatS : ∀ {Γ A B} (V : Shuts Γ) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls → Toldˢ V o → Toldᴸ V ls
+             → Frag o → Lanes ls → NoConn o → NoConns ls → shutAll V (gh (flatS op f d n q o ls)) ≡ gh (flatS op f d n q o ls)
+  shut-flatS V op f d n q o ls to tl fo fl no nls =
+    trans (shut-flat V op (lane f) (outerG d (gh o)) (lanesL ls) q (poolG d (gh o) (deadL ls)))
+      (trans (cong₂ (λ m L → flatMapᶜ op (lane f) m L q (shutAll V (poolG d (gh o) (deadL ls)))) (shut-outer V d o to fo no) (shut-lanes V ls tl fl nls))
+             (cong (flatMapᶜ op (lane f) (outerG d (gh o)) (lanesL ls) q) (shut-pool V d o ls to tl fo fl (λ _ → no))))
+
+  shut-outer : ∀ {Γ A} (V : Shuts Γ) d (o : St Γ A) → Toldˢ V o → Frag o → NoConn o → mapᴹ (shutAll V) (outerG d (gh o)) ≡ outerG d (gh o)
+  shut-outer V true  o to fo no = refl
+  shut-outer V false o to fo no = cong just (shut-fixed V o to fo no)
+
+  shut-lanes : ∀ {Γ A} (V : Shuts Γ) (ls : List (St Γ A)) → Toldᴸ V ls → Lanes ls → NoConns ls → map (shutAll V) (lanesL ls) ≡ lanesL ls
+  shut-lanes V [] _ _ _ = refl
+  shut-lanes V (lnS true (cutS true a s) ∷ ls) (ts , tl) (fs , fl) (ns , nls) =
+    trans (map-++ (shutAll V) (lanesL ls) [ gh s ]) (cong₂ _++_ (shut-lanes V ls tl fl nls) (cong [_] (shut-fixed V s ts fs ns)))
+  shut-lanes V (lnS false (cutS false a s) ∷ ls) (ts , tl) (fs , fl) (ns , nls) =
+    trans (map-++ (shutAll V) (lanesL ls) []) (cong (_++ []) (shut-lanes V ls tl fl nls))
+
+  shut-dead : ∀ {Γ A} (V : Shuts Γ) (ls : List (St Γ A)) → Toldᴸ V ls → Lanes ls → map (shutAll V) (deadL ls) ≡ deadL ls
+  shut-dead V [] _ _ = refl
+  shut-dead V (lnS true (cutS true a s) ∷ ls) (_ , tl) (_ , fl) = shut-dead V ls tl fl
+  shut-dead V (lnS false (cutS false a s) ∷ ls) (ts , tl) ((fs , ns) , fl) = cong₂ _∷_ (shut-fixed V (cutS false a s) ts (fs , ns) ns) (shut-dead V ls tl fl)
+
+  -- The pool: the dead lanes' rests, and the outer's once done.
+  shut-pool : ∀ {Γ A B} (V : Shuts Γ) d (o : St Γ A) (ls : List (St Γ B)) → Toldˢ V o → Toldᴸ V ls → Frag o → Lanes ls → (d ≡ true → NoConn o)
+            → shutAll V (poolG d (gh o) (deadL ls)) ≡ poolG d (gh o) (deadL ls)
+  shut-pool V false o ls to tl fo fl dn = trans (shut-rests V (deadL ls)) (cong restsᶜ (shut-dead V ls tl fl))
+  shut-pool V true  o ls to tl fo fl dn =
+    trans (shut-union V (restᶜ (gh o)) (restsᶜ (deadL ls)))
+      (cong₂ unionᶜ (trans (shut-rest V (gh o)) (cong restᶜ (shut-fixed V o to fo (dn refl))))
+                    (trans (shut-rests V (deadL ls)) (cong restsᶜ (shut-dead V ls tl fl))))
+
+rest-hushⱽ : ∀ {Γ A B} (V : Shuts Γ) (s : St Γ A) → Toldˢ V s → Frag s → NoConn s → restˢ {B = B} (shutAll V (gh s)) ≡ hushˢ
+rest-hushⱽ {B = B} V s t fs ns = trans (cong restˢ (shut-fixed V s t fs ns)) (rest-hush {B = B} s fs ns)

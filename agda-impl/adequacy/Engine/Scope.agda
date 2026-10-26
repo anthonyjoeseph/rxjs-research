@@ -14,7 +14,6 @@ open import Data.Bool using (Bool; true; false)
 open import Data.Nat using (ℕ)
 open import Data.List using (List; []; _∷_; [_]; _++_; _ʳ++_; reverse; map)
 open import Data.List.Properties using (ʳ++-defn; reverse-involutive)
-open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -30,7 +29,7 @@ import denotation.MonotonicList as M′
 open import denotation.Unfold using (NEnv; Node; Source; live; ended; Step; outˢ; skipˢ; endˢ; hushˢ; states; step; headˢ; meaning; subscribe)
 open import Tree using (Obs; FlatOp)
 open import operation.PureObservable using (module Machine)
-open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; CS; cs; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; plug)
+open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; CS; cs; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; plug)
 open import adequacy.Sane using (Mode; runs; over; loose; Sane; Saneᴸ)
 open import adequacy.Placed.Order using (Placed; Placedᴸ)
 open import adequacy.Stepper.Past using (Floor; Floorᴱ; floorᴱ-agree; First; Firstᴸ; afterᴱ; above; _≃_; alike)
@@ -39,7 +38,7 @@ open import adequacy.Env using (nagree-refl)
 open import adequacy.Stepper.Flat using (agree-head)
 open import adequacy.Engine.Meaning using (gh; lanesL; envAt; srcG; srcRun; endOf)
 open import adequacy.Engine.Race using (After)
-open import adequacy.Engine.Shuts using (Shuts; none; shutAt; upˢ; shutAll; Told)
+open import adequacy.Engine.Shuts using (Shuts; none; shutAt; upˢ; shutAll; Told; Toldˢ; Toldᴸ; told-drop)
 
 modeᴳ : ∀ {Γ X} → Source Γ X → Mode
 modeᴳ (live s)    = runs
@@ -233,6 +232,32 @@ ghᴸ-at : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n 
        → Ghᴸ c op f d n q o acc (xs ++ s ∷ post) → Gh (inLanes op f d n q o (xs ʳ++ acc) post c) s
 ghᴸ-at c op f d n q o []       acc s post (g , _)  = g
 ghᴸ-at c op f d n q o (x ∷ xs) acc s post (_ , gs) = ghᴸ-at c op f d n q o xs (x ∷ acc) s post gs
+
+-- Each live joiner told by every connect in scope that has ended: an
+-- ended source's own shut, one frame down, told it already.
+close-told : ∀ {Γ X A} (g : Source Γ X) (V : Shuts (X ∷ Γ)) (s : St (X ∷ Γ) A) → Toldˢ (closeOf g V) s → Toldˢ V s
+close-told (live n)    V s t = t
+close-told (ended e n) V s t = told-drop (here refl) e V s t
+
+mutual
+  gh-told : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Gh c s → Toldˢ (closures c) s
+  gh-told c (pend o)                g            = tt
+  gh-told c (coldS b l)             g            = tt
+  gh-told c (ofS i p xs)            g            = tt
+  gh-told c doneS                   g            = tt
+  gh-told c (mapS f s)              g            = gh-told (inMap f c) s g
+  gh-told c (scanS f z s)           g            = gh-told (inScan f z c) s g
+  gh-told c (cutS l a s)            g            = gh-told (inCut l a c) s g
+  gh-told c (lnS b s)               g            = gh-told (inLn b c) s g
+  gh-told c (takeS i q w s)         g            = gh-told (inTake i q w c) s g
+  gh-told c (flatS op f d n q o ls) (_ , go , gl) = gh-told (inOuter op f d n q ls c) o go , gh-toldᴸ c op f d n q o [] ls gl
+  gh-told c (connS k o b)           (_ , go , gb) = gh-told (inSrc k b c) o go , close-told (srcG k o) (upˢ (closures c)) b (gh-told (inBody k o c) b gb)
+  gh-told c (joinS j true x ib)     g            = g
+  gh-told c (joinS j false x ib)    g            = tt
+
+  gh-toldᴸ : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre ls → Ghᴸ c op f d n q o pre ls → Toldᴸ (closures c) ls
+  gh-toldᴸ c op f d n q o pre []         g        = tt
+  gh-toldᴸ c op f d n q o pre (s ∷ post) (g , gs) = gh-told (inLanes op f d n q o pre post c) s g , gh-toldᴸ c op f d n q o (s ∷ pre) post gs
 
 -- Kept of the whole tree, kept at every frame.
 gh-at : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Gh top (plug c s) → Gh c s

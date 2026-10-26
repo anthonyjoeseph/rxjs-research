@@ -9,7 +9,7 @@
 -- joiner its connect's end when the connect's source ends.
 module adequacy.Engine.Shuts where
 
-open import Data.Bool using (true; false)
+open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; map)
 open import Data.List.Properties using () renaming (map-id to map-idᴸ)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -21,10 +21,10 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂; trans; sym)
 
 open import denotation.MonotonicList.Events using (Pos)
-open import denotation.Unfold using (Node; Source; live; ended; joinᶜ; flatMapᶜ; connectᶜ; unionᶜ; shut; shutᴹ; shutᴸ; same?)
+open import denotation.Unfold using (Node; Source; live; ended; joinᶜ; flatMapᶜ; connectᶜ; unionᶜ; restᶜ; idleᶜ; restsᶜ; shut; shutᴹ; shutᴸ; same?)
 open import operation.PureObservable using (module Machine)
-open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS)
-open import adequacy.Engine.Meaning using (endOf)
+open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; free; cpAt; cutAt; overAt)
+open import adequacy.Engine.Meaning using (endOf; taken; doneG)
 
 data Shuts : List Set → Set₁ where
   none   : ∀ {Γ} → Shuts Γ
@@ -74,6 +74,24 @@ shut-flat none op g mo ls qs pl = sym (cong₂ (λ m l → flatMapᶜ op g m l q
 shut-flat (shutAt i c s) op g mo ls qs pl =
   trans (cong (shut i c) (shut-flat s op g mo ls qs pl))
         (cong₂ (λ m l → flatMapᶜ op g m l qs (shut i c (shutAll s pl))) (shutᴹ-map i c (shutAll s) mo) (shutᴸ-map i c (shutAll s) ls))
+
+shut-rest : ∀ {Γ A B} (s : Shuts Γ) (n : Node Γ A) → shutAll s (restᶜ {B = B} n) ≡ restᶜ (shutAll s n)
+shut-rest = shut-comm restᶜ (λ i c n → refl)
+
+shut-rests : ∀ {Γ A B} (s : Shuts Γ) (ds : List (Node Γ A)) → shutAll s (restsᶜ {B = B} ds) ≡ restsᶜ (map (shutAll s) ds)
+shut-rests s []       = shut-still s idleᶜ (λ i c → refl)
+shut-rests s (d ∷ ds) = trans (shut-union s (restᶜ d) (restsᶜ ds)) (cong₂ unionᶜ (shut-rest s d) (shut-rests s ds))
+
+shut-taken : ∀ {Γ A} (s : Shuts Γ) i q w (n : Node Γ A) → shutAll s (taken i q w n) ≡ taken i q w (shutAll s n)
+shut-taken s i q free       n = shut-comm (taken i q free) (λ j c n → refl) s n
+shut-taken s i q (cpAt p)   n = shut-comm (taken i q (cpAt p)) (λ j c n → refl) s n
+shut-taken s i q (cutAt p)  n = shut-rest s n
+shut-taken s i q (overAt p) n = shut-rest s n
+
+shut-done : ∀ {Γ A} (s : Shuts Γ) m (l : Bool) (n : Node Γ A) → shutAll s (doneG m l n) ≡ doneG m l (shutAll s n)
+shut-done s (just p) l     n = shut-rest s n
+shut-done s nothing  false n = shut-rest s n
+shut-done s nothing  true  n = refl
 
 shut-conn : ∀ {Γ X B} (s : Shuts Γ) r (b : Node (X ∷ Γ) B) (src : Source Γ X)
           → shutAll s (connectᶜ r b src) ≡ connectᶜ r (shutAll (upˢ s) b) (shutAllˢ s src)
