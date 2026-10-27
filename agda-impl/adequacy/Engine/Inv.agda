@@ -31,7 +31,7 @@ open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty
 open import denotation.MonotonicList.Events using (Pos; Timeline; emit; stall; close; Events∞; hush; idle; ix; last; root; From; timelineAt; done)
   renaming (at to atᶠ; quiet to silentᶠ)
 open import denotation.MonotonicList using (Agreeᵀ)
-open import operation.Key using (at; after)
+open import operation.Key using (at)
 open import denotation.Unfold using (NEnv; stateᴺ; cutᴺ; states; outerᴺ; subscribe; startᶜ; idleᶜ; flatMapᶜ)
 open import adequacy.Engine.Head using (Frag)
 open import adequacy.Engine.Keys using (Keys; Keyed; Held; FlatAt; FlatKeys; []ᴷ)
@@ -46,8 +46,12 @@ open import adequacy.Engine.Flown using (Owed; NextOwed; rise-owed; sub-owed)
 open import adequacy.Engine.Plug using (flight-held; keys-above; keys-swap)
 open import adequacy.Engine.Pick using (Order; order; module Order; Heard; whole; KeysAt; Shaped; Lead; Snap; ⊤₁; tt; Won; lane-on; pooled-live; search-won; causal-aloft; Caught; caught-sub; Within)
 open import adequacy.Engine.Pick.Lead using (lead-clear; lead-ends; lane-off)
-open import adequacy.Engine.Causal using (Causal; Tapes; Fut; Aloft⁺; causal-run; cold-≼; cold-over; void-≼; done-≼; of-≼; att-≼; cp-≼; over-≼; join-≼; conn-≼; body-conn; src-conn; owed-conn; ≼-refl; unsubIf-≼; cut-≼)
-open import adequacy.Engine.Room using (Room; plant; aloft-hole)
+open import adequacy.Engine.Causal using (Causal; causal-run; cold-≼; cold-over; void-≼; done-≼; of-≼; att-≼; cp-≼; over-≼; join-≼;
+  conn-≼; body-conn; src-conn; owed-conn; ≼-refl; unsubIf-≼; cut-≼)
+open import adequacy.Engine.Room using (plant; aloft-hole)
+open import adequacy.Engine.Fresh using (FreshS; NextFresh; room-mono; sown-here; after-sown; tapes-sown; ofFut-sown; conn-sown)
+open import adequacy.Engine.Freshen using (fresh-next)
+open import adequacy.Engine.Risen using (NextCaused; rise-causal)
 open import adequacy.Engine.Ghosted using (NextTold; told-next)
 open import adequacy.Engine.Scope using (Gh)
 open import adequacy.Engine.Firmed using (gh-firm)
@@ -369,7 +373,7 @@ module _ {R : Set} where
   NextInv (complete p)    = ⊤₁
   NextInv drained         = ⊤₁
 
-  NextFrag NextKeys NextShape NextFlight NextCaused : Step → Set
+  NextFrag NextKeys NextShape NextFlight : Step → Set
   NextLead : Step → Set₁
   NextFrag (silent t k)    = Frag (whole k)
   NextFrag (value t p a k) = Frag (whole k)
@@ -391,10 +395,6 @@ module _ {R : Set} where
   NextLead (value t p a k) = Lead k
   NextLead (complete p)    = ⊤₁
   NextLead drained         = ⊤₁
-  NextCaused (silent t k)    = Causal (whole k)
-  NextCaused (value t p a k) = Causal (whole k)
-  NextCaused (complete p)    = ⊤
-  NextCaused drained         = ⊤
 
   postulate
     -- THE SHAPE: a step keeps the whole tree in the fragment.
@@ -438,30 +438,6 @@ module _ {R : Set} where
     run-flight : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , absorbed , p ⟩ → NextOwed (step ⟨ c , s , absorbed , p ⟩)
     -- A tree's first subscription is in shape.
     flight-load : (o : Obs Timeline [] R) → Flight (Machine.load o)
-    -- THE STILL'S SUBTREE: after a step every node's every key to come
-    -- is aloft, nothing keyed under a skip not yet run: kept by a rise and
-    -- a subscription begun.
-    rise-causal : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Inv ⟨ c , s , rising e , p ⟩ → NextCaused (step ⟨ c , s , rising e , p ⟩)
-    -- A subscription's new keys — a cold's whole tape, an of's values,
-    -- a takeWhile's or flatMap's attach, a connect's body — aloft where
-    -- it subscribes, and every part racing it with room for them.
-    cold-aloft : ∀ {Γ A} (c : Ctx R Γ A) x p → Inv ⟨ c , pend (cold x) , subscribing , p ⟩
-               → ∀ {h} → Tapes (opening p (timelineAt x p)) h → Aloft⁺ h c (pend (cold x))
-    cold-room : ∀ {Γ A} (c : Ctx R Γ A) x p → Inv ⟨ c , pend (cold x) , subscribing , p ⟩ → Room (Tapes (opening p (timelineAt x p))) c
-    of-aloft : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) xs p → Inv ⟨ c , pend o , subscribing , p ⟩
-             → ∀ {h} → Fut {Γ} {A} (ofS 0 p xs) h → Aloft⁺ h c (pend o)
-    of-room : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) xs p → Inv ⟨ c , pend o , subscribing , p ⟩ → Room (Fut {Γ} {A} (ofS 0 p xs)) c
-    take-aloft : ∀ {Γ A} (c : Ctx R Γ A) i q (s : Obs Timeline Γ A) p → Inv ⟨ c , pend (takeWhile i q s) , subscribing , p ⟩
-               → Aloft⁺ (after p) c (pend (takeWhile i q s))
-    take-room : ∀ {Γ A} (c : Ctx R Γ A) i q (s : Obs Timeline Γ A) p → Inv ⟨ c , pend (takeWhile i q s) , subscribing , p ⟩ → Room (_≡ after p) c
-    flat-aloft : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Inv ⟨ c , pend (flatMap op f s) , subscribing , p ⟩
-               → Aloft⁺ (after p) c (pend (flatMap op f s))
-    flat-room : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Inv ⟨ c , pend (flatMap op f s) , subscribing , p ⟩
-              → Room (_≡ after p) c
-    conn-aloft : ∀ {Γ X A} (c : Ctx R Γ A) (s : Obs Timeline Γ X) (b : Obs Timeline (X ∷ Γ) A) p → Inv ⟨ c , pend (connect s b) , subscribing , p ⟩
-               → ∀ {h} → Fut (connS (cs false true false (just p) nothing nothing (p ⊕ [ ix 1 ]) root) (pend s) (pend b)) h → Aloft⁺ h c (pend (connect s b))
-    conn-room : ∀ {Γ X A} (c : Ctx R Γ A) (s : Obs Timeline Γ X) (b : Obs Timeline (X ∷ Γ) A) p → Inv ⟨ c , pend (connect s b) , subscribing , p ⟩
-              → Room (Fut (connS (cs false true false (just p) nothing nothing (p ⊕ [ ix 1 ]) root) (pend s) (pend b))) c
     -- A mark run rises, if at all, the event it showed, at its own key,
     -- leaving a node as live as the one it ran.
     run-lead : ∀ (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} p → search top t ≡ just (found (Γ , A , c , s) m key)
@@ -834,42 +810,48 @@ module _ {R : Set} where
   ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
   ...   | pl , own = run-at c′ p own (subst Causal (sym pl) (Order.causal (Inv.ord iv)))
 
-  -- A subscription keyed: its new node planted where it subscribes.
+  -- A subscription keyed: its new node planted where it subscribes, its
+  -- room and its aloft read off what it can plant.
+  freshOf : ∀ {Γ A} {c : Ctx R Γ A} {o p} → Inv ⟨ c , pend o , subscribing , p ⟩ → FreshS c (pend o) p
+  freshOf v = Order.fresh (Inv.ord v) tt
+
   cold-begin : ∀ {Γ A} (c : Ctx R Γ A) x p → Inv ⟨ c , pend (cold x) , subscribing , p ⟩ → NextCaused (step ⟨ c , pend (cold x) , subscribing , p ⟩)
   cold-begin c x p v =
     plant c {t = pend (cold x)} {coldS true (opening p (timelineAt x p))} (Order.causal (Inv.ord v))
-      ((λ f → aloft-hole c (cold-aloft c x p v f)) , tt) (λ _ n → (λ {_} f → n f) , tt) (cold-room c x p v)
+      ((λ f → aloft-hole c (proj₂ (freshOf v) (tapes-sown p (timelineAt x p) f))) , tt) (λ _ n → (λ {_} f → n f) , tt)
+      (room-mono c (λ {h} → tapes-sown p (timelineAt x p) {h}) (proj₁ (freshOf v)))
 
   of-begin : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) xs p → Inv ⟨ c , pend o , subscribing , p ⟩ → Causal (plug c (ofS 0 p xs))
   of-begin c o xs p v =
     plant c {t = pend o} {ofS 0 p xs} (Order.causal (Inv.ord v))
-      ((λ f → aloft-hole c (of-aloft c o xs p v f)) , tt) (λ _ n → (λ {_} f → n f) , tt) (of-room c o xs p v)
+      ((λ f → aloft-hole c (proj₂ (freshOf v) (ofFut-sown 0 p xs (proj₂ f)))) , tt) (λ _ n → (λ {_} f → n f) , tt)
+      (room-mono c (λ {h} f → ofFut-sown 0 p xs {h = h} (proj₂ f)) (proj₁ (freshOf v)))
 
   take-begin : ∀ {Γ A} (c : Ctx R Γ A) i q (s : Obs Timeline Γ A) p → Inv ⟨ c , pend (takeWhile i q s) , subscribing , p ⟩
              → NextCaused (step ⟨ c , pend (takeWhile i q s) , subscribing , p ⟩)
   take-begin c i q s p v =
     plant c {t = pend (takeWhile i q s)} {takeS i q free (cutS true (attAt p) (pend s))} (Order.causal (Inv.ord v))
-      ((λ { (_ , ()) }) , (λ { (_ , here refl) → aloft-hole c (take-aloft c i q s p v) ; (_ , there ()) }) , (λ { (_ , ()) }) , tt)
+      ((λ { (_ , ()) }) , (λ { (_ , here refl) → aloft-hole c (proj₂ (freshOf v) (sown-here p)) ; (_ , there ()) }) , (λ { (_ , ()) }) , tt)
       (λ _ n → (λ { (_ , ()) }) , (λ { (_ , here refl) → n refl ; (_ , there ()) }) , (λ { (_ , ()) }) , tt)
-      (take-room c i q s p v)
+      (room-mono c (λ {h} → after-sown p {h}) (proj₁ (freshOf v)))
 
   flat-begin : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Inv ⟨ c , pend (flatMap op f s) , subscribing , p ⟩
              → NextCaused (step ⟨ c , pend (flatMap op f s) , subscribing , p ⟩)
   flat-begin c op f s p v =
     plant c {t = pend (flatMap op f s)} {flatS op f false 0 [] (cutS true (attAt p) (pend s)) []} (Order.causal (Inv.ord v))
       ((λ { (_ , ()) }) ,
-       ((λ { (_ , here refl) → tt , aloft-hole c (flat-aloft c op f s p v) ; (_ , there ()) }) , (λ { (_ , ()) }) , tt) , tt)
+       ((λ { (_ , here refl) → tt , aloft-hole c (proj₂ (freshOf v) (sown-here p)) ; (_ , there ()) }) , (λ { (_ , ()) }) , tt) , tt)
       (λ _ n → (λ { (_ , ()) }) , ((λ { (_ , here refl) → n refl ; (_ , there ()) }) , (λ { (_ , ()) }) , tt) , tt)
-      (flat-room c op f s p v)
+      (room-mono c (λ {h} → after-sown p {h}) (proj₁ (freshOf v)))
 
   conn-begin : ∀ {Γ X A} (c : Ctx R Γ A) (s : Obs Timeline Γ X) (b : Obs Timeline (X ∷ Γ) A) p → Inv ⟨ c , pend (connect s b) , subscribing , p ⟩
              → NextCaused (step ⟨ c , pend (connect s b) , subscribing , p ⟩)
   conn-begin c s b p v =
     plant c {t = pend (connect s b)} {connS (cs false true false (just p) nothing nothing (p ⊕ [ ix 1 ]) root) (pend s) (pend b)}
       (Order.causal (Inv.ord v))
-      ((λ f → aloft-hole c (conn-aloft c s b p v f)) , ((λ { (_ , ()) }) , tt) , ((λ { (_ , ()) }) , tt))
+      ((λ f → aloft-hole c (proj₂ (freshOf v) (conn-sown p (pend s) (pend b) f))) , ((λ { (_ , ()) }) , tt) , ((λ { (_ , ()) }) , tt))
       (λ _ n → (λ {_} f → n f) , ((λ { (_ , ()) }) , tt) , ((λ { (_ , ()) }) , tt))
-      (conn-room c s b p v)
+      (room-mono c (λ {h} → conn-sown p (pend s) (pend b) {h}) (proj₁ (freshOf v)))
 
   -- A subscription begun: keyless frames over its source, or keyed.
   begin-causal : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Inv ⟨ c , pend o , subscribing , p ⟩
@@ -906,7 +888,7 @@ module _ {R : Set} where
   sub-causal c (joinS j g x ib)        p v = Order.causal (Inv.ord v)
 
   causal-next : ∀ k → Base k → Order k → NextCaused (step k)
-  causal-next ⟨ c , s , rising e , p ⟩    b o = rise-causal c s e p (b & o)
+  causal-next ⟨ c , s , rising e , p ⟩    b o = rise-causal c s e p b o
   causal-next ⟨ c , s , subscribing , p ⟩ b o = sub-causal c s p (b & o)
   causal-next ⟨ c , s , absorbed , p ⟩    b o = run-causal c s p (b & o)
 
@@ -942,11 +924,11 @@ module _ {R : Set} where
   flight-next : ∀ k → Base k → Order k → NextFlight (step k)
   flight-next k b o = flown (step k) (base-next k b) (shape-next k b o) (flight-owed k b o)
 
-  joined : ∀ x → NextShape x → NextFlight x → NextLead x → NextCaused x → NextHeard x → NextTold x → NextOrd x
-  joined (silent t k)    f g l u e h = order f g l u e h
-  joined (value t p a k) f g l u e h = order f g l u e h
-  joined (complete p)    f g l u e h = tt
-  joined drained         f g l u e h = tt
+  joined : ∀ x → NextShape x → NextFlight x → NextLead x → NextCaused x → NextHeard x → NextTold x → NextFresh x → NextOrd x
+  joined (silent t k)    f g l u e h r = order f g l u e h r
+  joined (value t p a k) f g l u e h r = order f g l u e h r
+  joined (complete p)    f g l u e h r = tt
+  joined drained         f g l u e h r = tt
 
   -- EVERY STEP KEEPS THE ORDER.
   heard-next : ∀ k → Order k → NextHeard (step k)
@@ -968,7 +950,7 @@ module _ {R : Set} where
   ... | just (found (_ , _ , c′ , s′) m key) = run-heard c′ p (proj₂ (search-hit (plug c s) e))
 
   ord-next : ∀ k → Base k → Order k → NextOrd (step k)
-  ord-next k b o = joined (step k) (shape-next k b o) (flight-next k b o) (lead-next k b o) (causal-next k b o) (heard-next k o) (told-next k b o)
+  ord-next k b o = joined (step k) (shape-next k b o) (flight-next k b o) (lead-next k b o) (causal-next k b o) (heard-next k o) (told-next k b o) (fresh-next k b o)
 
   both : ∀ x → NextBase x → NextOrd x → NextInv x
   both (silent t k)    b o = b & o
@@ -984,10 +966,10 @@ module _ {R : Set} where
   load-causal o = (λ { (_ , ()) }) , tt
 
   inv-load : (o : Obs Timeline [] R) → Inv (Machine.load o)
-  inv-load o = base-load o & order (tt , tt , tt) (flight-load o) (lift (λ _ → tt)) (load-causal o) tt tt
+  inv-load o = base-load o & order (tt , tt , tt) (flight-load o) (lift (λ _ → tt)) (load-causal o) tt tt (λ _ → tt , λ _ → tt)
 
   -- A settled node anywhere in a tree the invariant holds of, absorbed at
   -- the same position: the invariant at it.
   inv-at : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Unpended s → Wf (plug c s) → Held (plug c s) → Causal (plug c s)
          → Toldˢ none (plug c s) → Inv ⟨ c , s , absorbed , p ⟩
-  inv-at c s p u w f t g = base-at c s p u w & order f (flight-held c s p (proj₁ (wf-split c s u w)) f) tt t tt g
+  inv-at c s p u w f t g = base-at c s p u w & order f (flight-held c s p (proj₁ (wf-split c s u w)) f) tt t tt g (λ ())

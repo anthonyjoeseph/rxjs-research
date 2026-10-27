@@ -13,7 +13,8 @@
 -- So a configuration carries the fragment's shape (`Frag` of its whole
 -- tree), while a value rises what that pick established about the frames
 -- above it (`Clear`), and where the search runs, that nothing is keyed
--- under a skip not yet run (`Causal`).  From that a still find leads every
+-- under a skip not yet run (`Causal`), and where it subscribes, room for
+-- what it plants (`adequacy.Engine.Fresh`).  From that a still find leads every
 -- race above it past each live source's skips (`Apart`): the engine's race
 -- reads a source's skip at one key, while the frames above are asked of
 -- every position under it.
@@ -77,6 +78,7 @@ open import adequacy.Placed.Order using (Headed; Sorted; every)
 open import adequacy.Placed.Rising using (past-sub)
 open import adequacy.Engine.Above using (Flight; lanesL-++; deadL-++; rests-++)
 open import adequacy.Engine.Fold using (search-hit; found-own)
+open import adequacy.Engine.Fresh using (Fresh)
 open import adequacy.Engine.Ahead using (Sides; Ahead; Under; shown; shows-open; Aloof; ahead-over; Off; OffT) renaming (shows to showsᶜ)
 open import adequacy.Engine.Scope using (Scope; modes; firsts-after; firsts-not-before; first-not-before; shut-head-eq; Outs; GhEᴸ; FloorAt; FloorSrc; first-floor; floor-lower; scope-src; past-floor; closures; ended-at; shut-floor; shut-states; Gh; Ghᴸ; gh-at; gh-told)
 open import adequacy.Sane using (Mode)
@@ -579,6 +581,7 @@ record Order {R} (k : Conf R) : Set₁ where
     causal : Causal (whole k)
     heard  : Heard k
     told   : Toldˢ none (whole k)
+    fresh  : Fresh k
 
 -- Where the search runs, the tree is apart.
 order-apart : ∀ {R Γ A} {c : Ctx R Γ A} {s : St Γ A} {p} → Order ⟨ c , s , absorbed , p ⟩ → Apart (plug c s)
