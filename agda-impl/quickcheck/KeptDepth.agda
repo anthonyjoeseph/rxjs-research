@@ -1014,6 +1014,33 @@ private
   causalᵇ : ℕ → Bool → Conf ℕ → Bool
   causalᵇ i fu ⟨ c , s , _ , _ ⟩ = nodesᵇ (reading i) fu top (plug c s)
 
+  -- A subscription's position apart from a key: neither at or under the
+  -- other.
+  apartᵇ : Pos → Key → Bool
+  apartᵇ p k = not (prefixᵇ (keyPos k) p) ∧ not (prefixᵇ p (keyPos k))
+
+  -- Every key, owned or to come, of each part racing the hole, and each
+  -- enclosing connect's own marks, apart from where it subscribes.
+  roomᵇ : ∀ {Γ A} → Pos → Ctx ℕ Γ A → St Γ A → Bool
+  roomᵇ p top                               s = true
+  roomᵇ p (inMap f c)                       s = roomᵇ p c (mapS f s)
+  roomᵇ p (inScan f z c)                    s = roomᵇ p c (scanS f z s)
+  roomᵇ p (inCut l a c)                     s = roomᵇ p c (cutS l a s)
+  roomᵇ p (inLn b c)                        s = roomᵇ p c (lnS b s)
+  roomᵇ p (inTake i q w c)                  s = roomᵇ p c (takeS i q w s)
+  roomᵇ p (inOuter op f d n q ls c)         s = lanesAllᵇ true (apartᵇ p) ls ∧ roomᵇ p c (flatS op f d n q s ls)
+  roomᵇ p (inLanes op f d n q o pre post c) s =
+    keysAllᵇ true (apartᵇ p) o ∧ lanesAllᵇ true (apartᵇ p) pre ∧ lanesAllᵇ true (apartᵇ p) post
+    ∧ roomᵇ p c (flatS op f d n q o (pre ʳ++L s ∷ post))
+  roomᵇ p (inSrc kk b c)                    s =
+    keysAllᵇ true (apartᵇ p) b ∧ ownAllᵇ (apartᵇ p) (own (connS kk s b)) ∧ roomᵇ p c (connS kk s b)
+  roomᵇ p (inBody kk o c)                   s =
+    keysAllᵇ true (apartᵇ p) o ∧ ownAllᵇ (apartᵇ p) (own (connS kk o s)) ∧ roomᵇ p c (connS kk o s)
+
+  freshᵇ : Conf ℕ → Bool
+  freshᵇ ⟨ c , pend o , subscribing , p ⟩ = roomᵇ p c (pend o)
+  freshᵇ _                                = true
+
   -- A rising or subscribing configuration's hole's run in shape
   -- (`adequacy.Engine.Above.Flight`), its observer closed as `b` says.
   flightᵇ : Bool → Conf ℕ → Bool
@@ -1053,6 +1080,7 @@ private
       else if not (causalᵇ 1 false m) then no (best ⊔ run) ("\n  uncausal-all: a racing part's key, zero-extended, at or under a mark, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (causalᵇ 1 true m) then no (best ⊔ run) ("\n  uncausal-future: a racing part's key at or under a mark to come, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (causalᵇ 2 true m) then no (best ⊔ run) ("\n  uncausal-to-come: a racing part's key to come at or under a mark to come, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (freshᵇ m) then no (best ⊔ run) ("\n  unfresh: a racing part's key or a connect's mark not apart from a subscription, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else next n run best (ls + linkCount m) m (step m)
 
     next : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict
