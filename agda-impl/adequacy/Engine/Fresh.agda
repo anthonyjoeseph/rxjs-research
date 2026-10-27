@@ -29,85 +29,19 @@ open import denotation.MonotonicList.Events using (Pos; Timeline; From; ix; sub;
   renaming (at to atᶠ)
 open import operation.Key using (Key; at; after)
 open import operation.PureObservable using (Tape; play; ending; over; due; rest; opening; module Machine; module Driver)
-open import adequacy.Engine.Causal using (Farᴷ; Fut; Aloft⁺; ofFut; Tapes; advance; ahead; posᴷ; keys-map; lanes-map)
+open import adequacy.Engine.Causal using (Farᴷ; Fut; Aloft⁺; ofFut; Tapes; advance; ahead; keys-map; lanes-map)
 open import adequacy.Engine.Room using (Room; aloft-hole)
+open import adequacy.Engine.Sown using (Sown; Sownᴷ; inside; framed; Proper; proper-snoc; sown-here; after-sown; sown-mono; sown-ext; sown-trans; sib-apart)
 
 open Machine using (St; pend; connS; cs; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody;
   Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; closedUp; begin; ofM; _⊕_)
 
 ------------------------------------------------------------------------
--- Where a subscription keys
-
-data Sown (p : Pos) : Pos → Set where
-  inside : ∀ ys → Sown p (p ++ ys)
-  framed : ∀ t e ys → Sown p e → Sown p (ix t ∷ sub e ∷ ys)
-
-Sownᴷ : Pos → Key → Set
-Sownᴷ p h = Sown p (posᴷ h)
-
-sown-here : ∀ p → Sown p p
-sown-here p = subst (Sown p) (++-identityʳ p) (inside [])
-
-after-sown : ∀ p {h} → h ≡ after p → Sownᴷ p h
-after-sown p refl = sown-here p
-
--- A place under `p` sows only where `p` does.
-sown-mono : ∀ p ys {h} → Sown (p ++ ys) h → Sown p h
-sown-mono p ys (inside zs)       = subst (Sown p) (sym (++-assoc p ys zs)) (inside (ys ++ zs))
-sown-mono p ys (framed t e zs s) = framed t e zs (sown-mono p ys s)
-
--- What is sown, extended, is sown.
-sown-ext : ∀ {p h} zs → Sown p h → Sown p (h ++ zs)
-sown-ext {p} zs (inside ys)       = subst (Sown p) (sym (++-assoc p ys zs)) (inside (ys ++ zs))
-sown-ext     zs (framed t e ys s) = framed t e (ys ++ zs) s
-
-------------------------------------------------------------------------
--- No place sows a place tagged by what it sows
-
-size : Pos → ℕ
-size []           = 0
-size (ix _ ∷ xs)  = suc (size xs)
-size (sub e ∷ xs) = suc (size e + size xs)
-size (last ∷ xs)  = suc (size xs)
-
-size-++ : ∀ xs ys → size (xs ++ ys) ≡ size xs + size ys
-size-++ []           ys = refl
-size-++ (ix _ ∷ xs)  ys = cong suc (size-++ xs ys)
-size-++ (sub e ∷ xs) ys = cong suc (trans (cong (size e +_) (size-++ xs ys)) (sym (+-assoc (size e) (size xs) (size ys))))
-size-++ (last ∷ xs)  ys = cong suc (size-++ xs ys)
-
-sown-size : ∀ {p h} → Sown p h → size p ≤ size h
-sown-size {p} (inside ys)       = subst (size p ≤_) (sym (size-++ p ys)) (m≤m+n (size p) ys′)
-  where ys′ = size ys
-sown-size     (framed t e ys s) = ≤-trans (sown-size s) (≤-trans (m≤m+n (size e) (size ys)) (≤-trans (n≤1+n _) (n≤1+n _)))
-
-tag-size : ∀ a e ys → size e < size (a ∷ sub e ∷ ys)
-tag-size (ix _)  e ys = s≤s (≤-trans (m≤m+n (size e) (size ys)) (n≤1+n _))
-tag-size (sub d) e ys = s≤s (≤-trans (≤-trans (m≤m+n (size e) (size ys)) (n≤1+n _)) (m≤n+m _ (size d)))
-tag-size last    e ys = s≤s (≤-trans (m≤m+n (size e) (size ys)) (n≤1+n _))
-
-no-self : ∀ a e ys → Sown (a ∷ sub e ∷ ys) e → ⊥
-no-self a e ys s = <⇒≱ (tag-size a e ys) (sown-size s)
-
-------------------------------------------------------------------------
 -- A connect's body sows nowhere at or under its source's place
 
-body-far : ∀ p {h} → Sownᴷ (p ++ [ ix 0 ]) h → Farᴷ h (at (p ++ [ ix 1 ]))
-body-far p {after x} s = tt
-body-far p {at x}    s n (ys , eq) = off p x s n ys eq
-  where
-    off : ∀ p x → Sown (p ++ [ ix 0 ]) x → ∀ n ys → (p ++ [ ix 1 ]) ++ replicate n (ix 0) ≡ x ++ ys → ⊥
-    off p .((p ++ [ ix 0 ]) ++ zs) (inside zs) n ys eq
-      with ++-cancelˡ p (ix 1 ∷ replicate n (ix 0)) (ix 0 ∷ (zs ++ ys))
-             (trans (sym (++-assoc p [ ix 1 ] (replicate n (ix 0))))
-               (trans eq (trans (++-assoc (p ++ [ ix 0 ]) zs ys) (++-assoc p [ ix 0 ] (zs ++ ys)))))
-    ... | ()
-    off []            .(ix t ∷ sub e ∷ zs) (framed t e zs s) zero    ys ()
-    off []            .(ix t ∷ sub e ∷ zs) (framed t e zs s) (suc n) ys ()
-    off (a ∷ [])      .(ix t ∷ sub e ∷ zs) (framed t e zs s) n       ys ()
-    off (a ∷ b ∷ p′)  .(ix t ∷ sub e ∷ zs) (framed t e zs s) n       ys eq
-      with ∷-injectiveˡ (∷-injectiveʳ eq)
-    ... | refl = no-self a e (p′ ++ [ ix 0 ]) s
+body-far : ∀ p → Proper p → ∀ {h} → Sownᴷ (p ++ [ ix 0 ]) h → Farᴷ h (at (p ++ [ ix 1 ]))
+body-far p pr {after x} s = tt
+body-far p pr {at x}    s = λ a b → sib-apart p pr tt tt (λ ()) (sown-trans s a) b
 
 ------------------------------------------------------------------------
 -- What a begun node plants is sown where it subscribed
@@ -163,9 +97,10 @@ conn-sown p s b (_ , there ())
 ------------------------------------------------------------------------
 -- The field
 
--- Room for, and aloft, every key the subscription can plant.
+-- Below the run's root, room for, and aloft, every key the subscription
+-- can plant.
 FreshS : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Pos → Set
-FreshS c (pend o) p = Room (Sownᴷ p) c × (∀ {h} → Sownᴷ p h → Aloft⁺ h c (pend o))
+FreshS c (pend o) p = Proper p × Room (Sownᴷ p) c × (∀ {h} → Sownᴷ p h → Aloft⁺ h c (pend o))
 FreshS c _        p = ⊤
 
 Subscribing : ∀ {A} → Mode A → Set
@@ -204,19 +139,19 @@ module _ {R : Set} where
   -- A child begun at or under its parent's place, under frames racing
   -- nothing keyed.
   begin-fresh : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → FreshS c (pend o) p → NextFresh (took (begin c o p))
-  begin-fresh c (cold x)          p (r , a) = λ ()
-  begin-fresh c empty             p (r , a) = λ ()
-  begin-fresh c (of xs)           p (r , a) = λ ()
-  begin-fresh c (map f s)         p (r , a) = λ _ → r , λ h → aloft-hole c (a h)
-  begin-fresh c (scan f z s)      p (r , a) = λ _ → r , λ h → aloft-hole c (a h)
-  begin-fresh c (takeWhile i q s) p (r , a) = λ _ → r , λ h → aloft-hole c (a h)
-  begin-fresh c (flatMap op f s)  p (r , a) = λ _ → (tt , r) , λ h → tt , aloft-hole c (a h)
-  begin-fresh c (connect s b)     p (r , a) = λ _ →
+  begin-fresh c (cold x)          p (pr , r , a) = λ ()
+  begin-fresh c empty             p (pr , r , a) = λ ()
+  begin-fresh c (of xs)           p (pr , r , a) = λ ()
+  begin-fresh c (map f s)         p (pr , r , a) = λ _ → pr , r , λ h → aloft-hole c (a h)
+  begin-fresh c (scan f z s)      p (pr , r , a) = λ _ → pr , r , λ h → aloft-hole c (a h)
+  begin-fresh c (takeWhile i q s) p (pr , r , a) = λ _ → pr , r , λ h → aloft-hole c (a h)
+  begin-fresh c (flatMap op f s)  p (pr , r , a) = λ _ → pr , (tt , r) , λ h → tt , aloft-hole c (a h)
+  begin-fresh c (connect s b)     p (pr , r , a) = λ _ → proper-snoc p (ix 0) ,
     (((λ { (_ , ()) }) , tt) , room-mono c (sown-mono p [ ix 0 ]) r) ,
     λ {h} sh → ((λ { (_ , ()) }) , tt) , ((λ { (_ , ()) }) , tt)
-             , (λ { (_ , here refl) → body-far p sh ; (_ , there ()) })
+             , (λ { (_ , here refl) → body-far p pr sh ; (_ , there ()) })
              , aloft-hole c (a (sown-mono p [ ix 0 ] sh))
-  begin-fresh c (connected x)     p (r , a) with closedUp c x
+  begin-fresh c (connected x)     p (pr , r , a) with closedUp c x
   ... | true  = λ ()
   ... | false = λ ()
-  begin-fresh c (defer l)         p (r , a) = λ _ → room-mono c (sown-mono p [ ix 1 ]) r , λ h → aloft-hole c (a (sown-mono p [ ix 1 ] h))
+  begin-fresh c (defer l)         p (pr , r , a) = λ _ → proper-snoc p (ix 1) , room-mono c (sown-mono p [ ix 1 ]) r , λ h → aloft-hole c (a (sown-mono p [ ix 1 ] h))

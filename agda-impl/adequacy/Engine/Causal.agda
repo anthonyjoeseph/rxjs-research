@@ -7,7 +7,10 @@
 -- takes from what the invariant reads: the tree it leaves is weaker
 -- (`_≼_`: each node's keys to come among the old ones, or past one at or
 -- above it), and a weaker tree is causal wherever the stronger was
--- (`causal-≼`).
+-- (`causal-≼`).  "Under" is what a key's place can cause (`Sown`): two
+-- keys are far when nothing the one can lead to is anything the other
+-- can, so a part far from a mark is far from all it will plant
+-- (`far-in`, `far-out`).
 module adequacy.Engine.Causal where
 
 open import Data.Empty using (⊥; ⊥-elim)
@@ -27,6 +30,7 @@ open import Tree using (Obs; FlatOp)
 open import denotation.MonotonicList.Events using (Pos; Timeline; ix; last; emit; stall; close; Frame∞; From∞)
 open import operation.Key using (Key; at; after)
 open import operation.PureObservable using (module Machine; due; Tape; play; ending; over; rest)
+open import adequacy.Engine.Sown using (Sown; Sownᴷ; posᴷ; sown-here; sown-ext; sown-trans)
 
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; CS; cs;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; own;
@@ -35,22 +39,29 @@ open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; 
 ------------------------------------------------------------------------
 -- Keys
 
--- A position's key: where it is, or the position it is past.
-posᴷ : Key → Pos
-posᴷ (at p)    = p
-posᴷ (after p) = p
-
--- A key far from a mark's: no position its events reach at or under the
--- mark's, an at-key's own with `ix 0`s appended as `shift` appends them.
+-- A key far from a mark's: nothing the key's place can cause is anything
+-- the mark's can, nor the place a past mark is past.  A past key causes
+-- nothing.
 Farᴷ : Key → Key → Set
-Farᴷ (at p)    (at q)    = ∀ n → (Σ Pos λ ys → q ++ replicate n (ix 0) ≡ p ++ ys) → ⊥
-Farᴷ (at p)    (after q) = (Σ Pos λ ys → q ≡ p ++ ys) → ⊥
+Farᴷ (at p)    (at q)    = ∀ {y} → Sown p y → Sown q y → ⊥
+Farᴷ (at p)    (after q) = Sown p q → ⊥
 Farᴷ (after p) h         = ⊤
 
 -- A mark at or under no position a key is at.
 Freeᴷ : Key → Key → Set
 Freeᴷ k (at r)    = (Σ Pos λ ys → posᴷ k ≡ r ++ ys) → ⊥
 Freeᴷ k (after _) = ⊤
+
+-- Far from a place, far from all it sows; a place far, all it sows far.
+far-in : ∀ k {x h} → Farᴷ k (at x) → Sownᴷ x h → Farᴷ k h
+far-in (at p)    {h = at z}    fr s = λ a b → fr a (sown-trans s b)
+far-in (at p)    {h = after z} fr s = λ a → fr a s
+far-in (after p)               fr s = tt
+
+far-out : ∀ {x} k {h} → Farᴷ (at x) k → Sownᴷ x h → Farᴷ h k
+far-out (at q)    {at z}    fr s = λ a b → fr (sown-trans s a) b
+far-out (after q) {at z}    fr s = λ a → fr (sown-trans s a)
+far-out k         {after z} fr s = tt
 
 -- A started cold's tape, one leaf move on: a frame's next value or stall,
 -- a close's next frame; a completion delivered, nothing.
@@ -343,7 +354,7 @@ after≤at : ∀ q r ys → r ≡ q ++ ys → after q ≤ᴷ at r
 after≤at q r ys e = record { farK = fk ; freeK = λ _ _ → tt ; farM = λ _ _ → tt ; freeM = fm }
   where
     fk : ∀ k → Farᴷ k (at r) → Farᴷ k (after q)
-    fk (at p)    fr (zs , e′) = fr 0 (zs ++ ys , trans (++-identityʳ r) (trans e (trans (cong (_++ ys) e′) (++-assoc p zs ys))))
+    fk (at p)    fr a = fr (subst (Sown p) (sym e) (sown-ext ys a)) (sown-here r)
     fk (after p) fr           = tt
     fm : ∀ g → Freeᴷ (at r) g → Freeᴷ (after q) g
     fm (at p)    fr (zs , e′) = fr (zs ++ ys , trans e (trans (cong (_++ ys) e′) (++-assoc p zs ys)))
