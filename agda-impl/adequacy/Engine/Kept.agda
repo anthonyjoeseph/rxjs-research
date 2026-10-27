@@ -25,7 +25,6 @@ open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; reverse)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (zero; suc; pred)
-open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Unit using (tt)
@@ -54,11 +53,11 @@ open import adequacy.Engine.Meaning using (Has; M; _≅_; _≋_; agree-≅; atOu
   ≋-by; ≋-out; ≋-trans)
 open import adequacy.Engine.Flown using (lanes-cut; lanes-rise)
 open import adequacy.Engine.Fold using (Unpended; Opened; Wf; Base; module Base; wfI; wf-split; search-hit; Owns; ofO; attO; cpO; cutO; bodyO; srcAttO; owedO; joinO; leafO; owned)
-open import adequacy.Engine.Inv using (Inv; module Inv; inv-at)
+open import adequacy.Engine.Inv using (Inv; module Inv; inv-at; joined-over)
 open import adequacy.Engine.Race using (First)
 open import adequacy.Engine.Keys using (Held)
 open import adequacy.Engine.Above using (take-true; take-incl; take-excl; toʳ)
-open import adequacy.Engine.Pick using (module Order; Clear; Apart)
+open import adequacy.Engine.Pick using (module Order; Clear; Apart; lead-clear)
 open import adequacy.Engine.Shuts using (Toldˢ; none)
 open import adequacy.Engine.Plug using (take-plug; outer-plug; lanes-plug; lanes-plugʳ; done-plug; body-plug; conn-plugⁿ)
 
@@ -205,9 +204,6 @@ module _ {R : Set} where
     -- A joiner's next fed value, shown at its position.
     join-nx : ∀ {Γ A} (c : Ctx R Γ A) j x q (a : A) ib p → Inv ⟨ c , joinS j true x ((q , nx a) ∷ ib) , absorbed , p ⟩
             → M ⟨ c , joinS j true x ((q , nx a) ∷ ib) , absorbed , p ⟩ ≅ M ⟨ c , joinS j true x ib , rising (nx a) , q ⟩
-    -- A joiner of a source already ended owes its end at its `last`.
-    joined-closed : ∀ {Γ A} (c : Ctx R Γ A) (x : A ∈ Γ) p → Inv ⟨ c , pend (connected x) , subscribing , p ⟩
-                  → closedUp c x ≡ true → M ⟨ c , pend (connected x) , subscribing , p ⟩ ≅ M ⟨ c , ofS 0 p [] , absorbed , p ⟩
     -- A defer is the program it defers, one level down, after a skip.
     defer-kept : ∀ {Γ A} (c : Ctx R Γ A) l p → Inv ⟨ c , pend (defer l) , subscribing , p ⟩ → Kept ⟨ c , pend (defer l) , subscribing , p ⟩
 
@@ -216,7 +212,7 @@ module _ {R : Set} where
               → Inv ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩ → flagOf s ≡ true
               → First p (outerᴺ (lane f) (outerG d (gh o)) (envAt c)) (states (lanesL post) (envAt c)) (states (lanesL (reverse pre)) (envAt c))
                   (outerT d (gh o) (envAt c) (poolRuns (reverse pre) post true (envAt c) (stateᴺ (gh s) (envAt c))))
-  lanes-first op f d n q o pre post c s b p v fl = proj₁ (Order.lead (Inv.ord v) fl)
+  lanes-first op f d n q o pre post c s b p v fl = proj₁ (lead-clear (Inv.ord v) fl)
 
   ----------------------------------------------------------------------
   -- A configuration focused anywhere means what its whole tree means
@@ -322,7 +318,7 @@ module _ {R : Set} where
         (lift-≅ c true (src-plug k (feed (here refl) p (nx a) b) s (envAt c) (Base.settled (Inv.base v))
           (proj₁ (proj₂ (wf-split c (connS k s b) tt (wfI (Inv.base v))))))))
     where
-      L = src-leads k b c s a p v (Order.lead (Inv.ord v))
+      L = src-leads k b c s a p v (lead-clear (Inv.ord v))
 
   rises : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Inv ⟨ c , s , rising e , p ⟩ → Kept ⟨ c , s , rising e , p ⟩
   rises top                               s (nx a) p v          = out-≅ refl
@@ -373,7 +369,7 @@ module _ {R : Set} where
       []ᴸ []ᑫ (agreeᵀ-refl m idle)
   begins c (connect s b)     p v = lift-≅ c true (≋-by refl refl)
   begins c (connected x)     p v with closedUp c x in ce
-  ... | true  = joined-closed c x p v ce
+  ... | true  = lift-≅ c true (joined-over c x p v ce)
   ... | false = ≅-refl
   begins c (defer l)         p v = defer-kept c l p v
 

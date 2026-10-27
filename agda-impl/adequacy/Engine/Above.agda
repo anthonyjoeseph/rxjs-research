@@ -37,11 +37,14 @@ open import adequacy.Engine.Meaning using (_≋_; ≋-by; ≋-out; mapped; scann
   switched-ne; taking∞-ne; outerFrame-ne; lanesFrame-ne; srcFrame-ne; bodyFrame-ne; lanes-refl; lanes-++; holeL-ne; outerT-ne; poolRuns-cut; outer-refl; rested-ne; env-ne; same; ≈-refl; laneᴹ;
   lane; lanesL; liveL; deadL; deadOne; holeL; holeT; tailsOn; poolG; poolT; outerT; outerG; laneRuns; poolRuns; gh; envAt; hole; flagOf; risen; endingAt)
   renaming (outerOf to outerOfᴹ)
-open import adequacy.Engine.Keys using (Shape; Shape′; TakeAt; FlatAt; LaneKeys; _∷ᴷ_; ConnAt; Keyed; KeyedL; srcIn)
+open import adequacy.Engine.Keys using (Shape; Shape′; TakeAt; FlatAt; LaneKeys; _∷ᴷ_; ConnAt; Keyed; KeyedL; srcIn; OuterKeys)
 open import adequacy.Placed.Order using (Sorted; Headed; Disjoint; Ext; Owned; Prefix; every; everyT-mono; ext; owned-ext; prefix-++)
-open import adequacy.Placed.Keys using (ix-mark; last-mark; prefix-refl; prefix-plus; prefix-lane; tagged-mark)
-open import adequacy.Placed.Burst using (owned-drop; freshᴿ)
+open import adequacy.Placed.Keys using (ix-mark; last-mark; prefix-refl; prefix-plus; prefix-lane; tagged-mark; every-≈; everyT-≈)
+open import adequacy.Placed.Burst using (module Bursting; owned-drop; freshᴿ; fresh-≈)
 open import adequacy.Placed.Trail using (trail; spread)
+open import adequacy.Placed.FlatOrder using (module FlatOrder)
+open import adequacy.Placed.Walk using (module Walk)
+open import adequacy.Env using (Same; nagree-refl)
 
 open Events∞
 open Agreeˢ
@@ -104,13 +107,52 @@ Above (inBody k o c)                    f h =
 Flight : ∀ {R} → Conf R → Set
 Flight ⟨ c , s , m , p ⟩ = Shape (hole c s m p) × Above c (flagOf s) (hole c s m p)
 
--- Each frame's own facts read its runs no finer than alike at every depth.
+-- A body's keys read its environment no finer than alike at every depth;
+-- a merge's lanes, outer and pool, a source's cue and a connect's bound
+-- each read their runs so.
 postulate
-  takeAt-≋  : ∀ {A} w {h h′ : Events∞ A} → h ≋ h′ → TakeAt w h → TakeAt w h′
-  flatAt-≋  : ∀ {Γ B} (ρ : NEnv Γ) {o o′ : Maybe (Events∞ (MonotonicList B))} {ls ls′ : List (Events∞ B)} {t t′}
-            → (∀ n → Outerᴿ n o o′) → (∀ n → Lanes n ls ls′) → (∀ n → Agreeᵀ n t t′) → FlatAt ρ o ls t → FlatAt ρ o′ ls′ t′
-  connAt-≋  : ∀ {Γ X B} k {β β′ : Events∞ B} {σ σ′ : Events∞ X} (ρ : NEnv Γ) → β ≋ β′ → σ ≋ σ′ → ConnAt k β σ ρ → ConnAt k β′ σ′ ρ
-  keyed-env : ∀ {Γ X A} (s : St (X ∷ Γ) A) (ρ : NEnv Γ) {e e′ : Events X} → (∀ n → Agree n e e′) → Keyed s (e ∷ᴬ ρ) → Keyed s (e′ ∷ᴬ ρ)
+  keyed-same     : ∀ {Γ A} (s : St Γ A) {ρ ρ′ : NEnv Γ} → Same ρ ρ′ → Keyed s ρ → Keyed s ρ′
+  laneKeys-lanes : ∀ {B} p {ls ls′ : List (Events∞ B)} {rs}
+                 → (∀ n → Lanes n ls ls′) → LaneKeys p ls rs → LaneKeys p ls′ rs
+  flatAt-rest    : ∀ {B} p {o o′ : Maybe (Events∞ (MonotonicList B))} rs {t t′}
+                 → (∀ n → Outerᴿ n o o′) → (∀ n → Agreeᵀ n t t′)
+                 → All (FlatOrder.Aside p o) rs × OuterKeys p o × FlatOrder.Pool p o rs t
+                 → All (FlatOrder.Aside p o′) rs × OuterKeys p o′ × FlatOrder.Pool p o′ rs t′
+  cue-≈          : ∀ {A} r {l : Pos} {x y : Events A} → (∀ k → Agree k x y)
+                 → Bursting.Cue r l x → Bursting.Cue r l y
+  ub-transport   : ∀ {X B} {β β′ : Events∞ B} {σ σ′ : Events∞ X} (m : Pos) (hm : Headed m)
+                 → β ≋ β′ → σ ≋ σ′ → Walk.UB m hm β σ → Walk.UB m hm β′ σ′
+
+-- Each frame's own facts read its runs no finer than alike at every depth.
+takeAt-≋ : ∀ {A} w {h h′ : Events∞ A} → h ≋ h′ → TakeAt w h → TakeAt w h′
+takeAt-≋ (cpAt k)  x (hd , ev) = hd , everyT-≈ _ _ (λ n → cutˢ (x n)) ev
+takeAt-≋ free      x ta        = ta
+takeAt-≋ (cutAt _) x ta        = ta
+takeAt-≋ (overAt _) x ta       = ta
+
+flatAt-≋ : ∀ {Γ B} (ρ : NEnv Γ) {o o′ : Maybe (Events∞ (MonotonicList B))} {ls ls′ : List (Events∞ B)} {t t′}
+         → (∀ n → Outerᴿ n o o′) → (∀ n → Lanes n ls ls′) → (∀ n → Agreeᵀ n t t′) → FlatAt ρ o ls t → FlatAt ρ o′ ls′ t′
+flatAt-≋ ρ xo xl xt (p , hd , al , rs , lk , pt , aside , ok , pool) =
+  let (aside′ , ok′ , pool′) = flatAt-rest p rs xo xt (aside , ok , pool)
+  in  p , hd , al , rs , laneKeys-lanes p xl lk , pt , aside′ , ok′ , pool′
+
+connAt-≋ : ∀ {Γ X B} k {β β′ : Events∞ B} {σ σ′ : Events∞ X} (ρ : NEnv Γ) → β ≋ β′ → σ ≋ σ′ → ConnAt k β σ ρ → ConnAt k β′ σ′ ρ
+connAt-≋ k ρ xβ xσ ca = record
+  { mark = mark ; hm = hm ; at = at
+  ; kb   = every-≈ _ _ (λ n → nowˢ (xβ n)) (proj₁ kb) , everyT-≈ _ _ (λ n → cutˢ (xβ n)) (proj₂ kb)
+  ; kr   = every-≈ _ _ (λ n → nowˢ (xβ n)) (proj₁ kr) , everyT-≈ _ _ (λ n → cutˢ (xβ n)) (proj₂ kr)
+  ; fr   = fresh-≈ _ _ _ (λ n → nowˢ (xβ n)) fr
+  ; cue  = proj₁ cue , proj₁ (proj₂ cue)
+          , cue-≈ (mark ++ [ ix 1 ]) (λ n → nowˢ (xσ n)) (proj₁ (proj₂ (proj₂ cue)))
+          , everyT-≈ _ _ (λ n → cutˢ (xβ n)) (proj₂ (proj₂ (proj₂ cue)))
+  ; ks   = every-≈ _ _ (λ n → nowˢ (xσ n)) (proj₁ ks) , everyT-≈ _ _ (λ n → cutˢ (xσ n)) (proj₂ ks)
+  ; rs   = every-≈ _ _ (λ n → nowˢ (xσ n)) (proj₁ rs) , everyT-≈ _ _ (λ n → cutˢ (xσ n)) (proj₂ rs)
+  ; ub   = ub-transport mark hm xβ xσ ub
+  ; sub  = sub ; ends = ends }
+  where open ConnAt ca
+
+keyed-env : ∀ {Γ X A} (s : St (X ∷ Γ) A) (ρ : NEnv Γ) {e e′ : Events X} → (∀ n → Agree n e e′) → Keyed s (e ∷ᴬ ρ) → Keyed s (e′ ∷ᴬ ρ)
+keyed-env s ρ agree = keyed-same s (λ m → agree m , nagree-refl m ρ)
 
 private
   outerAt-ne : ∀ {Γ A C} d (g : A → Obs Timeline Γ C) (ρ : NEnv Γ) {h h′ : Events∞ A} → h ≋ h′ → ∀ n → Outerᴿ n (outerAt d g ρ h) (outerAt d g ρ h′)

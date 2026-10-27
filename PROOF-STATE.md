@@ -25,12 +25,12 @@ Members: `body-keyed-drops`, `lane-begin-tail`, `outer-begin-tail`,
 Untried: a node rewritten by a rise, a connect's begin, a mark run or an
 unsubscribe keeps every node's positional facts (`adequacy.Engine.Keys`),
 reading the event in flight from the flight; a joiner of a subject over
-keeps the tree keyed. Probed in kept-depth,
+runs as an empty `of`: the subject ended before the joiner's position. Probed in kept-depth,
 except a merge's mark. Settled by bodies, or a probe refuting a clause.
 
 Members: `unsub-take-here`, `unsub-flat-here`, `unsub-conn-here`, `unsub-body-keyed`,
 `rise-admit-keys`, `rise-outer-end-keys`, `rise-lane-end-keys`,
-`rise-src-keys`, `rise-body-end-keys`, `begin-conn-keys`, `begin-joined-keys`,
+`rise-src-keys`, `rise-body-end-keys`, `begin-conn-keys`, `joined-over`,
 `run-keys`.
 
 #### THE ENDLESS SUBSCRIPTION
@@ -151,7 +151,7 @@ each is a body.
 
 Members: `quiet-empty`, `lift-skip`, `unsub-rest`, `conn-unsub`,
 `rise-outer-nx`, `rise-outer-cp`, `rise-lanes-cp`, `src-leads`, `fed-ghost`,
-`rise-src-cp`, `rise-body-nx`, `rise-body-cp`, `join-nx`, `joined-closed`,
+`rise-src-cp`, `rise-body-nx`, `rise-body-cp`, `join-nx`,
 `defer-kept`, `env-ne`.
 
 #### THE PICK
@@ -205,7 +205,8 @@ Untried, mechanical: what the frames above keep, and a run's shape, is read
 alike off runs alike, and off the ghost as the whole tree's keys, a dead
 lane's read only through what it leaves running. Settled by bodies.
 
-Members: `takeAt-≋`, `flatAt-≋`, `connAt-≋`, `keyed-env`, `shape-≋`, `rise-dead-keys`.
+Members: `rise-dead-keys`, `keyed-same`, `laneKeys-lanes`, `flatAt-rest`,
+`cue-≈`, `ub-transport`.
 
 ## Tier 2 — the simultaneous spec
 

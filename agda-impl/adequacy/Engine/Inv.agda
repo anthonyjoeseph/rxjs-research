@@ -11,10 +11,12 @@
 module adequacy.Engine.Inv where
 
 open import Data.Bool using (Bool; true; false; not; if_then_else_; _∧_)
+open import Data.Bool.Properties using (∧-identityʳ)
+open import Level using (lift; lower)
 open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; _ʳ++_; null; [_]; reverse)
 open import Data.Maybe using (just; nothing)
-open import Data.Nat using (ℕ; zero; suc; pred; _<ᵇ_; _≡ᵇ_)
+open import Data.Nat using (zero; suc; pred; _<ᵇ_; _≡ᵇ_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Relation.Nullary using (¬_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -23,7 +25,8 @@ open import Data.List.Relation.Unary.Any using (here)
 import Data.List.Relation.Unary.All
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; subst₂; sym; trans; cong)
 
-open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap;
+  connect; connected; defer)
 open import denotation.MonotonicList.Events using (Pos; Timeline; emit; stall; close; Events∞; hush; idle; ix; last; From; timelineAt; done)
   renaming (at to atᶠ; quiet to silentᶠ)
 open import denotation.MonotonicList using (Agreeᵀ)
@@ -40,7 +43,7 @@ open import adequacy.Engine.Race using (NotBefore)
 open import adequacy.Engine.Meaning using (_≋_; ≋-by; flagOf; envAt; gh; risen; lane; lanesL; laneRuns; poolRuns; outerT; outerG; poolG; deadL)
 open import adequacy.Engine.Flown using (Owed; NextOwed; rise-owed; sub-owed)
 open import adequacy.Engine.Plug using (flight-held; keys-above; keys-swap)
-open import adequacy.Engine.Pick using (Order; order; module Order; Heard; whole; KeysAt; Shaped; Lead; Clear; Ends; EndsIf; Won; won-clear; won-ends; out-open; search-won; Apart; Searched)
+open import adequacy.Engine.Pick using (Order; order; module Order; Heard; whole; KeysAt; Shaped; Lead; Snap; ⊤₁; tt; Won; lead-clear; lead-ends; lane-on; lane-off; pooled-live; search-won; Apart; Searched)
 open import adequacy.Engine.Ghosted using (NextTold; told-next)
 open import adequacy.Engine.Scope using (Gh)
 open import adequacy.Engine.Firmed using (gh-firm)
@@ -50,7 +53,7 @@ open import adequacy.Engine.Fold using (Base; Owns; Unpended; Wf; WfC; Wfs; attO
 
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; closed; closedUp;
-  CS; cs; shows; outOf; attAt; attached; free; cpAt; cutAt; overAt; nx; cp;
+  CS; cs; shows; still; outOf; attAt; attached; free; cpAt; cutAt; overAt; nx; cp;
   Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising;
   Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM; search; found; leaf;
   rise; run; begin; start; admit; dequeue; settle; ended; alive; feed; feedL; unsub; killAll; unsubIf; _⊕_)
@@ -344,25 +347,26 @@ module _ {R : Set} where
   ----------------------------------------------------------------------
   -- The whole invariant: the fold and the order
 
-  record Inv (k : Conf R) : Set where
+  record Inv (k : Conf R) : Set₁ where
     constructor _&_
     field
       base : Base k
       ord  : Order k
 
-  NextOrd : Step → Set
+  NextOrd : Step → Set₁
   NextOrd (silent t k)    = Order k
   NextOrd (value t p a k) = Order k
-  NextOrd (complete p)    = ⊤
-  NextOrd drained         = ⊤
+  NextOrd (complete p)    = ⊤₁
+  NextOrd drained         = ⊤₁
 
-  NextInv : Step → Set
+  NextInv : Step → Set₁
   NextInv (silent t k)    = Inv k
   NextInv (value t p a k) = Inv k
-  NextInv (complete p)    = ⊤
-  NextInv drained         = ⊤
+  NextInv (complete p)    = ⊤₁
+  NextInv drained         = ⊤₁
 
-  NextFrag NextKeys NextShape NextFlight NextLead NextApart : Step → Set
+  NextFrag NextKeys NextShape NextFlight NextApart : Step → Set
+  NextLead : Step → Set₁
   NextFrag (silent t k)    = Frag (whole k)
   NextFrag (value t p a k) = Frag (whole k)
   NextFrag (complete p)    = ⊤
@@ -381,8 +385,8 @@ module _ {R : Set} where
   NextFlight drained         = ⊤
   NextLead (silent t k)    = Lead k
   NextLead (value t p a k) = Lead k
-  NextLead (complete p)    = ⊤
-  NextLead drained         = ⊤
+  NextLead (complete p)    = ⊤₁
+  NextLead drained         = ⊤₁
   NextApart (silent t k)    = Searched k
   NextApart (value t p a k) = Searched k
   NextApart (complete p)    = ⊤
@@ -412,10 +416,12 @@ module _ {R : Set} where
     rise-dead-keys : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) e p
                    → Inv ⟨ inLanes op f d n q o pre post c , s , rising e , p ⟩ → alive s ≡ false
                    → Keys (plug c (flatS op f d n q o (pre ʳ++ s ∷ post)))
-    -- A joiner of a subject already over, and a connect begun, leave the
-    -- tree keyed.
-    begin-joined-keys : ∀ {Γ A} (c : Ctx R Γ A) (x : A ∈ Γ) p → Inv ⟨ c , pend (connected x) , subscribing , p ⟩ → closedUp c x ≡ true
-                      → Keys (plug c (ofS 0 p []))
+    -- A joiner of a subject already over runs as an empty `of` at its
+    -- position: the subject ended before the joiner's position, so its
+    -- rejoin owes the end at the joiner's `last`.
+    joined-over : ∀ {Γ A} (c : Ctx R Γ A) (x : A ∈ Γ) p → Inv ⟨ c , pend (connected x) , subscribing , p ⟩ → closedUp c x ≡ true
+                → stateᴺ (subscribe (connected x) p) (envAt c) ≋ stateᴺ (gh (ofS 0 p [])) (envAt c)
+    -- A connect begun leaves the tree keyed.
     begin-conn-keys : ∀ {Γ X A} (c : Ctx R Γ A) (s : Obs Timeline Γ X) (b : Obs Timeline (X ∷ Γ) A) p
                     → Inv ⟨ c , pend (connect s b) , subscribing , p ⟩ → NextKeys (step ⟨ c , pend (connect s b) , subscribing , p ⟩)
     -- THE STILL'S SUBTREE: a subscription heads its position, where no
@@ -434,19 +440,14 @@ module _ {R : Set} where
     -- A mark run rises, if at all, the event it showed, at its own key,
     -- leaving a node as live as the one it ran.
     run-lead : ∀ (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} p → search top t ≡ just (found (Γ , A , c , s) m key)
-             → (∀ q a (s′ : St Γ A) → key ≡ at q → outOf c s m ≡ shows (nx a) → alive s ≡ alive s′ → Clear q a c s′)
-             → (∀ q (s′ : St Γ A) → key ≡ at q → outOf c s m ≡ shows cp → alive s ≡ alive s′ → Ends q c s′)
+             → (∀ q e (s′ : St Γ A) → key ≡ at q → outOf c s m ≡ shows e → alive s ≡ alive s′ → Snap q e c s′)
              → NextLead (took (run c s m p))
 
   -- Where a lane begins, every frame above it, its flatMap's other parts
   -- among them, passes every skip under it.
-  Begun : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p → Set
+  Begun : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p → Set₁
   Begun c op f d n q o ls a p =
     closed c ≡ false → Lead ⟨ inCut true (attAt (p ⊕ [ ix 1 ])) (inLn true (inLanes op f d (suc n) q o (reverse ls) [] c)) , pend (f a) , subscribing , p ⊕ [ ix 1 ] ⟩
-
-  Dequeues : ∀ {Γ A B} (c : Ctx R Γ B) (op : FlatOp) (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (q : List A) (o : St Γ A) (ls : List (St Γ B)) (p : Pos) → Set
-  Dequeues c op f d n []      o ls p = ⊤
-  Dequeues c op f d n (a ∷ q) o ls p = Begun c op f d n q o ls a p
 
   -- A lane begun under `p`, as its flatMap's other parts lead it.
   BegunSides : ∀ {Γ A B} (f : A → Obs Timeline Γ B) → Bool → St Γ A → List (St Γ B) → Pos → NEnv Γ → Set
@@ -457,7 +458,7 @@ module _ {R : Set} where
   begun : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p
         → (showsᶜ c true ≡ true → Ahead (_≡ p ⊕ [ ix 0 ]) c true) → (showsᶜ c true ≡ true → BegunSides f d o ls p (envAt c))
         → (showsᶜ c true ≡ true → Aloof p c true) → Begun c op f d n q o ls a p
-  begun c op f d n q o ls a p ah sd al cl sh =
+  begun c op f d n q o ls a p ah sd al cl = lift λ sh →
     sd sh , ahead-over p (λ j u → under-sub p [ ix 1 ] j u) c true (ah sh) (al sh)
 
   postulate
@@ -483,29 +484,24 @@ module _ {R : Set} where
   -- leaves the frames above, it leaves under the lane it begins.
   outer-begun : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p
               → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ → Begun c op f d n q o ls a p
-  outer-begun c op f true  n q o ls a p iv = ⊥-elim (Order.lead (Inv.ord iv))
+  outer-begun c op f true  n q o ls a p iv = ⊥-elim (lead-clear (Inv.ord iv))
   outer-begun c op f false n q o ls a p iv =
-    begun c op f false n q o ls a p (proj₁ (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv)))))) (outer-begun-sides c op f n q o ls a p iv)
-      (proj₂ (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv))))))
+    begun c op f false n q o ls a p (proj₁ (proj₂ (proj₂ (proj₂ (lead-clear (Inv.ord iv)))))) (outer-begun-sides c op f n q o ls a p iv)
+      (proj₂ (proj₂ (proj₂ (proj₂ (lead-clear (Inv.ord iv))))))
 
   switch-begun : ∀ {Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p
                → Inv ⟨ inOuter switchᶠ f d n q ls c , o , rising (nx a) , p ⟩ → Begun c switchᶠ f d 0 q o (proj₁ (killAll ls)) a p
-  switch-begun c f true  n q o ls a p iv = ⊥-elim (Order.lead (Inv.ord iv))
+  switch-begun c f true  n q o ls a p iv = ⊥-elim (lead-clear (Inv.ord iv))
   switch-begun c f false n q o ls a p iv =
-    begun c switchᶠ f false 0 q o (proj₁ (killAll ls)) a p (proj₁ (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv))))))
-      (switch-begun-sides c f n q o ls a p iv) (proj₂ (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv))))))
+    begun c switchᶠ f false 0 q o (proj₁ (killAll ls)) a p (proj₁ (proj₂ (proj₂ (proj₂ (lead-clear (Inv.ord iv))))))
+      (switch-begun-sides c f n q o ls a p iv) (proj₂ (proj₂ (proj₂ (proj₂ (lead-clear (Inv.ord iv))))))
 
   lane-begun : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n a q (o : St Γ A) pre post (s : St Γ B) p
              → alive s ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
              → Begun c op f d (pred n) q o (pre ʳ++ ended s ∷ post) a p
   lane-begun c op f d n a q o pre post s p al iv =
-    begun c op f d (pred n) q o (pre ʳ++ ended s ∷ post) a p (λ sh → proj₁ (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv)))) sh))
-      (lane-begun-sides c op f d n a q o pre post s p al iv) (λ sh → proj₂ (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv)))) sh))
-
-  dequeues : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) p
-           → alive s ≡ true → Inv ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → Dequeues c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p
-  dequeues c op f d n []      o pre post s p al iv = tt
-  dequeues c op f d n (a ∷ q) o pre post s p al iv = lane-begun c op f d n a q o pre post s p al iv
+    begun c op f d (pred n) q o (pre ʳ++ ended s ∷ post) a p (λ sh → proj₁ (proj₂ (proj₂ (proj₂ (lead-ends (Inv.ord iv)))) sh))
+      (lane-begun-sides c op f d n a q o pre post s p al iv) (λ sh → proj₂ (proj₂ (proj₂ (proj₂ (lead-ends (Inv.ord iv)))) sh))
 
   -- Nothing a subscription starts or a slot frees rises a value; an
   -- outer completing rises its flatMap's end with the end's lead.
@@ -515,17 +511,11 @@ module _ {R : Set} where
   ... | true  = tt
   ... | false = b refl
 
-  lead-if : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p b → EndsIf b p c s → Lead ⟨ c , s , (if b then rising cp else absorbed) , p ⟩
-  lead-if c s p true  l = l
-  lead-if c s p false l = tt
-
-  settle-lead : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) d n e p → EndsIf (d ∧ (n ≡ᵇ 0) ∧ e) p c s → Lead ⟨ c , s , settle d n e , p ⟩
-  settle-lead c s d n e p l = lead-if c s p (d ∧ (n ≡ᵇ 0) ∧ e) l
-
-  dequeue-lead : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls p
-               → EndsIf (d ∧ (n ≡ᵇ 0) ∧ null q) p c (flatS op f d n q o ls) → Dequeues c op f d n q o ls p → Lead (dequeue c op f d n q o ls p)
-  dequeue-lead c op f d n []      o ls p l b = settle-lead c (flatS op f d n [] o ls) d n true p l
-  dequeue-lead c op f d n (a ∷ q) o ls p l b = start-lead c op f d n q o ls a p b
+  -- A completion the flatMap passes on keeps the snapshot it rose with.
+  lead-if : ∀ {Γ A} (c : Ctx R Γ A) (s t : St Γ A) p b → alive t ≡ alive s → Won (at p , (if b then shows cp else still)) c t
+          → Frag (plug c t) → Gh top (plug c t) → Keys (plug c t) → Lead ⟨ c , s , (if b then rising cp else absorbed) , p ⟩
+  lead-if c s t p true  al w ft gt kt = t , al , w , ft , gt , kt
+  lead-if c s t p false al w ft gt kt = tt
 
   admit-lead : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
              → NextLead (took (admit c op f d n q o ls a p))
@@ -539,27 +529,23 @@ module _ {R : Set} where
   ... | true  = start-lead c exhaustᶠ f d n q o ls a p (outer-begun c exhaustᶠ f d n q o ls a p iv)
   ... | false = tt
 
-  -- A rise carries its lead: each frame was clear at the position the
-  -- value reaches it.
+  -- A rise carries its lead: the snapshot, read at the frame above.
   rise-lead : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Lead ⟨ c , s , rising e , p ⟩ → Inv ⟨ c , s , rising e , p ⟩
             → NextLead (took (rise c s e p))
   rise-lead top                               s (nx a) p l iv = tt
   rise-lead top                               s cp     p l iv = tt
-  rise-lead (inMap f c)                       s (nx a) p l iv = l
-  rise-lead (inMap f c)                       s cp     p l iv = l
-  rise-lead (inScan f z c)                    s (nx a) p l iv = l
-  rise-lead (inScan f z c)                    s cp     p l iv = l
-  rise-lead (inCut true x c)                  s (nx a) p l iv = l refl
-  rise-lead (inCut true x c)                  s cp     p l iv = l refl
+  rise-lead (inMap f c)                       s e      p (t , al , w , ft , gt , kt) iv = mapS f t , refl , w , ft , gt , kt
+  rise-lead (inScan f z c)                    s (nx a) p (t , al , w , ft , gt , kt) iv = scanS f z t , refl , w , ft , gt , kt
+  rise-lead (inScan f z c)                    s cp     p (t , al , w , ft , gt , kt) iv = scanS f z t , refl , w , ft , gt , kt
+  rise-lead (inCut true x c)                  s e      p (t , al , w , ft , gt , kt) iv = cutS true x t , refl , w , ft , gt , kt
   rise-lead (inCut false x c)                 s (nx a) p l iv = tt
   rise-lead (inCut false x c)                 s cp     p l iv = tt
-  rise-lead (inLn b c)                        s (nx a) p l iv = l
-  rise-lead (inLn b c)                        s cp     p l iv = l
-  rise-lead (inTake i q free c)               s (nx a) p l iv with q a | i
-  ... | true  | _     = proj₁ l refl
-  ... | false | true  = proj₂ l refl refl
+  rise-lead (inLn b c)                        s e      p (t , al , w , ft , gt , kt) iv = lnS b t , refl , w , ft , gt , kt
+  rise-lead (inTake i q free c)               s (nx a) p (t , al , w , ft , gt , kt) iv with q a | i
+  ... | true  | _     = takeS _ q free t , refl , w , ft , gt , kt
+  ... | false | true  = takeS true q free t , refl , w , ft , gt , kt
   ... | false | false = tt
-  rise-lead (inTake i q free c)               s cp     p l iv = l
+  rise-lead (inTake i q free c)               s cp     p (t , al , w , ft , gt , kt) iv = takeS i q free t , refl , w , ft , gt , kt
   rise-lead (inTake i q (cpAt r) c)           s (nx a) p l iv = tt
   rise-lead (inTake i q (cpAt r) c)           s cp     p l iv = tt
   rise-lead (inTake i q (cutAt r) c)          s (nx a) p l iv = tt
@@ -568,21 +554,31 @@ module _ {R : Set} where
   rise-lead (inTake i q (overAt r) c)         s cp     p l iv = tt
   rise-lead (inOuter op f d n q ls c)         s (nx a) p l iv = admit-lead c op f d n q s ls a p iv
   rise-lead (inOuter op f true n q ls c)      s cp     p l iv = tt
-  rise-lead (inOuter op f false n q ls c)     s cp     p l iv = settle-lead c (flatS op f true n q s ls) true n (null q) p (proj₂ l)
-  rise-lead (inLanes op f d n q o pre post c) s (nx b) p l iv with alive s
-  ... | true  = proj₂ (l refl)
+  rise-lead (inOuter op f false n q ls c)     s cp     p (t , al , (r , w , u) , ft , gt , kt) iv =
+    lead-if c (flatS op f true n q s ls) (flatS op f false n q t ls) p ((n ≡ᵇ 0) ∧ null q) refl w ft gt kt
+  rise-lead (inLanes op f d n q o pre post c) s (nx b) p (t , al , (l , u , w) , ft , gt , kt) iv with alive s
+  ... | true  = flatS op f d n q o (pre ʳ++ t ∷ post) , refl , lane-on d n q {alive t} {at p} b {c} (pooled-live (alive t) u) w , ft , gt , kt
   ... | false = tt
-  rise-lead (inLanes op f d n q o pre post c) s cp     p l iv with alive s in al
-  ... | true  = dequeue-lead c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p (proj₁ (proj₂ (proj₂ l))) (dequeues c op f d n q o pre post s p al iv)
+  rise-lead (inLanes op f d n [] o pre post c) s cp    p (t , al , (l , u , w) , ft , gt , kt) iv with alive s
+  ... | true  = lead-if c (flatS op f d (pred n) [] o (pre ʳ++ ended s ∷ post)) (flatS op f d n [] o (pre ʳ++ t ∷ post)) p (d ∧ (pred n ≡ᵇ 0) ∧ true) refl
+                  (subst (λ x → Won (at p , (if d ∧ x then shows cp else still)) c (flatS op f d n [] o (pre ʳ++ t ∷ post))) (sym (∧-identityʳ (pred n ≡ᵇ 0)))
+                     (lane-off d n [] {alive t} {at p} {c} (pooled-live (alive t) u) w)) ft gt kt
+  ... | false = tt
+  rise-lead (inLanes op f d n (a ∷ q) o pre post c) s cp p l iv with alive s in al
+  ... | true  = start-lead c op f d (pred n) q o (pre ʳ++ ended s ∷ post) a p (lane-begun c op f d n a q o pre post s p al iv)
   ... | false = tt
   rise-lead (inSrc k b c)                     s (nx a) p l iv = tt
   rise-lead (inSrc k b c)                     s cp     p l iv = tt
-  rise-lead (inBody (cs cl true sa ba as nothing r en) o c) s (nx b) p l iv = proj₂ (proj₂ l)
-  rise-lead (inBody (cs cl true sa ba as (just _) r en) o c) s (nx b) p () iv
-  rise-lead (inBody (cs cl false sa ba as ow r en) o c)      s (nx b) p () iv
-  rise-lead (inBody (cs cl true sa ba as nothing r en) o c) s cp p l iv = proj₂ l _
-  rise-lead (inBody (cs cl true sa ba as (just _) r en) o c) s cp p () iv
-  rise-lead (inBody (cs cl false sa ba as ow r en) o c)      s cp p () iv
+  rise-lead (inBody (cs cl true sa ba as nothing r en) o c) s (nx b) p (t , al , (_ , _ , _ , w) , ft , gt , kt) iv =
+    connS (cs cl true sa ba as nothing r en) o t , refl , w , ft , gt , kt
+  rise-lead (inBody (cs cl true sa ba as (just _) r en) o c)  s (nx b) p (t , al , (() , _) , ft , gt , kt) iv
+  rise-lead (inBody (cs cl false sa ba as (just _) r en) o c) s (nx b) p (t , al , (() , _) , ft , gt , kt) iv
+  rise-lead (inBody (cs cl false sa ba as nothing r en) o c)  s (nx b) p (t , al , (() , _) , ft , gt , kt) iv
+  rise-lead (inBody (cs cl true sa ba as nothing r en) o c) s cp p (t , al , (_ , _ , _ , w) , ft , gt , kt) iv =
+    connS (cs cl true sa ba as nothing r en) o t , refl , w , ft , gt , kt
+  rise-lead (inBody (cs cl true sa ba as (just _) r en) o c)  s cp p (t , al , (() , _) , ft , gt , kt) iv
+  rise-lead (inBody (cs cl false sa ba as (just _) r en) o c) s cp p (t , al , (() , _) , ft , gt , kt) iv
+  rise-lead (inBody (cs cl false sa ba as nothing r en) o c)  s cp p (t , al , (() , _) , ft , gt , kt) iv
 
   -- A subscribe rises nothing, and carries its lead down.
   sub-lead : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Lead ⟨ c , s , subscribing , p ⟩ → NextLead (step ⟨ c , s , subscribing , p ⟩)
@@ -592,13 +588,13 @@ module _ {R : Set} where
   sub-lead c (pend (map f o))         p l = l
   sub-lead c (pend (scan f z o))      p l = l
   sub-lead c (pend (takeWhile i q o)) p l = l
-  sub-lead c (pend (flatMap op f o))  p l = λ sh → (λ k _ → Data.List.Relation.Unary.All.[] , tt) , l sh
+  sub-lead c (pend (flatMap op f o))  p l = lift λ sh → (λ k _ → Data.List.Relation.Unary.All.[] , tt) , lower l sh
   sub-lead c (pend (connect o b))     p l =
-    λ sh → proj₁ (fresh-src o p (envAt c)) , proj₂ (fresh-src o p (envAt c)) , ahead-mono (under-sub p [ ix 0 ]) c true (l sh)
+    lift λ sh → proj₁ (fresh-src o p (envAt c)) , proj₂ (fresh-src o p (envAt c)) , ahead-mono (under-sub p [ ix 0 ]) c true (lower l sh)
   sub-lead c (pend (connected x))     p l with closedUp c x
   ... | true  = tt
   ... | false = tt
-  sub-lead c (pend (defer d))         p l = λ sh → ahead-mono (under-sub p [ ix 1 ]) c true (l sh)
+  sub-lead c (pend (defer d))         p l = lift λ sh → ahead-mono (under-sub p [ ix 1 ]) c true (lower l sh)
   sub-lead c (coldS b l′)             p l = l
   sub-lead c (ofS i q xs)             p l = l
   sub-lead c doneS                    p l = l
@@ -619,10 +615,9 @@ module _ {R : Set} where
   ... | nothing = tt
   ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
   ...   | pl , _ = run-lead (plug c s) p e
-                     (λ q a s″ kq oa al → won-clear q a c′ s′ s″ al (out-open c′ s′ m oa)
-                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oa (search-won (plug c s) (proj₁ (Order.shape o)) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))) (subst (Gh top) (sym pl) (gh-firm (plug c s) (proj₂ (Order.shape o)) (Order.told o))) (subst Keys (sym pl) (proj₂ (Order.shape o))))
-                     (λ q s″ kq oc al → won-ends q c′ s′ s″ al
-                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oc (search-won (plug c s) (proj₁ (Order.shape o)) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))) (subst (Gh top) (sym pl) (gh-firm (plug c s) (proj₂ (Order.shape o)) (Order.told o))) (subst Keys (sym pl) (proj₂ (Order.shape o))))
+                     (λ q e′ s″ kq oe al → s′ , al , subst₂ (λ k x → Won (k , x) c′ s′) kq oe (search-won (plug c s) (proj₁ (Order.shape o)) e)
+                        , subst Frag (sym pl) (proj₁ (Order.shape o)) , subst (Gh top) (sym pl) (gh-firm (plug c s) (proj₂ (Order.shape o)) (Order.told o))
+                        , subst Keys (sym pl) (proj₂ (Order.shape o)))
 
   -- A takeWhile failing a value ends one past it, what the frames above
   -- saw of the value's run.
@@ -741,7 +736,8 @@ module _ {R : Set} where
     where fr = sub-fresh c (flatMap op f s) p v
   begin-keys c (connect s b)     p v = begin-conn-keys c s b p v
   begin-keys c (connected x)     p v with closedUp c x in ce
-  ... | true  = begin-joined-keys c x p v ce
+  ... | true  = sub-swap c (connected x) p (ofS 0 p []) v refl e (shape-≋ e (proj₁ (Order.flight (Inv.ord v))) , tt)
+    where e = joined-over c x p v ce
   ... | false = sub-swap c (connected x) p (joinS p true x []) v refl (≋-by refl refl)
                   (((proj₁ fr , every-lookup (λ h → ¬ Owned p h) (envAt c) (proj₂ fr) x) , tt) , tt)
     where fr = sub-fresh c (connected x) p v
@@ -839,7 +835,7 @@ module _ {R : Set} where
   inv-next k (b & o) = both (step k) (base-next k b) (ord-next k b o)
 
   inv-load : (o : Obs Timeline [] R) → Inv (Machine.load o)
-  inv-load o = base-load o & order (tt , tt , tt) (flight-load o) (λ _ → tt) tt tt tt
+  inv-load o = base-load o & order (tt , tt , tt) (flight-load o) (lift (λ _ → tt)) tt tt tt
 
   -- A settled node anywhere in a tree the invariant holds of, absorbed at
   -- the same position: the invariant at it.

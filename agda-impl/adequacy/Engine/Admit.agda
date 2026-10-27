@@ -33,7 +33,7 @@ open import adequacy.Engine.Meaning using (envAt; risen; gh; lane; laneᴹ; lane
   poolRuns; lanes-refl)
 open import adequacy.Engine.Above using (rests-++)
 open import adequacy.Engine.Head using (Frag) renaming (Lanes to Lanesᴴ)
-open import adequacy.Engine.Pick using (Order; module Order)
+open import adequacy.Engine.Pick using (Order; module Order; lead-clear)
 open import adequacy.Engine.Head.Within using (frag-flat)
 open import adequacy.Engine.Ahead using (shows) renaming (Ahead to Aheadᶠ)
 open import adequacy.Engine.Race using (After; TailNotBefore)
@@ -110,7 +110,7 @@ outer-ahead : ∀ {R Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timel
             → shows (inOuter op f d n q ls c) true ≡ true → Order ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
             → Aheadᶠ (_≡ p ⊕ [ ix 0 ]) c true
 outer-ahead {d = true}  () od
-outer-ahead {d = false} sh od = proj₁ (proj₂ (proj₂ (proj₂ (Order.lead od)))) sh
+outer-ahead {d = false} sh od = proj₁ (proj₂ (proj₂ (proj₂ (lead-clear od)))) sh
 
 -- AN OUTER'S VALUE ADMITTED WHERE IT IS SHOWN IS SHOWN NEXT: every
 -- frame above passes its skip, whatever the admission left.
@@ -142,8 +142,8 @@ ignore-admits m (l ∷ ls) qs r e = refl
 outer-queues : ∀ {R Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
              → Queues op n → Order ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
              → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (outerX c op f d q ls o a p) (U.stateᴺ (gh (flatS op f d n (q ++ [ a ]) o ls)) (envAt c))
-outer-queues {op = mergeᶠ (just k)} {true} b od = ⊥-elim (Order.lead od)
-outer-queues {c = c} {mergeᶠ (just k)} {false} {n} {q} {ls} {f} {o} {a} {p} b od with Order.lead od
+outer-queues {op = mergeᶠ (just k)} {true} b od = ⊥-elim (lead-clear od)
+outer-queues {c = c} {mergeᶠ (just k)} {false} {n} {q} {ls} {f} {o} {a} {p} b od with lead-clear od
 ... | _ , al , tn , _ =
   outer-admits (mergeᶠ (just k)) (lane f) q (lanesL ls) (deadL ls) (envAt c) (gh o) a p _
     (trans (queue-admits k (laneᴹ (lane f) (envAt c) a) (U.states (lanesL ls) (envAt c)) (map (laneᴹ (lane f) (envAt c)) q) (p ⊕ [ ix 1 ])
@@ -158,8 +158,8 @@ outer-queues {op = exhaustᶠ}       ()
 outer-ignores : ∀ {R Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
               → Ignores op n → Order ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
               → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (outerX c op f d q ls o a p) (U.stateᴺ (gh (flatS op f d n q o ls)) (envAt c))
-outer-ignores {op = exhaustᶠ} {true} b od = ⊥-elim (Order.lead od)
-outer-ignores {c = c} {exhaustᶠ} {false} {n} {q} {ls} {f} {o} {a} {p} b od with Order.lead od
+outer-ignores {op = exhaustᶠ} {true} b od = ⊥-elim (lead-clear od)
+outer-ignores {c = c} {exhaustᶠ} {false} {n} {q} {ls} {f} {o} {a} {p} b od with lead-clear od
 ... | _ , al , tn , _ =
   outer-admits exhaustᶠ (lane f) q (lanesL ls) (deadL ls) (envAt c) (gh o) a p _
     (ignore-admits (laneᴹ (lane f) (envAt c) a) (U.states (lanesL ls) (envAt c)) (map (laneᴹ (lane f) (envAt c)) q) (p ⊕ [ ix 1 ])
@@ -209,24 +209,24 @@ begun-drops c op q ls f o a p ls′ ad la ta al tn =
 outer-begins : ∀ {R Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timeline Γ B} {o : St Γ A} {a p}
              → Begins op n → Order ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
              → Dropsˢ (_≡ p ⊕ [ ix 0 ]) (outerX c op f d q ls o a p) (begunY c op f d q o (keptLanes op ls) a p)
-outer-begins {d = true} b od = ⊥-elim (Order.lead od)
-outer-begins {c = c} {mergeᶠ nothing} {false} {n} {q} {ls} {f} {o} {a} {p} b od with Order.lead od
+outer-begins {d = true} b od = ⊥-elim (lead-clear od)
+outer-begins {c = c} {mergeᶠ nothing} {false} {n} {q} {ls} {f} {o} {a} {p} b od with lead-clear od
 ... | _ , al , tn , _ = begun-drops c (mergeᶠ nothing) q ls f o a p ls refl (λ m → lanes-refl m _) (λ m → ∪-idleᵀ m _) al tn
-outer-begins {c = c} {mergeᶠ (just k)} {false} {n} {q} {ls} {f} {o} {a} {p} b od with Order.lead od
+outer-begins {c = c} {mergeᶠ (just k)} {false} {n} {q} {ls} {f} {o} {a} {p} b od with lead-clear od
 ... | _ , al , tn , _ =
   begun-drops c (mergeᶠ (just k)) q ls f o a p ls
     (begin-admits k (laneᴹ (lane f) (envAt c) a) (U.states (lanesL ls) (envAt c)) (map (laneᴹ (lane f) (envAt c)) q) (p ⊕ [ ix 1 ])
        (subst (λ x → (x <ᵇ k) ≡ true) (trans en (sym (states-length (lanesL ls) (envAt c)))) b))
     (λ m → lanes-refl m _) (λ m → ∪-idleᵀ m _) al tn
   where en = proj₁ (proj₂ (proj₂ (frag-flat c (mergeᶠ (just k)) f false n q o ls (proj₁ (Order.shape od)))))
-outer-begins {c = c} {exhaustᶠ} {false} {n} {q} {ls} {f} {o} {a} {p} b od with Order.lead od
+outer-begins {c = c} {exhaustᶠ} {false} {n} {q} {ls} {f} {o} {a} {p} b od with lead-clear od
 ... | _ , al , tn , _ =
   begun-drops c exhaustᶠ q ls f o a p ls
     (exhaust-admits (laneᴹ (lane f) (envAt c) a) (U.states (lanesL ls) (envAt c)) (map (laneᴹ (lane f) (envAt c)) q) (p ⊕ [ ix 1 ])
        (subst (λ x → (x ≡ᵇ 0) ≡ true) (trans en (sym (states-length (lanesL ls) (envAt c)))) b))
     (λ m → lanes-refl m _) (λ m → ∪-idleᵀ m _) al tn
   where en = proj₁ (proj₂ (proj₂ (frag-flat c exhaustᶠ f false n q o ls (proj₁ (Order.shape od)))))
-outer-begins {c = c} {switchᶠ} {false} {n} {q} {ls} {f} {o} {a} {p} b od with Order.lead od
+outer-begins {c = c} {switchᶠ} {false} {n} {q} {ls} {f} {o} {a} {p} b od with lead-clear od
 ... | _ , al , tn , _ =
   begun-drops c switchᶠ q ls f o a p (proj₁ (killAll ls)) refl
     (λ m → subst (λ x → Lanes m (h ∷ []) (h ∷ U.states x (envAt c))) (sym (kill-lanes ls fl)) (lanes-refl m (h ∷ [])))

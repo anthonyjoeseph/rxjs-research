@@ -33,6 +33,7 @@
 module adequacy.Engine.Pick where
 
 open import Data.Empty using (⊥; ⊥-elim)
+open import Level using (Lift; suc; zero)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∨_; _∧_)
 open import Data.Bool.Properties using (∧-identityʳ)
 open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; reverse; null; map)
@@ -42,7 +43,7 @@ open import denotation.Unfold using (NEnv)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to all-++⁺; map⁺ to all-map⁺)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; pred; _≡ᵇ_)
-open import Data.Product using (_×_; _,_; proj₁; proj₂; uncurry)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂; uncurry)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans; cong)
 
@@ -51,10 +52,10 @@ open import denotation.MonotonicList.Events using (Pos; Timeline; Events; Events
 open import denotation.MonotonicList using (head; headᴼ; Agreeᵀ; agreeᵀ-refl; tailᴱ)
 open import denotation.Unfold using (Node; Step; states; step; headˢ; hushˢ; outˢ; skipˢ; endˢ; meaning; subscribe; outerᴺ; cutᴺ; restsᶜ)
 open import operation.Key using (Key; at; after; _<ᴷ_)
-open import operation.PureObservable using (peek; module Machine)
+open import operation.PureObservable using (module Machine)
 open Machine using (St; cs; mapS; scanS; cutS; lnS; takeS; flatS; connS; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes;
   inSrc; inBody; plug; closed; Out; still; shows; seek; search; found; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
-  Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM; pend; coldS; ofS; doneS; joinS; own; Found; nx; cp; alive; ended; free; cpAt; cutAt; overAt; _⊕_; mapT; scanT; cutT; takeT; laneT; shift; over; outOf)
+  Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM; pend; coldS; ofS; doneS; joinS; own; Found; Ev; nx; cp; alive; ended; free; cpAt; cutAt; overAt; _⊕_; mapT; scanT; cutT; takeT; laneT; shift; over; outOf)
   renaming (outerT to outerK)
 open import adequacy.Engine.Meaning using (gh; lane; lanesL; liveL; deadL; poolT; outerT; outerG; tailsOn; envAt; srcState; srcG)
 open import adequacy.Engine.Race using (NotBefore; After; TailNotBefore)
@@ -150,80 +151,6 @@ mutual
   EndsIf : ∀ {R Γ A} → Bool → Pos → Ctx R Γ A → St Γ A → Set
   EndsIf true  p c s = Ends p c s
   EndsIf false p c s = ⊤
-
--- A rise's lead; a subscription's, every frame above passing each skip
--- under it.
-Lead : ∀ {R} → Conf R → Set
-Lead ⟨ c , s , rising (nx a) , p ⟩ = Clear p a c s
-Lead ⟨ c , s , rising cp , p ⟩     = Ends p c s
-Lead ⟨ c , s , subscribing , p ⟩   = showsᶜ c true ≡ true → Ahead (Under (_≡ p)) c true
-Lead ⟨ c , s , absorbed , p ⟩      = ⊤
-
--- A value shows only under an open observer.
-out-open : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) m {a : A} → outOf c s m ≡ shows (nx a) → closed c ≡ false
-out-open c (pend o)                        m = λ ()
-out-open c (coldS b l)                     leafM with peek l
-... | nothing        = λ ()
-... | just nothing   with closed c
-...   | false = λ _ → refl
-...   | true  = λ ()
-out-open c (coldS b l)                     leafM | just (just _) with b | closed c
-...   | true  | false = λ _ → refl
-...   | true  | true  = λ ()
-...   | false | _     = λ ()
-out-open c (coldS b l)                     ofM = λ ()
-out-open c (coldS b l)                     attM = λ ()
-out-open c (coldS b l)                     bodyM = λ ()
-out-open c (coldS b l)                     srcAttM = λ ()
-out-open c (coldS b l)                     owedM = λ ()
-out-open c (coldS b l)                     cpM = λ ()
-out-open c (coldS b l)                     cutM = λ ()
-out-open c (coldS b l)                     joinM = λ ()
-out-open c (ofS i p xs)                    ofM with closed c
-... | false = λ _ → refl
-... | true  = λ ()
-out-open c (ofS i p xs)                    attM = λ ()
-out-open c (ofS i p xs)                    bodyM = λ ()
-out-open c (ofS i p xs)                    srcAttM = λ ()
-out-open c (ofS i p xs)                    owedM = λ ()
-out-open c (ofS i p xs)                    cpM = λ ()
-out-open c (ofS i p xs)                    cutM = λ ()
-out-open c (ofS i p xs)                    joinM = λ ()
-out-open c (ofS i p xs)                    leafM = λ ()
-out-open c doneS                                    m = λ ()
-out-open c (mapS f s)                               m = λ ()
-out-open c (scanS f z s)                            m = λ ()
-out-open c (cutS l x s)                             m = λ ()
-out-open c (lnS b s)                                m = λ ()
-out-open c (takeS i q free s)                       m = λ ()
-out-open c (takeS i q (cutAt r) s)                  m = λ ()
-out-open c (takeS i q (overAt r) s)                 m = λ ()
-out-open c (flatS op f d n q o ls)                  m = λ ()
-out-open c (connS k o b)                            m = λ ()
-out-open c (joinS j g x [])                         m = λ ()
-out-open c (takeS i q (cpAt r) s)          ofM = λ ()
-out-open c (takeS i q (cpAt r) s)          attM = λ ()
-out-open c (takeS i q (cpAt r) s)          bodyM = λ ()
-out-open c (takeS i q (cpAt r) s)          srcAttM = λ ()
-out-open c (takeS i q (cpAt r) s)          owedM = λ ()
-out-open c (takeS i q (cpAt r) s)          cpM with closed c
-... | false = λ ()
-... | true  = λ ()
-out-open c (takeS i q (cpAt r) s)          cutM = λ ()
-out-open c (takeS i q (cpAt r) s)          joinM = λ ()
-out-open c (takeS i q (cpAt r) s)          leafM = λ ()
-out-open c (joinS j false x (_ ∷ ib))      joinM = λ ()
-out-open c (joinS j true x (_ ∷ ib))       joinM with closed c
-... | false = λ _ → refl
-... | true  = λ ()
-out-open c (joinS j g x (_ ∷ ib))          ofM = λ ()
-out-open c (joinS j g x (_ ∷ ib))          attM = λ ()
-out-open c (joinS j g x (_ ∷ ib))          bodyM = λ ()
-out-open c (joinS j g x (_ ∷ ib))          srcAttM = λ ()
-out-open c (joinS j g x (_ ∷ ib))          owedM = λ ()
-out-open c (joinS j g x (_ ∷ ib))          cpM = λ ()
-out-open c (joinS j g x (_ ∷ ib))          cutM = λ ()
-out-open c (joinS j g x (_ ∷ ib))          leafM = λ ()
 
 whole : ∀ {R} → Conf R → St [] R
 whole ⟨ c , s , m , p ⟩ = plug c s
@@ -361,7 +288,27 @@ Heard ⟨ c , s , rising e , p ⟩   = closed c ≡ false
 Heard ⟨ c , s , subscribing , p ⟩ = ⊤
 Heard ⟨ c , s , absorbed , p ⟩    = ⊤
 
-record Order {R} (k : Conf R) : Set where
+-- What the search saw where a rise began, read at the frames it has yet
+-- to pass: a node as live as the one rising, its event winning every race
+-- above, the tree it sat in in the fragment, told and keyed.  Each frame's
+-- clearance (`Clear`, `Ends`) is read off it on demand (`lead-clear`,
+-- `lead-ends`).
+Snap : ∀ {R Γ A} → Pos → Ev A → Ctx R Γ A → St Γ A → Set₁
+Snap {Γ = Γ} {A} p e c s =
+  Σ (St Γ A) λ t → alive t ≡ alive s × Won (at p , shows e) c t × Frag (plug c t) × Gh top (plug c t) × Keys (plug c t)
+
+-- The unit a lead holds where nothing rises or subscribes.
+record ⊤₁ : Set₁ where
+  constructor tt
+
+-- A rise's lead; a subscription's, every frame above passing each skip
+-- under it.
+Lead : ∀ {R} → Conf R → Set₁
+Lead ⟨ c , s , rising e , p ⟩    = Snap p e c s
+Lead ⟨ c , s , subscribing , p ⟩ = Lift (suc zero) (showsᶜ c true ≡ true → Ahead (Under (_≡ p)) c true)
+Lead ⟨ c , s , absorbed , p ⟩    = ⊤₁
+
+record Order {R} (k : Conf R) : Set₁ where
   constructor order
   field
     shape  : Shaped k
@@ -932,3 +879,17 @@ mutual
           → Won (at p , (if b then shows cp else still)) c s → Frag (plug c s) → Gh top (plug c s) → Keys (plug c s) → EndsIf b p c s′
   ends-if p c true  s s′ al w ft gt kt = won-ends p c s s′ al w ft gt kt
   ends-if p c false s s′ al w ft gt kt = tt
+
+-- Each frame a rising value reaches is clear there, read off the snapshot.
+lead-clear : ∀ {R Γ A} {c : Ctx R Γ A} {s : St Γ A} {a p} → Order ⟨ c , s , rising (nx a) , p ⟩ → Clear p a c s
+lead-clear {c = c} {s} {a} {p} o =
+  won-clear p a c (proj₁ l) s (proj₁ (proj₂ l)) (Order.heard o) (proj₁ (proj₂ (proj₂ l)))
+    (proj₁ (proj₂ (proj₂ (proj₂ l)))) (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ l))))) (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ l)))))
+  where l = Order.lead o
+
+-- Each frame a rising completion reaches is clear there, likewise.
+lead-ends : ∀ {R Γ A} {c : Ctx R Γ A} {s : St Γ A} {p} → Order ⟨ c , s , rising cp , p ⟩ → Ends p c s
+lead-ends {c = c} {s} {p} o =
+  won-ends p c (proj₁ l) s (proj₁ (proj₂ l)) (proj₁ (proj₂ (proj₂ l)))
+    (proj₁ (proj₂ (proj₂ (proj₂ l)))) (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ l))))) (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ l)))))
+  where l = Order.lead o

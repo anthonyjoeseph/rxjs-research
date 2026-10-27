@@ -50,9 +50,9 @@ open import adequacy.Placed.Order using (every-lookup; sorted-headed; sorted-loo
   every∞-mono; headed-snoc; ordered-map; ordered-scan; steady-map; steady-scan)
 open import adequacy.Placed using (ordered-sub; steady-sub; spread-subᶠ)
 open import adequacy.Finite using (trunc; finite-trunc; trunc-agree)
-open import adequacy.Placed.Keys using (module Merge; alienᴱ-owned; beneath-owned; prefix-refl; values-map; owned-trans; values-mono; every-beside; every-map; every-scan)
+open import adequacy.Placed.Keys using (module Merge; alienᴱ-owned; beneath-owned; prefix-refl; values-map; owned-trans; values-mono; every-beside; every-map; every-scan; ordered-≈; steady-≈; every-≈; everyT-≈)
 open import adequacy.Placed.Trail using (Parted; Spread; spread-lim; tick-beneath; trail-map; Trail; Trailing; trail; trailᶠ;
-  trail-idle; trail-scan; trail-rejoin; sortedT-idle; flatT-idle)
+  trail-idle; trail-scan; trail-rejoin; sortedT-idle; flatT-idle; trail-≈)
 open import adequacy.Placed.Burst using (module Bursting; Fresh; FreshRun; ordered-tail; steady-tail; trail-tail)
 open import adequacy.Placed.Walk using (module Walk)
 open import adequacy.Placed.Rising using (Rise; Rules; module Reach; apartRules; keyedRules; rise-sub; headed-sub; headedRules; ordered-take; steady-take)
@@ -151,9 +151,14 @@ body-≋ (cs false sl sa ba as ow r′ e)       r b o ρ = λ k → same k _
 body-≋ (cs true sl sa (just p) as ow r′ e)  r b o ρ = λ k → same k _
 body-≋ (cs true sl sa nothing as ow r′ e)   r b o ρ = conn-shut r e b (restᶜ (gh o)) ρ
 
-postulate
-  -- A run's shape is what any run alike it shows.
-  shape-≋ : ∀ {A} {σ σ′ : Events∞ A} → σ ≋ σ′ → Shape σ → Shape σ′
+-- A run's shape is what any run alike it shows.
+shape-≋ : ∀ {A} {σ σ′ : Events∞ A} → σ ≋ σ′ → Shape σ → Shape σ′
+shape-≋ x (((ord , sty) , evH , evTH) , tr) =
+  ((ordered-≈ _ _ (λ n → Agreeˢ.nowˢ (x n)) ord
+  , steady-≈ _ _ (λ n → Agreeˢ.nowˢ (x n)) sty)
+  , every-≈ _ _ (λ n → Agreeˢ.nowˢ (x n)) evH
+  , everyT-≈ _ _ (λ n → Agreeˢ.cutˢ (x n)) evTH)
+  , trail-≈ _ _ _ _ (λ n → Agreeˢ.nowˢ (x n)) (λ n → Agreeˢ.cutˢ (x n)) tr
 
 -- A connect done with neither, at its source's mark.
 conn-core : ∀ {Γ X B} k (o : St Γ X) (b : St (X ∷ Γ) B) (ρ : NEnv Γ) (m : Here (connS k o b) ρ)
