@@ -17,7 +17,6 @@ module adequacy.Engine.FedWalk where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_])
-open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -41,7 +40,7 @@ open import adequacy.Engine.Keys using (Held)
 open import adequacy.Engine.Pick using (KAfter; Before)
 open import adequacy.Engine.Erase using (Eraseˢ; _,ᵉ_; Eraseᵀ; Erase; Lead⁼; _⊒_)
 open import adequacy.Engine.Race using (After; NotBefore)
-open import adequacy.Engine.Ahead using (Under; shown)
+open import adequacy.Engine.Ahead using (Under; shown; under-under; under-self)
 open import adequacy.Engine.Beside using (Sourced; body-⊒)
 open import adequacy.Placed.Trail using (Trailing)
 open import adequacy.Engine.Trails using (shape-src)
@@ -104,13 +103,6 @@ fed-scan g z (inj₂ x) = inj₂ (scanned-drops g z x)
 fed-took : ∀ {A P} i (q : A → Bool) {h h′ : Events∞ A} → Fed P h h′ → Fed P (took i q h) (took i q h′)
 fed-took i q (inj₁ x) = inj₁ (took-⊒ i q x)
 fed-took i q (inj₂ x) = inj₂ (took-drops i q x)
-
--- Positions under a position under one are under it.
-under-under : ∀ {P : Pos → Set} {k} → Under (Under P) k → Under P k
-under-under (_ , (k₀ , p₀ , y₀ , refl) , y , refl) = k₀ , p₀ , y₀ ++ y , ++-assoc k₀ y₀ y
-
-under-self : ∀ {P : Pos → Set} {k} → P k → Under P k
-under-self {k = k} p = k , p , [] , sym (++-identityʳ k)
 
 drops-mono : ∀ {A} {Q Q′ : Pos → Set} → (∀ {k} → Q k → Q′ k) → {h h′ : Events∞ A} → Dropsˢ Q h h′ → Dropsˢ Q′ h h′
 drops-mono m (dropˢ p a r)  = dropˢ (m p) a r

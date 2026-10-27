@@ -110,7 +110,7 @@ and the skip a value or a lane's end leaves just past itself, where the race
 whose frames above must pass every skip under its position. Settled when
 these are bodies, or refuted.
 
-Members: `apart-next`, `won-src`, `outer-begins-links`, `outer-queues-links`,
+Members: `apart-next`, `won-aloof`, `outer-begins-links`, `outer-queues-links`,
 `outer-ignores-links`, `lane-begin-links`, `outer-begun`, `switch-begun`,
 `lane-begun`.
 

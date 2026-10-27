@@ -70,7 +70,7 @@ open import adequacy.Placed.Trail using (Trail; Trailing)
 open import adequacy.Placed.Order using (Headed; Sorted; every)
 open import adequacy.Placed.Rising using (past-sub)
 open import adequacy.Engine.Above using (Flight; lanesL-++; deadL-++; rests-++)
-open import adequacy.Engine.Ahead using (Sides; Ahead; Under; shown; shows-open) renaming (shows to showsᶜ)
+open import adequacy.Engine.Ahead using (Sides; Ahead; Under; shown; shows-open; Aloof; ahead-over) renaming (shows to showsᶜ)
 open import adequacy.Engine.Scope using (Scope; modes; firsts-after; firsts-not-before; first-not-before; shut-head-eq; Outs; GhEᴸ; FloorAt; FloorSrc; first-floor; floor-lower; scope-src; past-floor; closures; ended-at; shut-floor; shut-states; Gh; Ghᴸ; gh-at; gh-told)
 open import adequacy.Sane using (Mode)
 open import adequacy.Stepper using (firsts; firstsᴸ)
@@ -781,12 +781,15 @@ lane-still d n (_ ∷ _) true  w = w
 lane-still d n (_ ∷ _) false w = w
 
 postulate
-  -- A LIVE SOURCE'S WON SKIP IS AHEAD UNDER IT: every frame above a
-  -- connect whose source won at `k` is ahead of each position under `k`.
-  won-src : ∀ {R Γ X B} k (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
-          → KAfter (shift (at k)) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
-          → Won (shift (at k) , still) c (connS (cs false true sa ba as nothing r en) o b)
-          → Frag (plug c (connS (cs false true sa ba as nothing r en) o b)) → showsᶜ c true ≡ true → Ahead (Under (_≡ k)) c true
+  -- A LIVE SOURCE'S WON SKIP IS ALOOF: no head the frames above a
+  -- connect whose source won at `k` ask of is below `k`.  The race above
+  -- reads the skip only at `k ⊕ [ ix 0 ]`; what lies under `k` is caused
+  -- by the skip, not yet run.
+  won-aloof : ∀ {R Γ X B} k (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
+            → KAfter (shift (at k)) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
+            → Won (shift (at k) , still) c (connS (cs false true sa ba as nothing r en) o b)
+            → Frag (plug c (connS (cs false true sa ba as nothing r en) o b)) → Gh top (plug c (connS (cs false true sa ba as nothing r en) o b)) → Keys (plug c (connS (cs false true sa ba as nothing r en) o b))
+            → showsᶜ c true ≡ true → Aloof k c true
 
 -- A still candidate that won is ahead at its key in every frame above
 -- it that shows it.
@@ -814,7 +817,9 @@ won-ahead k (inLanes op g d n q o pre post c) s true wn@(l , _ , w) ft gt kt sh 
   (λ { _ refl → lane-sides k c op g d n q o pre post s (shows-open c true sh)
                   (won-scope k still (inLanes op g d n q o pre post c) s wn ft gt kt) l gt (frag-flat c op g d n q o (pre ʳ++ s ∷ post) ft) })
   , won-ahead k c (flatS op g d n q o (pre ʳ++ s ∷ post)) true (lane-still d n q (alive s) {at k} {c} w) ft gt kt sh
-won-ahead k (inSrc (cs false true sa ba as nothing r en) b c) s f (ka , _ , w) ft gt kt sh = won-src k c sa ba as r en s b ka w ft sh
+won-ahead k (inSrc (cs false true sa ba as nothing r en) b c) s f (ka , _ , w) ft gt kt sh =
+  ahead-over k (λ j u → u) c true (won-ahead (k ⊕ [ ix 0 ]) c (connS (cs false true sa ba as nothing r en) s b) true w ft gt kt sh)
+    (won-aloof k c sa ba as r en s b ka w ft gt kt sh)
 won-ahead k (inSrc (cs false true sa ba as (just _) r en) b c) s f w ft gt kt ()
 won-ahead k (inSrc (cs false false sa ba as ow r en) b c)      s f w ft gt kt ()
 won-ahead k (inSrc (cs true sl sa ba as ow r en) b c)          s f w ft gt kt ()
