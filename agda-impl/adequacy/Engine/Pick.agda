@@ -69,7 +69,7 @@ open import adequacy.Engine.Head.Agrees using (head-agrees; head-agreesⱽ)
 open import adequacy.Engine.Shuts using (shutAll; told-none; Toldˢ; none)
 open import adequacy.Engine.Head.Within using (frag-flat; frag-parts; fr-at; conn-src)
 open import adequacy.Engine.Keys using (ConnAt; Keyed; Keys; keyed-at)
-open import adequacy.Engine.Causal using (posᴷ; Farᴷ; Freeᴷ; Keysᴬ; LaneKeys; Aloft⁺; Causal; keys-own; lanes-own; causal-own)
+open import adequacy.Engine.Causal using (posᴷ; Farᴷ; Freeᴷ; Keysᴬ; LaneKeys; Aloft⁺; Causal; keys-own; lanes-own; every-own; causal-own)
 open import adequacy.Engine.Trails using (envAt-sorted; shape-src)
 open import adequacy.Engine.Beside using (hush-idle)
 open import adequacy.Placed.Trail using (Trail; Trailing)
@@ -407,11 +407,11 @@ aloft-of k (inLanes op f d n q o pre post c) s (oo , rp , rn , a) =
   , race-far k c op f d n q o (s ∷ pre) post [] (lanes-own post rn)
   , aloft-of k c (flatS op f d n q o (pre ʳ++ s ∷ post)) a
 aloft-of k (inSrc kk b c)                    s (ob , os , a) =
-  far-cand k (inBody kk s c) b (keys-own b ob) , own-off k (own (connS kk s b)) os , aloft-of k c (connS kk s b) a
+  far-cand k (inBody kk s c) b (keys-own b ob) , own-off k (own (connS kk s b)) (every-own (connS kk s b) os) , aloft-of k c (connS kk s b) a
 aloft-of k (inBody kk o c)                   s (oo , fo , os , a) =
   far-cand k (inSrc kk s c) o (keys-own o oo)
   , free-cand k (cand (inSrc kk s c) o) (cand-keys (Freeᴷ k) (free-shift k) (inSrc kk s c) o (keys-own o fo))
-  , own-off k (own (connS kk o s)) os , aloft-of k c (connS kk o s) a
+  , own-off k (own (connS kk o s)) (every-own (connS kk o s) os) , aloft-of k c (connS kk o s) a
 
 -- A causal tree's node: its marks aloft.
 causal-aloft : ∀ {R} {t : St [] R} → Causal t → ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) {m k} → plug c s ≡ t → (m , k) ∈ own s → Aloft k c s
