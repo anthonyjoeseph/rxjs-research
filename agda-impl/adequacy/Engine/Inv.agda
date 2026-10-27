@@ -14,32 +14,37 @@ open import Data.Bool using (Bool; true; false; not; if_then_else_; _∧_)
 open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; _ʳ++_; null; [_]; reverse)
 open import Data.Maybe using (just; nothing)
-open import Data.Nat using (ℕ; suc; pred; _<ᵇ_; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; pred; _<ᵇ_; _≡ᵇ_)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Relation.Nullary using (¬_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.List.Relation.Unary.Any using (here)
 import Data.List.Relation.Unary.All
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; subst₂; sym; trans; cong)
 
-open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList.Events using (Pos; Timeline; emit; stall; close; Events∞; hush; idle; ix; last)
+open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+open import denotation.MonotonicList.Events using (Pos; Timeline; emit; stall; close; Events∞; hush; idle; ix; last; From; timelineAt; done)
+  renaming (at to atᶠ; quiet to silentᶠ)
 open import denotation.MonotonicList using (Agreeᵀ)
 open import operation.Key using (at)
-open import denotation.Unfold using (NEnv; stateᴺ; cutᴺ; states; outerᴺ; subscribe)
+open import denotation.Unfold using (NEnv; stateᴺ; cutᴺ; states; outerᴺ; subscribe; startᶜ; idleᶜ; flatMapᶜ)
 open import adequacy.Engine.Head using (Frag)
-open import adequacy.Engine.Keys using (Keys; Keyed; Held; FlatAt)
-open import adequacy.Engine.Above using (Flight; above-≋; take-excl; take-here; conn-drop; flat-drop; keyedL-ʳ++; toʳ; lanes-runs; lanes-P; rested-risen; ending-risen; takeAt-risen)
+open import adequacy.Engine.Keys using (Keys; Keyed; Held; FlatAt; FlatKeys)
+open import adequacy.Placed.Order using (Headed; Alienᴱ; Owned; every-lookup)
+open import adequacy.Engine.Trails using (shape-≋)
+open import adequacy.Engine.Above using (Above; Flight; above-≋; take-excl; take-here; conn-drop; flat-drop; keyedL-ʳ++; toʳ; lanes-runs; lanes-P; rested-risen; ending-risen; takeAt-risen)
 open import adequacy.Engine.Ahead using (Under; shown; ahead-mono; under-sub; Sides; Ahead; Aloof; ahead-over) renaming (shows to showsᶜ)
 open import adequacy.Engine.Race using (NotBefore)
-open import adequacy.Engine.Meaning using (envAt; gh; risen; lane; lanesL; laneRuns; poolRuns; outerT; outerG; poolG; deadL)
+open import adequacy.Engine.Meaning using (_≋_; ≋-by; flagOf; envAt; gh; risen; lane; lanesL; laneRuns; poolRuns; outerT; outerG; poolG; deadL)
 open import adequacy.Engine.Flown using (Owed; NextOwed; rise-owed; sub-owed)
-open import adequacy.Engine.Plug using (flight-held; keys-above)
+open import adequacy.Engine.Plug using (flight-held; keys-above; keys-swap)
 open import adequacy.Engine.Pick using (Order; order; module Order; Heard; whole; KeysAt; Shaped; Lead; Clear; Ends; EndsIf; Won; won-clear; won-ends; out-open; search-won; Apart; Searched)
 open import adequacy.Engine.Ghosted using (NextTold; told-next)
 open import adequacy.Engine.Scope using (Gh)
 open import adequacy.Engine.Firmed using (gh-firm)
 open import adequacy.Engine.Shuts using (Toldˢ; none)
-open import operation.PureObservable using (Tape; play; ending; over; module Machine; module Driver)
+open import operation.PureObservable using (Tape; play; ending; over; opening; module Machine; module Driver)
 open import adequacy.Engine.Fold using (Base; Owns; Unpended; Wf; WfC; Wfs; attO; base-at; bodyO; cpO; cutO; if-inv; inv; joinO; leafO; ofO; opened-move; opened-none; owedO; owned; pend-unsubIf; search-hit; settle-settled; srcAttO; wf-cut; wf-ended; wf-feed; wf-killAll; wf-split; wf-unsubIf; wfI; wfs-++; wfs-ʳ++)
 
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
@@ -406,8 +411,18 @@ module _ {R : Set} where
     rise-dead-keys : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) e p
                    → Inv ⟨ inLanes op f d n q o pre post c , s , rising e , p ⟩ → alive s ≡ false
                    → Keys (plug c (flatS op f d n q o (pre ʳ++ s ∷ post)))
-    begin-keys : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Inv ⟨ c , pend o , subscribing , p ⟩
-               → NextKeys (step ⟨ c , pend o , subscribing , p ⟩)
+    -- A merge begun keys nothing yet under its mark; a joiner of a
+    -- subject already over, and a connect begun, leave the tree keyed.
+    fresh-flat : ∀ {Γ A B} p (f : A → Obs Timeline Γ B) (ρ : NEnv Γ) → FlatKeys p (outerᴺ (lane f) (just idleᶜ) ρ) [] (cutᴺ (idleᶜ {B = B}) ρ) []
+    begin-joined-keys : ∀ {Γ A} (c : Ctx R Γ A) (x : A ∈ Γ) p → Inv ⟨ c , pend (connected x) , subscribing , p ⟩ → closedUp c x ≡ true
+                      → Keys (plug c (ofS 0 p []))
+    begin-conn-keys : ∀ {Γ X A} (c : Ctx R Γ A) (s : Obs Timeline Γ X) (b : Obs Timeline (X ∷ Γ) A) p
+                    → Inv ⟨ c , pend (connect s b) , subscribing , p ⟩ → NextKeys (step ⟨ c , pend (connect s b) , subscribing , p ⟩)
+    -- THE STILL'S SUBTREE: a subscription heads its position, where no
+    -- source of its environment has been.
+    sub-fresh : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Inv ⟨ c , pend o , subscribing , p ⟩ → Headed p × Alienᴱ p (envAt c)
+    -- THE FLIGHT, READ: a merge of an idle outer and no lanes is idle.
+    flat-idle : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (ρ : NEnv Γ) → stateᴺ idleᶜ ρ ≋ stateᴺ (flatMapᶜ op (lane f) (just idleᶜ) [] [] idleᶜ) ρ
     run-keys : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , absorbed , p ⟩ → NextKeys (step ⟨ c , s , absorbed , p ⟩)
     -- THE FLIGHT KEPT: a mark run rising or subscribing what it ran
     -- leaves its hole's run in shape, and every frame above keeping its
@@ -689,6 +704,46 @@ module _ {R : Set} where
   rise-keys (inSrc k b c)                     s e      p v = rise-src-keys c k b s e p v
   rise-keys (inBody k o c)                    s (nx b) p v = rise-body-keys c k o s b p v
   rise-keys (inBody k o c)                    s cp     p v = rise-body-end-keys c k o s p v
+
+  -- A subscribe begun: a former wrapping an idle node keeps the tree's
+  -- run where it was (`keys-swap`); a generator's ghost is its
+  -- subscription's run, which the flight already keys (`sub-swap`).
+  sub-swap : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p (t : St Γ A) → Inv ⟨ c , pend o , subscribing , p ⟩ → flagOf t ≡ true
+           → stateᴺ (subscribe o p) (envAt c) ≋ stateᴺ (gh t) (envAt c) → Keyed t (envAt c) → Keys (plug c t)
+  sub-swap c o p t v e x k =
+    keys-above c t (Base.ctxWf (Inv.base v)) (subst (λ f → Above c f (stateᴺ (gh t) (envAt c))) (sym e) (above-≋ c true x (proj₂ (Order.flight (Inv.ord v))))) k
+
+  cold-≋ : ∀ {Γ A} p (m : From A 0) (ρ : NEnv Γ) → stateᴺ (startᶜ p m) ρ ≋ stateᴺ (gh (coldS true (opening p m))) ρ
+  cold-≋ p (atᶠ zero _ b)    ρ = ≋-by refl refl
+  cold-≋ p (atᶠ (suc t) _ b) ρ = ≋-by refl refl
+  cold-≋ p done             ρ = ≋-by refl refl
+  cold-≋ p silentᶠ          ρ = ≋-by refl refl
+
+  begin-keys : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Inv ⟨ c , pend o , subscribing , p ⟩
+             → NextKeys (step ⟨ c , pend o , subscribing , p ⟩)
+  begin-keys c (cold x) p v = sub-swap c (cold x) p _ v refl e (shape-≋ e (proj₁ (Order.flight (Inv.ord v))) , tt)
+    where e = cold-≋ p (timelineAt x p) (envAt c)
+  begin-keys c empty             p v = sub-swap c empty p (ofS 0 p []) v refl (≋-by refl refl) (proj₁ (Order.flight (Inv.ord v)) , tt)
+  begin-keys c (of xs)           p v = sub-swap c (of xs) p (ofS 0 p xs) v refl (≋-by refl refl) (proj₁ (Order.flight (Inv.ord v)) , tt)
+  begin-keys c (map f s)         p v =
+    keys-swap c (pend (map f s)) (mapS f (pend s)) (Base.ctxWf (Inv.base v)) (Order.shape (Inv.ord v)) refl (≋-by refl refl) (tt , tt , tt)
+  begin-keys c (scan f z s)      p v =
+    keys-swap c (pend (scan f z s)) (scanS f z (pend s)) (Base.ctxWf (Inv.base v)) (Order.shape (Inv.ord v)) refl (≋-by refl refl) (tt , tt , tt)
+  begin-keys c (takeWhile i q s) p v =
+    keys-swap c (pend (takeWhile i q s)) (takeS i q free (cutS true (attAt p) (pend s))) (Base.ctxWf (Inv.base v)) (Order.shape (Inv.ord v)) refl
+      (≋-by refl refl) (tt , tt , tt , tt)
+  begin-keys c (flatMap op f s)  p v =
+    keys-swap c (pend (flatMap op f s)) (flatS op f false 0 [] (cutS true (attAt p) (pend s)) []) (Base.ctxWf (Inv.base v)) (Order.shape (Inv.ord v)) refl
+      (flat-idle op f (envAt c)) ((p , proj₁ fr , proj₂ fr , [] , fresh-flat p f (envAt c)) , (tt , tt , tt) , tt)
+    where fr = sub-fresh c (flatMap op f s) p v
+  begin-keys c (connect s b)     p v = begin-conn-keys c s b p v
+  begin-keys c (connected x)     p v with closedUp c x in ce
+  ... | true  = begin-joined-keys c x p v ce
+  ... | false = sub-swap c (connected x) p (joinS p true x []) v refl (≋-by refl refl)
+                  (((proj₁ fr , every-lookup (λ h → ¬ Owned p h) (envAt c) (proj₂ fr) x) , tt) , tt)
+    where fr = sub-fresh c (connected x) p v
+  begin-keys c (defer l)         p v =
+    keys-swap c (pend (defer l)) (pend (Later.force l)) (Base.ctxWf (Inv.base v)) (Order.shape (Inv.ord v)) refl (≋-by refl refl) (tt , tt)
 
   -- A subscribe of a settled node leaves the tree as it was.
   sub-keys : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , subscribing , p ⟩ → NextKeys (step ⟨ c , s , subscribing , p ⟩)

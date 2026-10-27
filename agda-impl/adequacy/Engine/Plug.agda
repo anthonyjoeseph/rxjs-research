@@ -223,3 +223,11 @@ keys-above (inSrc (cs true sl sa nothing as ow r e) b c) s (refl , _ , v) ((ca ,
 keys-above (inSrc (cs cl sl sa (just _) as ow r e) b c) s (() , _ , v) ab k
 keys-above (inBody k o c)                    s (_ , _ , v) ((ca , ko , _) , ab) x =
   keys-above c (connS k o s) v (above-≋ c true (body-plug k o s (envAt c)) ab) (ca , ko , x)
+
+-- A hole's node swapped for one whose run is alike and alive alike: the
+-- frames above keep theirs, so the whole tree is keyed once the new node
+-- keeps its own.
+keys-swap : ∀ {R Γ A} (c : Ctx R Γ A) (s t : St Γ A) → WfC c → Held (plug c s) → flagOf s ≡ flagOf t
+          → stateᴺ (gh s) (envAt c) ≋ stateᴺ (gh t) (envAt c) → Keyed t (envAt c) → Keys (plug c t)
+keys-swap c s t v fs e x k =
+  keys-above c t v (subst (λ f → Above c f (stateᴺ (gh t) (envAt c))) e (above-≋ c (flagOf s) x (above-held c s v fs))) k
