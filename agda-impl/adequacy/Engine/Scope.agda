@@ -15,6 +15,7 @@ open import Data.Nat using (ℕ)
 open import Data.List using (List; []; _∷_; [_]; _++_; _ʳ++_; reverse; map)
 open import Data.List.Properties using (ʳ++-defn; reverse-involutive)
 open import Data.List.Relation.Unary.Any using (here)
+open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -39,7 +40,7 @@ open import adequacy.Env using (nagree-refl)
 open import adequacy.Stepper.Flat using (agree-head)
 open import adequacy.Engine.Meaning using (gh; lanesL; envAt; srcG; srcRun; endOf)
 open import adequacy.Engine.Race using (After; NotBefore)
-open import adequacy.Engine.Shuts using (Shuts; none; shutAt; upˢ; shutAll; Told; Toldˢ; Toldᴸ; told-drop)
+open import adequacy.Engine.Shuts using (Shuts; none; shutAt; upˢ; snocˢ; closeOf; shutAll; Told; Toldˢ; Toldᴸ)
 
 modeᴳ : ∀ {Γ X} → Source Γ X → Mode
 modeᴳ (live s)    = runs
@@ -145,10 +146,6 @@ scope-src ν q (ended e t) ρ fs f = f
 -- an ended connect's body (`Unfold.shutˢᵗ`), telling every joiner of it,
 -- one a later subscription made too.  A node read through them is the
 -- one `Unfold` would hold there, alike in meaning (`shut-floor`).
-closeOf : ∀ {Γ X} → Source Γ X → Shuts (X ∷ Γ) → Shuts (X ∷ Γ)
-closeOf (live s)    ss = ss
-closeOf (ended e t) ss = shutAt (here refl) e ss
-
 closures : ∀ {R Γ A} → Ctx R Γ A → Shuts Γ
 closures top                               = none
 closures (inMap f c)                       = closures c
@@ -170,9 +167,13 @@ ended-up : ∀ {Γ X} (s : Shuts Γ) (e : Events X) (ρ : NEnv Γ) → Ended s �
 ended-up none           e ρ t        = tt
 ended-up (shutAt i c s) e ρ (a , t) = a , ended-up s e ρ t
 
+ended-snoc : ∀ {Γ X} (s : Shuts Γ) (i : X ∈ Γ) c (ρ : NEnv Γ) → Ended s ρ → lookup ρ i ≃ end c → Ended (snocˢ s i c) ρ
+ended-snoc none           i c ρ t       a = a , tt
+ended-snoc (shutAt j d s) i c ρ (b , t) a = b , ended-snoc s i c ρ t a
+
 ended-close : ∀ {Γ X} (g : Source Γ X) (ρ : NEnv Γ) (s : Shuts (X ∷ Γ)) → Ended s (srcRun g ρ ∷ᴬ ρ) → Ended (closeOf g s) (srcRun g ρ ∷ᴬ ρ)
 ended-close (live x)    ρ s t = t
-ended-close (ended e x) ρ s t = alike (λ n → agree-refl n (end e)) , t
+ended-close (ended e x) ρ s t = ended-snoc s (here refl) e (end e ∷ᴬ ρ) t (alike (λ n → agree-refl n (end e)))
 
 ended-at : ∀ {R Γ A} (c : Ctx R Γ A) → Ended (closures c) (envAt c)
 ended-at top                               = tt
@@ -265,9 +266,6 @@ ghᴸ-at c op f d n q o (x ∷ xs) acc s post (_ , gs) = ghᴸ-at c op f d n q o
 
 -- Each live joiner told by every connect in scope that has ended: an
 -- ended source's own shut, one frame down, told it already.
-close-told : ∀ {Γ X A} (g : Source Γ X) (V : Shuts (X ∷ Γ)) (s : St (X ∷ Γ) A) → Toldˢ (closeOf g V) s → Toldˢ V s
-close-told (live n)    V s t = t
-close-told (ended e n) V s t = told-drop (here refl) e V s t
 
 mutual
   gh-told : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Gh c s → Toldˢ (closures c) s
@@ -281,7 +279,7 @@ mutual
   gh-told c (lnS b s)               g            = gh-told (inLn b c) s g
   gh-told c (takeS i q w s)         g            = gh-told (inTake i q w c) s g
   gh-told c (flatS op f d n q o ls) (_ , go , gl) = gh-told (inOuter op f d n q ls c) o go , gh-toldᴸ c op f d n q o [] ls gl
-  gh-told c (connS k o b)           (_ , go , gb) = gh-told (inSrc k b c) o go , close-told (srcG k o) (upˢ (closures c)) b (gh-told (inBody k o c) b gb)
+  gh-told c (connS k o b)           (_ , go , gb) = gh-told (inSrc k b c) o go , gh-told (inBody k o c) b gb
   gh-told c (joinS j true x ib)     g            = g
   gh-told c (joinS j false x ib)    g            = tt
 

@@ -5,15 +5,16 @@
 -- list of them (`shutAll`), a node's formers pass the shuts through to
 -- their parts (`shut-comm`, `shut-flat`, `shut-conn`), and a joiner
 -- already told is left as it is (`told-shut`).  Of a state: each live
--- joiner of a shut connect told (`Toldˢ`), the machine feeding every live
--- joiner its connect's end when the connect's source ends.
+-- joiner of a shut connect told (`Toldˢ`), an ended connect's body read
+-- through its own source's end (`closeOf`): the machine feeding every
+-- live joiner its connect's end when the connect's source ends.
 module adequacy.Engine.Shuts where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; map)
 open import Data.List.Properties using () renaming (map-id to map-idᴸ)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.Any using (there)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing; is-just) renaming (map to mapᴹ)
 open import Data.Maybe.Properties using () renaming (map-id to map-idᴹ)
 open import Data.Product using (_×_; _,_)
@@ -24,7 +25,7 @@ open import denotation.MonotonicList.Events using (Pos)
 open import denotation.Unfold using (Node; Source; live; ended; joinᶜ; flatMapᶜ; connectᶜ; unionᶜ; restᶜ; idleᶜ; restsᶜ; shut; shutᴹ; shutᴸ; same?)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; free; cpAt; cutAt; overAt)
-open import adequacy.Engine.Meaning using (endOf; taken; doneG)
+open import adequacy.Engine.Meaning using (endOf; taken; doneG; srcG)
 
 data Shuts : List Set → Set₁ where
   none   : ∀ {Γ} → Shuts Γ
@@ -37,6 +38,21 @@ upˢ (shutAt i c s) = shutAt (there i) c (upˢ s)
 shutAll : ∀ {Γ B} → Shuts Γ → Node Γ B → Node Γ B
 shutAll none           n = n
 shutAll (shutAt i c s) n = shut i c (shutAll s n)
+
+-- One more shut, read first: innermost.
+snocˢ : ∀ {Γ X} → Shuts Γ → X ∈ Γ → Pos → Shuts Γ
+snocˢ none           i c = shutAt i c none
+snocˢ (shutAt j d s) i c = shutAt j d (snocˢ s i c)
+
+shut-snoc : ∀ {Γ X B} (s : Shuts Γ) (i : X ∈ Γ) c (n : Node Γ B) → shutAll (snocˢ s i c) n ≡ shutAll s (shut i c n)
+shut-snoc none           i c n = refl
+shut-snoc (shutAt j d s) i c n = cong (shut j d) (shut-snoc s i c n)
+
+-- A connect's body read through its source's end once it has one, as
+-- `Meaning.bodyG` shuts it.
+closeOf : ∀ {Γ X} → Source Γ X → Shuts (X ∷ Γ) → Shuts (X ∷ Γ)
+closeOf (live s)    ss = ss
+closeOf (ended e t) ss = snocˢ ss (here refl) e
 
 shutAllˢ : ∀ {Γ B} → Shuts Γ → Source Γ B → Source Γ B
 shutAllˢ s (live n)    = live (shutAll s n)
@@ -130,38 +146,13 @@ mutual
   Toldˢ V (lnS b s)               = Toldˢ V s
   Toldˢ V (takeS i q w s)         = Toldˢ V s
   Toldˢ V (flatS op f d n q o ls) = Toldˢ V o × Toldᴸ V ls
-  Toldˢ V (connS k o b)           = Toldˢ V o × Toldˢ (upˢ V) b
+  Toldˢ V (connS k o b)           = Toldˢ V o × Toldˢ (closeOf (srcG k o) (upˢ V)) b
   Toldˢ V (joinS j true x ib)     = Told V x (endOf ib)
   Toldˢ V _                       = ⊤
 
   Toldᴸ : ∀ {Γ A} → Shuts Γ → List (St Γ A) → Set
   Toldᴸ V []       = ⊤
   Toldᴸ V (s ∷ ls) = Toldˢ V s × Toldᴸ V ls
-
-told-∅ : ∀ {Γ X} (x : X ∈ Γ) e → Told none x e
-told-∅ x (just _) = tt
-told-∅ x nothing  = tt
-
--- With nothing shut, every joiner is told.
-mutual
-  told-none : ∀ {Γ A} (s : St Γ A) → Toldˢ none s
-  told-none (pend o)                = tt
-  told-none (coldS b l)             = tt
-  told-none (ofS i p xs)            = tt
-  told-none doneS                   = tt
-  told-none (mapS f s)              = told-none s
-  told-none (scanS f z s)           = told-none s
-  told-none (cutS l a s)            = told-none s
-  told-none (lnS b s)               = told-none s
-  told-none (takeS i q w s)         = told-none s
-  told-none (flatS op f d n q o ls) = told-none o , told-noneᴸ ls
-  told-none (connS k o b)           = told-none o , told-none b
-  told-none (joinS j true x ib)     = told-∅ x (endOf ib)
-  told-none (joinS j false x ib)    = tt
-
-  told-noneᴸ : ∀ {Γ A} (ls : List (St Γ A)) → Toldᴸ none ls
-  told-noneᴸ []       = tt
-  told-noneᴸ (s ∷ ls) = told-none s , told-noneᴸ ls
 
 told-drop₀ : ∀ {Γ X Y} (i : X ∈ Γ) e (V : Shuts Γ) (x : Y ∈ Γ) m → Told (shutAt i e V) x m → Told V x m
 told-drop₀ i e V x (just _) t       = tt
@@ -180,10 +171,19 @@ mutual
   told-drop i e V (lnS b s)               t         = told-drop i e V s t
   told-drop i e V (takeS j q w s)         t         = told-drop i e V s t
   told-drop i e V (flatS op f d n q o ls) (to , tl) = told-drop i e V o to , told-dropᴸ i e V ls tl
-  told-drop i e V (connS k o b)           (to , tb) = told-drop i e V o to , told-drop (there i) e (upˢ V) b tb
+  told-drop i e V (connS k o b)           (to , tb) = told-drop i e V o to , told-close (srcG k o) (there i) e (upˢ V) b tb
   told-drop i e V (joinS j true x ib)     t         = told-drop₀ i e V x (endOf ib) t
   told-drop i e V (joinS j false x ib)    t         = tt
+
+  told-close : ∀ {Γ A Y X} (g : Source Γ Y) (i : X ∈ (Y ∷ Γ)) e (V : Shuts (Y ∷ Γ)) (s : St (Y ∷ Γ) A) → Toldˢ (closeOf g (shutAt i e V)) s → Toldˢ (closeOf g V) s
+  told-close (live n)     i e V s t = told-drop i e V s t
+  told-close (ended e′ n) i e V s t = told-drop i e (snocˢ V (here refl) e′) s t
 
   told-dropᴸ : ∀ {Γ A X} (i : X ∈ Γ) e (V : Shuts Γ) (ls : List (St Γ A)) → Toldᴸ (shutAt i e V) ls → Toldᴸ V ls
   told-dropᴸ i e V []       t         = tt
   told-dropᴸ i e V (s ∷ ls) (ts , tl) = told-drop i e V s ts , told-dropᴸ i e V ls tl
+
+-- Told of any shuts, told of none.
+told-none : ∀ {Γ A} (V : Shuts Γ) (s : St Γ A) → Toldˢ V s → Toldˢ none s
+told-none none           s t = t
+told-none (shutAt i e V) s t = told-none V s (told-drop i e V s t)

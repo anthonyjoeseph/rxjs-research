@@ -21,8 +21,7 @@ open import denotation.Unfold using (Node; NEnv; mapᶜ; scanᶜ; takeWhileᶜ; 
 open import operation.PureObservable using (module Machine)
 open Machine using (Conf; ⟨_,_,_,_⟩; St; mapS; scanS; cutS; lnS; takeS; flatS; connS; cs; CS; plug)
 open import adequacy.Engine.Meaning using (gh; lanesL; srcG; srcRun)
-open import adequacy.Engine.Shuts using (Shuts; none; upˢ; shutAll)
-open import adequacy.Engine.Scope using (closeOf)
+open import adequacy.Engine.Shuts using (Shuts; none; upˢ; shutAll; closeOf)
 
 open import denotation.MonotonicList.Events using (Events∞)
 open Events∞

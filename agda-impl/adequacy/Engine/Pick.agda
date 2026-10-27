@@ -61,7 +61,7 @@ open import adequacy.Engine.Race using (NotBefore; After; TailNotBefore)
 open import adequacy.Engine.Head using (Frag; Lanes; Lane; Agrees; exact; early; HeadAt; HeadAtⁿ; cand; dead-idle; conn-idle; NoConn; at-<ᵖ; <≮ᴷ; ≮ᴷ-trans; ext-≮)
 open import adequacy.Engine.Head.Race using (shift-≮)
 open import adequacy.Engine.Head.Agrees using (head-agrees; head-agreesⱽ)
-open import adequacy.Engine.Shuts using (shutAll)
+open import adequacy.Engine.Shuts using (shutAll; told-none)
 open import adequacy.Engine.Head.Within using (frag-flat; frag-body; frag-parts; fr-at; conn-src)
 open import adequacy.Engine.Keys using (ConnAt; Keyed; Keys; keyed-at)
 open import adequacy.Engine.Trails using (envAt-sorted)
@@ -396,8 +396,8 @@ not-before-step q (just (k , still)) st w (early u) with headˢ st
 ... | just h  = subst (λ b → b ≡ false) (at-<ᵖ h q) (≮ᴷ-trans (at h) k (at q) u w)
 
 -- A node's head, read at an open observer.
-open-agrees : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → closed c ≡ false → Frag s → Agrees (cand c s) (step (gh s))
-open-agrees c s cl fs = subst (λ b → HeadAt b (cand c s) s) cl (head-agrees c s fs)
+open-agrees : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → closed c ≡ false → Frag s → Gh c s → Agrees (cand c s) (step (gh s))
+open-agrees c s cl fs g = subst (λ b → HeadAt b (cand c s) s) cl (head-agrees c s (told-none (closures c) s (gh-told c s g)) fs)
 
 -- An open frame's node read through the ended connects in scope
 -- (`Scope.closures`) steps as its candidate, as the plain node does: a
@@ -822,7 +822,7 @@ won-clear p a (inLanes op f d n q o pre post c) s s′ al ce wn@(l , _ , w) ft g
       (lane-on d n q {alive s} {at p} a {c} {flatS op f d n q o (pre ʳ++ s ∷ post)} (trans al lv) w) ft gt kt
 won-clear p a (inSrc kk b c)                    s s′ al ce (w , _) ft gt kt with over kk
 ... | true  = λ ()
-... | false = λ _ cl → after-step (p ⊕ [ ix 0 ]) (cand (inBody kk s c) b) (step (gh b)) w (open-agrees (inBody kk s c) b cl (frag-body c kk s b ft))
+... | false = λ _ cl → after-step (p ⊕ [ ix 0 ]) (cand (inBody kk s c) b) (step (gh b)) w (open-agrees (inBody kk s c) b cl (frag-body c kk s b ft) (proj₂ (proj₂ (gh-at c (connS kk s b) gt))))
 won-clear p a (inBody (cs cl true sa ba as nothing r en) o c) s s′ al ce (_ , lo , bf , w) ft gt kt =
   proj₁ bb , proj₂ bb , won-clear p a c (connS (cs cl true sa ba as nothing r en) o s) (connS (cs cl true sa ba as nothing r en) o s′) refl ce w ft gt kt
   where bb = body-link p c (cs cl true sa ba as nothing r en) o s ft ce refl lo bf

@@ -80,7 +80,7 @@ fed the rest. An erased skip erases tail pins too, so the tails' heads need
 not match; the configuration must keep erased pins out of a rested node.
 Settled when bodies, or refuted.
 
-Members: `fed-cut`, `fed-taken`, `fed-done`, `fed-ended`.
+Members: `fed-cut`, `fed-taken`, `fed-done`, `fed-ended`, `fed-shut`.
 
 #### THE FED POSITIONS
 
@@ -226,11 +226,11 @@ Members: `after-map`, `after-scan`, `after-take`, `clear-take`,
 
 #### THE FLIGHT, READ
 
-Untried, mechanical: what the frames above keep is read alike off runs alike,
-and off the ghost as the whole tree's keys, a dead lane's read only through
-what it leaves running. Settled by bodies.
+Untried, mechanical: what the frames above keep, and a run's shape, is read
+alike off runs alike, and off the ghost as the whole tree's keys, a dead
+lane's read only through what it leaves running. Settled by bodies.
 
-Members: `above-≋`, `keys-above`, `rise-dead-keys`.
+Members: `above-≋`, `shape-≋`, `keys-above`, `rise-dead-keys`.
 
 ## Tier 2 — the simultaneous spec
 

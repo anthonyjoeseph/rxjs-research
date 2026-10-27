@@ -287,9 +287,6 @@ firstsᴸ (c ∷ cs) ρ (fc , fs) = firsts c ρ fc , firstsᴸ cs ρ fs
 first : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (c : U.Node Γ A) (ρ : NEnv Γ) → Sane ν c → Placed c ρ → Firsts ν c ρ
 first c ρ sn pl = firsts c ρ (firm c ρ sn pl)
 
-firstᴸ : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (ls : List (U.Node Γ A)) (ρ : NEnv Γ) → Saneᴸ ν ls → Placedᴸ ls ρ → Firstᴸ ν ls ρ
-firstᴸ ls ρ sl pl = firstsᴸ ls ρ (firmᴸ ls ρ sl pl)
-
 -- A node whose step shows past `k`, among sources showing nothing
 -- before `k`, shows nothing before it.
 floor : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (c : U.Node Γ A) (ρ : NEnv Γ) k → Sane ν c → Placed c ρ

@@ -21,11 +21,12 @@ open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; _++_; [_]; reverse)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product using (_×_; _,_)
-open import Relation.Binary.PropositionalEquality using (_≡_; subst; sym; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; cong)
 
 open import Tree using (Obs; FlatOp)
 open import denotation.MonotonicList.Events using (Events; Events∞; Tail; Timeline; Pos; out; skip; end; idle; _∪_; ix; last)
@@ -36,7 +37,7 @@ open import denotation.NonExpansive using (Agreeˢ; _,ˢ_; Lanes; []ᴸ; _∷ᴸ
   mapᴱ-ne; scanᴱ-ne; takeWhileᴱ-ne; tailᴱ-ne; ∪-ne; burstOn-ne; beside-ne; go-ne; whole-ne; mapᴱ-neᴹ)
 open Agreeˢ
 open import denotation.Unfold using (Node; burstᶜ; ofᶜ; mapᶜ; scanᶜ; takeWhileᶜ; flatMapᶜ; joinᶜ; connectᶜ; endingᶜ; restᶜ; idleᶜ; unionᶜ;
-  restsᶜ; Source; live; ended; subscribe; NEnv; meaning; cutᴺ; stateᴺ; states; outerᴺ)
+  restsᶜ; Source; live; ended; subscribe; NEnv; meaning; cutᴺ; stateᴺ; states; outerᴺ; shut)
 open import denotation.Denote using (flatOp)
 open import operation.PureObservable using (Tape; play; ending; over)
 open import operation.PureObservable using (module Machine)
@@ -88,6 +89,17 @@ poolG : ∀ {Γ A B} → Bool → Node Γ A → List (Node Γ B) → Node Γ B
 poolG false n ds = restsᶜ ds
 poolG true  n ds = unionᶜ (restᶜ n) (restsᶜ ds)
 
+-- An ended source's connect tells its body's joiners its end, as
+-- `Unfold.shutˢᵗ` shuts the body when the source ends.
+-- It reads only `closed`, `bodyAt` and `endAt`, which the source's own
+-- steps leave alone.
+shutIf : ∀ {Γ X B} → Bool → Maybe Pos → Pos → Node (X ∷ Γ) B → Node (X ∷ Γ) B
+shutIf true nothing en n = shut (here refl) en n
+shutIf cl   ba      en n = n
+
+bodyG : ∀ {Γ X B} → CS → Node (X ∷ Γ) B → Node (X ∷ Γ) B
+bodyG k = shutIf (CS.closed k) (CS.bodyAt k) (CS.endAt k)
+
 -- A connect that completed is its rest.
 doneG : ∀ {Γ A} → Maybe Pos → Bool → Node Γ A → Node Γ A
 doneG (just _) l     n = restᶜ n
@@ -110,7 +122,7 @@ mutual
   gh (lnS b s)               = gh s
   gh (takeS i q w s)         = taken i q w (gh s)
   gh (flatS op f d n q o ls) = flatMapᶜ op (lane f) (outerG d (gh o)) (lanesL ls) q (poolG d (gh o) (deadL ls))
-  gh (connS k o b)           = doneG (CS.owedAt k) (CS.srcLive k) (connectᶜ (CS.srcAt k) (gh b) (srcOf (CS.bodyAt k) (CS.closed k) (CS.endAt k) o))
+  gh (connS k o b)           = doneG (CS.owedAt k) (CS.srcLive k) (connectᶜ (CS.srcAt k) (bodyG k (gh b)) (srcOf (CS.bodyAt k) (CS.closed k) (CS.endAt k) o))
   gh (joinS j g x ib)        = joinG g x j ib
 
   -- A node about to be subscribed at `p`, as `Unfold` subscribes it; else
