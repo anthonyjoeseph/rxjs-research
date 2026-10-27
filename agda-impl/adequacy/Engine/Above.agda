@@ -28,20 +28,23 @@ open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs)
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Tail; Timeline; out; end; ix; last; _<ᵖ_; <ᵖ-split; <ᵖ-apart; _∪_)
-open import denotation.MonotonicList using (MonotonicList; taking)
+open import denotation.MonotonicList using (MonotonicList; taking; Agree; Agreeᵀ; agree-refl; agreeᵀ-refl)
+open import denotation.NonExpansive using (Agreeˢ; _,ˢ_; Lanes; Outerᴿ; liveᴼ; doneᴼ; ∪-ne; mapᴱ-ne; scanᴱ-ne; mapᴱ-neᴹ)
 open import denotation.Unfold using (Node; NEnv; stateᴺ; cutᴺ; states; restsᶜ; outerᴺ; endingᶜ; takeWhileᶜ; restᶜ)
 open import operation.PureObservable using (module Machine)
-open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ev; nx; cp; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; CS; Conf; ⟨_,_,_,_⟩; free; cpAt; cutAt; overAt; _⊕_)
+open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ev; nx; cp; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; CS; Conf; ⟨_,_,_,_⟩; free; cpAt; cutAt; overAt; _⊕_)
 open import adequacy.Engine.Meaning using (_≋_; ≋-by; ≋-out; mapped; scanned; switched; taking∞; took; rested; outerFrame; lanesFrame; srcFrame; bodyFrame;
+  switched-ne; taking∞-ne; outerFrame-ne; lanesFrame-ne; srcFrame-ne; bodyFrame-ne; lanes-refl; lanes-++; holeL-ne; outerT-ne; poolRuns-cut; outer-refl; rested-ne; env-ne; same; ≈-refl; laneᴹ;
   lane; lanesL; liveL; deadL; deadOne; holeL; holeT; tailsOn; poolG; poolT; outerT; outerG; laneRuns; poolRuns; gh; envAt; hole; flagOf; risen; endingAt)
   renaming (outerOf to outerOfᴹ)
-open import adequacy.Engine.Keys using (Shape; Shape′; TakeAt; FlatAt; LaneKeys; _∷ᴷ_; ConnAt; Keyed; KeyedL; Keys; srcIn)
+open import adequacy.Engine.Keys using (Shape; Shape′; TakeAt; FlatAt; LaneKeys; _∷ᴷ_; ConnAt; Keyed; KeyedL; srcIn)
 open import adequacy.Placed.Order using (Sorted; Headed; Disjoint; Ext; Owned; Prefix; every; everyT-mono; ext; owned-ext; prefix-++)
 open import adequacy.Placed.Keys using (ix-mark; last-mark; prefix-refl; prefix-plus; prefix-lane; tagged-mark)
 open import adequacy.Placed.Burst using (owned-drop; freshᴿ)
 open import adequacy.Placed.Trail using (trail; spread)
 
 open Events∞
+open Agreeˢ
 
 ------------------------------------------------------------------------
 -- The frames above a hole
@@ -101,13 +104,54 @@ Above (inBody k o c)                    f h =
 Flight : ∀ {R} → Conf R → Set
 Flight ⟨ c , s , m , p ⟩ = Shape (hole c s m p) × Above c (flagOf s) (hole c s m p)
 
+-- Each frame's own facts read its runs no finer than alike at every depth.
 postulate
-  -- THE KEYS KEPT: runs alike at every depth are kept alike by every frame
-  -- above them.
-  above-≋ : ∀ {R Γ A} (c : Ctx R Γ A) f {h h′ : Events∞ A} → h ≋ h′ → Above c f h → Above c f h′
-  -- Every frame above a hole keeping its own of the run the hole's ghost
-  -- gives it, and the hole its own: the whole tree keyed.
-  keys-above : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Above c (flagOf s) (stateᴺ (gh s) (envAt c)) → Keyed s (envAt c) → Keys (plug c s)
+  takeAt-≋  : ∀ {A} w {h h′ : Events∞ A} → h ≋ h′ → TakeAt w h → TakeAt w h′
+  flatAt-≋  : ∀ {Γ B} (ρ : NEnv Γ) {o o′ : Maybe (Events∞ (MonotonicList B))} {ls ls′ : List (Events∞ B)} {t t′}
+            → (∀ n → Outerᴿ n o o′) → (∀ n → Lanes n ls ls′) → (∀ n → Agreeᵀ n t t′) → FlatAt ρ o ls t → FlatAt ρ o′ ls′ t′
+  connAt-≋  : ∀ {Γ X B} k {β β′ : Events∞ B} {σ σ′ : Events∞ X} (ρ : NEnv Γ) → β ≋ β′ → σ ≋ σ′ → ConnAt k β σ ρ → ConnAt k β′ σ′ ρ
+  keyed-env : ∀ {Γ X A} (s : St (X ∷ Γ) A) (ρ : NEnv Γ) {e e′ : Events X} → (∀ n → Agree n e e′) → Keyed s (e ∷ᴬ ρ) → Keyed s (e′ ∷ᴬ ρ)
+
+private
+  outerAt-ne : ∀ {Γ A C} d (g : A → Obs Timeline Γ C) (ρ : NEnv Γ) {h h′ : Events∞ A} → h ≋ h′ → ∀ n → Outerᴿ n (outerAt d g ρ h) (outerAt d g ρ h′)
+  outerAt-ne false g ρ x n = liveᴼ (cutˢ (x n)) (mapᴱ-neᴹ (λ a → ≈-refl (laneᴹ (lane g) ρ a)) (nowˢ (x n)))
+  outerAt-ne true  g ρ x n = doneᴼ
+
+  poolAt-ne : ∀ {Γ A B} d {h h′ : Events∞ A} (ds : List (Node Γ B)) (ρ : NEnv Γ) → h ≋ h′ → ∀ n → Agreeᵀ n (poolAt d h ds ρ) (poolAt d h′ ds ρ)
+  poolAt-ne false ds ρ x n = agreeᵀ-refl n (poolT ds ρ)
+  poolAt-ne true  ds ρ x n = ∪-ne (cutˢ (x n)) (agreeᵀ-refl n (poolT ds ρ))
+
+  fedRun-ne : ∀ {X} cl e {h h′ : Events∞ X} → h ≋ h′ → ∀ n → Agree n (fedRun cl e h) (fedRun cl e h′)
+  fedRun-ne false e x n = nowˢ (x n)
+  fedRun-ne true  e x n = agree-refl n _
+
+  srcRunning-≋ : ∀ {X} cl {h h′ : Events∞ X} → h ≋ h′ → srcRunning cl h ≋ srcRunning cl h′
+  srcRunning-≋ false x   = x
+  srcRunning-≋ {X} true {h} {h′} x n = rested-ne {B = X} h h′ (cutˢ (x n))
+
+-- Runs alike at every depth are kept alike by every frame above them.
+above-≋ : ∀ {R Γ A} (c : Ctx R Γ A) f {h h′ : Events∞ A} → h ≋ h′ → Above c f h → Above c f h′
+above-≋ top                               f x a = tt
+above-≋ (inMap g c)                       f x a = above-≋ c true (λ n → cutˢ (x n) ,ˢ mapᴱ-ne g (nowˢ (x n))) a
+above-≋ (inScan g z c)                    f x a = above-≋ c true (λ n → cutˢ (x n) ,ˢ scanᴱ-ne g z (nowˢ (x n))) a
+above-≋ (inCut l a′ c)                    f x a = above-≋ c true (λ n → switched-ne l (x n)) a
+above-≋ (inLn b c)                        f x a = above-≋ c b x a
+above-≋ (inTake i q w c)                  f x (ta , a) = takeAt-≋ w x ta , above-≋ c true (λ n → taking∞-ne i q w (x n)) a
+above-≋ (inOuter op g d m q ls c)         f x ((fa , kl) , a) =
+  (flatAt-≋ (envAt c) (outerAt-ne d g (envAt c) x) (λ n → lanes-refl n _) (poolAt-ne d (deadL ls) (envAt c) x) fa , kl)
+  , above-≋ c true (λ n → outerFrame-ne op (lane g) d q (lanesL ls) (deadL ls) (envAt c) (x n)) a
+above-≋ (inLanes op g d m q o pre post c) f {h} {h′} x ((fa , rest) , a) =
+  (flatAt-≋ (envAt c) (λ n → outer-refl n (lane g) (outerG d (gh o)) (envAt c))
+     (λ n → lanes-++ (lanes-refl n (states (lanesL post) (envAt c))) (lanes-++ (holeL-ne f (x n)) (lanes-refl n (states (lanesL (reverse pre)) (envAt c)))))
+     (λ n → outerT-ne d (gh o) (envAt c) (poolRuns-cut (reverse pre) post f (envAt c) h h′ (cutˢ (x n)))) fa , rest)
+  , above-≋ c true (λ n → lanesFrame-ne op (lane g) d q (gh o) (reverse pre) post f (envAt c) (x n)) a
+above-≋ (inSrc k b c)                     f x ((ca , kb) , a) =
+  (connAt-≋ k (envAt c) (λ n → env-ne (gh b) (envAt c) (fedRun-ne (CS.closed k) (CS.endAt k) x n)) (srcRunning-≋ (CS.closed k) x) ca
+   , keyed-env b (envAt c) (fedRun-ne (CS.closed k) (CS.endAt k) x) kb)
+  , above-≋ c true (λ n → srcFrame-ne k (gh b) (envAt c) (x n)) a
+above-≋ (inBody k o c)                    f x ((ca , rest) , a) =
+  (connAt-≋ k (envAt c) x (λ n → same n _) ca , rest)
+  , above-≋ c true (λ n → bodyFrame-ne k o (envAt c) (x n)) a
 
 -- A position not before a disjoint one: one past its last child is
 -- after it, apart from it, and no prefix of it.
