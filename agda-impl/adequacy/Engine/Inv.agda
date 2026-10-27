@@ -412,10 +412,12 @@ module _ {R : Set} where
     rise-dead-keys : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) e p
                    → Inv ⟨ inLanes op f d n q o pre post c , s , rising e , p ⟩ → alive s ≡ false
                    → Keys (plug c (flatS op f d n q o (pre ʳ++ s ∷ post)))
-    -- A joiner of a subject already over, and a connect begun, leave the
-    -- tree keyed.
-    begin-joined-keys : ∀ {Γ A} (c : Ctx R Γ A) (x : A ∈ Γ) p → Inv ⟨ c , pend (connected x) , subscribing , p ⟩ → closedUp c x ≡ true
-                      → Keys (plug c (ofS 0 p []))
+    -- A joiner of a subject already over runs as an empty `of` at its
+    -- position: the subject ended before the joiner's position, so its
+    -- rejoin owes the end at the joiner's `last`.
+    joined-over : ∀ {Γ A} (c : Ctx R Γ A) (x : A ∈ Γ) p → Inv ⟨ c , pend (connected x) , subscribing , p ⟩ → closedUp c x ≡ true
+                → stateᴺ (subscribe (connected x) p) (envAt c) ≋ stateᴺ (gh (ofS 0 p [])) (envAt c)
+    -- A connect begun leaves the tree keyed.
     begin-conn-keys : ∀ {Γ X A} (c : Ctx R Γ A) (s : Obs Timeline Γ X) (b : Obs Timeline (X ∷ Γ) A) p
                     → Inv ⟨ c , pend (connect s b) , subscribing , p ⟩ → NextKeys (step ⟨ c , pend (connect s b) , subscribing , p ⟩)
     -- THE STILL'S SUBTREE: a subscription heads its position, where no
@@ -741,7 +743,8 @@ module _ {R : Set} where
     where fr = sub-fresh c (flatMap op f s) p v
   begin-keys c (connect s b)     p v = begin-conn-keys c s b p v
   begin-keys c (connected x)     p v with closedUp c x in ce
-  ... | true  = begin-joined-keys c x p v ce
+  ... | true  = sub-swap c (connected x) p (ofS 0 p []) v refl e (shape-≋ e (proj₁ (Order.flight (Inv.ord v))) , tt)
+    where e = joined-over c x p v ce
   ... | false = sub-swap c (connected x) p (joinS p true x []) v refl (≋-by refl refl)
                   (((proj₁ fr , every-lookup (λ h → ¬ Owned p h) (envAt c) (proj₂ fr) x) , tt) , tt)
     where fr = sub-fresh c (connected x) p v
