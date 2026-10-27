@@ -96,9 +96,9 @@ Members: `kill-pool`.
 #### THE STILL'S SUBTREE
 
 One stored causality invariant (`Causal`): every key of what races a
-mark, its zero-extensions included, off the mark's position. Probed green
-at every walked configuration; kept by a rise, a subscription begun and a
-mark run, untried. A subscription headed and alien to its
+mark, an at-key's zero-extensions included, off the mark's position.
+Zero-extending every key is refuted; at-keys alone, unprobed. Kept by a
+rise, a subscription begun and a mark run, untried. A subscription headed and alien to its
 environment, and a begun lane's flatMap's other parts. Settled when these
 are bodies, or refuted.
 

@@ -884,7 +884,8 @@ private
   offKᵇ farᵇ : Key → Key → Bool
   offKᵇ (at p)    h = not (underKᵇ p h)
   offKᵇ (afterᴷ p) h = true
-  farᵇ (at p)    h = not (prefixᵇ p (keyPos h) ∨ (prefixᵇ (keyPos h) p ∧ zerosᵇ (dropL (lengthL (keyPos h)) p)))
+  farᵇ (at p)    (afterᴷ q) = not (prefixᵇ p q)
+  farᵇ (at p)    (at q) = not (prefixᵇ p q ∨ (prefixᵇ q p ∧ zerosᵇ (dropL (lengthL q) p)))
     where zerosᵇ : Pos → Bool
           zerosᵇ []             = true
           zerosᵇ (ix zero ∷ ls) = zerosᵇ ls

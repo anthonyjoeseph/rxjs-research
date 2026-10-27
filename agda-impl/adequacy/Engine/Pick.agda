@@ -347,11 +347,12 @@ Aloft k (inBody kk o c)                    s =
   OffC k (cand (inSrc kk s c) o) × (Beneath (cand (inSrc kk s c) o) k → ⊥) × All (λ mk → Offᴷ k (proj₂ mk)) (own (connS kk o s))
   × Aloft k c (connS kk o s)
 
--- A key far from a mark's: no position its events reach, its own with
--- `ix 0`s appended as `shift` appends them, at or under the mark's.
+-- A key far from a mark's: no position its events reach at or under the
+-- mark's, an at-key's own with `ix 0`s appended as `shift` appends them.
 Farᴷ : Key → Key → Set
-Farᴷ (at p)    h = ∀ n → (Σ Pos λ ys → posᴷ h ++ replicate n (ix 0) ≡ p ++ ys) → ⊥
-Farᴷ (after p) h = ⊤
+Farᴷ (at p)    (at q)    = ∀ n → (Σ Pos λ ys → q ++ replicate n (ix 0) ≡ p ++ ys) → ⊥
+Farᴷ (at p)    (after q) = (Σ Pos λ ys → q ≡ p ++ ys) → ⊥
+Farᴷ (after p) h         = ⊤
 
 -- A mark at or under no position a key is at.
 Freeᴷ : Key → Key → Set
@@ -413,7 +414,7 @@ postulate
 
 far-off : ∀ k h → Farᴷ k h → Offᴷ k h
 far-off (at p)    (at q)    fr (l , ys , e) = fr 0 (l ∷ ys , trans (++-identityʳ q) e)
-far-off (at p)    (after q) fr (ys , e)     = fr 0 (ys , trans (++-identityʳ q) e)
+far-off (at p)    (after q) fr u            = fr u
 far-off (after p) h         fr              = tt
 
 far-shift : ∀ k h → Farᴷ k h → Farᴷ k (shift h)
