@@ -727,21 +727,21 @@ module _ {R : Set} where
   flight-owed ⟨ c , s , subscribing , p ⟩ b o = sub-owed c s p o
   flight-owed ⟨ c , s , absorbed , p ⟩    b o = run-flight c s p (b & o)
 
-  flight-of : ∀ (k : Conf R) → Shaped k → Owed k → Flight k
-  flight-of ⟨ c , s , absorbed , p ⟩    h _ = flight-held c s p h
-  flight-of ⟨ c , s , subscribing , p ⟩ _ f = f
-  flight-of ⟨ c , s , rising e , p ⟩    _ f = f
+  flight-of : ∀ (k : Conf R) → Base k → Shaped k → Owed k → Flight k
+  flight-of ⟨ c , s , absorbed , p ⟩    b h _ = flight-held c s p (Base.ctxWf b) h
+  flight-of ⟨ c , s , subscribing , p ⟩ _ _ f = f
+  flight-of ⟨ c , s , rising e , p ⟩    _ _ f = f
 
-  flown : ∀ x → NextShape x → NextOwed x → NextFlight x
-  flown (silent t k)    h f = flight-of k h f
-  flown (value t p a k) h f = flight-of k h f
-  flown (complete p)    h f = tt
-  flown drained         h f = tt
+  flown : ∀ x → NextBase x → NextShape x → NextOwed x → NextFlight x
+  flown (silent t k)    b h f = flight-of k b h f
+  flown (value t p a k) b h f = flight-of k b h f
+  flown (complete p)    b h f = tt
+  flown drained         b h f = tt
 
   -- A step keeps its hole's run in shape, and what every frame above
   -- keeps of it.
   flight-next : ∀ k → Base k → Order k → NextFlight (step k)
-  flight-next k b o = flown (step k) (shape-next k b o) (flight-owed k b o)
+  flight-next k b o = flown (step k) (base-next k b) (shape-next k b o) (flight-owed k b o)
 
   joined : ∀ x → NextShape x → NextFlight x → NextLead x → NextApart x → NextHeard x → NextTold x → NextOrd x
   joined (silent t k)    f g l u e h = order f g l u e h
@@ -787,4 +787,4 @@ module _ {R : Set} where
   -- the same position: the invariant at it.
   inv-at : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Unpended s → Wf (plug c s) → Held (plug c s) → Apart (plug c s)
          → Toldˢ none (plug c s) → Inv ⟨ c , s , absorbed , p ⟩
-  inv-at c s p u w f t g = base-at c s p u w & order f (flight-held c s p f) tt t tt g
+  inv-at c s p u w f t g = base-at c s p u w & order f (flight-held c s p (proj₁ (wf-split c s u w)) f) tt t tt g
