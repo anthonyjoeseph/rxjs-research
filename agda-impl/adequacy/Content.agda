@@ -21,6 +21,7 @@ open import Data.List.Relation.Unary.Any using (Any)
 open import Data.List.Relation.Unary.All using ([]; _∷_)
 import Data.List.Relation.Unary.Any as Any
 open import Data.Empty using (⊥; ⊥-elim)
+open import Level using (lower)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; z≤n; s≤s; _<ᵇ_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; <-trans; ≤-<-trans; m≤n⇒m≤1+n; n≤1+n)
@@ -293,7 +294,7 @@ module Honesty (R : Set) where
              → Pass (_≡ p ⊕ [ ix 0 ]) c (flagOf (pend (defer l))) (U.stateᴺ (U.deferᶜ l p []) (envAt c))
                  (U.stateᴺ (U.subscribe (Later.force l) (p ⊕ [ ix 1 ])) (envAt c))
   defer-pass {c = c} {p = p} sh iv =
-    pass-of (_≡ p ⊕ [ ix 0 ]) c true (ahead-mono (λ k e → p , refl , [ ix 0 ] , e) c true (Order.lead (Inv.ord iv) sh)) (defer-links sh iv)
+    pass-of (_≡ p ⊕ [ ix 0 ]) c true (ahead-mono (λ k e → p , refl , [ ix 0 ] , e) c true (lower (Order.lead (Inv.ord iv)) sh)) (defer-links sh iv)
 
   -- A defer begun drops its skip.
   defer-drop : ∀ {Γ A} {c : Ctx R Γ A} {l p t m′}

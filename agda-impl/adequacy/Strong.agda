@@ -28,7 +28,7 @@ module Strongly (R : Set) where
   -- and whatever items the ghost's meaning reaches, so does its own.
   -- A set does not see a silence: a ghost showing nothing agrees as one
   -- with a cold stalling forever.
-  record Agrees (g : U.Node [] R) (m : Conf R) : Set where
+  record Agrees (g : U.Node [] R) (m : Conf R) : Set₁ where
     field
       inv   : Inv m
       same  : U.meaning g [] ≅ M m

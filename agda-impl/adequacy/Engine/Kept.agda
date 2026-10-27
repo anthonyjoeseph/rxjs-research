@@ -57,7 +57,7 @@ open import adequacy.Engine.Inv using (Inv; module Inv; inv-at; joined-over)
 open import adequacy.Engine.Race using (First)
 open import adequacy.Engine.Keys using (Held)
 open import adequacy.Engine.Above using (take-true; take-incl; take-excl; toʳ)
-open import adequacy.Engine.Pick using (module Order; Clear; Apart)
+open import adequacy.Engine.Pick using (module Order; Clear; Apart; lead-clear)
 open import adequacy.Engine.Shuts using (Toldˢ; none)
 open import adequacy.Engine.Plug using (take-plug; outer-plug; lanes-plug; lanes-plugʳ; done-plug; body-plug; conn-plugⁿ)
 
@@ -212,7 +212,7 @@ module _ {R : Set} where
               → Inv ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩ → flagOf s ≡ true
               → First p (outerᴺ (lane f) (outerG d (gh o)) (envAt c)) (states (lanesL post) (envAt c)) (states (lanesL (reverse pre)) (envAt c))
                   (outerT d (gh o) (envAt c) (poolRuns (reverse pre) post true (envAt c) (stateᴺ (gh s) (envAt c))))
-  lanes-first op f d n q o pre post c s b p v fl = proj₁ (Order.lead (Inv.ord v) fl)
+  lanes-first op f d n q o pre post c s b p v fl = proj₁ (lead-clear (Inv.ord v) fl)
 
   ----------------------------------------------------------------------
   -- A configuration focused anywhere means what its whole tree means
@@ -318,7 +318,7 @@ module _ {R : Set} where
         (lift-≅ c true (src-plug k (feed (here refl) p (nx a) b) s (envAt c) (Base.settled (Inv.base v))
           (proj₁ (proj₂ (wf-split c (connS k s b) tt (wfI (Inv.base v))))))))
     where
-      L = src-leads k b c s a p v (Order.lead (Inv.ord v))
+      L = src-leads k b c s a p v (lead-clear (Inv.ord v))
 
   rises : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Inv ⟨ c , s , rising e , p ⟩ → Kept ⟨ c , s , rising e , p ⟩
   rises top                               s (nx a) p v          = out-≅ refl

@@ -46,7 +46,7 @@ open import adequacy.Engine.Admit using (states-length; begun-runs; begun-pool; 
   kill-lanes; kill-pool)
 open import adequacy.Engine.Drop using (Dropsˢ; Pass; Links; pass-of; lane-admits)
 open import adequacy.Engine.Passed using (above-drops)
-open import adequacy.Engine.Pick using (Order; module Order; lanes-ʳsplit)
+open import adequacy.Engine.Pick using (Order; module Order; lanes-ʳsplit; lead-clear; lead-ends)
 open import adequacy.Engine.Head.Within using (frag-flat; frag-parts)
 open import adequacy.Placed.Order using (Ordered; Steady; Every; EveryT; Every∞; Headed; Atop; Past; Disjoint; ordered; steady; every; every∞-mono; everyT-mono;
   ordered-map; ordered-scan; steady-map; steady-scan)
@@ -545,7 +545,7 @@ module _ {R : Set} where
       ρ  = envAt c
       F  = flatS op f d n q o (reverse pre ++ s ∷ post)
       H  = lanesFrame op (lane f) d q (gh o) (reverse pre) post true ρ (risen (gh s) ρ (nx b) p)
-      fi = proj₁ (Order.lead od a)
+      fi = proj₁ (lead-clear od a)
       lo = lanes-out op f d n q o (reverse pre) post s ρ b p a fi
       sh : Shape′ (force H) (cut H)
       sh = frame-shape c op f d n q o pre post s (nx b) p od a
@@ -588,7 +588,7 @@ module _ {R : Set} where
       e₁ = proj₁ (last-one n de Sp Sr (stateᴺ (gh s) ρ) cn)
       e₂ = proj₂ (last-one n de Sp Sr (stateᴺ (gh s) ρ) cn)
       fe : force H ≡ end p
-      fe = trans (go-rise (flatOp op) nothing Sp h Sr [] T refl (proj₁ (proj₂ (Order.lead od)) ce)) (lane-solo (flatOp op) h T p e₁ e₂)
+      fe = trans (go-rise (flatOp op) nothing Sp h Sr [] T refl (proj₁ (proj₂ (lead-ends od)) ce)) (lane-solo (flatOp op) h T p e₁ e₂)
       L1 = trans (lanes-runs (reverse pre) (ended s) post ρ)
              (trans (cong (λ x → laneRuns (reverse pre) post x ρ (stateᴺ (gh (ended s)) ρ)) (ended-flag s ls)) (cong₂ _++_ e₁ e₂))
       P1 = trans (pool-runs (reverse pre) (ended s) post ρ)
@@ -620,7 +620,7 @@ module _ {R : Set} where
       ff = frag-flat c op f false zero [] s ls (proj₁ (Order.shape od))
       L0 : Ls ≡ []
       L0 = len0 Ls (trans (frag-count op f false zero s ls ff) (sym (states-length (lanesL ls) ρ)))
-      lt = proj₁ (Order.lead od) refl ce
+      lt = proj₁ (lead-ends od) refl ce
       fe : force H ≡ end p
       fe = trans (go-outer (flatOp op) e Ls [] T refl (proj₁ lt) (proj₂ lt)) (cong (λ x → M′.outer (flatOp op) e x [] T (end p)) L0)
       fl = proj₁ (proj₁ (proj₂ (Order.flight od)))
@@ -673,7 +673,7 @@ module _ {R : Set} where
                        (lanesFrame op (lane f) d q (gh o) (reverse (reverse (pre ʳ++ ended s ∷ post))) [] true (envAt c) (stateᴺ (subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c)))
   lane-begins-open c op f d n a q o pre post s p od al ce =
     ended-begins c op f d a q o pre post s p (proj₁ (proj₂ (lanes-ʳsplit pre fl))) al (proj₁ ss) (pool-sorted post (envAt c) (proj₂ ss))
-      (proj₁ (proj₂ (Order.lead od)) ce)
+      (proj₁ (proj₂ (lead-ends od)) ce)
     where
       ft = proj₁ (Order.shape od)
       fl = proj₂ (frag-parts op f d n (a ∷ q) o (pre ʳ++ s ∷ post) (frag-flat c op f d n (a ∷ q) o (pre ʳ++ s ∷ post) ft))
@@ -685,7 +685,7 @@ module _ {R : Set} where
                   → Pass (_≡ p ⊕ [ ix 0 ]) c true (lanesFrame op (lane f) d (a ∷ q) (gh o) (reverse pre) post true (envAt c) (risen (gh s) (envAt c) cp p))
                       (lanesFrame op (lane f) d q (gh o) (reverse (reverse (pre ʳ++ ended s ∷ post))) [] true (envAt c) (stateᴺ (subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c)))
   lane-begin-pass c op f d n a q o pre post s p sh od =
-    pass-of (_≡ p ⊕ [ ix 0 ]) c true (proj₁ (proj₂ (proj₂ (proj₂ (Order.lead od))) sh)) (lane-begin-links c op f d n a q o pre post s p sh od)
+    pass-of (_≡ p ⊕ [ ix 0 ]) c true (proj₁ (proj₂ (proj₂ (proj₂ (lead-ends od))) sh)) (lane-begin-links c op f d n a q o pre post s p sh od)
 
   -- A lane's end under an open observer, a value queued: every frame
   -- above the merge keeps its share past the skip the merge's run drops
@@ -779,7 +779,7 @@ module _ {R : Set} where
       ca = proj₁ (proj₁ (proj₂ (Order.flight od)))
       sσ = proj₂ (proj₂ (proj₁ (proj₂ (Order.flight od))))
       cr = conn-run r (gh s) (srcG k o) ρ
-      so = side-out r σ (force σ) {h = h} p b refl (burst-hushed r {σ = σ} (proj₂ sσ)) (proj₁ (proj₂ (Order.lead od)))
+      so = side-out r σ (force σ) {h = h} p b refl (burst-hushed r {σ = σ} (proj₂ sσ)) (proj₁ (proj₂ (lead-clear od)))
       ft = trans (proj₁ (proj₂ (proj₂ so))) (sym (proj₁ cr))
       ct = trans (proj₂ (proj₂ (proj₂ so))) (sym (proj₂ cr))
       bs = subst (λ r′ → Shape′ (M′.beside r′ h σ) (M′.burstOn r′ σ ∪ cut h)) (sym (ConnAt.at ca))
@@ -792,8 +792,8 @@ module _ {R : Set} where
   rise-body-flight c k@(cs cl true sa ba as nothing r en) o s b p od =
     shape-≋ (risen-≋ b p (body-≋ k r (gh s) o (envAt c))) (proj₁ fl) , above-≋ c true (risen-≋ b p (body-≋ k r (gh s) o (envAt c))) (proj₂ fl)
     where fl = body-flight c k o s b p od refl refl
-  rise-body-flight c (cs cl true sa ba as (just _) r en) o s b p od = ⊥-elim (Order.lead od)
-  rise-body-flight c (cs cl false sa ba as ow r en) o s b p od      = ⊥-elim (Order.lead od)
+  rise-body-flight c (cs cl true sa ba as (just _) r en) o s b p od = ⊥-elim (lead-clear od)
+  rise-body-flight c (cs cl false sa ba as ow r en) o s b p od      = ⊥-elim (lead-clear od)
 
   -- A merge settled: an end rising, else nothing owed.
   settled : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p b → (b ≡ true → Flight ⟨ c , s , rising cp , p ⟩)
@@ -872,7 +872,7 @@ module _ {R : Set} where
       kw  = proj₂ (every (proj₁ (proj₂ ok)))
       Rt  = FlatShape.roots-of pk (keyedL-shape ls ρ kl so) lk
       gq  = gen-queue pk f ρ hp so cl q
-      bl  = mapᴬ (λ {l} → after-beyond p (force l)) (proj₁ (proj₂ (Order.lead od)))
+      bl  = mapᴬ (λ {l} → after-beyond p (force l)) (proj₁ (proj₂ (lead-clear od)))
       ks  = admit-keys pk op ls ρ H (L.map (laneᴹ (lane f) ρ) q) fl sw kw
               (FlatOrder.Admit.admit-new pk p m _ T (mapᴬ proj₁ asd) gm okq sp kw pl Ls _ Rt pt gq bl)
               (FlatOrder.Admit.admit-switch pk p m _ T (mapᴬ proj₁ asd) gm okq sp kw pl Ls _ Rt pt gq bl)
@@ -882,7 +882,7 @@ module _ {R : Set} where
   -- closed one.
   rise-admit-flight : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q ls (s : St Γ A) a p
                     → Order ⟨ inOuter op f d n q ls c , s , rising (nx a) , p ⟩ → NextOwed (took (admit c op f d n q s ls a p))
-  rise-admit-flight c op f true n q ls s a p od = ⊥-elim (Order.lead od)
+  rise-admit-flight c op f true n q ls s a p od = ⊥-elim (lead-clear od)
   rise-admit-flight c (mergeᶠ nothing) f false n q ls s a p od =
     started c (mergeᶠ nothing) f false n q s ls a p (admit-flight c (mergeᶠ nothing) f n q ls s a p od tt)
   rise-admit-flight c (mergeᶠ (just k)) f false n q ls s a p od with n <ᵇ k in b
@@ -929,7 +929,7 @@ module _ {R : Set} where
       ca = proj₁ (proj₁ (proj₂ (Order.flight od)))
       sσ = proj₂ (proj₂ (proj₁ (proj₂ (Order.flight od))))
       cr = conn-run r (gh s) (srcG k o) ρ
-      se = side-end r σ (force σ) {h = h} p refl (proj₂ (proj₁ (Order.lead od) ce))
+      se = side-end r σ (force σ) {h = h} p refl (proj₂ (proj₁ (lead-ends od) ce))
       bs = subst (λ r′ → Shape′ (M′.beside r′ h σ) (M′.burstOn r′ σ ∪ cut h)) (sym (ConnAt.at ca))
              (beside-go (ConnAt.mark ca) (ConnAt.hm ca) h σ sσ (proj₁ (Order.flight od))
                 (ConnAt.kb ca) (ConnAt.kr ca) (ConnAt.fr ca) (ConnAt.cue ca) (ConnAt.ks ca) (ConnAt.rs ca) (ConnAt.ub ca))
@@ -941,8 +941,8 @@ module _ {R : Set} where
     shape-≋ (risen-end-≋ p E) (proj₁ fl) , above-≋ c true (risen-end-≋ p E) (proj₂ fl)
     where fl = body-end-flight c k o s p od refl refl
           E  = body-≋ (record k { owedAt = just p }) r (gh s) o (envAt c)
-  rise-body-end-flight c (cs cl true sa ba as (just _) r en) o s p od = ⊥-elim (Order.lead od)
-  rise-body-end-flight c (cs cl false sa ba as ow r en) o s p od      = ⊥-elim (Order.lead od)
+  rise-body-end-flight c (cs cl true sa ba as (just _) r en) o s p od = ⊥-elim (lead-ends od)
+  rise-body-end-flight c (cs cl false sa ba as ow r en) o s p od      = ⊥-elim (lead-ends od)
 
   -- A rise through a frame of one child passes its run up; one absorbed
   -- owes nothing.
