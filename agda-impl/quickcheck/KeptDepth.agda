@@ -60,7 +60,7 @@ open Machine using (Conf; ⟨_,_,_,_⟩; load; spot; subscribing; absorbed; risi
   plug; closed; alive; search; found; leafM; St; Ctx; Out; Ev; joinS; mapS; scanS; cutS; lnS; takeS; flatS; connS; inMap; inScan; inCut; inLn;
   inTake; inSrc; inBody; over; own; Mark; outOf; still; shows; cs; CS; free; cpAt; cutAt; overAt; _⊕_)
 open import Data.Maybe using (Maybe)
-open import operation.Key using (Key; _<ᴷ_)
+open import operation.Key using (Key; _<ᴷ_; at) renaming (after to afterᴷ)
 open import Tree using (Obs; FlatOp)
 open import denotation.MonotonicList.Events using (Timeline)
 open import adequacy.Engine.Head using (cand)
@@ -870,6 +870,128 @@ private
   rootKeysᵇ : Conf ℕ → Bool
   rootKeysᵇ ⟨ c , s , _ , _ ⟩ = keysWalkᵇ (plug c s) []ᴬ
 
+  -- `adequacy.Engine.Pick.Causal`, decided at every node of the
+  -- configuration (`causalᵇ 0`); and two stronger forms a mark run would
+  -- keep, every key of each racing part, not its candidate alone, off a
+  -- mark's position: strictly under it (`causalᵇ 1`), at or under it
+  -- (`causalᵇ 2`).
+  keyPos : Key → Pos
+  keyPos (at p)    = p
+  keyPos (afterᴷ p) = p
+
+  underKᵇ : Pos → Key → Bool
+  underKᵇ p (at q)    = extPᵇ p q
+  underKᵇ p (afterᴷ q) = prefixᵇ p q
+
+  offKᵇ offAtᵇ : Key → Key → Bool
+  offKᵇ (at p)    h = not (underKᵇ p h)
+  offKᵇ (afterᴷ p) h = true
+  offAtᵇ (at p)    h = not (prefixᵇ p (keyPos h))
+  offAtᵇ (afterᴷ p) h = true
+
+  ownAllᵇ : (Key → Bool) → List (Mark × Key) → Bool
+  ownAllᵇ P []             = true
+  ownAllᵇ P ((_ , h) ∷ ms) = P h ∧ ownAllᵇ P ms
+
+  mutual
+    keysAllᵇ : ∀ {Γ A} → (Key → Bool) → St Γ A → Bool
+    keysAllᵇ P s = ownAllᵇ P (own s) ∧ kidsAllᵇ P s
+
+    kidsAllᵇ : ∀ {Γ A} → (Key → Bool) → St Γ A → Bool
+    kidsAllᵇ P (mapS f s)              = keysAllᵇ P s
+    kidsAllᵇ P (scanS f z s)           = keysAllᵇ P s
+    kidsAllᵇ P (cutS l a s)            = keysAllᵇ P s
+    kidsAllᵇ P (lnS b s)               = keysAllᵇ P s
+    kidsAllᵇ P (takeS i q w s)         = keysAllᵇ P s
+    kidsAllᵇ P (flatS op f d n q o ls) = keysAllᵇ P o ∧ lanesAllᵇ P ls
+    kidsAllᵇ P (connS k o b)           = keysAllᵇ P o ∧ keysAllᵇ P b
+    kidsAllᵇ P _                       = true
+
+    lanesAllᵇ : ∀ {Γ A} → (Key → Bool) → List (St Γ A) → Bool
+    lanesAllᵇ P []       = true
+    lanesAllᵇ P (s ∷ ls) = keysAllᵇ P s ∧ lanesAllᵇ P ls
+
+  benᵇ : Key → Key → Bool
+  benᵇ (at r)    k = prefixᵇ r (keyPos k)
+  benᵇ (afterᴷ _) k = false
+
+  -- How a mark at `k` reads a part racing it, a connect's own marks, and
+  -- a body's source.
+  record Reading : Set₁ where
+    field
+      part  : ∀ {Γ B} → Key → Ctx ℕ Γ B → St Γ B → Bool
+      ownOk : Key → Key → Bool
+      srcOk : ∀ {Γ B} → Key → Ctx ℕ Γ B → St Γ B → Bool
+
+  reading : ℕ → Reading
+  reading zero    = record
+    { part  = λ k c x → offCᵇ k (cand c x)
+    ; ownOk = offKᵇ
+    ; srcOk = λ k c o → not (beneathCᵇ (cand c o) k) }
+    where
+      offCᵇ : ∀ {A} → Key → Maybe (Key × Out A) → Bool
+      offCᵇ k nothing        = true
+      offCᵇ k (just (h , _)) = offKᵇ k h
+      beneathCᵇ : ∀ {A} → Maybe (Key × Out A) → Key → Bool
+      beneathCᵇ (just (at r , _)) k = prefixᵇ r (keyPos k)
+      beneathCᵇ _                 k = false
+  reading (suc zero) = record
+    { part  = λ k c x → keysAllᵇ (offKᵇ k) x
+    ; ownOk = offKᵇ
+    ; srcOk = λ k c o → keysAllᵇ (λ h → not (benᵇ h k)) o }
+  reading (suc (suc _)) = record
+    { part  = λ k c x → keysAllᵇ (offAtᵇ k) x
+    ; ownOk = offAtᵇ
+    ; srcOk = λ k c o → keysAllᵇ (λ h → not (benᵇ h k)) o }
+
+  partsᵇ : ∀ {Γ A B} → Reading → Key → Ctx ℕ Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → ℕ
+         → List A → St Γ A → List (St Γ B) → List (St Γ B) → List (St Γ B) → Bool
+  partsᵇ r k c op f d n q o acc []       tl = true
+  partsᵇ r k c op f d n q o acc (x ∷ xs) tl = Reading.part r k (inLanes op f d n q o acc (xs ++L tl) c) x ∧ partsᵇ r k c op f d n q o (x ∷ acc) xs tl
+
+  aloftᵇ : ∀ {Γ A} → Reading → Key → Ctx ℕ Γ A → St Γ A → Bool
+  aloftᵇ r k top                               s = true
+  aloftᵇ r k (inMap f c)                       s = aloftᵇ r k c (mapS f s)
+  aloftᵇ r k (inScan f z c)                    s = aloftᵇ r k c (scanS f z s)
+  aloftᵇ r k (inCut l a c)                     s = aloftᵇ r k c (cutS l a s)
+  aloftᵇ r k (inLn b c)                        s = aloftᵇ r k c (lnS b s)
+  aloftᵇ r k (inTake i q w c)                  s = aloftᵇ r k c (takeS i q w s)
+  aloftᵇ r k (inOuter op f d n q ls c)         s = partsᵇ r k c op f d n q s [] ls [] ∧ aloftᵇ r k c (flatS op f d n q s ls)
+  aloftᵇ r k (inLanes op f d n q o pre post c) s =
+    Reading.part r k (inOuter op f d n q (pre ʳ++L s ∷ post) c) o ∧ partsᵇ r k c op f d n q o [] (reverseL pre) (s ∷ post)
+    ∧ partsᵇ r k c op f d n q o (s ∷ pre) post [] ∧ aloftᵇ r k c (flatS op f d n q o (pre ʳ++L s ∷ post))
+  aloftᵇ r k (inSrc kk b c)                    s =
+    Reading.part r k (inBody kk s c) b ∧ ownAllᵇ (Reading.ownOk r k) (own (connS kk s b)) ∧ aloftᵇ r k c (connS kk s b)
+  aloftᵇ r k (inBody kk o c)                   s =
+    Reading.part r k (inSrc kk s c) o ∧ Reading.srcOk r k (inSrc kk s c) o ∧ ownAllᵇ (Reading.ownOk r k) (own (connS kk o s))
+    ∧ aloftᵇ r k c (connS kk o s)
+
+  marksAloftᵇ : ∀ {Γ A} → Reading → Ctx ℕ Γ A → St Γ A → List (Mark × Key) → Bool
+  marksAloftᵇ r c s []             = true
+  marksAloftᵇ r c s ((_ , k) ∷ ms) = aloftᵇ r k c s ∧ marksAloftᵇ r c s ms
+
+  mutual
+    nodesᵇ : ∀ {Γ A} → Reading → Ctx ℕ Γ A → St Γ A → Bool
+    nodesᵇ r c s = marksAloftᵇ r c s (own s) ∧ kidNodesᵇ r c s
+
+    kidNodesᵇ : ∀ {Γ A} → Reading → Ctx ℕ Γ A → St Γ A → Bool
+    kidNodesᵇ r c (mapS f s)              = nodesᵇ r (inMap f c) s
+    kidNodesᵇ r c (scanS f z s)           = nodesᵇ r (inScan f z c) s
+    kidNodesᵇ r c (cutS l a s)            = nodesᵇ r (inCut l a c) s
+    kidNodesᵇ r c (lnS b s)               = nodesᵇ r (inLn b c) s
+    kidNodesᵇ r c (takeS i q w s)         = nodesᵇ r (inTake i q w c) s
+    kidNodesᵇ r c (flatS op f d n q o ls) = nodesᵇ r (inOuter op f d n q ls c) o ∧ laneNodesᵇ r c op f d n q o [] ls
+    kidNodesᵇ r c (connS k o b)           = nodesᵇ r (inSrc k b c) o ∧ nodesᵇ r (inBody k o c) b
+    kidNodesᵇ r c _                       = true
+
+    laneNodesᵇ : ∀ {Γ A B} → Reading → Ctx ℕ Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → ℕ
+               → List A → St Γ A → List (St Γ B) → List (St Γ B) → Bool
+    laneNodesᵇ r c op f d n q o pre []         = true
+    laneNodesᵇ r c op f d n q o pre (s ∷ post) = nodesᵇ r (inLanes op f d n q o pre post c) s ∧ laneNodesᵇ r c op f d n q o (s ∷ pre) post
+
+  causalᵇ : ℕ → Conf ℕ → Bool
+  causalᵇ i ⟨ c , s , _ , _ ⟩ = nodesᵇ (reading i) top (plug c s)
+
   -- A rising or subscribing configuration's hole's run in shape
   -- (`adequacy.Engine.Above.Flight`), its observer closed as `b` says.
   flightᵇ : Bool → Conf ℕ → Bool
@@ -905,6 +1027,9 @@ private
       else if not (flightᵇ false m) then no (best ⊔ run) ("\n  unflown: a hole's run out of shape under an open observer, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (flightᵇ true m) then no (best ⊔ run) ("\n  unflown: a hole's run out of shape under a closed observer, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (scopedᵇ m) then no (best ⊔ run) ("\n  unscoped: a subscribed source's or lane's shut ghost out of order, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (causalᵇ 0 m) then no (best ⊔ run) ("\n  uncausal: a racing part's candidate under a mark, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (causalᵇ 1 m) then no (best ⊔ run) ("\n  uncausal-all: a racing part's key under a mark, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (causalᵇ 2 m) then no (best ⊔ run) ("\n  uncausal-at: a racing part's key at or under a mark, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else next n run best (ls + linkCount m) m (step m)
 
     next : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict
