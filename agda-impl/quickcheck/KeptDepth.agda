@@ -32,7 +32,7 @@ open import Data.Bool using (Bool; true; false; not; _∧_; _∨_; if_then_else_
 open import Data.List using (List; []; _∷_; upTo; null) renaming (map to mapL; _++_ to _++L_; _ʳ++_ to _ʳ++L_; reverse to reverseL; drop to dropL; length to lengthL)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ; lookup to lookupᴬ)
 open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_; _<ᵇ_; _≡ᵇ_)
-open import Data.Product using (_×_; _,_; proj₁)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.String using (String; _++_)
@@ -62,6 +62,7 @@ open Machine using (Conf; ⟨_,_,_,_⟩; load; spot; subscribing; absorbed; risi
 open import Data.Maybe using (Maybe)
 open import operation.Key using (Key; _<ᴷ_; at) renaming (after to afterᴷ)
 open import Tree using (Obs; FlatOp)
+import Tree as T
 open import denotation.MonotonicList.Events using (Timeline)
 open import adequacy.Engine.Head using (cand)
 open import adequacy.Engine.Pick using (past)
@@ -69,9 +70,9 @@ open import adequacy.Engine.Meaning using (vals; endOf; mapped; scanned; took; o
 open import adequacy.Engine.Ahead using (shown) renaming (shows to showsᵃ)
 open import denotation.MonotonicList using (head)
 open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
-open import operation.PureObservable using (Tape; due) renaming (rest to restᵀ)
+open import operation.PureObservable using (Tape; due; opening) renaming (rest to restᵀ)
 open import adequacy.Engine.Causal using (advance)
-open import denotation.MonotonicList.Events using (Frame∞; From∞; last)
+open import denotation.MonotonicList.Events using (Frame∞; From∞; last; root; timelineAt)
 import denotation.Unfold as U
 open import Data.List.Membership.Propositional using (_∈_)
 
@@ -1014,6 +1015,57 @@ private
   causalᵇ : ℕ → Bool → Conf ℕ → Bool
   causalᵇ i fu ⟨ c , s , _ , _ ⟩ = nodesᵇ (reading i) fu top (plug c s)
 
+  -- A subscription's new keys, as `adequacy.Engine.Inv`'s begins plant
+  -- them: an attach's, a connect's own marks, else the begun node's
+  -- keys to come.
+  newᵇ : ∀ {Γ A} → T.Obs Timeline Γ A → Pos → Step → List Key
+  newᵇ (T.cold x)          p _            = mapL proj₂ (tapeKeys 64 (opening p (timelineAt x p)))
+  newᵇ (T.takeWhile i q s) p _            = afterᴷ p ∷ []
+  newᵇ (T.flatMap op f s)  p _            = afterᴷ p ∷ []
+  newᵇ (T.connect s b)     p _            =
+    mapL proj₂ (own (connS (cs false true false (just p) nothing nothing (p ⊕ (ix 1 ∷ [])) root) (pend s) (pend b)))
+  newᵇ o                   p (silent t m′) = mapL proj₂ (futᵇ (Conf.foc m′))
+  newᵇ o                   p _            = []
+
+  allᵇ : (Key → Bool) → List Key → Bool
+  allᵇ P []       = true
+  allᵇ P (h ∷ hs) = P h ∧ allᵇ P hs
+
+  -- A racing key free of a new one: not at or under it.
+  freeᵇ : Key → Key → Bool
+  freeᵇ k (at r)     = not (prefixᵇ r (keyPos k))
+  freeᵇ k (afterᴷ _) = true
+
+  -- `adequacy.Engine.Room.Room`: every key, owned or to come, of each part
+  -- racing the hole far from every new key, and a source's body's free.
+  roomᵇ : ∀ {Γ A} → List Key → Ctx ℕ Γ A → St Γ A → Bool
+  roomᵇ N top                               s = true
+  roomᵇ N (inMap f c)                       s = roomᵇ N c (mapS f s)
+  roomᵇ N (inScan f z c)                    s = roomᵇ N c (scanS f z s)
+  roomᵇ N (inCut l a c)                     s = roomᵇ N c (cutS l a s)
+  roomᵇ N (inLn b c)                        s = roomᵇ N c (lnS b s)
+  roomᵇ N (inTake i q w c)                  s = roomᵇ N c (takeS i q w s)
+  roomᵇ N (inOuter op f d n q ls c)         s = lanesAllᵇ true (λ k → allᵇ (farᵇ k) N) ls ∧ roomᵇ N c (flatS op f d n q s ls)
+  roomᵇ N (inLanes op f d n q o pre post c) s =
+    keysAllᵇ true (λ k → allᵇ (farᵇ k) N) o ∧ lanesAllᵇ true (λ k → allᵇ (farᵇ k) N) pre
+    ∧ lanesAllᵇ true (λ k → allᵇ (farᵇ k) N) post ∧ roomᵇ N c (flatS op f d n q o (pre ʳ++L s ∷ post))
+  roomᵇ N (inSrc kk b c)                    s =
+    keysAllᵇ true (λ k → allᵇ (λ h → farᵇ k h ∧ freeᵇ k h) N) b ∧ roomᵇ N c (connS kk s b)
+  roomᵇ N (inBody kk o c)                   s = keysAllᵇ true (λ k → allᵇ (farᵇ k) N) o ∧ roomᵇ N c (connS kk o s)
+
+  freshᵇ : Conf ℕ → Bool
+  freshᵇ m@(⟨ c , pend o , subscribing , p ⟩) = roomᵇ (newᵇ o p (step m)) c (pend o)
+  freshᵇ _                                   = true
+
+  showKeys : List Key → String
+  showKeys []              = ""
+  showKeys (at q ∷ hs)     = "at " ++ showP q ++ " " ++ showKeys hs
+  showKeys (afterᴷ q ∷ hs) = "after " ++ showP q ++ " " ++ showKeys hs
+
+  newKeys : Conf ℕ → String
+  newKeys m@(⟨ c , pend o , subscribing , p ⟩) = showKeys (newᵇ o p (step m))
+  newKeys _                                   = ""
+
   -- A rising or subscribing configuration's hole's run in shape
   -- (`adequacy.Engine.Above.Flight`), its observer closed as `b` says.
   flightᵇ : Bool → Conf ℕ → Bool
@@ -1053,6 +1105,7 @@ private
       else if not (causalᵇ 1 false m) then no (best ⊔ run) ("\n  uncausal-all: a racing part's key, zero-extended, at or under a mark, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (causalᵇ 1 true m) then no (best ⊔ run) ("\n  uncausal-future: a racing part's key at or under a mark to come, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (causalᵇ 2 true m) then no (best ⊔ run) ("\n  uncausal-to-come: a racing part's key to come at or under a mark to come, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (freshᵇ m) then no (best ⊔ run) ("\n  unfresh: a racing part's key not far from a subscription's new key, " ++ showMode m ++ " at " ++ showSpot (spot m) ++ ", new " ++ newKeys m)
       else next n run best (ls + linkCount m) m (step m)
 
     next : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict
