@@ -30,9 +30,10 @@ open import denotation.MonotonicList using (Agreeᵀ)
 open import operation.Key using (at)
 open import denotation.Unfold using (NEnv; stateᴺ; cutᴺ; states; outerᴺ; subscribe; startᶜ; idleᶜ; flatMapᶜ)
 open import adequacy.Engine.Head using (Frag)
-open import adequacy.Engine.Keys using (Keys; Keyed; Held; FlatAt; FlatKeys)
-open import adequacy.Placed.Order using (Headed; Alienᴱ; Owned; every-lookup)
+open import adequacy.Engine.Keys using (Keys; Keyed; Held; FlatAt; FlatKeys; []ᴷ)
+open import adequacy.Placed.Order using (Headed; Alienᴱ; Owned; every-lookup; everyT-idle)
 open import adequacy.Engine.Trails using (shape-≋)
+open import adequacy.Placed.Trail using (sortedT-idle; flatT-idle)
 open import adequacy.Engine.Above using (Above; Flight; above-≋; take-excl; take-here; conn-drop; flat-drop; keyedL-ʳ++; toʳ; lanes-runs; lanes-P; rested-risen; ending-risen; takeAt-risen)
 open import adequacy.Engine.Ahead using (Under; shown; ahead-mono; under-sub; Sides; Ahead; Aloof; ahead-over) renaming (shows to showsᶜ)
 open import adequacy.Engine.Race using (NotBefore)
@@ -411,9 +412,8 @@ module _ {R : Set} where
     rise-dead-keys : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) e p
                    → Inv ⟨ inLanes op f d n q o pre post c , s , rising e , p ⟩ → alive s ≡ false
                    → Keys (plug c (flatS op f d n q o (pre ʳ++ s ∷ post)))
-    -- A merge begun keys nothing yet under its mark; a joiner of a
-    -- subject already over, and a connect begun, leave the tree keyed.
-    fresh-flat : ∀ {Γ A B} p (f : A → Obs Timeline Γ B) (ρ : NEnv Γ) → FlatKeys p (outerᴺ (lane f) (just idleᶜ) ρ) [] (cutᴺ (idleᶜ {B = B}) ρ) []
+    -- A joiner of a subject already over, and a connect begun, leave the
+    -- tree keyed.
     begin-joined-keys : ∀ {Γ A} (c : Ctx R Γ A) (x : A ∈ Γ) p → Inv ⟨ c , pend (connected x) , subscribing , p ⟩ → closedUp c x ≡ true
                       → Keys (plug c (ofS 0 p []))
     begin-conn-keys : ∀ {Γ X A} (c : Ctx R Γ A) (s : Obs Timeline Γ X) (b : Obs Timeline (X ∷ Γ) A) p
@@ -421,8 +421,6 @@ module _ {R : Set} where
     -- THE STILL'S SUBTREE: a subscription heads its position, where no
     -- source of its environment has been.
     sub-fresh : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Inv ⟨ c , pend o , subscribing , p ⟩ → Headed p × Alienᴱ p (envAt c)
-    -- THE FLIGHT, READ: a merge of an idle outer and no lanes is idle.
-    flat-idle : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (ρ : NEnv Γ) → stateᴺ idleᶜ ρ ≋ stateᴺ (flatMapᶜ op (lane f) (just idleᶜ) [] [] idleᶜ) ρ
     run-keys : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , absorbed , p ⟩ → NextKeys (step ⟨ c , s , absorbed , p ⟩)
     -- THE FLIGHT KEPT: a mark run rising or subscribing what it ran
     -- leaves its hole's run in shape, and every frame above keeping its
@@ -465,7 +463,15 @@ module _ {R : Set} where
   postulate
     -- A RISE IS ALOOF: no head the frames above a rise at `p` ask of lies
     -- below `p`.  What lies under `p` the rise has yet to cause.
+    --
+    -- DEAD ROUTE: regions alone — `Keyed` indexed by where each node
+    --   subscribes, every mark owned by its parent's.  A merge's lanes are
+    --   rooted one `ix 1` past outer values, inside the outer's own region,
+    --   and a rise its outer's inner merge consumes leaves no outer value
+    --   above to be `Aside` of; only a causal fact separates them, each
+    --   root cut by an outer value before `p`.
     rise-aloof : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Inv ⟨ c , s , rising e , p ⟩ → showsᶜ c true ≡ true → Aloof p c true
+
     -- A LANE BEGUN IS CLEAR BESIDE: an admitted value's or a lane's end's
     -- flatMap's other parts come after every position under the lane it
     -- begins.
@@ -718,6 +724,14 @@ module _ {R : Set} where
   cold-≋ p (atᶠ (suc t) _ b) ρ = ≋-by refl refl
   cold-≋ p done             ρ = ≋-by refl refl
   cold-≋ p silentᶠ          ρ = ≋-by refl refl
+
+  -- A merge of an idle outer and no lanes is idle, and keys nothing yet
+  -- under its mark.
+  flat-idle : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (ρ : NEnv Γ) → stateᴺ idleᶜ ρ ≋ stateᴺ (flatMapᶜ op (lane f) (just idleᶜ) [] [] idleᶜ) ρ
+  flat-idle op f ρ = ≋-by refl refl
+
+  fresh-flat : ∀ {Γ A B} p (f : A → Obs Timeline Γ B) (ρ : NEnv Γ) → FlatKeys p (outerᴺ (lane f) (just idleᶜ) ρ) [] (cutᴺ (idleᶜ {B = B}) ρ) []
+  fresh-flat p f ρ = []ᴷ , tt , Data.List.Relation.Unary.All.[] , (record { spread = tt } , record { every = tt } , everyT-idle) , sortedT-idle , everyT-idle , everyT-idle , flatT-idle
 
   begin-keys : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Inv ⟨ c , pend o , subscribing , p ⟩
              → NextKeys (step ⟨ c , pend o , subscribing , p ⟩)
