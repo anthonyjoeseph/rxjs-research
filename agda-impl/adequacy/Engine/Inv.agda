@@ -18,6 +18,7 @@ open import Data.List using (List; []; _∷_; _ʳ++_; null; [_]; reverse)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (zero; suc; pred; _<ᵇ_; _≡ᵇ_)
 open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Properties using (++-identityʳ)
 open import Relation.Nullary using (¬_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
@@ -43,13 +44,13 @@ open import adequacy.Engine.Race using (NotBefore)
 open import adequacy.Engine.Meaning using (_≋_; ≋-by; flagOf; envAt; gh; risen; lane; lanesL; laneRuns; poolRuns; outerT; outerG; poolG; deadL)
 open import adequacy.Engine.Flown using (Owed; NextOwed; rise-owed; sub-owed)
 open import adequacy.Engine.Plug using (flight-held; keys-above; keys-swap)
-open import adequacy.Engine.Pick using (Order; order; module Order; Heard; whole; KeysAt; Shaped; Lead; Snap; ⊤₁; tt; Won; lead-clear; lead-ends; lane-on; lane-off; pooled-live; search-won; Apart; Searched)
+open import adequacy.Engine.Pick using (Order; order; module Order; Heard; whole; KeysAt; Shaped; Lead; Snap; ⊤₁; tt; Won; lead-clear; lead-ends; lane-on; lane-off; pooled-live; search-won; Caused; Causal; Caught; caught-sub; Within)
 open import adequacy.Engine.Ghosted using (NextTold; told-next)
 open import adequacy.Engine.Scope using (Gh)
 open import adequacy.Engine.Firmed using (gh-firm)
 open import adequacy.Engine.Shuts using (Toldˢ; none)
 open import operation.PureObservable using (Tape; play; ending; over; opening; module Machine; module Driver)
-open import adequacy.Engine.Fold using (Base; Owns; Unpended; Wf; WfC; Wfs; attO; base-at; bodyO; cpO; cutO; if-inv; inv; joinO; leafO; ofO; opened-move; opened-none; owedO; owned; pend-unsubIf; search-hit; settle-settled; srcAttO; wf-cut; wf-ended; wf-feed; wf-killAll; wf-split; wf-unsubIf; wfI; wfs-++; wfs-ʳ++)
+open import adequacy.Engine.Fold using (Base; Owns; Unpended; Wf; WfC; Wfs; attO; base-at; bodyO; cpO; cutO; if-inv; inv; joinO; leafO; ofO; opened-move; opened-none; owedO; owned; pend-unsubIf; search-hit; found-own; settle-settled; srcAttO; wf-cut; wf-ended; wf-feed; wf-killAll; wf-split; wf-unsubIf; wfI; wfs-++; wfs-ʳ++)
 
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; closed; closedUp;
@@ -365,7 +366,8 @@ module _ {R : Set} where
   NextInv (complete p)    = ⊤₁
   NextInv drained         = ⊤₁
 
-  NextFrag NextKeys NextShape NextFlight NextApart : Step → Set
+  NextFrag NextKeys NextShape NextFlight : Step → Set
+  NextCaused : Step → Set₁
   NextLead : Step → Set₁
   NextFrag (silent t k)    = Frag (whole k)
   NextFrag (value t p a k) = Frag (whole k)
@@ -387,10 +389,10 @@ module _ {R : Set} where
   NextLead (value t p a k) = Lead k
   NextLead (complete p)    = ⊤₁
   NextLead drained         = ⊤₁
-  NextApart (silent t k)    = Searched k
-  NextApart (value t p a k) = Searched k
-  NextApart (complete p)    = ⊤
-  NextApart drained         = ⊤
+  NextCaused (silent t k)    = Caused k
+  NextCaused (value t p a k) = Caused k
+  NextCaused (complete p)    = ⊤₁
+  NextCaused drained         = ⊤₁
 
   postulate
     -- THE SHAPE: a step keeps the whole tree in the fragment.
@@ -434,9 +436,10 @@ module _ {R : Set} where
     run-flight : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , absorbed , p ⟩ → NextOwed (step ⟨ c , s , absorbed , p ⟩)
     -- A tree's first subscription is in shape.
     flight-load : (o : Obs Timeline [] R) → Flight (Machine.load o)
-    -- THE STILL'S SUBTREE: where the search runs after a step, what it
-    -- finds still leads every race above it past each live source's skips.
-    apart-next : ∀ k → Base k → Order k → NextApart (step k)
+    -- THE STILL'S SUBTREE: where the search runs after a step, every
+    -- node's every mark is aloft: nothing is keyed under a skip that has
+    -- not yet run.
+    causal-next : ∀ k → Base k → Order k → NextCaused (step k)
     -- A mark run rises, if at all, the event it showed, at its own key,
     -- leaving a node as live as the one it ran.
     run-lead : ∀ (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} p → search top t ≡ just (found (Γ , A , c , s) m key)
@@ -513,9 +516,9 @@ module _ {R : Set} where
 
   -- A completion the flatMap passes on keeps the snapshot it rose with.
   lead-if : ∀ {Γ A} (c : Ctx R Γ A) (s t : St Γ A) p b → alive t ≡ alive s → Won (at p , (if b then shows cp else still)) c t
-          → Frag (plug c t) → Gh top (plug c t) → Keys (plug c t) → Lead ⟨ c , s , (if b then rising cp else absorbed) , p ⟩
-  lead-if c s t p true  al w ft gt kt = t , al , w , ft , gt , kt
-  lead-if c s t p false al w ft gt kt = tt
+          → Frag (plug c t) → Gh top (plug c t) → Keys (plug c t) → Caught p c t → Lead ⟨ c , s , (if b then rising cp else absorbed) , p ⟩
+  lead-if c s t p true  al w ft gt kt cg = t , al , w , ft , gt , kt , cg
+  lead-if c s t p false al w ft gt kt cg = tt
 
   admit-lead : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
              → NextLead (took (admit c op f d n q o ls a p))
@@ -534,18 +537,18 @@ module _ {R : Set} where
             → NextLead (took (rise c s e p))
   rise-lead top                               s (nx a) p l iv = tt
   rise-lead top                               s cp     p l iv = tt
-  rise-lead (inMap f c)                       s e      p (t , al , w , ft , gt , kt) iv = mapS f t , refl , w , ft , gt , kt
-  rise-lead (inScan f z c)                    s (nx a) p (t , al , w , ft , gt , kt) iv = scanS f z t , refl , w , ft , gt , kt
-  rise-lead (inScan f z c)                    s cp     p (t , al , w , ft , gt , kt) iv = scanS f z t , refl , w , ft , gt , kt
-  rise-lead (inCut true x c)                  s e      p (t , al , w , ft , gt , kt) iv = cutS true x t , refl , w , ft , gt , kt
+  rise-lead (inMap f c)                       s e      p (t , al , w , ft , gt , kt , cg) iv = mapS f t , refl , w , ft , gt , kt , cg
+  rise-lead (inScan f z c)                    s (nx a) p (t , al , w , ft , gt , kt , cg) iv = scanS f z t , refl , w , ft , gt , kt , cg
+  rise-lead (inScan f z c)                    s cp     p (t , al , w , ft , gt , kt , cg) iv = scanS f z t , refl , w , ft , gt , kt , cg
+  rise-lead (inCut true x c)                  s e      p (t , al , w , ft , gt , kt , cg) iv = cutS true x t , refl , w , ft , gt , kt , cg
   rise-lead (inCut false x c)                 s (nx a) p l iv = tt
   rise-lead (inCut false x c)                 s cp     p l iv = tt
-  rise-lead (inLn b c)                        s e      p (t , al , w , ft , gt , kt) iv = lnS b t , refl , w , ft , gt , kt
-  rise-lead (inTake i q free c)               s (nx a) p (t , al , w , ft , gt , kt) iv with q a | i
-  ... | true  | _     = takeS _ q free t , refl , w , ft , gt , kt
-  ... | false | true  = takeS true q free t , refl , w , ft , gt , kt
+  rise-lead (inLn b c)                        s e      p (t , al , w , ft , gt , kt , cg) iv = lnS b t , refl , w , ft , gt , kt , cg
+  rise-lead (inTake i q free c)               s (nx a) p (t , al , w , ft , gt , kt , cg) iv with q a | i
+  ... | true  | _     = takeS _ q free t , refl , w , ft , gt , kt , cg
+  ... | false | true  = takeS true q free t , refl , w , ft , gt , kt , caught-sub {c = c} {t = takeS true q free t} [ ix 0 ] cg
   ... | false | false = tt
-  rise-lead (inTake i q free c)               s cp     p (t , al , w , ft , gt , kt) iv = takeS i q free t , refl , w , ft , gt , kt
+  rise-lead (inTake i q free c)               s cp     p (t , al , w , ft , gt , kt , cg) iv = takeS i q free t , refl , w , ft , gt , kt , cg
   rise-lead (inTake i q (cpAt r) c)           s (nx a) p l iv = tt
   rise-lead (inTake i q (cpAt r) c)           s cp     p l iv = tt
   rise-lead (inTake i q (cutAt r) c)          s (nx a) p l iv = tt
@@ -554,31 +557,31 @@ module _ {R : Set} where
   rise-lead (inTake i q (overAt r) c)         s cp     p l iv = tt
   rise-lead (inOuter op f d n q ls c)         s (nx a) p l iv = admit-lead c op f d n q s ls a p iv
   rise-lead (inOuter op f true n q ls c)      s cp     p l iv = tt
-  rise-lead (inOuter op f false n q ls c)     s cp     p (t , al , (r , w , u) , ft , gt , kt) iv =
-    lead-if c (flatS op f true n q s ls) (flatS op f false n q t ls) p ((n ≡ᵇ 0) ∧ null q) refl w ft gt kt
-  rise-lead (inLanes op f d n q o pre post c) s (nx b) p (t , al , (l , u , w) , ft , gt , kt) iv with alive s
-  ... | true  = flatS op f d n q o (pre ʳ++ t ∷ post) , refl , lane-on d n q {alive t} {at p} b {c} (pooled-live (alive t) u) w , ft , gt , kt
+  rise-lead (inOuter op f false n q ls c)     s cp     p (t , al , (r , w , u) , ft , gt , kt , (k₀ , wi , _ , af)) iv =
+    lead-if c (flatS op f true n q s ls) (flatS op f false n q t ls) p ((n ≡ᵇ 0) ∧ null q) refl w ft gt kt (k₀ , wi , af)
+  rise-lead (inLanes op f d n q o pre post c) s (nx b) p (t , al , (l , u , w) , ft , gt , kt , (k₀ , wi , _ , _ , _ , af)) iv with alive s
+  ... | true  = flatS op f d n q o (pre ʳ++ t ∷ post) , refl , lane-on d n q {alive t} {at p} b {c} (pooled-live (alive t) u) w , ft , gt , kt , (k₀ , wi , af)
   ... | false = tt
-  rise-lead (inLanes op f d n [] o pre post c) s cp    p (t , al , (l , u , w) , ft , gt , kt) iv with alive s
+  rise-lead (inLanes op f d n [] o pre post c) s cp    p (t , al , (l , u , w) , ft , gt , kt , (k₀ , wi , _ , _ , _ , af)) iv with alive s
   ... | true  = lead-if c (flatS op f d (pred n) [] o (pre ʳ++ ended s ∷ post)) (flatS op f d n [] o (pre ʳ++ t ∷ post)) p (d ∧ (pred n ≡ᵇ 0) ∧ true) refl
                   (subst (λ x → Won (at p , (if d ∧ x then shows cp else still)) c (flatS op f d n [] o (pre ʳ++ t ∷ post))) (sym (∧-identityʳ (pred n ≡ᵇ 0)))
-                     (lane-off d n [] {alive t} {at p} {c} (pooled-live (alive t) u) w)) ft gt kt
+                     (lane-off d n [] {alive t} {at p} {c} (pooled-live (alive t) u) w)) ft gt kt (k₀ , wi , af)
   ... | false = tt
   rise-lead (inLanes op f d n (a ∷ q) o pre post c) s cp p l iv with alive s in al
   ... | true  = start-lead c op f d (pred n) q o (pre ʳ++ ended s ∷ post) a p (lane-begun c op f d n a q o pre post s p al iv)
   ... | false = tt
   rise-lead (inSrc k b c)                     s (nx a) p l iv = tt
   rise-lead (inSrc k b c)                     s cp     p l iv = tt
-  rise-lead (inBody (cs cl true sa ba as nothing r en) o c) s (nx b) p (t , al , (_ , _ , _ , w) , ft , gt , kt) iv =
-    connS (cs cl true sa ba as nothing r en) o t , refl , w , ft , gt , kt
-  rise-lead (inBody (cs cl true sa ba as (just _) r en) o c)  s (nx b) p (t , al , (() , _) , ft , gt , kt) iv
-  rise-lead (inBody (cs cl false sa ba as (just _) r en) o c) s (nx b) p (t , al , (() , _) , ft , gt , kt) iv
-  rise-lead (inBody (cs cl false sa ba as nothing r en) o c)  s (nx b) p (t , al , (() , _) , ft , gt , kt) iv
-  rise-lead (inBody (cs cl true sa ba as nothing r en) o c) s cp p (t , al , (_ , _ , _ , w) , ft , gt , kt) iv =
-    connS (cs cl true sa ba as nothing r en) o t , refl , w , ft , gt , kt
-  rise-lead (inBody (cs cl true sa ba as (just _) r en) o c)  s cp p (t , al , (() , _) , ft , gt , kt) iv
-  rise-lead (inBody (cs cl false sa ba as (just _) r en) o c) s cp p (t , al , (() , _) , ft , gt , kt) iv
-  rise-lead (inBody (cs cl false sa ba as nothing r en) o c)  s cp p (t , al , (() , _) , ft , gt , kt) iv
+  rise-lead (inBody (cs cl true sa ba as nothing r en) o c) s (nx b) p (t , al , (_ , _ , _ , w) , ft , gt , kt , (k₀ , wi , _ , _ , _ , af)) iv =
+    connS (cs cl true sa ba as nothing r en) o t , refl , w , ft , gt , kt , (k₀ , wi , af)
+  rise-lead (inBody (cs cl true sa ba as (just _) r en) o c)  s (nx b) p (t , al , (() , _) , ft , gt , kt , _) iv
+  rise-lead (inBody (cs cl false sa ba as (just _) r en) o c) s (nx b) p (t , al , (() , _) , ft , gt , kt , _) iv
+  rise-lead (inBody (cs cl false sa ba as nothing r en) o c)  s (nx b) p (t , al , (() , _) , ft , gt , kt , _) iv
+  rise-lead (inBody (cs cl true sa ba as nothing r en) o c) s cp p (t , al , (_ , _ , _ , w) , ft , gt , kt , (k₀ , wi , _ , _ , _ , af)) iv =
+    connS (cs cl true sa ba as nothing r en) o t , refl , w , ft , gt , kt , (k₀ , wi , af)
+  rise-lead (inBody (cs cl true sa ba as (just _) r en) o c)  s cp p (t , al , (() , _) , ft , gt , kt , _) iv
+  rise-lead (inBody (cs cl false sa ba as (just _) r en) o c) s cp p (t , al , (() , _) , ft , gt , kt , _) iv
+  rise-lead (inBody (cs cl false sa ba as nothing r en) o c)  s cp p (t , al , (() , _) , ft , gt , kt , _) iv
 
   -- A subscribe rises nothing, and carries its lead down.
   sub-lead : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Lead ⟨ c , s , subscribing , p ⟩ → NextLead (step ⟨ c , s , subscribing , p ⟩)
@@ -617,7 +620,8 @@ module _ {R : Set} where
   ...   | pl , _ = run-lead (plug c s) p e
                      (λ q e′ s″ kq oe al → s′ , al , subst₂ (λ k x → Won (k , x) c′ s′) kq oe (search-won (plug c s) (proj₁ (Order.shape o)) e)
                         , subst Frag (sym pl) (proj₁ (Order.shape o)) , subst (Gh top) (sym pl) (gh-firm (plug c s) (proj₂ (Order.shape o)) (Order.told o))
-                        , subst Keys (sym pl) (proj₂ (Order.shape o)))
+                        , subst Keys (sym pl) (proj₂ (Order.shape o))
+                        , key , subst (λ k → Within k q) (sym kq) ([] , sym (++-identityʳ q)) , Order.causal o c′ s′ pl (found-own (plug c s) e))
 
   -- A takeWhile failing a value ends one past it, what the frames above
   -- saw of the value's run.
@@ -797,7 +801,7 @@ module _ {R : Set} where
   flight-next : ∀ k → Base k → Order k → NextFlight (step k)
   flight-next k b o = flown (step k) (base-next k b) (shape-next k b o) (flight-owed k b o)
 
-  joined : ∀ x → NextShape x → NextFlight x → NextLead x → NextApart x → NextHeard x → NextTold x → NextOrd x
+  joined : ∀ x → NextShape x → NextFlight x → NextLead x → NextCaused x → NextHeard x → NextTold x → NextOrd x
   joined (silent t k)    f g l u e h = order f g l u e h
   joined (value t p a k) f g l u e h = order f g l u e h
   joined (complete p)    f g l u e h = tt
@@ -823,7 +827,7 @@ module _ {R : Set} where
   ... | just (found (_ , _ , c′ , s′) m key) = run-heard c′ p (proj₂ (search-hit (plug c s) e))
 
   ord-next : ∀ k → Base k → Order k → NextOrd (step k)
-  ord-next k b o = joined (step k) (shape-next k b o) (flight-next k b o) (lead-next k b o) (apart-next k b o) (heard-next k o) (told-next k b o)
+  ord-next k b o = joined (step k) (shape-next k b o) (flight-next k b o) (lead-next k b o) (causal-next k b o) (heard-next k o) (told-next k b o)
 
   both : ∀ x → NextBase x → NextOrd x → NextInv x
   both (silent t k)    b o = b & o
@@ -839,6 +843,6 @@ module _ {R : Set} where
 
   -- A settled node anywhere in a tree the invariant holds of, absorbed at
   -- the same position: the invariant at it.
-  inv-at : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Unpended s → Wf (plug c s) → Held (plug c s) → Apart (plug c s)
+  inv-at : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Unpended s → Wf (plug c s) → Held (plug c s) → Causal (plug c s)
          → Toldˢ none (plug c s) → Inv ⟨ c , s , absorbed , p ⟩
   inv-at c s p u w f t g = base-at c s p u w & order f (flight-held c s p (proj₁ (wf-split c s u w)) f) tt t tt g

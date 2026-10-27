@@ -17,7 +17,6 @@ module adequacy.Engine.Shown where
 open import Data.Bool using (Bool; true; false)
 open import Data.List using ([]; _∷_; _++_; [_]; reverse; _ʳ++_)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
-open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All) renaming (map to allMap; _∷_ to _∷ᴬ_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -41,7 +40,7 @@ open import adequacy.Engine.Meaning using (_≋_; ≋-trans; same; ≋-tr; mappe
 open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore)
 open import adequacy.Engine.Head using (Frag; cand; <ᴷ-irrefl; ≮ᴷ-trans; ≮<ᴷ; ext-≮)
 open import adequacy.Engine.Keys using (Held; Keys)
-open import adequacy.Engine.Fold using (Unpended)
+open import adequacy.Engine.Fold using (Unpended; found-own)
 open import adequacy.Engine.Pick using (Beat; past; KAfter; KNotBefore; Lost; body-link; Before; Race; LaneWon; lane-won; race-shut; lanes-gh;
   after-step; lane-sides; outer-link; src-floor)
 open import adequacy.Engine.Head.Within using (frag-flat; frag-parts)
@@ -68,9 +67,6 @@ keyAt false q = at q
 keyAt true  q = after q
 
 postulate
-  -- The search finds a node by one of its own marks.
-  found-own : ∀ {R} (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} → search top t ≡ just (found (Γ , A , c , s) m key)
-            → (m , key) ∈ own s
   -- Past a position is after every position under it.
   under-after : ∀ q y → after q <ᴷ at (q ++ y) ≡ false
   -- A SOURCE PAST ITS SKIPS shows no earlier than any position under

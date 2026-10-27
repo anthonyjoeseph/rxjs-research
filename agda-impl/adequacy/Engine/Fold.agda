@@ -24,7 +24,7 @@ open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; 
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; closed; closedUp;
   CS; cs; shows; outOf; attAt; attached; free; cpAt; cutAt; overAt; nx; cp;
   Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising;
-  Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM; search; found; leaf;
+  Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM; search; found; leaf; own;
   rise; run; begin; start; admit; dequeue; settle; ended; alive; feed; feedL; unsub; killAll; unsubIf; _⊕_)
   renaming (cut to cutᴹ)
 
@@ -375,3 +375,6 @@ postulate
   -- The least mark is a node's own, and its focus plugs back to the tree.
   search-hit : ∀ {R Γ A} (t : St [] R) {c : Ctx R Γ A} {s m key} → search top t ≡ just (found (Γ , A , c , s) m key)
              → plug c s ≡ t × Owns s m
+  -- The search finds a node by one of its own marks.
+  found-own : ∀ {R} (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} → search top t ≡ just (found (Γ , A , c , s) m key)
+            → (m , key) ∈ own s
