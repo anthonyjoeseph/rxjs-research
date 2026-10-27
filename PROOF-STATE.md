@@ -105,14 +105,13 @@ Members: `kill-pool`.
 Untried: a still skip leads every race above it past each live source's
 skips: nothing above is due under the skip's position. Both what the search
 finds (`Apart`; `quickcheck.KeptDepth` checks every absorbed configuration)
-and the skip a value or a lane's end leaves just past itself, where the race
-`Won` records only the shifted key, and the lane a value or an end begins,
-whose frames above must pass every skip under its position. Settled when
-these are bodies, or refuted.
+and the heads above a won skip or a rise, none below its position (`Aloof`,
+believed of `Keys`' disjointness), and a begun lane's flatMap's other parts.
+Settled when these are bodies, or refuted.
 
-Members: `apart-next`, `won-aloof`, `outer-begins-links`, `outer-queues-links`,
-`outer-ignores-links`, `lane-begin-links`, `outer-begun`, `switch-begun`,
-`lane-begun`.
+Members: `apart-next`, `won-aloof`, `rise-aloof`, `outer-begins-links`, `outer-queues-links`,
+`outer-ignores-links`, `lane-begin-links`, `outer-begun-sides`, `switch-begun-sides`,
+`lane-begun-sides`.
 
 #### THE TAIL'S SKIP
 

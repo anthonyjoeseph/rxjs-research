@@ -11,6 +11,7 @@
 module adequacy.Engine.Inv where
 
 open import Data.Bool using (Bool; true; false; not; if_then_else_; _∧_)
+open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; _ʳ++_; null; [_]; reverse)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; suc; pred; _<ᵇ_; _≡ᵇ_)
@@ -28,7 +29,7 @@ open import denotation.Unfold using (NEnv; stateᴺ; cutᴺ; states; outerᴺ; s
 open import adequacy.Engine.Head using (Frag)
 open import adequacy.Engine.Keys using (Keys; Keyed; Held; FlatAt)
 open import adequacy.Engine.Above using (Flight; above-≋; keys-above; take-excl; take-here; conn-drop; flat-drop; keyedL-ʳ++; toʳ; lanes-runs; lanes-P; rested-risen; ending-risen; takeAt-risen)
-open import adequacy.Engine.Ahead using (Under; shown; ahead-mono; under-sub)
+open import adequacy.Engine.Ahead using (Under; shown; ahead-mono; under-sub; Sides; Ahead; Aloof; ahead-over) renaming (shows to showsᶜ)
 open import adequacy.Engine.Race using (NotBefore)
 open import adequacy.Engine.Meaning using (envAt; gh; risen; lane; lanesL; laneRuns; poolRuns; outerT; outerG; poolG; deadL)
 open import adequacy.Engine.Flown using (Owed; NextOwed; rise-owed; sub-owed)
@@ -434,22 +435,62 @@ module _ {R : Set} where
   Dequeues c op f d n []      o ls p = ⊤
   Dequeues c op f d n (a ∷ q) o ls p = Begun c op f d n q o ls a p
 
+  -- A lane begun under `p`, as its flatMap's other parts lead it.
+  BegunSides : ∀ {Γ A B} (f : A → Obs Timeline Γ B) → Bool → St Γ A → List (St Γ B) → Pos → NEnv Γ → Set
+  BegunSides f d o ls p ρ = ∀ j → Under (_≡ p ⊕ [ ix 1 ]) j → Sides j f d o (reverse (reverse ls)) [] ρ
+
+  -- What the frames above lead at the skip just past `p`, they lead under
+  -- the lane `p` begins, none of their heads being below `p`.
+  begun : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p
+        → (showsᶜ c true ≡ true → Ahead (_≡ p ⊕ [ ix 0 ]) c true) → (showsᶜ c true ≡ true → BegunSides f d o ls p (envAt c))
+        → (showsᶜ c true ≡ true → Aloof p c true) → Begun c op f d n q o ls a p
+  begun c op f d n q o ls a p ah sd al cl sh =
+    sd sh , ahead-over p (λ j u → under-sub p [ ix 1 ] j u) c true (ah sh) (al sh)
+
   postulate
-    -- A LANE BEGUN IS CLEAR BENEATH: what an admitted value or a lane's end
-    -- leaves the frames above, it leaves under the lane it begins.
-    outer-begun : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p
-                → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ → Begun c op f d n q o ls a p
-    switch-begun : ∀ {Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p
-                 → Inv ⟨ inOuter switchᶠ f d n q ls c , o , rising (nx a) , p ⟩ → Begun c switchᶠ f d 0 q o (proj₁ (killAll ls)) a p
-    lane-begun : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n a q (o : St Γ A) pre post (s : St Γ B) p
-               → alive s ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
-               → Begun c op f d (pred n) q o (pre ʳ++ ended s ∷ post) a p
+    -- A RISE IS ALOOF: no head the frames above a rise at `p` ask of lies
+    -- below `p`.  What lies under `p` the rise has yet to cause.
+    rise-aloof : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Inv ⟨ c , s , rising e , p ⟩ → showsᶜ c true ≡ true → Aloof p c true
+    -- A LANE BEGUN IS CLEAR BESIDE: an admitted value's or a lane's end's
+    -- flatMap's other parts come after every position under the lane it
+    -- begins.
+    outer-begun-sides : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) n q (o : St Γ A) ls a p
+                      → Inv ⟨ inOuter op f false n q ls c , o , rising (nx a) , p ⟩ → showsᶜ c true ≡ true → BegunSides f false o ls p (envAt c)
+    switch-begun-sides : ∀ {Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) n q (o : St Γ A) ls a p
+                       → Inv ⟨ inOuter switchᶠ f false n q ls c , o , rising (nx a) , p ⟩ → showsᶜ c true ≡ true
+                       → BegunSides f false o (proj₁ (killAll ls)) p (envAt c)
+    lane-begun-sides : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n a q (o : St Γ A) pre post (s : St Γ B) p
+                     → alive s ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ → showsᶜ c true ≡ true
+                     → BegunSides f d o (pre ʳ++ ended s ∷ post) p (envAt c)
     -- A SOURCE ABOUT TO BE SUBSCRIBED shows no earlier than its body's
     -- subscription and, hushed, leaves nothing running.
     fresh-src : ∀ {Γ X} (o : Obs Timeline Γ X) p (ρ : NEnv Γ)
               → (Events∞.force (stateᴺ (subscribe o (p ⊕ [ ix 1 ])) ρ) ≡ hush
                    → ∀ d → Agreeᵀ d (Events∞.cut (stateᴺ (subscribe o (p ⊕ [ ix 1 ])) ρ)) idle)
               × (∀ k → Under (_≡ p ⊕ [ ix 0 ]) k → NotBefore k (shown (Events∞.force (stateᴺ (subscribe o (p ⊕ [ ix 1 ])) ρ))))
+
+  -- A LANE BEGUN IS CLEAR BENEATH: what an admitted value or a lane's end
+  -- leaves the frames above, it leaves under the lane it begins.
+  outer-begun : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p
+              → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ → Begun c op f d n q o ls a p
+  outer-begun c op f true  n q o ls a p iv = ⊥-elim (Order.lead (Inv.ord iv))
+  outer-begun c op f false n q o ls a p iv =
+    begun c op f false n q o ls a p (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv))))) (outer-begun-sides c op f n q o ls a p iv)
+      (λ sh → proj₂ (proj₂ (rise-aloof (inOuter op f false n q ls c) o (nx a) p iv sh)))
+
+  switch-begun : ∀ {Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p
+               → Inv ⟨ inOuter switchᶠ f d n q ls c , o , rising (nx a) , p ⟩ → Begun c switchᶠ f d 0 q o (proj₁ (killAll ls)) a p
+  switch-begun c f true  n q o ls a p iv = ⊥-elim (Order.lead (Inv.ord iv))
+  switch-begun c f false n q o ls a p iv =
+    begun c switchᶠ f false 0 q o (proj₁ (killAll ls)) a p (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv)))))
+      (switch-begun-sides c f n q o ls a p iv) (λ sh → proj₂ (proj₂ (rise-aloof (inOuter switchᶠ f false n q ls c) o (nx a) p iv sh)))
+
+  lane-begun : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n a q (o : St Γ A) pre post (s : St Γ B) p
+             → alive s ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
+             → Begun c op f d (pred n) q o (pre ʳ++ ended s ∷ post) a p
+  lane-begun c op f d n a q o pre post s p al iv =
+    begun c op f d (pred n) q o (pre ʳ++ ended s ∷ post) a p (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv)))))
+      (lane-begun-sides c op f d n a q o pre post s p al iv) (λ sh → proj₂ (rise-aloof (inLanes op f d n (a ∷ q) o pre post c) s cp p iv sh))
 
   dequeues : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) p
            → alive s ≡ true → Inv ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → Dequeues c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p
