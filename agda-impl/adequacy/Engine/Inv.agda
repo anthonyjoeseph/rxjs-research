@@ -30,9 +30,10 @@ open import denotation.MonotonicList using (Agreeᵀ)
 open import operation.Key using (at)
 open import denotation.Unfold using (NEnv; stateᴺ; cutᴺ; states; outerᴺ; subscribe; startᶜ; idleᶜ; flatMapᶜ)
 open import adequacy.Engine.Head using (Frag)
-open import adequacy.Engine.Keys using (Keys; Keyed; Held; FlatAt; FlatKeys)
-open import adequacy.Placed.Order using (Headed; Alienᴱ; Owned; every-lookup)
+open import adequacy.Engine.Keys using (Keys; Keyed; Held; FlatAt; FlatKeys; []ᴷ)
+open import adequacy.Placed.Order using (Headed; Alienᴱ; Owned; every-lookup; everyT-idle)
 open import adequacy.Engine.Trails using (shape-≋)
+open import adequacy.Placed.Trail using (sortedT-idle; flatT-idle)
 open import adequacy.Engine.Above using (Above; Flight; above-≋; take-excl; take-here; conn-drop; flat-drop; keyedL-ʳ++; toʳ; lanes-runs; lanes-P; rested-risen; ending-risen; takeAt-risen)
 open import adequacy.Engine.Ahead using (Under; shown; ahead-mono; under-sub; Sides; Ahead; Aloof; ahead-over) renaming (shows to showsᶜ)
 open import adequacy.Engine.Race using (NotBefore)
@@ -411,9 +412,8 @@ module _ {R : Set} where
     rise-dead-keys : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) e p
                    → Inv ⟨ inLanes op f d n q o pre post c , s , rising e , p ⟩ → alive s ≡ false
                    → Keys (plug c (flatS op f d n q o (pre ʳ++ s ∷ post)))
-    -- A merge begun keys nothing yet under its mark; a joiner of a
-    -- subject already over, and a connect begun, leave the tree keyed.
-    fresh-flat : ∀ {Γ A B} p (f : A → Obs Timeline Γ B) (ρ : NEnv Γ) → FlatKeys p (outerᴺ (lane f) (just idleᶜ) ρ) [] (cutᴺ (idleᶜ {B = B}) ρ) []
+    -- A joiner of a subject already over, and a connect begun, leave the
+    -- tree keyed.
     begin-joined-keys : ∀ {Γ A} (c : Ctx R Γ A) (x : A ∈ Γ) p → Inv ⟨ c , pend (connected x) , subscribing , p ⟩ → closedUp c x ≡ true
                       → Keys (plug c (ofS 0 p []))
     begin-conn-keys : ∀ {Γ X A} (c : Ctx R Γ A) (s : Obs Timeline Γ X) (b : Obs Timeline (X ∷ Γ) A) p
@@ -421,8 +421,6 @@ module _ {R : Set} where
     -- THE STILL'S SUBTREE: a subscription heads its position, where no
     -- source of its environment has been.
     sub-fresh : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Inv ⟨ c , pend o , subscribing , p ⟩ → Headed p × Alienᴱ p (envAt c)
-    -- THE FLIGHT, READ: a merge of an idle outer and no lanes is idle.
-    flat-idle : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (ρ : NEnv Γ) → stateᴺ idleᶜ ρ ≋ stateᴺ (flatMapᶜ op (lane f) (just idleᶜ) [] [] idleᶜ) ρ
     run-keys : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , absorbed , p ⟩ → NextKeys (step ⟨ c , s , absorbed , p ⟩)
     -- THE FLIGHT KEPT: a mark run rising or subscribing what it ran
     -- leaves its hole's run in shape, and every frame above keeping its
@@ -463,9 +461,6 @@ module _ {R : Set} where
     sd sh , ahead-over p (λ j u → under-sub p [ ix 1 ] j u) c true (ah sh) (al sh)
 
   postulate
-    -- A RISE IS ALOOF: no head the frames above a rise at `p` ask of lies
-    -- below `p`.  What lies under `p` the rise has yet to cause.
-    rise-aloof : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Inv ⟨ c , s , rising e , p ⟩ → showsᶜ c true ≡ true → Aloof p c true
     -- A LANE BEGUN IS CLEAR BESIDE: an admitted value's or a lane's end's
     -- flatMap's other parts come after every position under the lane it
     -- begins.
@@ -490,22 +485,22 @@ module _ {R : Set} where
               → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ → Begun c op f d n q o ls a p
   outer-begun c op f true  n q o ls a p iv = ⊥-elim (Order.lead (Inv.ord iv))
   outer-begun c op f false n q o ls a p iv =
-    begun c op f false n q o ls a p (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv))))) (outer-begun-sides c op f n q o ls a p iv)
-      (λ sh → proj₂ (proj₂ (rise-aloof (inOuter op f false n q ls c) o (nx a) p iv sh)))
+    begun c op f false n q o ls a p (proj₁ (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv)))))) (outer-begun-sides c op f n q o ls a p iv)
+      (proj₂ (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv))))))
 
   switch-begun : ∀ {Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p
                → Inv ⟨ inOuter switchᶠ f d n q ls c , o , rising (nx a) , p ⟩ → Begun c switchᶠ f d 0 q o (proj₁ (killAll ls)) a p
   switch-begun c f true  n q o ls a p iv = ⊥-elim (Order.lead (Inv.ord iv))
   switch-begun c f false n q o ls a p iv =
-    begun c switchᶠ f false 0 q o (proj₁ (killAll ls)) a p (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv)))))
-      (switch-begun-sides c f n q o ls a p iv) (λ sh → proj₂ (proj₂ (rise-aloof (inOuter switchᶠ f false n q ls c) o (nx a) p iv sh)))
+    begun c switchᶠ f false 0 q o (proj₁ (killAll ls)) a p (proj₁ (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv))))))
+      (switch-begun-sides c f n q o ls a p iv) (proj₂ (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv))))))
 
   lane-begun : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n a q (o : St Γ A) pre post (s : St Γ B) p
              → alive s ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
              → Begun c op f d (pred n) q o (pre ʳ++ ended s ∷ post) a p
   lane-begun c op f d n a q o pre post s p al iv =
-    begun c op f d (pred n) q o (pre ʳ++ ended s ∷ post) a p (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv)))))
-      (lane-begun-sides c op f d n a q o pre post s p al iv) (λ sh → proj₂ (rise-aloof (inLanes op f d n (a ∷ q) o pre post c) s cp p iv sh))
+    begun c op f d (pred n) q o (pre ʳ++ ended s ∷ post) a p (λ sh → proj₁ (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv)))) sh))
+      (lane-begun-sides c op f d n a q o pre post s p al iv) (λ sh → proj₂ (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv)))) sh))
 
   dequeues : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) p
            → alive s ≡ true → Inv ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → Dequeues c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p
@@ -718,6 +713,14 @@ module _ {R : Set} where
   cold-≋ p (atᶠ (suc t) _ b) ρ = ≋-by refl refl
   cold-≋ p done             ρ = ≋-by refl refl
   cold-≋ p silentᶠ          ρ = ≋-by refl refl
+
+  -- A merge of an idle outer and no lanes is idle, and keys nothing yet
+  -- under its mark.
+  flat-idle : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) (ρ : NEnv Γ) → stateᴺ idleᶜ ρ ≋ stateᴺ (flatMapᶜ op (lane f) (just idleᶜ) [] [] idleᶜ) ρ
+  flat-idle op f ρ = ≋-by refl refl
+
+  fresh-flat : ∀ {Γ A B} p (f : A → Obs Timeline Γ B) (ρ : NEnv Γ) → FlatKeys p (outerᴺ (lane f) (just idleᶜ) ρ) [] (cutᴺ (idleᶜ {B = B}) ρ) []
+  fresh-flat p f ρ = []ᴷ , tt , Data.List.Relation.Unary.All.[] , (record { spread = tt } , record { every = tt } , everyT-idle) , sortedT-idle , everyT-idle , everyT-idle , flatT-idle
 
   begin-keys : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Inv ⟨ c , pend o , subscribing , p ⟩
              → NextKeys (step ⟨ c , pend o , subscribing , p ⟩)

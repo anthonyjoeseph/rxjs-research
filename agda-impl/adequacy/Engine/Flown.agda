@@ -35,8 +35,8 @@ open import denotation.Denote using (flatOp)
 open import adequacy.Engine.Meaning using (_≋_; ≋-by; ≋-out; envAt; gh; srcG; srcRun; srcState; risen; lanesFrame; lane; lanesL; outerG; outerT;
   poolRuns; laneRuns; laneᴹ; flagOf; tailsOn; holeT; poolT; deadL; deadOne; lanes-refl; outerFrame; outerOf; poolG)
 open import adequacy.Engine.Union using (∪-idleᵀ; ∪-assocᵀ; ∪-commᵀ)
-open import adequacy.Engine.Keys using (Shape; Shape′; module ConnAt; LaneKeys; []ᴷ; _∷ᴷ_; FlatKeys; Keyed; KeyedL)
-open import adequacy.Engine.Trails using (body-≋; shape-≋; beside-go; module FlatShape; gen-queue; gen-sub; held-of; above-sorted; keyedL-shape)
+open import adequacy.Engine.Keys using (Here; Shape; Shape′; module ConnAt; LaneKeys; []ᴷ; _∷ᴷ_; FlatKeys; Keyed; KeyedL)
+open import adequacy.Engine.Trails using (shape-idle; body-≋; shape-≋; beside-go; module FlatShape; gen-queue; gen-sub; held-of; above-sorted; keyedL-shape)
 open import adequacy.Engine.Beside using (burst-hushed)
 open import adequacy.Engine.Race using (NotBefore; First; After; go-rise; go-outer; cuts-swap)
 open import adequacy.Engine.Ahead using (shown; Sides) renaming (shows to showsᶜ)
@@ -56,7 +56,7 @@ open import adequacy.Placed.Trail using (Trail; trail; trailᶠ; trail-map; trai
 open import adequacy.Placed.Rising using (module Reach; headedRules; ordered-take; steady-take; Beyond)
 open import adequacy.Placed.FlatAfter using (trail-take)
 open import adequacy.Placed.FlatOrder using (module FlatOrder)
-open import operation.PureObservable using (module Machine; module Driver)
+open import operation.PureObservable using (module Machine; module Driver; play; ending; over)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ctx; top; inMap; inScan; inCut;
   inLn; inTake; inOuter; inLanes; inSrc; inBody; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; nx; cp; free; cpAt; cutAt; overAt;
   CS; cs; closed; attAt; attached; start; plug; rise; begin; admit; dequeue; settle; ended; alive; killAll; _⊕_)
@@ -245,24 +245,83 @@ keyed-ended (lnS true (cutS true a s))   ρ l k = k
 keyed-ended (lnS false (cutS false a s)) ρ l k = k
 
 postulate
-  -- THE KEYS KEPT: a node unsubscribed keeps its keys.
+  -- THE KEYS KEPT: a node whose children are unsubscribed keeps its own
+  -- keys: a takeWhile its source cut, a merge its outer cut and its lanes
+  -- killed, a connect both its parts; and a connect's body, unsubscribed,
+  -- keeps its keys under its source unsubscribed.
+  unsub-take-here : ∀ {Γ A} i q w (s : St Γ A) (ρ : NEnv Γ) → Keyed (takeS i q w s) ρ → Here (takeS i q w (proj₁ (Machine.cut s))) ρ
+  unsub-flat-here : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls (ρ : NEnv Γ) → Keyed (flatS op f d n q o ls) ρ
+                  → Here (flatS op f d 0 q (proj₁ (Machine.cut o)) (proj₁ (killAll ls))) ρ
+  unsub-conn-here : ∀ {Γ X B} k (o : St Γ X) (b : St (X ∷ Γ) B) (ρ : NEnv Γ) → Keyed (connS k o b) ρ
+                  → Here (connS k (proj₁ (Machine.unsub o)) (proj₁ (Machine.unsub b))) ρ
+  unsub-body-keyed : ∀ {Γ X B} k (o : St Γ X) (b : St (X ∷ Γ) B) (ρ : NEnv Γ) → Keyed (connS k o b) ρ
+                   → Keyed (proj₁ (Machine.unsub b)) (srcRun (srcG k (proj₁ (Machine.unsub o))) ρ ∷ᴬ ρ)
+
+mutual
+  -- A node unsubscribed keeps its keys.
   unsub-keyed : ∀ {Γ A} (s : St Γ A) (ρ : NEnv Γ) → Keyed s ρ → Keyed (proj₁ (Machine.unsub s)) ρ
+  unsub-keyed (pend o)                       ρ k = k
+  unsub-keyed (coldS true (play τ u i t fr)) ρ k = shape-idle ρ , tt
+  unsub-keyed (coldS true (ending e))        ρ k = k
+  unsub-keyed (coldS true over)              ρ k = k
+  unsub-keyed (coldS false l)                ρ k = k
+  unsub-keyed (ofS i p xs)                   ρ k = k
+  unsub-keyed doneS                          ρ k = k
+  unsub-keyed (mapS f s) ρ (_ , k) with Machine.unsub s | unsub-keyed s ρ k
+  ... | s′ , u | k′ = tt , k′
+  unsub-keyed (scanS f z s) ρ (_ , k) with Machine.unsub s | unsub-keyed s ρ k
+  ... | s′ , u | k′ = tt , k′
+  unsub-keyed (cutS l a s) ρ k = k
+  unsub-keyed (lnS b s)    ρ k = k
+  unsub-keyed (takeS i q w s) ρ k with Machine.cut s | unsub-take-here i q w s ρ k | cut-keyed s ρ (proj₂ k)
+  ... | s′ , u | h | k′ = h , k′
+  unsub-keyed (flatS op f d n q o ls) ρ k
+    with Machine.cut o | killAll ls | unsub-flat-here op f d n q o ls ρ k | cut-keyed o ρ (proj₁ (proj₂ k)) | kill-keyed ls ρ (proj₂ (proj₂ k))
+  ... | o′ , u | ls′ , v | h | ko | kl = h , ko , kl
+  unsub-keyed (connS k o b) ρ x
+    with Machine.unsub o | Machine.unsub b | unsub-conn-here k o b ρ x | unsub-keyed o ρ (proj₁ (proj₂ x)) | unsub-body-keyed k o b ρ x
+  ... | o′ , u | b′ , v | h | ko | kb = h , ko , kb
+  unsub-keyed (joinS j g y ib) ρ k = tt , tt
 
--- The lanes a switch kills keep their keys.
-kill-keyed : ∀ {Γ B} (ls : List (St Γ B)) (ρ : NEnv Γ) → Lanesᴴ ls → KeyedL ls ρ → KeyedL (proj₁ (killAll ls)) ρ
-kill-keyed [] ρ _ k = tt
-kill-keyed (lnS true (cutS true attached s) ∷ ls) ρ (_ , fl) (k , kl)
-  with Machine.unsub s | unsub-keyed s ρ (proj₂ (proj₂ k)) | killAll ls | kill-keyed ls ρ fl kl
-... | s′ , u | ks | ls′ , t | kl′ = (tt , tt , ks) , kl′
-kill-keyed (lnS true (cutS true (attAt q) s) ∷ ls) ρ (_ , fl) (k , kl) with killAll ls | kill-keyed ls ρ fl kl
-... | ls′ , t | kl′ = k , kl′
-kill-keyed (lnS false (cutS false a s) ∷ ls) ρ (_ , fl) (k , kl) with killAll ls | kill-keyed ls ρ fl kl
-... | ls′ , t | kl′ = k , kl′
+  -- A node cut keeps its keys.
+  cut-keyed : ∀ {Γ A} (s : St Γ A) (ρ : NEnv Γ) → Keyed s ρ → Keyed (proj₁ (Machine.cut s)) ρ
+  cut-keyed (cutS l attached s) ρ (_ , k) with Machine.unsub s | unsub-keyed s ρ k
+  ... | s′ , u | k′ = tt , k′
+  cut-keyed (cutS l (attAt p) s)    ρ k = k
+  cut-keyed (pend o)                ρ k = k
+  cut-keyed (coldS b l)             ρ k = k
+  cut-keyed (ofS i p xs)            ρ k = k
+  cut-keyed doneS                   ρ k = k
+  cut-keyed (mapS f s)              ρ k = k
+  cut-keyed (scanS f z s)           ρ k = k
+  cut-keyed (lnS b s)               ρ k = k
+  cut-keyed (takeS i q w s)         ρ k = k
+  cut-keyed (flatS op f d n q o ls) ρ k = k
+  cut-keyed (connS k o b)           ρ x = x
+  cut-keyed (joinS j g y ib)        ρ k = k
 
-kept-keyed : ∀ {Γ B} op (ls : List (St Γ B)) (ρ : NEnv Γ) → Lanesᴴ ls → KeyedL ls ρ → KeyedL (keptLanes op ls) ρ
-kept-keyed (mergeᶠ m) ls ρ fl k = k
-kept-keyed switchᶠ    ls ρ fl k = kill-keyed ls ρ fl k
-kept-keyed exhaustᶠ   ls ρ fl k = k
+  -- The lanes a switch kills keep their keys.
+  kill-keyed : ∀ {Γ B} (ls : List (St Γ B)) (ρ : NEnv Γ) → KeyedL ls ρ → KeyedL (proj₁ (killAll ls)) ρ
+  kill-keyed [] ρ _ = tt
+  kill-keyed (lnS true s ∷ ls) ρ (k , kl) with Machine.cut s | cut-keyed s ρ (proj₂ k) | killAll ls | kill-keyed ls ρ kl
+  ... | s′ , u | ks | ls′ , t | kl′ = (tt , ks) , kl′
+  kill-keyed (lnS false s ∷ ls)            ρ (k , kl) = k , kill-keyed ls ρ kl
+  kill-keyed (pend o ∷ ls)                 ρ (k , kl) = k , kill-keyed ls ρ kl
+  kill-keyed (coldS b l ∷ ls)              ρ (k , kl) = k , kill-keyed ls ρ kl
+  kill-keyed (ofS i p xs ∷ ls)             ρ (k , kl) = k , kill-keyed ls ρ kl
+  kill-keyed (doneS ∷ ls)                  ρ (k , kl) = k , kill-keyed ls ρ kl
+  kill-keyed (mapS f s ∷ ls)               ρ (k , kl) = k , kill-keyed ls ρ kl
+  kill-keyed (scanS f z s ∷ ls)            ρ (k , kl) = k , kill-keyed ls ρ kl
+  kill-keyed (cutS l a s ∷ ls)             ρ (k , kl) = k , kill-keyed ls ρ kl
+  kill-keyed (takeS i q w s ∷ ls)          ρ (k , kl) = k , kill-keyed ls ρ kl
+  kill-keyed (flatS op f d n q o ls′ ∷ ls) ρ (k , kl) = k , kill-keyed ls ρ kl
+  kill-keyed (connS c o b ∷ ls)            ρ (k , kl) = k , kill-keyed ls ρ kl
+  kill-keyed (joinS j g y ib ∷ ls)         ρ (k , kl) = k , kill-keyed ls ρ kl
+
+kept-keyed : ∀ {Γ B} op (ls : List (St Γ B)) (ρ : NEnv Γ) → KeyedL ls ρ → KeyedL (keptLanes op ls) ρ
+kept-keyed (mergeᶠ m) ls ρ k = k
+kept-keyed switchᶠ    ls ρ k = kill-keyed ls ρ k
+kept-keyed exhaustᶠ   ls ρ k = k
 
 -- A run whose head is after a position lies beyond it.
 after-beyond : ∀ {A} p (x : Events A) → After p (M′.head x) → Beyond p x
@@ -626,7 +685,7 @@ module _ {R : Set} where
                   → Pass (_≡ p ⊕ [ ix 0 ]) c true (lanesFrame op (lane f) d (a ∷ q) (gh o) (reverse pre) post true (envAt c) (risen (gh s) (envAt c) cp p))
                       (lanesFrame op (lane f) d q (gh o) (reverse (reverse (pre ʳ++ ended s ∷ post))) [] true (envAt c) (stateᴺ (subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c)))
   lane-begin-pass c op f d n a q o pre post s p sh od =
-    pass-of (_≡ p ⊕ [ ix 0 ]) c true (proj₂ (proj₂ (proj₂ (Order.lead od))) sh) (lane-begin-links c op f d n a q o pre post s p sh od)
+    pass-of (_≡ p ⊕ [ ix 0 ]) c true (proj₁ (proj₂ (proj₂ (proj₂ (Order.lead od))) sh)) (lane-begin-links c op f d n a q o pre post s p sh od)
 
   -- A lane's end under an open observer, a value queued: every frame
   -- above the merge keeps its share past the skip the merge's run drops
@@ -805,7 +864,7 @@ module _ {R : Set} where
       pl  = proj₂ (proj₂ (proj₂ (proj₂ fk)))
       so  = above-sorted c true ab
       fl  = proj₂ (frag-parts op f false n q s ls (frag-flat c op f false n q s ls (proj₁ (Order.shape od))))
-      kL  = kept-keyed op ls ρ fl kl
+      kL  = kept-keyed op ls ρ kl
       gm  = gen-sub pk f ρ hp so cl a
       okq = FlatOrder.lane-ok pk p (proj₁ (every (proj₁ (proj₂ ok))))
       sp  = proj₁ (spread (proj₁ ok))

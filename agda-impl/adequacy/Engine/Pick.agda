@@ -97,7 +97,7 @@ Clear p a (inTake i q (overAt r) c)         s = ⊤
 Clear p a (inOuter op f true n q ls c)      s = ⊥
 Clear p a (inOuter op f false n q ls c)     s =
   closed c ≡ false × All (λ l → After p (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore p (poolT (deadL ls) (envAt c))
-  × (showsᶜ c true ≡ true → Ahead (_≡ p ⊕ [ ix 0 ]) c true)
+  × (showsᶜ c true ≡ true → Ahead (_≡ p ⊕ [ ix 0 ]) c true) × (showsᶜ c true ≡ true → Aloof p c true)
 Clear p a (inLanes op f d n q o pre post c) s =
   alive s ≡ true → Sides p f d o (reverse pre) post (envAt c) × Clear p a c (flatS op f d n q o (pre ʳ++ s ∷ post))
 Clear p a (inSrc k b c)                     s = over k ≡ false → closed c ≡ false → After (p ⊕ [ ix 0 ]) (headˢ (step (gh b)))
@@ -110,10 +110,10 @@ Clear p a (inBody (cs cl true sa ba as (just _) r en) o c) s = ⊥
 Clear p a (inBody (cs cl false sa ba as ow r en) o c)      s = ⊥
 
 -- Where a lane's end begins a queued value: the frames above, at the
--- skip just past the end.
+-- skip just past the end, none of their heads below the end.
 Queued : ∀ {R Γ B} {A : Set} → List A → Pos → Ctx R Γ B → Set
 Queued []      p c = ⊤
-Queued (_ ∷ _) p c = showsᶜ c true ≡ true → Ahead (_≡ p ⊕ [ ix 0 ]) c true
+Queued (_ ∷ _) p c = showsᶜ c true ≡ true → Ahead (_≡ p ⊕ [ ix 0 ]) c true × Aloof p c true
 
 -- Every frame a completion rising at `p` passes, and the node `rise`
 -- leaves below: a lane's flatMap, the lane live, while its parts are
@@ -781,15 +781,12 @@ lane-still d n (_ ∷ _) true  w = w
 lane-still d n (_ ∷ _) false w = w
 
 postulate
-  -- A LIVE SOURCE'S WON SKIP IS ALOOF: no head the frames above a
-  -- connect whose source won at `k` ask of is below `k`.  The race above
-  -- reads the skip only at `k ⊕ [ ix 0 ]`; what lies under `k` is caused
-  -- by the skip, not yet run.
-  won-aloof : ∀ {R Γ X B} k (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B)
-            → KAfter (shift (at k)) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
-            → Won (shift (at k) , still) c (connS (cs false true sa ba as nothing r en) o b)
-            → Frag (plug c (connS (cs false true sa ba as nothing r en) o b)) → Gh top (plug c (connS (cs false true sa ba as nothing r en) o b)) → Keys (plug c (connS (cs false true sa ba as nothing r en) o b))
-            → showsᶜ c true ≡ true → Aloof k c true
+  -- A WON SKIP IS ALOOF: no head the frames above a node whose skip won
+  -- just past `k` ask of is below `k`.  A source's skip, an outer's value
+  -- and a lane's end under a queue each reach the race above at
+  -- `k ⊕ [ ix 0 ]`; what lies under `k` they cause, not yet run.
+  won-aloof : ∀ {R Γ B} k (c : Ctx R Γ B) (t : St Γ B) → Won (at (k ⊕ [ ix 0 ]) , still) c t
+            → Frag (plug c t) → Gh top (plug c t) → Keys (plug c t) → showsᶜ c true ≡ true → Aloof k c true
 
 -- A still candidate that won is ahead at its key in every frame above
 -- it that shows it.
@@ -819,7 +816,7 @@ won-ahead k (inLanes op g d n q o pre post c) s true wn@(l , _ , w) ft gt kt sh 
   , won-ahead k c (flatS op g d n q o (pre ʳ++ s ∷ post)) true (lane-still d n q (alive s) {at k} {c} w) ft gt kt sh
 won-ahead k (inSrc (cs false true sa ba as nothing r en) b c) s f (ka , _ , w) ft gt kt sh =
   ahead-over k (λ j u → u) c true (won-ahead (k ⊕ [ ix 0 ]) c (connS (cs false true sa ba as nothing r en) s b) true w ft gt kt sh)
-    (won-aloof k c sa ba as r en s b ka w ft gt kt sh)
+    (won-aloof k c (connS (cs false true sa ba as nothing r en) s b) w ft gt kt sh)
 won-ahead k (inSrc (cs false true sa ba as (just _) r en) b c) s f w ft gt kt ()
 won-ahead k (inSrc (cs false false sa ba as ow r en) b c)      s f w ft gt kt ()
 won-ahead k (inSrc (cs true sl sa ba as ow r en) b c)          s f w ft gt kt ()
@@ -848,7 +845,7 @@ won-clear p a (inTake i q (cutAt r) c)          s s′ al ce w ft gt kt = tt
 won-clear p a (inTake i q (overAt r) c)         s s′ al ce w ft gt kt = tt
 won-clear p a (inOuter op f true n q ls c)      s s′ al ce (_ , _ , ()) ft gt kt
 won-clear p a (inOuter op f false n q ls c)     s s′ al ce wn@(r , w , u) ft gt kt =
-  cl , proj₁ ol , proj₂ ol , won-ahead (p ⊕ [ ix 0 ]) c (flatS op f false n q s ls) true w ft gt kt
+  cl , proj₁ ol , proj₂ ol , won-ahead (p ⊕ [ ix 0 ]) c (flatS op f false n q s ls) true w ft gt kt , won-aloof p c (flatS op f false n q s ls) w ft gt kt
   where
     cl    = unrisen-open (closed c) u
     parts = frag-parts op f false n q s ls (frag-flat c op f false n q s ls ft)
@@ -921,6 +918,7 @@ mutual
     trans (sym al) lv , (λ cl → lane-sides p c op f d n (a ∷ q) o pre post s cl (won-scope p (shows cp) (inLanes op f d n (a ∷ q) o pre post c) s wn ft gt kt) l gt (frag-flat c op f d n (a ∷ q) o (pre ʳ++ s ∷ post) ft))
     , ends-queued d (pred n ≡ᵇ 0) p c (flatS op f d (pred n) (a ∷ q) o (pre ʳ++ ended s′ ∷ post))
     , λ sh → won-ahead (p ⊕ [ ix 0 ]) c (flatS op f d n (a ∷ q) o (pre ʳ++ s ∷ post)) true (lane-shift d n a q {alive s} {at p} {c} lv w) ft gt kt sh
+             , won-aloof p c (flatS op f d n (a ∷ q) o (pre ʳ++ s ∷ post)) (lane-shift d n a q {alive s} {at p} {c} lv w) ft gt kt sh
     where lv = pooled-live (alive s) u
   won-ends p (inSrc kk b c)                    s s′ al w ft gt kt = tt
   won-ends p (inBody (cs cl true sa ba as nothing r en) o c) s s′ al (_ , lo , bf , w) ft gt kt =

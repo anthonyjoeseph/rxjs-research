@@ -24,13 +24,14 @@ Members: `body-keyed-drops`, `lane-begin-tail`, `outer-begin-tail`,
 
 Untried: a node rewritten by a rise, a connect's begin, a mark run or an
 unsubscribe keeps every node's positional facts (`adequacy.Engine.Keys`),
-reading the event in flight from the flight; a merge begun keys nothing yet,
-and a joiner of a subject over keeps the tree keyed. Probed in kept-depth,
+reading the event in flight from the flight; a joiner of a subject over
+keeps the tree keyed. Probed in kept-depth,
 except a merge's mark. Settled by bodies, or a probe refuting a clause.
 
-Members: `unsub-keyed`, `rise-admit-keys`, `rise-outer-end-keys`, `rise-lane-end-keys`,
+Members: `unsub-take-here`, `unsub-flat-here`, `unsub-conn-here`, `unsub-body-keyed`,
+`rise-admit-keys`, `rise-outer-end-keys`, `rise-lane-end-keys`,
 `rise-src-keys`, `rise-body-end-keys`, `begin-conn-keys`, `begin-joined-keys`,
-`fresh-flat`, `run-keys`.
+`run-keys`.
 
 #### THE ENDLESS SUBSCRIPTION
 
@@ -97,12 +98,12 @@ Members: `kill-pool`.
 Untried: a still skip leads every race above it past each live source's
 skips: nothing above is due under the skip's position. Both what the search
 finds (`Apart`; `quickcheck.KeptDepth` checks every absorbed configuration)
-and the heads above a won skip or a rise, none below its position (`Aloof`,
-believed of `Keys`' disjointness), a subscription headed and alien to its
+and the heads above a won skip, none below its position (`Aloof`, causal:
+each root above cut before it, carried up the rise), a subscription headed and alien to its
 environment, and a begun lane's flatMap's other parts. Settled when these
 are bodies, or refuted.
 
-Members: `apart-next`, `won-aloof`, `rise-aloof`, `sub-fresh`, `outer-begins-links`, `outer-queues-links`,
+Members: `apart-next`, `won-aloof`, `sub-fresh`, `outer-begins-links`, `outer-queues-links`,
 `outer-ignores-links`, `lane-begin-links`, `outer-begun-sides`, `switch-begun-sides`,
 `lane-begun-sides`.
 
@@ -204,8 +205,7 @@ Untried, mechanical: what the frames above keep, and a run's shape, is read
 alike off runs alike, and off the ghost as the whole tree's keys, a dead
 lane's read only through what it leaves running. Settled by bodies.
 
-Members: `takeAt-≋`, `flatAt-≋`, `connAt-≋`, `keyed-env`, `shape-≋`, `rise-dead-keys`,
-`flat-idle`.
+Members: `takeAt-≋`, `flatAt-≋`, `connAt-≋`, `keyed-env`, `shape-≋`, `rise-dead-keys`.
 
 ## Tier 2 — the simultaneous spec
 
