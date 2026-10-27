@@ -13,7 +13,7 @@ module adequacy.Engine.Inv where
 open import Data.Bool using (Bool; true; false; not; if_then_else_; _∧_)
 open import Data.Bool.Properties using (∧-identityʳ)
 open import Level using (lift; lower)
-open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; _ʳ++_; null; [_]; reverse)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (zero; suc; pred; _<ᵇ_; _≡ᵇ_)
@@ -44,13 +44,14 @@ open import adequacy.Engine.Race using (NotBefore)
 open import adequacy.Engine.Meaning using (_≋_; ≋-by; flagOf; envAt; gh; risen; lane; lanesL; laneRuns; poolRuns; outerT; outerG; poolG; deadL)
 open import adequacy.Engine.Flown using (Owed; NextOwed; rise-owed; sub-owed)
 open import adequacy.Engine.Plug using (flight-held; keys-above; keys-swap)
-open import adequacy.Engine.Pick using (Order; order; module Order; Heard; whole; KeysAt; Shaped; Lead; Snap; ⊤₁; tt; Won; lane-on; pooled-live; search-won; Causal; causal-aloft; Caught; caught-sub; Within)
+open import adequacy.Engine.Pick using (Order; order; module Order; Heard; whole; KeysAt; Shaped; Lead; Snap; ⊤₁; tt; Won; lane-on; pooled-live; search-won; causal-aloft; Caught; caught-sub; Within)
 open import adequacy.Engine.Pick.Lead using (lead-clear; lead-ends; lane-off)
+open import adequacy.Engine.Causal using (Causal; causal-run; done-≼; of-≼; att-≼; cp-≼; over-≼; join-≼; conn-≼; body-conn; src-conn; owed-conn; ≼-refl; unsubIf-≼; cut-≼)
 open import adequacy.Engine.Ghosted using (NextTold; told-next)
 open import adequacy.Engine.Scope using (Gh)
 open import adequacy.Engine.Firmed using (gh-firm)
 open import adequacy.Engine.Shuts using (Toldˢ; none)
-open import operation.PureObservable using (Tape; play; ending; over; opening; module Machine; module Driver)
+open import operation.PureObservable using (Tape; due; play; ending; over; opening; module Machine; module Driver)
 open import adequacy.Engine.Fold using (Base; Owns; Unpended; Wf; WfC; Wfs; attO; base-at; bodyO; cpO; cutO; if-inv; inv; joinO; leafO; ofO; opened-move; opened-none; owedO; owned; pend-unsubIf; search-hit; found-own; settle-settled; srcAttO; wf-cut; wf-ended; wf-feed; wf-killAll; wf-split; wf-unsubIf; wfI; wfs-++; wfs-ʳ++)
 
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
@@ -367,8 +368,7 @@ module _ {R : Set} where
   NextInv (complete p)    = ⊤₁
   NextInv drained         = ⊤₁
 
-  NextFrag NextKeys NextShape NextFlight : Step → Set
-  NextCaused : Step → Set₁
+  NextFrag NextKeys NextShape NextFlight NextCaused : Step → Set
   NextLead : Step → Set₁
   NextFrag (silent t k)    = Frag (whole k)
   NextFrag (value t p a k) = Frag (whole k)
@@ -392,8 +392,8 @@ module _ {R : Set} where
   NextLead drained         = ⊤₁
   NextCaused (silent t k)    = Causal (whole k)
   NextCaused (value t p a k) = Causal (whole k)
-  NextCaused (complete p)    = ⊤₁
-  NextCaused drained         = ⊤₁
+  NextCaused (complete p)    = ⊤
+  NextCaused drained         = ⊤
 
   postulate
     -- THE SHAPE: a step keeps the whole tree in the fragment.
@@ -437,12 +437,13 @@ module _ {R : Set} where
     run-flight : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , absorbed , p ⟩ → NextOwed (step ⟨ c , s , absorbed , p ⟩)
     -- A tree's first subscription is in shape.
     flight-load : (o : Obs Timeline [] R) → Flight (Machine.load o)
-    -- THE STILL'S SUBTREE: after a step every node's every mark is
-    -- aloft, nothing keyed under a skip not yet run: kept by a rise, a
-    -- subscription begun, and a mark run.
+    -- THE STILL'S SUBTREE: after a step every node's every mark to come
+    -- is aloft, nothing keyed under a skip not yet run: kept by a rise, a
+    -- subscription begun, and a cold leaf's run.
     rise-causal : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Inv ⟨ c , s , rising e , p ⟩ → NextCaused (step ⟨ c , s , rising e , p ⟩)
     sub-causal : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , subscribing , p ⟩ → NextCaused (step ⟨ c , s , subscribing , p ⟩)
-    run-causal : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , absorbed , p ⟩ → NextCaused (step ⟨ c , s , absorbed , p ⟩)
+    leaf-causal : ∀ {Γ A} (c : Ctx R Γ A) {b key} {l : Tape A} p → due l ≡ just key → Causal (plug c (coldS b l))
+                → NextCaused (took (run c (coldS b l) leafM p))
     -- A mark run rises, if at all, the event it showed, at its own key,
     -- leaving a node as live as the one it ran.
     run-lead : ∀ (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} p → search top t ≡ just (found (Γ , A , c , s) m key)
@@ -772,6 +773,37 @@ module _ {R : Set} where
   keys-next ⟨ c , s , subscribing , p ⟩ b o = sub-keys c s p (b & o)
   keys-next ⟨ c , s , absorbed , p ⟩    b o = run-keys c s p (b & o)
 
+  -- A mark run but a cold leaf's leaves its node weaker.
+  run-at : ∀ {Γ A} (c : Ctx R Γ A) {s : St Γ A} {m} p → Owns s m → Causal (plug c s) → NextCaused (took (run c s m p))
+  run-at c p (ofO {i = i} {p = q} {xs = xs}) ca with closed c | xs
+  ... | true  | _       = causal-run c (done-≼ _) ca
+  ... | false | []      = causal-run c (done-≼ _) ca
+  ... | false | x ∷ xs′ = causal-run c (of-≼ i q x xs′) ca
+  run-at c p (attO {l = l} {p = q} {s = s}) ca with unsubIf (not l) s | unsubIf-≼ (not l) s
+  ... | s′ , t | r = causal-run c (att-≼ l q r) ca
+  run-at c p (cpO {i = i} {q = q} {p = w} {s = s}) ca = causal-run c (cp-≼ i q w s) ca
+  run-at c p (cutO {i = i} {q = q} {p = w} {s = s}) ca with cutᴹ s | cut-≼ s
+  ... | s′ , t | r = causal-run c (over-≼ i q w r) ca
+  run-at c p (bodyO {k = cs cl sl sa (just q) as ow r e} {o = o} {b = b} _) ca =
+    causal-run c (conn-≼ (body-conn cl sl sa q as ow r e) (≼-refl o) (≼-refl b)) ca
+  run-at c p (bodyO {k = cs cl sl sa nothing as ow r e} ())
+  run-at c p (srcAttO {k = cs cl sl sa ba (just q) ow r e} {o = o} {b = b} _) ca with unsubIf (not sl) o | unsubIf-≼ (not sl) o
+  ... | o′ , t | ro = causal-run c (conn-≼ (src-conn cl sl sa ba q ow r e) ro (≼-refl b)) ca
+  run-at c p (srcAttO {k = cs cl sl sa ba nothing ow r e} ())
+  run-at c p (owedO {k = cs cl sl sa ba as (just q) r e} {o = o} {b = b} _) ca with unsubIf sa o | unsubIf-≼ sa o
+  ... | o′ , t | ro = causal-run c (conn-≼ (owed-conn cl sl sa ba as q r e) ro (≼-refl b)) ca
+  run-at c p (owedO {k = cs cl sl sa ba as nothing r e} ())
+  run-at c p (joinO {j = j} {g = g} {x = x} {q = q} {e = nx a} {ib = ib}) ca = causal-run c (join-≼ j g g x (q , nx a) ib) ca
+  run-at c p (joinO {j = j} {g = g} {x = x} {q = q} {e = cp} {ib = ib})   ca = causal-run c (join-≼ j g false x (q , cp) ib) ca
+  run-at c p (leafO d) ca = leaf-causal c p d ca
+
+  -- THE STILL'S SUBTREE, RUN: a mark run keeps the tree causal.
+  run-causal : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , absorbed , p ⟩ → NextCaused (step ⟨ c , s , absorbed , p ⟩)
+  run-causal c s p iv with search top (plug c s) in e
+  ... | nothing = tt
+  ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
+  ...   | pl , own = run-at c′ p own (subst Causal (sym pl) (Order.causal (Inv.ord iv)))
+
   causal-next : ∀ k → Base k → Order k → NextCaused (step k)
   causal-next ⟨ c , s , rising e , p ⟩    b o = rise-causal c s e p (b & o)
   causal-next ⟨ c , s , subscribing , p ⟩ b o = sub-causal c s p (b & o)
@@ -846,31 +878,9 @@ module _ {R : Set} where
   inv-next : ∀ k → Inv k → NextInv (step k)
   inv-next k (b & o) = both (step k) (base-next k b) (ord-next k b o)
 
-  -- Under any frame a node is not a subscription, so a tree that is one
-  -- holds it at the root, owning nothing: causal.
-  plug-pend : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) {o} → Unpended s → plug c s ≡ pend o → ⊥
-  plug-pend top                               s u refl = u
-  plug-pend (inMap f c)                       s u e    = plug-pend c _ tt e
-  plug-pend (inScan f z c)                    s u e    = plug-pend c _ tt e
-  plug-pend (inCut l a c)                     s u e    = plug-pend c _ tt e
-  plug-pend (inLn b c)                        s u e    = plug-pend c _ tt e
-  plug-pend (inTake i q w c)                  s u e    = plug-pend c _ tt e
-  plug-pend (inOuter op f d n q ls c)         s u e    = plug-pend c _ tt e
-  plug-pend (inLanes op f d n q o pre post c) s u e    = plug-pend c _ tt e
-  plug-pend (inSrc kk b c)                    s u e    = plug-pend c _ tt e
-  plug-pend (inBody kk o c)                   s u e    = plug-pend c _ tt e
-
+  -- A tree's first subscription owns nothing: causal.
   load-causal : (o : Obs Timeline [] R) → Causal (whole (Machine.load o))
-  load-causal o top                               s refl ()
-  load-causal o (inMap f c)                       s e    m = ⊥-elim (plug-pend c _ tt e)
-  load-causal o (inScan f z c)                    s e    m = ⊥-elim (plug-pend c _ tt e)
-  load-causal o (inCut l a c)                     s e    m = ⊥-elim (plug-pend c _ tt e)
-  load-causal o (inLn b c)                        s e    m = ⊥-elim (plug-pend c _ tt e)
-  load-causal o (inTake i q w c)                  s e    m = ⊥-elim (plug-pend c _ tt e)
-  load-causal o (inOuter op f d n q ls c)         s e    m = ⊥-elim (plug-pend c _ tt e)
-  load-causal o (inLanes op f d n q o′ pre post c) s e   m = ⊥-elim (plug-pend c _ tt e)
-  load-causal o (inSrc kk b c)                    s e    m = ⊥-elim (plug-pend c _ tt e)
-  load-causal o (inBody kk o′ c)                  s e    m = ⊥-elim (plug-pend c _ tt e)
+  load-causal o = Data.List.Relation.Unary.All.[] , tt
 
   inv-load : (o : Obs Timeline [] R) → Inv (Machine.load o)
   inv-load o = base-load o & order (tt , tt , tt) (flight-load o) (lift (λ _ → tt)) (load-causal o) tt tt

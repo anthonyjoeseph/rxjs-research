@@ -870,9 +870,10 @@ private
   rootKeysᵇ : Conf ℕ → Bool
   rootKeysᵇ ⟨ c , s , _ , _ ⟩ = keysWalkᵇ (plug c s) []ᴬ
 
-  -- `adequacy.Engine.Pick.Causal`, decided at every node of the
+  -- `adequacy.Engine.Causal.Causal`, decided at every node of the
   -- configuration (`causalᵇ 1`, `Farᴷ` and `Freeᴷ` over every key of each
-  -- racing part), and the candidates' `Aloft` it gives (`causalᵇ 0`).
+  -- racing part), and the candidates' `Aloft` it gives (`causalᵇ 0`); with
+  -- `fu`, of every mark to come, and `causalᵇ 2` of every key to come.
   keyPos : Key → Pos
   keyPos (at p)    = p
   keyPos (afterᴷ p) = p
@@ -896,23 +897,35 @@ private
   ownAllᵇ P []             = true
   ownAllᵇ P ((_ , h) ∷ ms) = P h ∧ ownAllᵇ P ms
 
+  -- Every mark a node will own: an of's every value and completion to
+  -- come, a joiner's whole queue.
+  ofFut : ℕ → Pos → ∀ {A : Set} → List A → List (Mark × Key)
+  ofFut i p []       = (ofM , at (p ⊕ (last ∷ []))) ∷ []
+  ofFut i p (_ ∷ xs) = (ofM , at (p ⊕ (ix i ∷ []))) ∷ ofFut (suc i) p xs
+
+  futᵇ : ∀ {Γ A} → St Γ A → List (Mark × Key)
+  futᵇ (ofS i p xs)     = ofFut i p xs
+  futᵇ (joinS j g x ib) = mapL (λ qe → (joinM , at (proj₁ qe))) ib
+  futᵇ s                = own s
+
+  -- Every key every node owns, or will own when `fu`.
   mutual
-    keysAllᵇ : ∀ {Γ A} → (Key → Bool) → St Γ A → Bool
-    keysAllᵇ P s = ownAllᵇ P (own s) ∧ kidsAllᵇ P s
+    keysAllᵇ : ∀ {Γ A} → Bool → (Key → Bool) → St Γ A → Bool
+    keysAllᵇ fu P s = ownAllᵇ P (if fu then futᵇ s else own s) ∧ kidsAllᵇ fu P s
 
-    kidsAllᵇ : ∀ {Γ A} → (Key → Bool) → St Γ A → Bool
-    kidsAllᵇ P (mapS f s)              = keysAllᵇ P s
-    kidsAllᵇ P (scanS f z s)           = keysAllᵇ P s
-    kidsAllᵇ P (cutS l a s)            = keysAllᵇ P s
-    kidsAllᵇ P (lnS b s)               = keysAllᵇ P s
-    kidsAllᵇ P (takeS i q w s)         = keysAllᵇ P s
-    kidsAllᵇ P (flatS op f d n q o ls) = keysAllᵇ P o ∧ lanesAllᵇ P ls
-    kidsAllᵇ P (connS k o b)           = keysAllᵇ P o ∧ keysAllᵇ P b
-    kidsAllᵇ P _                       = true
+    kidsAllᵇ : ∀ {Γ A} → Bool → (Key → Bool) → St Γ A → Bool
+    kidsAllᵇ fu P (mapS f s)              = keysAllᵇ fu P s
+    kidsAllᵇ fu P (scanS f z s)           = keysAllᵇ fu P s
+    kidsAllᵇ fu P (cutS l a s)            = keysAllᵇ fu P s
+    kidsAllᵇ fu P (lnS b s)               = keysAllᵇ fu P s
+    kidsAllᵇ fu P (takeS i q w s)         = keysAllᵇ fu P s
+    kidsAllᵇ fu P (flatS op f d n q o ls) = keysAllᵇ fu P o ∧ lanesAllᵇ fu P ls
+    kidsAllᵇ fu P (connS k o b)           = keysAllᵇ fu P o ∧ keysAllᵇ fu P b
+    kidsAllᵇ fu P _                       = true
 
-    lanesAllᵇ : ∀ {Γ A} → (Key → Bool) → List (St Γ A) → Bool
-    lanesAllᵇ P []       = true
-    lanesAllᵇ P (s ∷ ls) = keysAllᵇ P s ∧ lanesAllᵇ P ls
+    lanesAllᵇ : ∀ {Γ A} → Bool → (Key → Bool) → List (St Γ A) → Bool
+    lanesAllᵇ fu P []       = true
+    lanesAllᵇ fu P (s ∷ ls) = keysAllᵇ fu P s ∧ lanesAllᵇ fu P ls
 
   benᵇ : Key → Key → Bool
   benᵇ (at r)    k = prefixᵇ r (keyPos k)
@@ -938,10 +951,10 @@ private
       beneathCᵇ : ∀ {A} → Maybe (Key × Out A) → Key → Bool
       beneathCᵇ (just (at r , _)) k = prefixᵇ r (keyPos k)
       beneathCᵇ _                 k = false
-  reading (suc _) = record
-    { part  = λ k c x → keysAllᵇ (farᵇ k) x
+  reading (suc j) = record
+    { part  = λ k c x → keysAllᵇ (j ≡ᵇ 1) (farᵇ k) x
     ; ownOk = farᵇ
-    ; srcOk = λ k c o → keysAllᵇ (λ h → not (benᵇ h k)) o }
+    ; srcOk = λ k c o → keysAllᵇ (j ≡ᵇ 1) (λ h → not (benᵇ h k)) o }
 
   partsᵇ : ∀ {Γ A B} → Reading → Key → Ctx ℕ Γ B → FlatOp → (A → Obs Timeline Γ B) → Bool → ℕ
          → List A → St Γ A → List (St Γ B) → List (St Γ B) → List (St Γ B) → Bool
@@ -968,17 +981,6 @@ private
   marksAloftᵇ : ∀ {Γ A} → Reading → Ctx ℕ Γ A → St Γ A → List (Mark × Key) → Bool
   marksAloftᵇ r c s []             = true
   marksAloftᵇ r c s ((_ , k) ∷ ms) = aloftᵇ r k c s ∧ marksAloftᵇ r c s ms
-
-  -- Every mark a node will own: an of's every value and completion to
-  -- come, a joiner's whole queue.
-  ofFut : ℕ → Pos → ∀ {A : Set} → List A → List (Mark × Key)
-  ofFut i p []       = (ofM , at (p ⊕ (last ∷ []))) ∷ []
-  ofFut i p (_ ∷ xs) = (ofM , at (p ⊕ (ix i ∷ []))) ∷ ofFut (suc i) p xs
-
-  futᵇ : ∀ {Γ A} → St Γ A → List (Mark × Key)
-  futᵇ (ofS i p xs)     = ofFut i p xs
-  futᵇ (joinS j g x ib) = mapL (λ qe → (joinM , at (proj₁ qe))) ib
-  futᵇ s                = own s
 
   mutual
     nodesᵇ : ∀ {Γ A} → Reading → Bool → Ctx ℕ Γ A → St Γ A → Bool
@@ -1040,6 +1042,7 @@ private
       else if not (causalᵇ 0 false m) then no (best ⊔ run) ("\n  uncausal: a racing part's candidate under a mark, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (causalᵇ 1 false m) then no (best ⊔ run) ("\n  uncausal-all: a racing part's key, zero-extended, at or under a mark, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else if not (causalᵇ 1 true m) then no (best ⊔ run) ("\n  uncausal-future: a racing part's key at or under a mark to come, " ++ showMode m ++ " at " ++ showSpot (spot m))
+      else if not (causalᵇ 2 true m) then no (best ⊔ run) ("\n  uncausal-to-come: a racing part's key to come at or under a mark to come, " ++ showMode m ++ " at " ++ showSpot (spot m))
       else next n run best (ls + linkCount m) m (step m)
 
     next : ℕ → ℕ → ℕ → ℕ → Conf ℕ → Step → Verdict

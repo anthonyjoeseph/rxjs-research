@@ -69,6 +69,7 @@ open import adequacy.Engine.Head.Agrees using (head-agrees; head-agreesⱽ)
 open import adequacy.Engine.Shuts using (shutAll; told-none; Toldˢ; none)
 open import adequacy.Engine.Head.Within using (frag-flat; frag-parts; fr-at; conn-src)
 open import adequacy.Engine.Keys using (ConnAt; Keyed; Keys; keyed-at)
+open import adequacy.Engine.Causal using (posᴷ; Farᴷ; Freeᴷ; Keysᴬ; LaneKeys; Aloft⁺; Causal; keys-own; lanes-own; causal-own)
 open import adequacy.Engine.Trails using (envAt-sorted; shape-src)
 open import adequacy.Engine.Beside using (hush-idle)
 open import adequacy.Placed.Trail using (Trail; Trailing)
@@ -302,11 +303,6 @@ Apart t = Beats (search top t)
 -- lacks to give `Beat` past a live source (`won-beat`), and what the
 -- frames above a won skip owe the lane it begins (`won-aloof`).
 
--- A position's key: where it is, or the position it is past.
-posᴷ : Key → Pos
-posᴷ (at p)    = p
-posᴷ (after p) = p
-
 -- A key under `p`: at a position strictly under it, or past one at or
 -- under it.
 UnderK : Pos → Key → Set
@@ -346,61 +342,6 @@ Aloft k (inSrc kk b c)                     s =
 Aloft k (inBody kk o c)                    s =
   OffC k (cand (inSrc kk s c) o) × (Beneath (cand (inSrc kk s c) o) k → ⊥) × All (λ mk → Offᴷ k (proj₂ mk)) (own (connS kk o s))
   × Aloft k c (connS kk o s)
-
--- A key far from a mark's: no position its events reach at or under the
--- mark's, an at-key's own with `ix 0`s appended as `shift` appends them.
-Farᴷ : Key → Key → Set
-Farᴷ (at p)    (at q)    = ∀ n → (Σ Pos λ ys → q ++ replicate n (ix 0) ≡ p ++ ys) → ⊥
-Farᴷ (at p)    (after q) = (Σ Pos λ ys → q ≡ p ++ ys) → ⊥
-Farᴷ (after p) h         = ⊤
-
--- A mark at or under no position a key is at.
-Freeᴷ : Key → Key → Set
-Freeᴷ k (at r)    = (Σ Pos λ ys → posᴷ k ≡ r ++ ys) → ⊥
-Freeᴷ k (after _) = ⊤
-
--- Every key every node of a tree owns.
-mutual
-  Keysᴬ : ∀ {Γ A} → (Key → Set) → St Γ A → Set
-  Keysᴬ P s = All (λ mk → P (proj₂ mk)) (own s) × KidKeys P s
-
-  KidKeys : ∀ {Γ A} → (Key → Set) → St Γ A → Set
-  KidKeys P (mapS f s)              = Keysᴬ P s
-  KidKeys P (scanS f z s)           = Keysᴬ P s
-  KidKeys P (cutS l a s)            = Keysᴬ P s
-  KidKeys P (lnS b s)               = Keysᴬ P s
-  KidKeys P (takeS i q w s)         = Keysᴬ P s
-  KidKeys P (flatS op f d n q o ls) = Keysᴬ P o × LaneKeys P ls
-  KidKeys P (connS k o b)           = Keysᴬ P o × Keysᴬ P b
-  KidKeys P _                       = ⊤
-
-  LaneKeys : ∀ {Γ A} → (Key → Set) → List (St Γ A) → Set
-  LaneKeys P []       = ⊤
-  LaneKeys P (s ∷ ls) = Keysᴬ P s × LaneKeys P ls
-
--- Every frame above a node's mark at `k`: every key of each part racing
--- it, and each connect's own marks, far from `k`; a body's mark at or
--- under no key of its source.  Of every key, not the race's candidates
--- alone: a mark run hands a part's candidacy to a key no candidate
--- constrained.
-Aloft⁺ : ∀ {R Γ A} → Key → Ctx R Γ A → St Γ A → Set
-Aloft⁺ k top                                s = ⊤
-Aloft⁺ k (inMap f c)                        s = Aloft⁺ k c (mapS f s)
-Aloft⁺ k (inScan f z c)                     s = Aloft⁺ k c (scanS f z s)
-Aloft⁺ k (inCut l a c)                      s = Aloft⁺ k c (cutS l a s)
-Aloft⁺ k (inLn b c)                         s = Aloft⁺ k c (lnS b s)
-Aloft⁺ k (inTake i q w c)                   s = Aloft⁺ k c (takeS i q w s)
-Aloft⁺ k (inOuter op f d n q ls c)          s = LaneKeys (Farᴷ k) ls × Aloft⁺ k c (flatS op f d n q s ls)
-Aloft⁺ k (inLanes op f d n q o pre post c)  s =
-  Keysᴬ (Farᴷ k) o × LaneKeys (Farᴷ k) pre × LaneKeys (Farᴷ k) post × Aloft⁺ k c (flatS op f d n q o (pre ʳ++ s ∷ post))
-Aloft⁺ k (inSrc kk b c)                     s =
-  Keysᴬ (Farᴷ k) b × All (λ mk → Farᴷ k (proj₂ mk)) (own (connS kk s b)) × Aloft⁺ k c (connS kk s b)
-Aloft⁺ k (inBody kk o c)                    s =
-  Keysᴬ (Farᴷ k) o × Keysᴬ (Freeᴷ k) o × All (λ mk → Farᴷ k (proj₂ mk)) (own (connS kk o s)) × Aloft⁺ k c (connS kk o s)
-
--- Every node's every mark is aloft, every key of what races it far.
-Causal : ∀ {R} → St [] R → Set₁
-Causal {R} t = ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) {m k} → plug c s ≡ t → (m , k) ∈ own s → Aloft⁺ k c s
 
 -- What a candidate is of every key of a tree.
 CandP : ∀ {A} → (Key → Set) → Maybe (Key × Out A) → Set
@@ -459,22 +400,22 @@ aloft-of k (inScan f z c)                    s a = aloft-of k c (scanS f z s) a
 aloft-of k (inCut l x c)                     s a = aloft-of k c (cutS l x s) a
 aloft-of k (inLn b c)                        s a = aloft-of k c (lnS b s) a
 aloft-of k (inTake i q w c)                  s a = aloft-of k c (takeS i q w s) a
-aloft-of k (inOuter op f d n q ls c)         s (r , a) = race-far k c op f d n q s [] ls [] r , aloft-of k c (flatS op f d n q s ls) a
+aloft-of k (inOuter op f d n q ls c)         s (r , a) = race-far k c op f d n q s [] ls [] (lanes-own ls r) , aloft-of k c (flatS op f d n q s ls) a
 aloft-of k (inLanes op f d n q o pre post c) s (oo , rp , rn , a) =
-  far-cand k (inOuter op f d n q (pre ʳ++ s ∷ post) c) o oo
-  , race-far k c op f d n q o [] (reverse pre) (s ∷ post) (lanes-rev [] pre tt rp)
-  , race-far k c op f d n q o (s ∷ pre) post [] rn
+  far-cand k (inOuter op f d n q (pre ʳ++ s ∷ post) c) o (keys-own o oo)
+  , race-far k c op f d n q o [] (reverse pre) (s ∷ post) (lanes-rev [] pre tt (lanes-own pre rp))
+  , race-far k c op f d n q o (s ∷ pre) post [] (lanes-own post rn)
   , aloft-of k c (flatS op f d n q o (pre ʳ++ s ∷ post)) a
 aloft-of k (inSrc kk b c)                    s (ob , os , a) =
-  far-cand k (inBody kk s c) b ob , own-off k (own (connS kk s b)) os , aloft-of k c (connS kk s b) a
+  far-cand k (inBody kk s c) b (keys-own b ob) , own-off k (own (connS kk s b)) os , aloft-of k c (connS kk s b) a
 aloft-of k (inBody kk o c)                   s (oo , fo , os , a) =
-  far-cand k (inSrc kk s c) o oo
-  , free-cand k (cand (inSrc kk s c) o) (cand-keys (Freeᴷ k) (free-shift k) (inSrc kk s c) o fo)
+  far-cand k (inSrc kk s c) o (keys-own o oo)
+  , free-cand k (cand (inSrc kk s c) o) (cand-keys (Freeᴷ k) (free-shift k) (inSrc kk s c) o (keys-own o fo))
   , own-off k (own (connS kk o s)) os , aloft-of k c (connS kk o s) a
 
 -- A causal tree's node: its marks aloft.
 causal-aloft : ∀ {R} {t : St [] R} → Causal t → ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) {m k} → plug c s ≡ t → (m , k) ∈ own s → Aloft k c s
-causal-aloft ca c s {k = k} e i = aloft-of k c s (ca c s e i)
+causal-aloft ca c s {k = k} e i = aloft-of k c s (causal-own ca c s e i)
 
 -- The unit a lead holds where nothing rises or subscribes.
 record ⊤₁ : Set₁ where
