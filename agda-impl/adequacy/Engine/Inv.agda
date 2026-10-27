@@ -28,12 +28,12 @@ open import operation.Key using (at)
 open import denotation.Unfold using (NEnv; stateᴺ; cutᴺ; states; outerᴺ; subscribe)
 open import adequacy.Engine.Head using (Frag)
 open import adequacy.Engine.Keys using (Keys; Keyed; Held; FlatAt)
-open import adequacy.Engine.Above using (Flight; above-≋; keys-above; take-excl; take-here; conn-drop; flat-drop; keyedL-ʳ++; toʳ; lanes-runs; lanes-P; rested-risen; ending-risen; takeAt-risen)
+open import adequacy.Engine.Above using (Flight; above-≋; take-excl; take-here; conn-drop; flat-drop; keyedL-ʳ++; toʳ; lanes-runs; lanes-P; rested-risen; ending-risen; takeAt-risen)
 open import adequacy.Engine.Ahead using (Under; shown; ahead-mono; under-sub; Sides; Ahead; Aloof; ahead-over) renaming (shows to showsᶜ)
 open import adequacy.Engine.Race using (NotBefore)
 open import adequacy.Engine.Meaning using (envAt; gh; risen; lane; lanesL; laneRuns; poolRuns; outerT; outerG; poolG; deadL)
 open import adequacy.Engine.Flown using (Owed; NextOwed; rise-owed; sub-owed)
-open import adequacy.Engine.Plug using (flight-held)
+open import adequacy.Engine.Plug using (flight-held; keys-above)
 open import adequacy.Engine.Pick using (Order; order; module Order; Heard; whole; KeysAt; Shaped; Lead; Clear; Ends; EndsIf; Won; won-clear; won-ends; out-open; search-won; Apart; Searched)
 open import adequacy.Engine.Ghosted using (NextTold; told-next)
 open import adequacy.Engine.Scope using (Gh)
@@ -621,7 +621,7 @@ module _ {R : Set} where
   rise-take-keys c i q s a p v with q a in e | i
   ... | true  | _     = tt , proj₂ (Order.shape (Inv.ord v))
   ... | false | true  = take-here p a (stateᴺ (gh s) (envAt c)) (proj₁ (Order.flight (Inv.ord v))) , proj₂ (Order.shape (Inv.ord v))
-  ... | false | false = keys-above c (takeS false q (cpAt p) s)
+  ... | false | false = keys-above c (takeS false q (cpAt p) s) (Base.ctxWf (Inv.base v))
                           (above-≋ c true (take-excl q (gh s) (envAt c) a p e) (proj₂ (proj₂ (Order.flight (Inv.ord v)))))
                           (take-here p a (stateᴺ (gh s) (envAt c)) (proj₁ (Order.flight (Inv.ord v))) , proj₂ (Order.shape (Inv.ord v)))
 
@@ -665,19 +665,19 @@ module _ {R : Set} where
   rise-keys (inScan f z c)                    s cp     p v = tt , proj₂ (Order.shape (Inv.ord v))
   rise-keys (inCut true a c)                  s e      p v = tt , proj₂ (Order.shape (Inv.ord v))
   rise-keys (inCut false a c)                 s e      p v =
-    keys-above c (cutS false a s) (above-≋ c true (rested-risen (gh s) (envAt c) e p) (proj₂ (Order.flight (Inv.ord v)))) (tt , proj₂ (Order.shape (Inv.ord v)))
+    keys-above c (cutS false a s) (Base.ctxWf (Inv.base v)) (above-≋ c true (rested-risen (gh s) (envAt c) e p) (proj₂ (Order.flight (Inv.ord v)))) (tt , proj₂ (Order.shape (Inv.ord v)))
   rise-keys (inLn b c)                        s e      p v = tt , proj₂ (Order.shape (Inv.ord v))
   rise-keys (inTake i q free c)               s (nx a) p v = rise-take-keys c i q s a p v
   rise-keys (inTake i q free c)               s cp     p v = tt , proj₂ (Order.shape (Inv.ord v))
   -- a takeWhile already over absorbs what reaches it: the frames above
   -- saw only what it leaves running
   rise-keys (inTake i q (cpAt r) c)           s e      p v =
-    keys-above c (takeS i q (cpAt r) s) (above-≋ c true (ending-risen (r ⊕ [ last ]) (gh s) (envAt c) e p) (proj₂ (proj₂ (Order.flight (Inv.ord v)))))
+    keys-above c (takeS i q (cpAt r) s) (Base.ctxWf (Inv.base v)) (above-≋ c true (ending-risen (r ⊕ [ last ]) (gh s) (envAt c) e p) (proj₂ (proj₂ (Order.flight (Inv.ord v)))))
       (takeAt-risen (cpAt r) (gh s) (envAt c) e p (proj₁ (proj₂ (Order.flight (Inv.ord v)))) , proj₂ (Order.shape (Inv.ord v)))
   rise-keys (inTake i q (cutAt r) c)          s e      p v =
-    keys-above c (takeS i q (cutAt r) s) (above-≋ c true (rested-risen (gh s) (envAt c) e p) (proj₂ (proj₂ (Order.flight (Inv.ord v))))) (tt , proj₂ (Order.shape (Inv.ord v)))
+    keys-above c (takeS i q (cutAt r) s) (Base.ctxWf (Inv.base v)) (above-≋ c true (rested-risen (gh s) (envAt c) e p) (proj₂ (proj₂ (Order.flight (Inv.ord v))))) (tt , proj₂ (Order.shape (Inv.ord v)))
   rise-keys (inTake i q (overAt r) c)         s e      p v =
-    keys-above c (takeS i q (overAt r) s) (above-≋ c true (rested-risen (gh s) (envAt c) e p) (proj₂ (proj₂ (Order.flight (Inv.ord v))))) (tt , proj₂ (Order.shape (Inv.ord v)))
+    keys-above c (takeS i q (overAt r) s) (Base.ctxWf (Inv.base v)) (above-≋ c true (rested-risen (gh s) (envAt c) e p) (proj₂ (proj₂ (Order.flight (Inv.ord v))))) (tt , proj₂ (Order.shape (Inv.ord v)))
   rise-keys (inOuter op f d n q ls c)         s (nx a) p v = rise-admit-keys c op f d n q ls s a p v
   rise-keys (inOuter op f d n q ls c)         s cp     p v = rise-outer-end-keys c op f d n q ls s p v
   rise-keys (inLanes op f d n q o pre post c) s (nx b) p v with alive s in a

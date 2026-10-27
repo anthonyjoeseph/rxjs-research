@@ -31,11 +31,11 @@ open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Tail;
 open import denotation.MonotonicList using (MonotonicList; taking)
 open import denotation.Unfold using (Node; NEnv; stateᴺ; cutᴺ; states; restsᶜ; outerᴺ; endingᶜ; takeWhileᶜ; restᶜ)
 open import operation.PureObservable using (module Machine)
-open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ev; nx; cp; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; CS; Conf; ⟨_,_,_,_⟩; free; cpAt; cutAt; overAt; _⊕_)
+open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ev; nx; cp; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; CS; Conf; ⟨_,_,_,_⟩; free; cpAt; cutAt; overAt; _⊕_)
 open import adequacy.Engine.Meaning using (_≋_; ≋-by; ≋-out; mapped; scanned; switched; taking∞; took; rested; outerFrame; lanesFrame; srcFrame; bodyFrame;
   lane; lanesL; liveL; deadL; deadOne; holeL; holeT; tailsOn; poolG; poolT; outerT; outerG; laneRuns; poolRuns; gh; envAt; hole; flagOf; risen; endingAt)
   renaming (outerOf to outerOfᴹ)
-open import adequacy.Engine.Keys using (Shape; Shape′; TakeAt; FlatAt; LaneKeys; _∷ᴷ_; ConnAt; Keyed; KeyedL; Keys; srcIn)
+open import adequacy.Engine.Keys using (Shape; Shape′; TakeAt; FlatAt; LaneKeys; _∷ᴷ_; ConnAt; Keyed; KeyedL; srcIn)
 open import adequacy.Placed.Order using (Sorted; Headed; Disjoint; Ext; Owned; Prefix; every; everyT-mono; ext; owned-ext; prefix-++)
 open import adequacy.Placed.Keys using (ix-mark; last-mark; prefix-refl; prefix-plus; prefix-lane; tagged-mark)
 open import adequacy.Placed.Burst using (owned-drop; freshᴿ)
@@ -105,9 +105,6 @@ postulate
   -- THE KEYS KEPT: runs alike at every depth are kept alike by every frame
   -- above them.
   above-≋ : ∀ {R Γ A} (c : Ctx R Γ A) f {h h′ : Events∞ A} → h ≋ h′ → Above c f h → Above c f h′
-  -- Every frame above a hole keeping its own of the run the hole's ghost
-  -- gives it, and the hole its own: the whole tree keyed.
-  keys-above : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Above c (flagOf s) (stateᴺ (gh s) (envAt c)) → Keyed s (envAt c) → Keys (plug c s)
 
 -- A position not before a disjoint one: one past its last child is
 -- after it, apart from it, and no prefix of it.

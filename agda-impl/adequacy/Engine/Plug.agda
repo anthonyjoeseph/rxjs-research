@@ -39,8 +39,9 @@ open import adequacy.Engine.Meaning using (_≋_; ≋-by; ≋-sym; ≋-tr; ≋-t
   poolRuns; outerT; laneRuns; poolG; outerG; rested; bodyG)
 open import adequacy.Engine.Head using (Conn)
 open import adequacy.Engine.Head.Within using (fr-at)
-open import adequacy.Engine.Keys using (Held; KeyedL; ConnAt; here-at; keyed-at; keyedL-ʳ++)
-open import adequacy.Engine.Above using (Above; Flight; above-≋; lanes-runs; pool-runs; toʳ)
+open import adequacy.Engine.Keys using (Held; Keys; Keyed; KeyedL; ConnAt; FlatAt; here-at; keyed-at; keyedL-ʳ++)
+open import adequacy.Engine.Above using (Above; Flight; above-≋; lanes-runs; pool-runs; toʳ) renaming (keyedL-ʳ++ to keyedL-join)
+open import adequacy.Engine.Fold using (WfC)
 open import adequacy.Engine.Trails using (conn-shut; shape-st; shape-src; envAt-sorted; lanes-shape; lanes-held)
 
 ------------------------------------------------------------------------
@@ -156,7 +157,6 @@ mutual
       ρ  = envAt c
       h  = stateᴺ (gh s) ρ
       kd = keyed-at c (flatS op g d n q o (pre ʳ++ s ∷ post)) (proj₂ fs)
-      open import adequacy.Engine.Keys using (FlatAt)
       FlatAt′ = FlatAt ρ (outerᴺ (lane g) (outerG d (gh o)) ρ)
       L : states (lanesL (pre ʳ++ s ∷ post)) ρ ≡ laneRuns (reverse pre) post (flagOf s) ρ h
       L = toʳ (λ ls → states (lanesL ls) ρ ≡ laneRuns (reverse pre) post (flagOf s) ρ h) pre (lanes-runs (reverse pre) s post ρ)
@@ -195,3 +195,51 @@ mutual
 -- every frame above, kept.
 flight-held : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Held (plug c s) → Flight ⟨ c , s , absorbed , p ⟩
 flight-held c s p fs = shape-st c s fs , above-held c s fs
+
+------------------------------------------------------------------------
+-- And back: what every frame above keeps of a hole's run, the whole tree
+
+-- A source's rest, keyed as its run's rest.
+conn-unrested : ∀ {Γ X B} k {β : Events∞ B} (n : Node Γ X) (ρ : NEnv Γ) → ConnAt k β (rested {B = X} (stateᴺ n ρ)) ρ → ConnAt k β (stateᴺ (restᶜ n) ρ) ρ
+conn-unrested k n ρ x = record { mark = mark ; hm = hm ; at = at ; kb = kb ; kr = kr ; fr = fr ; cue = cue ; ks = ks ; rs = rs ; ub = ub ; sub = sub ; ends = ends }
+  where open ConnAt x
+
+-- Every frame above a hole keeping its own of the run the hole's ghost
+-- gives it, and the hole its own: the whole tree keyed.  Read only where
+-- each connect holding the hole in its source has its body subscribed
+-- (`WfC`): a source still to subscribe is idle as its hole reads it, and
+-- subscribed as the tree reads it.
+keys-above : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → WfC c → Above c (flagOf s) (stateᴺ (gh s) (envAt c)) → Keyed s (envAt c) → Keys (plug c s)
+keys-above top                               s v ab k = k
+keys-above (inMap g c)                       s v ab k = keys-above c (mapS g s) v (above-≋ c true (≋-by refl refl) ab) (tt , k)
+keys-above (inScan g z c)                    s v ab k = keys-above c (scanS g z s) v (above-≋ c true (≋-by refl refl) ab) (tt , k)
+keys-above (inCut true a c)                  s v ab k = keys-above c (cutS true a s) v ab (tt , k)
+keys-above (inCut false a c)                 s v ab k = keys-above c (cutS false a s) v (above-≋ c true (≋-by refl refl) ab) (tt , k)
+keys-above (inLn b c)                        s v ab k = keys-above c (lnS b s) v ab (tt , k)
+keys-above (inTake i q w c)                  s v (ta , ab) k =
+  keys-above c (takeS i q w s) v (above-≋ c true (take-plug i q w (gh s) (envAt c)) ab) (ta , k)
+keys-above (inOuter op g true n q ls c)      s (_ , v) ((fa , kl) , ab) k =
+  keys-above c (flatS op g true n q s ls) v (above-≋ c true (outer-plug op g true n q ls s (envAt c)) ab) (fa , k , kl)
+keys-above (inOuter op g false n q ls c)     s (_ , v) ((fa , kl) , ab) k =
+  keys-above c (flatS op g false n q s ls) v (above-≋ c true (outer-plug op g false n q ls s (envAt c)) ab) (fa , k , kl)
+keys-above (inLanes op g d n q o pre post c) s (_ , _ , _ , v) ((fa , ko , kp , kq , _) , ab) k =
+  keys-above c (flatS op g d n q o (pre ʳ++ s ∷ post)) v (above-≋ c true (lanes-plugʳ op g d n q o pre post s ρ) ab)
+    (subst₂ (FlatAt ρ (outerᴺ (lane g) (outerG d (gh o)) ρ)) (sym L) (sym P) fa , ko , keyedL-join pre kp (k , kq))
+  where
+    ρ  = envAt c
+    h  = stateᴺ (gh s) ρ
+    L : states (lanesL (pre ʳ++ s ∷ post)) ρ ≡ laneRuns (reverse pre) post (flagOf s) ρ h
+    L = toʳ (λ ls → states (lanesL ls) ρ ≡ laneRuns (reverse pre) post (flagOf s) ρ h) pre (lanes-runs (reverse pre) s post ρ)
+    pool : ∀ d → cutᴺ (poolG d (gh o) (deadL (reverse pre ++ s ∷ post))) ρ ≡ outerT d (gh o) ρ (poolRuns (reverse pre) post (flagOf s) ρ h)
+    pool false = pool-runs (reverse pre) s post ρ
+    pool true  = cong (cutᴺ (gh o) ρ ∪_) (pool-runs (reverse pre) s post ρ)
+    P : cutᴺ (poolG d (gh o) (deadL (pre ʳ++ s ∷ post))) ρ ≡ outerT d (gh o) ρ (poolRuns (reverse pre) post (flagOf s) ρ h)
+    P = toʳ (λ ls → cutᴺ (poolG d (gh o) (deadL ls)) ρ ≡ outerT d (gh o) ρ (poolRuns (reverse pre) post (flagOf s) ρ h)) pre (pool d)
+keys-above (inSrc (cs false sl sa nothing as ow r e) b c) s (refl , _ , v) ((ca , kb) , ab) k =
+  keys-above c (connS (cs false sl sa nothing as ow r e) s b) v (above-≋ c true (src-plugⁿ false sl sa as ow r e b s (envAt c)) ab) (ca , k , kb)
+keys-above (inSrc (cs true sl sa nothing as ow r e) b c) s (refl , _ , v) ((ca , kb) , ab) k =
+  keys-above c (connS (cs true sl sa nothing as ow r e) s b) v (above-≋ c true (src-plugⁿ true sl sa as ow r e b s (envAt c)) ab)
+    (conn-unrested (cs true sl sa nothing as ow r e) (gh s) (envAt c) ca , k , kb)
+keys-above (inSrc (cs cl sl sa (just _) as ow r e) b c) s (() , _ , v) ab k
+keys-above (inBody k o c)                    s (_ , _ , v) ((ca , ko , _) , ab) x =
+  keys-above c (connS k o s) v (above-≋ c true (body-plug k o s (envAt c)) ab) (ca , ko , x)
