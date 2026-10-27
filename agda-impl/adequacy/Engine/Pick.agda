@@ -71,7 +71,7 @@ open import adequacy.Engine.Above using (Flight; lanesL-++; deadL-++; rests-++)
 open import adequacy.Engine.Ahead using (Sides; Ahead; Under; shown; shows-open) renaming (shows to showsᶜ)
 open import adequacy.Engine.Scope using (Scope; modes; firsts-after; firsts-not-before; first-not-before; shut-head-eq; Outs; GhEᴸ; FloorAt; FloorSrc; first-floor; floor-lower; scope-src; past-floor; closures; ended-at; shut-floor; shut-states; Gh; Ghᴸ; gh-at; gh-told)
 open import adequacy.Sane using (Mode)
-open import adequacy.Stepper using (first; firstᴸ)
+open import adequacy.Stepper using (firsts; firstsᴸ)
 open import adequacy.Stepper.Past using (Floor; Floorᴱ; Firstᴸ)
 open import adequacy.Stepper.Flat using (head-mapᴱ)
 
@@ -495,10 +495,10 @@ outer-first : ∀ {R Γ A B} (c : Ctx R Γ B) p (g : A → Pos → Node Γ B) d 
             → Outs (modes c) (closures c) (envAt c) d (gh o) → (d ≡ false → NotBefore p (headˢ (step (shutAll (closures c) (gh o)))))
             → NotBefore p (headᴼ (outerᴺ g (outerG d (gh o)) (envAt c)))
 outer-first c p g true  o sc _         h = tt
-outer-first c p g false o sc (so , po) h =
+outer-first c p g false o sc fo h =
   subst (NotBefore p) (sym (head-mapᴱ _ (meaning (gh o) (envAt c))))
     (subst (NotBefore p) (shut-head-eq (closures c) (gh o) (envAt c) (ended-at c))
-      (first-not-before (modes c) (envAt c) p (step O) (meaning O (envAt c)) sc (first O (envAt c) so po) (h refl)))
+      (first-not-before (modes c) (envAt c) p (step O) (meaning O (envAt c)) sc (firsts O (envAt c) fo) (h refl)))
   where O = shutAll (closures c) (gh o)
 
 -- A lane first: its flatMap's other parts, each as the race read
@@ -532,7 +532,7 @@ sides-link c p op f d n q o pre post s fo fl dd gt sc hn ha ho = record
     E : lanesL (pre ʳ++ s ∷ post) ≡ (lanesL post ++ liveL s) ++ lanesL (reverse pre)
     E = trans (cong lanesL (ʳ++-defn pre)) (lanesL-++ (reverse pre) (s ∷ post))
     F₀ : Firstᴸ ν (map V ((lanesL post ++ liveL s) ++ lanesL (reverse pre))) ρ
-    F₀ = subst (λ ms → Firstᴸ ν (map V ms) ρ) E (firstᴸ {ν = ν} (map V (lanesL (pre ʳ++ s ∷ post))) ρ (proj₁ L) (proj₂ L))
+    F₀ = subst (λ ms → Firstᴸ ν (map V ms) ρ) E (firstsᴸ {ν = ν} (map V (lanesL (pre ʳ++ s ∷ post))) ρ L)
     F₁ : Firstᴸ ν (map V (lanesL post ++ liveL s)) ρ × Firstᴸ ν (map V (lanesL (reverse pre))) ρ
     F₁ = firstᴸ-++ (map V (lanesL post ++ liveL s)) (subst (λ ms → Firstᴸ ν ms ρ) (map-++ V (lanesL post ++ liveL s) (lanesL (reverse pre))) F₀)
     F : Firstᴸ ν (map V (lanesL post) ++ map V (liveL s)) ρ × Firstᴸ ν (map V (lanesL (reverse pre))) ρ
@@ -579,7 +579,7 @@ src-floor : ∀ {R Γ X B} p (c : Ctx R Γ B) kk (o : St Γ X) (b : St (X ∷ Γ
 src-floor p c (cs false sl sa nothing as ow r en) o b lo bf ft gt kt sc =
   shut-floor p (closures c) (gh o) (envAt c) (ended-at c)
     (first-floor (modes c) (envAt c) p (step V) (meaning V (envAt c)) sc
-      (first {ν = modes c} V (envAt c) (proj₁ G) (proj₂ G))
+      (firsts {ν = modes c} V (envAt c) G)
       (lost-floor p (cand (inSrc K b c) o) (step V) lo (shut-agrees c sl sa as ow r en o b ft gt)))
   where K = cs false sl sa nothing as ow r en
         V = shutAll (closures c) (gh o)
@@ -703,7 +703,7 @@ outer-link : ∀ {R Γ A B} (c : Ctx R Γ B) q op (f : A → Obs Timeline Γ B) 
            → All (λ l → After q (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore q (poolT (deadL ls) (envAt c))
 outer-link c q op f n q′ o ls ft gt sc hs =
   shut-states (After q) (closures c) (lanesL ls) (envAt c) (ended-at c)
-    (firsts-after (modes c) (envAt c) q V sc (firstᴸ {ν = modes c} V (envAt c) (proj₁ L) (proj₂ L))
+    (firsts-after (modes c) (envAt c) q V sc (firstsᴸ {ν = modes c} V (envAt c) L)
       (all-map⁺ hs))
   , pool-link c q op f n q′ o ls ft
   where V = map (shutAll (closures c)) (lanesL ls)

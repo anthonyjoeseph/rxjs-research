@@ -31,8 +31,8 @@ open import denotation.Unfold using (NEnv; Node; Source; live; ended; Step; out�
 open import Tree using (Obs; FlatOp)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; CS; cs; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; plug)
-open import adequacy.Sane using (Mode; runs; over; loose; Sane; Saneᴸ)
-open import adequacy.Placed.Order using (Placed; Placedᴸ)
+open import adequacy.Sane using (Mode; runs; over; loose)
+open import adequacy.Stepper using (Firm; Firmᴸ)
 open import adequacy.Stepper.Past using (Floor; Floorᴱ; floorᴱ-agree; First; Firstᴸ; afterᴱ; above; _≃_; alike)
 open import adequacy.Stepper.Parts using (shut-alikeⁱ)
 open import adequacy.Env using (nagree-refl)
@@ -213,7 +213,7 @@ shut-states P s (m ∷ ms) ρ t (a ∷ᴬ as) = subst P (shut-head-eq s m ρ t) 
 
 -- WHAT THE INVARIANT KEEPS OF EACH SUBSCRIBED CONNECT'S SOURCE, at the
 -- frame it sits in: its ghost read through the ended connects in scope
--- is a run's configuration there, placed in the environment the frame
+-- is firm (`adequacy.Stepper.Firm`) in the environment the frame
 -- reads, and so of each flatMap's lanes (`Lns`) and running outer
 -- (`Outs`); of each live joiner,
 -- that a shut connect told it its end (`Told`).  A lane at its place in
@@ -223,14 +223,14 @@ shut-states P s (m ∷ ms) ρ t (a ∷ᴬ as) = subst P (shut-head-eq s m ρ t) 
 --   connect's body, its own body emitting before its source subscribes,
 --   shows past the pick while ghosting that pending source untold.
 Src : ∀ {Γ X} → All (λ _ → Mode) Γ → Shuts Γ → NEnv Γ → CS → St Γ X → Set
-Src ν V ρ (cs false sl sa nothing as ow r en) o = Sane ν (shutAll V (gh o)) × Placed (shutAll V (gh o)) ρ
+Src ν V ρ (cs false sl sa nothing as ow r en) o = Firm ν (shutAll V (gh o)) ρ
 Src ν V ρ k                                   o = ⊤
 
 Lns : ∀ {Γ B} → All (λ _ → Mode) Γ → Shuts Γ → NEnv Γ → List (Node Γ B) → Set
-Lns ν V ρ ms = Saneᴸ ν (map (shutAll V) ms) × Placedᴸ (map (shutAll V) ms) ρ
+Lns ν V ρ ms = Firmᴸ ν (map (shutAll V) ms) ρ
 
 Outs : ∀ {Γ A} → All (λ _ → Mode) Γ → Shuts Γ → NEnv Γ → Bool → Node Γ A → Set
-Outs ν V ρ false n = Sane ν (shutAll V n) × Placed (shutAll V n) ρ
+Outs ν V ρ false n = Firm ν (shutAll V n) ρ
 Outs ν V ρ true  n = ⊤
 
 -- The scope read off the modes, shuts and environment in scope alone,
