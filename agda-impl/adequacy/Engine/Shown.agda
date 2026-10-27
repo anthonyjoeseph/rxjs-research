@@ -19,13 +19,12 @@ open import Data.List using ([]; _∷_; _++_; [_]; reverse; _ʳ++_)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.List.Relation.Unary.All using (All) renaming (map to allMap; _∷_ to _∷ᴬ_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 
-open import Tree using (Obs)
-open import denotation.MonotonicList.Events using (Events∞; Timeline; Pos; ix; idle; hush)
+open import denotation.MonotonicList.Events using (Events∞; Pos; ix; idle; hush)
 open import denotation.MonotonicList using (head; Agreeᵀ)
 open import denotation.NonExpansive using (_,ˢ_; mapᴱ-ne; scanᴱ-ne; Agreeˢ)
 open import denotation.Unfold using (stateᴺ; states; outerᴺ)
@@ -38,14 +37,14 @@ open import adequacy.Engine.Meaning using (_≋_; ≋-trans; same; ≋-tr; mappe
   flagOf; lanesFrame; outerFrame-ne; lanesFrame-ne; bodyFrame-ne; connSrc-ne; taking∞-ne;
   srcState; srcG; poolT; outerT)
 open import adequacy.Engine.Race using (First; After; NotBefore; TailNotBefore)
-open import adequacy.Engine.Head using (Frag; cand; <ᴷ-irrefl; ≮ᴷ-trans; ≮<ᴷ; ext-≮)
-open import adequacy.Engine.Keys using (Held; Keys)
+open import adequacy.Engine.Head using (Frag; cand; <ᴷ-irrefl)
+open import adequacy.Engine.Keys using (Held)
 open import adequacy.Engine.Fold using (Unpended; found-own)
-open import adequacy.Engine.Pick using (Beat; past; KAfter; KNotBefore; Lost; body-link; Before; Race; LaneWon; lane-won; race-shut; lanes-gh;
-  after-step; lane-sides; outer-link; src-floor)
+open import adequacy.Engine.Pick using (Beat; past; KAfter; body-link; Before; race-shut; lanes-gh; after-step; lane-sides; outer-link)
+open import adequacy.Engine.Pick.Lead using (under-after; kafter-≤; knot-≤; knot-lost; before-≤; beat-scope; lanewon-≤)
 open import adequacy.Engine.Head.Within using (frag-flat; frag-parts)
 open import adequacy.Engine.Ahead using (Under; shows; shows-open; shown)
-open import adequacy.Engine.Scope using (Scope; modes; scope-src; Gh)
+open import adequacy.Engine.Scope using (Gh)
 open import adequacy.Engine.Drop using (Dropsˢ; Pass; SrcPass; mapped-drops; scanned-drops; took-drops; lanes-drops; body-drops;
   outer-drops; src-drops; ≋-⊒)
 open import adequacy.Engine.Beside using (Sourced; sourced; sourced-≋)
@@ -67,8 +66,6 @@ keyAt false q = at q
 keyAt true  q = after q
 
 postulate
-  -- Past a position is after every position under it.
-  under-after : ∀ q y → after q <ᴷ at (q ++ y) ≡ false
   -- A SOURCE PAST ITS SKIPS shows no earlier than any position under
   -- them and, hushed, leaves nothing running.
   src-next : ∀ {R Γ X B} v q {P} (c : Ctx R Γ B) sa ba as r en (o : St Γ X) (b : St (X ∷ Γ) B) {h h′ : Events∞ X}
@@ -161,63 +158,6 @@ sought-under true q so _ (k , pk , y , refl) with so k pk
 past-key : ∀ v q → past false (keyAt v q) ≡ after q
 past-key false q = refl
 past-key true  q = refl
-
-------------------------------------------------------------------------
--- A race read at a key, read no later
-
-kafter-≤ : ∀ {A} K k (x : Maybe (Key × Out A)) → K <ᴷ at k ≡ false → KAfter K x → KAfter (at k) x
-kafter-≤ K k nothing        c w = tt
-kafter-≤ K k (just (h , _)) c w = ≮<ᴷ (at k) K h c w
-
-knot-≤ : ∀ {A} K k (x : Maybe (Key × Out A)) → K <ᴷ at k ≡ false → KNotBefore K x → KNotBefore (at k) x
-knot-≤ K k nothing        c w = tt
-knot-≤ K k (just (h , _)) c w = ≮ᴷ-trans h K (at k) w c
-
--- A candidate no earlier than a key shows no earlier than it either.
-knot-lost : ∀ {A} k (x : Maybe (Key × Out A)) → KNotBefore k x → Lost false k x
-knot-lost k nothing                w = tt
-knot-lost k (just (at h , _))    w = ≮ᴷ-trans (at (h ++ [ ix 0 ])) (at h) k (ext-≮ h [ ix 0 ]) w
-knot-lost k (just (after h , _)) w = w
-
-before-≤ : ∀ K k ms → K <ᴷ at k ≡ false → Before K ms → Before (at k) ms
-before-≤ K k ms c = allMap (λ {mk} w → ≮<ᴷ (at k) K (proj₂ mk) c w)
-
--- A key read past a live source's skips is no earlier than it.
-past-≮ : ∀ v key k → key <ᴷ at k ≡ false → past v key <ᴷ at k ≡ false
-past-≮ true  key       k c = c
-past-≮ false (at p)    k c = ≮ᴷ-trans (after p) (at p) (at k) (subst (λ q → after p <ᴷ at q ≡ false) (++-identityʳ p) (under-after p [])) c
-past-≮ false (after p) k c = c
-
--- Every connect a still find beats on its way up runs its source at or
--- past each position the find's key covers.
-beat-scope : ∀ {R Γ A} key k (c : Ctx R Γ A) (s : St Γ A) → Beat key c s → key <ᴷ at k ≡ false → Frag (plug c s) → Gh top (plug c s) → Keys (plug c s) → Scope k c
-beat-scope key k top                               s b ck ft gt kt = tt
-beat-scope key k (inMap f c)                       s b ck ft gt kt = beat-scope key k c (mapS f s) b ck ft gt kt
-beat-scope key k (inScan f z c)                    s b ck ft gt kt = beat-scope key k c (scanS f z s) b ck ft gt kt
-beat-scope key k (inCut l a c)                     s b ck ft gt kt = beat-scope key k c (cutS l a s) b ck ft gt kt
-beat-scope key k (inLn b′ c)                       s b ck ft gt kt = beat-scope key k c (lnS b′ s) b ck ft gt kt
-beat-scope key k (inTake i q w c)                  s b ck ft gt kt = beat-scope key k c (takeS i q w s) b ck ft gt kt
-beat-scope key k (inOuter op f d n q ls c)         s (_ , b) ck ft gt kt = beat-scope key k c (flatS op f d n q s ls) b ck ft gt kt
-beat-scope key k (inLanes op f d n q o pre post c) s (_ , b) ck ft gt kt = beat-scope key k c (flatS op f d n q o (pre ʳ++ s ∷ post)) b ck ft gt kt
-beat-scope key k (inSrc kk b′ c)                   s (_ , _ , b) ck ft gt kt =
-  beat-scope (past (over kk) key) k c (connS kk s b′) b (past-≮ (over kk) key k ck) ft gt kt
-beat-scope key k (inBody kk o c)                   s (nb , bf , b) ck ft gt kt =
-  scope-src (modes c) k (srcG kk o) (envAt c)
-    (src-floor k c kk o s (knot-lost (at k) (cand (inSrc kk s c) o) (knot-≤ key k (cand (inSrc kk s c) o) ck nb)) (before-≤ key k (own (connS kk o s)) ck bf) ft gt kt sc) sc
-  where sc = beat-scope key k c (connS kk o s) b ck ft gt kt
-
-race-map : ∀ {R Γ A B} {P P′ : Key → Maybe (Key × Out B) → Set} {k k′} → (∀ x → P k x → P′ k′ x)
-         → ∀ (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) acc ls tl
-         → Race P k c op f d n q o acc ls tl → Race P′ k′ c op f d n q o acc ls tl
-race-map m c op f d n q o acc []       tl r       = tt
-race-map m c op f d n q o acc (x ∷ xs) tl (w , r) = m _ w , race-map m c op f d n q o (x ∷ acc) xs tl r
-
-lanewon-≤ : ∀ {R Γ A B} K k (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B)
-          → K <ᴷ at k ≡ false → LaneWon K c op f d n q o pre post s → LaneWon (at k) c op f d n q o pre post s
-lanewon-≤ K k c op f d n q o pre post s le (lane-won wo wold wnew) =
-  lane-won (knot-≤ K k _ le wo)
-    (race-map (λ x → kafter-≤ K k x le) c op f d n q o [] (reverse pre) (s ∷ post) wold)
-    (race-map (λ x → knot-≤ K k x le) c op f d n q o (s ∷ pre) post [] wnew)
 
 ------------------------------------------------------------------------
 -- The walk

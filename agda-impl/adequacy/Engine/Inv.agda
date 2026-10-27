@@ -13,7 +13,7 @@ module adequacy.Engine.Inv where
 open import Data.Bool using (Bool; true; false; not; if_then_else_; _∧_)
 open import Data.Bool.Properties using (∧-identityʳ)
 open import Level using (lift; lower)
-open import Data.Empty using (⊥-elim)
+open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _ʳ++_; null; [_]; reverse)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (zero; suc; pred; _<ᵇ_; _≡ᵇ_)
@@ -44,7 +44,8 @@ open import adequacy.Engine.Race using (NotBefore)
 open import adequacy.Engine.Meaning using (_≋_; ≋-by; flagOf; envAt; gh; risen; lane; lanesL; laneRuns; poolRuns; outerT; outerG; poolG; deadL)
 open import adequacy.Engine.Flown using (Owed; NextOwed; rise-owed; sub-owed)
 open import adequacy.Engine.Plug using (flight-held; keys-above; keys-swap)
-open import adequacy.Engine.Pick using (Order; order; module Order; Heard; whole; KeysAt; Shaped; Lead; Snap; ⊤₁; tt; Won; lead-clear; lead-ends; lane-on; lane-off; pooled-live; search-won; Caused; Causal; Caught; caught-sub; Within)
+open import adequacy.Engine.Pick using (Order; order; module Order; Heard; whole; KeysAt; Shaped; Lead; Snap; ⊤₁; tt; Won; lane-on; pooled-live; search-won; Causal; Caught; caught-sub; Within)
+open import adequacy.Engine.Pick.Lead using (lead-clear; lead-ends; lane-off)
 open import adequacy.Engine.Ghosted using (NextTold; told-next)
 open import adequacy.Engine.Scope using (Gh)
 open import adequacy.Engine.Firmed using (gh-firm)
@@ -389,8 +390,8 @@ module _ {R : Set} where
   NextLead (value t p a k) = Lead k
   NextLead (complete p)    = ⊤₁
   NextLead drained         = ⊤₁
-  NextCaused (silent t k)    = Caused k
-  NextCaused (value t p a k) = Caused k
+  NextCaused (silent t k)    = Causal (whole k)
+  NextCaused (value t p a k) = Causal (whole k)
   NextCaused (complete p)    = ⊤₁
   NextCaused drained         = ⊤₁
 
@@ -436,10 +437,12 @@ module _ {R : Set} where
     run-flight : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , absorbed , p ⟩ → NextOwed (step ⟨ c , s , absorbed , p ⟩)
     -- A tree's first subscription is in shape.
     flight-load : (o : Obs Timeline [] R) → Flight (Machine.load o)
-    -- THE STILL'S SUBTREE: where the search runs after a step, every
-    -- node's every mark is aloft: nothing is keyed under a skip that has
-    -- not yet run.
-    causal-next : ∀ k → Base k → Order k → NextCaused (step k)
+    -- THE STILL'S SUBTREE: after a step every node's every mark is
+    -- aloft, nothing keyed under a skip not yet run: kept by a rise, a
+    -- subscription begun, and a mark run.
+    rise-causal : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Inv ⟨ c , s , rising e , p ⟩ → NextCaused (step ⟨ c , s , rising e , p ⟩)
+    sub-causal : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , subscribing , p ⟩ → NextCaused (step ⟨ c , s , subscribing , p ⟩)
+    run-causal : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , absorbed , p ⟩ → NextCaused (step ⟨ c , s , absorbed , p ⟩)
     -- A mark run rises, if at all, the event it showed, at its own key,
     -- leaving a node as live as the one it ran.
     run-lead : ∀ (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} p → search top t ≡ just (found (Γ , A , c , s) m key)
@@ -769,6 +772,11 @@ module _ {R : Set} where
   keys-next ⟨ c , s , subscribing , p ⟩ b o = sub-keys c s p (b & o)
   keys-next ⟨ c , s , absorbed , p ⟩    b o = run-keys c s p (b & o)
 
+  causal-next : ∀ k → Base k → Order k → NextCaused (step k)
+  causal-next ⟨ c , s , rising e , p ⟩    b o = rise-causal c s e p (b & o)
+  causal-next ⟨ c , s , subscribing , p ⟩ b o = sub-causal c s p (b & o)
+  causal-next ⟨ c , s , absorbed , p ⟩    b o = run-causal c s p (b & o)
+
   held : ∀ x → NextFrag x → NextKeys x → NextShape x
   held (silent t k)    f h = f , h
   held (value t p a k) f h = f , h
@@ -838,8 +846,34 @@ module _ {R : Set} where
   inv-next : ∀ k → Inv k → NextInv (step k)
   inv-next k (b & o) = both (step k) (base-next k b) (ord-next k b o)
 
+  -- Under any frame a node is not a subscription, so a tree that is one
+  -- holds it at the root, owning nothing: causal.
+  plug-pend : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) {o} → Unpended s → plug c s ≡ pend o → ⊥
+  plug-pend top                               s u refl = u
+  plug-pend (inMap f c)                       s u e    = plug-pend c _ tt e
+  plug-pend (inScan f z c)                    s u e    = plug-pend c _ tt e
+  plug-pend (inCut l a c)                     s u e    = plug-pend c _ tt e
+  plug-pend (inLn b c)                        s u e    = plug-pend c _ tt e
+  plug-pend (inTake i q w c)                  s u e    = plug-pend c _ tt e
+  plug-pend (inOuter op f d n q ls c)         s u e    = plug-pend c _ tt e
+  plug-pend (inLanes op f d n q o pre post c) s u e    = plug-pend c _ tt e
+  plug-pend (inSrc kk b c)                    s u e    = plug-pend c _ tt e
+  plug-pend (inBody kk o c)                   s u e    = plug-pend c _ tt e
+
+  load-causal : (o : Obs Timeline [] R) → Causal (whole (Machine.load o))
+  load-causal o top                               s refl ()
+  load-causal o (inMap f c)                       s e    m = ⊥-elim (plug-pend c _ tt e)
+  load-causal o (inScan f z c)                    s e    m = ⊥-elim (plug-pend c _ tt e)
+  load-causal o (inCut l a c)                     s e    m = ⊥-elim (plug-pend c _ tt e)
+  load-causal o (inLn b c)                        s e    m = ⊥-elim (plug-pend c _ tt e)
+  load-causal o (inTake i q w c)                  s e    m = ⊥-elim (plug-pend c _ tt e)
+  load-causal o (inOuter op f d n q ls c)         s e    m = ⊥-elim (plug-pend c _ tt e)
+  load-causal o (inLanes op f d n q o′ pre post c) s e   m = ⊥-elim (plug-pend c _ tt e)
+  load-causal o (inSrc kk b c)                    s e    m = ⊥-elim (plug-pend c _ tt e)
+  load-causal o (inBody kk o′ c)                  s e    m = ⊥-elim (plug-pend c _ tt e)
+
   inv-load : (o : Obs Timeline [] R) → Inv (Machine.load o)
-  inv-load o = base-load o & order (tt , tt , tt) (flight-load o) (lift (λ _ → tt)) tt tt tt
+  inv-load o = base-load o & order (tt , tt , tt) (flight-load o) (lift (λ _ → tt)) (load-causal o) tt tt
 
   -- A settled node anywhere in a tree the invariant holds of, absorbed at
   -- the same position: the invariant at it.

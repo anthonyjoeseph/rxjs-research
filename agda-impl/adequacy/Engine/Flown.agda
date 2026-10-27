@@ -46,7 +46,8 @@ open import adequacy.Engine.Admit using (states-length; begun-runs; begun-pool; 
   kill-lanes; kill-pool)
 open import adequacy.Engine.Drop using (Dropsˢ; Pass; Links; pass-of; lane-admits)
 open import adequacy.Engine.Passed using (above-drops)
-open import adequacy.Engine.Pick using (Order; module Order; lanes-ʳsplit; lead-clear; lead-ends)
+open import adequacy.Engine.Pick using (Order; module Order; lanes-ʳsplit)
+open import adequacy.Engine.Pick.Lead using (lead-clear; lead-ends)
 open import adequacy.Engine.Head.Within using (frag-flat; frag-parts)
 open import adequacy.Placed.Order using (Ordered; Steady; Every; EveryT; Every∞; Headed; Atop; Past; Disjoint; ordered; steady; every; every∞-mono; everyT-mono;
   ordered-map; ordered-scan; steady-map; steady-scan)
