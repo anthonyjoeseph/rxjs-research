@@ -34,8 +34,10 @@ open import adequacy.Engine.Meaning using (envAt; gh; risen; lane; lanesL; laneR
 open import adequacy.Engine.Flown using (Owed; NextOwed; rise-owed; sub-owed)
 open import adequacy.Engine.Plug using (flight-held)
 open import adequacy.Engine.Pick using (Order; order; module Order; Heard; whole; KeysAt; Shaped; Lead; Clear; Ends; EndsIf; Won; won-clear; won-ends; out-open; search-won; Apart; Searched)
-open import adequacy.Engine.Ghosted using (NextGhost; ghost-next)
+open import adequacy.Engine.Ghosted using (NextTold; told-next)
 open import adequacy.Engine.Scope using (Gh)
+open import adequacy.Engine.Firmed using (gh-firm)
+open import adequacy.Engine.Shuts using (Toldˢ; none)
 open import operation.PureObservable using (Tape; play; ending; over; module Machine; module Driver)
 open import adequacy.Engine.Fold using (Base; Owns; Unpended; Wf; WfC; Wfs; attO; base-at; bodyO; cpO; cutO; if-inv; inv; joinO; leafO; ofO; opened-move; opened-none; owedO; owned; pend-unsubIf; search-hit; settle-settled; srcAttO; wf-cut; wf-ended; wf-feed; wf-killAll; wf-split; wf-unsubIf; wfI; wfs-++; wfs-ʳ++)
 
@@ -567,9 +569,9 @@ module _ {R : Set} where
   ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
   ...   | pl , _ = run-lead (plug c s) p e
                      (λ q a s″ kq oa al → won-clear q a c′ s′ s″ al (out-open c′ s′ m oa)
-                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oa (search-won (plug c s) (proj₁ (Order.shape o)) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))) (subst (Gh top) (sym pl) (Order.ghosted o)) (subst Keys (sym pl) (proj₂ (Order.shape o))))
+                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oa (search-won (plug c s) (proj₁ (Order.shape o)) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))) (subst (Gh top) (sym pl) (gh-firm (plug c s) (proj₂ (Order.shape o)) (Order.told o))) (subst Keys (sym pl) (proj₂ (Order.shape o))))
                      (λ q s″ kq oc al → won-ends q c′ s′ s″ al
-                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oc (search-won (plug c s) (proj₁ (Order.shape o)) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))) (subst (Gh top) (sym pl) (Order.ghosted o)) (subst Keys (sym pl) (proj₂ (Order.shape o))))
+                        (subst₂ (λ k x → Won (k , x) c′ s′) kq oc (search-won (plug c s) (proj₁ (Order.shape o)) e)) (subst Frag (sym pl) (proj₁ (Order.shape o))) (subst (Gh top) (sym pl) (gh-firm (plug c s) (proj₂ (Order.shape o)) (Order.told o))) (subst Keys (sym pl) (proj₂ (Order.shape o))))
 
   -- A takeWhile failing a value ends one past it, what the frames above
   -- saw of the value's run.
@@ -700,7 +702,7 @@ module _ {R : Set} where
   flight-next : ∀ k → Base k → Order k → NextFlight (step k)
   flight-next k b o = flown (step k) (shape-next k b o) (flight-owed k b o)
 
-  joined : ∀ x → NextShape x → NextFlight x → NextLead x → NextApart x → NextHeard x → NextGhost x → NextOrd x
+  joined : ∀ x → NextShape x → NextFlight x → NextLead x → NextApart x → NextHeard x → NextTold x → NextOrd x
   joined (silent t k)    f g l u e h = order f g l u e h
   joined (value t p a k) f g l u e h = order f g l u e h
   joined (complete p)    f g l u e h = tt
@@ -726,7 +728,7 @@ module _ {R : Set} where
   ... | just (found (_ , _ , c′ , s′) m key) = run-heard c′ p (proj₂ (search-hit (plug c s) e))
 
   ord-next : ∀ k → Base k → Order k → NextOrd (step k)
-  ord-next k b o = joined (step k) (shape-next k b o) (flight-next k b o) (lead-next k b o) (apart-next k b o) (heard-next k o) (ghost-next k b o)
+  ord-next k b o = joined (step k) (shape-next k b o) (flight-next k b o) (lead-next k b o) (apart-next k b o) (heard-next k o) (told-next k b o)
 
   both : ∀ x → NextBase x → NextOrd x → NextInv x
   both (silent t k)    b o = b & o
@@ -743,5 +745,5 @@ module _ {R : Set} where
   -- A settled node anywhere in a tree the invariant holds of, absorbed at
   -- the same position: the invariant at it.
   inv-at : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Unpended s → Wf (plug c s) → Held (plug c s) → Apart (plug c s)
-         → Gh top (plug c s) → Inv ⟨ c , s , absorbed , p ⟩
+         → Toldˢ none (plug c s) → Inv ⟨ c , s , absorbed , p ⟩
   inv-at c s p u w f t g = base-at c s p u w & order f (flight-held c s p f) tt t tt g

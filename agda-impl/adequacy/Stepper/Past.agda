@@ -342,14 +342,26 @@ rejoin-first ν ρ i p t (end c)     eq al with p <ᵖ c in f
 ... | true  = inj₂ (past-at ν ρ i t (subst (λ e → Belowᴱ e (c ++ [ sub p ]) nothing) (sym eq) (shown-sub c p , tt)))
 ... | false = inj₂ (past-at ν ρ i t (subst (λ e → Belowᴱ e (p ++ [ last ]) nothing) (sym eq) (apart-end p c (λ pc → every al (inj₁ (subst (Prefix p) pc (prefix-refl p)))) f , tt)))
 
+-- What a joiner's first event reads: of one fed nothing and told
+-- nothing, that its source runs and is alien to it.
+Joined : ∀ {A} → Mode → Pos → List (Pos × Maybe A) → Maybe Pos → Events A → Set
+Joined m p []      nothing  h = Told m nothing × Alien p h
+Joined m p []      (just c) h = ⊤
+Joined m p (x ∷ xs) e       h = ⊤
+
+joined : ∀ {A} m p (xs : List (Pos × Maybe A)) e (h : Events A) → Told m e → Alien p h → Joined m p xs e h
+joined m p []      nothing  h t al = t , al
+joined m p []      (just c) h t al = tt
+joined m p (x ∷ xs) e       h t al = tt
+
 -- A joiner shows what it was fed, then its end once told it, else its
 -- source rejoined.
-first-join : ∀ {Γ A} (ν : All (λ _ → Mode) Γ) (i : A ∈ Γ) p xs e (ρ : NEnv Γ) → Told (lookup ν i) e → Alien p (lookup ρ i)
+first-join : ∀ {Γ A} (ν : All (λ _ → Mode) Γ) (i : A ∈ Γ) p xs e (ρ : NEnv Γ) → Joined (lookup ν i) p xs e (lookup ρ i)
            → Firsts ν (U.joinᶜ i p xs e) ρ
-first-join ν i p ((q , just a) ∷ xs) e ρ t al = inj₁ (out⁼ stopᵀ stop)
-first-join ν i p ((q , nothing) ∷ xs) e ρ t al = inj₁ (skip⁼ stopᵀ stop)
-first-join ν i p [] (just c) ρ t al = inj₁ end⁼
-first-join ν i p [] nothing ρ t al = rejoin-first ν ρ i p t (lookup ρ i) refl al
+first-join ν i p ((q , just a) ∷ xs) e ρ j = inj₁ (out⁼ stopᵀ stop)
+first-join ν i p ((q , nothing) ∷ xs) e ρ j = inj₁ (skip⁼ stopᵀ stop)
+first-join ν i p [] (just c) ρ j = inj₁ end⁼
+first-join ν i p [] nothing ρ (t , al) = rejoin-first ν ρ i p t (lookup ρ i) refl al
 
 -- What a source shown at or past `k` shows before, lies past `k`.
 aboveᴱ : ∀ {A} k h m (e : Events A) → Floorᴱ k e → Belowᴱ e h m → k <ᵖ h ≡ true

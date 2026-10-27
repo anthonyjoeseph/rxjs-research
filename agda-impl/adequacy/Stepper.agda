@@ -25,7 +25,7 @@ open import denotation.MonotonicList.Events using (Events; Events∞; out; skip;
 open import denotation.MonotonicList using (Agree; Agreeᵀ; stop; stopᵀ; out⁼; skip⁼; end⁼; hush⁼; agree-refl; agreeᵀ-refl; agreeᵀ-sym; agree-trans)
 open import denotation.NonExpansive using (Agreeˢ; _,ˢ_; beside-ne; body-ne; before-agree; ∪-ne; burstOn-ne)
 open import adequacy.Stepper.Past using (Belowᴱ; Clear; Clearᴱ; First; Firsts; Firstᴸ; Firstᴹ; Floor; Floorᴱ; Past; Pastᴱ; Shy; Skips;
-  Skipsᴸ; Skipsᴹ; _≃_; afterᴱ; alike; before-after; clear-floor; clear-lower; first-join;
+  Skipsᴸ; Skipsᴹ; _≃_; afterᴱ; alike; before-after; clear-floor; clear-lower; first-join; Joined; joined;
   floorᴱ-agree; head-map; head-scan; join-skips; one-map; one-scan; one-take; past-before;
   past-map; past-scan; past-take; past-under; shows; under-≡)
 open import adequacy.Stepper.Flat using (earliest-found; flat-first)
@@ -35,8 +35,8 @@ open Agreeˢ using (nowˢ)
 import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
-open import adequacy.Sane using (Sane; Saneᴹ; Saneᴸ; Mode; runs; over; Rested; step-rested; Told)
-open import adequacy.Placed.Order using (still; Placed; Placedᴹ; Placedᴸ; Sides; Alien)
+open import adequacy.Sane using (Sane; Saneᴹ; Saneᴸ; Mode; runs; over; Rested; step-rested)
+open import adequacy.Placed.Order using (still; Placed; Placedᴹ; Placedᴸ; Sides)
 open import adequacy.Placed.Heads using (apart-sides)
 open import adequacy.Placed.Keys using (ahead-quiet)
 
@@ -186,7 +186,8 @@ first-rested ν (U.burstingᶜ r t) ρ _ = first-bursting {ν = ν} r t ρ
 first-rested ν (U.underᶜ s b)    ρ _ = first-under {ν = ν} s b ρ
 
 -- WHAT A NODE'S FIRST EVENT READS of sanity and placing: each pool
--- rested, each joiner told and alien to its source, each defer placed.
+-- rested, each idle joiner untold where its source ended and alien to
+-- it, each defer placed.
 -- No order: a node's meaning starts with its step's event whatever
 -- follows it.
 mutual
@@ -195,7 +196,7 @@ mutual
   Firm ν (U.scanᶜ f z c)                 ρ = Firm ν c ρ
   Firm ν (U.takeWhileᶜ i p c)            ρ = Firm ν c ρ
   Firm ν (U.flatMapᶜ op g o ls qs pl)    ρ = Firmᴹ ν o ρ × Firmᴸ ν ls ρ × Rested pl
-  Firm ν (U.joinᶜ i p xs e)              ρ = Told (lookup ν i) e × Alien p (lookup ρ i)
+  Firm ν (U.joinᶜ i p xs e)              ρ = Joined (lookup ν i) p xs e (lookup ρ i)
   Firm ν (U.connectᶜ r b (U.live s))     ρ = Firm (runs ∷ᴬ ν) b (U.meaning s ρ ∷ᴬ ρ) × Firm ν s ρ
   Firm ν (U.connectᶜ r b (U.ended c t))  ρ = Firm (over ∷ᴬ ν) b (end c ∷ᴬ ρ) × Rested t
   Firm ν (U.deferᶜ l p ns)               ρ = Placed (U.deferᶜ l p ns) ρ
@@ -217,7 +218,7 @@ firm (U.mapᶜ f c)                   ρ sn             (_ , pl)          = firm
 firm (U.scanᶜ f z c)                ρ sn             (_ , pl)          = firm c ρ sn pl
 firm (U.takeWhileᶜ i p c)           ρ sn             (_ , pl)          = firm c ρ sn pl
 firm (U.flatMapᶜ op g o ls qs pl)   ρ (so , sl , _ , rp) (_ , po , pls , _) = firmᴹ o ρ so po , firmᴸ ls ρ sl pls , rp
-firm (U.joinᶜ i p xs e)             ρ sn             (_ , al)          = sn , al
+firm (U.joinᶜ i p xs e)             ρ sn             (_ , al)          = joined _ p xs e _ sn al
 firm (U.connectᶜ r b (U.live s))    ρ (sb , ss)      (_ , pb , ps , _) = firm b (U.meaning s ρ ∷ᴬ ρ) sb pb , firm s ρ ss ps
 firm (U.connectᶜ r b (U.ended c t)) ρ (sb , rt)      (_ , pb)          = firm b (end c ∷ᴬ ρ) sb pb , rt
 firm (U.deferᶜ l p ns)              ρ _              pd                = pd
@@ -256,7 +257,7 @@ firsts {ν = ν} (U.takeWhileᶜ i p c) ρ fm with firsts c ρ fm
 ... | inj₂ pa = inj₂ (past-take ν ρ i p (U.step c) (U.meaning c ρ) pa)
 firsts {ν = ν} (U.flatMapᶜ op g o ls qs pl) ρ (fo , fl , rp) =
   flat-first op g o ls qs pl ρ (firstsᴹ o ρ fo) (firstsᴸ ls ρ fl) rp (first-rested ν pl ρ rp)
-firsts {ν = ν} (U.joinᶜ i p xs e) ρ (t , al) = first-join ν i p xs e ρ t al
+firsts {ν = ν} (U.joinᶜ i p xs e) ρ j = first-join ν i p xs e ρ j
 firsts {ν = ν} (U.connectᶜ r b (U.live s)) ρ (fb , fs) =
   Beside.conn ν runs r ρ (U.meaning s ρ) (U.meaning s ρ) (U.stateᴺ s ρ) (U.step s) (U.stateᴺ b (U.meaning s ρ ∷ᴬ ρ)) (U.step b)
     (U.bodyˢ r (U.live s)) (U.step (U.connectᶜ r b (U.live s))) (λ p → p) (head-body r (U.live s) (U.step b))

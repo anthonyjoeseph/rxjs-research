@@ -8,22 +8,20 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE SCOPE
+#### THE TOLD
 
-A frame's link to the meaning reads every connect above it: each running
-source at or past the pick, derived per connect from its lost race through
-`Stepper.first`, or for a source still pending, from where it subscribes.
-Open: a step rewriting a node keeping each subscribed source's and each
-lane's and running outer's shut view `Sane`/`Placed`, and each live joiner told (`Scope.Gh`,
-carried in `Order`), the frames above included, mid-rise as well. Its order
-is probed mid-rise (`quickcheck.Scoped`), unrefuted. Settled by their steps
-over one fold along the context, or a refutation.
+Every joiner the shut view sees is told of its source's end (`Toldˢ none`,
+carried in `Order`); the ghost's scope follows wherever the tree is keyed
+(`Firmed.gh-firm`). Open: each step rewriting a node keeps it, mid-rise
+too. Risky: `begin-told` (a joiner subscribed inside an ended body) and
+`src-end-told` (the feed tells every joiner). Settled by a per-frame
+factoring of `Toldˢ none (plug c s)`, or a refutation.
 
-Members: `src-value-ghost`, `src-end-ghost`, `body-end-ghost`,
-`scan-ghost`, `take-fail-ghost`, `admit-ghost`, `outer-end-ghost`,
-`lane-end-ghost`, `begin-ghost`, `of-ghost`, `att-ghost`, `cp-ghost`,
-`cut-ghost`, `body-ghost`, `srcAtt-ghost`, `owed-ghost`, `join-ghost`,
-`leaf-ghost`.
+Members: `src-value-told`, `src-end-told`, `body-end-told`,
+`scan-told`, `take-fail-told`, `admit-told`, `outer-end-told`,
+`lane-end-told`, `begin-told`, `of-told`, `att-told`, `cp-told`,
+`cut-told`, `body-told`, `srcAtt-told`, `owed-told`, `join-told`,
+`leaf-told`.
 
 #### THE FLIGHT KEPT
 
