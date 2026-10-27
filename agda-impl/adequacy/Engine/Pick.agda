@@ -36,12 +36,11 @@ module adequacy.Engine.Pick where
 open import Data.Empty using (⊥; ⊥-elim)
 open import Level using (Lift; suc; zero)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∨_; _∧_)
-open import Data.Bool.Properties using (∧-identityʳ)
 open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; reverse; null; map)
 open import Data.List.Properties using (ʳ++-defn; ++-identityʳ; map-++; ++-assoc; ∷-injectiveˡ; ∷-injectiveʳ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Sum using (_⊎_; inj₁; inj₂) renaming ([_,_] to either)
-open import Data.List.Relation.Unary.All using (All; []; _∷_)
+open import Data.List.Relation.Unary.All using (All; []; _∷_) renaming (map to allMap; head to allHead; tail to allTail)
 open import denotation.Unfold using (NEnv)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to all-++⁺; map⁺ to all-map⁺)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -56,17 +55,19 @@ open import denotation.MonotonicList using (head; headᴼ; Agreeᵀ; agreeᵀ-re
 open import denotation.Unfold using (Node; Step; states; step; headˢ; hushˢ; outˢ; skipˢ; endˢ; meaning; subscribe; outerᴺ; cutᴺ; restsᶜ)
 open import operation.Key using (Key; at; after; _<ᴷ_)
 open import operation.PureObservable using (module Machine)
+
 open Machine using (St; cs; mapS; scanS; cutS; lnS; takeS; flatS; connS; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes;
   inSrc; inBody; plug; closed; Out; still; shows; seek; search; found; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
   Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM; pend; coldS; ofS; doneS; joinS; own; Found; Ev; nx; cp; alive; ended; free; cpAt; cutAt; overAt; _⊕_; mapT; scanT; cutT; takeT; laneT; shift; over; outOf)
   renaming (outerT to outerK)
 open import adequacy.Engine.Meaning using (gh; lane; lanesL; liveL; deadL; poolT; outerT; outerG; tailsOn; envAt; srcState; srcG)
 open import adequacy.Engine.Race using (NotBefore; After; TailNotBefore)
-open import adequacy.Engine.Head using (Frag; Lanes; Lane; Agrees; exact; early; HeadAt; HeadAtⁿ; cand; dead-idle; conn-idle; NoConn; at-<ᵖ; <≮ᴷ; ≮ᴷ-trans; ext-≮)
+open import adequacy.Engine.Head using (Frag; Lanes; Lane; Agrees; exact; early; HeadAt; HeadAtⁿ; cand; dead-idle; conn-idle; NoConn;
+  at-<ᵖ; <≮ᴷ; ≮ᴷ-trans; ext-≮)
 open import adequacy.Engine.Head.Race using (shift-≮)
 open import adequacy.Engine.Head.Agrees using (head-agrees; head-agreesⱽ)
 open import adequacy.Engine.Shuts using (shutAll; told-none; Toldˢ; none)
-open import adequacy.Engine.Head.Within using (frag-flat; frag-body; frag-parts; fr-at; conn-src)
+open import adequacy.Engine.Head.Within using (frag-flat; frag-parts; fr-at; conn-src)
 open import adequacy.Engine.Keys using (ConnAt; Keyed; Keys; keyed-at)
 open import adequacy.Engine.Trails using (envAt-sorted; shape-src)
 open import adequacy.Engine.Beside using (hush-idle)
@@ -75,7 +76,7 @@ open import adequacy.Placed.Order using (Headed; Sorted; every)
 open import adequacy.Placed.Rising using (past-sub)
 open import adequacy.Engine.Above using (Flight; lanesL-++; deadL-++; rests-++)
 open import adequacy.Engine.Fold using (search-hit; found-own)
-open import adequacy.Engine.Ahead using (Sides; Ahead; Under; shown; shows-open; Aloof; ahead-over) renaming (shows to showsᶜ)
+open import adequacy.Engine.Ahead using (Sides; Ahead; Under; shown; shows-open; Aloof; ahead-over; Off; OffT) renaming (shows to showsᶜ)
 open import adequacy.Engine.Scope using (Scope; modes; firsts-after; firsts-not-before; first-not-before; shut-head-eq; Outs; GhEᴸ; FloorAt; FloorSrc; first-floor; floor-lower; scope-src; past-floor; closures; ended-at; shut-floor; shut-states; Gh; Ghᴸ; gh-at; gh-told)
 open import adequacy.Sane using (Mode)
 open import adequacy.Stepper using (firsts; firstsᴸ)
@@ -354,12 +355,6 @@ Causal {R} t = ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) {m k} → plug c s ≡ 
 record ⊤₁ : Set₁ where
   constructor tt
 
--- Where the search runs, the tree is causal.
-Caused : ∀ {R} → Conf R → Set₁
-Caused ⟨ c , s , subscribing , p ⟩ = ⊤₁
-Caused ⟨ c , s , absorbed , p ⟩    = Causal (plug c s)
-Caused ⟨ c , s , rising e , p ⟩    = ⊤₁
-
 -- A still find's race up its frames, aloft at `k₀`: `Won`'s key and
 -- `Beat`'s, the same until a live source, then just under a position `q`
 -- at or under `k₀` and past `q`.
@@ -515,7 +510,7 @@ record Order {R} (k : Conf R) : Set₁ where
     shape  : Shaped k
     flight : Flight k
     lead   : Lead k
-    causal : Caused k
+    causal : Causal (whole k)
     heard  : Heard k
     told   : Toldˢ none (whole k)
 
@@ -919,174 +914,3 @@ lane-on : ∀ {R Γ A B} d n (q : List A) {b} {k} (a : B) {c : Ctx R Γ B} {t} �
         → Won (uncurry (laneT d n q) (cutT b k (shows (nx a)))) c t → Won (k , shows (nx a)) c t
 lane-on d n []      a refl w = w
 lane-on d n (_ ∷ _) a refl w = w
-
-postulate
-  -- BEATEN PAST A SKIP IS ALOOF: where every race above a node runs past
-  -- `k`, no head the frames above ask of is below `k`.  The stepper's
-  -- heads are read off the races' candidates (`head-agrees`), a lane
-  -- joined to a running source off that source.
-  beat-aloof : ∀ {R Γ B} k (c : Ctx R Γ B) (t : St Γ B) → Beat (after k) c t
-             → Frag (plug c t) → Gh top (plug c t) → Keys (plug c t) → showsᶜ c true ≡ true → Aloof k c true
-
--- A WON SKIP IS ALOOF: a skip that won just past `k`, aloft, beats every
--- race above it past `k` (`won-beat`); what lies under `k` it causes, not
--- yet run.
-won-aloof : ∀ {R Γ B} k (c : Ctx R Γ B) (t : St Γ B) → Won (at (k ⊕ [ ix 0 ]) , still) c t → Caught k c t
-          → Frag (plug c t) → Gh top (plug c t) → Keys (plug c t) → showsᶜ c true ≡ true → Aloof k c true
-won-aloof k c t w (at p₀ , (zs , e) , af) ft gt kt sh = beat-aloof k c t (won-beat c t (deep zs [] e) w af) ft gt kt sh
-won-aloof k c t w (after _ , () , af) ft gt kt sh
-
--- A still candidate that won is ahead at its key in every frame above
--- it that shows it.
-won-ahead : ∀ {R Γ A} k (c : Ctx R Γ A) (s : St Γ A) f → Won (at k , still) c s → Caught k c s → Frag (plug c s) → Gh top (plug c s) → Keys (plug c s) → showsᶜ c f ≡ true → Ahead (_≡ k) c f
-won-ahead k top                     s f w cg ft gt kt sh = tt
-won-ahead k (inMap g c)             s f w cg ft gt kt sh = won-ahead k c (mapS g s) true w cg ft gt kt sh
-won-ahead k (inScan g z c)          s f w cg ft gt kt sh = won-ahead k c (scanS g z s) true w cg ft gt kt sh
-won-ahead k (inCut true a c)        s f w cg ft gt kt sh = won-ahead k c (cutS true a s) true w cg ft gt kt sh
-won-ahead k (inCut false a c)       s f w cg ft gt kt ()
-won-ahead k (inLn b c)              s f w cg ft gt kt sh = won-ahead k c (lnS b s) b w cg ft gt kt sh
-won-ahead k (inTake i q free c)     s f w cg ft gt kt sh = won-ahead k c (takeS i q free s) true w cg ft gt kt sh
-won-ahead k (inTake i q (cpAt _) c)   s f w cg ft gt kt ()
-won-ahead k (inTake i q (cutAt _) c)  s f w cg ft gt kt ()
-won-ahead k (inTake i q (overAt _) c) s f w cg ft gt kt ()
-won-ahead k (inOuter op g true n q ls c) s f w cg ft gt kt ()
-won-ahead k (inOuter op g false n q ls c) s f wn@(r , w , _) (k₀ , wi , _ , af) ft gt kt sh =
-  (λ { _ refl → outer-link c k op g n q s ls ft gt (won-scope k still (inOuter op g false n q ls c) s wn ft gt kt)
-                  (race-shut KAfter (After k) (at k) (after-step k) c op g false n q s [] ls [] cl (proj₂ parts) (lanes-gh c op g false n q s ls gt) r) })
-  , won-ahead k c (flatS op g false n q s ls) true w (k₀ , wi , af) ft gt kt sh
-  where
-    cl    = shows-open c true sh
-    parts = frag-parts op g false n q s ls (frag-flat c op g false n q s ls ft)
-won-ahead k (inLanes op g d n q o pre post c) s false w cg ft gt kt ()
-won-ahead k (inLanes op g d n q o pre post c) s true wn@(l , _ , w) (k₀ , wi , _ , _ , _ , af) ft gt kt sh =
-  (λ { _ refl → lane-sides k c op g d n q o pre post s (shows-open c true sh)
-                  (won-scope k still (inLanes op g d n q o pre post c) s wn ft gt kt) l gt (frag-flat c op g d n q o (pre ʳ++ s ∷ post) ft) })
-  , won-ahead k c (flatS op g d n q o (pre ʳ++ s ∷ post)) true (lane-still d n q (alive s) {at k} {c} w) (k₀ , wi , af) ft gt kt sh
-won-ahead k (inSrc (cs false true sa ba as nothing r en) b c) s f (ka , _ , w) (k₀ , wi , _ , _ , af) ft gt kt sh =
-  ahead-over k (λ j u → u) c true (won-ahead (k ⊕ [ ix 0 ]) c (connS (cs false true sa ba as nothing r en) s b) true w (k₀ , within-sub k₀ [ ix 0 ] wi , af) ft gt kt sh)
-    (won-aloof k c (connS (cs false true sa ba as nothing r en) s b) w (k₀ , wi , af) ft gt kt sh)
-won-ahead k (inSrc (cs false true sa ba as (just _) r en) b c) s f w cg ft gt kt ()
-won-ahead k (inSrc (cs false false sa ba as ow r en) b c)      s f w cg ft gt kt ()
-won-ahead k (inSrc (cs true sl sa ba as ow r en) b c)          s f w cg ft gt kt ()
-won-ahead k (inBody (cs cl true sa ba as nothing r en) o c) s f (_ , lo , bf , w) (k₀ , wi , _ , _ , _ , af) ft gt kt sh =
-  proj₁ bb , (λ { _ refl → proj₂ bb }) , won-ahead k c (connS (cs cl true sa ba as nothing r en) o s) true w (k₀ , wi , af) ft gt kt sh
-  where bb = body-link k c (cs cl true sa ba as nothing r en) o s lo bf ft gt kt (won-scope k _ c (connS (cs cl true sa ba as nothing r en) o s) w ft gt kt)
-won-ahead k (inBody (cs cl true sa ba as (just _) r en) o c) s f w cg ft gt kt ()
-won-ahead k (inBody (cs cl false sa ba as ow r en) o c)      s f w cg ft gt kt ()
-
--- Up the found node's frames: each one the value reaches is clear there.
--- `s` is the node the search saw, `s′` the one the rise leaves.
-won-clear : ∀ {R Γ A} p (a : A) (c : Ctx R Γ A) (s s′ : St Γ A) → alive s ≡ alive s′ → closed c ≡ false
-          → Won (at p , shows (nx a)) c s → Caught p c s → Frag (plug c s) → Gh top (plug c s) → Keys (plug c s) → Clear p a c s′
-won-clear p a top                               s s′ al ce w cg ft gt kt = tt
-won-clear p a (inMap f c)                       s s′ al ce w cg ft gt kt = won-clear p (f a) c (mapS f s) (mapS f s′) refl ce w cg ft gt kt
-won-clear p a (inScan f z c)                    s s′ al ce w cg ft gt kt = won-clear p (f z a) c (scanS f z s) (scanS f (f z a) s′) refl ce w cg ft gt kt
-won-clear p a (inCut true x c)                  s s′ al ce w cg ft gt kt = λ _ → won-clear p a c (cutS true x s) (cutS true x s′) refl ce w cg ft gt kt
-won-clear p a (inCut false x c)                 s s′ al ce w cg ft gt kt = λ ()
-won-clear p a (inLn b c)                        s s′ al ce w cg ft gt kt = won-clear p a c (lnS b s) (lnS b s′) refl ce w cg ft gt kt
-won-clear p a (inTake i q free c)               s s′ al ce w (k₀ , wi , af) ft gt kt with q a | i
-... | true  | _     = (λ _ → won-clear p a c (takeS _ q free s) (takeS _ q free s′) refl ce w (k₀ , wi , af) ft gt kt) , (λ ())
-... | false | true  = (λ ()) , (λ _ _ → won-clear (p ⊕ [ ix 0 ]) a c (takeS true q free s) (takeS true q (cpAt p) s′) refl ce w (k₀ , within-sub k₀ [ ix 0 ] wi , af) ft gt kt)
-... | false | false = (λ ()) , (λ _ ())
-won-clear p a (inTake i q (cpAt r) c)           s s′ al ce w cg ft gt kt = tt
-won-clear p a (inTake i q (cutAt r) c)          s s′ al ce w cg ft gt kt = tt
-won-clear p a (inTake i q (overAt r) c)         s s′ al ce w cg ft gt kt = tt
-won-clear p a (inOuter op f true n q ls c)      s s′ al ce (_ , _ , ()) cg ft gt kt
-won-clear p a (inOuter op f false n q ls c)     s s′ al ce wn@(r , w , u) (k₀ , wi , _ , af) ft gt kt =
-  cl , proj₁ ol , proj₂ ol , won-ahead (p ⊕ [ ix 0 ]) c (flatS op f false n q s ls) true w (k₀ , within-sub k₀ [ ix 0 ] wi , af) ft gt kt , won-aloof p c (flatS op f false n q s ls) w (k₀ , wi , af) ft gt kt
-  where
-    cl    = unrisen-open (closed c) u
-    parts = frag-parts op f false n q s ls (frag-flat c op f false n q s ls ft)
-    ol    = outer-link c p op f n q s ls ft gt (won-scope p (shows (nx a)) (inOuter op f false n q ls c) s wn ft gt kt) (race-shut KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) (lanes-gh c op f false n q s ls gt) r)
-won-clear p a (inLanes op f d n q o pre post c) s s′ al ce wn@(l , _ , w) (k₀ , wi , _ , _ , _ , af) ft gt kt lv =
-  lane-sides p c op f d n q o pre post s ce (won-scope p (shows (nx a)) (inLanes op f d n q o pre post c) s wn ft gt kt) l gt (frag-flat c op f d n q o (pre ʳ++ s ∷ post) ft)
-  , won-clear p a c (flatS op f d n q o (pre ʳ++ s ∷ post)) (flatS op f d n q o (pre ʳ++ s′ ∷ post)) refl ce
-      (lane-on d n q {alive s} {at p} a {c} {flatS op f d n q o (pre ʳ++ s ∷ post)} (trans al lv) w) (k₀ , wi , af) ft gt kt
-won-clear p a (inSrc kk b c)                    s s′ al ce (w , _) cg ft gt kt with over kk
-... | true  = λ ()
-... | false = λ _ cl → after-step (p ⊕ [ ix 0 ]) (cand (inBody kk s c) b) (step (gh b)) w (open-agrees (inBody kk s c) b cl (frag-body c kk s b ft) (proj₂ (proj₂ (gh-at c (connS kk s b) gt))))
-won-clear p a (inBody (cs cl true sa ba as nothing r en) o c) s s′ al ce (_ , lo , bf , w) (k₀ , wi , _ , _ , _ , af) ft gt kt =
-  proj₁ bb , proj₂ bb , won-clear p a c (connS (cs cl true sa ba as nothing r en) o s) (connS (cs cl true sa ba as nothing r en) o s′) refl ce w (k₀ , wi , af) ft gt kt
-  where bb = body-link p c (cs cl true sa ba as nothing r en) o s lo bf ft gt kt (won-scope p _ c (connS (cs cl true sa ba as nothing r en) o s) w ft gt kt)
-won-clear p a (inBody (cs cl true sa ba as (just _) r en) o c)  s s′ al ce (() , _) cg ft gt kt
-won-clear p a (inBody (cs cl false sa ba as (just _) r en) o c) s s′ al ce (() , _) cg ft gt kt
-won-clear p a (inBody (cs cl false sa ba as nothing r en) o c)  s s′ al ce (() , _) cg ft gt kt
-
--- A lane's completion passes its flatMap's retag as the lane's end.
-lane-off : ∀ {R Γ A B} d n (q : List A) {b} {k} {c : Ctx R Γ B} {t} → b ≡ true
-         → Won (uncurry (laneT d n q) (cutT b k (shows cp))) c t → Won (laneT d n q k (shows cp)) c t
-lane-off d n q refl w = w
-
--- A live lane's completion under a queue passes its flatMap's retag as
--- a still skip just past it.
-lane-shift : ∀ {R Γ A B} d n (a : A) q {b} {k} {c : Ctx R Γ B} {t} → b ≡ true
-           → Won (uncurry (laneT d n (a ∷ q)) (cutT b k (shows cp))) c t → Won (shift k , still) c t
-lane-shift d n a q refl w = w
-
--- No end waits where a lane is queued.
-ends-queued : ∀ {R Γ A} d x p (c : Ctx R Γ A) s → EndsIf (d ∧ x ∧ false) p c s
-ends-queued false x     p c s = tt
-ends-queued true  false p c s = tt
-ends-queued true  true  p c s = tt
-
--- An open outer's end, won, leads its lanes and its pool.
-outer-ends : ∀ {R Γ A B} p (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (s : St Γ A) ls
-           → Won (at p , shows cp) (inOuter op f d n q ls c) s → Frag (plug c (flatS op f d n q s ls)) → Gh top (plug c (flatS op f d n q s ls)) → Keys (plug c (flatS op f d n q s ls)) → d ≡ false → closed c ≡ false
-           → All (λ l → After p (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × TailNotBefore p (poolT (deadL ls) (envAt c))
-outer-ends p c op f d n q s ls wn ft gt kt refl cl =
-  outer-link c p op f n q s ls ft gt (won-scope p (shows cp) (inOuter op f false n q ls c) s wn ft gt kt)
-    (race-shut KAfter (After p) (at p) (after-step p) c op f false n q s [] ls [] cl (proj₂ parts) (lanes-gh c op f false n q s ls gt) (proj₁ wn))
-  where parts = frag-parts op f false n q s ls (frag-flat c op f false n q s ls ft)
-
--- Up the found node's frames: each one the completion reaches is clear
--- there, as `won-clear` for a value.
-mutual
-  won-ends : ∀ {R Γ A} p (c : Ctx R Γ A) (s s′ : St Γ A) → alive s ≡ alive s′
-           → Won (at p , shows cp) c s → Caught p c s → Frag (plug c s) → Gh top (plug c s) → Keys (plug c s) → Ends p c s′
-  won-ends p top                               s s′ al w cg ft gt kt = tt
-  won-ends p (inMap f c)                       s s′ al w cg ft gt kt = won-ends p c (mapS f s) (mapS f s′) refl w cg ft gt kt
-  won-ends p (inScan f z c)                    s s′ al w cg ft gt kt = won-ends p c (scanS f z s) (scanS f z s′) refl w cg ft gt kt
-  won-ends p (inCut true x c)                  s s′ al w cg ft gt kt = λ _ → won-ends p c (cutS true x s) (cutS true x s′) refl w cg ft gt kt
-  won-ends p (inCut false x c)                 s s′ al w cg ft gt kt = λ ()
-  won-ends p (inLn b c)                        s s′ al w cg ft gt kt = won-ends p c (lnS b s) (lnS b s′) refl w cg ft gt kt
-  won-ends p (inTake i q free c)               s s′ al w cg ft gt kt = won-ends p c (takeS i q free s) (takeS i q free s′) refl w cg ft gt kt
-  won-ends p (inTake i q (cpAt r) c)           s s′ al w cg ft gt kt = tt
-  won-ends p (inTake i q (cutAt r) c)          s s′ al w cg ft gt kt = tt
-  won-ends p (inTake i q (overAt r) c)         s s′ al w cg ft gt kt = tt
-  won-ends p (inOuter op f d n q ls c)         s s′ al wn@(r , w , _) (k₀ , wi , _ , af) ft gt kt =
-    outer-ends p c op f d n q s ls wn ft gt kt , ends-if p c ((n ≡ᵇ 0) ∧ null q) (flatS op f d n q s ls) (flatS op f true n q s′ ls) refl w (k₀ , wi , af) ft gt kt
-  won-ends p (inLanes op f d n [] o pre post c) s s′ al wn@(l , u , w) (k₀ , wi , _ , _ , _ , af) ft gt kt =
-    trans (sym al) lv , (λ cl → lane-sides p c op f d n [] o pre post s cl (won-scope p (shows cp) (inLanes op f d n [] o pre post c) s wn ft gt kt) l gt (frag-flat c op f d n [] o (pre ʳ++ s ∷ post) ft))
-    , subst (λ b → EndsIf (d ∧ b) p c (flatS op f d (pred n) [] o (pre ʳ++ ended s′ ∷ post))) (sym (∧-identityʳ (pred n ≡ᵇ 0)))
-        (ends-if p c (d ∧ (pred n ≡ᵇ 0)) (flatS op f d n [] o (pre ʳ++ s ∷ post)) (flatS op f d (pred n) [] o (pre ʳ++ ended s′ ∷ post)) refl
-           (lane-off d n [] {alive s} {at p} {c} lv w) (k₀ , wi , af) ft gt kt)
-    , tt
-    where lv = pooled-live (alive s) u
-  won-ends p (inLanes op f d n (a ∷ q) o pre post c) s s′ al wn@(l , u , w) (k₀ , wi , _ , _ , _ , af) ft gt kt =
-    trans (sym al) lv , (λ cl → lane-sides p c op f d n (a ∷ q) o pre post s cl (won-scope p (shows cp) (inLanes op f d n (a ∷ q) o pre post c) s wn ft gt kt) l gt (frag-flat c op f d n (a ∷ q) o (pre ʳ++ s ∷ post) ft))
-    , ends-queued d (pred n ≡ᵇ 0) p c (flatS op f d (pred n) (a ∷ q) o (pre ʳ++ ended s′ ∷ post))
-    , λ sh → won-ahead (p ⊕ [ ix 0 ]) c (flatS op f d n (a ∷ q) o (pre ʳ++ s ∷ post)) true (lane-shift d n a q {alive s} {at p} {c} lv w) (k₀ , within-sub k₀ [ ix 0 ] wi , af) ft gt kt sh
-             , won-aloof p c (flatS op f d n (a ∷ q) o (pre ʳ++ s ∷ post)) (lane-shift d n a q {alive s} {at p} {c} lv w) (k₀ , wi , af) ft gt kt sh
-    where lv = pooled-live (alive s) u
-  won-ends p (inSrc kk b c)                    s s′ al w cg ft gt kt = tt
-  won-ends p (inBody (cs cl true sa ba as nothing r en) o c) s s′ al (_ , lo , bf , w) (k₀ , wi , _ , _ , _ , af) ft gt kt =
-    (λ ce → body-link p c (cs cl true sa ba as nothing r en) o s lo bf ft gt kt (won-scope p _ c (connS (cs cl true sa ba as nothing r en) o s) w ft gt kt))
-    , λ k′ → won-ends p c (connS (cs cl true sa ba as nothing r en) o s) (connS k′ o s′) refl w (k₀ , wi , af) ft gt kt
-  won-ends p (inBody (cs cl true sa ba as (just _) r en) o c)  s s′ al (() , _) cg ft gt kt
-  won-ends p (inBody (cs cl false sa ba as (just _) r en) o c) s s′ al (() , _) cg ft gt kt
-  won-ends p (inBody (cs cl false sa ba as nothing r en) o c)  s s′ al (() , _) cg ft gt kt
-
-  ends-if : ∀ {R Γ A} p (c : Ctx R Γ A) b (s s′ : St Γ A) → alive s ≡ alive s′
-          → Won (at p , (if b then shows cp else still)) c s → Caught p c s → Frag (plug c s) → Gh top (plug c s) → Keys (plug c s) → EndsIf b p c s′
-  ends-if p c true  s s′ al w cg ft gt kt = won-ends p c s s′ al w cg ft gt kt
-  ends-if p c false s s′ al w cg ft gt kt = tt
-
--- Each frame a rising value reaches is clear there, read off the snapshot.
-lead-clear : ∀ {R Γ A} {c : Ctx R Γ A} {s : St Γ A} {a p} → Order ⟨ c , s , rising (nx a) , p ⟩ → Clear p a c s
-lead-clear {c = c} {s} {a} {p} o with Order.lead o
-... | t , al , w , ft , gt , kt , cg = won-clear p a c t s al (Order.heard o) w cg ft gt kt
-
--- Each frame a rising completion reaches is clear there, likewise.
-lead-ends : ∀ {R Γ A} {c : Ctx R Γ A} {s : St Γ A} {p} → Order ⟨ c , s , rising cp , p ⟩ → Ends p c s
-lead-ends {c = c} {s} {p} o with Order.lead o
-... | t , al , w , ft , gt , kt , cg = won-ends p c t s al w cg ft gt kt
