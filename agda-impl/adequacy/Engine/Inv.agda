@@ -44,7 +44,7 @@ open import adequacy.Engine.Race using (NotBefore)
 open import adequacy.Engine.Meaning using (_≋_; ≋-by; flagOf; envAt; gh; risen; lane; lanesL; laneRuns; poolRuns; outerT; outerG; poolG; deadL)
 open import adequacy.Engine.Flown using (Owed; NextOwed; rise-owed; sub-owed)
 open import adequacy.Engine.Plug using (flight-held; keys-above; keys-swap)
-open import adequacy.Engine.Pick using (Order; order; module Order; Heard; whole; KeysAt; Shaped; Lead; Snap; ⊤₁; tt; Won; lane-on; pooled-live; search-won; Causal; Caught; caught-sub; Within)
+open import adequacy.Engine.Pick using (Order; order; module Order; Heard; whole; KeysAt; Shaped; Lead; Snap; ⊤₁; tt; Won; lane-on; pooled-live; search-won; Causal; causal-aloft; Caught; caught-sub; Within)
 open import adequacy.Engine.Pick.Lead using (lead-clear; lead-ends; lane-off)
 open import adequacy.Engine.Ghosted using (NextTold; told-next)
 open import adequacy.Engine.Scope using (Gh)
@@ -624,7 +624,7 @@ module _ {R : Set} where
                      (λ q e′ s″ kq oe al → s′ , al , subst₂ (λ k x → Won (k , x) c′ s′) kq oe (search-won (plug c s) (proj₁ (Order.shape o)) e)
                         , subst Frag (sym pl) (proj₁ (Order.shape o)) , subst (Gh top) (sym pl) (gh-firm (plug c s) (proj₂ (Order.shape o)) (Order.told o))
                         , subst Keys (sym pl) (proj₂ (Order.shape o))
-                        , key , subst (λ k → Within k q) (sym kq) ([] , sym (++-identityʳ q)) , Order.causal o c′ s′ pl (found-own (plug c s) e))
+                        , key , subst (λ k → Within k q) (sym kq) ([] , sym (++-identityʳ q)) , causal-aloft (Order.causal o) c′ s′ pl (found-own (plug c s) e))
 
   -- A takeWhile failing a value ends one past it, what the frames above
   -- saw of the value's run.
