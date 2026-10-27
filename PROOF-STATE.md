@@ -167,8 +167,7 @@ The search's found node leads every race above it, and shows out of no body
 whose connect is over; a step keeps the tree in the fragment. Probed on the
 spike engine. Settled when each is a body.
 
-Members: `search-hit`, `search-won`, `found-own`, `frag-next`, `run-lead`,
-`body-link`.
+Members: `search-hit`, `search-won`, `found-own`, `frag-next`, `run-lead`.
 
 #### THE HEADS
 
