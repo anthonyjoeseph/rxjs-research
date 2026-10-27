@@ -272,6 +272,14 @@ Beats : ∀ {R} → Maybe (Found R) → Set
 Beats nothing                                  = ⊤
 Beats (just (found (Γ , A , c , s) m key)) = outOf c s m ≡ still → Beat key c s
 
+-- DEAD ROUTE: deriving `Apart` from `search-won` and the tree's `Keys`,
+--   frame by frame as `won-clear` derives `Clear`.  At a live source `Won`
+--   reads the race above at `p ⊕ [ ix 0 ]`, `Beat` past every position under
+--   `p`; `Won` admits a sibling keyed at `p ⊕ [ ix 1 ]`, which `Beat` does
+--   not, and `Keys` only ties that key to the sibling's own head.  What
+--   excludes it is causality (nothing under `p` runs before `p`'s event),
+--   a fact of the run, not of the tree.  `won-aloof` asks the same of the
+--   tree alone.
 Apart : ∀ {R} → St [] R → Set
 Apart t = Beats (search top t)
 
