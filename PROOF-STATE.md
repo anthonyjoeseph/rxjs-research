@@ -28,7 +28,8 @@ reading the event in flight from the flight; a joiner of a subject over
 keeps the tree keyed. Probed in kept-depth,
 except a merge's mark. Settled by bodies, or a probe refuting a clause.
 
-Members: `unsub-keyed`, `rise-admit-keys`, `rise-outer-end-keys`, `rise-lane-end-keys`,
+Members: `unsub-take-here`, `unsub-flat-here`, `unsub-conn-here`, `unsub-body-keyed`,
+`rise-admit-keys`, `rise-outer-end-keys`, `rise-lane-end-keys`,
 `rise-src-keys`, `rise-body-end-keys`, `begin-conn-keys`, `begin-joined-keys`,
 `run-keys`.
 
