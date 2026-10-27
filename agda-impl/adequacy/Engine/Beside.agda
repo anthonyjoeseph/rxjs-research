@@ -92,6 +92,11 @@ after-before q (skip k r)  a′ = a′
 after-before q (end k)     a′ = a′
 after-before q hush        a′ = refl
 
+-- Hushed and trailing, it leaves nothing running.
+hush-idle : ∀ {A} t → Trail {A} hush t → t ≡ idle
+hush-idle (pin _ _) tr with () ← proj₁ (everyᵀ (proj₁ (proj₂ (trail tr))))
+hush-idle idle      tr = refl
+
 private
   before-after : ∀ {B} q (e : Events B) → M′.before q e ≡ true → After q (head e)
   before-after q (out _ _ _) b = b
@@ -112,11 +117,6 @@ private
   tnb-head : ∀ {A p} t → TailNotBefore p t → NotBefore p (head (tailᴱ {A} t))
   tnb-head (pin _ _) o = o
   tnb-head idle      o = tt
-
-  -- Hushed and trailing, it leaves nothing running.
-  hush-idle : ∀ {A} t → Trail {A} hush t → t ≡ idle
-  hush-idle (pin _ _) tr with () ← proj₁ (everyᵀ (proj₁ (proj₂ (trail tr))))
-  hush-idle idle      tr = refl
 
   lead-hushed : ∀ {A} {x y : Events A} → Lead⁼ x y → x ≡ hush → y ≡ hush
   lead-hushed hushᴸ refl = refl

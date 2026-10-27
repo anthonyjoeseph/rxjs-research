@@ -320,8 +320,9 @@ beat-pass v q {P} (inBody (cs cl true sa ba as nothing r en) o c) s f so (nb , o
     bl : ∀ k → keyAt v q <ᴷ at k ≡ false
        → (Events∞.force (srcState (srcG kk o) (envAt c)) ≡ hush → ∀ d → Agreeᵀ d (Events∞.cut (srcState (srcG kk o) (envAt c))) idle)
          × NotBefore k (shown (Events∞.force (srcState (srcG kk o) (envAt c))))
-    bl k le = body-link k c kk o s (proj₁ ft) (shows-open c true sh) refl (knot-lost (at k) (cand (inSrc kk s c) o) (knot-≤ (keyAt v q) k (cand (inSrc kk s c) o) le nb))
-                (before-≤ (keyAt v q) k (own (connS kk o s)) le ob)
+    bl k le = body-link k c kk o s (knot-lost (at k) (cand (inSrc kk s c) o) (knot-≤ (keyAt v q) k (cand (inSrc kk s c) o) le nb))
+                (before-≤ (keyAt v q) k (own (connS kk o s)) le ob) (proj₁ ft) gt (proj₂ ft)
+                (beat-scope (keyAt v q) k c (connS kk o s) w le (proj₁ ft) gt (proj₂ ft))
     hu = proj₁ (bl q (cover-own v q))
     nbk : ∀ k → P k → NotBefore k (shown (Events∞.force (srcState (srcG kk o) (envAt c))))
     nbk k pk = proj₂ (bl k (cover v q so k pk))

@@ -47,8 +47,8 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans; cong)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.MonotonicList.Events using (Pos; Timeline; Events∞; idle; out; skip; end; hush; ix; _<ᵖ_; <ᵖ-below; _∪_)
-open import denotation.MonotonicList using (head; headᴼ; Agreeᵀ)
+open import denotation.MonotonicList.Events using (Pos; Timeline; Events; Events∞; idle; out; skip; end; hush; ix; _<ᵖ_; <ᵖ-below; _∪_)
+open import denotation.MonotonicList using (head; headᴼ; Agreeᵀ; agreeᵀ-refl; tailᴱ)
 open import denotation.Unfold using (Node; Step; states; step; headˢ; hushˢ; outˢ; skipˢ; endˢ; meaning; subscribe; outerᴺ; cutᴺ; restsᶜ)
 open import operation.Key using (Key; at; after; _<ᴷ_)
 open import operation.PureObservable using (peek; module Machine)
@@ -64,7 +64,9 @@ open import adequacy.Engine.Head.Agrees using (head-agrees; head-agreesⱽ)
 open import adequacy.Engine.Shuts using (shutAll; told-none; Toldˢ; none)
 open import adequacy.Engine.Head.Within using (frag-flat; frag-body; frag-parts; fr-at; conn-src)
 open import adequacy.Engine.Keys using (ConnAt; Keyed; Keys; keyed-at)
-open import adequacy.Engine.Trails using (envAt-sorted)
+open import adequacy.Engine.Trails using (envAt-sorted; shape-src)
+open import adequacy.Engine.Beside using (hush-idle)
+open import adequacy.Placed.Trail using (Trail; Trailing)
 open import adequacy.Placed.Order using (Headed; Sorted; every)
 open import adequacy.Placed.Rising using (past-sub)
 open import adequacy.Engine.Above using (Flight; lanesL-++; deadL-++; rests-++)
@@ -690,6 +692,44 @@ won-floor (at p) o (inBody kk o′ c) s (_ , lo , bf , w) ft gt kt =
 won-scope : ∀ {R Γ A} p o (c : Ctx R Γ A) (s : St Γ A) → Won (at p , o) c s → Frag (plug c s) → Gh top (plug c s) → Keys (plug c s) → Scope p c
 won-scope p o c s w ft gt kt = won-floor (at p) o c s w ft gt kt
 
+floor-shown : ∀ {A} q (e : Events A) → Floorᴱ q e → NotBefore q (shown e)
+floor-shown q (out _ _ _) f = f
+floor-shown q (skip _ _)  f = f
+floor-shown q (end _)     f = f
+floor-shown q hush        f = tt
+
+-- Hushed and trailing, a state leaves nothing running.
+hushed-idle : ∀ {A} {σ : Events∞ A} → Trailing σ → Events∞.force σ ≡ hush → ∀ d → Agreeᵀ d (Events∞.cut σ) idle
+hushed-idle {σ = σ} tr eq d =
+  subst (λ t → Agreeᵀ d t idle) (sym (hush-idle (Events∞.cut σ) (subst (λ z → Trail z (Events∞.cut σ)) eq tr))) (agreeᵀ-refl d idle)
+
+-- A connect's source shows at or past `p` when its race was lost there:
+-- live or pending by `src-floor`; ended, it rests on no connect and so
+-- shows nothing.
+src-shown : ∀ {R Γ X B} p (c : Ctx R Γ B) kk (o : St Γ X) (b : St (X ∷ Γ) B)
+          → Lost false (at p) (cand (inSrc kk b c) o) → Before (at p) (own (connS kk o b)) → Frag (plug c (connS kk o b)) → Gh top (plug c (connS kk o b)) → Keys (plug c (connS kk o b)) → Scope p c
+          → NotBefore p (shown (Events∞.force (srcState (srcG kk o) (envAt c))))
+src-shown p c kk@(cs false sl sa nothing as ow r en) o b lo bf ft gt kt sc = floor-shown p _ (src-floor p c kk o b lo bf ft gt kt sc)
+src-shown p c (cs true sl sa nothing as ow r en) o b lo bf ft gt kt sc =
+  subst (λ t → NotBefore p (shown (tailᴱ t))) (sym (conn-idle o (envAt c) (proj₁ cn) (proj₁ (proj₂ (proj₂ cn)) refl))) tt
+  where cn = fr-at c (connS (cs true sl sa nothing as ow r en) o b) ft
+src-shown p c kk@(cs cl sl sa (just q) as ow r en) o b lo bf ft gt kt sc = floor-shown p _ (src-floor p c kk o b lo bf ft gt kt sc)
+
+-- A body first: the source's candidate, which its connect's race did not
+-- put before it, and the connect's own marks, after it, put the source's
+-- meaning no earlier; a source hushed leaves nothing running.
+--
+-- Without `Scope` it fails as `outer-link` does: a source joined to a
+-- running source above and fed nothing hushes its step, while its meaning
+-- shows the source above.
+body-link : ∀ {R Γ X B} q (c : Ctx R Γ B) kk (o : St Γ X) (b : St (X ∷ Γ) B)
+          → Lost false (at q) (cand (inSrc kk b c) o) → Before (at q) (own (connS kk o b))
+          → Frag (plug c (connS kk o b)) → Gh top (plug c (connS kk o b)) → Keys (plug c (connS kk o b)) → Scope q c
+          → (Events∞.force (srcState (srcG kk o) (envAt c)) ≡ hush → ∀ d → Agreeᵀ d (Events∞.cut (srcState (srcG kk o) (envAt c))) idle)
+            × NotBefore q (shown (Events∞.force (srcState (srcG kk o) (envAt c))))
+body-link q c kk o b lo bf ft gt kt sc =
+  hushed-idle {σ = srcState (srcG kk o) (envAt c)} (proj₂ (shape-src c kk o b (ft , kt))) , src-shown q c kk o b lo bf ft gt kt sc
+
 -- An outer first: its flatMap's lanes, each after it as the race read
 -- them and every running source in scope clear of it, are after it in
 -- the meaning.
@@ -747,14 +787,6 @@ postulate
           → KAfter (shift (at k)) (cand (inBody (cs false true sa ba as nothing r en) o c) b)
           → Won (shift (at k) , still) c (connS (cs false true sa ba as nothing r en) o b)
           → Frag (plug c (connS (cs false true sa ba as nothing r en) o b)) → showsᶜ c true ≡ true → Ahead (Under (_≡ k)) c true
-  -- A body first: the source's candidate, which its connect's race did not
-  -- put before it, and the connect's own marks, after it, put the source's
-  -- meaning no earlier; a source hushed leaves nothing running.
-  body-link : ∀ {R Γ X B} q (c : Ctx R Γ B) kk (o : St Γ X) (b : St (X ∷ Γ) B)
-            → Frag (plug c (connS kk o b)) → closed c ≡ false → over kk ≡ false
-            → Lost false (at q) (cand (inSrc kk b c) o) → Before (at q) (own (connS kk o b))
-            → (Events∞.force (srcState (srcG kk o) (envAt c)) ≡ hush → ∀ d → Agreeᵀ d (Events∞.cut (srcState (srcG kk o) (envAt c))) idle)
-              × NotBefore q (shown (Events∞.force (srcState (srcG kk o) (envAt c))))
 
 -- A still candidate that won is ahead at its key in every frame above
 -- it that shows it.
@@ -788,7 +820,7 @@ won-ahead k (inSrc (cs false false sa ba as ow r en) b c)      s f w ft gt kt ()
 won-ahead k (inSrc (cs true sl sa ba as ow r en) b c)          s f w ft gt kt ()
 won-ahead k (inBody (cs cl true sa ba as nothing r en) o c) s f (_ , lo , bf , w) ft gt kt sh =
   proj₁ bb , (λ { _ refl → proj₂ bb }) , won-ahead k c (connS (cs cl true sa ba as nothing r en) o s) true w ft gt kt sh
-  where bb = body-link k c (cs cl true sa ba as nothing r en) o s ft (shows-open c true sh) refl lo bf
+  where bb = body-link k c (cs cl true sa ba as nothing r en) o s lo bf ft gt kt (won-scope k _ c (connS (cs cl true sa ba as nothing r en) o s) w ft gt kt)
 won-ahead k (inBody (cs cl true sa ba as (just _) r en) o c) s f w ft gt kt ()
 won-ahead k (inBody (cs cl false sa ba as ow r en) o c)      s f w ft gt kt ()
 
@@ -825,7 +857,7 @@ won-clear p a (inSrc kk b c)                    s s′ al ce (w , _) ft gt kt wi
 ... | false = λ _ cl → after-step (p ⊕ [ ix 0 ]) (cand (inBody kk s c) b) (step (gh b)) w (open-agrees (inBody kk s c) b cl (frag-body c kk s b ft) (proj₂ (proj₂ (gh-at c (connS kk s b) gt))))
 won-clear p a (inBody (cs cl true sa ba as nothing r en) o c) s s′ al ce (_ , lo , bf , w) ft gt kt =
   proj₁ bb , proj₂ bb , won-clear p a c (connS (cs cl true sa ba as nothing r en) o s) (connS (cs cl true sa ba as nothing r en) o s′) refl ce w ft gt kt
-  where bb = body-link p c (cs cl true sa ba as nothing r en) o s ft ce refl lo bf
+  where bb = body-link p c (cs cl true sa ba as nothing r en) o s lo bf ft gt kt (won-scope p _ c (connS (cs cl true sa ba as nothing r en) o s) w ft gt kt)
 won-clear p a (inBody (cs cl true sa ba as (just _) r en) o c)  s s′ al ce (() , _) ft gt kt
 won-clear p a (inBody (cs cl false sa ba as (just _) r en) o c) s s′ al ce (() , _) ft gt kt
 won-clear p a (inBody (cs cl false sa ba as nothing r en) o c)  s s′ al ce (() , _) ft gt kt
@@ -887,7 +919,7 @@ mutual
     where lv = pooled-live (alive s) u
   won-ends p (inSrc kk b c)                    s s′ al w ft gt kt = tt
   won-ends p (inBody (cs cl true sa ba as nothing r en) o c) s s′ al (_ , lo , bf , w) ft gt kt =
-    (λ ce → body-link p c (cs cl true sa ba as nothing r en) o s ft ce refl lo bf)
+    (λ ce → body-link p c (cs cl true sa ba as nothing r en) o s lo bf ft gt kt (won-scope p _ c (connS (cs cl true sa ba as nothing r en) o s) w ft gt kt))
     , λ k′ → won-ends p c (connS (cs cl true sa ba as nothing r en) o s) (connS k′ o s′) refl w ft gt kt
   won-ends p (inBody (cs cl true sa ba as (just _) r en) o c)  s s′ al (() , _) ft gt kt
   won-ends p (inBody (cs cl false sa ba as (just _) r en) o c) s s′ al (() , _) ft gt kt
