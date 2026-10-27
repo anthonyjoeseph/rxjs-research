@@ -46,7 +46,7 @@ open import adequacy.Engine.Flown using (Owed; NextOwed; rise-owed; sub-owed)
 open import adequacy.Engine.Plug using (flight-held; keys-above; keys-swap)
 open import adequacy.Engine.Pick using (Order; order; module Order; Heard; whole; KeysAt; Shaped; Lead; Snap; ⊤₁; tt; Won; lane-on; pooled-live; search-won; causal-aloft; Caught; caught-sub; Within)
 open import adequacy.Engine.Pick.Lead using (lead-clear; lead-ends; lane-off)
-open import adequacy.Engine.Causal using (Causal; causal-run; cold-≼; cold-over; done-≼; of-≼; att-≼; cp-≼; over-≼; join-≼; conn-≼; body-conn; src-conn; owed-conn; ≼-refl; unsubIf-≼; cut-≼)
+open import adequacy.Engine.Causal using (Causal; causal-run; cold-≼; cold-over; void-≼; done-≼; of-≼; att-≼; cp-≼; over-≼; join-≼; conn-≼; body-conn; src-conn; owed-conn; ≼-refl; unsubIf-≼; cut-≼)
 open import adequacy.Engine.Ghosted using (NextTold; told-next)
 open import adequacy.Engine.Scope using (Gh)
 open import adequacy.Engine.Firmed using (gh-firm)
@@ -441,7 +441,16 @@ module _ {R : Set} where
     -- is aloft, nothing keyed under a skip not yet run: kept by a rise and
     -- a subscription begun.
     rise-causal : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Inv ⟨ c , s , rising e , p ⟩ → NextCaused (step ⟨ c , s , rising e , p ⟩)
-    sub-causal : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , subscribing , p ⟩ → NextCaused (step ⟨ c , s , subscribing , p ⟩)
+    -- A subscription keyed: a cold's whole tape, an of's values, a
+    -- takeWhile's or flatMap's attach, a connect's body.
+    cold-begin : ∀ {Γ A} (c : Ctx R Γ A) x p → Inv ⟨ c , pend (cold x) , subscribing , p ⟩ → NextCaused (step ⟨ c , pend (cold x) , subscribing , p ⟩)
+    of-begin : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) xs p → Inv ⟨ c , pend o , subscribing , p ⟩ → Causal (plug c (ofS 0 p xs))
+    take-begin : ∀ {Γ A} (c : Ctx R Γ A) i q (s : Obs Timeline Γ A) p → Inv ⟨ c , pend (takeWhile i q s) , subscribing , p ⟩
+               → NextCaused (step ⟨ c , pend (takeWhile i q s) , subscribing , p ⟩)
+    flat-begin : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Inv ⟨ c , pend (flatMap op f s) , subscribing , p ⟩
+               → NextCaused (step ⟨ c , pend (flatMap op f s) , subscribing , p ⟩)
+    conn-begin : ∀ {Γ X A} (c : Ctx R Γ A) (s : Obs Timeline Γ X) (b : Obs Timeline (X ∷ Γ) A) p → Inv ⟨ c , pend (connect s b) , subscribing , p ⟩
+               → NextCaused (step ⟨ c , pend (connect s b) , subscribing , p ⟩)
     -- A mark run rises, if at all, the event it showed, at its own key,
     -- leaving a node as live as the one it ran.
     run-lead : ∀ (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} p → search top t ≡ just (found (Γ , A , c , s) m key)
@@ -813,6 +822,40 @@ module _ {R : Set} where
   ... | nothing = tt
   ... | just (found (_ , _ , c′ , s′) m key) with search-hit (plug c s) e
   ...   | pl , own = run-at c′ p own (subst Causal (sym pl) (Order.causal (Inv.ord iv)))
+
+  -- A subscription begun: keyless frames over its source, or keyed.
+  begin-causal : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Inv ⟨ c , pend o , subscribing , p ⟩
+               → NextCaused (step ⟨ c , pend o , subscribing , p ⟩)
+  begin-causal c (cold x)          p v = cold-begin c x p v
+  begin-causal c empty             p v = of-begin c empty [] p v
+  begin-causal c (of xs)           p v = of-begin c (of xs) xs p v
+  begin-causal c (map f s)         p v =
+    causal-run c {mapS f (pend s)} {pend (map f s)} (void-≼ ((λ { (_ , ()) }) , (λ { (_ , ()) }) , tt)) (Order.causal (Inv.ord v))
+  begin-causal c (scan f z s)      p v =
+    causal-run c {scanS f z (pend s)} {pend (scan f z s)} (void-≼ ((λ { (_ , ()) }) , (λ { (_ , ()) }) , tt)) (Order.causal (Inv.ord v))
+  begin-causal c (takeWhile i q s) p v = take-begin c i q s p v
+  begin-causal c (flatMap op f s)  p v = flat-begin c op f s p v
+  begin-causal c (connect s b)     p v = conn-begin c s b p v
+  begin-causal c (connected x)     p v with closedUp c x
+  ... | true  = of-begin c (connected x) [] p v
+  ... | false = causal-run c {joinS p true x []} {pend (connected x)} (void-≼ ((λ { (_ , ()) }) , tt)) (Order.causal (Inv.ord v))
+  begin-causal c (defer l)         p v =
+    causal-run c {pend (Later.force l)} {pend (defer l)} (void-≼ ((λ { (_ , ()) }) , tt)) (Order.causal (Inv.ord v))
+
+  -- THE STILL'S SUBTREE, SUBSCRIBED: a subscription keeps the tree causal.
+  sub-causal : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , subscribing , p ⟩ → NextCaused (step ⟨ c , s , subscribing , p ⟩)
+  sub-causal c (pend x)                p v = begin-causal c x p v
+  sub-causal c (coldS b l)             p v = Order.causal (Inv.ord v)
+  sub-causal c (ofS i q xs)            p v = Order.causal (Inv.ord v)
+  sub-causal c doneS                   p v = Order.causal (Inv.ord v)
+  sub-causal c (mapS f s)              p v = Order.causal (Inv.ord v)
+  sub-causal c (scanS f z s)           p v = Order.causal (Inv.ord v)
+  sub-causal c (cutS l a s)            p v = Order.causal (Inv.ord v)
+  sub-causal c (lnS b s)               p v = Order.causal (Inv.ord v)
+  sub-causal c (takeS i q w s)         p v = Order.causal (Inv.ord v)
+  sub-causal c (flatS op f d n q o ls) p v = Order.causal (Inv.ord v)
+  sub-causal c (connS k o b)           p v = Order.causal (Inv.ord v)
+  sub-causal c (joinS j g x ib)        p v = Order.causal (Inv.ord v)
 
   causal-next : ∀ k → Base k → Order k → NextCaused (step k)
   causal-next ⟨ c , s , rising e , p ⟩    b o = rise-causal c s e p (b & o)

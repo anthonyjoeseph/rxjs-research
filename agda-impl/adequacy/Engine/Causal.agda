@@ -289,6 +289,40 @@ causal-own : ∀ {R} {t : St [] R} → Causal t → ∀ {Γ A} (c : Ctx R Γ A) 
 causal-own ca c s e i = proj₁ (walk-at c s (subst Causal (sym e) ca)) (own-fut s i)
 
 ------------------------------------------------------------------------
+-- Keyless
+
+-- No key owned or to come anywhere in a tree.
+Void : ∀ {Γ A} → St Γ A → Set
+Void = Keys⁺ (λ _ → ⊥)
+
+void-keys : ∀ {Γ A} {P : Key → Set} {s : St Γ A} → Void s → Keys⁺ P s
+void-keys {s = s} v = keys-map ⊥-elim s v
+
+-- A keyless tree is causal under any context: it has no mark to raise.
+mutual
+  void-causal : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Void s → CausalW c s
+  void-causal c s (a , k) = (λ f → ⊥-elim (a f)) , void-kids c s k
+
+  void-kids : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → KidKeys⁺ (λ _ → ⊥) s → KidsW c s
+  void-kids c (pend o)                k       = tt
+  void-kids c (coldS b l)             k       = tt
+  void-kids c (ofS i p xs)            k       = tt
+  void-kids c doneS                   k       = tt
+  void-kids c (mapS f s)              k       = void-causal (inMap f c) s k
+  void-kids c (scanS f z s)           k       = void-causal (inScan f z c) s k
+  void-kids c (cutS l a s)            k       = void-causal (inCut l a c) s k
+  void-kids c (lnS b s)               k       = void-causal (inLn b c) s k
+  void-kids c (takeS i q w s)         k       = void-causal (inTake i q w c) s k
+  void-kids c (flatS op f d n q o ls) (a , b) = void-causal (inOuter op f d n q ls c) o a , void-lanes c op f d n q o [] ls b
+  void-kids c (connS kk o b)          (x , y) = void-causal (inSrc kk b c) o x , void-causal (inBody kk o c) b y
+  void-kids c (joinS j g x ib)        k       = tt
+
+  void-lanes : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre ls
+             → LaneKeys⁺ (λ _ → ⊥) ls → LanesW c op f d n q o pre ls
+  void-lanes c op f d n q o pre []       tt       = tt
+  void-lanes c op f d n q o pre (s ∷ ls) (a , as) = void-causal (inLanes op f d n q o pre ls c) s a , void-lanes c op f d n q o (s ∷ pre) ls as
+
+------------------------------------------------------------------------
 -- Weaker
 
 -- A key weaker than another: whatever is far from or free of the other,
@@ -347,6 +381,7 @@ mutual
 
   data Kids≼ : ∀ {Γ A} → St Γ A → St Γ A → Set₁ where
     bare≼ : ∀ {Γ A} {s′ s : St Γ A} → Bare s′ → Kids≼ s′ s
+    void≼ : ∀ {Γ A} {s′ s : St Γ A} → Void s′ → Kids≼ s′ s
     map≼  : ∀ {Γ A B} {f f′ : A → B} {s′ s : St Γ A} → s′ ≼ s → Kids≼ (mapS f′ s′) (mapS f s)
     scan≼ : ∀ {Γ A B} {f f′ : B → A → B} {z z′} {s′ s : St Γ A} → s′ ≼ s → Kids≼ (scanS f′ z′ s′) (scanS f z s)
     cut≼  : ∀ {Γ A} {l l′ a a′} {s′ s : St Γ A} → s′ ≼ s → Kids≼ (cutS l′ a′ s′) (cutS l a s)
@@ -389,6 +424,7 @@ mutual
   kids-≼ tr (bare≼ {s′ = ofS i p xs} b)     k       = tt
   kids-≼ tr (bare≼ {s′ = doneS} b)          k       = tt
   kids-≼ tr (bare≼ {s′ = joinS j g x ib} b) k       = tt
+  kids-≼ tr (void≼ v)                       k       = proj₂ (void-keys v)
   kids-≼ tr (map≼ r)                        k       = keys-≼ tr r k
   kids-≼ tr (scan≼ r)                       k       = keys-≼ tr r k
   kids-≼ tr (cut≼ r)                        k       = keys-≼ tr r k
@@ -450,6 +486,7 @@ mutual
   causal-kids rc (bare≼ {s′ = ofS i p xs} b)     k       = tt
   causal-kids rc (bare≼ {s′ = doneS} b)          k       = tt
   causal-kids rc (bare≼ {s′ = joinS j g x ib} b) k       = tt
+  causal-kids {c′ = c′} {s′ = s′} rc (void≼ v)   k       = proj₂ (void-causal c′ s′ v)
   causal-kids rc (map≼ r)                        k       = causal-≼ (map≼ᶜ rc) r k
   causal-kids rc (scan≼ r)                       k       = causal-≼ (scan≼ᶜ rc) r k
   causal-kids rc (cut≼ r)                        k       = causal-≼ (cut≼ᶜ rc) r k
@@ -674,3 +711,7 @@ cold-≼ l = w≼ (node-same (λ { (n , e) → 1+ n , e })) (bare≼ tt)
 cold-over : ∀ {Γ A} b b′ (l : Tape A) → coldS {Γ} b′ over ≼ coldS b l
 cold-over b true  l = w≼ (nodeW (λ f → ⊥-elim (tapes-over f))) (bare≼ tt)
 cold-over b false l = w≼ (nodeW (λ { (_ , ()) })) (bare≼ tt)
+
+-- A keyless node: weaker than any.
+void-≼ : ∀ {Γ A} {s′ s : St Γ A} → Void s′ → s′ ≼ s
+void-≼ v = w≼ (nodeW (λ f → ⊥-elim (proj₁ v f))) (void≼ v)
