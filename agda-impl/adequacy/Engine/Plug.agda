@@ -34,14 +34,14 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; cs; ⟨_,_,_,_⟩; absorbed;
   free; cpAt; cutAt; overAt)
-open import adequacy.Engine.Meaning using (_≋_; ≋-by; ≋-sym; ≋-tr; same; doneE-ne; doneG; doneE; envAt; flagOf; gh; lane; lanesL; deadL;
+open import adequacy.Engine.Meaning using (_≋_; ≋-by; ≋-sym; ≋-tr; ≋-trans; same; doneE-ne; doneG; doneE; envAt; flagOf; gh; lane; lanesL; deadL;
   laneᴹ; lanes-refl; queue-refl; ≈-refl; lanesFrame; outerFrame; bodyFrame; srcFrame; connSrc; outerOf; srcG; srcRun; taken; taking∞;
-  poolRuns; outerT; laneRuns; poolG; outerG; rested)
+  poolRuns; outerT; laneRuns; poolG; outerG; rested; bodyG)
 open import adequacy.Engine.Head using (Conn)
 open import adequacy.Engine.Head.Within using (fr-at)
 open import adequacy.Engine.Keys using (Held; KeyedL; ConnAt; here-at; keyed-at; keyedL-ʳ++)
 open import adequacy.Engine.Above using (Above; Flight; above-≋; lanes-runs; pool-runs; toʳ)
-open import adequacy.Engine.Trails using (shape-st; shape-src; envAt-sorted; lanes-shape; lanes-held)
+open import adequacy.Engine.Trails using (conn-shut; shape-st; shape-src; envAt-sorted; lanes-shape; lanes-held)
 
 ------------------------------------------------------------------------
 -- Each frame is the node it is a hole of
@@ -82,18 +82,19 @@ done-plug nothing  true  n ρ x = x
 
 body-plug : ∀ {Γ X B} k (o : St Γ X) (s : St (X ∷ Γ) B) (ρ : NEnv Γ)
           → bodyFrame k o ρ (stateᴺ (gh s) (srcRun (srcG k o) ρ ∷ᴬ ρ)) ≋ stateᴺ (gh (connS k o s)) ρ
-body-plug (cs cl sl sa (just p) as ow r e)  o s ρ = done-plug ow sl _ ρ (≋-by refl refl)
+body-plug (cs false sl sa (just p) as ow r e) o s ρ = done-plug ow sl _ ρ (≋-by refl refl)
+body-plug (cs true sl sa (just p) as ow r e)  o s ρ = done-plug ow sl _ ρ (≋-by refl refl)
 body-plug (cs false sl sa nothing as ow r e) o s ρ = done-plug ow sl _ ρ (≋-by refl refl)
-body-plug (cs true sl sa nothing as ow r e)  o s ρ = done-plug ow sl _ ρ (≋-by refl refl)
+body-plug (cs true sl sa nothing as ow r e)  o s ρ = done-plug ow sl _ ρ (≋-trans (≋-by refl refl) (conn-shut r e (gh s) (restᶜ (gh o)) ρ))
 
 
 -- A source subscribed when its body was, running or ended, read through
 -- its connect.
 conn-plugⁿ : ∀ {Γ X B} cl sl sa as ow r e (b : St (X ∷ Γ) B) (s : St Γ X) (ρ : NEnv Γ)
-           → connSrc cl r e (gh b) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (connectᶜ r (gh b) (srcG (cs cl sl sa nothing as ow r e) s)) ρ
+           → connSrc cl r e (gh b) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (connectᶜ r (bodyG (cs cl sl sa nothing as ow r e) (gh b)) (srcG (cs cl sl sa nothing as ow r e) s)) ρ
 conn-plugⁿ false sl sa as ow r e b s ρ = ≋-by refl refl
-conn-plugⁿ {X = X} true sl sa as ow r e b s ρ k =
-  ∪-ne (burstOn-ne r (R k)) (agreeᵀ-refl k _) ,ˢ beside-ne r (same k _) (R k)
+conn-plugⁿ {X = X} true sl sa as ow r e b s ρ =
+  ≋-trans (λ k → ∪-ne (burstOn-ne r (R k)) (agreeᵀ-refl k _) ,ˢ beside-ne r (same k _) (R k)) (conn-shut r e (gh b) (restᶜ (gh s)) ρ)
   where
     R : rested {B = X} (stateᴺ (gh s) ρ) ≋ stateᴺ (restᶜ (gh s)) ρ
     R = ≋-by refl refl

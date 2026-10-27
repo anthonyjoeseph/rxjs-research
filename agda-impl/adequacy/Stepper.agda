@@ -15,7 +15,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (zero; suc)
 open import Data.Sum using (_⊎_; inj₁; inj₂; map₁; [_,_])
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂; map₂; uncurry)
-open import Data.Unit using (tt)
+open import Data.Unit using (⊤; tt)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; subst; cong)
 
@@ -35,8 +35,8 @@ open Agreeˢ using (nowˢ)
 import denotation.MonotonicList as M′
 import denotation.Unfold as U
 open import denotation.Unfold using (NEnv)
-open import adequacy.Sane using (Sane; Saneᴹ; Saneᴸ; Mode; runs; over; Rested; step-rested)
-open import adequacy.Placed.Order using (still; Placed; Placedᴹ; Placedᴸ; Sides)
+open import adequacy.Sane using (Sane; Saneᴹ; Saneᴸ; Mode; runs; over; Rested; step-rested; Told)
+open import adequacy.Placed.Order using (still; Placed; Placedᴹ; Placedᴸ; Sides; Alien)
 open import adequacy.Placed.Heads using (apart-sides)
 open import adequacy.Placed.Keys using (ahead-quiet)
 
@@ -185,51 +185,107 @@ first-rested ν (U.unionᶜ x y)    ρ _ = first-union {ν = ν} x y ρ
 first-rested ν (U.burstingᶜ r t) ρ _ = first-bursting {ν = ν} r t ρ
 first-rested ν (U.underᶜ s b)    ρ _ = first-under {ν = ν} s b ρ
 
--- A node's meaning starts with the event its step shows, else past
--- a running source's shown event: a joiner's.
-first : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (c : U.Node Γ A) (ρ : NEnv Γ) → Sane ν c → Placed c ρ → Firsts ν c ρ
-firstᴹ : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (o : Maybe (U.Node Γ A)) (ρ : NEnv Γ) → Saneᴹ ν o → Placedᴹ o ρ → Firstᴹ ν o ρ
-firstᴸ : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (ls : List (U.Node Γ A)) (ρ : NEnv Γ) → Saneᴸ ν ls → Placedᴸ ls ρ → Firstᴸ ν ls ρ
-first (U.framesᶜ τ e m)  ρ _ _ = inj₁ (agreeing (frames-after ρ τ e m) 1)
-first (U.burstᶜ τ r i b) ρ _ _ = inj₁ (agreeing (burst-after ρ τ r i b) 1)
-first (U.ofᶜ p i xs)     ρ _ _ = inj₁ (agreeing (of-after ρ p i xs) 1)
-first {ν = ν} (U.mapᶜ f c) ρ sn (_ , pl) with first c ρ sn pl
+-- WHAT A NODE'S FIRST EVENT READS of sanity and placing: each pool
+-- rested, each joiner told and alien to its source, each defer placed.
+-- No order: a node's meaning starts with its step's event whatever
+-- follows it.
+mutual
+  Firm : ∀ {Γ A} → All (λ _ → Mode) Γ → U.Node Γ A → NEnv Γ → Set
+  Firm ν (U.mapᶜ f c)                    ρ = Firm ν c ρ
+  Firm ν (U.scanᶜ f z c)                 ρ = Firm ν c ρ
+  Firm ν (U.takeWhileᶜ i p c)            ρ = Firm ν c ρ
+  Firm ν (U.flatMapᶜ op g o ls qs pl)    ρ = Firmᴹ ν o ρ × Firmᴸ ν ls ρ × Rested pl
+  Firm ν (U.joinᶜ i p xs e)              ρ = Told (lookup ν i) e × Alien p (lookup ρ i)
+  Firm ν (U.connectᶜ r b (U.live s))     ρ = Firm (runs ∷ᴬ ν) b (U.meaning s ρ ∷ᴬ ρ) × Firm ν s ρ
+  Firm ν (U.connectᶜ r b (U.ended c t))  ρ = Firm (over ∷ᴬ ν) b (end c ∷ᴬ ρ) × Rested t
+  Firm ν (U.deferᶜ l p ns)               ρ = Placed (U.deferᶜ l p ns) ρ
+  Firm ν _                               ρ = ⊤
+
+  Firmᴹ : ∀ {Γ A} → All (λ _ → Mode) Γ → Maybe (U.Node Γ A) → NEnv Γ → Set
+  Firmᴹ ν nothing  ρ = ⊤
+  Firmᴹ ν (just c) ρ = Firm ν c ρ
+
+  Firmᴸ : ∀ {Γ A} → All (λ _ → Mode) Γ → List (U.Node Γ A) → NEnv Γ → Set
+  Firmᴸ ν []       ρ = ⊤
+  Firmᴸ ν (c ∷ cs) ρ = Firm ν c ρ × Firmᴸ ν cs ρ
+
+-- A sane, placed node is firm.
+firm : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (c : U.Node Γ A) (ρ : NEnv Γ) → Sane ν c → Placed c ρ → Firm ν c ρ
+firmᴹ : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (o : Maybe (U.Node Γ A)) (ρ : NEnv Γ) → Saneᴹ ν o → Placedᴹ o ρ → Firmᴹ ν o ρ
+firmᴸ : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (ls : List (U.Node Γ A)) (ρ : NEnv Γ) → Saneᴸ ν ls → Placedᴸ ls ρ → Firmᴸ ν ls ρ
+firm (U.mapᶜ f c)                   ρ sn             (_ , pl)          = firm c ρ sn pl
+firm (U.scanᶜ f z c)                ρ sn             (_ , pl)          = firm c ρ sn pl
+firm (U.takeWhileᶜ i p c)           ρ sn             (_ , pl)          = firm c ρ sn pl
+firm (U.flatMapᶜ op g o ls qs pl)   ρ (so , sl , _ , rp) (_ , po , pls , _) = firmᴹ o ρ so po , firmᴸ ls ρ sl pls , rp
+firm (U.joinᶜ i p xs e)             ρ sn             (_ , al)          = sn , al
+firm (U.connectᶜ r b (U.live s))    ρ (sb , ss)      (_ , pb , ps , _) = firm b (U.meaning s ρ ∷ᴬ ρ) sb pb , firm s ρ ss ps
+firm (U.connectᶜ r b (U.ended c t)) ρ (sb , rt)      (_ , pb)          = firm b (end c ∷ᴬ ρ) sb pb , rt
+firm (U.deferᶜ l p ns)              ρ _              pd                = pd
+firm (U.framesᶜ τ e m)              ρ _ _ = tt
+firm (U.burstᶜ τ r i b)             ρ _ _ = tt
+firm (U.ofᶜ p i xs)                 ρ _ _ = tt
+firm (U.endingᶜ p n)                ρ _ _ = tt
+firm (U.restᶜ n)                    ρ _ _ = tt
+firm U.idleᶜ                        ρ _ _ = tt
+firm (U.unionᶜ x y)                 ρ _ _ = tt
+firm (U.burstingᶜ r t)              ρ _ _ = tt
+firm (U.underᶜ s b)                 ρ _ _ = tt
+
+firmᴹ nothing  ρ _  _  = tt
+firmᴹ (just c) ρ sc pc = firm c ρ sc pc
+
+firmᴸ []       ρ _         _         = tt
+firmᴸ (c ∷ cs) ρ (sc , ss) (pc , ps) = firm c ρ sc pc , firmᴸ cs ρ ss ps
+
+-- A firm node's meaning starts with the event its step shows, else
+-- past a running source's shown event: a joiner's.
+firsts : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (c : U.Node Γ A) (ρ : NEnv Γ) → Firm ν c ρ → Firsts ν c ρ
+firstsᴹ : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (o : Maybe (U.Node Γ A)) (ρ : NEnv Γ) → Firmᴹ ν o ρ → Firstᴹ ν o ρ
+firstsᴸ : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (ls : List (U.Node Γ A)) (ρ : NEnv Γ) → Firmᴸ ν ls ρ → Firstᴸ ν ls ρ
+firsts (U.framesᶜ τ e m)  ρ _ = inj₁ (agreeing (frames-after ρ τ e m) 1)
+firsts (U.burstᶜ τ r i b) ρ _ = inj₁ (agreeing (burst-after ρ τ r i b) 1)
+firsts (U.ofᶜ p i xs)     ρ _ = inj₁ (agreeing (of-after ρ p i xs) 1)
+firsts {ν = ν} (U.mapᶜ f c) ρ fm with firsts c ρ fm
 ... | inj₁ ag = inj₁ (one-map ρ f (U.step c) ag)
 ... | inj₂ pa = inj₂ (past-map ν ρ f (U.step c) (U.meaning c ρ) pa)
-first {ν = ν} (U.scanᶜ f z c) ρ sn (_ , pl) with first c ρ sn pl
+firsts {ν = ν} (U.scanᶜ f z c) ρ fm with firsts c ρ fm
 ... | inj₁ ag = inj₁ (one-scan ρ f z (U.step c) ag)
 ... | inj₂ pa = inj₂ (past-scan ν ρ f z (U.step c) (U.meaning c ρ) pa)
-first {ν = ν} (U.takeWhileᶜ i p c) ρ sn (_ , pl) with first c ρ sn pl
+firsts {ν = ν} (U.takeWhileᶜ i p c) ρ fm with firsts c ρ fm
 ... | inj₁ ag = inj₁ (one-take ρ i p (U.step c) ag)
 ... | inj₂ pa = inj₂ (past-take ν ρ i p (U.step c) (U.meaning c ρ) pa)
-first {ν = ν} (U.flatMapᶜ op g o ls qs pl) ρ (so , sl , _ , rp) (_ , po , pls , _) =
-  flat-first op g o ls qs pl ρ (firstᴹ o ρ so po) (firstᴸ ls ρ sl pls) rp (first-rested ν pl ρ rp)
-first {ν = ν} (U.joinᶜ i p xs e) ρ sn (_ , al) = first-join ν i p xs e ρ sn al
-first {ν = ν} (U.connectᶜ r b (U.live s)) ρ (sb , ss) (_ , pb , ps , _) =
+firsts {ν = ν} (U.flatMapᶜ op g o ls qs pl) ρ (fo , fl , rp) =
+  flat-first op g o ls qs pl ρ (firstsᴹ o ρ fo) (firstsᴸ ls ρ fl) rp (first-rested ν pl ρ rp)
+firsts {ν = ν} (U.joinᶜ i p xs e) ρ (t , al) = first-join ν i p xs e ρ t al
+firsts {ν = ν} (U.connectᶜ r b (U.live s)) ρ (fb , fs) =
   Beside.conn ν runs r ρ (U.meaning s ρ) (U.meaning s ρ) (U.stateᴺ s ρ) (U.step s) (U.stateᴺ b (U.meaning s ρ ∷ᴬ ρ)) (U.step b)
     (U.bodyˢ r (U.live s)) (U.step (U.connectᶜ r b (U.live s))) (λ p → p) (head-body r (U.live s) (U.step b))
     (λ k → one-body ρ _ r (U.stateᴺ s ρ) k (U.live s) (U.step b)) (one-bodyˢ ρ _ r (U.live s) (U.step b))
     (source-hush r b (U.step b) s (U.step s)) (source-split r b (U.step b) s (U.step s))
-    (first s ρ ss ps) (first b (U.meaning s ρ ∷ᴬ ρ) sb pb)
-first {ν = ν} (U.connectᶜ r b (U.ended c t)) ρ (sb , rt) (_ , pb) =
+    (firsts s ρ fs) (firsts b (U.meaning s ρ ∷ᴬ ρ) fb)
+firsts {ν = ν} (U.connectᶜ r b (U.ended c t)) ρ (fb , rt) =
   Beside.conn ν over r ρ (end c) (U.meaning t ρ) (U.stateᴺ t ρ) (U.step t) (U.stateᴺ b (end c ∷ᴬ ρ)) (U.step b)
     (U.shutˢᵗ r c t) (U.step (U.connectᶜ r b (U.ended c t))) inj₂ (head-shut r c t (U.step b))
     (λ k → one-shut ρ _ r (U.stateᴺ t ρ) k c t (U.step b)) (one-shutˢ ρ _ r c t (U.step b))
     (ended-hush r b (U.step b) c t (U.step t)) (ended-split r b (U.step b) c t (U.step t) (step-rested t rt))
-    (first-rested ν t ρ rt) (first b (end c ∷ᴬ ρ) sb pb)
-first {ν = ν} (U.deferᶜ l p ns) ρ _ pd = first-defer {ν = ν} l p ns ρ pd
-first (U.endingᶜ p n)   ρ _ _ = inj₁ end⁼
-first {ν = ν} (U.restᶜ n)       ρ _ _ = first-rest {ν = ν} n ρ
-first U.idleᶜ           ρ _ _ = inj₁ hush⁼
-first {ν = ν} (U.unionᶜ x y)    ρ _ _ = first-union {ν = ν} x y ρ
-first {ν = ν} (U.burstingᶜ r t) ρ _ _ = first-bursting {ν = ν} r t ρ
-first {ν = ν} (U.underᶜ s b)    ρ _ _ = first-under {ν = ν} s b ρ
+    (first-rested ν t ρ rt) (firsts b (end c ∷ᴬ ρ) fb)
+firsts {ν = ν} (U.deferᶜ l p ns) ρ pd = first-defer {ν = ν} l p ns ρ pd
+firsts (U.endingᶜ p n)   ρ _ = inj₁ end⁼
+firsts {ν = ν} (U.restᶜ n)       ρ _ = first-rest {ν = ν} n ρ
+firsts U.idleᶜ           ρ _ = inj₁ hush⁼
+firsts {ν = ν} (U.unionᶜ x y)    ρ _ = first-union {ν = ν} x y ρ
+firsts {ν = ν} (U.burstingᶜ r t) ρ _ = first-bursting {ν = ν} r t ρ
+firsts {ν = ν} (U.underᶜ s b)    ρ _ = first-under {ν = ν} s b ρ
 
-firstᴹ nothing  ρ _  _  = tt
-firstᴹ (just c) ρ sc pc = first c ρ sc pc
+firstsᴹ nothing  ρ _  = tt
+firstsᴹ (just c) ρ fc = firsts c ρ fc
 
-firstᴸ []       ρ _          _          = tt
-firstᴸ (c ∷ cs) ρ (sc , ss) (pc , ps) = first c ρ sc pc , firstᴸ cs ρ ss ps
+firstsᴸ []       ρ _         = tt
+firstsᴸ (c ∷ cs) ρ (fc , fs) = firsts c ρ fc , firstsᴸ cs ρ fs
+
+-- A sane, placed node's meaning starts with the event its step shows.
+first : ∀ {Γ A} {ν : All (λ _ → Mode) Γ} (c : U.Node Γ A) (ρ : NEnv Γ) → Sane ν c → Placed c ρ → Firsts ν c ρ
+first c ρ sn pl = firsts c ρ (firm c ρ sn pl)
 
 -- A node whose step shows past `k`, among sources showing nothing
 -- before `k`, shows nothing before it.

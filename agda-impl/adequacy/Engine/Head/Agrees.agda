@@ -4,6 +4,8 @@ module adequacy.Engine.Head.Agrees where
 
 open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_; [_]; map)
+open import Data.List.Relation.Unary.Any using (here)
+open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Properties using (++-identityʳ; map-++; length-map)
 open import Data.Maybe using (Maybe; just; nothing) renaming (map to mapᴹ)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -12,7 +14,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong;
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.MonotonicList.Events using (Pos; Timeline)
-open import denotation.Unfold using (Node; Step; outˢ; skipˢ; endˢ; hushˢ; headˢ; step; restˢ; restsˢ; restᴹ; restsᶜ; restᶜ; unionˢ;
+open import denotation.Unfold using (Node; shut; Step; outˢ; skipˢ; endˢ; hushˢ; headˢ; step; restˢ; restsˢ; restᴹ; restsᶜ; restᶜ; unionˢ;
   Earliest; found; earliest; pick; Outer; doneᵒ; runᵒ; outerOf; goˢ; outerˢ; laneˢ; flatˢ;
   Source; live; ended; connectᶜ; burstingᶜ; underᶜ; subscribe; sourceˢ; bodyˢ; shutˢᵗ; burstsˢ; beforeˢ; idleᶜ; mapᶜ; scanᶜ) renaming (none to noneᴱ)
 open import operation.Key using (at; after)
@@ -20,8 +22,8 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ctx; closed; inMap; inCut;
   Out; still; shows; Cand; seek; first; retag; mapT; cutT; nx; cp; attached; attAt; raceT; outerT; laneT; lanes; inOuter; inLanes; inLn; inScan; inTake;
   CS; cs; inSrc; inBody; own; ownBest; shift; over; sourceT; bodyM; owedM) renaming (found to foundᴹ)
-open import adequacy.Engine.Meaning using (gh; lane; lanesL; deadL; outerG; poolG; doneG; srcG; vals; endOf)
-open import adequacy.Engine.Shuts using (Shuts; none; upˢ; shutAll; shutAllˢ; Toldˢ; Toldᴸ; told-none; told-shut; shut-still; shut-comm; shut-flat; shut-conn; shut-done; shut-taken)
+open import adequacy.Engine.Meaning using (gh; bodyG; lane; lanesL; deadL; outerG; poolG; doneG; srcG; vals; endOf)
+open import adequacy.Engine.Shuts using (Shuts; none; shutAt; upˢ; snocˢ; shut-snoc; closeOf; shutAll; shutAllˢ; Toldˢ; Toldᴸ; told-none; told-drop; told-shut; shut-still; shut-comm; shut-flat; shut-conn; shut-done; shut-taken)
 open import adequacy.Engine.Head using (cold-head; pend-head; scanS-head; takeS-head; limit-head; switch-head; exhaust-head; Agrees; Conn; Done; Frag; Head; HeadAt; Lanes; NoConn; Quiet; []; _∷_; att-head; calm; cand; done-head; done-step; early; exact; hush-quiet; map-head; none; of-head; off-head; off-quiet; on-head; pool-step; quiet-first; quiet-hush; rest-hush; HeadAtⁿ; shut-fixed; shut-pool; rest-hushⱽ; tape-still)
 open import adequacy.Engine.Head.Race using (WA; calm-first; ended-shut; first-l; len-earliest; min-wa; on-true; outer-at; over-ended; over-src; over-step; own-calm; own-first; p1-live; p3-live; quiet-race; quiet-wa; race; shut-via; src-calm; src-quiet; sub-bursts; sub-head; under-hush; union-upto; win; win-snoc)
 
@@ -32,14 +34,30 @@ open import adequacy.Engine.Head.Race using (WA; calm-first; ended-shut; first-l
 fixed : ∀ {Γ A} b x (s : St Γ A) (V : Shuts Γ) → shutAll V (gh s) ≡ gh s → HeadAtⁿ b x (gh s) → HeadAtⁿ b x (shutAll V (gh s))
 fixed b x s V e h = subst (HeadAtⁿ b x) (sym e) h
 
+-- An ended connect's body read through shuts one frame down is its
+-- ghost read through those and its source's end, innermost.
+body-shut : ∀ {Γ X B} (V : Shuts Γ) k (o : St Γ X) (n : Node (X ∷ Γ) B) → shutAll (upˢ V) (bodyG k n) ≡ shutAll (closeOf (srcG k o) (upˢ V)) n
+body-shut V (cs false sl sa (just p) as ow r e) o n = refl
+body-shut V (cs false sl sa nothing as ow r e)  o n = refl
+body-shut V (cs true sl sa (just p) as ow r e)  o n = refl
+body-shut V (cs true sl sa nothing as ow r e)   o n = sym (shut-snoc (upˢ V) (here refl) e n)
+
 -- A connect read through shuts: its body through the same shuts one
--- frame down, its source through them.
+-- frame down and its source's end, its source through them.
 shut-gh-conn : ∀ {Γ X B} (V : Shuts Γ) k (o : St Γ X) (b : St (X ∷ Γ) B)
-             → shutAll V (gh (connS k o b)) ≡ doneG (CS.owedAt k) (CS.srcLive k) (connectᶜ (CS.srcAt k) (shutAll (upˢ V) (gh b)) (shutAllˢ V (srcG k o)))
-shut-gh-conn V k o b = trans (shut-done V (CS.owedAt k) (CS.srcLive k) _) (cong (doneG (CS.owedAt k) (CS.srcLive k)) (shut-conn V (CS.srcAt k) (gh b) (srcG k o)))
+             → shutAll V (gh (connS k o b)) ≡ doneG (CS.owedAt k) (CS.srcLive k) (connectᶜ (CS.srcAt k) (shutAll (closeOf (srcG k o) (upˢ V)) (gh b)) (shutAllˢ V (srcG k o)))
+shut-gh-conn V k o b =
+  trans (shut-done V (CS.owedAt k) (CS.srcLive k) _)
+    (cong (doneG (CS.owedAt k) (CS.srcLive k))
+      (trans (shut-conn V (CS.srcAt k) (bodyG k (gh b)) (srcG k o)) (cong (λ N → connectᶜ (CS.srcAt k) N (shutAllˢ V (srcG k o))) (body-shut V k o (gh b)))))
+
+-- Told through shuts and one more, told through that one alone.
+told-snoc : ∀ {Γ X A} (V : Shuts Γ) (i : X ∈ Γ) e (s : St Γ A) → Toldˢ (snocˢ V i e) s → Toldˢ (snocˢ none i e) s
+told-snoc none           i e s t = t
+told-snoc (shutAt j d V) i e s t = told-snoc V i e s (told-drop j d (snocˢ V i e) s t)
 
 -- A subscribed connect with nothing connected below.
-conn-fixed : ∀ {Γ X B} (V : Shuts Γ) cl sl sa as ow r e (o : St Γ X) (b : St (X ∷ Γ) B) → Toldˢ V o → Toldˢ (upˢ V) b
+conn-fixed : ∀ {Γ X B} (V : Shuts Γ) cl sl sa as ow r e (o : St Γ X) (b : St (X ∷ Γ) B) → Toldˢ V o → Toldˢ (closeOf (srcG (cs cl sl sa nothing as ow r e) o) (upˢ V)) b
            → Frag o → Frag b → NoConn o → NoConn b
            → shutAll V (gh (connS (cs cl sl sa nothing as ow r e) o b)) ≡ gh (connS (cs cl sl sa nothing as ow r e) o b)
 conn-fixed V false sl sa as ow r e o b to tb fo fb no nb =
@@ -47,7 +65,9 @@ conn-fixed V false sl sa as ow r e o b to tb fo fb no nb =
     (cong₂ (λ N M → doneG ow sl (connectᶜ r N (live M))) (shut-fixed (upˢ V) b tb fb nb) (shut-fixed V o to fo no))
 conn-fixed V true sl sa as ow r e o b to tb fo fb no nb =
   trans (shut-gh-conn V (cs true sl sa nothing as ow r e) o b)
-    (cong₂ (λ N M → doneG ow sl (connectᶜ r N (ended e M))) (shut-fixed (upˢ V) b tb fb nb) (shut-fixed V (cutS false attached o) to (fo , no) no))
+    (cong₂ (λ N M → doneG ow sl (connectᶜ r N (ended e M)))
+      (trans (shut-fixed (snocˢ (upˢ V) (here refl) e) b tb fb nb) (sym (shut-fixed (snocˢ none (here refl) e) b (told-snoc (upˢ V) (here refl) e b tb) fb nb)))
+      (shut-fixed V (cutS false attached o) to (fo , no) no))
 
 mutual
   head-agreesⱽ : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) (V : Shuts Γ) → Toldˢ V s → Frag s → HeadAtⁿ (closed c) (cand c s) (shutAll V (gh s))
@@ -88,10 +108,10 @@ mutual
   flat-at : ∀ {R Γ A B} b (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) d n (o : St Γ A) ls (V : Shuts Γ) → Toldˢ V (flatS (mergeᶠ nothing) f d n [] o ls)
           → closed c ≡ b → Frag (flatS (mergeᶠ nothing) f d n [] o ls)
           → HeadAtⁿ b (cand c (flatS (mergeᶠ nothing) f d n [] o ls)) (shutAll V (gh (flatS (mergeᶠ nothing) f d n [] o ls)))
-  flat-at true c f d n o ls V t cl (fo , fl , en , dd) =
+  flat-at true c f d n o ls V (to , tl) cl (fo , fl , en , dd) =
     quiet-race d n (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)
-      (subst (λ b → HeadAtⁿ b (cand (inOuter (mergeᶠ nothing) f d n [] ls c) o) (gh o)) cl (head-agreesⱽ (inOuter (mergeᶠ nothing) f d n [] ls c) o none (told-none o) fo))
-      (lanes-quiet c f d n o [] ls cl fl)
+      (subst (λ b → HeadAtⁿ b (cand (inOuter (mergeᶠ nothing) f d n [] ls c) o) (gh o)) cl (head-agreesⱽ (inOuter (mergeᶠ nothing) f d n [] ls c) o none (told-none V o to) fo))
+      (lanes-quiet c f d n o V [] ls cl fl tl)
   flat-at false c f d n o ls V (to , tl) cl (fo , fl , en , dd) =
     subst (λ m → Agrees (cand c FL) (step m)) (sym (shut-flat V (mergeᶠ nothing) (lane f) (outerG d (gh o)) (lanesL ls) [] (poolG d (gh o) (deadL ls))))
       (subst (λ st → Agrees (cand c FL) (flatˢ (mergeᶠ nothing) (lane f) OUT LS [] P st (earliest LS)))
@@ -127,19 +147,19 @@ mutual
         (lanes-wa c f d n o V (lnS false (cutS false a s) ∷ pre) post cl fl tl))
     where C = inLn false (inLanes (mergeᶠ nothing) f d n [] o pre post c)
 
-  lanes-quiet : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) d n (o : St Γ A) pre ls → closed c ≡ true → Lanes ls
+  lanes-quiet : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) d n (o : St Γ A) (V : Shuts Γ) pre ls → closed c ≡ true → Lanes ls → Toldᴸ V ls
               → Quiet (mapᴹ proj₂ (lanes c (mergeᶠ nothing) f d n [] o pre ls))
-  lanes-quiet c f d n o pre [] cl _ = none
-  lanes-quiet c f d n o pre (lnS true (cutS true a s) ∷ post) cl (fs , fl) =
+  lanes-quiet c f d n o V pre [] cl _ _ = none
+  lanes-quiet c f d n o V pre (lnS true (cutS true a s) ∷ post) cl (fs , fl) (ts , tl) =
     quiet-first (retag (cutT true) (seek C (cutS true a s))) (lanes c (mergeᶠ nothing) f d n [] o (lnS true (cutS true a s) ∷ pre) post)
       (subst Quiet (sym (on-true (seek C (cutS true a s))))
-        (subst (λ b → HeadAtⁿ b (cand C (cutS true a s)) (gh s)) cl (head-agreesⱽ C (cutS true a s) none (told-none s) fs)))
-      (lanes-quiet c f d n o (lnS true (cutS true a s) ∷ pre) post cl fl)
+        (subst (λ b → HeadAtⁿ b (cand C (cutS true a s)) (gh s)) cl (head-agreesⱽ C (cutS true a s) none (told-none V (cutS true a s) ts) fs)))
+      (lanes-quiet c f d n o V (lnS true (cutS true a s) ∷ pre) post cl fl tl)
     where C = inLn true (inLanes (mergeᶠ nothing) f d n [] o pre post c)
-  lanes-quiet c f d n o pre (lnS false (cutS false a s) ∷ post) cl (fs , fl) =
+  lanes-quiet c f d n o V pre (lnS false (cutS false a s) ∷ post) cl (fs , fl) (_ , tl) =
     quiet-first (retag (cutT false) (seek C (cutS false a s))) (lanes c (mergeᶠ nothing) f d n [] o (lnS false (cutS false a s) ∷ pre) post)
       (off-quiet (seek C (cutS false a s)))
-      (lanes-quiet c f d n o (lnS false (cutS false a s) ∷ pre) post cl fl)
+      (lanes-quiet c f d n o V (lnS false (cutS false a s) ∷ pre) post cl fl tl)
     where C = inLn false (inLanes (mergeᶠ nothing) f d n [] o pre post c)
 
   -- A joiner: what it was fed, in order, while live.
@@ -161,9 +181,9 @@ mutual
   ... | false = exact refl
 
   -- A done node under an open observer shows nothing.
-  done-quiet : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → closed c ≡ false → Frag s → Done s → Quiet (cand c s)
-  done-quiet c s cc fs ds =
-    hush-quiet (subst (Agrees (cand c s)) (done-step s fs ds) (subst (λ b → HeadAtⁿ b (cand c s) (gh s)) cc (head-agreesⱽ c s none (told-none s) fs)))
+  done-quiet : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) (V : Shuts Γ) → Toldˢ V s → closed c ≡ false → Frag s → Done s → Quiet (cand c s)
+  done-quiet c s V t cc fs ds =
+    hush-quiet (subst (Agrees (cand c s)) (done-step s fs ds) (subst (λ b → HeadAtⁿ b (cand c s) (gh s)) cc (head-agreesⱽ c s none (told-none V s t) fs)))
 
   conn-body : ∀ {Γ X B} k (o : St Γ X) (b : St (X ∷ Γ) B) → Conn k o b → Frag b
   conn-body (cs cl sl sa (just p) nothing ow r e) (pend s) b (fb , _) = fb
@@ -171,19 +191,19 @@ mutual
 
   -- A connect: its source's skip against its body's mark, as the stepper
   -- races them.
-  conn-at : ∀ {R Γ X B} bb (c : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) (V : Shuts Γ) → Toldˢ V o → Toldˢ (upˢ V) b → closed c ≡ bb → Conn k o b
+  conn-at : ∀ {R Γ X B} bb (c : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) (V : Shuts Γ) → Toldˢ V o → Toldˢ (closeOf (srcG k o) (upˢ V)) b → closed c ≡ bb → Conn k o b
           → HeadAtⁿ bb (cand c (connS k o b)) (shutAll V (gh (connS k o b)))
   conn-at true c k o b V to tb cc fk =
     quiet-first (ownBest c (connS k o b) (own (connS k o b))) (sourceT (over k) (seek (inSrc k b c) o) (seek (inBody k o c) b))
       (own-calm c k o b (own (connS k o b)))
       (src-quiet (over k) (seek (inSrc k b c) o) (seek (inBody k o c) b)
-        (subst (λ x → HeadAtⁿ x (cand (inBody k o c) b) (gh b)) cc (head-agreesⱽ (inBody k o c) b none (told-none b) (conn-body k o b fk))))
+        (subst (λ x → HeadAtⁿ x (cand (inBody k o c) b) (gh b)) cc (head-agreesⱽ (inBody k o c) b none (told-none _ b tb) (conn-body k o b fk))))
   -- Not yet subscribed, over.
   conn-at {B = B} false c (cs cl sl sa (just p) nothing (just q) r e) (pend s) b V to tb cc (fb , refl , ov) =
     subst (λ m → Agrees (cand c (connS K (pend s) b)) (step m)) (sym (shut-gh-conn V K (pend s) b))
       (subst (Agrees (cand c (connS K (pend s) b))) (sym (under-hush r S N (rest-hushⱽ {B = B} (upˢ V) b tb fb (proj₂ (ov refl)))))
         (first-l (ownBest c (connS K (pend s) b) (own (connS K (pend s) b))) (seek (inBody K (pend s) c) b) _
-          (done-quiet (inBody K (pend s) c) b cc fb (proj₁ (ov refl)))
+          (done-quiet (inBody K (pend s) c) b (upˢ V) tb cc fb (proj₁ (ov refl)))
           (own-first c K (pend s) b bodyM (at r) ((owedM , after q) ∷ []) _
             (union-upto (at r) _ _ (burstsˢ r S (step S)) (sub-bursts V s r)))))
     where K = cs cl sl sa (just p) nothing (just q) r e
@@ -193,7 +213,7 @@ mutual
     subst (λ m → Agrees (cand c (connS K (pend s) b)) (step m)) (sym (shut-gh-conn V K (pend s) b))
       (subst (Agrees (cand c (connS K (pend s) b))) (sym (under-hush r S N (rest-hushⱽ {B = B} (upˢ V) b tb fb (proj₂ (ov refl)))))
         (first-l (ownBest c (connS K (pend s) b) (own (connS K (pend s) b))) (seek (inBody K (pend s) c) b) _
-          (done-quiet (inBody K (pend s) c) b cc fb (proj₁ (ov refl)))
+          (done-quiet (inBody K (pend s) c) b (upˢ V) tb cc fb (proj₁ (ov refl)))
           (own-first c K (pend s) b bodyM (at r) [] _
             (union-upto (at r) _ _ (burstsˢ r S (step S)) (sub-bursts V s r)))))
     where K = cs cl false sa (just p) nothing nothing r e
@@ -210,19 +230,19 @@ mutual
   -- Subscribed: over, the source live or ended.
   conn-at false c (cs false sl sa nothing as (just q) r e) o b V to tb cc (fo , fb , cn , ov) =
     fixed false _ (connS K o b) V (conn-fixed V false sl sa as (just q) r e o b to tb fo fb (proj₁ (ov refl)) (proj₂ (proj₂ (ov refl))))
-      (conn-live-over c K o b cc refl fo fb (ov refl))
+      (conn-live-over c K o b V to tb cc refl fo fb (ov refl))
     where K = cs false sl sa nothing as (just q) r e
   conn-at false c (cs true sl sa nothing as (just q) r e) o b V to tb cc (fo , fb , cn , ov) =
     fixed false _ (connS K o b) V (conn-fixed V true sl sa as (just q) r e o b to tb fo fb (proj₁ (ov refl)) (proj₂ (proj₂ (ov refl))))
-      (conn-ended-over c K o b cc fo fb (ov refl))
+      (conn-ended-over c K o b V to tb cc fo fb (ov refl))
     where K = cs true sl sa nothing as (just q) r e
   conn-at false c (cs false false sa nothing as nothing r e) o b V to tb cc (fo , fb , cn , ov) =
     fixed false _ (connS K o b) V (conn-fixed V false false sa as nothing r e o b to tb fo fb (proj₁ (ov refl)) (proj₂ (proj₂ (ov refl))))
-      (conn-live-over c K o b cc refl fo fb (ov refl))
+      (conn-live-over c K o b V to tb cc refl fo fb (ov refl))
     where K = cs false false sa nothing as nothing r e
   conn-at false c (cs true false sa nothing as nothing r e) o b V to tb cc (fo , fb , cn , ov) =
     fixed false _ (connS K o b) V (conn-fixed V true false sa as nothing r e o b to tb fo fb (proj₁ (ov refl)) (proj₂ (proj₂ (ov refl))))
-      (conn-ended-over c K o b cc fo fb (ov refl))
+      (conn-ended-over c K o b V to tb cc fo fb (ov refl))
     where K = cs true false sa nothing as nothing r e
   -- Subscribed and live.
   conn-at false c (cs false true sa nothing as nothing r e) o b V to tb cc (fo , fb , cn , ov) =
@@ -242,41 +262,44 @@ mutual
         (subst (Agrees (cand c (connS K o b))) (sym (ended-shut r e (gh o) N (rest-hush {B = X₀} o fo (cn refl))))
           (calm-first (ownBest c (connS K o b) (own (connS K o b))) (sourceT false X Y) _ (own-calm c K o b (own (connS K o b)))
             (shut-via r e (restᶜ (gh o)) (step N)
-              (src-calm false X Y (step N) (subst (λ x → HeadAtⁿ x (cand (inBody K o c) b) N) cc (head-agreesⱽ (inBody K o c) b (upˢ V) tb fb)))))))
+              (src-calm false X Y (step N) (subst (λ x → HeadAtⁿ x (cand (inBody K o c) b) N) cc (head-agreesⱽ (inBody K o c) b (snocˢ (upˢ V) (here refl) e) tb fb)))))))
     where K = cs true true sa nothing as nothing r e
           X = seek (inSrc K b c) o
           Y = seek (inBody K o c) b
-          N = shutAll (upˢ V) (gh b)
+          N = shutAll (snocˢ (upˢ V) (here refl) e) (gh b)
 
   -- Over, the source live: its event's place unmoved.
-  conn-live-over : ∀ {R Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) → closed c ≡ false → closed (inSrc k b c) ≡ false
+  conn-live-over : ∀ {R Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) (V : Shuts Γ) → Toldˢ V o → Toldˢ (closeOf (srcG k o) (upˢ V)) b
+                 → closed c ≡ false → closed (inSrc k b c) ≡ false
                  → Frag o → Frag b → NoConn o × Done b × NoConn b
                  → Agrees (mapᴹ proj₂ (first (ownBest c (connS k o b) (own (connS k o b))) (sourceT true (seek (inSrc k b c) o) (seek (inBody k o c) b))))
                           (restˢ {B = B} (connectᶜ (CS.srcAt k) (gh b) (live (gh o))))
-  conn-live-over {B = B} c k o b cc cs′ fo fb (no , db , nb) =
+  conn-live-over {B = B} c k o b V to tb cc cs′ fo fb (no , db , nb) =
     subst (Agrees (mapᴹ proj₂ (first OWN (sourceT true X Y)))) (sym (under-hush (CS.srcAt k) (gh o) (gh b) (rest-hush {B = B} b fb nb)))
       (calm-first OWN (sourceT true X Y) _ (own-calm c k o b (own (connS k o b)))
         (over-src X Y (step (gh o)) _
-          (subst (λ x → HeadAt x (cand (inSrc k b c) o) o) cs′ (head-agreesⱽ (inSrc k b c) o none (told-none o) fo))
-          (done-quiet (inBody k o c) b cc fb db)
+          (subst (λ x → HeadAt x (cand (inSrc k b c) o) o) cs′ (head-agreesⱽ (inSrc k b c) o none (told-none V o to) fo))
+          (done-quiet (inBody k o c) b _ tb cc fb db)
           (over-step (CS.srcAt k) _ _ (gh o) (step (gh o)) (rest-hush {B = B} o fo no))))
     where OWN = ownBest c (connS k o b) (own (connS k o b))
           X = seek (inSrc k b c) o
           Y = seek (inBody k o c) b
 
   -- Over, the source ended: nothing rests, and nothing shows.
-  conn-ended-over : ∀ {R Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) → closed c ≡ false
-                  → Frag o → Frag b → NoConn o × Done b × NoConn b
+  conn-ended-over : ∀ {R Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (b : St (X ∷ Γ) B) (V : Shuts Γ) → Toldˢ V o → Toldˢ (snocˢ (upˢ V) (here refl) (CS.endAt k)) b
+                  → closed c ≡ false → Frag o → Frag b → NoConn o × Done b × NoConn b
                   → Agrees (mapᴹ proj₂ (first (ownBest c (connS k o b) (own (connS k o b))) (sourceT true (seek (inSrc k b c) o) (seek (inBody k o c) b))))
-                           (restˢ {B = B} (connectᶜ (CS.srcAt k) (gh b) (ended (CS.endAt k) (restᶜ (gh o)))))
-  conn-ended-over {X = X₀} {B = B} c k o b cc fo fb (no , db , nb) =
-    subst (Agrees (mapᴹ proj₂ (first OWN (sourceT true X Y))))
-      (sym (over-ended (CS.srcAt k) (CS.endAt k) (gh o) (gh b) (rest-hush {B = B} o fo no) (rest-hush {B = X₀} o fo no) (rest-hush {B = B} b fb nb)))
-      (quiet-hush (quiet-first OWN (sourceT true X Y) (own-calm c k o b (own (connS k o b)))
-        (src-quiet true X Y (done-quiet (inBody k o c) b cc fb db))))
+                           (restˢ {B = B} (connectᶜ (CS.srcAt k) (shut (here refl) (CS.endAt k) (gh b)) (ended (CS.endAt k) (restᶜ (gh o)))))
+  conn-ended-over {X = X₀} {B = B} c k o b V to tb cc fo fb (no , db , nb) =
+    subst (λ N → Agrees (mapᴹ proj₂ (first OWN (sourceT true X Y))) (restˢ {B = B} (connectᶜ (CS.srcAt k) N (ended (CS.endAt k) (restᶜ (gh o))))))
+      (sym (shut-fixed (snocˢ none (here refl) (CS.endAt k)) b (told-snoc (upˢ V) (here refl) (CS.endAt k) b tb) fb nb))
+      (subst (Agrees (mapᴹ proj₂ (first OWN (sourceT true X Y))))
+        (sym (over-ended (CS.srcAt k) (CS.endAt k) (gh o) (gh b) (rest-hush {B = B} o fo no) (rest-hush {B = X₀} o fo no) (rest-hush {B = B} b fb nb)))
+        (quiet-hush (quiet-first OWN (sourceT true X Y) (own-calm c k o b (own (connS k o b)))
+          (src-quiet true X Y (done-quiet (inBody k o c) b _ tb cc fb db)))))
     where OWN = ownBest c (connS k o b) (own (connS k o b))
           X = seek (inSrc k b c) o
           Y = seek (inBody k o c) b
 
-head-agrees : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Frag s → Head c s
-head-agrees c s fs = head-agreesⱽ c s none (told-none s) fs
+head-agrees : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Toldˢ none s → Frag s → Head c s
+head-agrees c s t fs = head-agreesⱽ c s none t fs

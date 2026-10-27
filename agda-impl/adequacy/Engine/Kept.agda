@@ -48,7 +48,7 @@ open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; 
   Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load;
   Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM; search; found; run; unsub; leaf; feed)
   renaming (cut to cutᴹ)
-open import adequacy.Engine.Meaning using (Has; M; _≅_; _≋_; agree-≅; atOut; closed-hides; connSrc; doneE; doneG; envAt; flagOf; gh;
+open import adequacy.Engine.Meaning using (Has; M; _≅_; _≋_; agree-≅; atOut; bodyG; closed-hides; connSrc; doneE; doneG; envAt; flagOf; gh;
   joinG; lane; lanes-dead; lanesFrame; lanesL; lift-≅; outerG; outerOf; outerT; pastOut;
   poolRuns; risen; srcFrame; srcG; subOr; tape; took; up; lift-ne; ≅-refl; ≅-trans; ≈-refl;
   ≋-by; ≋-out; ≋-trans)
@@ -98,7 +98,7 @@ live-plug sa nothing  as r e b s ρ u = ≋-by refl refl
 
 private
   conn-plug : ∀ {Γ X B} k (b : St (X ∷ Γ) B) (s : St Γ X) (ρ : NEnv Γ) → Unpended s → Opened k s
-            → connSrc (CS.closed k) (CS.srcAt k) (CS.endAt k) (gh b) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (connectᶜ (CS.srcAt k) (gh b) (srcG k s)) ρ
+            → connSrc (CS.closed k) (CS.srcAt k) (CS.endAt k) (gh b) ρ (stateᴺ (gh s) ρ) ≋ stateᴺ (connectᶜ (CS.srcAt k) (bodyG k (gh b)) (srcG k s)) ρ
   conn-plug (cs false sl sa (just p) as ow r e) b s ρ u o rewrite sub-settled (p ⊕ [ ix 1 ]) s u = ≋-by refl refl
   conn-plug (cs true  sl sa (just p) as ow r e) b s ρ u (() , _)
   conn-plug (cs cl sl sa nothing as ow r e)     b s ρ u o = conn-plugⁿ cl sl sa as ow r e b s ρ
@@ -165,8 +165,8 @@ module _ {R : Set} where
                → up c true (stateᴺ (restᶜ (gh s)) (envAt c)) ≅ up c true (stateᴺ (restᶜ (gh s′)) (envAt c))
     -- And a connect's rest, its source unsubscribed.
     conn-unsub : ∀ {Γ X B} (c : Ctx R Γ B) k (b : St (X ∷ Γ) B) (o : St Γ X) {o′ t} → unsub o ≡ (o′ , t)
-               → up c true (stateᴺ (restᶜ (connectᶜ (CS.srcAt k) (gh b) (srcG k o))) (envAt c))
-               ≅ up c true (stateᴺ (restᶜ (connectᶜ (CS.srcAt k) (gh b) (srcG k o′))) (envAt c))
+               → up c true (stateᴺ (restᶜ (connectᶜ (CS.srcAt k) (bodyG k (gh b)) (srcG k o))) (envAt c))
+               ≅ up c true (stateᴺ (restᶜ (connectᶜ (CS.srcAt k) (bodyG k (gh b)) (srcG k o′))) (envAt c))
 
     -- The frames with siblings: a rise interleaves with what they run.
     rise-outer-nx : ∀ {Γ A B} op (f : A → Obs Timeline Γ B) d n q ls (c : Ctx R Γ B) (o : St Γ A) a p

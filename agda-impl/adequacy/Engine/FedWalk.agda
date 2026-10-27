@@ -28,13 +28,14 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; hush; idle; ix)
 open import denotation.MonotonicList using (head; Agree; Agreeᵀ; agree-sym; agreeᵀ-sym; agree-refl)
 open import denotation.NonExpansive using (Agreeˢ)
-open import denotation.Unfold using (NEnv; meaning; stateᴺ; Source; live; ended)
+open import denotation.Unfold using (NEnv; meaning; stateᴺ; Source; live; ended; shut)
+open import Data.List.Relation.Unary.Any using (here)
 open import operation.Key using (after)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ctx; inMap; inScan; inCut; inLn;
   inTake; inOuter; inLanes; inSrc; inBody; plug; own; cs; CS; Owe; free; cpAt; cutAt; overAt; Att; Ev; _⊕_)
 open import operation.PureObservable using (ending; play; over)
-open import adequacy.Engine.Meaning using (_≋_; ≋-by; gh; envAt; srcRun; srcG; srcState; subOr; bodyConn; mapped; scanned; took)
+open import adequacy.Engine.Meaning using (_≋_; ≋-by; bodyG; gh; envAt; srcRun; srcG; srcState; subOr; bodyConn; mapped; scanned; took)
 open import adequacy.Engine.Head using (Frag; cand)
 open import adequacy.Engine.Keys using (Held)
 open import adequacy.Engine.Pick using (KAfter; Before)
@@ -255,7 +256,13 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
     fed-body-on : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) cl sa ba as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
                 → Frag (plug e (connS (cs cl true sa ba as nothing r en) s t))
                 → ∀ k → Under P k → After (k ++ [ ix 0 ])
-                    (head (force (stateᴺ (gh t) (srcRun (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd) ∷ᴬ envOf (force h′) dd))))
+                    (head (force (stateᴺ (bodyG (cs cl true sa ba as nothing r en) (gh t)) (srcRun (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd) ∷ᴬ envOf (force h′) dd))))
+    -- A BODY READ THROUGH ITS ENDED SOURCE'S SHUT is fed as it was: the
+    -- shut tells its joiners the end their environment already holds.
+    fed-shut : ∀ {Δ Y C} {e : Ctx R Δ C} (dd : Down e) sa as r en (s : St Δ Y) (t : St (Y ∷ Δ) C)
+             → FedAt (dBody {k = cs true true sa nothing as nothing r en} {s} dd) t
+             → Fed P (stateᴺ (shut (here refl) en (gh t)) (envOf (force h) (dBody {k = cs true true sa nothing as nothing r en} {s} dd)))
+                     (stateᴺ (shut (here refl) en (gh t)) (envOf (force h′) (dBody {k = cs true true sa nothing as nothing r en} {s} dd)))
 
   -- THE ENVIRONMENT FED THE REST is the stepped tree's.
   env-agree : ∀ m {Δ C} {e : Ctx R Δ C} (dd : Down e) → NAgree m (envOf (force h′) dd) (envAt (rebase dd))
@@ -308,11 +315,12 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
            → Held (plug (rebase dd) (connS (cs cl true sa ba as nothing r en) s t))
            → Fed P (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h) dd))
                    (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd))
-           → FedAt (dBody {k = cs cl true sa ba as nothing r en} {s} dd) t
+           → Fed P (stateᴺ (bodyG (cs cl true sa ba as nothing r en) (gh t)) (envOf (force h) (dBody {k = cs cl true sa ba as nothing r en} {s} dd)))
+                   (stateᴺ (bodyG (cs cl true sa ba as nothing r en) (gh t)) (envOf (force h′) (dBody {k = cs cl true sa ba as nothing r en} {s} dd)))
            → Fed P (bodyConn r (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h) dd))
-                     (stateᴺ (gh t) (envOf (force h) (dBody {k = cs cl true sa ba as nothing r en} {s} dd))))
+                     (stateᴺ (bodyG (cs cl true sa ba as nothing r en) (gh t)) (envOf (force h) (dBody {k = cs cl true sa ba as nothing r en} {s} dd))))
                    (bodyConn r (srcState (srcG (cs cl true sa ba as nothing r en) s) (envOf (force h′) dd))
-                     (stateᴺ (gh t) (envOf (force h′) (dBody {k = cs cl true sa ba as nothing r en} {s} dd))))
+                     (stateᴺ (bodyG (cs cl true sa ba as nothing r en) (gh t)) (envOf (force h′) (dBody {k = cs cl true sa ba as nothing r en} {s} dd))))
   live-fed dd cl sa ba as r en s t fs fs′ σ β =
     conn-fed r (fed-sourced dd cl sa ba as r en s t (proj₁ fs)) (fed-trail dd cl sa ba as r en s t fs′)
       (proj₁ nx) (proj₂ nx) (fed-body-on dd cl sa ba as r en s t (proj₁ fs)) σ β
@@ -327,9 +335,11 @@ module Walk {R Γ X B} (v : Bool) (q : Pos) {P : Pos → Set} (c : Ctx R Γ B) (
   fed-conn dd (cs false true sa nothing as nothing r en) s t fs fs′ is it =
     fed-by refl refl refl refl (live-fed dd false sa nothing as r en s t fs fs′ is it)
   fed-conn dd (cs true true sa nothing as nothing r en) s t fs fs′ is it =
-    fed-by refl refl refl refl (live-fed dd true sa nothing as r en s t fs fs′ (fed-ended dd sa as r en s t (proj₁ fs) is) it)
-  fed-conn dd (cs cl true sa (just p) as nothing r en) s t fs fs′ is it =
-    fed-by refl refl refl refl (live-fed dd cl sa (just p) as r en s t fs fs′ (sub-fed dd cl sa p as r en s t fs is) it)
+    fed-by refl refl refl refl (live-fed dd true sa nothing as r en s t fs fs′ (fed-ended dd sa as r en s t (proj₁ fs) is) (fed-shut dd sa as r en s t it))
+  fed-conn dd (cs false true sa (just p) as nothing r en) s t fs fs′ is it =
+    fed-by refl refl refl refl (live-fed dd false sa (just p) as r en s t fs fs′ (sub-fed dd false sa p as r en s t fs is) it)
+  fed-conn dd (cs true true sa (just p) as nothing r en) s t fs fs′ is it =
+    fed-by refl refl refl refl (live-fed dd true sa (just p) as r en s t fs fs′ (sub-fed dd true sa p as r en s t fs is) it)
 
   mutual
     walk : ∀ {Δ C} {e : Ctx R Δ C} (dd : Down e) (s : St Δ C) → Held (plug e s) → Held (plug (rebase dd) s) → FedAt dd s

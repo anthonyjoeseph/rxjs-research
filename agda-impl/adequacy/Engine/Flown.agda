@@ -28,15 +28,15 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.MonotonicList.Events using (Events; Events∞; Pos; Timeline; out; skip; end; hush; idle; ix; _∪_)
 import denotation.MonotonicList as M′
-open import denotation.MonotonicList using (MonotonicList; Agreeᵀ; Agree; agree-refl; agreeᵀ-refl; agreeᵀ-trans)
-open import denotation.NonExpansive using (_,ˢ_; ∪-ne; Lanes)
-open import denotation.Unfold using (NEnv; Node; Source; live; meaning; connectᶜ; stateᴺ; cutᴺ; states; outerᴺ; outer∞; subscribe)
+open import denotation.MonotonicList using (MonotonicList; Agreeᵀ; Agree; stop; out⁼; agree-refl; agreeᵀ-refl; agreeᵀ-trans)
+open import denotation.NonExpansive using (_,ˢ_; ∪-ne; Lanes; module Agreeˢ)
+open import denotation.Unfold using (NEnv; Node; Source; live; meaning; connectᶜ; restᶜ; stateᴺ; cutᴺ; states; outerᴺ; outer∞; subscribe)
 open import denotation.Denote using (flatOp)
 open import adequacy.Engine.Meaning using (_≋_; ≋-by; ≋-out; envAt; gh; srcG; srcRun; srcState; risen; lanesFrame; lane; lanesL; outerG; outerT;
   poolRuns; laneRuns; laneᴹ; flagOf; tailsOn; holeT; poolT; deadL; deadOne; lanes-refl; outerFrame; outerOf; poolG)
 open import adequacy.Engine.Union using (∪-idleᵀ; ∪-assocᵀ; ∪-commᵀ)
 open import adequacy.Engine.Keys using (Shape; Shape′; module ConnAt; LaneKeys; []ᴷ; _∷ᴷ_; FlatKeys; Keyed; KeyedL)
-open import adequacy.Engine.Trails using (beside-go; module FlatShape; gen-queue; gen-sub; held-of; above-sorted; keyedL-shape)
+open import adequacy.Engine.Trails using (body-≋; shape-≋; beside-go; module FlatShape; gen-queue; gen-sub; held-of; above-sorted; keyedL-shape)
 open import adequacy.Engine.Beside using (burst-hushed)
 open import adequacy.Engine.Race using (NotBefore; First; After; go-rise; go-outer; cuts-swap)
 open import adequacy.Engine.Ahead using (shown; Sides) renaming (shows to showsᶜ)
@@ -78,6 +78,15 @@ shape-out p a {r} {r′} ef ec (((o , st) , ev , et) , tr) =
 
 -- A connect's run: its body's beside its source's, and what both leave
 -- running.
+-- A value risen out of runs alike.
+risen-≋ : ∀ {Γ A} {n n′ : Node Γ A} {ρ : NEnv Γ} a p → stateᴺ n ρ ≋ stateᴺ n′ ρ → risen n ρ (nx a) p ≋ risen n′ ρ (nx a) p
+risen-≋ a p e zero    = Agreeˢ.cutˢ (e zero) ,ˢ stop
+risen-≋ a p e (suc m) = Agreeˢ.cutˢ (e (suc m)) ,ˢ out⁼ (Agreeˢ.cutˢ (e m)) (Agreeˢ.nowˢ (e m))
+
+-- An end risen out of what runs alike leave.
+risen-end-≋ : ∀ {Γ A B} {n n′ : Node Γ A} {ρ : NEnv Γ} p → stateᴺ n ρ ≋ stateᴺ n′ ρ → risen (restᶜ {B = B} n) ρ cp p ≋ risen (restᶜ n′) ρ cp p
+risen-end-≋ p e m = Agreeˢ.cutˢ (e m) ,ˢ agree-refl m _
+
 conn-run : ∀ {Γ X B} r (n : Node (X ∷ Γ) B) (σ : Source Γ X) (ρ : NEnv Γ)
          → meaning (connectᶜ r n σ) ρ ≡ M′.beside r (stateᴺ n (srcRun σ ρ ∷ᴬ ρ)) (srcState σ ρ)
          × cutᴺ (connectᶜ r n σ) ρ ≡ M′.burstOn r (srcState σ ρ) ∪ cutᴺ n (srcRun σ ρ ∷ᴬ ρ)
@@ -693,11 +702,13 @@ module _ {R : Set} where
       PU = trans (sym P1) (trans (cong (λ z → poolT (deadL z) ρ) (sym (ʳ++-defn pre))) (begun-pool L ρ H))
 
   -- A body's value rises out of its connect only while the connect is
-  -- live, its source no earlier: the connect's run shows it first.
-  rise-body-flight : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (s : St (X ∷ Γ) B) b p → Order ⟨ inBody k o c , s , rising (nx b) , p ⟩
-                   → Flight ⟨ c , connS k o s , rising (nx b) , p ⟩
-  rise-body-flight c (cs cl true sa ba as nothing r en) o s b p od =
-    subst (Shape′ (out p b (stateᴺ (gh (connS k o s)) ρ))) (sym (proj₂ cr))
+  -- live, its source no earlier: the connect's run shows it first, the
+  -- body read unshut.
+  body-flight : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (s : St (X ∷ Γ) B) b p → Order ⟨ inBody k o c , s , rising (nx b) , p ⟩
+              → CS.srcLive k ≡ true → CS.owedAt k ≡ nothing
+              → Shape (risen (connectᶜ (CS.srcAt k) (gh s) (srcG k o)) (envAt c) (nx b) p) × Above c true (risen (connectᶜ (CS.srcAt k) (gh s) (srcG k o)) (envAt c) (nx b) p)
+  body-flight c (cs cl true sa ba as nothing r en) o s b p od refl refl =
+    subst (Shape′ (out p b (stateᴺ (connectᶜ r (gh s) (srcG k o)) ρ))) (sym (proj₂ cr))
       (shape-out p b ft ct (subst (λ x → Shape′ x (M′.burstOn r σ ∪ cut h)) (proj₁ (proj₂ so)) bs))
     , above-≋ c true (≋-out (proj₁ (proj₂ so)) refl ft ct (sym (proj₂ cr))) (proj₂ (proj₂ (Order.flight od)))
     where
@@ -715,6 +726,13 @@ module _ {R : Set} where
       bs = subst (λ r′ → Shape′ (M′.beside r′ h σ) (M′.burstOn r′ σ ∪ cut h)) (sym (ConnAt.at ca))
              (beside-go (ConnAt.mark ca) (ConnAt.hm ca) h σ sσ (proj₁ (Order.flight od))
                 (ConnAt.kb ca) (ConnAt.kr ca) (ConnAt.fr ca) (ConnAt.cue ca) (ConnAt.ks ca) (ConnAt.rs ca) (ConnAt.ub ca))
+
+  -- And so with the body shut once its source has ended (`bodyG`).
+  rise-body-flight : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (s : St (X ∷ Γ) B) b p → Order ⟨ inBody k o c , s , rising (nx b) , p ⟩
+                   → Flight ⟨ c , connS k o s , rising (nx b) , p ⟩
+  rise-body-flight c k@(cs cl true sa ba as nothing r en) o s b p od =
+    shape-≋ (risen-≋ b p (body-≋ k r (gh s) o (envAt c))) (proj₁ fl) , above-≋ c true (risen-≋ b p (body-≋ k r (gh s) o (envAt c))) (proj₂ fl)
+    where fl = body-flight c k o s b p od refl refl
   rise-body-flight c (cs cl true sa ba as (just _) r en) o s b p od = ⊥-elim (Order.lead od)
   rise-body-flight c (cs cl false sa ba as ow r en) o s b p od      = ⊥-elim (Order.lead od)
 
@@ -835,10 +853,12 @@ module _ {R : Set} where
   rise-lane-end-flight c op f d n q o pre post s p od al = rise-lane-end-open c op f d n q o pre post s p od al (Order.heard od)
 
   -- A body's end ends its live connect, its source no earlier under an
-  -- open observer: the connect's run ends there.
-  rise-body-end-flight : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (s : St (X ∷ Γ) B) p → Order ⟨ inBody k o c , s , rising cp , p ⟩
-                       → Flight ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
-  rise-body-end-flight c (cs cl true sa ba as nothing r en) o s p od =
+  -- open observer: the connect's run ends there, the body read unshut.
+  body-end-flight : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (s : St (X ∷ Γ) B) p → Order ⟨ inBody k o c , s , rising cp , p ⟩
+                  → CS.srcLive k ≡ true → CS.owedAt k ≡ nothing
+                  → Shape (risen (restᶜ {B = B} (connectᶜ (CS.srcAt k) (gh s) (srcG k o))) (envAt c) cp p)
+                  × Above c true (risen (restᶜ {B = B} (connectᶜ (CS.srcAt k) (gh s) (srcG k o))) (envAt c) cp p)
+  body-end-flight c (cs cl true sa ba as nothing r en) o s p od refl refl =
     subst (Shape′ (end p)) (sym (proj₂ cr)) (subst (λ x → Shape′ x (M′.burstOn r σ ∪ cut h)) se bs)
     , above-≋ c true (≋-by se (sym (proj₂ cr))) (proj₂ (proj₂ (Order.flight od)))
     where
@@ -854,6 +874,14 @@ module _ {R : Set} where
       bs = subst (λ r′ → Shape′ (M′.beside r′ h σ) (M′.burstOn r′ σ ∪ cut h)) (sym (ConnAt.at ca))
              (beside-go (ConnAt.mark ca) (ConnAt.hm ca) h σ sσ (proj₁ (Order.flight od))
                 (ConnAt.kb ca) (ConnAt.kr ca) (ConnAt.fr ca) (ConnAt.cue ca) (ConnAt.ks ca) (ConnAt.rs ca) (ConnAt.ub ca))
+
+  -- And so with the body shut once its source has ended.
+  rise-body-end-flight : ∀ {Γ X B} (c : Ctx R Γ B) k (o : St Γ X) (s : St (X ∷ Γ) B) p → Order ⟨ inBody k o c , s , rising cp , p ⟩
+                       → Flight ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
+  rise-body-end-flight c k@(cs cl true sa ba as nothing r en) o s p od =
+    shape-≋ (risen-end-≋ p E) (proj₁ fl) , above-≋ c true (risen-end-≋ p E) (proj₂ fl)
+    where fl = body-end-flight c k o s p od refl refl
+          E  = body-≋ (record k { owedAt = just p }) r (gh s) o (envAt c)
   rise-body-end-flight c (cs cl true sa ba as (just _) r en) o s p od = ⊥-elim (Order.lead od)
   rise-body-end-flight c (cs cl false sa ba as ow r en) o s p od      = ⊥-elim (Order.lead od)
 

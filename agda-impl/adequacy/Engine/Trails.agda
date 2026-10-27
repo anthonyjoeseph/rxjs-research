@@ -29,11 +29,18 @@ open import denotation.MonotonicList using (MonotonicList) renaming (cold to col
 import denotation.MonotonicList as M′
 open import denotation.Denote using (flatOp)
 open import denotation.Unfold using (NEnv; Node; meaning; Source; live; ended; stateᴺ; cutᴺ; idleᶜ; restᶜ; connectᶜ; subscribe;
-  states; joined; fedᴺ; put)
+  states; joined; fedᴺ; put; shut)
+open import Data.List.Relation.Unary.Any using (here)
+open import Relation.Binary.PropositionalEquality using (refl)
+open import denotation.MonotonicList using (agree-refl; agreeᵀ-refl)
+open import denotation.NonExpansive using (Agreeˢ; _,ˢ_; ∪-ne; beside-ne)
+open import adequacy.Env using (nagree-refl)
+open import adequacy.Stepper.Past using (alike)
+open import adequacy.Stepper.Parts using (shut-alikeⁱ)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; Ctx; top; inMap; inScan; inCut; inLn;
   inTake; inOuter; inLanes; inSrc; inBody; plug; cs; CS; _⊕_)
-open import adequacy.Engine.Meaning using (vals; endOf; gh; envAt; srcG; srcRun; srcState; subOr; lane; lanesL; liveL; holeL; flagOf)
+open import adequacy.Engine.Meaning using (vals; endOf; gh; envAt; srcG; srcRun; srcState; subOr; lane; lanesL; liveL; holeL; flagOf; bodyG; _≋_; same)
 open import adequacy.Engine.Above using (Above; states-++; live-hole)
 open import adequacy.Engine.Keys using (Shape′; Shape; LaneKeys; []ᴷ; _∷ᴷ_; OuterKeys; outerOf; Fed; Joins; ConnAt; Held; Here; Keyed; KeyedL; SubKeys; EndKeys;
   keyed-at; keyedL-ʳ++)
@@ -130,6 +137,24 @@ beside-shape p hp n (live s)    ρ shS shB kb kr fr cu ks rs ub =
 beside-shape p hp n (ended c t) ρ shS shB kb kr fr cu ks rs ub =
   beside-go p hp (stateᴺ n (end c ∷ᴬ ρ)) (stateᴺ t ρ) shS shB kb kr fr cu ks rs ub
 
+-- A body told its ended source's end runs as it did untold.
+shut-ended : ∀ {Γ X B} e (b : Node (X ∷ Γ) B) (ρ : NEnv Γ) → stateᴺ b (end e ∷ᴬ ρ) ≋ stateᴺ (shut (here refl) e b) (end e ∷ᴬ ρ)
+shut-ended e b ρ = shut-alikeⁱ (here refl) e b (alike (λ n → agree-refl n (end e))) (λ m → nagree-refl m (end e ∷ᴬ ρ))
+
+-- And so its connect.
+conn-shut : ∀ {Γ X B} r e (b : Node (X ∷ Γ) B) (t : Node Γ X) (ρ : NEnv Γ)
+          → stateᴺ (connectᶜ r b (ended e t)) ρ ≋ stateᴺ (connectᶜ r (shut (here refl) e b) (ended e t)) ρ
+conn-shut r e b t ρ k = ∪-ne (agreeᵀ-refl k (M′.burstOn r (stateᴺ t ρ))) (Agreeˢ.cutˢ (shut-ended e b ρ k)) ,ˢ beside-ne r (shut-ended e b ρ k) (same k (stateᴺ t ρ))
+
+body-≋ : ∀ {Γ X B} k r (b : Node (X ∷ Γ) B) (o : St Γ X) (ρ : NEnv Γ) → stateᴺ (connectᶜ r b (srcG k o)) ρ ≋ stateᴺ (connectᶜ r (bodyG k b) (srcG k o)) ρ
+body-≋ (cs false sl sa ba as ow r′ e)       r b o ρ = λ k → same k _
+body-≋ (cs true sl sa (just p) as ow r′ e)  r b o ρ = λ k → same k _
+body-≋ (cs true sl sa nothing as ow r′ e)   r b o ρ = conn-shut r e b (restᶜ (gh o)) ρ
+
+postulate
+  -- A run's shape is what any run alike it shows.
+  shape-≋ : ∀ {A} {σ σ′ : Events∞ A} → σ ≋ σ′ → Shape σ → Shape σ′
+
 -- A connect done with neither, at its source's mark.
 conn-core : ∀ {Γ X B} k (o : St Γ X) (b : St (X ∷ Γ) B) (ρ : NEnv Γ) (m : Here (connS k o b) ρ)
      → Shape (srcState (srcG k o) ρ) → Shape (stateᴺ (gh b) (srcRun (srcG k o) ρ ∷ᴬ ρ))
@@ -144,9 +169,9 @@ conn-core k o b ρ m shS shB =
 shape-conn : ∀ {Γ X B} k (o : St Γ X) (b : St (X ∷ Γ) B) (ρ : NEnv Γ) → Here (connS k o b) ρ
            → Shape (srcState (srcG k o) ρ) → Shape (stateᴺ (gh b) (srcRun (srcG k o) ρ ∷ᴬ ρ))
            → Shape (stateᴺ (gh (connS k o b)) ρ)
-shape-conn k@(cs cl sl sa ba as (just q) r en) o b ρ m shS shB = shape-rest (connectᶜ r (gh b) (srcG k o)) ρ (conn-core k o b ρ m shS shB)
-shape-conn k@(cs cl false sa ba as nothing r en) o b ρ m shS shB = shape-rest (connectᶜ r (gh b) (srcG k o)) ρ (conn-core k o b ρ m shS shB)
-shape-conn k@(cs cl true sa ba as nothing r en) o b ρ m shS shB = conn-core k o b ρ m shS shB
+shape-conn k@(cs cl sl sa ba as (just q) r en) o b ρ m shS shB = shape-rest (connectᶜ r (bodyG k (gh b)) (srcG k o)) ρ (shape-≋ (body-≋ k r (gh b) o ρ) (conn-core k o b ρ m shS shB))
+shape-conn k@(cs cl false sa ba as nothing r en) o b ρ m shS shB = shape-rest (connectᶜ r (bodyG k (gh b)) (srcG k o)) ρ (shape-≋ (body-≋ k r (gh b) o ρ) (conn-core k o b ρ m shS shB))
+shape-conn k@(cs cl true sa ba as nothing r en) o b ρ m shS shB = shape-≋ (body-≋ k r (gh b) o ρ) (conn-core k o b ρ m shS shB)
 
 ------------------------------------------------------------------------
 -- A merge
