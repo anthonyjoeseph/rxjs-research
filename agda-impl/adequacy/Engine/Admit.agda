@@ -110,7 +110,7 @@ outer-ahead : ∀ {R Γ A B} {c : Ctx R Γ B} {op d n q ls} {f : A → Obs Timel
             → shows (inOuter op f d n q ls c) true ≡ true → Order ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩
             → Aheadᶠ (_≡ p ⊕ [ ix 0 ]) c true
 outer-ahead {d = true}  () od
-outer-ahead {d = false} sh od = proj₂ (proj₂ (proj₂ (Order.lead od))) sh
+outer-ahead {d = false} sh od = proj₁ (proj₂ (proj₂ (proj₂ (Order.lead od)))) sh
 
 -- AN OUTER'S VALUE ADMITTED WHERE IT IS SHOWN IS SHOWN NEXT: every
 -- frame above passes its skip, whatever the admission left.

@@ -98,12 +98,12 @@ Members: `kill-pool`.
 Untried: a still skip leads every race above it past each live source's
 skips: nothing above is due under the skip's position. Both what the search
 finds (`Apart`; `quickcheck.KeptDepth` checks every absorbed configuration)
-and the heads above a won skip or a rise, none below its position (`Aloof`,
-causal: each root above cut before it), a subscription headed and alien to its
+and the heads above a won skip, none below its position (`Aloof`, causal:
+each root above cut before it, carried up the rise), a subscription headed and alien to its
 environment, and a begun lane's flatMap's other parts. Settled when these
 are bodies, or refuted.
 
-Members: `apart-next`, `won-aloof`, `rise-aloof`, `sub-fresh`, `outer-begins-links`, `outer-queues-links`,
+Members: `apart-next`, `won-aloof`, `sub-fresh`, `outer-begins-links`, `outer-queues-links`,
 `outer-ignores-links`, `lane-begin-links`, `outer-begun-sides`, `switch-begun-sides`,
 `lane-begun-sides`.
 

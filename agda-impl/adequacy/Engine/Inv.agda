@@ -461,17 +461,6 @@ module _ {R : Set} where
     sd sh , ahead-over p (λ j u → under-sub p [ ix 1 ] j u) c true (ah sh) (al sh)
 
   postulate
-    -- A RISE IS ALOOF: no head the frames above a rise at `p` ask of lies
-    -- below `p`.  What lies under `p` the rise has yet to cause.
-    --
-    -- DEAD ROUTE: regions alone — `Keyed` indexed by where each node
-    --   subscribes, every mark owned by its parent's.  A merge's lanes are
-    --   rooted one `ix 1` past outer values, inside the outer's own region,
-    --   and a rise its outer's inner merge consumes leaves no outer value
-    --   above to be `Aside` of; only a causal fact separates them, each
-    --   root cut by an outer value before `p`.
-    rise-aloof : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Inv ⟨ c , s , rising e , p ⟩ → showsᶜ c true ≡ true → Aloof p c true
-
     -- A LANE BEGUN IS CLEAR BESIDE: an admitted value's or a lane's end's
     -- flatMap's other parts come after every position under the lane it
     -- begins.
@@ -496,22 +485,22 @@ module _ {R : Set} where
               → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ → Begun c op f d n q o ls a p
   outer-begun c op f true  n q o ls a p iv = ⊥-elim (Order.lead (Inv.ord iv))
   outer-begun c op f false n q o ls a p iv =
-    begun c op f false n q o ls a p (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv))))) (outer-begun-sides c op f n q o ls a p iv)
-      (λ sh → proj₂ (proj₂ (rise-aloof (inOuter op f false n q ls c) o (nx a) p iv sh)))
+    begun c op f false n q o ls a p (proj₁ (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv)))))) (outer-begun-sides c op f n q o ls a p iv)
+      (proj₂ (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv))))))
 
   switch-begun : ∀ {Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls a p
                → Inv ⟨ inOuter switchᶠ f d n q ls c , o , rising (nx a) , p ⟩ → Begun c switchᶠ f d 0 q o (proj₁ (killAll ls)) a p
   switch-begun c f true  n q o ls a p iv = ⊥-elim (Order.lead (Inv.ord iv))
   switch-begun c f false n q o ls a p iv =
-    begun c switchᶠ f false 0 q o (proj₁ (killAll ls)) a p (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv)))))
-      (switch-begun-sides c f n q o ls a p iv) (λ sh → proj₂ (proj₂ (rise-aloof (inOuter switchᶠ f false n q ls c) o (nx a) p iv sh)))
+    begun c switchᶠ f false 0 q o (proj₁ (killAll ls)) a p (proj₁ (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv))))))
+      (switch-begun-sides c f n q o ls a p iv) (proj₂ (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv))))))
 
   lane-begun : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n a q (o : St Γ A) pre post (s : St Γ B) p
              → alive s ≡ true → Inv ⟨ inLanes op f d n (a ∷ q) o pre post c , s , rising cp , p ⟩
              → Begun c op f d (pred n) q o (pre ʳ++ ended s ∷ post) a p
   lane-begun c op f d n a q o pre post s p al iv =
-    begun c op f d (pred n) q o (pre ʳ++ ended s ∷ post) a p (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv)))))
-      (lane-begun-sides c op f d n a q o pre post s p al iv) (λ sh → proj₂ (rise-aloof (inLanes op f d n (a ∷ q) o pre post c) s cp p iv sh))
+    begun c op f d (pred n) q o (pre ʳ++ ended s ∷ post) a p (λ sh → proj₁ (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv)))) sh))
+      (lane-begun-sides c op f d n a q o pre post s p al iv) (λ sh → proj₂ (proj₂ (proj₂ (proj₂ (Order.lead (Inv.ord iv)))) sh))
 
   dequeues : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) pre post (s : St Γ B) p
            → alive s ≡ true → Inv ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ → Dequeues c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p

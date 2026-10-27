@@ -685,7 +685,7 @@ module _ {R : Set} where
                   → Pass (_≡ p ⊕ [ ix 0 ]) c true (lanesFrame op (lane f) d (a ∷ q) (gh o) (reverse pre) post true (envAt c) (risen (gh s) (envAt c) cp p))
                       (lanesFrame op (lane f) d q (gh o) (reverse (reverse (pre ʳ++ ended s ∷ post))) [] true (envAt c) (stateᴺ (subscribe (f a) (p ⊕ [ ix 1 ])) (envAt c)))
   lane-begin-pass c op f d n a q o pre post s p sh od =
-    pass-of (_≡ p ⊕ [ ix 0 ]) c true (proj₂ (proj₂ (proj₂ (Order.lead od))) sh) (lane-begin-links c op f d n a q o pre post s p sh od)
+    pass-of (_≡ p ⊕ [ ix 0 ]) c true (proj₁ (proj₂ (proj₂ (proj₂ (Order.lead od))) sh)) (lane-begin-links c op f d n a q o pre post s p sh od)
 
   -- A lane's end under an open observer, a value queued: every frame
   -- above the merge keeps its share past the skip the merge's run drops
