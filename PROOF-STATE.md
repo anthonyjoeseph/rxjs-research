@@ -211,7 +211,7 @@ Untried, mechanical: what the frames above keep, and a run's shape, is read
 alike off runs alike, and off the ghost as the whole tree's keys, a dead
 lane's read only through what it leaves running. Settled by bodies.
 
-Members: `above-≋`, `shape-≋`, `rise-dead-keys`.
+Members: `takeAt-≋`, `flatAt-≋`, `connAt-≋`, `keyed-env`, `shape-≋`, `rise-dead-keys`.
 
 ## Tier 2 — the simultaneous spec
 
