@@ -95,17 +95,16 @@ Members: `kill-pool`.
 
 #### THE STILL'S SUBTREE
 
-Untried: a still skip leads every race above it past each live source's
-skips: nothing above is due under the skip's position. Both what the search
-finds (`Apart`; `quickcheck.KeptDepth` checks every absorbed configuration)
-and the heads above a won skip, none below its position (`Aloof`, causal:
-each root above cut before it, carried up the rise), a subscription headed and alien to its
+Untried: one stored causality invariant, nothing keyed under a skip not
+yet run (`Causal`), kept by every step (`causal-next`); `Apart` follows.
+The heads above a skip every race runs past, none below its position
+(`beat-aloof`), a subscription headed and alien to its
 environment, and a begun lane's flatMap's other parts. Settled when these
 are bodies, or refuted.
 
-Members: `apart-next`, `won-aloof`, `sub-fresh`, `outer-begins-links`, `outer-queues-links`,
-`outer-ignores-links`, `lane-begin-links`, `outer-begun-sides`, `switch-begun-sides`,
-`lane-begun-sides`.
+Members: `causal-next`, `beat-aloof`, `sub-fresh`, `outer-begins-links`, `outer-queues-links`,
+`outer-ignores-links`, `lane-begin-links`, `outer-begun-sides`,
+`switch-begun-sides`, `lane-begun-sides`.
 
 #### THE TAIL'S SKIP
 
@@ -177,7 +176,8 @@ Members: `sub-head`, `sub-bursts`, `scanS-head`, `takeS-head`, `limit-head`,
 Keys are a strict order agreeing with positions. Believed unfoldings.
 Settled when each is a body.
 
-Members: `<ᴷ-trans`, `<ᴷ-irrefl`, `≮ᴷ-trans`, `at-<ᵖ`, `ext-≮`, `under-after`.
+Members: `<ᴷ-trans`, `<ᴷ-irrefl`, `≮ᴷ-trans`, `at-<ᵖ`, `ext-≮`, `under-after`,
+`deep-after`, `deep-nb`, `lost-at`.
 
 #### THE LINK
 
