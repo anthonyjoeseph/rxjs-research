@@ -95,9 +95,10 @@ Members: `kill-pool`.
 
 #### THE STILL'S SUBTREE
 
-Untried: one stored causality invariant, nothing keyed under a skip not
-yet run (`Causal`), kept by a rise, a subscription begun and a mark run;
-`Apart` and a won skip's aloofness follow. A subscription headed and alien to its
+One stored causality invariant (`Causal`): every key of what races a
+mark, an at-key's zero-extensions included, off the mark's position.
+Zero-extending every key is refuted; at-keys alone, unprobed. Kept by a
+rise, a subscription begun and a mark run, untried. A subscription headed and alien to its
 environment, and a begun lane's flatMap's other parts. Settled when these
 are bodies, or refuted.
 
@@ -206,6 +207,14 @@ lane's read only through what it leaves running. Settled by bodies.
 
 Members: `rise-dead-keys`, `keyed-same`, `laneKeys-lanes`, `flatAt-rest`,
 `cue-≈`, `ub-transport`.
+
+#### A CANDIDATE IS A NODE'S KEY
+
+Untried, mechanical: `seek` passes a node's own key up as it is or
+shifted, so whatever every key shift-closed has its candidate has. Settled
+by a body over `seek`'s mutual recursion.
+
+Members: `cand-keys`.
 
 ## Tier 2 — the simultaneous spec
 
