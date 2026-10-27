@@ -61,7 +61,7 @@ open import adequacy.Engine.Race using (NotBefore; After; TailNotBefore)
 open import adequacy.Engine.Head using (Frag; Lanes; Lane; Agrees; exact; early; HeadAt; HeadAtⁿ; cand; dead-idle; conn-idle; NoConn; at-<ᵖ; <≮ᴷ; ≮ᴷ-trans; ext-≮)
 open import adequacy.Engine.Head.Race using (shift-≮)
 open import adequacy.Engine.Head.Agrees using (head-agrees; head-agreesⱽ)
-open import adequacy.Engine.Shuts using (shutAll; told-none)
+open import adequacy.Engine.Shuts using (shutAll; told-none; Toldˢ; none)
 open import adequacy.Engine.Head.Within using (frag-flat; frag-body; frag-parts; fr-at; conn-src)
 open import adequacy.Engine.Keys using (ConnAt; Keyed; Keys; keyed-at)
 open import adequacy.Engine.Trails using (envAt-sorted)
@@ -367,7 +367,7 @@ record Order {R} (k : Conf R) : Set where
     lead   : Lead k
     apart  : Searched k
     heard  : Heard k
-    ghosted : Gh top (whole k)
+    told   : Toldˢ none (whole k)
 
 postulate
   -- The engine's search: the found node's key leads every race above it.
