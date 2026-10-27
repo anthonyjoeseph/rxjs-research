@@ -360,18 +360,25 @@ Caused ⟨ c , s , subscribing , p ⟩ = ⊤₁
 Caused ⟨ c , s , absorbed , p ⟩    = Causal (plug c s)
 Caused ⟨ c , s , rising e , p ⟩    = ⊤₁
 
--- A still find's race up its frames: `Won`'s key and `Beat`'s, the same
--- until a live source, then just under the find and past it.
+-- A still find's race up its frames, aloft at `k₀`: `Won`'s key and
+-- `Beat`'s, the same until a live source, then just under a position `q`
+-- at or under `k₀` and past `q`.
 data Track : Key → Key → Key → Set where
   same : ∀ {k} → Track k k k
-  deep : ∀ {p} ys → Track (at p) (at (p ++ ix 0 ∷ ys)) (after p)
+  deep : ∀ {p q} zs ys → q ≡ p ++ zs → Track (at p) (at (q ++ ix 0 ∷ ys)) (after q)
 
 track-src : ∀ v {k₀ kw k} → Track k₀ kw k → Track k₀ (if v then kw else shift kw) (past v k)
-track-src true  t                = t
-track-src false (same {at p})    = deep []
-track-src false (same {after p}) = same
-track-src false (deep {p} ys)    =
-  subst (λ q → Track (at p) (at q) (after p)) (sym (++-assoc p (ix 0 ∷ ys) [ ix 0 ])) (deep (ys ++ [ ix 0 ]))
+track-src true  t                    = t
+track-src false (same {at p})        = deep [] [] (sym (++-identityʳ p))
+track-src false (same {after p})     = same
+track-src false (deep {p} {q} zs ys e) =
+  subst (λ r → Track (at p) (at r) (after q)) (sym (++-assoc q (ix 0 ∷ ys) [ ix 0 ])) (deep zs (ys ++ [ ix 0 ]) e)
+
+-- Under a position under `p` is under `p`.
+under-lift : ∀ p zs h → UnderK (p ++ zs) h → UnderK p h
+under-lift p []       (at q)    (l , ys , e)  = l , ys , trans e (cong (_++ l ∷ ys) (++-identityʳ p))
+under-lift p (z ∷ zs) (at q)    (l , ys , e)  = z , zs ++ l ∷ ys , trans e (++-assoc p (z ∷ zs) (l ∷ ys))
+under-lift p zs       (after q) (ys , e)      = zs ++ ys , trans e (++-assoc p zs ys)
 
 -- Two positions, one a prefix of the other's extension: the first under
 -- the second, or the second strictly under the first.
@@ -395,12 +402,12 @@ postulate
 after-track : ∀ {A} (x : Maybe (Key × Out A)) {k₀ kw k} → Track k₀ kw k → KAfter kw x → OffC k₀ x → KAfter k x
 after-track nothing        t             a o = tt
 after-track (just _)       same          a o = a
-after-track (just (h , _)) (deep {p} ys) a o = deep-after p ys h a o
+after-track (just (h , _)) (deep {p} {q} zs ys refl) a o = deep-after q ys h a (λ u → o (under-lift p zs h u))
 
 nb-track : ∀ {A} (x : Maybe (Key × Out A)) {k₀ kw k} → Track k₀ kw k → KNotBefore kw x → OffC k₀ x → KNotBefore k x
 nb-track nothing        t             a o = tt
 nb-track (just _)       same          a o = a
-nb-track (just (h , _)) (deep {p} ys) a o = deep-nb p ys h a o
+nb-track (just (h , _)) (deep {p} {q} zs ys refl) a o = deep-nb q ys h a (λ u → o (under-lift p zs h u))
 
 before-track : ∀ (ms : List (Mark × Key)) {k₀ kw k} → Track k₀ kw k → Before kw ms → All (λ mk → Offᴷ k₀ (proj₂ mk)) ms → Before k ms
 before-track []             t []       []       = []
@@ -409,12 +416,14 @@ before-track ((m , h) ∷ ms) t (b ∷ bs) (o ∷ os) = after-track {A = ⊤} (j
 lost-track : ∀ {A} v (x : Maybe (Key × Out A)) {k₀ kw k} → Track k₀ kw k → Lost v kw x → OffC k₀ x → (Beneath x k₀ → ⊥) → KNotBefore k x
 lost-track v     nothing              t             lo o bn = tt
 lost-track true  (just (h , _))       same          lo o bn = lo
-lost-track true  (just (h , _))       (deep {p} ys) lo o bn = deep-nb p ys h lo o
+lost-track true  (just (h , _))       (deep {p} {q} zs ys refl) lo o bn = deep-nb q ys h lo (λ u → o (under-lift p zs h u))
 lost-track false (just (at r , _))    (same {k})    lo o bn = lost-at r k lo bn
 lost-track false (just (after r , _)) same          lo o bn = lo
-lost-track false (just (after r , _)) (deep {p} ys) lo o bn = deep-nb p ys (after r) lo o
-lost-track false (just (at r , _))    (deep {p} ys) lo o bn =
-  deep-nb p ys (at r) (lost-at r (at (p ++ ix 0 ∷ ys)) lo λ { (us , e) → either bn o (common-prefix p r e) }) o
+lost-track false (just (after r , _)) (deep {p} {q} zs ys refl) lo o bn = deep-nb q ys (after r) lo (λ u → o (under-lift p zs (after r) u))
+lost-track false (just (at r , _))    (deep {p} {q} zs ys refl) lo o bn =
+  deep-nb q ys (at r)
+    (lost-at r (at (q ++ ix 0 ∷ ys)) lo λ { (us , e) → either bn o (common-prefix p r (trans (sym (++-assoc p zs (ix 0 ∷ ys))) e)) })
+    (λ u → o (under-lift p zs (at r) u))
 
 race-map : ∀ {R Γ A B} {P Q S : Key → Maybe (Key × Out B) → Set} {kp kq ks} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) acc xs tl
          → (∀ x → P kp x → Q kq x → S ks x) → Race P kp c op f d n q o acc xs tl → Race Q kq c op f d n q o acc xs tl → Race S ks c op f d n q o acc xs tl
@@ -912,12 +921,20 @@ lane-on d n []      a refl w = w
 lane-on d n (_ ∷ _) a refl w = w
 
 postulate
-  -- A WON SKIP IS ALOOF: no head the frames above a node whose skip won
-  -- just past `k` ask of is below `k`.  A source's skip, an outer's value
-  -- and a lane's end under a queue each reach the race above at
-  -- `k ⊕ [ ix 0 ]`; what lies under `k` they cause, not yet run.
-  won-aloof : ∀ {R Γ B} k (c : Ctx R Γ B) (t : St Γ B) → Won (at (k ⊕ [ ix 0 ]) , still) c t → Caught k c t
-            → Frag (plug c t) → Gh top (plug c t) → Keys (plug c t) → showsᶜ c true ≡ true → Aloof k c true
+  -- BEATEN PAST A SKIP IS ALOOF: where every race above a node runs past
+  -- `k`, no head the frames above ask of is below `k`.  The stepper's
+  -- heads are read off the races' candidates (`head-agrees`), a lane
+  -- joined to a running source off that source.
+  beat-aloof : ∀ {R Γ B} k (c : Ctx R Γ B) (t : St Γ B) → Beat (after k) c t
+             → Frag (plug c t) → Gh top (plug c t) → Keys (plug c t) → showsᶜ c true ≡ true → Aloof k c true
+
+-- A WON SKIP IS ALOOF: a skip that won just past `k`, aloft, beats every
+-- race above it past `k` (`won-beat`); what lies under `k` it causes, not
+-- yet run.
+won-aloof : ∀ {R Γ B} k (c : Ctx R Γ B) (t : St Γ B) → Won (at (k ⊕ [ ix 0 ]) , still) c t → Caught k c t
+          → Frag (plug c t) → Gh top (plug c t) → Keys (plug c t) → showsᶜ c true ≡ true → Aloof k c true
+won-aloof k c t w (at p₀ , (zs , e) , af) ft gt kt sh = beat-aloof k c t (won-beat c t (deep zs [] e) w af) ft gt kt sh
+won-aloof k c t w (after _ , () , af) ft gt kt sh
 
 -- A still candidate that won is ahead at its key in every frame above
 -- it that shows it.

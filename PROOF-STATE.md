@@ -97,12 +97,12 @@ Members: `kill-pool`.
 
 Untried: one stored causality invariant, nothing keyed under a skip not
 yet run (`Causal`), kept by every step (`causal-next`); `Apart` follows.
-The heads above a won skip, none below its position (`won-aloof`, read
-under the find's `Caught`), a subscription headed and alien to its
+The heads above a skip every race runs past, none below its position
+(`beat-aloof`), a subscription headed and alien to its
 environment, and a begun lane's flatMap's other parts. Settled when these
 are bodies, or refuted.
 
-Members: `causal-next`, `won-aloof`, `sub-fresh`, `outer-begins-links`, `outer-queues-links`,
+Members: `causal-next`, `beat-aloof`, `sub-fresh`, `outer-begins-links`, `outer-queues-links`,
 `outer-ignores-links`, `lane-begin-links`, `outer-begun-sides`,
 `switch-begun-sides`, `lane-begun-sides`.
 
