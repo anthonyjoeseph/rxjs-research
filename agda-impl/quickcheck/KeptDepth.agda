@@ -870,7 +870,7 @@ private
   rootKeysᵇ : Conf ℕ → Bool
   rootKeysᵇ ⟨ c , s , _ , _ ⟩ = keysWalkᵇ (plug c s) []ᴬ
 
-  -- `adequacy.Engine.Pick.Causal`, decided at every node of the
+  -- `adequacy.Engine.Causal.Causal`, decided at every node of the
   -- configuration (`causalᵇ 1`, `Farᴷ` and `Freeᴷ` over every key of each
   -- racing part), and the candidates' `Aloft` it gives (`causalᵇ 0`); with
   -- `fu`, of every mark to come, and `causalᵇ 2` of every key to come.

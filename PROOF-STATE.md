@@ -95,14 +95,13 @@ Members: `kill-pool`.
 
 #### THE STILL'S SUBTREE
 
-One stored causality invariant (`Causal`): every key of what races a
-mark, an at-key's zero-extensions included, off the mark's position.
-Zero-extending every key is refuted; at-keys alone, unprobed. Kept by a
-rise, a subscription begun and a mark run, untried. A subscription headed and alien to its
-environment, and a begun lane's flatMap's other parts. Settled when these
-are bodies, or refuted.
+One stored causality invariant (`Causal`), over every mark and key to
+come: kept by a rise, a subscription begun and a cold leaf's run (its
+next frame's keys are new; every other run only weakens the tree).
+A subscription headed and alien to its environment, and a begun lane's
+flatMap's other parts. Settled when these are bodies, or refuted.
 
-Members: `rise-causal`, `sub-causal`, `run-causal`, `sub-fresh`, `outer-begins-links`,
+Members: `rise-causal`, `sub-causal`, `leaf-causal`, `sub-fresh`, `outer-begins-links`,
 `outer-queues-links`, `outer-ignores-links`, `lane-begin-links`,
 `outer-begun-sides`, `switch-begun-sides`, `lane-begun-sides`.
 
