@@ -427,6 +427,16 @@ private
 ... | eq = <ᵖ-down k h x y kh (λ l ls e → ne l ls (cong₂ _∷_ (sym (eq-label a b c)) e))
 ... | gt with () ← kh
 
+-- Past `k ++ [ ix 0 ]` and not below `k`, past everything below `k`.
+<ᵖ-over : ∀ k h ys → (k ++ [ ix 0 ]) <ᵖ h ≡ true → (∀ l ls → h ≡ k ++ l ∷ ls → ⊥) → (k ++ ys) <ᵖ h ≡ true
+<ᵖ-over []      []      ys () ne
+<ᵖ-over []      (l ∷ h) ys _  ne = ⊥-elim (ne l h refl)
+<ᵖ-over (a ∷ k) []      ys () ne
+<ᵖ-over (a ∷ k) (b ∷ h) ys kh ne with cmpLabel a b in c
+... | lt = refl
+... | eq = <ᵖ-over k h ys kh (λ l ls e → ne l ls (cong₂ _∷_ (sym (eq-label a b c)) e))
+... | gt with () ← kh
+
 <ᵖ-next : ∀ p q y → p <ᵖ q ≡ true → (p ++ [ ix 0 ]) <ᵖ (q ++ [ y ]) ≡ true
 <ᵖ-next []      []                  y ()
 <ᵖ-next []      (ix zero ∷ [])      y h = refl

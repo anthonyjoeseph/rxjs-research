@@ -10,23 +10,24 @@
 module adequacy.Engine.Ahead where
 
 open import Data.Bool using (Bool; true; false; not; _∧_)
-open import Data.Empty using (⊥)
-open import Data.List using (List; _++_; reverse)
-open import Data.List.Properties using (++-assoc)
-open import Data.List.Relation.Unary.All using (All)
+open import Data.Empty using (⊥; ⊥-elim)
+open import Data.List using (List; []; _∷_; _++_; [_]; reverse)
+open import Data.List.Properties using (++-assoc; ++-identityʳ)
+open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (Σ; _×_; _,_)
-open import Data.Unit using (⊤)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Sum using (inj₁; inj₂)
+open import Data.Unit using (⊤; tt)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
 
 open import Tree using (Obs)
-open import denotation.MonotonicList.Events using (Pos; Timeline; Events; Events∞; idle; hush; _∪_)
-open import denotation.MonotonicList using (head; shownAt; Agreeᵀ)
+open import denotation.MonotonicList.Events using (Pos; Timeline; Events; Events∞; Tail; idle; pin; hush; ix; _∪_; <ᵖ-over; <ᵖ-split; <ᵖ-asym)
+open import denotation.MonotonicList using (MonotonicList; head; headᴼ; shownAt; Agreeᵀ)
 open import denotation.Unfold using (NEnv; states; outerᴺ)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; cs; free; cpAt; cutAt; overAt; closed)
 open import adequacy.Engine.Meaning using (gh; lane; outerG; lanesL; deadL; poolT; tailsOn; outerT; envAt; srcState; srcG)
-open import adequacy.Engine.Race using (First; NotBefore; After; TailNotBefore)
+open import adequacy.Engine.Race using (First; first; NotBefore; After; TailNotBefore)
 
 -- A flatMap's other parts, as a lane rising at `p` leads them.
 Sides : ∀ {Γ A B} → Pos → (A → Obs Timeline Γ B) → Bool → St Γ A → List (St Γ B) → List (St Γ B) → NEnv Γ → Set
@@ -152,3 +153,113 @@ ahead-mono m (inBody (cs cl false sa ba as ow r en) o c)         f ()
 -- What is under a position under `p` is under `p`.
 under-sub : ∀ p y k → Under (_≡ p ++ y) k → Under (_≡ p) k
 under-sub p y _ (_ , refl , y′ , refl) = p , refl , y ++ y′ , ++-assoc p y y′
+
+-- Positions under a position under one are under it.
+under-under : ∀ {P : Pos → Set} {k} → Under (Under P) k → Under P k
+under-under (_ , (k₀ , p₀ , y₀ , refl) , y , refl) = k₀ , p₀ , y₀ ++ y , ++-assoc k₀ y₀ y
+
+under-self : ∀ {P : Pos → Set} {k} → P k → Under P k
+under-self {k = k} p = k , p , [] , sym (++-identityʳ k)
+
+------------------------------------------------------------------------
+-- Aloof of a skip's subtree
+
+-- A head not below `k`.
+Off : Pos → Maybe Pos → Set
+Off k nothing  = ⊤
+Off k (just h) = ∀ l ls → h ≡ k ++ l ∷ ls → ⊥
+
+OffT : Pos → Tail → Set
+OffT k idle      = ⊤
+OffT k (pin h u) = Off k (just h)
+
+-- A lane's siblings, none below `k`.
+OffFirst : ∀ {B} → Pos → Maybe (Events∞ (MonotonicList B)) → List (Events∞ B) → List (Events∞ B) → Tail → Set
+OffFirst k o ls rs t =
+  All (λ l → Off k (head (Events∞.force l))) ls × All (λ l → Off k (head (Events∞.force l))) rs × Off k (headᴼ o) × OffT k t
+
+-- Every head the frames above a skip at `k` ask of, none below `k`.
+Aloof : ∀ {R Γ A} → Pos → Ctx R Γ A → Bool → Set
+Aloof k top                                                 f = ⊤
+Aloof k (inMap g c)                                         f = Aloof k c true
+Aloof k (inScan g z c)                                      f = Aloof k c true
+Aloof k (inCut true a c)                                    f = Aloof k c true
+Aloof k (inCut false a c)                                   f = ⊤
+Aloof k (inLn b c)                                          f = Aloof k c b
+Aloof k (inTake i q free c)                                 f = Aloof k c true
+Aloof k (inTake i q (cpAt _) c)                             f = ⊤
+Aloof k (inTake i q (cutAt _) c)                            f = ⊤
+Aloof k (inTake i q (overAt _) c)                           f = ⊤
+Aloof k (inOuter op g true n q ls c)                        f = ⊤
+Aloof k (inOuter op g false n q ls c)                       f =
+  All (λ l → Off k (head (Events∞.force l))) (states (lanesL ls) (envAt c)) × OffT k (poolT (deadL ls) (envAt c)) × Aloof k c true
+Aloof k (inLanes op g d n q o pre post c)                   false = ⊤
+Aloof k (inLanes op g d n q o pre post c)                   true  =
+  OffFirst k (outerᴺ (lane g) (outerG d (gh o)) (envAt c)) (states (lanesL post) (envAt c)) (states (lanesL (reverse pre)) (envAt c))
+    (outerT d (gh o) (envAt c) (tailsOn (deadL (reverse pre)) (envAt c) (idle ∪ poolT (deadL post) (envAt c))))
+  × Aloof k c true
+Aloof k (inSrc (cs false true sa ba as nothing r en) b c)   f = Aloof k c true
+Aloof k (inSrc (cs false true sa ba as (just _) r en) b c)  f = ⊤
+Aloof k (inSrc (cs false false sa ba as ow r en) b c)       f = ⊤
+Aloof k (inSrc (cs true sl sa ba as ow r en) b c)           f = ⊤
+Aloof k (inBody (cs cl true sa ba as nothing r en) o c)     f =
+  Off k (shown (Events∞.force (srcState (srcG (cs cl true sa ba as nothing r en) o) (envAt c)))) × Aloof k c true
+Aloof k (inBody (cs cl true sa ba as (just _) r en) o c)    f = ⊤
+Aloof k (inBody (cs cl false sa ba as ow r en) o c)         f = ⊤
+
+off-after : ∀ k h {j} → Under (_≡ k) j → After (k ++ [ ix 0 ]) h → Off k h → After j h
+off-after k nothing  u                       a o = tt
+off-after k (just h) (_ , refl , ys , refl) a o = <ᵖ-over k h ys a o
+
+off-nb : ∀ k h {j} → Under (_≡ k) j → NotBefore (k ++ [ ix 0 ]) h → Off k h → NotBefore j h
+off-nb k nothing  u                       n o = tt
+off-nb k (just h) (_ , refl , ys , refl) n o with <ᵖ-split (k ++ [ ix 0 ]) h n
+... | inj₁ lt = <ᵖ-asym (k ++ ys) h (<ᵖ-over k h ys lt o)
+... | inj₂ e  = ⊥-elim (o (ix 0) [] (sym e))
+
+off-tnb : ∀ k t {j} → Under (_≡ k) j → TailNotBefore (k ++ [ ix 0 ]) t → OffT k t → TailNotBefore j t
+off-tnb k idle      u n o = tt
+off-tnb k (pin h v) u n o = off-nb k (just h) u n o
+
+off-alls : ∀ {X : Set} (F : Pos → Maybe Pos → Set) (hd : X → Maybe Pos) k {j} → (∀ h → F (k ++ [ ix 0 ]) h → Off k h → F j h)
+         → (xs : List X) → All (λ x → F (k ++ [ ix 0 ]) (hd x)) xs → All (λ x → Off k (hd x)) xs → All (λ x → F j (hd x)) xs
+off-alls F hd k g []       []ᴬ        []ᴬ        = []ᴬ
+off-alls F hd k g (x ∷ xs) (a ∷ᴬ as) (o ∷ᴬ os) = g (hd x) a o ∷ᴬ off-alls F hd k g xs as os
+
+off-first : ∀ {B} k {j} {o : Maybe (Events∞ (MonotonicList B))} {ls rs t} → Under (_≡ k) j → First (k ++ [ ix 0 ]) o ls rs t → OffFirst k o ls rs t → First j o ls rs t
+off-first k {o = o} {ls} {rs} {t} u (first b a on tn) (ob , oa , oo , ot) =
+  first (off-alls NotBefore (λ l → head (Events∞.force l)) k (λ h → off-nb k h u) ls b ob)
+        (off-alls After (λ l → head (Events∞.force l)) k (λ h → off-after k h u) rs a oa)
+        (off-nb k (headᴼ o) u on oo) (off-tnb k t u tn ot)
+
+-- What the frames above ask at `k ++ [ ix 0 ]`, they ask of every
+-- position under `k`, none of their heads being below `k`.
+ahead-over : ∀ {R Γ A} {P : Pos → Set} k → (∀ j → P j → Under (_≡ k) j) → (c : Ctx R Γ A) (f : Bool)
+           → Ahead (_≡ k ++ [ ix 0 ]) c f → Aloof k c f → Ahead P c f
+ahead-over k sub top                                                 f a al = tt
+ahead-over k sub (inMap g c)                                         f a al = ahead-over k sub c true a al
+ahead-over k sub (inScan g z c)                                      f a al = ahead-over k sub c true a al
+ahead-over k sub (inCut true x c)                                    f a al = ahead-over k sub c true a al
+ahead-over k sub (inCut false x c)                                   f () al
+ahead-over k sub (inLn b c)                                          f a al = ahead-over k sub c b a al
+ahead-over k sub (inTake i q free c)                                 f a al = ahead-over k sub c true a al
+ahead-over k sub (inTake i q (cpAt _) c)                             f () al
+ahead-over k sub (inTake i q (cutAt _) c)                            f () al
+ahead-over k sub (inTake i q (overAt _) c)                           f () al
+ahead-over k sub (inOuter op g true n q ls c)                        f () al
+ahead-over k sub (inOuter op g false n q ls c)                       f (o , a) (ol , ot , al) =
+  (λ j pj → off-alls After (λ l → head (Events∞.force l)) k (λ h → off-after k h (sub j pj)) _ (proj₁ (o _ refl)) ol
+          , off-tnb k _ (sub j pj) (proj₂ (o _ refl)) ot)
+  , ahead-over k sub c true a al
+ahead-over k sub (inLanes op g d n q o pre post c)                   false () al
+ahead-over k sub (inLanes op g d n q o pre post c)                   true (s , a) (so , al) =
+  (λ j pj → off-first k (sub j pj) (s _ refl) so) , ahead-over k sub c true a al
+ahead-over k sub (inSrc (cs false true sa ba as nothing r en) b c)   f a al =
+  ahead-over k (λ j u → under-under (under-mono sub j u)) c true (ahead-mono (λ j e → under-self e) c true a) al
+ahead-over k sub (inSrc (cs false true sa ba as (just _) r en) b c)  f () al
+ahead-over k sub (inSrc (cs false false sa ba as ow r en) b c)       f () al
+ahead-over k sub (inSrc (cs true sl sa ba as ow r en) b c)           f () al
+ahead-over k sub (inBody (cs cl true sa ba as nothing r en) o c)     f (hu , nb , a) (on , al) =
+  hu , (λ j pj → off-nb k _ (sub j pj) (nb _ refl) on) , ahead-over k sub c true a al
+ahead-over k sub (inBody (cs cl true sa ba as (just _) r en) o c)    f () al
+ahead-over k sub (inBody (cs cl false sa ba as ow r en) o c)         f () al
