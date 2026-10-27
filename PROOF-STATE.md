@@ -96,15 +96,15 @@ Members: `kill-pool`.
 #### THE STILL'S SUBTREE
 
 One stored causality invariant (`Causal`), over every key to come (a
-live cold's whole tape): kept by a rise, and by a subscription's new
-keys — a cold's every frame, an of's values, an attach, a connect's
-body — aloft where it subscribes, with room in every racing part. A
-subscription headed and alien to its environment, and a begun lane's
-flatMap's other parts. Settled when these are bodies, or refuted.
+live cold's whole tape): kept by a rise, and by a subscription, whose
+room is stored (`Fresh`) and handed down by each begin. Open: room for
+everything a lane plants, among its flatMap's other parts, where its
+outer's value or a freed slot begins it; and a connect's source's, beside
+its body. A subscription headed and alien to its environment, and a begun
+lane's flatMap's other parts. Settled when these are bodies, or refuted.
 
-Members: `rise-causal`, `cold-aloft`, `cold-room`, `of-aloft`, `of-room`,
-`take-aloft`, `take-room`, `flat-aloft`, `flat-room`, `conn-aloft`,
-`conn-room`, `sub-fresh`, `outer-begins-links`,
+Members: `rise-causal`, `admit-fresh`, `dequeue-fresh`, `src-fresh`,
+`sub-fresh`, `outer-begins-links`,
 `outer-queues-links`, `outer-ignores-links`, `lane-begin-links`,
 `outer-begun-sides`, `switch-begun-sides`, `lane-begun-sides`.
 
