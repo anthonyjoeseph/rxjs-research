@@ -107,7 +107,9 @@ Above (inBody k o c)                    f h =
 Flight : ∀ {R} → Conf R → Set
 Flight ⟨ c , s , m , p ⟩ = Shape (hole c s m p) × Above c (flagOf s) (hole c s m p)
 
--- Transport lemmas whose proofs require sub-lemmas not yet established.
+-- A body's keys read its environment no finer than alike at every depth;
+-- a merge's lanes, outer and pool, a source's cue and a connect's bound
+-- each read their runs so.
 postulate
   keyed-same     : ∀ {Γ A} (s : St Γ A) {ρ ρ′ : NEnv Γ} → Same ρ ρ′ → Keyed s ρ → Keyed s ρ′
   laneKeys-lanes : ∀ {B} p {ls ls′ : List (Events∞ B)} {rs}

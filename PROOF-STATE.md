@@ -205,15 +205,8 @@ Untried, mechanical: what the frames above keep, and a run's shape, is read
 alike off runs alike, and off the ghost as the whole tree's keys, a dead
 lane's read only through what it leaves running. Settled by bodies.
 
-Members: `rise-dead-keys`.
-
-#### THE TRANSPORT LEAVES
-
-Transport sub-lemmas needed to discharge `connAt-≋`, `flatAt-≋`, and
-`keyed-same`: position-preserving agreement on lanes, outer, pool, cue and UB.
-Settled when each is a body.
-
-Members: `keyed-same`, `laneKeys-lanes`, `flatAt-rest`, `cue-≈`, `ub-transport`.
+Members: `rise-dead-keys`, `keyed-same`, `laneKeys-lanes`, `flatAt-rest`,
+`cue-≈`, `ub-transport`.
 
 ## Tier 2 — the simultaneous spec
 
