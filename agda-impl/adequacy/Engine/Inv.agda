@@ -51,6 +51,7 @@ open import adequacy.Engine.Causal using (Causal; causal-run; cold-≼; cold-ove
 open import adequacy.Engine.Room using (plant; aloft-hole)
 open import adequacy.Engine.Fresh using (FreshS; NextFresh; room-mono; sown-here; after-sown; tapes-sown; ofFut-sown; conn-sown)
 open import adequacy.Engine.Freshen using (fresh-next)
+open import adequacy.Engine.Risen using (NextCaused; rise-causal)
 open import adequacy.Engine.Ghosted using (NextTold; told-next)
 open import adequacy.Engine.Scope using (Gh)
 open import adequacy.Engine.Firmed using (gh-firm)
@@ -372,7 +373,7 @@ module _ {R : Set} where
   NextInv (complete p)    = ⊤₁
   NextInv drained         = ⊤₁
 
-  NextFrag NextKeys NextShape NextFlight NextCaused : Step → Set
+  NextFrag NextKeys NextShape NextFlight : Step → Set
   NextLead : Step → Set₁
   NextFrag (silent t k)    = Frag (whole k)
   NextFrag (value t p a k) = Frag (whole k)
@@ -394,10 +395,6 @@ module _ {R : Set} where
   NextLead (value t p a k) = Lead k
   NextLead (complete p)    = ⊤₁
   NextLead drained         = ⊤₁
-  NextCaused (silent t k)    = Causal (whole k)
-  NextCaused (value t p a k) = Causal (whole k)
-  NextCaused (complete p)    = ⊤
-  NextCaused drained         = ⊤
 
   postulate
     -- THE SHAPE: a step keeps the whole tree in the fragment.
@@ -441,10 +438,6 @@ module _ {R : Set} where
     run-flight : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) p → Inv ⟨ c , s , absorbed , p ⟩ → NextOwed (step ⟨ c , s , absorbed , p ⟩)
     -- A tree's first subscription is in shape.
     flight-load : (o : Obs Timeline [] R) → Flight (Machine.load o)
-    -- THE STILL'S SUBTREE: after a step every node's every key to come
-    -- is aloft, nothing keyed under a skip not yet run: kept by a rise and
-    -- a subscription begun.
-    rise-causal : ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) e p → Inv ⟨ c , s , rising e , p ⟩ → NextCaused (step ⟨ c , s , rising e , p ⟩)
     -- A mark run rises, if at all, the event it showed, at its own key,
     -- leaving a node as live as the one it ran.
     run-lead : ∀ (t : St [] R) {Γ A} {c : Ctx R Γ A} {s m key} p → search top t ≡ just (found (Γ , A , c , s) m key)
@@ -895,7 +888,7 @@ module _ {R : Set} where
   sub-causal c (joinS j g x ib)        p v = Order.causal (Inv.ord v)
 
   causal-next : ∀ k → Base k → Order k → NextCaused (step k)
-  causal-next ⟨ c , s , rising e , p ⟩    b o = rise-causal c s e p (b & o)
+  causal-next ⟨ c , s , rising e , p ⟩    b o = rise-causal c s e p b o
   causal-next ⟨ c , s , subscribing , p ⟩ b o = sub-causal c s p (b & o)
   causal-next ⟨ c , s , absorbed , p ⟩    b o = run-causal c s p (b & o)
 
