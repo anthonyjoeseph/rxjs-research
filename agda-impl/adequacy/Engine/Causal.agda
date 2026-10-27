@@ -1,8 +1,8 @@
 {-# OPTIONS --guardedness #-}
 
 -- NOTHING KEYED UNDER A SKIP NOT YET RUN (`Causal`): at every node, each
--- mark it owns or will own (`fut`: an of's values and completion to come,
--- a joiner's queue) is aloft (`Aloft⁺`) of every key, owned or to come,
+-- key it owns or will own (`Fut`: a live cold's whole tape, an of's values
+-- and completion to come, a joiner's queue) is aloft (`Aloft⁺`) of every key, owned or to come,
 -- of each part racing it.  Read over what is to come, a mark run only
 -- takes from what the invariant reads: the tree it leaves is weaker
 -- (`_≼_`: each node's keys to come among the old ones, or past one at or
@@ -10,23 +10,23 @@
 -- (`causal-≼`).
 module adequacy.Engine.Causal where
 
-open import Data.Empty using (⊥)
+open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; reverse; replicate; map)
 open import Data.List.Properties using (++-identityʳ; ++-assoc; ʳ++-defn; reverse-involutive)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.List.Relation.Unary.All using (All; tabulate; lookup) renaming (map to allMap)
+open import Data.List.Relation.Unary.All using (All; tabulate)
 open import Data.Maybe using (just; nothing)
-open import Data.Nat using (ℕ) renaming (suc to 1+)
+open import Data.Nat using (ℕ; zero) renaming (suc to 1+)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans; cong)
 
 open import Tree using (Obs; FlatOp)
-open import denotation.MonotonicList.Events using (Pos; Timeline; ix; last)
+open import denotation.MonotonicList.Events using (Pos; Timeline; ix; last; emit; stall; close; Frame∞; From∞)
 open import operation.Key using (Key; at; after)
-open import operation.PureObservable using (module Machine; due)
+open import operation.PureObservable using (module Machine; due; Tape; play; ending; over; rest)
 
 open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; CS; cs;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; own;
@@ -52,72 +52,120 @@ Freeᴷ : Key → Key → Set
 Freeᴷ k (at r)    = (Σ Pos λ ys → posᴷ k ≡ r ++ ys) → ⊥
 Freeᴷ k (after _) = ⊤
 
--- What a node will own: an of's every value and completion to come, a
--- joiner's whole queue; else what it owns.
+-- A started cold's tape, one leaf move on: a frame's next value or stall,
+-- a close's next frame; a completion delivered, nothing.
+advance : ∀ {A} → Tape A → Tape A
+advance (play τ u i t (emit a k))  = play τ u (1+ i) t k
+advance (play τ u i t (stall k))   = play τ u (1+ i) t (Frame∞.force k)
+advance (play τ u i t (close k))   = rest τ (u ++ [ last ]) (From∞.force k)
+advance (ending e)                 = over
+advance over                       = over
+
+ahead : ∀ {A} → ℕ → Tape A → Tape A
+ahead zero   l = l
+ahead (1+ n) l = ahead n (advance l)
+
+-- Every key a tape is due at, now or after moves to come.
+Tapes : ∀ {A} → Tape A → Key → Set
+Tapes l h = Σ ℕ λ n → due (ahead n l) ≡ just h
+
+ahead-over : ∀ {A} n → ahead {A} n over ≡ over
+ahead-over zero   = refl
+ahead-over (1+ n) = ahead-over n
+
+tapes-over : ∀ {A h} → Tapes {A} over h → ⊥
+tapes-over {A} (n , e) = none (trans (sym (cong due (ahead-over {A} n))) e)
+  where
+    none : ∀ {h} → nothing ≡ just h → ⊥
+    none ()
+
+own-tape : ∀ {Γ A} b (l : Tape A) {m h} → (m , h) ∈ own {Γ} {A} (coldS b l) → Tapes l h
+own-tape b l i with due l in e
+own-tape b l (here refl)  | just k = zero , e
+own-tape b l (there ())   | just k
+own-tape b l ()           | nothing
+
 ofFut : ℕ → Pos → ∀ {A : Set} → List A → List (Mark × Key)
 ofFut i p []       = [ (ofM , at (p ⊕ [ last ])) ]
 ofFut i p (_ ∷ xs) = (ofM , at (p ⊕ [ ix i ])) ∷ ofFut (1+ i) p xs
 
-fut : ∀ {Γ A} → St Γ A → List (Mark × Key)
-fut (ofS i p xs)     = ofFut i p xs
-fut (joinS j g x ib) = map (λ qe → (joinM , at (proj₁ qe))) ib
-fut s                = own s
+-- What a node will own: a live cold's whole tape, an of's every value
+-- and completion to come, a joiner's whole queue; else what it owns.
+Fut : ∀ {Γ A} → St Γ A → Key → Set
+Fut (coldS true l)   h = Tapes l h
+Fut (ofS i p xs)     h = Σ Mark λ m → (m , h) ∈ ofFut i p xs
+Fut (joinS j g x ib) h = Σ Mark λ m → (m , h) ∈ map (λ qe → (joinM , at (proj₁ qe))) ib
+Fut s                h = Σ Mark λ m → (m , h) ∈ own s
 
-own-fut : ∀ {Γ A} (s : St Γ A) {mk} → mk ∈ own s → mk ∈ fut s
-own-fut (pend o)                    i = i
-own-fut (coldS b l)                 i = i
-own-fut (ofS i p [])                m = m
-own-fut (ofS i p (_ ∷ _))           (here e) = here e
-own-fut (ofS i p (_ ∷ _))           (there ())
-own-fut doneS                       i = i
-own-fut (mapS f s)                  i = i
-own-fut (scanS f z s)               i = i
-own-fut (cutS l a s)                i = i
-own-fut (lnS b s)                   i = i
-own-fut (takeS i q w s)             m = m
-own-fut (flatS op f d n q o ls)     i = i
-own-fut (connS k o b)               i = i
+Every : ∀ {Γ A} → (Key → Set) → St Γ A → Set
+Every P s = ∀ {h} → Fut s h → P h
+
+own-fut : ∀ {Γ A} (s : St Γ A) {m h} → (m , h) ∈ own s → Fut s h
+own-fut (pend o)                    i = _ , i
+own-fut {Γ} {A} (coldS true l)      i = own-tape {Γ} {A} true l i
+own-fut (coldS false l)             i = _ , i
+own-fut (ofS j p [])                i = _ , i
+own-fut (ofS j p (_ ∷ _))           (here e) = _ , here e
+own-fut (ofS j p (_ ∷ _))           (there ())
+own-fut doneS                       i = _ , i
+own-fut (mapS f s)                  i = _ , i
+own-fut (scanS f z s)               i = _ , i
+own-fut (cutS l a s)                i = _ , i
+own-fut (lnS b s)                   i = _ , i
+own-fut (takeS j q w s)             i = _ , i
+own-fut (flatS op f d n q o ls)     i = _ , i
+own-fut (connS k o b)               i = _ , i
 own-fut (joinS j g x [])            ()
-own-fut (joinS j g x ((q , _) ∷ _)) (here e) = here e
+own-fut (joinS j g x ((q , _) ∷ _)) (here e) = _ , here e
 own-fut (joinS j g x ((q , _) ∷ _)) (there ())
 
--- Every key every node of a tree owns, or will own, as `ks` reads it.
+-- Every key every node of a tree owns.
 mutual
-  KeysBy : (∀ {Γ A} → St Γ A → List (Mark × Key)) → ∀ {Γ A} → (Key → Set) → St Γ A → Set
-  KeysBy ks P s = All (λ mk → P (proj₂ mk)) (ks s) × KidKeys ks P s
+  Keysᴬ : ∀ {Γ A} → (Key → Set) → St Γ A → Set
+  Keysᴬ P s = All (λ mk → P (proj₂ mk)) (own s) × KidKeys P s
 
-  KidKeys : (∀ {Γ A} → St Γ A → List (Mark × Key)) → ∀ {Γ A} → (Key → Set) → St Γ A → Set
-  KidKeys ks P (mapS f s)              = KeysBy ks P s
-  KidKeys ks P (scanS f z s)           = KeysBy ks P s
-  KidKeys ks P (cutS l a s)            = KeysBy ks P s
-  KidKeys ks P (lnS b s)               = KeysBy ks P s
-  KidKeys ks P (takeS i q w s)         = KeysBy ks P s
-  KidKeys ks P (flatS op f d n q o ls) = KeysBy ks P o × LaneKeysBy ks P ls
-  KidKeys ks P (connS k o b)           = KeysBy ks P o × KeysBy ks P b
-  KidKeys ks P _                       = ⊤
+  KidKeys : ∀ {Γ A} → (Key → Set) → St Γ A → Set
+  KidKeys P (mapS f s)              = Keysᴬ P s
+  KidKeys P (scanS f z s)           = Keysᴬ P s
+  KidKeys P (cutS l a s)            = Keysᴬ P s
+  KidKeys P (lnS b s)               = Keysᴬ P s
+  KidKeys P (takeS i q w s)         = Keysᴬ P s
+  KidKeys P (flatS op f d n q o ls) = Keysᴬ P o × LaneKeys P ls
+  KidKeys P (connS k o b)           = Keysᴬ P o × Keysᴬ P b
+  KidKeys P _                       = ⊤
 
-  LaneKeysBy : (∀ {Γ A} → St Γ A → List (Mark × Key)) → ∀ {Γ A} → (Key → Set) → List (St Γ A) → Set
-  LaneKeysBy ks P []       = ⊤
-  LaneKeysBy ks P (s ∷ ls) = KeysBy ks P s × LaneKeysBy ks P ls
+  LaneKeys : ∀ {Γ A} → (Key → Set) → List (St Γ A) → Set
+  LaneKeys P []       = ⊤
+  LaneKeys P (s ∷ ls) = Keysᴬ P s × LaneKeys P ls
 
-Keysᴬ : ∀ {Γ A} → (Key → Set) → St Γ A → Set
-Keysᴬ = KeysBy own
+-- Every key every node of a tree owns or will own.
+mutual
+  Keys⁺ : ∀ {Γ A} → (Key → Set) → St Γ A → Set
+  Keys⁺ P s = Every P s × KidKeys⁺ P s
 
-LaneKeys : ∀ {Γ A} → (Key → Set) → List (St Γ A) → Set
-LaneKeys = LaneKeysBy own
+  KidKeys⁺ : ∀ {Γ A} → (Key → Set) → St Γ A → Set
+  KidKeys⁺ P (mapS f s)              = Keys⁺ P s
+  KidKeys⁺ P (scanS f z s)           = Keys⁺ P s
+  KidKeys⁺ P (cutS l a s)            = Keys⁺ P s
+  KidKeys⁺ P (lnS b s)               = Keys⁺ P s
+  KidKeys⁺ P (takeS i q w s)         = Keys⁺ P s
+  KidKeys⁺ P (flatS op f d n q o ls) = Keys⁺ P o × LaneKeys⁺ P ls
+  KidKeys⁺ P (connS k o b)           = Keys⁺ P o × Keys⁺ P b
+  KidKeys⁺ P _                       = ⊤
 
-Keys⁺ : ∀ {Γ A} → (Key → Set) → St Γ A → Set
-Keys⁺ = KeysBy fut
-
-LaneKeys⁺ : ∀ {Γ A} → (Key → Set) → List (St Γ A) → Set
-LaneKeys⁺ = LaneKeysBy fut
+  LaneKeys⁺ : ∀ {Γ A} → (Key → Set) → List (St Γ A) → Set
+  LaneKeys⁺ P []       = ⊤
+  LaneKeys⁺ P (s ∷ ls) = Keys⁺ P s × LaneKeys⁺ P ls
 
 -- What is to come includes what is owned.
+every-own : ∀ {Γ A} {P : Key → Set} (s : St Γ A) → Every P s → All (λ mk → P (proj₂ mk)) (own s)
+every-own s a = tabulate (λ i → a (own-fut s i))
+
 mutual
   keys-own : ∀ {Γ A} {P : Key → Set} (s : St Γ A) → Keys⁺ P s → Keysᴬ P s
-  keys-own s (a , k) = tabulate (λ i → lookup a (own-fut s i)) , kids-own s k
+  keys-own s (a , k) = every-own s a , kids-own s k
 
-  kids-own : ∀ {Γ A} {P : Key → Set} (s : St Γ A) → KidKeys fut P s → KidKeys own P s
+  kids-own : ∀ {Γ A} {P : Key → Set} (s : St Γ A) → KidKeys⁺ P s → KidKeys P s
   kids-own (pend o)                k        = tt
   kids-own (coldS b l)             k        = tt
   kids-own (ofS i p xs)            k        = tt
@@ -137,12 +185,10 @@ mutual
 
 -- What every key `P` holds of, `Q` holds of.
 mutual
-  keys-map : ∀ {ks : ∀ {Γ A} → St Γ A → List (Mark × Key)} {Γ A} {P Q : Key → Set} → (∀ {h} → P h → Q h) → (s : St Γ A)
-           → KeysBy ks P s → KeysBy ks Q s
-  keys-map g s (a , k) = allMap g a , kids-map g s k
+  keys-map : ∀ {Γ A} {P Q : Key → Set} → (∀ {h} → P h → Q h) → (s : St Γ A) → Keys⁺ P s → Keys⁺ Q s
+  keys-map g s (a , k) = (λ f → g (a f)) , kids-map g s k
 
-  kids-map : ∀ {ks : ∀ {Γ A} → St Γ A → List (Mark × Key)} {Γ A} {P Q : Key → Set} → (∀ {h} → P h → Q h) → (s : St Γ A)
-           → KidKeys ks P s → KidKeys ks Q s
+  kids-map : ∀ {Γ A} {P Q : Key → Set} → (∀ {h} → P h → Q h) → (s : St Γ A) → KidKeys⁺ P s → KidKeys⁺ Q s
   kids-map g (pend o)                k       = tt
   kids-map g (coldS b l)             k       = tt
   kids-map g (ofS i p xs)            k       = tt
@@ -156,8 +202,7 @@ mutual
   kids-map g (connS k o b)           (x , y) = keys-map g o x , keys-map g b y
   kids-map g (joinS j h x ib)        k       = tt
 
-  lanes-map : ∀ {ks : ∀ {Γ A} → St Γ A → List (Mark × Key)} {Γ A} {P Q : Key → Set} → (∀ {h} → P h → Q h) → (ls : List (St Γ A))
-            → LaneKeysBy ks P ls → LaneKeysBy ks Q ls
+  lanes-map : ∀ {Γ A} {P Q : Key → Set} → (∀ {h} → P h → Q h) → (ls : List (St Γ A)) → LaneKeys⁺ P ls → LaneKeys⁺ Q ls
   lanes-map g []       tt       = tt
   lanes-map g (s ∷ ls) (a , as) = keys-map g s a , lanes-map g ls as
 
@@ -180,14 +225,14 @@ Aloft⁺ k (inOuter op f d n q ls c)          s = LaneKeys⁺ (Farᴷ k) ls × A
 Aloft⁺ k (inLanes op f d n q o pre post c)  s =
   Keys⁺ (Farᴷ k) o × LaneKeys⁺ (Farᴷ k) pre × LaneKeys⁺ (Farᴷ k) post × Aloft⁺ k c (flatS op f d n q o (pre ʳ++ s ∷ post))
 Aloft⁺ k (inSrc kk b c)                     s =
-  Keys⁺ (Farᴷ k) b × All (λ mk → Farᴷ k (proj₂ mk)) (fut (connS kk s b)) × Aloft⁺ k c (connS kk s b)
+  Keys⁺ (Farᴷ k) b × Every (Farᴷ k) (connS kk s b) × Aloft⁺ k c (connS kk s b)
 Aloft⁺ k (inBody kk o c)                    s =
-  Keys⁺ (Farᴷ k) o × Keys⁺ (Freeᴷ k) o × All (λ mk → Farᴷ k (proj₂ mk)) (fut (connS kk o s)) × Aloft⁺ k c (connS kk o s)
+  Keys⁺ (Farᴷ k) o × Keys⁺ (Freeᴷ k) o × Every (Farᴷ k) (connS kk o s) × Aloft⁺ k c (connS kk o s)
 
--- At every node under `c`, every mark to come aloft.
+-- At every node under `c`, every key to come aloft.
 mutual
   CausalW : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Set
-  CausalW c s = All (λ mk → Aloft⁺ (proj₂ mk) c s) (fut s) × KidsW c s
+  CausalW c s = Every (λ h → Aloft⁺ h c s) s × KidsW c s
 
   KidsW : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Set
   KidsW c (mapS f s)              = CausalW (inMap f c) s
@@ -204,7 +249,7 @@ mutual
   LanesW c op f d n q o pre []         = ⊤
   LanesW c op f d n q o pre (s ∷ post) = CausalW (inLanes op f d n q o pre post c) s × LanesW c op f d n q o (s ∷ pre) post
 
--- Every node's every mark to come is aloft.
+-- Every node's every key to come is aloft.
 Causal : ∀ {R} → St [] R → Set
 Causal t = CausalW top t
 
@@ -241,7 +286,7 @@ walk-at (inBody kk o c)                   s w = proj₂ (proj₂ (walk-at c (con
 
 -- A causal tree's node's own marks: aloft.
 causal-own : ∀ {R} {t : St [] R} → Causal t → ∀ {Γ A} (c : Ctx R Γ A) (s : St Γ A) {m k} → plug c s ≡ t → (m , k) ∈ own s → Aloft⁺ k c s
-causal-own ca c s e i = lookup (proj₁ (walk-at c s (subst Causal (sym e) ca))) (own-fut s i)
+causal-own ca c s e i = proj₁ (walk-at c s (subst Causal (sym e) ca)) (own-fut s i)
 
 ------------------------------------------------------------------------
 -- Weaker
@@ -270,17 +315,17 @@ after≤at q r ys e = record { farK = fk ; freeK = λ _ _ → tt ; farM = λ _ _
     fm (at p)    fr (zs , e′) = fr (zs ++ ys , trans e (trans (cong (_++ ys) e′) (++-assoc p zs ys)))
     fm (after p) fr           = tt
 
--- Each mark to come of `s′` weaker than one of `s`'s.
+-- Each key to come of `s′` weaker than one of `s`'s.
 record NodeW {Γ Γ′ A A′} (s′ : St Γ′ A′) (s : St Γ A) : Set where
   constructor nodeW
-  field back : ∀ {mk′} → mk′ ∈ fut s′ → Σ (Mark × Key) λ mk → mk ∈ fut s × proj₂ mk′ ≤ᴷ proj₂ mk
+  field back : ∀ {h′} → Fut s′ h′ → Σ Key λ h → Fut s h × h′ ≤ᴷ h
 open NodeW
 
 node-all : ∀ {Γ Γ′ A A′} {s′ : St Γ′ A′} {s : St Γ A} {P : Key → Set} → (∀ {h h′} → h′ ≤ᴷ h → P h → P h′) → NodeW s′ s
-         → All (λ mk → P (proj₂ mk)) (fut s) → All (λ mk → P (proj₂ mk)) (fut s′)
-node-all tr nw a = tabulate (λ i → tr (proj₂ (proj₂ (back nw i))) (lookup a (proj₁ (proj₂ (back nw i)))))
+         → Every P s → Every P s′
+node-all tr nw a f = tr (proj₂ (proj₂ (back nw f))) (a (proj₁ (proj₂ (back nw f))))
 
--- A connect's own marks, as its record alone gives them.
+-- A connect's own keys, as its record alone gives them.
 record ConnW (kk′ kk : CS) : Set₁ where
   constructor connW
   field conn : ∀ {Γ X B} {o o′ : St Γ X} {b b′ : St (X ∷ Γ) B} → NodeW (connS kk′ o′ b′) (connS kk o b)
@@ -338,7 +383,7 @@ mutual
   keys-≼ : ∀ {Γ A} {P : Key → Set} → (∀ {h h′} → h′ ≤ᴷ h → P h → P h′) → {s′ s : St Γ A} → s′ ≼ s → Keys⁺ P s → Keys⁺ P s′
   keys-≼ tr (w≼ nw ks) (a , k) = node-all tr nw a , kids-≼ tr ks k
 
-  kids-≼ : ∀ {Γ A} {P : Key → Set} → (∀ {h h′} → h′ ≤ᴷ h → P h → P h′) → {s′ s : St Γ A} → Kids≼ s′ s → KidKeys fut P s → KidKeys fut P s′
+  kids-≼ : ∀ {Γ A} {P : Key → Set} → (∀ {h h′} → h′ ≤ᴷ h → P h → P h′) → {s′ s : St Γ A} → Kids≼ s′ s → KidKeys⁺ P s → KidKeys⁺ P s′
   kids-≼ tr (bare≼ {s′ = pend o} b)         k       = tt
   kids-≼ tr (bare≼ {s′ = coldS x l} b)      k       = tt
   kids-≼ tr (bare≼ {s′ = ofS i p xs} b)     k       = tt
@@ -389,15 +434,15 @@ aloft-≤ le (inTake i q w c)                  t a = aloft-≤ le c (takeS i q w
 aloft-≤ le (inOuter op f d n q ls c)         t (l , a) = lanes-map (farM le _) ls l , aloft-≤ le c (flatS op f d n q t ls) a
 aloft-≤ le (inLanes op f d n q o pre post c) t (x , p , r , a) =
   keys-map (farM le _) o x , lanes-map (farM le _) pre p , lanes-map (farM le _) post r , aloft-≤ le c (flatS op f d n q o (pre ʳ++ t ∷ post)) a
-aloft-≤ le (inSrc kk b c)                    t (x , m , a) = keys-map (farM le _) b x , allMap (farM le _) m , aloft-≤ le c (connS kk t b) a
+aloft-≤ le (inSrc kk b c)                    t (x , m , a) = keys-map (farM le _) b x , (λ f → farM le _ (m f)) , aloft-≤ le c (connS kk t b) a
 aloft-≤ le (inBody kk o c)                   t (x , f , m , a) =
-  keys-map (farM le _) o x , keys-map (freeM le _) o f , allMap (farM le _) m , aloft-≤ le c (connS kk o t) a
+  keys-map (farM le _) o x , keys-map (freeM le _) o f , (λ g → farM le _ (m g)) , aloft-≤ le c (connS kk o t) a
 
 -- WEAKER STAYS CAUSAL: a weaker tree under a weaker context.
 mutual
   causal-≼ : ∀ {R Γ A} {c′ c : Ctx R Γ A} {s′ s : St Γ A} → c′ ≼ᶜ c → s′ ≼ s → CausalW c s → CausalW c′ s′
   causal-≼ {c′ = c′} {c} {s′} {s} rc (w≼ nw ks) (m , k) =
-    tabulate (λ i → aloft-≤ (proj₂ (proj₂ (back nw i))) c′ s′ (aloft-≼ᶜ rc (lookup m (proj₁ (proj₂ (back nw i)))))) , causal-kids rc ks k
+    (λ f → aloft-≤ (proj₂ (proj₂ (back nw f))) c′ s′ (aloft-≼ᶜ rc (m (proj₁ (proj₂ (back nw f)))))) , causal-kids rc ks k
 
   causal-kids : ∀ {R Γ A} {c′ c : Ctx R Γ A} {s′ s : St Γ A} → c′ ≼ᶜ c → Kids≼ s′ s → KidsW c s → KidsW c′ s′
   causal-kids rc (bare≼ {s′ = pend o} b)         k       = tt
@@ -433,11 +478,14 @@ own-conn (cs cl sl sa (just p) nothing  (just w) r e) = refl
 own-conn (cs cl sl sa (just p) (just a) nothing  r e) = refl
 own-conn (cs cl sl sa (just p) (just a) (just w) r e) = refl
 
-conn-refl : ∀ k → ConnW k k
-conn-refl k = connW (λ {Γ} {X} {B} {o} {o′} {b} {b′} → nodeW (λ i → _ , subst (_ ∈_) (own-conn k {o = o′} {o} {b′} {b}) i , ≤ᴷ-refl))
+owned : ∀ {xs ys : List (Mark × Key)} → xs ≡ ys → ∀ {h} → (Σ Mark λ m → (m , h) ∈ xs) → Σ Mark λ m → (m , h) ∈ ys
+owned e (m , i) = m , subst (_ ∈_) e i
 
-node-same : ∀ {Γ Γ′ A A′} {s′ : St Γ′ A′} {s : St Γ A} → fut s′ ≡ fut s → NodeW s′ s
-node-same e = nodeW (λ i → _ , subst (_ ∈_) e i , ≤ᴷ-refl)
+conn-refl : ∀ k → ConnW k k
+conn-refl k = connW (λ {Γ} {X} {B} {o} {o′} {b} {b′} → nodeW (λ f → _ , owned (own-conn k {o = o′} {o} {b′} {b}) f , ≤ᴷ-refl))
+
+node-same : ∀ {Γ Γ′ A A′} {s′ : St Γ′ A′} {s : St Γ A} → (∀ {h} → Fut s′ h → Fut s h) → NodeW s′ s
+node-same e = nodeW (λ f → _ , e f , ≤ᴷ-refl)
 
 own-cut : ∀ {Γ A} l a {s s′ : St Γ A} → own (cutS l a s) ≡ own (cutS l a s′)
 own-cut l attached  = refl
@@ -449,14 +497,9 @@ own-take i q (cpAt p)   = refl
 own-take i q (cutAt p)  = refl
 own-take i q (overAt p) = refl
 
-own-cold : ∀ {Γ A} b b′ l → own {Γ} {A} (coldS b l) ≡ own {Γ} {A} (coldS b′ l)
-own-cold b b′ l with due l
-... | just k  = refl
-... | nothing = refl
-
 mutual
   ≼-refl : ∀ {Γ A} (s : St Γ A) → s ≼ s
-  ≼-refl s = w≼ (node-same {s′ = s} {s} refl) (kids-refl s)
+  ≼-refl s = w≼ (node-same {s′ = s} {s} (λ f → f)) (kids-refl s)
 
   kids-refl : ∀ {Γ A} (s : St Γ A) → Kids≼ s s
   kids-refl (pend o)                = bare≼ tt
@@ -483,14 +526,14 @@ lanes-ʳ++ (p ∷ pre) r = lanes-ʳ++ pre (≼-refl p ∷≼ r)
 -- A weaker node keeps the whole tree weaker.
 plug-≼ : ∀ {R Γ A} (c : Ctx R Γ A) {s′ s : St Γ A} → s′ ≼ s → plug c s′ ≼ plug c s
 plug-≼ top                               r = r
-plug-≼ (inMap f c)                       {s′} {s} r = plug-≼ c {mapS f s′} {mapS f s} (w≼ (nodeW (λ ())) (map≼ r))
-plug-≼ (inScan f z c)                    {s′} {s} r = plug-≼ c {scanS f z s′} {scanS f z s} (w≼ (nodeW (λ ())) (scan≼ r))
-plug-≼ (inCut l a c)                     {s′} {s} r = plug-≼ c {cutS l a s′} {cutS l a s} (w≼ (node-same (own-cut l a)) (cut≼ r))
-plug-≼ (inLn b c)                        {s′} {s} r = plug-≼ c {lnS b s′} {lnS b s} (w≼ (nodeW (λ ())) (ln≼ r))
-plug-≼ (inTake i q w c)                  {s′} {s} r = plug-≼ c {takeS i q w s′} {takeS i q w s} (w≼ (node-same (own-take i q w)) (take≼ r))
-plug-≼ (inOuter op f d n q ls c)         {s′} {s} r = plug-≼ c {flatS op f d n q s′ ls} {flatS op f d n q s ls} (w≼ (nodeW (λ ())) (flat≼ r (lanes-refl ls)))
+plug-≼ (inMap f c)                       {s′} {s} r = plug-≼ c {mapS f s′} {mapS f s} (w≼ (nodeW (λ { (_ , ()) })) (map≼ r))
+plug-≼ (inScan f z c)                    {s′} {s} r = plug-≼ c {scanS f z s′} {scanS f z s} (w≼ (nodeW (λ { (_ , ()) })) (scan≼ r))
+plug-≼ (inCut l a c)                     {s′} {s} r = plug-≼ c {cutS l a s′} {cutS l a s} (w≼ (node-same (owned (own-cut l a))) (cut≼ r))
+plug-≼ (inLn b c)                        {s′} {s} r = plug-≼ c {lnS b s′} {lnS b s} (w≼ (nodeW (λ { (_ , ()) })) (ln≼ r))
+plug-≼ (inTake i q w c)                  {s′} {s} r = plug-≼ c {takeS i q w s′} {takeS i q w s} (w≼ (node-same (owned (own-take i q w))) (take≼ r))
+plug-≼ (inOuter op f d n q ls c)         {s′} {s} r = plug-≼ c {flatS op f d n q s′ ls} {flatS op f d n q s ls} (w≼ (nodeW (λ { (_ , ()) })) (flat≼ r (lanes-refl ls)))
 plug-≼ (inLanes op f d n q o pre post c) {s′} {s} r =
-  plug-≼ c {flatS op f d n q o (pre ʳ++ s′ ∷ post)} {flatS op f d n q o (pre ʳ++ s ∷ post)} (w≼ (nodeW (λ ())) (flat≼ (≼-refl o) (lanes-ʳ++ pre (r ∷≼ lanes-refl post))))
+  plug-≼ c {flatS op f d n q o (pre ʳ++ s′ ∷ post)} {flatS op f d n q o (pre ʳ++ s ∷ post)} (w≼ (nodeW (λ { (_ , ()) })) (flat≼ (≼-refl o) (lanes-ʳ++ pre (r ∷≼ lanes-refl post))))
 plug-≼ (inSrc kk b c)                    {s′} {s} r = plug-≼ c {connS kk s′ b} {connS kk s b} (w≼ (conn (conn-refl kk)) (conn≼ (conn-refl kk) r (≼-refl b)))
 plug-≼ (inBody kk o c)                   {s′} {s} r = plug-≼ c {connS kk o s′} {connS kk o s} (w≼ (conn (conn-refl kk)) (conn≼ (conn-refl kk) (≼-refl o) r))
 
@@ -502,22 +545,22 @@ causal-run c r = causal-≼ top≼ (plug-≼ c r)
 mutual
   unsub-≼ : ∀ {Γ A} (s : St Γ A) → proj₁ (unsub s) ≼ s
   unsub-≼ (pend o)                = ≼-refl _
-  unsub-≼ {Γ} {A} (coldS true l)  = w≼ (node-same (own-cold {Γ} {A} false true l)) (bare≼ tt)
+  unsub-≼ {Γ} {A} (coldS true l)  = w≼ (node-same (λ { (_ , i) → own-tape {Γ} {A} false l i })) (bare≼ tt)
   unsub-≼ (coldS false l)         = ≼-refl _
   unsub-≼ (ofS i p xs)            = ≼-refl _
   unsub-≼ doneS                   = ≼-refl _
-  unsub-≼ (mapS f s)              = w≼ (nodeW (λ ())) (map≼ (unsub-≼ s))
-  unsub-≼ (scanS f z s)           = w≼ (nodeW (λ ())) (scan≼ (unsub-≼ s))
+  unsub-≼ (mapS f s)              = w≼ (nodeW (λ { (_ , ()) })) (map≼ (unsub-≼ s))
+  unsub-≼ (scanS f z s)           = w≼ (nodeW (λ { (_ , ()) })) (scan≼ (unsub-≼ s))
   unsub-≼ (cutS l a s)            = ≼-refl _
   unsub-≼ (lnS b s)               = ≼-refl _
-  unsub-≼ (takeS i q w s)         = w≼ (node-same (own-take i q w)) (take≼ (cut-≼ s))
-  unsub-≼ (flatS op f d n q o ls) = w≼ (nodeW (λ ())) (flat≼ (cut-≼ o) (killAll-≼ ls))
+  unsub-≼ (takeS i q w s)         = w≼ (node-same (owned (own-take i q w))) (take≼ (cut-≼ s))
+  unsub-≼ (flatS op f d n q o ls) = w≼ (nodeW (λ { (_ , ()) })) (flat≼ (cut-≼ o) (killAll-≼ ls))
   unsub-≼ (connS k o b)           = w≼ (conn (conn-refl k)) (conn≼ (conn-refl k) (unsub-≼ o) (unsub-≼ b))
-  unsub-≼ (joinS j g x ib)        = w≼ (nodeW (λ ())) (bare≼ tt)
+  unsub-≼ (joinS j g x ib)        = w≼ (nodeW (λ { (_ , ()) })) (bare≼ tt)
 
   cut-≼ : ∀ {Γ A} (s : St Γ A) → proj₁ (cut s) ≼ s
-  cut-≼ (cutS l attached s)  = w≼ (nodeW (λ ())) (cut≼ (unsub-≼ s))
-  cut-≼ (cutS l (attAt p) s) = w≼ (node-same refl) (cut≼ (≼-refl s))
+  cut-≼ (cutS l attached s)  = w≼ (nodeW (λ { (_ , ()) })) (cut≼ (unsub-≼ s))
+  cut-≼ (cutS l (attAt p) s) = w≼ (node-same (λ f → f)) (cut≼ (≼-refl s))
   cut-≼ (pend o)                = ≼-refl _
   cut-≼ (coldS b l)             = ≼-refl _
   cut-≼ (ofS i p xs)            = ≼-refl _
@@ -532,7 +575,7 @@ mutual
 
   killAll-≼ : ∀ {Γ A} (ls : List (St Γ A)) → Lanes≼ (proj₁ (killAll ls)) ls
   killAll-≼ []                 = []≼
-  killAll-≼ (lnS true s ∷ ls)  = w≼ (nodeW (λ ())) (ln≼ (cut-≼ s)) ∷≼ killAll-≼ ls
+  killAll-≼ (lnS true s ∷ ls)  = w≼ (nodeW (λ { (_ , ()) })) (ln≼ (cut-≼ s)) ∷≼ killAll-≼ ls
   killAll-≼ (lnS false s ∷ ls) = ≼-refl _ ∷≼ killAll-≼ ls
   killAll-≼ (pend o ∷ ls)                = ≼-refl _ ∷≼ killAll-≼ ls
   killAll-≼ (coldS b l ∷ ls)             = ≼-refl _ ∷≼ killAll-≼ ls
@@ -552,22 +595,22 @@ unsubIf-≼ false s = ≼-refl s
 
 -- A mark run, node by node: its node weaker.
 of-≼ : ∀ {Γ A} i p (x : A) xs → ofS {Γ} (1+ i) p xs ≼ ofS i p (x ∷ xs)
-of-≼ i p x xs = w≼ (nodeW (λ m → _ , there m , ≤ᴷ-refl)) (bare≼ tt)
+of-≼ i p x xs = w≼ (nodeW (λ { (m , i) → _ , (m , there i) , ≤ᴷ-refl })) (bare≼ tt)
 
 done-≼ : ∀ {Γ A} (s : St Γ A) → doneS ≼ s
-done-≼ s = w≼ (nodeW (λ ())) (bare≼ tt)
+done-≼ s = w≼ (nodeW (λ { (_ , ()) })) (bare≼ tt)
 
 join-≼ : ∀ {Γ A} j g g′ (x : A ∈ Γ) qe ib → joinS j g′ x ib ≼ joinS j g x (qe ∷ ib)
-join-≼ j g g′ x qe ib = w≼ (nodeW (λ m → _ , there m , ≤ᴷ-refl)) (bare≼ tt)
+join-≼ j g g′ x qe ib = w≼ (nodeW (λ { (m , i) → _ , (m , there i) , ≤ᴷ-refl })) (bare≼ tt)
 
 att-≼ : ∀ {Γ A} l p {s′ s : St Γ A} → s′ ≼ s → cutS l attached s′ ≼ cutS l (attAt p) s
-att-≼ l p r = w≼ (nodeW (λ ())) (cut≼ r)
+att-≼ l p r = w≼ (nodeW (λ { (_ , ()) })) (cut≼ r)
 
 cp-≼ : ∀ {Γ A} i q p (s : St Γ A) → takeS i q (cutAt p) s ≼ takeS i q (cpAt p) s
-cp-≼ i q p s = w≼ (nodeW (λ { (here refl) → _ , here refl , after≤at p (p ⊕ [ last ]) [ last ] refl ; (there ()) })) (take≼ (≼-refl s))
+cp-≼ i q p s = w≼ (nodeW (λ { (_ , here refl) → _ , (_ , here refl) , after≤at p (p ⊕ [ last ]) [ last ] refl ; (_ , there ()) })) (take≼ (≼-refl s))
 
 over-≼ : ∀ {Γ A} i q p {s′ s : St Γ A} → s′ ≼ s → takeS i q (overAt p) s′ ≼ takeS i q (cutAt p) s
-over-≼ i q p r = w≼ (nodeW (λ ())) (take≼ r)
+over-≼ i q p r = w≼ (nodeW (λ { (_ , ()) })) (take≼ r)
 
 -- A body subscribed: its mark handed to the source's attach, past where
 -- the body was keyed.
@@ -577,48 +620,57 @@ body-conn cl sl sa p as ow r e = connW (λ {Γ} {X} {B} {o} {o′} {b} {b′} �
     q = p ⊕ [ ix 1 ]
     hand : after q ≤ᴷ at q
     hand = after≤at q q [] (sym (++-identityʳ q))
-    go : ∀ as ow {Γ X B} {o o′ : St Γ X} {b b′ : St (X ∷ Γ) B} {mk′} → mk′ ∈ fut (connS (cs cl sl sa nothing (just q) ow r e) o′ b′)
-       → Σ (Mark × Key) λ mk → mk ∈ fut (connS (cs cl sl sa (just p) as ow r e) o b) × proj₂ mk′ ≤ᴷ proj₂ mk
-    go nothing  nothing  (here refl)         = _ , here refl , hand
-    go nothing  nothing  (there ())
-    go nothing  (just w) (here refl)         = _ , here refl , hand
-    go nothing  (just w) (there (here refl)) = _ , there (here refl) , ≤ᴷ-refl
-    go nothing  (just w) (there (there ()))
-    go (just a) nothing  (here refl)         = _ , here refl , hand
-    go (just a) nothing  (there ())
-    go (just a) (just w) (here refl)         = _ , here refl , hand
-    go (just a) (just w) (there (here refl)) = _ , there (there (here refl)) , ≤ᴷ-refl
-    go (just a) (just w) (there (there ()))
+    go : ∀ as ow {Γ X B} {o o′ : St Γ X} {b b′ : St (X ∷ Γ) B} {h′} → Fut (connS (cs cl sl sa nothing (just q) ow r e) o′ b′) h′
+       → Σ Key λ h → Fut (connS (cs cl sl sa (just p) as ow r e) o b) h × h′ ≤ᴷ h
+    go nothing  nothing  (_ , here refl)               = _ , (_ , here refl) , hand
+    go nothing  nothing  (_ , there ())
+    go nothing  (just w) (_ , here refl)               = _ , (_ , here refl) , hand
+    go nothing  (just w) (_ , there (here refl))       = _ , (_ , there (here refl)) , ≤ᴷ-refl
+    go nothing  (just w) (_ , there (there ()))
+    go (just a) nothing  (_ , here refl)               = _ , (_ , here refl) , hand
+    go (just a) nothing  (_ , there ())
+    go (just a) (just w) (_ , here refl)               = _ , (_ , here refl) , hand
+    go (just a) (just w) (_ , there (here refl))       = _ , (_ , there (there (here refl))) , ≤ᴷ-refl
+    go (just a) (just w) (_ , there (there ()))
 
 -- A source's attach run: its mark dropped.
 src-conn : ∀ cl sl sa ba a ow r e → ConnW (cs cl sl true ba nothing ow r e) (cs cl sl sa ba (just a) ow r e)
 src-conn cl sl sa ba a ow r e = connW (λ {Γ} {X} {B} {o} {o′} {b} {b′} → nodeW (go ba ow {Γ} {X} {B} {o} {o′} {b} {b′}))
   where
-    go : ∀ ba ow {Γ X B} {o o′ : St Γ X} {b b′ : St (X ∷ Γ) B} {mk′} → mk′ ∈ fut (connS (cs cl sl true ba nothing ow r e) o′ b′)
-       → Σ (Mark × Key) λ mk → mk ∈ fut (connS (cs cl sl sa ba (just a) ow r e) o b) × proj₂ mk′ ≤ᴷ proj₂ mk
-    go nothing  nothing  ()
-    go nothing  (just w) (here refl)         = _ , there (here refl) , ≤ᴷ-refl
-    go nothing  (just w) (there ())
-    go (just p) nothing  (here refl)         = _ , here refl , ≤ᴷ-refl
-    go (just p) nothing  (there ())
-    go (just p) (just w) (here refl)         = _ , here refl , ≤ᴷ-refl
-    go (just p) (just w) (there (here refl)) = _ , there (there (here refl)) , ≤ᴷ-refl
-    go (just p) (just w) (there (there ()))
+    go : ∀ ba ow {Γ X B} {o o′ : St Γ X} {b b′ : St (X ∷ Γ) B} {h′} → Fut (connS (cs cl sl true ba nothing ow r e) o′ b′) h′
+       → Σ Key λ h → Fut (connS (cs cl sl sa ba (just a) ow r e) o b) h × h′ ≤ᴷ h
+    go nothing  nothing  (_ , ())
+    go nothing  (just w) (_ , here refl)               = _ , (_ , there (here refl)) , ≤ᴷ-refl
+    go nothing  (just w) (_ , there ())
+    go (just p) nothing  (_ , here refl)               = _ , (_ , here refl) , ≤ᴷ-refl
+    go (just p) nothing  (_ , there ())
+    go (just p) (just w) (_ , here refl)               = _ , (_ , here refl) , ≤ᴷ-refl
+    go (just p) (just w) (_ , there (here refl))       = _ , (_ , there (there (here refl))) , ≤ᴷ-refl
+    go (just p) (just w) (_ , there (there ()))
 
 -- A source's teardown run: its mark dropped.
 owed-conn : ∀ cl sl sa ba as w r e → ConnW (cs cl false sa ba as nothing r e) (cs cl sl sa ba as (just w) r e)
 owed-conn cl sl sa ba as w r e = connW (λ {Γ} {X} {B} {o} {o′} {b} {b′} → nodeW (go ba as {Γ} {X} {B} {o} {o′} {b} {b′}))
   where
-    go : ∀ ba as {Γ X B} {o o′ : St Γ X} {b b′ : St (X ∷ Γ) B} {mk′} → mk′ ∈ fut (connS (cs cl false sa ba as nothing r e) o′ b′)
-       → Σ (Mark × Key) λ mk → mk ∈ fut (connS (cs cl sl sa ba as (just w) r e) o b) × proj₂ mk′ ≤ᴷ proj₂ mk
-    go nothing  nothing  ()
-    go nothing  (just a) (here refl)         = _ , here refl , ≤ᴷ-refl
-    go nothing  (just a) (there ())
-    go (just p) nothing  (here refl)         = _ , here refl , ≤ᴷ-refl
-    go (just p) nothing  (there ())
-    go (just p) (just a) (here refl)         = _ , here refl , ≤ᴷ-refl
-    go (just p) (just a) (there (here refl)) = _ , there (here refl) , ≤ᴷ-refl
-    go (just p) (just a) (there (there ()))
+    go : ∀ ba as {Γ X B} {o o′ : St Γ X} {b b′ : St (X ∷ Γ) B} {h′} → Fut (connS (cs cl false sa ba as nothing r e) o′ b′) h′
+       → Σ Key λ h → Fut (connS (cs cl sl sa ba as (just w) r e) o b) h × h′ ≤ᴷ h
+    go nothing  nothing  (_ , ())
+    go nothing  (just a) (_ , here refl)               = _ , (_ , here refl) , ≤ᴷ-refl
+    go nothing  (just a) (_ , there ())
+    go (just p) nothing  (_ , here refl)               = _ , (_ , here refl) , ≤ᴷ-refl
+    go (just p) nothing  (_ , there ())
+    go (just p) (just a) (_ , here refl)               = _ , (_ , here refl) , ≤ᴷ-refl
+    go (just p) (just a) (_ , there (here refl))       = _ , (_ , there (here refl)) , ≤ᴷ-refl
+    go (just p) (just a) (_ , there (there ()))
 
 conn-≼ : ∀ {Γ X B} {kk′ kk} {o′ o : St Γ X} {b′ b : St (X ∷ Γ) B} → ConnW kk′ kk → o′ ≼ o → b′ ≼ b → connS kk′ o′ b′ ≼ connS kk o b
 conn-≼ cw ro rb = w≼ (conn cw) (conn≼ cw ro rb)
+
+-- A live cold's leaf run: its tape moved on.
+cold-≼ : ∀ {Γ A} (l : Tape A) → coldS {Γ} true (advance l) ≼ coldS true l
+cold-≼ l = w≼ (node-same (λ { (n , e) → 1+ n , e })) (bare≼ tt)
+
+-- A cold whose tape is over: nothing to come.
+cold-over : ∀ {Γ A} b b′ (l : Tape A) → coldS {Γ} b′ over ≼ coldS b l
+cold-over b true  l = w≼ (nodeW (λ f → ⊥-elim (tapes-over f))) (bare≼ tt)
+cold-over b false l = w≼ (nodeW (λ { (_ , ()) })) (bare≼ tt)

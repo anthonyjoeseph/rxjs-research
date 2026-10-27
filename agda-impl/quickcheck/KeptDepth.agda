@@ -69,7 +69,8 @@ open import adequacy.Engine.Meaning using (vals; endOf; mapped; scanned; took; o
 open import adequacy.Engine.Ahead using (shown) renaming (shows to showsᵃ)
 open import denotation.MonotonicList using (head)
 open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
-open import operation.PureObservable using () renaming (rest to restᵀ)
+open import operation.PureObservable using (Tape; due) renaming (rest to restᵀ)
+open import adequacy.Engine.Causal using (advance)
 open import denotation.MonotonicList.Events using (Frame∞; From∞; last)
 import denotation.Unfold as U
 open import Data.List.Membership.Propositional using (_∈_)
@@ -897,13 +898,22 @@ private
   ownAllᵇ P []             = true
   ownAllᵇ P ((_ , h) ∷ ms) = P h ∧ ownAllᵇ P ms
 
-  -- Every mark a node will own: an of's every value and completion to
-  -- come, a joiner's whole queue.
+  -- A live cold's tape, its first `n` keys: past every move these
+  -- scripts' tapes make.
+  tapeKeys : ∀ {A} → ℕ → Tape A → List (Mark × Key)
+  tapeKeys zero    l = []
+  tapeKeys (suc n) l with due l
+  ... | just k  = (leafM , k) ∷ tapeKeys n (advance l)
+  ... | nothing = []
+
+  -- Every mark a node will own: a live cold's whole tape, an of's every
+  -- value and completion to come, a joiner's whole queue.
   ofFut : ℕ → Pos → ∀ {A : Set} → List A → List (Mark × Key)
   ofFut i p []       = (ofM , at (p ⊕ (last ∷ []))) ∷ []
   ofFut i p (_ ∷ xs) = (ofM , at (p ⊕ (ix i ∷ []))) ∷ ofFut (suc i) p xs
 
   futᵇ : ∀ {Γ A} → St Γ A → List (Mark × Key)
+  futᵇ (coldS true l)   = tapeKeys 64 l
   futᵇ (ofS i p xs)     = ofFut i p xs
   futᵇ (joinS j g x ib) = mapL (λ qe → (joinM , at (proj₁ qe))) ib
   futᵇ s                = own s
