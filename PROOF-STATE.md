@@ -95,16 +95,16 @@ Members: `kill-pool`.
 
 #### THE STILL'S SUBTREE
 
-One stored causality invariant (`Causal`), over every key to come: kept
-by a rise keying something new (a takeWhile's failing value, an outer's
-value, a lane's end, a source's event, a body's end), and by a lane or a
-connect's source subscribing, whose room (`Fresh`) among its racing parts
-is open. A subscription headed and alien to its environment, and a begun
-lane's flatMap's other parts. Settled when these are bodies, or refuted.
+One stored causality invariant (`Causal`), over every key to come; every
+rise keying something new keeps it but a source's event feeding its
+joiners. Open: a mark run's node already shy of what it plants where it
+rises (an of's, a takeWhile's completion, a joiner's, a cold's); a
+connect's source subscribed once its body is; a subscription headed and
+alien to its environment; a begun lane's flatMap's other parts. Settled
+when these are bodies, or refuted.
 
-Members: `take-fail-causal`, `admit-causal`, `dequeue-causal`,
-`feed-causal`, `owed-causal`, `admit-fresh`, `dequeue-fresh`, `src-fresh`,
-`sub-fresh`, `outer-begins-links`,
+Members: `feed-causal`, `of-proper`, `take-shy`, `join-shy`, `cold-end`,
+`cold-shy`, `src-fresh`, `sub-fresh`, `outer-begins-links`,
 `outer-queues-links`, `outer-ignores-links`, `lane-begin-links`,
 `outer-begun-sides`, `switch-begun-sides`, `lane-begun-sides`.
 

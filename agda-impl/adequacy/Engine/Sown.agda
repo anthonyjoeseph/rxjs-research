@@ -7,10 +7,12 @@
 module adequacy.Engine.Sown where
 
 open import Data.Empty using (⊥)
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using ([]; _∷_; _++_; [_])
 open import Data.List.Properties using (++-assoc; ++-identityʳ; ++-cancelˡ; ∷-injectiveˡ; ∷-injectiveʳ)
-open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; _<_; s≤s)
-open import Data.Nat.Properties using (m≤m+n; m≤n+m; n≤1+n; ≤-trans; <⇒≱; +-assoc)
+open import Data.Nat using (ℕ; suc; _+_; _≤_; _<_; s≤s; z≤n)
+open import Data.Nat.Properties using (m≤m+n; m≤n+m; n≤1+n; ≤-trans; <⇒≱; +-assoc; +-comm; +-monoʳ-≤)
+open import Data.Product using (Σ; _,_)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; subst; sym; trans; cong)
 
@@ -34,9 +36,6 @@ Sownᴷ p h = Sown p (posᴷ h)
 
 sown-here : ∀ p → Sown p p
 sown-here p = subst (Sown p) (++-identityʳ p) (inside [])
-
-after-sown : ∀ p {h} → h ≡ after p → Sownᴷ p h
-after-sown p refl = sown-here p
 
 -- A place under `p` sows only where `p` does.
 sown-mono : ∀ p ys {h} → Sown (p ++ ys) h → Sown p h
@@ -116,3 +115,49 @@ sib-apart p {a} {b} pr pa pb ne s₁ s₂ = go s₁ s₂ refl
     go (framed t e ys s) (inside zs) eq = off pb zs t e ys s (sym eq)
     go (framed t e ys s) (framed t′ e′ zs s′) eq with ∷-injectiveˡ (∷-injectiveʳ eq)
     ... | refl = go s s′ refl
+
+------------------------------------------------------------------------
+-- What a subscription plants
+
+-- Strictly under a place: sown by one of its steps.
+Sown⁺ : Pos → Pos → Set
+Sown⁺ p y = Σ Label λ l → Sown (p ++ [ l ]) y
+
+-- A subscription at `p` keys strictly under it, or past it.
+Plant : Pos → Key → Set
+Plant p h = Sown⁺ p (posᴷ h) ⊎ h ≡ after p
+
+sown⁺-here : ∀ p l → Sown⁺ p (p ++ [ l ])
+sown⁺-here p l = l , sown-here (p ++ [ l ])
+
+sown⁺-sown : ∀ {p y} → Sown⁺ p y → Sown p y
+sown⁺-sown {p} (l , s) = sown-mono p [ l ] s
+
+sown⁺-ext : ∀ {p y} zs → Sown⁺ p y → Sown⁺ p (y ++ zs)
+sown⁺-ext zs (l , s) = l , sown-ext zs s
+
+sown⁺-trans : ∀ {p x y} → Sown⁺ p x → Sown x y → Sown⁺ p y
+sown⁺-trans (l , s) s′ = l , sown-trans s s′
+
+plant-sown : ∀ {p h} → Plant p h → Sownᴷ p h
+plant-sown (inj₁ s)    = sown⁺-sown s
+plant-sown {p} (inj₂ refl) = sown-here p
+
+-- A step's subscription plants only where its parent's does.
+plant-under : ∀ p l {h} → Plant (p ++ [ l ]) h → Plant p h
+plant-under p l (inj₁ (l′ , s)) = inj₁ (l , sown-mono (p ++ [ l ]) [ l′ ] s)
+plant-under p l (inj₂ refl)     = inj₁ (sown⁺-here p l)
+
+one-size : ∀ l → 1 ≤ size [ l ]
+one-size (ix _)  = s≤s z≤n
+one-size (sub _) = s≤s z≤n
+one-size last    = s≤s z≤n
+
+sown⁺-size : ∀ {p y} → Sown⁺ p y → size p < size y
+sown⁺-size {p} (l , s) =
+  ≤-trans (subst (_≤ size (p ++ [ l ])) (+-comm (size p) 1) (subst (size p + 1 ≤_) (sym (size-++ p [ l ])) (+-monoʳ-≤ (size p) (one-size l))))
+    (sown-size s)
+
+-- Nothing strictly under a place sows it.
+sown⁺-up : ∀ {p y} → Sown⁺ p y → Sown y p → ⊥
+sown⁺-up s t = <⇒≱ (sown⁺-size s) (sown-size t)

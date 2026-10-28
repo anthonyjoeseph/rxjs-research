@@ -8,18 +8,20 @@
 -- the hole: a node's own condition reads its racing parts, never itself.
 module adequacy.Engine.Room where
 
-open import Data.List using (List; []; _∷_; _++_; _ʳ++_; reverse)
+open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; reverse)
 open import Data.List.Properties using (ʳ++-defn; ++-identityʳ; reverse-involutive)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; subst; sym; trans)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans)
 
 open import Tree using (Obs)
-open import denotation.MonotonicList.Events using (Timeline)
-open import operation.Key using (Key)
+open import denotation.MonotonicList.Events using (Pos; Timeline; ix)
+open import operation.Key using (Key; at; after)
 open import operation.PureObservable using (module Machine)
 open import adequacy.Engine.Causal using (Farᴷ; Freeᴷ; Fut; Every; Keys⁺; KidKeys⁺; LaneKeys⁺; Aloft⁺; CausalW; KidsW; LanesW;
-  Causal; walk-at; own-conn; owned)
+  Causal; walk-at; own-conn; owned; keys-map; lanes-map)
+open import adequacy.Engine.Sown using (Sown; Plant; inside; sown-here; sown-ext; sown⁺-here; sown⁺-ext)
 
 open Machine using (St; pend; coldS; ofS; doneS; joinS; mapS; scanS; cutS; lnS; takeS; flatS; connS; Ctx; top; inMap; inScan; inCut; inLn; inTake;
   inOuter; inLanes; inSrc; inBody; plug; attached; attAt; free; cpAt; cutAt; overAt)
@@ -54,11 +56,21 @@ Grow N t t′ = ∀ {P : Key → Set} → Keys⁺ P t → (∀ {h} → N h → P
 ------------------------------------------------------------------------
 -- The hole is not read
 
+fut-cut : ∀ {Γ A} l a {t t′ : St Γ A} {h} → Fut (cutS l a t′) h → Fut (cutS l a t) h
+fut-cut l attached  f = f
+fut-cut l (attAt p) f = f
+
+fut-take : ∀ {Γ A} i q w {t t′ : St Γ A} {h} → Fut (takeS i q w t′) h → Fut (takeS i q w t) h
+fut-take i q free       f = f
+fut-take i q (cpAt p)   f = f
+fut-take i q (cutAt p)  f = f
+fut-take i q (overAt p) f = f
+
 aloft-hole : ∀ {R Γ A} {k} (c : Ctx R Γ A) {t t′ : St Γ A} → Aloft⁺ k c t → Aloft⁺ k c t′
 aloft-hole top                               a                = tt
 aloft-hole (inMap f c)                       a                = aloft-hole c a
 aloft-hole (inScan f z c)                    a                = aloft-hole c a
-aloft-hole (inCut l x c)                     a                = aloft-hole c a
+aloft-hole (inCut l x c) {t} {t′}           (e , a)          = (λ f → e (fut-cut l x {t} {t′} f)) , aloft-hole c a
 aloft-hole (inLn b c)                        a                = aloft-hole c a
 aloft-hole (inTake i q w c)                  a                = aloft-hole c a
 aloft-hole (inOuter op f d n q ls c)         (l , a)          = l , aloft-hole c a
@@ -90,7 +102,7 @@ mutual
   swap-kids hy (joinS j g x ib)        kq        k         = tt
   swap-kids hy (mapS f s)              kq        k         = swap-causal (λ {k} {t} {t′} → hy {k} {mapS f t} {mapS f t′}) s kq k
   swap-kids hy (scanS f z s)           kq        k         = swap-causal (λ {k} {t} {t′} → hy {k} {scanS f z t} {scanS f z t′}) s kq k
-  swap-kids hy (cutS l a s)            kq        k         = swap-causal (λ {k} {t} {t′} → hy {k} {cutS l a t} {cutS l a t′}) s kq k
+  swap-kids hy (cutS l a s)            kq        k         = swap-causal (λ { {k} {t} {t′} qk (e , a′) → (λ {_} f → e (fut-cut l a {t} {t′} f)) , hy {k} {cutS l a t} {cutS l a t′} qk a′ }) s kq k
   swap-kids hy (lnS b s)               kq        k         = swap-causal (λ {k} {t} {t′} → hy {k} {lnS b t} {lnS b t′}) s kq k
   swap-kids hy (takeS i q w s)         kq        k         = swap-causal (λ {k} {t} {t′} → hy {k} {takeS i q w t} {takeS i q w t′}) s kq k
   swap-kids hy (flatS op f d n q o ls) (ko , kl) (co , cl) =
@@ -170,16 +182,6 @@ module _ {R Γ A B} {N : Key → Set} (c : Ctx R Γ B) op (f : A → Obs Timelin
 ------------------------------------------------------------------------
 -- Planted
 
-fut-cut : ∀ {Γ A} l a {t t′ : St Γ A} {h} → Fut (cutS l a t′) h → Fut (cutS l a t) h
-fut-cut l attached  f = f
-fut-cut l (attAt p) f = f
-
-fut-take : ∀ {Γ A} i q w {t t′ : St Γ A} {h} → Fut (takeS i q w t′) h → Fut (takeS i q w t) h
-fut-take i q free       f = f
-fut-take i q (cpAt p)   f = f
-fut-take i q (cutAt p)  f = f
-fut-take i q (overAt p) f = f
-
 -- A PLANTED SUBTREE: causal where its hole was, and room for its new keys.
 plant : ∀ {R Γ A} {N : Key → Set} (c : Ctx R Γ A) {t t′ : St Γ A}
       → Causal (plug c t) → CausalW c t′ → Grow N t t′ → Room N c → Causal (plug c t′)
@@ -223,3 +225,69 @@ plant (inBody kk o c) {t} {t′} ca w g (ro , r) =
      w)
     (λ { (e , ko , kb) m → (λ {_} z → e (owned (own-conn kk {o} {o} {t′} {t}) z)) , ko , g kb m }) r
   where old = walk-at c (connS kk o t) ca
+
+------------------------------------------------------------------------
+-- Room for what a subscription plants
+
+-- A family read inside the key walk.
+mutual
+  keys-all : ∀ {Γ A} {N : Key → Set} {Q : Key → Key → Set} (s : St Γ A) → (∀ {h} → N h → Keys⁺ (Q h) s)
+           → Keys⁺ (λ k → ∀ {h} → N h → Q h k) s
+  keys-all s g = (λ {k} f {h} w → proj₁ (g w) f) , kids-all s (λ w → proj₂ (g w))
+
+  kids-all : ∀ {Γ A} {N : Key → Set} {Q : Key → Key → Set} (s : St Γ A) → (∀ {h} → N h → KidKeys⁺ (Q h) s)
+           → KidKeys⁺ (λ k → ∀ {h} → N h → Q h k) s
+  kids-all (pend o)                g = tt
+  kids-all (coldS b l)             g = tt
+  kids-all (ofS i p xs)            g = tt
+  kids-all doneS                   g = tt
+  kids-all (joinS j y x ib)        g = tt
+  kids-all (mapS f s)              g = keys-all s g
+  kids-all (scanS f z s)           g = keys-all s g
+  kids-all (cutS l a s)            g = keys-all s g
+  kids-all (lnS b s)               g = keys-all s g
+  kids-all (takeS i q w s)         g = keys-all s g
+  kids-all (flatS op f d n q o ls) g = keys-all o (λ w → proj₁ (g w)) , lanes-all ls (λ w → proj₂ (g w))
+  kids-all (connS k o b)           g = keys-all o (λ w → proj₁ (g w)) , keys-all b (λ w → proj₂ (g w))
+
+  lanes-all : ∀ {Γ A} {N : Key → Set} {Q : Key → Key → Set} (ls : List (St Γ A)) → (∀ {h} → N h → LaneKeys⁺ (Q h) ls)
+            → LaneKeys⁺ (λ k → ∀ {h} → N h → Q h k) ls
+  lanes-all []       g = tt
+  lanes-all (s ∷ ls) g = keys-all s (λ w → proj₁ (g w)) , lanes-all ls (λ w → proj₂ (g w))
+
+-- A key every plant of `p` is far from.
+Shy : Pos → Key → Set
+Shy p k = ∀ {h} → Plant p h → Farᴷ h k
+
+-- Far from each plant of `p`, and free of each: a past plant is read off
+-- the one just under it.
+clear-of : ∀ p {k} → Shy p k → Clear (Plant p) k
+clear-of p {at y}    g {at z}    w           = λ a b → g w b a
+clear-of p {at y}    g {after z} (inj₁ s)    = λ b → g {at (z ++ [ ix 0 ])} (inj₁ (sown⁺-ext [ ix 0 ] s)) (sown-here _) (sown-ext [ ix 0 ] b)
+clear-of p {at y}    g {after z} (inj₂ refl) = λ b → g {at (p ++ [ ix 0 ])} (inj₁ (sown⁺-here p (ix 0))) (sown-here _) (sown-ext [ ix 0 ] b)
+clear-of p {after y} g           w           = tt
+
+clean-of : ∀ p {k} → Shy p k → Clean (Plant p) k
+clean-of p {at y}    g {at r}    w (ys , e) = g w (subst (Sown r) (sym e) (inside ys)) (sown-here y)
+clean-of p {after y} g {at r}    w (ys , e) = g w (subst (Sown r) (sym e) (inside ys))
+clean-of p           g {after z} w          = tt
+
+-- Every plant aloft: every part racing it has room for them.
+aloft-room : ∀ {R Γ A} p (c : Ctx R Γ A) (t : St Γ A) → (∀ {h} → Plant p h → Aloft⁺ h c t) → Room (Plant p) c
+aloft-room p top                               t g = tt
+aloft-room p (inMap f c)                       t g = aloft-room p c (mapS f t) g
+aloft-room p (inScan f z c)                    t g = aloft-room p c (scanS f z t) g
+aloft-room p (inCut l x c)                     t g = aloft-room p c (cutS l x t) (λ w → proj₂ (g w))
+aloft-room p (inLn b c)                        t g = aloft-room p c (lnS b t) g
+aloft-room p (inTake i q w c)                  t g = aloft-room p c (takeS i q w t) g
+aloft-room p (inOuter op f d n q ls c)         t g =
+  lanes-map {P = Shy p} (clear-of p) ls (lanes-all ls (λ w → proj₁ (g w))) , aloft-room p c (flatS op f d n q t ls) (λ w → proj₂ (g w))
+aloft-room p (inLanes op f d n q o pre post c) t g =
+  keys-map {P = Shy p} (clear-of p) o (keys-all o (λ w → proj₁ (g w))) ,
+  lanes-map {P = Shy p} (clear-of p) pre (lanes-all pre (λ w → proj₁ (proj₂ (g w)))) ,
+  lanes-map {P = Shy p} (clear-of p) post (lanes-all post (λ w → proj₁ (proj₂ (proj₂ (g w))))) ,
+  aloft-room p c (flatS op f d n q o (pre ʳ++ t ∷ post)) (λ w → proj₂ (proj₂ (proj₂ (g w))))
+aloft-room p (inSrc kk b c)                    t g =
+  keys-map {P = Shy p} (λ {k} a → (λ {h} → clear-of p {k} a {h}) , (λ {h} → clean-of p {k} a {h})) b (keys-all b (λ w → proj₁ (g w))) , aloft-room p c (connS kk t b) (λ w → proj₂ (proj₂ (g w)))
+aloft-room p (inBody kk o c)                   t g =
+  keys-map {P = Shy p} (clear-of p) o (keys-all o (λ w → proj₁ (g w))) , aloft-room p c (connS kk o t) (λ w → proj₂ (proj₂ (proj₂ (g w))))

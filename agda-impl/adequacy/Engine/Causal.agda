@@ -9,13 +9,12 @@
 -- above it), and a weaker tree is causal wherever the stronger was
 -- (`causal-≼`).  "Under" is what a key's place can cause (`Sown`): two
 -- keys are far when nothing the one can lead to is anything the other
--- can, so a part far from a mark is far from all it will plant
--- (`far-in`, `far-out`).
+-- can, so a mark aloft makes all it will plant aloft (`aloft-out`).
 module adequacy.Engine.Causal where
 
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Bool using (Bool; true; false)
-open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; reverse; replicate; map)
+open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; reverse; map)
 open import Data.List.Properties using (++-identityʳ; ++-assoc; ʳ++-defn; reverse-involutive)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -30,9 +29,9 @@ open import Tree using (Obs; FlatOp)
 open import denotation.MonotonicList.Events using (Pos; Timeline; ix; last; emit; stall; close; Frame∞; From∞)
 open import operation.Key using (Key; at; after)
 open import operation.PureObservable using (module Machine; due; Tape; play; ending; over; rest)
-open import adequacy.Engine.Sown using (Sown; Sownᴷ; posᴷ; sown-here; sown-ext; sown-trans)
+open import adequacy.Engine.Sown using (Sown; Sownᴷ; inside; posᴷ; sown-here; sown-ext; sown-trans)
 
-open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; CS; cs;
+open Machine using (St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; CS; cs; Att;
   Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; plug; own;
   Mark; ofM; joinM; attached; attAt; free; cpAt; cutAt; overAt; unsub; cut; killAll; unsubIf; _⊕_)
 
@@ -52,16 +51,15 @@ Freeᴷ : Key → Key → Set
 Freeᴷ k (at r)    = (Σ Pos λ ys → posᴷ k ≡ r ++ ys) → ⊥
 Freeᴷ k (after _) = ⊤
 
--- Far from a place, far from all it sows; a place far, all it sows far.
-far-in : ∀ k {x h} → Farᴷ k (at x) → Sownᴷ x h → Farᴷ k h
-far-in (at p)    {h = at z}    fr s = λ a b → fr a (sown-trans s b)
-far-in (at p)    {h = after z} fr s = λ a → fr a s
-far-in (after p)               fr s = tt
-
+-- A place far, all it sows far, and free.
 far-out : ∀ {x} k {h} → Farᴷ (at x) k → Sownᴷ x h → Farᴷ h k
 far-out (at q)    {at z}    fr s = λ a b → fr (sown-trans s a) b
 far-out (after q) {at z}    fr s = λ a → fr (sown-trans s a)
 far-out k         {after z} fr s = tt
+
+free-out : ∀ {x} k {h} → Farᴷ (at x) k → Sownᴷ x h → Freeᴷ h k
+free-out (at r)    fr s (ys , e) = fr s (subst (Sown r) (sym e) (inside ys))
+free-out (after r) fr s          = tt
 
 -- A started cold's tape, one leaf move on: a frame's next value or stall,
 -- a close's next frame; a completion delivered, nothing.
@@ -221,7 +219,7 @@ mutual
 -- The invariant
 
 -- Every frame above a node's mark at `k`: every key, owned or to come, of
--- each part racing it, and each connect's own marks, far from `k`; a
+-- each part racing it, and each connect's and cut's own marks, far from `k`; a
 -- body's mark at or under no key of its source.  Of every key, not the
 -- race's candidates alone: a mark run hands a part's candidacy to a key
 -- no candidate constrained.
@@ -229,7 +227,7 @@ Aloft⁺ : ∀ {R Γ A} → Key → Ctx R Γ A → St Γ A → Set
 Aloft⁺ k top                                s = ⊤
 Aloft⁺ k (inMap f c)                        s = Aloft⁺ k c (mapS f s)
 Aloft⁺ k (inScan f z c)                     s = Aloft⁺ k c (scanS f z s)
-Aloft⁺ k (inCut l a c)                      s = Aloft⁺ k c (cutS l a s)
+Aloft⁺ k (inCut l a c)                      s = Every (Farᴷ k) (cutS l a s) × Aloft⁺ k c (cutS l a s)
 Aloft⁺ k (inLn b c)                         s = Aloft⁺ k c (lnS b s)
 Aloft⁺ k (inTake i q w c)                   s = Aloft⁺ k c (takeS i q w s)
 Aloft⁺ k (inOuter op f d n q ls c)          s = LaneKeys⁺ (Farᴷ k) ls × Aloft⁺ k c (flatS op f d n q s ls)
@@ -376,6 +374,16 @@ record ConnW (kk′ kk : CS) : Set₁ where
   field conn : ∀ {Γ X B} {o o′ : St Γ X} {b b′ : St (X ∷ Γ) B} → NodeW (connS kk′ o′ b′) (connS kk o b)
 open ConnW
 
+-- A cut's own mark kept, or dropped.
+data CutW : Att → Att → Set where
+  cut-same : ∀ {a} → CutW a a
+  cut-drop : ∀ {a} → CutW attached a
+
+cut-fut : ∀ {Γ A} {l l′ a a′} {s s′ : St Γ A} → CutW a′ a → ∀ {h} → Fut (cutS l′ a′ s′) h → Fut (cutS l a s) h
+cut-fut {a = attached}  cut-same f = f
+cut-fut {a = attAt p}   cut-same f = f
+cut-fut                 cut-drop (_ , ())
+
 -- No children.
 Bare : ∀ {Γ A} → St Γ A → Set
 Bare (pend o)         = ⊤
@@ -395,7 +403,7 @@ mutual
     void≼ : ∀ {Γ A} {s′ s : St Γ A} → Void s′ → Kids≼ s′ s
     map≼  : ∀ {Γ A B} {f f′ : A → B} {s′ s : St Γ A} → s′ ≼ s → Kids≼ (mapS f′ s′) (mapS f s)
     scan≼ : ∀ {Γ A B} {f f′ : B → A → B} {z z′} {s′ s : St Γ A} → s′ ≼ s → Kids≼ (scanS f′ z′ s′) (scanS f z s)
-    cut≼  : ∀ {Γ A} {l l′ a a′} {s′ s : St Γ A} → s′ ≼ s → Kids≼ (cutS l′ a′ s′) (cutS l a s)
+    cut≼  : ∀ {Γ A} {l l′ a a′} {s′ s : St Γ A} → CutW a′ a → s′ ≼ s → Kids≼ (cutS l′ a′ s′) (cutS l a s)
     ln≼   : ∀ {Γ A} {b b′} {s′ s : St Γ A} → s′ ≼ s → Kids≼ (lnS b′ s′) (lnS b s)
     take≼ : ∀ {Γ A} {i i′ q q′ w w′} {s′ s : St Γ A} → s′ ≼ s → Kids≼ (takeS i′ q′ w′ s′) (takeS i q w s)
     flat≼ : ∀ {Γ A B} {op op′} {f f′ : A → Obs Timeline Γ B} {d d′ n n′ q q′} {o′ o : St Γ A} {ls′ ls}
@@ -412,7 +420,7 @@ data _≼ᶜ_ {R} : ∀ {Γ A} → Ctx R Γ A → Ctx R Γ A → Set₁ where
   top≼   : top ≼ᶜ top
   map≼ᶜ  : ∀ {Γ A B} {f f′ : A → B} {c′ c : Ctx R Γ B} → c′ ≼ᶜ c → inMap f′ c′ ≼ᶜ inMap f c
   scan≼ᶜ : ∀ {Γ A B} {f f′ : B → A → B} {z z′} {c′ c : Ctx R Γ B} → c′ ≼ᶜ c → inScan f′ z′ c′ ≼ᶜ inScan f z c
-  cut≼ᶜ  : ∀ {Γ A} {l l′ a a′} {c′ c : Ctx R Γ A} → c′ ≼ᶜ c → inCut l′ a′ c′ ≼ᶜ inCut l a c
+  cut≼ᶜ  : ∀ {Γ A} {l l′ a a′} {c′ c : Ctx R Γ A} → CutW a′ a → c′ ≼ᶜ c → inCut l′ a′ c′ ≼ᶜ inCut l a c
   ln≼ᶜ   : ∀ {Γ A} {b b′} {c′ c : Ctx R Γ A} → c′ ≼ᶜ c → inLn b′ c′ ≼ᶜ inLn b c
   take≼ᶜ : ∀ {Γ A} {i i′ q q′ w w′} {c′ c : Ctx R Γ A} → c′ ≼ᶜ c → inTake i′ q′ w′ c′ ≼ᶜ inTake i q w c
   outer≼ᶜ : ∀ {Γ A B} {op op′} {f f′ : A → Obs Timeline Γ B} {d d′ n n′ q q′} {ls′ ls} {c′ c : Ctx R Γ B}
@@ -438,7 +446,7 @@ mutual
   kids-≼ tr (void≼ v)                       k       = proj₂ (void-keys v)
   kids-≼ tr (map≼ r)                        k       = keys-≼ tr r k
   kids-≼ tr (scan≼ r)                       k       = keys-≼ tr r k
-  kids-≼ tr (cut≼ r)                        k       = keys-≼ tr r k
+  kids-≼ tr (cut≼ cw r)                     k       = keys-≼ tr r k
   kids-≼ tr (ln≼ r)                         k       = keys-≼ tr r k
   kids-≼ tr (take≼ r)                       k       = keys-≼ tr r k
   kids-≼ tr (flat≼ r rs)                    (a , b) = keys-≼ tr r a , lanes-≼ tr rs b
@@ -460,7 +468,7 @@ aloft-≼ᶜ : ∀ {R Γ A} {k} {c′ c : Ctx R Γ A} → c′ ≼ᶜ c → ∀ 
 aloft-≼ᶜ top≼                         a = tt
 aloft-≼ᶜ (map≼ᶜ r)                    a = aloft-≼ᶜ r a
 aloft-≼ᶜ (scan≼ᶜ r)                   a = aloft-≼ᶜ r a
-aloft-≼ᶜ (cut≼ᶜ r)                    a = aloft-≼ᶜ r a
+aloft-≼ᶜ {k = k} (cut≼ᶜ cw r)         (e , a) = (λ f → e (cut-fut cw f)) , aloft-≼ᶜ r a
 aloft-≼ᶜ (ln≼ᶜ r)                     a = aloft-≼ᶜ r a
 aloft-≼ᶜ (take≼ᶜ r)                   a = aloft-≼ᶜ r a
 aloft-≼ᶜ {k = k} (outer≼ᶜ rs r)       (l , a) = lanes-≼ (far-tr k) rs l , aloft-≼ᶜ r a
@@ -475,7 +483,7 @@ aloft-≤ : ∀ {R Γ A} {h h′} → h′ ≤ᴷ h → (c : Ctx R Γ A) (t : St
 aloft-≤ le top                               t a = tt
 aloft-≤ le (inMap f c)                       t a = aloft-≤ le c (mapS f t) a
 aloft-≤ le (inScan f z c)                    t a = aloft-≤ le c (scanS f z t) a
-aloft-≤ le (inCut l x c)                     t a = aloft-≤ le c (cutS l x t) a
+aloft-≤ le (inCut l x c)                     t (e , a) = (λ f → farM le _ (e f)) , aloft-≤ le c (cutS l x t) a
 aloft-≤ le (inLn b c)                        t a = aloft-≤ le c (lnS b t) a
 aloft-≤ le (inTake i q w c)                  t a = aloft-≤ le c (takeS i q w t) a
 aloft-≤ le (inOuter op f d n q ls c)         t (l , a) = lanes-map (farM le _) ls l , aloft-≤ le c (flatS op f d n q t ls) a
@@ -484,6 +492,24 @@ aloft-≤ le (inLanes op f d n q o pre post c) t (x , p , r , a) =
 aloft-≤ le (inSrc kk b c)                    t (x , m , a) = keys-map (farM le _) b x , (λ f → farM le _ (m f)) , aloft-≤ le c (connS kk t b) a
 aloft-≤ le (inBody kk o c)                   t (x , f , m , a) =
   keys-map (farM le _) o x , keys-map (freeM le _) o f , (λ g → farM le _ (m g)) , aloft-≤ le c (connS kk o t) a
+
+-- A mark aloft: all it sows aloft.
+aloft-out : ∀ {R Γ A} {x h} (c : Ctx R Γ A) (t : St Γ A) → Aloft⁺ (at x) c t → Sownᴷ x h → Aloft⁺ h c t
+aloft-out top                               t a                  s = tt
+aloft-out (inMap f c)                       t a                  s = aloft-out c (mapS f t) a s
+aloft-out (inScan f z c)                    t a                  s = aloft-out c (scanS f z t) a s
+aloft-out (inCut l y c)                     t (e , a)            s = (λ g → far-out _ (e g) s) , aloft-out c (cutS l y t) a s
+aloft-out (inLn b c)                        t a                  s = aloft-out c (lnS b t) a s
+aloft-out (inTake i q w c)                  t a                  s = aloft-out c (takeS i q w t) a s
+aloft-out (inOuter op f d n q ls c)         t (kl , a)           s =
+  lanes-map (λ {k} fr → far-out k fr s) ls kl , aloft-out c (flatS op f d n q t ls) a s
+aloft-out (inLanes op f d n q o pre post c) t (ko , kp , kq , a) s =
+  keys-map (λ {k} fr → far-out k fr s) o ko , lanes-map (λ {k} fr → far-out k fr s) pre kp , lanes-map (λ {k} fr → far-out k fr s) post kq ,
+  aloft-out c (flatS op f d n q o (pre ʳ++ t ∷ post)) a s
+aloft-out (inSrc kk b c)                    t (kb , m , a)       s =
+  keys-map (λ {k} fr → far-out k fr s) b kb , (λ g → far-out _ (m g) s) , aloft-out c (connS kk t b) a s
+aloft-out (inBody kk o c)                   t (ko , kf , m , a)  s =
+  keys-map (λ {k} fr → far-out k fr s) o ko , keys-map (λ {k} fr → free-out k fr s) o ko , (λ g → far-out _ (m g) s) , aloft-out c (connS kk o t) a s
 
 -- WEAKER STAYS CAUSAL: a weaker tree under a weaker context.
 mutual
@@ -500,7 +526,7 @@ mutual
   causal-kids {c′ = c′} {s′ = s′} rc (void≼ v)   k       = proj₂ (void-causal c′ s′ v)
   causal-kids rc (map≼ r)                        k       = causal-≼ (map≼ᶜ rc) r k
   causal-kids rc (scan≼ r)                       k       = causal-≼ (scan≼ᶜ rc) r k
-  causal-kids rc (cut≼ r)                        k       = causal-≼ (cut≼ᶜ rc) r k
+  causal-kids rc (cut≼ cw r)                     k       = causal-≼ (cut≼ᶜ cw rc) r k
   causal-kids rc (ln≼ r)                         k       = causal-≼ (ln≼ᶜ rc) r k
   causal-kids rc (take≼ r)                       k       = causal-≼ (take≼ᶜ rc) r k
   causal-kids rc (flat≼ r rs)                    (o , l) = causal-≼ (outer≼ᶜ rs rc) r o , causal-lanes rc r []≼ rs l
@@ -556,7 +582,7 @@ mutual
   kids-refl doneS                   = bare≼ tt
   kids-refl (mapS f s)              = map≼ (≼-refl s)
   kids-refl (scanS f z s)           = scan≼ (≼-refl s)
-  kids-refl (cutS l a s)            = cut≼ (≼-refl s)
+  kids-refl (cutS l a s)            = cut≼ cut-same (≼-refl s)
   kids-refl (lnS b s)               = ln≼ (≼-refl s)
   kids-refl (takeS i q w s)         = take≼ (≼-refl s)
   kids-refl (flatS op f d n q o ls) = flat≼ (≼-refl o) (lanes-refl ls)
@@ -576,7 +602,7 @@ plug-≼ : ∀ {R Γ A} (c : Ctx R Γ A) {s′ s : St Γ A} → s′ ≼ s → p
 plug-≼ top                               r = r
 plug-≼ (inMap f c)                       {s′} {s} r = plug-≼ c {mapS f s′} {mapS f s} (w≼ (nodeW (λ { (_ , ()) })) (map≼ r))
 plug-≼ (inScan f z c)                    {s′} {s} r = plug-≼ c {scanS f z s′} {scanS f z s} (w≼ (nodeW (λ { (_ , ()) })) (scan≼ r))
-plug-≼ (inCut l a c)                     {s′} {s} r = plug-≼ c {cutS l a s′} {cutS l a s} (w≼ (node-same (owned (own-cut l a))) (cut≼ r))
+plug-≼ (inCut l a c)                     {s′} {s} r = plug-≼ c {cutS l a s′} {cutS l a s} (w≼ (node-same (owned (own-cut l a))) (cut≼ cut-same r))
 plug-≼ (inLn b c)                        {s′} {s} r = plug-≼ c {lnS b s′} {lnS b s} (w≼ (nodeW (λ { (_ , ()) })) (ln≼ r))
 plug-≼ (inTake i q w c)                  {s′} {s} r = plug-≼ c {takeS i q w s′} {takeS i q w s} (w≼ (node-same (owned (own-take i q w))) (take≼ r))
 plug-≼ (inOuter op f d n q ls c)         {s′} {s} r = plug-≼ c {flatS op f d n q s′ ls} {flatS op f d n q s ls} (w≼ (nodeW (λ { (_ , ()) })) (flat≼ r (lanes-refl ls)))
@@ -607,8 +633,8 @@ mutual
   unsub-≼ (joinS j g x ib)        = w≼ (nodeW (λ { (_ , ()) })) (bare≼ tt)
 
   cut-≼ : ∀ {Γ A} (s : St Γ A) → proj₁ (cut s) ≼ s
-  cut-≼ (cutS l attached s)  = w≼ (nodeW (λ { (_ , ()) })) (cut≼ (unsub-≼ s))
-  cut-≼ (cutS l (attAt p) s) = w≼ (node-same (λ f → f)) (cut≼ (≼-refl s))
+  cut-≼ (cutS l attached s)  = w≼ (nodeW (λ { (_ , ()) })) (cut≼ cut-same (unsub-≼ s))
+  cut-≼ (cutS l (attAt p) s) = w≼ (node-same (λ f → f)) (cut≼ cut-same (≼-refl s))
   cut-≼ (pend o)                = ≼-refl _
   cut-≼ (coldS b l)             = ≼-refl _
   cut-≼ (ofS i p xs)            = ≼-refl _
@@ -652,7 +678,7 @@ join-≼ : ∀ {Γ A} j g g′ (x : A ∈ Γ) qe ib → joinS j g′ x ib ≼ jo
 join-≼ j g g′ x qe ib = w≼ (nodeW (λ { (m , i) → _ , (m , there i) , ≤ᴷ-refl })) (bare≼ tt)
 
 att-≼ : ∀ {Γ A} l p {s′ s : St Γ A} → s′ ≼ s → cutS l attached s′ ≼ cutS l (attAt p) s
-att-≼ l p r = w≼ (nodeW (λ { (_ , ()) })) (cut≼ r)
+att-≼ l p r = w≼ (nodeW (λ { (_ , ()) })) (cut≼ cut-drop r)
 
 cp-≼ : ∀ {Γ A} i q p (s : St Γ A) → takeS i q (cutAt p) s ≼ takeS i q (cpAt p) s
 cp-≼ i q p s = w≼ (nodeW (λ { (_ , here refl) → _ , (_ , here refl) , after≤at p (p ⊕ [ last ]) [ last ] refl ; (_ , there ()) })) (take≼ (≼-refl s))

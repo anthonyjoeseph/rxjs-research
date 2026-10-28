@@ -37,7 +37,7 @@ module adequacy.Engine.Pick where
 open import Data.Empty using (⊥; ⊥-elim)
 open import Level using (Lift; suc; zero)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∨_; _∧_)
-open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; reverse; reverseAcc; replicate; null; map)
+open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; reverse; reverseAcc; null; map)
 open import Data.List.Properties using (ʳ++-defn; ++-identityʳ; map-++; ++-assoc; ∷-injectiveˡ; ∷-injectiveʳ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Sum using (_⊎_; inj₁; inj₂) renaming ([_,_] to either)
@@ -400,7 +400,7 @@ aloft-of : ∀ {R Γ A} k (c : Ctx R Γ A) (s : St Γ A) → Aloft⁺ k c s → 
 aloft-of k top                               s a = tt
 aloft-of k (inMap f c)                       s a = aloft-of k c (mapS f s) a
 aloft-of k (inScan f z c)                    s a = aloft-of k c (scanS f z s) a
-aloft-of k (inCut l x c)                     s a = aloft-of k c (cutS l x s) a
+aloft-of k (inCut l x c)                     s a = aloft-of k c (cutS l x s) (proj₂ a)
 aloft-of k (inLn b c)                        s a = aloft-of k c (lnS b s) a
 aloft-of k (inTake i q w c)                  s a = aloft-of k c (takeS i q w s) a
 aloft-of k (inOuter op f d n q ls c)         s (r , a) = race-far k c op f d n q s [] ls [] (lanes-own ls r) , aloft-of k c (flatS op f d n q s ls) a
