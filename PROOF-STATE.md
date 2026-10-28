@@ -8,17 +8,32 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE SETTLING APPROXIMANTS
+#### THE RECURSION SETTLES
 
-Untried: past enough approximants, nothing at or before a reached row
-changes, and each operator carries that through. The old route counted
-rows: approximant n agrees with the next for n rows, each operator reading
-no further than it shows. Joining an ended hot breaks the count: the end
-shows at once, however many rows the hot took to reach it. Settled by a
-measure that also counts the hot's rows, or a program whose reached row
-flips forever.
+Untried: past enough approximants, a `defer`'s rows at and below a reached
+row stop changing. The fixpoint fact: a cut `defer` hides behind its own
+spin, so no structural count reaches it. Settled by a proof by well-founded
+descent on the reached row, or a program whose reached row flips forever.
 
-Members: `flatMap-lim`, `connect-lim`, `scan-lim`, `takeWhile-lim`, `map-lim`, `defer-lim`.
+Members: `settles-defer`.
+
+#### THE JOINERS READ AHEAD
+
+Suspect over arbitrary inputs: a joiner's `Done` reads values after the
+reached row, and a lane's rows may precede its subscription, so agreement
+below a row does not carry through. Settled by causal `Done` and readings
+starting at subscription (true of every program's meaning), or a pair of
+chains that agree below a row and join differently there.
+
+Members: `flatMap-cont`, `connect-cont`.
+
+#### THE ONE-INPUT OPERATORS
+
+Untried beyond `map`: each reads only rows at and before its own, so
+agreement below a row carries through. Settled by bodies mirroring
+`map-cont`.
+
+Members: `scan-cont`, `takeWhile-cont`, `defer-cont`.
 
 ## Tier 0 — the emission set carries the theorems
 
