@@ -166,13 +166,13 @@ module Concat {A B : Set} (f : A → Den B) (o : Table A) where
     next  : ∀ {i q a q′ a′} → Nth i q a → o q′ (out a′) → q ≺ q′
           → (∀ {k b} → o k (out b) → q ≺ k → q′ ≼ k) → Nth (suc i) q′ a′
 
-  -- Lane i, subscribed at `s`.
-  data Sub : ℕ → Pos → A → Set where
-    sub₀   : ∀ {q a} → Nth 0 q a → Sub 0 (q ++ [ ix 1 ]) a
-    free   : ∀ {i s a c q a′} → Sub i s a → enter (f a) s c end → Nth (suc i) q a′ → c ≺ q
-           → Sub (suc i) (q ++ [ ix 1 ]) a′
-    queued : ∀ {i s a c q a′} → Sub i s a → enter (f a) s c end → Nth (suc i) q a′ → q ≺ c
-           → Sub (suc i) (c ++ [ ix 1 ]) a′
+  -- Lane i, for the outer's value at `q`, subscribed at `s`.
+  data Sub : ℕ → Pos → Pos → A → Set where
+    sub₀   : ∀ {q a} → Nth 0 q a → Sub 0 q (q ++ [ ix 1 ]) a
+    free   : ∀ {i q₀ s a c q a′} → Sub i q₀ s a → enter (f a) s c end → Nth (suc i) q a′ → c ≺ q
+           → Sub (suc i) q (q ++ [ ix 1 ]) a′
+    queued : ∀ {i q₀ s a c q a′} → Sub i q₀ s a → enter (f a) s c end → Nth (suc i) q a′ → q ≺ c
+           → Sub (suc i) q (c ++ [ ix 1 ]) a′
 
   -- Lane i+1's value has arrived by `c`.
   Waiting : ℕ → Pos → Set
@@ -184,17 +184,17 @@ module Concat {A B : Set} (f : A → Den B) (o : Table A) where
 
   -- Every lane has ended by `c`.
   Drained : Pos → Set
-  Drained c = ∀ {i q a} → Nth i q a → Σ Pos λ s → Σ Pos λ c′ → Sub i s a × enter (f a) s c′ end × c′ ≺ c
+  Drained c = ∀ {i q a} → Nth i q a → Σ Pos λ s → Σ Pos λ c′ → Sub i q s a × enter (f a) s c′ end × c′ ≺ c
 
   data ConcatT : Table B where
     val     : ∀ {q a} → o q (out a) → ConcatT (q ++ [ ix 0 ]) skip
     step    : ∀ {q} → o q skip → ConcatT q skip
     oend    : ∀ {c} → o c end → Drained c → ConcatT c end
     opass   : ∀ {c} → o c end → ¬ Drained c → ConcatT c skip
-    lane    : ∀ {i s a k e} → Sub i s a → enter (f a) s k e → Work e → ConcatT k e
-    handoff : ∀ {i s a c} → Sub i s a → enter (f a) s c end → Waiting i c → ConcatT (c ++ [ ix 0 ]) skip
-    lend    : ∀ {i s a c} → Sub i s a → enter (f a) s c end → ¬ Waiting i c → Over c → ConcatT c end
-    lpass   : ∀ {i s a c} → Sub i s a → enter (f a) s c end → ¬ Waiting i c → ¬ Over c → ConcatT c skip
+    lane    : ∀ {i q s a k e} → Sub i q s a → enter (f a) s k e → Work e → ConcatT k e
+    handoff : ∀ {i q s a c} → Sub i q s a → enter (f a) s c end → Waiting i c → ConcatT (c ++ [ ix 0 ]) skip
+    lend    : ∀ {i q s a c} → Sub i q s a → enter (f a) s c end → ¬ Waiting i c → Over c → ConcatT c end
+    lpass   : ∀ {i q s a c} → Sub i q s a → enter (f a) s c end → ¬ Waiting i c → ¬ Over c → ConcatT c skip
 
 ------------------------------------------------------------------------
 -- Connect
