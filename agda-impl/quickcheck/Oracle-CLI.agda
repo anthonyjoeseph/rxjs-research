@@ -85,7 +85,8 @@ private
   namedProg : ℕ → IO ⊤
   namedProg s = putStrLn ("{\"seed\":" ++ showℕ s ++ ",\"prog\":" ++ showCode namedᵗ (named s)
                           ++ ",\"denote\":" ++ showTrace namedᵗ (denoteTrace 3 500 (named s))
-                          ++ ",\"pure\":" ++ showTrace namedᵗ (pureTrace 3 500 (named s)) ++ "}")
+                          ++ ",\"pure\":" ++ showTrace namedᵗ (pureTrace 3 500 (named s))
+                          ++ ",\"table\":" ++ tableJSON 3 (named s) ++ "}")
 
   hand : List (String × Prog natᵗ) → IO ⊤
   hand []             = putStrLn "hand: done"
