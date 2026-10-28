@@ -3,6 +3,21 @@
 -- THE EMISSION SET'S LAWS: the meaning of a node is its operator applied to its
 -- children's meanings, so proofs over it go one operator at a time; and
 -- `map` fuses.
+--
+-- A row behind infinitely many rows separates the two sides.  Take
+-- `Y = defer (merge (Y , of [ 1 ]))`, a synchronous loop.  Approximant n
+-- of `Y` holds n values, the outermost lane's `1` at one fixed position
+-- `Q` behind the other n - 1.  So `scan _+_ 0 Y` shows `n` at `Q` in
+-- approximant n, and no one row at `Q` is in the limit; but
+-- `map (const 0) (scan _+_ 0 Y)` shows `0` at `Q` in every approximant
+-- from 1, so its limit holds that row while `mapᵀ` of the limit has
+-- nothing at `Q`.  The same shape breaks the negations: `takeWhile` over
+-- `merge (map (const false) X , of [ true ])` with
+-- `X = defer (that takeWhile)` passes its `true` in every other
+-- approximant, so the limit drops it, while the limit of the merge has no
+-- failing value before it.  Either row has infinitely many rows before it
+-- (each unrolled `defer`'s guard), so no subscriber reaches it, and rxjs
+-- overflows its stack there.
 module denotation.EmissionSet.Laws where
 
 open import Data.Bool using (Bool)

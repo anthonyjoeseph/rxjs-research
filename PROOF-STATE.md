@@ -2,22 +2,27 @@
 
 Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
+## Tier −1 — the emission set is compositional
+
+**Compositional:** every former's meaning is its operator applied to its children's meanings.
+
+### Ledger
+
+#### THE UNREACHED ROWS
+
+Refuted as stated: the limit and an operator disagree on a row behind
+infinitely many rows, for `map` as for the negations (header of
+`denotation.EmissionSet.Laws`). Open: which rows compositionality is
+stated over. Settled by Anthony's choice of the equivalence, then each
+former's limit proven over it.
+
+Members: `flatMap-lim`, `connect-lim`, `scan-lim`, `takeWhile-lim`, `map-lim`, `defer-lim`.
+
 ## Tier 0 — the emission set carries the theorems
 
 **Port:** Main restated over the emission set; `adequacy/` and `simultaneous/` ported to it; no old-denotation use left.
 
 ### Ledger
-
-#### THE LIMIT THROUGH A NEGATION
-
-Untried: a row these operators show is decided by a predicate over every
-row of an input (`Merge.Done`, `Switch.Cut`, `Bounded.Queued`,
-`TakeWhile.Failed`, `Values.Nth`), and a later approximant can add the row
-that flips it, so the limit need not commute with the operator. Settled by
-each predicate's verdict stabilising along the approximants, or a program
-whose approximants flip a row forever.
-
-Members: `flatMap-lim`, `connect-lim`, `scan-lim`, `takeWhile-lim`.
 
 #### THE PORTED THEOREM
 
@@ -34,13 +39,6 @@ Untried: the simultaneous spec read off the emission set's rows. Settled
 by porting `simultaneous/` the same way.
 
 Members: `left-to-rightᵀ`, `coherentᵀ`, `batchableᵀ`, `positionedᵀ`.
-
-#### THE POINTWISE LIMITS
-
-A row of these is one child's row, shifted, so every approximant agrees
-with the limit row by row. Settled by bodies.
-
-Members: `map-lim`, `defer-lim`.
 
 ## Tier 1 — the adequacy theorem
 
