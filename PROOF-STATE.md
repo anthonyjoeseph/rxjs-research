@@ -4,35 +4,46 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ## Tier −1 — the emission set is compositional
 
-**Compositional:** every former but `defer` means its operator by definition; `defer` unfolds to its body.
+**Compositional:** every former but `defer` means its operator; `defer` unfolds to its body at admissible subscriptions.
 
 ### Ledger
 
-#### THE RECURSION SETTLES
+#### THE CONNECT READS APART
 
-Untried: past enough approximants, a `defer`'s rows at and below a reached
-row stop changing. The fixpoint fact: a cut `defer` hides behind its own
-spin, so no structural count reaches it. Settled by a proof by well-founded
-descent on the reached row, or a program whose reached row flips forever.
+Untried: a connect's source and body rows lie in disjoint worlds, so the
+modulus carries through both and a hidden source row never lands before a
+body row past the body's end. Settled by a body for `connect-ne` over the
+world separation, or a pair of chains agreeing below a row that join differently.
 
-Members: `settles-defer`.
+Members: `connect-ne`, `connect-inv`.
 
-#### THE JOINERS READ AHEAD
+#### THE WORLD INVARIANT
 
-Suspect, and blocked constructively. A lane's rows may precede its
-subscription; and a joiner's index must bound every lane's,
-which no finite listing of the outer yields. Settled by a modulus read off the reached row's count, uniform in
-the lane, or a pair of chains that agree below a row and join differently.
+Untried, new: every reading keeps its rows in its world, reachable, flat,
+and an end's burst below one world position. Settled by bodies per
+operator, or a program whose reading leaves its world.
 
-Members: `flatMap-cont`, `connect-cont`.
+Members: `flatMap-inv`, `takeWhile-inv`, `scan-inv`, `map-inv`, `defer-inv`, `lim-inv`, `cold-inv`, `empty-inv`, `of-inv`, `spin-inv`, `lawful-hot`, `inv-widen`, `world-after`, `ok-step`.
+
+#### THE JOINERS WITHIN THE BOUND
+
+Untried: a lane subscribed at a world position is admissible, and its
+bound is at least the outer's, uniformly in the lane. Settled by bodies.
+
+Members: `flatMap-ne`, `takeWhile-ne`.
+
+#### CAUSALITY
+
+Untried: each operator reads its inputs no further than it runs. Settled
+by bodies, the joiners' by lane positions lying after the outer's row.
+
+Members: `hot-causal`, `flatMap-causal`, `connect-causal`, `takeWhile-causal`, `scan-causal`, `map-causal`, `defer-causal`, `lim-causal`.
 
 #### THE ONE-INPUT OPERATORS
 
-Untried beyond `map`: each reads only rows at and before its own, so
-agreement below a row carries through. Settled by bodies mirroring
-`map-cont`.
+Untried: rows at their input's positions keep the bound. Settled by bodies.
 
-Members: `scan-cont`, `takeWhile-cont`, `defer-cont`.
+Members: `map-ne`, `scan-ne`.
 
 ## Tier 0 — the emission set carries the theorems
 
