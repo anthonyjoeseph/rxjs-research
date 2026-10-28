@@ -280,10 +280,13 @@ const run = async (
   console.log(
     `oracle: ${rows.length - failures.length}/${rows.length} ${fam.label}seeds agree`,
   );
-  const tabled = rows.filter(
-    (r) => r.table !== undefined && r.table !== null,
-  ).length;
-  if (tabled > 0) console.log(`oracle: ${tabled} ${fam.label}seeds tabled`);
+  const tables = rows.flatMap((r) =>
+    r.table === undefined || r.table === null ? [] : [r.table],
+  );
+  if (tables.length > 0)
+    console.log(
+      `oracle: ${tables.length} ${fam.label}seeds tabled, ${tables.filter((t) => t.end !== "cut").length} uncut, ${tables.filter((t) => t.events.length > 0).length} with events`,
+    );
   return failures.length === 0 && rows.length === count;
 };
 
