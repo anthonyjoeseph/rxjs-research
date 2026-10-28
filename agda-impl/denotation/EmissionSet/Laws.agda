@@ -2,17 +2,16 @@
 
 -- THE EMISSION SET'S LAWS: the meaning of a node is its operator applied to its
 -- children's meanings, so proofs over it go one operator at a time; and
--- `map` fuses.
+-- `map` fuses.  Every former but `defer` means its operator by
+-- definition; `defer` unfolds.
 --
--- THE ROUTE: the meaning is the limit of its approximants only because of
--- recursion through `defer`, so compositionality is the limit commuting
--- with each operator.  A chain CONVERGES to an observable (`Conv`) when,
--- wherever the observable is reached, the chain agrees with it at and
--- below from some index on.  A convergent chain's limit is that
--- observable (`conv-lim`); each operator carries convergence (`-cont`);
--- so the approximants converge to the meaning by structure (`settles`),
--- `defer` excepted, and each former's equation is `conv-lim` of its
--- operator's continuity.
+-- THE ROUTE TO UNFOLDING: a `defer` means the limit of its approximants.
+-- A chain CONVERGES to an observable (`Conv`) when, wherever the
+-- observable is reached, the chain agrees with it at and below from some
+-- index on.  A convergent chain's limit is that observable (`conv-lim`);
+-- each operator carries convergence (`-cont`); so the approximants
+-- converge to the meaning by structure (`settles`), the recursion
+-- excepted, and the body's convergence, under `deferᵀ`, is the unfolding.
 module denotation.EmissionSet.Laws where
 
 open import Data.Bool using (Bool; T)
@@ -23,7 +22,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (_∷_; lookup)
 open import Data.Empty using (⊥)
 open import Data.Nat using (ℕ; zero; suc; _≤_; s≤s; _⊔_)
-open import Data.Nat.Properties using (≤-refl; m≤m⊔n; m≤n⊔m)
+open import Data.Nat.Properties using (m≤m⊔n; m≤n⊔m)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Function using (_∘_; Equivalence)
 open import Relation.Binary.PropositionalEquality using (refl; sym; subst)
@@ -48,15 +47,8 @@ private
   entered-few (hot t)  p (_ , F) = few-via (λ y → _ , proj₁ y) F
   entered-few (Den.cold f) p (_ , F) = few-via (λ y → _ , proj₁ y) F
 
-  -- Limits of row-for-row alike sequences, truncated, are alike.
-  lim-map : ∀ {A} {c c′ : ℕ → EmissionSet A} → (∀ {n q e} → c n q e → c′ n q e) → (∀ {n q e} → c′ n q e → c n q e)
-          → ∀ {q e} → Truncate (Lim c) q e → Truncate (Lim c′) q e
-  lim-map to back (from N h , F) = from N (λ n le → to (h n le)) , few-via (λ { (from M h′) → _ , from M λ n le → back (h′ n le) }) F
-
-  -- A row of every approximant is a row of the limit, and back.
-  constant : ∀ {A} (d : Den A) p {q e} → (Truncate (Lim (λ _ → enter d p)) q e → enter d p q e) × (enter d p q e → Truncate (Lim (λ _ → enter d p)) q e)
-  constant d p = (λ { (from N h , _) → h N ≤-refl }) , λ x →
-    from 0 (λ _ _ → x) , few-via (λ { (from N h) → _ , h N ≤-refl }) (entered-few d p x)
+  ≅-refl : ∀ {A} (d : Den A) → d ≅ d
+  ≅-refl d p = (λ x → x) , (λ x → x)
 
 ------------------------------------------------------------------------
 -- The order on positions
@@ -111,11 +103,6 @@ record Compositionalᵀ : Set₁ where
 
 ------------------------------------------------------------------------
 -- A convergent chain's limit
-
--- `_≅_` carries convergence.
-conv-resp : ∀ {A} {c : ℕ → Den A} {d d′} → Conv c d → d ≅ d′ → Conv c d′
-Conv.at (conv-resp {d = d} {d′} cv eq) p F with Conv.at cv p (few-via (λ y → _ , proj₁ (eq p) y) F)
-... | N , ag = N , λ n le yq → (λ x → proj₁ (eq p) (proj₁ (ag n le yq) x)) , λ x → proj₂ (ag n le yq) (proj₂ (eq p) x)
 
 -- A constant chain converges to its value.
 conv-const : ∀ {A} (d : Den A) → Conv (λ _ → d) d
@@ -213,7 +200,7 @@ postulate
                  → Conv (λ n → connectᵀ (c n) (Fs n)) (connectᵀ d G)
 
   -- THE RECURSION SETTLES: past enough approximants, a `defer`'s rows at
-  -- and below a reached row stop changing.
+  -- and below a row of their limit stop changing.
   settles-defer : ∀ {Γ A} (l : Later Timeline Γ A) {ρs : ℕ → DenEnv Γ} {ρ} → EnvConv ρs ρ
                 → Conv (λ n → approxᵀ n (defer l) (ρs n)) (⟦ defer l ⟧ᵀ ρ)
 
@@ -228,81 +215,48 @@ private
   EnvConv.at (env-cons cv ec) (here refl) = cv
   EnvConv.at (env-cons cv ec) (there i)   = EnvConv.at ec i
 
-  -- `conv-resp`, read from the target.
-  conv-back : ∀ {A} {c : ℕ → Den A} {d} d′ → Conv c d → d′ ≅ d → Conv c d′
-  conv-back d′ cv eq = conv-resp cv λ p → proj₂ (eq p) , proj₁ (eq p)
-
 -- By structure: an operator's chain converges to the operator applied to
--- its children's meanings, which is the operator's meaning by `conv-lim`.
+-- its children's meanings, which is its meaning.
 settles : ∀ {Γ A} (o : Obs Timeline Γ A) {ρs : ℕ → DenEnv Γ} {ρ} → EnvConv ρs ρ → Conv (λ n → approxᵀ n o (ρs n)) (⟦ o ⟧ᵀ ρ)
+settles (cold c)          ec = conv-const (coldᵀ c)
+settles empty             ec = conv-const emptyᵀ
+settles (of xs)           ec = conv-const (ofᵀ xs)
+settles (map f s)         ec = map-cont f (settles s ec)
+settles (scan f z s)      ec = scan-cont f z (settles s ec)
+settles (takeWhile i k s) ec = takeWhile-cont i k (settles s ec)
+settles (flatMap op f s) {ρs} {ρ} ec =
+  flatMap-cont op {fs = λ n a → approxᵀ n (f a) (ρs n)} {g = λ a → ⟦ f a ⟧ᵀ ρ} (settles s ec) λ a → settles (f a) ec
+settles (connect s b) {ρs} {ρ} ec =
+  connect-cont {Fs = λ n h → approxᵀ n b (h ∷ ρs n)} {G = λ h → ⟦ b ⟧ᵀ (h ∷ ρ)} (settles s ec)
+    λ {hs} {h} hc → settles b {λ n → hot (hs n) ∷ ρs n} {hot h ∷ ρ} (env-cons hc ec)
+settles (connected i)     ec = EnvConv.at ec i
+settles (defer l)         ec = settles-defer l ec
 
--- An operator's meaning, through the limit: each approximant applies the
--- operator to its children's approximants, and the limit commutes with it.
-map-lim : ∀ {Γ A B} (f : A → B) (s : Obs Timeline Γ A) (ρ : DenEnv Γ) → ⟦ map f s ⟧ᵀ ρ ≅ mapᵀ f (⟦ s ⟧ᵀ ρ)
-map-lim f s ρ = conv-lim (map-cont f (settles s (env-const ρ)))
-
-scan-lim : ∀ {Γ A B} (f : B → A → B) z (s : Obs Timeline Γ A) (ρ : DenEnv Γ) → ⟦ scan f z s ⟧ᵀ ρ ≅ scanᵀ f z (⟦ s ⟧ᵀ ρ)
-scan-lim f z s ρ = conv-lim (scan-cont f z (settles s (env-const ρ)))
-
-takeWhile-lim : ∀ {Γ A} (i : Bool) (k : A → Bool) (s : Obs Timeline Γ A) (ρ : DenEnv Γ) → ⟦ takeWhile i k s ⟧ᵀ ρ ≅ takeWhileᵀ i k (⟦ s ⟧ᵀ ρ)
-takeWhile-lim i k s ρ = conv-lim (takeWhile-cont i k (settles s (env-const ρ)))
-
-flatMap-lim : ∀ {Γ A B} (op : FlatOp) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) (ρ : DenEnv Γ)
-            → ⟦ flatMap op f s ⟧ᵀ ρ ≅ flatMapᵀ op (λ a → ⟦ f a ⟧ᵀ ρ) (⟦ s ⟧ᵀ ρ)
-flatMap-lim op f s ρ = conv-lim (flatMap-cont op {fs = λ n a → approxᵀ n (f a) ρ} {g = λ a → ⟦ f a ⟧ᵀ ρ} {c = λ n → approxᵀ n s ρ} {d = ⟦ s ⟧ᵀ ρ}
-  (settles s (env-const ρ)) λ a → settles (f a) (env-const ρ))
-
-connect-lim : ∀ {Γ A B} (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) (ρ : DenEnv Γ)
-            → ⟦ connect s b ⟧ᵀ ρ ≅ connectᵀ (⟦ s ⟧ᵀ ρ) (λ h → ⟦ b ⟧ᵀ (h ∷ ρ))
-connect-lim s b ρ = conv-lim (connect-cont {c = λ n → approxᵀ n s ρ} {d = ⟦ s ⟧ᵀ ρ} {Fs = λ n h → approxᵀ n b (h ∷ ρ)} {G = λ h → ⟦ b ⟧ᵀ (h ∷ ρ)}
-  (settles s (env-const ρ)) λ {hs} {h} hc → settles b {λ n → hot (hs n) ∷ ρ} {hot h ∷ ρ} (env-cons hc (env-const ρ)))
-
--- The approximants from 1 on are `deferᵀ` of the body's.
+-- THE UNFOLDING: the approximants from 1 on are `deferᵀ` of the body's.
 defer-lim : ∀ {Γ A} (l : Later Timeline Γ A) (ρ : DenEnv Γ) → ⟦ defer l ⟧ᵀ ρ ≅ deferᵀ (⟦ Later.force l ⟧ᵀ ρ)
 defer-lim l ρ = conv-lim {c = λ n → approxᵀ n (defer l) ρ} {d = deferᵀ (⟦ Later.force l ⟧ᵀ ρ)}
   (conv-pred {c = λ n → approxᵀ n (defer l) ρ} (defer-cont {c = λ n → approxᵀ n (Later.force l) ρ} {d = ⟦ Later.force l ⟧ᵀ ρ}
     (settles (Later.force l) {λ _ → ρ} {ρ} (env-const ρ))))
 
-settles (cold c)          {ρ = ρ} ec = conv-back (⟦ cold c ⟧ᵀ ρ) (conv-const (coldᵀ c)) (λ p → constant (coldᵀ c) p)
-settles empty             {ρ = ρ} ec = conv-back (⟦ empty ⟧ᵀ ρ) (conv-const emptyᵀ) (λ p → constant emptyᵀ p)
-settles (of xs)           {ρ = ρ} ec = conv-back (⟦ of xs ⟧ᵀ ρ) (conv-const (ofᵀ xs)) (λ p → constant (ofᵀ xs) p)
-settles (map f s) {ρ = ρ} ec =
-  conv-back (⟦ map f s ⟧ᵀ ρ) (map-cont f (settles s ec)) (map-lim f s ρ)
-settles (scan f z s) {ρ = ρ} ec =
-  conv-back (⟦ scan f z s ⟧ᵀ ρ) (scan-cont f z (settles s ec)) (scan-lim f z s ρ)
-settles (takeWhile i k s) {ρ = ρ} ec =
-  conv-back (⟦ takeWhile i k s ⟧ᵀ ρ) (takeWhile-cont i k (settles s ec)) (takeWhile-lim i k s ρ)
-settles (flatMap op f s) {ρs} {ρ} ec =
-  conv-back (⟦ flatMap op f s ⟧ᵀ ρ)
-    (flatMap-cont op {fs = λ n a → approxᵀ n (f a) (ρs n)} {g = λ a → ⟦ f a ⟧ᵀ ρ} (settles s ec) λ a → settles (f a) ec)
-    (flatMap-lim op f s ρ)
-settles (connect s b) {ρs} {ρ} ec =
-  conv-back (⟦ connect s b ⟧ᵀ ρ)
-    (connect-cont {Fs = λ n h → approxᵀ n b (h ∷ ρs n)} {G = λ h → ⟦ b ⟧ᵀ (h ∷ ρ)} (settles s ec)
-      λ {hs} {h} hc → settles b {λ n → hot (hs n) ∷ ρs n} {hot h ∷ ρ} (env-cons hc ec))
-    (connect-lim s b ρ)
-settles (connected i) {ρ = ρ} ec = conv-back (⟦ connected i ⟧ᵀ ρ) (EnvConv.at ec i) (λ p → constant (lookup ρ i) p)
-settles (defer l)         ec = settles-defer l ec
-
 -- THE MEANING IS COMPOSITIONAL.
 compositionalᵀ : Compositionalᵀ
 compositionalᵀ = record
-  { coldᶜ      = λ c ρ → constant (coldᵀ c)
-  ; emptyᶜ     = λ ρ → constant emptyᵀ
-  ; ofᶜ        = λ xs ρ → constant (ofᵀ xs)
-  ; mapᶜ       = map-lim
-  ; scanᶜ      = scan-lim
-  ; takeWhileᶜ = takeWhile-lim
-  ; flatMapᶜ   = flatMap-lim
-  ; connectᶜ   = connect-lim
-  ; connectedᶜ = λ i ρ → constant (lookup ρ i)
+  { coldᶜ      = λ c ρ → ≅-refl (coldᵀ c)
+  ; emptyᶜ     = λ ρ → ≅-refl emptyᵀ
+  ; ofᶜ        = λ xs ρ → ≅-refl (ofᵀ xs)
+  ; mapᶜ       = λ f s ρ → ≅-refl (mapᵀ f (⟦ s ⟧ᵀ ρ))
+  ; scanᶜ      = λ f z s ρ → ≅-refl (scanᵀ f z (⟦ s ⟧ᵀ ρ))
+  ; takeWhileᶜ = λ i k s ρ → ≅-refl (takeWhileᵀ i k (⟦ s ⟧ᵀ ρ))
+  ; flatMapᶜ   = λ op f s ρ → ≅-refl (flatMapᵀ op (λ a → ⟦ f a ⟧ᵀ ρ) (⟦ s ⟧ᵀ ρ))
+  ; connectᶜ   = λ s b ρ → ≅-refl (connectᵀ (⟦ s ⟧ᵀ ρ) (λ h → ⟦ b ⟧ᵀ (h ∷ ρ)))
+  ; connectedᶜ = λ i ρ → ≅-refl (lookup ρ i)
   ; deferᶜ     = defer-lim
   }
 
 -- MAP FUSES: `map (f ∘ g)` and `map f ∘ map g` have the same rows.
 map-fusionᵀ : ∀ {Γ A B C} (f : B → C) (g : A → B) (s : Obs Timeline Γ A) (ρ : DenEnv Γ)
             → ⟦ map (f ∘ g) s ⟧ᵀ ρ ≅ ⟦ map f (map g s) ⟧ᵀ ρ
-map-fusionᵀ f g s ρ p = lim-map fuse split , lim-map split fuse
+map-fusionᵀ f g s ρ p = fuse , split
   where
     down : ∀ {t k e} → MapT (f ∘ g) t k e → Σ (Ev _) (MapT g t k)
     down (map-out x)  = _ , map-out x

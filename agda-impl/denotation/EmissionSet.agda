@@ -404,5 +404,16 @@ approxᵀ (suc n) (defer l)         ρ = deferᵀ (approxᵀ n (Later.force l) �
 data Lim {A : Set} (c : ℕ → EmissionSet A) (q : Pos) (e : Ev A) : Set where
   from : ∀ N → (∀ n → N ≤ n → c n q e) → Lim c q e
 
+-- THE MEANING: each operator applied to its children's meanings.  Only a
+-- `defer`, the one recursion, is a limit: of its approximants.
 ⟦_⟧ᵀ : ∀ {Γ A} → Obs Timeline Γ A → DenEnv Γ → Den A
-⟦ o ⟧ᵀ ρ = cold λ p → Lim λ n → enter (approxᵀ n o ρ) p
+⟦ cold c ⟧ᵀ          ρ = coldᵀ c
+⟦ empty ⟧ᵀ           ρ = emptyᵀ
+⟦ of xs ⟧ᵀ           ρ = ofᵀ xs
+⟦ map f s ⟧ᵀ         ρ = mapᵀ f (⟦ s ⟧ᵀ ρ)
+⟦ scan f z s ⟧ᵀ      ρ = scanᵀ f z (⟦ s ⟧ᵀ ρ)
+⟦ takeWhile i p s ⟧ᵀ ρ = takeWhileᵀ i p (⟦ s ⟧ᵀ ρ)
+⟦ flatMap op f s ⟧ᵀ  ρ = flatMapᵀ op (λ a → ⟦ f a ⟧ᵀ ρ) (⟦ s ⟧ᵀ ρ)
+⟦ connect s b ⟧ᵀ     ρ = connectᵀ (⟦ s ⟧ᵀ ρ) λ h → ⟦ b ⟧ᵀ (h ∷ ρ)
+⟦ connected i ⟧ᵀ     ρ = lookup ρ i
+⟦ defer l ⟧ᵀ         ρ = cold λ p → Lim λ n → enter (approxᵀ n (defer l) ρ) p
