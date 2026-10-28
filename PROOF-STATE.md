@@ -19,9 +19,8 @@ Members: `settles-defer`.
 
 #### THE JOINERS READ AHEAD
 
-Suspect, and blocked constructively. The bounded merge's schedule
-(`runs`, `held`) reads a lane's whole future, and a lane's rows may
-precede its subscription; and a joiner's index must bound every lane's,
+Suspect, and blocked constructively. A lane's rows may precede its
+subscription; and a joiner's index must bound every lane's,
 which no finite listing of the outer yields. Settled by a modulus read off the reached row's count, uniform in
 the lane, or a pair of chains that agree below a row and join differently.
 

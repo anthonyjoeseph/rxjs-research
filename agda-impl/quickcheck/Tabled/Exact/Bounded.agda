@@ -1,53 +1,53 @@
 {-# OPTIONS --guardedness #-}
 
--- BOUNDED MERGE, LISTED EXACTLY: `Bounded.Sched` level by level, as the
--- listing grows it.  Each level's schedules are exactly that level's
--- `Sched`s, and each value's entry holds its lane under every schedule
--- and every start `Starts` allows.  A value's level is below its count of
--- values before it, so the listing's levels reach every value.
+-- BOUNDED MERGE, LISTED EXACTLY: the lanes level by level, as the listing
+-- grows them.  The ends passed on below a level list exactly the lanes
+-- before it (`Lists`), so a count over them decides `Bounded.Kth`,
+-- and each value's entry holds its lane at every start `Starts` allows.
+-- A value's level is below its count of values before it, so the
+-- listing's levels reach every value.
 module quickcheck.Tabled.Exact.Bounded where
 
-open import Data.Bool using (true; false; if_then_else_)
+open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Bool.Properties using (T-≡)
 open import Function.Bundles using (Equivalence)
-open import Data.Empty using (⊥-elim)
-open import Data.List using (List; []; _∷_; _++_; [_]; length; null) renaming (map to mapL)
+open import Data.Empty using (⊥; ⊥-elim)
+open import Data.List using (List; []; _∷_; _++_; [_]; length) renaming (map to mapL)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻; ∈-map⁺; ∈-map⁻; ∈-deduplicate⁺; ∈-deduplicate⁻)
-open import Data.List.Properties using (≡-dec)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻; ∈-map⁺; ∈-map⁻)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just)
-open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≤_; _<_; _<ᵇ_; _≤ᵇ_; _≡ᵇ_; z≤n)
+open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≤_; _<_; _<ᵇ_; _≤ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties
-  using (<ᵇ⇒<; <⇒<ᵇ; ≡ᵇ⇒≡; ≡⇒≡ᵇ; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ≮⇒≥; <⇒≱; ≤⇒≯; m≤n⇒m<n∨m≡n; +-suc; +-identityʳ; ≤-<-trans)
+  using (<ᵇ⇒<; <⇒<ᵇ; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ≮⇒≥; <⇒≱; ≤⇒≯; m≤n⇒m<n∨m≡n; +-suc; +-identityʳ; ≤-<-trans; ≤-refl; ≤-trans; n≤1+n; ≤-pred)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit using (tt)
+open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (¬_)
 
-open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; _≟ᵖ_; ix; <ᵖ-asym)
-open import denotation.EmissionSet using (out; skip; end; EmissionSet; Den; enter; below)
+open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; ix; <ᵖ-trans)
+open import denotation.EmissionSet using (out; skip; end; EmissionSet; Den; enter)
 import denotation.EmissionSet as Tb
-open import quickcheck.Tabled using (Row; Listed; rows; short; concatMap; concatMapM; mapM; endBy; ends; values; outerRow;
+open import quickcheck.Tabled using (Row; Listed; rows; short; concatMap; mapM; anyᵇ; endBy; values; outerRow; _≼ᵇ_;
   module BoundedL; module Order)
 open import quickcheck.Tabled.Exact.Base
-  using (Exact; Exactly; sound; complete; fromT; fromNot; offT; ∨-false; ∧-true; ∧-intro; off; or-of; or-right; ≟-refl; ≟-true;
-  any⁻; any⁺; any-off; all⁻; all⁺; single⁻; when⁻; when⁺; if⁻; if-t; if-f; cm⁻; cm⁺; bind⁻; mapM⁻; mapM⁺; cmM⁻; cmM⁺;
-  null⁻; null⁺; null-off; values⁺; ends⁻; ends⁺; endBy→; →endBy; cnt-in; module OrderX)
+  using (Exact; Exactly; sound; complete; fromT; fromNot; offT; not-T; T-not; ∨-false; ∧-true; ∧-intro; off; or-of; or-right;
+  ≟-refl; ≟-true; any⁻; any⁺; any-off; all⁻; all⁺; single⁻; when⁻; when⁺; if⁻; if-t; if-f; cm⁻; cm⁺; bind⁻; mapM⁻; mapM⁺;
+  values⁺; ends⁻; ends⁺; endBy→; →endBy; cnt-in; module OrderX)
 
 module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln : A → Pos → Maybe (Listed B)) (o : Listed A)
   (eo : Exactly o t) (eln : ∀ {a s l} → ln a s ≡ just l → Exactly l (enter (fD a) s))
-  (G : List (ℕ × Pos × A × List (List Pos × Pos × Listed B)))
-  (eG : BoundedL.levels n ln o (length (values (rows o))) 0 [ [] ] (Order.nths (values (rows o)) 0) ≡ just G)
+  (G : List (ℕ × Pos × A × List (Pos × Listed B)))
+  (eG : BoundedL.levels n ln o (length (values (rows o))) 0 [] (Order.nths (values (rows o)) 0) ≡ just G)
   (u : short (BoundedL.boundedRows n ln o G) ≡ false)
   where
   open Tb.Bounded n fD t
-    using (Starts; room; freed; queued; Sched; none; ended; runs; held; Sub; Queued; Done; BoundedT;
+    using (Kth; Starts; room; freed; queued; Ends; Sched; Sub; Queued; Done; BoundedT;
     val; step; oend; opass; lane; handoff; lend; lpass)
   open Tb.Values t using (Nth)
   open BoundedL n ln o
-    using (vals; freedAt; starts; Entry; laneAt; entry; grownE; heldE; grow; dedup; levels; done; laneRow; boundedRows)
+    using (vals; count; starts; Entry; laneAt; entry; laneEnds; entryEnds; endsOf; levels; done; laneRow; boundedRows)
     renaming (queued to queuedᵇ)
   open Order vals using (nths)
 
@@ -55,13 +55,78 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     exo : Exact o t
     exo = eo (proj₁ (∨-false {short o} u))
 
-    uncut : ∀ {j q a ss es s l} → (j , q , a , ss) ∈ G → (es , s , l) ∈ ss → short l ≡ false
+    uncut : ∀ {j q a ss s l} → (j , q , a , ss) ∈ G → (s , l) ∈ ss → short l ≡ false
     uncut {ss = ss} gm sm = any-off {xs = ss} (any-off {xs = G} (proj₂ (∨-false {short o} u)) gm) sm
 
-    exl : ∀ {j q a ss es s l} → (j , q , a , ss) ∈ G → (es , s , l) ∈ ss → ln a s ≡ just l → Exact l (enter (fD a) s)
+    exl : ∀ {j q a ss s l} → (j , q , a , ss) ∈ G → (s , l) ∈ ss → ln a s ≡ just l → Exact l (enter (fD a) s)
     exl gm sm el = eln el (uncut gm sm)
 
   open OrderX exo using (nth-s; nth-c; nth-out; nth-cnt)
+
+  ----------------------------------------------------------------------
+  -- The lanes before, as listed
+
+  -- `ess` lists the lanes `ls` exactly, end for end.
+  Lists : List (List Pos) → List (Pos → Set) → Set
+  Lists []         []       = ⊤
+  Lists (es ∷ ess) (l ∷ ls) = ((∀ {c} → c ∈ es → l c) × (∀ {c} → l c → c ∈ es)) × Lists ess ls
+  Lists []         (_ ∷ _)  = ⊥
+  Lists (_ ∷ _)    []       = ⊥
+
+  private
+    Kth-mono : ∀ {P Q : Pos → Set} → (∀ {c} → P c → Q c) → ∀ {ls} k → Kth P ls k → Kth Q ls k
+    Kth-mono f {[]}     k       ()
+    Kth-mono f {l ∷ ls} zero    (inj₁ (c , lc , pc))       = inj₁ (c , lc , f pc)
+    Kth-mono f {l ∷ ls} zero    (inj₂ h)                  = inj₂ (Kth-mono f zero h)
+    Kth-mono f {l ∷ ls} (suc k) (inj₁ ((c , lc , pc) , h)) = inj₁ ((c , lc , f pc) , Kth-mono f k h)
+    Kth-mono f {l ∷ ls} (suc k) (inj₂ h)                  = inj₂ (Kth-mono f (suc k) h)
+
+  -- `count p` decides `Kth P`, for a test `p` deciding `P`.
+  module Count (p : Pos → Bool) (P : Pos → Set) (to : ∀ {c} → p c ≡ true → P c) (from : ∀ {c} → P c → p c ≡ true) where
+    count-step : ∀ es ess → count p ess ≤ count p (es ∷ ess)
+    count-step es ess with anyᵇ p es
+    ... | true  = n≤1+n _
+    ... | false = ≤-refl
+
+    at→ : ∀ {ess ls} k → Lists ess ls → Kth P ls k → suc k ≤ count p ess
+    at→ {[]}       {[]}     k _ ()
+    at→ {[]}       {_ ∷ _}  k () _
+    at→ {_ ∷ _}    {[]}     k () _
+    at→ {es ∷ ess} {l ∷ ls} zero ((_ , cmp) , L) (inj₁ (c , lc , pc)) with anyᵇ p es in e
+    ... | true  = s≤s z≤n
+    ... | false = ⊥-elim (offT e (Equivalence.from T-≡ (any⁺ {xs = es} (cmp lc) (from pc))))
+    at→ {es ∷ ess} {l ∷ ls} (suc k) ((_ , cmp) , L) (inj₁ ((c , lc , pc) , h)) with anyᵇ p es in e
+    ... | true  = s≤s (at→ k L h)
+    ... | false = ⊥-elim (offT e (Equivalence.from T-≡ (any⁺ {xs = es} (cmp lc) (from pc))))
+    at→ {es ∷ ess} {l ∷ ls} zero    (_ , L) (inj₂ h) = ≤-trans (at→ zero L h) (count-step es ess)
+    at→ {es ∷ ess} {l ∷ ls} (suc k) (_ , L) (inj₂ h) = ≤-trans (at→ (suc k) L h) (count-step es ess)
+
+    →at : ∀ {ess ls} k → Lists ess ls → suc k ≤ count p ess → Kth P ls k
+    →at {[]}       {[]}     k _ ()
+    →at {[]}       {_ ∷ _}  k () _
+    →at {_ ∷ _}    {[]}     k () _
+    →at {es ∷ ess} {l ∷ ls} zero ((snd , _) , L) le with anyᵇ p es in e
+    ... | true  = let (c , cm , pc) = any⁻ {xs = es} e in inj₁ (c , snd cm , to pc)
+    ... | false = inj₂ (→at zero L le)
+    →at {es ∷ ess} {l ∷ ls} (suc k) ((snd , _) , L) le with anyᵇ p es in e
+    ... | true  = let (c , cm , pc) = any⁻ {xs = es} e in inj₁ ((c , snd cm , to pc) , →at k L (≤-pred le))
+    ... | false = inj₂ (→at (suc k) L le)
+
+  module Lt (c : Pos) = Count (λ k → k <ᵖ c) (λ k → Tb._≺_ k c) (λ e → Equivalence.from T-≡ e) fromT
+  module Le (c : Pos) = Count (λ k → k ≼ᵇ c) (λ k → Tb._≼_ k c) not-T T-not
+
+  private
+    one→ : ∀ {ess ls c} → Lists ess ls → Kth (_≡ c) ls 0 → Σ (List Pos) λ es → es ∈ ess × c ∈ es
+    one→ {[]}       {[]}     _ ()
+    one→ {[]}       {_ ∷ _}  () _
+    one→ {_ ∷ _}    {[]}     () _
+    one→ {es ∷ ess} {l ∷ ls} ((_ , cmp) , L) (inj₁ (c′ , lc , refl)) = es , here refl , cmp lc
+    one→ {es ∷ ess} {l ∷ ls} (_ , L) (inj₂ h) = let (es′ , m , cm) = one→ L h in es′ , there m , cm
+
+    →one : ∀ {ess ls es c} → Lists ess ls → es ∈ ess → c ∈ es → Kth (_≡ c) ls 0
+    →one {_ ∷ _} {[]}     () _ _
+    →one {_ ∷ _} {l ∷ ls} ((snd , _) , L) (here refl) cm = inj₁ (_ , snd cm , refl)
+    →one {_ ∷ _} {l ∷ ls} (_ , L) (there m) cm = inj₂ (→one L m cm)
 
   ----------------------------------------------------------------------
   -- Where a lane starts
@@ -73,136 +138,97 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     lt-off : ∀ {i} → n ≤ i → (i <ᵇ n) ≡ false
     lt-off {i} le = fromNot λ h → <⇒≱ (<ᵇ⇒< i n h) le
 
-  freedAt-s : ∀ i q es c {s} → n ≤ i → c ∈ es → s ∈ freedAt i q es c → Starts i q es s
-  freedAt-s i q es c le cm h with if⁻ {b = below c es ≡ᵇ (i ∸ n)} h
-  ... | inj₂ (_ , ())
-  ... | inj₁ (kb , h′) with if⁻ {b = c <ᵖ q} h′
-  ... | inj₁ (cq , h″) =
-    subst (Starts i q es) (sym (single⁻ h″)) (freed le (cm , ≡ᵇ⇒≡ (below c es) (i ∸ n) (Equivalence.from T-≡ kb)) (Equivalence.from T-≡ cq))
-  ... | inj₂ (_ , h″) = let (qc , e) = when⁻ h″ in
-    subst (Starts i q es) (sym e) (queued le (cm , ≡ᵇ⇒≡ (below c es) (i ∸ n) (Equivalence.from T-≡ kb)) (Equivalence.from T-≡ qc))
+    ≺-trans : ∀ {x y z} → Tb._≺_ x y → Tb._≺_ y z → Tb._≺_ x z
+    ≺-trans {x} {y} {z} a b = Equivalence.from T-≡ (<ᵖ-trans x y z (Equivalence.to T-≡ a) (Equivalence.to T-≡ b))
 
-  starts-s : ∀ i q es {s} → s ∈ starts i q es → Starts i q es s
-  starts-s i q es m with if⁻ {b = i <ᵇ n} m
-  ... | inj₁ (lt , h) = subst (Starts i q es) (sym (single⁻ h)) (room (<ᵇ⇒< i n (Equivalence.from T-≡ lt)))
-  ... | inj₂ (ge , h) = let (c , cm , h′) = cm⁻ {xs = es} h in freedAt-s i q es c (n≤ ge) cm h′
+  starts-s : ∀ i q {ess ls s} → Lists ess ls → s ∈ starts i q ess → Starts i q ls s
+  starts-s i q {ess} {ls} L m with if⁻ {b = i <ᵇ n} m
+  ... | inj₁ (lt , h) = subst (Starts i q ls) (sym (single⁻ h)) (room (<ᵇ⇒< i n (Equivalence.from T-≡ lt)))
+  ... | inj₂ (ge , h) with if⁻ {b = suc (i ∸ n) ≤ᵇ count (λ k → k <ᵖ q) ess} h
+  ... | inj₁ (fr , h′) =
+    subst (Starts i q ls) (sym (single⁻ h′)) (freed (n≤ ge) (Lt.→at q (i ∸ n) L (≤ᵇ⇒≤ _ _ (Equivalence.from T-≡ fr))))
+  ... | inj₂ (_ , h′) with cm⁻ {xs = ess} h′
+  ... | (es , esm , h″) with cm⁻ {xs = es} h″
+  ... | (c , cm , h‴) with when⁻ h‴
+  ... | (b , e) with ∧-true {q <ᵖ c} b
+  ... | (qc , b′) with ∧-true {suc (i ∸ n) ≤ᵇ count (λ k → k ≼ᵇ c) ess} b′
+  ... | (le , nlt) = subst (Starts i q ls) (sym e) (queued (n≤ ge) (Equivalence.from T-≡ qc) (→one L esm cm)
+    (Le.→at c (i ∸ n) L (≤ᵇ⇒≤ _ _ (Equivalence.from T-≡ le)))
+    (λ h → not-T nlt (≤⇒≤ᵇ (Lt.at→ c (i ∸ n) L h))))
 
-  starts-c : ∀ {i q es s} → Starts i q es s → s ∈ starts i q es
-  starts-c (room lt) = if-t (fromT (<⇒<ᵇ lt)) (here refl)
-  starts-c {i} {q} {es} (freed {c} le (cm , kb) cq) =
-    if-f (lt-off le) (cm⁺ cm (if-t (fromT (≡⇒≡ᵇ (below c es) (i ∸ n) kb)) (if-t (fromT cq) (here refl))))
-  starts-c {i} {q} {es} (queued {c} le (cm , kb) qc) =
-    if-f (lt-off le) (cm⁺ cm (if-t (fromT (≡⇒≡ᵇ (below c es) (i ∸ n) kb)) (if-f (<ᵖ-asym q c (fromT qc)) (when⁺ (fromT qc)))))
+  starts-c : ∀ {i q ess ls s} → Lists ess ls → Starts i q ls s → s ∈ starts i q ess
+  starts-c L (room lt) = if-t (fromT (<⇒<ᵇ lt)) (here refl)
+  starts-c L (freed le h) = if-f (lt-off le) (if-t (fromT (≤⇒≤ᵇ (Lt.at→ _ _ L h))) (here refl))
+  starts-c {i} {q} {ess} L (queued {c} le qc one h nh) =
+    let (es , esm , cm) = one→ L one in
+    if-f (lt-off le) (if-f (fromNot λ fr → nh (Kth-mono (λ {k} kq → ≺-trans {k} {q} {c} kq qc) (i ∸ n) (Lt.→at q (i ∸ n) L (≤ᵇ⇒≤ _ _ fr))))
+      (cm⁺ {xs = ess} esm (cm⁺ {xs = es} cm (when⁺ (∧-intro (fromT qc)
+        (∧-intro (fromT (≤⇒≤ᵇ (Le.at→ c (i ∸ n) L h))) (T-not λ fr → nh (Lt.→at c (i ∸ n) L (≤ᵇ⇒≤ _ _ fr)))))))))
 
   ----------------------------------------------------------------------
   -- A level's entries
 
-  -- An entry of level `j`, built from the schedules `ess`.
-  Good : ℕ → List (List Pos) → Entry → Set
-  Good j ess (q , a , ss) = Nth j q a
-    × (∀ {es s l} → (es , s , l) ∈ ss → es ∈ ess × Starts j q es s × ln a s ≡ just l)
-    × (∀ {es s} → es ∈ ess → Starts j q es s → Σ (Listed B) λ l → (es , s , l) ∈ ss)
-
-  -- An entry of level `j`, read against `Sched j`.
+  -- An entry of level `j`, read against the lanes before it.
   Fine : ℕ → Entry → Set
   Fine j (q , a , ss) = Nth j q a
-    × (∀ {es s l} → (es , s , l) ∈ ss → Sched j es × Starts j q es s × ln a s ≡ just l)
-    × (∀ {es s} → Sched j es → Starts j q es s → Σ (Listed B) λ l → (es , s , l) ∈ ss)
+    × (∀ {s l} → (s , l) ∈ ss → Starts j q (Sched j) s × ln a s ≡ just l)
+    × (∀ {s} → Starts j q (Sched j) s → Σ (Listed B) λ l → (s , l) ∈ ss)
 
-  -- Level `i`'s schedules are exactly `Sched i`'s.
-  Lv : ℕ → List (List Pos) → Set
-  Lv i ess = (∀ {es} → es ∈ ess → Sched i es) × (∀ {es} → Sched i es → es ∈ ess)
-
-  entry-ok : ∀ j ess {q a e} → (q , a) ∈ nths j → entry j ess (q , a) ≡ just e
-    → Σ (List (List Pos × Pos × Listed B)) λ ss → e ≡ (q , a , ss) × Good j ess (q , a , ss)
-  entry-ok j ess {q} {a} nm e with bind⁻ {m = concatMapM (λ es → mapM (laneAt a es) (starts j q es)) ess} e
-  ... | (ss , ecm , refl) = ss , refl , nth-s j nm , snd , cmp
+  entry-ok : ∀ j {ess} → Lists ess (Sched j) → ∀ {q a e} → (q , a) ∈ nths j → entry j ess (q , a) ≡ just e
+    → Σ (List (Pos × Listed B)) λ ss → e ≡ (q , a , ss) × Fine j (q , a , ss)
+  entry-ok j {ess} L {q} {a} nm e with bind⁻ {m = mapM (laneAt a) (starts j q ess)} e
+  ... | (ss , ems , refl) = ss , refl , nth-s j nm , snd , cmp
     where
-    snd : ∀ {es s l} → (es , s , l) ∈ ss → es ∈ ess × Starts j q es s × ln a s ≡ just l
-    snd m with cmM⁻ {xs = ess} ecm m
-    ... | (es′ , esm , zs , fz , h) with mapM⁻ {xs = starts j q es′} fz h
+    snd : ∀ {s l} → (s , l) ∈ ss → Starts j q (Sched j) s × ln a s ≡ just l
+    snd m with mapM⁻ {xs = starts j q ess} ems m
     ... | (s′ , sm , ez) with bind⁻ {m = ln a s′} ez
-    ... | (l′ , el , refl) = esm , starts-s j q es′ sm , el
+    ... | (l′ , el , refl) = starts-s j q L sm , el
 
-    cmp : ∀ {es s} → es ∈ ess → Starts j q es s → Σ (Listed B) λ l → (es , s , l) ∈ ss
-    cmp {es} {s} esm St with cmM⁺ {xs = ess} ecm esm
-    ... | (zs , fz , k) with mapM⁺ {xs = starts j q es} fz (starts-c St)
+    cmp : ∀ {s} → Starts j q (Sched j) s → Σ (Listed B) λ l → (s , l) ∈ ss
+    cmp {s} St with mapM⁺ {xs = starts j q ess} ems (starts-c L St)
     ... | (y , ym , ey) with bind⁻ {m = ln a s} ey
-    ... | (l , el , refl) = l , k ym
+    ... | (l , el , refl) = l , ym
 
-  fine : ∀ {j ess e} → Lv j ess → Good j ess e → Fine j e
-  fine {e = q , a , ss} lv (N , snd , cmp) =
-    N , (λ m → let (esm , St , el) = snd m in proj₁ lv esm , St , el) , λ S St → cmp (proj₂ lv S) St
-
-  ----------------------------------------------------------------------
-  -- The next level
-
-  grow-ok : ∀ i ess gs → Lv i ess → (∀ {e} → e ∈ gs → Fine i e × (i , e) ∈ G)
-    → (∀ {q a} → Nth i q a → Σ (List (List Pos × Pos × Listed B)) λ ss → (q , a , ss) ∈ gs)
-    → Lv (suc i) (grow i ess gs)
-  grow-ok i ess gs lv ok found = sound-g , complete-g
+  -- A level's listed ends are its lanes' ends.
+  ends-ok : ∀ i gs → (∀ {e} → e ∈ gs → Fine i e × (i , e) ∈ G)
+    → (∀ {q a} → Nth i q a → Σ (List (Pos × Listed B)) λ ss → (q , a , ss) ∈ gs)
+    → (∀ {c} → c ∈ endsOf gs → Ends i (Sched i) c) × (∀ {c} → Ends i (Sched i) c → c ∈ endsOf gs)
+  ends-ok i gs ok found = snd-e , cmp-e
     where
-    sound-g : ∀ {es′} → es′ ∈ grow i ess gs → Sched (suc i) es′
-    sound-g m with ∈-++⁻ (concatMap grownE gs) m
-    ... | inj₁ h with cm⁻ {xs = gs} h
-    ... | ((q , a , ss) , em , h′) with cm⁻ {xs = ss} h′
-    ... | ((es , s , l) , sm , h″) with ok em
-    ... | ((N , snd , _) , gm) with snd sm
-    ... | (S , St , el) with if⁻ {b = null (ends (rows l))} h″
-    ... | inj₁ (nl , h‴) =
-      subst (Sched (suc i)) (sym (single⁻ h‴)) (runs S N St λ y → null⁻ nl (ends⁺ (complete (exl gm sm el) y)))
-    ... | inj₂ (_ , h‴) = let (c , cm , e) = ∈-map⁻ (_∷ es) h‴ in
-      subst (Sched (suc i)) (sym e) (ended S N St (sound (exl gm sm el) (ends⁻ cm)))
-    sound-g m | inj₂ h with cm⁻ {xs = gs} h
-    ... | ((q , a , ss) , em , h′) with cm⁻ {xs = ess} h′
-    ... | (es , esm , h″) with when⁻ h″
-    ... | (hb , refl) with ∧-true {n ≤ᵇ i} hb
-    ... | (h₁ , h₂) = held (proj₁ lv esm) (proj₁ (proj₁ (ok em)))
-      (≤ᵇ⇒≤ n i (Equivalence.from T-≡ h₁)) (≤ᵇ⇒≤ (length es) (i ∸ n) (Equivalence.from T-≡ h₂))
+    snd-e : ∀ {c} → c ∈ endsOf gs → Ends i (Sched i) c
+    snd-e m with cm⁻ {xs = gs} m
+    ... | ((q , a , ss) , em , h) with cm⁻ {xs = ss} h
+    ... | ((s , l) , sm , h′) with ok em
+    ... | ((N , snd , _) , gm) = let (St , el) = snd sm in q , a , s , N , St , sound (exl gm sm el) (ends⁻ h′)
 
-    complete-g : ∀ {es′} → Sched (suc i) es′ → es′ ∈ grow i ess gs
-    complete-g (ended {es = es} S N St y) with found N
+    cmp-e : ∀ {c} → Ends i (Sched i) c → c ∈ endsOf gs
+    cmp-e (q , a , s , N , St , y) with found N
     ... | (ss , em) with ok em
-    ... | ((_ , snd , cmp) , gm) with cmp S St
-    ... | (l , sm) with snd sm
-    ... | (_ , _ , el) = let cm = ends⁺ (complete (exl gm sm el) y) in
-      ∈-++⁺ˡ (cm⁺ em (cm⁺ sm (if-f (null-off cm) (∈-map⁺ (_∷ es) cm))))
-    complete-g (runs S N St ne) with found N
-    ... | (ss , em) with ok em
-    ... | ((_ , snd , cmp) , gm) with cmp S St
-    ... | (l , sm) with snd sm
-    ... | (_ , _ , el) = ∈-++⁺ˡ (cm⁺ em (cm⁺ sm (if-t (null⁺ λ cm → ne (sound (exl gm sm el) (ends⁻ cm))) (here refl))))
-    complete-g (held S N le le′) with found N
-    ... | (ss , em) =
-      ∈-++⁺ʳ (concatMap grownE gs) (cm⁺ em (cm⁺ (proj₂ lv S) (when⁺ (∧-intro (fromT (≤⇒≤ᵇ le)) (fromT (≤⇒≤ᵇ le′))))))
-
-  dedup-ok : ∀ {i ess} → Lv i ess → Lv i (dedup ess)
-  dedup-ok {ess = ess} (snd , cmp) =
-    (λ m → snd (∈-deduplicate⁻ (≡-dec _≟ᵖ_) ess m)) , λ S → ∈-deduplicate⁺ (≡-dec _≟ᵖ_) (cmp S)
+    ... | ((_ , snd , cmp) , gm) with cmp St
+    ... | (l , sm) = cm⁺ {f = entryEnds} {xs = gs} em (cm⁺ {f = laneEnds} {xs = ss} sm (ends⁺ (complete (exl gm sm (proj₂ (snd sm))) y)))
 
   ----------------------------------------------------------------------
   -- Every level
 
-  levels-ok : ∀ K i ess {G′} → levels K i ess (nths i) ≡ just G′ → (∀ {x} → x ∈ G′ → x ∈ G) → Lv i ess
+  levels-ok : ∀ K i ess {G′} → levels K i ess (nths i) ≡ just G′ → (∀ {x} → x ∈ G′ → x ∈ G) → Lists ess (Sched i)
     → (∀ {j e} → (j , e) ∈ G′ → Fine j e)
-    × (∀ {j q a} → i ≤ j → j < K + i → Nth j q a → Σ (List (List Pos × Pos × Listed B)) λ ss → (j , q , a , ss) ∈ G′)
-  levels-ok zero i ess refl sub lv = (λ ()) , λ le lt N → ⊥-elim (≤⇒≯ le lt)
-  levels-ok (suc K) i ess e sub lv with bind⁻ {m = mapM (entry i ess) (nths i)} e
-  ... | (gs , egs , e′) with bind⁻ {m = levels K (suc i) (dedup (grow i ess gs)) (nths (suc i))} e′
+    × (∀ {j q a} → i ≤ j → j < K + i → Nth j q a → Σ (List (Pos × Listed B)) λ ss → (j , q , a , ss) ∈ G′)
+  levels-ok zero i ess refl sub L = (λ ()) , λ le lt N → ⊥-elim (≤⇒≯ le lt)
+  levels-ok (suc K) i ess e sub L with bind⁻ {m = mapM (entry i ess) (nths i)} e
+  ... | (gs , egs , e′) with bind⁻ {m = levels K (suc i) (endsOf gs ∷ ess) (nths (suc i))} e′
   ... | (rest , erest , refl) = sound-l , complete-l
     where
     good : ∀ {x} → x ∈ gs → Fine i x × (i , x) ∈ G
     good m with mapM⁻ {xs = nths i} egs m
-    ... | ((q , a) , nm , ex) with entry-ok i ess nm ex
-    ... | (ss , refl , gd) = fine lv gd , sub (∈-++⁺ˡ (∈-map⁺ (i ,_) m))
+    ... | ((q , a) , nm , ex) with entry-ok i L nm ex
+    ... | (ss , refl , fn) = fn , sub (∈-++⁺ˡ (∈-map⁺ (i ,_) m))
 
-    found : ∀ {q a} → Nth i q a → Σ (List (List Pos × Pos × Listed B)) λ ss → (q , a , ss) ∈ gs
+    found : ∀ {q a} → Nth i q a → Σ (List (Pos × Listed B)) λ ss → (q , a , ss) ∈ gs
     found N with mapM⁺ {xs = nths i} egs (nth-c N)
-    ... | (x , xm , ex) with entry-ok i ess (nth-c N) ex
+    ... | (x , xm , ex) with entry-ok i L (nth-c N) ex
     ... | (ss , refl , _) = ss , xm
 
-    ih = levels-ok K (suc i) (dedup (grow i ess gs)) erest (λ m → sub (∈-++⁺ʳ (mapL (i ,_) gs) m))
-      (dedup-ok (grow-ok i ess gs lv good found))
+    ih = levels-ok K (suc i) (endsOf gs ∷ ess) erest (λ m → sub (∈-++⁺ʳ (mapL (i ,_) gs) m)) (ends-ok i gs good found , L)
 
     sound-l : ∀ {j x} → (j , x) ∈ mapL (i ,_) gs ++ rest → Fine j x
     sound-l m with ∈-++⁻ (mapL (i ,_) gs) m
@@ -211,29 +237,26 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     sound-l m | inj₂ h = proj₁ ih h
 
     complete-l : ∀ {j q a} → i ≤ j → j < suc K + i → Nth j q a
-      → Σ (List (List Pos × Pos × Listed B)) λ ss → (j , q , a , ss) ∈ mapL (i ,_) gs ++ rest
+      → Σ (List (Pos × Listed B)) λ ss → (j , q , a , ss) ∈ mapL (i ,_) gs ++ rest
     complete-l {j} le lt N with m≤n⇒m<n∨m≡n le
     ... | inj₂ refl = let (ss , xm) = found N in ss , ∈-++⁺ˡ (∈-map⁺ (i ,_) xm)
     ... | inj₁ lt′ = let (ss , xm) = proj₂ ih lt′ (subst (λ x → j < x) (sym (+-suc K i)) lt) N in
       ss , ∈-++⁺ʳ (mapL (i ,_) gs) xm
 
   private
-    lv₀ : Lv 0 [ [] ]
-    lv₀ = (λ { (here refl) → none ; (there ()) }) , λ { none → here refl }
-
-    levG = levels-ok (length vals) 0 [ [] ] eG (λ m → m) lv₀
+    levG = levels-ok (length vals) 0 [] eG (λ m → m) tt
 
     fine-all : ∀ {j e} → (j , e) ∈ G → Fine j e
     fine-all = proj₁ levG
 
     -- Every value's level is listed.
-    found-all : ∀ {j q a} → Nth j q a → Σ (List (List Pos × Pos × Listed B)) λ ss → (j , q , a , ss) ∈ G
+    found-all : ∀ {j q a} → Nth j q a → Σ (List (Pos × Listed B)) λ ss → (j , q , a , ss) ∈ G
     found-all N = proj₂ levG z≤n
       (subst (λ x → _ < x) (sym (+-identityʳ (length vals)))
         (≤-<-trans (nth-cnt N) (cnt-in (values⁺ (complete exo (nth-out N)))))) N
 
-    sub-of : ∀ {j q a ss es s l} → (j , q , a , ss) ∈ G → (es , s , l) ∈ ss → Sub j q s a × Exact l (enter (fD a) s)
-    sub-of gm sm = let (N , snd , _) = fine-all gm ; (S , St , el) = snd sm in (_ , S , N , St) , exl gm sm el
+    sub-of : ∀ {j q a ss s l} → (j , q , a , ss) ∈ G → (s , l) ∈ ss → Sub j q s a × Exact l (enter (fD a) s)
+    sub-of gm sm = let (N , snd , _) = fine-all gm ; (St , el) = snd sm in (N , St) , exl gm sm el
 
   ----------------------------------------------------------------------
   -- The tests
@@ -242,12 +265,12 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     queued→ : ∀ c → queuedᵇ G c ≡ true → Queued c
     queued→ c e with any⁻ {xs = G} e
     ... | ((j , q , a , ss) , gm , h) with any⁻ {xs = ss} h
-    ... | ((es , s , l) , sm , d) with ≟-true {s} {c ++ [ ix 1 ]} d
+    ... | ((s , l) , sm , d) with ≟-true {s} {c ++ [ ix 1 ]} d
     ... | refl = j , q , a , proj₁ (sub-of gm sm)
 
     →queued : ∀ c → Queued c → queuedᵇ G c ≡ true
-    →queued c (j , q , a , es , S , N , St) =
-      let (ss , gm) = found-all N ; (l , sm) = proj₂ (proj₂ (fine-all gm)) S St in
+    →queued c (j , q , a , N , St) =
+      let (ss , gm) = found-all N ; (l , sm) = proj₂ (proj₂ (fine-all gm)) St in
       any⁺ {xs = G} gm (any⁺ {xs = ss} sm (≟-refl (c ++ [ ix 1 ])))
 
     done→ : ∀ c → done G c ≡ true → Done c
@@ -257,14 +280,14 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
       lanes : ∀ {i q a} → Nth i q a → Tb._≺_ q c → Σ Pos λ s → Σ Pos λ c′ → Sub i q s a × enter (fD a) s c′ end × Tb._≼_ c′ c
       lanes N qc with found-all N
       ... | (ss , gm) with any⁻ {xs = ss} (or-right (fromT qc) (all⁻ {xs = G} e₂ gm))
-      ... | ((es , s , l) , sm , eb) with sub-of gm sm
+      ... | ((s , l) , sm , eb) with sub-of gm sm
       ... | (sb , ex) with endBy→ ex {c} eb
       ... | (c′ , y , le) = s , c′ , sb , y , le
 
     →done : ∀ c → Done c → done G c ≡ true
     →done c ((c₀ , x , le) , lanes) = ∧-intro (→endBy exo {c₀} {c} x le) (all⁺ {xs = G} λ { {j , q , a , ss} gm →
       or-of (q <ᵖ c) λ qc →
-      let (N , _ , cmp) = fine-all gm ; (s , c′ , (es , S , _ , St) , y , le′) = lanes N (Equivalence.from T-≡ qc) ; (l , sm) = cmp S St in
+      let (N , _ , cmp) = fine-all gm ; (s , c′ , (_ , St) , y , le′) = lanes N (Equivalence.from T-≡ qc) ; (l , sm) = cmp St in
       any⁺ {xs = ss} sm (→endBy (proj₂ (sub-of gm sm)) {c′} {c} y le′) })
 
   ----------------------------------------------------------------------
@@ -299,7 +322,7 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     outer-s {c , end} rm h with single⁻ h
     ... | refl = end-row (sound exo rm)
 
-    lane-s : ∀ {j q a ss es s l r k e} → (j , q , a , ss) ∈ G → (es , s , l) ∈ ss → r ∈ rows l → (k , e) ≡ laneRow G r → BoundedT k e
+    lane-s : ∀ {j q a ss s l r k e} → (j , q , a , ss) ∈ G → (s , l) ∈ ss → r ∈ rows l → (k , e) ≡ laneRow G r → BoundedT k e
     lane-s {r = k′ , out b} gm sm rm refl = let (sb , ex) = sub-of gm sm in lane sb (sound ex rm) tt
     lane-s {r = k′ , skip}  gm sm rm refl = let (sb , ex) = sub-of gm sm in lane sb (sound ex rm) tt
     lane-s {r = c , end} gm sm rm eq with if-split (queuedᵇ G c) eq
@@ -318,8 +341,8 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     -- A lane's row, under some schedule.
     shown : ∀ {j q s a r} → Sub j q s a → (∀ {l} → Exact l (enter (fD a) s) → r ∈ mapL (laneRow G) (rows l))
       → r ∈ rows (boundedRows G)
-    shown (es , S , N , St) h =
-      let (ss , gm) = found-all N ; (l , sm) = proj₂ (proj₂ (fine-all gm)) S St in
+    shown (N , St) h =
+      let (ss , gm) = found-all N ; (l , sm) = proj₂ (proj₂ (fine-all gm)) St in
       ∈-++⁺ʳ (concatMap (outerRow (done G)) (rows o)) (cm⁺ {xs = G} gm (cm⁺ {xs = ss} sm (h (proj₂ (sub-of gm sm)))))
 
     passing : ∀ c → ¬ Queued c → laneRow G (c , end) ≡ (c , (if done G c then end else skip))
@@ -330,7 +353,7 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
   ... | inj₁ h = let (r , rm , h′) = cm⁻ {xs = rows o} h in outer-s rm h′
   ... | inj₂ h with cm⁻ {xs = G} h
   ... | ((j , q , a , ss) , gm , h′) with cm⁻ {xs = ss} h′
-  ... | ((es , s , l) , sm , h″) with ∈-map⁻ (laneRow G) h″
+  ... | ((s , l) , sm , h″) with ∈-map⁻ (laneRow G) h″
   ... | (r , rm , eq) = lane-s gm sm rm eq
 
   complete-b : ∀ {q e} → BoundedT q e → (q , e) ∈ rows (boundedRows G)
@@ -349,6 +372,6 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
 bounded-exact : ∀ {A B} (k : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln : A → Pos → Maybe (Listed B)) (o : Listed A)
   → Exactly o t → (∀ {a s l} → ln a s ≡ just l → Exactly l (enter (fD a) s))
   → ∀ {l} → BoundedL.listB k ln o ≡ just l → Exactly l (Tb.Bounded.BoundedT k fD t)
-bounded-exact k fD t ln o eo eln e u with bind⁻ {m = BoundedL.levels k ln o (length (values (rows o))) 0 [ [] ] (Order.nths (values (rows o)) 0)} e
+bounded-exact k fD t ln o eo eln e u with bind⁻ {m = BoundedL.levels k ln o (length (values (rows o))) 0 [] (Order.nths (values (rows o)) 0)} e
 ... | (G , eG , refl) = record { sound = sound-b ; complete = complete-b }
   where open BoundedX k fD t ln o eo eln G eG u

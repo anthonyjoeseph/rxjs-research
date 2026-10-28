@@ -19,14 +19,15 @@
 -- the limit and the operator would disagree on it.
 module denotation.EmissionSet where
 
-open import Data.Bool using (Bool; T; not; if_then_else_)
+open import Data.Bool using (Bool; T; not)
 open import Data.Empty using (⊥)
-open import Data.List using (List; []; _∷_; _++_; [_]; length)
+open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; _∷_; lookup)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _∸_)
 open import Data.Product using (Σ; _×_)
+open import Data.Sum using (_⊎_)
 open import Data.Unit using (⊤)
 open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
@@ -221,40 +222,41 @@ module Merge {A B : Set} (f : A → Den B) (o : EmissionSet A) where
 -- queue, and the queue's first lane is subscribed where a lane ends, that
 -- end shown silent at its first effect.  Lanes start in value order, so
 -- lane i is running once i ∸ n + 1 of the lanes before it have ended: it
--- starts where its value arrives, or past the (i ∸ n)-th of their ends in
--- position order, whichever is later.  `just 1` is concat.
--- How many of `es` lie before `c`.
-below : Pos → List Pos → ℕ
-below c []       = 0
-below c (e ∷ es) = if e <ᵖ c then suc (below c es) else below c es
-
+-- starts where its value arrives, or where the (i ∸ n + 1)-th of their
+-- ends falls, whichever is later.  Each is decided by the ends before the
+-- start, so a lane that never starts never ends and frees nothing.
+-- `just 1` is concat.
 module Bounded {A B : Set} (n : ℕ) (f : A → Den B) (o : EmissionSet A) where
   open Values o
 
-  -- `c` is `es`'s k-th in position order, from 0.
-  Kth : ℕ → List Pos → Pos → Set
-  Kth k es c = c ∈ es × below c es ≡ k
+  -- `k` and one more of the lanes `ls`, each given by its ends, end
+  -- where `P` holds: for `P` closed downward, the lanes' k-th end in
+  -- position order, from 0, is where `P` holds.
+  Kth : (Pos → Set) → List (Pos → Set) → ℕ → Set
+  Kth P []       k       = ⊥
+  Kth P (l ∷ ls) zero    = (Σ Pos λ c → l c × P c) ⊎ Kth P ls zero
+  Kth P (l ∷ ls) (suc k) = ((Σ Pos λ c → l c × P c) × Kth P ls k) ⊎ Kth P ls (suc k)
 
-  -- Where lane i, for the value at `q`, starts, given the ends `es` of
-  -- the lanes before it.
-  data Starts (i : ℕ) (q : Pos) (es : List Pos) : Pos → Set where
-    room   : i < n → Starts i q es (q ++ [ ix 1 ])
-    freed  : ∀ {c} → n ≤ i → Kth (i ∸ n) es c → c ≺ q → Starts i q es (q ++ [ ix 1 ])
-    queued : ∀ {c} → n ≤ i → Kth (i ∸ n) es c → q ≺ c → Starts i q es (c ++ [ ix 1 ])
+  -- Where lane i, for the value at `q`, starts, given the lanes `ls`
+  -- before it: at once, or at the end that frees it.
+  data Starts (i : ℕ) (q : Pos) (ls : List (Pos → Set)) : Pos → Set where
+    room   : i < n → Starts i q ls (q ++ [ ix 1 ])
+    freed  : n ≤ i → Kth (_≺ q) ls (i ∸ n) → Starts i q ls (q ++ [ ix 1 ])
+    queued : ∀ {c} → n ≤ i → q ≺ c → Kth (_≡ c) ls 0 → Kth (_≼ c) ls (i ∸ n)
+           → ¬ Kth (_≺ c) ls (i ∸ n) → Starts i q ls (c ++ [ ix 1 ])
 
-  -- The ends of lanes 0 … i-1: of those started, those that end.  A lane
-  -- too few ends free is held for good, and every lane after it.
-  data Sched : ℕ → List Pos → Set where
-    none  : Sched 0 []
-    ended : ∀ {i es q a s c} → Sched i es → Nth i q a → Starts i q es s → enter (f a) s c end
-          → Sched (suc i) (c ∷ es)
-    runs  : ∀ {i es q a s} → Sched i es → Nth i q a → Starts i q es s → (∀ {c} → ¬ enter (f a) s c end)
-          → Sched (suc i) es
-    held  : ∀ {i es q a} → Sched i es → Nth i q a → n ≤ i → length es ≤ i ∸ n → Sched (suc i) es
+  -- Lane i's ends, given the lanes before it.
+  Ends : ℕ → List (Pos → Set) → Pos → Set
+  Ends i ls c = Σ Pos λ q → Σ A λ a → Σ Pos λ s → Nth i q a × Starts i q ls s × enter (f a) s c end
+
+  -- The lanes before lane i, the latest first.
+  Sched : ℕ → List (Pos → Set)
+  Sched zero    = []
+  Sched (suc i) = Ends i (Sched i) ∷ Sched i
 
   -- Lane i, for the outer's value at `q`, subscribed at `s`.
   Sub : ℕ → Pos → Pos → A → Set
-  Sub i q s a = Σ (List Pos) λ es → Sched i es × Nth i q a × Starts i q es s
+  Sub i q s a = Nth i q a × Starts i q (Sched i) s
 
   -- A queued lane starts past `c`.
   Queued : Pos → Set

@@ -9,7 +9,7 @@ open import Data.Bool using (Bool; true; false; T; not; _∧_; _∨_; if_then_el
 open import Data.Bool.Properties using (T-≡)
 open import Function.Bundles using (Equivalence)
 open import Data.Empty using (⊥-elim)
-open import Data.List using (List; []; _∷_; _++_; [_]; length; null)
+open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -192,17 +192,6 @@ cmM⁺ {f = f} {x ∷ xs} e m with bind⁻ {m = f x} e
 ... | (ws , rest , refl) with m
 ... | here refl = zs , fx , ∈-++⁺ˡ
 ... | there m′  = let (vs , fv , k) = cmM⁺ {f = f} rest m′ in vs , fv , λ h → ∈-++⁺ʳ zs (k h)
-
-null⁻ : ∀ {X : Set} {xs : List X} {x} → null xs ≡ true → ¬ x ∈ xs
-null⁻ {xs = []} _ ()
-
-null⁺ : ∀ {X : Set} {xs : List X} → (∀ {x} → ¬ x ∈ xs) → null xs ≡ true
-null⁺ {xs = []}    _ = refl
-null⁺ {xs = x ∷ _} n = ⊥-elim (n (here refl))
-
-null-off : ∀ {X : Set} {xs : List X} {x} → x ∈ xs → null xs ≡ false
-null-off (here _)  = refl
-null-off (there _) = refl
 
 ------------------------------------------------------------------------
 -- Rows
