@@ -198,30 +198,43 @@ module MergeL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) wher
             ⊣ (short o ∨ anyᵇ (λ { (_ , _ , l) → short l }) ls)
 open MergeL public using (mergeRows)
 
--- `EmissionSet.Scan.ScanT`: each value with every fold up to it.
+-- `EmissionSet.Scan.ScanT`: level by level, as `Values.Nth` counts, each
+-- value with the folds ending at it, read off the level before.
 module ScanL {A B : Set} (f : B → A → B) (z : B) (o : Listed A) where
   vals : List (Pos × A)
   vals = values (rows o)
-  open Order vals using (minᵇ; nextᵇ)
+  open Order vals using (nextᵇ; after; nths)
 
-  -- `Scan.Acc`: the folds ending at the value `a` at `q`, through at most
-  -- `n` values.  A chain never repeats a position, so the number of
-  -- values listed is enough.
+  opening : Pos × A → Pos × A × List B
+  opening (q , a) = q , a , [ f z a ]
+
+  -- The folds ending at the value `a` at `q`, from the level before.
+  step : List (Pos × A × List B) → Pos × A → Pos × A × List B
+  step cur (q , a) = q , a , concatMap (λ { (q₀ , _ , bs) → if nextᵇ q₀ q then mapL (λ b → f b a) bs else [] }) cur
+
+  -- Levels up to `k` on, from level `cur` holding the values `vs`; the
+  -- next level's values are passed on rather than recomputed.
   mutual
-    accs : ℕ → Pos → A → List B
-    accs zero    q a = []
-    accs (suc n) q a = when (minᵇ q) (f z a) ++ concatMap (prior n q a) vals
+    levels : ℕ → List (Pos × A) → List (Pos × A × List B) → List (Pos × A × List B)
+    levels zero    vs cur = []
+    levels (suc k) vs cur = cur ++ onward k (after vs) cur
 
-    prior : ℕ → Pos → A → Pos × A → List B
-    prior n q a (q₀ , a₀) = if nextᵇ q₀ q then mapL (λ b → f b a) (accs n q₀ a₀) else []
+    onward : ℕ → List (Pos × A) → List (Pos × A × List B) → List (Pos × A × List B)
+    onward k vs cur = levels k vs (mapL (step cur) vs)
 
-  scanRow : Row A → List (Row B)
-  scanRow (q , out a) = mapL (λ b → q , out b) (accs (suc (length vals)) q a)
-  scanRow (q , skip)  = [ q , skip ]
-  scanRow (q , end)   = [ q , end ]
+  table : List (Pos × A × List B)
+  table = levels (length vals) (nths 0) (mapL opening (nths 0))
+
+  folds : Pos × A × List B → List (Row B)
+  folds (q , _ , bs) = mapL (λ b → q , out b) bs
+
+  others : Row A → List (Row B)
+  others (q , out _) = []
+  others (q , skip)  = [ q , skip ]
+  others (q , end)   = [ q , end ]
 
   scanRows : Listed B
-  scanRows = concatMap scanRow (rows o) ⊣ short o
+  scanRows = (concatMap folds table ++ concatMap others (rows o)) ⊣ short o
 open ScanL public using (scanRows)
 
 -- `EmissionSet.TakeWhile.TakeT`, subscribed at `p`.
