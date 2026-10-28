@@ -10,7 +10,7 @@
 -- listed completely.  A cut listing claims nothing.
 module quickcheck.Tabled.Exact where
 
-open import Data.Bool using (Bool; true; false; T; not; _∧_; _∨_; if_then_else_)
+open import Data.Bool using (Bool; true; false; T; not; if_then_else_)
 open import Data.Bool.Properties using (T-≡)
 open import Function.Bundles using (Equivalence)
 open import Data.Empty using (⊥-elim)
@@ -19,10 +19,10 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻; ∈-map⁺; ∈-map⁻)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc)
+open import Data.Maybe using (just; nothing)
+open import Data.Nat using (zero; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (¬_)
@@ -31,169 +31,22 @@ open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty
 import denotation.MonotonicList.Events as E
 open import denotation.MonotonicList.Events using (Pos; Timeline; _<ᵖ_; inside; ix)
 open import denotation.EmissionSet
-  using (out; skip; end; EmissionSet; _≼_; InE; at-out; at-skip; at-end; on-out; on-skip; Proper; Rejoin;
+  using (out; skip; end; EmissionSet; InE; at-out; at-skip; at-end; on-out; on-skip; Proper; Rejoin;
   ended; late; Den; enter; MapT; map-out; map-skip; map-end; DeferT; guard; DenEnv; approxᵀ)
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled
-  using (Row; Listed; _⊣_; rows; short; bind; concatMap; mapM; when; anyᵇ; allᵇ; endBy; properᵇ;
-  proper; values; fuel; horizon; walk; mapRow; mapRows; rejoinRow; rejoin; hotOf; outerRow;
-  mergeRows; connRows; scanRows; takeRows; switchRows; module MergeL; module TakeL; module ExhaustL;
-  module BoundedL; module ConnL; listT)
+  using (Row; Listed; _⊣_; rows; short; concatMap; when; endBy; proper; values; fuel; horizon; walk;
+  mapRow; mapRows; rejoinRow; rejoin; hotOf; outerRow; mergeRows; connRows; takeRows; lanes;
+  module MergeL; module TakeL; module ConnL; listT)
+open import quickcheck.Tabled.Exact.Base
+  using (Exact; Exactly; sound; complete; fromT; fromNot; offT; T-not; ∨-false; ∧-true; ∧-intro; off;
+  any⁻; any⁺; any-off; all⁻; all⁺; single⁻; when⁻; when⁺; if⁻; if-t; if-f; cm⁻; cm⁺; bind⁻;
+  values⁻; values⁺; endBy→; →endBy; proper→; →proper; lanes-from; lanes-to)
+open import quickcheck.Tabled.Exact.Scan using (scan-exact)
+open import quickcheck.Tabled.Exact.Switch using (switch-exact)
+open import quickcheck.Tabled.Exact.Exhaust using (exhaust-exact)
+open import quickcheck.Tabled.Exact.Bounded using (bounded-exact)
 
-------------------------------------------------------------------------
--- Exactness
-
-record Exact {A : Set} (l : Listed A) (t : EmissionSet A) : Set where
-  field
-    sound    : ∀ {q e} → (q , e) ∈ rows l → t q e
-    complete : ∀ {q e} → t q e → (q , e) ∈ rows l
-open Exact public
-
-Exactly : ∀ {A} → Listed A → EmissionSet A → Set
-Exactly l t = short l ≡ false → Exact l t
-
-------------------------------------------------------------------------
--- Booleans
-
-private
-  fromT : ∀ {b} → T b → b ≡ true
-  fromT {true} _ = refl
-
-  fromNot : ∀ {b} → ¬ T b → b ≡ false
-  fromNot {true}  n = ⊥-elim (n tt)
-  fromNot {false} _ = refl
-
-  offT : ∀ {b} → b ≡ false → ¬ T b
-  offT refl ()
-
-  not-T : ∀ {b} → not b ≡ true → ¬ T b
-  not-T {true}  ()
-  not-T {false} _ ()
-
-  T-not : ∀ {b} → ¬ T b → not b ≡ true
-  T-not {true}  n = ⊥-elim (n tt)
-  T-not {false} _ = refl
-
-  ∨-false : ∀ {a b} → a ∨ b ≡ false → a ≡ false × b ≡ false
-  ∨-false {true}  ()
-  ∨-false {false} e = refl , e
-
-  ∧-true : ∀ {a b} → a ∧ b ≡ true → a ≡ true × b ≡ true
-  ∧-true {true}  e = refl , e
-  ∧-true {false} ()
-
-  ∧-intro : ∀ {a b} → a ≡ true → b ≡ true → a ∧ b ≡ true
-  ∧-intro refl e = e
-
-  -- A test that would hold had its predicate held.
-  off : ∀ {b} {P : Set} → (b ≡ true → P) → ¬ P → b ≡ false
-  off {true}  f n = ⊥-elim (n (f refl))
-  off {false} _ _ = refl
-
-------------------------------------------------------------------------
--- Lists
-
-  any⁻ : ∀ {X : Set} {p : X → Bool} {xs} → anyᵇ p xs ≡ true → Σ X λ x → x ∈ xs × p x ≡ true
-  any⁻ {xs = []} ()
-  any⁻ {p = p} {x ∷ xs} e with p x in px
-  ... | true  = x , here refl , px
-  ... | false = let (y , m , py) = any⁻ {p = p} {xs} e in y , there m , py
-
-  any⁺ : ∀ {X : Set} {p : X → Bool} {xs x} → x ∈ xs → p x ≡ true → anyᵇ p xs ≡ true
-  any⁺ {p = p} {y ∷ xs} (here refl) e rewrite e = refl
-  any⁺ {p = p} {y ∷ xs} (there m) e with p y
-  ... | true  = refl
-  ... | false = any⁺ {p = p} m e
-
-  any-off : ∀ {X : Set} {p : X → Bool} {xs x} → anyᵇ p xs ≡ false → x ∈ xs → p x ≡ false
-  any-off {p = p} {x = x} e m with p x in px
-  ... | true  = ⊥-elim (offT e (Equivalence.from T-≡ (any⁺ {p = p} m px)))
-  ... | false = refl
-
-  all⁻ : ∀ {X : Set} {p : X → Bool} {xs x} → allᵇ p xs ≡ true → x ∈ xs → p x ≡ true
-  all⁻ {p = p} {y ∷ xs} e (here refl) = proj₁ (∧-true e)
-  all⁻ {p = p} {y ∷ xs} e (there m)   = all⁻ {p = p} (proj₂ (∧-true {p y} e)) m
-
-  all⁺ : ∀ {X : Set} {p : X → Bool} {xs} → (∀ {x} → x ∈ xs → p x ≡ true) → allᵇ p xs ≡ true
-  all⁺ {xs = []}         f = refl
-  all⁺ {p = p} {y ∷ xs} f = ∧-intro (f (here refl)) (all⁺ {p = p} (λ m → f (there m)))
-
-  single⁻ : ∀ {X : Set} {x y : X} → y ∈ [ x ] → y ≡ x
-  single⁻ (here e) = e
-  single⁻ (there ())
-
-  when⁻ : ∀ {X : Set} {b} {x y : X} → y ∈ when b x → b ≡ true × y ≡ x
-  when⁻ {b = true}  m = refl , single⁻ m
-  when⁻ {b = false} ()
-
-  when⁺ : ∀ {X : Set} {b} {x : X} → b ≡ true → x ∈ when b x
-  when⁺ refl = here refl
-
-  if⁻ : ∀ {X : Set} {b} {xs ys : List X} {x} → x ∈ (if b then xs else ys) → (b ≡ true × x ∈ xs) ⊎ (b ≡ false × x ∈ ys)
-  if⁻ {b = true}  m = inj₁ (refl , m)
-  if⁻ {b = false} m = inj₂ (refl , m)
-
-  if-t : ∀ {X : Set} {b} {xs ys : List X} {x} → b ≡ true → x ∈ xs → x ∈ (if b then xs else ys)
-  if-t refl m = m
-
-  if-f : ∀ {X : Set} {b} {xs ys : List X} {x} → b ≡ false → x ∈ ys → x ∈ (if b then xs else ys)
-  if-f refl m = m
-
-  cm⁻ : ∀ {X Y : Set} {f : X → List Y} {xs : List X} {y} → y ∈ concatMap f xs → Σ X λ x → x ∈ xs × y ∈ f x
-  cm⁻ {xs = []} ()
-  cm⁻ {f = f} {x ∷ xs} m with ∈-++⁻ (f x) m
-  ... | inj₁ h = x , here refl , h
-  ... | inj₂ h = let (z , zm , zh) = cm⁻ {f = f} {xs} h in z , there zm , zh
-
-  cm⁺ : ∀ {X Y : Set} {f : X → List Y} {xs : List X} {x y} → x ∈ xs → y ∈ f x → y ∈ concatMap f xs
-  cm⁺ {f = f} {x ∷ xs} (here refl) h = ∈-++⁺ˡ h
-  cm⁺ {f = f} {x ∷ xs} (there m)   h = ∈-++⁺ʳ (f x) (cm⁺ {f = f} m h)
-
-  bind⁻ : ∀ {X Y : Set} {m : Maybe X} {k : X → Maybe Y} {y} → bind m k ≡ just y → Σ X λ x → m ≡ just x × k x ≡ just y
-  bind⁻ {m = just x} e = x , refl , e
-  bind⁻ {m = nothing} ()
-
-  mapM⁻ : ∀ {X Y : Set} {f : X → Maybe Y} {xs ys y} → mapM f xs ≡ just ys → y ∈ ys → Σ X λ x → x ∈ xs × f x ≡ just y
-  mapM⁻ {xs = []} refl ()
-  mapM⁻ {f = f} {x ∷ xs} e m with bind⁻ {m = f x} e
-  ... | (y₀ , fx , e′) with bind⁻ {m = mapM f xs} e′
-  ... | (ys₀ , rest , refl) with m
-  ... | here refl = x , here refl , fx
-  ... | there m′  = let (z , zm , fz) = mapM⁻ {f = f} rest m′ in z , there zm , fz
-
-  mapM⁺ : ∀ {X Y : Set} {f : X → Maybe Y} {xs ys x} → mapM f xs ≡ just ys → x ∈ xs → Σ Y λ y → y ∈ ys × f x ≡ just y
-  mapM⁺ {xs = []} _ ()
-  mapM⁺ {f = f} {x ∷ xs} e m with bind⁻ {m = f x} e
-  ... | (y₀ , fx , e′) with bind⁻ {m = mapM f xs} e′
-  ... | (ys₀ , rest , refl) with m
-  ... | here refl = y₀ , here refl , fx
-  ... | there m′  = let (z , zm , fz) = mapM⁺ {f = f} rest m′ in z , there zm , fz
-
-------------------------------------------------------------------------
--- Rows
-
-  values⁻ : ∀ {A} {rs : List (Row A)} {q a} → (q , a) ∈ values rs → (q , out a) ∈ rs
-  values⁻ {rs = (k , out b) ∷ rs} (here refl) = here refl
-  values⁻ {rs = (k , out b) ∷ rs} (there m)   = there (values⁻ m)
-  values⁻ {rs = (k , skip) ∷ rs}  m           = there (values⁻ m)
-  values⁻ {rs = (k , end) ∷ rs}   m           = there (values⁻ m)
-
-  values⁺ : ∀ {A} {rs : List (Row A)} {q a} → (q , out a) ∈ rs → (q , a) ∈ values rs
-  values⁺ {rs = (k , out b) ∷ rs} (here refl) = here refl
-  values⁺ {rs = (k , out b) ∷ rs} (there m)   = there (values⁺ m)
-  values⁺ {rs = (k , skip) ∷ rs}  (here ())
-  values⁺ {rs = (k , skip) ∷ rs}  (there m)   = values⁺ m
-  values⁺ {rs = (k , end) ∷ rs}   (here ())
-  values⁺ {rs = (k , end) ∷ rs}   (there m)   = values⁺ m
-
-  endBy→ : ∀ {X : Set} {u : EmissionSet X} {l : Listed X} → Exact l u → ∀ {c} → endBy (rows l) c ≡ true → Σ Pos λ k → u k end × k ≼ c
-  endBy→ {l = l} ex e with any⁻ {xs = rows l} e
-  ... | ((k , end) , m , h)   = k , sound ex m , not-T h
-  ... | ((k , out _) , m , ())
-  ... | ((k , skip) , m , ())
-
-  →endBy : ∀ {X : Set} {u : EmissionSet X} {l : Listed X} → Exact l u → ∀ {k c} → u k end → k ≼ c → endBy (rows l) c ≡ true
-  →endBy ex x kc = any⁺ (complete ex x) (T-not kc)
 ------------------------------------------------------------------------
 -- Leaves
 
@@ -245,16 +98,12 @@ proper-exact : ∀ {A} {l : Listed A} {t : EmissionSet A} → Exactly l t → Ex
 proper-exact {A} {l} {t} el u = record { sound = s ; complete = c }
   where
     ex = el u
-    pb→ : ∀ {q} → properᵇ (rows l) q ≡ true → ∀ {k} → t k end → q ≼ k
-    pb→ e x = not-T (all⁻ e (complete ex x))
-    →pb : ∀ {q} → (∀ {k} → t k end → q ≼ k) → properᵇ (rows l) q ≡ true
-    →pb h = all⁺ {xs = rows l} λ { {k , out _} m → refl ; {k , skip} m → refl ; {k , end} m → T-not (h (sound ex m)) }
     s : ∀ {q e} → (q , e) ∈ proper (rows l) → Proper t q e
     s m with cm⁻ {xs = rows l} m
     ... | ((k , e′) , m′ , h) with when⁻ h
-    ... | (pb , refl) = sound ex m′ , pb→ pb
+    ... | (pb , refl) = sound ex m′ , proper→ ex pb
     c : ∀ {q e} → Proper t q e → (q , e) ∈ proper (rows l)
-    c (x , h) = cm⁺ (complete ex x) (when⁺ (→pb h))
+    c (x , h) = cm⁺ (complete ex x) (when⁺ (→proper ex h))
 
 -- `EmissionSet.Rejoin`, joining a hot at `p`.
 private
@@ -385,7 +234,7 @@ merge-exact fD {t} o ls eo from to u = record { sound = sound-m ; complete = com
   where open MergeX fD t o ls u eo from to
 
 ------------------------------------------------------------------------
--- Scan, takeWhile, switch, exhaust, bounded merge
+-- takeWhile
 
 module TakeX {A : Set} (incl : Bool) (keep : A → Bool) (p : Pos) (t : EmissionSet A) (o : Listed A) (ex : Exact o t) where
   open Tb.TakeWhile incl keep t p
@@ -442,23 +291,6 @@ take-exact : ∀ {A} (i : Bool) (keep : A → Bool) (p : Pos) {t : EmissionSet A
   → Exactly (takeRows i keep p o) (Tb.TakeWhile.TakeT i keep t p)
 take-exact i keep p {t} o eo u = record { sound = sound-t ; complete = complete-t }
   where open TakeX i keep p t o (eo u)
-
-postulate
-  scan-exact : ∀ {A B} (f : B → A → B) (z : B) {t : EmissionSet A} (o : Listed A) → Exactly o t
-    → Exactly (scanRows f z o) (Tb.Scan.ScanT f z t)
-
-  switch-exact : ∀ {A B} (fD : A → Den B) {t : EmissionSet A} (o : Listed A) (ls : List (Pos × A × Listed B)) → Exactly o t
-    → (∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (enter (fD a) (q ++ [ ix 1 ])))
-    → (∀ {q a} → (q , a) ∈ values (rows o) → Σ (Listed B) λ l → (q , a , l) ∈ ls)
-    → Exactly (switchRows o ls) (Tb.Switch.SwitchT fD t)
-
-  exhaust-exact : ∀ {A B} (fD : A → Den B) (t : EmissionSet A) (ln : A → Pos → Maybe (Listed B)) (o : Listed A)
-    → Exactly o t → (∀ {a s l} → ln a s ≡ just l → Exactly l (enter (fD a) s))
-    → ∀ {l} → ExhaustL.listE ln o ≡ just l → Exactly l (Tb.Exhaust.ExhaustT fD t)
-
-  bounded-exact : ∀ {A B} (k : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln : A → Pos → Maybe (Listed B)) (o : Listed A)
-    → Exactly o t → (∀ {a s l} → ln a s ≡ just l → Exactly l (enter (fD a) s))
-    → ∀ {l} → BoundedL.listB k ln o ≡ just l → Exactly l (Tb.Bounded.BoundedT k fD t)
 
 ------------------------------------------------------------------------
 -- Connect
@@ -530,39 +362,21 @@ listT-exact n (scan f z s) {ρL} ρ p e with bind⁻ {m = listT n s ρL p} e
 listT-exact n (takeWhile i q s) {ρL} ρ p e with bind⁻ {m = listT n s ρL p} e
 ... | (l₀ , e₀ , refl) = take-exact i q p l₀ (listT-exact n s ρ p e₀)
 listT-exact n (flatMap (mergeᶠ nothing) f s) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL p} e
-... | (o , eo , e₁)
-  with bind⁻ {m = mapM (λ qa → bind (listT n (f (proj₂ qa)) ρL (proj₁ qa ++ [ ix 1 ])) λ l → just (proj₁ qa , proj₂ qa , l)) (values (rows o))} e₁
-... | (ls , els , refl) = merge-exact (λ a → approxᵀ n (f a) ρD) o ls (listT-exact n s ρ p eo) from to
-  where
-    from : ∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (enter (approxᵀ n (f a) ρD) (q ++ [ ix 1 ]))
-    from m with mapM⁻ {xs = values (rows o)} els m
-    ... | ((q′ , a′) , vm , fx) with bind⁻ {m = listT n (f a′) ρL (q′ ++ [ ix 1 ])} fx
-    ... | (l′ , el′ , refl) = vm , listT-exact n (f a′) ρ (q′ ++ [ ix 1 ]) el′
-    to : ∀ {q a} → (q , a) ∈ values (rows o) → Σ (Listed _) λ l → (q , a , l) ∈ ls
-    to {q} {a} vm with mapM⁺ {xs = values (rows o)} els vm
-    ... | (y , ym , fx) with bind⁻ {m = listT n (f a) ρL (q ++ [ ix 1 ])} fx
-    ... | (l′ , _ , refl) = l′ , ym
+... | (o , eo , e₁) with bind⁻ {m = lanes (λ a → listT n (f a) ρL) (values (rows o))} e₁
+... | (ls , els , refl) = merge-exact (λ a → approxᵀ n (f a) ρD) o ls (listT-exact n s ρ p eo)
+  (lanes-from {ln = λ a → listT n (f a) ρL} {D = λ a → enter (approxᵀ n (f a) ρD)} (λ {a} {s′} el → listT-exact n (f a) ρ s′ el) els) (lanes-to {ln = λ a → listT n (f a) ρL} els)
 listT-exact n (flatMap (mergeᶠ (just k)) f s) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL p} e
 ... | (o , eo , e₁) =
   bounded-exact k (λ a → approxᵀ n (f a) ρD) _ (λ a → listT n (f a) ρL) o (listT-exact n s ρ p eo)
     (λ {a} {s′} el → listT-exact n (f a) ρ s′ el) e₁
 listT-exact n (flatMap switchᶠ f s) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL p} e
-... | (o , eo , e₁)
-  with bind⁻ {m = mapM (λ qa → bind (listT n (f (proj₂ qa)) ρL (proj₁ qa ++ [ ix 1 ])) λ l → just (proj₁ qa , proj₂ qa , l)) (values (rows o))} e₁
-... | (ls , els , refl) = switch-exact (λ a → approxᵀ n (f a) ρD) o ls (listT-exact n s ρ p eo) from to
-  where
-    from : ∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (enter (approxᵀ n (f a) ρD) (q ++ [ ix 1 ]))
-    from m with mapM⁻ {xs = values (rows o)} els m
-    ... | ((q′ , a′) , vm , fx) with bind⁻ {m = listT n (f a′) ρL (q′ ++ [ ix 1 ])} fx
-    ... | (l′ , el′ , refl) = vm , listT-exact n (f a′) ρ (q′ ++ [ ix 1 ]) el′
-    to : ∀ {q a} → (q , a) ∈ values (rows o) → Σ (Listed _) λ l → (q , a , l) ∈ ls
-    to {q} {a} vm with mapM⁺ {xs = values (rows o)} els vm
-    ... | (y , ym , fx) with bind⁻ {m = listT n (f a) ρL (q ++ [ ix 1 ])} fx
-    ... | (l′ , _ , refl) = l′ , ym
+... | (o , eo , e₁) with bind⁻ {m = lanes (λ a → listT n (f a) ρL) (values (rows o))} e₁
+... | (ls , els , refl) = switch-exact (λ a → approxᵀ n (f a) ρD) o ls (listT-exact n s ρ p eo)
+  (lanes-from {ln = λ a → listT n (f a) ρL} {D = λ a → enter (approxᵀ n (f a) ρD)} (λ {a} {s′} el → listT-exact n (f a) ρ s′ el) els) (lanes-to {ln = λ a → listT n (f a) ρL} els)
 listT-exact n (flatMap exhaustᶠ f s) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL p} e
-... | (o , eo , e₁) =
-  exhaust-exact (λ a → approxᵀ n (f a) ρD) _ (λ a → listT n (f a) ρL) o (listT-exact n s ρ p eo)
-    (λ {a} {s′} el → listT-exact n (f a) ρ s′ el) e₁
+... | (o , eo , e₁) with bind⁻ {m = lanes (λ a → listT n (f a) ρL) (values (rows o))} e₁
+... | (ls , els , refl) = exhaust-exact (λ a → approxᵀ n (f a) ρD) o ls (listT-exact n s ρ p eo)
+  (lanes-from {ln = λ a → listT n (f a) ρL} {D = λ a → enter (approxᵀ n (f a) ρD)} (λ {a} {s′} el → listT-exact n (f a) ρ s′ el) els) (lanes-to {ln = λ a → listT n (f a) ρL} els)
 listT-exact n (connect s b) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL (p ++ [ ix 1 ])} e
 ... | (σl , eσ , e₁) with bind⁻ {m = listT n b (hotOf σl ∷ ρL) (p ++ [ ix 0 ])} e₁
 ... | (βl , eβ , refl) =

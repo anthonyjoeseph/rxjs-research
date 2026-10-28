@@ -2,6 +2,46 @@
 
 Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
+## Tier 0 — the emission set carries the theorems
+
+**Port:** Main restated over the emission set; `adequacy/` and `simultaneous/` ported to it; no old-denotation use left.
+
+### Ledger
+
+#### THE LIMIT THROUGH A NEGATION
+
+Untried: a row these operators show is decided by a predicate over every
+row of an input (`Merge.Done`, `Switch.Cut`, `Bounded.Queued`,
+`TakeWhile.Failed`, `Values.Nth`), and a later approximant can add the row
+that flips it, so the limit need not commute with the operator. Settled by
+each predicate's verdict stabilising along the approximants, or a program
+whose approximants flip a row forever.
+
+Members: `flatMap-lim`, `connect-lim`, `scan-lim`, `takeWhile-lim`.
+
+#### THE PORTED THEOREM
+
+Untried: what the engine's run shows is what a reader of the emission set
+meets. Settled by porting `adequacy/` onto the emission set under
+`make port-check` until `make old-denotation` reads zero; what is left
+is Tier 1.
+
+Members: `adequacyᵀ`.
+
+#### THE PORTED SPEC
+
+Untried: the simultaneous spec read off the emission set's rows. Settled
+by porting `simultaneous/` the same way.
+
+Members: `left-to-rightᵀ`, `coherentᵀ`, `batchableᵀ`, `positionedᵀ`.
+
+#### THE POINTWISE LIMITS
+
+A row of these is one child's row, shifted, so every approximant agrees
+with the limit row by row. Settled by bodies.
+
+Members: `map-lim`, `defer-lim`.
+
 ## Tier 1 — the adequacy theorem
 
 **Adequacy:** the denotation matches the operational semantics.

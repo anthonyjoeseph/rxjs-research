@@ -7,7 +7,7 @@
 module quickcheck.Tabled where
 
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
-open import Data.List using (List; []; _∷_; _++_; [_]; foldr; length) renaming (map to mapL)
+open import Data.List using (List; []; _∷_; _++_; [_]; foldr; length; null) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _≤ᵇ_; _≡ᵇ_; _<ᵇ_; _∸_)
@@ -54,6 +54,10 @@ mapM : ∀ {X Y : Set} → (X → Maybe Y) → List X → Maybe (List Y)
 mapM f []       = just []
 mapM f (x ∷ xs) = bind (f x) λ y → bind (mapM f xs) λ ys → just (y ∷ ys)
 
+concatMapM : ∀ {X Y : Set} → (X → Maybe (List Y)) → List X → Maybe (List Y)
+concatMapM f []       = just []
+concatMapM f (x ∷ xs) = bind (f x) λ ys → bind (concatMapM f xs) λ zs → just (ys ++ zs)
+
 when : ∀ {X : Set} → Bool → X → List X
 when b x = if b then [ x ] else []
 
@@ -76,6 +80,10 @@ isEnd _   = false
 endBy : ∀ {A} → List (Row A) → Pos → Bool
 endBy rs c = anyᵇ (λ { (k , e) → isEnd e ∧ (k ≼ᵇ c) }) rs
 
+-- An end row strictly before `c`.
+endBefore : ∀ {A} → List (Row A) → Pos → Bool
+endBefore rs c = anyᵇ (λ { (k , e) → isEnd e ∧ (k <ᵖ c) }) rs
+
 -- The positions of the end rows.
 ends : ∀ {A} → List (Row A) → List Pos
 ends = concatMap λ { (k , e) → when (isEnd e) k }
@@ -91,6 +99,26 @@ values : ∀ {A} → List (Row A) → List (Pos × A)
 values []                  = []
 values ((q , out a) ∷ rs)  = (q , a) ∷ values rs
 values (_ ∷ rs)            = values rs
+
+-- `EmissionSet.Values`, over an input's listed values.  A position may
+-- hold several, and each is followed.
+module Order {A : Set} (vs : List (Pos × A)) where
+  -- No value before `q`.
+  minᵇ : Pos → Bool
+  minᵇ q = allᵇ (λ { (k , _) → q ≼ᵇ k }) vs
+
+  -- `q′` is the first value after `q`.
+  nextᵇ : Pos → Pos → Bool
+  nextᵇ q q′ = (q <ᵖ q′) ∧ allᵇ (λ { (k , _) → not (q <ᵖ k) ∨ (q′ ≼ᵇ k) }) vs
+
+  -- The values first after one of `prev`.
+  after : List (Pos × A) → List (Pos × A)
+  after prev = concatMap (λ { (q′ , a′) → when (anyᵇ (λ { (q , _) → nextᵇ q q′ }) prev) (q′ , a′) }) vs
+
+  -- `Values.Nth`.
+  nths : ℕ → List (Pos × A)
+  nths zero    = concatMap (λ { (q , a) → when (minᵇ q) (q , a) }) vs
+  nths (suc i) = after (nths i)
 
 private
   cons : ∀ {A} → Row A → Listed A → Listed A
@@ -149,6 +177,10 @@ outerRow d (q , out _) = [ q ++ [ ix 0 ] , skip ]
 outerRow d (q , skip)  = [ q , skip ]
 outerRow d (c , end)   = [ c , (if d c then end else skip) ]
 
+-- Each value's lane, listed at its subscription.
+lanes : ∀ {A B : Set} → (A → Pos → Maybe (Listed B)) → List (Pos × A) → Maybe (List (Pos × A × Listed B))
+lanes ln = mapM λ qa → bind (ln (proj₂ qa) (proj₁ qa ++ [ ix 1 ])) λ l → just (proj₁ qa , proj₂ qa , l)
+
 -- `EmissionSet.Merge.MergeT`, each value's lane listed at its subscription.
 module MergeL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) where
   done : Pos → Bool
@@ -163,22 +195,30 @@ module MergeL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) wher
             ⊣ (short o ∨ anyᵇ (λ { (_ , _ , l) → short l }) ls)
 open MergeL public using (mergeRows)
 
--- `EmissionSet.Scan.ScanT`: each value with the fold up to it.
+-- `EmissionSet.Scan.ScanT`: each value with every fold up to it.
 module ScanL {A B : Set} (f : B → A → B) (z : B) (o : Listed A) where
   vals : List (Pos × A)
-  vals = values (sort (rows o))
+  vals = values (rows o)
+  open Order vals using (minᵇ; nextᵇ)
 
-  foldTo : Pos → B → List (Pos × A) → B
-  foldTo q b []             = b
-  foldTo q b ((k , a) ∷ vs) = foldTo q (if k ≼ᵇ q then f b a else b) vs
+  -- `Scan.Acc`: the folds ending at the value `a` at `q`, through at most
+  -- `n` values.  A chain never repeats a position, so the number of
+  -- values listed is enough.
+  mutual
+    accs : ℕ → Pos → A → List B
+    accs zero    q a = []
+    accs (suc n) q a = when (minᵇ q) (f z a) ++ concatMap (prior n q a) vals
 
-  scanRow : Row A → Row B
-  scanRow (q , out a) = q , out (foldTo q z vals)
-  scanRow (q , skip)  = q , skip
-  scanRow (q , end)   = q , end
+    prior : ℕ → Pos → A → Pos × A → List B
+    prior n q a (q₀ , a₀) = if nextᵇ q₀ q then mapL (λ b → f b a) (accs n q₀ a₀) else []
+
+  scanRow : Row A → List (Row B)
+  scanRow (q , out a) = mapL (λ b → q , out b) (accs (suc (length vals)) q a)
+  scanRow (q , skip)  = [ q , skip ]
+  scanRow (q , end)   = [ q , end ]
 
   scanRows : Listed B
-  scanRows = mapL scanRow (rows o) ⊣ short o
+  scanRows = concatMap scanRow (rows o) ⊣ short o
 open ScanL public using (scanRows)
 
 -- `EmissionSet.TakeWhile.TakeT`, subscribed at `p`.
@@ -223,67 +263,114 @@ module SwitchL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) whe
              ⊣ (short o ∨ anyᵇ (λ { (_ , _ , l) → short l }) ls)
 open SwitchL public using (switchRows)
 
--- `EmissionSet.Exhaust.ExhaustT`: a merge of the lanes run, in value order,
--- each run if the last lane run has ended before its value.
-module ExhaustL {A B : Set} (lane : A → Pos → Maybe (Listed B)) (o : Listed A) where
-  free : Maybe (List Pos) → Pos → Bool
-  free nothing   q = true
-  free (just es) q = anyᵇ (λ c → c <ᵖ q) es
+-- `EmissionSet.Exhaust.ExhaustT`, each value's lane listed at its
+-- subscription: a merge of the lanes run.
+module ExhaustL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) where
+  vals : List (Pos × A)
+  vals = values (rows o)
+  open Order vals using (minᵇ; nextᵇ)
 
-  runL : Maybe (List Pos) → List (Pos × A) → Maybe (List (Pos × A × Listed B))
-  runL st []             = just []
-  runL st ((q , a) ∷ vs) =
-    if free st q
-    then bind (lane a (q ++ [ ix 1 ])) (λ l → bind (runL (just (ends (rows l))) vs) λ rs → just ((q , a , l) ∷ rs))
-    else runL st vs
+  -- `Exhaust.Cur`'s step at the value at `q₂`, from a lane of the last
+  -- run at `q`: ended before it, `q₂` runs; ended nowhere before it, `q`
+  -- stays the last run.
+  moves : Pos → Pos → Pos × A × Listed B → List Pos
+  moves q₂ q (q′ , _ , l) =
+    if does (q′ ≟ᵖ q) then when (endBefore (rows l) q₂) q₂ ++ when (properᵇ (rows l) q₂) q else []
 
-  listE : Maybe (Listed B)
-  listE = bind (runL nothing (values (sort (rows o)))) λ rs → just (mergeRows o rs)
+  -- `Exhaust.Cur`: the last runs at the value at `q₂`, through at most `n`
+  -- values.
+  mutual
+    curs : ℕ → Pos → List Pos
+    curs zero    q₂ = []
+    curs (suc n) q₂ = when (minᵇ q₂) q₂ ++ concatMap (prior n q₂) vals
 
--- `EmissionSet.Bounded.BoundedT`: lanes placed in value order, each where
--- `EmissionSet.Bounded.Starts` puts it; one held holds every later one.
+    prior : ℕ → Pos → Pos × A → List Pos
+    prior n q₂ (q₁ , _) = if nextᵇ q₁ q₂ then concatMap (λ q → concatMap (moves q₂ q) ls) (curs n q₁) else []
+
+  -- `Exhaust.Run`.
+  runᵇ : Pos → Bool
+  runᵇ q = anyᵇ (λ q′ → does (q′ ≟ᵖ q)) (curs (suc (length vals)) q)
+
+  done : Pos → Bool
+  done c = endBy (rows o) c ∧ allᵇ (λ { (q , _ , l) → not (runᵇ q) ∨ endBy (rows l) c }) ls
+
+  laneRow : Row B → Row B
+  laneRow (c , end) = c , (if done c then end else skip)
+  laneRow r         = r
+
+  exhaustRows : Listed B
+  exhaustRows = (concatMap (outerRow done) (rows o) ++ concatMap (λ { (q , _ , l) → if runᵇ q then mapL laneRow (rows l) else [] }) ls)
+              ⊣ (short o ∨ anyᵇ (λ { (_ , _ , l) → short l }) ls)
+open ExhaustL public using (exhaustRows)
+
+-- `EmissionSet.Bounded.BoundedT`: level by level, every schedule the lanes
+-- before allow, and each value's lanes under each.
 module BoundedL {A B : Set} (n : ℕ) (lane : A → Pos → Maybe (Listed B)) (o : Listed A) where
   vals : List (Pos × A)
-  vals = values (sort (rows o))
+  vals = values (rows o)
+  open Order vals using (nths)
 
-  -- `es`'s k-th in position order, from 0, among `cs`.
-  kth : ℕ → List Pos → List Pos → Maybe Pos
-  kth k es []       = nothing
-  kth k es (c ∷ cs) = if below c es ≡ᵇ k then just c else kth k es cs
+  -- `Bounded.Starts`.
+  freedAt : ℕ → Pos → List Pos → Pos → List Pos
+  freedAt i q es c =
+    if below c es ≡ᵇ (i ∸ n) then (if c <ᵖ q then [ q ++ [ ix 1 ] ] else when (q <ᵖ c) (c ++ [ ix 1 ])) else []
 
-  -- Where lane i starts; `nothing` if held.
-  startAt : ℕ → Pos → List Pos → Maybe Pos
-  startAt i q es =
-    if i <ᵇ n then just (q ++ [ ix 1 ])
-    else bind (kth (i ∸ n) es es) λ c → just (if c <ᵖ q then q ++ [ ix 1 ] else c ++ [ ix 1 ])
+  starts : ℕ → Pos → List Pos → List Pos
+  starts i q es = if i <ᵇ n then [ q ++ [ ix 1 ] ] else concatMap (freedAt i q es) es
 
-  mutual
-    schedL : ℕ → List Pos → List (Pos × A) → Maybe (List (Pos × Listed B))
-    schedL i es []             = just []
-    schedL i es ((q , a) ∷ vs) = placed i es a vs (startAt i q es)
+  -- A value, and its lane under each schedule: the schedule, where it
+  -- starts, its rows.
+  Entry : Set
+  Entry = Pos × A × List (List Pos × Pos × Listed B)
 
-    placed : ℕ → List Pos → A → List (Pos × A) → Maybe Pos → Maybe (List (Pos × Listed B))
-    placed i es a vs nothing  = just []
-    placed i es a vs (just s) =
-      bind (lane a s) λ l → bind (schedL (suc i) (ends (rows l) ++ es) vs) λ rs → just ((s , l) ∷ rs)
+  laneAt : A → List Pos → Pos → Maybe (List Pos × Pos × Listed B)
+  laneAt a es s = bind (lane a s) λ l → just (es , s , l)
 
-  module _ (sc : List (Pos × Listed B)) where
+  entry : ℕ → List (List Pos) → Pos × A → Maybe Entry
+  entry i ess (q , a) = bind (concatMapM (λ es → mapM (laneAt a es) (starts i q es)) ess) λ ss → just (q , a , ss)
+
+  -- `Bounded.Sched`'s next level: a lane's end, or none if it never ends;
+  -- or held.
+  grown : List Pos × Pos × Listed B → List (List Pos)
+  grown (es , _ , l) = if null (ends (rows l)) then [ es ] else mapL (_∷ es) (ends (rows l))
+
+  grownE : Entry → List (List Pos)
+  grownE (_ , _ , ss) = concatMap grown ss
+
+  heldᵇ : ℕ → List Pos → Bool
+  heldᵇ i es = (n ≤ᵇ i) ∧ (length es ≤ᵇ i ∸ n)
+
+  heldE : ℕ → List (List Pos) → List (List Pos)
+  heldE i ess = concatMap (λ es → when (heldᵇ i es) es) ess
+
+  grow : ℕ → List (List Pos) → List Entry → List (List Pos)
+  grow i ess gs = concatMap grownE gs ++ concatMap (λ _ → heldE i ess) gs
+
+  -- Levels `i` up to `i + k`, from the schedules `ess` of level `i`.
+  levels : ℕ → ℕ → List (List Pos) → Maybe (List (ℕ × Entry))
+  levels zero    i ess = just []
+  levels (suc k) i ess =
+    bind (mapM (entry i ess) (nths i)) λ gs →
+    bind (levels k (suc i) (grow i ess gs)) λ rest → just (mapL (i ,_) gs ++ rest)
+
+  module _ (gs : List (ℕ × Entry)) where
     queued : Pos → Bool
-    queued c = anyᵇ (λ { (s , _) → does (s ≟ᵖ (c ++ [ ix 1 ])) }) sc
+    queued c = anyᵇ (λ { (_ , _ , _ , ss) → anyᵇ (λ { (_ , s , _) → does (s ≟ᵖ (c ++ [ ix 1 ])) }) ss }) gs
 
     done : Pos → Bool
-    done c = endBy (rows o) c ∧ (length sc ≡ᵇ length vals) ∧ allᵇ (λ { (_ , l) → endBy (rows l) c }) sc
+    done c = endBy (rows o) c ∧ allᵇ (λ { (_ , _ , _ , ss) → anyᵇ (λ { (_ , _ , l) → endBy (rows l) c }) ss }) gs
 
     laneRow : Row B → Row B
     laneRow (c , end) = if queued c then (c ++ [ ix 0 ] , skip) else (c , (if done c then end else skip))
     laneRow r         = r
 
     boundedRows : Listed B
-    boundedRows = (concatMap (outerRow done) (rows o) ++ concatMap (λ { (_ , l) → mapL laneRow (rows l) }) sc)
-                ⊣ (short o ∨ anyᵇ (λ { (_ , l) → short l }) sc)
+    boundedRows = (concatMap (outerRow done) (rows o)
+                    ++ concatMap (λ { (_ , _ , _ , ss) → concatMap (λ { (_ , _ , l) → mapL laneRow (rows l) }) ss }) gs)
+                ⊣ (short o ∨ anyᵇ (λ { (_ , _ , _ , ss) → anyᵇ (λ { (_ , _ , l) → short l }) ss }) gs)
 
   listB : Maybe (Listed B)
-  listB = bind (schedL 0 [] vals) λ sc → just (boundedRows sc)
+  listB = bind (levels (length vals) 0 [ [] ]) λ gs → just (boundedRows gs)
 
 -- `EmissionSet.Connect.ConnT`.
 module ConnL {A B : Set} (r : Pos) (σ : Listed A) (β : Listed B) where
@@ -311,17 +398,13 @@ listT n       (map f s)         ρ p = bind (listT n s ρ p) λ l → just (mapR
 listT n       (scan f z s)      ρ p = bind (listT n s ρ p) λ l → just (scanRows f z l)
 listT n       (takeWhile i q s) ρ p = bind (listT n s ρ p) λ l → just (takeRows i q p l)
 listT n       (flatMap (mergeᶠ nothing) f s) ρ p =
-  bind (listT n s ρ p) λ o →
-  bind (mapM (λ qa → bind (listT n (f (proj₂ qa)) ρ (proj₁ qa ++ [ ix 1 ])) λ l → just (proj₁ qa , proj₂ qa , l)) (values (rows o))) λ ls →
-  just (mergeRows o ls)
+  bind (listT n s ρ p) λ o → bind (lanes (λ a → listT n (f a) ρ) (values (rows o))) λ ls → just (mergeRows o ls)
 listT n       (flatMap (mergeᶠ (just k)) f s) ρ p =
   bind (listT n s ρ p) λ o → BoundedL.listB k (λ a → listT n (f a) ρ) o
 listT n       (flatMap switchᶠ f s) ρ p =
-  bind (listT n s ρ p) λ o →
-  bind (mapM (λ qa → bind (listT n (f (proj₂ qa)) ρ (proj₁ qa ++ [ ix 1 ])) λ l → just (proj₁ qa , proj₂ qa , l)) (values (rows o))) λ ls →
-  just (switchRows o ls)
+  bind (listT n s ρ p) λ o → bind (lanes (λ a → listT n (f a) ρ) (values (rows o))) λ ls → just (switchRows o ls)
 listT n       (flatMap exhaustᶠ f s) ρ p =
-  bind (listT n s ρ p) λ o → ExhaustL.listE (λ a → listT n (f a) ρ) o
+  bind (listT n s ρ p) λ o → bind (lanes (λ a → listT n (f a) ρ) (values (rows o))) λ ls → just (exhaustRows o ls)
 listT n       (connect s b)     ρ p =
   bind (listT n s ρ (p ++ [ ix 1 ])) λ σ →
   bind (listT n b (hotOf σ ∷ ρ) (p ++ [ ix 0 ])) λ β →
