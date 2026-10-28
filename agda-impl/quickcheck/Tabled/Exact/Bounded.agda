@@ -13,7 +13,8 @@ open import Function.Bundles using (Equivalence)
 open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_]; length; null) renaming (map to mapL)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻; ∈-map⁺; ∈-map⁻)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻; ∈-map⁺; ∈-map⁻; ∈-deduplicate⁺; ∈-deduplicate⁻)
+open import Data.List.Properties using (≡-dec)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just)
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≤_; _<_; _<ᵇ_; _≤ᵇ_; _≡ᵇ_; z≤n)
@@ -25,7 +26,7 @@ open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (¬_)
 
-open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; ix; <ᵖ-asym)
+open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; _≟ᵖ_; ix; <ᵖ-asym)
 open import denotation.EmissionSet using (out; skip; end; EmissionSet; Den; enter; below)
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled using (Row; Listed; rows; short; concatMap; concatMapM; mapM; endBy; ends; values; outerRow;
@@ -38,7 +39,7 @@ open import quickcheck.Tabled.Exact.Base
 module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln : A → Pos → Maybe (Listed B)) (o : Listed A)
   (eo : Exactly o t) (eln : ∀ {a s l} → ln a s ≡ just l → Exactly l (enter (fD a) s))
   (G : List (ℕ × Pos × A × List (List Pos × Pos × Listed B)))
-  (eG : BoundedL.levels n ln o (length (values (rows o))) 0 [ [] ] ≡ just G)
+  (eG : BoundedL.levels n ln o (length (values (rows o))) 0 [ [] ] (Order.nths (values (rows o)) 0) ≡ just G)
   (u : short (BoundedL.boundedRows n ln o G) ≡ false)
   where
   open Tb.Bounded n fD t
@@ -46,7 +47,7 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     val; step; oend; opass; lane; handoff; lend; lpass)
   open Tb.Values t using (Nth)
   open BoundedL n ln o
-    using (vals; freedAt; starts; Entry; laneAt; entry; grownE; heldE; grow; levels; done; laneRow; boundedRows)
+    using (vals; freedAt; starts; Entry; laneAt; entry; grownE; heldE; grow; dedup; levels; done; laneRow; boundedRows)
     renaming (queued to queuedᵇ)
   open Order vals using (nths)
 
@@ -175,15 +176,19 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     ... | (ss , em) =
       ∈-++⁺ʳ (concatMap grownE gs) (cm⁺ em (cm⁺ (proj₂ lv S) (when⁺ (∧-intro (fromT (≤⇒≤ᵇ le)) (fromT (≤⇒≤ᵇ le′))))))
 
+  dedup-ok : ∀ {i ess} → Lv i ess → Lv i (dedup ess)
+  dedup-ok {ess = ess} (snd , cmp) =
+    (λ m → snd (∈-deduplicate⁻ (≡-dec _≟ᵖ_) ess m)) , λ S → ∈-deduplicate⁺ (≡-dec _≟ᵖ_) (cmp S)
+
   ----------------------------------------------------------------------
   -- Every level
 
-  levels-ok : ∀ K i ess {G′} → levels K i ess ≡ just G′ → (∀ {x} → x ∈ G′ → x ∈ G) → Lv i ess
+  levels-ok : ∀ K i ess {G′} → levels K i ess (nths i) ≡ just G′ → (∀ {x} → x ∈ G′ → x ∈ G) → Lv i ess
     → (∀ {j e} → (j , e) ∈ G′ → Fine j e)
     × (∀ {j q a} → i ≤ j → j < K + i → Nth j q a → Σ (List (List Pos × Pos × Listed B)) λ ss → (j , q , a , ss) ∈ G′)
   levels-ok zero i ess refl sub lv = (λ ()) , λ le lt N → ⊥-elim (≤⇒≯ le lt)
   levels-ok (suc K) i ess e sub lv with bind⁻ {m = mapM (entry i ess) (nths i)} e
-  ... | (gs , egs , e′) with bind⁻ {m = levels K (suc i) (grow i ess gs)} e′
+  ... | (gs , egs , e′) with bind⁻ {m = levels K (suc i) (dedup (grow i ess gs)) (nths (suc i))} e′
   ... | (rest , erest , refl) = sound-l , complete-l
     where
     good : ∀ {x} → x ∈ gs → Fine i x × (i , x) ∈ G
@@ -196,7 +201,8 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     ... | (x , xm , ex) with entry-ok i ess (nth-c N) ex
     ... | (ss , refl , _) = ss , xm
 
-    ih = levels-ok K (suc i) (grow i ess gs) erest (λ m → sub (∈-++⁺ʳ (mapL (i ,_) gs) m)) (grow-ok i ess gs lv good found)
+    ih = levels-ok K (suc i) (dedup (grow i ess gs)) erest (λ m → sub (∈-++⁺ʳ (mapL (i ,_) gs) m))
+      (dedup-ok (grow-ok i ess gs lv good found))
 
     sound-l : ∀ {j x} → (j , x) ∈ mapL (i ,_) gs ++ rest → Fine j x
     sound-l m with ∈-++⁻ (mapL (i ,_) gs) m
@@ -342,6 +348,6 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
 bounded-exact : ∀ {A B} (k : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln : A → Pos → Maybe (Listed B)) (o : Listed A)
   → Exactly o t → (∀ {a s l} → ln a s ≡ just l → Exactly l (enter (fD a) s))
   → ∀ {l} → BoundedL.listB k ln o ≡ just l → Exactly l (Tb.Bounded.BoundedT k fD t)
-bounded-exact k fD t ln o eo eln e u with bind⁻ {m = BoundedL.levels k ln o (length (values (rows o))) 0 [ [] ]} e
+bounded-exact k fD t ln o eo eln e u with bind⁻ {m = BoundedL.levels k ln o (length (values (rows o))) 0 [ [] ] (Order.nths (values (rows o)) 0)} e
 ... | (G , eG , refl) = record { sound = sound-b ; complete = complete-b }
   where open BoundedX k fD t ln o eo eln G eG u

@@ -41,7 +41,8 @@ module ExhaustX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A
   where
   open Tb.Exhaust fD t
   open Tb.Values t using (Next)
-  open ExhaustL o ls using (vals; moves; curs; prior; runᵇ; done; laneRow)
+  open ExhaustL o ls using (vals; moves; curs; prior; runᵇ; runs)
+  open ExhaustL.Ran o ls runs using (ranᵇ; done; laneRow)
   open Order vals using (minᵇ; nextᵇ)
 
   private
@@ -116,6 +117,16 @@ module ExhaustX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A
   →run : ∀ q → Run q → runᵇ q ≡ true
   →run q R = any⁺ {xs = curs (suc (length vals)) q} (curs-c R (suc (length vals)) (s≤s (cnt≤ vals))) (≟-refl q)
 
+  ran→ : ∀ q → ranᵇ q ≡ true → Run q
+  ran→ q e with any⁻ {xs = runs} e
+  ... | (q′ , m , d) with ≟-true {q′} {q} d
+  ... | refl with cm⁻ {xs = ls} m
+  ... | ((q″ , a , l) , lm , h) with when⁻ h
+  ... | (rn , refl) = run→ q′ (out-of lm) rn
+
+  →ran : ∀ q {a} → t q (out a) → Run q → ranᵇ q ≡ true
+  →ran q x R = let (l , m) = lane-of x in any⁺ {xs = runs} (cm⁺ m (when⁺ (→run q R))) (≟-refl q)
+
   ----------------------------------------------------------------------
   -- The rows
 
@@ -123,11 +134,11 @@ module ExhaustX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A
     done→ : ∀ c → done c ≡ true → Done c
     done→ c e = endBy→ exo {c} (proj₁ (∧-true {endBy (rows o) c} e)) , λ {q} x R →
       let (l , m) = lane-of x
-      in endBy→ (exl m) {c} (or-right (→run q R) (all⁻ {xs = ls} (proj₂ (∧-true {endBy (rows o) c} e)) m))
+      in endBy→ (exl m) {c} (or-right (→ran q x R) (all⁻ {xs = ls} (proj₂ (∧-true {endBy (rows o) c} e)) m))
 
     →done : ∀ c → Done c → done c ≡ true
     →done c ((c₀ , x , le) , lanes) = ∧-intro (→endBy exo {c₀} {c} x le) (all⁺ {xs = ls} λ { {q , a , l} m →
-      or-of (runᵇ q) λ rn → let (c′ , y , le′) = lanes (out-of m) (run→ q (out-of m) rn) in →endBy (exl m) {c′} {c} y le′ })
+      or-of (ranᵇ q) λ rn → let (c′ , y , le′) = lanes (out-of m) (ran→ q rn) in →endBy (exl m) {c′} {c} y le′ })
 
     end-row : ∀ {c} → t c end → ExhaustT c (if done c then end else skip)
     end-row {c} x with done c in dc
@@ -166,16 +177,16 @@ module ExhaustX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A
     -- A row of a lane that runs.
     shown : ∀ {q a r} → t q (out a) → Run q → (∀ {l} → (q , a , l) ∈ ls → r ∈ mapL laneRow (rows l)) → r ∈ rows (exhaustRows o ls)
     shown {q} x R h = let (l , m) = lane-of x in
-      ∈-++⁺ʳ (concatMap (outerRow done) (rows o)) (cm⁺ m (if-t (→run q R) (h m)))
+      ∈-++⁺ʳ (concatMap (outerRow done) (rows o)) (cm⁺ m (if-t (→ran q x R) (h m)))
 
   sound-e : ∀ {q e} → (q , e) ∈ rows (exhaustRows o ls) → ExhaustT q e
   sound-e m with ∈-++⁻ (concatMap (outerRow done) (rows o)) m
   ... | inj₁ h = let (r , rm , h′) = cm⁻ {xs = rows o} h in outer-s rm h′
   ... | inj₂ h with cm⁻ {xs = ls} h
-  ... | ((q₀ , a , l) , lm , h′) with if⁻ {b = runᵇ q₀} h′
+  ... | ((q₀ , a , l) , lm , h′) with if⁻ {b = ranᵇ q₀} h′
   ... | inj₂ (_ , ())
   ... | inj₁ (rn , h″) with ∈-map⁻ laneRow h″
-  ... | (r , rm , eq) = lane-s lm (run→ q₀ (out-of lm) rn) rm eq
+  ... | (r , rm , eq) = lane-s lm (ran→ q₀ rn) rm eq
 
   complete-e : ∀ {q e} → ExhaustT q e → (q , e) ∈ rows (exhaustRows o ls)
   complete-e (val x)          = ∈-++⁺ˡ (cm⁺ (complete exo x) (here refl))

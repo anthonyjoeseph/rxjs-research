@@ -7,7 +7,8 @@
 module quickcheck.Tabled where
 
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
-open import Data.List using (List; []; _∷_; _++_; [_]; foldr; length; null) renaming (map to mapL)
+open import Data.List using (List; []; _∷_; _++_; [_]; foldr; length; null; deduplicate) renaming (map to mapL)
+open import Data.List.Properties using (≡-dec)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤ᵇ_; _≡ᵇ_; _<ᵇ_; _∸_)
@@ -293,16 +294,27 @@ module ExhaustL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) wh
   runᵇ : Pos → Bool
   runᵇ q = anyᵇ (λ q′ → does (q′ ≟ᵖ q)) (curs (suc (length vals)) q)
 
-  done : Pos → Bool
-  done c = endBy (rows o) c ∧ allᵇ (λ { (q , _ , l) → not (runᵇ q) ∨ endBy (rows l) c }) ls
+  -- The lanes that run, found once and passed on.
+  runs : List Pos
+  runs = concatMap (λ { (q , _ , _) → when (runᵇ q) q }) ls
 
-  laneRow : Row B → Row B
-  laneRow (c , end) = c , (if done c then end else skip)
-  laneRow r         = r
+  module Ran (rs : List Pos) where
+    ranᵇ : Pos → Bool
+    ranᵇ q = anyᵇ (λ q′ → does (q′ ≟ᵖ q)) rs
+
+    done : Pos → Bool
+    done c = endBy (rows o) c ∧ allᵇ (λ { (q , _ , l) → not (ranᵇ q) ∨ endBy (rows l) c }) ls
+
+    laneRow : Row B → Row B
+    laneRow (c , end) = c , (if done c then end else skip)
+    laneRow r         = r
+
+    ranRows : Listed B
+    ranRows = (concatMap (outerRow done) (rows o) ++ concatMap (λ { (q , _ , l) → if ranᵇ q then mapL laneRow (rows l) else [] }) ls)
+            ⊣ (short o ∨ anyᵇ (λ { (_ , _ , l) → short l }) ls)
 
   exhaustRows : Listed B
-  exhaustRows = (concatMap (outerRow done) (rows o) ++ concatMap (λ { (q , _ , l) → if runᵇ q then mapL laneRow (rows l) else [] }) ls)
-              ⊣ (short o ∨ anyᵇ (λ { (_ , _ , l) → short l }) ls)
+  exhaustRows = Ran.ranRows runs
 open ExhaustL public using (exhaustRows)
 
 -- `EmissionSet.Bounded.BoundedT`: level by level, every schedule the lanes
@@ -310,7 +322,7 @@ open ExhaustL public using (exhaustRows)
 module BoundedL {A B : Set} (n : ℕ) (lane : A → Pos → Maybe (Listed B)) (o : Listed A) where
   vals : List (Pos × A)
   vals = values (rows o)
-  open Order vals using (nths)
+  open Order vals using (after; nths)
 
   -- `Bounded.Starts`.
   freedAt : ℕ → Pos → List Pos → Pos → List Pos
@@ -348,12 +360,18 @@ module BoundedL {A B : Set} (n : ℕ) (lane : A → Pos → Maybe (Listed B)) (o
   grow : ℕ → List (List Pos) → List Entry → List (List Pos)
   grow i ess gs = concatMap grownE gs ++ concatMap (λ _ → heldE i ess) gs
 
-  -- Levels `i` up to `i + k`, from the schedules `ess` of level `i`.
-  levels : ℕ → ℕ → List (List Pos) → Maybe (List (ℕ × Entry))
-  levels zero    i ess = just []
-  levels (suc k) i ess =
-    bind (mapM (entry i ess) (nths i)) λ gs →
-    bind (levels k (suc i) (grow i ess gs)) λ rest → just (mapL (i ,_) gs ++ rest)
+  -- A level's schedules, each once: entries agreeing on a lane's end
+  -- grow the same one.
+  dedup : List (List Pos) → List (List Pos)
+  dedup = deduplicate (≡-dec _≟ᵖ_)
+
+  -- Levels `i` up to `i + k`, from the schedules `ess` and the values
+  -- `vs` (`nths i`) of level `i`.
+  levels : ℕ → ℕ → List (List Pos) → List (Pos × A) → Maybe (List (ℕ × Entry))
+  levels zero    i ess vs = just []
+  levels (suc k) i ess vs =
+    bind (mapM (entry i ess) vs) λ gs →
+    bind (levels k (suc i) (dedup (grow i ess gs)) (after vs)) λ rest → just (mapL (i ,_) gs ++ rest)
 
   module _ (gs : List (ℕ × Entry)) where
     queued : Pos → Bool
@@ -372,7 +390,7 @@ module BoundedL {A B : Set} (n : ℕ) (lane : A → Pos → Maybe (Listed B)) (o
                 ⊣ (short o ∨ anyᵇ (λ { (_ , _ , _ , ss) → anyᵇ (λ { (_ , _ , l) → short l }) ss }) gs)
 
   listB : Maybe (Listed B)
-  listB = bind (levels (length vals) 0 [ [] ]) λ gs → just (boundedRows gs)
+  listB = bind (levels (length vals) 0 [ [] ] (nths 0)) λ gs → just (boundedRows gs)
 
 -- `EmissionSet.Connect.ConnT`.
 module ConnL {A B : Set} (r : Pos) (σ : Listed A) (β : Listed B) where
