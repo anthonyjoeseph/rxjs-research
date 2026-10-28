@@ -1,10 +1,10 @@
 {-# OPTIONS --guardedness #-}
 
--- READING A TABLE: what a subscriber meets, one row at a time.  The next
+-- READING AN EMISSION SET: what a subscriber meets, one row at a time.  The next
 -- row is the least past the last one met, and it is met only once it is
 -- reached (`Seen`).  A skip is met but tells nothing; a reader who meets
 -- no row past the last is told the run has gone silent.
-module denotation.Table.Read where
+module denotation.EmissionSet.Read where
 
 open import Data.List using (List; []; _∷_; _++_)
 open import Data.List.Relation.Unary.All using (All)
@@ -15,7 +15,7 @@ open import Relation.Nullary using (¬_)
 
 open import denotation.MonotonicList.Events using (Pos; tick)
 open import denotation.Order using (Item; val; fin; silent)
-open import denotation.Table using (Ev; out; skip; end; Table; Work; _≺_; _≼_; Seen)
+open import denotation.EmissionSet using (Ev; out; skip; end; EmissionSet; Work; _≺_; _≼_; Seen)
 
 -- Past a cursor; with none, anywhere.
 After : Maybe Pos → Pos → Set
@@ -35,7 +35,7 @@ items ((q , out a) ∷ rs) = val (tick q) a ∷ items rs
 items ((q , skip) ∷ rs)  = items rs
 items ((q , end) ∷ rs)   = fin ∷ []
 
-module _ {A : Set} (t : Table A) where
+module _ {A : Set} (t : EmissionSet A) where
 
   -- `q` is the first row past `c`.
   Least : Maybe Pos → Pos → Set
@@ -50,7 +50,7 @@ module _ {A : Set} (t : Table A) where
     []  : ∀ {c} → Run c []
     _∷_ : ∀ {c q e rs} → Seen t q e × Least c q → Run (just q) rs → Run c ((q , e) ∷ rs)
 
-  -- A reader of the table is told `is`: what the rows it has met tell
+  -- A reader of the emission set is told `is`: what the rows it has met tell
   -- it, and silence once none follows an unended run.
   data Reads : List (Item A) → Set where
     met    : ∀ {rs} → Run nothing rs → Reads (items rs)

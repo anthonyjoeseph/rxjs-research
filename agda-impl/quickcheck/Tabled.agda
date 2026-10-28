@@ -1,9 +1,9 @@
 {-# OPTIONS --guardedness #-}
 
--- THE TABLE, LISTED: the rows `denotation.Table` gives a program, as a
--- list, up to a horizon — what the oracle checks the table against rxjs
+-- THE EMISSION SET, LISTED: the rows `denotation.EmissionSet` gives a program, as a
+-- list, up to a horizon — what the oracle checks the emission set against rxjs
 -- by.  A development tool: no proof reads it.  Each clause mirrors one of
--- the table's.
+-- the emission set's.
 module quickcheck.Tabled where
 
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
@@ -17,7 +17,7 @@ open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty
 import denotation.MonotonicList.Events as E
 open import denotation.MonotonicList.Events using (Pos; Time; Timeline; timelineAt; _<ᵖ_; _≟ᵖ_; inside; ix; sub; last; root)
 open import denotation.MonotonicList using (start; ofᴱ)
-open import denotation.Table using (Ev; out; skip; end; below)
+open import denotation.EmissionSet using (Ev; out; skip; end; below)
 open import Relation.Nullary using (does)
 open import quickcheck.Oracle using (Event; val; _▸_; Trace; completed; silent; cut; depth; showTrace)
 open import quickcheck.Code using (Prog; toObs; timeline)
@@ -31,8 +31,8 @@ Row : Set → Set
 Row A = Pos × Ev A
 
 -- The rows, and whether a budget cut them short anywhere.  An uncut
--- listing holds exactly its table's rows (`quickcheck.Tabled.Exact`), so
--- each decision below is its table predicate, read off the rows.
+-- listing holds exactly its emission set's rows (`quickcheck.Tabled.Exact`), so
+-- each decision below is its emission set predicate, read off the rows.
 record Listed (A : Set) : Set where
   constructor _⊣_
   field
@@ -80,7 +80,7 @@ endBy rs c = anyᵇ (λ { (k , e) → isEnd e ∧ (k ≼ᵇ c) }) rs
 ends : ∀ {A} → List (Row A) → List Pos
 ends = concatMap λ { (k , e) → when (isEnd e) k }
 
--- `Table.Proper`: at or before every end.
+-- `EmissionSet.Proper`: at or before every end.
 properᵇ : ∀ {A} → List (Row A) → Pos → Bool
 properᵇ rs q = allᵇ (λ { (c , e) → not (isEnd e) ∨ (q ≼ᵇ c) }) rs
 
@@ -130,7 +130,7 @@ mapRow f (q , end)   = q , end
 mapRows : ∀ {A B} → (A → B) → Listed A → Listed B
 mapRows f (rs ⊣ b) = mapL (mapRow f) rs ⊣ b
 
--- `Table.Rejoin`, over a hot's rows.
+-- `EmissionSet.Rejoin`, over a hot's rows.
 rejoinRow : ∀ {A} → Pos → Row A → List (Row A)
 rejoinRow p (q , end) = if p <ᵖ q then [ q ++ [ sub p ] , end ] else [ p ++ [ last ] , end ]
 rejoinRow p (q , e)   = when (p <ᵖ q) (q ++ [ sub p ] , e)
@@ -138,7 +138,7 @@ rejoinRow p (q , e)   = when (p <ᵖ q) (q ++ [ sub p ] , e)
 rejoin : ∀ {A} → Pos → Listed A → Listed A
 rejoin p (rs ⊣ b) = concatMap (rejoinRow p) rs ⊣ b
 
--- `Table.Proper`.
+-- `EmissionSet.Proper`.
 hotOf : ∀ {A} → Listed A → Listed A
 hotOf (rs ⊣ b) = proper rs ⊣ b
 
@@ -149,7 +149,7 @@ outerRow d (q , out _) = [ q ++ [ ix 0 ] , skip ]
 outerRow d (q , skip)  = [ q , skip ]
 outerRow d (c , end)   = [ c , (if d c then end else skip) ]
 
--- `Table.Merge.MergeT`, each value's lane listed at its subscription.
+-- `EmissionSet.Merge.MergeT`, each value's lane listed at its subscription.
 module MergeL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) where
   done : Pos → Bool
   done c = endBy (rows o) c ∧ allᵇ (λ { (_ , _ , l) → endBy (rows l) c }) ls
@@ -163,7 +163,7 @@ module MergeL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) wher
             ⊣ (short o ∨ anyᵇ (λ { (_ , _ , l) → short l }) ls)
 open MergeL public using (mergeRows)
 
--- `Table.Scan.ScanT`: each value with the fold up to it.
+-- `EmissionSet.Scan.ScanT`: each value with the fold up to it.
 module ScanL {A B : Set} (f : B → A → B) (z : B) (o : Listed A) where
   vals : List (Pos × A)
   vals = values (sort (rows o))
@@ -181,7 +181,7 @@ module ScanL {A B : Set} (f : B → A → B) (z : B) (o : Listed A) where
   scanRows = mapL scanRow (rows o) ⊣ short o
 open ScanL public using (scanRows)
 
--- `Table.TakeWhile.TakeT`, subscribed at `p`.
+-- `EmissionSet.TakeWhile.TakeT`, subscribed at `p`.
 module TakeL {A : Set} (incl : Bool) (keep : A → Bool) (p : Pos) (o : Listed A) where
   failed : Pos → Bool
   failed k = anyᵇ (λ { (q , a) → not (keep a) ∧ (q <ᵖ k) }) (values (rows o))
@@ -197,7 +197,7 @@ module TakeL {A : Set} (incl : Bool) (keep : A → Bool) (p : Pos) (o : Listed A
   takeRows = concatMap takeRow (rows o) ⊣ short o
 open TakeL public using (takeRows)
 
--- `Table.Switch.SwitchT`, each value's lane listed at its subscription.
+-- `EmissionSet.Switch.SwitchT`, each value's lane listed at its subscription.
 module SwitchL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) where
   vals : List (Pos × A)
   vals = values (rows o)
@@ -223,7 +223,7 @@ module SwitchL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) whe
              ⊣ (short o ∨ anyᵇ (λ { (_ , _ , l) → short l }) ls)
 open SwitchL public using (switchRows)
 
--- `Table.Exhaust.ExhaustT`: a merge of the lanes run, in value order,
+-- `EmissionSet.Exhaust.ExhaustT`: a merge of the lanes run, in value order,
 -- each run if the last lane run has ended before its value.
 module ExhaustL {A B : Set} (lane : A → Pos → Maybe (Listed B)) (o : Listed A) where
   free : Maybe (List Pos) → Pos → Bool
@@ -240,8 +240,8 @@ module ExhaustL {A B : Set} (lane : A → Pos → Maybe (Listed B)) (o : Listed 
   listE : Maybe (Listed B)
   listE = bind (runL nothing (values (sort (rows o)))) λ rs → just (mergeRows o rs)
 
--- `Table.Bounded.BoundedT`: lanes placed in value order, each where
--- `Table.Bounded.Starts` puts it; one held holds every later one.
+-- `EmissionSet.Bounded.BoundedT`: lanes placed in value order, each where
+-- `EmissionSet.Bounded.Starts` puts it; one held holds every later one.
 module BoundedL {A B : Set} (n : ℕ) (lane : A → Pos → Maybe (Listed B)) (o : Listed A) where
   vals : List (Pos × A)
   vals = values (sort (rows o))
@@ -285,7 +285,7 @@ module BoundedL {A B : Set} (n : ℕ) (lane : A → Pos → Maybe (Listed B)) (o
   listB : Maybe (Listed B)
   listB = bind (schedL 0 [] vals) λ sc → just (boundedRows sc)
 
--- `Table.Connect.ConnT`.
+-- `EmissionSet.Connect.ConnT`.
 module ConnL {A B : Set} (r : Pos) (σ : Listed A) (β : Listed B) where
   alive : Pos → Bool
   alive q = allᵇ (λ { (c , e) → not (isEnd e) ∨ (q <ᵖ c) }) (rows β)
@@ -302,7 +302,7 @@ open ConnL public using (connRows)
 ------------------------------------------------------------------------
 -- A program tree, listed
 
--- `Table.approxᵀ`'s clauses, approximant n, subscribed at `p`.
+-- `EmissionSet.approxᵀ`'s clauses, approximant n, subscribed at `p`.
 listT : ∀ {Γ A} → ℕ → Obs Timeline Γ A → All Listed Γ → Pos → Maybe (Listed A)
 listT n       (cold c)          ρ p = just (walk fuel (start p (timelineAt c p)))
 listT n       empty             ρ p = just ([ p ++ [ last ] , end ] ⊣ false)
@@ -335,7 +335,7 @@ listT (suc n) (defer l)         ρ p =
 -- The trace
 
 -- Values in position order, a tick opening each frame; completed if the
--- table ends, cut if a budget cut it short, silent otherwise.
+-- emission set ends, cut if a budget cut it short, silent otherwise.
 traceT : ∀ {A} → Listed A → Trace A
 traceT {A} (rs ⊣ b) = go nothing (sort (proper rs)) ▸ finish
   where
@@ -349,7 +349,7 @@ traceT {A} (rs ⊣ b) = go nothing (sort (proper rs)) ▸ finish
     finish : O.End
     finish = if anyᵇ (λ { (_ , e) → isEnd e }) rs then completed else if b then cut else silent
 
--- A generated program's table, as the oracle reads it, unfolded as the
+-- A generated program's emission set, as the oracle reads it, unfolded as the
 -- denotation's trace is; `null` if it lists nothing.
 tableJSON : ∀ {t} → ℕ → Prog t → String
 tableJSON {t} u p with listT (depth u p) (toObs timeline u p [] [] []) [] root

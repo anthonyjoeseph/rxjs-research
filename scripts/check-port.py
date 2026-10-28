@@ -20,7 +20,7 @@ in its cone, only what it has gained since is checked: the engine the port
 runs on is not the port.  A port directory that IS part of the old tower is
 ported in place, so every declaration in it is checked.
 
-A name ending in `ᵀ` is its table reading, and answers to the old name
+A name ending in `ᵀ` is its emission-set reading, and answers to the old name
 without the suffix as well as to its own.
 
 Helpers are free: a `private` declaration, or anything local to a clause

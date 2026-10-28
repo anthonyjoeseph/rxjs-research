@@ -12,14 +12,14 @@ weigh-++ = Set
 under-shown-connect : Set
 under-shown-connect = Set
 
--- MUST NOT: the table reading of an old body.
+-- MUST NOT: the emission-set reading of an old body.
 sibling-spreadᵀ : Set
 sibling-spreadᵀ = Set
 
--- MUST FIRE (FILLED GAP): the table reading of an old postulate.
+-- MUST FIRE (FILLED GAP): the emission-set reading of an old postulate.
 placingᵀ : Set
 placingᵀ = Set
 
--- MUST FIRE (NEW NAME): a table reading of no old name.
+-- MUST FIRE (NEW NAME): a emission-set reading of no old name.
 inventedᵀ : Set
 inventedᵀ = Set

@@ -252,7 +252,7 @@ port-selftest:
 	    echo "$$out" | grep -q "\.agda:$$n " && { echo "SELFTEST FAIL: $$n reported, but it is inside the boundary"; fail=1; }; \
 	  done; \
 	  echo "$$out" | grep -q "port-check: FAIL — 10 problem" || { echo "SELFTEST FAIL: expected exactly 10 problems"; fail=1; }; \
-	  if [ $$fail -eq 0 ]; then echo "port-selftest: PASS (a new body, in the port or its import cone, a filled gap, and a missing or unresolving OLD BODY each fire, in a port directory or in place, through a table reading too; ported names, new and kept postulates and helpers do not)"; \
+	  if [ $$fail -eq 0 ]; then echo "port-selftest: PASS (a new body, in the port or its import cone, a filled gap, and a missing or unresolving OLD BODY each fire, in a port directory or in place, through an emission-set reading too; ported names, new and kept postulates and helpers do not)"; \
 	  else echo "$$out"; exit 1; fi
 
 # THE OLD DENOTATION, COUNTED (Anthony): every use of the stream denotation

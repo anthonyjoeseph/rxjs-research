@@ -1,10 +1,10 @@
 {-# OPTIONS --guardedness #-}
 
--- THE LISTING IS THE TABLE: an uncut listing (`quickcheck.Tabled`) holds
--- exactly the rows of the table approximant it mirrors, so every trace
+-- THE LISTING IS THE EMISSION SET: an uncut listing (`quickcheck.Tabled`) holds
+-- exactly the rows of the emission set approximant it mirrors, so every trace
 -- the oracle compares against rxjs is read off the relation itself.
 --
--- Exact, not merely sound: a listed end or skip decides a table predicate
+-- Exact, not merely sound: a listed end or skip decides an emission set predicate
 -- that quantifies over the inputs' rows (`Merge.Done`, `Bounded.Queued`,
 -- `Connect.Alive`, `Proper`), so it is sound only if those inputs were
 -- listed completely.  A cut listing claims nothing.
@@ -30,10 +30,10 @@ open import Relation.Nullary using (¬_)
 open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 import denotation.MonotonicList.Events as E
 open import denotation.MonotonicList.Events using (Pos; Timeline; _<ᵖ_; inside; ix)
-open import denotation.Table
-  using (out; skip; end; Table; _≼_; InE; at-out; at-skip; at-end; on-out; on-skip; Proper; Rejoin;
+open import denotation.EmissionSet
+  using (out; skip; end; EmissionSet; _≼_; InE; at-out; at-skip; at-end; on-out; on-skip; Proper; Rejoin;
   ended; late; Den; enter; MapT; map-out; map-skip; map-end; DeferT; guard; DenEnv; approxᵀ)
-import denotation.Table as Tb
+import denotation.EmissionSet as Tb
 open import quickcheck.Tabled
   using (Row; Listed; _⊣_; rows; short; bind; concatMap; mapM; when; anyᵇ; allᵇ; endBy; properᵇ;
   proper; values; fuel; horizon; walk; mapRow; mapRows; rejoinRow; rejoin; hotOf; outerRow;
@@ -43,13 +43,13 @@ open import quickcheck.Tabled
 ------------------------------------------------------------------------
 -- Exactness
 
-record Exact {A : Set} (l : Listed A) (t : Table A) : Set where
+record Exact {A : Set} (l : Listed A) (t : EmissionSet A) : Set where
   field
     sound    : ∀ {q e} → (q , e) ∈ rows l → t q e
     complete : ∀ {q e} → t q e → (q , e) ∈ rows l
 open Exact public
 
-Exactly : ∀ {A} → Listed A → Table A → Set
+Exactly : ∀ {A} → Listed A → EmissionSet A → Set
 Exactly l t = short l ≡ false → Exact l t
 
 ------------------------------------------------------------------------
@@ -186,13 +186,13 @@ private
   values⁺ {rs = (k , end) ∷ rs}   (here ())
   values⁺ {rs = (k , end) ∷ rs}   (there m)   = values⁺ m
 
-  endBy→ : ∀ {X : Set} {u : Table X} {l : Listed X} → Exact l u → ∀ {c} → endBy (rows l) c ≡ true → Σ Pos λ k → u k end × k ≼ c
+  endBy→ : ∀ {X : Set} {u : EmissionSet X} {l : Listed X} → Exact l u → ∀ {c} → endBy (rows l) c ≡ true → Σ Pos λ k → u k end × k ≼ c
   endBy→ {l = l} ex e with any⁻ {xs = rows l} e
   ... | ((k , end) , m , h)   = k , sound ex m , not-T h
   ... | ((k , out _) , m , ())
   ... | ((k , skip) , m , ())
 
-  →endBy : ∀ {X : Set} {u : Table X} {l : Listed X} → Exact l u → ∀ {k c} → u k end → k ≼ c → endBy (rows l) c ≡ true
+  →endBy : ∀ {X : Set} {u : EmissionSet X} {l : Listed X} → Exact l u → ∀ {k c} → u k end → k ≼ c → endBy (rows l) c ≡ true
   →endBy ex x kc = any⁺ (complete ex x) (T-not kc)
 ------------------------------------------------------------------------
 -- Leaves
@@ -220,7 +220,7 @@ end-exact k _ = record { sound = λ { (here refl) → at-end ; (there ()) } ; co
 ------------------------------------------------------------------------
 -- One input
 
-map-exact : ∀ {A B} (f : A → B) {l : Listed A} {t : Table A} → Exactly l t → Exactly (mapRows f l) (MapT f t)
+map-exact : ∀ {A B} (f : A → B) {l : Listed A} {t : EmissionSet A} → Exactly l t → Exactly (mapRows f l) (MapT f t)
 map-exact f {l} {t} el u = record { sound = s ; complete = c }
   where
     ex = el u
@@ -240,8 +240,8 @@ defer-exact eb u = record
   { sound    = λ { (here refl) → guard ; (there m) → Tb.body (sound (eb u) m) }
   ; complete = λ { guard → here refl ; (Tb.body x) → there (complete (eb u) x) } }
 
--- `Table.Proper`, the rows a hot shows.
-proper-exact : ∀ {A} {l : Listed A} {t : Table A} → Exactly l t → Exactly (hotOf l) (Proper t)
+-- `EmissionSet.Proper`, the rows a hot shows.
+proper-exact : ∀ {A} {l : Listed A} {t : EmissionSet A} → Exactly l t → Exactly (hotOf l) (Proper t)
 proper-exact {A} {l} {t} el u = record { sound = s ; complete = c }
   where
     ex = el u
@@ -256,9 +256,9 @@ proper-exact {A} {l} {t} el u = record { sound = s ; complete = c }
     c : ∀ {q e} → Proper t q e → (q , e) ∈ proper (rows l)
     c (x , h) = cm⁺ (complete ex x) (when⁺ (→pb h))
 
--- `Table.Rejoin`, joining a hot at `p`.
+-- `EmissionSet.Rejoin`, joining a hot at `p`.
 private
-  rj-row : ∀ {A} {t : Table A} p {k e q e′} → t k e → (q , e′) ∈ rejoinRow p (k , e) → Rejoin p t q e′
+  rj-row : ∀ {A} {t : EmissionSet A} p {k e q e′} → t k e → (q , e′) ∈ rejoinRow p (k , e) → Rejoin p t q e′
   rj-row p {k} {end} x h with if⁻ {b = p <ᵖ k} h
   ... | inj₁ (pk , m) with single⁻ m
   ... | refl = ended x (Equivalence.from T-≡ pk)
@@ -269,14 +269,14 @@ private
   rj-row p {k} {skip} x h with when⁻ h
   ... | (pk , refl) = Tb.shown x tt (Equivalence.from T-≡ pk)
 
-  rj-in : ∀ {A} {t : Table A} p {q e} → Rejoin p t q e → Σ (Row A) λ r → t (proj₁ r) (proj₂ r) × (q , e) ∈ rejoinRow p r
+  rj-in : ∀ {A} {t : EmissionSet A} p {q e} → Rejoin p t q e → Σ (Row A) λ r → t (proj₁ r) (proj₂ r) × (q , e) ∈ rejoinRow p r
   rj-in p (Tb.shown {k} {out a} x _ pk) = (k , out a) , x , when⁺ (fromT pk)
   rj-in p (Tb.shown {k} {skip} x _ pk)  = (k , skip) , x , when⁺ (fromT pk)
   rj-in p (Tb.shown {k} {end} x () pk)
   rj-in p (ended {c} x pc) = (c , end) , x , if-t (fromT pc) (here refl)
   rj-in p (late {c} x cp)  = (c , end) , x , if-f (fromNot cp) (here refl)
 
-rejoin-exact : ∀ {A} {l : Listed A} {t : Table A} → Exactly l t → ∀ p → Exactly (rejoin p l) (Rejoin p t)
+rejoin-exact : ∀ {A} {l : Listed A} {t : EmissionSet A} → Exactly l t → ∀ p → Exactly (rejoin p l) (Rejoin p t)
 rejoin-exact {l = l} {t} el p u = record { sound = s ; complete = c }
   where
     ex = el u
@@ -290,7 +290,7 @@ rejoin-exact {l = l} {t} el p u = record { sound = s ; complete = c }
 ------------------------------------------------------------------------
 -- Merge
 
-module MergeX {A B : Set} (fD : A → Den B) (t : Table A) (o : Listed A) (ls : List (Pos × A × Listed B))
+module MergeX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A) (ls : List (Pos × A × Listed B))
   (u : short (mergeRows o ls) ≡ false)
   (eo : Exactly o t)
   (ls-from : ∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (enter (fD a) (q ++ [ ix 1 ])))
@@ -377,7 +377,7 @@ module MergeX {A B : Set} (fD : A → Den B) (t : Table A) (o : Listed A) (ls : 
     let (l , m) = ls-to (values⁺ (complete exo x)) in
     ∈-++⁺ʳ (concatMap (outerRow done) (rows o)) (cm⁺ m (lane-end {c} (off (done→ c) nD) (complete (exl m) y)))
 
-merge-exact : ∀ {A B} (fD : A → Den B) {t : Table A} (o : Listed A) (ls : List (Pos × A × Listed B)) → Exactly o t
+merge-exact : ∀ {A B} (fD : A → Den B) {t : EmissionSet A} (o : Listed A) (ls : List (Pos × A × Listed B)) → Exactly o t
   → (∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (enter (fD a) (q ++ [ ix 1 ])))
   → (∀ {q a} → (q , a) ∈ values (rows o) → Σ (Listed B) λ l → (q , a , l) ∈ ls)
   → Exactly (mergeRows o ls) (Tb.Merge.MergeT fD t)
@@ -387,7 +387,7 @@ merge-exact fD {t} o ls eo from to u = record { sound = sound-m ; complete = com
 ------------------------------------------------------------------------
 -- Scan, takeWhile, switch, exhaust, bounded merge
 
-module TakeX {A : Set} (incl : Bool) (keep : A → Bool) (p : Pos) (t : Table A) (o : Listed A) (ex : Exact o t) where
+module TakeX {A : Set} (incl : Bool) (keep : A → Bool) (p : Pos) (t : EmissionSet A) (o : Listed A) (ex : Exact o t) where
   open Tb.TakeWhile incl keep t p
   open TakeL incl keep p o using (failed; takeRow)
 
@@ -438,25 +438,25 @@ module TakeX {A : Set} (incl : Bool) (keep : A → Bool) (p : Pos) (t : Table A)
   complete-t (tend {q} x nF) = cm⁺ (complete ex x) (if-f (off (failed→ q) nF) (here refl))
   complete-t (left {q} x F ins) = cm⁺ (complete ex x) (if-t (→failed q F) (when⁺ (fromT ins)))
 
-take-exact : ∀ {A} (i : Bool) (keep : A → Bool) (p : Pos) {t : Table A} (o : Listed A) → Exactly o t
+take-exact : ∀ {A} (i : Bool) (keep : A → Bool) (p : Pos) {t : EmissionSet A} (o : Listed A) → Exactly o t
   → Exactly (takeRows i keep p o) (Tb.TakeWhile.TakeT i keep t p)
 take-exact i keep p {t} o eo u = record { sound = sound-t ; complete = complete-t }
   where open TakeX i keep p t o (eo u)
 
 postulate
-  scan-exact : ∀ {A B} (f : B → A → B) (z : B) {t : Table A} (o : Listed A) → Exactly o t
+  scan-exact : ∀ {A B} (f : B → A → B) (z : B) {t : EmissionSet A} (o : Listed A) → Exactly o t
     → Exactly (scanRows f z o) (Tb.Scan.ScanT f z t)
 
-  switch-exact : ∀ {A B} (fD : A → Den B) {t : Table A} (o : Listed A) (ls : List (Pos × A × Listed B)) → Exactly o t
+  switch-exact : ∀ {A B} (fD : A → Den B) {t : EmissionSet A} (o : Listed A) (ls : List (Pos × A × Listed B)) → Exactly o t
     → (∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (enter (fD a) (q ++ [ ix 1 ])))
     → (∀ {q a} → (q , a) ∈ values (rows o) → Σ (Listed B) λ l → (q , a , l) ∈ ls)
     → Exactly (switchRows o ls) (Tb.Switch.SwitchT fD t)
 
-  exhaust-exact : ∀ {A B} (fD : A → Den B) (t : Table A) (ln : A → Pos → Maybe (Listed B)) (o : Listed A)
+  exhaust-exact : ∀ {A B} (fD : A → Den B) (t : EmissionSet A) (ln : A → Pos → Maybe (Listed B)) (o : Listed A)
     → Exactly o t → (∀ {a s l} → ln a s ≡ just l → Exactly l (enter (fD a) s))
     → ∀ {l} → ExhaustL.listE ln o ≡ just l → Exactly l (Tb.Exhaust.ExhaustT fD t)
 
-  bounded-exact : ∀ {A B} (k : ℕ) (fD : A → Den B) (t : Table A) (ln : A → Pos → Maybe (Listed B)) (o : Listed A)
+  bounded-exact : ∀ {A B} (k : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln : A → Pos → Maybe (Listed B)) (o : Listed A)
     → Exactly o t → (∀ {a s l} → ln a s ≡ just l → Exactly l (enter (fD a) s))
     → ∀ {l} → BoundedL.listB k ln o ≡ just l → Exactly l (Tb.Bounded.BoundedT k fD t)
 
@@ -505,7 +505,7 @@ conn-exact sD F p σl βl eσ eβ u = record { sound = sound-k ; complete = comp
 ------------------------------------------------------------------------
 -- A program tree
 
--- Each listed hot in scope, joined anywhere, is exactly its table joined.
+-- Each listed hot in scope, joined anywhere, is exactly its emission set joined.
 data EnvRel : ∀ {Γ} → All Listed Γ → DenEnv Γ → Set₁ where
   []  : EnvRel [] []
   _∷_ : ∀ {A Γ} {l : Listed A} {d : Den A} {ρL : All Listed Γ} {ρD : DenEnv Γ}
@@ -516,7 +516,7 @@ env-lookup : ∀ {Γ A} {ρL : All Listed Γ} {ρD : DenEnv Γ} → EnvRel ρL �
 env-lookup (r ∷ _) (here refl) = r
 env-lookup (_ ∷ ρ) (there i)   = env-lookup ρ i
 
--- THE LISTING IS THE TABLE: whatever `listT` lists uncut is exactly the
+-- THE LISTING IS THE EMISSION SET: whatever `listT` lists uncut is exactly the
 -- rows of `approxᵀ` at the same approximant.
 listT-exact : ∀ {Γ A} n (o : Obs Timeline Γ A) {ρL : All Listed Γ} {ρD : DenEnv Γ} → EnvRel ρL ρD
   → ∀ p {l} → listT n o ρL p ≡ just l → Exactly l (enter (approxᵀ n o ρD) p)

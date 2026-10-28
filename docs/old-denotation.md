@@ -1,7 +1,7 @@
 # `make old-denotation` — Tier 0's remaining work
 
-Tier 0 moves the proofs from the stream denotation to the table
-(`denotation/Table`). It is done when nothing outside the old denotation
+Tier 0 moves the proofs from the stream denotation to the emission set
+(`denotation/EmissionSet`). It is done when nothing outside the old denotation
 reaches it, so the old denotation can be deleted outright. `make
 old-denotation` lists every remaining use, by file, and exits 1 while any is
 left. **It joins the gate when it reads clean**; until then the count is a

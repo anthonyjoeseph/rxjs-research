@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """THE OLD DENOTATION, COUNTED (Anthony): Tier 0 is done when nothing
-outside the old denotation reaches it.  The table (`denotation/Table`) is
+outside the old denotation reaches it.  The emission set (`denotation/EmissionSet`) is
 the meaning; the stream denotation is what Tier 0 ports away from.
 
 The old denotation is

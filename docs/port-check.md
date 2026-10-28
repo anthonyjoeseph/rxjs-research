@@ -1,7 +1,7 @@
 # `make port-check` — the port boundary
 
 Tier 0 carries the adequacy and simultaneous proofs (`adequacy/`,
-`simultaneous/`) from the stream denotation to the table, in place. The
+`simultaneous/`) from the stream denotation to the emission set, in place. The
 boundary is that the port **only ports**: work the old proof left undone is
 Tier 1's, never the port's.
 
@@ -37,7 +37,7 @@ there is a postulate.
 
 **Matching is by name only.** A ported declaration's type changes with the
 denotation under it; its name does not. Same name, same role. **`xᵀ` is `x`'s
-table reading** and answers to the old `x` as well as to its own name.
+emission set reading** and answers to the old `x` as well as to its own name.
 
 **Free:** a `private` declaration, anything in a `where`, a data type's
 constructors and a record's fields. They belong to the body they serve.

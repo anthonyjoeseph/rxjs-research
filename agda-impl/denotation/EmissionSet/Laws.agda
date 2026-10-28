@@ -1,9 +1,9 @@
 {-# OPTIONS --guardedness #-}
 
--- THE TABLE'S LAWS: the meaning of a node is its operator applied to its
+-- THE EMISSION SET'S LAWS: the meaning of a node is its operator applied to its
 -- children's meanings, so proofs over it go one operator at a time; and
 -- `map` fuses.
-module denotation.Table.Laws where
+module denotation.EmissionSet.Laws where
 
 open import Data.Bool using (Bool)
 open import Data.List using (List; _∷_)
@@ -15,7 +15,7 @@ open import Function using (_∘_)
 
 open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList.Events using (Timeline)
-open import denotation.Table
+open import denotation.EmissionSet
   using (Den; enter; DenEnv; Lim; from; ⟦_⟧ᵀ; coldᵀ; emptyᵀ; ofᵀ; mapᵀ; scanᵀ; takeWhileᵀ; flatMapᵀ; connectᵀ; deferᵀ;
          MapT; map-out; map-skip; map-end)
 
