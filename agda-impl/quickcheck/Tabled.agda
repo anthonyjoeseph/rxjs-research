@@ -3,21 +3,22 @@
 -- THE TABLE, LISTED: the rows `denotation.Table` gives a program, as a
 -- list, up to a horizon — what the oracle checks the table against rxjs
 -- by.  A development tool: no proof reads it.  Each clause mirrors one of
--- the table's; an operator the table leaves out lists nothing.
+-- the table's.
 module quickcheck.Tabled where
 
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
-open import Data.List using (List; []; _∷_; _++_; [_]; foldr; null) renaming (map to mapL)
+open import Data.List using (List; []; _∷_; _++_; [_]; foldr; length) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _≤ᵇ_; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _≤ᵇ_; _≡ᵇ_; _<ᵇ_; _∸_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 
-open import Tree using (Obs; Later; mergeᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 import denotation.MonotonicList.Events as E
-open import denotation.MonotonicList.Events using (Pos; Time; Timeline; timelineAt; _<ᵖ_; inside; ix; sub; last; root)
+open import denotation.MonotonicList.Events using (Pos; Time; Timeline; timelineAt; _<ᵖ_; _≟ᵖ_; inside; ix; sub; last; root)
 open import denotation.MonotonicList using (start; ofᴱ)
-open import denotation.Table using (Ev; out; skip; end)
+open import denotation.Table using (Ev; out; skip; end; below)
+open import Relation.Nullary using (does)
 open import quickcheck.Oracle using (Event; val; _▸_; Trace; completed; silent; cut; depth; showTrace)
 open import quickcheck.Code using (Prog; toObs; timeline)
 open import Data.String using (String)
@@ -71,10 +72,9 @@ isEnd : ∀ {A} → Ev A → Bool
 isEnd end = true
 isEnd _   = false
 
--- An end row at or before `c`; strictly before `c`.
-endBy endBefore : ∀ {A} → List (Row A) → Pos → Bool
-endBy     rs c = anyᵇ (λ { (k , e) → isEnd e ∧ (k ≼ᵇ c) }) rs
-endBefore rs c = anyᵇ (λ { (k , e) → isEnd e ∧ (k <ᵖ c) }) rs
+-- An end row at or before `c`.
+endBy : ∀ {A} → List (Row A) → Pos → Bool
+endBy rs c = anyᵇ (λ { (k , e) → isEnd e ∧ (k ≼ᵇ c) }) rs
 
 -- The positions of the end rows.
 ends : ∀ {A} → List (Row A) → List Pos
@@ -163,68 +163,127 @@ module MergeL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) wher
             ⊣ (short o ∨ anyᵇ (λ { (_ , _ , l) → short l }) ls)
 open MergeL public using (mergeRows)
 
--- `Table.Concat`, level by level: lane i is for the outer's i-th value,
--- `nthL i`; a level's group lists, for each such value, its lanes, one
--- per place lane i-1 ended.  Values stand in position order, so there
--- are no more levels than values; one past that is a budget's cut.
-module ConcatL {A B : Set} (lane : A → Pos → Maybe (Listed B)) (o : Listed A) where
+-- `Table.Scan.ScanT`: each value with the fold up to it.
+module ScanL {A B : Set} (f : B → A → B) (z : B) (o : Listed A) where
+  vals : List (Pos × A)
+  vals = values (sort (rows o))
+
+  foldTo : Pos → B → List (Pos × A) → B
+  foldTo q b []             = b
+  foldTo q b ((k , a) ∷ vs) = foldTo q (if k ≼ᵇ q then f b a else b) vs
+
+  scanRow : Row A → Row B
+  scanRow (q , out a) = q , out (foldTo q z vals)
+  scanRow (q , skip)  = q , skip
+  scanRow (q , end)   = q , end
+
+  scanRows : Listed B
+  scanRows = mapL scanRow (rows o) ⊣ short o
+open ScanL public using (scanRows)
+
+-- `Table.TakeWhile.TakeT`, subscribed at `p`.
+module TakeL {A : Set} (incl : Bool) (keep : A → Bool) (p : Pos) (o : Listed A) where
+  failed : Pos → Bool
+  failed k = anyᵇ (λ { (q , a) → not (keep a) ∧ (q <ᵖ k) }) (values (rows o))
+
+  kept : Row A → List (Row A)
+  kept (q , out a) = if keep a then [ q , out a ] else when incl (q ++ [ ix 0 ] , out a) ++ [ q ++ [ last ] , end ]
+  kept r           = [ r ]
+
+  takeRow : Row A → List (Row A)
+  takeRow (q , e) = if failed q then when (inside p q) (q , skip) else kept (q , e)
+
+  takeRows : Listed A
+  takeRows = concatMap takeRow (rows o) ⊣ short o
+open TakeL public using (takeRows)
+
+-- `Table.Switch.SwitchT`, each value's lane listed at its subscription.
+module SwitchL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) where
   vals : List (Pos × A)
   vals = values (rows o)
 
-  -- The value after `q`, if no value lies between.
-  after : Pos → Pos × A → List (Pos × A)
-  after q (q′ , a′) = when ((q <ᵖ q′) ∧ allᵇ (λ { (k , _) → not (q <ᵖ k) ∨ (q′ ≼ᵇ k) }) vals) (q′ , a′)
+  cutᵇ : Pos → Pos → Bool
+  cutᵇ q k = anyᵇ (λ { (q′ , _) → (q <ᵖ q′) ∧ (q′ <ᵖ k) }) vals
 
-  nthL : ℕ → List (Pos × A)
-  nthL zero    = concatMap (λ { (q , a) → when (allᵇ (λ { (k , _) → q ≼ᵇ k }) vals) (q , a) }) vals
-  nthL (suc i) = concatMap (λ { (q , _) → concatMap (after q) vals }) (nthL i)
+  latest : Pos → Bool
+  latest q = allᵇ (λ { (q′ , _) → q′ ≼ᵇ q }) vals
 
-  Group : Set
-  Group = Pos × A × List (Pos × Listed B)
+  done : Pos → Bool
+  done c = endBy (rows o) c ∧ allᵇ (λ { (q , _ , l) → not (latest q) ∨ endBy (rows l) c }) ls
 
-  -- Where lane i+1, for the value at `q`, may start: past each end of a
-  -- lane i, or where its value arrives.
-  starts : List Group → Pos → List Pos
-  starts gs q = concatMap (λ { (_ , _ , ls) → concatMap (λ { (_ , l) → concatMap (λ c →
-                  when (c <ᵖ q) (q ++ [ ix 1 ]) ++ when (q <ᵖ c) (c ++ [ ix 1 ])) (ends (rows l)) }) ls }) gs
+  live : Row B → Row B
+  live (c , end) = c , (if done c then end else skip)
+  live r         = r
 
-  group : List Pos → Pos × A → Maybe Group
-  group ss (q , a) = bind (mapM (λ s → bind (lane a s) λ l → just (s , l)) ss) λ ls → just (q , a , ls)
+  laneRow : Pos → Row B → List (Row B)
+  laneRow q (k , e) = if cutᵇ q k then when (inside (q ++ [ ix 1 ]) k) (k , skip) else [ live (k , e) ]
 
-  levelL : ℕ → Maybe (List Group)
-  levelL zero    = mapM (λ { (q , a) → group [ q ++ [ ix 1 ] ] (q , a) }) (nthL zero)
-  levelL (suc i) = bind (levelL i) λ gs → mapM (λ { (q , a) → group (starts gs q) (q , a) }) (nthL (suc i))
+  switchRows : Listed B
+  switchRows = (concatMap (outerRow done) (rows o) ++ concatMap (λ { (q , _ , l) → concatMap (laneRow q) (rows l) }) ls)
+             ⊣ (short o ∨ anyᵇ (λ { (_ , _ , l) → short l }) ls)
+open SwitchL public using (switchRows)
 
-  upto : ℕ → List ℕ
-  upto zero    = []
-  upto (suc n) = upto n ++ [ n ]
+-- `Table.Exhaust.ExhaustT`: a merge of the lanes run, in value order,
+-- each run if the last lane run has ended before its value.
+module ExhaustL {A B : Set} (lane : A → Pos → Maybe (Listed B)) (o : Listed A) where
+  free : Maybe (List Pos) → Pos → Bool
+  free nothing   q = true
+  free (just es) q = anyᵇ (λ c → c <ᵖ q) es
 
-  count : ∀ {X : Set} → List X → ℕ
-  count = foldr (λ _ → suc) 0
+  runL : Maybe (List Pos) → List (Pos × A) → Maybe (List (Pos × A × Listed B))
+  runL st []             = just []
+  runL st ((q , a) ∷ vs) =
+    if free st q
+    then bind (lane a (q ++ [ ix 1 ])) (λ l → bind (runL (just (ends (rows l))) vs) λ rs → just ((q , a , l) ∷ rs))
+    else runL st vs
 
-  lanesOf : List (ℕ × List Group) → List (ℕ × Listed B)
-  lanesOf = concatMap λ { (i , gs) → concatMap (λ { (_ , _ , ls) → mapL (λ { (_ , l) → i , l }) ls }) gs }
+  listE : Maybe (Listed B)
+  listE = bind (runL nothing (values (sort (rows o)))) λ rs → just (mergeRows o rs)
 
-  module _ (lv : List (ℕ × List Group)) where
-    over : Pos → Bool
-    over c = endBefore (rows o) c
+-- `Table.Bounded.BoundedT`: lanes placed in value order, each where
+-- `Table.Bounded.Starts` puts it; one held holds every later one.
+module BoundedL {A B : Set} (n : ℕ) (lane : A → Pos → Maybe (Listed B)) (o : Listed A) where
+  vals : List (Pos × A)
+  vals = values (sort (rows o))
 
-    waiting : ℕ → Pos → Bool
-    waiting i c = anyᵇ (λ { (q , _) → q <ᵖ c }) (nthL (suc i))
+  -- `es`'s k-th in position order, from 0, among `cs`.
+  kth : ℕ → List Pos → List Pos → Maybe Pos
+  kth k es []       = nothing
+  kth k es (c ∷ cs) = if below c es ≡ᵇ k then just c else kth k es cs
 
-    drained : Pos → Bool
-    drained c = allᵇ (λ { (_ , gs) → allᵇ (λ { (_ , _ , ls) → anyᵇ (λ { (_ , l) → endBefore (rows l) c }) ls }) gs }) lv
+  -- Where lane i starts; `nothing` if held.
+  startAt : ℕ → Pos → List Pos → Maybe Pos
+  startAt i q es =
+    if i <ᵇ n then just (q ++ [ ix 1 ])
+    else bind (kth (i ∸ n) es es) λ c → just (if c <ᵖ q then q ++ [ ix 1 ] else c ++ [ ix 1 ])
 
-    laneRow : ℕ → Row B → Row B
-    laneRow i (c , end) = if waiting i c then (c ++ [ ix 0 ] , skip) else (c , (if over c then end else skip))
-    laneRow i r         = r
+  mutual
+    schedL : ℕ → List Pos → List (Pos × A) → Maybe (List (Pos × Listed B))
+    schedL i es []             = just []
+    schedL i es ((q , a) ∷ vs) = placed i es a vs (startAt i q es)
 
-    concatRows : Listed B
-    concatRows = (concatMap (outerRow drained) (rows o) ++ concatMap (λ { (i , l) → mapL (laneRow i) (rows l) }) (lanesOf lv))
-               ⊣ (short o ∨ not (null (nthL (suc (count vals)))) ∨ anyᵇ (λ { (_ , l) → short l }) (lanesOf lv))
+    placed : ℕ → List Pos → A → List (Pos × A) → Maybe Pos → Maybe (List (Pos × Listed B))
+    placed i es a vs nothing  = just []
+    placed i es a vs (just s) =
+      bind (lane a s) λ l → bind (schedL (suc i) (ends (rows l) ++ es) vs) λ rs → just ((s , l) ∷ rs)
 
-  listC : Maybe (Listed B)
-  listC = bind (mapM (λ i → bind (levelL i) λ gs → just (i , gs)) (upto (suc (count vals)))) λ lv → just (concatRows lv)
+  module _ (sc : List (Pos × Listed B)) where
+    queued : Pos → Bool
+    queued c = anyᵇ (λ { (s , _) → does (s ≟ᵖ (c ++ [ ix 1 ])) }) sc
+
+    done : Pos → Bool
+    done c = endBy (rows o) c ∧ (length sc ≡ᵇ length vals) ∧ allᵇ (λ { (_ , l) → endBy (rows l) c }) sc
+
+    laneRow : Row B → Row B
+    laneRow (c , end) = if queued c then (c ++ [ ix 0 ] , skip) else (c , (if done c then end else skip))
+    laneRow r         = r
+
+    boundedRows : Listed B
+    boundedRows = (concatMap (outerRow done) (rows o) ++ concatMap (λ { (_ , l) → mapL laneRow (rows l) }) sc)
+                ⊣ (short o ∨ anyᵇ (λ { (_ , l) → short l }) sc)
+
+  listB : Maybe (Listed B)
+  listB = bind (schedL 0 [] vals) λ sc → just (boundedRows sc)
 
 -- `Table.Connect.ConnT`.
 module ConnL {A B : Set} (r : Pos) (σ : Listed A) (β : Listed B) where
@@ -249,15 +308,20 @@ listT n       (cold c)          ρ p = just (walk fuel (start p (timelineAt c p)
 listT n       empty             ρ p = just ([ p ++ [ last ] , end ] ⊣ false)
 listT n       (of xs)           ρ p = just (walk fuel (ofᴱ p 0 xs))
 listT n       (map f s)         ρ p = bind (listT n s ρ p) λ l → just (mapRows f l)
-listT n       (scan f z s)      ρ p = nothing
-listT n       (takeWhile i q s) ρ p = nothing
+listT n       (scan f z s)      ρ p = bind (listT n s ρ p) λ l → just (scanRows f z l)
+listT n       (takeWhile i q s) ρ p = bind (listT n s ρ p) λ l → just (takeRows i q p l)
 listT n       (flatMap (mergeᶠ nothing) f s) ρ p =
   bind (listT n s ρ p) λ o →
   bind (mapM (λ qa → bind (listT n (f (proj₂ qa)) ρ (proj₁ qa ++ [ ix 1 ])) λ l → just (proj₁ qa , proj₂ qa , l)) (values (rows o))) λ ls →
   just (mergeRows o ls)
-listT n       (flatMap (mergeᶠ (just (suc zero))) f s) ρ p =
-  bind (listT n s ρ p) λ o → ConcatL.listC (λ a → listT n (f a) ρ) o
-listT n       (flatMap op f s)  ρ p = nothing
+listT n       (flatMap (mergeᶠ (just k)) f s) ρ p =
+  bind (listT n s ρ p) λ o → BoundedL.listB k (λ a → listT n (f a) ρ) o
+listT n       (flatMap switchᶠ f s) ρ p =
+  bind (listT n s ρ p) λ o →
+  bind (mapM (λ qa → bind (listT n (f (proj₂ qa)) ρ (proj₁ qa ++ [ ix 1 ])) λ l → just (proj₁ qa , proj₂ qa , l)) (values (rows o))) λ ls →
+  just (switchRows o ls)
+listT n       (flatMap exhaustᶠ f s) ρ p =
+  bind (listT n s ρ p) λ o → ExhaustL.listE (λ a → listT n (f a) ρ) o
 listT n       (connect s b)     ρ p =
   bind (listT n s ρ (p ++ [ ix 1 ])) λ σ →
   bind (listT n b (hotOf σ ∷ ρ) (p ++ [ ix 0 ])) λ β →
@@ -286,7 +350,7 @@ traceT {A} (rs ⊣ b) = go nothing (sort (proper rs)) ▸ finish
     finish = if anyᵇ (λ { (_ , e) → isEnd e }) rs then completed else if b then cut else silent
 
 -- A generated program's table, as the oracle reads it, unfolded as the
--- denotation's trace is; `null` where the table leaves an operator out.
+-- denotation's trace is; `null` if it lists nothing.
 tableJSON : ∀ {t} → ℕ → Prog t → String
 tableJSON {t} u p with listT (depth u p) (toObs timeline u p [] [] []) [] root
 ... | just l  = showTrace t (traceT l)

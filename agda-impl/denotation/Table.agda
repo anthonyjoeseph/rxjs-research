@@ -16,18 +16,19 @@
 -- blocks everything after it.
 module denotation.Table where
 
-open import Data.Bool using (Bool; T)
+open import Data.Bool using (Bool; T; not; if_then_else_)
 open import Data.Empty using (⊥)
-open import Data.List using (List; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; _∷_; lookup)
 open import Data.Maybe using (just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _≤_)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _∸_)
 open import Data.Product using (Σ; _×_)
 open import Data.Unit using (⊤)
 open import Relation.Nullary using (¬_)
+open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import Tree using (Obs; Later; FlatOp; mergeᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 import denotation.MonotonicList.Events as E
 open import denotation.MonotonicList.Events using (Pos; Timeline; timelineAt; _<ᵖ_; inside; ix; sub; last)
 open import denotation.MonotonicList using (start; ofᴱ)
@@ -130,6 +131,56 @@ data DeferT {A : Set} (s : Den A) (p : Pos) : Table A where
 deferᵀ : ∀ {A} → Den A → Den A
 deferᵀ s = cold (DeferT s)
 
+-- An input's values in position order.
+module Values {A : Set} (o : Table A) where
+
+  -- `q′` is the first value after `q`.
+  Next : Pos → Pos → Set
+  Next q q′ = ∀ {k b} → o k (out b) → q ≺ k → q′ ≼ k
+
+  -- The i-th value.
+  data Nth : ℕ → Pos → A → Set where
+    first : ∀ {q a} → o q (out a) → (∀ {k b} → o k (out b) → q ≼ k) → Nth 0 q a
+    next  : ∀ {i q a q′ a′} → Nth i q a → o q′ (out a′) → q ≺ q′ → Next q q′ → Nth (suc i) q′ a′
+
+-- SCAN: each value as the fold of every value up to it.
+module Scan {A B : Set} (f : B → A → B) (z : B) (t : Table A) where
+  open Values t using (Next)
+
+  -- The fold up to the value at `q`.
+  data Acc : Pos → B → Set where
+    acc₀ : ∀ {q a} → t q (out a) → (∀ {k b} → t k (out b) → q ≼ k) → Acc q (f z a)
+    acc  : ∀ {q b q′ a′} → Acc q b → t q′ (out a′) → q ≺ q′ → Next q q′ → Acc q′ (f b a′)
+
+  data ScanT : Table B where
+    sval  : ∀ {q b} → Acc q b → ScanT q (out b)
+    sstep : ∀ {q} → t q skip → ScanT q skip
+    send  : ∀ {q} → t q end → ScanT q end
+
+scanᵀ : ∀ {A B} → (B → A → B) → B → Den A → Den B
+scanᵀ f z s = cold λ p → Scan.ScanT f z (enter s p)
+
+-- TAKEWHILE, subscribed at `p`: values while they pass.  The first
+-- failing one leaves under `ix 0` of its position if inclusive, and the
+-- completion under `last` either way.  What the source still runs of its
+-- subscribe burst stays, as skips; the rest is unsubscribed.
+module TakeWhile {A : Set} (incl : Bool) (keep : A → Bool) (t : Table A) (p : Pos) where
+
+  -- A failing value lies before `k`.
+  Failed : Pos → Set
+  Failed k = Σ Pos λ q → Σ A λ a → t q (out a) × T (not (keep a)) × q ≺ k
+
+  data TakeT : Table A where
+    pass  : ∀ {q a} → t q (out a) → T (keep a) → ¬ Failed q → TakeT q (out a)
+    fail  : ∀ {q a} → t q (out a) → T (not (keep a)) → ¬ Failed q → T incl → TakeT (q ++ [ ix 0 ]) (out a)
+    stop  : ∀ {q a} → t q (out a) → T (not (keep a)) → ¬ Failed q → TakeT (q ++ [ last ]) end
+    step  : ∀ {q} → t q skip → ¬ Failed q → TakeT q skip
+    tend  : ∀ {q} → t q end → ¬ Failed q → TakeT q end
+    left  : ∀ {q e} → t q e → Failed q → T (inside p q) → TakeT q skip
+
+takeWhileᵀ : ∀ {A} → Bool → (A → Bool) → Den A → Den A
+takeWhileᵀ i keep s = cold λ p → TakeWhile.TakeT i keep (enter s p) p
+
 ------------------------------------------------------------------------
 -- Merge
 
@@ -155,46 +206,127 @@ module Merge {A B : Set} (f : A → Den B) (o : Table A) where
     lend  : ∀ {q a c} → o q (out a) → Lane q a c end → Done c → MergeT c end
     lpass : ∀ {q a c} → o q (out a) → Lane q a c end → ¬ Done c → MergeT c skip
 
--- CONCAT: lane i+1 waits for lane i.  It is subscribed where its value
--- arrives if lane i has ended by then, and otherwise where lane i ends,
--- that end shown silent at its first effect.
-module Concat {A B : Set} (f : A → Den B) (o : Table A) where
+-- MERGE, BOUNDED BY n: a value arriving with n lanes running waits in a
+-- queue, and the queue's first lane is subscribed where a lane ends, that
+-- end shown silent at its first effect.  Lanes start in value order, so
+-- lane i is running once i ∸ n + 1 of the lanes before it have ended: it
+-- starts where its value arrives, or past the (i ∸ n)-th of their ends in
+-- position order, whichever is later.  `just 1` is concat.
+-- How many of `es` lie before `c`.
+below : Pos → List Pos → ℕ
+below c []       = 0
+below c (e ∷ es) = if e <ᵖ c then suc (below c es) else below c es
 
-  -- The outer's i-th value.
-  data Nth : ℕ → Pos → A → Set where
-    first : ∀ {q a} → o q (out a) → (∀ {k b} → o k (out b) → q ≼ k) → Nth 0 q a
-    next  : ∀ {i q a q′ a′} → Nth i q a → o q′ (out a′) → q ≺ q′
-          → (∀ {k b} → o k (out b) → q ≺ k → q′ ≼ k) → Nth (suc i) q′ a′
+module Bounded {A B : Set} (n : ℕ) (f : A → Den B) (o : Table A) where
+  open Values o
+
+  -- `c` is `es`'s k-th in position order, from 0.
+  Kth : ℕ → List Pos → Pos → Set
+  Kth k es c = c ∈ es × below c es ≡ k
+
+  -- Where lane i, for the value at `q`, starts, given the ends `es` of
+  -- the lanes before it.
+  data Starts (i : ℕ) (q : Pos) (es : List Pos) : Pos → Set where
+    room   : i < n → Starts i q es (q ++ [ ix 1 ])
+    freed  : ∀ {c} → n ≤ i → Kth (i ∸ n) es c → c ≺ q → Starts i q es (q ++ [ ix 1 ])
+    queued : ∀ {c} → n ≤ i → Kth (i ∸ n) es c → q ≺ c → Starts i q es (c ++ [ ix 1 ])
+
+  -- The ends of lanes 0 … i-1: of those started, those that end.  A lane
+  -- too few ends free is held for good, and every lane after it.
+  data Sched : ℕ → List Pos → Set where
+    none  : Sched 0 []
+    ended : ∀ {i es q a s c} → Sched i es → Nth i q a → Starts i q es s → enter (f a) s c end
+          → Sched (suc i) (c ∷ es)
+    runs  : ∀ {i es q a s} → Sched i es → Nth i q a → Starts i q es s → (∀ {c} → ¬ enter (f a) s c end)
+          → Sched (suc i) es
+    held  : ∀ {i es q a} → Sched i es → Nth i q a → n ≤ i → length es ≤ i ∸ n → Sched (suc i) es
 
   -- Lane i, for the outer's value at `q`, subscribed at `s`.
-  data Sub : ℕ → Pos → Pos → A → Set where
-    sub₀   : ∀ {q a} → Nth 0 q a → Sub 0 q (q ++ [ ix 1 ]) a
-    free   : ∀ {i q₀ s a c q a′} → Sub i q₀ s a → enter (f a) s c end → Nth (suc i) q a′ → c ≺ q
-           → Sub (suc i) q (q ++ [ ix 1 ]) a′
-    queued : ∀ {i q₀ s a c q a′} → Sub i q₀ s a → enter (f a) s c end → Nth (suc i) q a′ → q ≺ c
-           → Sub (suc i) q (c ++ [ ix 1 ]) a′
+  Sub : ℕ → Pos → Pos → A → Set
+  Sub i q s a = Σ (List Pos) λ es → Sched i es × Nth i q a × Starts i q es s
 
-  -- Lane i+1's value has arrived by `c`.
-  Waiting : ℕ → Pos → Set
-  Waiting i c = Σ Pos λ q → Σ A λ a → Nth (suc i) q a × q ≺ c
+  -- A queued lane starts past `c`.
+  Queued : Pos → Set
+  Queued c = Σ ℕ λ i → Σ Pos λ q → Σ A λ a → Sub i q (c ++ [ ix 1 ]) a
 
-  -- The outer has ended by `c`.
-  Over : Pos → Set
-  Over c = Σ Pos λ c₀ → o c₀ end × c₀ ≺ c
+  -- Every part has ended by `c`.
+  Done : Pos → Set
+  Done c = (Σ Pos λ c₀ → o c₀ end × c₀ ≼ c)
+         × (∀ {i q a} → Nth i q a → Σ Pos λ s → Σ Pos λ c′ → Sub i q s a × enter (f a) s c′ end × c′ ≼ c)
 
-  -- Every lane has ended by `c`.
-  Drained : Pos → Set
-  Drained c = ∀ {i q a} → Nth i q a → Σ Pos λ s → Σ Pos λ c′ → Sub i q s a × enter (f a) s c′ end × c′ ≺ c
+  data BoundedT : Table B where
+    val     : ∀ {q a} → o q (out a) → BoundedT (q ++ [ ix 0 ]) skip
+    step    : ∀ {q} → o q skip → BoundedT q skip
+    oend    : ∀ {c} → o c end → Done c → BoundedT c end
+    opass   : ∀ {c} → o c end → ¬ Done c → BoundedT c skip
+    lane    : ∀ {i q s a k e} → Sub i q s a → enter (f a) s k e → Work e → BoundedT k e
+    handoff : ∀ {i q s a c} → Sub i q s a → enter (f a) s c end → Queued c → BoundedT (c ++ [ ix 0 ]) skip
+    lend    : ∀ {i q s a c} → Sub i q s a → enter (f a) s c end → ¬ Queued c → Done c → BoundedT c end
+    lpass   : ∀ {i q s a c} → Sub i q s a → enter (f a) s c end → ¬ Queued c → ¬ Done c → BoundedT c skip
 
-  data ConcatT : Table B where
-    val     : ∀ {q a} → o q (out a) → ConcatT (q ++ [ ix 0 ]) skip
-    step    : ∀ {q} → o q skip → ConcatT q skip
-    oend    : ∀ {c} → o c end → Drained c → ConcatT c end
-    opass   : ∀ {c} → o c end → ¬ Drained c → ConcatT c skip
-    lane    : ∀ {i q s a k e} → Sub i q s a → enter (f a) s k e → Work e → ConcatT k e
-    handoff : ∀ {i q s a c} → Sub i q s a → enter (f a) s c end → Waiting i c → ConcatT (c ++ [ ix 0 ]) skip
-    lend    : ∀ {i q s a c} → Sub i q s a → enter (f a) s c end → ¬ Waiting i c → Over c → ConcatT c end
-    lpass   : ∀ {i q s a c} → Sub i q s a → enter (f a) s c end → ¬ Waiting i c → ¬ Over c → ConcatT c skip
+-- SWITCH: a value's lane runs until the next value arrives.  What a cut
+-- lane still runs of its subscribe burst stays, as skips.
+module Switch {A B : Set} (f : A → Den B) (o : Table A) where
+
+  Lane : Pos → A → Table B
+  Lane q a = enter (f a) (q ++ [ ix 1 ])
+
+  -- A value after `q` arrived before `k`.
+  Cut : Pos → Pos → Set
+  Cut q k = Σ Pos λ q′ → Σ A λ a′ → o q′ (out a′) × q ≺ q′ × q′ ≺ k
+
+  -- No value after `q`.
+  Latest : Pos → Set
+  Latest q = ∀ {q′ a′} → o q′ (out a′) → q′ ≼ q
+
+  -- The outer and the last lane have ended by `c`.
+  Done : Pos → Set
+  Done c = (Σ Pos λ c₀ → o c₀ end × c₀ ≼ c)
+         × (∀ {q a} → o q (out a) → Latest q → Σ Pos λ c′ → Lane q a c′ end × c′ ≼ c)
+
+  data SwitchT : Table B where
+    val   : ∀ {q a} → o q (out a) → SwitchT (q ++ [ ix 0 ]) skip
+    step  : ∀ {q} → o q skip → SwitchT q skip
+    oend  : ∀ {c} → o c end → Done c → SwitchT c end
+    opass : ∀ {c} → o c end → ¬ Done c → SwitchT c skip
+    lane  : ∀ {q a k e} → o q (out a) → Lane q a k e → Work e → ¬ Cut q k → SwitchT k e
+    lend  : ∀ {q a c} → o q (out a) → Lane q a c end → ¬ Cut q c → Done c → SwitchT c end
+    lpass : ∀ {q a c} → o q (out a) → Lane q a c end → ¬ Cut q c → ¬ Done c → SwitchT c skip
+    left  : ∀ {q a k e} → o q (out a) → Lane q a k e → Cut q k → T (inside (q ++ [ ix 1 ]) k) → SwitchT k skip
+
+-- EXHAUST: a value's lane runs only if the last lane run has ended by the
+-- time it arrives; otherwise the value is dropped.
+module Exhaust {A B : Set} (f : A → Den B) (o : Table A) where
+  open Values o using (Next)
+
+  Lane : Pos → A → Table B
+  Lane q a = enter (f a) (q ++ [ ix 1 ])
+
+  -- At the value at `q′`, the last lane run is the value at `q`'s.
+  data Cur : Pos → Pos → Set where
+    cur₀ : ∀ {q a} → o q (out a) → (∀ {k b} → o k (out b) → q ≼ k) → Cur q q
+    run  : ∀ {q₁ q a c q₂ a₂} → Cur q₁ q → o q (out a) → Lane q a c end → c ≺ q₂
+         → o q₂ (out a₂) → q₁ ≺ q₂ → Next q₁ q₂ → Cur q₂ q₂
+    drop : ∀ {q₁ q a q₂ a₂} → Cur q₁ q → o q (out a) → (∀ {c} → Lane q a c end → q₂ ≼ c)
+         → o q₂ (out a₂) → q₁ ≺ q₂ → Next q₁ q₂ → Cur q₂ q
+
+  -- The value at `q` runs its lane.
+  Run : Pos → Set
+  Run q = Cur q q
+
+  -- The outer and every lane run have ended by `c`.
+  Done : Pos → Set
+  Done c = (Σ Pos λ c₀ → o c₀ end × c₀ ≼ c)
+         × (∀ {q a} → o q (out a) → Run q → Σ Pos λ c′ → Lane q a c′ end × c′ ≼ c)
+
+  data ExhaustT : Table B where
+    val   : ∀ {q a} → o q (out a) → ExhaustT (q ++ [ ix 0 ]) skip
+    step  : ∀ {q} → o q skip → ExhaustT q skip
+    oend  : ∀ {c} → o c end → Done c → ExhaustT c end
+    opass : ∀ {c} → o c end → ¬ Done c → ExhaustT c skip
+    lane  : ∀ {q a k e} → o q (out a) → Run q → Lane q a k e → Work e → ExhaustT k e
+    lend  : ∀ {q a c} → o q (out a) → Run q → Lane q a c end → Done c → ExhaustT c end
+    lpass : ∀ {q a c} → o q (out a) → Run q → Lane q a c end → ¬ Done c → ExhaustT c skip
 
 ------------------------------------------------------------------------
 -- Connect
@@ -230,16 +362,11 @@ connectᵀ s F = cold λ p → Connect.ConnT s F p
 ------------------------------------------------------------------------
 -- FlatMap
 
--- The operators the spike leaves out: a gap per operator.
-postulate
-  scanᵀ      : ∀ {A B} → (B → A → B) → B → Den A → Den B
-  takeWhileᵀ : ∀ {A} → Bool → (A → Bool) → Den A → Den A
-  flatOtherᵀ : ∀ {A B} → FlatOp → (A → Den B) → Den A → Den B
-
 flatMapᵀ : ∀ {A B} → FlatOp → (A → Den B) → Den A → Den B
-flatMapᵀ (mergeᶠ nothing)        f s = cold λ p → Merge.MergeT f (enter s p)
-flatMapᵀ (mergeᶠ (just (suc zero))) f s = cold λ p → Concat.ConcatT f (enter s p)
-flatMapᵀ op                      f s = flatOtherᵀ op f s
+flatMapᵀ (mergeᶠ nothing)  f s = cold λ p → Merge.MergeT f (enter s p)
+flatMapᵀ (mergeᶠ (just n)) f s = cold λ p → Bounded.BoundedT n f (enter s p)
+flatMapᵀ switchᶠ           f s = cold λ p → Switch.SwitchT f (enter s p)
+flatMapᵀ exhaustᶠ          f s = cold λ p → Exhaust.ExhaustT f (enter s p)
 
 ------------------------------------------------------------------------
 -- A program tree's table

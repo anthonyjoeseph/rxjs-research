@@ -5,7 +5,7 @@
 -- the oracle compares against rxjs is read off the relation itself.
 --
 -- Exact, not merely sound: a listed end or skip decides a table predicate
--- that quantifies over the inputs' rows (`Merge.Done`, `Concat.Drained`,
+-- that quantifies over the inputs' rows (`Merge.Done`, `Bounded.Queued`,
 -- `Connect.Alive`, `Proper`), so it is sound only if those inputs were
 -- listed completely.  A cut listing claims nothing.
 module quickcheck.Tabled.Exact where
@@ -20,24 +20,25 @@ open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; �
 open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _<_; z<s; s≤s)
-open import Data.Nat.Properties using (m≤n⇒m<n∨m≡n; m<n⇒m<1+n; <-trans; n<1+n)
+open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 import denotation.MonotonicList.Events as E
 open import denotation.MonotonicList.Events using (Pos; Timeline; _<ᵖ_; inside; ix)
 open import denotation.Table
-  using (Ev; out; skip; end; Table; _≺_; _≼_; InE; at-out; at-skip; at-end; on-out; on-skip; Proper; Rejoin; ended; late;
-         Den; enter; MapT; map-out; map-skip; map-end; DeferT; guard; DenEnv; approxᵀ)
+  using (out; skip; end; Table; _≼_; InE; at-out; at-skip; at-end; on-out; on-skip; Proper; Rejoin;
+  ended; late; Den; enter; MapT; map-out; map-skip; map-end; DeferT; guard; DenEnv; approxᵀ)
 import denotation.Table as Tb
 open import quickcheck.Tabled
-  using (Row; Listed; _⊣_; rows; short; bind; concatMap; mapM; when; anyᵇ; allᵇ; isEnd; endBy; endBefore; ends; properᵇ; proper; values;
-         fuel; horizon; walk; mapRow; mapRows; rejoinRow; rejoin; hotOf; outerRow; mergeRows; connRows; module MergeL; module ConcatL; module ConnL; listT)
+  using (Row; Listed; _⊣_; rows; short; bind; concatMap; mapM; when; anyᵇ; allᵇ; endBy; properᵇ;
+  proper; values; fuel; horizon; walk; mapRow; mapRows; rejoinRow; rejoin; hotOf; outerRow;
+  mergeRows; connRows; scanRows; takeRows; switchRows; module MergeL; module ExhaustL;
+  module BoundedL; module ConnL; listT)
 
 ------------------------------------------------------------------------
 -- Exactness
@@ -83,13 +84,6 @@ private
 
   ∧-intro : ∀ {a b} → a ≡ true → b ≡ true → a ∧ b ≡ true
   ∧-intro refl e = e
-
-  or-right : ∀ {b c} → not b ∨ c ≡ true → b ≡ true → c ≡ true
-  or-right e refl = e
-
-  or-intro : ∀ {b c} → (b ≡ true → c ≡ true) → not b ∨ c ≡ true
-  or-intro {true}  f = f refl
-  or-intro {false} f = refl
 
   -- A test that would hold had its predicate held.
   off : ∀ {b} {P : Set} → (b ≡ true → P) → ¬ P → b ≡ false
@@ -175,10 +169,6 @@ private
   ... | here refl = y₀ , here refl , fx
   ... | there m′  = let (z , zm , fz) = mapM⁺ {f = f} rest m′ in z , there zm , fz
 
-  null-gone : ∀ {X : Set} {xs : List X} → not (null xs) ≡ false → ∀ {x} → ¬ x ∈ xs
-  null-gone {xs = []} _ ()
-  null-gone {xs = _ ∷ _} ()
-
 ------------------------------------------------------------------------
 -- Rows
 
@@ -196,19 +186,6 @@ private
   values⁺ {rs = (k , end) ∷ rs}   (here ())
   values⁺ {rs = (k , end) ∷ rs}   (there m)   = values⁺ m
 
-  end-at : ∀ {X : Set} {rs : List (Row X)} {c} k (e : Ev X) → (k , e) ∈ rs → c ∈ when (isEnd e) k → (c , end) ∈ rs
-  end-at k end     rm (here refl) = rm
-  end-at k end     rm (there ())
-  end-at k (out _) rm ()
-  end-at k skip    rm ()
-
-  ends⁻ : ∀ {X : Set} {rs : List (Row X)} {c} → c ∈ ends rs → (c , end) ∈ rs
-  ends⁻ {rs = rs} m with cm⁻ {xs = rs} m
-  ... | ((k , e) , rm , h) = end-at k e rm h
-
-  ends⁺ : ∀ {X : Set} {rs : List (Row X)} {c} → (c , end) ∈ rs → c ∈ ends rs
-  ends⁺ {rs = rs} m = cm⁺ {xs = rs} m (here refl)
-
   endBy→ : ∀ {X : Set} {u : Table X} {l : Listed X} → Exact l u → ∀ {c} → endBy (rows l) c ≡ true → Σ Pos λ k → u k end × k ≼ c
   endBy→ {l = l} ex e with any⁻ {xs = rows l} e
   ... | ((k , end) , m , h)   = k , sound ex m , not-T h
@@ -217,16 +194,6 @@ private
 
   →endBy : ∀ {X : Set} {u : Table X} {l : Listed X} → Exact l u → ∀ {k c} → u k end → k ≼ c → endBy (rows l) c ≡ true
   →endBy ex x kc = any⁺ (complete ex x) (T-not kc)
-
-  endBefore→ : ∀ {X : Set} {u : Table X} {l : Listed X} → Exact l u → ∀ {c} → endBefore (rows l) c ≡ true → Σ Pos λ k → u k end × k ≺ c
-  endBefore→ {l = l} ex e with any⁻ {xs = rows l} e
-  ... | ((k , end) , m , h)   = k , sound ex m , Equivalence.from T-≡ h
-  ... | ((k , out _) , m , ())
-  ... | ((k , skip) , m , ())
-
-  →endBefore : ∀ {X : Set} {u : Table X} {l : Listed X} → Exact l u → ∀ {k c} → u k end → k ≺ c → endBefore (rows l) c ≡ true
-  →endBefore ex x kc = any⁺ (complete ex x) (fromT kc)
-
 ------------------------------------------------------------------------
 -- Leaves
 
@@ -418,333 +385,27 @@ merge-exact fD {t} o ls eo from to u = record { sound = sound-m ; complete = com
   where open MergeX fD t o ls u eo from to
 
 ------------------------------------------------------------------------
--- Concat
+-- Scan, takeWhile, switch, exhaust, bounded merge
 
-module ConcatX {A B : Set} (fD : A → Den B) (t : Table A) (ln : A → Pos → Maybe (Listed B)) (o : Listed A)
-  (exo : Exact o t)
-  (el : ∀ {a s l} → ln a s ≡ just l → Exactly l (enter (fD a) s))
-  where
-  open Tb.Concat fD t
-  open ConcatL ln o
+postulate
+  scan-exact : ∀ {A B} (f : B → A → B) (z : B) {t : Table A} (o : Listed A) → Exactly o t
+    → Exactly (scanRows f z o) (Tb.Scan.ScanT f z t)
 
-  private
-    K : ℕ
-    K = count vals
+  take-exact : ∀ {A} (i : Bool) (keep : A → Bool) (p : Pos) {t : Table A} (o : Listed A) → Exactly o t
+    → Exactly (takeRows i keep p o) (Tb.TakeWhile.TakeT i keep t p)
 
-    val-out : ∀ {q a} → (q , a) ∈ vals → t q (out a)
-    val-out m = sound exo (values⁻ m)
+  switch-exact : ∀ {A B} (fD : A → Den B) {t : Table A} (o : Listed A) (ls : List (Pos × A × Listed B)) → Exactly o t
+    → (∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (enter (fD a) (q ++ [ ix 1 ])))
+    → (∀ {q a} → (q , a) ∈ values (rows o) → Σ (Listed B) λ l → (q , a , l) ∈ ls)
+    → Exactly (switchRows o ls) (Tb.Switch.SwitchT fD t)
 
-    out-val : ∀ {q a} → t q (out a) → (q , a) ∈ vals
-    out-val x = values⁺ (complete exo x)
+  exhaust-exact : ∀ {A B} (fD : A → Den B) (t : Table A) (ln : A → Pos → Maybe (Listed B)) (o : Listed A)
+    → Exactly o t → (∀ {a s l} → ln a s ≡ just l → Exactly l (enter (fD a) s))
+    → ∀ {l} → ExhaustL.listE ln o ≡ just l → Exactly l (Tb.Exhaust.ExhaustT fD t)
 
-  -- The i-th values.
-  nth-sound : ∀ i {q a} → (q , a) ∈ nthL i → Nth i q a
-  nth-sound zero m with cm⁻ {xs = vals} m
-  ... | ((q , a) , vm , h) with when⁻ h
-  ... | (b , refl) = first (val-out vm) (λ x → not-T (all⁻ b (out-val x)))
-  nth-sound (suc i) m with cm⁻ {xs = nthL i} m
-  ... | ((q₀ , a₀) , m₀ , h) with cm⁻ {xs = vals} h
-  ... | ((q , a) , vm , h′) with when⁻ h′
-  ... | (b , refl) = next (nth-sound i m₀) (val-out vm) (Equivalence.from T-≡ (proj₁ (∧-true b)))
-                       (λ x qk → not-T (or-right (all⁻ (proj₂ (∧-true b)) (out-val x)) (fromT qk)))
-
-  nth-complete : ∀ {i q a} → Nth i q a → (q , a) ∈ nthL i
-  nth-complete (first x all) = cm⁺ {xs = vals} (out-val x) (when⁺ (all⁺ {xs = vals} λ { {k , b} m → T-not (all (val-out m)) }))
-  nth-complete {suc i} (next {q = q₀} N x lt all) =
-    cm⁺ {xs = nthL i} (nth-complete N) (cm⁺ {f = after q₀} {xs = vals} (out-val x) (when⁺ (∧-intro (fromT lt)
-      (all⁺ {xs = vals} λ { {k , b} m → or-intro (λ qk → T-not (all (val-out m) (Equivalence.from T-≡ qk))) }))))
-
-  sub-nth : ∀ {i q s a} → Sub i q s a → Nth i q a
-  sub-nth (sub₀ N)         = N
-  sub-nth (free _ _ N _)   = N
-  sub-nth (queued _ _ N _) = N
-
-  waiting-iff : ∀ lv i c → (waiting lv i c ≡ true → Waiting i c) × (Waiting i c → waiting lv i c ≡ true)
-  waiting-iff lv i c = to , fro
-    where
-      to : waiting lv i c ≡ true → Waiting i c
-      to e with any⁻ {xs = nthL (suc i)} e
-      ... | ((q , a) , m , h) = q , a , nth-sound (suc i) m , Equivalence.from T-≡ h
-      fro : Waiting i c → waiting lv i c ≡ true
-      fro (q , a , N , qc) = any⁺ {xs = nthL (suc i)} (nth-complete N) (fromT qc)
-
-  -- Every level past the values is empty.
-  private
-    Gone : ℕ → Set
-    Gone i = ∀ {x} → ¬ x ∈ nthL i
-
-    gone-step : ∀ i → Gone i → Gone (suc i)
-    gone-step i g m = let (y , ym , _) = cm⁻ {xs = nthL i} m in g ym
-
-    levels-or-gone : Gone (suc K) → ∀ j → j < suc K ⊎ Gone j
-    levels-or-gone g zero = inj₁ z<s
-    levels-or-gone g (suc j) with levels-or-gone g j
-    ... | inj₂ gj = inj₂ (gone-step j gj)
-    ... | inj₁ (s≤s le) with m≤n⇒m<n∨m≡n le
-    ...   | inj₁ lt   = inj₁ (s≤s lt)
-    ...   | inj₂ refl = inj₂ g
-
-    upto⁺ : ∀ {i n} → i < n → i ∈ upto n
-    upto⁺ {i} {suc n} (s≤s le) with m≤n⇒m<n∨m≡n le
-    ... | inj₁ lt   = ∈-++⁺ˡ (upto⁺ lt)
-    ... | inj₂ refl = ∈-++⁺ʳ (upto i) (here refl)
-
-    upto⁻ : ∀ {i n} → i ∈ upto n → i < n
-    upto⁻ {i} {suc n} m with ∈-++⁻ (upto n) m
-    ... | inj₁ m′        = m<n⇒m<1+n (upto⁻ m′)
-    ... | inj₂ (here refl) = n<1+n n
-    ... | inj₂ (there ())
-
-    down : ∀ {i n} → suc i < n → i < n
-    down lt = <-trans (n<1+n _) lt
-
-  group⁻ : ∀ {ss q a g} → group ss (q , a) ≡ just g
-    → Σ (List (Pos × Listed B)) λ ls → g ≡ (q , a , ls)
-        × (∀ {s l} → (s , l) ∈ ls → s ∈ ss × ln a s ≡ just l)
-        × (∀ {s} → s ∈ ss → Σ (Listed B) λ l → (s , l) ∈ ls)
-  group⁻ {ss} {q} {a} e with bind⁻ {m = mapM (λ s → bind (ln a s) λ l → just (s , l)) ss} e
-  ... | (ls , els , refl) = ls , refl , fr , to
-    where
-      fr : ∀ {s l} → (s , l) ∈ ls → s ∈ ss × ln a s ≡ just l
-      fr m with mapM⁻ {xs = ss} els m
-      ... | (s′ , sm , fs) with bind⁻ {m = ln a s′} fs
-      ... | (l′ , e′ , refl) = sm , e′
-      to : ∀ {s} → s ∈ ss → Σ (Listed B) λ l → (s , l) ∈ ls
-      to {s′} sm with mapM⁺ {xs = ss} els sm
-      ... | ((s″ , l′) , m , fs) with bind⁻ {m = ln a s′} fs
-      ... | (l″ , e′ , refl) = l″ , m
-
-  -- A level, listed: each of the i-th values with its lanes.
-  record Level (i : ℕ) (gs : List Group) : Set where
-    field
-      from  : ∀ {q a ls} → (q , a , ls) ∈ gs → (q , a) ∈ nthL i × (∀ {s l} → (s , l) ∈ ls → Sub i q s a × ln a s ≡ just l)
-      to    : ∀ {q a} → (q , a) ∈ nthL i → Σ (List (Pos × Listed B)) λ ls → (q , a , ls) ∈ gs
-      cover : ∀ {q a ls s} → (q , a , ls) ∈ gs → Sub i q s a → Σ (Listed B) λ l → (s , l) ∈ ls
-
-  module _ (lv : List (ℕ × List Group))
-    (lv-ok : mapM (λ i → bind (levelL i) λ gs → just (i , gs)) (upto (suc K)) ≡ just lv)
-    (u : short (concatRows lv) ≡ false)
-    where
-
-    private
-      uncut-lv : ∀ {j l} → (j , l) ∈ lanesOf lv → short l ≡ false
-      uncut-lv m = any-off {xs = lanesOf lv} (proj₂ (∨-false {not (null (nthL (suc K)))} (proj₂ (∨-false {short o} u)))) m
-
-      gone-K : Gone (suc K)
-      gone-K = null-gone (proj₁ (∨-false {not (null (nthL (suc K)))} (proj₂ (∨-false {short o} u))))
-
-      in-range : ∀ {j q a} → Nth j q a → j < suc K
-      in-range {j} N with levels-or-gone gone-K j
-      ... | inj₁ lt = lt
-      ... | inj₂ g  = ⊥-elim (g (nth-complete N))
-
-      lv-at : ∀ {j gs} → j < suc K → levelL j ≡ just gs → (j , gs) ∈ lv
-      lv-at {j} lt e with mapM⁺ {xs = upto (suc K)} lv-ok (upto⁺ lt)
-      ... | (y , ym , fy) with bind⁻ {m = levelL j} fy
-      ... | (gs′ , e′ , refl) with trans (sym e) e′
-      ... | refl = ym
-
-      lv-from : ∀ {j gs} → (j , gs) ∈ lv → j < suc K × levelL j ≡ just gs
-      lv-from m with mapM⁻ {xs = upto (suc K)} lv-ok m
-      ... | (j′ , jm , fy) with bind⁻ {m = levelL j′} fy
-      ... | (gs′ , e′ , refl) = upto⁻ jm , e′
-
-      uncut-at : ∀ {j gs q a ls s l} → j < suc K → levelL j ≡ just gs → (q , a , ls) ∈ gs → (s , l) ∈ ls → short l ≡ false
-      uncut-at lt e gm lm = uncut-lv (cm⁺ (lv-at lt e) (cm⁺ gm (∈-map⁺ _ lm)))
-
-    level : ∀ i {gs} → i < suc K → levelL i ≡ just gs → Level i gs
-
-    private
-      from₀ : ∀ {gs} → levelL zero ≡ just gs → ∀ {q a ls} → (q , a , ls) ∈ gs
-        → (q , a) ∈ nthL zero × (∀ {s l} → (s , l) ∈ ls → Sub zero q s a × ln a s ≡ just l)
-      from₀ e m with mapM⁻ {xs = nthL zero} e m
-      ... | ((q′ , a′) , xm , fx) with group⁻ {ss = [ q′ ++ [ ix 1 ] ]} fx
-      ... | (ls′ , refl , fr , _) = xm , λ m′ →
-        let (sm , le) = fr m′ in subst (λ s → Sub zero q′ s a′) (sym (single⁻ sm)) (sub₀ (nth-sound zero xm)) , le
-
-      to₀ : ∀ {gs} → levelL zero ≡ just gs → ∀ {q a} → (q , a) ∈ nthL zero → Σ (List (Pos × Listed B)) λ ls → (q , a , ls) ∈ gs
-      to₀ e {q} m with mapM⁺ {xs = nthL zero} e m
-      ... | (g , gm , fx) with group⁻ {ss = [ q ++ [ ix 1 ] ]} fx
-      ... | (ls , refl , _) = ls , gm
-
-      cover₀ : ∀ {gs} → levelL zero ≡ just gs → ∀ {q a ls s} → (q , a , ls) ∈ gs → Sub zero q s a → Σ (Listed B) λ l → (s , l) ∈ ls
-      cover₀ e m (sub₀ N) with mapM⁻ {xs = nthL zero} e m
-      ... | ((q′ , a′) , xm , fx) with group⁻ {ss = [ q′ ++ [ ix 1 ] ]} fx
-      ... | (ls′ , refl , _ , to′) = to′ (here refl)
-
-      -- Where a lane i+1 may start is where one does.
-      start-sub : ∀ i {gs₀ q a s} → i < suc K → levelL i ≡ just gs₀ → (q , a) ∈ nthL (suc i) → s ∈ starts gs₀ q → Sub (suc i) q s a
-      start-sub i {gs₀} {q} {a} {s} lt e₀ xm sm with cm⁻ {xs = gs₀} sm
-      ... | ((q₀ , a₀ , ls₀) , gm , h) with cm⁻ {xs = ls₀} h
-      ... | ((s₀ , l₀) , lm , h′) with cm⁻ {xs = ends (rows l₀)} h′
-      ... | (c , cm , h″) with Level.from (level i lt e₀) gm
-      ... | (_ , subs) with subs lm
-      ... | (S , le) with ∈-++⁻ (when (c <ᵖ q) (q ++ [ ix 1 ])) h″
-      ... | inj₁ w = let (cq , eq) = when⁻ w in
-        subst (λ s → Sub (suc i) q s a) (sym eq) (free S (sound (el le (uncut-at lt e₀ gm lm)) (ends⁻ cm)) (nth-sound (suc i) xm) (Equivalence.from T-≡ cq))
-      ... | inj₂ w = let (qc , eq) = when⁻ w in
-        subst (λ s → Sub (suc i) q s a) (sym eq) (queued S (sound (el le (uncut-at lt e₀ gm lm)) (ends⁻ cm)) (nth-sound (suc i) xm) (Equivalence.from T-≡ qc))
-
-      -- Where a lane i+1 starts is where one may.
-      sub-start : ∀ i {gs₀ q s a} → i < suc K → levelL i ≡ just gs₀ → Sub (suc i) q s a → s ∈ starts gs₀ q
-      sub-start i lt e₀ (free {c = c} S lk N cq) =
-        let L = level i lt e₀
-            (ls₀ , gm) = Level.to L (nth-complete (sub-nth S))
-            (l₀ , lm) = Level.cover L gm S
-            (_ , le) = proj₂ (Level.from L gm) lm
-        in cm⁺ gm (cm⁺ lm (cm⁺ (ends⁺ (complete (el le (uncut-at lt e₀ gm lm)) lk)) (∈-++⁺ˡ (when⁺ (fromT cq)))))
-      sub-start i {q = q} lt e₀ (queued {c = c} S lk N qc) =
-        let L = level i lt e₀
-            (ls₀ , gm) = Level.to L (nth-complete (sub-nth S))
-            (l₀ , lm) = Level.cover L gm S
-            (_ , le) = proj₂ (Level.from L gm) lm
-        in cm⁺ gm (cm⁺ lm (cm⁺ (ends⁺ (complete (el le (uncut-at lt e₀ gm lm)) lk))
-             (∈-++⁺ʳ (when (c <ᵖ q) (q ++ [ ix 1 ])) (when⁺ (fromT qc)))))
-
-      fromₛ : ∀ i {gs} → suc i < suc K → levelL (suc i) ≡ just gs → ∀ {q a ls} → (q , a , ls) ∈ gs
-        → (q , a) ∈ nthL (suc i) × (∀ {s l} → (s , l) ∈ ls → Sub (suc i) q s a × ln a s ≡ just l)
-      fromₛ i lt e m with bind⁻ {m = levelL i} e
-      ... | (gs₀ , e₀ , e₁) with mapM⁻ {xs = nthL (suc i)} e₁ m
-      ... | ((q′ , a′) , xm , fx) with group⁻ {ss = starts gs₀ q′} fx
-      ... | (ls′ , refl , fr , _) = xm , λ m′ → let (sm , le) = fr m′ in start-sub i (down lt) e₀ xm sm , le
-
-      toₛ : ∀ i {gs} → levelL (suc i) ≡ just gs → ∀ {q a} → (q , a) ∈ nthL (suc i) → Σ (List (Pos × Listed B)) λ ls → (q , a , ls) ∈ gs
-      toₛ i e {q} m with bind⁻ {m = levelL i} e
-      ... | (gs₀ , e₀ , e₁) with mapM⁺ {xs = nthL (suc i)} e₁ m
-      ... | (g , gm , fx) with group⁻ {ss = starts gs₀ q} fx
-      ... | (ls , refl , _) = ls , gm
-
-      coverₛ : ∀ i {gs} → suc i < suc K → levelL (suc i) ≡ just gs → ∀ {q a ls s} → (q , a , ls) ∈ gs → Sub (suc i) q s a
-        → Σ (Listed B) λ l → (s , l) ∈ ls
-      coverₛ i lt e m S with bind⁻ {m = levelL i} e
-      ... | (gs₀ , e₀ , e₁) with mapM⁻ {xs = nthL (suc i)} e₁ m
-      ... | ((q′ , a′) , xm , fx) with group⁻ {ss = starts gs₀ q′} fx
-      ... | (ls′ , refl , _ , to′) = to′ (sub-start i (down lt) e₀ S)
-
-    level zero    lt e = record { from = from₀ e ; to = to₀ e ; cover = cover₀ e }
-    level (suc i) lt e = record { from = fromₛ i lt e ; to = toₛ i e ; cover = coverₛ i lt e }
-
-    private
-      -- A listed lane is a lane of the table.
-      lane-of : ∀ {j l} → (j , l) ∈ lanesOf lv → Σ Pos λ q → Σ Pos λ s → Σ A λ a → Sub j q s a × ln a s ≡ just l
-      lane-of m with cm⁻ {xs = lv} m
-      ... | ((j′ , gs) , jm , h) with cm⁻ {xs = gs} h
-      ... | ((q , a , ls) , gm , h′) with ∈-map⁻ _ h′
-      ... | ((s , l′) , sm , refl) with lv-from jm
-      ... | (lt , e) = let (S , le) = proj₂ (Level.from (level j′ lt e) gm) sm in q , s , a , S , le
-
-      -- A lane of the table is listed.
-      of-lane : ∀ {j q s a} → Sub j q s a → Σ (Listed B) λ l → (j , l) ∈ lanesOf lv × ln a s ≡ just l
-      of-lane {j} S with in-range (sub-nth S)
-      ... | lt with mapM⁺ {xs = upto (suc K)} lv-ok (upto⁺ lt)
-      ... | (y , ym , fy) with bind⁻ {m = levelL j} fy
-      ... | (gs , e , refl) =
-        let L = level j lt e
-            (ls , gm) = Level.to L (nth-complete (sub-nth S))
-            (l , lm) = Level.cover L gm S
-            (_ , le) = proj₂ (Level.from L gm) lm
-        in l , cm⁺ ym (cm⁺ gm (∈-map⁺ _ lm)) , le
-
-      exl : ∀ {j l} → (j , l) ∈ lanesOf lv → ∀ {a s} → ln a s ≡ just l → Exact l (enter (fD a) s)
-      exl m le = el le (uncut-lv m)
-
-      over→ : ∀ c → over lv c ≡ true → Over c
-      over→ c e = endBefore→ exo {c} e
-
-      →over : ∀ c → Over c → over lv c ≡ true
-      →over c (c₀ , x , lt) = →endBefore exo {c₀} {c} x lt
-
-      drained→ : ∀ c → drained lv c ≡ true → Drained c
-      drained→ c e {i} N with in-range N
-      ... | lt with mapM⁺ {xs = upto (suc K)} lv-ok (upto⁺ lt)
-      ... | (y , ym , fy) with bind⁻ {m = levelL i} fy
-      ... | (gs , eg , refl) =
-        let L = level i lt eg
-            (ls , gm) = Level.to L (nth-complete N)
-            ((s , l) , lm , h) = any⁻ {xs = ls} (all⁻ (all⁻ e ym) gm)
-            (S , le) = proj₂ (Level.from L gm) lm
-            (c′ , lk , lt′) = endBefore→ (el le (uncut-at lt eg gm lm)) {c} h
-        in s , c′ , S , lk , lt′
-
-      →drained : ∀ c → Drained c → drained lv c ≡ true
-      →drained c D = all⁺ {xs = lv} λ { {i , gs} ym → all⁺ {xs = gs} λ { {q , a , ls} gm →
-        let (lt , eg) = lv-from ym
-            L = level i lt eg
-            (s , c′ , S , lk , lt′) = D (nth-sound i (proj₁ (Level.from L gm)))
-            (l , lm) = Level.cover L gm S
-            (_ , le) = proj₂ (Level.from L gm) lm
-        in any⁺ lm (→endBefore (el le (uncut-at lt eg gm lm)) {c′} {c} lk lt′) } }
-
-      end-row : ∀ {c} → t c end → ConcatT c (if drained lv c then end else skip)
-      end-row {c} x with drained lv c in dc
-      ... | true  = oend x (drained→ c dc)
-      ... | false = opass x (λ D → offT dc (Equivalence.from T-≡ (→drained c D)))
-
-      lend-row : ∀ {i q₀ s a c q e} → Sub i q₀ s a → enter (fD a) s c end → (q , e) ≡ laneRow lv i (c , end) → ConcatT q e
-      lend-row {i} {c = c} S lk eq with waiting lv i c in w | over lv c in ov | eq
-      ... | true  | _     | refl = handoff S lk (proj₁ (waiting-iff lv i c) w)
-      ... | false | true  | refl = lend S lk (λ W → offT w (Equivalence.from T-≡ (proj₂ (waiting-iff lv i c) W))) (over→ c ov)
-      ... | false | false | refl = lpass S lk (λ W → offT w (Equivalence.from T-≡ (proj₂ (waiting-iff lv i c) W))) (λ O → offT ov (Equivalence.from T-≡ (→over c O)))
-
-      outer-s : ∀ {r q e} → r ∈ rows o → (q , e) ∈ outerRow (drained lv) r → ConcatT q e
-      outer-s {k , out a} rm h with single⁻ h
-      ... | refl = val (sound exo rm)
-      outer-s {k , skip} rm h with single⁻ h
-      ... | refl = step (sound exo rm)
-      outer-s {c , end} rm h with single⁻ h
-      ... | refl = end-row (sound exo rm)
-
-      lane-s : ∀ {j l r q e} → (j , l) ∈ lanesOf lv → r ∈ rows l → (q , e) ≡ laneRow lv j r → ConcatT q e
-      lane-s {r = k , out b} m rm refl = let (_ , _ , _ , S , le) = lane-of m in lane S (sound (exl m le) rm) tt
-      lane-s {r = k , skip}  m rm refl = let (_ , _ , _ , S , le) = lane-of m in lane S (sound (exl m le) rm) tt
-      lane-s {r = c , end}   m rm eq   = let (_ , _ , _ , S , le) = lane-of m in lend-row S (sound (exl m le) rm) eq
-
-      outer-end : ∀ {c b} → drained lv c ≡ b → (c , (if b then end else skip)) ∈ outerRow {A} {B} (drained lv) (c , end)
-      outer-end refl = here refl
-
-      lane-end : ∀ {i c bw bo} {rs : List (Row B)} → waiting lv i c ≡ bw → over lv c ≡ bo → (c , end) ∈ rs
-        → (if bw then (c ++ [ ix 0 ] , skip) else (c , (if bo then end else skip))) ∈ mapL (laneRow lv i) rs
-      lane-end {i} refl refl r = ∈-map⁺ (laneRow lv i) r
-
-      lane-in : ∀ {i k e} {rs : List (Row B)} → Tb.Work e → (k , e) ∈ rs → (k , e) ∈ mapL (laneRow lv i) rs
-      lane-in {i} {e = out b} _ r = ∈-map⁺ (laneRow lv i) r
-      lane-in {i} {e = skip}  _ r = ∈-map⁺ (laneRow lv i) r
-      lane-in {e = end} () r
-
-      outers : List (Row B)
-      outers = concatMap (outerRow (drained lv)) (rows o)
-
-    sound-c : ∀ {q e} → (q , e) ∈ rows (concatRows lv) → ConcatT q e
-    sound-c m with ∈-++⁻ outers m
-    ... | inj₁ h = let (r , rm , h′) = cm⁻ {xs = rows o} h in outer-s rm h′
-    ... | inj₂ h with cm⁻ {xs = lanesOf lv} h
-    ... | ((j , l) , lm , h′) with ∈-map⁻ (laneRow lv j) h′
-    ... | (r , rm , eq) = lane-s lm rm eq
-
-    complete-c : ∀ {q e} → ConcatT q e → (q , e) ∈ rows (concatRows lv)
-    complete-c (val x)       = ∈-++⁺ˡ (cm⁺ (complete exo x) (here refl))
-    complete-c (step x)      = ∈-++⁺ˡ (cm⁺ (complete exo x) (here refl))
-    complete-c (oend {c} x D)    = ∈-++⁺ˡ (cm⁺ (complete exo x) (outer-end {c} (→drained c D)))
-    complete-c (opass {c} x nD)  = ∈-++⁺ˡ (cm⁺ (complete exo x) (outer-end {c} (off (drained→ c) nD)))
-    complete-c (lane S lk w) =
-      let (l , m , le) = of-lane S in ∈-++⁺ʳ outers (cm⁺ m (lane-in w (complete (exl m le) lk)))
-    complete-c (handoff {i} {c = c} S lk W) =
-      let (l , m , le) = of-lane S in
-      ∈-++⁺ʳ outers (cm⁺ m (lane-end {i} {c} (proj₂ (waiting-iff lv i c) W) refl (complete (exl m le) lk)))
-    complete-c (lend {i} {c = c} S lk nW O) =
-      let (l , m , le) = of-lane S in
-      ∈-++⁺ʳ outers (cm⁺ m (lane-end {i} {c} (off (proj₁ (waiting-iff lv i c)) nW) (→over c O) (complete (exl m le) lk)))
-    complete-c (lpass {i} {c = c} S lk nW nO) =
-      let (l , m , le) = of-lane S in
-      ∈-++⁺ʳ outers (cm⁺ m (lane-end {i} {c} (off (proj₁ (waiting-iff lv i c)) nW) (off (over→ c) nO) (complete (exl m le) lk)))
-
-concat-exact : ∀ {A B} (fD : A → Den B) (t : Table A) (ln : A → Pos → Maybe (Listed B)) (o : Listed A)
-  → Exactly o t → (∀ {a s l} → ln a s ≡ just l → Exactly l (enter (fD a) s))
-  → ∀ {l} → ConcatL.listC ln o ≡ just l → Exactly l (Tb.Concat.ConcatT fD t)
-concat-exact fD t ln o eo el e u
-  with bind⁻ {m = mapM (λ i → bind (ConcatL.levelL ln o i) λ gs → just (i , gs)) (ConcatL.upto ln o (suc (ConcatL.count ln o (ConcatL.vals ln o))))} e
-... | (lv , lv-ok , refl) = record { sound = sound-c lv lv-ok u ; complete = complete-c lv lv-ok u }
-  where open ConcatX fD t ln o (eo (proj₁ (∨-false {short o} u))) el
+  bounded-exact : ∀ {A B} (k : ℕ) (fD : A → Den B) (t : Table A) (ln : A → Pos → Maybe (Listed B)) (o : Listed A)
+    → Exactly o t → (∀ {a s l} → ln a s ≡ just l → Exactly l (enter (fD a) s))
+    → ∀ {l} → BoundedL.listB k ln o ≡ just l → Exactly l (Tb.Bounded.BoundedT k fD t)
 
 ------------------------------------------------------------------------
 -- Connect
@@ -811,8 +472,10 @@ listT-exact n empty     ρ p refl = end-exact _
 listT-exact n (of xs)   ρ p refl = walk-exact fuel _
 listT-exact n (map f s) {ρL} ρ p e with bind⁻ {m = listT n s ρL p} e
 ... | (l₀ , e₀ , refl) = map-exact f (listT-exact n s ρ p e₀)
-listT-exact n (scan f z s)      ρ p ()
-listT-exact n (takeWhile i q s) ρ p ()
+listT-exact n (scan f z s) {ρL} ρ p e with bind⁻ {m = listT n s ρL p} e
+... | (l₀ , e₀ , refl) = scan-exact f z l₀ (listT-exact n s ρ p e₀)
+listT-exact n (takeWhile i q s) {ρL} ρ p e with bind⁻ {m = listT n s ρL p} e
+... | (l₀ , e₀ , refl) = take-exact i q p l₀ (listT-exact n s ρ p e₀)
 listT-exact n (flatMap (mergeᶠ nothing) f s) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL p} e
 ... | (o , eo , e₁)
   with bind⁻ {m = mapM (λ qa → bind (listT n (f (proj₂ qa)) ρL (proj₁ qa ++ [ ix 1 ])) λ l → just (proj₁ qa , proj₂ qa , l)) (values (rows o))} e₁
@@ -826,14 +489,27 @@ listT-exact n (flatMap (mergeᶠ nothing) f s) {ρL} {ρD} ρ p e with bind⁻ {
     to {q} {a} vm with mapM⁺ {xs = values (rows o)} els vm
     ... | (y , ym , fx) with bind⁻ {m = listT n (f a) ρL (q ++ [ ix 1 ])} fx
     ... | (l′ , _ , refl) = l′ , ym
-listT-exact n (flatMap (mergeᶠ (just zero)) f s) ρ p ()
-listT-exact n (flatMap (mergeᶠ (just (suc zero))) f s) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL p} e
+listT-exact n (flatMap (mergeᶠ (just k)) f s) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL p} e
 ... | (o , eo , e₁) =
-  concat-exact (λ a → approxᵀ n (f a) ρD) _ (λ a → listT n (f a) ρL) o (listT-exact n s ρ p eo)
+  bounded-exact k (λ a → approxᵀ n (f a) ρD) _ (λ a → listT n (f a) ρL) o (listT-exact n s ρ p eo)
     (λ {a} {s′} el → listT-exact n (f a) ρ s′ el) e₁
-listT-exact n (flatMap (mergeᶠ (just (suc (suc k)))) f s) ρ p ()
-listT-exact n (flatMap switchᶠ f s)  ρ p ()
-listT-exact n (flatMap exhaustᶠ f s) ρ p ()
+listT-exact n (flatMap switchᶠ f s) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL p} e
+... | (o , eo , e₁)
+  with bind⁻ {m = mapM (λ qa → bind (listT n (f (proj₂ qa)) ρL (proj₁ qa ++ [ ix 1 ])) λ l → just (proj₁ qa , proj₂ qa , l)) (values (rows o))} e₁
+... | (ls , els , refl) = switch-exact (λ a → approxᵀ n (f a) ρD) o ls (listT-exact n s ρ p eo) from to
+  where
+    from : ∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (enter (approxᵀ n (f a) ρD) (q ++ [ ix 1 ]))
+    from m with mapM⁻ {xs = values (rows o)} els m
+    ... | ((q′ , a′) , vm , fx) with bind⁻ {m = listT n (f a′) ρL (q′ ++ [ ix 1 ])} fx
+    ... | (l′ , el′ , refl) = vm , listT-exact n (f a′) ρ (q′ ++ [ ix 1 ]) el′
+    to : ∀ {q a} → (q , a) ∈ values (rows o) → Σ (Listed _) λ l → (q , a , l) ∈ ls
+    to {q} {a} vm with mapM⁺ {xs = values (rows o)} els vm
+    ... | (y , ym , fx) with bind⁻ {m = listT n (f a) ρL (q ++ [ ix 1 ])} fx
+    ... | (l′ , _ , refl) = l′ , ym
+listT-exact n (flatMap exhaustᶠ f s) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL p} e
+... | (o , eo , e₁) =
+  exhaust-exact (λ a → approxᵀ n (f a) ρD) _ (λ a → listT n (f a) ρL) o (listT-exact n s ρ p eo)
+    (λ {a} {s′} el → listT-exact n (f a) ρ s′ el) e₁
 listT-exact n (connect s b) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL (p ++ [ ix 1 ])} e
 ... | (σl , eσ , e₁) with bind⁻ {m = listT n b (hotOf σl ∷ ρL) (p ++ [ ix 0 ])} e₁
 ... | (βl , eβ , refl) =
