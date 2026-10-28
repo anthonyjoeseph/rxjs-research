@@ -37,7 +37,7 @@ import denotation.Table as Tb
 open import quickcheck.Tabled
   using (Row; Listed; _⊣_; rows; short; bind; concatMap; mapM; when; anyᵇ; allᵇ; endBy; properᵇ;
   proper; values; fuel; horizon; walk; mapRow; mapRows; rejoinRow; rejoin; hotOf; outerRow;
-  mergeRows; connRows; scanRows; takeRows; switchRows; module MergeL; module ExhaustL;
+  mergeRows; connRows; scanRows; takeRows; switchRows; module MergeL; module TakeL; module ExhaustL;
   module BoundedL; module ConnL; listT)
 
 ------------------------------------------------------------------------
@@ -387,12 +387,65 @@ merge-exact fD {t} o ls eo from to u = record { sound = sound-m ; complete = com
 ------------------------------------------------------------------------
 -- Scan, takeWhile, switch, exhaust, bounded merge
 
+module TakeX {A : Set} (incl : Bool) (keep : A → Bool) (p : Pos) (t : Table A) (o : Listed A) (ex : Exact o t) where
+  open Tb.TakeWhile incl keep t p
+  open TakeL incl keep p o using (failed; takeRow)
+
+  private
+    false-of : ∀ {b} → T (not b) → b ≡ false
+    false-of {false} _ = refl
+
+    failed→ : ∀ k → failed k ≡ true → Failed k
+    failed→ k e with any⁻ {xs = values (rows o)} e
+    ... | ((q , a) , m , h) = let (nk , qk) = ∧-true h in
+      q , a , sound ex (values⁻ m) , Equivalence.from T-≡ nk , Equivalence.from T-≡ qk
+
+    →failed : ∀ k → Failed k → failed k ≡ true
+    →failed k (q , a , x , nk , qk) = any⁺ (values⁺ (complete ex x)) (∧-intro (fromT nk) (fromT qk))
+
+    unfailed : ∀ k → failed k ≡ false → ¬ Failed k
+    unfailed k nf F = offT nf (Equivalence.from T-≡ (→failed k F))
+
+    kept-row : ∀ {k e₀ q e} → t k e₀ → ¬ Failed k → (q , e) ∈ TakeL.kept incl keep p o (k , e₀) → TakeT q e
+    kept-row {e₀ = out a} x nF h with if⁻ {b = keep a} h
+    ... | inj₁ (ka , m) with single⁻ m
+    ... | refl = pass x (Equivalence.from T-≡ ka) nF
+    kept-row {e₀ = out a} x nF h | inj₂ (nk , m) with ∈-++⁻ (when incl _) m
+    ... | inj₁ m′ with when⁻ {b = incl} m′
+    ... | (inc , refl) = fail x (Equivalence.from T-≡ (T-not (offT nk))) nF (Equivalence.from T-≡ inc)
+    kept-row {e₀ = out a} x nF h | inj₂ (nk , m) | inj₂ m′ with single⁻ m′
+    ... | refl = stop x (Equivalence.from T-≡ (T-not (offT nk))) nF
+    kept-row {e₀ = skip} x nF h with single⁻ h
+    ... | refl = step x nF
+    kept-row {e₀ = end} x nF h with single⁻ h
+    ... | refl = tend x nF
+
+  sound-t : ∀ {q e} → (q , e) ∈ rows (takeRows incl keep p o) → TakeT q e
+  sound-t m with cm⁻ {xs = rows o} m
+  ... | ((k , e₀) , km , h) with if⁻ {b = failed k} h
+  ... | inj₁ (fk , h′) with when⁻ {b = inside p k} h′
+  ... | (ins , refl) = left (sound ex km) (failed→ k fk) (Equivalence.from T-≡ ins)
+  sound-t m | ((k , e₀) , km , h) | inj₂ (nf , h′) = kept-row (sound ex km) (unfailed k nf) h′
+
+  complete-t : ∀ {q e} → TakeT q e → (q , e) ∈ rows (takeRows incl keep p o)
+  complete-t (pass {q} x kp nF) =
+    cm⁺ (complete ex x) (if-f (off (failed→ q) nF) (if-t (fromT kp) (here refl)))
+  complete-t (fail {q} x nk nF inc) =
+    cm⁺ (complete ex x) (if-f (off (failed→ q) nF) (if-f (false-of nk) (∈-++⁺ˡ (when⁺ (fromT inc)))))
+  complete-t (stop {q} x nk nF) =
+    cm⁺ (complete ex x) (if-f (off (failed→ q) nF) (if-f (false-of nk) (∈-++⁺ʳ (when incl _) (here refl))))
+  complete-t (step {q} x nF) = cm⁺ (complete ex x) (if-f (off (failed→ q) nF) (here refl))
+  complete-t (tend {q} x nF) = cm⁺ (complete ex x) (if-f (off (failed→ q) nF) (here refl))
+  complete-t (left {q} x F ins) = cm⁺ (complete ex x) (if-t (→failed q F) (when⁺ (fromT ins)))
+
+take-exact : ∀ {A} (i : Bool) (keep : A → Bool) (p : Pos) {t : Table A} (o : Listed A) → Exactly o t
+  → Exactly (takeRows i keep p o) (Tb.TakeWhile.TakeT i keep t p)
+take-exact i keep p {t} o eo u = record { sound = sound-t ; complete = complete-t }
+  where open TakeX i keep p t o (eo u)
+
 postulate
   scan-exact : ∀ {A B} (f : B → A → B) (z : B) {t : Table A} (o : Listed A) → Exactly o t
     → Exactly (scanRows f z o) (Tb.Scan.ScanT f z t)
-
-  take-exact : ∀ {A} (i : Bool) (keep : A → Bool) (p : Pos) {t : Table A} (o : Listed A) → Exactly o t
-    → Exactly (takeRows i keep p o) (Tb.TakeWhile.TakeT i keep t p)
 
   switch-exact : ∀ {A B} (fD : A → Den B) {t : Table A} (o : Listed A) (ls : List (Pos × A × Listed B)) → Exactly o t
     → (∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (enter (fD a) (q ++ [ ix 1 ])))
