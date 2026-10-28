@@ -3,21 +3,6 @@
 -- THE EMISSION SET'S LAWS: the meaning of a node is its operator applied to its
 -- children's meanings, so proofs over it go one operator at a time; and
 -- `map` fuses.
---
--- A row behind infinitely many rows separates the two sides.  Take
--- `Y = defer (merge (Y , of [ 1 ]))`, a synchronous loop.  Approximant n
--- of `Y` holds n values, the outermost lane's `1` at one fixed position
--- `Q` behind the other n - 1.  So `scan _+_ 0 Y` shows `n` at `Q` in
--- approximant n, and no one row at `Q` is in the limit; but
--- `map (const 0) (scan _+_ 0 Y)` shows `0` at `Q` in every approximant
--- from 1, so its limit holds that row while `mapᵀ` of the limit has
--- nothing at `Q`.  The same shape breaks the negations: `takeWhile` over
--- `merge (map (const false) X , of [ true ])` with
--- `X = defer (that takeWhile)` passes its `true` in every other
--- approximant, so the limit drops it, while the limit of the merge has no
--- failing value before it.  Either row has infinitely many rows before it
--- (each unrolled `defer`'s guard), so no subscriber reaches it, and rxjs
--- overflows its stack there.
 module denotation.EmissionSet.Laws where
 
 open import Data.Bool using (Bool)
@@ -25,13 +10,13 @@ open import Data.List using (List; _∷_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (_∷_; lookup)
 open import Data.Nat.Properties using (≤-refl)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (Σ; _×_; _,_; proj₂)
 open import Function using (_∘_)
 
 open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList.Events using (Timeline)
 open import denotation.EmissionSet
-  using (Den; enter; DenEnv; Lim; from; ⟦_⟧ᵀ; coldᵀ; emptyᵀ; ofᵀ; mapᵀ; scanᵀ; takeWhileᵀ; flatMapᵀ; connectᵀ; deferᵀ;
+  using (Ev; EmissionSet; Few; Truncate; Den; enter; DenEnv; Lim; from; ⟦_⟧ᵀ; coldᵀ; emptyᵀ; ofᵀ; mapᵀ; scanᵀ; takeWhileᵀ; flatMapᵀ; connectᵀ; deferᵀ;
          MapT; map-out; map-skip; map-end)
 
 -- The same rows at every subscription.
@@ -90,11 +75,30 @@ map-fusionᵀ : ∀ {Γ A B C} (f : B → C) (g : A → B) (s : Obs Timeline Γ 
             → ⟦ map (f ∘ g) s ⟧ᵀ ρ ≅ ⟦ map f (map g s) ⟧ᵀ ρ
 map-fusionᵀ f g s ρ p = (λ { (from N h) → from N λ n le → fuse (h n le) }) , λ { (from N h) → from N λ n le → split (h n le) }
   where
-    fuse : ∀ {t q e} → MapT (f ∘ g) t q e → MapT f (MapT g t) q e
-    fuse (map-out x)  = map-out (map-out x)
-    fuse (map-skip x) = map-skip (map-skip x)
-    fuse (map-end x)  = map-end (map-end x)
-    split : ∀ {t q e} → MapT f (MapT g t) q e → MapT (f ∘ g) t q e
-    split (map-out (map-out x))   = map-out x
-    split (map-skip (map-skip x)) = map-skip x
-    split (map-end (map-end x))   = map-end x
+    few-via : ∀ {A B} {t : EmissionSet A} {t′ : EmissionSet B} {q} → (∀ {k e} → t′ k e → Σ (Ev A) (t k)) → Few t q → Few t′ q
+    few-via back (ks , h) = ks , λ x lt → h (proj₂ (back x)) lt
+
+    down : ∀ {t k e} → MapT (f ∘ g) t k e → Σ (Ev _) (MapT g t k)
+    down (map-out x)  = _ , map-out x
+    down (map-skip x) = _ , map-skip x
+    down (map-end x)  = _ , map-end x
+
+    up : ∀ {t k e} → MapT g t k e → Σ (Ev _) (MapT (f ∘ g) t k)
+    up (map-out x)  = _ , map-out x
+    up (map-skip x) = _ , map-skip x
+    up (map-end x)  = _ , map-end x
+
+    across : ∀ {t k e} → MapT f (Truncate (MapT g t)) k e → Σ (Ev _) (MapT (f ∘ g) t k)
+    across (map-out (map-out x , _))   = _ , map-out x
+    across (map-skip (map-skip x , _)) = _ , map-skip x
+    across (map-end (map-end x , _))   = _ , map-end x
+
+    fuse : ∀ {t q e} → Truncate (MapT (f ∘ g) t) q e → Truncate (MapT f (Truncate (MapT g t))) q e
+    fuse (map-out x , F)  = map-out (map-out x , few-via up F) , few-via across F
+    fuse (map-skip x , F) = map-skip (map-skip x , few-via up F) , few-via across F
+    fuse (map-end x , F)  = map-end (map-end x , few-via up F) , few-via across F
+
+    split : ∀ {t q e} → Truncate (MapT f (Truncate (MapT g t))) q e → Truncate (MapT (f ∘ g) t) q e
+    split (map-out (map-out x , G) , _)   = map-out x , few-via down G
+    split (map-skip (map-skip x , G) , _) = map-skip x , few-via down G
+    split (map-end (map-end x , G) , _)   = map-end x , few-via down G

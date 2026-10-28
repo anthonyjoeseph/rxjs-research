@@ -31,7 +31,7 @@ open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty
 import denotation.MonotonicList.Events as E
 open import denotation.MonotonicList.Events using (Pos; Timeline; _<ᵖ_; inside; ix)
 open import denotation.EmissionSet
-  using (out; skip; end; EmissionSet; InE; at-out; at-skip; at-end; on-out; on-skip; Proper; Rejoin;
+  using (out; skip; end; EmissionSet; InE; at-out; at-skip; at-end; on-out; on-skip; Proper; Truncate; Rejoin;
   ended; late; Den; enter; MapT; map-out; map-skip; map-end; DeferT; guard; DenEnv; approxᵀ)
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled
@@ -92,6 +92,13 @@ defer-exact : ∀ {A} {s : Den A} {p} {b : Listed A} → Exactly b (enter s (p +
 defer-exact eb u = record
   { sound    = λ { (here refl) → guard ; (there m) → Tb.body (sound (eb u) m) }
   ; complete = λ { guard → here refl ; (Tb.body x) → there (complete (eb u) x) } }
+
+-- `EmissionSet.Truncate` keeps every row of a listing: a list puts
+-- finitely many rows before any.
+truncate-exact : ∀ {A} {l : Listed A} {t : EmissionSet A} → Exactly l t → Exactly l (Truncate t)
+truncate-exact {l = l} el u = record
+  { sound    = λ m → sound (el u) m , mapL proj₁ (rows l) , λ x _ → ∈-map⁺ proj₁ (complete (el u) x)
+  ; complete = λ x → complete (el u) (proj₁ x) }
 
 -- `EmissionSet.Proper`, the rows a hot shows.
 proper-exact : ∀ {A} {l : Listed A} {t : EmissionSet A} → Exactly l t → Exactly (hotOf l) (Proper t)
@@ -356,38 +363,38 @@ listT-exact n (cold c)  ρ p refl = walk-exact fuel _
 listT-exact n empty     ρ p refl = end-exact _
 listT-exact n (of xs)   ρ p refl = walk-exact fuel _
 listT-exact n (map f s) {ρL} ρ p e with bind⁻ {m = listT n s ρL p} e
-... | (l₀ , e₀ , refl) = map-exact f (listT-exact n s ρ p e₀)
+... | (l₀ , e₀ , refl) = truncate-exact (map-exact f (listT-exact n s ρ p e₀))
 listT-exact n (scan f z s) {ρL} ρ p e with bind⁻ {m = listT n s ρL p} e
-... | (l₀ , e₀ , refl) = scan-exact f z l₀ (listT-exact n s ρ p e₀)
+... | (l₀ , e₀ , refl) = truncate-exact (scan-exact f z l₀ (listT-exact n s ρ p e₀))
 listT-exact n (takeWhile i q s) {ρL} ρ p e with bind⁻ {m = listT n s ρL p} e
-... | (l₀ , e₀ , refl) = take-exact i q p l₀ (listT-exact n s ρ p e₀)
+... | (l₀ , e₀ , refl) = truncate-exact (take-exact i q p l₀ (listT-exact n s ρ p e₀))
 listT-exact n (flatMap (mergeᶠ nothing) f s) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL p} e
 ... | (o , eo , e₁) with bind⁻ {m = lanes (λ a → listT n (f a) ρL) (values (rows o))} e₁
-... | (ls , els , refl) = merge-exact (λ a → approxᵀ n (f a) ρD) o ls (listT-exact n s ρ p eo)
-  (lanes-from {ln = λ a → listT n (f a) ρL} {D = λ a → enter (approxᵀ n (f a) ρD)} (λ {a} {s′} el → listT-exact n (f a) ρ s′ el) els) (lanes-to {ln = λ a → listT n (f a) ρL} els)
+... | (ls , els , refl) = truncate-exact (merge-exact (λ a → approxᵀ n (f a) ρD) o ls (listT-exact n s ρ p eo)
+  (lanes-from {ln = λ a → listT n (f a) ρL} {D = λ a → enter (approxᵀ n (f a) ρD)} (λ {a} {s′} el → listT-exact n (f a) ρ s′ el) els) (lanes-to {ln = λ a → listT n (f a) ρL} els))
 listT-exact n (flatMap (mergeᶠ (just k)) f s) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL p} e
 ... | (o , eo , e₁) =
-  bounded-exact k (λ a → approxᵀ n (f a) ρD) _ (λ a → listT n (f a) ρL) o (listT-exact n s ρ p eo)
-    (λ {a} {s′} el → listT-exact n (f a) ρ s′ el) e₁
+  truncate-exact (bounded-exact k (λ a → approxᵀ n (f a) ρD) _ (λ a → listT n (f a) ρL) o (listT-exact n s ρ p eo)
+    (λ {a} {s′} el → listT-exact n (f a) ρ s′ el) e₁)
 listT-exact n (flatMap switchᶠ f s) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL p} e
 ... | (o , eo , e₁) with bind⁻ {m = lanes (λ a → listT n (f a) ρL) (values (rows o))} e₁
-... | (ls , els , refl) = switch-exact (λ a → approxᵀ n (f a) ρD) o ls (listT-exact n s ρ p eo)
-  (lanes-from {ln = λ a → listT n (f a) ρL} {D = λ a → enter (approxᵀ n (f a) ρD)} (λ {a} {s′} el → listT-exact n (f a) ρ s′ el) els) (lanes-to {ln = λ a → listT n (f a) ρL} els)
+... | (ls , els , refl) = truncate-exact (switch-exact (λ a → approxᵀ n (f a) ρD) o ls (listT-exact n s ρ p eo)
+  (lanes-from {ln = λ a → listT n (f a) ρL} {D = λ a → enter (approxᵀ n (f a) ρD)} (λ {a} {s′} el → listT-exact n (f a) ρ s′ el) els) (lanes-to {ln = λ a → listT n (f a) ρL} els))
 listT-exact n (flatMap exhaustᶠ f s) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL p} e
 ... | (o , eo , e₁) with bind⁻ {m = lanes (λ a → listT n (f a) ρL) (values (rows o))} e₁
-... | (ls , els , refl) = exhaust-exact (λ a → approxᵀ n (f a) ρD) o ls (listT-exact n s ρ p eo)
-  (lanes-from {ln = λ a → listT n (f a) ρL} {D = λ a → enter (approxᵀ n (f a) ρD)} (λ {a} {s′} el → listT-exact n (f a) ρ s′ el) els) (lanes-to {ln = λ a → listT n (f a) ρL} els)
+... | (ls , els , refl) = truncate-exact (exhaust-exact (λ a → approxᵀ n (f a) ρD) o ls (listT-exact n s ρ p eo)
+  (lanes-from {ln = λ a → listT n (f a) ρL} {D = λ a → enter (approxᵀ n (f a) ρD)} (λ {a} {s′} el → listT-exact n (f a) ρ s′ el) els) (lanes-to {ln = λ a → listT n (f a) ρL} els))
 listT-exact n (connect s b) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL (p ++ [ ix 1 ])} e
 ... | (σl , eσ , e₁) with bind⁻ {m = listT n b (hotOf σl ∷ ρL) (p ++ [ ix 0 ])} e₁
 ... | (βl , eβ , refl) =
-  conn-exact (approxᵀ n s ρD) (λ h → approxᵀ n b (h ∷ ρD)) p σl βl σx
-    (listT-exact n b ((λ p′ → rejoin-exact (proper-exact σx) p′) ∷ ρ) (p ++ [ ix 0 ]) eβ)
+  truncate-exact (conn-exact (approxᵀ n s ρD) (λ h → approxᵀ n b (h ∷ ρD)) p σl βl σx
+    (listT-exact n b ((λ p′ → rejoin-exact (proper-exact σx) p′) ∷ ρ) (p ++ [ ix 0 ]) eβ))
   where
     σx = listT-exact n s ρ (p ++ [ ix 1 ]) eσ
 listT-exact n (connected i) ρ p refl = env-lookup ρ i p
 listT-exact zero    (defer l) ρ p refl = λ ()
 listT-exact (suc n) (defer l) {ρL} ρ p e with bind⁻ {m = listT n (Later.force l) ρL (p ++ [ ix 1 ])} e
-... | (b , eb , refl) = defer-exact (listT-exact n (Later.force l) ρ (p ++ [ ix 1 ]) eb)
+... | (b , eb , refl) = truncate-exact (defer-exact (listT-exact n (Later.force l) ρ (p ++ [ ix 1 ]) eb))
 
 -- A closed program, as the oracle lists it.
 tabled-exact : ∀ {A} n (o : Obs Timeline [] A) p {l} → listT n o [] p ≡ just l → Exactly l (enter (approxᵀ n o []) p)

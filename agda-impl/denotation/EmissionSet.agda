@@ -11,9 +11,12 @@
 -- rows.  An emission set's PROPER rows are those at or before its end; a hot
 -- shows only those.
 --
--- What a subscriber sees is the ω-prefix (`Seen`): a row with infinitely
--- many rows before it is never reached, which is how a synchronous loop
--- blocks everything after it.
+-- TRUNCATED AT THE FIRST INFINITY: a row with infinitely many rows before
+-- it is never reached, which is how a synchronous loop blocks everything
+-- after it, so every operator keeps only the rows with finitely many
+-- before them (`Truncate`).  A set could hold a row past infinity where a
+-- stream cannot; the operator would decide it from rows nobody reaches, and
+-- the limit and the operator would disagree on it.
 module denotation.EmissionSet where
 
 open import Data.Bool using (Bool; T; not; if_then_else_)
@@ -68,9 +71,17 @@ data InE {A : Set} : E.Events A → EmissionSet A where
 Proper : ∀ {A} → EmissionSet A → EmissionSet A
 Proper t q e = t q e × (∀ {c} → t c end → q ≼ c)
 
--- What a subscriber reaches: a row with finitely many rows before it.
+-- Finitely many rows lie before `q`.
+Few : ∀ {A} → EmissionSet A → Pos → Set
+Few t q = Σ (List Pos) λ ks → ∀ {k e′} → t k e′ → k ≺ q → k ∈ ks
+
+-- The rows with finitely many rows before them.
+Truncate : ∀ {A} → EmissionSet A → EmissionSet A
+Truncate t q e = t q e × Few t q
+
+-- What a subscriber reaches: a proper row with finitely many rows before it.
 Seen : ∀ {A} → EmissionSet A → EmissionSet A
-Seen t q e = Proper t q e × Σ (List Pos) λ ks → ∀ {k e′} → t k e′ → k ≺ q → k ∈ ks
+Seen t q e = Proper t q e × Few t q
 
 ------------------------------------------------------------------------
 -- Observables
@@ -121,7 +132,7 @@ data MapT {A B : Set} (f : A → B) (t : EmissionSet A) : EmissionSet B where
   map-end  : ∀ {q} → t q end → MapT f t q end
 
 mapᵀ : ∀ {A B} → (A → B) → Den A → Den B
-mapᵀ f s = cold λ p → MapT f (enter s p)
+mapᵀ f s = cold λ p → Truncate (MapT f (enter s p))
 
 -- A `skip`, then the body: rxjs's own `defer`, synchronous.
 data DeferT {A : Set} (s : Den A) (p : Pos) : EmissionSet A where
@@ -129,7 +140,7 @@ data DeferT {A : Set} (s : Den A) (p : Pos) : EmissionSet A where
   body  : ∀ {q e} → enter s (p ++ [ ix 1 ]) q e → DeferT s p q e
 
 deferᵀ : ∀ {A} → Den A → Den A
-deferᵀ s = cold (DeferT s)
+deferᵀ s = cold λ p → Truncate (DeferT s p)
 
 -- An input's values in position order.
 module Values {A : Set} (o : EmissionSet A) where
@@ -158,7 +169,7 @@ module Scan {A B : Set} (f : B → A → B) (z : B) (t : EmissionSet A) where
     send  : ∀ {q} → t q end → ScanT q end
 
 scanᵀ : ∀ {A B} → (B → A → B) → B → Den A → Den B
-scanᵀ f z s = cold λ p → Scan.ScanT f z (enter s p)
+scanᵀ f z s = cold λ p → Truncate (Scan.ScanT f z (enter s p))
 
 -- TAKEWHILE, subscribed at `p`: values while they pass.  The first
 -- failing one leaves under `ix 0` of its position if inclusive, and the
@@ -179,7 +190,7 @@ module TakeWhile {A : Set} (incl : Bool) (keep : A → Bool) (t : EmissionSet A)
     left  : ∀ {q e} → t q e → Failed q → T (inside p q) → TakeT q skip
 
 takeWhileᵀ : ∀ {A} → Bool → (A → Bool) → Den A → Den A
-takeWhileᵀ i keep s = cold λ p → TakeWhile.TakeT i keep (enter s p) p
+takeWhileᵀ i keep s = cold λ p → Truncate (TakeWhile.TakeT i keep (enter s p) p)
 
 ------------------------------------------------------------------------
 -- Merge
@@ -357,16 +368,16 @@ module Connect {A B : Set} (s : Den A) (F : Den A → Den B) (p : Pos) where
     pinned : ∀ {k e} → σ k e → ¬ Alive (k ++ [ ix 0 ]) → T (inside r k) → ConnT k skip
 
 connectᵀ : ∀ {A B} → Den A → (Den A → Den B) → Den B
-connectᵀ s F = cold λ p → Connect.ConnT s F p
+connectᵀ s F = cold λ p → Truncate (Connect.ConnT s F p)
 
 ------------------------------------------------------------------------
 -- FlatMap
 
 flatMapᵀ : ∀ {A B} → FlatOp → (A → Den B) → Den A → Den B
-flatMapᵀ (mergeᶠ nothing)  f s = cold λ p → Merge.MergeT f (enter s p)
-flatMapᵀ (mergeᶠ (just n)) f s = cold λ p → Bounded.BoundedT n f (enter s p)
-flatMapᵀ switchᶠ           f s = cold λ p → Switch.SwitchT f (enter s p)
-flatMapᵀ exhaustᶠ          f s = cold λ p → Exhaust.ExhaustT f (enter s p)
+flatMapᵀ (mergeᶠ nothing)  f s = cold λ p → Truncate (Merge.MergeT f (enter s p))
+flatMapᵀ (mergeᶠ (just n)) f s = cold λ p → Truncate (Bounded.BoundedT n f (enter s p))
+flatMapᵀ switchᶠ           f s = cold λ p → Truncate (Switch.SwitchT f (enter s p))
+flatMapᵀ exhaustᶠ          f s = cold λ p → Truncate (Exhaust.ExhaustT f (enter s p))
 
 ------------------------------------------------------------------------
 -- A program tree's emission set
