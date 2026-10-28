@@ -59,6 +59,7 @@ open import denotation.MonotonicList.Events using (Timeline)
 open import quickcheck.Placing using (placing; placingParts)
 open import quickcheck.Stepping using (steppingFails)
 open import quickcheck.KeptDepth using (keptLines)
+open import quickcheck.Tabled using (tableJSON)
 
 private
   each : List ℕ → (ℕ → IO ⊤) → IO ⊤
@@ -72,7 +73,8 @@ private
   prog : ℕ → IO ⊤
   prog s = putStrLn ("{\"seed\":" ++ showℕ s ++ ",\"prog\":" ++ showCode natᵗ (program s)
                      ++ ",\"denote\":" ++ showTrace natᵗ (denoteTrace 3 500 (program s))
-                     ++ ",\"pure\":" ++ showTrace natᵗ (pureTrace 3 500 (program s)) ++ "}")
+                     ++ ",\"pure\":" ++ showTrace natᵗ (pureTrace 3 500 (program s))
+                     ++ ",\"table\":" ++ tableJSON 3 (program s) ++ "}")
 
   io : ℕ → IO ⊤
   io s = oracle ioOp 3 500 (program s)

@@ -70,6 +70,8 @@ type Row = {
   prog: Code;
   denote: Trace;
   pure: Trace;
+  // the table's trace, where the table covers every operator the program uses
+  table?: Trace | null;
 };
 
 const bin = process.env.AGDA_CLI_BIN ?? "../agda-impl/_cli/Oracle-CLI";
@@ -207,6 +209,9 @@ const check = async (fam: Family, row: Row): Promise<string[]> => {
           : [`io         ${show(ioTrace)}`]),
     // the QUICKCHECK leg: the pure semantics, against the denotation
     ...(agrees(row.denote, row.pure) ? [] : ["(denotation and pure disagree)"]),
+    ...(row.table === undefined || row.table === null || agrees(row.table, rx)
+      ? []
+      : [`table      ${show(row.table)}`]),
   ];
   return bad.length === 0
     ? []
@@ -260,6 +265,7 @@ const run = async (
         ...(JSON.parse(l) as Row),
         denote: exact.denote,
         pure: exact.pure,
+        table: exact.table,
       };
     });
   const verdicts = await Promise.all(
@@ -274,6 +280,10 @@ const run = async (
   console.log(
     `oracle: ${rows.length - failures.length}/${rows.length} ${fam.label}seeds agree`,
   );
+  const tabled = rows.filter(
+    (r) => r.table !== undefined && r.table !== null,
+  ).length;
+  if (tabled > 0) console.log(`oracle: ${tabled} ${fam.label}seeds tabled`);
   return failures.length === 0 && rows.length === count;
 };
 
