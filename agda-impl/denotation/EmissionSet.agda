@@ -202,10 +202,10 @@ module Merge {A B : Set} (f : A → Den B) (o : EmissionSet A) where
   Lane : Pos → A → EmissionSet B
   Lane q a = enter (f a) (q ++ [ ix 1 ])
 
-  -- Every part has ended by `c`.
+  -- Every part begun before `c` has ended by `c`.
   Done : Pos → Set
   Done c = (Σ Pos λ c₀ → o c₀ end × c₀ ≼ c)
-         × (∀ {q a} → o q (out a) → Σ Pos λ c′ → Lane q a c′ end × c′ ≼ c)
+         × (∀ {q a} → o q (out a) → q ≺ c → Σ Pos λ c′ → Lane q a c′ end × c′ ≼ c)
 
   -- The whole ends where the last part does; every other end is a skip.
   data MergeT : EmissionSet B where
@@ -260,10 +260,10 @@ module Bounded {A B : Set} (n : ℕ) (f : A → Den B) (o : EmissionSet A) where
   Queued : Pos → Set
   Queued c = Σ ℕ λ i → Σ Pos λ q → Σ A λ a → Sub i q (c ++ [ ix 1 ]) a
 
-  -- Every part has ended by `c`.
+  -- Every part begun before `c` has ended by `c`.
   Done : Pos → Set
   Done c = (Σ Pos λ c₀ → o c₀ end × c₀ ≼ c)
-         × (∀ {i q a} → Nth i q a → Σ Pos λ s → Σ Pos λ c′ → Sub i q s a × enter (f a) s c′ end × c′ ≼ c)
+         × (∀ {i q a} → Nth i q a → q ≺ c → Σ Pos λ s → Σ Pos λ c′ → Sub i q s a × enter (f a) s c′ end × c′ ≼ c)
 
   data BoundedT : EmissionSet B where
     val     : ∀ {q a} → o q (out a) → BoundedT (q ++ [ ix 0 ]) skip
@@ -286,14 +286,14 @@ module Switch {A B : Set} (f : A → Den B) (o : EmissionSet A) where
   Cut : Pos → Pos → Set
   Cut q k = Σ Pos λ q′ → Σ A λ a′ → o q′ (out a′) × q ≺ q′ × q′ ≺ k
 
-  -- No value after `q`.
-  Latest : Pos → Set
-  Latest q = ∀ {q′ a′} → o q′ (out a′) → q′ ≼ q
+  -- No value after `q` before `c`.
+  Latest : Pos → Pos → Set
+  Latest q c = ∀ {q′ a′} → o q′ (out a′) → q′ ≺ c → q′ ≼ q
 
-  -- The outer and the last lane have ended by `c`.
+  -- The outer and the last lane begun before `c` have ended by `c`.
   Done : Pos → Set
   Done c = (Σ Pos λ c₀ → o c₀ end × c₀ ≼ c)
-         × (∀ {q a} → o q (out a) → Latest q → Σ Pos λ c′ → Lane q a c′ end × c′ ≼ c)
+         × (∀ {q a} → o q (out a) → q ≺ c → Latest q c → Σ Pos λ c′ → Lane q a c′ end × c′ ≼ c)
 
   data SwitchT : EmissionSet B where
     val   : ∀ {q a} → o q (out a) → SwitchT (q ++ [ ix 0 ]) skip
@@ -325,10 +325,10 @@ module Exhaust {A B : Set} (f : A → Den B) (o : EmissionSet A) where
   Run : Pos → Set
   Run q = Cur q q
 
-  -- The outer and every lane run have ended by `c`.
+  -- The outer and every lane run begun before `c` have ended by `c`.
   Done : Pos → Set
   Done c = (Σ Pos λ c₀ → o c₀ end × c₀ ≼ c)
-         × (∀ {q a} → o q (out a) → Run q → Σ Pos λ c′ → Lane q a c′ end × c′ ≼ c)
+         × (∀ {q a} → o q (out a) → q ≺ c → Run q → Σ Pos λ c′ → Lane q a c′ end × c′ ≼ c)
 
   data ExhaustT : EmissionSet B where
     val   : ∀ {q a} → o q (out a) → ExhaustT (q ++ [ ix 0 ]) skip

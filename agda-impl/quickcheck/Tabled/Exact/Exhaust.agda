@@ -22,7 +22,7 @@ open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 open import Relation.Nullary using (does)
 
-open import denotation.MonotonicList.Events using (Pos; _≟ᵖ_; ix)
+open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; _≟ᵖ_; ix)
 open import denotation.EmissionSet using (out; skip; end; EmissionSet; Den; enter)
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled
@@ -132,13 +132,14 @@ module ExhaustX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A
 
   private
     done→ : ∀ c → done c ≡ true → Done c
-    done→ c e = endBy→ exo {c} (proj₁ (∧-true {endBy (rows o) c} e)) , λ {q} x R →
+    done→ c e = endBy→ exo {c} (proj₁ (∧-true {endBy (rows o) c} e)) , λ {q} x qc R →
       let (l , m) = lane-of x
-      in endBy→ (exl m) {c} (or-right (→ran q x R) (all⁻ {xs = ls} (proj₂ (∧-true {endBy (rows o) c} e)) m))
+      in endBy→ (exl m) {c} (or-right (→ran q x R) (or-right (fromT qc) (all⁻ {xs = ls} (proj₂ (∧-true {endBy (rows o) c} e)) m)))
 
     →done : ∀ c → Done c → done c ≡ true
     →done c ((c₀ , x , le) , lanes) = ∧-intro (→endBy exo {c₀} {c} x le) (all⁺ {xs = ls} λ { {q , a , l} m →
-      or-of (ranᵇ q) λ rn → let (c′ , y , le′) = lanes (out-of m) (ran→ q rn) in →endBy (exl m) {c′} {c} y le′ })
+      or-of (q <ᵖ c) λ qc → or-of (ranᵇ q) λ rn →
+        let (c′ , y , le′) = lanes (out-of m) (Equivalence.from T-≡ qc) (ran→ q rn) in →endBy (exl m) {c′} {c} y le′ })
 
     end-row : ∀ {c} → t c end → ExhaustT c (if done c then end else skip)
     end-row {c} x with done c in dc

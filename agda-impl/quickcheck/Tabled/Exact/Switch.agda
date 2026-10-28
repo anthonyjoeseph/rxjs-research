@@ -56,20 +56,21 @@ module SwitchX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A)
     →cut : ∀ q k → Cut q k → cutᵇ q k ≡ true
     →cut q k (q′ , a′ , x , l₁ , l₂) = any⁺ (values⁺ (complete exo x)) (∧-intro (fromT l₁) (fromT l₂))
 
-    latest→ : ∀ q → latest q ≡ true → Latest q
-    latest→ q e x = not-T (all⁻ e (values⁺ (complete exo x)))
+    latest→ : ∀ q c → latest q c ≡ true → Latest q c
+    latest→ q c e x qc = not-T (or-right (fromT qc) (all⁻ e (values⁺ (complete exo x))))
 
-    →latest : ∀ q → Latest q → latest q ≡ true
-    →latest q h = all⁺ {xs = vals} λ { {q′ , a′} m → T-not (h (sound exo (values⁻ m))) }
+    →latest : ∀ q c → Latest q c → latest q c ≡ true
+    →latest q c h = all⁺ {xs = vals} λ { {q′ , a′} m → or-of (q′ <ᵖ c) λ lt → T-not (h (sound exo (values⁻ m)) (Equivalence.from T-≡ lt)) }
 
     done→ : ∀ c → done c ≡ true → Done c
-    done→ c e = endBy→ exo {c} (proj₁ (∧-true {endBy (rows o) c} e)) , λ {q} x L →
+    done→ c e = endBy→ exo {c} (proj₁ (∧-true {endBy (rows o) c} e)) , λ {q} x qc L →
       let (l , m) = ls-to (values⁺ (complete exo x))
-      in endBy→ (exl m) {c} (or-right (→latest q L) (all⁻ {xs = ls} (proj₂ (∧-true {endBy (rows o) c} e)) m))
+      in endBy→ (exl m) {c} (or-right (→latest q c L) (or-right (fromT qc) (all⁻ {xs = ls} (proj₂ (∧-true {endBy (rows o) c} e)) m)))
 
     →done : ∀ c → Done c → done c ≡ true
     →done c ((c₀ , x , le) , lanes) = ∧-intro (→endBy exo {c₀} {c} x le) (all⁺ {xs = ls} λ { {q , a , l} m →
-      or-of (latest q) λ lt → let (c′ , y , le′) = lanes (out-of m) (latest→ q lt) in →endBy (exl m) {c′} {c} y le′ })
+      or-of (q <ᵖ c) λ qc → or-of (latest q c) λ lt →
+        let (c′ , y , le′) = lanes (out-of m) (Equivalence.from T-≡ qc) (latest→ q c lt) in →endBy (exl m) {c′} {c} y le′ })
 
     end-row : ∀ {c} → t c end → SwitchT c (if done c then end else skip)
     end-row {c} x with done c in dc

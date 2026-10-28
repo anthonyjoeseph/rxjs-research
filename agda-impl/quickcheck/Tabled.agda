@@ -187,7 +187,7 @@ lanes ln = mapM λ qa → bind (ln (proj₂ qa) (proj₁ qa ++ [ ix 1 ])) λ l �
 -- `EmissionSet.Merge.MergeT`, each value's lane listed at its subscription.
 module MergeL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) where
   done : Pos → Bool
-  done c = endBy (rows o) c ∧ allᵇ (λ { (_ , _ , l) → endBy (rows l) c }) ls
+  done c = endBy (rows o) c ∧ allᵇ (λ { (q , _ , l) → not (q <ᵖ c) ∨ endBy (rows l) c }) ls
 
   laneRow : Row B → Row B
   laneRow (c , end) = c , (if done c then end else skip)
@@ -261,11 +261,11 @@ module SwitchL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) whe
   cutᵇ : Pos → Pos → Bool
   cutᵇ q k = anyᵇ (λ { (q′ , _) → (q <ᵖ q′) ∧ (q′ <ᵖ k) }) vals
 
-  latest : Pos → Bool
-  latest q = allᵇ (λ { (q′ , _) → q′ ≼ᵇ q }) vals
+  latest : Pos → Pos → Bool
+  latest q c = allᵇ (λ { (q′ , _) → not (q′ <ᵖ c) ∨ (q′ ≼ᵇ q) }) vals
 
   done : Pos → Bool
-  done c = endBy (rows o) c ∧ allᵇ (λ { (q , _ , l) → not (latest q) ∨ endBy (rows l) c }) ls
+  done c = endBy (rows o) c ∧ allᵇ (λ { (q , _ , l) → not (q <ᵖ c) ∨ (not (latest q c) ∨ endBy (rows l) c) }) ls
 
   live : Row B → Row B
   live (c , end) = c , (if done c then end else skip)
@@ -316,7 +316,7 @@ module ExhaustL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) wh
     ranᵇ q = anyᵇ (λ q′ → does (q′ ≟ᵖ q)) rs
 
     done : Pos → Bool
-    done c = endBy (rows o) c ∧ allᵇ (λ { (q , _ , l) → not (ranᵇ q) ∨ endBy (rows l) c }) ls
+    done c = endBy (rows o) c ∧ allᵇ (λ { (q , _ , l) → not (q <ᵖ c) ∨ (not (ranᵇ q) ∨ endBy (rows l) c) }) ls
 
     laneRow : Row B → Row B
     laneRow (c , end) = c , (if done c then end else skip)
@@ -391,7 +391,7 @@ module BoundedL {A B : Set} (n : ℕ) (lane : A → Pos → Maybe (Listed B)) (o
     queued c = anyᵇ (λ { (_ , _ , _ , ss) → anyᵇ (λ { (_ , s , _) → does (s ≟ᵖ (c ++ [ ix 1 ])) }) ss }) gs
 
     done : Pos → Bool
-    done c = endBy (rows o) c ∧ allᵇ (λ { (_ , _ , _ , ss) → anyᵇ (λ { (_ , _ , l) → endBy (rows l) c }) ss }) gs
+    done c = endBy (rows o) c ∧ allᵇ (λ { (_ , q , _ , ss) → not (q <ᵖ c) ∨ anyᵇ (λ { (_ , _ , l) → endBy (rows l) c }) ss }) gs
 
     laneRow : Row B → Row B
     laneRow (c , end) = if queued c then (c ++ [ ix 0 ] , skip) else (c , (if done c then end else skip))

@@ -39,7 +39,7 @@ open import quickcheck.Tabled
   mapRow; mapRows; rejoinRow; rejoin; hotOf; outerRow; mergeRows; connRows; takeRows; lanes;
   module MergeL; module TakeL; module ConnL; listT)
 open import quickcheck.Tabled.Exact.Base
-  using (Exact; Exactly; sound; complete; fromT; fromNot; offT; T-not; ∨-false; ∧-true; ∧-intro; off;
+  using (Exact; Exactly; sound; complete; fromT; fromNot; offT; T-not; ∨-false; ∧-true; ∧-intro; off; or-of; or-right;
   any⁻; any⁺; any-off; all⁻; all⁺; single⁻; when⁻; when⁺; if⁻; if-t; if-f; cm⁻; cm⁺; bind⁻;
   values⁻; values⁺; endBy→; →endBy; proper→; →proper; lanes-from; lanes-to)
 open import quickcheck.Tabled.Exact.Scan using (scan-exact)
@@ -169,13 +169,13 @@ module MergeX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A) 
     out-of m = sound exo (values⁻ (proj₁ (ls-from m)))
 
     done→ : ∀ c → done c ≡ true → Done c
-    done→ c e = endBy→ exo {c} (proj₁ (∧-true {endBy (rows o) c} e)) , λ x →
+    done→ c e = endBy→ exo {c} (proj₁ (∧-true {endBy (rows o) c} e)) , λ x qc →
       let (l , m) = ls-to (values⁺ (complete exo x))
-      in endBy→ (exl m) {c} (all⁻ {xs = ls} (proj₂ (∧-true {endBy (rows o) c} e)) m)
+      in endBy→ (exl m) {c} (or-right (fromT qc) (all⁻ {xs = ls} (proj₂ (∧-true {endBy (rows o) c} e)) m))
 
     →done : ∀ c → Done c → done c ≡ true
     →done c ((c₀ , x , le) , lanes) = ∧-intro (→endBy exo {c₀} {c} x le) (all⁺ {xs = ls} λ { {q , a , l} m →
-      let (c′ , y , le′) = lanes (out-of m) in →endBy (exl m) {c′} {c} y le′ })
+      or-of (q <ᵖ c) λ qc → let (c′ , y , le′) = lanes (out-of m) (Equivalence.from T-≡ qc) in →endBy (exl m) {c′} {c} y le′ })
 
     end-row : ∀ {c} → t c end → MergeT c (if done c then end else skip)
     end-row {c} x with done c in dc

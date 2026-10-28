@@ -4,7 +4,7 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ## Tier −1 — the emission set is compositional
 
-**Compositional:** every former's meaning is its operator applied to its children's meanings.
+**Compositional:** every former but `defer` means its operator by definition; `defer` unfolds to its body.
 
 ### Ledger
 
@@ -19,10 +19,10 @@ Members: `settles-defer`.
 
 #### THE JOINERS READ AHEAD
 
-Suspect, and blocked constructively. A joiner's `Done` reads values after
-the reached row, and a lane's rows may precede its subscription; and its
-index must bound every lane's, which no finite listing of the outer
-yields. Settled by a modulus read off the reached row's count, uniform in
+Suspect, and blocked constructively. The bounded merge's schedule
+(`runs`, `held`) reads a lane's whole future, and a lane's rows may
+precede its subscription; and a joiner's index must bound every lane's,
+which no finite listing of the outer yields. Settled by a modulus read off the reached row's count, uniform in
 the lane, or a pair of chains that agree below a row and join differently.
 
 Members: `flatMap-cont`, `connect-cont`.

@@ -32,7 +32,7 @@ import denotation.EmissionSet as Tb
 open import quickcheck.Tabled using (Row; Listed; rows; short; concatMap; concatMapM; mapM; endBy; ends; values; outerRow;
   module BoundedL; module Order)
 open import quickcheck.Tabled.Exact.Base
-  using (Exact; Exactly; sound; complete; fromT; fromNot; offT; ∨-false; ∧-true; ∧-intro; off; ≟-refl; ≟-true;
+  using (Exact; Exactly; sound; complete; fromT; fromNot; offT; ∨-false; ∧-true; ∧-intro; off; or-of; or-right; ≟-refl; ≟-true;
   any⁻; any⁺; any-off; all⁻; all⁺; single⁻; when⁻; when⁺; if⁻; if-t; if-f; cm⁻; cm⁺; bind⁻; mapM⁻; mapM⁺; cmM⁻; cmM⁺;
   null⁻; null⁺; null-off; values⁺; ends⁻; ends⁺; endBy→; →endBy; cnt-in; module OrderX)
 
@@ -254,16 +254,17 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     done→ c e with ∧-true {endBy (rows o) c} e
     ... | (e₁ , e₂) = endBy→ exo {c} e₁ , lanes
       where
-      lanes : ∀ {i q a} → Nth i q a → Σ Pos λ s → Σ Pos λ c′ → Sub i q s a × enter (fD a) s c′ end × Tb._≼_ c′ c
-      lanes N with found-all N
-      ... | (ss , gm) with any⁻ {xs = ss} (all⁻ {xs = G} e₂ gm)
+      lanes : ∀ {i q a} → Nth i q a → Tb._≺_ q c → Σ Pos λ s → Σ Pos λ c′ → Sub i q s a × enter (fD a) s c′ end × Tb._≼_ c′ c
+      lanes N qc with found-all N
+      ... | (ss , gm) with any⁻ {xs = ss} (or-right (fromT qc) (all⁻ {xs = G} e₂ gm))
       ... | ((es , s , l) , sm , eb) with sub-of gm sm
       ... | (sb , ex) with endBy→ ex {c} eb
       ... | (c′ , y , le) = s , c′ , sb , y , le
 
     →done : ∀ c → Done c → done G c ≡ true
     →done c ((c₀ , x , le) , lanes) = ∧-intro (→endBy exo {c₀} {c} x le) (all⁺ {xs = G} λ { {j , q , a , ss} gm →
-      let (N , _ , cmp) = fine-all gm ; (s , c′ , (es , S , _ , St) , y , le′) = lanes N ; (l , sm) = cmp S St in
+      or-of (q <ᵖ c) λ qc →
+      let (N , _ , cmp) = fine-all gm ; (s , c′ , (es , S , _ , St) , y , le′) = lanes N (Equivalence.from T-≡ qc) ; (l , sm) = cmp S St in
       any⁺ {xs = ss} sm (→endBy (proj₂ (sub-of gm sm)) {c′} {c} y le′) })
 
   ----------------------------------------------------------------------
