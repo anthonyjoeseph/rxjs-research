@@ -19,11 +19,11 @@ Members: `settles-defer`.
 
 #### THE JOINERS READ AHEAD
 
-Suspect over arbitrary inputs: a joiner's `Done` reads values after the
-reached row, and a lane's rows may precede its subscription, so agreement
-below a row does not carry through. Settled by causal `Done` and readings
-starting at subscription (true of every program's meaning), or a pair of
-chains that agree below a row and join differently there.
+Suspect, and blocked constructively. A joiner's `Done` reads values after
+the reached row, and a lane's rows may precede its subscription; and its
+index must bound every lane's, which no finite listing of the outer
+yields. Settled by a modulus read off the reached row's count, uniform in
+the lane, or a pair of chains that agree below a row and join differently.
 
 Members: `flatMap-cont`, `connect-cont`.
 

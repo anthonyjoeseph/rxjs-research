@@ -195,6 +195,17 @@ postulate
   scan-cont      : ∀ {A B} (f : B → A → B) z {c : ℕ → Den A} {d} → Conv c d → Conv (λ n → scanᵀ f z (c n)) (scanᵀ f z d)
   takeWhile-cont : ∀ {A} (i : Bool) (k : A → Bool) {c : ℕ → Den A} {d} → Conv c d → Conv (λ n → takeWhileᵀ i k (c n)) (takeWhileᵀ i k d)
   defer-cont     : ∀ {A} {c : ℕ → Den A} {d} → Conv c d → Conv (λ n → deferᵀ (c n)) (deferᵀ d)
+  -- A JOINER'S INDEX bounds every lane's: the rows at and below a reached
+  -- row read the lanes of the outer's values before it, so its N is the
+  -- largest of theirs.
+  --
+  -- DEAD ROUTE: taking that largest N over the outer values that `Few`
+  --   lists.  `Few` lists positions, and whether a position holds a value,
+  --   and which, is not decidable.  Listing the rows themselves does not
+  --   repair it: a row list does not transport back through `map`, since
+  --   `f a ≡ f a′` at one position keeps `a′` and loses `a`.  A bound that
+  --   does not enumerate the lanes is needed: one read off the reached
+  --   row's count, uniform in the lane.
   flatMap-cont   : ∀ {A B} (op : FlatOp) {fs : ℕ → A → Den B} {g} {c : ℕ → Den A} {d}
                  → Conv c d → (∀ a → Conv (λ n → fs n a) (g a)) → Conv (λ n → flatMapᵀ op (fs n) (c n)) (flatMapᵀ op g d)
   connect-cont   : ∀ {A B} {c : ℕ → Den A} {d} {Fs : ℕ → Den A → Den B} {G}
