@@ -1,7 +1,7 @@
 .PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain placing placing-count stepping kept-depth bg bg-check bg-wait \
         wiring wiring-gate wiring-selftest unsafe-check dup-check dup-selftest \
         imports-check imports-fix imports-selftest comments-check comments-selftest \
-        roadmap-check roadmap-selftest port-check port-selftest find find-prose postulates notify split \
+        roadmap-check roadmap-selftest port-check port-selftest old-denotation old-denotation-selftest find find-prose postulates notify split \
         ts-check ts-lint ts-format-check ts-gate
 
 # UTF-8 locale for em-dashes and special characters in Agda output
@@ -50,6 +50,7 @@ help:
 	@echo "  find-prose    search comment blocks and docs for a finding:  make find-prose Q='dead route'"
 	@echo "  wiring        the wiring report (wiring-gate: the same, exiting 1)"
 	@echo "  port-check    the port keeps the old tower's names and postulates (PORT_BASE)"
+	@echo "  old-denotation  every use of the stream denotation outside it: Tier 0's remaining work"
 	@echo "  imports-fix   delete unused imports and names"
 	@echo "  split         cut a long module:  make split F=<file> (lists cuts);  make split F=<file> P='Mod Mod.B@120'"
 	@echo "                a nested one, in place:  make split F=<file> SUB='Inner Inner2@300'"
@@ -67,6 +68,7 @@ GATE_CHEAP = wiring-selftest wiring-gate \
              imports-selftest imports-check \
              roadmap-selftest roadmap-check \
              comments-selftest comments-check \
+             port-selftest port-check old-denotation-selftest \
              ts-gate
 
 gate-cheap:
@@ -217,38 +219,65 @@ wiring-selftest:
 	  if [ $$fail -eq 0 ]; then echo "wiring-selftest: PASS (R2 fires on the passed-only lemma and on its eta-expansion, and on nothing else; module applications conduct; \`with\` arms conduct at both scopes; a postulate block nested in a seal reaches the ledger; a pragma nested in a pragma closes on its own close; a CLI postulate with a COMPILE GHC body leaves it, an unbound one or one outside CLI/ stays)"; \
 	  else echo "$$out"; exit 1; fi
 
-# Not in the gate (Anthony): run by hand while a port/ directory exists.
-# THE PORT BOUNDARY (Anthony): in $(SRC)/port/ and what it imports, a body
-# keeps a name the old tower had at PORT_BASE; an old postulate stays one; a
-# postulated old body says where it was; a new postulate is free.  The frozen commit is
-# what the port answers to, so it moves only by hand.  → docs/port-check.md
-PORT_BASE := 85c14392490061b71342d104b2d16a16cb4ec724
-# The engine's modules took the old engine's names under port/; what they
-# declared at PORT_BASE under their spike paths is not the port's.
-PORT_RENAMED := --renamed port/operation/AbstractObservable.agda=agda-impl/operation/Marked.agda \
-                          port/operation/PureObservable.agda=agda-impl/operation/MarkedPure.agda \
-                          port/operation/Observable.agda=agda-impl/operation/MarkedObservable.agda
+# THE PORT BOUNDARY (Anthony): adequacy/ and simultaneous/ move onto the
+# table in place.  There and in what they import, a body keeps a name the old
+# tower had at PORT_BASE (`xᵀ` answers to `x`); an old postulate stays one; a
+# postulated old body says where it was; a new postulate is free.  The frozen
+# commit is what the port answers to, so it moves only by hand.  → docs/port-check.md
+PORT_BASE := ef65c8cb193015c6afd2f75d1d11059afd9a4b97
+PORT_SCOPE := adequacy simultaneous
 
 port-check:
-	@scripts/check-port.py --base $(PORT_BASE) $(PORT_RENAMED)
+	@scripts/check-port.py --base $(PORT_BASE) --port $(PORT_SCOPE) --old $(addprefix $(SRC)/,$(PORT_SCOPE))
 
 # PROVES port-check IS LOAD-BEARING: one row per way out of the boundary must
 # fire, a new body moved into the port's import cone included; and an old
 # name ported, a new postulate, an old postulate kept, a pointed-at old body,
 # a private helper and a where-local must not.
+# The fixtures answer to a tower of their own, frozen with them.
+PORT_SELFTEST_BASE := 85c14392490061b71342d104b2d16a16cb4ec724
+
 port-selftest:
-	@out=$$(scripts/check-port.py --base $(PORT_BASE) --src scripts/port-selftest 2>&1); \
+	@out=$$(scripts/check-port.py --base $(PORT_SELFTEST_BASE) --src scripts/port-selftest --port port adequacy \
+	        --renamed adequacy/Placed.agda=agda-impl/adequacy/Placed.agda 2>&1); \
 	  fail=0; \
 	  for r in "NEW NAME    Engine.agda:smuggled" "NEW NAME    port/Fixture.agda:invented" "FILLED GAP  port/Fixture.agda:placing" \
 	           "NO OLD BODY port/Fixture.agda:complete" "BAD OLD BODY port/Fixture.agda:reaches" \
-	           "BAD OLD BODY port/Fixture.agda:prefix-chain" "BAD OLD BODY port/Fixture.agda:reached"; do \
+	           "BAD OLD BODY port/Fixture.agda:prefix-chain" "BAD OLD BODY port/Fixture.agda:reached" \
+	           "FILLED GAP  adequacy/Placed.agda:under-shown-connect" "FILLED GAP  adequacy/Placed.agda:placingᵀ" \
+	           "NEW NAME    adequacy/Placed.agda:inventedᵀ"; do \
 	    echo "$$out" | grep -qF "$$r" || { echo "SELFTEST FAIL: \`$$r\` not reported — the boundary has a hole"; fail=1; }; \
 	  done; \
-	  for n in run fresh-gap engine-gap ticks-up content helper read-of local; do \
+	  for n in run fresh-gap engine-gap ticks-up content helper read-of local weigh-++ sibling-spreadᵀ; do \
 	    echo "$$out" | grep -q "\.agda:$$n " && { echo "SELFTEST FAIL: $$n reported, but it is inside the boundary"; fail=1; }; \
 	  done; \
-	  echo "$$out" | grep -q "port-check: FAIL — 7 problem" || { echo "SELFTEST FAIL: expected exactly 7 problems"; fail=1; }; \
-	  if [ $$fail -eq 0 ]; then echo "port-selftest: PASS (a new body, in the port or its import cone, a filled gap, and a missing or unresolving OLD BODY each fire; ported names, new and kept postulates and helpers do not)"; \
+	  echo "$$out" | grep -q "port-check: FAIL — 10 problem" || { echo "SELFTEST FAIL: expected exactly 10 problems"; fail=1; }; \
+	  if [ $$fail -eq 0 ]; then echo "port-selftest: PASS (a new body, in the port or its import cone, a filled gap, and a missing or unresolving OLD BODY each fire, in a port directory or in place, through a table reading too; ported names, new and kept postulates and helpers do not)"; \
+	  else echo "$$out"; exit 1; fi
+
+# THE OLD DENOTATION, COUNTED (Anthony): every use of the stream denotation
+# outside it, by file.  Not in the gate while Tier 0 runs: the count is
+# its remaining work, and Tier 0 is done at none.  → docs/old-denotation.md
+OLD_DENOTATION := --module denotation.Denote denotation.Observe denotation.Compositional \
+                           denotation.Laws denotation.NonExpansive \
+                  --host denotation.MonotonicList --name observe lub
+
+old-denotation:
+	@scripts/check-old-denotation.py $(OLD_DENOTATION)
+
+# PROVES old-denotation IS LOAD-BEARING: each way of reaching the old
+# denotation fires, and a host's engine vocabulary does not.
+old-denotation-selftest:
+	@out=$$(scripts/check-old-denotation.py --src scripts/old-denotation-selftest --module Old --host Host --name observe 2>&1); \
+	  fail=0; \
+	  for r in "fixture/Uses.agda:6: imports \`Old\`" "fixture/Uses.agda:10: takes \`mapᴰ\`" "fixture/Uses.agda:10: takes \`observe\`" \
+	           "fixture/Uses.agda:14: opens \`Host\` with no" "fixture/Uses.agda:19: uses \`H.scanᴰ\`"; do \
+	    echo "$$out" | grep -qF "$$r" || { echo "SELFTEST FAIL: \`$$r\` not reported — the count has a hole"; fail=1; }; \
+	  done; \
+	  echo "$$out" | grep -q "Clean.agda" && { echo "SELFTEST FAIL: Clean.agda reported, but it reaches only engine vocabulary"; fail=1; }; \
+	  echo "$$out" | grep -q "^fixture/Uses.agda.*Run\|Old.agda\|Host.agda" && { echo "SELFTEST FAIL: an engine name, or the old denotation itself, reported"; fail=1; }; \
+	  echo "$$out" | grep -q "old-denotation: 5 use(s) across 1 file(s)" || { echo "SELFTEST FAIL: expected exactly 5 uses in 1 file"; fail=1; }; \
+	  if [ $$fail -eq 0 ]; then echo "old-denotation-selftest: PASS (an old module, an old name over a split using list, a wholesale host and a qualified operator each fire; engine vocabulary and the old denotation itself do not)"; \
 	  else echo "$$out"; exit 1; fi
 
 # SOUNDNESS GUARD.  The build is not `--safe` — it cannot be while
