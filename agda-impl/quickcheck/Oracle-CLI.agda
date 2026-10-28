@@ -15,6 +15,8 @@
 --   Oracle-CLI denote SEED       the denotation's trace of one seed
 --   Oracle-CLI pure SEED         the pure semantics' trace of one seed
 --   Oracle-CLI table SEED        the enumerator's listing of one seed
+--   Oracle-CLI table-trace SEED  its walk node by node, unbuffered, which
+--                                a timeout does not swallow
 --   Oracle-CLI chain FROM COUNT  the seeds whose denotation's approximants
 --                                are no chain (`quickcheck.Chain`)
 --   Oracle-CLI placing SEED CHECK whether that seed's machine trace strays
@@ -60,9 +62,19 @@ open import denotation.MonotonicList.Events using (Timeline)
 open import quickcheck.Placing using (placing; placingParts)
 open import quickcheck.Stepping using (steppingFails)
 open import quickcheck.KeptDepth using (keptLines)
-open import quickcheck.Tabled using (tableJSON)
+open import quickcheck.Tabled using (tableJSON; tableTrace)
+
+open import IO.Primitive.Handle using (hSetBuffering; stdout; noBuffering)
 
 private
+  -- Unbuffered, so what a killed run printed survives it.
+  eachLine : List String → IO ⊤
+  eachLine xs = hSetBuffering stdout noBuffering >>= λ _ → go xs
+    where
+    go : List String → IO ⊤
+    go []       = pure _
+    go (x ∷ xs) = putStrLn x >>= λ _ → go xs
+
   each : List ℕ → (ℕ → IO ⊤) → IO ⊤
   each []       f = pure _
   each (x ∷ xs) f = f x >>= λ _ → each xs f
@@ -106,7 +118,7 @@ private
   nat = readMaybe 10
 
   usage : IO ⊤
-  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI code SEED | Oracle-CLI named FROM COUNT | Oracle-CLI named-code SEED | Oracle-CLI named-io SEED | Oracle-CLI denote SEED | Oracle-CLI pure SEED | Oracle-CLI table SEED | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI placing SEED CHECK | Oracle-CLI stepping FROM COUNT | Oracle-CLI kept-depth FROM COUNT | Oracle-CLI hand | Oracle-CLI why-hand N | Oracle-CLI spin | Oracle-CLI why-spin N K"
+  usage = putStrLn "usage: Oracle-CLI prog FROM COUNT | Oracle-CLI code SEED | Oracle-CLI named FROM COUNT | Oracle-CLI named-code SEED | Oracle-CLI named-io SEED | Oracle-CLI denote SEED | Oracle-CLI pure SEED | Oracle-CLI table SEED | Oracle-CLI table-trace SEED | Oracle-CLI io SEED | Oracle-CLI chain FROM COUNT | Oracle-CLI placing SEED CHECK | Oracle-CLI stepping FROM COUNT | Oracle-CLI kept-depth FROM COUNT | Oracle-CLI hand | Oracle-CLI why-hand N | Oracle-CLI spin | Oracle-CLI why-spin N K"
 
   dispatch : List String → IO ⊤
   dispatch ("prog" ∷ f ∷ c ∷ []) with nat f | nat c
@@ -132,6 +144,9 @@ private
   ... | nothing = usage
   dispatch ("table" ∷ s ∷ []) with nat s
   ... | just s′ = putStrLn (tableJSON 3 (program s′))
+  ... | nothing = usage
+  dispatch ("table-trace" ∷ s ∷ []) with nat s
+  ... | just s′ = eachLine (tableTrace 3 (program s′))
   ... | nothing = usage
   dispatch ("io" ∷ s ∷ []) with nat s
   ... | just s′ = io s′

@@ -10,7 +10,7 @@ open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_
 open import Data.List using (List; []; _∷_; _++_; [_]; foldr; length; null) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _≤ᵇ_; _≡ᵇ_; _<ᵇ_; _∸_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _≤ᵇ_; _≡ᵇ_; _<ᵇ_; _∸_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 
 open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
@@ -22,6 +22,8 @@ open import Relation.Nullary using (does)
 open import quickcheck.Oracle using (Event; val; _▸_; Trace; completed; silent; cut; depth; showTrace)
 open import quickcheck.Code using (Prog; toObs; timeline)
 open import Data.String using (String)
+import Data.String as S
+open import Data.Nat.Show using () renaming (show to showℕ)
 import quickcheck.Oracle as O
 
 ------------------------------------------------------------------------
@@ -438,3 +440,55 @@ tableJSON : ∀ {t} → ℕ → Prog t → String
 tableJSON {t} u p with listT (depth u p) (toObs timeline u p [] [] []) [] root
 ... | just l  = showTrace t (traceT l)
 ... | nothing = "null"
+
+------------------------------------------------------------------------
+-- Where the listing spends its time
+
+private
+  nodeName : ∀ {Γ A} → Obs Timeline Γ A → String
+  nodeName (cold _)                    = "cold"
+  nodeName empty                       = "empty"
+  nodeName (of _)                      = "of"
+  nodeName (map _ _)                   = "map"
+  nodeName (scan _ _ _)                = "scan"
+  nodeName (takeWhile _ _ _)           = "takeWhile"
+  nodeName (flatMap (mergeᶠ nothing) _ _)  = "merge"
+  nodeName (flatMap (mergeᶠ (just k)) _ _) = "merge " S.++ showℕ k
+  nodeName (flatMap switchᶠ _ _)       = "switch"
+  nodeName (flatMap exhaustᶠ _ _)      = "exhaust"
+  nodeName (connect _ _)               = "connect"
+  nodeName (connected _)               = "connected"
+  nodeName (defer _)                   = "defer"
+
+  size : ∀ {A} → Maybe (Listed A) → String
+  size (just l) = showℕ (length (rows l)) S.++ " rows"
+  size nothing  = "nothing"
+
+  laneSize : ∀ {A B : Set} → Maybe (List (Pos × A × Listed B)) → String
+  laneSize (just ls) = showℕ (length ls) S.++ " lanes, " S.++ showℕ (foldr (λ { (_ , _ , l) k → length (rows l) + k }) 0 ls) S.++ " rows"
+  laneSize nothing   = "nothing"
+
+  lanesOf : ∀ {Γ A B} → ℕ → (A → Obs Timeline Γ B) → Obs Timeline Γ A → All Listed Γ → Pos → List String
+  lanesOf n f s ρ p = [ "lanes: " S.++ laneSize (bind (listT n s ρ p) λ o → lanes (λ a → listT n (f a) ρ) (values (rows o))) ]
+
+-- Each node of `listT`'s walk: a line opening it, its parts' lines, and a
+-- line closing it with its rows; a flatMap's lanes get a line of their own.
+mutual
+  traceL : ∀ {Γ A} → ℕ → Obs Timeline Γ A → All Listed Γ → Pos → List String
+  traceL n o ρ p = ("open " S.++ nodeName o) ∷ (parts n o ρ p ++ [ "close " S.++ nodeName o S.++ ": " S.++ size (listT n o ρ p) ])
+
+  parts : ∀ {Γ A} → ℕ → Obs Timeline Γ A → All Listed Γ → Pos → List String
+  parts n (map _ s)                       ρ p = traceL n s ρ p
+  parts n (scan _ _ s)                    ρ p = traceL n s ρ p
+  parts n (takeWhile _ _ s)               ρ p = traceL n s ρ p
+  parts n (flatMap (mergeᶠ (just _)) _ s) ρ p = traceL n s ρ p
+  parts n (flatMap k f s)                 ρ p = traceL n s ρ p ++ lanesOf n f s ρ p
+  parts n (connect s b)                   ρ p with listT n s ρ (p ++ [ ix 1 ])
+  ... | just σ  = traceL n s ρ (p ++ [ ix 1 ]) ++ traceL n b (hotOf σ ∷ ρ) (p ++ [ ix 0 ])
+  ... | nothing = traceL n s ρ (p ++ [ ix 1 ])
+  parts (suc n) (defer l)                 ρ p = traceL n (Later.force l) ρ (p ++ [ ix 1 ])
+  parts _ _                               ρ p = []
+
+-- A generated program's listing, traced node by node.
+tableTrace : ∀ {t} → ℕ → Prog t → List String
+tableTrace u p = traceL (depth u p) (toObs timeline u p [] [] []) [] root

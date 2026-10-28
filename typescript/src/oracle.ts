@@ -157,6 +157,22 @@ const cli = (
 
 const show = (t: Trace): string => JSON.stringify(canon(names(t)));
 
+// Where a stuck seed's listing got to: the last lines of its walk, which
+// the CLI writes unbuffered so a timeout keeps them.
+const traced = (seed: number): string =>
+  (
+    spawnSync(bin, ["table-trace", String(seed)], {
+      encoding: "utf8",
+      timeout: 3 * timeoutMs,
+      maxBuffer: 1 << 28,
+    }).stdout ?? ""
+  )
+    .trim()
+    .split("\n")
+    .slice(-12)
+    .map((l) => `\n    ${l}`)
+    .join("");
+
 // The CLI's subcommands for one family of programs: the seed's program,
 // or its named one (`quickcheck.Quickcheck.named`).
 // `engines`: whether the CLI can run each engine's leg alone.
@@ -248,7 +264,7 @@ const run = async (
   const stuck = single.filter(({ listed }) => listed?.failed !== undefined);
   stuck.forEach(({ seed, listed }) =>
     console.log(
-      `oracle: FAIL ${fam.label}seed ${seed}\n  prog       ${cli([fam.code, String(seed)]).out.trim()}\n  listing    ${listed?.failed}${fam.engines ? `\n  denote     ${cli(["denote", String(seed)]).failed ?? "finishes"}\n  pure       ${cli(["pure", String(seed)]).failed ?? "finishes"}\n  table      ${cli(["table", String(seed)]).failed ?? "finishes"}` : ""}`,
+      `oracle: FAIL ${fam.label}seed ${seed}\n  prog       ${cli([fam.code, String(seed)]).out.trim()}\n  listing    ${listed?.failed}${fam.engines ? `\n  denote     ${cli(["denote", String(seed)]).failed ?? "finishes"}\n  pure       ${cli(["pure", String(seed)]).failed ?? "finishes"}\n  table      ${cli(["table", String(seed)]).failed ?? "finishes"}\n  walk${traced(seed)}` : ""}`,
     ),
   );
   const rows = (
