@@ -359,9 +359,9 @@ env-lookup (_ ∷ ρ) (there i)   = env-lookup ρ i
 -- rows of `approxᵀ` at the same approximant.
 listT-exact : ∀ {Γ A} n (o : Obs Timeline Γ A) {ρL : All Listed Γ} {ρD : DenEnv Γ} → EnvRel ρL ρD
   → ∀ p {l} → listT n o ρL p ≡ just l → Exactly l (enter (approxᵀ n o ρD) p)
-listT-exact n (cold c)  ρ p refl = walk-exact fuel _
-listT-exact n empty     ρ p refl = end-exact _
-listT-exact n (of xs)   ρ p refl = walk-exact fuel _
+listT-exact n (cold c)  ρ p refl = truncate-exact (walk-exact fuel _)
+listT-exact n empty     ρ p refl = truncate-exact (end-exact _)
+listT-exact n (of xs)   ρ p refl = truncate-exact (walk-exact fuel _)
 listT-exact n (map f s) {ρL} ρ p e with bind⁻ {m = listT n s ρL p} e
 ... | (l₀ , e₀ , refl) = truncate-exact (map-exact f (listT-exact n s ρ p e₀))
 listT-exact n (scan f z s) {ρL} ρ p e with bind⁻ {m = listT n s ρL p} e
@@ -388,7 +388,7 @@ listT-exact n (connect s b) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL (
 ... | (σl , eσ , e₁) with bind⁻ {m = listT n b (hotOf σl ∷ ρL) (p ++ [ ix 0 ])} e₁
 ... | (βl , eβ , refl) =
   truncate-exact (conn-exact (approxᵀ n s ρD) (λ h → approxᵀ n b (h ∷ ρD)) p σl βl σx
-    (listT-exact n b ((λ p′ → rejoin-exact (proper-exact σx) p′) ∷ ρ) (p ++ [ ix 0 ]) eβ))
+    (listT-exact n b ((λ p′ → truncate-exact (rejoin-exact (proper-exact σx) p′)) ∷ ρ) (p ++ [ ix 0 ]) eβ))
   where
     σx = listT-exact n s ρ (p ++ [ ix 1 ]) eσ
 listT-exact n (connected i) ρ p refl = env-lookup ρ i p

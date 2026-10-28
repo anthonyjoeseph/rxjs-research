@@ -8,13 +8,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE UNREACHED ROWS
+#### THE SETTLING APPROXIMANTS
 
-Refuted as stated: the limit and an operator disagree on a row behind
-infinitely many rows, for `map` as for the negations (header of
-`denotation.EmissionSet.Laws`). Open: which rows compositionality is
-stated over. Settled by Anthony's choice of the equivalence, then each
-former's limit proven over it.
+Untried: past enough approximants, nothing at or before a reached row
+changes, and each operator carries that through. The old route counted
+rows: approximant n agrees with the next for n rows, each operator reading
+no further than it shows. Joining an ended hot breaks the count: the end
+shows at once, however many rows the hot took to reach it. Settled by a
+measure that also counts the hot's rows, or a program whose reached row
+flips forever.
 
 Members: `flatMap-lim`, `connect-lim`, `scan-lim`, `takeWhile-lim`, `map-lim`, `defer-lim`.
 

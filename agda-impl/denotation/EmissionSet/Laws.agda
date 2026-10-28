@@ -9,24 +9,40 @@ open import Data.Bool using (Bool)
 open import Data.List using (List; _∷_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (_∷_; lookup)
+open import Data.Nat using (ℕ)
 open import Data.Nat.Properties using (≤-refl)
-open import Data.Product using (Σ; _×_; _,_; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Function using (_∘_)
 
 open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList.Events using (Timeline)
 open import denotation.EmissionSet
-  using (Ev; EmissionSet; Few; Truncate; Den; enter; DenEnv; Lim; from; ⟦_⟧ᵀ; coldᵀ; emptyᵀ; ofᵀ; mapᵀ; scanᵀ; takeWhileᵀ; flatMapᵀ; connectᵀ; deferᵀ;
+  using (Ev; EmissionSet; Few; Truncate; Den; hot; enter; DenEnv; Lim; from; ⟦_⟧ᵀ; coldᵀ; emptyᵀ; ofᵀ; mapᵀ; scanᵀ; takeWhileᵀ; flatMapᵀ; connectᵀ; deferᵀ;
          MapT; map-out; map-skip; map-end)
 
 -- The same rows at every subscription.
 _≅_ : ∀ {A} → Den A → Den A → Set
 d ≅ d′ = ∀ p {q e} → (enter d p q e → enter d′ p q e) × (enter d′ p q e → enter d p q e)
 
--- A row of every approximant is a row of the limit, and back.
 private
-  constant : ∀ {A} (d : Den A) p {q e} → (Lim (λ _ → enter d p) q e → enter d p q e) × (enter d p q e → Lim (λ _ → enter d p) q e)
-  constant d p = (λ { (from N h) → h N ≤-refl }) , λ x → from 0 λ _ _ → x
+  -- Rows before `q` in `t′` are rows of `t`, so as few.
+  few-via : ∀ {A B} {t : EmissionSet A} {t′ : EmissionSet B} {q} → (∀ {k e} → t′ k e → Σ (Ev A) (t k)) → Few t q → Few t′ q
+  few-via back (ks , h) = ks , λ x lt → h (proj₂ (back x)) lt
+
+  -- A row read through `enter` has finitely many rows before it.
+  entered-few : ∀ {A} (d : Den A) p {q e} → enter d p q e → Few (enter d p) q
+  entered-few (hot t)  p (_ , F) = few-via (λ y → _ , proj₁ y) F
+  entered-few (Den.cold f) p (_ , F) = few-via (λ y → _ , proj₁ y) F
+
+  -- Limits of row-for-row alike sequences, truncated, are alike.
+  lim-map : ∀ {A} {c c′ : ℕ → EmissionSet A} → (∀ {n q e} → c n q e → c′ n q e) → (∀ {n q e} → c′ n q e → c n q e)
+          → ∀ {q e} → Truncate (Lim c) q e → Truncate (Lim c′) q e
+  lim-map to back (from N h , F) = from N (λ n le → to (h n le)) , few-via (λ { (from M h′) → _ , from M λ n le → back (h′ n le) }) F
+
+  -- A row of every approximant is a row of the limit, and back.
+  constant : ∀ {A} (d : Den A) p {q e} → (Truncate (Lim (λ _ → enter d p)) q e → enter d p q e) × (enter d p q e → Truncate (Lim (λ _ → enter d p)) q e)
+  constant d p = (λ { (from N h , _) → h N ≤-refl }) , λ x →
+    from 0 (λ _ _ → x) , few-via (λ { (from N h) → _ , h N ≤-refl }) (entered-few d p x)
 
 record Compositionalᵀ : Set₁ where
   field
@@ -73,11 +89,8 @@ compositionalᵀ = record
 -- MAP FUSES: `map (f ∘ g)` and `map f ∘ map g` have the same rows.
 map-fusionᵀ : ∀ {Γ A B C} (f : B → C) (g : A → B) (s : Obs Timeline Γ A) (ρ : DenEnv Γ)
             → ⟦ map (f ∘ g) s ⟧ᵀ ρ ≅ ⟦ map f (map g s) ⟧ᵀ ρ
-map-fusionᵀ f g s ρ p = (λ { (from N h) → from N λ n le → fuse (h n le) }) , λ { (from N h) → from N λ n le → split (h n le) }
+map-fusionᵀ f g s ρ p = lim-map fuse split , lim-map split fuse
   where
-    few-via : ∀ {A B} {t : EmissionSet A} {t′ : EmissionSet B} {q} → (∀ {k e} → t′ k e → Σ (Ev A) (t k)) → Few t q → Few t′ q
-    few-via back (ks , h) = ks , λ x lt → h (proj₂ (back x)) lt
-
     down : ∀ {t k e} → MapT (f ∘ g) t k e → Σ (Ev _) (MapT g t k)
     down (map-out x)  = _ , map-out x
     down (map-skip x) = _ , map-skip x

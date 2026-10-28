@@ -224,7 +224,7 @@ wiring-selftest:
 # tower had at PORT_BASE (`xᵀ` answers to `x`); an old postulate stays one; a
 # postulated old body says where it was; a new postulate is free.  The frozen
 # commit is what the port answers to, so it moves only by hand.  → docs/port-check.md
-PORT_BASE := 5af5575c4e46f09bcd3242490c5a62e8b37e86e5
+PORT_BASE := 75e04489a541f557440de7b319f7284a65a24cb7
 PORT_SCOPE := adequacy simultaneous
 
 port-check:
