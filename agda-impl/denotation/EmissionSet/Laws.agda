@@ -43,13 +43,15 @@ open import Data.Maybe using (just; nothing)
 open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList.Events using (Timeline; Pos; ix; sub; last)
 open import denotation.EmissionSet
-  using (Ev; out; skip; end; EmissionSet; _≺_; _≼_; Truncate; Proper; Rejoin; shown; ended; late; guard; body; Den; hot; enter; After; DenEnv; approxᵀ; ⟦_⟧ᵀ; coldᵀ; emptyᵀ; ofᵀ; mapᵀ; scanᵀ; takeWhileᵀ; flatMapᵀ; connectᵀ; deferᵀ; ⊥ᵀ;
-         MapT; map-out; map-skip; map-end)
+  using (Ev; out; skip; end; EmissionSet; _≺_; _≼_; Truncate; Rejoin; shown; ended; late; guard; body;
+  Den; hot; enter; After; DenEnv; approxᵀ; ⟦_⟧ᵀ; coldᵀ; emptyᵀ; ofᵀ; mapᵀ; scanᵀ; takeWhileᵀ;
+  flatMapᵀ; connectᵀ; deferᵀ; ⊥ᵀ; MapT; map-out; map-skip; map-end)
 import denotation.EmissionSet as ES
 open import denotation.EmissionSet.Laws.Modulus
   using (≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext; few-via; AgreeTo; ⟨_⟩; upto; AgreeTo-sym; AgS; trunc-ag; trunc-to; ~-cold; _≈⟨_∣_⟩_; ≈-refl; ≈-sym; ≈-trans; ≈-mono; Same; agree-all; LimD; limit; ticks; contract; unfold₀; _~⟨_⟩_; ~-refl)
 open import denotation.EmissionSet.Laws.Worlds using (Ok; _⊕_; Lawful; InvAt; InvD; Hots; GoodEnv; world-after; ok-step; inv-widen; empty-inv; of-inv; spin-inv; map-inv; scan-inv; defer-inv; lim-inv)
 open import denotation.EmissionSet.Laws.Connect using (connect-inv)
+open import denotation.EmissionSet.Laws.ConnectNe using (Causal; proper-ag; connect-ne)
 
 -- The same rows at every subscription.
 _≅_ : ∀ {A} → Den A → Den A → Set
@@ -78,10 +80,6 @@ record Compositionalᵀ : Set₁ where
 ------------------------------------------------------------------------
 -- Causality
 
--- A body reads its hot no further than the hot has run.
-Causal : ∀ {A B} → (Den A → Den B) → Set₁
-Causal F = ∀ {q t t′} → AgreeTo q t t′ → F (hot t) ~⟨ q ⟩ F (hot t′)
-
 -- Every handle alike at and below `q`.
 EnvAg : ∀ {Γ} → Pos → DenEnv Γ → DenEnv Γ → Set₁
 EnvAg {Γ} q ρ ρ′ = ∀ {A} (i : A ∈ Γ) → lookup ρ i ~⟨ q ⟩ lookup ρ′ i
@@ -102,12 +100,6 @@ postulate
   flatMap-ne   : ∀ {A B H k} (op : FlatOp) {f f′ : A → Den B} {s s′ : Den A}
                → InvD H s → InvD H s′ → (∀ a → InvD H (f a)) → (∀ a → InvD H (f′ a))
                → s ≈⟨ Ok H ∣ k ⟩ s′ → (∀ a → f a ≈⟨ Ok H ∣ k ⟩ f′ a) → flatMapᵀ op f s ≈⟨ Ok H ∣ k ⟩ flatMapᵀ op f′ s′
-  connect-ne   : ∀ {A B H k} {s s′ : Den A} {F F′ : Den A → Den B}
-               → InvD H s → InvD H s′
-               → (∀ {t} → Lawful t → InvD (H ⊕ t) (F (hot t))) → (∀ {t} → Lawful t → InvD (H ⊕ t) (F′ (hot t)))
-               → Causal F → Causal F′
-               → s ≈⟨ Ok H ∣ k ⟩ s′ → (∀ {t} → Lawful t → F (hot t) ≈⟨ Ok (H ⊕ t) ∣ k ⟩ F′ (hot t))
-               → connectᵀ s F ≈⟨ Ok H ∣ k ⟩ connectᵀ s′ F′
 
   -- EACH OPERATOR KEEPS THE INVARIANT.
   cold-inv      : ∀ {A H} (c : Timeline A) → InvD H (coldᵀ c)
@@ -196,17 +188,6 @@ takeWhile-causal i keep a = ~-cold λ p → ⟨ (λ yq → TW.take-to i keep p (
 
 -- A CONNECT reads its body's end only up to the source step it shows.
 private
-  proper-to : ∀ {A Q} {t t′ : EmissionSet A} → AgreeTo Q t t′ → ∀ {y e} → y ≼ Q → Proper t y e → Proper t′ y e
-  proper-to {Q = Q} {t′ = t′} a {y} yQ (x , pr) = proj₁ (upto a {y} yQ) x , ends
-    where
-      ends : ∀ {c} → t′ c end → y ≼ c
-      ends {c} x′ with ≼-or-≻ c Q
-      ... | inj₁ cQ = pr (proj₂ (upto a {c} cQ) x′)
-      ... | inj₂ Qc = ≺→≼ {y} {c} (≼-≺-≺ {y} {Q} {c} yQ Qc)
-
-  proper-ag : ∀ {A Q} {t t′ : EmissionSet A} → AgreeTo Q t t′ → AgreeTo Q (Proper t) (Proper t′)
-  proper-ag a = ⟨ (λ {y} yQ → proper-to a yQ , proper-to (AgreeTo-sym a) yQ) ⟩
-
   alive-to : ∀ {B Q k} {β β′ : EmissionSet B} → AgreeTo Q β β′ → k ≼ Q → (∀ {c} → β c end → k ≺ c) → ∀ {c} → β′ c end → k ≺ c
   alive-to {Q = Q} {k} a kQ al {c} x with ≼-or-≻ c Q
   ... | inj₁ cQ = al (proj₂ (upto a {c} cQ) x)

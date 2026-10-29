@@ -8,15 +8,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE CONNECT READS APART
-
-Untried: a connect's source and body rows lie in disjoint worlds, so the
-modulus carries through both and a hidden source row never lands before a
-body row past the body's end. Settled by a body for `connect-ne` over the
-world separation, or a pair of chains agreeing below a row that join differently.
-
-Members: `connect-ne`.
-
 #### THE WORLD INVARIANT
 
 Open for the operators that place rows of their own: a timeline's ticks,
