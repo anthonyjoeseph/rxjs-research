@@ -188,7 +188,7 @@ connect-ne : ∀ {A B H k} {s s′ : Den A} {F F′ : Den A → Den B}
 connect-ne {H = H} {k} {s} {s′} {F} {F′} Is Is′ IF IF′ cF cF′ as aF p ok = trunc-ag go
   where
     go : AgC k (Connect.ConnT s F p) (Connect.ConnT s′ F′ p)
-    go q (inj₁ c) = Core.agree Is Is′ IF IF′ cF′ as aF p ok c
-    go q (inj₂ c) = AgreeTo-sym (Core.agree Is′ Is IF′ IF cF
+    go q (inj₁ c) = Core.agree {s = s} {s′} {F} {F′} Is Is′ IF IF′ cF′ as aF p ok c
+    go q (inj₂ c) = AgreeTo-sym (Core.agree {s = s′} {s} {F′} {F} Is′ Is IF′ IF cF
                       (≈ᶜ-sym {R = Ok H} {k} {s} {s′} as)
                       (λ {t} L → ≈ᶜ-sym {R = Ok (H ⊕ t)} {k} {F (hot t)} {F′ (hot t)} (aF L)) p ok c)

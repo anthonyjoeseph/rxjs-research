@@ -28,7 +28,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
-open import adequacy.Rows using (Frag; rows; RT; toEv; Visible; Vis; Past; Plus; old; new; _≃_; _⇄_; silent; shown; Steps;
+open import adequacy.Rows using (env; Frag; rows; RT; toEv; Visible; Vis; Past; Plus; old; new; _≃_; _⇄_; silent; shown; Steps;
   Shows*; Shows*-≃; ≃-sym; conv; []; _∷_; tau; val; fin)
 open import adequacy.Bound using (Good; G)
 open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
@@ -61,21 +61,21 @@ postulate
 
 -- A map entered: its source pending under it.
 sub-map : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → B) s p → Sim ⟨ c , pend (map f s) , subscribing , p ⟩ [] ⟨ inMap f c , pend s , subscribing , p ⟩
-sub-map c f s p (inv g (uc , _)) = inv (good-swap c sw g) (uc , tt) , silent (vis-≃ (up-≃ c (enter-map f s p)))
+sub-map c f s p (inv g (uc , _)) = inv (good-swap c sw g) (uc , tt) , silent (vis-≃ (up-≃ c (enter-map (env c) f s p)))
   where
-    sw : Swap (pend (map f s)) (mapS f (pend s))
+    sw : Swap (env c) (pend (map f s)) (mapS f (pend s))
     sw = record { same = (λ ()) ⇄ (λ { (map-out ()) ; (map-skip ()) ; (map-end ()) }) ; live≡ = refl ; node = λ _ x → x ; lane = λ _ () ; body = λ _ _ () }
 
 -- A merge entered: its outer pending under it, attached at `p`, nothing begun.
 sub-merge : ∀ {R Γ A B} (c : Ctx R Γ B) f (s : Obs Timeline Γ A) p
           → Sim ⟨ c , pend (flatMap (mergeᶠ nothing) f s) , subscribing , p ⟩ [] ⟨ inCut true (attAt p) (inOuter (mergeᶠ nothing) f false 0 [] [] c) , pend s , subscribing , p ⟩
-sub-merge c f s p (inv g (uc , _)) = inv (good-swap c sw g) ((tt , uc) , tt) , silent (vis-≃ (up-≃ c (enter-merge f s p fr)))
+sub-merge c f s p (inv g (uc , _)) = inv (good-swap c sw g) ((tt , uc) , tt) , silent (vis-≃ (up-≃ c (enter-merge (env c) f s p fr)))
   where
     fr = pend-good c _ (proj₂ (good-split c _ g))
-    node′ : ∀ v → G v (pend (flatMap (mergeᶠ nothing) f s)) → G v (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt p) (pend s)) [])
+    node′ : ∀ v → G (env c) v (pend (flatMap (mergeᶠ nothing) f s)) → G (env c) v (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt p) (pend s)) [])
     node′ true  (ff , fs) = fs , tt , refl , ff , (λ ()) , (λ ()) , refl , (λ ()) , ((λ ()) , tt)
     node′ false (ff , fs) = fs , tt , refl , ff , tt
-    sw : Swap (pend (flatMap (mergeᶠ nothing) f s)) (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt p) (pend s)) [])
+    sw : Swap (env c) (pend (flatMap (mergeᶠ nothing) f s)) (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt p) (pend s)) [])
     sw = record { same = ≃-sym (flat-∅ _ false) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () }
 
 stay : ∀ {R} {k : Conf R} → Sim k [] k
@@ -119,13 +119,13 @@ rise-top s e p (inv g (_ , _ , os , _ , ld , _)) | true = inv g os , shown (new 
     vis : ∀ e → Visible (toEv e)
     vis (nx _) = tt
     vis cp     = tt
-    least : ∀ {q e′} → Vis (Plus (rows s) p (toEv e)) q e′ → p ≼ q
+    least : ∀ {q e′} → Vis (Plus (rows []ᴬ s) p (toEv e)) q e′ → p ≼ q
     least {q} (old r , v) qp = ≺-absurd {q} {p} qp (ld r)
     least (new , v)       qp = ≺-irrefl {p} qp
-    to′ : ∀ {q e′} → Vis (Past p (Plus (rows s) p (toEv e))) q e′ → Vis (rows s) q e′
+    to′ : ∀ {q e′} → Vis (Past p (Plus (rows []ᴬ s) p (toEv e))) q e′ → Vis (rows []ᴬ s) q e′
     to′ ((old r , _) , v) = r , v
     to′ ((new , pp) , v)  = ⊥-elim (≺-irrefl {p} pp)
-    from′ : ∀ {q e′} → Vis (rows s) q e′ → Vis (Past p (Plus (rows s) p (toEv e))) q e′
+    from′ : ∀ {q e′} → Vis (rows []ᴬ s) q e′ → Vis (Past p (Plus (rows []ᴬ s) p (toEv e))) q e′
     from′ (r , v) = (old r , ld r) , v
 
 after-map : ∀ {A B} (f : A → B) {t : EmissionSet A} {p} → After p t → After p (MapT f t)
@@ -169,7 +169,7 @@ rise-map : ∀ {R Γ A B} (f : A → B) (c : Ctx R Γ B) s e p → Sim ⟨ inMap
 rise-map f c s e p i with alive s in al
 rise-map f c s e p (inv g (_ , _ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
 rise-map f c s e p (inv g (uc , lc , os , _ , af , en)) | true =
-  inv g (uc , lc , os , tt , after-map f {p = p} af , ends-map f e en) , silent (vis-≃ (up-≃ c (map-plus f (rows s) p e)))
+  inv g (uc , lc , os , tt , after-map f {p = p} af , ends-map f e en) , silent (vis-≃ (up-≃ c (map-plus f (rows (env c) s) p e)))
 
 rise-cut : ∀ {R Γ A} l a (c : Ctx R Γ A) s e p → Sim ⟨ inCut l a c , s , rising e , p ⟩ [] ⟨ c , cutS l a s , (if l then rising e else absorbed) , p ⟩
 rise-cut false a c s e p (inv g (() , _))
@@ -226,7 +226,7 @@ data Marked {Γ : List Set} : ∀ {A} → St Γ A → Mark → Set₁ where
 
 postulate
   -- WHAT A GOOD TREE'S SEARCH FINDS: an of's next, or a switch's attach.
-  found-mark : ∀ {R Γ′ A′} (c : Ctx R Γ′ A′) s {Γ A c′ s′ m κ} → Good (plug c s) → search top (plug c s) ≡ just (found (Γ , A , c′ , s′) m κ) → Marked s′ m
+  found-mark : ∀ {R Γ′ A′} (c : Ctx R Γ′ A′) s {Γ A c′ s′ m κ} → Good []ᴬ (plug c s) → search top (plug c s) ≡ just (found (Γ , A , c′ , s′) m κ) → Marked s′ m
 
   -- A SWITCH ATTACHED: nothing owed changes.
   abs-att : ∀ {R Γ′ A′ Γ A} {c : Ctx R Γ′ A′} {s} {c′ : Ctx R Γ A} {l p₀ s₀ κ k′ sh t} p

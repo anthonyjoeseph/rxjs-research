@@ -9,7 +9,6 @@ open import Data.Bool using (false)
 open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; [_]; _++_; concatMap) renaming (map to mapL)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (just; nothing)
@@ -21,7 +20,7 @@ open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Pos; Timeline; ix; last; ofᴱ)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; InE; at-out; at-end; on-out; Truncate; Few; enter; ⟦_⟧;
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; InE; at-out; at-end; on-out; Truncate; Few; enter; ⟦_⟧; DenEnv;
   MapT; map-out; map-skip; map-end; LaneOf; module Joining)
 open import denotation.Laws.Modulus using (few-via; entered-few)
 open import adequacy.Rows using (Frag; ∅; pendRows; reads; _≃_; _⇄_; module Flat)
@@ -105,21 +104,21 @@ module _ {A B : Set} (Lane : Pos → A → EmissionSet B) (lf : ∀ q a → Fini
       row (rhand x _)                 = begun (hb x) (there (there (here refl)))
 
 -- A fragment program, entered anywhere: finitely many rows.
-frag-fin : ∀ {A} (o : Obs Timeline [] A) → Frag o → ∀ p → Finite (enter (⟦ o ⟧ []ᴬ) p)
-frag-fin empty                          _        p = trunc-fin (of-fin p 0 [])
-frag-fin (of xs)                        _        p = trunc-fin (of-fin p 0 xs)
-frag-fin (map f s)                      fs       p = trunc-fin (map-fin f (frag-fin s fs p))
-frag-fin (flatMap (mergeᶠ nothing) f s) (ff , fs) p =
-  trunc-fin (join-fin (LaneOf λ a → ⟦ f a ⟧ []ᴬ) (λ q a → fin-⊆ (frag-fin (f a) (ff a) (q ++ [ ix 1 ])) proj₁) (frag-fin s fs p) ([] , λ ()))
-frag-fin (cold _)                       () _
-frag-fin (scan _ _ _)                   () _
-frag-fin (takeWhile _ _ _)              () _
-frag-fin (flatMap (mergeᶠ (just _)) _ _) () _
-frag-fin (flatMap switchᶠ _ _)          () _
-frag-fin (flatMap exhaustᶠ _ _)         () _
-frag-fin (connect _ _)                  () _
-frag-fin (connected ())                 _  _
-frag-fin (defer _)                      () _
+frag-fin : ∀ {Γ A} (ρ : DenEnv Γ) (o : Obs Timeline Γ A) → Frag o → ∀ p → Finite (enter (⟦ o ⟧ ρ) p)
+frag-fin ρ empty                          _        p = trunc-fin (of-fin p 0 [])
+frag-fin ρ (of xs)                        _        p = trunc-fin (of-fin p 0 xs)
+frag-fin ρ (map f s)                      fs       p = trunc-fin (map-fin f (frag-fin ρ s fs p))
+frag-fin ρ (flatMap (mergeᶠ nothing) f s) (ff , fs) p =
+  trunc-fin (join-fin (LaneOf λ a → ⟦ f a ⟧ ρ) (λ q a → fin-⊆ (frag-fin ρ (f a) (ff a) (q ++ [ ix 1 ])) proj₁) (frag-fin ρ s fs p) ([] , λ ()))
+frag-fin ρ (cold _)                       () _
+frag-fin ρ (scan _ _ _)                   () _
+frag-fin ρ (takeWhile _ _ _)              () _
+frag-fin ρ (flatMap (mergeᶠ (just _)) _ _) () _
+frag-fin ρ (flatMap switchᶠ _ _)          () _
+frag-fin ρ (flatMap exhaustᶠ _ _)         () _
+frag-fin ρ (connect _ _)                  () _
+frag-fin ρ (connected _)                () _
+frag-fin ρ (defer _)                      () _
 
 -- Two joiners on one outer and like lane readings, with the same begun
 -- rows and over at the same places: the same rows.
@@ -188,22 +187,20 @@ flat-∅ L d = to′ ⇄ λ ()
     to′ (Flat.rhand () _)
 
 -- A MAP ENTERED: its source entered, mapped.
-enter-map : ∀ {Γ A B} (f : A → B) (s : Obs Timeline Γ A) p → pendRows (map f s) p ≃ MapT f (pendRows s p)
-enter-map {[]}    f s p = proj₁ ⇄ λ x → x , few′ x
+enter-map : ∀ {Γ A B} (ρ : DenEnv Γ) (f : A → B) (s : Obs Timeline Γ A) p → pendRows ρ (map f s) p ≃ MapT f (pendRows ρ s p)
+enter-map ρ f s p = proj₁ ⇄ λ x → x , few′ x
   where
-    inner : ∀ {k e} → MapT f (enter (⟦ s ⟧ []ᴬ) p) k e → Σ (Ev _) (enter (⟦ s ⟧ []ᴬ) p k)
+    inner : ∀ {k e} → MapT f (enter (⟦ s ⟧ ρ) p) k e → Σ (Ev _) (enter (⟦ s ⟧ ρ) p k)
     inner (map-out y)  = _ , y
     inner (map-skip y) = _ , y
     inner (map-end y)  = _ , y
-    few′ : ∀ {q e} → MapT f (enter (⟦ s ⟧ []ᴬ) p) q e → Few (MapT f (enter (⟦ s ⟧ []ᴬ) p)) q
-    few′ x = few-via inner (entered-few (⟦ s ⟧ []ᴬ) p (proj₂ (inner x)))
-enter-map {_ ∷ _} f s p = (λ ()) ⇄ λ { (map-out ()) ; (map-skip ()) ; (map-end ()) }
+    few′ : ∀ {q e} → MapT f (enter (⟦ s ⟧ ρ) p) q e → Few (MapT f (enter (⟦ s ⟧ ρ) p)) q
+    few′ x = few-via inner (entered-few (⟦ s ⟧ ρ) p (proj₂ (inner x)))
 
 -- A MERGE ENTERED: the merge part way through, at its outer entered, not
 -- done, nothing begun.
-enter-merge : ∀ {Γ A B} (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Frag (flatMap (mergeᶠ nothing) f s)
-            → pendRows (flatMap (mergeᶠ nothing) f s) p ≃ Flat.JoinT (λ a → pendRows (f a)) (pendRows s p) false []
-enter-merge {[]}    f s p fr =
-  ≃-trans (kept (join-fin (LaneOf λ a → ⟦ f a ⟧ []ᴬ) (λ q a → fin-⊆ (frag-fin (f a) (proj₁ fr a) (q ++ [ ix 1 ])) proj₁) (frag-fin s (proj₂ fr) p) ([] , λ ())))
+enter-merge : ∀ {Γ A B} (ρ : DenEnv Γ) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Frag (flatMap (mergeᶠ nothing) f s)
+            → pendRows ρ (flatMap (mergeᶠ nothing) f s) p ≃ Flat.JoinT (λ a → pendRows ρ (f a)) (pendRows ρ s p) false []
+enter-merge ρ f s p fr =
+  ≃-trans (kept (join-fin (LaneOf λ a → ⟦ f a ⟧ ρ) (λ q a → fin-⊆ (frag-fin ρ (f a) (proj₁ fr a) (q ++ [ ix 1 ])) proj₁) (frag-fin ρ s (proj₂ fr) p) ([] , λ ())))
           (joining-≃ ((λ (l , p) → reads l p) ⇄ λ (reads l p) → l , p) ((λ ()) ⇄ λ ()) (λ e → inj₂ e , tt) λ { (inj₁ () , _) ; (inj₂ e , _) → e })
-enter-merge {_ ∷ _} f s p _ = (λ ()) ⇄ λ x → to (flat-∅ (λ a → pendRows (f a)) false) x

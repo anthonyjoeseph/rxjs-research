@@ -25,7 +25,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (ofᴱ)
 open import denotation.Events using (Pos; ix; last; <ᵖ-asym; <ᵖ-split; <ᵖ-step; <ᵖ-shift; <ᵖ-below; <ᵖ-part; <ᵖ-ix)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; InE; at-out; at-end; on-out; MapT; map-out; map-skip; map-end)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; InE; at-out; at-end; on-out; MapT; map-out; map-skip; map-end; DenEnv)
 open import denotation.Laws.Modulus using (≼-refl)
 open import operation.Key using (Key; at; after; _<ᴷ_; ≮ᴷ-trans; <ᴷ-trans; <ᴷ-irrefl; at-<ᵖ; clash)
 open import operation.PureObservable using (module Machine)
@@ -302,41 +302,41 @@ Live false X = ⊤
 --
 -- REFUTED: 85ad69b9 found-lead without the parts apart, by a merge whose outer and lane are empty ofs at one position
 mutual
-  G : ∀ {Γ A} → Bool → St Γ A → Set
-  G b (pend o)                              = Frag o
-  G b (ofS i p xs)                          = ⊤
-  G b doneS                                 = ⊤
-  G b (mapS f s)                            = G b s
-  G b (cutS l a s)                          = G (b ∧ l) s
-  G b (flatS (mergeᶠ nothing) f d n q o ls) =
-    G b o × GL b ls × q ≡ [] × (∀ a → Frag (f a)) × Live b (Single (rows o) × EndLast (rows o) × n ≡ live ls × (T d → Empty (rows o)) × Parts (rows o) (rowsL ls))
-  G b _                                     = ⊥
+  G : ∀ {Γ A} → DenEnv Γ → Bool → St Γ A → Set
+  G ρ b (pend o)                              = Frag o
+  G ρ b (ofS i p xs)                          = ⊤
+  G ρ b doneS                                 = ⊤
+  G ρ b (mapS f s)                            = G ρ b s
+  G ρ b (cutS l a s)                          = G ρ (b ∧ l) s
+  G ρ b (flatS (mergeᶠ nothing) f d n q o ls) =
+    G ρ b o × GL ρ b ls × q ≡ [] × (∀ a → Frag (f a)) × Live b (Single (rows ρ o) × EndLast (rows ρ o) × n ≡ live ls × (T d → Empty (rows ρ o)) × Parts (rows ρ o) (rowsL ρ ls))
+  G ρ b _                                     = ⊥
 
-  GL : ∀ {Γ A} → Bool → List (St Γ A) → Set
-  GL b []       = ⊤
-  GL b (s ∷ ls) = GLn b s × GL b ls
+  GL : ∀ {Γ A} → DenEnv Γ → Bool → List (St Γ A) → Set
+  GL ρ b []       = ⊤
+  GL ρ b (s ∷ ls) = GLn ρ b s × GL ρ b ls
 
   -- A lane: in its list and switched on, or out of it and off.
-  GLn : ∀ {Γ A} → Bool → St Γ A → Set
-  GLn b (lnS l s) = LnBody b l s
-  GLn b _         = ⊥
+  GLn : ∀ {Γ A} → DenEnv Γ → Bool → St Γ A → Set
+  GLn ρ b (lnS l s) = LnBody ρ b l s
+  GLn ρ b _         = ⊥
 
-  LnBody : ∀ {Γ A} → Bool → Bool → St Γ A → Set
-  LnBody b l (cutS l′ a s) = l ≡ l′ × G (b ∧ l) s × Live (b ∧ l) (EndLast (rows s))
-  LnBody b l _             = ⊥
+  LnBody : ∀ {Γ A} → DenEnv Γ → Bool → Bool → St Γ A → Set
+  LnBody ρ b l (cutS l′ a s) = l ≡ l′ × G ρ (b ∧ l) s × Live (b ∧ l) (EndLast (rows ρ s))
+  LnBody ρ b l _             = ⊥
 
-Good : ∀ {Γ A} → St Γ A → Set
-Good = G true
+Good : ∀ {Γ A} → DenEnv Γ → St Γ A → Set
+Good ρ = G ρ true
 
-GoodL : ∀ {Γ A} → List (St Γ A) → Set
-GoodL = GL true
+GoodL : ∀ {Γ A} → DenEnv Γ → List (St Γ A) → Set
+GoodL ρ = GL ρ true
 
-GoodLn : ∀ {Γ A} → St Γ A → Set
-GoodLn = GLn true
+GoodLn : ∀ {Γ A} → DenEnv Γ → St Γ A → Set
+GoodLn ρ = GLn ρ true
 
 -- Live, a fortiori of the right shape.
 mutual
-  shape : ∀ {Γ A} {v} (s : St Γ A) → G v s → G false s
+  shape : ∀ {Γ A} {ρ : DenEnv Γ} {v} (s : St Γ A) → G ρ v s → G ρ false s
   shape (pend o)                                  g = g
   shape (ofS i p xs)                              g = g
   shape doneS                                     g = g
@@ -353,11 +353,11 @@ mutual
   shape (connS _ _ _)                             ()
   shape (joinS _ _ _ _)                           ()
 
-  shapeL : ∀ {Γ A} {v} (ls : List (St Γ A)) → GL v ls → GL false ls
+  shapeL : ∀ {Γ A} {ρ : DenEnv Γ} {v} (ls : List (St Γ A)) → GL ρ v ls → GL ρ false ls
   shapeL []       _        = tt
   shapeL (s ∷ ls) (g , gs) = shapeLn s g , shapeL ls gs
 
-  shapeLn : ∀ {Γ A} {v} (s : St Γ A) → GLn v s → GLn false s
+  shapeLn : ∀ {Γ A} {ρ : DenEnv Γ} {v} (s : St Γ A) → GLn ρ v s → GLn ρ false s
   shapeLn {v = v} (lnS l (cutS l′ a s)) (eq , g , _) = eq , shape {v = v ∧ l} s g , tt
   shapeLn (lnS _ (pend _))              ()
   shapeLn (lnS _ (coldS _ _))           ()
@@ -382,11 +382,11 @@ mutual
   shapeLn (connS _ _ _)         ()
   shapeLn (joinS _ _ _ _)       ()
 
-data LaneV {Γ A} : St Γ A → Set₁ where
-  on  : ∀ a s → Good s → EndLast (rows s) → LaneV (lnS true (cutS true a s))
-  off : ∀ a s → LaneV (lnS false (cutS false a s))
+data LaneV {Γ A} (ρ : DenEnv Γ) : St Γ A → Set₁ where
+  on  : ∀ a s → Good ρ s → EndLast (rows ρ s) → LaneV ρ (lnS true (cutS true a s))
+  off : ∀ a s → LaneV ρ (lnS false (cutS false a s))
 
-lane-v : ∀ {Γ A} (s : St Γ A) → GoodLn s → LaneV s
+lane-v : ∀ {Γ A} {ρ : DenEnv Γ} (s : St Γ A) → GoodLn ρ s → LaneV ρ s
 lane-v (lnS true  (cutS true  a s)) (refl , g , e) = on a s g e
 lane-v (lnS false (cutS false a s)) (refl , _)     = off a s
 lane-v (lnS true  (cutS false a s)) (() , _)
@@ -415,21 +415,21 @@ lane-v (joinS _ _ _ _) ()
 lane-v (cutS _ _ _) ()
 
 -- No lane in the list: none owes anything.
-dead-empty : ∀ {Γ A} (ls : List (St Γ A)) → GoodL ls → live ls ≡ 0 → Each Empty (rowsL ls)
+dead-empty : ∀ {Γ A} {ρ : DenEnv Γ} (ls : List (St Γ A)) → GoodL ρ ls → live ls ≡ 0 → Each Empty (rowsL ρ ls)
 dead-empty []       _         _ = _
 dead-empty (s ∷ ls) (gs , gl) z with lane-v s gs
 dead-empty (_ ∷ ls) (gs , gl) () | on _ _ _ _
 dead-empty (_ ∷ ls) (gs , gl) z  | off _ _ =(λ ()) , dead-empty ls gl z
 
 -- One lane at most in the list: its end ends them all.
-one-gone : ∀ {Γ A} (ls : List (St Γ A)) → GoodL ls → pred (live ls) ≡ 0 → ∀ {q} → Lanes (rowsL ls) q end → Each (λ t → Gone t q) (rowsL ls)
+one-gone : ∀ {Γ A} {ρ : DenEnv Γ} (ls : List (St Γ A)) → GoodL ρ ls → pred (live ls) ≡ 0 → ∀ {q} → Lanes (rowsL ρ ls) q end → Each (λ t → Gone t q) (rowsL ρ ls)
 one-gone (s ∷ ls) (gs , gl) z x with lane-v s gs
-one-gone (_ ∷ ls) (gs , gl) z {q} (inj₁ r) | on _ _ _ e = (λ r′ → e r r′) , gone-empty {c = q} (rowsL ls) (dead-empty ls gl z)
-one-gone (_ ∷ ls) (gs , gl) z (inj₂ x) | on _ _ _ e = ⊥-elim (empty-any (rowsL ls) (dead-empty ls gl z) x)
+one-gone (_ ∷ ls) (gs , gl) z {q} (inj₁ r) | on _ _ _ e = (λ r′ → e r r′) , gone-empty {c = q} (rowsL _ ls) (dead-empty ls gl z)
+one-gone (_ ∷ ls) (gs , gl) z (inj₂ x) | on _ _ _ e = ⊥-elim (empty-any (rowsL _ ls) (dead-empty ls gl z) x)
 one-gone (_ ∷ ls) (gs , gl) z (inj₁ ()) | off _ _
 one-gone (_ ∷ ls) (gs , gl) z (inj₂ x) | off _ _ =(λ ()) , one-gone ls gl z x
 
-counts : ∀ {Γ A B} {O : EmissionSet A} (ls : List (St Γ B)) {d n} → GoodL ls → n ≡ live ls → (T d → Empty O) → Counts O (rowsL ls) d n
+counts : ∀ {Γ A B} {ρ : DenEnv Γ} {O : EmissionSet A} (ls : List (St Γ B)) {d n} → GoodL ρ ls → n ≡ live ls → (T d → Empty O) → Counts O (rowsL ρ ls) d n
 counts ls gl refl ov = record { none = dead-empty ls gl ; one = one-gone ls gl ; over = ov }
 
 ------------------------------------------------------------------------
@@ -492,7 +492,7 @@ mapped f (just (g , K , shows cp)) b =
 -- The lanes, one by one
 
 -- A lane read through its list's switch: an ended lane shows nothing.
-lane-ok : ∀ {R Γ B} (s : St Γ B) (y : Maybe (Cand R B)) → OK (rows s) y → OK (rows s) (retag (cutT (alive s)) y)
+lane-ok : ∀ {R Γ B} {ρ : DenEnv Γ} (s : St Γ B) (y : Maybe (Cand R B)) → OK (rows ρ s) y → OK (rows ρ s) (retag (cutT (alive s)) y)
 lane-ok (lnS true s)  y b = kept y b
 lane-ok (lnS false s) y b = silenced y (ok-mk y b)
 lane-ok (ofS i p xs)          y b = kept y b
@@ -631,34 +631,34 @@ module Race {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (L
 -- Every node
 
 -- Under a cut switched off: silent whatever it holds.
-seek-off : ∀ {R Γ A} (c : Ctx R Γ A) a (s : St Γ A) → OK (rows (cutS false a s)) (seek c (cutS false a s))
+seek-off : ∀ {R Γ A} {ρ : DenEnv Γ} (c : Ctx R Γ A) a (s : St Γ A) → OK (rows ρ (cutS false a s)) (seek c (cutS false a s))
 seek-off c attached s = silenced (seek (inCut false attached c) s) (seek-mark (inCut false attached c) s)
 seek-off c (attAt p) s =
   own-first (_ , _ , c , cutS false (attAt p) s) attM (after p) _ (silenced (seek (inCut false (attAt p) c) s) (seek-mark (inCut false (attAt p) c) s))
 
 mutual
-  seek-ok : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Good s → OK (rows s) (seek c s)
+  seek-ok : ∀ {R Γ A} {ρ : DenEnv Γ} (c : Ctx R Γ A) (s : St Γ A) → Good ρ s → OK (rows ρ s) (seek c s)
   seek-ok c (ofS i p [])       _ = record { from = of-from p i [] ; mark = ⊑-refl _ ; shown = λ eq → _ , refl , of-shows c i p [] eq }
   seek-ok c (ofS i p (x ∷ xs)) _ = record { from = of-from p i (x ∷ xs) ; mark = ⊑-refl _ ; shown = λ eq → _ , refl , of-shows c i p (x ∷ xs) eq }
   seek-ok c doneS              _ = λ ()
   seek-ok c (pend o)           _ = λ ()
   seek-ok c (mapS f s)         g = mapped f (seek (inMap f c) s) (seek-ok (inMap f c) s g)
   seek-ok c (cutS true attached s)   g = kept (seek (inCut true attached c) s) (seek-ok (inCut true attached c) s g)
-  seek-ok c (cutS false a s)         _ = seek-off c a s
+  seek-ok {ρ = ρ} c (cutS false a s) _ = seek-off {ρ = ρ} c a s
   seek-ok c (cutS true (attAt p) s)  g =
     own-first (_ , _ , c , cutS true (attAt p) s) attM (after p) _ (kept (seek (inCut true (attAt p) c) s) (seek-ok (inCut true (attAt p) c) s g))
-  seek-ok c (flatS (mergeᶠ nothing) f d n .[] o ls) (go , gl , refl , _ , sO , eO , nl , ov , _) =
-    Race.race-ok (λ a → pendRows (f a)) (rows o) (rowsL ls) d n sO eO (counts ls gl nl ov)
+  seek-ok {ρ = ρ} c (flatS (mergeᶠ nothing) f d n .[] o ls) (go , gl , refl , _ , sO , eO , nl , ov , _) =
+    Race.race-ok (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n sO eO (counts ls gl nl ov)
       (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)
       (seek-ok (inOuter (mergeᶠ nothing) f d n [] ls c) o go) (lanes-ok c f d n o [] ls gl)
 
-  seek-ln : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → GoodLn s → OK (rows s) (seek c s)
-  seek-ln c s g with lane-v s g
+  seek-ln : ∀ {R Γ A} {ρ : DenEnv Γ} (c : Ctx R Γ A) (s : St Γ A) → GoodLn ρ s → OK (rows ρ s) (seek c s)
+  seek-ln {ρ = ρ} c s g with lane-v s g
   ... | on a s₀ g₀ _ = seek-ok (inLn true c) (cutS true a s₀) g₀
-  ... | off a s₀     = seek-off (inLn false c) a s₀
+  ... | off a s₀     = seek-off {ρ = ρ} (inLn false c) a s₀
 
-  lanes-ok : ∀ {R Γ A B} (c : Ctx R Γ B) f d n (o : St Γ A) pre (ls : List (St Γ B)) → GoodL ls
-           → OKL (rowsL ls) (lanes c (mergeᶠ nothing) f d n [] o pre ls)
+  lanes-ok : ∀ {R Γ A B} {ρ : DenEnv Γ} (c : Ctx R Γ B) f d n (o : St Γ A) pre (ls : List (St Γ B)) → GoodL ρ ls
+           → OKL (rowsL ρ ls) (lanes c (mergeᶠ nothing) f d n [] o pre ls)
   lanes-ok c f d n o pre []         _          = tt
   lanes-ok c f d n o pre (s ∷ post) (gs , gp) =
     lanes-first (retag (cutT (alive s)) (seek (inLanes (mergeᶠ nothing) f d n [] o pre post c) s)) (lanes c (mergeᶠ nothing) f d n [] o (s ∷ pre) post)

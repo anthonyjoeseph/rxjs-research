@@ -1,17 +1,18 @@
 {-# OPTIONS --guardedness #-}
 
--- THE ROWS OF A STATE, FOR A FRAGMENT WITHOUT `defer`: what the engine's
--- state still owes, read off as emission-set rows.
+-- THE ROWS OF A STATE: what the engine's state still owes, read off as
+-- emission-set rows.
 -- Every configuration owes the rows its tree still owes the root (`RT`),
 -- read node by node off the state: an of its values left, a merge the
--- union of what its outer and its lanes owe.  A step either keeps the
+-- union of what its outer and its lanes owe, a connect its body's rows
+-- under an environment binding its source.  A step either keeps the
 -- visible rows or shows the least of them and drops it.
 module adequacy.Rows where
 
 open import Data.Bool using (Bool; T; true; false; if_then_else_)
 open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; [_]; _ʳ++_; _++_)
-open import Data.List.Relation.Unary.All using ([])
+open import Data.List.Relation.Unary.All using ([]; _∷_; lookup)
 open import Data.Sum using (_⊎_)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_)
@@ -21,9 +22,9 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; empty; of; map; flatMap)
 open import denotation.Events using (ofᴱ)
 open import denotation.Events using (Pos; Timeline; ix)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; InE; enter; MapT; ⟦_⟧; Ended; module Joining)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; InE; enter; MapT; ⟦_⟧; Ended; module Joining; Den; hot; Proper; DenEnv; module Connecting)
 open import operation.PureObservable using (module Machine; module Driver)
-open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; load; moved; quiet; pend; ofS; mapS; cutS; lnS; flatS; alive; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; nx; cp) renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
+open Machine using (St; Ctx; CS; connS; joinS; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; load; moved; quiet; pend; ofS; mapS; cutS; lnS; flatS; alive; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; nx; cp) renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
 
 ------------------------------------------------------------------------
 -- The fragment
@@ -96,24 +97,65 @@ record Lane {A B : Set} (L : A → Pos → EmissionSet B) (q : Pos) (a : A) (k :
 module Flat {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (d : Bool) (Ls : List (EmissionSet B)) where
   open Joining (Lane L) O (Lanes Ls) (λ c → (T d ⊎ Ended O c) × Each (λ t → Gone t c) Ls) (λ _ → ⊤) (λ _ _ → ⊥) (λ _ → ⊥) public
 
--- What a subscription pending at `p` owes: its meaning, entered there.
-pendRows : ∀ {Γ A} → Obs Timeline Γ A → Pos → EmissionSet A
-pendRows {[]}    o p = enter (⟦ o ⟧ []) p
-pendRows {_ ∷ _} o p = ∅
+-- What a subscription pending at `p` owes: its meaning under `ρ`,
+-- entered there.
+pendRows : ∀ {Γ A} → DenEnv Γ → Obs Timeline Γ A → Pos → EmissionSet A
+pendRows ρ o p = enter (⟦ o ⟧ ρ) p
 
--- What a node still owes its parent.
+-- A source's end once it has shown it, kept for joiners still to come.
+data Closed {A : Set} (k : CS) : EmissionSet A where
+  shut : T (CS.closed k) → Closed k (CS.endAt k) end
+
+-- A BINDER'S MEANING: what its source still owes, and its end once
+-- closed, up to that end, made hot.  A joiner rejoins what is past where
+-- it joined, or the end at once.
+Hot : ∀ {A} → EmissionSet A → CS → Den A
+Hot t k = hot (Proper (λ q e → t q e ⊎ Closed k q e))
+
+-- What a joiner has been fed and not shown.
+data Inbox {A : Set} : List (Pos × Evᴹ A) → EmissionSet A where
+  this : ∀ {q e ib} → Inbox ((q , e) ∷ ib) q (toEv e)
+  that : ∀ {x ib q e} → Inbox ib q e → Inbox (x ∷ ib) q e
+
+-- Rows of either.
+_∪_ : ∀ {A} → EmissionSet A → EmissionSet A → EmissionSet A
+(t ∪ u) q e = t q e ⊎ u q e
+
+-- What a node still owes its parent, under `ρ`, the meaning of every
+-- binder in scope.
 mutual
-  rows : ∀ {Γ A} → St Γ A → EmissionSet A
-  rows (ofS i p xs)                           = InE (ofᴱ p i xs)
-  rows (mapS f s)                             = MapT f (rows s)
-  rows (cutS true a s)                        = rows s
-  rows (lnS true s)                           = rows s
-  rows (flatS (mergeᶠ nothing) f d n q o ls)  = Flat.JoinT (λ a → pendRows (f a)) (rows o) d (rowsL ls)
-  rows _                                      = ∅
+  rows : ∀ {Γ A} → DenEnv Γ → St Γ A → EmissionSet A
+  rows ρ (ofS i p xs)                           = InE (ofᴱ p i xs)
+  rows ρ (mapS f s)                             = MapT f (rows ρ s)
+  rows ρ (cutS true a s)                        = rows ρ s
+  rows ρ (lnS true s)                           = rows ρ s
+  rows ρ (flatS (mergeᶠ nothing) f d n q o ls)  = Flat.JoinT (λ a → pendRows ρ (f a)) (rows ρ o) d (rowsL ρ ls)
+  rows ρ (connS k o b)                          = Connecting.ConnT (CS.srcAt k) (src ρ k o) (rows (Hot (src ρ k o) k ∷ ρ) b)
+  rows ρ (joinS j true x ib)                    = Inbox ib ∪ enter (lookup ρ x) j
+  rows ρ (joinS j false x ib)                   = Inbox ib
+  rows ρ _                                      = ∅
 
-  rowsL : ∀ {Γ A} → List (St Γ A) → List (EmissionSet A)
-  rowsL []       = []
-  rowsL (s ∷ ls) = rows s ∷ rowsL ls
+  rowsL : ∀ {Γ A} → DenEnv Γ → List (St Γ A) → List (EmissionSet A)
+  rowsL ρ []       = []
+  rowsL ρ (s ∷ ls) = rows ρ s ∷ rowsL ρ ls
+
+  -- A connect's source: subscribed at its own position once pending.
+  src : ∀ {Γ X} → DenEnv Γ → CS → St Γ X → EmissionSet X
+  src ρ k (pend o) = pendRows ρ o (CS.srcAt k)
+  src ρ k o        = rows ρ o
+
+-- The meaning of every binder in scope at the hole.
+env : ∀ {R Γ A} → Ctx R Γ A → DenEnv Γ
+env top                                  = []
+env (inMap f c)                          = env c
+env (inScan f z c)                       = env c
+env (inCut l a c)                        = env c
+env (inLn b c)                           = env c
+env (inTake i p w c)                     = env c
+env (inOuter op f d n q ls c)            = env c
+env (inLanes op f d n q o pre post c)    = env c
+env (inSrc k b c)                        = env c
+env (inBody k o c)                       = Hot (src (env c) k o) k ∷ env c
 
 -- What the root still owes, given what the hole owes.
 up : ∀ {R Γ A} → Ctx R Γ A → EmissionSet A → EmissionSet R
@@ -125,32 +167,32 @@ up (inCut false a c)                                  H = up c ∅
 up (inLn true c)                                      H = up c H
 up (inLn false c)                                     H = up c ∅
 up (inTake i p w c)                                   H = up c ∅
-up (inOuter (mergeᶠ nothing) f d n q ls c)            H = up c (Flat.JoinT (λ a → pendRows (f a)) H d (rowsL ls))
+up (inOuter (mergeᶠ nothing) f d n q ls c)            H = up c (Flat.JoinT (λ a → pendRows (env c) (f a)) H d (rowsL (env c) ls))
 up (inOuter (mergeᶠ (just _)) f d n q ls c)           H = up c ∅
 up (inOuter switchᶠ f d n q ls c)                     H = up c ∅
 up (inOuter exhaustᶠ f d n q ls c)                    H = up c ∅
-up (inLanes (mergeᶠ nothing) f d n q o pre post c)    H = up c (Flat.JoinT (λ a → pendRows (f a)) (rows o) d (rowsL pre ʳ++ (H ∷ rowsL post)))
+up (inLanes (mergeᶠ nothing) f d n q o pre post c)    H = up c (Flat.JoinT (λ a → pendRows (env c) (f a)) (rows (env c) o) d (rowsL (env c) pre ʳ++ (H ∷ rowsL (env c) post)))
 up (inLanes (mergeᶠ (just _)) f d n q o pre post c)   H = up c ∅
 up (inLanes switchᶠ f d n q o pre post c)             H = up c ∅
 up (inLanes exhaustᶠ f d n q o pre post c)            H = up c ∅
-up (inSrc k b c)                                      H = up c ∅
-up (inBody k o c)                                     H = up c ∅
+up (inSrc k b c)                                      H = up c (Connecting.ConnT (CS.srcAt k) H (rows (Hot H k ∷ env c) b))
+up (inBody k o c)                                     H = up c (Connecting.ConnT (CS.srcAt k) (src (env c) k o) H)
 
 -- A rising event is owed only out of a live node: a lane out of its
 -- list absorbs it.
-Risen : ∀ {Γ A} → St Γ A → Pos → Ev A → EmissionSet A
-Risen s p v = if alive s then Plus (rows s) p v else rows s
+Risen : ∀ {Γ A} → DenEnv Γ → St Γ A → Pos → Ev A → EmissionSet A
+Risen ρ s p v = if alive s then Plus (rows ρ s) p v else rows ρ s
 
 -- What the focus owes: a pending subscription its meaning, a rising
 -- event its row.
-here : ∀ {Γ A} → St Γ A → Mode A → Pos → EmissionSet A
-here s        (rising e)  p = Risen s p (toEv e)
-here s        absorbed    p = rows s
-here (pend o) subscribing p = pendRows o p
-here s        subscribing p = rows s
+here : ∀ {Γ A} → DenEnv Γ → St Γ A → Mode A → Pos → EmissionSet A
+here ρ s        (rising e)  p = Risen ρ s p (toEv e)
+here ρ s        absorbed    p = rows ρ s
+here ρ (pend o) subscribing p = pendRows ρ o p
+here ρ s        subscribing p = rows ρ s
 
 RT : ∀ {R} → Conf R → EmissionSet R
-RT ⟨ c , s , m , p ⟩ = up c (here s m p)
+RT ⟨ c , s , m , p ⟩ = up c (here (env c) s m p)
 
 ------------------------------------------------------------------------
 -- Runs
