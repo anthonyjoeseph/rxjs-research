@@ -30,12 +30,12 @@ open import Data.Unit using (⊤; tt)
 open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
-open import denotation.MonotonicList.Events using (Pos; Label; ix; sub; last; inside; inside-++; inside-self; inside-cons; <ᵖ-part; <ᵖ-ix)
+open import denotation.MonotonicList.Events using (Pos; Label; ix; sub; last; inside; inside-++; inside-self; inside-cons; <ᵖ-part; <ᵖ-ix; <ᵖ-split; <ᵖ-between)
 open import denotation.MonotonicList using (ofᴱ)
 open import denotation.EmissionSet using (Ev; end; skip; EmissionSet; _≺_; _≼_; Den; hot; cold; enter; DenEnv; Truncate; InE; at-out;
   at-end; on-out; emptyᵀ; ofᵀ; spin; ⊥ᵀ; MapT; map-out; map-skip; map-end; mapᵀ; module Scan;
   scanᵀ; DeferT; guard; body; deferᵀ; from)
-open import denotation.EmissionSet.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺→≼; ≼-refl; ≼-trans; ≼-≺-≺; ≺-ext; LimD)
+open import denotation.EmissionSet.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺→≼; ≼-refl; ≼-trans; ≼-≺-≺; ≺-ext; ≼-false; LimD)
 
 -- A label that opens no subscription.
 data Plain : Label → Set where
@@ -272,6 +272,17 @@ inside-⊑ (a ∷ x) []      ()
 inside-⊑ (a ∷ x) (b ∷ y) i with inside-cons a x b y (Equivalence.to T-≡ i)
 ... | refl , i′ with inside-⊑ x y (Equivalence.from T-≡ i′)
 ...   | zs , eq = zs , cong (a ∷_) eq
+
+-- What lies under `w` is an interval.
+conv : ∀ {w a b y} → w ⊑ a → a ≼ b → b ≺ y → w ⊑ y → w ⊑ b
+conv {w} {a} {b} wa ab by (ys , refl) with <ᵖ-split w b (≼-false {w} {b} (≼-trans {w} {a} {b} (⊑-≼ wa) ab))
+... | inj₁ lt   = <ᵖ-between w b ys lt (Equivalence.to T-≡ by)
+... | inj₂ refl = [] , sym (++-identityʳ w)
+
+-- A row before a row under the subscription is under it.
+in-world : ∀ {C H p} {X : EmissionSet C} → InvAt H p X → ∀ {k y e} → X k e → k ≺ y → T (inside p y) → T (inside p k)
+in-world {p = p} I {k} {y} x lt i =
+  ⊑-inside (conv (⊑-refl p) (≺→≼ {p} {k} (world-after (InvAt.world I x) (InvAt.real I x))) lt (inside-⊑ p y i))
 
 -- Leading `y ++ [ l ]`: leading `y`, or it.
 ⊑-snoc : ∀ {w} y {l} → w ⊑ (y ++ [ l ]) → w ⊑ y ⊎ w ≡ y ++ [ l ]
