@@ -37,7 +37,7 @@ module adequacy.Engine.Pick where
 open import Data.Empty using (⊥; ⊥-elim)
 open import Level using (Lift; suc; zero)
 open import Data.Bool using (Bool; true; false; if_then_else_; _∨_; _∧_)
-open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; reverse; reverseAcc; replicate; null; map)
+open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; reverse; reverseAcc; null; map)
 open import Data.List.Properties using (ʳ++-defn; ++-identityʳ; map-++; ++-assoc; ∷-injectiveˡ; ∷-injectiveʳ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Sum using (_⊎_; inj₁; inj₂) renaming ([_,_] to either)
@@ -70,7 +70,8 @@ open import adequacy.Engine.Head.Agrees using (head-agrees; head-agreesⱽ)
 open import adequacy.Engine.Shuts using (shutAll; told-none; Toldˢ; none)
 open import adequacy.Engine.Head.Within using (frag-flat; frag-parts; fr-at; conn-src)
 open import adequacy.Engine.Keys using (ConnAt; Keyed; Keys; keyed-at)
-open import adequacy.Engine.Causal using (posᴷ; Farᴷ; Freeᴷ; Keysᴬ; LaneKeys; Aloft⁺; Causal; keys-own; lanes-own; every-own; causal-own)
+open import adequacy.Engine.Sown using (Sown; inside; posᴷ; sown-here; sown-mono)
+open import adequacy.Engine.Causal using (Farᴷ; Freeᴷ; Keysᴬ; LaneKeys; Aloft⁺; Causal; keys-own; lanes-own; every-own; causal-own)
 open import adequacy.Engine.Trails using (envAt-sorted; shape-src)
 open import adequacy.Engine.Beside using (hush-idle)
 open import adequacy.Placed.Trail using (Trail; Trailing)
@@ -356,12 +357,12 @@ postulate
   cand-keys : ∀ {R Γ B} (P : Key → Set) → (∀ h → P h → P (shift h)) → (c : Ctx R Γ B) (x : St Γ B) → Keysᴬ P x → CandP P (cand c x)
 
 far-off : ∀ k h → Farᴷ k h → Offᴷ k h
-far-off (at p)    (at q)    fr (l , ys , e) = fr 0 (l ∷ ys , trans (++-identityʳ q) e)
-far-off (at p)    (after q) fr u            = fr u
+far-off (at p)    (at q)    fr (l , ys , e) = fr (subst (Sown p) (sym e) (inside (l ∷ ys))) (sown-here q)
+far-off (at p)    (after q) fr (ys , e)     = fr (subst (Sown p) (sym e) (inside ys))
 far-off (after p) h         fr              = tt
 
 far-shift : ∀ k h → Farᴷ k h → Farᴷ k (shift h)
-far-shift (at p)    (at q)    fr n (ys , e) = fr (1+ n) (ys , trans (sym (++-assoc q [ ix 0 ] (replicate n (ix 0)))) e)
+far-shift (at p)    (at q)    fr a b = fr a (sown-mono q [ ix 0 ] b)
 far-shift (at p)    (after q) fr          = fr
 far-shift (after p) h         fr          = tt
 
@@ -399,7 +400,7 @@ aloft-of : ∀ {R Γ A} k (c : Ctx R Γ A) (s : St Γ A) → Aloft⁺ k c s → 
 aloft-of k top                               s a = tt
 aloft-of k (inMap f c)                       s a = aloft-of k c (mapS f s) a
 aloft-of k (inScan f z c)                    s a = aloft-of k c (scanS f z s) a
-aloft-of k (inCut l x c)                     s a = aloft-of k c (cutS l x s) a
+aloft-of k (inCut l x c)                     s a = aloft-of k c (cutS l x s) (proj₂ a)
 aloft-of k (inLn b c)                        s a = aloft-of k c (lnS b s) a
 aloft-of k (inTake i q w c)                  s a = aloft-of k c (takeS i q w s) a
 aloft-of k (inOuter op f d n q ls c)         s (r , a) = race-far k c op f d n q s [] ls [] (lanes-own ls r) , aloft-of k c (flatS op f d n q s ls) a

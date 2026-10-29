@@ -70,6 +70,8 @@ type Row = {
   prog: Code;
   denote: Trace;
   pure: Trace;
+  // the table's trace; `null` if the enumerator listed nothing
+  table: Trace | null;
 };
 
 const bin = process.env.AGDA_CLI_BIN ?? "../agda-impl/_cli/Oracle-CLI";
@@ -155,6 +157,22 @@ const cli = (
 
 const show = (t: Trace): string => JSON.stringify(canon(names(t)));
 
+// Where a stuck seed's listing got to: the last lines of its walk, which
+// the CLI writes unbuffered so a timeout keeps them.
+const traced = (seed: number): string =>
+  (
+    spawnSync(bin, ["table-trace", String(seed)], {
+      encoding: "utf8",
+      timeout: 3 * timeoutMs,
+      maxBuffer: 1 << 28,
+    }).stdout ?? ""
+  )
+    .trim()
+    .split("\n")
+    .slice(-12)
+    .map((l) => `\n    ${l}`)
+    .join("");
+
 // The CLI's subcommands for one family of programs: the seed's program,
 // or its named one (`quickcheck.Quickcheck.named`).
 // `engines`: whether the CLI can run each engine's leg alone.
@@ -207,6 +225,11 @@ const check = async (fam: Family, row: Row): Promise<string[]> => {
           : [`io         ${show(ioTrace)}`]),
     // the QUICKCHECK leg: the pure semantics, against the denotation
     ...(agrees(row.denote, row.pure) ? [] : ["(denotation and pure disagree)"]),
+    ...(row.table === undefined || row.table === null
+      ? ["table      missing"]
+      : agrees(row.table, rx)
+        ? []
+        : [`table      ${show(row.table)}`]),
   ];
   return bad.length === 0
     ? []
@@ -241,7 +264,7 @@ const run = async (
   const stuck = single.filter(({ listed }) => listed?.failed !== undefined);
   stuck.forEach(({ seed, listed }) =>
     console.log(
-      `oracle: FAIL ${fam.label}seed ${seed}\n  prog       ${cli([fam.code, String(seed)]).out.trim()}\n  listing    ${listed?.failed}${fam.engines ? `\n  denote     ${cli(["denote", String(seed)]).failed ?? "finishes"}\n  pure       ${cli(["pure", String(seed)]).failed ?? "finishes"}` : ""}`,
+      `oracle: FAIL ${fam.label}seed ${seed}\n  prog       ${cli([fam.code, String(seed)]).out.trim()}\n  listing    ${listed?.failed}${fam.engines ? `\n  denote     ${cli(["denote", String(seed)]).failed ?? "finishes"}\n  pure       ${cli(["pure", String(seed)]).failed ?? "finishes"}\n  table      ${cli(["table", String(seed)]).failed ?? "finishes"}\n  walk${traced(seed)}` : ""}`,
     ),
   );
   const rows = (
@@ -260,6 +283,7 @@ const run = async (
         ...(JSON.parse(l) as Row),
         denote: exact.denote,
         pure: exact.pure,
+        table: exact.table,
       };
     });
   const verdicts = await Promise.all(
@@ -274,6 +298,13 @@ const run = async (
   console.log(
     `oracle: ${rows.length - failures.length}/${rows.length} ${fam.label}seeds agree`,
   );
+  const tables = rows.flatMap((r) =>
+    r.table === undefined || r.table === null ? [] : [r.table],
+  );
+  if (tables.length > 0)
+    console.log(
+      `oracle: ${tables.length} ${fam.label}seeds tabled, ${tables.filter((t) => t.end !== "cut").length} uncut, ${tables.filter((t) => t.events.length > 0).length} with events`,
+    );
   return failures.length === 0 && rows.length === count;
 };
 

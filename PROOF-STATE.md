@@ -2,6 +2,65 @@
 
 Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
+## Tier −1 — the emission set is compositional
+
+**Compositional:** every former but `defer` means its operator; `defer` unfolds to its body at admissible subscriptions.
+
+### Ledger
+
+#### THE CONNECT READS APART
+
+Untried: a connect's source and body rows lie in disjoint worlds, so the
+modulus carries through both and a hidden source row never lands before a
+body row past the body's end. Settled by a body for `connect-ne` over the
+world separation, or a pair of chains agreeing below a row that join differently.
+
+Members: `connect-ne`, `connect-inv`.
+
+#### THE WORLD INVARIANT
+
+Untried, new: every reading keeps its rows in its world, reachable, flat,
+and an end's burst below one world position. Settled by bodies per
+operator, or a program whose reading leaves its world.
+
+Members: `flatMap-inv`, `takeWhile-inv`, `scan-inv`, `map-inv`, `defer-inv`,
+`lim-inv`, `cold-inv`, `empty-inv`, `of-inv`, `spin-inv`, `lawful-hot`.
+
+#### THE JOINERS WITHIN THE BOUND
+
+Untried: a lane subscribed at a world position is admissible, and its
+bound is at least the outer's, uniformly in the lane. Settled by bodies.
+
+Members: `flatMap-ne`, `takeWhile-ne`.
+
+#### THE ONE-INPUT OPERATORS
+
+Untried: rows at their input's positions keep the bound. Settled by bodies.
+
+Members: `scan-ne`.
+
+## Tier 0 — the emission set carries the theorems
+
+**Port:** Main restated over the emission set; `adequacy/` and `simultaneous/` ported to it; no old-denotation use left.
+
+### Ledger
+
+#### THE PORTED THEOREM
+
+Untried: what the engine's run shows is what a reader of the emission set
+meets. Settled by porting `adequacy/` onto the emission set under
+`make port-check` until `make old-denotation` reads zero; what is left
+is Tier 1.
+
+Members: `adequacyᵀ`.
+
+#### THE PORTED SPEC
+
+Untried: the simultaneous spec read off the emission set's rows. Settled
+by porting `simultaneous/` the same way.
+
+Members: `left-to-rightᵀ`, `coherentᵀ`, `batchableᵀ`, `positionedᵀ`.
+
 ## Tier 1 — the adequacy theorem
 
 **Adequacy:** the denotation matches the operational semantics.
@@ -95,16 +154,16 @@ Members: `kill-pool`.
 
 #### THE STILL'S SUBTREE
 
-One stored causality invariant (`Causal`), over every key to come: kept
-by a rise keying something new (a takeWhile's failing value, an outer's
-value, a lane's end, a source's event, a body's end), and by a lane or a
-connect's source subscribing, whose room (`Fresh`) among its racing parts
-is open. A subscription headed and alien to its environment, and a begun
-lane's flatMap's other parts. Settled when these are bodies, or refuted.
+One stored causality invariant (`Causal`), over every key to come; every
+rise keying something new keeps it but a source's event feeding its
+joiners. Open: a mark run's node already shy of what it plants where it
+rises (an of's, a takeWhile's completion, a joiner's, a cold's); a
+connect's source subscribed once its body is; a subscription headed and
+alien to its environment; a begun lane's flatMap's other parts. Settled
+when these are bodies, or refuted.
 
-Members: `take-fail-causal`, `admit-causal`, `dequeue-causal`,
-`feed-causal`, `owed-causal`, `admit-fresh`, `dequeue-fresh`, `src-fresh`,
-`sub-fresh`, `outer-begins-links`,
+Members: `feed-causal`, `of-proper`, `take-shy`, `join-shy`, `cold-end`,
+`cold-shy`, `src-fresh`, `sub-fresh`, `outer-begins-links`,
 `outer-queues-links`, `outer-ignores-links`, `lane-begin-links`,
 `outer-begun-sides`, `switch-begun-sides`, `lane-begun-sides`.
 

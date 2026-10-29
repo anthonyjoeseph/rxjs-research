@@ -17,7 +17,11 @@ THE SCOPE is the port directory and its IMPORT CONE, the old tower aside,
 so a body cannot leave the boundary by moving to a module the port imports.
 In a module that existed at the frozen commit, under the port directory or
 in its cone, only what it has gained since is checked: the engine the port
-runs on is not the port.
+runs on is not the port.  A port directory that IS part of the old tower is
+ported in place, so every declaration in it is checked.
+
+A name ending in `ᵀ` is its emission-set reading, and answers to the old name
+without the suffix as well as to its own.
 
 Helpers are free: a `private` declaration, or anything local to a clause
 (`where`), is part of the body it serves.  Constructors and fields go with
@@ -27,7 +31,7 @@ change with the engine under it.
 Textual, like `check-wiring.py`, whose declaration scan this reuses.
 
 Usage:
-    scripts/check-port.py --base SHA [--src DIR] [--port DIR] [--old PATH ...]
+    scripts/check-port.py --base SHA [--src DIR] [--port DIR ...] [--old PATH ...]
 """
 
 import argparse
@@ -170,7 +174,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", required=True, help="the commit the old tower is frozen at")
     ap.add_argument("--src", default="agda-impl")
-    ap.add_argument("--port", default="port", help="the port directory, under --src")
+    ap.add_argument("--port", nargs="+", default=["port"], help="the port directories, under --src")
     ap.add_argument("--old", nargs="+", default=["agda-impl/adequacy", "agda-impl/operation/AbstractObservable.agda",
                              "agda-impl/operation/PureObservable.agda", "agda-impl/operation/Observable.agda"],
                     help="the old tower's paths, from the repo root")
@@ -186,9 +190,9 @@ def main():
     with tempfile.TemporaryDirectory() as d:
         old = kinds_by_file(d, snapshot(a.base, a.old, d))
 
-    port_dir = os.path.join(a.src, a.port)
+    port_dirs = [os.path.join(a.src, p) for p in a.port]
     roots = sorted(os.path.relpath(os.path.join(r, f), a.src)
-                   for r, _, fs in os.walk(port_dir) for f in fs if f.endswith(".agda"))
+                   for d in port_dirs for r, _, fs in os.walk(d) for f in fs if f.endswith(".agda"))
     prefix = os.path.relpath(a.src, git("rev-parse", "--show-toplevel").stdout.strip() or ".")
     tower = [p.split("/", 1)[1] for p in a.old]
     in_tower = lambda f: any(f == t or f.startswith(t.rstrip("/") + "/") for t in tower)
@@ -198,7 +202,7 @@ def main():
         with open(os.path.join(a.src, f), encoding="utf-8") as fh:
             lines = fh.read().split("\n")
         before = None
-        for path in [os.path.join(prefix, f)] + renamed.get(f, []):
+        for path in [] if in_tower(f) else [os.path.join(prefix, f)] + renamed.get(f, []):
             names = names_at(a.base, path)
             if names is not None:
                 before = (before or set()) | names
@@ -211,7 +215,7 @@ def main():
                 continue
             checked += 1
             where = f"{f}:{n}"
-            olds = {k for _, k in old.get(n, set())}
+            olds = {k for m in {n, n.removesuffix("ᵀ")} for _, k in old.get(m, set())}
             new_postulate = n in postulate_names
             if not olds:
                 if new_postulate:
@@ -235,7 +239,7 @@ def main():
     if problems:
         print(f"port-check: FAIL — {len(problems)} problem(s) over {checked} declaration(s); rules in docs/port-check.md")
         sys.exit(1)
-    print(f"port-check: clean ({checked} declaration(s) in {port_dir} and its cone; "
+    print(f"port-check: clean ({checked} declaration(s) in {', '.join(port_dirs)} and their cone; "
           f"every body an old name, no gap filled, {fresh} new postulate(s))")
 
 
