@@ -160,6 +160,20 @@ real-snoc (ix j ∷ x)  pl r = back-snoc (ix j ∷ []) x pl r
 real-snoc (sub _ ∷ _) _  ()
 real-snoc (last ∷ _)  _  ()
 
+private
+  back-sub : ∀ acc x {e} → Back acc x → Real e → e ≺ ((acc ++ x) ++ [ sub e ]) → Back acc (x ++ [ sub e ])
+  back-sub acc []           {e} b            re lt = re , subst (λ z → e ≺ (z ++ [ sub e ])) (++-identityʳ acc) lt , tt
+  back-sub acc (sub e′ ∷ x) {e} (r , l , b)  re lt = r , l , back-sub (acc ++ [ sub e′ ]) x b re (subst (λ z → e ≺ (z ++ [ sub e ])) (sym (++-assoc acc [ sub e′ ] x)) lt)
+  back-sub acc (ix j ∷ x)   {e} b            re lt = back-sub (acc ++ [ ix j ]) x b re (subst (λ z → e ≺ (z ++ [ sub e ])) (sym (++-assoc acc [ ix j ] x)) lt)
+  back-sub acc (last ∷ x)   {e} b            re lt = back-sub (acc ++ [ last ]) x b re (subst (λ z → e ≺ (z ++ [ sub e ])) (sym (++-assoc acc [ last ] x)) lt)
+
+-- A reachable position naming an earlier reachable one is reachable.
+real-sub : ∀ x {e} → Real x → Real e → e ≺ (x ++ [ sub e ]) → Real (x ++ [ sub e ])
+real-sub []          ()
+real-sub (ix j ∷ x)  r re lt = back-sub (ix j ∷ []) x r re lt
+real-sub (sub _ ∷ _) ()
+real-sub (last ∷ _)  ()
+
 snoc≢[] : ∀ (x : Pos) {l : Label} → x ++ [ l ] ≡ [] → ⊥
 snoc≢[] []      ()
 snoc≢[] (_ ∷ _) ()
@@ -338,10 +352,9 @@ data Parent (a c : Pos) : Set where
 step-parent : ∀ x {l} → Plain l → Parent x (x ++ [ l ])
 step-parent x pl = plain pl refl
 
-private
-  plain-sub : ∀ {l e} → Plain l → l ≡ sub e → ⊥
-  plain-sub plain-ix   ()
-  plain-sub plain-last ()
+plain-sub : ∀ {l e} → Plain l → l ≡ sub e → ⊥
+plain-sub plain-ix   ()
+plain-sub plain-last ()
 
 -- A position has one parent.
 parent-fun : ∀ {a b c} → Parent a c → Parent b c → a ≡ b

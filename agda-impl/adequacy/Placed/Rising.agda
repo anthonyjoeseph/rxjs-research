@@ -8,7 +8,7 @@ open import Data.List.Properties using (∷-injective; ∷-injectiveʳ; ++-ident
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.Nat using (zero; suc; _+_; _≤_; _<_; s≤s)
-open import Data.Nat.Properties using (≤-refl; +-identityʳ; +-monoʳ-<; ≤-pred; m≤n⇒m<n∨m≡n; <⇒≢; +-suc; +-monoʳ-≤; ≤-trans; m≤m+n; <-irrefl)
+open import Data.Nat.Properties using (≤-refl; +-identityʳ; +-monoʳ-<; <⇒≢; +-suc; +-monoʳ-≤; ≤-trans; m≤m+n; <-irrefl)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_; map to mapᴬ)
 open import Data.List.Relation.Unary.All.Properties using () renaming (++⁺ to All++⁺; ++⁻ˡ to All++⁻ˡ; ++⁻ʳ to All++⁻ʳ)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -18,7 +18,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList.Events using (timelineAt; Events; Events∞; Pos; From; Timeline; out; skip; end; hush; ix; sub; last; tick; _<ᵖ_;
+open import denotation.MonotonicList.Events using (ix-<; timelineAt; Events; Events∞; Pos; From; Timeline; out; skip; end; hush; ix; sub; last; tick; _<ᵖ_;
   <ᵖ-asym; <ᵖ-split; <ᵖ-trans; <ᵖ-irrefl; <ᵖ-part; ≮-trans; <ᵖ-below; <ᵖ-tick; <ᵖ-ix; Tail;
   Tail∞; pin; idle)
 open import denotation.MonotonicList using (MonotonicList; Agree; agree; agreeᵀ; none; found)
@@ -468,11 +468,6 @@ next-ix r i = <ᵖ-part r [] [] (<ᵖ-ix i) , λ x → ext-irrefl r (under-ext r
 
 ix-last : ∀ r i → (r ++ [ ix i ]) <ᵖ (r ++ [ last ]) ≡ true × ¬ Ext (r ++ [ ix i ]) (r ++ [ last ])
 ix-last r i = <ᵖ-part r [] [] refl , λ x → ext-irrefl r (under-ext r r x)
-
-ix-< : ∀ {m n} → m < n → (ix m ∷ []) <ᵖ (ix n ∷ []) ≡ true
-ix-< {m} {suc n} l with m≤n⇒m<n∨m≡n (≤-pred l)
-... | inj₁ l′   = <ᵖ-trans (ix m ∷ []) (ix n ∷ []) (ix (suc n) ∷ []) (ix-< l′) (<ᵖ-ix n)
-... | inj₂ refl = <ᵖ-ix n
 
 -- A later tick: strictly past, and not inside.
 tick-past : ∀ {m n} p q → m < n → (ix m ∷ p) <ᵖ (ix n ∷ q) ≡ true × ¬ Ext (ix m ∷ p) (ix n ∷ q)

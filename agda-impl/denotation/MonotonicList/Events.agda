@@ -416,6 +416,10 @@ private
 <ᵖ-ix : ∀ i → (ix i ∷ []) <ᵖ (ix (suc i) ∷ []) ≡ true
 <ᵖ-ix i rewrite ℕ-lt {i} {suc i} (n<1+n i) = refl
 
+-- A later tick comes later.
+ix-< : ∀ {m n} → m < n → (ix m ∷ []) <ᵖ (ix n ∷ []) ≡ true
+ix-< l rewrite ℕ-lt l = refl
+
 -- Positions in order and not one below the other stay in order a label
 -- down; and what is past `p` is past `p ++ [ ix 0 ]` a label down.
 <ᵖ-down : ∀ k h x y → k <ᵖ h ≡ true → (∀ l ls → h ≡ k ++ l ∷ ls → ⊥) → (k ++ [ x ]) <ᵖ (h ++ [ y ]) ≡ true
