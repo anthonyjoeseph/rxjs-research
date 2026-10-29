@@ -16,6 +16,7 @@ open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
+open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
 open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; trans; sym)
 
@@ -26,8 +27,8 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; plug; alive; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (∅; env; rows; rowsL; Lanes; Each; module Flat; _≃_)
-open import adequacy.Up using (any-ʳ++ʳ; any-≈; _≈ᴸ_; []; _∷_; ≈ᴸ-refl; ≈ᴸ-sym; flat-≃; map-≃; ≃-refl)
-open import adequacy.Bound using (Empty; empty-any; Single; EndLast; Spread; Parts; Live; G; GL; GLn; LnBody; live)
+open import adequacy.Up using (any-ʳ++ʳ; _≈ᴸ_; []; _∷_; ≈ᴸ-refl; flat-≃; map-≃; ≃-refl)
+open import adequacy.Bound using (Empty; empty-any; EndLast; Roots; Rooted; Live; G; GL; GLn; LnBody; live)
 
 open _≃_
 
@@ -184,15 +185,12 @@ goodL-ʳ++ []       _        b = b
 goodL-ʳ++ (x ∷ xs) (g , gs) b = goodL-ʳ++ xs gs (g , b)
 
 goodL-ʳ++⁻ : ∀ {Γ A} {ρ : DenEnv Γ} {v} (xs : List (St Γ A)) {ys} → GL ρ v (xs ʳ++ ys) → GL ρ v xs × GL ρ v ys
-goodL-ʳ++⁻ []       b = tt , b
+goodL-ʳ++⁻ []       b = tt₁ , b
 goodL-ʳ++⁻ (x ∷ xs) b with goodL-ʳ++⁻ xs b
 ... | a , (g , c) = (g , a) , c
 
 ------------------------------------------------------------------------
 -- A node swapped for one owing the same rows
-
-single-≃ : ∀ {A} {t u : EmissionSet A} → t ≃ u → Single t → Single u
-single-≃ eq s r r′ = s (from eq r) (from eq r′)
 
 endlast-≃ : ∀ {A} {t u : EmissionSet A} → t ≃ u → EndLast t → EndLast u
 endlast-≃ eq el r r′ = el (from eq r) (from eq r′)
@@ -206,7 +204,7 @@ live-endlast false eq el = tt
 
 -- The same rows, the same liveness, a good node and lane for a good one:
 -- the same good tree.
-record Swap {Γ A} (ρ : DenEnv Γ) (s s′ : St Γ A) : Set where
+record Swap {Γ A} (ρ : DenEnv Γ) (s s′ : St Γ A) : Set₁ where
   field
     same : rows ρ s ≃ rows ρ s′
     live≡ : alive s ≡ alive s′
@@ -226,15 +224,18 @@ lanes-≃ : ∀ {Γ A} {ρ : DenEnv Γ} (xs : List (St Γ A)) {ys ys′} → row
 lanes-≃ []       h = h
 lanes-≃ (x ∷ xs) h = lanes-≃ xs (≃-refl ∷ h)
 
-spread-≈ : ∀ {B} {Ls Ls′ : List (EmissionSet B)} → Ls ≈ᴸ Ls′ → Spread Ls → Spread Ls′
-spread-≈ []       _       = tt
-spread-≈ (e ∷ es) (a , s) = (λ r x → a (from e r) (any-≈ (≈ᴸ-sym es) x)) , spread-≈ es s
+roots-≈ : ∀ {A B} {H : Pos → Set} {X : EmissionSet A} qs {Ls Ls′ : List (EmissionSet B)} → Ls ≈ᴸ Ls′ → Roots H X qs Ls → Roots H X qs Ls′
+roots-≈ []       []       _                         = tt
+roots-≈ (q ∷ qs) (e ∷ es) ((a , x , w) , nq , rs) = (a , x , λ l → w (from e l)) , nq , roots-≈ qs es rs
+roots-≈ []       (_ ∷ _)  ()
+roots-≈ (_ ∷ _)  []       ()
 
-parts-≃ : ∀ {A B} {O O′ : EmissionSet A} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′ → Parts O Ls → Parts O′ Ls′
-parts-≃ eo es (a , s) = (λ r x → a (from eo r) (any-≈ (≈ᴸ-sym es) x)) , spread-≈ es s
+rooted-≃ : ∀ {Γ A B} {ρ : DenEnv Γ} {O O′ : EmissionSet A} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′ → Rooted ρ O Ls → Rooted ρ O′ Ls′
+rooted-≃ eo es r = record { o₀ = o₀ ; p₀ = p₀ ; inv = inv ; sub = λ x → sub (from eo x) ; qs = qs ; roots = roots-≈ qs es roots }
+  where open Rooted r
 
 -- Never good, as a node, a lane or a lane's body.
-record Dead {Γ A} (ρ : DenEnv Γ) (s : St Γ A) : Set where
+record Dead {Γ A} (ρ : DenEnv Γ) (s : St Γ A) : Set₁ where
   field
     no-node : ∀ v → G ρ v s → ⊥
     no-lane : ∀ v → GLn ρ v s → ⊥
@@ -280,15 +281,15 @@ good-swap (inLn false c)   sw g = good-swap c (record { same = ≃-refl ; live�
 good-swap (inTake i q w c) sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ())) g
 good-swap (inOuter (mergeᶠ nothing) f d n q ls c) {s} {s′} sw g =
   good-swap c {s = flatS (mergeᶠ nothing) f d n q s ls} {s′ = flatS (mergeᶠ nothing) f d n q s′ ls} (record { same = flat-≃ _ (same sw) (≈ᴸ-refl (rowsL (env c) ls)) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ ()
-                      ; node = λ { true (go , gl , qe , fa , si , el , nl , ov , pa) → node sw true go , gl , qe , fa , (λ {q} {e} {e′} → single-≃ (same sw) si {q} {e} {e′}) , (λ {c} {q} {e} → endlast-≃ (same sw) el {c} {q} {e}) , nl , (λ t {q} {e} → empty-≃ (same sw) (ov t) {q} {e}) , parts-≃ (same sw) (≈ᴸ-refl (rowsL (env c) ls)) pa
-                                 ; false (go , gl , qe , fa , _) → node sw false go , gl , qe , fa , tt } }) g
+                      ; node = λ { true (go , gl , qe , fa , el , nl , ov , rt) → node sw true go , gl , qe , fa , (λ {c} {q} {e} → endlast-≃ (same sw) el {c} {q} {e}) , nl , (λ t {q} {e} → empty-≃ (same sw) (ov t) {q} {e}) , rooted-≃ (same sw) (≈ᴸ-refl (rowsL (env c) ls)) rt
+                                 ; false (go , gl , qe , fa , _) → node sw false go , gl , qe , fa , tt , tt , tt , tt₁ } }) g
 good-swap (inOuter (mergeᶠ (just _)) f d n q ls c) sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ())) g
 good-swap (inOuter switchᶠ f d n q ls c)  sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ())) g
 good-swap (inOuter exhaustᶠ f d n q ls c) sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ())) g
 good-swap (inLanes (mergeᶠ nothing) f d n q o pre post c) {s} {s′} sw g =
   good-swap c {s = flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post)} {s′ = flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s′ ∷ post)} (record { same = flat-≃ _ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post))) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ ()
-                      ; node = λ { true (go , gl , qe , fa , si , el , nl , ov , pa) → go , goodL-swap pre (lane sw true) gl , qe , fa , si , el , trans nl (live-swap pre (live≡ sw)) , ov , parts-≃ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post))) pa
-                                 ; false (go , gl , qe , fa , _) → go , goodL-swap pre (lane sw false) gl , qe , fa , tt } }) g
+                      ; node = λ { true (go , gl , qe , fa , el , nl , ov , rt) → go , goodL-swap pre (lane sw true) gl , qe , fa , el , trans nl (live-swap pre (live≡ sw)) , ov , rooted-≃ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post))) rt
+                                 ; false (go , gl , qe , fa , _) → go , goodL-swap pre (lane sw false) gl , qe , fa , tt , tt , tt , tt₁ } }) g
 good-swap (inLanes (mergeᶠ (just _)) f d n q o pre post c) sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ())) g
 good-swap (inLanes switchᶠ f d n q o pre post c)  sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ())) g
 good-swap (inLanes exhaustᶠ f d n q o pre post c) sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ())) g

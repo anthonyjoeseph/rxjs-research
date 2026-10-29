@@ -250,7 +250,7 @@ postulate
 
 -- A closed of sits under a dead lane, so dropping it is checked for shape only.
 good-closed : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ xs} → closed c ≡ true → Good [] (plug c (ofS i p₀ xs)) → Good [] (plug c doneS)
-good-closed c cl g = dead-swap c (closed-dead c (proj₁ (good-split c _ g)) cl) (record { node₀ = λ _ → tt ; lane₀ = λ () ; body₀ = λ _ () }) g
+good-closed c cl g = dead-swap c (closed-dead c (proj₁ (good-split c _ g)) cl) (record { node₀ = λ _ → tt₁ ; lane₀ = λ () ; body₀ = λ _ () }) g
 
 -- The root's rows, read at the of the search found.
 into : ∀ {R Γ′ A′ Γ A} (c : Ctx R Γ′ A′) (s : St Γ′ A′) (c′ : Ctx R Γ A) (s′ : St Γ A) → plug c′ s′ ≡ plug c s → Good [] (plug c s)

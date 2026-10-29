@@ -15,12 +15,16 @@ open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (Σ; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
+open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
+open import Level using (lift; lower)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Timeline; root)
 open import denotation.EmissionSet using (EmissionSet; out; end; MapT; map-out; map-skip; map-end; _≼_; enter; ⟦_⟧)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd)
+open import denotation.Laws.Worlds using (GoodEnv)
+open import denotation.Laws using (inv-⟦⟧)
 open import operation.PureObservable using (PureObs; module Machine; module Driver)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; found; Mark; ofM; attM;
                     rise; run; start; dequeue; settle; alive; ended; mapEv; nx; cp; attAt; attached; Torn;
@@ -30,10 +34,10 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
                     renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (env; Frag; rows; RT; toEv; Visible; Vis; Past; Plus; old; new; _≃_; _⇄_; silent; shown; Steps;
   Shows*; Shows*-≃; ≃-sym; conv; []; _∷_; tau; val; fin)
-open import adequacy.Bound using (Good; G)
+open import adequacy.Bound using (Good; G; Rooted)
 open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
 open import adequacy.Skip using (After)
-open import adequacy.Inv using (Inv; inv; good; Sim; Ends; GoodF; good-split; open-alive)
+open import adequacy.Inv using (Inv; inv; good; Sim; Ends; GoodC; GoodF; good-split; open-alive)
 open import adequacy.LaneCp using (rise-lane-cp)
 open import adequacy.AbsOf using (abs-of)
 open import denotation.Read using (Meets)
@@ -42,15 +46,34 @@ open import adequacy.Enter using (enter-map; enter-merge; flat-∅)
 
 pend-good : ∀ {R Γ A} (c : Ctx R Γ A) o → GoodF c (pend o) → Frag o
 pend-good (inLanes op f d n q o′ pre post c) o ()
-pend-good top                o g = g
-pend-good (inMap f c)        o g = g
-pend-good (inScan f z c)     o g = g
-pend-good (inCut l a c)      o g = g
-pend-good (inLn b c)         o g = g
-pend-good (inTake i q w c)   o g = g
-pend-good (inOuter op f d n q ls c) o g = g
-pend-good (inSrc k b c)      o g = g
-pend-good (inBody k o′ c)    o g = g
+pend-good top                o g = lower g
+pend-good (inMap f c)        o g = lower g
+pend-good (inScan f z c)     o g = lower g
+pend-good (inCut l a c)      o g = lower g
+pend-good (inLn b c)         o g = lower g
+pend-good (inTake i q w c)   o g = lower g
+pend-good (inOuter op f d n q ls c) o g = lower g
+pend-good (inSrc k b c)      o g = lower g
+pend-good (inBody k o′ c)    o g = lower g
+
+-- A good context binds nothing, so its environment keeps the invariant.
+env-good : ∀ {R Γ A} (c : Ctx R Γ A) → GoodC c → GoodEnv (env c)
+env-good top                                         _  ()
+env-good (inMap f c)                                 gc = env-good c gc
+env-good (inCut l a c)                               gc = env-good c gc
+env-good (inLn b c)                                  gc = env-good c gc
+env-good (inOuter (mergeᶠ nothing) f d n q ls c)     gc = env-good c gc
+env-good (inLanes (mergeᶠ nothing) f d n q o pre post c) gc = env-good c gc
+env-good (inOuter (mergeᶠ (just _)) f d n q ls c)    ()
+env-good (inOuter switchᶠ f d n q ls c)              ()
+env-good (inOuter exhaustᶠ f d n q ls c)             ()
+env-good (inLanes (mergeᶠ (just _)) f d n q o pre post c) ()
+env-good (inLanes switchᶠ f d n q o pre post c)      ()
+env-good (inLanes exhaustᶠ f d n q o pre post c)     ()
+env-good (inScan f z c)                              ()
+env-good (inTake i q w c)                            ()
+env-good (inSrc k b c)                               ()
+env-good (inBody k o c)                              ()
 
 ------------------------------------------------------------------------
 -- Subscribing
@@ -61,7 +84,7 @@ postulate
 
 -- A map entered: its source pending under it.
 sub-map : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → B) s p → Sim ⟨ c , pend (map f s) , subscribing , p ⟩ [] ⟨ inMap f c , pend s , subscribing , p ⟩
-sub-map c f s p (inv g (uc , _)) = inv (good-swap c sw g) (uc , tt) , silent (vis-≃ (up-≃ c (enter-map (env c) f s p)))
+sub-map c f s p (inv g (uc , _ , ok)) = inv (good-swap c sw g) (uc , tt , ok) , silent (vis-≃ (up-≃ c (enter-map (env c) f s p)))
   where
     sw : Swap (env c) (pend (map f s)) (mapS f (pend s))
     sw = record { same = (λ ()) ⇄ (λ { (map-out ()) ; (map-skip ()) ; (map-end ()) }) ; live≡ = refl ; node = λ _ x → x ; lane = λ _ () ; body = λ _ _ () }
@@ -69,12 +92,15 @@ sub-map c f s p (inv g (uc , _)) = inv (good-swap c sw g) (uc , tt) , silent (vi
 -- A merge entered: its outer pending under it, attached at `p`, nothing begun.
 sub-merge : ∀ {R Γ A B} (c : Ctx R Γ B) f (s : Obs Timeline Γ A) p
           → Sim ⟨ c , pend (flatMap (mergeᶠ nothing) f s) , subscribing , p ⟩ [] ⟨ inCut true (attAt p) (inOuter (mergeᶠ nothing) f false 0 [] [] c) , pend s , subscribing , p ⟩
-sub-merge c f s p (inv g (uc , _)) = inv (good-swap c sw g) ((tt , uc) , tt) , silent (vis-≃ (up-≃ c (enter-merge (env c) f s p fr)))
+sub-merge c f s p (inv g (uc , _ , ok)) = inv (good-swap c sw g) ((tt , uc) , tt , ok) , silent (vis-≃ (up-≃ c (enter-merge (env c) f s p fr)))
   where
     fr = pend-good c _ (proj₂ (good-split c _ g))
+    -- The outer about to enter at `p`: inside its own entry, nothing begun.
+    rt : Rooted (env c) (rows (env c) (cutS true (attAt p) (pend s))) []
+    rt = record { o₀ = s ; p₀ = p ; inv = inv-⟦⟧ s (env c) (env-good c (proj₁ (good-split c _ g))) p ok ; sub = λ () ; qs = [] ; roots = tt }
     node′ : ∀ v → G (env c) v (pend (flatMap (mergeᶠ nothing) f s)) → G (env c) v (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt p) (pend s)) [])
-    node′ true  (ff , fs) = fs , tt , refl , ff , (λ ()) , (λ ()) , refl , (λ ()) , ((λ ()) , tt)
-    node′ false (ff , fs) = fs , tt , refl , ff , tt
+    node′ true  (lift (ff , fs)) = lift fs , tt₁ , refl , ff , (λ ()) , refl , (λ ()) , rt
+    node′ false (lift (ff , fs)) = lift fs , tt₁ , refl , ff , tt , tt , tt , tt₁
     sw : Swap (env c) (pend (flatMap (mergeᶠ nothing) f s)) (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt p) (pend s)) [])
     sw = record { same = ≃-sym (flat-∅ _ false) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () }
 
@@ -372,4 +398,4 @@ postulate
 -- THE SOUND HALF: what the engine shows, a subscriber to the program's
 -- rows is shown.
 sound : ∀ {R} {o : PureObs [] R} → Frag o → ∀ {rs} → Steps (load o) rs → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs)
-sound {o = o} fo st = met-of-shown {o = o} fo (sound-from (inv fo (tt , tt)) st)
+sound {o = o} fo st = met-of-shown {o = o} fo (sound-from (inv (lift fo) (tt , tt , tt , λ ())) st)
