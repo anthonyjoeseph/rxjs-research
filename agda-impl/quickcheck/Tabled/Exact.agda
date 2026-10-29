@@ -315,15 +315,15 @@ module ConnX {A B : Set} (sD : Den A) (F : Den A → Den B) (p : Pos) (σl : Lis
     →alive : ∀ q → Alive q → alive q ≡ true
     →alive q h = all⁺ {xs = rows βl} λ { {c , end} m → fromT (h (sound eβ m)) ; {c , out _} m → refl ; {c , skip} m → refl }
 
-    pinned-row : ∀ {k e₀ q e} → Tb.Connect.σ sD F p k e₀ → ¬ Alive (k ++ [ ix 0 ]) → (q , e) ∈ when (inside (p ++ [ ix 1 ]) k) (k , skip) → ConnT q e
+    pinned-row : ∀ {k e₀ q e} → Tb.Connect.σ sD F p k e₀ → ¬ Alive k → (q , e) ∈ when (inside (p ++ [ ix 1 ]) k) (k , skip) → ConnT q e
     pinned-row x na h with when⁻ h
     ... | (ins , refl) = pinned x na (Equivalence.from T-≡ ins)
 
     shown-row : ∀ {k e₀ q e} → Tb.Connect.σ sD F p k e₀ → (q , e) ∈ shownL (k , e₀) → ConnT q e
-    shown-row {k} x h with if⁻ {b = alive (k ++ [ ix 0 ])} h
+    shown-row {k} x h with if⁻ {b = alive k} h
     ... | inj₁ (al , m) with single⁻ m
-    ... | refl = shown x (alive→ (k ++ [ ix 0 ]) al)
-    shown-row {k} x h | inj₂ (al , h′) = pinned-row x (λ A → offT al (Equivalence.from T-≡ (→alive (k ++ [ ix 0 ]) A))) h′
+    ... | refl = shown x (alive→ k al)
+    shown-row {k} x h | inj₂ (al , h′) = pinned-row x (λ A → offT al (Equivalence.from T-≡ (→alive k A))) h′
 
   sound-k : ∀ {q e} → (q , e) ∈ rows (connRows (p ++ [ ix 1 ]) σl βl) → ConnT q e
   sound-k m with ∈-++⁻ (rows βl) m
@@ -332,8 +332,8 @@ module ConnX {A B : Set} (sD : Den A) (F : Den A → Den B) (p : Pos) (σl : Lis
 
   complete-k : ∀ {q e} → ConnT q e → (q , e) ∈ rows (connRows (p ++ [ ix 1 ]) σl βl)
   complete-k (body x)         = ∈-++⁺ˡ (complete eβ x)
-  complete-k (shown {k} x A)      = ∈-++⁺ʳ (rows βl) (cm⁺ (complete eσ x) (if-t (→alive (k ++ [ ix 0 ]) A) (here refl)))
-  complete-k (pinned {k} x nA ins) = ∈-++⁺ʳ (rows βl) (cm⁺ (complete eσ x) (if-f (off (alive→ (k ++ [ ix 0 ])) nA) (when⁺ (fromT ins))))
+  complete-k (shown {k} x A)      = ∈-++⁺ʳ (rows βl) (cm⁺ (complete eσ x) (if-t (→alive k A) (here refl)))
+  complete-k (pinned {k} x nA ins) = ∈-++⁺ʳ (rows βl) (cm⁺ (complete eσ x) (if-f (off (alive→ k) nA) (when⁺ (fromT ins))))
 
 conn-exact : ∀ {A B} (sD : Den A) (F : Den A → Den B) (p : Pos) (σl : Listed A) (βl : Listed B)
   → Exactly σl (Tb.Connect.σ sD F p) → Exactly βl (Tb.Connect.β sD F p)

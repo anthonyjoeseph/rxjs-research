@@ -23,7 +23,8 @@ Untried, new: every reading keeps its rows in its world, reachable, flat,
 and an end's burst below one world position. Settled by bodies per
 operator, or a program whose reading leaves its world.
 
-Members: `flatMap-inv`, `takeWhile-inv`, `scan-inv`, `map-inv`, `defer-inv`, `lim-inv`, `cold-inv`, `empty-inv`, `of-inv`, `spin-inv`, `lawful-hot`, `inv-widen`, `world-after`, `ok-step`.
+Members: `flatMap-inv`, `takeWhile-inv`, `scan-inv`, `map-inv`, `defer-inv`,
+`lim-inv`, `cold-inv`, `empty-inv`, `of-inv`, `spin-inv`, `lawful-hot`.
 
 #### THE JOINERS WITHIN THE BOUND
 
@@ -37,13 +38,13 @@ Members: `flatMap-ne`, `takeWhile-ne`.
 Untried: each operator reads its inputs no further than it runs. Settled
 by bodies, the joiners' by lane positions lying after the outer's row.
 
-Members: `hot-causal`, `flatMap-causal`, `connect-causal`, `takeWhile-causal`, `scan-causal`, `map-causal`, `defer-causal`, `lim-causal`.
+Members: `flatMap-causal`.
 
 #### THE ONE-INPUT OPERATORS
 
 Untried: rows at their input's positions keep the bound. Settled by bodies.
 
-Members: `map-ne`, `scan-ne`.
+Members: `scan-ne`.
 
 ## Tier 0 — the emission set carries the theorems
 

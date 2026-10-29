@@ -408,7 +408,7 @@ module ConnL {A B : Set} (r : Pos) (σ : Listed A) (β : Listed B) where
 
   shown : Row A → List (Row B)
   shown (k , _) =
-    if alive (k ++ [ ix 0 ]) then [ k ++ [ ix 0 ] , skip ]
+    if alive k then [ k ++ [ ix 0 ] , skip ]
     else when (inside r k) (k , skip)
 
   connRows : Listed B

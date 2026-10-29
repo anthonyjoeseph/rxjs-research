@@ -27,24 +27,26 @@
 module denotation.EmissionSet.Laws where
 
 open import Data.Bool using (Bool)
-open import Data.List using (List; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (_∷_; lookup)
-open import Data.Nat using (zero; suc)
+open import Data.Nat using (ℕ; zero; suc)
 open import Data.Nat.Properties using (n≤1+n)
-open import Data.Product using (Σ; _×_; _,_)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Sum using (inj₁; inj₂)
 open import Function using (_∘_)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList.Events using (Timeline; Pos; ix)
+open import denotation.MonotonicList.Events using (Timeline; Pos; ix; sub; last)
 open import denotation.EmissionSet
-  using (Ev; EmissionSet; _≺_; Truncate; Den; hot; enter; DenEnv; approxᵀ; ⟦_⟧ᵀ; coldᵀ; emptyᵀ; ofᵀ; mapᵀ; scanᵀ; takeWhileᵀ; flatMapᵀ; connectᵀ; deferᵀ; ⊥ᵀ;
+  using (Ev; out; skip; end; EmissionSet; _≺_; _≼_; Truncate; Proper; Rejoin; shown; ended; late; guard; body; Den; hot; enter; DenEnv; approxᵀ; ⟦_⟧ᵀ; coldᵀ; emptyᵀ; ofᵀ; mapᵀ; scanᵀ; takeWhileᵀ; flatMapᵀ; connectᵀ; deferᵀ; ⊥ᵀ;
          MapT; map-out; map-skip; map-end)
+import denotation.EmissionSet as ES
 open import denotation.EmissionSet.Laws.Modulus
-  using (≺-trans; few-via; AgreeTo; _≈⟨_∣_⟩_; ≈-refl; ≈-sym; ≈-trans; ≈-mono; Same; agree-all; LimD; limit; ticks; contract; unfold₀; _~⟨_⟩_; ~-refl)
-open import denotation.EmissionSet.Laws.Worlds using (Ok; _⊕_; Lawful; InvAt; InvD; Hots; GoodEnv; W; Real)
+  using (≺-trans; ≺→≼; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext; few-via; AgreeTo; ⟨_⟩; upto; AgreeTo-sym; AgS; trunc-ag; trunc-to; ~-cold; _≈⟨_∣_⟩_; ≈-refl; ≈-sym; ≈-trans; ≈-mono; Same; agree-all; LimD; limit; ticks; contract; unfold₀; _~⟨_⟩_; ~-refl)
+open import denotation.EmissionSet.Laws.Worlds using (Ok; _⊕_; Lawful; InvAt; InvD; Hots; GoodEnv; world-after; ok-step; inv-widen)
 
 -- The same rows at every subscription.
 _≅_ : ∀ {A} → Den A → Den A → Set
@@ -86,7 +88,6 @@ EnvAg {Γ} q ρ ρ′ = ∀ {A} (i : A ∈ Γ) → lookup ρ i ~⟨ q ⟩ lookup
 
 postulate
   -- EACH OPERATOR KEEPS THE MODULUS at admissible subscriptions.
-  map-ne       : ∀ {A B R k} (f : A → B) {s s′ : Den A} → s ≈⟨ R ∣ k ⟩ s′ → mapᵀ f s ≈⟨ R ∣ k ⟩ mapᵀ f s′
   scan-ne      : ∀ {A B R k} (f : B → A → B) z {s s′ : Den A} → s ≈⟨ R ∣ k ⟩ s′ → scanᵀ f z s ≈⟨ R ∣ k ⟩ scanᵀ f z s′
   takeWhile-ne : ∀ {A H k} (i : Bool) (keep : A → Bool) {s s′ : Den A} → InvD H s → InvD H s′
                → s ≈⟨ Ok H ∣ k ⟩ s′ → takeWhileᵀ i keep s ≈⟨ Ok H ∣ k ⟩ takeWhileᵀ i keep s′
@@ -106,16 +107,8 @@ postulate
                → connectᵀ s F ≈⟨ Ok H ∣ k ⟩ connectᵀ s′ F′
 
   -- EACH OPERATOR READS ITS INPUTS NO FURTHER THAN IT RUNS.
-  hot-causal       : ∀ {A q} {t t′ : EmissionSet A} → AgreeTo q t t′ → hot t ~⟨ q ⟩ hot t′
-  map-causal       : ∀ {A B q} (f : A → B) {s s′ : Den A} → s ~⟨ q ⟩ s′ → mapᵀ f s ~⟨ q ⟩ mapᵀ f s′
-  scan-causal      : ∀ {A B q} (f : B → A → B) z {s s′ : Den A} → s ~⟨ q ⟩ s′ → scanᵀ f z s ~⟨ q ⟩ scanᵀ f z s′
-  takeWhile-causal : ∀ {A q} (i : Bool) (keep : A → Bool) {s s′ : Den A} → s ~⟨ q ⟩ s′ → takeWhileᵀ i keep s ~⟨ q ⟩ takeWhileᵀ i keep s′
   flatMap-causal   : ∀ {A B q} (op : FlatOp) {f f′ : A → Den B} {s s′ : Den A}
                    → s ~⟨ q ⟩ s′ → (∀ a → f a ~⟨ q ⟩ f′ a) → flatMapᵀ op f s ~⟨ q ⟩ flatMapᵀ op f′ s′
-  connect-causal   : ∀ {A B q} {s s′ : Den A} {F F′ : Den A → Den B}
-                   → s ~⟨ q ⟩ s′ → (∀ {t t′} → AgreeTo q t t′ → F (hot t) ~⟨ q ⟩ F′ (hot t′)) → connectᵀ s F ~⟨ q ⟩ connectᵀ s′ F′
-  defer-causal     : ∀ {A q} {s s′ : Den A} → s ~⟨ q ⟩ s′ → deferᵀ s ~⟨ q ⟩ deferᵀ s′
-  lim-causal       : ∀ {A q} {c c′ : _ → Den A} → (∀ n → c n ~⟨ q ⟩ c′ n) → LimD c ~⟨ q ⟩ LimD c′
 
   -- EACH OPERATOR KEEPS THE INVARIANT.
   cold-inv      : ∀ {A H} (c : Timeline A) → InvD H (coldᵀ c)
@@ -130,16 +123,142 @@ postulate
   defer-inv     : ∀ {A H} {s : Den A} → InvD H s → InvD H (deferᵀ s)
   lim-inv       : ∀ {A H} {c : _ → Den A} → (∀ n → InvD H (c n)) → InvD H (LimD c)
 
-  -- A lawful hot keeps it among its own rows; a handle keeps it under
-  -- more hot rows.
+  -- A lawful hot keeps it among its own rows.
   lawful-hot : ∀ {A H} {t : EmissionSet A} → Lawful t → InvD (H ⊕ t) (hot t)
-  inv-widen  : ∀ {A B H} {t : EmissionSet B} {d : Den A} → InvD H d → InvD (H ⊕ t) d
 
-  -- The world lies after the subscription.
-  world-after : ∀ {H p y} → W H p y → Real y → p ≺ y
 
-  -- A `defer`'s body is subscribed admissibly.
-  ok-step : ∀ {H} p → Ok H p → Ok H (p ++ [ ix 1 ])
+------------------------------------------------------------------------
+-- Operators that read a row where it lies
+
+-- MAP KEEPS EVERY ROW where it is.
+private
+  map-ag : ∀ {A B q} (f : A → B) {t t′ : EmissionSet A} → AgreeTo q t t′ → AgreeTo q (MapT f t) (MapT f t′)
+  map-ag {A} f {t} {t′} a = ⟨ (λ {y} yq → go (λ {e} → proj₁ (upto a {y} {e} yq)) , go (λ {e} → proj₂ (upto a {y} {e} yq))) ⟩
+    where
+      go : ∀ {u u′ : EmissionSet A} {y} → (∀ {e} → u y e → u′ y e) → ∀ {e} → MapT f u y e → MapT f u′ y e
+      go h (map-out x)  = map-out (h x)
+      go h (map-skip x) = map-skip (h x)
+      go h (map-end x)  = map-end (h x)
+
+  map-up : ∀ {A B} (f : A → B) {t : EmissionSet A} {y e} → t y e → Σ (Ev B) (MapT f t y)
+  map-up f {e = out a} x = _ , map-out x
+  map-up f {e = skip}  x = _ , map-skip x
+  map-up f {e = end}   x = _ , map-end x
+
+  map-agS : ∀ {A B N} (f : A → B) {t t′ : EmissionSet A} → AgS N t t′ → AgS N (MapT f t) (MapT f t′)
+  map-agS f ag q (inj₁ b) = map-ag f (ag q (inj₁ λ x yq → b (proj₂ (map-up f x)) yq))
+  map-agS f ag q (inj₂ b) = map-ag f (ag q (inj₂ λ x yq → b (proj₂ (map-up f x)) yq))
+
+map-ne : ∀ {A B R k} (f : A → B) {s s′ : Den A} → s ≈⟨ R ∣ k ⟩ s′ → mapᵀ f s ≈⟨ R ∣ k ⟩ mapᵀ f s′
+map-ne f ag p r = trunc-ag (map-agS f (ag p r))
+
+map-causal : ∀ {A B q} (f : A → B) {s s′ : Den A} → s ~⟨ q ⟩ s′ → mapᵀ f s ~⟨ q ⟩ mapᵀ f s′
+map-causal f a = ~-cold λ p → map-ag f (a p)
+
+-- SCAN AND TAKEWHILE read every value, but past the bound only to know
+-- it lies past it.
+private
+  -- A condition on every value: read at or before `Q`, free past it.
+  over : ∀ {A Q} {t t′ : EmissionSet A} → AgreeTo Q t t′ → (P : Pos → Set) → (∀ {k} → Q ≺ k → P k)
+       → (∀ {k b} → t k (out b) → P k) → ∀ {k b} → t′ k (out b) → P k
+  over {Q = Q} a P far h {k} x with ≼-or-≻ k Q
+  ... | inj₁ kQ = h (proj₂ (upto a {k} kQ) x)
+  ... | inj₂ Qk = far Qk
+
+  module SC {A B : Set} (f : B → A → B) (z : B) {Q : Pos} where
+    open ES.Scan using (Acc; acc₀; acc; ScanT; sval; sstep; send)
+
+    acc-to : ∀ {t t′ : EmissionSet A} → AgreeTo Q t t′ → ∀ {q b} → q ≼ Q → Acc f z t q b → Acc f z t′ q b
+    acc-to a {q} qQ (acc₀ x mn) =
+      acc₀ (proj₁ (upto a {q} qQ) x) (over a (λ k → q ≼ k) (λ {k} Qk → ≺→≼ {q} {k} (≼-≺-≺ {q} {Q} {k} qQ Qk)) mn)
+    acc-to a {q′} q′Q (acc {q} ac x lt nx) =
+      acc (acc-to a qQ ac) (proj₁ (upto a {q′} q′Q) x) lt
+          (over a (λ k → q ≺ k → q′ ≼ k) (λ {k} Qk _ → ≺→≼ {q′} {k} (≼-≺-≺ {q′} {Q} {k} q′Q Qk)) nx)
+      where qQ = ≺→≼ {q} {Q} (≺-≼-≺ {q} {q′} {Q} lt q′Q)
+
+    scan-to : ∀ {t t′ : EmissionSet A} → AgreeTo Q t t′ → ∀ {y e} → y ≼ Q → ScanT f z t y e → ScanT f z t′ y e
+    scan-to a {y} yQ (sval ac) = sval (acc-to a yQ ac)
+    scan-to a {y} yQ (sstep x) = sstep (proj₁ (upto a {y} yQ) x)
+    scan-to a {y} yQ (send x)  = send (proj₁ (upto a {y} yQ) x)
+
+  module TW {A : Set} (incl : Bool) (keep : A → Bool) (p : Pos) {Q : Pos} where
+    open ES.TakeWhile using (TakeT; Failed; pass; fail; stop; step; tend; left)
+
+    fail-to : ∀ {t t′ : EmissionSet A} {q} → AgreeTo Q t t′ → q ≼ Q → Failed incl keep t p q → Failed incl keep t′ p q
+    fail-to {q = q} a qQ (q′ , b , x , nk , lt) = q′ , b , proj₁ (upto a {q′} (≺→≼ {q′} {Q} (≺-≼-≺ {q′} {q} {Q} lt qQ))) x , nk , lt
+
+    take-to : ∀ {t t′ : EmissionSet A} → AgreeTo Q t t′ → ∀ {y e} → y ≼ Q → TakeT incl keep t p y e → TakeT incl keep t′ p y e
+    take-to a {y} yQ (pass x k nf)      = pass (proj₁ (upto a {y} yQ) x) k (λ g → nf (fail-to (AgreeTo-sym a) yQ g))
+    take-to a     yQ (fail {q} x k nf i) = fail (proj₁ (upto a {q} qQ) x) k (λ g → nf (fail-to (AgreeTo-sym a) qQ g)) i
+      where qQ = ≺→≼ {q} {Q} (≺-≼-≺ {q} {q ++ [ ix 0 ]} {Q} (≺-ext q []) yQ)
+    take-to a     yQ (stop {q} x k nf)  = stop (proj₁ (upto a {q} qQ) x) k (λ g → nf (fail-to (AgreeTo-sym a) qQ g))
+      where qQ = ≺→≼ {q} {Q} (≺-≼-≺ {q} {q ++ [ last ]} {Q} (≺-ext q []) yQ)
+    take-to a {y} yQ (step x nf)        = step (proj₁ (upto a {y} yQ) x) (λ g → nf (fail-to (AgreeTo-sym a) yQ g))
+    take-to a {y} yQ (tend x nf)        = tend (proj₁ (upto a {y} yQ) x) (λ g → nf (fail-to (AgreeTo-sym a) yQ g))
+    take-to a {y} yQ (left x fd ins)    = left (proj₁ (upto a {y} yQ) x) (fail-to a yQ fd) ins
+
+scan-causal : ∀ {A B q} (f : B → A → B) z {s s′ : Den A} → s ~⟨ q ⟩ s′ → scanᵀ f z s ~⟨ q ⟩ scanᵀ f z s′
+scan-causal f z a = ~-cold λ p → ⟨ (λ yq → SC.scan-to f z (a p) yq , SC.scan-to f z (AgreeTo-sym (a p)) yq) ⟩
+
+takeWhile-causal : ∀ {A q} (i : Bool) (keep : A → Bool) {s s′ : Den A} → s ~⟨ q ⟩ s′ → takeWhileᵀ i keep s ~⟨ q ⟩ takeWhileᵀ i keep s′
+takeWhile-causal i keep a = ~-cold λ p → ⟨ (λ yq → TW.take-to i keep p (a p) yq , TW.take-to i keep p (AgreeTo-sym (a p)) yq) ⟩
+
+-- A CONNECT reads its body's end only up to the source step it shows.
+private
+  proper-to : ∀ {A Q} {t t′ : EmissionSet A} → AgreeTo Q t t′ → ∀ {y e} → y ≼ Q → Proper t y e → Proper t′ y e
+  proper-to {Q = Q} {t′ = t′} a {y} yQ (x , pr) = proj₁ (upto a {y} yQ) x , ends
+    where
+      ends : ∀ {c} → t′ c end → y ≼ c
+      ends {c} x′ with ≼-or-≻ c Q
+      ... | inj₁ cQ = pr (proj₂ (upto a {c} cQ) x′)
+      ... | inj₂ Qc = ≺→≼ {y} {c} (≼-≺-≺ {y} {Q} {c} yQ Qc)
+
+  proper-ag : ∀ {A Q} {t t′ : EmissionSet A} → AgreeTo Q t t′ → AgreeTo Q (Proper t) (Proper t′)
+  proper-ag a = ⟨ (λ {y} yQ → proper-to a yQ , proper-to (AgreeTo-sym a) yQ) ⟩
+
+  alive-to : ∀ {B Q k} {β β′ : EmissionSet B} → AgreeTo Q β β′ → k ≼ Q → (∀ {c} → β c end → k ≺ c) → ∀ {c} → β′ c end → k ≺ c
+  alive-to {Q = Q} {k} a kQ al {c} x with ≼-or-≻ c Q
+  ... | inj₁ cQ = al (proj₂ (upto a {c} cQ) x)
+  ... | inj₂ Qc = ≼-≺-≺ {k} {Q} {c} kQ Qc
+
+  conn-to : ∀ {A B Q} (s s′ : Den A) (F F′ : Den A → Den B) p
+          → AgreeTo Q (enter s (p ++ [ ix 1 ])) (enter s′ (p ++ [ ix 1 ]))
+          → AgreeTo Q (ES.Connect.β s F p) (ES.Connect.β s′ F′ p)
+          → ∀ {y e} → y ≼ Q → ES.Connect.ConnT s F p y e → ES.Connect.ConnT s′ F′ p y e
+  conn-to s s′ F F′ p aσ aβ {y} yQ (ES.Connect.body x) = ES.Connect.body (proj₁ (upto aβ {y} yQ) x)
+  conn-to {Q = Q} s s′ F F′ p aσ aβ yQ (ES.Connect.shown {k} x al) =
+    ES.Connect.shown (proj₁ (upto aσ {k} kQ) x) (alive-to aβ kQ al)
+    where kQ = ≺→≼ {k} {Q} (≺-≼-≺ {k} {k ++ [ ix 0 ]} {Q} (≺-ext k []) yQ)
+  conn-to s s′ F F′ p aσ aβ {y} yQ (ES.Connect.pinned x nal ins) =
+    ES.Connect.pinned (proj₁ (upto aσ {y} yQ) x) (λ al → nal (alive-to (AgreeTo-sym aβ) yQ al)) ins
+
+connect-causal : ∀ {A B q} {s s′ : Den A} {F F′ : Den A → Den B}
+               → s ~⟨ q ⟩ s′ → (∀ {t t′} → AgreeTo q t t′ → F (hot t) ~⟨ q ⟩ F′ (hot t′)) → connectᵀ s F ~⟨ q ⟩ connectᵀ s′ F′
+connect-causal {s = s} {s′} {F} {F′} as af = ~-cold λ p →
+  ⟨ (λ {y} yq → conn-to s s′ F F′ p (as (p ++ [ ix 1 ])) (af (proper-ag (as (p ++ [ ix 1 ]))) (p ++ [ ix 0 ])) yq
+              , conn-to s′ s F′ F p (AgreeTo-sym (as (p ++ [ ix 1 ]))) (AgreeTo-sym (af (proper-ag (as (p ++ [ ix 1 ]))) (p ++ [ ix 0 ]))) yq) ⟩
+
+-- DEFER READS ITS BODY where it lies.
+defer-causal : ∀ {A q} {s s′ : Den A} → s ~⟨ q ⟩ s′ → deferᵀ s ~⟨ q ⟩ deferᵀ s′
+defer-causal a = ~-cold λ p →
+  ⟨ (λ {y} yq → (λ { guard → guard ; (body x) → body (proj₁ (upto (a (p ++ [ ix 1 ])) {y} yq) x) })
+              , (λ { guard → guard ; (body x) → body (proj₂ (upto (a (p ++ [ ix 1 ])) {y} yq) x) })) ⟩
+
+lim-causal : ∀ {A q} {c c′ : ℕ → Den A} → (∀ n → c n ~⟨ q ⟩ c′ n) → LimD c ~⟨ q ⟩ LimD c′
+lim-causal a = ~-cold λ p →
+  ⟨ (λ {y} yq → (λ { (ES.from N l) → ES.from N λ n le → proj₁ (upto (a n p) {y} yq) (l n le) })
+              , (λ { (ES.from N l) → ES.from N λ n le → proj₂ (upto (a n p) {y} yq) (l n le) })) ⟩
+
+-- A JOINED HOT reads a row before the one it shows.
+private
+  rejoin-ag : ∀ {A q p} {t t′ : EmissionSet A} → AgreeTo q t t′ → ∀ {y e} → y ≼ q → Rejoin p t y e → Rejoin p t′ y e
+  rejoin-ag {q = q} {p} a yq (shown {k} x w pk) = shown (proj₁ (upto a {k} (≺→≼ {k} {q} (≺-≼-≺ {k} {k ++ [ sub p ]} {q} (≺-ext k []) yq))) x) w pk
+  rejoin-ag {q = q} {p} a yq (ended {c} x pc)   = ended (proj₁ (upto a {c} (≺→≼ {c} {q} (≺-≼-≺ {c} {c ++ [ sub p ]} {q} (≺-ext c []) yq))) x) pc
+  rejoin-ag {q = q} {p} a yq (late {c} x cp)    =
+    late (proj₁ (upto a {c} (≺→≼ {c} {q} (≺-≼-≺ {c} {p ++ [ last ]} {q} (≼-≺-≺ {c} {p} {p ++ [ last ]} cp (≺-ext p [])) yq))) x) cp
+
+hot-causal : ∀ {A q} {t t′ : EmissionSet A} → AgreeTo q t t′ → hot t ~⟨ q ⟩ hot t′
+hot-causal {q = q} a p = trunc-to ⟨ (λ {y} yq → rejoin-ag {q = q} {p} a yq , rejoin-ag {q = q} {p} (AgreeTo-sym a) yq) ⟩
 
 ------------------------------------------------------------------------
 -- The environment

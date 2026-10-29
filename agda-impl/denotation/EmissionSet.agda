@@ -346,9 +346,14 @@ module Exhaust {A B : Set} (f : A → Den B) (o : EmissionSet A) where
 
 -- Subscribed at `p`: the body at `p ++ [ ix 0 ]` over the source made hot,
 -- then the source at `r = p ++ [ ix 1 ]`.  Each source step at `k` shows
--- silent at its first effect while the body lives; once the body has
--- ended, what remains of the source's subscribe burst still runs, at its
+-- silent at its first effect if the body has not ended by `k`; once it
+-- has, what remains of the source's subscribe burst still runs, at its
 -- own positions.  The body's end ends the connect.
+--
+-- Liveness is read AT `k`, never at the shown row: a body end at
+-- `k ++ [ ix 0 ]` lies in the source's world, which no lawful body
+-- reaches, and reading there would make the connect hang on a row past
+-- the one it produces (`connect-causal`).
 module Connect {A B : Set} (s : Den A) (F : Den A → Den B) (p : Pos) where
 
   r : Pos
@@ -366,8 +371,8 @@ module Connect {A B : Set} (s : Den A) (F : Den A → Den B) (p : Pos) where
 
   data ConnT : EmissionSet B where
     body   : ∀ {k e} → β k e → ConnT k e
-    shown  : ∀ {k e} → σ k e → Alive (k ++ [ ix 0 ]) → ConnT (k ++ [ ix 0 ]) skip
-    pinned : ∀ {k e} → σ k e → ¬ Alive (k ++ [ ix 0 ]) → T (inside r k) → ConnT k skip
+    shown  : ∀ {k e} → σ k e → Alive k → ConnT (k ++ [ ix 0 ]) skip
+    pinned : ∀ {k e} → σ k e → ¬ Alive k → T (inside r k) → ConnT k skip
 
 connectᵀ : ∀ {A B} → Den A → (Den A → Den B) → Den B
 connectᵀ s F = cold λ p → Connect.ConnT s F p

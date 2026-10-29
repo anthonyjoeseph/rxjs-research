@@ -33,7 +33,7 @@ open import Function using (_∘_; Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; subst₂)
 open import Relation.Nullary.Decidable.Core using (T?)
 
-open import denotation.MonotonicList.Events using (Pos; Label; ix; sub; last; _<ᵖ_; <ᵖ-trans; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-split; <ᵖ-part)
+open import denotation.MonotonicList.Events using (Pos; Label; ix; sub; last; _<ᵖ_; <ᵖ-trans; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-split; <ᵖ-part; <ᵖ-below)
 open import denotation.EmissionSet
   using (Ev; EmissionSet; _≺_; _≼_; Few; Truncate; Den; hot; cold; enter; Lim; from; Spin; spin; ⊥ᵀ; DeferT; guard; body; deferᵀ)
 
@@ -63,6 +63,25 @@ private
 ≺-≼-≺ {w} {y} {q} wy yq with <ᵖ-split y q (≼-false {y} {q} yq)
 ... | inj₁ lt   = ≺-trans {w} {y} {q} wy (Equivalence.from T-≡ lt)
 ... | inj₂ refl = wy
+
+-- Before what is after what is at or before: before.
+≼-≺-≺ : ∀ {x y z} → x ≼ y → y ≺ z → x ≺ z
+≼-≺-≺ {x} {y} {z} xy yz with <ᵖ-split x y (≼-false {x} {y} xy)
+... | inj₁ lt   = ≺-trans {x} {y} {z} (Equivalence.from T-≡ lt) yz
+... | inj₂ refl = yz
+
+≼-trans : ∀ {x y z} → x ≼ y → y ≼ z → x ≼ z
+≼-trans {x} {y} {z} xy yz zx = yz (≺-≼-≺ {z} {x} {y} zx xy)
+
+-- At or before, or after.
+≼-or-≻ : ∀ x q → x ≼ q ⊎ q ≺ x
+≼-or-≻ x q with q <ᵖ x
+... | true  = inj₂ tt
+... | false = inj₁ (λ ())
+
+-- A position comes before its extensions.
+≺-ext : ∀ x {l} ys → x ≺ (x ++ l ∷ ys)
+≺-ext x ys = Equivalence.from T-≡ (<ᵖ-below x ys)
 
 ------------------------------------------------------------------------
 -- Few
@@ -377,6 +396,21 @@ unfold₀ {s = s} after p r q side = ⟨ agree ⟩
 -- At and below `q`, the same rows at every subscription.
 _~⟨_⟩_ : ∀ {A} → Den A → Pos → Den A → Set
 d ~⟨ q ⟩ d′ = ∀ p → AgreeTo q (enter d p) (enter d′ p)
+
+-- Agreeing at and below `q` agrees below what is at or before it.
+ag-down : ∀ {A} {t t′ : EmissionSet A} {q y} → y ≼ q → AgreeTo q t t′ → AgreeTo y t t′
+ag-down {q = q} {y} yq a = ⟨ (λ {v} vy → upto a {v} (≼-trans {v} {y} {q} vy yq)) ⟩
+
+-- TRUNCATION KEEPS AGREEMENT at and below `q`: a row there has its
+-- predecessors there too.
+trunc-to : ∀ {A} {t t′ : EmissionSet A} {q} → AgreeTo q t t′ → AgreeTo q (Truncate t) (Truncate t′)
+trunc-to {q = q} a = ⟨ (λ {y} yq →
+    (λ { (x , F) → proj₁ (upto a {y} yq) x , few-agree (ag-down {q = q} {y} yq a) F })
+  , (λ { (x , F) → proj₂ (upto a {y} yq) x , few-agree (AgreeTo-sym (ag-down {q = q} {y} yq a)) F })) ⟩
+
+-- A cold agreeing at every subscription.
+~-cold : ∀ {A q} {f f′ : Pos → EmissionSet A} → (∀ p → AgreeTo q (f p) (f′ p)) → cold f ~⟨ q ⟩ cold f′
+~-cold a p = trunc-to (a p)
 
 ~-refl : ∀ {A q} (d : Den A) → d ~⟨ q ⟩ d
 ~-refl d p = ⟨ (λ yq → (λ x → x) , (λ x → x)) ⟩
