@@ -22,14 +22,14 @@ open import Data.List using ([]; _∷_; _++_; [_])
 open import Data.List.Properties using (++-identityʳ; ∷ʳ-injectiveˡ; ∷ʳ-injectiveʳ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit using (⊤; tt)
+open import Data.Unit using (⊤)
 open import Relation.Nullary using (¬_; yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
 open import denotation.Events using (Pos; ix; inside; _≟ᵖ_)
-open import denotation.EmissionSet using (Ev; out; skip; end; EmissionSet; _≺_; _≼_; Work; Den; enter; After; Truncate; module Merge;
+open import denotation.EmissionSet using (Ev; out; skip; end; EmissionSet; _≺_; _≼_; Work; Den; enter; After; Truncate; module Joiner;
   module Switch; module Exhaust)
-open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≺→≼; ≼-antisym; ≼-or-≻; ≺-≼-≺; ≼-≺-≺)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺→≼; ≼-antisym; ≼-or-≻; ≺-≼-≺; ≼-≺-≺)
 open import denotation.Laws.Worlds using (Plain; plain-ix; W; W⁼; step; here; inW; Real; Ok; InvAt; InvD; _⊑_; real-snoc;
   ok-in; nest-in; nest⁼; apart-w; leads; w-up; not-up; conv; ⊑-refl; ⊑-snoc; ⊑-snoc⁺; ⊑-inside; inside-⊑; flat-under; ext≢; out-inj)
 
@@ -313,31 +313,42 @@ module Join {A B : Set} {H : Pos → Set} {p : Pos} (ok : Ok H p) (f : A → Den
       ; quiet = λ c y cy → quiet-v en (vw c) (vw y) cy
       }
 
-module MergeI {A B H p} (ok : Ok H p) (f : A → Den B) (fi : ∀ a → InvD H (f a)) {O : EmissionSet A} (Io : InvAt H p O) where
-  open Merge f O using (MergeT; val; step; oend; opass; lane; lend; lpass; Done)
+-- A joiner, given its policy: a cut only ever grows, and never reaches
+-- inside a run lane's subscription.
+module JoinerI {A B H p} (ok : Ok H p) (f : A → Den B) (fi : ∀ a → InvD H (f a)) {O : EmissionSet A} (Io : InvAt H p O)
+               (Runs : Pos → Set) (Cut : Pos → Pos → Set) (cut-up : ∀ {q k y} → Cut q k → k ≼ y → Cut q y)
+               (uncut : ∀ {q a k} → O q (out a) → Cut q k → T (inside (q ++ [ ix 1 ]) k) → ⊥) where
+  open Joiner f O Runs Cut using (JoinT; val; step; oend; opass; lane; lend; lpass; left; Done)
   open Join ok f fi Io using (module View; end-before)
-  open View Done (λ _ _ _ → ⊤)
+  open View Done (λ q _ y → Runs q × ¬ Cut q y)
 
-  vw : ∀ {y e} → MergeT y e → V y e
-  vw (val x)        = v-val x refl
-  vw (step x)       = v-o x o-skip
-  vw (oend x d)     = v-o x (o-end d)
-  vw (opass x nd)   = v-o x (o-pass nd)
-  vw (lane x l w)   = v-lane x l (l-work tt w)
-  vw (lend x l d)   = v-lane x l (l-end tt d)
-  vw (lpass x l nd) = v-lane x l (l-pass tt nd)
+  vw : ∀ {y e} → JoinT y e → V y e
+  vw (val x)             = v-val x refl
+  vw (step x)            = v-o x o-skip
+  vw (oend x d)          = v-o x (o-end d)
+  vw (opass x nd)        = v-o x (o-pass nd)
+  vw (lane x r l nc w)   = v-lane x l (l-work (r , nc) w)
+  vw (lend x r l nc d)   = v-lane x l (l-end (r , nc) d)
+  vw (lpass x r l nc nd) = v-lane x l (l-pass (r , nc) nd)
+  vw (left x _ _ c ins)  = ⊥-elim (uncut x c ins)
 
   en : ∀ {c} → Done c → Ended c
-  en {c} ((c₀ , oc , le) , ln) = (c₀ , oc , le) , λ {q} xq _ _ _ → ln xq (≺-≼-≺ {q} {c₀} {c} (end-before oc xq) le)
+  en {c} ((c₀ , oc , le) , ln) = (c₀ , oc , le) , λ {q} xq _ (r , nc) cy → ln xq r (≺-≼-≺ {q} {c₀} {c} (end-before oc xq) le) (λ ct → nc (cut-up ct (≺→≼ {c} {_} cy)))
 
-  inv : InvAt H p (Truncate MergeT)
+  inv : InvAt H p (Truncate JoinT)
   inv = inv-v (λ x → vw (proj₁ x)) en
 
+-- A switch's cut only grows.
+switch-cut-up : ∀ {A B : Set} (f : A → Den B) (o : EmissionSet A) {q k y} → Switch.Cut f o q k → k ≼ y → Switch.Cut f o q y
+switch-cut-up f o {k = k} {y} (q′ , a′ , x , qq′ , q′k) ky = q′ , a′ , x , qq′ , ≺-≼-≺ {q′} {k} {y} q′k ky
+
+module MergeI {A B H p} (ok : Ok H p) (f : A → Den B) (fi : ∀ a → InvD H (f a)) {O : EmissionSet A} (Io : InvAt H p O) where
+  open JoinerI ok f fi Io (λ _ → ⊤) (λ _ _ → ⊥) (λ ()) (λ _ ()) public using (inv)
+
 module SwitchI {A B H p} (ok : Ok H p) (f : A → Den B) (fi : ∀ a → InvD H (f a)) {O : EmissionSet A} (Io : InvAt H p O) where
-  open Switch f O using (SwitchT; val; step; oend; opass; lane; lend; lpass; left; Done; Cut; Latest)
-  open Join ok f fi Io using (module View; Lane; end-before; strict)
+  open Switch f O using (Cut)
+  open Join ok f fi Io using (strict)
   open InvAt Io renaming (under to U)
-  open View Done (λ q _ y → ¬ Cut q y)
 
   -- A value cuts no lane inside its own subscription.
   uncut : ∀ {q a k} → O q (out a) → Cut q k → T (inside (q ++ [ ix 1 ]) k) → ⊥
@@ -345,46 +356,8 @@ module SwitchI {A B H p} (ok : Ok H p) (f : A → Den B) (fi : ∀ a → InvD H 
   ... | inj₁ le = U xq xq′ plain-ix here (conv {q ++ [ ix 1 ]} {q ++ [ ix 1 ]} {q′} {k} (⊑-refl _) le q′k (inside-⊑ _ k ins))
   ... | inj₂ lt = strict xq xq′ qq′ (conv {q} {q} {q′} {q ++ [ ix 1 ]} (⊑-refl q) (≺→≼ {q} {q′} qq′) lt (⊑-snoc⁺ q))
 
-  vw : ∀ {y e} → SwitchT y e → V y e
-  vw (val x)           = v-val x refl
-  vw (step x)          = v-o x o-skip
-  vw (oend x d)        = v-o x (o-end d)
-  vw (opass x nd)      = v-o x (o-pass nd)
-  vw (lane x l w nc)   = v-lane x l (l-work nc w)
-  vw (lend x l nc d)   = v-lane x l (l-end nc d)
-  vw (lpass x l nc nd) = v-lane x l (l-pass nc nd)
-  vw (left x _ c ins)  = ⊥-elim (uncut x c ins)
-
-  en : ∀ {c} → Done c → Ended c
-  en {c} ((c₀ , oc , le) , ln) = (c₀ , oc , le) , go
-    where
-      go : ∀ {q a y e₀} → O q (out a) → Lane q a y e₀ → ¬ Cut q y → c ≺ y → Σ Pos λ c′ → Lane q a c′ end × c′ ≼ c
-      go {q} {y = y} xq _ nc cy = ln xq (≺-≼-≺ {q} {c₀} {c} (end-before oc xq) le) latest
-        where
-          latest : Latest q c
-          latest {q′} x′ q′c with ≼-or-≻ q′ q
-          ... | inj₁ le′ = le′
-          ... | inj₂ lt  = ⊥-elim (nc (q′ , _ , x′ , lt , ≺-trans {q′} {c} {y} q′c cy))
-
-  inv : InvAt H p (Truncate SwitchT)
-  inv = inv-v (λ x → vw (proj₁ x)) en
+  open JoinerI ok f fi Io (λ _ → ⊤) Cut (λ {q} {k} {y} → switch-cut-up f O {q} {k} {y}) (λ {q} {a} {k} → uncut {q} {a} {k}) public using (inv)
 
 module ExhaustI {A B H p} (ok : Ok H p) (f : A → Den B) (fi : ∀ a → InvD H (f a)) {O : EmissionSet A} (Io : InvAt H p O) where
-  open Exhaust f O using (ExhaustT; val; step; oend; opass; lane; lend; lpass; Done; Run)
-  open Join ok f fi Io using (module View; end-before)
-  open View Done (λ q _ _ → Run q)
-
-  vw : ∀ {y e} → ExhaustT y e → V y e
-  vw (val x)          = v-val x refl
-  vw (step x)         = v-o x o-skip
-  vw (oend x d)       = v-o x (o-end d)
-  vw (opass x nd)     = v-o x (o-pass nd)
-  vw (lane x r l w)   = v-lane x l (l-work r w)
-  vw (lend x r l d)   = v-lane x l (l-end r d)
-  vw (lpass x r l nd) = v-lane x l (l-pass r nd)
-
-  en : ∀ {c} → Done c → Ended c
-  en {c} ((c₀ , oc , le) , ln) = (c₀ , oc , le) , λ {q} xq _ r _ → ln xq (≺-≼-≺ {q} {c₀} {c} (end-before oc xq) le) r
-
-  inv : InvAt H p (Truncate ExhaustT)
-  inv = inv-v (λ x → vw (proj₁ x)) en
+  open Exhaust f O using (Run)
+  open JoinerI ok f fi Io Run (λ _ _ → ⊥) (λ ()) (λ _ ()) public using (inv)

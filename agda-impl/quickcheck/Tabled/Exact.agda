@@ -169,25 +169,25 @@ module MergeX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A) 
     out-of m = sound exo (values⁻ (proj₁ (ls-from m)))
 
     done→ : ∀ c → done c ≡ true → Done c
-    done→ c e = endBy→ exo {c} (proj₁ (∧-true {endBy (rows o) c} e)) , λ x qc →
+    done→ c e = endBy→ exo {c} (proj₁ (∧-true {endBy (rows o) c} e)) , λ x _ qc _ →
       let (l , m) = ls-to (values⁺ (complete exo x))
       in endBy→ (exl m) {c} (or-right (fromT qc) (all⁻ {xs = ls} (proj₂ (∧-true {endBy (rows o) c} e)) m))
 
     →done : ∀ c → Done c → done c ≡ true
     →done c ((c₀ , x , le) , lanes) = ∧-intro (→endBy exo {c₀} {c} x le) (all⁺ {xs = ls} λ { {q , a , l} m →
-      or-of (q <ᵖ c) λ qc → let (c′ , y , le′) = lanes (out-of m) (Equivalence.from T-≡ qc) in →endBy (exl m) {c′} {c} y le′ })
+      or-of (q <ᵖ c) λ qc → let (c′ , y , le′) = lanes (out-of m) tt (Equivalence.from T-≡ qc) (λ ()) in →endBy (exl m) {c′} {c} y le′ })
 
-    end-row : ∀ {c} → t c end → MergeT c (if done c then end else skip)
+    end-row : ∀ {c} → t c end → JoinT c (if done c then end else skip)
     end-row {c} x with done c in dc
     ... | true  = oend x (done→ c dc)
     ... | false = opass x (λ D → offT dc (Equivalence.from T-≡ (→done c D)))
 
-    lend-row : ∀ {q a c} → t q (out a) → Lane q a c end → MergeT c (if done c then end else skip)
+    lend-row : ∀ {q a c} → t q (out a) → Lane q a c end → JoinT c (if done c then end else skip)
     lend-row {c = c} x y with done c in dc
-    ... | true  = lend x y (done→ c dc)
-    ... | false = lpass x y (λ D → offT dc (Equivalence.from T-≡ (→done c D)))
+    ... | true  = lend x tt y (λ ()) (done→ c dc)
+    ... | false = lpass x tt y (λ ()) (λ D → offT dc (Equivalence.from T-≡ (→done c D)))
 
-    outer-s : ∀ {r q e} → r ∈ rows o → (q , e) ∈ outerRow done r → MergeT q e
+    outer-s : ∀ {r q e} → r ∈ rows o → (q , e) ∈ outerRow done r → JoinT q e
     outer-s {k , out a} rm h with single⁻ h
     ... | refl = val (sound exo rm)
     outer-s {k , skip} rm h with single⁻ h
@@ -195,9 +195,9 @@ module MergeX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A) 
     outer-s {c , end} rm h with single⁻ h
     ... | refl = end-row (sound exo rm)
 
-    lane-s : ∀ {q₀ a l r q e} → (q₀ , a , l) ∈ ls → r ∈ rows l → (q , e) ≡ laneRow r → MergeT q e
-    lane-s {r = k , out b} m rm refl = lane (out-of m) (sound (exl m) rm) tt
-    lane-s {r = k , skip}  m rm refl = lane (out-of m) (sound (exl m) rm) tt
+    lane-s : ∀ {q₀ a l r q e} → (q₀ , a , l) ∈ ls → r ∈ rows l → (q , e) ≡ laneRow r → JoinT q e
+    lane-s {r = k , out b} m rm refl = lane (out-of m) tt (sound (exl m) rm) (λ ()) tt
+    lane-s {r = k , skip}  m rm refl = lane (out-of m) tt (sound (exl m) rm) (λ ()) tt
     lane-s {r = c , end}   m rm refl = lend-row (out-of m) (sound (exl m) rm)
 
     outer-end : ∀ {c b} → done c ≡ b → (c , (if b then end else skip)) ∈ outerRow {A} {B} done (c , end)
@@ -211,32 +211,33 @@ module MergeX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A) 
     lane-in {e = skip}  _ r = ∈-map⁺ laneRow r
     lane-in {e = end}   () r
 
-  sound-m : ∀ {q e} → (q , e) ∈ rows (mergeRows o ls) → MergeT q e
+  sound-m : ∀ {q e} → (q , e) ∈ rows (mergeRows o ls) → JoinT q e
   sound-m m with ∈-++⁻ (concatMap (outerRow done) (rows o)) m
   ... | inj₁ h = let (r , rm , h′) = cm⁻ {xs = rows o} h in outer-s rm h′
   ... | inj₂ h with cm⁻ {xs = ls} h
   ... | ((q₀ , a , l) , lm , h′) with ∈-map⁻ laneRow h′
   ... | (r , rm , eq) = lane-s lm rm eq
 
-  complete-m : ∀ {q e} → MergeT q e → (q , e) ∈ rows (mergeRows o ls)
+  complete-m : ∀ {q e} → JoinT q e → (q , e) ∈ rows (mergeRows o ls)
   complete-m (val x)      = ∈-++⁺ˡ (cm⁺ (complete exo x) (here refl))
   complete-m (step x)     = ∈-++⁺ˡ (cm⁺ (complete exo x) (here refl))
   complete-m (oend {c} x D)   = ∈-++⁺ˡ (cm⁺ (complete exo x) (outer-end {c} (→done c D)))
   complete-m (opass {c} x nD) = ∈-++⁺ˡ (cm⁺ (complete exo x) (outer-end {c} (off (done→ c) nD)))
-  complete-m (lane x y w) =
+  complete-m (lane x _ y _ w) =
     let (l , m) = ls-to (values⁺ (complete exo x)) in
     ∈-++⁺ʳ (concatMap (outerRow done) (rows o)) (cm⁺ m (lane-in w (complete (exl m) y)))
-  complete-m (lend {c = c} x y D) =
+  complete-m (lend {c = c} x _ y _ D) =
     let (l , m) = ls-to (values⁺ (complete exo x)) in
     ∈-++⁺ʳ (concatMap (outerRow done) (rows o)) (cm⁺ m (lane-end {c} (→done c D) (complete (exl m) y)))
-  complete-m (lpass {c = c} x y nD) =
+  complete-m (lpass {c = c} x _ y _ nD) =
     let (l , m) = ls-to (values⁺ (complete exo x)) in
     ∈-++⁺ʳ (concatMap (outerRow done) (rows o)) (cm⁺ m (lane-end {c} (off (done→ c) nD) (complete (exl m) y)))
+  complete-m (left _ _ _ () _)
 
 merge-exact : ∀ {A B} (fD : A → Den B) {t : EmissionSet A} (o : Listed A) (ls : List (Pos × A × Listed B)) → Exactly o t
   → (∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (After (fD a) (q ++ [ ix 1 ])))
   → (∀ {q a} → (q , a) ∈ values (rows o) → Σ (Listed B) λ l → (q , a , l) ∈ ls)
-  → Exactly (mergeRows o ls) (Tb.Merge.MergeT fD t)
+  → Exactly (mergeRows o ls) (Tb.Merge.JoinT fD t)
 merge-exact fD {t} o ls eo from to u = record { sound = sound-m ; complete = complete-m }
   where open MergeX fD t o ls u eo from to
 

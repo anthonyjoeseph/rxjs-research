@@ -56,33 +56,34 @@ module SwitchX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A)
     →cut : ∀ q k → Cut q k → cutᵇ q k ≡ true
     →cut q k (q′ , a′ , x , l₁ , l₂) = any⁺ (values⁺ (complete exo x)) (∧-intro (fromT l₁) (fromT l₂))
 
-    latest→ : ∀ q c → latest q c ≡ true → Latest q c
-    latest→ q c e x qc = not-T (or-right (fromT qc) (all⁻ e (values⁺ (complete exo x))))
+    latest→ : ∀ q c → latest q c ≡ true → ¬ Cut q c
+    latest→ q c e (_ , _ , x , qq′ , q′c) = not-T (or-right (fromT q′c) (all⁻ e (values⁺ (complete exo x)))) qq′
 
-    →latest : ∀ q c → Latest q c → latest q c ≡ true
-    →latest q c h = all⁺ {xs = vals} λ { {q′ , a′} m → or-of (q′ <ᵖ c) λ lt → T-not (h (sound exo (values⁻ m)) (Equivalence.from T-≡ lt)) }
+    →latest : ∀ q c → ¬ Cut q c → latest q c ≡ true
+    →latest q c nc = all⁺ {xs = vals} λ { {q′ , a′} m → or-of (q′ <ᵖ c) λ lt →
+      T-not (λ qq′ → nc (q′ , a′ , sound exo (values⁻ m) , qq′ , Equivalence.from T-≡ lt)) }
 
     done→ : ∀ c → done c ≡ true → Done c
-    done→ c e = endBy→ exo {c} (proj₁ (∧-true {endBy (rows o) c} e)) , λ {q} x qc L →
+    done→ c e = endBy→ exo {c} (proj₁ (∧-true {endBy (rows o) c} e)) , λ {q} x _ qc L →
       let (l , m) = ls-to (values⁺ (complete exo x))
       in endBy→ (exl m) {c} (or-right (→latest q c L) (or-right (fromT qc) (all⁻ {xs = ls} (proj₂ (∧-true {endBy (rows o) c} e)) m)))
 
     →done : ∀ c → Done c → done c ≡ true
     →done c ((c₀ , x , le) , lanes) = ∧-intro (→endBy exo {c₀} {c} x le) (all⁺ {xs = ls} λ { {q , a , l} m →
       or-of (q <ᵖ c) λ qc → or-of (latest q c) λ lt →
-        let (c′ , y , le′) = lanes (out-of m) (Equivalence.from T-≡ qc) (latest→ q c lt) in →endBy (exl m) {c′} {c} y le′ })
+        let (c′ , y , le′) = lanes (out-of m) tt (Equivalence.from T-≡ qc) (latest→ q c lt) in →endBy (exl m) {c′} {c} y le′ })
 
-    end-row : ∀ {c} → t c end → SwitchT c (if done c then end else skip)
+    end-row : ∀ {c} → t c end → JoinT c (if done c then end else skip)
     end-row {c} x with done c in dc
     ... | true  = oend x (done→ c dc)
     ... | false = opass x (λ D → offT dc (Equivalence.from T-≡ (→done c D)))
 
-    lend-row : ∀ {q a c} → t q (out a) → Lane q a c end → ¬ Cut q c → SwitchT c (if done c then end else skip)
+    lend-row : ∀ {q a c} → t q (out a) → Lane q a c end → ¬ Cut q c → JoinT c (if done c then end else skip)
     lend-row {c = c} x y nC with done c in dc
-    ... | true  = lend x y nC (done→ c dc)
-    ... | false = lpass x y nC (λ D → offT dc (Equivalence.from T-≡ (→done c D)))
+    ... | true  = lend x tt y nC (done→ c dc)
+    ... | false = lpass x tt y nC (λ D → offT dc (Equivalence.from T-≡ (→done c D)))
 
-    outer-s : ∀ {r q e} → r ∈ rows o → (q , e) ∈ outerRow done r → SwitchT q e
+    outer-s : ∀ {r q e} → r ∈ rows o → (q , e) ∈ outerRow done r → JoinT q e
     outer-s {k , out a} rm h with single⁻ h
     ... | refl = val (sound exo rm)
     outer-s {k , skip} rm h with single⁻ h
@@ -90,15 +91,15 @@ module SwitchX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A)
     outer-s {c , end} rm h with single⁻ h
     ... | refl = end-row (sound exo rm)
 
-    live-s : ∀ {q₀ a l k e₀ q e} → (q₀ , a , l) ∈ ls → Lane q₀ a k e₀ → ¬ Cut q₀ k → (q , e) ≡ live (k , e₀) → SwitchT q e
-    live-s {e₀ = out b} m y nC refl = lane (out-of m) y tt nC
-    live-s {e₀ = skip}  m y nC refl = lane (out-of m) y tt nC
+    live-s : ∀ {q₀ a l k e₀ q e} → (q₀ , a , l) ∈ ls → Lane q₀ a k e₀ → ¬ Cut q₀ k → (q , e) ≡ live (k , e₀) → JoinT q e
+    live-s {e₀ = out b} m y nC refl = lane (out-of m) tt y nC tt
+    live-s {e₀ = skip}  m y nC refl = lane (out-of m) tt y nC tt
     live-s {e₀ = end}   m y nC refl = lend-row (out-of m) y nC
 
-    lane-s : ∀ {q₀ a l r q e} → (q₀ , a , l) ∈ ls → r ∈ rows l → (q , e) ∈ laneRow q₀ r → SwitchT q e
+    lane-s : ∀ {q₀ a l r q e} → (q₀ , a , l) ∈ ls → r ∈ rows l → (q , e) ∈ laneRow q₀ r → JoinT q e
     lane-s {q₀} {r = k , e₀} m rm h with if⁻ {b = cutᵇ q₀ k} h
     ... | inj₁ (ct , h′) with when⁻ h′
-    ... | (ins , refl) = left (out-of m) (sound (exl m) rm) (cut→ q₀ k ct) (Equivalence.from T-≡ ins)
+    ... | (ins , refl) = left (out-of m) tt (sound (exl m) rm) (cut→ q₀ k ct) (Equivalence.from T-≡ ins)
     lane-s {q₀} {r = k , e₀} m rm h | inj₂ (nc , h′) =
       live-s m (sound (exl m) rm) (λ C → offT nc (Equivalence.from T-≡ (→cut q₀ k C))) (single⁻ h′)
 
@@ -119,28 +120,28 @@ module SwitchX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A)
       let (l , m) = ls-to (values⁺ (complete exo x)) in
       ∈-++⁺ʳ (concatMap (outerRow done) (rows o)) (cm⁺ m (cm⁺ (complete (exl m) y) (if-f (off (cut→ q k) nC) h)))
 
-  sound-w : ∀ {q e} → (q , e) ∈ rows (switchRows o ls) → SwitchT q e
+  sound-w : ∀ {q e} → (q , e) ∈ rows (switchRows o ls) → JoinT q e
   sound-w m with ∈-++⁻ (concatMap (outerRow done) (rows o)) m
   ... | inj₁ h = let (r , rm , h′) = cm⁻ {xs = rows o} h in outer-s rm h′
   ... | inj₂ h with cm⁻ {xs = ls} h
   ... | ((q₀ , a , l) , lm , h′) with cm⁻ {xs = rows l} h′
   ... | (r , rm , h″) = lane-s lm rm h″
 
-  complete-w : ∀ {q e} → SwitchT q e → (q , e) ∈ rows (switchRows o ls)
+  complete-w : ∀ {q e} → JoinT q e → (q , e) ∈ rows (switchRows o ls)
   complete-w (val x)          = ∈-++⁺ˡ (cm⁺ (complete exo x) (here refl))
   complete-w (step x)         = ∈-++⁺ˡ (cm⁺ (complete exo x) (here refl))
   complete-w (oend {c} x D)   = ∈-++⁺ˡ (cm⁺ (complete exo x) (outer-end {c} (→done c D)))
   complete-w (opass {c} x nD) = ∈-++⁺ˡ (cm⁺ (complete exo x) (outer-end {c} (off (done→ c) nD)))
-  complete-w (lane x y w nC)  = kept x y nC (live-in w)
-  complete-w (lend {c = c} x y nC D)   = kept x y nC (live-end {c} (→done c D))
-  complete-w (lpass {c = c} x y nC nD) = kept x y nC (live-end {c} (off (done→ c) nD))
-  complete-w (left {q} {a} {k} x y C ins) =
+  complete-w (lane x _ y nC w) = kept x y nC (live-in w)
+  complete-w (lend {c = c} x _ y nC D)   = kept x y nC (live-end {c} (→done c D))
+  complete-w (lpass {c = c} x _ y nC nD) = kept x y nC (live-end {c} (off (done→ c) nD))
+  complete-w (left {q} {a} {k} x _ y C ins) =
     let (l , m) = ls-to (values⁺ (complete exo x)) in
     ∈-++⁺ʳ (concatMap (outerRow done) (rows o)) (cm⁺ m (cm⁺ (complete (exl m) y) (if-t (→cut q k C) (when⁺ (fromT ins)))))
 
 switch-exact : ∀ {A B} (fD : A → Den B) {t : EmissionSet A} (o : Listed A) (ls : List (Pos × A × Listed B)) → Exactly o t
   → (∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (After (fD a) (q ++ [ ix 1 ])))
   → (∀ {q a} → (q , a) ∈ values (rows o) → Σ (Listed B) λ l → (q , a , l) ∈ ls)
-  → Exactly (switchRows o ls) (Tb.Switch.SwitchT fD t)
+  → Exactly (switchRows o ls) (Tb.Switch.JoinT fD t)
 switch-exact fD {t} o ls eo from to u = record { sound = sound-w ; complete = complete-w }
   where open SwitchX fD t o ls u eo from to

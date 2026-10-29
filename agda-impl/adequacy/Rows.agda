@@ -86,7 +86,7 @@ Each P (t ∷ Ls) = P t × Each P Ls
 
 -- A MERGE PART WAY THROUGH: what is left of its outer, `O`; the lanes it
 -- has begun, `Ls`; and a lane for each value the outer still owes,
--- subscribed as `Merge` subscribes it.  With nothing begun it is `MergeT`.
+-- subscribed as `Merge` subscribes it.  With nothing begun it is `Merge.JoinT`.
 module Flat {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (Ls : List (EmissionSet B)) where
 
   Lane : Pos → A → EmissionSet B

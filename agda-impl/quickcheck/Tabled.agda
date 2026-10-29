@@ -195,7 +195,7 @@ afterL ln a s = bind (ln a s) λ l → just (past s l)
 lanes : ∀ {A B : Set} → (A → Pos → Maybe (Listed B)) → List (Pos × A) → Maybe (List (Pos × A × Listed B))
 lanes ln = mapM λ qa → bind (ln (proj₂ qa) (proj₁ qa ++ [ ix 1 ])) λ l → just (proj₁ qa , proj₂ qa , l)
 
--- `EmissionSet.Merge.MergeT`, each value's lane listed at its subscription.
+-- `EmissionSet.Merge.JoinT`, each value's lane listed at its subscription.
 module MergeL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) where
   done : Pos → Bool
   done c = endBy (rows o) c ∧ allᵇ (λ { (q , _ , l) → not (q <ᵖ c) ∨ endBy (rows l) c }) ls
@@ -264,7 +264,7 @@ module TakeL {A : Set} (incl : Bool) (keep : A → Bool) (p : Pos) (o : Listed A
   takeRows = concatMap takeRow (rows o) ⊣ short o
 open TakeL public using (takeRows)
 
--- `EmissionSet.Switch.SwitchT`, each value's lane listed at its subscription.
+-- `EmissionSet.Switch.JoinT`, each value's lane listed at its subscription.
 module SwitchL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) where
   vals : List (Pos × A)
   vals = values (rows o)
@@ -290,7 +290,7 @@ module SwitchL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) whe
              ⊣ (short o ∨ anyᵇ (λ { (_ , _ , l) → short l }) ls)
 open SwitchL public using (switchRows)
 
--- `EmissionSet.Exhaust.ExhaustT`, each value's lane listed at its
+-- `EmissionSet.Exhaust.JoinT`, each value's lane listed at its
 -- subscription: a merge of the lanes run.
 module ExhaustL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) where
   vals : List (Pos × A)
