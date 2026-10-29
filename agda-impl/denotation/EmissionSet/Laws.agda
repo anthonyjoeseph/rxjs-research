@@ -26,33 +26,35 @@
 -- `[ix 0, sub p]` does the same at a reachable position.
 module denotation.EmissionSet.Laws where
 
-open import Data.Bool using (Bool)
+open import Data.Bool using (Bool; T; true; false; not)
+open import Data.Bool.Properties using (T-≡)
+open import Data.Unit using (tt)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (_∷_; lookup)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.Nat using (ℕ; zero; suc; _≤?_)
-open import Data.Nat.Properties using (n≤1+n)
+open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; _≤?_)
+open import Data.Nat.Properties using (n≤1+n; ≤-trans; m≤m+n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Function using (_∘_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
-open import Data.List.Properties using (∷ʳ-injectiveˡ)
+open import Function using (_∘_; Equivalence)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
+open import Data.List.Properties using (∷ʳ-injectiveˡ; ++-identityʳ)
 open import Data.Maybe using (just; nothing)
 open import Relation.Nullary using (¬_; Dec; yes; no)
 open import Relation.Nullary.Decidable.Core using (decidable-stable; ¬¬-excluded-middle)
 
 open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList.Events using (Timeline; Pos; ix; sub; last)
+open import denotation.MonotonicList.Events using (Timeline; Pos; ix; sub; last; inside; <ᵖ-apart)
 open import denotation.EmissionSet
   using (Ev; out; skip; end; EmissionSet; _≺_; _≼_; Few; Truncate; Rejoin; shown; ended; late; guard; body;
   Den; hot; enter; After; DenEnv; approxᵀ; ⟦_⟧ᵀ; coldᵀ; emptyᵀ; ofᵀ; mapᵀ; scanᵀ; takeWhileᵀ;
   flatMapᵀ; connectᵀ; deferᵀ; ⊥ᵀ; MapT; map-out; map-skip; map-end)
 import denotation.EmissionSet as ES
 open import denotation.EmissionSet.Laws.Modulus
-  using (size; Bnd<; few-ind; entered-few; ≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext; few-via; AgreeTo; ⟨_⟩; upto; AgreeTo-sym; AgS; trunc-ag; trunc-to; ~-cold; _≈⟨_∣_⟩_; ≈-refl; ≈-sym; ≈-trans; ≈-mono; Same; agree-all; LimD; limit; ticks; contract; unfold₀; _~⟨_⟩_; ~-refl)
-open import denotation.EmissionSet.Laws.Worlds using (Ok; _⊕_; Lawful; InvAt; InvD; Hots; GoodEnv; world-after; ok-step; inv-widen; empty-inv; of-inv; spin-inv; map-inv; scan-inv; defer-inv; lim-inv)
+  using (size; size-++; ≺-irrefl; Bnd<; few-ind; entered-few; ≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext; few-via; AgreeTo; ⟨_⟩; upto; AgreeTo-sym; AgS; trunc-ag; trunc-to; ~-cold; _≈⟨_∣_⟩_; ≈-refl; ≈-sym; ≈-trans; ≈-mono; Same; agree-all; LimD; limit; ticks; contract; unfold₀; _~⟨_⟩_; ~-refl)
+open import denotation.EmissionSet.Laws.Worlds using (Ok; _⊕_; Lawful; InvAt; in-world; InvD; Hots; GoodEnv; world-after; ok-step; inv-widen; empty-inv; of-inv; spin-inv; map-inv; scan-inv; defer-inv; lim-inv)
 open import denotation.EmissionSet.Laws.Connect using (connect-inv)
 open import denotation.EmissionSet.Laws.ConnectNe using (Causal; proper-ag; connect-ne)
 
@@ -92,8 +94,6 @@ EnvAg {Γ} q ρ ρ′ = ∀ {A} (i : A ∈ Γ) → lookup ρ i ~⟨ q ⟩ lookup
 
 postulate
   -- EACH OPERATOR KEEPS THE MODULUS at admissible subscriptions.
-  takeWhile-ne : ∀ {A H k} (i : Bool) (keep : A → Bool) {s s′ : Den A} → InvD H s → InvD H s′
-               → s ≈⟨ Ok H ∣ k ⟩ s′ → takeWhileᵀ i keep s ≈⟨ Ok H ∣ k ⟩ takeWhileᵀ i keep s′
   -- A JOINER keeps the bound uniformly in the lane: no lane is listed.
   --
   -- DEAD ROUTE: an index per lane, the largest over the outer values that
@@ -241,6 +241,92 @@ scan-ne f z {s} {s′} ag p r = trunc-ag go
 
 takeWhile-causal : ∀ {A q} (i : Bool) (keep : A → Bool) {s s′ : Den A} → s ~⟨ q ⟩ s′ → takeWhileᵀ i keep s ~⟨ q ⟩ takeWhileᵀ i keep s′
 takeWhile-causal i keep a = ~-cold λ p → ⟨ (λ yq → TW.take-to i keep p (a p) yq , TW.take-to i keep p (AgreeTo-sym (a p)) yq) ⟩
+
+-- A TAKEWHILE BOUNDS ITS SOURCE before each of its rows' sources.  A
+-- source row before the first failure is passed, or is the failure, shown
+-- one label down; one past it lies before a row under the subscription,
+-- so is under it, and is left as a skip.  Whether a row is past the
+-- failure is not decidable, but the bound is.
+private
+  module TN {A : Set} (incl : Bool) (keep : A → Bool) (p : Pos) where
+    open ES.TakeWhile incl keep using (TakeT; Failed; pass; fail; stop; step; tend; left)
+
+    fd-trans : ∀ {X : EmissionSet A} {w z} → Failed X p w → w ≺ z → Failed X p z
+    fd-trans {w = w} {z} (q , a , x , nk , lt) wz = q , a , x , nk , ≺-trans {q} {w} {z} lt wz
+
+    -- A row's source is where `at` agrees.
+    move : ∀ {X Y : EmissionSet A} {Q} → (∀ {z e} → X z e → z ≼ Q → (Failed X p z → T (inside p z)) → AgreeTo z X Y)
+         → ∀ {y e} → y ≼ Q → TakeT X p y e → TakeT Y p y e
+    move at {y} yQ (pass x k nf)       = TW.take-to incl keep p (at x yQ (⊥-elim ∘ nf)) (≼-refl {y}) (pass x k nf)
+    move at {y} yQ (step x nf)         = TW.take-to incl keep p (at x yQ (⊥-elim ∘ nf)) (≼-refl {y}) (step x nf)
+    move at {y} yQ (tend x nf)         = TW.take-to incl keep p (at x yQ (⊥-elim ∘ nf)) (≼-refl {y}) (tend x nf)
+    move at {y} yQ (left x fd ins)     = TW.take-to incl keep p (at x yQ (λ _ → ins)) (≼-refl {y}) (left x fd ins)
+    move {Q = Q} at yQ (fail {q} x k nf i) =
+      fail (proj₁ (upto a {q} (≼-refl {q})) x) k (λ g → nf (TW.fail-to incl keep p (AgreeTo-sym a) (≼-refl {q}) g)) i
+      where a = at x (≺→≼ {q} {Q} (≺-≼-≺ {q} {q ++ [ ix 0 ]} {Q} (≺-ext q []) yQ)) (⊥-elim ∘ nf)
+    move {Q = Q} at yQ (stop {q} x k nf) =
+      stop (proj₁ (upto a {q} (≼-refl {q})) x) k (λ g → nf (TW.fail-to incl keep p (AgreeTo-sym a) (≼-refl {q}) g))
+      where a = at x (≺→≼ {q} {Q} (≺-≼-≺ {q} {q ++ [ last ]} {Q} (≺-ext q []) yQ)) (⊥-elim ∘ nf)
+
+    module Core {H : Pos → Set} {k : ℕ} {s s′ : Den A} (Is : InvD H s) (Is′ : InvD H s′)
+                (ag : s ≈⟨ Ok H ∣ k ⟩ s′) (ok : Ok H p) {Q : Pos}
+                (bd : Bnd< (size p + k) (TakeT (enter s p) p) Q) where
+      t t′ : EmissionSet A
+      t  = enter s p
+      t′ = enter s′ p
+      I  = Is p ok
+      I′ = Is′ p ok
+
+      -- A source row before `z`, which is under the subscription if the row is past the failure.
+      row-b : ∀ {w e z} → t w e → w ≺ z → z ≼ Q → (∀ {l ys} → z ≡ w ++ l ∷ ys → ⊥) → (Failed t p w → T (inside p z))
+            → size w ≤ size p + k
+      row-b {w} {e} {z} x wz zQ nu fz = decidable-stable (size w ≤? size p + k) λ ¬le →
+        ¬¬-excluded-middle {A = Failed t p w} λ
+          { (yes f) → ¬le (bd (left x f (in-world I x wz (fz f))) wQ)
+          ; (no nf) → ¬le (pre x nf) }
+        where
+          wQ = ≺-≼-≺ {w} {z} {Q} wz zQ
+          nu′ : ∀ ys → z ≡ w ++ ys → ⊥
+          nu′ []       eq = ≺-irrefl {w} (subst (w ≺_) (trans eq (++-identityʳ w)) wz)
+          nu′ (l ∷ ys) eq = nu eq
+          stopQ : (w ++ [ last ]) ≺ Q
+          stopQ = ≺-≼-≺ {w ++ [ last ]} {z} {Q} (Equivalence.from T-≡ (<ᵖ-apart w z [ last ] (Equivalence.to T-≡ wz) nu′)) zQ
+          pre : ∀ {e} → t w e → ¬ Failed t p w → size w ≤ size p + k
+          pre {skip}  x nf = bd (step x nf) wQ
+          pre {end}   x nf = bd (tend x nf) wQ
+          pre {out a} x nf with keep a in eq
+          ... | true  = bd (pass x (subst T (sym eq) tt) nf) wQ
+          ... | false = ≤-trans (subst (size w ≤_) (sym (size-++ w last)) (m≤m+n (size w) 1)) (bd (stop x (subst (T ∘ not) (sym eq) tt) nf) stopQ)
+
+      flat-nu : ∀ {X : EmissionSet A} → InvAt H p X → ∀ {w e z e′} → X w e → X z e′ → ∀ {l ys} → z ≡ w ++ l ∷ ys → ⊥
+      flat-nu J x z refl = InvAt.flat J x z
+
+      bnd : ∀ {z e} → t z e → z ≼ Q → (Failed t p z → T (inside p z)) → Bnd< (size p + k) t z
+      bnd xz zQ fz {w} x wz = row-b x wz zQ (flat-nu I x xz) (λ f → fz (fd-trans {X = t} f wz))
+
+      bnd′ : ∀ {z e} → t′ z e → z ≼ Q → (Failed t′ p z → T (inside p z)) → Bnd< (size p + k) t′ z
+      bnd′ x′ = few-ind P stp (entered-few s′ p x′) x′
+        where
+          P : Pos → Set
+          P z = ∀ {e} → t′ z e → z ≼ Q → (Failed t′ p z → T (inside p z)) → Bnd< (size p + k) t′ z
+          stp : ∀ {z} → Few t′ z → (∀ {v e} → t′ v e → v ≺ z → P v) → P z
+          stp {z} _ ih xz zQ fz {w} x′ wz =
+            row-b (proj₂ (upto a {w} (≼-refl {w})) x′) wz zQ (flat-nu I′ x′ xz)
+              (λ f → fz (fd-trans {X = t′} (TW.fail-to incl keep p {t = t} {t′} a (≼-refl {w}) f) wz))
+            where
+              a = ag p ok w (inj₂ (ih x′ wz x′ (≺→≼ {w} {Q} (≺-≼-≺ {w} {z} {Q} wz zQ)) λ f → in-world I′ x′ wz (fz (fd-trans {X = t′} f wz))))
+
+      agree : AgreeTo Q (TakeT t p) (TakeT t′ p)
+      agree = ⟨ (λ yQ → move {Q = Q} (λ {z} x zQ fz → ag p ok z (inj₁ (bnd x zQ fz))) yQ
+                      , move {Q = Q} (λ {z} x zQ fz → AgreeTo-sym (ag p ok z (inj₂ (bnd′ x zQ fz)))) yQ) ⟩
+
+takeWhile-ne : ∀ {A H k} (i : Bool) (keep : A → Bool) {s s′ : Den A} → InvD H s → InvD H s′
+             → s ≈⟨ Ok H ∣ k ⟩ s′ → takeWhileᵀ i keep s ≈⟨ Ok H ∣ k ⟩ takeWhileᵀ i keep s′
+takeWhile-ne {H = H} {k} i keep {s} {s′} Is Is′ ag p ok = trunc-ag go
+  where
+    go : AgS (size p + k) (ES.TakeWhile.TakeT i keep (enter s p) p) (ES.TakeWhile.TakeT i keep (enter s′ p) p)
+    go q (inj₁ bd) = TN.Core.agree i keep p {s = s} {s′} Is Is′ ag ok bd
+    go q (inj₂ bd) = AgreeTo-sym (TN.Core.agree i keep p {s = s′} {s} Is′ Is (≈-sym {R = Ok H} {k} {s} {s′} ag) ok bd)
 
 -- A CONNECT reads its body's end only up to the source step it shows.
 private

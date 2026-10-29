@@ -17,7 +17,6 @@ open import Data.Bool using (T)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using ([]; _++_; [_])
-open import Data.List.Properties using (++-identityʳ)
 open import Data.Nat using (ℕ; _≤_; _+_; _≤?_)
 open import Data.Nat.Properties using (≤-trans; m≤m+n; +-monoˡ-≤)
 open import Data.Product using (_,_; proj₁; proj₂)
@@ -26,14 +25,14 @@ open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 open import Relation.Nullary using (yes; no)
 
-open import denotation.MonotonicList.Events using (Pos; ix; inside; <ᵖ-between; <ᵖ-split; <ᵖ-step)
+open import denotation.MonotonicList.Events using (Pos; ix; inside; <ᵖ-split; <ᵖ-step)
 open import denotation.EmissionSet using (EmissionSet; end; _≺_; _≼_; Den; hot; enter; Proper; module Connect; connectᵀ)
 open import denotation.EmissionSet.Laws.Modulus
   using (AgreeTo; ⟨_⟩; upto; AgreeTo-sym; AgreeTo-trans; AgS; Bnd<; trunc-ag; _≈⟨_∣_⟩_; ≈-sym; _~⟨_⟩_;
-  size; size-++; ≺-trans; ≺-irrefl; ≺→≼; ≼-refl; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≼-or-≻; ≼-false; ≺-ext)
+  size; size-++; ≺-trans; ≺-irrefl; ≺→≼; ≼-refl; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≼-or-≻; ≺-ext)
 open import denotation.EmissionSet.Laws.Worlds
-  using (step; plain-ix; Ok; _⊕_; Lawful; InvAt; InvD; ok-step; world-after; _⊑_; ⊑-refl; ⊑-≼;
-  ⊑-inside; inside-⊑; Anc; world-anc; apart)
+  using (step; plain-ix; Ok; _⊕_; Lawful; InvAt; InvD; ok-step; inside-⊑; conv; in-world; Anc;
+  world-anc; apart)
 import denotation.EmissionSet.Laws.Connect as LC
 
 -- A body reads its hot no further than the hot has run.
@@ -58,12 +57,6 @@ private
   ≺-succ {k} {y} lt ne with <ᵖ-split (k ++ [ ix 0 ]) y (<ᵖ-step k y (Equivalence.to T-≡ lt))
   ... | inj₁ l  = Equivalence.from T-≡ l
   ... | inj₂ eq = ⊥-elim (ne (sym eq))
-
-  -- What lies under `w` is an interval.
-  conv : ∀ {w a b y} → w ⊑ a → a ≼ b → b ≺ y → w ⊑ y → w ⊑ b
-  conv {w} {a} {b} wa ab by (ys , refl) with <ᵖ-split w b (≼-false {w} {b} (≼-trans {w} {a} {b} (⊑-≼ wa) ab))
-  ... | inj₁ lt   = <ᵖ-between w b ys lt (Equivalence.to T-≡ by)
-  ... | inj₂ refl = [] , sym (++-identityʳ w)
 
   sz-snoc : ∀ k → size k ≤ size (k ++ [ ix 0 ])
   sz-snoc k = subst (size k ≤_) (sym (size-++ k (ix 0))) (m≤m+n (size k) 1)
@@ -109,8 +102,7 @@ private
     -- A source row lies under the source's subscription once it lies
     -- before a row that does.
     in-r : ∀ {k y e} → C.σ k e → k ≺ y → T (inside r y) → T (inside r k)
-    in-r {k} {y} x lt i =
-      ⊑-inside (conv (⊑-refl r) (≺→≼ {r} {k} (world-after (InvAt.world Iσ x) (InvAt.real Iσ x))) lt (inside-⊑ r y i))
+    in-r = in-world Iσ
 
     module _ {q : Pos} (bd : Bnd< (size p + n) C.ConnT q) where
 
