@@ -7,33 +7,38 @@
 -- frame, a mark run where the search's bound says it leads.
 module adequacy.Sim where
 
-open import Data.Bool using (true; false; if_then_else_)
-open import Data.Empty using (⊥-elim)
+open import Data.Bool using (true; false; if_then_else_; not)
+open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Nat using (_≡ᵇ_)
 open import Data.List using (List; []; _∷_; [_]; null)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Maybe using (just; nothing)
-open import Data.Product using (_,_; proj₁; proj₂)
-open import Data.Unit using (tt)
+open import Data.Product using (Σ; _,_; proj₁; proj₂)
+open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Timeline; root)
 open import denotation.EmissionSet using (EmissionSet; out; end; MapT; map-out; map-skip; map-end; _≼_; enter; ⟦_⟧)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd)
-open import operation.PureObservable using (PureObs; module Machine)
+open import operation.PureObservable using (PureObs; module Machine; module Driver)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; found; Mark; ofM; attM;
                     rise; run; start; dequeue; settle; alive; ended; mapEv; nx; cp; attAt; attached; Torn;
+                    Stepped; quiet; begin; admit; closed; killAll; unsubIf; free; cpAt; cutAt; overAt;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (Frag; rows; RT; toEv; Visible; Vis; Past; Plus; old; new; _≃_; _⇄_; silent; shown; Steps;
-  Shows*; Shows*-≃; ≃-sym; conv; []; _∷_)
-open import adequacy.Bound using (Good)
+  Shows*; Shows*-≃; ≃-sym; conv; []; _∷_; tau; val; fin)
+open import adequacy.Bound using (Good; G)
 open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
 open import adequacy.Skip using (After)
 open import adequacy.Inv using (Inv; inv; good; Sim; Ends; GoodF; good-split; open-alive)
 open import adequacy.LaneCp using (rise-lane-cp)
 open import adequacy.AbsOf using (abs-of)
+open import denotation.Read using (Meets)
+open import adequacy.Owes using (Swap; good-swap)
+open import adequacy.Enter using (enter-map; enter-merge; flat-∅)
 
 pend-good : ∀ {R Γ A} (c : Ctx R Γ A) o → GoodF c (pend o) → Frag o
 pend-good (inLanes op f d n q o′ pre post c) o ()
@@ -53,9 +58,25 @@ pend-good (inBody k o′ c)    o g = g
 postulate
   sub-empty : ∀ {R Γ A} (c : Ctx R Γ A) p → Sim ⟨ c , pend empty , subscribing , p ⟩ [] ⟨ c , ofS 0 p [] , absorbed , p ⟩
   sub-of    : ∀ {R Γ A} (c : Ctx R Γ A) xs p → Sim ⟨ c , pend (of xs) , subscribing , p ⟩ [] ⟨ c , ofS 0 p xs , absorbed , p ⟩
-  sub-map   : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → B) s p → Sim ⟨ c , pend (map f s) , subscribing , p ⟩ [] ⟨ inMap f c , pend s , subscribing , p ⟩
-  sub-merge : ∀ {R Γ A B} (c : Ctx R Γ B) f (s : Obs Timeline Γ A) p
-            → Sim ⟨ c , pend (flatMap (mergeᶠ nothing) f s) , subscribing , p ⟩ [] ⟨ inCut true (attAt p) (inOuter (mergeᶠ nothing) f false 0 [] [] c) , pend s , subscribing , p ⟩
+
+-- A map entered: its source pending under it.
+sub-map : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → B) s p → Sim ⟨ c , pend (map f s) , subscribing , p ⟩ [] ⟨ inMap f c , pend s , subscribing , p ⟩
+sub-map c f s p (inv g (uc , _)) = inv (good-swap c sw g) (uc , tt) , silent (vis-≃ (up-≃ c (enter-map f s p)))
+  where
+    sw : Swap (pend (map f s)) (mapS f (pend s))
+    sw = record { same = (λ ()) ⇄ (λ { (map-out ()) ; (map-skip ()) ; (map-end ()) }) ; live≡ = refl ; node = λ _ x → x ; lane = λ _ () ; body = λ _ _ () }
+
+-- A merge entered: its outer pending under it, attached at `p`, nothing begun.
+sub-merge : ∀ {R Γ A B} (c : Ctx R Γ B) f (s : Obs Timeline Γ A) p
+          → Sim ⟨ c , pend (flatMap (mergeᶠ nothing) f s) , subscribing , p ⟩ [] ⟨ inCut true (attAt p) (inOuter (mergeᶠ nothing) f false 0 [] [] c) , pend s , subscribing , p ⟩
+sub-merge c f s p (inv g (uc , _)) = inv (good-swap c sw g) ((tt , uc) , tt) , silent (vis-≃ (up-≃ c (enter-merge f s p fr)))
+  where
+    fr = pend-good c _ (proj₂ (good-split c _ g))
+    node′ : ∀ v → G v (pend (flatMap (mergeᶠ nothing) f s)) → G v (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt p) (pend s)) [])
+    node′ true  (ff , fs) = fs , tt , refl , ff , (λ ()) , (λ ()) , refl , (λ ()) , ((λ ()) , tt)
+    node′ false (ff , fs) = fs , tt , refl , ff , tt
+    sw : Swap (pend (flatMap (mergeᶠ nothing) f s)) (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt p) (pend s)) [])
+    sw = record { same = ≃-sym (flat-∅ _ false) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () }
 
 stay : ∀ {R} {k : Conf R} → Sim k [] k
 stay i = i , silent ((λ x → x) ⇄ (λ x → x))
@@ -220,6 +241,108 @@ abs-sim c s p eq  i | just (found (_ , _ , c′ , s′) m κ) with found-mark c 
 ... | attK _ _ _ = abs-att p fd eq i
 
 ------------------------------------------------------------------------
+-- No cold in the fragment: every step moves or finds nothing to do
+
+Mv : ∀ {R} → Stepped R → Set
+Mv (moved _ _ _) = ⊤
+Mv quiet         = ⊤
+Mv _             = ⊥
+
+admit-mv : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q o ls a p → Mv (admit c op f d n q o ls a p)
+admit-mv c (mergeᶠ nothing)  f d n q o ls a p = tt
+admit-mv c (mergeᶠ (just m)) f d n q o ls a p = tt
+admit-mv c switchᶠ           f d n q o ls a p with killAll ls
+... | _ = tt
+admit-mv c exhaustᶠ          f d n q o ls a p with n ≡ᵇ 0
+... | true  = tt
+... | false = tt
+
+rise-mv : ∀ {R Γ A} (c : Ctx R Γ A) s e p → Mv (rise c s e p)
+rise-mv top                       s e      p = tt
+rise-mv (inMap f c)               s e      p = tt
+rise-mv (inScan f z c)            s (nx a) p = tt
+rise-mv (inScan f z c)            s cp     p = tt
+rise-mv (inCut l a c)             s e      p = tt
+rise-mv (inLn b c)                s e      p = tt
+rise-mv (inTake i q free c)       s (nx a) p with q a | i
+... | true  | _     = tt
+... | false | true  = tt
+... | false | false = tt
+rise-mv (inTake i q free c)       s cp     p = tt
+rise-mv (inTake i q (cpAt r) c)   s e      p = tt
+rise-mv (inTake i q (cutAt r) c)  s e      p = tt
+rise-mv (inTake i q (overAt r) c) s e      p = tt
+rise-mv (inOuter op f d n q ls c) o (nx a) p = admit-mv c op f d n q o ls a p
+rise-mv (inOuter op f d n q ls c) o cp     p = tt
+rise-mv (inLanes op f d n q o pre post c) s (nx b) p = tt
+rise-mv (inLanes op f d n q o pre post c) s cp     p = tt
+rise-mv (inSrc k b c)             s (nx a) p = tt
+rise-mv (inSrc k b c)             s cp     p = tt
+rise-mv (inBody k o c)            s (nx b) p = tt
+rise-mv (inBody k o c)            s cp     p = tt
+
+begin-mv : ∀ {R Γ A} (c : Ctx R Γ A) o p → Frag o → Mv (begin c o p)
+begin-mv c empty                          p _ = tt
+begin-mv c (of xs)                        p _ = tt
+begin-mv c (map f s)                      p _ = tt
+begin-mv c (flatMap (mergeᶠ nothing) f s) p _ = tt
+
+sub-mv : ∀ {R Γ A} (c : Ctx R Γ A) s p → GoodF c s → Mv (stepᴹ ⟨ c , s , subscribing , p ⟩)
+sub-mv c (pend o)                p g = begin-mv c o p (pend-good c o g)
+sub-mv c (coldS b l)             p g = tt
+sub-mv c (ofS i q xs)            p g = tt
+sub-mv c doneS                   p g = tt
+sub-mv c (mapS f s)              p g = tt
+sub-mv c (scanS f z s)           p g = tt
+sub-mv c (cutS l a s)            p g = tt
+sub-mv c (lnS b s)               p g = tt
+sub-mv c (takeS i q w s)         p g = tt
+sub-mv c (flatS op f d n q o ls) p g = tt
+sub-mv c (connS k o b)           p g = tt
+sub-mv c (joinS j g′ x ib)       p g = tt
+
+run-of-mv : ∀ {R Γ A} (c : Ctx R Γ A) i q (xs : List A) p → Mv (run c (ofS i q xs) ofM p)
+run-of-mv c i q xs p with closed c | xs
+... | true  | _     = tt
+... | false | []    = tt
+... | false | _ ∷ _ = tt
+
+run-att-mv : ∀ {R Γ A} (c : Ctx R Γ A) l q (s : St Γ A) p → Mv (run c (cutS l (attAt q) s) attM p)
+run-att-mv c l q s p with unsubIf (not l) s
+... | _ = tt
+
+frag-mv : ∀ {R} {k : Conf R} → Inv k → Mv (stepᴹ k)
+frag-mv {k = ⟨ c , s , rising e , p ⟩}   i = rise-mv c s e p
+frag-mv {k = ⟨ c , s , subscribing , p ⟩} i = sub-mv c s p (proj₂ (good-split c s (good i)))
+frag-mv {k = ⟨ c , s , absorbed , p ⟩}    i with search top (plug c s) in fd
+... | nothing = tt
+... | just (found (_ , _ , c′ , s′) m κ) with found-mark c s (good i) fd
+...   | ofK j q xs  = run-of-mv c′ j q xs p
+...   | attK l q s₀ = run-att-mv c′ l q s₀ p
+
+-- The driver's steps read back as the engine's.
+module _ {R : Set} where
+  open Driver R using (took; value; complete) renaming (silent to τ)
+
+  τ-moved : (x : Stepped R) → Mv x → ∀ {t k′} → took x ≡ τ t k′ → Σ Torn λ tr → x ≡ moved k′ [] tr
+  τ-moved (moved k [] tr) _ refl = tr , refl
+  τ-moved (moved k ((_ , nx _) ∷ _) tr) _ ()
+  τ-moved (moved k ((_ , cp) ∷ _) tr)   _ ()
+  τ-moved quiet _ ()
+
+  val-moved : (x : Stepped R) → Mv x → ∀ {t p a k′} → took x ≡ value t p a k′ → Σ (Shownᴹ R) λ rest → Σ Torn λ tr → x ≡ moved k′ ((p , nx a) ∷ rest) tr
+  val-moved (moved k [] tr) _ ()
+  val-moved (moved k ((_ , nx _) ∷ rest) tr) _ refl = rest , tr , refl
+  val-moved (moved k ((_ , cp) ∷ _) tr)      _ ()
+  val-moved quiet _ ()
+
+  fin-moved : (x : Stepped R) → Mv x → ∀ {p} → took x ≡ complete p → Σ (Conf R) λ k′ → Σ (Shownᴹ R) λ rest → Σ Torn λ tr → x ≡ moved k′ ((p , cp) ∷ rest) tr
+  fin-moved (moved k [] tr) _ ()
+  fin-moved (moved k ((_ , nx _) ∷ _) tr)    _ ()
+  fin-moved (moved k ((_ , cp) ∷ rest) tr)   _ refl = k , rest , tr , refl
+  fin-moved quiet _ ()
+
+------------------------------------------------------------------------
 -- The run
 
 step-sim : ∀ {R} {k k′ : Conf R} {sh t} → stepᴹ k ≡ moved k′ sh t → Sim k sh k′
@@ -227,13 +350,26 @@ step-sim {k = ⟨ c , s , rising e , p ⟩}   eq = rise-sim c s e p eq
 step-sim {k = ⟨ c , s , subscribing , p ⟩} eq = sub-sim c s p eq
 step-sim {k = ⟨ c , s , absorbed , p ⟩}    eq = abs-sim c s p eq
 
-sound-from : ∀ {R} {k k′ : Conf R} {rs} → Inv k → Steps k rs k′ → Shows* (RT k) (conv rs)
+sound-from : ∀ {R} {k : Conf R} {rs} → Inv k → Steps k rs → Shows* (RT k) (conv rs)
 sound-from i [] = []
-sound-from i (e ∷ st) with step-sim e i
-... | i′ , silent eq        = Shows*-≃ (≃-sym eq) (sound-from i′ st)
-... | i′ , shown v lt eq    = (v , lt) ∷ Shows*-≃ (≃-sym eq) (sound-from i′ st)
+sound-from {k = k} i (tau e st) with τ-moved (stepᴹ k) (frag-mv i) e
+... | _ , eq with step-sim eq i
+...   | i′ , silent q = Shows*-≃ (≃-sym q) (sound-from i′ st)
+sound-from {k = k} i (val e st) with val-moved (stepᴹ k) (frag-mv i) e
+... | _ , _ , eq with step-sim eq i
+...   | i′ , shown v lt q = (v , lt) ∷ Shows*-≃ (≃-sym q) (sound-from i′ st)
+sound-from {k = k} i (fin e) with fin-moved (stepᴹ k) (frag-mv i) e
+... | _ , _ , _ , eq with step-sim eq i
+...   | _ , shown v lt _ = (v , lt) ∷ []
 
--- THE SOUND HALF: what the engine shows, a reader of the program's rows
--- is shown.
-sound : ∀ {R} {o : PureObs [] R} → Frag o → ∀ {rs k} → Steps (load o) rs k → Shows* (enter (⟦ o ⟧ []ᴬ) root) (conv rs)
-sound fo st = sound-from (inv fo (tt , tt)) st
+postulate
+  -- THE SKIPS BETWEEN: a fragment program's least visible rows, shown in
+  -- turn, are the shown rows of a reader's run, the skips before each met
+  -- on the way.  Finitely many rows lie before each (`adequacy.Enter`),
+  -- and none visible past the end; the run lists them in position order.
+  met-of-shown : ∀ {R} {o : PureObs [] R} → Frag o → ∀ {vs} → Shows* (enter (⟦ o ⟧ []ᴬ) root) vs → Meets (enter (⟦ o ⟧ []ᴬ) root) vs
+
+-- THE SOUND HALF: what the engine shows, a subscriber to the program's
+-- rows is shown.
+sound : ∀ {R} {o : PureObs [] R} → Frag o → ∀ {rs} → Steps (load o) rs → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs)
+sound {o = o} fo st = met-of-shown {o = o} fo (sound-from (inv fo (tt , tt)) st)

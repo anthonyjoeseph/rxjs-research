@@ -7,19 +7,20 @@
 -- `p`, so where the two disagree no end reads them differently.
 module adequacy.Skip where
 
-open import Data.Empty using (⊥-elim)
+open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _ʳ++_; _++_; [_])
 open import Data.Maybe using (just; nothing)
-open import Data.Product using (Σ; _×_; _,_)
+open import Data.Product using (_×_; _,_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-open import Data.Bool using (true; false)
+open import Data.Bool using (Bool; T; true; false)
+open import Relation.Nullary using (¬_)
 open import adequacy.Up using (all-ʳ++)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; ix)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; MapT; map-out; map-skip; map-end)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; _≺_; _≼_; MapT; map-out; map-skip; map-end; Ended)
 open import denotation.Laws.Modulus using (≺-trans; ≺→≼; ≼-≺-≺; ≺-ext)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
@@ -139,36 +140,42 @@ since-map f s (map-out r)  = s r
 since-map f s (map-skip r) = s r
 since-map f s (map-end r)  = s r
 
-module _ {A B : Set} (L : A → Pos → EmissionSet B) {p : Pos} where
+module _ {A B : Set} (L : A → Pos → EmissionSet B) {d : Bool} {p : Pos} where
 
   -- A lane begun past an outer value lies past what the value lies past.
-  lane-since : ∀ {O : EmissionSet A} {Ls q a k e} → Since p O → O q (out a) → Flat.Lane L O Ls q a k e → p ≼ k
+  lane-since : ∀ {O : EmissionSet A} {Ls q a k e} → Since p O → O q (out a) → Flat.Lane L O d Ls q a k e → p ≼ k
   lane-since {q = q} {a = a} {k = k} so r (_ , s) =
     ≺→≼ {p} {k} (≺-trans {p} {q ++ [ ix 1 ]} {k} (≼-≺-≺ {p} {q} {q ++ [ ix 1 ]} (so {q} {out a} r) (≺-ext q [])) s)
 
-  since-flat : ∀ (O : EmissionSet A) (Ls : List (EmissionSet B)) → Since p O → Each (Since p) Ls → Since p (Flat.FlatR L O Ls)
+  since-flat : ∀ (O : EmissionSet A) (Ls : List (EmissionSet B)) → Since p O → Each (Since p) Ls → Since p (Flat.JoinT L O d Ls)
   since-flat O Ls so sl (Flat.val {q} {a} r) = ≺→≼ {p} {q ++ [ ix 0 ]} (≼-≺-≺ {p} {q} {q ++ [ ix 0 ]} (so {q} {out a} r) (≺-ext q []))
   since-flat O Ls so sl (Flat.step r)     = so r
   since-flat O Ls so sl (Flat.oend r _)   = so r
   since-flat O Ls so sl (Flat.opass r _)  = so r
-  since-flat O Ls so sl (Flat.lane {q} {a} r l _) = lane-since {O = O} {Ls = Ls} {q = q} {a = a} so r l
-  since-flat O Ls so sl (Flat.lend {q} {a} r l _) = lane-since {O = O} {Ls = Ls} {q = q} {a = a} so r l
-  since-flat O Ls so sl (Flat.lpass {q} {a} r l _) = lane-since {O = O} {Ls = Ls} {q = q} {a = a} so r l
+  since-flat O Ls so sl (Flat.lane {q} {a} r _ l _ _) = lane-since {O = O} {Ls = Ls} {q = q} {a = a} so r l
+  since-flat O Ls so sl (Flat.lend {q} {a} r _ l _ _) = lane-since {O = O} {Ls = Ls} {q = q} {a = a} so r l
+  since-flat O Ls so sl (Flat.lpass {q} {a} r _ l _ _) = lane-since {O = O} {Ls = Ls} {q = q} {a = a} so r l
+  since-flat O Ls so sl (Flat.left _ _ _ () _)
   since-flat O Ls so sl (Flat.run x _)    = since-lanes Ls sl x
   since-flat O Ls so sl (Flat.rend x _)   = since-lanes Ls sl x
   since-flat O Ls so sl (Flat.rpass x _)  = since-lanes Ls sl x
 
   -- A merge done by an end at or past the focus is done either way.
-  done-≈ : ∀ {O O′ : EmissionSet A} {Ls Ls′} c → O ≈⟨ p ⟩ O′ → Ls ≈ᴸ⟨ p ⟩ Ls′ → p ≼ c → Flat.Done L O Ls c → Flat.Done L O′ Ls′ c
-  done-≈ {O′ = O′} {Ls′ = Ls′} c eo es pc (g , h , ls) = gone-≈ {c = c} eo pc g , h′ , each-≈ {c = c} es pc ls
+  done-≈ : ∀ {O O′ : EmissionSet A} {Ls Ls′} c → O ≈⟨ p ⟩ O′ → Ls ≈ᴸ⟨ p ⟩ Ls′ → p ≼ c → Flat.Done L O d Ls c → Flat.Done L O′ d Ls′ c
+  done-≈ {O} {O′} {Ls′ = Ls′} c eo es pc ((g , ls) , h) = (g′ g , each-≈ {c = c} es pc ls) , h′
     where
-      h′ : ∀ {q a} → O′ q (out a) → q ≺ c → Σ Pos λ c′ → Flat.Lane L O′ Ls′ q a c′ end × c′ ≼ c
-      h′ {q} {a} r lt with bwd eo r
-      ... | inj₁ r′ = h {q} {a} r′ lt
+      g′ : T d ⊎ Ended O c → T d ⊎ Ended O′ c
+      g′ (inj₁ td) = inj₁ td
+      g′ (inj₂ (c₀ , x , le)) with fwd eo x
+      ... | inj₁ x′ = inj₂ (c₀ , x′ , le)
+      ... | inj₂ (_ , ())
+      h′ : ∀ {q a} → O′ q (out a) → ⊤ → q ≺ c → ¬ ⊥ → Ended (Flat.Lane L O′ d Ls′ q a) c
+      h′ {q} {a} r ru lt nc with bwd eo r
+      ... | inj₁ r′ = h {q} {a} r′ ru lt nc
       ... | inj₂ (_ , ())
 
   flat-→ : ∀ {O O′ : EmissionSet A} (Ls Ls′ : List (EmissionSet B)) → O ≈⟨ p ⟩ O′ → Ls ≈ᴸ⟨ p ⟩ Ls′ → Since p O → Each (Since p) Ls
-         → ∀ {k e} → Flat.FlatR L O Ls k e → Flat.FlatR L O′ Ls′ k e ⊎ Skip p k e
+         → ∀ {k e} → Flat.JoinT L O d Ls k e → Flat.JoinT L O′ d Ls′ k e ⊎ Skip p k e
   flat-→ Ls Ls′ eo es so sl (Flat.val r) with fwd eo r
   ... | inj₁ r′       = inj₁ (Flat.val r′)
   ... | inj₂ (_ , ())
@@ -181,15 +188,16 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {p : Pos} where
   flat-→ Ls Ls′ eo es so sl (Flat.opass {c} r nd) with fwd eo r
   ... | inj₁ r′       = inj₁ (Flat.opass r′ λ d → nd (done-≈ c (≈-sym eo) (≈ᴸ-sym es) (so r) d))
   ... | inj₂ (_ , ())
-  flat-→ Ls Ls′ eo es so sl (Flat.lane r l w) with fwd eo r
-  ... | inj₁ r′       = inj₁ (Flat.lane r′ l w)
+  flat-→ Ls Ls′ eo es so sl (Flat.lane r ru l nc w) with fwd eo r
+  ... | inj₁ r′       = inj₁ (Flat.lane r′ ru l nc w)
   ... | inj₂ (_ , ())
-  flat-→ {O = O} Ls Ls′ eo es so sl (Flat.lend {q} {a} {c} r l d) with fwd eo r
-  ... | inj₁ r′       = inj₁ (Flat.lend r′ l (done-≈ c eo es (lane-since {O = O} {Ls = Ls} {q = q} {a = a} so r l) d))
+  flat-→ {O = O} Ls Ls′ eo es so sl (Flat.lend {q} {a} {c} r ru l nc d) with fwd eo r
+  ... | inj₁ r′       = inj₁ (Flat.lend r′ ru l nc (done-≈ c eo es (lane-since {O = O} {Ls = Ls} {q = q} {a = a} so r l) d))
   ... | inj₂ (_ , ())
-  flat-→ {O = O} Ls Ls′ eo es so sl (Flat.lpass {q} {a} {c} r l nd) with fwd eo r
-  ... | inj₁ r′       = inj₁ (Flat.lpass r′ l λ d → nd (done-≈ c (≈-sym eo) (≈ᴸ-sym es) (lane-since {O = O} {Ls = Ls} {q = q} {a = a} so r l) d))
+  flat-→ {O = O} Ls Ls′ eo es so sl (Flat.lpass {q} {a} {c} r ru l nc nd) with fwd eo r
+  ... | inj₁ r′       = inj₁ (Flat.lpass r′ ru l nc λ d → nd (done-≈ c (≈-sym eo) (≈ᴸ-sym es) (lane-since {O = O} {Ls = Ls} {q = q} {a = a} so r l) d))
   ... | inj₂ (_ , ())
+  flat-→ Ls Ls′ eo es so sl (Flat.left _ _ _ () _)
   flat-→ Ls Ls′ eo es so sl (Flat.run x w) with lanes-≈ es x
   ... | inj₁ x′ = inj₁ (Flat.run x′ w)
   ... | inj₂ sk = inj₂ sk
@@ -201,7 +209,7 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {p : Pos} where
   ... | inj₂ (_ , ())
 
   flat-≈ : ∀ {O O′ : EmissionSet A} (Ls Ls′ : List (EmissionSet B)) → O ≈⟨ p ⟩ O′ → Ls ≈ᴸ⟨ p ⟩ Ls′
-         → Since p O → Since p O′ → Each (Since p) Ls → Each (Since p) Ls′ → Flat.FlatR L O Ls ≈⟨ p ⟩ Flat.FlatR L O′ Ls′
+         → Since p O → Since p O′ → Each (Since p) Ls → Each (Since p) Ls′ → Flat.JoinT L O d Ls ≈⟨ p ⟩ Flat.JoinT L O′ d Ls′
   flat-≈ Ls Ls′ eo es so so′ sl sl′ = flat-→ Ls Ls′ eo es so sl ⇆ flat-→ Ls′ Ls (≈-sym eo) (≈ᴸ-sym es) so′ sl′
 
 ------------------------------------------------------------------------

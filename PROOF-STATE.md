@@ -14,30 +14,59 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE COMPLETE HALF
-
-Untried: every row a reader of the emission set meets, some run of the
-pure semantics shows. Settled by a body, or a program whose emission set
-holds a row no run reaches.
-
-Members: `complete`.
-
 #### BEYOND THE FRAGMENT
 
-Untried: the sound half for `cold`, `scan`, `takeWhile`, `connect`,
-`defer`, switch, exhaust and a bounded merge. The split is excluded
-middle: `Frag` is not decidable over a merge's lanes. Settled once the
-sound half covers every program, which retires the split.
+Untried, riskiest under a connect: `rows` reads only the state, so
+`pendRows` owes nothing under a binder, yet a joiner owes its inbox, the
+source's remaining rows rekeyed under it, and a late end. `rows` needs an
+environment per binder (the source's remaining rows, closed or not), and a
+body's rows past a position shown blind to earlier hot rows but the end.
+This can change `rows`'s type, so it comes before any other former. The
+split is excluded middle. Settled once the sound half covers every program.
 
 Members: `sound-beyond`, `frag?`.
 
+#### THE COMPLETE HALF
+
+Untried: every row met, some run shows. Route: a machine-only progress
+lemma, a measure on `Conf` (pending program, marks, context depth) bounding
+silent steps while a visible row is owed; a mark keyed `after` shows nothing
+and removes itself. Soundness then names what shows. The one row fact
+needed is that owing nothing is `Empty`. Settled by a body, or a program
+whose emission set holds a row no run reaches.
+
+Members: `complete`.
+
+#### THE SKIPS BETWEEN
+
+Untried: the engine's shown rows, each the least visible one left, are
+the shown rows of a reader's run, which meets every skip in order. Rows
+before each are finitely many, but which of a listing's positions are rows
+is undecided: needs an exact listing of a fragment program's rows, or
+excluded middle. Settled by a body, or a fragment program showing a value
+past its end.
+
+Members: `met-of-shown`.
+
 #### THE GOOD TREE KEPT
 
-Untried: a mark run at an of keeps `Good`, its merges' parts still apart,
-and a closed of dropped changes nothing owed (`adequacy.AbsOf`). Settled by
-bodies, or a program whose of run leaves two parts sharing a position.
+Untried: a mark run at an of keeps `Good`, its merges' parts still apart.
+A lane begun at a value's second child stays apart by Tier −1's `world`,
+`flat` and `under`, given `Ok` there: owed first, a lemma that the
+machine's subscription positions are `Real`. Settled by bodies, or a
+program whose of run leaves two parts sharing a position.
 
-Members: `good-of`, `good-done`, `owes-closed`.
+Members: `good-of`, `good-done`.
+
+#### THE OWED
+
+Suspect past the fragment: `Owes` reads a live node as owing a row, false
+for a cold that hushes (live, no rows, never ends). Restate as a live node
+owing no end, equivalent in the fragment and all `¬ Done` needs. Then a
+closed of dropped changes nothing owed (`adequacy.AbsOf`). Settled by the
+restatement and a body.
+
+Members: `owes-closed`.
 
 #### THE MARK FOUND
 
@@ -51,10 +80,11 @@ Members: `found-mark`, `abs-att`, `rise-outer-nx`, `rise-outer-cp`,
 
 #### THE SUBSCRIPTIONS ENTERED
 
-Believed: subscribing to `empty`, `of`, `map` or a merge enters exactly
-the rows its emission set begins with. Settled when each is a body.
+Believed: subscribing to `empty` or `of` enters exactly the rows its
+emission set begins with, those rows placed behind every ancestor's parts
+so its merges stay apart and end last. Settled when each is a body.
 
-Members: `sub-empty`, `sub-of`, `sub-map`, `sub-merge`.
+Members: `sub-empty`, `sub-of`.
 
 #### THE KEYS
 

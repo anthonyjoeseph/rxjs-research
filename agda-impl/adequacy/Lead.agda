@@ -301,7 +301,7 @@ module Step {R Γ A B} (v : Bool) (c : Ctx R Γ B) (f : A → Obs Timeline Γ B)
 module Race {R Γ A B} (v : Bool) (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St Γ A) (ls : List (St Γ B)) where
 
   FR : EmissionSet B
-  FR = Flat.FlatR (λ x → pendRows (f x)) (rows o) (rowsL ls)
+  FR = Flat.JoinT (λ x → pendRows (f x)) (rows o) d (rowsL ls)
 
   lane-occ : ∀ {Q} (o′ o″ : Out B) → (∀ {b} → Fits o′ (out b) → Fits o″ (out b)) → Occ (Lanes (rowsL ls)) Q o′ → Occ FR Q o″
   lane-occ o′ o″ fo oc = occ-bind oc go
@@ -403,7 +403,7 @@ mutual
   kids-lead v c (mapS f s)       g = map-leads v f (seek (inMap f c) s) (seek-lead v (inMap f c) s g)
   kids-lead v c (cutS true a s)  g = cut-on v (seek (inCut true a c) s) (seek-lead (v Data.Bool.∧ true) (inCut true a c) s g)
   kids-lead v c (cutS false a s) g = cut-off v (seek (inCut false a c) s) (seek-lead (v Data.Bool.∧ false) (inCut false a c) s g)
-  kids-lead true c (flatS (mergeᶠ nothing) f d n .[] o ls) (go , gl , refl , _ , _ , _ , _ , pa) =
+  kids-lead true c (flatS (mergeᶠ nothing) f d n .[] o ls) (go , gl , refl , _ , _ , _ , _ , _ , pa) =
     Race.race-leads true c f d n o ls
       (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)
       (seek-lead true (inOuter (mergeᶠ nothing) f d n [] ls c) o go)

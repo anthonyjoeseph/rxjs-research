@@ -21,32 +21,39 @@
 -- grouping of the elaborated run's values.  A batch restamped to the
 -- instant it was released in, to pass `coherent`, fails it.
 --
+-- AN INSTANT'S END IS A FACT OF THE ROWS, NOT OF WHAT IS SHOWN: work no
+-- subscriber sees (a skip) still runs in some instant, so a run is over,
+-- and an instant left, by every row past it.  Those are read off the
+-- emission set directly, over its reached rows (`Seen`), never through a
+-- reader.
+--
 -- EACH IS TWO DIRECTIONS OVER PREFIXES, since a run need not end: what
 -- has come out is within what the spec allows, and everything the spec
--- allows comes out eventually.  A prefix is the rows a reader of the
--- emission set meets first (`denotation.Read.Run`).  Only
+-- allows comes out eventually.  A prefix is what a subscriber is shown
+-- first (`denotation.Read.Meets`), the reader adequacy reads by.  Only
 -- `left-to-right`'s second half needs the plain run's instants finite: an
 -- instant that never ends is never released, so `ones` batched shows
 -- nothing, as specified.
 module simultaneous.Statement where
 
 open import Data.Bool using (Bool; true; false)
-open import Data.List using (List; []; _∷_; _++_; concat)
+open import Data.List using (List; []; _∷_; concat)
 import Data.List as L
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
-open import Data.List.Relation.Unary.All using (All; [])
+open import Data.List.Relation.Unary.All using ([])
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
+open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (Any)
-open import Data.Maybe using (just; nothing)
-open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
+open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Product using (_×_; Σ; _,_; proj₂)
 open import Data.Sum using (_⊎_)
 open import Data.Unit using (⊤)
 open import Function using (_⇔_)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_)
 
 open import denotation.Events using (_≟ᵖ_; Pos; Timeline; root)
-open import denotation.EmissionSet using (Ev; out; end; EmissionSet; enter; ⟦_⟧)
-open import denotation.Read using (Run; Hush; cursor)
+open import denotation.EmissionSet using (Ev; out; skip; end; EmissionSet; Proper; Seen; _≺_; enter; ⟦_⟧)
+open import denotation.Read using (Meets; After; cursor)
 open import simultaneous.InstEmit using (InstEmit)
 open import simultaneous.SObs using (SObs; module Elaborate)
 import simultaneous.Spec as Spec
@@ -73,9 +80,9 @@ batched o = enter (⟦ batchedObs o ⟧ []) root
 ------------------------------------------------------------------------
 -- Readings of the rows met
 
--- The rows a reader at the root meets first.
+-- What a subscriber at the root is shown first.
 Met : ∀ {A} → EmissionSet A → List (Pos × Ev A) → Set
-Met t rs = Run t nothing rs
+Met = Meets
 
 -- The values among them, each at its position.
 outs : ∀ {A} → List (Pos × Ev A) → List (Pos × A)
@@ -97,24 +104,33 @@ joined rs = concat (L.map proj₂ (batchesOut rs))
 grouped : ∀ {A} → Bool → List (Pos × Ev (IE A)) → List (Pos × List A)
 grouped ov rs = closed ov (batchSimultaneousᴰ (stamped (values rs)))
 
--- The rows met reach the run's end: its completion, or nothing after.
+-- Past `c`, finitely many rows, each reached once those before it are.
+Spent : ∀ {A} → EmissionSet A → Maybe Pos → Set
+Spent t c = Σ (List Pos) λ ks → ∀ {k e} → t k e → After c k → k ∈ ks × Proper t k e
+
+-- Past `c`, nothing a subscriber is shown.
+Quiet : ∀ {A} → EmissionSet A → Maybe Pos → Set
+Quiet t c = ∀ {k e} → t k e → After c k → e ≡ skip
+
+-- What was shown reaches the run's end: its completion, or past it only
+-- finitely much unseen work.
 Over : ∀ {A} → EmissionSet A → List (Pos × Ev A) → Set
-Over t rs = Any (λ r → proj₂ r ≡ end) rs ⊎ Hush t (cursor nothing rs)
+Over t rs = Any (λ r → proj₂ r ≡ end) rs ⊎ (Spent t (cursor nothing rs) × Quiet t (cursor nothing rs))
 
 -- A grouping may keep its last group only once the run is over.
 Closes : ∀ {A} → EmissionSet A → List (Pos × Ev A) → Bool → Set
 Closes t rs false = ⊤
 Closes t rs true  = Over t rs
 
--- Past the row at `q`, the run leaves `q`'s instant after finitely many
--- rows: a row of another instant, the completion, or nothing after.
+-- Past the row at `q`, the run leaves `q`'s instant: a reached row of
+-- another instant or the completion, or finitely many rows after.
 Exits : ∀ {A} → EmissionSet A → Pos → Set
-Exits t q = Σ _ λ rs → Run t (just q) rs
-          × (Any (λ r → instantOf (proj₁ r) ≢ instantOf q ⊎ proj₂ r ≡ end) rs ⊎ Hush t (cursor (just q) rs))
+Exits {A} t q = (Σ Pos λ k → Σ (Ev A) λ e → Seen t k e × q ≺ k × (instantOf k ≢ instantOf q ⊎ e ≡ end))
+              ⊎ Spent t (just q)
 
--- Every instant a reader meets is over after finitely many rows.
+-- Every instant a row is reached in is over.
 FiniteInstants : ∀ {A} → EmissionSet A → Set
-FiniteInstants t = ∀ {rs q e} → Met t (rs ++ (q , e) ∷ []) → Exits t q
+FiniteInstants t = ∀ {q e} → Seen t q e → Exits t q
 
 ------------------------------------------------------------------------
 -- The three relations, between emission sets
@@ -153,7 +169,7 @@ Batchable : Set₁
 Batchable = ∀ {A} (o : SObs [] A) → Batches (batched o) (elaborated o)
 
 Positioned : Set₁
-Positioned = ∀ {A} (o : SObs [] A) {rs} → Met (events o) rs → All Rooted (L.map proj₁ rs)
+Positioned = ∀ {A} (o : SObs [] A) {k e} → Seen (events o) k e → Rooted k
 
 postulate
   left-to-right : Left-To-Right

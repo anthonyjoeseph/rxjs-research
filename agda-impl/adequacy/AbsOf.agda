@@ -128,7 +128,7 @@ up-plug (inOuter (mergeᶠ (just m)) f d n q ls c) s = up-plug c (flatS (merge�
 up-plug (inOuter switchᶠ f d n q ls c)           s = up-plug c (flatS switchᶠ f d n q s ls)
 up-plug (inOuter exhaustᶠ f d n q ls c)          s = up-plug c (flatS exhaustᶠ f d n q s ls)
 up-plug (inLanes (mergeᶠ nothing) f d n q o pre post c) s =
-  ≃-trans (up-≃ c (≡→≃ (cong (Flat.FlatR _ (rows o)) (sym (rowsL-ʳ++ pre)))))
+  ≃-trans (up-≃ c (≡→≃ (cong (Flat.JoinT _ (rows o) d) (sym (rowsL-ʳ++ pre)))))
           (up-plug c (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post)))
 up-plug (inLanes (mergeᶠ (just m)) f d n q o pre post c) s = up-plug c (flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s ∷ post))
 up-plug (inLanes switchᶠ f d n q o pre post c)           s = up-plug c (flatS switchᶠ f d n q o (pre ʳ++ s ∷ post))
