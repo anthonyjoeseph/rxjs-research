@@ -32,16 +32,16 @@ import denotation.MonotonicList.Events as E
 open import denotation.MonotonicList.Events using (Pos; Timeline; _<ᵖ_; inside; ix)
 open import denotation.EmissionSet
   using (out; skip; end; EmissionSet; InE; at-out; at-skip; at-end; on-out; on-skip; Proper; Truncate; Rejoin;
-  ended; late; Den; enter; MapT; map-out; map-skip; map-end; DeferT; guard; DenEnv; approxᵀ)
+  ended; late; Den; enter; After; MapT; map-out; map-skip; map-end; DeferT; guard; DenEnv; approxᵀ)
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled
   using (Row; Listed; _⊣_; rows; short; concatMap; when; endBy; proper; values; fuel; horizon; walk;
-  mapRow; mapRows; rejoinRow; rejoin; hotOf; outerRow; mergeRows; connRows; takeRows; lanes;
+  mapRow; mapRows; rejoinRow; rejoin; hotOf; outerRow; mergeRows; connRows; takeRows; lanes; afterL;
   module MergeL; module TakeL; module ConnL; listT)
 open import quickcheck.Tabled.Exact.Base
   using (Exact; Exactly; sound; complete; fromT; fromNot; offT; T-not; ∨-false; ∧-true; ∧-intro; off; or-of; or-right;
   any⁻; any⁺; any-off; all⁻; all⁺; single⁻; when⁻; when⁺; if⁻; if-t; if-f; cm⁻; cm⁺; bind⁻;
-  values⁻; values⁺; endBy→; →endBy; proper→; →proper; lanes-from; lanes-to)
+  values⁻; values⁺; endBy→; →endBy; proper→; →proper; lanes-from; lanes-to; afterL-exact)
 open import quickcheck.Tabled.Exact.Scan using (scan-exact)
 open import quickcheck.Tabled.Exact.Switch using (switch-exact)
 open import quickcheck.Tabled.Exact.Exhaust using (exhaust-exact)
@@ -149,7 +149,7 @@ rejoin-exact {l = l} {t} el p u = record { sound = s ; complete = c }
 module MergeX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A) (ls : List (Pos × A × Listed B))
   (u : short (mergeRows o ls) ≡ false)
   (eo : Exactly o t)
-  (ls-from : ∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (enter (fD a) (q ++ [ ix 1 ])))
+  (ls-from : ∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (After (fD a) (q ++ [ ix 1 ])))
   (ls-to : ∀ {q a} → (q , a) ∈ values (rows o) → Σ (Listed B) λ l → (q , a , l) ∈ ls)
   where
   open Tb.Merge fD t
@@ -162,7 +162,7 @@ module MergeX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A) 
     uncut : ∀ {q a l} → (q , a , l) ∈ ls → short l ≡ false
     uncut m = any-off {xs = ls} (proj₂ (∨-false {short o} u)) m
 
-    exl : ∀ {q a l} → (q , a , l) ∈ ls → Exact l (enter (fD a) (q ++ [ ix 1 ]))
+    exl : ∀ {q a l} → (q , a , l) ∈ ls → Exact l (After (fD a) (q ++ [ ix 1 ]))
     exl m = proj₂ (ls-from m) (uncut m)
 
     out-of : ∀ {q a l} → (q , a , l) ∈ ls → t q (out a)
@@ -234,7 +234,7 @@ module MergeX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A) 
     ∈-++⁺ʳ (concatMap (outerRow done) (rows o)) (cm⁺ m (lane-end {c} (off (done→ c) nD) (complete (exl m) y)))
 
 merge-exact : ∀ {A B} (fD : A → Den B) {t : EmissionSet A} (o : Listed A) (ls : List (Pos × A × Listed B)) → Exactly o t
-  → (∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (enter (fD a) (q ++ [ ix 1 ])))
+  → (∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (After (fD a) (q ++ [ ix 1 ])))
   → (∀ {q a} → (q , a) ∈ values (rows o) → Σ (Listed B) λ l → (q , a , l) ∈ ls)
   → Exactly (mergeRows o ls) (Tb.Merge.MergeT fD t)
 merge-exact fD {t} o ls eo from to u = record { sound = sound-m ; complete = complete-m }
@@ -369,21 +369,21 @@ listT-exact n (scan f z s) {ρL} ρ p e with bind⁻ {m = listT n s ρL p} e
 listT-exact n (takeWhile i q s) {ρL} ρ p e with bind⁻ {m = listT n s ρL p} e
 ... | (l₀ , e₀ , refl) = truncate-exact (take-exact i q p l₀ (listT-exact n s ρ p e₀))
 listT-exact n (flatMap (mergeᶠ nothing) f s) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL p} e
-... | (o , eo , e₁) with bind⁻ {m = lanes (λ a → listT n (f a) ρL) (values (rows o))} e₁
+... | (o , eo , e₁) with bind⁻ {m = lanes (afterL (λ a → listT n (f a) ρL)) (values (rows o))} e₁
 ... | (ls , els , refl) = truncate-exact (merge-exact (λ a → approxᵀ n (f a) ρD) o ls (listT-exact n s ρ p eo)
-  (lanes-from {ln = λ a → listT n (f a) ρL} {D = λ a → enter (approxᵀ n (f a) ρD)} (λ {a} {s′} el → listT-exact n (f a) ρ s′ el) els) (lanes-to {ln = λ a → listT n (f a) ρL} els))
+  (lanes-from {ln = afterL (λ a → listT n (f a) ρL)} {D = λ a → After (approxᵀ n (f a) ρD)} (afterL-exact {ln = λ a → listT n (f a) ρL} {D = λ a → enter (approxᵀ n (f a) ρD)} (λ {a} {s′} el → listT-exact n (f a) ρ s′ el)) els) (lanes-to {ln = afterL (λ a → listT n (f a) ρL)} els))
 listT-exact n (flatMap (mergeᶠ (just k)) f s) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL p} e
 ... | (o , eo , e₁) =
-  truncate-exact (bounded-exact k (λ a → approxᵀ n (f a) ρD) _ (λ a → listT n (f a) ρL) o (listT-exact n s ρ p eo)
-    (λ {a} {s′} el → listT-exact n (f a) ρ s′ el) e₁)
+  truncate-exact (bounded-exact k (λ a → approxᵀ n (f a) ρD) _ (afterL (λ a → listT n (f a) ρL)) o (listT-exact n s ρ p eo)
+    (afterL-exact {ln = λ a → listT n (f a) ρL} {D = λ a → enter (approxᵀ n (f a) ρD)} (λ {a} {s′} el → listT-exact n (f a) ρ s′ el)) e₁)
 listT-exact n (flatMap switchᶠ f s) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL p} e
-... | (o , eo , e₁) with bind⁻ {m = lanes (λ a → listT n (f a) ρL) (values (rows o))} e₁
+... | (o , eo , e₁) with bind⁻ {m = lanes (afterL (λ a → listT n (f a) ρL)) (values (rows o))} e₁
 ... | (ls , els , refl) = truncate-exact (switch-exact (λ a → approxᵀ n (f a) ρD) o ls (listT-exact n s ρ p eo)
-  (lanes-from {ln = λ a → listT n (f a) ρL} {D = λ a → enter (approxᵀ n (f a) ρD)} (λ {a} {s′} el → listT-exact n (f a) ρ s′ el) els) (lanes-to {ln = λ a → listT n (f a) ρL} els))
+  (lanes-from {ln = afterL (λ a → listT n (f a) ρL)} {D = λ a → After (approxᵀ n (f a) ρD)} (afterL-exact {ln = λ a → listT n (f a) ρL} {D = λ a → enter (approxᵀ n (f a) ρD)} (λ {a} {s′} el → listT-exact n (f a) ρ s′ el)) els) (lanes-to {ln = afterL (λ a → listT n (f a) ρL)} els))
 listT-exact n (flatMap exhaustᶠ f s) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL p} e
-... | (o , eo , e₁) with bind⁻ {m = lanes (λ a → listT n (f a) ρL) (values (rows o))} e₁
+... | (o , eo , e₁) with bind⁻ {m = lanes (afterL (λ a → listT n (f a) ρL)) (values (rows o))} e₁
 ... | (ls , els , refl) = truncate-exact (exhaust-exact (λ a → approxᵀ n (f a) ρD) o ls (listT-exact n s ρ p eo)
-  (lanes-from {ln = λ a → listT n (f a) ρL} {D = λ a → enter (approxᵀ n (f a) ρD)} (λ {a} {s′} el → listT-exact n (f a) ρ s′ el) els) (lanes-to {ln = λ a → listT n (f a) ρL} els))
+  (lanes-from {ln = afterL (λ a → listT n (f a) ρL)} {D = λ a → After (approxᵀ n (f a) ρD)} (afterL-exact {ln = λ a → listT n (f a) ρL} {D = λ a → enter (approxᵀ n (f a) ρD)} (λ {a} {s′} el → listT-exact n (f a) ρ s′ el)) els) (lanes-to {ln = afterL (λ a → listT n (f a) ρL)} els))
 listT-exact n (connect s b) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL (p ++ [ ix 1 ])} e
 ... | (σl , eσ , e₁) with bind⁻ {m = listT n b (hotOf σl ∷ ρL) (p ++ [ ix 0 ])} e₁
 ... | (βl , eβ , refl) =

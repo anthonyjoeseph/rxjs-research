@@ -179,6 +179,18 @@ outerRow d (q , out _) = [ q ++ [ ix 0 ] , skip ]
 outerRow d (q , skip)  = [ q , skip ]
 outerRow d (c , end)   = [ c , (if d c then end else skip) ]
 
+-- `EmissionSet.After`: the rows past `s`.
+pastRows : ∀ {A} → Pos → List (Row A) → List (Row A)
+pastRows s []             = []
+pastRows s ((k , e) ∷ rs) = if s <ᵖ k then (k , e) ∷ pastRows s rs else pastRows s rs
+
+past : ∀ {A} → Pos → Listed A → Listed A
+past s (rs ⊣ b) = pastRows s rs ⊣ b
+
+-- A lane listing, read past its subscription.
+afterL : ∀ {A B : Set} → (A → Pos → Maybe (Listed B)) → A → Pos → Maybe (Listed B)
+afterL ln a s = bind (ln a s) λ l → just (past s l)
+
 -- Each value's lane, listed at its subscription.
 lanes : ∀ {A B : Set} → (A → Pos → Maybe (Listed B)) → List (Pos × A) → Maybe (List (Pos × A × Listed B))
 lanes ln = mapM λ qa → bind (ln (proj₂ qa) (proj₁ qa ++ [ ix 1 ])) λ l → just (proj₁ qa , proj₂ qa , l)
@@ -427,13 +439,13 @@ listT n       (map f s)         ρ p = bind (listT n s ρ p) λ l → just (mapR
 listT n       (scan f z s)      ρ p = bind (listT n s ρ p) λ l → just (scanRows f z l)
 listT n       (takeWhile i q s) ρ p = bind (listT n s ρ p) λ l → just (takeRows i q p l)
 listT n       (flatMap (mergeᶠ nothing) f s) ρ p =
-  bind (listT n s ρ p) λ o → bind (lanes (λ a → listT n (f a) ρ) (values (rows o))) λ ls → just (mergeRows o ls)
+  bind (listT n s ρ p) λ o → bind (lanes (afterL (λ a → listT n (f a) ρ)) (values (rows o))) λ ls → just (mergeRows o ls)
 listT n       (flatMap (mergeᶠ (just k)) f s) ρ p =
-  bind (listT n s ρ p) λ o → BoundedL.listB k (λ a → listT n (f a) ρ) o
+  bind (listT n s ρ p) λ o → BoundedL.listB k (afterL (λ a → listT n (f a) ρ)) o
 listT n       (flatMap switchᶠ f s) ρ p =
-  bind (listT n s ρ p) λ o → bind (lanes (λ a → listT n (f a) ρ) (values (rows o))) λ ls → just (switchRows o ls)
+  bind (listT n s ρ p) λ o → bind (lanes (afterL (λ a → listT n (f a) ρ)) (values (rows o))) λ ls → just (switchRows o ls)
 listT n       (flatMap exhaustᶠ f s) ρ p =
-  bind (listT n s ρ p) λ o → bind (lanes (λ a → listT n (f a) ρ) (values (rows o))) λ ls → just (exhaustRows o ls)
+  bind (listT n s ρ p) λ o → bind (lanes (afterL (λ a → listT n (f a) ρ)) (values (rows o))) λ ls → just (exhaustRows o ls)
 listT n       (connect s b)     ρ p =
   bind (listT n s ρ (p ++ [ ix 1 ])) λ σ →
   bind (listT n b (hotOf σ ∷ ρ) (p ++ [ ix 0 ])) λ β →
@@ -496,7 +508,7 @@ private
   laneSize nothing   = "nothing"
 
   lanesOf : ∀ {Γ A B} → ℕ → (A → Obs Timeline Γ B) → Obs Timeline Γ A → All Listed Γ → Pos → List String
-  lanesOf n f s ρ p = [ "lanes: " S.++ laneSize (bind (listT n s ρ p) λ o → lanes (λ a → listT n (f a) ρ) (values (rows o))) ]
+  lanesOf n f s ρ p = [ "lanes: " S.++ laneSize (bind (listT n s ρ p) λ o → lanes (afterL (λ a → listT n (f a) ρ)) (values (rows o))) ]
 
 -- Each node of `listT`'s walk: a line opening it, its parts' lines, and a
 -- line closing it with its rows; a flatMap's lanes get a line of their own.

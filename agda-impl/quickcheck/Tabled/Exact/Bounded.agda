@@ -27,7 +27,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_)
 
 open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; ix; <ᵖ-trans)
-open import denotation.EmissionSet using (out; skip; end; EmissionSet; Den; enter)
+open import denotation.EmissionSet using (out; skip; end; EmissionSet; Den; After)
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled using (Row; Listed; rows; short; concatMap; mapM; anyᵇ; endBy; values; outerRow; _≼ᵇ_;
   module BoundedL; module Order)
@@ -37,7 +37,7 @@ open import quickcheck.Tabled.Exact.Base
   values⁺; ends⁻; ends⁺; endBy→; →endBy; cnt-in; module OrderX)
 
 module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln : A → Pos → Maybe (Listed B)) (o : Listed A)
-  (eo : Exactly o t) (eln : ∀ {a s l} → ln a s ≡ just l → Exactly l (enter (fD a) s))
+  (eo : Exactly o t) (eln : ∀ {a s l} → ln a s ≡ just l → Exactly l (After (fD a) s))
   (G : List (ℕ × Pos × A × List (Pos × Listed B)))
   (eG : BoundedL.levels n ln o (length (values (rows o))) 0 [] (Order.nths (values (rows o)) 0) ≡ just G)
   (u : short (BoundedL.boundedRows n ln o G) ≡ false)
@@ -58,7 +58,7 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     uncut : ∀ {j q a ss s l} → (j , q , a , ss) ∈ G → (s , l) ∈ ss → short l ≡ false
     uncut {ss = ss} gm sm = any-off {xs = ss} (any-off {xs = G} (proj₂ (∨-false {short o} u)) gm) sm
 
-    exl : ∀ {j q a ss s l} → (j , q , a , ss) ∈ G → (s , l) ∈ ss → ln a s ≡ just l → Exact l (enter (fD a) s)
+    exl : ∀ {j q a ss s l} → (j , q , a , ss) ∈ G → (s , l) ∈ ss → ln a s ≡ just l → Exact l (After (fD a) s)
     exl gm sm el = eln el (uncut gm sm)
 
   open OrderX exo using (nth-s; nth-c; nth-out; nth-cnt)
@@ -255,7 +255,7 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
       (subst (λ x → _ < x) (sym (+-identityʳ (length vals)))
         (≤-<-trans (nth-cnt N) (cnt-in (values⁺ (complete exo (nth-out N)))))) N
 
-    sub-of : ∀ {j q a ss s l} → (j , q , a , ss) ∈ G → (s , l) ∈ ss → Sub j q s a × Exact l (enter (fD a) s)
+    sub-of : ∀ {j q a ss s l} → (j , q , a , ss) ∈ G → (s , l) ∈ ss → Sub j q s a × Exact l (After (fD a) s)
     sub-of gm sm = let (N , snd , _) = fine-all gm ; (St , el) = snd sm in (N , St) , exl gm sm el
 
   ----------------------------------------------------------------------
@@ -277,7 +277,7 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     done→ c e with ∧-true {endBy (rows o) c} e
     ... | (e₁ , e₂) = endBy→ exo {c} e₁ , lanes
       where
-      lanes : ∀ {i q a} → Nth i q a → Tb._≺_ q c → Σ Pos λ s → Σ Pos λ c′ → Sub i q s a × enter (fD a) s c′ end × Tb._≼_ c′ c
+      lanes : ∀ {i q a} → Nth i q a → Tb._≺_ q c → Σ Pos λ s → Σ Pos λ c′ → Sub i q s a × After (fD a) s c′ end × Tb._≼_ c′ c
       lanes N qc with found-all N
       ... | (ss , gm) with any⁻ {xs = ss} (or-right (fromT qc) (all⁻ {xs = G} e₂ gm))
       ... | ((s , l) , sm , eb) with sub-of gm sm
@@ -309,7 +309,7 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     ... | true  = oend x (done→ c dc)
     ... | false = opass x (λ D → offT dc (Equivalence.from T-≡ (→done c D)))
 
-    lend-row : ∀ {j q s a c} → Sub j q s a → enter (fD a) s c end → ¬ Queued c → BoundedT c (if done G c then end else skip)
+    lend-row : ∀ {j q s a c} → Sub j q s a → After (fD a) s c end → ¬ Queued c → BoundedT c (if done G c then end else skip)
     lend-row {c = c} sb y nQ with done G c in dc
     ... | true  = lend sb y nQ (done→ c dc)
     ... | false = lpass sb y nQ (λ D → offT dc (Equivalence.from T-≡ (→done c D)))
@@ -339,7 +339,7 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     lane-in {e = end}   () r
 
     -- A lane's row, under some schedule.
-    shown : ∀ {j q s a r} → Sub j q s a → (∀ {l} → Exact l (enter (fD a) s) → r ∈ mapL (laneRow G) (rows l))
+    shown : ∀ {j q s a r} → Sub j q s a → (∀ {l} → Exact l (After (fD a) s) → r ∈ mapL (laneRow G) (rows l))
       → r ∈ rows (boundedRows G)
     shown (N , St) h =
       let (ss , gm) = found-all N ; (l , sm) = proj₂ (proj₂ (fine-all gm)) St in
@@ -370,7 +370,7 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     subst (_∈ _) (trans (passing c nQ) (cong (λ b → c , (if b then end else skip)) (off (done→ c) nD))) (∈-map⁺ (laneRow G) (complete ex y))
 
 bounded-exact : ∀ {A B} (k : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln : A → Pos → Maybe (Listed B)) (o : Listed A)
-  → Exactly o t → (∀ {a s l} → ln a s ≡ just l → Exactly l (enter (fD a) s))
+  → Exactly o t → (∀ {a s l} → ln a s ≡ just l → Exactly l (After (fD a) s))
   → ∀ {l} → BoundedL.listB k ln o ≡ just l → Exactly l (Tb.Bounded.BoundedT k fD t)
 bounded-exact k fD t ln o eo eln e u with bind⁻ {m = BoundedL.levels k ln o (length (values (rows o))) 0 [] (Order.nths (values (rows o)) 0)} e
 ... | (G , eG , refl) = record { sound = sound-b ; complete = complete-b }

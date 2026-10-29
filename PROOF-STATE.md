@@ -33,13 +33,6 @@ bound is at least the outer's, uniformly in the lane. Settled by bodies.
 
 Members: `flatMap-ne`, `takeWhile-ne`.
 
-#### CAUSALITY
-
-Untried: each operator reads its inputs no further than it runs. Settled
-by bodies, the joiners' by lane positions lying after the outer's row.
-
-Members: `flatMap-causal`.
-
 #### THE ONE-INPUT OPERATORS
 
 Untried: rows at their input's positions keep the bound. Settled by bodies.

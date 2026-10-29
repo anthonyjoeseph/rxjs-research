@@ -105,6 +105,12 @@ enter : ∀ {A} → Den A → Pos → EmissionSet A
 enter (hot t)  p = Truncate (Rejoin p t)
 enter (cold f) p = Truncate (f p)
 
+-- A LANE subscribed at `s`: its rows past `s`.  A lawful reading has no
+-- other, and a joiner reading one before its subscription would hang its
+-- rows on outer values past them (`flatMap-causal`).
+After : ∀ {A} → Den A → Pos → EmissionSet A
+After d s k e = enter d s k e × s ≺ k
+
 ------------------------------------------------------------------------
 -- Leaves
 
@@ -201,7 +207,7 @@ takeWhileᵀ i keep s = cold λ p → TakeWhile.TakeT i keep (enter s p) p
 module Merge {A B : Set} (f : A → Den B) (o : EmissionSet A) where
 
   Lane : Pos → A → EmissionSet B
-  Lane q a = enter (f a) (q ++ [ ix 1 ])
+  Lane q a = After (f a) (q ++ [ ix 1 ])
 
   -- Every part begun before `c` has ended by `c`.
   Done : Pos → Set
@@ -247,7 +253,7 @@ module Bounded {A B : Set} (n : ℕ) (f : A → Den B) (o : EmissionSet A) where
 
   -- Lane i's ends, given the lanes before it.
   Ends : ℕ → List (Pos → Set) → Pos → Set
-  Ends i ls c = Σ Pos λ q → Σ A λ a → Σ Pos λ s → Nth i q a × Starts i q ls s × enter (f a) s c end
+  Ends i ls c = Σ Pos λ q → Σ A λ a → Σ Pos λ s → Nth i q a × Starts i q ls s × After (f a) s c end
 
   -- The lanes before lane i, the latest first.
   Sched : ℕ → List (Pos → Set)
@@ -265,24 +271,24 @@ module Bounded {A B : Set} (n : ℕ) (f : A → Den B) (o : EmissionSet A) where
   -- Every part begun before `c` has ended by `c`.
   Done : Pos → Set
   Done c = (Σ Pos λ c₀ → o c₀ end × c₀ ≼ c)
-         × (∀ {i q a} → Nth i q a → q ≺ c → Σ Pos λ s → Σ Pos λ c′ → Sub i q s a × enter (f a) s c′ end × c′ ≼ c)
+         × (∀ {i q a} → Nth i q a → q ≺ c → Σ Pos λ s → Σ Pos λ c′ → Sub i q s a × After (f a) s c′ end × c′ ≼ c)
 
   data BoundedT : EmissionSet B where
     val     : ∀ {q a} → o q (out a) → BoundedT (q ++ [ ix 0 ]) skip
     step    : ∀ {q} → o q skip → BoundedT q skip
     oend    : ∀ {c} → o c end → Done c → BoundedT c end
     opass   : ∀ {c} → o c end → ¬ Done c → BoundedT c skip
-    lane    : ∀ {i q s a k e} → Sub i q s a → enter (f a) s k e → Work e → BoundedT k e
-    handoff : ∀ {i q s a c} → Sub i q s a → enter (f a) s c end → Queued c → BoundedT (c ++ [ ix 0 ]) skip
-    lend    : ∀ {i q s a c} → Sub i q s a → enter (f a) s c end → ¬ Queued c → Done c → BoundedT c end
-    lpass   : ∀ {i q s a c} → Sub i q s a → enter (f a) s c end → ¬ Queued c → ¬ Done c → BoundedT c skip
+    lane    : ∀ {i q s a k e} → Sub i q s a → After (f a) s k e → Work e → BoundedT k e
+    handoff : ∀ {i q s a c} → Sub i q s a → After (f a) s c end → Queued c → BoundedT (c ++ [ ix 0 ]) skip
+    lend    : ∀ {i q s a c} → Sub i q s a → After (f a) s c end → ¬ Queued c → Done c → BoundedT c end
+    lpass   : ∀ {i q s a c} → Sub i q s a → After (f a) s c end → ¬ Queued c → ¬ Done c → BoundedT c skip
 
 -- SWITCH: a value's lane runs until the next value arrives.  What a cut
 -- lane still runs of its subscribe burst stays, as skips.
 module Switch {A B : Set} (f : A → Den B) (o : EmissionSet A) where
 
   Lane : Pos → A → EmissionSet B
-  Lane q a = enter (f a) (q ++ [ ix 1 ])
+  Lane q a = After (f a) (q ++ [ ix 1 ])
 
   -- A value after `q` arrived before `k`.
   Cut : Pos → Pos → Set
@@ -313,7 +319,7 @@ module Exhaust {A B : Set} (f : A → Den B) (o : EmissionSet A) where
   open Values o using (Next)
 
   Lane : Pos → A → EmissionSet B
-  Lane q a = enter (f a) (q ++ [ ix 1 ])
+  Lane q a = After (f a) (q ++ [ ix 1 ])
 
   -- At the value at `q′`, the last lane run is the value at `q`'s.
   data Cur : Pos → Pos → Set where

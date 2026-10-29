@@ -36,16 +36,18 @@ open import Data.Nat.Properties using (n≤1+n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Function using (_∘_)
-open import Relation.Binary.PropositionalEquality using (refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
+open import Data.List.Properties using (∷ʳ-injectiveˡ)
+open import Data.Maybe using (just; nothing)
 
-open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList.Events using (Timeline; Pos; ix; sub; last)
 open import denotation.EmissionSet
-  using (Ev; out; skip; end; EmissionSet; _≺_; _≼_; Truncate; Proper; Rejoin; shown; ended; late; guard; body; Den; hot; enter; DenEnv; approxᵀ; ⟦_⟧ᵀ; coldᵀ; emptyᵀ; ofᵀ; mapᵀ; scanᵀ; takeWhileᵀ; flatMapᵀ; connectᵀ; deferᵀ; ⊥ᵀ;
+  using (Ev; out; skip; end; EmissionSet; _≺_; _≼_; Truncate; Proper; Rejoin; shown; ended; late; guard; body; Den; hot; enter; After; DenEnv; approxᵀ; ⟦_⟧ᵀ; coldᵀ; emptyᵀ; ofᵀ; mapᵀ; scanᵀ; takeWhileᵀ; flatMapᵀ; connectᵀ; deferᵀ; ⊥ᵀ;
          MapT; map-out; map-skip; map-end)
 import denotation.EmissionSet as ES
 open import denotation.EmissionSet.Laws.Modulus
-  using (≺-trans; ≺→≼; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext; few-via; AgreeTo; ⟨_⟩; upto; AgreeTo-sym; AgS; trunc-ag; trunc-to; ~-cold; _≈⟨_∣_⟩_; ≈-refl; ≈-sym; ≈-trans; ≈-mono; Same; agree-all; LimD; limit; ticks; contract; unfold₀; _~⟨_⟩_; ~-refl)
+  using (≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext; few-via; AgreeTo; ⟨_⟩; upto; AgreeTo-sym; AgS; trunc-ag; trunc-to; ~-cold; _≈⟨_∣_⟩_; ≈-refl; ≈-sym; ≈-trans; ≈-mono; Same; agree-all; LimD; limit; ticks; contract; unfold₀; _~⟨_⟩_; ~-refl)
 open import denotation.EmissionSet.Laws.Worlds using (Ok; _⊕_; Lawful; InvAt; InvD; Hots; GoodEnv; world-after; ok-step; inv-widen)
 
 -- The same rows at every subscription.
@@ -105,10 +107,6 @@ postulate
                → Causal F → Causal F′
                → s ≈⟨ Ok H ∣ k ⟩ s′ → (∀ {t} → Lawful t → F (hot t) ≈⟨ Ok (H ⊕ t) ∣ k ⟩ F′ (hot t))
                → connectᵀ s F ≈⟨ Ok H ∣ k ⟩ connectᵀ s′ F′
-
-  -- EACH OPERATOR READS ITS INPUTS NO FURTHER THAN IT RUNS.
-  flatMap-causal   : ∀ {A B q} (op : FlatOp) {f f′ : A → Den B} {s s′ : Den A}
-                   → s ~⟨ q ⟩ s′ → (∀ a → f a ~⟨ q ⟩ f′ a) → flatMapᵀ op f s ~⟨ q ⟩ flatMapᵀ op f′ s′
 
   -- EACH OPERATOR KEEPS THE INVARIANT.
   cold-inv      : ∀ {A H} (c : Timeline A) → InvD H (coldᵀ c)
@@ -259,6 +257,266 @@ private
 
 hot-causal : ∀ {A q} {t t′ : EmissionSet A} → AgreeTo q t t′ → hot t ~⟨ q ⟩ hot t′
 hot-causal {q = q} a p = trunc-to ⟨ (λ {y} yq → rejoin-ag {q = q} {p} a yq , rejoin-ag {q = q} {p} (AgreeTo-sym a) yq) ⟩
+
+-- A JOINER reads a lane only past its subscription, so a lane row at or
+-- before the bound has its outer value there too.  The rest it reads (a
+-- cut, a latest value, a first value, an unended lane) holds past the
+-- bound by order alone.
+private
+  module Join {A B : Set} (Q : Pos) where
+    -- Every lane agrees; a record, so its type names both families.
+    record Lanes (f f′ : A → Den B) : Set where
+      constructor lanes
+      field lanes-ag : ∀ a → f a ~⟨ Q ⟩ f′ a
+    open Lanes
+
+    lanes-sym : ∀ {f f′} → Lanes f f′ → Lanes f′ f
+    lanes-sym af = lanes λ a p → AgreeTo-sym (lanes-ag af a p)
+
+    below : ∀ x y → x ≺ y → y ≼ Q → x ≼ Q
+    below x y xy yQ = ≺→≼ {x} {Q} (≺-≼-≺ {x} {y} {Q} xy yQ)
+
+    trans≼ : ∀ x y → x ≼ y → y ≼ Q → x ≼ Q
+    trans≼ x y xy yQ = ≼-trans {x} {y} {Q} xy yQ
+
+    beyond : ∀ x y → x ≼ Q → Q ≺ y → x ≼ y
+    beyond x y xQ Qy = ≺→≼ {x} {y} (≼-≺-≺ {x} {Q} {y} xQ Qy)
+
+    fwd : ∀ {X} {t t′ : EmissionSet X} → AgreeTo Q t t′ → ∀ y {e} → y ≼ Q → t y e → t′ y e
+    fwd a y yQ = proj₁ (upto a {y} yQ)
+
+    bwd : ∀ {X} {t t′ : EmissionSet X} → AgreeTo Q t t′ → ∀ y {e} → y ≼ Q → t′ y e → t y e
+    bwd a y yQ = proj₂ (upto a {y} yQ)
+
+    lane-to : ∀ {f f′} → Lanes f f′ → ∀ a s k {e} → k ≼ Q → After (f a) s k e → After (f′ a) s k e
+    lane-to af a s k kQ (x , sk) = fwd (lanes-ag af a s) k kQ x , sk
+
+    -- A lane at `q ++ [ ix 1 ]` with a row at or before the bound.
+    value-below : ∀ q k → (q ++ [ ix 1 ]) ≺ k → k ≼ Q → q ≼ Q
+    value-below q k sk kQ = below q k (≺-trans {q} {q ++ [ ix 1 ]} {k} (≺-ext q []) sk) kQ
+
+    -- An unended lane: unended before `x` past the bound by order.
+    unended-to : ∀ {f f′} → Lanes f f′ → ∀ a s x → x ≼ Q → (∀ {c} → After (f a) s c end → x ≼ c)
+               → ∀ {c} → After (f′ a) s c end → x ≼ c
+    unended-to af a s x xQ nl {c} l′ with ≼-or-≻ c Q
+    ... | inj₁ cQ = nl (lane-to (lanes-sym af) a s c cQ l′)
+    ... | inj₂ Qc = beyond x c xQ Qc
+
+    least-to : ∀ {o o′ : EmissionSet A} → AgreeTo Q o o′ → ∀ q → q ≼ Q
+             → (∀ {k b} → o k (out b) → q ≼ k) → ∀ {k b} → o′ k (out b) → q ≼ k
+    least-to ao q qQ mn = over ao (λ k → q ≼ k) (λ {k} Qk → beyond q k qQ Qk) mn
+
+    next-to : ∀ {o o′ : EmissionSet A} → AgreeTo Q o o′ → ∀ q q′ → q′ ≼ Q → ES.Values.Next o q q′ → ES.Values.Next o′ q q′
+    next-to ao q q′ q′Q nx = over ao (λ k → q ≺ k → q′ ≼ k) (λ {k} Qk _ → beyond q′ k q′Q Qk) nx
+
+    module MergeJ where
+      open ES.Merge using (Done; MergeT; val; step; oend; opass; lane; lend; lpass)
+
+      done-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes f f′ → ∀ c → c ≼ Q → Done f o c → Done f′ o′ c
+      done-to ao af c cQ ((c₀ , x , c₀c) , h) =
+          (c₀ , fwd ao c₀ (trans≼ c₀ c c₀c cQ) x , c₀c)
+        , λ {q} {a} x′ qc → let (c′ , y , c′c) = h (bwd ao q (below q c qc cQ) x′) qc
+                            in c′ , lane-to af a (q ++ [ ix 1 ]) c′ (trans≼ c′ c c′c cQ) y , c′c
+
+      merge-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes f f′ → ∀ y {e} → y ≼ Q → MergeT f o y e → MergeT f′ o′ y e
+      merge-to ao af _ yQ (val {q} x)                = val (fwd ao q (below q (q ++ [ ix 0 ]) (≺-ext q []) yQ) x)
+      merge-to ao af y yQ (step x)                   = step (fwd ao y yQ x)
+      merge-to ao af y yQ (oend x d)                 = oend (fwd ao y yQ x) (done-to ao af y yQ d)
+      merge-to ao af y yQ (opass x nd)               = opass (fwd ao y yQ x) (λ d → nd (done-to (AgreeTo-sym ao) (lanes-sym af) y yQ d))
+      merge-to ao af y yQ (lane {q} {a} x l w)       =
+        lane (fwd ao q (value-below q y (proj₂ l) yQ) x) (lane-to af a (q ++ [ ix 1 ]) y yQ l) w
+      merge-to ao af y yQ (lend {q} {a} x l d)       =
+        lend (fwd ao q (value-below q y (proj₂ l) yQ) x) (lane-to af a (q ++ [ ix 1 ]) y yQ l) (done-to ao af y yQ d)
+      merge-to ao af y yQ (lpass {q} {a} x l nd)     =
+        lpass (fwd ao q (value-below q y (proj₂ l) yQ) x) (lane-to af a (q ++ [ ix 1 ]) y yQ l)
+              (λ d → nd (done-to (AgreeTo-sym ao) (lanes-sym af) y yQ d))
+
+    module SwitchJ where
+      open ES.Switch using (Cut; Latest; Done; SwitchT; val; step; oend; opass; lane; lend; lpass; left)
+
+      cut-to : ∀ (f f′ : A → Den B) {o o′ : EmissionSet A} → AgreeTo Q o o′ → ∀ q k → k ≼ Q → Cut f o q k → Cut f′ o′ q k
+      cut-to f f′ ao q k kQ (q′ , a′ , x , qq′ , q′k) = q′ , a′ , fwd ao q′ (below q′ k q′k kQ) x , qq′ , q′k
+
+      latest-to : ∀ (f f′ : A → Den B) {o o′ : EmissionSet A} → AgreeTo Q o o′ → ∀ q c → c ≼ Q → Latest f o q c → Latest f′ o′ q c
+      latest-to f f′ ao q c cQ la {q′} x′ q′c = la {q′} (bwd ao q′ (below q′ c q′c cQ) x′) q′c
+
+      done-to : ∀ (f f′ : A → Den B) {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes f f′ → ∀ c → c ≼ Q → Done f o c → Done f′ o′ c
+      done-to f f′ ao af c cQ ((c₀ , x , c₀c) , h) =
+          (c₀ , fwd ao c₀ (trans≼ c₀ c c₀c cQ) x , c₀c)
+        , λ {q} {a} x′ qc la′ →
+            let (c′ , y , c′c) = h (bwd ao q (below q c qc cQ) x′) qc (latest-to f′ f (AgreeTo-sym ao) q c cQ la′)
+            in c′ , lane-to af a (q ++ [ ix 1 ]) c′ (trans≼ c′ c c′c cQ) y , c′c
+
+      switch-to : ∀ (f f′ : A → Den B) {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes f f′ → ∀ y {e} → y ≼ Q → SwitchT f o y e → SwitchT f′ o′ y e
+      switch-to f f′ ao af _ yQ (val {q} x)           = val (fwd ao q (below q (q ++ [ ix 0 ]) (≺-ext q []) yQ) x)
+      switch-to f f′ ao af y yQ (step x)              = step (fwd ao y yQ x)
+      switch-to f f′ ao af y yQ (oend x d)            = oend (fwd ao y yQ x) (done-to f f′ ao af y yQ d)
+      switch-to f f′ ao af y yQ (opass x nd)          =
+        opass (fwd ao y yQ x) (λ d → nd (done-to f′ f (AgreeTo-sym ao) (lanes-sym af) y yQ d))
+      switch-to f f′ ao af y yQ (lane {q} {a} x l w nc) =
+        lane (fwd ao q (value-below q y (proj₂ l) yQ) x) (lane-to af a (q ++ [ ix 1 ]) y yQ l) w
+             (λ c → nc (cut-to f′ f (AgreeTo-sym ao) q y yQ c))
+      switch-to f f′ ao af y yQ (lend {q} {a} x l nc d) =
+        lend (fwd ao q (value-below q y (proj₂ l) yQ) x) (lane-to af a (q ++ [ ix 1 ]) y yQ l)
+             (λ c → nc (cut-to f′ f (AgreeTo-sym ao) q y yQ c)) (done-to f f′ ao af y yQ d)
+      switch-to f f′ ao af y yQ (lpass {q} {a} x l nc nd) =
+        lpass (fwd ao q (value-below q y (proj₂ l) yQ) x) (lane-to af a (q ++ [ ix 1 ]) y yQ l)
+              (λ c → nc (cut-to f′ f (AgreeTo-sym ao) q y yQ c)) (λ d → nd (done-to f′ f (AgreeTo-sym ao) (lanes-sym af) y yQ d))
+      switch-to f f′ ao af y yQ (left {q} {a} x l c ins) =
+        left (fwd ao q (value-below q y (proj₂ l) yQ) x) (lane-to af a (q ++ [ ix 1 ]) y yQ l) (cut-to f f′ ao q y yQ c) ins
+
+    module ExhaustJ where
+      open ES.Exhaust using (Cur; cur₀; run; drop; Done; ExhaustT; val; step; oend; opass; lane; lend; lpass)
+
+      cur-le : ∀ {f : A → Den B} {o : EmissionSet A} {q₁ q} → Cur f o q₁ q → q ≼ q₁
+      cur-le {q₁ = q₁} (cur₀ _ _)            = ≼-refl {q₁}
+      cur-le {q₁ = q₂} (run _ _ _ _ _ _ _)    = ≼-refl {q₂}
+      cur-le (drop {q₁} {q} {q₂ = q₂} cu _ _ _ lt _) = ≺→≼ {q} {q₂} (≼-≺-≺ {q} {q₁} {q₂} (cur-le cu) lt)
+
+      cur-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes f f′ → ∀ q₁ q → q₁ ≼ Q → Cur f o q₁ q → Cur f′ o′ q₁ q
+      cur-to ao af q₁ _ q₁Q (cur₀ x mn) = cur₀ (fwd ao q₁ q₁Q x) (least-to ao q₁ q₁Q mn)
+      cur-to ao af q₂ _ q₂Q (run {q₁} {q} {a} {c} cu x l cq₂ x₂ lt nx) =
+        run (cur-to ao af q₁ q q₁Q cu) (fwd ao q qQ x) (lane-to af a (q ++ [ ix 1 ]) c (below c q₂ cq₂ q₂Q) l) cq₂
+            (fwd ao q₂ q₂Q x₂) lt (next-to ao q₁ q₂ q₂Q nx)
+        where
+          q₁Q = below q₁ q₂ lt q₂Q
+          qQ  = trans≼ q q₁ (cur-le cu) q₁Q
+      cur-to ao af q₂ q q₂Q (drop {q₁} {a = a} cu x nl x₂ lt nx) =
+        drop (cur-to ao af q₁ q q₁Q cu) (fwd ao q qQ x) (unended-to af a (q ++ [ ix 1 ]) q₂ q₂Q nl)
+             (fwd ao q₂ q₂Q x₂) lt (next-to ao q₁ q₂ q₂Q nx)
+        where
+          q₁Q = below q₁ q₂ lt q₂Q
+          qQ  = trans≼ q q₁ (cur-le cu) q₁Q
+
+      done-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes f f′ → ∀ c → c ≼ Q → Done f o c → Done f′ o′ c
+      done-to ao af c cQ ((c₀ , x , c₀c) , h) =
+          (c₀ , fwd ao c₀ (trans≼ c₀ c c₀c cQ) x , c₀c)
+        , λ {q} {a} x′ qc r′ →
+            let qQ = below q c qc cQ
+                (c′ , y , c′c) = h (bwd ao q qQ x′) qc (cur-to (AgreeTo-sym ao) (lanes-sym af) q q qQ r′)
+            in c′ , lane-to af a (q ++ [ ix 1 ]) c′ (trans≼ c′ c c′c cQ) y , c′c
+
+      exhaust-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes f f′ → ∀ y {e} → y ≼ Q → ExhaustT f o y e → ExhaustT f′ o′ y e
+      exhaust-to ao af _ yQ (val {q} x)       = val (fwd ao q (below q (q ++ [ ix 0 ]) (≺-ext q []) yQ) x)
+      exhaust-to ao af y yQ (step x)          = step (fwd ao y yQ x)
+      exhaust-to ao af y yQ (oend x d)        = oend (fwd ao y yQ x) (done-to ao af y yQ d)
+      exhaust-to ao af y yQ (opass x nd)      = opass (fwd ao y yQ x) (λ d → nd (done-to (AgreeTo-sym ao) (lanes-sym af) y yQ d))
+      exhaust-to ao af y yQ (lane {q} {a} x r l w) =
+        lane (fwd ao q qQ x) (cur-to ao af q q qQ r) (lane-to af a (q ++ [ ix 1 ]) y yQ l) w
+        where qQ = value-below q y (proj₂ l) yQ
+      exhaust-to ao af y yQ (lend {q} {a} x r l d) =
+        lend (fwd ao q qQ x) (cur-to ao af q q qQ r) (lane-to af a (q ++ [ ix 1 ]) y yQ l) (done-to ao af y yQ d)
+        where qQ = value-below q y (proj₂ l) yQ
+      exhaust-to ao af y yQ (lpass {q} {a} x r l nd) =
+        lpass (fwd ao q qQ x) (cur-to ao af q q qQ r) (lane-to af a (q ++ [ ix 1 ]) y yQ l)
+              (λ d → nd (done-to (AgreeTo-sym ao) (lanes-sym af) y yQ d))
+        where qQ = value-below q y (proj₂ l) yQ
+
+    module BoundedJ (n : ℕ) where
+      open ES.Values using (Nth; first; next)
+      open ES.Bounded using (Kth; Starts; room; freed; queued; Ends; Sched; Sub; Queued; Done; BoundedT;
+                             val; step; oend; opass; lane; handoff; lend; lpass)
+
+      -- Two lists of lanes, each by its ends, agreeing at and below the bound.
+      data LAg : List (Pos → Set) → List (Pos → Set) → Set₁ where
+        none : LAg [] []
+        _&_  : ∀ {l l′ ls ls′} → (∀ c → c ≼ Q → (l c → l′ c) × (l′ c → l c)) → LAg ls ls′ → LAg (l ∷ ls) (l′ ∷ ls′)
+
+      lag-sym : ∀ {ls ls′} → LAg ls ls′ → LAg ls′ ls
+      lag-sym none    = none
+      lag-sym (g & L) = (λ c cQ → proj₂ (g c cQ) , proj₁ (g c cQ)) & lag-sym L
+
+      -- `Kth` reads neither family, so both are named.
+      kth-to : ∀ (f f′ : A → Den B) (o o′ : EmissionSet A) {P ls ls′} → LAg ls ls′ → (∀ c → P c → c ≼ Q)
+             → ∀ k → Kth n f o P ls k → Kth n f′ o′ P ls′ k
+      kth-to f f′ o o′ none    bP k ()
+      kth-to f f′ o o′ (g & L) bP zero    (inj₁ (c , y , pc))       = inj₁ (c , proj₁ (g c (bP c pc)) y , pc)
+      kth-to f f′ o o′ (g & L) bP zero    (inj₂ r)                  = inj₂ (kth-to f f′ o o′ L bP zero r)
+      kth-to f f′ o o′ (g & L) bP (suc k) (inj₁ ((c , y , pc) , r)) = inj₁ ((c , proj₁ (g c (bP c pc)) y , pc) , kth-to f f′ o o′ L bP k r)
+      kth-to f f′ o o′ (g & L) bP (suc k) (inj₂ r)                  = inj₂ (kth-to f f′ o o′ L bP (suc k) r)
+
+      -- What a subscription `x ++ [ ix 1 ]` hangs on lies at or before the bound.
+      Stem : Pos → Set
+      Stem s = ∀ x → s ≡ x ++ [ ix 1 ] → x ≼ Q
+
+      stem-≼ : ∀ s → s ≼ Q → Stem s
+      stem-≼ s sQ x refl = below x (x ++ [ ix 1 ]) (≺-ext x []) sQ
+
+      stem-at : ∀ c → c ≼ Q → Stem (c ++ [ ix 1 ])
+      stem-at c cQ x e = subst (_≼ Q) (∷ʳ-injectiveˡ c x e) cQ
+
+      starts-q : ∀ {f : A → Den B} {o : EmissionSet A} {i q ls s} → Stem s → Starts n f o i q ls s → q ≼ Q
+      starts-q {q = q} st (room _)                = st q refl
+      starts-q {q = q} st (freed _ _)             = st q refl
+      starts-q {q = q} st (queued {c} _ qc _ _ _) = below q c qc (st c refl)
+
+      starts-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} {i q ls ls′ s} → LAg ls ls′ → Stem s → Starts n f o i q ls s → Starts n f′ o′ i q ls′ s
+      starts-to L st (room lt) = room lt
+      starts-to {f} {f′} {o} {o′} {q = q} L st (freed le h) =
+        freed le (kth-to f f′ o o′ L (λ c cq → below c q cq (st q refl)) _ h)
+      starts-to {f} {f′} {o} {o′} L st (queued {c} le qc one h nh) =
+        queued le qc (kth-to f f′ o o′ L (λ { c′ refl → cQ }) 0 one) (kth-to f f′ o o′ L (λ c′ c′c → trans≼ c′ c c′c cQ) _ h)
+               (λ h′ → nh (kth-to f′ f o′ o (lag-sym L) (λ c′ c′c → below c′ c c′c cQ) _ h′))
+        where cQ = st c refl
+
+      nth-to : ∀ {o o′ : EmissionSet A} {i q a} → AgreeTo Q o o′ → q ≼ Q → Nth o i q a → Nth o′ i q a
+      nth-to {q = q} ao qQ (first x mn)                = first (fwd ao q qQ x) (least-to ao q qQ mn)
+      nth-to {q = q′} ao q′Q (next {q = q} N x lt nx)  =
+        next (nth-to ao (below q q′ lt q′Q) N) (fwd ao q′ q′Q x) lt (next-to ao q q′ q′Q nx)
+
+      ends-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes f f′ → ∀ {i ls ls′} → LAg ls ls′
+              → ∀ c → c ≼ Q → Ends n f o i ls c → Ends n f′ o′ i ls′ c
+      ends-to ao af L c cQ (q , a , s , N , St , (y , sc)) =
+        q , a , s , nth-to ao (starts-q st St) N , starts-to L st St , lane-to af a s c cQ (y , sc)
+        where st = stem-≼ s (below s c sc cQ)
+
+      sched-ag : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes f f′ → ∀ i → LAg (Sched n f o i) (Sched n f′ o′ i)
+      sched-ag ao af zero    = none
+      sched-ag ao af (suc i) =
+        (λ c cQ → ends-to ao af (sched-ag ao af i) c cQ , ends-to (AgreeTo-sym ao) (lanes-sym af) (lag-sym (sched-ag ao af i)) c cQ)
+        & sched-ag ao af i
+
+      sub-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes f f′ → ∀ {i q s a} → Stem s → Sub n f o i q s a → Sub n f′ o′ i q s a
+      sub-to ao af {i} st (N , St) = nth-to ao (starts-q st St) N , starts-to (sched-ag ao af i) st St
+
+      queued-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes f f′ → ∀ c → c ≼ Q → Queued n f o c → Queued n f′ o′ c
+      queued-to ao af c cQ (i , q , a , sb) = i , q , a , sub-to ao af (stem-at c cQ) sb
+
+      done-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes f f′ → ∀ c → c ≼ Q → Done n f o c → Done n f′ o′ c
+      done-to ao af c cQ ((c₀ , x , c₀c) , h) =
+          (c₀ , fwd ao c₀ (trans≼ c₀ c c₀c cQ) x , c₀c)
+        , λ {i} {q} {a} N′ qc →
+            let (s , c′ , sb , (y , sc′) , c′c) = h (nth-to (AgreeTo-sym ao) (below q c qc cQ) N′) qc
+                c′Q = trans≼ c′ c c′c cQ
+            in s , c′ , sub-to ao af (stem-≼ s (below s c′ sc′ c′Q)) sb , lane-to af a s c′ c′Q (y , sc′) , c′c
+
+      bounded-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes f f′ → ∀ y {e} → y ≼ Q → BoundedT n f o y e → BoundedT n f′ o′ y e
+      bounded-to ao af _ yQ (val {q} x)    = val (fwd ao q (below q (q ++ [ ix 0 ]) (≺-ext q []) yQ) x)
+      bounded-to ao af y yQ (step x)       = step (fwd ao y yQ x)
+      bounded-to ao af y yQ (oend x d)     = oend (fwd ao y yQ x) (done-to ao af y yQ d)
+      bounded-to ao af y yQ (opass x nd)   = opass (fwd ao y yQ x) (λ d → nd (done-to (AgreeTo-sym ao) (lanes-sym af) y yQ d))
+      bounded-to ao af y yQ (lane {s = s} {a = a} sb (x , sy) w) =
+        lane (sub-to ao af (stem-≼ s (below s y sy yQ)) sb) (lane-to af a s y yQ (x , sy)) w
+      bounded-to ao af _ yQ (handoff {s = s} {a = a} {c = c} sb (x , sc) qd) =
+        handoff (sub-to ao af (stem-≼ s (below s c sc cQ)) sb) (lane-to af a s c cQ (x , sc)) (queued-to ao af c cQ qd)
+        where cQ = below c (c ++ [ ix 0 ]) (≺-ext c []) yQ
+      bounded-to ao af y yQ (lend {s = s} {a = a} sb (x , sy) nq d) =
+        lend (sub-to ao af (stem-≼ s (below s y sy yQ)) sb) (lane-to af a s y yQ (x , sy))
+             (λ q′ → nq (queued-to (AgreeTo-sym ao) (lanes-sym af) y yQ q′)) (done-to ao af y yQ d)
+      bounded-to ao af y yQ (lpass {s = s} {a = a} sb (x , sy) nq nd) =
+        lpass (sub-to ao af (stem-≼ s (below s y sy yQ)) sb) (lane-to af a s y yQ (x , sy))
+              (λ q′ → nq (queued-to (AgreeTo-sym ao) (lanes-sym af) y yQ q′)) (λ d → nd (done-to (AgreeTo-sym ao) (lanes-sym af) y yQ d))
+
+flatMap-causal : ∀ {A B q} (op : FlatOp) {f f′ : A → Den B} {s s′ : Den A}
+               → s ~⟨ q ⟩ s′ → (∀ a → f a ~⟨ q ⟩ f′ a) → flatMapᵀ op f s ~⟨ q ⟩ flatMapᵀ op f′ s′
+flatMap-causal {q = q} (mergeᶠ nothing) as af = ~-cold λ p →
+  ⟨ (λ {y} yq → Join.MergeJ.merge-to q (as p) (Join.lanes af) y yq , Join.MergeJ.merge-to q (AgreeTo-sym (as p)) (Join.lanes-sym q (Join.lanes af)) y yq) ⟩
+flatMap-causal {q = q} (mergeᶠ (just n)) as af = ~-cold λ p →
+  ⟨ (λ {y} yq → Join.BoundedJ.bounded-to q n (as p) (Join.lanes af) y yq , Join.BoundedJ.bounded-to q n (AgreeTo-sym (as p)) (Join.lanes-sym q (Join.lanes af)) y yq) ⟩
+flatMap-causal {q = q} switchᶠ {f} {f′} as af = ~-cold λ p →
+  ⟨ (λ {y} yq → Join.SwitchJ.switch-to q f f′ (as p) (Join.lanes af) y yq , Join.SwitchJ.switch-to q f′ f (AgreeTo-sym (as p)) (Join.lanes-sym q (Join.lanes af)) y yq) ⟩
+flatMap-causal {q = q} exhaustᶠ as af = ~-cold λ p →
+  ⟨ (λ {y} yq → Join.ExhaustJ.exhaust-to q (as p) (Join.lanes af) y yq , Join.ExhaustJ.exhaust-to q (AgreeTo-sym (as p)) (Join.lanes-sym q (Join.lanes af)) y yq) ⟩
 
 ------------------------------------------------------------------------
 -- The environment

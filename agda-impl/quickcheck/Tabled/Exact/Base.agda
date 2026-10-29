@@ -19,7 +19,7 @@ open import Data.Nat.Properties using (m≤n⇒m≤1+n; ≤-trans)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 open import Relation.Nullary using (¬_; does; yes; no)
 
 open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; _≟ᵖ_; ix; <ᵖ-trans; <ᵖ-irrefl)
@@ -27,7 +27,7 @@ open import denotation.EmissionSet using (out; skip; end; EmissionSet; _≺_; _�
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled
   using (Row; Listed; rows; short; bind; concatMap; mapM; concatMapM; when; anyᵇ; allᵇ; endBy; endBefore; ends;
-  properᵇ; values; lanes; module Order)
+  properᵇ; values; lanes; pastRows; afterL; module Order)
 
 ------------------------------------------------------------------------
 -- Exactness
@@ -258,6 +258,29 @@ lanes-to : ∀ {A B : Set} {ln : A → Pos → Maybe (Listed B)} {vs ls} → lan
 lanes-to {ln = ln} {vs = vs} e {q} {a} vm with mapM⁺ {xs = vs} e vm
 ... | (y , ym , fx) with bind⁻ {m = ln a (q ++ [ ix 1 ])} fx
 ... | (l′ , _ , refl) = l′ , ym
+
+-- A lane listing read past its subscription lists the lane's rows past it.
+pastRows⁻ : ∀ {A s k e} (rs : List (Row A)) → (k , e) ∈ pastRows s rs → (k , e) ∈ rs × s ≺ k
+pastRows⁻ [] ()
+pastRows⁻ {s = s} ((k′ , e′) ∷ rs) m with s <ᵖ k′ in h
+pastRows⁻ ((k′ , e′) ∷ rs) (here refl) | true  = here refl , subst T (sym h) tt
+pastRows⁻ ((k′ , e′) ∷ rs) (there m)   | true  = let (x , y) = pastRows⁻ rs m in there x , y
+pastRows⁻ ((k′ , e′) ∷ rs) m           | false = let (x , y) = pastRows⁻ rs m in there x , y
+
+pastRows⁺ : ∀ {A s k e} (rs : List (Row A)) → (k , e) ∈ rs → s ≺ k → (k , e) ∈ pastRows s rs
+pastRows⁺ {s = s} ((k′ , e′) ∷ rs) m sk with s <ᵖ k′ in h
+pastRows⁺ ((k′ , e′) ∷ rs) (here refl) sk | true  = here refl
+pastRows⁺ ((k′ , e′) ∷ rs) (there m)   sk | true  = there (pastRows⁺ rs m sk)
+pastRows⁺ ((k′ , e′) ∷ rs) (here refl) sk | false = ⊥-elim (subst T h sk)
+pastRows⁺ ((k′ , e′) ∷ rs) (there m)   sk | false = pastRows⁺ rs m sk
+
+afterL-exact : ∀ {A B : Set} {ln : A → Pos → Maybe (Listed B)} {D : A → Pos → EmissionSet B}
+  → (∀ {a s l} → ln a s ≡ just l → Exactly l (D a s))
+  → ∀ {a s l} → afterL ln a s ≡ just l → Exactly l (λ k e → D a s k e × s ≺ k)
+afterL-exact {ln = ln} ih {a} {s} e with bind⁻ {m = ln a s} e
+... | (l₀ , e₀ , refl) = λ u → record
+  { sound    = λ m → let (x , y) = pastRows⁻ (rows l₀) m in sound (ih e₀ u) x , y
+  ; complete = λ { (x , y) → pastRows⁺ (rows l₀) (complete (ih e₀ u) x) y } }
 
 ------------------------------------------------------------------------
 -- Counting what lies before
