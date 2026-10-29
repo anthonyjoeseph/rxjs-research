@@ -23,12 +23,6 @@ bound is at least the outer's, uniformly in the lane. Settled by bodies.
 
 Members: `flatMap-ne`, `takeWhile-ne`.
 
-#### THE ONE-INPUT OPERATORS
-
-Untried: rows at their input's positions keep the bound. Settled by bodies.
-
-Members: `scan-ne`.
-
 ## Tier 0 — the emission set carries the theorems
 
 **Port:** Main restated over the emission set; `adequacy/` and `simultaneous/` ported to it; no old-denotation use left.

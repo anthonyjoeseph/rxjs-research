@@ -31,24 +31,27 @@ open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (_∷_; lookup)
-open import Data.Nat using (ℕ; zero; suc)
+open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Nat using (ℕ; zero; suc; _≤?_)
 open import Data.Nat.Properties using (n≤1+n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Function using (_∘_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 open import Data.List.Properties using (∷ʳ-injectiveˡ)
 open import Data.Maybe using (just; nothing)
+open import Relation.Nullary using (¬_; Dec; yes; no)
+open import Relation.Nullary.Decidable.Core using (decidable-stable; ¬¬-excluded-middle)
 
 open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.MonotonicList.Events using (Timeline; Pos; ix; sub; last)
 open import denotation.EmissionSet
-  using (Ev; out; skip; end; EmissionSet; _≺_; _≼_; Truncate; Rejoin; shown; ended; late; guard; body;
+  using (Ev; out; skip; end; EmissionSet; _≺_; _≼_; Few; Truncate; Rejoin; shown; ended; late; guard; body;
   Den; hot; enter; After; DenEnv; approxᵀ; ⟦_⟧ᵀ; coldᵀ; emptyᵀ; ofᵀ; mapᵀ; scanᵀ; takeWhileᵀ;
   flatMapᵀ; connectᵀ; deferᵀ; ⊥ᵀ; MapT; map-out; map-skip; map-end)
 import denotation.EmissionSet as ES
 open import denotation.EmissionSet.Laws.Modulus
-  using (≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext; few-via; AgreeTo; ⟨_⟩; upto; AgreeTo-sym; AgS; trunc-ag; trunc-to; ~-cold; _≈⟨_∣_⟩_; ≈-refl; ≈-sym; ≈-trans; ≈-mono; Same; agree-all; LimD; limit; ticks; contract; unfold₀; _~⟨_⟩_; ~-refl)
+  using (size; Bnd<; few-ind; entered-few; ≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext; few-via; AgreeTo; ⟨_⟩; upto; AgreeTo-sym; AgS; trunc-ag; trunc-to; ~-cold; _≈⟨_∣_⟩_; ≈-refl; ≈-sym; ≈-trans; ≈-mono; Same; agree-all; LimD; limit; ticks; contract; unfold₀; _~⟨_⟩_; ~-refl)
 open import denotation.EmissionSet.Laws.Worlds using (Ok; _⊕_; Lawful; InvAt; InvD; Hots; GoodEnv; world-after; ok-step; inv-widen; empty-inv; of-inv; spin-inv; map-inv; scan-inv; defer-inv; lim-inv)
 open import denotation.EmissionSet.Laws.Connect using (connect-inv)
 open import denotation.EmissionSet.Laws.ConnectNe using (Causal; proper-ag; connect-ne)
@@ -89,7 +92,6 @@ EnvAg {Γ} q ρ ρ′ = ∀ {A} (i : A ∈ Γ) → lookup ρ i ~⟨ q ⟩ lookup
 
 postulate
   -- EACH OPERATOR KEEPS THE MODULUS at admissible subscriptions.
-  scan-ne      : ∀ {A B R k} (f : B → A → B) z {s s′ : Den A} → s ≈⟨ R ∣ k ⟩ s′ → scanᵀ f z s ≈⟨ R ∣ k ⟩ scanᵀ f z s′
   takeWhile-ne : ∀ {A H k} (i : Bool) (keep : A → Bool) {s s′ : Den A} → InvD H s → InvD H s′
                → s ≈⟨ Ok H ∣ k ⟩ s′ → takeWhileᵀ i keep s ≈⟨ Ok H ∣ k ⟩ takeWhileᵀ i keep s′
   -- A JOINER keeps the bound uniformly in the lane: no lane is listed.
@@ -182,6 +184,60 @@ private
 
 scan-causal : ∀ {A B q} (f : B → A → B) z {s s′ : Den A} → s ~⟨ q ⟩ s′ → scanᵀ f z s ~⟨ q ⟩ scanᵀ f z s′
 scan-causal f z a = ~-cold λ p → ⟨ (λ yq → SC.scan-to f z (a p) yq , SC.scan-to f z (AgreeTo-sym (a p)) yq) ⟩
+
+-- A SCAN BOUNDS ITS SOURCE: a value with few rows before it has a fold,
+-- from the latest value among those rows, or from none.  Which of them
+-- holds a value is not decidable, but the bound is, so it is read
+-- classically.
+private
+  module SN {A B : Set} (f : B → A → B) (z : B) (t : EmissionSet A) where
+    open ES.Scan f z t using (Acc; acc₀; acc; ScanT; sval; sstep; send)
+
+    Val : Pos → Set
+    Val k = Σ A λ a → t k (out a)
+
+    -- The latest value before `w` among `ks`, or none there.
+    Latest : Pos → List Pos → Set
+    Latest w ks = (∀ {k} → k ∈ ks → Val k → k ≺ w → ⊥)
+                ⊎ Σ Pos λ v → Val v × v ≺ w × (∀ {k} → k ∈ ks → Val k → k ≺ w → k ≼ v)
+
+    latest : ∀ w ks → ¬ ¬ Latest w ks
+    latest w []       ¬L = ¬L (inj₁ λ ())
+    latest w (k ∷ ks) ¬L = latest w ks λ L → ¬¬-excluded-middle {A = Val k × k ≺ w} λ d → ¬L (add L d)
+      where
+        add : Latest w ks → Dec (Val k × k ≺ w) → Latest w (k ∷ ks)
+        add (inj₁ none) (no ¬h) = inj₁ λ { {_} (here refl) vk kw → ¬h (vk , kw) ; {_} (there m) → none m }
+        add (inj₂ (v , vv , vw , mx)) (no ¬h) =
+          inj₂ (v , vv , vw , λ { {_} (here refl) vk kw → ⊥-elim (¬h (vk , kw)) ; {_} (there m) → mx m })
+        add (inj₁ none) (yes (vk , kw)) =
+          inj₂ (k , vk , kw , λ { {_} (here refl) _ _ → ≼-refl {k} ; {_} (there m) vk′ k′w → ⊥-elim (none m vk′ k′w) })
+        add (inj₂ (v , vv , vw , mx)) (yes (vk , kw)) with ≼-or-≻ v k
+        ... | inj₁ vk≼ = inj₂ (k , vk , kw , λ { {_} (here refl) _ _ → ≼-refl {k} ; {k′} (there m) vk′ k′w → ≼-trans {k′} {v} {k} (mx m vk′ k′w) vk≼ })
+        ... | inj₂ kv  = inj₂ (v , vv , vw , λ { {_} (here refl) _ _ → ≺→≼ {k} {v} kv ; {_} (there m) → mx m })
+
+    fold : ∀ {w} → Few t w → ∀ {a} → t w (out a) → ¬ ¬ Σ B (Acc w)
+    fold = few-ind (λ w → ∀ {a} → t w (out a) → ¬ ¬ Σ B (Acc w)) step
+      where
+        step : ∀ {w} → Few t w → (∀ {v e} → t v e → v ≺ w → ∀ {a} → t v (out a) → ¬ ¬ Σ B (Acc v))
+             → ∀ {a} → t w (out a) → ¬ ¬ Σ B (Acc w)
+        step {w} (ks , h) ih {a} x ¬A = latest w ks λ
+          { (inj₁ none) → ¬A (f z a , acc₀ x λ y kw → none (h y kw) (_ , y) kw)
+          ; (inj₂ (v , (_ , xv) , vw , mx)) → ih xv vw xv λ
+              { (b , av) → ¬A (f b a , acc av x vw λ y vk kw → mx (h y kw) (_ , y) kw vk) } }
+
+    bound : ∀ {N q} → (∀ {y e} → t y e → Few t y) → Bnd< N ScanT q → Bnd< N t q
+    bound     fw bd {y} {skip}  x yq = bd (sstep x) yq
+    bound     fw bd {y} {end}   x yq = bd (send x) yq
+    bound {N} fw bd {y} {out a} x yq = decidable-stable (size y ≤? N) λ ¬le → fold (fw x) x λ { (_ , ac) → ¬le (bd (sval ac) yq) }
+
+scan-ne : ∀ {A B R k} (f : B → A → B) z {s s′ : Den A} → s ≈⟨ R ∣ k ⟩ s′ → scanᵀ f z s ≈⟨ R ∣ k ⟩ scanᵀ f z s′
+scan-ne f z {s} {s′} ag p r = trunc-ag go
+  where
+    go : AgS _ (ES.Scan.ScanT f z (enter s p)) (ES.Scan.ScanT f z (enter s′ p))
+    go q (inj₁ bd) = ⟨ (λ yq → SC.scan-to f z a yq , SC.scan-to f z (AgreeTo-sym a) yq) ⟩
+      where a = ag p r q (inj₁ (SN.bound f z (enter s p) (entered-few s p) bd))
+    go q (inj₂ bd) = ⟨ (λ yq → SC.scan-to f z a yq , SC.scan-to f z (AgreeTo-sym a) yq) ⟩
+      where a = ag p r q (inj₂ (SN.bound f z (enter s′ p) (entered-few s′ p) bd))
 
 takeWhile-causal : ∀ {A q} (i : Bool) (keep : A → Bool) {s s′ : Den A} → s ~⟨ q ⟩ s′ → takeWhileᵀ i keep s ~⟨ q ⟩ takeWhileᵀ i keep s′
 takeWhile-causal i keep a = ~-cold λ p → ⟨ (λ yq → TW.take-to i keep p (a p) yq , TW.take-to i keep p (AgreeTo-sym (a p)) yq) ⟩
