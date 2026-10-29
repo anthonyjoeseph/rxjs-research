@@ -19,12 +19,11 @@ Members: `connect-ne`, `connect-inv`.
 
 #### THE WORLD INVARIANT
 
-Untried, new: every reading keeps its rows in its world, reachable, flat,
-and an end's burst below one world position. Settled by bodies per
-operator, or a program whose reading leaves its world.
+Open for the operators that place rows of their own: a timeline's ticks,
+a joiner's lanes, takeWhile's failing value, a rejoined hot. Settled by
+bodies, or a program whose reading leaves its world.
 
-Members: `flatMap-inv`, `takeWhile-inv`, `scan-inv`, `map-inv`, `defer-inv`,
-`lim-inv`, `cold-inv`, `empty-inv`, `of-inv`, `spin-inv`, `lawful-hot`.
+Members: `flatMap-inv`, `takeWhile-inv`, `cold-inv`, `lawful-hot`.
 
 #### THE JOINERS WITHIN THE BOUND
 
