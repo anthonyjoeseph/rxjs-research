@@ -6,7 +6,7 @@
 -- read node by node off the state: an of its values left, a merge the
 -- union of what its outer and its lanes owe.  A step either keeps the
 -- visible rows or shows the least of them and drops it.
-module adequacy.Direct where
+module direct.Rows where
 
 open import Data.Bool using (true; false; if_then_else_)
 open import Data.Empty using (⊥)

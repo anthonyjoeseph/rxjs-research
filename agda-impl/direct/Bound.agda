@@ -5,9 +5,11 @@
 -- shows sits at that key, as a row.  Finding nothing, the node owes
 -- nothing.  A merge's race is the only real case: the outer wins only
 -- strictly before every lane, and a value it shows is a skip just past it.
-module adequacy.Direct.Bound where
+module direct.Bound where
 
 open import Data.Bool using (Bool; true; false; T; _∧_; if_then_else_)
+open import Data.Bool.Properties using (T-≡)
+open import Function.Bundles using (Equivalence)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.Maybe using (Maybe; just; nothing)
@@ -22,24 +24,20 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.MonotonicList using (ofᴱ)
-open import denotation.MonotonicList.Events using (Pos; ix; last; _<ᵖ_; <ᵖ-asym; <ᵖ-split; <ᵖ-step; <ᵖ-shift; <ᵖ-below; <ᵖ-part; <ᵖ-ix)
+open import denotation.MonotonicList.Events using (Pos; ix; last; <ᵖ-asym; <ᵖ-split; <ᵖ-step; <ᵖ-shift; <ᵖ-below; <ᵖ-part; <ᵖ-ix)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; InE; at-out; at-end; on-out; MapT; map-out; map-skip; map-end)
 open import operation.Key using (Key; at; after; _<ᴷ_)
+open import adequacy.Engine.Head using (≮ᴷ-trans; <ᴷ-trans; <ᴷ-irrefl; at-<ᵖ; clash)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed;
                     free; cpAt; cutAt; overAt; inScan; inTake; inSrc; inBody;
                     ofS; doneS; mapS; cutS; lnS; flatS; coldS; scanS; takeS; connS; joinS; inMap; inCut; inLn; inOuter; inLanes; nx; cp; attached; attAt; attM; pend) renaming (Ev to Evᴹ; over to overᶜ)
-open import adequacy.Direct using (Frag; rows; rowsL; pendRows; toEv; Gone; Lanes; Each; module Flat)
+open import direct.Rows using (Frag; rows; rowsL; pendRows; toEv; Gone; Lanes; Each; module Flat)
 
 ------------------------------------------------------------------------
 -- Keys
 
 postulate
-  ≮ᴷ-trans  : ∀ a b c → a <ᴷ b ≡ false → b <ᴷ c ≡ false → a <ᴷ c ≡ false
-  <ᴷ-trans  : ∀ a b c → a <ᴷ b ≡ true → b <ᴷ c ≡ true → a <ᴷ c ≡ true
-  <ᴷ-irrefl : ∀ k → k <ᴷ k ≡ false
-  -- At a position, keys compare as positions do.
-  at-<ᵖ     : ∀ p q → at p <ᴷ at q ≡ p <ᵖ q
   -- Just past a position, still before a mark's `after` the position is before.
   shift-after : ∀ q r → at q <ᴷ after r ≡ true → after r <ᴷ at (q ++ [ ix 0 ]) ≡ false
 
@@ -55,22 +53,16 @@ open _⊑_
 ⊑-trans : ∀ {a b c} → a ⊑ b → b ⊑ c → a ⊑ c
 ⊑-trans {a} {b} {c} ab bc = ⊑i (≮ᴷ-trans c b a (un bc) (un ab))
 
-clash : ∀ {b} → b ≡ true → b ≡ false → ⊥
-clash refl ()
-
 <→⊑ : ∀ a b → a <ᴷ b ≡ true → a ⊑ b
 <→⊑ a b ab with b <ᴷ a in ba
 ... | false = ⊑i ba
 ... | true  = ⊥-elim (clash (<ᴷ-trans a b a ab ba) (<ᴷ-irrefl a))
 
-T→≡ : ∀ {b} → T b → b ≡ true
-T→≡ {true} _ = refl
-
 ≺→⊑ : ∀ {p q} → p ≺ q → at p ⊑ at q
-≺→⊑ {p} {q} pq = ⊑i (trans (at-<ᵖ q p) (<ᵖ-asym p q (T→≡ pq)))
+≺→⊑ {p} {q} pq = ⊑i (trans (at-<ᵖ q p) (<ᵖ-asym p q (Equivalence.to T-≡ pq)))
 
 ⊑→≼ : ∀ {p q} → at p ⊑ at q → p ≼ q
-⊑→≼ {p} {q} h qp = clash (T→≡ qp) (trans (sym (at-<ᵖ q p)) (un h))
+⊑→≼ {p} {q} h qp = clash (Equivalence.to T-≡ qp) (trans (sym (at-<ᵖ q p)) (un h))
 
 -- Under a position is no earlier.
 ext-⊑ : ∀ p x → at p ⊑ at (p ++ x)

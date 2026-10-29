@@ -3,7 +3,7 @@
 -- WHAT THE ROOT OWES RESPECTS THE ROWS: the same rows in the hole, the
 -- same rows at the root, frame by frame.  A merge's lanes are matched
 -- index by index, so a lane's rows replaced in its list is the same merge.
-module adequacy.Direct.Up where
+module direct.Up where
 
 open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_; _ʳ++_)
@@ -16,7 +16,7 @@ open import denotation.MonotonicList.Events using (Pos)
 open import denotation.EmissionSet using (EmissionSet; MapT; map-out; map-skip; map-end)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Direct using (up; Vis; Plus; old; new; rowsL; Gone; Lanes; Each; module Flat; _≃_; _⇄_; ≃-sym)
+open import direct.Rows using (up; Vis; Plus; old; new; rowsL; Gone; Lanes; Each; module Flat; _≃_; _⇄_; ≃-sym)
 
 open _≃_
 

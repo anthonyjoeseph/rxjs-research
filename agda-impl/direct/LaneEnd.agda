@@ -4,7 +4,7 @@
 -- every other part of the merge strictly past `p`.  Off `p` the merge
 -- owes what it owes with the lane gone; at `p` it owes its own end when
 -- every other part owes nothing, and a skip otherwise.
-module adequacy.Direct.LaneEnd where
+module direct.LaneEnd where
 
 open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; _ʳ++_)
@@ -16,10 +16,10 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import denotation.MonotonicList.Events using (Pos)
 open import denotation.EmissionSet using (EmissionSet; end; _≼_)
 open import denotation.EmissionSet.Laws.Modulus using (≺→≼; ≼-refl)
-open import adequacy.Direct using (∅; Plus; old; new; Gone; Lanes; Each; module Flat)
-open import adequacy.Direct.Up using (any-ʳ++; any-ʳ++ˡ; any-ʳ++ʳ; all-ʳ++; all-ʳ++⁻)
-open import adequacy.Direct.Bound using (Empty)
-open import adequacy.Direct.Skip using (After; Since; _≈⟨_⟩_; _⇆_; Skip; after-since; since-lanes; lane-since; since-flat)
+open import direct.Rows using (∅; Plus; old; new; Gone; Lanes; Each; module Flat)
+open import direct.Up using (any-ʳ++; any-ʳ++ˡ; any-ʳ++ʳ; all-ʳ++; all-ʳ++⁻)
+open import direct.Bound using (Empty)
+open import direct.Skip using (After; Since; _≈⟨_⟩_; _⇆_; Skip; after-since; since-lanes; lane-since; since-flat)
 
 -- A lane's rows, by `c`, each: one of them, by `c`.
 gone-any : ∀ {B} (Ls : List (EmissionSet B)) {c k e} → Each (λ t → Gone t c) Ls → Lanes Ls k e → k ≼ c

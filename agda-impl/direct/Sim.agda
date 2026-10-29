@@ -5,7 +5,7 @@
 -- step keeps the visible rows or shows the least and drops it, by mode: a
 -- subscription entered as the rows of what it begins, a rise read up one
 -- frame, a mark run where the search's bound says it leads.
-module adequacy.Direct.Sim where
+module direct.Sim where
 
 open import Data.Bool using (true; false; if_then_else_)
 open import Data.Empty using (⊥-elim)
@@ -26,14 +26,14 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
-open import adequacy.Direct using (Frag; rows; RT; toEv; Visible; Vis; Past; Plus; old; new; _≃_; _⇄_; silent; shown; Steps;
+open import direct.Rows using (Frag; rows; RT; toEv; Visible; Vis; Past; Plus; old; new; _≃_; _⇄_; silent; shown; Steps;
   Shows*; Shows*-≃; ≃-sym; conv; []; _∷_)
-open import adequacy.Direct.Bound using (Good)
-open import adequacy.Direct.Up using (up-≃; ≃-refl; vis-≃)
-open import adequacy.Direct.Skip using (After)
-open import adequacy.Direct.Inv using (Inv; inv; good; Sim; Ends; GoodF; good-split; open-alive)
-open import adequacy.Direct.LaneCp using (rise-lane-cp)
-open import adequacy.Direct.AbsOf using (abs-of)
+open import direct.Bound using (Good)
+open import direct.Up using (up-≃; ≃-refl; vis-≃)
+open import direct.Skip using (After)
+open import direct.Inv using (Inv; inv; good; Sim; Ends; GoodF; good-split; open-alive)
+open import direct.LaneCp using (rise-lane-cp)
+open import direct.AbsOf using (abs-of)
 
 pend-good : ∀ {R Γ A} (c : Ctx R Γ A) o → GoodF c (pend o) → Frag o
 pend-good (inLanes op f d n q o′ pre post c) o ()

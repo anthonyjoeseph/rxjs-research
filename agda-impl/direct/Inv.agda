@@ -4,7 +4,7 @@
 -- focus is owed.  A rising event leads every other part of each merge it
 -- climbs, and its own node owes only rows past it; a mark run or a
 -- subscription in flight asks only that every live part still owes.
-module adequacy.Direct.Inv where
+module direct.Inv where
 
 open import Data.Bool using (Bool; true; false; _∧_)
 open import Data.Bool.Properties using (∧-zeroʳ; ∧-identityʳ)
@@ -23,11 +23,11 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     closed; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ)
-open import adequacy.Direct using (rows; RT; Moves)
-open import adequacy.Direct.Up using (≃-refl)
-open import adequacy.Direct.Bound using (Empty; Good; G; GLn; LnBody)
-open import adequacy.Direct.Skip using (After; LeadC)
-open import adequacy.Direct.Owes using (Owes; UpO; goodL-ʳ++⁻; goodL-swap; Swap; good-swap)
+open import direct.Rows using (rows; RT; Moves)
+open import direct.Up using (≃-refl)
+open import direct.Bound using (Empty; Good; G; GLn; LnBody)
+open import direct.Skip using (After; LeadC)
+open import direct.Owes using (Owes; UpO; goodL-ʳ++⁻; goodL-swap; Swap; good-swap)
 
 -- A node an event can rise out of: not cut, not out of its list.
 Open : ∀ {Γ A} → St Γ A → Set

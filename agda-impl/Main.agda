@@ -17,6 +17,11 @@ open import adequacy.Adequacy using (adequacy)
 -- a reader of the program's emission set meets, row by row in position order.
 open import adequacy.EmissionSet using (adequacyᵀ)
 
+-- THE DIRECT LINK, ON A FRAGMENT: for `empty`, `of`, `map` and unbounded
+-- `merge`, every run of the pure semantics shows what a reader of the
+-- emission set meets, read straight off the rows the state still owes.
+open import direct.Sim using (sound)
+
 -- THE MEANING IS A FOLD: the theorem's denotation is the limit of each
 -- operator's `MonotonicList` function applied to its children's.
 open import denotation.Denote using (folded)

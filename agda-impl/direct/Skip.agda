@@ -5,7 +5,7 @@
 -- `p`, owe the same rows at the root but for skips at `p`.  A merge's end
 -- waits on every part's rows, and a row at `p` lies by any end at or past
 -- `p`, so where the two disagree no end reads them differently.
-module adequacy.Direct.Skip where
+module direct.Skip where
 
 open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; _ʳ++_; _++_; [_])
@@ -15,7 +15,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Data.Bool using (true; false)
-open import adequacy.Direct.Up using (all-ʳ++)
+open import direct.Up using (all-ʳ++)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.MonotonicList.Events using (Pos; ix)
@@ -23,7 +23,7 @@ open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_
 open import denotation.EmissionSet.Laws.Modulus using (≺-trans; ≺→≼; ≼-≺-≺; ≺-ext)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Direct using (up; rows; rowsL; pendRows; Gone; Lanes; Each; module Flat; _≃_; _⇄_; Vis)
+open import direct.Rows using (up; rows; rowsL; pendRows; Gone; Lanes; Each; module Flat; _≃_; _⇄_; Vis)
 
 ------------------------------------------------------------------------
 -- Rows past a position

@@ -7,7 +7,7 @@
 -- strictly past; the merge's end there is owed exactly when every other
 -- part owes nothing, which the counts read as the outer done and no
 -- other lane live.
-module adequacy.Direct.LaneCp where
+module direct.LaneCp where
 
 open import Data.Bool using (Bool; true; false; T; if_then_else_)
 open import Data.Empty using (⊥-elim)
@@ -28,15 +28,15 @@ open import denotation.EmissionSet.Laws.Modulus using (≼-refl)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; ⟨_,_,_,_⟩; plug; absorbed; rising; cp; alive; ended; dequeue; settle; Att;
                     cutS; lnS; flatS; inLanes)
-open import adequacy.Direct using (∅; up; here; rows; rowsL; pendRows; Plus; old; new; Lanes; Each; module Flat; _≃_; _⇄_;
+open import direct.Rows using (∅; up; here; rows; rowsL; pendRows; Plus; old; new; Lanes; Each; module Flat; _≃_; _⇄_;
   ≃-sym; Moves; silent)
-open import adequacy.Direct.Up using (any-ʳ++ˡ; any-ʳ++ʳ; all-ʳ++; ≈ᴸ-refl; _∷_; flat-≃; up-≃; ≃-refl; ≃-trans; vis-≃; plus-≃)
-open import adequacy.Direct.Bound using (Empty; Single; EndLast; Parts; Good; GoodL; G; GLn; shape; on; off; lane-v; live; dead-empty)
-open import adequacy.Direct.Skip using (After; Since; LeadC; _≈⟨_⟩_; ≈-vis; up-≈)
-open import adequacy.Direct.LaneEnd using (frame-≈; done-at; outer-owes; lanes-owe; since-x; since-y)
-open import adequacy.Direct.Owes using (Owing; Owes; OwesL; UpO; Swap; owes-join; need-of; owesL-ʳ++; rowsL-ʳ++; ≡→≃; owing-≃; empty-≃;
+open import direct.Up using (any-ʳ++ˡ; any-ʳ++ʳ; all-ʳ++; ≈ᴸ-refl; _∷_; flat-≃; up-≃; ≃-refl; ≃-trans; vis-≃; plus-≃)
+open import direct.Bound using (Empty; Single; EndLast; Parts; Good; GoodL; G; GLn; shape; on; off; lane-v; live; dead-empty)
+open import direct.Skip using (After; Since; LeadC; _≈⟨_⟩_; ≈-vis; up-≈)
+open import direct.LaneEnd using (frame-≈; done-at; outer-owes; lanes-owe; since-x; since-y)
+open import direct.Owes using (Owing; Owes; OwesL; UpO; Swap; owes-join; need-of; owesL-ʳ++; rowsL-ʳ++; ≡→≃; owing-≃; empty-≃;
                                         flat-owing-o; flat-owing-l; flat-empty; live-ʳ++; live-owing; goodL-ʳ++⁻; goodL-swap; lanes-≃; parts-≃; good-swap)
-open import adequacy.Direct.Inv using (Inv; inv; Sim; good-split; node-good; upo-liv)
+open import direct.Inv using (Inv; inv; Sim; good-split; node-good; upo-liv)
 
 module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St Γ A) (pre post : List (St Γ B)) (c : Ctx R Γ B)
           (a : Att) (s₀ : St Γ B) (p : Pos)

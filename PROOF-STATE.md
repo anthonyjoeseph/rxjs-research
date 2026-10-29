@@ -31,6 +31,29 @@ is Tier 1.
 
 Members: `adequacyᵀ`.
 
+#### THE GOOD TREE KEPT
+
+Untried: a mark run at an of keeps `Good`, its merges' parts still apart,
+and a closed of dropped changes nothing owed (`direct.AbsOf`). Settled by
+bodies, or a program whose of run leaves two parts sharing a position.
+
+Members: `good-of`, `good-done`, `owes-closed`.
+
+#### THE MARK FOUND
+
+Untried: a good tree's search finds an of's next or an attach, an attach
+moves nothing owed, and a lane's value passes unless the lane is over
+(`direct.Sim`). Settled when each is a body.
+
+Members: `found-mark`, `abs-att`, `rise-lane-nx`.
+
+#### THE SUBSCRIPTIONS ENTERED
+
+Believed: subscribing to `empty`, `of`, `map` or a merge enters exactly
+the rows its emission set begins with. Settled when each is a body.
+
+Members: `sub-empty`, `sub-of`, `sub-map`, `sub-merge`.
+
 #### THE PORTED SPEC
 
 Untried: the simultaneous spec read off the emission set's rows. Settled
@@ -215,7 +238,7 @@ Keys are a strict order agreeing with positions. Believed unfoldings.
 Settled when each is a body.
 
 Members: `<ᴷ-trans`, `<ᴷ-irrefl`, `≮ᴷ-trans`, `at-<ᵖ`, `ext-≮`, `under-after`,
-`deep-after`, `deep-nb`, `lost-at`.
+`deep-after`, `deep-nb`, `lost-at`, `shift-after`.
 
 #### THE LINK
 

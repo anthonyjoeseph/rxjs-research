@@ -6,7 +6,7 @@
 -- winner owns a row at that key and the parts are apart, so the loser's
 -- rows there are none.  The winner's key is its event's position or past
 -- it, and a lane's later siblings lose ties to it.
-module adequacy.Direct.Lead where
+module direct.Lead where
 
 open import Data.Bool using (Bool; true; false; T)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -28,10 +28,11 @@ open Machine using (St; Ctx; Cand; found; Mark; ofM; attM; Att; Out; still; show
                     raceT; outerT; laneT; mapT; cutT; alive; outOf; closed; attached; attAt;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inCut; inLn; inOuter; inLanes)
-open import adequacy.Direct using (rows; rowsL; pendRows; toEv; Lanes; Each; module Flat)
-open import adequacy.Direct.Bound using (_⊑_; ⊑i; ⊑-refl; ⊑-trans; ≮ᴷ-trans; at-<ᵖ; <→⊑; clash; ext-⊑; From; Bd; OK; OKL; Live;
+open import direct.Rows using (rows; rowsL; pendRows; toEv; Lanes; Each; module Flat)
+open import adequacy.Engine.Head using (≮ᴷ-trans; at-<ᵖ; clash)
+open import direct.Bound using (_⊑_; ⊑i; ⊑-refl; ⊑-trans; <→⊑; ext-⊑; From; Bd; OK; OKL; Live;
                                          Apart; Spread; Parts; G; GL; GLn; Good; ofPos; from-weak; seek-ok; seek-ln; lane-ok; lanes-ok)
-open import adequacy.Direct.Skip using (After; LeadC)
+open import direct.Skip using (After; LeadC)
 
 open _⊑_
 open Bd

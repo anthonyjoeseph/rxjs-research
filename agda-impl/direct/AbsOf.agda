@@ -4,7 +4,7 @@
 -- the tree, so the root's rows are the of's rows read up its frames; the
 -- of's least row is then its event, risen.  Under a closed frame nothing
 -- the of owes reaches the root, and its run is silent.
-module adequacy.Direct.AbsOf where
+module direct.AbsOf where
 
 open import Data.Bool using (true; false; T; if_then_else_)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -28,13 +28,13 @@ open Machine using (St; Ctx; Cand; found; ⟨_,_,_,_⟩; absorbed; rising; plug;
                     shift; over; closed; alive; cutT; mapT; scanT; takeT; run; moved; ofM; cp; nx;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Direct using (∅; up; rows; Plus; old; new; module Flat; _≃_; _⇄_; ≃-sym; Moves; silent)
-open import adequacy.Direct.Up using (up-≃; ≃-refl; ≃-trans; vis-≃)
-open import adequacy.Direct.Bound using (Good; LnBody; ofPos; of-from; ⊑→≼)
-open import adequacy.Direct.Skip using (After; LeadC)
-open import adequacy.Direct.Lead using (lead-found)
-open import adequacy.Direct.Owes using (Owes; UpO; owesL-ʳ++⁻; rowsL-ʳ++; ≡→≃)
-open import adequacy.Direct.Inv using (Inv; inv; Sim; Open; good-split; unF; closed-dead; dead-swap)
+open import direct.Rows using (∅; up; rows; Plus; old; new; module Flat; _≃_; _⇄_; ≃-sym; Moves; silent)
+open import direct.Up using (up-≃; ≃-refl; ≃-trans; vis-≃)
+open import direct.Bound using (Good; LnBody; ofPos; of-from; ⊑→≼)
+open import direct.Skip using (After; LeadC)
+open import direct.Lead using (lead-found)
+open import direct.Owes using (Owes; UpO; owesL-ʳ++⁻; rowsL-ʳ++; ≡→≃)
+open import direct.Inv using (Inv; inv; Sim; Open; good-split; unF; closed-dead; dead-swap)
 
 ------------------------------------------------------------------------
 -- Where the search lands

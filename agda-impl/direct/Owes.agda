@@ -4,7 +4,7 @@
 -- its list, each owe some row, if only their end.  A merge reads its
 -- other parts' rows to decide whether it is over, so a part that owed
 -- nothing while still live would end the merge early.
-module adequacy.Direct.Owes where
+module direct.Owes where
 
 open import Data.Bool using (true; false; T; _∧_)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -24,9 +24,9 @@ open import denotation.EmissionSet using (EmissionSet; out; skip; end; MapT; map
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; plug; alive; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Direct using (∅; rows; rowsL; Lanes; Each; module Flat; _≃_)
-open import adequacy.Direct.Up using (any-ʳ++ʳ; any-≈; _≈ᴸ_; []; _∷_; ≈ᴸ-refl; ≈ᴸ-sym; flat-≃; map-≃; ≃-refl)
-open import adequacy.Direct.Bound using (Empty; empty-any; Single; EndLast; Spread; Parts; Live; G; GL; GLn; LnBody; live)
+open import direct.Rows using (∅; rows; rowsL; Lanes; Each; module Flat; _≃_)
+open import direct.Up using (any-ʳ++ʳ; any-≈; _≈ᴸ_; []; _∷_; ≈ᴸ-refl; ≈ᴸ-sym; flat-≃; map-≃; ≃-refl)
+open import direct.Bound using (Empty; empty-any; Single; EndLast; Spread; Parts; Live; G; GL; GLn; LnBody; live)
 
 open _≃_
 
