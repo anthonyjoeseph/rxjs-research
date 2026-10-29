@@ -24,7 +24,7 @@ open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; _≺_; _�
 open import denotation.Laws.Modulus using (≺-trans; ≺→≼; ≼-≺-≺; ≺-ext)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (up; rows; rowsL; pendRows; Gone; Lane; reads; Lanes; Each; module Flat; _≃_; _⇄_; Vis)
+open import adequacy.Rows using (up; env; rows; rowsL; pendRows; Gone; Lane; reads; Lanes; Each; module Flat; _≃_; _⇄_; Vis)
 
 ------------------------------------------------------------------------
 -- Rows past a position
@@ -38,14 +38,18 @@ Since : ∀ {A} → Pos → EmissionSet A → Set
 Since p t = ∀ {q e} → t q e → p ≼ q
 
 -- What a rising event at `p` is owed past: frame by frame, every other
--- part of a merge it rises through.
+-- part of a merge it rises through.  Never past a binder: a connect shows
+-- its source's skip at `p` at `p ++ [ ix 0 ]`, and every joiner its own
+-- under `p`, so a skip at `p` alone is not what differs above it.
 LeadC : ∀ {R Γ A} → Ctx R Γ A → Pos → Set
 LeadC (inMap f c)                                    p = LeadC c p
 LeadC (inCut l a c)                                  p = LeadC c p
 LeadC (inLn b c)                                     p = LeadC c p
-LeadC (inOuter (mergeᶠ nothing) f d n q ls c)        p = Each (After p) (rowsL ls) × LeadC c p
+LeadC (inOuter (mergeᶠ nothing) f d n q ls c)        p = Each (After p) (rowsL (env c) ls) × LeadC c p
 LeadC (inLanes (mergeᶠ nothing) f d n q o pre post c) p =
-  After p (rows o) × Each (After p) (rowsL pre) × Each (After p) (rowsL post) × LeadC c p
+  After p (rows (env c) o) × Each (After p) (rowsL (env c) pre) × Each (After p) (rowsL (env c) post) × LeadC c p
+LeadC (inSrc k b c)                                  p = ⊥
+LeadC (inBody k o c)                                 p = ⊥
 LeadC _                                              p = ⊤
 
 after-since : ∀ {B} {p} (Ls : List (EmissionSet B)) → Each (After p) Ls → Each (Since p) Ls
@@ -231,25 +235,26 @@ up-≈ (inTake i q w c)                        ld st su eq = ≈-refl
 up-≈ (inOuter (mergeᶠ nothing) f d n q ls c) {t} {u} (al , ld) st su eq =
   up-≈ c ld (since-flat L t Ls st sl) (since-flat L u Ls su sl) (flat-≈ L Ls Ls eq (≈ᴸ-refl Ls) st su sl sl)
   where
-    L  = λ a → pendRows (f a)
-    Ls = rowsL ls
+    L  = λ a → pendRows (env c) (f a)
+    Ls = rowsL (env c) ls
     sl = after-since Ls al
 up-≈ (inOuter (mergeᶠ (just _)) f d n q ls c) ld st su eq = ≈-refl
 up-≈ (inOuter switchᶠ f d n q ls c)           ld st su eq = ≈-refl
 up-≈ (inOuter exhaustᶠ f d n q ls c)          ld st su eq = ≈-refl
 up-≈ (inLanes (mergeᶠ nothing) f d n q o pre post c) {t} {u} (ao , apre , apost , ld) st su eq =
   up-≈ c ld (since-flat L O Lt so slt) (since-flat L O Lu so slu)
-       (flat-≈ L Lt Lu ≈-refl (≈ᴸ-hole (rowsL pre) (eq ∷ ≈ᴸ-refl (rowsL post))) so so slt slu)
+       (flat-≈ L Lt Lu ≈-refl (≈ᴸ-hole (rowsL ρ pre) (eq ∷ ≈ᴸ-refl (rowsL ρ post))) so so slt slu)
   where
-    L   = λ a → pendRows (f a)
-    O   = rows o
-    Lt  = rowsL pre ʳ++ (t ∷ rowsL post)
-    Lu  = rowsL pre ʳ++ (u ∷ rowsL post)
+    ρ   = env c
+    L   = λ a → pendRows ρ (f a)
+    O   = rows ρ o
+    Lt  = rowsL ρ pre ʳ++ (t ∷ rowsL ρ post)
+    Lu  = rowsL ρ pre ʳ++ (u ∷ rowsL ρ post)
     so  = λ {q} {e} r → ≺→≼ {_} {q} (ao {q} {e} r)
-    slt = all-ʳ++ (rowsL pre) (after-since (rowsL pre) apre) (st , after-since (rowsL post) apost)
-    slu = all-ʳ++ (rowsL pre) (after-since (rowsL pre) apre) (su , after-since (rowsL post) apost)
+    slt = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (st , after-since (rowsL ρ post) apost)
+    slu = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (su , after-since (rowsL ρ post) apost)
 up-≈ (inLanes (mergeᶠ (just _)) f d n q o pre post c) ld st su eq = ≈-refl
 up-≈ (inLanes switchᶠ f d n q o pre post c)   ld st su eq = ≈-refl
 up-≈ (inLanes exhaustᶠ f d n q o pre post c)  ld st su eq = ≈-refl
-up-≈ (inSrc k b c)                            ld st su eq = ≈-refl
-up-≈ (inBody k o c)                           ld st su eq = ≈-refl
+up-≈ (inSrc k b c)                            () st su eq
+up-≈ (inBody k o c)                           () st su eq

@@ -325,6 +325,20 @@ module Exhaust {A B : Set} (f : A → Den B) (o : EmissionSet A) where
 -- `k ++ [ ix 0 ]` lies in the source's world, which no lawful body
 -- reaches, and reading there would make the connect hang on a row past
 -- the one it produces (`connect-causal`).
+--
+-- `Connecting` joins any source's rows `σ`, subscribed at `r`, to any
+-- body's rows `β`: a connect part way through is one too.
+module Connecting {A B : Set} (r : Pos) (σ : EmissionSet A) (β : EmissionSet B) where
+
+  -- The body has not ended by `q`.
+  Alive : Pos → Set
+  Alive q = ∀ {c} → β c end → q ≺ c
+
+  data ConnT : EmissionSet B where
+    body   : ∀ {k e} → β k e → ConnT k e
+    shown  : ∀ {k e} → σ k e → Alive k → ConnT (k ++ [ ix 0 ]) skip
+    pinned : ∀ {k e} → σ k e → ¬ Alive k → T (inside r k) → ConnT k skip
+
 module Connect {A B : Set} (s : Den A) (F : Den A → Den B) (p : Pos) where
 
   r : Pos
@@ -336,14 +350,7 @@ module Connect {A B : Set} (s : Den A) (F : Den A → Den B) (p : Pos) where
   β : EmissionSet B
   β = enter (F (hot (Proper σ))) (p ++ [ ix 0 ])
 
-  -- The body has not ended by `q`.
-  Alive : Pos → Set
-  Alive q = ∀ {c} → β c end → q ≺ c
-
-  data ConnT : EmissionSet B where
-    body   : ∀ {k e} → β k e → ConnT k e
-    shown  : ∀ {k e} → σ k e → Alive k → ConnT (k ++ [ ix 0 ]) skip
-    pinned : ∀ {k e} → σ k e → ¬ Alive k → T (inside r k) → ConnT k skip
+  open Connecting r σ β public
 
 ------------------------------------------------------------------------
 -- FlatMap

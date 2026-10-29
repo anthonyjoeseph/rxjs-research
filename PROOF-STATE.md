@@ -16,15 +16,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### BEYOND THE FRAGMENT
 
-Untried, riskiest under a connect: `rows` reads only the state, so
-`pendRows` owes nothing under a binder, yet a joiner owes its inbox, the
-source's remaining rows rekeyed under it, and a late end. `rows` needs an
-environment per binder (the source's remaining rows, closed or not), and a
-body's rows past a position shown blind to earlier hot rows but the end.
-This can change `rows`'s type, so it comes before any other former. The
-split is excluded middle. Settled once the sound half covers every program.
+Riskiest under a connect: `rows` now carries an environment, a binder
+bound to its source's rows with the end kept once closed, but nothing past
+the fragment is proven against it. Open: equal binder rows give equal body
+rows; a skip lifts past no binder, as a connect shows its source's skip one
+level down and a joiner its own at the binder's; and a good tree holds no
+connect, so the invariant must first say what a connect owes. The split is
+excluded middle. Settled once the sound half covers every program.
 
-Members: `sound-beyond`, `frag?`.
+Members: `sound-beyond`, `frag?`, `rows-hot`.
 
 #### THE COMPLETE HALF
 

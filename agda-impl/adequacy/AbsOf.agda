@@ -8,6 +8,7 @@ module adequacy.AbsOf where
 
 open import Data.Bool using (true; false; T; if_then_else_)
 open import Data.Empty using (⊥; ⊥-elim)
+open import Data.List.Relation.Unary.All using ([])
 open import Data.List using (List; []; _∷_; _ʳ++_; [_]; _++_)
 open import Data.Maybe using (Maybe; just; nothing) renaming (map to mapᴹ)
 open import Data.Nat using (suc)
@@ -20,7 +21,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym;
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (ix; last; <ᵖ-part; <ᵖ-ix)
 open import denotation.Events using (ofᴱ)
-open import denotation.EmissionSet using (EmissionSet; _≺_; InE; at-out; at-end; on-out; out; end)
+open import denotation.EmissionSet using (EmissionSet; DenEnv; _≺_; InE; at-out; at-end; on-out; out; end)
 open import denotation.Laws.Modulus using (≺-≼-≺)
 open import operation.Key using (_<ᴷ_)
 open import operation.PureObservable using (module Machine)
@@ -28,13 +29,13 @@ open Machine using (St; Ctx; Cand; found; ⟨_,_,_,_⟩; absorbed; rising; plug;
                     shift; over; closed; alive; cutT; mapT; scanT; takeT; run; moved; ofM; cp; nx;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (∅; up; rows; Plus; old; new; module Flat; _≃_; _⇄_; ≃-sym; Moves; silent)
+open import adequacy.Rows using (env; ∅; up; rows; Plus; old; new; module Flat; _≃_; _⇄_; ≃-sym; Moves; silent)
 open import adequacy.Up using (up-≃; ≃-refl; ≃-trans; vis-≃)
 open import adequacy.Bound using (Good; LnBody; ofPos; of-from; ⊑→≼)
 open import adequacy.Skip using (After; LeadC)
 open import adequacy.Lead using (lead-found)
 open import adequacy.Owes using (Owes; UpO; owesL-ʳ++⁻; rowsL-ʳ++; ≡→≃)
-open import adequacy.Inv using (Inv; inv; Sim; Open; good-split; unF; closed-dead; dead-swap)
+open import adequacy.Inv using (Inv; inv; Sim; Open; GoodC; good-split; unF; closed-dead; dead-swap)
 
 ------------------------------------------------------------------------
 -- Where the search lands
@@ -114,53 +115,53 @@ search-plug t fd = lands-just (seek top t) (seek-lands top t refl) fd
 -- The rows, frame by frame
 
 -- What the root owes is the hole's rows read up its frames.
-up-plug : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → up c (rows s) ≃ rows (plug c s)
-up-plug top                s = ≃-refl
-up-plug (inMap f c)        s = up-plug c (mapS f s)
-up-plug (inScan f z c)     s = up-plug c (scanS f z s)
-up-plug (inCut true a c)   s = up-plug c (cutS true a s)
-up-plug (inCut false a c)  s = up-plug c (cutS false a s)
-up-plug (inLn true c)      s = up-plug c (lnS true s)
-up-plug (inLn false c)     s = up-plug c (lnS false s)
-up-plug (inTake i q w c)   s = up-plug c (takeS i q w s)
-up-plug (inOuter (mergeᶠ nothing) f d n q ls c)  s = up-plug c (flatS (mergeᶠ nothing) f d n q s ls)
-up-plug (inOuter (mergeᶠ (just m)) f d n q ls c) s = up-plug c (flatS (mergeᶠ (just m)) f d n q s ls)
-up-plug (inOuter switchᶠ f d n q ls c)           s = up-plug c (flatS switchᶠ f d n q s ls)
-up-plug (inOuter exhaustᶠ f d n q ls c)          s = up-plug c (flatS exhaustᶠ f d n q s ls)
-up-plug (inLanes (mergeᶠ nothing) f d n q o pre post c) s =
-  ≃-trans (up-≃ c (≡→≃ (cong (Flat.JoinT _ (rows o) d) (sym (rowsL-ʳ++ pre)))))
-          (up-plug c (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post)))
-up-plug (inLanes (mergeᶠ (just m)) f d n q o pre post c) s = up-plug c (flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s ∷ post))
-up-plug (inLanes switchᶠ f d n q o pre post c)           s = up-plug c (flatS switchᶠ f d n q o (pre ʳ++ s ∷ post))
-up-plug (inLanes exhaustᶠ f d n q o pre post c)          s = up-plug c (flatS exhaustᶠ f d n q o (pre ʳ++ s ∷ post))
-up-plug (inSrc k b c)      s = up-plug c (connS k s b)
-up-plug (inBody k o c)     s = up-plug c (connS k o s)
+up-plug : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → GoodC c → up c (rows (env c) s) ≃ rows [] (plug c s)
+up-plug top                s _  = ≃-refl
+up-plug (inMap f c)        s gc = up-plug c (mapS f s) gc
+up-plug (inCut true a c)   s gc = up-plug c (cutS true a s) gc
+up-plug (inCut false a c)  s gc = up-plug c (cutS false a s) gc
+up-plug (inLn true c)      s gc = up-plug c (lnS true s) gc
+up-plug (inLn false c)     s gc = up-plug c (lnS false s) gc
+up-plug (inOuter (mergeᶠ nothing) f d n q ls c) s gc = up-plug c (flatS (mergeᶠ nothing) f d n q s ls) gc
+up-plug (inLanes (mergeᶠ nothing) f d n q o pre post c) s gc =
+  ≃-trans (up-≃ c (≡→≃ (cong (Flat.JoinT _ (rows (env c) o) d) (sym (rowsL-ʳ++ pre)))))
+          (up-plug c (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post)) gc)
+up-plug (inScan f z c)     s ()
+up-plug (inTake i q w c)   s ()
+up-plug (inOuter (mergeᶠ (just m)) f d n q ls c) s ()
+up-plug (inOuter switchᶠ f d n q ls c)           s ()
+up-plug (inOuter exhaustᶠ f d n q ls c)          s ()
+up-plug (inLanes (mergeᶠ (just m)) f d n q o pre post c) s ()
+up-plug (inLanes switchᶠ f d n q o pre post c)           s ()
+up-plug (inLanes exhaustᶠ f d n q o pre post c)          s ()
+up-plug (inSrc k b c)      s ()
+up-plug (inBody k o c)     s ()
 
 -- Under a closed frame, the hole reaches nothing.
-closed-up : ∀ {R Γ A} (c : Ctx R Γ A) {t u : EmissionSet A} → closed c ≡ true → up c t ≃ up c u
-closed-up top               ()
-closed-up (inMap f c)       e = closed-up c e
-closed-up (inScan f z c)    e = ≃-refl
-closed-up (inCut true a c)  e = closed-up c e
-closed-up (inCut false a c) e = ≃-refl
-closed-up (inLn true c)     e = closed-up c e
-closed-up (inLn false c)    e = ≃-refl
-closed-up (inTake i q w c)  e = ≃-refl
-closed-up (inOuter (mergeᶠ nothing) f d n q ls c)  e = closed-up c e
-closed-up (inOuter (mergeᶠ (just m)) f d n q ls c) e = ≃-refl
-closed-up (inOuter switchᶠ f d n q ls c)           e = ≃-refl
-closed-up (inOuter exhaustᶠ f d n q ls c)          e = ≃-refl
-closed-up (inLanes (mergeᶠ nothing) f d n q o pre post c)  e = closed-up c e
-closed-up (inLanes (mergeᶠ (just m)) f d n q o pre post c) e = ≃-refl
-closed-up (inLanes switchᶠ f d n q o pre post c)           e = ≃-refl
-closed-up (inLanes exhaustᶠ f d n q o pre post c)          e = ≃-refl
-closed-up (inSrc k b c)     e = ≃-refl
-closed-up (inBody k o c)    e = ≃-refl
+closed-up : ∀ {R Γ A} (c : Ctx R Γ A) {t u : EmissionSet A} → GoodC c → closed c ≡ true → up c t ≃ up c u
+closed-up top               _  ()
+closed-up (inMap f c)       gc e = closed-up c gc e
+closed-up (inScan f z c)    _ e = ≃-refl
+closed-up (inCut true a c)  gc e = closed-up c gc e
+closed-up (inCut false a c) _ e = ≃-refl
+closed-up (inLn true c)     gc e = closed-up c gc e
+closed-up (inLn false c)    _ e = ≃-refl
+closed-up (inTake i q w c)  _ e = ≃-refl
+closed-up (inOuter (mergeᶠ nothing) f d n q ls c)  gc e = closed-up c gc e
+closed-up (inOuter (mergeᶠ (just m)) f d n q ls c) _ e = ≃-refl
+closed-up (inOuter switchᶠ f d n q ls c)           _ e = ≃-refl
+closed-up (inOuter exhaustᶠ f d n q ls c)          _ e = ≃-refl
+closed-up (inLanes (mergeᶠ nothing) f d n q o pre post c)  gc e = closed-up c gc e
+closed-up (inLanes (mergeᶠ (just m)) f d n q o pre post c) _ e = ≃-refl
+closed-up (inLanes switchᶠ f d n q o pre post c)           _ e = ≃-refl
+closed-up (inLanes exhaustᶠ f d n q o pre post c)          _ e = ≃-refl
+closed-up (inSrc k b c)     () _
+closed-up (inBody k o c)    () _
 
 ------------------------------------------------------------------------
 -- What an open hole's frames owe
 
-lnbody-open : ∀ {Γ A} {v} (s : St Γ A) → LnBody v false s → Open s → ⊥
+lnbody-open : ∀ {Γ A} {ρ : DenEnv Γ} {v} (s : St Γ A) → LnBody ρ v false s → Open s → ⊥
 lnbody-open (cutS l a s) (refl , _) op = op
 lnbody-open (pend _)              () _
 lnbody-open (coldS _ _)           () _
@@ -175,7 +176,7 @@ lnbody-open (connS _ _ _)         () _
 lnbody-open (joinS _ _ _ _)       () _
 
 -- An open hole under open frames: what the tree owes, cut there.
-owes-split : ∀ {R Γ A} (c : Ctx R Γ A) {s : St Γ A} → closed c ≡ false → Open s → Good (plug c s) → Owes (plug c s) → UpO c × Owes s
+owes-split : ∀ {R Γ A} (c : Ctx R Γ A) {s : St Γ A} → closed c ≡ false → Open s → Good [] (plug c s) → Owes [] (plug c s) → UpO c × Owes (env c) s
 owes-split top              cl op g ow = _ , ow
 owes-split (inMap f c)      cl op g ow = owes-split c cl _ g ow
 owes-split (inCut true a c) cl op g ow = owes-split c cl _ g ow
@@ -234,32 +235,34 @@ after-of p i xs {q} r = ≺-≼-≺ {p ++ [ ix i ]} {ofPos p (suc i) xs} {q} (nx
 
 -- THE FOUND OF LEADS: every other part of each merge above it lies
 -- strictly past its event.
-found-lead : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ xs κ} → closed c ≡ false → Good (plug c (ofS i p₀ xs))
+found-lead : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ xs κ} → closed c ≡ false → Good [] (plug c (ofS i p₀ xs))
            → search top (plug c (ofS i p₀ xs)) ≡ just (found (Γ , A , c , ofS i p₀ xs) ofM κ) → LeadC c (ofPos p₀ i xs)
 found-lead c {i} {p₀} {xs} cl g fd = lead-found {t = plug c (ofS i p₀ xs)} {c = c} {s = ofS i p₀ xs} cl refl g fd
 
 postulate
   -- THE LEAST ROW TAKEN, THE TREE STILL GOOD.
-  good-of   : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ x xs κ} → closed c ≡ false → Good (plug c (ofS i p₀ (x ∷ xs)))
-            → search top (plug c (ofS i p₀ (x ∷ xs))) ≡ just (found (Γ , A , c , ofS i p₀ (x ∷ xs)) ofM κ) → Good (plug c (ofS (suc i) p₀ xs))
-  good-done : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ κ} → closed c ≡ false → Good (plug c (ofS i p₀ []))
-            → search top (plug c (ofS i p₀ [])) ≡ just (found (Γ , A , c , ofS i p₀ []) ofM κ) → Good (plug c doneS)
+  good-of   : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ x xs κ} → closed c ≡ false → Good [] (plug c (ofS i p₀ (x ∷ xs)))
+            → search top (plug c (ofS i p₀ (x ∷ xs))) ≡ just (found (Γ , A , c , ofS i p₀ (x ∷ xs)) ofM κ) → Good [] (plug c (ofS (suc i) p₀ xs))
+  good-done : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ κ} → closed c ≡ false → Good [] (plug c (ofS i p₀ []))
+            → search top (plug c (ofS i p₀ [])) ≡ just (found (Γ , A , c , ofS i p₀ []) ofM κ) → Good [] (plug c doneS)
   -- A CLOSED OF, DROPPED: what is owed above the cut does not change.
-  owes-closed : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ xs} → closed c ≡ true → Owes (plug c (ofS i p₀ xs)) → Owes (plug c doneS)
+  owes-closed : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ xs} → closed c ≡ true → Owes [] (plug c (ofS i p₀ xs)) → Owes [] (plug c doneS)
 
 -- A closed of sits under a dead lane, so dropping it is checked for shape only.
-good-closed : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ xs} → closed c ≡ true → Good (plug c (ofS i p₀ xs)) → Good (plug c doneS)
+good-closed : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ xs} → closed c ≡ true → Good [] (plug c (ofS i p₀ xs)) → Good [] (plug c doneS)
 good-closed c cl g = dead-swap c (closed-dead c (proj₁ (good-split c _ g)) cl) (record { node₀ = λ _ → tt ; lane₀ = λ () ; body₀ = λ _ () }) g
 
 -- The root's rows, read at the of the search found.
-into : ∀ {R Γ′ A′ Γ A} (c : Ctx R Γ′ A′) (s : St Γ′ A′) (c′ : Ctx R Γ A) (s′ : St Γ A) → plug c′ s′ ≡ plug c s → up c (rows s) ≃ up c′ (rows s′)
-into c s c′ s′ pl = ≃-trans (up-plug c s) (≃-trans (≡→≃ (cong rows (sym pl))) (≃-sym (up-plug c′ s′)))
+into : ∀ {R Γ′ A′ Γ A} (c : Ctx R Γ′ A′) (s : St Γ′ A′) (c′ : Ctx R Γ A) (s′ : St Γ A) → plug c′ s′ ≡ plug c s → Good [] (plug c s)
+     → up c (rows (env c) s) ≃ up c′ (rows (env c′) s′)
+into c s c′ s′ pl g = ≃-trans (up-plug c s (proj₁ (good-split c s g)))
+                        (≃-trans (≡→≃ (cong (rows []) (sym pl))) (≃-sym (up-plug c′ s′ (proj₁ (good-split c′ s′ (subst (Good []) (sym pl) g))))))
 
 -- A closed of runs out silently.
 closed-of : ∀ {R Γ′ A′ Γ A} (c : Ctx R Γ′ A′) (s : St Γ′ A′) (c′ : Ctx R Γ A) {i p₀ xs} p₁ → closed c′ ≡ true → plug c′ (ofS i p₀ xs) ≡ plug c s
-          → Good (plug c s) → Owes (plug c s) → Inv ⟨ c′ , doneS , absorbed , p₁ ⟩ × Moves (up c (rows s)) [] (up c′ ∅)
+          → Good [] (plug c s) → Owes [] (plug c s) → Inv ⟨ c′ , doneS , absorbed , p₁ ⟩ × Moves (up c (rows (env c) s)) [] (up c′ ∅)
 closed-of c s c′ p₁ cl pl g ow =
-  inv (good-closed c′ cl (subst Good (sym pl) g)) (owes-closed c′ cl (subst Owes (sym pl) ow)) , silent (vis-≃ (≃-trans (into c s c′ _ pl) (closed-up c′ cl)))
+  inv (good-closed c′ cl (subst (Good []) (sym pl) g)) (owes-closed c′ cl (subst (Owes []) (sym pl) ow)) , silent (vis-≃ (≃-trans (into c s c′ _ pl g) (closed-up c′ (proj₁ (good-split c′ _ (subst (Good []) (sym pl) g))) cl)))
 
 -- AN OF'S NEXT RUN: the least row, risen.
 abs-of : ∀ {R Γ′ A′ Γ A} {c : Ctx R Γ′ A′} {s} {c′ : Ctx R Γ A} {i p₀ xs κ k′ sh t} p
@@ -269,19 +272,19 @@ abs-of {c = c} {s} {c′} {i} {p₀} {[]} p fd eq (inv g ow) with closed c′ in
 abs-of {c = c} {s} {c′} {i} {p₀} {[]} p fd refl (inv g ow) | true = closed-of c s c′ p₀ cl (search-plug (plug c s) fd) g ow
 abs-of {c = c} {s} {c′} {i} {p₀} {[]} p fd refl (inv g ow) | false =
   inv (good-done c′ cl g′ fd′) (proj₁ (owes-split c′ cl tt g′ ow′) , found-lead c′ cl g′ fd′ , tt , tt , (λ ()) , (λ ()))
-  , silent (vis-≃ (≃-trans (into c s c′ _ pl) (up-≃ c′ (of-last p₀ i))))
+  , silent (vis-≃ (≃-trans (into c s c′ _ pl g) (up-≃ c′ (of-last p₀ i))))
   where
     pl  = search-plug (plug c s) fd
     fd′ = subst (λ u → search top u ≡ _) (sym pl) fd
-    g′  = subst Good (sym pl) g
-    ow′ = subst Owes (sym pl) ow
+    g′  = subst (Good []) (sym pl) g
+    ow′ = subst (Owes []) (sym pl) ow
 abs-of {c = c} {s} {c′} {i} {p₀} {x ∷ xs} p fd eq (inv g ow) with closed c′ in cl
 abs-of {c = c} {s} {c′} {i} {p₀} {x ∷ xs} p fd refl (inv g ow) | true = closed-of c s c′ p₀ cl (search-plug (plug c s) fd) g ow
 abs-of {c = c} {s} {c′} {i} {p₀} {x ∷ xs} p fd refl (inv g ow) | false =
   inv (good-of c′ cl g′ fd′) (proj₁ (owes-split c′ cl tt g′ ow′) , found-lead c′ cl g′ fd′ , tt , tt , after-of p₀ i xs , tt)
-  , silent (vis-≃ (≃-trans (into c s c′ _ pl) (up-≃ c′ (of-next p₀ i x xs))))
+  , silent (vis-≃ (≃-trans (into c s c′ _ pl g) (up-≃ c′ (of-next p₀ i x xs))))
   where
     pl  = search-plug (plug c s) fd
     fd′ = subst (λ u → search top u ≡ _) (sym pl) fd
-    g′  = subst Good (sym pl) g
-    ow′ = subst Owes (sym pl) ow
+    g′  = subst (Good []) (sym pl) g
+    ow′ = subst (Owes []) (sym pl) ow

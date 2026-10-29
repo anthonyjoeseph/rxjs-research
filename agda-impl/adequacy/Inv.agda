@@ -9,6 +9,7 @@ module adequacy.Inv where
 open import Data.Bool using (Bool; true; false; _∧_)
 open import Data.Bool.Properties using (∧-zeroʳ; ∧-identityʳ)
 open import Data.Empty using (⊥; ⊥-elim)
+open import Data.List.Relation.Unary.All using ([])
 open import Data.List using (_∷_; _ʳ++_)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -17,13 +18,13 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.EmissionSet using (EmissionSet)
+open import denotation.EmissionSet using (EmissionSet; DenEnv)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; plug; alive; nx; cp;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     closed; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ)
-open import adequacy.Rows using (rows; RT; Moves)
+open import adequacy.Rows using (env; rows; RT; Moves)
 open import adequacy.Up using (≃-refl)
 open import adequacy.Bound using (Empty; Good; G; GLn; LnBody)
 open import adequacy.Skip using (After; LeadC)
@@ -41,14 +42,14 @@ Ends (nx _) t = ⊤
 Ends cp     t = Empty t
 
 Lead : ∀ {R} → Conf R → Set
-Lead ⟨ c , s , rising e , p ⟩ = UpO c × LeadC c p × Owes s × Open s × After p (rows s) × Ends e (rows s)
-Lead ⟨ c , s , subscribing , p ⟩ = UpO c × Owes s
-Lead ⟨ c , s , absorbed , p ⟩    = Owes (plug c s)
+Lead ⟨ c , s , rising e , p ⟩ = UpO c × LeadC c p × Owes (env c) s × Open s × After p (rows (env c) s) × Ends e (rows (env c) s)
+Lead ⟨ c , s , subscribing , p ⟩ = UpO c × Owes (env c) s
+Lead ⟨ c , s , absorbed , p ⟩    = Owes [] (plug c s)
 
 record Inv {R} (k : Conf R) : Set where
   constructor inv
   field
-    good : Good (plug (Conf.ctx k) (Conf.foc k))
+    good : Good [] (plug (Conf.ctx k) (Conf.foc k))
     lead : Lead k
 open Inv public
 
@@ -99,19 +100,19 @@ liv (inBody k o c)                    = liv c
 
 -- What a frame's hole must be: under a merge's lanes, a lane.
 GoodF : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Set
-GoodF (inLanes op f d n q o pre post c) s = GLn (liv c) s
-GoodF top                s = G true s
-GoodF (inMap f c)        s = G (liv c) s
-GoodF (inScan f z c)     s = G (liv c) s
-GoodF (inCut l a c)      s = G (liv c ∧ l) s
-GoodF (inLn b c)         s = G (liv c) s
-GoodF (inTake i q w c)   s = G (liv c) s
-GoodF (inOuter op f d n q ls c) s = G (liv c) s
-GoodF (inSrc k b c)      s = G (liv c) s
-GoodF (inBody k o c)     s = G (liv c) s
+GoodF (inLanes op f d n q o pre post c) s = GLn (env c) (liv c) s
+GoodF top                s = G [] true s
+GoodF (inMap f c)        s = G (env c) (liv c) s
+GoodF (inScan f z c)     s = G (env c) (liv c) s
+GoodF (inCut l a c)      s = G (env c) (liv c ∧ l) s
+GoodF (inLn b c)         s = G (env c) (liv c) s
+GoodF (inTake i q w c)   s = G (env c) (liv c) s
+GoodF (inOuter op f d n q ls c) s = G (env c) (liv c) s
+GoodF (inSrc k b c)      s = G (env c) (liv c) s
+GoodF (inBody k o c)     s = G (env (inBody k o c)) (liv c) s
 
 -- A hole's rows, good either way.
-unF : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → GoodF c s → G (liv c) s ⊎ GLn (liv c) s
+unF : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → GoodF c s → G (env c) (liv c) s ⊎ GLn (env c) (liv c) s
 unF (inLanes op f d n q o pre post c) s g = inj₂ g
 unF top                s g = inj₁ g
 unF (inMap f c)        s g = inj₁ g
@@ -123,7 +124,7 @@ unF (inOuter op f d n q ls c) s g = inj₁ g
 unF (inSrc k b c)      s g = inj₁ g
 unF (inBody k o c)     s g = inj₁ g
 
-lnbody-good : ∀ {Γ A} v b (s : St Γ A) → LnBody v b s → G v s
+lnbody-good : ∀ {Γ A} {ρ : DenEnv Γ} v b (s : St Γ A) → LnBody ρ v b s → G ρ v s
 lnbody-good v b (cutS l a s) (refl , g , _) = g
 lnbody-good v b (pend _)              ()
 lnbody-good v b (coldS _ _)           ()
@@ -137,7 +138,7 @@ lnbody-good v b (flatS _ _ _ _ _ _ _) ()
 lnbody-good v b (connS _ _ _)         ()
 lnbody-good v b (joinS _ _ _ _)       ()
 
-good-split : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Good (plug c s) → GoodC c × GoodF c s
+good-split : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Good [] (plug c s) → GoodC c × GoodF c s
 good-split top s g = tt , g
 good-split (inMap f c) s g with good-split c (mapS f s) g
 ... | gc , gf with unF c _ gf
@@ -154,7 +155,7 @@ good-split (inCut l a c) s g with good-split c (cutS l a s) g
 good-split (inLn b c) s g with good-split c (lnS b s) g
 ... | gc , gf with unF c _ gf
 ... | inj₁ ()
-... | inj₂ gl = gc , lnbody-good (liv c) b s gl
+... | inj₂ gl = gc , lnbody-good {ρ = env c} (liv c) b s gl
 good-split (inTake i q w c) s g with good-split c (takeS i q w s) g
 ... | _ , gf with unF c _ gf
 ... | inj₁ ()
@@ -201,7 +202,7 @@ good-split (inBody k o c) s g with good-split c (connS k o s) g
 ... | inj₂ ()
 
 -- The good node a frame sits on.
-node-good : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Good (plug c s) → (GLn (liv c) s → ⊥) → G (liv c) s
+node-good : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Good [] (plug c s) → (GLn (env c) (liv c) s → ⊥) → G (env c) (liv c) s
 node-good c s g nl with unF c s (proj₂ (good-split c s g))
 ... | inj₁ gs = gs
 ... | inj₂ gl = ⊥-elim (nl gl)
@@ -241,15 +242,15 @@ closed-dead (inOuter (mergeᶠ nothing) f d n q ls c) gc cl = closed-dead c gc c
 closed-dead (inLanes (mergeᶠ nothing) f d n q o pre post c) gc cl = closed-dead c gc cl
 
 -- Swapped where nothing is owed: only the shape asked.
-record Swap₀ {Γ A} (s s′ : St Γ A) : Set where
+record Swap₀ {Γ A} (ρ : DenEnv Γ) (s s′ : St Γ A) : Set where
   field
-    node₀ : G false s → G false s′
-    lane₀ : GLn false s → GLn false s′
-    body₀ : ∀ b → LnBody false b s → LnBody false b s′
+    node₀ : G ρ false s → G ρ false s′
+    lane₀ : GLn ρ false s → GLn ρ false s′
+    body₀ : ∀ b → LnBody ρ false b s → LnBody ρ false b s′
 open Swap₀
 
 -- The cut that switched the lane off: nothing under it is owed above.
-killed : ∀ {Γ A} a {s s′ : St Γ A} → Swap₀ s s′ → Swap (cutS false a s) (cutS false a s′)
+killed : ∀ {Γ A} {ρ : DenEnv Γ} a {s s′ : St Γ A} → Swap₀ ρ s s′ → Swap ρ (cutS false a s) (cutS false a s′)
 killed a sw = record
   { same  = ≃-refl
   ; live≡ = refl
@@ -257,10 +258,10 @@ killed a sw = record
   ; lane  = λ _ ()
   ; body  = λ { true _ (refl , g , _) → refl , node₀ sw g , tt ; false _ (refl , g , _) → refl , node₀ sw g , tt } }
 
-nothing₀ : ∀ {Γ A} {s s′ : St Γ A} → (G false s → ⊥) → (GLn false s → ⊥) → (∀ b → LnBody false b s → ⊥) → Swap₀ s s′
+nothing₀ : ∀ {Γ A} {ρ : DenEnv Γ} {s s′ : St Γ A} → (G ρ false s → ⊥) → (GLn ρ false s → ⊥) → (∀ b → LnBody ρ false b s → ⊥) → Swap₀ ρ s s′
 nothing₀ ng nl nb = record { node₀ = λ g → ⊥-elim (ng g) ; lane₀ = λ g → ⊥-elim (nl g) ; body₀ = λ b g → ⊥-elim (nb b g) }
 
-dead-swap : ∀ {R Γ A} (c : Ctx R Γ A) {s s′ : St Γ A} → liv c ≡ false → Swap₀ s s′ → Good (plug c s) → Good (plug c s′)
+dead-swap : ∀ {R Γ A} (c : Ctx R Γ A) {s s′ : St Γ A} → liv c ≡ false → Swap₀ (env c) s s′ → Good [] (plug c s) → Good [] (plug c s′)
 dead-swap top               () sw g
 dead-swap (inMap f c)       dd sw g = dead-swap c dd (record { node₀ = node₀ sw ; lane₀ = λ () ; body₀ = λ _ () }) g
 dead-swap (inScan f z c)    dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g

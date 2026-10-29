@@ -300,12 +300,12 @@ private
           → AgreeTo Q (enter s (p ++ [ ix 1 ])) (enter s′ (p ++ [ ix 1 ]))
           → AgreeTo Q (ES.Connect.β s F p) (ES.Connect.β s′ F′ p)
           → ∀ {y e} → y ≼ Q → ES.Connect.ConnT s F p y e → ES.Connect.ConnT s′ F′ p y e
-  conn-to s s′ F F′ p aσ aβ {y} yQ (ES.Connect.body x) = ES.Connect.body (proj₁ (upto aβ {y} yQ) x)
-  conn-to {Q = Q} s s′ F F′ p aσ aβ yQ (ES.Connect.shown {k} x al) =
-    ES.Connect.shown (proj₁ (upto aσ {k} kQ) x) (alive-to aβ kQ al)
+  conn-to s s′ F F′ p aσ aβ {y} yQ (ES.Connecting.body x) = ES.Connecting.body (proj₁ (upto aβ {y} yQ) x)
+  conn-to {Q = Q} s s′ F F′ p aσ aβ yQ (ES.Connecting.shown {k} x al) =
+    ES.Connecting.shown (proj₁ (upto aσ {k} kQ) x) (alive-to aβ kQ al)
     where kQ = ≺→≼ {k} {Q} (≺-≼-≺ {k} {k ++ [ ix 0 ]} {Q} (≺-ext k []) yQ)
-  conn-to s s′ F F′ p aσ aβ {y} yQ (ES.Connect.pinned x nal ins) =
-    ES.Connect.pinned (proj₁ (upto aσ {y} yQ) x) (λ al → nal (alive-to (AgreeTo-sym aβ) yQ al)) ins
+  conn-to s s′ F F′ p aσ aβ {y} yQ (ES.Connecting.pinned x nal ins) =
+    ES.Connecting.pinned (proj₁ (upto aσ {y} yQ) x) (λ al → nal (alive-to (AgreeTo-sym aβ) yQ al)) ins
 
 connect-causal : ∀ {A B q} {s s′ : Den A} {F F′ : Den A → Den B}
                → s ~⟨ q ⟩ s′ → (∀ {t t′} → AgreeTo q t t′ → F (hot t) ~⟨ q ⟩ F′ (hot t′)) → Op.connect s F ~⟨ q ⟩ Op.connect s′ F′
@@ -359,7 +359,7 @@ inv-approx n       (map f s)         ρ g = map-inv f {approx n s ρ} (inv-appro
 inv-approx n       (scan f z s)      ρ g = scan-inv f z {approx n s ρ} (inv-approx n s ρ g)
 inv-approx n       (takeWhile i k s) ρ g = takeWhile-inv i k {approx n s ρ} (inv-approx n s ρ g)
 inv-approx n       (flatMap op f s)  ρ g = flatMap-inv op (inv-approx n s ρ g) λ a → inv-approx n (f a) ρ g
-inv-approx n       (connect s b)     ρ g = connect-inv (inv-approx n s ρ g) λ {t} L → inv-approx n b (hot t ∷ ρ) (good-cons L g)
+inv-approx n       (connect s b)     ρ g = connect-inv {s = approx n s ρ} {F = λ h → approx n b (h ∷ ρ)} (inv-approx n s ρ g) λ {t} L → inv-approx n b (hot t ∷ ρ) (good-cons L g)
 inv-approx n       (connected i)     ρ g = g i
 inv-approx zero    (defer l)         ρ g = spin-inv
 inv-approx (suc n) (defer l)         ρ g = defer-inv (inv-approx n (Later.force l) ρ g)
@@ -372,7 +372,7 @@ inv-⟦⟧ (map f s)         ρ g = map-inv f {⟦ s ⟧ ρ} (inv-⟦⟧ s ρ g)
 inv-⟦⟧ (scan f z s)      ρ g = scan-inv f z {⟦ s ⟧ ρ} (inv-⟦⟧ s ρ g)
 inv-⟦⟧ (takeWhile i k s) ρ g = takeWhile-inv i k {⟦ s ⟧ ρ} (inv-⟦⟧ s ρ g)
 inv-⟦⟧ (flatMap op f s)  ρ g = flatMap-inv op (inv-⟦⟧ s ρ g) λ a → inv-⟦⟧ (f a) ρ g
-inv-⟦⟧ (connect s b)     ρ g = connect-inv (inv-⟦⟧ s ρ g) λ {t} L → inv-⟦⟧ b (hot t ∷ ρ) (good-cons L g)
+inv-⟦⟧ (connect s b)     ρ g = connect-inv {s = ⟦ s ⟧ ρ} {F = λ h → ⟦ b ⟧ (h ∷ ρ)} (inv-⟦⟧ s ρ g) λ {t} L → inv-⟦⟧ b (hot t ∷ ρ) (good-cons L g)
 inv-⟦⟧ (connected i)     ρ g = g i
 inv-⟦⟧ (defer l)         ρ g = lim-inv {c = λ n → approx n (defer l) ρ} λ n → inv-approx n (defer l) ρ g
 
@@ -385,7 +385,7 @@ causal-approx n       (map f s)         {ρ} {ρ′} e = map-causal f {approx n 
 causal-approx n       (scan f z s)      {ρ} {ρ′} e = scan-causal f z {approx n s ρ} {approx n s ρ′} (causal-approx n s e)
 causal-approx n       (takeWhile i k s) {ρ} {ρ′} e = takeWhile-causal i k {approx n s ρ} {approx n s ρ′} (causal-approx n s e)
 causal-approx n       (flatMap op f s)  e = flatMap-causal op (causal-approx n s e) λ a → causal-approx n (f a) e
-causal-approx n       (connect s b)     e = connect-causal (causal-approx n s e) λ a → causal-approx n b (ag-cons (hot-causal a) e)
+causal-approx n       (connect s b)     {ρ} {ρ′} e = connect-causal {s = approx n s ρ} {approx n s ρ′} {λ h → approx n b (h ∷ ρ)} {λ h → approx n b (h ∷ ρ′)} (causal-approx n s e) λ a → causal-approx n b (ag-cons (hot-causal a) e)
 causal-approx n       (connected i)     e = e i
 causal-approx zero    (defer l)         e = ~-refl Op.⊥
 causal-approx (suc n) (defer l)         e = defer-causal (causal-approx n (Later.force l) e)
@@ -398,7 +398,7 @@ causal-⟦⟧ (map f s)         {ρ} {ρ′} e = map-causal f {⟦ s ⟧ ρ} {�
 causal-⟦⟧ (scan f z s)      {ρ} {ρ′} e = scan-causal f z {⟦ s ⟧ ρ} {⟦ s ⟧ ρ′} (causal-⟦⟧ s e)
 causal-⟦⟧ (takeWhile i k s) {ρ} {ρ′} e = takeWhile-causal i k {⟦ s ⟧ ρ} {⟦ s ⟧ ρ′} (causal-⟦⟧ s e)
 causal-⟦⟧ (flatMap op f s)  e = flatMap-causal op (causal-⟦⟧ s e) λ a → causal-⟦⟧ (f a) e
-causal-⟦⟧ (connect s b)     e = connect-causal (causal-⟦⟧ s e) λ a → causal-⟦⟧ b (ag-cons (hot-causal a) e)
+causal-⟦⟧ (connect s b)     {ρ} {ρ′} e = connect-causal {s = ⟦ s ⟧ ρ} {⟦ s ⟧ ρ′} {λ h → ⟦ b ⟧ (h ∷ ρ)} {λ h → ⟦ b ⟧ (h ∷ ρ′)} (causal-⟦⟧ s e) λ a → causal-⟦⟧ b (ag-cons (hot-causal a) e)
 causal-⟦⟧ (connected i)     e = e i
 causal-⟦⟧ (defer l) {ρ} {ρ′} e = lim-causal {c = λ n → approx n (defer l) ρ} {c′ = λ n → approx n (defer l) ρ′} λ n → causal-approx n (defer l) e
 
@@ -434,7 +434,7 @@ settle n       (flatMap op f s)  ρ g =
   flatMap-ne op (inv-approx n s ρ g) (inv-approx (suc n) s ρ g) (λ a → inv-approx n (f a) ρ g) (λ a → inv-approx (suc n) (f a) ρ g)
     (settle n s ρ g) λ a → settle n (f a) ρ g
 settle n       (connect s b)     ρ g =
-  connect-ne (inv-approx n s ρ g) (inv-approx (suc n) s ρ g)
+  connect-ne {s = approx n s ρ} {approx (suc n) s ρ} {λ h → approx n b (h ∷ ρ)} {λ h → approx (suc n) b (h ∷ ρ)} (inv-approx n s ρ g) (inv-approx (suc n) s ρ g)
     (λ {t} L → inv-approx n b (hot t ∷ ρ) (good-cons L g)) (λ {t} L → inv-approx (suc n) b (hot t ∷ ρ) (good-cons L g))
     (causal-at n b ρ) (causal-at (suc n) b ρ)
     (settle n s ρ g) λ {t} L → settle n b (hot t ∷ ρ) (good-cons L g)
@@ -456,7 +456,7 @@ from k (flatMap op f s)  ρ g =
   flatMap-ne op (inv-⟦⟧ s ρ g) (inv-approx k s ρ g) (λ a → inv-⟦⟧ (f a) ρ g) (λ a → inv-approx k (f a) ρ g)
     (from k s ρ g) λ a → from k (f a) ρ g
 from k (connect s b)     ρ g =
-  connect-ne (inv-⟦⟧ s ρ g) (inv-approx k s ρ g)
+  connect-ne {s = ⟦ s ⟧ ρ} {approx k s ρ} {λ h → ⟦ b ⟧ (h ∷ ρ)} {λ h → approx k b (h ∷ ρ)} (inv-⟦⟧ s ρ g) (inv-approx k s ρ g)
     (λ {t} L → inv-⟦⟧ b (hot t ∷ ρ) (good-cons L g)) (λ {t} L → inv-approx k b (hot t ∷ ρ) (good-cons L g))
     (causal-in b ρ) (causal-at k b ρ)
     (from k s ρ g) λ {t} L → from k b (hot t ∷ ρ) (good-cons L g)

@@ -277,4 +277,4 @@ module _ {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
       re (pinned x _ _ , _) = InvAt.real Iσ x
 
 connect-inv : ∀ {A B H} {s : Den A} {F : Den A → Den B} → InvD H s → (∀ {t} → Lawful t → InvD (H ⊕ t) (F (hot t))) → InvD H (Op.connect s F)
-connect-inv Is IF p ok = connect-at Is IF p ok
+connect-inv {s = s} {F} Is IF p ok = connect-at {s = s} {F = F} Is IF p ok

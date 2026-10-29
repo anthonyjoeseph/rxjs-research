@@ -7,16 +7,17 @@ module adequacy.Up where
 
 open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_; _ʳ++_)
+open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos)
-open import denotation.EmissionSet using (EmissionSet; MapT; map-out; map-skip; map-end)
+open import denotation.EmissionSet using (EmissionSet; MapT; map-out; map-skip; map-end; DenEnv; module Connecting)
 open import operation.PureObservable using (module Machine)
-open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (up; pendRows; Vis; Plus; old; new; rowsL; Gone; Lanes; Each; module Flat; _≃_; _⇄_; ≃-sym)
+open Machine using (Ctx; St; CS; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
+open import adequacy.Rows using (up; env; rows; Hot; pendRows; Vis; Plus; old; new; rowsL; Gone; Lanes; Each; module Flat; _≃_; _⇄_; ≃-sym)
 
 open _≃_
 
@@ -123,6 +124,22 @@ map-≃ f eq = go (to eq) ⇄ go (from eq)
     go h (map-skip r) = map-skip (h r)
     go h (map-end r)  = map-end (h r)
 
+-- The same source and the same body: the same connect.
+conn-≃ : ∀ {A B : Set} r {σ σ′ : EmissionSet A} {β β′ : EmissionSet B} → σ ≃ σ′ → β ≃ β′ → Connecting.ConnT r σ β ≃ Connecting.ConnT r σ′ β′
+conn-≃ {A} {B} r es eb = go es eb ⇄ go (≃-sym es) (≃-sym eb)
+  where
+    go : ∀ {σ σ′ : EmissionSet A} {β β′ : EmissionSet B} → σ ≃ σ′ → β ≃ β′ → ∀ {q e} → Connecting.ConnT r σ β q e → Connecting.ConnT r σ′ β′ q e
+    go es eb (Connecting.body x)           = Connecting.body (to eb x)
+    go es eb (Connecting.shown x al)       = Connecting.shown (to es x) λ y → al (from eb y)
+    go es eb (Connecting.pinned x nal ins) = Connecting.pinned (to es x) (λ al → nal λ y → al (to eb y)) ins
+
+-- A BINDER'S MEANING, UP TO THE SAME ROWS: a body reads its binder only
+-- through the rows it holds, so the same rows bound give the same body.
+-- By induction over the state and, under a pending subscription, over
+-- the program's meaning, every operator reading its inputs row by row.
+postulate
+  rows-hot : ∀ {Γ X B} {t u : EmissionSet X} (k : CS) (ρ : DenEnv Γ) (b : St (X ∷ Γ) B) → t ≃ u → rows (Hot t k ∷ᴬ ρ) b ≃ rows (Hot u k ∷ᴬ ρ) b
+
 -- THE CONGRUENCE.
 up-≃ : ∀ {R Γ A} (c : Ctx R Γ A) {t u : EmissionSet A} → t ≃ u → up c t ≃ up c u
 up-≃ top                                              eq = eq
@@ -133,13 +150,13 @@ up-≃ (inCut false a c)                                eq = ≃-refl
 up-≃ (inLn true c)                                    eq = up-≃ c eq
 up-≃ (inLn false c)                                   eq = ≃-refl
 up-≃ (inTake i p w c)                                 eq = ≃-refl
-up-≃ (inOuter (mergeᶠ nothing) f d n q ls c)          eq = up-≃ c (flat-≃ (λ a → pendRows (f a)) eq (≈ᴸ-refl (rowsL ls)))
+up-≃ (inOuter (mergeᶠ nothing) f d n q ls c)          eq = up-≃ c (flat-≃ (λ a → pendRows (env c) (f a)) eq (≈ᴸ-refl (rowsL (env c) ls)))
 up-≃ (inOuter (mergeᶠ (just _)) f d n q ls c)         eq = ≃-refl
 up-≃ (inOuter switchᶠ f d n q ls c)                   eq = ≃-refl
 up-≃ (inOuter exhaustᶠ f d n q ls c)                  eq = ≃-refl
-up-≃ (inLanes (mergeᶠ nothing) f d n q o pre post c)  eq = up-≃ c (flat-≃ (λ a → pendRows (f a)) ≃-refl (ʳ++-≈ (rowsL pre) (eq ∷ ≈ᴸ-refl (rowsL post))))
+up-≃ (inLanes (mergeᶠ nothing) f d n q o pre post c)  eq = up-≃ c (flat-≃ (λ a → pendRows (env c) (f a)) ≃-refl (ʳ++-≈ (rowsL (env c) pre) (eq ∷ ≈ᴸ-refl (rowsL (env c) post))))
 up-≃ (inLanes (mergeᶠ (just _)) f d n q o pre post c) eq = ≃-refl
 up-≃ (inLanes switchᶠ f d n q o pre post c)           eq = ≃-refl
 up-≃ (inLanes exhaustᶠ f d n q o pre post c)          eq = ≃-refl
-up-≃ (inSrc k b c)                                    eq = ≃-refl
-up-≃ (inBody k o c)                                   eq = ≃-refl
+up-≃ (inSrc k b c)                                    eq = up-≃ c (conn-≃ _ eq (rows-hot k (env c) b eq))
+up-≃ (inBody k o c)                                   eq = up-≃ c (conn-≃ _ ≃-refl eq)
