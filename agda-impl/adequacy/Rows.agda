@@ -17,7 +17,6 @@ open import Data.Sum using (_⊎_)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_)
 open import Data.Unit using (⊤)
-open import Data.Nat using (ℕ; zero; suc)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; empty; of; map; flatMap)
@@ -71,6 +70,10 @@ record _≃_ {A : Set} (t u : EmissionSet A) : Set where
     from : ∀ {q e} → u q e → t q e
 open _≃_
 
+-- A lane or an outer ended by `c`: every row it still owes, by `c`.
+Gone : ∀ {X} → EmissionSet X → Pos → Set
+Gone t c = ∀ {k e} → t k e → k ≼ c
+
 -- Rows of any lane of a list.
 Lanes : ∀ {B} → List (EmissionSet B) → EmissionSet B
 Lanes []       k e = ⊥
@@ -81,17 +84,8 @@ Each : ∀ {B} → (EmissionSet B → Set) → List (EmissionSet B) → Set
 Each P []       = ⊤
 Each P (t ∷ Ls) = P t × Each P Ls
 
--- `k` of the lanes ended by `c`.  A lane out of its list owes nothing,
--- its end included, so `k` lanes ended are the `k` still in the list
--- ended: rxjs's merge counts its running lanes rather than reading them.
-Enough : ∀ {B} → ℕ → List (EmissionSet B) → Pos → Set
-Enough zero    _        c = ⊤
-Enough (suc k) []       c = ⊥
-Enough (suc k) (t ∷ Ls) c = (Ended t c × Enough k Ls c) ⊎ Enough (suc k) Ls c
-
 -- A MERGE PART WAY THROUGH: `Merge`'s joiner at what is left of its outer,
--- `O`, done already where `d`, with the lanes it has begun, `Ls`, `n` of
--- them still in the list.
+-- `O`, done already where `d`, with the lanes it has begun, `Ls`.
 -- `At L`, as a record: Agda reads `L` back off it, which it cannot off
 -- `At`'s product.
 record Lane {A B : Set} (L : A → Pos → EmissionSet B) (q : Pos) (a : A) (k : Pos) (e : Ev B) : Set where
@@ -100,8 +94,8 @@ record Lane {A B : Set} (L : A → Pos → EmissionSet B) (q : Pos) (a : A) (k :
     lane : L a (q ++ [ ix 1 ]) k e
     past : (q ++ [ ix 1 ]) ≺ k
 
-module Flat {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (d : Bool) (n : ℕ) (Ls : List (EmissionSet B)) where
-  open Joining (Lane L) O (Lanes Ls) (λ c → (T d ⊎ Ended O c) × Enough n Ls c) (λ _ → ⊤) (λ _ _ → ⊥) (λ _ → ⊥) public
+module Flat {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (d : Bool) (Ls : List (EmissionSet B)) where
+  open Joining (Lane L) O (Lanes Ls) (λ c → (T d ⊎ Ended O c) × Each (λ t → Gone t c) Ls) (λ _ → ⊤) (λ _ _ → ⊥) (λ _ → ⊥) public
 
 -- What a subscription pending at `p` owes: its meaning under `ρ`,
 -- entered there.
@@ -135,7 +129,7 @@ mutual
   rows ρ (mapS f s)                             = MapT f (rows ρ s)
   rows ρ (cutS true a s)                        = rows ρ s
   rows ρ (lnS true s)                           = rows ρ s
-  rows ρ (flatS (mergeᶠ nothing) f d n q o ls)  = Flat.JoinT (λ a → pendRows ρ (f a)) (rows ρ o) d n (rowsL ρ ls)
+  rows ρ (flatS (mergeᶠ nothing) f d n q o ls)  = Flat.JoinT (λ a → pendRows ρ (f a)) (rows ρ o) d (rowsL ρ ls)
   rows ρ (connS k o b)                          = Connecting.ConnT (CS.srcAt k) (src ρ k o) (rows (Hot (src ρ k o) k ∷ ρ) b)
   rows ρ (joinS j true x ib)                    = Inbox ib ∪ enter (lookup ρ x) j
   rows ρ (joinS j false x ib)                   = Inbox ib
@@ -173,11 +167,11 @@ up (inCut false a c)                                  H = up c ∅
 up (inLn true c)                                      H = up c H
 up (inLn false c)                                     H = up c ∅
 up (inTake i p w c)                                   H = up c ∅
-up (inOuter (mergeᶠ nothing) f d n q ls c)            H = up c (Flat.JoinT (λ a → pendRows (env c) (f a)) H d n (rowsL (env c) ls))
+up (inOuter (mergeᶠ nothing) f d n q ls c)            H = up c (Flat.JoinT (λ a → pendRows (env c) (f a)) H d (rowsL (env c) ls))
 up (inOuter (mergeᶠ (just _)) f d n q ls c)           H = up c ∅
 up (inOuter switchᶠ f d n q ls c)                     H = up c ∅
 up (inOuter exhaustᶠ f d n q ls c)                    H = up c ∅
-up (inLanes (mergeᶠ nothing) f d n q o pre post c)    H = up c (Flat.JoinT (λ a → pendRows (env c) (f a)) (rows (env c) o) d n (rowsL (env c) pre ʳ++ (H ∷ rowsL (env c) post)))
+up (inLanes (mergeᶠ nothing) f d n q o pre post c)    H = up c (Flat.JoinT (λ a → pendRows (env c) (f a)) (rows (env c) o) d (rowsL (env c) pre ʳ++ (H ∷ rowsL (env c) post)))
 up (inLanes (mergeᶠ (just _)) f d n q o pre post c)   H = up c ∅
 up (inLanes switchᶠ f d n q o pre post c)             H = up c ∅
 up (inLanes exhaustᶠ f d n q o pre post c)            H = up c ∅

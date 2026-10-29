@@ -12,8 +12,7 @@ open import Data.List using (List; []; _∷_; _ʳ++_; _++_; [_])
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit using (⊤; tt)
-open import Data.Nat using (ℕ; zero; suc)
+open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Data.Bool using (Bool; T; true; false)
 open import Relation.Nullary using (¬_)
@@ -25,7 +24,7 @@ open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; _≺_; _�
 open import denotation.Laws.Modulus using (≺-trans; ≺→≼; ≼-≺-≺; ≺-ext)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (up; env; rows; rowsL; pendRows; Enough; Lane; reads; Lanes; Each; module Flat; _≃_; _⇄_; Vis)
+open import adequacy.Rows using (up; env; rows; rowsL; pendRows; Gone; Lane; reads; Lanes; Each; module Flat; _≃_; _⇄_; Vis)
 
 ------------------------------------------------------------------------
 -- Rows past a position
@@ -89,11 +88,10 @@ open _≈⟨_⟩_
     ... | inj₁ r′          = r′ , v
     ... | inj₂ (refl , refl) = ⊥-elim v
 
--- An end is never a skip: ended either way.
-ended-≈ : ∀ {A} {t u : EmissionSet A} {p c} → t ≈⟨ p ⟩ u → Ended t c → Ended u c
-ended-≈ eq (c₀ , r , le) with fwd eq r
-... | inj₁ r′      = c₀ , r′ , le
-... | inj₂ (_ , ())
+gone-≈ : ∀ {A} {t u : EmissionSet A} {p c} → t ≈⟨ p ⟩ u → p ≼ c → Gone t c → Gone u c
+gone-≈ {c = c} eq pc g {k} {e} r with bwd eq r
+... | inj₁ r′            = g {k} {e} r′
+... | inj₂ (refl , refl) = pc
 
 data _≈ᴸ⟨_⟩_ {B : Set} : List (EmissionSet B) → Pos → List (EmissionSet B) → Set₁ where
   []  : ∀ {p} → [] ≈ᴸ⟨ p ⟩ []
@@ -120,11 +118,9 @@ lanes-≈ (_ ∷ es) (inj₂ x) with lanes-≈ es x
 ... | inj₁ x′ = inj₁ (inj₂ x′)
 ... | inj₂ sk = inj₂ sk
 
-enough-≈⟨⟩ : ∀ {B} {Ls Ls′ : List (EmissionSet B)} {p} → Ls ≈ᴸ⟨ p ⟩ Ls′ → ∀ k {c} → Enough k Ls c → Enough k Ls′ c
-enough-≈⟨⟩ es       zero    _              = tt
-enough-≈⟨⟩ []       (suc k) ()
-enough-≈⟨⟩ (e ∷ es) (suc k) {c} (inj₁ (x , y)) = inj₁ (ended-≈ {c = c} e x , enough-≈⟨⟩ es k y)
-enough-≈⟨⟩ (e ∷ es) (suc k) (inj₂ y)       = inj₂ (enough-≈⟨⟩ es (suc k) y)
+each-≈ : ∀ {B} {Ls Ls′ : List (EmissionSet B)} {p c} → Ls ≈ᴸ⟨ p ⟩ Ls′ → p ≼ c → Each (λ t → Gone t c) Ls → Each (λ t → Gone t c) Ls′
+each-≈ []       pc _        = _
+each-≈ {c = c} (e ∷ es) pc (g , gs) = gone-≈ {c = c} e pc g , each-≈ {c = c} es pc gs
 
 ------------------------------------------------------------------------
 -- Up a map, up a merge
@@ -148,14 +144,14 @@ since-map f s (map-out r)  = s r
 since-map f s (map-skip r) = s r
 since-map f s (map-end r)  = s r
 
-module _ {A B : Set} (L : A → Pos → EmissionSet B) {d : Bool} {n : ℕ} {p : Pos} where
+module _ {A B : Set} (L : A → Pos → EmissionSet B) {d : Bool} {p : Pos} where
 
   -- A lane begun past an outer value lies past what the value lies past.
   lane-since : ∀ {O : EmissionSet A} {q a k e} → Since p O → O q (out a) → Lane L q a k e → p ≼ k
   lane-since {q = q} {a = a} {k = k} so r (reads _ s) =
     ≺→≼ {p} {k} (≺-trans {p} {q ++ [ ix 1 ]} {k} (≼-≺-≺ {p} {q} {q ++ [ ix 1 ]} (so {q} {out a} r) (≺-ext q [])) s)
 
-  since-flat : ∀ (O : EmissionSet A) (Ls : List (EmissionSet B)) → Since p O → Each (Since p) Ls → Since p (Flat.JoinT L O d n Ls)
+  since-flat : ∀ (O : EmissionSet A) (Ls : List (EmissionSet B)) → Since p O → Each (Since p) Ls → Since p (Flat.JoinT L O d Ls)
   since-flat O Ls so sl (Flat.val {q} {a} r) = ≺→≼ {p} {q ++ [ ix 0 ]} (≼-≺-≺ {p} {q} {q ++ [ ix 0 ]} (so {q} {out a} r) (≺-ext q []))
   since-flat O Ls so sl (Flat.step r)     = so r
   since-flat O Ls so sl (Flat.oend r _)   = so r
@@ -170,57 +166,59 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {d : Bool} {n : ℕ} {p :
   since-flat O Ls so sl (Flat.rend x _ _)  = since-lanes Ls sl x
   since-flat O Ls so sl (Flat.rpass x _ _) = since-lanes Ls sl x
 
-  -- A merge done is done either way: no end is a skip.
-  done-≈ : ∀ {O O′ : EmissionSet A} {Ls Ls′} c → O ≈⟨ p ⟩ O′ → Ls ≈ᴸ⟨ p ⟩ Ls′ → Flat.Done L O d n Ls c → Flat.Done L O′ d n Ls′ c
-  done-≈ {O} {O′} {Ls′ = Ls′} c eo es ((g , ls) , h) = (g′ g , enough-≈⟨⟩ es n ls) , h′
+  -- A merge done by an end at or past the focus is done either way.
+  done-≈ : ∀ {O O′ : EmissionSet A} {Ls Ls′} c → O ≈⟨ p ⟩ O′ → Ls ≈ᴸ⟨ p ⟩ Ls′ → p ≼ c → Flat.Done L O d Ls c → Flat.Done L O′ d Ls′ c
+  done-≈ {O} {O′} {Ls′ = Ls′} c eo es pc ((g , ls) , h) = (g′ g , each-≈ {c = c} es pc ls) , h′
     where
       g′ : T d ⊎ Ended O c → T d ⊎ Ended O′ c
       g′ (inj₁ td) = inj₁ td
-      g′ (inj₂ e) = inj₂ (ended-≈ {c = c} eo e)
+      g′ (inj₂ (c₀ , x , le)) with fwd eo x
+      ... | inj₁ x′ = inj₂ (c₀ , x′ , le)
+      ... | inj₂ (_ , ())
       h′ : ∀ {q a} → O′ q (out a) → ⊤ → q ≺ c → ¬ ⊥ → Ended (Lane L q a) c
       h′ {q} {a} r ru lt nc with bwd eo r
       ... | inj₁ r′ = h {q} {a} r′ ru lt nc
       ... | inj₂ (_ , ())
 
-  flat-→ : ∀ {O O′ : EmissionSet A} (Ls Ls′ : List (EmissionSet B)) → O ≈⟨ p ⟩ O′ → Ls ≈ᴸ⟨ p ⟩ Ls′
-         → ∀ {k e} → Flat.JoinT L O d n Ls k e → Flat.JoinT L O′ d n Ls′ k e ⊎ Skip p k e
-  flat-→ Ls Ls′ eo es (Flat.val r) with fwd eo r
+  flat-→ : ∀ {O O′ : EmissionSet A} (Ls Ls′ : List (EmissionSet B)) → O ≈⟨ p ⟩ O′ → Ls ≈ᴸ⟨ p ⟩ Ls′ → Since p O → Each (Since p) Ls
+         → ∀ {k e} → Flat.JoinT L O d Ls k e → Flat.JoinT L O′ d Ls′ k e ⊎ Skip p k e
+  flat-→ Ls Ls′ eo es so sl (Flat.val r) with fwd eo r
   ... | inj₁ r′       = inj₁ (Flat.val r′)
   ... | inj₂ (_ , ())
-  flat-→ Ls Ls′ eo es (Flat.step r) with fwd eo r
+  flat-→ Ls Ls′ eo es so sl (Flat.step r) with fwd eo r
   ... | inj₁ r′       = inj₁ (Flat.step r′)
   ... | inj₂ (eq , _) = inj₂ (eq , refl)
-  flat-→ Ls Ls′ eo es (Flat.oend {c} r d) with fwd eo r
-  ... | inj₁ r′       = inj₁ (Flat.oend r′ (done-≈ c eo es d))
+  flat-→ Ls Ls′ eo es so sl (Flat.oend {c} r d) with fwd eo r
+  ... | inj₁ r′       = inj₁ (Flat.oend r′ (done-≈ c eo es (so r) d))
   ... | inj₂ (_ , ())
-  flat-→ Ls Ls′ eo es (Flat.opass {c} r nd) with fwd eo r
-  ... | inj₁ r′       = inj₁ (Flat.opass r′ λ d → nd (done-≈ c (≈-sym eo) (≈ᴸ-sym es) d))
+  flat-→ Ls Ls′ eo es so sl (Flat.opass {c} r nd) with fwd eo r
+  ... | inj₁ r′       = inj₁ (Flat.opass r′ λ d → nd (done-≈ c (≈-sym eo) (≈ᴸ-sym es) (so r) d))
   ... | inj₂ (_ , ())
-  flat-→ Ls Ls′ eo es (Flat.lane r ru l nc w) with fwd eo r
+  flat-→ Ls Ls′ eo es so sl (Flat.lane r ru l nc w) with fwd eo r
   ... | inj₁ r′       = inj₁ (Flat.lane r′ ru l nc w)
   ... | inj₂ (_ , ())
-  flat-→ Ls Ls′ eo es (Flat.lend {c = c} r ru l nc nh d) with fwd eo r
-  ... | inj₁ r′       = inj₁ (Flat.lend r′ ru l nc nh (done-≈ c eo es d))
+  flat-→ {O = O} Ls Ls′ eo es so sl (Flat.lend {q} {a} {c} r ru l nc nh d) with fwd eo r
+  ... | inj₁ r′       = inj₁ (Flat.lend r′ ru l nc nh (done-≈ c eo es (lane-since {O = O} {q = q} {a = a} so r l) d))
   ... | inj₂ (_ , ())
-  flat-→ Ls Ls′ eo es (Flat.lpass {c = c} r ru l nc nh nd) with fwd eo r
-  ... | inj₁ r′       = inj₁ (Flat.lpass r′ ru l nc nh λ d → nd (done-≈ c (≈-sym eo) (≈ᴸ-sym es) d))
+  flat-→ {O = O} Ls Ls′ eo es so sl (Flat.lpass {q} {a} {c} r ru l nc nh nd) with fwd eo r
+  ... | inj₁ r′       = inj₁ (Flat.lpass r′ ru l nc nh λ d → nd (done-≈ c (≈-sym eo) (≈ᴸ-sym es) (lane-since {O = O} {q = q} {a = a} so r l) d))
   ... | inj₂ (_ , ())
-  flat-→ Ls Ls′ eo es (Flat.left _ _ _ () _)
-  flat-→ Ls Ls′ eo es (Flat.hand _ _ _ _ ())
-  flat-→ Ls Ls′ eo es (Flat.rhand _ ())
-  flat-→ Ls Ls′ eo es (Flat.run x w) with lanes-≈ es x
+  flat-→ Ls Ls′ eo es so sl (Flat.left _ _ _ () _)
+  flat-→ Ls Ls′ eo es so sl (Flat.hand _ _ _ _ ())
+  flat-→ Ls Ls′ eo es so sl (Flat.rhand _ ())
+  flat-→ Ls Ls′ eo es so sl (Flat.run x w) with lanes-≈ es x
   ... | inj₁ x′ = inj₁ (Flat.run x′ w)
   ... | inj₂ sk = inj₂ sk
-  flat-→ Ls Ls′ eo es (Flat.rend {c} x nh d) with lanes-≈ es x
-  ... | inj₁ x′       = inj₁ (Flat.rend x′ nh (done-≈ c eo es d))
+  flat-→ Ls Ls′ eo es so sl (Flat.rend {c} x nh d) with lanes-≈ es x
+  ... | inj₁ x′       = inj₁ (Flat.rend x′ nh (done-≈ c eo es (since-lanes Ls sl x) d))
   ... | inj₂ (_ , ())
-  flat-→ Ls Ls′ eo es (Flat.rpass {c} x nh nd) with lanes-≈ es x
-  ... | inj₁ x′       = inj₁ (Flat.rpass x′ nh λ d → nd (done-≈ c (≈-sym eo) (≈ᴸ-sym es) d))
+  flat-→ Ls Ls′ eo es so sl (Flat.rpass {c} x nh nd) with lanes-≈ es x
+  ... | inj₁ x′       = inj₁ (Flat.rpass x′ nh λ d → nd (done-≈ c (≈-sym eo) (≈ᴸ-sym es) (since-lanes Ls sl x) d))
   ... | inj₂ (_ , ())
 
   flat-≈ : ∀ {O O′ : EmissionSet A} (Ls Ls′ : List (EmissionSet B)) → O ≈⟨ p ⟩ O′ → Ls ≈ᴸ⟨ p ⟩ Ls′
-         → Flat.JoinT L O d n Ls ≈⟨ p ⟩ Flat.JoinT L O′ d n Ls′
-  flat-≈ Ls Ls′ eo es = flat-→ Ls Ls′ eo es ⇆ flat-→ Ls′ Ls (≈-sym eo) (≈ᴸ-sym es)
+         → Since p O → Since p O′ → Each (Since p) Ls → Each (Since p) Ls′ → Flat.JoinT L O d Ls ≈⟨ p ⟩ Flat.JoinT L O′ d Ls′
+  flat-≈ Ls Ls′ eo es so so′ sl sl′ = flat-→ Ls Ls′ eo es so sl ⇆ flat-→ Ls′ Ls (≈-sym eo) (≈ᴸ-sym es) so′ sl′
 
 ------------------------------------------------------------------------
 -- THE LIFT
@@ -235,7 +233,7 @@ up-≈ (inLn true c)                           ld st su eq = up-≈ c ld st su e
 up-≈ (inLn false c)                          ld st su eq = ≈-refl
 up-≈ (inTake i q w c)                        ld st su eq = ≈-refl
 up-≈ (inOuter (mergeᶠ nothing) f d n q ls c) {t} {u} (al , ld) st su eq =
-  up-≈ c ld (since-flat L t Ls st sl) (since-flat L u Ls su sl) (flat-≈ L Ls Ls eq (≈ᴸ-refl Ls))
+  up-≈ c ld (since-flat L t Ls st sl) (since-flat L u Ls su sl) (flat-≈ L Ls Ls eq (≈ᴸ-refl Ls) st su sl sl)
   where
     L  = λ a → pendRows (env c) (f a)
     Ls = rowsL (env c) ls
@@ -245,7 +243,7 @@ up-≈ (inOuter switchᶠ f d n q ls c)           ld st su eq = ≈-refl
 up-≈ (inOuter exhaustᶠ f d n q ls c)          ld st su eq = ≈-refl
 up-≈ (inLanes (mergeᶠ nothing) f d n q o pre post c) {t} {u} (ao , apre , apost , ld) st su eq =
   up-≈ c ld (since-flat L O Lt so slt) (since-flat L O Lu so slu)
-       (flat-≈ L Lt Lu ≈-refl (≈ᴸ-hole (rowsL ρ pre) (eq ∷ ≈ᴸ-refl (rowsL ρ post))))
+       (flat-≈ L Lt Lu ≈-refl (≈ᴸ-hole (rowsL ρ pre) (eq ∷ ≈ᴸ-refl (rowsL ρ post))) so so slt slu)
   where
     ρ   = env c
     L   = λ a → pendRows ρ (f a)

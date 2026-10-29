@@ -308,7 +308,7 @@ module Race {R Γ A B} (v : Bool) (c : Ctx R Γ B) (f : A → Obs Timeline Γ B)
   ρ = env c
 
   FR : EmissionSet B
-  FR = Flat.JoinT (λ x → pendRows ρ (f x)) (rows ρ o) d n (rowsL ρ ls)
+  FR = Flat.JoinT (λ x → pendRows ρ (f x)) (rows ρ o) d (rowsL ρ ls)
 
   lane-occ : ∀ {Q} (o′ o″ : Out B) → (∀ {b} → Fits o′ (out b) → Fits o″ (out b)) → Occ (Lanes (rowsL ρ ls)) Q o′ → Occ FR Q o″
   lane-occ o′ o″ fo oc = occ-bind oc go
@@ -440,8 +440,8 @@ mutual
   kids-lead v c (joinS _ _ _ _)  ()
 
   seek-ln-lead : ∀ {R Γ A} v (c : Ctx R Γ A) (s : St Γ A) → GLn (env c) v s → Leads v c (rows (env c) s) (seek c s)
-  seek-ln-lead v c (lnS true (cutS .true a s₀)) (refl , g₀) = ln-leads (seek (inLn true c) (cutS true a s₀)) (seek-lead v (inLn true c) (cutS true a s₀) g₀)
-  seek-ln-lead v c (lnS false (cutS .false a s₀)) (refl , g₀) = ln-leads (seek (inLn false c) (cutS false a s₀)) (seek-lead v (inLn false c) (cutS false a s₀) g₀)
+  seek-ln-lead v c (lnS true (cutS .true a s₀)) (refl , g₀ , _) = ln-leads (seek (inLn true c) (cutS true a s₀)) (seek-lead v (inLn true c) (cutS true a s₀) g₀)
+  seek-ln-lead v c (lnS false (cutS .false a s₀)) (refl , g₀ , _) = ln-leads (seek (inLn false c) (cutS false a s₀)) (seek-lead v (inLn false c) (cutS false a s₀) g₀)
   seek-ln-lead v c (lnS _ (pend _)) ()
   seek-ln-lead v c (lnS _ (coldS _ _)) ()
   seek-ln-lead v c (lnS _ (ofS _ _ _)) ()

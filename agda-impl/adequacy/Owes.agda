@@ -10,7 +10,7 @@ open import Data.Bool using (Bool; true; false; T; _∧_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _ʳ++_)
 open import Data.Maybe using (just; nothing)
-open import Data.Nat using (ℕ; suc; _+_)
+open import Data.Nat using (suc; _+_)
 open import Data.Nat.Properties using (+-suc)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.List.Relation.Unary.All using ([])
@@ -28,7 +28,7 @@ open Machine using (St; Ctx; plug; alive; pend; coldS; ofS; doneS; mapS; scanS; 
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (∅; env; rows; rowsL; Lanes; Each; module Flat; _≃_)
 open import adequacy.Up using (any-ʳ++ʳ; _≈ᴸ_; []; _∷_; ≈ᴸ-refl; flat-≃; map-≃; ≃-refl)
-open import adequacy.Bound using (Empty; empty-any; Roots; Rooted; Live; G; GL; GLn; LnBody; live; MergeG; mergeG-map)
+open import adequacy.Bound using (Empty; empty-any; EndLast; Roots; Rooted; Live; G; GL; GLn; LnBody; live; MergeG; mergeG-map)
 
 open _≃_
 
@@ -109,9 +109,9 @@ map-owing f {t} ow em = ow go
     go {e = skip}  r = em (map-skip r)
     go {e = end}   r = em (map-end r)
 
-module _ {A B : Set} (L : A → Pos → EmissionSet B) {O : EmissionSet A} {d : Bool} {n : ℕ} {Ls : List (EmissionSet B)} where
+module _ {A B : Set} (L : A → Pos → EmissionSet B) {O : EmissionSet A} {d : Bool} {Ls : List (EmissionSet B)} where
   -- An outer owing a row: the merge owes one for it.
-  flat-owing-o : Owing O → Owing (Flat.JoinT L O d n Ls)
+  flat-owing-o : Owing O → Owing (Flat.JoinT L O d Ls)
   flat-owing-o ow em = ow go
     where
       go : Empty O
@@ -119,7 +119,7 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {O : EmissionSet A} {d : 
       go {e = skip}  r = em (Flat.step r)
       go {e = end}   r = em (Flat.opass r λ d → em (Flat.oend r d))
 
-  flat-owing-l : Owing (Lanes Ls) → Owing (Flat.JoinT L O d n Ls)
+  flat-owing-l : Owing (Lanes Ls) → Owing (Flat.JoinT L O d Ls)
   flat-owing-l ow em = ow go
     where
       go : Empty (Lanes Ls)
@@ -127,7 +127,7 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {O : EmissionSet A} {d : 
       go {e = skip}  x = em (Flat.run x _)
       go {e = end}   x = em (Flat.rpass x (λ ()) λ d → em (Flat.rend x (λ ()) d))
 
-  flat-empty : Empty O → Each Empty Ls → Empty (Flat.JoinT L O d n Ls)
+  flat-empty : Empty O → Each Empty Ls → Empty (Flat.JoinT L O d Ls)
   flat-empty eo el (Flat.val r)       = eo r
   flat-empty eo el (Flat.step r)      = eo r
   flat-empty eo el (Flat.oend r _)    = eo r
@@ -157,7 +157,7 @@ need-of (inOuter (mergeᶠ (just _)) f d n q ls c) ow = tt
 need-of (inOuter switchᶠ f d n q ls c)          ow = tt
 need-of (inOuter exhaustᶠ f d n q ls c)         ow = tt
 need-of (inLanes (mergeᶠ nothing) f d n q o pre post c) {s} ow =
-  (λ _ → ow) , need-of c (owing-≃ (≡→≃ (cong (Flat.JoinT _ (rows (env c) o) d n) (sym (rowsL-ʳ++ pre))))
+  (λ _ → ow) , need-of c (owing-≃ (≡→≃ (cong (Flat.JoinT _ (rows (env c) o) d) (sym (rowsL-ʳ++ pre))))
                                   (flat-owing-l _ λ em → ow λ r → em (any-ʳ++ʳ (rowsL (env c) pre) (inj₁ r))))
 need-of (inLanes (mergeᶠ (just _)) f d n q o pre post c) ow = tt
 need-of (inLanes switchᶠ f d n q o pre post c)  ow = tt
@@ -189,11 +189,18 @@ goodL-ʳ++⁻ []       b = tt₁ , b
 goodL-ʳ++⁻ (x ∷ xs) b with goodL-ʳ++⁻ xs b
 ... | a , (g , c) = (g , a) , c
 
+------------------------------------------------------------------------
+-- A node swapped for one owing the same rows
+
+endlast-≃ : ∀ {A} {t u : EmissionSet A} → t ≃ u → EndLast t → EndLast u
+endlast-≃ eq el r r′ = el (from eq r) (from eq r′)
+
 empty-≃ : ∀ {A} {t u : EmissionSet A} → t ≃ u → Empty t → Empty u
 empty-≃ eq em r = em (from eq r)
 
-------------------------------------------------------------------------
--- A node swapped for one owing the same rows
+live-endlast : ∀ {A} v {t u : EmissionSet A} → t ≃ u → Live v (EndLast t) → Live v (EndLast u)
+live-endlast true  eq el = endlast-≃ eq el
+live-endlast false eq el = tt
 
 -- The same rows, the same liveness, a good node and lane for a good one:
 -- the same good tree.
@@ -243,7 +250,7 @@ dead-up : ∀ {R Γ A} (c : Ctx R Γ A) {s : St Γ A} → Dead (env c) s → ∀
 dead-up top              dd {v} g = no-node dd v g
 dead-up (inMap f c)      dd g = dead-up c (record { no-node = no-node dd ; no-lane = λ _ () ; no-body = λ _ _ () }) g
 dead-up (inScan f z c)   dd g = dead-up c (record { no-node = λ _ () ; no-lane = λ _ () ; no-body = λ _ _ () }) g
-dead-up (inCut l a c)    dd g = dead-up c (record { no-node = λ v → no-node dd (v ∧ l) ; no-lane = λ _ () ; no-body = λ { v b (_ , gs) → no-node dd (v ∧ b) gs } }) g
+dead-up (inCut l a c)    dd g = dead-up c (record { no-node = λ v → no-node dd (v ∧ l) ; no-lane = λ _ () ; no-body = λ { v b (_ , gs , _) → no-node dd (v ∧ b) gs } }) g
 dead-up (inLn b c)       dd g = dead-up c (record { no-node = λ _ () ; no-lane = λ v → no-body dd v b ; no-body = λ _ _ () }) g
 dead-up (inTake i q w c) dd g = dead-up c (record { no-node = λ _ () ; no-lane = λ _ () ; no-body = λ _ _ () }) g
 dead-up (inOuter (mergeᶠ nothing) f d n q ls c) dd g =
@@ -267,8 +274,8 @@ good-swap : ∀ {R Γ A} (c : Ctx R Γ A) {s s′ : St Γ A} → Swap (env c) s 
 good-swap top              sw {v} g = node sw v g
 good-swap (inMap f c)      sw g = good-swap c (record { same = map-≃ f (same sw) ; live≡ = refl ; node = node sw ; lane = λ _ () ; body = λ _ _ () }) g
 good-swap (inScan f z c)   sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ())) g
-good-swap (inCut true a c) sw g = good-swap c (record { same = same sw ; live≡ = refl ; node = λ v → node sw (v ∧ true) ; lane = λ _ () ; body = λ { v b (eq , gs) → eq , node sw (v ∧ b) gs } }) g
-good-swap (inCut false a c) sw g = good-swap c (record { same = ≃-refl ; live≡ = refl ; node = λ v → node sw (v ∧ false) ; lane = λ _ () ; body = λ { v b (eq , gs) → eq , node sw (v ∧ b) gs } }) g
+good-swap (inCut true a c) sw g = good-swap c (record { same = same sw ; live≡ = refl ; node = λ v → node sw (v ∧ true) ; lane = λ _ () ; body = λ { v b (eq , gs , el) → eq , node sw (v ∧ b) gs , live-endlast (v ∧ b) (same sw) el } }) g
+good-swap (inCut false a c) sw g = good-swap c (record { same = ≃-refl ; live≡ = refl ; node = λ v → node sw (v ∧ false) ; lane = λ _ () ; body = λ { v b (eq , gs , el) → eq , node sw (v ∧ b) gs , live-endlast (v ∧ b) (same sw) el } }) g
 good-swap (inLn true c)    sw g = good-swap c (record { same = same sw ; live≡ = refl ; node = λ _ () ; lane = λ v → body sw v true ; body = λ _ _ () }) g
 good-swap (inLn false c)   sw g = good-swap c (record { same = ≃-refl ; live≡ = refl ; node = λ _ () ; lane = λ v → body sw v false ; body = λ _ _ () }) g
 good-swap (inTake i q w c) sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ())) g

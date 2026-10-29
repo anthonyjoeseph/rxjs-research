@@ -124,7 +124,7 @@ up-plug (inLn true c)      s gc = up-plug c (lnS true s) gc
 up-plug (inLn false c)     s gc = up-plug c (lnS false s) gc
 up-plug (inOuter (mergeᶠ nothing) f d n q ls c) s gc = up-plug c (flatS (mergeᶠ nothing) f d n q s ls) gc
 up-plug (inLanes (mergeᶠ nothing) f d n q o pre post c) s gc =
-  ≃-trans (up-≃ c (≡→≃ (cong (Flat.JoinT _ (rows (env c) o) d n) (sym (rowsL-ʳ++ pre)))))
+  ≃-trans (up-≃ c (≡→≃ (cong (Flat.JoinT _ (rows (env c) o) d) (sym (rowsL-ʳ++ pre)))))
           (up-plug c (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post)) gc)
 up-plug (inScan f z c)     s ()
 up-plug (inTake i q w c)   s ()
