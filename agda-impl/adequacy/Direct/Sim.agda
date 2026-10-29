@@ -31,50 +31,11 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
                     renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Direct using (Frag; rows; up; RT; here; pendRows; toEv; Visible; Vis; Past; Plus; old; new; _≃_; _⇄_; Moves; silent; shown;
                                    Steps; Shows*; Shows*-≃; ≃-sym; conv; []; _∷_)
-open import adequacy.Direct.Bound using (Good; GoodLn)
+open import adequacy.Direct.Bound using (Good)
 open import adequacy.Direct.Up using (up-≃; ≃-refl)
-
-------------------------------------------------------------------------
--- The invariant
-
--- A rising event leads: everything else still owed lies strictly past it.
-Lead : ∀ {R} → Conf R → Set
-Lead ⟨ c , s , rising e , p ⟩ = ∀ {q e′} → Vis (up c (rows s)) q e′ → p ≺ q
-Lead _                         = ⊤
-
-record Inv {R} (k : Conf R) : Set where
-  constructor inv
-  field
-    good : Good (plug (Conf.ctx k) (Conf.foc k))
-    lead : Lead k
-open Inv
-
--- The frames the fragment builds.
-GoodC : ∀ {R Γ A} → Ctx R Γ A → Set
-GoodC top                                          = ⊤
-GoodC (inMap f c)                                  = GoodC c
-GoodC (inCut l a c)                                = GoodC c
-GoodC (inLn b c)                                   = GoodC c
-GoodC (inOuter (mergeᶠ nothing) f d n q ls c)      = GoodC c
-GoodC (inLanes (mergeᶠ nothing) f d n q o pre post c) = GoodC c
-GoodC _                                            = ⊥
-
--- One step against the rows, the invariant kept.
-Sim : ∀ {R} → Conf R → Shownᴹ R → Conf R → Set₁
-Sim k sh k′ = Inv k → Inv k′ × Moves (RT k) sh (RT k′)
-
--- What a frame's hole must be: under a merge's lanes, a lane.
-GoodF : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Set
-GoodF (inLanes op f d n q o pre post c) s = GoodLn s
-GoodF top                s = Good s
-GoodF (inMap f c)        s = Good s
-GoodF (inScan f z c)     s = Good s
-GoodF (inCut l a c)      s = Good s
-GoodF (inLn b c)         s = Good s
-GoodF (inTake i q w c)   s = Good s
-GoodF (inOuter op f d n q ls c) s = Good s
-GoodF (inSrc k b c)      s = Good s
-GoodF (inBody k o c)     s = Good s
+open import adequacy.Direct.Skip using (After)
+open import adequacy.Direct.Inv using (Inv; inv; good; Sim; Ends; GoodF; good-split; open-alive)
+open import adequacy.Direct.LaneCp using (rise-lane-cp)
 
 pend-good : ∀ {R Γ A} (c : Ctx R Γ A) o → GoodF c (pend o) → Frag o
 pend-good (inLanes op f d n q o′ pre post c) o ()
@@ -87,14 +48,6 @@ pend-good (inTake i q w c)   o g = g
 pend-good (inOuter op f d n q ls c) o g = g
 pend-good (inSrc k b c)      o g = g
 pend-good (inBody k o′ c)    o g = g
-
--- Only a lane is ever out of its list.
-dead-bad : ∀ {Γ A} (s : St Γ A) → alive s ≡ false → Good s → ⊥
-dead-bad (lnS b s) _ ()
-
-postulate
-  -- A GOOD TREE, CUT AT A HOLE: good frames, a good focus.
-  good-split : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Good (plug c s) → GoodC c × GoodF c s
 
 ------------------------------------------------------------------------
 -- Subscribing
@@ -141,37 +94,35 @@ sub-sim c (joinS j g x ib)  p refl = stay
 -- At the root: the event shown, the least row, and dropped.
 rise-top : ∀ {R} (s : St [] R) e p → Sim ⟨ top , s , rising e , p ⟩ [ (p , e) ] ⟨ top , s , absorbed , p ⟩
 rise-top s e p i with alive s in al
-rise-top s e p (inv g ld) | false = ⊥-elim (dead-bad s al g)
-rise-top s e p (inv g ld) | true = inv g tt , shown (new , vis e) least (to′ ⇄ from′)
+rise-top s e p (inv g (_ , _ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
+rise-top s e p (inv g (_ , _ , os , _ , ld , _)) | true = inv g os , shown (new , vis e) least (to′ ⇄ from′)
   where
     vis : ∀ e → Visible (toEv e)
     vis (nx _) = tt
     vis cp     = tt
     least : ∀ {q e′} → Vis (Plus (rows s) p (toEv e)) q e′ → p ≼ q
-    least {q} (old r , v) qp = ≺-absurd {q} {p} qp (ld (r , v))
+    least {q} (old r , v) qp = ≺-absurd {q} {p} qp (ld r)
     least (new , v)       qp = ≺-irrefl {p} qp
     to′ : ∀ {q e′} → Vis (Past p (Plus (rows s) p (toEv e))) q e′ → Vis (rows s) q e′
     to′ ((old r , _) , v) = r , v
     to′ ((new , pp) , v)  = ⊥-elim (≺-irrefl {p} pp)
     from′ : ∀ {q e′} → Vis (rows s) q e′ → Vis (Past p (Plus (rows s) p (toEv e))) q e′
-    from′ (r , v) = (old r , ld (r , v)) , v
-
--- A hole's rows, good either way.
-unF : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → GoodF c s → Good s ⊎ GoodLn s
-unF (inLanes op f d n q o pre post c) s g = inj₂ g
-unF top                s g = inj₁ g
-unF (inMap f c)        s g = inj₁ g
-unF (inScan f z c)     s g = inj₁ g
-unF (inCut l a c)      s g = inj₁ g
-unF (inLn b c)         s g = inj₁ g
-unF (inTake i q w c)   s g = inj₁ g
-unF (inOuter op f d n q ls c) s g = inj₁ g
-unF (inSrc k b c)      s g = inj₁ g
-unF (inBody k o c)     s g = inj₁ g
+    from′ (r , v) = (old r , ld r) , v
 
 vis-≃ : ∀ {A} {t u : EmissionSet A} → t ≃ u → Vis t ≃ Vis u
 vis-≃ eq = (λ { (r , v) → to eq r , v }) ⇄ (λ { (r , v) → from eq r , v })
   where open _≃_
+
+after-map : ∀ {A B} (f : A → B) {t : EmissionSet A} {p} → After p t → After p (MapT f t)
+after-map f a (map-out r)  = a r
+after-map f a (map-skip r) = a r
+after-map f a (map-end r)  = a r
+
+ends-map : ∀ {A B} (f : A → B) {t : EmissionSet A} e → Ends e t → Ends (mapEv f e) (MapT f t)
+ends-map f (nx _) _  = tt
+ends-map f cp     em (map-out r)  = em r
+ends-map f cp     em (map-skip r) = em r
+ends-map f cp     em (map-end r)  = em r
 
 map-plus : ∀ {A B} (f : A → B) (t : EmissionSet A) p e → MapT f (Plus t p (toEv e)) ≃ Plus (MapT f t) p (toEv (mapEv f e))
 map-plus f t p (nx a) = to′ ⇄ from′
@@ -201,21 +152,21 @@ map-plus f t p cp = to′ ⇄ from′
 
 rise-map : ∀ {R Γ A B} (f : A → B) (c : Ctx R Γ B) s e p → Sim ⟨ inMap f c , s , rising e , p ⟩ [] ⟨ c , mapS f s , rising (mapEv f e) , p ⟩
 rise-map f c s e p i with alive s in al
-rise-map f c s e p (inv g ld) | false with unF c (mapS f s) (proj₂ (good-split c (mapS f s) g))
-... | inj₁ gs = ⊥-elim (dead-bad s al gs)
-rise-map f c s e p (inv g ld) | true = inv g ld , silent (vis-≃ (up-≃ c (map-plus f (rows s) p e)))
+rise-map f c s e p (inv g (_ , _ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
+rise-map f c s e p (inv g (uc , lc , os , _ , af , en)) | true =
+  inv g (uc , lc , os , tt , after-map f {p = p} af , ends-map f e en) , silent (vis-≃ (up-≃ c (map-plus f (rows s) p e)))
 
 rise-cut : ∀ {R Γ A} l a (c : Ctx R Γ A) s e p → Sim ⟨ inCut l a c , s , rising e , p ⟩ [] ⟨ c , cutS l a s , (if l then rising e else absorbed) , p ⟩
-rise-cut false a c s e p (inv g ld) = inv g tt , silent ≃-refl
+rise-cut false a c s e p (inv g (() , _))
 rise-cut true  a c s e p i with alive s in al
-rise-cut true  a c s e p (inv g ld) | false = ⊥-elim (dead-bad s al (proj₂ (good-split (inCut true a c) s g)))
-rise-cut true  a c s e p (inv g ld) | true  = inv g ld , silent ≃-refl
+rise-cut true  a c s e p (inv g (_ , _ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
+rise-cut true  a c s e p (inv g (uc , lc , os , _ , af , en)) | true = inv g (uc , lc , os , tt , af , en) , silent ≃-refl
 
 rise-ln : ∀ {R Γ A} b (c : Ctx R Γ A) s e p → Sim ⟨ inLn b c , s , rising e , p ⟩ [] ⟨ c , lnS b s , rising e , p ⟩
-rise-ln false c s e p (inv g ld) = inv g ld , silent ≃-refl
+rise-ln false c s e p (inv g (() , _))
 rise-ln true  c s e p i with alive s in al
-rise-ln true  c s e p (inv g ld) | false = ⊥-elim (dead-bad s al (proj₂ (good-split (inLn true c) s g)))
-rise-ln true  c s e p (inv g ld) | true  = inv g ld , silent ≃-refl
+rise-ln true  c s e p (inv g (_ , _ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
+rise-ln true  c s e p (inv g (uc , lc , os , _ , af , en)) | true = inv g (uc , lc , os , tt , af , en) , silent ≃-refl
 
 postulate
   -- AN OUTER'S VALUE BEGINS ITS LANE.
@@ -228,11 +179,6 @@ postulate
   rise-lane-nx : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s b p
                → Sim ⟨ inLanes (mergeᶠ nothing) f d n q o pre post c , s , rising (nx b) , p ⟩ []
                      (if alive s then ⟨ c , flatS (mergeᶠ nothing) f d n q o (pre Data.List.ʳ++ s ∷ post) , rising (nx b) , p ⟩
-                                 else ⟨ c , flatS (mergeᶠ nothing) f d n q o (pre Data.List.ʳ++ s ∷ post) , absorbed , p ⟩)
-  -- A LANE'S END, SHOWN ONLY AS THE LAST WITH THE OUTER DONE.
-  rise-lane-cp : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s p
-               → Sim ⟨ inLanes (mergeᶠ nothing) f d n q o pre post c , s , rising cp , p ⟩ []
-                     (if alive s then dequeue c (mergeᶠ nothing) f d (Data.Nat.pred n) q o (pre Data.List.ʳ++ ended s ∷ post) p
                                  else ⟨ c , flatS (mergeᶠ nothing) f d n q o (pre Data.List.ʳ++ s ∷ post) , absorbed , p ⟩)
 
 rise-sim : ∀ {R Γ A} {k′ : Conf R} {sh t} (c : Ctx R Γ A) (s : St Γ A) e p → stepᴹ ⟨ c , s , rising e , p ⟩ ≡ moved k′ sh t → Sim ⟨ c , s , rising e , p ⟩ sh k′
@@ -300,4 +246,4 @@ sound-from i (e ∷ st) with step-sim e i
 -- THE SOUND HALF: what the engine shows, a reader of the program's rows
 -- is shown.
 sound : ∀ {R} {o : PureObs [] R} → Frag o → ∀ {rs k} → Steps (load o) rs k → Shows* (enter (⟦ o ⟧ᵀ []ᴬ) root) (conv rs)
-sound fo st = sound-from (inv fo tt) st
+sound fo st = sound-from (inv fo (tt , tt)) st

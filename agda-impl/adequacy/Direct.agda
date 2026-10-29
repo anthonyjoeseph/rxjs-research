@@ -10,11 +10,11 @@ module adequacy.Direct where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Empty using (⊥)
-open import Data.List using (List; []; _∷_; _++_; [_]; _ʳ++_; lookup)
+open import Data.List using (List; []; _∷_; _++_; [_]; _ʳ++_)
 open import Data.List.Relation.Unary.All using ([])
+open import Data.Sum using (_⊎_)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (Σ; _×_; _,_)
-open import Data.Sum using (_⊎_)
 open import Data.Unit using (⊤)
 open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
@@ -70,9 +70,19 @@ record _≃_ {A : Set} (t u : EmissionSet A) : Set where
     from : ∀ {q e} → u q e → t q e
 open _≃_
 
--- A lane or an outer ended by `c`: nothing left of it, or its end by `c`.
+-- A lane or an outer ended by `c`: every row it still owes, by `c`.
 Gone : ∀ {X} → EmissionSet X → Pos → Set
-Gone t c = (∀ {k e} → ¬ t k e) ⊎ Σ Pos λ c′ → t c′ end × c′ ≼ c
+Gone t c = ∀ {k e} → t k e → k ≼ c
+
+-- Rows of any lane of a list.
+Lanes : ∀ {B} → List (EmissionSet B) → EmissionSet B
+Lanes []       k e = ⊥
+Lanes (t ∷ Ls) k e = t k e ⊎ Lanes Ls k e
+
+-- A fact of every lane of a list.
+Each : ∀ {B} → (EmissionSet B → Set) → List (EmissionSet B) → Set
+Each P []       = ⊤
+Each P (t ∷ Ls) = P t × Each P Ls
 
 -- A MERGE PART WAY THROUGH: what is left of its outer, `O`; the lanes it
 -- has begun, `Ls`; and a lane for each value the outer still owes,
@@ -85,7 +95,7 @@ module Flat {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (L
   Done : Pos → Set
   Done c = Gone O c
          × (∀ {q a} → O q (out a) → q ≺ c → Σ Pos λ c′ → Lane q a c′ end × c′ ≼ c)
-         × (∀ i → Gone (lookup Ls i) c)
+         × Each (λ t → Gone t c) Ls
 
   data FlatR : EmissionSet B where
     val   : ∀ {q a} → O q (out a) → FlatR (q ++ [ ix 0 ]) skip
@@ -95,9 +105,9 @@ module Flat {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (L
     lane  : ∀ {q a k e} → O q (out a) → Lane q a k e → Work e → FlatR k e
     lend  : ∀ {q a c} → O q (out a) → Lane q a c end → Done c → FlatR c end
     lpass : ∀ {q a c} → O q (out a) → Lane q a c end → ¬ Done c → FlatR c skip
-    run   : ∀ {k e} i → lookup Ls i k e → Work e → FlatR k e
-    rend  : ∀ {c} i → lookup Ls i c end → Done c → FlatR c end
-    rpass : ∀ {c} i → lookup Ls i c end → ¬ Done c → FlatR c skip
+    run   : ∀ {k e} → Lanes Ls k e → Work e → FlatR k e
+    rend  : ∀ {c} → Lanes Ls c end → Done c → FlatR c end
+    rpass : ∀ {c} → Lanes Ls c end → ¬ Done c → FlatR c skip
 
 -- What a subscription pending at `p` owes: its meaning, entered there.
 pendRows : ∀ {Γ A} → Obs Timeline Γ A → Pos → EmissionSet A
