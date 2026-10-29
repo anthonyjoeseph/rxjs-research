@@ -13,10 +13,10 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.MonotonicList.Events using (Pos)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; end; MapT; map-out; map-skip; map-end)
+open import denotation.EmissionSet using (EmissionSet; MapT; map-out; map-skip; map-end)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Direct using (up; rows; Vis; Plus; old; new; rowsL; pendRows; Gone; Lanes; Each; module Flat; _≃_; _⇄_; ≃-sym)
+open import adequacy.Direct using (up; Vis; Plus; old; new; rowsL; Gone; Lanes; Each; module Flat; _≃_; _⇄_; ≃-sym)
 
 open _≃_
 

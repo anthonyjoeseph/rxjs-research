@@ -8,7 +8,7 @@
 -- visible rows or shows the least of them and drops it.
 module adequacy.Direct where
 
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (true; false; if_then_else_)
 open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; _++_; [_]; _ʳ++_)
 open import Data.List.Relation.Unary.All using ([])
@@ -21,9 +21,9 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; empty; of; map; flatMap)
 open import denotation.MonotonicList using (ofᴱ)
-open import denotation.MonotonicList.Events using (Pos; Timeline; ix; root)
+open import denotation.MonotonicList.Events using (Pos; Timeline; ix)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; Work; InE; enter; MapT; ⟦_⟧ᵀ)
-open import operation.PureObservable using (PureObs; module Machine)
+open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; load; moved; quiet; pend; ofS; mapS; cutS; lnS; flatS; alive; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; nx; cp) renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
 
 ------------------------------------------------------------------------

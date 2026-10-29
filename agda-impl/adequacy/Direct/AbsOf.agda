@@ -6,7 +6,7 @@
 -- the of owes reaches the root, and its run is silent.
 module adequacy.Direct.AbsOf where
 
-open import Data.Bool using (Bool; true; false; T; if_then_else_)
+open import Data.Bool using (true; false; T; if_then_else_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _ʳ++_; [_]; _++_)
 open import Data.Maybe using (Maybe; just; nothing) renaming (map to mapᴹ)
@@ -32,8 +32,8 @@ open import adequacy.Direct using (∅; up; rows; Plus; old; new; module Flat; _
 open import adequacy.Direct.Up using (up-≃; ≃-refl; ≃-trans; vis-≃)
 open import adequacy.Direct.Bound using (Good; LnBody; ofPos; of-from; ⊑→≼)
 open import adequacy.Direct.Skip using (After; LeadC)
-open import adequacy.Direct.Owes using (Owing; Owes; OwesL; UpO; owesL-ʳ++; owesL-ʳ++⁻; rowsL-ʳ++; ≡→≃)
-open import adequacy.Direct.Inv using (Inv; inv; Sim; Open; good-split; unF)
+open import adequacy.Direct.Owes using (Owes; UpO; owesL-ʳ++⁻; rowsL-ʳ++; ≡→≃)
+open import adequacy.Direct.Inv using (Inv; inv; Sim; Open; good-split; unF; closed-dead; dead-swap)
 
 ------------------------------------------------------------------------
 -- Where the search lands
@@ -159,7 +159,7 @@ closed-up (inBody k o c)    e = ≃-refl
 ------------------------------------------------------------------------
 -- What an open hole's frames owe
 
-lnbody-open : ∀ {Γ A} (s : St Γ A) → LnBody false s → Open s → ⊥
+lnbody-open : ∀ {Γ A} {v} (s : St Γ A) → LnBody v false s → Open s → ⊥
 lnbody-open (cutS l a s) (refl , _) op = op
 lnbody-open (pend _)              () _
 lnbody-open (coldS _ _)           () _
@@ -242,8 +242,11 @@ postulate
   good-done : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ κ} → closed c ≡ false → Good (plug c (ofS i p₀ []))
             → search top (plug c (ofS i p₀ [])) ≡ just (found (Γ , A , c , ofS i p₀ []) ofM κ) → Good (plug c doneS)
   -- A CLOSED OF, DROPPED: what is owed above the cut does not change.
-  good-closed : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ xs} → closed c ≡ true → Good (plug c (ofS i p₀ xs)) → Good (plug c doneS)
   owes-closed : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ xs} → closed c ≡ true → Owes (plug c (ofS i p₀ xs)) → Owes (plug c doneS)
+
+-- A closed of sits under a dead lane, so dropping it is checked for shape only.
+good-closed : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ xs} → closed c ≡ true → Good (plug c (ofS i p₀ xs)) → Good (plug c doneS)
+good-closed c cl g = dead-swap c (closed-dead c (proj₁ (good-split c _ g)) cl) (record { node₀ = λ _ → tt ; lane₀ = λ () ; body₀ = λ _ () }) g
 
 -- The root's rows, read at the of the search found.
 into : ∀ {R Γ′ A′ Γ A} (c : Ctx R Γ′ A′) (s : St Γ′ A′) (c′ : Ctx R Γ A) (s′ : St Γ A) → plug c′ s′ ≡ plug c s → up c (rows s) ≃ up c′ (rows s′)

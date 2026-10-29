@@ -6,7 +6,7 @@
 -- every other part owes nothing, and a skip otherwise.
 module adequacy.Direct.LaneEnd where
 
-open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; _ʳ++_)
 open import Data.Product using (_×_; _,_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
@@ -14,8 +14,8 @@ open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import denotation.MonotonicList.Events using (Pos)
-open import denotation.EmissionSet using (EmissionSet; out; skip; end; _≺_; _≼_)
-open import denotation.EmissionSet.Laws.Modulus using (≺→≼; ≼-refl; ≺-absurd)
+open import denotation.EmissionSet using (EmissionSet; end; _≼_)
+open import denotation.EmissionSet.Laws.Modulus using (≺→≼; ≼-refl)
 open import adequacy.Direct using (∅; Plus; old; new; Gone; Lanes; Each; module Flat)
 open import adequacy.Direct.Up using (any-ʳ++; any-ʳ++ˡ; any-ʳ++ʳ; all-ʳ++; all-ʳ++⁻)
 open import adequacy.Direct.Bound using (Empty)

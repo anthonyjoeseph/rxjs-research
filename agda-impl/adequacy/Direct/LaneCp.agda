@@ -10,32 +10,33 @@
 module adequacy.Direct.LaneCp where
 
 open import Data.Bool using (Bool; true; false; T; if_then_else_)
-open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; _ʳ++_)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_)
 open import Data.Nat.Properties using (+-suc; m+n≡0⇒m≡0; m+n≡0⇒n≡0)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit using (⊤; tt)
+open import Data.Unit using (tt)
 open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; trans; sym; subst)
 
 open import Tree using (Obs; mergeᶠ)
 open import denotation.MonotonicList.Events using (Pos; Timeline)
-open import denotation.EmissionSet using (EmissionSet; end)
+open import denotation.EmissionSet using (end)
 open import denotation.EmissionSet.Laws.Modulus using (≼-refl)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; ⟨_,_,_,_⟩; plug; absorbed; rising; cp; alive; ended; dequeue; settle; Att;
                     cutS; lnS; flatS; inLanes)
-open import adequacy.Direct using (∅; up; here; rows; rowsL; pendRows; Vis; Plus; old; new; Lanes; Each; module Flat; _≃_; _⇄_; ≃-sym; Moves; silent)
+open import adequacy.Direct using (∅; up; here; rows; rowsL; pendRows; Plus; old; new; Lanes; Each; module Flat; _≃_; _⇄_;
+  ≃-sym; Moves; silent)
 open import adequacy.Direct.Up using (any-ʳ++ˡ; any-ʳ++ʳ; all-ʳ++; ≈ᴸ-refl; _∷_; flat-≃; up-≃; ≃-refl; ≃-trans; vis-≃; plus-≃)
-open import adequacy.Direct.Bound using (Empty; Single; EndLast; Good; GoodL; on; off; lane-v; live; dead-empty)
+open import adequacy.Direct.Bound using (Empty; Single; EndLast; Good; GoodL; G; GLn; shape; on; off; lane-v; live; dead-empty)
 open import adequacy.Direct.Skip using (After; Since; LeadC; _≈⟨_⟩_; ≈-vis; up-≈)
 open import adequacy.Direct.LaneEnd using (frame-≈; done-at; outer-owes; lanes-owe; since-x; since-y)
 open import adequacy.Direct.Owes using (Owing; Owes; OwesL; UpO; Swap; owes-join; need-of; owesL-ʳ++; rowsL-ʳ++; ≡→≃; owing-≃; empty-≃;
                                         flat-owing-o; flat-owing-l; flat-empty; live-ʳ++; live-owing; goodL-ʳ++⁻; goodL-swap; lanes-≃; good-swap)
-open import adequacy.Direct.Inv using (Inv; inv; Sim; good-split; node-good)
+open import adequacy.Direct.Inv using (Inv; inv; Sim; good-split; node-good; upo-liv)
 
 module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St Γ A) (pre post : List (St Γ B)) (c : Ctx R Γ B)
           (a : Att) (s₀ : St Γ B) (p : Pos)
@@ -78,10 +79,11 @@ module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St 
     where
       lane≃ : rows ln ≃ rows ed
       lane≃ = (λ r → ⊥-elim (en r)) ⇄ λ ()
-      gnode : Good (flatS (mergeᶠ nothing) f d n [] o (pre ʳ++ ln ∷ post)) → Good (node (pred n))
-      gnode _ = go , goodL-swap pre (λ _ → refl , g₀ , λ ()) gl , refl , si , el , trans cnt (sym (live-ʳ++ pre)) , ov
+      gnode : ∀ v → G v (flatS (mergeᶠ nothing) f d n [] o (pre ʳ++ ln ∷ post)) → G v (node (pred n))
+      gnode true  _                  = go , goodL-swap pre (λ _ → refl , shape s₀ g₀ , tt) gl , refl , si , el , trans cnt (sym (live-ʳ++ pre)) , ov
+      gnode false (go′ , gl′ , qe , _) = go′ , goodL-swap pre (λ { (refl , g′ , _) → refl , g′ , tt }) gl′ , qe , tt
       sw : Swap (flatS (mergeᶠ nothing) f d n [] o (pre ʳ++ ln ∷ post)) (node (pred n))
-      sw = record { same = flat-≃ L ≃-refl (lanes-≃ pre (lane≃ ∷ ≈ᴸ-refl Post)) ; live≡ = refl ; node = gnode ; lane = λ () ; body = λ _ () }
+      sw = record { same = flat-≃ L ≃-refl (lanes-≃ pre (lane≃ ∷ ≈ᴸ-refl Post)) ; live≡ = refl ; node = gnode ; lane = λ _ () ; body = λ _ _ () }
 
   owes′ : Owes (node (pred n))
   owes′ = ho , oo , owesL-ʳ++ pre op ((λ ()) , tt , oq)
@@ -148,9 +150,11 @@ rise-lane-cp : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s 
              → Sim ⟨ inLanes (mergeᶠ nothing) f d n q o pre post c , s , rising cp , p ⟩ []
                    (if alive s then dequeue c (mergeᶠ nothing) f d (pred n) q o (pre ʳ++ ended s ∷ post) p
                                else ⟨ c , flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
-rise-lane-cp f d n q o pre post c s p (inv g (u , l , os , op′ , as , es)) with lane-v s (proj₂ (good-split (inLanes (mergeᶠ nothing) f d n q o pre post c) s g))
-... | off a s₀ g₀ = ⊥-elim op′
-... | on a s₀ g₀ _ with node-good c (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post)) g (λ ())
+rise-lane-cp f d n q o pre post c s p (inv g (u , l , os , op′ , as , es)) with upo-liv (inLanes (mergeᶠ nothing) f d n q o pre post c) u
+... | lv with lane-v s (subst (λ v → GLn v s) lv (proj₂ (good-split (inLanes (mergeᶠ nothing) f d n q o pre post c) s g)))
+... | off a s₀ = ⊥-elim op′
+... | on a s₀ g₀ _ with subst (λ v → G v (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post))) lv
+                            (node-good c (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post)) g (λ ()))
 ... | go , gl , refl , si , el , nl , ov with u | l
 ... | ho , oo , op , oq , uc | ao , apre , apost , lc =
   Cp.result f d n o pre post c a s₀ p g go gl si el nl ov g₀ ho oo op oq uc ao apre apost lc es

@@ -7,30 +7,27 @@
 -- frame, a mark run where the search's bound says it leads.
 module adequacy.Direct.Sim where
 
-open import Data.Bool using (Bool; true; false; if_then_else_)
-open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Bool using (true; false; if_then_else_)
+open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; null)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Maybe using (just; nothing)
-open import Data.Nat using (ℕ)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit using (⊤; tt)
+open import Data.Product using (_,_; proj₁; proj₂)
+open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList.Events using (Pos; Timeline; root)
-open import denotation.EmissionSet using (EmissionSet; out; end; MapT; map-out; map-skip; map-end; _≺_; _≼_; enter; ⟦_⟧ᵀ)
+open import denotation.MonotonicList.Events using (Timeline; root)
+open import denotation.EmissionSet using (EmissionSet; out; end; MapT; map-out; map-skip; map-end; _≼_; enter; ⟦_⟧ᵀ)
 open import denotation.EmissionSet.Laws.Modulus using (≺-irrefl; ≺-absurd)
-open import operation.Key using (Key)
 open import operation.PureObservable using (PureObs; module Machine)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; found; Mark; ofM; attM;
                     rise; run; start; dequeue; settle; alive; ended; mapEv; nx; cp; attAt; attached; Torn;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
-open import adequacy.Direct using (Frag; rows; up; RT; here; pendRows; toEv; Visible; Vis; Past; Plus; old; new; _≃_; _⇄_; Moves; silent; shown;
-                                   Steps; Shows*; Shows*-≃; ≃-sym; conv; []; _∷_)
+open import adequacy.Direct using (Frag; rows; RT; toEv; Visible; Vis; Past; Plus; old; new; _≃_; _⇄_; silent; shown; Steps;
+  Shows*; Shows*-≃; ≃-sym; conv; []; _∷_)
 open import adequacy.Direct.Bound using (Good)
 open import adequacy.Direct.Up using (up-≃; ≃-refl; vis-≃)
 open import adequacy.Direct.Skip using (After)
