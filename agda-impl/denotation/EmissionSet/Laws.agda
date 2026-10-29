@@ -60,6 +60,7 @@ open import denotation.EmissionSet.Laws.Connect using (connect-inv)
 open import denotation.EmissionSet.Laws.TakeInv using (takeWhile-inv)
 open import denotation.EmissionSet.Laws.HotInv using (lawful-hot)
 open import denotation.EmissionSet.Laws.ColdInv using (cold-inv)
+open import denotation.EmissionSet.Laws.FlatInv using (flatMap-inv)
 open import denotation.EmissionSet.Laws.ConnectNe using (Causal; proper-ag; connect-ne)
 
 -- The same rows at every subscription.
@@ -106,10 +107,6 @@ postulate
   flatMap-ne   : ∀ {A B H k} (op : FlatOp) {f f′ : A → Den B} {s s′ : Den A}
                → InvD H s → InvD H s′ → (∀ a → InvD H (f a)) → (∀ a → InvD H (f′ a))
                → s ≈⟨ Ok H ∣ k ⟩ s′ → (∀ a → f a ≈⟨ Ok H ∣ k ⟩ f′ a) → flatMapᵀ op f s ≈⟨ Ok H ∣ k ⟩ flatMapᵀ op f′ s′
-
-  -- EACH OPERATOR KEEPS THE INVARIANT.
-  flatMap-inv   : ∀ {A B H} (op : FlatOp) {f : A → Den B} {s : Den A} → InvD H s → (∀ a → InvD H (f a)) → InvD H (flatMapᵀ op f s)
-
 
 ------------------------------------------------------------------------
 -- Operators that read a row where it lies

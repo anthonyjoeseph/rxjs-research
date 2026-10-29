@@ -692,6 +692,9 @@ inv-widen {H = H} {t} {d} inv p (r , dj) = record
 ------------------------------------------------------------------------
 -- The leaves keep it
 
+out-inj : ∀ {A} {a b : A} → out a ≡ out b → a ≡ b
+out-inj refl = refl
+
 private
   -- One plain label below `p`.
   Below : Pos → Pos → Set
@@ -761,9 +764,6 @@ private
 
   spin-skip : ∀ {A p y} {e : Ev A} → Spin p y e → e ≡ skip
   spin-skip (spin _) = refl
-
-  out-inj : ∀ {A} {a b : A} → out a ≡ out b → a ≡ b
-  out-inj refl = refl
 
   -- The rows of `of`, past the index it is at.
   of-idx : ∀ {A} p i (xs : List A) {y e} → InE (ofᴱ p i xs) y e → (Σ ℕ λ j → i ≤ j × y ≡ p ++ [ ix j ]) ⊎ y ≡ p ++ [ last ]
