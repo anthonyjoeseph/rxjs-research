@@ -32,6 +32,7 @@ open import adequacy.Direct using (∅; up; rows; Plus; old; new; module Flat; _
 open import adequacy.Direct.Up using (up-≃; ≃-refl; ≃-trans; vis-≃)
 open import adequacy.Direct.Bound using (Good; LnBody; ofPos; of-from; ⊑→≼)
 open import adequacy.Direct.Skip using (After; LeadC)
+open import adequacy.Direct.Lead using (lead-found)
 open import adequacy.Direct.Owes using (Owes; UpO; owesL-ʳ++⁻; rowsL-ʳ++; ≡→≃)
 open import adequacy.Direct.Inv using (Inv; inv; Sim; Open; good-split; unF; closed-dead; dead-swap)
 
@@ -231,11 +232,13 @@ after-of p i xs {q} r = ≺-≼-≺ {p ++ [ ix i ]} {ofPos p (suc i) xs} {q} (nx
 ------------------------------------------------------------------------
 -- The run
 
+-- THE FOUND OF LEADS: every other part of each merge above it lies
+-- strictly past its event.
+found-lead : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ xs κ} → closed c ≡ false → Good (plug c (ofS i p₀ xs))
+           → search top (plug c (ofS i p₀ xs)) ≡ just (found (Γ , A , c , ofS i p₀ xs) ofM κ) → LeadC c (ofPos p₀ i xs)
+found-lead c {i} {p₀} {xs} cl g fd = lead-found {t = plug c (ofS i p₀ xs)} {c = c} {s = ofS i p₀ xs} cl refl g fd
+
 postulate
-  -- THE FOUND OF LEADS: every other part of each merge above it lies
-  -- strictly past its event.
-  found-lead : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ xs κ} → closed c ≡ false → Good (plug c (ofS i p₀ xs))
-             → search top (plug c (ofS i p₀ xs)) ≡ just (found (Γ , A , c , ofS i p₀ xs) ofM κ) → LeadC c (ofPos p₀ i xs)
   -- THE LEAST ROW TAKEN, THE TREE STILL GOOD.
   good-of   : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ x xs κ} → closed c ≡ false → Good (plug c (ofS i p₀ (x ∷ xs)))
             → search top (plug c (ofS i p₀ (x ∷ xs))) ≡ just (found (Γ , A , c , ofS i p₀ (x ∷ xs)) ofM κ) → Good (plug c (ofS (suc i) p₀ xs))
