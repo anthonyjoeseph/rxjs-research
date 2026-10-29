@@ -18,7 +18,7 @@ open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (¬_)
 
-open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; ix)
+open import denotation.Events using (Pos; _<ᵖ_; ix)
 open import denotation.EmissionSet using (out; skip; end; EmissionSet; Den; After)
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled using (Listed; rows; short; concatMap; endBy; values; outerRow; switchRows; module SwitchL)

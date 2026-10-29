@@ -16,7 +16,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Relation.Nullary using (does)
 
-open import denotation.MonotonicList.Events using (Pos; Label; ix; sub; last; _≟ᵖ_)
+open import denotation.Events using (Pos; Label; ix; sub; last; _≟ᵖ_)
 
 infixr 5 _×ᵗ_ _+ᵗ_
 

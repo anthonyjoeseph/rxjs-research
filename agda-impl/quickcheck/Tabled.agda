@@ -14,17 +14,17 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _≤ᵇ_; _≡ᵇ_; _<ᵇ_; _�
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 
 open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-import denotation.MonotonicList.Events as E
-open import denotation.MonotonicList.Events using (Pos; Time; Timeline; timelineAt; _<ᵖ_; _≟ᵖ_; inside; ix; sub; last; root)
-open import denotation.MonotonicList using (start; ofᴱ)
+import denotation.Events as E
+open import denotation.Events using (Pos; Time; Timeline; timelineAt; _<ᵖ_; _≟ᵖ_; inside; ix; sub; last; root)
+open import denotation.Events using (start; ofᴱ)
 open import denotation.EmissionSet using (Ev; out; skip; end)
 open import Relation.Nullary using (does)
-open import quickcheck.Oracle using (Event; val; _▸_; Trace; completed; silent; cut; depth; showTrace)
+open import quickcheck.Trace using (Event; val; _▸_; Trace; completed; silent; cut; depth; showTrace)
 open import quickcheck.Code using (Prog; toObs; timeline)
 open import Data.String using (String)
 import Data.String as S
 open import Data.Nat.Show using () renaming (show to showℕ)
-import quickcheck.Oracle as O
+import quickcheck.Trace as O
 
 ------------------------------------------------------------------------
 -- Listings
@@ -430,7 +430,7 @@ open ConnL public using (connRows)
 ------------------------------------------------------------------------
 -- A program tree, listed
 
--- `EmissionSet.approxᵀ`'s clauses, approximant n, subscribed at `p`.
+-- `EmissionSet.approx`'s clauses, approximant n, subscribed at `p`.
 listT : ∀ {Γ A} → ℕ → Obs Timeline Γ A → All Listed Γ → Pos → Maybe (Listed A)
 listT n       (cold c)          ρ p = just (walk fuel (start p (timelineAt c p)))
 listT n       empty             ρ p = just ([ p ++ [ last ] , end ] ⊣ false)

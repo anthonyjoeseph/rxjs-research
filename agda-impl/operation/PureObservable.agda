@@ -3,8 +3,8 @@
 -- THE PURE RUNTIME OVER `operation.AbstractObservable`.  A cold leaf keeps
 -- the frame it plays — the cascade it sits in, its next index — or the
 -- completion it owes; that is its mark's key.  A frame's later frames
--- are the same leaf, rekeyed under the timer cascade `Unfold` places them
--- in.  So the driver keeps nothing: no clock, no timers, no turns, no
+-- are the same leaf, rekeyed under the timer cascade
+-- `denotation.EmissionSet` places them in.  So the driver keeps nothing: no clock, no timers, no turns, no
 -- depths.  The run's time is the tick of the position it is at.
 module operation.PureObservable where
 
@@ -15,7 +15,7 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_)
 
 open import Tree using (Obs)
-open import denotation.MonotonicList.Events using (Timeline; timelineAt; ML; Burst; Burst∞; ML∞; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Pos; ix; last; tick) renaming (sub to subᴾ)
+open import denotation.Events using (Timeline; timelineAt; ML; Burst; Burst∞; ML∞; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Pos; ix; last; tick) renaming (sub to subᴾ)
 open import operation.Key using (Key) renaming (at to atᴷ)
 
 ------------------------------------------------------------------------

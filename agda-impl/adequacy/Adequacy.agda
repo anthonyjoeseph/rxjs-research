@@ -1,125 +1,47 @@
 {-# OPTIONS --guardedness #-}
 
--- THE LINK.  The pure semantics the harness
--- runs (`operation.PureObservable`) agrees with the denotation: the
--- limit of its prefixes, the n-th read for n steps up to tick n, is the
--- meaning observed at the root, with positions forgotten down to ticks.
+-- THE THEOREM: the pure semantics, run on a program, shows exactly the
+-- rows a reader of the program's emission set meets, in position order —
+-- each run shows what the reader meets first, and whatever the reader
+-- meets, some run shows.
 --
--- Two halves, proven apart.  BELOW, safety: every prefix's
--- record is sorted and alike the meaning's events as a set, so placed
--- against them.  ABOVE, liveness: whatever the meaning shows, some prefix
--- reaches.
+-- The sound half is proven on the fragment `adequacy.Rows.Frag`
+-- (`adequacy.Sim.sound`) and owed beyond it (`sound-beyond`).  The split
+-- is excluded middle (`frag?`), since a merge's lanes are `f a` for every
+-- `a` and the fragment cannot be decided.
 module adequacy.Adequacy where
 
-open import Data.Bool using (true; false; T)
-open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using ([]; _++_)
-open import Data.List.Relation.Unary.All using ([])
-open import Data.Nat using (ℕ; zero; suc; _≤_; s≤s; _<ᵇ_)
-open import Data.Nat.Properties using (≤-<-trans; <ᵇ⇒<; <⇒<ᵇ; n≤1+n)
-open import Data.Product using (_,_; Σ; proj₁; proj₂)
-open import Data.Unit using (tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; sym; subst)
+open import Data.List using (List; [])
+open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
+open import Data.Product using (Σ; _×_; _,_)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Relation.Nullary using (¬_)
 
-open import adequacy.Record using (Up; Placed; ahead; framed; shows; placed-⊑; frames-cut)
-open import operation.PureObservable using (PureObs; module Driver; module Machine; module Pure) renaming (run to prefix)
-open import adequacy.Sorted using (module Sorting)
-open import adequacy.Sorted.Walk using (module SortingWalk)
-open import adequacy.Content.Log using (module HonestLog)
-open import adequacy.Ghost using (module Ghosting)
-open import adequacy.Progress using (module Progressing)
-open import denotation.MonotonicList.Events using (ML; Time; root)
-open import denotation.MonotonicList using (observe; ticks)
-open import denotation.Order using (_⊑_; _≃_; Shows; Chain; limit; limit-ub; limit-least; shows-≼; shows-cmp; cmp-long)
-open import denotation.Observe using (events)
-open import denotation.Denote using (⟦_⟧)
+open import denotation.Events using (Pos; root)
+open import denotation.EmissionSet using (Ev; enter; ⟦_⟧)
+open import operation.PureObservable using (PureObs; module Machine)
+open Machine using (load)
+open import adequacy.Rows using (Frag; Steps; Shows*; conv)
+open import adequacy.Sim using (sound)
 
--- The pure run: the limit of its prefixes, the n-th read for n steps up
--- to tick n.
-run : ∀ {A} → PureObs [] A → ML A
-run o = limit λ n → prefix n n o
+-- The rows a reader of `o`'s emission set, subscribed at the root, meets
+-- first.
+Met : ∀ {R} → PureObs [] R → List (Pos × Ev R) → Set₁
+Met o rs = Shows* (enter (⟦ o ⟧ []ᴬ) root) rs
 
-module Link (R : Set) where
-  open Driver R using (silent; value; drained; step; reading; Read; read; noted; later) renaming (complete to completeˢ)
-  open Machine using (Conf; load)
-  open Pure R using (finished; cutOff; frames)
-  open Sorting R using (Ascending; ascending)
-  open SortingWalk R using (sorted)
-  open Ghosting R using (Alike)
-  open HonestLog R using (content)
-  open Progressing R using (reached)
+Sound : ∀ {R} → PureObs [] R → Set₁
+Sound o = ∀ {rs k} → Steps (load o) rs k → Met o (conv rs)
 
-  -- The first n steps up to tick h, read.
-  read-of : PureObs [] R → ℕ → Time → Read
-  read-of o n h = reading h n 0 (load o)
+Complete : ∀ {R} → PureObs [] R → Set₁
+Complete o = ∀ {rs} → Met o rs → Σ _ λ rs′ → Σ _ λ k → Steps (load o) rs′ k × conv rs′ ≡ rs
 
-  postulate
-    -- SORTED AND ALIKE IS PLACED: a record ascending in its marks and
-    -- alike a program's events as a set is those events, in order.  No
-    -- machine: the fold's positions ascend too, so two ascending lists
-    -- with the same members agree.  Stated at a program's events, not
-    -- any events, since only the fold's are known to ascend.
-    placing : (o : PureObs [] R) → ∀ {en qs xs} → Ascending root qs → Alike en qs xs (events o) → Placed en qs xs (events o)
+postulate
+  frag?        : ∀ {R} (o : PureObs [] R) → Frag o ⊎ ¬ Frag o
+  sound-beyond : ∀ {R} (o : PureObs [] R) → ¬ Frag o → Sound o
+  complete     : ∀ {R} (o : PureObs [] R) → Complete o
 
-  -- SAFETY: every prefix of the run is placed against the meaning's
-  -- events.
-  placedᴿ : (o : PureObs [] R) (n h : ℕ) → Placed (Read.endedAs (read-of o n h)) (Read.marks (read-of o n h)) (Read.log (read-of o n h)) (events o)
-  placedᴿ o n h = placing o (ascending (sorted o) n h 0) (content o n h)
-
-  postulate
-    -- The meaning's ticks never fall.
-    ticks-up : (o : PureObs [] R) → Up 0 (events o)
-
-  -- Whatever the meaning shows, some prefix shows.
-  reaches : (o : PureObs [] R) → ∀ {is} → Shows (ticks (events o)) is → Σ ℕ λ n → Shows (prefix n n o) is
-  reaches o s with reached o (ahead s)
-  ... | n , long = n , shows-≼ (cmp-long (shows-cmp s (shows (ticks-up o) (placedᴿ o n n))) long) (framed (Read.log r) (Read.endedAs r))
-    where r = read-of o n n
-
-  -- Each prefix is below the meaning.
-  complete : (o : PureObs [] R) (n : ℕ) → prefix n n o ⊑ ticks (events o)
-  complete o n = placed-⊑ (ticks-up o) (placedᴿ o n n)
-
-  ----------------------------------------------------------------------
-  -- The prefixes, a chain
-
-  -- A longer prefix to a later tick is the same, or extends the record
-  -- of a cut one.
-  private
-    data Grows : Read → Read → Set where
-      stays : ∀ {r} → Grows r r
-      cuts  : ∀ {ms xs c ms′ e′} ys → Grows (read ms xs (cutOff c)) (read ms′ (xs ++ ys) e′)
-
-    noted-grows : ∀ {p x r r′} → Grows r r′ → Grows (noted p x r) (noted p x r′)
-    noted-grows stays     = stays
-    noted-grows (cuts ys) = cuts ys
-
-    -- A tick past a horizon is past any earlier one.
-    past : ∀ {h h′} t → h ≤ h′ → (h <ᵇ t) ≡ false → (h′ <ᵇ t) ≡ true → ⊥
-    past {h} {h′} t le f tr = subst T f (<⇒<ᵇ (≤-<-trans le (<ᵇ⇒< h′ t (subst T (sym tr) tt))))
-
-    grows : ∀ {h h′ n n′} c (k : Conf R) → h ≤ h′ → n ≤ n′ → Grows (reading h n c k) (reading h′ n′ c k)
-    grows {n = zero} c k hh nn = cuts _
-    grows {h} {h′} {suc n} {suc n′} c k hh (s≤s nn) with step k
-    ... | silent t k′ with h <ᵇ t in e | h′ <ᵇ t in e′
-    ...   | true  | _     = cuts _
-    ...   | false | true  = ⊥-elim (past t hh e e′)
-    ...   | false | false = grows (later c t) k′ hh nn
-    grows {h} {h′} {suc n} {suc n′} c k hh (s≤s nn) | value t p a k′ with h <ᵇ t in e | h′ <ᵇ t in e′
-    ...   | true  | _     = cuts _
-    ...   | false | true  = ⊥-elim (past t hh e e′)
-    ...   | false | false = noted-grows (grows t k′ hh nn)
-    grows {n = suc n} {suc n′} c k hh (s≤s nn) | completeˢ p = stays
-    grows {n = suc n} {suc n′} c k hh (s≤s nn) | drained    = stays
-
-    grows-⊑ : ∀ {r r′} → Grows r r′ → frames (Read.log r) (Read.endedAs r) ⊑ frames (Read.log r′) (Read.endedAs r′)
-    grows-⊑ stays s                               = s
-    grows-⊑ (cuts {xs = xs} {c = c} {e′ = e′} ys) = frames-cut xs ys c e′
-
-  prefix-chain : (o : PureObs [] R) → Chain (λ n → prefix n n o)
-  prefix-chain o n = grows-⊑ (grows 0 (load o) (n≤1+n n) (n≤1+n n))
-
-adequacy : ∀ {A} (o : PureObs [] A) → run o ≃ ticks (observe (⟦ o ⟧ []) root)
-adequacy {A} o = limit-least (prefix-chain o) (complete o)
-               , λ s → limit-ub (prefix-chain o) (proj₁ (reaches o s)) (proj₂ (reaches o s))
-  where open Link A
+adequacy : ∀ {R} (o : PureObs [] R) → Sound o × Complete o
+adequacy o with frag? o
+... | inj₁ f = (λ st → sound f st) , complete o
+... | inj₂ n = sound-beyond o n , complete o

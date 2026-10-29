@@ -1,7 +1,7 @@
 {-# OPTIONS --guardedness #-}
 
 -- THE EMISSION SET: a program's meaning as every row of work it causes, each at
--- its position.  The positions are `MonotonicList`'s, and they are totally
+-- its position.  The positions (`denotation.Events`) are totally
 -- ordered, so an emission set needs no order of its own: the n-th event is the
 -- n-th row by position.  An operator is a function on emission sets, defined
 -- all at once — a merge is a union, a joiner is a filter and a rekey.
@@ -20,7 +20,7 @@
 module denotation.EmissionSet where
 
 open import Data.Bool using (Bool; T; not)
-open import Data.Empty using (⊥)
+open import Data.Empty using () renaming (⊥ to Empty)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; _∷_; lookup)
@@ -32,10 +32,9 @@ open import Data.Unit using (⊤)
 open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-import denotation.MonotonicList.Events as E
-open import denotation.MonotonicList.Events using (Pos; Timeline; timelineAt; _<ᵖ_; inside; ix; sub; last)
-open import denotation.MonotonicList using (start; ofᴱ)
+open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
+import denotation.Events as E
+open import denotation.Events using (Pos; Timeline; timelineAt; _<ᵖ_; inside; ix; sub; last; start; ofᴱ)
 
 ------------------------------------------------------------------------
 -- Rows
@@ -57,7 +56,7 @@ p ≼ q = ¬ (q ≺ p)
 
 -- Work that is not a completion.
 Work : ∀ {A} → Ev A → Set
-Work end = ⊥
+Work end = Empty
 Work _   = ⊤
 
 -- The rows a stream reaches, each at a finite index.
@@ -91,7 +90,7 @@ Seen t q e = Proper t q e × Few t q
 -- subscription position.  Only a `connect` makes a hot.
 data Den (A : Set) : Set₁ where
   hot  : EmissionSet A → Den A
-  cold : (Pos → EmissionSet A) → Den A
+  coldAt : (Pos → EmissionSet A) → Den A
 
 -- JOINING A HOT AT `p`: what comes after `p`, rekeyed under `sub p`; a
 -- hot already ended at `p` ends at once.  Nothing is shown for what was
@@ -103,7 +102,7 @@ data Rejoin {A : Set} (p : Pos) (t : EmissionSet A) : EmissionSet A where
 
 enter : ∀ {A} → Den A → Pos → EmissionSet A
 enter (hot t)  p = Truncate (Rejoin p t)
-enter (cold f) p = Truncate (f p)
+enter (coldAt f) p = Truncate (f p)
 
 -- A LANE subscribed at `s`: its rows past `s`.  A lawful reading has no
 -- other, and a joiner reading one before its subscription would hang its
@@ -114,21 +113,9 @@ After d s k e = enter d s k e × s ≺ k
 ------------------------------------------------------------------------
 -- Leaves
 
-coldᵀ : ∀ {A} → Timeline A → Den A
-coldᵀ c = cold λ p → InE (start p (timelineAt c p))
-
-emptyᵀ : ∀ {A} → Den A
-emptyᵀ = cold λ p → InE (E.end (p ++ [ last ]))
-
-ofᵀ : ∀ {A} → List A → Den A
-ofᵀ xs = cold λ p → InE (ofᴱ p 0 xs)
-
 -- No information yet: a subscription that spins and never closes.
 data Spin {A : Set} (p : Pos) : EmissionSet A where
   spin : ∀ i → Spin p (p ++ [ ix i ]) skip
-
-⊥ᵀ : ∀ {A} → Den A
-⊥ᵀ = cold Spin
 
 ------------------------------------------------------------------------
 -- One input
@@ -138,16 +125,10 @@ data MapT {A B : Set} (f : A → B) (t : EmissionSet A) : EmissionSet B where
   map-skip : ∀ {q} → t q skip → MapT f t q skip
   map-end  : ∀ {q} → t q end → MapT f t q end
 
-mapᵀ : ∀ {A B} → (A → B) → Den A → Den B
-mapᵀ f s = cold λ p → MapT f (enter s p)
-
 -- A `skip`, then the body: rxjs's own `defer`, synchronous.
 data DeferT {A : Set} (s : Den A) (p : Pos) : EmissionSet A where
   guard : DeferT s p (p ++ [ ix 0 ]) skip
   body  : ∀ {q e} → enter s (p ++ [ ix 1 ]) q e → DeferT s p q e
-
-deferᵀ : ∀ {A} → Den A → Den A
-deferᵀ s = cold (DeferT s)
 
 -- An input's values in position order.
 module Values {A : Set} (o : EmissionSet A) where
@@ -175,9 +156,6 @@ module Scan {A B : Set} (f : B → A → B) (z : B) (t : EmissionSet A) where
     sstep : ∀ {q} → t q skip → ScanT q skip
     send  : ∀ {q} → t q end → ScanT q end
 
-scanᵀ : ∀ {A B} → (B → A → B) → B → Den A → Den B
-scanᵀ f z s = cold λ p → Scan.ScanT f z (enter s p)
-
 -- TAKEWHILE, subscribed at `p`: values while they pass.  The first
 -- failing one leaves under `ix 0` of its position if inclusive, and the
 -- completion under `last` either way.  What the source still runs of its
@@ -195,9 +173,6 @@ module TakeWhile {A : Set} (incl : Bool) (keep : A → Bool) (t : EmissionSet A)
     step  : ∀ {q} → t q skip → ¬ Failed q → TakeT q skip
     tend  : ∀ {q} → t q end → ¬ Failed q → TakeT q end
     left  : ∀ {q e} → t q e → Failed q → T (inside p q) → TakeT q skip
-
-takeWhileᵀ : ∀ {A} → Bool → (A → Bool) → Den A → Den A
-takeWhileᵀ i keep s = cold λ p → TakeWhile.TakeT i keep (enter s p) p
 
 ------------------------------------------------------------------------
 -- Merge
@@ -239,7 +214,7 @@ module Bounded {A B : Set} (n : ℕ) (f : A → Den B) (o : EmissionSet A) where
   -- where `P` holds: for `P` closed downward, the lanes' k-th end in
   -- position order, from 0, is where `P` holds.
   Kth : (Pos → Set) → List (Pos → Set) → ℕ → Set
-  Kth P []       k       = ⊥
+  Kth P []       k       = Empty
   Kth P (l ∷ ls) zero    = (Σ Pos λ c → l c × P c) ⊎ Kth P ls zero
   Kth P (l ∷ ls) (suc k) = ((Σ Pos λ c → l c × P c) × Kth P ls k) ⊎ Kth P ls (suc k)
 
@@ -380,38 +355,69 @@ module Connect {A B : Set} (s : Den A) (F : Den A → Den B) (p : Pos) where
     shown  : ∀ {k e} → σ k e → Alive k → ConnT (k ++ [ ix 0 ]) skip
     pinned : ∀ {k e} → σ k e → ¬ Alive k → T (inside r k) → ConnT k skip
 
-connectᵀ : ∀ {A B} → Den A → (Den A → Den B) → Den B
-connectᵀ s F = cold λ p → Connect.ConnT s F p
-
 ------------------------------------------------------------------------
 -- FlatMap
 
-flatMapᵀ : ∀ {A B} → FlatOp → (A → Den B) → Den A → Den B
-flatMapᵀ (mergeᶠ nothing)  f s = cold λ p → Merge.MergeT f (enter s p)
-flatMapᵀ (mergeᶠ (just n)) f s = cold λ p → Bounded.BoundedT n f (enter s p)
-flatMapᵀ switchᶠ           f s = cold λ p → Switch.SwitchT f (enter s p)
-flatMapᵀ exhaustᶠ          f s = cold λ p → Exhaust.ExhaustT f (enter s p)
+------------------------------------------------------------------------
+-- Each operator's emission set, from its inputs'
+
+module Op where
+
+  cold : ∀ {A} → Timeline A → Den A
+  cold c = Den.coldAt λ p → InE (start p (timelineAt c p))
+
+  empty : ∀ {A} → Den A
+  empty = Den.coldAt λ p → InE (E.end (p ++ [ last ]))
+
+  of : ∀ {A} → List A → Den A
+  of xs = Den.coldAt λ p → InE (ofᴱ p 0 xs)
+
+  ⊥ : ∀ {A} → Den A
+  ⊥ = Den.coldAt Spin
+
+  map : ∀ {A B} → (A → B) → Den A → Den B
+  map f s = Den.coldAt λ p → MapT f (enter s p)
+
+  defer : ∀ {A} → Den A → Den A
+  defer s = Den.coldAt (DeferT s)
+
+  scan : ∀ {A B} → (B → A → B) → B → Den A → Den B
+  scan f z s = Den.coldAt λ p → Scan.ScanT f z (enter s p)
+
+  takeWhile : ∀ {A} → Bool → (A → Bool) → Den A → Den A
+  takeWhile i keep s = Den.coldAt λ p → TakeWhile.TakeT i keep (enter s p) p
+
+  connect : ∀ {A B} → Den A → (Den A → Den B) → Den B
+  connect s F = Den.coldAt λ p → Connect.ConnT s F p
+
+  flatMap : ∀ {A B} → FlatOp → (A → Den B) → Den A → Den B
+  flatMap (mergeᶠ nothing)  f s = Den.coldAt λ p → Merge.MergeT f (enter s p)
+  flatMap (mergeᶠ (just n)) f s = Den.coldAt λ p → Bounded.BoundedT n f (enter s p)
+  flatMap switchᶠ           f s = Den.coldAt λ p → Switch.SwitchT f (enter s p)
+  flatMap exhaustᶠ          f s = Den.coldAt λ p → Exhaust.ExhaustT f (enter s p)
 
 ------------------------------------------------------------------------
 -- A program tree's emission set
 
+open import Tree using (cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+
 DenEnv : List Set → Set₁
 DenEnv = All Den
 
--- APPROXIMANT n: every path through more than n `defer`s cut off at ⊥ᵀ,
--- as `denotation.Denote`'s.
-approxᵀ : ∀ {Γ A} → ℕ → Obs Timeline Γ A → DenEnv Γ → Den A
-approxᵀ n       (cold c)          ρ = coldᵀ c
-approxᵀ n       empty             ρ = emptyᵀ
-approxᵀ n       (of xs)           ρ = ofᵀ xs
-approxᵀ n       (map f s)         ρ = mapᵀ f (approxᵀ n s ρ)
-approxᵀ n       (scan f z s)      ρ = scanᵀ f z (approxᵀ n s ρ)
-approxᵀ n       (takeWhile i p s) ρ = takeWhileᵀ i p (approxᵀ n s ρ)
-approxᵀ n       (flatMap op f s)  ρ = flatMapᵀ op (λ a → approxᵀ n (f a) ρ) (approxᵀ n s ρ)
-approxᵀ n       (connect s b)     ρ = connectᵀ (approxᵀ n s ρ) λ h → approxᵀ n b (h ∷ ρ)
-approxᵀ n       (connected i)     ρ = lookup ρ i
-approxᵀ zero    (defer l)         ρ = ⊥ᵀ
-approxᵀ (suc n) (defer l)         ρ = deferᵀ (approxᵀ n (Later.force l) ρ)
+-- APPROXIMANT n: every path through more than n `defer`s cut off at
+-- `Op.⊥`.
+approx : ∀ {Γ A} → ℕ → Obs Timeline Γ A → DenEnv Γ → Den A
+approx n       (cold c)          ρ = Op.cold c
+approx n       empty             ρ = Op.empty
+approx n       (of xs)           ρ = Op.of xs
+approx n       (map f s)         ρ = Op.map f (approx n s ρ)
+approx n       (scan f z s)      ρ = Op.scan f z (approx n s ρ)
+approx n       (takeWhile i p s) ρ = Op.takeWhile i p (approx n s ρ)
+approx n       (flatMap op f s)  ρ = Op.flatMap op (λ a → approx n (f a) ρ) (approx n s ρ)
+approx n       (connect s b)     ρ = Op.connect (approx n s ρ) λ h → approx n b (h ∷ ρ)
+approx n       (connected i)     ρ = lookup ρ i
+approx zero    (defer l)         ρ = Op.⊥
+approx (suc n) (defer l)         ρ = Op.defer (approx n (Later.force l) ρ)
 
 -- THE LIMIT: a row every approximant has from some index on.
 data Lim {A : Set} (c : ℕ → EmissionSet A) (q : Pos) (e : Ev A) : Set where
@@ -419,14 +425,14 @@ data Lim {A : Set} (c : ℕ → EmissionSet A) (q : Pos) (e : Ev A) : Set where
 
 -- THE MEANING: each operator applied to its children's meanings.  Only a
 -- `defer`, the one recursion, is a limit: of its approximants.
-⟦_⟧ᵀ : ∀ {Γ A} → Obs Timeline Γ A → DenEnv Γ → Den A
-⟦ cold c ⟧ᵀ          ρ = coldᵀ c
-⟦ empty ⟧ᵀ           ρ = emptyᵀ
-⟦ of xs ⟧ᵀ           ρ = ofᵀ xs
-⟦ map f s ⟧ᵀ         ρ = mapᵀ f (⟦ s ⟧ᵀ ρ)
-⟦ scan f z s ⟧ᵀ      ρ = scanᵀ f z (⟦ s ⟧ᵀ ρ)
-⟦ takeWhile i p s ⟧ᵀ ρ = takeWhileᵀ i p (⟦ s ⟧ᵀ ρ)
-⟦ flatMap op f s ⟧ᵀ  ρ = flatMapᵀ op (λ a → ⟦ f a ⟧ᵀ ρ) (⟦ s ⟧ᵀ ρ)
-⟦ connect s b ⟧ᵀ     ρ = connectᵀ (⟦ s ⟧ᵀ ρ) λ h → ⟦ b ⟧ᵀ (h ∷ ρ)
-⟦ connected i ⟧ᵀ     ρ = lookup ρ i
-⟦ defer l ⟧ᵀ         ρ = cold λ p → Lim λ n → enter (approxᵀ n (defer l) ρ) p
+⟦_⟧ : ∀ {Γ A} → Obs Timeline Γ A → DenEnv Γ → Den A
+⟦ cold c ⟧          ρ = Op.cold c
+⟦ empty ⟧           ρ = Op.empty
+⟦ of xs ⟧           ρ = Op.of xs
+⟦ map f s ⟧         ρ = Op.map f (⟦ s ⟧ ρ)
+⟦ scan f z s ⟧      ρ = Op.scan f z (⟦ s ⟧ ρ)
+⟦ takeWhile i p s ⟧ ρ = Op.takeWhile i p (⟦ s ⟧ ρ)
+⟦ flatMap op f s ⟧  ρ = Op.flatMap op (λ a → ⟦ f a ⟧ ρ) (⟦ s ⟧ ρ)
+⟦ connect s b ⟧     ρ = Op.connect (⟦ s ⟧ ρ) λ h → ⟦ b ⟧ (h ∷ ρ)
+⟦ connected i ⟧     ρ = lookup ρ i
+⟦ defer l ⟧         ρ = coldAt λ p → Lim λ n → enter (approx n (defer l) ρ) p

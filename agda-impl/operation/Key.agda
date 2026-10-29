@@ -6,10 +6,12 @@
 module operation.Key where
 
 open import Data.Bool using (Bool; true; false; _∧_; _∨_)
+open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; [_])
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (does)
 
-open import denotation.MonotonicList.Events using (Pos; Label; _<ᵖ_; _≟ˡ_)
+open import denotation.Events using (Pos; Label; _<ᵖ_; _≟ˡ_)
 
 data Key : Set where
   at    : Pos → Key
@@ -48,3 +50,14 @@ private
 -- Strictly earlier.
 _<ᴷ_ : Key → Key → Bool
 k <ᴷ k′ = lex (ext k) (ext k′)
+
+postulate
+  <ᴷ-trans  : ∀ a b c → a <ᴷ b ≡ true → b <ᴷ c ≡ true → a <ᴷ c ≡ true
+  <ᴷ-irrefl : ∀ k → k <ᴷ k ≡ false
+  -- Neither strictly before the next, twice: not strictly before the last.
+  ≮ᴷ-trans  : ∀ a b c → a <ᴷ b ≡ false → b <ᴷ c ≡ false → a <ᴷ c ≡ false
+  -- At a position, keys compare as positions do.
+  at-<ᵖ     : ∀ p q → at p <ᴷ at q ≡ p <ᵖ q
+
+clash : ∀ {b} → b ≡ true → b ≡ false → ⊥
+clash refl ()

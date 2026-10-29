@@ -1,9 +1,10 @@
 {-# OPTIONS --guardedness #-}
 
--- ADEQUACY, TESTED.  The denotation, the pure event loop and the
--- state-tree machine must give the same trace for every program; `quickcheck k` returns the seeds below k
--- whose program they disagree on.  A trace cut by the step budget only
--- has to be a prefix of the other side's.
+-- ADEQUACY, TESTED.  The denotation (its emission set, listed) and the
+-- pure semantics must give the same trace for every program;
+-- `quickcheck k` returns the seeds below k whose program they disagree
+-- on.  A trace cut by the step budget only has to be a prefix of the
+-- other side's.
 module quickcheck.Quickcheck where
 
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
@@ -19,7 +20,8 @@ open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import quickcheck.Ty using (boolᵗ; natᵗ; nameᵗ; _×ᵗ_; ⟦_⟧ᵀ; eqᵀ)
 open import quickcheck.Tm using (Tm; var; nat; plus; less; pair)
 open import quickcheck.Code using (Script; script; Code; cold; fresh; empty; of; map; scan; takeWhile; flatMap; connect; connected; μ; var; defer; Prog)
-open import quickcheck.Oracle using (Event; _▸_; tick; val; End; completed; silent; cut; Trace; denoteTrace; pureTrace)
+open import quickcheck.Trace using (Event; _▸_; tick; val; End; completed; silent; cut; Trace)
+open import quickcheck.Oracle using (denoteTrace; pureTrace)
 
 ------------------------------------------------------------------------
 -- The property
@@ -48,9 +50,9 @@ agrees t (xs ▸ cut) (ys ▸ _)   = prefix t xs ys
 agrees t (xs ▸ _)   (ys ▸ cut) = prefix t ys xs
 agrees t (xs ▸ x)   (ys ▸ y)   = prefix t xs ys ∧ prefix t ys xs ∧ eqEnd x y
 
--- Each `μ` unfolds at most 3 times; each trace is read for 500 steps.
+-- Each `μ` unfolds at most 3 times; the pure trace is read for 500 steps.
 prop : ∀ t → Prog t → Bool
-prop t p = agrees t (denoteTrace 3 500 p) (pureTrace 3 500 p)
+prop t p = agrees t (denoteTrace 3 p) (pureTrace 3 500 p)
 
 ------------------------------------------------------------------------
 -- Generating: programs over ℕ, every context a list of `natᵗ`s
