@@ -8,14 +8,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE NESTED LANES
-
-Open for a bounded merge only: a queued lane subscribes under the end of
-the lane it follows, so lanes' worlds nest rather than lie apart.
-Settled by a body, or a program whose queued lane meets its predecessor.
-
-Members: `bounded-inv`.
-
 ## Tier 0 — adequacy
 
 **Adequacy:** what the pure semantics shows is what a reader of the emission set meets, row by row.

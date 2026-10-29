@@ -51,10 +51,36 @@ below y {l} ys q eq with ⊑-snoc q (l ∷ ys , sym eq)
 ... | inj₁ le  = le
 ... | inj₂ eq′ = ⊥-elim (ext≢ y ys (trans eq (sym eq′)))
 
+-- The worlds of a reading's rows' children, the reading at `p`.
+module Kids {C : Set} {H : Pos → Set} {p : Pos} (ok : Ok H p) {O : EmissionSet C} (Io : InvAt H p O) where
+  open InvAt Io renaming (world to wo; under to U)
+
+  -- Two rows' children: apart worlds.
+  kids : ∀ {x x′ e e′ l l′ w} → O x e → O x′ e′ → Plain l → Plain l′ → (x ++ [ l ] ≡ x′ ++ [ l′ ] → ⊥)
+       → W⁼ H (x ++ [ l ]) w → W⁼ H (x′ ++ [ l′ ]) w → ⊥
+  kids x x′ pl pl′ ne = apart-w pl pl′ ne (λ v → U x′ x pl′ v (⊑-refl _)) (λ v → U x x′ pl v (⊑-refl _))
+
+  -- An outer row's child's world leads no other outer row's child ...
+  kid-root : ∀ {x e l w q e′ l′} → O x e → Plain l → W⁼ H (x ++ [ l ]) w → O q e′ → Plain l′
+           → (x ++ [ l ] ≡ q ++ [ l′ ] → ⊥) → w ⊑ (q ++ [ l′ ]) → ⊥
+  kid-root {q = q} ox pl v oq pl′ ne r with ⊑-snoc q r
+  ... | inj₁ wq   = U ox oq pl v wq
+  ... | inj₂ refl with w-up pl′ v
+  ...   | inj₁ eq = ne eq
+  ...   | inj₂ v′ = U ox oq pl v′ (⊑-refl q)
+
+  -- ... nor a row of another's lane.
+  kid-lane : ∀ {x e l w q e″ y} → O x e → Plain l → W⁼ H (x ++ [ l ]) w → O q e″ → W H (q ++ [ ix 1 ]) y
+           → (x ++ [ l ] ≡ q ++ [ ix 1 ] → ⊥) → w ⊑ y → ⊥
+  kid-lane ox pl v xq yw ne le =
+    leads (proj₁ ok) (proj₂ ok) (nest-in (step (inW (wo ox)) pl) v) (kids ox xq pl plain-ix ne v) (kid-root ox pl v xq plain-ix ne)
+          (inW yw) le
+
 -- An outer `O` read at `p`, and each of its values' lanes.
 module Join {A B : Set} {H : Pos → Set} {p : Pos} (ok : Ok H p) (f : A → Den B) (fi : ∀ a → InvD H (f a))
             {O : EmissionSet A} (Io : InvAt H p O) where
   open InvAt Io renaming (world to wo; real to re; func to fu; flat to fl; burst to bu; under to U; quiet to qu)
+  open Kids ok Io public
 
   Lane : Pos → A → EmissionSet B
   Lane q a = After (f a) (q ++ [ ix 1 ])
@@ -90,27 +116,6 @@ module Join {A B : Set} {H : Pos → Set} {p : Pos} (ok : Ok H p) (f : A → Den
   val-after : ∀ {c₀ q a} → O c₀ end → O q (out a) → c₀ ≺ (q ++ [ ix 0 ]) → ⊥
   val-after {c₀} {q} oc xq lt =
     strict xq oc (end-before oc xq) (conv {q} {q} {c₀} {q ++ [ ix 0 ]} (⊑-refl q) (≺→≼ {q} {c₀} (end-before oc xq)) lt (⊑-snoc⁺ q))
-
-  -- Two outer rows' children: apart worlds.
-  kids : ∀ {x x′ e e′ l l′ w} → O x e → O x′ e′ → Plain l → Plain l′ → (x ++ [ l ] ≡ x′ ++ [ l′ ] → ⊥)
-       → W⁼ H (x ++ [ l ]) w → W⁼ H (x′ ++ [ l′ ]) w → ⊥
-  kids x x′ pl pl′ ne = apart-w pl pl′ ne (λ v → U x′ x pl′ v (⊑-refl _)) (λ v → U x x′ pl v (⊑-refl _))
-
-  -- An outer row's child's world leads no other outer row's child ...
-  kid-root : ∀ {x e l w q e′ l′} → O x e → Plain l → W⁼ H (x ++ [ l ]) w → O q e′ → Plain l′
-           → (x ++ [ l ] ≡ q ++ [ l′ ] → ⊥) → w ⊑ (q ++ [ l′ ]) → ⊥
-  kid-root {q = q} ox pl v oq pl′ ne r with ⊑-snoc q r
-  ... | inj₁ wq   = U ox oq pl v wq
-  ... | inj₂ refl with w-up pl′ v
-  ...   | inj₁ eq = ne eq
-  ...   | inj₂ v′ = U ox oq pl v′ (⊑-refl q)
-
-  -- ... nor a row of another's lane.
-  kid-lane : ∀ {x e l w q a y} → O x e → Plain l → W⁼ H (x ++ [ l ]) w → O q (out a) → W H (q ++ [ ix 1 ]) y
-           → (x ++ [ l ] ≡ q ++ [ ix 1 ] → ⊥) → w ⊑ y → ⊥
-  kid-lane ox pl v xq yw ne le =
-    leads (proj₁ ok) (proj₂ ok) (nest-in (step (inW (wo ox)) pl) v) (kids ox xq pl plain-ix ne v) (kid-root ox pl v xq plain-ix ne)
-          (inW yw) le
 
   -- No outer row lies in a lane's world.
   o-lane : ∀ {y e q a} → O y e → O q (out a) → W H (q ++ [ ix 1 ]) y → ⊥
