@@ -18,8 +18,8 @@ module denotation.EmissionSet.Laws.Count where
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
-open import Data.List.Properties using (++-assoc)
-open import Data.List.Relation.Unary.Any using (Any; here; there)
+open import Data.List.Properties using (++-assoc; ∷-injectiveˡ; ∷-injectiveʳ)
+open import Data.List.Relation.Unary.Any using (Any; here; there; any?)
 import Data.List.Relation.Unary.Any as Any
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; z≤n; _⊔_; _∸_)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred; m≤m⊔n; m≤n⊔m; m≤n+m; m∸n+n≡m)
@@ -27,8 +27,11 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; map₂)
 open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; cong)
+open import Relation.Nullary using (¬_; Dec; yes; no)
+open import Relation.Nullary.Decidable using (_⊎-dec_)
+open import Relation.Nullary.Decidable.Core using (decidable-stable)
 
-open import denotation.MonotonicList.Events using (Pos; ix; <ᵖ-split; <ᵖ-part)
+open import denotation.MonotonicList.Events using (Pos; ix; <ᵖ-split; <ᵖ-part; <ᵖ-between; _≟ˡ_)
 open import denotation.EmissionSet using (Ev; EmissionSet; _≺_; _≼_; Truncate; Den; enter; from; Spin; spin; ⊥ᵀ; DeferT; guard; body; deferᵀ)
 open import denotation.EmissionSet.Laws.Modulus
   using (≺-trans; ≺-irrefl; ≺→≼; ≼-refl; ≼-false; ≺-≼-≺; ≼-≺-≺; ≼-or-≻; few-down; few-agree; few-ind; entered-few;
@@ -58,6 +61,26 @@ cov-down {q} {w} {k = k} (inj₁ kq) kw wq with <ᵖ-split w q (≼-false {w} {q
 ... | inj₂ refl = inj₁ kq
 cov-down (inj₂ a) kw wq = inj₂ a
 
+-- Leading is decidable, so is covering.
+⊑? : ∀ x y → Dec (x ⊑ y)
+⊑? []      y       = yes (y , refl)
+⊑? (a ∷ x) []      = no λ { (_ , ()) }
+⊑? (a ∷ x) (b ∷ y) with a ≟ˡ b | ⊑? x y
+... | no ne    | _             = no λ { (_ , eq) → ne (sym (∷-injectiveˡ eq)) }
+... | yes refl | no ne         = no λ { (zs , eq) → ne (zs , ∷-injectiveʳ eq) }
+... | yes refl | yes (zs , eq) = yes (zs , cong (a ∷_) eq)
+
+cov-stable : ∀ {q ks k} → ¬ ¬ Cov q ks k → Cov q ks k
+cov-stable {q} {ks} {k} = decidable-stable (⊑? k q ⊎-dec any? (⊑? k) ks)
+
+-- Before `q`, a row's child lies before `q`, or `q` under the row.
+child : ∀ {v q} l → v ≺ q → v ⊑ q ⊎ (v ++ [ l ]) ≺ q
+child {v} {q} l vq with ≼-or-≻ q (v ++ [ l ])
+... | inj₂ lt = inj₂ lt
+... | inj₁ ql with <ᵖ-split q (v ++ [ l ]) (≼-false {q} {v ++ [ l ]} ql)
+...   | inj₁ lt = inj₁ (<ᵖ-between v q [ l ] (Equivalence.to T-≡ vq) lt)
+...   | inj₂ eq = inj₁ ([ l ] , eq)
+
 -- Few before `q`, few before an earlier cut.
 cnt-down : ∀ {A n} {t : EmissionSet A} {q w} → Cnt n t q → w ≼ q → Cnt n t w
 cnt-down {q = q} {w} (ks , le , h) wq = ks , le , λ {k} x kw → cov-down (h x (≺-≼-≺ {k} {w} {q} kw wq)) kw wq
@@ -66,11 +89,12 @@ cnt-mono : ∀ {A m n} {t : EmissionSet A} {q} → m ≤ n → Cnt m t q → Cnt
 cnt-mono mn (ks , le , h) = ks , ≤-trans le mn , h
 
 -- READ THROUGH ITS IMAGES: each row of `u` before `q` under `q`, or under a
--- row of `t` before `q`: what covers `t` covers `u`.
+-- row of `t` before `q`: what covers `t` covers `u`.  Covering is
+-- decidable, so an image need only be not refuted.
 cnt-up : ∀ {A B n} {t : EmissionSet A} {u : EmissionSet B} {q} → Cnt n t q
-       → (∀ {k e} → u k e → k ≺ q → k ⊑ q ⊎ Σ Pos λ k′ → Σ (Ev A) (t k′) × k ⊑ k′ × k′ ≺ q)
+       → (∀ {k e} → u k e → k ≺ q → ¬ ¬ (k ⊑ q ⊎ Σ Pos λ k′ → Σ (Ev A) (t k′) × k ⊑ k′ × k′ ≺ q))
        → Cnt n u q
-cnt-up {A = A} {t = t} {q = q} (ks , le , h) im = ks , le , λ x kq → go (im x kq)
+cnt-up {A = A} {t = t} {q = q} (ks , le , h) im = ks , le , λ x kq → cov-stable λ ¬c → im x kq λ i → ¬c (go i)
   where
     go : ∀ {k} → k ⊑ q ⊎ Σ Pos (λ k′ → Σ (Ev A) (t k′) × k ⊑ k′ × k′ ≺ q) → Cov q ks k
     go (inj₁ kq)                     = inj₁ kq
