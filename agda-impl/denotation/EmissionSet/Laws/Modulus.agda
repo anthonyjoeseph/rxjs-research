@@ -46,6 +46,9 @@ open import denotation.EmissionSet
 ≺-irrefl : ∀ {x} → x ≺ x → ⊥
 ≺-irrefl {x} a = subst T (<ᵖ-irrefl x) a
 
+≺-absurd : ∀ {x y} → x ≺ y → y ≺ x → ⊥
+≺-absurd {x} {y} a b = ≺-irrefl {x} (≺-trans {x} {y} {x} a b)
+
 ≼-refl : ∀ {x} → x ≼ x
 ≼-refl {x} = ≺-irrefl {x}
 

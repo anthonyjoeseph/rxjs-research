@@ -49,6 +49,7 @@ import denotation.EmissionSet as ES
 open import denotation.EmissionSet.Laws.Modulus
   using (≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext; few-via; AgreeTo; ⟨_⟩; upto; AgreeTo-sym; AgS; trunc-ag; trunc-to; ~-cold; _≈⟨_∣_⟩_; ≈-refl; ≈-sym; ≈-trans; ≈-mono; Same; agree-all; LimD; limit; ticks; contract; unfold₀; _~⟨_⟩_; ~-refl)
 open import denotation.EmissionSet.Laws.Worlds using (Ok; _⊕_; Lawful; InvAt; InvD; Hots; GoodEnv; world-after; ok-step; inv-widen; empty-inv; of-inv; spin-inv; map-inv; scan-inv; defer-inv; lim-inv)
+open import denotation.EmissionSet.Laws.Connect using (connect-inv)
 
 -- The same rows at every subscription.
 _≅_ : ∀ {A} → Den A → Den A → Set
@@ -112,7 +113,6 @@ postulate
   cold-inv      : ∀ {A H} (c : Timeline A) → InvD H (coldᵀ c)
   takeWhile-inv : ∀ {A H} (i : Bool) (keep : A → Bool) {s : Den A} → InvD H s → InvD H (takeWhileᵀ i keep s)
   flatMap-inv   : ∀ {A B H} (op : FlatOp) {f : A → Den B} {s : Den A} → InvD H s → (∀ a → InvD H (f a)) → InvD H (flatMapᵀ op f s)
-  connect-inv   : ∀ {A B H} {s : Den A} {F : Den A → Den B} → InvD H s → (∀ {t} → Lawful t → InvD (H ⊕ t) (F (hot t))) → InvD H (connectᵀ s F)
 
   -- A lawful hot keeps it among its own rows.
   lawful-hot : ∀ {A H} {t : EmissionSet A} → Lawful t → InvD (H ⊕ t) (hot t)

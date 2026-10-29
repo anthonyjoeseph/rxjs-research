@@ -15,7 +15,7 @@ modulus carries through both and a hidden source row never lands before a
 body row past the body's end. Settled by a body for `connect-ne` over the
 world separation, or a pair of chains agreeing below a row that join differently.
 
-Members: `connect-ne`, `connect-inv`.
+Members: `connect-ne`.
 
 #### THE WORLD INVARIANT
 

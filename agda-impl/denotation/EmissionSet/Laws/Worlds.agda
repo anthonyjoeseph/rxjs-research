@@ -19,7 +19,7 @@ open import Data.Bool using (T)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_])
-open import Data.List.Properties using (++-assoc; ++-cancelˡ)
+open import Data.List.Properties using (++-assoc; ++-cancelˡ; ++-identityʳ; ++-conicalˡ; ∷-injective; ∷-injectiveˡ; ∷ʳ-injectiveˡ; ∷ʳ-injectiveʳ)
 open import Data.Nat using (ℕ; suc; _⊔_)
 open import Data.Nat.Properties using (≤-refl; m≤m⊔n; m≤n⊔m)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -28,14 +28,14 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Function using (Equivalence)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
-open import denotation.MonotonicList.Events using (Pos; Label; ix; sub; last; inside; inside-++; inside-self; <ᵖ-part; <ᵖ-ix)
+open import denotation.MonotonicList.Events using (Pos; Label; ix; sub; last; inside; inside-++; inside-self; inside-cons; <ᵖ-part; <ᵖ-ix)
 open import denotation.MonotonicList using (ofᴱ)
 open import denotation.EmissionSet using (Ev; end; skip; EmissionSet; _≺_; _≼_; Den; hot; cold; enter; DenEnv; Truncate; InE; at-out;
   at-end; on-out; emptyᵀ; ofᵀ; spin; ⊥ᵀ; MapT; map-out; map-skip; map-end; mapᵀ; module Scan;
   scanᵀ; DeferT; guard; body; deferᵀ; from)
-open import denotation.EmissionSet.Laws.Modulus using (≺-trans; ≺-irrefl; ≺→≼; ≼-refl; ≼-≺-≺; ≺-ext; LimD)
+open import denotation.EmissionSet.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺→≼; ≼-refl; ≼-trans; ≼-≺-≺; ≺-ext; LimD)
 
 -- A label that opens no subscription.
 data Plain : Label → Set where
@@ -146,16 +146,18 @@ private
   back-snoc acc (ix j ∷ x)   pl         b            = back-snoc (acc ++ [ ix j ]) x pl b
   back-snoc acc (last ∷ x)   pl         b            = back-snoc (acc ++ [ last ]) x pl b
 
-  real-snoc : ∀ x {l} → Plain l → Real x → Real (x ++ [ l ])
-  real-snoc []          _  ()
-  real-snoc (ix j ∷ x)  pl r = back-snoc (ix j ∷ []) x pl r
-  real-snoc (sub _ ∷ _) _  ()
-  real-snoc (last ∷ _)  _  ()
+-- A reachable position one plain label down is reachable.
+real-snoc : ∀ x {l} → Plain l → Real x → Real (x ++ [ l ])
+real-snoc []          _  ()
+real-snoc (ix j ∷ x)  pl r = back-snoc (ix j ∷ []) x pl r
+real-snoc (sub _ ∷ _) _  ()
+real-snoc (last ∷ _)  _  ()
 
-  snoc≢[] : ∀ (x : Pos) {l : Label} → x ++ [ l ] ≡ [] → ⊥
-  snoc≢[] []      ()
-  snoc≢[] (_ ∷ _) ()
+snoc≢[] : ∀ (x : Pos) {l : Label} → x ++ [ l ] ≡ [] → ⊥
+snoc≢[] []      ()
+snoc≢[] (_ ∷ _) ()
 
+private
   w-nonempty : ∀ {H p y} → W H p y → y ≡ [] → ⊥
   w-nonempty (step {x} _ _)   eq = snoc≢[] x eq
   w-nonempty (timer _ _)      ()
@@ -180,18 +182,30 @@ mutual
   world-after⁼ {p = p} here    r = ≼-refl {p}
   world-after⁼ {p = p} {y} (inW w) r = ≺→≼ {p} {y} (world-after w r)
 
-private
-  -- The world one tick down lies in the world.
-  mutual
-    shrink : ∀ {H p i w} → W H (p ++ [ ix i ]) w → W H p w
-    shrink (step w l)           = step (inW (shrink⁼ w)) l
-    shrink (timer t w)          = timer t (inW (shrink⁼ w))
-    shrink (join (inj₁ h) w eh) = join (inj₁ h) (inW (shrink⁼ w)) eh
-    shrink (join (inj₂ v) w eh) = join (inj₂ (shrink v)) (inW (shrink⁼ w)) eh
+-- The world one tick down lies in the world.
+mutual
+  shrink : ∀ {H p i w} → W H (p ++ [ ix i ]) w → W H p w
+  shrink (step w l)           = step (inW (shrink⁼ w)) l
+  shrink (timer t w)          = timer t (inW (shrink⁼ w))
+  shrink (join (inj₁ h) w eh) = join (inj₁ h) (inW (shrink⁼ w)) eh
+  shrink (join (inj₂ v) w eh) = join (inj₂ (shrink v)) (inW (shrink⁼ w)) eh
 
-    shrink⁼ : ∀ {H p i w} → W⁼ H (p ++ [ ix i ]) w → W H p w
-    shrink⁼ here    = step here plain-ix
-    shrink⁼ (inW w) = shrink w
+  shrink⁼ : ∀ {H p i w} → W⁼ H (p ++ [ ix i ]) w → W H p w
+  shrink⁼ here    = step here plain-ix
+  shrink⁼ (inW w) = shrink w
+
+-- A world one tick down whose own hots lie in the world lies in it.
+mutual
+  narrow : ∀ {B H p i w} {t : EmissionSet B} → (∀ {h e} → t h e → W H p h) → W (H ⊕ t) (p ++ [ ix i ]) w → W H p w
+  narrow tw (step w l)                     = step (inW (narrow⁼ tw w)) l
+  narrow tw (timer k w)                    = timer k (inW (narrow⁼ tw w))
+  narrow tw (join (inj₁ (inj₁ (_ , x))) w eh) = join (inj₂ (tw x)) (inW (narrow⁼ tw w)) eh
+  narrow tw (join (inj₁ (inj₂ h)) w eh)    = join (inj₁ h) (inW (narrow⁼ tw w)) eh
+  narrow tw (join (inj₂ v) w eh)           = join (inj₂ (narrow tw v)) (inW (narrow⁼ tw w)) eh
+
+  narrow⁼ : ∀ {B H p i w} {t : EmissionSet B} → (∀ {h e} → t h e → W H p h) → W⁼ (H ⊕ t) (p ++ [ ix i ]) w → W H p w
+  narrow⁼ tw here    = step here plain-ix
+  narrow⁼ tw (inW w) = narrow tw w
 
 -- A `defer`'s body is subscribed admissibly.
 ok-step : ∀ {H} p → Ok H p → Ok H (p ++ [ ix 1 ])
@@ -226,16 +240,204 @@ inv-widen {H = H} {t} {d} inv p (r , dj) = record
     open InvAt (inv p (r , λ hh w ins → dj (inj₂ hh) (widen t w) ins)) renaming (world to wo; real to re; flat to fl; burst to bu)
 
 ------------------------------------------------------------------------
+-- Ancestry
+
+-- No position is its own extension.
+ext≢ : ∀ x {l} ys → x ++ l ∷ ys ≡ x → ⊥
+ext≢ x ys eq = ≺-irrefl {x} (subst (x ≺_) eq (≺-ext x ys))
+
+-- `x` LEADS `y`: `y` is `x` or lies under it.
+_⊑_ : Pos → Pos → Set
+x ⊑ y = Σ Pos λ zs → y ≡ x ++ zs
+
+⊑-refl : ∀ x → x ⊑ x
+⊑-refl x = [] , sym (++-identityʳ x)
+
+⊑-snoc⁺ : ∀ x {l} → x ⊑ (x ++ [ l ])
+⊑-snoc⁺ x {l} = [ l ] , refl
+
+⊑-trans : ∀ {x y z} → x ⊑ y → y ⊑ z → x ⊑ z
+⊑-trans {x} (zs , refl) (ws , refl) = zs ++ ws , ++-assoc x zs ws
+
+⊑-≼ : ∀ {x y} → x ⊑ y → x ≼ y
+⊑-≼ {x} ([] , refl)     = subst (x ≼_) (sym (++-identityʳ x)) (≼-refl {x})
+⊑-≼ {x} (z ∷ zs , refl) = ≺→≼ {x} {x ++ z ∷ zs} (≺-ext x zs)
+
+⊑-inside : ∀ {x y} → x ⊑ y → T (inside x y)
+⊑-inside {x} (zs , refl) = Equivalence.from T-≡ (inside-++ x x zs (inside-self x))
+
+inside-⊑ : ∀ x y → T (inside x y) → x ⊑ y
+inside-⊑ []      y       _ = y , refl
+inside-⊑ (a ∷ x) []      ()
+inside-⊑ (a ∷ x) (b ∷ y) i with inside-cons a x b y (Equivalence.to T-≡ i)
+... | refl , i′ with inside-⊑ x y (Equivalence.from T-≡ i′)
+...   | zs , eq = zs , cong (a ∷_) eq
+
+-- Leading `y ++ [ l ]`: leading `y`, or it.
+⊑-snoc : ∀ {w} y {l} → w ⊑ (y ++ [ l ]) → w ⊑ y ⊎ w ≡ y ++ [ l ]
+⊑-snoc {w} y (zs , eq) = go w y zs eq
+  where
+    go : ∀ w y {l} zs → y ++ [ l ] ≡ w ++ zs → w ⊑ y ⊎ w ≡ y ++ [ l ]
+    go []      y       zs eq = inj₁ (y , refl)
+    go (a ∷ w) []      zs eq with ∷-injective eq
+    ... | refl , eq′ with ++-conicalˡ w zs (sym eq′)
+    ...   | refl = inj₂ refl
+    go (a ∷ w) (b ∷ y) zs eq with ∷-injective eq
+    ... | refl , eq′ with go w y zs eq′
+    ...   | inj₁ (vs , e) = inj₁ (vs , cong (a ∷_) e)
+    ...   | inj₂ e        = inj₂ (cong (a ∷_) e)
+
+-- Two leaders of one position: one leads the other.
+⊑-cmp : ∀ w k {b} → w ⊑ b → k ⊑ b → w ⊑ k ⊎ k ⊑ w
+⊑-cmp []      k       _           _          = inj₁ (k , refl)
+⊑-cmp (a ∷ w) []      _           _          = inj₂ (a ∷ w , refl)
+⊑-cmp (a ∷ w) (c ∷ k) (zs , refl) (zs′ , eq) with ∷-injective eq
+... | refl , eq′ with ⊑-cmp w k (zs , refl) (zs′ , eq′)
+...   | inj₁ (vs , e) = inj₁ (vs , cong (a ∷_) e)
+...   | inj₂ (vs , e) = inj₂ (vs , cong (a ∷_) e)
+
+-- Positions apart past a common prefix.
+diverge : ∀ k {a b : Label} ys ms → (a ≡ b → ⊥) → (k ++ [ a ]) ++ ys ≡ (k ++ [ b ]) ++ ms → ⊥
+diverge k {a} {b} ys ms ne eq =
+  ne (∷-injectiveˡ (++-cancelˡ k (a ∷ ys) (b ∷ ms) (trans (sym (++-assoc k [ a ] ys)) (trans eq (++-assoc k [ b ] ms)))))
+
+-- A row leading another of a flat reading is it.
+same-lead : ∀ {C H q} {X : EmissionSet C} → InvAt H q X → ∀ {k k′ e e′} → X k e → X k′ e′ → k ⊑ k′ → k ≡ k′
+same-lead I {k} x x′ ([] , eq)      = trans (sym (++-identityʳ k)) (sym eq)
+same-lead I     x x′ (z ∷ zs , refl) = ⊥-elim (InvAt.flat I x x′)
+
+-- No row of a flat reading lies under another's child.
+flat-under : ∀ {C H q} {X : EmissionSet C} → InvAt H q X → ∀ {k k′ a e e′} → X k e → X k′ e′ → (k ++ [ a ]) ⊑ k′ → ⊥
+flat-under {X = X} I {k} {a = a} {e′ = e′} x x′ (zs , refl) = InvAt.flat I x (subst (λ z → X z e′) (++-assoc k [ a ] zs) x′)
+
+-- `a` is `c`'s PARENT: `c` steps a plain label from it, or names it in a
+-- closing `sub`.
+data Parent (a c : Pos) : Set where
+  plain : ∀ {l} → Plain l → c ≡ a ++ [ l ] → Parent a c
+  named : ∀ h → c ≡ h ++ [ sub a ] → Parent a c
+
+step-parent : ∀ x {l} → Plain l → Parent x (x ++ [ l ])
+step-parent x pl = plain pl refl
+
+private
+  plain-sub : ∀ {l e} → Plain l → l ≡ sub e → ⊥
+  plain-sub plain-ix   ()
+  plain-sub plain-last ()
+
+-- A position has one parent.
+parent-fun : ∀ {a b c} → Parent a c → Parent b c → a ≡ b
+parent-fun {a} {b} (plain _ e)  (plain _ e′)  = ∷ʳ-injectiveˡ a b (trans (sym e) e′)
+parent-fun {a}     (plain pl e) (named h e′)  = ⊥-elim (plain-sub pl (∷ʳ-injectiveʳ a h (trans (sym e) e′)))
+parent-fun {b = b} (named h e)  (plain pl e′) = ⊥-elim (plain-sub pl (sym (∷ʳ-injectiveʳ h b (trans (sym e) e′))))
+parent-fun         (named h e)  (named h′ e′) with ∷ʳ-injectiveʳ h h′ (trans (sym e) e′)
+... | refl = refl
+
+-- `a` is an ANCESTOR of `c`.
+data Anc (a : Pos) : Pos → Set where
+  self : Anc a a
+  up   : ∀ {b c} → Anc a b → Parent b c → Anc a c
+
+anc-view : ∀ {a c} → Anc a c → a ≡ c ⊎ Σ Pos λ b → Anc a b × Parent b c
+anc-view self      = inj₁ refl
+anc-view (up x pb) = inj₂ (_ , x , pb)
+
+-- Two ancestors of one position: one is the other's.
+anc-lin : ∀ {a b w} → Anc a w → Anc b w → Anc a b ⊎ Anc b a
+anc-lin self       y         = inj₂ y
+anc-lin (up x pa)  self      = inj₁ (up x pa)
+anc-lin (up x pa)  (up y pb) with parent-fun pa pb
+... | refl = anc-lin x y
+
+anc-nil : ∀ {a} → Anc a [] → a ≡ []
+anc-nil self                    = refl
+anc-nil (up {b} _ (plain _ e))  = ⊥-elim (snoc≢[] b (sym e))
+anc-nil (up _ (named h e))      = ⊥-elim (snoc≢[] h (sym e))
+
+private
+  back-lt : ∀ acc x {e} → Back acc (x ++ [ sub e ]) → e ≺ ((acc ++ x) ++ [ sub e ])
+  back-lt acc []           {e} (_ , lt , _) = subst (λ z → e ≺ (z ++ [ sub e ])) (sym (++-identityʳ acc)) lt
+  back-lt acc (sub e′ ∷ x) {e} (_ , _ , b)  = subst (λ z → e ≺ (z ++ [ sub e ])) (++-assoc acc [ sub e′ ] x) (back-lt (acc ++ [ sub e′ ]) x b)
+  back-lt acc (ix i ∷ x)   {e} b            = subst (λ z → e ≺ (z ++ [ sub e ])) (++-assoc acc [ ix i ] x) (back-lt (acc ++ [ ix i ]) x b)
+  back-lt acc (last ∷ x)   {e} b            = subst (λ z → e ≺ (z ++ [ sub e ])) (++-assoc acc [ last ] x) (back-lt (acc ++ [ last ]) x b)
+
+  real-lt : ∀ x {e} → Real (x ++ [ sub e ]) → e ≺ (x ++ [ sub e ])
+  real-lt []          ()
+  real-lt (ix i ∷ x)  r = back-lt (ix i ∷ []) x r
+  real-lt (sub _ ∷ _) ()
+  real-lt (last ∷ _)  ()
+
+  -- A reachable position's parent is empty or reachable, and before it.
+  parent-real : ∀ {b c} → Parent b c → Real c → (b ≡ [] ⊎ Real b) × b ≺ c
+  parent-real {b} (plain {l} _ refl) r = real-init b [ l ] r , ≺-ext b []
+  parent-real {b} (named h refl)     r = inj₂ (real-last h r) , real-lt h r
+
+-- AN ANCESTOR comes no later.
+anc-≼ : ∀ {a c} → Anc a c → Real c → a ≼ c
+anc-≼ {a} self r = ≼-refl {a}
+anc-≼ {a} {c} (up {b} x pb) r with parent-real pb r
+... | inj₂ rb , bc = ≺→≼ {a} {c} (≼-≺-≺ {a} {b} {c} (anc-≼ x rb) bc)
+... | inj₁ refl , bc with anc-nil x
+...   | refl = ≺→≼ {[]} {c} bc
+
+-- The world descends from its subscription.
+mutual
+  world-anc : ∀ {H p w} → W H p w → Anc p w
+  world-anc (step w pl)       = up (world-anc⁼ w) (plain pl refl)
+  world-anc (timer t w)       = up (world-anc⁼ w) (named (ix t ∷ []) refl)
+  world-anc (join {h} _ w _)  = up (world-anc⁼ w) (named h refl)
+
+  world-anc⁼ : ∀ {H p w} → W⁼ H p w → Anc p w
+  world-anc⁼ here    = self
+  world-anc⁼ (inW w) = world-anc w
+
+private
+  ≺-[] : ∀ q → q ≺ [] → ⊥
+  ≺-[] []      ()
+  ≺-[] (_ ∷ _) ()
+
+  not-under : ∀ {p i j} → (i ≡ j → ⊥) → Real p → Anc (p ++ [ ix i ]) (p ++ [ ix j ]) → ⊥
+  not-under {p} {i} {j} ne rp a with anc-view a
+  ... | inj₁ eq = ne (ix-inj (∷ʳ-injectiveʳ p p eq))
+    where ix-inj : ix i ≡ ix j → i ≡ j
+          ix-inj refl = refl
+  ... | inj₂ (b , x , pb) with parent-fun pb (step-parent p {ix j} plain-ix)
+  ...   | refl = anc-≼ x rp (≺-ext p [])
+
+-- SIBLING WORLDS ARE APART: nothing descends from both `p ++ [ ix 0 ]` and
+-- `p ++ [ ix 1 ]`; each is the other's only through `p`, before both.
+apart : ∀ {p w} → Real p → Anc (p ++ [ ix 0 ]) w → Anc (p ++ [ ix 1 ]) w → ⊥
+apart rp x y with anc-lin x y
+... | inj₁ a = not-under (λ ()) rp a
+... | inj₂ a = not-under (λ ()) rp a
+
+-- A descendant of `a` leads nothing reachable before `a`.
+anc-lead : ∀ {a w q} → Anc a w → w ⊑ q → Real q → q ≺ a → ⊥
+anc-lead {a} {w} x (zs , refl) rq qa with real-init w zs rq
+... | inj₂ rw = ≼-trans {a} {w} {w ++ zs} (anc-≼ x rw) (⊑-≼ {w} {w ++ zs} (zs , refl)) qa
+... | inj₁ refl with anc-nil x
+...   | refl = ≺-[] zs qa
+
+-- A descendant of a subscription leads no lone tick.
+tick-lead : ∀ {p i w t} → Real p → Anc (p ++ [ ix i ]) w → w ⊑ (ix t ∷ []) → ⊥
+tick-lead {p} {i} {w} {t} rp x le with ⊑-snoc {w} [] {ix t} le
+... | inj₁ le′ = snoc≢[] p (nil-lead x le′)
+  where
+    nil-lead : ∀ {a v} → Anc a v → v ⊑ [] → a ≡ []
+    nil-lead {v = v} y (zs , eq) with ++-conicalˡ v zs (sym eq)
+    ... | refl = anc-nil y
+... | inj₂ refl = unit rp x
+  where
+    unit : ∀ {p i t} → Real p → Anc (p ++ [ ix i ]) (ix t ∷ []) → ⊥
+    unit {p} {t = t} rp x with anc-view x
+    ... | inj₁ eq with ∷ʳ-injectiveˡ p [] eq
+    ...   | refl = rp
+    unit {p} {t = t} rp x | inj₂ (b , y , pb) with parent-fun pb (step-parent [] {ix t} plain-ix)
+    ... | refl = snoc≢[] p (anc-nil y)
+
+------------------------------------------------------------------------
 -- The leaves keep it
 
 private
-  ≺-absurd : ∀ {x y} → x ≺ y → y ≺ x → ⊥
-  ≺-absurd {x} {y} a b = ≺-irrefl {x} (≺-trans {x} {y} {x} a b)
-
-  -- No position is its own extension.
-  ext≢ : ∀ x {l} ys → x ++ l ∷ ys ≡ x → ⊥
-  ext≢ x ys eq = ≺-irrefl {x} (subst (x ≺_) eq (≺-ext x ys))
-
   -- One plain label below `p`.
   Below : Pos → Pos → Set
   Below p y = Σ Label λ l → Plain l × y ≡ p ++ [ l ]
