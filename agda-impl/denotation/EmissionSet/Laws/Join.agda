@@ -16,7 +16,6 @@
 module denotation.EmissionSet.Laws.Join where
 
 open import Data.Bool using (T)
-open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Properties using (∷ʳ-injectiveˡ)
 open import Data.Maybe using (just; nothing)
@@ -29,12 +28,12 @@ open import Data.Unit using (tt)
 
 open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.MonotonicList.Events using (Pos; ix; inside)
-open import denotation.EmissionSet using (Ev; out; skip; end; EmissionSet; _≺_; _≼_; Den; enter; After; flatMapᵀ)
+open import denotation.EmissionSet using (out; skip; end; EmissionSet; _≺_; _≼_; Den; enter; After; flatMapᵀ)
 import denotation.EmissionSet as ES
 open import denotation.EmissionSet.Laws.Modulus
   using (≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext; AgreeTo; ⟨_⟩; upto; AgreeTo-sym; _~⟨_⟩_; ~-cold)
-open import denotation.EmissionSet.Laws.Count using (Cnt; AgC; _≈ᶜ⟨_∣_⟩_; ≈ᶜ-sym; cnt-up; cnt-down; child; trunc-ag)
-open import denotation.EmissionSet.Laws.Worlds using (Ok; InvAt; InvD; world-after; ok-in; ok-step; in-world; _⊑_; ⊑-refl)
+open import denotation.EmissionSet.Laws.Count using (Cnt; _≈ᶜ⟨_∣_⟩_; ≈ᶜ-sym; cnt-up; cnt-down; trunc-ag; Img; em; seen; seen-under)
+open import denotation.EmissionSet.Laws.Worlds using (Ok; InvAt; InvD; world-after; ok-in; ok-step; in-world)
 
 -- A condition on every value: read at or before `Q`, free past it.
 over : ∀ {A Q} {t t′ : EmissionSet A} → AgreeTo Q t t′ → (P : Pos → Set) → (∀ {k} → Q ≺ k → P k)
@@ -402,21 +401,6 @@ flatMap-causal {A} {q = q} exhaustᶠ {f} {f′} as af = ~-cold λ p →
 -- The order modulus
 
 private
-  -- Where a read row shows: under the cut, or under a joiner row before it.
-  Img : ∀ {B} → EmissionSet B → Pos → Pos → Set
-  Img {B} t Q k = k ⊑ Q ⊎ Σ Pos λ k′ → Σ (Ev B) (t k′) × k ⊑ k′ × k′ ≺ Q
-
-  em : ∀ {P G : Set} → (P → ¬ ¬ G) → (¬ P → ¬ ¬ G) → ¬ ¬ G
-  em p np ¬g = np (λ x → p x ¬g) ¬g
-
-  shown : ∀ {B} {t : EmissionSet B} {Q k e} → t k e → k ≺ Q → ¬ ¬ Img t Q k
-  shown {k = k} x kQ ¬i = ¬i (inj₂ (k , (_ , x) , ⊑-refl k , kQ))
-
-  shown-under : ∀ {B} {t : EmissionSet B} {Q k l e} → t (k ++ [ l ]) e → k ≺ Q → ¬ ¬ Img t Q k
-  shown-under {k = k} {l} x kQ ¬i with child l kQ
-  ... | inj₁ kQ′ = ¬i (inj₁ kQ′)
-  ... | inj₂ lt  = ¬i (inj₂ (k ++ [ l ] , (_ , x) , ([ l ] , refl) , lt))
-
   -- What one side's joiner reads, few before a cut where it is.
   module Keep {A B H n} {f f′ : A → Den B} {s s′ : Den A} (Is : InvD H s) (If : ∀ a → InvD H (f a))
               (as : s ≈ᶜ⟨ Ok H ∣ n ⟩ s′) (af : ∀ a → f a ≈ᶜ⟨ Ok H ∣ n ⟩ f′ a) (p : Pos) (ok : Ok H p) where
@@ -448,16 +432,16 @@ private
       side c = ⟨ (λ {y} yq → merge-to ao L y yq , merge-to (AgreeTo-sym ao) (lanes-sym ao L) y yq) ⟩
         where
           img-o : ∀ {y e} → o y e → y ≺ Q → ¬ ¬ Img MergeT Q y
-          img-o {e = out _} x yQ = shown-under (val x) yQ
-          img-o {e = skip}  x yQ = shown (step x) yQ
-          img-o {e = end}   x yQ = em (λ d → shown (oend x d) yQ) (λ nd → shown (opass x nd) yQ)
+          img-o {e = out _} x yQ = seen-under (val x) yQ
+          img-o {e = skip}  x yQ = seen (step x) yQ
+          img-o {e = end}   x yQ = em (λ d → seen (oend x d) yQ) (λ nd → seen (opass x nd) yQ)
 
           ao = outer c img-o
 
           img-l : ∀ {q a} (x : o q (out a)) {y e} → enter (f a) (q ++ [ ix 1 ]) y e → y ≺ Q → ¬ ¬ Img MergeT Q y
-          img-l x {e = out _} l yQ = shown (lane x (l , past {a = _} (val-ok x) l) tt) yQ
-          img-l x {e = skip}  l yQ = shown (lane x (l , past {a = _} (val-ok x) l) tt) yQ
-          img-l x {e = end}   l yQ = em (λ d → shown (lend x (l , past {a = _} (val-ok x) l) d) yQ) (λ nd → shown (lpass x (l , past {a = _} (val-ok x) l) nd) yQ)
+          img-l x {e = out _} l yQ = seen (lane x (l , past {a = _} (val-ok x) l) tt) yQ
+          img-l x {e = skip}  l yQ = seen (lane x (l , past {a = _} (val-ok x) l) tt) yQ
+          img-l x {e = end}   l yQ = em (λ d → seen (lend x (l , past {a = _} (val-ok x) l) d) yQ) (λ nd → seen (lpass x (l , past {a = _} (val-ok x) l) nd) yQ)
 
           L = lanes λ x _ → lane-ag (val-ok x) c (img-l x)
 
@@ -469,9 +453,9 @@ private
       side c = ⟨ (λ {y} yq → switch-to f f′ ao L y yq , switch-to f′ f (AgreeTo-sym ao) (lanes-sym ao L) y yq) ⟩
         where
           img-o : ∀ {y e} → o y e → y ≺ Q → ¬ ¬ Img SwitchT Q y
-          img-o {e = out _} x yQ = shown-under (val x) yQ
-          img-o {e = skip}  x yQ = shown (step x) yQ
-          img-o {e = end}   x yQ = em (λ d → shown (oend x d) yQ) (λ nd → shown (opass x nd) yQ)
+          img-o {e = out _} x yQ = seen-under (val x) yQ
+          img-o {e = skip}  x yQ = seen (step x) yQ
+          img-o {e = end}   x yQ = em (λ d → seen (oend x d) yQ) (λ nd → seen (opass x nd) yQ)
 
           ao = outer c img-o
 
@@ -484,11 +468,11 @@ private
               ly l′ = l′ , past {a = _} (val-ok x) l′
               cut : Read f o q k → Cut q y → ¬ ¬ Img SwitchT k y
               cut (inj₁ nc)  (q′ , a′ , x′ , qq′ , q′y) = λ _ → nc (q′ , a′ , x′ , qq′ , ≺-trans {q′} {y} {k} q′y yk)
-              cut (inj₂ ins) cy = shown (left x (ly l) cy (in-world (If a (q ++ [ ix 1 ]) (val-ok x)) l yk ins)) yk
+              cut (inj₂ ins) cy = seen (left x (ly l) cy (in-world (If a (q ++ [ ix 1 ]) (val-ok x)) l yk ins)) yk
               uncut : ∀ e′ → enter (f a) (q ++ [ ix 1 ]) y e′ → ¬ Cut q y → ¬ ¬ Img SwitchT k y
-              uncut (out _) l′ nc = shown (lane x (ly l′) tt nc) yk
-              uncut skip    l′ nc = shown (lane x (ly l′) tt nc) yk
-              uncut end     l′ nc = em (λ d → shown (lend x (ly l′) nc d) yk) (λ nd → shown (lpass x (ly l′) nc nd) yk)
+              uncut (out _) l′ nc = seen (lane x (ly l′) tt nc) yk
+              uncut skip    l′ nc = seen (lane x (ly l′) tt nc) yk
+              uncut end     l′ nc = em (λ d → seen (lend x (ly l′) nc d) yk) (λ nd → seen (lpass x (ly l′) nc nd) yk)
 
           L = lanes λ {q} {a} {k} x _ kQ r → lane-ag (val-ok x) (cnt-down c kQ) (img-l x kQ r)
 
@@ -500,16 +484,16 @@ private
       side c = ⟨ (λ {y} yq → exhaust-to ao L y yq , exhaust-to (AgreeTo-sym ao) (lanes-sym ao L) y yq) ⟩
         where
           img-o : ∀ {y e} → o y e → y ≺ Q → ¬ ¬ Img ExhaustT Q y
-          img-o {e = out _} x yQ = shown-under (val x) yQ
-          img-o {e = skip}  x yQ = shown (step x) yQ
-          img-o {e = end}   x yQ = em (λ d → shown (oend x d) yQ) (λ nd → shown (opass x nd) yQ)
+          img-o {e = out _} x yQ = seen-under (val x) yQ
+          img-o {e = skip}  x yQ = seen (step x) yQ
+          img-o {e = end}   x yQ = em (λ d → seen (oend x d) yQ) (λ nd → seen (opass x nd) yQ)
 
           ao = outer c img-o
 
           img-l : ∀ {q a} (x : o q (out a)) → ES.Exhaust.Run f o q → ∀ {y e} → enter (f a) (q ++ [ ix 1 ]) y e → y ≺ Q → ¬ ¬ Img ExhaustT Q y
-          img-l x r {e = out _} l yQ = shown (lane x r (l , past {a = _} (val-ok x) l) tt) yQ
-          img-l x r {e = skip}  l yQ = shown (lane x r (l , past {a = _} (val-ok x) l) tt) yQ
-          img-l x r {e = end}   l yQ = em (λ d → shown (lend x r (l , past {a = _} (val-ok x) l) d) yQ) (λ nd → shown (lpass x r (l , past {a = _} (val-ok x) l) nd) yQ)
+          img-l x r {e = out _} l yQ = seen (lane x r (l , past {a = _} (val-ok x) l) tt) yQ
+          img-l x r {e = skip}  l yQ = seen (lane x r (l , past {a = _} (val-ok x) l) tt) yQ
+          img-l x r {e = end}   l yQ = em (λ d → seen (lend x r (l , past {a = _} (val-ok x) l) d) yQ) (λ nd → seen (lpass x r (l , past {a = _} (val-ok x) l) nd) yQ)
 
           L = lanes λ x r _ → lane-ag (val-ok x) c (img-l x r)
 
@@ -551,18 +535,18 @@ private
       side c = ⟨ (λ {y} yq → bounded-to ao L y yq , bounded-to (AgreeTo-sym ao) (lanes-sym ao L) y yq) ⟩
         where
           img-o : ∀ {y e} → o y e → y ≺ Q → ¬ ¬ Img BoundedT Q y
-          img-o {e = out _} x yQ = shown-under (val x) yQ
-          img-o {e = skip}  x yQ = shown (step x) yQ
-          img-o {e = end}   x yQ = em (λ d → shown (oend x d) yQ) (λ nd → shown (opass x nd) yQ)
+          img-o {e = out _} x yQ = seen-under (val x) yQ
+          img-o {e = skip}  x yQ = seen (step x) yQ
+          img-o {e = end}   x yQ = em (λ d → seen (oend x d) yQ) (λ nd → seen (opass x nd) yQ)
 
           ao = outer c img-o
 
           img-l : ∀ {i q s₀ a} (sb : Sub i q s₀ a) → ∀ {y e} → enter (f a) s₀ y e → y ≺ Q → ¬ ¬ Img BoundedT Q y
-          img-l sb {e = out _} l yQ = shown (lane sb (l , past (sub-ok sb) l) tt) yQ
-          img-l sb {e = skip}  l yQ = shown (lane sb (l , past (sub-ok sb) l) tt) yQ
+          img-l sb {e = out _} l yQ = seen (lane sb (l , past (sub-ok sb) l) tt) yQ
+          img-l sb {e = skip}  l yQ = seen (lane sb (l , past (sub-ok sb) l) tt) yQ
           img-l sb {e = end}   l yQ =
-            em (λ qd → shown-under (handoff sb ly qd) yQ)
-               (λ nq → em (λ d → shown (lend sb ly nq d) yQ) (λ nd → shown (lpass sb ly nq nd) yQ))
+            em (λ qd → seen-under (handoff sb ly qd) yQ)
+               (λ nq → em (λ d → seen (lend sb ly nq d) yQ) (λ nd → seen (lpass sb ly nq nd) yQ))
             where ly = l , past (sub-ok sb) l
 
           L = lanes λ sb _ → lane-ag (sub-ok sb) c (img-l sb)

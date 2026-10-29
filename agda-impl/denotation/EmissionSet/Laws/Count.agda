@@ -81,6 +81,21 @@ child {v} {q} l vq with ≼-or-≻ q (v ++ [ l ])
 ...   | inj₁ lt = inj₁ (<ᵖ-between v q [ l ] (Equivalence.to T-≡ vq) lt)
 ...   | inj₂ eq = inj₁ ([ l ] , eq)
 
+-- Where a read row shows: under the cut, or under a row before it.
+Img : ∀ {B} → EmissionSet B → Pos → Pos → Set
+Img {B} t Q k = k ⊑ Q ⊎ Σ Pos λ k′ → Σ (Ev B) (t k′) × k ⊑ k′ × k′ ≺ Q
+
+em : ∀ {P G : Set} → (P → ¬ ¬ G) → (¬ P → ¬ ¬ G) → ¬ ¬ G
+em p np ¬g = np (λ x → p x ¬g) ¬g
+
+seen : ∀ {B} {t : EmissionSet B} {Q k e} → t k e → k ≺ Q → ¬ ¬ Img t Q k
+seen {k = k} x kQ ¬i = ¬i (inj₂ (k , (_ , x) , ⊑-refl k , kQ))
+
+seen-under : ∀ {B} {t : EmissionSet B} {Q k l e} → t (k ++ [ l ]) e → k ≺ Q → ¬ ¬ Img t Q k
+seen-under {k = k} {l} x kQ ¬i with child l kQ
+... | inj₁ kQ′ = ¬i (inj₁ kQ′)
+... | inj₂ lt  = ¬i (inj₂ (k ++ [ l ] , (_ , x) , ([ l ] , refl) , lt))
+
 -- Few before `q`, few before an earlier cut.
 cnt-down : ∀ {A n} {t : EmissionSet A} {q w} → Cnt n t q → w ≼ q → Cnt n t w
 cnt-down {q = q} {w} (ks , le , h) wq = ks , le , λ {k} x kw → cov-down (h x (≺-≼-≺ {k} {w} {q} kw wq)) kw wq
@@ -92,11 +107,10 @@ cnt-mono mn (ks , le , h) = ks , ≤-trans le mn , h
 -- row of `t` before `q`: what covers `t` covers `u`.  Covering is
 -- decidable, so an image need only be not refuted.
 cnt-up : ∀ {A B n} {t : EmissionSet A} {u : EmissionSet B} {q} → Cnt n t q
-       → (∀ {k e} → u k e → k ≺ q → ¬ ¬ (k ⊑ q ⊎ Σ Pos λ k′ → Σ (Ev A) (t k′) × k ⊑ k′ × k′ ≺ q))
-       → Cnt n u q
+       → (∀ {k e} → u k e → k ≺ q → ¬ ¬ Img t q k) → Cnt n u q
 cnt-up {A = A} {t = t} {q = q} (ks , le , h) im = ks , le , λ x kq → cov-stable λ ¬c → im x kq λ i → ¬c (go i)
   where
-    go : ∀ {k} → k ⊑ q ⊎ Σ Pos (λ k′ → Σ (Ev A) (t k′) × k ⊑ k′ × k′ ≺ q) → Cov q ks k
+    go : ∀ {k} → Img t q k → Cov q ks k
     go (inj₁ kq)                     = inj₁ kq
     go (inj₂ (k′ , (_ , x) , kk , lt)) = cov-up kk (h x lt)
 
