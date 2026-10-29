@@ -71,6 +71,15 @@ record _≃_ {A : Set} (t u : EmissionSet A) : Set where
 open _≃_
 
 -- A lane or an outer ended by `c`: every row it still owes, by `c`.
+-- Exact only where every lane ends, as in the fragment: a lane that
+-- never ends owes nothing and reads gone.
+--
+-- DEAD ROUTE: a lane finished as `Ended` in its rows, or as its node's
+--   live-lane count: while a lane's end rises to its merge, the lane is
+--   still in the list, owes nothing and holds no end, so the merge's bare
+--   rows skip an end the denotation has.  Rows cannot tell an end in
+--   flight from a lane that never ends; the hole's state can, and `up`
+--   does not see it.
 Gone : ∀ {X} → EmissionSet X → Pos → Set
 Gone t c = ∀ {k e} → t k e → k ≼ c
 

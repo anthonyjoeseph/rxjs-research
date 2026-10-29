@@ -393,6 +393,13 @@ postulate
   -- turn, are the shown rows of a reader's run, the skips before each met
   -- on the way.  Finitely many rows lie before each (`adequacy.Enter`),
   -- and none visible past the end; the run lists them in position order.
+  --
+  -- DEAD ROUTE: reading the rows off the oracle's listing
+  --   (`quickcheck.Tabled.Exact.tabled-exact`): it is exact only uncut, and
+  --   its horizon is a fixed time, so a cold source ticking past it, or an
+  --   infinite one, cuts the listing and it claims nothing.  The horizon a
+  --   run needs is the position of its last shown row, which the listing
+  --   does not take.
   met-of-shown : ∀ {R} {o : PureObs [] R} → Frag o → ∀ {vs} → Shows* (enter (⟦ o ⟧ []ᴬ) root) vs → Meets (enter (⟦ o ⟧ []ᴬ) root) vs
 
 -- THE SOUND HALF: what the engine shows, a subscriber to the program's
