@@ -25,13 +25,16 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 open import Relation.Nullary using (¬_)
+open import Data.Unit using (tt)
 
 open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.MonotonicList.Events using (Pos; ix; inside)
-open import denotation.EmissionSet using (Ev; out; EmissionSet; _≺_; _≼_; Den; enter; After; flatMapᵀ)
+open import denotation.EmissionSet using (Ev; out; skip; end; EmissionSet; _≺_; _≼_; Den; enter; After; flatMapᵀ)
 import denotation.EmissionSet as ES
 open import denotation.EmissionSet.Laws.Modulus
   using (≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext; AgreeTo; ⟨_⟩; upto; AgreeTo-sym; _~⟨_⟩_; ~-cold)
+open import denotation.EmissionSet.Laws.Count using (Cnt; AgC; _≈ᶜ⟨_∣_⟩_; ≈ᶜ-sym; cnt-up; cnt-down; child; trunc-ag)
+open import denotation.EmissionSet.Laws.Worlds using (Ok; InvAt; InvD; world-after; ok-in; ok-step; in-world; _⊑_; ⊑-refl)
 
 -- A condition on every value: read at or before `Q`, free past it.
 over : ∀ {A Q} {t t′ : EmissionSet A} → AgreeTo Q t t′ → (P : Pos → Set) → (∀ {k} → Q ≺ k → P k)
@@ -394,3 +397,190 @@ flatMap-causal {A} {q = q} exhaustᶠ {f} {f′} as af = ~-cold λ p →
     open Join.ExhaustJ q
     L : ∀ {o : EmissionSet A} → Lanes o f f′
     L = lanes λ {q′} {a} _ _ _ → af a (q′ ++ [ ix 1 ])
+
+------------------------------------------------------------------------
+-- The order modulus
+
+private
+  -- Where a read row shows: under the cut, or under a joiner row before it.
+  Img : ∀ {B} → EmissionSet B → Pos → Pos → Set
+  Img {B} t Q k = k ⊑ Q ⊎ Σ Pos λ k′ → Σ (Ev B) (t k′) × k ⊑ k′ × k′ ≺ Q
+
+  em : ∀ {P G : Set} → (P → ¬ ¬ G) → (¬ P → ¬ ¬ G) → ¬ ¬ G
+  em p np ¬g = np (λ x → p x ¬g) ¬g
+
+  shown : ∀ {B} {t : EmissionSet B} {Q k e} → t k e → k ≺ Q → ¬ ¬ Img t Q k
+  shown {k = k} x kQ ¬i = ¬i (inj₂ (k , (_ , x) , ⊑-refl k , kQ))
+
+  shown-under : ∀ {B} {t : EmissionSet B} {Q k l e} → t (k ++ [ l ]) e → k ≺ Q → ¬ ¬ Img t Q k
+  shown-under {k = k} {l} x kQ ¬i with child l kQ
+  ... | inj₁ kQ′ = ¬i (inj₁ kQ′)
+  ... | inj₂ lt  = ¬i (inj₂ (k ++ [ l ] , (_ , x) , ([ l ] , refl) , lt))
+
+  -- What one side's joiner reads, few before a cut where it is.
+  module Keep {A B H n} {f f′ : A → Den B} {s s′ : Den A} (Is : InvD H s) (If : ∀ a → InvD H (f a))
+              (as : s ≈ᶜ⟨ Ok H ∣ n ⟩ s′) (af : ∀ a → f a ≈ᶜ⟨ Ok H ∣ n ⟩ f′ a) (p : Pos) (ok : Ok H p) where
+    o o′ : EmissionSet A
+    o  = enter s p
+    o′ = enter s′ p
+
+    Io = Is p ok
+
+    val-ok : ∀ {q a} → o q (out a) → Ok H (q ++ [ ix 1 ])
+    val-ok {q} x = ok-step q (ok-in ok (InvAt.world Io x) (InvAt.real Io x))
+
+    -- A lane's rows lie past its subscription.
+    past : ∀ {a s₀} (k₀ : Ok H s₀) {y e} → enter (f a) s₀ y e → s₀ ≺ y
+    past {a} {s₀} k₀ x = world-after (InvAt.world I x) (InvAt.real I x) where I = If a s₀ k₀
+
+    outer : ∀ {Q} {t : EmissionSet B} → Cnt n t Q → (∀ {y e} → o y e → y ≺ Q → ¬ ¬ Img t Q y) → AgreeTo Q o o′
+    outer {Q} c im = as p ok Q (inj₁ (cnt-up c im))
+
+    lane-ag : ∀ {Q a s₀} {t : EmissionSet B} → Ok H s₀ → Cnt n t Q
+            → (∀ {y e} → enter (f a) s₀ y e → y ≺ Q → ¬ ¬ Img t Q y) → AgreeTo Q (enter (f a) s₀) (enter (f′ a) s₀)
+    lane-ag {Q} {a} {s₀} k₀ c im = af a s₀ k₀ Q (inj₁ (cnt-up c im))
+
+    module KM (Q : Pos) where
+      open ES.Merge f o using (Done; MergeT; val; step; oend; opass; lane; lend; lpass)
+      open Join.MergeJ {A} {B} Q using (lanes; merge-to; lanes-sym)
+
+      side : Cnt n MergeT Q → AgreeTo Q MergeT (ES.Merge.MergeT f′ o′)
+      side c = ⟨ (λ {y} yq → merge-to ao L y yq , merge-to (AgreeTo-sym ao) (lanes-sym ao L) y yq) ⟩
+        where
+          img-o : ∀ {y e} → o y e → y ≺ Q → ¬ ¬ Img MergeT Q y
+          img-o {e = out _} x yQ = shown-under (val x) yQ
+          img-o {e = skip}  x yQ = shown (step x) yQ
+          img-o {e = end}   x yQ = em (λ d → shown (oend x d) yQ) (λ nd → shown (opass x nd) yQ)
+
+          ao = outer c img-o
+
+          img-l : ∀ {q a} (x : o q (out a)) {y e} → enter (f a) (q ++ [ ix 1 ]) y e → y ≺ Q → ¬ ¬ Img MergeT Q y
+          img-l x {e = out _} l yQ = shown (lane x (l , past {a = _} (val-ok x) l) tt) yQ
+          img-l x {e = skip}  l yQ = shown (lane x (l , past {a = _} (val-ok x) l) tt) yQ
+          img-l x {e = end}   l yQ = em (λ d → shown (lend x (l , past {a = _} (val-ok x) l) d) yQ) (λ nd → shown (lpass x (l , past {a = _} (val-ok x) l) nd) yQ)
+
+          L = lanes λ x _ → lane-ag (val-ok x) c (img-l x)
+
+    module KS (Q : Pos) where
+      open ES.Switch f o using (Cut; Done; SwitchT; val; step; oend; opass; lane; lend; lpass; left)
+      open Join.SwitchJ {A} {B} Q using (lanes; switch-to; lanes-sym; Read)
+
+      side : Cnt n SwitchT Q → AgreeTo Q SwitchT (ES.Switch.SwitchT f′ o′)
+      side c = ⟨ (λ {y} yq → switch-to f f′ ao L y yq , switch-to f′ f (AgreeTo-sym ao) (lanes-sym ao L) y yq) ⟩
+        where
+          img-o : ∀ {y e} → o y e → y ≺ Q → ¬ ¬ Img SwitchT Q y
+          img-o {e = out _} x yQ = shown-under (val x) yQ
+          img-o {e = skip}  x yQ = shown (step x) yQ
+          img-o {e = end}   x yQ = em (λ d → shown (oend x d) yQ) (λ nd → shown (opass x nd) yQ)
+
+          ao = outer c img-o
+
+          -- Read at the cut `k`, read at every lane row before it.
+          img-l : ∀ {q a k} (x : o q (out a)) → k ≼ Q → Read f o q k
+                → ∀ {y e} → enter (f a) (q ++ [ ix 1 ]) y e → y ≺ k → ¬ ¬ Img SwitchT k y
+          img-l {q} {a} {k} x kQ r {y} {e} l yk = em (cut r) (uncut e l)
+            where
+              ly : ∀ {e′} → enter (f a) (q ++ [ ix 1 ]) y e′ → ES.Switch.Lane f o q a y e′
+              ly l′ = l′ , past {a = _} (val-ok x) l′
+              cut : Read f o q k → Cut q y → ¬ ¬ Img SwitchT k y
+              cut (inj₁ nc)  (q′ , a′ , x′ , qq′ , q′y) = λ _ → nc (q′ , a′ , x′ , qq′ , ≺-trans {q′} {y} {k} q′y yk)
+              cut (inj₂ ins) cy = shown (left x (ly l) cy (in-world (If a (q ++ [ ix 1 ]) (val-ok x)) l yk ins)) yk
+              uncut : ∀ e′ → enter (f a) (q ++ [ ix 1 ]) y e′ → ¬ Cut q y → ¬ ¬ Img SwitchT k y
+              uncut (out _) l′ nc = shown (lane x (ly l′) tt nc) yk
+              uncut skip    l′ nc = shown (lane x (ly l′) tt nc) yk
+              uncut end     l′ nc = em (λ d → shown (lend x (ly l′) nc d) yk) (λ nd → shown (lpass x (ly l′) nc nd) yk)
+
+          L = lanes λ {q} {a} {k} x _ kQ r → lane-ag (val-ok x) (cnt-down c kQ) (img-l x kQ r)
+
+    module KE (Q : Pos) where
+      open ES.Exhaust f o using (Done; ExhaustT; val; step; oend; opass; lane; lend; lpass)
+      open Join.ExhaustJ {A} {B} Q using (lanes; exhaust-to; lanes-sym)
+
+      side : Cnt n ExhaustT Q → AgreeTo Q ExhaustT (ES.Exhaust.ExhaustT f′ o′)
+      side c = ⟨ (λ {y} yq → exhaust-to ao L y yq , exhaust-to (AgreeTo-sym ao) (lanes-sym ao L) y yq) ⟩
+        where
+          img-o : ∀ {y e} → o y e → y ≺ Q → ¬ ¬ Img ExhaustT Q y
+          img-o {e = out _} x yQ = shown-under (val x) yQ
+          img-o {e = skip}  x yQ = shown (step x) yQ
+          img-o {e = end}   x yQ = em (λ d → shown (oend x d) yQ) (λ nd → shown (opass x nd) yQ)
+
+          ao = outer c img-o
+
+          img-l : ∀ {q a} (x : o q (out a)) → ES.Exhaust.Run f o q → ∀ {y e} → enter (f a) (q ++ [ ix 1 ]) y e → y ≺ Q → ¬ ¬ Img ExhaustT Q y
+          img-l x r {e = out _} l yQ = shown (lane x r (l , past {a = _} (val-ok x) l) tt) yQ
+          img-l x r {e = skip}  l yQ = shown (lane x r (l , past {a = _} (val-ok x) l) tt) yQ
+          img-l x r {e = end}   l yQ = em (λ d → shown (lend x r (l , past {a = _} (val-ok x) l) d) yQ) (λ nd → shown (lpass x r (l , past {a = _} (val-ok x) l) nd) yQ)
+
+          L = lanes λ x r _ → lane-ag (val-ok x) c (img-l x r)
+
+    module KB (m : ℕ) (Q : Pos) where
+      open ES.Values o using (Nth; first; next)
+      open ES.Bounded m f o using (Kth; Starts; room; freed; queued; Ends; Sched; Sub; Queued; Done; BoundedT;
+                                   val; step; oend; opass; lane; handoff; lend; lpass)
+      open Join.BoundedJ {A} {B} Q m using (lanes; bounded-to; lanes-sym)
+
+      nth-val : ∀ {i q a} → Nth i q a → o q (out a)
+      nth-val (first x _)    = x
+      nth-val (next _ x _ _) = x
+
+      -- Every lane subscribes where the invariant holds: at a value, or past an earlier lane's end.
+      starts-ok : ∀ i {q a s₀} → Nth i q a → Starts i q (Sched i) s₀ → Ok H s₀
+      kth-ok    : ∀ {P} i k → Kth P (Sched i) k → Σ Pos λ c → P c × Ok H c
+      end-ok    : ∀ i {c} → Ends i (Sched i) c → Ok H c
+
+      starts-ok i N (room _)    = val-ok (nth-val N)
+      starts-ok i N (freed _ _) = val-ok (nth-val N)
+      starts-ok i N (queued {c} _ _ one _ _) with kth-ok i 0 one
+      ... | _ , refl , k₀ = ok-step c k₀
+
+      kth-ok zero    k       ()
+      kth-ok (suc i) zero    (inj₁ (c , y , pc))       = c , pc , end-ok i y
+      kth-ok (suc i) zero    (inj₂ r)                  = kth-ok i zero r
+      kth-ok (suc i) (suc k) (inj₁ ((c , y , pc) , _)) = c , pc , end-ok i y
+      kth-ok (suc i) (suc k) (inj₂ r)                  = kth-ok i (suc k) r
+
+      end-ok i (q , a , s₀ , N , St , (y , _)) = ok-in k₀ (InvAt.world I y) (InvAt.real I y)
+        where
+          k₀ = starts-ok i N St
+          I  = If a s₀ k₀
+
+      sub-ok : ∀ {i q s₀ a} → Sub i q s₀ a → Ok H s₀
+      sub-ok {i} (N , St) = starts-ok i N St
+
+      side : Cnt n BoundedT Q → AgreeTo Q BoundedT (ES.Bounded.BoundedT m f′ o′)
+      side c = ⟨ (λ {y} yq → bounded-to ao L y yq , bounded-to (AgreeTo-sym ao) (lanes-sym ao L) y yq) ⟩
+        where
+          img-o : ∀ {y e} → o y e → y ≺ Q → ¬ ¬ Img BoundedT Q y
+          img-o {e = out _} x yQ = shown-under (val x) yQ
+          img-o {e = skip}  x yQ = shown (step x) yQ
+          img-o {e = end}   x yQ = em (λ d → shown (oend x d) yQ) (λ nd → shown (opass x nd) yQ)
+
+          ao = outer c img-o
+
+          img-l : ∀ {i q s₀ a} (sb : Sub i q s₀ a) → ∀ {y e} → enter (f a) s₀ y e → y ≺ Q → ¬ ¬ Img BoundedT Q y
+          img-l sb {e = out _} l yQ = shown (lane sb (l , past (sub-ok sb) l) tt) yQ
+          img-l sb {e = skip}  l yQ = shown (lane sb (l , past (sub-ok sb) l) tt) yQ
+          img-l sb {e = end}   l yQ =
+            em (λ qd → shown-under (handoff sb ly qd) yQ)
+               (λ nq → em (λ d → shown (lend sb ly nq d) yQ) (λ nd → shown (lpass sb ly nq nd) yQ))
+            where ly = l , past (sub-ok sb) l
+
+          L = lanes λ sb _ → lane-ag (sub-ok sb) c (img-l sb)
+
+-- EACH JOINER KEEPS THE ORDER MODULUS at admissible subscriptions: what
+-- is few before a cut in one side's joiner is few in what it reads there.
+flatMap-ne : ∀ {A B H k} (op : FlatOp) {f f′ : A → Den B} {s s′ : Den A}
+           → InvD H s → InvD H s′ → (∀ a → InvD H (f a)) → (∀ a → InvD H (f′ a))
+           → s ≈ᶜ⟨ Ok H ∣ k ⟩ s′ → (∀ a → f a ≈ᶜ⟨ Ok H ∣ k ⟩ f′ a) → flatMapᵀ op f s ≈ᶜ⟨ Ok H ∣ k ⟩ flatMapᵀ op f′ s′
+flatMap-ne {H = H} {k} (mergeᶠ nothing) {f} {f′} {s} {s′} Is Is′ If If′ as af p ok = trunc-ag λ
+  { Q (inj₁ c) → Keep.KM.side {H = H} {k} {f = f} {f′} {s} {s′} Is If as af p ok Q c
+  ; Q (inj₂ c) → AgreeTo-sym (Keep.KM.side {H = H} {k} {f = f′} {f} {s′} {s} Is′ If′ (≈ᶜ-sym {d = s} {s′} as) (λ a → ≈ᶜ-sym {d = f a} {f′ a} (af a)) p ok Q c) }
+flatMap-ne {H = H} {k} (mergeᶠ (just m)) {f} {f′} {s} {s′} Is Is′ If If′ as af p ok = trunc-ag λ
+  { Q (inj₁ c) → Keep.KB.side {H = H} {k} {f = f} {f′} {s} {s′} Is If as af p ok m Q c
+  ; Q (inj₂ c) → AgreeTo-sym (Keep.KB.side {H = H} {k} {f = f′} {f} {s′} {s} Is′ If′ (≈ᶜ-sym {d = s} {s′} as) (λ a → ≈ᶜ-sym {d = f a} {f′ a} (af a)) p ok m Q c) }
+flatMap-ne {H = H} {k} switchᶠ {f} {f′} {s} {s′} Is Is′ If If′ as af p ok = trunc-ag λ
+  { Q (inj₁ c) → Keep.KS.side {H = H} {k} {f = f} {f′} {s} {s′} Is If as af p ok Q c
+  ; Q (inj₂ c) → AgreeTo-sym (Keep.KS.side {H = H} {k} {f = f′} {f} {s′} {s} Is′ If′ (≈ᶜ-sym {d = s} {s′} as) (λ a → ≈ᶜ-sym {d = f a} {f′ a} (af a)) p ok Q c) }
+flatMap-ne {H = H} {k} exhaustᶠ {f} {f′} {s} {s′} Is Is′ If If′ as af p ok = trunc-ag λ
+  { Q (inj₁ c) → Keep.KE.side {H = H} {k} {f = f} {f′} {s} {s′} Is If as af p ok Q c
+  ; Q (inj₂ c) → AgreeTo-sym (Keep.KE.side {H = H} {k} {f = f′} {f} {s′} {s} Is′ If′ (≈ᶜ-sym {d = s} {s′} as) (λ a → ≈ᶜ-sym {d = f a} {f′ a} (af a)) p ok Q c) }
