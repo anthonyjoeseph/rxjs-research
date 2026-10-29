@@ -25,8 +25,8 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; plug; alive; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Direct using (∅; rows; rowsL; Lanes; Each; module Flat; _≃_)
-open import adequacy.Direct.Up using (any-ʳ++ʳ; _≈ᴸ_; _∷_; ≈ᴸ-refl; flat-≃; map-≃; ≃-refl)
-open import adequacy.Direct.Bound using (Empty; empty-any; Single; EndLast; Live; G; GL; GLn; LnBody; live)
+open import adequacy.Direct.Up using (any-ʳ++ʳ; any-≈; _≈ᴸ_; []; _∷_; ≈ᴸ-refl; ≈ᴸ-sym; flat-≃; map-≃; ≃-refl)
+open import adequacy.Direct.Bound using (Empty; empty-any; Single; EndLast; Spread; Parts; Live; G; GL; GLn; LnBody; live)
 
 open _≃_
 
@@ -222,6 +222,13 @@ lanes-≃ : ∀ {Γ A} (xs : List (St Γ A)) {ys ys′} → rowsL ys ≈ᴸ rows
 lanes-≃ []       h = h
 lanes-≃ (x ∷ xs) h = lanes-≃ xs (≃-refl ∷ h)
 
+spread-≈ : ∀ {B} {Ls Ls′ : List (EmissionSet B)} → Ls ≈ᴸ Ls′ → Spread Ls → Spread Ls′
+spread-≈ []       _       = tt
+spread-≈ (e ∷ es) (a , s) = (λ r x → a (from e r) (any-≈ (≈ᴸ-sym es) x)) , spread-≈ es s
+
+parts-≃ : ∀ {A B} {O O′ : EmissionSet A} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′ → Parts O Ls → Parts O′ Ls′
+parts-≃ eo es (a , s) = (λ r x → a (from eo r) (any-≈ (≈ᴸ-sym es) x)) , spread-≈ es s
+
 -- A node owing nothing and never good.
 void : ∀ {Γ A} {s s′ : St Γ A} → rows s ≡ ∅ → rows s′ ≡ ∅ → alive s ≡ alive s′ → (∀ v → G v s → ⊥) → (∀ v → GLn v s → ⊥) → (∀ v b → LnBody v b s → ⊥) → Swap s s′
 void e e′ al ng nl nb = record { same = ≡→≃ (trans e (sym e′)) ; live≡ = al ; node = λ v g → ⊥-elim (ng v g) ; lane = λ v g → ⊥-elim (nl v g) ; body = λ v b g → ⊥-elim (nb v b g) }
@@ -237,14 +244,14 @@ good-swap (inLn false c)   sw g = good-swap c (record { same = ≃-refl ; live�
 good-swap (inTake i q w c) sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ())) g
 good-swap (inOuter (mergeᶠ nothing) f d n q ls c) {s} {s′} sw g =
   good-swap c {s = flatS (mergeᶠ nothing) f d n q s ls} {s′ = flatS (mergeᶠ nothing) f d n q s′ ls} (record { same = flat-≃ _ (same sw) (≈ᴸ-refl (rowsL ls)) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ ()
-                      ; node = λ { true (go , gl , qe , si , el , nl , ov) → node sw true go , gl , qe , (λ {q} {e} {e′} → single-≃ (same sw) si {q} {e} {e′}) , (λ {c} {q} {e} → endlast-≃ (same sw) el {c} {q} {e}) , nl , (λ t {q} {e} → empty-≃ (same sw) (ov t) {q} {e})
+                      ; node = λ { true (go , gl , qe , si , el , nl , ov , pa) → node sw true go , gl , qe , (λ {q} {e} {e′} → single-≃ (same sw) si {q} {e} {e′}) , (λ {c} {q} {e} → endlast-≃ (same sw) el {c} {q} {e}) , nl , (λ t {q} {e} → empty-≃ (same sw) (ov t) {q} {e}) , parts-≃ (same sw) (≈ᴸ-refl (rowsL ls)) pa
                                  ; false (go , gl , qe , _) → node sw false go , gl , qe , tt } }) g
 good-swap (inOuter (mergeᶠ (just _)) f d n q ls c) sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ())) g
 good-swap (inOuter switchᶠ f d n q ls c)  sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ())) g
 good-swap (inOuter exhaustᶠ f d n q ls c) sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ())) g
 good-swap (inLanes (mergeᶠ nothing) f d n q o pre post c) {s} {s′} sw g =
   good-swap c {s = flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post)} {s′ = flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s′ ∷ post)} (record { same = flat-≃ _ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL post))) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ ()
-                      ; node = λ { true (go , gl , qe , si , el , nl , ov) → go , goodL-swap pre (lane sw true) gl , qe , si , el , trans nl (live-swap pre (live≡ sw)) , ov
+                      ; node = λ { true (go , gl , qe , si , el , nl , ov , pa) → go , goodL-swap pre (lane sw true) gl , qe , si , el , trans nl (live-swap pre (live≡ sw)) , ov , parts-≃ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL post))) pa
                                  ; false (go , gl , qe , _) → go , goodL-swap pre (lane sw false) gl , qe , tt } }) g
 good-swap (inLanes (mergeᶠ (just _)) f d n q o pre post c) sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ())) g
 good-swap (inLanes switchᶠ f d n q o pre post c)  sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ())) g

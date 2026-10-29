@@ -286,6 +286,20 @@ live : ∀ {Γ A} → List (St Γ A) → ℕ
 live []       = 0
 live (s ∷ ls) = if alive s then suc (live ls) else live ls
 
+-- No position owed by both.
+Apart : ∀ {X Y} → EmissionSet X → EmissionSet Y → Set
+Apart t u = ∀ {q e e′} → t q e → u q e′ → ⊥
+
+-- Each lane apart from every later one.
+Spread : ∀ {B} → List (EmissionSet B) → Set
+Spread []       = ⊤
+Spread (t ∷ Ls) = Apart t (Lanes Ls) × Spread Ls
+
+-- A merge's outer and lanes, all apart: a tie between them is never a
+-- row of both, so the race's winner leads the losers strictly.
+Parts : ∀ {A B} → EmissionSet A → List (EmissionSet B) → Set
+Parts O Ls = Apart O (Lanes Ls) × Spread Ls
+
 -- Asked of a live node only.
 Live : Bool → Set → Set
 Live true  X = X
@@ -293,6 +307,8 @@ Live false X = ⊤
 
 -- The fragment's shape everywhere, its row facts only where live: under
 -- a cut switched off nothing is owed, so nothing there is asked to agree.
+--
+-- REFUTED: 85ad69b9 found-lead without the parts apart, by a merge whose outer and lane are empty ofs at one position
 mutual
   G : ∀ {Γ A} → Bool → St Γ A → Set
   G b (pend o)                              = Frag o
@@ -301,7 +317,7 @@ mutual
   G b (mapS f s)                            = G b s
   G b (cutS l a s)                          = G (b ∧ l) s
   G b (flatS (mergeᶠ nothing) f d n q o ls) =
-    G b o × GL b ls × q ≡ [] × Live b (Single (rows o) × EndLast (rows o) × n ≡ live ls × (T d → Empty (rows o)))
+    G b o × GL b ls × q ≡ [] × Live b (Single (rows o) × EndLast (rows o) × n ≡ live ls × (T d → Empty (rows o)) × Parts (rows o) (rowsL ls))
   G b _                                     = ⊥
 
   GL : ∀ {Γ A} → Bool → List (St Γ A) → Set
@@ -630,7 +646,7 @@ mutual
   seek-ok c (cutS false a s)         _ = seek-off c a s
   seek-ok c (cutS true (attAt p) s)  g =
     own-first (_ , _ , c , cutS true (attAt p) s) attM (after p) _ (kept (seek (inCut true (attAt p) c) s) (seek-ok (inCut true (attAt p) c) s g))
-  seek-ok c (flatS (mergeᶠ nothing) f d n .[] o ls) (go , gl , refl , sO , eO , nl , ov) =
+  seek-ok c (flatS (mergeᶠ nothing) f d n .[] o ls) (go , gl , refl , sO , eO , nl , ov , _) =
     Race.race-ok (λ a → pendRows (f a)) (rows o) (rowsL ls) d n sO eO (counts ls gl nl ov)
       (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)
       (seek-ok (inOuter (mergeᶠ nothing) f d n [] ls c) o go) (lanes-ok c f d n o [] ls gl)
