@@ -22,7 +22,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-split)
-open import denotation.EmissionSet using (EmissionSet; DenEnv; Ev; out; skip; end; _≺_; MapT; map-out; map-skip; map-end; at-out; at-end)
+open import denotation.EmissionSet using (EmissionSet; DenEnv; Ev; Truncate; out; skip; end; _≺_; MapT; map-out; map-skip; map-end; at-out; at-end)
 open import operation.Key using (Key; at; _<ᴷ_; ≮ᴷ-trans; at-<ᵖ; clash)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Cand; found; Mark; ofM; attM; Att; Out; still; shows; nx; cp; seek; search; kids; lanes; own; ownBest; first; retag;
@@ -31,7 +31,7 @@ open Machine using (St; Ctx; Cand; found; Mark; ofM; attM; Att; Out; still; show
                     top; inMap; inCut; inLn; inOuter; inLanes)
 open import adequacy.Rows using (env; rows; rowsL; pendRows; toEv; Lanes; Each; module Flat)
 open import adequacy.Bound using (_⊑_; ⊑i; ⊑-refl; ⊑-trans; <→⊑; ext-⊑; From; Bd; OK; OKL; Live;
-                                         Apart; Spread; Parts; rooted-parts; MergeG; G; GL; GLn; Good; ofPos; from-weak; seek-ok; seek-ln; lane-ok; lanes-ok)
+                                         Apart; Spread; Parts; rooted-parts; ⊑→≼; join-ok; MergeG; G; GL; GLn; Good; ofPos; from-weak; seek-ok; seek-ln; lane-ok; lanes-ok)
 open import adequacy.Skip using (After; LeadC)
 
 open _⊑_
@@ -188,6 +188,16 @@ first-leads (just x)           nothing              lx ly = lx
 first-leads (just (f , h , o)) (just (g , h′ , o′)) lx ly with h′ <ᴷ h
 ... | true  = ly
 ... | false = lx
+
+-- Read as entered: the winner's own row has nothing of its node before it.
+leads-trunc : ∀ {R Γ A} v {c : Ctx R Γ A} {t : EmissionSet A} (y : Maybe (Cand R A)) → Live v (OK t y) → Leads v c t y → Leads v c (Truncate t) y
+leads-trunc v     nothing                                  _ _       = tt₁
+leads-trunc false (just (found (_ , _ , c′ , s′) m κ , K , o)) _ (e , _) = e , tt
+leads-trunc true  {t = t} (just (found (_ , _ , c′ , s′) m κ , K , o)) b (e , l) = e , λ cl P oa → proj₁ (l cl P oa) , tr (proj₂ (l cl P oa))
+  where
+    tr : ∀ {P} → Tight t P K o → Tight (Truncate t) P K o
+    tr (strict lt)        = strict lt
+    tr (tie Q refl pq oc) = tie Q refl pq (occ-bind oc λ r fe → hit (r , ([] , λ {k} y lt → ⊥-elim (⊑→≼ {Q} {k} (Bd.from b y) lt))) fe)
 
 ------------------------------------------------------------------------
 -- One frame
@@ -412,20 +422,23 @@ mutual
   kids-lead v c (cutS false a s) g = cut-off v (seek (inCut false a c) s) (seek-lead (v Data.Bool.∧ false) (inCut false a c) s g)
   kids-lead true c (flatS (mergeᶠ nothing) f d n q o ls) m with MergeG.fresh m
   ... | refl =
-    Race.race-leads true c f d n o ls
+    leads-trunc true (raceT d n [] (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls))
+      (join-ok c f d n o ls m)
+    (Race.race-leads true c f d n o ls
       (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)
       (seek-lead true (inOuter (mergeᶠ nothing) f d n [] ls c) o outer)
       (lanes-lead true c f d n o [] ls lanesG (proj₂ (rooted-parts rooted)))
       (seek-ok (inOuter (mergeᶠ nothing) f d n [] ls c) o outer)
       (lanes-ok c f d n o [] ls lanesG)
-      (rooted-parts rooted)
+      (rooted-parts rooted))
     where open MergeG m
   kids-lead false c (flatS (mergeᶠ nothing) f d n q o ls) m with MergeG.fresh m
   ... | refl =
-    Race.race-leads false c f d n o ls
+    leads-trunc false (raceT d n [] (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)) tt
+    (Race.race-leads false c f d n o ls
       (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)
       (seek-lead false (inOuter (mergeᶠ nothing) f d n [] ls c) o (MergeG.outer m))
-      (lanes-lead false c f d n o [] ls (MergeG.lanesG m) tt) tt tt tt
+      (lanes-lead false c f d n o [] ls (MergeG.lanesG m) tt) tt tt tt)
   kids-lead v c (ofS _ _ _)      _ = tt₁
   kids-lead v c doneS            _ = tt₁
   kids-lead v c (pend _)         _ = tt₁

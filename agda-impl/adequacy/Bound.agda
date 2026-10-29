@@ -22,14 +22,13 @@ open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁; tt to tt₁)
-open import Level using (Lift)
 open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (ofᴱ)
 open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-asym; <ᵖ-split; <ᵖ-step; <ᵖ-shift; <ᵖ-below; <ᵖ-part; <ᵖ-ix)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; InE; at-out; at-end; on-out; MapT; map-out; map-skip; map-end; DenEnv)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; Truncate; InE; at-out; at-end; on-out; MapT; map-out; map-skip; map-end; DenEnv)
 open import denotation.Laws.Modulus using (≼-refl)
 open import denotation.Laws.Worlds using (InvAt; Hots; W; inW; plain-ix; apart-w) renaming (⊑-refl to ⊑ᵖ-refl)
 open import operation.Key using (Key; at; after; _<ᴷ_; ≮ᴷ-trans; <ᴷ-trans; <ᴷ-irrefl; at-<ᵖ; clash)
@@ -37,7 +36,7 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed;
                     free; cpAt; cutAt; overAt; inScan; inTake; inSrc; inBody;
                     ofS; doneS; mapS; cutS; lnS; flatS; coldS; scanS; takeS; connS; joinS; inMap; inCut; inLn; inOuter; inLanes; nx; cp; attached; attAt; attM; pend) renaming (Ev to Evᴹ; over to overᶜ)
-open import adequacy.Rows using (Frag; rows; rowsL; pendRows; toEv; Gone; Lanes; Each; reads; module Flat)
+open import adequacy.Rows using (rows; rowsL; pendRows; toEv; Gone; Lanes; Each; reads; module Flat)
 
 ------------------------------------------------------------------------
 -- Keys
@@ -368,29 +367,28 @@ module _ {Γ A B} {ρ : DenEnv Γ} {O : EmissionSet A} {Ls : List (EmissionSet B
   rooted-parts : Parts O Ls
   rooted-parts = (λ oy l → let (q , _ , a , xq , w) = root-of qs Ls roots l in under xq (sub oy) plain-ix (inW w) (⊑ᵖ-refl _)) , spread qs Ls roots
 
--- A merge node: its outer and lanes good, nothing queued, its lanes in
--- the fragment; where live, its count, its done outer owing nothing, and
--- its parts rooted at the outer's entry.
+-- A merge node: its outer and lanes good, nothing queued; where live,
+-- its count, its done outer owing nothing, and its parts rooted at the
+-- outer's entry.
 record MergeG {Γ A B} (Go Gl : Set₁) (ρ : DenEnv Γ) (b : Bool) (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (q : List A) (o : St Γ A) (ls : List (St Γ B)) : Set₁ where
   field
     outer  : Go
     lanesG : Gl
     fresh  : q ≡ []
-    inFrag : ∀ a → Frag (f a)
     count  : Live b (n ≡ live ls)
     spent  : Live b (T d → Empty (rows ρ o))
     rooted : Live₁ b (Rooted ρ (rows ρ o) (rowsL ρ ls))
 
 -- Off: only the shape.
-mergeG₀ : ∀ {Γ A B Go Gl} {ρ : DenEnv Γ} {f : A → Obs Timeline Γ B} {d n q o} {ls : List (St Γ B)} → Go → Gl → q ≡ [] → (∀ a → Frag (f a)) → MergeG Go Gl ρ false f d n q o ls
-mergeG₀ go gl qe fa = record { outer = go ; lanesG = gl ; fresh = qe ; inFrag = fa ; count = tt ; spent = tt ; rooted = tt₁ }
+mergeG₀ : ∀ {Γ A B Go Gl} {ρ : DenEnv Γ} {f : A → Obs Timeline Γ B} {d n q o} {ls : List (St Γ B)} → Go → Gl → q ≡ [] → MergeG Go Gl ρ false f d n q o ls
+mergeG₀ go gl qe = record { outer = go ; lanesG = gl ; fresh = qe ; count = tt ; spent = tt ; rooted = tt₁ }
 
 -- The same merge over other parts, its facts carried.
 mergeG-map : ∀ {Γ A B Go Gl Go′ Gl′} {ρ : DenEnv Γ} {b} {f : A → Obs Timeline Γ B} {d n n′ q} {o o′ : St Γ A} {ls ls′ : List (St Γ B)}
            → (Go → Go′) → (Gl → Gl′) → (Live b (n ≡ live ls) → Live b (n′ ≡ live ls′)) → (Live b (T d → Empty (rows ρ o)) → Live b (T d → Empty (rows ρ o′)))
            → (Live₁ b (Rooted ρ (rows ρ o) (rowsL ρ ls)) → Live₁ b (Rooted ρ (rows ρ o′) (rowsL ρ ls′)))
            → MergeG Go Gl ρ b f d n q o ls → MergeG Go′ Gl′ ρ b f d n′ q o′ ls′
-mergeG-map ho hl hc hs hr m = record { outer = ho outer ; lanesG = hl lanesG ; fresh = fresh ; inFrag = inFrag ; count = hc count ; spent = hs spent ; rooted = hr rooted }
+mergeG-map ho hl hc hs hr m = record { outer = ho outer ; lanesG = hl lanesG ; fresh = fresh ; count = hc count ; spent = hs spent ; rooted = hr rooted }
   where open MergeG m
 
 -- The fragment's shape everywhere, its row facts only where live: under
@@ -399,7 +397,7 @@ mergeG-map ho hl hc hs hr m = record { outer = ho outer ; lanesG = hl lanesG ; f
 -- REFUTED: 85ad69b9 found-lead without the parts apart, by a merge whose outer and lane are empty ofs at one position
 mutual
   G : ∀ {Γ A} → DenEnv Γ → Bool → St Γ A → Set₁
-  G ρ b (pend o)                              = Lift _ (Frag o)
+  G ρ b (pend o)                              = ⊤₁
   G ρ b (ofS i p xs)                          = ⊤₁
   G ρ b doneS                                 = ⊤₁
   G ρ b (mapS f s)                            = G ρ b s
@@ -437,7 +435,7 @@ mutual
   shape doneS                                     g = g
   shape (mapS f s)                                g = shape s g
   shape {v = v} (cutS l a s)                      g = shape {v = v ∧ l} s g
-  shape (flatS (mergeᶠ nothing) f d n q o ls)     m = mergeG₀ (shape o outer) (shapeL ls lanesG) fresh inFrag
+  shape (flatS (mergeᶠ nothing) f d n q o ls)     m = mergeG₀ (shape o outer) (shapeL ls lanesG) fresh
     where open MergeG m
   shape (flatS (mergeᶠ (just _)) f d n q o ls)    ()
   shape (flatS switchᶠ f d n q o ls)              ()
@@ -723,6 +721,14 @@ module Race {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (L
   ... | true  = outer-wins f h o b (from-weak Ls (shift-< h k lt) (proj₁ bl))
   ... | false = lane-wins g k o′ (λ r → ⊑-trans (⊑i lt) (from b r)) bl
 
+-- As entered: nothing lies before where a mark is keyed, so what it
+-- shows has nothing before it.
+ok-trunc : ∀ {R A} {t : EmissionSet A} (x : Maybe (Cand R A)) → OK t x → OK (Truncate t) x
+ok-trunc nothing            e (r , _) = e r
+ok-trunc (just (f , K , o)) b =
+  record { from = λ (r , _) → from b r ; mark = mark b
+         ; shown = λ eq → let (q , k , r) = shown b eq in q , k , r , ([] , λ {k′} y lt → ⊥-elim (⊑→≼ (subst (_⊑ at k′) k (from b y)) lt)) }
+
 ------------------------------------------------------------------------
 -- Every node
 
@@ -744,7 +750,12 @@ mutual
   seek-ok c (cutS true (attAt p) s)  g =
     own-first (_ , _ , c , cutS true (attAt p) s) attM (after p) _ (kept (seek (inCut true (attAt p) c) s) (seek-ok (inCut true (attAt p) c) s g))
   seek-ok {ρ = ρ} c (flatS (mergeᶠ nothing) f d n q o ls) m with MergeG.fresh m
-  ... | refl =
+  ... | refl = ok-trunc (raceT d n [] (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)) (join-ok c f d n o ls m)
+
+  -- The joiner before it is entered.
+  join-ok : ∀ {R Γ A B} {ρ : DenEnv Γ} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) d n (o : St Γ A) ls → Good ρ (flatS (mergeᶠ nothing) f d n [] o ls)
+          → OK (Flat.JoinT (λ a → pendRows ρ (f a)) (rows ρ o) d (rowsL ρ ls)) (raceT d n [] (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls))
+  join-ok {ρ = ρ} c f d n o ls m =
     Race.race-ok (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) (counts ls lanesG count spent)
       (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)
       (seek-ok (inOuter (mergeᶠ nothing) f d n [] ls c) o outer) (lanes-ok c f d n o [] ls lanesG)

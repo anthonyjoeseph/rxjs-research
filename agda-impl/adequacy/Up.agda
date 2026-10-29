@@ -14,7 +14,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos)
-open import denotation.EmissionSet using (EmissionSet; MapT; map-out; map-skip; map-end; DenEnv; module Connecting)
+open import denotation.EmissionSet using (EmissionSet; Truncate; Few; MapT; map-out; map-skip; map-end; DenEnv; module Connecting)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; St; CS; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (up; env; rows; Hot; pendRows; Vis; Plus; old; new; rowsL; Gone; Lanes; Each; module Flat; _≃_; _⇄_; ≃-sym)
@@ -116,6 +116,18 @@ flat-≃ : ∀ {A B : Set} (L : A → Pos → EmissionSet B) {O O′ : EmissionS
        → Flat.JoinT L O d Ls ≃ Flat.JoinT L O′ d Ls′
 flat-≃ L eo es = flat L eo es ⇄ flat L (≃-sym eo) (≈ᴸ-sym es)
 
+-- Fewer rows: no more before any position.
+few-⊆ : ∀ {A} {t u : EmissionSet A} → (∀ {k e} → u k e → t k e) → ∀ {q} → Few t q → Few u q
+few-⊆ h (ks , f) = ks , λ x lt → f (h x) lt
+
+trunc-≃ : ∀ {A} {t u : EmissionSet A} → t ≃ u → Truncate t ≃ Truncate u
+trunc-≃ eq = (λ (r , fw) → to eq r , few-⊆ (from eq) fw) ⇄ (λ (r , fw) → from eq r , few-⊆ (to eq) fw)
+
+-- The same outer and the same lanes: the same merge, as entered.
+row-≃ : ∀ {A B : Set} (L : A → Pos → EmissionSet B) {O O′ : EmissionSet A} {d} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′
+      → Flat.RowT L O d Ls ≃ Flat.RowT L O′ d Ls′
+row-≃ L eo es = trunc-≃ (flat-≃ L eo es)
+
 map-≃ : ∀ {A B} (f : A → B) {t u : EmissionSet A} → t ≃ u → MapT f t ≃ MapT f u
 map-≃ f eq = go (to eq) ⇄ go (from eq)
   where
@@ -150,11 +162,11 @@ up-≃ (inCut false a c)                                eq = ≃-refl
 up-≃ (inLn true c)                                    eq = up-≃ c eq
 up-≃ (inLn false c)                                   eq = ≃-refl
 up-≃ (inTake i p w c)                                 eq = ≃-refl
-up-≃ (inOuter (mergeᶠ nothing) f d n q ls c)          eq = up-≃ c (flat-≃ (λ a → pendRows (env c) (f a)) eq (≈ᴸ-refl (rowsL (env c) ls)))
+up-≃ (inOuter (mergeᶠ nothing) f d n q ls c)          eq = up-≃ c (row-≃ (λ a → pendRows (env c) (f a)) eq (≈ᴸ-refl (rowsL (env c) ls)))
 up-≃ (inOuter (mergeᶠ (just _)) f d n q ls c)         eq = ≃-refl
 up-≃ (inOuter switchᶠ f d n q ls c)                   eq = ≃-refl
 up-≃ (inOuter exhaustᶠ f d n q ls c)                  eq = ≃-refl
-up-≃ (inLanes (mergeᶠ nothing) f d n q o pre post c)  eq = up-≃ c (flat-≃ (λ a → pendRows (env c) (f a)) ≃-refl (ʳ++-≈ (rowsL (env c) pre) (eq ∷ ≈ᴸ-refl (rowsL (env c) post))))
+up-≃ (inLanes (mergeᶠ nothing) f d n q o pre post c)  eq = up-≃ c (row-≃ (λ a → pendRows (env c) (f a)) ≃-refl (ʳ++-≈ (rowsL (env c) pre) (eq ∷ ≈ᴸ-refl (rowsL (env c) post))))
 up-≃ (inLanes (mergeᶠ (just _)) f d n q o pre post c) eq = ≃-refl
 up-≃ (inLanes switchᶠ f d n q o pre post c)           eq = ≃-refl
 up-≃ (inLanes exhaustᶠ f d n q o pre post c)          eq = ≃-refl
