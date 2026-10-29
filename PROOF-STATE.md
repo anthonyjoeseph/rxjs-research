@@ -69,10 +69,11 @@ Members: `found-mark`, `abs-att`, `rise-outer-nx`, `rise-outer-cp`,
 
 #### THE SUBSCRIPTIONS ENTERED
 
-Believed: subscribing to `empty`, `of`, `map` or a merge enters exactly
-the rows its emission set begins with. Settled when each is a body.
+Believed: subscribing to `empty` or `of` enters exactly the rows its
+emission set begins with, those rows placed behind every ancestor's parts
+so its merges stay apart and end last. Settled when each is a body.
 
-Members: `sub-empty`, `sub-of`, `sub-map`, `sub-merge`.
+Members: `sub-empty`, `sub-of`.
 
 #### THE KEYS
 

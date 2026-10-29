@@ -30,12 +30,14 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
                     renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (Frag; rows; RT; toEv; Visible; Vis; Past; Plus; old; new; _≃_; _⇄_; silent; shown; Steps;
   Shows*; Shows*-≃; ≃-sym; conv; []; _∷_; tau; val; fin)
-open import adequacy.Bound using (Good)
+open import adequacy.Bound using (Good; G)
 open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
 open import adequacy.Skip using (After)
 open import adequacy.Inv using (Inv; inv; good; Sim; Ends; GoodF; good-split; open-alive)
 open import adequacy.LaneCp using (rise-lane-cp)
 open import adequacy.AbsOf using (abs-of)
+open import adequacy.Owes using (Swap; good-swap)
+open import adequacy.Enter using (enter-map; enter-merge; flat-∅)
 
 pend-good : ∀ {R Γ A} (c : Ctx R Γ A) o → GoodF c (pend o) → Frag o
 pend-good (inLanes op f d n q o′ pre post c) o ()
@@ -55,9 +57,25 @@ pend-good (inBody k o′ c)    o g = g
 postulate
   sub-empty : ∀ {R Γ A} (c : Ctx R Γ A) p → Sim ⟨ c , pend empty , subscribing , p ⟩ [] ⟨ c , ofS 0 p [] , absorbed , p ⟩
   sub-of    : ∀ {R Γ A} (c : Ctx R Γ A) xs p → Sim ⟨ c , pend (of xs) , subscribing , p ⟩ [] ⟨ c , ofS 0 p xs , absorbed , p ⟩
-  sub-map   : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → B) s p → Sim ⟨ c , pend (map f s) , subscribing , p ⟩ [] ⟨ inMap f c , pend s , subscribing , p ⟩
-  sub-merge : ∀ {R Γ A B} (c : Ctx R Γ B) f (s : Obs Timeline Γ A) p
-            → Sim ⟨ c , pend (flatMap (mergeᶠ nothing) f s) , subscribing , p ⟩ [] ⟨ inCut true (attAt p) (inOuter (mergeᶠ nothing) f false 0 [] [] c) , pend s , subscribing , p ⟩
+
+-- A map entered: its source pending under it.
+sub-map : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → B) s p → Sim ⟨ c , pend (map f s) , subscribing , p ⟩ [] ⟨ inMap f c , pend s , subscribing , p ⟩
+sub-map c f s p (inv g (uc , _)) = inv (good-swap c sw g) (uc , tt) , silent (vis-≃ (up-≃ c (enter-map f s p)))
+  where
+    sw : Swap (pend (map f s)) (mapS f (pend s))
+    sw = record { same = (λ ()) ⇄ (λ { (map-out ()) ; (map-skip ()) ; (map-end ()) }) ; live≡ = refl ; node = λ _ x → x ; lane = λ _ () ; body = λ _ _ () }
+
+-- A merge entered: its outer pending under it, attached at `p`, nothing begun.
+sub-merge : ∀ {R Γ A B} (c : Ctx R Γ B) f (s : Obs Timeline Γ A) p
+          → Sim ⟨ c , pend (flatMap (mergeᶠ nothing) f s) , subscribing , p ⟩ [] ⟨ inCut true (attAt p) (inOuter (mergeᶠ nothing) f false 0 [] [] c) , pend s , subscribing , p ⟩
+sub-merge c f s p (inv g (uc , _)) = inv (good-swap c sw g) ((tt , uc) , tt) , silent (vis-≃ (up-≃ c (enter-merge f s p fr)))
+  where
+    fr = pend-good c _ (proj₂ (good-split c _ g))
+    node′ : ∀ v → G v (pend (flatMap (mergeᶠ nothing) f s)) → G v (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt p) (pend s)) [])
+    node′ true  (ff , fs) = fs , tt , refl , ff , (λ ()) , (λ ()) , refl , (λ ()) , ((λ ()) , tt)
+    node′ false (ff , fs) = fs , tt , refl , ff , tt
+    sw : Swap (pend (flatMap (mergeᶠ nothing) f s)) (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt p) (pend s)) [])
+    sw = record { same = ≃-sym (flat-∅ _ false) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () }
 
 stay : ∀ {R} {k : Conf R} → Sim k [] k
 stay i = i , silent ((λ x → x) ⇄ (λ x → x))

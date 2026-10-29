@@ -309,7 +309,7 @@ mutual
   G b (mapS f s)                            = G b s
   G b (cutS l a s)                          = G (b ∧ l) s
   G b (flatS (mergeᶠ nothing) f d n q o ls) =
-    G b o × GL b ls × q ≡ [] × Live b (Single (rows o) × EndLast (rows o) × n ≡ live ls × (T d → Empty (rows o)) × Parts (rows o) (rowsL ls))
+    G b o × GL b ls × q ≡ [] × (∀ a → Frag (f a)) × Live b (Single (rows o) × EndLast (rows o) × n ≡ live ls × (T d → Empty (rows o)) × Parts (rows o) (rowsL ls))
   G b _                                     = ⊥
 
   GL : ∀ {Γ A} → Bool → List (St Γ A) → Set
@@ -342,7 +342,7 @@ mutual
   shape doneS                                     g = g
   shape (mapS f s)                                g = shape s g
   shape {v = v} (cutS l a s)                      g = shape {v = v ∧ l} s g
-  shape (flatS (mergeᶠ nothing) f d n q o ls)     (go , gl , qe , _) = shape o go , shapeL ls gl , qe , tt
+  shape (flatS (mergeᶠ nothing) f d n q o ls)     (go , gl , qe , fa , _) = shape o go , shapeL ls gl , qe , fa , tt
   shape (flatS (mergeᶠ (just _)) f d n q o ls)    ()
   shape (flatS switchᶠ f d n q o ls)              ()
   shape (flatS exhaustᶠ f d n q o ls)             ()
@@ -641,7 +641,7 @@ mutual
   seek-ok c (cutS false a s)         _ = seek-off c a s
   seek-ok c (cutS true (attAt p) s)  g =
     own-first (_ , _ , c , cutS true (attAt p) s) attM (after p) _ (kept (seek (inCut true (attAt p) c) s) (seek-ok (inCut true (attAt p) c) s g))
-  seek-ok c (flatS (mergeᶠ nothing) f d n .[] o ls) (go , gl , refl , sO , eO , nl , ov , _) =
+  seek-ok c (flatS (mergeᶠ nothing) f d n .[] o ls) (go , gl , refl , _ , sO , eO , nl , ov , _) =
     Race.race-ok (λ a → pendRows (f a)) (rows o) (rowsL ls) d n sO eO (counts ls gl nl ov)
       (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)
       (seek-ok (inOuter (mergeᶠ nothing) f d n [] ls c) o go) (lanes-ok c f d n o [] ls gl)

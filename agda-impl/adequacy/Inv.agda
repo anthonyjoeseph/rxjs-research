@@ -270,12 +270,12 @@ dead-swap (inCut true a c)  dd sw g =
 dead-swap (inLn b c)        dd sw g = dead-swap c dd (record { node₀ = λ () ; lane₀ = body₀ sw b ; body₀ = λ _ () }) g
 dead-swap (inTake i q w c)  dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inOuter (mergeᶠ nothing) f d n q ls c) dd sw g =
-  dead-swap c dd (record { node₀ = λ { (go , gl , qe , _) → node₀ sw go , gl , qe , tt } ; lane₀ = λ () ; body₀ = λ _ () }) g
+  dead-swap c dd (record { node₀ = λ { (go , gl , qe , fa , _) → node₀ sw go , gl , qe , fa , tt } ; lane₀ = λ () ; body₀ = λ _ () }) g
 dead-swap (inOuter (mergeᶠ (just _)) f d n q ls c) dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inOuter switchᶠ f d n q ls c)  dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inOuter exhaustᶠ f d n q ls c) dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inLanes (mergeᶠ nothing) f d n q o pre post c) dd sw g =
-  dead-swap c dd (record { node₀ = λ { (go , gl , qe , _) → go , goodL-swap pre (lane₀ sw) gl , qe , tt } ; lane₀ = λ () ; body₀ = λ _ () }) g
+  dead-swap c dd (record { node₀ = λ { (go , gl , qe , fa , _) → go , goodL-swap pre (lane₀ sw) gl , qe , fa , tt } ; lane₀ = λ () ; body₀ = λ _ () }) g
 dead-swap (inLanes (mergeᶠ (just _)) f d n q o pre post c) dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inLanes switchᶠ f d n q o pre post c)  dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inLanes exhaustᶠ f d n q o pre post c) dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
