@@ -16,12 +16,21 @@ open import denotation.MonotonicList.Events using (Pos)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; MapT; map-out; map-skip; map-end)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Direct using (up; rows; rowsL; pendRows; Gone; Lanes; Each; module Flat; _≃_; _⇄_; ≃-sym)
+open import adequacy.Direct using (up; rows; Vis; Plus; old; new; rowsL; pendRows; Gone; Lanes; Each; module Flat; _≃_; _⇄_; ≃-sym)
 
 open _≃_
 
 ≃-refl : ∀ {A} {t : EmissionSet A} → t ≃ t
 ≃-refl = (λ x → x) ⇄ (λ x → x)
+
+≃-trans : ∀ {A} {t u v : EmissionSet A} → t ≃ u → u ≃ v → t ≃ v
+≃-trans a b = (λ r → to b (to a r)) ⇄ (λ r → from a (from b r))
+
+vis-≃ : ∀ {A} {t u : EmissionSet A} → t ≃ u → Vis t ≃ Vis u
+vis-≃ eq = (λ { (r , v) → to eq r , v }) ⇄ (λ { (r , v) → from eq r , v })
+
+plus-≃ : ∀ {A} {t u : EmissionSet A} {p e} → t ≃ u → Plus t p e ≃ Plus u p e
+plus-≃ eq = (λ { (old r) → old (to eq r) ; new → new }) ⇄ (λ { (old r) → old (from eq r) ; new → new })
 
 -- Two lists of lanes, lane by lane the same rows.
 data _≈ᴸ_ {B : Set} : List (EmissionSet B) → List (EmissionSet B) → Set₁ where

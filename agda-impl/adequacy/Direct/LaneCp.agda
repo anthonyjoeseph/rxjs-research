@@ -29,24 +29,13 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; ⟨_,_,_,_⟩; plug; absorbed; rising; cp; alive; ended; dequeue; settle; Att;
                     cutS; lnS; flatS; inLanes)
 open import adequacy.Direct using (∅; up; here; rows; rowsL; pendRows; Vis; Plus; old; new; Lanes; Each; module Flat; _≃_; _⇄_; ≃-sym; Moves; silent)
-open import adequacy.Direct.Up using (any-ʳ++ˡ; any-ʳ++ʳ; all-ʳ++; ≈ᴸ-refl; _∷_; flat-≃; up-≃; ≃-refl)
+open import adequacy.Direct.Up using (any-ʳ++ˡ; any-ʳ++ʳ; all-ʳ++; ≈ᴸ-refl; _∷_; flat-≃; up-≃; ≃-refl; ≃-trans; vis-≃; plus-≃)
 open import adequacy.Direct.Bound using (Empty; Single; EndLast; Good; GoodL; on; off; lane-v; live; dead-empty)
 open import adequacy.Direct.Skip using (After; Since; LeadC; _≈⟨_⟩_; ≈-vis; up-≈)
 open import adequacy.Direct.LaneEnd using (frame-≈; done-at; outer-owes; lanes-owe; since-x; since-y)
 open import adequacy.Direct.Owes using (Owing; Owes; OwesL; UpO; Swap; owes-join; need-of; owesL-ʳ++; rowsL-ʳ++; ≡→≃; owing-≃; empty-≃;
                                         flat-owing-o; flat-owing-l; flat-empty; live-ʳ++; live-owing; goodL-ʳ++⁻; goodL-swap; lanes-≃; good-swap)
 open import adequacy.Direct.Inv using (Inv; inv; Sim; good-split; node-good)
-
-open _≃_
-
-≃-trans : ∀ {A} {t u v : EmissionSet A} → t ≃ u → u ≃ v → t ≃ v
-≃-trans a b = (λ r → to b (to a r)) ⇄ (λ r → from a (from b r))
-
-vis-≃ : ∀ {A} {t u : EmissionSet A} → t ≃ u → Vis t ≃ Vis u
-vis-≃ eq = (λ { (r , v) → to eq r , v }) ⇄ (λ { (r , v) → from eq r , v })
-
-plus-≃ : ∀ {A} {t u : EmissionSet A} {p e} → t ≃ u → Plus t p e ≃ Plus u p e
-plus-≃ eq = (λ { (old r) → old (to eq r) ; new → new }) ⇄ (λ { (old r) → old (from eq r) ; new → new })
 
 module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St Γ A) (pre post : List (St Γ B)) (c : Ctx R Γ B)
           (a : Att) (s₀ : St Γ B) (p : Pos)

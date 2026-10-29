@@ -32,10 +32,11 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
 open import adequacy.Direct using (Frag; rows; up; RT; here; pendRows; toEv; Visible; Vis; Past; Plus; old; new; _≃_; _⇄_; Moves; silent; shown;
                                    Steps; Shows*; Shows*-≃; ≃-sym; conv; []; _∷_)
 open import adequacy.Direct.Bound using (Good)
-open import adequacy.Direct.Up using (up-≃; ≃-refl)
+open import adequacy.Direct.Up using (up-≃; ≃-refl; vis-≃)
 open import adequacy.Direct.Skip using (After)
 open import adequacy.Direct.Inv using (Inv; inv; good; Sim; Ends; GoodF; good-split; open-alive)
 open import adequacy.Direct.LaneCp using (rise-lane-cp)
+open import adequacy.Direct.AbsOf using (abs-of)
 
 pend-good : ∀ {R Γ A} (c : Ctx R Γ A) o → GoodF c (pend o) → Frag o
 pend-good (inLanes op f d n q o′ pre post c) o ()
@@ -108,10 +109,6 @@ rise-top s e p (inv g (_ , _ , os , _ , ld , _)) | true = inv g os , shown (new 
     to′ ((new , pp) , v)  = ⊥-elim (≺-irrefl {p} pp)
     from′ : ∀ {q e′} → Vis (rows s) q e′ → Vis (Past p (Plus (rows s) p (toEv e))) q e′
     from′ (r , v) = (old r , ld r) , v
-
-vis-≃ : ∀ {A} {t u : EmissionSet A} → t ≃ u → Vis t ≃ Vis u
-vis-≃ eq = (λ { (r , v) → to eq r , v }) ⇄ (λ { (r , v) → from eq r , v })
-  where open _≃_
 
 after-map : ∀ {A B} (f : A → B) {t : EmissionSet A} {p} → After p t → After p (MapT f t)
 after-map f a (map-out r)  = a r
@@ -213,10 +210,6 @@ postulate
   -- WHAT A GOOD TREE'S SEARCH FINDS: an of's next, or a switch's attach.
   found-mark : ∀ {R Γ′ A′} (c : Ctx R Γ′ A′) s {Γ A c′ s′ m κ} → Good (plug c s) → search top (plug c s) ≡ just (found (Γ , A , c′ , s′) m κ) → Marked s′ m
 
-  -- AN OF'S NEXT RUN: the least row, risen.
-  abs-of : ∀ {R Γ′ A′ Γ A} {c : Ctx R Γ′ A′} {s} {c′ : Ctx R Γ A} {i p₀ xs κ k′ sh t} p
-         → search top (plug c s) ≡ just (found (Γ , A , c′ , ofS i p₀ xs) ofM κ) → run c′ (ofS i p₀ xs) ofM p ≡ moved k′ sh t
-         → Sim ⟨ c , s , absorbed , p ⟩ sh k′
   -- A SWITCH ATTACHED: nothing owed changes.
   abs-att : ∀ {R Γ′ A′ Γ A} {c : Ctx R Γ′ A′} {s} {c′ : Ctx R Γ A} {l p₀ s₀ κ k′ sh t} p
           → search top (plug c s) ≡ just (found (Γ , A , c′ , cutS l (attAt p₀) s₀) attM κ) → run c′ (cutS l (attAt p₀) s₀) attM p ≡ moved k′ sh t
