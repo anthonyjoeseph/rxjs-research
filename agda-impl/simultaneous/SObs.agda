@@ -23,7 +23,7 @@ open import Data.Maybe using (nothing)
 open import Data.Product using (_×_; _,_; proj₂)
 
 open import Tree using (Obs; Later; FlatOp; mergeᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList.Events using (Timeline)
+open import denotation.Events using (Timeline)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; delivery; valuesOf)
 
 SObs : List Set → Set → Set₁

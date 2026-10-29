@@ -56,7 +56,7 @@ open import Data.Product using (_×_; _,_)
 open import Data.Unit using (⊤; tt)
 open import IO.Primitive.Core using (pure; _>>=_)
 
-open import denotation.MonotonicList.Events using (Pos; ix)
+open import denotation.Events using (Pos; ix)
 open import operation.Key using (Key; _<ᴷ_)
 open import Tree using (Obs)
 

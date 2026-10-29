@@ -26,7 +26,7 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (¬_)
 
-open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; ix; <ᵖ-trans)
+open import denotation.Events using (Pos; _<ᵖ_; ix; <ᵖ-trans)
 open import denotation.EmissionSet using (out; skip; end; EmissionSet; Den; After)
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled using (Row; Listed; rows; short; concatMap; mapM; anyᵇ; endBy; values; outerRow; _≼ᵇ_;

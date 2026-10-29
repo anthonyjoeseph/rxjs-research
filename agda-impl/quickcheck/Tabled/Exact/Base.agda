@@ -22,7 +22,7 @@ open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 open import Relation.Nullary using (¬_; does; yes; no)
 
-open import denotation.MonotonicList.Events using (Pos; _<ᵖ_; _≟ᵖ_; ix; <ᵖ-trans; <ᵖ-irrefl)
+open import denotation.Events using (Pos; _<ᵖ_; _≟ᵖ_; ix; <ᵖ-trans; <ᵖ-irrefl)
 open import denotation.EmissionSet using (out; skip; end; EmissionSet; _≺_; _≼_)
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled

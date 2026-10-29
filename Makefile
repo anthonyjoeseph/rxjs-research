@@ -1,7 +1,7 @@
-.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build chain placing placing-count stepping kept-depth bg bg-check bg-wait \
+.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build bg bg-check bg-wait \
         wiring wiring-gate wiring-selftest unsafe-check dup-check dup-selftest \
         imports-check imports-fix imports-selftest comments-check comments-selftest \
-        roadmap-check roadmap-selftest port-check port-selftest old-denotation old-denotation-selftest find find-prose postulates notify split \
+        roadmap-check roadmap-selftest find find-prose postulates notify split \
         ts-check ts-lint ts-format-check ts-gate
 
 # UTF-8 locale for em-dashes and special characters in Agda output
@@ -38,19 +38,13 @@ help:
 	@echo "  gate          WHAT YOU TYPE: every cheap check, then Agda on Main"
 	@echo "  gate-cheap    the textual checks alone (seconds, no Agda)"
 	@echo "  agda          typecheck $(SRC)/Main.agda — everything Main reaches"
-	@echo "  check         typecheck one module and what IT imports:  make check F=simultaneous/Pure.agda"
+	@echo "  check         typecheck one module and what IT imports:  make check F=simultaneous/Statement.agda"
 	@echo "  bug-cache     compile the bug cache's runner and run every row"
 	@echo "  oracle        the three Agda engines against real rxjs (typescript/ drives it)"
-	@echo "  chain         the denotation's approximants form a chain (ARGS=\"FROM COUNT\")"
-	@echo "  placing       the machine's trace is placed against the root's events (ARGS=\"FROM COUNT\", default 0 300, max 500 without SWEEP=1)"
-	@echo "  stepping      the stepper shows what its configuration means, skips included (ARGS=\"FROM COUNT\", default 0 300)"
-	@echo "  kept-depth    every silent engine step drops leading skips of its meaning or means the same (ARGS=\"FROM COUNT\", default 0 1000)"
 	@echo "  postulates    every postulate in $(SRC) by name — the work ledger"
 	@echo "  find          search the declared TYPE of every statement:  make find Q='⊑ lub'"
 	@echo "  find-prose    search comment blocks and docs for a finding:  make find-prose Q='dead route'"
 	@echo "  wiring        the wiring report (wiring-gate: the same, exiting 1)"
-	@echo "  port-check    the port keeps the old tower's names and postulates (PORT_BASE)"
-	@echo "  old-denotation  every use of the stream denotation outside it: Tier 0's remaining work"
 	@echo "  imports-fix   delete unused imports and names"
 	@echo "  split         cut a long module:  make split F=<file> (lists cuts);  make split F=<file> P='Mod Mod.B@120'"
 	@echo "                a nested one, in place:  make split F=<file> SUB='Inner Inner2@300'"
@@ -68,7 +62,6 @@ GATE_CHEAP = wiring-selftest wiring-gate \
              imports-selftest imports-check \
              roadmap-selftest roadmap-check \
              comments-selftest comments-check \
-             port-selftest port-check old-denotation-selftest \
              ts-gate
 
 gate-cheap:
@@ -108,60 +101,6 @@ oracle-build:
 
 oracle: oracle-build
 	@cd typescript && AGDA_CLI_BIN=$(CURDIR)/$(ORACLE_BIN) npm run --silent oracle -- $(ARGS)
-
-# The denotation's approximants as a chain, on ARGS="FROM COUNT" seeds:
-# green when the run reaches its `done` line and no seed FAILs.
-chain: oracle-build
-	@out=$$($(ORACLE_BIN) chain $(ARGS)); echo "$$out"; \
-	  echo "$$out" | grep -q '^chain: done ' || { echo "chain: RED — the run never finished"; exit 1; }; \
-	  if echo "$$out" | grep -q '^chain: FAIL '; then echo "chain: RED"; exit 1; fi; \
-	  echo "chain: GREEN"
-
-# The machine's trace placed against the meaning, positions included, on
-# ARGS="FROM COUNT" seeds (default "0 300").  A smoke check for a change to
-# the denotation or the engine, never a sweep: COUNT over 500 is refused
-# unless SWEEP=1.  One process per seed, each capped in time and heap, so a
-# seed that runs away is named, with its program and each check alone,
-# instead of taking the runner down with it.
-PLACING_SEED_SECS = 90
-PLACING_ARGS = $(or $(ARGS),0 300)
-placing-count:
-	@set -- $(PLACING_ARGS); \
-	  if [ "$${2:-0}" -gt 500 ] && [ "$(SWEEP)" != 1 ]; then \
-	    echo "placing: COUNT $$2 refused — 300 seeds is the smoke check; SWEEP=1 to override" >&2; exit 2; fi
-
-placing: placing-count oracle-build
-	@set -- $(PLACING_ARGS); s=$$1; e=$$(($$1 + $$2)); bad=0; \
-	  while [ $$s -lt $$e ]; do \
-	    out=$$(timeout $(PLACING_SEED_SECS) $(ORACLE_BIN) placing $$s all +RTS -M3g -RTS 2>&1); code=$$?; \
-	    case "$$out" in \
-	      "placing: ok "*) ;; \
-	      "placing: FAIL "*) echo "$$out"; bad=1 ;; \
-	      *) echo "placing: ABORT seed $$s (exit $$code)"; bad=1; $(ORACLE_BIN) code $$s; \
-	         for c in placed rising steady steps trails spread flat; do \
-	           one=$$(timeout $(PLACING_SEED_SECS) $(ORACLE_BIN) placing $$s $$c +RTS -M3g -RTS 2>&1); \
-	           echo "  $$c (exit $$?): $$one"; done ;; \
-	    esac; s=$$(($$s + 1)); done; \
-	  if [ $$bad = 1 ]; then echo "placing: RED"; exit 1; fi; echo "placing: GREEN"
-
-# The stepper against the meaning, event for event, skips included, on
-# ARGS="FROM COUNT" seeds (default "0 300").
-STEPPING_ARGS = $(or $(ARGS),0 300)
-stepping: oracle-build
-	@out=$$($(ORACLE_BIN) stepping $(STEPPING_ARGS)); echo "$$out"; \
-	  echo "$$out" | grep -q '^stepping: done ' || { echo "stepping: RED — the run never finished"; exit 1; }; \
-	  if echo "$$out" | grep -q '^stepping: FAIL '; then echo "stepping: RED"; exit 1; fi; \
-	  echo "stepping: GREEN"
-
-# Every silent engine step drops leading skips of its meaning or means the
-# same, on ARGS="FROM COUNT" seeds (default "0 100"); each line carries the
-# seed's longest run of steps meaning the same.
-KEPT_DEPTH_ARGS = $(or $(ARGS),0 1000)
-kept-depth: oracle-build
-	@out=$$($(ORACLE_BIN) kept-depth $(KEPT_DEPTH_ARGS)); echo "$$out"; \
-	  echo "$$out" | grep -q '^kept-depth: done ' || { echo "kept-depth: RED — the run never finished"; exit 1; }; \
-	  if echo "$$out" | grep -q '^kept-depth: FAIL '; then echo "kept-depth: RED"; exit 1; fi; \
-	  echo "kept-depth: GREEN"
 
 # The runner prints a FAIL line per failing row and a closing `done` line;
 # a run without the `done` line died part-way and is red.  See
@@ -217,67 +156,6 @@ wiring-selftest:
 	  echo "$$led" | grep -q "^ffi-unbound " || { echo "SELFTEST FAIL: ffi-unbound missing from the ledger — the FFI exemption swallowed a CLI postulate with no binding"; fail=1; }; \
 	  echo "$$led" | grep -q "^ffi-outside " || { echo "SELFTEST FAIL: ffi-outside missing from the ledger — a binding outside CLI/ must earn nothing"; fail=1; }; \
 	  if [ $$fail -eq 0 ]; then echo "wiring-selftest: PASS (R2 fires on the passed-only lemma and on its eta-expansion, and on nothing else; module applications conduct; \`with\` arms conduct at both scopes; a postulate block nested in a seal reaches the ledger; a pragma nested in a pragma closes on its own close; a CLI postulate with a COMPILE GHC body leaves it, an unbound one or one outside CLI/ stays)"; \
-	  else echo "$$out"; exit 1; fi
-
-# THE PORT BOUNDARY (Anthony): adequacy/ and simultaneous/ move onto the
-# table in place.  There and in what they import, a body keeps a name the old
-# tower had at PORT_BASE (`xᵀ` answers to `x`); an old postulate stays one; a
-# postulated old body says where it was; a new postulate is free.  The frozen
-# commit is what the port answers to, so it moves only by hand.  → docs/port-check.md
-PORT_BASE := 75e04489a541f557440de7b319f7284a65a24cb7
-PORT_SCOPE := adequacy simultaneous
-
-port-check:
-	@scripts/check-port.py --base $(PORT_BASE) --port $(PORT_SCOPE) --old $(addprefix $(SRC)/,$(PORT_SCOPE))
-
-# PROVES port-check IS LOAD-BEARING: one row per way out of the boundary must
-# fire, a new body moved into the port's import cone included; and an old
-# name ported, a new postulate, an old postulate kept, a pointed-at old body,
-# a private helper and a where-local must not.
-# The fixtures answer to a tower of their own, frozen with them.
-PORT_SELFTEST_BASE := 85c14392490061b71342d104b2d16a16cb4ec724
-
-port-selftest:
-	@out=$$(scripts/check-port.py --base $(PORT_SELFTEST_BASE) --src scripts/port-selftest --port port adequacy \
-	        --renamed adequacy/Placed.agda=agda-impl/adequacy/Placed.agda 2>&1); \
-	  fail=0; \
-	  for r in "NEW NAME    Engine.agda:smuggled" "NEW NAME    port/Fixture.agda:invented" "FILLED GAP  port/Fixture.agda:placing" \
-	           "NO OLD BODY port/Fixture.agda:complete" "BAD OLD BODY port/Fixture.agda:reaches" \
-	           "BAD OLD BODY port/Fixture.agda:prefix-chain" "BAD OLD BODY port/Fixture.agda:reached" \
-	           "FILLED GAP  adequacy/Placed.agda:under-shown-connect" "FILLED GAP  adequacy/Placed.agda:placingᵀ" \
-	           "NEW NAME    adequacy/Placed.agda:inventedᵀ"; do \
-	    echo "$$out" | grep -qF "$$r" || { echo "SELFTEST FAIL: \`$$r\` not reported — the boundary has a hole"; fail=1; }; \
-	  done; \
-	  for n in run fresh-gap engine-gap ticks-up content helper read-of local weigh-++ sibling-spreadᵀ; do \
-	    echo "$$out" | grep -q "\.agda:$$n " && { echo "SELFTEST FAIL: $$n reported, but it is inside the boundary"; fail=1; }; \
-	  done; \
-	  echo "$$out" | grep -q "port-check: FAIL — 10 problem" || { echo "SELFTEST FAIL: expected exactly 10 problems"; fail=1; }; \
-	  if [ $$fail -eq 0 ]; then echo "port-selftest: PASS (a new body, in the port or its import cone, a filled gap, and a missing or unresolving OLD BODY each fire, in a port directory or in place, through an emission-set reading too; ported names, new and kept postulates and helpers do not)"; \
-	  else echo "$$out"; exit 1; fi
-
-# THE OLD DENOTATION, COUNTED (Anthony): every use of the stream denotation
-# outside it, by file.  Not in the gate while Tier 0 runs: the count is
-# its remaining work, and Tier 0 is done at none.  → docs/old-denotation.md
-OLD_DENOTATION := --module denotation.Denote denotation.Observe denotation.Compositional \
-                           denotation.Laws denotation.NonExpansive \
-                  --host denotation.MonotonicList --name observe lub
-
-old-denotation:
-	@scripts/check-old-denotation.py $(OLD_DENOTATION)
-
-# PROVES old-denotation IS LOAD-BEARING: each way of reaching the old
-# denotation fires, and a host's engine vocabulary does not.
-old-denotation-selftest:
-	@out=$$(scripts/check-old-denotation.py --src scripts/old-denotation-selftest --module Old --host Host --name observe 2>&1); \
-	  fail=0; \
-	  for r in "fixture/Uses.agda:6: imports \`Old\`" "fixture/Uses.agda:10: takes \`mapᴰ\`" "fixture/Uses.agda:10: takes \`observe\`" \
-	           "fixture/Uses.agda:14: opens \`Host\` with no" "fixture/Uses.agda:19: uses \`H.scanᴰ\`"; do \
-	    echo "$$out" | grep -qF "$$r" || { echo "SELFTEST FAIL: \`$$r\` not reported — the count has a hole"; fail=1; }; \
-	  done; \
-	  echo "$$out" | grep -q "Clean.agda" && { echo "SELFTEST FAIL: Clean.agda reported, but it reaches only engine vocabulary"; fail=1; }; \
-	  echo "$$out" | grep -q "^fixture/Uses.agda.*Run\|Old.agda\|Host.agda" && { echo "SELFTEST FAIL: an engine name, or the old denotation itself, reported"; fail=1; }; \
-	  echo "$$out" | grep -q "old-denotation: 5 use(s) across 1 file(s)" || { echo "SELFTEST FAIL: expected exactly 5 uses in 1 file"; fail=1; }; \
-	  if [ $$fail -eq 0 ]; then echo "old-denotation-selftest: PASS (an old module, an old name over a split using list, a wholesale host and a qualified operator each fire; engine vocabulary and the old denotation itself do not)"; \
 	  else echo "$$out"; exit 1; fi
 
 # SOUNDNESS GUARD.  The build is not `--safe` — it cannot be while

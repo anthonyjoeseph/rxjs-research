@@ -19,7 +19,7 @@ open import Data.Product using (_×_; _,_; Σ)
 open import Data.Unit using (⊤; tt)
 open import IO.Primitive.Core using (pure; _>>=_)
 
-open import denotation.MonotonicList.Events using (From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Timeline; fixed; fresh; timelineAt; Pos; ix)
+open import denotation.Events using (From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Timeline; fixed; fresh; timelineAt; Pos; ix)
 open import operation.Observable using (IORef; newIORef; readIORef; writeIORef; IOCold; Emit; fixIO′)
 
 private

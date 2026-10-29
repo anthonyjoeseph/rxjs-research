@@ -28,9 +28,6 @@ evidence behind a rule come here.
 | `roadmap-check` | [roadmap-check.md](roadmap-check.md) | leave a postulate out of PROOF-STATE's groups, overrun a budget, or date PROOF-STATE, CLAUDE.md or docs |
 | `comments-selftest` | [comments-check.md](comments-check.md) | ship a comment checker that has stopped firing |
 | `comments-check` | [comments-check.md](comments-check.md) | date a source comment, record what happened to a declaration, bury the evidence mid-paragraph, cite a twin that is not there |
-| `port-selftest` | [port-check.md](port-check.md) | ship a port checker that has stopped firing |
-| `port-check` | [port-check.md](port-check.md) | give `adequacy/`, `simultaneous/` or what they import a body the old tower lacks, a body for an old postulate, or postulate an old body without pointing at it |
-| `old-denotation-selftest` | [old-denotation.md](old-denotation.md) | ship an old-denotation counter that has stopped firing |
 | `ts-gate` | — | land TypeScript that does not typecheck or lint |
 | `agda` | [agda-build.md](agda-build.md) | land anything that does not typecheck from Main, warnings included |
 
@@ -49,4 +46,3 @@ Beside the gate, in its own CI job: `bug-cache` — [bug-cache.md](bug-cache.md)
 | [delegation.md](delegation.md) | worker model pinning and directives |
 | [split.md](split.md) | `make split` — cut a long module into parts and retarget its consumers |
 | [notify.md](notify.md) | `make notify` — the ntfy.sh push a gate sends on the way out |
-| [old-denotation.md](old-denotation.md) | `make old-denotation` — every use of the stream denotation outside it: Tier 0's remaining work |

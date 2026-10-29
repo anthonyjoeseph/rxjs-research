@@ -8,23 +8,22 @@ open import operation.Key using (Key; at; after; _<ᴷ_)
 -- it, as a MARK keyed by when it runs (`operation.Key`).  Once what runs
 -- now is absorbed, the least-keyed mark in the tree runs next.
 --
--- Positions are execution order (`denotation.MonotonicList.Events`), so
+-- Positions are execution order (`denotation.Events`), so
 -- the order is read off the tree, and nothing in the state names
 -- anything else in it: no job stack, no joiner paths, no feed stack, no
 -- timers, no depths.
 --
 -- A connect's feed is pushed into each joiner's own inbox when its source
--- rises, as `denotation.Unfold`'s `feed` does; each joiner then runs its
--- inbox at its own positions.  A cold leaf's runtime state says when it
--- is next due (`due`), so a runtime's frames and timers are marks too,
--- and what it shows then (`peek`: a value, its end, or nothing).
+-- rises; each joiner then runs its inbox at its own positions.  A cold
+-- leaf's runtime state says when it is next due (`due`), so a runtime's
+-- frames and timers are marks too, and what it shows then (`peek`: a
+-- value, its end, or nothing).
 --
 -- ONE EVENT PER SEARCH.  No event is shown except by a mark keyed where
 -- it sits: a subscribe shows nothing, and an end it owes (empty's, a
 -- joiner's whose subject is over) is an of with nothing left, owed at
--- its `last`.  The least mark is the one `denotation.Unfold.step` races
--- first: each candidate is keyed by where its event sits as its parent
--- sees it, and every tie goes as the stepper's does.
+-- its `last`.  The least mark runs first: each candidate is keyed by
+-- where its event sits as its parent sees it.
 module operation.AbstractObservable (C L : Set → Set₁) (due : ∀ {A} → L A → Maybe Key) (peek : ∀ {A} → L A → Maybe (Maybe A)) where
 
 open import Data.List using (List; []; _∷_; _++_; _ʳ++_; [_]; length; null; reverse)
@@ -33,11 +32,16 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; zero; suc; pred; _≡ᵇ_; _<ᵇ_)
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
 open import Data.Product using (Σ; _×_; _,_; proj₁)
-open import Relation.Binary.PropositionalEquality using (refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.MonotonicList.Events using (Pos; ix; last; root; _<ᵖ_) renaming (sub to subᴾ)
-open import denotation.Unfold using (same?)
+open import denotation.Events using (Pos; ix; last; root; _<ᵖ_) renaming (sub to subᴾ)
+
+-- Two connects in scope, the same one or not.
+same? : ∀ {Γ : List Set} {A B : Set} → A ∈ Γ → B ∈ Γ → Maybe (A ≡ B)
+same? (here refl) (here refl) = just refl
+same? (there i)   (there j)   = same? i j
+same? _           _           = nothing
 
 data Ev (A : Set) : Set where
   nx : A → Ev A
@@ -230,10 +234,9 @@ unsubIf false s = s , []
 ------------------------------------------------------------------------
 -- A connect's feed, pushed into each of its live joiners
 
--- A step at `p` queued last for a joiner joined at `j`, as
--- `denotation.Unfold.fed` and `denotation.Unfold.told` queue it: under
--- where it joined if it joined before; else a value is not its, and an
--- end is at once.
+-- A step at `p` queued last for a joiner joined at `j`: under where it
+-- joined if it joined before; else a value is not its, and an end is at
+-- once.
 queued : ∀ {A} → Pos → Pos → Ev A → List (Pos × Ev A) → List (Pos × Ev A)
 queued j p (nx a) ib = if j <ᵖ p then ib ++ [ (p ⊕ [ subᴾ j ] , nx a) ] else ib
 queued j p cp     ib = ib ++ [ (if j <ᵖ p then p ⊕ [ subᴾ j ] else j ⊕ [ last ]) , cp ]
