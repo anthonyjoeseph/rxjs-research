@@ -318,7 +318,7 @@ module Join {A B : Set} {H : Pos → Set} {p : Pos} (ok : Ok H p) (f : A → Den
 module JoinerI {A B H p} (ok : Ok H p) (f : A → Den B) (fi : ∀ a → InvD H (f a)) {O : EmissionSet A} (Io : InvAt H p O)
                (Runs : Pos → Set) (Cut : Pos → Pos → Set) (cut-up : ∀ {q k y} → Cut q k → k ≼ y → Cut q y)
                (uncut : ∀ {q a k} → O q (out a) → Cut q k → T (inside (q ++ [ ix 1 ]) k) → ⊥) where
-  open Joiner f O Runs Cut using (JoinT; val; step; oend; opass; lane; lend; lpass; left; run; rend; rpass; Done)
+  open Joiner f O Runs Cut using (JoinT; val; step; oend; opass; lane; lend; lpass; hand; left; run; rend; rpass; rhand; Done)
   open Join ok f fi Io using (module View; end-before)
   open View Done (λ q _ y → Runs q × ¬ Cut q y)
 
@@ -328,12 +328,14 @@ module JoinerI {A B H p} (ok : Ok H p) (f : A → Den B) (fi : ∀ a → InvD H 
   vw (oend x d)          = v-o x (o-end d)
   vw (opass x nd)        = v-o x (o-pass nd)
   vw (lane x r l nc w)   = v-lane x l (l-work (r , nc) w)
-  vw (lend x r l nc d)   = v-lane x l (l-end (r , nc) d)
-  vw (lpass x r l nc nd) = v-lane x l (l-pass (r , nc) nd)
-  vw (left x _ _ c ins)  = ⊥-elim (uncut x c ins)
+  vw (lend x r l nc _ d)   = v-lane x l (l-end (r , nc) d)
+  vw (lpass x r l nc _ nd) = v-lane x l (l-pass (r , nc) nd)
+  vw (hand _ _ _ _ ())
+  vw (left x _ _ c ins)    = ⊥-elim (uncut x c ins)
   vw (run () _)
-  vw (rend () _)
-  vw (rpass () _)
+  vw (rend () _ _)
+  vw (rpass () _ _)
+  vw (rhand () _)
 
   en : ∀ {c} → Done c → Ended c
   en {c} ((c₀ , oc , le) , ln) = (c₀ , oc , le) , λ {q} xq _ (r , nc) cy → ln xq r (≺-≼-≺ {q} {c₀} {c} (end-before oc xq) le) (λ ct → nc (cut-up ct (≺→≼ {c} {_} cy)))

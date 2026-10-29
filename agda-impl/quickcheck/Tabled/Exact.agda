@@ -32,7 +32,7 @@ import denotation.Events as E
 open import denotation.Events using (Pos; Timeline; _<ᵖ_; inside; ix)
 open import denotation.EmissionSet
   using (out; skip; end; EmissionSet; InE; at-out; at-skip; at-end; on-out; on-skip; Proper; Truncate; Rejoin;
-  ended; late; Den; enter; After; MapT; map-out; map-skip; map-end; DeferT; guard; DenEnv; approx)
+  ended; late; Den; enter; After; LaneOf; MapT; map-out; map-skip; map-end; DeferT; guard; DenEnv; approx)
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled
   using (Row; Listed; _⊣_; rows; short; concatMap; when; endBy; proper; values; fuel; horizon; walk;
@@ -182,10 +182,10 @@ module MergeX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A) 
     ... | true  = oend x (done→ c dc)
     ... | false = opass x (λ D → offT dc (Equivalence.from T-≡ (→done c D)))
 
-    lend-row : ∀ {q a c} → t q (out a) → Lane q a c end → JoinT c (if done c then end else skip)
+    lend-row : ∀ {q a c} → t q (out a) → LaneOf fD q a c end → JoinT c (if done c then end else skip)
     lend-row {c = c} x y with done c in dc
-    ... | true  = lend x tt y (λ ()) (done→ c dc)
-    ... | false = lpass x tt y (λ ()) (λ D → offT dc (Equivalence.from T-≡ (→done c D)))
+    ... | true  = lend x tt y (λ ()) (λ ()) (done→ c dc)
+    ... | false = lpass x tt y (λ ()) (λ ()) (λ D → offT dc (Equivalence.from T-≡ (→done c D)))
 
     outer-s : ∀ {r q e} → r ∈ rows o → (q , e) ∈ outerRow done r → JoinT q e
     outer-s {k , out a} rm h with single⁻ h
@@ -226,16 +226,18 @@ module MergeX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A) 
   complete-m (lane x _ y _ w) =
     let (l , m) = ls-to (values⁺ (complete exo x)) in
     ∈-++⁺ʳ (concatMap (outerRow done) (rows o)) (cm⁺ m (lane-in w (complete (exl m) y)))
-  complete-m (lend {c = c} x _ y _ D) =
+  complete-m (lend {c = c} x _ y _ _ D) =
     let (l , m) = ls-to (values⁺ (complete exo x)) in
     ∈-++⁺ʳ (concatMap (outerRow done) (rows o)) (cm⁺ m (lane-end {c} (→done c D) (complete (exl m) y)))
-  complete-m (lpass {c = c} x _ y _ nD) =
+  complete-m (lpass {c = c} x _ y _ _ nD) =
     let (l , m) = ls-to (values⁺ (complete exo x)) in
     ∈-++⁺ʳ (concatMap (outerRow done) (rows o)) (cm⁺ m (lane-end {c} (off (done→ c) nD) (complete (exl m) y)))
   complete-m (left _ _ _ () _)
   complete-m (run () _)
-  complete-m (rend () _)
-  complete-m (rpass () _)
+  complete-m (rend () _ _)
+  complete-m (rpass () _ _)
+  complete-m (hand _ _ _ _ ())
+  complete-m (rhand () _)
 
 merge-exact : ∀ {A B} (fD : A → Den B) {t : EmissionSet A} (o : Listed A) (ls : List (Pos × A × Listed B)) → Exactly o t
   → (∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (After (fD a) (q ++ [ ix 1 ])))

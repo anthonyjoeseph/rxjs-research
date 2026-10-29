@@ -28,6 +28,7 @@ open import Relation.Nullary using (¬_)
 
 open import denotation.Events using (Pos; _<ᵖ_; ix; <ᵖ-trans)
 open import denotation.EmissionSet using (out; skip; end; EmissionSet; Den; After)
+open import denotation.Laws.Nth using (module Nths)
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled using (Row; Listed; rows; short; concatMap; mapM; anyᵇ; endBy; values; outerRow; _≼ᵇ_;
   module BoundedL; module Order)
@@ -43,9 +44,10 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
   (u : short (BoundedL.boundedRows n ln o G) ≡ false)
   where
   open Tb.Bounded n fD t
-    using (Kth; Starts; room; freed; queued; Ends; Sched; Sub; Queued; Done; BoundedT;
-    val; step; oend; opass; lane; handoff; lend; lpass)
+    using (Kth; Starts; room; freed; queued; Ends; Sched; Sub; Queued; Done; JoinT; Lane; Indexed;
+    val; step; oend; opass; lane; lend; lpass; hand; left; run; rend; rpass; rhand)
   open Tb.Values t using (Nth)
+  open Nths t using (nth-val; nth-at; nth-inj)
   open BoundedL n ln o
     using (vals; count; starts; Entry; laneAt; entry; laneEnds; entryEnds; endsOf; levels; done; laneRow; boundedRows)
     renaming (queued to queuedᵇ)
@@ -61,7 +63,7 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     exl : ∀ {j q a ss s l} → (j , q , a , ss) ∈ G → (s , l) ∈ ss → ln a s ≡ just l → Exact l (After (fD a) s)
     exl gm sm el = eln el (uncut gm sm)
 
-  open OrderX exo using (nth-s; nth-c; nth-out; nth-cnt)
+  open OrderX exo using (nth-s; nth-c; nth-cnt)
 
   ----------------------------------------------------------------------
   -- The lanes before, as listed
@@ -253,7 +255,7 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     found-all : ∀ {j q a} → Nth j q a → Σ (List (Pos × Listed B)) λ ss → (j , q , a , ss) ∈ G
     found-all N = proj₂ levG z≤n
       (subst (λ x → _ < x) (sym (+-identityʳ (length vals)))
-        (≤-<-trans (nth-cnt N) (cnt-in (values⁺ (complete exo (nth-out N)))))) N
+        (≤-<-trans (nth-cnt N) (cnt-in (values⁺ (complete exo (nth-val N)))))) N
 
     sub-of : ∀ {j q a ss s l} → (j , q , a , ss) ∈ G → (s , l) ∈ ss → Sub j q s a × Exact l (After (fD a) s)
     sub-of gm sm = let (N , snd , _) = fine-all gm ; (St , el) = snd sm in (N , St) , exl gm sm el
@@ -275,19 +277,20 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
 
     done→ : ∀ c → done G c ≡ true → Done c
     done→ c e with ∧-true {endBy (rows o) c} e
-    ... | (e₁ , e₂) = endBy→ exo {c} e₁ , lanes
+    ... | (e₁ , e₂) = endBy→ exo {c} e₁ , λ x ix qc _ → lanes x ix qc
       where
-      lanes : ∀ {i q a} → Nth i q a → Tb._≺_ q c → Σ Pos λ s → Σ Pos λ c′ → Sub i q s a × After (fD a) s c′ end × Tb._≼_ c′ c
-      lanes N qc with found-all N
+      lanes : ∀ {q a} → t q (out a) → Indexed q → Tb._≺_ q c → Tb.Ended (Lane q a) c
+      lanes x (i , _ , N₀) qc with found-all (nth-at N₀ x)
       ... | (ss , gm) with any⁻ {xs = ss} (or-right (fromT qc) (all⁻ {xs = G} e₂ gm))
       ... | ((s , l) , sm , eb) with sub-of gm sm
       ... | (sb , ex) with endBy→ ex {c} eb
-      ... | (c′ , y , le) = s , c′ , sb , y , le
+      ... | (c′ , y , le) = c′ , (i , s , sb , y) , le
 
     →done : ∀ c → Done c → done G c ≡ true
     →done c ((c₀ , x , le) , lanes) = ∧-intro (→endBy exo {c₀} {c} x le) (all⁺ {xs = G} λ { {j , q , a , ss} gm →
       or-of (q <ᵖ c) λ qc →
-      let (N , _ , cmp) = fine-all gm ; (s , c′ , (_ , St) , y , le′) = lanes N (Equivalence.from T-≡ qc) ; (l , sm) = cmp St in
+      let (N , _ , cmp) = fine-all gm ; (c′ , (_ , s , (N′ , St) , y) , le′) = lanes (nth-val N) (_ , _ , N) (Equivalence.from T-≡ qc) (λ ())
+          (l , sm) = cmp (subst (λ i → Starts i q (Sched i) s) (nth-inj N′ N) St) in
       any⁺ {xs = ss} sm (→endBy (proj₂ (sub-of gm sm)) {c′} {c} y le′) })
 
   ----------------------------------------------------------------------
@@ -304,17 +307,17 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     if≡f : ∀ {X : Set} {b} {x y : X} → b ≡ false → (if b then x else y) ≡ y
     if≡f refl = refl
 
-    end-row : ∀ {c} → t c end → BoundedT c (if done G c then end else skip)
+    end-row : ∀ {c} → t c end → JoinT c (if done G c then end else skip)
     end-row {c} x with done G c in dc
     ... | true  = oend x (done→ c dc)
     ... | false = opass x (λ D → offT dc (Equivalence.from T-≡ (→done c D)))
 
-    lend-row : ∀ {j q s a c} → Sub j q s a → After (fD a) s c end → ¬ Queued c → BoundedT c (if done G c then end else skip)
-    lend-row {c = c} sb y nQ with done G c in dc
-    ... | true  = lend sb y nQ (done→ c dc)
-    ... | false = lpass sb y nQ (λ D → offT dc (Equivalence.from T-≡ (→done c D)))
+    lend-row : ∀ {j q s a c} → Sub j q s a → After (fD a) s c end → ¬ Queued c → JoinT c (if done G c then end else skip)
+    lend-row {j} {s = s} {a} {c} sb@(N , _) y nQ with done G c in dc
+    ... | true  = lend (nth-val N) (j , a , N) (j , s , sb , y) (λ ()) nQ (done→ c dc)
+    ... | false = lpass (nth-val N) (j , a , N) (j , s , sb , y) (λ ()) nQ (λ D → offT dc (Equivalence.from T-≡ (→done c D)))
 
-    outer-s : ∀ {r q e} → r ∈ rows o → (q , e) ∈ outerRow (done G) r → BoundedT q e
+    outer-s : ∀ {r q e} → r ∈ rows o → (q , e) ∈ outerRow (done G) r → JoinT q e
     outer-s {k , out a} rm h with single⁻ h
     ... | refl = val (sound exo rm)
     outer-s {k , skip} rm h with single⁻ h
@@ -322,11 +325,14 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     outer-s {c , end} rm h with single⁻ h
     ... | refl = end-row (sound exo rm)
 
-    lane-s : ∀ {j q a ss s l r k e} → (j , q , a , ss) ∈ G → (s , l) ∈ ss → r ∈ rows l → (k , e) ≡ laneRow G r → BoundedT k e
-    lane-s {r = k′ , out b} gm sm rm refl = let (sb , ex) = sub-of gm sm in lane sb (sound ex rm) tt
-    lane-s {r = k′ , skip}  gm sm rm refl = let (sb , ex) = sub-of gm sm in lane sb (sound ex rm) tt
-    lane-s {r = c , end} gm sm rm eq with if-split (queuedᵇ G c) eq
-    ... | inj₁ (qc , refl) = let (sb , ex) = sub-of gm sm in handoff sb (sound ex rm) (queued→ c qc)
+    lane-s : ∀ {j q a ss s l r k e} → (j , q , a , ss) ∈ G → (s , l) ∈ ss → r ∈ rows l → (k , e) ≡ laneRow G r → JoinT k e
+    lane-s {j} {a = a} {s = s} {r = k′ , out b} gm sm rm refl = let (sb , ex) = sub-of gm sm in
+      lane (nth-val (proj₁ sb)) (j , a , proj₁ sb) (j , s , sb , sound ex rm) (λ ()) tt
+    lane-s {j} {a = a} {s = s} {r = k′ , skip}  gm sm rm refl = let (sb , ex) = sub-of gm sm in
+      lane (nth-val (proj₁ sb)) (j , a , proj₁ sb) (j , s , sb , sound ex rm) (λ ()) tt
+    lane-s {j} {a = a} {s = s} {r = c , end} gm sm rm eq with if-split (queuedᵇ G c) eq
+    ... | inj₁ (qc , refl) = let (sb , ex) = sub-of gm sm in
+      hand (nth-val (proj₁ sb)) (j , a , proj₁ sb) (j , s , sb , sound ex rm) (λ ()) (queued→ c qc)
     ... | inj₂ (nq , refl) = let (sb , ex) = sub-of gm sm in
       lend-row sb (sound ex rm) (λ Q → offT nq (Equivalence.from T-≡ (→queued c Q)))
 
@@ -348,7 +354,7 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     passing : ∀ c → ¬ Queued c → laneRow G (c , end) ≡ (c , (if done G c then end else skip))
     passing c nQ = if≡f {b = queuedᵇ G c} (off (queued→ c) nQ)
 
-  sound-b : ∀ {q e} → (q , e) ∈ rows (boundedRows G) → BoundedT q e
+  sound-b : ∀ {q e} → (q , e) ∈ rows (boundedRows G) → JoinT q e
   sound-b m with ∈-++⁻ (concatMap (outerRow (done G)) (rows o)) m
   ... | inj₁ h = let (r , rm , h′) = cm⁻ {xs = rows o} h in outer-s rm h′
   ... | inj₂ h with cm⁻ {xs = G} h
@@ -356,22 +362,27 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
   ... | ((s , l) , sm , h″) with ∈-map⁻ (laneRow G) h″
   ... | (r , rm , eq) = lane-s gm sm rm eq
 
-  complete-b : ∀ {q e} → BoundedT q e → (q , e) ∈ rows (boundedRows G)
+  complete-b : ∀ {q e} → JoinT q e → (q , e) ∈ rows (boundedRows G)
   complete-b (val x)          = ∈-++⁺ˡ (cm⁺ (complete exo x) (here refl))
   complete-b (step x)         = ∈-++⁺ˡ (cm⁺ (complete exo x) (here refl))
   complete-b (oend {c} x D)   = ∈-++⁺ˡ (cm⁺ (complete exo x) (outer-end {c} (→done c D)))
   complete-b (opass {c} x nD) = ∈-++⁺ˡ (cm⁺ (complete exo x) (outer-end {c} (off (done→ c) nD)))
-  complete-b (lane sb y w)    = shown sb λ ex → lane-in w (complete ex y)
-  complete-b (handoff {c = c} sb y Q) = shown sb λ ex →
+  complete-b (lane _ _ (_ , _ , sb , y) _ w) = shown sb λ ex → lane-in w (complete ex y)
+  complete-b (hand {c = c} _ _ (_ , _ , sb , y) _ Q) = shown sb λ ex →
     subst (_∈ _) (if≡t {b = queuedᵇ G c} (→queued c Q)) (∈-map⁺ (laneRow G) (complete ex y))
-  complete-b (lend {c = c} sb y nQ D) = shown sb λ ex →
+  complete-b (lend {c = c} _ _ (_ , _ , sb , y) _ nQ D) = shown sb λ ex →
     subst (_∈ _) (trans (passing c nQ) (cong (λ b → c , (if b then end else skip)) (→done c D))) (∈-map⁺ (laneRow G) (complete ex y))
-  complete-b (lpass {c = c} sb y nQ nD) = shown sb λ ex →
+  complete-b (lpass {c = c} _ _ (_ , _ , sb , y) _ nQ nD) = shown sb λ ex →
     subst (_∈ _) (trans (passing c nQ) (cong (λ b → c , (if b then end else skip)) (off (done→ c) nD))) (∈-map⁺ (laneRow G) (complete ex y))
+  complete-b (left _ _ _ () _)
+  complete-b (run () _)
+  complete-b (rend () _ _)
+  complete-b (rpass () _ _)
+  complete-b (rhand () _)
 
 bounded-exact : ∀ {A B} (k : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln : A → Pos → Maybe (Listed B)) (o : Listed A)
   → Exactly o t → (∀ {a s l} → ln a s ≡ just l → Exactly l (After (fD a) s))
-  → ∀ {l} → BoundedL.listB k ln o ≡ just l → Exactly l (Tb.Bounded.BoundedT k fD t)
+  → ∀ {l} → BoundedL.listB k ln o ≡ just l → Exactly l (Tb.Bounded.JoinT k fD t)
 bounded-exact k fD t ln o eo eln e u with bind⁻ {m = BoundedL.levels k ln o (length (values (rows o))) 0 [] (Order.nths (values (rows o)) 0)} e
 ... | (G , eG , refl) = record { sound = sound-b ; complete = complete-b }
   where open BoundedX k fD t ln o eo eln G eG u

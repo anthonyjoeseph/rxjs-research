@@ -341,7 +341,7 @@ module ExhaustL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) wh
   exhaustRows = Ran.ranRows runs
 open ExhaustL public using (exhaustRows)
 
--- `EmissionSet.Bounded.BoundedT`: level by level, each value's lane at
+-- `EmissionSet.Bounded.JoinT`: level by level, each value's lane at
 -- every start `Starts` allows, and each level's ends passed on to the
 -- next.
 module BoundedL {A B : Set} (n : ℕ) (lane : A → Pos → Maybe (Listed B)) (o : Listed A) where

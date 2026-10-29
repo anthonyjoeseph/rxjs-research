@@ -20,6 +20,7 @@ open import Relation.Binary.PropositionalEquality using (refl; sym; subst)
 
 open import denotation.Events using (Pos)
 open import denotation.EmissionSet using (out; skip; end; EmissionSet)
+open import denotation.Laws.Nth using (module Nths)
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled using (Listed; rows; concatMap; scanRows; module ScanL; module Order)
 open import quickcheck.Tabled.Exact.Base
@@ -30,7 +31,8 @@ module ScanX {A B : Set} (f : B → A → B) (z : B) (t : EmissionSet A) (o : Li
   open Tb.Values t using (Next; Nth; first; next)
   open ScanL f z o using (vals; opening; step; levels; table; folds; others)
   open Order vals using (nextᵇ; nths)
-  open OrderX ex using (next→; →next; nth-s; nth-c; nth-out; nth-cnt)
+  open OrderX ex using (next→; →next; nth-s; nth-c; nth-cnt)
+  open Nths t using (nth-val)
 
   -- A fold ending at the value `a` at `q`, the `i`th value.
   data AccV : ℕ → Pos → A → B → Set where
@@ -78,7 +80,7 @@ module ScanX {A B : Set} (f : B → A → B) (z : B) (t : EmissionSet A) (o : Li
     ... | inj₂ (_ , ())
     ... | inj₁ (nx , h′) with ∈-map⁻ (λ b → f b a) h′
     ... | (b₀ , bm , refl) =
-      v (proj₁ (proj₁ lv em) bm) (nth-out (nth-s (suc i) nm)) (proj₁ (next→ q₀ q nx)) (proj₂ (next→ q₀ q nx))
+      v (proj₁ (proj₁ lv em) bm) (nth-val (nth-s (suc i) nm)) (proj₁ (next→ q₀ q nx)) (proj₂ (next→ q₀ q nx))
 
     cmp : ∀ {b} → AccV (suc i) q a b → b ∈ proj₂ (proj₂ (step cur (q , a)))
     cmp (v {q₀ = q₀} y x lt nx) with proj₂ lv (accv-nth y)
@@ -136,7 +138,7 @@ module ScanX {A B : Set} (f : B → A → B) (z : B) (t : EmissionSet A) (o : Li
   ... | (j , a , y′) =
     let N = accv-nth y′
         bound = subst (λ x → j < x) (sym (+-identityʳ (length vals)))
-          (≤-<-trans (nth-cnt N) (cnt-in (values⁺ (complete ex (nth-out N)))))
+          (≤-<-trans (nth-cnt N) (cnt-in (values⁺ (complete ex (nth-val N)))))
         (bs , m , e) = proj₂ levT z≤n bound N
     in ∈-++⁺ˡ (cm⁺ m (∈-map⁺ (λ b → q , out b) (proj₂ e y′)))
   complete-s (sstep x) = ∈-++⁺ʳ (concatMap folds table) (cm⁺ (complete ex x) (here refl))

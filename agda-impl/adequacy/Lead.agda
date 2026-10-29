@@ -309,7 +309,7 @@ module Race {R Γ A B} (v : Bool) (c : Ctx R Γ B) (f : A → Obs Timeline Γ B)
       go : ∀ {Q e} → Lanes (rowsL ls) Q e → Fits o′ e → Occ FR Q o″
       go {e = out b} x fe = hit (Flat.run x tt) (fo fe)
       go {e = skip}  x _  = hit (Flat.run x tt) tt
-      go {e = end}   x _  = occ λ k → k (Flat.rpass x λ dn → k (Flat.rend x dn) tt) tt
+      go {e = end}   x _  = occ λ k → k (Flat.rpass x (λ ()) λ dn → k (Flat.rend x (λ ()) dn) tt) tt
 
   outer-still : ∀ {Q} → Occ (rows o) Q still → Occ FR Q still
   outer-still oc = occ-bind oc go

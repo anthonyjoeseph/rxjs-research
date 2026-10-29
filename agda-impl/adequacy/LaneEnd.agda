@@ -109,17 +109,19 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {p : Pos} {O : EmissionSe
     fwd′ (Flat.oend {c} r d)   = inj₁ (y→ (Flat.oend r (done-xy c (so r) d)))
     fwd′ (Flat.opass {c} r nd) = inj₁ (y→ (Flat.opass r λ d → nd (done-yx c (so r) d)))
     fwd′ (Flat.lane r ru l nc w) = inj₁ (y→ (Flat.lane r ru l nc w))
-    fwd′ (Flat.lend {q} {a} {c} r ru l nc dn)   = inj₁ (y→ (Flat.lend r ru l nc (done-xy c (lane-since L {d = d} {O = O} {Ls = LX} {q = q} {a = a} so r l) dn)))
-    fwd′ (Flat.lpass {q} {a} {c} r ru l nc nd) = inj₁ (y→ (Flat.lpass r ru l nc λ dn → nd (done-yx c (lane-since L {d = d} {O = O} {Ls = LX} {q = q} {a = a} so r l) dn)))
+    fwd′ (Flat.lend {q} {a} {c} r ru l nc nh dn)   = inj₁ (y→ (Flat.lend r ru l nc nh (done-xy c (lane-since L {d = d} {O = O} {q = q} {a = a} so r l) dn)))
+    fwd′ (Flat.lpass {q} {a} {c} r ru l nc nh nd) = inj₁ (y→ (Flat.lpass r ru l nc nh λ dn → nd (done-yx c (lane-since L {d = d} {O = O} {q = q} {a = a} so r l) dn)))
     fwd′ (Flat.left _ _ _ () _)
+    fwd′ (Flat.hand _ _ _ _ ())
+    fwd′ (Flat.rhand _ ())
     fwd′ (Flat.run x w) with lanes-xy x
     ... | inj₁ x′           = inj₁ (y→ (Flat.run x′ w))
     ... | inj₂ (refl , refl) = ⊥-elim w
-    fwd′ (Flat.rend {c} x d) with lanes-xy x
-    ... | inj₁ x′           = inj₁ (y→ (Flat.rend x′ (done-xy c (since-lanes LX sx x) d)))
+    fwd′ (Flat.rend {c} x nh d) with lanes-xy x
+    ... | inj₁ x′           = inj₁ (y→ (Flat.rend x′ nh (done-xy c (since-lanes LX sx x) d)))
     ... | inj₂ (refl , refl) = inj₁ (dp d)
-    fwd′ (Flat.rpass {c} x nd) with lanes-xy x
-    ... | inj₁ x′           = inj₁ (y→ (Flat.rpass x′ λ d → nd (done-yx c (since-lanes LX sx x) d)))
+    fwd′ (Flat.rpass {c} x nh nd) with lanes-xy x
+    ... | inj₁ x′           = inj₁ (y→ (Flat.rpass x′ nh λ d → nd (done-yx c (since-lanes LX sx x) d)))
     ... | inj₂ (refl , refl) = inj₂ (refl , refl)
 
     back : ∀ {k e} → Y k e → X k e
@@ -128,17 +130,19 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {p : Pos} {O : EmissionSe
     back (Flat.oend {c} r d)   = Flat.oend r (done-yx c (so r) d)
     back (Flat.opass {c} r nd) = Flat.opass r λ d → nd (done-xy c (so r) d)
     back (Flat.lane r ru l nc w) = Flat.lane r ru l nc w
-    back (Flat.lend {q} {a} {c} r ru l nc dn)   = Flat.lend r ru l nc (done-yx c (lane-since L {d = d} {O = O} {Ls = LY} {q = q} {a = a} so r l) dn)
-    back (Flat.lpass {q} {a} {c} r ru l nc nd) = Flat.lpass r ru l nc λ dn → nd (done-xy c (lane-since L {d = d} {O = O} {Ls = LY} {q = q} {a = a} so r l) dn)
+    back (Flat.lend {q} {a} {c} r ru l nc nh dn)   = Flat.lend r ru l nc nh (done-yx c (lane-since L {d = d} {O = O} {q = q} {a = a} so r l) dn)
+    back (Flat.lpass {q} {a} {c} r ru l nc nh nd) = Flat.lpass r ru l nc nh λ dn → nd (done-xy c (lane-since L {d = d} {O = O} {q = q} {a = a} so r l) dn)
     back (Flat.left _ _ _ () _)
+    back (Flat.hand _ _ _ _ ())
+    back (Flat.rhand _ ())
     back (Flat.run x w)  = Flat.run (lanes-yx x) w
-    back (Flat.rend {c} x d)   = Flat.rend (lanes-yx x) (done-yx c (since-lanes LY sy x) d)
-    back (Flat.rpass {c} x nd) = Flat.rpass (lanes-yx x) λ d → nd (done-xy c (since-lanes LY sy x) d)
+    back (Flat.rend {c} x nh d)   = Flat.rend (lanes-yx x) nh (done-yx c (since-lanes LY sy x) d)
+    back (Flat.rpass {c} x nh nd) = Flat.rpass (lanes-yx x) nh λ d → nd (done-xy c (since-lanes LY sy x) d)
 
     bwd′ : ∀ {k e} → Y′ k e → X k e ⊎ Skip p k e
     bwd′ r with y← r
     ... | inj₁ r′                  = inj₁ (back r′)
-    ... | inj₂ (refl , refl , d)   = inj₁ (Flat.rend (any-ʳ++ʳ Pre (inj₁ new)) d)
+    ... | inj₂ (refl , refl , d)   = inj₁ (Flat.rend (any-ʳ++ʳ Pre (inj₁ new)) (λ ()) d)
 
     frame-≈ : X ≈⟨ p ⟩ Y′
     frame-≈ = fwd′ ⇆ bwd′

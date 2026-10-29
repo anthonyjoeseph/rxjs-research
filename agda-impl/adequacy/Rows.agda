@@ -10,7 +10,7 @@ module adequacy.Rows where
 
 open import Data.Bool using (Bool; T; true; false; if_then_else_)
 open import Data.Empty using (⊥)
-open import Data.List using (List; []; _∷_; [_]; _ʳ++_)
+open import Data.List using (List; []; _∷_; [_]; _ʳ++_; _++_)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Sum using (_⊎_)
 open import Data.Maybe using (just; nothing)
@@ -20,7 +20,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; empty; of; map; flatMap)
 open import denotation.Events using (ofᴱ)
-open import denotation.Events using (Pos; Timeline)
+open import denotation.Events using (Pos; Timeline; ix)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; InE; enter; MapT; ⟦_⟧; Ended; module Joining)
 open import operation.PureObservable using (module Machine; module Driver)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; load; moved; quiet; pend; ofS; mapS; cutS; lnS; flatS; alive; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; nx; cp) renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
@@ -85,8 +85,16 @@ Each P (t ∷ Ls) = P t × Each P Ls
 
 -- A MERGE PART WAY THROUGH: `Merge`'s joiner at what is left of its outer,
 -- `O`, done already where `d`, with the lanes it has begun, `Ls`.
+-- `At L`, as a record: Agda reads `L` back off it, which it cannot off
+-- `At`'s product.
+record Lane {A B : Set} (L : A → Pos → EmissionSet B) (q : Pos) (a : A) (k : Pos) (e : Ev B) : Set where
+  constructor reads
+  field
+    lane : L a (q ++ [ ix 1 ]) k e
+    past : (q ++ [ ix 1 ]) ≺ k
+
 module Flat {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (d : Bool) (Ls : List (EmissionSet B)) where
-  open Joining L O (Lanes Ls) (λ c → (T d ⊎ Ended O c) × Each (λ t → Gone t c) Ls) (λ _ → ⊤) (λ _ _ → ⊥) public
+  open Joining (Lane L) O (Lanes Ls) (λ c → (T d ⊎ Ended O c) × Each (λ t → Gone t c) Ls) (λ _ → ⊤) (λ _ _ → ⊥) (λ _ → ⊥) public
 
 -- What a subscription pending at `p` owes: its meaning, entered there.
 pendRows : ∀ {Γ A} → Obs Timeline Γ A → Pos → EmissionSet A

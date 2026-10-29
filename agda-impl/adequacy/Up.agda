@@ -16,7 +16,7 @@ open import denotation.Events using (Pos)
 open import denotation.EmissionSet using (EmissionSet; MapT; map-out; map-skip; map-end)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (up; Vis; Plus; old; new; rowsL; Gone; Lanes; Each; module Flat; _≃_; _⇄_; ≃-sym)
+open import adequacy.Rows using (up; pendRows; Vis; Plus; old; new; rowsL; Gone; Lanes; Each; module Flat; _≃_; _⇄_; ≃-sym)
 
 open _≃_
 
@@ -102,12 +102,14 @@ flat L eo es (Flat.step r)             = Flat.step (to eo r)
 flat L eo es (Flat.oend r d)           = Flat.oend (to eo r) (done L eo es d)
 flat L eo es (Flat.opass r nd)         = Flat.opass (to eo r) λ d → nd (done L (≃-sym eo) (≈ᴸ-sym es) d)
 flat L eo es (Flat.lane r ru l nc w)   = Flat.lane (to eo r) ru l nc w
-flat L eo es (Flat.lend r ru l nc d)   = Flat.lend (to eo r) ru l nc (done L eo es d)
-flat L eo es (Flat.lpass r ru l nc nd) = Flat.lpass (to eo r) ru l nc λ d → nd (done L (≃-sym eo) (≈ᴸ-sym es) d)
+flat L eo es (Flat.lend r ru l nc nh d)   = Flat.lend (to eo r) ru l nc nh (done L eo es d)
+flat L eo es (Flat.lpass r ru l nc nh nd) = Flat.lpass (to eo r) ru l nc nh λ d → nd (done L (≃-sym eo) (≈ᴸ-sym es) d)
 flat L eo es (Flat.left _ _ _ () _)
+flat L eo es (Flat.hand _ _ _ _ ())
+flat L eo es (Flat.rhand _ ())
 flat L eo es (Flat.run x w)            = Flat.run (any-≈ es x) w
-flat L eo es (Flat.rend x d)           = Flat.rend (any-≈ es x) (done L eo es d)
-flat L eo es (Flat.rpass x nd)         = Flat.rpass (any-≈ es x) λ d → nd (done L (≃-sym eo) (≈ᴸ-sym es) d)
+flat L eo es (Flat.rend x nh d)        = Flat.rend (any-≈ es x) nh (done L eo es d)
+flat L eo es (Flat.rpass x nh nd)      = Flat.rpass (any-≈ es x) nh λ d → nd (done L (≃-sym eo) (≈ᴸ-sym es) d)
 
 flat-≃ : ∀ {A B : Set} (L : A → Pos → EmissionSet B) {O O′ : EmissionSet A} {d} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′
        → Flat.JoinT L O d Ls ≃ Flat.JoinT L O′ d Ls′
@@ -131,11 +133,11 @@ up-≃ (inCut false a c)                                eq = ≃-refl
 up-≃ (inLn true c)                                    eq = up-≃ c eq
 up-≃ (inLn false c)                                   eq = ≃-refl
 up-≃ (inTake i p w c)                                 eq = ≃-refl
-up-≃ (inOuter (mergeᶠ nothing) f d n q ls c)          eq = up-≃ c (flat-≃ _ eq (≈ᴸ-refl (rowsL ls)))
+up-≃ (inOuter (mergeᶠ nothing) f d n q ls c)          eq = up-≃ c (flat-≃ (λ a → pendRows (f a)) eq (≈ᴸ-refl (rowsL ls)))
 up-≃ (inOuter (mergeᶠ (just _)) f d n q ls c)         eq = ≃-refl
 up-≃ (inOuter switchᶠ f d n q ls c)                   eq = ≃-refl
 up-≃ (inOuter exhaustᶠ f d n q ls c)                  eq = ≃-refl
-up-≃ (inLanes (mergeᶠ nothing) f d n q o pre post c)  eq = up-≃ c (flat-≃ _ ≃-refl (ʳ++-≈ (rowsL pre) (eq ∷ ≈ᴸ-refl (rowsL post))))
+up-≃ (inLanes (mergeᶠ nothing) f d n q o pre post c)  eq = up-≃ c (flat-≃ (λ a → pendRows (f a)) ≃-refl (ʳ++-≈ (rowsL pre) (eq ∷ ≈ᴸ-refl (rowsL post))))
 up-≃ (inLanes (mergeᶠ (just _)) f d n q o pre post c) eq = ≃-refl
 up-≃ (inLanes switchᶠ f d n q o pre post c)           eq = ≃-refl
 up-≃ (inLanes exhaustᶠ f d n q o pre post c)          eq = ≃-refl

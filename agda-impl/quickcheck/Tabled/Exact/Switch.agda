@@ -19,7 +19,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (¬_)
 
 open import denotation.Events using (Pos; _<ᵖ_; ix)
-open import denotation.EmissionSet using (out; skip; end; EmissionSet; Den; After)
+open import denotation.EmissionSet using (out; skip; end; EmissionSet; Den; After; LaneOf)
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled using (Listed; rows; short; concatMap; endBy; values; outerRow; switchRows; module SwitchL)
 open import quickcheck.Tabled.Exact.Base
@@ -78,10 +78,10 @@ module SwitchX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A)
     ... | true  = oend x (done→ c dc)
     ... | false = opass x (λ D → offT dc (Equivalence.from T-≡ (→done c D)))
 
-    lend-row : ∀ {q a c} → t q (out a) → Lane q a c end → ¬ Cut q c → JoinT c (if done c then end else skip)
+    lend-row : ∀ {q a c} → t q (out a) → LaneOf fD q a c end → ¬ Cut q c → JoinT c (if done c then end else skip)
     lend-row {c = c} x y nC with done c in dc
-    ... | true  = lend x tt y nC (done→ c dc)
-    ... | false = lpass x tt y nC (λ D → offT dc (Equivalence.from T-≡ (→done c D)))
+    ... | true  = lend x tt y nC (λ ()) (done→ c dc)
+    ... | false = lpass x tt y nC (λ ()) (λ D → offT dc (Equivalence.from T-≡ (→done c D)))
 
     outer-s : ∀ {r q e} → r ∈ rows o → (q , e) ∈ outerRow done r → JoinT q e
     outer-s {k , out a} rm h with single⁻ h
@@ -91,7 +91,7 @@ module SwitchX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A)
     outer-s {c , end} rm h with single⁻ h
     ... | refl = end-row (sound exo rm)
 
-    live-s : ∀ {q₀ a l k e₀ q e} → (q₀ , a , l) ∈ ls → Lane q₀ a k e₀ → ¬ Cut q₀ k → (q , e) ≡ live (k , e₀) → JoinT q e
+    live-s : ∀ {q₀ a l k e₀ q e} → (q₀ , a , l) ∈ ls → LaneOf fD q₀ a k e₀ → ¬ Cut q₀ k → (q , e) ≡ live (k , e₀) → JoinT q e
     live-s {e₀ = out b} m y nC refl = lane (out-of m) tt y nC tt
     live-s {e₀ = skip}  m y nC refl = lane (out-of m) tt y nC tt
     live-s {e₀ = end}   m y nC refl = lend-row (out-of m) y nC
@@ -115,7 +115,7 @@ module SwitchX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A)
     live-in {e = end}   ()
 
     -- A lane's row, uncut.
-    kept : ∀ {q a k e r} → t q (out a) → Lane q a k e → ¬ Cut q k → r ∈ [ live (k , e) ] → r ∈ rows (switchRows o ls)
+    kept : ∀ {q a k e r} → t q (out a) → LaneOf fD q a k e → ¬ Cut q k → r ∈ [ live (k , e) ] → r ∈ rows (switchRows o ls)
     kept {q} {a} {k} {e} x y nC h =
       let (l , m) = ls-to (values⁺ (complete exo x)) in
       ∈-++⁺ʳ (concatMap (outerRow done) (rows o)) (cm⁺ m (cm⁺ (complete (exl m) y) (if-f (off (cut→ q k) nC) h)))
@@ -133,14 +133,16 @@ module SwitchX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A)
   complete-w (oend {c} x D)   = ∈-++⁺ˡ (cm⁺ (complete exo x) (outer-end {c} (→done c D)))
   complete-w (opass {c} x nD) = ∈-++⁺ˡ (cm⁺ (complete exo x) (outer-end {c} (off (done→ c) nD)))
   complete-w (lane x _ y nC w) = kept x y nC (live-in w)
-  complete-w (lend {c = c} x _ y nC D)   = kept x y nC (live-end {c} (→done c D))
-  complete-w (lpass {c = c} x _ y nC nD) = kept x y nC (live-end {c} (off (done→ c) nD))
+  complete-w (lend {c = c} x _ y nC _ D)   = kept x y nC (live-end {c} (→done c D))
+  complete-w (lpass {c = c} x _ y nC _ nD) = kept x y nC (live-end {c} (off (done→ c) nD))
   complete-w (left {q} {a} {k} x _ y C ins) =
     let (l , m) = ls-to (values⁺ (complete exo x)) in
     ∈-++⁺ʳ (concatMap (outerRow done) (rows o)) (cm⁺ m (cm⁺ (complete (exl m) y) (if-t (→cut q k C) (when⁺ (fromT ins)))))
   complete-w (run () _)
-  complete-w (rend () _)
-  complete-w (rpass () _)
+  complete-w (rend () _ _)
+  complete-w (rpass () _ _)
+  complete-w (hand _ _ _ _ ())
+  complete-w (rhand () _)
 
 switch-exact : ∀ {A B} (fD : A → Den B) {t : EmissionSet A} (o : Listed A) (ls : List (Pos × A × Listed B)) → Exactly o t
   → (∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (After (fD a) (q ++ [ ix 1 ])))

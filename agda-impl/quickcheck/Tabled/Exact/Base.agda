@@ -24,6 +24,7 @@ open import Relation.Nullary using (¬_; does; yes; no)
 
 open import denotation.Events using (Pos; _<ᵖ_; _≟ᵖ_; ix; <ᵖ-trans; <ᵖ-irrefl)
 open import denotation.EmissionSet using (out; skip; end; EmissionSet; _≺_; _≼_)
+open import denotation.Laws.Nth using (module Nths)
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled
   using (Row; Listed; rows; short; bind; concatMap; mapM; concatMapM; when; anyᵇ; allᵇ; endBy; endBefore; ends;
@@ -325,6 +326,7 @@ cnt-in {vs = (k , _) ∷ vs} {q} (there m) with k <ᵖ q
 
 -- `quickcheck.Tabled.Order`'s tests are `EmissionSet.Values`'s predicates.
 module OrderX {A : Set} {t : EmissionSet A} {o : Listed A} (ex : Exact o t) where
+  open Nths t using (nth-val)
   open Order (values (rows o)) using (minᵇ; nextᵇ; nths)
   open Tb.Values t using (Next; Nth; first; next)
 
@@ -355,11 +357,8 @@ module OrderX {A : Set} {t : EmissionSet A} {o : Listed A} (ex : Exact o t) wher
   nth-c (first x mn)      = cm⁺ (values⁺ (complete ex x)) (when⁺ (→min mn))
   nth-c (next {q = q₀} {q′ = q′} N x lt nx) = cm⁺ (values⁺ (complete ex x)) (when⁺ (any⁺ (nth-c N) (→next q₀ q′ lt nx)))
 
-  nth-out : ∀ {i q a} → Nth i q a → t q (out a)
-  nth-out (first x _)    = x
-  nth-out (next _ x _ _) = x
 
   -- The i-th value has i values before it.
   nth-cnt : ∀ {i q a} → Nth i q a → i ≤ cnt q (values (rows o))
   nth-cnt (first x _)      = z≤n
-  nth-cnt (next N x lt _) = ≤-trans (s≤s (nth-cnt N)) (cnt-lt (values⁺ (complete ex (nth-out N))) (fromT lt))
+  nth-cnt (next N x lt _) = ≤-trans (s≤s (nth-cnt N)) (cnt-lt (values⁺ (complete ex (nth-val N))) (fromT lt))
