@@ -55,11 +55,10 @@ open import denotation.EmissionSet
 ≺→≼ : ∀ {x y} → x ≺ y → x ≼ y
 ≺→≼ {x} {y} a b = subst T (<ᵖ-asym x y (Equivalence.to T-≡ a)) b
 
-private
-  ≼-false : ∀ {y q} → y ≼ q → q <ᵖ y ≡ false
-  ≼-false {y} {q} h with q <ᵖ y
-  ... | true  = ⊥-elim (h tt)
-  ... | false = refl
+≼-false : ∀ {y q} → y ≼ q → q <ᵖ y ≡ false
+≼-false {y} {q} h with q <ᵖ y
+... | true  = ⊥-elim (h tt)
+... | false = refl
 
 -- Before what is at or before `q`: before `q`.
 ≺-≼-≺ : ∀ {w y q} → w ≺ y → y ≼ q → w ≺ q
