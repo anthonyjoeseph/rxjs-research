@@ -157,14 +157,18 @@ mutual
   Good doneS                                      = ⊤
   Good (mapS f s)                                 = Good s
   Good (cutS l a s)                               = Good s
-  Good (lnS true s)                               = Good s
-  Good (lnS false (cutS false a s))               = Good s
   Good (flatS (mergeᶠ nothing) f d n q o ls)      = Good o × GoodL ls × q ≡ [] × Single (rows o) × Counts (rows o) (rowsL ls) d n
   Good _                                          = ⊥
 
   GoodL : ∀ {Γ A} → List (St Γ A) → Set
   GoodL []       = ⊤
-  GoodL (s ∷ ls) = Good s × GoodL ls
+  GoodL (s ∷ ls) = GoodLn s × GoodL ls
+
+  -- A lane: in its list, or out of it with its switch off.
+  GoodLn : ∀ {Γ A} → St Γ A → Set
+  GoodLn (lnS true s)                 = Good s
+  GoodLn (lnS false (cutS false a s)) = Good s
+  GoodLn _                            = ⊥
 
 ------------------------------------------------------------------------
 -- An of
@@ -379,16 +383,18 @@ mutual
     own-first (_ , _ , c , cutS true (attAt p) s) attM (after p) _ (kept (seek (inCut true (attAt p) c) s) (seek-ok (inCut true (attAt p) c) s g))
   seek-ok c (cutS false (attAt p) s) g =
     own-first (_ , _ , c , cutS false (attAt p) s) attM (after p) _ (silenced (seek (inCut false (attAt p) c) s) (seek-ok (inCut false (attAt p) c) s g))
-  seek-ok c (lnS true s)       g = seek-ok (inLn true c) s g
-  seek-ok c (lnS false (cutS false a s)) g = seek-ok (inLn false c) (cutS false a s) g
   seek-ok c (flatS (mergeᶠ nothing) f d n .[] o ls) (go , gl , refl , sO , cn) =
     Race.race-ok (λ a → pendRows (f a)) (rows o) (rowsL ls) d n sO cn
       (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)
       (seek-ok (inOuter (mergeᶠ nothing) f d n [] ls c) o go) (lanes-ok c f d n o [] ls gl)
+
+  seek-ln : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → GoodLn s → OK (rows s) (seek c s)
+  seek-ln c (lnS true s)                 g = seek-ok (inLn true c) s g
+  seek-ln c (lnS false (cutS false a s)) g = seek-ok (inLn false c) (cutS false a s) g
 
   lanes-ok : ∀ {R Γ A B} (c : Ctx R Γ B) f d n (o : St Γ A) pre (ls : List (St Γ B)) → GoodL ls
            → OKL (rowsL ls) (lanes c (mergeᶠ nothing) f d n [] o pre ls)
   lanes-ok c f d n o pre []         _          = λ ()
   lanes-ok c f d n o pre (s ∷ post) (gs , gp) =
     lanes-first (retag (cutT (alive s)) (seek (inLanes (mergeᶠ nothing) f d n [] o pre post c) s)) (lanes c (mergeᶠ nothing) f d n [] o (s ∷ pre) post)
-      (lane-ok s _ (seek-ok (inLanes (mergeᶠ nothing) f d n [] o pre post c) s gs)) (lanes-ok c f d n o (s ∷ pre) post gp)
+      (lane-ok s _ (seek-ln (inLanes (mergeᶠ nothing) f d n [] o pre post c) s gs)) (lanes-ok c f d n o (s ∷ pre) post gp)

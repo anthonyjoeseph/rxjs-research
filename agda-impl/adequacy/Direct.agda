@@ -8,7 +8,7 @@
 -- visible rows or shows the least of them and drops it.
 module adequacy.Direct where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; _++_; [_]; _ʳ++_; lookup)
 open import Data.List.Relation.Unary.All using ([])
@@ -24,7 +24,7 @@ open import denotation.MonotonicList using (ofᴱ)
 open import denotation.MonotonicList.Events using (Pos; Timeline; ix; root)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; Work; InE; enter; MapT; ⟦_⟧ᵀ)
 open import operation.PureObservable using (PureObs; module Machine)
-open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; load; moved; quiet; pend; ofS; mapS; cutS; lnS; flatS; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; nx; cp) renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
+open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; load; moved; quiet; pend; ofS; mapS; cutS; lnS; flatS; alive; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; nx; cp) renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
 
 ------------------------------------------------------------------------
 -- The fragment
@@ -139,10 +139,15 @@ up (inLanes exhaustᶠ f d n q o pre post c)            H = up c ∅
 up (inSrc k b c)                                      H = up c ∅
 up (inBody k o c)                                     H = up c ∅
 
+-- A rising event is owed only out of a live node: a lane out of its
+-- list absorbs it.
+Risen : ∀ {Γ A} → St Γ A → Pos → Ev A → EmissionSet A
+Risen s p v = if alive s then Plus (rows s) p v else rows s
+
 -- What the focus owes: a pending subscription its meaning, a rising
 -- event its row.
 here : ∀ {Γ A} → St Γ A → Mode A → Pos → EmissionSet A
-here s        (rising e)  p = Plus (rows s) p (toEv e)
+here s        (rising e)  p = Risen s p (toEv e)
 here s        absorbed    p = rows s
 here (pend o) subscribing p = pendRows o p
 here s        subscribing p = rows s
