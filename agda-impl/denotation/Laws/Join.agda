@@ -104,7 +104,8 @@ module Join {A B : Set} (Q : Pos) where
     module Policy (runs-from : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes o f f′ → ∀ q → q ≼ Q → Runs f′ o′ q → Runs f o q)
                   (cut-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → ∀ q k → k ≼ Q → Cut f o q k → Cut f′ o′ q k)
                   (cut-up : ∀ {f : A → Den B} {o : EmissionSet A} {q k y} → Cut f o q k → k ≼ y → Cut f o q y) where
-      open ES.Joiner using (Done; val; step; oend; opass; lane; lend; lpass; left)
+      open ES.Joiner using (Done)
+      open ES.Joining using (val; step; oend; opass; lane; lend; lpass; left; run; rend; rpass)
 
       read-from : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → ∀ q k → k ≼ Q → Read f′ o′ q k → Read f o q k
       read-from {f} {f′} ao q k kQ (inj₁ nc) = inj₁ (λ c → nc (cut-to {f} {f′} ao q k kQ c))
@@ -147,6 +148,9 @@ module Join {A B : Set} (Q : Pos) where
       join-to {f} {f′} ao L y yQ (left {q} x r l c ins) =
         left (fwd ao q qQ x) (runs-to ao L q qQ r) (lane-to L x r yQ (inj₂ ins) l) (cut-to {f} {f′} ao q y yQ c) ins
         where qQ = value-below q y (proj₂ l) yQ
+      join-to ao L _ _ (run () _)
+      join-to ao L _ _ (rend () _)
+      join-to ao L _ _ (rpass () _)
 
       agree : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes o f f′ → AgreeTo Q (JT f o) (JT f′ o′)
       agree ao L = ⟨ (λ {y} yQ → join-to ao L y yQ , join-to (AgreeTo-sym ao) (lanes-sym ao L) y yQ) ⟩

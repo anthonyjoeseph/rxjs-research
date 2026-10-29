@@ -9,6 +9,7 @@ module adequacy.LaneEnd where
 open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; _ʳ++_)
 open import Data.Product using (_×_; _,_)
+open import Data.Bool using (Bool; T)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -30,17 +31,13 @@ after-lanes : ∀ {B} {p} (Ls : List (EmissionSet B)) → Each (After p) Ls → 
 after-lanes (_ ∷ _)  (a , _)  (inj₁ r) kp = kp (a r)
 after-lanes {p = p} (_ ∷ Ls) (_ , as) (inj₂ x) kp = after-lanes {p = p} Ls as x kp
 
--- Past `p` and by `p`: nothing.
-after-gone : ∀ {A} {t : EmissionSet A} {p} → After p t → Gone t p → Empty t
-after-gone {p = p} a g {q} {e} r = g {q} {e} r (a {q} {e} r)
-
-module _ {A B : Set} (L : A → Pos → EmissionSet B) {p : Pos} {O : EmissionSet A} (Pre Post : List (EmissionSet B)) {t₀ : EmissionSet B}
+module _ {A B : Set} (L : A → Pos → EmissionSet B) {p : Pos} {O : EmissionSet A} {d : Bool} (Pre Post : List (EmissionSet B)) {t₀ : EmissionSet B}
          (ao : After p O) (apre : Each (After p) Pre) (apost : Each (After p) Post) (e₀ : Empty t₀) where
 
   LX = Pre ʳ++ (Plus t₀ p end ∷ Post)
   LY = Pre ʳ++ (∅ ∷ Post)
-  X  = Flat.FlatR L O LX
-  Y  = Flat.FlatR L O LY
+  X  = Flat.JoinT L O d LX
+  Y  = Flat.JoinT L O d LY
 
   so : Since p O
   so {q} {e} r = ≺→≼ {p} {q} (ao {q} {e} r)
@@ -68,21 +65,21 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {p : Pos} {O : EmissionSe
   ... | inj₂ (inj₁ ())
   ... | inj₂ (inj₂ b) = any-ʳ++ʳ Pre (inj₂ b)
 
-  done-xy : ∀ c → p ≼ c → Flat.Done L O LX c → Flat.Done L O LY c
-  done-xy c pc (g , h , ls) with all-ʳ++⁻ Pre ls
-  ... | gp , (_ , gq) = g , h , all-ʳ++ Pre gp ((λ ()) , gq)
+  done-xy : ∀ c → p ≼ c → Flat.Done L O d LX c → Flat.Done L O d LY c
+  done-xy c pc ((g , ls) , h) with all-ʳ++⁻ Pre ls
+  ... | gp , (_ , gq) = (g , all-ʳ++ Pre gp ((λ ()) , gq)) , h
 
-  done-yx : ∀ c → p ≼ c → Flat.Done L O LY c → Flat.Done L O LX c
-  done-yx c pc (g , h , ls) with all-ʳ++⁻ Pre ls
-  ... | gp , (_ , gq) = g , h , all-ʳ++ Pre gp (hole , gq)
+  done-yx : ∀ c → p ≼ c → Flat.Done L O d LY c → Flat.Done L O d LX c
+  done-yx c pc ((g , ls) , h) with all-ʳ++⁻ Pre ls
+  ... | gp , (_ , gq) = (g , all-ʳ++ Pre gp (hole , gq)) , h
     where
       hole : Gone (Plus t₀ p end) c
       hole (old r) = ⊥-elim (e₀ r)
       hole new     = pc
 
   -- The merge done at `p` exactly when every other part owes nothing.
-  done-at : Empty O → Each Empty Pre → Each Empty Post → Flat.Done L O LX p
-  done-at eo ep eq = (λ r → ⊥-elim (eo r)) , (λ r _ → ⊥-elim (eo r)) , all-ʳ++ Pre (gone Pre ep) (hole , gone Post eq)
+  done-at : T d → Each Empty Pre → Each Empty Post → Flat.Done L O d LX p
+  done-at td ep eq = (inj₁ td , all-ʳ++ Pre (gone Pre ep) (hole , gone Post eq)) , λ {q} r _ lt _ → ⊥-elim (≺→≼ {p} {q} (ao r) lt)
     where
       gone : ∀ (Ls : List (EmissionSet B)) → Each Empty Ls → Each (λ t → Gone t p) Ls
       gone []       _        = _
@@ -91,28 +88,30 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {p : Pos} {O : EmissionSe
       hole (old r) = ⊥-elim (e₀ r)
       hole new     = ≼-refl {p}
 
-  outer-owes : ¬ Empty O → ¬ Flat.Done L O LX p
-  outer-owes ne (g , _) = ne (after-gone {p = p} ao (λ {q} {e} → g {q} {e}))
+  outer-owes : ¬ T d → ¬ Flat.Done L O d LX p
+  outer-owes nd ((inj₁ td , _) , _)             = nd td
+  outer-owes nd ((inj₂ (c₀ , x , c₀p) , _) , _) = c₀p (ao x)
 
-  lanes-owe : ¬ Empty (Lanes Pre) ⊎ ¬ Empty (Lanes Post) → ¬ Flat.Done L O LX p
-  lanes-owe w (_ , _ , ls) with all-ʳ++⁻ Pre ls
+  lanes-owe : ¬ Empty (Lanes Pre) ⊎ ¬ Empty (Lanes Post) → ¬ Flat.Done L O d LX p
+  lanes-owe w ((_ , ls) , _) with all-ʳ++⁻ Pre ls
   ... | gp , (_ , gq) with w
   ... | inj₁ ne = ne λ x → after-lanes {p = p} Pre apre x (gone-any Pre {p} gp x)
   ... | inj₂ ne = ne λ x → after-lanes {p = p} Post apost x (gone-any Post {p} gq x)
 
   -- THE FRAME: the merge with the lane read as `Y′`, which owes `Y` and
   -- at most the merge's own end at `p`.
-  module _ (Y′ : EmissionSet B) (dp : Flat.Done L O LX p → Y′ p end) (y→ : ∀ {k e} → Y k e → Y′ k e)
-           (y← : ∀ {k e} → Y′ k e → Y k e ⊎ (k ≡ p × e ≡ end × Flat.Done L O LX p)) where
+  module _ (Y′ : EmissionSet B) (dp : Flat.Done L O d LX p → Y′ p end) (y→ : ∀ {k e} → Y k e → Y′ k e)
+           (y← : ∀ {k e} → Y′ k e → Y k e ⊎ (k ≡ p × e ≡ end × Flat.Done L O d LX p)) where
 
     fwd′ : ∀ {k e} → X k e → Y′ k e ⊎ Skip p k e
     fwd′ (Flat.val r)    = inj₁ (y→ (Flat.val r))
     fwd′ (Flat.step r)   = inj₁ (y→ (Flat.step r))
     fwd′ (Flat.oend {c} r d)   = inj₁ (y→ (Flat.oend r (done-xy c (so r) d)))
     fwd′ (Flat.opass {c} r nd) = inj₁ (y→ (Flat.opass r λ d → nd (done-yx c (so r) d)))
-    fwd′ (Flat.lane r l w) = inj₁ (y→ (Flat.lane r l w))
-    fwd′ (Flat.lend {q} {a} {c} r l d)   = inj₁ (y→ (Flat.lend r l (done-xy c (lane-since L {O = O} {Ls = LX} {q = q} {a = a} so r l) d)))
-    fwd′ (Flat.lpass {q} {a} {c} r l nd) = inj₁ (y→ (Flat.lpass r l λ d → nd (done-yx c (lane-since L {O = O} {Ls = LX} {q = q} {a = a} so r l) d)))
+    fwd′ (Flat.lane r ru l nc w) = inj₁ (y→ (Flat.lane r ru l nc w))
+    fwd′ (Flat.lend {q} {a} {c} r ru l nc dn)   = inj₁ (y→ (Flat.lend r ru l nc (done-xy c (lane-since L {d = d} {O = O} {Ls = LX} {q = q} {a = a} so r l) dn)))
+    fwd′ (Flat.lpass {q} {a} {c} r ru l nc nd) = inj₁ (y→ (Flat.lpass r ru l nc λ dn → nd (done-yx c (lane-since L {d = d} {O = O} {Ls = LX} {q = q} {a = a} so r l) dn)))
+    fwd′ (Flat.left _ _ _ () _)
     fwd′ (Flat.run x w) with lanes-xy x
     ... | inj₁ x′           = inj₁ (y→ (Flat.run x′ w))
     ... | inj₂ (refl , refl) = ⊥-elim w
@@ -128,9 +127,10 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {p : Pos} {O : EmissionSe
     back (Flat.step r)   = Flat.step r
     back (Flat.oend {c} r d)   = Flat.oend r (done-yx c (so r) d)
     back (Flat.opass {c} r nd) = Flat.opass r λ d → nd (done-xy c (so r) d)
-    back (Flat.lane r l w) = Flat.lane r l w
-    back (Flat.lend {q} {a} {c} r l d)   = Flat.lend r l (done-yx c (lane-since L {O = O} {Ls = LY} {q = q} {a = a} so r l) d)
-    back (Flat.lpass {q} {a} {c} r l nd) = Flat.lpass r l λ d → nd (done-xy c (lane-since L {O = O} {Ls = LY} {q = q} {a = a} so r l) d)
+    back (Flat.lane r ru l nc w) = Flat.lane r ru l nc w
+    back (Flat.lend {q} {a} {c} r ru l nc dn)   = Flat.lend r ru l nc (done-yx c (lane-since L {d = d} {O = O} {Ls = LY} {q = q} {a = a} so r l) dn)
+    back (Flat.lpass {q} {a} {c} r ru l nc nd) = Flat.lpass r ru l nc λ dn → nd (done-xy c (lane-since L {d = d} {O = O} {Ls = LY} {q = q} {a = a} so r l) dn)
+    back (Flat.left _ _ _ () _)
     back (Flat.run x w)  = Flat.run (lanes-yx x) w
     back (Flat.rend {c} x d)   = Flat.rend (lanes-yx x) (done-yx c (since-lanes LY sy x) d)
     back (Flat.rpass {c} x nd) = Flat.rpass (lanes-yx x) λ d → nd (done-xy c (since-lanes LY sy x) d)

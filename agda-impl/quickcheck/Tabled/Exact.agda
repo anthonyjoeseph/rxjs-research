@@ -233,6 +233,9 @@ module MergeX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A) 
     let (l , m) = ls-to (values⁺ (complete exo x)) in
     ∈-++⁺ʳ (concatMap (outerRow done) (rows o)) (cm⁺ m (lane-end {c} (off (done→ c) nD) (complete (exl m) y)))
   complete-m (left _ _ _ () _)
+  complete-m (run () _)
+  complete-m (rend () _)
+  complete-m (rpass () _)
 
 merge-exact : ∀ {A B} (fD : A → Den B) {t : EmissionSet A} (o : Listed A) (ls : List (Pos × A × Listed B)) → Exactly o t
   → (∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (After (fD a) (q ++ [ ix 1 ])))

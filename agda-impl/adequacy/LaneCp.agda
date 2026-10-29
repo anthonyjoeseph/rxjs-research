@@ -55,18 +55,18 @@ module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St 
   ed   = lnS false (cutS false a s₀)
   LX   = Pre ʳ++ (Plus (rows s₀) p end ∷ Post)
   LY   = Pre ʳ++ (∅ ∷ Post)
-  Y    = Flat.FlatR L O LY
+  Y    = Flat.JoinT L O d LY
 
   node : ℕ → St Γ B
   node m = flatS (mergeᶠ nothing) f d m [] o (pre ʳ++ ed ∷ post)
 
   rowsY : ∀ {m} → rows (node m) ≃ Y
-  rowsY = ≡→≃ (cong (Flat.FlatR L O) (rowsL-ʳ++ pre))
+  rowsY = ≡→≃ (cong (Flat.JoinT L O d) (rowsL-ʳ++ pre))
 
-  sx′ = since-x L {p} {O} Pre Post {rows s₀} ao apre apost en
-  sy′ = since-y L {p} {O} Pre Post {rows s₀} ao apre apost en
-  fr  = frame-≈ L {p} {O} Pre Post {rows s₀} ao apre apost en
-  da  = done-at L {p} {O} Pre Post {rows s₀} ao apre apost en
+  sx′ = since-x L {p} {O} {d} Pre Post {rows s₀} ao apre apost en
+  sy′ = since-y L {p} {O} {d} Pre Post {rows s₀} ao apre apost en
+  fr  = frame-≈ L {p} {O} {d} Pre Post {rows s₀} ao apre apost en
+  da  = done-at L {p} {O} {d} Pre Post {rows s₀} ao apre apost en
 
   cnt : pred n ≡ live pre + live post
   cnt = cong pred (trans nl (trans (live-ʳ++ pre) (+-suc (live pre) (live post))))
@@ -91,14 +91,14 @@ module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St 
   ------------------------------------------------------------------------
   -- The two outcomes
 
-  pass : ¬ Flat.Done L O LX p → Owing Y
-       → Inv ⟨ c , node (pred n) , absorbed , p ⟩ × Moves (up c (Flat.FlatR L O LX)) [] (up c (rows (node (pred n))))
+  pass : ¬ Flat.Done L O d LX p → Owing Y
+       → Inv ⟨ c , node (pred n) , absorbed , p ⟩ × Moves (up c (Flat.JoinT L O d LX)) [] (up c (rows (node (pred n))))
   pass nd ow = inv good′ (owes-join c uc owes′ (need-of c (owing-≃ (≃-sym (rowsY {pred n})) ow)))
              , silent (≃-trans (≈-vis (up-≈ c lc (sx′) (sy′)
                                              (fr Y (λ d → ⊥-elim (nd d)) (λ r → r) inj₁)))
                                (vis-≃ (up-≃ c (≃-sym (rowsY {pred n})))))
 
-  done : T d → pred n ≡ 0 → Inv ⟨ c , node (pred n) , rising cp , p ⟩ × Moves (up c (Flat.FlatR L O LX)) [] (up c (Plus (rows (node (pred n))) p end))
+  done : T d → pred n ≡ 0 → Inv ⟨ c , node (pred n) , rising cp , p ⟩ × Moves (up c (Flat.JoinT L O d LX)) [] (up c (Plus (rows (node (pred n))) p end))
   done td pz = inv good′ (uc , lc , owes′ , tt , (λ r → ⊥-elim (empty-node r)) , empty-node)
              , silent (≃-trans (≈-vis (up-≈ c lc (sx′) since′
                                              (fr (Plus Y p end) (λ _ → new) old back)))
@@ -109,10 +109,10 @@ module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St 
       gs = goodL-ʳ++⁻ pre gl
       ep = dead-empty pre (proj₁ gs) (m+n≡0⇒m≡0 (live pre) z)
       eq = dead-empty post (proj₂ (proj₂ gs)) (m+n≡0⇒n≡0 (live pre) z)
-      D  = da eo ep eq
+      D  = da td ep eq
       empty-node : Empty (rows (node (pred n)))
       empty-node = empty-≃ (≃-sym (rowsY {pred n})) (flat-empty L eo (all-ʳ++ Pre ep ((λ {_} {_} ()) , eq)))
-      back : ∀ {k e} → Plus Y p end k e → Y k e ⊎ (k ≡ p × e ≡ end × Flat.Done L O LX p)
+      back : ∀ {k e} → Plus Y p end k e → Y k e ⊎ (k ≡ p × e ≡ end × Flat.Done L O d LX p)
       back (old r) = inj₁ r
       back new     = inj₂ (refl , refl , D)
       since′ : Since p (Plus Y p end)
@@ -133,13 +133,14 @@ module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St 
   owing-ly (inj₂ ow) em = ow λ {q} {e} x → em (any-ʳ++ʳ Pre (inj₂ x))
 
   Out : Machine.Mode B → Set₁
-  Out m = Inv ⟨ c , node (pred n) , m , p ⟩ × Moves (up c (Flat.FlatR L O LX)) [] (up c (here (node (pred n)) m p))
+  Out m = Inv ⟨ c , node (pred n) , m , p ⟩ × Moves (up c (Flat.JoinT L O d LX)) [] (up c (here (node (pred n)) m p))
 
   pick : ∀ b → d ≡ b → ∀ m → pred n ≡ m → Out (settle b m true)
-  pick false db m em = pass (outer-owes L {p} {O} Pre Post {rows s₀} ao apre apost en ow) (flat-owing-o L {O} {LY} ow)
-    where ow = ho λ t → subst T db t
+  pick false db m em = pass (outer-owes L {p} {O} {d} Pre Post {rows s₀} ao apre apost en nd) (flat-owing-o L {O} {d} {LY} ow)
+    where nd = λ t → subst T db t
+          ow = ho nd
   pick true db zero em = done (subst T (sym db) tt) em
-  pick true db (suc k) em = pass (lanes-owe L {p} {O} Pre Post {rows s₀} ao apre apost en w) (flat-owing-l L {O} {LY} (owing-ly w))
+  pick true db (suc k) em = pass (lanes-owe L {p} {O} {d} Pre Post {rows s₀} ao apre apost en w) (flat-owing-l L {O} {d} {LY} (owing-ly w))
     where w = live-other k (trans (sym cnt) em)
 
   result : Out (settle d (pred n) true)

@@ -198,6 +198,9 @@ module ExhaustX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A
   complete-e (lend {c = c} x R y _ D) = shown x R λ m → lane-end {c} (→done c D) (complete (exl m) y)
   complete-e (lpass {c = c} x R y _ nD) = shown x R λ m → lane-end {c} (off (done→ c) nD) (complete (exl m) y)
   complete-e (left _ _ _ () _)
+  complete-e (run () _)
+  complete-e (rend () _)
+  complete-e (rpass () _)
 
 exhaust-exact : ∀ {A B} (fD : A → Den B) {t : EmissionSet A} (o : Listed A) (ls : List (Pos × A × Listed B)) → Exactly o t
   → (∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (After (fD a) (q ++ [ ix 1 ])))

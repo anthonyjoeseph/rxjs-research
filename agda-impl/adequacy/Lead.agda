@@ -301,7 +301,7 @@ module Step {R Γ A B} (v : Bool) (c : Ctx R Γ B) (f : A → Obs Timeline Γ B)
 module Race {R Γ A B} (v : Bool) (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St Γ A) (ls : List (St Γ B)) where
 
   FR : EmissionSet B
-  FR = Flat.FlatR (λ x → pendRows (f x)) (rows o) (rowsL ls)
+  FR = Flat.JoinT (λ x → pendRows (f x)) (rows o) d (rowsL ls)
 
   lane-occ : ∀ {Q} (o′ o″ : Out B) → (∀ {b} → Fits o′ (out b) → Fits o″ (out b)) → Occ (Lanes (rowsL ls)) Q o′ → Occ FR Q o″
   lane-occ o′ o″ fo oc = occ-bind oc go

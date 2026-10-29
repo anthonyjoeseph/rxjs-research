@@ -6,7 +6,7 @@
 -- nothing while still live would end the merge early.
 module adequacy.Owes where
 
-open import Data.Bool using (true; false; T; _∧_)
+open import Data.Bool using (Bool; true; false; T; _∧_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _ʳ++_)
 open import Data.Maybe using (just; nothing)
@@ -107,9 +107,9 @@ map-owing f {t} ow em = ow go
     go {e = skip}  r = em (map-skip r)
     go {e = end}   r = em (map-end r)
 
-module _ {A B : Set} (L : A → Pos → EmissionSet B) {O : EmissionSet A} {Ls : List (EmissionSet B)} where
+module _ {A B : Set} (L : A → Pos → EmissionSet B) {O : EmissionSet A} {d : Bool} {Ls : List (EmissionSet B)} where
   -- An outer owing a row: the merge owes one for it.
-  flat-owing-o : Owing O → Owing (Flat.FlatR L O Ls)
+  flat-owing-o : Owing O → Owing (Flat.JoinT L O d Ls)
   flat-owing-o ow em = ow go
     where
       go : Empty O
@@ -117,7 +117,7 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {O : EmissionSet A} {Ls :
       go {e = skip}  r = em (Flat.step r)
       go {e = end}   r = em (Flat.opass r λ d → em (Flat.oend r d))
 
-  flat-owing-l : Owing (Lanes Ls) → Owing (Flat.FlatR L O Ls)
+  flat-owing-l : Owing (Lanes Ls) → Owing (Flat.JoinT L O d Ls)
   flat-owing-l ow em = ow go
     where
       go : Empty (Lanes Ls)
@@ -125,14 +125,15 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {O : EmissionSet A} {Ls :
       go {e = skip}  x = em (Flat.run x _)
       go {e = end}   x = em (Flat.rpass x λ d → em (Flat.rend x d))
 
-  flat-empty : Empty O → Each Empty Ls → Empty (Flat.FlatR L O Ls)
+  flat-empty : Empty O → Each Empty Ls → Empty (Flat.JoinT L O d Ls)
   flat-empty eo el (Flat.val r)       = eo r
   flat-empty eo el (Flat.step r)      = eo r
   flat-empty eo el (Flat.oend r _)    = eo r
   flat-empty eo el (Flat.opass r _)   = eo r
-  flat-empty eo el (Flat.lane r _ _)  = eo r
-  flat-empty eo el (Flat.lend r _ _)  = eo r
-  flat-empty eo el (Flat.lpass r _ _) = eo r
+  flat-empty eo el (Flat.lane r _ _ _ _)  = eo r
+  flat-empty eo el (Flat.lend r _ _ _ _)  = eo r
+  flat-empty eo el (Flat.lpass r _ _ _ _) = eo r
+  flat-empty eo el (Flat.left _ _ _ () _)
   flat-empty eo el (Flat.run x _)     = empty-any Ls el x
   flat-empty eo el (Flat.rend x _)    = empty-any Ls el x
   flat-empty eo el (Flat.rpass x _)   = empty-any Ls el x
@@ -152,7 +153,7 @@ need-of (inOuter (mergeᶠ (just _)) f d n q ls c) ow = tt
 need-of (inOuter switchᶠ f d n q ls c)          ow = tt
 need-of (inOuter exhaustᶠ f d n q ls c)         ow = tt
 need-of (inLanes (mergeᶠ nothing) f d n q o pre post c) {s} ow =
-  (λ _ → ow) , need-of c (owing-≃ (≡→≃ (cong (Flat.FlatR _ (rows o)) (sym (rowsL-ʳ++ pre))))
+  (λ _ → ow) , need-of c (owing-≃ (≡→≃ (cong (Flat.JoinT _ (rows o) d) (sym (rowsL-ʳ++ pre))))
                                   (flat-owing-l _ λ em → ow λ r → em (any-ʳ++ʳ (rowsL pre) (inj₁ r))))
 need-of (inLanes (mergeᶠ (just _)) f d n q o pre post c) ow = tt
 need-of (inLanes switchᶠ f d n q o pre post c)  ow = tt

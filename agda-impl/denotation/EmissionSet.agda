@@ -181,20 +181,27 @@ module TakeWhile {A : Set} (incl : Bool) (keep : A → Bool) (t : EmissionSet A)
 LaneOf : ∀ {A B : Set} → (A → Den B) → Pos → A → EmissionSet B
 LaneOf f q a = After (f a) (q ++ [ ix 1 ])
 
--- A JOINER: the outer `o`, and each value `a` at `q` it runs (`Runs q`)
--- subscribed as a lane, its first effect `q ++ [ ix 0 ]` silent.  A lane
--- counts until it is cut (`Cut q k`, closed upward in `k`); past that,
--- what it still runs of its subscribe burst stays, as skips.  The whole
--- ends where the last part does; every other end is a skip.
-module Joiner {A B : Set} (f : A → Den B) (o : EmissionSet A) (Runs : Pos → Set) (Cut : Pos → Pos → Set) where
+-- `t` has ended by `c`.
+Ended : ∀ {X : Set} → EmissionSet X → Pos → Set
+Ended t c = Σ Pos λ c₀ → t c₀ end × c₀ ≼ c
+
+-- A JOINER PART WAY THROUGH: what is left of the outer, `o`; each value
+-- `a` at `q` it runs (`Runs q`) subscribed as a lane at `q ++ [ ix 1 ]`,
+-- reading `L a` there, its first effect `q ++ [ ix 0 ]` silent; and the
+-- rows `Bg` of the lanes already begun, over by `c` where `Over c` holds
+-- along with the outer.  A lane counts until it is cut (`Cut q k`, closed
+-- upward in `k`); past that, what it still runs of its subscribe burst
+-- stays, as skips.  The whole ends where the last part does; every other
+-- end is a skip.
+module Joining {A B : Set} (L : A → Pos → EmissionSet B) (o : EmissionSet A) (Bg : EmissionSet B) (Over : Pos → Set)
+               (Runs : Pos → Set) (Cut : Pos → Pos → Set) where
 
   Lane : Pos → A → EmissionSet B
-  Lane = LaneOf f
+  Lane q a k e = L a (q ++ [ ix 1 ]) k e × (q ++ [ ix 1 ]) ≺ k
 
   -- Every part running at `c` has ended by `c`.
   Done : Pos → Set
-  Done c = (Σ Pos λ c₀ → o c₀ end × c₀ ≼ c)
-         × (∀ {q a} → o q (out a) → Runs q → q ≺ c → ¬ Cut q c → Σ Pos λ c′ → Lane q a c′ end × c′ ≼ c)
+  Done c = Over c × (∀ {q a} → o q (out a) → Runs q → q ≺ c → ¬ Cut q c → Ended (Lane q a) c)
 
   data JoinT : EmissionSet B where
     val   : ∀ {q a} → o q (out a) → JoinT (q ++ [ ix 0 ]) skip
@@ -205,6 +212,13 @@ module Joiner {A B : Set} (f : A → Den B) (o : EmissionSet A) (Runs : Pos → 
     lend  : ∀ {q a c} → o q (out a) → Runs q → Lane q a c end → ¬ Cut q c → Done c → JoinT c end
     lpass : ∀ {q a c} → o q (out a) → Runs q → Lane q a c end → ¬ Cut q c → ¬ Done c → JoinT c skip
     left  : ∀ {q a k e} → o q (out a) → Runs q → Lane q a k e → Cut q k → T (inside (q ++ [ ix 1 ]) k) → JoinT k skip
+    run   : ∀ {k e} → Bg k e → Work e → JoinT k e
+    rend  : ∀ {c} → Bg c end → Done c → JoinT c end
+    rpass : ∀ {c} → Bg c end → ¬ Done c → JoinT c skip
+
+-- A JOINER, freshly subscribed: nothing begun, and over where its outer is.
+module Joiner {A B : Set} (f : A → Den B) (o : EmissionSet A) (Runs : Pos → Set) (Cut : Pos → Pos → Set) where
+  open Joining (λ a → enter (f a)) o (λ _ _ → Empty) (Ended o) Runs Cut public
 
 -- MERGE: every value runs, and no lane is cut.
 module Merge {A B : Set} (f : A → Den B) (o : EmissionSet A) where

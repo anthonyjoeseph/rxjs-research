@@ -138,6 +138,9 @@ module SwitchX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A)
   complete-w (left {q} {a} {k} x _ y C ins) =
     let (l , m) = ls-to (values⁺ (complete exo x)) in
     ∈-++⁺ʳ (concatMap (outerRow done) (rows o)) (cm⁺ m (cm⁺ (complete (exl m) y) (if-t (→cut q k C) (when⁺ (fromT ins)))))
+  complete-w (run () _)
+  complete-w (rend () _)
+  complete-w (rpass () _)
 
 switch-exact : ∀ {A B} (fD : A → Den B) {t : EmissionSet A} (o : Listed A) (ls : List (Pos × A × Listed B)) → Exactly o t
   → (∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (After (fD a) (q ++ [ ix 1 ])))

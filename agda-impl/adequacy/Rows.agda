@@ -8,21 +8,20 @@
 -- visible rows or shows the least of them and drops it.
 module adequacy.Rows where
 
-open import Data.Bool using (true; false; if_then_else_)
+open import Data.Bool using (Bool; T; true; false; if_then_else_)
 open import Data.Empty using (⊥)
-open import Data.List using (List; []; _∷_; _++_; [_]; _ʳ++_)
+open import Data.List using (List; []; _∷_; [_]; _ʳ++_)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Sum using (_⊎_)
 open import Data.Maybe using (just; nothing)
-open import Data.Product using (Σ; _×_; _,_)
+open import Data.Product using (_×_; _,_)
 open import Data.Unit using (⊤)
-open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; empty; of; map; flatMap)
 open import denotation.Events using (ofᴱ)
-open import denotation.Events using (Pos; Timeline; ix)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; Work; InE; enter; MapT; ⟦_⟧)
+open import denotation.Events using (Pos; Timeline)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; InE; enter; MapT; ⟦_⟧; Ended; module Joining)
 open import operation.PureObservable using (module Machine; module Driver)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; load; moved; quiet; pend; ofS; mapS; cutS; lnS; flatS; alive; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; nx; cp) renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
 
@@ -84,30 +83,10 @@ Each : ∀ {B} → (EmissionSet B → Set) → List (EmissionSet B) → Set
 Each P []       = ⊤
 Each P (t ∷ Ls) = P t × Each P Ls
 
--- A MERGE PART WAY THROUGH: what is left of its outer, `O`; the lanes it
--- has begun, `Ls`; and a lane for each value the outer still owes,
--- subscribed as `Merge` subscribes it.  With nothing begun it is `Merge.JoinT`.
-module Flat {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (Ls : List (EmissionSet B)) where
-
-  Lane : Pos → A → EmissionSet B
-  Lane q a k e = L a (q ++ [ ix 1 ]) k e × (q ++ [ ix 1 ]) ≺ k
-
-  Done : Pos → Set
-  Done c = Gone O c
-         × (∀ {q a} → O q (out a) → q ≺ c → Σ Pos λ c′ → Lane q a c′ end × c′ ≼ c)
-         × Each (λ t → Gone t c) Ls
-
-  data FlatR : EmissionSet B where
-    val   : ∀ {q a} → O q (out a) → FlatR (q ++ [ ix 0 ]) skip
-    step  : ∀ {q} → O q skip → FlatR q skip
-    oend  : ∀ {c} → O c end → Done c → FlatR c end
-    opass : ∀ {c} → O c end → ¬ Done c → FlatR c skip
-    lane  : ∀ {q a k e} → O q (out a) → Lane q a k e → Work e → FlatR k e
-    lend  : ∀ {q a c} → O q (out a) → Lane q a c end → Done c → FlatR c end
-    lpass : ∀ {q a c} → O q (out a) → Lane q a c end → ¬ Done c → FlatR c skip
-    run   : ∀ {k e} → Lanes Ls k e → Work e → FlatR k e
-    rend  : ∀ {c} → Lanes Ls c end → Done c → FlatR c end
-    rpass : ∀ {c} → Lanes Ls c end → ¬ Done c → FlatR c skip
+-- A MERGE PART WAY THROUGH: `Merge`'s joiner at what is left of its outer,
+-- `O`, done already where `d`, with the lanes it has begun, `Ls`.
+module Flat {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (d : Bool) (Ls : List (EmissionSet B)) where
+  open Joining L O (Lanes Ls) (λ c → (T d ⊎ Ended O c) × Each (λ t → Gone t c) Ls) (λ _ → ⊤) (λ _ _ → ⊥) public
 
 -- What a subscription pending at `p` owes: its meaning, entered there.
 pendRows : ∀ {Γ A} → Obs Timeline Γ A → Pos → EmissionSet A
@@ -121,7 +100,7 @@ mutual
   rows (mapS f s)                             = MapT f (rows s)
   rows (cutS true a s)                        = rows s
   rows (lnS true s)                           = rows s
-  rows (flatS (mergeᶠ nothing) f d n q o ls)  = Flat.FlatR (λ a → pendRows (f a)) (rows o) (rowsL ls)
+  rows (flatS (mergeᶠ nothing) f d n q o ls)  = Flat.JoinT (λ a → pendRows (f a)) (rows o) d (rowsL ls)
   rows _                                      = ∅
 
   rowsL : ∀ {Γ A} → List (St Γ A) → List (EmissionSet A)
@@ -138,11 +117,11 @@ up (inCut false a c)                                  H = up c ∅
 up (inLn true c)                                      H = up c H
 up (inLn false c)                                     H = up c ∅
 up (inTake i p w c)                                   H = up c ∅
-up (inOuter (mergeᶠ nothing) f d n q ls c)            H = up c (Flat.FlatR (λ a → pendRows (f a)) H (rowsL ls))
+up (inOuter (mergeᶠ nothing) f d n q ls c)            H = up c (Flat.JoinT (λ a → pendRows (f a)) H d (rowsL ls))
 up (inOuter (mergeᶠ (just _)) f d n q ls c)           H = up c ∅
 up (inOuter switchᶠ f d n q ls c)                     H = up c ∅
 up (inOuter exhaustᶠ f d n q ls c)                    H = up c ∅
-up (inLanes (mergeᶠ nothing) f d n q o pre post c)    H = up c (Flat.FlatR (λ a → pendRows (f a)) (rows o) (rowsL pre ʳ++ (H ∷ rowsL post)))
+up (inLanes (mergeᶠ nothing) f d n q o pre post c)    H = up c (Flat.JoinT (λ a → pendRows (f a)) (rows o) d (rowsL pre ʳ++ (H ∷ rowsL post)))
 up (inLanes (mergeᶠ (just _)) f d n q o pre post c)   H = up c ∅
 up (inLanes switchᶠ f d n q o pre post c)             H = up c ∅
 up (inLanes exhaustᶠ f d n q o pre post c)            H = up c ∅

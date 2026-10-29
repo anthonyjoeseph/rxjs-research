@@ -26,6 +26,7 @@ open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (ofᴱ)
 open import denotation.Events using (Pos; ix; last; <ᵖ-asym; <ᵖ-split; <ᵖ-step; <ᵖ-shift; <ᵖ-below; <ᵖ-part; <ᵖ-ix)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; InE; at-out; at-end; on-out; MapT; map-out; map-skip; map-end)
+open import denotation.Laws.Modulus using (≼-refl)
 open import operation.Key using (Key; at; after; _<ᴷ_; ≮ᴷ-trans; <ᴷ-trans; <ᴷ-irrefl; at-<ᵖ; clash)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed;
@@ -524,25 +525,26 @@ lanes-first {Ls = Ls} (just (g , K , o)) (just (g′ , K′ , o′)) bx (fy , my
 
 module Race {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (Ls : List (EmissionSet B)) (d : Bool) (n : ℕ)
             (sO : Single O) (eO : EndLast O) (cn : Counts O Ls d n) where
-  open Flat L O Ls
+  open Flat L O d Ls
   open Counts cn
 
   -- Every row of the merge sits no earlier than some row of a part:
   -- `K` bounding the outer's and the lanes', it bounds the merge's.
-  rows-from : ∀ K → From K O → Each (From K) Ls → From K FlatR
+  rows-from : ∀ K → From K O → Each (From K) Ls → From K JoinT
   rows-from K fo fl (val r)          = ⊑-trans (fo r) (ext-⊑ _ [ ix 0 ])
   rows-from K fo fl (step r)         = fo r
   rows-from K fo fl (oend r _)       = fo r
   rows-from K fo fl (opass r _)      = fo r
-  rows-from K fo fl (lane r (_ , s) _) = ⊑-trans (fo r) (⊑-trans (ext-⊑ _ [ ix 1 ]) (≺→⊑ s))
-  rows-from K fo fl (lend r (_ , s) _) = ⊑-trans (fo r) (⊑-trans (ext-⊑ _ [ ix 1 ]) (≺→⊑ s))
-  rows-from K fo fl (lpass r (_ , s) _) = ⊑-trans (fo r) (⊑-trans (ext-⊑ _ [ ix 1 ]) (≺→⊑ s))
+  rows-from K fo fl (lane r _ (_ , s) _ _) = ⊑-trans (fo r) (⊑-trans (ext-⊑ _ [ ix 1 ]) (≺→⊑ s))
+  rows-from K fo fl (lend r _ (_ , s) _ _) = ⊑-trans (fo r) (⊑-trans (ext-⊑ _ [ ix 1 ]) (≺→⊑ s))
+  rows-from K fo fl (lpass r _ (_ , s) _ _) = ⊑-trans (fo r) (⊑-trans (ext-⊑ _ [ ix 1 ]) (≺→⊑ s))
+  rows-from K fo fl (left _ _ _ () _)
   rows-from K fo fl (run x _)        = from-any Ls fl x
   rows-from K fo fl (rend x _)       = from-any Ls fl x
   rows-from K fo fl (rpass x _)      = from-any Ls fl x
 
   -- The outer showing a value at `q₀`: every row sits just past it or later.
-  past-val : ∀ {q₀ a} → O q₀ (out a) → From (at q₀) O → Each (From (at (q₀ ++ [ ix 0 ]))) Ls → From (at (q₀ ++ [ ix 0 ])) FlatR
+  past-val : ∀ {q₀ a} → O q₀ (out a) → From (at q₀) O → Each (From (at (q₀ ++ [ ix 0 ]))) Ls → From (at (q₀ ++ [ ix 0 ])) JoinT
   past-val v fo fl (val r)          = shift-≮ _ (at _) (fo r)
   past-val v fo fl (step r)         = past-⊑ (fo r) λ { refl → skip≢ (sO v r) }
     where skip≢ : ∀ {a} → out a ≡ skip → ⊥
@@ -553,35 +555,37 @@ module Race {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (L
   past-val v fo fl (opass r _)      = past-⊑ (fo r) λ { refl → end≢ (sO v r) }
     where end≢ : ∀ {a} → out a ≡ end → ⊥
           end≢ ()
-  past-val v fo fl (lane r (_ , s) _) = ⊑-trans (shift-≮ _ (at _) (fo r)) (⊑-trans (ix01 _) (≺→⊑ s))
-  past-val v fo fl (lend r (_ , s) _) = ⊑-trans (shift-≮ _ (at _) (fo r)) (⊑-trans (ix01 _) (≺→⊑ s))
-  past-val v fo fl (lpass r (_ , s) _) = ⊑-trans (shift-≮ _ (at _) (fo r)) (⊑-trans (ix01 _) (≺→⊑ s))
+  past-val v fo fl (lane r _ (_ , s) _ _) = ⊑-trans (shift-≮ _ (at _) (fo r)) (⊑-trans (ix01 _) (≺→⊑ s))
+  past-val v fo fl (lend r _ (_ , s) _ _) = ⊑-trans (shift-≮ _ (at _) (fo r)) (⊑-trans (ix01 _) (≺→⊑ s))
+  past-val v fo fl (lpass r _ (_ , s) _ _) = ⊑-trans (shift-≮ _ (at _) (fo r)) (⊑-trans (ix01 _) (≺→⊑ s))
+  past-val v fo fl (left _ _ _ () _)
   past-val v fo fl (run x _)        = from-any Ls fl x
   past-val v fo fl (rend x _)       = from-any Ls fl x
   past-val v fo fl (rpass x _)      = from-any Ls fl x
 
   -- The outer's end at `q₀` with no lane running ends the merge.
   outer-done : ∀ {q₀} → O q₀ end → From (at q₀) O → n ≡ 0 → Done q₀
-  outer-done {q₀} r fo nz = (λ r′ → eO r r′) , (λ v lt → ⊥-elim (⊑→≼ (fo v) lt)) , gone-empty {c = q₀} Ls (none nz)
+  outer-done {q₀} r fo nz = (inj₂ (q₀ , r , ≼-refl {q₀}) , gone-empty {c = q₀} Ls (none nz)) , (λ v _ lt _ → ⊥-elim (⊑→≼ (fo v) lt))
 
   -- A lane's end at `q`, the outer done and no other lane running, ends it.
   lane-done : ∀ {q} → Lanes Ls q end → T d → pred n ≡ 0 → Done q
-  lane-done x td pn = (λ r → ⊥-elim (over td r)) , (λ v _ → ⊥-elim (over td v)) , one pn x
+  lane-done x td pn = (inj₁ td , one pn x) , (λ v _ _ _ → ⊥-elim (over td v))
 
-  empty-flat : Empty O → Each Empty Ls → Empty FlatR
+  empty-flat : Empty O → Each Empty Ls → Empty JoinT
   empty-flat eo el (val r)       = eo r
   empty-flat eo el (step r)      = eo r
   empty-flat eo el (oend r _)    = eo r
   empty-flat eo el (opass r _)   = eo r
-  empty-flat eo el (lane r _ _)  = eo r
-  empty-flat eo el (lend r _ _)  = eo r
-  empty-flat eo el (lpass r _ _) = eo r
+  empty-flat eo el (lane r _ _ _ _)  = eo r
+  empty-flat eo el (lend r _ _ _ _)  = eo r
+  empty-flat eo el (lpass r _ _ _ _) = eo r
+  empty-flat eo el (left _ _ _ () _)
   empty-flat eo el (run x _)    = empty-any Ls el x
   empty-flat eo el (rend x _)    = empty-any Ls el x
   empty-flat eo el (rpass x _)   = empty-any Ls el x
 
   -- A lane winning, the outer no earlier.
-  lane-wins : ∀ {R} (g : Found R) K (o′ : Out B) → From K O → OKL Ls (just (g , K , o′)) → OK FlatR (just (g , laneT {A = A} d n [] K o′))
+  lane-wins : ∀ {R} (g : Found R) K (o′ : Out B) → From K O → OKL Ls (just (g , K , o′)) → OK JoinT (just (g , laneT {A = A} d n [] K o′))
   lane-wins g K still fo (fl , ml , sl) =
     record { from = rows-from K fo fl ; mark = ml ; shown = λ () }
   lane-wins g K (shows (nx b)) fo (fl , ml , sl) =
@@ -589,27 +593,27 @@ module Race {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (L
            ; shown = λ { refl → let (q , k , x) = sl refl in q , k , run x tt } }
   lane-wins g K (shows cp) fo (fl , ml , sl) = ends d refl (pred n ≡ᵇ 0) refl
     where
-      ends : ∀ b → d ≡ b → ∀ c → (pred n ≡ᵇ 0) ≡ c → OK FlatR (just (g , K , (if b ∧ c then shows cp else still)))
+      ends : ∀ b → d ≡ b → ∀ c → (pred n ≡ᵇ 0) ≡ c → OK JoinT (just (g , K , (if b ∧ c then shows cp else still)))
       ends true  de true  pn = record { from = rows-from K fo fl ; mark = ml
                                       ; shown = λ { refl → let (q , k , x) = sl refl in q , k , rend x (lane-done x (subst T (sym de) tt) (≡ᵇ⇒≡ (pred n) 0 (subst T (sym pn) tt))) } }
       ends true  de false pn = record { from = rows-from K fo fl ; mark = ml ; shown = λ () }
       ends false de c     pn = record { from = rows-from K fo fl ; mark = ml ; shown = λ () }
 
   -- The outer winning, the lanes no earlier than just past its key.
-  outer-wins : ∀ {R} (f : Found R) h (o : Out A) → Bd O (Found.key f) h o → Each (From (shift h)) Ls → OK FlatR (just (f , outerT n [] h o))
+  outer-wins : ∀ {R} (f : Found R) h (o : Out A) → Bd O (Found.key f) h o → Each (From (shift h)) Ls → OK JoinT (just (f , outerT n [] h o))
   outer-wins f h still b fl =
     record { from = rows-from h (from b) (from-weak Ls (shift-⊑ h) fl) ; mark = mark b ; shown = λ () }
   outer-wins f h (shows (nx a)) b fl with shown b refl
   ... | q₀ , refl , v = record { from = past-val v (from b) fl ; mark = ⊑-trans (mark b) (shift-⊑ (at q₀)) ; shown = λ () }
   outer-wins f h (shows cp) b fl = ends (n ≡ᵇ 0) refl
     where
-      ends : ∀ z → (n ≡ᵇ 0) ≡ z → OK FlatR (just (f , h , (if z ∧ true then shows cp else still)))
+      ends : ∀ z → (n ≡ᵇ 0) ≡ z → OK JoinT (just (f , h , (if z ∧ true then shows cp else still)))
       ends false nz = record { from = rows-from h (from b) (from-weak Ls (shift-⊑ h) fl) ; mark = mark b ; shown = λ () }
       ends true  nz with shown b refl
       ... | q₀ , refl , r = record { from = rows-from (at q₀) (from b) (from-weak Ls (shift-⊑ (at q₀)) fl) ; mark = mark b
                                    ; shown = λ { refl → q₀ , refl , oend r (outer-done r (from b) (≡ᵇ⇒≡ n 0 (subst T (sym nz) tt))) } }
 
-  race-ok : ∀ {R} (x : Maybe (Cand R A)) (y : Maybe (Cand R B)) → OK O x → OKL Ls y → OK FlatR (raceT d n [] x y)
+  race-ok : ∀ {R} (x : Maybe (Cand R A)) (y : Maybe (Cand R B)) → OK O x → OKL Ls y → OK JoinT (raceT d n [] x y)
   race-ok nothing            nothing             eo el = empty-flat eo el
   race-ok nothing            (just (g , k , o′)) eo bl = lane-wins g k o′ (λ r → ⊥-elim (eo r)) bl
   race-ok (just (f , h , o)) nothing             b  el = outer-wins f h o b (from-empty Ls el)

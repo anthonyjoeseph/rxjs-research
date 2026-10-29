@@ -90,25 +90,27 @@ module _ {B : Set} where
   ... | a , (pz , c) = (pz , a) , c
 
 -- The same outer and the same lanes: the same merge.
-done : ∀ {A B : Set} (L : A → Pos → EmissionSet B) {O O′ : EmissionSet A} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′
-     → ∀ {c} → Flat.Done L O Ls c → Flat.Done L O′ Ls′ c
-done L eo es {c} (g , h , ls) = Gone-≃ {c = c} eo g , (λ r lt → h (from eo r) lt) , all-≈ es {c} ls
+done : ∀ {A B : Set} (L : A → Pos → EmissionSet B) {O O′ : EmissionSet A} {d} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′
+     → ∀ {c} → Flat.Done L O d Ls c → Flat.Done L O′ d Ls′ c
+done L eo es {c} ((inj₁ td , ls) , h) = (inj₁ td , all-≈ es {c} ls) , λ r ru lt nc → h (from eo r) ru lt nc
+done L eo es {c} ((inj₂ (c₀ , x , le) , ls) , h) = (inj₂ (c₀ , to eo x , le) , all-≈ es {c} ls) , λ r ru lt nc → h (from eo r) ru lt nc
 
-flat : ∀ {A B : Set} (L : A → Pos → EmissionSet B) {O O′ : EmissionSet A} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′
-     → ∀ {q e} → Flat.FlatR L O Ls q e → Flat.FlatR L O′ Ls′ q e
-flat L eo es (Flat.val r)        = Flat.val (to eo r)
-flat L eo es (Flat.step r)       = Flat.step (to eo r)
-flat L eo es (Flat.oend r d)     = Flat.oend (to eo r) (done L eo es d)
-flat L eo es (Flat.opass r nd)   = Flat.opass (to eo r) λ d → nd (done L (≃-sym eo) (≈ᴸ-sym es) d)
-flat L eo es (Flat.lane r l w)   = Flat.lane (to eo r) l w
-flat L eo es (Flat.lend r l d)   = Flat.lend (to eo r) l (done L eo es d)
-flat L eo es (Flat.lpass r l nd) = Flat.lpass (to eo r) l λ d → nd (done L (≃-sym eo) (≈ᴸ-sym es) d)
-flat L eo es (Flat.run x w)      = Flat.run (any-≈ es x) w
-flat L eo es (Flat.rend x d)     = Flat.rend (any-≈ es x) (done L eo es d)
-flat L eo es (Flat.rpass x nd)   = Flat.rpass (any-≈ es x) λ d → nd (done L (≃-sym eo) (≈ᴸ-sym es) d)
+flat : ∀ {A B : Set} (L : A → Pos → EmissionSet B) {O O′ : EmissionSet A} {d} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′
+     → ∀ {q e} → Flat.JoinT L O d Ls q e → Flat.JoinT L O′ d Ls′ q e
+flat L eo es (Flat.val r)              = Flat.val (to eo r)
+flat L eo es (Flat.step r)             = Flat.step (to eo r)
+flat L eo es (Flat.oend r d)           = Flat.oend (to eo r) (done L eo es d)
+flat L eo es (Flat.opass r nd)         = Flat.opass (to eo r) λ d → nd (done L (≃-sym eo) (≈ᴸ-sym es) d)
+flat L eo es (Flat.lane r ru l nc w)   = Flat.lane (to eo r) ru l nc w
+flat L eo es (Flat.lend r ru l nc d)   = Flat.lend (to eo r) ru l nc (done L eo es d)
+flat L eo es (Flat.lpass r ru l nc nd) = Flat.lpass (to eo r) ru l nc λ d → nd (done L (≃-sym eo) (≈ᴸ-sym es) d)
+flat L eo es (Flat.left _ _ _ () _)
+flat L eo es (Flat.run x w)            = Flat.run (any-≈ es x) w
+flat L eo es (Flat.rend x d)           = Flat.rend (any-≈ es x) (done L eo es d)
+flat L eo es (Flat.rpass x nd)         = Flat.rpass (any-≈ es x) λ d → nd (done L (≃-sym eo) (≈ᴸ-sym es) d)
 
-flat-≃ : ∀ {A B : Set} (L : A → Pos → EmissionSet B) {O O′ : EmissionSet A} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′
-       → Flat.FlatR L O Ls ≃ Flat.FlatR L O′ Ls′
+flat-≃ : ∀ {A B : Set} (L : A → Pos → EmissionSet B) {O O′ : EmissionSet A} {d} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′
+       → Flat.JoinT L O d Ls ≃ Flat.JoinT L O′ d Ls′
 flat-≃ L eo es = flat L eo es ⇄ flat L (≃-sym eo) (≈ᴸ-sym es)
 
 map-≃ : ∀ {A B} (f : A → B) {t u : EmissionSet A} → t ≃ u → MapT f t ≃ MapT f u
