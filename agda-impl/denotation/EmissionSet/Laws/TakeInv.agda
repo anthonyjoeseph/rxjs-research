@@ -24,7 +24,7 @@ open import denotation.MonotonicList.Events using (Pos; Label; ix; last; inside;
 open import denotation.EmissionSet using (Ev; out; end; skip; EmissionSet; _≺_; module TakeWhile; takeWhileᵀ)
 open import denotation.EmissionSet.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺-ext; ≼-false; ≼-or-≻)
 open import denotation.EmissionSet.Laws.Worlds using (Plain; plain-ix; plain-last; W; W⁼; step; here; inW; real-snoc; Real; InvAt; InvD;
-  ⊑-refl; ⊑-snoc⁺; ⊑-snoc; conv; in-world; ext≢; same-lead; flat-under)
+  ⊑-refl; ⊑-snoc⁺; ⊑-snoc; conv; in-world; ext≢; same-lead; flat-under; _⊑_; w-up; nest⁼)
 
 private
   T-not : ∀ {b} → T b → T (not b) → ⊥
@@ -111,6 +111,18 @@ private
     stop-last r (sh-fail _) lt = ≺-absurd {r ++ [ last ]} {r ++ [ ix 0 ]} lt (Equivalence.from T-≡ (<ᵖ-part r {ix 0} {last} [] [] refl))
     stop-last r sh-stop     lt = ≺-irrefl {r ++ [ last ]} lt
 
+    -- Nothing below a failing value follows a stop.
+    stop-sh : ∀ {r q′ a a′ l′ e} → t r (out a) → T (not (keep a)) → t q′ (out a′) → ¬ Failed q′ → Sh a′ l′ e → (r ++ [ last ]) ≺ (q′ ++ [ l′ ]) → ⊥
+    stop-sh {r} {q′} {l′ = l′} xr nk xy nf′ k′ cy with ≼-or-≻ q′ r
+    ... | inj₂ rq = nf′ (r , _ , xr , nk , rq)
+    ... | inj₁ qr with <ᵖ-split q′ r (≼-false {q′} {r} qr)
+    ...   | inj₂ refl = stop-last r k′ cy
+    ...   | inj₁ lt   = ≺-absurd {r} {q′ ++ [ l′ ]} (≺-trans {r} {r ++ [ last ]} (≺-ext r []) cy)
+                                  (Equivalence.from T-≡ (<ᵖ-apart q′ r [ l′ ] lt noext))
+      where noext : ∀ ys → r ≡ q′ ++ ys → ⊥
+            noext []       eq = ≺-irrefl {q′} (subst (q′ ≺_) (trans eq (++-identityʳ q′)) (Equivalence.from T-≡ lt))
+            noext (l ∷ ys) eq = InvAt.flat I xy (subst (λ z → t z _) eq xr)
+
     bu : ∀ {c y e} → Vw c end → Vw y e → c ≺ y → Σ Pos λ w → W⁼ H p w × T (inside w c) × T (inside w y)
     bu {c} (sm xc (s-own _ _)) (sm xy _) cy = InvAt.burst I xc xy cy
     bu {c} (sm xc (s-own _ _)) (sh {q = q′} {l = l′} xy _ _ _ refl) cy with ≼-or-≻ q′ c
@@ -123,15 +135,38 @@ private
       ⊥-elim (nfy (r , _ , xr , nk , ≺-trans {r} {r ++ [ last ]} (≺-ext r []) cy))
     bu (sh {q = r} xr nk nf sh-stop refl) (sm xy (s-left _ iy)) cy =
       p , here , Equivalence.from T-≡ (inside-++ p r [ last ] (Equivalence.to T-≡ (in-world I xr (≺-trans {r} {r ++ [ last ]} (≺-ext r []) cy) iy))) , iy
-    bu (sh {q = r} xr nk nf sh-stop refl) (sh {q = q′} {l = l′} xy _ nf′ k′ refl) cy with ≼-or-≻ q′ r
-    ... | inj₂ rq = ⊥-elim (nf′ (r , _ , xr , nk , rq))
-    ... | inj₁ qr with <ᵖ-split q′ r (≼-false {q′} {r} qr)
-    ...   | inj₂ refl = ⊥-elim (stop-last r k′ cy)
-    ...   | inj₁ lt   = ⊥-elim (≺-absurd {r} {q′ ++ [ l′ ]} (≺-trans {r} {r ++ [ last ]} (≺-ext r []) cy)
-                                  (Equivalence.from T-≡ (<ᵖ-apart q′ r [ l′ ] lt noext)))
-      where noext : ∀ ys → r ≡ q′ ++ ys → ⊥
-            noext []       eq = ≺-irrefl {q′} (subst (q′ ≺_) (trans eq (++-identityʳ q′)) (Equivalence.from T-≡ lt))
-            noext (l ∷ ys) eq = InvAt.flat I xy (subst (λ z → t z _) eq xr)
+    bu (sh {q = r} xr nk nf sh-stop refl) (sh xy nk′ nf′ k′ refl) cy = ⊥-elim (stop-sh xr nk xy nf′ k′ cy)
+
+    -- Only skips follow an end.
+    qu : ∀ {c y e} → Vw c end → Vw y e → c ≺ y → e ≡ skip
+    qu _ (sm _ (s-left _ _)) _ = refl
+    qu (sm xc (s-own _ _)) (sm xy (s-own _ _)) cy = InvAt.quiet I xc xy cy
+    qu {c} (sm xc (s-own _ _)) (sh {q = q′} xy _ _ _ refl) cy with ≼-or-≻ q′ c
+    ... | inj₂ lt with InvAt.quiet I xc xy lt
+    ...   | ()
+    qu {c} (sm xc (s-own _ _)) (sh {q = q′} xy _ _ _ refl) cy | inj₁ le with same-lead I xy xc (conv (⊑-refl q′) le cy (⊑-snoc⁺ q′))
+    ... | refl with InvAt.func I xy xc
+    ...   | ()
+    qu (sh {q = r} xr nk nf sh-stop refl) (sm xy (s-own _ nfy)) cy =
+      ⊥-elim (nfy (r , _ , xr , nk , ≺-trans {r} {r ++ [ last ]} (≺-ext r []) cy))
+    qu (sh xr nk nf sh-stop refl) (sh xy nk′ nf′ k′ refl) cy = ⊥-elim (stop-sh xr nk xy nf′ k′ cy)
+
+    -- Under a kept row's child lies no other: a row's child below a
+    -- failing value is the value's, or under it.
+    un : ∀ {q y w l e e′} → Vw q e → Vw y e′ → Plain l → W⁼ H (q ++ [ l ]) w → w ⊑ y → ⊥
+    un (sm xq _) (sm xy _) pl v le = InvAt.under I xq xy pl v le
+    un (sh xr _ _ k refl) (sm xy _) pl v le = InvAt.under I xr xy (sh-plain k) (nest⁼ (inW (step here pl)) v) le
+    un {q} {l = l} (sm xq kq) (sh {q = q′} xy nk nf k refl) pl v le with ⊑-snoc q′ le
+    ... | inj₁ le′ = InvAt.under I xq xy pl v le′
+    ... | inj₂ e with w-up (sh-plain k) (subst (W⁼ H (q ++ [ l ])) e v)
+    ...   | inj₂ v′ = InvAt.under I xq xy pl v′ (⊑-refl q′)
+    ...   | inj₁ eq with ∷ʳ-injectiveˡ q q′ eq
+    ...     | refl = clash xq kq xy nk nf
+    un {q} {l = l} (sh xr _ _ k₀ refl) (sh {q = q′} xy _ _ k refl) pl v le with ⊑-snoc q′ le
+    ... | inj₁ le′ = InvAt.under I xr xy (sh-plain k₀) (nest⁼ (inW (step here pl)) v) le′
+    ... | inj₂ e with w-up (sh-plain k) (subst (W⁼ H (q ++ [ l ])) e v)
+    ...   | inj₁ eq = InvAt.flat I xr (subst (λ z → t z _) (sym (∷ʳ-injectiveˡ q q′ eq)) xy)
+    ...   | inj₂ v′ = InvAt.under I xr xy (sh-plain k₀) (nest⁼ (inW (step here pl)) v′) (⊑-refl q′)
 
 takeWhile-inv : ∀ {A H} (i : Bool) (keep : A → Bool) {s} → InvD {A} H s → InvD H (takeWhileᵀ i keep s)
 takeWhile-inv i keep inv p ok = record
@@ -140,5 +175,7 @@ takeWhile-inv i keep inv p ok = record
   ; func  = λ x x′ → fu (view (proj₁ x)) (view (proj₁ x′))
   ; flat  = λ x x′ → fl (view (proj₁ x)) (view (proj₁ x′)) refl
   ; burst = λ c y cy → bu (view (proj₁ c)) (view (proj₁ y)) cy
+  ; under = λ x y → un (view (proj₁ x)) (view (proj₁ y))
+  ; quiet = λ c y cy → qu (view (proj₁ c)) (view (proj₁ y)) cy
   }
   where open TI i keep (inv p ok)

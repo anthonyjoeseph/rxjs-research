@@ -8,8 +8,8 @@ module denotation.EmissionSet.Laws.HotInv where
 
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using ([]; _∷_; _++_; [_])
-open import Data.List.Properties using (++-assoc; ∷ʳ-injectiveˡ)
-open import Data.Product using (_,_; proj₁)
+open import Data.List.Properties using (++-assoc; ∷ʳ-injectiveˡ; ∷ʳ-injectiveʳ)
+open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Function using (Equivalence)
 open import Data.Bool.Properties using (T-≡)
@@ -18,8 +18,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import denotation.MonotonicList.Events using (Pos; sub; last; <ᵖ-split; <ᵖ-down)
 open import denotation.EmissionSet using (Ev; end; EmissionSet; _≺_; _≼_; hot; Rejoin; shown; ended; late)
 open import denotation.EmissionSet.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺-ext; ≼-trans; ≼-false)
-open import denotation.EmissionSet.Laws.Worlds using (_⊕_; Lawful; W; step; join; here; plain-last; real-snoc; real-sub; Real; InvD;
-  ⊑-snoc; ext≢)
+open import denotation.EmissionSet.Laws.Worlds using (_⊕_; Lawful; W; W⁼; step; join; here; inW; Plain; plain-last; plain-sub; real-snoc; real-sub; Real; InvD;
+  _⊑_; ⊑-snoc; ⊑-inside; ext≢; not-up; nest-in; named-view; named-e; anc-≼; world-anc⁼; world-after)
 
 private
   module HI {A H p} {t : EmissionSet A} (L : Lawful t) where
@@ -72,9 +72,22 @@ lawful-hot {H = H} {t} L p ok = record
   ; func  = λ x x′ → fu (view (proj₁ x)) (view (proj₁ x′))
   ; flat  = λ x x′ → fl (view (proj₁ x)) (view (proj₁ x′)) refl
   ; burst = λ c y cy → ⊥-elim (bu (view (proj₁ c)) (view (proj₁ y)) cy)
+  ; under = λ x y → un (view (proj₁ x)) (view (proj₁ y))
+  ; quiet = λ c y cy → ⊥-elim (bu (view (proj₁ c)) (view (proj₁ y)) cy)
   }
   where
     open HI {H = H} {p} L
     re : ∀ {y e} → Vw y e → Real y
     re (jn {q} x pq refl) = real-sub q (Lawful.real L x) (proj₁ ok) (≺-trans {p} {q} {q ++ [ sub p ]} pq (≺-ext q []))
     re (lt _ _ _ refl)    = real-snoc p plain-last (proj₁ ok)
+
+    -- Under a row's child lies neither the subscription nor a hot row.
+    un : ∀ {q y w l e e′} → Vw q e → Vw y e′ → Plain l → W⁼ (H ⊕ t) (q ++ [ l ]) w → w ⊑ y → ⊥
+    un (lt xc cp _ _) (jn x pq _) _ _ _ = no-mix x pq xc cp
+    un (jn x pq _) (lt xc cp _ _) _ _ _ = no-mix x pq xc cp
+    un (lt _ _ _ refl) (lt _ _ _ refl) pl v le = not-up (real-snoc p plain-last (proj₁ ok)) v le
+    un {q} {l = l} vq@(jn _ _ _) (jn {q′} x′ _ refl) pl v le with ⊑-snoc q′ le
+    ... | inj₁ le′ = proj₂ ok (inj₁ (_ , x′)) (nest-in (step (inW (wo vq)) pl) v) (⊑-inside le′)
+    ... | inj₂ e   = anc-≼ (world-anc⁼ vp) (proj₁ ok) (world-after (step (inW (wo vq)) pl) (real-snoc q pl (re vq)))
+      where vp : W⁼ (H ⊕ t) (q ++ [ l ]) p
+            vp = named-e (named-view {h = q′} (subst (W⁼ (H ⊕ t) (q ++ [ l ])) e v)) λ eq → plain-sub pl (sym (∷ʳ-injectiveʳ q′ q eq))
