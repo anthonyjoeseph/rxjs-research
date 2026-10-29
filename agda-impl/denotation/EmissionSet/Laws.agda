@@ -56,6 +56,7 @@ open import denotation.EmissionSet.Laws.Modulus
   using (size; size-++; ≺-irrefl; Bnd<; few-ind; entered-few; ≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext; few-via; AgreeTo; ⟨_⟩; upto; AgreeTo-sym; AgS; trunc-ag; trunc-to; ~-cold; _≈⟨_∣_⟩_; ≈-refl; ≈-sym; ≈-trans; ≈-mono; Same; agree-all; LimD; limit; ticks; contract; unfold₀; _~⟨_⟩_; ~-refl)
 open import denotation.EmissionSet.Laws.Worlds using (Ok; _⊕_; Lawful; InvAt; in-world; InvD; Hots; GoodEnv; world-after; ok-step; inv-widen; empty-inv; of-inv; spin-inv; map-inv; scan-inv; defer-inv; lim-inv)
 open import denotation.EmissionSet.Laws.Connect using (connect-inv)
+open import denotation.EmissionSet.Laws.TakeInv using (takeWhile-inv)
 open import denotation.EmissionSet.Laws.ConnectNe using (Causal; proper-ag; connect-ne)
 
 -- The same rows at every subscription.
@@ -105,7 +106,6 @@ postulate
 
   -- EACH OPERATOR KEEPS THE INVARIANT.
   cold-inv      : ∀ {A H} (c : Timeline A) → InvD H (coldᵀ c)
-  takeWhile-inv : ∀ {A H} (i : Bool) (keep : A → Bool) {s : Den A} → InvD H s → InvD H (takeWhileᵀ i keep s)
   flatMap-inv   : ∀ {A B H} (op : FlatOp) {f : A → Den B} {s : Den A} → InvD H s → (∀ a → InvD H (f a)) → InvD H (flatMapᵀ op f s)
 
   -- A lawful hot keeps it among its own rows.

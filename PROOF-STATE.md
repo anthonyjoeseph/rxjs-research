@@ -11,10 +11,10 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE WORLD INVARIANT
 
 Open for the operators that place rows of their own: a timeline's ticks,
-a joiner's lanes, takeWhile's failing value, a rejoined hot. Settled by
-bodies, or a program whose reading leaves its world.
+a joiner's lanes, a rejoined hot. Settled by bodies, or a program whose
+reading leaves its world.
 
-Members: `flatMap-inv`, `takeWhile-inv`, `cold-inv`, `lawful-hot`.
+Members: `flatMap-inv`, `cold-inv`, `lawful-hot`.
 
 #### THE JOINERS WITHIN THE BOUND
 

@@ -20,22 +20,22 @@ open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Properties using (++-assoc; ++-cancelˡ; ++-identityʳ; ++-conicalˡ; ∷-injective; ∷-injectiveˡ; ∷ʳ-injectiveˡ; ∷ʳ-injectiveʳ)
-open import Data.Nat using (ℕ; suc; _⊔_)
-open import Data.Nat.Properties using (≤-refl; m≤m⊔n; m≤n⊔m)
+open import Data.Nat using (ℕ; suc; _⊔_; _≤_)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; n≤1+n; 1+n≰n; m≤m⊔n; m≤n⊔m)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (_∷_; []; lookup)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
-open import Function using (Equivalence)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
+open import Function using (Equivalence; _∘_)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
 
 open import denotation.MonotonicList.Events using (Pos; Label; ix; sub; last; inside; inside-++; inside-self; inside-cons; <ᵖ-part; <ᵖ-ix; <ᵖ-split; <ᵖ-between)
 open import denotation.MonotonicList using (ofᴱ)
-open import denotation.EmissionSet using (Ev; end; skip; EmissionSet; _≺_; _≼_; Den; hot; cold; enter; DenEnv; Truncate; InE; at-out;
-  at-end; on-out; emptyᵀ; ofᵀ; spin; ⊥ᵀ; MapT; map-out; map-skip; map-end; mapᵀ; module Scan;
+open import denotation.EmissionSet using (Ev; out; end; skip; EmissionSet; _≺_; _≼_; Den; hot; cold; enter; DenEnv; Truncate; InE; at-out;
+  at-end; on-out; emptyᵀ; ofᵀ; spin; ⊥ᵀ; MapT; map-out; map-skip; map-end; mapᵀ; Spin; module Scan;
   scanᵀ; DeferT; guard; body; deferᵀ; from)
-open import denotation.EmissionSet.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺→≼; ≼-refl; ≼-trans; ≼-≺-≺; ≺-ext; ≼-false; LimD)
+open import denotation.EmissionSet.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺→≼; ≼-refl; ≼-trans; ≼-antisym; ≼-≺-≺; ≺-ext; ≼-false; LimD)
 
 -- A label that opens no subscription.
 data Plain : Label → Set where
@@ -82,16 +82,23 @@ _⊕_ {A} H t q = Σ (Ev A) (t q) ⊎ H q
 record Lawful {A} (t : EmissionSet A) : Set where
   field
     real   : ∀ {y e} → t y e → Real y
+    func   : ∀ {y e e′} → t y e → t y e′ → e ≡ e′
     flat   : ∀ {y e l ys e′} → t y e → t (y ++ l ∷ ys) e′ → ⊥
     proper : ∀ {c y e} → t c end → t y e → y ≼ c
 
 -- THE INVARIANT of a reading at `p`: its rows lie in the world and are
--- reachable; none lies below another; and what follows an end lies with
--- it below one position of the world — the rest of the burst it ended in.
+-- reachable; one event at a position; none lies below another; and what
+-- follows an end lies with it below one position of the world — the rest
+-- of the burst it ended in.
+--
+-- One event at a position, because an operator that reads a value's
+-- content would otherwise place rows from two events at one position one
+-- below the other: a takeWhile passing one and failing the other there.
 record InvAt {A} (H : Pos → Set) (p : Pos) (X : EmissionSet A) : Set where
   field
     world : ∀ {y e} → X y e → W H p y
     real  : ∀ {y e} → X y e → Real y
+    func  : ∀ {y e e′} → X y e → X y e′ → e ≡ e′
     flat  : ∀ {y e l ys e′} → X y e → X (y ++ l ∷ ys) e′ → ⊥
     burst : ∀ {c y e} → X c end → X y e → c ≺ y → Σ Pos λ w → W⁼ H p w × T (inside w c) × T (inside w y)
 
@@ -230,6 +237,7 @@ inv-widen : ∀ {A B H} {t : EmissionSet B} {d : Den A} → InvD H d → InvD (H
 inv-widen {H = H} {t} {d} inv p (r , dj) = record
   { world = λ x → widen t (wo x)
   ; real  = re
+  ; func  = fu
   ; flat  = fl
   ; burst = λ ce ye cy → bump (bu ce ye cy)
   }
@@ -237,7 +245,7 @@ inv-widen {H = H} {t} {d} inv p (r , dj) = record
     bump : ∀ {c y} → Σ Pos (λ w → W⁼ H p w × T (inside w c) × T (inside w y)) → Σ Pos (λ w → W⁼ (H ⊕ t) p w × T (inside w c) × T (inside w y))
     bump (w , w⁼ , i) = w , widen⁼ t w⁼ , i
 
-    open InvAt (inv p (r , λ hh w ins → dj (inj₂ hh) (widen t w) ins)) renaming (world to wo; real to re; flat to fl; burst to bu)
+    open InvAt (inv p (r , λ hh w ins → dj (inj₂ hh) (widen t w) ins)) renaming (world to wo; real to re; func to fu; flat to fl; burst to bu)
 
 ------------------------------------------------------------------------
 -- Ancestry
@@ -455,10 +463,12 @@ private
 
   -- A READING ONE LABEL DEEP keeps the invariant: its rows are siblings,
   -- under `p` together.
-  shallow-inv : ∀ {A H p} {X : EmissionSet A} → Ok H p → (∀ {y e} → X y e → Below p y) → InvAt H p X
-  shallow-inv {H = H} {p} (r , _) sh = record
+  shallow-inv : ∀ {A H p} {X : EmissionSet A} → Ok H p → (∀ {y e} → X y e → Below p y)
+              → (∀ {y e e′} → X y e → X y e′ → e ≡ e′) → InvAt H p X
+  shallow-inv {H = H} {p} (r , _) sh fu = record
     { world = λ x → wo (sh x)
     ; real  = λ x → re (sh x)
+    ; func  = fu
     ; flat  = λ x x′ → fl (sh x) (sh x′)
     ; burst = λ c y _ → p , here , ins (sh c) , ins (sh y)
     }
@@ -479,10 +489,11 @@ private
   -- A reading whose rows are another's, ends kept, keeps its invariant.
   inv-via : ∀ {A B H p} {X : EmissionSet A} {Y : EmissionSet B}
           → (∀ {y e} → X y e → Σ (Ev B) (Y y)) → (∀ {y} → X y end → Y y end)
-          → InvAt H p Y → InvAt H p X
-  inv-via bk be I = record
+          → (∀ {y e e′} → X y e → X y e′ → e ≡ e′) → InvAt H p Y → InvAt H p X
+  inv-via bk be fu I = record
     { world = λ x → InvAt.world I (proj₂ (bk x))
     ; real  = λ x → InvAt.real I (proj₂ (bk x))
+    ; func  = fu
     ; flat  = λ x x′ → InvAt.flat I (proj₂ (bk x)) (proj₂ (bk x′))
     ; burst = λ c y cy → InvAt.burst I (be c) (proj₂ (bk y)) cy
     }
@@ -496,18 +507,79 @@ private
   acc-row (Scan.acc₀ x _)     = _ , x
   acc-row (Scan.acc _ x _ _)  = _ , x
 
+  spin-skip : ∀ {A p y} {e : Ev A} → Spin p y e → e ≡ skip
+  spin-skip (spin _) = refl
+
+  out-inj : ∀ {A} {a b : A} → out a ≡ out b → a ≡ b
+  out-inj refl = refl
+
+  -- The rows of `of`, past the index it is at.
+  of-idx : ∀ {A} p i (xs : List A) {y e} → InE (ofᴱ p i xs) y e → (Σ ℕ λ j → i ≤ j × y ≡ p ++ [ ix j ]) ⊎ y ≡ p ++ [ last ]
+  of-idx p i []       at-end     = inj₂ refl
+  of-idx p i (x ∷ xs) at-out     = inj₁ (i , ≤-refl , refl)
+  of-idx p i (x ∷ xs) (on-out r) with of-idx p (suc i) xs r
+  ... | inj₁ (j , le , eq) = inj₁ (j , ≤-trans (n≤1+n i) le , eq)
+  ... | inj₂ eq            = inj₂ eq
+
+  of-fresh : ∀ {A} p i (xs : List A) {e} → InE (ofᴱ p (suc i) xs) (p ++ [ ix i ]) e → ⊥
+  of-fresh p i xs r with of-idx p (suc i) xs r
+  ... | inj₁ (j , le , eq) with ∷ʳ-injectiveʳ p p eq
+  ...   | refl = 1+n≰n le
+  of-fresh p i xs r | inj₂ eq with ∷ʳ-injectiveʳ p p eq
+  ... | ()
+
+  of-func : ∀ {A} p i (xs : List A) {y e e′} → InE (ofᴱ p i xs) y e → InE (ofᴱ p i xs) y e′ → e ≡ e′
+  of-func p i []       at-end     at-end      = refl
+  of-func p i (x ∷ xs) at-out     at-out      = refl
+  of-func p i (x ∷ xs) at-out     (on-out r′) = ⊥-elim (of-fresh p i xs r′)
+  of-func p i (x ∷ xs) (on-out r) at-out      = ⊥-elim (of-fresh p i xs r)
+  of-func p i (x ∷ xs) (on-out r) (on-out r′) = of-func p (suc i) xs r r′
+
+  -- A fold has one value at a position.
+  module AccF {A B : Set} (f : B → A → B) (z : B) {t : EmissionSet A} (fu : ∀ {y e e′} → t y e → t y e′ → e ≡ e′) where
+    open Scan f z t using (Acc; acc₀; acc)
+
+    acc-val : ∀ {q b} → Acc q b → Σ A λ a → t q (out a)
+    acc-val (acc₀ x _)    = _ , x
+    acc-val (acc _ x _ _) = _ , x
+
+    acc-func : ∀ {q q′ b b′} → q ≡ q′ → Acc q b → Acc q′ b′ → b ≡ b′
+    acc-func refl (acc₀ x _)       (acc₀ x′ _)      = cong (f z) (out-inj (fu x x′))
+    acc-func refl (acc₀ _ mn)      (acc a _ lt _)   = ⊥-elim (mn (proj₂ (acc-val a)) lt)
+    acc-func refl (acc a _ lt _)   (acc₀ _ mn)      = ⊥-elim (mn (proj₂ (acc-val a)) lt)
+    acc-func refl (acc {q₀} a x lt nx) (acc {q₁} a′ x′ lt′ nx′) =
+      cong₂ f (acc-func (≼-antisym {q₀} {q₁} (λ h → nx′ (proj₂ (acc-val a)) h lt) (λ h → nx (proj₂ (acc-val a′)) h lt′)) a a′)
+              (out-inj (fu x x′))
+
 empty-inv : ∀ {A H} → InvD H (emptyᵀ {A})
-empty-inv p ok = shallow-inv ok λ { (at-end , _) → last , plain-last , refl }
+empty-inv p ok = shallow-inv ok (λ { (at-end , _) → last , plain-last , refl }) λ { (at-end , _) (at-end , _) → refl }
 
 of-inv : ∀ {A H} (xs : List A) → InvD H (ofᵀ xs)
-of-inv xs p ok = shallow-inv ok λ x → of-below p 0 xs (proj₁ x)
+of-inv xs p ok = shallow-inv ok (λ x → of-below p 0 xs (proj₁ x)) λ x x′ → of-func p 0 xs (proj₁ x) (proj₁ x′)
 
 spin-inv : ∀ {A H} → InvD H (⊥ᵀ {A})
-spin-inv p ok = shallow-inv ok λ { (spin i , _) → ix i , plain-ix , refl }
+spin-inv p ok = shallow-inv ok (λ { (spin i , _) → ix i , plain-ix , refl }) λ x x′ → trans (spin-skip (proj₁ x)) (sym (spin-skip (proj₁ x′)))
 
 map-inv : ∀ {A B H} (f : A → B) {s : Den A} → InvD H s → InvD H (mapᵀ f s)
-map-inv f {s} inv p ok = inv-via bk be (inv p ok)
+map-inv f {s} inv p ok = inv-via bk be fu (inv p ok)
   where
+    fu : ∀ {y e e′} → Truncate (MapT f (enter s p)) y e → Truncate (MapT f (enter s p)) y e′ → e ≡ e′
+    fu (map-out x , _)  (map-out x′ , _)  = cong (out ∘ f) (out-inj (InvAt.func (inv p ok) x x′))
+    fu (map-out x , _)  (map-skip x′ , _) with InvAt.func (inv p ok) x x′
+    ... | ()
+    fu (map-out x , _)  (map-end x′ , _)  with InvAt.func (inv p ok) x x′
+    ... | ()
+    fu (map-skip x , _) (map-out x′ , _)  with InvAt.func (inv p ok) x x′
+    ... | ()
+    fu (map-skip x , _) (map-skip x′ , _) = refl
+    fu (map-skip x , _) (map-end x′ , _)  with InvAt.func (inv p ok) x x′
+    ... | ()
+    fu (map-end x , _)  (map-out x′ , _)  with InvAt.func (inv p ok) x x′
+    ... | ()
+    fu (map-end x , _)  (map-skip x′ , _) with InvAt.func (inv p ok) x x′
+    ... | ()
+    fu (map-end x , _)  (map-end x′ , _)  = refl
+
     bk : ∀ {y e} → Truncate (MapT f (enter s p)) y e → Σ _ (enter s p y)
     bk (map-out x , _)  = _ , x
     bk (map-skip x , _) = _ , x
@@ -517,8 +589,28 @@ map-inv f {s} inv p ok = inv-via bk be (inv p ok)
     be (map-end x , _) = x
 
 scan-inv : ∀ {A B H} (f : B → A → B) z {s : Den A} → InvD H s → InvD H (scanᵀ f z s)
-scan-inv f z {s} inv p ok = inv-via bk be (inv p ok)
+scan-inv f z {s} inv p ok = inv-via bk be fu (inv p ok)
   where
+    I = inv p ok
+    open AccF f z (InvAt.func I)
+
+    fu : ∀ {y e e′} → Truncate (Scan.ScanT f z (enter s p)) y e → Truncate (Scan.ScanT f z (enter s p)) y e′ → e ≡ e′
+    fu (Scan.sval a , _)  (Scan.sval a′ , _)  = cong out (acc-func refl a a′)
+    fu (Scan.sval a , _)  (Scan.sstep x′ , _) with InvAt.func I (proj₂ (acc-val a)) x′
+    ... | ()
+    fu (Scan.sval a , _)  (Scan.send x′ , _)  with InvAt.func I (proj₂ (acc-val a)) x′
+    ... | ()
+    fu (Scan.sstep x , _) (Scan.sval a′ , _)  with InvAt.func I (proj₂ (acc-val a′)) x
+    ... | ()
+    fu (Scan.sstep x , _) (Scan.sstep x′ , _) = refl
+    fu (Scan.sstep x , _) (Scan.send x′ , _)  with InvAt.func I x x′
+    ... | ()
+    fu (Scan.send x , _)  (Scan.sval a′ , _)  with InvAt.func I (proj₂ (acc-val a′)) x
+    ... | ()
+    fu (Scan.send x , _)  (Scan.sstep x′ , _) with InvAt.func I x x′
+    ... | ()
+    fu (Scan.send x , _)  (Scan.send x′ , _)  = refl
+
     bk : ∀ {y e} → Truncate (Scan.ScanT f z (enter s p)) y e → Σ _ (enter s p y)
     bk (Scan.sval a , _)  = acc-row a
     bk (Scan.sstep x , _) = _ , x
@@ -530,7 +622,7 @@ scan-inv f z {s} inv p ok = inv-via bk be (inv p ok)
 -- A DEFER keeps it: its guard lies before the body's subscription, and
 -- the body's world lies in its own.
 defer-inv : ∀ {A H} {s : Den A} → InvD H s → InvD H (deferᵀ s)
-defer-inv {A} {H} {s} inv p ok = record { world = wo ; real = re ; flat = λ x x′ → fl (view x) (view x′) ; burst = λ c y cy → bu (view c) (view y) cy }
+defer-inv {A} {H} {s} inv p ok = record { world = wo ; real = re ; func = λ x x′ → fu (view x) (view x′) ; flat = λ x x′ → fl (view x) (view x′) ; burst = λ c y cy → bu (view c) (view y) cy }
   where
     I = inv (p ++ [ ix 1 ]) (ok-step p ok)
     B = enter s (p ++ [ ix 1 ])
@@ -557,6 +649,12 @@ defer-inv {A} {H} {s} inv p ok = record { world = wo ; real = re ; flat = λ x x
     re (guard , _)  = real-snoc p plain-ix (proj₁ ok)
     re (body x , _) = InvAt.real I x
 
+    fu : ∀ {y e e′} → View y e → View y e′ → e ≡ e′
+    fu (inj₁ (_ , refl)) (inj₁ (_ , refl)) = refl
+    fu (inj₁ (refl , _)) (inj₂ b) = ⊥-elim (≺-absurd {p ++ [ ix 1 ]} {p ++ [ ix 0 ]} (after b) (early []))
+    fu (inj₂ b) (inj₁ (refl , _)) = ⊥-elim (≺-absurd {p ++ [ ix 1 ]} {p ++ [ ix 0 ]} (after b) (early []))
+    fu (inj₂ b) (inj₂ b′) = InvAt.func I b b′
+
     fl : ∀ {y e l ys e′} → View y e → View (y ++ l ∷ ys) e′ → ⊥
     fl {ys = ys} (inj₁ (refl , _)) (inj₁ (eq , _)) = ext≢ (p ++ [ ix 0 ]) ys eq
     fl {l = l} {ys} (inj₁ (refl , _)) (inj₂ b) =
@@ -577,6 +675,7 @@ lim-inv : ∀ {A H} {c : ℕ → Den A} → (∀ n → InvD H (c n)) → InvD H 
 lim-inv inv p ok = record
   { world = λ { (from N l , _) → InvAt.world (I N) (l N ≤-refl) }
   ; real  = λ { (from N l , _) → InvAt.real (I N) (l N ≤-refl) }
+  ; func  = λ { (from N l , _) (from M m , _) → InvAt.func (I (N ⊔ M)) (l (N ⊔ M) (m≤m⊔n N M)) (m (N ⊔ M) (m≤n⊔m N M)) }
   ; flat  = λ { (from N l , _) (from M m , _) → InvAt.flat (I (N ⊔ M)) (l (N ⊔ M) (m≤m⊔n N M)) (m (N ⊔ M) (m≤n⊔m N M)) }
   ; burst = λ { (from N l , _) (from M m , _) cy → InvAt.burst (I (N ⊔ M)) (l (N ⊔ M) (m≤m⊔n N M)) (m (N ⊔ M) (m≤n⊔m N M)) cy }
   }

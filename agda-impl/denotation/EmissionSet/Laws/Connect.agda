@@ -113,6 +113,7 @@ module _ {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
   lawful : Lawful σ′
   lawful = record
     { real   = λ x → InvAt.real Iσ (proj₁ x)
+    ; func   = λ x x′ → InvAt.func Iσ (proj₁ x) (proj₁ x′)
     ; flat   = λ x x′ → InvAt.flat Iσ (proj₁ x) (proj₁ x′)
     ; proper = λ c y → proj₂ y (proj₁ c)
     }
@@ -156,6 +157,23 @@ module _ {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
   ...     | inj₂ kw with ⊑-trans kw (inside-⊑ w c ic)
   ...       | [] , eq     = ⊥-elim (apart rp (subst (Anc p₀) (trans eq (++-identityʳ k)) (world-anc⁼ (bw ce))) (world-anc⁼ (sw x)))
   ...       | z ∷ zs , eq = subst (k ≺_) (sym eq) (≺-ext k zs)
+
+  -- A body row is not a source row's first child, nor a source row.
+  shown-body : ∀ {y e k e′} → β y e → σ k e′ → y ≡ k ++ [ ix 0 ] → ⊥
+  shown-body {k = k} b x refl with source-leads (sw x) (bw b) ([ ix 0 ] , refl)
+  ... | h , e , (_ , σh) , kh , (ms , eq) with same-lead Iσ x (proj₁ σh) kh
+  ...   | refl = diverge k [] ms (λ ()) (trans (++-identityʳ (k ++ [ ix 0 ])) eq)
+
+  fu : ∀ {y e e′} → V y e → V y e′ → e ≡ e′
+  fu (vb b)         (vb b′)        = InvAt.func Iβ b b′
+  fu (vb b)         (vs x _ eq _)  = ⊥-elim (shown-body b x eq)
+  fu {y} (vb b)     (vp x _ _ _)   = ⊥-elim (body-leads (bw b) (sw x) (⊑-refl y))
+  fu (vs x _ eq _)  (vb b)         = ⊥-elim (shown-body b x eq)
+  fu {y} (vp x _ _ _) (vb b)       = ⊥-elim (body-leads (bw b) (sw x) (⊑-refl y))
+  fu (vs _ _ _ e₁)  (vs _ _ _ e₂)  = trans e₁ (sym e₂)
+  fu (vs _ _ _ e₁)  (vp _ _ _ e₂)  = trans e₁ (sym e₂)
+  fu (vp _ _ _ e₁)  (vs _ _ _ e₂)  = trans e₁ (sym e₂)
+  fu (vp _ _ _ e₁)  (vp _ _ _ e₂)  = trans e₁ (sym e₂)
 
   fl : ∀ {y e l ys e′} → V y e → V (y ++ l ∷ ys) e′ → ⊥
   fl (vb b) (vb b′) = InvAt.flat Iβ b b′
@@ -207,6 +225,7 @@ module _ {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
   connect-at = record
     { world = wo
     ; real  = re
+    ; func  = λ x x′ → fu (view x) (view x′)
     ; flat  = λ x x′ → fl (view x) (view x′)
     ; burst = λ c y cy → bu (view c) (view y) cy
     }
