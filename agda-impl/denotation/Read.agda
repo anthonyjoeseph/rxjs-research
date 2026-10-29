@@ -9,7 +9,6 @@ open import Data.List using (List; []; _∷_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_)
 open import Data.Unit using (⊤)
-open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import denotation.Events using (Pos)
@@ -37,10 +36,6 @@ module _ {A : Set} (t : EmissionSet A) where
   -- `q` is the first row past `c`.
   Least : Maybe Pos → Pos → Set
   Least c q = After c q × (∀ {k e} → t k e → After c k → q ≼ k)
-
-  -- No row past `c`.
-  Hush : Maybe Pos → Set
-  Hush c = ∀ {k e} → t k e → ¬ After c k
 
   -- The rows a reader at `c` meets, in order.
   data Run : Maybe Pos → List (Pos × Ev A) → Set where
