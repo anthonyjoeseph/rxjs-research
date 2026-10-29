@@ -368,6 +368,31 @@ module _ {Γ A B} {ρ : DenEnv Γ} {O : EmissionSet A} {Ls : List (EmissionSet B
   rooted-parts : Parts O Ls
   rooted-parts = (λ oy l → let (q , _ , a , xq , w) = root-of qs Ls roots l in under xq (sub oy) plain-ix (inW w) (⊑ᵖ-refl _)) , spread qs Ls roots
 
+-- A merge node: its outer and lanes good, nothing queued, its lanes in
+-- the fragment; where live, its count, its done outer owing nothing, and
+-- its parts rooted at the outer's entry.
+record MergeG {Γ A B} (Go Gl : Set₁) (ρ : DenEnv Γ) (b : Bool) (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (q : List A) (o : St Γ A) (ls : List (St Γ B)) : Set₁ where
+  field
+    outer  : Go
+    lanesG : Gl
+    fresh  : q ≡ []
+    inFrag : ∀ a → Frag (f a)
+    count  : Live b (n ≡ live ls)
+    spent  : Live b (T d → Empty (rows ρ o))
+    rooted : Live₁ b (Rooted ρ (rows ρ o) (rowsL ρ ls))
+
+-- Off: only the shape.
+mergeG₀ : ∀ {Γ A B Go Gl} {ρ : DenEnv Γ} {f : A → Obs Timeline Γ B} {d n q o} {ls : List (St Γ B)} → Go → Gl → q ≡ [] → (∀ a → Frag (f a)) → MergeG Go Gl ρ false f d n q o ls
+mergeG₀ go gl qe fa = record { outer = go ; lanesG = gl ; fresh = qe ; inFrag = fa ; count = tt ; spent = tt ; rooted = tt₁ }
+
+-- The same merge over other parts, its facts carried.
+mergeG-map : ∀ {Γ A B Go Gl Go′ Gl′} {ρ : DenEnv Γ} {b} {f : A → Obs Timeline Γ B} {d n n′ q} {o o′ : St Γ A} {ls ls′ : List (St Γ B)}
+           → (Go → Go′) → (Gl → Gl′) → (Live b (n ≡ live ls) → Live b (n′ ≡ live ls′)) → (Live b (T d → Empty (rows ρ o)) → Live b (T d → Empty (rows ρ o′)))
+           → (Live₁ b (Rooted ρ (rows ρ o) (rowsL ρ ls)) → Live₁ b (Rooted ρ (rows ρ o′) (rowsL ρ ls′)))
+           → MergeG Go Gl ρ b f d n q o ls → MergeG Go′ Gl′ ρ b f d n′ q o′ ls′
+mergeG-map ho hl hc hs hr m = record { outer = ho outer ; lanesG = hl lanesG ; fresh = fresh ; inFrag = inFrag ; count = hc count ; spent = hs spent ; rooted = hr rooted }
+  where open MergeG m
+
 -- The fragment's shape everywhere, its row facts only where live: under
 -- a cut switched off nothing is owed, so nothing there is asked to agree.
 --
@@ -379,8 +404,7 @@ mutual
   G ρ b doneS                                 = ⊤₁
   G ρ b (mapS f s)                            = G ρ b s
   G ρ b (cutS l a s)                          = G ρ (b ∧ l) s
-  G ρ b (flatS (mergeᶠ nothing) f d n q o ls) =
-    G ρ b o × GL ρ b ls × q ≡ [] × (∀ a → Frag (f a)) × Live b (EndLast (rows ρ o)) × Live b (n ≡ live ls) × Live b (T d → Empty (rows ρ o)) × Live₁ b (Rooted ρ (rows ρ o) (rowsL ρ ls))
+  G ρ b (flatS (mergeᶠ nothing) f d n q o ls) = MergeG (G ρ b o) (GL ρ b ls) ρ b f d n q o ls
   G ρ b _                                     = ⊥₁
 
   GL : ∀ {Γ A} → DenEnv Γ → Bool → List (St Γ A) → Set₁
@@ -413,7 +437,8 @@ mutual
   shape doneS                                     g = g
   shape (mapS f s)                                g = shape s g
   shape {v = v} (cutS l a s)                      g = shape {v = v ∧ l} s g
-  shape (flatS (mergeᶠ nothing) f d n q o ls)     (go , gl , qe , fa , _) = shape o go , shapeL ls gl , qe , fa , tt , tt , tt , tt₁
+  shape (flatS (mergeᶠ nothing) f d n q o ls)     m = mergeG₀ (shape o outer) (shapeL ls lanesG) fresh inFrag
+    where open MergeG m
   shape (flatS (mergeᶠ (just _)) f d n q o ls)    ()
   shape (flatS switchᶠ f d n q o ls)              ()
   shape (flatS exhaustᶠ f d n q o ls)             ()
@@ -595,7 +620,7 @@ lanes-first {Ls = Ls} (just (g , K , o)) (just (g′ , K′ , o′)) bx (fy , my
 -- The race
 
 module Race {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (Ls : List (EmissionSet B)) (d : Bool) (n : ℕ)
-            (sO : Single O) (eO : EndLast O) (cn : Counts O Ls d n) where
+            (sO : Single O) (cn : Counts O Ls d n) where
   open Flat L O d Ls
   open Counts cn
 
@@ -718,10 +743,12 @@ mutual
   seek-ok {ρ = ρ} c (cutS false a s) _ = seek-off {ρ = ρ} c a s
   seek-ok c (cutS true (attAt p) s)  g =
     own-first (_ , _ , c , cutS true (attAt p) s) attM (after p) _ (kept (seek (inCut true (attAt p) c) s) (seek-ok (inCut true (attAt p) c) s g))
-  seek-ok {ρ = ρ} c (flatS (mergeᶠ nothing) f d n .[] o ls) (go , gl , refl , _ , eO , nl , ov , rt) =
-    Race.race-ok (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rt) eO (counts ls gl nl ov)
+  seek-ok {ρ = ρ} c (flatS (mergeᶠ nothing) f d n q o ls) m with MergeG.fresh m
+  ... | refl =
+    Race.race-ok (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) (counts ls lanesG count spent)
       (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)
-      (seek-ok (inOuter (mergeᶠ nothing) f d n [] ls c) o go) (lanes-ok c f d n o [] ls gl)
+      (seek-ok (inOuter (mergeᶠ nothing) f d n [] ls c) o outer) (lanes-ok c f d n o [] ls lanesG)
+    where open MergeG m
 
   seek-ln : ∀ {R Γ A} {ρ : DenEnv Γ} (c : Ctx R Γ A) (s : St Γ A) → GoodLn ρ s → OK (rows ρ s) (seek c s)
   seek-ln {ρ = ρ} c s g with lane-v s g

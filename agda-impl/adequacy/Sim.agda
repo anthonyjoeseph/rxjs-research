@@ -34,7 +34,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
                     renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (env; Frag; rows; RT; toEv; Visible; Vis; Past; Plus; old; new; _≃_; _⇄_; silent; shown; Steps;
   Shows*; Shows*-≃; ≃-sym; conv; []; _∷_; tau; val; fin)
-open import adequacy.Bound using (Good; G; Rooted)
+open import adequacy.Bound using (Good; G; Rooted; mergeG₀)
 open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
 open import adequacy.Skip using (After)
 open import adequacy.Inv using (Inv; inv; good; Sim; Ends; GoodC; GoodF; good-split; open-alive)
@@ -99,8 +99,8 @@ sub-merge c f s p (inv g (uc , _ , ok)) = inv (good-swap c sw g) ((tt , uc) , tt
     rt : Rooted (env c) (rows (env c) (cutS true (attAt p) (pend s))) []
     rt = record { o₀ = s ; p₀ = p ; inv = inv-⟦⟧ s (env c) (env-good c (proj₁ (good-split c _ g))) p ok ; sub = λ () ; qs = [] ; roots = tt }
     node′ : ∀ v → G (env c) v (pend (flatMap (mergeᶠ nothing) f s)) → G (env c) v (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt p) (pend s)) [])
-    node′ true  (lift (ff , fs)) = lift fs , tt₁ , refl , ff , (λ ()) , refl , (λ ()) , rt
-    node′ false (lift (ff , fs)) = lift fs , tt₁ , refl , ff , tt , tt , tt , tt₁
+    node′ true  (lift (ff , fs)) = record { outer = lift fs ; lanesG = tt₁ ; fresh = refl ; inFrag = ff ; count = refl ; spent = λ () ; rooted = rt }
+    node′ false (lift (ff , fs)) = mergeG₀ (lift fs) tt₁ refl ff
     sw : Swap (env c) (pend (flatMap (mergeᶠ nothing) f s)) (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt p) (pend s)) [])
     sw = record { same = ≃-sym (flat-∅ _ false) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () }
 

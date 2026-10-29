@@ -30,10 +30,10 @@ open import denotation.Laws.Modulus using (≼-refl)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; ⟨_,_,_,_⟩; plug; absorbed; rising; cp; alive; ended; dequeue; settle; Att;
                     cutS; lnS; flatS; inLanes)
-open import adequacy.Rows using (env; Frag; ∅; up; here; rows; rowsL; pendRows; Plus; old; new; Lanes; Each; module Flat; _≃_; _⇄_;
+open import adequacy.Rows using (env; ∅; up; here; rows; rowsL; pendRows; Plus; old; new; Lanes; Each; module Flat; _≃_; _⇄_;
   ≃-sym; Moves; silent)
 open import adequacy.Up using (any-ʳ++ˡ; any-ʳ++ʳ; all-ʳ++; ≈ᴸ-refl; _∷_; flat-≃; up-≃; ≃-refl; ≃-trans; vis-≃; plus-≃)
-open import adequacy.Bound using (Empty; EndLast; Rooted; Good; GoodL; G; GLn; shape; on; off; lane-v; live; dead-empty)
+open import adequacy.Bound using (Empty; Good; G; GLn; shape; on; off; lane-v; live; dead-empty; MergeG; mergeG-map)
 open import adequacy.Skip using (After; Since; LeadC; _≈⟨_⟩_; ≈-vis; up-≈)
 open import adequacy.LaneEnd using (frame-≈; done-at; outer-owes; lanes-owe; since-x; since-y)
 open import adequacy.Owes using (Owing; Owes; OwesL; UpO; Swap; owes-join; need-of; owesL-ʳ++; rowsL-ʳ++; ≡→≃; owing-≃; empty-≃;
@@ -43,11 +43,12 @@ open import adequacy.Inv using (Inv; inv; Sim; good-split; node-good; upo-liv)
 module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St Γ A) (pre post : List (St Γ B)) (c : Ctx R Γ B)
           (a : Att) (s₀ : St Γ B) (p : Pos)
           (g : Good [] (plug c (flatS (mergeᶠ nothing) f d n [] o (pre ʳ++ lnS true (cutS true a s₀) ∷ post))))
-          (go : Good (env c) o) (fa : ∀ x → Frag (f x)) (gl : GoodL (env c) (pre ʳ++ lnS true (cutS true a s₀) ∷ post)) (el : EndLast (rows (env c) o)) (nl : n ≡ live (pre ʳ++ lnS true (cutS true a s₀) ∷ post))
-          (ov : T d → Empty (rows (env c) o)) (rt : Rooted (env c) (rows (env c) o) (rowsL (env c) (pre ʳ++ lnS true (cutS true a s₀) ∷ post))) (g₀ : Good (env c) s₀)
+          (mg : G (env c) true (flatS (mergeᶠ nothing) f d n [] o (pre ʳ++ lnS true (cutS true a s₀) ∷ post))) (g₀ : Good (env c) s₀)
           (ho : ¬ T d → Owing (rows (env c) o)) (oo : Owes (env c) o) (op : OwesL (env c) pre) (oq : OwesL (env c) post) (uc : UpO c)
           (ao : After p (rows (env c) o)) (apre : Each (After p) (rowsL (env c) pre)) (apost : Each (After p) (rowsL (env c) post)) (lc : LeadC c p)
           (en : Empty (rows (env c) s₀)) where
+
+  open MergeG mg
 
   ρ : DenEnv Γ
   ρ = env c
@@ -74,7 +75,7 @@ module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St 
   da  = done-at L {p} {O} {d} Pre Post {rows ρ s₀} ao apre apost en
 
   cnt : pred n ≡ live pre + live post
-  cnt = cong pred (trans nl (trans (live-ʳ++ pre) (+-suc (live pre) (live post))))
+  cnt = cong pred (trans count (trans (live-ʳ++ pre) (+-suc (live pre) (live post))))
 
   ------------------------------------------------------------------------
   -- The tree after
@@ -85,8 +86,9 @@ module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St 
       lane≃ : rows ρ ln ≃ rows ρ ed
       lane≃ = (λ r → ⊥-elim (en r)) ⇄ λ ()
       gnode : ∀ v → G ρ v (flatS (mergeᶠ nothing) f d n [] o (pre ʳ++ ln ∷ post)) → G ρ v (node (pred n))
-      gnode true  _                  = go , goodL-swap pre (λ _ → refl , shape s₀ g₀ , tt) gl , refl , fa , el , trans cnt (sym (live-ʳ++ pre)) , ov , rooted-≃ ≃-refl (lanes-≃ pre (lane≃ ∷ ≈ᴸ-refl Post)) rt
-      gnode false (go′ , gl′ , qe , fa′ , _) = go′ , goodL-swap pre (λ { (refl , g′ , _) → refl , g′ , tt }) gl′ , qe , fa′ , tt , tt , tt , tt₁
+      gnode true  _  = record { outer = outer ; lanesG = goodL-swap pre (λ _ → refl , shape s₀ g₀ , tt) lanesG ; fresh = refl ; inFrag = inFrag
+                              ; count = trans cnt (sym (live-ʳ++ pre)) ; spent = spent ; rooted = rooted-≃ ≃-refl (lanes-≃ pre (lane≃ ∷ ≈ᴸ-refl Post)) rooted }
+      gnode false m′ = mergeG-map (λ x → x) (goodL-swap pre (λ { (refl , g′ , _) → refl , g′ , tt })) (λ x → x) (λ x → x) (λ x → x) m′
       sw : Swap ρ (flatS (mergeᶠ nothing) f d n [] o (pre ʳ++ ln ∷ post)) (node (pred n))
       sw = record { same = flat-≃ L ≃-refl (lanes-≃ pre (lane≃ ∷ ≈ᴸ-refl Post)) ; live≡ = refl ; node = gnode ; lane = λ _ () ; body = λ _ _ () }
 
@@ -109,9 +111,9 @@ module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St 
                                              (fr (Plus Y p end) (λ _ → new) old back)))
                                (vis-≃ (up-≃ c (plus-≃ (≃-sym (rowsY {pred n}))))))
     where
-      eo = ov td
+      eo = spent td
       z  = trans (sym cnt) pz
-      gs = goodL-ʳ++⁻ pre gl
+      gs = goodL-ʳ++⁻ pre lanesG
       ep = dead-empty pre (proj₁ gs) (m+n≡0⇒m≡0 (live pre) z)
       eq = dead-empty post (proj₂ (proj₂ gs)) (m+n≡0⇒n≡0 (live pre) z)
       D  = da td ep eq
@@ -161,6 +163,6 @@ rise-lane-cp f d n q o pre post c s p (inv g (u , l , os , op′ , as , es)) wit
 ... | off a s₀ = ⊥-elim op′
 ... | on a s₀ g₀ _ with subst (λ v → G (env c) v (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post))) lv
                             (node-good c (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post)) g (λ ()))
-... | go , gl , refl , fa , el , nl , ov , rt with u | l
-... | ho , oo , op , oq , uc | ao , apre , apost , lc =
-  Cp.result f d n o pre post c a s₀ p g go fa gl el nl ov rt g₀ ho oo op oq uc ao apre apost lc es
+... | mg with MergeG.fresh mg | u | l
+... | refl | ho , oo , op , oq , uc | ao , apre , apost , lc =
+  Cp.result f d n o pre post c a s₀ p g mg g₀ ho oo op oq uc ao apre apost lc es

@@ -28,7 +28,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
 open import adequacy.Rows using (env; rows; RT; Moves)
 open import adequacy.Up using (≃-refl)
 open import denotation.Laws.Worlds using (Ok; Hots)
-open import adequacy.Bound using (Empty; Good; G; GLn; LnBody)
+open import adequacy.Bound using (Empty; Good; G; GLn; LnBody; MergeG; mergeG-map)
 open import adequacy.Skip using (After; LeadC)
 open import adequacy.Owes using (Owes; UpO; goodL-ʳ++⁻; goodL-swap; Swap; good-swap)
 
@@ -164,7 +164,7 @@ good-split (inTake i q w c) s g with good-split c (takeS i q w s) g
 ... | inj₂ ()
 good-split (inOuter (mergeᶠ nothing) f d n q ls c) s g with good-split c (flatS (mergeᶠ nothing) f d n q s ls) g
 ... | gc , gf with unF c _ gf
-... | inj₁ gm = gc , proj₁ gm
+... | inj₁ gm = gc , MergeG.outer gm
 ... | inj₂ ()
 good-split (inOuter (mergeᶠ (just m)) f d n q ls c) s g with good-split c (flatS (mergeᶠ (just m)) f d n q s ls) g
 ... | _ , gf with unF c _ gf
@@ -180,7 +180,7 @@ good-split (inOuter exhaustᶠ f d n q ls c) s g with good-split c (flatS exhaus
 ... | inj₂ ()
 good-split (inLanes (mergeᶠ nothing) f d n q o pre post c) s g with good-split c (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post)) g
 ... | gc , gf with unF c _ gf
-... | inj₁ (_ , gl , _) = gc , proj₁ (proj₂ (goodL-ʳ++⁻ pre gl))
+... | inj₁ gm = gc , proj₁ (proj₂ (goodL-ʳ++⁻ pre (MergeG.lanesG gm)))
 ... | inj₂ ()
 good-split (inLanes (mergeᶠ (just m)) f d n q o pre post c) s g with good-split c (flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s ∷ post)) g
 ... | _ , gf with unF c _ gf
@@ -273,12 +273,12 @@ dead-swap (inCut true a c)  dd sw g =
 dead-swap (inLn b c)        dd sw g = dead-swap c dd (record { node₀ = λ () ; lane₀ = body₀ sw b ; body₀ = λ _ () }) g
 dead-swap (inTake i q w c)  dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inOuter (mergeᶠ nothing) f d n q ls c) dd sw g =
-  dead-swap c dd (record { node₀ = λ { (go , gl , qe , fa , _) → node₀ sw go , gl , qe , fa , tt , tt , tt , tt₁ } ; lane₀ = λ () ; body₀ = λ _ () }) g
+  dead-swap c dd (record { node₀ = mergeG-map (node₀ sw) (λ x → x) (λ x → x) (λ x → x) (λ x → x) ; lane₀ = λ () ; body₀ = λ _ () }) g
 dead-swap (inOuter (mergeᶠ (just _)) f d n q ls c) dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inOuter switchᶠ f d n q ls c)  dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inOuter exhaustᶠ f d n q ls c) dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inLanes (mergeᶠ nothing) f d n q o pre post c) dd sw g =
-  dead-swap c dd (record { node₀ = λ { (go , gl , qe , fa , _) → go , goodL-swap pre (lane₀ sw) gl , qe , fa , tt , tt , tt , tt₁ } ; lane₀ = λ () ; body₀ = λ _ () }) g
+  dead-swap c dd (record { node₀ = mergeG-map (λ x → x) (goodL-swap pre (lane₀ sw)) (λ x → x) (λ x → x) (λ x → x) ; lane₀ = λ () ; body₀ = λ _ () }) g
 dead-swap (inLanes (mergeᶠ (just _)) f d n q o pre post c) dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inLanes switchᶠ f d n q o pre post c)  dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inLanes exhaustᶠ f d n q o pre post c) dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g

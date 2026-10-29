@@ -31,7 +31,7 @@ open Machine using (St; Ctx; Cand; found; Mark; ofM; attM; Att; Out; still; show
                     top; inMap; inCut; inLn; inOuter; inLanes)
 open import adequacy.Rows using (env; rows; rowsL; pendRows; toEv; Lanes; Each; module Flat)
 open import adequacy.Bound using (_⊑_; ⊑i; ⊑-refl; ⊑-trans; <→⊑; ext-⊑; From; Bd; OK; OKL; Live;
-                                         Apart; Spread; Parts; rooted-parts; G; GL; GLn; Good; ofPos; from-weak; seek-ok; seek-ln; lane-ok; lanes-ok)
+                                         Apart; Spread; Parts; rooted-parts; MergeG; G; GL; GLn; Good; ofPos; from-weak; seek-ok; seek-ln; lane-ok; lanes-ok)
 open import adequacy.Skip using (After; LeadC)
 
 open _⊑_
@@ -410,19 +410,22 @@ mutual
   kids-lead v c (mapS f s)       g = map-leads v f (seek (inMap f c) s) (seek-lead v (inMap f c) s g)
   kids-lead v c (cutS true a s)  g = cut-on v (seek (inCut true a c) s) (seek-lead (v Data.Bool.∧ true) (inCut true a c) s g)
   kids-lead v c (cutS false a s) g = cut-off v (seek (inCut false a c) s) (seek-lead (v Data.Bool.∧ false) (inCut false a c) s g)
-  kids-lead true c (flatS (mergeᶠ nothing) f d n .[] o ls) (go , gl , refl , _ , _ , _ , _ , rt) =
+  kids-lead true c (flatS (mergeᶠ nothing) f d n q o ls) m with MergeG.fresh m
+  ... | refl =
     Race.race-leads true c f d n o ls
       (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)
-      (seek-lead true (inOuter (mergeᶠ nothing) f d n [] ls c) o go)
-      (lanes-lead true c f d n o [] ls gl (proj₂ (rooted-parts rt)))
-      (seek-ok (inOuter (mergeᶠ nothing) f d n [] ls c) o go)
-      (lanes-ok c f d n o [] ls gl)
-      (rooted-parts rt)
-  kids-lead false c (flatS (mergeᶠ nothing) f d n .[] o ls) (go , gl , refl , _) =
+      (seek-lead true (inOuter (mergeᶠ nothing) f d n [] ls c) o outer)
+      (lanes-lead true c f d n o [] ls lanesG (proj₂ (rooted-parts rooted)))
+      (seek-ok (inOuter (mergeᶠ nothing) f d n [] ls c) o outer)
+      (lanes-ok c f d n o [] ls lanesG)
+      (rooted-parts rooted)
+    where open MergeG m
+  kids-lead false c (flatS (mergeᶠ nothing) f d n q o ls) m with MergeG.fresh m
+  ... | refl =
     Race.race-leads false c f d n o ls
       (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)
-      (seek-lead false (inOuter (mergeᶠ nothing) f d n [] ls c) o go)
-      (lanes-lead false c f d n o [] ls gl tt) tt tt tt
+      (seek-lead false (inOuter (mergeᶠ nothing) f d n [] ls c) o (MergeG.outer m))
+      (lanes-lead false c f d n o [] ls (MergeG.lanesG m) tt) tt tt tt
   kids-lead v c (ofS _ _ _)      _ = tt₁
   kids-lead v c doneS            _ = tt₁
   kids-lead v c (pend _)         _ = tt₁
