@@ -36,6 +36,7 @@ open import adequacy.Skip using (After)
 open import adequacy.Inv using (Inv; inv; good; Sim; Ends; GoodF; good-split; open-alive)
 open import adequacy.LaneCp using (rise-lane-cp)
 open import adequacy.AbsOf using (abs-of)
+open import denotation.Read using (Meets)
 open import adequacy.Owes using (Swap; good-swap)
 open import adequacy.Enter using (enter-map; enter-merge; flat-∅)
 
@@ -361,7 +362,14 @@ sound-from {k = k} i (fin e) with fin-moved (stepᴹ k) (frag-mv i) e
 ... | _ , _ , _ , eq with step-sim eq i
 ...   | _ , shown v lt _ = (v , lt) ∷ []
 
--- THE SOUND HALF: what the engine shows, a reader of the program's rows
--- is shown.
-sound : ∀ {R} {o : PureObs [] R} → Frag o → ∀ {rs} → Steps (load o) rs → Shows* (enter (⟦ o ⟧ []ᴬ) root) (conv rs)
-sound fo st = sound-from (inv fo (tt , tt)) st
+postulate
+  -- THE SKIPS BETWEEN: a fragment program's least visible rows, shown in
+  -- turn, are the shown rows of a reader's run, the skips before each met
+  -- on the way.  Finitely many rows lie before each (`adequacy.Enter`),
+  -- and none visible past the end; the run lists them in position order.
+  met-of-shown : ∀ {R} {o : PureObs [] R} → Frag o → ∀ {vs} → Shows* (enter (⟦ o ⟧ []ᴬ) root) vs → Meets (enter (⟦ o ⟧ []ᴬ) root) vs
+
+-- THE SOUND HALF: what the engine shows, a subscriber to the program's
+-- rows is shown.
+sound : ∀ {R} {o : PureObs [] R} → Frag o → ∀ {rs} → Steps (load o) rs → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs)
+sound {o = o} fo st = met-of-shown {o = o} fo (sound-from (inv fo (tt , tt)) st)

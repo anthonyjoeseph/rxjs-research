@@ -37,6 +37,17 @@ whose emission set holds a row no run reaches.
 
 Members: `complete`.
 
+#### THE SKIPS BETWEEN
+
+Untried: the engine's shown rows, each the least visible one left, are
+the shown rows of a reader's run, which meets every skip in order. Rows
+before each are finitely many, but which of a listing's positions are rows
+is undecided: needs an exact listing of a fragment program's rows, or
+excluded middle. Settled by a body, or a fragment program showing a value
+past its end.
+
+Members: `met-of-shown`.
+
 #### THE GOOD TREE KEPT
 
 Untried: a mark run at an of keeps `Good`, its merges' parts still apart.
