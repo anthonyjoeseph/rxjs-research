@@ -13,7 +13,7 @@ open import Function.Bundles using (Equivalence)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; pred; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; pred; _≡ᵇ_)
 open import Data.Nat.Properties using (≡ᵇ⇒≡)
 open import Data.List.Properties using (++-identityʳ; ∷ʳ-injectiveˡ)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -37,7 +37,7 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed;
                     free; cpAt; cutAt; overAt; inScan; inTake; inSrc; inBody;
                     ofS; doneS; mapS; cutS; lnS; flatS; coldS; scanS; takeS; connS; joinS; inMap; inCut; inLn; inOuter; inLanes; nx; cp; attached; attAt; attM; pend) renaming (Ev to Evᴹ; over to overᶜ)
-open import adequacy.Rows using (Frag; rows; rowsL; pendRows; toEv; Gone; Lanes; Each; reads; module Flat)
+open import adequacy.Rows using (Frag; rows; rowsL; pendRows; toEv; Enough; Lanes; Each; reads; module Flat)
 
 ------------------------------------------------------------------------
 -- Keys
@@ -241,10 +241,6 @@ mutual
     first-mk _ _ (retag-mk (raise-cut (alive s)) (seek (inLanes op f d n q o pre post c) s) (seek-mark (inLanes op f d n q o pre post c) s))
                  (lanes-mark c op f d n q o (s ∷ pre) post)
 
--- An end, every row still owed by it.
-EndLast : ∀ {A} → EmissionSet A → Set
-EndLast t = ∀ {c q e} → t c end → t q e → q ≼ c
-
 module _ {B : Set} where
   empty-any : ∀ (Ls : List (EmissionSet B)) → Each Empty Ls → Empty (Lanes Ls)
   empty-any (_ ∷ _)  (n , _)  (inj₁ r) = n r
@@ -262,21 +258,10 @@ module _ {B : Set} where
   from-empty []       _        = _
   from-empty (_ ∷ Ls) (n , ns) = (λ r → ⊥-elim (n r)) , from-empty Ls ns
 
-  gone-empty : ∀ {c} (Ls : List (EmissionSet B)) → Each Empty Ls → Each (λ t → Gone t c) Ls
-  gone-empty         []       _        = _
-  gone-empty {c = c} (_ ∷ Ls) (n , ns) = (λ r → ⊥-elim (n r)) , gone-empty {c = c} Ls ns
-
-------------------------------------------------------------------------
--- The node facts the race reads
-
-record Counts {A B : Set} (O : EmissionSet A) (Ls : List (EmissionSet B)) (d : Bool) (n : ℕ) : Set where
-  field
-    -- No lane running: every lane begun has ended.
-    none : n ≡ 0 → Each Empty Ls
-    -- At most one running: a lane's end ends every lane.
-    one  : pred n ≡ 0 → ∀ {q} → Lanes Ls q end → Each (λ t → Gone t q) Ls
-    -- The outer done: it owes nothing.
-    over : T d → Empty O
+  -- A lane's end: one lane ended there.
+  end-enough : ∀ (Ls : List (EmissionSet B)) {q} → Lanes Ls q end → Enough 1 Ls q
+  end-enough (_ ∷ _)  {q} (inj₁ r) = inj₁ ((q , r , ≼-refl {q}) , tt)
+  end-enough (_ ∷ Ls) (inj₂ x) = inj₂ (end-enough Ls x)
 
 -- The lanes still in their list.
 live : ∀ {Γ A} → List (St Γ A) → ℕ
@@ -417,7 +402,7 @@ mutual
   GLn ρ b _         = ⊥₁
 
   LnBody : ∀ {Γ A} → DenEnv Γ → Bool → Bool → St Γ A → Set₁
-  LnBody ρ b l (cutS l′ a s) = l ≡ l′ × G ρ (b ∧ l) s × Live (b ∧ l) (EndLast (rows ρ s))
+  LnBody ρ b l (cutS l′ a s) = l ≡ l′ × G ρ (b ∧ l) s
   LnBody ρ b l _             = ⊥₁
 
 Good : ∀ {Γ A} → DenEnv Γ → St Γ A → Set₁
@@ -454,7 +439,7 @@ mutual
   shapeL (s ∷ ls) (g , gs) = shapeLn s g , shapeL ls gs
 
   shapeLn : ∀ {Γ A} {ρ : DenEnv Γ} {v} (s : St Γ A) → GLn ρ v s → GLn ρ false s
-  shapeLn {v = v} (lnS l (cutS l′ a s)) (eq , g , _) = eq , shape {v = v ∧ l} s g , tt
+  shapeLn {v = v} (lnS l (cutS l′ a s)) (eq , g) = eq , shape {v = v ∧ l} s g
   shapeLn (lnS _ (pend _))              ()
   shapeLn (lnS _ (coldS _ _))           ()
   shapeLn (lnS _ (ofS _ _ _))           ()
@@ -479,11 +464,11 @@ mutual
   shapeLn (joinS _ _ _ _)       ()
 
 data LaneV {Γ A} (ρ : DenEnv Γ) : St Γ A → Set₁ where
-  on  : ∀ a s → Good ρ s → EndLast (rows ρ s) → LaneV ρ (lnS true (cutS true a s))
+  on  : ∀ a s → Good ρ s → LaneV ρ (lnS true (cutS true a s))
   off : ∀ a s → LaneV ρ (lnS false (cutS false a s))
 
 lane-v : ∀ {Γ A} {ρ : DenEnv Γ} (s : St Γ A) → GoodLn ρ s → LaneV ρ s
-lane-v (lnS true  (cutS true  a s)) (refl , g , e) = on a s g e
+lane-v (lnS true  (cutS true  a s)) (refl , g) = on a s g
 lane-v (lnS false (cutS false a s)) (refl , _)     = off a s
 lane-v (lnS true  (cutS false a s)) (() , _)
 lane-v (lnS false (cutS true  a s)) (() , _)
@@ -514,19 +499,8 @@ lane-v (cutS _ _ _) ()
 dead-empty : ∀ {Γ A} {ρ : DenEnv Γ} (ls : List (St Γ A)) → GoodL ρ ls → live ls ≡ 0 → Each Empty (rowsL ρ ls)
 dead-empty []       _         _ = _
 dead-empty (s ∷ ls) (gs , gl) z with lane-v s gs
-dead-empty (_ ∷ ls) (gs , gl) () | on _ _ _ _
+dead-empty (_ ∷ ls) (gs , gl) () | on _ _ _
 dead-empty (_ ∷ ls) (gs , gl) z  | off _ _ =(λ ()) , dead-empty ls gl z
-
--- One lane at most in the list: its end ends them all.
-one-gone : ∀ {Γ A} {ρ : DenEnv Γ} (ls : List (St Γ A)) → GoodL ρ ls → pred (live ls) ≡ 0 → ∀ {q} → Lanes (rowsL ρ ls) q end → Each (λ t → Gone t q) (rowsL ρ ls)
-one-gone (s ∷ ls) (gs , gl) z x with lane-v s gs
-one-gone (_ ∷ ls) (gs , gl) z {q} (inj₁ r) | on _ _ _ e = (λ r′ → e r r′) , gone-empty {c = q} (rowsL _ ls) (dead-empty ls gl z)
-one-gone (_ ∷ ls) (gs , gl) z (inj₂ x) | on _ _ _ e = ⊥-elim (empty-any (rowsL _ ls) (dead-empty ls gl z) x)
-one-gone (_ ∷ ls) (gs , gl) z (inj₁ ()) | off _ _
-one-gone (_ ∷ ls) (gs , gl) z (inj₂ x) | off _ _ =(λ ()) , one-gone ls gl z x
-
-counts : ∀ {Γ A B} {ρ : DenEnv Γ} {O : EmissionSet A} (ls : List (St Γ B)) {d n} → GoodL ρ ls → n ≡ live ls → (T d → Empty O) → Counts O (rowsL ρ ls) d n
-counts ls gl refl ov = record { none = dead-empty ls gl ; one = one-gone ls gl ; over = ov }
 
 ------------------------------------------------------------------------
 -- An of
@@ -620,9 +594,8 @@ lanes-first {Ls = Ls} (just (g , K , o)) (just (g′ , K′ , o′)) bx (fy , my
 -- The race
 
 module Race {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (Ls : List (EmissionSet B)) (d : Bool) (n : ℕ)
-            (sO : Single O) (cn : Counts O Ls d n) where
-  open Flat L O d Ls
-  open Counts cn
+            (sO : Single O) (over : T d → Empty O) where
+  open Flat L O d n Ls
 
   -- Every row of the merge sits no earlier than some row of a part:
   -- `K` bounding the outer's and the lanes', it bounds the merge's.
@@ -665,11 +638,16 @@ module Race {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (L
 
   -- The outer's end at `q₀` with no lane running ends the merge.
   outer-done : ∀ {q₀} → O q₀ end → From (at q₀) O → n ≡ 0 → Done q₀
-  outer-done {q₀} r fo nz = (inj₂ (q₀ , r , ≼-refl {q₀}) , gone-empty {c = q₀} Ls (none nz)) , (λ v _ lt _ → ⊥-elim (⊑→≼ (fo v) lt))
+  outer-done {q₀} r fo refl = (inj₂ (q₀ , r , ≼-refl {q₀}) , tt) , (λ v _ lt _ → ⊥-elim (⊑→≼ (fo v) lt))
 
   -- A lane's end at `q`, the outer done and no other lane running, ends it.
   lane-done : ∀ {q} → Lanes Ls q end → T d → pred n ≡ 0 → Done q
-  lane-done x td pn = (inj₁ td , one pn x) , (λ v _ _ _ → ⊥-elim (over td v))
+  lane-done {q} x td pn = (inj₁ td , one n pn) , (λ v _ _ _ → ⊥-elim (over td v))
+    where
+      one : ∀ m → pred m ≡ 0 → Enough m Ls q
+      one zero          _  = tt
+      one (suc zero)    _  = end-enough Ls x
+      one (suc (suc _)) ()
 
   empty-flat : Empty O → Each Empty Ls → Empty JoinT
   empty-flat eo el (val r)       = eo r
@@ -745,14 +723,14 @@ mutual
     own-first (_ , _ , c , cutS true (attAt p) s) attM (after p) _ (kept (seek (inCut true (attAt p) c) s) (seek-ok (inCut true (attAt p) c) s g))
   seek-ok {ρ = ρ} c (flatS (mergeᶠ nothing) f d n q o ls) m with MergeG.fresh m
   ... | refl =
-    Race.race-ok (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) (counts ls lanesG count spent)
+    Race.race-ok (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) spent
       (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)
       (seek-ok (inOuter (mergeᶠ nothing) f d n [] ls c) o outer) (lanes-ok c f d n o [] ls lanesG)
     where open MergeG m
 
   seek-ln : ∀ {R Γ A} {ρ : DenEnv Γ} (c : Ctx R Γ A) (s : St Γ A) → GoodLn ρ s → OK (rows ρ s) (seek c s)
   seek-ln {ρ = ρ} c s g with lane-v s g
-  ... | on a s₀ g₀ _ = seek-ok (inLn true c) (cutS true a s₀) g₀
+  ... | on a s₀ g₀ = seek-ok (inLn true c) (cutS true a s₀) g₀
   ... | off a s₀     = seek-off {ρ = ρ} (inLn false c) a s₀
 
   lanes-ok : ∀ {R Γ A B} {ρ : DenEnv Γ} (c : Ctx R Γ B) f d n (o : St Γ A) pre (ls : List (St Γ B)) → GoodL ρ ls

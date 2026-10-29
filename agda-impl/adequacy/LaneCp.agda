@@ -61,18 +61,18 @@ module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St 
   ed   = lnS false (cutS false a s₀)
   LX   = Pre ʳ++ (Plus (rows ρ s₀) p end ∷ Post)
   LY   = Pre ʳ++ (∅ ∷ Post)
-  Y    = Flat.JoinT L O d LY
+  Y    = Flat.JoinT L O d (pred n) LY
 
   node : ℕ → St Γ B
   node m = flatS (mergeᶠ nothing) f d m [] o (pre ʳ++ ed ∷ post)
 
-  rowsY : ∀ {m} → rows ρ (node m) ≃ Y
-  rowsY = ≡→≃ (cong (Flat.JoinT L O d) (rowsL-ʳ++ pre))
+  rowsY : rows ρ (node (pred n)) ≃ Y
+  rowsY = ≡→≃ (cong (Flat.JoinT L O d (pred n)) (rowsL-ʳ++ pre))
 
-  sx′ = since-x L {p} {O} {d} Pre Post {rows ρ s₀} ao apre apost en
-  sy′ = since-y L {p} {O} {d} Pre Post {rows ρ s₀} ao apre apost en
-  fr  = frame-≈ L {p} {O} {d} Pre Post {rows ρ s₀} ao apre apost en
-  da  = done-at L {p} {O} {d} Pre Post {rows ρ s₀} ao apre apost en
+  sx′ = since-x L {p} {O} {d} {n} Pre Post {rows ρ s₀} ao apre apost en
+  sy′ = since-y L {p} {O} {d} {n} Pre Post {rows ρ s₀} ao apre apost en
+  fr  = frame-≈ L {p} {O} {d} {n} Pre Post {rows ρ s₀} ao apre apost en
+  da  = done-at L {p} {O} {d} {n} Pre Post {rows ρ s₀} ao apre apost en
 
   cnt : pred n ≡ live pre + live post
   cnt = cong pred (trans count (trans (live-ʳ++ pre) (+-suc (live pre) (live post))))
@@ -86,9 +86,9 @@ module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St 
       lane≃ : rows ρ ln ≃ rows ρ ed
       lane≃ = (λ r → ⊥-elim (en r)) ⇄ λ ()
       gnode : ∀ v → G ρ v (flatS (mergeᶠ nothing) f d n [] o (pre ʳ++ ln ∷ post)) → G ρ v (node (pred n))
-      gnode true  _  = record { outer = outer ; lanesG = goodL-swap pre (λ _ → refl , shape s₀ g₀ , tt) lanesG ; fresh = refl ; inFrag = inFrag
+      gnode true  _  = record { outer = outer ; lanesG = goodL-swap pre (λ _ → refl , shape s₀ g₀) lanesG ; fresh = refl ; inFrag = inFrag
                               ; count = trans cnt (sym (live-ʳ++ pre)) ; spent = spent ; rooted = rooted-≃ ≃-refl (lanes-≃ pre (lane≃ ∷ ≈ᴸ-refl Post)) rooted }
-      gnode false m′ = mergeG-map (λ x → x) (goodL-swap pre (λ { (refl , g′ , _) → refl , g′ , tt })) (λ x → x) (λ x → x) (λ x → x) m′
+      gnode false m′ = mergeG-map (λ x → x) (goodL-swap pre (λ { (refl , g′) → refl , g′ })) (λ x → x) (λ x → x) (λ x → x) m′
       sw : Swap ρ (flatS (mergeᶠ nothing) f d n [] o (pre ʳ++ ln ∷ post)) (node (pred n))
       sw = record { same = flat-≃ L ≃-refl (lanes-≃ pre (lane≃ ∷ ≈ᴸ-refl Post)) ; live≡ = refl ; node = gnode ; lane = λ _ () ; body = λ _ _ () }
 
@@ -98,28 +98,28 @@ module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St 
   ------------------------------------------------------------------------
   -- The two outcomes
 
-  pass : ¬ Flat.Done L O d LX p → Owing Y
-       → Inv ⟨ c , node (pred n) , absorbed , p ⟩ × Moves (up c (Flat.JoinT L O d LX)) [] (up c (rows ρ (node (pred n))))
-  pass nd ow = inv good′ (owes-join c uc owes′ (need-of c (owing-≃ (≃-sym (rowsY {pred n})) ow)))
+  pass : ¬ Flat.Done L O d n LX p → Owing Y
+       → Inv ⟨ c , node (pred n) , absorbed , p ⟩ × Moves (up c (Flat.JoinT L O d n LX)) [] (up c (rows ρ (node (pred n))))
+  pass nd ow = inv good′ (owes-join c uc owes′ (need-of c (owing-≃ (≃-sym (rowsY)) ow)))
              , silent (≃-trans (≈-vis (up-≈ c lc (sx′) (sy′)
                                              (fr Y (λ d → ⊥-elim (nd d)) (λ r → r) inj₁)))
-                               (vis-≃ (up-≃ c (≃-sym (rowsY {pred n})))))
+                               (vis-≃ (up-≃ c (≃-sym (rowsY)))))
 
-  done : T d → pred n ≡ 0 → Inv ⟨ c , node (pred n) , rising cp , p ⟩ × Moves (up c (Flat.JoinT L O d LX)) [] (up c (Plus (rows ρ (node (pred n))) p end))
+  done : T d → pred n ≡ 0 → Inv ⟨ c , node (pred n) , rising cp , p ⟩ × Moves (up c (Flat.JoinT L O d n LX)) [] (up c (Plus (rows ρ (node (pred n))) p end))
   done td pz = inv good′ (uc , lc , owes′ , tt , (λ r → ⊥-elim (empty-node r)) , empty-node)
              , silent (≃-trans (≈-vis (up-≈ c lc (sx′) since′
                                              (fr (Plus Y p end) (λ _ → new) old back)))
-                               (vis-≃ (up-≃ c (plus-≃ (≃-sym (rowsY {pred n}))))))
+                               (vis-≃ (up-≃ c (plus-≃ (≃-sym (rowsY))))))
     where
       eo = spent td
       z  = trans (sym cnt) pz
       gs = goodL-ʳ++⁻ pre lanesG
       ep = dead-empty pre (proj₁ gs) (m+n≡0⇒m≡0 (live pre) z)
       eq = dead-empty post (proj₂ (proj₂ gs)) (m+n≡0⇒n≡0 (live pre) z)
-      D  = da td ep eq
+      D  = da td pz
       empty-node : Empty (rows ρ (node (pred n)))
-      empty-node = empty-≃ (≃-sym (rowsY {pred n})) (flat-empty L eo (all-ʳ++ Pre ep ((λ {_} {_} ()) , eq)))
-      back : ∀ {k e} → Plus Y p end k e → Y k e ⊎ (k ≡ p × e ≡ end × Flat.Done L O d LX p)
+      empty-node = empty-≃ (≃-sym (rowsY)) (flat-empty L eo (all-ʳ++ Pre ep ((λ {_} {_} ()) , eq)))
+      back : ∀ {k e} → Plus Y p end k e → Y k e ⊎ (k ≡ p × e ≡ end × Flat.Done L O d n LX p)
       back (old r) = inj₁ r
       back new     = inj₂ (refl , refl , D)
       since′ : Since p (Plus Y p end)
@@ -140,14 +140,14 @@ module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St 
   owing-ly (inj₂ ow) em = ow λ {q} {e} x → em (any-ʳ++ʳ Pre (inj₂ x))
 
   Out : Machine.Mode B → Set₁
-  Out m = Inv ⟨ c , node (pred n) , m , p ⟩ × Moves (up c (Flat.JoinT L O d LX)) [] (up c (here ρ (node (pred n)) m p))
+  Out m = Inv ⟨ c , node (pred n) , m , p ⟩ × Moves (up c (Flat.JoinT L O d n LX)) [] (up c (here ρ (node (pred n)) m p))
 
   pick : ∀ b → d ≡ b → ∀ m → pred n ≡ m → Out (settle b m true)
-  pick false db m em = pass (outer-owes L {p} {O} {d} Pre Post {rows ρ s₀} ao apre apost en nd) (flat-owing-o L {O} {d} {LY} ow)
+  pick false db m em = pass (outer-owes L {p} {O} {d} {n} Pre Post {rows ρ s₀} ao apre apost en nd) (flat-owing-o L {O} {d} {pred n} {LY} ow)
     where nd = λ t → subst T db t
           ow = ho nd
   pick true db zero em = done (subst T (sym db) tt) em
-  pick true db (suc k) em = pass (lanes-owe L {p} {O} {d} Pre Post {rows ρ s₀} ao apre apost en w) (flat-owing-l L {O} {d} {LY} (owing-ly w))
+  pick true db (suc k) em = pass (lanes-owe L {p} {O} {d} {n} Pre Post {rows ρ s₀} ao apre apost en k em) (flat-owing-l L {O} {d} {pred n} {LY} (owing-ly w))
     where w = live-other k (trans (sym cnt) em)
 
   result : Out (settle d (pred n) true)
@@ -161,7 +161,7 @@ rise-lane-cp : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s 
 rise-lane-cp f d n q o pre post c s p (inv g (u , l , os , op′ , as , es)) with upo-liv (inLanes (mergeᶠ nothing) f d n q o pre post c) u
 ... | lv with lane-v s (subst (λ v → GLn (env c) v s) lv (proj₂ (good-split (inLanes (mergeᶠ nothing) f d n q o pre post c) s g)))
 ... | off a s₀ = ⊥-elim op′
-... | on a s₀ g₀ _ with subst (λ v → G (env c) v (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post))) lv
+... | on a s₀ g₀ with subst (λ v → G (env c) v (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post))) lv
                             (node-good c (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post)) g (λ ()))
 ... | mg with MergeG.fresh mg | u | l
 ... | refl | ho , oo , op , oq , uc | ao , apre , apost , lc =

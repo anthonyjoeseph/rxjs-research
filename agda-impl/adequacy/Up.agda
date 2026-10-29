@@ -11,13 +11,15 @@ open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Nat using (zero; suc)
+open import Data.Unit using (tt)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos)
-open import denotation.EmissionSet using (EmissionSet; MapT; map-out; map-skip; map-end; DenEnv; module Connecting)
+open import denotation.EmissionSet using (EmissionSet; Ended; MapT; map-out; map-skip; map-end; DenEnv; module Connecting)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; St; CS; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (up; env; rows; Hot; pendRows; Vis; Plus; old; new; rowsL; Gone; Lanes; Each; module Flat; _≃_; _⇄_; ≃-sym)
+open import adequacy.Rows using (up; env; rows; Hot; pendRows; Vis; Plus; old; new; rowsL; Enough; Lanes; Each; module Flat; _≃_; _⇄_; ≃-sym)
 
 open _≃_
 
@@ -54,12 +56,14 @@ any-≈ : ∀ {B} {Ls Ls′ : List (EmissionSet B)} → Ls ≈ᴸ Ls′ → ∀ 
 any-≈ (e ∷ _)  (inj₁ r) = inj₁ (to e r)
 any-≈ (_ ∷ es) (inj₂ x) = inj₂ (any-≈ es x)
 
-Gone-≃ : ∀ {X} {t u : EmissionSet X} {c} → t ≃ u → Gone t c → Gone u c
-Gone-≃ eq g r = g (from eq r)
+ended-≃ : ∀ {X} {t u : EmissionSet X} {c} → t ≃ u → Ended t c → Ended u c
+ended-≃ eq (c₀ , r , le) = c₀ , to eq r , le
 
-all-≈ : ∀ {B} {Ls Ls′ : List (EmissionSet B)} → Ls ≈ᴸ Ls′ → ∀ {c} → Each (λ t → Gone t c) Ls → Each (λ t → Gone t c) Ls′
-all-≈ []       _        = _
-all-≈ (e ∷ es) {c} (g , gs) = Gone-≃ {c = c} e g , all-≈ es {c} gs
+enough-≈ : ∀ {B} {Ls Ls′ : List (EmissionSet B)} → Ls ≈ᴸ Ls′ → ∀ k {c} → Enough k Ls c → Enough k Ls′ c
+enough-≈ es       zero    _              = tt
+enough-≈ []       (suc k) ()
+enough-≈ (e ∷ es) (suc k) {c} (inj₁ (x , y)) = inj₁ (ended-≃ {c = c} e x , enough-≈ es k y)
+enough-≈ (e ∷ es) (suc k) (inj₂ y)       = inj₂ (enough-≈ es (suc k) y)
 
 ------------------------------------------------------------------------
 -- A list with a hole: the lanes before it, nearest first, and after.
@@ -91,13 +95,13 @@ module _ {B : Set} where
   ... | a , (pz , c) = (pz , a) , c
 
 -- The same outer and the same lanes: the same merge.
-done : ∀ {A B : Set} (L : A → Pos → EmissionSet B) {O O′ : EmissionSet A} {d} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′
-     → ∀ {c} → Flat.Done L O d Ls c → Flat.Done L O′ d Ls′ c
-done L eo es {c} ((inj₁ td , ls) , h) = (inj₁ td , all-≈ es {c} ls) , λ r ru lt nc → h (from eo r) ru lt nc
-done L eo es {c} ((inj₂ (c₀ , x , le) , ls) , h) = (inj₂ (c₀ , to eo x , le) , all-≈ es {c} ls) , λ r ru lt nc → h (from eo r) ru lt nc
+done : ∀ {A B : Set} (L : A → Pos → EmissionSet B) {O O′ : EmissionSet A} {d n} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′
+     → ∀ {c} → Flat.Done L O d n Ls c → Flat.Done L O′ d n Ls′ c
+done L {n = n} eo es ((inj₁ td , ls) , h) = (inj₁ td , enough-≈ es n ls) , λ r ru lt nc → h (from eo r) ru lt nc
+done L {n = n} eo es ((inj₂ (c₀ , x , le) , ls) , h) = (inj₂ (c₀ , to eo x , le) , enough-≈ es n ls) , λ r ru lt nc → h (from eo r) ru lt nc
 
-flat : ∀ {A B : Set} (L : A → Pos → EmissionSet B) {O O′ : EmissionSet A} {d} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′
-     → ∀ {q e} → Flat.JoinT L O d Ls q e → Flat.JoinT L O′ d Ls′ q e
+flat : ∀ {A B : Set} (L : A → Pos → EmissionSet B) {O O′ : EmissionSet A} {d n} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′
+     → ∀ {q e} → Flat.JoinT L O d n Ls q e → Flat.JoinT L O′ d n Ls′ q e
 flat L eo es (Flat.val r)              = Flat.val (to eo r)
 flat L eo es (Flat.step r)             = Flat.step (to eo r)
 flat L eo es (Flat.oend r d)           = Flat.oend (to eo r) (done L eo es d)
@@ -112,8 +116,8 @@ flat L eo es (Flat.run x w)            = Flat.run (any-≈ es x) w
 flat L eo es (Flat.rend x nh d)        = Flat.rend (any-≈ es x) nh (done L eo es d)
 flat L eo es (Flat.rpass x nh nd)      = Flat.rpass (any-≈ es x) nh λ d → nd (done L (≃-sym eo) (≈ᴸ-sym es) d)
 
-flat-≃ : ∀ {A B : Set} (L : A → Pos → EmissionSet B) {O O′ : EmissionSet A} {d} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′
-       → Flat.JoinT L O d Ls ≃ Flat.JoinT L O′ d Ls′
+flat-≃ : ∀ {A B : Set} (L : A → Pos → EmissionSet B) {O O′ : EmissionSet A} {d n} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′
+       → Flat.JoinT L O d n Ls ≃ Flat.JoinT L O′ d n Ls′
 flat-≃ L eo es = flat L eo es ⇄ flat L (≃-sym eo) (≈ᴸ-sym es)
 
 map-≃ : ∀ {A B} (f : A → B) {t u : EmissionSet A} → t ≃ u → MapT f t ≃ MapT f u

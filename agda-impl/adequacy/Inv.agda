@@ -127,7 +127,7 @@ unF (inSrc k b c)      s g = inj₁ g
 unF (inBody k o c)     s g = inj₁ g
 
 lnbody-good : ∀ {Γ A} {ρ : DenEnv Γ} v b (s : St Γ A) → LnBody ρ v b s → G ρ v s
-lnbody-good v b (cutS l a s) (refl , g , _) = g
+lnbody-good v b (cutS l a s) (refl , g) = g
 lnbody-good v b (pend _)              ()
 lnbody-good v b (coldS _ _)           ()
 lnbody-good v b (ofS _ _ _)           ()
@@ -258,7 +258,7 @@ killed a sw = record
   ; live≡ = refl
   ; node  = λ { true g → node₀ sw g ; false g → node₀ sw g }
   ; lane  = λ _ ()
-  ; body  = λ { true _ (refl , g , _) → refl , node₀ sw g , tt ; false _ (refl , g , _) → refl , node₀ sw g , tt } }
+  ; body  = λ { true _ (refl , g) → refl , node₀ sw g ; false _ (refl , g) → refl , node₀ sw g } }
 
 nothing₀ : ∀ {Γ A} {ρ : DenEnv Γ} {s s′ : St Γ A} → (G ρ false s → ⊥) → (GLn ρ false s → ⊥) → (∀ b → LnBody ρ false b s → ⊥) → Swap₀ ρ s s′
 nothing₀ ng nl nb = record { node₀ = λ g → ⊥-elim (ng g) ; lane₀ = λ g → ⊥-elim (nl g) ; body₀ = λ b g → ⊥-elim (nb b g) }
@@ -269,7 +269,7 @@ dead-swap (inMap f c)       dd sw g = dead-swap c dd (record { node₀ = node₀
 dead-swap (inScan f z c)    dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inCut false a c) dd sw g = good-swap c (killed a sw) g
 dead-swap (inCut true a c)  dd sw g =
-  dead-swap c (trans (sym (∧-identityʳ (liv c))) dd) (record { node₀ = node₀ sw ; lane₀ = λ () ; body₀ = λ { b (eq , g′ , _) → eq , node₀ sw g′ , tt } }) g
+  dead-swap c (trans (sym (∧-identityʳ (liv c))) dd) (record { node₀ = node₀ sw ; lane₀ = λ () ; body₀ = λ { b (eq , g′) → eq , node₀ sw g′ } }) g
 dead-swap (inLn b c)        dd sw g = dead-swap c dd (record { node₀ = λ () ; lane₀ = body₀ sw b ; body₀ = λ _ () }) g
 dead-swap (inTake i q w c)  dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inOuter (mergeᶠ nothing) f d n q ls c) dd sw g =

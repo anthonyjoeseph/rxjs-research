@@ -168,10 +168,10 @@ module _ {A B : Set} {Lane Lane′ : Pos → A → EmissionSet B} {O : EmissionS
       bwd (Y.rhand x h)         = X.rhand (from bg x) h
 
 -- A merge with no outer rows and no lane begun: no rows.
-flat-∅ : ∀ {A B} (L : A → Pos → EmissionSet B) d → Flat.JoinT L ∅ d [] ≃ ∅
+flat-∅ : ∀ {A B} (L : A → Pos → EmissionSet B) d → Flat.JoinT L ∅ d 0 [] ≃ ∅
 flat-∅ L d = to′ ⇄ λ ()
   where
-    to′ : ∀ {k e} → Flat.JoinT L ∅ d [] k e → ⊥
+    to′ : ∀ {k e} → Flat.JoinT L ∅ d 0 [] k e → ⊥
     to′ (Flat.val ())
     to′ (Flat.step ())
     to′ (Flat.oend () _)
@@ -200,7 +200,7 @@ enter-map ρ f s p = proj₁ ⇄ λ x → x , few′ x
 -- A MERGE ENTERED: the merge part way through, at its outer entered, not
 -- done, nothing begun.
 enter-merge : ∀ {Γ A B} (ρ : DenEnv Γ) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Frag (flatMap (mergeᶠ nothing) f s)
-            → pendRows ρ (flatMap (mergeᶠ nothing) f s) p ≃ Flat.JoinT (λ a → pendRows ρ (f a)) (pendRows ρ s p) false []
+            → pendRows ρ (flatMap (mergeᶠ nothing) f s) p ≃ Flat.JoinT (λ a → pendRows ρ (f a)) (pendRows ρ s p) false 0 []
 enter-merge ρ f s p fr =
   ≃-trans (kept (join-fin (LaneOf λ a → ⟦ f a ⟧ ρ) (λ q a → fin-⊆ (frag-fin ρ (f a) (proj₁ fr a) (q ++ [ ix 1 ])) proj₁) (frag-fin ρ s (proj₂ fr) p) ([] , λ ())))
           (joining-≃ ((λ (l , p) → reads l p) ⇄ λ (reads l p) → l , p) ((λ ()) ⇄ λ ()) (λ e → inj₂ e , tt) λ { (inj₁ () , _) ; (inj₂ e , _) → e })
