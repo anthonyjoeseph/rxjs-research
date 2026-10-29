@@ -123,7 +123,7 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {O : EmissionSet A} {d : 
       go : Empty (Lanes Ls)
       go {e = out _} x = em (Flat.run x _)
       go {e = skip}  x = em (Flat.run x _)
-      go {e = end}   x = em (Flat.rpass x λ d → em (Flat.rend x d))
+      go {e = end}   x = em (Flat.rpass x (λ ()) λ d → em (Flat.rend x (λ ()) d))
 
   flat-empty : Empty O → Each Empty Ls → Empty (Flat.JoinT L O d Ls)
   flat-empty eo el (Flat.val r)       = eo r
@@ -131,12 +131,14 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {O : EmissionSet A} {d : 
   flat-empty eo el (Flat.oend r _)    = eo r
   flat-empty eo el (Flat.opass r _)   = eo r
   flat-empty eo el (Flat.lane r _ _ _ _)  = eo r
-  flat-empty eo el (Flat.lend r _ _ _ _)  = eo r
-  flat-empty eo el (Flat.lpass r _ _ _ _) = eo r
+  flat-empty eo el (Flat.lend r _ _ _ _ _)  = eo r
+  flat-empty eo el (Flat.lpass r _ _ _ _ _) = eo r
+  flat-empty eo el (Flat.hand _ _ _ _ ())
   flat-empty eo el (Flat.left _ _ _ () _)
   flat-empty eo el (Flat.run x _)     = empty-any Ls el x
-  flat-empty eo el (Flat.rend x _)    = empty-any Ls el x
-  flat-empty eo el (Flat.rpass x _)   = empty-any Ls el x
+  flat-empty eo el (Flat.rend x _ _)  = empty-any Ls el x
+  flat-empty eo el (Flat.rpass x _ _) = empty-any Ls el x
+  flat-empty eo el (Flat.rhand _ ())
 
 -- A part owing a row: its frame's node owes one.
 need-of : ∀ {R Γ A} (c : Ctx R Γ A) {s : St Γ A} → Owing (rows s) → Need c s

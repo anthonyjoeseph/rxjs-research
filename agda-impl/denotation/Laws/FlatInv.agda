@@ -1,8 +1,8 @@
 {-# OPTIONS --guardedness #-}
 
 -- EACH JOINER KEEPS THE INVARIANT: merge, switch and exhaust by the
--- joiner view (`Laws.JoinInv`), a bounded merge by its own
--- (`Laws.BoundedInv`).
+-- joiner view (`Laws.JoinInv`), a bounded merge, whose lanes start where
+-- its schedule puts them, by its own (`Laws.BoundedInv`).
 module denotation.Laws.FlatInv where
 
 open import Data.Maybe using (just; nothing)

@@ -32,7 +32,7 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed;
                     free; cpAt; cutAt; overAt; inScan; inTake; inSrc; inBody;
                     ofS; doneS; mapS; cutS; lnS; flatS; coldS; scanS; takeS; connS; joinS; inMap; inCut; inLn; inOuter; inLanes; nx; cp; attached; attAt; attM; pend) renaming (Ev to Evᴹ; over to overᶜ)
-open import adequacy.Rows using (Frag; rows; rowsL; pendRows; toEv; Gone; Lanes; Each; module Flat)
+open import adequacy.Rows using (Frag; rows; rowsL; pendRows; toEv; Gone; Lanes; Each; reads; module Flat)
 
 ------------------------------------------------------------------------
 -- Keys
@@ -535,13 +535,15 @@ module Race {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (L
   rows-from K fo fl (step r)         = fo r
   rows-from K fo fl (oend r _)       = fo r
   rows-from K fo fl (opass r _)      = fo r
-  rows-from K fo fl (lane r _ (_ , s) _ _) = ⊑-trans (fo r) (⊑-trans (ext-⊑ _ [ ix 1 ]) (≺→⊑ s))
-  rows-from K fo fl (lend r _ (_ , s) _ _) = ⊑-trans (fo r) (⊑-trans (ext-⊑ _ [ ix 1 ]) (≺→⊑ s))
-  rows-from K fo fl (lpass r _ (_ , s) _ _) = ⊑-trans (fo r) (⊑-trans (ext-⊑ _ [ ix 1 ]) (≺→⊑ s))
+  rows-from K fo fl (lane r _ (reads _ s) _ _) = ⊑-trans (fo r) (⊑-trans (ext-⊑ _ [ ix 1 ]) (≺→⊑ s))
+  rows-from K fo fl (lend r _ (reads _ s) _ _ _) = ⊑-trans (fo r) (⊑-trans (ext-⊑ _ [ ix 1 ]) (≺→⊑ s))
+  rows-from K fo fl (lpass r _ (reads _ s) _ _ _) = ⊑-trans (fo r) (⊑-trans (ext-⊑ _ [ ix 1 ]) (≺→⊑ s))
   rows-from K fo fl (left _ _ _ () _)
   rows-from K fo fl (run x _)        = from-any Ls fl x
-  rows-from K fo fl (rend x _)       = from-any Ls fl x
-  rows-from K fo fl (rpass x _)      = from-any Ls fl x
+  rows-from K fo fl (rend x _ _)     = from-any Ls fl x
+  rows-from K fo fl (rpass x _ _)    = from-any Ls fl x
+  rows-from K fo fl (hand _ _ _ _ ())
+  rows-from K fo fl (rhand _ ())
 
   -- The outer showing a value at `q₀`: every row sits just past it or later.
   past-val : ∀ {q₀ a} → O q₀ (out a) → From (at q₀) O → Each (From (at (q₀ ++ [ ix 0 ]))) Ls → From (at (q₀ ++ [ ix 0 ])) JoinT
@@ -555,13 +557,15 @@ module Race {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (L
   past-val v fo fl (opass r _)      = past-⊑ (fo r) λ { refl → end≢ (sO v r) }
     where end≢ : ∀ {a} → out a ≡ end → ⊥
           end≢ ()
-  past-val v fo fl (lane r _ (_ , s) _ _) = ⊑-trans (shift-≮ _ (at _) (fo r)) (⊑-trans (ix01 _) (≺→⊑ s))
-  past-val v fo fl (lend r _ (_ , s) _ _) = ⊑-trans (shift-≮ _ (at _) (fo r)) (⊑-trans (ix01 _) (≺→⊑ s))
-  past-val v fo fl (lpass r _ (_ , s) _ _) = ⊑-trans (shift-≮ _ (at _) (fo r)) (⊑-trans (ix01 _) (≺→⊑ s))
+  past-val v fo fl (lane r _ (reads _ s) _ _) = ⊑-trans (shift-≮ _ (at _) (fo r)) (⊑-trans (ix01 _) (≺→⊑ s))
+  past-val v fo fl (lend r _ (reads _ s) _ _ _) = ⊑-trans (shift-≮ _ (at _) (fo r)) (⊑-trans (ix01 _) (≺→⊑ s))
+  past-val v fo fl (lpass r _ (reads _ s) _ _ _) = ⊑-trans (shift-≮ _ (at _) (fo r)) (⊑-trans (ix01 _) (≺→⊑ s))
   past-val v fo fl (left _ _ _ () _)
   past-val v fo fl (run x _)        = from-any Ls fl x
-  past-val v fo fl (rend x _)       = from-any Ls fl x
-  past-val v fo fl (rpass x _)      = from-any Ls fl x
+  past-val v fo fl (rend x _ _)     = from-any Ls fl x
+  past-val v fo fl (rpass x _ _)    = from-any Ls fl x
+  past-val v fo fl (hand _ _ _ _ ())
+  past-val v fo fl (rhand _ ())
 
   -- The outer's end at `q₀` with no lane running ends the merge.
   outer-done : ∀ {q₀} → O q₀ end → From (at q₀) O → n ≡ 0 → Done q₀
@@ -577,12 +581,14 @@ module Race {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (L
   empty-flat eo el (oend r _)    = eo r
   empty-flat eo el (opass r _)   = eo r
   empty-flat eo el (lane r _ _ _ _)  = eo r
-  empty-flat eo el (lend r _ _ _ _)  = eo r
-  empty-flat eo el (lpass r _ _ _ _) = eo r
+  empty-flat eo el (lend r _ _ _ _ _)  = eo r
+  empty-flat eo el (lpass r _ _ _ _ _) = eo r
   empty-flat eo el (left _ _ _ () _)
   empty-flat eo el (run x _)    = empty-any Ls el x
-  empty-flat eo el (rend x _)    = empty-any Ls el x
-  empty-flat eo el (rpass x _)   = empty-any Ls el x
+  empty-flat eo el (rend x _ _)  = empty-any Ls el x
+  empty-flat eo el (rpass x _ _)  = empty-any Ls el x
+  empty-flat eo el (hand _ _ _ _ ())
+  empty-flat eo el (rhand _ ())
 
   -- A lane winning, the outer no earlier.
   lane-wins : ∀ {R} (g : Found R) K (o′ : Out B) → From K O → OKL Ls (just (g , K , o′)) → OK JoinT (just (g , laneT {A = A} d n [] K o′))
@@ -595,7 +601,7 @@ module Race {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (L
     where
       ends : ∀ b → d ≡ b → ∀ c → (pred n ≡ᵇ 0) ≡ c → OK JoinT (just (g , K , (if b ∧ c then shows cp else still)))
       ends true  de true  pn = record { from = rows-from K fo fl ; mark = ml
-                                      ; shown = λ { refl → let (q , k , x) = sl refl in q , k , rend x (lane-done x (subst T (sym de) tt) (≡ᵇ⇒≡ (pred n) 0 (subst T (sym pn) tt))) } }
+                                      ; shown = λ { refl → let (q , k , x) = sl refl in q , k , rend x (λ ()) (lane-done x (subst T (sym de) tt) (≡ᵇ⇒≡ (pred n) 0 (subst T (sym pn) tt))) } }
       ends true  de false pn = record { from = rows-from K fo fl ; mark = ml ; shown = λ () }
       ends false de c     pn = record { from = rows-from K fo fl ; mark = ml ; shown = λ () }
 

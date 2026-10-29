@@ -24,8 +24,8 @@ open import Data.List using ([]; _∷_; _++_; [_])
 open import Data.List.Properties using (∷ʳ-injectiveˡ; ∷ʳ-injectiveʳ)
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≤_; _<_)
 open import Data.Nat.Induction using (<-wellFounded)
-open import Data.Nat.Properties using (<-cmp; <⇒≱; <⇒≤; ≤-refl; ≤-trans; n≤1+n; n<1+n; m<n⇒m<1+n; m<1+n⇒m<n∨m≡n; ≤-<-trans;
-  <-trans; <-irrefl; +-∸-assoc; m∸n+n≡m; m≤n+m)
+open import Data.Nat.Properties using (<-cmp; <⇒≱; <⇒≤; ≤-refl; ≤-trans; n≤1+n; n<1+n; m<n⇒m<1+n; ≤-<-trans; <-trans; <-irrefl;
+  +-∸-assoc; m∸n+n≡m; m≤n+m)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
@@ -37,10 +37,11 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong;
 open import denotation.Events using (Pos; ix; inside; _≟ᵖ_)
 open import denotation.EmissionSet using (Ev; out; skip; end; EmissionSet; _≺_; _≼_; Work; Den; enter; After; Truncate; module Values;
   module Bounded)
-open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≼-antisym; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext)
+open import denotation.Laws.Modulus using (≺-trans; ≼-antisym; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext)
 open import denotation.Laws.Worlds using (Plain; plain-ix; W; W⁼; step; here; inW; Real; Ok; InvAt; InvD; _⊑_; real-snoc; ok-in; nest;
   nest⁼; nest-in; leads; w-up; not-up; sib; same-lead; flat-under; conv; ⊑-refl; ⊑-snoc; ⊑-snoc⁺; ⊑-inside; inside-⊑; ext≢; out-inj)
 open import denotation.Laws.JoinInv using (ix01; ix10; below; module Kids; module Join)
+open import denotation.Laws.Nth using (module Nths)
 
 end≢skip : ∀ {C} → _≡_ {A = Ev C} end skip → ⊥
 end≢skip ()
@@ -59,30 +60,7 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   open InvAt Io renaming (world to wo; real to re; func to fu; flat to fl; burst to bu; under to U; quiet to qu)
   open Join ok f fi Io using (sw; kids; kid-root; kid-lane; o-lane; val-lane; o-lead; o-lane-lead; end-before; val-after; module View)
   open View Done (λ _ _ _ → ⊤) using (OEv; o-skip; o-end; o-pass; o-nout; o-func; o-skipped)
-
-  ------------------------------------------------------------------------
-  -- The outer's values in order
-
-  nth-val : ∀ {i q a} → Nth i q a → O q (out a)
-  nth-val (first x _)    = x
-  nth-val (next _ x _ _) = x
-
-  nth-fun : ∀ {i q q′ a a′} → Nth i q a → Nth i q′ a′ → q ≡ q′
-  nth-fun {q = q} {q′} (first x m) (first x′ m′) = ≼-antisym {q} {q′} (m x′) (m′ x)
-  nth-fun {q = q} {q′} (next nq x lt nx) (next nq′ x′ lt′ nx′) with nth-fun nq nq′
-  ... | refl = ≼-antisym {q} {q′} (nx x′ lt′) (nx′ x lt)
-
-  nth-lt : ∀ {i i′ q q′ a a′} → i < i′ → Nth i q a → Nth i′ q′ a′ → q ≺ q′
-  nth-lt {q = q} {q′} lt nq (next {q = q₀} nq′ _ lt′ _) with m<1+n⇒m<n∨m≡n lt
-  ... | inj₁ lt″ = ≺-trans {q} {q₀} {q′} (nth-lt lt″ nq nq′) lt′
-  ... | inj₂ refl with nth-fun nq nq′
-  ...   | refl = lt′
-
-  nth-inj : ∀ {i i′ q a a′} → Nth i q a → Nth i′ q a′ → i ≡ i′
-  nth-inj {i} {i′} {q} nq nq′ with <-cmp i i′
-  ... | tri< lt _ _ = ⊥-elim (≺-irrefl {q} (nth-lt lt nq nq′))
-  ... | tri≈ _ eq _ = eq
-  ... | tri> _ _ gt = ⊥-elim (≺-irrefl {q} (nth-lt gt nq′ nq))
+  open Nths O using (nth-val; nth-fun; nth-lt; nth-inj)
 
   ------------------------------------------------------------------------
   -- Counting ends
@@ -442,15 +420,20 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
     v-val : ∀ {q a} → O q (out a) → y ≡ q ++ [ ix 0 ] → V y skip
     v-l   : ∀ {i q s a e} → Sub i q s a → LEv a s y e → V y e
 
-  vw : ∀ {y e} → BoundedT y e → V y e
-  vw (val x)            = v-val x refl
-  vw (step x)           = v-o x o-skip
-  vw (oend x d)         = v-o x (o-end d)
-  vw (opass x nd)       = v-o x (o-pass nd)
-  vw (lane sb l w)      = v-l sb (l-work l w)
-  vw (handoff sb l Q)   = v-l sb (l-hand l Q refl)
-  vw (lend sb l nQ d)   = v-l sb (l-end l nQ d)
-  vw (lpass sb l nQ nd) = v-l sb (l-pass l nQ nd)
+  vw : ∀ {y e} → JoinT y e → V y e
+  vw (val x)                           = v-val x refl
+  vw (step x)                          = v-o x o-skip
+  vw (oend x d)                        = v-o x (o-end d)
+  vw (opass x nd)                      = v-o x (o-pass nd)
+  vw (lane _ _ (_ , _ , sb , l) _ w)     = v-l sb (l-work l w)
+  vw (hand _ _ (_ , _ , sb , l) _ Q)     = v-l sb (l-hand l Q refl)
+  vw (lend _ _ (_ , _ , sb , l) _ nQ d)  = v-l sb (l-end l nQ d)
+  vw (lpass _ _ (_ , _ , sb , l) _ nQ nd) = v-l sb (l-pass l nQ nd)
+  vw (left _ _ _ () _)
+  vw (run () _)
+  vw (rend () _ _)
+  vw (rpass () _ _)
+  vw (rhand () _)
 
   work-end : ∀ {e : Ev B} → Work e → e ≡ end → ⊥
   work-end w refl = w
@@ -576,9 +559,11 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
 
   -- A lane begun before the merge's end has ended by it.
   lane-done : ∀ {c i q s a} → Done c → Sub i q s a → Σ Pos λ c′ → After (f a) s c′ end × c′ ≼ c
-  lane-done {c} {q = q} ((c₀ , oc , le) , ln) sb with ln (proj₁ sb) (≺-≼-≺ {q} {c₀} {c} (end-before oc (nth-val (proj₁ sb))) le)
-  ... | _ , c′ , sb₁ , x , le′ with sub-fun sb₁ sb
-  ...   | refl , refl , refl = c′ , x , le′
+  lane-done {c} {i} {q} {a = a} ((c₀ , oc , le) , ln) sb
+    with ln (nth-val (proj₁ sb)) (i , a , proj₁ sb) (≺-≼-≺ {q} {c₀} {c} (end-before oc (nth-val (proj₁ sb))) le) (λ ())
+  ... | c′ , (_ , _ , sb₁ , x) , le′ with nth-inj (proj₁ sb₁) (proj₁ sb)
+  ...   | refl with sub-fun sb₁ sb
+  ...     | refl , refl , refl = c′ , x , le′
 
   row-burst : ∀ {i q s a c c′ y e} → Sub i q s a → After (f a) s c′ end → c′ ≼ c → After (f a) s y e → c ≺ y
             → Σ Pos λ w → W⁼ H p w × T (inside w c) × T (inside w y)
@@ -617,7 +602,7 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
       go _ (v-l _ (l-pass _ _ _)) _ = refl
       go _ (v-l _ (l-hand _ _ _)) _ = refl
 
-  inv : InvAt H p (Truncate BoundedT)
+  inv : InvAt H p (Truncate JoinT)
   inv = record
     { world = λ x → world-v (vw (proj₁ x))
     ; real  = λ x → real-v (vw (proj₁ x))

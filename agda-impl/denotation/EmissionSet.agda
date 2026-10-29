@@ -177,27 +177,30 @@ module TakeWhile {A : Set} (incl : Bool) (keep : A → Bool) (t : EmissionSet A)
 ------------------------------------------------------------------------
 -- Joiners
 
--- A value `a` at `q`'s lane, subscribed at `q ++ [ ix 1 ]`.
+-- A value `a` at `q`'s lane, read by `L` at `q ++ [ ix 1 ]`: its rows
+-- past that subscription.
+At : ∀ {A B : Set} → (A → Pos → EmissionSet B) → Pos → A → EmissionSet B
+At L q a k e = L a (q ++ [ ix 1 ]) k e × (q ++ [ ix 1 ]) ≺ k
+
 LaneOf : ∀ {A B : Set} → (A → Den B) → Pos → A → EmissionSet B
-LaneOf f q a = After (f a) (q ++ [ ix 1 ])
+LaneOf f = At (λ a → enter (f a))
 
 -- `t` has ended by `c`.
 Ended : ∀ {X : Set} → EmissionSet X → Pos → Set
 Ended t c = Σ Pos λ c₀ → t c₀ end × c₀ ≼ c
 
 -- A JOINER PART WAY THROUGH: what is left of the outer, `o`; each value
--- `a` at `q` it runs (`Runs q`) subscribed as a lane at `q ++ [ ix 1 ]`,
--- reading `L a` there, its first effect `q ++ [ ix 0 ]` silent; and the
+-- `a` at `q` it runs (`Runs q`), its first effect `q ++ [ ix 0 ]` silent,
+-- read as the lane `Lane q a` wherever the policy subscribes it; and the
 -- rows `Bg` of the lanes already begun, over by `c` where `Over c` holds
 -- along with the outer.  A lane counts until it is cut (`Cut q k`, closed
 -- upward in `k`); past that, what it still runs of its subscribe burst
--- stays, as skips.  The whole ends where the last part does; every other
--- end is a skip.
-module Joining {A B : Set} (L : A → Pos → EmissionSet B) (o : EmissionSet A) (Bg : EmissionSet B) (Over : Pos → Set)
-               (Runs : Pos → Set) (Cut : Pos → Pos → Set) where
-
-  Lane : Pos → A → EmissionSet B
-  Lane q a k e = L a (q ++ [ ix 1 ]) k e × (q ++ [ ix 1 ]) ≺ k
+-- under `q ++ [ ix 1 ]` stays, as skips.  A lane's end at `c` where
+-- `Hand c` holds hands its place to a queued lane: it shows silent at its
+-- first effect `c ++ [ ix 0 ]`, the queued lane subscribing at its second.
+-- The whole ends where the last part does; every other end is a skip.
+module Joining {A B : Set} (Lane : Pos → A → EmissionSet B) (o : EmissionSet A) (Bg : EmissionSet B) (Over : Pos → Set)
+               (Runs : Pos → Set) (Cut : Pos → Pos → Set) (Hand : Pos → Set) where
 
   -- Every part running at `c` has ended by `c`.
   Done : Pos → Set
@@ -209,16 +212,19 @@ module Joining {A B : Set} (L : A → Pos → EmissionSet B) (o : EmissionSet A)
     oend  : ∀ {c} → o c end → Done c → JoinT c end
     opass : ∀ {c} → o c end → ¬ Done c → JoinT c skip
     lane  : ∀ {q a k e} → o q (out a) → Runs q → Lane q a k e → ¬ Cut q k → Work e → JoinT k e
-    lend  : ∀ {q a c} → o q (out a) → Runs q → Lane q a c end → ¬ Cut q c → Done c → JoinT c end
-    lpass : ∀ {q a c} → o q (out a) → Runs q → Lane q a c end → ¬ Cut q c → ¬ Done c → JoinT c skip
+    lend  : ∀ {q a c} → o q (out a) → Runs q → Lane q a c end → ¬ Cut q c → ¬ Hand c → Done c → JoinT c end
+    lpass : ∀ {q a c} → o q (out a) → Runs q → Lane q a c end → ¬ Cut q c → ¬ Hand c → ¬ Done c → JoinT c skip
+    hand  : ∀ {q a c} → o q (out a) → Runs q → Lane q a c end → ¬ Cut q c → Hand c → JoinT (c ++ [ ix 0 ]) skip
     left  : ∀ {q a k e} → o q (out a) → Runs q → Lane q a k e → Cut q k → T (inside (q ++ [ ix 1 ]) k) → JoinT k skip
     run   : ∀ {k e} → Bg k e → Work e → JoinT k e
-    rend  : ∀ {c} → Bg c end → Done c → JoinT c end
-    rpass : ∀ {c} → Bg c end → ¬ Done c → JoinT c skip
+    rend  : ∀ {c} → Bg c end → ¬ Hand c → Done c → JoinT c end
+    rpass : ∀ {c} → Bg c end → ¬ Hand c → ¬ Done c → JoinT c skip
+    rhand : ∀ {c} → Bg c end → Hand c → JoinT (c ++ [ ix 0 ]) skip
 
--- A JOINER, freshly subscribed: nothing begun, and over where its outer is.
+-- A JOINER, freshly subscribed: each lane at its value's second child,
+-- nothing begun, no hand-off, and over where its outer is.
 module Joiner {A B : Set} (f : A → Den B) (o : EmissionSet A) (Runs : Pos → Set) (Cut : Pos → Pos → Set) where
-  open Joining (λ a → enter (f a)) o (λ _ _ → Empty) (Ended o) Runs Cut public
+  open Joining (LaneOf f) o (λ _ _ → Empty) (Ended o) Runs Cut (λ _ → Empty) public
 
 -- MERGE: every value runs, and no lane is cut.
 module Merge {A B : Set} (f : A → Den B) (o : EmissionSet A) where
@@ -268,20 +274,15 @@ module Bounded {A B : Set} (n : ℕ) (f : A → Den B) (o : EmissionSet A) where
   Queued : Pos → Set
   Queued c = Σ ℕ λ i → Σ Pos λ q → Σ A λ a → Sub i q (c ++ [ ix 1 ]) a
 
-  -- Every part begun before `c` has ended by `c`.
-  Done : Pos → Set
-  Done c = (Σ Pos λ c₀ → o c₀ end × c₀ ≼ c)
-         × (∀ {i q a} → Nth i q a → q ≺ c → Σ Pos λ s → Σ Pos λ c′ → Sub i q s a × After (f a) s c′ end × c′ ≼ c)
+  -- The value at `q`'s lane, wherever the schedule subscribes it.
+  Lane : Pos → A → EmissionSet B
+  Lane q a k e = Σ ℕ λ i → Σ Pos λ s → Sub i q s a × After (f a) s k e
 
-  data BoundedT : EmissionSet B where
-    val     : ∀ {q a} → o q (out a) → BoundedT (q ++ [ ix 0 ]) skip
-    step    : ∀ {q} → o q skip → BoundedT q skip
-    oend    : ∀ {c} → o c end → Done c → BoundedT c end
-    opass   : ∀ {c} → o c end → ¬ Done c → BoundedT c skip
-    lane    : ∀ {i q s a k e} → Sub i q s a → After (f a) s k e → Work e → BoundedT k e
-    handoff : ∀ {i q s a c} → Sub i q s a → After (f a) s c end → Queued c → BoundedT (c ++ [ ix 0 ]) skip
-    lend    : ∀ {i q s a c} → Sub i q s a → After (f a) s c end → ¬ Queued c → Done c → BoundedT c end
-    lpass   : ∀ {i q s a c} → Sub i q s a → After (f a) s c end → ¬ Queued c → ¬ Done c → BoundedT c skip
+  -- A value with an index runs.
+  Indexed : Pos → Set
+  Indexed q = Σ ℕ λ i → Σ A λ a → Nth i q a
+
+  open Joining Lane o (λ _ _ → Empty) (Ended o) Indexed (λ _ _ → Empty) Queued public
 
 -- SWITCH: a value's lane runs until the next value arrives.
 module Switch {A B : Set} (f : A → Den B) (o : EmissionSet A) where
@@ -381,7 +382,7 @@ module Op where
 
   flatMap : ∀ {A B} → FlatOp → (A → Den B) → Den A → Den B
   flatMap (mergeᶠ nothing)  f s = Den.coldAt λ p → Merge.JoinT f (enter s p)
-  flatMap (mergeᶠ (just n)) f s = Den.coldAt λ p → Bounded.BoundedT n f (enter s p)
+  flatMap (mergeᶠ (just n)) f s = Den.coldAt λ p → Bounded.JoinT n f (enter s p)
   flatMap switchᶠ           f s = Den.coldAt λ p → Switch.JoinT f (enter s p)
   flatMap exhaustᶠ          f s = Den.coldAt λ p → Exhaust.JoinT f (enter s p)
 
