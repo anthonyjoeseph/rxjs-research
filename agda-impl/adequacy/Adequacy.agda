@@ -31,10 +31,10 @@ Met : ∀ {R} → PureObs [] R → List (Pos × Ev R) → Set₁
 Met o rs = Shows* (enter (⟦ o ⟧ []ᴬ) root) rs
 
 Sound : ∀ {R} → PureObs [] R → Set₁
-Sound o = ∀ {rs k} → Steps (load o) rs k → Met o (conv rs)
+Sound o = ∀ {rs} → Steps (load o) rs → Met o (conv rs)
 
 Complete : ∀ {R} → PureObs [] R → Set₁
-Complete o = ∀ {rs} → Met o rs → Σ _ λ rs′ → Σ _ λ k → Steps (load o) rs′ k × conv rs′ ≡ rs
+Complete o = ∀ {rs} → Met o rs → Σ _ λ rs′ → Steps (load o) rs′ × conv rs′ ≡ rs
 
 postulate
   frag?        : ∀ {R} (o : PureObs [] R) → Frag o ⊎ ¬ Frag o

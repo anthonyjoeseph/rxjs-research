@@ -7,27 +7,29 @@
 -- frame, a mark run where the search's bound says it leads.
 module adequacy.Sim where
 
-open import Data.Bool using (true; false; if_then_else_)
-open import Data.Empty using (⊥-elim)
+open import Data.Bool using (true; false; if_then_else_; not)
+open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Nat using (_≡ᵇ_)
 open import Data.List using (List; []; _∷_; [_]; null)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Maybe using (just; nothing)
-open import Data.Product using (_,_; proj₁; proj₂)
-open import Data.Unit using (tt)
+open import Data.Product using (Σ; _,_; proj₁; proj₂)
+open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Timeline; root)
 open import denotation.EmissionSet using (EmissionSet; out; end; MapT; map-out; map-skip; map-end; _≼_; enter; ⟦_⟧)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd)
-open import operation.PureObservable using (PureObs; module Machine)
+open import operation.PureObservable using (PureObs; module Machine; module Driver)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; found; Mark; ofM; attM;
                     rise; run; start; dequeue; settle; alive; ended; mapEv; nx; cp; attAt; attached; Torn;
+                    Stepped; quiet; begin; admit; closed; killAll; unsubIf; free; cpAt; cutAt; overAt;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (Frag; rows; RT; toEv; Visible; Vis; Past; Plus; old; new; _≃_; _⇄_; silent; shown; Steps;
-  Shows*; Shows*-≃; ≃-sym; conv; []; _∷_)
+  Shows*; Shows*-≃; ≃-sym; conv; []; _∷_; tau; val; fin)
 open import adequacy.Bound using (Good)
 open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
 open import adequacy.Skip using (After)
@@ -220,6 +222,108 @@ abs-sim c s p eq  i | just (found (_ , _ , c′ , s′) m κ) with found-mark c 
 ... | attK _ _ _ = abs-att p fd eq i
 
 ------------------------------------------------------------------------
+-- No cold in the fragment: every step moves or finds nothing to do
+
+Mv : ∀ {R} → Stepped R → Set
+Mv (moved _ _ _) = ⊤
+Mv quiet         = ⊤
+Mv _             = ⊥
+
+admit-mv : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q o ls a p → Mv (admit c op f d n q o ls a p)
+admit-mv c (mergeᶠ nothing)  f d n q o ls a p = tt
+admit-mv c (mergeᶠ (just m)) f d n q o ls a p = tt
+admit-mv c switchᶠ           f d n q o ls a p with killAll ls
+... | _ = tt
+admit-mv c exhaustᶠ          f d n q o ls a p with n ≡ᵇ 0
+... | true  = tt
+... | false = tt
+
+rise-mv : ∀ {R Γ A} (c : Ctx R Γ A) s e p → Mv (rise c s e p)
+rise-mv top                       s e      p = tt
+rise-mv (inMap f c)               s e      p = tt
+rise-mv (inScan f z c)            s (nx a) p = tt
+rise-mv (inScan f z c)            s cp     p = tt
+rise-mv (inCut l a c)             s e      p = tt
+rise-mv (inLn b c)                s e      p = tt
+rise-mv (inTake i q free c)       s (nx a) p with q a | i
+... | true  | _     = tt
+... | false | true  = tt
+... | false | false = tt
+rise-mv (inTake i q free c)       s cp     p = tt
+rise-mv (inTake i q (cpAt r) c)   s e      p = tt
+rise-mv (inTake i q (cutAt r) c)  s e      p = tt
+rise-mv (inTake i q (overAt r) c) s e      p = tt
+rise-mv (inOuter op f d n q ls c) o (nx a) p = admit-mv c op f d n q o ls a p
+rise-mv (inOuter op f d n q ls c) o cp     p = tt
+rise-mv (inLanes op f d n q o pre post c) s (nx b) p = tt
+rise-mv (inLanes op f d n q o pre post c) s cp     p = tt
+rise-mv (inSrc k b c)             s (nx a) p = tt
+rise-mv (inSrc k b c)             s cp     p = tt
+rise-mv (inBody k o c)            s (nx b) p = tt
+rise-mv (inBody k o c)            s cp     p = tt
+
+begin-mv : ∀ {R Γ A} (c : Ctx R Γ A) o p → Frag o → Mv (begin c o p)
+begin-mv c empty                          p _ = tt
+begin-mv c (of xs)                        p _ = tt
+begin-mv c (map f s)                      p _ = tt
+begin-mv c (flatMap (mergeᶠ nothing) f s) p _ = tt
+
+sub-mv : ∀ {R Γ A} (c : Ctx R Γ A) s p → GoodF c s → Mv (stepᴹ ⟨ c , s , subscribing , p ⟩)
+sub-mv c (pend o)                p g = begin-mv c o p (pend-good c o g)
+sub-mv c (coldS b l)             p g = tt
+sub-mv c (ofS i q xs)            p g = tt
+sub-mv c doneS                   p g = tt
+sub-mv c (mapS f s)              p g = tt
+sub-mv c (scanS f z s)           p g = tt
+sub-mv c (cutS l a s)            p g = tt
+sub-mv c (lnS b s)               p g = tt
+sub-mv c (takeS i q w s)         p g = tt
+sub-mv c (flatS op f d n q o ls) p g = tt
+sub-mv c (connS k o b)           p g = tt
+sub-mv c (joinS j g′ x ib)       p g = tt
+
+run-of-mv : ∀ {R Γ A} (c : Ctx R Γ A) i q (xs : List A) p → Mv (run c (ofS i q xs) ofM p)
+run-of-mv c i q xs p with closed c | xs
+... | true  | _     = tt
+... | false | []    = tt
+... | false | _ ∷ _ = tt
+
+run-att-mv : ∀ {R Γ A} (c : Ctx R Γ A) l q (s : St Γ A) p → Mv (run c (cutS l (attAt q) s) attM p)
+run-att-mv c l q s p with unsubIf (not l) s
+... | _ = tt
+
+frag-mv : ∀ {R} {k : Conf R} → Inv k → Mv (stepᴹ k)
+frag-mv {k = ⟨ c , s , rising e , p ⟩}   i = rise-mv c s e p
+frag-mv {k = ⟨ c , s , subscribing , p ⟩} i = sub-mv c s p (proj₂ (good-split c s (good i)))
+frag-mv {k = ⟨ c , s , absorbed , p ⟩}    i with search top (plug c s) in fd
+... | nothing = tt
+... | just (found (_ , _ , c′ , s′) m κ) with found-mark c s (good i) fd
+...   | ofK j q xs  = run-of-mv c′ j q xs p
+...   | attK l q s₀ = run-att-mv c′ l q s₀ p
+
+-- The driver's steps read back as the engine's.
+module _ {R : Set} where
+  open Driver R using (took; value; complete) renaming (silent to τ)
+
+  τ-moved : (x : Stepped R) → Mv x → ∀ {t k′} → took x ≡ τ t k′ → Σ Torn λ tr → x ≡ moved k′ [] tr
+  τ-moved (moved k [] tr) _ refl = tr , refl
+  τ-moved (moved k ((_ , nx _) ∷ _) tr) _ ()
+  τ-moved (moved k ((_ , cp) ∷ _) tr)   _ ()
+  τ-moved quiet _ ()
+
+  val-moved : (x : Stepped R) → Mv x → ∀ {t p a k′} → took x ≡ value t p a k′ → Σ (Shownᴹ R) λ rest → Σ Torn λ tr → x ≡ moved k′ ((p , nx a) ∷ rest) tr
+  val-moved (moved k [] tr) _ ()
+  val-moved (moved k ((_ , nx _) ∷ rest) tr) _ refl = rest , tr , refl
+  val-moved (moved k ((_ , cp) ∷ _) tr)      _ ()
+  val-moved quiet _ ()
+
+  fin-moved : (x : Stepped R) → Mv x → ∀ {p} → took x ≡ complete p → Σ (Conf R) λ k′ → Σ (Shownᴹ R) λ rest → Σ Torn λ tr → x ≡ moved k′ ((p , cp) ∷ rest) tr
+  fin-moved (moved k [] tr) _ ()
+  fin-moved (moved k ((_ , nx _) ∷ _) tr)    _ ()
+  fin-moved (moved k ((_ , cp) ∷ rest) tr)   _ refl = k , rest , tr , refl
+  fin-moved quiet _ ()
+
+------------------------------------------------------------------------
 -- The run
 
 step-sim : ∀ {R} {k k′ : Conf R} {sh t} → stepᴹ k ≡ moved k′ sh t → Sim k sh k′
@@ -227,13 +331,19 @@ step-sim {k = ⟨ c , s , rising e , p ⟩}   eq = rise-sim c s e p eq
 step-sim {k = ⟨ c , s , subscribing , p ⟩} eq = sub-sim c s p eq
 step-sim {k = ⟨ c , s , absorbed , p ⟩}    eq = abs-sim c s p eq
 
-sound-from : ∀ {R} {k k′ : Conf R} {rs} → Inv k → Steps k rs k′ → Shows* (RT k) (conv rs)
+sound-from : ∀ {R} {k : Conf R} {rs} → Inv k → Steps k rs → Shows* (RT k) (conv rs)
 sound-from i [] = []
-sound-from i (e ∷ st) with step-sim e i
-... | i′ , silent eq        = Shows*-≃ (≃-sym eq) (sound-from i′ st)
-... | i′ , shown v lt eq    = (v , lt) ∷ Shows*-≃ (≃-sym eq) (sound-from i′ st)
+sound-from {k = k} i (tau e st) with τ-moved (stepᴹ k) (frag-mv i) e
+... | _ , eq with step-sim eq i
+...   | i′ , silent q = Shows*-≃ (≃-sym q) (sound-from i′ st)
+sound-from {k = k} i (val e st) with val-moved (stepᴹ k) (frag-mv i) e
+... | _ , _ , eq with step-sim eq i
+...   | i′ , shown v lt q = (v , lt) ∷ Shows*-≃ (≃-sym q) (sound-from i′ st)
+sound-from {k = k} i (fin e) with fin-moved (stepᴹ k) (frag-mv i) e
+... | _ , _ , _ , eq with step-sim eq i
+...   | _ , shown v lt _ = (v , lt) ∷ []
 
 -- THE SOUND HALF: what the engine shows, a reader of the program's rows
 -- is shown.
-sound : ∀ {R} {o : PureObs [] R} → Frag o → ∀ {rs k} → Steps (load o) rs k → Shows* (enter (⟦ o ⟧ []ᴬ) root) (conv rs)
+sound : ∀ {R} {o : PureObs [] R} → Frag o → ∀ {rs} → Steps (load o) rs → Shows* (enter (⟦ o ⟧ []ᴬ) root) (conv rs)
 sound fo st = sound-from (inv fo (tt , tt)) st

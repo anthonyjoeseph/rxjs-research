@@ -23,7 +23,7 @@ open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; empty; of; map; fl
 open import denotation.Events using (ofᴱ)
 open import denotation.Events using (Pos; Timeline; ix)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; Work; InE; enter; MapT; ⟦_⟧)
-open import operation.PureObservable using (module Machine)
+open import operation.PureObservable using (module Machine; module Driver)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; load; moved; quiet; pend; ofS; mapS; cutS; lnS; flatS; alive; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; nx; cp) renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
 
 ------------------------------------------------------------------------
@@ -168,10 +168,13 @@ RT ⟨ c , s , m , p ⟩ = up c (here s m p)
 ------------------------------------------------------------------------
 -- Runs
 
--- The engine run from `k` to `k′`, showing `rs`.
-data Steps {R : Set} : Conf R → Shownᴹ R → Conf R → Set₁ where
-  []  : ∀ {k} → Steps k [] k
-  _∷_ : ∀ {k k′ k″ sh t rs} → stepᴹ k ≡ moved k′ sh t → Steps k′ rs k″ → Steps k (sh ++ rs) k″
+-- The pure semantics run from `k`, showing `rs`: the driver's steps, so
+-- a cold begun and a cold's turn are steps too.
+data Steps {R : Set} : Conf R → Shownᴹ R → Set₁ where
+  []   : ∀ {k} → Steps k []
+  tau  : ∀ {k k′ t rs} → Driver.step R k ≡ Driver.silent t k′ → Steps k′ rs → Steps k rs
+  val  : ∀ {k k′ t p a rs} → Driver.step R k ≡ Driver.value t p a k′ → Steps k′ rs → Steps k ((p , nx a) ∷ rs)
+  fin  : ∀ {k p} → Driver.step R k ≡ Driver.complete p → Steps k [ (p , cp) ]
 
 conv : ∀ {R} → Shownᴹ R → List (Pos × Ev R)
 conv []             = []
