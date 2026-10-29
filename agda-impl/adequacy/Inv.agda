@@ -15,6 +15,7 @@ open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
+open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
@@ -26,6 +27,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
                     renaming (Ev to Evᴹ; Shown to Shownᴹ)
 open import adequacy.Rows using (env; rows; RT; Moves)
 open import adequacy.Up using (≃-refl)
+open import denotation.Laws.Worlds using (Ok; Hots)
 open import adequacy.Bound using (Empty; Good; G; GLn; LnBody)
 open import adequacy.Skip using (After; LeadC)
 open import adequacy.Owes using (Owes; UpO; goodL-ʳ++⁻; goodL-swap; Swap; good-swap)
@@ -43,10 +45,10 @@ Ends cp     t = Empty t
 
 Lead : ∀ {R} → Conf R → Set
 Lead ⟨ c , s , rising e , p ⟩ = UpO c × LeadC c p × Owes (env c) s × Open s × After p (rows (env c) s) × Ends e (rows (env c) s)
-Lead ⟨ c , s , subscribing , p ⟩ = UpO c × Owes (env c) s
+Lead ⟨ c , s , subscribing , p ⟩ = UpO c × Owes (env c) s × Ok (Hots (env c)) p
 Lead ⟨ c , s , absorbed , p ⟩    = Owes [] (plug c s)
 
-record Inv {R} (k : Conf R) : Set where
+record Inv {R} (k : Conf R) : Set₁ where
   constructor inv
   field
     good : Good [] (plug (Conf.ctx k) (Conf.foc k))
@@ -99,7 +101,7 @@ liv (inSrc k b c)                     = liv c
 liv (inBody k o c)                    = liv c
 
 -- What a frame's hole must be: under a merge's lanes, a lane.
-GoodF : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Set
+GoodF : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Set₁
 GoodF (inLanes op f d n q o pre post c) s = GLn (env c) (liv c) s
 GoodF top                s = G [] true s
 GoodF (inMap f c)        s = G (env c) (liv c) s
@@ -242,7 +244,7 @@ closed-dead (inOuter (mergeᶠ nothing) f d n q ls c) gc cl = closed-dead c gc c
 closed-dead (inLanes (mergeᶠ nothing) f d n q o pre post c) gc cl = closed-dead c gc cl
 
 -- Swapped where nothing is owed: only the shape asked.
-record Swap₀ {Γ A} (ρ : DenEnv Γ) (s s′ : St Γ A) : Set where
+record Swap₀ {Γ A} (ρ : DenEnv Γ) (s s′ : St Γ A) : Set₁ where
   field
     node₀ : G ρ false s → G ρ false s′
     lane₀ : GLn ρ false s → GLn ρ false s′
@@ -271,12 +273,12 @@ dead-swap (inCut true a c)  dd sw g =
 dead-swap (inLn b c)        dd sw g = dead-swap c dd (record { node₀ = λ () ; lane₀ = body₀ sw b ; body₀ = λ _ () }) g
 dead-swap (inTake i q w c)  dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inOuter (mergeᶠ nothing) f d n q ls c) dd sw g =
-  dead-swap c dd (record { node₀ = λ { (go , gl , qe , fa , _) → node₀ sw go , gl , qe , fa , tt } ; lane₀ = λ () ; body₀ = λ _ () }) g
+  dead-swap c dd (record { node₀ = λ { (go , gl , qe , fa , _) → node₀ sw go , gl , qe , fa , tt , tt , tt , tt₁ } ; lane₀ = λ () ; body₀ = λ _ () }) g
 dead-swap (inOuter (mergeᶠ (just _)) f d n q ls c) dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inOuter switchᶠ f d n q ls c)  dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inOuter exhaustᶠ f d n q ls c) dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inLanes (mergeᶠ nothing) f d n q o pre post c) dd sw g =
-  dead-swap c dd (record { node₀ = λ { (go , gl , qe , fa , _) → go , goodL-swap pre (lane₀ sw) gl , qe , fa , tt } ; lane₀ = λ () ; body₀ = λ _ () }) g
+  dead-swap c dd (record { node₀ = λ { (go , gl , qe , fa , _) → go , goodL-swap pre (lane₀ sw) gl , qe , fa , tt , tt , tt , tt₁ } ; lane₀ = λ () ; body₀ = λ _ () }) g
 dead-swap (inLanes (mergeᶠ (just _)) f d n q o pre post c) dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inLanes switchᶠ f d n q o pre post c)  dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inLanes exhaustᶠ f d n q o pre post c) dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g

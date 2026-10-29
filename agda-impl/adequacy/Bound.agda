@@ -15,18 +15,23 @@ open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; suc; pred; _≡ᵇ_)
 open import Data.Nat.Properties using (≡ᵇ⇒≡)
-open import Data.List.Properties using (++-identityʳ)
+open import Data.List.Properties using (++-identityʳ; ∷ʳ-injectiveˡ)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
+open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁; tt to tt₁)
+open import Level using (Lift)
 open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
-open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
+open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (ofᴱ)
-open import denotation.Events using (Pos; ix; last; <ᵖ-asym; <ᵖ-split; <ᵖ-step; <ᵖ-shift; <ᵖ-below; <ᵖ-part; <ᵖ-ix)
+open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-asym; <ᵖ-split; <ᵖ-step; <ᵖ-shift; <ᵖ-below; <ᵖ-part; <ᵖ-ix)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; InE; at-out; at-end; on-out; MapT; map-out; map-skip; map-end; DenEnv)
 open import denotation.Laws.Modulus using (≼-refl)
+open import denotation.Laws.Worlds using (InvAt; Hots; W; inW; plain-ix; apart-w) renaming (⊑-refl to ⊑ᵖ-refl)
 open import operation.Key using (Key; at; after; _<ᴷ_; ≮ᴷ-trans; <ᴷ-trans; <ᴷ-irrefl; at-<ᵖ; clash)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed;
@@ -297,41 +302,107 @@ Live : Bool → Set → Set
 Live true  X = X
 Live false X = ⊤
 
+Live₁ : Bool → Set₁ → Set₁
+Live₁ true  X = X
+Live₁ false X = ⊤₁
+
+data ⊥₁ : Set₁ where
+
+------------------------------------------------------------------------
+-- A merge's parts, read off its outer's entry
+
+-- A lane begun at a value of `X` at `q`: its rows in the world of the
+-- value's second child, where the lane subscribed.
+Root : ∀ {A B} → (Pos → Set) → EmissionSet A → Pos → EmissionSet B → Set
+Root {A} H X q t = Σ A λ a → X q (out a) × (∀ {y e} → t y e → W H (q ++ [ ix 1 ]) y)
+
+-- Each lane at a value of its own.
+Roots : ∀ {A B} → (Pos → Set) → EmissionSet A → List Pos → List (EmissionSet B) → Set
+Roots H X []       []       = ⊤
+Roots H X (q ∷ qs) (t ∷ Ls) = Root H X q t × (q ∈ qs → ⊥) × Roots H X qs Ls
+Roots H X _        _        = ⊥
+
+-- A merge's outer still inside what it entered, every lane begun at one
+-- of that entry's values: the entry keeps Tier −1's invariant, so the
+-- outer's rows are single and its parts apart.
+record Rooted {Γ A B} (ρ : DenEnv Γ) (O : EmissionSet A) (Ls : List (EmissionSet B)) : Set₁ where
+  field
+    o₀    : Obs Timeline Γ A
+    p₀    : Pos
+    inv   : InvAt (Hots ρ) p₀ (pendRows ρ o₀ p₀)
+    sub   : ∀ {q e} → O q e → pendRows ρ o₀ p₀ q e
+    qs    : List Pos
+    roots : Roots (Hots ρ) (pendRows ρ o₀ p₀) qs Ls
+
+module _ {Γ A B} {ρ : DenEnv Γ} {O : EmissionSet A} {Ls : List (EmissionSet B)} (r : Rooted ρ O Ls) where
+  open Rooted r
+  open InvAt inv using (func; under)
+
+  private
+    root-of : ∀ qs′ (Ls′ : List (EmissionSet B)) → Roots (Hots ρ) (pendRows ρ o₀ p₀) qs′ Ls′ → ∀ {y e} → Lanes Ls′ y e
+            → Σ Pos λ q → q ∈ qs′ × Σ A λ a → pendRows ρ o₀ p₀ q (out a) × W (Hots ρ) (q ++ [ ix 1 ]) y
+    root-of (q ∷ qs′) (t ∷ Ls′) ((a , x , w) , _ , _) (inj₁ l) = q , here refl , a , x , w l
+    root-of (q ∷ qs′) (t ∷ Ls′) (_ , _ , rs) (inj₂ l) with root-of qs′ Ls′ rs l
+    ... | q′ , m , rest = q′ , there m , rest
+    root-of []        []        _  ()
+    root-of []        (_ ∷ _)   () _
+    root-of (_ ∷ _)   []        () _
+
+    spread : ∀ qs′ (Ls′ : List (EmissionSet B)) → Roots (Hots ρ) (pendRows ρ o₀ p₀) qs′ Ls′ → Spread Ls′
+    spread []        []        _ = tt
+    spread (q ∷ qs′) (t ∷ Ls′) ((a , x , w) , nq , rs) = apart′ , spread qs′ Ls′ rs
+      where
+        apart′ : Apart t (Lanes Ls′)
+        apart′ l l′ with root-of qs′ Ls′ rs l′
+        ... | q′ , m , a′ , x′ , w′ =
+          apart-w plain-ix plain-ix (λ eq → nq (subst (_∈ qs′) (sym (∷ʳ-injectiveˡ q q′ eq)) m))
+                  (λ v → under x′ x plain-ix v (⊑ᵖ-refl _)) (λ v → under x x′ plain-ix v (⊑ᵖ-refl _)) (inW (w l)) (inW w′)
+    spread []        (_ ∷ _)   ()
+    spread (_ ∷ _)   []        ()
+
+  -- One event a row: the entry's.
+  rooted-single : Single O
+  rooted-single x x′ = func (sub x) (sub x′)
+
+  -- No outer row in a lane's world; no two lanes' worlds meet.
+  rooted-parts : Parts O Ls
+  rooted-parts = (λ oy l → let (q , _ , a , xq , w) = root-of qs Ls roots l in under xq (sub oy) plain-ix (inW w) (⊑ᵖ-refl _)) , spread qs Ls roots
+
 -- The fragment's shape everywhere, its row facts only where live: under
 -- a cut switched off nothing is owed, so nothing there is asked to agree.
 --
 -- REFUTED: 85ad69b9 found-lead without the parts apart, by a merge whose outer and lane are empty ofs at one position
 mutual
-  G : ∀ {Γ A} → DenEnv Γ → Bool → St Γ A → Set
-  G ρ b (pend o)                              = Frag o
-  G ρ b (ofS i p xs)                          = ⊤
-  G ρ b doneS                                 = ⊤
+  G : ∀ {Γ A} → DenEnv Γ → Bool → St Γ A → Set₁
+  G ρ b (pend o)                              = Lift _ (Frag o)
+  G ρ b (ofS i p xs)                          = ⊤₁
+  G ρ b doneS                                 = ⊤₁
   G ρ b (mapS f s)                            = G ρ b s
   G ρ b (cutS l a s)                          = G ρ (b ∧ l) s
   G ρ b (flatS (mergeᶠ nothing) f d n q o ls) =
-    G ρ b o × GL ρ b ls × q ≡ [] × (∀ a → Frag (f a)) × Live b (Single (rows ρ o) × EndLast (rows ρ o) × n ≡ live ls × (T d → Empty (rows ρ o)) × Parts (rows ρ o) (rowsL ρ ls))
-  G ρ b _                                     = ⊥
+    G ρ b o × GL ρ b ls × q ≡ [] × (∀ a → Frag (f a)) × Live b (EndLast (rows ρ o)) × Live b (n ≡ live ls) × Live b (T d → Empty (rows ρ o)) × Live₁ b (Rooted ρ (rows ρ o) (rowsL ρ ls))
+  G ρ b _                                     = ⊥₁
 
-  GL : ∀ {Γ A} → DenEnv Γ → Bool → List (St Γ A) → Set
-  GL ρ b []       = ⊤
+  GL : ∀ {Γ A} → DenEnv Γ → Bool → List (St Γ A) → Set₁
+  GL ρ b []       = ⊤₁
   GL ρ b (s ∷ ls) = GLn ρ b s × GL ρ b ls
 
   -- A lane: in its list and switched on, or out of it and off.
-  GLn : ∀ {Γ A} → DenEnv Γ → Bool → St Γ A → Set
+  GLn : ∀ {Γ A} → DenEnv Γ → Bool → St Γ A → Set₁
   GLn ρ b (lnS l s) = LnBody ρ b l s
-  GLn ρ b _         = ⊥
+  GLn ρ b _         = ⊥₁
 
-  LnBody : ∀ {Γ A} → DenEnv Γ → Bool → Bool → St Γ A → Set
+  LnBody : ∀ {Γ A} → DenEnv Γ → Bool → Bool → St Γ A → Set₁
   LnBody ρ b l (cutS l′ a s) = l ≡ l′ × G ρ (b ∧ l) s × Live (b ∧ l) (EndLast (rows ρ s))
-  LnBody ρ b l _             = ⊥
+  LnBody ρ b l _             = ⊥₁
 
-Good : ∀ {Γ A} → DenEnv Γ → St Γ A → Set
+Good : ∀ {Γ A} → DenEnv Γ → St Γ A → Set₁
 Good ρ = G ρ true
 
-GoodL : ∀ {Γ A} → DenEnv Γ → List (St Γ A) → Set
+GoodL : ∀ {Γ A} → DenEnv Γ → List (St Γ A) → Set₁
 GoodL ρ = GL ρ true
 
-GoodLn : ∀ {Γ A} → DenEnv Γ → St Γ A → Set
+GoodLn : ∀ {Γ A} → DenEnv Γ → St Γ A → Set₁
 GoodLn ρ = GLn ρ true
 
 -- Live, a fortiori of the right shape.
@@ -342,7 +413,7 @@ mutual
   shape doneS                                     g = g
   shape (mapS f s)                                g = shape s g
   shape {v = v} (cutS l a s)                      g = shape {v = v ∧ l} s g
-  shape (flatS (mergeᶠ nothing) f d n q o ls)     (go , gl , qe , fa , _) = shape o go , shapeL ls gl , qe , fa , tt
+  shape (flatS (mergeᶠ nothing) f d n q o ls)     (go , gl , qe , fa , _) = shape o go , shapeL ls gl , qe , fa , tt , tt , tt , tt₁
   shape (flatS (mergeᶠ (just _)) f d n q o ls)    ()
   shape (flatS switchᶠ f d n q o ls)              ()
   shape (flatS exhaustᶠ f d n q o ls)             ()
@@ -354,7 +425,7 @@ mutual
   shape (joinS _ _ _ _)                           ()
 
   shapeL : ∀ {Γ A} {ρ : DenEnv Γ} {v} (ls : List (St Γ A)) → GL ρ v ls → GL ρ false ls
-  shapeL []       _        = tt
+  shapeL []       _        = tt₁
   shapeL (s ∷ ls) (g , gs) = shapeLn s g , shapeL ls gs
 
   shapeLn : ∀ {Γ A} {ρ : DenEnv Γ} {v} (s : St Γ A) → GLn ρ v s → GLn ρ false s
@@ -647,8 +718,8 @@ mutual
   seek-ok {ρ = ρ} c (cutS false a s) _ = seek-off {ρ = ρ} c a s
   seek-ok c (cutS true (attAt p) s)  g =
     own-first (_ , _ , c , cutS true (attAt p) s) attM (after p) _ (kept (seek (inCut true (attAt p) c) s) (seek-ok (inCut true (attAt p) c) s g))
-  seek-ok {ρ = ρ} c (flatS (mergeᶠ nothing) f d n .[] o ls) (go , gl , refl , _ , sO , eO , nl , ov , _) =
-    Race.race-ok (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n sO eO (counts ls gl nl ov)
+  seek-ok {ρ = ρ} c (flatS (mergeᶠ nothing) f d n .[] o ls) (go , gl , refl , _ , eO , nl , ov , rt) =
+    Race.race-ok (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rt) eO (counts ls gl nl ov)
       (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)
       (seek-ok (inOuter (mergeᶠ nothing) f d n [] ls c) o go) (lanes-ok c f d n o [] ls gl)
 

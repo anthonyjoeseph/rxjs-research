@@ -19,6 +19,7 @@ open import Data.Nat.Properties using (+-suc; m+n≡0⇒m≡0; m+n≡0⇒n≡0)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
+open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
 open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; trans; sym; subst)
 
@@ -32,18 +33,18 @@ open Machine using (St; Ctx; ⟨_,_,_,_⟩; plug; absorbed; rising; cp; alive; e
 open import adequacy.Rows using (env; Frag; ∅; up; here; rows; rowsL; pendRows; Plus; old; new; Lanes; Each; module Flat; _≃_; _⇄_;
   ≃-sym; Moves; silent)
 open import adequacy.Up using (any-ʳ++ˡ; any-ʳ++ʳ; all-ʳ++; ≈ᴸ-refl; _∷_; flat-≃; up-≃; ≃-refl; ≃-trans; vis-≃; plus-≃)
-open import adequacy.Bound using (Empty; Single; EndLast; Parts; Good; GoodL; G; GLn; shape; on; off; lane-v; live; dead-empty)
+open import adequacy.Bound using (Empty; EndLast; Rooted; Good; GoodL; G; GLn; shape; on; off; lane-v; live; dead-empty)
 open import adequacy.Skip using (After; Since; LeadC; _≈⟨_⟩_; ≈-vis; up-≈)
 open import adequacy.LaneEnd using (frame-≈; done-at; outer-owes; lanes-owe; since-x; since-y)
 open import adequacy.Owes using (Owing; Owes; OwesL; UpO; Swap; owes-join; need-of; owesL-ʳ++; rowsL-ʳ++; ≡→≃; owing-≃; empty-≃;
-                                        flat-owing-o; flat-owing-l; flat-empty; live-ʳ++; live-owing; goodL-ʳ++⁻; goodL-swap; lanes-≃; parts-≃; good-swap)
+                                        flat-owing-o; flat-owing-l; flat-empty; live-ʳ++; live-owing; goodL-ʳ++⁻; goodL-swap; lanes-≃; rooted-≃; good-swap)
 open import adequacy.Inv using (Inv; inv; Sim; good-split; node-good; upo-liv)
 
 module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St Γ A) (pre post : List (St Γ B)) (c : Ctx R Γ B)
           (a : Att) (s₀ : St Γ B) (p : Pos)
           (g : Good [] (plug c (flatS (mergeᶠ nothing) f d n [] o (pre ʳ++ lnS true (cutS true a s₀) ∷ post))))
-          (go : Good (env c) o) (fa : ∀ x → Frag (f x)) (gl : GoodL (env c) (pre ʳ++ lnS true (cutS true a s₀) ∷ post)) (si : Single (rows (env c) o)) (el : EndLast (rows (env c) o)) (nl : n ≡ live (pre ʳ++ lnS true (cutS true a s₀) ∷ post))
-          (ov : T d → Empty (rows (env c) o)) (pa : Parts (rows (env c) o) (rowsL (env c) (pre ʳ++ lnS true (cutS true a s₀) ∷ post))) (g₀ : Good (env c) s₀)
+          (go : Good (env c) o) (fa : ∀ x → Frag (f x)) (gl : GoodL (env c) (pre ʳ++ lnS true (cutS true a s₀) ∷ post)) (el : EndLast (rows (env c) o)) (nl : n ≡ live (pre ʳ++ lnS true (cutS true a s₀) ∷ post))
+          (ov : T d → Empty (rows (env c) o)) (rt : Rooted (env c) (rows (env c) o) (rowsL (env c) (pre ʳ++ lnS true (cutS true a s₀) ∷ post))) (g₀ : Good (env c) s₀)
           (ho : ¬ T d → Owing (rows (env c) o)) (oo : Owes (env c) o) (op : OwesL (env c) pre) (oq : OwesL (env c) post) (uc : UpO c)
           (ao : After p (rows (env c) o)) (apre : Each (After p) (rowsL (env c) pre)) (apost : Each (After p) (rowsL (env c) post)) (lc : LeadC c p)
           (en : Empty (rows (env c) s₀)) where
@@ -84,8 +85,8 @@ module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St 
       lane≃ : rows ρ ln ≃ rows ρ ed
       lane≃ = (λ r → ⊥-elim (en r)) ⇄ λ ()
       gnode : ∀ v → G ρ v (flatS (mergeᶠ nothing) f d n [] o (pre ʳ++ ln ∷ post)) → G ρ v (node (pred n))
-      gnode true  _                  = go , goodL-swap pre (λ _ → refl , shape s₀ g₀ , tt) gl , refl , fa , si , el , trans cnt (sym (live-ʳ++ pre)) , ov , parts-≃ ≃-refl (lanes-≃ pre (lane≃ ∷ ≈ᴸ-refl Post)) pa
-      gnode false (go′ , gl′ , qe , fa′ , _) = go′ , goodL-swap pre (λ { (refl , g′ , _) → refl , g′ , tt }) gl′ , qe , fa′ , tt
+      gnode true  _                  = go , goodL-swap pre (λ _ → refl , shape s₀ g₀ , tt) gl , refl , fa , el , trans cnt (sym (live-ʳ++ pre)) , ov , rooted-≃ ≃-refl (lanes-≃ pre (lane≃ ∷ ≈ᴸ-refl Post)) rt
+      gnode false (go′ , gl′ , qe , fa′ , _) = go′ , goodL-swap pre (λ { (refl , g′ , _) → refl , g′ , tt }) gl′ , qe , fa′ , tt , tt , tt , tt₁
       sw : Swap ρ (flatS (mergeᶠ nothing) f d n [] o (pre ʳ++ ln ∷ post)) (node (pred n))
       sw = record { same = flat-≃ L ≃-refl (lanes-≃ pre (lane≃ ∷ ≈ᴸ-refl Post)) ; live≡ = refl ; node = gnode ; lane = λ _ () ; body = λ _ _ () }
 
@@ -160,6 +161,6 @@ rise-lane-cp f d n q o pre post c s p (inv g (u , l , os , op′ , as , es)) wit
 ... | off a s₀ = ⊥-elim op′
 ... | on a s₀ g₀ _ with subst (λ v → G (env c) v (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post))) lv
                             (node-good c (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post)) g (λ ()))
-... | go , gl , refl , fa , si , el , nl , ov , pa with u | l
+... | go , gl , refl , fa , el , nl , ov , rt with u | l
 ... | ho , oo , op , oq , uc | ao , apre , apost , lc =
-  Cp.result f d n o pre post c a s₀ p g go fa gl si el nl ov pa g₀ ho oo op oq uc ao apre apost lc es
+  Cp.result f d n o pre post c a s₀ p g go fa gl el nl ov rt g₀ ho oo op oq uc ao apre apost lc es

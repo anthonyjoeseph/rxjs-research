@@ -50,11 +50,11 @@ Members: `met-of-shown`.
 
 #### THE GOOD TREE KEPT
 
-Untried: a mark run at an of keeps `Good`, its merges' parts still apart.
-A lane begun at a value's second child stays apart by Tier −1's `world`,
-`flat` and `under`, given `Ok` there: owed first, a lemma that the
-machine's subscription positions are `Real`. Settled by bodies, or a
-program whose of run leaves two parts sharing a position.
+Untried: a mark run at an of keeps `Good`. Apartness is derived, not
+carried: `Rooted` reads it off Tier −1's invariant at the outer's entry.
+Owed: each outer still inside its entry, and a lane begun rooted at a
+value of its own, its rows in its subscription's world. Settled by
+bodies, or a program whose of run leaves two parts sharing a position.
 
 Members: `good-of`, `good-done`.
 
