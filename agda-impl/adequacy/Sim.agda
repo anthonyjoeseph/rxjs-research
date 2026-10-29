@@ -1,22 +1,28 @@
 {-# OPTIONS --guardedness #-}
 
--- THE DIRECT LINK, FOR A FRAGMENT WITHOUT `defer`: the engine run against
--- the emission set's rows, with no stepper and no tower between them.  A
--- step keeps the visible rows or shows the least and drops it, by mode: a
--- subscription entered as the rows of what it begins, a rise read up one
--- frame, a mark run where the search's bound says it leads.
+-- THE DIRECT LINK: the engine run against the emission set's rows, with
+-- no stepper and no tower between them.  A step keeps the visible rows or
+-- shows the least and drops it, by mode: a subscription entered as the
+-- rows of what it begins, a rise read up one frame, a mark run where the
+-- search's bound says it leads.
+--
+-- The link is grown one former at a time.  Subscribing to a former not
+-- yet grown hands the rest of the run to that former's own leaf
+-- (`beyond-scan` and its siblings), so `reach` is total by pattern
+-- matching: growing a former turns its leaf into the arms the link needs
+-- for it, and the coverage checker names every former still owed.
 module adequacy.Sim where
 
 open import Data.Bool using (true; false; if_then_else_; not)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Nat using (_≡ᵇ_)
 open import Data.List using (List; []; _∷_; [_]; null)
+open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Maybe using (just; nothing)
-open import Data.Product using (Σ; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _,_; proj₁)
 open import Data.Unit using (⊤; tt)
 open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
-open import Level using (lift; lower)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
@@ -32,29 +38,17 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
-open import adequacy.Rows using (env; Frag; rows; RT; toEv; Visible; Vis; Past; Plus; old; new; _≃_; _⇄_; silent; shown; Steps;
+open import adequacy.Rows using (env; rows; RT; toEv; Visible; Vis; Past; Plus; old; new; _≃_; _⇄_; silent; shown; Steps;
   Shows*; Shows*-≃; ≃-sym; conv; []; _∷_; tau; val; fin)
-open import adequacy.Bound using (Good; G; Rooted)
+open import adequacy.Bound using (Good; G; Rooted; mergeG₀)
 open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
 open import adequacy.Skip using (After)
-open import adequacy.Inv using (Inv; inv; good; Sim; Ends; GoodC; GoodF; good-split; open-alive)
+open import adequacy.Inv using (Inv; inv; good; Sim; Ends; GoodC; good-split; open-alive)
 open import adequacy.LaneCp using (rise-lane-cp)
 open import adequacy.AbsOf using (abs-of)
 open import denotation.Read using (Meets)
 open import adequacy.Owes using (Swap; good-swap)
 open import adequacy.Enter using (enter-map; enter-merge; flat-∅)
-
-pend-good : ∀ {R Γ A} (c : Ctx R Γ A) o → GoodF c (pend o) → Frag o
-pend-good (inLanes op f d n q o′ pre post c) o ()
-pend-good top                o g = lower g
-pend-good (inMap f c)        o g = lower g
-pend-good (inScan f z c)     o g = lower g
-pend-good (inCut l a c)      o g = lower g
-pend-good (inLn b c)         o g = lower g
-pend-good (inTake i q w c)   o g = lower g
-pend-good (inOuter op f d n q ls c) o g = lower g
-pend-good (inSrc k b c)      o g = lower g
-pend-good (inBody k o′ c)    o g = lower g
 
 -- A good context binds nothing, so its environment keeps the invariant.
 env-good : ∀ {R Γ A} (c : Ctx R Γ A) → GoodC c → GoodEnv (env c)
@@ -75,6 +69,25 @@ env-good (inTake i q w c)                            ()
 env-good (inSrc k b c)                               ()
 env-good (inBody k o c)                              ()
 
+-- Nor does it bind anything to read.
+unbound : ∀ {R Γ A X} (c : Ctx R Γ A) → GoodC c → X ∈ Γ → ⊥
+unbound top                                         _  ()
+unbound (inMap f c)                                 gc x = unbound c gc x
+unbound (inCut l a c)                               gc x = unbound c gc x
+unbound (inLn b c)                                  gc x = unbound c gc x
+unbound (inOuter (mergeᶠ nothing) f d n q ls c)     gc x = unbound c gc x
+unbound (inLanes (mergeᶠ nothing) f d n q o pre post c) gc x = unbound c gc x
+unbound (inOuter (mergeᶠ (just _)) f d n q ls c)    ()
+unbound (inOuter switchᶠ f d n q ls c)              ()
+unbound (inOuter exhaustᶠ f d n q ls c)             ()
+unbound (inLanes (mergeᶠ (just _)) f d n q o pre post c) ()
+unbound (inLanes switchᶠ f d n q o pre post c)      ()
+unbound (inLanes exhaustᶠ f d n q o pre post c)     ()
+unbound (inScan f z c)                              ()
+unbound (inTake i q w c)                            ()
+unbound (inSrc k b c)                               ()
+unbound (inBody k o c)                              ()
+
 ------------------------------------------------------------------------
 -- Subscribing
 
@@ -92,46 +105,39 @@ sub-map c f s p (inv g (uc , _ , ok)) = inv (good-swap c sw g) (uc , tt , ok) , 
 -- A merge entered: its outer pending under it, attached at `p`, nothing begun.
 sub-merge : ∀ {R Γ A B} (c : Ctx R Γ B) f (s : Obs Timeline Γ A) p
           → Sim ⟨ c , pend (flatMap (mergeᶠ nothing) f s) , subscribing , p ⟩ [] ⟨ inCut true (attAt p) (inOuter (mergeᶠ nothing) f false 0 [] [] c) , pend s , subscribing , p ⟩
-sub-merge c f s p (inv g (uc , _ , ok)) = inv (good-swap c sw g) ((tt , uc) , tt , ok) , silent (vis-≃ (up-≃ c (enter-merge (env c) f s p fr)))
+sub-merge c f s p (inv g (uc , _ , ok)) = inv (good-swap c sw g) ((tt , uc) , tt , ok) , silent (vis-≃ (up-≃ c (enter-merge (env c) f s p)))
   where
-    fr = pend-good c _ (proj₂ (good-split c _ g))
     -- The outer about to enter at `p`: inside its own entry, nothing begun.
     rt : Rooted (env c) (rows (env c) (cutS true (attAt p) (pend s))) []
     rt = record { o₀ = s ; p₀ = p ; inv = inv-⟦⟧ s (env c) (env-good c (proj₁ (good-split c _ g))) p ok ; sub = λ () ; qs = [] ; roots = tt }
     node′ : ∀ v → G (env c) v (pend (flatMap (mergeᶠ nothing) f s)) → G (env c) v (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt p) (pend s)) [])
-    node′ true  (lift (ff , fs)) = lift fs , tt₁ , refl , ff , (λ ()) , refl , (λ ()) , rt
-    node′ false (lift (ff , fs)) = lift fs , tt₁ , refl , ff , tt , tt , tt , tt₁
+    node′ true  _ = record { outer = tt₁ ; lanesG = tt₁ ; fresh = refl ; count = refl ; spent = λ () ; rooted = rt }
+    node′ false _ = mergeG₀ tt₁ tt₁ refl
     sw : Swap (env c) (pend (flatMap (mergeᶠ nothing) f s)) (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt p) (pend s)) [])
     sw = record { same = ≃-sym (flat-∅ _ false) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () }
 
 stay : ∀ {R} {k : Conf R} → Sim k [] k
 stay i = i , silent ((λ x → x) ⇄ (λ x → x))
 
-sub-sim : ∀ {R Γ A} {k′ : Conf R} {sh t} (c : Ctx R Γ A) (s : St Γ A) p → stepᴹ ⟨ c , s , subscribing , p ⟩ ≡ moved k′ sh t → Sim ⟨ c , s , subscribing , p ⟩ sh k′
-sub-sim c (pend empty)                          p refl = sub-empty c p
-sub-sim c (pend (of xs))                        p refl = sub-of c xs p
-sub-sim c (pend (map f s))                      p refl = sub-map c f s p
-sub-sim c (pend (flatMap (mergeᶠ nothing) f s)) p refl = sub-merge c f s p
-sub-sim c (pend (cold x))                       p eq i = ⊥-elim (pend-good c _ (proj₂ (good-split c _ (good i))))
-sub-sim c (pend (scan f z s))                   p eq i = ⊥-elim (pend-good c _ (proj₂ (good-split c _ (good i))))
-sub-sim c (pend (takeWhile b q s))              p eq i = ⊥-elim (pend-good c _ (proj₂ (good-split c _ (good i))))
-sub-sim c (pend (flatMap (mergeᶠ (just m)) f s)) p eq i = ⊥-elim (pend-good c _ (proj₂ (good-split c _ (good i))))
-sub-sim c (pend (flatMap switchᶠ f s))          p eq i = ⊥-elim (pend-good c _ (proj₂ (good-split c _ (good i))))
-sub-sim c (pend (flatMap exhaustᶠ f s))         p eq i = ⊥-elim (pend-good c _ (proj₂ (good-split c _ (good i))))
-sub-sim c (pend (connect s b))                  p eq i = ⊥-elim (pend-good c _ (proj₂ (good-split c _ (good i))))
-sub-sim c (pend (connected x))                  p eq i = ⊥-elim (pend-good c _ (proj₂ (good-split c _ (good i))))
-sub-sim c (pend (defer l))                      p eq i = ⊥-elim (pend-good c _ (proj₂ (good-split c _ (good i))))
-sub-sim c (coldS b l)       p refl = stay
-sub-sim c (ofS i q xs)      p refl = stay
-sub-sim c doneS             p refl = stay
-sub-sim c (mapS f s)        p refl = stay
-sub-sim c (scanS f z s)     p refl = stay
-sub-sim c (cutS l a s)      p refl = stay
-sub-sim c (lnS b s)         p refl = stay
-sub-sim c (takeS i q w s)   p refl = stay
-sub-sim c (flatS op f d n q o ls) p refl = stay
-sub-sim c (connS k o b)     p refl = stay
-sub-sim c (joinS j g x ib)  p refl = stay
+-- A node already running, not a pending program.
+Running : ∀ {Γ A} → St Γ A → Set
+Running (pend _) = ⊥
+Running _        = ⊤
+
+-- Subscribing to a node already running: nothing to do.
+sub-sim : ∀ {R Γ A} {k′ : Conf R} {sh t} (c : Ctx R Γ A) (s : St Γ A) p → Running s → stepᴹ ⟨ c , s , subscribing , p ⟩ ≡ moved k′ sh t → Sim ⟨ c , s , subscribing , p ⟩ sh k′
+sub-sim c (pend _)          p () _
+sub-sim c (coldS b l)       p _ refl = stay
+sub-sim c (ofS i q xs)      p _ refl = stay
+sub-sim c doneS             p _ refl = stay
+sub-sim c (mapS f s)        p _ refl = stay
+sub-sim c (scanS f z s)     p _ refl = stay
+sub-sim c (cutS l a s)      p _ refl = stay
+sub-sim c (lnS b s)         p _ refl = stay
+sub-sim c (takeS i q w s)   p _ refl = stay
+sub-sim c (flatS op f d n q o ls) p _ refl = stay
+sub-sim c (connS k o b)     p _ refl = stay
+sub-sim c (joinS j g x ib)  p _ refl = stay
 
 ------------------------------------------------------------------------
 -- Rising
@@ -245,7 +251,7 @@ rise-sim c@(inBody _ _ _)                      s e p eq i = ⊥-elim (proj₁ (g
 ------------------------------------------------------------------------
 -- A mark run
 
--- The marks the fragment's nodes own.
+-- The marks a good tree's nodes own.
 data Marked {Γ : List Set} : ∀ {A} → St Γ A → Mark → Set₁ where
   ofK  : ∀ {A} i p (xs : List A) → Marked (ofS i p xs) ofM
   attK : ∀ {A} l p (s : St Γ A) → Marked (cutS l (attAt p) s) attM
@@ -267,7 +273,7 @@ abs-sim c s p eq  i | just (found (_ , _ , c′ , s′) m κ) with found-mark c 
 ... | attK _ _ _ = abs-att p fd eq i
 
 ------------------------------------------------------------------------
--- No cold in the fragment: every step moves or finds nothing to do
+-- Within what is grown, every step moves or finds nothing to do
 
 Mv : ∀ {R} → Stepped R → Set
 Mv (moved _ _ _) = ⊤
@@ -307,26 +313,6 @@ rise-mv (inSrc k b c)             s cp     p = tt
 rise-mv (inBody k o c)            s (nx b) p = tt
 rise-mv (inBody k o c)            s cp     p = tt
 
-begin-mv : ∀ {R Γ A} (c : Ctx R Γ A) o p → Frag o → Mv (begin c o p)
-begin-mv c empty                          p _ = tt
-begin-mv c (of xs)                        p _ = tt
-begin-mv c (map f s)                      p _ = tt
-begin-mv c (flatMap (mergeᶠ nothing) f s) p _ = tt
-
-sub-mv : ∀ {R Γ A} (c : Ctx R Γ A) s p → GoodF c s → Mv (stepᴹ ⟨ c , s , subscribing , p ⟩)
-sub-mv c (pend o)                p g = begin-mv c o p (pend-good c o g)
-sub-mv c (coldS b l)             p g = tt
-sub-mv c (ofS i q xs)            p g = tt
-sub-mv c doneS                   p g = tt
-sub-mv c (mapS f s)              p g = tt
-sub-mv c (scanS f z s)           p g = tt
-sub-mv c (cutS l a s)            p g = tt
-sub-mv c (lnS b s)               p g = tt
-sub-mv c (takeS i q w s)         p g = tt
-sub-mv c (flatS op f d n q o ls) p g = tt
-sub-mv c (connS k o b)           p g = tt
-sub-mv c (joinS j g′ x ib)       p g = tt
-
 run-of-mv : ∀ {R Γ A} (c : Ctx R Γ A) i q (xs : List A) p → Mv (run c (ofS i q xs) ofM p)
 run-of-mv c i q xs p with closed c | xs
 ... | true  | _     = tt
@@ -337,10 +323,8 @@ run-att-mv : ∀ {R Γ A} (c : Ctx R Γ A) l q (s : St Γ A) p → Mv (run c (cu
 run-att-mv c l q s p with unsubIf (not l) s
 ... | _ = tt
 
-frag-mv : ∀ {R} {k : Conf R} → Inv k → Mv (stepᴹ k)
-frag-mv {k = ⟨ c , s , rising e , p ⟩}   i = rise-mv c s e p
-frag-mv {k = ⟨ c , s , subscribing , p ⟩} i = sub-mv c s p (proj₂ (good-split c s (good i)))
-frag-mv {k = ⟨ c , s , absorbed , p ⟩}    i with search top (plug c s) in fd
+abs-mv : ∀ {R Γ A} (c : Ctx R Γ A) s p → Inv ⟨ c , s , absorbed , p ⟩ → Mv (stepᴹ ⟨ c , s , absorbed , p ⟩)
+abs-mv c s p i with search top (plug c s) in fd
 ... | nothing = tt
 ... | just (found (_ , _ , c′ , s′) m κ) with found-mark c s (good i) fd
 ...   | ofK j q xs  = run-of-mv c′ j q xs p
@@ -371,31 +355,97 @@ module _ {R : Set} where
 ------------------------------------------------------------------------
 -- The run
 
-step-sim : ∀ {R} {k k′ : Conf R} {sh t} → stepᴹ k ≡ moved k′ sh t → Sim k sh k′
-step-sim {k = ⟨ c , s , rising e , p ⟩}   eq = rise-sim c s e p eq
-step-sim {k = ⟨ c , s , subscribing , p ⟩} eq = sub-sim c s p eq
-step-sim {k = ⟨ c , s , absorbed , p ⟩}    eq = abs-sim c s p eq
+-- Whatever a run from `k` shows, a reader of its rows is shown.
+Runs : ∀ {R} → Conf R → Set₁
+Runs k = ∀ {rs} → Steps k rs → Shows* (RT k) (conv rs)
 
-sound-from : ∀ {R} {k : Conf R} {rs} → Inv k → Steps k rs → Shows* (RT k) (conv rs)
-sound-from i [] = []
-sound-from {k = k} i (tau e st) with τ-moved (stepᴹ k) (frag-mv i) e
-... | _ , eq with step-sim eq i
-...   | i′ , silent q = Shows*-≃ (≃-sym q) (sound-from i′ st)
-sound-from {k = k} i (val e st) with val-moved (stepᴹ k) (frag-mv i) e
-... | _ , _ , eq with step-sim eq i
-...   | i′ , shown v lt q = (v , lt) ∷ Shows*-≃ (≃-sym q) (sound-from i′ st)
-sound-from {k = k} i (fin e) with fin-moved (stepᴹ k) (frag-mv i) e
-... | _ , _ , _ , eq with step-sim eq i
-...   | _ , shown v lt _ = (v , lt) ∷ []
+-- SUBSCRIBING TO A FORMER NOT YET GROWN: the run from there, its own leaf.
+-- Each owes what growing it would: its node's place in `adequacy.Bound.G`,
+-- its rows and what it owes, and the step arms of the nodes it builds.
+postulate
+  beyond-cold    : ∀ {R Γ A} (c : Ctx R Γ A) x p → Inv ⟨ c , pend (cold x) , subscribing , p ⟩ → Runs ⟨ c , pend (cold x) , subscribing , p ⟩
+  beyond-scan    : ∀ {R Γ A B} (c : Ctx R Γ B) (f : B → A → B) z (s : Obs Timeline Γ A) p
+                 → Inv ⟨ c , pend (scan f z s) , subscribing , p ⟩ → Runs ⟨ c , pend (scan f z s) , subscribing , p ⟩
+  beyond-take    : ∀ {R Γ A} (c : Ctx R Γ A) b q (s : Obs Timeline Γ A) p
+                 → Inv ⟨ c , pend (takeWhile b q s) , subscribing , p ⟩ → Runs ⟨ c , pend (takeWhile b q s) , subscribing , p ⟩
+  beyond-bounded : ∀ {R Γ A B} (c : Ctx R Γ B) m (f : A → Obs Timeline Γ B) s p
+                 → Inv ⟨ c , pend (flatMap (mergeᶠ (just m)) f s) , subscribing , p ⟩ → Runs ⟨ c , pend (flatMap (mergeᶠ (just m)) f s) , subscribing , p ⟩
+  beyond-switch  : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) s p
+                 → Inv ⟨ c , pend (flatMap switchᶠ f s) , subscribing , p ⟩ → Runs ⟨ c , pend (flatMap switchᶠ f s) , subscribing , p ⟩
+  beyond-exhaust : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) s p
+                 → Inv ⟨ c , pend (flatMap exhaustᶠ f s) , subscribing , p ⟩ → Runs ⟨ c , pend (flatMap exhaustᶠ f s) , subscribing , p ⟩
+  beyond-connect : ∀ {R Γ A B} (c : Ctx R Γ B) (s : Obs Timeline Γ A) b p
+                 → Inv ⟨ c , pend (connect s b) , subscribing , p ⟩ → Runs ⟨ c , pend (connect s b) , subscribing , p ⟩
+  beyond-defer   : ∀ {R Γ A} (c : Ctx R Γ A) l p → Inv ⟨ c , pend (defer l) , subscribing , p ⟩ → Runs ⟨ c , pend (defer l) , subscribing , p ⟩
+
+-- Where a step goes: on, linked a step at a time, or into a former's leaf.
+data Reach {R} (k : Conf R) : Set₁ where
+  within : Mv (stepᴹ k) → (∀ {k′ sh t} → stepᴹ k ≡ moved k′ sh t → Sim k sh k′) → Reach k
+  beyond : Runs k → Reach k
+
+reach-pend : ∀ {R Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Inv ⟨ c , pend o , subscribing , p ⟩ → Reach ⟨ c , pend o , subscribing , p ⟩
+reach-pend c empty                           p i = within tt λ { refl → sub-empty c p }
+reach-pend c (of xs)                         p i = within tt λ { refl → sub-of c xs p }
+reach-pend c (map f s)                       p i = within tt λ { refl → sub-map c f s p }
+reach-pend c (flatMap (mergeᶠ nothing) f s)  p i = within tt λ { refl → sub-merge c f s p }
+reach-pend c (connected x)                   p i = ⊥-elim (unbound c (proj₁ (good-split c _ (good i))) x)
+reach-pend c (cold x)                        p i = beyond (beyond-cold c x p i)
+reach-pend c (scan f z s)                    p i = beyond (beyond-scan c f z s p i)
+reach-pend c (takeWhile b q s)               p i = beyond (beyond-take c b q s p i)
+reach-pend c (flatMap (mergeᶠ (just m)) f s) p i = beyond (beyond-bounded c m f s p i)
+reach-pend c (flatMap switchᶠ f s)           p i = beyond (beyond-switch c f s p i)
+reach-pend c (flatMap exhaustᶠ f s)          p i = beyond (beyond-exhaust c f s p i)
+reach-pend c (connect s b)                   p i = beyond (beyond-connect c s b p i)
+reach-pend c (defer l)                       p i = beyond (beyond-defer c l p i)
+
+reach : ∀ {R} (k : Conf R) → Inv k → Reach k
+reach ⟨ c , s , rising e , p ⟩                        i = within (rise-mv c s e p) (rise-sim c s e p)
+reach ⟨ c , pend o , subscribing , p ⟩                i = reach-pend c o p i
+reach ⟨ c , coldS b l , subscribing , p ⟩             i = within tt (sub-sim c (coldS b l) p tt)
+reach ⟨ c , ofS j q xs , subscribing , p ⟩            i = within tt (sub-sim c (ofS j q xs) p tt)
+reach ⟨ c , doneS , subscribing , p ⟩                 i = within tt (sub-sim c doneS p tt)
+reach ⟨ c , mapS f s , subscribing , p ⟩              i = within tt (sub-sim c (mapS f s) p tt)
+reach ⟨ c , scanS f z s , subscribing , p ⟩           i = within tt (sub-sim c (scanS f z s) p tt)
+reach ⟨ c , cutS l a s , subscribing , p ⟩            i = within tt (sub-sim c (cutS l a s) p tt)
+reach ⟨ c , lnS b s , subscribing , p ⟩               i = within tt (sub-sim c (lnS b s) p tt)
+reach ⟨ c , takeS j q w s , subscribing , p ⟩         i = within tt (sub-sim c (takeS j q w s) p tt)
+reach ⟨ c , flatS op f d n q o ls , subscribing , p ⟩ i = within tt (sub-sim c (flatS op f d n q o ls) p tt)
+reach ⟨ c , connS k o b , subscribing , p ⟩           i = within tt (sub-sim c (connS k o b) p tt)
+reach ⟨ c , joinS j g x ib , subscribing , p ⟩        i = within tt (sub-sim c (joinS j g x ib) p tt)
+reach ⟨ c , s , absorbed , p ⟩                        i = within (abs-mv c s p i) (abs-sim c s p)
+
+sound-from : ∀ {R} {k : Conf R} → Inv k → Runs k
+sound-from {k = k} i st with reach k i
+... | beyond b      = b st
+... | within mv sim = go st
+  where
+    go : ∀ {rs} → Steps k rs → Shows* (RT k) (conv rs)
+    go [] = []
+    go (tau e st′) with τ-moved (stepᴹ k) mv e
+    ... | _ , eq with sim eq i
+    ...   | i′ , silent q = Shows*-≃ (≃-sym q) (sound-from i′ st′)
+    go (val e st′) with val-moved (stepᴹ k) mv e
+    ... | _ , _ , eq with sim eq i
+    ...   | i′ , shown v lt q = (v , lt) ∷ Shows*-≃ (≃-sym q) (sound-from i′ st′)
+    go (fin e) with fin-moved (stepᴹ k) mv e
+    ... | _ , _ , _ , eq with sim eq i
+    ...   | _ , shown v lt _ = (v , lt) ∷ []
 
 postulate
-  -- THE SKIPS BETWEEN: a fragment program's least visible rows, shown in
+  -- THE SKIPS BETWEEN: a program's least visible rows, shown in
   -- turn, are the shown rows of a reader's run, the skips before each met
   -- on the way.  Finitely many rows lie before each (`adequacy.Enter`),
   -- and none visible past the end; the run lists them in position order.
-  met-of-shown : ∀ {R} {o : PureObs [] R} → Frag o → ∀ {vs} → Shows* (enter (⟦ o ⟧ []ᴬ) root) vs → Meets (enter (⟦ o ⟧ []ᴬ) root) vs
+  --
+  -- DEAD ROUTE: reading the rows off the oracle's listing
+  --   (`quickcheck.Tabled.Exact.tabled-exact`): it is exact only uncut, and
+  --   its horizon is a fixed time, so a cold source ticking past it, or an
+  --   infinite one, cuts the listing and it claims nothing.  The horizon a
+  --   run needs is the position of its last shown row, which the listing
+  --   does not take.
+  met-of-shown : ∀ {R} {o : PureObs [] R} {vs} → Shows* (enter (⟦ o ⟧ []ᴬ) root) vs → Meets (enter (⟦ o ⟧ []ᴬ) root) vs
 
 -- THE SOUND HALF: what the engine shows, a subscriber to the program's
 -- rows is shown.
-sound : ∀ {R} {o : PureObs [] R} → Frag o → ∀ {rs} → Steps (load o) rs → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs)
-sound {o = o} fo st = met-of-shown {o = o} fo (sound-from (inv (lift fo) (tt , tt , tt , λ ())) st)
+sound : ∀ {R} {o : PureObs [] R} {rs} → Steps (load o) rs → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs)
+sound {o = o} st = met-of-shown {o = o} (sound-from (inv tt₁ (tt , tt , tt , λ ())) st)

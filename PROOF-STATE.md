@@ -14,17 +14,36 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### BEYOND THE FRAGMENT
+#### THE CONNECT GROWN
 
-Riskiest under a connect: `rows` now carries an environment, a binder
-bound to its source's rows with the end kept once closed, but nothing past
-the fragment is proven against it. Open: equal binder rows give equal body
-rows; a skip lifts past no binder, as a connect shows its source's skip one
-level down and a joiner its own at the binder's; and a good tree holds no
-connect, so the invariant must first say what a connect owes. The split is
-excluded middle. Settled once the sound half covers every program.
+Riskiest, grown first: subscribing to a connect is its own leaf until a
+good tree can hold one. Open: what a connect node owes in
+`adequacy.Bound.G`; equal binder rows giving equal body rows; a skip
+lifting past no binder, as a connect shows its source's skip one level
+down and a joiner its own at the binder's. Settled when `reach` links a
+connect a step at a time.
 
-Members: `sound-beyond`, `frag?`, `rows-hot`.
+Members: `beyond-connect`, `rows-hot`.
+
+#### THE FORMERS NOT GROWN
+
+Each former still handed to its own leaf in `reach` owes a node in
+`adequacy.Bound.G`, its rows and what it owes, and the step arms of the
+nodes it builds. A cold that hushes meets THE OWED; `defer` unfolds only
+at admissible subscriptions. Settled former by former, as each leaf
+becomes arms.
+
+Members: `beyond-cold`, `beyond-scan`, `beyond-take`, `beyond-bounded`,
+`beyond-switch`, `beyond-exhaust`, `beyond-defer`.
+
+#### OWING AS ENTERED
+
+Believed: a merge of good parts owing a row owes one with finitely many
+before it. The goal is a negation, so a finitary case split is free:
+finitely many parts lie before any row, each truncation-closed. Settled
+by a body, or a good merge whose every row has infinitely many before.
+
+Members: `owing-row`.
 
 #### THE COMPLETE HALF
 
@@ -42,9 +61,8 @@ Members: `complete`.
 Untried: the engine's shown rows, each the least visible one left, are
 the shown rows of a reader's run, which meets every skip in order. Rows
 before each are finitely many, but which of a listing's positions are rows
-is undecided: needs an exact listing of a fragment program's rows, or
-excluded middle. Settled by a body, or a fragment program showing a value
-past its end.
+is undecided, and the oracle's listing is cut at a fixed horizon. Settled
+by a body, or a program showing a value past its end.
 
 Members: `met-of-shown`.
 
@@ -60,9 +78,9 @@ Members: `good-of`, `good-done`.
 
 #### THE OWED
 
-Suspect past the fragment: `Owes` reads a live node as owing a row, false
+Suspect once cold is grown: `Owes` reads a live node as owing a row, false
 for a cold that hushes (live, no rows, never ends). Restate as a live node
-owing no end, equivalent in the fragment and all `¬ Done` needs. Then a
+owing no end, equivalent on the grown formers and all `¬ Done` needs. Then a
 closed of dropped changes nothing owed (`adequacy.AbsOf`). Settled by the
 restatement and a body.
 

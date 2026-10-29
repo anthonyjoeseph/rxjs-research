@@ -10,13 +10,13 @@ open import Data.Bool using (Bool; true; false; _∧_)
 open import Data.Bool.Properties using (∧-zeroʳ; ∧-identityʳ)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List.Relation.Unary.All using ([])
-open import Data.List using (_∷_; _ʳ++_)
+open import Data.List using (List; _∷_; _ʳ++_)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.EmissionSet using (EmissionSet; DenEnv)
@@ -25,12 +25,12 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     closed; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ)
-open import adequacy.Rows using (env; rows; RT; Moves)
-open import adequacy.Up using (≃-refl)
+open import adequacy.Rows using (env; rows; rowsL; pendRows; RT; Moves; module Flat)
+open import adequacy.Up using (≃-refl; any-ʳ++ʳ)
 open import denotation.Laws.Worlds using (Ok; Hots)
-open import adequacy.Bound using (Empty; Good; G; GLn; LnBody)
+open import adequacy.Bound using (Empty; Good; G; GLn; LnBody; MergeG; mergeG-map)
 open import adequacy.Skip using (After; LeadC)
-open import adequacy.Owes using (Owes; UpO; goodL-ʳ++⁻; goodL-swap; Swap; good-swap)
+open import adequacy.Owes using (Owes; UpO; Need; Owing; map-owing; flat-owing-o; flat-owing-l; owing-≃; ≡→≃; rowsL-ʳ++; goodL-ʳ++⁻; goodL-swap; Swap; good-swap)
 
 -- A node an event can rise out of: not cut, not out of its list.
 Open : ∀ {Γ A} → St Γ A → Set
@@ -164,7 +164,7 @@ good-split (inTake i q w c) s g with good-split c (takeS i q w s) g
 ... | inj₂ ()
 good-split (inOuter (mergeᶠ nothing) f d n q ls c) s g with good-split c (flatS (mergeᶠ nothing) f d n q s ls) g
 ... | gc , gf with unF c _ gf
-... | inj₁ gm = gc , proj₁ gm
+... | inj₁ gm = gc , MergeG.outer gm
 ... | inj₂ ()
 good-split (inOuter (mergeᶠ (just m)) f d n q ls c) s g with good-split c (flatS (mergeᶠ (just m)) f d n q s ls) g
 ... | _ , gf with unF c _ gf
@@ -180,7 +180,7 @@ good-split (inOuter exhaustᶠ f d n q ls c) s g with good-split c (flatS exhaus
 ... | inj₂ ()
 good-split (inLanes (mergeᶠ nothing) f d n q o pre post c) s g with good-split c (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post)) g
 ... | gc , gf with unF c _ gf
-... | inj₁ (_ , gl , _) = gc , proj₁ (proj₂ (goodL-ʳ++⁻ pre gl))
+... | inj₁ gm = gc , proj₁ (proj₂ (goodL-ʳ++⁻ pre (MergeG.lanesG gm)))
 ... | inj₂ ()
 good-split (inLanes (mergeᶠ (just m)) f d n q o pre post c) s g with good-split c (flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s ∷ post)) g
 ... | _ , gf with unF c _ gf
@@ -208,6 +208,40 @@ node-good : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → Good [] (plug c s) �
 node-good c s g nl with unF c s (proj₂ (good-split c s g))
 ... | inj₁ gs = gs
 ... | inj₂ gl = ⊥-elim (nl gl)
+
+-- A MERGE OWING A ROW, AS ENTERED: a joiner of good parts owing a row
+-- owes one with finitely many before it.  Every part of a good node owes
+-- only rows with finitely many of its own before them, and finitely many
+-- parts lie before any row, so the earliest part with infinitely many
+-- rows before a row offers one with finitely many.
+postulate
+  owing-row : ∀ {Γ A B} {ρ : DenEnv Γ} {b} f d n q (o : St Γ A) (ls : List (St Γ B)) → G ρ b (flatS (mergeᶠ nothing) f d n q o ls)
+            → Owing (Flat.JoinT (λ a → pendRows ρ (f a)) (rows ρ o) d (rowsL ρ ls)) → Owing (rows ρ (flatS (mergeᶠ nothing) f d n q o ls))
+
+-- A part owing a row: its frame's node owes one.
+need-of : ∀ {R Γ A} (c : Ctx R Γ A) {s : St Γ A} → Good [] (plug c s) → Owing (rows (env c) s) → Need c s
+need-of top                                     g ow = tt
+need-of (inMap f c)                             g ow = need-of c g (map-owing f ow)
+need-of (inCut true a c)                        g ow = need-of c g ow
+need-of (inCut false a c)                       g ow = tt
+need-of (inLn true c)                           g ow = need-of c g ow
+need-of (inLn false c)                          g ow = tt
+need-of (inScan f z c)                          g ow = tt
+need-of (inTake i q w c)                        g ow = tt
+need-of (inOuter (mergeᶠ nothing) f d n q ls c) {s} g ow =
+  (λ _ → ow) , need-of c g (owing-row f d n q s ls (node-good c _ g (λ ())) (flat-owing-o _ ow))
+need-of (inOuter (mergeᶠ (just _)) f d n q ls c) g ow = tt
+need-of (inOuter switchᶠ f d n q ls c)          g ow = tt
+need-of (inOuter exhaustᶠ f d n q ls c)         g ow = tt
+need-of (inLanes (mergeᶠ nothing) f d n q o pre post c) {s} g ow =
+  (λ _ → ow) , need-of c g (owing-row f d n q o (pre ʳ++ s ∷ post) (node-good c _ g (λ ()))
+                              (owing-≃ (≡→≃ (cong (Flat.JoinT _ (rows (env c) o) d) (sym (rowsL-ʳ++ pre))))
+                                       (flat-owing-l _ λ em → ow λ r → em (any-ʳ++ʳ (rowsL (env c) pre) (inj₁ r)))))
+need-of (inLanes (mergeᶠ (just _)) f d n q o pre post c) g ow = tt
+need-of (inLanes switchᶠ f d n q o pre post c)  g ow = tt
+need-of (inLanes exhaustᶠ f d n q o pre post c) g ow = tt
+need-of (inSrc k b c)                           g ow = tt
+need-of (inBody k o c)                          g ow = tt
 
 -- Under open frames every hole is owed.
 upo-liv : ∀ {R Γ A} (c : Ctx R Γ A) → UpO c → liv c ≡ true
@@ -273,12 +307,12 @@ dead-swap (inCut true a c)  dd sw g =
 dead-swap (inLn b c)        dd sw g = dead-swap c dd (record { node₀ = λ () ; lane₀ = body₀ sw b ; body₀ = λ _ () }) g
 dead-swap (inTake i q w c)  dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inOuter (mergeᶠ nothing) f d n q ls c) dd sw g =
-  dead-swap c dd (record { node₀ = λ { (go , gl , qe , fa , _) → node₀ sw go , gl , qe , fa , tt , tt , tt , tt₁ } ; lane₀ = λ () ; body₀ = λ _ () }) g
+  dead-swap c dd (record { node₀ = mergeG-map (node₀ sw) (λ x → x) (λ x → x) (λ x → x) (λ x → x) ; lane₀ = λ () ; body₀ = λ _ () }) g
 dead-swap (inOuter (mergeᶠ (just _)) f d n q ls c) dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inOuter switchᶠ f d n q ls c)  dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inOuter exhaustᶠ f d n q ls c) dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inLanes (mergeᶠ nothing) f d n q o pre post c) dd sw g =
-  dead-swap c dd (record { node₀ = λ { (go , gl , qe , fa , _) → go , goodL-swap pre (lane₀ sw) gl , qe , fa , tt , tt , tt , tt₁ } ; lane₀ = λ () ; body₀ = λ _ () }) g
+  dead-swap c dd (record { node₀ = mergeG-map (λ x → x) (goodL-swap pre (lane₀ sw)) (λ x → x) (λ x → x) (λ x → x) ; lane₀ = λ () ; body₀ = λ _ () }) g
 dead-swap (inLanes (mergeᶠ (just _)) f d n q o pre post c) dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inLanes switchᶠ f d n q o pre post c)  dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g
 dead-swap (inLanes exhaustᶠ f d n q o pre post c) dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ())) g

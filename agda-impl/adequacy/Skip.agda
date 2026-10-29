@@ -10,6 +10,8 @@ module adequacy.Skip where
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _ʳ++_; _++_; [_])
 open import Data.Maybe using (just; nothing)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Product using (_×_; _,_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
@@ -20,7 +22,7 @@ open import adequacy.Up using (all-ʳ++)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; ix)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; _≺_; _≼_; MapT; map-out; map-skip; map-end; Ended)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; _≺_; _≼_; Truncate; Few; MapT; map-out; map-skip; map-end; Ended)
 open import denotation.Laws.Modulus using (≺-trans; ≺→≼; ≼-≺-≺; ≺-ext)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
@@ -220,6 +222,26 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {d : Bool} {p : Pos} wher
          → Since p O → Since p O′ → Each (Since p) Ls → Each (Since p) Ls′ → Flat.JoinT L O d Ls ≈⟨ p ⟩ Flat.JoinT L O′ d Ls′
   flat-≈ Ls Ls′ eo es so so′ sl sl′ = flat-→ Ls Ls′ eo es so sl ⇆ flat-→ Ls′ Ls (≈-sym eo) (≈ᴸ-sym es) so′ sl′
 
+  since-row : ∀ (O : EmissionSet A) (Ls : List (EmissionSet B)) → Since p O → Each (Since p) Ls → Since p (Flat.RowT L O d Ls)
+  since-row O Ls so sl (r , _) = since-flat O Ls so sl r
+
+-- A skip more or less: one more row before any position.
+few-≈ : ∀ {A} {t u : EmissionSet A} {p} → (∀ {q e} → u q e → t q e ⊎ Skip p q e) → ∀ {q} → Few t q → Few u q
+few-≈ {t = t} {p = p} h {q} (ks , f) = p ∷ ks , λ x lt → go (h x) lt
+  where
+    go : ∀ {k e} → t k e ⊎ Skip p k e → k ≺ q → k ∈ (p ∷ ks)
+    go (inj₁ y)           lt = there (f y lt)
+    go (inj₂ (refl , _))  lt = here refl
+
+trunc-≈ : ∀ {A} {t u : EmissionSet A} {p} → t ≈⟨ p ⟩ u → Truncate t ≈⟨ p ⟩ Truncate u
+trunc-≈ eq = go (fwd eq) (bwd eq) ⇆ go (bwd eq) (fwd eq)
+  where
+    go : ∀ {t u : EmissionSet _} {p} → (∀ {q e} → t q e → u q e ⊎ Skip p q e) → (∀ {q e} → u q e → t q e ⊎ Skip p q e)
+       → ∀ {q e} → Truncate t q e → Truncate u q e ⊎ Skip p q e
+    go h k (r , fw) with h r
+    ... | inj₁ r′ = inj₁ (r′ , few-≈ k fw)
+    ... | inj₂ sk = inj₂ sk
+
 ------------------------------------------------------------------------
 -- THE LIFT
 
@@ -233,7 +255,7 @@ up-≈ (inLn true c)                           ld st su eq = up-≈ c ld st su e
 up-≈ (inLn false c)                          ld st su eq = ≈-refl
 up-≈ (inTake i q w c)                        ld st su eq = ≈-refl
 up-≈ (inOuter (mergeᶠ nothing) f d n q ls c) {t} {u} (al , ld) st su eq =
-  up-≈ c ld (since-flat L t Ls st sl) (since-flat L u Ls su sl) (flat-≈ L Ls Ls eq (≈ᴸ-refl Ls) st su sl sl)
+  up-≈ c ld (since-row L t Ls st sl) (since-row L u Ls su sl) (trunc-≈ (flat-≈ L Ls Ls eq (≈ᴸ-refl Ls) st su sl sl))
   where
     L  = λ a → pendRows (env c) (f a)
     Ls = rowsL (env c) ls
@@ -242,8 +264,8 @@ up-≈ (inOuter (mergeᶠ (just _)) f d n q ls c) ld st su eq = ≈-refl
 up-≈ (inOuter switchᶠ f d n q ls c)           ld st su eq = ≈-refl
 up-≈ (inOuter exhaustᶠ f d n q ls c)          ld st su eq = ≈-refl
 up-≈ (inLanes (mergeᶠ nothing) f d n q o pre post c) {t} {u} (ao , apre , apost , ld) st su eq =
-  up-≈ c ld (since-flat L O Lt so slt) (since-flat L O Lu so slu)
-       (flat-≈ L Lt Lu ≈-refl (≈ᴸ-hole (rowsL ρ pre) (eq ∷ ≈ᴸ-refl (rowsL ρ post))) so so slt slu)
+  up-≈ c ld (since-row L O Lt so slt) (since-row L O Lu so slu)
+       (trunc-≈ (flat-≈ L Lt Lu ≈-refl (≈ᴸ-hole (rowsL ρ pre) (eq ∷ ≈ᴸ-refl (rowsL ρ post))) so so slt slu))
   where
     ρ   = env c
     L   = λ a → pendRows ρ (f a)

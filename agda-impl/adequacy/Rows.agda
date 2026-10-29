@@ -19,22 +19,12 @@ open import Data.Product using (_×_; _,_)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; empty; of; map; flatMap)
+open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (ofᴱ)
 open import denotation.Events using (Pos; Timeline; ix)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; InE; enter; MapT; ⟦_⟧; Ended; module Joining; Den; hot; Proper; DenEnv; module Connecting)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; InE; enter; Truncate; MapT; ⟦_⟧; Ended; module Joining; Den; hot; Proper; DenEnv; module Connecting)
 open import operation.PureObservable using (module Machine; module Driver)
 open Machine using (St; Ctx; CS; connS; joinS; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; load; moved; quiet; pend; ofS; mapS; cutS; lnS; flatS; alive; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; nx; cp) renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
-
-------------------------------------------------------------------------
--- The fragment
-
-Frag : ∀ {Γ A} → Obs Timeline Γ A → Set
-Frag empty                         = ⊤
-Frag (of xs)                       = ⊤
-Frag (map f s)                     = Frag s
-Frag (flatMap (mergeᶠ nothing) f s) = (∀ a → Frag (f a)) × Frag s
-Frag _                             = ⊥
 
 ------------------------------------------------------------------------
 -- Rows
@@ -71,6 +61,15 @@ record _≃_ {A : Set} (t u : EmissionSet A) : Set where
 open _≃_
 
 -- A lane or an outer ended by `c`: every row it still owes, by `c`.
+-- Exact only where every lane ends, as in the fragment: a lane that
+-- never ends owes nothing and reads gone.
+--
+-- DEAD ROUTE: a lane finished as `Ended` in its rows, or as its node's
+--   live-lane count: while a lane's end rises to its merge, the lane is
+--   still in the list, owes nothing and holds no end, so the merge's bare
+--   rows skip an end the denotation has.  Rows cannot tell an end in
+--   flight from a lane that never ends; the hole's state can, and `up`
+--   does not see it.
 Gone : ∀ {X} → EmissionSet X → Pos → Set
 Gone t c = ∀ {k e} → t k e → k ≼ c
 
@@ -94,8 +93,14 @@ record Lane {A B : Set} (L : A → Pos → EmissionSet B) (q : Pos) (a : A) (k :
     lane : L a (q ++ [ ix 1 ]) k e
     past : (q ++ [ ix 1 ]) ≺ k
 
+--
+-- What it owes is the joiner's rows with finitely many before, as entered
+-- (`RowT`): a lane that never stops leaves every row past it unreached.
 module Flat {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (d : Bool) (Ls : List (EmissionSet B)) where
   open Joining (Lane L) O (Lanes Ls) (λ c → (T d ⊎ Ended O c) × Each (λ t → Gone t c) Ls) (λ _ → ⊤) (λ _ _ → ⊥) (λ _ → ⊥) public
+
+  RowT : EmissionSet B
+  RowT = Truncate JoinT
 
 -- What a subscription pending at `p` owes: its meaning under `ρ`,
 -- entered there.
@@ -129,7 +134,7 @@ mutual
   rows ρ (mapS f s)                             = MapT f (rows ρ s)
   rows ρ (cutS true a s)                        = rows ρ s
   rows ρ (lnS true s)                           = rows ρ s
-  rows ρ (flatS (mergeᶠ nothing) f d n q o ls)  = Flat.JoinT (λ a → pendRows ρ (f a)) (rows ρ o) d (rowsL ρ ls)
+  rows ρ (flatS (mergeᶠ nothing) f d n q o ls)  = Flat.RowT (λ a → pendRows ρ (f a)) (rows ρ o) d (rowsL ρ ls)
   rows ρ (connS k o b)                          = Connecting.ConnT (CS.srcAt k) (src ρ k o) (rows (Hot (src ρ k o) k ∷ ρ) b)
   rows ρ (joinS j true x ib)                    = Inbox ib ∪ enter (lookup ρ x) j
   rows ρ (joinS j false x ib)                   = Inbox ib
@@ -167,11 +172,11 @@ up (inCut false a c)                                  H = up c ∅
 up (inLn true c)                                      H = up c H
 up (inLn false c)                                     H = up c ∅
 up (inTake i p w c)                                   H = up c ∅
-up (inOuter (mergeᶠ nothing) f d n q ls c)            H = up c (Flat.JoinT (λ a → pendRows (env c) (f a)) H d (rowsL (env c) ls))
+up (inOuter (mergeᶠ nothing) f d n q ls c)            H = up c (Flat.RowT (λ a → pendRows (env c) (f a)) H d (rowsL (env c) ls))
 up (inOuter (mergeᶠ (just _)) f d n q ls c)           H = up c ∅
 up (inOuter switchᶠ f d n q ls c)                     H = up c ∅
 up (inOuter exhaustᶠ f d n q ls c)                    H = up c ∅
-up (inLanes (mergeᶠ nothing) f d n q o pre post c)    H = up c (Flat.JoinT (λ a → pendRows (env c) (f a)) (rows (env c) o) d (rowsL (env c) pre ʳ++ (H ∷ rowsL (env c) post)))
+up (inLanes (mergeᶠ nothing) f d n q o pre post c)    H = up c (Flat.RowT (λ a → pendRows (env c) (f a)) (rows (env c) o) d (rowsL (env c) pre ʳ++ (H ∷ rowsL (env c) post)))
 up (inLanes (mergeᶠ (just _)) f d n q o pre post c)   H = up c ∅
 up (inLanes switchᶠ f d n q o pre post c)             H = up c ∅
 up (inLanes exhaustᶠ f d n q o pre post c)            H = up c ∅
