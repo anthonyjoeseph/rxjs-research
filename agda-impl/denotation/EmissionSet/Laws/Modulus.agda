@@ -72,6 +72,11 @@ open import denotation.EmissionSet
 ... | inj₁ lt   = ≺-trans {x} {y} {z} (Equivalence.from T-≡ lt) yz
 ... | inj₂ refl = yz
 
+≼-antisym : ∀ {x y} → x ≼ y → y ≼ x → x ≡ y
+≼-antisym {x} {y} xy yx with <ᵖ-split x y (≼-false {x} {y} xy)
+... | inj₁ lt = ⊥-elim (yx (Equivalence.from T-≡ lt))
+... | inj₂ eq = eq
+
 ≼-trans : ∀ {x y z} → x ≼ y → y ≼ z → x ≼ z
 ≼-trans {x} {y} {z} xy yz zx = yz (≺-≼-≺ {z} {x} {y} zx xy)
 

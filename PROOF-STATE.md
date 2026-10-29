@@ -8,13 +8,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE WORLD INVARIANT
+#### THE NESTED LANES
 
-Open for the operators that place rows of their own: a timeline's ticks,
-a joiner's lanes, takeWhile's failing value, a rejoined hot. Settled by
-bodies, or a program whose reading leaves its world.
+Open for a bounded merge only: a queued lane subscribes under the end of
+the lane it follows, so lanes' worlds nest rather than lie apart.
+Settled by a body, or a program whose queued lane meets its predecessor.
 
-Members: `flatMap-inv`, `takeWhile-inv`, `cold-inv`, `lawful-hot`.
+Members: `bounded-inv`.
 
 #### THE JOINERS WITHIN THE BOUND
 
