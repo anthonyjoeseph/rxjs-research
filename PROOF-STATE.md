@@ -171,14 +171,6 @@ body.
 
 Members: `sub-empty`, `sub-of`, `sub-defer`.
 
-#### THE JOINERS' AGREEMENT
-
-Believed: a joiner part way through reads its outer and lanes, begun or
-not, only at and below each row, as the denotation's joiner does. Settled
-by bodies, one generic over `Joining`'s policy if it fits all four.
-
-Members: `flat-ag`, `switch-ag`, `exhaust-ag`, `bounded-ag`.
-
 ## Tier 1 — the simultaneous spec
 
 **The spec:** batchSimultaneous groups what plain rxjs delivers by instant, in order, read off the emission set.

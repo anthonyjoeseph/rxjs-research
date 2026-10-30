@@ -24,6 +24,7 @@ open Machine using (St; CS; Owe; free; cpAt; cutAt; overAt; pend; coldS; ofS; do
 
 open import adequacy.Rows using (rows; rowsL; Hot; Closed; _∪_; TakeR; Kept; kept; Stops; stop; left; _≃_; _⇄_;
   module Flat; module SwitchF; module ExhaustF; module BoundedF)
+open import adequacy.Policy using (join-ag; flat-to; switch-to; exhaust-to; bounded-to)
 
 ------------------------------------------------------------------------
 -- Agreement, by operator
@@ -59,20 +60,36 @@ hot-ag k {t} {t′} a = hot-causal (proper-ag (∪-ag a (ag-refl (Closed k))))
 
 -- A JOINER PART WAY THROUGH READS ITS INPUTS CAUSALLY: its outer, each
 -- lane it would begin and each lane it has begun, at and below `q`,
--- decide its rows there.  The denotation's joiner does (`flatMap-causal`).
-postulate
-  flat-ag : ∀ {A B Q} {L L′ : A → Pos → EmissionSet B} {O O′ : EmissionSet A} d n {Ls Ls′ : List (EmissionSet B)}
+-- decide its rows there.
+private
+  la-sym : ∀ {A B : Set} {Q} {L L′ : A → Pos → EmissionSet B} → (∀ a p → AgreeTo Q (L a p) (L′ a p)) → ∀ a p → AgreeTo Q (L′ a p) (L a p)
+  la-sym la a p = AgreeTo-sym (la a p)
+
+  ls-sym : ∀ {B : Set} {Q} {Ls Ls′ : List (EmissionSet B)} → Pointwise (AgreeTo Q) Ls Ls′ → Pointwise (AgreeTo Q) Ls′ Ls
+  ls-sym []       = []
+  ls-sym (g ∷ gs) = AgreeTo-sym g ∷ ls-sym gs
+
+flat-ag : ∀ {A B Q} {L L′ : A → Pos → EmissionSet B} {O O′ : EmissionSet A} d n {Ls Ls′ : List (EmissionSet B)}
+        → (∀ a p → AgreeTo Q (L a p) (L′ a p)) → AgreeTo Q O O′ → Pointwise (AgreeTo Q) Ls Ls′
+        → AgreeTo Q (Flat.RowT L O d n Ls) (Flat.RowT L′ O′ d n Ls′)
+flat-ag {Q = Q} d n la ao ls = trunc-to (join-ag Q (flat-to Q d n la ao ls) (flat-to Q d n (la-sym la) (AgreeTo-sym ao) (ls-sym ls)))
+
+switch-ag : ∀ {A B Q} {L L′ : A → Pos → EmissionSet B} {O O′ : EmissionSet A} d n {Ls Ls′ : List (EmissionSet B)}
           → (∀ a p → AgreeTo Q (L a p) (L′ a p)) → AgreeTo Q O O′ → Pointwise (AgreeTo Q) Ls Ls′
-          → AgreeTo Q (Flat.RowT L O d n Ls) (Flat.RowT L′ O′ d n Ls′)
-  switch-ag : ∀ {A B Q} {L L′ : A → Pos → EmissionSet B} {O O′ : EmissionSet A} d n {Ls Ls′ : List (EmissionSet B)}
-            → (∀ a p → AgreeTo Q (L a p) (L′ a p)) → AgreeTo Q O O′ → Pointwise (AgreeTo Q) Ls Ls′
-            → AgreeTo Q (SwitchF.RowT L O d n Ls) (SwitchF.RowT L′ O′ d n Ls′)
-  exhaust-ag : ∀ {A B Q} {L L′ : A → Pos → EmissionSet B} {O O′ : EmissionSet A} d n {Ls Ls′ : List (EmissionSet B)}
-             → (∀ a p → AgreeTo Q (L a p) (L′ a p)) → AgreeTo Q O O′ → Pointwise (AgreeTo Q) Ls Ls′
-             → AgreeTo Q (ExhaustF.RowT L O d n Ls) (ExhaustF.RowT L′ O′ d n Ls′)
-  bounded-ag : ∀ {A B Q} m {L L′ : A → Pos → EmissionSet B} {O O′ : EmissionSet A} d n Qu {Ls Ls′ : List (EmissionSet B)}
-             → (∀ a p → AgreeTo Q (L a p) (L′ a p)) → AgreeTo Q O O′ → Pointwise (AgreeTo Q) Ls Ls′
-             → AgreeTo Q (BoundedF.RowT m L O d n Qu Ls) (BoundedF.RowT m L′ O′ d n Qu Ls′)
+          → AgreeTo Q (SwitchF.RowT L O d n Ls) (SwitchF.RowT L′ O′ d n Ls′)
+switch-ag {Q = Q} d n la ao ls = trunc-to (join-ag Q (switch-to Q d n la ao ls) (switch-to Q d n (la-sym la) (AgreeTo-sym ao) (ls-sym ls)))
+
+exhaust-ag : ∀ {A B Q} {L L′ : A → Pos → EmissionSet B} {O O′ : EmissionSet A} d n {Ls Ls′ : List (EmissionSet B)}
+           → (∀ a p → AgreeTo Q (L a p) (L′ a p)) → AgreeTo Q O O′ → Pointwise (AgreeTo Q) Ls Ls′
+           → AgreeTo Q (ExhaustF.RowT L O d n Ls) (ExhaustF.RowT L′ O′ d n Ls′)
+exhaust-ag {Q = Q} d n la ao ls =
+  trunc-to (join-ag Q (exhaust-to Q d n la ao ls (la-sym la) (ls-sym ls)) (exhaust-to Q d n (la-sym la) (AgreeTo-sym ao) (ls-sym ls) la ls))
+
+bounded-ag : ∀ {A B Q} m {L L′ : A → Pos → EmissionSet B} {O O′ : EmissionSet A} d n Qu {Ls Ls′ : List (EmissionSet B)}
+           → (∀ a p → AgreeTo Q (L a p) (L′ a p)) → AgreeTo Q O O′ → Pointwise (AgreeTo Q) Ls Ls′
+           → AgreeTo Q (BoundedF.RowT m L O d n Qu Ls) (BoundedF.RowT m L′ O′ d n Qu Ls′)
+bounded-ag {Q = Q} m d n Qu la ao ls =
+  trunc-to (join-ag Q (bounded-to Q m d n Qu la ao ls (la-sym la) (ls-sym ls)) (bounded-to Q m d n Qu (la-sym la) (AgreeTo-sym ao) (ls-sym ls) la ls))
 
 ------------------------------------------------------------------------
 -- By the state
