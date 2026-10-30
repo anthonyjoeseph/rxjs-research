@@ -23,9 +23,9 @@ open import denotation.EmissionSet using (EmissionSet; DenEnv; module Connecting
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; plug; alive; nx; cp;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
-                    closed; CS; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
+                    free; cpAt; cutAt; overAt; closed; CS; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ)
-open import adequacy.Rows using (env; rows; rowsL; pendRows; here; RT; Moves; module Flat)
+open import adequacy.Rows using (TakeR; Kept; stop; env; rows; rowsL; pendRows; here; RT; Moves; module Flat)
 open import adequacy.Up using (≃-refl; any-ʳ++ʳ)
 open import denotation.Laws.Worlds using (Ok; Hots)
 open import adequacy.Bound using (Empty; Good; G; GLn; LnBody; SrcG; Held; MergeG; mergeG-map; shape)
@@ -98,6 +98,7 @@ GoodC : ∀ {R Γ A} → Ctx R Γ A → Set
 GoodC top                                          = ⊤
 GoodC (inMap f c)                                  = GoodC c
 GoodC (inScan f z c)                               = GoodC c
+GoodC (inTake i q w c)                             = GoodC c
 GoodC (inCut l a c)                                = GoodC c
 GoodC (inLn b c)                                   = GoodC c
 GoodC (inOuter (mergeᶠ nothing) f d n q ls c)      = GoodC c
@@ -186,8 +187,8 @@ good-split (inLn b c) s g with good-split c (lnS b s) g
 ... | inj₂ (inj₁ gl) = gc , lnbody-good {ρ = env c} (liv c) b s gl
 ... | inj₂ (inj₂ ())
 good-split (inTake i q w c) s g with good-split c (takeS i q w s) g
-... | _ , gf with unF c _ gf
-... | inj₁ ()
+... | gc , gf with unF c _ gf
+... | inj₁ gm = gc , gm
 ... | inj₂ (inj₁ ())
 ... | inj₂ (inj₂ ())
 good-split (inOuter (mergeᶠ nothing) f d n q ls c) s g with good-split c (flatS (mergeᶠ nothing) f d n q s ls) g
@@ -262,6 +263,24 @@ postulate
 postulate
   scan-owing : ∀ {A B} (f : B → A → B) z {t : EmissionSet A} → Owing t → Owing (Scan.ScanT f z t)
 
+-- A TAKE OF A SOURCE OWING, OWES, while no value has failed: its least
+-- row passes, or is the first failing value, kept or stopped at.
+postulate
+  take-owing : ∀ {A} i (q : A → Bool) {t : EmissionSet A} → Owing t → Owing (TakeR i q free t)
+
+-- A FAILED TAKE PAST ITS STOP OWES: what it keeps of a source owing.
+-- Suspect: a source owing only rows past its failing value keeps none,
+-- while the machine's take stays alive owing only its cut, as a hushing
+-- cold does; one with THE OWED.
+postulate
+  kept-owing : ∀ {A} p {t : EmissionSet A} → Owing t → Owing (Kept p t)
+
+take-owes : ∀ {A} i (q : A → Bool) w {t : EmissionSet A} → Owing t → Owing (TakeR i q w t)
+take-owes i q free       ow = take-owing i q ow
+take-owes i q (cpAt p)   ow = λ em → em stop
+take-owes i q (cutAt p)  ow = kept-owing p ow
+take-owes i q (overAt p) ow = kept-owing p ow
+
 -- A CONNECT WHOSE SOURCE OWES, OWES: a live connect's source row is a
 -- burst pin, an echo while the body runs, or a pin its own connect keeps,
 -- and once the body has ended the body's end is a row of its own.
@@ -273,13 +292,13 @@ upo-liv : ∀ {R Γ A} (c : Ctx R Γ A) → UpO c → liv c ≡ true
 upo-liv top              _ = refl
 upo-liv (inMap f c)      u = upo-liv c u
 upo-liv (inScan f z c)   u = upo-liv c u
+upo-liv (inTake i q w c) u = upo-liv c u
 upo-liv (inCut true a c) u rewrite upo-liv c u = refl
 upo-liv (inLn true c)    u = upo-liv c u
 upo-liv (inOuter (mergeᶠ nothing) f d n q ls c) (_ , u) = upo-liv c u
 upo-liv (inLanes (mergeᶠ nothing) f d n q o pre post c) (_ , _ , _ , _ , u) = upo-liv c u
 upo-liv (inCut false a c) ()
 upo-liv (inLn false c)    ()
-upo-liv (inTake i q w c)  ()
 upo-liv (inOuter (mergeᶠ (just _)) f d n q ls c) ()
 upo-liv (inOuter switchᶠ f d n q ls c)  ()
 upo-liv (inOuter exhaustᶠ f d n q ls c) ()
@@ -295,6 +314,7 @@ need-of : ∀ {R Γ A} (c : Ctx R Γ A) {s : St Γ A} → UpO c → Good [] (plu
 need-of top                                     u g ow so = tt
 need-of (inMap f c)                             u g ow so = need-of c u g (map-owing f ow) so
 need-of (inScan f z c)                          u g ow so = need-of c u g (scan-owing f z ow) so
+need-of (inTake i q w c)                        u g ow so = need-of c u g (take-owes i q w ow) so
 need-of (inCut true a c)                        u g ow so = need-of c u g ow so
 need-of (inLn true c)                           u g ow so = need-of c u g ow so
 need-of (inOuter (mergeᶠ nothing) f d n q ls c) {s} (_ , u) g ow so =
@@ -329,6 +349,7 @@ closed-dead : ∀ {R Γ A} (c : Ctx R Γ A) → GoodC c → closed c ≡ true �
 closed-dead top              _  ()
 closed-dead (inMap f c)      gc cl = closed-dead c gc cl
 closed-dead (inScan f z c)   gc cl = closed-dead c gc cl
+closed-dead (inTake i q w c) gc cl = closed-dead c gc cl
 closed-dead (inCut false a c) _ _  = inj₁ (∧-zeroʳ (liv c))
 closed-dead (inCut true a c) gc cl with closed-dead c gc cl
 ... | inj₁ d = inj₁ (trans (∧-identityʳ (liv c)) d)
@@ -373,7 +394,7 @@ dead-swap (inCut false a c) dd sw g = good-swap c (killed a sw) g
 dead-swap (inCut true a c)  dd sw g =
   dead-swap c (trans (sym (∧-identityʳ (liv c))) dd) (record { node₀ = node₀ sw ; lane₀ = λ () ; body₀ = λ { b (eq , g′ , _) → eq , node₀ sw g′ , tt } ; held₀ = λ () }) g
 dead-swap (inLn b c)        dd sw g = dead-swap c dd (record { node₀ = λ () ; lane₀ = body₀ sw b ; body₀ = λ _ () ; held₀ = λ () }) g
-dead-swap (inTake i q w c)  dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ()) (λ ())) g
+dead-swap (inTake i q w c)  dd sw g = dead-swap c dd (record { node₀ = node₀ sw ; lane₀ = λ () ; body₀ = λ _ () ; held₀ = λ () }) g
 dead-swap (inOuter (mergeᶠ nothing) f d n q ls c) dd sw g =
   dead-swap c dd (record { node₀ = mergeG-map (node₀ sw) (λ x → x) (λ x → x) (λ x → x) (λ x → x) ; lane₀ = λ () ; body₀ = λ _ () ; held₀ = λ () }) g
 dead-swap (inOuter (mergeᶠ (just _)) f d n q ls c) dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ()) (λ ())) g

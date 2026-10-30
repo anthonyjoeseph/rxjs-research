@@ -76,8 +76,7 @@ Each former still handed to its own leaf in `reach` owes a node in
 `adequacy.Bound.G`, its rows and what it owes, and the step arms of the
 nodes it builds. Settled former by former, as each leaf becomes arms.
 
-Members: `beyond-take`, `beyond-bounded`, `beyond-switch`,
-`beyond-exhaust`.
+Members: `beyond-bounded`, `beyond-switch`, `beyond-exhaust`.
 
 #### OWING AS ENTERED
 
@@ -88,7 +87,7 @@ is free: finitely many rows lie before any row, each truncation-closed.
 Settled by bodies, or a good node whose every row has infinitely many
 before.
 
-Members: `owing-row`, `scan-owing`.
+Members: `owing-row`, `scan-owing`, `take-owing`.
 
 #### THE SCAN STEPPED
 
@@ -97,6 +96,16 @@ leads the scanned rows and the rest fold from it; an end rises unfolded.
 Settled when each is a body over `denotation.EmissionSet`'s `Scan.Acc`.
 
 Members: `rise-scan-nx`, `rise-scan-cp`.
+
+#### THE TAKE STEPPED
+
+Untried: a take's search keys and leads its rows, stated whole as a
+connect's is; a value passing or failing, its end, its stop and its cut
+keep `Inv`. Open: whether the child's find bounds the rows before its
+key, which a passing value's `¬ Failed` needs. Settled when each is a body.
+
+Members: `take-ok`, `take-lead`, `rise-take-nx`, `rise-take-fail`,
+`rise-take-cp`, `rise-take-owed`, `abs-stop`, `abs-cut`.
 
 #### THE COMPLETE HALF
 
@@ -134,11 +143,11 @@ Members: `good-of`, `good-done`.
 Suspect: `Owes` reads a live node as owing a row, false for a cold that
 hushes (live, no rows, never ends), and `Rows.Flat` finishes a begun lane
 by `Gone`, which a hushing lane meets vacuously where the entered joiner's
-`Ended` does not. Restate both as a live node owing no end. Then a closed
+`Ended` does not; a failed take past its stop is live owing only its cut. Restate both as a live node owing no end. Then a closed
 of dropped changes nothing owed (`adequacy.AbsOf`). Settled by the
 restatement and a body, or a merge over a hushing lane.
 
-Members: `owes-closed`.
+Members: `owes-closed`, `kept-owing`.
 
 #### THE MARK FOUND
 

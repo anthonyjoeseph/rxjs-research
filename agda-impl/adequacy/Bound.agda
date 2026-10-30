@@ -413,6 +413,7 @@ mutual
   G ρ b doneS                                 = ⊤₁
   G ρ b (mapS f s)                            = G ρ b s
   G ρ b (scanS f z s)                         = G ρ b s
+  G ρ b (takeS i q w s)                       = G ρ b s
   G ρ b (cutS l a s)                          = G ρ (b ∧ l) s
   G ρ b (flatS (mergeᶠ nothing) f d n q o ls) = MergeG (G ρ b o) (GL ρ b ls) ρ b f d n q o ls
   G ρ b (connS k o s)                         = SrcG ρ b (CS.bodyAt k) o × G (Hot (rows ρ o) k ∷ᴬ ρ) b s × Live b (T (CS.closed k) → Empty (rows ρ o))
@@ -465,7 +466,7 @@ mutual
   shape (coldS _ _)                               g = g
   shape (scanS f z s)                             g = shape s g
   shape (lnS _ _)                                 ()
-  shape (takeS _ _ _ _)                           ()
+  shape (takeS i q w s)                           g = shape s g
   shape {v = v} (connS k o b)                     (gs , gb , _) = shapeSrc {v = v} (CS.bodyAt k) o gs , shape b gb , tt
   shape (joinS j true x ib)                       _ = tt₁
   shape (joinS j false x ib)                      _ = tt₁
@@ -804,6 +805,14 @@ postulate
   -- value, stall or close, or its completion owed; a dead cold owes none.
   cold-ok : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) b l → OK (rows ρ (coldS b l)) (seek c (coldS b l))
 
+  -- A TAKE'S SEARCH KEYS ITS ROWS: unfailed, its child's find retagged; a
+  -- failing value's completion owed at its stop; its kept pins after.
+  --
+  -- DEAD ROUTE: retagging its child's `OK` as `scanned` does: a shown
+  --   value passes only while no failing value lies before it, and the
+  --   child's `OK` says nothing of the rows before its key.
+  take-ok : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) i q w (s : St [] A) → Good ρ (takeS i q w s) → OK (rows ρ (takeS i q w s)) (seek c (takeS i q w s))
+
 mutual
   seek-ok : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) (s : St [] A) → Good ρ s → OK (rows ρ s) (seek c s)
   seek-ok c (ofS i p [])       _ = record { from = of-from p i [] ; mark = ⊑-refl _ ; shown = λ eq → _ , refl , of-shows c i p [] eq }
@@ -813,6 +822,7 @@ mutual
   seek-ok c (coldS b l)        _ = cold-ok c b l
   seek-ok c (mapS f s)         g = mapped f (seek (inMap f c) s) (seek-ok (inMap f c) s g)
   seek-ok c (scanS f z s)      g = scanned f z (seek (inScan f z c) s) (seek-ok (inScan f z c) s g)
+  seek-ok c (takeS i q w s)    g = take-ok c i q w s g
   seek-ok c (cutS true attached s)   g = kept (seek (inCut true attached c) s) (seek-ok (inCut true attached c) s g)
   seek-ok {ρ = ρ} c (cutS false a s) _ = seek-off {ρ = ρ} c a s
   seek-ok c (cutS true (attAt p) s)  g =
