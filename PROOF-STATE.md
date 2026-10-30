@@ -76,17 +76,27 @@ Each former still handed to its own leaf in `reach` owes a node in
 `adequacy.Bound.G`, its rows and what it owes, and the step arms of the
 nodes it builds. Settled former by former, as each leaf becomes arms.
 
-Members: `beyond-scan`, `beyond-take`, `beyond-bounded`,
-`beyond-switch`, `beyond-exhaust`.
+Members: `beyond-take`, `beyond-bounded`, `beyond-switch`,
+`beyond-exhaust`.
 
 #### OWING AS ENTERED
 
 Believed: a merge of good parts owing a row owes one with finitely many
-before it. The goal is a negation, so a finitary case split is free:
-finitely many parts lie before any row, each truncation-closed. Settled
-by a body, or a good merge whose every row has infinitely many before.
+before it, and a scan of a source owing a row owes one, its source's
+values having a least. The goal is a negation, so a finitary case split
+is free: finitely many rows lie before any row, each truncation-closed.
+Settled by bodies, or a good node whose every row has infinitely many
+before.
 
-Members: `owing-row`.
+Members: `owing-row`, `scan-owing`.
+
+#### THE SCAN STEPPED
+
+Untried: a scan's rising value is its source's least, so the fold of it
+leads the scanned rows and the rest fold from it; an end rises unfolded.
+Settled when each is a body over `denotation.EmissionSet`'s `Scan.Acc`.
+
+Members: `rise-scan-nx`, `rise-scan-cp`.
 
 #### THE COMPLETE HALF
 

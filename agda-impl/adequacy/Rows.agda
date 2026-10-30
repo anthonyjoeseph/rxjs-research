@@ -16,16 +16,16 @@ open import Data.List using (List; []; _∷_; [_]; _ʳ++_; _++_)
 open import Data.List.Relation.Unary.All using ([]; _∷_; lookup)
 open import Data.Sum using (_⊎_)
 open import Data.Maybe using (just; nothing)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (Σ; _×_; _,_)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (ofᴱ; Events; burst; hush) renaming (end to endᴱ)
 open import denotation.Events using (Pos; Timeline; ix)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; _≺_; _≼_; InE; enter; Truncate; MapT; ⟦_⟧; Ended; module Joining; Den; hot; Proper; DenEnv; module Connecting)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; _≺_; _≼_; InE; enter; Truncate; MapT; ⟦_⟧; Ended; module Joining; module Scan; Den; hot; Proper; DenEnv; module Connecting)
 open import operation.PureObservable using (module Machine; module Driver; Tape; play; ending; over)
-open Machine using (St; Ctx; CS; connS; joinS; coldS; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; load; moved; quiet; pend; ofS; mapS; cutS; lnS; flatS; alive; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; nx; cp) renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
+open Machine using (St; Ctx; CS; connS; joinS; coldS; scanS; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; load; moved; quiet; pend; ofS; mapS; cutS; lnS; flatS; alive; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; nx; cp) renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
 
 ------------------------------------------------------------------------
 -- Rows
@@ -135,6 +135,11 @@ tapeE over              = hush
 _∪_ : ∀ {A} → EmissionSet A → EmissionSet A → EmissionSet A
 (t ∪ u) q e = t q e ⊎ u q e
 
+-- A scan's fold at a position stands on a value of its source there.
+acc-val : ∀ {A B} {f : B → A → B} {z} {t : EmissionSet A} {q b} → Scan.Acc f z t q b → Σ A λ a → t q (out a)
+acc-val (Scan.acc₀ r _)    = _ , r
+acc-val (Scan.acc _ r _ _) = _ , r
+
 -- What a node still owes its parent, under `ρ`, the meaning of every
 -- binder in scope.
 mutual
@@ -143,6 +148,7 @@ mutual
   rows ρ (ofS i p xs)                           = InE (ofᴱ p i xs)
   rows ρ (coldS true l)                         = InE (tapeE l)
   rows ρ (mapS f s)                             = MapT f (rows ρ s)
+  rows ρ (scanS f z s)                          = Scan.ScanT f z (rows ρ s)
   rows ρ (cutS true a s)                        = rows ρ s
   rows ρ (lnS true s)                           = rows ρ s
   rows ρ (flatS (mergeᶠ nothing) f d n q o ls)  = Flat.RowT (λ a → pendRows ρ (f a)) (rows ρ o) d (rowsL ρ ls)
@@ -172,7 +178,7 @@ env (inBody k o c)                       = Hot (rows (env c) o) k ∷ env c
 up : ∀ {R Γ A} → Ctx R Γ A → EmissionSet A → EmissionSet R
 up top                                                H = H
 up (inMap f c)                                        H = up c (MapT f H)
-up (inScan f z c)                                     H = up c ∅
+up (inScan f z c)                                     H = up c (Scan.ScanT f z H)
 up (inCut true a c)                                   H = up c H
 up (inCut false a c)                                  H = up c ∅
 up (inLn true c)                                      H = up c H

@@ -8,7 +8,7 @@
 --
 -- The link is grown one former at a time.  Subscribing to a former not
 -- yet grown hands the rest of the run to that former's own leaf
--- (`beyond-scan` and its siblings), so `reach` is total by pattern
+-- (`beyond-take` and its siblings), so `reach` is total by pattern
 -- matching: growing a former turns its leaf into the arms the link needs
 -- for it, and the coverage checker names every former still owed.
 module adequacy.Sim where
@@ -30,7 +30,7 @@ open import Data.List using (_ʳ++_)
 
 open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Timeline; root; ix; timelineAt; emit; stall; close)
-open import denotation.EmissionSet using (DenEnv; EmissionSet; out; end; MapT; map-out; map-skip; map-pin; map-end; _≼_; enter; ⟦_⟧; Proper)
+open import denotation.EmissionSet using (DenEnv; EmissionSet; out; end; MapT; map-out; map-skip; map-pin; map-end; module Scan; _≼_; enter; ⟦_⟧; Proper)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd)
 open import denotation.Laws.Worlds using (GoodEnv; Lawful)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
@@ -53,7 +53,7 @@ open import adequacy.LaneCp using (rise-lane-cp)
 open import adequacy.AbsOf using (abs-of)
 open import denotation.Read using (Meets)
 open import adequacy.Owes using (Swap; good-swap)
-open import adequacy.Enter using (enter-map; enter-merge; flat-∅)
+open import adequacy.Enter using (enter-map; enter-scan; enter-merge; flat-∅)
 
 postulate
   -- A GOOD TREE'S CONNECT SOURCE READS LAWFULLY: its rows reachable, one
@@ -66,6 +66,7 @@ postulate
 env-good : ∀ {R Γ A} (c : Ctx R Γ A) {s} → GoodC c → Good []ᴬ (plug c s) → GoodEnv (env c)
 env-good top                                         _  _ ()
 env-good (inMap f c)                                 gc g = env-good c gc g
+env-good (inScan f z c)                              gc g = env-good c gc g
 env-good (inCut l a c)                               gc g = env-good c gc g
 env-good (inLn b c)                                  gc g = env-good c gc g
 env-good (inOuter (mergeᶠ nothing) f d n q ls c)     gc g = env-good c gc g
@@ -76,7 +77,6 @@ env-good (inOuter exhaustᶠ f d n q ls c)             ()
 env-good (inLanes (mergeᶠ (just _)) f d n q o pre post c) ()
 env-good (inLanes switchᶠ f d n q o pre post c)      ()
 env-good (inLanes exhaustᶠ f d n q o pre post c)     ()
-env-good (inScan f z c)                              ()
 env-good (inTake i q w c)                            ()
 env-good (inSrc k b c)                               gc g = env-good c gc g
 env-good (inBody k o c) {s}                          gc g = good-cons (src-lawful k o s c g) (env-good c gc g)
@@ -94,6 +94,13 @@ sub-map c f s q p (inv g (uc , _ , ok , so)) = inv (good-swap c sw g) (uc , tt ,
   where
     sw : Swap (env c) doneS (mapS f doneS)
     sw = record { same = (λ ()) ⇄ (λ { (map-out ()) ; (map-skip ()) ; (map-pin ()) ; (map-end ()) }) ; live≡ = refl ; node = λ _ x → x ; lane = λ _ () ; body = λ _ _ () ; held = λ () }
+
+-- A scan entered: its source pending under it.
+sub-scan : ∀ {R Γ A B} (c : Ctx R Γ B) (f : B → A → B) z s q p → Sim ⟨ c , pend (scan f z s) q , subscribing , p ⟩ [] ⟨ inScan f z c , pend s q , subscribing , q ⟩
+sub-scan c f z s q p (inv g (uc , _ , ok , so)) = inv (good-swap c sw g) (uc , tt , ok , srcO-≃ c (enter-scan (env c) f z s q) so) , silent (vis-≃ (up-≃ c (enter-scan (env c) f z s q)))
+  where
+    sw : Swap (env c) doneS (scanS f z doneS)
+    sw = record { same = (λ ()) ⇄ (λ { (Scan.sval (Scan.acc₀ () _)) ; (Scan.sval (Scan.acc _ () _ _)) ; (Scan.sstep ()) ; (Scan.spin ()) ; (Scan.send ()) }) ; live≡ = refl ; node = λ _ x → x ; lane = λ _ () ; body = λ _ _ () ; held = λ () }
 
 -- A merge entered: its outer pending under it, attached at `p`, nothing begun.
 sub-merge : ∀ {R Γ A B} (c : Ctx R Γ B) f (s : Obs Timeline Γ A) q p
@@ -240,6 +247,12 @@ rise-ln true  c s e p i with alive s in al
 rise-ln true  c s e p (inv g (_ , _ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
 rise-ln true  c s e p (inv g (uc , lc , os , _ , af , en , so)) | true = inv g (uc , lc , os , tt , af , en , srcO-≃ c (risen (env c) s e p al) so) , silent ≃-refl
 
+-- A SCAN'S VALUE FOLDED: the source's least value leaves as the fold of
+-- it, and the rest of the source's rows fold from there.
+postulate
+  rise-scan-nx : ∀ {R Γ A B} (f : B → A → B) z (c : Ctx R Γ B) s a p → Sim ⟨ inScan f z c , s , rising (nx a) , p ⟩ [] ⟨ c , scanS f (f z a) s , rising (nx (f z a)) , p ⟩
+  rise-scan-cp : ∀ {R Γ A B} (f : B → A → B) z (c : Ctx R Γ B) s p → Sim ⟨ inScan f z c , s , rising cp , p ⟩ [] ⟨ c , scanS f z s , rising cp , p ⟩
+
 postulate
   -- AN OUTER'S VALUE BEGINS ITS LANE.
   rise-outer-nx : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p
@@ -269,13 +282,14 @@ postulate
 rise-sim : ∀ {R Γ A} {k′ : Conf R} {sh t} (c : Ctx R Γ A) (s : St Γ A) e p → stepᴹ ⟨ c , s , rising e , p ⟩ ≡ moved k′ sh t → Sim ⟨ c , s , rising e , p ⟩ sh k′
 rise-sim top            s e p refl = rise-top s e p
 rise-sim (inMap f c)    s e p refl = rise-map f c s e p
+rise-sim (inScan f z c) s (nx a) p refl = rise-scan-nx f z c s a p
+rise-sim (inScan f z c) s cp     p refl = rise-scan-cp f z c s p
 rise-sim (inCut l a c)  s e p refl = rise-cut l a c s e p
 rise-sim (inLn b c)     s e p refl = rise-ln b c s e p
 rise-sim (inOuter (mergeᶠ nothing) f d n q ls c) o (nx a) p refl = rise-outer-nx f d n q ls c o a p
 rise-sim (inOuter (mergeᶠ nothing) f d n q ls c) o cp     p refl = rise-outer-cp f d n q ls c o p
 rise-sim (inLanes (mergeᶠ nothing) f d n q o pre post c) s (nx b) p refl = rise-lane-nx f d n q o pre post c s b p
 rise-sim (inLanes (mergeᶠ nothing) f d n q o pre post c) s cp     p refl = rise-lane-cp f d n q o pre post c s p
-rise-sim c@(inScan _ _ _)                      s e p eq i = ⊥-elim (proj₁ (good-split c s (good i)))
 rise-sim c@(inTake _ _ _ _)                    s e p eq i = ⊥-elim (proj₁ (good-split c s (good i)))
 rise-sim c@(inOuter (mergeᶠ (just _)) _ _ _ _ _ _) s e p eq i = ⊥-elim (proj₁ (good-split c s (good i)))
 rise-sim c@(inOuter switchᶠ _ _ _ _ _ _)       s e p eq i = ⊥-elim (proj₁ (good-split c s (good i)))
@@ -453,8 +467,6 @@ Runs k = ∀ {rs} → Steps k rs → Shows* (RT k) (conv rs)
 -- Each owes what growing it would: its node's place in `adequacy.Bound.G`,
 -- its rows and what it owes, and the step arms of the nodes it builds.
 postulate
-  beyond-scan    : ∀ {R Γ A B} (c : Ctx R Γ B) (f : B → A → B) z (s : Obs Timeline Γ A) q′ p
-                 → Inv ⟨ c , pend (scan f z s) q′ , subscribing , p ⟩ → Runs ⟨ c , pend (scan f z s) q′ , subscribing , p ⟩
   beyond-take    : ∀ {R Γ A} (c : Ctx R Γ A) b q (s : Obs Timeline Γ A) q′ p
                  → Inv ⟨ c , pend (takeWhile b q s) q′ , subscribing , p ⟩ → Runs ⟨ c , pend (takeWhile b q s) q′ , subscribing , p ⟩
   beyond-bounded : ∀ {R Γ A B} (c : Ctx R Γ B) m (f : A → Obs Timeline Γ B) s q′ p
@@ -510,7 +522,7 @@ reach-pend c (map f s)                       q p i = within tt λ { refl → sub
 reach-pend c (flatMap (mergeᶠ nothing) f s)  q p i = within tt λ { refl → sub-merge c f s q p }
 reach-pend c (connected x)                   q p i = within (join-mv c x q {p}) (join-sim c x q p)
 reach-pend c (cold x)                        q p i = driven tt λ { refl → sub-cold c x q p }
-reach-pend c (scan f z s)                    q p i = beyond (beyond-scan c f z s q p i)
+reach-pend c (scan f z s)                    q p i = within tt λ { refl → sub-scan c f z s q p }
 reach-pend c (takeWhile b w s)               q p i = beyond (beyond-take c b w s q p i)
 reach-pend c (flatMap (mergeᶠ (just m)) f s) q p i = beyond (beyond-bounded c m f s q p i)
 reach-pend c (flatMap switchᶠ f s)           q p i = beyond (beyond-switch c f s q p i)

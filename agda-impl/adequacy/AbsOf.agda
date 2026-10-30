@@ -119,6 +119,7 @@ search-plug t fd = lands-just (seek top t) (seek-lands top t refl) fd
 up-plug : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → GoodC c → up c (rows (env c) s) ≃ rows [] (plug c s)
 up-plug top                s _  = ≃-refl
 up-plug (inMap f c)        s gc = up-plug c (mapS f s) gc
+up-plug (inScan f z c)     s gc = up-plug c (scanS f z s) gc
 up-plug (inCut true a c)   s gc = up-plug c (cutS true a s) gc
 up-plug (inCut false a c)  s gc = up-plug c (cutS false a s) gc
 up-plug (inLn true c)      s gc = up-plug c (lnS true s) gc
@@ -127,7 +128,6 @@ up-plug (inOuter (mergeᶠ nothing) f d n q ls c) s gc = up-plug c (flatS (merge
 up-plug (inLanes (mergeᶠ nothing) f d n q o pre post c) s gc =
   ≃-trans (up-≃ c (≡→≃ (cong (Flat.RowT _ (rows (env c) o) d) (sym (rowsL-ʳ++ pre)))))
           (up-plug c (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post)) gc)
-up-plug (inScan f z c)     s ()
 up-plug (inTake i q w c)   s ()
 up-plug (inOuter (mergeᶠ (just m)) f d n q ls c) s ()
 up-plug (inOuter switchᶠ f d n q ls c)           s ()
@@ -142,7 +142,7 @@ up-plug (inBody k o c)     s gc = up-plug c (connS k o s) gc
 off-up : ∀ {R Γ A} (c : Ctx R Γ A) {t u : EmissionSet A} → liv c ≡ false → up c t ≃ up c u
 off-up top               ()
 off-up (inMap f c)       d = off-up c d
-off-up (inScan f z c)    d = ≃-refl
+off-up (inScan f z c)    d = off-up c d
 off-up (inCut true a c)  d = off-up c (trans (sym (∧-identityʳ (liv c))) d)
 off-up (inCut false a c) d = ≃-refl
 off-up (inLn true c)     d = off-up c d
@@ -186,6 +186,7 @@ owes-split : ∀ {R Γ A} (c : Ctx R Γ A) {s : St Γ A} → closed c ≡ false 
            → UpO c × Owes (env c) s × SrcO c (rows (env c) s)
 owes-split top              cl op g ow = _ , ow , tt
 owes-split (inMap f c)      cl op g ow = owes-split c cl _ g ow
+owes-split (inScan f z c)   cl op g ow = owes-split c cl _ g ow
 owes-split (inCut true a c) cl op g ow = owes-split c cl _ g ow
 owes-split (inCut false a c) () op g ow
 owes-split (inLn true c)    cl op g ow = owes-split c cl _ g ow
@@ -202,7 +203,6 @@ owes-split (inSrc k b c) {s} cl op g ow with owes-split c (∨-false (CS.closed 
 ... | u , (os , ob) , so = u , os , ob , so
 owes-split (inBody k o c) cl op g ow with owes-split c cl _ g ow
 ... | u , (oo , os) , so = (oo , u) , os , so
-owes-split c@(inScan _ _ _)    {s} cl op g ow = ⊥-elim (proj₁ (good-split c s g))
 owes-split c@(inTake _ _ _ _)  {s} cl op g ow = ⊥-elim (proj₁ (good-split c s g))
 owes-split c@(inOuter (mergeᶠ (just _)) _ _ _ _ _ _) {s} cl op g ow = ⊥-elim (proj₁ (good-split c s g))
 owes-split c@(inOuter switchᶠ _ _ _ _ _ _)           {s} cl op g ow = ⊥-elim (proj₁ (good-split c s g))
