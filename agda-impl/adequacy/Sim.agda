@@ -14,20 +14,20 @@ open import Data.List using (List; []; _∷_; [_]; null; _++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.List.Relation.Unary.Any using () renaming (here to hd)
-open import Data.Sum using (_⊎_; inj₁)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Maybe using (just; nothing)
-open import Data.Product using (Σ; _,_)
+open import Data.Product using (Σ; _,_; _×_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Data.List using (_ʳ++_)
 
 open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Events using (Timeline; root; ix; timelineAt; emit; stall; close)
+open import denotation.Events using (Timeline; root; Pos; ix; timelineAt; emit; stall; close)
 open import denotation.EmissionSet using (EmissionSet; out; end; MapT; map-out; map-skip; map-pin; map-end; module Scan;
-  module TakeWhile; _≼_; enter; ⟦_⟧; Proper)
-open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd)
-open import denotation.Laws.Worlds using (GoodEnv; Lawful; Hots)
+  module TakeWhile; _≼_; _≺_; enter; ⟦_⟧; Proper; Den; Silent; Dep)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≼-or-≻; entered-few)
+open import denotation.Laws.Worlds using (GoodEnv; Lawful; Hots; InvAt)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; over; opening)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; found; Mark; ofM; attM;
@@ -37,7 +37,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
-open import adequacy.Rows using (env; rows; pendRows; Closed; RT; toEv; Visible; Vis; Past; Plus; old; new; _≃_; _⇄_; silent; shown;
+open import adequacy.Rows using (env; rows; pendRows; Closed; RT; toEv; Vis; Past; Lowest; Beyond; into; back; narrow; Plus; old; new; _≃_; _⇄_; silent; shown;
   Steps; Shows*; Shows*-≃; ≃-sym; conv; []; _∷_; tau; val; fin)
 open import adequacy.Bound using (Good; G; Rooted; mergeG₀)
 open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
@@ -45,7 +45,7 @@ open import adequacy.Skip using (After)
 open import adequacy.Inv using (Inv; inv; good; Sim; Ends; open-alive)
 open import adequacy.LaneCp using (rise-lane-cp)
 open import adequacy.AbsOf using (abs-of)
-open import denotation.Read using (Meets)
+open import denotation.Read using (Meets; Run; Visible; loud; []; _∷_)
 open import adequacy.Swap using (Swap; good-swap)
 open import adequacy.Enter using (enter-map; enter-scan; enter-merge; flat-∅; enter-bounded; enter-switch; enter-exhaust; bounded-∅; switch-∅; exhaust-∅)
 
@@ -666,44 +666,76 @@ reach ⟨ c , connS k o b , subscribing , p ⟩           i = within tt (sub-sim
 reach ⟨ c , joinS j g x ib , subscribing , p ⟩        i = within tt (sub-sim c (joinS j g x ib) p tt)
 reach ⟨ c , s , absorbed , p ⟩                        i = linked (abs-link c s p i)
 
+-- A silent step keeps the visible rows.
+sim-tau : ∀ {R} {k k′ : Conf R} {t} → Inv k → Driver.step R k ≡ Driver.silent t k′ → Inv k′ × Vis (RT k) ≃ Vis (RT k′)
+sim-tau {k = k} i e = go (reach k i)
+  where
+    go : Reach k → _
+    go (driven h sim) with sim e i
+    ... | i′ , silent q = i′ , q
+    go (within mv sim) with τ-moved (stepᴹ k) mv e
+    ... | _ , eq with sim eq i
+    ...   | i′ , silent q = i′ , q
+
+-- A value shows the least visible row and drops it.
+sim-val : ∀ {R} {k k′ : Conf R} {t p a} → Inv k → Driver.step R k ≡ Driver.value t p a k′
+        → Inv k′ × Lowest (RT k) p (out a) × Vis (Past p (RT k)) ≃ Vis (RT k′)
+sim-val {k = k} i e = go (reach k i)
+  where
+    go : Reach k → _
+    go (driven h sim) = ⊥-elim (hush-val h e)
+    go (within mv sim) with val-moved (stepᴹ k) mv e
+    ... | _ , _ , eq with sim eq i
+    ...   | i′ , shown v lt q = i′ , (v , λ {q} {e′} → lt {q} {e′}) , q
+
+-- The end shows the least visible row.
+sim-fin : ∀ {R} {k : Conf R} {p} → Inv k → Driver.step R k ≡ Driver.complete p → Lowest (RT k) p end
+sim-fin {k = k} i e = go (reach k i)
+  where
+    go : Reach k → _
+    go (driven h sim) = ⊥-elim (hush-fin h e)
+    go (within mv sim) with fin-moved (stepᴹ k) mv e
+    ... | _ , _ , _ , eq with sim eq i
+    ...   | _ , shown v lt _ = v , λ {q} {e′} → lt {q} {e′}
+
 -- Whatever a run from `k` shows, a reader of its rows is shown.
 sound-from : ∀ {R} {k : Conf R} → Inv k → ∀ {rs} → Steps k rs → Shows* (RT k) (conv rs)
-sound-from {k = k} i st with reach k i
-... | driven h sim  = go st
-  where
-    go : ∀ {rs} → Steps k rs → Shows* (RT k) (conv rs)
-    go [] = []
-    go (tau e st′) with sim e i
-    ... | i′ , silent q = Shows*-≃ (≃-sym q) (sound-from i′ st′)
-    go (val e _) = ⊥-elim (hush-val h e)
-    go (fin e)   = ⊥-elim (hush-fin h e)
-... | within mv sim = go st
-  where
-    go : ∀ {rs} → Steps k rs → Shows* (RT k) (conv rs)
-    go [] = []
-    go (tau e st′) with τ-moved (stepᴹ k) mv e
-    ... | _ , eq with sim eq i
-    ...   | i′ , silent q = Shows*-≃ (≃-sym q) (sound-from i′ st′)
-    go (val e st′) with val-moved (stepᴹ k) mv e
-    ... | _ , _ , eq with sim eq i
-    ...   | i′ , shown v lt q = (v , lt) ∷ Shows*-≃ (≃-sym q) (sound-from i′ st′)
-    go (fin e) with fin-moved (stepᴹ k) mv e
-    ... | _ , _ , _ , eq with sim eq i
-    ...   | _ , shown v lt _ = (v , lt) ∷ []
+sound-from i []          = []
+sound-from i (tau e st)  = let (i′ , q) = sim-tau i e in Shows*-≃ (≃-sym q) (sound-from i′ st)
+sound-from i (val e st)  = let (i′ , l , q) = sim-val i e in l ∷ Shows*-≃ (≃-sym q) (sound-from i′ st)
+sound-from i (fin e)     = sim-fin i e ∷ []
 
-postulate
-  -- THE SKIPS BETWEEN: a program's least visible rows, shown in
-  -- turn, are the shown rows of a reader's run, the skips before each met
-  -- on the way.  Finitely many rows lie before each (`adequacy.Enter`),
-  -- and none visible past the end; the run lists them in position order.
-  --
-  -- DEAD ROUTE: reading the rows off the oracle's listing
-  --   (`quickcheck.Tabled.Exact.tabled-exact`): it is exact only uncut, and
-  --   its horizon is a fixed time, so a cold source ticking past it, or an
-  --   infinite one, cuts the listing and it claims nothing.  The horizon a
-  --   run needs is the position of its last shown row, which the listing
-  --   does not take.
-  met-of-shown : ∀ {R} {o : PureObs [] R} {vs} → Shows* (enter (⟦ o ⟧ []ᴬ) root) vs → Meets (enter (⟦ o ⟧ []ᴬ) root) vs
+-- THE SKIPS BETWEEN: least visible rows shown in turn are a reader's run.
+-- Each has few rows before it, as it is entered, and no end before it,
+-- since only silent rows follow an end.
+module _ {A} (d : Den A) (p₀ : Pos) (quiet : ∀ {c y e} → enter d p₀ c end → enter d p₀ y e → c ≺ y → Silent e) where
+  private
+    t : EmissionSet A
+    t = enter d p₀
+
+    dep : ∀ {q e k e′} → Visible e → Dep q e k e′
+    dep {e = out _} _ = tt
+    dep {e = end}   _ = tt
+
+  run-of : ∀ c {vs} → Shows* (Beyond t c) vs → Run t c vs
+  run-of c [] = []
+  run-of c (_∷_ {p = p} ((x , vi) , lt) rest) =
+    (((tp , proper) , entered-few d p₀ (dep vi) tp) , vi , cq , λ tk vk ck → lt (back c tk ck , vk))
+    ∷ run-of (just p) (Shows*-≃ (narrow c cq) rest)
+    where
+      tp = proj₁ (into c x)
+      cq = proj₂ (into c x)
+      proper : ∀ {k} → t k end → p ≼ k
+      proper {k} tk with ≼-or-≻ p k
+      ... | inj₁ le = le
+      ... | inj₂ kp = ⊥-elim (loud vi (quiet tk tp kp))
+
+-- Only silent rows follow a program's end.
+quiet-root : ∀ {R} (o : PureObs [] R) {c y e} → enter (⟦ o ⟧ []ᴬ) root c end → enter (⟦ o ⟧ []ᴬ) root y e → c ≺ y → Silent e
+quiet-root o = InvAt.quiet (inv-⟦⟧ o []ᴬ (λ ()) root (tt , λ ()))
+
+met-of-shown : ∀ {R} {o : PureObs [] R} {vs} → Shows* (enter (⟦ o ⟧ []ᴬ) root) vs → Meets (enter (⟦ o ⟧ []ᴬ) root) vs
+met-of-shown {o = o} = run-of (⟦ o ⟧ []ᴬ) root (quiet-root o) nothing
 
 -- THE SOUND HALF: what the engine shows, a subscriber to the program's
 -- rows is shown.

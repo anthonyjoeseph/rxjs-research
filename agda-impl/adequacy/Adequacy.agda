@@ -19,6 +19,7 @@ open Machine using (load)
 open import denotation.Read using (Meets)
 open import adequacy.Rows using (Steps; conv)
 open import adequacy.Sim using (sound)
+open import adequacy.Complete using (complete)
 
 -- The rows a reader of `o`'s emission set, subscribed at the root, meets
 -- first.
@@ -31,8 +32,6 @@ Sound o = ∀ {rs} → Steps (load o) rs → Met o (conv rs)
 Complete : ∀ {R} → PureObs [] R → Set₁
 Complete o = ∀ {rs} → Met o rs → Σ _ λ rs′ → Steps (load o) rs′ × conv rs′ ≡ rs
 
-postulate
-  complete : ∀ {R} (o : PureObs [] R) → Complete o
 
 adequacy : ∀ {R} (o : PureObs [] R) → Sound o × Complete o
 adequacy o = (λ st → sound st) , complete o
