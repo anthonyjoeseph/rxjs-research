@@ -414,12 +414,13 @@ mutual
   G ρ b (mapS f s)                            = G ρ b s
   G ρ b (cutS l a s)                          = G ρ (b ∧ l) s
   G ρ b (flatS (mergeᶠ nothing) f d n q o ls) = MergeG (G ρ b o) (GL ρ b ls) ρ b f d n q o ls
-  G ρ b (connS k o s)                         = SrcG ρ b (CS.bodyAt k) o × G (Hot (rows ρ o) k ∷ᴬ ρ) b s
+  G ρ b (connS k o s)                         = SrcG ρ b (CS.bodyAt k) o × G (Hot (rows ρ o) k ∷ᴬ ρ) b s × Live b (T (CS.closed k) → Empty (rows ρ o))
   G ρ b (joinS j true x ib)                   = Live₁ b (Fed ib (enter (lookup ρ x) j))
   G ρ b (joinS j false x ib)                  = Live₁ b (Fed ib ∅)
   G ρ b _                                     = ⊥₁
 
-  -- A connect's source: still owed while its body subscribes, then good.
+  -- A connect's source: still owed while its body subscribes, then good;
+  -- once its connect has seen it complete, owing nothing.
   SrcG : ∀ {Γ A} → DenEnv Γ → Bool → Maybe Pos → St Γ A → Set₁
   SrcG ρ b (just _) s = Held s
   SrcG ρ b nothing  s          = G ρ b s
@@ -446,9 +447,9 @@ GoodL ρ = GL ρ true
 GoodLn : ∀ {Γ A} → DenEnv Γ → St Γ A → Set₁
 GoodLn ρ = GLn ρ true
 
--- Live, a fortiori of the right shape.
+-- Live, a fortiori of the right shape, which reads no environment.
 mutual
-  shape : ∀ {Γ A} {ρ : DenEnv Γ} {v} (s : St Γ A) → G ρ v s → G ρ false s
+  shape : ∀ {Γ A} {ρ ρ′ : DenEnv Γ} {v} (s : St Γ A) → G ρ v s → G ρ′ false s
   shape (pend o _)                                  ()
   shape (ofS i p xs)                              g = g
   shape doneS                                     g = g
@@ -463,19 +464,19 @@ mutual
   shape (scanS _ _ _)                             ()
   shape (lnS _ _)                                 ()
   shape (takeS _ _ _ _)                           ()
-  shape {v = v} (connS k o b)                     (gs , gb) = shapeSrc {v = v} (CS.bodyAt k) o gs , shape b gb
+  shape {v = v} (connS k o b)                     (gs , gb , _) = shapeSrc {v = v} (CS.bodyAt k) o gs , shape b gb , tt
   shape (joinS j true x ib)                       _ = tt₁
   shape (joinS j false x ib)                      _ = tt₁
 
-  shapeSrc : ∀ {Γ A} {ρ : DenEnv Γ} {v} m (s : St Γ A) → SrcG ρ v m s → SrcG ρ false m s
+  shapeSrc : ∀ {Γ A} {ρ ρ′ : DenEnv Γ} {v} m (s : St Γ A) → SrcG ρ v m s → SrcG ρ′ false m s
   shapeSrc (just _) s g = g
   shapeSrc {v = v} nothing s g  = shape {v = v} s g
 
-  shapeL : ∀ {Γ A} {ρ : DenEnv Γ} {v} (ls : List (St Γ A)) → GL ρ v ls → GL ρ false ls
+  shapeL : ∀ {Γ A} {ρ ρ′ : DenEnv Γ} {v} (ls : List (St Γ A)) → GL ρ v ls → GL ρ′ false ls
   shapeL []       _        = tt₁
   shapeL (s ∷ ls) (g , gs) = shapeLn s g , shapeL ls gs
 
-  shapeLn : ∀ {Γ A} {ρ : DenEnv Γ} {v} (s : St Γ A) → GLn ρ v s → GLn ρ false s
+  shapeLn : ∀ {Γ A} {ρ ρ′ : DenEnv Γ} {v} (s : St Γ A) → GLn ρ v s → GLn ρ′ false s
   shapeLn {v = v} (lnS l (cutS l′ a s)) (eq , g , _) = eq , shape {v = v ∧ l} s g , tt
   shapeLn (lnS _ (pend _ _))              ()
   shapeLn (lnS _ (coldS _ _))           ()
