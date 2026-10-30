@@ -18,7 +18,7 @@ open import denotation.EmissionSet using (EmissionSet; Truncate; Reach; MapT; ma
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; St; CS; free; cpAt; cutAt; overAt; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (TakeR; kept; Stops; stop; left; up; env; rows; Hot; pendRows; Vis; Plus; old; new; rowsL;
-  Gone; Lanes; Each; module Flat; _≃_; _⇄_; ≃-sym)
+  Gone; Lanes; Each; module Flat; module BoundedF; module SwitchF; module ExhaustF; _≃_; _⇄_; ≃-sym)
 
 open _≃_
 
@@ -183,6 +183,15 @@ conn-≃ {A} {B} r es eb = go es eb ⇄ go (≃-sym es) (≃-sym eb)
 
 -- A BINDER'S MEANING, UP TO THE SAME ROWS: a body reads its binder only
 -- through the rows it holds, so the same rows bound give the same body.
+-- The same outer and the same lanes: the same joiner part way through.
+postulate
+  bounded-≃ : ∀ {A B : Set} m (L : A → Pos → EmissionSet B) {O O′ : EmissionSet A} {d n q} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′
+            → BoundedF.RowT m L O d n q Ls ≃ BoundedF.RowT m L O′ d n q Ls′
+  switch-≃  : ∀ {A B : Set} (L : A → Pos → EmissionSet B) {O O′ : EmissionSet A} {d n} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′
+            → SwitchF.RowT L O d n Ls ≃ SwitchF.RowT L O′ d n Ls′
+  exhaust-≃ : ∀ {A B : Set} (L : A → Pos → EmissionSet B) {O O′ : EmissionSet A} {d n} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′
+            → ExhaustF.RowT L O d n Ls ≃ ExhaustF.RowT L O′ d n Ls′
+
 -- By induction over the state and, under a pending subscription, over
 -- the program's meaning, every operator reading its inputs row by row.
 postulate
@@ -199,12 +208,12 @@ up-≃ (inLn true c)                                    eq = up-≃ c eq
 up-≃ (inLn false c)                                   eq = ≃-refl
 up-≃ (inTake i q w c)                                 eq = up-≃ c (take-≃ i q w eq)
 up-≃ (inOuter (mergeᶠ nothing) f d n q ls c)          eq = up-≃ c (row-≃ (λ a → pendRows (env c) (f a)) eq (≈ᴸ-refl (rowsL (env c) ls)))
-up-≃ (inOuter (mergeᶠ (just _)) f d n q ls c)         eq = ≃-refl
-up-≃ (inOuter switchᶠ f d n q ls c)                   eq = ≃-refl
-up-≃ (inOuter exhaustᶠ f d n q ls c)                  eq = ≃-refl
+up-≃ (inOuter (mergeᶠ (just m)) f d n q ls c)         eq = up-≃ c (bounded-≃ m (λ a → pendRows (env c) (f a)) eq (≈ᴸ-refl (rowsL (env c) ls)))
+up-≃ (inOuter switchᶠ f d n q ls c)                   eq = up-≃ c (switch-≃ (λ a → pendRows (env c) (f a)) eq (≈ᴸ-refl (rowsL (env c) ls)))
+up-≃ (inOuter exhaustᶠ f d n q ls c)                  eq = up-≃ c (exhaust-≃ (λ a → pendRows (env c) (f a)) eq (≈ᴸ-refl (rowsL (env c) ls)))
 up-≃ (inLanes (mergeᶠ nothing) f d n q o pre post c)  eq = up-≃ c (row-≃ (λ a → pendRows (env c) (f a)) ≃-refl (ʳ++-≈ (rowsL (env c) pre) (eq ∷ ≈ᴸ-refl (rowsL (env c) post))))
-up-≃ (inLanes (mergeᶠ (just _)) f d n q o pre post c) eq = ≃-refl
-up-≃ (inLanes switchᶠ f d n q o pre post c)           eq = ≃-refl
-up-≃ (inLanes exhaustᶠ f d n q o pre post c)          eq = ≃-refl
+up-≃ (inLanes (mergeᶠ (just m)) f d n q o pre post c) eq = up-≃ c (bounded-≃ m (λ a → pendRows (env c) (f a)) ≃-refl (ʳ++-≈ (rowsL (env c) pre) (eq ∷ ≈ᴸ-refl (rowsL (env c) post))))
+up-≃ (inLanes switchᶠ f d n q o pre post c)           eq = up-≃ c (switch-≃ (λ a → pendRows (env c) (f a)) ≃-refl (ʳ++-≈ (rowsL (env c) pre) (eq ∷ ≈ᴸ-refl (rowsL (env c) post))))
+up-≃ (inLanes exhaustᶠ f d n q o pre post c)          eq = up-≃ c (exhaust-≃ (λ a → pendRows (env c) (f a)) ≃-refl (ʳ++-≈ (rowsL (env c) pre) (eq ∷ ≈ᴸ-refl (rowsL (env c) post))))
 up-≃ (inSrc k b c)                                    eq = up-≃ c (conn-≃ _ eq (rows-hot k (env c) b eq))
 up-≃ (inBody k o c)                                   eq = up-≃ c (conn-≃ _ ≃-refl eq)

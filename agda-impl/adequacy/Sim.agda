@@ -5,24 +5,18 @@
 -- shows the least and drops it, by mode: a subscription entered as the
 -- rows of what it begins, a rise read up one frame, a mark run where the
 -- search's bound says it leads.
---
--- The link is grown one former at a time.  Subscribing to a former not
--- yet grown hands the rest of the run to that former's own leaf
--- (`beyond-bounded` and its siblings), so `reach` is total by pattern
--- matching: growing a former turns its leaf into the arms the link needs
--- for it, and the coverage checker names every former still owed.
 module adequacy.Sim where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; not)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.Nat using (_≡ᵇ_)
-open import Data.List using (List; []; _∷_; [_]; null)
+open import Data.Nat using (_≡ᵇ_; _<ᵇ_; pred)
+open import Data.List using (List; []; _∷_; [_]; null; _++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.List.Relation.Unary.Any using () renaming (here to hd)
-open import Data.Sum using (_⊎_)
+open import Data.Sum using (_⊎_; inj₁)
 open import Data.Maybe using (just; nothing)
-open import Data.Product using (Σ; _,_; proj₁)
+open import Data.Product using (Σ; _,_)
 open import Data.Unit using (⊤; tt)
 open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -47,13 +41,13 @@ open import adequacy.Rows using (env; rows; Closed; here; RT; toEv; Visible; Vis
 open import adequacy.Bound using (Good; G; Rooted; mergeG₀)
 open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
 open import adequacy.Skip using (After)
-open import adequacy.Inv using (Inv; inv; good; Sim; Ends; GoodC; good-split; open-alive)
+open import adequacy.Inv using (Inv; inv; good; Sim; Ends; open-alive)
 open import adequacy.Owes using (srcO-≃)
 open import adequacy.LaneCp using (rise-lane-cp)
 open import adequacy.AbsOf using (abs-of)
 open import denotation.Read using (Meets)
 open import adequacy.Owes using (Swap; good-swap)
-open import adequacy.Enter using (enter-map; enter-scan; enter-merge; flat-∅)
+open import adequacy.Enter using (enter-map; enter-scan; enter-merge; flat-∅; enter-bounded; enter-switch; enter-exhaust; bounded-∅; switch-∅; exhaust-∅)
 
 postulate
   -- A GOOD TREE'S CONNECT SOURCE READS LAWFULLY: its rows reachable, one
@@ -63,23 +57,17 @@ postulate
 
 -- A good tree's environment keeps the invariant: each binder a
 -- connect's source.
-env-good : ∀ {R Γ A} (c : Ctx R Γ A) {s} → GoodC c → Good []ᴬ (plug c s) → GoodEnv (env c)
-env-good top                                         _  _ ()
-env-good (inMap f c)                                 gc g = env-good c gc g
-env-good (inScan f z c)                              gc g = env-good c gc g
-env-good (inCut l a c)                               gc g = env-good c gc g
-env-good (inLn b c)                                  gc g = env-good c gc g
-env-good (inOuter (mergeᶠ nothing) f d n q ls c)     gc g = env-good c gc g
-env-good (inLanes (mergeᶠ nothing) f d n q o pre post c) gc g = env-good c gc g
-env-good (inOuter (mergeᶠ (just _)) f d n q ls c)    ()
-env-good (inOuter switchᶠ f d n q ls c)              ()
-env-good (inOuter exhaustᶠ f d n q ls c)             ()
-env-good (inLanes (mergeᶠ (just _)) f d n q o pre post c) ()
-env-good (inLanes switchᶠ f d n q o pre post c)      ()
-env-good (inLanes exhaustᶠ f d n q o pre post c)     ()
-env-good (inTake i q w c)                            gc g = env-good c gc g
-env-good (inSrc k b c)                               gc g = env-good c gc g
-env-good (inBody k o c) {s}                          gc g = good-cons (src-lawful k o s c g) (env-good c gc g)
+env-good : ∀ {R Γ A} (c : Ctx R Γ A) {s} → Good []ᴬ (plug c s) → GoodEnv (env c)
+env-good top                                         _ ()
+env-good (inMap f c)                                 g = env-good c g
+env-good (inScan f z c)                              g = env-good c g
+env-good (inCut l a c)                               g = env-good c g
+env-good (inLn b c)                                  g = env-good c g
+env-good (inOuter op f d n q ls c)                   g = env-good c g
+env-good (inLanes op f d n q o pre post c)           g = env-good c g
+env-good (inTake i q w c)                            g = env-good c g
+env-good (inSrc k b c)                               g = env-good c g
+env-good (inBody k o c) {s}                          g = good-cons (src-lawful k o s c g) (env-good c g)
 
 ------------------------------------------------------------------------
 -- Subscribing
@@ -119,12 +107,51 @@ sub-merge {A = A} {B} c f s q p (inv g (uc , _ , ok , so)) = inv (good-swap c sw
   where
     -- The outer about to enter at `p`: inside its own entry, nothing begun.
     rt : Rooted (env c) (rows (env c) (cutS true (attAt q) doneS)) []
-    rt = record { o₀ = s ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c (proj₁ (good-split c _ g)) g) q ok ; sub = λ () ; qs = [] ; roots = tt }
+    rt = record { o₀ = s ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c g) q ok ; sub = λ () ; qs = [] ; roots = tt }
     node′ : ∀ v → G (env c) v (doneS {A = B}) → G (env c) v (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt q) (doneS {A = A})) [])
     node′ true  _ = record { outer = tt₁ ; lanesG = tt₁ ; fresh = refl ; count = refl ; spent = λ () ; rooted = rt }
     node′ false _ = mergeG₀ tt₁ tt₁ refl
     sw : Swap (env c) doneS (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt q) doneS) [])
     sw = record { same = ≃-sym (flat-∅ _ false) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () ; held = λ () }
+
+-- A BOUNDED MERGE ENTERED: its outer pending under it, nothing begun or queued.
+sub-bounded : ∀ {R Γ A B} (c : Ctx R Γ B) m (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) q p
+          → Sim ⟨ c , pend (flatMap (mergeᶠ (just m)) f s) q , subscribing , p ⟩ [] ⟨ inCut true (attAt q) (inOuter (mergeᶠ (just m)) f false 0 [] [] c) , pend s q , subscribing , q ⟩
+sub-bounded {A = A} {B} c m f s q p (inv g (uc , _ , ok , so)) = inv (good-swap c sw g) ((tt , uc) , tt , ok , srcO-≃ c (enter-bounded (env c) m f s q) so) , silent (vis-≃ (up-≃ c (enter-bounded (env c) m f s q)))
+  where
+    rt : Rooted (env c) (rows (env c) (cutS true (attAt q) doneS)) []
+    rt = record { o₀ = s ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c g) q ok ; sub = λ () ; qs = [] ; roots = tt }
+    node′ : ∀ v → G (env c) v (doneS {A = B}) → G (env c) v (flatS (mergeᶠ (just m)) f false 0 [] (cutS true (attAt q) (doneS {A = A})) [])
+    node′ true  _ = (record { outer = tt₁ ; lanesG = tt₁ ; fresh = refl ; count = refl ; spent = λ () ; rooted = rt } , inj₁ refl)
+    node′ false _ = (mergeG₀ tt₁ tt₁ refl , tt)
+    sw : Swap (env c) doneS (flatS (mergeᶠ (just m)) f false 0 [] (cutS true (attAt q) doneS) [])
+    sw = record { same = ≃-sym (bounded-∅ m _ false 0) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () ; held = λ () }
+
+-- A SWITCH ENTERED: its outer pending under it, nothing begun.
+sub-switch : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) q p
+          → Sim ⟨ c , pend (flatMap switchᶠ f s) q , subscribing , p ⟩ [] ⟨ inCut true (attAt q) (inOuter switchᶠ f false 0 [] [] c) , pend s q , subscribing , q ⟩
+sub-switch {A = A} {B} c f s q p (inv g (uc , _ , ok , so)) = inv (good-swap c sw g) ((tt , uc) , tt , ok , srcO-≃ c (enter-switch (env c) f s q) so) , silent (vis-≃ (up-≃ c (enter-switch (env c) f s q)))
+  where
+    rt : Rooted (env c) (rows (env c) (cutS true (attAt q) doneS)) []
+    rt = record { o₀ = s ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c g) q ok ; sub = λ () ; qs = [] ; roots = tt }
+    node′ : ∀ v → G (env c) v (doneS {A = B}) → G (env c) v (flatS switchᶠ f false 0 [] (cutS true (attAt q) (doneS {A = A})) [])
+    node′ true  _ = record { outer = tt₁ ; lanesG = tt₁ ; fresh = refl ; count = refl ; spent = λ () ; rooted = rt }
+    node′ false _ = mergeG₀ tt₁ tt₁ refl
+    sw : Swap (env c) doneS (flatS switchᶠ f false 0 [] (cutS true (attAt q) doneS) [])
+    sw = record { same = ≃-sym (switch-∅ _ false 0) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () ; held = λ () }
+
+-- AN EXHAUST ENTERED: its outer pending under it, nothing begun.
+sub-exhaust : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) q p
+          → Sim ⟨ c , pend (flatMap exhaustᶠ f s) q , subscribing , p ⟩ [] ⟨ inCut true (attAt q) (inOuter exhaustᶠ f false 0 [] [] c) , pend s q , subscribing , q ⟩
+sub-exhaust {A = A} {B} c f s q p (inv g (uc , _ , ok , so)) = inv (good-swap c sw g) ((tt , uc) , tt , ok , srcO-≃ c (enter-exhaust (env c) f s q) so) , silent (vis-≃ (up-≃ c (enter-exhaust (env c) f s q)))
+  where
+    rt : Rooted (env c) (rows (env c) (cutS true (attAt q) doneS)) []
+    rt = record { o₀ = s ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c g) q ok ; sub = λ () ; qs = [] ; roots = tt }
+    node′ : ∀ v → G (env c) v (doneS {A = B}) → G (env c) v (flatS exhaustᶠ f false 0 [] (cutS true (attAt q) (doneS {A = A})) [])
+    node′ true  _ = record { outer = tt₁ ; lanesG = tt₁ ; fresh = refl ; count = refl ; spent = λ () ; rooted = rt }
+    node′ false _ = mergeG₀ tt₁ tt₁ refl
+    sw : Swap (env c) doneS (flatS exhaustᶠ f false 0 [] (cutS true (attAt q) doneS) [])
+    sw = record { same = ≃-sym (exhaust-∅ _ false 0) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () ; held = λ () }
 
 postulate
   -- A CONNECT ENTERED: its body pending under `ix 0`, its source pending
@@ -291,6 +318,60 @@ postulate
                      (if alive s then ⟨ c , flatS (mergeᶠ nothing) f d n q o (pre Data.List.ʳ++ s ∷ post) , rising (nx b) , p ⟩
                                  else ⟨ c , flatS (mergeᶠ nothing) f d n q o (pre Data.List.ʳ++ s ∷ post) , absorbed , p ⟩)
 
+  -- A BOUNDED MERGE'S OUTER VALUE BEGINS ITS LANE WITH ROOM, ELSE WAITS.
+  rise-bounded-nx : ∀ {R Γ A B} m f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p
+                  → Sim ⟨ inOuter (mergeᶠ (just m)) f d n q ls c , o , rising (nx a) , p ⟩ []
+                        (if n <ᵇ m then start c (mergeᶠ (just m)) f d n q o ls a p
+                                   else ⟨ c , flatS (mergeᶠ (just m)) f d n (q ++ [ a ]) o ls , absorbed , p ⟩)
+  -- A BOUNDED MERGE'S OUTER END, SHOWN ONLY WITH NO LANE RUNNING OR WAITING.
+  rise-bounded-cp : ∀ {R Γ A B} m f d n q ls (c : Ctx R Γ B) (o : St Γ A) p
+                 → Sim ⟨ inOuter (mergeᶠ (just m)) f d n q ls c , o , rising cp , p ⟩ [] ⟨ c , flatS (mergeᶠ (just m)) f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
+  -- A BOUNDED MERGE'S LANE VALUE PASSES, UNLESS THE LANE IS OVER.
+  rise-bounded-lane-nx : ∀ {R Γ A B} m f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s b p
+                      → Sim ⟨ inLanes (mergeᶠ (just m)) f d n q o pre post c , s , rising (nx b) , p ⟩ []
+                            (if alive s then ⟨ c , flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s ∷ post) , rising (nx b) , p ⟩
+                                        else ⟨ c , flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
+  -- A BOUNDED MERGE'S LANE END FREES ITS SLOT FOR THE FIRST WAITING VALUE.
+  rise-bounded-lane-cp : ∀ {R Γ A B} m f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s p
+                      → Sim ⟨ inLanes (mergeᶠ (just m)) f d n q o pre post c , s , rising cp , p ⟩ []
+                            (if alive s then dequeue c (mergeᶠ (just m)) f d (pred n) q o (pre ʳ++ ended s ∷ post) p
+                                        else ⟨ c , flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
+  -- A SWITCH'S OUTER VALUE CUTS EVERY RUNNING LANE AND BEGINS ITS OWN.
+  rise-switch-nx : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p ls′ (t : Torn) → killAll ls ≡ (ls′ , t)
+                 → Sim ⟨ inOuter switchᶠ f d n q ls c , o , rising (nx a) , p ⟩ [] (start c switchᶠ f d 0 q o ls′ a p)
+  -- A SWITCH'S OUTER END, SHOWN ONLY WITH NO LANE RUNNING.
+  rise-switch-cp : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) p
+                → Sim ⟨ inOuter switchᶠ f d n q ls c , o , rising cp , p ⟩ [] ⟨ c , flatS switchᶠ f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
+  -- A SWITCH'S LANE VALUE PASSES, UNLESS THE LANE IS OVER.
+  rise-switch-lane-nx : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s b p
+                     → Sim ⟨ inLanes switchᶠ f d n q o pre post c , s , rising (nx b) , p ⟩ []
+                           (if alive s then ⟨ c , flatS switchᶠ f d n q o (pre ʳ++ s ∷ post) , rising (nx b) , p ⟩
+                                       else ⟨ c , flatS switchᶠ f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
+  -- A SWITCH'S LANE END.
+  rise-switch-lane-cp : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s p
+                     → Sim ⟨ inLanes switchᶠ f d n q o pre post c , s , rising cp , p ⟩ []
+                           (if alive s then dequeue c switchᶠ f d (pred n) q o (pre ʳ++ ended s ∷ post) p
+                                       else ⟨ c , flatS switchᶠ f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
+  -- AN EXHAUST'S OUTER VALUE BEGINS ITS LANE WITH NONE RUNNING.
+  rise-exhaust-run : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p → (n ≡ᵇ 0) ≡ true
+                   → Sim ⟨ inOuter exhaustᶠ f d n q ls c , o , rising (nx a) , p ⟩ [] (start c exhaustᶠ f d n q o ls a p)
+  -- AN EXHAUST'S OUTER VALUE, A LANE RUNNING, IS DROPPED.
+  rise-exhaust-drop : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p → (n ≡ᵇ 0) ≡ false
+                    → Sim ⟨ inOuter exhaustᶠ f d n q ls c , o , rising (nx a) , p ⟩ [] ⟨ c , flatS exhaustᶠ f d n q o ls , absorbed , p ⟩
+  -- AN EXHAUST'S OUTER END, SHOWN ONLY WITH NO LANE RUNNING.
+  rise-exhaust-cp : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) p
+                 → Sim ⟨ inOuter exhaustᶠ f d n q ls c , o , rising cp , p ⟩ [] ⟨ c , flatS exhaustᶠ f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
+  -- AN EXHAUST'S LANE VALUE PASSES, UNLESS THE LANE IS OVER.
+  rise-exhaust-lane-nx : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s b p
+                      → Sim ⟨ inLanes exhaustᶠ f d n q o pre post c , s , rising (nx b) , p ⟩ []
+                            (if alive s then ⟨ c , flatS exhaustᶠ f d n q o (pre ʳ++ s ∷ post) , rising (nx b) , p ⟩
+                                        else ⟨ c , flatS exhaustᶠ f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
+  -- AN EXHAUST'S LANE END.
+  rise-exhaust-lane-cp : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s p
+                      → Sim ⟨ inLanes exhaustᶠ f d n q o pre post c , s , rising cp , p ⟩ []
+                            (if alive s then dequeue c exhaustᶠ f d (pred n) q o (pre ʳ++ ended s ∷ post) p
+                                        else ⟨ c , flatS exhaustᶠ f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
+
   -- A SOURCE'S VALUE FEEDS ITS BODY.
   rise-src-nx : ∀ {R Γ X B} (k : CS) (b : St (X ∷ Γ) B) (c : Ctx R Γ B) s a p
               → Sim ⟨ inSrc k b c , s , rising (nx a) , p ⟩ [] ⟨ c , connS k s (feed (hd refl) p (nx a) b) , absorbed , p ⟩
@@ -325,12 +406,21 @@ rise-sim (inTake i w free c)       s cp p refl = rise-take-cp i w c s p
 rise-sim (inTake i w (cpAt r) c)   s e  p refl = rise-take-owed i w (cpAt r) c s e p (λ ())
 rise-sim (inTake i w (cutAt r) c)  s e  p refl = rise-take-owed i w (cutAt r) c s e p (λ ())
 rise-sim (inTake i w (overAt r) c) s e  p refl = rise-take-owed i w (overAt r) c s e p (λ ())
-rise-sim c@(inOuter (mergeᶠ (just _)) _ _ _ _ _ _) s e p eq i = ⊥-elim (proj₁ (good-split c s (good i)))
-rise-sim c@(inOuter switchᶠ _ _ _ _ _ _)       s e p eq i = ⊥-elim (proj₁ (good-split c s (good i)))
-rise-sim c@(inOuter exhaustᶠ _ _ _ _ _ _)      s e p eq i = ⊥-elim (proj₁ (good-split c s (good i)))
-rise-sim c@(inLanes (mergeᶠ (just _)) _ _ _ _ _ _ _ _) s e p eq i = ⊥-elim (proj₁ (good-split c s (good i)))
-rise-sim c@(inLanes switchᶠ _ _ _ _ _ _ _ _)   s e p eq i = ⊥-elim (proj₁ (good-split c s (good i)))
-rise-sim c@(inLanes exhaustᶠ _ _ _ _ _ _ _ _)  s e p eq i = ⊥-elim (proj₁ (good-split c s (good i)))
+rise-sim (inOuter (mergeᶠ (just m)) f d n q ls c) o (nx a) p refl = rise-bounded-nx m f d n q ls c o a p
+rise-sim (inOuter (mergeᶠ (just m)) f d n q ls c) o cp     p refl = rise-bounded-cp m f d n q ls c o p
+rise-sim (inLanes (mergeᶠ (just m)) f d n q o pre post c) s (nx b) p refl = rise-bounded-lane-nx m f d n q o pre post c s b p
+rise-sim (inLanes (mergeᶠ (just m)) f d n q o pre post c) s cp     p refl = rise-bounded-lane-cp m f d n q o pre post c s p
+rise-sim (inOuter switchᶠ f d n q ls c) o (nx a) p eq with killAll ls in kl
+rise-sim (inOuter switchᶠ f d n q ls c) o (nx a) p refl | ls′ , t = rise-switch-nx f d n q ls c o a p ls′ t kl
+rise-sim (inOuter switchᶠ f d n q ls c) o cp     p refl = rise-switch-cp f d n q ls c o p
+rise-sim (inLanes switchᶠ f d n q o pre post c) s (nx b) p refl = rise-switch-lane-nx f d n q o pre post c s b p
+rise-sim (inLanes switchᶠ f d n q o pre post c) s cp     p refl = rise-switch-lane-cp f d n q o pre post c s p
+rise-sim (inOuter exhaustᶠ f d n q ls c) o (nx a) p eq with n ≡ᵇ 0 in z
+rise-sim (inOuter exhaustᶠ f d n q ls c) o (nx a) p refl | true  = rise-exhaust-run f d n q ls c o a p z
+rise-sim (inOuter exhaustᶠ f d n q ls c) o (nx a) p refl | false = rise-exhaust-drop f d n q ls c o a p z
+rise-sim (inOuter exhaustᶠ f d n q ls c) o cp     p refl = rise-exhaust-cp f d n q ls c o p
+rise-sim (inLanes exhaustᶠ f d n q o pre post c) s (nx b) p refl = rise-exhaust-lane-nx f d n q o pre post c s b p
+rise-sim (inLanes exhaustᶠ f d n q o pre post c) s cp     p refl = rise-exhaust-lane-cp f d n q o pre post c s p
 rise-sim (inSrc k b c)  s (nx a) p refl = rise-src-nx k b c s a p
 rise-sim (inSrc k b c)  s cp     p refl = rise-src-cp k b c s p
 rise-sim (inBody k o c) s (nx x) p refl = rise-body-nx k o c s x p
@@ -514,17 +604,6 @@ module _ {R : Set} where
 Runs : ∀ {R} → Conf R → Set₁
 Runs k = ∀ {rs} → Steps k rs → Shows* (RT k) (conv rs)
 
--- SUBSCRIBING TO A FORMER NOT YET GROWN: the run from there, its own leaf.
--- Each owes what growing it would: its node's place in `adequacy.Bound.G`,
--- its rows and what it owes, and the step arms of the nodes it builds.
-postulate
-  beyond-bounded : ∀ {R Γ A B} (c : Ctx R Γ B) m (f : A → Obs Timeline Γ B) s q′ p
-                 → Inv ⟨ c , pend (flatMap (mergeᶠ (just m)) f s) q′ , subscribing , p ⟩ → Runs ⟨ c , pend (flatMap (mergeᶠ (just m)) f s) q′ , subscribing , p ⟩
-  beyond-switch  : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) s q′ p
-                 → Inv ⟨ c , pend (flatMap switchᶠ f s) q′ , subscribing , p ⟩ → Runs ⟨ c , pend (flatMap switchᶠ f s) q′ , subscribing , p ⟩
-  beyond-exhaust : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) s q′ p
-                 → Inv ⟨ c , pend (flatMap exhaustᶠ f s) q′ , subscribing , p ⟩ → Runs ⟨ c , pend (flatMap exhaustᶠ f s) q′ , subscribing , p ⟩
-
 join-mv : ∀ {R Γ A} (c : Ctx R Γ A) (x : A ∈ Γ) q {p} → Mv (stepᴹ ⟨ c , pend (connected x) q , subscribing , p ⟩)
 join-mv c x q with closedUp c x
 ... | true  = tt
@@ -536,12 +615,10 @@ join-sim c x q p eq with closedUp c x in cu
 join-sim c x q p refl | true  = sub-joined c x q p cu
 join-sim c x q p refl | false = sub-join c x q p cu
 
--- Where a step goes: on, linked a step at a time, engine or driver, or
--- into a former's leaf.
+-- Where a step goes: on, linked a step at a time, engine or driver.
 data Reach {R} (k : Conf R) : Set₁ where
   within : Mv (stepᴹ k) → (∀ {k′ sh t} → stepᴹ k ≡ moved k′ sh t → Sim k sh k′) → Reach k
   driven : Hush (Driver.step R k) → (∀ {t k′} → Driver.step R k ≡ Driver.silent t k′ → Sim k [] k′) → Reach k
-  beyond : Runs k → Reach k
 
 -- A step linked, read off the step itself, so a search's outcome can be
 -- abstracted in it.
@@ -575,9 +652,9 @@ reach-pend c (connected x)                   q p i = within (join-mv c x q {p}) 
 reach-pend c (cold x)                        q p i = driven tt λ { refl → sub-cold c x q p }
 reach-pend c (scan f z s)                    q p i = within tt λ { refl → sub-scan c f z s q p }
 reach-pend c (takeWhile b w s)               q p i = within tt λ { refl → sub-take c b w s q p }
-reach-pend c (flatMap (mergeᶠ (just m)) f s) q p i = beyond (beyond-bounded c m f s q p i)
-reach-pend c (flatMap switchᶠ f s)           q p i = beyond (beyond-switch c f s q p i)
-reach-pend c (flatMap exhaustᶠ f s)          q p i = beyond (beyond-exhaust c f s q p i)
+reach-pend c (flatMap (mergeᶠ (just m)) f s) q p i = within tt λ { refl → sub-bounded c m f s q p }
+reach-pend c (flatMap switchᶠ f s)           q p i = within tt λ { refl → sub-switch c f s q p }
+reach-pend c (flatMap exhaustᶠ f s)          q p i = within tt λ { refl → sub-exhaust c f s q p }
 reach-pend c (connect s b)                   q p i = within tt λ { refl → sub-connect c s b q p }
 reach-pend c (defer l)                       q p i = within tt λ { refl → sub-defer c l q p }
 
@@ -599,7 +676,6 @@ reach ⟨ c , s , absorbed , p ⟩                        i = linked (abs-link c
 
 sound-from : ∀ {R} {k : Conf R} → Inv k → Runs k
 sound-from {k = k} i st with reach k i
-... | beyond b      = b st
 ... | driven h sim  = go st
   where
     go : ∀ {rs} → Steps k rs → Shows* (RT k) (conv rs)

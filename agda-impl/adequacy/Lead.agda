@@ -122,8 +122,8 @@ data Ext {R} {Γ′ A′} (c′ : Ctx R Γ′ A′) : ∀ {Γ A} → Ctx R Γ A 
   eCut   : ∀ {Γ A} {l a} {c : Ctx R Γ A} → Ext c′ (inCut l a c) → Ext c′ c
   eTake  : ∀ {Γ A} {i q w} {c : Ctx R Γ A} → Ext c′ (inTake i q w c) → Ext c′ c
   eLn    : ∀ {Γ A} {b} {c : Ctx R Γ A} → Ext c′ (inLn b c) → Ext c′ c
-  eOuter : ∀ {Γ A B} {f d n q ls} {c : Ctx R Γ B} → Ext c′ (inOuter {A = A} (mergeᶠ nothing) f d n q ls c) → Ext c′ c
-  eLanes : ∀ {Γ A B} {f d n q} {o : St Γ A} {pre post} {c : Ctx R Γ B} → Ext c′ (inLanes (mergeᶠ nothing) f d n q o pre post c) → Ext c′ c
+  eOuter : ∀ {Γ A B} {op f d n q ls} {c : Ctx R Γ B} → Ext c′ (inOuter {A = A} op f d n q ls c) → Ext c′ c
+  eLanes : ∀ {Γ A B} {op f d n q} {o : St Γ A} {pre post} {c : Ctx R Γ B} → Ext c′ (inLanes op f d n q o pre post c) → Ext c′ c
   eSrc   : ∀ {Γ X B} {k} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} → Ext c′ (inSrc k b c) → Ext c′ c
   eBody  : ∀ {Γ X B} {k} {o : St Γ X} {c : Ctx R Γ B} → Ext c′ (inBody k o c) → Ext c′ c
 
@@ -483,6 +483,16 @@ postulate
   take-lead : ∀ {R A} v (c : Ctx R [] A) i q w (s : St [] A) → G (env c) v (takeS i q w s)
             → Leads v c (rows (env c) (takeS i q w s)) (kids c (takeS i q w s))
 
+  -- A JOINER'S SEARCH LEADS, a bounded merge, a switch or an exhaust as a
+  -- merge's does: the raced find, every other part past it.  Stated whole,
+  -- as `bounded-ok` and its siblings are.
+  bounded-lead : ∀ {R A B} v (c : Ctx R [] B) m (f : A → Obs Timeline [] B) d n q (o : St [] A) ls → G (env c) v (flatS (mergeᶠ (just m)) f d n q o ls)
+               → Leads v c (rows (env c) (flatS (mergeᶠ (just m)) f d n q o ls)) (kids c (flatS (mergeᶠ (just m)) f d n q o ls))
+  switch-lead  : ∀ {R A B} v (c : Ctx R [] B) (f : A → Obs Timeline [] B) d n q (o : St [] A) ls → G (env c) v (flatS switchᶠ f d n q o ls)
+               → Leads v c (rows (env c) (flatS switchᶠ f d n q o ls)) (kids c (flatS switchᶠ f d n q o ls))
+  exhaust-lead : ∀ {R A B} v (c : Ctx R [] B) (f : A → Obs Timeline [] B) d n q (o : St [] A) ls → G (env c) v (flatS exhaustᶠ f d n q o ls)
+               → Leads v c (rows (env c) (flatS exhaustᶠ f d n q o ls)) (kids c (flatS exhaustᶠ f d n q o ls))
+
 own-lead : ∀ {R Γ A} v (c : Ctx R Γ A) (s : St Γ A) → G (env c) v s → Leads v c (rows (env c) s) (ownBest c s (own s))
 own-lead true  c (ofS i p [])         _ = stop , λ { cl _ refl → tt , tie (p ++ [ last ]) refl (⊑-refl _) (hit at-end tt) }
 own-lead true  c (ofS i p (x ∷ xs))   _ = stop , λ { cl _ refl → tt , tie (p ++ [ ix i ]) refl (⊑-refl _) (hit {e = out x} at-out (of-out c {i} {p} {x} {xs} cl)) }
@@ -532,9 +542,9 @@ mutual
   kids-lead v c (ofS _ _ _)      _ = tt₁
   kids-lead v c doneS            _ = tt₁
   kids-lead v c (pend _ _)         _ = tt₁
-  kids-lead v c (flatS (mergeᶠ (just _)) _ _ _ _ _ _) ()
-  kids-lead v c (flatS switchᶠ _ _ _ _ _ _)           ()
-  kids-lead v c (flatS exhaustᶠ _ _ _ _ _ _)          ()
+  kids-lead v c (flatS (mergeᶠ (just m)) f d n q o ls) g = bounded-lead v c m f d n q o ls g
+  kids-lead v c (flatS switchᶠ f d n q o ls)           g = switch-lead v c f d n q o ls g
+  kids-lead v c (flatS exhaustᶠ f d n q o ls)          g = exhaust-lead v c f d n q o ls g
   kids-lead v c (lnS _ _)        ()
   kids-lead true  c (scanS f z s) g = scan-leads true f z (seek (inScan f z c) s) (seek-ok (inScan f z c) s g) (seek-lead true (inScan f z c) s g)
   kids-lead false c (scanS f z s) g = scan-leads false f z (seek (inScan f z c) s) tt (seek-lead false (inScan f z c) s g)
