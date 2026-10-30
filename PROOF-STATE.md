@@ -132,13 +132,13 @@ Members: `take-leadᶜ`, `rise-take-nx`, `rise-take-fail`,
 
 #### THE SILENT RUN, FINITE
 
-Open: short of a row a reader meets next, a run takes finitely many silent
-steps. Rows dropped is no fuel (an of's run drops none); the fuel must be
-state-level — the rows still held by ofs before the met one, by `Few`.
-Settled by a body, or a program whose engine stalls silently forever before
-a row its emission set holds.
+Short of a row a reader meets next, a run is fuelled by the rows at or
+before it strictly past its clock. Open: whether the clock (the least mark
+due once absorbed, else the run's position) never runs back, and whether
+steps passing no such row are few. Settled by bodies, or a program whose
+engine stalls silently forever before a row its emission set holds.
 
-Members: `silent-finite`.
+Members: `clock-mono`, `still-finite`.
 
 #### THE GOOD TREE KEPT
 

@@ -5,31 +5,39 @@
 -- before.
 module adequacy.Complete where
 
+open import Data.Bool using (true; false; if_then_else_)
 open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _<?_; s≤s; z≤n)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred; <-≤-trans; n≮0; m≤n⇒m≤1+n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
 open import Induction.WellFounded using (Acc; acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; subst; subst₂; sym; trans)
+open import Relation.Nullary using (Dec; yes; no)
 
-open import denotation.Events using (Pos; root)
-open import denotation.EmissionSet using (Ev; out; end; EmissionSet; enter; ⟦_⟧; Seen)
+open import denotation.Events using (Pos; root; _≟ᵖ_)
+open import denotation.EmissionSet using (Ev; out; end; EmissionSet; enter; ⟦_⟧; Seen; _≼_)
 open import denotation.Laws.Modulus using (≼-antisym)
 open import denotation.Laws.Worlds using (InvAt)
 open import denotation.Laws using (inv-⟦⟧)
 open import denotation.Read using (Run; Meets; Visible; loud; cursor; []; _∷_)
 import denotation.Read as Read
 open import operation.PureObservable using (PureObs; module Machine; module Driver)
-open Machine using (Conf; load; nx; cp) renaming (Shown to Shownᴹ)
+open Machine using (Conf; load; nx; cp; absorbed) renaming (Shown to Shownᴹ)
+open import operation.Key using (Key; at; _<ᴷ_; clash)
 open import adequacy.Rows using (Steps; conv; RT; Vis; Past; Lowest; Beyond; into; back; narrow; past-≃; _≃_; ≃-sym; []; tau;
   val; fin)
 open _≃_
 open import adequacy.Up using (≃-refl; ≃-trans)
 open import adequacy.Inv using (Inv; inv)
 open import adequacy.Sim using (sim-tau; sim-val; sim-fin; quiet-root; drained-quiet)
+open import adequacy.Bound using (_⊑_; ⊑i; ⊑-trans; ≼-≢)
 
 -- A run from `k` to `k′` showing `rs`.
 data Path {R : Set} : Conf R → Shownᴹ R → Conf R → Set₁ where
@@ -56,16 +64,66 @@ data Next {R : Set} (k : Conf R) (p : Pos) : Ev R → Set₁ where
 _⇜_ : ∀ {R} → Conf R → Conf R → Set₁
 _⇜_ {R} k′ k = Σ _ λ τ → Driver.step R k ≡ Driver.silent τ k′
 
+_▸τ_ : ∀ {R} {k k′ k″ : Conf R} {rs} → Path k rs k′ → k″ ⇜ k′ → Path k rs k″
+[]        ▸τ (_ , e) = tau e []
+tau e pth ▸τ st      = tau e (pth ▸τ st)
+val e pth ▸τ st      = val e (pth ▸τ st)
+
+-- THE RUN'S CLOCK: the least mark due once everything is absorbed; mid-run,
+-- where the run is.
+Clock : ∀ {R} → Conf R → Key
+Clock k with Conf.mode k | Machine.next k
+... | absorbed | just κ = κ
+... | _        | _      = at (Conf.pos k)
+
+-- `k′` a silent step on from `k`, its clock passing no row of `t` at or
+-- before `p`.
+Still : ∀ {R} → EmissionSet R → Pos → Conf R → Conf R → Set₁
+Still t p k′ k = k′ ⇜ k × (∀ {q e} → t q e → q ≼ p → Clock k <ᴷ at q ≡ true → Clock k′ <ᴷ at q ≡ true)
+
+-- Of `qs`, those strictly past `κ`.
+ahead : Key → List Pos → ℕ
+ahead κ []       = 0
+ahead κ (q ∷ qs) = if κ <ᴷ at q then suc (ahead κ qs) else ahead κ qs
+
+-- Strictly past a later key: strictly past an earlier one.
+past-earlier : ∀ {κ κ′} q → κ ⊑ κ′ → κ′ <ᴷ at q ≡ true → κ <ᴷ at q ≡ true
+past-earlier {κ} q h p with κ <ᴷ at q in e
+... | true  = refl
+... | false = ⊥-elim (clash p (_⊑_.un (⊑-trans {at q} {κ} (⊑i e) h)))
+
+ahead-mono : ∀ {κ κ′} → κ ⊑ κ′ → ∀ qs → ahead κ′ qs ≤ ahead κ qs
+ahead-mono h [] = z≤n
+ahead-mono {κ} {κ′} h (q ∷ qs) with κ′ <ᴷ at q in e′ | κ <ᴷ at q in e
+... | true  | true  = s≤s (ahead-mono h qs)
+... | true  | false = ⊥-elim (clash (past-earlier q h e′) e)
+... | false | true  = m≤n⇒m≤1+n (ahead-mono h qs)
+... | false | false = ahead-mono h qs
+
+-- A later clock passing a listed row: fewer ahead.
+ahead-drop : ∀ {κ κ′ q qs} → κ ⊑ κ′ → q ∈ qs → κ <ᴷ at q ≡ true → κ′ <ᴷ at q ≡ false → ahead κ′ qs < ahead κ qs
+ahead-drop {qs = _ ∷ qs} h (here refl) p n rewrite p | n = s≤s (ahead-mono h qs)
+ahead-drop {κ} {κ′} {qs = r ∷ _} h (there m) p n with κ′ <ᴷ at r in e′ | κ <ᴷ at r in e
+... | true  | true  = s≤s (ahead-drop h m p n)
+... | true  | false = ⊥-elim (clash (past-earlier r h e′) e)
+... | false | true  = m≤n⇒m≤1+n (ahead-drop h m p n)
+... | false | false = ahead-drop h m p n
+
 postulate
-  -- SILENT RUNS ARE FINITE: short of a row a reader meets next, a run
-  -- takes finitely many silent steps.  Few rows lie before a met one, and
-  -- each of's run before it is one of them.
-  -- DEAD ROUTE: a measure on the rows a silent step drops.  `of-next` reads
-  --   an of's run as a full `≃` on rows, as do the subscribes and the climbs,
-  --   so most silent steps drop no row and the measure never moves; a
-  --   strengthened `Moves.silent` tracking dropped rows would fuel nothing.
-  silent-finite : ∀ {R} (o : PureObs [] R) {rs k p e} → Path (load o) rs k
-                → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ]) → Acc _⇜_ k
+  -- THE CLOCK NEVER RUNS BACK: short of a row a reader meets next, a silent
+  -- step's clock is no earlier.  Mid-run the run's position leads every
+  -- mark due, and every mark a step makes lies at or past it.
+  -- DEAD ROUTE: the least mark due as the clock throughout.  A lane begun
+  --   by an outer's value makes marks under that value, before the outer's
+  --   next mark, so mid-run the least key falls.
+  clock-mono : ∀ {R} (o : PureObs [] R) {rs k k′ p e} → Path (load o) rs k
+             → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ]) → k′ ⇜ k → Clock k ⊑ Clock k′
+
+  -- STILL STEPS ARE FEW: short of a row a reader meets next, a run whose
+  -- clock passes no row at or before it takes finitely many steps — the
+  -- climbs, the subscribes, and the marks of what nothing above shows.
+  still-finite : ∀ {R} (o : PureObs [] R) {rs k p e} → Path (load o) rs k
+               → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ]) → Acc (Still (enter (⟦ o ⟧ []ᴬ) root) p) k
 
 module _ {R : Set} (o : PureObs [] R) where
   private
@@ -134,10 +192,50 @@ module _ {R : Set} (o : PureObs [] R) where
     last []       (h ∷ []) = h
     last (_ ∷ xs) (_ ∷ m)  = last xs m
 
+    -- SILENT RUNS ARE FINITE: short of a row a reader meets next, a run
+    -- takes finitely many silent steps.  The fuel: the rows at or before
+    -- the met one strictly past the clock, few by `Few`; a step passing
+    -- none is still.
+    -- DEAD ROUTE: a measure on the rows a silent step drops.  `of-next` reads
+    --   an of's run as a full `≃` on rows, as do the subscribes and the climbs,
+    --   so most silent steps drop no row and the measure never moves; a
+    --   strengthened `Moves.silent` tracking dropped rows would fuel nothing.
+    silent-finite : ∀ {rs k p e} → Path (load o) rs k → Meets t (conv rs ++ [ (p , e) ]) → Acc _⇜_ k
+    silent-finite {rs} {k₀} {p} {e} pth₀ m = fuel _ ≤-refl (still-finite o pth₀ m) pth₀
+      where
+        few = proj₂ (proj₁ (last {c = nothing} (conv rs) m))
+
+        ks : List Pos
+        ks = p ∷ proj₁ few
+
+        μ : Conf R → ℕ
+        μ k = ahead (Clock k) ks
+
+        listed : ∀ {q e′} → t q e′ → q ≼ p → q ∈ ks
+        listed {q} tq le with q ≟ᵖ p
+        ... | yes refl = here refl
+        ... | no ne    = there (proj₂ few tq (≼-≢ le ne))
+
+        mutual
+          fuel : ∀ n {k} → μ k ≤ n → Acc (Still t p) k → Path (load o) rs k → Acc _⇜_ k
+          fuel n {k} le (acc rec) pth = acc λ {k′} st → on n le rec pth st (μ k′ <? μ k)
+
+          on : ∀ n {k k′} → μ k ≤ n → (∀ {k″} → Still t p k″ k → Acc (Still t p) k″) → Path (load o) rs k → k′ ⇜ k
+             → Dec (μ k′ < μ k) → Acc _⇜_ k′
+          on zero    le _ _ _ (yes lt) = ⊥-elim (n≮0 (<-≤-trans lt le))
+          on (suc n) le _ pth st (yes lt) = fuel n (≤-pred (≤-trans lt le)) (still-finite o (pth ▸τ st) m) (pth ▸τ st)
+          on n {k} {k′} le rec pth st (no ¬lt) = fuel n (≤-trans (ahead-mono h ks) le) (rec (st , kept)) (pth ▸τ st)
+            where
+              h = clock-mono o pth m st
+              kept : ∀ {q e′} → t q e′ → q ≼ p → Clock k <ᴷ at q ≡ true → Clock k′ <ᴷ at q ≡ true
+              kept {q} tq le′ c with Clock k′ <ᴷ at q in e′
+              ... | true  = refl
+              ... | false = ⊥-elim (¬lt (ahead-drop h (listed tq le′) c e′))
+
     progress : ∀ {rs k p e} → Path (load o) rs k → Meets t (conv rs ++ [ (p , e) ]) → Next k p e
     progress {rs} pth m =
       let (i , r) = along nothing pth (inv tt₁ (tt , (tt , λ ()))) (≃-refl {t = Vis (RT (load o))})
-      in next (cursor nothing (conv rs)) i r (last {c = nothing} (conv rs) m) (silent-finite o pth m)
+      in next (cursor nothing (conv rs)) i r (last {c = nothing} (conv rs) m) (silent-finite pth m)
 
     -- Shown what was met so far, a run shows what is met next.
     go : ∀ {rs₀ k} → Path (load o) rs₀ k → Run t nothing (conv rs₀) → ∀ rs → Run t (cursor nothing (conv rs₀)) rs
