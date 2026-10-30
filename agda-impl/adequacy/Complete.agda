@@ -59,7 +59,11 @@ _⇜_ {R} k′ k = Σ _ λ τ → Driver.step R k ≡ Driver.silent τ k′
 postulate
   -- SILENT RUNS ARE FINITE: short of a row a reader meets next, a run
   -- takes finitely many silent steps.  Few rows lie before a met one, and
-  -- a silent step drops rows or advances finitely much bookkeeping.
+  -- each of's run before it is one of them.
+  -- DEAD ROUTE: a measure on the rows a silent step drops.  `of-next` reads
+  --   an of's run as a full `≃` on rows, as do the subscribes and the climbs,
+  --   so most silent steps drop no row and the measure never moves; a
+  --   strengthened `Moves.silent` tracking dropped rows would fuel nothing.
   silent-finite : ∀ {R} (o : PureObs [] R) {rs k p e} → Path (load o) rs k
                 → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ]) → Acc _⇜_ k
 
