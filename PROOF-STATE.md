@@ -31,7 +31,7 @@ its tape, keep `Inv`; its due mark keys and leads its rows. Open: whether
 a stall or a frame's close, a skip in its rows, moves nothing owed. Settled
 when each is a body.
 
-Members: `sub-cold`, `abs-leaf`, `cold-ok`, `cold-lead`.
+Members: `sub-cold`, `abs-leaf`, `cold-ok`.
 
 #### THE JOINERS STEPPED
 
