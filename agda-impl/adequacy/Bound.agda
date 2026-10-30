@@ -18,6 +18,7 @@ open import Data.Nat.Properties using (≡ᵇ⇒≡)
 open import Data.List.Properties using (++-identityʳ; ∷ʳ-injectiveˡ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.All using (lookup) renaming (_∷_ to _∷ᴬ_)
 open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
@@ -28,15 +29,15 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (ofᴱ)
 open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-asym; <ᵖ-split; <ᵖ-step; <ᵖ-shift; <ᵖ-below; <ᵖ-part; <ᵖ-ix)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; _≺_; _≼_; Truncate; InE; at-out; at-end; on-out; MapT; map-out; map-skip; map-pin; map-end; DenEnv)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; _≺_; _≼_; Truncate; InE; enter; at-out; at-end; on-out; MapT; map-out; map-skip; map-pin; map-end; DenEnv)
 open import denotation.Laws.Modulus using (≼-refl)
 open import denotation.Laws.Worlds using (InvAt; Hots; W; inW; plain-ix; apart-w) renaming (⊑-refl to ⊑ᵖ-refl)
 open import operation.Key using (Key; at; after; _<ᴷ_; ≮ᴷ-trans; <ᴷ-trans; <ᴷ-irrefl; at-<ᵖ; clash)
 open import operation.PureObservable using (module Machine)
-open Machine using (St; Ctx; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed;
+open Machine using (St; Ctx; CS; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed;
                     free; cpAt; cutAt; overAt; inScan; inTake; inSrc; inBody;
                     ofS; doneS; mapS; cutS; lnS; flatS; coldS; scanS; takeS; connS; joinS; inMap; inCut; inLn; inOuter; inLanes; nx; cp; attached; attAt; attM; pend) renaming (Ev to Evᴹ; over to overᶜ)
-open import adequacy.Rows using (rows; rowsL; pendRows; toEv; Gone; Lanes; Each; reads; module Flat)
+open import adequacy.Rows using (rows; rowsL; pendRows; toEv; Gone; Lanes; Each; reads; module Flat; ∅; Hot; Inbox; _∪_)
 
 ------------------------------------------------------------------------
 -- Keys
@@ -391,6 +392,12 @@ mergeG-map : ∀ {Γ A B Go Gl Go′ Gl′} {ρ : DenEnv Γ} {b} {f : A → Obs 
 mergeG-map ho hl hc hs hr m = record { outer = ho outer ; lanesG = hl lanesG ; fresh = fresh ; count = hc count ; spent = hs spent ; rooted = hr rooted }
   where open MergeG m
 
+-- A joiner's inbox in order, each entry strictly before every later one
+-- and before every row the source still owes it.
+Fed : ∀ {A} → List (Pos × Evᴹ A) → EmissionSet A → Set₁
+Fed []             t = ⊤₁
+Fed ((q , _) ∷ ib) t = (∀ {y e} → (Inbox ib ∪ t) y e → q ≺ y) × Fed ib t
+
 -- The fragment's shape everywhere, its row facts only where live: under
 -- a cut switched off nothing is owed, so nothing there is asked to agree.
 --
@@ -402,7 +409,16 @@ mutual
   G ρ b (mapS f s)                            = G ρ b s
   G ρ b (cutS l a s)                          = G ρ (b ∧ l) s
   G ρ b (flatS (mergeᶠ nothing) f d n q o ls) = MergeG (G ρ b o) (GL ρ b ls) ρ b f d n q o ls
+  G ρ b (connS k o s)                         = SrcG ρ b (CS.bodyAt k) o × G (Hot (rows ρ o) k ∷ᴬ ρ) b s
+  G ρ b (joinS j true x ib)                   = Live₁ b (Fed ib (enter (lookup ρ x) j))
+  G ρ b (joinS j false x ib)                  = Live₁ b (Fed ib ∅)
   G ρ b _                                     = ⊥₁
+
+  -- A connect's source: still owed while its body subscribes, then good.
+  SrcG : ∀ {Γ A} → DenEnv Γ → Bool → Maybe Pos → St Γ A → Set₁
+  SrcG ρ b (just _) (pend o q) = ⊤₁
+  SrcG ρ b (just _) _          = ⊥₁
+  SrcG ρ b nothing  s          = G ρ b s
 
   GL : ∀ {Γ A} → DenEnv Γ → Bool → List (St Γ A) → Set₁
   GL ρ b []       = ⊤₁
