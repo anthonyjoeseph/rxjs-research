@@ -39,7 +39,7 @@ open import adequacy.Rows using (env; ∅; Hot; up; here; rows; rowsL; pendRows;
 open import adequacy.Up using (any-ʳ++ˡ; any-ʳ++ʳ; all-ʳ++; ≈ᴸ-refl; _∷_; up-≃; ≃-refl; ≃-trans; vis-≃; plus-≃; trunc-≃;
   row-≃)
 open import adequacy.Bound using (Empty; Good; G; GLn; shape; on; off; lane-v; live; dead-empty; MergeG; mergeG-map)
-open import adequacy.Skip using (After; Since; LeadC; _≈⟨_⟩_; up-vis; ≈-refl; since-map; map-≈; since-row; flat-≈; after-since;
+open import adequacy.Skip using (After; Since; LeadC; _≈⟨_⟩_; up-vis; ≈-refl; since-map; map-≈; since-scan; scan-≈; since-row; flat-≈; after-since;
                                  ≈ᴸ-hole; conn-≈; since-conn) renaming (≈ᴸ-refl to ≈ᴸ-refl⟨⟩; _∷_ to _∷≈_)
 open import adequacy.LaneEnd using (frame-≈; done-at; outer-owes; lanes-owe; since-x; since-y)
 open import adequacy.Owes using (Owing; Owes; OwesL; UpO; Swap; owes-join; SrcO; srcO-≃; owesL-ʳ++; rowsL-ʳ++; ≡→≃; owing-≃; empty-≃;
@@ -62,7 +62,7 @@ postulate
 srcO-≈ : ∀ {R Γ A} (c : Ctx R Γ A) {t u : EmissionSet A} {p} → LeadC c p → Since p t → Since p u → t ≈⟨ p ⟩ u → SrcO c t → SrcO c u
 srcO-≈ top                                   ld st su eq so = tt
 srcO-≈ (inMap f c)                             ld st su eq so = srcO-≈ c ld (since-map f st) (since-map f su) (map-≈ f eq) so
-srcO-≈ (inScan f z c)                          ld st su eq so = tt
+srcO-≈ (inScan f z c)                          ld st su eq so = srcO-≈ c ld (since-scan f z st) (since-scan f z su) (scan-≈ f z eq) so
 srcO-≈ (inCut true a c)                        ld st su eq so = srcO-≈ c ld st su eq so
 srcO-≈ (inCut false a c)                       ld st su eq so = tt
 srcO-≈ (inLn true c)                           ld st su eq so = srcO-≈ c ld st su eq so

@@ -19,7 +19,7 @@ open import Data.List.Properties using (++-identityʳ; ∷ʳ-injectiveˡ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (lookup) renaming (_∷_ to _∷ᴬ_)
-open import Data.Product using (Σ; _×_; _,_; proj₁)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁; tt to tt₁)
@@ -29,7 +29,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (ofᴱ)
 open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-asym; <ᵖ-split; <ᵖ-step; <ᵖ-shift; <ᵖ-below; <ᵖ-part; <ᵖ-ix)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; _≺_; _≼_; Truncate; InE; enter; at-out; at-end; on-out; MapT; map-out; map-skip; map-pin; map-end; DenEnv)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; _≺_; _≼_; Truncate; InE; enter; at-out; at-end; on-out; MapT; map-out; map-skip; map-pin; map-end; module Scan; DenEnv)
 open import denotation.Laws.Modulus using (≼-refl)
 open import denotation.Laws.Worlds using (InvAt; Hots; W; inW; plain-ix; apart-w) renaming (⊑-refl to ⊑ᵖ-refl)
 open import operation.Key using (Key; at; after; _<ᴷ_; ≮ᴷ-trans; <ᴷ-trans; <ᴷ-irrefl; at-<ᵖ; clash)
@@ -37,7 +37,7 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; CS; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed;
                     free; cpAt; cutAt; overAt; inScan; inTake; inSrc; inBody;
                     ofS; doneS; mapS; cutS; lnS; flatS; coldS; scanS; takeS; connS; joinS; inMap; inCut; inLn; inOuter; inLanes; nx; cp; attached; attAt; attM; pend) renaming (Ev to Evᴹ; over to overᶜ)
-open import adequacy.Rows using (rows; rowsL; pendRows; toEv; Gone; Lanes; Each; reads; module Flat; ∅; Hot; Inbox; _∪_)
+open import adequacy.Rows using (acc-val; rows; rowsL; pendRows; toEv; Gone; Lanes; Each; reads; module Flat; ∅; Hot; Inbox; _∪_)
 
 ------------------------------------------------------------------------
 -- Keys
@@ -412,6 +412,7 @@ mutual
   G ρ b (ofS i p xs)                          = ⊤₁
   G ρ b doneS                                 = ⊤₁
   G ρ b (mapS f s)                            = G ρ b s
+  G ρ b (scanS f z s)                         = G ρ b s
   G ρ b (cutS l a s)                          = G ρ (b ∧ l) s
   G ρ b (flatS (mergeᶠ nothing) f d n q o ls) = MergeG (G ρ b o) (GL ρ b ls) ρ b f d n q o ls
   G ρ b (connS k o s)                         = SrcG ρ b (CS.bodyAt k) o × G (Hot (rows ρ o) k ∷ᴬ ρ) b s × Live b (T (CS.closed k) → Empty (rows ρ o))
@@ -462,7 +463,7 @@ mutual
   shape (flatS switchᶠ f d n q o ls)              ()
   shape (flatS exhaustᶠ f d n q o ls)             ()
   shape (coldS _ _)                               g = g
-  shape (scanS _ _ _)                             ()
+  shape (scanS f z s)                             g = shape s g
   shape (lnS _ _)                                 ()
   shape (takeS _ _ _ _)                           ()
   shape {v = v} (connS k o b)                     (gs , gb , _) = shapeSrc {v = v} (CS.bodyAt k) o gs , shape b gb , tt
@@ -608,6 +609,21 @@ mapped f (just (g , K , shows (nx a))) b =
 mapped f (just (g , K , shows cp)) b =
   record { from = λ { (map-out r) → from b r ; (map-skip r) → from b r ; (map-pin r) → from b r ; (map-end r) → from b r } ; mark = mark b
          ; shown = λ { refl → let (q , k , r) = shown b refl in q , k , map-end r } }
+
+-- A scan's next value folds its source's least one, keyed as its source.
+scanned : ∀ {R A B} (f : B → A → B) z {t : EmissionSet A} (y : Maybe (Cand R A)) → OK t y → OK (Scan.ScanT f z t) (retag (scanT f z) y)
+scanned f z nothing e (Scan.sval a)  = e (proj₂ (acc-val a))
+scanned f z nothing e (Scan.sstep r) = e r
+scanned f z nothing e (Scan.spin r)  = e r
+scanned f z nothing e (Scan.send r)  = e r
+scanned f z (just (g , K , still)) b =
+  record { from = λ { (Scan.sval a) → from b (proj₂ (acc-val a)) ; (Scan.sstep r) → from b r ; (Scan.spin r) → from b r ; (Scan.send r) → from b r } ; mark = mark b ; shown = λ () }
+scanned f z (just (g , K , shows (nx a))) b =
+  record { from = λ { (Scan.sval a) → from b (proj₂ (acc-val a)) ; (Scan.sstep r) → from b r ; (Scan.spin r) → from b r ; (Scan.send r) → from b r } ; mark = mark b
+         ; shown = λ { refl → let (q , k , r) = shown b refl in q , k , Scan.sval (Scan.acc₀ r (λ r′ → ⊑→≼ (subst (_⊑ at _) k (from b r′)))) } }
+scanned f z (just (g , K , shows cp)) b =
+  record { from = λ { (Scan.sval a) → from b (proj₂ (acc-val a)) ; (Scan.sstep r) → from b r ; (Scan.spin r) → from b r ; (Scan.send r) → from b r } ; mark = mark b
+         ; shown = λ { refl → let (q , k , r) = shown b refl in q , k , Scan.send r } }
 
 ------------------------------------------------------------------------
 -- The lanes, one by one
@@ -796,6 +812,7 @@ mutual
   seek-ok c (connS k o b)      g = conn-ok c k o b g
   seek-ok c (coldS b l)        _ = cold-ok c b l
   seek-ok c (mapS f s)         g = mapped f (seek (inMap f c) s) (seek-ok (inMap f c) s g)
+  seek-ok c (scanS f z s)      g = scanned f z (seek (inScan f z c) s) (seek-ok (inScan f z c) s g)
   seek-ok c (cutS true attached s)   g = kept (seek (inCut true attached c) s) (seek-ok (inCut true attached c) s g)
   seek-ok {ρ = ρ} c (cutS false a s) _ = seek-off {ρ = ρ} c a s
   seek-ok c (cutS true (attAt p) s)  g =

@@ -13,7 +13,7 @@ open import Data.Maybe using (just; nothing)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (_×_; _,_; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -24,11 +24,11 @@ open import adequacy.Up using (all-ʳ++)
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; ix)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; _≺_; _≼_; Truncate; Reach; Dep; MapT; map-out; map-skip; map-pin;
-  map-end; Ended; module Connecting)
+  map-end; Ended; module Connecting; module Scan)
 open import denotation.Laws.Modulus using (≺-trans; ≺→≼; ≼-≺-≺; ≺-ext)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; St; CS; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (up; env; rows; rowsL; pendRows; Gone; Lane; reads; Lanes; Each; module Flat; _≃_; _⇄_; Vis; Hot; ∅)
+open import adequacy.Rows using (acc-val; up; env; rows; rowsL; pendRows; Gone; Lane; reads; Lanes; Each; module Flat; _≃_; _⇄_; Vis; Hot; ∅)
 
 ------------------------------------------------------------------------
 -- Rows past a position
@@ -46,6 +46,7 @@ Since p t = ∀ {q e} → t q e → p ≼ q
 -- body's own rows: those it is not yet fed of the source's.
 LeadC : ∀ {R Γ A} → Ctx R Γ A → Pos → Set
 LeadC (inMap f c)                                    p = LeadC c p
+LeadC (inScan f z c)                                 p = LeadC c p
 LeadC (inCut l a c)                                  p = LeadC c p
 LeadC (inLn b c)                                     p = LeadC c p
 LeadC (inOuter (mergeᶠ nothing) f d n q ls c)        p = Each (After p) (rowsL (env c) ls) × LeadC c p
@@ -150,6 +151,38 @@ since-map f s (map-out r)  = s r
 since-map f s (map-skip r) = s r
 since-map f s (map-pin r)  = s r
 since-map f s (map-end r)  = s r
+
+-- Skips apart, folded alike: a fold reads values only.
+scan-≈ : ∀ {A B} (f : B → A → B) z {t u : EmissionSet A} {p} → t ≈⟨ p ⟩ u → Scan.ScanT f z t ≈⟨ p ⟩ Scan.ScanT f z u
+scan-≈ {A} {B} f z {p = p} eq = go (fwd eq) (bwd eq) ⇆ go (bwd eq) (fwd eq)
+  where
+    val : ∀ {t u : EmissionSet A} → (∀ {q e} → t q e → u q e ⊎ Skip p q e) → ∀ {q a} → t q (out a) → u q (out a)
+    val h r with h r
+    ... | inj₁ r′       = r′
+    ... | inj₂ (_ , ())
+    acc : ∀ {t u : EmissionSet A} → (∀ {q e} → t q e → u q e ⊎ Skip p q e) → (∀ {q e} → u q e → t q e ⊎ Skip p q e)
+        → ∀ {q b} → Scan.Acc f z t q b → Scan.Acc f z u q b
+    acc h h⁻ (Scan.acc₀ r mn)     = Scan.acc₀ (val h r) (λ y → mn (val h⁻ y))
+    acc h h⁻ (Scan.acc a r lt nx) = Scan.acc (acc h h⁻ a) (val h r) lt (λ y → nx (val h⁻ y))
+    go : ∀ {t u : EmissionSet A} → (∀ {q e} → t q e → u q e ⊎ Skip p q e) → (∀ {q e} → u q e → t q e ⊎ Skip p q e)
+       → ∀ {q e} → Scan.ScanT f z t q e → Scan.ScanT f z u q e ⊎ Skip p q e
+    go h h⁻ (Scan.sval a) = inj₁ (Scan.sval (acc h h⁻ a))
+    go h h⁻ (Scan.sstep r) with h r
+    ... | inj₁ r′            = inj₁ (Scan.sstep r′)
+    ... | inj₂ (refl , refl) = inj₂ (refl , refl)
+    go h h⁻ (Scan.spin r) with h r
+    ... | inj₁ r′       = inj₁ (Scan.spin r′)
+    ... | inj₂ (_ , ())
+    go h h⁻ (Scan.send r) with h r
+    ... | inj₁ r′       = inj₁ (Scan.send r′)
+    ... | inj₂ (_ , ())
+
+-- A fold sits at a value.
+since-scan : ∀ {A B} (f : B → A → B) z {t : EmissionSet A} {p} → Since p t → Since p (Scan.ScanT f z t)
+since-scan f z s (Scan.sval a)  = s (proj₂ (acc-val a))
+since-scan f z s (Scan.sstep r) = s r
+since-scan f z s (Scan.spin r)  = s r
+since-scan f z s (Scan.send r)  = s r
 
 module _ {A B : Set} (L : A → Pos → EmissionSet B) {d : Bool} {p : Pos} where
 
@@ -300,7 +333,7 @@ postulate
 up-vis : ∀ {R Γ A} (c : Ctx R Γ A) {t u : EmissionSet A} {p} → LeadC c p → Since p t → Since p u → t ≈⟨ p ⟩ u → Vis (up c t) ≃ Vis (up c u)
 up-vis top                                   ld st su eq = ≈-vis eq
 up-vis (inMap f c)                             ld st su eq = up-vis c ld (since-map f st) (since-map f su) (map-≈ f eq)
-up-vis (inScan f z c)                          ld st su eq = ≃-id
+up-vis (inScan f z c)                          ld st su eq = up-vis c ld (since-scan f z st) (since-scan f z su) (scan-≈ f z eq)
 up-vis (inCut true a c)                        ld st su eq = up-vis c ld st su eq
 up-vis (inCut false a c)                       ld st su eq = ≃-id
 up-vis (inLn true c)                           ld st su eq = up-vis c ld st su eq

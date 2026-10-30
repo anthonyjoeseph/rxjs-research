@@ -13,12 +13,12 @@ open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (refl)
 open import Data.Unit using (tt)
 
-open import Tree using (Obs; mergeᶠ; map; flatMap)
+open import Tree using (Obs; mergeᶠ; map; scan; flatMap)
 open import denotation.Events using (Pos; Timeline)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; Reach; PDep; enter; ⟦_⟧; DenEnv;
-  MapT; map-out; map-skip; map-pin; map-end; module Joining)
+  MapT; map-out; map-skip; map-pin; map-end; module Scan; module Joining)
 open import denotation.Laws.Modulus using (reach-via; entered-reach)
-open import adequacy.Rows using (∅; pendRows; reads; _≃_; _⇄_; module Flat)
+open import adequacy.Rows using (acc-val; ∅; pendRows; reads; _≃_; _⇄_; module Flat)
 open import adequacy.Up using (trunc-≃)
 
 open _≃_
@@ -124,3 +124,29 @@ enter-merge : ∀ {Γ A B} (ρ : DenEnv Γ) (f : A → Obs Timeline Γ B) (s : O
             → pendRows ρ (flatMap (mergeᶠ nothing) f s) p ≃ Flat.RowT (λ a → pendRows ρ (f a)) (pendRows ρ s p) false []
 enter-merge ρ f s p =
   trunc-≃ (joining-≃ ((λ (l , p) → reads l p) ⇄ λ (reads l p) → l , p) ((λ ()) ⇄ λ ()) (λ e → inj₂ e , tt) λ { (inj₁ () , _) ; (inj₂ e , _) → e })
+
+-- A SCAN ENTERED: its source entered, scanned.
+enter-scan : ∀ {Γ A B} (ρ : DenEnv Γ) (f : B → A → B) z (s : Obs Timeline Γ A) p → pendRows ρ (scan f z s) p ≃ Scan.ScanT f z (pendRows ρ s p)
+enter-scan ρ f z s p = proj₁ ⇄ λ x → x , reach′ x
+  where
+    t = enter (⟦ s ⟧ ρ) p
+
+    src : ∀ {k e} → Scan.ScanT f z t k e → Σ (Ev _) (t k)
+    src (Scan.sval a)  = _ , proj₂ (acc-val a)
+    src (Scan.sstep y) = _ , y
+    src (Scan.spin y)  = _ , y
+    src (Scan.send y)  = _ , y
+
+    -- A pin's source row is the same pin.
+    pd : ∀ {k e r} (x : Scan.ScanT f z t k e) → PDep r k e → PDep r k (proj₁ (src x))
+    pd x             (inj₁ kr)   = inj₁ kr
+    pd (Scan.spin y) (inj₂ refl) = inj₂ refl
+    pd (Scan.sval y)  (inj₂ ())
+    pd (Scan.sstep y) (inj₂ ())
+    pd (Scan.send y)  (inj₂ ())
+
+    reach′ : ∀ {q e} → Scan.ScanT f z t q e → Reach (Scan.ScanT f z t) q e
+    reach′ (Scan.sval {b = b} a) = reach-via {e = out b} {out (proj₁ (acc-val a))} (λ x _ _ → proj₁ (src x) , proj₂ (src x) , tt) (entered-reach (⟦ s ⟧ ρ) p (proj₂ (acc-val a)))
+    reach′ (Scan.sstep y) = reach-via {e = skip} {skip} (λ x _ _ → proj₁ (src x) , proj₂ (src x) , tt) (entered-reach (⟦ s ⟧ ρ) p y)
+    reach′ (Scan.send y)  = reach-via {e = end} {end} (λ x _ _ → proj₁ (src x) , proj₂ (src x) , tt) (entered-reach (⟦ s ⟧ ρ) p y)
+    reach′ (Scan.spin {r = r} y) = reach-via {e = pin r} {pin r} (λ x _ d → proj₁ (src x) , proj₂ (src x) , λ i → pd x (d i)) (entered-reach (⟦ s ⟧ ρ) p y)

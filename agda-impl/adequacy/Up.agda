@@ -14,7 +14,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos)
-open import denotation.EmissionSet using (EmissionSet; Truncate; Reach; MapT; map-out; map-skip; map-pin; map-end; DenEnv; module Connecting)
+open import denotation.EmissionSet using (EmissionSet; Truncate; Reach; MapT; map-out; map-skip; map-pin; map-end; DenEnv; module Connecting; module Scan)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; St; CS; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (up; env; rows; Hot; pendRows; Vis; Plus; old; new; rowsL; Gone; Lanes; Each; module Flat; _≃_; _⇄_; ≃-sym)
@@ -138,6 +138,19 @@ map-≃ f eq = go (to eq) ⇄ go (from eq)
     go h (map-pin r)  = map-pin (h r)
     go h (map-end r)  = map-end (h r)
 
+-- The same rows scanned: the same folds.
+scan-≃ : ∀ {A B} (f : B → A → B) z {t u : EmissionSet A} → t ≃ u → Scan.ScanT f z t ≃ Scan.ScanT f z u
+scan-≃ {A} {B} f z eq = go (to eq) (from eq) ⇄ go (from eq) (to eq)
+  where
+    acc : ∀ {t u : EmissionSet A} → (∀ {q e} → t q e → u q e) → (∀ {q e} → u q e → t q e) → ∀ {q b} → Scan.Acc f z t q b → Scan.Acc f z u q b
+    acc h h⁻ (Scan.acc₀ r mn)     = Scan.acc₀ (h r) (λ y → mn (h⁻ y))
+    acc h h⁻ (Scan.acc a r lt nx) = Scan.acc (acc h h⁻ a) (h r) lt (λ y → nx (h⁻ y))
+    go : ∀ {t u : EmissionSet A} → (∀ {q e} → t q e → u q e) → (∀ {q e} → u q e → t q e) → ∀ {q e} → Scan.ScanT f z t q e → Scan.ScanT f z u q e
+    go h h⁻ (Scan.sval a)  = Scan.sval (acc h h⁻ a)
+    go h h⁻ (Scan.sstep r) = Scan.sstep (h r)
+    go h h⁻ (Scan.spin r)  = Scan.spin (h r)
+    go h h⁻ (Scan.send r)  = Scan.send (h r)
+
 -- The same source and the same body: the same connect.
 conn-≃ : ∀ {A B : Set} r {σ σ′ : EmissionSet A} {β β′ : EmissionSet B} → σ ≃ σ′ → β ≃ β′ → Connecting.ConnT r σ β ≃ Connecting.ConnT r σ′ β′
 conn-≃ {A} {B} r es eb = go es eb ⇄ go (≃-sym es) (≃-sym eb)
@@ -159,7 +172,7 @@ postulate
 up-≃ : ∀ {R Γ A} (c : Ctx R Γ A) {t u : EmissionSet A} → t ≃ u → up c t ≃ up c u
 up-≃ top                                              eq = eq
 up-≃ (inMap f c)                                      eq = up-≃ c (map-≃ f eq)
-up-≃ (inScan f z c)                                   eq = ≃-refl
+up-≃ (inScan f z c)                                   eq = up-≃ c (scan-≃ f z eq)
 up-≃ (inCut true a c)                                 eq = up-≃ c eq
 up-≃ (inCut false a c)                                eq = ≃-refl
 up-≃ (inLn true c)                                    eq = up-≃ c eq

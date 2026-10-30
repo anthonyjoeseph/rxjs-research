@@ -22,13 +22,13 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-split)
-open import denotation.EmissionSet using (EmissionSet; DenEnv; Ev; Truncate; out; skip; pin; end; _≺_; MapT; map-out; map-skip; map-pin; map-end; at-out; at-end)
+open import denotation.EmissionSet using (EmissionSet; DenEnv; Ev; Truncate; out; skip; pin; end; _≺_; MapT; map-out; map-skip; map-pin; map-end; module Scan; at-out; at-end)
 open import operation.Key using (Key; at; _<ᴷ_; ≮ᴷ-trans; at-<ᵖ; clash)
 open import operation.PureObservable using (module Machine; Tape; play; ending; over)
 open Machine using (St; Ctx; CS; Cand; found; Mark; ofM; attM; leafM; Att; Out; still; shows; nx; cp; seek; search; kids; lanes; own; ownBest; first; retag;
-                    raceT; outerT; laneT; mapT; cutT; alive; outOf; closed; attached; attAt;
+                    raceT; outerT; laneT; mapT; scanT; cutT; alive; outOf; closed; attached; attAt;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
-                    top; inMap; inCut; inLn; inOuter; inLanes; inSrc; inBody)
+                    top; inMap; inScan; inCut; inLn; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (env; rows; rowsL; pendRows; toEv; Lanes; Each; module Flat; Hot; ∅)
 open import adequacy.Bound using (_⊑_; ⊑i; ⊑-refl; ⊑-trans; <→⊑; ext-⊑; From; Bd; OK; OKL; Live;
                                          Apart; Spread; Parts; rooted-parts; ⊑→≼; join-ok; MergeG; G; GL; GLn; Good; ofPos; from-weak; seek-ok; seek-ln; lane-ok; lanes-ok)
@@ -118,6 +118,7 @@ each-empty {P = P} (_ ∷ Ls) (n , ns) = (λ {q} {e} r → ⊥-elim (n {q} {e} r
 data Ext {R} {Γ′ A′} (c′ : Ctx R Γ′ A′) : ∀ {Γ A} → Ctx R Γ A → Set₁ where
   stop   : Ext c′ c′
   eMap   : ∀ {Γ A B} {f : A → B} {c : Ctx R Γ B} → Ext c′ (inMap f c) → Ext c′ c
+  eScan  : ∀ {Γ A B} {f : B → A → B} {z} {c : Ctx R Γ B} → Ext c′ (inScan f z c) → Ext c′ c
   eCut   : ∀ {Γ A} {l a} {c : Ctx R Γ A} → Ext c′ (inCut l a c) → Ext c′ c
   eLn    : ∀ {Γ A} {b} {c : Ctx R Γ A} → Ext c′ (inLn b c) → Ext c′ c
   eOuter : ∀ {Γ A B} {f d n q ls} {c : Ctx R Γ B} → Ext c′ (inOuter {A = A} (mergeᶠ nothing) f d n q ls c) → Ext c′ c
@@ -129,6 +130,7 @@ data Ext {R} {Γ′ A′} (c′ : Ctx R Γ′ A′) : ∀ {Γ A} → Ctx R Γ A 
 LeadE : ∀ {R Γ′ A′ Γ A} {c′ : Ctx R Γ′ A′} {c : Ctx R Γ A} → Ext c′ c → Pos → Set
 LeadE stop                                        P = ⊤
 LeadE (eMap e)                                    P = LeadE e P
+LeadE (eScan e)                                   P = LeadE e P
 LeadE (eCut e)                                    P = LeadE e P
 LeadE (eLn e)                                     P = LeadE e P
 LeadE (eOuter {ls = ls} {c = c} e)                P = Each (After P) (rowsL (env c) ls) × LeadE e P
@@ -140,6 +142,7 @@ LeadE (eBody {o = o} {c = c} e)                   P = After P (rows (env c) o) �
 lead-ext : ∀ {R Γ′ A′ Γ A} {c′ : Ctx R Γ′ A′} {c : Ctx R Γ A} (e : Ext c′ c) {P} → LeadE e P → LeadC c P → LeadC c′ P
 lead-ext stop       _                  lc = lc
 lead-ext (eMap e)   le                 lc = lead-ext e le lc
+lead-ext (eScan e)  le                 lc = lead-ext e le lc
 lead-ext (eCut e)   le                 lc = lead-ext e le lc
 lead-ext (eLn e)    le                 lc = lead-ext e le lc
 lead-ext (eOuter e) (a , le)           lc = lead-ext e le (a , lc)
@@ -154,6 +157,7 @@ lead-ext (eBody e)  (a , le)           lc = lead-ext e le (a , lc)
 ext-closed : ∀ {R Γ′ A′ Γ A} {c′ : Ctx R Γ′ A′} {c : Ctx R Γ A} → Ext c′ c → closed c ≡ true → closed c′ ≡ true
 ext-closed stop       h = h
 ext-closed (eMap e)   h = ext-closed e h
+ext-closed (eScan e)  h = ext-closed e h
 ext-closed (eCut {l = l} {c = c} e) h = ext-closed e (subst (λ b → (Data.Bool.not l Data.Bool.∨ b) ≡ true) (sym h) (∨-true (Data.Bool.not l)))
 ext-closed (eLn e)    h = ext-closed e h
 ext-closed (eOuter e) h = ext-closed e h
@@ -244,6 +248,40 @@ map-leads {A = A} v f {t = t} (just (found (_ , _ , c′ , s′) m κ , K , show
     mv {e = skip}  r _ = hit (map-skip r) tt
     mv {e = pin _} r _ = hit (map-pin r) tt
     mv {e = end}   r _ = hit (map-end r) tt
+
+-- A scan's value at its source's least one: the fold of that value alone.
+scan-leads : ∀ {R Γ A B} v (f : B → A → B) z {c : Ctx R Γ B} {t} (y : Maybe (Cand R A)) → Live v (OK t y) → Leads v (inScan f z c) t y → Leads v c (Scan.ScanT f z t) (retag (scanT f z) y)
+scan-leads v f z nothing _ _ = tt₁
+scan-leads false f z (just (found (_ , _ , c′ , s′) m κ , K , still))     _ (e , l) = eScan e , tt
+scan-leads false f z (just (found (_ , _ , c′ , s′) m κ , K , shows (nx a))) _ (e , l) = eScan e , tt
+scan-leads false f z (just (found (_ , _ , c′ , s′) m κ , K , shows cp))  _ (e , l) = eScan e , tt
+scan-leads {A = A} true f z {t = t} (just (found (_ , _ , c′ , s′) m κ , K , still)) _ (e , l) =
+  eScan e , relive true (tight-occ (λ oc → occ-bind oc mv)) l
+  where
+    mv : ∀ {Q e} → t Q e → Fits {A} still e → Occ (Scan.ScanT f z t) Q still
+    mv {e = out _} r ()
+    mv {e = skip}  r _ = hit (Scan.sstep r) tt
+    mv {e = pin _} r _ = hit (Scan.spin r) tt
+    mv {e = end}   r _ = hit (Scan.send r) tt
+scan-leads {A = A} true f z {t = t} (just (found (_ , _ , c′ , s′) m κ , K , shows (nx a))) b (e , l) =
+  eScan e , λ cl P oa → proj₁ (l cl P oa) , tr (proj₂ (l cl P oa))
+  where
+    mv : ∀ {Q e} → K ≡ at Q → t Q e → Fits (shows (nx a)) e → Occ (Scan.ScanT f z t) Q (shows (nx (f z a)))
+    mv {e = out _} eq r refl = hit (Scan.sval (Scan.acc₀ r (λ r′ → ⊑→≼ (subst (_⊑ at _) eq (from b r′))))) refl
+    mv {e = skip}  eq r _    = hit (Scan.sstep r) tt
+    mv {e = pin _} eq r _    = hit (Scan.spin r) tt
+    mv {e = end}   eq r _    = hit (Scan.send r) tt
+    tr : ∀ {P} → Tight t P K (shows (nx a)) → Tight (Scan.ScanT f z t) P K (shows (nx (f z a)))
+    tr (strict lt)       = strict lt
+    tr (tie Q eq pq oc)  = tie Q eq pq (occ-bind oc (mv eq))
+scan-leads {A = A} true f z {t = t} (just (found (_ , _ , c′ , s′) m κ , K , shows cp)) _ (e , l) =
+  eScan e , relive true (tight-occ (λ oc → occ-bind oc mv)) l
+  where
+    mv : ∀ {Q e} → t Q e → Fits {A} (shows cp) e → Occ (Scan.ScanT f z t) Q (shows cp)
+    mv {e = out _} r ()
+    mv {e = skip}  r _ = hit (Scan.sstep r) tt
+    mv {e = pin _} r _ = hit (Scan.spin r) tt
+    mv {e = end}   r _ = hit (Scan.send r) tt
 
 cut-on : ∀ {R Γ A} v {a} {c : Ctx R Γ A} {t} (y : Maybe (Cand R A)) → Leads (v Data.Bool.∧ true) (inCut true a c) t y → Leads v c t (retag (cutT true) y)
 cut-on v     nothing                                 _       = tt₁
@@ -448,7 +486,7 @@ own-lead v c doneS                _ = tt₁
 own-lead v c (pend o _)             _ = tt₁
 own-lead v c (flatS op f d n q o ls) _ = tt₁
 own-lead v c (lnS b s)            ()
-own-lead v c (scanS _ _ _)        ()
+own-lead v c (scanS f z s)        _ = tt₁
 own-lead v c (coldS b l)          _ = cold-lead v c b l
 own-lead v c (takeS _ _ _ _)      ()
 own-lead v c (connS k o b)        _ = own-none v c {connS k o b} (own (connS k o b)) (λ ())
@@ -488,7 +526,8 @@ mutual
   kids-lead v c (flatS switchᶠ _ _ _ _ _ _)           ()
   kids-lead v c (flatS exhaustᶠ _ _ _ _ _ _)          ()
   kids-lead v c (lnS _ _)        ()
-  kids-lead v c (scanS _ _ _)    ()
+  kids-lead true  c (scanS f z s) g = scan-leads true f z (seek (inScan f z c) s) (seek-ok (inScan f z c) s g) (seek-lead true (inScan f z c) s g)
+  kids-lead false c (scanS f z s) g = scan-leads false f z (seek (inScan f z c) s) tt (seek-lead false (inScan f z c) s g)
   kids-lead v c (coldS _ _)      _ = tt₁
   kids-lead v c (takeS _ _ _ _)  ()
   kids-lead v c (connS k o b)    g = conn-lead v c k o b g

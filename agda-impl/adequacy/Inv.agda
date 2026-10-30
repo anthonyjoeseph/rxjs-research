@@ -19,7 +19,7 @@ open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong; subst)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.EmissionSet using (EmissionSet; DenEnv; module Connecting)
+open import denotation.EmissionSet using (EmissionSet; DenEnv; module Connecting; module Scan)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; plug; alive; nx; cp;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
@@ -97,6 +97,7 @@ open-alive (joinS _ _ _ _)     _ ()
 GoodC : ∀ {R Γ A} → Ctx R Γ A → Set
 GoodC top                                          = ⊤
 GoodC (inMap f c)                                  = GoodC c
+GoodC (inScan f z c)                               = GoodC c
 GoodC (inCut l a c)                                = GoodC c
 GoodC (inLn b c)                                   = GoodC c
 GoodC (inOuter (mergeᶠ nothing) f d n q ls c)      = GoodC c
@@ -170,8 +171,8 @@ good-split (inMap f c) s g with good-split c (mapS f s) g
 ... | inj₂ (inj₁ ())
 ... | inj₂ (inj₂ ())
 good-split (inScan f z c) s g with good-split c (scanS f z s) g
-... | _ , gf with unF c _ gf
-... | inj₁ ()
+... | gc , gf with unF c _ gf
+... | inj₁ gm = gc , gm
 ... | inj₂ (inj₁ ())
 ... | inj₂ (inj₂ ())
 good-split (inCut l a c) s g with good-split c (cutS l a s) g
@@ -256,6 +257,11 @@ postulate
   owing-row : ∀ {Γ A B} {ρ : DenEnv Γ} {b} f d n q (o : St Γ A) (ls : List (St Γ B)) → G ρ b (flatS (mergeᶠ nothing) f d n q o ls)
             → Owing (Flat.JoinT (λ a → pendRows ρ (f a)) (rows ρ o) d (rowsL ρ ls)) → Owing (rows ρ (flatS (mergeᶠ nothing) f d n q o ls))
 
+-- A SCAN OF A SOURCE OWING, OWES: a source value is a scan row only once
+-- a least value stands before it, so the row it is owed must have one.
+postulate
+  scan-owing : ∀ {A B} (f : B → A → B) z {t : EmissionSet A} → Owing t → Owing (Scan.ScanT f z t)
+
 -- A CONNECT WHOSE SOURCE OWES, OWES: a live connect's source row is a
 -- burst pin, an echo while the body runs, or a pin its own connect keeps,
 -- and once the body has ended the body's end is a row of its own.
@@ -266,11 +272,11 @@ postulate
 upo-liv : ∀ {R Γ A} (c : Ctx R Γ A) → UpO c → liv c ≡ true
 upo-liv top              _ = refl
 upo-liv (inMap f c)      u = upo-liv c u
+upo-liv (inScan f z c)   u = upo-liv c u
 upo-liv (inCut true a c) u rewrite upo-liv c u = refl
 upo-liv (inLn true c)    u = upo-liv c u
 upo-liv (inOuter (mergeᶠ nothing) f d n q ls c) (_ , u) = upo-liv c u
 upo-liv (inLanes (mergeᶠ nothing) f d n q o pre post c) (_ , _ , _ , _ , u) = upo-liv c u
-upo-liv (inScan f z c)    ()
 upo-liv (inCut false a c) ()
 upo-liv (inLn false c)    ()
 upo-liv (inTake i q w c)  ()
@@ -288,6 +294,7 @@ upo-liv (inBody k o c) (_ , u) = upo-liv c u
 need-of : ∀ {R Γ A} (c : Ctx R Γ A) {s : St Γ A} → UpO c → Good [] (plug c s) → Owing (rows (env c) s) → SrcO c (rows (env c) s) → Need c s
 need-of top                                     u g ow so = tt
 need-of (inMap f c)                             u g ow so = need-of c u g (map-owing f ow) so
+need-of (inScan f z c)                          u g ow so = need-of c u g (scan-owing f z ow) so
 need-of (inCut true a c)                        u g ow so = need-of c u g ow so
 need-of (inLn true c)                           u g ow so = need-of c u g ow so
 need-of (inOuter (mergeᶠ nothing) f d n q ls c) {s} (_ , u) g ow so =
@@ -321,6 +328,7 @@ Shut (inBody k o c)                    = Shut c
 closed-dead : ∀ {R Γ A} (c : Ctx R Γ A) → GoodC c → closed c ≡ true → liv c ≡ false ⊎ Shut c
 closed-dead top              _  ()
 closed-dead (inMap f c)      gc cl = closed-dead c gc cl
+closed-dead (inScan f z c)   gc cl = closed-dead c gc cl
 closed-dead (inCut false a c) _ _  = inj₁ (∧-zeroʳ (liv c))
 closed-dead (inCut true a c) gc cl with closed-dead c gc cl
 ... | inj₁ d = inj₁ (trans (∧-identityʳ (liv c)) d)
@@ -360,7 +368,7 @@ nothing₀ ng nl nb nh = record { node₀ = λ g → ⊥-elim (ng g) ; lane₀ =
 dead-swap : ∀ {R Γ A} (c : Ctx R Γ A) {s s′ : St Γ A} → liv c ≡ false → Swap₀ (env c) s s′ → Good [] (plug c s) → Good [] (plug c s′)
 dead-swap top               () sw g
 dead-swap (inMap f c)       dd sw g = dead-swap c dd (record { node₀ = node₀ sw ; lane₀ = λ () ; body₀ = λ _ () ; held₀ = λ () }) g
-dead-swap (inScan f z c)    dd sw g = dead-swap c dd (nothing₀ (λ ()) (λ ()) (λ _ ()) (λ ())) g
+dead-swap (inScan f z c)    dd sw g = dead-swap c dd (record { node₀ = node₀ sw ; lane₀ = λ () ; body₀ = λ _ () ; held₀ = λ () }) g
 dead-swap (inCut false a c) dd sw g = good-swap c (killed a sw) g
 dead-swap (inCut true a c)  dd sw g =
   dead-swap c (trans (sym (∧-identityʳ (liv c))) dd) (record { node₀ = node₀ sw ; lane₀ = λ () ; body₀ = λ { b (eq , g′ , _) → eq , node₀ sw g′ , tt } ; held₀ = λ () }) g
