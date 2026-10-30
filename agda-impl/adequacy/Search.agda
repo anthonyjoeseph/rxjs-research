@@ -39,7 +39,7 @@ open Machine using (St; Ctx; CS; cs; _⊕_; bodyM; Cand; Found; found; Focus; Ma
                     free; cpAt; cutAt; overAt; inScan; inTake; inSrc; inBody;
                     ofS; doneS; mapS; cutS; cpM; cutM; lnS; flatS; coldS; scanS; takeS; connS; joinS; inMap; inCut; inLn; inOuter; inLanes; nx; cp; attached; attAt; attM; pend) renaming (Ev to Evᴹ; over to overᶜ)
 open import adequacy.Rows using (acc-val; rows; rowsL; pendRows; toEv; Lanes; Each; Kth; AllEnd; EndsOf; Lane; reads; module Flat; module SwitchF; module ExhaustF; module BoundedF; ∅; Hot; Inbox; _∪_; Kept; Stops) renaming (kept to keptᴿ; stop to stopᴿ; left to leftᴿ; sub to subᴿ)
-open import adequacy.Cap using (irr; ⊑-<; <-⊑; ⊑-<⊑; ≮; dec; Past; OKᶜ; OKLᶜ; each-map; ok-cap; uncap; uncapL; cap-retag; cap-sub;
+open import adequacy.Cap using (irr; ⊑-<; <-⊑; ⊑-<⊑; ≮; dec; Past; OKᶜ; OKLᶜ; each-map; ok-cap; uncap; cap-retag; cap-sub;
   one; own-stills; first-stillsᶜ; first-at; lanes-firstᶜ; Calm; Quiet; QuietL; calm-map; EnvSingle; body-quiet; conn-free; conn-held; told-nil; join-head)
 open import adequacy.Bound using (Apart; <→⊑; Bd; Empty; From; Good; GoodL; GoodLn; MergeG; OK; OKL; Single; _⊑_; empty-any; ext-⊑; above-any; Above; After; held; raise-map; raise-scan; raise-cut; raise-take; raise-outer; raise-lane; from-empty; from-weak; ix01; kept; lane-ok; lane-v; mapped; of-from; of-shows; off; on; one-end; own-first; past-⊑; rooted-single; rooted-parts; Parts; scanned; seek-mark; shift-<; shift-≮; shift-⊑; silenced; ≺→⊑; ⊑-refl; ⊑-trans; ⊑i; ⊑→≼)
 
@@ -613,13 +613,3 @@ mutual
 seek-ok : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) (s : St [] A) → Good ρ s → OK (rows ρ s) (seek c s)
 seek-ok c s g = uncap (seek c s) (λ C → seek-okᶜ C c s (λ ()) g (λ ()))
 
-seek-ln : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) (s : St [] A) → GoodLn ρ s → OK (rows ρ s) (seek c s)
-seek-ln c s g = uncap (seek c s) (λ C → seek-lnᶜ C c s (λ ()) g (λ ()))
-
-lanes-ok : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) op f d n q (o : St [] A) pre (ls : List (St [] B)) → GoodL ρ ls
-         → OKL (rowsL ρ ls) (lanes c op f d n q o pre ls)
-lanes-ok {ρ = ρ} c op f d n q o pre ls gl = uncapL (rowsL ρ ls) (lanes c op f d n q o pre ls) (λ C → lanes-okᶜ C c op f d n q o pre ls (λ ()) gl (λ ()))
-
-join-ok : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) op (f : A → Obs Timeline [] B) d n (o : St [] A) ls {J : EmissionSet B}
-        → Racesᶜ R (rows ρ o) (rowsL ρ ls) d n [] J → Good ρ o → GoodL ρ ls → OK J (raceT d n [] (seek (inOuter op f d n [] ls c) o) (lanes c op f d n [] o [] ls))
-join-ok c op f d n o ls rc go gl = uncap _ (λ C → join-okᶜ C c op f d n [] o ls rc (λ ()) go gl (λ ()) (λ ()))

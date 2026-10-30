@@ -616,7 +616,7 @@ bg-wait:
 # load-bearing: without it a killed build leaves no terminal marker and
 # `bg-wait` blocks forever.  Full reasoning and both constraints on the
 # trap's output format: docs/bg.md.
-LOG ?= /tmp/rxjs-bg-$(T).log
+LOG ?= /tmp/rxjs-bg-$(notdir $(CURDIR))-$(T).log
 
 # bg-wait's poll interval, seconds.  Override with I=<n>.
 I ?= 60

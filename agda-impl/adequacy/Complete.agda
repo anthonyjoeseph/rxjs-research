@@ -5,7 +5,7 @@
 -- before.
 module adequacy.Complete where
 
-open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -29,7 +29,7 @@ open import adequacy.Rows using (Steps; conv; RT; Vis; Past; Lowest; Beyond; int
 open _≃_
 open import adequacy.Up using (≃-refl; ≃-trans)
 open import adequacy.Inv using (Inv; inv)
-open import adequacy.Sim using (sim-tau; sim-val; sim-fin; quiet-root)
+open import adequacy.Sim using (sim-tau; sim-val; sim-fin; quiet-root; drained-quiet)
 
 -- A run from `k` to `k′` showing `rs`.
 data Path {R : Set} : Conf R → Shownᴹ R → Conf R → Set₁ where
@@ -59,13 +59,13 @@ _⇜_ {R} k′ k = Σ _ λ τ → Driver.step R k ≡ Driver.silent τ k′
 postulate
   -- SILENT RUNS ARE FINITE: short of a row a reader meets next, a run
   -- takes finitely many silent steps.  Few rows lie before a met one, and
-  -- a silent step drops rows or advances finitely much bookkeeping.
+  -- each of's run before it is one of them.
+  -- DEAD ROUTE: a measure on the rows a silent step drops.  `of-next` reads
+  --   an of's run as a full `≃` on rows, as do the subscribes and the climbs,
+  --   so most silent steps drop no row and the measure never moves; a
+  --   strengthened `Moves.silent` tracking dropped rows would fuel nothing.
   silent-finite : ∀ {R} (o : PureObs [] R) {rs k p e} → Path (load o) rs k
                 → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ]) → Acc _⇜_ k
-
-  -- A DRAINED ENGINE OWES NOTHING VISIBLE: with no mark left, no row the
-  -- root is told of is owed.
-  drained-quiet : ∀ {R} {k : Conf R} → Inv k → Driver.step R k ≡ Driver.drained → ∀ {q e} → Vis (RT k) q e → ⊥
 
 module _ {R : Set} (o : PureObs [] R) where
   private

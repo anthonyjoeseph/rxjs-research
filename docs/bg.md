@@ -99,15 +99,13 @@ The second line is there because `pkill -f "bin/agda"` misses: the binary lives
 under a `libexec/ghc-*-inplace` path, and one process survived two rounds of the
 narrower pattern.
 
-## The default log is per TARGET, not per tree
+## The default log is per tree and per target
 
-`LOG` defaults to `/tmp/rxjs-bg-$(T).log`, and nothing in that path names the
-checkout. So two worktrees running the same target share one log. The second
-launch's `rm -f` unlinks the first build's log, the first build keeps writing
-into a file nobody can open by name, and the second one's verdict, a kill
-included, is what `bg-check` then reports for both. It reads as the first build
-dying, and that build is still running. Pass `LOG=` for any build outside the
-main checkout. A build whose log was unlinked can still be read through
+`LOG` defaults to `/tmp/rxjs-bg-<checkout dir>-$(T).log`. A path naming only
+the target let two worktrees share one log: the second launch's `rm -f`
+unlinked the first build's log, and `bg-check` reported the second build's
+verdict for both. Two checkouts with the same directory name still collide; pass
+`LOG=` there. A build whose log was unlinked can still be read through
 `/proc/<make pid>/fd/1`.
 
 ## macOS

@@ -16,13 +16,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE CONNECT'S SEARCH
 
-Riskiest: a connect's lead is stated whole, over the connect node, at an
-empty environment only, because its body's joiners read the binder. Its
-search keys its rows up to a cap the binder leaves quiet (`OKᶜ`); open
-whether the lead carries the same cap. Settled by a body, or a connect
-whose body's joiner leads a row before its source's find.
+Riskiest: the connect's lead is a body; what is left is how its source's
+rows and its body's sit against each other. Open whether an over connect's
+source ties at all, and whether the pure order already keeps the source past
+a body's find. Settled by bodies, or a program whose source row lands at or
+before a body find no later than it.
 
-Members: `conn-lead`.
+Members: `unfed-after`, `over-tight`, `conn-body-src`.
 
 #### THE COLD STEPPED
 
@@ -58,7 +58,7 @@ and lanes starting past their start's end bound every `waits` row above
 the find. Settled by bodies over `Rows.BoundedF`'s `Starts`, or a queued
 merge whose race shows a row the cap leaves quiet.
 
-Members: `queued-race`, `bounded-wait-lead`.
+Members: `queued-race`, `bounded-wait-leadᶜ`.
 
 #### THE CONNECT STEPPED
 
@@ -68,8 +68,8 @@ Open: whether `G`'s connect node (source held until subscribed, a
 completed source owing nothing) is enough for each; a source's end must
 leave its rows `Empty`. Settled when each is a body.
 
-Members: `sub-connect`, `sub-join`, `sub-joined`, `rise-src-nx`,
-`rise-src-cp`, `rise-body-nx`, `rise-body-cp`, `abs-con`, `abs-join`.
+Members: `sub-connect`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`,
+`rise-body-cp`, `abs-con`, `abs-join`.
 
 #### THE BINDER READ
 
@@ -118,25 +118,18 @@ Members: `rise-scan-nx`, `rise-scan-cp`.
 Untried: a take's search leads its rows; a value passing or failing,
 its end, its stop and its cut keep `Inv`. Settled when each is a body.
 
-Members: `take-lead`, `rise-take-nx`, `rise-take-fail`,
+Members: `take-leadᶜ`, `rise-take-nx`, `rise-take-fail`,
 `rise-take-cp`, `rise-take-owed`, `abs-stop`, `abs-cut`.
 
 #### THE SILENT RUN, FINITE
 
-Untried: short of a row a reader meets next, a run takes finitely many
-silent steps. Route: a lexicographic measure — visible rows owed before the
-met one (finitely many, by `Few`) then bookkeeping; needs `Moves.silent` to
-track rows, not only visible ones. Settled by a body, or a program whose
-engine stalls silently forever before a row its emission set holds.
+Open: short of a row a reader meets next, a run takes finitely many silent
+steps. Rows dropped is no fuel (an of's run drops none); the fuel must be
+state-level — the rows still held by ofs before the met one, by `Few`.
+Settled by a body, or a program whose engine stalls silently forever before
+a row its emission set holds.
 
 Members: `silent-finite`.
-
-#### THE DRAINED ENGINE
-
-Untried: an engine with no mark left owes no visible row. Settled by a body
-by state over `Inv`, or a drained state still owing one.
-
-Members: `drained-quiet`.
 
 #### THE GOOD TREE KEPT
 

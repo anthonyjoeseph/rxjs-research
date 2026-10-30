@@ -15,36 +15,37 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.List.Relation.Unary.Any using () renaming (here to hd)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Maybe using (just; nothing)
+open import Data.Maybe using (just; nothing) renaming (map to mapᴹ)
 open import Data.Product using (Σ; _,_; _×_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl)
 open import Data.List using (_ʳ++_)
 
 open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Timeline; root; Pos; ix; timelineAt; emit; stall; close)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; MapT; map-out; map-skip; map-pin; map-end; module Scan;
-  module TakeWhile; _≼_; _≺_; enter; ⟦_⟧; Proper; Den; Silent; Dep)
+  module TakeWhile; module Connecting; _≼_; _≺_; enter; ⟦_⟧; Proper; Den; Silent; Dep)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≼-or-≻; entered-few)
 open import denotation.Laws.Worlds using (GoodEnv; Lawful; Hots; InvAt)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; over; opening)
-open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; found; Mark; ofM; attM;
+open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; seek; found; Mark; ofM; attM;
                     rise; run; start; dequeue; settle; alive; ended; mapEv; nx; cp; attAt; attached; Torn;
                     Stepped; quiet; begin; admit; closed; killAll; unsubIf; free; cpAt; cutAt; overAt; cut; cpM; cutM; CS; cs; feed; closedUp; _⊕_;
-                    bodyM; srcAttM; owedM; joinM; leafM; Poke; gone; leaf;
+                    bodyM; srcAttM; owedM; joinM; leafM; Poke; gone; leaf; starting; turn;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (env; rows; pendRows; Closed; RT; toEv; Vis; Past; Lowest; Beyond; into; back; narrow; Plus; old; new; _≃_; _⇄_; silent; shown;
   Steps; Shows*; Shows*-≃; ≃-sym; conv; []; _∷_; tau; val; fin)
-open import adequacy.Bound using (Good; G; Rooted; mergeG₀)
+open import adequacy.Bound using (Good; G; Rooted; mergeG₀; OK)
+open import adequacy.Search using (seek-ok)
 open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
-open import adequacy.Skip using (After)
+open import adequacy.Skip using (After; after-conn)
 open import adequacy.Inv using (Inv; inv; good; Sim; Ends; open-alive)
 open import adequacy.LaneCp using (rise-lane-cp)
-open import adequacy.AbsOf using (abs-of)
+open import adequacy.AbsOf using (abs-of; up-plug)
 open import denotation.Read using (Meets; Run; Visible; loud; []; _∷_)
 open import adequacy.Swap using (Swap; good-swap)
 open import adequacy.Enter using (enter-map; enter-scan; enter-merge; flat-∅; enter-bounded; enter-switch; enter-exhaust; bounded-∅; switch-∅; exhaust-∅)
@@ -262,6 +263,32 @@ map-plus f t p cp = to′ ⇄ from′
     from′ new                = map-end new
 
 
+-- A BODY VALUE PASSES THROUGH ITS CONNECT: a value adds no end, so the
+-- body's liveness is unchanged.
+conn-plus-nx : ∀ {A B} r (σ : EmissionSet A) (β : EmissionSet B) p (v : B)
+             → Connecting.ConnT r σ (Plus β p (out v)) ≃ Plus (Connecting.ConnT r σ β) p (out v)
+conn-plus-nx r σ β p v = to′ ⇄ from′
+  where
+    live : ∀ {q} → (∀ {c} → Plus β p (out v) c end → q ≺ c) → ∀ {c} → β c end → q ≺ c
+    live al x = al (old x)
+
+    unlive : ∀ {q} → (∀ {c} → β c end → q ≺ c) → ∀ {c} → Plus β p (out v) c end → q ≺ c
+    unlive al (old x) = al x
+
+    to′ : ∀ {q e} → Connecting.ConnT r σ (Plus β p (out v)) q e → Plus (Connecting.ConnT r σ β) p (out v) q e
+    to′ (Connecting.body (old x))     = old (Connecting.body x)
+    to′ (Connecting.body new)         = new
+    to′ (Connecting.burst x i)        = old (Connecting.burst x i)
+    to′ (Connecting.echo {k} x al u ni) = old (Connecting.echo x (live {k} al) u ni)
+    to′ (Connecting.kept {_} {p′} x al ni i) = old (Connecting.kept x (live {p′} al) ni i)
+
+    from′ : ∀ {q e} → Plus (Connecting.ConnT r σ β) p (out v) q e → Connecting.ConnT r σ (Plus β p (out v)) q e
+    from′ (old (Connecting.body x))         = Connecting.body (old x)
+    from′ (old (Connecting.burst x i))      = Connecting.burst x i
+    from′ (old (Connecting.echo {k} x al u ni)) = Connecting.echo x (unlive {k} al) u ni
+    from′ (old (Connecting.kept {_} {p′} x al ni i)) = Connecting.kept x (unlive {p′} al) ni i
+    from′ new                               = Connecting.body new
+
 rise-map : ∀ {R Γ A B} (f : A → B) (c : Ctx R Γ B) s e p → Sim ⟨ inMap f c , s , rising e , p ⟩ [] ⟨ c , mapS f s , rising (mapEv f e) , p ⟩
 rise-map f c s e p i with alive s in al
 rise-map f c s e p (inv g (_ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
@@ -374,12 +401,25 @@ postulate
   -- A SOURCE'S END FEEDS ITS BODY AND CLOSES ITS CONNECT.
   rise-src-cp : ∀ {R Γ X B} (k : CS) (b : St (X ∷ Γ) B) (c : Ctx R Γ B) s p
               → Sim ⟨ inSrc k b c , s , rising cp , p ⟩ [] ⟨ c , connS (record k { closed = true ; endAt = p }) s (feed (hd refl) p cp b) , absorbed , p ⟩
-  -- A BODY'S VALUE IS ITS CONNECT'S.
-  rise-body-nx : ∀ {R Γ X B} (k : CS) (o : St Γ X) (c : Ctx R Γ B) s x p
-               → Sim ⟨ inBody k o c , s , rising (nx x) , p ⟩ [] ⟨ c , connS k o s , rising (nx x) , p ⟩
   -- A BODY'S END IS ITS CONNECT'S, ITS SOURCE OWED A TEARDOWN THERE.
+  -- DEAD ROUTE: the target Lead requires `Empty (ConnT r σ β)` from
+  --   `Ends cp`, but `Alive` in `ConnT r σ ∅` is vacuous (no body-end in
+  --   β), so source echoes appear and that fails when σ is non-empty.
+  --   With `After p σ` the source side is right, since `Plus β p end`
+  --   blocks source positions past p; the target `Plus (ConnT r σ β) p
+  --   end` still reads a vacuous Alive.  Blocked on a G invariant linking
+  --   a body's end to an empty σ.
   rise-body-cp : ∀ {R Γ X B} (k : CS) (o : St Γ X) (c : Ctx R Γ B) s p
                → Sim ⟨ inBody k o c , s , rising cp , p ⟩ [] ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
+
+-- A BODY'S VALUE IS ITS CONNECT'S.
+rise-body-nx : ∀ {R Γ X B} (k : CS) (o : St Γ X) (c : Ctx R Γ B) s x p
+             → Sim ⟨ inBody k o c , s , rising (nx x) , p ⟩ [] ⟨ c , connS k o s , rising (nx x) , p ⟩
+rise-body-nx k o c s x p i with alive s in al
+rise-body-nx k o c s x p (inv g (_ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
+rise-body-nx k o c s x p (inv g (uc , (afs , lc) , _ , af , _)) | true =
+  inv g (uc , lc , tt , after-conn (CS.connAt k) (rows (env c) o) (rows (env (inBody k o c)) s) {p} afs af , tt)
+  , silent (vis-≃ (up-≃ c (conn-plus-nx (CS.connAt k) _ _ p x)))
 
 rise-sim : ∀ {R Γ A} {k′ : Conf R} {sh t} (c : Ctx R Γ A) (s : St Γ A) e p → stepᴹ ⟨ c , s , rising e , p ⟩ ≡ moved k′ sh t → Sim ⟨ c , s , rising e , p ⟩ sh k′
 rise-sim top            s e p refl = rise-top s e p
@@ -478,7 +518,6 @@ postulate
 
 Mv : ∀ {R} → Stepped R → Set
 Mv (moved _ _ _) = ⊤
-Mv quiet         = ⊤
 Mv _             = ⊥
 
 admit-mv : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q o ls a p → Mv (admit c op f d n q o ls a p)
@@ -546,7 +585,7 @@ run-join-mv c j g x ((q , cp) ∷ ib)   p = tt
 
 -- The driver's steps read back as the engine's.
 module _ {R : Set} where
-  open Driver R using (took; value; complete) renaming (silent to τ)
+  open Driver R using (took; value; complete; drained) renaming (silent to τ)
 
   τ-moved : (x : Stepped R) → Mv x → ∀ {t k′} → took x ≡ τ t k′ → Σ Torn λ tr → x ≡ moved k′ [] tr
   τ-moved (moved k [] tr) _ refl = tr , refl
@@ -566,31 +605,49 @@ module _ {R : Set} where
   fin-moved (moved k ((_ , cp) ∷ rest) tr)   _ refl = k , rest , tr , refl
   fin-moved quiet _ ()
 
+  mv-drained : (x : Stepped R) → Mv x → took x ≢ drained
+  mv-drained (moved k [] tr)                _ ()
+  mv-drained (moved k ((_ , nx _) ∷ _) tr) _ ()
+  mv-drained (moved k ((_ , cp) ∷ _) tr)   _ ()
+  mv-drained quiet                          () _
+  mv-drained (starting _ _ _)               () _
+  mv-drained (turn _)                       () _
+
+  quiet-τ : ∀ {x t k′} → x ≡ quiet → took x ≢ τ t k′
+  quiet-τ refl ()
+
+  quiet-val : ∀ {x t p a k′} → x ≡ quiet → took x ≢ value t p a k′
+  quiet-val refl ()
+
+  quiet-fin : ∀ {x p} → x ≡ quiet → took x ≢ complete p
+  quiet-fin refl ()
+
 -- A driver step that shows nothing: a cold's subscription or turn.
 module _ {R : Set} where
   open Driver R using (Step; played; value; complete; drained) renaming (silent to τ)
 
   Hush : Step → Set
   Hush (τ _ _) = ⊤
-  Hush drained = ⊤
   Hush _       = ⊥
 
-  played-hush : ∀ pk → Hush (played pk)
-  played-hush gone                                         = tt
-  played-hush (leaf true (ending e) cl dv st)              = tt
-  played-hush (leaf false l cl dv st)                      = tt
-  played-hush (leaf true (play τ′ u i t fr) true dv st)    = tt
-  played-hush (leaf true over true dv st)                  = tt
-  played-hush (leaf true (play τ′ u i t (emit a k)) false dv st) = tt
-  played-hush (leaf true (play τ′ u i t (stall k)) false dv st)  = tt
-  played-hush (leaf true (play τ′ u i t (close k)) false dv st)  = tt
-  played-hush (leaf true over false dv st)                 = tt
+  played-hush : ∀ {A} b l cl dv st → Hush (played (leaf {A = A} b l cl dv st))
+  played-hush true (ending e) cl dv st              = tt
+  played-hush false l cl dv st                      = tt
+  played-hush true (play τ′ u i t fr) true dv st    = tt
+  played-hush true over true dv st                  = tt
+  played-hush true (play τ′ u i t (emit a k)) false dv st = tt
+  played-hush true (play τ′ u i t (stall k)) false dv st  = tt
+  played-hush true (play τ′ u i t (close k)) false dv st  = tt
+  played-hush true over false dv st                 = tt
 
   hush-val : ∀ {x t p a k′} → Hush x → x ≡ value t p a k′ → ⊥
   hush-val h refl = h
 
   hush-fin : ∀ {x p} → Hush x → x ≡ complete p → ⊥
   hush-fin h refl = h
+
+  hush-drained : ∀ {x} → Hush x → x ≢ drained
+  hush-drained h refl = h
 
 ------------------------------------------------------------------------
 -- The run
@@ -610,21 +667,35 @@ join-sim c x q p refl | false = sub-join c x q p cu
 data Reach {R} (k : Conf R) : Set₁ where
   within : Mv (stepᴹ k) → (∀ {k′ sh t} → stepᴹ k ≡ moved k′ sh t → Sim k sh k′) → Reach k
   driven : Hush (Driver.step R k) → (∀ {t k′} → Driver.step R k ≡ Driver.silent t k′ → Sim k [] k′) → Reach k
+  stills : stepᴹ k ≡ quiet → (∀ {q e} → Vis (RT k) q e → ⊥) → Reach k
 
 -- A step linked, read off the step itself, so a search's outcome can be
 -- abstracted in it.
 data Link {R} (k : Conf R) : Stepped R → Set₁ where
   mvL   : ∀ {x} → Mv x → (∀ {k′ sh t} → x ≡ moved k′ sh t → Sim k sh k′) → Link k x
   hushL : ∀ {x} → Hush (Driver.took R x) → (∀ {t k′} → Driver.took R x ≡ Driver.silent t k′ → Sim k [] k′) → Link k x
+  stillL : (∀ {q e} → Vis (RT k) q e → ⊥) → Link k quiet
 
 linked : ∀ {R} {k : Conf R} → Link k (stepᴹ k) → Reach k
-linked (mvL mv sim)  = within mv sim
-linked (hushL h sim) = driven h sim
+linked {k = k} = go refl
+  where
+    go : ∀ {x} → stepᴹ k ≡ x → Link k x → Reach k
+    go eq   (stillL v)    = stills eq v
+    go refl (mvL mv sim)  = within mv sim
+    go refl (hushL h sim) = driven h sim
+
+-- A good tree whose search finds nothing has no rows.
+search-none : ∀ {R} (t : St [] R) → Good []ᴬ t → search top t ≡ nothing → ∀ {q e} → rows []ᴬ t q e → ⊥
+search-none t g = go (seek top t) (seek-ok top t g)
+  where
+    go : ∀ y → OK (rows []ᴬ t) y → mapᴹ proj₁ y ≡ nothing → ∀ {q e} → rows []ᴬ t q e → ⊥
+    go nothing  e _ = e
+    go (just _) _ ()
 
 -- A mark run, by what the search found.
 abs-link : ∀ {R Γ A} (c : Ctx R Γ A) s p → Inv ⟨ c , s , absorbed , p ⟩ → Link ⟨ c , s , absorbed , p ⟩ (stepᴹ ⟨ c , s , absorbed , p ⟩)
 abs-link c s p i with search top (plug c s) in fd
-... | nothing = mvL tt λ ()
+... | nothing = stillL λ v → search-none (plug c s) (good i) fd (_≃_.to (up-plug c s) (proj₁ v))
 ... | just (found (_ , _ , c′ , s′) m κ) with found-mark c s (good i) fd
 ...   | ofK j q xs     = mvL (run-of-mv c′ j q xs p) (λ eq → abs-of p fd eq)
 ...   | attK l q s₀    = mvL (run-att-mv c′ l q s₀ p) (λ eq → abs-att p fd eq)
@@ -632,7 +703,7 @@ abs-link c s p i with search top (plug c s) in fd
 ...   | joinK j g x ib = mvL (run-join-mv c′ j g x ib p) (λ eq → abs-join p fd eq)
 ...   | stopK j q r s₀ = mvL tt (λ eq → abs-stop p fd eq)
 ...   | cutK j q r s₀  = mvL (run-cut-mv c′ j q r s₀ p) (λ eq → abs-cut p fd eq)
-...   | leafK b l      = hushL (played-hush (leaf b l (closed c′) (λ e l′ b′ p′ → ⟨ c′ , coldS b′ l′ , (if not (closed c′) then rising e else absorbed) , p′ ⟩) (λ l′ → ⟨ c′ , coldS b l′ , absorbed , p ⟩))) (λ eq → abs-leaf p fd eq)
+...   | leafK b l      = hushL (played-hush b l (closed c′) (λ e l′ b′ p′ → ⟨ c′ , coldS b′ l′ , (if not (closed c′) then rising e else absorbed) , p′ ⟩) (λ l′ → ⟨ c′ , coldS b l′ , absorbed , p ⟩)) (λ eq → abs-leaf p fd eq)
 
 reach-pend : ∀ {R Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) q p → Inv ⟨ c , pend o q , subscribing , p ⟩ → Reach ⟨ c , pend o q , subscribing , p ⟩
 reach-pend c empty                           q p i = within tt λ { refl → sub-empty c q p }
@@ -675,6 +746,7 @@ sim-tau {k = k} i e = go (reach k i)
     go (within mv sim) with τ-moved (stepᴹ k) mv e
     ... | _ , eq with sim eq i
     ...   | i′ , silent q = i′ , q
+    go (stills eq _) = ⊥-elim (quiet-τ eq e)
 
 -- A value shows the least visible row and drops it.
 sim-val : ∀ {R} {k k′ : Conf R} {t p a} → Inv k → Driver.step R k ≡ Driver.value t p a k′
@@ -683,6 +755,7 @@ sim-val {k = k} i e = go (reach k i)
   where
     go : Reach k → _
     go (driven h sim) = ⊥-elim (hush-val h e)
+    go (stills eq _)  = ⊥-elim (quiet-val eq e)
     go (within mv sim) with val-moved (stepᴹ k) mv e
     ... | _ , _ , eq with sim eq i
     ...   | i′ , shown v lt q = i′ , (v , λ {q} {e′} → lt {q} {e′}) , q
@@ -693,9 +766,19 @@ sim-fin {k = k} i e = go (reach k i)
   where
     go : Reach k → _
     go (driven h sim) = ⊥-elim (hush-fin h e)
+    go (stills eq _)  = ⊥-elim (quiet-fin eq e)
     go (within mv sim) with fin-moved (stepᴹ k) mv e
     ... | _ , _ , _ , eq with sim eq i
     ...   | _ , shown v lt _ = v , λ {q} {e′} → lt {q} {e′}
+
+-- A drained engine owes nothing visible.
+drained-quiet : ∀ {R} {k : Conf R} → Inv k → Driver.step R k ≡ Driver.drained → ∀ {q e} → Vis (RT k) q e → ⊥
+drained-quiet {k = k} i e = go (reach k i)
+  where
+    go : Reach k → ∀ {q e} → Vis (RT k) q e → ⊥
+    go (within mv sim) _ = mv-drained (stepᴹ k) mv e
+    go (driven h sim)  _ = hush-drained h e
+    go (stills _ v)      = v
 
 -- Whatever a run from `k` shows, a reader of its rows is shown.
 sound-from : ∀ {R} {k : Conf R} → Inv k → ∀ {rs} → Steps k rs → Shows* (RT k) (conv rs)
