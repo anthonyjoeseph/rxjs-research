@@ -39,13 +39,13 @@ Members: `enter-bounded`, `enter-switch`, `enter-exhaust`,
 `rise-exhaust-drop`, `rise-exhaust-cp`, `rise-exhaust-lane-nx`,
 `rise-exhaust-lane-cp`.
 
-#### THE JOINERS' SEARCH
+#### THE QUEUED SEARCH
 
-A joiner's search is stated whole, over the node, as a connect's is:
-its find keys and leads its rows. Settled by bodies over `MergeG`.
+A bounded merge's search with values waiting keys and leads its rows: a
+lane's end hands off to the queue's first just past it. Settled by
+bodies over the bounded schedule's `Queued` and `Starts`.
 
-Members: `bounded-ok`, `switch-ok`, `exhaust-ok`, `bounded-lead`,
-`switch-lead`, `exhaust-lead`.
+Members: `bounded-wait-ok`, `bounded-wait-lead`.
 
 #### THE CONNECT'S SEARCH
 
@@ -94,6 +94,14 @@ of whose run shows.
 
 Members: `shut-of`.
 
+#### ONE EVENT A POSITION
+
+Untried: a good node's rows hold one event at a position: a merge's
+parts apart by `Rooted`, a connect's body and source echoes by world.
+Settled by a body by former, or a good tree with two rows at a position.
+
+Members: `rows-single`.
+
 #### THE SCAN STEPPED
 
 Untried: a scan's rising value is its source's least, so the fold of it
@@ -104,12 +112,10 @@ Members: `rise-scan-nx`, `rise-scan-cp`.
 
 #### THE TAKE STEPPED
 
-Untried: a take's search keys and leads its rows, stated whole as a
-connect's is; a value passing or failing, its end, its stop and its cut
-keep `Inv`. Open: whether the child's find bounds the rows before its
-key, which a passing value's `¬ Failed` needs. Settled when each is a body.
+Untried: a take's search leads its rows; a value passing or failing,
+its end, its stop and its cut keep `Inv`. Settled when each is a body.
 
-Members: `take-ok`, `take-lead`, `rise-take-nx`, `rise-take-fail`,
+Members: `take-lead`, `rise-take-nx`, `rise-take-fail`,
 `rise-take-cp`, `rise-take-owed`, `abs-stop`, `abs-cut`.
 
 #### THE COMPLETE HALF
@@ -164,15 +170,6 @@ subscription reads as its body one level down. Settled when each is a
 body.
 
 Members: `sub-empty`, `sub-of`, `sub-defer`.
-
-#### THE JOINERS' ROWS RESPECTED
-
-Believed: a joiner part way through respects equal parts and a skip in
-its parts as a merge's rows do. Settled by bodies mirroring `Skip`'s
-`flat-≈` and `Up`'s `row-≃`.
-
-Members: `bounded-≃`, `switch-≃`, `exhaust-≃`, `since-bounded`,
-`since-switch`, `since-exhaust`, `bounded-≈`, `switch-≈`, `exhaust-≈`.
 
 #### THE KEYS
 
