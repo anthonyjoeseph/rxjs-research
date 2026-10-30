@@ -17,11 +17,14 @@ open import Data.Unit using (⊤)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos)
-open import denotation.EmissionSet using (EmissionSet; out; end; Ended; module Values; module Joining; Truncate; Reach; MapT; map-out; map-skip; map-pin; map-end; DenEnv; module Connecting; module Scan; module TakeWhile)
+open import denotation.EmissionSet using (EmissionSet; out; end; Ended; module Values; module Joining; Truncate; Reach; MapT; map-out;
+  map-skip; map-pin; map-end; module Connecting; module Scan; module TakeWhile)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; St; CS; free; cpAt; cutAt; overAt; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (TakeR; kept; Stops; stop; left; up; env; rows; Hot; pendRows; Vis; Plus; old; new; rowsL;
-  Lane; From; Lanes; Each; Kth; AllEnd; EndsOf; module Flat; module BoundedF; module SwitchF; module ExhaustF; _≃_; _⇄_; ≃-sym)
+open import adequacy.Causal using (rows-hot)
+open import adequacy.Rows using (TakeR; kept; Stops; stop; left; up; env; pendRows; Vis; Plus; old; new; rowsL; Lane; From;
+  Lanes; Each; Kth; AllEnd; EndsOf; module Flat; module BoundedF; module SwitchF;
+  module ExhaustF; _≃_; _⇄_; ≃-sym)
 
 open _≃_
 
@@ -411,13 +414,6 @@ conn-≃ {A} {B} r es eb = go es eb ⇄ go (≃-sym es) (≃-sym eb)
     go es eb (Connecting.burst x i)        = Connecting.burst (to es x) i
     go es eb (Connecting.echo x al u ni)   = Connecting.echo (to es x) (λ y → al (from eb y)) u ni
     go es eb (Connecting.kept x al ni i)   = Connecting.kept (to es x) (λ y → al (from eb y)) ni i
-
--- A BINDER'S MEANING, UP TO THE SAME ROWS: a body reads its binder only
--- through the rows it holds, so the same rows bound give the same body.
--- By induction over the state and, under a pending subscription, over
--- the program's meaning, every operator reading its inputs row by row.
-postulate
-  rows-hot : ∀ {Γ X B} {t u : EmissionSet X} (k : CS) (ρ : DenEnv Γ) (b : St (X ∷ Γ) B) → t ≃ u → rows (Hot t k ∷ᴬ ρ) b ≃ rows (Hot u k ∷ᴬ ρ) b
 
 -- THE CONGRUENCE.
 up-≃ : ∀ {R Γ A} (c : Ctx R Γ A) {t u : EmissionSet A} → t ≃ u → up c t ≃ up c u

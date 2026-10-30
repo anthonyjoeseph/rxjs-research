@@ -7,6 +7,7 @@
 module adequacy.ConnLead where
 
 open import Data.Bool using (true; false; T)
+open import Data.Empty using (⊥-elim)
 open import Data.List using (_∷_; _++_; [_])
 open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
 open import Data.List.Relation.Unary.Any using (here)
@@ -17,12 +18,15 @@ open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import denotation.Events using (ix)
-open import denotation.EmissionSet using (EmissionSet; module Connecting)
+open import denotation.EmissionSet using (EmissionSet; module Connecting; _≺_; Proper)
+open import denotation.Laws.Modulus using (upto; ≼-or-≻; ≺-irrefl; ≼-≺-≺; ≺-≼-≺; ≺→≼)
+open import denotation.Laws using (ag-cons; hot-below)
 open import operation.Key using (Key; at; _<ᴷ_)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; CS; Cand; found; still; shift; seek; own; ownBest; sourceT; closed; connS; inSrc; inBody)
-open import adequacy.Rows using (env; rows; Hot; ∅)
-open import adequacy.Bound using (_⊑_; ⊑i; ⊑-refl; ⊑-trans; <→⊑; ext-⊑; shift-⊑; Bd; From; Good)
+open import adequacy.Rows using (env; rows; Hot; ∅; _∪_; Closed)
+open import adequacy.Causal using (rows-causal; env-refl)
+open import adequacy.Bound using (_⊑_; ⊑i; ⊑-refl; ⊑-trans; <→⊑; ext-⊑; shift-⊑; Bd; From; Good; ⊑→≼)
 open import adequacy.Cap using (OKᶜ; EnvSingle; Air; bind-after; bind-past; meet; meet-ˡ; meet-ʳ; meet-hi; ext-<; ⊑-<; <-⊑; ≮; StillAt; still-at)
 open import adequacy.Skip using (After)
 open import adequacy.Leads using (Leads; Leadsᶜ; Beats; eSrc; eBody; OfAt; Occ; Tight; strict; tie; occ-bind; hit; tight-⊑; tight-occ;
@@ -52,12 +56,6 @@ raise-tight              (tie Q refl pq _) = strict (⊑-< (at (Q ++ [ ix 0 ])) 
 -- The gaps
 
 postulate
-  -- A BODY UNFED IS NO EARLIER THAN FED, UP TO ITS SOURCE'S FIRST ROW: a
-  -- binder row heard at `x` lands under `x`, so with no source row before
-  -- `P` the body's rows up to `P` are the same with its source or without.
-  unfed-after : ∀ {Γ X A} (ρ : _) k (o : St Γ X) (b : St (X ∷ Γ) A) → Good ρ (connS k o b) → ∀ P
-              → From (at P) (rows ρ o) → After P (rows (Hot (rows ρ o) k ∷ᴬ ρ) b) → After P (rows (Hot ∅ k ∷ᴬ ρ) b)
-
   -- A BODY'S FIND NO LATER THAN ITS SOURCE'S RAISED ONE: the source's
   -- rows lie strictly past the body's event.
   conn-body-src : ∀ {R Γ A X} (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvSingle (env c) → Good (env c) (connS k o b)
@@ -86,6 +84,22 @@ body-win C c k o b C₂ c₂ air kc bl aσ =
   where
     ly = proj₁ (bl C₂ c₂ air) (un kc)
 
+-- A BODY UNFED IS NO EARLIER THAN FED, UP TO ITS SOURCE'S FIRST ROW: a
+-- binder row heard at `x` lands under `x`, so with no source row before
+-- `P` the body's rows up to `P` are the same with its source or without.
+unfed-after : ∀ {Γ X A} (ρ : _) k (o : St Γ X) (b : St (X ∷ Γ) A) → ∀ P
+            → From (at P) (rows ρ o) → After P (rows (Hot (rows ρ o) k ∷ᴬ ρ) b) → After P (rows (Hot ∅ k ∷ᴬ ρ) b)
+unfed-after ρ k o b P fr aft {q} x with ≼-or-≻ q P
+... | inj₂ Pq = Pq
+... | inj₁ qP = aft (proj₂ (upto (rows-causal (ag-cons (hot-below fed unfed) (env-refl ρ)) b) {q} qP) x)
+  where
+    fed : ∀ {y e} → y ≺ P → Proper (rows ρ o ∪ Closed k) y e → Proper (∅ ∪ Closed k) y e
+    fed {y} yP (inj₁ s , _)  = ⊥-elim (≺-irrefl {P} (≼-≺-≺ {P} {y} {P} (⊑→≼ (fr s)) yP))
+    fed     yP (inj₂ c , pr) = inj₂ c , λ { (inj₁ ()) ; (inj₂ c′) → pr (inj₂ c′) }
+    unfed : ∀ {y e} → y ≺ P → Proper (∅ ∪ Closed k) y e → Proper (rows ρ o ∪ Closed k) y e
+    unfed     yP (inj₁ () , _)
+    unfed {y} yP (inj₂ c , pr) = inj₂ c , λ { {c′} (inj₁ s) → ≺→≼ {y} {c′} (≺-≼-≺ {y} {P} {c′} yP (⊑→≼ (fr s))) ; (inj₂ c′) → pr (inj₂ c′) }
+
 -- The source's find raised, the body's rows unfed past its event.
 src-win : ∀ {R Γ A X} C (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ Γ) A) → Good (env c) (connS k o b)
         → ∀ {Γ₁ A₁} {c₁ : Ctx R Γ₁ A₁} {s₁ m κ h₀ o′}
@@ -97,7 +111,7 @@ src-win C c k o b g {c₁ = c₁} {s₁} {m} {κ} {h₀} {o′} lx ox ab bf =
   eSrc (proj₁ lx′) , λ cl P oa →
     let (le , tg) = proj₂ lx′ cl P oa
         pk        = tight-⊑ tg
-    in (unfed-after (env c) k o b g P (λ r → ⊑-trans pk (from okx r)) (ab bf P (⊑-trans pk (shift-⊑ h₀))) , le)
+    in (unfed-after (env c) k o b P (λ r → ⊑-trans pk (from okx r)) (ab bf P (⊑-trans pk (shift-⊑ h₀))) , le)
        , raise-tight tg
   where
     bx  = un (up {h₀} {shift h₀} {C} (shift-⊑ h₀) bf)

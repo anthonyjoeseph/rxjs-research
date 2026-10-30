@@ -17,12 +17,11 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE CONNECT'S SEARCH
 
 Riskiest: how a connect's source rows and its body's sit against each
-other. Open: whether a body's find never shares a source row's position (an
-invariant `Good` does not yet state), and whether a body's rows read a
-source's emissions only at or past them. Settled by bodies, or a program
-whose source row lands at or before a body find no later than it.
+other. Open: whether a body's find never shares a source row's position, an
+invariant `Good` does not yet state. Settled by a body, or a program whose
+source row lands at or before a body find no later than it.
 
-Members: `unfed-after`, `conn-body-src`.
+Members: `conn-body-src`.
 
 #### THE COLD STEPPED
 
@@ -73,11 +72,11 @@ Members: `sub-connect`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`,
 
 #### THE BINDER READ
 
-Believed: a body reads its binder only through the binder's rows, and a
-good tree's connect source reads lawfully. Settled by bodies, or a body
-whose rows or goodness differ under equal binder rows.
+Believed: a body's goodness reads its binder only through the binder's
+rows, and a good tree's connect source reads lawfully. Settled by bodies,
+or a body whose goodness differs under equal binder rows.
 
-Members: `rows-hot`, `good-hot`, `src-lawful`.
+Members: `good-hot`, `src-lawful`.
 
 #### A SKIP UNDER A CONNECT
 
@@ -162,6 +161,14 @@ subscription reads as its body one level down. Settled when each is a
 body.
 
 Members: `sub-empty`, `sub-of`, `sub-defer`.
+
+#### THE JOINERS' AGREEMENT
+
+Believed: a joiner part way through reads its outer and lanes, begun or
+not, only at and below each row, as the denotation's joiner does. Settled
+by bodies, one generic over `Joining`'s policy if it fits all four.
+
+Members: `flat-ag`, `switch-ag`, `exhaust-ag`, `bounded-ag`.
 
 ## Tier 1 — the simultaneous spec
 
