@@ -61,7 +61,7 @@ private
     view (stop x nk nf)   = sh x nk nf sh-stop refl
     view (step x nf)      = sm x (s-own tt nf)
     view (tend x nf)      = sm x (s-own tt nf)
-    view (left x nf)      = sm x (s-left nf)
+    view (left x nf _)    = sm x (s-left nf)
 
     sh-plain : ∀ {a l e} → Sh a l e → Plain l
     sh-plain (sh-fail _) = plain-ix

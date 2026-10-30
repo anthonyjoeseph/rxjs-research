@@ -17,6 +17,12 @@
 -- rows with finitely many before them (`Truncate`).  A set could hold a row past infinity where a
 -- stream cannot; the operator would decide it from rows nobody reaches, and
 -- the limit and the operator would disagree on it.
+--
+-- A PIN IS REACHED THROUGH ITS OWN PAST: what came before its connect, and
+-- the burst before it (`Dep`).  The body between them can be cut from
+-- below, and rxjs then runs the burst, so a body that would never return
+-- hides it only where nothing cuts it: the reader (`Seen`) counts every
+-- row.  No operator decides anything from a pin.
 module denotation.EmissionSet where
 
 open import Data.Bool using (Bool; T; not)
@@ -42,7 +48,8 @@ open import denotation.Events using (Pos; Timeline; timelineAt; _<ᵖ_; inside; 
 -- `pin p`: unseen work of the connect subscribed at `p`, in its source's
 -- subscribe burst.  A cut stops everything else, and this too unless it
 -- fell before `p`: rxjs subscribes a connect's source whatever happened
--- to its body, and nothing can unsubscribe a source mid-subscribe.
+-- to its body, and nothing can unsubscribe a source mid-subscribe.  A
+-- kept pin lies under its connect, so a cut is read no later than it.
 data Ev (A : Set) : Set where
   out  : A → Ev A
   skip : Ev A
@@ -96,9 +103,23 @@ Proper t q e = t q e × (∀ {c} → t c end → q ≼ c)
 Few : ∀ {A} → EmissionSet A → Pos → Set
 Few t q = Σ (List Pos) λ ks → ∀ {k e′} → t k e′ → k ≺ q → k ∈ ks
 
--- The rows with finitely many rows before them.
+-- A pin's past: before its connect, or the connect's burst.
+PDep : ∀ {A} → Pos → Pos → Ev A → Set
+PDep r k e′ = k ≺ r ⊎ e′ ≡ pin r
+
+-- What a row at `q` waits on: a pin under its connect, its past; any
+-- other row, everything before it.
+Dep : ∀ {A} → Pos → Ev A → Pos → Ev A → Set
+Dep q (pin r) k e′ = T (inside r q) → PDep r k e′
+Dep q _       k e′ = ⊤
+
+-- Finitely many rows the row at `q` waits on.
+Reach : ∀ {A} → EmissionSet A → Pos → Ev A → Set
+Reach t q e = Σ (List Pos) λ ks → ∀ {k e′} → t k e′ → k ≺ q → Dep q e k e′ → k ∈ ks
+
+-- The rows with finitely many rows they wait on.
 Truncate : ∀ {A} → EmissionSet A → EmissionSet A
-Truncate t q e = t q e × Few t q
+Truncate t q e = t q e × Reach t q e
 
 -- What a subscriber reaches: a proper row with finitely many rows before it.
 Seen : ∀ {A} → EmissionSet A → EmissionSet A
@@ -197,7 +218,7 @@ module TakeWhile {A : Set} (incl : Bool) (keep : A → Bool) (t : EmissionSet A)
     stop  : ∀ {q a} → t q (out a) → T (not (keep a)) → ¬ Failed q → TakeT (q ++ [ last ]) end
     step  : ∀ {q} → t q skip → ¬ Failed q → TakeT q skip
     tend  : ∀ {q} → t q end → ¬ Failed q → TakeT q end
-    left  : ∀ {q r} → t q (pin r) → ¬ Failed r → TakeT q (pin r)
+    left  : ∀ {q r} → t q (pin r) → ¬ Failed r → T (inside r q) → TakeT q (pin r)
 
 ------------------------------------------------------------------------
 -- Joiners
@@ -219,8 +240,8 @@ Ended t c = Σ Pos λ c₀ → t c₀ end × c₀ ≼ c
 -- read as the lane `Lane q a` wherever the policy subscribes it; and the
 -- rows `Bg` of the lanes already begun, over by `c` where `Over c` holds
 -- along with the outer.  A lane counts until it is cut (`Cut q k`, closed
--- upward in `k`); past that, its pins stay whose connect it had subscribed
--- by the cut.  A lane's end at `c` where
+-- upward in `k`); its pins stay whose connect it had subscribed by the
+-- cut.  A lane's end at `c` where
 -- `Hand c` holds hands its place to a queued lane: it shows silent at its
 -- first effect `c ++ [ ix 0 ]`, the queued lane subscribing at its second.
 -- The whole ends where the last part does; every other end is a skip.
@@ -241,7 +262,7 @@ module Joining {A B : Set} (Lane : Pos → A → EmissionSet B) (o : EmissionSet
     lend  : ∀ {q a c} → o q (out a) → Runs q → Lane q a c end → ¬ Cut q c → ¬ Hand c → Done c → JoinT c end
     lpass : ∀ {q a c} → o q (out a) → Runs q → Lane q a c end → ¬ Cut q c → ¬ Hand c → ¬ Done c → JoinT c skip
     hand  : ∀ {q a c} → o q (out a) → Runs q → Lane q a c end → ¬ Cut q c → Hand c → JoinT (c ++ [ ix 0 ]) skip
-    left  : ∀ {q a k r} → o q (out a) → Runs q → Lane q a k (pin r) → Cut q k → ¬ Cut q r → JoinT k (pin r)
+    left  : ∀ {q a k r} → o q (out a) → Runs q → Lane q a k (pin r) → ¬ Cut q r → T (inside r k) → JoinT k (pin r)
     run   : ∀ {k e} → Bg k e → Work e → JoinT k e
     rend  : ∀ {c} → Bg c end → ¬ Hand c → Done c → JoinT c end
     rpass : ∀ {c} → Bg c end → ¬ Hand c → ¬ Done c → JoinT c skip
@@ -343,11 +364,10 @@ module Exhaust {A B : Set} (f : A → Den B) (o : EmissionSet A) where
 
 -- Subscribed at `p`: the body at `p ++ [ ix 0 ]` over the source made hot,
 -- then the source at `r = p ++ [ ix 1 ]`.  Each source step at `k` shows
--- silent at its first effect if the body has not ended by `k`; once it
--- has, what remains of the source's subscribe burst still runs, at its
--- own positions, and so do the source's pins whose connect it subscribed
--- while the body ran.  The body's end ends the connect.  The burst is
--- this connect's pins; the source's other rows keep their own.
+-- silent at its first effect.  The subscribe burst is this connect's pins
+-- and runs whatever the body did; past it, a step shows only while the
+-- body runs, and the source's own pins only whose connect it subscribed
+-- while the body ran.  The body's end ends the connect.
 --
 -- Liveness is read AT `k`, never at the shown row: a body end at
 -- `k ++ [ ix 0 ]` lies in the source's world, which no lawful body
@@ -366,12 +386,10 @@ module Connecting {A B : Set} (p : Pos) (σ : EmissionSet A) (β : EmissionSet B
   Alive q = ∀ {c} → β c end → q ≺ c
 
   data ConnT : EmissionSet B where
-    body   : ∀ {k e} → β k e → ConnT k e
-    shown  : ∀ {k e} → σ k e → Alive k → T (inside r k) → ConnT (k ++ [ ix 0 ]) (pin p)
-    echo   : ∀ {k e} → σ k e → Alive k → Unpinned e → T (not (inside r k)) → ConnT (k ++ [ ix 0 ]) skip
-    relay  : ∀ {k p′} → σ k (pin p′) → Alive k → T (not (inside r k)) → ConnT (k ++ [ ix 0 ]) (pin p′)
-    pinned : ∀ {k e} → σ k e → ¬ Alive k → T (inside r k) → ConnT k (pin p)
-    kept   : ∀ {k p′} → σ k (pin p′) → ¬ Alive k → Alive p′ → T (not (inside r k)) → ConnT k (pin p′)
+    body  : ∀ {k e} → β k e → ConnT k e
+    burst : ∀ {k e} → σ k e → T (inside r k) → ConnT (k ++ [ ix 0 ]) (pin p)
+    echo  : ∀ {k e} → σ k e → Alive k → Unpinned e → T (not (inside r k)) → ConnT (k ++ [ ix 0 ]) skip
+    kept  : ∀ {k p′} → σ k (pin p′) → Alive p′ → T (not (inside r k)) → T (inside p′ k) → ConnT (k ++ [ ix 0 ]) (pin p′)
 
 module Connect {A B : Set} (s : Den A) (F : Den A → Den B) (p : Pos) where
 

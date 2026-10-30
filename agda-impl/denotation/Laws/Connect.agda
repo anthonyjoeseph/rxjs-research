@@ -188,37 +188,23 @@ module _ {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
   pin-at {y} k (pin p′) x ky refl | false with InvAt.pinned Iσ x
   ... | w⁼ , i = inW (shrink⁼ w⁼) , ⊑-inside (⊑-trans (inside-⊑ p′ k i) ky)
 
-  -- A row kept past the body's end: in the burst, or a pin whose connect
-  -- subscribed while the body ran.
-  Stays : Pos → Ev A → Set
-  Stays y e = T (inside r y) ⊎ Σ Pos λ p′ → e ≡ pin p′ × Alive p′
+  -- Why a source row shows: the body still runs, it is in the burst, or
+  -- it is a pin whose connect subscribed while the body ran.
+  data Why (k : Pos) : Ev A → Set where
+    live : ∀ {e′} → Alive k → Why k e′
+    brst : ∀ {e′} → T (inside r k) → Why k e′
+    kpt  : ∀ {p′} → Alive p′ → Why k (pin p′)
 
   -- A connect row, its position free.
   data V (y : Pos) (e : Ev B) : Set where
     vb : β y e → V y e
-    vs : ∀ {k e′} → σ k e′ → Alive k → y ≡ k ++ [ ix 0 ] → e ≡ tag k e′ → V y e
-    vp : ∀ {e′} → σ y e′ → ¬ Alive y → Stays y e′ → e ≡ tag y e′ → V y e
+    vs : ∀ {k e′} → σ k e′ → Why k e′ → y ≡ k ++ [ ix 0 ] → e ≡ tag k e′ → V y e
 
   view : ∀ {y e} → Truncate ConnT y e → V y e
-  view (body x , _)          = vb x
-  view (shown x a i , _)     = vs x a refl (tag-in i)
-  view (echo x a u o , _)    = vs x a refl (trans (own-unpinned u) (tag-out o))
-  view (relay x a o , _)     = vs x a refl (tag-out o)
-  view (pinned x a i , _)    = vp x a (inj₁ i) (tag-in i)
-  view (kept x a a′ o , _)   = vp x a (inj₂ (_ , refl , a′)) (tag-out o)
-
-  -- UNDER A SOURCE ROW THE BODY IS ALIVE: an end at or before it would
-  -- put the body row in that end's burst, below a body position leading
-  -- the source row.
-  alive-at : ∀ {k e l ys e′} → σ k e → β (k ++ l ∷ ys) e′ → Alive k
-  alive-at {k} {l = l} {ys} x b {c} ce with ≼-or-≻ c k
-  ... | inj₂ kc = kc
-  ... | inj₁ ck with InvAt.burst Iβ ce b (≼-≺-≺ {c} {k} {k ++ l ∷ ys} ck (≺-ext k ys))
-  ...   | w , w⁼ , ic , ib with ⊑-cmp w k (inside-⊑ w _ ib) (l ∷ ys , refl)
-  ...     | inj₁ wk = ⊥-elim (body-leads w⁼ (sw x) wk)
-  ...     | inj₂ kw with ⊑-trans kw (inside-⊑ w c ic)
-  ...       | [] , eq     = ⊥-elim (apart rp (subst (Anc p₀) (trans eq (++-identityʳ k)) (world-anc⁼ (bw ce))) (world-anc⁼ (sw x)))
-  ...       | z ∷ zs , eq = subst (k ≺_) (sym eq) (≺-ext k zs)
+  view (body x , _)       = vb x
+  view (burst x i , _)    = vs x (brst i) refl (tag-in i)
+  view (echo x a u o , _) = vs x (live a) refl (trans (own-unpinned u) (tag-out o))
+  view (kept x a o _ , _) = vs x (kpt a) refl (tag-out o)
 
   -- A body row is not a source row's first child, nor a source row.
   shown-body : ∀ {y e k e′} → β y e → σ k e′ → y ≡ k ++ [ ix 0 ] → ⊥
@@ -229,78 +215,60 @@ module _ {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
   fu : ∀ {y e e′} → V y e → V y e′ → e ≡ e′
   fu (vb b)         (vb b′)        = InvAt.func Iβ b b′
   fu (vb b)         (vs x _ eq _)  = ⊥-elim (shown-body b x eq)
-  fu {y} (vb b)     (vp x _ _ _)   = ⊥-elim (body-leads (bw b) (sw x) (⊑-refl y))
   fu (vs x _ eq _)  (vb b)         = ⊥-elim (shown-body b x eq)
-  fu {y} (vp x _ _ _) (vb b)       = ⊥-elim (body-leads (bw b) (sw x) (⊑-refl y))
   fu (vs {k} x _ eq e₁) (vs {k′} x′ _ eq′ e₂) with ∷ʳ-injectiveˡ k k′ (trans (sym eq) eq′)
   ... | refl with InvAt.func Iσ x x′
   ...   | refl = trans e₁ (sym e₂)
-  fu (vs x _ refl _) (vp x′ _ _ _) = ⊥-elim (InvAt.flat Iσ x x′)
-  fu (vp x _ _ _) (vs x′ _ refl _) = ⊥-elim (InvAt.flat Iσ x′ x)
-  fu (vp x _ _ e₁) (vp x′ _ _ e₂) with InvAt.func Iσ x x′
-  ... | refl = trans e₁ (sym e₂)
 
   fl : ∀ {y e l ys e′} → V y e → V (y ++ l ∷ ys) e′ → ⊥
   fl (vb b) (vb b′) = InvAt.flat Iβ b b′
   fl {y} {l = l} {ys} (vb b) (vs {k} x _ eq _) with ⊑-snoc k (l ∷ ys , sym eq)
   ... | inj₁ yk = body-leads (bw b) (sw x) yk
   ... | inj₂ e₂ = ext≢ y ys (trans eq (sym e₂))
-  fl {l = l} {ys} (vb b) (vp x _ _ _) = body-leads (bw b) (sw x) (l ∷ ys , refl)
   fl {l = l} {ys} (vs {k} x _ refl _) (vb b) with source-leads (sw x) (bw b) (ix 0 ∷ l ∷ ys , ++-assoc k [ ix 0 ] (l ∷ ys))
   ... | h , e , (_ , σh) , kh , (ms , eq) with same-lead Iσ x (proj₁ σh) kh
   ...   | refl = diverge k (l ∷ ys) ms (λ ()) eq
   fl {l = l} {ys} (vs {k} x _ refl _) (vs {k′} x′ _ eq _) with ⊑-snoc k′ (l ∷ ys , sym eq)
   ... | inj₁ le = flat-under Iσ x x′ le
   ... | inj₂ e₂ = ext≢ (k ++ [ ix 0 ]) ys (trans eq (sym e₂))
-  fl {l = l} {ys} (vs x _ refl _) (vp x′ _ _ _) = flat-under Iσ x x′ (l ∷ ys , refl)
-  fl (vp x na _ _) (vb b) = na (alive-at x b)
-  fl {y} {l = l} {ys} (vp x na _ _) (vs {k′} x′ a′ eq _) with ⊑-snoc k′ (l ∷ ys , sym eq)
-  ... | inj₂ e₂ = ext≢ y ys (trans eq (sym e₂))
-  ... | inj₁ yk with same-lead Iσ x x′ yk
-  ...   | refl = na a′
-  fl (vp x _ _ _) (vp x′ _ _ _) = InvAt.flat Iσ x x′
 
   between : ∀ {b c k} → b ≺ c → c ≺ k → b ⊑ k → b ⊑ c
   between {b} {c} bc ck (zs , refl) = <ᵖ-between b c zs (Equivalence.to T-≡ bc) (Equivalence.to T-≡ ck)
 
   bu : ∀ {c y e} → V c end → V y e → c ≺ y → Σ Pos λ w → W⁼ H p w × T (inside w c) × T (inside w y)
   bu (vs {k} {e′} _ _ _ eq) _ _ = end-tag k e′ eq
-  bu (vp {e′} _ _ _ eq) _ _     = end-tag _ e′ eq
   bu (vb ce) (vb b) cy with InvAt.burst Iβ ce b cy
   ... | w , w⁼ , i = w , inW (narrow⁼ σ-wp w⁼) , i
-  bu {c} (vb ce) (vs {k} x a refl _) cy with <ᵖ-between k c [ ix 0 ] (Equivalence.to T-≡ (a ce)) (Equivalence.to T-≡ cy)
+  bu {c} (vb ce) (vs {k} x (live a) refl _) cy with <ᵖ-between k c [ ix 0 ] (Equivalence.to T-≡ (a ce)) (Equivalence.to T-≡ cy)
   ... | zs , refl with source-leads (sw x) (bw ce) (zs , refl)
   ...   | h , e , (_ , σh) , kh , (ms , eq) with same-lead Iσ x (proj₁ σh) kh
   ...     | refl = ⊥-elim (≺-absurd {k ++ zs} {k ++ [ ix 0 ]} cy
                      (subst ((k ++ [ ix 0 ]) ≺_) (sym (trans eq (++-assoc k [ sub e ] ms)))
                        (Equivalence.from T-≡ (<ᵖ-part k {ix 0} {sub e} [] ms refl))))
-  bu {c} {k} (vb ce) (vp x na (inj₁ i) _) cy = p , here , ⊑-inside (between pc cy pk) , ⊑-inside pk
+  bu {c} (vb ce) (vs {k} x (brst i) refl _) cy = p , here , ⊑-inside (between pc cy py) , ⊑-inside py
     where
-      pk = pinned-under i
+      py = ⊑-trans (pinned-under i) (⊑-snoc⁺ k)
       pc : p ≺ c
       pc = ≺-≼-≺ {p} {p₀} {c} (≺-ext p []) (anc-≼ (world-anc⁼ (bw ce)) (InvAt.real Iβ ce))
-  bu {c} {k} (vb ce) (vp x na (inj₂ (p′ , refl , a′)) _) cy with InvAt.pinned Iσ x
-  ... | w⁼ , i = p′ , inW (shrink⁼ w⁼) , ⊑-inside (between (a′ ce) cy (inside-⊑ p′ k i)) , i
+  bu {c} (vb ce) (vs {k} x (kpt {p′} a′) refl _) cy with InvAt.pinned Iσ x
+  ... | w⁼ , i = p′ , inW (shrink⁼ w⁼) , ⊑-inside (between (a′ ce) cy py) , ⊑-inside py
+    where py = ⊑-trans (inside-⊑ p′ k i) (⊑-snoc⁺ k)
 
   qu : ∀ {c y e} → V c end → V y e → c ≺ y → Silent e
   qu (vs {k} {e′} _ _ _ eq) _ _ = end-tag k e′ eq
-  qu (vp {e′} _ _ _ eq) _ _     = end-tag _ e′ eq
   qu (vb ce) (vb b) cy                = InvAt.quiet Iβ ce b cy
   qu (vb _) (vs {k} {e′} _ _ _ refl) _ = tag-silent k e′
-  qu (vb _) (vp {e′} _ _ _ refl) _     = tag-silent _ e′
 
   -- A pin, where it lies.
   pi : ∀ {y r′} → V y (pin r′) → W⁼ H p r′ × T (inside r′ y)
   pi (vb b) with InvAt.pinned Iβ b
   ... | w⁼ , i = inW (narrow⁼ σ-wp w⁼) , i
   pi (vs {k} {e′} x _ refl eq) = pin-at k e′ x (⊑-snoc⁺ k) eq
-  pi (vp {e′} x _ _ eq)        = pin-at _ e′ x (⊑-refl _) eq
 
   -- UNDER A ROW'S CHILD LIES NO ROW: a body row's child is in the body's
   -- world, and a source row's in the source's.
   un : ∀ {q y w l e e′} → V q e → V y e′ → Plain l → W⁼ H (q ++ [ l ]) w → w ⊑ y → ⊥
   un (vb b) (vb b′) pl v le = InvAt.under Iβ b b′ pl (widen⁼ σ′ v) le
-  un (vb b) (vp x _ _ _) pl v le = body-leads (nest⁼ (inW (step (bw b) pl)) (widen⁼ σ′ v)) (sw x) le
   un {q} {l = l} (vb b) (vs {k} x _ refl _) pl v le with ⊑-snoc k le
   ... | inj₁ le′ = body-leads (nest⁼ (inW (step (bw b) pl)) (widen⁼ σ′ v)) (sw x) le′
   ... | inj₂ e with w-up plain-ix (subst (W⁼ H (q ++ [ l ])) e v)
@@ -308,20 +276,11 @@ module _ {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
   ...   | inj₂ v′ = body-leads (nest⁼ (inW (step (bw b) pl)) (widen⁼ σ′ v′)) (sw x) (⊑-refl k)
   un (vs {k} x _ refl _) (vb b) pl v le with source-leads (nest⁼ (inW (step (inW (step (sw x) plain-ix)) pl)) v) (bw b) le
   ... | h , _ , (_ , σh) , wh , _ = InvAt.under Iσ x (proj₁ σh) plain-ix (nest⁼ (inW (step here pl)) v) wh
-  un (vs {k} x _ refl _) (vp x′ _ _ _) pl v le = InvAt.under Iσ x x′ plain-ix (nest⁼ (inW (step here pl)) v) le
   un {l = l} (vs {k} x _ refl _) (vs {k′} x′ _ refl _) pl v le with ⊑-snoc k′ le
   ... | inj₁ le′ = InvAt.under Iσ x x′ plain-ix (nest⁼ (inW (step here pl)) v) le′
   ... | inj₂ e with w-up plain-ix (subst (W⁼ H ((k ++ [ ix 0 ]) ++ [ l ])) e v)
   ...   | inj₁ eq = InvAt.flat Iσ x (subst (λ z → σ z _) (sym (∷ʳ-injectiveˡ (k ++ [ ix 0 ]) k′ eq)) x′)
   ...   | inj₂ v′ = InvAt.under Iσ x x′ plain-ix (nest⁼ (inW (step here pl)) v′) (⊑-refl k′)
-  un (vp {_} x _ _ _) (vb b) pl v le with source-leads (nest⁼ (inW (step (sw x) pl)) v) (bw b) le
-  ... | h , _ , (_ , σh) , wh , _ = InvAt.under Iσ x (proj₁ σh) pl v wh
-  un (vp x _ _ _) (vp x′ _ _ _) pl v le = InvAt.under Iσ x x′ pl v le
-  un {q} {l = l} (vp x na _ _) (vs {k′} x′ a′ refl _) pl v le with ⊑-snoc k′ le
-  ... | inj₁ le′ = InvAt.under Iσ x x′ pl v le′
-  ... | inj₂ e with w-up plain-ix (subst (W⁼ H (q ++ [ l ])) e v)
-  ...   | inj₁ eq = na (subst Alive (sym (∷ʳ-injectiveˡ q k′ eq)) a′)
-  ...   | inj₂ v′ = InvAt.under Iσ x x′ pl v′ (⊑-refl k′)
 
   -- The connect's reading at an admissible `p`.
   connect-at : InvAt H p (Truncate ConnT)
@@ -338,19 +297,15 @@ module _ {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
     where
       wo : ∀ {y e} → Truncate ConnT y e → W H p y
       wo (body x , _)       = narrow σ-wp (InvAt.world Iβ x)
-      wo (shown x _ _ , _)    = step (inW (shrink (InvAt.world Iσ x))) plain-ix
-      wo (echo x _ _ _ , _)   = step (inW (shrink (InvAt.world Iσ x))) plain-ix
-      wo (relay x _ _ , _)    = step (inW (shrink (InvAt.world Iσ x))) plain-ix
-      wo (pinned x _ _ , _)   = shrink (InvAt.world Iσ x)
-      wo (kept x _ _ _ , _)   = shrink (InvAt.world Iσ x)
+      wo (burst x _ , _)    = step (inW (shrink (InvAt.world Iσ x))) plain-ix
+      wo (echo x _ _ _ , _) = step (inW (shrink (InvAt.world Iσ x))) plain-ix
+      wo (kept x _ _ _ , _) = step (inW (shrink (InvAt.world Iσ x))) plain-ix
 
       re : ∀ {y e} → Truncate ConnT y e → Real y
       re (body x , _)       = InvAt.real Iβ x
-      re (shown {k} x _ _ , _)   = real-snoc k {ix 0} plain-ix (InvAt.real Iσ x)
-      re (echo {k} x _ _ _ , _)  = real-snoc k {ix 0} plain-ix (InvAt.real Iσ x)
-      re (relay {k} x _ _ , _)   = real-snoc k {ix 0} plain-ix (InvAt.real Iσ x)
-      re (pinned x _ _ , _)      = InvAt.real Iσ x
-      re (kept x _ _ _ , _)      = InvAt.real Iσ x
+      re (burst {k} x _ , _)    = real-snoc k {ix 0} plain-ix (InvAt.real Iσ x)
+      re (echo {k} x _ _ _ , _) = real-snoc k {ix 0} plain-ix (InvAt.real Iσ x)
+      re (kept {k} x _ _ _ , _) = real-snoc k {ix 0} plain-ix (InvAt.real Iσ x)
 
 connect-inv : ∀ {A B H} {s : Den A} {F : Den A → Den B} → InvD H s → (∀ {t} → Lawful t → InvD (H ⊕ t) (F (hot t))) → InvD H (Op.connect s F)
 connect-inv {s = s} {F} Is IF p ok = connect-at {s = s} {F = F} Is IF p ok

@@ -11,7 +11,7 @@
 -- What follows an end follows the outer's end and every running lane's,
 -- so the outer's and the lanes' `burst` and `quiet` carry over.
 --
--- A switch's `left` rows never arise: a value cutting a lane past a pin's
+-- A `left` row is a lane's own: a value cutting a lane past a pin's
 -- connect would be an outer row under the lane's world.
 module denotation.Laws.JoinInv where
 
@@ -21,7 +21,7 @@ open import Data.List using ([]; _∷_; _++_; [_])
 open import Data.List.Properties using (++-identityʳ; ∷ʳ-injectiveˡ; ∷ʳ-injectiveʳ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit using (⊤)
+open import Data.Unit using (⊤; tt)
 open import Relation.Nullary using (¬_; yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
@@ -344,7 +344,7 @@ module JoinerI {A B H p} (ok : Ok H p) (f : A → Den B) (fi : ∀ a → InvD H 
   vw (lend x r l nc _ d)   = v-lane x l (l-end (r , nc) d)
   vw (lpass x r l nc _ nd) = v-lane x l (l-pass (r , nc) nd)
   vw (hand _ _ _ _ ())
-  vw (left x _ l c nc)     = ⊥-elim (let (w⁼ , i) = InvAt.pinned (LI x) (proj₁ l) in uncut x w⁼ i c nc)
+  vw (left x r l nc _)     = v-lane x l (l-work (r , λ c → let (w⁼ , i) = InvAt.pinned (LI x) (proj₁ l) in uncut x w⁼ i c nc) tt)
   vw (run () _)
   vw (rend () _ _)
   vw (rpass () _ _)
