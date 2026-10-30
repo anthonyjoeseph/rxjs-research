@@ -56,12 +56,13 @@ open Bd
 ------------------------------------------------------------------------
 -- The winner's key against its own rows
 
--- A row there the event's own: a value only as the value shown.
+-- A row there the event's own: a value only as the value shown, an end
+-- only as the end shown.
 Fits : ∀ {A} → Out A → Ev A → Set
 Fits o (out a) = o ≡ shows (nx a)
 Fits o skip    = ⊤
 Fits o (pin _) = ⊤
-Fits o end     = ⊤
+Fits o end     = o ≡ shows cp
 
 -- Some row at `Q`, short of saying which.
 record Occ {A} (t : EmissionSet A) (Q : Pos) (o : Out A) : Set where
@@ -309,7 +310,7 @@ map-leads {A = A} v f {t = t} (just (found (_ , _ , c′ , s′) m κ , K , stil
     mv {e = out _} r ()
     mv {e = skip}  r _ = hit (map-skip r) tt
     mv {e = pin _} r _ = hit (map-pin r) tt
-    mv {e = end}   r _ = hit (map-end r) tt
+    mv {e = end}   r ()
 map-leads {A = A} v f {t = t} (just (found (_ , _ , c′ , s′) m κ , K , shows (nx a))) (e , l) =
   eMap e , relive v (tight-occ (λ oc → occ-bind oc mv)) l
   where
@@ -317,7 +318,7 @@ map-leads {A = A} v f {t = t} (just (found (_ , _ , c′ , s′) m κ , K , show
     mv {e = out _} r refl = hit (map-out r) refl
     mv {e = skip}  r _    = hit (map-skip r) tt
     mv {e = pin _} r _    = hit (map-pin r) tt
-    mv {e = end}   r _    = hit (map-end r) tt
+    mv {e = end}   r ()
 map-leads {A = A} v f {t = t} (just (found (_ , _ , c′ , s′) m κ , K , shows cp)) (e , l) =
   eMap e , relive v (tight-occ (λ oc → occ-bind oc mv)) l
   where
@@ -325,7 +326,7 @@ map-leads {A = A} v f {t = t} (just (found (_ , _ , c′ , s′) m κ , K , show
     mv {e = out _} r ()
     mv {e = skip}  r _ = hit (map-skip r) tt
     mv {e = pin _} r _ = hit (map-pin r) tt
-    mv {e = end}   r _ = hit (map-end r) tt
+    mv {e = end}   r refl = hit (map-end r) refl
 
 -- A scan's value at its source's least one: the fold of that value alone.
 scan-leads : ∀ {R Γ A B} v (f : B → A → B) z {c : Ctx R Γ B} {t} (y : Maybe (Cand R A)) → Live v (OK t y) → Leads v (inScan f z c) t y → Leads v c (Scan.ScanT f z t) (retag (scanT f z) y)
@@ -340,7 +341,7 @@ scan-leads {A = A} true f z {t = t} (just (found (_ , _ , c′ , s′) m κ , K 
     mv {e = out _} r ()
     mv {e = skip}  r _ = hit (Scan.sstep r) tt
     mv {e = pin _} r _ = hit (Scan.spin r) tt
-    mv {e = end}   r _ = hit (Scan.send r) tt
+    mv {e = end}   r ()
 scan-leads {A = A} true f z {t = t} (just (found (_ , _ , c′ , s′) m κ , K , shows (nx a))) b (e , l) =
   eScan e , λ cl P oa → proj₁ (l cl P oa) , tr (proj₂ (l cl P oa))
   where
@@ -348,7 +349,7 @@ scan-leads {A = A} true f z {t = t} (just (found (_ , _ , c′ , s′) m κ , K 
     mv {e = out _} eq r refl = hit (Scan.sval (Scan.acc₀ r (λ r′ → ⊑→≼ (subst (_⊑ at _) eq (from b r′))))) refl
     mv {e = skip}  eq r _    = hit (Scan.sstep r) tt
     mv {e = pin _} eq r _    = hit (Scan.spin r) tt
-    mv {e = end}   eq r _    = hit (Scan.send r) tt
+    mv {e = end}   eq r ()
     tr : ∀ {P} → Tight t P K (shows (nx a)) → Tight (Scan.ScanT f z t) P K (shows (nx (f z a)))
     tr (strict lt)       = strict lt
     tr (tie Q eq pq oc)  = tie Q eq pq (occ-bind oc (mv eq))
@@ -359,7 +360,7 @@ scan-leads {A = A} true f z {t = t} (just (found (_ , _ , c′ , s′) m κ , K 
     mv {e = out _} r ()
     mv {e = skip}  r _ = hit (Scan.sstep r) tt
     mv {e = pin _} r _ = hit (Scan.spin r) tt
-    mv {e = end}   r _ = hit (Scan.send r) tt
+    mv {e = end}   r refl = hit (Scan.send r) refl
 
 cut-on : ∀ {R Γ A} v {a} {c : Ctx R Γ A} {t} (y : Maybe (Cand R A)) → Leads (v Data.Bool.∧ true) (inCut true a c) t y → Leads v c t (retag (cutT true) y)
 cut-on v     nothing                                 _       = tt₁
