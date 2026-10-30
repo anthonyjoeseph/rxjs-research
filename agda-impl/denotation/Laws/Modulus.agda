@@ -82,18 +82,6 @@ open import denotation.EmissionSet
 ------------------------------------------------------------------------
 -- Few
 
--- Rows of `t′` are rows of `t`, so as few.
-few-via : ∀ {A B} {t : EmissionSet A} {t′ : EmissionSet B} {q} → (∀ {k e} → t′ k e → Σ (Ev A) (t k)) → Few t q → Few t′ q
-few-via back (ks , h) = ks , λ x lt → h (proj₂ (back x)) lt
-
--- Fewer before an earlier position.
-few-down : ∀ {A} {t : EmissionSet A} {y w} → Few t y → w ≺ y → Few t w
-few-down {y = y} {w} (ks , h) wy = ks , λ {k} x kw → h x (≺-trans {k} {w} {y} kw wy)
-
--- Few before `q`: whatever a row there waits on is few.
-few-reach : ∀ {A} {t : EmissionSet A} {q e} → Few t q → Reach t q e
-few-reach (ks , h) = ks , λ x lt _ → h x lt
-
 -- A row waiting on everything before it is reached by few.
 reach-few : ∀ {A} {t : EmissionSet A} {q e} → (∀ {k e′} → Dep q e k e′) → Reach t q e → Few t q
 reach-few all (ks , h) = ks , λ x lt → h x lt all
@@ -143,10 +131,6 @@ AgreeTo-sym ⟨ a ⟩ = ⟨ (λ {y} {e} yq → proj₂ (a {y} {e} yq) , proj₁ 
 
 AgreeTo-trans : ∀ {A} {t u v : EmissionSet A} {q} → AgreeTo q t u → AgreeTo q u v → AgreeTo q t v
 AgreeTo-trans ⟨ a ⟩ ⟨ b ⟩ = ⟨ (λ {y} {e} yq → proj₁ (b {y} {e} yq) ∘ proj₁ (a {y} {e} yq) , proj₂ (a {y} {e} yq) ∘ proj₂ (b {y} {e} yq)) ⟩
-
--- Agreeing at and below `q`, rows before `q` are as few.
-few-agree : ∀ {A} {t t′ : EmissionSet A} {q} → AgreeTo q t t′ → Few t q → Few t′ q
-few-agree {q = q} a (ks , h) = ks , λ {k} {e′} x kq → h (proj₂ (upto a {k} {e′} (≺→≼ {k} {q} kq)) x) kq
 
 reach-agree : ∀ {A} {t t′ : EmissionSet A} {q e} → AgreeTo q t t′ → Reach t q e → Reach t′ q e
 reach-agree {q = q} a = reach-via λ {k} {e′} x kq d → e′ , proj₂ (upto a {k} {e′} (≺→≼ {k} {q} kq)) x , d

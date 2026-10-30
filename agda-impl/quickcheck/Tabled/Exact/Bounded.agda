@@ -45,7 +45,7 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
   where
   open Tb.Bounded n fD t
     using (Kth; Starts; room; freed; queued; Ends; Sched; Sub; Queued; Done; JoinT; Lane; Indexed;
-    val; step; oend; opass; lane; lend; lpass; hand; left; run; rend; rpass; rhand)
+    val; step; opin; oend; opass; lane; lend; lpass; hand; left; run; rend; rpass; rhand)
   open Tb.Values t using (Nth)
   open Nths t using (nth-val; nth-at; nth-inj)
   open BoundedL n ln o
@@ -324,11 +324,15 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     ... | refl = step (sound exo rm)
     outer-s {c , end} rm h with single⁻ h
     ... | refl = end-row (sound exo rm)
+    outer-s {k , Tb.pin r} rm h with single⁻ h
+    ... | refl = opin (sound exo rm)
 
     lane-s : ∀ {j q a ss s l r k e} → (j , q , a , ss) ∈ G → (s , l) ∈ ss → r ∈ rows l → (k , e) ≡ laneRow G r → JoinT k e
     lane-s {j} {a = a} {s = s} {r = k′ , out b} gm sm rm refl = let (sb , ex) = sub-of gm sm in
       lane (nth-val (proj₁ sb)) (j , a , proj₁ sb) (j , s , sb , sound ex rm) (λ ()) tt
     lane-s {j} {a = a} {s = s} {r = k′ , skip}  gm sm rm refl = let (sb , ex) = sub-of gm sm in
+      lane (nth-val (proj₁ sb)) (j , a , proj₁ sb) (j , s , sb , sound ex rm) (λ ()) tt
+    lane-s {j} {a = a} {s = s} {r = k′ , Tb.pin _} gm sm rm refl = let (sb , ex) = sub-of gm sm in
       lane (nth-val (proj₁ sb)) (j , a , proj₁ sb) (j , s , sb , sound ex rm) (λ ()) tt
     lane-s {j} {a = a} {s = s} {r = c , end} gm sm rm eq with if-split (queuedᵇ G c) eq
     ... | inj₁ (qc , refl) = let (sb , ex) = sub-of gm sm in
@@ -342,6 +346,7 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     lane-in : ∀ {k e} {rs : List (Row B)} → Tb.Work e → (k , e) ∈ rs → (k , e) ∈ mapL (laneRow G) rs
     lane-in {e = out b} _ r = ∈-map⁺ (laneRow G) r
     lane-in {e = skip}  _ r = ∈-map⁺ (laneRow G) r
+    lane-in {e = Tb.pin _} _ r = ∈-map⁺ (laneRow G) r
     lane-in {e = end}   () r
 
     -- A lane's row, under some schedule.
@@ -374,7 +379,8 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     subst (_∈ _) (trans (passing c nQ) (cong (λ b → c , (if b then end else skip)) (→done c D))) (∈-map⁺ (laneRow G) (complete ex y))
   complete-b (lpass {c = c} _ _ (_ , _ , sb , y) _ nQ nD) = shown sb λ ex →
     subst (_∈ _) (trans (passing c nQ) (cong (λ b → c , (if b then end else skip)) (off (done→ c) nD))) (∈-map⁺ (laneRow G) (complete ex y))
-  complete-b (left _ _ _ () _)
+  complete-b (opin x)         = ∈-++⁺ˡ (cm⁺ (complete exo x) (here refl))
+  complete-b (left _ _ (_ , _ , sb , y) _ _) = shown sb λ ex → ∈-map⁺ (laneRow G) (complete ex y)
   complete-b (run () _)
   complete-b (rend () _ _)
   complete-b (rpass () _ _)

@@ -116,9 +116,6 @@ seen-under {k = k} {l} x kQ ¬i with child l kQ
 cnt-down : ∀ {A n} {t : EmissionSet A} {q w} → Cnt n t q → w ≼ q → Cnt n t w
 cnt-down {q = q} {w} (ks , le , h) wq = ks , le , λ {k} x kw → cov-down (h x (≺-≼-≺ {k} {w} {q} kw wq)) kw wq
 
-cnt-mono : ∀ {A m n} {t : EmissionSet A} {q} → m ≤ n → Cnt m t q → Cnt n t q
-cnt-mono mn (ks , le , h) = ks , ≤-trans le mn , h
-
 -- READ THROUGH ITS IMAGES: each row of `u` before `q` under `q`, or under a
 -- row of `t` before `q`: what covers `t` covers `u`.  Covering is
 -- decidable, so an image need only be not refuted.

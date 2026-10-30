@@ -202,6 +202,7 @@ values⁻ {rs = (k , out b) ∷ rs} (here refl) = here refl
 values⁻ {rs = (k , out b) ∷ rs} (there m)   = there (values⁻ m)
 values⁻ {rs = (k , skip) ∷ rs}  m           = there (values⁻ m)
 values⁻ {rs = (k , end) ∷ rs}   m           = there (values⁻ m)
+values⁻ {rs = (k , Tb.pin _) ∷ rs} m        = there (values⁻ m)
 
 values⁺ : ∀ {A} {rs : List (Row A)} {q a} → (q , out a) ∈ rs → (q , a) ∈ values rs
 values⁺ {rs = (k , out b) ∷ rs} (here refl) = here refl
@@ -210,6 +211,8 @@ values⁺ {rs = (k , skip) ∷ rs}  (here ())
 values⁺ {rs = (k , skip) ∷ rs}  (there m)   = values⁺ m
 values⁺ {rs = (k , end) ∷ rs}   (here ())
 values⁺ {rs = (k , end) ∷ rs}   (there m)   = values⁺ m
+values⁺ {rs = (k , Tb.pin _) ∷ rs} (here ())
+values⁺ {rs = (k , Tb.pin _) ∷ rs} (there m) = values⁺ m
 
 ends⁻ : ∀ {A} {rs : List (Row A)} {c} → c ∈ ends rs → (c , end) ∈ rs
 ends⁻ {rs = rs} m with cm⁻ {xs = rs} m
@@ -217,6 +220,7 @@ ends⁻ {rs = rs} m with cm⁻ {xs = rs} m
 ... | (_ , refl) = rm
 ends⁻ {rs = rs} m | ((k , out _) , rm , ())
 ends⁻ {rs = rs} m | ((k , skip) , rm , ())
+ends⁻ {rs = rs} m | ((k , Tb.pin _) , rm , ())
 
 ends⁺ : ∀ {A} {rs : List (Row A)} {c} → (c , end) ∈ rs → c ∈ ends rs
 ends⁺ m = cm⁺ m (here refl)
@@ -226,6 +230,7 @@ endBy→ {l = l} ex e with any⁻ {xs = rows l} e
 ... | ((k , end) , m , h)   = k , sound ex m , not-T h
 ... | ((k , out _) , m , ())
 ... | ((k , skip) , m , ())
+... | ((k , Tb.pin _) , m , ())
 
 →endBy : ∀ {X : Set} {u : EmissionSet X} {l : Listed X} → Exact l u → ∀ {k c} → u k end → k ≼ c → endBy (rows l) c ≡ true
 →endBy ex x kc = any⁺ (complete ex x) (T-not kc)
@@ -235,6 +240,7 @@ endBefore→ {l = l} ex e with any⁻ {xs = rows l} e
 ... | ((c , end) , m , h)   = c , sound ex m , Equivalence.from T-≡ h
 ... | ((c , out _) , m , ())
 ... | ((c , skip) , m , ())
+... | ((c , Tb.pin _) , m , ())
 
 →endBefore : ∀ {X : Set} {u : EmissionSet X} {l : Listed X} → Exact l u → ∀ {c q} → u c end → c ≺ q → endBefore (rows l) q ≡ true
 →endBefore ex x cq = any⁺ (complete ex x) (fromT cq)
@@ -244,7 +250,7 @@ proper→ : ∀ {X : Set} {u : EmissionSet X} {l : Listed X} → Exact l u → �
 proper→ ex e x = not-T (all⁻ e (complete ex x))
 
 →proper : ∀ {X : Set} {u : EmissionSet X} {l : Listed X} → Exact l u → ∀ {q} → (∀ {c} → u c end → q ≼ c) → properᵇ (rows l) q ≡ true
-→proper {l = l} ex h = all⁺ {xs = rows l} λ { {k , out _} m → refl ; {k , skip} m → refl ; {k , end} m → T-not (h (sound ex m)) }
+→proper {l = l} ex h = all⁺ {xs = rows l} λ { {k , out _} m → refl ; {k , skip} m → refl ; {k , Tb.pin _} m → refl ; {k , end} m → T-not (h (sound ex m)) }
 
 -- Each value's lane, listed at its subscription, is exactly its lane.
 lanes-from : ∀ {A B : Set} {ln : A → Pos → Maybe (Listed B)} {D : A → Pos → EmissionSet B} {vs ls}

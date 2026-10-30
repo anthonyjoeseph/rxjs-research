@@ -21,10 +21,10 @@ open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
 open import denotation.Events using (Pos; Label; ix; last; inside; inside-++; <ᵖ-part; <ᵖ-split; <ᵖ-apart)
-open import denotation.EmissionSet using (Ev; out; end; skip; pin; Silent; hush; held; EmissionSet; _≺_; module TakeWhile; module Op)
+open import denotation.EmissionSet using (Ev; out; end; skip; pin; Silent; held; EmissionSet; _≺_; module TakeWhile; module Op)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺-ext; ≼-false; ≼-or-≻)
-open import denotation.Laws.Worlds using (Plain; plain-ix; plain-last; W; W⁼; step; here; inW; real-snoc; Real; InvAt; InvD;
-  ⊑-refl; ⊑-snoc⁺; ⊑-snoc; ⊑-inside; inside-⊑; conv; in-world; ext≢; same-lead; flat-under; _⊑_; w-up; nest⁼)
+open import denotation.Laws.Worlds using (Plain; plain-ix; plain-last; W; W⁼; step; here; inW; real-snoc; Real; InvAt; InvD; ⊑-refl;
+  ⊑-snoc⁺; ⊑-snoc; ⊑-inside; inside-⊑; conv; ext≢; same-lead; flat-under; _⊑_; w-up; nest⁼)
 
 private
   T-not : ∀ {b} → T b → T (not b) → ⊥

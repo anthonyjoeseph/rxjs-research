@@ -50,13 +50,13 @@ open import denotation.EmissionSet
   body; Den; hot; enter; DenEnv; approx; ⟦_⟧; MapT; map-out; map-skip; map-pin; map-end; module Op)
 import denotation.EmissionSet as ES
 open import denotation.Laws.Modulus
-  using (few-ind; entered-few; ≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext; few-via; reach-via;
+  using (few-ind; entered-few; ≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext; reach-via;
   AgreeTo; ⟨_⟩; upto; AgreeTo-sym; trunc-to; ~-cold; Same; LimD; _~⟨_⟩_; ~-refl)
 open import denotation.Laws.Count
   using (Cnt; DCnt; AgC; agc; ag-cnt; dcnt-pin; dcnt-pin-up; dcnt-cnt; pinned-after; trunc-ag; cnt-up; cnt-down; Img; em; seen; seen-under; _≈ᶜ⟨_∣_⟩_; ≈ᶜ-refl; ≈ᶜ-sym; ≈ᶜ-trans; ≈ᶜ-mono; agree-all; limit; Aft; contract; unfold₀)
 open import denotation.Laws.Join using (over; flatMap-causal; flatMap-ne)
-open import denotation.Laws.Worlds using (Ok; Lawful; InvAt; in-world; InvD; Hots; GoodEnv; world-after; ok-step; ⊑-≼; inside-⊑; inv-widen; empty-inv;
-  of-inv; spin-inv; map-inv; scan-inv; defer-inv; lim-inv)
+open import denotation.Laws.Worlds using (Ok; Lawful; InvAt; InvD; Hots; GoodEnv; world-after; ok-step; ⊑-≼; inside-⊑; inv-widen;
+  empty-inv; of-inv; spin-inv; map-inv; scan-inv; defer-inv; lim-inv)
 open import denotation.Laws.Connect using (connect-inv)
 open import denotation.Laws.TakeInv using (takeWhile-inv)
 open import denotation.Laws.HotInv using (lawful-hot)

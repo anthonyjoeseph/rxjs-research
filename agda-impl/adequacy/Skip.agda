@@ -22,7 +22,8 @@ open import adequacy.Up using (all-ʳ++)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; ix)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; _≺_; _≼_; Truncate; Few; MapT; map-out; map-skip; map-end; Ended)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; _≺_; _≼_; Truncate; Reach; Dep; MapT; map-out; map-skip; map-pin;
+  map-end; Ended)
 open import denotation.Laws.Modulus using (≺-trans; ≺→≼; ≼-≺-≺; ≺-ext)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
@@ -137,6 +138,9 @@ map-≈ f eq = go (fwd eq) ⇆ go (bwd eq)
     go h (map-skip r) with h r
     ... | inj₁ r′            = inj₁ (map-skip r′)
     ... | inj₂ (refl , refl) = inj₂ (refl , refl)
+    go h (map-pin r) with h r
+    ... | inj₁ r′     = inj₁ (map-pin r′)
+    ... | inj₂ (_ , ())
     go h (map-end r) with h r
     ... | inj₁ r′     = inj₁ (map-end r′)
     ... | inj₂ (_ , ())
@@ -144,6 +148,7 @@ map-≈ f eq = go (fwd eq) ⇆ go (bwd eq)
 since-map : ∀ {A B} (f : A → B) {t : EmissionSet A} {p} → Since p t → Since p (MapT f t)
 since-map f s (map-out r)  = s r
 since-map f s (map-skip r) = s r
+since-map f s (map-pin r)  = s r
 since-map f s (map-end r)  = s r
 
 module _ {A B : Set} (L : A → Pos → EmissionSet B) {d : Bool} {p : Pos} where
@@ -156,12 +161,13 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {d : Bool} {p : Pos} wher
   since-flat : ∀ (O : EmissionSet A) (Ls : List (EmissionSet B)) → Since p O → Each (Since p) Ls → Since p (Flat.JoinT L O d Ls)
   since-flat O Ls so sl (Flat.val {q} {a} r) = ≺→≼ {p} {q ++ [ ix 0 ]} (≼-≺-≺ {p} {q} {q ++ [ ix 0 ]} (so {q} {out a} r) (≺-ext q []))
   since-flat O Ls so sl (Flat.step r)     = so r
+  since-flat O Ls so sl (Flat.opin r)     = so r
   since-flat O Ls so sl (Flat.oend r _)   = so r
   since-flat O Ls so sl (Flat.opass r _)  = so r
   since-flat O Ls so sl (Flat.lane {q} {a} r _ l _ _) = lane-since {O = O} {q = q} {a = a} so r l
   since-flat O Ls so sl (Flat.lend {q} {a} r _ l _ _ _) = lane-since {O = O} {q = q} {a = a} so r l
   since-flat O Ls so sl (Flat.lpass {q} {a} r _ l _ _ _) = lane-since {O = O} {q = q} {a = a} so r l
-  since-flat O Ls so sl (Flat.left _ _ _ () _)
+  since-flat O Ls so sl (Flat.left {q} {a} r _ l _ _) = lane-since {O = O} {q = q} {a = a} so r l
   since-flat O Ls so sl (Flat.hand _ _ _ _ ())
   since-flat O Ls so sl (Flat.rhand _ ())
   since-flat O Ls so sl (Flat.run x _)    = since-lanes Ls sl x
@@ -190,6 +196,9 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {d : Bool} {p : Pos} wher
   flat-→ Ls Ls′ eo es so sl (Flat.step r) with fwd eo r
   ... | inj₁ r′       = inj₁ (Flat.step r′)
   ... | inj₂ (eq , _) = inj₂ (eq , refl)
+  flat-→ Ls Ls′ eo es so sl (Flat.opin r) with fwd eo r
+  ... | inj₁ r′       = inj₁ (Flat.opin r′)
+  ... | inj₂ (_ , ())
   flat-→ Ls Ls′ eo es so sl (Flat.oend {c} r d) with fwd eo r
   ... | inj₁ r′       = inj₁ (Flat.oend r′ (done-≈ c eo es (so r) d))
   ... | inj₂ (_ , ())
@@ -205,7 +214,9 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {d : Bool} {p : Pos} wher
   flat-→ {O = O} Ls Ls′ eo es so sl (Flat.lpass {q} {a} {c} r ru l nc nh nd) with fwd eo r
   ... | inj₁ r′       = inj₁ (Flat.lpass r′ ru l nc nh λ d → nd (done-≈ c (≈-sym eo) (≈ᴸ-sym es) (lane-since {O = O} {q = q} {a = a} so r l) d))
   ... | inj₂ (_ , ())
-  flat-→ Ls Ls′ eo es so sl (Flat.left _ _ _ () _)
+  flat-→ Ls Ls′ eo es so sl (Flat.left r ru l nc i) with fwd eo r
+  ... | inj₁ r′       = inj₁ (Flat.left r′ ru l nc i)
+  ... | inj₂ (_ , ())
   flat-→ Ls Ls′ eo es so sl (Flat.hand _ _ _ _ ())
   flat-→ Ls Ls′ eo es so sl (Flat.rhand _ ())
   flat-→ Ls Ls′ eo es so sl (Flat.run x w) with lanes-≈ es x
@@ -226,12 +237,12 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {d : Bool} {p : Pos} wher
   since-row O Ls so sl (r , _) = since-flat O Ls so sl r
 
 -- A skip more or less: one more row before any position.
-few-≈ : ∀ {A} {t u : EmissionSet A} {p} → (∀ {q e} → u q e → t q e ⊎ Skip p q e) → ∀ {q} → Few t q → Few u q
-few-≈ {t = t} {p = p} h {q} (ks , f) = p ∷ ks , λ x lt → go (h x) lt
+reach-≈ : ∀ {A} {t u : EmissionSet A} {p} → (∀ {q e} → u q e → t q e ⊎ Skip p q e) → ∀ {q e} → Reach t q e → Reach u q e
+reach-≈ {t = t} {p = p} h {q} {e} (ks , f) = p ∷ ks , λ x lt → go (h x) lt
   where
-    go : ∀ {k e} → t k e ⊎ Skip p k e → k ≺ q → k ∈ (p ∷ ks)
-    go (inj₁ y)           lt = there (f y lt)
-    go (inj₂ (refl , _))  lt = here refl
+    go : ∀ {k e′} → t k e′ ⊎ Skip p k e′ → k ≺ q → Dep q e k e′ → k ∈ (p ∷ ks)
+    go (inj₁ y)           lt d = there (f y lt d)
+    go (inj₂ (refl , _))  lt _ = here refl
 
 trunc-≈ : ∀ {A} {t u : EmissionSet A} {p} → t ≈⟨ p ⟩ u → Truncate t ≈⟨ p ⟩ Truncate u
 trunc-≈ eq = go (fwd eq) (bwd eq) ⇆ go (bwd eq) (fwd eq)
@@ -239,7 +250,7 @@ trunc-≈ eq = go (fwd eq) (bwd eq) ⇆ go (bwd eq) (fwd eq)
     go : ∀ {t u : EmissionSet _} {p} → (∀ {q e} → t q e → u q e ⊎ Skip p q e) → (∀ {q e} → u q e → t q e ⊎ Skip p q e)
        → ∀ {q e} → Truncate t q e → Truncate u q e ⊎ Skip p q e
     go h k (r , fw) with h r
-    ... | inj₁ r′ = inj₁ (r′ , few-≈ k fw)
+    ... | inj₁ r′ = inj₁ (r′ , reach-≈ k fw)
     ... | inj₂ sk = inj₂ sk
 
 ------------------------------------------------------------------------

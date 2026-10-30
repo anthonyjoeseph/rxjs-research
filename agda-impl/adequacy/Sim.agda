@@ -27,7 +27,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Timeline; root)
-open import denotation.EmissionSet using (EmissionSet; out; end; MapT; map-out; map-skip; map-end; _≼_; enter; ⟦_⟧)
+open import denotation.EmissionSet using (EmissionSet; out; end; MapT; map-out; map-skip; map-pin; map-end; _≼_; enter; ⟦_⟧)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd)
 open import denotation.Laws.Worlds using (GoodEnv)
 open import denotation.Laws using (inv-⟦⟧)
@@ -100,7 +100,7 @@ sub-map : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → B) s p → Sim ⟨ c , pend
 sub-map c f s p (inv g (uc , _ , ok)) = inv (good-swap c sw g) (uc , tt , ok) , silent (vis-≃ (up-≃ c (enter-map (env c) f s p)))
   where
     sw : Swap (env c) (pend (map f s)) (mapS f (pend s))
-    sw = record { same = (λ ()) ⇄ (λ { (map-out ()) ; (map-skip ()) ; (map-end ()) }) ; live≡ = refl ; node = λ _ x → x ; lane = λ _ () ; body = λ _ _ () }
+    sw = record { same = (λ ()) ⇄ (λ { (map-out ()) ; (map-skip ()) ; (map-pin ()) ; (map-end ()) }) ; live≡ = refl ; node = λ _ x → x ; lane = λ _ () ; body = λ _ _ () }
 
 -- A merge entered: its outer pending under it, attached at `p`, nothing begun.
 sub-merge : ∀ {R Γ A B} (c : Ctx R Γ B) f (s : Obs Timeline Γ A) p
@@ -163,12 +163,14 @@ rise-top s e p (inv g (_ , _ , os , _ , ld , _)) | true = inv g os , shown (new 
 after-map : ∀ {A B} (f : A → B) {t : EmissionSet A} {p} → After p t → After p (MapT f t)
 after-map f a (map-out r)  = a r
 after-map f a (map-skip r) = a r
+after-map f a (map-pin r)  = a r
 after-map f a (map-end r)  = a r
 
 ends-map : ∀ {A B} (f : A → B) {t : EmissionSet A} e → Ends e t → Ends (mapEv f e) (MapT f t)
 ends-map f (nx _) _  = tt
 ends-map f cp     em (map-out r)  = em r
 ends-map f cp     em (map-skip r) = em r
+ends-map f cp     em (map-pin r)  = em r
 ends-map f cp     em (map-end r)  = em r
 
 map-plus : ∀ {A B} (f : A → B) (t : EmissionSet A) p e → MapT f (Plus t p (toEv e)) ≃ Plus (MapT f t) p (toEv (mapEv f e))
@@ -178,10 +180,12 @@ map-plus f t p (nx a) = to′ ⇄ from′
     to′ (map-out (old r))  = old (map-out r)
     to′ (map-out new)      = new
     to′ (map-skip (old r)) = old (map-skip r)
+    to′ (map-pin (old r))  = old (map-pin r)
     to′ (map-end (old r))  = old (map-end r)
     from′ : ∀ {q e′} → Plus (MapT f t) p (out (f a)) q e′ → MapT f (Plus t p (out a)) q e′
     from′ (old (map-out r))  = map-out (old r)
     from′ (old (map-skip r)) = map-skip (old r)
+    from′ (old (map-pin r))  = map-pin (old r)
     from′ (old (map-end r))  = map-end (old r)
     from′ new                = map-out new
 map-plus f t p cp = to′ ⇄ from′
@@ -189,11 +193,13 @@ map-plus f t p cp = to′ ⇄ from′
     to′ : ∀ {q e′} → MapT f (Plus t p end) q e′ → Plus (MapT f t) p end q e′
     to′ (map-out (old r))  = old (map-out r)
     to′ (map-skip (old r)) = old (map-skip r)
+    to′ (map-pin (old r))  = old (map-pin r)
     to′ (map-end (old r))  = old (map-end r)
     to′ (map-end new)      = new
     from′ : ∀ {q e′} → Plus (MapT f t) p end q e′ → MapT f (Plus t p end) q e′
     from′ (old (map-out r))  = map-out (old r)
     from′ (old (map-skip r)) = map-skip (old r)
+    from′ (old (map-pin r))  = map-pin (old r)
     from′ (old (map-end r))  = map-end (old r)
     from′ new                = map-end new
 

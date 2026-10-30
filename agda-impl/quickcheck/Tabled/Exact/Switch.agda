@@ -5,7 +5,7 @@
 -- only the latest lane's end counted toward the whole's.
 module quickcheck.Tabled.Exact.Switch where
 
-open import Data.Bool using (true; false; if_then_else_)
+open import Data.Bool using (true; false; not; if_then_else_)
 open import Data.Bool.Properties using (T-≡)
 open import Function.Bundles using (Equivalence)
 open import Data.List using (List; []; _∷_; _++_; [_]) renaming (map to mapL)
@@ -90,35 +90,50 @@ module SwitchX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A)
     ... | refl = step (sound exo rm)
     outer-s {c , end} rm h with single⁻ h
     ... | refl = end-row (sound exo rm)
+    outer-s {k , Tb.pin r} rm h with single⁻ h
+    ... | refl = opin (sound exo rm)
 
     live-s : ∀ {q₀ a l k e₀ q e} → (q₀ , a , l) ∈ ls → LaneOf fD q₀ a k e₀ → ¬ Cut q₀ k → (q , e) ≡ live (k , e₀) → JoinT q e
     live-s {e₀ = out b} m y nC refl = lane (out-of m) tt y nC tt
     live-s {e₀ = skip}  m y nC refl = lane (out-of m) tt y nC tt
     live-s {e₀ = end}   m y nC refl = lend-row (out-of m) y nC
+    live-s {e₀ = Tb.pin _} m y nC refl = lane (out-of m) tt y nC tt
+
+    unpinned-s : ∀ {q₀ a l k e₀ q e} → (q₀ , a , l) ∈ ls → (k , e₀) ∈ rows l
+      → (q , e) ∈ (if cutᵇ q₀ k then [] else [ live (k , e₀) ]) → JoinT q e
+    unpinned-s {q₀} {k = k} m rm h with if⁻ {b = cutᵇ q₀ k} h
+    ... | inj₁ (_ , ())
+    ... | inj₂ (nc , h′) = live-s m (sound (exl m) rm) (λ C → offT nc (Equivalence.from T-≡ (→cut q₀ k C))) (single⁻ h′)
 
     lane-s : ∀ {q₀ a l r q e} → (q₀ , a , l) ∈ ls → r ∈ rows l → (q , e) ∈ laneRow q₀ r → JoinT q e
-    lane-s {q₀} {r = k , e₀} m rm h with if⁻ {b = cutᵇ q₀ k} h
+    lane-s {r = k , out _} m rm h = unpinned-s m rm h
+    lane-s {r = k , skip}  m rm h = unpinned-s m rm h
+    lane-s {r = k , end}   m rm h = unpinned-s m rm h
+    lane-s {q₀} {r = k , Tb.pin r} m rm h with if⁻ {b = cutᵇ q₀ k} h
     ... | inj₁ (ct , h′) with when⁻ h′
-    ... | (ins , refl) = left (out-of m) tt (sound (exl m) rm) (cut→ q₀ k ct) (Equivalence.from T-≡ ins)
-    lane-s {q₀} {r = k , e₀} m rm h | inj₂ (nc , h′) =
-      live-s m (sound (exl m) rm) (λ C → offT nc (Equivalence.from T-≡ (→cut q₀ k C))) (single⁻ h′)
+    ... | (c , refl) with ∧-true {not (cutᵇ q₀ r)} c
+    ... | (nr , ins) = left (out-of m) tt (sound (exl m) rm) (λ C → not-T nr (Equivalence.from T-≡ (→cut q₀ r C)))
+                         (Equivalence.from T-≡ ins)
+    lane-s {q₀} {r = k , Tb.pin r} m rm h | inj₂ (nc , h′) with single⁻ h′
+    ... | refl = lane (out-of m) tt (sound (exl m) rm) (λ C → offT nc (Equivalence.from T-≡ (→cut q₀ k C))) tt
 
     outer-end : ∀ {c b} → done c ≡ b → (c , (if b then end else skip)) ∈ outerRow {A} {B} done (c , end)
     outer-end refl = here refl
 
-    live-end : ∀ {c b} → done c ≡ b → (c , (if b then end else skip)) ∈ [ live (c , end) ]
-    live-end refl = here refl
+    live-end : ∀ {q c b} → ¬ Cut q c → done c ≡ b → (c , (if b then end else skip)) ∈ laneRow q (c , end)
+    live-end {q} {c} nC refl = if-f (off (cut→ q c) nC) (here refl)
 
-    live-in : ∀ {k e} → Tb.Work e → (k , e) ∈ [ live (k , e) ]
-    live-in {e = out b} _ = here refl
-    live-in {e = skip}  _ = here refl
-    live-in {e = end}   ()
+    live-in : ∀ {q k e} → ¬ Cut q k → Tb.Work e → (k , e) ∈ laneRow q (k , e)
+    live-in {q} {k} {e = out b} nC _ = if-f (off (cut→ q k) nC) (here refl)
+    live-in {q} {k} {e = skip}  nC _ = if-f (off (cut→ q k) nC) (here refl)
+    live-in {q} {k} {e = Tb.pin r} nC _ = if-f (off (cut→ q k) nC) (here refl)
+    live-in {e = end}   _ ()
 
-    -- A lane's row, uncut.
-    kept : ∀ {q a k e r} → t q (out a) → LaneOf fD q a k e → ¬ Cut q k → r ∈ [ live (k , e) ] → r ∈ rows (switchRows o ls)
-    kept {q} {a} {k} {e} x y nC h =
+    -- A lane's row.
+    kept : ∀ {q a k e r} → t q (out a) → LaneOf fD q a k e → r ∈ laneRow q (k , e) → r ∈ rows (switchRows o ls)
+    kept {q} {a} {k} {e} x y h =
       let (l , m) = ls-to (values⁺ (complete exo x)) in
-      ∈-++⁺ʳ (concatMap (outerRow done) (rows o)) (cm⁺ m (cm⁺ (complete (exl m) y) (if-f (off (cut→ q k) nC) h)))
+      ∈-++⁺ʳ (concatMap (outerRow done) (rows o)) (cm⁺ m (cm⁺ (complete (exl m) y) h))
 
   sound-w : ∀ {q e} → (q , e) ∈ rows (switchRows o ls) → JoinT q e
   sound-w m with ∈-++⁻ (concatMap (outerRow done) (rows o)) m
@@ -132,12 +147,13 @@ module SwitchX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A)
   complete-w (step x)         = ∈-++⁺ˡ (cm⁺ (complete exo x) (here refl))
   complete-w (oend {c} x D)   = ∈-++⁺ˡ (cm⁺ (complete exo x) (outer-end {c} (→done c D)))
   complete-w (opass {c} x nD) = ∈-++⁺ˡ (cm⁺ (complete exo x) (outer-end {c} (off (done→ c) nD)))
-  complete-w (lane x _ y nC w) = kept x y nC (live-in w)
-  complete-w (lend {c = c} x _ y nC _ D)   = kept x y nC (live-end {c} (→done c D))
-  complete-w (lpass {c = c} x _ y nC _ nD) = kept x y nC (live-end {c} (off (done→ c) nD))
-  complete-w (left {q} {a} {k} x _ y C ins) =
-    let (l , m) = ls-to (values⁺ (complete exo x)) in
-    ∈-++⁺ʳ (concatMap (outerRow done) (rows o)) (cm⁺ m (cm⁺ (complete (exl m) y) (if-t (→cut q k C) (when⁺ (fromT ins)))))
+  complete-w (opin x)         = ∈-++⁺ˡ (cm⁺ (complete exo x) (here refl))
+  complete-w (lane {q} x _ y nC w) = kept x y (live-in {q} nC w)
+  complete-w (lend {q} {c = c} x _ y nC _ D)   = kept x y (live-end {q} nC (→done c D))
+  complete-w (lpass {q} {c = c} x _ y nC _ nD) = kept x y (live-end {q} nC (off (done→ c) nD))
+  complete-w (left {q} {a} {k} {r} x _ y nR ins) with cutᵇ q k in ck
+  ... | true  = kept x y (if-t ck (when⁺ (∧-intro (T-not λ tr → nR (cut→ q r (fromT tr))) (fromT ins))))
+  ... | false = kept x y (if-f ck (here refl))
   complete-w (run () _)
   complete-w (rend () _ _)
   complete-w (rpass () _ _)

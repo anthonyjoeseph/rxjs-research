@@ -17,20 +17,19 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using ([]; _∷_; _++_; [_])
 open import Data.List.Properties using (++-assoc; ++-identityʳ; ∷ʳ-injectiveˡ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
-open import Relation.Nullary using (¬_)
 
 open import denotation.Events using (Pos; ix; sub; inside; <ᵖ-part; <ᵖ-between)
 open import denotation.EmissionSet using (Ev; out; end; skip; pin; Unpinned; Silent; hush; held; EmissionSet; _≺_; Den; hot; Truncate; Proper; module Connect; module Op)
-open import denotation.Laws.Modulus using (≺-absurd; ≼-≺-≺; ≺-≼-≺; ≼-or-≻; ≺-ext)
+open import denotation.Laws.Modulus using (≺-absurd; ≺-≼-≺; ≺-ext)
 open import denotation.Laws.Worlds
   using (W; W⁼; step; timer; join; here; inW; plain-ix; Real; Ok; _⊕_; Lawful; InvAt; InvD; ok-step;
   real-snoc; shrink; shrink⁼; narrow; narrow⁼; ext≢; _⊑_; ⊑-refl; ⊑-snoc⁺; ⊑-trans; ⊑-snoc;
-  ⊑-cmp; ⊑-inside; inside-⊑; diverge; same-lead; flat-under; Anc; world-anc; world-anc⁼; anc-≼;
-  apart; anc-lead; tick-lead; Plain; widen⁼; nest⁼; w-up)
+  ⊑-inside; inside-⊑; diverge; same-lead; flat-under; world-anc; world-anc⁼; anc-≼; apart;
+  anc-lead; tick-lead; Plain; widen⁼; nest⁼; w-up)
 
 module _ {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
          (Is : InvD H s) (IF : ∀ {t} → Lawful t → InvD (H ⊕ t) (F (hot t)))

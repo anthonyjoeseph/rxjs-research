@@ -22,7 +22,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos)
-open import denotation.EmissionSet using (EmissionSet; out; skip; end; MapT; map-out; map-skip; map-end; DenEnv)
+open import denotation.EmissionSet using (EmissionSet; out; skip; pin; end; MapT; map-out; map-skip; map-pin; map-end; DenEnv)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; plug; alive; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
@@ -107,6 +107,7 @@ map-owing f {t} ow em = ow go
     go : Empty t
     go {e = out _} r = em (map-out r)
     go {e = skip}  r = em (map-skip r)
+    go {e = pin _} r = em (map-pin r)
     go {e = end}   r = em (map-end r)
 
 module _ {A B : Set} (L : A → Pos → EmissionSet B) {O : EmissionSet A} {d : Bool} {Ls : List (EmissionSet B)} where
@@ -117,6 +118,7 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {O : EmissionSet A} {d : 
       go : Empty O
       go {e = out _} r = em (Flat.val r)
       go {e = skip}  r = em (Flat.step r)
+      go {e = pin _} r = em (Flat.opin r)
       go {e = end}   r = em (Flat.opass r λ d → em (Flat.oend r d))
 
   flat-owing-l : Owing (Lanes Ls) → Owing (Flat.JoinT L O d Ls)
@@ -125,18 +127,20 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {O : EmissionSet A} {d : 
       go : Empty (Lanes Ls)
       go {e = out _} x = em (Flat.run x _)
       go {e = skip}  x = em (Flat.run x _)
+      go {e = pin _} x = em (Flat.run x _)
       go {e = end}   x = em (Flat.rpass x (λ ()) λ d → em (Flat.rend x (λ ()) d))
 
   flat-empty : Empty O → Each Empty Ls → Empty (Flat.JoinT L O d Ls)
   flat-empty eo el (Flat.val r)       = eo r
   flat-empty eo el (Flat.step r)      = eo r
+  flat-empty eo el (Flat.opin r)      = eo r
   flat-empty eo el (Flat.oend r _)    = eo r
   flat-empty eo el (Flat.opass r _)   = eo r
   flat-empty eo el (Flat.lane r _ _ _ _)  = eo r
   flat-empty eo el (Flat.lend r _ _ _ _ _)  = eo r
   flat-empty eo el (Flat.lpass r _ _ _ _ _) = eo r
   flat-empty eo el (Flat.hand _ _ _ _ ())
-  flat-empty eo el (Flat.left _ _ _ () _)
+  flat-empty eo el (Flat.left r _ _ _ _) = eo r
   flat-empty eo el (Flat.run x _)     = empty-any Ls el x
   flat-empty eo el (Flat.rend x _ _)  = empty-any Ls el x
   flat-empty eo el (Flat.rpass x _ _) = empty-any Ls el x

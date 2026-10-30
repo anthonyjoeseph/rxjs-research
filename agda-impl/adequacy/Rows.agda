@@ -22,7 +22,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (ofᴱ)
 open import denotation.Events using (Pos; Timeline; ix)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; InE; enter; Truncate; MapT; ⟦_⟧; Ended; module Joining; Den; hot; Proper; DenEnv; module Connecting)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; _≺_; _≼_; InE; enter; Truncate; MapT; ⟦_⟧; Ended; module Joining; Den; hot; Proper; DenEnv; module Connecting)
 open import operation.PureObservable using (module Machine; module Driver)
 open Machine using (St; Ctx; CS; connS; joinS; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; load; moved; quiet; pend; ofS; mapS; cutS; lnS; flatS; alive; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; nx; cp) renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
 
@@ -40,6 +40,7 @@ toEv cp     = end
 Visible : ∀ {A} → Ev A → Set
 Visible (out _) = ⊤
 Visible skip    = ⊥
+Visible (pin _) = ⊥
 Visible end     = ⊤
 
 Vis : ∀ {A} → EmissionSet A → EmissionSet A
