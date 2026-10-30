@@ -24,7 +24,7 @@ open import Data.List using (_ʳ++_)
 
 open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Timeline; root; Pos; ix; timelineAt; emit; stall; close)
-open import denotation.EmissionSet using (EmissionSet; out; end; MapT; map-out; map-skip; map-pin; map-end; module Scan;
+open import denotation.EmissionSet using (EmissionSet; Ev; out; end; MapT; map-out; map-skip; map-pin; map-end; module Scan;
   module TakeWhile; _≼_; _≺_; enter; ⟦_⟧; Proper; Den; Silent; Dep)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≼-or-≻; entered-few)
 open import denotation.Laws.Worlds using (GoodEnv; Lawful; Hots; InvAt)
@@ -713,14 +713,14 @@ module _ {A} (d : Den A) (p₀ : Pos) (quiet : ∀ {c y e} → enter d p₀ c en
     t : EmissionSet A
     t = enter d p₀
 
-    dep : ∀ {q e k e′} → Visible e → Dep q e k e′
+    dep : ∀ {q} {e : Ev A} {k e′} → Visible e → Dep q e k e′
     dep {e = out _} _ = tt
     dep {e = end}   _ = tt
 
   run-of : ∀ c {vs} → Shows* (Beyond t c) vs → Run t c vs
   run-of c [] = []
   run-of c (_∷_ {p = p} ((x , vi) , lt) rest) =
-    (((tp , proper) , entered-few d p₀ (dep vi) tp) , vi , cq , λ tk vk ck → lt (back c tk ck , vk))
+    (((tp , proper) , entered-few d p₀ (λ {k} {e′} → dep {p} {_} {k} {e′} vi) tp) , vi , cq , λ tk vk ck → lt (back c tk ck , vk))
     ∷ run-of (just p) (Shows*-≃ (narrow c cq) rest)
     where
       tp = proj₁ (into c x)
