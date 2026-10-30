@@ -41,7 +41,7 @@ open Machine using (St; Ctx; CS; cs; _⊕_; bodyM; Cand; Found; found; Focus; Ma
 open import adequacy.Rows using (acc-val; rows; rowsL; pendRows; toEv; Lanes; Each; Kth; AllEnd; EndsOf; Lane; reads; module Flat; module SwitchF; module ExhaustF; module BoundedF; ∅; Hot; Inbox; _∪_; Kept; Stops) renaming (kept to keptᴿ; stop to stopᴿ; left to leftᴿ; sub to subᴿ)
 open import adequacy.Cap using (irr; ⊑-<; <-⊑; ⊑-<⊑; ≮; dec; Past; OKᶜ; OKLᶜ; each-map; ok-cap; uncap; uncapL; cap-retag; cap-sub;
   one; own-stills; first-stillsᶜ; first-at; lanes-firstᶜ; Calm; Quiet; QuietL; calm-map; EnvSingle; body-quiet; conn-free; conn-held; told-nil; join-head)
-open import adequacy.Bound using (Apart; <→⊑; Bd; Empty; From; Good; GoodL; GoodLn; MergeG; OK; OKL; Single; _⊑_; empty-any; ext-⊑; above-any; Above; After; held; raise-map; raise-scan; raise-cut; raise-take; raise-outer; raise-lane; from-empty; from-weak; ix01; kept; lane-ok; lane-v; mapped; of-from; of-shows; off; on; one-end; own-first; past-⊑; rooted-single; scanned; seek-mark; shift-<; shift-≮; shift-⊑; silenced; ≺→⊑; ⊑-refl; ⊑-trans; ⊑i; ⊑→≼)
+open import adequacy.Bound using (Apart; <→⊑; Bd; Empty; From; Good; GoodL; GoodLn; MergeG; OK; OKL; Single; _⊑_; empty-any; ext-⊑; above-any; Above; After; held; raise-map; raise-scan; raise-cut; raise-take; raise-outer; raise-lane; from-empty; from-weak; ix01; kept; lane-ok; lane-v; mapped; of-from; of-shows; off; on; one-end; own-first; past-⊑; rooted-single; rooted-parts; Parts; scanned; seek-mark; shift-<; shift-≮; shift-⊑; silenced; ≺→⊑; ⊑-refl; ⊑-trans; ⊑i; ⊑→≼)
 
 open _⊑_
 open Bd
@@ -233,16 +233,16 @@ bounded-unqueued m L O Ls d n {c} ap fo x (_ , _ , a , BoundedF.Item.outer {q = 
     starts {q = q} (BoundedF.Starts.queued {c = c₁} _ qc _ _ _) _ h₂ = h₂ {c₁} refl qc
 
 -- Each policy's race, from its outer's and its lanes' finds, up to any cap.
-Racesᶜ : ∀ {A B} → (R : Set) → EmissionSet A → List (EmissionSet B) → Bool → ℕ → EmissionSet B → Set₁
-Racesᶜ R O Ls d n J = ∀ C (x : Maybe (Cand R _)) (y : Maybe (Cand R _)) → OKᶜ C O x → OKLᶜ C Ls y → OKᶜ C J (raceT d n [] x y)
+Racesᶜ : ∀ {A B} → (R : Set) → EmissionSet A → List (EmissionSet B) → Bool → ℕ → List A → EmissionSet B → Set₁
+Racesᶜ R O Ls d n q J = ∀ C (x : Maybe (Cand R _)) (y : Maybe (Cand R _)) → OKᶜ C O x → OKLᶜ C Ls y → OKᶜ C J (raceT d n q x y)
 
-flat-race : ∀ {R A B} (L : A → Pos → EmissionSet B) O Ls d n → Single O → (T d → Empty O) → Racesᶜ R O Ls d n (Flat.JoinT L O d n Ls)
+flat-race : ∀ {R A B} (L : A → Pos → EmissionSet B) O Ls d n → Single O → (T d → Empty O) → Racesᶜ R O Ls d n [] (Flat.JoinT L O d n Ls)
 flat-race L O Ls d n sO sp =
   Race.race-okᶜ (Lane L) O (Lanes Ls) Over (λ _ → ⊤) (λ _ _ → ⊥) (λ _ → ⊥) Ls d n sO sp read-after (λ {P} → above-any {P = P} Ls) (empty-any Ls) (λ _ x → x)
     (λ {c} r z → over-at (inj₂ (c , r , ≼-refl {c})) (none-run {c = c} n Ls z)) (λ {c} x td pn → over-at (inj₁ td) (one-end n Ls pn {c} x)) (λ _ ())
   where open Flat L O d n Ls using (Over; over-at)
 
-switch-race : ∀ {R A B} (L : A → Pos → EmissionSet B) O Ls d n → Single O → (T d → Empty O) → Racesᶜ R O Ls d n (SwitchF.JoinT L O d n Ls)
+switch-race : ∀ {R A B} (L : A → Pos → EmissionSet B) O Ls d n → Single O → (T d → Empty O) → Racesᶜ R O Ls d n [] (SwitchF.JoinT L O d n Ls)
 switch-race L O Ls d n sO sp =
   Race.race-okᶜ (Lane L) O Bg Over (λ _ → ⊤) Cut (λ _ → ⊥) Ls d n sO sp read-after (λ {P} → bg-above {P}) bg-empty
     (switch-at L O Ls d n)
@@ -256,14 +256,14 @@ switch-race L O Ls d n sO sp =
     bg-empty el (bg x _)     = empty-any Ls el x
     bg-empty el (bpin x _ _) = empty-any Ls el x
 
-exhaust-race : ∀ {R A B} (L : A → Pos → EmissionSet B) O Ls d n → Single O → (T d → Empty O) → Racesᶜ R O Ls d n (ExhaustF.JoinT L O d n Ls)
+exhaust-race : ∀ {R A B} (L : A → Pos → EmissionSet B) O Ls d n → Single O → (T d → Empty O) → Racesᶜ R O Ls d n [] (ExhaustF.JoinT L O d n Ls)
 exhaust-race L O Ls d n sO sp =
   Race.race-okᶜ (Lane L) O (Lanes Ls) Over Run (λ _ _ → ⊥) (λ _ → ⊥) Ls d n sO sp read-after (λ {P} → above-any {P = P} Ls) (empty-any Ls) (λ _ x → x)
     (λ {c} r z → inj₂ (c , r , ≼-refl {c}) , none-run {c = c} n Ls z) (λ {c} x td pn → inj₁ td , one-end n Ls pn {c} x) (λ _ ())
   where open ExhaustF L O d n Ls using (Over; Run)
 
 -- Nothing queued: no lane waits, and with the outer done none starts.
-bounded-race : ∀ {R A B} m (L : A → Pos → EmissionSet B) O Ls d n → Single O → (T d → Empty O) → Racesᶜ R O Ls d n (BoundedF.JoinT m L O d n [] Ls)
+bounded-race : ∀ {R A B} m (L : A → Pos → EmissionSet B) O Ls d n → Single O → (T d → Empty O) → Racesᶜ R O Ls d n [] (BoundedF.JoinT m L O d n [] Ls)
 bounded-race m L O Ls d n sO sp =
   Race.race-okᶜ LaneB O Bg Over Indexed (λ _ _ → ⊥) Queued Ls d n sO sp lane-after (λ {P} → bg-above {P}) bg-empty (λ _ x → begun x)
     (λ {c} r z → inj₂ (c , r , ≼-refl {c}) , counted {c} (none-run {c = c} n Ls z))
@@ -474,12 +474,19 @@ postulate
   -- value, stall or close, or its completion owed; a dead cold owes none.
   cold-ok : ∀ {R Γ A} {ρ : DenEnv Γ} (c : Ctx R Γ A) b l → OK (rows ρ (coldS b l)) (seek c (coldS b l))
 
-  -- A BOUNDED MERGE'S SEARCH WITH VALUES WAITING KEYS ITS ROWS up to the
-  -- cap: a lane's end hands off to the queue's first just past it, the
-  -- merge's end owed by none.
-  bounded-wait-okᶜ : ∀ {R Γ A B} {ρ : DenEnv Γ} C (c : Ctx R Γ B) m (f : A → Obs Timeline Γ B) d n a q (o : St Γ A) ls
-                   → EnvSingle ρ → Good ρ (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls) → Quiet C ρ (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls)
-                   → OKᶜ C (rows ρ (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls)) (seek c (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls))
+  -- A BOUNDED MERGE'S RACE WITH VALUES WAITING KEYS ITS ROWS up to the
+  -- cap, every slot taken: the earliest lane end hands off to the
+  -- queue's head just past it, so nothing is owed at it; the queue's
+  -- lanes start past a lane's end, and the merge's end is owed by none.
+  queued-race : ∀ {R A B} m (L : A → Pos → EmissionSet B) O Ls d n (a : A) q → Single O → Each Single Ls → Parts O Ls → n ≡ m
+              → Racesᶜ R O Ls d n (a ∷ q) (BoundedF.JoinT m L O d n (a ∷ q) Ls)
+
+-- A good lane list's rows, one event a position each.
+lanes-single : ∀ {Γ A} {ρ : DenEnv Γ} (ls : List (St Γ A)) → EnvSingle ρ → GoodL ρ ls → Each Single (rowsL ρ ls)
+lanes-single []       _  _         = tt
+lanes-single (s ∷ ls) es (gs , gl) with lane-v s gs
+... | on a s₀ g₀ _ = rows-single s₀ es g₀ , lanes-single ls es gl
+... | off a s₀     = (λ ()) , lanes-single ls es gl
 
 -- EVERY SEARCH KEYS ITS ROWS UP TO A CAP ITS BINDERS LEAVE QUIET: a
 -- connect's body is searched under a binder capped no later than the
@@ -503,20 +510,25 @@ mutual
     first-stillsᶜ C (just (found (_ , _ , c , cutS true (attAt p) s) attM (after p) , after p , still)) _ (one (⊑-refl _))
       (cap-retag C (cutT true) (raise-cut true) (λ r → _ , _ , r , ⊑-refl _) (λ y → kept y) (seek (inCut true (attAt p) c) s) (seek-okᶜ C (inCut true (attAt p) c) s es g qt))
   seek-okᶜ {ρ = ρ} C c (flatS (mergeᶠ nothing) f d n q o ls) es g qt with MergeG.fresh g
-  ... | refl = okᶜ-trunc C _ (join-okᶜ C c (mergeᶠ nothing) f d n o ls (flat-race (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) spent)
+  ... | refl = okᶜ-trunc C _ (join-okᶜ C c (mergeᶠ nothing) f d n [] o ls (flat-race (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) spent)
                                         es outer lanesG (calm-fst C ρ qt) (calm-snd C ρ qt))
     where open MergeG g
   seek-okᶜ {ρ = ρ} C c (flatS (mergeᶠ (just m)) f d n [] o ls) es (g , _) qt =
-    okᶜ-trunc C _ (join-okᶜ C c (mergeᶠ (just m)) f d n o ls (bounded-race m (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) spent)
+    okᶜ-trunc C _ (join-okᶜ C c (mergeᶠ (just m)) f d n [] o ls (bounded-race m (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) spent)
                              es outer lanesG (calm-fst C ρ qt) (calm-snd C ρ qt))
     where open MergeG g
-  seek-okᶜ C c (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls) es g qt = bounded-wait-okᶜ C c m f d n a q o ls es g qt
+  seek-okᶜ {ρ = ρ} C c (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls) es (g , full) qt =
+    okᶜ-trunc C _ (join-okᶜ C c (mergeᶠ (just m)) f d n (a ∷ q) o ls
+                     (queued-race m (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n a q (rooted-single rooted) (lanes-single ls es lanesG) (rooted-parts rooted)
+                        ([ (λ ()) , (λ e → e) ]′ full))
+                     es outer lanesG (calm-fst C ρ qt) (calm-snd C ρ qt))
+    where open MergeG g
   seek-okᶜ {ρ = ρ} C c (flatS switchᶠ f d n q o ls) es g qt with MergeG.fresh g
-  ... | refl = okᶜ-trunc C _ (join-okᶜ C c switchᶠ f d n o ls (switch-race (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) spent)
+  ... | refl = okᶜ-trunc C _ (join-okᶜ C c switchᶠ f d n [] o ls (switch-race (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) spent)
                                         es outer lanesG (calm-fst C ρ qt) (calm-snd C ρ qt))
     where open MergeG g
   seek-okᶜ {ρ = ρ} C c (flatS exhaustᶠ f d n q o ls) es g qt with MergeG.fresh g
-  ... | refl = okᶜ-trunc C _ (join-okᶜ C c exhaustᶠ f d n o ls (exhaust-race (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) spent)
+  ... | refl = okᶜ-trunc C _ (join-okᶜ C c exhaustᶠ f d n [] o ls (exhaust-race (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) spent)
                                         es outer lanesG (calm-fst C ρ qt) (calm-snd C ρ qt))
     where open MergeG g
   seek-okᶜ C c (joinS j true x []) _ _ qt =
@@ -558,11 +570,11 @@ mutual
       (seek (inTake i q (overAt r) c) s) (seek-okᶜ C (inTake i q (overAt r) c) s es g qt)
 
   -- A joiner with nothing queued: its policy's race over its parts' finds.
-  join-okᶜ : ∀ {R Γ A B} {ρ : DenEnv Γ} C (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n (o : St Γ A) ls {J : EmissionSet B}
-           → Racesᶜ R (rows ρ o) (rowsL ρ ls) d n J → EnvSingle ρ → Good ρ o → GoodL ρ ls → Quiet C ρ o → QuietL C ρ ls
-           → OKᶜ C J (raceT d n [] (seek (inOuter op f d n [] ls c) o) (lanes c op f d n [] o [] ls))
-  join-okᶜ C c op f d n o ls rc es go gl qo ql =
-    rc C (seek (inOuter op f d n [] ls c) o) (lanes c op f d n [] o [] ls) (seek-okᶜ C (inOuter op f d n [] ls c) o es go qo) (lanes-okᶜ C c op f d n [] o [] ls es gl ql)
+  join-okᶜ : ∀ {R Γ A B} {ρ : DenEnv Γ} C (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls {J : EmissionSet B}
+           → Racesᶜ R (rows ρ o) (rowsL ρ ls) d n q J → EnvSingle ρ → Good ρ o → GoodL ρ ls → Quiet C ρ o → QuietL C ρ ls
+           → OKᶜ C J (raceT d n q (seek (inOuter op f d n q ls c) o) (lanes c op f d n q o [] ls))
+  join-okᶜ C c op f d n q o ls rc es go gl qo ql =
+    rc C (seek (inOuter op f d n q ls c) o) (lanes c op f d n q o [] ls) (seek-okᶜ C (inOuter op f d n q ls c) o es go qo) (lanes-okᶜ C c op f d n q o [] ls es gl ql)
 
   seek-lnᶜ : ∀ {R Γ A} {ρ : DenEnv Γ} C (c : Ctx R Γ A) (s : St Γ A) → EnvSingle ρ → GoodLn ρ s → Quiet C ρ s → OKᶜ C (rows ρ s) (seek c s)
   seek-lnᶜ {ρ = ρ} C c s es g qt with lane-v s g
@@ -590,5 +602,5 @@ lanes-ok : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) op f d n q (o : St [] A
 lanes-ok {ρ = ρ} c op f d n q o pre ls gl = uncapL (rowsL ρ ls) (lanes c op f d n q o pre ls) (λ C → lanes-okᶜ C c op f d n q o pre ls (λ ()) gl (λ ()))
 
 join-ok : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) op (f : A → Obs Timeline [] B) d n (o : St [] A) ls {J : EmissionSet B}
-        → Racesᶜ R (rows ρ o) (rowsL ρ ls) d n J → Good ρ o → GoodL ρ ls → OK J (raceT d n [] (seek (inOuter op f d n [] ls c) o) (lanes c op f d n [] o [] ls))
-join-ok c op f d n o ls rc go gl = uncap _ (λ C → join-okᶜ C c op f d n o ls rc (λ ()) go gl (λ ()) (λ ()))
+        → Racesᶜ R (rows ρ o) (rowsL ρ ls) d n [] J → Good ρ o → GoodL ρ ls → OK J (raceT d n [] (seek (inOuter op f d n [] ls c) o) (lanes c op f d n [] o [] ls))
+join-ok c op f d n o ls rc go gl = uncap _ (λ C → join-okᶜ C c op f d n [] o ls rc (λ ()) go gl (λ ()) (λ ()))
