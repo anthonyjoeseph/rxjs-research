@@ -45,17 +45,17 @@ Members: `sub-cold`, `abs-leaf`, `burst-from`.
 
 Untried: a bounded merge, a switch or an exhaust part way through reads
 its begun lanes over off its live count, not off each lane's rows, and
-each entry, outer value, outer end, lane value and lane end keeps `Inv`.
-Open: whether the count and `Rows.BoundedF`'s schedule from begun lanes
-track the machine's queue and kills. Settled when each is a body, or a
-joiner whose lane end in flight the count reads wrong.
+each entry, outer value, outer end and lane value keeps `Inv`; a lane's
+end is one step over the policy. Open: whether `Rows.BoundedF`'s schedule
+from begun lanes tracks the machine's queue, with a lane gone or handed
+on. Settled when each is a body, or a bounded merge whose freed slot the
+schedule reads wrong.
 
-Members: `enter-bounded`, `enter-switch`, `enter-exhaust`,
-`rise-bounded-nx`, `rise-bounded-cp`, `rise-bounded-lane-nx`,
-`rise-bounded-lane-cp`, `rise-switch-nx`, `rise-switch-cp`,
-`rise-switch-lane-nx`, `rise-switch-lane-cp`, `rise-exhaust-run`,
-`rise-exhaust-drop`, `rise-exhaust-cp`, `rise-exhaust-lane-nx`,
-`rise-exhaust-lane-cp`.
+Members: `enter-bounded`, `enter-switch`, `enter-exhaust`, `rise-bounded-nx`,
+`rise-bounded-cp`, `rise-bounded-lane-nx`, `bounded-ends-at`,
+`rise-bounded-lane-hand`, `rise-switch-nx`, `rise-switch-cp`,
+`rise-switch-lane-nx`, `rise-exhaust-run`, `rise-exhaust-drop`,
+`rise-exhaust-cp`, `rise-exhaust-lane-nx`.
 
 #### THE CONNECT STEPPED
 

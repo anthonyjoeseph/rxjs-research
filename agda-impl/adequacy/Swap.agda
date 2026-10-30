@@ -4,12 +4,12 @@
 -- lists and counts its merges read.
 module adequacy.Swap where
 
-open import Data.Bool using (Bool; true; false; _∧_)
+open import Data.Bool using (true; false; _∧_)
 open import Data.List using (List; []; _∷_; _ʳ++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (just; nothing)
-open import Data.Nat using (ℕ; _+_)
+open import Data.Nat using (_+_)
 open import Data.Nat.Properties using (+-suc)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.List.Relation.Unary.All using ([]; lookup) renaming (_∷_ to _∷ᴬ_)
@@ -25,7 +25,7 @@ open import denotation.Laws.Modulus using (⟨_⟩; upto; ≼-refl)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; CS; plug; alive; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (env; rows; rowsL; Each; module Flat; _≃_; _⇄_; Hot)
+open import adequacy.Rows using (env; rows; rowsL; _≃_; _⇄_; Hot)
 open import adequacy.Causal using (rows-hot; rows-≃; rows-causal; hot-ag; env-refl)
 open import adequacy.Up using (_≈ᴸ_; []; _∷_; ≈ᴸ-refl; row-≃; map-≃; scan-≃; take-≃; ≃-refl; conn-≃; bounded-≃;
   switch-≃; exhaust-≃)
@@ -43,24 +43,6 @@ rowsL-ʳ++ (x ∷ xs) = rowsL-ʳ++ xs
 
 ≡→≃ : ∀ {A} {t u : EmissionSet A} → t ≡ u → t ≃ u
 ≡→≃ refl = ≃-refl
-
-module _ {A B : Set} (L : A → Pos → EmissionSet B) {O : EmissionSet A} {d : Bool} {n : ℕ} {Ls : List (EmissionSet B)} where
-  -- No part owing a row: the merge owes none.
-  flat-empty : Empty O → Each Empty Ls → Empty (Flat.JoinT L O d n Ls)
-  flat-empty eo el (Flat.val r)       = eo r
-  flat-empty eo el (Flat.step r)      = eo r
-  flat-empty eo el (Flat.opin r)      = eo r
-  flat-empty eo el (Flat.oend r _)    = eo r
-  flat-empty eo el (Flat.opass r _)   = eo r
-  flat-empty eo el (Flat.lane r _ _ _ _)  = eo r
-  flat-empty eo el (Flat.lend r _ _ _ _ _)  = eo r
-  flat-empty eo el (Flat.lpass r _ _ _ _ _) = eo r
-  flat-empty eo el (Flat.hand _ _ _ _ ())
-  flat-empty eo el (Flat.left r _ _ _ _) = eo r
-  flat-empty eo el (Flat.run x _)     = empty-any Ls el x
-  flat-empty eo el (Flat.rend x _ _)  = empty-any Ls el x
-  flat-empty eo el (Flat.rpass x _ _) = empty-any Ls el x
-  flat-empty eo el (Flat.rhand _ ())
 
 ------------------------------------------------------------------------
 -- Lanes still in their list

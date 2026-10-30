@@ -102,3 +102,20 @@ module Frame {A B : Set} {PX PY : Policy A B} {p : Pos} (E : EndsAt PX PY p) whe
 
     frame-≈ : JoinP PX ≈⟨ p ⟩ Y′
     frame-≈ = fwd′ ⇆ bwd′
+
+-- A joiner over nothing shows nothing.
+join-empty : ∀ {A B} (P : Policy A B) → (∀ {q e} → ¬ outer P q e) → (∀ {q e} → ¬ begun P q e) → ∀ {q e} → ¬ JoinP P q e
+join-empty P eo eb (Joining.val r)             = eo r
+join-empty P eo eb (Joining.step r)            = eo r
+join-empty P eo eb (Joining.opin r)            = eo r
+join-empty P eo eb (Joining.oend r _)          = eo r
+join-empty P eo eb (Joining.opass r _)         = eo r
+join-empty P eo eb (Joining.lane r _ _ _ _)    = eo r
+join-empty P eo eb (Joining.lend r _ _ _ _ _)  = eo r
+join-empty P eo eb (Joining.lpass r _ _ _ _ _) = eo r
+join-empty P eo eb (Joining.hand r _ _ _ _)    = eo r
+join-empty P eo eb (Joining.left r _ _ _ _)    = eo r
+join-empty P eo eb (Joining.run x _)           = eb x
+join-empty P eo eb (Joining.rend x _ _)        = eb x
+join-empty P eo eb (Joining.rpass x _ _)       = eb x
+join-empty P eo eb (Joining.rhand x _)         = eb x
