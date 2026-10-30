@@ -24,7 +24,7 @@ open import denotation.Read using (Run; Meets; Visible; loud; cursor; []; _∷_)
 import denotation.Read as Read
 open import operation.PureObservable using (PureObs; module Machine; module Driver)
 open Machine using (Conf; load; nx; cp) renaming (Shown to Shownᴹ)
-open import adequacy.Rows using (Steps; conv; RT; Vis; Lowest; Beyond; into; back; narrow; past-≃; _≃_; _⇄_; ≃-sym; []; tau; val; fin)
+open import adequacy.Rows using (Steps; conv; RT; Vis; Past; Lowest; Beyond; into; back; narrow; past-≃; _≃_; _⇄_; ≃-sym; []; tau; val; fin)
 open _≃_
 open import adequacy.Up using (≃-refl; ≃-trans)
 open import adequacy.Inv using (Inv; inv)
