@@ -228,7 +228,7 @@ mutual
   kids-mark c (flatS op f d n q o ls) =
     race-mk d n q (seek (inOuter op f d n q ls c) o) (lanes c op f d n q o [] ls) (seek-mark (inOuter op f d n q ls c) o) (lanes-mark c op f d n q o [] ls)
   kids-mark c (connS k o b)   = source-mk (overᶜ k) (seek (inSrc k b c) o) (seek (inBody k o c) b) (seek-mark (inSrc k b c) o) (seek-mark (inBody k o c) b)
-  kids-mark c (pend _)        = tt
+  kids-mark c (pend _ _)        = tt
   kids-mark c (coldS _ _)     = tt
   kids-mark c (ofS _ _ _)     = tt
   kids-mark c doneS           = tt
@@ -397,7 +397,6 @@ mergeG-map ho hl hc hs hr m = record { outer = ho outer ; lanesG = hl lanesG ; f
 -- REFUTED: 85ad69b9 found-lead without the parts apart, by a merge whose outer and lane are empty ofs at one position
 mutual
   G : ∀ {Γ A} → DenEnv Γ → Bool → St Γ A → Set₁
-  G ρ b (pend o)                              = ⊤₁
   G ρ b (ofS i p xs)                          = ⊤₁
   G ρ b doneS                                 = ⊤₁
   G ρ b (mapS f s)                            = G ρ b s
@@ -430,7 +429,7 @@ GoodLn ρ = GLn ρ true
 -- Live, a fortiori of the right shape.
 mutual
   shape : ∀ {Γ A} {ρ : DenEnv Γ} {v} (s : St Γ A) → G ρ v s → G ρ false s
-  shape (pend o)                                  g = g
+  shape (pend o _)                                  ()
   shape (ofS i p xs)                              g = g
   shape doneS                                     g = g
   shape (mapS f s)                                g = shape s g
@@ -453,7 +452,7 @@ mutual
 
   shapeLn : ∀ {Γ A} {ρ : DenEnv Γ} {v} (s : St Γ A) → GLn ρ v s → GLn ρ false s
   shapeLn {v = v} (lnS l (cutS l′ a s)) (eq , g , _) = eq , shape {v = v ∧ l} s g , tt
-  shapeLn (lnS _ (pend _))              ()
+  shapeLn (lnS _ (pend _ _))              ()
   shapeLn (lnS _ (coldS _ _))           ()
   shapeLn (lnS _ (ofS _ _ _))           ()
   shapeLn (lnS _ doneS)                 ()
@@ -464,7 +463,7 @@ mutual
   shapeLn (lnS _ (flatS _ _ _ _ _ _ _)) ()
   shapeLn (lnS _ (connS _ _ _))         ()
   shapeLn (lnS _ (joinS _ _ _ _))       ()
-  shapeLn (pend _)              ()
+  shapeLn (pend _ _)              ()
   shapeLn (coldS _ _)           ()
   shapeLn (ofS _ _ _)           ()
   shapeLn doneS                 ()
@@ -486,7 +485,7 @@ lane-v (lnS false (cutS false a s)) (refl , _)     = off a s
 lane-v (lnS true  (cutS false a s)) (() , _)
 lane-v (lnS false (cutS true  a s)) (() , _)
 lane-v (lnS _ (lnS _ _)) ()
-lane-v (lnS _ (pend _)) ()
+lane-v (lnS _ (pend _ _)) ()
 lane-v (lnS _ (coldS _ _)) ()
 lane-v (lnS _ (ofS _ _ _)) ()
 lane-v (lnS _ (doneS)) ()
@@ -496,7 +495,7 @@ lane-v (lnS _ (takeS _ _ _ _)) ()
 lane-v (lnS _ (flatS _ _ _ _ _ _ _)) ()
 lane-v (lnS _ (connS _ _ _)) ()
 lane-v (lnS _ (joinS _ _ _ _)) ()
-lane-v (pend _) ()
+lane-v (pend _ _) ()
 lane-v (coldS _ _) ()
 lane-v (ofS _ _ _) ()
 lane-v (doneS) ()
@@ -595,7 +594,7 @@ lane-ok doneS                 y b = kept y b
 lane-ok (mapS f s)            y b = kept y b
 lane-ok (cutS l a s)          y b = kept y b
 lane-ok (flatS op f d n q o ls) y b = kept y b
-lane-ok (pend o)      y b = kept y b
+lane-ok (pend o _)      y b = kept y b
 lane-ok (coldS v l)   y b = kept y b
 lane-ok (scanS f z s) y b = kept y b
 lane-ok (takeS i q w s) y b = kept y b
@@ -749,7 +748,6 @@ mutual
   seek-ok c (ofS i p [])       _ = record { from = of-from p i [] ; mark = ⊑-refl _ ; shown = λ eq → _ , refl , of-shows c i p [] eq }
   seek-ok c (ofS i p (x ∷ xs)) _ = record { from = of-from p i (x ∷ xs) ; mark = ⊑-refl _ ; shown = λ eq → _ , refl , of-shows c i p (x ∷ xs) eq }
   seek-ok c doneS              _ = λ ()
-  seek-ok c (pend o)           _ = λ ()
   seek-ok c (mapS f s)         g = mapped f (seek (inMap f c) s) (seek-ok (inMap f c) s g)
   seek-ok c (cutS true attached s)   g = kept (seek (inCut true attached c) s) (seek-ok (inCut true attached c) s g)
   seek-ok {ρ = ρ} c (cutS false a s) _ = seek-off {ρ = ρ} c a s

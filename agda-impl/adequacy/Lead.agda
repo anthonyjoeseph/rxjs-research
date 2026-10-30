@@ -409,7 +409,7 @@ own-lead false c (cutS l (attAt q) s) _ = stop , tt
 own-lead v c (cutS l attached s)  _ = tt₁
 own-lead v c (mapS f s)           _ = tt₁
 own-lead v c doneS                _ = tt₁
-own-lead v c (pend o)             _ = tt₁
+own-lead v c (pend o _)             _ = tt₁
 own-lead v c (flatS op f d n q o ls) _ = tt₁
 own-lead v c (lnS b s)            ()
 own-lead v c (scanS _ _ _)        ()
@@ -447,7 +447,7 @@ mutual
       (lanes-lead false c f d n o [] ls (MergeG.lanesG m) tt) tt tt tt)
   kids-lead v c (ofS _ _ _)      _ = tt₁
   kids-lead v c doneS            _ = tt₁
-  kids-lead v c (pend _)         _ = tt₁
+  kids-lead v c (pend _ _)         _ = tt₁
   kids-lead v c (flatS (mergeᶠ (just _)) _ _ _ _ _ _) ()
   kids-lead v c (flatS switchᶠ _ _ _ _ _ _)           ()
   kids-lead v c (flatS exhaustᶠ _ _ _ _ _ _)          ()
@@ -461,7 +461,7 @@ mutual
   seek-ln-lead : ∀ {R Γ A} v (c : Ctx R Γ A) (s : St Γ A) → GLn (env c) v s → Leads v c (rows (env c) s) (seek c s)
   seek-ln-lead v c (lnS true (cutS .true a s₀)) (refl , g₀ , _) = ln-leads (seek (inLn true c) (cutS true a s₀)) (seek-lead v (inLn true c) (cutS true a s₀) g₀)
   seek-ln-lead v c (lnS false (cutS .false a s₀)) (refl , g₀ , _) = ln-leads (seek (inLn false c) (cutS false a s₀)) (seek-lead v (inLn false c) (cutS false a s₀) g₀)
-  seek-ln-lead v c (lnS _ (pend _)) ()
+  seek-ln-lead v c (lnS _ (pend _ _)) ()
   seek-ln-lead v c (lnS _ (coldS _ _)) ()
   seek-ln-lead v c (lnS _ (ofS _ _ _)) ()
   seek-ln-lead v c (lnS _ doneS) ()
@@ -472,7 +472,7 @@ mutual
   seek-ln-lead v c (lnS _ (flatS _ _ _ _ _ _ _)) ()
   seek-ln-lead v c (lnS _ (connS _ _ _)) ()
   seek-ln-lead v c (lnS _ (joinS _ _ _ _)) ()
-  seek-ln-lead v c (pend _) ()
+  seek-ln-lead v c (pend _ _) ()
   seek-ln-lead v c (coldS _ _) ()
   seek-ln-lead v c (ofS _ _ _) ()
   seek-ln-lead v c doneS ()
@@ -500,7 +500,7 @@ mutual
       (lane-ok (lnS l (cutS l a s₀)) _ (seek-ln (inLanes (mergeᶠ nothing) f d n [] o pre post c) (lnS l (cutS l a s₀)) gs))
       (lanes-ok c f d n o (lnS l (cutS l a s₀) ∷ pre) post gp)
       sp
-  lanes-lead v c f d n o pre ((lnS _ (pend _)) ∷ post) (() , _) sp
+  lanes-lead v c f d n o pre ((lnS _ (pend _ _)) ∷ post) (() , _) sp
   lanes-lead v c f d n o pre ((lnS _ (coldS _ _)) ∷ post) (() , _) sp
   lanes-lead v c f d n o pre ((lnS _ (ofS _ _ _)) ∷ post) (() , _) sp
   lanes-lead v c f d n o pre ((lnS _ doneS) ∷ post) (() , _) sp
@@ -511,7 +511,7 @@ mutual
   lanes-lead v c f d n o pre ((lnS _ (flatS _ _ _ _ _ _ _)) ∷ post) (() , _) sp
   lanes-lead v c f d n o pre ((lnS _ (connS _ _ _)) ∷ post) (() , _) sp
   lanes-lead v c f d n o pre ((lnS _ (joinS _ _ _ _)) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((pend _) ∷ post) (() , _) sp
+  lanes-lead v c f d n o pre ((pend _ _) ∷ post) (() , _) sp
   lanes-lead v c f d n o pre ((coldS _ _) ∷ post) (() , _) sp
   lanes-lead v c f d n o pre ((ofS _ _ _) ∷ post) (() , _) sp
   lanes-lead v c f d n o pre (doneS ∷ post) (() , _) sp

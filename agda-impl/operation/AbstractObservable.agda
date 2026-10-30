@@ -73,8 +73,8 @@ data Owe : Set where
 -- A connect's subject and its source's switch, and what it owes: the
 -- source's subscription (the body subscribed at `p`), the source's
 -- attach (subscribed at `p`), the source's teardown (the body completed
--- at `p`); where the source is subscribed, and where it ended, once
--- closed.
+-- at `p`); where the connect is subscribed, and where its source ended,
+-- once closed.
 record CS : Set where
   constructor cs
   field
@@ -84,11 +84,12 @@ record CS : Set where
     bodyAt  : Maybe Pos
     attSrc  : Maybe Pos
     owedAt  : Maybe Pos
-    srcAt   : Pos
+    connAt  : Pos
     endAt   : Pos
 
 data St (Γ : List Set) : Set → Set₁ where
-  pend  : ∀ {A} → Obs C Γ A → St Γ A
+  -- a subscription owed, and where it will be made
+  pend  : ∀ {A} → Obs C Γ A → Pos → St Γ A
   -- a started cold: live, and what the runtime keeps of it
   coldS : ∀ {A} → Bool → L A → St Γ A
   -- the next value's index, where the of was subscribed, the values left
@@ -492,25 +493,25 @@ begin : ∀ {R Γ A} → Ctx R Γ A → Obs C Γ A → Pos → Stepped R
 begin c (cold x)          p = starting x p λ l → ⟨ c , coldS true l , absorbed , p ⟩
 begin c empty             p = ok ⟨ c , ofS 0 p [] , absorbed , p ⟩
 begin c (of xs)           p = ok ⟨ c , ofS 0 p xs , absorbed , p ⟩
-begin c (map f s)         p = ok ⟨ inMap f c , pend s , subscribing , p ⟩
-begin c (scan f z s)      p = ok ⟨ inScan f z c , pend s , subscribing , p ⟩
-begin c (takeWhile i q s) p = ok ⟨ inCut true (attAt p) (inTake i q free c) , pend s , subscribing , p ⟩
-begin c (flatMap op f s)  p = ok ⟨ inCut true (attAt p) (inOuter op f false 0 [] [] c) , pend s , subscribing , p ⟩
+begin c (map f s)         p = ok ⟨ inMap f c , pend s p , subscribing , p ⟩
+begin c (scan f z s)      p = ok ⟨ inScan f z c , pend s p , subscribing , p ⟩
+begin c (takeWhile i q s) p = ok ⟨ inCut true (attAt p) (inTake i q free c) , pend s p , subscribing , p ⟩
+begin c (flatMap op f s)  p = ok ⟨ inCut true (attAt p) (inOuter op f false 0 [] [] c) , pend s p , subscribing , p ⟩
 -- the body under `ix 0`; its source, once the body's subscription
 -- exists, under `ix 1`
-begin c (connect s b)     p = ok ⟨ inBody (cs false true false (just p) nothing nothing (p ⊕ [ ix 1 ]) root) (pend s) c , pend b , subscribing , p ⊕ [ ix 0 ] ⟩
+begin c (connect s b)     p = ok ⟨ inBody (cs false true false (just p) nothing nothing p root) (pend s (p ⊕ [ ix 1 ])) c , pend b (p ⊕ [ ix 0 ]) , subscribing , p ⊕ [ ix 0 ] ⟩
 -- a joiner keeps where it joined; a completed subject owes it its end under `last`
 begin c (connected x)     p with closedUp c x
 ... | true  = ok ⟨ c , ofS 0 p [] , absorbed , p ⟩
 ... | false = ok ⟨ c , joinS p true x [] , absorbed , p ⟩
 -- a defer's body one level down
-begin c (defer l)         p = ok ⟨ c , pend (Later.force l) , subscribing , p ⊕ [ ix 1 ] ⟩
+begin c (defer l)         p = ok ⟨ c , pend (Later.force l) (p ⊕ [ ix 1 ]) , subscribing , p ⊕ [ ix 1 ] ⟩
 
 -- A lane begun under `ix 1`, unless the flatMap's own observer is closed.
 start : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → A → Pos → Conf R
 start c op f d n q o ls a p with closed c
 ... | true  = ⟨ c , flatS op f d n q o ls , absorbed , p ⟩
-... | false = ⟨ inCut true (attAt (p ⊕ [ ix 1 ])) (inLn true (inLanes op f d (suc n) q o (reverse ls) [] c)) , pend (f a) , subscribing , p ⊕ [ ix 1 ] ⟩
+... | false = ⟨ inCut true (attAt (p ⊕ [ ix 1 ])) (inLn true (inLanes op f d (suc n) q o (reverse ls) [] c)) , pend (f a) (p ⊕ [ ix 1 ]) , subscribing , p ⊕ [ ix 1 ] ⟩
 
 -- The outer done, no lane running and, `e`, none waiting: complete.
 settle : ∀ {B} → Bool → ℕ → Bool → Mode B
@@ -600,7 +601,7 @@ run c s m r = ok ⟨ c , s , absorbed , r ⟩
 -- By the mode first, so a fact about a step splits on the mode alone.
 stepAt : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Mode A → Pos → Stepped R
 stepAt c s (rising e)   p = rise c s e p
-stepAt c (pend o) subscribing p = begin c o p
+stepAt c (pend o q) subscribing _ = begin c o q
 stepAt c s subscribing p = ok ⟨ c , s , subscribing , p ⟩
 -- the least mark run
 stepAt c s absorbed p with search top (plug c s)
@@ -612,7 +613,7 @@ step ⟨ c , s , m , p ⟩ = stepAt c s m p
 
 -- The root subscribed.
 load : ∀ {R} → Obs C [] R → Conf R
-load o = ⟨ top , pend o , subscribing , root ⟩
+load o = ⟨ top , pend o root , subscribing , root ⟩
 
 ------------------------------------------------------------------------
 -- What a runtime reads and does

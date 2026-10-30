@@ -92,28 +92,28 @@ unbound (inBody k o c)                              ()
 -- Subscribing
 
 postulate
-  sub-empty : ∀ {R Γ A} (c : Ctx R Γ A) p → Sim ⟨ c , pend empty , subscribing , p ⟩ [] ⟨ c , ofS 0 p [] , absorbed , p ⟩
-  sub-of    : ∀ {R Γ A} (c : Ctx R Γ A) xs p → Sim ⟨ c , pend (of xs) , subscribing , p ⟩ [] ⟨ c , ofS 0 p xs , absorbed , p ⟩
+  sub-empty : ∀ {R Γ A} (c : Ctx R Γ A) q p → Sim ⟨ c , pend empty q , subscribing , p ⟩ [] ⟨ c , ofS 0 q [] , absorbed , q ⟩
+  sub-of    : ∀ {R Γ A} (c : Ctx R Γ A) xs q p → Sim ⟨ c , pend (of xs) q , subscribing , p ⟩ [] ⟨ c , ofS 0 q xs , absorbed , q ⟩
 
 -- A map entered: its source pending under it.
-sub-map : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → B) s p → Sim ⟨ c , pend (map f s) , subscribing , p ⟩ [] ⟨ inMap f c , pend s , subscribing , p ⟩
-sub-map c f s p (inv g (uc , _ , ok)) = inv (good-swap c sw g) (uc , tt , ok) , silent (vis-≃ (up-≃ c (enter-map (env c) f s p)))
+sub-map : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → B) s q p → Sim ⟨ c , pend (map f s) q , subscribing , p ⟩ [] ⟨ inMap f c , pend s q , subscribing , q ⟩
+sub-map c f s q p (inv g (uc , _ , ok)) = inv (good-swap c sw g) (uc , tt , ok) , silent (vis-≃ (up-≃ c (enter-map (env c) f s q)))
   where
-    sw : Swap (env c) (pend (map f s)) (mapS f (pend s))
+    sw : Swap (env c) doneS (mapS f doneS)
     sw = record { same = (λ ()) ⇄ (λ { (map-out ()) ; (map-skip ()) ; (map-pin ()) ; (map-end ()) }) ; live≡ = refl ; node = λ _ x → x ; lane = λ _ () ; body = λ _ _ () }
 
 -- A merge entered: its outer pending under it, attached at `p`, nothing begun.
-sub-merge : ∀ {R Γ A B} (c : Ctx R Γ B) f (s : Obs Timeline Γ A) p
-          → Sim ⟨ c , pend (flatMap (mergeᶠ nothing) f s) , subscribing , p ⟩ [] ⟨ inCut true (attAt p) (inOuter (mergeᶠ nothing) f false 0 [] [] c) , pend s , subscribing , p ⟩
-sub-merge c f s p (inv g (uc , _ , ok)) = inv (good-swap c sw g) ((tt , uc) , tt , ok) , silent (vis-≃ (up-≃ c (enter-merge (env c) f s p)))
+sub-merge : ∀ {R Γ A B} (c : Ctx R Γ B) f (s : Obs Timeline Γ A) q p
+          → Sim ⟨ c , pend (flatMap (mergeᶠ nothing) f s) q , subscribing , p ⟩ [] ⟨ inCut true (attAt q) (inOuter (mergeᶠ nothing) f false 0 [] [] c) , pend s q , subscribing , q ⟩
+sub-merge {A = A} {B} c f s q p (inv g (uc , _ , ok)) = inv (good-swap c sw g) ((tt , uc) , tt , ok) , silent (vis-≃ (up-≃ c (enter-merge (env c) f s q)))
   where
     -- The outer about to enter at `p`: inside its own entry, nothing begun.
-    rt : Rooted (env c) (rows (env c) (cutS true (attAt p) (pend s))) []
-    rt = record { o₀ = s ; p₀ = p ; inv = inv-⟦⟧ s (env c) (env-good c (proj₁ (good-split c _ g))) p ok ; sub = λ () ; qs = [] ; roots = tt }
-    node′ : ∀ v → G (env c) v (pend (flatMap (mergeᶠ nothing) f s)) → G (env c) v (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt p) (pend s)) [])
+    rt : Rooted (env c) (rows (env c) (cutS true (attAt q) doneS)) []
+    rt = record { o₀ = s ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c (proj₁ (good-split c _ g))) q ok ; sub = λ () ; qs = [] ; roots = tt }
+    node′ : ∀ v → G (env c) v (doneS {A = B}) → G (env c) v (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt q) (doneS {A = A})) [])
     node′ true  _ = record { outer = tt₁ ; lanesG = tt₁ ; fresh = refl ; count = refl ; spent = λ () ; rooted = rt }
     node′ false _ = mergeG₀ tt₁ tt₁ refl
-    sw : Swap (env c) (pend (flatMap (mergeᶠ nothing) f s)) (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt p) (pend s)) [])
+    sw : Swap (env c) doneS (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt q) doneS) [])
     sw = record { same = ≃-sym (flat-∅ _ false) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () }
 
 stay : ∀ {R} {k : Conf R} → Sim k [] k
@@ -121,12 +121,12 @@ stay i = i , silent ((λ x → x) ⇄ (λ x → x))
 
 -- A node already running, not a pending program.
 Running : ∀ {Γ A} → St Γ A → Set
-Running (pend _) = ⊥
+Running (pend _ _) = ⊥
 Running _        = ⊤
 
 -- Subscribing to a node already running: nothing to do.
 sub-sim : ∀ {R Γ A} {k′ : Conf R} {sh t} (c : Ctx R Γ A) (s : St Γ A) p → Running s → stepᴹ ⟨ c , s , subscribing , p ⟩ ≡ moved k′ sh t → Sim ⟨ c , s , subscribing , p ⟩ sh k′
-sub-sim c (pend _)          p () _
+sub-sim c (pend _ _)        p () _
 sub-sim c (coldS b l)       p _ refl = stay
 sub-sim c (ofS i q xs)      p _ refl = stay
 sub-sim c doneS             p _ refl = stay
@@ -369,44 +369,44 @@ Runs k = ∀ {rs} → Steps k rs → Shows* (RT k) (conv rs)
 -- Each owes what growing it would: its node's place in `adequacy.Bound.G`,
 -- its rows and what it owes, and the step arms of the nodes it builds.
 postulate
-  beyond-cold    : ∀ {R Γ A} (c : Ctx R Γ A) x p → Inv ⟨ c , pend (cold x) , subscribing , p ⟩ → Runs ⟨ c , pend (cold x) , subscribing , p ⟩
-  beyond-scan    : ∀ {R Γ A B} (c : Ctx R Γ B) (f : B → A → B) z (s : Obs Timeline Γ A) p
-                 → Inv ⟨ c , pend (scan f z s) , subscribing , p ⟩ → Runs ⟨ c , pend (scan f z s) , subscribing , p ⟩
-  beyond-take    : ∀ {R Γ A} (c : Ctx R Γ A) b q (s : Obs Timeline Γ A) p
-                 → Inv ⟨ c , pend (takeWhile b q s) , subscribing , p ⟩ → Runs ⟨ c , pend (takeWhile b q s) , subscribing , p ⟩
-  beyond-bounded : ∀ {R Γ A B} (c : Ctx R Γ B) m (f : A → Obs Timeline Γ B) s p
-                 → Inv ⟨ c , pend (flatMap (mergeᶠ (just m)) f s) , subscribing , p ⟩ → Runs ⟨ c , pend (flatMap (mergeᶠ (just m)) f s) , subscribing , p ⟩
-  beyond-switch  : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) s p
-                 → Inv ⟨ c , pend (flatMap switchᶠ f s) , subscribing , p ⟩ → Runs ⟨ c , pend (flatMap switchᶠ f s) , subscribing , p ⟩
-  beyond-exhaust : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) s p
-                 → Inv ⟨ c , pend (flatMap exhaustᶠ f s) , subscribing , p ⟩ → Runs ⟨ c , pend (flatMap exhaustᶠ f s) , subscribing , p ⟩
-  beyond-connect : ∀ {R Γ A B} (c : Ctx R Γ B) (s : Obs Timeline Γ A) b p
-                 → Inv ⟨ c , pend (connect s b) , subscribing , p ⟩ → Runs ⟨ c , pend (connect s b) , subscribing , p ⟩
-  beyond-defer   : ∀ {R Γ A} (c : Ctx R Γ A) l p → Inv ⟨ c , pend (defer l) , subscribing , p ⟩ → Runs ⟨ c , pend (defer l) , subscribing , p ⟩
+  beyond-cold    : ∀ {R Γ A} (c : Ctx R Γ A) x q′ p → Inv ⟨ c , pend (cold x) q′ , subscribing , p ⟩ → Runs ⟨ c , pend (cold x) q′ , subscribing , p ⟩
+  beyond-scan    : ∀ {R Γ A B} (c : Ctx R Γ B) (f : B → A → B) z (s : Obs Timeline Γ A) q′ p
+                 → Inv ⟨ c , pend (scan f z s) q′ , subscribing , p ⟩ → Runs ⟨ c , pend (scan f z s) q′ , subscribing , p ⟩
+  beyond-take    : ∀ {R Γ A} (c : Ctx R Γ A) b q (s : Obs Timeline Γ A) q′ p
+                 → Inv ⟨ c , pend (takeWhile b q s) q′ , subscribing , p ⟩ → Runs ⟨ c , pend (takeWhile b q s) q′ , subscribing , p ⟩
+  beyond-bounded : ∀ {R Γ A B} (c : Ctx R Γ B) m (f : A → Obs Timeline Γ B) s q′ p
+                 → Inv ⟨ c , pend (flatMap (mergeᶠ (just m)) f s) q′ , subscribing , p ⟩ → Runs ⟨ c , pend (flatMap (mergeᶠ (just m)) f s) q′ , subscribing , p ⟩
+  beyond-switch  : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) s q′ p
+                 → Inv ⟨ c , pend (flatMap switchᶠ f s) q′ , subscribing , p ⟩ → Runs ⟨ c , pend (flatMap switchᶠ f s) q′ , subscribing , p ⟩
+  beyond-exhaust : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) s q′ p
+                 → Inv ⟨ c , pend (flatMap exhaustᶠ f s) q′ , subscribing , p ⟩ → Runs ⟨ c , pend (flatMap exhaustᶠ f s) q′ , subscribing , p ⟩
+  beyond-connect : ∀ {R Γ A B} (c : Ctx R Γ B) (s : Obs Timeline Γ A) b q′ p
+                 → Inv ⟨ c , pend (connect s b) q′ , subscribing , p ⟩ → Runs ⟨ c , pend (connect s b) q′ , subscribing , p ⟩
+  beyond-defer   : ∀ {R Γ A} (c : Ctx R Γ A) l q′ p → Inv ⟨ c , pend (defer l) q′ , subscribing , p ⟩ → Runs ⟨ c , pend (defer l) q′ , subscribing , p ⟩
 
 -- Where a step goes: on, linked a step at a time, or into a former's leaf.
 data Reach {R} (k : Conf R) : Set₁ where
   within : Mv (stepᴹ k) → (∀ {k′ sh t} → stepᴹ k ≡ moved k′ sh t → Sim k sh k′) → Reach k
   beyond : Runs k → Reach k
 
-reach-pend : ∀ {R Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) p → Inv ⟨ c , pend o , subscribing , p ⟩ → Reach ⟨ c , pend o , subscribing , p ⟩
-reach-pend c empty                           p i = within tt λ { refl → sub-empty c p }
-reach-pend c (of xs)                         p i = within tt λ { refl → sub-of c xs p }
-reach-pend c (map f s)                       p i = within tt λ { refl → sub-map c f s p }
-reach-pend c (flatMap (mergeᶠ nothing) f s)  p i = within tt λ { refl → sub-merge c f s p }
-reach-pend c (connected x)                   p i = ⊥-elim (unbound c (proj₁ (good-split c _ (good i))) x)
-reach-pend c (cold x)                        p i = beyond (beyond-cold c x p i)
-reach-pend c (scan f z s)                    p i = beyond (beyond-scan c f z s p i)
-reach-pend c (takeWhile b q s)               p i = beyond (beyond-take c b q s p i)
-reach-pend c (flatMap (mergeᶠ (just m)) f s) p i = beyond (beyond-bounded c m f s p i)
-reach-pend c (flatMap switchᶠ f s)           p i = beyond (beyond-switch c f s p i)
-reach-pend c (flatMap exhaustᶠ f s)          p i = beyond (beyond-exhaust c f s p i)
-reach-pend c (connect s b)                   p i = beyond (beyond-connect c s b p i)
-reach-pend c (defer l)                       p i = beyond (beyond-defer c l p i)
+reach-pend : ∀ {R Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) q p → Inv ⟨ c , pend o q , subscribing , p ⟩ → Reach ⟨ c , pend o q , subscribing , p ⟩
+reach-pend c empty                           q p i = within tt λ { refl → sub-empty c q p }
+reach-pend c (of xs)                         q p i = within tt λ { refl → sub-of c xs q p }
+reach-pend c (map f s)                       q p i = within tt λ { refl → sub-map c f s q p }
+reach-pend c (flatMap (mergeᶠ nothing) f s)  q p i = within tt λ { refl → sub-merge c f s q p }
+reach-pend c (connected x)                   q p i = ⊥-elim (unbound c (proj₁ (good-split c _ (good i))) x)
+reach-pend c (cold x)                        q p i = beyond (beyond-cold c x q p i)
+reach-pend c (scan f z s)                    q p i = beyond (beyond-scan c f z s q p i)
+reach-pend c (takeWhile b w s)               q p i = beyond (beyond-take c b w s q p i)
+reach-pend c (flatMap (mergeᶠ (just m)) f s) q p i = beyond (beyond-bounded c m f s q p i)
+reach-pend c (flatMap switchᶠ f s)           q p i = beyond (beyond-switch c f s q p i)
+reach-pend c (flatMap exhaustᶠ f s)          q p i = beyond (beyond-exhaust c f s q p i)
+reach-pend c (connect s b)                   q p i = beyond (beyond-connect c s b q p i)
+reach-pend c (defer l)                       q p i = beyond (beyond-defer c l q p i)
 
 reach : ∀ {R} (k : Conf R) → Inv k → Reach k
 reach ⟨ c , s , rising e , p ⟩                        i = within (rise-mv c s e p) (rise-sim c s e p)
-reach ⟨ c , pend o , subscribing , p ⟩                i = reach-pend c o p i
+reach ⟨ c , pend o q , subscribing , p ⟩              i = reach-pend c o q p i
 reach ⟨ c , coldS b l , subscribing , p ⟩             i = within tt (sub-sim c (coldS b l) p tt)
 reach ⟨ c , ofS j q xs , subscribing , p ⟩            i = within tt (sub-sim c (ofS j q xs) p tt)
 reach ⟨ c , doneS , subscribing , p ⟩                 i = within tt (sub-sim c doneS p tt)
