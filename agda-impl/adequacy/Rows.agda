@@ -21,11 +21,11 @@ open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (ofᴱ)
+open import denotation.Events using (ofᴱ; Events; burst; hush) renaming (end to endᴱ)
 open import denotation.Events using (Pos; Timeline; ix)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; _≺_; _≼_; InE; enter; Truncate; MapT; ⟦_⟧; Ended; module Joining; Den; hot; Proper; DenEnv; module Connecting)
-open import operation.PureObservable using (module Machine; module Driver)
-open Machine using (St; Ctx; CS; connS; joinS; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; load; moved; quiet; pend; ofS; mapS; cutS; lnS; flatS; alive; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; nx; cp) renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
+open import operation.PureObservable using (module Machine; module Driver; Tape; play; ending; over)
+open Machine using (St; Ctx; CS; connS; joinS; coldS; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; load; moved; quiet; pend; ofS; mapS; cutS; lnS; flatS; alive; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; nx; cp) renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
 
 ------------------------------------------------------------------------
 -- Rows
@@ -124,6 +124,13 @@ data Inbox {A : Set} : List (Pos × Evᴹ A) → EmissionSet A where
   this : ∀ {q e ib} → Inbox ((q , e) ∷ ib) q (toEv e)
   that : ∀ {x ib q e} → Inbox ib q e → Inbox (x ∷ ib) q e
 
+-- A started cold's events: the frame it plays from its next index, its
+-- completion owed, or nothing more.
+tapeE : ∀ {A} → Tape A → Events A
+tapeE (play τ u i t fr) = burst τ u i fr
+tapeE (ending e)        = endᴱ e
+tapeE over              = hush
+
 -- Rows of either.
 _∪_ : ∀ {A} → EmissionSet A → EmissionSet A → EmissionSet A
 (t ∪ u) q e = t q e ⊎ u q e
@@ -134,6 +141,7 @@ mutual
   rows : ∀ {Γ A} → DenEnv Γ → St Γ A → EmissionSet A
   rows ρ (pend o p)                             = pendRows ρ o p
   rows ρ (ofS i p xs)                           = InE (ofᴱ p i xs)
+  rows ρ (coldS true l)                         = InE (tapeE l)
   rows ρ (mapS f s)                             = MapT f (rows ρ s)
   rows ρ (cutS true a s)                        = rows ρ s
   rows ρ (lnS true s)                           = rows ρ s

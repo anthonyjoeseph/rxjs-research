@@ -417,6 +417,7 @@ mutual
   G ρ b (connS k o s)                         = SrcG ρ b (CS.bodyAt k) o × G (Hot (rows ρ o) k ∷ᴬ ρ) b s × Live b (T (CS.closed k) → Empty (rows ρ o))
   G ρ b (joinS j true x ib)                   = Live₁ b (Fed ib (enter (lookup ρ x) j))
   G ρ b (joinS j false x ib)                  = Live₁ b (Fed ib ∅)
+  G ρ b (coldS v l)                           = ⊤₁
   G ρ b _                                     = ⊥₁
 
   -- A connect's source: still owed while its body subscribes, then good;
@@ -460,7 +461,7 @@ mutual
   shape (flatS (mergeᶠ (just _)) f d n q o ls)    ()
   shape (flatS switchᶠ f d n q o ls)              ()
   shape (flatS exhaustᶠ f d n q o ls)             ()
-  shape (coldS _ _)                               ()
+  shape (coldS _ _)                               g = g
   shape (scanS _ _ _)                             ()
   shape (lnS _ _)                                 ()
   shape (takeS _ _ _ _)                           ()
@@ -783,12 +784,17 @@ postulate
   --   binder says nothing under a quiet one.
   conn-ok : ∀ {R A X} {ρ : DenEnv []} (c : Ctx R [] A) k (o : St [] X) (b : St (X ∷ []) A) → Good ρ (connS k o b) → OK (rows ρ (connS k o b)) (seek c (connS k o b))
 
+  -- A COLD'S DUE MARK KEYS ITS ROWS: the next step of its tape, a frame's
+  -- value, stall or close, or its completion owed; a dead cold owes none.
+  cold-ok : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) b l → OK (rows ρ (coldS b l)) (seek c (coldS b l))
+
 mutual
   seek-ok : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) (s : St [] A) → Good ρ s → OK (rows ρ s) (seek c s)
   seek-ok c (ofS i p [])       _ = record { from = of-from p i [] ; mark = ⊑-refl _ ; shown = λ eq → _ , refl , of-shows c i p [] eq }
   seek-ok c (ofS i p (x ∷ xs)) _ = record { from = of-from p i (x ∷ xs) ; mark = ⊑-refl _ ; shown = λ eq → _ , refl , of-shows c i p (x ∷ xs) eq }
   seek-ok c doneS              _ = λ ()
   seek-ok c (connS k o b)      g = conn-ok c k o b g
+  seek-ok c (coldS b l)        _ = cold-ok c b l
   seek-ok c (mapS f s)         g = mapped f (seek (inMap f c) s) (seek-ok (inMap f c) s g)
   seek-ok c (cutS true attached s)   g = kept (seek (inCut true attached c) s) (seek-ok (inCut true attached c) s g)
   seek-ok {ρ = ρ} c (cutS false a s) _ = seek-off {ρ = ρ} c a s

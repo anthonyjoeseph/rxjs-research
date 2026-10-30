@@ -14,6 +14,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE COLD STEPPED
+
+A cold entered at its timeline read where it subscribes, and each turn of
+its tape, keep `Inv`; its due mark keys and leads its rows. Open: whether
+a stall or a frame's close, a skip in its rows, moves nothing owed. Settled
+when each is a body.
+
+Members: `sub-cold`, `abs-leaf`, `cold-ok`, `cold-lead`.
+
 #### THE CONNECT'S SEARCH
 
 Riskiest: a connect's search is stated whole, over the connect node, at
@@ -65,12 +74,10 @@ Members: `conn-owing`, `shut-of`.
 
 Each former still handed to its own leaf in `reach` owes a node in
 `adequacy.Bound.G`, its rows and what it owes, and the step arms of the
-nodes it builds. A cold that hushes meets THE OWED; `defer` unfolds only
-at admissible subscriptions. Settled former by former, as each leaf
-becomes arms.
+nodes it builds. Settled former by former, as each leaf becomes arms.
 
-Members: `beyond-cold`, `beyond-scan`, `beyond-take`, `beyond-bounded`,
-`beyond-switch`, `beyond-exhaust`, `beyond-defer`.
+Members: `beyond-scan`, `beyond-take`, `beyond-bounded`,
+`beyond-switch`, `beyond-exhaust`.
 
 #### OWING AS ENTERED
 
@@ -114,11 +121,12 @@ Members: `good-of`, `good-done`.
 
 #### THE OWED
 
-Suspect once cold is grown: `Owes` reads a live node as owing a row, false
-for a cold that hushes (live, no rows, never ends). Restate as a live node
-owing no end, equivalent on the grown formers and all `¬ Done` needs. Then a
-closed of dropped changes nothing owed (`adequacy.AbsOf`). Settled by the
-restatement and a body.
+Suspect: `Owes` reads a live node as owing a row, false for a cold that
+hushes (live, no rows, never ends), and `Rows.Flat` finishes a begun lane
+by `Gone`, which a hushing lane meets vacuously where the entered joiner's
+`Ended` does not. Restate both as a live node owing no end. Then a closed
+of dropped changes nothing owed (`adequacy.AbsOf`). Settled by the
+restatement and a body, or a merge over a hushing lane.
 
 Members: `owes-closed`.
 
@@ -136,9 +144,11 @@ Members: `found-mark`, `abs-att`, `rise-outer-nx`, `rise-outer-cp`,
 
 Believed: subscribing to `empty` or `of` enters exactly the rows its
 emission set begins with, those rows placed behind every ancestor's parts
-so its merges stay apart and end last. Settled when each is a body.
+so its merges stay apart and end last; a `defer` entered at an admissible
+subscription reads as its body one level down. Settled when each is a
+body.
 
-Members: `sub-empty`, `sub-of`.
+Members: `sub-empty`, `sub-of`, `sub-defer`.
 
 #### THE KEYS
 
