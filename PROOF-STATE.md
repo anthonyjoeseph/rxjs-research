@@ -14,6 +14,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### A RISEN OUTER VALUE'S ENTRY
+
+Riskiest: `Inv` holds a rising outer value past the joiner's other parts,
+but not in its outer's frozen entry nor where its binders are hot; the
+begun lane's `Rooted` and `Subs` need both. Settled by an invariant field
+carrying them up from the outer, or a value risen outside its entry.
+
+Members: `begin-good`, `begin-ok`.
+
 #### A CONNECT ENDED BEFORE ITS SOURCE
 
 Riskiest: `Inv` asks a rising end's node to be `Empty`, but a body ending
@@ -54,15 +63,15 @@ Members: `sub-cold`, `abs-leaf`, `burst-from`.
 
 Untried: a bounded merge, a switch or an exhaust part way through reads
 its begun lanes over off its live count, not off each lane's rows, and
-each entry, outer value and outer end keeps `Inv`; a lane's end and value
-are each one step over the policy. Open: whether `Rows.BoundedF`'s schedule
+each entry, outer value and outer end keeps `Inv`; a lane's end, value and
+begin are each one step over the policy, a switch's begin excepted. Open: whether `Rows.BoundedF`'s schedule
 from begun lanes tracks the machine's queue, with a lane gone or handed
 on. Settled when each is a body, or a bounded merge whose freed slot the
 schedule reads wrong.
 
-Members: `rise-bounded-nx`, `bounded-ends-at`, `bounded-val-at`, `bounded-outer-at`,
-`rise-bounded-lane-hand`, `rise-switch-nx`, `rise-exhaust-run`,
-`rise-exhaust-drop`.
+Members: `bounded-ends-at`, `bounded-val-at`, `bounded-outer-at`,
+`rise-bounded-lane-hand`, `rise-switch-nx`, `rise-exhaust-drop`,
+`bounded-begin-at`, `exhaust-begin-at`, `rise-bounded-wait`.
 
 #### THE CONNECT STEPPED
 
@@ -95,11 +104,11 @@ Members: `src-vis`.
 
 #### AN OF IN A COMPLETED SOURCE
 
-Untried: an of in a source its connect has seen complete runs out
-silently, its rows reaching no row above. Settled by a body, or such an
-of whose run shows.
+Untried: an of or an outer value in a source its connect has seen
+complete runs out silently, its rows reaching no row above. Settled by a
+body, or such a run that shows.
 
-Members: `shut-of`.
+Members: `shut-of`, `shut-begin`.
 
 #### ONE EVENT A POSITION
 
@@ -151,11 +160,10 @@ Members: `good-of`, `good-done`, `good-lane-end`, `good-outer-end`.
 #### THE MARK FOUND
 
 Untried: a good tree's search finds an of's next, an attach, a
-connect's own mark or a joiner's next; an attach moves nothing owed, an
-outer's value begins its lane, and its end shows only with no lane
-running (`adequacy.Sim`). Settled when each is a body.
+connect's own mark or a joiner's next; an attach moves nothing owed, and
+an outer's end shows only with no lane running (`adequacy.Sim`). Settled when each is a body.
 
-Members: `found-mark`, `abs-att`, `rise-outer-nx`.
+Members: `found-mark`, `abs-att`.
 
 #### THE SUBSCRIPTIONS ENTERED
 

@@ -9,8 +9,8 @@ module adequacy.Sim where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; not)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.Nat using (_≡ᵇ_; _<ᵇ_; pred)
-open import Data.List using (List; []; _∷_; [_]; _++_)
+open import Data.Nat using (_≡ᵇ_; pred)
+open import Data.List using (List; []; _∷_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.List.Relation.Unary.Any using () renaming (here to hd)
@@ -51,6 +51,7 @@ open import adequacy.AbsOf using (abs-of; up-plug)
 open import denotation.Read using (Meets; Run; Visible; loud; []; _∷_)
 open import adequacy.Swap using (Swap; good-swap)
 open import adequacy.Env using (env-good)
+open import adequacy.OuterNx using (rise-outer-nx; rise-bounded-nx; rise-exhaust-run)
 open import adequacy.Enter using (enter-map; enter-scan; enter-merge; flat-∅; enter-bounded; enter-switch; enter-exhaust; bounded-∅; switch-∅; exhaust-∅)
 
 
@@ -313,26 +314,21 @@ postulate
                  → Sim ⟨ inTake i w o c , s , rising e , p ⟩ [] ⟨ c , takeS i w o s , absorbed , p ⟩
 
 postulate
-  -- AN OUTER'S VALUE BEGINS ITS LANE.
-  rise-outer-nx : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p
-                → Sim ⟨ inOuter (mergeᶠ nothing) f d n q ls c , o , rising (nx a) , p ⟩ [] (start c (mergeᶠ nothing) f d n q o ls a p)
-
-  -- A BOUNDED MERGE'S OUTER VALUE BEGINS ITS LANE WITH ROOM, ELSE WAITS.
-  rise-bounded-nx : ∀ {R Γ A B} m f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p
-                  → Sim ⟨ inOuter (mergeᶠ (just m)) f d n q ls c , o , rising (nx a) , p ⟩ []
-                        (if n <ᵇ m then start c (mergeᶠ (just m)) f d n q o ls a p
-                                   else ⟨ c , flatS (mergeᶠ (just m)) f d n (q ++ [ a ]) o ls , absorbed , p ⟩)
   -- A BOUNDED MERGE'S LANE END FREES ITS SLOT FOR THE FIRST WAITING VALUE.
   rise-bounded-lane-hand : ∀ {R Γ A B} m f d n a q (o : St Γ A) pre post (c : Ctx R Γ B) s p
                          → Sim ⟨ inLanes (mergeᶠ (just m)) f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ []
                                (if alive s then dequeue c (mergeᶠ (just m)) f d (pred n) (a ∷ q) o (pre ʳ++ ended s ∷ post) p
                                            else ⟨ c , flatS (mergeᶠ (just m)) f d n (a ∷ q) o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
+
   -- A SWITCH'S OUTER VALUE CUTS EVERY RUNNING LANE AND BEGINS ITS OWN.
+  --
+  -- DEAD ROUTE: as `adequacy.OuterNx.BeginAt`, two readings agreeing but
+  --   for the value's skip.  The killed lanes' pins stay begun rows of the
+  --   switch's schedule while their values past the cut leave, so the two
+  --   readings differ past the value too, not by one skip.
   rise-switch-nx : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p ls′ (t : Torn) → killAll ls ≡ (ls′ , t)
                  → Sim ⟨ inOuter switchᶠ f d n q ls c , o , rising (nx a) , p ⟩ [] (start c switchᶠ f d 0 q o ls′ a p)
-  -- AN EXHAUST'S OUTER VALUE BEGINS ITS LANE WITH NONE RUNNING.
-  rise-exhaust-run : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p → (n ≡ᵇ 0) ≡ true
-                   → Sim ⟨ inOuter exhaustᶠ f d n q ls c , o , rising (nx a) , p ⟩ [] (start c exhaustᶠ f d n q o ls a p)
+
   -- AN EXHAUST'S OUTER VALUE, A LANE RUNNING, IS DROPPED.
   rise-exhaust-drop : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p → (n ≡ᵇ 0) ≡ false
                     → Sim ⟨ inOuter exhaustᶠ f d n q ls c , o , rising (nx a) , p ⟩ [] ⟨ c , flatS exhaustᶠ f d n q o ls , absorbed , p ⟩
