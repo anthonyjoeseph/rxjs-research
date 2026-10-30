@@ -6,7 +6,7 @@
 -- subscription in flight asks only that every live part still owes.
 module adequacy.Inv where
 
-open import Data.Bool using (Bool; true; false; T; _∧_; _∨_)
+open import Data.Bool using (Bool; true; false; T; _∧_)
 open import Data.Bool.Properties using (∧-zeroʳ; ∧-identityʳ)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List.Relation.Unary.All using ([])

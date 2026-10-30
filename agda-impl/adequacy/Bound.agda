@@ -773,6 +773,14 @@ postulate
   -- A CONNECT'S SEEK LEADS ITS ROWS: whatever its source and body find,
   -- the source winning only strictly before the body, keys every row the
   -- connect still owes, its body's joiners' unfed rows included.
+  --
+  -- DEAD ROUTE: recursing into the body as `seek-ok` does into every
+  --   other node: `seek-ok` is stated at an empty environment, and a
+  --   joiner's rows read its binder, so no joiner's OK holds apart from
+  --   the source it reads.
+  -- DEAD ROUTE: reading the body under a quiet binder to reuse `seek-ok`:
+  --   `G` and `rows` read the environment, so a body good under its real
+  --   binder says nothing under a quiet one.
   conn-ok : ∀ {R A X} {ρ : DenEnv []} (c : Ctx R [] A) k (o : St [] X) (b : St (X ∷ []) A) → Good ρ (connS k o b) → OK (rows ρ (connS k o b)) (seek c (connS k o b))
 
 mutual

@@ -12,7 +12,7 @@ open import Data.List using (List; []; _∷_; _ʳ++_)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (suc; _+_)
 open import Data.Nat.Properties using (+-suc)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_)
 open import Data.List.Relation.Unary.All using ([]) renaming (_∷_ to _∷ᴬ_)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
@@ -28,7 +28,8 @@ open Machine using (St; Ctx; CS; plug; alive; pend; coldS; ofS; doneS; mapS; sca
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (∅; env; rows; rowsL; pendRows; Lanes; Each; module Flat; _≃_; Hot)
 open import adequacy.Up using (_≈ᴸ_; []; _∷_; ≈ᴸ-refl; row-≃; map-≃; ≃-refl; conn-≃; rows-hot; ʳ++-≈)
-open import adequacy.Bound using (Empty; empty-any; EndLast; Roots; Rooted; Live; G; GL; GLn; LnBody; SrcG; Held; live; MergeG; mergeG-map)
+open import adequacy.Bound using (Empty; empty-any; EndLast; Roots; Rooted; Live; G; GL; GLn; LnBody; SrcG; Held; live;
+  mergeG-map)
 
 open _≃_
 
@@ -223,20 +224,6 @@ rooted-≃ : ∀ {Γ A B} {ρ : DenEnv Γ} {O O′ : EmissionSet A} {Ls Ls′ : 
 rooted-≃ eo es r = record { o₀ = o₀ ; p₀ = p₀ ; inv = inv ; sub = λ x → sub (from eo x) ; qs = qs ; roots = roots-≈ qs es roots }
   where open Rooted r
 
--- Never good, as a node, a lane or a lane's body.
-record Dead {Γ A} (ρ : DenEnv Γ) (s : St Γ A) : Set₁ where
-  field
-    no-node : ∀ v → G ρ v s → ⊥
-    no-lane : ∀ v → GLn ρ v s → ⊥
-    no-body : ∀ v b → LnBody ρ v b s → ⊥
-    no-held : Held s → ⊥
-open Dead
-
--- A source never good is never good as a connect's.
-src-dead : ∀ {Γ A} {ρ : DenEnv Γ} {s : St Γ A} {v} m → Dead ρ s → SrcG ρ v m s → ⊥
-src-dead {v = v} nothing dd g = no-node dd v g
-src-dead (just _)        dd g = no-held dd g
-
 -- A source swapped: the same source to its connect.
 src-swap : ∀ {Γ A} {ρ : DenEnv Γ} {s s′ : St Γ A} → Swap ρ s s′ → ∀ v m → SrcG ρ v m s → SrcG ρ v m s′
 src-swap sw v nothing  g = node sw v g
@@ -289,27 +276,6 @@ srcO-≃ (inBody k o c)                                   eq so = srcO-≃ c (co
 spent-≃ : ∀ {A} {t u : EmissionSet A} {P : Set} v → t ≃ u → Live v (P → Empty t) → Live v (P → Empty u)
 spent-≃ true  eq sp h = empty-≃ eq (sp h)
 spent-≃ false eq sp   = tt
-
--- A dead node in a good tree: none.
-dead-up : ∀ {R Γ A} (c : Ctx R Γ A) {s : St Γ A} → Dead (env c) s → ∀ {v} → G [] v (plug c s) → ⊥
-dead-up top              dd {v} g = no-node dd v g
-dead-up (inMap f c)      dd g = dead-up c (record { no-node = no-node dd ; no-lane = λ _ () ; no-body = λ _ _ () ; no-held = λ () }) g
-dead-up (inScan f z c)   dd g = dead-up c (record { no-node = λ _ () ; no-lane = λ _ () ; no-body = λ _ _ () ; no-held = λ () }) g
-dead-up (inCut l a c)    dd g = dead-up c (record { no-node = λ v → no-node dd (v ∧ l) ; no-lane = λ _ () ; no-body = λ { v b (_ , gs , _) → no-node dd (v ∧ b) gs } ; no-held = λ () }) g
-dead-up (inLn b c)       dd g = dead-up c (record { no-node = λ _ () ; no-lane = λ v → no-body dd v b ; no-body = λ _ _ () ; no-held = λ () }) g
-dead-up (inTake i q w c) dd g = dead-up c (record { no-node = λ _ () ; no-lane = λ _ () ; no-body = λ _ _ () ; no-held = λ () }) g
-dead-up (inOuter (mergeᶠ nothing) f d n q ls c) dd g =
-  dead-up c (record { no-node = λ v x → no-node dd v (MergeG.outer x) ; no-lane = λ _ () ; no-body = λ _ _ () ; no-held = λ () }) g
-dead-up (inOuter (mergeᶠ (just _)) f d n q ls c) dd g = dead-up c (record { no-node = λ _ () ; no-lane = λ _ () ; no-body = λ _ _ () ; no-held = λ () }) g
-dead-up (inOuter switchᶠ f d n q ls c)  dd g = dead-up c (record { no-node = λ _ () ; no-lane = λ _ () ; no-body = λ _ _ () ; no-held = λ () }) g
-dead-up (inOuter exhaustᶠ f d n q ls c) dd g = dead-up c (record { no-node = λ _ () ; no-lane = λ _ () ; no-body = λ _ _ () ; no-held = λ () }) g
-dead-up (inLanes (mergeᶠ nothing) f d n q o pre post c) dd g =
-  dead-up c (record { no-node = λ v x → no-lane dd v (proj₁ (proj₂ (goodL-ʳ++⁻ pre (MergeG.lanesG x)))) ; no-lane = λ _ () ; no-body = λ _ _ () ; no-held = λ () }) g
-dead-up (inLanes (mergeᶠ (just _)) f d n q o pre post c) dd g = dead-up c (record { no-node = λ _ () ; no-lane = λ _ () ; no-body = λ _ _ () ; no-held = λ () }) g
-dead-up (inLanes switchᶠ f d n q o pre post c)  dd g = dead-up c (record { no-node = λ _ () ; no-lane = λ _ () ; no-body = λ _ _ () ; no-held = λ () }) g
-dead-up (inLanes exhaustᶠ f d n q o pre post c) dd g = dead-up c (record { no-node = λ _ () ; no-lane = λ _ () ; no-body = λ _ _ () ; no-held = λ () }) g
-dead-up (inSrc k b c)    dd g = dead-up c (record { no-node = λ { v (gs , _) → src-dead (CS.bodyAt k) dd gs } ; no-lane = λ _ () ; no-body = λ _ _ () ; no-held = λ () }) g
-dead-up (inBody k o c)   dd g = dead-up c (record { no-node = λ { v (_ , gb , _) → no-node dd v gb } ; no-lane = λ _ () ; no-body = λ _ _ () ; no-held = λ () }) g
 
 -- A node owing nothing and never good.
 void : ∀ {Γ A} {ρ : DenEnv Γ} {s s′ : St Γ A} → rows ρ s ≡ ∅ → rows ρ s′ ≡ ∅ → alive s ≡ alive s′ → (∀ v → G ρ v s → ⊥) → (∀ v → GLn ρ v s → ⊥) → (∀ v b → LnBody ρ v b s → ⊥) → (Held s → ⊥) → Swap ρ s s′

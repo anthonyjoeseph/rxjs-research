@@ -29,7 +29,7 @@ open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
 open import Data.Maybe using (just)
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline)
-open import denotation.EmissionSet using (EmissionSet; Ev; end; DenEnv; Truncate; module Connecting)
+open import denotation.EmissionSet using (EmissionSet; Ev; end; DenEnv; Truncate)
 open import denotation.Laws.Modulus using (≼-refl; ≺-irrefl)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; CS; ⟨_,_,_,_⟩; plug; absorbed; rising; cp; alive; ended; dequeue; settle; Att;

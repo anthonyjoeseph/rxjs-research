@@ -14,16 +14,52 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE CONNECT GROWN
+#### THE CONNECT'S SEARCH
 
-Riskiest, grown first: subscribing to a connect is its own leaf until a
-good tree can hold one. Open: what a connect node owes in
-`adequacy.Bound.G`; equal binder rows giving equal body rows; a skip
-lifting past no binder, as a connect shows its source's skip one level
-down and a joiner its own at the binder's. Settled when `reach` links a
-connect a step at a time.
+Riskiest: a connect's search is stated whole, over the connect node, at
+an empty environment only, because its body's joiners read the binder.
+Open: whether the whole-node statement holds with the source winning
+only strictly before the body, or the search's key needs a cap carried
+from the binder (`From`/`OK` keyed by a bound). Settled by bodies, or a
+connect whose body's joiner keys a row before its source's find.
 
-Members: `beyond-connect`, `rows-hot`.
+Members: `conn-ok`, `conn-lead`.
+
+#### THE CONNECT STEPPED
+
+A connect entered, a joiner joined, a source's or body's rise, a
+connect's own mark run and a joiner's next, each one step keeping `Inv`.
+Open: whether `G`'s connect node (source held until subscribed, a
+completed source owing nothing) is enough for each; a source's end must
+leave its rows `Empty`. Settled when each is a body.
+
+Members: `sub-connect`, `sub-join`, `sub-joined`, `rise-src-nx`,
+`rise-src-cp`, `rise-body-nx`, `rise-body-cp`, `abs-con`, `abs-join`.
+
+#### THE BINDER READ
+
+Believed: a body reads its binder only through the binder's rows, and a
+good tree's connect source reads lawfully. Settled by bodies, or a body
+whose rows, goodness or owing differ under equal binder rows.
+
+Members: `rows-hot`, `good-hot`, `owes-hot`, `src-lawful`.
+
+#### A SKIP UNDER A CONNECT
+
+Untried: a skip at a source past its lead is unseen above its connect,
+and moves nothing it owes, the connect showing it a skip or a pin and
+each joiner a skip where it joined. Settled by bodies, or a source skip
+that changes what the connect shows.
+
+Members: `src-vis`, `src-owes-≈`.
+
+#### WHAT A CONNECT OWES
+
+Untried: a live connect whose source owes, owes; an of in a completed
+source runs out silently. Settled by bodies, or a live connect owing
+nothing over a source that owes.
+
+Members: `conn-owing`, `shut-of`.
 
 #### THE FORMERS NOT GROWN
 
@@ -88,8 +124,8 @@ Members: `owes-closed`.
 
 #### THE MARK FOUND
 
-Untried: a good tree's search finds an of's next or an attach, an attach
-moves nothing owed, an outer's value begins its lane, its end shows only
+Untried: a good tree's search finds an of's next, an attach, a
+connect's own mark or a joiner's next; an attach moves nothing owed, an outer's value begins its lane, its end shows only
 with no lane running, and a lane's value passes unless the lane is over
 (`adequacy.Sim`). Settled when each is a body.
 
