@@ -19,7 +19,7 @@ open import Data.Maybe using (just; nothing) renaming (map to mapᴹ)
 open import Data.Product using (Σ; _,_; _×_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl)
 open import Data.List using (_ʳ++_)
 
 open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
@@ -42,7 +42,7 @@ open import adequacy.Rows using (env; rows; pendRows; Closed; RT; toEv; Vis; Pas
 open import adequacy.Bound using (Good; G; Rooted; mergeG₀; OK)
 open import adequacy.Search using (seek-ok)
 open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
-open import adequacy.Skip using (After; LeadC; after-conn)
+open import adequacy.Skip using (After; after-conn)
 open import adequacy.Inv using (Inv; inv; good; Sim; Ends; open-alive)
 open import adequacy.LaneCp using (rise-lane-cp)
 open import adequacy.AbsOf using (abs-of; up-plug)
@@ -263,17 +263,31 @@ map-plus f t p cp = to′ ⇄ from′
     from′ new                = map-end new
 
 
-postulate
-  -- A BODY VALUE PASSES THROUGH ITS CONNECT: the connect's rows before the
-  -- step are `ConnT r σ β`; at the source they are `ConnT r σ (Plus β p
-  -- (out v))`, so the bijection holds via `body new ↔ new` and identity on
-  -- source-echo rows.  `Alive` coerces via `old`/`old⁻¹`; the `new` arm
-  -- of Plus carries event `out v ≠ end`, so no end is added by Plus and
-  -- the coercion is a bijection.  Inversion of the `new` pattern requires
-  -- refuting `out v = end` at the position level; postulated as a leaf
-  -- until the inversion-depth issue is resolved.
-  conn-plus-nx : ∀ {A B} r (σ : EmissionSet A) (β : EmissionSet B) p (v : B)
-               → Connecting.ConnT r σ (Plus β p (out v)) ≃ Plus (Connecting.ConnT r σ β) p (out v)
+-- A BODY VALUE PASSES THROUGH ITS CONNECT: a value adds no end, so the
+-- body's liveness is unchanged.
+conn-plus-nx : ∀ {A B} r (σ : EmissionSet A) (β : EmissionSet B) p (v : B)
+             → Connecting.ConnT r σ (Plus β p (out v)) ≃ Plus (Connecting.ConnT r σ β) p (out v)
+conn-plus-nx r σ β p v = to′ ⇄ from′
+  where
+    live : ∀ {q} → (∀ {c} → Plus β p (out v) c end → q ≺ c) → ∀ {c} → β c end → q ≺ c
+    live al x = al (old x)
+
+    unlive : ∀ {q} → (∀ {c} → β c end → q ≺ c) → ∀ {c} → Plus β p (out v) c end → q ≺ c
+    unlive al (old x) = al x
+
+    to′ : ∀ {q e} → Connecting.ConnT r σ (Plus β p (out v)) q e → Plus (Connecting.ConnT r σ β) p (out v) q e
+    to′ (Connecting.body (old x))     = old (Connecting.body x)
+    to′ (Connecting.body new)         = new
+    to′ (Connecting.burst x i)        = old (Connecting.burst x i)
+    to′ (Connecting.echo {k} x al u ni) = old (Connecting.echo x (live {k} al) u ni)
+    to′ (Connecting.kept {_} {p′} x al ni i) = old (Connecting.kept x (live {p′} al) ni i)
+
+    from′ : ∀ {q e} → Plus (Connecting.ConnT r σ β) p (out v) q e → Connecting.ConnT r σ (Plus β p (out v)) q e
+    from′ (old (Connecting.body x))         = Connecting.body (old x)
+    from′ (old (Connecting.burst x i))      = Connecting.burst x i
+    from′ (old (Connecting.echo {k} x al u ni)) = Connecting.echo x (unlive {k} al) u ni
+    from′ (old (Connecting.kept {_} {p′} x al ni i)) = Connecting.kept x (unlive {p′} al) ni i
+    from′ new                               = Connecting.body new
 
 rise-map : ∀ {R Γ A B} (f : A → B) (c : Ctx R Γ B) s e p → Sim ⟨ inMap f c , s , rising e , p ⟩ [] ⟨ c , mapS f s , rising (mapEv f e) , p ⟩
 rise-map f c s e p i with alive s in al
@@ -389,14 +403,12 @@ postulate
               → Sim ⟨ inSrc k b c , s , rising cp , p ⟩ [] ⟨ c , connS (record k { closed = true ; endAt = p }) s (feed (hd refl) p cp b) , absorbed , p ⟩
   -- A BODY'S END IS ITS CONNECT'S, ITS SOURCE OWED A TEARDOWN THERE.
   -- DEAD ROUTE: the target Lead requires `Empty (ConnT r σ β)` from
-  -- `Ends cp`, but `Alive` in `ConnT r σ ∅` is vacuous (no body-end in
-  -- β), so source echoes appear — `Empty (ConnT r σ β)` fails when σ is
-  -- non-empty.  With `After p σ`, Alive DOES fail in `ConnT r σ (Plus β
-  -- p end)` (since `Plus β p end` witnesses a body end at p, blocking
-  -- source positions after p), so the source RT is correct, but the
-  -- target RT uses `Plus (ConnT r σ β) p end` with vacuous Alive.  A new
-  -- G invariant linking body-end to Empty σ is needed before this can
-  -- be proven.
+  --   `Ends cp`, but `Alive` in `ConnT r σ ∅` is vacuous (no body-end in
+  --   β), so source echoes appear and that fails when σ is non-empty.
+  --   With `After p σ` the source side is right, since `Plus β p end`
+  --   blocks source positions past p; the target `Plus (ConnT r σ β) p
+  --   end` still reads a vacuous Alive.  Blocked on a G invariant linking
+  --   a body's end to an empty σ.
   rise-body-cp : ∀ {R Γ X B} (k : CS) (o : St Γ X) (c : Ctx R Γ B) s p
                → Sim ⟨ inBody k o c , s , rising cp , p ⟩ [] ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
 

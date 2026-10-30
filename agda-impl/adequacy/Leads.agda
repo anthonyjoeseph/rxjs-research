@@ -1,23 +1,25 @@
 {-# OPTIONS --guardedness #-}
 
+-- WHAT A FIND LEADS: every part a find rose through lies past its event,
+-- or exactly at it where the find is tight.  A lead under a cap asks it
+-- only of a find no later than the cap; a race's loser lies past the
+-- winner strictly, or on a tie owns nothing there.
 module adequacy.Leads where
 
 open import Data.Bool using (Bool; true; false; T)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.All using ([]) renaming (_∷_ to _∷ᴬ_)
-open import Data.Nat using (ℕ)
 open import Data.Maybe using (Maybe; just; nothing) renaming (map to mapᴹ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁; tt to tt₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
-open import Relation.Nullary using (¬_)
 
-open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-split; emit; stall; close)
-open import denotation.EmissionSet using (EmissionSet; DenEnv; Ev; Truncate; module Joining; out; skip; pin; end; _≺_; MapT; map-out; map-skip; map-pin; map-end; module Scan; at-out; at-skip; at-end)
+open import denotation.Events using (Pos; ix; <ᵖ-split)
+open import denotation.EmissionSet using (EmissionSet; Ev; Truncate; out; skip; pin; end; _≺_; MapT; map-out; map-skip; map-pin;
+  map-end; module Scan)
 open import operation.Key using (Key; at; _<ᴷ_; ≮ᴷ-trans; at-<ᵖ; clash)
 open import operation.PureObservable using (module Machine; Tape; play; ending; over)
 
@@ -25,12 +27,11 @@ open Machine using (St; Ctx; CS; Cand; found; Mark; ofM; attM; leafM; Att; Out; 
                     raceT; outerT; laneT; mapT; scanT; cutT; alive; outOf; closed; attached; attAt;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (env; rows; rowsL; pendRows; toEv; Lanes; Each; module BoundedF; Hot; ∅)
+open import adequacy.Rows using (env; rows; rowsL; Lanes; Each; Hot; ∅)
 open import adequacy.Bound using (rooted-single; _⊑_; ⊑i; ⊑-refl; ⊑-trans; <→⊑; ext-⊑; From; Bd; OK; OKL; Live; Apart; Spread;
   Parts; rooted-parts; ⊑→≼; MergeG; G; GL; GLn; Good; ofPos; from-weak; lane-ok; raise-map; raise-scan; raise-cut; raise-outer; raise-lane)
   renaming (After to Afterᶜ)
-open import adequacy.Cap using (Before; OKᶜ; OKLᶜ; each-map; cap-retag; Quiet; QuietL; EnvSingle)
-open import adequacy.Search using (seek-okᶜ; seek-lnᶜ; lanes-okᶜ; join-okᶜ; calm-fst; calm-snd; flat-race; switch-race; exhaust-race; bounded-race; switch-at; bounded-unqueued)
+open import adequacy.Cap using (Before; OKᶜ; OKLᶜ; each-map)
 open import adequacy.Skip using (After; LeadC; LeadT)
 
 open _⊑_
@@ -106,10 +107,6 @@ each-past {P = P} {K} (u ∷ Ls) tg ap (f , fs) = past-tie {u = u} {P = P} {K} t
 each-strict : ∀ {B} {P K K′} (Ls : List (EmissionSet B)) → at P ⊑ K → K <ᴷ K′ ≡ true → Each (From K′) Ls → Each (After P) Ls
 each-strict []       pk kk _        = tt
 each-strict {P = P} {K} {K′} (u ∷ Ls) pk kk (f , fs) = past-strict {u = u} {P} {K} {K′} pk kk f , each-strict {P = P} {K} {K′} Ls pk kk fs
-
-each-empty : ∀ {B} {P} (Ls : List (EmissionSet B)) → Each (λ t → ∀ {q e} → t q e → ⊥) Ls → Each (After P) Ls
-each-empty []       _        = tt
-each-empty {P = P} (_ ∷ Ls) (n , ns) = (λ {q} {e} r → ⊥-elim (n {q} {e} r)) , each-empty {P = P} Ls ns
 
 ------------------------------------------------------------------------
 -- Under a cap

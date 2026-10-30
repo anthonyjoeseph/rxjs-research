@@ -8,7 +8,7 @@
 -- it, and a lane's later siblings lose ties to it.
 module adequacy.Lead where
 
-open import Data.Bool using (Bool; true; false; T)
+open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_]; drop)
 open import Data.List.Relation.Unary.All using ([]) renaming (_∷_ to _∷ᴬ_)
@@ -18,25 +18,25 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁; tt to tt₁)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-split; emit; stall; close)
-open import denotation.EmissionSet using (EmissionSet; DenEnv; Ev; Truncate; module Joining; out; skip; pin; end; _≺_; MapT; map-out; map-skip; map-pin; map-end; module Scan; at-out; at-skip; at-end)
-open import operation.Key using (Key; at; _<ᴷ_; ≮ᴷ-trans; at-<ᵖ; clash)
+open import denotation.Events using (Pos; Timeline; ix; last; emit; stall; close)
+open import denotation.EmissionSet using (EmissionSet; DenEnv; Truncate; module Joining; out; skip; pin; end; at-out; at-skip; at-end)
+open import operation.Key using (Key; at; _<ᴷ_)
 open import operation.PureObservable using (module Machine; Tape; play; ending; over)
 open Machine using (St; Ctx; CS; Cand; found; Mark; ofM; attM; leafM; Att; Out; still; shows; nx; cp; seek; search; kids; lanes; own; ownBest; first; retag;
                     raceT; outerT; laneT; mapT; scanT; cutT; alive; outOf; closed; attached; attAt;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; cs; bodyM; _⊕_)
-open import adequacy.Rows using (env; rows; rowsL; pendRows; toEv; Lanes; Each; module BoundedF; Hot; ∅)
+open import adequacy.Rows using (env; rows; rowsL; pendRows; toEv; Lanes; Each; module BoundedF)
 open import adequacy.Bound using (held; rooted-single; _⊑_; ⊑i; ⊑-refl; ⊑-trans; <→⊑; ext-⊑; From; Bd; OK; OKL; Live; Apart; Spread;
   Parts; rooted-parts; ⊑→≼; MergeG; G; GL; GLn; Good; ofPos; from-weak; lane-ok; raise-map; raise-scan; raise-cut; raise-outer; raise-lane)
   renaming (After to Afterᶜ)
-open import adequacy.Cap using (Before; OKᶜ; OKLᶜ; each-map; cap-retag; Quiet; QuietL; EnvSingle; body-quiet; first-at; own-stills)
+open import adequacy.Cap using (Before; OKᶜ; OKLᶜ; cap-retag; Quiet; QuietL; EnvSingle; body-quiet; first-at; own-stills)
 open import adequacy.Search using (bind-single; seek-okᶜ; seek-lnᶜ; lanes-okᶜ; join-okᶜ; calm-fst; calm-snd; flat-race; switch-race; exhaust-race; bounded-race; switch-at; bounded-unqueued)
-open import adequacy.Skip using (After; LeadC; LeadT)
+open import adequacy.Skip using (After; LeadC)
 open import adequacy.ConnLead using (conn-free-lead; conn-held-lead; conn-off-lead)
 open import adequacy.Leads using (Beats; Ext; Fits; LeadE; Leads; Leadsᶜ; Occ; OfAt; Tight; before-retag; cut-off; cut-on; eLanes; eOuter; each-past; exact; first-leads; first-leadsᶜ; from-lost; from-none; froms-lost; hit; lead-ext; leads-trunc; lmap; ln-leads; lost-strict; lost-strict-each; lzip; map-leads; none-aft; nones-aft; occ; occ-bind; past-tie; scan-leads; stop; strict; tie; tight-occ; tight-⊑; uncap-lead; up)
 

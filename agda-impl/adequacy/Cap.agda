@@ -16,7 +16,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (lookup) renaming (_∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Sum using (_⊎_; inj₁; inj₂; map₂; [_,_]′)
 open import Data.Unit using (⊤; tt)
 open import Relation.Nullary using (¬_)
@@ -31,7 +31,7 @@ open Machine using (St; Ctx; CS; cs; Cand; found; Out; still; shows; seek; own; 
                     connS; joinS; joinM; cp) renaming (Ev to Evᴹ)
 open import adequacy.Rows using (toEv; Each; Hot; Inbox; _∪_; this; that; Closed; shut)
 open import adequacy.Bound using (_⊑_; ⊑i; ⊑-refl; ⊑-trans; <→⊑; ≺→⊑; ext-⊑; shift-≮; raise-src; Above; After; From; Single;
-  Empty; Bd; OK; OKL; Mk; Fed; Told; ToldL; ToldAt)
+  Bd; OK; OKL; Mk; Fed; Told; ToldL; ToldAt)
 
 open _⊑_
 open Bd
@@ -147,19 +147,6 @@ uncap nothing h {q} r with h (at q)
 ... | inj₁ (_ , a) = irr (at q) (a r)
 ... | inj₂ (() , _)
 uncap (just (f , K , o)) h with h K
-... | inj₁ (p , _) = ⊥-elim (irr K p)
-... | inj₂ (_ , b) = b
-
-uncapL : ∀ {R B} (Ls : List (EmissionSet B)) (y : Maybe (Cand R B)) → (∀ C → OKLᶜ C Ls y) → OKL Ls y
-uncapL {R} Ls nothing h = none Ls (λ C → past C (h C))
-  where
-    past : ∀ C → OKLᶜ {R} C Ls nothing → Each (After C) Ls
-    past C (inj₁ (_ , e)) = e
-    past C (inj₂ (() , _))
-    none : ∀ Ls′ → (∀ C → Each (After C) Ls′) → Each Empty Ls′
-    none []        _ = tt
-    none (_ ∷ Ls′) a = (λ {q} r → irr (at q) (proj₁ (a (at q)) r)) , none Ls′ (λ C → proj₂ (a C))
-uncapL Ls (just (f , K , o)) h with h K
 ... | inj₁ (p , _) = ⊥-elim (irr K p)
 ... | inj₂ (_ , b) = b
 

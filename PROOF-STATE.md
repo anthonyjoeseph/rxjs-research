@@ -68,8 +68,8 @@ Open: whether `G`'s connect node (source held until subscribed, a
 completed source owing nothing) is enough for each; a source's end must
 leave its rows `Empty`. Settled when each is a body.
 
-Members: `sub-connect`, `sub-join`, `sub-joined`, `rise-src-nx`,
-`rise-src-cp`, `rise-body-nx`, `rise-body-cp`, `abs-con`, `abs-join`.
+Members: `sub-connect`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`,
+`rise-body-cp`, `abs-con`, `abs-join`.
 
 #### THE BINDER READ
 
@@ -130,13 +130,6 @@ track rows, not only visible ones. Settled by a body, or a program whose
 engine stalls silently forever before a row its emission set holds.
 
 Members: `silent-finite`.
-
-#### THE DRAINED ENGINE
-
-Untried: an engine with no mark left owes no visible row. Settled by a body
-by state over `Inv`, or a drained state still owing one.
-
-Members: `drained-quiet`.
 
 #### THE GOOD TREE KEPT
 

@@ -5,7 +5,7 @@
 -- before.
 module adequacy.Complete where
 
-open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Maybe using (Maybe; just; nothing)
