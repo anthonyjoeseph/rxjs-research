@@ -81,11 +81,12 @@ Members: `sub-connect`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`,
 
 #### THE BINDER READ
 
-Believed: a body's goodness reads its binder only through the binder's
-rows, and a good tree's connect source reads lawfully. Settled by bodies,
-or a body whose goodness differs under equal binder rows.
+Believed: a good tree's connect source reads lawfully, its rows and its
+end one event a position, none under another. Open: a connect under a
+switched-off cut, whose `G` asks nothing of its source. Settled by a body,
+or a good tree whose dead connect's source rows clash.
 
-Members: `good-hot`, `src-lawful`.
+Members: `src-lawful`.
 
 #### A SKIP UNDER A CONNECT
 
