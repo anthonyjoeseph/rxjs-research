@@ -24,8 +24,8 @@ open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-split)
 open import denotation.EmissionSet using (EmissionSet; DenEnv; Ev; Truncate; out; skip; pin; end; _≺_; MapT; map-out; map-skip; map-pin; map-end; at-out; at-end)
 open import operation.Key using (Key; at; _<ᴷ_; ≮ᴷ-trans; at-<ᵖ; clash)
-open import operation.PureObservable using (module Machine)
-open Machine using (St; Ctx; CS; Cand; found; Mark; ofM; attM; Att; Out; still; shows; nx; cp; seek; search; kids; lanes; own; ownBest; first; retag;
+open import operation.PureObservable using (module Machine; Tape; play; ending; over)
+open Machine using (St; Ctx; CS; Cand; found; Mark; ofM; attM; leafM; Att; Out; still; shows; nx; cp; seek; search; kids; lanes; own; ownBest; first; retag;
                     raceT; outerT; laneT; mapT; cutT; alive; outOf; closed; attached; attAt;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inCut; inLn; inOuter; inLanes; inSrc; inBody)
@@ -164,9 +164,16 @@ ext-closed (eBody e)  h = ext-closed e h
 ------------------------------------------------------------------------
 -- What a search finds, read at the of it found
 
--- An of's own mark: the position of its next row.
+-- A started cold's next step: a frame's at its index, or its completion.
+TapeAt : ∀ {A} → Tape A → Pos → Set
+TapeAt (play τ u i t fr) P = P ≡ u ++ [ ix i ]
+TapeAt (ending e)        P = P ≡ e
+TapeAt over              P = ⊥
+
+-- An of's own mark, or a live cold's: the position of its next row.
 OfAt : ∀ {Γ A} → St Γ A → Mark → Pos → Set
 OfAt (ofS i p xs) ofM P = P ≡ ofPos p i xs
+OfAt (coldS true l) leafM P = TapeAt l P
 OfAt _            _   P = ⊥
 
 Leads : ∀ {R Γ A} → Bool → Ctx R Γ A → EmissionSet A → Maybe (Cand R A) → Set₁
@@ -417,6 +424,9 @@ own-none v c {s} {t} ((m , k) ∷ ms) no = first-leads {v = v} {c = c} {t = t} (
     one false = stop , tt
 
 postulate
+  -- A COLD'S OWN MARK LEADS: its tape's next step keys its rows, tight.
+  cold-lead : ∀ {R Γ A} v (c : Ctx R Γ A) b (l : Tape A) → Leads v c (rows (env c) (coldS b l)) (ownBest c (coldS b l) (own (coldS {Γ = Γ} b l)))
+
   -- A CONNECT'S SEARCH LEADS: whatever its source or its body finds, the
   -- source winning only strictly before the body, keys the connect's rows,
   -- and the part that lost lies past it: the body's own rows past a
@@ -439,7 +449,7 @@ own-lead v c (pend o _)             _ = tt₁
 own-lead v c (flatS op f d n q o ls) _ = tt₁
 own-lead v c (lnS b s)            ()
 own-lead v c (scanS _ _ _)        ()
-own-lead v c (coldS _ _)          ()
+own-lead v c (coldS b l)          _ = cold-lead v c b l
 own-lead v c (takeS _ _ _ _)      ()
 own-lead v c (connS k o b)        _ = own-none v c {connS k o b} (own (connS k o b)) (λ ())
 own-lead v c (joinS j g x ib)     _ = own-none v c {joinS j g x ib} (own (joinS j g x ib)) (λ ())
@@ -479,7 +489,7 @@ mutual
   kids-lead v c (flatS exhaustᶠ _ _ _ _ _ _)          ()
   kids-lead v c (lnS _ _)        ()
   kids-lead v c (scanS _ _ _)    ()
-  kids-lead v c (coldS _ _)      ()
+  kids-lead v c (coldS _ _)      _ = tt₁
   kids-lead v c (takeS _ _ _ _)  ()
   kids-lead v c (connS k o b)    g = conn-lead v c k o b g
   kids-lead v c (joinS _ _ () _) _

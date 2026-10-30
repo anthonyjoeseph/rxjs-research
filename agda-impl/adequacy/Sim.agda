@@ -29,16 +29,16 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Data.List using (_ʳ++_)
 
 open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Events using (Timeline; root; ix)
+open import denotation.Events using (Timeline; root; ix; timelineAt; emit; stall; close)
 open import denotation.EmissionSet using (DenEnv; EmissionSet; out; end; MapT; map-out; map-skip; map-pin; map-end; _≼_; enter; ⟦_⟧; Proper)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd)
 open import denotation.Laws.Worlds using (GoodEnv; Lawful)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
-open import operation.PureObservable using (PureObs; module Machine; module Driver)
+open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; over; opening)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; found; Mark; ofM; attM;
                     rise; run; start; dequeue; settle; alive; ended; mapEv; nx; cp; attAt; attached; Torn;
                     Stepped; quiet; begin; admit; closed; killAll; unsubIf; free; cpAt; cutAt; overAt; CS; cs; feed; closedUp; _⊕_;
-                    bodyM; srcAttM; owedM; joinM;
+                    bodyM; srcAttM; owedM; joinM; leafM; Poke; gone; leaf;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
@@ -115,6 +115,10 @@ postulate
   sub-connect : ∀ {R Γ A B} (c : Ctx R Γ B) (s : Obs Timeline Γ A) b q p
               → Sim ⟨ c , pend (connect s b) q , subscribing , p ⟩ []
                     ⟨ inBody (cs false true false (just q) nothing nothing q root) (pend s (q ⊕ [ ix 1 ])) c , pend b (q ⊕ [ ix 0 ]) , subscribing , q ⊕ [ ix 0 ] ⟩
+  -- A COLD ENTERED: its timeline read at the subscription, its tape
+  -- begun there.
+  sub-cold : ∀ {R Γ A} (c : Ctx R Γ A) (x : Timeline A) q p
+           → Sim ⟨ c , pend (cold x) q , subscribing , p ⟩ [] ⟨ c , coldS true (opening q (timelineAt x q)) , absorbed , q ⟩
   -- A DEFER ENTERED: its body pending one level down, its rows those the
   -- defer begins with there.
   sub-defer : ∀ {R Γ A} (c : Ctx R Γ A) l q p
@@ -293,10 +297,11 @@ data Marked {Γ : List Set} : ∀ {A} → St Γ A → Mark → Set₁ where
   attK : ∀ {A} l p (s : St Γ A) → Marked (cutS l (attAt p) s) attM
   conK : ∀ {X A} k (o : St Γ X) (b : St (X ∷ Γ) A) m → m ≡ bodyM ⊎ (m ≡ srcAttM ⊎ m ≡ owedM) → Marked (connS k o b) m
   joinK : ∀ {A} j g (x : A ∈ Γ) ib → Marked (joinS j g x ib) joinM
+  leafK : ∀ {A} b (l : Tape A) → Marked (coldS b l) leafM
 
 postulate
   -- WHAT A GOOD TREE'S SEARCH FINDS: an of's next, a switch's attach, a
-  -- connect's own, or a joiner's next.
+  -- connect's own, a joiner's next, or a cold's turn.
   found-mark : ∀ {R Γ′ A′} (c : Ctx R Γ′ A′) s {Γ A c′ s′ m κ} → Good []ᴬ (plug c s) → search top (plug c s) ≡ just (found (Γ , A , c′ , s′) m κ) → Marked s′ m
 
   -- A SWITCH ATTACHED: nothing owed changes.
@@ -310,19 +315,16 @@ postulate
           → search top (plug c s) ≡ just (found (Γ , A , c′ , connS k o b) m κ) → run c′ (connS k o b) m p ≡ moved k′ sh t
           → Sim ⟨ c , s , absorbed , p ⟩ sh k′
 
+  -- A COLD'S TURN: its tape played one step, a value or its end rising,
+  -- a stall or a frame's close moving nothing owed.
+  abs-leaf : ∀ {R Γ′ A′ Γ A} {c : Ctx R Γ′ A′} {s} {c′ : Ctx R Γ A} {b} {l : Tape A} {κ t k′} p
+           → search top (plug c s) ≡ just (found (Γ , A , c′ , coldS b l) leafM κ) → Driver.took R (run c′ (coldS b l) leafM p) ≡ Driver.silent t k′
+           → Sim ⟨ c , s , absorbed , p ⟩ [] k′
+
   -- A JOINER'S NEXT RISES.
   abs-join : ∀ {R Γ′ A′ Γ A} {c : Ctx R Γ′ A′} {s} {c′ : Ctx R Γ A} {j g} {x : A ∈ Γ} {ib κ k′ sh t} p
            → search top (plug c s) ≡ just (found (Γ , A , c′ , joinS j g x ib) joinM κ) → run c′ (joinS j g x ib) joinM p ≡ moved k′ sh t
            → Sim ⟨ c , s , absorbed , p ⟩ sh k′
-
-abs-sim : ∀ {R Γ A} {k′ : Conf R} {sh t} (c : Ctx R Γ A) (s : St Γ A) p → stepᴹ ⟨ c , s , absorbed , p ⟩ ≡ moved k′ sh t → Sim ⟨ c , s , absorbed , p ⟩ sh k′
-abs-sim c s p eq i with search top (plug c s) in fd
-abs-sim c s p ()  i | nothing
-abs-sim c s p eq  i | just (found (_ , _ , c′ , s′) m κ) with found-mark c s (good i) fd
-... | ofK _ _ _  = abs-of p fd eq i
-... | attK _ _ _ = abs-att p fd eq i
-... | conK _ _ _ _ _ = abs-con p fd eq i
-... | joinK _ _ _ _ = abs-join p fd eq i
 
 ------------------------------------------------------------------------
 -- Within what is grown, every step moves or finds nothing to do
@@ -391,15 +393,6 @@ run-join-mv c j g x []              p = tt
 run-join-mv c j g x ((q , nx a) ∷ ib) p = tt
 run-join-mv c j g x ((q , cp) ∷ ib)   p = tt
 
-abs-mv : ∀ {R Γ A} (c : Ctx R Γ A) s p → Inv ⟨ c , s , absorbed , p ⟩ → Mv (stepᴹ ⟨ c , s , absorbed , p ⟩)
-abs-mv c s p i with search top (plug c s) in fd
-... | nothing = tt
-... | just (found (_ , _ , c′ , s′) m κ) with found-mark c s (good i) fd
-...   | ofK j q xs  = run-of-mv c′ j q xs p
-...   | attK l q s₀ = run-att-mv c′ l q s₀ p
-...   | conK k o b m w = run-con-mv c′ k o b m p w
-...   | joinK j g x ib = run-join-mv c′ j g x ib p
-
 -- The driver's steps read back as the engine's.
 module _ {R : Set} where
   open Driver R using (took; value; complete) renaming (silent to τ)
@@ -422,6 +415,33 @@ module _ {R : Set} where
   fin-moved (moved k ((_ , cp) ∷ rest) tr)   _ refl = k , rest , tr , refl
   fin-moved quiet _ ()
 
+-- A driver step that shows nothing: a cold's subscription or turn.
+module _ {R : Set} where
+  open Driver R using (Step; played; value; complete; drained) renaming (silent to τ)
+
+  Hush : Step → Set
+  Hush (τ _ _) = ⊤
+  Hush drained = ⊤
+  Hush _       = ⊥
+
+  played-hush : ∀ pk → Hush (played pk)
+  played-hush gone                                         = tt
+  played-hush (leaf b (ending e) cl dv st)                 = tt
+  played-hush (leaf false (play τ′ u i t fr) cl dv st)     = tt
+  played-hush (leaf false over cl dv st)                   = tt
+  played-hush (leaf true (play τ′ u i t fr) true dv st)    = tt
+  played-hush (leaf true over true dv st)                  = tt
+  played-hush (leaf true (play τ′ u i t (emit a k)) false dv st) = tt
+  played-hush (leaf true (play τ′ u i t (stall k)) false dv st)  = tt
+  played-hush (leaf true (play τ′ u i t (close k)) false dv st)  = tt
+  played-hush (leaf true over false dv st)                 = tt
+
+  hush-val : ∀ {x t p a k′} → Hush x → x ≡ value t p a k′ → ⊥
+  hush-val h refl = h
+
+  hush-fin : ∀ {x p} → Hush x → x ≡ complete p → ⊥
+  hush-fin h refl = h
+
 ------------------------------------------------------------------------
 -- The run
 
@@ -433,7 +453,6 @@ Runs k = ∀ {rs} → Steps k rs → Shows* (RT k) (conv rs)
 -- Each owes what growing it would: its node's place in `adequacy.Bound.G`,
 -- its rows and what it owes, and the step arms of the nodes it builds.
 postulate
-  beyond-cold    : ∀ {R Γ A} (c : Ctx R Γ A) x q′ p → Inv ⟨ c , pend (cold x) q′ , subscribing , p ⟩ → Runs ⟨ c , pend (cold x) q′ , subscribing , p ⟩
   beyond-scan    : ∀ {R Γ A B} (c : Ctx R Γ B) (f : B → A → B) z (s : Obs Timeline Γ A) q′ p
                  → Inv ⟨ c , pend (scan f z s) q′ , subscribing , p ⟩ → Runs ⟨ c , pend (scan f z s) q′ , subscribing , p ⟩
   beyond-take    : ∀ {R Γ A} (c : Ctx R Γ A) b q (s : Obs Timeline Γ A) q′ p
@@ -456,10 +475,33 @@ join-sim c x q p eq with closedUp c x in cu
 join-sim c x q p refl | true  = sub-joined c x q p cu
 join-sim c x q p refl | false = sub-join c x q p cu
 
--- Where a step goes: on, linked a step at a time, or into a former's leaf.
+-- Where a step goes: on, linked a step at a time, engine or driver, or
+-- into a former's leaf.
 data Reach {R} (k : Conf R) : Set₁ where
   within : Mv (stepᴹ k) → (∀ {k′ sh t} → stepᴹ k ≡ moved k′ sh t → Sim k sh k′) → Reach k
+  driven : Hush (Driver.step R k) → (∀ {t k′} → Driver.step R k ≡ Driver.silent t k′ → Sim k [] k′) → Reach k
   beyond : Runs k → Reach k
+
+-- A step linked, read off the step itself, so a search's outcome can be
+-- abstracted in it.
+data Link {R} (k : Conf R) : Stepped R → Set₁ where
+  mvL   : ∀ {x} → Mv x → (∀ {k′ sh t} → x ≡ moved k′ sh t → Sim k sh k′) → Link k x
+  hushL : ∀ {x} → Hush (Driver.took R x) → (∀ {t k′} → Driver.took R x ≡ Driver.silent t k′ → Sim k [] k′) → Link k x
+
+linked : ∀ {R} {k : Conf R} → Link k (stepᴹ k) → Reach k
+linked (mvL mv sim)  = within mv sim
+linked (hushL h sim) = driven h sim
+
+-- A mark run, by what the search found.
+abs-link : ∀ {R Γ A} (c : Ctx R Γ A) s p → Inv ⟨ c , s , absorbed , p ⟩ → Link ⟨ c , s , absorbed , p ⟩ (stepᴹ ⟨ c , s , absorbed , p ⟩)
+abs-link c s p i with search top (plug c s) in fd
+... | nothing = mvL tt λ ()
+... | just (found (_ , _ , c′ , s′) m κ) with found-mark c s (good i) fd
+...   | ofK j q xs     = mvL (run-of-mv c′ j q xs p) (λ eq → abs-of p fd eq)
+...   | attK l q s₀    = mvL (run-att-mv c′ l q s₀ p) (λ eq → abs-att p fd eq)
+...   | conK k o b m w = mvL (run-con-mv c′ k o b m p w) (λ eq → abs-con p fd eq)
+...   | joinK j g x ib = mvL (run-join-mv c′ j g x ib p) (λ eq → abs-join p fd eq)
+...   | leafK b l      = hushL (played-hush (leaf b l (closed c′) (λ e l′ b′ p′ → ⟨ c′ , coldS b′ l′ , (if not (closed c′) then rising e else absorbed) , p′ ⟩) (λ l′ → ⟨ c′ , coldS b l′ , absorbed , p ⟩))) (λ eq → abs-leaf p fd eq)
 
 reach-pend : ∀ {R Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) q p → Inv ⟨ c , pend o q , subscribing , p ⟩ → Reach ⟨ c , pend o q , subscribing , p ⟩
 reach-pend c empty                           q p i = within tt λ { refl → sub-empty c q p }
@@ -467,7 +509,7 @@ reach-pend c (of xs)                         q p i = within tt λ { refl → sub
 reach-pend c (map f s)                       q p i = within tt λ { refl → sub-map c f s q p }
 reach-pend c (flatMap (mergeᶠ nothing) f s)  q p i = within tt λ { refl → sub-merge c f s q p }
 reach-pend c (connected x)                   q p i = within (join-mv c x q {p}) (join-sim c x q p)
-reach-pend c (cold x)                        q p i = beyond (beyond-cold c x q p i)
+reach-pend c (cold x)                        q p i = driven tt λ { refl → sub-cold c x q p }
 reach-pend c (scan f z s)                    q p i = beyond (beyond-scan c f z s q p i)
 reach-pend c (takeWhile b w s)               q p i = beyond (beyond-take c b w s q p i)
 reach-pend c (flatMap (mergeᶠ (just m)) f s) q p i = beyond (beyond-bounded c m f s q p i)
@@ -490,11 +532,19 @@ reach ⟨ c , takeS j q w s , subscribing , p ⟩         i = within tt (sub-sim
 reach ⟨ c , flatS op f d n q o ls , subscribing , p ⟩ i = within tt (sub-sim c (flatS op f d n q o ls) p tt)
 reach ⟨ c , connS k o b , subscribing , p ⟩           i = within tt (sub-sim c (connS k o b) p tt)
 reach ⟨ c , joinS j g x ib , subscribing , p ⟩        i = within tt (sub-sim c (joinS j g x ib) p tt)
-reach ⟨ c , s , absorbed , p ⟩                        i = within (abs-mv c s p i) (abs-sim c s p)
+reach ⟨ c , s , absorbed , p ⟩                        i = linked (abs-link c s p i)
 
 sound-from : ∀ {R} {k : Conf R} → Inv k → Runs k
 sound-from {k = k} i st with reach k i
 ... | beyond b      = b st
+... | driven h sim  = go st
+  where
+    go : ∀ {rs} → Steps k rs → Shows* (RT k) (conv rs)
+    go [] = []
+    go (tau e st′) with sim e i
+    ... | i′ , silent q = Shows*-≃ (≃-sym q) (sound-from i′ st′)
+    go (val e _) = ⊥-elim (hush-val h e)
+    go (fin e)   = ⊥-elim (hush-fin h e)
 ... | within mv sim = go st
   where
     go : ∀ {rs} → Steps k rs → Shows* (RT k) (conv rs)
