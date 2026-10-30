@@ -164,7 +164,8 @@ dirs c@(inSrc k b c′)                     = dirs c′ ++ [ dir c ]
 dirs c@(inBody k o c′)                    = dirs c′ ++ [ dir c ]
 
 -- What the hole's observer answers when polled: rxjs's `closed`.  A
--- switch off answers true; a connect's source asks its subject.
+-- switch off answers true; a connect's source asks its subject, and
+-- answers true too once the connect itself is torn down.
 closed : ∀ {R Γ A} → Ctx R Γ A → Bool
 closed top                               = false
 closed (inMap f c)                       = closed c
@@ -174,7 +175,7 @@ closed (inLn b c)                        = closed c
 closed (inTake i p w c)                  = closed c
 closed (inOuter op f d n q ls c)         = closed c
 closed (inLanes op f d n q o pre post c) = closed c
-closed (inSrc k b c)                     = CS.closed k
+closed (inSrc k b c)                     = CS.closed k ∨ closed c
 closed (inBody k o c)                    = closed c
 
 -- Whether a joiner's binder, up its own context, has completed.

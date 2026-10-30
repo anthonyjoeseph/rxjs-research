@@ -11,7 +11,7 @@ module adequacy.Lead where
 open import Data.Bool using (Bool; true; false; T)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_])
-open import Data.List.Relation.Unary.All using ([])
+open import Data.List.Relation.Unary.All using ([]) renaming (_∷_ to _∷ᴬ_)
 open import Data.Nat using (ℕ)
 open import Data.Maybe using (Maybe; just; nothing) renaming (map to mapᴹ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -25,11 +25,11 @@ open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-split)
 open import denotation.EmissionSet using (EmissionSet; DenEnv; Ev; Truncate; out; skip; pin; end; _≺_; MapT; map-out; map-skip; map-pin; map-end; at-out; at-end)
 open import operation.Key using (Key; at; _<ᴷ_; ≮ᴷ-trans; at-<ᵖ; clash)
 open import operation.PureObservable using (module Machine)
-open Machine using (St; Ctx; Cand; found; Mark; ofM; attM; Att; Out; still; shows; nx; cp; seek; search; kids; lanes; own; ownBest; first; retag;
+open Machine using (St; Ctx; CS; Cand; found; Mark; ofM; attM; Att; Out; still; shows; nx; cp; seek; search; kids; lanes; own; ownBest; first; retag;
                     raceT; outerT; laneT; mapT; cutT; alive; outOf; closed; attached; attAt;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
-                    top; inMap; inCut; inLn; inOuter; inLanes)
-open import adequacy.Rows using (env; rows; rowsL; pendRows; toEv; Lanes; Each; module Flat)
+                    top; inMap; inCut; inLn; inOuter; inLanes; inSrc; inBody)
+open import adequacy.Rows using (env; rows; rowsL; pendRows; toEv; Lanes; Each; module Flat; Hot; ∅)
 open import adequacy.Bound using (_⊑_; ⊑i; ⊑-refl; ⊑-trans; <→⊑; ext-⊑; From; Bd; OK; OKL; Live;
                                          Apart; Spread; Parts; rooted-parts; ⊑→≼; join-ok; MergeG; G; GL; GLn; Good; ofPos; from-weak; seek-ok; seek-ln; lane-ok; lanes-ok)
 open import adequacy.Skip using (After; LeadC)
@@ -122,6 +122,8 @@ data Ext {R} {Γ′ A′} (c′ : Ctx R Γ′ A′) : ∀ {Γ A} → Ctx R Γ A 
   eLn    : ∀ {Γ A} {b} {c : Ctx R Γ A} → Ext c′ (inLn b c) → Ext c′ c
   eOuter : ∀ {Γ A B} {f d n q ls} {c : Ctx R Γ B} → Ext c′ (inOuter {A = A} (mergeᶠ nothing) f d n q ls c) → Ext c′ c
   eLanes : ∀ {Γ A B} {f d n q} {o : St Γ A} {pre post} {c : Ctx R Γ B} → Ext c′ (inLanes (mergeᶠ nothing) f d n q o pre post c) → Ext c′ c
+  eSrc   : ∀ {Γ X B} {k} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} → Ext c′ (inSrc k b c) → Ext c′ c
+  eBody  : ∀ {Γ X B} {k} {o : St Γ X} {c : Ctx R Γ B} → Ext c′ (inBody k o c) → Ext c′ c
 
 -- Each merge's other parts past `P`, over the added frames.
 LeadE : ∀ {R Γ′ A′ Γ A} {c′ : Ctx R Γ′ A′} {c : Ctx R Γ A} → Ext c′ c → Pos → Set
@@ -132,6 +134,8 @@ LeadE (eLn e)                                     P = LeadE e P
 LeadE (eOuter {ls = ls} {c = c} e)                P = Each (After P) (rowsL (env c) ls) × LeadE e P
 LeadE (eLanes {o = o} {pre = pre} {post = post} {c = c} e) P =
   After P (rows (env c) o) × Each (After P) (rowsL (env c) pre) × Each (After P) (rowsL (env c) post) × LeadE e P
+LeadE (eSrc {k = k} {b = b} {c = c} e)            P = After P (rows (Hot ∅ k ∷ᴬ env c) b) × LeadE e P
+LeadE (eBody {o = o} {c = c} e)                   P = After P (rows (env c) o) × LeadE e P
 
 lead-ext : ∀ {R Γ′ A′ Γ A} {c′ : Ctx R Γ′ A′} {c : Ctx R Γ A} (e : Ext c′ c) {P} → LeadE e P → LeadC c P → LeadC c′ P
 lead-ext stop       _                  lc = lc
@@ -140,6 +144,8 @@ lead-ext (eCut e)   le                 lc = lead-ext e le lc
 lead-ext (eLn e)    le                 lc = lead-ext e le lc
 lead-ext (eOuter e) (a , le)           lc = lead-ext e le (a , lc)
 lead-ext (eLanes e) (a , b , d , le)   lc = lead-ext e le (a , b , d , lc)
+lead-ext (eSrc e)   (a , le)           lc = lead-ext e le (a , lc)
+lead-ext (eBody e)  (a , le)           lc = lead-ext e le (a , lc)
 
 ∨-true : ∀ b → (b Data.Bool.∨ true) ≡ true
 ∨-true true  = refl
@@ -152,6 +158,8 @@ ext-closed (eCut {l = l} {c = c} e) h = ext-closed e (subst (λ b → (Data.Bool
 ext-closed (eLn e)    h = ext-closed e h
 ext-closed (eOuter e) h = ext-closed e h
 ext-closed (eLanes e) h = ext-closed e h
+ext-closed (eSrc {k = k} e) h = ext-closed e (subst (λ b → (CS.closed k Data.Bool.∨ b) ≡ true) (sym h) (∨-true (CS.closed k)))
+ext-closed (eBody e)  h = ext-closed e h
 
 ------------------------------------------------------------------------
 -- What a search finds, read at the of it found
@@ -399,6 +407,24 @@ of-out c cl with closed c
 of-out c () | true
 of-out c cl | false = refl
 
+-- Marks no of owns lead nothing.
+own-none : ∀ {R Γ A} v (c : Ctx R Γ A) {s : St Γ A} {t} ms → (∀ {m P} → OfAt s m P → ⊥) → Leads v c t (ownBest c s ms)
+own-none v     c []       no = tt₁
+own-none v c {s} {t} ((m , k) ∷ ms) no = first-leads {v = v} {c = c} {t = t} (just (found (_ , _ , c , s) m k , k , outOf c s m)) (ownBest c s ms) (one v) (own-none v c ms no)
+  where
+    one : ∀ v → Leads v c t (just (found (_ , _ , c , s) m k , k , outOf c s m))
+    one true  = stop , λ cl P oa → ⊥-elim (no oa)
+    one false = stop , tt
+
+postulate
+  -- A CONNECT'S SEARCH LEADS: whatever its source or its body finds, the
+  -- source winning only strictly before the body, keys the connect's rows,
+  -- and the part that lost lies past it: the body's own rows past a
+  -- source's find, the source's rows past a body's.  Stated whole, as
+  -- `conn-ok` is, and for the same reason.
+  conn-lead : ∀ {R A X} v (c : Ctx R [] A) k (o : St [] X) (b : St (X ∷ []) A) → G (env c) v (connS k o b)
+            → Leads v c (rows (env c) (connS k o b)) (kids c (connS k o b))
+
 own-lead : ∀ {R Γ A} v (c : Ctx R Γ A) (s : St Γ A) → G (env c) v s → Leads v c (rows (env c) s) (ownBest c s (own s))
 own-lead true  c (ofS i p [])         _ = stop , λ { cl _ refl → tt , tie (p ++ [ last ]) refl (⊑-refl _) (hit at-end tt) }
 own-lead true  c (ofS i p (x ∷ xs))   _ = stop , λ { cl _ refl → tt , tie (p ++ [ ix i ]) refl (⊑-refl _) (hit {e = out x} at-out (of-out c {i} {p} {x} {xs} cl)) }
@@ -415,14 +441,14 @@ own-lead v c (lnS b s)            ()
 own-lead v c (scanS _ _ _)        ()
 own-lead v c (coldS _ _)          ()
 own-lead v c (takeS _ _ _ _)      ()
-own-lead v c (connS _ _ _)        ()
-own-lead v c (joinS _ _ _ _)      ()
+own-lead v c (connS k o b)        _ = own-none v c {connS k o b} (own (connS k o b)) (λ ())
+own-lead v c (joinS j g x ib)     _ = own-none v c {joinS j g x ib} (own (joinS j g x ib)) (λ ())
 
 mutual
-  seek-lead : ∀ {R Γ A} v (c : Ctx R Γ A) (s : St Γ A) → G (env c) v s → Leads v c (rows (env c) s) (seek c s)
+  seek-lead : ∀ {R A} v (c : Ctx R [] A) (s : St [] A) → G (env c) v s → Leads v c (rows (env c) s) (seek c s)
   seek-lead v c s g = first-leads (ownBest c s (own s)) (kids c s) (own-lead v c s g) (kids-lead v c s g)
 
-  kids-lead : ∀ {R Γ A} v (c : Ctx R Γ A) (s : St Γ A) → G (env c) v s → Leads v c (rows (env c) s) (kids c s)
+  kids-lead : ∀ {R A} v (c : Ctx R [] A) (s : St [] A) → G (env c) v s → Leads v c (rows (env c) s) (kids c s)
   kids-lead v c (mapS f s)       g = map-leads v f (seek (inMap f c) s) (seek-lead v (inMap f c) s g)
   kids-lead v c (cutS true a s)  g = cut-on v (seek (inCut true a c) s) (seek-lead (v Data.Bool.∧ true) (inCut true a c) s g)
   kids-lead v c (cutS false a s) g = cut-off v (seek (inCut false a c) s) (seek-lead (v Data.Bool.∧ false) (inCut false a c) s g)
@@ -455,10 +481,10 @@ mutual
   kids-lead v c (scanS _ _ _)    ()
   kids-lead v c (coldS _ _)      ()
   kids-lead v c (takeS _ _ _ _)  ()
-  kids-lead v c (connS _ _ _)    ()
-  kids-lead v c (joinS _ _ _ _)  ()
+  kids-lead v c (connS k o b)    g = conn-lead v c k o b g
+  kids-lead v c (joinS _ _ () _) _
 
-  seek-ln-lead : ∀ {R Γ A} v (c : Ctx R Γ A) (s : St Γ A) → GLn (env c) v s → Leads v c (rows (env c) s) (seek c s)
+  seek-ln-lead : ∀ {R A} v (c : Ctx R [] A) (s : St [] A) → GLn (env c) v s → Leads v c (rows (env c) s) (seek c s)
   seek-ln-lead v c (lnS true (cutS .true a s₀)) (refl , g₀ , _) = ln-leads (seek (inLn true c) (cutS true a s₀)) (seek-lead v (inLn true c) (cutS true a s₀) g₀)
   seek-ln-lead v c (lnS false (cutS .false a s₀)) (refl , g₀ , _) = ln-leads (seek (inLn false c) (cutS false a s₀)) (seek-lead v (inLn false c) (cutS false a s₀) g₀)
   seek-ln-lead v c (lnS _ (pend _ _)) ()
@@ -484,7 +510,7 @@ mutual
   seek-ln-lead v c (connS _ _ _) ()
   seek-ln-lead v c (joinS _ _ _ _) ()
 
-  lanes-lead : ∀ {R Γ A B} v (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) d n (o : St Γ A) pre (ls : List (St Γ B)) → GL (env c) v ls → Live v (Spread (rowsL (env c) ls))
+  lanes-lead : ∀ {R A B} v (c : Ctx R [] B) (f : A → Obs Timeline [] B) d n (o : St [] A) pre (ls : List (St [] B)) → GL (env c) v ls → Live v (Spread (rowsL (env c) ls))
              → LL v c f d n o pre ls (lanes c (mergeᶠ nothing) f d n [] o pre ls)
   lanes-lead v c f d n o pre []         _         _  = tt₁
   lanes-lead false c f d n o pre (lnS l (cutS .l a s₀) ∷ post) (gs@(refl , _) , gp) sp =

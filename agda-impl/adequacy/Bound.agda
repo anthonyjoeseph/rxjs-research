@@ -394,6 +394,11 @@ mergeG-map ho hl hc hs hr m = record { outer = ho outer ; lanesG = hl lanesG ; f
 
 -- A joiner's inbox in order, each entry strictly before every later one
 -- and before every row the source still owes it.
+-- A subscription still owed.
+Held : ∀ {Γ A} → St Γ A → Set₁
+Held (pend _ _) = ⊤₁
+Held _          = ⊥₁
+
 Fed : ∀ {A} → List (Pos × Evᴹ A) → EmissionSet A → Set₁
 Fed []             t = ⊤₁
 Fed ((q , _) ∷ ib) t = (∀ {y e} → (Inbox ib ∪ t) y e → q ≺ y) × Fed ib t
@@ -416,8 +421,7 @@ mutual
 
   -- A connect's source: still owed while its body subscribes, then good.
   SrcG : ∀ {Γ A} → DenEnv Γ → Bool → Maybe Pos → St Γ A → Set₁
-  SrcG ρ b (just _) (pend o q) = ⊤₁
-  SrcG ρ b (just _) _          = ⊥₁
+  SrcG ρ b (just _) s = Held s
   SrcG ρ b nothing  s          = G ρ b s
 
   GL : ∀ {Γ A} → DenEnv Γ → Bool → List (St Γ A) → Set₁
@@ -459,8 +463,13 @@ mutual
   shape (scanS _ _ _)                             ()
   shape (lnS _ _)                                 ()
   shape (takeS _ _ _ _)                           ()
-  shape (connS _ _ _)                             ()
-  shape (joinS _ _ _ _)                           ()
+  shape {v = v} (connS k o b)                     (gs , gb) = shapeSrc {v = v} (CS.bodyAt k) o gs , shape b gb
+  shape (joinS j true x ib)                       _ = tt₁
+  shape (joinS j false x ib)                      _ = tt₁
+
+  shapeSrc : ∀ {Γ A} {ρ : DenEnv Γ} {v} m (s : St Γ A) → SrcG ρ v m s → SrcG ρ false m s
+  shapeSrc (just _) s g = g
+  shapeSrc {v = v} nothing s g  = shape {v = v} s g
 
   shapeL : ∀ {Γ A} {ρ : DenEnv Γ} {v} (ls : List (St Γ A)) → GL ρ v ls → GL ρ false ls
   shapeL []       _        = tt₁
@@ -759,11 +768,18 @@ seek-off c attached s = silenced (seek (inCut false attached c) s) (seek-mark (i
 seek-off c (attAt p) s =
   own-first (_ , _ , c , cutS false (attAt p) s) attM (after p) _ (silenced (seek (inCut false (attAt p) c) s) (seek-mark (inCut false (attAt p) c) s))
 
+postulate
+  -- A CONNECT'S SEEK LEADS ITS ROWS: whatever its source and body find,
+  -- the source winning only strictly before the body, keys every row the
+  -- connect still owes, its body's joiners' unfed rows included.
+  conn-ok : ∀ {R A X} {ρ : DenEnv []} (c : Ctx R [] A) k (o : St [] X) (b : St (X ∷ []) A) → Good ρ (connS k o b) → OK (rows ρ (connS k o b)) (seek c (connS k o b))
+
 mutual
-  seek-ok : ∀ {R Γ A} {ρ : DenEnv Γ} (c : Ctx R Γ A) (s : St Γ A) → Good ρ s → OK (rows ρ s) (seek c s)
+  seek-ok : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) (s : St [] A) → Good ρ s → OK (rows ρ s) (seek c s)
   seek-ok c (ofS i p [])       _ = record { from = of-from p i [] ; mark = ⊑-refl _ ; shown = λ eq → _ , refl , of-shows c i p [] eq }
   seek-ok c (ofS i p (x ∷ xs)) _ = record { from = of-from p i (x ∷ xs) ; mark = ⊑-refl _ ; shown = λ eq → _ , refl , of-shows c i p (x ∷ xs) eq }
   seek-ok c doneS              _ = λ ()
+  seek-ok c (connS k o b)      g = conn-ok c k o b g
   seek-ok c (mapS f s)         g = mapped f (seek (inMap f c) s) (seek-ok (inMap f c) s g)
   seek-ok c (cutS true attached s)   g = kept (seek (inCut true attached c) s) (seek-ok (inCut true attached c) s g)
   seek-ok {ρ = ρ} c (cutS false a s) _ = seek-off {ρ = ρ} c a s
@@ -773,7 +789,7 @@ mutual
   ... | refl = ok-trunc (raceT d n [] (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)) (join-ok c f d n o ls m)
 
   -- The joiner before it is entered.
-  join-ok : ∀ {R Γ A B} {ρ : DenEnv Γ} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) d n (o : St Γ A) ls → Good ρ (flatS (mergeᶠ nothing) f d n [] o ls)
+  join-ok : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) (f : A → Obs Timeline [] B) d n (o : St [] A) ls → Good ρ (flatS (mergeᶠ nothing) f d n [] o ls)
           → OK (Flat.JoinT (λ a → pendRows ρ (f a)) (rows ρ o) d (rowsL ρ ls)) (raceT d n [] (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls))
   join-ok {ρ = ρ} c f d n o ls m =
     Race.race-ok (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) (counts ls lanesG count spent)
@@ -781,12 +797,12 @@ mutual
       (seek-ok (inOuter (mergeᶠ nothing) f d n [] ls c) o outer) (lanes-ok c f d n o [] ls lanesG)
     where open MergeG m
 
-  seek-ln : ∀ {R Γ A} {ρ : DenEnv Γ} (c : Ctx R Γ A) (s : St Γ A) → GoodLn ρ s → OK (rows ρ s) (seek c s)
+  seek-ln : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) (s : St [] A) → GoodLn ρ s → OK (rows ρ s) (seek c s)
   seek-ln {ρ = ρ} c s g with lane-v s g
   ... | on a s₀ g₀ _ = seek-ok (inLn true c) (cutS true a s₀) g₀
   ... | off a s₀     = seek-off {ρ = ρ} (inLn false c) a s₀
 
-  lanes-ok : ∀ {R Γ A B} {ρ : DenEnv Γ} (c : Ctx R Γ B) f d n (o : St Γ A) pre (ls : List (St Γ B)) → GoodL ρ ls
+  lanes-ok : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) f d n (o : St [] A) pre (ls : List (St [] B)) → GoodL ρ ls
            → OKL (rowsL ρ ls) (lanes c (mergeᶠ nothing) f d n [] o pre ls)
   lanes-ok c f d n o pre []         _          = tt
   lanes-ok c f d n o pre (s ∷ post) (gs , gp) =

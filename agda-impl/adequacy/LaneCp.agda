@@ -37,7 +37,7 @@ open import adequacy.Rows using (env; ∅; up; here; rows; rowsL; pendRows; Plus
 open import adequacy.Up using (any-ʳ++ˡ; any-ʳ++ʳ; all-ʳ++; ≈ᴸ-refl; _∷_; up-≃; ≃-refl; ≃-trans; vis-≃; plus-≃; trunc-≃;
   row-≃)
 open import adequacy.Bound using (Empty; Good; G; GLn; shape; on; off; lane-v; live; dead-empty; MergeG; mergeG-map)
-open import adequacy.Skip using (After; Since; LeadC; _≈⟨_⟩_; ≈-vis; up-≈)
+open import adequacy.Skip using (After; Since; LeadC; _≈⟨_⟩_; up-vis)
 open import adequacy.LaneEnd using (frame-≈; done-at; outer-owes; lanes-owe; since-x; since-y)
 open import adequacy.Owes using (Owing; Owes; OwesL; UpO; Swap; owes-join; owesL-ʳ++; rowsL-ʳ++; ≡→≃; owing-≃; empty-≃;
                                         flat-owing-o; flat-owing-l; flat-empty; live-ʳ++; live-owing; goodL-ʳ++⁻; goodL-swap; lanes-≃; rooted-≃; good-swap)
@@ -122,14 +122,14 @@ module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St 
   pass : ¬ Flat.Done L O d LX p → Owing Y
        → Inv ⟨ c , node (pred n) , absorbed , p ⟩ × Moves (up c (Flat.RowT L O d LX)) [] (up c (rows ρ (node (pred n))))
   pass nd ow = inv good′ (owes-join c uc owes′ (need-of c good′ (owing-row f d (pred n) [] o (pre ʳ++ ed ∷ post) (node-good c _ good′ (λ ())) (owing-≃ (≃-sym joinY) ow))))
-             , silent (≃-trans (≈-vis (up-≈ c lc (λ (r , _) → sx′ r) (λ (r , _) → sy′ r)
-                                             (trunc-≈ (fr Y (λ d → ⊥-elim (nd d)) (λ r → r) inj₁))))
+             , silent (≃-trans (up-vis c lc (λ (r , _) → sx′ r) (λ (r , _) → sy′ r)
+                                             (trunc-≈ (fr Y (λ d → ⊥-elim (nd d)) (λ r → r) inj₁)))
                                (vis-≃ (up-≃ c (≃-sym (rowsY {pred n})))))
 
   done : T d → pred n ≡ 0 → Inv ⟨ c , node (pred n) , rising cp , p ⟩ × Moves (up c (Flat.RowT L O d LX)) [] (up c (Plus (rows ρ (node (pred n))) p end))
   done td pz = inv good′ (uc , lc , owes′ , tt , (λ r → ⊥-elim (empty-node r)) , empty-node)
-             , silent (≃-trans (≈-vis (up-≈ c lc (λ (r , _) → sx′ r) (λ (r , _) → since′ r)
-                                             (trunc-≈ (fr (Plus Y p end) (λ _ → new) old back))))
+             , silent (≃-trans (up-vis c lc (λ (r , _) → sx′ r) (λ (r , _) → since′ r)
+                                             (trunc-≈ (fr (Plus Y p end) (λ _ → new) old back)))
                                (vis-≃ (up-≃ c (≃-trans (trunc-plus sy′) (plus-≃ (≃-sym (rowsY {pred n})))))))
     where
       eo = spent td

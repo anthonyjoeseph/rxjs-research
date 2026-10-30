@@ -11,6 +11,7 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _ʳ++_; _++_; [_])
 open import Data.Maybe using (just; nothing)
 open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Product using (_×_; _,_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
@@ -23,11 +24,11 @@ open import adequacy.Up using (all-ʳ++)
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; ix)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; _≺_; _≼_; Truncate; Reach; Dep; MapT; map-out; map-skip; map-pin;
-  map-end; Ended)
+  map-end; Ended; module Connecting)
 open import denotation.Laws.Modulus using (≺-trans; ≺→≼; ≼-≺-≺; ≺-ext)
 open import operation.PureObservable using (module Machine)
-open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (up; env; rows; rowsL; pendRows; Gone; Lane; reads; Lanes; Each; module Flat; _≃_; _⇄_; Vis)
+open Machine using (Ctx; St; CS; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
+open import adequacy.Rows using (up; env; rows; rowsL; pendRows; Gone; Lane; reads; Lanes; Each; module Flat; _≃_; _⇄_; Vis; Hot; ∅)
 
 ------------------------------------------------------------------------
 -- Rows past a position
@@ -41,9 +42,8 @@ Since : ∀ {A} → Pos → EmissionSet A → Set
 Since p t = ∀ {q e} → t q e → p ≼ q
 
 -- What a rising event at `p` is owed past: frame by frame, every other
--- part of a merge it rises through.  Never past a binder: a connect shows
--- its source's skip at `p` at `p ++ [ ix 0 ]`, and every joiner its own
--- under `p`, so a skip at `p` alone is not what differs above it.
+-- part of a merge or a connect it rises through.  Up a source, the
+-- body's own rows: those it is not yet fed of the source's.
 LeadC : ∀ {R Γ A} → Ctx R Γ A → Pos → Set
 LeadC (inMap f c)                                    p = LeadC c p
 LeadC (inCut l a c)                                  p = LeadC c p
@@ -51,8 +51,8 @@ LeadC (inLn b c)                                     p = LeadC c p
 LeadC (inOuter (mergeᶠ nothing) f d n q ls c)        p = Each (After p) (rowsL (env c) ls) × LeadC c p
 LeadC (inLanes (mergeᶠ nothing) f d n q o pre post c) p =
   After p (rows (env c) o) × Each (After p) (rowsL (env c) pre) × Each (After p) (rowsL (env c) post) × LeadC c p
-LeadC (inSrc k b c)                                  p = ⊥
-LeadC (inBody k o c)                                 p = ⊥
+LeadC (inSrc k b c)                                  p = After p (rows (Hot ∅ k ∷ᴬ env c) b) × LeadC c p
+LeadC (inBody k o c)                                 p = After p (rows (env c) o) × LeadC c p
 LeadC _                                              p = ⊤
 
 after-since : ∀ {B} {p} (Ls : List (EmissionSet B)) → Each (After p) Ls → Each (Since p) Ls
@@ -254,28 +254,69 @@ trunc-≈ eq = go (fwd eq) (bwd eq) ⇆ go (bwd eq) (fwd eq)
     ... | inj₂ sk = inj₂ sk
 
 ------------------------------------------------------------------------
+-- Up a connect
+
+-- A body a skip apart: its connect too, the source's rows read alike
+-- while the body has not ended, an end being no skip.
+conn-≈ : ∀ {A B} (r : Pos) (σ : EmissionSet A) {t u : EmissionSet B} {p} → t ≈⟨ p ⟩ u → Connecting.ConnT r σ t ≈⟨ p ⟩ Connecting.ConnT r σ u
+conn-≈ {A} {B} r σ {p = p} eq = go (fwd eq) (bwd eq) ⇆ go (bwd eq) (fwd eq)
+  where
+    alive : ∀ {t u : EmissionSet B} → (∀ {q e} → u q e → t q e ⊎ Skip p q e) → ∀ {k} → Connecting.Alive r σ t k → Connecting.Alive r σ u k
+    alive h′ al y with h′ y
+    ... | inj₁ y′      = al y′
+    ... | inj₂ (_ , ())
+    go : ∀ {t u : EmissionSet B} → (∀ {q e} → t q e → u q e ⊎ Skip p q e) → (∀ {q e} → u q e → t q e ⊎ Skip p q e)
+       → ∀ {q e} → Connecting.ConnT r σ t q e → Connecting.ConnT r σ u q e ⊎ Skip p q e
+    go h h′ (Connecting.body x) with h x
+    ... | inj₁ x′ = inj₁ (Connecting.body x′)
+    ... | inj₂ sk = inj₂ sk
+    go h h′ (Connecting.burst x i)      = inj₁ (Connecting.burst x i)
+    go h h′ (Connecting.echo {k} x al un ni) = inj₁ (Connecting.echo x (alive h′ {k} al) un ni)
+    go h h′ (Connecting.kept {p′ = p′} x al ni i)  = inj₁ (Connecting.kept x (alive h′ {p′} al) ni i)
+
+-- A source past `p` shows past `p`.
+since-conn : ∀ {A B} (r : Pos) (σ : EmissionSet A) (t : EmissionSet B) {p} → After p σ → Since p t → Since p (Connecting.ConnT r σ t)
+since-conn r σ t {p} ao st (Connecting.body x)          = st x
+since-conn r σ t {p} ao st (Connecting.burst {k} x _)   = ≺→≼ {p} {k ++ [ ix 0 ]} (≺-trans {p} {k} {k ++ [ ix 0 ]} (ao x) (≺-ext k []))
+since-conn r σ t {p} ao st (Connecting.echo {k} x _ _ _) = ≺→≼ {p} {k ++ [ ix 0 ]} (≺-trans {p} {k} {k ++ [ ix 0 ]} (ao x) (≺-ext k []))
+since-conn r σ t {p} ao st (Connecting.kept {k} x _ _ _) = ≺→≼ {p} {k ++ [ ix 0 ]} (≺-trans {p} {k} {k ++ [ ix 0 ]} (ao x) (≺-ext k []))
+
+postulate
+  -- A SKIP AT A SOURCE IS UNSEEN ABOVE ITS CONNECT: the connect shows it
+  -- as a skip or a pin under it, and every joiner fed it as a skip under
+  -- where it joined, so what differs above is skips past `p` alone, and
+  -- the frames above, every other part past `p`, end alike.
+  src-vis : ∀ {R Γ X B} (k : CS) (b : St (X ∷ Γ) B) (c : Ctx R Γ B) {t u : EmissionSet X} {p}
+          → After p (rows (Hot ∅ k ∷ᴬ env c) b) → LeadC c p → Since p t → Since p u → t ≈⟨ p ⟩ u
+          → Vis (up (inSrc k b c) t) ≃ Vis (up (inSrc k b c) u)
+
+------------------------------------------------------------------------
 -- THE LIFT
 
-up-≈ : ∀ {R Γ A} (c : Ctx R Γ A) {t u : EmissionSet A} {p} → LeadC c p → Since p t → Since p u → t ≈⟨ p ⟩ u → up c t ≈⟨ p ⟩ up c u
-up-≈ top                                     ld st su eq = eq
-up-≈ (inMap f c)                             ld st su eq = up-≈ c ld (since-map f st) (since-map f su) (map-≈ f eq)
-up-≈ (inScan f z c)                          ld st su eq = ≈-refl
-up-≈ (inCut true a c)                        ld st su eq = up-≈ c ld st su eq
-up-≈ (inCut false a c)                       ld st su eq = ≈-refl
-up-≈ (inLn true c)                           ld st su eq = up-≈ c ld st su eq
-up-≈ (inLn false c)                          ld st su eq = ≈-refl
-up-≈ (inTake i q w c)                        ld st su eq = ≈-refl
-up-≈ (inOuter (mergeᶠ nothing) f d n q ls c) {t} {u} (al , ld) st su eq =
-  up-≈ c ld (since-row L t Ls st sl) (since-row L u Ls su sl) (trunc-≈ (flat-≈ L Ls Ls eq (≈ᴸ-refl Ls) st su sl sl))
+-- The same rows, seen alike.
+≃-id : ∀ {A} {t : EmissionSet A} → t ≃ t
+≃-id = (λ x → x) ⇄ (λ x → x)
+
+up-vis : ∀ {R Γ A} (c : Ctx R Γ A) {t u : EmissionSet A} {p} → LeadC c p → Since p t → Since p u → t ≈⟨ p ⟩ u → Vis (up c t) ≃ Vis (up c u)
+up-vis top                                   ld st su eq = ≈-vis eq
+up-vis (inMap f c)                             ld st su eq = up-vis c ld (since-map f st) (since-map f su) (map-≈ f eq)
+up-vis (inScan f z c)                          ld st su eq = ≃-id
+up-vis (inCut true a c)                        ld st su eq = up-vis c ld st su eq
+up-vis (inCut false a c)                       ld st su eq = ≃-id
+up-vis (inLn true c)                           ld st su eq = up-vis c ld st su eq
+up-vis (inLn false c)                          ld st su eq = ≃-id
+up-vis (inTake i q w c)                        ld st su eq = ≃-id
+up-vis (inOuter (mergeᶠ nothing) f d n q ls c) {t} {u} (al , ld) st su eq =
+  up-vis c ld (since-row L t Ls st sl) (since-row L u Ls su sl) (trunc-≈ (flat-≈ L Ls Ls eq (≈ᴸ-refl Ls) st su sl sl))
   where
     L  = λ a → pendRows (env c) (f a)
     Ls = rowsL (env c) ls
     sl = after-since Ls al
-up-≈ (inOuter (mergeᶠ (just _)) f d n q ls c) ld st su eq = ≈-refl
-up-≈ (inOuter switchᶠ f d n q ls c)           ld st su eq = ≈-refl
-up-≈ (inOuter exhaustᶠ f d n q ls c)          ld st su eq = ≈-refl
-up-≈ (inLanes (mergeᶠ nothing) f d n q o pre post c) {t} {u} (ao , apre , apost , ld) st su eq =
-  up-≈ c ld (since-row L O Lt so slt) (since-row L O Lu so slu)
+up-vis (inOuter (mergeᶠ (just _)) f d n q ls c) ld st su eq = ≃-id
+up-vis (inOuter switchᶠ f d n q ls c)           ld st su eq = ≃-id
+up-vis (inOuter exhaustᶠ f d n q ls c)          ld st su eq = ≃-id
+up-vis (inLanes (mergeᶠ nothing) f d n q o pre post c) {t} {u} (ao , apre , apost , ld) st su eq =
+  up-vis c ld (since-row L O Lt so slt) (since-row L O Lu so slu)
        (trunc-≈ (flat-≈ L Lt Lu ≈-refl (≈ᴸ-hole (rowsL ρ pre) (eq ∷ ≈ᴸ-refl (rowsL ρ post))) so so slt slu))
   where
     ρ   = env c
@@ -286,8 +327,9 @@ up-≈ (inLanes (mergeᶠ nothing) f d n q o pre post c) {t} {u} (ao , apre , ap
     so  = λ {q} {e} r → ≺→≼ {_} {q} (ao {q} {e} r)
     slt = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (st , after-since (rowsL ρ post) apost)
     slu = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (su , after-since (rowsL ρ post) apost)
-up-≈ (inLanes (mergeᶠ (just _)) f d n q o pre post c) ld st su eq = ≈-refl
-up-≈ (inLanes switchᶠ f d n q o pre post c)   ld st su eq = ≈-refl
-up-≈ (inLanes exhaustᶠ f d n q o pre post c)  ld st su eq = ≈-refl
-up-≈ (inSrc k b c)                            () st su eq
-up-≈ (inBody k o c)                           () st su eq
+up-vis (inLanes (mergeᶠ (just _)) f d n q o pre post c) ld st su eq = ≃-id
+up-vis (inLanes switchᶠ f d n q o pre post c)   ld st su eq = ≃-id
+up-vis (inLanes exhaustᶠ f d n q o pre post c)  ld st su eq = ≃-id
+up-vis (inSrc k b c)                            (ab , ld) st su eq = src-vis k b c ab ld st su eq
+up-vis (inBody k o c) {t} {u}                   (ao , ld) st su eq =
+  up-vis c ld (since-conn (CS.connAt k) _ t ao st) (since-conn (CS.connAt k) _ u ao su) (conn-≈ (CS.connAt k) _ eq)
