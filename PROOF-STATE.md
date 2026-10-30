@@ -60,8 +60,7 @@ from begun lanes tracks the machine's queue, with a lane gone or handed
 on. Settled when each is a body, or a bounded merge whose freed slot the
 schedule reads wrong.
 
-Members: `enter-bounded`, `enter-switch`, `enter-exhaust`, `rise-bounded-nx`,
-`bounded-ends-at`, `bounded-val-at`, `bounded-outer-at`,
+Members: `rise-bounded-nx`, `bounded-ends-at`, `bounded-val-at`, `bounded-outer-at`,
 `rise-bounded-lane-hand`, `rise-switch-nx`, `rise-exhaust-run`,
 `rise-exhaust-drop`.
 
