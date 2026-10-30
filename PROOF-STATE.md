@@ -17,11 +17,11 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE CONNECT'S SEARCH
 
 Riskiest: how a connect's source rows and its body's sit against each
-other. Open: whether a body's find never shares a source row's position, an
-invariant `Good` does not yet state. Settled by a body, or a program whose
-source row lands at or before a body find no later than it.
+other. Open: whether a body's find lies under no row its source still owes,
+an invariant `Good` does not yet state. Settled by a body, or a program whose
+body finds at or under a source row not yet fed.
 
-Members: `conn-body-src`.
+Members: `body-apart`.
 
 #### THE COLD STEPPED
 

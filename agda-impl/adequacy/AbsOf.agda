@@ -27,7 +27,7 @@ open import denotation.Laws.Modulus using (≺-≼-≺)
 open import operation.Key using (_<ᴷ_)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; CS; Cand; found; ⟨_,_,_,_⟩; absorbed; rising; plug; search; seek; kids; lanes; own; ownBest; first; retag; raceT; sourceT;
-                    shift; over; closed; alive; cutT; mapT; scanT; takeT; run; moved; ofM; cp; nx;
+                    shift; closed; alive; cutT; mapT; scanT; takeT; run; moved; ofM; cp; nx;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (env; ∅; up; rows; Plus; module BoundedF; module SwitchF; module ExhaustF; old; new;

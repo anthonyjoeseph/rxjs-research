@@ -25,10 +25,10 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (ofᴱ)
-open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-asym; <ᵖ-split; <ᵖ-step; <ᵖ-shift; <ᵖ-below; <ᵖ-part; <ᵖ-ix)
+open import denotation.Events using (Pos; Timeline; ix; last; inside; inside-self; inside-++; <ᵖ-asym; <ᵖ-split; <ᵖ-step; <ᵖ-shift; <ᵖ-below; <ᵖ-part; <ᵖ-ix)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; _≺_; _≼_; InE; enter; at-out; at-end; on-out; MapT; map-out;
   map-skip; map-pin; map-end; module Scan; DenEnv)
-open import denotation.Laws.Modulus using (≼-refl)
+open import denotation.Laws.Modulus using (≼-refl; ≼-false; ≼-trans; ≼-antisym; ≼-or-≻)
 open import denotation.Laws.Worlds using (InvAt; Hots; W; inW; plain-ix; apart-w) renaming (⊑-refl to ⊑ᵖ-refl)
 open import operation.Key using (Key; at; after; _<ᴷ_; ≮ᴷ-trans; <ᴷ-trans; <ᴷ-irrefl; at-<ᵖ; clash; shift-after)
 open import operation.PureObservable using (module Machine)
@@ -94,6 +94,32 @@ past-⊑ : ∀ {p q} → at p ⊑ at q → ¬ p ≡ q → at (p ++ [ ix 0 ]) ⊑
 past-⊑ {p} {q} pq ne with <ᵖ-split p q (trans (sym (at-<ᵖ q p)) (un pq))
 ... | inj₁ lt = ⊑i (trans (at-<ᵖ q (p ++ [ ix 0 ])) (<ᵖ-step p q lt))
 ... | inj₂ eq = ⊥-elim (ne eq)
+
+-- At or before and not it: before.
+≼-≢ : ∀ {p q} → p ≼ q → ¬ p ≡ q → p ≺ q
+≼-≢ {p} {q} pq ne with <ᵖ-split p q (≼-false {p} {q} pq)
+... | inj₁ lt = Equivalence.from T-≡ lt
+... | inj₂ eq = ⊥-elim (ne eq)
+
+-- NO LATER THAN JUST PAST A KEY THAT EVERY ROW IS PAST: before every row
+-- it is not under.  Nothing lies strictly between a position and the
+-- first step under it.
+apart-before : ∀ {P q} h → at P ⊑ shift h → h ⊑ at q → ¬ T (inside q P) → P ≺ q
+apart-before {P} {q} h Ph hq ni = go h Ph hq
+  where
+  ne : ¬ P ≡ q
+  ne refl = ni (Equivalence.from T-≡ (inside-self P))
+
+  go : ∀ h → at P ⊑ shift h → h ⊑ at q → P ≺ q
+  go (after r) Ph hq = ≼-≢ {P} {q} (⊑→≼ (⊑-trans Ph hq)) ne
+  go (at x) Ph hq with ≼-or-≻ P x
+  ... | inj₁ Px = ≼-≢ {P} {q} (≼-trans {P} {x} {q} Px (⊑→≼ hq)) ne
+  ... | inj₂ xP with <ᵖ-split x q (trans (sym (at-<ᵖ q x)) (un hq))
+  ... | inj₁ lt   = ≼-≢ {P} {q} (≼-trans {P} {x ++ [ ix 0 ]} {q} (⊑→≼ Ph) (λ t → subst T (<ᵖ-step x q lt) t)) ne
+  ... | inj₂ refl = ⊥-elim (ni (subst (λ z → T (inside x z)) (sym eq) (Equivalence.from T-≡ (inside-++ x x [ ix 0 ] (inside-self x)))))
+    where
+    eq : P ≡ x ++ [ ix 0 ]
+    eq = ≼-antisym {P} {x ++ [ ix 0 ]} (⊑→≼ Ph) (λ t → subst T (<ᵖ-step x P (Equivalence.to T-≡ xP)) t)
 
 ------------------------------------------------------------------------
 -- What a found mark promises

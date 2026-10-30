@@ -17,7 +17,7 @@ open import Data.Sum using (inj₁; inj₂)
 open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import denotation.Events using (ix)
+open import denotation.Events using (ix; inside)
 open import denotation.EmissionSet using (EmissionSet; module Connecting; _≺_; Proper)
 open import denotation.Laws.Modulus using (upto; ≼-or-≻; ≺-irrefl; ≼-≺-≺; ≺-≼-≺; ≺→≼)
 open import denotation.Laws using (ag-cons; hot-below)
@@ -26,7 +26,7 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; CS; Cand; found; still; shift; seek; own; ownBest; sourceT; closed; connS; inSrc; inBody)
 open import adequacy.Rows using (env; rows; Hot; ∅; _∪_; Closed)
 open import adequacy.Causal using (rows-causal; env-refl)
-open import adequacy.Bound using (_⊑_; ⊑i; ⊑-refl; ⊑-trans; <→⊑; ext-⊑; shift-⊑; Bd; From; Good; ⊑→≼)
+open import adequacy.Bound using (_⊑_; ⊑i; ⊑-refl; ⊑-trans; <→⊑; ext-⊑; shift-⊑; Bd; From; Good; ⊑→≼; apart-before)
 open import adequacy.Cap using (OKᶜ; EnvSingle; Air; bind-after; bind-past; meet; meet-ˡ; meet-ʳ; meet-hi; ext-<; ⊑-<; <-⊑; ≮; StillAt; still-at)
 open import adequacy.Skip using (After)
 open import adequacy.Leads using (Leads; Leadsᶜ; Beats; eSrc; eBody; OfAt; Occ; Tight; strict; tie; occ-bind; hit; tight-⊑; tight-occ;
@@ -55,16 +55,25 @@ raise-tight              (tie Q refl pq _) = strict (⊑-< (at (Q ++ [ ix 0 ])) 
 ------------------------------------------------------------------------
 -- The gaps
 
+-- A BODY'S EVENT IS UNDER NO ROW ITS SOURCE STILL OWES: a body's events
+-- lie under its own subscriptions or under source rows already fed to
+-- its binder, never at or under one still to come.
 postulate
-  -- A BODY'S FIND NO LATER THAN ITS SOURCE'S RAISED ONE: the source's
-  -- rows lie strictly past the body's event.
-  conn-body-src : ∀ {R Γ A X} (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvSingle (env c) → Good (env c) (connS k o b)
-                → ∀ {Γ₁ A₁} {c₁ : Ctx R Γ₁ A₁} {s₁ m₁ κ₁ h₀ o′} → seek (inSrc k b c) o ≡ just (found (Γ₁ , A₁ , c₁ , s₁) m₁ κ₁ , h₀ , o′)
-                → Bd (rows (env c) o) κ₁ h₀ o′
-                → ∀ {Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ K o″} → seek (inBody k o c) b ≡ just (found (Γ′ , A′ , c′ , s′) m κ , K , o″)
-                → K ⊑ (shift h₀)
-                → closed c′ ≡ false → ∀ P → OfAt s′ m P → Tight (rows (Hot (rows (env c) o) k ∷ᴬ env c) b) P K o″
-                → After P (rows (env c) o)
+  body-apart : ∀ {R Γ A X} (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvSingle (env c) → Good (env c) (connS k o b)
+             → ∀ {Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ K o″} → seek (inBody k o c) b ≡ just (found (Γ′ , A′ , c′ , s′) m κ , K , o″)
+             → closed c′ ≡ false → ∀ P → OfAt s′ m P → ∀ {q e} → rows (env c) o q e → ¬ T (inside q P)
+
+-- A BODY'S FIND NO LATER THAN ITS SOURCE'S RAISED ONE: the source's
+-- rows lie strictly past the body's event.
+conn-body-src : ∀ {R Γ A X} (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvSingle (env c) → Good (env c) (connS k o b)
+              → ∀ {Γ₁ A₁} {c₁ : Ctx R Γ₁ A₁} {s₁ m₁ κ₁ h₀ o′} → seek (inSrc k b c) o ≡ just (found (Γ₁ , A₁ , c₁ , s₁) m₁ κ₁ , h₀ , o′)
+              → Bd (rows (env c) o) κ₁ h₀ o′
+              → ∀ {Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ K o″} → seek (inBody k o c) b ≡ just (found (Γ′ , A′ , c′ , s′) m κ , K , o″)
+              → K ⊑ (shift h₀)
+              → closed c′ ≡ false → ∀ P → OfAt s′ m P → Tight (rows (Hot (rows (env c) o) k ∷ᴬ env c) b) P K o″
+              → After P (rows (env c) o)
+conn-body-src c k o b es g xe bσ ye Ksh cl P oa tg {q} x =
+  apart-before _ (⊑-trans (tight-⊑ tg) Ksh) (from bσ x) (body-apart c k o b es g ye cl P oa x)
 
 ------------------------------------------------------------------------
 -- The body, under a cap no later
