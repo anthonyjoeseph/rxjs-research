@@ -29,8 +29,8 @@ open import denotation.Events using (Pos; ix; inside; _≟ᵖ_)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Silent; hush; held; EmissionSet; _≺_; _≼_; Work; Den; enter; After; Truncate; module Joiner;
   module Switch; module Exhaust)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺→≼; ≼-antisym; ≼-or-≻; ≺-≼-≺; ≼-≺-≺)
-open import denotation.Laws.Worlds using (Plain; plain-ix; W; W⁼; step; here; inW; Real; Ok; InvAt; InvD; _⊑_; real-snoc;
-  ok-in; nest-in; nest⁼; apart-w; leads; w-up; not-up; conv; ⊑-refl; ⊑-snoc; ⊑-snoc⁺; ⊑-inside; inside-⊑; flat-under; ext≢; out-inj)
+open import denotation.Laws.Worlds using (Plain; plain-ix; W; W⁼; step; here; inW; Real; Ok; InvAt; InvD; _⊑_; real-snoc; ok-in; nest-in; nest⁼; apart-w; leads; w-up; not-up; conv; ⊑-refl; ⊑-snoc; ⊑-snoc⁺; ⊑-inside; inside-⊑; flat-under; ext≢)
+open import denotation.Laws.Worlds.Leaves using (out-inj)
 
 out≢skip : ∀ {A} {a : A} → out a ≡ skip → ⊥
 out≢skip ()

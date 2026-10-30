@@ -55,8 +55,8 @@ open import denotation.Laws.Modulus
 open import denotation.Laws.Count
   using (Cnt; DCnt; AgC; agc; ag-cnt; dcnt-pin; dcnt-pin-up; dcnt-cnt; pinned-after; trunc-ag; cnt-up; cnt-down; Img; em; seen; seen-under; _≈ᶜ⟨_∣_⟩_; ≈ᶜ-refl; ≈ᶜ-sym; ≈ᶜ-trans; ≈ᶜ-mono; agree-all; limit; Aft; contract; unfold₀)
 open import denotation.Laws.Join using (over; flatMap-causal; flatMap-ne)
-open import denotation.Laws.Worlds using (Ok; Lawful; InvAt; InvD; Hots; GoodEnv; world-after; ok-step; ⊑-≼; inside-⊑; inv-widen;
-  empty-inv; of-inv; spin-inv; map-inv; scan-inv; defer-inv; lim-inv)
+open import denotation.Laws.Worlds using (Ok; Lawful; InvAt; InvD; Hots; GoodEnv; world-after; ok-step; ⊑-≼; inside-⊑; inv-widen)
+open import denotation.Laws.Worlds.Leaves using (empty-inv; of-inv; spin-inv; map-inv; scan-inv; defer-inv; lim-inv)
 open import denotation.Laws.Connect using (connect-inv)
 open import denotation.Laws.TakeInv using (takeWhile-inv)
 open import denotation.Laws.HotInv using (lawful-hot)

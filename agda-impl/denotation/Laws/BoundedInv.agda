@@ -38,8 +38,8 @@ open import denotation.Events using (Pos; ix; inside; _≟ᵖ_)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Silent; hush; EmissionSet; _≺_; _≼_; Work; Den; enter; After; Truncate; module Values;
   module Bounded)
 open import denotation.Laws.Modulus using (≺-trans; ≼-antisym; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext)
-open import denotation.Laws.Worlds using (Plain; plain-ix; W; W⁼; step; here; inW; Real; Ok; InvAt; InvD; _⊑_; real-snoc; ok-in; nest;
-  nest⁼; nest-in; leads; w-up; not-up; sib; same-lead; flat-under; conv; ⊑-refl; ⊑-snoc; ⊑-snoc⁺; ⊑-inside; inside-⊑; ext≢; out-inj)
+open import denotation.Laws.Worlds using (Plain; plain-ix; W; W⁼; step; here; inW; Real; Ok; InvAt; InvD; _⊑_; real-snoc; ok-in; nest; nest⁼; nest-in; leads; w-up; not-up; sib; same-lead; flat-under; conv; ⊑-refl; ⊑-snoc; ⊑-snoc⁺; ⊑-inside; inside-⊑; ext≢)
+open import denotation.Laws.Worlds.Leaves using (out-inj)
 open import denotation.Laws.JoinInv using (ix01; ix10; below; module Kids; module Join)
 open import denotation.Laws.Nth using (module Nths)
 
