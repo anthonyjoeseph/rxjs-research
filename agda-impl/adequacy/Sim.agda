@@ -24,7 +24,8 @@ open import Data.List using (_ʳ++_)
 
 open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Timeline; root; ix; timelineAt; emit; stall; close)
-open import denotation.EmissionSet using (DenEnv; EmissionSet; out; end; MapT; map-out; map-skip; map-pin; map-end; module Scan; module TakeWhile; _≼_; enter; ⟦_⟧; Proper)
+open import denotation.EmissionSet using (EmissionSet; out; end; MapT; map-out; map-skip; map-pin; map-end; module Scan;
+  module TakeWhile; _≼_; enter; ⟦_⟧; Proper)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd)
 open import denotation.Laws.Worlds using (GoodEnv; Lawful)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
@@ -36,17 +37,16 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
-open import adequacy.Rows using (env; rows; Closed; here; RT; toEv; Visible; Vis; Past; Plus; old; new; _≃_; _⇄_; silent; shown; Steps;
-  Shows*; Shows*-≃; ≃-sym; conv; []; _∷_; tau; val; fin)
+open import adequacy.Rows using (env; rows; Closed; RT; toEv; Visible; Vis; Past; Plus; old; new; _≃_; _⇄_; silent; shown;
+  Steps; Shows*; Shows*-≃; ≃-sym; conv; []; _∷_; tau; val; fin)
 open import adequacy.Bound using (Good; G; Rooted; mergeG₀)
 open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
 open import adequacy.Skip using (After)
 open import adequacy.Inv using (Inv; inv; good; Sim; Ends; open-alive)
-open import adequacy.Owes using (srcO-≃)
 open import adequacy.LaneCp using (rise-lane-cp)
 open import adequacy.AbsOf using (abs-of)
 open import denotation.Read using (Meets)
-open import adequacy.Owes using (Swap; good-swap)
+open import adequacy.Swap using (Swap; good-swap)
 open import adequacy.Enter using (enter-map; enter-scan; enter-merge; flat-∅; enter-bounded; enter-switch; enter-exhaust; bounded-∅; switch-∅; exhaust-∅)
 
 postulate
@@ -78,14 +78,14 @@ postulate
 
 -- A map entered: its source pending under it.
 sub-map : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → B) s q p → Sim ⟨ c , pend (map f s) q , subscribing , p ⟩ [] ⟨ inMap f c , pend s q , subscribing , q ⟩
-sub-map c f s q p (inv g (uc , _ , ok , so)) = inv (good-swap c sw g) (uc , tt , ok , srcO-≃ c (enter-map (env c) f s q) so) , silent (vis-≃ (up-≃ c (enter-map (env c) f s q)))
+sub-map c f s q p (inv g (uc , ok)) = inv (good-swap c sw g) (uc , ok) , silent (vis-≃ (up-≃ c (enter-map (env c) f s q)))
   where
     sw : Swap (env c) doneS (mapS f doneS)
     sw = record { same = (λ ()) ⇄ (λ { (map-out ()) ; (map-skip ()) ; (map-pin ()) ; (map-end ()) }) ; live≡ = refl ; node = λ _ x → x ; lane = λ _ () ; body = λ _ _ () ; held = λ () }
 
 -- A scan entered: its source pending under it.
 sub-scan : ∀ {R Γ A B} (c : Ctx R Γ B) (f : B → A → B) z s q p → Sim ⟨ c , pend (scan f z s) q , subscribing , p ⟩ [] ⟨ inScan f z c , pend s q , subscribing , q ⟩
-sub-scan c f z s q p (inv g (uc , _ , ok , so)) = inv (good-swap c sw g) (uc , tt , ok , srcO-≃ c (enter-scan (env c) f z s q) so) , silent (vis-≃ (up-≃ c (enter-scan (env c) f z s q)))
+sub-scan c f z s q p (inv g (uc , ok)) = inv (good-swap c sw g) (uc , ok) , silent (vis-≃ (up-≃ c (enter-scan (env c) f z s q)))
   where
     sw : Swap (env c) doneS (scanS f z doneS)
     sw = record { same = (λ ()) ⇄ (λ { (Scan.sval (Scan.acc₀ () _)) ; (Scan.sval (Scan.acc _ () _ _)) ; (Scan.sstep ()) ; (Scan.spin ()) ; (Scan.send ()) }) ; live≡ = refl ; node = λ _ x → x ; lane = λ _ () ; body = λ _ _ () ; held = λ () }
@@ -93,7 +93,7 @@ sub-scan c f z s q p (inv g (uc , _ , ok , so)) = inv (good-swap c sw g) (uc , t
 -- A take entered: its source pending under it, attached at `p`, unfailed.
 sub-take : ∀ {R Γ A} (c : Ctx R Γ A) i (w : A → Bool) s q p
          → Sim ⟨ c , pend (takeWhile i w s) q , subscribing , p ⟩ [] ⟨ inCut true (attAt q) (inTake i w free c) , pend s q , subscribing , q ⟩
-sub-take c i w s q p (inv g (uc , _ , ok , so)) = inv (good-swap c sw g) (uc , tt , ok , so) , silent ((λ x → x) ⇄ (λ x → x))
+sub-take c i w s q p (inv g (uc , ok)) = inv (good-swap c sw g) (uc , ok) , silent ((λ x → x) ⇄ (λ x → x))
   where
     sw : Swap (env c) doneS (takeS i w free (cutS true (attAt q) doneS))
     sw = record { same = (λ ()) ⇄ (λ { (TakeWhile.pass () _ _ , _) ; (TakeWhile.fail () _ _ _ , _) ; (TakeWhile.stop () _ _ , _)
@@ -103,7 +103,7 @@ sub-take c i w s q p (inv g (uc , _ , ok , so)) = inv (good-swap c sw g) (uc , t
 -- A merge entered: its outer pending under it, attached at `p`, nothing begun.
 sub-merge : ∀ {R Γ A B} (c : Ctx R Γ B) f (s : Obs Timeline Γ A) q p
           → Sim ⟨ c , pend (flatMap (mergeᶠ nothing) f s) q , subscribing , p ⟩ [] ⟨ inCut true (attAt q) (inOuter (mergeᶠ nothing) f false 0 [] [] c) , pend s q , subscribing , q ⟩
-sub-merge {A = A} {B} c f s q p (inv g (uc , _ , ok , so)) = inv (good-swap c sw g) ((tt , uc) , tt , ok , srcO-≃ c (enter-merge (env c) f s q) so) , silent (vis-≃ (up-≃ c (enter-merge (env c) f s q)))
+sub-merge {A = A} {B} c f s q p (inv g (uc , ok)) = inv (good-swap c sw g) (uc , ok) , silent (vis-≃ (up-≃ c (enter-merge (env c) f s q)))
   where
     -- The outer about to enter at `p`: inside its own entry, nothing begun.
     rt : Rooted (env c) (rows (env c) (cutS true (attAt q) doneS)) []
@@ -112,12 +112,12 @@ sub-merge {A = A} {B} c f s q p (inv g (uc , _ , ok , so)) = inv (good-swap c sw
     node′ true  _ = record { outer = tt₁ ; lanesG = tt₁ ; fresh = refl ; count = refl ; spent = λ () ; rooted = rt }
     node′ false _ = mergeG₀ tt₁ tt₁ refl
     sw : Swap (env c) doneS (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt q) doneS) [])
-    sw = record { same = ≃-sym (flat-∅ _ false) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () ; held = λ () }
+    sw = record { same = ≃-sym (flat-∅ _ false 0) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () ; held = λ () }
 
 -- A BOUNDED MERGE ENTERED: its outer pending under it, nothing begun or queued.
 sub-bounded : ∀ {R Γ A B} (c : Ctx R Γ B) m (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) q p
           → Sim ⟨ c , pend (flatMap (mergeᶠ (just m)) f s) q , subscribing , p ⟩ [] ⟨ inCut true (attAt q) (inOuter (mergeᶠ (just m)) f false 0 [] [] c) , pend s q , subscribing , q ⟩
-sub-bounded {A = A} {B} c m f s q p (inv g (uc , _ , ok , so)) = inv (good-swap c sw g) ((tt , uc) , tt , ok , srcO-≃ c (enter-bounded (env c) m f s q) so) , silent (vis-≃ (up-≃ c (enter-bounded (env c) m f s q)))
+sub-bounded {A = A} {B} c m f s q p (inv g (uc , ok)) = inv (good-swap c sw g) (uc , ok) , silent (vis-≃ (up-≃ c (enter-bounded (env c) m f s q)))
   where
     rt : Rooted (env c) (rows (env c) (cutS true (attAt q) doneS)) []
     rt = record { o₀ = s ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c g) q ok ; sub = λ () ; qs = [] ; roots = tt }
@@ -130,7 +130,7 @@ sub-bounded {A = A} {B} c m f s q p (inv g (uc , _ , ok , so)) = inv (good-swap 
 -- A SWITCH ENTERED: its outer pending under it, nothing begun.
 sub-switch : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) q p
           → Sim ⟨ c , pend (flatMap switchᶠ f s) q , subscribing , p ⟩ [] ⟨ inCut true (attAt q) (inOuter switchᶠ f false 0 [] [] c) , pend s q , subscribing , q ⟩
-sub-switch {A = A} {B} c f s q p (inv g (uc , _ , ok , so)) = inv (good-swap c sw g) ((tt , uc) , tt , ok , srcO-≃ c (enter-switch (env c) f s q) so) , silent (vis-≃ (up-≃ c (enter-switch (env c) f s q)))
+sub-switch {A = A} {B} c f s q p (inv g (uc , ok)) = inv (good-swap c sw g) (uc , ok) , silent (vis-≃ (up-≃ c (enter-switch (env c) f s q)))
   where
     rt : Rooted (env c) (rows (env c) (cutS true (attAt q) doneS)) []
     rt = record { o₀ = s ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c g) q ok ; sub = λ () ; qs = [] ; roots = tt }
@@ -143,7 +143,7 @@ sub-switch {A = A} {B} c f s q p (inv g (uc , _ , ok , so)) = inv (good-swap c s
 -- AN EXHAUST ENTERED: its outer pending under it, nothing begun.
 sub-exhaust : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) q p
           → Sim ⟨ c , pend (flatMap exhaustᶠ f s) q , subscribing , p ⟩ [] ⟨ inCut true (attAt q) (inOuter exhaustᶠ f false 0 [] [] c) , pend s q , subscribing , q ⟩
-sub-exhaust {A = A} {B} c f s q p (inv g (uc , _ , ok , so)) = inv (good-swap c sw g) ((tt , uc) , tt , ok , srcO-≃ c (enter-exhaust (env c) f s q) so) , silent (vis-≃ (up-≃ c (enter-exhaust (env c) f s q)))
+sub-exhaust {A = A} {B} c f s q p (inv g (uc , ok)) = inv (good-swap c sw g) (uc , ok) , silent (vis-≃ (up-≃ c (enter-exhaust (env c) f s q)))
   where
     rt : Rooted (env c) (rows (env c) (cutS true (attAt q) doneS)) []
     rt = record { o₀ = s ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c g) q ok ; sub = λ () ; qs = [] ; roots = tt }
@@ -203,8 +203,8 @@ sub-sim c (joinS j g x ib)  p _ refl = stay
 -- At the root: the event shown, the least row, and dropped.
 rise-top : ∀ {R} (s : St [] R) e p → Sim ⟨ top , s , rising e , p ⟩ [ (p , e) ] ⟨ top , s , absorbed , p ⟩
 rise-top s e p i with alive s in al
-rise-top s e p (inv g (_ , _ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
-rise-top s e p (inv g (_ , _ , os , _ , ld , _)) | true = inv g os , shown (new , vis e) least (to′ ⇄ from′)
+rise-top s e p (inv g (_ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
+rise-top s e p (inv g (_ , _ , _ , ld , _)) | true = inv g tt , shown (new , vis e) least (to′ ⇄ from′)
   where
     vis : ∀ e → Visible (toEv e)
     vis (nx _) = tt
@@ -261,28 +261,24 @@ map-plus f t p cp = to′ ⇄ from′
     from′ (old (map-end r))  = map-end (old r)
     from′ new                = map-end new
 
--- A live node's rising row: its rows and the event.
-risen : ∀ {Γ A} (ρ : DenEnv Γ) (s : St Γ A) e p → alive s ≡ true → here ρ s (rising e) p ≃ Plus (rows ρ s) p (toEv e)
-risen ρ s e p al with alive s
-risen ρ s e p refl | true = ≃-refl
 
 rise-map : ∀ {R Γ A B} (f : A → B) (c : Ctx R Γ B) s e p → Sim ⟨ inMap f c , s , rising e , p ⟩ [] ⟨ c , mapS f s , rising (mapEv f e) , p ⟩
 rise-map f c s e p i with alive s in al
-rise-map f c s e p (inv g (_ , _ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
-rise-map f c s e p (inv g (uc , lc , os , _ , af , en , so)) | true =
-  inv g (uc , lc , os , tt , after-map f {p = p} af , ends-map f e en , srcO-≃ c (map-plus f (rows (env c) s) p e) (srcO-≃ (inMap f c) (risen (env c) s e p al) so)) , silent (vis-≃ (up-≃ c (map-plus f (rows (env c) s) p e)))
+rise-map f c s e p (inv g (_ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
+rise-map f c s e p (inv g (uc , lc , _ , af , en)) | true =
+  inv g (uc , lc , tt , after-map f {p = p} af , ends-map f e en) , silent (vis-≃ (up-≃ c (map-plus f (rows (env c) s) p e)))
 
 rise-cut : ∀ {R Γ A} l a (c : Ctx R Γ A) s e p → Sim ⟨ inCut l a c , s , rising e , p ⟩ [] ⟨ c , cutS l a s , (if l then rising e else absorbed) , p ⟩
 rise-cut false a c s e p (inv g (() , _))
 rise-cut true  a c s e p i with alive s in al
-rise-cut true  a c s e p (inv g (_ , _ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
-rise-cut true  a c s e p (inv g (uc , lc , os , _ , af , en , so)) | true = inv g (uc , lc , os , tt , af , en , srcO-≃ c (risen (env c) s e p al) so) , silent ≃-refl
+rise-cut true  a c s e p (inv g (_ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
+rise-cut true  a c s e p (inv g (uc , lc , _ , af , en)) | true = inv g (uc , lc , tt , af , en) , silent ≃-refl
 
 rise-ln : ∀ {R Γ A} b (c : Ctx R Γ A) s e p → Sim ⟨ inLn b c , s , rising e , p ⟩ [] ⟨ c , lnS b s , rising e , p ⟩
 rise-ln false c s e p (inv g (() , _))
 rise-ln true  c s e p i with alive s in al
-rise-ln true  c s e p (inv g (_ , _ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
-rise-ln true  c s e p (inv g (uc , lc , os , _ , af , en , so)) | true = inv g (uc , lc , os , tt , af , en , srcO-≃ c (risen (env c) s e p al) so) , silent ≃-refl
+rise-ln true  c s e p (inv g (_ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
+rise-ln true  c s e p (inv g (uc , lc , _ , af , en)) | true = inv g (uc , lc , tt , af , en) , silent ≃-refl
 
 -- A SCAN'S VALUE FOLDED: the source's least value leaves as the fold of
 -- it, and the rest of the source's rows fold from there.
@@ -600,10 +596,6 @@ module _ {R : Set} where
 ------------------------------------------------------------------------
 -- The run
 
--- Whatever a run from `k` shows, a reader of its rows is shown.
-Runs : ∀ {R} → Conf R → Set₁
-Runs k = ∀ {rs} → Steps k rs → Shows* (RT k) (conv rs)
-
 join-mv : ∀ {R Γ A} (c : Ctx R Γ A) (x : A ∈ Γ) q {p} → Mv (stepᴹ ⟨ c , pend (connected x) q , subscribing , p ⟩)
 join-mv c x q with closedUp c x
 ... | true  = tt
@@ -674,7 +666,8 @@ reach ⟨ c , connS k o b , subscribing , p ⟩           i = within tt (sub-sim
 reach ⟨ c , joinS j g x ib , subscribing , p ⟩        i = within tt (sub-sim c (joinS j g x ib) p tt)
 reach ⟨ c , s , absorbed , p ⟩                        i = linked (abs-link c s p i)
 
-sound-from : ∀ {R} {k : Conf R} → Inv k → Runs k
+-- Whatever a run from `k` shows, a reader of its rows is shown.
+sound-from : ∀ {R} {k : Conf R} → Inv k → ∀ {rs} → Steps k rs → Shows* (RT k) (conv rs)
 sound-from {k = k} i st with reach k i
 ... | driven h sim  = go st
   where
@@ -715,4 +708,4 @@ postulate
 -- THE SOUND HALF: what the engine shows, a subscriber to the program's
 -- rows is shown.
 sound : ∀ {R} {o : PureObs [] R} {rs} → Steps (load o) rs → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs)
-sound {o = o} st = met-of-shown {o = o} (sound-from (inv tt₁ (tt , tt , (tt , λ ()) , tt)) st)
+sound {o = o} st = met-of-shown {o = o} (sound-from (inv tt₁ (tt , (tt , λ ()))) st)

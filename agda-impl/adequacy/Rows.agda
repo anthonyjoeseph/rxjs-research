@@ -64,19 +64,6 @@ record _≃_ {A : Set} (t u : EmissionSet A) : Set where
     from : ∀ {q e} → u q e → t q e
 open _≃_
 
--- A lane or an outer ended by `c`: every row it still owes, by `c`.
--- Exact only where every lane ends, as in the fragment: a lane that
--- never ends owes nothing and reads gone.
---
--- DEAD ROUTE: a lane finished as `Ended` in its rows, or as its node's
---   live-lane count: while a lane's end rises to its merge, the lane is
---   still in the list, owes nothing and holds no end, so the merge's bare
---   rows skip an end the denotation has.  Rows cannot tell an end in
---   flight from a lane that never ends; the hole's state can, and `up`
---   does not see it.
-Gone : ∀ {X} → EmissionSet X → Pos → Set
-Gone t c = ∀ {k e} → t k e → k ≼ c
-
 -- Rows of any lane of a list.
 Lanes : ∀ {B} → List (EmissionSet B) → EmissionSet B
 Lanes []       k e = ⊥
@@ -86,25 +73,6 @@ Lanes (t ∷ Ls) k e = t k e ⊎ Lanes Ls k e
 Each : ∀ {B} → (EmissionSet B → Set) → List (EmissionSet B) → Set
 Each P []       = ⊤
 Each P (t ∷ Ls) = P t × Each P Ls
-
--- A MERGE PART WAY THROUGH: `Merge`'s joiner at what is left of its outer,
--- `O`, done already where `d`, with the lanes it has begun, `Ls`.
--- `At L`, as a record: Agda reads `L` back off it, which it cannot off
--- `At`'s product.
-record Lane {A B : Set} (L : A → Pos → EmissionSet B) (q : Pos) (a : A) (k : Pos) (e : Ev B) : Set where
-  constructor reads
-  field
-    lane : L a (q ++ [ ix 1 ]) k e
-    past : (q ++ [ ix 1 ]) ≺ k
-
---
--- What it owes is the joiner's rows with finitely many before, as entered
--- (`RowT`): a lane that never stops leaves every row past it unreached.
-module Flat {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (d : Bool) (Ls : List (EmissionSet B)) where
-  open Joining (Lane L) O (Lanes Ls) (λ c → (T d ⊎ Ended O c) × Each (λ t → Gone t c) Ls) (λ _ → ⊤) (λ _ _ → ⊥) (λ _ → ⊥) public
-
-  RowT : EmissionSet B
-  RowT = Truncate JoinT
 
 -- Lanes given by their ends: the k-th of their ends in position order,
 -- from 0, is where `P` holds, for `P` closed downward.
@@ -124,6 +92,36 @@ AllEnd P (suc k) ls = Kth P ls k
 EndsOf : ∀ {B} → List (EmissionSet B) → List (Pos → Set)
 EndsOf []       = []
 EndsOf (t ∷ Ls) = (λ c → t c end) ∷ EndsOf Ls
+
+-- A lane begun at a value at `q`, past where it subscribed.
+-- `At L`, as a record: Agda reads `L` back off it, which it cannot off
+-- `At`'s product.
+record Lane {A B : Set} (L : A → Pos → EmissionSet B) (q : Pos) (a : A) (k : Pos) (e : Ev B) : Set where
+  constructor reads
+  field
+    lane : L a (q ++ [ ix 1 ]) k e
+    past : (q ++ [ ix 1 ]) ≺ k
+
+-- A MERGE PART WAY THROUGH: `Merge`'s joiner at what is left of its outer,
+-- `O`, done already where `d`, with the lanes it has begun, `Ls`, `n` of
+-- them still running, over once each running one has ended (`AllEnd`).
+--
+-- What it owes is the joiner's rows with finitely many before, as entered
+-- (`RowT`): a lane that never stops leaves every row past it unreached.
+--
+-- `Over` is a record so that Agda reads `n` back off it, which it cannot
+-- off `AllEnd`.
+module Flat {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (d : Bool) (n : ℕ) (Ls : List (EmissionSet B)) where
+  record Over (c : Pos) : Set where
+    constructor over-at
+    field
+      o-over : T d ⊎ Ended O c
+      l-over : AllEnd (_≼ c) n (EndsOf Ls)
+
+  open Joining (Lane L) O (Lanes Ls) Over (λ _ → ⊤) (λ _ _ → ⊥) (λ _ → ⊥) public
+
+  RowT : EmissionSet B
+  RowT = Truncate JoinT
 
 -- A lane begun at `s`, past its subscription.
 record From {A B : Set} (L : A → Pos → EmissionSet B) (a : A) (s k : Pos) (e : Ev B) : Set where
@@ -322,7 +320,7 @@ mutual
   rows ρ (takeS i q w s)                        = TakeR i q w (rows ρ s)
   rows ρ (cutS true a s)                        = rows ρ s
   rows ρ (lnS true s)                           = rows ρ s
-  rows ρ (flatS (mergeᶠ nothing) f d n q o ls)  = Flat.RowT (λ a → pendRows ρ (f a)) (rows ρ o) d (rowsL ρ ls)
+  rows ρ (flatS (mergeᶠ nothing) f d n q o ls)  = Flat.RowT (λ a → pendRows ρ (f a)) (rows ρ o) d n (rowsL ρ ls)
   rows ρ (flatS (mergeᶠ (just m)) f d n q o ls) = BoundedF.RowT m (λ a → pendRows ρ (f a)) (rows ρ o) d n q (rowsL ρ ls)
   rows ρ (flatS switchᶠ f d n q o ls)           = SwitchF.RowT (λ a → pendRows ρ (f a)) (rows ρ o) d n (rowsL ρ ls)
   rows ρ (flatS exhaustᶠ f d n q o ls)          = ExhaustF.RowT (λ a → pendRows ρ (f a)) (rows ρ o) d n (rowsL ρ ls)
@@ -358,11 +356,11 @@ up (inCut false a c)                                  H = up c ∅
 up (inLn true c)                                      H = up c H
 up (inLn false c)                                     H = up c ∅
 up (inTake i q w c)                                   H = up c (TakeR i q w H)
-up (inOuter (mergeᶠ nothing) f d n q ls c)            H = up c (Flat.RowT (λ a → pendRows (env c) (f a)) H d (rowsL (env c) ls))
+up (inOuter (mergeᶠ nothing) f d n q ls c)            H = up c (Flat.RowT (λ a → pendRows (env c) (f a)) H d n (rowsL (env c) ls))
 up (inOuter (mergeᶠ (just m)) f d n q ls c)           H = up c (BoundedF.RowT m (λ a → pendRows (env c) (f a)) H d n q (rowsL (env c) ls))
 up (inOuter switchᶠ f d n q ls c)                     H = up c (SwitchF.RowT (λ a → pendRows (env c) (f a)) H d n (rowsL (env c) ls))
 up (inOuter exhaustᶠ f d n q ls c)                    H = up c (ExhaustF.RowT (λ a → pendRows (env c) (f a)) H d n (rowsL (env c) ls))
-up (inLanes (mergeᶠ nothing) f d n q o pre post c)    H = up c (Flat.RowT (λ a → pendRows (env c) (f a)) (rows (env c) o) d (rowsL (env c) pre ʳ++ (H ∷ rowsL (env c) post)))
+up (inLanes (mergeᶠ nothing) f d n q o pre post c)    H = up c (Flat.RowT (λ a → pendRows (env c) (f a)) (rows (env c) o) d n (rowsL (env c) pre ʳ++ (H ∷ rowsL (env c) post)))
 up (inLanes (mergeᶠ (just m)) f d n q o pre post c)   H = up c (BoundedF.RowT m (λ a → pendRows (env c) (f a)) (rows (env c) o) d n q (rowsL (env c) pre ʳ++ (H ∷ rowsL (env c) post)))
 up (inLanes switchᶠ f d n q o pre post c)             H = up c (SwitchF.RowT (λ a → pendRows (env c) (f a)) (rows (env c) o) d n (rowsL (env c) pre ʳ++ (H ∷ rowsL (env c) post)))
 up (inLanes exhaustᶠ f d n q o pre post c)            H = up c (ExhaustF.RowT (λ a → pendRows (env c) (f a)) (rows (env c) o) d n (rowsL (env c) pre ʳ++ (H ∷ rowsL (env c) post)))

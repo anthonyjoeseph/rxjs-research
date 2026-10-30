@@ -13,7 +13,7 @@ open import Function.Bundles using (Equivalence)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; pred; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; pred; _≡ᵇ_)
 open import Data.Nat.Properties using (≡ᵇ⇒≡)
 open import Data.List.Properties using (++-identityʳ; ∷ʳ-injectiveˡ)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -37,7 +37,7 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; CS; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed;
                     free; cpAt; cutAt; overAt; inScan; inTake; inSrc; inBody;
                     ofS; doneS; mapS; cutS; lnS; flatS; coldS; scanS; takeS; connS; joinS; inMap; inCut; inLn; inOuter; inLanes; nx; cp; attached; attAt; attM; pend) renaming (Ev to Evᴹ; over to overᶜ)
-open import adequacy.Rows using (acc-val; rows; rowsL; pendRows; toEv; Gone; Lanes; Each; reads; module Flat; ∅; Hot; Inbox; _∪_)
+open import adequacy.Rows using (acc-val; rows; rowsL; pendRows; toEv; Lanes; Each; Kth; AllEnd; EndsOf; reads; module Flat; ∅; Hot; Inbox; _∪_)
 
 ------------------------------------------------------------------------
 -- Keys
@@ -262,21 +262,19 @@ module _ {B : Set} where
   from-empty []       _        = _
   from-empty (_ ∷ Ls) (n , ns) = (λ r → ⊥-elim (n r)) , from-empty Ls ns
 
-  gone-empty : ∀ {c} (Ls : List (EmissionSet B)) → Each Empty Ls → Each (λ t → Gone t c) Ls
-  gone-empty         []       _        = _
-  gone-empty {c = c} (_ ∷ Ls) (n , ns) = (λ r → ⊥-elim (n r)) , gone-empty {c = c} Ls ns
+  -- A lane's end at `q`: some lane ends by `q`.
+  lanes-kth : ∀ (Ls : List (EmissionSet B)) {q} → Lanes Ls q end → Kth (_≼ q) (EndsOf Ls) 0
+  lanes-kth (_ ∷ _)  {q} (inj₁ r) = inj₁ (q , r , ≼-refl {q})
+  lanes-kth (_ ∷ Ls)     (inj₂ x) = inj₂ (lanes-kth Ls x)
+
+  -- At most one lane running: a lane's end ends every running lane.
+  one-end : ∀ n (Ls : List (EmissionSet B)) → pred n ≡ 0 → ∀ {q} → Lanes Ls q end → AllEnd (_≼ q) n (EndsOf Ls)
+  one-end zero          Ls _  _ = tt
+  one-end (suc zero)    Ls _  x = lanes-kth Ls x
+  one-end (suc (suc n)) Ls () _
 
 ------------------------------------------------------------------------
 -- The node facts the race reads
-
-record Counts {A B : Set} (O : EmissionSet A) (Ls : List (EmissionSet B)) (d : Bool) (n : ℕ) : Set where
-  field
-    -- No lane running: every lane begun has ended.
-    none : n ≡ 0 → Each Empty Ls
-    -- At most one running: a lane's end ends every lane.
-    one  : pred n ≡ 0 → ∀ {q} → Lanes Ls q end → Each (λ t → Gone t q) Ls
-    -- The outer done: it owes nothing.
-    over : T d → Empty O
 
 -- The lanes still in their list.
 live : ∀ {Γ A} → List (St Γ A) → ℕ
@@ -549,16 +547,6 @@ dead-empty (s ∷ ls) (gs , gl) z with lane-v s gs
 dead-empty (_ ∷ ls) (gs , gl) () | on _ _ _ _
 dead-empty (_ ∷ ls) (gs , gl) z  | off _ _ =(λ ()) , dead-empty ls gl z
 
--- One lane at most in the list: its end ends them all.
-one-gone : ∀ {Γ A} {ρ : DenEnv Γ} (ls : List (St Γ A)) → GoodL ρ ls → pred (live ls) ≡ 0 → ∀ {q} → Lanes (rowsL ρ ls) q end → Each (λ t → Gone t q) (rowsL ρ ls)
-one-gone (s ∷ ls) (gs , gl) z x with lane-v s gs
-one-gone (_ ∷ ls) (gs , gl) z {q} (inj₁ r) | on _ _ _ e = (λ r′ → e r r′) , gone-empty {c = q} (rowsL _ ls) (dead-empty ls gl z)
-one-gone (_ ∷ ls) (gs , gl) z (inj₂ x) | on _ _ _ e = ⊥-elim (empty-any (rowsL _ ls) (dead-empty ls gl z) x)
-one-gone (_ ∷ ls) (gs , gl) z (inj₁ ()) | off _ _
-one-gone (_ ∷ ls) (gs , gl) z (inj₂ x) | off _ _ =(λ ()) , one-gone ls gl z x
-
-counts : ∀ {Γ A B} {ρ : DenEnv Γ} {O : EmissionSet A} (ls : List (St Γ B)) {d n} → GoodL ρ ls → n ≡ live ls → (T d → Empty O) → Counts O (rowsL ρ ls) d n
-counts ls gl refl ov = record { none = dead-empty ls gl ; one = one-gone ls gl ; over = ov }
 
 ------------------------------------------------------------------------
 -- An of
@@ -668,9 +656,8 @@ lanes-first {Ls = Ls} (just (g , K , o)) (just (g′ , K′ , o′)) bx (fy , my
 -- The race
 
 module Race {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (Ls : List (EmissionSet B)) (d : Bool) (n : ℕ)
-            (sO : Single O) (cn : Counts O Ls d n) where
-  open Flat L O d Ls
-  open Counts cn
+            (sO : Single O) (over : T d → Empty O) where
+  open Flat L O d n Ls
 
   -- Every row of the merge sits no earlier than some row of a part:
   -- `K` bounding the outer's and the lanes', it bounds the merge's.
@@ -717,11 +704,11 @@ module Race {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (L
 
   -- The outer's end at `q₀` with no lane running ends the merge.
   outer-done : ∀ {q₀} → O q₀ end → From (at q₀) O → n ≡ 0 → Done q₀
-  outer-done {q₀} r fo nz = (inj₂ (q₀ , r , ≼-refl {q₀}) , gone-empty {c = q₀} Ls (none nz)) , (λ v _ lt _ → ⊥-elim (⊑→≼ (fo v) lt))
+  outer-done {q₀} r fo refl = over-at (inj₂ (q₀ , r , ≼-refl {q₀})) tt , (λ v _ lt _ → ⊥-elim (⊑→≼ (fo v) lt))
 
   -- A lane's end at `q`, the outer done and no other lane running, ends it.
   lane-done : ∀ {q} → Lanes Ls q end → T d → pred n ≡ 0 → Done q
-  lane-done x td pn = (inj₁ td , one pn x) , (λ v _ _ _ → ⊥-elim (over td v))
+  lane-done x td pn = over-at (inj₁ td) (one-end n Ls pn x) , (λ v _ _ _ → ⊥-elim (over td v))
 
   empty-flat : Empty O → Each Empty Ls → Empty JoinT
   empty-flat eo el (val r)       = eo r
@@ -850,9 +837,9 @@ mutual
 
   -- The joiner before it is entered.
   join-ok : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) (f : A → Obs Timeline [] B) d n (o : St [] A) ls → Good ρ (flatS (mergeᶠ nothing) f d n [] o ls)
-          → OK (Flat.JoinT (λ a → pendRows ρ (f a)) (rows ρ o) d (rowsL ρ ls)) (raceT d n [] (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls))
+          → OK (Flat.JoinT (λ a → pendRows ρ (f a)) (rows ρ o) d n (rowsL ρ ls)) (raceT d n [] (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls))
   join-ok {ρ = ρ} c f d n o ls m =
-    Race.race-ok (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) (counts ls lanesG count spent)
+    Race.race-ok (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) spent
       (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)
       (seek-ok (inOuter (mergeᶠ nothing) f d n [] ls c) o outer) (lanes-ok c f d n o [] ls lanesG)
     where open MergeG m
