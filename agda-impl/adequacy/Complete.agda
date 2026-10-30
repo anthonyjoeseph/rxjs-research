@@ -92,11 +92,15 @@ module _ {R : Set} (o : PureObs [] R) where
     -- what it has shown.
     along : ∀ {k₀ rs k} c → Path k₀ rs k → Inv k₀ → Vis (RT k₀) ≃ Vis (Beyond t c) → Inv k × Vis (RT k) ≃ Vis (Beyond t (cursor c (conv rs)))
     along c []          i r = i , r
-    along c (tau e pth) i r = let (i′ , q) = sim-tau i e in along c pth i′ (≃-trans (≃-sym q) r)
-    along c (val e pth) i r =
+    along {k₀} c (tau {k′ = k₁} e pth) i r =
+      let (i′ , q) = sim-tau i e
+      in along c pth i′ (≃-trans {t = Vis (RT k₁)} {u = Vis (RT k₀)} {v = Vis (Beyond t c)} (≃-sym q) r)
+    along {k₀} c (val {k′ = k₁} {p = p} e pth) i r =
       let (i′ , (v , _) , q) = sim-val i e
           cq = proj₂ (into c (proj₁ (to r v)))
-      in along (just _) pth i′ (≃-trans (≃-sym q) (≃-trans (past-≃ {p = _} r) (narrow c cq)))
+      in along (just p) pth i′
+           (≃-trans {t = Vis (RT k₁)} {u = Vis (Past p (RT k₀))} {v = Vis (Beyond t (just p))} (≃-sym q)
+             (≃-trans {u = Vis (Past p (Beyond t c))} (past-≃ {t = RT k₀} {u = Beyond t c} {p = p} r) (narrow {t = t} c cq)))
 
     -- The row met next past `c`.
     Owed : Maybe Pos → Pos → Ev R → Set
@@ -104,24 +108,24 @@ module _ {R : Set} (o : PureObs [] R) where
 
     -- The least visible row of a state, read as the program's past `c`,
     -- is the row met next.
-    same : ∀ {k c p e q e′} → Vis (RT k) ≃ Vis (Beyond t c) → Owed c p e → Lowest (RT k) q e′ → p ≡ q × e ≡ e′
-    same {c = c} r (((tp , _) , _) , vi , ap , lt) (v , lt′) =
+    same : ∀ {k} c {p e q e′} → Vis (RT k) ≃ Vis (Beyond t c) → Owed c p e → Lowest (RT k) q e′ → p ≡ q × e ≡ e′
+    same c r (((tp , _) , _) , vi , ap , lt) (v , lt′) =
       let (tq , cq) = into c (proj₁ (to r v))
           pq = ≼-antisym (lt tq (proj₂ v) cq) (lt′ (from r (back c tp ap , vi)))
       in pq , InvAt.func (inv-⟦⟧ o []ᴬ (λ ()) root (tt , λ ())) tp (subst (λ x → t x _) (sym pq) tq)
 
     -- From a state on the run, the row met next is the next shown.
-    next : ∀ {k c p e} → Inv k → Vis (RT k) ≃ Vis (Beyond t c) → Owed c p e → Acc _⇜_ k → Next k p e
-    next {k} {c} {p} {e} i r h@(((tp , _) , _) , vi , ap , _) (acc rec) = go (Driver.step R k) refl
+    next : ∀ {k} c {p e} → Inv k → Vis (RT k) ≃ Vis (Beyond t c) → Owed c p e → Acc _⇜_ k → Next k p e
+    next {k} c {p} {e} i r h@(((tp , _) , _) , vi , ap , _) (acc rec) = go (Driver.step R k) refl
       where
         go : ∀ x → Driver.step R k ≡ x → Next k p e
-        go (Driver.silent τ k′) eq with next (proj₁ (sim-tau i eq)) (≃-trans (≃-sym (proj₂ (sim-tau i eq))) r) h (rec (τ , eq))
+        go (Driver.silent τ k′) eq with next c (proj₁ (sim-tau i eq)) (≃-trans {t = Vis (RT k′)} {u = Vis (RT k)} {v = Vis (Beyond t c)} (≃-sym (proj₂ (sim-tau i eq))) r) h (rec (τ , eq))
         ... | more pth = more (tau eq pth)
         ... | done st  = done (tau eq st)
         go (Driver.value τ q a k′) eq =
-          let (pq , ee) = same r h (proj₁ (proj₂ (sim-val i eq))) in subst₂ (Next k) (sym pq) (sym ee) (more (val eq []))
+          let (pq , ee) = same c r h (proj₁ (proj₂ (sim-val i eq))) in subst₂ (Next k) (sym pq) (sym ee) (more (val eq []))
         go (Driver.complete q) eq =
-          let (pq , ee) = same r h (sim-fin i eq) in subst₂ (Next k) (sym pq) (sym ee) (done (fin eq))
+          let (pq , ee) = same c r h (sim-fin i eq) in subst₂ (Next k) (sym pq) (sym ee) (done (fin eq))
         go Driver.drained eq = ⊥-elim (drained-quiet i eq (from r (back c tp ap , vi)))
 
     -- The last row met.
@@ -131,8 +135,8 @@ module _ {R : Set} (o : PureObs [] R) where
 
     progress : ∀ {rs k p e} → Path (load o) rs k → Meets t (conv rs ++ [ (p , e) ]) → Next k p e
     progress {rs} pth m =
-      let (i , r) = along nothing pth (inv tt₁ (tt , (tt , λ ()))) ≃-refl
-      in next i r (last (conv rs) m) (silent-finite o pth m)
+      let (i , r) = along nothing pth (inv tt₁ (tt , (tt , λ ()))) (≃-refl {t = Vis (RT (load o))})
+      in next (cursor nothing (conv rs)) i r (last {c = nothing} (conv rs) m) (silent-finite o pth m)
 
     -- Shown what was met so far, a run shows what is met next.
     go : ∀ {rs₀ k} → Path (load o) rs₀ k → Run t nothing (conv rs₀) → ∀ rs → Run t (cursor nothing (conv rs₀)) rs
