@@ -22,7 +22,7 @@ search keys its rows up to a cap the binder leaves quiet (`OKᶜ`); open
 whether the lead carries the same cap. Settled by a body, or a connect
 whose body's joiner leads a row before its source's find.
 
-Members: `conn-lead`.
+Members: `conn-leadᶜ`.
 
 #### THE COLD STEPPED
 
@@ -58,7 +58,7 @@ and lanes starting past their start's end bound every `waits` row above
 the find. Settled by bodies over `Rows.BoundedF`'s `Starts`, or a queued
 merge whose race shows a row the cap leaves quiet.
 
-Members: `queued-race`, `bounded-wait-lead`.
+Members: `queued-race`, `bounded-wait-leadᶜ`.
 
 #### THE CONNECT STEPPED
 
@@ -118,7 +118,7 @@ Members: `rise-scan-nx`, `rise-scan-cp`.
 Untried: a take's search leads its rows; a value passing or failing,
 its end, its stop and its cut keep `Inv`. Settled when each is a body.
 
-Members: `take-lead`, `rise-take-nx`, `rise-take-fail`,
+Members: `take-leadᶜ`, `rise-take-nx`, `rise-take-fail`,
 `rise-take-cp`, `rise-take-owed`, `abs-stop`, `abs-cut`.
 
 #### THE SILENT RUN, FINITE
