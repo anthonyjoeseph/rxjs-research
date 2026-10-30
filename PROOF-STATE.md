@@ -171,15 +171,6 @@ body.
 
 Members: `sub-empty`, `sub-of`, `sub-defer`.
 
-#### THE JOINERS' ROWS RESPECTED
-
-Believed: a joiner part way through respects equal parts and a skip in
-its parts as a merge's rows do. Settled by bodies mirroring `Skip`'s
-`flat-≈` and `Up`'s `row-≃`.
-
-Members: `bounded-≃`, `switch-≃`, `exhaust-≃`, `since-bounded`,
-`since-switch`, `since-exhaust`, `bounded-≈`, `switch-≈`, `exhaust-≈`.
-
 #### THE KEYS
 
 Believed: keys order as positions do, strictly and transitively, and a
