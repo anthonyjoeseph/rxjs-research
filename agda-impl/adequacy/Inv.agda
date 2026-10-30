@@ -43,15 +43,30 @@ Ends : ∀ {A} → Evᴹ A → EmissionSet A → Set
 Ends (nx _) t = ⊤
 Ends cp     t = Empty t
 
+-- A subscription owed is made where the binders in scope are hot.
+Subs : ∀ {Γ A} → DenEnv Γ → St Γ A → Set
+Subs ρ (pend o q) = Ok (Hots ρ) q
+Subs ρ _          = ⊤
+
 Lead : ∀ {R} → Conf R → Set
 Lead ⟨ c , s , rising e , p ⟩ = UpO c × LeadC c p × Owes (env c) s × Open s × After p (rows (env c) s) × Ends e (rows (env c) s)
-Lead ⟨ c , s , subscribing , p ⟩ = UpO c × Owes (env c) s × Ok (Hots (env c)) p
+Lead ⟨ c , s , subscribing , p ⟩ = UpO c × Owes (env c) s × Subs (env c) s
 Lead ⟨ c , s , absorbed , p ⟩    = Owes [] (plug c s)
+
+-- The tree the seeker reads: a subscription still owed owes it nothing.
+Seen : ∀ {Γ A} → St Γ A → St Γ A
+Seen (pend o q) = doneS
+Seen s          = s
+
+Settled : ∀ {R} → Conf R → St _ R
+Settled ⟨ c , s , subscribing , p ⟩ = plug c (Seen s)
+Settled ⟨ c , s , rising e , p ⟩    = plug c s
+Settled ⟨ c , s , absorbed , p ⟩    = plug c s
 
 record Inv {R} (k : Conf R) : Set₁ where
   constructor inv
   field
-    good : Good [] (plug (Conf.ctx k) (Conf.foc k))
+    good : Good [] (Settled k)
     lead : Lead k
 open Inv public
 
@@ -62,7 +77,7 @@ Sim k sh k′ = Inv k → Inv k′ × Moves (RT k) sh (RT k′)
 open-alive : ∀ {Γ A} (s : St Γ A) → Open s → alive s ≡ false → ⊥
 open-alive (lnS false _)       () _
 open-alive (lnS true _)        _ ()
-open-alive (pend _)            _ ()
+open-alive (pend _ _)            _ ()
 open-alive (coldS _ _)         _ ()
 open-alive (ofS _ _ _)         _ ()
 open-alive doneS               _ ()
@@ -128,7 +143,7 @@ unF (inBody k o c)     s g = inj₁ g
 
 lnbody-good : ∀ {Γ A} {ρ : DenEnv Γ} v b (s : St Γ A) → LnBody ρ v b s → G ρ v s
 lnbody-good v b (cutS l a s) (refl , g , _) = g
-lnbody-good v b (pend _)              ()
+lnbody-good v b (pend _ _)              ()
 lnbody-good v b (coldS _ _)           ()
 lnbody-good v b (ofS _ _ _)           ()
 lnbody-good v b doneS                 ()

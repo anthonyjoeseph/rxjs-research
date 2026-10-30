@@ -89,7 +89,7 @@ mutual
     race-lands d n q (seek (inOuter op f d n q ls c) o) (lanes c op f d n q o [] ls) (seek-lands (inOuter op f d n q ls c) o e) (lanes-lands c op f d n q o [] ls e)
   kids-lands c (connS k o b)           e =
     source-lands (over k) (seek (inSrc k b c) o) (seek (inBody k o c) b) (seek-lands (inSrc k b c) o e) (seek-lands (inBody k o c) b e)
-  kids-lands c (pend _)                e = tt₁
+  kids-lands c (pend _ _)                e = tt₁
   kids-lands c (coldS _ _)             e = tt₁
   kids-lands c (ofS _ _ _)             e = tt₁
   kids-lands c doneS                   e = tt₁
@@ -163,7 +163,7 @@ closed-up (inBody k o c)    () _
 
 lnbody-open : ∀ {Γ A} {ρ : DenEnv Γ} {v} (s : St Γ A) → LnBody ρ v false s → Open s → ⊥
 lnbody-open (cutS l a s) (refl , _) op = op
-lnbody-open (pend _)              () _
+lnbody-open (pend _ _)              () _
 lnbody-open (coldS _ _)           () _
 lnbody-open (ofS _ _ _)           () _
 lnbody-open doneS                 () _
