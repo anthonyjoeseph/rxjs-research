@@ -47,7 +47,7 @@ open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; 
 open import denotation.Laws.Modulus
   using (≺-trans; ≺-irrefl; ≺→≼; ≼-refl; ≼-false; ≺-≼-≺; ≼-≺-≺; ≼-or-≻; reach-via; entered-reach;
   AgreeTo; ⟨_⟩; Same; LimD; ticks)
-open import denotation.Laws.Worlds using (_⊑_; ⊑-refl; ⊑-trans; ⊑-≼; ⊑-cmp; conv; ⊑-inside; inside-⊑)
+open import denotation.Laws.Worlds using (_⊑_; ⊑-refl; ⊑-trans; ⊑-≼; ⊑-cmp; conv; ⊑-inside; inside-⊑; InvAt; Real; real-init; nonempty⁼; world-after⁼)
 
 ------------------------------------------------------------------------
 -- Counting
@@ -150,6 +150,28 @@ dcnt-cnt all (ks , le , h) = ks , le , λ x kq → h x kq all
 dcnt-pin : ∀ {A n} {t : EmissionSet A} {q r} → T (inside r q) → DCnt n t q (pin r) → Cnt n t r
 dcnt-pin {q = q} {r} i (ks , le , h) = ks , le , λ {k} x kr → cov-down (h x (≺-≼-≺ {k} {r} {q} kr rq) (λ _ → inj₁ kr)) kr rq
   where rq = ⊑-≼ (inside-⊑ r q i)
+
+-- A pin's wait read through images: what lies before its connect through
+-- an image there, its own pins where they lie.
+dcnt-pin-up : ∀ {A B n} {t : EmissionSet A} {u : EmissionSet B} {q r} → T (inside r q) → DCnt n t q (pin r)
+            → (∀ {k e} → u k e → k ≺ r → ¬ ¬ Img t r k) → (∀ {k} → u k (pin r) → k ≺ q → t k (pin r)) → DCnt n u q (pin r)
+dcnt-pin-up {n = n} {u = u} {q} {r} i d im sh = proj₁ d , proj₁ (proj₂ d) , go
+  where
+    c : Cnt n u r
+    c = cnt-up (dcnt-pin i d) im
+
+    go : ∀ {k e′} → u k e′ → k ≺ q → Dep q (pin r) k e′ → Cov q (proj₁ d) k
+    go x kq dp with dp i
+    ... | inj₁ kr   = cov-lift (proj₂ (proj₂ c) x kr) (inside-⊑ r q i)
+    ... | inj₂ refl = proj₂ (proj₂ d) (sh x kq) kq (λ _ → inj₂ refl)
+
+-- A pin's connect lies in its world, so at or past the subscription.
+pinned-after : ∀ {A H p} {X : EmissionSet A} → InvAt H p X → Real p → ∀ {y r} → X y (pin r) → p ≼ r
+pinned-after I rp {y} {r} x with InvAt.pinned I x
+... | w⁼ , i with inside-⊑ r y i
+...   | zs , refl with real-init r zs (InvAt.real I x)
+...     | inj₁ refl = ⊥-elim (nonempty⁼ (λ { refl → rp }) w⁼)
+...     | inj₂ rr   = world-after⁼ w⁼ rr
 
 -- WHAT A ROW WAITS ON WAITS ON WHAT IT WAITS ON: past a pin's connect
 -- and before the pin lies only its own burst.
