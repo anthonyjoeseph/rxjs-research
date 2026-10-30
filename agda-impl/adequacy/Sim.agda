@@ -25,7 +25,7 @@ open import Data.List using (_ʳ++_)
 open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Timeline; root; Pos; ix; timelineAt; emit; stall; close)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; MapT; map-out; map-skip; map-pin; map-end; module Scan;
-  module TakeWhile; _≼_; _≺_; enter; ⟦_⟧; Proper; Den; Silent; Dep)
+  module TakeWhile; module Connecting; _≼_; _≺_; enter; ⟦_⟧; Proper; Den; Silent; Dep)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≼-or-≻; entered-few)
 open import denotation.Laws.Worlds using (GoodEnv; Lawful; Hots; InvAt)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
@@ -41,7 +41,7 @@ open import adequacy.Rows using (env; rows; pendRows; Closed; RT; toEv; Vis; Pas
   Steps; Shows*; Shows*-≃; ≃-sym; conv; []; _∷_; tau; val; fin)
 open import adequacy.Bound using (Good; G; Rooted; mergeG₀)
 open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
-open import adequacy.Skip using (After)
+open import adequacy.Skip using (After; LeadC; after-conn)
 open import adequacy.Inv using (Inv; inv; good; Sim; Ends; open-alive)
 open import adequacy.LaneCp using (rise-lane-cp)
 open import adequacy.AbsOf using (abs-of)
@@ -262,6 +262,18 @@ map-plus f t p cp = to′ ⇄ from′
     from′ new                = map-end new
 
 
+postulate
+  -- A BODY VALUE PASSES THROUGH ITS CONNECT: the connect's rows before the
+  -- step are `ConnT r σ β`; at the source they are `ConnT r σ (Plus β p
+  -- (out v))`, so the bijection holds via `body new ↔ new` and identity on
+  -- source-echo rows.  `Alive` coerces via `old`/`old⁻¹`; the `new` arm
+  -- of Plus carries event `out v ≠ end`, so no end is added by Plus and
+  -- the coercion is a bijection.  Inversion of the `new` pattern requires
+  -- refuting `out v = end` at the position level; postulated as a leaf
+  -- until the inversion-depth issue is resolved.
+  conn-plus-nx : ∀ {A B} r (σ : EmissionSet A) (β : EmissionSet B) p (v : B)
+               → Connecting.ConnT r σ (Plus β p (out v)) ≃ Plus (Connecting.ConnT r σ β) p (out v)
+
 rise-map : ∀ {R Γ A B} (f : A → B) (c : Ctx R Γ B) s e p → Sim ⟨ inMap f c , s , rising e , p ⟩ [] ⟨ c , mapS f s , rising (mapEv f e) , p ⟩
 rise-map f c s e p i with alive s in al
 rise-map f c s e p (inv g (_ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
@@ -374,12 +386,29 @@ postulate
   -- A SOURCE'S END FEEDS ITS BODY AND CLOSES ITS CONNECT.
   rise-src-cp : ∀ {R Γ X B} (k : CS) (b : St (X ∷ Γ) B) (c : Ctx R Γ B) s p
               → Sim ⟨ inSrc k b c , s , rising cp , p ⟩ [] ⟨ c , connS (record k { closed = true ; endAt = p }) s (feed (hd refl) p cp b) , absorbed , p ⟩
-  -- A BODY'S VALUE IS ITS CONNECT'S.
-  rise-body-nx : ∀ {R Γ X B} (k : CS) (o : St Γ X) (c : Ctx R Γ B) s x p
-               → Sim ⟨ inBody k o c , s , rising (nx x) , p ⟩ [] ⟨ c , connS k o s , rising (nx x) , p ⟩
   -- A BODY'S END IS ITS CONNECT'S, ITS SOURCE OWED A TEARDOWN THERE.
+  -- DEAD ROUTE: the target Lead requires `Empty (ConnT r σ β)` from
+  -- `Ends cp`, but `Alive` in `ConnT r σ ∅` is vacuous (no body-end in
+  -- β), so source echoes appear — `Empty (ConnT r σ β)` fails when σ is
+  -- non-empty.  With `After p σ`, Alive DOES fail in `ConnT r σ (Plus β
+  -- p end)` (since `Plus β p end` witnesses a body end at p, blocking
+  -- source positions after p), so the source RT is correct, but the
+  -- target RT uses `Plus (ConnT r σ β) p end` with vacuous Alive.  A new
+  -- G invariant linking body-end to Empty σ is needed before this can
+  -- be proven.
   rise-body-cp : ∀ {R Γ X B} (k : CS) (o : St Γ X) (c : Ctx R Γ B) s p
                → Sim ⟨ inBody k o c , s , rising cp , p ⟩ [] ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
+
+-- A BODY'S VALUE IS ITS CONNECT'S: Good is inherited (the plugged tree is
+-- the same before and after), After p holds on ConnT by after-conn, and
+-- the row bijection is conn-plus-nx.
+rise-body-nx : ∀ {R Γ X B} (k : CS) (o : St Γ X) (c : Ctx R Γ B) s x p
+             → Sim ⟨ inBody k o c , s , rising (nx x) , p ⟩ [] ⟨ c , connS k o s , rising (nx x) , p ⟩
+rise-body-nx k o c s x p i with alive s in al
+rise-body-nx k o c s x p (inv g (_ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
+rise-body-nx k o c s x p (inv g (uc , (afs , lc) , _ , af , _)) | true =
+  inv g (uc , lc , tt , after-conn (CS.connAt k) _ _ afs af , tt)
+  , silent (vis-≃ (up-≃ c (conn-plus-nx (CS.connAt k) _ _ p x)))
 
 rise-sim : ∀ {R Γ A} {k′ : Conf R} {sh t} (c : Ctx R Γ A) (s : St Γ A) e p → stepᴹ ⟨ c , s , rising e , p ⟩ ≡ moved k′ sh t → Sim ⟨ c , s , rising e , p ⟩ sh k′
 rise-sim top            s e p refl = rise-top s e p

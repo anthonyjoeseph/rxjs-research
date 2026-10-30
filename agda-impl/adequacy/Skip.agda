@@ -483,6 +483,13 @@ since-conn r σ t {p} ao st (Connecting.burst {k} x _)   = ≺→≼ {p} {k ++ [
 since-conn r σ t {p} ao st (Connecting.echo {k} x _ _ _) = ≺→≼ {p} {k ++ [ ix 0 ]} (≺-trans {p} {k} {k ++ [ ix 0 ]} (ao x) (≺-ext k []))
 since-conn r σ t {p} ao st (Connecting.kept {k} x _ _ _) = ≺→≼ {p} {k ++ [ ix 0 ]} (≺-trans {p} {k} {k ++ [ ix 0 ]} (ao x) (≺-ext k []))
 
+-- A source and body strictly past `p` keep connect strictly past `p`.
+after-conn : ∀ {A B} (r : Pos) (σ : EmissionSet A) (t : EmissionSet B) {p} → After p σ → After p t → After p (Connecting.ConnT r σ t)
+after-conn r σ t {p} ao at (Connecting.body x)              = at x
+after-conn r σ t {p} ao at (Connecting.burst  {k} x _)     = ≺-trans {p} {k} {k ++ [ ix 0 ]} (ao x) (≺-ext k [])
+after-conn r σ t {p} ao at (Connecting.echo   {k} x _ _ _) = ≺-trans {p} {k} {k ++ [ ix 0 ]} (ao x) (≺-ext k [])
+after-conn r σ t {p} ao at (Connecting.kept   {k} x _ _ _) = ≺-trans {p} {k} {k ++ [ ix 0 ]} (ao x) (≺-ext k [])
+
 postulate
   -- A SKIP AT A SOURCE IS UNSEEN ABOVE ITS CONNECT: the connect shows it
   -- as a skip or a pin under it, and every joiner fed it as a skip under
