@@ -450,6 +450,10 @@ postulate
   -- A GOOD NODE'S ROWS HOLD ONE EVENT A POSITION, its binders' doing so:
   -- a joiner's rows are its binder's, so a binder with two events at a
   -- position gives its joiner two.
+  --
+  -- DEAD ROUTE: read off an entry at every node, as `rooted-single` reads
+  --   a merge's outer.  A rising focus's ancestors hold rows no entry has,
+  --   as `adequacy.OuterNx.begin-good` records.
   rows-single : ∀ {Γ A} {ρ : DenEnv Γ} (s : St Γ A) → EnvSingle ρ → Good ρ s → Single (rows ρ s)
 
 -- At or past where it was decided, one of `p` and `q` before the other.

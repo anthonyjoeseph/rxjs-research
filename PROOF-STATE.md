@@ -18,8 +18,9 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 Riskiest: `Inv` holds a rising outer value past the joiner's other parts,
 but not in its outer's frozen entry nor where its binders are hot; the
-begun lane's `Rooted` and `Subs` need both. Settled by an invariant field
-carrying them up from the outer, or a value risen outside its entry.
+begun lane's `Rooted` and `Subs` need both. Open: a lead field reading each
+frame through the risen row, not an entry on every node of `Good`. Settled
+by that field, or a value risen outside its entry.
 
 Members: `begin-good`, `begin-ok`.
 

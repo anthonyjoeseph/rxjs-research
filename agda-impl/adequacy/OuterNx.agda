@@ -344,6 +344,14 @@ postulate
   -- entry; `Inv` says the outer's rows lie there, but not the value it
   -- has just risen.  Every frame above reads the joiner's rows, now with
   -- the lane's for the value's.
+  --
+  -- DEAD ROUTE: every live node's rows inside an entry frozen when it
+  --   subscribed, `Rooted`'s `sub` at each node of `Good`.  `Good` reads a
+  --   rising focus's ancestors with the risen row already gone, and a
+  --   joiner is not monotone in its parts: a lane's end gone leaves the
+  --   joiner not done, so its outer's end reads as a pass where the entry
+  --   holds the end.  Only a reading through the risen row, frame by frame
+  --   up the context as `LeadC` reads `After`, stays inside the entry.
   begin-good : ∀ {R Γ A B} op (f : A → Obs Timeline Γ B) d n q ls (c : Ctx R Γ B) (o : St Γ A) a p
              → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ → closed c ≡ false → q ≡ []
              → Good [] (plug c (flatS op f d (suc n) q o (reverse ls ʳ++ lnS true (cutS true (attAt (p ++ [ ix 1 ])) doneS) ∷ [])))
