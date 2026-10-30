@@ -27,13 +27,13 @@ open import Data.List.Properties using (∷ʳ-injectiveˡ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-split; <ᵖ-part; Time; Frame; burst; emit; stall; close)
+open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-split; <ᵖ-part; Frame; burst; emit; stall; close)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; _≺_; _≼_; Truncate; module TakeWhile; DenEnv;
   module Joining; module Values; MapT; map-out; map-skip; map-pin; map-end; module Scan; InE; at-out; at-end)
 open import denotation.Laws.Modulus using (≼-refl)
 open import denotation.Laws.Worlds using (InvAt; Hots; W; inW; plain-ix; apart-w) renaming (⊑-refl to ⊑ᵖ-refl)
 open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᵖ; clash)
-open import operation.PureObservable using (module Machine; Tape; play; ending; over)
+open import operation.PureObservable using (module Machine; play; ending; over)
 
 open Machine using (St; Ctx; CS; cs; _⊕_; bodyM; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed;
                     free; cpAt; cutAt; overAt; inScan; inTake; inSrc; inBody;
