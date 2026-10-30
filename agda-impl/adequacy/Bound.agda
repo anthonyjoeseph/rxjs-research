@@ -30,7 +30,7 @@ open import denotation.EmissionSet using (EmissionSet; Ev; out; end; _≺_; _≼
   map-skip; map-pin; map-end; module Scan; DenEnv)
 open import denotation.Laws.Modulus using (≼-refl)
 open import denotation.Laws.Worlds using (InvAt; Hots; W; inW; plain-ix; apart-w) renaming (⊑-refl to ⊑ᵖ-refl)
-open import operation.Key using (Key; at; after; _<ᴷ_; ≮ᴷ-trans; <ᴷ-trans; <ᴷ-irrefl; at-<ᵖ; clash)
+open import operation.Key using (Key; at; after; _<ᴷ_; ≮ᴷ-trans; <ᴷ-trans; <ᴷ-irrefl; at-<ᵖ; clash; shift-after)
 open import operation.PureObservable using (module Machine)
 
 open Machine using (St; Ctx; CS; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed; same?; _⊕_;
@@ -40,10 +40,6 @@ open import adequacy.Rows using (acc-val; rows; rowsL; pendRows; toEv; Lanes; Ea
 
 ------------------------------------------------------------------------
 -- Keys
-
-postulate
-  -- Just past a position, still before a mark's `after` the position is before.
-  shift-after : ∀ q r → at q <ᴷ after r ≡ true → after r <ᴷ at (q ++ [ ix 0 ]) ≡ false
 
 -- `a` no later than `b`.
 record _⊑_ (a b : Key) : Set where
