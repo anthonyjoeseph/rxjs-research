@@ -59,14 +59,13 @@ Members: `enter-bounded`, `enter-switch`, `enter-exhaust`,
 
 #### THE QUEUED SEARCH
 
-A bounded merge with values waiting has every slot taken (`G`'s
-`n ≡ m`), so its earliest lane end is `Queued` and hands off to the
-queue's head just past it. Open: whether apartness, one event a position
-and lanes starting past their start's end bound every `waits` row above
-the find. Settled by bodies over `Rows.BoundedF`'s `Starts`, or a queued
-merge whose race shows a row the cap leaves quiet.
+A bounded merge with values waiting: its race keys its rows, a lane's end
+handing off to the queue's head just past it. Open: `Leads`' `Tight` lets
+a lane's unshown find tie at the lane's end row, which queued leaves the
+merge no row. Settled by a find tied at an end row always showing it, or
+a queued lane whose unshown find ties at its end.
 
-Members: `queued-race`, `bounded-wait-leadᶜ`.
+Members: `bounded-wait-leadᶜ`.
 
 #### THE CONNECT STEPPED
 

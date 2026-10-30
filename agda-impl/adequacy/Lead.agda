@@ -287,6 +287,12 @@ postulate
 
   -- A BOUNDED MERGE'S SEARCH WITH VALUES WAITING LEADS: the raced find,
   -- every other part past it, a lane's end handing off to the queue.
+  --
+  -- `Race` here is fixed to an empty queue; over a queue, a lane's end
+  -- shown is a skip just past it, strictly past every tie, and an outer's
+  -- end is a pass.  What is left is a lane's find not shown, tied at a
+  -- lane row: `Fits still end` holds, so the row may be the lane's end,
+  -- which with a value queued hands off and leaves the merge no row there.
   bounded-wait-leadᶜ : ∀ {R Γ A B} C v (c : Ctx R Γ B) m (f : A → Obs Timeline Γ B) d n a q (o : St Γ A) ls → Gate (EnvSingle (env c)) v
                      → G (env c) v (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls) → Gate (Quiet C (env c) (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls)) v
                      → Leadsᶜ C v c (rows (env c) (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls)) (kids c (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls))
