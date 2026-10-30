@@ -33,7 +33,7 @@ open import denotation.Laws.Worlds using (InvAt; Hots; W; inW; plain-ix; apart-w
 open import operation.Key using (Key; at; after; _<ᴷ_; ≮ᴷ-trans; <ᴷ-trans; <ᴷ-irrefl; at-<ᵖ; clash)
 open import operation.PureObservable using (module Machine)
 
-open Machine using (St; Ctx; CS; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed;
+open Machine using (St; Ctx; CS; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed; same?;
                     free; cpAt; cutAt; overAt; inScan; inTake; inSrc; inBody;
                     ofS; doneS; mapS; cutS; cpM; cutM; lnS; flatS; coldS; scanS; takeS; connS; joinS; inMap; inCut; inLn; inOuter; inLanes; nx; cp; attached; attAt; attM; pend) renaming (Ev to Evᴹ; over to overᶜ)
 open import adequacy.Rows using (acc-val; rows; rowsL; pendRows; toEv; Lanes; Each; Kth; AllEnd; EndsOf; Lane; reads; module Flat; module SwitchF; module ExhaustF; module BoundedF; ∅; Hot; Inbox; _∪_; Kept; Stops) renaming (kept to keptᴿ; stop to stopᴿ; left to leftᴿ; sub to subᴿ)
@@ -393,16 +393,45 @@ mergeG-map : ∀ {Γ A B Go Gl Go′ Gl′} {ρ : DenEnv Γ} {b} {f : A → Obs 
 mergeG-map ho hl hc hs hr m = record { outer = ho outer ; lanesG = hl lanesG ; fresh = fresh ; count = hc count ; spent = hs spent ; rooted = hr rooted }
   where open MergeG m
 
--- A joiner's inbox in order, each entry strictly before every later one
--- and before every row the source still owes it.
 -- A subscription still owed.
 Held : ∀ {Γ A} → St Γ A → Set₁
 Held (pend _ _) = ⊤₁
 Held _          = ⊥₁
 
+-- A joiner's inbox in order, each entry strictly before every later one,
+-- and before every row the source still owes it but the one it is: a
+-- closed source's end, fed to the joiner, is still among its binder's rows.
 Fed : ∀ {A} → List (Pos × Evᴹ A) → EmissionSet A → Set₁
 Fed []             t = ⊤₁
-Fed ((q , _) ∷ ib) t = (∀ {y e} → (Inbox ib ∪ t) y e → q ≺ y) × Fed ib t
+Fed ((q , e) ∷ ib) t = (∀ {y e′} → Inbox ib y e′ → q ≺ y) × (∀ {y e′} → t y e′ → q ≺ y ⊎ (y ≡ q × e′ ≡ toEv e)) × Fed ib t
+
+-- An inbox the end was fed to, still waiting last.
+data Ends {A : Set} : List (Pos × Evᴹ A) → Set where
+  end₁ : ∀ {q} → Ends [ (q , cp) ]
+  more : ∀ {x ib} → Ends ib → Ends (x ∷ ib)
+
+ToldAt : ∀ {A B} → Maybe (A ≡ B) → List (Pos × Evᴹ B) → Set
+ToldAt nothing  _  = ⊤
+ToldAt (just _) ib = Ends ib
+
+-- Every live joiner of binder `x` already fed its end: what a closed
+-- source leaves under it, its end fed to each joiner as it came.  Nothing
+-- under a switched-off cut is asked.
+mutual
+  Told : ∀ {Γ X A} → X ∈ Γ → St Γ A → Set
+  Told x (joinS j true y ib) = ToldAt (same? x y) ib
+  Told x (mapS f s)              = Told x s
+  Told x (scanS f z s)           = Told x s
+  Told x (cutS true a s)         = Told x s
+  Told x (lnS b s)               = Told x s
+  Told x (takeS v q w s)         = Told x s
+  Told x (flatS op f d n q o ls) = Told x o × ToldL x ls
+  Told x (connS k o b)           = Told x o × Told (there x) b
+  Told x _                       = ⊤
+
+  ToldL : ∀ {Γ X A} → X ∈ Γ → List (St Γ A) → Set
+  ToldL x []       = ⊤
+  ToldL x (s ∷ ls) = Told x s × ToldL x ls
 
 -- The fragment's shape everywhere, its row facts only where live: under
 -- a cut switched off nothing is owed, so nothing there is asked to agree.
@@ -420,7 +449,7 @@ mutual
   G ρ b (flatS (mergeᶠ (just m)) f d n q o ls) = MergeG (G ρ b o) (GL ρ b ls) ρ b f d n [] o ls × Live b ((q ≡ []) ⊎ (n ≡ m))
   G ρ b (flatS switchᶠ f d n q o ls)          = MergeG (G ρ b o) (GL ρ b ls) ρ b f d n q o ls
   G ρ b (flatS exhaustᶠ f d n q o ls)         = MergeG (G ρ b o) (GL ρ b ls) ρ b f d n q o ls
-  G ρ b (connS k o s)                         = SrcG ρ b (CS.bodyAt k) o × G (Hot (rows ρ o) k ∷ᴬ ρ) b s × Live b (T (CS.closed k) → Empty (rows ρ o))
+  G ρ b (connS k o s)                         = SrcG ρ b (CS.bodyAt k) o × G (Hot (rows ρ o) k ∷ᴬ ρ) b s × Live b (T (CS.closed k) → Empty (rows ρ o)) × Live b (T (CS.closed k) → Told (here refl) s)
   G ρ b (joinS j true x ib)                   = Live₁ b (Fed ib (enter (lookup ρ x) j))
   G ρ b (joinS j false x ib)                  = Live₁ b (Fed ib ∅)
   G ρ b (coldS v l)                           = ⊤₁
@@ -474,7 +503,7 @@ mutual
   shape (scanS f z s)                             g = shape s g
   shape (lnS _ _)                                 ()
   shape (takeS i q w s)                           g = shape s g
-  shape {v = v} (connS k o b)                     (gs , gb , _) = shapeSrc {v = v} (CS.bodyAt k) o gs , shape b gb , tt
+  shape {v = v} (connS k o b)                     (gs , gb , _) = shapeSrc {v = v} (CS.bodyAt k) o gs , shape b gb , tt , tt
   shape (joinS j true x ib)                       _ = tt₁
   shape (joinS j false x ib)                      _ = tt₁
 

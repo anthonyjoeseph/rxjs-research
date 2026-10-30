@@ -316,7 +316,8 @@ killed a sw = record
   ; node  = λ { true g → node₀ sw g ; false g → node₀ sw g }
   ; lane  = λ _ ()
   ; body  = λ { true _ (refl , g , _) → refl , node₀ sw g , tt ; false _ (refl , g , _) → refl , node₀ sw g , tt }
-  ; held  = λ () }
+  ; held  = λ ()
+  ; told  = λ _ _ → tt }
 
 dead-swap : ∀ {R Γ A} (c : Ctx R Γ A) {s s′ : St Γ A} → liv c ≡ false → Swap₀ (env c) s s′ → Good [] (plug c s) → Good [] (plug c s′)
 dead-swap top               () sw g
@@ -344,9 +345,9 @@ dead-swap (inLanes switchᶠ f d n q o pre post c)  dd sw g =
 dead-swap (inLanes exhaustᶠ f d n q o pre post c) dd sw g =
   dead-swap c dd (record { node₀ = mergeG-map (λ x → x) (goodL-swap pre (lane₀ sw)) (λ x → x) (λ x → x) (λ x → x) ; lane₀ = λ () ; body₀ = λ _ () ; held₀ = λ () }) g
 dead-swap (inSrc k b c)     dd sw g =
-  dead-swap c dd (record { node₀ = λ { (gs , gb , _) → src₀ (CS.bodyAt k) gs , shape b gb , tt } ; lane₀ = λ () ; body₀ = λ _ () ; held₀ = λ () }) g
+  dead-swap c dd (record { node₀ = λ { (gs , gb , _) → src₀ (CS.bodyAt k) gs , shape b gb , tt , tt } ; lane₀ = λ () ; body₀ = λ _ () ; held₀ = λ () }) g
   where
     src₀ : ∀ m → SrcG (env c) false m _ → SrcG (env c) false m _
     src₀ nothing  = node₀ sw
     src₀ (just _) = held₀ sw
-dead-swap (inBody k o c)    dd sw g = dead-swap c dd (record { node₀ = λ { (gs , gb , sp) → gs , node₀ sw gb , sp } ; lane₀ = λ () ; body₀ = λ _ () ; held₀ = λ () }) g
+dead-swap (inBody k o c)    dd sw g = dead-swap c dd (record { node₀ = λ { (gs , gb , sp , tl) → gs , node₀ sw gb , sp , tl } ; lane₀ = λ () ; body₀ = λ _ () ; held₀ = λ () }) g
