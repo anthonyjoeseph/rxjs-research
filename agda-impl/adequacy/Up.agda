@@ -5,7 +5,7 @@
 -- index by index, so a lane's rows replaced in its list is the same merge.
 module adequacy.Up where
 
-open import Data.Bool using (true; false)
+open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; _ʳ++_)
 open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
 open import Data.Maybe using (just; nothing)
@@ -14,10 +14,11 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos)
-open import denotation.EmissionSet using (EmissionSet; Truncate; Reach; MapT; map-out; map-skip; map-pin; map-end; DenEnv; module Connecting; module Scan)
+open import denotation.EmissionSet using (EmissionSet; Truncate; Reach; MapT; map-out; map-skip; map-pin; map-end; DenEnv; module Connecting; module Scan; module TakeWhile)
 open import operation.PureObservable using (module Machine)
-open Machine using (Ctx; St; CS; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (up; env; rows; Hot; pendRows; Vis; Plus; old; new; rowsL; Gone; Lanes; Each; module Flat; _≃_; _⇄_; ≃-sym)
+open Machine using (Ctx; St; CS; free; cpAt; cutAt; overAt; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
+open import adequacy.Rows using (TakeR; kept; Stops; stop; left; up; env; rows; Hot; pendRows; Vis; Plus; old; new; rowsL;
+  Gone; Lanes; Each; module Flat; _≃_; _⇄_; ≃-sym)
 
 open _≃_
 
@@ -138,6 +139,25 @@ map-≃ f eq = go (to eq) ⇄ go (from eq)
     go h (map-pin r)  = map-pin (h r)
     go h (map-end r)  = map-end (h r)
 
+-- The same rows taken: the same rows kept.
+take-≃ : ∀ {A} i (q : A → Bool) w {t u : EmissionSet A} → t ≃ u → TakeR i q w t ≃ TakeR i q w u
+take-≃ {A} i q free     eq = trunc-≃ (go (to eq) (from eq) ⇄ go (from eq) (to eq))
+  where
+    go : ∀ {t u : EmissionSet A} → (∀ {k e} → t k e → u k e) → (∀ {k e} → u k e → t k e) → ∀ {k e} → TakeWhile.TakeT i q t k e → TakeWhile.TakeT i q u k e
+    go h h⁻ (TakeWhile.pass r k nf)   = TakeWhile.pass (h r) k λ (k′ , a , x , y , z) → nf (k′ , a , h⁻ x , y , z)
+    go h h⁻ (TakeWhile.fail r k nf j) = TakeWhile.fail (h r) k (λ (k′ , a , x , y , z) → nf (k′ , a , h⁻ x , y , z)) j
+    go h h⁻ (TakeWhile.stop r k nf)   = TakeWhile.stop (h r) k λ (k′ , a , x , y , z) → nf (k′ , a , h⁻ x , y , z)
+    go h h⁻ (TakeWhile.step r nf)     = TakeWhile.step (h r) λ (k′ , a , x , y , z) → nf (k′ , a , h⁻ x , y , z)
+    go h h⁻ (TakeWhile.tend r nf)     = TakeWhile.tend (h r) λ (k′ , a , x , y , z) → nf (k′ , a , h⁻ x , y , z)
+    go h h⁻ (TakeWhile.left r nf j)   = TakeWhile.left (h r) (λ (k′ , a , x , y , z) → nf (k′ , a , h⁻ x , y , z)) j
+take-≃ i q (cpAt p)   eq = go (to eq) ⇄ go (from eq)
+  where
+    go : ∀ {A} {t u : EmissionSet A} → (∀ {k e} → t k e → u k e) → ∀ {k e} → Stops p t k e → Stops p u k e
+    go h stop                = stop
+    go h (left (kept r n j)) = left (kept (h r) n j)
+take-≃ i q (cutAt p)  eq = (λ { (kept r n j) → kept (to eq r) n j }) ⇄ λ { (kept r n j) → kept (from eq r) n j }
+take-≃ i q (overAt p) eq = (λ { (kept r n j) → kept (to eq r) n j }) ⇄ λ { (kept r n j) → kept (from eq r) n j }
+
 -- The same rows scanned: the same folds.
 scan-≃ : ∀ {A B} (f : B → A → B) z {t u : EmissionSet A} → t ≃ u → Scan.ScanT f z t ≃ Scan.ScanT f z u
 scan-≃ {A} {B} f z eq = go (to eq) (from eq) ⇄ go (from eq) (to eq)
@@ -177,7 +197,7 @@ up-≃ (inCut true a c)                                 eq = up-≃ c eq
 up-≃ (inCut false a c)                                eq = ≃-refl
 up-≃ (inLn true c)                                    eq = up-≃ c eq
 up-≃ (inLn false c)                                   eq = ≃-refl
-up-≃ (inTake i p w c)                                 eq = ≃-refl
+up-≃ (inTake i q w c)                                 eq = up-≃ c (take-≃ i q w eq)
 up-≃ (inOuter (mergeᶠ nothing) f d n q ls c)          eq = up-≃ c (row-≃ (λ a → pendRows (env c) (f a)) eq (≈ᴸ-refl (rowsL (env c) ls)))
 up-≃ (inOuter (mergeᶠ (just _)) f d n q ls c)         eq = ≃-refl
 up-≃ (inOuter switchᶠ f d n q ls c)                   eq = ≃-refl

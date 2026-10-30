@@ -8,12 +8,12 @@
 --
 -- The link is grown one former at a time.  Subscribing to a former not
 -- yet grown hands the rest of the run to that former's own leaf
--- (`beyond-take` and its siblings), so `reach` is total by pattern
+-- (`beyond-bounded` and its siblings), so `reach` is total by pattern
 -- matching: growing a former turns its leaf into the arms the link needs
 -- for it, and the coverage checker names every former still owed.
 module adequacy.Sim where
 
-open import Data.Bool using (true; false; if_then_else_; not)
+open import Data.Bool using (Bool; true; false; if_then_else_; not)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Nat using (_≡ᵇ_)
 open import Data.List using (List; []; _∷_; [_]; null)
@@ -30,14 +30,14 @@ open import Data.List using (_ʳ++_)
 
 open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Timeline; root; ix; timelineAt; emit; stall; close)
-open import denotation.EmissionSet using (DenEnv; EmissionSet; out; end; MapT; map-out; map-skip; map-pin; map-end; module Scan; _≼_; enter; ⟦_⟧; Proper)
+open import denotation.EmissionSet using (DenEnv; EmissionSet; out; end; MapT; map-out; map-skip; map-pin; map-end; module Scan; module TakeWhile; _≼_; enter; ⟦_⟧; Proper)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd)
 open import denotation.Laws.Worlds using (GoodEnv; Lawful)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; over; opening)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; found; Mark; ofM; attM;
                     rise; run; start; dequeue; settle; alive; ended; mapEv; nx; cp; attAt; attached; Torn;
-                    Stepped; quiet; begin; admit; closed; killAll; unsubIf; free; cpAt; cutAt; overAt; CS; cs; feed; closedUp; _⊕_;
+                    Stepped; quiet; begin; admit; closed; killAll; unsubIf; free; cpAt; cutAt; overAt; cut; cpM; cutM; CS; cs; feed; closedUp; _⊕_;
                     bodyM; srcAttM; owedM; joinM; leafM; Poke; gone; leaf;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
@@ -77,7 +77,7 @@ env-good (inOuter exhaustᶠ f d n q ls c)             ()
 env-good (inLanes (mergeᶠ (just _)) f d n q o pre post c) ()
 env-good (inLanes switchᶠ f d n q o pre post c)      ()
 env-good (inLanes exhaustᶠ f d n q o pre post c)     ()
-env-good (inTake i q w c)                            ()
+env-good (inTake i q w c)                            gc g = env-good c gc g
 env-good (inSrc k b c)                               gc g = env-good c gc g
 env-good (inBody k o c) {s}                          gc g = good-cons (src-lawful k o s c g) (env-good c gc g)
 
@@ -101,6 +101,16 @@ sub-scan c f z s q p (inv g (uc , _ , ok , so)) = inv (good-swap c sw g) (uc , t
   where
     sw : Swap (env c) doneS (scanS f z doneS)
     sw = record { same = (λ ()) ⇄ (λ { (Scan.sval (Scan.acc₀ () _)) ; (Scan.sval (Scan.acc _ () _ _)) ; (Scan.sstep ()) ; (Scan.spin ()) ; (Scan.send ()) }) ; live≡ = refl ; node = λ _ x → x ; lane = λ _ () ; body = λ _ _ () ; held = λ () }
+
+-- A take entered: its source pending under it, attached at `p`, unfailed.
+sub-take : ∀ {R Γ A} (c : Ctx R Γ A) i (w : A → Bool) s q p
+         → Sim ⟨ c , pend (takeWhile i w s) q , subscribing , p ⟩ [] ⟨ inCut true (attAt q) (inTake i w free c) , pend s q , subscribing , q ⟩
+sub-take c i w s q p (inv g (uc , _ , ok , so)) = inv (good-swap c sw g) (uc , tt , ok , so) , silent ((λ x → x) ⇄ (λ x → x))
+  where
+    sw : Swap (env c) doneS (takeS i w free (cutS true (attAt q) doneS))
+    sw = record { same = (λ ()) ⇄ (λ { (TakeWhile.pass () _ _ , _) ; (TakeWhile.fail () _ _ _ , _) ; (TakeWhile.stop () _ _ , _)
+                                      ; (TakeWhile.step () _ , _) ; (TakeWhile.tend () _ , _) ; (TakeWhile.left () _ _ , _) })
+                ; live≡ = refl ; node = λ _ x → x ; lane = λ _ () ; body = λ _ _ () ; held = λ () }
 
 -- A merge entered: its outer pending under it, attached at `p`, nothing begun.
 sub-merge : ∀ {R Γ A B} (c : Ctx R Γ B) f (s : Obs Timeline Γ A) q p
@@ -253,6 +263,21 @@ postulate
   rise-scan-nx : ∀ {R Γ A B} (f : B → A → B) z (c : Ctx R Γ B) s a p → Sim ⟨ inScan f z c , s , rising (nx a) , p ⟩ [] ⟨ c , scanS f (f z a) s , rising (nx (f z a)) , p ⟩
   rise-scan-cp : ∀ {R Γ A B} (f : B → A → B) z (c : Ctx R Γ B) s p → Sim ⟨ inScan f z c , s , rising cp , p ⟩ [] ⟨ c , scanS f z s , rising cp , p ⟩
 
+-- A TAKE'S VALUE: kept while it passes, the source's rows past it taken
+-- likewise; a failing value shown or not as the take is inclusive, its
+-- completion owed after it; its source's end its own.  Once failed, the
+-- take absorbs whatever still reaches it.
+postulate
+  rise-take-nx   : ∀ {R Γ A} i (w : A → Bool) (c : Ctx R Γ A) s a p → w a ≡ true
+                 → Sim ⟨ inTake i w free c , s , rising (nx a) , p ⟩ [] ⟨ c , takeS i w free s , rising (nx a) , p ⟩
+  rise-take-fail : ∀ {R Γ A} i (w : A → Bool) (c : Ctx R Γ A) s a p → w a ≡ false
+                 → Sim ⟨ inTake i w free c , s , rising (nx a) , p ⟩ []
+                       (if i then ⟨ c , takeS i w (cpAt p) s , rising (nx a) , p ⊕ [ ix 0 ] ⟩ else ⟨ c , takeS i w (cpAt p) s , absorbed , p ⟩)
+  rise-take-cp   : ∀ {R Γ A} i (w : A → Bool) (c : Ctx R Γ A) s p
+                 → Sim ⟨ inTake i w free c , s , rising cp , p ⟩ [] ⟨ c , takeS i w free s , rising cp , p ⟩
+  rise-take-owed : ∀ {R Γ A} i (w : A → Bool) o (c : Ctx R Γ A) s e p → (o ≡ free → ⊥)
+                 → Sim ⟨ inTake i w o c , s , rising e , p ⟩ [] ⟨ c , takeS i w o s , absorbed , p ⟩
+
 postulate
   -- AN OUTER'S VALUE BEGINS ITS LANE.
   rise-outer-nx : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p
@@ -290,7 +315,16 @@ rise-sim (inOuter (mergeᶠ nothing) f d n q ls c) o (nx a) p refl = rise-outer-
 rise-sim (inOuter (mergeᶠ nothing) f d n q ls c) o cp     p refl = rise-outer-cp f d n q ls c o p
 rise-sim (inLanes (mergeᶠ nothing) f d n q o pre post c) s (nx b) p refl = rise-lane-nx f d n q o pre post c s b p
 rise-sim (inLanes (mergeᶠ nothing) f d n q o pre post c) s cp     p refl = rise-lane-cp f d n q o pre post c s p
-rise-sim c@(inTake _ _ _ _)                    s e p eq i = ⊥-elim (proj₁ (good-split c s (good i)))
+rise-sim (inTake true w free c) s (nx a) p eq with w a in wa
+rise-sim (inTake true w free c) s (nx a) p refl | true  = rise-take-nx true w c s a p wa
+rise-sim (inTake true w free c) s (nx a) p refl | false = rise-take-fail true w c s a p wa
+rise-sim (inTake false w free c) s (nx a) p eq with w a in wa
+rise-sim (inTake false w free c) s (nx a) p refl | true  = rise-take-nx false w c s a p wa
+rise-sim (inTake false w free c) s (nx a) p refl | false = rise-take-fail false w c s a p wa
+rise-sim (inTake i w free c)       s cp p refl = rise-take-cp i w c s p
+rise-sim (inTake i w (cpAt r) c)   s e  p refl = rise-take-owed i w (cpAt r) c s e p (λ ())
+rise-sim (inTake i w (cutAt r) c)  s e  p refl = rise-take-owed i w (cutAt r) c s e p (λ ())
+rise-sim (inTake i w (overAt r) c) s e  p refl = rise-take-owed i w (overAt r) c s e p (λ ())
 rise-sim c@(inOuter (mergeᶠ (just _)) _ _ _ _ _ _) s e p eq i = ⊥-elim (proj₁ (good-split c s (good i)))
 rise-sim c@(inOuter switchᶠ _ _ _ _ _ _)       s e p eq i = ⊥-elim (proj₁ (good-split c s (good i)))
 rise-sim c@(inOuter exhaustᶠ _ _ _ _ _ _)      s e p eq i = ⊥-elim (proj₁ (good-split c s (good i)))
@@ -312,10 +346,13 @@ data Marked {Γ : List Set} : ∀ {A} → St Γ A → Mark → Set₁ where
   conK : ∀ {X A} k (o : St Γ X) (b : St (X ∷ Γ) A) m → m ≡ bodyM ⊎ (m ≡ srcAttM ⊎ m ≡ owedM) → Marked (connS k o b) m
   joinK : ∀ {A} j g (x : A ∈ Γ) ib → Marked (joinS j g x ib) joinM
   leafK : ∀ {A} b (l : Tape A) → Marked (coldS b l) leafM
+  stopK : ∀ {A} i (q : A → Bool) r (s : St Γ A) → Marked (takeS i q (cpAt r) s) cpM
+  cutK  : ∀ {A} i (q : A → Bool) r (s : St Γ A) → Marked (takeS i q (cutAt r) s) cutM
 
 postulate
   -- WHAT A GOOD TREE'S SEARCH FINDS: an of's next, a switch's attach, a
-  -- connect's own, a joiner's next, or a cold's turn.
+  -- connect's own, a joiner's next, a cold's turn, or a failed take's
+  -- stop or cut.
   found-mark : ∀ {R Γ′ A′} (c : Ctx R Γ′ A′) s {Γ A c′ s′ m κ} → Good []ᴬ (plug c s) → search top (plug c s) ≡ just (found (Γ , A , c′ , s′) m κ) → Marked s′ m
 
   -- A SWITCH ATTACHED: nothing owed changes.
@@ -327,6 +364,16 @@ postulate
   -- down; nothing owed changes.
   abs-con : ∀ {R Γ′ A′ Γ A X} {c : Ctx R Γ′ A′} {s} {c′ : Ctx R Γ A} {k o} {b : St (X ∷ Γ) A} {m κ k′ sh t} p
           → search top (plug c s) ≡ just (found (Γ , A , c′ , connS k o b) m κ) → run c′ (connS k o b) m p ≡ moved k′ sh t
+          → Sim ⟨ c , s , absorbed , p ⟩ sh k′
+
+  -- A FAILED TAKE'S COMPLETION: shown at its stop unless closed above.
+  abs-stop : ∀ {R Γ′ A′ Γ A} {c : Ctx R Γ′ A′} {s} {c′ : Ctx R Γ A} {i} {q : A → Bool} {r s₀ κ k′ sh t} p
+           → search top (plug c s) ≡ just (found (Γ , A , c′ , takeS i q (cpAt r) s₀) cpM κ) → run c′ (takeS i q (cpAt r) s₀) cpM p ≡ moved k′ sh t
+           → Sim ⟨ c , s , absorbed , p ⟩ sh k′
+
+  -- A FAILED TAKE PAST ITS STOP CUTS ITS SOURCE: nothing owed changes.
+  abs-cut : ∀ {R Γ′ A′ Γ A} {c : Ctx R Γ′ A′} {s} {c′ : Ctx R Γ A} {i} {q : A → Bool} {r s₀ κ k′ sh t} p
+          → search top (plug c s) ≡ just (found (Γ , A , c′ , takeS i q (cutAt r) s₀) cutM κ) → run c′ (takeS i q (cutAt r) s₀) cutM p ≡ moved k′ sh t
           → Sim ⟨ c , s , absorbed , p ⟩ sh k′
 
   -- A COLD'S TURN: its tape played one step, a value or its end rising,
@@ -402,6 +449,10 @@ run-con-mv c k o b .owedM p (Data.Sum.inj₂ (Data.Sum.inj₂ refl)) with CS.owe
 ... | just _  | _ = tt
 ... | nothing | _ = tt
 
+run-cut-mv : ∀ {R Γ A} (c : Ctx R Γ A) i (q : A → Bool) r (s : St Γ A) p → Mv (run c (takeS i q (cutAt r) s) cutM p)
+run-cut-mv c i q r s p with cut s
+... | _ = tt
+
 run-join-mv : ∀ {R Γ A} (c : Ctx R Γ A) j g (x : A ∈ Γ) ib p → Mv (run c (joinS j g x ib) joinM p)
 run-join-mv c j g x []              p = tt
 run-join-mv c j g x ((q , nx a) ∷ ib) p = tt
@@ -467,8 +518,6 @@ Runs k = ∀ {rs} → Steps k rs → Shows* (RT k) (conv rs)
 -- Each owes what growing it would: its node's place in `adequacy.Bound.G`,
 -- its rows and what it owes, and the step arms of the nodes it builds.
 postulate
-  beyond-take    : ∀ {R Γ A} (c : Ctx R Γ A) b q (s : Obs Timeline Γ A) q′ p
-                 → Inv ⟨ c , pend (takeWhile b q s) q′ , subscribing , p ⟩ → Runs ⟨ c , pend (takeWhile b q s) q′ , subscribing , p ⟩
   beyond-bounded : ∀ {R Γ A B} (c : Ctx R Γ B) m (f : A → Obs Timeline Γ B) s q′ p
                  → Inv ⟨ c , pend (flatMap (mergeᶠ (just m)) f s) q′ , subscribing , p ⟩ → Runs ⟨ c , pend (flatMap (mergeᶠ (just m)) f s) q′ , subscribing , p ⟩
   beyond-switch  : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) s q′ p
@@ -513,6 +562,8 @@ abs-link c s p i with search top (plug c s) in fd
 ...   | attK l q s₀    = mvL (run-att-mv c′ l q s₀ p) (λ eq → abs-att p fd eq)
 ...   | conK k o b m w = mvL (run-con-mv c′ k o b m p w) (λ eq → abs-con p fd eq)
 ...   | joinK j g x ib = mvL (run-join-mv c′ j g x ib p) (λ eq → abs-join p fd eq)
+...   | stopK j q r s₀ = mvL tt (λ eq → abs-stop p fd eq)
+...   | cutK j q r s₀  = mvL (run-cut-mv c′ j q r s₀ p) (λ eq → abs-cut p fd eq)
 ...   | leafK b l      = hushL (played-hush (leaf b l (closed c′) (λ e l′ b′ p′ → ⟨ c′ , coldS b′ l′ , (if not (closed c′) then rising e else absorbed) , p′ ⟩) (λ l′ → ⟨ c′ , coldS b l′ , absorbed , p ⟩))) (λ eq → abs-leaf p fd eq)
 
 reach-pend : ∀ {R Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) q p → Inv ⟨ c , pend o q , subscribing , p ⟩ → Reach ⟨ c , pend o q , subscribing , p ⟩
@@ -523,7 +574,7 @@ reach-pend c (flatMap (mergeᶠ nothing) f s)  q p i = within tt λ { refl → s
 reach-pend c (connected x)                   q p i = within (join-mv c x q {p}) (join-sim c x q p)
 reach-pend c (cold x)                        q p i = driven tt λ { refl → sub-cold c x q p }
 reach-pend c (scan f z s)                    q p i = within tt λ { refl → sub-scan c f z s q p }
-reach-pend c (takeWhile b w s)               q p i = beyond (beyond-take c b w s q p i)
+reach-pend c (takeWhile b w s)               q p i = within tt λ { refl → sub-take c b w s q p }
 reach-pend c (flatMap (mergeᶠ (just m)) f s) q p i = beyond (beyond-bounded c m f s q p i)
 reach-pend c (flatMap switchᶠ f s)           q p i = beyond (beyond-switch c f s q p i)
 reach-pend c (flatMap exhaustᶠ f s)          q p i = beyond (beyond-exhaust c f s q p i)

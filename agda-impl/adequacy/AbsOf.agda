@@ -128,7 +128,7 @@ up-plug (inOuter (mergeᶠ nothing) f d n q ls c) s gc = up-plug c (flatS (merge
 up-plug (inLanes (mergeᶠ nothing) f d n q o pre post c) s gc =
   ≃-trans (up-≃ c (≡→≃ (cong (Flat.RowT _ (rows (env c) o) d) (sym (rowsL-ʳ++ pre)))))
           (up-plug c (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post)) gc)
-up-plug (inTake i q w c)   s ()
+up-plug (inTake i q w c)   s gc = up-plug c (takeS i q w s) gc
 up-plug (inOuter (mergeᶠ (just m)) f d n q ls c) s ()
 up-plug (inOuter switchᶠ f d n q ls c)           s ()
 up-plug (inOuter exhaustᶠ f d n q ls c)          s ()
@@ -147,7 +147,7 @@ off-up (inCut true a c)  d = off-up c (trans (sym (∧-identityʳ (liv c))) d)
 off-up (inCut false a c) d = ≃-refl
 off-up (inLn true c)     d = off-up c d
 off-up (inLn false c)    d = ≃-refl
-off-up (inTake i q w c)  d = ≃-refl
+off-up (inTake i q w c)  d = off-up c d
 off-up (inOuter (mergeᶠ nothing) f d n q ls c)  dd = off-up c dd
 off-up (inOuter (mergeᶠ (just m)) f d n q ls c) dd = ≃-refl
 off-up (inOuter switchᶠ f d n q ls c)           dd = ≃-refl
@@ -187,6 +187,7 @@ owes-split : ∀ {R Γ A} (c : Ctx R Γ A) {s : St Γ A} → closed c ≡ false 
 owes-split top              cl op g ow = _ , ow , tt
 owes-split (inMap f c)      cl op g ow = owes-split c cl _ g ow
 owes-split (inScan f z c)   cl op g ow = owes-split c cl _ g ow
+owes-split (inTake i q w c) cl op g ow = owes-split c cl _ g ow
 owes-split (inCut true a c) cl op g ow = owes-split c cl _ g ow
 owes-split (inCut false a c) () op g ow
 owes-split (inLn true c)    cl op g ow = owes-split c cl _ g ow
@@ -203,7 +204,6 @@ owes-split (inSrc k b c) {s} cl op g ow with owes-split c (∨-false (CS.closed 
 ... | u , (os , ob) , so = u , os , ob , so
 owes-split (inBody k o c) cl op g ow with owes-split c cl _ g ow
 ... | u , (oo , os) , so = (oo , u) , os , so
-owes-split c@(inTake _ _ _ _)  {s} cl op g ow = ⊥-elim (proj₁ (good-split c s g))
 owes-split c@(inOuter (mergeᶠ (just _)) _ _ _ _ _ _) {s} cl op g ow = ⊥-elim (proj₁ (good-split c s g))
 owes-split c@(inOuter switchᶠ _ _ _ _ _ _)           {s} cl op g ow = ⊥-elim (proj₁ (good-split c s g))
 owes-split c@(inOuter exhaustᶠ _ _ _ _ _ _)          {s} cl op g ow = ⊥-elim (proj₁ (good-split c s g))

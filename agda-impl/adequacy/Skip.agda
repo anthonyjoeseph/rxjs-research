@@ -22,13 +22,13 @@ open import Relation.Nullary using (¬_)
 open import adequacy.Up using (all-ʳ++)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Pos; ix)
+open import denotation.Events using (Pos; ix; last)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; _≺_; _≼_; Truncate; Reach; Dep; MapT; map-out; map-skip; map-pin;
-  map-end; Ended; module Connecting; module Scan)
+  map-end; Ended; module Connecting; module Scan; module TakeWhile)
 open import denotation.Laws.Modulus using (≺-trans; ≺→≼; ≼-≺-≺; ≺-ext)
 open import operation.PureObservable using (module Machine)
-open Machine using (Ctx; St; CS; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (acc-val; up; env; rows; rowsL; pendRows; Gone; Lane; reads; Lanes; Each; module Flat; _≃_; _⇄_; Vis; Hot; ∅)
+open Machine using (Owe; free; cpAt; cutAt; overAt; Ctx; St; CS; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
+open import adequacy.Rows using (TakeR; Kept; kept; Stops; stop; left; acc-val; up; env; rows; rowsL; pendRows; Gone; Lane; reads; Lanes; Each; module Flat; _≃_; _⇄_; Vis; Hot; ∅)
 
 ------------------------------------------------------------------------
 -- Rows past a position
@@ -41,6 +41,11 @@ After p t = ∀ {q e} → t q e → p ≺ q
 Since : ∀ {A} → Pos → EmissionSet A → Set
 Since p t = ∀ {q e} → t q e → p ≼ q
 
+-- A take that has failed ends where the failing value stops it.
+LeadT : Owe → Pos → Set
+LeadT (cpAt p₀) p = p ≼ (p₀ ++ [ last ])
+LeadT _         p = ⊤
+
 -- What a rising event at `p` is owed past: frame by frame, every other
 -- part of a merge or a connect it rises through.  Up a source, the
 -- body's own rows: those it is not yet fed of the source's.
@@ -49,6 +54,7 @@ LeadC (inMap f c)                                    p = LeadC c p
 LeadC (inScan f z c)                                 p = LeadC c p
 LeadC (inCut l a c)                                  p = LeadC c p
 LeadC (inLn b c)                                     p = LeadC c p
+LeadC (inTake i q w c)                               p = LeadT w p × LeadC c p
 LeadC (inOuter (mergeᶠ nothing) f d n q ls c)        p = Each (After p) (rowsL (env c) ls) × LeadC c p
 LeadC (inLanes (mergeᶠ nothing) f d n q o pre post c) p =
   After p (rows (env c) o) × Each (After p) (rowsL (env c) pre) × Each (After p) (rowsL (env c) post) × LeadC c p
@@ -287,6 +293,69 @@ trunc-≈ eq = go (fwd eq) (bwd eq) ⇆ go (bwd eq) (fwd eq)
     ... | inj₂ sk = inj₂ sk
 
 ------------------------------------------------------------------------
+-- Up a take
+
+kept-≈ : ∀ {A} p₀ {t u : EmissionSet A} {p} → t ≈⟨ p ⟩ u → Kept p₀ t ≈⟨ p ⟩ Kept p₀ u
+kept-≈ {A} p₀ {p = p} eq = go (fwd eq) ⇆ go (bwd eq)
+  where
+    go : ∀ {t u : EmissionSet A} → (∀ {k e} → t k e → u k e ⊎ Skip p k e) → ∀ {k e} → Kept p₀ t k e → Kept p₀ u k e ⊎ Skip p k e
+    go h (kept x np ins) with h x
+    ... | inj₁ x′       = inj₁ (kept x′ np ins)
+    ... | inj₂ (_ , ())
+
+since-take : ∀ {A} i (q : A → Bool) w {t : EmissionSet A} {p} → LeadT w p → Since p t → Since p (TakeR i q w t)
+since-take i q free {t} {p} _ s (r , _) = go r
+  where
+    go : ∀ {k e} → TakeWhile.TakeT i q t k e → p ≼ k
+    go (TakeWhile.pass x _ _)             = s x
+    go (TakeWhile.fail {k} {a} x _ _ _)   = ≺→≼ {p} {k ++ [ ix 0 ]} (≼-≺-≺ {p} {k} {k ++ [ ix 0 ]} (s {k} {out a} x) (≺-ext k []))
+    go (TakeWhile.stop {k} {a} x _ _)     = ≺→≼ {p} {k ++ [ last ]} (≼-≺-≺ {p} {k} {k ++ [ last ]} (s {k} {out a} x) (≺-ext k []))
+    go (TakeWhile.step x _)               = s x
+    go (TakeWhile.tend x _)               = s x
+    go (TakeWhile.left x _ _)             = s x
+since-take i q (cpAt p₀)  lt s stop                 = lt
+since-take i q (cpAt p₀)  lt s (left (kept x _ _))  = s x
+since-take i q (cutAt p₀) lt s (kept x _ _)         = s x
+since-take i q (overAt p₀) lt s (kept x _ _)        = s x
+
+take-≈ : ∀ {A} i (q : A → Bool) w {t u : EmissionSet A} {p} → t ≈⟨ p ⟩ u → TakeR i q w t ≈⟨ p ⟩ TakeR i q w u
+take-≈ {A} i q free {p = p} eq = trunc-≈ (go (fwd eq) (bwd eq) ⇆ go (bwd eq) (fwd eq))
+  where
+    nf : ∀ {t u : EmissionSet A} → (∀ {k e} → u k e → t k e ⊎ Skip p k e) → ∀ {k} → ¬ TakeWhile.Failed i q t k → ¬ TakeWhile.Failed i q u k
+    nf h⁻ n (k′ , a , y , nk , lt) with h⁻ y
+    ... | inj₁ y′       = n (k′ , a , y′ , nk , lt)
+    ... | inj₂ (_ , ())
+    go : ∀ {t u : EmissionSet A} → (∀ {k e} → t k e → u k e ⊎ Skip p k e) → (∀ {k e} → u k e → t k e ⊎ Skip p k e)
+       → ∀ {k e} → TakeWhile.TakeT i q t k e → TakeWhile.TakeT i q u k e ⊎ Skip p k e
+    go h h⁻ (TakeWhile.pass x kp n) with h x
+    ... | inj₁ x′       = inj₁ (TakeWhile.pass x′ kp (nf h⁻ n))
+    ... | inj₂ (_ , ())
+    go h h⁻ (TakeWhile.fail x kp n ic) with h x
+    ... | inj₁ x′       = inj₁ (TakeWhile.fail x′ kp (nf h⁻ n) ic)
+    ... | inj₂ (_ , ())
+    go h h⁻ (TakeWhile.stop x kp n) with h x
+    ... | inj₁ x′       = inj₁ (TakeWhile.stop x′ kp (nf h⁻ n))
+    ... | inj₂ (_ , ())
+    go h h⁻ (TakeWhile.step x n) with h x
+    ... | inj₁ x′            = inj₁ (TakeWhile.step x′ (nf h⁻ n))
+    ... | inj₂ (refl , refl) = inj₂ (refl , refl)
+    go h h⁻ (TakeWhile.tend x n) with h x
+    ... | inj₁ x′       = inj₁ (TakeWhile.tend x′ (nf h⁻ n))
+    ... | inj₂ (_ , ())
+    go h h⁻ (TakeWhile.left x n ins) with h x
+    ... | inj₁ x′       = inj₁ (TakeWhile.left x′ (nf h⁻ n) ins)
+    ... | inj₂ (_ , ())
+take-≈ {A} i q (cpAt p₀) {p = p} eq = go (fwd eq) ⇆ go (bwd eq)
+  where
+    go : ∀ {t u : EmissionSet A} → (∀ {k e} → t k e → u k e ⊎ Skip p k e) → ∀ {k e} → Stops p₀ t k e → Stops p₀ u k e ⊎ Skip p k e
+    go h stop = inj₁ stop
+    go h (left (kept x np ins)) with h x
+    ... | inj₁ x′       = inj₁ (left (kept x′ np ins))
+    ... | inj₂ (_ , ())
+take-≈ {A} i q (cutAt p₀) {p = p} eq = kept-≈ p₀ eq
+take-≈ {A} i q (overAt p₀) {p = p} eq = kept-≈ p₀ eq
+
+------------------------------------------------------------------------
 -- Up a connect
 
 -- A body a skip apart: its connect too, the source's rows read alike
@@ -338,7 +407,7 @@ up-vis (inCut true a c)                        ld st su eq = up-vis c ld st su e
 up-vis (inCut false a c)                       ld st su eq = ≃-id
 up-vis (inLn true c)                           ld st su eq = up-vis c ld st su eq
 up-vis (inLn false c)                          ld st su eq = ≃-id
-up-vis (inTake i q w c)                        ld st su eq = ≃-id
+up-vis (inTake i q w c)                        (lt , ld) st su eq = up-vis c ld (since-take i q w lt st) (since-take i q w lt su) (take-≈ i q w eq)
 up-vis (inOuter (mergeᶠ nothing) f d n q ls c) {t} {u} (al , ld) st su eq =
   up-vis c ld (since-row L t Ls st sl) (since-row L u Ls su sl) (trunc-≈ (flat-≈ L Ls Ls eq (≈ᴸ-refl Ls) st su sl sl))
   where

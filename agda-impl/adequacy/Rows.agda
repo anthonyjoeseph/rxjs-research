@@ -12,6 +12,7 @@ module adequacy.Rows where
 
 open import Data.Bool using (Bool; T; true; false; if_then_else_)
 open import Data.Empty using (⊥)
+open import Relation.Nullary using (¬_)
 open import Data.List using (List; []; _∷_; [_]; _ʳ++_; _++_)
 open import Data.List.Relation.Unary.All using ([]; _∷_; lookup)
 open import Data.Sum using (_⊎_)
@@ -22,10 +23,10 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (ofᴱ; Events; burst; hush) renaming (end to endᴱ)
-open import denotation.Events using (Pos; Timeline; ix)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; _≺_; _≼_; InE; enter; Truncate; MapT; ⟦_⟧; Ended; module Joining; module Scan; Den; hot; Proper; DenEnv; module Connecting)
+open import denotation.Events using (Pos; Timeline; ix; last; inside)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; _≺_; _≼_; InE; enter; Truncate; MapT; ⟦_⟧; Ended; module Joining; module Scan; module TakeWhile; Den; hot; Proper; DenEnv; module Connecting)
 open import operation.PureObservable using (module Machine; module Driver; Tape; play; ending; over)
-open Machine using (St; Ctx; CS; connS; joinS; coldS; scanS; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; load; moved; quiet; pend; ofS; mapS; cutS; lnS; flatS; alive; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; nx; cp) renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
+open Machine using (St; Ctx; CS; Owe; free; cpAt; cutAt; overAt; takeS; connS; joinS; coldS; scanS; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; load; moved; quiet; pend; ofS; mapS; cutS; lnS; flatS; alive; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; nx; cp) renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
 
 ------------------------------------------------------------------------
 -- Rows
@@ -140,6 +141,23 @@ acc-val : ∀ {A B} {f : B → A → B} {z} {t : EmissionSet A} {q b} → Scan.A
 acc-val (Scan.acc₀ r _)    = _ , r
 acc-val (Scan.acc _ r _ _) = _ , r
 
+-- A take past its failing value at `p`: the source's pins whose connect
+-- subscribed no later, and its end while still owed.
+data Kept {A : Set} (p : Pos) (t : EmissionSet A) : EmissionSet A where
+  kept : ∀ {k r} → t k (pin r) → ¬ (p ≺ r) → T (inside r k) → Kept p t k (pin r)
+
+data Stops {A : Set} (p : Pos) (t : EmissionSet A) : EmissionSet A where
+  stop : Stops p t (p ++ [ last ]) end
+  left : ∀ {k e} → Kept p t k e → Stops p t k e
+
+-- A take's rows, by what it owes: its source's taken, entered as a
+-- subscription's; once its failing value is shown, its end and pins left.
+TakeR : ∀ {A} → Bool → (A → Bool) → Owe → EmissionSet A → EmissionSet A
+TakeR i q free       t = Truncate (TakeWhile.TakeT i q t)
+TakeR i q (cpAt p)   t = Stops p t
+TakeR i q (cutAt p)  t = Kept p t
+TakeR i q (overAt p) t = Kept p t
+
 -- What a node still owes its parent, under `ρ`, the meaning of every
 -- binder in scope.
 mutual
@@ -149,6 +167,7 @@ mutual
   rows ρ (coldS true l)                         = InE (tapeE l)
   rows ρ (mapS f s)                             = MapT f (rows ρ s)
   rows ρ (scanS f z s)                          = Scan.ScanT f z (rows ρ s)
+  rows ρ (takeS i q w s)                        = TakeR i q w (rows ρ s)
   rows ρ (cutS true a s)                        = rows ρ s
   rows ρ (lnS true s)                           = rows ρ s
   rows ρ (flatS (mergeᶠ nothing) f d n q o ls)  = Flat.RowT (λ a → pendRows ρ (f a)) (rows ρ o) d (rowsL ρ ls)
@@ -183,7 +202,7 @@ up (inCut true a c)                                   H = up c H
 up (inCut false a c)                                  H = up c ∅
 up (inLn true c)                                      H = up c H
 up (inLn false c)                                     H = up c ∅
-up (inTake i p w c)                                   H = up c ∅
+up (inTake i q w c)                                   H = up c (TakeR i q w H)
 up (inOuter (mergeᶠ nothing) f d n q ls c)            H = up c (Flat.RowT (λ a → pendRows (env c) (f a)) H d (rowsL (env c) ls))
 up (inOuter (mergeᶠ (just _)) f d n q ls c)           H = up c ∅
 up (inOuter switchᶠ f d n q ls c)                     H = up c ∅

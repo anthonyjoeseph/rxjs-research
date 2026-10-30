@@ -26,8 +26,8 @@ open import denotation.EmissionSet using (EmissionSet; out; skip; pin; end; modu
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; CS; plug; alive; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (∅; env; rows; rowsL; pendRows; Lanes; Each; module Flat; _≃_; Hot)
-open import adequacy.Up using (_≈ᴸ_; []; _∷_; ≈ᴸ-refl; row-≃; map-≃; scan-≃; ≃-refl; conn-≃; rows-hot; ʳ++-≈)
+open import adequacy.Rows using (TakeR; ∅; env; rows; rowsL; pendRows; Lanes; Each; module Flat; _≃_; Hot)
+open import adequacy.Up using (_≈ᴸ_; []; _∷_; ≈ᴸ-refl; row-≃; map-≃; scan-≃; take-≃; ≃-refl; conn-≃; rows-hot; ʳ++-≈)
 open import adequacy.Bound using (Empty; empty-any; EndLast; Roots; Rooted; Live; G; GL; GLn; LnBody; SrcG; Held; live;
   mergeG-map)
 
@@ -40,6 +40,7 @@ mutual
   Owes : ∀ {Γ A} → DenEnv Γ → St Γ A → Set
   Owes ρ (mapS f s)                              = Owes ρ s
   Owes ρ (scanS f z s)                           = Owes ρ s
+  Owes ρ (takeS i q w s)                         = Owes ρ s
   Owes ρ (cutS true a s)                         = Owes ρ s
   Owes ρ (lnS b s)                               = Owes ρ s
   Owes ρ (flatS (mergeᶠ nothing) f d n q o ls)   = (¬ T d → Owing (rows ρ o)) × Owes ρ o × OwesL ρ ls
@@ -56,6 +57,7 @@ UpO : ∀ {R Γ A} → Ctx R Γ A → Set
 UpO top                                           = ⊤
 UpO (inMap f c)                                   = UpO c
 UpO (inScan f z c)                                = UpO c
+UpO (inTake i q w c)                              = UpO c
 UpO (inCut true a c)                              = UpO c
 UpO (inLn true c)                                 = UpO c
 UpO (inOuter (mergeᶠ nothing) f d n q ls c)       = OwesL (env c) ls × UpO c
@@ -70,6 +72,7 @@ Need : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Set
 Need top                                           s = ⊤
 Need (inMap f c)                                   s = Need c (mapS f s)
 Need (inScan f z c)                                s = Need c (scanS f z s)
+Need (inTake i q w c)                              s = Need c (takeS i q w s)
 Need (inCut true a c)                              s = Need c (cutS true a s)
 Need (inLn true c)                                 s = Need c (lnS true s)
 Need (inOuter (mergeᶠ nothing) f d n q ls c)       s = (¬ T d → Owing (rows (env c) s)) × Need c (flatS (mergeᶠ nothing) f d n q s ls)
@@ -92,6 +95,7 @@ owes-join : ∀ {R Γ A} (c : Ctx R Γ A) {s : St Γ A} → UpO c → Owes (env 
 owes-join top                                     u          o n         = o
 owes-join (inMap f c)                             u          o n         = owes-join c u o n
 owes-join (inScan f z c)                          u          o n         = owes-join c u o n
+owes-join (inTake i q w c)                        u          o n         = owes-join c u o n
 owes-join (inCut true a c)                        u          o n         = owes-join c u o n
 owes-join (inLn true c)                           u          o n         = owes-join c u o n
 owes-join (inOuter (mergeᶠ nothing) f d n q ls c) (ol , u)   o (h , nd)  = owes-join c u (h , o , ol) nd
@@ -247,6 +251,7 @@ SrcO : ∀ {R Γ A} → Ctx R Γ A → EmissionSet A → Set
 SrcO top                                             H = ⊤
 SrcO (inMap f c)                                     H = SrcO c (MapT f H)
 SrcO (inScan f z c)                                  H = SrcO c (Scan.ScanT f z H)
+SrcO (inTake i q w c)                                H = SrcO c (TakeR i q w H)
 SrcO (inCut true a c)                                H = SrcO c H
 SrcO (inLn true c)                                   H = SrcO c H
 SrcO (inOuter (mergeᶠ nothing) f d n q ls c)         H = SrcO c (Flat.RowT (λ a → pendRows (env c) (f a)) H d (rowsL (env c) ls))
@@ -264,7 +269,7 @@ srcO-≃ (inCut true a c)                                 eq so = srcO-≃ c eq 
 srcO-≃ (inCut false a c)                                eq so = tt
 srcO-≃ (inLn true c)                                    eq so = srcO-≃ c eq so
 srcO-≃ (inLn false c)                                   eq so = tt
-srcO-≃ (inTake i p w c)                                 eq so = tt
+srcO-≃ (inTake i q w c)                                 eq so = srcO-≃ c (take-≃ i q w eq) so
 srcO-≃ (inOuter (mergeᶠ nothing) f d n q ls c)          eq so = srcO-≃ c (row-≃ (λ a → pendRows (env c) (f a)) eq (≈ᴸ-refl (rowsL (env c) ls))) so
 srcO-≃ (inOuter (mergeᶠ (just _)) f d n q ls c)         eq so = tt
 srcO-≃ (inOuter switchᶠ f d n q ls c)                   eq so = tt
@@ -294,7 +299,7 @@ good-swap (inCut true a c) sw g = good-swap c (record { same = same sw ; live≡
 good-swap (inCut false a c) sw g = good-swap c (record { same = ≃-refl ; live≡ = refl ; node = λ v → node sw (v ∧ false) ; lane = λ _ () ; body = λ { v b (eq , gs , el) → eq , node sw (v ∧ b) gs , live-endlast (v ∧ b) (same sw) el } ; held = λ () }) g
 good-swap (inLn true c)    sw g = good-swap c (record { same = same sw ; live≡ = refl ; node = λ _ () ; lane = λ v → body sw v true ; body = λ _ _ () ; held = λ () }) g
 good-swap (inLn false c)   sw g = good-swap c (record { same = ≃-refl ; live≡ = refl ; node = λ _ () ; lane = λ v → body sw v false ; body = λ _ _ () ; held = λ () }) g
-good-swap (inTake i q w c) sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ()) (λ ())) g
+good-swap (inTake i q w c) sw g = good-swap c (record { same = take-≃ i q w (same sw) ; live≡ = refl ; node = node sw ; lane = λ _ () ; body = λ _ _ () ; held = λ () }) g
 good-swap (inOuter (mergeᶠ nothing) f d n q ls c) {s} {s′} sw g =
   good-swap c {s = flatS (mergeᶠ nothing) f d n q s ls} {s′ = flatS (mergeᶠ nothing) f d n q s′ ls} (record { same = row-≃ _ (same sw) (≈ᴸ-refl (rowsL (env c) ls)) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ ()
                       ; node = λ { true m → mergeG-map (node sw true) (λ x → x) (λ x → x) (λ ov t {q} {e} → empty-≃ (same sw) (ov t) {q} {e}) (rooted-≃ (same sw) (≈ᴸ-refl (rowsL (env c) ls))) m

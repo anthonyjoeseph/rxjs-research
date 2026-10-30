@@ -28,11 +28,11 @@ open import operation.PureObservable using (module Machine; Tape; play; ending; 
 open Machine using (St; Ctx; CS; Cand; found; Mark; ofM; attM; leafM; Att; Out; still; shows; nx; cp; seek; search; kids; lanes; own; ownBest; first; retag;
                     raceT; outerT; laneT; mapT; scanT; cutT; alive; outOf; closed; attached; attAt;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
-                    top; inMap; inScan; inCut; inLn; inOuter; inLanes; inSrc; inBody)
+                    top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (env; rows; rowsL; pendRows; toEv; Lanes; Each; module Flat; Hot; ∅)
 open import adequacy.Bound using (_⊑_; ⊑i; ⊑-refl; ⊑-trans; <→⊑; ext-⊑; From; Bd; OK; OKL; Live;
                                          Apart; Spread; Parts; rooted-parts; ⊑→≼; join-ok; MergeG; G; GL; GLn; Good; ofPos; from-weak; seek-ok; seek-ln; lane-ok; lanes-ok)
-open import adequacy.Skip using (After; LeadC)
+open import adequacy.Skip using (After; LeadC; LeadT)
 
 open _⊑_
 open Bd
@@ -120,6 +120,7 @@ data Ext {R} {Γ′ A′} (c′ : Ctx R Γ′ A′) : ∀ {Γ A} → Ctx R Γ A 
   eMap   : ∀ {Γ A B} {f : A → B} {c : Ctx R Γ B} → Ext c′ (inMap f c) → Ext c′ c
   eScan  : ∀ {Γ A B} {f : B → A → B} {z} {c : Ctx R Γ B} → Ext c′ (inScan f z c) → Ext c′ c
   eCut   : ∀ {Γ A} {l a} {c : Ctx R Γ A} → Ext c′ (inCut l a c) → Ext c′ c
+  eTake  : ∀ {Γ A} {i q w} {c : Ctx R Γ A} → Ext c′ (inTake i q w c) → Ext c′ c
   eLn    : ∀ {Γ A} {b} {c : Ctx R Γ A} → Ext c′ (inLn b c) → Ext c′ c
   eOuter : ∀ {Γ A B} {f d n q ls} {c : Ctx R Γ B} → Ext c′ (inOuter {A = A} (mergeᶠ nothing) f d n q ls c) → Ext c′ c
   eLanes : ∀ {Γ A B} {f d n q} {o : St Γ A} {pre post} {c : Ctx R Γ B} → Ext c′ (inLanes (mergeᶠ nothing) f d n q o pre post c) → Ext c′ c
@@ -132,6 +133,7 @@ LeadE stop                                        P = ⊤
 LeadE (eMap e)                                    P = LeadE e P
 LeadE (eScan e)                                   P = LeadE e P
 LeadE (eCut e)                                    P = LeadE e P
+LeadE (eTake {w = w} e)                           P = LeadT w P × LeadE e P
 LeadE (eLn e)                                     P = LeadE e P
 LeadE (eOuter {ls = ls} {c = c} e)                P = Each (After P) (rowsL (env c) ls) × LeadE e P
 LeadE (eLanes {o = o} {pre = pre} {post = post} {c = c} e) P =
@@ -144,6 +146,7 @@ lead-ext stop       _                  lc = lc
 lead-ext (eMap e)   le                 lc = lead-ext e le lc
 lead-ext (eScan e)  le                 lc = lead-ext e le lc
 lead-ext (eCut e)   le                 lc = lead-ext e le lc
+lead-ext (eTake e)  (a , le)           lc = lead-ext e le (a , lc)
 lead-ext (eLn e)    le                 lc = lead-ext e le lc
 lead-ext (eOuter e) (a , le)           lc = lead-ext e le (a , lc)
 lead-ext (eLanes e) (a , b , d , le)   lc = lead-ext e le (a , b , d , lc)
@@ -160,6 +163,7 @@ ext-closed (eMap e)   h = ext-closed e h
 ext-closed (eScan e)  h = ext-closed e h
 ext-closed (eCut {l = l} {c = c} e) h = ext-closed e (subst (λ b → (Data.Bool.not l Data.Bool.∨ b) ≡ true) (sym h) (∨-true (Data.Bool.not l)))
 ext-closed (eLn e)    h = ext-closed e h
+ext-closed (eTake e)  h = ext-closed e h
 ext-closed (eOuter e) h = ext-closed e h
 ext-closed (eLanes e) h = ext-closed e h
 ext-closed (eSrc {k = k} e) h = ext-closed e (subst (λ b → (CS.closed k Data.Bool.∨ b) ≡ true) (sym h) (∨-true (CS.closed k)))
@@ -473,6 +477,12 @@ postulate
   conn-lead : ∀ {R A X} v (c : Ctx R [] A) k (o : St [] X) (b : St (X ∷ []) A) → G (env c) v (connS k o b)
             → Leads v c (rows (env c) (connS k o b)) (kids c (connS k o b))
 
+  -- A TAKE'S SEARCH LEADS: unfailed, its child's find through the take,
+  -- every part it lost past the shown event; failed, nothing shown.
+  -- Stated whole, as `take-ok` is, and for the same reason.
+  take-lead : ∀ {R A} v (c : Ctx R [] A) i q w (s : St [] A) → G (env c) v (takeS i q w s)
+            → Leads v c (rows (env c) (takeS i q w s)) (kids c (takeS i q w s))
+
 own-lead : ∀ {R Γ A} v (c : Ctx R Γ A) (s : St Γ A) → G (env c) v s → Leads v c (rows (env c) s) (ownBest c s (own s))
 own-lead true  c (ofS i p [])         _ = stop , λ { cl _ refl → tt , tie (p ++ [ last ]) refl (⊑-refl _) (hit at-end tt) }
 own-lead true  c (ofS i p (x ∷ xs))   _ = stop , λ { cl _ refl → tt , tie (p ++ [ ix i ]) refl (⊑-refl _) (hit {e = out x} at-out (of-out c {i} {p} {x} {xs} cl)) }
@@ -488,7 +498,7 @@ own-lead v c (flatS op f d n q o ls) _ = tt₁
 own-lead v c (lnS b s)            ()
 own-lead v c (scanS f z s)        _ = tt₁
 own-lead v c (coldS b l)          _ = cold-lead v c b l
-own-lead v c (takeS _ _ _ _)      ()
+own-lead v c (takeS i q w s)      _ = own-none v c {takeS i q w s} (own (takeS i q w s)) (λ ())
 own-lead v c (connS k o b)        _ = own-none v c {connS k o b} (own (connS k o b)) (λ ())
 own-lead v c (joinS j g x ib)     _ = own-none v c {joinS j g x ib} (own (joinS j g x ib)) (λ ())
 
@@ -528,8 +538,8 @@ mutual
   kids-lead v c (lnS _ _)        ()
   kids-lead true  c (scanS f z s) g = scan-leads true f z (seek (inScan f z c) s) (seek-ok (inScan f z c) s g) (seek-lead true (inScan f z c) s g)
   kids-lead false c (scanS f z s) g = scan-leads false f z (seek (inScan f z c) s) tt (seek-lead false (inScan f z c) s g)
+  kids-lead v c (takeS i q w s)   g = take-lead v c i q w s g
   kids-lead v c (coldS _ _)      _ = tt₁
-  kids-lead v c (takeS _ _ _ _)  ()
   kids-lead v c (connS k o b)    g = conn-lead v c k o b g
   kids-lead v c (joinS _ _ () _) _
 

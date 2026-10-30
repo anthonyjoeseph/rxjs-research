@@ -39,7 +39,7 @@ open import adequacy.Rows using (env; ∅; Hot; up; here; rows; rowsL; pendRows;
 open import adequacy.Up using (any-ʳ++ˡ; any-ʳ++ʳ; all-ʳ++; ≈ᴸ-refl; _∷_; up-≃; ≃-refl; ≃-trans; vis-≃; plus-≃; trunc-≃;
   row-≃)
 open import adequacy.Bound using (Empty; Good; G; GLn; shape; on; off; lane-v; live; dead-empty; MergeG; mergeG-map)
-open import adequacy.Skip using (After; Since; LeadC; _≈⟨_⟩_; up-vis; ≈-refl; since-map; map-≈; since-scan; scan-≈; since-row; flat-≈; after-since;
+open import adequacy.Skip using (After; Since; LeadC; _≈⟨_⟩_; up-vis; ≈-refl; since-map; map-≈; since-scan; scan-≈; since-take; take-≈; since-row; flat-≈; after-since;
                                  ≈ᴸ-hole; conn-≈; since-conn) renaming (≈ᴸ-refl to ≈ᴸ-refl⟨⟩; _∷_ to _∷≈_)
 open import adequacy.LaneEnd using (frame-≈; done-at; outer-owes; lanes-owe; since-x; since-y)
 open import adequacy.Owes using (Owing; Owes; OwesL; UpO; Swap; owes-join; SrcO; srcO-≃; owesL-ʳ++; rowsL-ʳ++; ≡→≃; owing-≃; empty-≃;
@@ -67,7 +67,7 @@ srcO-≈ (inCut true a c)                        ld st su eq so = srcO-≈ c ld 
 srcO-≈ (inCut false a c)                       ld st su eq so = tt
 srcO-≈ (inLn true c)                           ld st su eq so = srcO-≈ c ld st su eq so
 srcO-≈ (inLn false c)                          ld st su eq so = tt
-srcO-≈ (inTake i q w c)                        ld st su eq so = tt
+srcO-≈ (inTake i q w c)                        (lt , ld) st su eq so = srcO-≈ c ld (since-take i q w lt st) (since-take i q w lt su) (take-≈ i q w eq) so
 srcO-≈ (inOuter (mergeᶠ nothing) f d n q ls c) {t} {u} (al , ld) st su eq so =
   srcO-≈ c ld (since-row L t Ls st sl) (since-row L u Ls su sl) (trunc-≈ (flat-≈ L Ls Ls eq (≈ᴸ-refl⟨⟩ Ls) st su sl sl)) so
   where
