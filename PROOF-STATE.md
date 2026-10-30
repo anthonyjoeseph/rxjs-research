@@ -14,6 +14,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### A CONNECT ENDED BEFORE ITS SOURCE
+
+Riskiest: `Inv` asks a rising end's node to be `Empty`, but a body ending
+before its source's burst leaves that burst owed as silent pins. Open:
+`Ends cp` over visible rows only, which a lane's end then reads. Settled
+when `≈` carries silent rows past `p` with `Truncate`'s reach intact.
+
+Members: `rise-body-cp`.
+
 #### THE CONNECT'S SEARCH
 
 Riskiest: how a connect's source rows and its body's sit against each
@@ -68,7 +77,7 @@ completed source owing nothing) is enough for each; a source's end must
 leave its rows `Empty`. Settled when each is a body.
 
 Members: `sub-connect`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`,
-`rise-body-cp`, `abs-con`, `abs-join`.
+`abs-con`, `abs-join`.
 
 #### THE BINDER READ
 

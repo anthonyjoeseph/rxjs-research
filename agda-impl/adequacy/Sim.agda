@@ -402,13 +402,16 @@ postulate
   rise-src-cp : ∀ {R Γ X B} (k : CS) (b : St (X ∷ Γ) B) (c : Ctx R Γ B) s p
               → Sim ⟨ inSrc k b c , s , rising cp , p ⟩ [] ⟨ c , connS (record k { closed = true ; endAt = p }) s (feed (hd refl) p cp b) , absorbed , p ⟩
   -- A BODY'S END IS ITS CONNECT'S, ITS SOURCE OWED A TEARDOWN THERE.
-  -- DEAD ROUTE: the target Lead requires `Empty (ConnT r σ β)` from
-  --   `Ends cp`, but `Alive` in `ConnT r σ ∅` is vacuous (no body-end in
-  --   β), so source echoes appear and that fails when σ is non-empty.
-  --   With `After p σ` the source side is right, since `Plus β p end`
-  --   blocks source positions past p; the target `Plus (ConnT r σ β) p
-  --   end` still reads a vacuous Alive.  Blocked on a G invariant linking
-  --   a body's end to an empty σ.
+  -- False against `Inv` as it stands: `connect(of(1,2), h => empty)` ends
+  -- its body while subscribing it, its source's burst still owed, and
+  -- those rows are `ConnT`'s silent `burst` pins past the end, so the
+  -- target's `Ends cp` (`Empty`) fails while the source's holds.  Every
+  -- row a connect owes past its body's end is silent, so the step keeps
+  -- the visible rows; what moves is `Ends cp`, to visible rows only.  A
+  -- lane ending with silent pins owed then reaches `LaneEnd`, whose `≈`
+  -- slack is one skip at `p`, and `reach-≈` counts that slack as one row.
+  -- DEAD ROUTE: a `G` invariant emptying the source at a body's end: the
+  --   source is still owed its whole subscription there.
   rise-body-cp : ∀ {R Γ X B} (k : CS) (o : St Γ X) (c : Ctx R Γ B) s p
                → Sim ⟨ inBody k o c , s , rising cp , p ⟩ [] ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
 
