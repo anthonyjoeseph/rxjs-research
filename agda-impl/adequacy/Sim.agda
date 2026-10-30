@@ -28,7 +28,7 @@ open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Data.List using (_ʳ++_)
 
-open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Timeline; root; ix)
 open import denotation.EmissionSet using (DenEnv; EmissionSet; out; end; MapT; map-out; map-skip; map-pin; map-end; _≼_; enter; ⟦_⟧; Proper)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd)
@@ -115,6 +115,10 @@ postulate
   sub-connect : ∀ {R Γ A B} (c : Ctx R Γ B) (s : Obs Timeline Γ A) b q p
               → Sim ⟨ c , pend (connect s b) q , subscribing , p ⟩ []
                     ⟨ inBody (cs false true false (just q) nothing nothing q root) (pend s (q ⊕ [ ix 1 ])) c , pend b (q ⊕ [ ix 0 ]) , subscribing , q ⊕ [ ix 0 ] ⟩
+  -- A DEFER ENTERED: its body pending one level down, its rows those the
+  -- defer begins with there.
+  sub-defer : ∀ {R Γ A} (c : Ctx R Γ A) l q p
+            → Sim ⟨ c , pend (defer l) q , subscribing , p ⟩ [] ⟨ c , pend (Later.force l) (q ⊕ [ ix 1 ]) , subscribing , q ⊕ [ ix 1 ] ⟩
   -- A JOINER OF A COMPLETED SUBJECT: its end owed, under `last`.
   sub-joined : ∀ {R Γ A} (c : Ctx R Γ A) (x : A ∈ Γ) q p → closedUp c x ≡ true
              → Sim ⟨ c , pend (connected x) q , subscribing , p ⟩ [] ⟨ c , ofS 0 q [] , absorbed , q ⟩
@@ -440,7 +444,6 @@ postulate
                  → Inv ⟨ c , pend (flatMap switchᶠ f s) q′ , subscribing , p ⟩ → Runs ⟨ c , pend (flatMap switchᶠ f s) q′ , subscribing , p ⟩
   beyond-exhaust : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) s q′ p
                  → Inv ⟨ c , pend (flatMap exhaustᶠ f s) q′ , subscribing , p ⟩ → Runs ⟨ c , pend (flatMap exhaustᶠ f s) q′ , subscribing , p ⟩
-  beyond-defer   : ∀ {R Γ A} (c : Ctx R Γ A) l q′ p → Inv ⟨ c , pend (defer l) q′ , subscribing , p ⟩ → Runs ⟨ c , pend (defer l) q′ , subscribing , p ⟩
 
 join-mv : ∀ {R Γ A} (c : Ctx R Γ A) (x : A ∈ Γ) q {p} → Mv (stepᴹ ⟨ c , pend (connected x) q , subscribing , p ⟩)
 join-mv c x q with closedUp c x
@@ -471,7 +474,7 @@ reach-pend c (flatMap (mergeᶠ (just m)) f s) q p i = beyond (beyond-bounded c 
 reach-pend c (flatMap switchᶠ f s)           q p i = beyond (beyond-switch c f s q p i)
 reach-pend c (flatMap exhaustᶠ f s)          q p i = beyond (beyond-exhaust c f s q p i)
 reach-pend c (connect s b)                   q p i = within tt λ { refl → sub-connect c s b q p }
-reach-pend c (defer l)                       q p i = beyond (beyond-defer c l q p i)
+reach-pend c (defer l)                       q p i = within tt λ { refl → sub-defer c l q p }
 
 reach : ∀ {R} (k : Conf R) → Inv k → Reach k
 reach ⟨ c , s , rising e , p ⟩                        i = within (rise-mv c s e p) (rise-sim c s e p)

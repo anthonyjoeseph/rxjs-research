@@ -65,12 +65,11 @@ Members: `conn-owing`, `shut-of`.
 
 Each former still handed to its own leaf in `reach` owes a node in
 `adequacy.Bound.G`, its rows and what it owes, and the step arms of the
-nodes it builds. A cold that hushes meets THE OWED; `defer` unfolds only
-at admissible subscriptions. Settled former by former, as each leaf
-becomes arms.
+nodes it builds. A cold that hushes meets THE OWED. Settled former by
+former, as each leaf becomes arms.
 
 Members: `beyond-cold`, `beyond-scan`, `beyond-take`, `beyond-bounded`,
-`beyond-switch`, `beyond-exhaust`, `beyond-defer`.
+`beyond-switch`, `beyond-exhaust`.
 
 #### OWING AS ENTERED
 
@@ -136,9 +135,11 @@ Members: `found-mark`, `abs-att`, `rise-outer-nx`, `rise-outer-cp`,
 
 Believed: subscribing to `empty` or `of` enters exactly the rows its
 emission set begins with, those rows placed behind every ancestor's parts
-so its merges stay apart and end last. Settled when each is a body.
+so its merges stay apart and end last; a `defer` entered at an admissible
+subscription reads as its body one level down. Settled when each is a
+body.
 
-Members: `sub-empty`, `sub-of`.
+Members: `sub-empty`, `sub-of`, `sub-defer`.
 
 #### THE KEYS
 
