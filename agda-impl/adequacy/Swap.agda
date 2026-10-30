@@ -117,8 +117,8 @@ roots-≈ (q ∷ qs) (e ∷ es) ((a , x , w) , nq , rs) = (a , x , λ l → w (f
 roots-≈ []       (_ ∷ _)  ()
 roots-≈ (_ ∷ _)  []       ()
 
-rooted-≃ : ∀ {Γ A B} {ρ : DenEnv Γ} {O O′ : EmissionSet A} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′ → Rooted ρ O Ls → Rooted ρ O′ Ls′
-rooted-≃ eo es r = record { o₀ = o₀ ; p₀ = p₀ ; inv = inv ; sub = λ x → sub (from eo x) ; qs = qs ; roots = roots-≈ qs es roots }
+rooted-≃ : ∀ {A B} {O O′ : EmissionSet A} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′ → Rooted O Ls → Rooted O′ Ls′
+rooted-≃ eo es r = record { H = H ; X = X ; p₀ = p₀ ; inv = inv ; sub = λ x → sub (from eo x) ; qs = qs ; roots = roots-≈ qs es roots }
   where open Rooted r
 
 -- A source swapped: the same source to its connect.

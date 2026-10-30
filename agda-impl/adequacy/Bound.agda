@@ -321,23 +321,27 @@ Roots H X _        _        = ⊥
 
 -- A merge's outer still inside what it entered, every lane begun at one
 -- of that entry's values: the entry keeps Tier −1's invariant, so the
--- outer's rows are single and its parts apart.
-record Rooted {Γ A B} (ρ : DenEnv Γ) (O : EmissionSet A) (Ls : List (EmissionSet B)) : Set₁ where
+-- outer's rows are single and its parts apart. The entry's rows `X` and
+-- hots `H` are frozen when the outer subscribes: a binder's step moves
+-- rows from the environment into a joiner's inbox, and the entry re-read
+-- at the current environment would lose them.
+record Rooted {A B} (O : EmissionSet A) (Ls : List (EmissionSet B)) : Set₁ where
   field
-    o₀    : Obs Timeline Γ A
+    H     : Pos → Set
+    X     : EmissionSet A
     p₀    : Pos
-    inv   : InvAt (Hots ρ) p₀ (pendRows ρ o₀ p₀)
-    sub   : ∀ {q e} → O q e → pendRows ρ o₀ p₀ q e
+    inv   : InvAt H p₀ X
+    sub   : ∀ {q e} → O q e → X q e
     qs    : List Pos
-    roots : Roots (Hots ρ) (pendRows ρ o₀ p₀) qs Ls
+    roots : Roots H X qs Ls
 
-module _ {Γ A B} {ρ : DenEnv Γ} {O : EmissionSet A} {Ls : List (EmissionSet B)} (r : Rooted ρ O Ls) where
+module _ {A B} {O : EmissionSet A} {Ls : List (EmissionSet B)} (r : Rooted O Ls) where
   open Rooted r
   open InvAt inv using (func; under)
 
   private
-    root-of : ∀ qs′ (Ls′ : List (EmissionSet B)) → Roots (Hots ρ) (pendRows ρ o₀ p₀) qs′ Ls′ → ∀ {y e} → Lanes Ls′ y e
-            → Σ Pos λ q → q ∈ qs′ × Σ A λ a → pendRows ρ o₀ p₀ q (out a) × W (Hots ρ) (q ++ [ ix 1 ]) y
+    root-of : ∀ qs′ (Ls′ : List (EmissionSet B)) → Roots H X qs′ Ls′ → ∀ {y e} → Lanes Ls′ y e
+            → Σ Pos λ q → q ∈ qs′ × Σ A λ a → X q (out a) × W H (q ++ [ ix 1 ]) y
     root-of (q ∷ qs′) (t ∷ Ls′) ((a , x , w) , _ , _) (inj₁ l) = q , here refl , a , x , w l
     root-of (q ∷ qs′) (t ∷ Ls′) (_ , _ , rs) (inj₂ l) with root-of qs′ Ls′ rs l
     ... | q′ , m , rest = q′ , there m , rest
@@ -345,7 +349,7 @@ module _ {Γ A B} {ρ : DenEnv Γ} {O : EmissionSet A} {Ls : List (EmissionSet B
     root-of []        (_ ∷ _)   () _
     root-of (_ ∷ _)   []        () _
 
-    spread : ∀ qs′ (Ls′ : List (EmissionSet B)) → Roots (Hots ρ) (pendRows ρ o₀ p₀) qs′ Ls′ → Spread Ls′
+    spread : ∀ qs′ (Ls′ : List (EmissionSet B)) → Roots H X qs′ Ls′ → Spread Ls′
     spread []        []        _ = tt
     spread (q ∷ qs′) (t ∷ Ls′) ((a , x , w) , nq , rs) = apart′ , spread qs′ Ls′ rs
       where
@@ -375,7 +379,7 @@ record MergeG {Γ A B} (Go Gl : Set₁) (ρ : DenEnv Γ) (b : Bool) (f : A → O
     fresh  : q ≡ []
     count  : Live b (n ≡ live ls)
     spent  : Live b (T d → Empty (rows ρ o))
-    rooted : Live₁ b (Rooted ρ (rows ρ o) (rowsL ρ ls))
+    rooted : Live₁ b (Rooted (rows ρ o) (rowsL ρ ls))
 
 -- Off: only the shape.
 mergeG₀ : ∀ {Γ A B Go Gl} {ρ : DenEnv Γ} {f : A → Obs Timeline Γ B} {d n q o} {ls : List (St Γ B)} → Go → Gl → q ≡ [] → MergeG Go Gl ρ false f d n q o ls
@@ -384,7 +388,7 @@ mergeG₀ go gl qe = record { outer = go ; lanesG = gl ; fresh = qe ; count = tt
 -- The same merge over other parts, its facts carried.
 mergeG-map : ∀ {Γ A B Go Gl Go′ Gl′} {ρ : DenEnv Γ} {b} {f : A → Obs Timeline Γ B} {d n n′ q} {o o′ : St Γ A} {ls ls′ : List (St Γ B)}
            → (Go → Go′) → (Gl → Gl′) → (Live b (n ≡ live ls) → Live b (n′ ≡ live ls′)) → (Live b (T d → Empty (rows ρ o)) → Live b (T d → Empty (rows ρ o′)))
-           → (Live₁ b (Rooted ρ (rows ρ o) (rowsL ρ ls)) → Live₁ b (Rooted ρ (rows ρ o′) (rowsL ρ ls′)))
+           → (Live₁ b (Rooted (rows ρ o) (rowsL ρ ls)) → Live₁ b (Rooted (rows ρ o′) (rowsL ρ ls′)))
            → MergeG Go Gl ρ b f d n q o ls → MergeG Go′ Gl′ ρ b f d n′ q o′ ls′
 mergeG-map ho hl hc hs hr m = record { outer = ho outer ; lanesG = hl lanesG ; fresh = fresh ; count = hc count ; spent = hs spent ; rooted = hr rooted }
   where open MergeG m
