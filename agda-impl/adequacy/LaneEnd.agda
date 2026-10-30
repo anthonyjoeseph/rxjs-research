@@ -108,8 +108,8 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {p : Pos} {O : EmissionSe
   LY = Pre ʳ++ (∅ ∷ Post)
 
   PX PY : FlatOp → Policy A B
-  PX op = polOf op L O d n LX
-  PY op = polOf op L O d (pred n) LY
+  PX op = polOf op L O d n [] LX
+  PY op = polOf op L O d (pred n) [] LY
 
   sw : Sw (λ c → Plus t₀ p end c end) (λ c → ∅ {B} c end) (EndsOf LX) (EndsOf LY)
   sw = sw-ends Pre here

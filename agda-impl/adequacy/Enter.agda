@@ -5,72 +5,27 @@
 module adequacy.Enter where
 
 open import Data.Bool using (false)
-open import Data.Empty using (⊥)
-open import Data.List using ([])
+open import Data.Empty using (⊥; ⊥-elim)
+open import Data.List using (List; [])
+open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_)
+open import Data.Nat using (ℕ; zero; suc)
 open import Data.Maybe using (nothing; just)
-open import Data.Product using (Σ; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (refl)
-open import Data.Unit using (tt)
+open import Data.Unit using (⊤; tt)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; map; scan; flatMap)
 open import denotation.Events using (Pos; Timeline)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; Reach; PDep; enter; ⟦_⟧; DenEnv;
-  MapT; map-out; map-skip; map-pin; map-end; module Scan; module Joining)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; Reach; PDep; enter; ⟦_⟧; DenEnv; MapT; map-out;
+  map-skip; map-pin; map-end; module Scan; module Switch; module Exhaust; module Bounded;
+  LaneOf; At; Ended)
 open import denotation.Laws.Modulus using (reach-via; entered-reach)
-open import adequacy.Rows using (acc-val; ∅; pendRows; reads; _≃_; _⇄_; module Flat; module BoundedF; module SwitchF; module ExhaustF)
-open import adequacy.Up using (trunc-≃)
+open import adequacy.Rows using (acc-val; ∅; pendRows; Lane; reads; Kth; sub; _≃_; _⇄_; module Flat; module BoundedF; module SwitchF; module ExhaustF)
+open import adequacy.Up using (trunc-≃; join-≃)
+open import adequacy.Policy using (Policy; flatP; switchP; exhaustP; boundedP)
 
 open _≃_
-
--- Two joiners on one outer and like lane readings, with the same begun
--- rows and over at the same places: the same rows.
-module _ {A B : Set} {Lane Lane′ : Pos → A → EmissionSet B} {O : EmissionSet A} {Bg Bg′ : EmissionSet B} {Over Over′ : Pos → Set}
-         {Runs : Pos → Set} {Cut : Pos → Pos → Set} {Hand : Pos → Set}
-         (ln : ∀ {q a} → Lane q a ≃ Lane′ q a) (bg : Bg ≃ Bg′) (ov : ∀ {c} → Over c → Over′ c) (vo : ∀ {c} → Over′ c → Over c) where
-  private
-    module X = Joining Lane O Bg Over Runs Cut Hand
-    module Y = Joining Lane′ O Bg′ Over′ Runs Cut Hand
-
-    xy : ∀ {c} → X.Done c → Y.Done c
-    xy (o , h) = ov o , λ x r lt nc → let (c₀ , e , le) = h x r lt nc in c₀ , to ln e , le
-
-    yx : ∀ {c} → Y.Done c → X.Done c
-    yx (o , h) = vo o , λ x r lt nc → let (c₀ , e , le) = h x r lt nc in c₀ , from ln e , le
-
-  joining-≃ : X.JoinT ≃ Y.JoinT
-  joining-≃ = fwd ⇄ bwd
-    where
-      fwd : ∀ {k e} → X.JoinT k e → Y.JoinT k e
-      fwd (X.val x)             = Y.val x
-      fwd (X.step x)            = Y.step x
-      fwd (X.opin x)            = Y.opin x
-      fwd (X.oend x d)          = Y.oend x (xy d)
-      fwd (X.opass x nd)        = Y.opass x λ d → nd (yx d)
-      fwd (X.lane x r l nc w)   = Y.lane x r (to ln l) nc w
-      fwd (X.lend x r l nc nh d)   = Y.lend x r (to ln l) nc nh (xy d)
-      fwd (X.lpass x r l nc nh nd) = Y.lpass x r (to ln l) nc nh λ d → nd (yx d)
-      fwd (X.hand x r l nc h)      = Y.hand x r (to ln l) nc h
-      fwd (X.left x r l c i)    = Y.left x r (to ln l) c i
-      fwd (X.run x w)           = Y.run (to bg x) w
-      fwd (X.rend x nh d)       = Y.rend (to bg x) nh (xy d)
-      fwd (X.rpass x nh nd)     = Y.rpass (to bg x) nh λ d → nd (yx d)
-      fwd (X.rhand x h)         = Y.rhand (to bg x) h
-      bwd : ∀ {k e} → Y.JoinT k e → X.JoinT k e
-      bwd (Y.val x)             = X.val x
-      bwd (Y.step x)            = X.step x
-      bwd (Y.opin x)            = X.opin x
-      bwd (Y.oend x d)          = X.oend x (yx d)
-      bwd (Y.opass x nd)        = X.opass x λ d → nd (xy d)
-      bwd (Y.lane x r l nc w)   = X.lane x r (from ln l) nc w
-      bwd (Y.lend x r l nc nh d)   = X.lend x r (from ln l) nc nh (yx d)
-      bwd (Y.lpass x r l nc nh nd) = X.lpass x r (from ln l) nc nh λ d → nd (xy d)
-      bwd (Y.hand x r l nc h)      = X.hand x r (from ln l) nc h
-      bwd (Y.left x r l c i)    = X.left x r (from ln l) c i
-      bwd (Y.run x w)           = X.run (from bg x) w
-      bwd (Y.rend x nh d)       = X.rend (from bg x) nh (yx d)
-      bwd (Y.rpass x nh nd)     = X.rpass (from bg x) nh λ d → nd (xy d)
-      bwd (Y.rhand x h)         = X.rhand (from bg x) h
 
 -- A merge with no outer rows and no lane begun: no rows.
 flat-∅ : ∀ {A B} (L : A → Pos → EmissionSet B) d n → Flat.RowT L ∅ d n [] ≃ ∅
@@ -155,15 +110,6 @@ bounded-∅ m L d n = (λ (r , _) → to′ r) ⇄ λ ()
     to′ (BoundedF.rpass (BoundedF.waits (BoundedF.queued () , _) _) _ _)
     to′ (BoundedF.rhand (BoundedF.waits (BoundedF.queued () , _) _) _)
 
--- A BOUNDED MERGE, A SWITCH, AN EXHAUST ENTERED: the joiner part way
--- through at its outer entered, not done, nothing begun or queued.
-postulate
-  enter-bounded : ∀ {Γ A B} (ρ : DenEnv Γ) m (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p
-                → pendRows ρ (flatMap (mergeᶠ (just m)) f s) p ≃ BoundedF.RowT m (λ a → pendRows ρ (f a)) (pendRows ρ s p) false 0 [] []
-  enter-switch  : ∀ {Γ A B} (ρ : DenEnv Γ) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p
-                → pendRows ρ (flatMap switchᶠ f s) p ≃ SwitchF.RowT (λ a → pendRows ρ (f a)) (pendRows ρ s p) false 0 []
-  enter-exhaust : ∀ {Γ A B} (ρ : DenEnv Γ) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p
-                → pendRows ρ (flatMap exhaustᶠ f s) p ≃ ExhaustF.RowT (λ a → pendRows ρ (f a)) (pendRows ρ s p) false 0 []
 
 -- A MAP ENTERED: its source entered, mapped.
 enter-map : ∀ {Γ A B} (ρ : DenEnv Γ) (f : A → B) (s : Obs Timeline Γ A) p → pendRows ρ (map f s) p ≃ MapT f (pendRows ρ s p)
@@ -191,12 +137,26 @@ enter-map ρ f s p = proj₁ ⇄ λ x → x , reach′ x
     reach′ (map-end y)  = reach-via {e = end} {end} (λ x _ _ → proj₁ (src x) , proj₂ (src x) , tt) (entered-reach (⟦ s ⟧ ρ) p y)
     reach′ (map-pin {r = r} y) = reach-via {e = pin r} {pin r} (λ x _ d → proj₁ (src x) , proj₂ (src x) , λ i → pd x (d i)) (entered-reach (⟦ s ⟧ ρ) p y)
 
+-- The denotation's joiner, freshly subscribed, as a policy.
+denP : ∀ {A B : Set} → (Pos → A → EmissionSet B) → EmissionSet A → (Pos → Set) → (Pos → Pos → Set) → Policy A B
+denP L o Ru Cu = record { lanes = L ; outer = o ; begun = λ _ _ → ⊥ ; over = Ended o ; runs = Ru ; cut = Cu ; hand = λ _ → ⊥ }
+
+-- A lane read at its value's second child.
+lane-at : ∀ {A B} {L : A → Pos → EmissionSet B} {q a} → At L q a ≃ Lane L q a
+lane-at = (λ (l , p) → reads l p) ⇄ λ (reads l p) → l , p
+
 -- A MERGE ENTERED: the merge part way through, at its outer entered, not
 -- done, nothing begun.
 enter-merge : ∀ {Γ A B} (ρ : DenEnv Γ) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p
             → pendRows ρ (flatMap (mergeᶠ nothing) f s) p ≃ Flat.RowT (λ a → pendRows ρ (f a)) (pendRows ρ s p) false 0 []
 enter-merge ρ f s p =
-  trunc-≃ (joining-≃ ((λ (l , p) → reads l p) ⇄ λ (reads l p) → l , p) ((λ ()) ⇄ λ ()) (λ e → Flat.over-at (inj₂ e) tt) λ { (Flat.over-at (inj₁ ()) _) ; (Flat.over-at (inj₂ e) _) → e })
+  trunc-≃ (join-≃ (denP (LaneOf (λ a → ⟦ f a ⟧ ρ)) O (λ _ → ⊤) (λ _ _ → ⊥)) (flatP L O false 0 [])
+                  (record { lane≃ = lane-at ; ov→ = λ e → Flat.over-at (inj₂ e) tt ; ov← = λ { (Flat.over-at (inj₁ ()) _) ; (Flat.over-at (inj₂ e) _) → e }
+                          ; ru→ = λ x → x ; ru← = λ x → x ; cu→ = λ x → x ; cu← = λ x → x ; ha→ = λ () ; ha← = λ () })
+                  ((λ x → x) ⇄ (λ x → x)) ((λ ()) ⇄ (λ ())))
+  where
+    O = pendRows ρ s p
+    L = λ a → pendRows ρ (f a)
 
 -- A SCAN ENTERED: its source entered, scanned.
 enter-scan : ∀ {Γ A B} (ρ : DenEnv Γ) (f : B → A → B) z (s : Obs Timeline Γ A) p → pendRows ρ (scan f z s) p ≃ Scan.ScanT f z (pendRows ρ s p)
@@ -223,3 +183,123 @@ enter-scan ρ f z s p = proj₁ ⇄ λ x → x , reach′ x
     reach′ (Scan.sstep y) = reach-via {e = skip} {skip} (λ x _ _ → proj₁ (src x) , proj₂ (src x) , tt) (entered-reach (⟦ s ⟧ ρ) p y)
     reach′ (Scan.send y)  = reach-via {e = end} {end} (λ x _ _ → proj₁ (src x) , proj₂ (src x) , tt) (entered-reach (⟦ s ⟧ ρ) p y)
     reach′ (Scan.spin {r = r} y) = reach-via {e = pin r} {pin r} (λ x _ d → proj₁ (src x) , proj₂ (src x) , λ i → pd x (d i)) (entered-reach (⟦ s ⟧ ρ) p y)
+
+-- A SWITCH ENTERED: the switch part way through at its outer entered, not
+-- done, nothing begun.
+enter-switch : ∀ {Γ A B} (ρ : DenEnv Γ) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p
+             → pendRows ρ (flatMap switchᶠ f s) p ≃ SwitchF.RowT (λ a → pendRows ρ (f a)) (pendRows ρ s p) false 0 []
+enter-switch ρ f s p =
+  trunc-≃ (join-≃ (denP (LaneOf (λ a → ⟦ f a ⟧ ρ)) O (λ _ → ⊤) (Switch.Cut (λ a → ⟦ f a ⟧ ρ) O)) (switchP L O false 0 [])
+                  (record { lane≃ = lane-at ; ov→ = λ e → inj₂ e , inj₁ tt ; ov← = λ { (inj₁ () , _) ; (inj₂ e , _) → e }
+                          ; ru→ = λ x → x ; ru← = λ x → x ; cu→ = λ x → x ; cu← = λ x → x ; ha→ = λ () ; ha← = λ () })
+                  ((λ x → x) ⇄ (λ x → x)) ((λ ()) ⇄ λ { (SwitchF.bg () _) ; (SwitchF.bpin () _ _) }))
+  where
+    O = pendRows ρ s p
+    L = λ a → pendRows ρ (f a)
+
+-- AN EXHAUST ENTERED: the exhaust part way through at its outer entered,
+-- not done, nothing begun, so a value runs exactly where the
+-- denotation's does.
+module _ {Γ A B} (ρ : DenEnv Γ) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) (p : Pos) where
+  private
+    O = pendRows ρ s p
+    L = λ a → pendRows ρ (f a)
+    module D = Exhaust (λ a → ⟦ f a ⟧ ρ) O
+    module F = ExhaustF L O false 0 []
+
+    -- No lane begun: none is ever the last run.
+    no-bg : ∀ {q} → F.Cur q nothing → ⊥
+    no-bg (F.bg₀ _ _ nf)      = nf tt
+    no-bg (F.bdrop c _ _ _ _) = no-bg c
+
+    cur→ : ∀ {q₁ q} → D.Cur q₁ q → F.Cur q₁ (just q)
+    cur→ (D.cur₀ r mn)                     = F.cur₀ r mn tt
+    cur→ (D.run c r (l , lp) lt r₂ lt′ nx) = F.run (cur→ c) r (reads l lp) lt r₂ lt′ nx
+    cur→ (D.drop c r h r₂ lt nx)           = F.drop (cur→ c) r (λ (reads l lp) → h (l , lp)) r₂ lt nx
+
+    cur← : ∀ {q₁ q} → F.Cur q₁ (just q) → D.Cur q₁ q
+    cur← (F.cur₀ r mn _)                         = D.cur₀ r mn
+    cur← (F.run c r (reads l lp) lt r₂ lt′ nx)   = D.run (cur← c) r (l , lp) lt r₂ lt′ nx
+    cur← (F.drop c r h r₂ lt nx)                 = D.drop (cur← c) r (λ (l , lp) → h (reads l lp)) r₂ lt nx
+    cur← (F.brun c _ _ _ _)                      = ⊥-elim (no-bg c)
+
+  enter-exhaust : pendRows ρ (flatMap exhaustᶠ f s) p ≃ ExhaustF.RowT L O false 0 []
+  enter-exhaust =
+    trunc-≃ (join-≃ (denP (LaneOf (λ a → ⟦ f a ⟧ ρ)) O D.Run (λ _ _ → ⊥)) (exhaustP L O false 0 [])
+                    (record { lane≃ = lane-at ; ov→ = λ e → inj₂ e , tt ; ov← = λ { (inj₁ () , _) ; (inj₂ e , _) → e }
+                            ; ru→ = cur→ ; ru← = cur← ; cu→ = λ x → x ; cu← = λ x → x ; ha→ = λ () ; ha← = λ () })
+                    ((λ x → x) ⇄ (λ x → x)) ((λ ()) ⇄ (λ ())))
+
+-- Two lists of ends, end for end the same.
+SameEnds : List (Pos → Set) → List (Pos → Set) → Set₁
+SameEnds = Pointwise (λ l l′ → ∀ c → (l c → l′ c) × (l′ c → l c))
+
+-- A BOUNDED MERGE ENTERED: the joiner part way through at its outer
+-- entered, not done, nothing begun or queued, so its schedule is the
+-- denotation's lane for lane.
+module _ {Γ A B} (ρ : DenEnv Γ) (m : ℕ) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) (p : Pos) where
+  private
+    O = pendRows ρ s p
+    L = λ a → pendRows ρ (f a)
+    module D = Bounded m (λ a → ⟦ f a ⟧ ρ) O
+    module F = BoundedF m L O false 0 [] []
+
+    kth→ : ∀ {P ls ls′ k} → SameEnds ls ls′ → D.Kth P ls k → Kth P ls′ k
+    kth→ {k = zero}  (r ∷ pw) (inj₁ (c , l , x))       = inj₁ (c , proj₁ (r c) l , x)
+    kth→ {k = zero}  (r ∷ pw) (inj₂ y)                 = inj₂ (kth→ pw y)
+    kth→ {k = suc k} (r ∷ pw) (inj₁ ((c , l , x) , y)) = inj₁ ((c , proj₁ (r c) l , x) , kth→ pw y)
+    kth→ {k = suc k} (r ∷ pw) (inj₂ y)                 = inj₂ (kth→ pw y)
+
+    kth← : ∀ {P ls ls′ k} → SameEnds ls ls′ → Kth P ls′ k → D.Kth P ls k
+    kth← {k = zero}  (r ∷ pw) (inj₁ (c , l , x))       = inj₁ (c , proj₂ (r c) l , x)
+    kth← {k = zero}  (r ∷ pw) (inj₂ y)                 = inj₂ (kth← pw y)
+    kth← {k = suc k} (r ∷ pw) (inj₁ ((c , l , x) , y)) = inj₁ ((c , proj₂ (r c) l , x) , kth← pw y)
+    kth← {k = suc k} (r ∷ pw) (inj₂ y)                 = inj₂ (kth← pw y)
+
+    starts→ : ∀ {i q ls ls′ t} → SameEnds ls ls′ → D.Starts i q ls t → F.Starts i ls′ (just q) t
+    starts→ pw (D.room lt)                = F.room lt
+    starts→ pw (D.freed le k)             = F.freed le (kth→ pw k)
+    starts→ pw (D.queued le lt k₀ kl nk)  = F.queued le lt (kth→ pw k₀) (kth→ pw kl) (λ x → nk (kth← pw x))
+
+    starts← : ∀ {i q ls ls′ t} → SameEnds ls ls′ → F.Starts i ls′ (just q) t → D.Starts i q ls t
+    starts← pw (F.room lt)                = D.room lt
+    starts← pw (F.freed le k)             = D.freed le (kth← pw k)
+    starts← pw (F.queued le lt k₀ kl nk)  = D.queued le lt (kth← pw k₀) (kth← pw kl) (λ x → nk (kth→ pw x))
+
+    ends→ : ∀ {i ls ls′ c} → SameEnds ls ls′ → D.Ends i ls c → F.Ends i ls′ c
+    ends→ pw (q , a , t , nt , st , (e , lt)) = just q , a , t , F.outer nt , starts→ pw st , sub e lt
+
+    ends← : ∀ {i ls ls′ c} → SameEnds ls ls′ → F.Ends i ls′ c → D.Ends i ls c
+    ends← pw (just q , a , t , F.outer nt , st , sub e lt) = q , a , t , nt , starts← pw st , (e , lt)
+    ends← pw (nothing , a , t , F.queued () , _)
+
+    sched : ∀ i → SameEnds (D.Sched i) (F.Sched i)
+    sched zero    = []
+    sched (suc i) = (λ c → ends→ (sched i) , ends← (sched i)) ∷ sched i
+
+    lane→ : ∀ {q a k e} → D.Lane q a k e → F.LaneB q a k e
+    lane→ (i , t , (nt , st) , (e , lt)) = i , t , (F.outer nt , starts→ (sched i) st) , sub e lt
+
+    lane← : ∀ {q a k e} → F.LaneB q a k e → D.Lane q a k e
+    lane← (i , t , (F.outer nt , st) , sub e lt) = i , t , (nt , starts← (sched i) st) , (e , lt)
+
+    ha→ : ∀ {c} → D.Queued c → F.Queued c
+    ha→ (i , q , a , nt , st) = i , just q , a , F.outer nt , starts→ (sched i) st
+
+    ha← : ∀ {c} → F.Queued c → D.Queued c
+    ha← (i , just q , a , F.outer nt , st) = i , q , a , nt , starts← (sched i) st
+    ha← (i , nothing , a , F.queued () , _)
+
+    bg← : ∀ {k e} → F.Bg k e → ⊥
+    bg← (F.begun ())
+    bg← (F.waits (F.queued () , _) _)
+
+    dP = record { lanes = D.Lane ; outer = O ; begun = λ _ _ → ⊥ ; over = Ended O ; runs = D.Indexed ; cut = λ _ _ → ⊥ ; hand = D.Queued }
+
+  enter-bounded : pendRows ρ (flatMap (mergeᶠ (just m)) f s) p ≃ BoundedF.RowT m L O false 0 [] []
+  enter-bounded =
+    trunc-≃ (join-≃ dP (boundedP m L O false 0 [] [])
+                    (record { lane≃ = lane→ ⇄ lane← ; ov→ = λ e → inj₂ e , tt ; ov← = λ { (inj₁ () , _) ; (inj₂ e , _) → e }
+                            ; ru→ = λ (i , a , nt) → i , a , F.outer nt ; ru← = λ { (i , a , F.outer nt) → i , a , nt }
+                            ; cu→ = λ x → x ; cu← = λ x → x ; ha→ = ha→ ; ha← = ha← })
+                    ((λ x → x) ⇄ (λ x → x)) ((λ ()) ⇄ λ x → ⊥-elim (bg← x)))
