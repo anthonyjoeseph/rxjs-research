@@ -57,16 +57,6 @@ Members: `enter-bounded`, `enter-switch`, `enter-exhaust`,
 `rise-exhaust-drop`, `rise-exhaust-cp`, `rise-exhaust-lane-nx`,
 `rise-exhaust-lane-cp`.
 
-#### THE QUEUED SEARCH
-
-A bounded merge with values waiting: its race keys its rows, a lane's end
-handing off to the queue's head just past it. Open: `Leads`' `Tight` lets
-a lane's unshown find tie at the lane's end row, which queued leaves the
-merge no row. Settled by a find tied at an end row always showing it, or
-a queued lane whose unshown find ties at its end.
-
-Members: `bounded-wait-leadᶜ`.
-
 #### THE CONNECT STEPPED
 
 A connect entered, a joiner joined, a source's or body's rise, a
