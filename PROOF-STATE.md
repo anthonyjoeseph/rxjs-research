@@ -94,6 +94,14 @@ of whose run shows.
 
 Members: `shut-of`.
 
+#### ONE EVENT A POSITION
+
+Untried: a good node's rows hold one event at a position: a merge's
+parts apart by `Rooted`, a connect's body and source echoes by world.
+Settled by a body by former, or a good tree with two rows at a position.
+
+Members: `rows-single`.
+
 #### THE SCAN STEPPED
 
 Untried: a scan's rising value is its source's least, so the fold of it
@@ -104,12 +112,10 @@ Members: `rise-scan-nx`, `rise-scan-cp`.
 
 #### THE TAKE STEPPED
 
-Untried: a take's search keys and leads its rows, stated whole as a
-connect's is; a value passing or failing, its end, its stop and its cut
-keep `Inv`. Open: whether the child's find bounds the rows before its
-key, which a passing value's `¬ Failed` needs. Settled when each is a body.
+Untried: a take's search leads its rows; a value passing or failing,
+its end, its stop and its cut keep `Inv`. Settled when each is a body.
 
-Members: `take-ok`, `take-lead`, `rise-take-nx`, `rise-take-fail`,
+Members: `take-lead`, `rise-take-nx`, `rise-take-fail`,
 `rise-take-cp`, `rise-take-owed`, `abs-stop`, `abs-cut`.
 
 #### THE COMPLETE HALF

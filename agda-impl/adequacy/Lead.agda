@@ -479,7 +479,6 @@ postulate
 
   -- A TAKE'S SEARCH LEADS: unfailed, its child's find through the take,
   -- every part it lost past the shown event; failed, nothing shown.
-  -- Stated whole, as `take-ok` is, and for the same reason.
   take-lead : ∀ {R A} v (c : Ctx R [] A) i q w (s : St [] A) → G (env c) v (takeS i q w s)
             → Leads v c (rows (env c) (takeS i q w s)) (kids c (takeS i q w s))
 
