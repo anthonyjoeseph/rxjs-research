@@ -7,18 +7,18 @@ module adequacy.Enter where
 open import Data.Bool using (false)
 open import Data.Empty using (⊥)
 open import Data.List using ([])
-open import Data.Maybe using (nothing)
+open import Data.Maybe using (nothing; just)
 open import Data.Product using (Σ; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (refl)
 open import Data.Unit using (tt)
 
-open import Tree using (Obs; mergeᶠ; map; scan; flatMap)
+open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; map; scan; flatMap)
 open import denotation.Events using (Pos; Timeline)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; Reach; PDep; enter; ⟦_⟧; DenEnv;
   MapT; map-out; map-skip; map-pin; map-end; module Scan; module Joining)
 open import denotation.Laws.Modulus using (reach-via; entered-reach)
-open import adequacy.Rows using (acc-val; ∅; pendRows; reads; _≃_; _⇄_; module Flat)
+open import adequacy.Rows using (acc-val; ∅; pendRows; reads; _≃_; _⇄_; module Flat; module BoundedF; module SwitchF; module ExhaustF)
 open import adequacy.Up using (trunc-≃)
 
 open _≃_
@@ -91,6 +91,79 @@ flat-∅ L d = (λ (r , _) → to′ r) ⇄ λ ()
     to′ (Flat.rend () _ _)
     to′ (Flat.rpass () _ _)
     to′ (Flat.rhand () _)
+
+-- A JOINER WITH NO OUTER ROWS, NOTHING BEGUN AND NOTHING QUEUED: no rows.
+switch-∅ : ∀ {A B} (L : A → Pos → EmissionSet B) d n → SwitchF.RowT L ∅ d n [] ≃ ∅
+switch-∅ L d n = (λ (r , _) → to′ r) ⇄ λ ()
+  where
+    to′ : ∀ {k e} → SwitchF.JoinT L ∅ d n [] k e → ⊥
+    to′ (SwitchF.val ())
+    to′ (SwitchF.step ())
+    to′ (SwitchF.opin ())
+    to′ (SwitchF.oend () _)
+    to′ (SwitchF.opass () _)
+    to′ (SwitchF.lane () _ _ _ _)
+    to′ (SwitchF.lend () _ _ _ _ _)
+    to′ (SwitchF.lpass () _ _ _ _ _)
+    to′ (SwitchF.hand () _ _ _ _)
+    to′ (SwitchF.left () _ _ _ _)
+    to′ (SwitchF.run (SwitchF.bg () _) _)
+    to′ (SwitchF.rend (SwitchF.bg () _) _ _)
+    to′ (SwitchF.rpass (SwitchF.bg () _) _ _)
+    to′ (SwitchF.rhand (SwitchF.bg () _) _)
+    to′ (SwitchF.run (SwitchF.bpin () _ _) _)
+
+exhaust-∅ : ∀ {A B} (L : A → Pos → EmissionSet B) d n → ExhaustF.RowT L ∅ d n [] ≃ ∅
+exhaust-∅ L d n = (λ (r , _) → to′ r) ⇄ λ ()
+  where
+    to′ : ∀ {k e} → ExhaustF.JoinT L ∅ d n [] k e → ⊥
+    to′ (ExhaustF.val ())
+    to′ (ExhaustF.step ())
+    to′ (ExhaustF.opin ())
+    to′ (ExhaustF.oend () _)
+    to′ (ExhaustF.opass () _)
+    to′ (ExhaustF.lane () _ _ _ _)
+    to′ (ExhaustF.lend () _ _ _ _ _)
+    to′ (ExhaustF.lpass () _ _ _ _ _)
+    to′ (ExhaustF.hand () _ _ _ _)
+    to′ (ExhaustF.left () _ _ _ _)
+    to′ (ExhaustF.run () _)
+    to′ (ExhaustF.rend () _ _)
+    to′ (ExhaustF.rpass () _ _)
+    to′ (ExhaustF.rhand () _)
+
+bounded-∅ : ∀ {A B} m (L : A → Pos → EmissionSet B) d n → BoundedF.RowT m L ∅ d n [] [] ≃ ∅
+bounded-∅ m L d n = (λ (r , _) → to′ r) ⇄ λ ()
+  where
+    to′ : ∀ {k e} → BoundedF.JoinT m L ∅ d n [] [] k e → ⊥
+    to′ (BoundedF.val ())
+    to′ (BoundedF.step ())
+    to′ (BoundedF.opin ())
+    to′ (BoundedF.oend () _)
+    to′ (BoundedF.opass () _)
+    to′ (BoundedF.lane () _ _ _ _)
+    to′ (BoundedF.lend () _ _ _ _ _)
+    to′ (BoundedF.lpass () _ _ _ _ _)
+    to′ (BoundedF.hand () _ _ _ _)
+    to′ (BoundedF.left () _ _ _ _)
+    to′ (BoundedF.run (BoundedF.begun ()) _)
+    to′ (BoundedF.rend (BoundedF.begun ()) _ _)
+    to′ (BoundedF.rpass (BoundedF.begun ()) _ _)
+    to′ (BoundedF.rhand (BoundedF.begun ()) _)
+    to′ (BoundedF.run (BoundedF.waits (BoundedF.queued () , _) _) _)
+    to′ (BoundedF.rend (BoundedF.waits (BoundedF.queued () , _) _) _ _)
+    to′ (BoundedF.rpass (BoundedF.waits (BoundedF.queued () , _) _) _ _)
+    to′ (BoundedF.rhand (BoundedF.waits (BoundedF.queued () , _) _) _)
+
+-- A BOUNDED MERGE, A SWITCH, AN EXHAUST ENTERED: the joiner part way
+-- through at its outer entered, not done, nothing begun or queued.
+postulate
+  enter-bounded : ∀ {Γ A B} (ρ : DenEnv Γ) m (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p
+                → pendRows ρ (flatMap (mergeᶠ (just m)) f s) p ≃ BoundedF.RowT m (λ a → pendRows ρ (f a)) (pendRows ρ s p) false 0 [] []
+  enter-switch  : ∀ {Γ A B} (ρ : DenEnv Γ) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p
+                → pendRows ρ (flatMap switchᶠ f s) p ≃ SwitchF.RowT (λ a → pendRows ρ (f a)) (pendRows ρ s p) false 0 []
+  enter-exhaust : ∀ {Γ A B} (ρ : DenEnv Γ) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p
+                → pendRows ρ (flatMap exhaustᶠ f s) p ≃ ExhaustF.RowT (λ a → pendRows ρ (f a)) (pendRows ρ s p) false 0 []
 
 -- A MAP ENTERED: its source entered, mapped.
 enter-map : ∀ {Γ A B} (ρ : DenEnv Γ) (f : A → B) (s : Obs Timeline Γ A) p → pendRows ρ (map f s) p ≃ MapT f (pendRows ρ s p)

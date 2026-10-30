@@ -7,7 +7,7 @@
 module adequacy.Owes where
 
 open import Data.Bool using (Bool; true; false; T; _∧_)
-open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; _ʳ++_)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (suc; _+_)
@@ -18,7 +18,7 @@ open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
 open import Relation.Nullary using (¬_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos)
@@ -26,8 +26,9 @@ open import denotation.EmissionSet using (EmissionSet; out; skip; pin; end; modu
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; CS; plug; alive; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (TakeR; ∅; env; rows; rowsL; pendRows; Lanes; Each; module Flat; _≃_; Hot)
-open import adequacy.Up using (_≈ᴸ_; []; _∷_; ≈ᴸ-refl; row-≃; map-≃; scan-≃; take-≃; ≃-refl; conn-≃; rows-hot; ʳ++-≈)
+open import adequacy.Rows using (TakeR; env; rows; rowsL; pendRows; Lanes; Each; module Flat; module BoundedF; module SwitchF;
+  module ExhaustF; _≃_; Hot)
+open import adequacy.Up using (_≈ᴸ_; []; _∷_; ≈ᴸ-refl; row-≃; map-≃; scan-≃; take-≃; ≃-refl; conn-≃; rows-hot; ʳ++-≈; bounded-≃; switch-≃; exhaust-≃)
 open import adequacy.Bound using (Empty; empty-any; EndLast; Roots; Rooted; Live; G; GL; GLn; LnBody; SrcG; Held; live;
   mergeG-map)
 
@@ -43,7 +44,7 @@ mutual
   Owes ρ (takeS i q w s)                         = Owes ρ s
   Owes ρ (cutS true a s)                         = Owes ρ s
   Owes ρ (lnS b s)                               = Owes ρ s
-  Owes ρ (flatS (mergeᶠ nothing) f d n q o ls)   = (¬ T d → Owing (rows ρ o)) × Owes ρ o × OwesL ρ ls
+  Owes ρ (flatS op f d n q o ls)                 = (¬ T d → Owing (rows ρ o)) × Owes ρ o × OwesL ρ ls
   Owes ρ (connS k o b)                           = Owes ρ o × Owes (Hot (rows ρ o) k ∷ᴬ ρ) b
   Owes ρ _                                       = ⊤
 
@@ -60,8 +61,8 @@ UpO (inScan f z c)                                = UpO c
 UpO (inTake i q w c)                              = UpO c
 UpO (inCut true a c)                              = UpO c
 UpO (inLn true c)                                 = UpO c
-UpO (inOuter (mergeᶠ nothing) f d n q ls c)       = OwesL (env c) ls × UpO c
-UpO (inLanes (mergeᶠ nothing) f d n q o pre post c) =
+UpO (inOuter op f d n q ls c)                     = OwesL (env c) ls × UpO c
+UpO (inLanes op f d n q o pre post c)             =
   (¬ T d → Owing (rows (env c) o)) × Owes (env c) o × OwesL (env c) pre × OwesL (env c) post × UpO c
 UpO (inSrc k b c)                                 = UpO c
 UpO (inBody k o c)                                = Owes (env c) o × UpO c
@@ -75,9 +76,9 @@ Need (inScan f z c)                                s = Need c (scanS f z s)
 Need (inTake i q w c)                              s = Need c (takeS i q w s)
 Need (inCut true a c)                              s = Need c (cutS true a s)
 Need (inLn true c)                                 s = Need c (lnS true s)
-Need (inOuter (mergeᶠ nothing) f d n q ls c)       s = (¬ T d → Owing (rows (env c) s)) × Need c (flatS (mergeᶠ nothing) f d n q s ls)
-Need (inLanes (mergeᶠ nothing) f d n q o pre post c) s =
-  (T (alive s) → Owing (rows (env c) s)) × Need c (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post))
+Need (inOuter op f d n q ls c)                     s = (¬ T d → Owing (rows (env c) s)) × Need c (flatS op f d n q s ls)
+Need (inLanes op f d n q o pre post c)             s =
+  (T (alive s) → Owing (rows (env c) s)) × Need c (flatS op f d n q o (pre ʳ++ s ∷ post))
 Need (inSrc k b c)                                s = Owes (Hot (rows (env c) s) k ∷ᴬ env c) b × Need c (connS k s b)
 Need (inBody k o c)                               s = Need c (connS k o s)
 Need _                                             s = ⊤
@@ -98,9 +99,9 @@ owes-join (inScan f z c)                          u          o n         = owes-
 owes-join (inTake i q w c)                        u          o n         = owes-join c u o n
 owes-join (inCut true a c)                        u          o n         = owes-join c u o n
 owes-join (inLn true c)                           u          o n         = owes-join c u o n
-owes-join (inOuter (mergeᶠ nothing) f d n q ls c) (ol , u)   o (h , nd)  = owes-join c u (h , o , ol) nd
-owes-join (inLanes (mergeᶠ nothing) f d n q o′ pre post c) {s} (ho , oo , op , oq , u) o (h , nd) =
-  owes-join c u (ho , oo , owesL-ʳ++ pre op (h , o , oq)) nd
+owes-join (inOuter op f d n q ls c)               (ol , u)   o (h , nd)  = owes-join c u (h , o , ol) nd
+owes-join (inLanes op f d n q o′ pre post c) {s} (ho , oo , opr , oq , u) o (h , nd) =
+  owes-join c u (ho , oo , owesL-ʳ++ pre opr (h , o , oq)) nd
 owes-join (inSrc k b c)                           u          o (ob , n)  = owes-join c u (o , ob) n
 owes-join (inBody k o′ c)                         (oo , u)   o n         = owes-join c u (oo , o) n
 
@@ -257,6 +258,15 @@ SrcO (inLn true c)                                   H = SrcO c H
 SrcO (inOuter (mergeᶠ nothing) f d n q ls c)         H = SrcO c (Flat.RowT (λ a → pendRows (env c) (f a)) H d (rowsL (env c) ls))
 SrcO (inLanes (mergeᶠ nothing) f d n q o pre post c) H =
   SrcO c (Flat.RowT (λ a → pendRows (env c) (f a)) (rows (env c) o) d (rowsL (env c) pre ʳ++ (H ∷ rowsL (env c) post)))
+SrcO (inOuter (mergeᶠ (just m)) f d n q ls c)         H = SrcO c (BoundedF.RowT m (λ a → pendRows (env c) (f a)) H d n q (rowsL (env c) ls))
+SrcO (inLanes (mergeᶠ (just m)) f d n q o pre post c) H =
+  SrcO c (BoundedF.RowT m (λ a → pendRows (env c) (f a)) (rows (env c) o) d n q (rowsL (env c) pre ʳ++ (H ∷ rowsL (env c) post)))
+SrcO (inOuter switchᶠ f d n q ls c)                   H = SrcO c (SwitchF.RowT (λ a → pendRows (env c) (f a)) H d n (rowsL (env c) ls))
+SrcO (inLanes switchᶠ f d n q o pre post c)           H =
+  SrcO c (SwitchF.RowT (λ a → pendRows (env c) (f a)) (rows (env c) o) d n (rowsL (env c) pre ʳ++ (H ∷ rowsL (env c) post)))
+SrcO (inOuter exhaustᶠ f d n q ls c)                  H = SrcO c (ExhaustF.RowT (λ a → pendRows (env c) (f a)) H d n (rowsL (env c) ls))
+SrcO (inLanes exhaustᶠ f d n q o pre post c)          H =
+  SrcO c (ExhaustF.RowT (λ a → pendRows (env c) (f a)) (rows (env c) o) d n (rowsL (env c) pre ʳ++ (H ∷ rowsL (env c) post)))
 SrcO (inSrc k b c)                                   H = Owes (Hot H k ∷ᴬ env c) b × SrcO c (Connecting.ConnT (CS.connAt k) H (rows (Hot H k ∷ᴬ env c) b))
 SrcO (inBody k o c)                                  H = SrcO c (Connecting.ConnT (CS.connAt k) (rows (env c) o) H)
 SrcO _                                               H = ⊤
@@ -271,14 +281,17 @@ srcO-≃ (inLn true c)                                    eq so = srcO-≃ c eq 
 srcO-≃ (inLn false c)                                   eq so = tt
 srcO-≃ (inTake i q w c)                                 eq so = srcO-≃ c (take-≃ i q w eq) so
 srcO-≃ (inOuter (mergeᶠ nothing) f d n q ls c)          eq so = srcO-≃ c (row-≃ (λ a → pendRows (env c) (f a)) eq (≈ᴸ-refl (rowsL (env c) ls))) so
-srcO-≃ (inOuter (mergeᶠ (just _)) f d n q ls c)         eq so = tt
-srcO-≃ (inOuter switchᶠ f d n q ls c)                   eq so = tt
-srcO-≃ (inOuter exhaustᶠ f d n q ls c)                  eq so = tt
+srcO-≃ (inOuter (mergeᶠ (just m)) f d n q ls c)         eq so = srcO-≃ c (bounded-≃ m (λ a → pendRows (env c) (f a)) eq (≈ᴸ-refl (rowsL (env c) ls))) so
+srcO-≃ (inOuter switchᶠ f d n q ls c)                   eq so = srcO-≃ c (switch-≃ (λ a → pendRows (env c) (f a)) eq (≈ᴸ-refl (rowsL (env c) ls))) so
+srcO-≃ (inOuter exhaustᶠ f d n q ls c)                  eq so = srcO-≃ c (exhaust-≃ (λ a → pendRows (env c) (f a)) eq (≈ᴸ-refl (rowsL (env c) ls))) so
 srcO-≃ (inLanes (mergeᶠ nothing) f d n q o pre post c)  eq so =
   srcO-≃ c (row-≃ (λ a → pendRows (env c) (f a)) ≃-refl (ʳ++-≈ (rowsL (env c) pre) (eq ∷ ≈ᴸ-refl (rowsL (env c) post)))) so
-srcO-≃ (inLanes (mergeᶠ (just _)) f d n q o pre post c) eq so = tt
-srcO-≃ (inLanes switchᶠ f d n q o pre post c)           eq so = tt
-srcO-≃ (inLanes exhaustᶠ f d n q o pre post c)          eq so = tt
+srcO-≃ (inLanes (mergeᶠ (just m)) f d n q o pre post c) eq so =
+  srcO-≃ c (bounded-≃ m (λ a → pendRows (env c) (f a)) ≃-refl (ʳ++-≈ (rowsL (env c) pre) (eq ∷ ≈ᴸ-refl (rowsL (env c) post)))) so
+srcO-≃ (inLanes switchᶠ f d n q o pre post c)           eq so =
+  srcO-≃ c (switch-≃ (λ a → pendRows (env c) (f a)) ≃-refl (ʳ++-≈ (rowsL (env c) pre) (eq ∷ ≈ᴸ-refl (rowsL (env c) post)))) so
+srcO-≃ (inLanes exhaustᶠ f d n q o pre post c)          eq so =
+  srcO-≃ c (exhaust-≃ (λ a → pendRows (env c) (f a)) ≃-refl (ʳ++-≈ (rowsL (env c) pre) (eq ∷ ≈ᴸ-refl (rowsL (env c) post)))) so
 srcO-≃ (inSrc k b c)                                    eq (ob , so) = owes-hot k (env c) b eq ob , srcO-≃ c (conn-≃ _ eq (rows-hot k (env c) b eq)) so
 srcO-≃ (inBody k o c)                                   eq so = srcO-≃ c (conn-≃ _ ≃-refl eq) so
 
@@ -286,10 +299,6 @@ srcO-≃ (inBody k o c)                                   eq so = srcO-≃ c (co
 spent-≃ : ∀ {A} {t u : EmissionSet A} {P : Set} v → t ≃ u → Live v (P → Empty t) → Live v (P → Empty u)
 spent-≃ true  eq sp h = empty-≃ eq (sp h)
 spent-≃ false eq sp   = tt
-
--- A node owing nothing and never good.
-void : ∀ {Γ A} {ρ : DenEnv Γ} {s s′ : St Γ A} → rows ρ s ≡ ∅ → rows ρ s′ ≡ ∅ → alive s ≡ alive s′ → (∀ v → G ρ v s → ⊥) → (∀ v → GLn ρ v s → ⊥) → (∀ v b → LnBody ρ v b s → ⊥) → (Held s → ⊥) → Swap ρ s s′
-void e e′ al ng nl nb nh = record { same = ≡→≃ (trans e (sym e′)) ; live≡ = al ; node = λ v g → ⊥-elim (ng v g) ; lane = λ v g → ⊥-elim (nl v g) ; body = λ v b g → ⊥-elim (nb v b g) ; held = λ h → ⊥-elim (nh h) }
 
 good-swap : ∀ {R Γ A} (c : Ctx R Γ A) {s s′ : St Γ A} → Swap (env c) s s′ → ∀ {v} → G [] v (plug c s) → G [] v (plug c s′)
 good-swap top              sw {v} g = node sw v g
@@ -304,16 +313,34 @@ good-swap (inOuter (mergeᶠ nothing) f d n q ls c) {s} {s′} sw g =
   good-swap c {s = flatS (mergeᶠ nothing) f d n q s ls} {s′ = flatS (mergeᶠ nothing) f d n q s′ ls} (record { same = row-≃ _ (same sw) (≈ᴸ-refl (rowsL (env c) ls)) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ ()
                       ; node = λ { true m → mergeG-map (node sw true) (λ x → x) (λ x → x) (λ ov t {q} {e} → empty-≃ (same sw) (ov t) {q} {e}) (rooted-≃ (same sw) (≈ᴸ-refl (rowsL (env c) ls))) m
                                  ; false m → mergeG-map (node sw false) (λ x → x) (λ x → x) (λ x → x) (λ x → x) m } }) g
-good-swap (inOuter (mergeᶠ (just _)) f d n q ls c) sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ()) (λ ())) g
-good-swap (inOuter switchᶠ f d n q ls c)  sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ()) (λ ())) g
-good-swap (inOuter exhaustᶠ f d n q ls c) sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ()) (λ ())) g
+good-swap (inOuter (mergeᶠ (just m)) f d n q ls c) {s} {s′} sw g =
+  good-swap c {s = flatS (mergeᶠ (just m)) f d n q s ls} {s′ = flatS (mergeᶠ (just m)) f d n q s′ ls} (record { same = bounded-≃ m _ (same sw) (≈ᴸ-refl (rowsL (env c) ls)) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ ()
+                      ; node = λ { true (mg , w) → mergeG-map (node sw true) (λ x → x) (λ x → x) (λ ov t {q} {e} → empty-≃ (same sw) (ov t) {q} {e}) (rooted-≃ (same sw) (≈ᴸ-refl (rowsL (env c) ls))) mg , w
+                                 ; false (mg , w) → mergeG-map (node sw false) (λ x → x) (λ x → x) (λ x → x) (λ x → x) mg , w } }) g
+good-swap (inOuter switchᶠ f d n q ls c) {s} {s′} sw g =
+  good-swap c {s = flatS switchᶠ f d n q s ls} {s′ = flatS switchᶠ f d n q s′ ls} (record { same = switch-≃ _ (same sw) (≈ᴸ-refl (rowsL (env c) ls)) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ ()
+                      ; node = λ { true m → mergeG-map (node sw true) (λ x → x) (λ x → x) (λ ov t {q} {e} → empty-≃ (same sw) (ov t) {q} {e}) (rooted-≃ (same sw) (≈ᴸ-refl (rowsL (env c) ls))) m
+                                 ; false m → mergeG-map (node sw false) (λ x → x) (λ x → x) (λ x → x) (λ x → x) m } }) g
+good-swap (inOuter exhaustᶠ f d n q ls c) {s} {s′} sw g =
+  good-swap c {s = flatS exhaustᶠ f d n q s ls} {s′ = flatS exhaustᶠ f d n q s′ ls} (record { same = exhaust-≃ _ (same sw) (≈ᴸ-refl (rowsL (env c) ls)) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ ()
+                      ; node = λ { true m → mergeG-map (node sw true) (λ x → x) (λ x → x) (λ ov t {q} {e} → empty-≃ (same sw) (ov t) {q} {e}) (rooted-≃ (same sw) (≈ᴸ-refl (rowsL (env c) ls))) m
+                                 ; false m → mergeG-map (node sw false) (λ x → x) (λ x → x) (λ x → x) (λ x → x) m } }) g
 good-swap (inLanes (mergeᶠ nothing) f d n q o pre post c) {s} {s′} sw g =
   good-swap c {s = flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post)} {s′ = flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s′ ∷ post)} (record { same = row-≃ _ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post))) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ ()
                       ; node = λ { true m → mergeG-map (λ x → x) (goodL-swap pre (lane sw true)) (λ nl → trans nl (live-swap pre (live≡ sw))) (λ x → x) (rooted-≃ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post)))) m
                                  ; false m → mergeG-map (λ x → x) (goodL-swap pre (lane sw false)) (λ x → x) (λ x → x) (λ x → x) m } }) g
-good-swap (inLanes (mergeᶠ (just _)) f d n q o pre post c) sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ()) (λ ())) g
-good-swap (inLanes switchᶠ f d n q o pre post c)  sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ()) (λ ())) g
-good-swap (inLanes exhaustᶠ f d n q o pre post c) sw g = good-swap c (void refl refl refl (λ _ ()) (λ _ ()) (λ _ _ ()) (λ ())) g
+good-swap (inLanes (mergeᶠ (just m)) f d n q o pre post c) {s} {s′} sw g =
+  good-swap c {s = flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s ∷ post)} {s′ = flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s′ ∷ post)} (record { same = bounded-≃ m _ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post))) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ ()
+                      ; node = λ { true (mg , w) → mergeG-map (λ x → x) (goodL-swap pre (lane sw true)) (λ nl → trans nl (live-swap pre (live≡ sw))) (λ x → x) (rooted-≃ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post)))) mg , w
+                                 ; false (mg , w) → mergeG-map (λ x → x) (goodL-swap pre (lane sw false)) (λ x → x) (λ x → x) (λ x → x) mg , w } }) g
+good-swap (inLanes switchᶠ f d n q o pre post c) {s} {s′} sw g =
+  good-swap c {s = flatS switchᶠ f d n q o (pre ʳ++ s ∷ post)} {s′ = flatS switchᶠ f d n q o (pre ʳ++ s′ ∷ post)} (record { same = switch-≃ _ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post))) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ ()
+                      ; node = λ { true m → mergeG-map (λ x → x) (goodL-swap pre (lane sw true)) (λ nl → trans nl (live-swap pre (live≡ sw))) (λ x → x) (rooted-≃ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post)))) m
+                                 ; false m → mergeG-map (λ x → x) (goodL-swap pre (lane sw false)) (λ x → x) (λ x → x) (λ x → x) m } }) g
+good-swap (inLanes exhaustᶠ f d n q o pre post c) {s} {s′} sw g =
+  good-swap c {s = flatS exhaustᶠ f d n q o (pre ʳ++ s ∷ post)} {s′ = flatS exhaustᶠ f d n q o (pre ʳ++ s′ ∷ post)} (record { same = exhaust-≃ _ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post))) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ ()
+                      ; node = λ { true m → mergeG-map (λ x → x) (goodL-swap pre (lane sw true)) (λ nl → trans nl (live-swap pre (live≡ sw))) (λ x → x) (rooted-≃ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post)))) m
+                                 ; false m → mergeG-map (λ x → x) (goodL-swap pre (lane sw false)) (λ x → x) (λ x → x) (λ x → x) m } }) g
 good-swap (inSrc k b c) {s} {s′} sw g =
   good-swap c {s = connS k s b} {s′ = connS k s′ b} (record { same = conn-≃ _ (same sw) (rows-hot k (env c) b (same sw)) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ ()
                       ; node = λ { v (gs , gb , sp) → src-swap sw v (CS.bodyAt k) gs , good-hot k (env c) b (same sw) v gb , spent-≃ v (same sw) sp } }) g

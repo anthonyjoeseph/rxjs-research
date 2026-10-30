@@ -20,7 +20,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (lookup) renaming (_∷_ to _∷ᴬ_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁; tt to tt₁)
 open import Relation.Nullary using (¬_)
@@ -416,6 +416,9 @@ mutual
   G ρ b (takeS i q w s)                       = G ρ b s
   G ρ b (cutS l a s)                          = G ρ (b ∧ l) s
   G ρ b (flatS (mergeᶠ nothing) f d n q o ls) = MergeG (G ρ b o) (GL ρ b ls) ρ b f d n q o ls
+  G ρ b (flatS (mergeᶠ (just m)) f d n q o ls) = MergeG (G ρ b o) (GL ρ b ls) ρ b f d n [] o ls × Live b ((q ≡ []) ⊎ (n ≡ m))
+  G ρ b (flatS switchᶠ f d n q o ls)          = MergeG (G ρ b o) (GL ρ b ls) ρ b f d n q o ls
+  G ρ b (flatS exhaustᶠ f d n q o ls)         = MergeG (G ρ b o) (GL ρ b ls) ρ b f d n q o ls
   G ρ b (connS k o s)                         = SrcG ρ b (CS.bodyAt k) o × G (Hot (rows ρ o) k ∷ᴬ ρ) b s × Live b (T (CS.closed k) → Empty (rows ρ o))
   G ρ b (joinS j true x ib)                   = Live₁ b (Fed ib (enter (lookup ρ x) j))
   G ρ b (joinS j false x ib)                  = Live₁ b (Fed ib ∅)
@@ -460,9 +463,12 @@ mutual
   shape {v = v} (cutS l a s)                      g = shape {v = v ∧ l} s g
   shape (flatS (mergeᶠ nothing) f d n q o ls)     m = mergeG₀ (shape o outer) (shapeL ls lanesG) fresh
     where open MergeG m
-  shape (flatS (mergeᶠ (just _)) f d n q o ls)    ()
-  shape (flatS switchᶠ f d n q o ls)              ()
-  shape (flatS exhaustᶠ f d n q o ls)             ()
+  shape (flatS (mergeᶠ (just _)) f d n q o ls)    (m , _) = mergeG₀ (shape o outer) (shapeL ls lanesG) refl , tt
+    where open MergeG m
+  shape (flatS switchᶠ f d n q o ls)              m = mergeG₀ (shape o outer) (shapeL ls lanesG) fresh
+    where open MergeG m
+  shape (flatS exhaustᶠ f d n q o ls)             m = mergeG₀ (shape o outer) (shapeL ls lanesG) fresh
+    where open MergeG m
   shape (coldS _ _)                               g = g
   shape (scanS f z s)                             g = shape s g
   shape (lnS _ _)                                 ()
@@ -813,6 +819,15 @@ postulate
   --   child's `OK` says nothing of the rows before its key.
   take-ok : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) i q w (s : St [] A) → Good ρ (takeS i q w s) → OK (rows ρ (takeS i q w s)) (seek c (takeS i q w s))
 
+  -- A JOINER'S SEARCH KEYS ITS ROWS, a bounded merge, a switch or an
+  -- exhaust as a merge's does: its outer's and lanes' finds raced.
+  bounded-ok : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) m (f : A → Obs Timeline [] B) d n q (o : St [] A) ls
+             → Good ρ (flatS (mergeᶠ (just m)) f d n q o ls) → OK (rows ρ (flatS (mergeᶠ (just m)) f d n q o ls)) (seek c (flatS (mergeᶠ (just m)) f d n q o ls))
+  switch-ok  : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) (f : A → Obs Timeline [] B) d n q (o : St [] A) ls
+             → Good ρ (flatS switchᶠ f d n q o ls) → OK (rows ρ (flatS switchᶠ f d n q o ls)) (seek c (flatS switchᶠ f d n q o ls))
+  exhaust-ok : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) (f : A → Obs Timeline [] B) d n q (o : St [] A) ls
+             → Good ρ (flatS exhaustᶠ f d n q o ls) → OK (rows ρ (flatS exhaustᶠ f d n q o ls)) (seek c (flatS exhaustᶠ f d n q o ls))
+
 mutual
   seek-ok : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) (s : St [] A) → Good ρ s → OK (rows ρ s) (seek c s)
   seek-ok c (ofS i p [])       _ = record { from = of-from p i [] ; mark = ⊑-refl _ ; shown = λ eq → _ , refl , of-shows c i p [] eq }
@@ -829,6 +844,9 @@ mutual
     own-first (_ , _ , c , cutS true (attAt p) s) attM (after p) _ (kept (seek (inCut true (attAt p) c) s) (seek-ok (inCut true (attAt p) c) s g))
   seek-ok {ρ = ρ} c (flatS (mergeᶠ nothing) f d n q o ls) m with MergeG.fresh m
   ... | refl = ok-trunc (raceT d n [] (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)) (join-ok c f d n o ls m)
+  seek-ok c (flatS (mergeᶠ (just m)) f d n q o ls) g = bounded-ok c m f d n q o ls g
+  seek-ok c (flatS switchᶠ f d n q o ls)           g = switch-ok c f d n q o ls g
+  seek-ok c (flatS exhaustᶠ f d n q o ls)          g = exhaust-ok c f d n q o ls g
 
   -- The joiner before it is entered.
   join-ok : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) (f : A → Obs Timeline [] B) d n (o : St [] A) ls → Good ρ (flatS (mergeᶠ nothing) f d n [] o ls)

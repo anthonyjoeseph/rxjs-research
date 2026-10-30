@@ -30,13 +30,14 @@ open Machine using (St; Ctx; CS; Cand; found; ⟨_,_,_,_⟩; absorbed; rising; p
                     shift; over; closed; alive; cutT; mapT; scanT; takeT; run; moved; ofM; cp; nx;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (env; ∅; up; rows; Plus; old; new; module Flat; _≃_; _⇄_; ≃-sym; Moves; silent)
+open import adequacy.Rows using (env; ∅; up; rows; Plus; module BoundedF; module SwitchF; module ExhaustF; old; new;
+  module Flat; _≃_; _⇄_; ≃-sym; Moves; silent)
 open import adequacy.Up using (up-≃; ≃-refl; ≃-trans; vis-≃)
 open import adequacy.Bound using (Good; LnBody; ofPos; of-from; ⊑→≼)
 open import adequacy.Skip using (After; LeadC)
 open import adequacy.Lead using (lead-found)
 open import adequacy.Owes using (Owes; UpO; SrcO; srcO-≃; owesL-ʳ++⁻; rowsL-ʳ++; ≡→≃)
-open import adequacy.Inv using (Inv; inv; Sim; Open; GoodC; good-split; unF; liv; Shut; closed-dead; dead-swap)
+open import adequacy.Inv using (Inv; inv; Sim; Open; good-split; unF; liv; Shut; closed-dead; dead-swap)
 
 ------------------------------------------------------------------------
 -- Where the search lands
@@ -116,27 +117,33 @@ search-plug t fd = lands-just (seek top t) (seek-lands top t refl) fd
 -- The rows, frame by frame
 
 -- What the root owes is the hole's rows read up its frames.
-up-plug : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → GoodC c → up c (rows (env c) s) ≃ rows [] (plug c s)
-up-plug top                s _  = ≃-refl
-up-plug (inMap f c)        s gc = up-plug c (mapS f s) gc
-up-plug (inScan f z c)     s gc = up-plug c (scanS f z s) gc
-up-plug (inCut true a c)   s gc = up-plug c (cutS true a s) gc
-up-plug (inCut false a c)  s gc = up-plug c (cutS false a s) gc
-up-plug (inLn true c)      s gc = up-plug c (lnS true s) gc
-up-plug (inLn false c)     s gc = up-plug c (lnS false s) gc
-up-plug (inOuter (mergeᶠ nothing) f d n q ls c) s gc = up-plug c (flatS (mergeᶠ nothing) f d n q s ls) gc
-up-plug (inLanes (mergeᶠ nothing) f d n q o pre post c) s gc =
+up-plug : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → up c (rows (env c) s) ≃ rows [] (plug c s)
+up-plug top                s = ≃-refl
+up-plug (inMap f c)        s = up-plug c (mapS f s)
+up-plug (inScan f z c)     s = up-plug c (scanS f z s)
+up-plug (inCut true a c)   s = up-plug c (cutS true a s)
+up-plug (inCut false a c)  s = up-plug c (cutS false a s)
+up-plug (inLn true c)      s = up-plug c (lnS true s)
+up-plug (inLn false c)     s = up-plug c (lnS false s)
+up-plug (inOuter (mergeᶠ nothing) f d n q ls c) s = up-plug c (flatS (mergeᶠ nothing) f d n q s ls)
+up-plug (inLanes (mergeᶠ nothing) f d n q o pre post c) s =
   ≃-trans (up-≃ c (≡→≃ (cong (Flat.RowT _ (rows (env c) o) d) (sym (rowsL-ʳ++ pre)))))
-          (up-plug c (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post)) gc)
-up-plug (inTake i q w c)   s gc = up-plug c (takeS i q w s) gc
-up-plug (inOuter (mergeᶠ (just m)) f d n q ls c) s ()
-up-plug (inOuter switchᶠ f d n q ls c)           s ()
-up-plug (inOuter exhaustᶠ f d n q ls c)          s ()
-up-plug (inLanes (mergeᶠ (just m)) f d n q o pre post c) s ()
-up-plug (inLanes switchᶠ f d n q o pre post c)           s ()
-up-plug (inLanes exhaustᶠ f d n q o pre post c)          s ()
-up-plug (inSrc k b c)      s gc = up-plug c (connS k s b) gc
-up-plug (inBody k o c)     s gc = up-plug c (connS k o s) gc
+          (up-plug c (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post)))
+up-plug (inTake i q w c)   s = up-plug c (takeS i q w s)
+up-plug (inOuter (mergeᶠ (just m)) f d n q ls c) s = up-plug c (flatS (mergeᶠ (just m)) f d n q s ls)
+up-plug (inLanes (mergeᶠ (just m)) f d n q o pre post c) s =
+  ≃-trans (up-≃ c (≡→≃ (cong (BoundedF.RowT m _ (rows (env c) o) d n q) (sym (rowsL-ʳ++ pre)))))
+          (up-plug c (flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s ∷ post)))
+up-plug (inOuter switchᶠ f d n q ls c) s = up-plug c (flatS switchᶠ f d n q s ls)
+up-plug (inLanes switchᶠ f d n q o pre post c) s =
+  ≃-trans (up-≃ c (≡→≃ (cong (SwitchF.RowT _ (rows (env c) o) d n) (sym (rowsL-ʳ++ pre)))))
+          (up-plug c (flatS switchᶠ f d n q o (pre ʳ++ s ∷ post)))
+up-plug (inOuter exhaustᶠ f d n q ls c) s = up-plug c (flatS exhaustᶠ f d n q s ls)
+up-plug (inLanes exhaustᶠ f d n q o pre post c) s =
+  ≃-trans (up-≃ c (≡→≃ (cong (ExhaustF.RowT _ (rows (env c) o) d n) (sym (rowsL-ʳ++ pre)))))
+          (up-plug c (flatS exhaustᶠ f d n q o (pre ʳ++ s ∷ post)))
+up-plug (inSrc k b c)      s = up-plug c (connS k s b)
+up-plug (inBody k o c)     s = up-plug c (connS k o s)
 
 -- Under a cut switched off, the hole reaches nothing.
 off-up : ∀ {R Γ A} (c : Ctx R Γ A) {t u : EmissionSet A} → liv c ≡ false → up c t ≃ up c u
@@ -148,14 +155,14 @@ off-up (inCut false a c) d = ≃-refl
 off-up (inLn true c)     d = off-up c d
 off-up (inLn false c)    d = ≃-refl
 off-up (inTake i q w c)  d = off-up c d
-off-up (inOuter (mergeᶠ nothing) f d n q ls c)  dd = off-up c dd
-off-up (inOuter (mergeᶠ (just m)) f d n q ls c) dd = ≃-refl
-off-up (inOuter switchᶠ f d n q ls c)           dd = ≃-refl
-off-up (inOuter exhaustᶠ f d n q ls c)          dd = ≃-refl
-off-up (inLanes (mergeᶠ nothing) f d n q o pre post c)  dd = off-up c dd
-off-up (inLanes (mergeᶠ (just m)) f d n q o pre post c) dd = ≃-refl
-off-up (inLanes switchᶠ f d n q o pre post c)           dd = ≃-refl
-off-up (inLanes exhaustᶠ f d n q o pre post c)          dd = ≃-refl
+off-up (inOuter (mergeᶠ nothing) f d n q ls c) dd = off-up c dd
+off-up (inOuter (mergeᶠ (just m)) f d n q ls c) dd = off-up c dd
+off-up (inOuter switchᶠ f d n q ls c) dd = off-up c dd
+off-up (inOuter exhaustᶠ f d n q ls c) dd = off-up c dd
+off-up (inLanes (mergeᶠ nothing) f d n q o pre post c) dd = off-up c dd
+off-up (inLanes (mergeᶠ (just m)) f d n q o pre post c) dd = off-up c dd
+off-up (inLanes switchᶠ f d n q o pre post c) dd = off-up c dd
+off-up (inLanes exhaustᶠ f d n q o pre post c) dd = off-up c dd
 off-up (inSrc k b c)     d = off-up c d
 off-up (inBody k o c)    d = off-up c d
 
@@ -191,7 +198,7 @@ owes-split (inTake i q w c) cl op g ow = owes-split c cl _ g ow
 owes-split (inCut true a c) cl op g ow = owes-split c cl _ g ow
 owes-split (inCut false a c) () op g ow
 owes-split (inLn true c)    cl op g ow = owes-split c cl _ g ow
-owes-split (inLn false c) {s} cl op g ow with unF c (lnS false s) (proj₂ (good-split c (lnS false s) g))
+owes-split (inLn false c) {s} cl op g ow with unF c (lnS false s) (good-split c (lnS false s) g)
 ... | inj₁ ()
 ... | inj₂ (inj₁ lb) = ⊥-elim (lnbody-open s lb op)
 ... | inj₂ (inj₂ ())
@@ -204,12 +211,21 @@ owes-split (inSrc k b c) {s} cl op g ow with owes-split c (∨-false (CS.closed 
 ... | u , (os , ob) , so = u , os , ob , so
 owes-split (inBody k o c) cl op g ow with owes-split c cl _ g ow
 ... | u , (oo , os) , so = (oo , u) , os , so
-owes-split c@(inOuter (mergeᶠ (just _)) _ _ _ _ _ _) {s} cl op g ow = ⊥-elim (proj₁ (good-split c s g))
-owes-split c@(inOuter switchᶠ _ _ _ _ _ _)           {s} cl op g ow = ⊥-elim (proj₁ (good-split c s g))
-owes-split c@(inOuter exhaustᶠ _ _ _ _ _ _)          {s} cl op g ow = ⊥-elim (proj₁ (good-split c s g))
-owes-split c@(inLanes (mergeᶠ (just _)) _ _ _ _ _ _ _ _) {s} cl op g ow = ⊥-elim (proj₁ (good-split c s g))
-owes-split c@(inLanes switchᶠ _ _ _ _ _ _ _ _)           {s} cl op g ow = ⊥-elim (proj₁ (good-split c s g))
-owes-split c@(inLanes exhaustᶠ _ _ _ _ _ _ _ _)          {s} cl op g ow = ⊥-elim (proj₁ (good-split c s g))
+owes-split (inOuter (mergeᶠ (just m)) f d n q ls c) cl op g ow with owes-split c cl _ g ow
+... | u , (h , o , ol) , so = (ol , u) , o , so
+owes-split (inLanes (mergeᶠ (just m)) f d n q o pre post c) {s} cl op g ow with owes-split c cl _ g ow
+... | u , (h , oo , ol) , so with owesL-ʳ++⁻ pre ol
+... | op′ , (_ , os , oq) = (h , oo , op′ , oq , u) , os , subst (λ X → SrcO c (BoundedF.RowT m _ (rows (env c) o) d n q X)) (rowsL-ʳ++ pre) so
+owes-split (inOuter switchᶠ f d n q ls c) cl op g ow with owes-split c cl _ g ow
+... | u , (h , o , ol) , so = (ol , u) , o , so
+owes-split (inLanes switchᶠ f d n q o pre post c) {s} cl op g ow with owes-split c cl _ g ow
+... | u , (h , oo , ol) , so with owesL-ʳ++⁻ pre ol
+... | op′ , (_ , os , oq) = (h , oo , op′ , oq , u) , os , subst (λ X → SrcO c (SwitchF.RowT _ (rows (env c) o) d n X)) (rowsL-ʳ++ pre) so
+owes-split (inOuter exhaustᶠ f d n q ls c) cl op g ow with owes-split c cl _ g ow
+... | u , (h , o , ol) , so = (ol , u) , o , so
+owes-split (inLanes exhaustᶠ f d n q o pre post c) {s} cl op g ow with owes-split c cl _ g ow
+... | u , (h , oo , ol) , so with owesL-ʳ++⁻ pre ol
+... | op′ , (_ , os , oq) = (h , oo , op′ , oq , u) , os , subst (λ X → SrcO c (ExhaustF.RowT _ (rows (env c) o) d n X)) (rowsL-ʳ++ pre) so
 
 ------------------------------------------------------------------------
 -- An of's rows
@@ -263,10 +279,9 @@ good-closed : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ xs} → liv c ≡ false → 
 good-closed c d g = dead-swap c d (record { node₀ = λ _ → tt₁ ; lane₀ = λ () ; body₀ = λ _ () ; held₀ = λ () }) g
 
 -- The root's rows, read at the of the search found.
-into : ∀ {R Γ′ A′ Γ A} (c : Ctx R Γ′ A′) (s : St Γ′ A′) (c′ : Ctx R Γ A) (s′ : St Γ A) → plug c′ s′ ≡ plug c s → Good [] (plug c s)
+into : ∀ {R Γ′ A′ Γ A} (c : Ctx R Γ′ A′) (s : St Γ′ A′) (c′ : Ctx R Γ A) (s′ : St Γ A) → plug c′ s′ ≡ plug c s
      → up c (rows (env c) s) ≃ up c′ (rows (env c′) s′)
-into c s c′ s′ pl g = ≃-trans (up-plug c s (proj₁ (good-split c s g)))
-                        (≃-trans (≡→≃ (cong (rows []) (sym pl))) (≃-sym (up-plug c′ s′ (proj₁ (good-split c′ s′ (subst (Good []) (sym pl) g))))))
+into c s c′ s′ pl = ≃-trans (up-plug c s) (≃-trans (≡→≃ (cong (rows []) (sym pl))) (≃-sym (up-plug c′ s′)))
 
 postulate
   -- AN OF IN A COMPLETED SOURCE RUNS OUT SILENTLY: the source owes nothing
@@ -278,10 +293,10 @@ postulate
 -- A closed of runs out silently.
 closed-of : ∀ {R Γ′ A′ Γ A} (c : Ctx R Γ′ A′) (s : St Γ′ A′) (c′ : Ctx R Γ A) {i p₀ xs} p₁ → closed c′ ≡ true → plug c′ (ofS i p₀ xs) ≡ plug c s
           → Good [] (plug c s) → Owes [] (plug c s) → Inv ⟨ c′ , doneS , absorbed , p₁ ⟩ × Moves (up c (rows (env c) s)) [] (up c′ ∅)
-closed-of c s c′ p₁ cl pl g ow with closed-dead c′ (proj₁ (good-split c′ _ (subst (Good []) (sym pl) g))) cl
+closed-of c s c′ p₁ cl pl g ow with closed-dead c′ cl
 ... | inj₂ sh = shut-of c s c′ p₁ sh pl g ow
 ... | inj₁ d  =
-  inv (good-closed c′ d (subst (Good []) (sym pl) g)) (owes-closed c′ cl (subst (Owes []) (sym pl) ow)) , silent (vis-≃ (≃-trans (into c s c′ _ pl g) (off-up c′ d)))
+  inv (good-closed c′ d (subst (Good []) (sym pl) g)) (owes-closed c′ cl (subst (Owes []) (sym pl) ow)) , silent (vis-≃ (≃-trans (into c s c′ _ pl) (off-up c′ d)))
 
 -- AN OF'S NEXT RUN: the least row, risen.
 abs-of : ∀ {R Γ′ A′ Γ A} {c : Ctx R Γ′ A′} {s} {c′ : Ctx R Γ A} {i p₀ xs κ k′ sh t} p
@@ -291,7 +306,7 @@ abs-of {c = c} {s} {c′} {i} {p₀} {[]} p fd eq (inv g ow) with closed c′ in
 abs-of {c = c} {s} {c′} {i} {p₀} {[]} p fd refl (inv g ow) | true = closed-of c s c′ p₀ cl (search-plug (plug c s) fd) g ow
 abs-of {c = c} {s} {c′} {i} {p₀} {[]} p fd refl (inv g ow) | false =
   inv (good-done c′ cl g′ fd′) (proj₁ sp , found-lead c′ cl g′ fd′ , tt , tt , (λ ()) , (λ ()) , srcO-≃ c′ (of-last p₀ i) (proj₂ (proj₂ sp)))
-  , silent (vis-≃ (≃-trans (into c s c′ _ pl g) (up-≃ c′ (of-last p₀ i))))
+  , silent (vis-≃ (≃-trans (into c s c′ _ pl) (up-≃ c′ (of-last p₀ i))))
   where
     pl  = search-plug (plug c s) fd
     fd′ = subst (λ u → search top u ≡ _) (sym pl) fd
@@ -302,7 +317,7 @@ abs-of {c = c} {s} {c′} {i} {p₀} {x ∷ xs} p fd eq (inv g ow) with closed c
 abs-of {c = c} {s} {c′} {i} {p₀} {x ∷ xs} p fd refl (inv g ow) | true = closed-of c s c′ p₀ cl (search-plug (plug c s) fd) g ow
 abs-of {c = c} {s} {c′} {i} {p₀} {x ∷ xs} p fd refl (inv g ow) | false =
   inv (good-of c′ cl g′ fd′) (proj₁ sp , found-lead c′ cl g′ fd′ , tt , tt , after-of p₀ i xs , tt , srcO-≃ c′ (of-next p₀ i x xs) (proj₂ (proj₂ sp)))
-  , silent (vis-≃ (≃-trans (into c s c′ _ pl g) (up-≃ c′ (of-next p₀ i x xs))))
+  , silent (vis-≃ (≃-trans (into c s c′ _ pl) (up-≃ c′ (of-next p₀ i x xs))))
   where
     pl  = search-plug (plug c s) fd
     fd′ = subst (λ u → search top u ≡ _) (sym pl) fd

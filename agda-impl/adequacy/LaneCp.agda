@@ -40,6 +40,7 @@ open import adequacy.Up using (any-ʳ++ˡ; any-ʳ++ʳ; all-ʳ++; ≈ᴸ-refl; _�
   row-≃)
 open import adequacy.Bound using (Empty; Good; G; GLn; shape; on; off; lane-v; live; dead-empty; MergeG; mergeG-map)
 open import adequacy.Skip using (After; Since; LeadC; _≈⟨_⟩_; up-vis; ≈-refl; since-map; map-≈; since-scan; scan-≈; since-take; take-≈; since-row; flat-≈; after-since;
+                                 since-bounded; since-switch; since-exhaust; bounded-≈; switch-≈; exhaust-≈;
                                  ≈ᴸ-hole; conn-≈; since-conn) renaming (≈ᴸ-refl to ≈ᴸ-refl⟨⟩; _∷_ to _∷≈_)
 open import adequacy.LaneEnd using (frame-≈; done-at; outer-owes; lanes-owe; since-x; since-y)
 open import adequacy.Owes using (Owing; Owes; OwesL; UpO; Swap; owes-join; SrcO; srcO-≃; owesL-ʳ++; rowsL-ʳ++; ≡→≃; owing-≃; empty-≃;
@@ -74,9 +75,24 @@ srcO-≈ (inOuter (mergeᶠ nothing) f d n q ls c) {t} {u} (al , ld) st su eq so
     L  = λ a → pendRows (env c) (f a)
     Ls = rowsL (env c) ls
     sl = after-since Ls al
-srcO-≈ (inOuter (mergeᶠ (just _)) f d n q ls c) ld st su eq so = tt
-srcO-≈ (inOuter switchᶠ f d n q ls c)           ld st su eq so = tt
-srcO-≈ (inOuter exhaustᶠ f d n q ls c)          ld st su eq so = tt
+srcO-≈ (inOuter (mergeᶠ (just m)) f d n q ls c) {t} {u} (al , ld) st su eq so =
+  srcO-≈ c ld (since-bounded m L t Ls st sl) (since-bounded m L u Ls su sl) (bounded-≈ m L Ls Ls eq (≈ᴸ-refl⟨⟩ Ls) st su sl sl) so
+  where
+    L  = λ a → pendRows (env c) (f a)
+    Ls = rowsL (env c) ls
+    sl = after-since Ls al
+srcO-≈ (inOuter switchᶠ f d n q ls c) {t} {u} (al , ld) st su eq so =
+  srcO-≈ c ld (since-switch L t Ls st sl) (since-switch L u Ls su sl) (switch-≈ L Ls Ls eq (≈ᴸ-refl⟨⟩ Ls) st su sl sl) so
+  where
+    L  = λ a → pendRows (env c) (f a)
+    Ls = rowsL (env c) ls
+    sl = after-since Ls al
+srcO-≈ (inOuter exhaustᶠ f d n q ls c) {t} {u} (al , ld) st su eq so =
+  srcO-≈ c ld (since-exhaust L t Ls st sl) (since-exhaust L u Ls su sl) (exhaust-≈ L Ls Ls eq (≈ᴸ-refl⟨⟩ Ls) st su sl sl) so
+  where
+    L  = λ a → pendRows (env c) (f a)
+    Ls = rowsL (env c) ls
+    sl = after-since Ls al
 srcO-≈ (inLanes (mergeᶠ nothing) f d n q o pre post c) {t} {u} (ao , apre , apost , ld) st su eq so =
   srcO-≈ c ld (since-row L O Lt sO slt) (since-row L O Lu sO slu)
        (trunc-≈ (flat-≈ L Lt Lu ≈-refl (≈ᴸ-hole (rowsL ρ pre) (eq ∷≈ ≈ᴸ-refl⟨⟩ (rowsL ρ post))) sO sO slt slu)) so
@@ -89,9 +105,42 @@ srcO-≈ (inLanes (mergeᶠ nothing) f d n q o pre post c) {t} {u} (ao , apre , 
     sO  = λ {q} {e} r → ≺→≼ {_} {q} (ao {q} {e} r)
     slt = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (st , after-since (rowsL ρ post) apost)
     slu = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (su , after-since (rowsL ρ post) apost)
-srcO-≈ (inLanes (mergeᶠ (just _)) f d n q o pre post c) ld st su eq so = tt
-srcO-≈ (inLanes switchᶠ f d n q o pre post c)   ld st su eq so = tt
-srcO-≈ (inLanes exhaustᶠ f d n q o pre post c)  ld st su eq so = tt
+srcO-≈ (inLanes (mergeᶠ (just m)) f d n q o pre post c) {t} {u} (ao , apre , apost , ld) st su eq so =
+  srcO-≈ c ld (since-bounded m L O Lt sO slt) (since-bounded m L O Lu sO slu)
+       (bounded-≈ m L Lt Lu ≈-refl (≈ᴸ-hole (rowsL ρ pre) (eq ∷≈ ≈ᴸ-refl⟨⟩ (rowsL ρ post))) sO sO slt slu) so
+  where
+    ρ   = env c
+    L   = λ a → pendRows ρ (f a)
+    O   = rows ρ o
+    Lt  = rowsL ρ pre ʳ++ (t ∷ rowsL ρ post)
+    Lu  = rowsL ρ pre ʳ++ (u ∷ rowsL ρ post)
+    sO  = λ {q} {e} r → ≺→≼ {_} {q} (ao {q} {e} r)
+    slt = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (st , after-since (rowsL ρ post) apost)
+    slu = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (su , after-since (rowsL ρ post) apost)
+srcO-≈ (inLanes switchᶠ f d n q o pre post c) {t} {u} (ao , apre , apost , ld) st su eq so =
+  srcO-≈ c ld (since-switch L O Lt sO slt) (since-switch L O Lu sO slu)
+       (switch-≈ L Lt Lu ≈-refl (≈ᴸ-hole (rowsL ρ pre) (eq ∷≈ ≈ᴸ-refl⟨⟩ (rowsL ρ post))) sO sO slt slu) so
+  where
+    ρ   = env c
+    L   = λ a → pendRows ρ (f a)
+    O   = rows ρ o
+    Lt  = rowsL ρ pre ʳ++ (t ∷ rowsL ρ post)
+    Lu  = rowsL ρ pre ʳ++ (u ∷ rowsL ρ post)
+    sO  = λ {q} {e} r → ≺→≼ {_} {q} (ao {q} {e} r)
+    slt = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (st , after-since (rowsL ρ post) apost)
+    slu = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (su , after-since (rowsL ρ post) apost)
+srcO-≈ (inLanes exhaustᶠ f d n q o pre post c) {t} {u} (ao , apre , apost , ld) st su eq so =
+  srcO-≈ c ld (since-exhaust L O Lt sO slt) (since-exhaust L O Lu sO slu)
+       (exhaust-≈ L Lt Lu ≈-refl (≈ᴸ-hole (rowsL ρ pre) (eq ∷≈ ≈ᴸ-refl⟨⟩ (rowsL ρ post))) sO sO slt slu) so
+  where
+    ρ   = env c
+    L   = λ a → pendRows ρ (f a)
+    O   = rows ρ o
+    Lt  = rowsL ρ pre ʳ++ (t ∷ rowsL ρ post)
+    Lu  = rowsL ρ pre ʳ++ (u ∷ rowsL ρ post)
+    sO  = λ {q} {e} r → ≺→≼ {_} {q} (ao {q} {e} r)
+    slt = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (st , after-since (rowsL ρ post) apost)
+    slu = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (su , after-since (rowsL ρ post) apost)
 srcO-≈ (inSrc k b c)                            (ab , ld) st su eq so = src-owes-≈ k b c ab ld st su eq so
 srcO-≈ (inBody k o c) {t} {u}                   (ao , ld) st su eq so =
   srcO-≈ c ld (since-conn (CS.connAt k) _ t ao st) (since-conn (CS.connAt k) _ u ao su) (conn-≈ (CS.connAt k) _ eq) so
@@ -235,7 +284,7 @@ rise-lane-cp : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s 
                    (if alive s then dequeue c (mergeᶠ nothing) f d (pred n) q o (pre ʳ++ ended s ∷ post) p
                                else ⟨ c , flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
 rise-lane-cp f d n q o pre post c s p (inv g (u , l , os , op′ , as , es , so)) with upo-liv (inLanes (mergeᶠ nothing) f d n q o pre post c) u
-... | lv with lane-v s (subst (λ v → GLn (env c) v s) lv (proj₂ (good-split (inLanes (mergeᶠ nothing) f d n q o pre post c) s g)))
+... | lv with lane-v s (subst (λ v → GLn (env c) v s) lv (good-split (inLanes (mergeᶠ nothing) f d n q o pre post c) s g))
 ... | off a s₀ = ⊥-elim op′
 ... | on a s₀ g₀ _ with subst (λ v → G (env c) v (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post))) lv
                             (node-good c (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post)) g (λ ()) (λ ()))
