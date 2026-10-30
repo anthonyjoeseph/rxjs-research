@@ -10,7 +10,7 @@ module adequacy.Sim where
 open import Data.Bool using (Bool; true; false; if_then_else_; not)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Nat using (_≡ᵇ_; _<ᵇ_; pred)
-open import Data.List using (List; []; _∷_; [_]; null; _++_)
+open import Data.List using (List; []; _∷_; [_]; _++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.List.Relation.Unary.Any using () renaming (here to hd)
@@ -45,6 +45,7 @@ open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
 open import adequacy.Skip using (After; after-conn)
 open import adequacy.Inv using (Inv; inv; good; Sim; Ends; open-alive)
 open import adequacy.LaneCp using (rise-lane-cp; rise-switch-lane-cp; rise-exhaust-lane-cp; rise-bounded-lane-cp)
+open import adequacy.OuterCp using (rise-outer-cp; rise-bounded-cp; rise-switch-cp; rise-exhaust-cp)
 open import adequacy.LaneNx using (rise-lane-nx; rise-bounded-lane-nx; rise-switch-lane-nx; rise-exhaust-lane-nx)
 open import adequacy.AbsOf using (abs-of; up-plug)
 open import denotation.Read using (Meets; Run; Visible; loud; []; _∷_)
@@ -333,18 +334,12 @@ postulate
   -- AN OUTER'S VALUE BEGINS ITS LANE.
   rise-outer-nx : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p
                 → Sim ⟨ inOuter (mergeᶠ nothing) f d n q ls c , o , rising (nx a) , p ⟩ [] (start c (mergeᶠ nothing) f d n q o ls a p)
-  -- AN OUTER'S END, SHOWN ONLY WITH NO LANE RUNNING.
-  rise-outer-cp : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) p
-                → Sim ⟨ inOuter (mergeᶠ nothing) f d n q ls c , o , rising cp , p ⟩ [] ⟨ c , flatS (mergeᶠ nothing) f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
 
   -- A BOUNDED MERGE'S OUTER VALUE BEGINS ITS LANE WITH ROOM, ELSE WAITS.
   rise-bounded-nx : ∀ {R Γ A B} m f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p
                   → Sim ⟨ inOuter (mergeᶠ (just m)) f d n q ls c , o , rising (nx a) , p ⟩ []
                         (if n <ᵇ m then start c (mergeᶠ (just m)) f d n q o ls a p
                                    else ⟨ c , flatS (mergeᶠ (just m)) f d n (q ++ [ a ]) o ls , absorbed , p ⟩)
-  -- A BOUNDED MERGE'S OUTER END, SHOWN ONLY WITH NO LANE RUNNING OR WAITING.
-  rise-bounded-cp : ∀ {R Γ A B} m f d n q ls (c : Ctx R Γ B) (o : St Γ A) p
-                 → Sim ⟨ inOuter (mergeᶠ (just m)) f d n q ls c , o , rising cp , p ⟩ [] ⟨ c , flatS (mergeᶠ (just m)) f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
   -- A BOUNDED MERGE'S LANE END FREES ITS SLOT FOR THE FIRST WAITING VALUE.
   rise-bounded-lane-hand : ∀ {R Γ A B} m f d n a q (o : St Γ A) pre post (c : Ctx R Γ B) s p
                          → Sim ⟨ inLanes (mergeᶠ (just m)) f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ []
@@ -353,18 +348,12 @@ postulate
   -- A SWITCH'S OUTER VALUE CUTS EVERY RUNNING LANE AND BEGINS ITS OWN.
   rise-switch-nx : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p ls′ (t : Torn) → killAll ls ≡ (ls′ , t)
                  → Sim ⟨ inOuter switchᶠ f d n q ls c , o , rising (nx a) , p ⟩ [] (start c switchᶠ f d 0 q o ls′ a p)
-  -- A SWITCH'S OUTER END, SHOWN ONLY WITH NO LANE RUNNING.
-  rise-switch-cp : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) p
-                → Sim ⟨ inOuter switchᶠ f d n q ls c , o , rising cp , p ⟩ [] ⟨ c , flatS switchᶠ f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
   -- AN EXHAUST'S OUTER VALUE BEGINS ITS LANE WITH NONE RUNNING.
   rise-exhaust-run : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p → (n ≡ᵇ 0) ≡ true
                    → Sim ⟨ inOuter exhaustᶠ f d n q ls c , o , rising (nx a) , p ⟩ [] (start c exhaustᶠ f d n q o ls a p)
   -- AN EXHAUST'S OUTER VALUE, A LANE RUNNING, IS DROPPED.
   rise-exhaust-drop : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p → (n ≡ᵇ 0) ≡ false
                     → Sim ⟨ inOuter exhaustᶠ f d n q ls c , o , rising (nx a) , p ⟩ [] ⟨ c , flatS exhaustᶠ f d n q o ls , absorbed , p ⟩
-  -- AN EXHAUST'S OUTER END, SHOWN ONLY WITH NO LANE RUNNING.
-  rise-exhaust-cp : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) p
-                 → Sim ⟨ inOuter exhaustᶠ f d n q ls c , o , rising cp , p ⟩ [] ⟨ c , flatS exhaustᶠ f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
 
   -- A SOURCE'S VALUE FEEDS ITS BODY.
   rise-src-nx : ∀ {R Γ X B} (k : CS) (b : St (X ∷ Γ) B) (c : Ctx R Γ B) s a p

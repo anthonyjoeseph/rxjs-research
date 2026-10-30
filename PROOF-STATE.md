@@ -23,6 +23,15 @@ when `≈` carries silent rows past `p` with `Truncate`'s reach intact.
 
 Members: `rise-body-cp`.
 
+#### A DONE JOINER RISEN AGAIN
+
+Refuted against `Inv` as it stands: a joiner done with no lane live and
+none waiting has risen its end, yet nothing stops its outer rising one.
+Open: an invariant tying a done joiner to a closed or spent frame above.
+Settled by that invariant, or a program whose done joiner's outer ends.
+
+Members: `rise-joiner-cp-spent`.
+
 #### THE CONNECT'S SEARCH
 
 Riskiest: how a connect's source rows and its body's sit against each
@@ -52,9 +61,9 @@ on. Settled when each is a body, or a bounded merge whose freed slot the
 schedule reads wrong.
 
 Members: `enter-bounded`, `enter-switch`, `enter-exhaust`, `rise-bounded-nx`,
-`rise-bounded-cp`, `bounded-ends-at`, `bounded-val-at`,
-`rise-bounded-lane-hand`, `rise-switch-nx`, `rise-switch-cp`,
-`rise-exhaust-run`, `rise-exhaust-drop`, `rise-exhaust-cp`.
+`bounded-ends-at`, `bounded-val-at`, `bounded-outer-at`,
+`rise-bounded-lane-hand`, `rise-switch-nx`, `rise-exhaust-run`,
+`rise-exhaust-drop`.
 
 #### THE CONNECT STEPPED
 
@@ -138,7 +147,7 @@ rows in its subscription's world, and every frame above a merge good
 over rows that may now end where the lane did. Settled by bodies, or a
 program whose of run leaves two parts sharing a position.
 
-Members: `good-of`, `good-done`, `good-lane-end`.
+Members: `good-of`, `good-done`, `good-lane-end`, `good-outer-end`.
 
 #### THE MARK FOUND
 
@@ -147,7 +156,7 @@ connect's own mark or a joiner's next; an attach moves nothing owed, an
 outer's value begins its lane, and its end shows only with no lane
 running (`adequacy.Sim`). Settled when each is a body.
 
-Members: `found-mark`, `abs-att`, `rise-outer-nx`, `rise-outer-cp`.
+Members: `found-mark`, `abs-att`, `rise-outer-nx`.
 
 #### THE SUBSCRIPTIONS ENTERED
 
