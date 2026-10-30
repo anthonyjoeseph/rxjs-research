@@ -11,14 +11,15 @@ open import Data.Bool using (Bool; true; false; T; _∧_; if_then_else_; not)
 open import Data.Bool.Properties using (T-≡)
 open import Function.Bundles using (Equivalence)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; _++_; [_]; drop)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; pred; _≡ᵇ_; _+_)
 open import Data.Nat.Properties using (+-identityʳ)
 open import Data.Nat.Properties using (≡ᵇ⇒≡)
 open import Data.List.Relation.Unary.All using (lookup) renaming (_∷_ to _∷ᴬ_)
-open import Data.Product using (Σ; _×_; _,_; proj₁)
-open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
+open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Unit using (⊤; tt)
 open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁; tt to tt₁)
 open import Relation.Nullary using (¬_)
@@ -28,17 +29,19 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-split; <ᵖ-part)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; _≺_; _≼_; Truncate; module TakeWhile; DenEnv;
-  module Joining; module Values)
+  module Joining; module Values; MapT; map-out; map-skip; map-pin; map-end; module Scan)
 open import denotation.Laws.Modulus using (≼-refl)
 open import denotation.Laws.Worlds using (InvAt; Hots; W; inW; plain-ix; apart-w) renaming (⊑-refl to ⊑ᵖ-refl)
-open import operation.Key using (at; after; _<ᴷ_; at-<ᵖ)
+open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᵖ; clash)
 open import operation.PureObservable using (module Machine)
 
-open Machine using (St; Ctx; CS; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed;
+open Machine using (St; Ctx; CS; cs; _⊕_; bodyM; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed;
                     free; cpAt; cutAt; overAt; inScan; inTake; inSrc; inBody;
                     ofS; doneS; mapS; cutS; cpM; cutM; lnS; flatS; coldS; scanS; takeS; connS; joinS; inMap; inCut; inLn; inOuter; inLanes; nx; cp; attached; attAt; attM; pend) renaming (Ev to Evᴹ; over to overᶜ)
 open import adequacy.Rows using (acc-val; rows; rowsL; pendRows; toEv; Lanes; Each; Kth; AllEnd; EndsOf; Lane; reads; module Flat; module SwitchF; module ExhaustF; module BoundedF; ∅; Hot; Inbox; _∪_; Kept; Stops) renaming (kept to keptᴿ; stop to stopᴿ; left to leftᴿ; sub to subᴿ)
-open import adequacy.Bound using (Apart; <→⊑; Bd; Empty; From; Good; GoodL; GoodLn; MergeG; OK; OKL; Single; _⊑_; empty-any; ext-⊑; from-any; from-empty; from-weak; ix01; kept; lane-ok; lane-v; lanes-first; mapped; of-from; of-shows; off; on; one-end; own-first; past-⊑; rooted-single; scanned; seek-mark; shift-<; shift-≮; shift-⊑; silenced; ≺→⊑; ⊑-refl; ⊑-trans; ⊑i; ⊑→≼)
+open import adequacy.Cap using (irr; ⊑-<; <-⊑; ⊑-<⊑; ≮; dec; Past; OKᶜ; OKLᶜ; each-map; ok-cap; uncap; uncapL; cap-retag; cap-sub;
+  one; own-stills; first-stillsᶜ; first-at; lanes-firstᶜ; Calm; Quiet; QuietL; calm-map; EnvSingle; body-quiet; conn-free; conn-held; told-nil; join-head)
+open import adequacy.Bound using (Apart; <→⊑; Bd; Empty; From; Good; GoodL; GoodLn; MergeG; OK; OKL; Single; _⊑_; empty-any; ext-⊑; above-any; Above; After; held; raise-map; raise-scan; raise-cut; raise-take; raise-outer; raise-lane; from-empty; from-weak; ix01; kept; lane-ok; lane-v; mapped; of-from; of-shows; off; on; one-end; own-first; past-⊑; rooted-single; rooted-parts; Parts; scanned; seek-mark; shift-<; shift-≮; shift-⊑; silenced; ≺→⊑; ⊑-refl; ⊑-trans; ⊑i; ⊑→≼)
 
 open _⊑_
 open Bd
@@ -49,7 +52,7 @@ module Race {A B : Set} (Ln : Pos → A → EmissionSet B) (O : EmissionSet A) (
             (Cut : Pos → Pos → Set) (Hand : Pos → Set) (Ls : List (EmissionSet B)) (d : Bool) (n : ℕ)
             (sO : Single O) (over : T d → Empty O)
             (lane-after : ∀ {q a k e} → Ln q a k e → at (q ++ [ ix 0 ]) ⊑ at k)
-            (bg-from : ∀ {K} → Each (From K) Ls → From K Bg)
+            (bg-above : ∀ {P : Key → Set} → Each (Above P) Ls → Above P Bg)
             (bg-empty : Each Empty Ls → Empty Bg)
             (bg-at : ∀ {c e} → From (at c) O → Lanes Ls c e → Bg c e)
             (over-outer : ∀ {c} → O c end → n ≡ 0 → Over c)
@@ -61,23 +64,26 @@ module Race {A B : Set} (Ln : Pos → A → EmissionSet B) (O : EmissionSet A) (
   lane-from : ∀ {K q a k e} → K ⊑ at q → Ln q a k e → K ⊑ at k
   lane-from u l = ⊑-trans u (⊑-trans (ext-⊑ _ [ ix 0 ]) (lane-after l))
 
-  -- Every row of the joiner sits no earlier than some row of a part:
-  -- `K` bounding the outer's and the lanes', it bounds the joiner's.
+  -- Every row of the joiner sits no earlier than some row of a part: `P`
+  -- closed upward holding of the outer's and the lanes', it holds of the joiner's.
+  rows-up : ∀ (P : Key → Set) → (∀ {a b} → P a → a ⊑ b → P b) → Above P O → Each (Above P) Ls → Above P JoinT
+  rows-up P up fo fl (val r)             = up (fo r) (ext-⊑ _ [ ix 0 ])
+  rows-up P up fo fl (step r)            = fo r
+  rows-up P up fo fl (opin r)            = fo r
+  rows-up P up fo fl (oend r _)          = fo r
+  rows-up P up fo fl (opass r _)         = fo r
+  rows-up P up fo fl (lane r _ l _ _)    = up (fo r) (lane-from (⊑-refl _) l)
+  rows-up P up fo fl (lend r _ l _ _ _)  = up (fo r) (lane-from (⊑-refl _) l)
+  rows-up P up fo fl (lpass r _ l _ _ _) = up (fo r) (lane-from (⊑-refl _) l)
+  rows-up P up fo fl (hand r _ l _ _)    = up (fo r) (⊑-trans (lane-from (⊑-refl _) l) (ext-⊑ _ [ ix 0 ]))
+  rows-up P up fo fl (left r _ l _ _)    = up (fo r) (lane-from (⊑-refl _) l)
+  rows-up P up fo fl (run x _)           = bg-above {P} fl x
+  rows-up P up fo fl (rend x _ _)        = bg-above {P} fl x
+  rows-up P up fo fl (rpass x _ _)       = bg-above {P} fl x
+  rows-up P up fo fl (rhand x _)         = up (bg-above {P} fl x) (ext-⊑ _ [ ix 0 ])
+
   rows-from : ∀ K → From K O → Each (From K) Ls → From K JoinT
-  rows-from K fo fl (val r)             = ⊑-trans (fo r) (ext-⊑ _ [ ix 0 ])
-  rows-from K fo fl (step r)            = fo r
-  rows-from K fo fl (opin r)            = fo r
-  rows-from K fo fl (oend r _)          = fo r
-  rows-from K fo fl (opass r _)         = fo r
-  rows-from K fo fl (lane r _ l _ _)    = lane-from (fo r) l
-  rows-from K fo fl (lend r _ l _ _ _)  = lane-from (fo r) l
-  rows-from K fo fl (lpass r _ l _ _ _) = lane-from (fo r) l
-  rows-from K fo fl (hand r _ l _ _)    = ⊑-trans (lane-from (fo r) l) (ext-⊑ _ [ ix 0 ])
-  rows-from K fo fl (left r _ l _ _)    = lane-from (fo r) l
-  rows-from K fo fl (run x _)           = bg-from fl x
-  rows-from K fo fl (rend x _ _)        = bg-from fl x
-  rows-from K fo fl (rpass x _ _)       = bg-from fl x
-  rows-from K fo fl (rhand x _)         = ⊑-trans (bg-from fl x) (ext-⊑ _ [ ix 0 ])
+  rows-from K = rows-up (K ⊑_) (λ a b → ⊑-trans a b)
 
   -- A lane's row past its value, the value no earlier than `q₀`.
   lane-past : ∀ {q₀ q a k e} → at q₀ ⊑ at q → Ln q a k e → at (q₀ ++ [ ix 0 ]) ⊑ at k
@@ -103,10 +109,10 @@ module Race {A B : Set} (Ln : Pos → A → EmissionSet B) (O : EmissionSet A) (
   past-val v fo fl (lpass r _ l _ _ _) = lane-past (fo r) l
   past-val v fo fl (hand r _ l _ _)    = ⊑-trans (lane-past (fo r) l) (ext-⊑ _ [ ix 0 ])
   past-val v fo fl (left r _ l _ _)    = lane-past (fo r) l
-  past-val v fo fl (run x _)           = bg-from fl x
-  past-val v fo fl (rend x _ _)        = bg-from fl x
-  past-val v fo fl (rpass x _ _)       = bg-from fl x
-  past-val v fo fl (rhand x _)         = ⊑-trans (bg-from fl x) (ext-⊑ _ [ ix 0 ])
+  past-val {q₀} v fo fl (run x _)           = bg-above {at (q₀ ++ [ ix 0 ]) ⊑_} fl x
+  past-val {q₀} v fo fl (rend x _ _)        = bg-above {at (q₀ ++ [ ix 0 ]) ⊑_} fl x
+  past-val {q₀} v fo fl (rpass x _ _)       = bg-above {at (q₀ ++ [ ix 0 ]) ⊑_} fl x
+  past-val {q₀} v fo fl (rhand x _)         = ⊑-trans (bg-above {at (q₀ ++ [ ix 0 ]) ⊑_} fl x) (ext-⊑ _ [ ix 0 ])
 
   -- The outer's end at `q₀` with no lane running ends the joiner.
   outer-done : ∀ {q₀} → O q₀ end → From (at q₀) O → n ≡ 0 → Done q₀
@@ -170,6 +176,33 @@ module Race {A B : Set} (Ln : Pos → A → EmissionSet B) (O : EmissionSet A) (
   ... | true  = outer-wins f h o b (from-weak Ls (shift-< h k lt) (proj₁ bl))
   ... | false = lane-wins g k o′ (λ r → ⊑-trans (⊑i lt) (from b r)) bl
 
+  -- Past the cap, the race's key past it too.
+  race-past : ∀ {R} C (x : Maybe (Cand R A)) (y : Maybe (Cand R B)) → Past C x → Past C y → Past C (raceT d n [] x y)
+  race-past C nothing            nothing             _ _ = tt
+  race-past C nothing            (just (g , K , o′)) _ p = <-⊑ C p (raise-lane {A} {B} d n [] K o′)
+  race-past C (just (f , h , o)) nothing             p _ = <-⊑ C p (raise-outer {A} {B} n [] h o)
+  race-past C (just (f , h , o)) (just (g , K , o′)) p p′ with h <ᴷ K
+  ... | true  = <-⊑ C p (raise-outer {A} {B} n [] h o)
+  ... | false = <-⊑ C p′ (raise-lane {A} {B} d n [] K o′)
+
+  -- Up to a cap: a side past it loses to a side at or before it.
+  race-okᶜ : ∀ {R} C (x : Maybe (Cand R A)) (y : Maybe (Cand R B)) → OKᶜ C O x → OKLᶜ C Ls y → OKᶜ C JoinT (raceT d n [] x y)
+  race-okᶜ C x y (inj₂ (_ , bx)) (inj₂ (_ , by)) = ok-cap C (raceT d n [] x y) (race-ok x y bx by)
+  race-okᶜ C x y (inj₁ (px , ax)) (inj₁ (py , ay)) =
+    inj₁ (race-past C x y px py , rows-up (λ k → C <ᴷ k ≡ true) (λ a b → <-⊑ C a b) ax ay)
+  race-okᶜ C x nothing _ (inj₂ (() , _))
+  race-okᶜ C nothing _ (inj₂ (() , _)) _
+  race-okᶜ C nothing (just (g , K , o′)) (inj₁ (_ , ax)) (inj₂ (kc , bl)) =
+    ok-cap C (just (g , laneT {A = A} d n [] K o′)) (lane-wins g K o′ (λ {q} r → ⊑-<⊑ (at q) (≮ K C kc) (ax r)) bl)
+  race-okᶜ C (just (f , h , o)) (just (g , K , o′)) (inj₁ (ph , ax)) (inj₂ (kc , bl)) with h <ᴷ K in lt
+  ... | true  = ⊥-elim (clash (<-⊑ C ph (<→⊑ h K lt)) kc)
+  ... | false = ok-cap C (just (g , laneT {A = A} d n [] K o′)) (lane-wins g K o′ (λ {q} r → ⊑-<⊑ (at q) (≮ K C kc) (ax r)) bl)
+  race-okᶜ C (just (f , h , o)) nothing (inj₂ (hc , bx)) (inj₁ (_ , ay)) =
+    ok-cap C (just (f , outerT {B = B} n [] h o)) (outer-wins f h o bx (each-map Ls (λ a {q} {_} r → shift-< h (at q) (⊑-< (at q) (≮ h C hc) (a r))) ay))
+  race-okᶜ C (just (f , h , o)) (just (g , K , o′)) (inj₂ (hc , bx)) (inj₁ (pK , ay)) with h <ᴷ K in lt
+  ... | true  = ok-cap C (just (f , outerT {B = B} n [] h o)) (outer-wins f h o bx (each-map Ls (λ a {q} {_} r → shift-< h (at q) (⊑-< (at q) (≮ h C hc) (a r))) ay))
+  ... | false = ⊥-elim (irr C (<-⊑ C pK (⊑-trans (≮ K h lt) (≮ h C hc))))
+
 -- No lane running, by its count.
 none-run : ∀ {B} {c} n (Ls : List (EmissionSet B)) → n ≡ 0 → AllEnd (_≼ c) n (EndsOf Ls)
 none-run {c = c} n Ls z = subst (λ k → AllEnd (_≼ c) k (EndsOf Ls)) (sym z) tt
@@ -199,40 +232,40 @@ bounded-unqueued m L O Ls d n {c} ap fo x (_ , _ , a , BoundedF.Item.outer {q = 
     starts (BoundedF.Starts.freed _ _)         h₁ _  = h₁ refl
     starts {q = q} (BoundedF.Starts.queued {c = c₁} _ qc _ _ _) _ h₂ = h₂ {c₁} refl qc
 
--- Each policy's race, from its outer's and its lanes' finds.
-Races : ∀ {A B} → (R : Set) → EmissionSet A → List (EmissionSet B) → Bool → ℕ → EmissionSet B → Set₁
-Races R O Ls d n J = ∀ (x : Maybe (Cand R _)) (y : Maybe (Cand R _)) → OK O x → OKL Ls y → OK J (raceT d n [] x y)
+-- Each policy's race, from its outer's and its lanes' finds, up to any cap.
+Racesᶜ : ∀ {A B} → (R : Set) → EmissionSet A → List (EmissionSet B) → Bool → ℕ → List A → EmissionSet B → Set₁
+Racesᶜ R O Ls d n q J = ∀ C (x : Maybe (Cand R _)) (y : Maybe (Cand R _)) → OKᶜ C O x → OKLᶜ C Ls y → OKᶜ C J (raceT d n q x y)
 
-flat-race : ∀ {R A B} (L : A → Pos → EmissionSet B) O Ls d n → Single O → (T d → Empty O) → Races R O Ls d n (Flat.JoinT L O d n Ls)
+flat-race : ∀ {R A B} (L : A → Pos → EmissionSet B) O Ls d n → Single O → (T d → Empty O) → Racesᶜ R O Ls d n [] (Flat.JoinT L O d n Ls)
 flat-race L O Ls d n sO sp =
-  Race.race-ok (Lane L) O (Lanes Ls) Over (λ _ → ⊤) (λ _ _ → ⊥) (λ _ → ⊥) Ls d n sO sp read-after (from-any Ls) (empty-any Ls) (λ _ x → x)
+  Race.race-okᶜ (Lane L) O (Lanes Ls) Over (λ _ → ⊤) (λ _ _ → ⊥) (λ _ → ⊥) Ls d n sO sp read-after (λ {P} → above-any {P = P} Ls) (empty-any Ls) (λ _ x → x)
     (λ {c} r z → over-at (inj₂ (c , r , ≼-refl {c})) (none-run {c = c} n Ls z)) (λ {c} x td pn → over-at (inj₁ td) (one-end n Ls pn {c} x)) (λ _ ())
   where open Flat L O d n Ls using (Over; over-at)
 
-switch-race : ∀ {R A B} (L : A → Pos → EmissionSet B) O Ls d n → Single O → (T d → Empty O) → Races R O Ls d n (SwitchF.JoinT L O d n Ls)
+switch-race : ∀ {R A B} (L : A → Pos → EmissionSet B) O Ls d n → Single O → (T d → Empty O) → Racesᶜ R O Ls d n [] (SwitchF.JoinT L O d n Ls)
 switch-race L O Ls d n sO sp =
-  Race.race-ok (Lane L) O Bg Over (λ _ → ⊤) Cut (λ _ → ⊥) Ls d n sO sp read-after bg-from bg-empty
+  Race.race-okᶜ (Lane L) O Bg Over (λ _ → ⊤) Cut (λ _ → ⊥) Ls d n sO sp read-after (λ {P} → bg-above {P}) bg-empty
     (switch-at L O Ls d n)
     (λ {c} r z → inj₂ (c , r , ≼-refl {c}) , inj₁ (none-run {c = c} n Ls z)) (λ {c} x td pn → inj₁ td , inj₁ (one-end n Ls pn {c} x)) (λ _ ())
   where
     open SwitchF L O d n Ls using (Bg; bg; bpin; Over; Cut)
-    bg-from : ∀ {K} → Each (From K) Ls → From K Bg
-    bg-from fl (bg x _)     = from-any Ls fl x
-    bg-from fl (bpin x _ _) = from-any Ls fl x
+    bg-above : ∀ {P : Key → Set} → Each (Above P) Ls → Above P Bg
+    bg-above {P} fl (bg x _)     = above-any {P = P} Ls fl x
+    bg-above {P} fl (bpin x _ _) = above-any {P = P} Ls fl x
     bg-empty : Each Empty Ls → Empty Bg
     bg-empty el (bg x _)     = empty-any Ls el x
     bg-empty el (bpin x _ _) = empty-any Ls el x
 
-exhaust-race : ∀ {R A B} (L : A → Pos → EmissionSet B) O Ls d n → Single O → (T d → Empty O) → Races R O Ls d n (ExhaustF.JoinT L O d n Ls)
+exhaust-race : ∀ {R A B} (L : A → Pos → EmissionSet B) O Ls d n → Single O → (T d → Empty O) → Racesᶜ R O Ls d n [] (ExhaustF.JoinT L O d n Ls)
 exhaust-race L O Ls d n sO sp =
-  Race.race-ok (Lane L) O (Lanes Ls) Over Run (λ _ _ → ⊥) (λ _ → ⊥) Ls d n sO sp read-after (from-any Ls) (empty-any Ls) (λ _ x → x)
+  Race.race-okᶜ (Lane L) O (Lanes Ls) Over Run (λ _ _ → ⊥) (λ _ → ⊥) Ls d n sO sp read-after (λ {P} → above-any {P = P} Ls) (empty-any Ls) (λ _ x → x)
     (λ {c} r z → inj₂ (c , r , ≼-refl {c}) , none-run {c = c} n Ls z) (λ {c} x td pn → inj₁ td , one-end n Ls pn {c} x) (λ _ ())
   where open ExhaustF L O d n Ls using (Over; Run)
 
 -- Nothing queued: no lane waits, and with the outer done none starts.
-bounded-race : ∀ {R A B} m (L : A → Pos → EmissionSet B) O Ls d n → Single O → (T d → Empty O) → Races R O Ls d n (BoundedF.JoinT m L O d n [] Ls)
+bounded-race : ∀ {R A B} m (L : A → Pos → EmissionSet B) O Ls d n → Single O → (T d → Empty O) → Racesᶜ R O Ls d n [] (BoundedF.JoinT m L O d n [] Ls)
 bounded-race m L O Ls d n sO sp =
-  Race.race-ok LaneB O Bg Over Indexed (λ _ _ → ⊥) Queued Ls d n sO sp lane-after bg-from bg-empty (λ _ x → begun x)
+  Race.race-okᶜ LaneB O Bg Over Indexed (λ _ _ → ⊥) Queued Ls d n sO sp lane-after (λ {P} → bg-above {P}) bg-empty (λ _ x → begun x)
     (λ {c} r z → inj₂ (c , r , ≼-refl {c}) , counted {c} (none-run {c = c} n Ls z))
     (λ {c} x td pn → inj₁ td , counted {c} (one-end n Ls pn {c} x)) no-hand
   where
@@ -245,9 +278,9 @@ bounded-race m L O Ls d n sO sp =
     lane-after (_ , _ , (_ , Starts.freed _ _) , subᴿ _ s)  = ⊑-trans (ix01 _) (≺→⊑ s)
     lane-after (_ , _ , (_ , Starts.queued {c = c} _ qc _ _ _) , subᴿ _ s) =
       ⊑-trans (past-⊑ (≺→⊑ qc) λ eq → ⊑→≼ {c} {c} (⊑-refl (at c)) (subst (_≺ c) eq qc)) (⊑-trans (ext-⊑ c [ ix 1 ]) (≺→⊑ s))
-    bg-from : ∀ {K} → Each (From K) Ls → From K Bg
-    bg-from fl (begun x)                  = from-any Ls fl x
-    bg-from fl (waits (Item.queued () , _) _)
+    bg-above : ∀ {P : Key → Set} → Each (Above P) Ls → Above P Bg
+    bg-above {P} fl (begun x)                  = above-any {P = P} Ls fl x
+    bg-above fl (waits (Item.queued () , _) _)
     bg-empty : Each Empty Ls → Empty Bg
     bg-empty el (begun x)                  = empty-any Ls el x
     bg-empty el (waits (Item.queued () , _) _)
@@ -270,8 +303,10 @@ ok-trunc (just (f , K , o)) b =
 -- A take
 
 postulate
-  -- A GOOD NODE'S ROWS HOLD ONE EVENT A POSITION.
-  rows-single : ∀ {A} {ρ : DenEnv []} (s : St [] A) → Good ρ s → Single (rows ρ s)
+  -- A GOOD NODE'S ROWS HOLD ONE EVENT A POSITION, its binders' doing so:
+  -- a joiner's rows are its binder's, so a binder with two events at a
+  -- position gives its joiner two.
+  rows-single : ∀ {Γ A} {ρ : DenEnv Γ} (s : St Γ A) → EnvSingle ρ → Good ρ s → Single (rows ρ s)
 
 -- At or past where it was decided, one of `p` and `q` before the other.
 ⊑-split : ∀ {p q} → at p ⊑ at q → p ≺ q ⊎ p ≡ q
@@ -364,6 +399,64 @@ kept-ok i w (cpAt _)   nf (just (f , K , o)) b = record { from = λ { (keptᴿ x
 kept-ok i w (cutAt _)  nf (just (f , K , o)) b = record { from = λ { (keptᴿ x _ _) → from b x } ; mark = mark b ; shown = λ () }
 kept-ok i w (overAt _) nf (just (f , K , o)) b = record { from = λ { (keptᴿ x _ _) → from b x } ; mark = mark b ; shown = λ () }
 
+-- A take's stop and kept pins, all past the cap.
+stops-after : ∀ {A} C r {t : EmissionSet A} → C <ᴷ at (r ++ [ last ]) ≡ true → After C t → After C (Stops r t)
+stops-after C r ck a stopᴿ                = ck
+stops-after C r ck a (leftᴿ (keptᴿ x _ _)) = a x
+
+-- Its child's rows all past the cap: its own completion leads.
+own-stopᶜ : ∀ {R Γ A} C (c : Ctx R Γ A) i (w : A → Bool) r (s : St Γ A) {t : EmissionSet A}
+          → C <ᴷ at (r ++ [ last ]) ≡ true ⊎ C <ᴷ at (r ++ [ last ]) ≡ false → After C t
+          → OKᶜ C (Stops r t) (just (found (_ , _ , c , takeS i w (cpAt r) s) cpM (at (r ++ [ last ])) , at (r ++ [ last ]) , outOf c (takeS i w (cpAt r) s) cpM))
+own-stopᶜ C c i w r s (inj₁ ck) a = inj₁ (ck , stops-after C r ck a)
+own-stopᶜ C c i w r s (inj₂ ck) a =
+  inj₂ (ck , record { from = λ { stopᴿ → ⊑-refl _ ; (leftᴿ (keptᴿ {k} x _ _)) → ⊑-<⊑ (at k) (≮ (at (r ++ [ last ])) C ck) (a x) }
+                    ; mark = ⊑-refl _ ; shown = stop-shown c r })
+
+take-stopᶜ : ∀ {R Γ A} C (c : Ctx R Γ A) i (w : A → Bool) r (s : St Γ A) {t : EmissionSet A} (y : Maybe (Cand R A)) → OKᶜ C t y
+           → OKᶜ C (Stops r t) (first (just (found (_ , _ , c , takeS i w (cpAt r) s) cpM (at (r ++ [ last ])) , at (r ++ [ last ]) , outOf c (takeS i w (cpAt r) s) cpM))
+                                       (retag (takeT i w (cpAt r)) y))
+take-stopᶜ C c i w r s y (inj₂ (_ , b)) = ok-cap C _ (take-stop c i w r s y b)
+take-stopᶜ C c i w r s nothing (inj₁ (_ , a)) = own-stopᶜ C c i w r s (dec C (at (r ++ [ last ]))) a
+take-stopᶜ C c i w r s (just (g , h , o)) (inj₁ (p , a)) with h <ᴷ at (r ++ [ last ]) in lt
+... | true  = inj₁ (p , stops-after C r (<-⊑ C p (<→⊑ h (at (r ++ [ last ])) lt)) a)
+... | false = own-stopᶜ C c i w r s (dec C (at (r ++ [ last ]))) a
+
+-- A row of a map or scan sits at its source's.
+map-src : ∀ {A B} {f : A → B} {t : EmissionSet A} {q e} → MapT f t q e → Σ Pos λ q′ → Σ (Ev A) λ e′ → t q′ e′ × at q′ ⊑ at q
+map-src (map-out r)  = _ , _ , r , ⊑-refl _
+map-src (map-skip r) = _ , _ , r , ⊑-refl _
+map-src (map-pin r)  = _ , _ , r , ⊑-refl _
+map-src (map-end r)  = _ , _ , r , ⊑-refl _
+
+scan-src : ∀ {A B} {f : B → A → B} {z} {t : EmissionSet A} {q e} → Scan.ScanT f z t q e → Σ Pos λ q′ → Σ (Ev A) λ e′ → t q′ e′ × at q′ ⊑ at q
+scan-src (Scan.sval a)  = _ , _ , proj₂ (acc-val a) , ⊑-refl _
+scan-src (Scan.sstep r) = _ , _ , r , ⊑-refl _
+scan-src (Scan.spin r)  = _ , _ , r , ⊑-refl _
+scan-src (Scan.send r)  = _ , _ , r , ⊑-refl _
+
+kept-src : ∀ {A} {p} {t : EmissionSet A} {q e} → Kept p t q e → Σ Pos λ q′ → Σ (Ev A) λ e′ → t q′ e′ × at q′ ⊑ at q
+kept-src (keptᴿ x _ _) = _ , _ , x , ⊑-refl _
+
+okᶜ-trunc : ∀ {R A} C {t : EmissionSet A} (y : Maybe (Cand R A)) → OKᶜ C t y → OKᶜ C (Truncate t) y
+okᶜ-trunc C = cap-sub C ok-trunc (λ r → proj₁ r)
+
+-- A switched-off joiner's inbox alone.
+inbox-ok : ∀ {R A} {u : EmissionSet A} (y : Maybe (Cand R A)) → OK (u ∪ ∅) y → OK u y
+inbox-ok nothing            e r = e (inj₁ r)
+inbox-ok (just (g , K , o)) b =
+  record { from = λ r → from b (inj₁ r) ; mark = mark b
+         ; shown = λ eq → let (q , k , r) = shown b eq in q , k , [ (λ x → x) , (λ ()) ]′ r }
+
+okc : ∀ {R Γ A} {ρ : DenEnv Γ} C (c : Ctx R Γ A) (s : St Γ A) → OK (rows ρ s) (seek c s) → OKᶜ C (rows ρ s) (seek c s)
+okc C c s = ok-cap C (seek c s)
+
+calm-fst : ∀ {Γ} C (ρ : DenEnv Γ) {P Q : ∀ {X} → X ∈ Γ → Set} → Calm C ρ (λ x → P x × Q x) → Calm C ρ P
+calm-fst C ρ = calm-map {C = C} {ρ = ρ} (λ _ → proj₁)
+
+calm-snd : ∀ {Γ} C (ρ : DenEnv Γ) {P Q : ∀ {X} → X ∈ Γ → Set} → Calm C ρ (λ x → P x × Q x) → Calm C ρ Q
+calm-snd C ρ = calm-map {C = C} {ρ = ρ} (λ _ → proj₂)
+
 ------------------------------------------------------------------------
 -- Every node
 
@@ -374,83 +467,140 @@ seek-off c (attAt p) s =
   own-first (_ , _ , c , cutS false (attAt p) s) attM (after p) _ (silenced (seek (inCut false (attAt p) c) s) (seek-mark (inCut false (attAt p) c) s))
 
 postulate
-  -- A CONNECT'S SEEK LEADS ITS ROWS: whatever its source and body find,
-  -- the source winning only strictly before the body, keys every row the
-  -- connect still owes, its body's joiners' unfed rows included.
-  --
-  -- DEAD ROUTE: recursing into the body as `seek-ok` does into every
-  --   other node: `seek-ok` is stated at an empty environment, and a
-  --   joiner's rows read its binder, so no joiner's OK holds apart from
-  --   the source it reads.
-  -- DEAD ROUTE: reading the body under a quiet binder to reuse `seek-ok`:
-  --   `G` and `rows` read the environment, so a body good under its real
-  --   binder says nothing under a quiet one.
-  conn-ok : ∀ {R A X} {ρ : DenEnv []} (c : Ctx R [] A) k (o : St [] X) (b : St (X ∷ []) A) → Good ρ (connS k o b) → OK (rows ρ (connS k o b)) (seek c (connS k o b))
+  -- A CONNECT'S BINDER HOLDS ONE EVENT A POSITION, its source's rows doing so.
+  bind-single : ∀ {Γ X A} {ρ : DenEnv Γ} k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvSingle ρ → Good ρ (connS k o b) → EnvSingle (Hot (rows ρ o) k ∷ᴬ ρ)
 
   -- A COLD'S DUE MARK KEYS ITS ROWS: the next step of its tape, a frame's
   -- value, stall or close, or its completion owed; a dead cold owes none.
-  cold-ok : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) b l → OK (rows ρ (coldS b l)) (seek c (coldS b l))
+  cold-ok : ∀ {R Γ A} {ρ : DenEnv Γ} (c : Ctx R Γ A) b l → OK (rows ρ (coldS b l)) (seek c (coldS b l))
 
-  -- A BOUNDED MERGE'S SEARCH WITH VALUES WAITING KEYS ITS ROWS: a lane's
-  -- end hands off to the queue's first just past it, the merge's end
-  -- owed by none.
-  bounded-wait-ok : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) m (f : A → Obs Timeline [] B) d n a q (o : St [] A) ls
-                  → Good ρ (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls) → OK (rows ρ (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls)) (seek c (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls))
+  -- A BOUNDED MERGE'S RACE WITH VALUES WAITING KEYS ITS ROWS up to the
+  -- cap, every slot taken: the earliest lane end hands off to the
+  -- queue's head just past it, so nothing is owed at it; the queue's
+  -- lanes start past a lane's end, and the merge's end is owed by none.
+  queued-race : ∀ {R A B} m (L : A → Pos → EmissionSet B) O Ls d n (a : A) q → Single O → Each Single Ls → Parts O Ls → n ≡ m
+              → Racesᶜ R O Ls d n (a ∷ q) (BoundedF.JoinT m L O d n (a ∷ q) Ls)
 
+-- A good lane list's rows, one event a position each.
+lanes-single : ∀ {Γ A} {ρ : DenEnv Γ} (ls : List (St Γ A)) → EnvSingle ρ → GoodL ρ ls → Each Single (rowsL ρ ls)
+lanes-single []       _  _         = tt
+lanes-single (s ∷ ls) es (gs , gl) with lane-v s gs
+... | on a s₀ g₀ _ = rows-single s₀ es g₀ , lanes-single ls es gl
+... | off a s₀     = (λ ()) , lanes-single ls es gl
+
+-- EVERY SEARCH KEYS ITS ROWS UP TO A CAP ITS BINDERS LEAVE QUIET: a
+-- connect's body is searched under a binder capped no later than the
+-- source's find, which is all a joiner of it can be asked to lead.
 mutual
-  seek-ok : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) (s : St [] A) → Good ρ s → OK (rows ρ s) (seek c s)
-  seek-ok c (ofS i p [])       _ = record { from = of-from p i [] ; mark = ⊑-refl _ ; shown = λ eq → _ , refl , of-shows c i p [] eq }
-  seek-ok c (ofS i p (x ∷ xs)) _ = record { from = of-from p i (x ∷ xs) ; mark = ⊑-refl _ ; shown = λ eq → _ , refl , of-shows c i p (x ∷ xs) eq }
-  seek-ok c doneS              _ = λ ()
-  seek-ok c (connS k o b)      g = conn-ok c k o b g
-  seek-ok c (coldS b l)        _ = cold-ok c b l
-  seek-ok c (mapS f s)         g = mapped f (seek (inMap f c) s) (seek-ok (inMap f c) s g)
-  seek-ok c (scanS f z s)      g = scanned f z (seek (inScan f z c) s) (seek-ok (inScan f z c) s g)
-  seek-ok c (takeS i q w s)    g = take-ok c i q w s g
-  seek-ok c (cutS true attached s)   g = kept (seek (inCut true attached c) s) (seek-ok (inCut true attached c) s g)
-  seek-ok {ρ = ρ} c (cutS false a s) _ = seek-off {ρ = ρ} c a s
-  seek-ok c (cutS true (attAt p) s)  g =
-    own-first (_ , _ , c , cutS true (attAt p) s) attM (after p) _ (kept (seek (inCut true (attAt p) c) s) (seek-ok (inCut true (attAt p) c) s g))
-  seek-ok {ρ = ρ} c (flatS (mergeᶠ nothing) f d n q o ls) g with MergeG.fresh g
-  ... | refl = ok-trunc _ (join-ok c (mergeᶠ nothing) f d n o ls (flat-race (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) spent) outer lanesG)
+  seek-okᶜ : ∀ {R Γ A} {ρ : DenEnv Γ} C (c : Ctx R Γ A) (s : St Γ A) → EnvSingle ρ → Good ρ s → Quiet C ρ s → OKᶜ C (rows ρ s) (seek c s)
+  seek-okᶜ {ρ = ρ} C c (ofS i p [])       _ _ _ = okc {ρ = ρ} C c (ofS i p []) (record { from = of-from p i [] ; mark = ⊑-refl _ ; shown = λ eq → _ , refl , of-shows c i p [] eq })
+  seek-okᶜ {ρ = ρ} C c (ofS i p (x ∷ xs)) _ _ _ = okc {ρ = ρ} C c (ofS i p (x ∷ xs)) (record { from = of-from p i (x ∷ xs) ; mark = ⊑-refl _ ; shown = λ eq → _ , refl , of-shows c i p (x ∷ xs) eq })
+  seek-okᶜ {ρ = ρ} C c doneS              _ _ _ = okc {ρ = ρ} C c doneS (λ ())
+  seek-okᶜ C c (connS k o b)      es g qt = conn-okᶜ C c k o b es g qt
+  seek-okᶜ {ρ = ρ} C c (coldS b l)        _ _ _ = okc {ρ = ρ} C c (coldS b l) (cold-ok c b l)
+  seek-okᶜ C c (mapS f s)         es g qt =
+    cap-retag C (mapT f) (raise-map f) map-src (λ y → mapped f y) (seek (inMap f c) s) (seek-okᶜ C (inMap f c) s es g qt)
+  seek-okᶜ C c (scanS f z s)      es g qt =
+    cap-retag C (scanT f z) (raise-scan f z) scan-src (λ y → scanned f z y) (seek (inScan f z c) s) (seek-okᶜ C (inScan f z c) s es g qt)
+  seek-okᶜ C c (takeS i q w s)    es g qt = take-okᶜ C c i q w s es g qt
+  seek-okᶜ C c (cutS true attached s) es g qt =
+    cap-retag C (cutT true) (raise-cut true) (λ r → _ , _ , r , ⊑-refl _) (λ y → kept y) (seek (inCut true attached c) s) (seek-okᶜ C (inCut true attached c) s es g qt)
+  seek-okᶜ {ρ = ρ} C c (cutS false a s) _ _ _ = okc {ρ = ρ} C c (cutS false a s) (seek-off {ρ = ρ} c a s)
+  seek-okᶜ C c (cutS true (attAt p) s) es g qt =
+    first-stillsᶜ C (just (found (_ , _ , c , cutS true (attAt p) s) attM (after p) , after p , still)) _ (one (⊑-refl _))
+      (cap-retag C (cutT true) (raise-cut true) (λ r → _ , _ , r , ⊑-refl _) (λ y → kept y) (seek (inCut true (attAt p) c) s) (seek-okᶜ C (inCut true (attAt p) c) s es g qt))
+  seek-okᶜ {ρ = ρ} C c (flatS (mergeᶠ nothing) f d n q o ls) es g qt with MergeG.fresh g
+  ... | refl = okᶜ-trunc C _ (join-okᶜ C c (mergeᶠ nothing) f d n [] o ls (flat-race (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) spent)
+                                        es outer lanesG (calm-fst C ρ qt) (calm-snd C ρ qt))
     where open MergeG g
-  seek-ok {ρ = ρ} c (flatS (mergeᶠ (just m)) f d n [] o ls) (g , _) =
-    ok-trunc _ (join-ok c (mergeᶠ (just m)) f d n o ls (bounded-race m (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) spent) outer lanesG)
+  seek-okᶜ {ρ = ρ} C c (flatS (mergeᶠ (just m)) f d n [] o ls) es (g , _) qt =
+    okᶜ-trunc C _ (join-okᶜ C c (mergeᶠ (just m)) f d n [] o ls (bounded-race m (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) spent)
+                             es outer lanesG (calm-fst C ρ qt) (calm-snd C ρ qt))
     where open MergeG g
-  seek-ok c (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls) g = bounded-wait-ok c m f d n a q o ls g
-  seek-ok {ρ = ρ} c (flatS switchᶠ f d n q o ls) g with MergeG.fresh g
-  ... | refl = ok-trunc _ (join-ok c switchᶠ f d n o ls (switch-race (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) spent) outer lanesG)
+  seek-okᶜ {ρ = ρ} C c (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls) es (g , full) qt =
+    okᶜ-trunc C _ (join-okᶜ C c (mergeᶠ (just m)) f d n (a ∷ q) o ls
+                     (queued-race m (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n a q (rooted-single rooted) (lanes-single ls es lanesG) (rooted-parts rooted)
+                        ([ (λ ()) , (λ e → e) ]′ full))
+                     es outer lanesG (calm-fst C ρ qt) (calm-snd C ρ qt))
     where open MergeG g
-  seek-ok {ρ = ρ} c (flatS exhaustᶠ f d n q o ls) g with MergeG.fresh g
-  ... | refl = ok-trunc _ (join-ok c exhaustᶠ f d n o ls (exhaust-race (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) spent) outer lanesG)
+  seek-okᶜ {ρ = ρ} C c (flatS switchᶠ f d n q o ls) es g qt with MergeG.fresh g
+  ... | refl = okᶜ-trunc C _ (join-okᶜ C c switchᶠ f d n [] o ls (switch-race (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) spent)
+                                        es outer lanesG (calm-fst C ρ qt) (calm-snd C ρ qt))
     where open MergeG g
+  seek-okᶜ {ρ = ρ} C c (flatS exhaustᶠ f d n q o ls) es g qt with MergeG.fresh g
+  ... | refl = okᶜ-trunc C _ (join-okᶜ C c exhaustᶠ f d n [] o ls (exhaust-race (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) spent)
+                                        es outer lanesG (calm-fst C ρ qt) (calm-snd C ρ qt))
+    where open MergeG g
+  seek-okᶜ C c (joinS j true x []) _ _ qt =
+    inj₁ (tt , λ { (inj₁ ()) ; (inj₂ r) → [ (λ air → air j r) , (λ t → ⊥-elim (told-nil x t)) ]′ (qt x) })
+  seek-okᶜ C c (joinS j false x []) _ _ _ = inj₁ (tt , λ ())
+  seek-okᶜ {ρ = ρ} C c (joinS j true x ((q , e) ∷ ib)) _ g _ = okc {ρ = ρ} C c (joinS j true x ((q , e) ∷ ib)) (join-head c j true x q e ib g)
+  seek-okᶜ {ρ = ρ} C c (joinS j false x ((q , e) ∷ ib)) _ g _ = okc {ρ = ρ} C c (joinS j false x ((q , e) ∷ ib)) (inbox-ok (seek c (joinS j false x ((q , e) ∷ ib))) (join-head c j false x q e ib g))
+
+  -- A CONNECT'S SEEK LEADS ITS ROWS: whatever its source and body find,
+  -- the source winning only strictly before the body, keys every row the
+  -- connect still owes up to the cap, its body searched under its binder
+  -- capped no later than the source's find.
+  conn-okᶜ : ∀ {R Γ A X} {ρ : DenEnv Γ} C (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvSingle ρ → Good ρ (connS k o b) → Quiet C ρ (connS k o b)
+           → OKᶜ C (rows ρ (connS k o b)) (seek c (connS k o b))
+  conn-okᶜ {ρ = ρ} C c k@(cs cl sl sa nothing aS oA ca ea) o b es g@(go , gb , _ , tl) qt =
+    first-stillsᶜ C (ownBest c (connS k o b) (own (connS k o b))) _ (own-stills c k o b (own (connS k o b)))
+      (conn-free {ρ = ρ} k (rows ρ o) {β = rows (Hot (rows ρ o) k ∷ᴬ ρ) b} C (overᶜ k) (seek (inSrc k b c) o) (seek (inBody k o c) b)
+         (seek-okᶜ C (inSrc k b c) o es go (calm-fst C ρ qt)) (seek-mark (inSrc k b c) o)
+         (λ C₂ c₂ air → seek-okᶜ C₂ (inBody k o c) b (bind-single k o b es g) gb (body-quiet {C = C} {C₂ = C₂} {σ = rows ρ o} k o b c₂ qt tl air)))
+  conn-okᶜ {ρ = ρ} C c k@(cs cl sl sa (just p) aS oA ca ea) o b es g@(held hf , gb , _ , tl) qt =
+    conn-held {ρ = ρ} k (rows ρ o) {β = rows (Hot (rows ρ o) k ∷ᴬ ρ) b} C (p ⊕ [ ix 1 ]) (ownBest c (connS k o b) (own (connS k o b))) (seek (inBody k o c) b) hf
+      (first-at {f = (_ , _ , c , connS k o b)} {m = bodyM} (at (p ⊕ [ ix 1 ])) (ownBest c (connS k o b) (drop 1 (own (connS k o b)))) (own-stills c k o b (drop 1 (own (connS k o b)))))
+      (λ C₂ c₂ air → seek-okᶜ C₂ (inBody k o c) b (bind-single k o b es g) gb (body-quiet {C = C} {C₂ = C₂} {σ = rows ρ o} k o b c₂ qt tl air))
 
   -- A TAKE'S SEARCH KEYS ITS ROWS: unfailed, its child's find retagged; a
   -- failing value's completion owed at its stop; its kept pins after.
-  take-ok : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) i q w (s : St [] A) → Good ρ (takeS i q w s) → OK (rows ρ (takeS i q w s)) (seek c (takeS i q w s))
-  take-ok {ρ = ρ} c i q free s g =
-    ok-trunc (retag (takeT i q free) (seek (inTake i q free c) s))
-      (take-free i q (seek (inTake i q free c) s) (rows-single {ρ = ρ} s g) (seek-ok (inTake i q free c) s g))
-  take-ok c i q (cpAt r) s g = take-stop c i q r s (seek (inTake i q (cpAt r) c) s) (seek-ok (inTake i q (cpAt r) c) s g)
-  take-ok c i q (cutAt r) s g =
-    own-first (_ , _ , c , takeS i q (cutAt r) s) cutM (after r) _ (kept-ok i q (cutAt r) (λ ()) (seek (inTake i q (cutAt r) c) s) (seek-ok (inTake i q (cutAt r) c) s g))
-  take-ok c i q (overAt r) s g = kept-ok i q (overAt r) (λ ()) (seek (inTake i q (overAt r) c) s) (seek-ok (inTake i q (overAt r) c) s g)
+  take-okᶜ : ∀ {R Γ A} {ρ : DenEnv Γ} C (c : Ctx R Γ A) i q w (s : St Γ A) → EnvSingle ρ → Good ρ (takeS i q w s) → Quiet C ρ (takeS i q w s)
+           → OKᶜ C (rows ρ (takeS i q w s)) (seek c (takeS i q w s))
+  take-okᶜ {ρ = ρ} C c i q free s es g qt =
+    okᶜ-trunc C _ (cap-retag C (takeT i q free) (raise-take i q free) take-src (λ y → take-free i q y (rows-single {ρ = ρ} s es g))
+                    (seek (inTake i q free c) s) (seek-okᶜ C (inTake i q free c) s es g qt))
+  take-okᶜ C c i q (cpAt r) s es g qt = take-stopᶜ C c i q r s (seek (inTake i q (cpAt r) c) s) (seek-okᶜ C (inTake i q (cpAt r) c) s es g qt)
+  take-okᶜ C c i q (cutAt r) s es g qt =
+    first-stillsᶜ C (just (found (_ , _ , c , takeS i q (cutAt r) s) cutM (after r) , after r , still)) _ (one (⊑-refl _))
+      (cap-retag C (takeT i q (cutAt r)) (raise-take i q (cutAt r)) kept-src (λ y → kept-ok i q (cutAt r) (λ ()) y)
+         (seek (inTake i q (cutAt r) c) s) (seek-okᶜ C (inTake i q (cutAt r) c) s es g qt))
+  take-okᶜ C c i q (overAt r) s es g qt =
+    cap-retag C (takeT i q (overAt r)) (raise-take i q (overAt r)) kept-src (λ y → kept-ok i q (overAt r) (λ ()) y)
+      (seek (inTake i q (overAt r) c) s) (seek-okᶜ C (inTake i q (overAt r) c) s es g qt)
 
   -- A joiner with nothing queued: its policy's race over its parts' finds.
-  join-ok : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) op (f : A → Obs Timeline [] B) d n (o : St [] A) ls {J : EmissionSet B}
-          → (∀ (x : Maybe (Cand R A)) (y : Maybe (Cand R B)) → OK (rows ρ o) x → OKL (rowsL ρ ls) y → OK J (raceT d n [] x y))
-          → Good ρ o → GoodL ρ ls → OK J (raceT d n [] (seek (inOuter op f d n [] ls c) o) (lanes c op f d n [] o [] ls))
-  join-ok c op f d n o ls rc go gl =
-    rc (seek (inOuter op f d n [] ls c) o) (lanes c op f d n [] o [] ls) (seek-ok (inOuter op f d n [] ls c) o go) (lanes-ok c op f d n [] o [] ls gl)
+  join-okᶜ : ∀ {R Γ A B} {ρ : DenEnv Γ} C (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls {J : EmissionSet B}
+           → Racesᶜ R (rows ρ o) (rowsL ρ ls) d n q J → EnvSingle ρ → Good ρ o → GoodL ρ ls → Quiet C ρ o → QuietL C ρ ls
+           → OKᶜ C J (raceT d n q (seek (inOuter op f d n q ls c) o) (lanes c op f d n q o [] ls))
+  join-okᶜ C c op f d n q o ls rc es go gl qo ql =
+    rc C (seek (inOuter op f d n q ls c) o) (lanes c op f d n q o [] ls) (seek-okᶜ C (inOuter op f d n q ls c) o es go qo) (lanes-okᶜ C c op f d n q o [] ls es gl ql)
 
-  seek-ln : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) (s : St [] A) → GoodLn ρ s → OK (rows ρ s) (seek c s)
-  seek-ln {ρ = ρ} c s g with lane-v s g
-  ... | on a s₀ g₀ _ = seek-ok (inLn true c) (cutS true a s₀) g₀
-  ... | off a s₀     = seek-off {ρ = ρ} (inLn false c) a s₀
+  seek-lnᶜ : ∀ {R Γ A} {ρ : DenEnv Γ} C (c : Ctx R Γ A) (s : St Γ A) → EnvSingle ρ → GoodLn ρ s → Quiet C ρ s → OKᶜ C (rows ρ s) (seek c s)
+  seek-lnᶜ {ρ = ρ} C c s es g qt with lane-v s g
+  ... | on a s₀ g₀ _ = seek-okᶜ C (inLn true c) (cutS true a s₀) es g₀ qt
+  ... | off a s₀     = okc {ρ = ρ} C c (lnS false (cutS false a s₀)) (seek-off {ρ = ρ} (inLn false c) a s₀)
 
-  lanes-ok : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) op f d n q (o : St [] A) pre (ls : List (St [] B)) → GoodL ρ ls
-           → OKL (rowsL ρ ls) (lanes c op f d n q o pre ls)
-  lanes-ok c op f d n q o pre []         _          = tt
-  lanes-ok c op f d n q o pre (s ∷ post) (gs , gp) =
-    lanes-first (retag (cutT (alive s)) (seek (inLanes op f d n q o pre post c) s)) (lanes c op f d n q o (s ∷ pre) post)
-      (lane-ok s _ (seek-ln (inLanes op f d n q o pre post c) s gs)) (lanes-ok c op f d n q o (s ∷ pre) post gp)
+  lanes-okᶜ : ∀ {R Γ A B} {ρ : DenEnv Γ} C (c : Ctx R Γ B) op f d n q (o : St Γ A) pre (ls : List (St Γ B)) → EnvSingle ρ → GoodL ρ ls → QuietL C ρ ls
+            → OKLᶜ C (rowsL ρ ls) (lanes c op f d n q o pre ls)
+  lanes-okᶜ C c op f d n q o pre []         _ _          _  = inj₁ (tt , tt)
+  lanes-okᶜ {ρ = ρ} C c op f d n q o pre (s ∷ post) es (gs , gp) ql =
+    lanes-firstᶜ C (retag (cutT (alive s)) (seek (inLanes op f d n q o pre post c) s)) (lanes c op f d n q o (s ∷ pre) post)
+      (cap-retag C (cutT (alive s)) (raise-cut (alive s)) (λ r → _ , _ , r , ⊑-refl _) (λ y → lane-ok s y)
+         (seek (inLanes op f d n q o pre post c) s) (seek-lnᶜ C (inLanes op f d n q o pre post c) s es gs (calm-fst C ρ ql)))
+      (lanes-okᶜ C c op f d n q o (s ∷ pre) post es gp (calm-snd C ρ ql))
+
+-- At no binder, every cap at once: exact.
+seek-ok : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) (s : St [] A) → Good ρ s → OK (rows ρ s) (seek c s)
+seek-ok c s g = uncap (seek c s) (λ C → seek-okᶜ C c s (λ ()) g (λ ()))
+
+seek-ln : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) (s : St [] A) → GoodLn ρ s → OK (rows ρ s) (seek c s)
+seek-ln c s g = uncap (seek c s) (λ C → seek-lnᶜ C c s (λ ()) g (λ ()))
+
+lanes-ok : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) op f d n q (o : St [] A) pre (ls : List (St [] B)) → GoodL ρ ls
+         → OKL (rowsL ρ ls) (lanes c op f d n q o pre ls)
+lanes-ok {ρ = ρ} c op f d n q o pre ls gl = uncapL (rowsL ρ ls) (lanes c op f d n q o pre ls) (λ C → lanes-okᶜ C c op f d n q o pre ls (λ ()) gl (λ ()))
+
+join-ok : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) op (f : A → Obs Timeline [] B) d n (o : St [] A) ls {J : EmissionSet B}
+        → Racesᶜ R (rows ρ o) (rowsL ρ ls) d n [] J → Good ρ o → GoodL ρ ls → OK J (raceT d n [] (seek (inOuter op f d n [] ls c) o) (lanes c op f d n [] o [] ls))
+join-ok c op f d n o ls rc go gl = uncap _ (λ C → join-okᶜ C c op f d n [] o ls rc (λ ()) go gl (λ ()) (λ ()))

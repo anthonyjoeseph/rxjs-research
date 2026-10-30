@@ -6,6 +6,8 @@ module adequacy.Swap where
 
 open import Data.Bool using (Bool; true; false; _∧_)
 open import Data.List using (List; []; _∷_; _ʳ++_)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; _+_)
 open import Data.Nat.Properties using (+-suc)
@@ -24,8 +26,8 @@ open Machine using (St; Ctx; CS; plug; alive; pend; coldS; ofS; doneS; mapS; sca
 open import adequacy.Rows using (env; rows; rowsL; Each; module Flat; _≃_; Hot)
 open import adequacy.Up using (_≈ᴸ_; []; _∷_; ≈ᴸ-refl; row-≃; map-≃; scan-≃; take-≃; ≃-refl; conn-≃; rows-hot; bounded-≃;
   switch-≃; exhaust-≃)
-open import adequacy.Bound using (Empty; empty-any; EndLast; Roots; Rooted; Live; G; GL; GLn; LnBody; SrcG; Held; live;
-  mergeG-map)
+open import adequacy.Bound using (Empty; empty-any; EndLast; Roots; Rooted; Live; G; GL; GLn; LnBody; SrcG; HeldAt; live;
+  mergeG-map; Told; ToldL)
 
 open _≃_
 
@@ -97,11 +99,30 @@ record Swap {Γ A} (ρ : DenEnv Γ) (s s′ : St Γ A) : Set₁ where
     node : ∀ v → G ρ v s → G ρ v s′
     lane : ∀ v → GLn ρ v s → GLn ρ v s′
     body : ∀ v b → LnBody ρ v b s → LnBody ρ v b s′
-    held : Held s → Held s′
+    held : ∀ {v q} → HeldAt ρ v q s → HeldAt ρ v q s′
+    told : ∀ {X} (x : X ∈ Γ) → Told x s → Told x s′
 open Swap
 
 live-swap : ∀ {Γ A} (xs : List (St Γ A)) {s s′ ys} → alive s ≡ alive s′ → live (xs ʳ++ s ∷ ys) ≡ live (xs ʳ++ s′ ∷ ys)
 live-swap xs {s} {s′} {ys} eq rewrite live-ʳ++ xs {s ∷ ys} | live-ʳ++ xs {s′ ∷ ys} | eq = refl
+
+toldL-ʳ++ : ∀ {Γ X A} {x : X ∈ Γ} (xs : List (St Γ A)) {ys} → ToldL x xs → ToldL x ys → ToldL x (xs ʳ++ ys)
+toldL-ʳ++ []       _        b = b
+toldL-ʳ++ (y ∷ xs) (t , ts) b = toldL-ʳ++ xs ts (t , b)
+
+toldL-ʳ++⁻ : ∀ {Γ X A} {x : X ∈ Γ} (xs : List (St Γ A)) {ys} → ToldL x (xs ʳ++ ys) → ToldL x xs × ToldL x ys
+toldL-ʳ++⁻ []       b = tt , b
+toldL-ʳ++⁻ (y ∷ xs) b with toldL-ʳ++⁻ xs b
+... | a , (t , c) = (t , a) , c
+
+toldL-swap : ∀ {Γ X A} {x : X ∈ Γ} (xs : List (St Γ A)) {s s′ ys} → (Told x s → Told x s′) → ToldL x (xs ʳ++ s ∷ ys) → ToldL x (xs ʳ++ s′ ∷ ys)
+toldL-swap xs h t with toldL-ʳ++⁻ xs t
+... | tx , (ts , ty) = toldL-ʳ++ xs tx (h ts , ty)
+
+-- A closed binder's joiners told, up to a swap that keeps them told.
+live-told : ∀ v {P : Set} {t u : Set} → (t → u) → Live v (P → t) → Live v (P → u)
+live-told true  h l p = h (l p)
+live-told false h l   = tt
 
 goodL-swap : ∀ {Γ A} {ρ : DenEnv Γ} {v} (xs : List (St Γ A)) {s s′ ys} → (GLn ρ v s → GLn ρ v s′) → GL ρ v (xs ʳ++ s ∷ ys) → GL ρ v (xs ʳ++ s′ ∷ ys)
 goodL-swap xs h g with goodL-ʳ++⁻ xs g
@@ -117,8 +138,8 @@ roots-≈ (q ∷ qs) (e ∷ es) ((a , x , w) , nq , rs) = (a , x , λ l → w (f
 roots-≈ []       (_ ∷ _)  ()
 roots-≈ (_ ∷ _)  []       ()
 
-rooted-≃ : ∀ {Γ A B} {ρ : DenEnv Γ} {O O′ : EmissionSet A} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′ → Rooted ρ O Ls → Rooted ρ O′ Ls′
-rooted-≃ eo es r = record { o₀ = o₀ ; p₀ = p₀ ; inv = inv ; sub = λ x → sub (from eo x) ; qs = qs ; roots = roots-≈ qs es roots }
+rooted-≃ : ∀ {A B} {O O′ : EmissionSet A} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′ → Rooted O Ls → Rooted O′ Ls′
+rooted-≃ eo es r = record { H = H ; X = X ; p₀ = p₀ ; inv = inv ; sub = λ x → sub (from eo x) ; qs = qs ; roots = roots-≈ qs es roots }
   where open Rooted r
 
 -- A source swapped: the same source to its connect.
@@ -138,48 +159,48 @@ spent-≃ false eq sp   = tt
 
 good-swap : ∀ {R Γ A} (c : Ctx R Γ A) {s s′ : St Γ A} → Swap (env c) s s′ → ∀ {v} → G [] v (plug c s) → G [] v (plug c s′)
 good-swap top              sw {v} g = node sw v g
-good-swap (inMap f c)      sw g = good-swap c (record { same = map-≃ f (same sw) ; live≡ = refl ; node = node sw ; lane = λ _ () ; body = λ _ _ () ; held = λ () }) g
-good-swap (inScan f z c)   sw g = good-swap c (record { same = scan-≃ f z (same sw) ; live≡ = refl ; node = node sw ; lane = λ _ () ; body = λ _ _ () ; held = λ () }) g
-good-swap (inCut true a c) sw g = good-swap c (record { same = same sw ; live≡ = refl ; node = λ v → node sw (v ∧ true) ; lane = λ _ () ; body = λ { v b (eq , gs , el) → eq , node sw (v ∧ b) gs , live-endlast (v ∧ b) (same sw) el } ; held = λ () }) g
-good-swap (inCut false a c) sw g = good-swap c (record { same = ≃-refl ; live≡ = refl ; node = λ v → node sw (v ∧ false) ; lane = λ _ () ; body = λ { v b (eq , gs , el) → eq , node sw (v ∧ b) gs , live-endlast (v ∧ b) (same sw) el } ; held = λ () }) g
-good-swap (inLn true c)    sw g = good-swap c (record { same = same sw ; live≡ = refl ; node = λ _ () ; lane = λ v → body sw v true ; body = λ _ _ () ; held = λ () }) g
-good-swap (inLn false c)   sw g = good-swap c (record { same = ≃-refl ; live≡ = refl ; node = λ _ () ; lane = λ v → body sw v false ; body = λ _ _ () ; held = λ () }) g
-good-swap (inTake i q w c) sw g = good-swap c (record { same = take-≃ i q w (same sw) ; live≡ = refl ; node = node sw ; lane = λ _ () ; body = λ _ _ () ; held = λ () }) g
+good-swap (inMap f c)      sw g = good-swap c (record { same = map-≃ f (same sw) ; live≡ = refl ; node = node sw ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = told sw }) g
+good-swap (inScan f z c)   sw g = good-swap c (record { same = scan-≃ f z (same sw) ; live≡ = refl ; node = node sw ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = told sw }) g
+good-swap (inCut true a c) sw g = good-swap c (record { same = same sw ; live≡ = refl ; node = λ v → node sw (v ∧ true) ; lane = λ _ () ; body = λ { v b (eq , gs , el) → eq , node sw (v ∧ b) gs , live-endlast (v ∧ b) (same sw) el } ; held = λ () ; told = told sw }) g
+good-swap (inCut false a c) sw g = good-swap c (record { same = ≃-refl ; live≡ = refl ; node = λ v → node sw (v ∧ false) ; lane = λ _ () ; body = λ { v b (eq , gs , el) → eq , node sw (v ∧ b) gs , live-endlast (v ∧ b) (same sw) el } ; held = λ () ; told = λ _ _ → tt }) g
+good-swap (inLn true c)    sw g = good-swap c (record { same = same sw ; live≡ = refl ; node = λ _ () ; lane = λ v → body sw v true ; body = λ _ _ () ; held = λ () ; told = told sw }) g
+good-swap (inLn false c)   sw g = good-swap c (record { same = ≃-refl ; live≡ = refl ; node = λ _ () ; lane = λ v → body sw v false ; body = λ _ _ () ; held = λ () ; told = told sw }) g
+good-swap (inTake i q w c) sw g = good-swap c (record { same = take-≃ i q w (same sw) ; live≡ = refl ; node = node sw ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = told sw }) g
 good-swap (inOuter (mergeᶠ nothing) f d n q ls c) {s} {s′} sw g =
-  good-swap c {s = flatS (mergeᶠ nothing) f d n q s ls} {s′ = flatS (mergeᶠ nothing) f d n q s′ ls} (record { same = row-≃ _ n (same sw) (≈ᴸ-refl (rowsL (env c) ls)) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ ()
+  good-swap c {s = flatS (mergeᶠ nothing) f d n q s ls} {s′ = flatS (mergeᶠ nothing) f d n q s′ ls} (record { same = row-≃ _ n (same sw) (≈ᴸ-refl (rowsL (env c) ls)) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = λ x (a , b) → told sw x a , b
                       ; node = λ { true m → mergeG-map (node sw true) (λ x → x) (λ x → x) (λ ov t {q} {e} → empty-≃ (same sw) (ov t) {q} {e}) (rooted-≃ (same sw) (≈ᴸ-refl (rowsL (env c) ls))) m
                                  ; false m → mergeG-map (node sw false) (λ x → x) (λ x → x) (λ x → x) (λ x → x) m } }) g
 good-swap (inOuter (mergeᶠ (just m)) f d n q ls c) {s} {s′} sw g =
-  good-swap c {s = flatS (mergeᶠ (just m)) f d n q s ls} {s′ = flatS (mergeᶠ (just m)) f d n q s′ ls} (record { same = bounded-≃ m _ (same sw) (≈ᴸ-refl (rowsL (env c) ls)) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ ()
+  good-swap c {s = flatS (mergeᶠ (just m)) f d n q s ls} {s′ = flatS (mergeᶠ (just m)) f d n q s′ ls} (record { same = bounded-≃ m _ (same sw) (≈ᴸ-refl (rowsL (env c) ls)) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = λ x (a , b) → told sw x a , b
                       ; node = λ { true (mg , w) → mergeG-map (node sw true) (λ x → x) (λ x → x) (λ ov t {q} {e} → empty-≃ (same sw) (ov t) {q} {e}) (rooted-≃ (same sw) (≈ᴸ-refl (rowsL (env c) ls))) mg , w
                                  ; false (mg , w) → mergeG-map (node sw false) (λ x → x) (λ x → x) (λ x → x) (λ x → x) mg , w } }) g
 good-swap (inOuter switchᶠ f d n q ls c) {s} {s′} sw g =
-  good-swap c {s = flatS switchᶠ f d n q s ls} {s′ = flatS switchᶠ f d n q s′ ls} (record { same = switch-≃ _ (same sw) (≈ᴸ-refl (rowsL (env c) ls)) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ ()
+  good-swap c {s = flatS switchᶠ f d n q s ls} {s′ = flatS switchᶠ f d n q s′ ls} (record { same = switch-≃ _ (same sw) (≈ᴸ-refl (rowsL (env c) ls)) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = λ x (a , b) → told sw x a , b
                       ; node = λ { true m → mergeG-map (node sw true) (λ x → x) (λ x → x) (λ ov t {q} {e} → empty-≃ (same sw) (ov t) {q} {e}) (rooted-≃ (same sw) (≈ᴸ-refl (rowsL (env c) ls))) m
                                  ; false m → mergeG-map (node sw false) (λ x → x) (λ x → x) (λ x → x) (λ x → x) m } }) g
 good-swap (inOuter exhaustᶠ f d n q ls c) {s} {s′} sw g =
-  good-swap c {s = flatS exhaustᶠ f d n q s ls} {s′ = flatS exhaustᶠ f d n q s′ ls} (record { same = exhaust-≃ _ (same sw) (≈ᴸ-refl (rowsL (env c) ls)) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ ()
+  good-swap c {s = flatS exhaustᶠ f d n q s ls} {s′ = flatS exhaustᶠ f d n q s′ ls} (record { same = exhaust-≃ _ (same sw) (≈ᴸ-refl (rowsL (env c) ls)) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = λ x (a , b) → told sw x a , b
                       ; node = λ { true m → mergeG-map (node sw true) (λ x → x) (λ x → x) (λ ov t {q} {e} → empty-≃ (same sw) (ov t) {q} {e}) (rooted-≃ (same sw) (≈ᴸ-refl (rowsL (env c) ls))) m
                                  ; false m → mergeG-map (node sw false) (λ x → x) (λ x → x) (λ x → x) (λ x → x) m } }) g
 good-swap (inLanes (mergeᶠ nothing) f d n q o pre post c) {s} {s′} sw g =
-  good-swap c {s = flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post)} {s′ = flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s′ ∷ post)} (record { same = row-≃ _ n ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post))) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ ()
+  good-swap c {s = flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post)} {s′ = flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s′ ∷ post)} (record { same = row-≃ _ n ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post))) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = λ x (a , b) → a , toldL-swap pre (told sw x) b
                       ; node = λ { true m → mergeG-map (λ x → x) (goodL-swap pre (lane sw true)) (λ nl → trans nl (live-swap pre (live≡ sw))) (λ x → x) (rooted-≃ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post)))) m
                                  ; false m → mergeG-map (λ x → x) (goodL-swap pre (lane sw false)) (λ x → x) (λ x → x) (λ x → x) m } }) g
 good-swap (inLanes (mergeᶠ (just m)) f d n q o pre post c) {s} {s′} sw g =
-  good-swap c {s = flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s ∷ post)} {s′ = flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s′ ∷ post)} (record { same = bounded-≃ m _ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post))) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ ()
+  good-swap c {s = flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s ∷ post)} {s′ = flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s′ ∷ post)} (record { same = bounded-≃ m _ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post))) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = λ x (a , b) → a , toldL-swap pre (told sw x) b
                       ; node = λ { true (mg , w) → mergeG-map (λ x → x) (goodL-swap pre (lane sw true)) (λ nl → trans nl (live-swap pre (live≡ sw))) (λ x → x) (rooted-≃ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post)))) mg , w
                                  ; false (mg , w) → mergeG-map (λ x → x) (goodL-swap pre (lane sw false)) (λ x → x) (λ x → x) (λ x → x) mg , w } }) g
 good-swap (inLanes switchᶠ f d n q o pre post c) {s} {s′} sw g =
-  good-swap c {s = flatS switchᶠ f d n q o (pre ʳ++ s ∷ post)} {s′ = flatS switchᶠ f d n q o (pre ʳ++ s′ ∷ post)} (record { same = switch-≃ _ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post))) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ ()
+  good-swap c {s = flatS switchᶠ f d n q o (pre ʳ++ s ∷ post)} {s′ = flatS switchᶠ f d n q o (pre ʳ++ s′ ∷ post)} (record { same = switch-≃ _ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post))) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = λ x (a , b) → a , toldL-swap pre (told sw x) b
                       ; node = λ { true m → mergeG-map (λ x → x) (goodL-swap pre (lane sw true)) (λ nl → trans nl (live-swap pre (live≡ sw))) (λ x → x) (rooted-≃ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post)))) m
                                  ; false m → mergeG-map (λ x → x) (goodL-swap pre (lane sw false)) (λ x → x) (λ x → x) (λ x → x) m } }) g
 good-swap (inLanes exhaustᶠ f d n q o pre post c) {s} {s′} sw g =
-  good-swap c {s = flatS exhaustᶠ f d n q o (pre ʳ++ s ∷ post)} {s′ = flatS exhaustᶠ f d n q o (pre ʳ++ s′ ∷ post)} (record { same = exhaust-≃ _ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post))) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ ()
+  good-swap c {s = flatS exhaustᶠ f d n q o (pre ʳ++ s ∷ post)} {s′ = flatS exhaustᶠ f d n q o (pre ʳ++ s′ ∷ post)} (record { same = exhaust-≃ _ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post))) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = λ x (a , b) → a , toldL-swap pre (told sw x) b
                       ; node = λ { true m → mergeG-map (λ x → x) (goodL-swap pre (lane sw true)) (λ nl → trans nl (live-swap pre (live≡ sw))) (λ x → x) (rooted-≃ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post)))) m
                                  ; false m → mergeG-map (λ x → x) (goodL-swap pre (lane sw false)) (λ x → x) (λ x → x) (λ x → x) m } }) g
 good-swap (inSrc k b c) {s} {s′} sw g =
-  good-swap c {s = connS k s b} {s′ = connS k s′ b} (record { same = conn-≃ _ (same sw) (rows-hot k (env c) b (same sw)) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ ()
-                      ; node = λ { v (gs , gb , sp) → src-swap sw v (CS.bodyAt k) gs , good-hot k (env c) b (same sw) v gb , spent-≃ v (same sw) sp } }) g
+  good-swap c {s = connS k s b} {s′ = connS k s′ b} (record { same = conn-≃ _ (same sw) (rows-hot k (env c) b (same sw)) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = λ x (a , b) → told sw x a , b
+                      ; node = λ { v (gs , gb , sp , tl) → src-swap sw v (CS.bodyAt k) gs , good-hot k (env c) b (same sw) v gb , spent-≃ v (same sw) sp , tl } }) g
 good-swap (inBody k o c) {s} {s′} sw g =
-  good-swap c {s = connS k o s} {s′ = connS k o s′} (record { same = conn-≃ _ ≃-refl (same sw) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ ()
-                      ; node = λ { v (gs , gb , sp) → gs , node sw v gb , sp } }) g
+  good-swap c {s = connS k o s} {s′ = connS k o s′} (record { same = conn-≃ _ ≃-refl (same sw) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = λ x (a , b) → a , told sw (there x) b
+                      ; node = λ { v (gs , gb , sp , tl) → gs , node sw v gb , sp , live-told v (told sw (here refl)) tl } }) g

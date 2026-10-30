@@ -27,7 +27,7 @@ open import denotation.Events using (Timeline; root; ix; timelineAt; emit; stall
 open import denotation.EmissionSet using (EmissionSet; out; end; MapT; map-out; map-skip; map-pin; map-end; module Scan;
   module TakeWhile; _≼_; enter; ⟦_⟧; Proper)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd)
-open import denotation.Laws.Worlds using (GoodEnv; Lawful)
+open import denotation.Laws.Worlds using (GoodEnv; Lawful; Hots)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; over; opening)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; found; Mark; ofM; attM;
@@ -37,7 +37,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
-open import adequacy.Rows using (env; rows; Closed; RT; toEv; Visible; Vis; Past; Plus; old; new; _≃_; _⇄_; silent; shown;
+open import adequacy.Rows using (env; rows; pendRows; Closed; RT; toEv; Visible; Vis; Past; Plus; old; new; _≃_; _⇄_; silent; shown;
   Steps; Shows*; Shows*-≃; ≃-sym; conv; []; _∷_; tau; val; fin)
 open import adequacy.Bound using (Good; G; Rooted; mergeG₀)
 open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
@@ -81,14 +81,14 @@ sub-map : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → B) s q p → Sim ⟨ c , pe
 sub-map c f s q p (inv g (uc , ok)) = inv (good-swap c sw g) (uc , ok) , silent (vis-≃ (up-≃ c (enter-map (env c) f s q)))
   where
     sw : Swap (env c) doneS (mapS f doneS)
-    sw = record { same = (λ ()) ⇄ (λ { (map-out ()) ; (map-skip ()) ; (map-pin ()) ; (map-end ()) }) ; live≡ = refl ; node = λ _ x → x ; lane = λ _ () ; body = λ _ _ () ; held = λ () }
+    sw = record { same = (λ ()) ⇄ (λ { (map-out ()) ; (map-skip ()) ; (map-pin ()) ; (map-end ()) }) ; live≡ = refl ; node = λ _ x → x ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = λ _ _ → tt }
 
 -- A scan entered: its source pending under it.
 sub-scan : ∀ {R Γ A B} (c : Ctx R Γ B) (f : B → A → B) z s q p → Sim ⟨ c , pend (scan f z s) q , subscribing , p ⟩ [] ⟨ inScan f z c , pend s q , subscribing , q ⟩
 sub-scan c f z s q p (inv g (uc , ok)) = inv (good-swap c sw g) (uc , ok) , silent (vis-≃ (up-≃ c (enter-scan (env c) f z s q)))
   where
     sw : Swap (env c) doneS (scanS f z doneS)
-    sw = record { same = (λ ()) ⇄ (λ { (Scan.sval (Scan.acc₀ () _)) ; (Scan.sval (Scan.acc _ () _ _)) ; (Scan.sstep ()) ; (Scan.spin ()) ; (Scan.send ()) }) ; live≡ = refl ; node = λ _ x → x ; lane = λ _ () ; body = λ _ _ () ; held = λ () }
+    sw = record { same = (λ ()) ⇄ (λ { (Scan.sval (Scan.acc₀ () _)) ; (Scan.sval (Scan.acc _ () _ _)) ; (Scan.sstep ()) ; (Scan.spin ()) ; (Scan.send ()) }) ; live≡ = refl ; node = λ _ x → x ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = λ _ _ → tt }
 
 -- A take entered: its source pending under it, attached at `p`, unfailed.
 sub-take : ∀ {R Γ A} (c : Ctx R Γ A) i (w : A → Bool) s q p
@@ -98,7 +98,7 @@ sub-take c i w s q p (inv g (uc , ok)) = inv (good-swap c sw g) (uc , ok) , sile
     sw : Swap (env c) doneS (takeS i w free (cutS true (attAt q) doneS))
     sw = record { same = (λ ()) ⇄ (λ { (TakeWhile.pass () _ _ , _) ; (TakeWhile.fail () _ _ _ , _) ; (TakeWhile.stop () _ _ , _)
                                       ; (TakeWhile.step () _ , _) ; (TakeWhile.tend () _ , _) ; (TakeWhile.left () _ _ , _) })
-                ; live≡ = refl ; node = λ _ x → x ; lane = λ _ () ; body = λ _ _ () ; held = λ () }
+                ; live≡ = refl ; node = λ _ x → x ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = λ _ _ → tt }
 
 -- A merge entered: its outer pending under it, attached at `p`, nothing begun.
 sub-merge : ∀ {R Γ A B} (c : Ctx R Γ B) f (s : Obs Timeline Γ A) q p
@@ -106,52 +106,52 @@ sub-merge : ∀ {R Γ A B} (c : Ctx R Γ B) f (s : Obs Timeline Γ A) q p
 sub-merge {A = A} {B} c f s q p (inv g (uc , ok)) = inv (good-swap c sw g) (uc , ok) , silent (vis-≃ (up-≃ c (enter-merge (env c) f s q)))
   where
     -- The outer about to enter at `p`: inside its own entry, nothing begun.
-    rt : Rooted (env c) (rows (env c) (cutS true (attAt q) doneS)) []
-    rt = record { o₀ = s ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c g) q ok ; sub = λ () ; qs = [] ; roots = tt }
+    rt : Rooted (rows (env c) (cutS true (attAt q) doneS)) []
+    rt = record { H = Hots (env c) ; X = pendRows (env c) s q ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c g) q ok ; sub = λ () ; qs = [] ; roots = tt }
     node′ : ∀ v → G (env c) v (doneS {A = B}) → G (env c) v (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt q) (doneS {A = A})) [])
     node′ true  _ = record { outer = tt₁ ; lanesG = tt₁ ; fresh = refl ; count = refl ; spent = λ () ; rooted = rt }
     node′ false _ = mergeG₀ tt₁ tt₁ refl
     sw : Swap (env c) doneS (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt q) doneS) [])
-    sw = record { same = ≃-sym (flat-∅ _ false 0) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () ; held = λ () }
+    sw = record { same = ≃-sym (flat-∅ _ false 0) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = λ _ _ → tt , tt }
 
 -- A BOUNDED MERGE ENTERED: its outer pending under it, nothing begun or queued.
 sub-bounded : ∀ {R Γ A B} (c : Ctx R Γ B) m (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) q p
           → Sim ⟨ c , pend (flatMap (mergeᶠ (just m)) f s) q , subscribing , p ⟩ [] ⟨ inCut true (attAt q) (inOuter (mergeᶠ (just m)) f false 0 [] [] c) , pend s q , subscribing , q ⟩
 sub-bounded {A = A} {B} c m f s q p (inv g (uc , ok)) = inv (good-swap c sw g) (uc , ok) , silent (vis-≃ (up-≃ c (enter-bounded (env c) m f s q)))
   where
-    rt : Rooted (env c) (rows (env c) (cutS true (attAt q) doneS)) []
-    rt = record { o₀ = s ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c g) q ok ; sub = λ () ; qs = [] ; roots = tt }
+    rt : Rooted (rows (env c) (cutS true (attAt q) doneS)) []
+    rt = record { H = Hots (env c) ; X = pendRows (env c) s q ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c g) q ok ; sub = λ () ; qs = [] ; roots = tt }
     node′ : ∀ v → G (env c) v (doneS {A = B}) → G (env c) v (flatS (mergeᶠ (just m)) f false 0 [] (cutS true (attAt q) (doneS {A = A})) [])
     node′ true  _ = (record { outer = tt₁ ; lanesG = tt₁ ; fresh = refl ; count = refl ; spent = λ () ; rooted = rt } , inj₁ refl)
     node′ false _ = (mergeG₀ tt₁ tt₁ refl , tt)
     sw : Swap (env c) doneS (flatS (mergeᶠ (just m)) f false 0 [] (cutS true (attAt q) doneS) [])
-    sw = record { same = ≃-sym (bounded-∅ m _ false 0) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () ; held = λ () }
+    sw = record { same = ≃-sym (bounded-∅ m _ false 0) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = λ _ _ → tt , tt }
 
 -- A SWITCH ENTERED: its outer pending under it, nothing begun.
 sub-switch : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) q p
           → Sim ⟨ c , pend (flatMap switchᶠ f s) q , subscribing , p ⟩ [] ⟨ inCut true (attAt q) (inOuter switchᶠ f false 0 [] [] c) , pend s q , subscribing , q ⟩
 sub-switch {A = A} {B} c f s q p (inv g (uc , ok)) = inv (good-swap c sw g) (uc , ok) , silent (vis-≃ (up-≃ c (enter-switch (env c) f s q)))
   where
-    rt : Rooted (env c) (rows (env c) (cutS true (attAt q) doneS)) []
-    rt = record { o₀ = s ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c g) q ok ; sub = λ () ; qs = [] ; roots = tt }
+    rt : Rooted (rows (env c) (cutS true (attAt q) doneS)) []
+    rt = record { H = Hots (env c) ; X = pendRows (env c) s q ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c g) q ok ; sub = λ () ; qs = [] ; roots = tt }
     node′ : ∀ v → G (env c) v (doneS {A = B}) → G (env c) v (flatS switchᶠ f false 0 [] (cutS true (attAt q) (doneS {A = A})) [])
     node′ true  _ = record { outer = tt₁ ; lanesG = tt₁ ; fresh = refl ; count = refl ; spent = λ () ; rooted = rt }
     node′ false _ = mergeG₀ tt₁ tt₁ refl
     sw : Swap (env c) doneS (flatS switchᶠ f false 0 [] (cutS true (attAt q) doneS) [])
-    sw = record { same = ≃-sym (switch-∅ _ false 0) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () ; held = λ () }
+    sw = record { same = ≃-sym (switch-∅ _ false 0) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = λ _ _ → tt , tt }
 
 -- AN EXHAUST ENTERED: its outer pending under it, nothing begun.
 sub-exhaust : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) q p
           → Sim ⟨ c , pend (flatMap exhaustᶠ f s) q , subscribing , p ⟩ [] ⟨ inCut true (attAt q) (inOuter exhaustᶠ f false 0 [] [] c) , pend s q , subscribing , q ⟩
 sub-exhaust {A = A} {B} c f s q p (inv g (uc , ok)) = inv (good-swap c sw g) (uc , ok) , silent (vis-≃ (up-≃ c (enter-exhaust (env c) f s q)))
   where
-    rt : Rooted (env c) (rows (env c) (cutS true (attAt q) doneS)) []
-    rt = record { o₀ = s ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c g) q ok ; sub = λ () ; qs = [] ; roots = tt }
+    rt : Rooted (rows (env c) (cutS true (attAt q) doneS)) []
+    rt = record { H = Hots (env c) ; X = pendRows (env c) s q ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c g) q ok ; sub = λ () ; qs = [] ; roots = tt }
     node′ : ∀ v → G (env c) v (doneS {A = B}) → G (env c) v (flatS exhaustᶠ f false 0 [] (cutS true (attAt q) (doneS {A = A})) [])
     node′ true  _ = record { outer = tt₁ ; lanesG = tt₁ ; fresh = refl ; count = refl ; spent = λ () ; rooted = rt }
     node′ false _ = mergeG₀ tt₁ tt₁ refl
     sw : Swap (env c) doneS (flatS exhaustᶠ f false 0 [] (cutS true (attAt q) doneS) [])
-    sw = record { same = ≃-sym (exhaust-∅ _ false 0) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () ; held = λ () }
+    sw = record { same = ≃-sym (exhaust-∅ _ false 0) ; live≡ = refl ; node = node′ ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = λ _ _ → tt , tt }
 
 postulate
   -- A CONNECT ENTERED: its body pending under `ix 0`, its source pending
