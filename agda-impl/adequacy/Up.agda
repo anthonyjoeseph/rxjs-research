@@ -6,22 +6,24 @@
 module adequacy.Up where
 
 open import Data.Bool using (Bool; T; true; false)
-open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; _ʳ++_; length)
 open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Product using (_×_; _,_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit using (⊤)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos)
-open import denotation.EmissionSet using (EmissionSet; out; end; Ended; module Values; module Joining; Truncate; Reach; MapT; map-out; map-skip; map-pin; map-end; DenEnv; module Connecting; module Scan; module TakeWhile)
+open import denotation.EmissionSet using (EmissionSet; out; end; Ended; module Values; module Joining; Truncate; Reach; MapT; map-out;
+  map-skip; map-pin; map-end; module Connecting; module Scan; module TakeWhile)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; St; CS; free; cpAt; cutAt; overAt; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (TakeR; kept; Stops; stop; left; up; env; rows; Hot; pendRows; Vis; Plus; old; new; rowsL;
-  Lane; From; Lanes; Each; Kth; AllEnd; EndsOf; module Flat; module BoundedF; module SwitchF; module ExhaustF; _≃_; _⇄_; ≃-sym)
+open import adequacy.Causal using (rows-hot)
+open import adequacy.Policy using (Policy; JoinP; DoneP; flatP; switchP; exhaustP; boundedP)
+open import adequacy.Rows using (TakeR; kept; Stops; stop; left; up; env; pendRows; Vis; Plus; old; new; rowsL; From; Lanes;
+  Each; Kth; AllEnd; EndsOf; module Flat; module BoundedF; module SwitchF; module ExhaustF;
+  _≃_; _⇄_; ≃-sym)
 
 open _≃_
 
@@ -139,25 +141,6 @@ nth-like l l⁻ (Values.next x r lt nx) = Values.next (nth-like l l⁻ x) (outs 
 ------------------------------------------------------------------------
 -- A joiner's policy
 
--- What `Joining` takes.
-record Policy (A B : Set) : Set₁ where
-  field
-    lanes : Pos → A → EmissionSet B
-    outer : EmissionSet A
-    begun : EmissionSet B
-    over  : Pos → Set
-    runs  : Pos → Set
-    cut   : Pos → Pos → Set
-    hand  : Pos → Set
-
-JoinP : ∀ {A B} → Policy A B → EmissionSet B
-JoinP P = Joining.JoinT (lanes P) (outer P) (begun P) (over P) (runs P) (cut P) (hand P)
-  where open Policy
-
-DoneP : ∀ {A B} → Policy A B → Pos → Set
-DoneP P = Joining.Done (lanes P) (outer P) (begun P) (over P) (runs P) (cut P) (hand P)
-  where open Policy
-
 -- Two policies reading their lanes, ends, runs, cuts and hand-offs alike.
 record Reads {A B} (P P′ : Policy A B) : Set where
   open Policy
@@ -205,20 +188,7 @@ join-≃ : ∀ {A B} (P P′ : Policy A B) → Reads P P′ → Policy.outer P �
 join-≃ P P′ R eo eb = join-→ P P′ R eo eb ⇄ join-→ P′ P (reads-sym R) (≃-sym eo) (≃-sym eb)
 
 ------------------------------------------------------------------------
--- The four policies
-
-flatP : ∀ {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (d : Bool) (n : ℕ) (Ls : List (EmissionSet B)) → Policy A B
-flatP L O d n Ls = record { lanes = Lane L ; outer = O ; begun = Lanes Ls ; over = Flat.Over L O d n Ls ; runs = λ _ → ⊤ ; cut = λ _ _ → ⊥ ; hand = λ _ → ⊥ }
-
-switchP : ∀ {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (d : Bool) (n : ℕ) (Ls : List (EmissionSet B)) → Policy A B
-switchP L O d n Ls = record { lanes = Lane L ; outer = O ; begun = SwitchF.Bg L O d n Ls ; over = SwitchF.Over L O d n Ls ; runs = λ _ → ⊤ ; cut = SwitchF.Cut L O d n Ls ; hand = λ _ → ⊥ }
-
-exhaustP : ∀ {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (d : Bool) (n : ℕ) (Ls : List (EmissionSet B)) → Policy A B
-exhaustP L O d n Ls = record { lanes = Lane L ; outer = O ; begun = Lanes Ls ; over = ExhaustF.Over L O d n Ls ; runs = ExhaustF.Run L O d n Ls ; cut = λ _ _ → ⊥ ; hand = λ _ → ⊥ }
-
-boundedP : ∀ {A B : Set} (m : ℕ) (L : A → Pos → EmissionSet B) (O : EmissionSet A) (d : Bool) (n : ℕ) (Qu : List A) (Ls : List (EmissionSet B)) → Policy A B
-boundedP m L O d n Qu Ls = record { lanes = BoundedF.LaneB m L O d n Qu Ls ; outer = O ; begun = BoundedF.Bg m L O d n Qu Ls ; over = BoundedF.Over m L O d n Qu Ls
-                                  ; runs = BoundedF.Indexed m L O d n Qu Ls ; cut = λ _ _ → ⊥ ; hand = BoundedF.Queued m L O d n Qu Ls }
+-- The four policies, read alike
 
 -- Each policy, read alike from an outer with the same values and ends
 -- and lanes with the same ends.
@@ -411,13 +381,6 @@ conn-≃ {A} {B} r es eb = go es eb ⇄ go (≃-sym es) (≃-sym eb)
     go es eb (Connecting.burst x i)        = Connecting.burst (to es x) i
     go es eb (Connecting.echo x al u ni)   = Connecting.echo (to es x) (λ y → al (from eb y)) u ni
     go es eb (Connecting.kept x al ni i)   = Connecting.kept (to es x) (λ y → al (from eb y)) ni i
-
--- A BINDER'S MEANING, UP TO THE SAME ROWS: a body reads its binder only
--- through the rows it holds, so the same rows bound give the same body.
--- By induction over the state and, under a pending subscription, over
--- the program's meaning, every operator reading its inputs row by row.
-postulate
-  rows-hot : ∀ {Γ X B} {t u : EmissionSet X} (k : CS) (ρ : DenEnv Γ) (b : St (X ∷ Γ) B) → t ≃ u → rows (Hot t k ∷ᴬ ρ) b ≃ rows (Hot u k ∷ᴬ ρ) b
 
 -- THE CONGRUENCE.
 up-≃ : ∀ {R Γ A} (c : Ctx R Γ A) {t u : EmissionSet A} → t ≃ u → up c t ≃ up c u

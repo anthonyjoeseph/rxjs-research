@@ -20,7 +20,8 @@ open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Data.Bool using (Bool; true; false)
 open import Relation.Nullary using (¬_)
-open import adequacy.Up using (all-ʳ++; _⇔ᴾ_; Like; like; Policy; JoinP; Reads; reads-sym; done-reads; flatP; switchP; exhaustP; boundedP;
+open import adequacy.Policy using (Policy; JoinP; flatP; switchP; exhaustP; boundedP)
+open import adequacy.Up using (all-ʳ++; _⇔ᴾ_; Like; like; Reads; reads-sym; done-reads;
   flat-reads; switch-reads; exhaust-reads; bounded-reads; kill-like; waits-like)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)

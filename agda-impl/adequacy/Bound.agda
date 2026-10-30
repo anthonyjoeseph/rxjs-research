@@ -25,25 +25,21 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (ofᴱ)
-open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-asym; <ᵖ-split; <ᵖ-step; <ᵖ-shift; <ᵖ-below; <ᵖ-part; <ᵖ-ix)
+open import denotation.Events using (Pos; Timeline; ix; last; inside; inside-self; inside-++; <ᵖ-asym; <ᵖ-split; <ᵖ-step; <ᵖ-shift; <ᵖ-below; <ᵖ-part; <ᵖ-ix)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; _≺_; _≼_; InE; enter; at-out; at-end; on-out; MapT; map-out;
   map-skip; map-pin; map-end; module Scan; DenEnv)
-open import denotation.Laws.Modulus using (≼-refl)
+open import denotation.Laws.Modulus using (≼-refl; ≼-false; ≼-trans; ≼-antisym; ≼-or-≻)
 open import denotation.Laws.Worlds using (InvAt; Hots; W; inW; plain-ix; apart-w) renaming (⊑-refl to ⊑ᵖ-refl)
-open import operation.Key using (Key; at; after; _<ᴷ_; ≮ᴷ-trans; <ᴷ-trans; <ᴷ-irrefl; at-<ᵖ; clash)
+open import operation.Key using (Key; at; after; _<ᴷ_; ≮ᴷ-trans; <ᴷ-trans; <ᴷ-irrefl; at-<ᵖ; clash; shift-after)
 open import operation.PureObservable using (module Machine)
 
 open Machine using (St; Ctx; CS; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed; same?; _⊕_;
                     free; cpAt; cutAt; overAt; inScan; inTake; inSrc; inBody;
-                    ofS; doneS; mapS; cutS; cpM; cutM; lnS; flatS; coldS; scanS; takeS; connS; joinS; inMap; inCut; inLn; inOuter; inLanes; nx; cp; attached; attAt; attM; pend) renaming (Ev to Evᴹ; over to overᶜ)
+                    ofS; doneS; mapS; cutS; cpM; cutM; lnS; flatS; coldS; scanS; takeS; connS; joinS; inMap; inCut; inLn; inOuter; inLanes; nx; cp; attached; attAt; attM; pend) renaming (Ev to Evᴹ)
 open import adequacy.Rows using (acc-val; rows; rowsL; pendRows; toEv; Lanes; Each; Kth; AllEnd; EndsOf; Lane; reads; module Flat; module SwitchF; module ExhaustF; module BoundedF; ∅; Hot; Inbox; _∪_; Kept; Stops) renaming (kept to keptᴿ; stop to stopᴿ; left to leftᴿ; sub to subᴿ)
 
 ------------------------------------------------------------------------
 -- Keys
-
-postulate
-  -- Just past a position, still before a mark's `after` the position is before.
-  shift-after : ∀ q r → at q <ᴷ after r ≡ true → after r <ᴷ at (q ++ [ ix 0 ]) ≡ false
 
 -- `a` no later than `b`.
 record _⊑_ (a b : Key) : Set where
@@ -98,6 +94,32 @@ past-⊑ : ∀ {p q} → at p ⊑ at q → ¬ p ≡ q → at (p ++ [ ix 0 ]) ⊑
 past-⊑ {p} {q} pq ne with <ᵖ-split p q (trans (sym (at-<ᵖ q p)) (un pq))
 ... | inj₁ lt = ⊑i (trans (at-<ᵖ q (p ++ [ ix 0 ])) (<ᵖ-step p q lt))
 ... | inj₂ eq = ⊥-elim (ne eq)
+
+-- At or before and not it: before.
+≼-≢ : ∀ {p q} → p ≼ q → ¬ p ≡ q → p ≺ q
+≼-≢ {p} {q} pq ne with <ᵖ-split p q (≼-false {p} {q} pq)
+... | inj₁ lt = Equivalence.from T-≡ lt
+... | inj₂ eq = ⊥-elim (ne eq)
+
+-- NO LATER THAN JUST PAST A KEY THAT EVERY ROW IS PAST: before every row
+-- it is not under.  Nothing lies strictly between a position and the
+-- first step under it.
+apart-before : ∀ {P q} h → at P ⊑ shift h → h ⊑ at q → ¬ T (inside q P) → P ≺ q
+apart-before {P} {q} h Ph hq ni = go h Ph hq
+  where
+  ne : ¬ P ≡ q
+  ne refl = ni (Equivalence.from T-≡ (inside-self P))
+
+  go : ∀ h → at P ⊑ shift h → h ⊑ at q → P ≺ q
+  go (after r) Ph hq = ≼-≢ {P} {q} (⊑→≼ (⊑-trans Ph hq)) ne
+  go (at x) Ph hq with ≼-or-≻ P x
+  ... | inj₁ Px = ≼-≢ {P} {q} (≼-trans {P} {x} {q} Px (⊑→≼ hq)) ne
+  ... | inj₂ xP with <ᵖ-split x q (trans (sym (at-<ᵖ q x)) (un hq))
+  ... | inj₁ lt   = ≼-≢ {P} {q} (≼-trans {P} {x ++ [ ix 0 ]} {q} (⊑→≼ Ph) (λ t → subst T (<ᵖ-step x q lt) t)) ne
+  ... | inj₂ refl = ⊥-elim (ni (subst (λ z → T (inside x z)) (sym eq) (Equivalence.from T-≡ (inside-++ x x [ ix 0 ] (inside-self x)))))
+    where
+    eq : P ≡ x ++ [ ix 0 ]
+    eq = ≼-antisym {P} {x ++ [ ix 0 ]} (⊑→≼ Ph) (λ t → subst T (<ᵖ-step x P (Equivalence.to T-≡ xP)) t)
 
 ------------------------------------------------------------------------
 -- What a found mark promises
@@ -212,15 +234,11 @@ race-mk d n q (just (found f m κ , h , o)) (just (found g m′ κ′ , k , o′
 ... | true  = ⊑-trans mx (raise-outer n q h o)
 ... | false = ⊑-trans my (raise-lane d n q k o′)
 
-raise-src : ∀ v h → h ⊑ (if v then h else shift h)
-raise-src true  h = ⊑-refl h
-raise-src false h = shift-⊑ h
-
-source-mk : ∀ {R A B} v (x : Maybe (Cand R A)) (y : Maybe (Cand R B)) → Mk x → Mk y → Mk (sourceT v x y)
-source-mk v nothing                      y                            _  my = my
-source-mk v (just (found f m κ , h , o)) nothing                      mx _  = ⊑-trans mx (raise-src v h)
-source-mk v (just (found f m κ , h , o)) (just (found g m′ κ′ , k , o′)) mx my with (if v then h else shift h) <ᴷ k
-... | true  = ⊑-trans mx (raise-src v h)
+source-mk : ∀ {R A B} (x : Maybe (Cand R A)) (y : Maybe (Cand R B)) → Mk x → Mk y → Mk (sourceT x y)
+source-mk nothing                      y                            _  my = my
+source-mk (just (found f m κ , h , o)) nothing                      mx _  = ⊑-trans mx (shift-⊑ h)
+source-mk (just (found f m κ , h , o)) (just (found g m′ κ′ , k , o′)) mx my with shift h <ᴷ k
+... | true  = ⊑-trans mx (shift-⊑ h)
 ... | false = my
 
 mutual
@@ -235,7 +253,7 @@ mutual
   kids-mark c (takeS i q w s) = retag-mk (raise-take i q w) (seek (inTake i q w c) s) (seek-mark (inTake i q w c) s)
   kids-mark c (flatS op f d n q o ls) =
     race-mk d n q (seek (inOuter op f d n q ls c) o) (lanes c op f d n q o [] ls) (seek-mark (inOuter op f d n q ls c) o) (lanes-mark c op f d n q o [] ls)
-  kids-mark c (connS k o b)   = source-mk (overᶜ k) (seek (inSrc k b c) o) (seek (inBody k o c) b) (seek-mark (inSrc k b c) o) (seek-mark (inBody k o c) b)
+  kids-mark c (connS k o b)   = source-mk (seek (inSrc k b c) o) (seek (inBody k o c) b) (seek-mark (inSrc k b c) o) (seek-mark (inBody k o c) b)
   kids-mark c (pend _ _)        = tt
   kids-mark c (coldS _ _)     = tt
   kids-mark c (ofS _ _ _)     = tt

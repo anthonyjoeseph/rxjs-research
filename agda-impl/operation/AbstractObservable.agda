@@ -411,19 +411,11 @@ raceT d n q nothing            (just (g , k , o′))  = just (g , laneT d n q k 
 raceT d n q (just (f , h , o)) nothing              = just (f , outerT n q h o)
 raceT d n q (just (f , h , o)) (just (g , k , o′))  = if h <ᴷ k then just (f , outerT n q h o) else just (g , laneT d n q k o′)
 
--- A connect over: its body completed, or its source torn down.
-over : CS → Bool
-over k with CS.owedAt k
-... | just _  = true
-... | nothing = not (CS.srcLive k)
-
--- The source only strictly before the body, a skip just past its event;
--- once the connect is over, where its event sits, as a rest runs.
-sourceT : ∀ {R A B} → Bool → Maybe (Cand R A) → Maybe (Cand R B) → Maybe (Cand R B)
-sourceT v nothing            b                    = b
-sourceT v (just (f , h , o)) nothing              = just (f , (if v then h else shift h) , still)
-sourceT v (just (f , h , o)) (just (g , k , o′))  =
-  if (if v then h else shift h) <ᴷ k then just (f , (if v then h else shift h) , still) else just (g , k , o′)
+-- The source only strictly before the body, a skip just past its event.
+sourceT : ∀ {R A B} → Maybe (Cand R A) → Maybe (Cand R B) → Maybe (Cand R B)
+sourceT nothing            b                    = b
+sourceT (just (f , h , o)) nothing              = just (f , shift h , still)
+sourceT (just (f , h , o)) (just (g , k , o′))  = if shift h <ᴷ k then just (f , shift h , still) else just (g , k , o′)
 
 -- The mark the stepper races first under the hole, a node's own before
 -- its children on a tie.
@@ -438,7 +430,7 @@ mutual
   kids c (lnS b s)               = seek (inLn b c) s
   kids c (takeS i q w s)         = retag (takeT i q w) (seek (inTake i q w c) s)
   kids c (flatS op f d n q o ls) = raceT d n q (seek (inOuter op f d n q ls c) o) (lanes c op f d n q o [] ls)
-  kids c (connS k o b)           = sourceT (over k) (seek (inSrc k b c) o) (seek (inBody k o c) b)
+  kids c (connS k o b)           = sourceT (seek (inSrc k b c) o) (seek (inBody k o c) b)
   kids c _                       = nothing
 
   lanes : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → List (St Γ B) → Maybe (Cand R B)

@@ -388,6 +388,10 @@ private
 <ᵖ-below []      ys = refl
 <ᵖ-below (a ∷ p) ys rewrite refl-label a = <ᵖ-below p ys
 
+-- A shared first label leaves the order to the rest.
+<ᵖ-cons : ∀ a p q → (a ∷ p) <ᵖ (a ∷ q) ≡ p <ᵖ q
+<ᵖ-cons a p q rewrite refl-label a = refl
+
 <ᵖ-part : ∀ p {a b} ys zs → (a ∷ []) <ᵖ (b ∷ []) ≡ true → (p ++ a ∷ ys) <ᵖ (p ++ b ∷ zs) ≡ true
 <ᵖ-part [] {a} {b} ys zs h with lexi-lt (cmpLabel a b) eq (isLt-lt h)
 ... | inj₁ x rewrite x = refl

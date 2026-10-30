@@ -11,23 +11,26 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; _+_)
 open import Data.Nat.Properties using (+-suc)
-open import Data.Product using (_×_; _,_)
-open import Data.List.Relation.Unary.All using ([]) renaming (_∷_ to _∷ᴬ_)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.List.Relation.Unary.All using ([]; lookup) renaming (_∷_ to _∷ᴬ_)
 open import Data.Unit using (tt)
 open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos)
-open import denotation.EmissionSet using (EmissionSet; DenEnv)
+open import denotation.EmissionSet using (EmissionSet; DenEnv; enter)
+open import denotation.Laws using (EnvAg; ag-cons)
+open import denotation.Laws.Modulus using (⟨_⟩; upto; ≼-refl)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; CS; plug; alive; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (env; rows; rowsL; Each; module Flat; _≃_; Hot)
-open import adequacy.Up using (_≈ᴸ_; []; _∷_; ≈ᴸ-refl; row-≃; map-≃; scan-≃; take-≃; ≃-refl; conn-≃; rows-hot; bounded-≃;
+open import adequacy.Rows using (env; rows; rowsL; Each; module Flat; _≃_; _⇄_; Hot)
+open import adequacy.Causal using (rows-hot; rows-≃; rows-causal; hot-ag; env-refl)
+open import adequacy.Up using (_≈ᴸ_; []; _∷_; ≈ᴸ-refl; row-≃; map-≃; scan-≃; take-≃; ≃-refl; conn-≃; bounded-≃;
   switch-≃; exhaust-≃)
-open import adequacy.Bound using (Empty; empty-any; EndLast; Roots; Rooted; Live; G; GL; GLn; LnBody; SrcG; HeldAt; live;
-  mergeG-map; Told; ToldL)
+open import adequacy.Bound using (Empty; empty-any; EndLast; Roots; Rooted; Live; Live₁; G; GL; GLn; LnBody; SrcG; HeldAt; live;
+  mergeG-map; MergeG; Told; ToldL; Fed) renaming (held to heldᴮ)
 
 open _≃_
 
@@ -147,15 +150,110 @@ src-swap : ∀ {Γ A} {ρ : DenEnv Γ} {s s′ : St Γ A} → Swap ρ s s′ →
 src-swap sw v nothing  g = node sw v g
 src-swap sw v (just _) g = held sw g
 
-postulate
-  -- A BINDER'S GOOD BODY, UP TO THE SAME ROWS: a body reads its binder
-  -- only through the rows it holds, as `rows-hot` has it of its rows.
-  good-hot : ∀ {Γ X B} {t u : EmissionSet X} (k : CS) (ρ : DenEnv Γ) (b : St (X ∷ Γ) B) → t ≃ u → ∀ v → G (Hot t k ∷ᴬ ρ) v b → G (Hot u k ∷ᴬ ρ) v b
-
 -- A completed source owing nothing, up to the same rows.
 spent-≃ : ∀ {A} {t u : EmissionSet A} {P : Set} v → t ≃ u → Live v (P → Empty t) → Live v (P → Empty u)
 spent-≃ true  eq sp h = empty-≃ eq (sp h)
 spent-≃ false eq sp   = tt
+
+------------------------------------------------------------------------
+-- The same goodness under agreeing binders
+
+-- Environments agreeing at every bound.
+Agree : ∀ {Γ} → DenEnv Γ → DenEnv Γ → Set₁
+Agree ρ ρ′ = ∀ Q → EnvAg Q ρ ρ′
+
+private
+  agree-cons : ∀ {Γ X} {ρ ρ′ : DenEnv Γ} (k : CS) (o : St Γ X) → Agree ρ ρ′ → Agree (Hot (rows ρ o) k ∷ᴬ ρ) (Hot (rows ρ′ o) k ∷ᴬ ρ′)
+  agree-cons k o e Q = ag-cons (hot-ag k (rows-causal (e Q) o)) (e Q)
+
+  enter-≃ : ∀ {Γ A} {ρ ρ′ : DenEnv Γ} → Agree ρ ρ′ → (x : A ∈ Γ) → ∀ j → enter (lookup ρ x) j ≃ enter (lookup ρ′ x) j
+  enter-≃ e x j = (λ {q} r → proj₁ (upto (e q x j) {q} (≼-refl {q})) r) ⇄ (λ {q} r → proj₂ (upto (e q x j) {q} (≼-refl {q})) r)
+
+  rowsL-≈ : ∀ {Γ A} {ρ ρ′ : DenEnv Γ} → Agree ρ ρ′ → (ls : List (St Γ A)) → rowsL ρ ls ≈ᴸ rowsL ρ′ ls
+  rowsL-≈ e []       = []
+  rowsL-≈ e (s ∷ ls) = rows-≃ e s ∷ rowsL-≈ e ls
+
+  fed-≃ : ∀ {A} {t u : EmissionSet A} ib → t ≃ u → Fed ib t → Fed ib u
+  fed-≃ []       eq _           = tt₁
+  fed-≃ (_ ∷ ib) eq (a , b , f) = a , (λ y → b (from eq y)) , fed-≃ ib eq f
+
+  live-rooted : ∀ {A B} v {O O′ : EmissionSet A} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′ → Live₁ v (Rooted O Ls) → Live₁ v (Rooted O′ Ls′)
+  live-rooted true  eo es r = rooted-≃ eo es r
+  live-rooted false eo es r = tt₁
+
+-- A GOOD TREE UNDER AGREEING BINDERS: goodness reads its binders only
+-- through the rows they give, and a joiner's inbox only against its
+-- binder's rows.
+mutual
+  good-env : ∀ {Γ A} {ρ ρ′ : DenEnv Γ} → Agree ρ ρ′ → ∀ v (s : St Γ A) → G ρ v s → G ρ′ v s
+  good-env e v (pend o p)                            ()
+  good-env e v (lnS l s)                             ()
+  good-env e v (ofS i p xs)                          g = g
+  good-env e v doneS                                 g = g
+  good-env e v (coldS w l)                           g = g
+  good-env e v (mapS f s)                            g = good-env e v s g
+  good-env e v (scanS f z s)                         g = good-env e v s g
+  good-env e v (takeS i q w s)                       g = good-env e v s g
+  good-env e v (cutS l a s)                          g = good-env e (v ∧ l) s g
+  good-env e v (flatS (mergeᶠ nothing) f d n q o ls)  g       = merge-env e v o ls g
+  good-env e v (flatS (mergeᶠ (just m)) f d n q o ls) (g , w) = merge-env e v o ls g , w
+  good-env e v (flatS switchᶠ f d n q o ls)           g       = merge-env e v o ls g
+  good-env e v (flatS exhaustᶠ f d n q o ls)          g       = merge-env e v o ls g
+  good-env e v (connS k o s) (gs , gb , sp , tl) =
+    src-env e v (CS.bodyAt k) o gs , good-env (agree-cons k o e) v s gb , spent-≃ v (rows-≃ e o) sp , tl
+  good-env {ρ = ρ} {ρ′} e true (joinS j true x ib) g = fed-≃ ib (enter-≃ {ρ = ρ} {ρ′} e x j) g
+  good-env e false (joinS j true x ib)  g = g
+  good-env e v     (joinS j false x ib) g = g
+
+  merge-env : ∀ {Γ A B} {ρ ρ′ : DenEnv Γ} → Agree ρ ρ′ → ∀ v {f d n q} (o : St Γ A) (ls : List (St Γ B))
+            → MergeG (G ρ v o) (GL ρ v ls) ρ v f d n q o ls → MergeG (G ρ′ v o) (GL ρ′ v ls) ρ′ v f d n q o ls
+  merge-env e v o ls m = record
+    { outer  = good-env e v o (MergeG.outer m)
+    ; lanesG = gl-env e v ls (MergeG.lanesG m)
+    ; fresh  = MergeG.fresh m
+    ; count  = MergeG.count m
+    ; spent  = spent-≃ v (rows-≃ e o) (MergeG.spent m)
+    ; rooted = live-rooted v (rows-≃ e o) (rowsL-≈ e ls) (MergeG.rooted m)
+    }
+
+  src-env : ∀ {Γ A} {ρ ρ′ : DenEnv Γ} → Agree ρ ρ′ → ∀ v m (s : St Γ A) → SrcG ρ v m s → SrcG ρ′ v m s
+  src-env e v nothing  s                    g = good-env e v s g
+  src-env e true  (just p) (pend o q) (heldᴮ h) = heldᴮ λ r → h (from (rows-≃ e (pend o q)) r)
+  src-env e false (just p) (pend o q) (heldᴮ h) = heldᴮ tt
+
+  gl-env : ∀ {Γ A} {ρ ρ′ : DenEnv Γ} → Agree ρ ρ′ → ∀ v (ls : List (St Γ A)) → GL ρ v ls → GL ρ′ v ls
+  gl-env e v []       g       = tt₁
+  gl-env e v (s ∷ ls) (a , b) = gln-env e v s a , gl-env e v ls b
+
+  gln-env : ∀ {Γ A} {ρ ρ′ : DenEnv Γ} → Agree ρ ρ′ → ∀ v (s : St Γ A) → GLn ρ v s → GLn ρ′ v s
+  gln-env e v (lnS l (cutS l′ a s)) (eq , g , el) = eq , good-env e (v ∧ l) s g , live-endlast (v ∧ l) (rows-≃ e s) el
+  gln-env e v (lnS l (pend _ _))        ()
+  gln-env e v (lnS l (coldS _ _))       ()
+  gln-env e v (lnS l (ofS _ _ _))       ()
+  gln-env e v (lnS l doneS)             ()
+  gln-env e v (lnS l (mapS _ _))        ()
+  gln-env e v (lnS l (scanS _ _ _))     ()
+  gln-env e v (lnS l (lnS _ _))         ()
+  gln-env e v (lnS l (takeS _ _ _ _))   ()
+  gln-env e v (lnS l (flatS _ _ _ _ _ _ _)) ()
+  gln-env e v (lnS l (connS _ _ _))     ()
+  gln-env e v (lnS l (joinS _ _ _ _))   ()
+  gln-env e v (pend _ _)                ()
+  gln-env e v (coldS _ _)               ()
+  gln-env e v (ofS _ _ _)               ()
+  gln-env e v doneS                     ()
+  gln-env e v (mapS _ _)                ()
+  gln-env e v (scanS _ _ _)             ()
+  gln-env e v (cutS _ _ _)              ()
+  gln-env e v (takeS _ _ _ _)           ()
+  gln-env e v (flatS _ _ _ _ _ _ _)     ()
+  gln-env e v (connS _ _ _)             ()
+  gln-env e v (joinS _ _ _ _)           ()
+
+-- A BINDER'S GOOD BODY, UP TO THE SAME ROWS: a body reads its binder
+-- only through the rows it holds.
+good-hot : ∀ {Γ X B} {t u : EmissionSet X} (k : CS) (ρ : DenEnv Γ) (b : St (X ∷ Γ) B) → t ≃ u → ∀ v → G (Hot t k ∷ᴬ ρ) v b → G (Hot u k ∷ᴬ ρ) v b
+good-hot k ρ b eq v = good-env (λ Q → ag-cons (hot-ag k ⟨ (λ _ → to eq , from eq) ⟩) (env-refl ρ)) v b
 
 good-swap : ∀ {R Γ A} (c : Ctx R Γ A) {s s′ : St Γ A} → Swap (env c) s s′ → ∀ {v} → G [] v (plug c s) → G [] v (plug c s′)
 good-swap top              sw {v} g = node sw v g

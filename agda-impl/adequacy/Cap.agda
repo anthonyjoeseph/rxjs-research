@@ -30,7 +30,7 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; CS; cs; Cand; found; Out; still; shows; seek; own; ownBest; first; sourceT; shift; closed; outOf; same?;
                     connS; joinS; joinM; cp) renaming (Ev to Evᴹ)
 open import adequacy.Rows using (toEv; Each; Hot; Inbox; _∪_; this; that; Closed; shut)
-open import adequacy.Bound using (_⊑_; ⊑i; ⊑-refl; ⊑-trans; <→⊑; ≺→⊑; ext-⊑; shift-≮; raise-src; Above; After; From; Single;
+open import adequacy.Bound using (_⊑_; ⊑i; ⊑-refl; ⊑-trans; <→⊑; ≺→⊑; ext-⊑; shift-≮; shift-⊑; Above; After; From; Single;
   Bd; OK; OKL; Mk; Fed; Told; ToldL; ToldAt)
 
 open _⊑_
@@ -78,16 +78,11 @@ ext-< x l = trans (at-<ᵖ x (x ++ [ l ])) (<ᵖ-below x [])
 
 -- A source's event, raised as its connect reads it, before anything a
 -- joiner hears of a row no earlier.
-bind-past : ∀ v h x l → [ ix 0 ] <ᵖ [ l ] ≡ true → h ⊑ at x → (if v then h else shift h) <ᴷ at (x ++ [ l ]) ≡ true
-bind-past true  h         x l lt u = ⊑-< (at (x ++ [ l ])) u (ext-< x l)
-bind-past false (at p)    x l lt u = ⊑-< (at (x ++ [ l ])) (shift-≮ x (at p) u) (trans (at-<ᵖ (x ++ [ ix 0 ]) (x ++ [ l ])) (<ᵖ-part x [] [] lt))
-bind-past false (after p) x l lt u = ⊑-< (at (x ++ [ l ])) u (ext-< x l)
+bind-past : ∀ h x l → [ ix 0 ] <ᵖ [ l ] ≡ true → h ⊑ at x → shift h <ᴷ at (x ++ [ l ]) ≡ true
+bind-past (at p)    x l lt u = ⊑-< (at (x ++ [ l ])) (shift-≮ x (at p) u) (trans (at-<ᵖ (x ++ [ ix 0 ]) (x ++ [ l ])) (<ᵖ-part x [] [] lt))
+bind-past (after p) x l lt u = ⊑-< (at (x ++ [ l ])) u (ext-< x l)
 
 -- A source's row, echoed just past it, no earlier than its raised event.
-src-past : ∀ v h k → h ⊑ at k → (if v then h else shift h) ⊑ at (k ++ [ ix 0 ])
-src-past true  h k u = ⊑-trans u (ext-⊑ k [ ix 0 ])
-src-past false h k u = shift-≮ k h u
-
 -- The earlier of two keys, the first on a tie.
 meet : Key → Key → Key
 meet a b = if a <ᴷ b then a else b
@@ -354,14 +349,14 @@ module Vs {R B : Set} (C C₂ h : Key) {T′ β : EmissionSet B}
       kC = ⊑-trans (≮ K C₂ kc₂) c₂C
 
   -- The source's raised event against the body's, the body's on a tie.
-  src-vs : ∀ {Y : Set} {f m κ h₀} {o : Out Y} v → h ≡ (if v then h₀ else shift h₀) → κ ⊑ h₀ → (y : Maybe (Cand R B)) → OKᶜ C₂ β y
-         → OKᶜ {R} C T′ (sourceT v (just (found f m κ , h₀ , o)) y)
-  src-vs {f = f} {m = m} {κ = κ} {h₀ = h₀} v eq kh nothing by =
+  src-vs : ∀ {Y : Set} {f m κ h₀} {o : Out Y} → h ≡ shift h₀ → κ ⊑ h₀ → (y : Maybe (Cand R B)) → OKᶜ C₂ β y
+         → OKᶜ {R} C T′ (sourceT (just (found f m κ , h₀ , o)) y)
+  src-vs {f = f} {m = m} {κ = κ} {h₀ = h₀} eq kh nothing by =
     subst (λ z → OKᶜ {R} C T′ (just (found f m κ , z , still))) eq
-      (a-wins {f} {m} {κ} nothing (subst (κ ⊑_) (sym eq) (⊑-trans kh (raise-src v h₀))) (λ ()) by)
-  src-vs {f = f} {m = m} {κ = κ} {h₀ = h₀} v eq kh (just (g , K , o′)) by with (if v then h₀ else shift h₀) <ᴷ K in lt
+      (a-wins {f} {m} {κ} nothing (subst (κ ⊑_) (sym eq) (⊑-trans kh (shift-⊑ h₀))) (λ ()) by)
+  src-vs {f = f} {m = m} {κ = κ} {h₀ = h₀} eq kh (just (g , K , o′)) by with shift h₀ <ᴷ K in lt
   ... | true  = subst (λ z → OKᶜ {R} C T′ (just (found f m κ , z , still))) eq
-                  (a-wins {f} {m} {κ} (just (g , K , o′)) (subst (κ ⊑_) (sym eq) (⊑-trans kh (raise-src v h₀)))
+                  (a-wins {f} {m} {κ} (just (g , K , o′)) (subst (κ ⊑_) (sym eq) (⊑-trans kh (shift-⊑ h₀)))
                           (λ { refl → <→⊑ h K (trans (cong (_<ᴷ K) eq) lt) }) by)
   ... | false = y-wins {g} {K} {o′} (≮ K h (trans (cong (_<ᴷ K) eq) lt)) by
 
@@ -392,27 +387,27 @@ module _ {R B X : Set} {Γ} {ρ : DenEnv Γ} (k : CS) (σ : EmissionSet X) {β :
 
   -- Its source subscribed: the source's find raised against the body's,
   -- the body capped no later than the source's.
-  conn-free : ∀ C v (x : Maybe (Cand R X)) (y : Maybe (Cand R B)) → OKᶜ C σ x → Mk x → Body C y → OKᶜ C ConnT (sourceT v x y)
-  conn-free C v nothing y (inj₁ (_ , aσ)) _ bd =
+  conn-free : ∀ C (x : Maybe (Cand R X)) (y : Maybe (Cand R B)) → OKᶜ C σ x → Mk x → Body C y → OKᶜ C ConnT (sourceT x y)
+  conn-free C nothing y (inj₁ (_ , aσ)) _ bd =
     body-only C y (conn-rows (λ a → C <ᴷ a ≡ true) (λ {k′} s → <-⊑ C (aσ s) (ext-⊑ k′ [ ix 0 ])))
       (bd C (⊑-refl C) (λ nc → bind-after σ k C (λ a → C <ᴷ a ≡ true) (λ d e → <-⊑ C d e) aσ (λ {x} l _ c → <-⊑ C c (ext-⊑ x [ l ])) nc))
-  conn-free C v nothing y (inj₂ (() , _)) _ bd
-  conn-free C v (just (found f m κ , h₀ , o)) y (inj₁ (ch , aσ)) kh bd =
+  conn-free C nothing y (inj₂ (() , _)) _ bd
+  conn-free C (just (found f m κ , h₀ , o)) y (inj₁ (ch , aσ)) kh bd =
     Vs.src-vs C (meet C h) h (meet-ˡ C h) (meet-lo C h) (meet-hi C h)
-      (conn-rows (λ a → C <ᴷ a ≡ true ⊎ h ⊑ a) (λ {k′} s → inj₁ (<-⊑ C (aσ s) (ext-⊑ k′ [ ix 0 ])))) body v refl kh y
+      (conn-rows (λ a → C <ᴷ a ≡ true ⊎ h ⊑ a) (λ {k′} s → inj₁ (<-⊑ C (aσ s) (ext-⊑ k′ [ ix 0 ])))) body refl kh y
       (bd (meet C h) (meet-ˡ C h)
           (λ nc → bind-after σ k (meet C h) (λ a → C <ᴷ a ≡ true) (λ d e → <-⊑ C d e) aσ (λ {x} l _ c → ⊑-< (at (x ++ [ l ])) (meet-ˡ C h) (<-⊑ C c (ext-⊑ x [ l ]))) nc))
     where
       h : Key
-      h = if v then h₀ else shift h₀
-  conn-free C v (just (found f m κ , h₀ , o)) y (inj₂ (_ , bσ)) kh bd =
+      h = shift h₀
+  conn-free C (just (found f m κ , h₀ , o)) y (inj₂ (_ , bσ)) kh bd =
     Vs.src-vs C (meet C h) h (meet-ˡ C h) (meet-lo C h) (meet-hi C h)
-      (conn-rows (λ a → C <ᴷ a ≡ true ⊎ h ⊑ a) (λ {k′} s → inj₂ (src-past v h₀ k′ (from bσ s)))) body v refl kh y
+      (conn-rows (λ a → C <ᴷ a ≡ true ⊎ h ⊑ a) (λ {k′} s → inj₂ (shift-≮ k′ h₀ (from bσ s)))) body refl kh y
       (bd (meet C h) (meet-ˡ C h)
-          (λ nc → bind-after σ k (meet C h) (h₀ ⊑_) ⊑-trans (from bσ) (λ {x} l lt d → ⊑-< (at (x ++ [ l ])) (meet-ʳ C h) (bind-past v h₀ x l lt d)) nc))
+          (λ nc → bind-after σ k (meet C h) (h₀ ⊑_) ⊑-trans (from bσ) (λ {x} l lt d → ⊑-< (at (x ++ [ l ])) (meet-ʳ C h) (bind-past h₀ x l lt d)) nc))
     where
       h : Key
-      h = if v then h₀ else shift h₀
+      h = shift h₀
 
   -- Its body subscribing, its source owing nothing before the body's
   -- `ix 1`: its own marks, the earliest no later than that, against the body's.

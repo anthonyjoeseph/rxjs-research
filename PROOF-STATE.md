@@ -14,15 +14,23 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### A CONNECT ENDED BEFORE ITS SOURCE
+
+Riskiest: `Inv` asks a rising end's node to be `Empty`, but a body ending
+before its source's burst leaves that burst owed as silent pins. Open:
+`Ends cp` over visible rows only, which a lane's end then reads. Settled
+when `≈` carries silent rows past `p` with `Truncate`'s reach intact.
+
+Members: `rise-body-cp`.
+
 #### THE CONNECT'S SEARCH
 
-Riskiest: the connect's lead is a body; what is left is how its source's
-rows and its body's sit against each other. Open whether an over connect's
-source ties at all, and whether the pure order already keeps the source past
-a body's find. Settled by bodies, or a program whose source row lands at or
-before a body find no later than it.
+Riskiest: how a connect's source rows and its body's sit against each
+other. Open: whether a body's find lies under no row its source still owes,
+an invariant `Good` does not yet state. Settled by a body, or a program whose
+body finds at or under a source row not yet fed.
 
-Members: `unfed-after`, `over-tight`, `conn-body-src`.
+Members: `body-apart`.
 
 #### THE COLD STEPPED
 
@@ -51,14 +59,13 @@ Members: `enter-bounded`, `enter-switch`, `enter-exhaust`,
 
 #### THE QUEUED SEARCH
 
-A bounded merge with values waiting has every slot taken (`G`'s
-`n ≡ m`), so its earliest lane end is `Queued` and hands off to the
-queue's head just past it. Open: whether apartness, one event a position
-and lanes starting past their start's end bound every `waits` row above
-the find. Settled by bodies over `Rows.BoundedF`'s `Starts`, or a queued
-merge whose race shows a row the cap leaves quiet.
+A bounded merge with values waiting: its race keys its rows, a lane's end
+handing off to the queue's head just past it. Open: `Leads`' `Tight` lets
+a lane's unshown find tie at the lane's end row, which queued leaves the
+merge no row. Settled by a find tied at an end row always showing it, or
+a queued lane whose unshown find ties at its end.
 
-Members: `queued-race`, `bounded-wait-leadᶜ`.
+Members: `bounded-wait-leadᶜ`.
 
 #### THE CONNECT STEPPED
 
@@ -69,15 +76,16 @@ completed source owing nothing) is enough for each; a source's end must
 leave its rows `Empty`. Settled when each is a body.
 
 Members: `sub-connect`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`,
-`rise-body-cp`, `abs-con`, `abs-join`.
+`abs-con`, `abs-join`.
 
 #### THE BINDER READ
 
-Believed: a body reads its binder only through the binder's rows, and a
-good tree's connect source reads lawfully. Settled by bodies, or a body
-whose rows or goodness differ under equal binder rows.
+Believed: a good tree's connect source reads lawfully, its rows and its
+end one event a position, none under another. Open: a connect under a
+switched-off cut, whose `G` asks nothing of its source. Settled by a body,
+or a good tree whose dead connect's source rows clash.
 
-Members: `rows-hot`, `good-hot`, `src-lawful`.
+Members: `src-lawful`.
 
 #### A SKIP UNDER A CONNECT
 
@@ -123,13 +131,13 @@ Members: `take-leadᶜ`, `rise-take-nx`, `rise-take-fail`,
 
 #### THE SILENT RUN, FINITE
 
-Open: short of a row a reader meets next, a run takes finitely many silent
-steps. Rows dropped is no fuel (an of's run drops none); the fuel must be
-state-level — the rows still held by ofs before the met one, by `Few`.
-Settled by a body, or a program whose engine stalls silently forever before
-a row its emission set holds.
+Short of a row a reader meets next, a run is fuelled by the rows at or
+before it strictly past its clock. Open: whether the clock (the least mark
+due once absorbed, else the run's position) never runs back, and whether
+steps passing no such row are few. Settled by bodies, or a program whose
+engine stalls silently forever before a row its emission set holds.
 
-Members: `silent-finite`.
+Members: `clock-mono`, `still-finite`.
 
 #### THE GOOD TREE KEPT
 
@@ -162,14 +170,6 @@ subscription reads as its body one level down. Settled when each is a
 body.
 
 Members: `sub-empty`, `sub-of`, `sub-defer`.
-
-#### THE KEYS
-
-Believed: keys order as positions do, strictly and transitively, and a
-position just past another stays before the mark the other is before.
-Settled by bodies over `denotation.Events`' label comparisons.
-
-Members: `shift-after`, `<ᴷ-trans`, `<ᴷ-irrefl`, `≮ᴷ-trans`, `at-<ᵖ`.
 
 ## Tier 1 — the simultaneous spec
 
