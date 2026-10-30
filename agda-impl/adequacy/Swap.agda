@@ -13,7 +13,7 @@ open import Data.Nat using (ℕ; _+_)
 open import Data.Nat.Properties using (+-suc)
 open import Data.Product using (_×_; _,_)
 open import Data.List.Relation.Unary.All using ([]) renaming (_∷_ to _∷ᴬ_)
-open import Data.Unit using (⊤; tt)
+open import Data.Unit using (tt)
 open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans)
 
@@ -26,7 +26,7 @@ open Machine using (St; Ctx; CS; plug; alive; pend; coldS; ofS; doneS; mapS; sca
 open import adequacy.Rows using (env; rows; rowsL; Each; module Flat; _≃_; Hot)
 open import adequacy.Up using (_≈ᴸ_; []; _∷_; ≈ᴸ-refl; row-≃; map-≃; scan-≃; take-≃; ≃-refl; conn-≃; rows-hot; bounded-≃;
   switch-≃; exhaust-≃)
-open import adequacy.Bound using (Empty; empty-any; EndLast; Roots; Rooted; Live; G; GL; GLn; LnBody; SrcG; Held; live;
+open import adequacy.Bound using (Empty; empty-any; EndLast; Roots; Rooted; Live; G; GL; GLn; LnBody; SrcG; HeldAt; live;
   mergeG-map; Told; ToldL)
 
 open _≃_
@@ -99,7 +99,7 @@ record Swap {Γ A} (ρ : DenEnv Γ) (s s′ : St Γ A) : Set₁ where
     node : ∀ v → G ρ v s → G ρ v s′
     lane : ∀ v → GLn ρ v s → GLn ρ v s′
     body : ∀ v b → LnBody ρ v b s → LnBody ρ v b s′
-    held : Held s → Held s′
+    held : ∀ {v q} → HeldAt ρ v q s → HeldAt ρ v q s′
     told : ∀ {X} (x : X ∈ Γ) → Told x s → Told x s′
 open Swap
 

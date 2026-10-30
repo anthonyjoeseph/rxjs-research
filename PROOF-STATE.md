@@ -41,22 +41,22 @@ Members: `enter-bounded`, `enter-switch`, `enter-exhaust`,
 
 #### THE QUEUED SEARCH
 
-A bounded merge's search with values waiting keys and leads its rows: a
-lane's end hands off to the queue's first just past it. Settled by
-bodies over the bounded schedule's `Queued` and `Starts`.
+A bounded merge's search with values waiting keys and leads its rows up
+to a cap: a lane's end hands off to the queue's first just past it.
+Open: what `G` keeps of the queue while values wait. Settled by bodies
+over the bounded schedule's `Queued` and `Starts`.
 
-Members: `bounded-wait-ok`, `bounded-wait-lead`.
+Members: `bounded-wait-okᶜ`, `bounded-wait-lead`.
 
 #### THE CONNECT'S SEARCH
 
-Riskiest: a connect's search is stated whole, over the connect node, at
-an empty environment only, because its body's joiners read the binder.
-Open: whether the whole-node statement holds with the source winning
-only strictly before the body, or the search's key needs a cap carried
-from the binder (`From`/`OK` keyed by a bound). Settled by bodies, or a
-connect whose body's joiner keys a row before its source's find.
+Riskiest: a connect's lead is stated whole, over the connect node, at an
+empty environment only, because its body's joiners read the binder. Its
+search keys its rows up to a cap the binder leaves quiet (`OKᶜ`); open
+whether the lead carries the same cap. Settled by a body, or a connect
+whose body's joiner leads a row before its source's find.
 
-Members: `conn-ok`, `conn-lead`.
+Members: `conn-lead`.
 
 #### THE CONNECT STEPPED
 
@@ -96,11 +96,12 @@ Members: `shut-of`.
 
 #### ONE EVENT A POSITION
 
-Untried: a good node's rows hold one event at a position: a merge's
-parts apart by `Rooted`, a connect's body and source echoes by world.
-Settled by a body by former, or a good tree with two rows at a position.
+Untried: a good node's rows hold one event at a position, its binders'
+doing so: a merge's parts apart by `Rooted`, a connect's body and source
+echoes by world, a binder's rejoins by its source's. Settled by a body by
+former, or a good tree with two rows at a position.
 
-Members: `rows-single`.
+Members: `rows-single`, `bind-single`.
 
 #### THE SCAN STEPPED
 

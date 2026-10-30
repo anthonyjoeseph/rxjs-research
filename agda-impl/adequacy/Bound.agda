@@ -33,7 +33,7 @@ open import denotation.Laws.Worlds using (InvAt; Hots; W; inW; plain-ix; apart-w
 open import operation.Key using (Key; at; after; _<ᴷ_; ≮ᴷ-trans; <ᴷ-trans; <ᴷ-irrefl; at-<ᵖ; clash)
 open import operation.PureObservable using (module Machine)
 
-open Machine using (St; Ctx; CS; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed; same?;
+open Machine using (St; Ctx; CS; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed; same?; _⊕_;
                     free; cpAt; cutAt; overAt; inScan; inTake; inSrc; inBody;
                     ofS; doneS; mapS; cutS; cpM; cutM; lnS; flatS; coldS; scanS; takeS; connS; joinS; inMap; inCut; inLn; inOuter; inLanes; nx; cp; attached; attAt; attM; pend) renaming (Ev to Evᴹ; over to overᶜ)
 open import adequacy.Rows using (acc-val; rows; rowsL; pendRows; toEv; Lanes; Each; Kth; AllEnd; EndsOf; Lane; reads; module Flat; module SwitchF; module ExhaustF; module BoundedF; ∅; Hot; Inbox; _∪_; Kept; Stops) renaming (kept to keptᴿ; stop to stopᴿ; left to leftᴿ; sub to subᴿ)
@@ -105,8 +105,16 @@ past-⊑ {p} {q} pq ne with <ᵖ-split p q (trans (sym (at-<ᵖ q p)) (un pq))
 Empty : ∀ {A} → EmissionSet A → Set
 Empty t = ∀ {q e} → ¬ t q e
 
+-- Every row at a key `P` holds of.
+Above : ∀ {A} → (Key → Set) → EmissionSet A → Set
+Above P t = ∀ {q e} → t q e → P (at q)
+
 From : ∀ {A} → Key → EmissionSet A → Set
-From K t = ∀ {q e} → t q e → K ⊑ at q
+From K = Above (K ⊑_)
+
+-- Every row strictly past `C`.
+After : ∀ {A} → Key → EmissionSet A → Set
+After C = Above (λ k → C <ᴷ k ≡ true)
 
 Single : ∀ {A} → EmissionSet A → Set
 Single t = ∀ {q e e′} → t q e → t q e′ → e ≡ e′
@@ -249,9 +257,9 @@ module _ {B : Set} where
   empty-any (_ ∷ _)  (n , _)  (inj₁ r) = n r
   empty-any (_ ∷ Ls) (_ , ns) (inj₂ x) = empty-any Ls ns x
 
-  from-any : ∀ {K} (Ls : List (EmissionSet B)) → Each (From K) Ls → From K (Lanes Ls)
-  from-any (_ ∷ _)  (f , _)  (inj₁ r) = f r
-  from-any (_ ∷ Ls) (_ , fs) (inj₂ x) = from-any Ls fs x
+  above-any : ∀ {P : Key → Set} (Ls : List (EmissionSet B)) → Each (Above P) Ls → Above P (Lanes Ls)
+  above-any (_ ∷ _)  (f , _)  (inj₁ r) = f r
+  above-any {P} (_ ∷ Ls) (_ , fs) (inj₂ x) = above-any {P} Ls fs x
 
   from-weak : ∀ {K K′} (Ls : List (EmissionSet B)) → K ⊑ K′ → Each (From K′) Ls → Each (From K) Ls
   from-weak []       h _        = _
@@ -398,6 +406,13 @@ Held : ∀ {Γ A} → St Γ A → Set₁
 Held (pend _ _) = ⊤₁
 Held _          = ⊥₁
 
+-- A subscription still owed at `q`, owing nothing before it.
+data HeldAt {Γ A} (ρ : DenEnv Γ) (b : Bool) (q : Pos) : St Γ A → Set₁ where
+  held : ∀ {o} → Live b (From (at q) (pendRows ρ o q)) → HeldAt ρ b q (pend o q)
+
+held-shape : ∀ {Γ A} {ρ : DenEnv Γ} {b q} {s : St Γ A} → HeldAt ρ b q s → Held s
+held-shape (held _) = tt₁
+
 -- A joiner's inbox in order, each entry strictly before every later one,
 -- and before every row the source still owes it but the one it is: a
 -- closed source's end, fed to the joiner, is still among its binder's rows.
@@ -455,10 +470,10 @@ mutual
   G ρ b (coldS v l)                           = ⊤₁
   G ρ b _                                     = ⊥₁
 
-  -- A connect's source: still owed while its body subscribes, then good;
-  -- once its connect has seen it complete, owing nothing.
+  -- A connect's source: still owed while its body subscribes, under its
+  -- body's `ix 1`, then good.
   SrcG : ∀ {Γ A} → DenEnv Γ → Bool → Maybe Pos → St Γ A → Set₁
-  SrcG ρ b (just _) s = Held s
+  SrcG ρ b (just p) s = HeldAt ρ b (p ⊕ [ ix 1 ]) s
   SrcG ρ b nothing  s          = G ρ b s
 
   GL : ∀ {Γ A} → DenEnv Γ → Bool → List (St Γ A) → Set₁
@@ -508,7 +523,7 @@ mutual
   shape (joinS j false x ib)                      _ = tt₁
 
   shapeSrc : ∀ {Γ A} {ρ ρ′ : DenEnv Γ} {v} m (s : St Γ A) → SrcG ρ v m s → SrcG ρ′ false m s
-  shapeSrc (just _) s g = g
+  shapeSrc (just _) (pend _ _) (held _) = held tt
   shapeSrc {v = v} nothing s g  = shape {v = v} s g
 
   shapeL : ∀ {Γ A} {ρ ρ′ : DenEnv Γ} {v} (ls : List (St Γ A)) → GL ρ v ls → GL ρ′ false ls
@@ -670,19 +685,6 @@ lane-ok (scanS f z s) y b = kept y b
 lane-ok (takeS i q w s) y b = kept y b
 lane-ok (connS k o b′) y b = kept y b
 lane-ok (joinS j g x ib) y b = kept y b
-
--- The first of a lane and the lanes after it.
-lanes-first : ∀ {R B} {l : EmissionSet B} {Ls} (x y : Maybe (Cand R B)) → OK l x → OKL Ls y → OKL (l ∷ Ls) (first x y)
-lanes-first nothing nothing ex ey = ex , ey
-lanes-first nothing (just (g , K , o)) ex (fy , my , sy) =
-  ((λ r → ⊥-elim (ex r)) , fy) , my , λ eq → let (q , k , x) = sy eq in q , k , inj₂ x
-lanes-first {Ls = Ls} (just (g , K , o)) nothing bx ey =
-  (from bx , from-empty Ls ey) , mark bx , λ eq → let (q , k , r) = shown bx eq in q , k , inj₁ r
-lanes-first {Ls = Ls} (just (g , K , o)) (just (g′ , K′ , o′)) bx (fy , my , sy) with K′ <ᴷ K in lt
-... | true  = ((λ r → ⊑-trans (<→⊑ K′ K lt) (from bx r)) , fy) , my
-            , λ eq → let (q , k , x) = sy eq in q , k , inj₂ x
-... | false = (from bx , from-weak Ls (⊑i lt) fy) , mark bx
-            , λ eq → let (q , k , r) = shown bx eq in q , k , inj₁ r
 
 ------------------------------------------------------------------------
 -- The race

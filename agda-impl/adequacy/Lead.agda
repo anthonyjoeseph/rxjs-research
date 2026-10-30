@@ -492,8 +492,9 @@ postulate
   -- A CONNECT'S SEARCH LEADS: whatever its source or its body finds, the
   -- source winning only strictly before the body, keys the connect's rows,
   -- and the part that lost lies past it: the body's own rows past a
-  -- source's find, the source's rows past a body's.  Stated whole, as
-  -- `conn-ok` is, and for the same reason.
+  -- source's find, the source's rows past a body's.  Stated whole: the
+  -- body's rows read its binder, so its lead holds only up to a cap, as
+  -- `conn-okᶜ` bounds its search.
   conn-lead : ∀ {R A X} v (c : Ctx R [] A) k (o : St [] X) (b : St (X ∷ []) A) → G (env c) v (connS k o b)
             → Leads v c (rows (env c) (connS k o b)) (kids c (connS k o b))
 
