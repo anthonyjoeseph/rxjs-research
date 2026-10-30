@@ -25,24 +25,76 @@ open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
 open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; trans; sym; subst)
 
-open import Tree using (Obs; mergeᶠ)
+open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
+open import Data.Maybe using (just)
+open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline)
 open import denotation.EmissionSet using (EmissionSet; Ev; end; DenEnv; Truncate)
 open import denotation.Laws.Modulus using (≼-refl; ≺-irrefl)
 open import operation.PureObservable using (module Machine)
-open Machine using (St; Ctx; ⟨_,_,_,_⟩; plug; absorbed; rising; cp; alive; ended; dequeue; settle; Att;
-                    cutS; lnS; flatS; inLanes)
-open import adequacy.Rows using (env; ∅; up; here; rows; rowsL; pendRows; Plus; old; new; Lanes; Each; module Flat; _≃_; _⇄_;
+open Machine using (St; Ctx; CS; ⟨_,_,_,_⟩; plug; absorbed; rising; cp; alive; ended; dequeue; settle; Att;
+                    cutS; lnS; flatS; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
+open import adequacy.Rows using (env; ∅; Hot; up; here; rows; rowsL; pendRows; Plus; old; new; Lanes; Each; module Flat; _≃_; _⇄_;
   ≃-sym; Moves; silent)
 open import adequacy.Up using (any-ʳ++ˡ; any-ʳ++ʳ; all-ʳ++; ≈ᴸ-refl; _∷_; up-≃; ≃-refl; ≃-trans; vis-≃; plus-≃; trunc-≃;
   row-≃)
 open import adequacy.Bound using (Empty; Good; G; GLn; shape; on; off; lane-v; live; dead-empty; MergeG; mergeG-map)
-open import adequacy.Skip using (After; Since; LeadC; _≈⟨_⟩_; ≈-vis; up-≈)
+open import adequacy.Skip using (After; Since; LeadC; _≈⟨_⟩_; up-vis; ≈-refl; since-map; map-≈; since-row; flat-≈; after-since;
+                                 ≈ᴸ-hole; conn-≈; since-conn) renaming (≈ᴸ-refl to ≈ᴸ-refl⟨⟩; _∷_ to _∷≈_)
 open import adequacy.LaneEnd using (frame-≈; done-at; outer-owes; lanes-owe; since-x; since-y)
-open import adequacy.Owes using (Owing; Owes; OwesL; UpO; Swap; owes-join; owesL-ʳ++; rowsL-ʳ++; ≡→≃; owing-≃; empty-≃;
+open import adequacy.Owes using (Owing; Owes; OwesL; UpO; Swap; owes-join; SrcO; srcO-≃; owesL-ʳ++; rowsL-ʳ++; ≡→≃; owing-≃; empty-≃;
                                         flat-owing-o; flat-owing-l; flat-empty; live-ʳ++; live-owing; goodL-ʳ++⁻; goodL-swap; lanes-≃; rooted-≃; good-swap)
 open import adequacy.Inv using (Inv; inv; Sim; good-split; node-good; upo-liv; need-of; owing-row)
 open import adequacy.Skip using (trunc-≈)
+open import denotation.Laws.Modulus using (≺→≼)
+
+postulate
+  -- WHAT A SOURCE OWES IS UNMOVED BY A SKIP PAST ITS LEAD: its body,
+  -- reading the source a skip apart, owes alike, and the connect above,
+  -- shown a skip or a pin under it, owes alike, every other part being
+  -- past `p`.
+  src-owes-≈ : ∀ {R Γ X B} (k : CS) (b : St (X ∷ Γ) B) (c : Ctx R Γ B) {t u : EmissionSet X} {p}
+             → After p (rows (Hot ∅ k ∷ᴬ env c) b) → LeadC c p → Since p t → Since p u → t ≈⟨ p ⟩ u
+             → SrcO (inSrc k b c) t → SrcO (inSrc k b c) u
+
+-- What is owed up a context, unmoved by a skip past its lead: `up-vis`
+-- for owing.
+srcO-≈ : ∀ {R Γ A} (c : Ctx R Γ A) {t u : EmissionSet A} {p} → LeadC c p → Since p t → Since p u → t ≈⟨ p ⟩ u → SrcO c t → SrcO c u
+srcO-≈ top                                   ld st su eq so = tt
+srcO-≈ (inMap f c)                             ld st su eq so = srcO-≈ c ld (since-map f st) (since-map f su) (map-≈ f eq) so
+srcO-≈ (inScan f z c)                          ld st su eq so = tt
+srcO-≈ (inCut true a c)                        ld st su eq so = srcO-≈ c ld st su eq so
+srcO-≈ (inCut false a c)                       ld st su eq so = tt
+srcO-≈ (inLn true c)                           ld st su eq so = srcO-≈ c ld st su eq so
+srcO-≈ (inLn false c)                          ld st su eq so = tt
+srcO-≈ (inTake i q w c)                        ld st su eq so = tt
+srcO-≈ (inOuter (mergeᶠ nothing) f d n q ls c) {t} {u} (al , ld) st su eq so =
+  srcO-≈ c ld (since-row L t Ls st sl) (since-row L u Ls su sl) (trunc-≈ (flat-≈ L Ls Ls eq (≈ᴸ-refl⟨⟩ Ls) st su sl sl)) so
+  where
+    L  = λ a → pendRows (env c) (f a)
+    Ls = rowsL (env c) ls
+    sl = after-since Ls al
+srcO-≈ (inOuter (mergeᶠ (just _)) f d n q ls c) ld st su eq so = tt
+srcO-≈ (inOuter switchᶠ f d n q ls c)           ld st su eq so = tt
+srcO-≈ (inOuter exhaustᶠ f d n q ls c)          ld st su eq so = tt
+srcO-≈ (inLanes (mergeᶠ nothing) f d n q o pre post c) {t} {u} (ao , apre , apost , ld) st su eq so =
+  srcO-≈ c ld (since-row L O Lt sO slt) (since-row L O Lu sO slu)
+       (trunc-≈ (flat-≈ L Lt Lu ≈-refl (≈ᴸ-hole (rowsL ρ pre) (eq ∷≈ ≈ᴸ-refl⟨⟩ (rowsL ρ post))) sO sO slt slu)) so
+  where
+    ρ   = env c
+    L   = λ a → pendRows ρ (f a)
+    O   = rows ρ o
+    Lt  = rowsL ρ pre ʳ++ (t ∷ rowsL ρ post)
+    Lu  = rowsL ρ pre ʳ++ (u ∷ rowsL ρ post)
+    sO  = λ {q} {e} r → ≺→≼ {_} {q} (ao {q} {e} r)
+    slt = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (st , after-since (rowsL ρ post) apost)
+    slu = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (su , after-since (rowsL ρ post) apost)
+srcO-≈ (inLanes (mergeᶠ (just _)) f d n q o pre post c) ld st su eq so = tt
+srcO-≈ (inLanes switchᶠ f d n q o pre post c)   ld st su eq so = tt
+srcO-≈ (inLanes exhaustᶠ f d n q o pre post c)  ld st su eq so = tt
+srcO-≈ (inSrc k b c)                            (ab , ld) st su eq so = src-owes-≈ k b c ab ld st su eq so
+srcO-≈ (inBody k o c) {t} {u}                   (ao , ld) st su eq so =
+  srcO-≈ c ld (since-conn (CS.connAt k) _ t ao st) (since-conn (CS.connAt k) _ u ao su) (conn-≈ (CS.connAt k) _ eq) so
 
 -- An end added past every row adds nothing before any of them.
 trunc-plus : ∀ {A} {t : EmissionSet A} {p} {v : Ev A} → Since p t → Truncate (Plus t p v) ≃ Plus (Truncate t) p v
@@ -64,7 +116,7 @@ module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St 
           (mg : G (env c) true (flatS (mergeᶠ nothing) f d n [] o (pre ʳ++ lnS true (cutS true a s₀) ∷ post))) (g₀ : Good (env c) s₀)
           (ho : ¬ T d → Owing (rows (env c) o)) (oo : Owes (env c) o) (op : OwesL (env c) pre) (oq : OwesL (env c) post) (uc : UpO c)
           (ao : After p (rows (env c) o)) (apre : Each (After p) (rowsL (env c) pre)) (apost : Each (After p) (rowsL (env c) post)) (lc : LeadC c p)
-          (en : Empty (rows (env c) s₀)) where
+          (en : Empty (rows (env c) s₀)) (so : SrcO (inLanes (mergeᶠ nothing) f d n [] o pre post c) (Plus (rows (env c) s₀) p end)) where
 
   open MergeG mg
 
@@ -111,7 +163,7 @@ module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St 
                               ; count = trans cnt (sym (live-ʳ++ pre)) ; spent = spent ; rooted = rooted-≃ ≃-refl (lanes-≃ pre (lane≃ ∷ ≈ᴸ-refl Post)) rooted }
       gnode false m′ = mergeG-map (λ x → x) (goodL-swap pre (λ { (refl , g′ , _) → refl , g′ , tt })) (λ x → x) (λ x → x) (λ x → x) m′
       sw : Swap ρ (flatS (mergeᶠ nothing) f d n [] o (pre ʳ++ ln ∷ post)) (node (pred n))
-      sw = record { same = row-≃ L ≃-refl (lanes-≃ pre (lane≃ ∷ ≈ᴸ-refl Post)) ; live≡ = refl ; node = gnode ; lane = λ _ () ; body = λ _ _ () }
+      sw = record { same = row-≃ L ≃-refl (lanes-≃ pre (lane≃ ∷ ≈ᴸ-refl Post)) ; live≡ = refl ; node = gnode ; lane = λ _ () ; body = λ _ _ () ; held = λ () }
 
   owes′ : Owes ρ (node (pred n))
   owes′ = ho , oo , owesL-ʳ++ pre op ((λ ()) , tt , oq)
@@ -121,16 +173,17 @@ module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St 
 
   pass : ¬ Flat.Done L O d LX p → Owing Y
        → Inv ⟨ c , node (pred n) , absorbed , p ⟩ × Moves (up c (Flat.RowT L O d LX)) [] (up c (rows ρ (node (pred n))))
-  pass nd ow = inv good′ (owes-join c uc owes′ (need-of c good′ (owing-row f d (pred n) [] o (pre ʳ++ ed ∷ post) (node-good c _ good′ (λ ())) (owing-≃ (≃-sym joinY) ow))))
-             , silent (≃-trans (≈-vis (up-≈ c lc (λ (r , _) → sx′ r) (λ (r , _) → sy′ r)
-                                             (trunc-≈ (fr Y (λ d → ⊥-elim (nd d)) (λ r → r) inj₁))))
+  pass nd ow = inv good′ (owes-join c uc owes′ (need-of c uc good′ (owing-row f d (pred n) [] o (pre ʳ++ ed ∷ post) (node-good c _ good′ (λ ()) (λ ())) (owing-≃ (≃-sym joinY) ow))
+                                                  (srcO-≃ c (≃-sym (rowsY {pred n})) (srcO-≈ c lc (λ (r , _) → sx′ r) (λ (r , _) → sy′ r) skip so))))
+             , silent (≃-trans (up-vis c lc (λ (r , _) → sx′ r) (λ (r , _) → sy′ r) skip)
                                (vis-≃ (up-≃ c (≃-sym (rowsY {pred n})))))
+    where skip = trunc-≈ (fr Y (λ d → ⊥-elim (nd d)) (λ r → r) inj₁)
 
   done : T d → pred n ≡ 0 → Inv ⟨ c , node (pred n) , rising cp , p ⟩ × Moves (up c (Flat.RowT L O d LX)) [] (up c (Plus (rows ρ (node (pred n))) p end))
-  done td pz = inv good′ (uc , lc , owes′ , tt , (λ r → ⊥-elim (empty-node r)) , empty-node)
-             , silent (≃-trans (≈-vis (up-≈ c lc (λ (r , _) → sx′ r) (λ (r , _) → since′ r)
-                                             (trunc-≈ (fr (Plus Y p end) (λ _ → new) old back))))
-                               (vis-≃ (up-≃ c (≃-trans (trunc-plus sy′) (plus-≃ (≃-sym (rowsY {pred n})))))))
+  done td pz = inv good′ (uc , lc , owes′ , tt , (λ r → ⊥-elim (empty-node r)) , empty-node
+                         , srcO-≃ c to-node (srcO-≈ c lc (λ (r , _) → sx′ r) (λ (r , _) → since′ r) skip so))
+             , silent (≃-trans (up-vis c lc (λ (r , _) → sx′ r) (λ (r , _) → since′ r) skip)
+                               (vis-≃ (up-≃ c to-node)))
     where
       eo = spent td
       z  = trans (sym cnt) pz
@@ -146,6 +199,8 @@ module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St 
       since′ : Since p (Plus Y p end)
       since′ (old r) = sy′ r
       since′ new     = ≼-refl {p}
+      skip   = trunc-≈ (fr (Plus Y p end) (λ _ → new) old back)
+      to-node = ≃-trans (trunc-plus sy′) (plus-≃ (≃-sym (rowsY {pred n})))
 
   ------------------------------------------------------------------------
   -- Which, by the counts
@@ -179,11 +234,11 @@ rise-lane-cp : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s 
              → Sim ⟨ inLanes (mergeᶠ nothing) f d n q o pre post c , s , rising cp , p ⟩ []
                    (if alive s then dequeue c (mergeᶠ nothing) f d (pred n) q o (pre ʳ++ ended s ∷ post) p
                                else ⟨ c , flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
-rise-lane-cp f d n q o pre post c s p (inv g (u , l , os , op′ , as , es)) with upo-liv (inLanes (mergeᶠ nothing) f d n q o pre post c) u
+rise-lane-cp f d n q o pre post c s p (inv g (u , l , os , op′ , as , es , so)) with upo-liv (inLanes (mergeᶠ nothing) f d n q o pre post c) u
 ... | lv with lane-v s (subst (λ v → GLn (env c) v s) lv (proj₂ (good-split (inLanes (mergeᶠ nothing) f d n q o pre post c) s g)))
 ... | off a s₀ = ⊥-elim op′
 ... | on a s₀ g₀ _ with subst (λ v → G (env c) v (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post))) lv
-                            (node-good c (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post)) g (λ ()))
+                            (node-good c (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post)) g (λ ()) (λ ()))
 ... | mg with MergeG.fresh mg | u | l
 ... | refl | ho , oo , op , oq , uc | ao , apre , apost , lc =
-  Cp.result f d n o pre post c a s₀ p g mg g₀ ho oo op oq uc ao apre apost lc es
+  Cp.result f d n o pre post c a s₀ p g mg g₀ ho oo op oq uc ao apre apost lc es so
