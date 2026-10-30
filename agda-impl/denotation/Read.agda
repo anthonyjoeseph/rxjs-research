@@ -12,7 +12,7 @@ open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import denotation.Events using (Pos)
-open import denotation.EmissionSet using (Ev; out; skip; end; EmissionSet; _≺_; _≼_; Seen)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; _≺_; _≼_; Seen)
 
 -- Past a cursor; with none, anywhere.
 After : Maybe Pos → Pos → Set
@@ -24,6 +24,7 @@ shown : ∀ {A} → List (Pos × Ev A) → List (Pos × Ev A)
 shown []                 = []
 shown ((q , out a) ∷ rs) = (q , out a) ∷ shown rs
 shown ((q , skip)  ∷ rs) = shown rs
+shown ((q , pin _) ∷ rs) = shown rs
 shown ((q , end)   ∷ rs) = (q , end) ∷ shown rs
 
 -- Where a reader at `c` stands once it has met `rs`.

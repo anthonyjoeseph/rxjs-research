@@ -10,13 +10,14 @@ open import Data.List using ([])
 open import Data.Maybe using (nothing)
 open import Data.Product using (Σ; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
+open import Relation.Binary.PropositionalEquality using (refl)
 open import Data.Unit using (tt)
 
 open import Tree using (Obs; mergeᶠ; map; flatMap)
 open import denotation.Events using (Pos; Timeline)
-open import denotation.EmissionSet using (EmissionSet; Ev; Few; enter; ⟦_⟧; DenEnv;
-  MapT; map-out; map-skip; map-end; module Joining)
-open import denotation.Laws.Modulus using (few-via; entered-few)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; Reach; PDep; enter; ⟦_⟧; DenEnv;
+  MapT; map-out; map-skip; map-pin; map-end; module Joining)
+open import denotation.Laws.Modulus using (reach-via; entered-reach)
 open import adequacy.Rows using (∅; pendRows; reads; _≃_; _⇄_; module Flat)
 open import adequacy.Up using (trunc-≃)
 
@@ -43,6 +44,7 @@ module _ {A B : Set} {Lane Lane′ : Pos → A → EmissionSet B} {O : EmissionS
       fwd : ∀ {k e} → X.JoinT k e → Y.JoinT k e
       fwd (X.val x)             = Y.val x
       fwd (X.step x)            = Y.step x
+      fwd (X.opin x)            = Y.opin x
       fwd (X.oend x d)          = Y.oend x (xy d)
       fwd (X.opass x nd)        = Y.opass x λ d → nd (yx d)
       fwd (X.lane x r l nc w)   = Y.lane x r (to ln l) nc w
@@ -57,6 +59,7 @@ module _ {A B : Set} {Lane Lane′ : Pos → A → EmissionSet B} {O : EmissionS
       bwd : ∀ {k e} → Y.JoinT k e → X.JoinT k e
       bwd (Y.val x)             = X.val x
       bwd (Y.step x)            = X.step x
+      bwd (Y.opin x)            = X.opin x
       bwd (Y.oend x d)          = X.oend x (yx d)
       bwd (Y.opass x nd)        = X.opass x λ d → nd (xy d)
       bwd (Y.lane x r l nc w)   = X.lane x r (from ln l) nc w
@@ -76,6 +79,7 @@ flat-∅ L d = (λ (r , _) → to′ r) ⇄ λ ()
     to′ : ∀ {k e} → Flat.JoinT L ∅ d [] k e → ⊥
     to′ (Flat.val ())
     to′ (Flat.step ())
+    to′ (Flat.opin ())
     to′ (Flat.oend () _)
     to′ (Flat.opass () _)
     to′ (Flat.lane () _ _ _ _)
@@ -90,14 +94,29 @@ flat-∅ L d = (λ (r , _) → to′ r) ⇄ λ ()
 
 -- A MAP ENTERED: its source entered, mapped.
 enter-map : ∀ {Γ A B} (ρ : DenEnv Γ) (f : A → B) (s : Obs Timeline Γ A) p → pendRows ρ (map f s) p ≃ MapT f (pendRows ρ s p)
-enter-map ρ f s p = proj₁ ⇄ λ x → x , few′ x
+enter-map ρ f s p = proj₁ ⇄ λ x → x , reach′ x
   where
-    inner : ∀ {k e} → MapT f (enter (⟦ s ⟧ ρ) p) k e → Σ (Ev _) (enter (⟦ s ⟧ ρ) p k)
-    inner (map-out y)  = _ , y
-    inner (map-skip y) = _ , y
-    inner (map-end y)  = _ , y
-    few′ : ∀ {q e} → MapT f (enter (⟦ s ⟧ ρ) p) q e → Few (MapT f (enter (⟦ s ⟧ ρ) p)) q
-    few′ x = few-via inner (entered-few (⟦ s ⟧ ρ) p (proj₂ (inner x)))
+    t = enter (⟦ s ⟧ ρ) p
+
+    src : ∀ {k e} → MapT f t k e → Σ (Ev _) (t k)
+    src (map-out y)  = _ , y
+    src (map-skip y) = _ , y
+    src (map-pin y)  = _ , y
+    src (map-end y)  = _ , y
+
+    -- A pin's source row is the same pin.
+    pd : ∀ {k e r} (x : MapT f t k e) → PDep r k e → PDep r k (proj₁ (src x))
+    pd x            (inj₁ kr)   = inj₁ kr
+    pd (map-pin y)  (inj₂ refl) = inj₂ refl
+    pd (map-out y)  (inj₂ ())
+    pd (map-skip y) (inj₂ ())
+    pd (map-end y)  (inj₂ ())
+
+    reach′ : ∀ {q e} → MapT f t q e → Reach (MapT f t) q e
+    reach′ (map-out {a = a} y) = reach-via {e = out (f a)} {out a} (λ x _ _ → proj₁ (src x) , proj₂ (src x) , tt) (entered-reach (⟦ s ⟧ ρ) p y)
+    reach′ (map-skip y) = reach-via {e = skip} {skip} (λ x _ _ → proj₁ (src x) , proj₂ (src x) , tt) (entered-reach (⟦ s ⟧ ρ) p y)
+    reach′ (map-end y)  = reach-via {e = end} {end} (λ x _ _ → proj₁ (src x) , proj₂ (src x) , tt) (entered-reach (⟦ s ⟧ ρ) p y)
+    reach′ (map-pin {r = r} y) = reach-via {e = pin r} {pin r} (λ x _ d → proj₁ (src x) , proj₂ (src x) , λ i → pd x (d i)) (entered-reach (⟦ s ⟧ ρ) p y)
 
 -- A MERGE ENTERED: the merge part way through, at its outer entered, not
 -- done, nothing begun.

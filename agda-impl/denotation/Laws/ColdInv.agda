@@ -25,9 +25,8 @@ open import denotation.Events using (Pos; Label; ix; sub; last; Time; tick; From
 open import denotation.Events using (frames; burst; start)
 open import denotation.EmissionSet using (Ev; end; _≺_; _≼_; InE; at-out; at-skip; at-end; on-out; on-skip; module Op)
 open import denotation.Laws.Modulus using (≺→≼; ≼-refl; ≺-≼-≺; ≼-≺-≺; ≺-irrefl; ≺-ext)
-open import denotation.Laws.Worlds using (Plain; plain-ix; plain-last; plain-sub; W; W⁼; step; timer; here; inW; Real; real-snoc; real-init; InvD;
-  world-after; _⊑_; ⊑-≼; ⊑-snoc; ext≢; snoc≢[]; Anc; self; up; plain; named; anc-view; parent-fun; step-parent; anc-trans; anc-≼; world-anc⁼;
-  nest-in; nonempty⁼; lone)
+open import denotation.Laws.Worlds using (Plain; plain-ix; plain-last; plain-sub; W; W⁼; step; timer; here; inW; Real; real-snoc; real-init; InvD; world-after; _⊑_; ⊑-≼; ⊑-snoc; ext≢; snoc≢[]; Anc; self; up; plain; named; anc-view; parent-fun; step-parent; anc-trans; anc-≼; world-anc⁼; nest-in; nonempty⁼; lone)
+open import denotation.Laws.Worlds.Leaves using (ine-pin)
 
 private
   -- A reachable position before a timer's later tick.
@@ -228,6 +227,7 @@ cold-inv {A} {H} c p (rp , dj) = record
   ; burst = λ ce y cy → ⊥-elim (la m (proj₁ ce) (proj₁ y) cy)
   ; under = λ x y pl v le → un (proj₁ x) (proj₁ y) (row m (proj₁ x)) (row m (proj₁ y)) pl v le
   ; quiet = λ ce y cy → ⊥-elim (la m (proj₁ ce) (proj₁ y) cy)
+  ; pinned = λ x → ⊥-elim (ine-pin (proj₁ x))
   }
   where
     m = timelineAt c p

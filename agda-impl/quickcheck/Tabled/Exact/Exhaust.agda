@@ -158,11 +158,14 @@ module ExhaustX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A
     ... | refl = step (sound exo rm)
     outer-s {c , end} rm h with single⁻ h
     ... | refl = end-row (sound exo rm)
+    outer-s {k , Tb.pin r} rm h with single⁻ h
+    ... | refl = opin (sound exo rm)
 
     lane-s : ∀ {q₀ a l r q e} → (q₀ , a , l) ∈ ls → Run q₀ → r ∈ rows l → (q , e) ≡ laneRow r → JoinT q e
     lane-s {r = k , out b} m R rm refl = lane (out-of m) R (sound (exl m) rm) (λ ()) tt
     lane-s {r = k , skip}  m R rm refl = lane (out-of m) R (sound (exl m) rm) (λ ()) tt
     lane-s {r = c , end}   m R rm refl = lend-row (out-of m) R (sound (exl m) rm)
+    lane-s {r = k , Tb.pin _} m R rm refl = lane (out-of m) R (sound (exl m) rm) (λ ()) tt
 
     outer-end : ∀ {c b} → done c ≡ b → (c , (if b then end else skip)) ∈ outerRow {A} {B} done (c , end)
     outer-end refl = here refl
@@ -173,6 +176,7 @@ module ExhaustX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A
     lane-in : ∀ {k e} {rs : List (Row B)} → Tb.Work e → (k , e) ∈ rs → (k , e) ∈ mapL laneRow rs
     lane-in {e = out b} _ r = ∈-map⁺ laneRow r
     lane-in {e = skip}  _ r = ∈-map⁺ laneRow r
+    lane-in {e = Tb.pin _} _ r = ∈-map⁺ laneRow r
     lane-in {e = end}   () r
 
     -- A row of a lane that runs.
@@ -197,7 +201,8 @@ module ExhaustX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A
   complete-e (lane x R y _ w) = shown x R λ m → lane-in w (complete (exl m) y)
   complete-e (lend {c = c} x R y _ _ D) = shown x R λ m → lane-end {c} (→done c D) (complete (exl m) y)
   complete-e (lpass {c = c} x R y _ _ nD) = shown x R λ m → lane-end {c} (off (done→ c) nD) (complete (exl m) y)
-  complete-e (left _ _ _ () _)
+  complete-e (opin x)         = ∈-++⁺ˡ (cm⁺ (complete exo x) (here refl))
+  complete-e (left x R y _ _) = shown x R λ m → ∈-map⁺ laneRow (complete (exl m) y)
   complete-e (run () _)
   complete-e (rend () _ _)
   complete-e (rpass () _ _)

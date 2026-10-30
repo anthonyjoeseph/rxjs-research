@@ -24,7 +24,7 @@ open import Relation.Nullary.Decidable.Core using (T?)
 
 open import denotation.Events using (Pos; ix; _<ᵖ_; <ᵖ-trans; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-split; <ᵖ-part; <ᵖ-below)
 open import denotation.EmissionSet
-  using (Ev; EmissionSet; _≺_; _≼_; Few; Truncate; Den; hot; coldAt; enter; Lim; from)
+  using (Ev; EmissionSet; _≺_; _≼_; Few; Dep; Reach; Truncate; Den; hot; coldAt; enter; Lim; from)
 
 ------------------------------------------------------------------------
 -- The order on positions
@@ -82,18 +82,24 @@ open import denotation.EmissionSet
 ------------------------------------------------------------------------
 -- Few
 
--- Rows of `t′` are rows of `t`, so as few.
-few-via : ∀ {A B} {t : EmissionSet A} {t′ : EmissionSet B} {q} → (∀ {k e} → t′ k e → Σ (Ev A) (t k)) → Few t q → Few t′ q
-few-via back (ks , h) = ks , λ x lt → h (proj₂ (back x)) lt
+-- A row waiting on everything before it is reached by few.
+reach-few : ∀ {A} {t : EmissionSet A} {q e} → (∀ {k e′} → Dep q e k e′) → Reach t q e → Few t q
+reach-few all (ks , h) = ks , λ x lt → h x lt all
 
--- Fewer before an earlier position.
-few-down : ∀ {A} {t : EmissionSet A} {y w} → Few t y → w ≺ y → Few t w
-few-down {y = y} {w} (ks , h) wy = ks , λ {k} x kw → h x (≺-trans {k} {w} {y} kw wy)
+-- Rows of `t′` a row waits on are rows of `t` it waits on, so as few.
+reach-via : ∀ {A B} {t : EmissionSet A} {t′ : EmissionSet B} {q e e₀}
+          → (∀ {k e′} → t′ k e′ → k ≺ q → Dep q e k e′ → Σ (Ev A) λ e″ → t k e″ × Dep q e₀ k e″)
+          → Reach t q e₀ → Reach t′ q e
+reach-via back (ks , h) = ks , λ x lt d → h (proj₁ (proj₂ (back x lt d))) lt (proj₂ (proj₂ (back x lt d)))
 
--- A row read through `enter` has finitely many rows before it.
-entered-few : ∀ {A} (d : Den A) p {q e} → enter d p q e → Few (enter d p) q
-entered-few (hot t)  p (_ , F) = few-via (λ y → _ , proj₁ y) F
-entered-few (coldAt f) p (_ , F) = few-via (λ y → _ , proj₁ y) F
+-- A row read through `enter` has finitely many rows it waits on.
+entered-reach : ∀ {A} (d : Den A) p {q e} → enter d p q e → Reach (enter d p) q e
+entered-reach (hot t)  p (_ , F) = reach-via (λ y _ d → _ , proj₁ y , d) F
+entered-reach (coldAt f) p (_ , F) = reach-via (λ y _ d → _ , proj₁ y , d) F
+
+-- A row of no pin read through `enter` has finitely many rows before it.
+entered-few : ∀ {A} (d : Den A) p {q e} → (∀ {k e′} → Dep q e k e′) → enter d p q e → Few (enter d p) q
+entered-few d p all x = reach-few all (entered-reach d p x)
 
 -- INDUCTION ON THE ROWS BEFORE: a property that holds of a row once it
 -- holds of every row before it holds of every row with few before it.
@@ -126,9 +132,8 @@ AgreeTo-sym ⟨ a ⟩ = ⟨ (λ {y} {e} yq → proj₂ (a {y} {e} yq) , proj₁ 
 AgreeTo-trans : ∀ {A} {t u v : EmissionSet A} {q} → AgreeTo q t u → AgreeTo q u v → AgreeTo q t v
 AgreeTo-trans ⟨ a ⟩ ⟨ b ⟩ = ⟨ (λ {y} {e} yq → proj₁ (b {y} {e} yq) ∘ proj₁ (a {y} {e} yq) , proj₂ (a {y} {e} yq) ∘ proj₂ (b {y} {e} yq)) ⟩
 
--- Agreeing at and below `q`, rows before `q` are as few.
-few-agree : ∀ {A} {t t′ : EmissionSet A} {q} → AgreeTo q t t′ → Few t q → Few t′ q
-few-agree {q = q} a (ks , h) = ks , λ {k} {e′} x kq → h (proj₂ (upto a {k} {e′} (≺→≼ {k} {q} kq)) x) kq
+reach-agree : ∀ {A} {t t′ : EmissionSet A} {q e} → AgreeTo q t t′ → Reach t q e → Reach t′ q e
+reach-agree {q = q} a = reach-via λ {k} {e′} x kq d → e′ , proj₂ (upto a {k} {e′} (≺→≼ {k} {q} kq)) x , d
 
 ------------------------------------------------------------------------
 -- Observables
@@ -160,8 +165,8 @@ ag-down {q = q} {y} yq a = ⟨ (λ {v} vy → upto a {v} (≼-trans {v} {y} {q} 
 -- predecessors there too.
 trunc-to : ∀ {A} {t t′ : EmissionSet A} {q} → AgreeTo q t t′ → AgreeTo q (Truncate t) (Truncate t′)
 trunc-to {q = q} a = ⟨ (λ {y} yq →
-    (λ { (x , F) → proj₁ (upto a {y} yq) x , few-agree (ag-down {q = q} {y} yq a) F })
-  , (λ { (x , F) → proj₂ (upto a {y} yq) x , few-agree (AgreeTo-sym (ag-down {q = q} {y} yq a)) F })) ⟩
+    (λ { (x , F) → proj₁ (upto a {y} yq) x , reach-agree (ag-down {q = q} {y} yq a) F })
+  , (λ { (x , F) → proj₂ (upto a {y} yq) x , reach-agree (AgreeTo-sym (ag-down {q = q} {y} yq a)) F })) ⟩
 
 -- A cold agreeing at every subscription.
 ~-cold : ∀ {A q} {f f′ : Pos → EmissionSet A} → (∀ p → AgreeTo q (f p) (f′ p)) → coldAt f ~⟨ q ⟩ coldAt f′

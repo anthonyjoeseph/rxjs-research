@@ -49,14 +49,14 @@ trunc-plus : ∀ {A} {t : EmissionSet A} {p} {v : Ev A} → Since p t → Trunca
 trunc-plus {t = t} {p} {v} sp = to′ ⇄ from′
   where
     to′ : ∀ {k e} → Truncate (Plus t p v) k e → Plus (Truncate t) p v k e
-    to′ (old r , ks , f) = old (r , ks , λ y lt → f (old y) lt)
+    to′ (old r , ks , f) = old (r , ks , λ y lt d → f (old y) lt d)
     to′ (new   , _)      = new
     from′ : ∀ {k e} → Plus (Truncate t) p v k e → Truncate (Plus t p v) k e
     from′ (old (r , ks , f)) = old r , p ∷ ks , go
-      where go : ∀ {k′ e′} → Plus t p v k′ e′ → _ → k′ ∈ (p ∷ ks)
-            go (old y) lt = there (f y lt)
-            go new     _  = hd refl
-    from′ new = new , [] , λ { (old y) lt → ⊥-elim (sp y lt) ; new lt → ⊥-elim (≺-irrefl {p} lt) }
+      where go : ∀ {k′ e′} → Plus t p v k′ e′ → _ → _ → k′ ∈ (p ∷ ks)
+            go (old y) lt d = there (f y lt d)
+            go new     _  _ = hd refl
+    from′ new = new , [] , λ { (old y) lt _ → ⊥-elim (sp y lt) ; new lt _ → ⊥-elim (≺-irrefl {p} lt) }
 
 module Cp {R Γ A B} (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St Γ A) (pre post : List (St Γ B)) (c : Ctx R Γ B)
           (a : Att) (s₀ : St Γ B) (p : Pos)

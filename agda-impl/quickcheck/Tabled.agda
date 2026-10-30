@@ -17,7 +17,7 @@ open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty
 import denotation.Events as E
 open import denotation.Events using (Pos; Time; Timeline; timelineAt; _<ᵖ_; _≟ᵖ_; inside; ix; sub; last; root)
 open import denotation.Events using (start; ofᴱ)
-open import denotation.EmissionSet using (Ev; out; skip; end)
+open import denotation.EmissionSet using (Ev; out; skip; pin; end)
 open import Relation.Nullary using (does)
 open import quickcheck.Trace using (Event; val; _▸_; Trace; completed; silent; cut; depth; showTrace)
 open import quickcheck.Code using (Prog; toObs; timeline)
@@ -155,6 +155,7 @@ private
 mapRow : ∀ {A B} → (A → B) → Row A → Row B
 mapRow f (q , out a) = q , out (f a)
 mapRow f (q , skip)  = q , skip
+mapRow f (q , pin r) = q , pin r
 mapRow f (q , end)   = q , end
 
 mapRows : ∀ {A B} → (A → B) → Listed A → Listed B
@@ -162,7 +163,8 @@ mapRows f (rs ⊣ b) = mapL (mapRow f) rs ⊣ b
 
 -- `EmissionSet.Rejoin`, over a hot's rows.
 rejoinRow : ∀ {A} → Pos → Row A → List (Row A)
-rejoinRow p (q , end) = if p <ᵖ q then [ q ++ [ sub p ] , end ] else [ p ++ [ last ] , end ]
+rejoinRow p (q , end)   = if p <ᵖ q then [ q ++ [ sub p ] , end ] else [ p ++ [ last ] , end ]
+rejoinRow p (q , pin _) = when (p <ᵖ q) (q ++ [ sub p ] , skip)
 rejoinRow p (q , e)   = when (p <ᵖ q) (q ++ [ sub p ] , e)
 
 rejoin : ∀ {A} → Pos → Listed A → Listed A
@@ -177,6 +179,7 @@ hotOf (rs ⊣ b) = proper rs ⊣ b
 outerRow : ∀ {A B : Set} → (Pos → Bool) → Row A → List (Row B)
 outerRow d (q , out _) = [ q ++ [ ix 0 ] , skip ]
 outerRow d (q , skip)  = [ q , skip ]
+outerRow d (q , pin r) = [ q , pin r ]
 outerRow d (c , end)   = [ c , (if d c then end else skip) ]
 
 -- `EmissionSet.After`: the rows past `s`.
@@ -242,14 +245,15 @@ module ScanL {A B : Set} (f : B → A → B) (z : B) (o : Listed A) where
   others : Row A → List (Row B)
   others (q , out _) = []
   others (q , skip)  = [ q , skip ]
+  others (q , pin r) = [ q , pin r ]
   others (q , end)   = [ q , end ]
 
   scanRows : Listed B
   scanRows = (concatMap folds table ++ concatMap others (rows o)) ⊣ short o
 open ScanL public using (scanRows)
 
--- `EmissionSet.TakeWhile.TakeT`, subscribed at `p`.
-module TakeL {A : Set} (incl : Bool) (keep : A → Bool) (p : Pos) (o : Listed A) where
+-- `EmissionSet.TakeWhile.TakeT`.
+module TakeL {A : Set} (incl : Bool) (keep : A → Bool) (o : Listed A) where
   failed : Pos → Bool
   failed k = anyᵇ (λ { (q , a) → not (keep a) ∧ (q <ᵖ k) }) (values (rows o))
 
@@ -258,7 +262,8 @@ module TakeL {A : Set} (incl : Bool) (keep : A → Bool) (p : Pos) (o : Listed A
   kept r           = [ r ]
 
   takeRow : Row A → List (Row A)
-  takeRow (q , e) = if failed q then when (inside p q) (q , skip) else kept (q , e)
+  takeRow (q , pin r) = when (not (failed r) ∧ inside r q) (q , pin r)
+  takeRow (q , e)     = if failed q then [] else kept (q , e)
 
   takeRows : Listed A
   takeRows = concatMap takeRow (rows o) ⊣ short o
@@ -283,7 +288,8 @@ module SwitchL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) whe
   live r         = r
 
   laneRow : Pos → Row B → List (Row B)
-  laneRow q (k , e) = if cutᵇ q k then when (inside (q ++ [ ix 1 ]) k) (k , skip) else [ live (k , e) ]
+  laneRow q (k , pin r) = if cutᵇ q k then when (not (cutᵇ q r) ∧ inside r k) (k , pin r) else [ k , pin r ]
+  laneRow q (k , e)     = if cutᵇ q k then [] else [ live (k , e) ]
 
   switchRows : Listed B
   switchRows = (concatMap (outerRow done) (rows o) ++ concatMap (λ { (q , _ , l) → concatMap (laneRow q) (rows l) }) ls)
@@ -414,14 +420,21 @@ module BoundedL {A B : Set} (n : ℕ) (lane : A → Pos → Maybe (Listed B)) (o
   listB = bind (levels (length vals) 0 [] (nths 0)) λ gs → just (boundedRows gs)
 
 -- `EmissionSet.Connect.ConnT`.
-module ConnL {A B : Set} (r : Pos) (σ : Listed A) (β : Listed B) where
+module ConnL {A B : Set} (p : Pos) (σ : Listed A) (β : Listed B) where
+  r : Pos
+  r = p ++ [ ix 1 ]
+
   alive : Pos → Bool
   alive q = allᵇ (λ { (c , e) → not (isEnd e) ∨ (q <ᵖ c) }) (rows β)
 
+  -- Unsubscribed, a source row shows only while the body runs, a pin
+  -- only whose connect it subscribed while the body ran.
+  unsub : Row A → List (Row B)
+  unsub (k , pin p′) = when (alive p′ ∧ inside p′ k) (k ++ [ ix 0 ] , pin p′)
+  unsub (k , _)      = when (alive k) (k ++ [ ix 0 ] , skip)
+
   shown : Row A → List (Row B)
-  shown (k , _) =
-    if alive k then [ k ++ [ ix 0 ] , skip ]
-    else when (inside r k) (k , skip)
+  shown (k , e) = if inside r k then [ k ++ [ ix 0 ] , pin p ] else unsub (k , e)
 
   connRows : Listed B
   connRows = (rows β ++ concatMap shown (rows σ)) ⊣ (short σ ∨ short β)
@@ -437,7 +450,7 @@ listT n       empty             ρ p = just ([ p ++ [ last ] , end ] ⊣ false)
 listT n       (of xs)           ρ p = just (walk fuel (ofᴱ p 0 xs))
 listT n       (map f s)         ρ p = bind (listT n s ρ p) λ l → just (mapRows f l)
 listT n       (scan f z s)      ρ p = bind (listT n s ρ p) λ l → just (scanRows f z l)
-listT n       (takeWhile i q s) ρ p = bind (listT n s ρ p) λ l → just (takeRows i q p l)
+listT n       (takeWhile i q s) ρ p = bind (listT n s ρ p) λ l → just (takeRows i q l)
 listT n       (flatMap (mergeᶠ nothing) f s) ρ p =
   bind (listT n s ρ p) λ o → bind (lanes (afterL (λ a → listT n (f a) ρ)) (values (rows o))) λ ls → just (mergeRows o ls)
 listT n       (flatMap (mergeᶠ (just k)) f s) ρ p =
@@ -449,7 +462,7 @@ listT n       (flatMap exhaustᶠ f s) ρ p =
 listT n       (connect s b)     ρ p =
   bind (listT n s ρ (p ++ [ ix 1 ])) λ σ →
   bind (listT n b (hotOf σ ∷ ρ) (p ++ [ ix 0 ])) λ β →
-  just (connRows (p ++ [ ix 1 ]) σ β)
+  just (connRows p σ β)
 listT n       (connected i)     ρ p = just (rejoin p (lookup ρ i))
 listT zero    (defer l)         ρ p = just ([] ⊣ true)
 listT (suc n) (defer l)         ρ p =

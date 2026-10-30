@@ -28,7 +28,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (ofᴱ)
 open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-asym; <ᵖ-split; <ᵖ-step; <ᵖ-shift; <ᵖ-below; <ᵖ-part; <ᵖ-ix)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; Truncate; InE; at-out; at-end; on-out; MapT; map-out; map-skip; map-end; DenEnv)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; _≺_; _≼_; Truncate; InE; at-out; at-end; on-out; MapT; map-out; map-skip; map-pin; map-end; DenEnv)
 open import denotation.Laws.Modulus using (≼-refl)
 open import denotation.Laws.Worlds using (InvAt; Hots; W; inW; plain-ix; apart-w) renaming (⊑-refl to ⊑ᵖ-refl)
 open import operation.Key using (Key; at; after; _<ᴷ_; ≮ᴷ-trans; <ᴷ-trans; <ᴷ-irrefl; at-<ᵖ; clash)
@@ -572,14 +572,15 @@ kept (just (g , K , o)) b = b
 mapped : ∀ {R A B} (f : A → B) {t : EmissionSet A} (y : Maybe (Cand R A)) → OK t y → OK (MapT f t) (retag (mapT f) y)
 mapped f nothing e (map-out r) = e r
 mapped f nothing e (map-skip r) = e r
+mapped f nothing e (map-pin r) = e r
 mapped f nothing e (map-end r) = e r
 mapped f (just (g , K , still)) b =
-  record { from = λ { (map-out r) → from b r ; (map-skip r) → from b r ; (map-end r) → from b r } ; mark = mark b ; shown = λ () }
+  record { from = λ { (map-out r) → from b r ; (map-skip r) → from b r ; (map-pin r) → from b r ; (map-end r) → from b r } ; mark = mark b ; shown = λ () }
 mapped f (just (g , K , shows (nx a))) b =
-  record { from = λ { (map-out r) → from b r ; (map-skip r) → from b r ; (map-end r) → from b r } ; mark = mark b
+  record { from = λ { (map-out r) → from b r ; (map-skip r) → from b r ; (map-pin r) → from b r ; (map-end r) → from b r } ; mark = mark b
          ; shown = λ { refl → let (q , k , r) = shown b refl in q , k , map-out r } }
 mapped f (just (g , K , shows cp)) b =
-  record { from = λ { (map-out r) → from b r ; (map-skip r) → from b r ; (map-end r) → from b r } ; mark = mark b
+  record { from = λ { (map-out r) → from b r ; (map-skip r) → from b r ; (map-pin r) → from b r ; (map-end r) → from b r } ; mark = mark b
          ; shown = λ { refl → let (q , k , r) = shown b refl in q , k , map-end r } }
 
 ------------------------------------------------------------------------
@@ -627,12 +628,13 @@ module Race {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (L
   rows-from : ∀ K → From K O → Each (From K) Ls → From K JoinT
   rows-from K fo fl (val r)          = ⊑-trans (fo r) (ext-⊑ _ [ ix 0 ])
   rows-from K fo fl (step r)         = fo r
+  rows-from K fo fl (opin r)         = fo r
   rows-from K fo fl (oend r _)       = fo r
   rows-from K fo fl (opass r _)      = fo r
   rows-from K fo fl (lane r _ (reads _ s) _ _) = ⊑-trans (fo r) (⊑-trans (ext-⊑ _ [ ix 1 ]) (≺→⊑ s))
   rows-from K fo fl (lend r _ (reads _ s) _ _ _) = ⊑-trans (fo r) (⊑-trans (ext-⊑ _ [ ix 1 ]) (≺→⊑ s))
   rows-from K fo fl (lpass r _ (reads _ s) _ _ _) = ⊑-trans (fo r) (⊑-trans (ext-⊑ _ [ ix 1 ]) (≺→⊑ s))
-  rows-from K fo fl (left _ _ _ () _)
+  rows-from K fo fl (left r _ (reads _ s) _ _) = ⊑-trans (fo r) (⊑-trans (ext-⊑ _ [ ix 1 ]) (≺→⊑ s))
   rows-from K fo fl (run x _)        = from-any Ls fl x
   rows-from K fo fl (rend x _ _)     = from-any Ls fl x
   rows-from K fo fl (rpass x _ _)    = from-any Ls fl x
@@ -645,6 +647,9 @@ module Race {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (L
   past-val v fo fl (step r)         = past-⊑ (fo r) λ { refl → skip≢ (sO v r) }
     where skip≢ : ∀ {a} → out a ≡ skip → ⊥
           skip≢ ()
+  past-val v fo fl (opin r)         = past-⊑ (fo r) λ { refl → pin≢ (sO v r) }
+    where pin≢ : ∀ {a r′} → out a ≡ pin r′ → ⊥
+          pin≢ ()
   past-val v fo fl (oend r _)       = past-⊑ (fo r) λ { refl → end≢ (sO v r) }
     where end≢ : ∀ {a} → out a ≡ end → ⊥
           end≢ ()
@@ -654,7 +659,7 @@ module Race {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (L
   past-val v fo fl (lane r _ (reads _ s) _ _) = ⊑-trans (shift-≮ _ (at _) (fo r)) (⊑-trans (ix01 _) (≺→⊑ s))
   past-val v fo fl (lend r _ (reads _ s) _ _ _) = ⊑-trans (shift-≮ _ (at _) (fo r)) (⊑-trans (ix01 _) (≺→⊑ s))
   past-val v fo fl (lpass r _ (reads _ s) _ _ _) = ⊑-trans (shift-≮ _ (at _) (fo r)) (⊑-trans (ix01 _) (≺→⊑ s))
-  past-val v fo fl (left _ _ _ () _)
+  past-val v fo fl (left r _ (reads _ s) _ _) = ⊑-trans (shift-≮ _ (at _) (fo r)) (⊑-trans (ix01 _) (≺→⊑ s))
   past-val v fo fl (run x _)        = from-any Ls fl x
   past-val v fo fl (rend x _ _)     = from-any Ls fl x
   past-val v fo fl (rpass x _ _)    = from-any Ls fl x
@@ -672,12 +677,13 @@ module Race {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (L
   empty-flat : Empty O → Each Empty Ls → Empty JoinT
   empty-flat eo el (val r)       = eo r
   empty-flat eo el (step r)      = eo r
+  empty-flat eo el (opin r)      = eo r
   empty-flat eo el (oend r _)    = eo r
   empty-flat eo el (opass r _)   = eo r
   empty-flat eo el (lane r _ _ _ _)  = eo r
   empty-flat eo el (lend r _ _ _ _ _)  = eo r
   empty-flat eo el (lpass r _ _ _ _ _) = eo r
-  empty-flat eo el (left _ _ _ () _)
+  empty-flat eo el (left r _ _ _ _) = eo r
   empty-flat eo el (run x _)    = empty-any Ls el x
   empty-flat eo el (rend x _ _)  = empty-any Ls el x
   empty-flat eo el (rpass x _ _)  = empty-any Ls el x

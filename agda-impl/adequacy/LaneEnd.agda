@@ -106,12 +106,13 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {p : Pos} {O : EmissionSe
     fwd′ : ∀ {k e} → X k e → Y′ k e ⊎ Skip p k e
     fwd′ (Flat.val r)    = inj₁ (y→ (Flat.val r))
     fwd′ (Flat.step r)   = inj₁ (y→ (Flat.step r))
+    fwd′ (Flat.opin r)   = inj₁ (y→ (Flat.opin r))
     fwd′ (Flat.oend {c} r d)   = inj₁ (y→ (Flat.oend r (done-xy c (so r) d)))
     fwd′ (Flat.opass {c} r nd) = inj₁ (y→ (Flat.opass r λ d → nd (done-yx c (so r) d)))
     fwd′ (Flat.lane r ru l nc w) = inj₁ (y→ (Flat.lane r ru l nc w))
     fwd′ (Flat.lend {q} {a} {c} r ru l nc nh dn)   = inj₁ (y→ (Flat.lend r ru l nc nh (done-xy c (lane-since L {d = d} {O = O} {q = q} {a = a} so r l) dn)))
     fwd′ (Flat.lpass {q} {a} {c} r ru l nc nh nd) = inj₁ (y→ (Flat.lpass r ru l nc nh λ dn → nd (done-yx c (lane-since L {d = d} {O = O} {q = q} {a = a} so r l) dn)))
-    fwd′ (Flat.left _ _ _ () _)
+    fwd′ (Flat.left r ru l nc i) = inj₁ (y→ (Flat.left r ru l nc i))
     fwd′ (Flat.hand _ _ _ _ ())
     fwd′ (Flat.rhand _ ())
     fwd′ (Flat.run x w) with lanes-xy x
@@ -127,12 +128,13 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {p : Pos} {O : EmissionSe
     back : ∀ {k e} → Y k e → X k e
     back (Flat.val r)    = Flat.val r
     back (Flat.step r)   = Flat.step r
+    back (Flat.opin r)   = Flat.opin r
     back (Flat.oend {c} r d)   = Flat.oend r (done-yx c (so r) d)
     back (Flat.opass {c} r nd) = Flat.opass r λ d → nd (done-xy c (so r) d)
     back (Flat.lane r ru l nc w) = Flat.lane r ru l nc w
     back (Flat.lend {q} {a} {c} r ru l nc nh dn)   = Flat.lend r ru l nc nh (done-yx c (lane-since L {d = d} {O = O} {q = q} {a = a} so r l) dn)
     back (Flat.lpass {q} {a} {c} r ru l nc nh nd) = Flat.lpass r ru l nc nh λ dn → nd (done-xy c (lane-since L {d = d} {O = O} {q = q} {a = a} so r l) dn)
-    back (Flat.left _ _ _ () _)
+    back (Flat.left r ru l nc i) = Flat.left r ru l nc i
     back (Flat.hand _ _ _ _ ())
     back (Flat.rhand _ ())
     back (Flat.run x w)  = Flat.run (lanes-yx x) w

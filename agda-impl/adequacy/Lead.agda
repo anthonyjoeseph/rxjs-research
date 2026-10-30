@@ -22,7 +22,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-split)
-open import denotation.EmissionSet using (EmissionSet; DenEnv; Ev; Truncate; out; skip; end; _≺_; MapT; map-out; map-skip; map-end; at-out; at-end)
+open import denotation.EmissionSet using (EmissionSet; DenEnv; Ev; Truncate; out; skip; pin; end; _≺_; MapT; map-out; map-skip; map-pin; map-end; at-out; at-end)
 open import operation.Key using (Key; at; _<ᴷ_; ≮ᴷ-trans; at-<ᵖ; clash)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Cand; found; Mark; ofM; attM; Att; Out; still; shows; nx; cp; seek; search; kids; lanes; own; ownBest; first; retag;
@@ -60,6 +60,7 @@ open Bd
 Fits : ∀ {A} → Out A → Ev A → Set
 Fits o (out a) = o ≡ shows (nx a)
 Fits o skip    = ⊤
+Fits o (pin _) = ⊤
 Fits o end     = ⊤
 
 -- Some row at `Q`, short of saying which.
@@ -197,7 +198,7 @@ leads-trunc true  {t = t} (just (found (_ , _ , c′ , s′) m κ , K , o)) b (e
   where
     tr : ∀ {P} → Tight t P K o → Tight (Truncate t) P K o
     tr (strict lt)        = strict lt
-    tr (tie Q refl pq oc) = tie Q refl pq (occ-bind oc λ r fe → hit (r , ([] , λ {k} y lt → ⊥-elim (⊑→≼ {Q} {k} (Bd.from b y) lt))) fe)
+    tr (tie Q refl pq oc) = tie Q refl pq (occ-bind oc λ r fe → hit (r , ([] , λ {k} y lt _ → ⊥-elim (⊑→≼ {Q} {k} (Bd.from b y) lt))) fe)
 
 ------------------------------------------------------------------------
 -- One frame
@@ -210,6 +211,7 @@ map-leads {A = A} v f {t = t} (just (found (_ , _ , c′ , s′) m κ , K , stil
     mv : ∀ {Q e} → t Q e → Fits {A} still e → Occ (MapT f t) Q still
     mv {e = out _} r ()
     mv {e = skip}  r _ = hit (map-skip r) tt
+    mv {e = pin _} r _ = hit (map-pin r) tt
     mv {e = end}   r _ = hit (map-end r) tt
 map-leads {A = A} v f {t = t} (just (found (_ , _ , c′ , s′) m κ , K , shows (nx a))) (e , l) =
   eMap e , relive v (tight-occ (λ oc → occ-bind oc mv)) l
@@ -217,6 +219,7 @@ map-leads {A = A} v f {t = t} (just (found (_ , _ , c′ , s′) m κ , K , show
     mv : ∀ {Q e} → t Q e → Fits (shows (nx a)) e → Occ (MapT f t) Q (shows (nx (f a)))
     mv {e = out _} r refl = hit (map-out r) refl
     mv {e = skip}  r _    = hit (map-skip r) tt
+    mv {e = pin _} r _    = hit (map-pin r) tt
     mv {e = end}   r _    = hit (map-end r) tt
 map-leads {A = A} v f {t = t} (just (found (_ , _ , c′ , s′) m κ , K , shows cp)) (e , l) =
   eMap e , relive v (tight-occ (λ oc → occ-bind oc mv)) l
@@ -224,6 +227,7 @@ map-leads {A = A} v f {t = t} (just (found (_ , _ , c′ , s′) m κ , K , show
     mv : ∀ {Q e} → t Q e → Fits {A} (shows cp) e → Occ (MapT f t) Q (shows cp)
     mv {e = out _} r ()
     mv {e = skip}  r _ = hit (map-skip r) tt
+    mv {e = pin _} r _ = hit (map-pin r) tt
     mv {e = end}   r _ = hit (map-end r) tt
 
 cut-on : ∀ {R Γ A} v {a} {c : Ctx R Γ A} {t} (y : Maybe (Cand R A)) → Leads (v Data.Bool.∧ true) (inCut true a c) t y → Leads v c t (retag (cutT true) y)
@@ -326,6 +330,7 @@ module Race {R Γ A B} (v : Bool) (c : Ctx R Γ B) (f : A → Obs Timeline Γ B)
       go : ∀ {Q e} → Lanes (rowsL ρ ls) Q e → Fits o′ e → Occ FR Q o″
       go {e = out b} x fe = hit (Flat.run x tt) (fo fe)
       go {e = skip}  x _  = hit (Flat.run x tt) tt
+      go {e = pin _} x _  = hit (Flat.run x tt) tt
       go {e = end}   x _  = occ λ k → k (Flat.rpass x (λ ()) λ dn → k (Flat.rend x (λ ()) dn) tt) tt
 
   outer-still : ∀ {Q} → Occ (rows ρ o) Q still → Occ FR Q still
@@ -334,6 +339,7 @@ module Race {R Γ A B} (v : Bool) (c : Ctx R Γ B) (f : A → Obs Timeline Γ B)
       go : ∀ {Q e} → rows ρ o Q e → Fits still e → Occ FR Q still
       go {e = out _} r ()
       go {e = skip}  r _ = hit (Flat.step r) tt
+      go {e = pin _} r _ = hit (Flat.opin r) tt
       go {e = end}   r _ = occ λ k → k (Flat.opass r λ dn → k (Flat.oend r dn) tt) tt
 
   lane-tight : ∀ {P k} (o′ : Out B) → Tight (Lanes (rowsL ρ ls)) P k o′ → Tight FR P (proj₁ (laneT {A = A} d n [] k o′)) (proj₂ (laneT {A = A} d n [] k o′))

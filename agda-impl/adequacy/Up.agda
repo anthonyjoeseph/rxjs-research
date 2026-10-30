@@ -14,7 +14,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos)
-open import denotation.EmissionSet using (EmissionSet; Truncate; Few; MapT; map-out; map-skip; map-end; DenEnv; module Connecting)
+open import denotation.EmissionSet using (EmissionSet; Truncate; Reach; MapT; map-out; map-skip; map-pin; map-end; DenEnv; module Connecting)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; St; CS; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (up; env; rows; Hot; pendRows; Vis; Plus; old; new; rowsL; Gone; Lanes; Each; module Flat; _≃_; _⇄_; ≃-sym)
@@ -100,12 +100,13 @@ flat : ∀ {A B : Set} (L : A → Pos → EmissionSet B) {O O′ : EmissionSet A
      → ∀ {q e} → Flat.JoinT L O d Ls q e → Flat.JoinT L O′ d Ls′ q e
 flat L eo es (Flat.val r)              = Flat.val (to eo r)
 flat L eo es (Flat.step r)             = Flat.step (to eo r)
+flat L eo es (Flat.opin r)             = Flat.opin (to eo r)
 flat L eo es (Flat.oend r d)           = Flat.oend (to eo r) (done L eo es d)
 flat L eo es (Flat.opass r nd)         = Flat.opass (to eo r) λ d → nd (done L (≃-sym eo) (≈ᴸ-sym es) d)
 flat L eo es (Flat.lane r ru l nc w)   = Flat.lane (to eo r) ru l nc w
 flat L eo es (Flat.lend r ru l nc nh d)   = Flat.lend (to eo r) ru l nc nh (done L eo es d)
 flat L eo es (Flat.lpass r ru l nc nh nd) = Flat.lpass (to eo r) ru l nc nh λ d → nd (done L (≃-sym eo) (≈ᴸ-sym es) d)
-flat L eo es (Flat.left _ _ _ () _)
+flat L eo es (Flat.left r ru l nc i)    = Flat.left (to eo r) ru l nc i
 flat L eo es (Flat.hand _ _ _ _ ())
 flat L eo es (Flat.rhand _ ())
 flat L eo es (Flat.run x w)            = Flat.run (any-≈ es x) w
@@ -117,11 +118,11 @@ flat-≃ : ∀ {A B : Set} (L : A → Pos → EmissionSet B) {O O′ : EmissionS
 flat-≃ L eo es = flat L eo es ⇄ flat L (≃-sym eo) (≈ᴸ-sym es)
 
 -- Fewer rows: no more before any position.
-few-⊆ : ∀ {A} {t u : EmissionSet A} → (∀ {k e} → u k e → t k e) → ∀ {q} → Few t q → Few u q
-few-⊆ h (ks , f) = ks , λ x lt → f (h x) lt
+reach-⊆ : ∀ {A} {t u : EmissionSet A} → (∀ {k e} → u k e → t k e) → ∀ {q e} → Reach t q e → Reach u q e
+reach-⊆ h (ks , f) = ks , λ x lt d → f (h x) lt d
 
 trunc-≃ : ∀ {A} {t u : EmissionSet A} → t ≃ u → Truncate t ≃ Truncate u
-trunc-≃ eq = (λ (r , fw) → to eq r , few-⊆ (from eq) fw) ⇄ (λ (r , fw) → from eq r , few-⊆ (to eq) fw)
+trunc-≃ eq = (λ (r , fw) → to eq r , reach-⊆ (from eq) fw) ⇄ (λ (r , fw) → from eq r , reach-⊆ (to eq) fw)
 
 -- The same outer and the same lanes: the same merge, as entered.
 row-≃ : ∀ {A B : Set} (L : A → Pos → EmissionSet B) {O O′ : EmissionSet A} {d} {Ls Ls′ : List (EmissionSet B)} → O ≃ O′ → Ls ≈ᴸ Ls′
@@ -134,6 +135,7 @@ map-≃ f eq = go (to eq) ⇄ go (from eq)
     go : ∀ {t u} → (∀ {q e} → t q e → u q e) → ∀ {q e} → MapT f t q e → MapT f u q e
     go h (map-out r)  = map-out (h r)
     go h (map-skip r) = map-skip (h r)
+    go h (map-pin r)  = map-pin (h r)
     go h (map-end r)  = map-end (h r)
 
 -- The same source and the same body: the same connect.
@@ -142,8 +144,9 @@ conn-≃ {A} {B} r es eb = go es eb ⇄ go (≃-sym es) (≃-sym eb)
   where
     go : ∀ {σ σ′ : EmissionSet A} {β β′ : EmissionSet B} → σ ≃ σ′ → β ≃ β′ → ∀ {q e} → Connecting.ConnT r σ β q e → Connecting.ConnT r σ′ β′ q e
     go es eb (Connecting.body x)           = Connecting.body (to eb x)
-    go es eb (Connecting.shown x al)       = Connecting.shown (to es x) λ y → al (from eb y)
-    go es eb (Connecting.pinned x nal ins) = Connecting.pinned (to es x) (λ al → nal λ y → al (to eb y)) ins
+    go es eb (Connecting.burst x i)        = Connecting.burst (to es x) i
+    go es eb (Connecting.echo x al u ni)   = Connecting.echo (to es x) (λ y → al (from eb y)) u ni
+    go es eb (Connecting.kept x al ni i)   = Connecting.kept (to es x) (λ y → al (from eb y)) ni i
 
 -- A BINDER'S MEANING, UP TO THE SAME ROWS: a body reads its binder only
 -- through the rows it holds, so the same rows bound give the same body.

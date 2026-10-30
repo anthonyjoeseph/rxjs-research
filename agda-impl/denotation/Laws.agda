@@ -36,9 +36,9 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.Nat.Properties using (n≤1+n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂) renaming (map to ⊎-map)
 open import Function using (_∘_)
-open import Relation.Binary.PropositionalEquality using (refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 open import Relation.Nullary using (¬_; Dec; yes; no)
 open import Relation.Nullary.Decidable.Core using (¬¬-excluded-middle)
 
@@ -46,17 +46,17 @@ open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhil
   defer)
 open import denotation.Events using (Timeline; Pos; ix; sub; last; inside)
 open import denotation.EmissionSet
-  using (Ev; out; skip; end; EmissionSet; _≺_; _≼_; Few; Truncate; Rejoin; shown; ended; late; guard;
-  body; Den; hot; enter; DenEnv; approx; ⟦_⟧; MapT; map-out; map-skip; map-end; module Op)
+  using (Ev; out; skip; end; pin; EmissionSet; _≺_; _≼_; Few; Reach; Dep; Truncate; Rejoin; shown; heard; ended; late; guard;
+  body; Den; hot; enter; DenEnv; approx; ⟦_⟧; MapT; map-out; map-skip; map-pin; map-end; module Op)
 import denotation.EmissionSet as ES
 open import denotation.Laws.Modulus
-  using (few-ind; entered-few; ≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext; few-via;
+  using (few-ind; entered-few; ≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext; reach-via;
   AgreeTo; ⟨_⟩; upto; AgreeTo-sym; trunc-to; ~-cold; Same; LimD; _~⟨_⟩_; ~-refl)
 open import denotation.Laws.Count
-  using (Cnt; AgC; trunc-ag; cnt-up; cnt-down; Img; em; seen; seen-under; _≈ᶜ⟨_∣_⟩_; ≈ᶜ-refl; ≈ᶜ-sym; ≈ᶜ-trans; ≈ᶜ-mono; agree-all; limit; Aft; contract; unfold₀)
+  using (Cnt; DCnt; AgC; agc; ag-cnt; dcnt-pin; dcnt-pin-up; dcnt-cnt; pinned-after; trunc-ag; cnt-up; cnt-down; Img; em; seen; seen-under; _≈ᶜ⟨_∣_⟩_; ≈ᶜ-refl; ≈ᶜ-sym; ≈ᶜ-trans; ≈ᶜ-mono; agree-all; limit; Aft; contract; unfold₀)
 open import denotation.Laws.Join using (over; flatMap-causal; flatMap-ne)
-open import denotation.Laws.Worlds using (Ok; Lawful; InvAt; in-world; InvD; Hots; GoodEnv; world-after; ok-step; inv-widen; empty-inv;
-  of-inv; spin-inv; map-inv; scan-inv; defer-inv; lim-inv)
+open import denotation.Laws.Worlds using (Ok; Lawful; InvAt; InvD; Hots; GoodEnv; world-after; ok-step; ⊑-≼; inside-⊑; inv-widen)
+open import denotation.Laws.Worlds.Leaves using (empty-inv; of-inv; spin-inv; map-inv; scan-inv; defer-inv; lim-inv)
 open import denotation.Laws.Connect using (connect-inv)
 open import denotation.Laws.TakeInv using (takeWhile-inv)
 open import denotation.Laws.HotInv using (lawful-hot)
@@ -106,17 +106,24 @@ private
       go : ∀ {u u′ : EmissionSet A} {y} → (∀ {e} → u y e → u′ y e) → ∀ {e} → MapT f u y e → MapT f u′ y e
       go h (map-out x)  = map-out (h x)
       go h (map-skip x) = map-skip (h x)
+      go h (map-pin x)  = map-pin (h x)
       go h (map-end x)  = map-end (h x)
 
   map-up : ∀ {A B} (f : A → B) {t : EmissionSet A} {y e} → t y e → Σ (Ev B) (MapT f t y)
   map-up f {e = out a} x = _ , map-out x
   map-up f {e = skip}  x = _ , map-skip x
+  map-up f {e = pin _} x = _ , map-pin x
   map-up f {e = end}   x = _ , map-end x
 
 map-ne : ∀ {A B R k} (f : A → B) {s s′ : Den A} → s ≈ᶜ⟨ R ∣ k ⟩ s′ → Op.map f s ≈ᶜ⟨ R ∣ k ⟩ Op.map f s′
-map-ne f ag p r = trunc-ag λ
-  { q (inj₁ c) → map-ag f (ag p r q (inj₁ (cnt-up c λ x yq → seen (proj₂ (map-up f x)) yq)))
-  ; q (inj₂ c) → map-ag f (ag p r q (inj₂ (cnt-up c λ x yq → seen (proj₂ (map-up f x)) yq))) }
+map-ne f ag p rp = trunc-ag (agc
+  (λ { q (inj₁ c) → map-ag f (ag-cnt (ag p rp) q (inj₁ (cnt-up c λ x yq → seen (proj₂ (map-up f x)) yq)))
+     ; q (inj₂ c) → map-ag f (ag-cnt (ag p rp) q (inj₂ (cnt-up c λ x yq → seen (proj₂ (map-up f x)) yq))) })
+  λ q r i c → let b = ag p rp q (pin r) (pin-in i c) in (λ { (map-pin x) → map-pin (proj₁ b x) }) , (λ { (map-pin x) → map-pin (proj₂ b x) }))
+  where
+    pin-in : ∀ {t t′ : EmissionSet _} {q r} → T (inside r q) → DCnt _ (MapT f t) q (pin r) ⊎ DCnt _ (MapT f t′) q (pin r) → DCnt _ t q (pin r) ⊎ DCnt _ t′ q (pin r)
+    pin-in i (inj₁ d) = inj₁ (dcnt-pin-up i d (λ x kr → seen (proj₂ (map-up f x)) kr) (λ x _ → map-pin x))
+    pin-in i (inj₂ d) = inj₂ (dcnt-pin-up i d (λ x kr → seen (proj₂ (map-up f x)) kr) (λ x _ → map-pin x))
 
 map-causal : ∀ {A B q} (f : A → B) {s s′ : Den A} → s ~⟨ q ⟩ s′ → Op.map f s ~⟨ q ⟩ Op.map f s′
 map-causal f a = ~-cold λ p → map-ag f (a p)
@@ -125,7 +132,7 @@ map-causal f a = ~-cold λ p → map-ag f (a p)
 -- it lies past it.
 private
   module SC {A B : Set} (f : B → A → B) (z : B) {Q : Pos} where
-    open ES.Scan using (Acc; acc₀; acc; ScanT; sval; sstep; send)
+    open ES.Scan using (Acc; acc₀; acc; ScanT; sval; sstep; spin; send)
 
     acc-to : ∀ {t t′ : EmissionSet A} → AgreeTo Q t t′ → ∀ {q b} → q ≼ Q → Acc f z t q b → Acc f z t′ q b
     acc-to a {q} qQ (acc₀ x mn) =
@@ -138,15 +145,16 @@ private
     scan-to : ∀ {t t′ : EmissionSet A} → AgreeTo Q t t′ → ∀ {y e} → y ≼ Q → ScanT f z t y e → ScanT f z t′ y e
     scan-to a {y} yQ (sval ac) = sval (acc-to a yQ ac)
     scan-to a {y} yQ (sstep x) = sstep (proj₁ (upto a {y} yQ) x)
+    scan-to a {y} yQ (spin x)  = spin (proj₁ (upto a {y} yQ) x)
     scan-to a {y} yQ (send x)  = send (proj₁ (upto a {y} yQ) x)
 
-  module TW {A : Set} (incl : Bool) (keep : A → Bool) (p : Pos) {Q : Pos} where
+  module TW {A : Set} (incl : Bool) (keep : A → Bool) {Q : Pos} where
     open ES.TakeWhile using (TakeT; Failed; pass; fail; stop; step; tend; left)
 
-    fail-to : ∀ {t t′ : EmissionSet A} {q} → AgreeTo Q t t′ → q ≼ Q → Failed incl keep t p q → Failed incl keep t′ p q
+    fail-to : ∀ {t t′ : EmissionSet A} {q} → AgreeTo Q t t′ → q ≼ Q → Failed incl keep t q → Failed incl keep t′ q
     fail-to {q = q} a qQ (q′ , b , x , nk , lt) = q′ , b , proj₁ (upto a {q′} (≺→≼ {q′} {Q} (≺-≼-≺ {q′} {q} {Q} lt qQ))) x , nk , lt
 
-    take-to : ∀ {t t′ : EmissionSet A} → AgreeTo Q t t′ → ∀ {y e} → y ≼ Q → TakeT incl keep t p y e → TakeT incl keep t′ p y e
+    take-to : ∀ {t t′ : EmissionSet A} → AgreeTo Q t t′ → ∀ {y e} → y ≼ Q → TakeT incl keep t y e → TakeT incl keep t′ y e
     take-to a {y} yQ (pass x k nf)      = pass (proj₁ (upto a {y} yQ) x) k (λ g → nf (fail-to (AgreeTo-sym a) yQ g))
     take-to a     yQ (fail {q} x k nf i) = fail (proj₁ (upto a {q} qQ) x) k (λ g → nf (fail-to (AgreeTo-sym a) qQ g)) i
       where qQ = ≺→≼ {q} {Q} (≺-≼-≺ {q} {q ++ [ ix 0 ]} {Q} (≺-ext q []) yQ)
@@ -154,7 +162,8 @@ private
       where qQ = ≺→≼ {q} {Q} (≺-≼-≺ {q} {q ++ [ last ]} {Q} (≺-ext q []) yQ)
     take-to a {y} yQ (step x nf)        = step (proj₁ (upto a {y} yQ) x) (λ g → nf (fail-to (AgreeTo-sym a) yQ g))
     take-to a {y} yQ (tend x nf)        = tend (proj₁ (upto a {y} yQ) x) (λ g → nf (fail-to (AgreeTo-sym a) yQ g))
-    take-to a {y} yQ (left x fd ins)    = left (proj₁ (upto a {y} yQ) x) (fail-to a yQ fd) ins
+    take-to a {y} yQ (left {r = r} x nf ins) =
+      left (proj₁ (upto a {y} yQ) x) (λ g → nf (fail-to (AgreeTo-sym a) (≼-trans {r} {y} {Q} (⊑-≼ (inside-⊑ r y ins)) yQ) g)) ins
 
 scan-causal : ∀ {A B q} (f : B → A → B) z {s s′ : Den A} → s ~⟨ q ⟩ s′ → Op.scan f z s ~⟨ q ⟩ Op.scan f z s′
 scan-causal f z a = ~-cold λ p → ⟨ (λ yq → SC.scan-to f z (a p) yq , SC.scan-to f z (AgreeTo-sym (a p)) yq) ⟩
@@ -200,94 +209,126 @@ private
               { (b , av) → ¬A (f b a , acc av x vw λ y vk kw → mx (h y kw) (_ , y) kw vk) } }
 
 scan-ne : ∀ {A B R k} (f : B → A → B) z {s s′ : Den A} → s ≈ᶜ⟨ R ∣ k ⟩ s′ → Op.scan f z s ≈ᶜ⟨ R ∣ k ⟩ Op.scan f z s′
-scan-ne {k = k} f z {s} {s′} ag p r = trunc-ag go
+scan-ne {k = k} f z {s} {s′} ag p rp = trunc-ag (agc lin pn)
   where
     -- A source row shows where it is, a value by its fold.
     img : ∀ (d : Den _) {q y e} → enter d p y e → y ≺ q → ¬ ¬ Img (ES.Scan.ScanT f z (enter d p)) q y
     img d {e = skip}  x yq = seen (ES.Scan.sstep x) yq
     img d {e = end}   x yq = seen (ES.Scan.send x) yq
-    img d {e = out _} x yq ¬i = SN.fold f z (enter d p) (entered-few d p x) x λ { (_ , ac) → seen (ES.Scan.sval ac) yq ¬i }
+    img d {e = pin _} x yq = seen (ES.Scan.spin x) yq
+    img d {e = out _} x yq ¬i = SN.fold f z (enter d p) (entered-few d p tt x) x λ { (_ , ac) → seen (ES.Scan.sval ac) yq ¬i }
 
-    go : AgC k (ES.Scan.ScanT f z (enter s p)) (ES.Scan.ScanT f z (enter s′ p))
-    go q (inj₁ c) = ⟨ (λ yq → SC.scan-to f z a yq , SC.scan-to f z (AgreeTo-sym a) yq) ⟩
-      where a = ag p r q (inj₁ (cnt-up c (img s)))
-    go q (inj₂ c) = ⟨ (λ yq → SC.scan-to f z a yq , SC.scan-to f z (AgreeTo-sym a) yq) ⟩
-      where a = ag p r q (inj₂ (cnt-up c (img s′)))
+    lin : ∀ q → Cnt k (ES.Scan.ScanT f z (enter s p)) q ⊎ Cnt k (ES.Scan.ScanT f z (enter s′ p)) q
+        → AgreeTo q (ES.Scan.ScanT f z (enter s p)) (ES.Scan.ScanT f z (enter s′ p))
+    lin q c = ⟨ (λ yq → SC.scan-to f z a yq , SC.scan-to f z (AgreeTo-sym a) yq) ⟩
+      where
+        a = ag-cnt (ag p rp) q (⊎-map (λ c → cnt-up c (img s)) (λ c → cnt-up c (img s′)) c)
+
+    -- A pin reads its source before its connect, and at its own pins.
+    pn : ∀ q r → T (inside r q) → DCnt k (ES.Scan.ScanT f z (enter s p)) q (pin r) ⊎ DCnt k (ES.Scan.ScanT f z (enter s′ p)) q (pin r)
+       → (ES.Scan.ScanT f z (enter s p) q (pin r) → ES.Scan.ScanT f z (enter s′ p) q (pin r))
+       × (ES.Scan.ScanT f z (enter s′ p) q (pin r) → ES.Scan.ScanT f z (enter s p) q (pin r))
+    pn q r i c = (λ { (ES.Scan.spin x) → ES.Scan.spin (proj₁ b x) }) , (λ { (ES.Scan.spin x) → ES.Scan.spin (proj₂ b x) })
+      where
+        b = ag p rp q (pin r) (⊎-map (λ d → dcnt-pin-up i d (img s) (λ x _ → ES.Scan.spin x)) (λ d → dcnt-pin-up i d (img s′) (λ x _ → ES.Scan.spin x)) c)
 
 takeWhile-causal : ∀ {A q} (i : Bool) (keep : A → Bool) {s s′ : Den A} → s ~⟨ q ⟩ s′ → Op.takeWhile i keep s ~⟨ q ⟩ Op.takeWhile i keep s′
-takeWhile-causal i keep a = ~-cold λ p → ⟨ (λ yq → TW.take-to i keep p (a p) yq , TW.take-to i keep p (AgreeTo-sym (a p)) yq) ⟩
+takeWhile-causal i keep a = ~-cold λ p → ⟨ (λ yq → TW.take-to i keep (a p) yq , TW.take-to i keep (AgreeTo-sym (a p)) yq) ⟩
 
--- A TAKEWHILE BOUNDS ITS SOURCE before each of its rows' sources.  A
--- source row before the first failure is passed, or is the failure, shown
--- one label down; one past it lies before a row under the subscription,
--- so is under it, and is left as a skip.  Whether a row is past the
--- failure is not decidable, but the bound is.
+-- A TAKEWHILE BOUNDS ITS SOURCE where it has not failed: before an
+-- unfailed row every source row shows, a pin by its connect's.  Whether
+-- the other side has failed there is not decidable, but its earliest
+-- failure before an unfailed row of this side would be one of this side's.
 private
-  module TN {A : Set} (incl : Bool) (keep : A → Bool) (p : Pos) where
+  module TN {A : Set} (incl : Bool) (keep : A → Bool) where
     open ES.TakeWhile incl keep using (TakeT; Failed; pass; fail; stop; step; tend; left)
 
-    fd-trans : ∀ {X : EmissionSet A} {w z} → Failed X p w → w ≺ z → Failed X p z
-    fd-trans {w = w} {z} (q , a , x , nk , lt) wz = q , a , x , nk , ≺-trans {q} {w} {z} lt wz
+    fd-up : ∀ {X : EmissionSet A} {w z} → Failed X w → w ≼ z → Failed X z
+    fd-up {w = w} {z} (q , a , x , nk , lt) wz = q , a , x , nk , ≺-≼-≺ {q} {w} {z} lt wz
 
-    -- A row's source is where `at` agrees.
-    move : ∀ {X Y : EmissionSet A} {Q} → (∀ {z e} → X z e → z ≼ Q → (Failed X p z → T (inside p z)) → AgreeTo z X Y)
-         → ∀ {y e} → y ≼ Q → TakeT X p y e → TakeT Y p y e
-    move at {y} yQ (pass x k nf)       = TW.take-to incl keep p (at x yQ (⊥-elim ∘ nf)) (≼-refl {y}) (pass x k nf)
-    move at {y} yQ (step x nf)         = TW.take-to incl keep p (at x yQ (⊥-elim ∘ nf)) (≼-refl {y}) (step x nf)
-    move at {y} yQ (tend x nf)         = TW.take-to incl keep p (at x yQ (⊥-elim ∘ nf)) (≼-refl {y}) (tend x nf)
-    move at {y} yQ (left x fd ins)     = TW.take-to incl keep p (at x yQ (λ _ → ins)) (≼-refl {y}) (left x fd ins)
-    move {Q = Q} at yQ (fail {q} x k nf i) =
-      fail (proj₁ (upto a {q} (≼-refl {q})) x) k (λ g → nf (TW.fail-to incl keep p (AgreeTo-sym a) (≼-refl {q}) g)) i
-      where a = at x (≺→≼ {q} {Q} (≺-≼-≺ {q} {q ++ [ ix 0 ]} {Q} (≺-ext q []) yQ)) (⊥-elim ∘ nf)
-    move {Q = Q} at yQ (stop {q} x k nf) =
-      stop (proj₁ (upto a {q} (≼-refl {q})) x) k (λ g → nf (TW.fail-to incl keep p (AgreeTo-sym a) (≼-refl {q}) g))
-      where a = at x (≺→≼ {q} {Q} (≺-≼-≺ {q} {q ++ [ last ]} {Q} (≺-ext q []) yQ)) (⊥-elim ∘ nf)
-
-    module Core {H : Pos → Set} {k : ℕ} {s s′ : Den A} (Is : InvD H s) (Is′ : InvD H s′)
-                (ag : s ≈ᶜ⟨ Ok H ∣ k ⟩ s′) (ok : Ok H p) {Q : Pos}
-                (c : Cnt k (TakeT (enter s p) p) Q) where
+    module Core {H : Pos → Set} {k : ℕ} {s s′ : Den A} (Is : InvD H s) (ag : s ≈ᶜ⟨ Ok H ∣ k ⟩ s′) (p : Pos) (ok : Ok H p) where
       t t′ : EmissionSet A
       t  = enter s p
       t′ = enter s′ p
       I  = Is p ok
-      I′ = Is′ p ok
 
-      -- A source row before `z`, under the subscription if past the failure, shows before `z`.
-      img : ∀ {z} → ∀ {w e} → t w e → w ≺ z → (Failed t p w → T (inside p w)) → ¬ ¬ Img (TakeT t p) z w
-      img {z} {w} {e} x wz fw = em (λ f → seen (left x f (fw f)) wz) (pre e x)
-        where
-          pre : ∀ e → t w e → ¬ Failed t p w → ¬ ¬ Img (TakeT t p) z w
-          pre skip    x nf = seen (step x nf) wz
-          pre end     x nf = seen (tend x nf) wz
-          pre (out a) x nf with keep a in eq
-          ... | true  = seen (pass x (subst T (sym eq) tt) nf) wz
-          ... | false = seen-under (stop x (subst (T ∘ not) (sym eq) tt) nf) wz
+      -- Before an unfailed row, every source row shows.
+      img : ∀ {z} → ¬ Failed t z → ∀ {w e} → t w e → w ≺ z → ¬ ¬ Img (TakeT t) z w
+      img {z} nf {w} {skip}  x wz = seen (step x (λ g → nf (fd-up {X = t} g (≺→≼ {w} {z} wz)))) wz
+      img {z} nf {w} {end}   x wz = seen (tend x (λ g → nf (fd-up {X = t} g (≺→≼ {w} {z} wz)))) wz
+      img {z} nf {w} {out a} x wz with keep a in eq
+      ... | true  = seen (pass x (subst T (sym eq) tt) (λ g → nf (fd-up {X = t} g (≺→≼ {w} {z} wz)))) wz
+      ... | false = seen-under (stop x (subst (T ∘ not) (sym eq) tt) (λ g → nf (fd-up {X = t} g (≺→≼ {w} {z} wz)))) wz
+      img {z} nf {w} {pin r} x wz =
+        seen (left x (λ g → nf (fd-up {X = t} g (≼-trans {r} {w} {z} (⊑-≼ (inside-⊑ r w i)) (≺→≼ {w} {z} wz)))) i) wz
+        where i = proj₂ (InvAt.pinned I x)
 
-      bnd : ∀ {z e} → t z e → z ≼ Q → (Failed t p z → T (inside p z)) → Cnt k t z
-      bnd xz zQ fz = cnt-up (cnt-down c zQ) λ {w} x wz → img x wz (λ f → in-world I x wz (fz (fd-trans {X = t} f wz)))
+      -- Unfailed at `z`, the sources agree there.
+      at : ∀ {z} → ¬ Failed t z → Cnt k (TakeT t) z → AgreeTo z t t′
+      at {z} nf c = ag-cnt (ag p ok) z (inj₁ (cnt-up c (img nf)))
 
-      bnd′ : ∀ {z e} → t′ z e → z ≼ Q → (Failed t′ p z → T (inside p z)) → Cnt k t′ z
-      bnd′ x′ = few-ind P stp (entered-few s′ p x′) x′
+      fl : ∀ {z} → AgreeTo z t t′ → ¬ Failed t z → ¬ Failed t′ z
+      fl {z} a nf g = nf (TW.fail-to incl keep (AgreeTo-sym a) (≼-refl {z}) g)
+
+      -- Nor has the other side.
+      unfailed : ∀ {y} → Cnt k (TakeT t) y → ¬ Failed t′ y → ¬ Failed t y
+      unfailed {y} c nf′ (q , a , x , nk , qy) = few-ind P stp (entered-few s p tt x) x nk qy
         where
           P : Pos → Set
-          P z = ∀ {e} → t′ z e → z ≼ Q → (Failed t′ p z → T (inside p z)) → Cnt k t′ z
-          stp : ∀ {z} → Few t′ z → (∀ {v e} → t′ v e → v ≺ z → P v) → P z
-          stp {z} _ ih xz zQ fz = cnt-up (cnt-down c zQ) λ {w} x′ wz →
-            let fw′ = λ f → in-world I′ x′ wz (fz (fd-trans {X = t′} f wz))
-                a   = ag p ok w (inj₂ (ih x′ wz x′ (≺→≼ {w} {Q} (≺-≼-≺ {w} {z} {Q} wz zQ)) fw′))
-            in img (proj₂ (upto a {w} (≼-refl {w})) x′) wz (λ f → fw′ (TW.fail-to incl keep p {t = t} {t′} a (≼-refl {w}) f))
+          P q = ∀ {a} → t q (out a) → T (not (keep a)) → q ≺ y → ⊥
+          stp : ∀ {q} → Few t q → (∀ {v e} → t v e → v ≺ q → P v) → P q
+          stp {q} _ ih {a} x nk qy =
+            em {P = Failed t q} {G = ⊥}
+               (λ { (q′ , a′ , x′ , nk′ , q′q) _ → ih x′ q′q x′ nk′ (≺-trans {q′} {q} {y} q′q qy) })
+               (λ nf _ → nf′ (q , a , proj₁ (upto (at nf (cnt-down c (≺→≼ {q} {y} qy))) {q} (≼-refl {q})) x , nk , qy))
+               (λ z → z)
 
-      agree : AgreeTo Q (TakeT t p) (TakeT t′ p)
-      agree = ⟨ (λ yQ → move {Q = Q} (λ {z} x zQ fz → ag p ok z (inj₁ (bnd x zQ fz))) yQ
-                      , move {Q = Q} (λ {z} x zQ fz → AgreeTo-sym (ag p ok z (inj₂ (bnd′ x zQ fz)))) yQ) ⟩
+      -- A pin whose connect is unfailed reads its source before the connect, and at its own pins.
+      pin-at : ∀ {y r} → ¬ Failed t r → T (inside r y) → DCnt k (TakeT t) y (pin r) → (t y (pin r) → t′ y (pin r)) × (t′ y (pin r) → t y (pin r))
+      pin-at {y} {r} nf i d = ag p ok y (pin r) (inj₁ (dcnt-pin-up i d (img nf) (λ x _ → left x nf (proj₂ (InvAt.pinned I x)))))
+
+      fwd : ∀ {y e} → DCnt k (TakeT t) y e → TakeT t y e → TakeT t′ y e
+      fwd {y} d (pass {a = a₀} x kp nf) = pass (proj₁ (upto a {y} (≼-refl {y})) x) kp (fl a nf)
+        where a = at nf (dcnt-cnt {e = out a₀} tt d)
+      fwd {y} d (step x nf) = step (proj₁ (upto a {y} (≼-refl {y})) x) (fl a nf)
+        where a = at nf (dcnt-cnt {e = skip} tt d)
+      fwd {y} d (tend x nf) = tend (proj₁ (upto a {y} (≼-refl {y})) x) (fl a nf)
+        where a = at nf (dcnt-cnt {e = end} tt d)
+      fwd d (fail {q} {a₀} x kp nf i) = fail (proj₁ (upto a {q} (≼-refl {q})) x) kp (fl a nf) i
+        where a = at nf (cnt-down (dcnt-cnt {e = out a₀} tt d) (≺→≼ {q} {q ++ [ ix 0 ]} (≺-ext q [])))
+      fwd d (stop {q} x kp nf) = stop (proj₁ (upto a {q} (≼-refl {q})) x) kp (fl a nf)
+        where a = at nf (cnt-down (dcnt-cnt {e = end} tt d) (≺→≼ {q} {q ++ [ last ]} (≺-ext q [])))
+      fwd d (left x nf i) = left (proj₁ (pin-at nf i d) x) (fl (at nf (dcnt-pin i d)) nf) i
+
+      bwd : ∀ {y e} → DCnt k (TakeT t) y e → TakeT t′ y e → TakeT t y e
+      bwd {y} d (pass {a = a₀} x′ kp nf′) = pass (proj₂ (upto (at nf c) {y} (≼-refl {y})) x′) kp nf
+        where c = dcnt-cnt {e = out a₀} tt d
+              nf = unfailed c nf′
+      bwd {y} d (step x′ nf′) = step (proj₂ (upto (at nf c) {y} (≼-refl {y})) x′) nf
+        where c = dcnt-cnt {e = skip} tt d
+              nf = unfailed c nf′
+      bwd {y} d (tend x′ nf′) = tend (proj₂ (upto (at nf c) {y} (≼-refl {y})) x′) nf
+        where c = dcnt-cnt {e = end} tt d
+              nf = unfailed c nf′
+      bwd d (fail {q} {a₀} x′ kp nf′ i) = fail (proj₂ (upto (at nf c) {q} (≼-refl {q})) x′) kp nf i
+        where c = cnt-down (dcnt-cnt {e = out a₀} tt d) (≺→≼ {q} {q ++ [ ix 0 ]} (≺-ext q []))
+              nf = unfailed c nf′
+      bwd d (stop {q} x′ kp nf′) = stop (proj₂ (upto (at nf c) {q} (≼-refl {q})) x′) kp nf
+        where c = cnt-down (dcnt-cnt {e = end} tt d) (≺→≼ {q} {q ++ [ last ]} (≺-ext q []))
+              nf = unfailed c nf′
+      bwd d (left x′ nf′ i) = left (proj₂ (pin-at nf i d) x′) nf i
+        where nf = unfailed (dcnt-pin i d) nf′
 
 takeWhile-ne : ∀ {A H k} (i : Bool) (keep : A → Bool) {s s′ : Den A} → InvD H s → InvD H s′
              → s ≈ᶜ⟨ Ok H ∣ k ⟩ s′ → Op.takeWhile i keep s ≈ᶜ⟨ Ok H ∣ k ⟩ Op.takeWhile i keep s′
 takeWhile-ne {H = H} {k} i keep {s} {s′} Is Is′ ag p ok = trunc-ag go
   where
-    go : AgC k (ES.TakeWhile.TakeT i keep (enter s p) p) (ES.TakeWhile.TakeT i keep (enter s′ p) p)
-    go q (inj₁ c) = TN.Core.agree i keep p {s = s} {s′} Is Is′ ag ok c
-    go q (inj₂ c) = AgreeTo-sym (TN.Core.agree i keep p {s = s′} {s} Is′ Is (≈ᶜ-sym {R = Ok H} {k} {s} {s′} ag) ok c)
+    module C  = TN.Core i keep {s = s} {s′} Is ag p ok
+    module C′ = TN.Core i keep {s = s′} {s} Is′ (≈ᶜ-sym {R = Ok H} {k} {s} {s′} ag) p ok
+
+    go : AgC k (ES.TakeWhile.TakeT i keep (enter s p)) (ES.TakeWhile.TakeT i keep (enter s′ p))
+    go q e (inj₁ d) = C.fwd d , C.bwd d
+    go q e (inj₂ d) = C′.bwd d , C′.fwd d
 
 -- A CONNECT reads its body's end only up to the source step it shows.
 private
@@ -301,11 +342,15 @@ private
           → AgreeTo Q (ES.Connect.β s F p) (ES.Connect.β s′ F′ p)
           → ∀ {y e} → y ≼ Q → ES.Connect.ConnT s F p y e → ES.Connect.ConnT s′ F′ p y e
   conn-to s s′ F F′ p aσ aβ {y} yQ (ES.Connecting.body x) = ES.Connecting.body (proj₁ (upto aβ {y} yQ) x)
-  conn-to {Q = Q} s s′ F F′ p aσ aβ yQ (ES.Connecting.shown {k} x al) =
-    ES.Connecting.shown (proj₁ (upto aσ {k} kQ) x) (alive-to aβ kQ al)
+  conn-to {Q = Q} s s′ F F′ p aσ aβ yQ (ES.Connecting.burst {k} x i) =
+    ES.Connecting.burst (proj₁ (upto aσ {k} kQ) x) i
     where kQ = ≺→≼ {k} {Q} (≺-≼-≺ {k} {k ++ [ ix 0 ]} {Q} (≺-ext k []) yQ)
-  conn-to s s′ F F′ p aσ aβ {y} yQ (ES.Connecting.pinned x nal ins) =
-    ES.Connecting.pinned (proj₁ (upto aσ {y} yQ) x) (λ al → nal (alive-to (AgreeTo-sym aβ) yQ al)) ins
+  conn-to {Q = Q} s s′ F F′ p aσ aβ yQ (ES.Connecting.echo {k} x al u ni) =
+    ES.Connecting.echo (proj₁ (upto aσ {k} kQ) x) (alive-to aβ kQ al) u ni
+    where kQ = ≺→≼ {k} {Q} (≺-≼-≺ {k} {k ++ [ ix 0 ]} {Q} (≺-ext k []) yQ)
+  conn-to {Q = Q} s s′ F F′ p aσ aβ yQ (ES.Connecting.kept {k} {p′} x al ni i) =
+    ES.Connecting.kept (proj₁ (upto aσ {k} kQ) x) (alive-to aβ (≼-trans {p′} {k} {Q} (⊑-≼ (inside-⊑ p′ k i)) kQ) al) ni i
+    where kQ = ≺→≼ {k} {Q} (≺-≼-≺ {k} {k ++ [ ix 0 ]} {Q} (≺-ext k []) yQ)
 
 connect-causal : ∀ {A B q} {s s′ : Den A} {F F′ : Den A → Den B}
                → s ~⟨ q ⟩ s′ → (∀ {t t′} → AgreeTo q t t′ → F (hot t) ~⟨ q ⟩ F′ (hot t′)) → Op.connect s F ~⟨ q ⟩ Op.connect s′ F′
@@ -328,6 +373,7 @@ lim-causal a = ~-cold λ p →
 private
   rejoin-ag : ∀ {A q p} {t t′ : EmissionSet A} → AgreeTo q t t′ → ∀ {y e} → y ≼ q → Rejoin p t y e → Rejoin p t′ y e
   rejoin-ag {q = q} {p} a yq (shown {k} x w pk) = shown (proj₁ (upto a {k} (≺→≼ {k} {q} (≺-≼-≺ {k} {k ++ [ sub p ]} {q} (≺-ext k []) yq))) x) w pk
+  rejoin-ag {q = q} {p} a yq (heard {k} x pk)   = heard (proj₁ (upto a {k} (≺→≼ {k} {q} (≺-≼-≺ {k} {k ++ [ sub p ]} {q} (≺-ext k []) yq))) x) pk
   rejoin-ag {q = q} {p} a yq (ended {c} x pc)   = ended (proj₁ (upto a {c} (≺→≼ {c} {q} (≺-≼-≺ {c} {c ++ [ sub p ]} {q} (≺-ext c []) yq))) x) pc
   rejoin-ag {q = q} {p} a yq (late {c} x cp)    =
     late (proj₁ (upto a {c} (≺→≼ {c} {q} (≺-≼-≺ {c} {p ++ [ last ]} {q} (≼-≺-≺ {c} {p} {p ++ [ last ]} cp (≺-ext p [])) yq))) x) cp
@@ -418,6 +464,7 @@ private
 -- A body's rows lie past its subscription.
 aft : ∀ {A H} (d : Den A) → InvD H d → Aft (Ok H) d
 aft d Id p ok {y} x = ≺→≼ {p ++ [ ix 1 ]} {y} (world-after (InvAt.world I x) (InvAt.real I x))
+                    , λ { refl → pinned-after I (proj₁ (ok-step p ok)) x }
   where I = Id (p ++ [ ix 1 ]) (ok-step p ok)
 
 -- THE RECURSION SETTLES: each approximant is within its index of the
@@ -496,27 +543,44 @@ map-fusion : ∀ {Γ A B C} (f : B → C) (g : A → B) (s : Obs Timeline Γ A) 
             → ⟦ map (f ∘ g) s ⟧ ρ ≅ ⟦ map f (map g s) ⟧ ρ
 map-fusion f g s ρ p = fuse , split
   where
-    down : ∀ {t k e} → MapT (f ∘ g) t k e → Σ (Ev _) (MapT g t k)
-    down (map-out x)  = _ , map-out x
-    down (map-skip x) = _ , map-skip x
-    down (map-end x)  = _ , map-end x
+    -- A row's image, a pin to the same pin.
+    Im : ∀ {X Y} → (Pos → Ev Y → Set) → Pos → Ev X → Set
+    Im u k e′ = Σ (Ev _) λ e″ → u k e″ × (∀ {r} → e′ ≡ pin r → e″ ≡ pin r)
 
-    up : ∀ {t k e} → MapT g t k e → Σ (Ev _) (MapT (f ∘ g) t k)
-    up (map-out x)  = _ , map-out x
-    up (map-skip x) = _ , map-skip x
-    up (map-end x)  = _ , map-end x
+    -- What a row waits on, read through images.
+    rv : ∀ {X Y} {t : EmissionSet X} {t′ : EmissionSet Y} {q e e₀} → (∀ {k e′} → t′ k e′ → Im t k e′)
+       → (∀ {k e′ e″} → (∀ {r} → e′ ≡ pin r → e″ ≡ pin r) → Dep q e k e′ → Dep q e₀ k e″) → Reach t q e₀ → Reach t′ q e
+    rv back dl = reach-via λ x _ d → proj₁ (back x) , proj₁ (proj₂ (back x)) , dl (proj₂ (proj₂ (back x))) d
 
-    across : ∀ {t k e} → MapT f (Truncate (MapT g t)) k e → Σ (Ev _) (MapT (f ∘ g) t k)
-    across (map-out (map-out x , _))   = _ , map-out x
-    across (map-skip (map-skip x , _)) = _ , map-skip x
-    across (map-end (map-end x , _))   = _ , map-end x
+    pp : ∀ {X Y : Set} {q r k} {e′ : Ev X} {e″ : Ev Y} → (∀ {r′} → e′ ≡ pin r′ → e″ ≡ pin r′) → Dep q (pin r) k e′ → Dep q (pin r) k e″
+    pp h d i = ⊎-map (λ z → z) h (d i)
+
+    down : ∀ {t k e} → MapT (f ∘ g) t k e → Im (MapT g t) k e
+    down (map-out x)  = _ , map-out x , λ ()
+    down (map-skip x) = _ , map-skip x , λ ()
+    down (map-pin x)  = _ , map-pin x , λ { refl → refl }
+    down (map-end x)  = _ , map-end x , λ ()
+
+    up : ∀ {t k e} → MapT g t k e → Im (MapT (f ∘ g) t) k e
+    up (map-out x)  = _ , map-out x , λ ()
+    up (map-skip x) = _ , map-skip x , λ ()
+    up (map-pin x)  = _ , map-pin x , λ { refl → refl }
+    up (map-end x)  = _ , map-end x , λ ()
+
+    across : ∀ {t k e} → MapT f (Truncate (MapT g t)) k e → Im (MapT (f ∘ g) t) k e
+    across (map-out (map-out x , _))   = _ , map-out x , λ ()
+    across (map-skip (map-skip x , _)) = _ , map-skip x , λ ()
+    across (map-pin (map-pin x , _))   = _ , map-pin x , λ { refl → refl }
+    across (map-end (map-end x , _))   = _ , map-end x , λ ()
 
     fuse : ∀ {t q e} → Truncate (MapT (f ∘ g) t) q e → Truncate (MapT f (Truncate (MapT g t))) q e
-    fuse (map-out x , F)  = map-out (map-out x , few-via up F) , few-via across F
-    fuse (map-skip x , F) = map-skip (map-skip x , few-via up F) , few-via across F
-    fuse (map-end x , F)  = map-end (map-end x , few-via up F) , few-via across F
+    fuse (map-out {a = a} x , F) = map-out (map-out x , rv {e = out (g a)} {out (f (g a))} up (λ _ _ → tt) F) , rv {e = out (f (g a))} {out (f (g a))} across (λ _ _ → tt) F
+    fuse (map-skip x , F)        = map-skip (map-skip x , rv {e = skip} {skip} up (λ _ _ → tt) F) , rv {e = skip} {skip} across (λ _ _ → tt) F
+    fuse (map-pin {r = r} x , F) = map-pin (map-pin x , rv {e = pin r} {pin r} up (λ {k} {e′} {e″} → pp {k = k} {e′} {e″}) F) , rv {e = pin r} {pin r} across (λ {k} {e′} {e″} → pp {k = k} {e′} {e″}) F
+    fuse (map-end x , F)         = map-end (map-end x , rv {e = end} {end} up (λ _ _ → tt) F) , rv {e = end} {end} across (λ _ _ → tt) F
 
     split : ∀ {t q e} → Truncate (MapT f (Truncate (MapT g t))) q e → Truncate (MapT (f ∘ g) t) q e
-    split (map-out (map-out x , G) , _)   = map-out x , few-via down G
-    split (map-skip (map-skip x , G) , _) = map-skip x , few-via down G
-    split (map-end (map-end x , G) , _)   = map-end x , few-via down G
+    split (map-out (map-out {a = a} x , G) , _) = map-out x , rv {e = out (f (g a))} {out (g a)} down (λ _ _ → tt) G
+    split (map-skip (map-skip x , G) , _)       = map-skip x , rv {e = skip} {skip} down (λ _ _ → tt) G
+    split (map-pin (map-pin {r = r} x , G) , _) = map-pin x , rv {e = pin r} {pin r} down (λ {k} {e′} {e″} → pp {k = k} {e′} {e″}) G
+    split (map-end (map-end x , G) , _)         = map-end x , rv {e = end} {end} down (λ _ _ → tt) G

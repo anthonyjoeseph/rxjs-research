@@ -27,7 +27,7 @@ open import quickcheck.Tabled.Exact.Base
   using (Exact; Exactly; sound; complete; if⁻; if-t; single⁻; cm⁻; cm⁺; values⁺; cnt-in; module OrderX)
 
 module ScanX {A B : Set} (f : B → A → B) (z : B) (t : EmissionSet A) (o : Listed A) (ex : Exact o t) where
-  open Tb.Scan f z t using (Acc; acc₀; acc; ScanT; sval; sstep; send)
+  open Tb.Scan f z t using (Acc; acc₀; acc; ScanT; sval; sstep; send; spin)
   open Tb.Values t using (Next; Nth; first; next)
   open ScanL f z o using (vals; opening; step; levels; table; folds; others)
   open Order vals using (nextᵇ; nths)
@@ -125,6 +125,8 @@ module ScanX {A B : Set} (f : B → A → B) (z : B) (t : EmissionSet A) (o : Li
     ... | refl = sstep (sound ex rm)
     other-s {_ , end}   rm h with single⁻ h
     ... | refl = send (sound ex rm)
+    other-s {_ , Tb.pin _} rm h with single⁻ h
+    ... | refl = spin (sound ex rm)
 
   sound-s : ∀ {q e} → (q , e) ∈ rows (scanRows f z o) → ScanT q e
   sound-s m with ∈-++⁻ (concatMap folds table) m
@@ -143,6 +145,7 @@ module ScanX {A B : Set} (f : B → A → B) (z : B) (t : EmissionSet A) (o : Li
     in ∈-++⁺ˡ (cm⁺ m (∈-map⁺ (λ b → q , out b) (proj₂ e y′)))
   complete-s (sstep x) = ∈-++⁺ʳ (concatMap folds table) (cm⁺ (complete ex x) (here refl))
   complete-s (send x)  = ∈-++⁺ʳ (concatMap folds table) (cm⁺ (complete ex x) (here refl))
+  complete-s (spin x)  = ∈-++⁺ʳ (concatMap folds table) (cm⁺ (complete ex x) (here refl))
 
 scan-exact : ∀ {A B} (f : B → A → B) (z : B) {t : EmissionSet A} (o : Listed A) → Exactly o t
   → Exactly (scanRows f z o) (Tb.Scan.ScanT f z t)

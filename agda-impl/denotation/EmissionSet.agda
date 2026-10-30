@@ -7,9 +7,9 @@
 -- all at once — a merge is a union, a joiner is a filter and a rekey.
 --
 -- Work that keeps running after whoever listens stops — a connect's
--- source still in its subscribe burst — stays in the emission set as `skip`
--- rows.  An emission set's PROPER rows are those at or before its end; a hot
--- shows only those.
+-- source still in its subscribe burst — stays in the emission set as `pin`
+-- rows, so a cut can tell it from work it stops.  An emission set's PROPER
+-- rows are those at or before its end; a hot shows only those.
 --
 -- TRUNCATED AT THE FIRST INFINITY: a row with infinitely many rows before
 -- it is never reached, which is how a synchronous loop blocks everything
@@ -17,6 +17,12 @@
 -- rows with finitely many before them (`Truncate`).  A set could hold a row past infinity where a
 -- stream cannot; the operator would decide it from rows nobody reaches, and
 -- the limit and the operator would disagree on it.
+--
+-- A PIN IS REACHED THROUGH ITS OWN PAST: what came before its connect, and
+-- the burst before it (`Dep`).  The body between them can be cut from
+-- below, and rxjs then runs the burst, so a body that would never return
+-- hides it only where nothing cuts it: the reader (`Seen`) counts every
+-- row.  No operator decides anything from a pin.
 module denotation.EmissionSet where
 
 open import Data.Bool using (Bool; T; not)
@@ -39,10 +45,16 @@ open import denotation.Events using (Pos; Timeline; timelineAt; _<ᵖ_; inside; 
 ------------------------------------------------------------------------
 -- Rows
 
+-- `pin p`: unseen work of the connect subscribed at `p`, in its source's
+-- subscribe burst.  A cut stops everything else, and this too unless it
+-- fell before `p`: rxjs subscribes a connect's source whatever happened
+-- to its body, and nothing can unsubscribe a source mid-subscribe.  A
+-- kept pin lies under its connect, so a cut is read no later than it.
 data Ev (A : Set) : Set where
   out  : A → Ev A
   skip : Ev A
   end  : Ev A
+  pin  : Pos → Ev A
 
 EmissionSet : Set → Set₁
 EmissionSet A = Pos → Ev A → Set
@@ -58,6 +70,22 @@ p ≼ q = ¬ (q ≺ p)
 Work : ∀ {A} → Ev A → Set
 Work end = Empty
 Work _   = ⊤
+
+-- A subscriber's own work: not a completion, not a pin.
+Bare : ∀ {A} → Ev A → Set
+Bare (out _) = ⊤
+Bare skip    = ⊤
+Bare _       = Empty
+
+-- Not a pin.
+Unpinned : ∀ {A} → Ev A → Set
+Unpinned (pin _) = Empty
+Unpinned _       = ⊤
+
+-- Work no subscriber is shown.
+data Silent {A : Set} : Ev A → Set where
+  hush : Silent skip
+  held : ∀ {p} → Silent (pin p)
 
 -- The rows a stream reaches, each at a finite index.
 data InE {A : Set} : E.Events A → EmissionSet A where
@@ -75,9 +103,23 @@ Proper t q e = t q e × (∀ {c} → t c end → q ≼ c)
 Few : ∀ {A} → EmissionSet A → Pos → Set
 Few t q = Σ (List Pos) λ ks → ∀ {k e′} → t k e′ → k ≺ q → k ∈ ks
 
--- The rows with finitely many rows before them.
+-- A pin's past: before its connect, or the connect's burst.
+PDep : ∀ {A} → Pos → Pos → Ev A → Set
+PDep r k e′ = k ≺ r ⊎ e′ ≡ pin r
+
+-- What a row at `q` waits on: a pin under its connect, its past; any
+-- other row, everything before it.
+Dep : ∀ {A} → Pos → Ev A → Pos → Ev A → Set
+Dep q (pin r) k e′ = T (inside r q) → PDep r k e′
+Dep q _       k e′ = ⊤
+
+-- Finitely many rows the row at `q` waits on.
+Reach : ∀ {A} → EmissionSet A → Pos → Ev A → Set
+Reach t q e = Σ (List Pos) λ ks → ∀ {k e′} → t k e′ → k ≺ q → Dep q e k e′ → k ∈ ks
+
+-- The rows with finitely many rows they wait on.
 Truncate : ∀ {A} → EmissionSet A → EmissionSet A
-Truncate t q e = t q e × Few t q
+Truncate t q e = t q e × Reach t q e
 
 -- What a subscriber reaches: a proper row with finitely many rows before it.
 Seen : ∀ {A} → EmissionSet A → EmissionSet A
@@ -94,9 +136,11 @@ data Den (A : Set) : Set₁ where
 
 -- JOINING A HOT AT `p`: what comes after `p`, rekeyed under `sub p`; a
 -- hot already ended at `p` ends at once.  Nothing is shown for what was
--- missed: the work was the source's, and the source shows it.
+-- missed: the work was the source's, and the source shows it.  A pin is
+-- the source's too: the joiner's copy of it is a plain skip.
 data Rejoin {A : Set} (p : Pos) (t : EmissionSet A) : EmissionSet A where
-  shown : ∀ {q e} → t q e → Work e → p ≺ q → Rejoin p t (q ++ [ sub p ]) e
+  shown : ∀ {q e} → t q e → Bare e → p ≺ q → Rejoin p t (q ++ [ sub p ]) e
+  heard : ∀ {q r} → t q (pin r) → p ≺ q → Rejoin p t (q ++ [ sub p ]) skip
   ended : ∀ {c} → t c end → p ≺ c → Rejoin p t (c ++ [ sub p ]) end
   late  : ∀ {c} → t c end → c ≼ p → Rejoin p t (p ++ [ last ]) end
 
@@ -123,6 +167,7 @@ data Spin {A : Set} (p : Pos) : EmissionSet A where
 data MapT {A B : Set} (f : A → B) (t : EmissionSet A) : EmissionSet B where
   map-out  : ∀ {q a} → t q (out a) → MapT f t q (out (f a))
   map-skip : ∀ {q} → t q skip → MapT f t q skip
+  map-pin  : ∀ {q r} → t q (pin r) → MapT f t q (pin r)
   map-end  : ∀ {q} → t q end → MapT f t q end
 
 -- A `skip`, then the body: rxjs's own `defer`, synchronous.
@@ -154,13 +199,14 @@ module Scan {A B : Set} (f : B → A → B) (z : B) (t : EmissionSet A) where
   data ScanT : EmissionSet B where
     sval  : ∀ {q b} → Acc q b → ScanT q (out b)
     sstep : ∀ {q} → t q skip → ScanT q skip
+    spin  : ∀ {q r} → t q (pin r) → ScanT q (pin r)
     send  : ∀ {q} → t q end → ScanT q end
 
--- TAKEWHILE, subscribed at `p`: values while they pass.  The first
--- failing one leaves under `ix 0` of its position if inclusive, and the
--- completion under `last` either way.  What the source still runs of its
--- subscribe burst stays, as skips; the rest is unsubscribed.
-module TakeWhile {A : Set} (incl : Bool) (keep : A → Bool) (t : EmissionSet A) (p : Pos) where
+-- TAKEWHILE: values while they pass.  The first failing one leaves under
+-- `ix 0` of its position if inclusive, and the completion under `last`
+-- either way.  A pin stays unless the failure fell before its connect was
+-- subscribed; the rest is unsubscribed.
+module TakeWhile {A : Set} (incl : Bool) (keep : A → Bool) (t : EmissionSet A) where
 
   -- A failing value lies before `k`.
   Failed : Pos → Set
@@ -172,7 +218,7 @@ module TakeWhile {A : Set} (incl : Bool) (keep : A → Bool) (t : EmissionSet A)
     stop  : ∀ {q a} → t q (out a) → T (not (keep a)) → ¬ Failed q → TakeT (q ++ [ last ]) end
     step  : ∀ {q} → t q skip → ¬ Failed q → TakeT q skip
     tend  : ∀ {q} → t q end → ¬ Failed q → TakeT q end
-    left  : ∀ {q e} → t q e → Failed q → T (inside p q) → TakeT q skip
+    left  : ∀ {q r} → t q (pin r) → ¬ Failed r → T (inside r q) → TakeT q (pin r)
 
 ------------------------------------------------------------------------
 -- Joiners
@@ -194,8 +240,8 @@ Ended t c = Σ Pos λ c₀ → t c₀ end × c₀ ≼ c
 -- read as the lane `Lane q a` wherever the policy subscribes it; and the
 -- rows `Bg` of the lanes already begun, over by `c` where `Over c` holds
 -- along with the outer.  A lane counts until it is cut (`Cut q k`, closed
--- upward in `k`); past that, what it still runs of its subscribe burst
--- under `q ++ [ ix 1 ]` stays, as skips.  A lane's end at `c` where
+-- upward in `k`); its pins stay whose connect it had subscribed by the
+-- cut.  A lane's end at `c` where
 -- `Hand c` holds hands its place to a queued lane: it shows silent at its
 -- first effect `c ++ [ ix 0 ]`, the queued lane subscribing at its second.
 -- The whole ends where the last part does; every other end is a skip.
@@ -209,13 +255,14 @@ module Joining {A B : Set} (Lane : Pos → A → EmissionSet B) (o : EmissionSet
   data JoinT : EmissionSet B where
     val   : ∀ {q a} → o q (out a) → JoinT (q ++ [ ix 0 ]) skip
     step  : ∀ {q} → o q skip → JoinT q skip
+    opin  : ∀ {q r} → o q (pin r) → JoinT q (pin r)
     oend  : ∀ {c} → o c end → Done c → JoinT c end
     opass : ∀ {c} → o c end → ¬ Done c → JoinT c skip
     lane  : ∀ {q a k e} → o q (out a) → Runs q → Lane q a k e → ¬ Cut q k → Work e → JoinT k e
     lend  : ∀ {q a c} → o q (out a) → Runs q → Lane q a c end → ¬ Cut q c → ¬ Hand c → Done c → JoinT c end
     lpass : ∀ {q a c} → o q (out a) → Runs q → Lane q a c end → ¬ Cut q c → ¬ Hand c → ¬ Done c → JoinT c skip
     hand  : ∀ {q a c} → o q (out a) → Runs q → Lane q a c end → ¬ Cut q c → Hand c → JoinT (c ++ [ ix 0 ]) skip
-    left  : ∀ {q a k e} → o q (out a) → Runs q → Lane q a k e → Cut q k → T (inside (q ++ [ ix 1 ]) k) → JoinT k skip
+    left  : ∀ {q a k r} → o q (out a) → Runs q → Lane q a k (pin r) → ¬ Cut q r → T (inside r k) → JoinT k (pin r)
     run   : ∀ {k e} → Bg k e → Work e → JoinT k e
     rend  : ∀ {c} → Bg c end → ¬ Hand c → Done c → JoinT c end
     rpass : ∀ {c} → Bg c end → ¬ Hand c → ¬ Done c → JoinT c skip
@@ -317,40 +364,42 @@ module Exhaust {A B : Set} (f : A → Den B) (o : EmissionSet A) where
 
 -- Subscribed at `p`: the body at `p ++ [ ix 0 ]` over the source made hot,
 -- then the source at `r = p ++ [ ix 1 ]`.  Each source step at `k` shows
--- silent at its first effect if the body has not ended by `k`; once it
--- has, what remains of the source's subscribe burst still runs, at its
--- own positions.  The body's end ends the connect.
+-- silent at its first effect.  The subscribe burst is this connect's pins
+-- and runs whatever the body did; past it, a step shows only while the
+-- body runs, and the source's own pins only whose connect it subscribed
+-- while the body ran.  The body's end ends the connect.
 --
 -- Liveness is read AT `k`, never at the shown row: a body end at
 -- `k ++ [ ix 0 ]` lies in the source's world, which no lawful body
 -- reaches, and reading there would make the connect hang on a row past
 -- the one it produces (`connect-causal`).
 --
--- `Connecting` joins any source's rows `σ`, subscribed at `r`, to any
--- body's rows `β`: a connect part way through is one too.
-module Connecting {A B : Set} (r : Pos) (σ : EmissionSet A) (β : EmissionSet B) where
+-- `Connecting` joins any source's rows `σ`, subscribed at `p ++ [ ix 1 ]`,
+-- to any body's rows `β`: a connect part way through is one too.
+module Connecting {A B : Set} (p : Pos) (σ : EmissionSet A) (β : EmissionSet B) where
+
+  r : Pos
+  r = p ++ [ ix 1 ]
 
   -- The body has not ended by `q`.
   Alive : Pos → Set
   Alive q = ∀ {c} → β c end → q ≺ c
 
   data ConnT : EmissionSet B where
-    body   : ∀ {k e} → β k e → ConnT k e
-    shown  : ∀ {k e} → σ k e → Alive k → ConnT (k ++ [ ix 0 ]) skip
-    pinned : ∀ {k e} → σ k e → ¬ Alive k → T (inside r k) → ConnT k skip
+    body  : ∀ {k e} → β k e → ConnT k e
+    burst : ∀ {k e} → σ k e → T (inside r k) → ConnT (k ++ [ ix 0 ]) (pin p)
+    echo  : ∀ {k e} → σ k e → Alive k → Unpinned e → T (not (inside r k)) → ConnT (k ++ [ ix 0 ]) skip
+    kept  : ∀ {k p′} → σ k (pin p′) → Alive p′ → T (not (inside r k)) → T (inside p′ k) → ConnT (k ++ [ ix 0 ]) (pin p′)
 
 module Connect {A B : Set} (s : Den A) (F : Den A → Den B) (p : Pos) where
 
-  r : Pos
-  r = p ++ [ ix 1 ]
-
   σ : EmissionSet A
-  σ = enter s r
+  σ = enter s (p ++ [ ix 1 ])
 
   β : EmissionSet B
   β = enter (F (hot (Proper σ))) (p ++ [ ix 0 ])
 
-  open Connecting r σ β public
+  open Connecting p σ β public
 
 ------------------------------------------------------------------------
 -- FlatMap
@@ -382,7 +431,7 @@ module Op where
   scan f z s = Den.coldAt λ p → Scan.ScanT f z (enter s p)
 
   takeWhile : ∀ {A} → Bool → (A → Bool) → Den A → Den A
-  takeWhile i keep s = Den.coldAt λ p → TakeWhile.TakeT i keep (enter s p) p
+  takeWhile i keep s = Den.coldAt λ p → TakeWhile.TakeT i keep (enter s p)
 
   connect : ∀ {A B} → Den A → (Den A → Den B) → Den B
   connect s F = Den.coldAt λ p → Connect.ConnT s F p
