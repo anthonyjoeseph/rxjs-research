@@ -16,13 +16,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE CONNECT'S SEARCH
 
-Riskiest: a connect's lead is stated whole, over the connect node, at an
-empty environment only, because its body's joiners read the binder. Its
-search keys its rows up to a cap the binder leaves quiet (`OKᶜ`); open
-whether the lead carries the same cap. Settled by a body, or a connect
-whose body's joiner leads a row before its source's find.
+Riskiest: the connect's lead is a body; what is left is how its source's
+rows and its body's sit against each other. Open whether an over connect's
+source ties at all, and whether the pure order already keeps the source past
+a body's find. Settled by bodies, or a program whose source row lands at or
+before a body find no later than it.
 
-Members: `conn-leadᶜ`.
+Members: `unfed-after`, `over-tight`, `conn-body-src`.
 
 #### THE COLD STEPPED
 
