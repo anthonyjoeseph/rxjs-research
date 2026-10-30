@@ -2,35 +2,49 @@
 
 -- THE INVARIANT OF THE DIRECT LINK: a good tree, and by mode what the
 -- focus is owed.  A rising event leads every other part of each merge it
--- climbs, and its own node owes only rows past it; a mark run or a
--- subscription in flight asks only that every live part still owes.
+-- climbs, and its own node owes only rows past it; a subscription in
+-- flight is made where its binders are hot.
 module adequacy.Inv where
 
 open import Data.Bool using (Bool; true; false; T; _∧_)
 open import Data.Bool.Properties using (∧-zeroʳ; ∧-identityʳ)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List.Relation.Unary.All using ([])
-open import Data.List using (List; _∷_; _ʳ++_)
+open import Data.List using (_∷_; _ʳ++_)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.EmissionSet using (EmissionSet; DenEnv; module Connecting; module Scan)
+open import denotation.EmissionSet using (EmissionSet; DenEnv)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; plug; alive; nx; cp;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     free; cpAt; cutAt; overAt; closed; CS; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ)
-open import adequacy.Rows using (TakeR; Kept; stop; env; rows; rowsL; pendRows; here; RT; Moves; Lanes; module Flat; module BoundedF; module SwitchF; module ExhaustF)
-open import adequacy.Up using (≃-refl; any-ʳ++ʳ)
+open import adequacy.Rows using (env; rows; RT; Moves)
+open import adequacy.Up using (≃-refl)
 open import denotation.Laws.Worlds using (Ok; Hots)
 open import adequacy.Bound using (Empty; Good; G; GLn; LnBody; SrcG; Held; MergeG; mergeG-map; shape)
 open import adequacy.Skip using (After; LeadC)
-open import adequacy.Owes using (Owes; UpO; Need; SrcO; Owing; map-owing; flat-owing-o; flat-owing-l; owing-≃; ≡→≃; rowsL-ʳ++; goodL-ʳ++⁻; goodL-swap; Swap; good-swap)
+open import adequacy.Swap using (goodL-ʳ++⁻; goodL-swap; Swap; good-swap)
+
+-- The frames a rising or subscribing event climbs, open.
+UpO : ∀ {R Γ A} → Ctx R Γ A → Set
+UpO top                           = ⊤
+UpO (inMap f c)                   = UpO c
+UpO (inScan f z c)                = UpO c
+UpO (inTake i q w c)              = UpO c
+UpO (inCut true a c)              = UpO c
+UpO (inLn true c)                 = UpO c
+UpO (inOuter op f d n q ls c)     = UpO c
+UpO (inLanes op f d n q o pre post c) = UpO c
+UpO (inSrc k b c)                 = UpO c
+UpO (inBody k o c)                = UpO c
+UpO _                             = ⊥
 
 -- A node an event can rise out of: not cut, not out of its list.
 Open : ∀ {Γ A} → St Γ A → Set
@@ -49,10 +63,9 @@ Subs ρ (pend o q) = Ok (Hots ρ) q
 Subs ρ _          = ⊤
 
 Lead : ∀ {R} → Conf R → Set
-Lead ⟨ c , s , rising e , p ⟩ = UpO c × LeadC c p × Owes (env c) s × Open s × After p (rows (env c) s) × Ends e (rows (env c) s)
-                                × SrcO c (here (env c) s (rising e) p)
-Lead ⟨ c , s , subscribing , p ⟩ = UpO c × Owes (env c) s × Subs (env c) s × SrcO c (rows (env c) s)
-Lead ⟨ c , s , absorbed , p ⟩    = Owes [] (plug c s)
+Lead ⟨ c , s , rising e , p ⟩ = UpO c × LeadC c p × Open s × After p (rows (env c) s) × Ends e (rows (env c) s)
+Lead ⟨ c , s , subscribing , p ⟩ = UpO c × Subs (env c) s
+Lead ⟨ c , s , absorbed , p ⟩    = ⊤
 
 -- The tree the seeker reads: a subscription still owed owes it nothing.
 Seen : ∀ {Γ A} → St Γ A → St Γ A
@@ -235,56 +248,6 @@ node-good c s g nl nh with unF c s (good-split c s g)
 ... | inj₂ (inj₁ gl) = ⊥-elim (nl gl)
 ... | inj₂ (inj₂ h)  = ⊥-elim (nh h)
 
--- A MERGE OWING A ROW, AS ENTERED: a joiner of good parts owing a row
--- owes one with finitely many before it.  Every part of a good node owes
--- only rows with finitely many of its own before them, and finitely many
--- parts lie before any row, so the earliest part with infinitely many
--- rows before a row offers one with finitely many.
-postulate
-  owing-row : ∀ {Γ A B} {ρ : DenEnv Γ} {b} f d n q (o : St Γ A) (ls : List (St Γ B)) → G ρ b (flatS (mergeᶠ nothing) f d n q o ls)
-            → Owing (Flat.JoinT (λ a → pendRows ρ (f a)) (rows ρ o) d (rowsL ρ ls)) → Owing (rows ρ (flatS (mergeᶠ nothing) f d n q o ls))
-
--- A JOINER OWING A ROW, AS ENTERED, a bounded merge, a switch or an
--- exhaust: one of its parts owing a row, it owes one with finitely many
--- before it, as a merge does.  A lane a switch's value cuts leaves that
--- value's row owed instead.
-postulate
-  bounded-owing : ∀ {Γ A B} {ρ : DenEnv Γ} {b} m f d n q (o : St Γ A) (ls : List (St Γ B)) → G ρ b (flatS (mergeᶠ (just m)) f d n q o ls)
-                → Owing (rows ρ o) ⊎ Owing (Lanes (rowsL ρ ls)) → Owing (rows ρ (flatS (mergeᶠ (just m)) f d n q o ls))
-  switch-owing  : ∀ {Γ A B} {ρ : DenEnv Γ} {b} f d n q (o : St Γ A) (ls : List (St Γ B)) → G ρ b (flatS switchᶠ f d n q o ls)
-                → Owing (rows ρ o) ⊎ Owing (Lanes (rowsL ρ ls)) → Owing (rows ρ (flatS switchᶠ f d n q o ls))
-  exhaust-owing : ∀ {Γ A B} {ρ : DenEnv Γ} {b} f d n q (o : St Γ A) (ls : List (St Γ B)) → G ρ b (flatS exhaustᶠ f d n q o ls)
-                → Owing (rows ρ o) ⊎ Owing (Lanes (rowsL ρ ls)) → Owing (rows ρ (flatS exhaustᶠ f d n q o ls))
-
--- A SCAN OF A SOURCE OWING, OWES: a source value is a scan row only once
--- a least value stands before it, so the row it is owed must have one.
-postulate
-  scan-owing : ∀ {A B} (f : B → A → B) z {t : EmissionSet A} → Owing t → Owing (Scan.ScanT f z t)
-
--- A TAKE OF A SOURCE OWING, OWES, while no value has failed: its least
--- row passes, or is the first failing value, kept or stopped at.
-postulate
-  take-owing : ∀ {A} i (q : A → Bool) {t : EmissionSet A} → Owing t → Owing (TakeR i q free t)
-
--- A FAILED TAKE PAST ITS STOP OWES: what it keeps of a source owing.
--- Suspect: a source owing only rows past its failing value keeps none,
--- while the machine's take stays alive owing only its cut, as a hushing
--- cold does; one with THE OWED.
-postulate
-  kept-owing : ∀ {A} p {t : EmissionSet A} → Owing t → Owing (Kept p t)
-
-take-owes : ∀ {A} i (q : A → Bool) w {t : EmissionSet A} → Owing t → Owing (TakeR i q w t)
-take-owes i q free       ow = take-owing i q ow
-take-owes i q (cpAt p)   ow = λ em → em stop
-take-owes i q (cutAt p)  ow = kept-owing p ow
-take-owes i q (overAt p) ow = kept-owing p ow
-
--- A CONNECT WHOSE SOURCE OWES, OWES: a live connect's source row is a
--- burst pin, an echo while the body runs, or a pin its own connect keeps,
--- and once the body has ended the body's end is a row of its own.
-postulate
-  conn-owing : ∀ {Γ A X} {ρ : DenEnv Γ} (k : CS) (o : St Γ X) (b : St (X ∷ Γ) A) → G ρ true (connS k o b) → Owing (rows ρ o) → Owing (rows ρ (connS k o b))
-
 -- Under open frames every hole is owed.
 upo-liv : ∀ {R Γ A} (c : Ctx R Γ A) → UpO c → liv c ≡ true
 upo-liv top              _ = refl
@@ -293,50 +256,12 @@ upo-liv (inScan f z c)   u = upo-liv c u
 upo-liv (inTake i q w c) u = upo-liv c u
 upo-liv (inCut true a c) u rewrite upo-liv c u = refl
 upo-liv (inLn true c)    u = upo-liv c u
-upo-liv (inOuter op f d n q ls c) (_ , u) = upo-liv c u
-upo-liv (inLanes op f d n q o pre post c) (_ , _ , _ , _ , u) = upo-liv c u
+upo-liv (inOuter op f d n q ls c) u = upo-liv c u
+upo-liv (inLanes op f d n q o pre post c) u = upo-liv c u
 upo-liv (inCut false a c) ()
 upo-liv (inLn false c)    ()
 upo-liv (inSrc k b c)  u       = upo-liv c u
-upo-liv (inBody k o c) (_ , u) = upo-liv c u
-
--- A part owing a row under open frames: its frame's node owes one, and
--- each connect it is the source of owes in its body.
-need-of : ∀ {R Γ A} (c : Ctx R Γ A) {s : St Γ A} → UpO c → Good [] (plug c s) → Owing (rows (env c) s) → SrcO c (rows (env c) s) → Need c s
-need-of top                                     u g ow so = tt
-need-of (inMap f c)                             u g ow so = need-of c u g (map-owing f ow) so
-need-of (inScan f z c)                          u g ow so = need-of c u g (scan-owing f z ow) so
-need-of (inTake i q w c)                        u g ow so = need-of c u g (take-owes i q w ow) so
-need-of (inCut true a c)                        u g ow so = need-of c u g ow so
-need-of (inLn true c)                           u g ow so = need-of c u g ow so
-need-of (inOuter (mergeᶠ nothing) f d n q ls c) {s} (_ , u) g ow so =
-  (λ _ → ow) , need-of c u g (owing-row f d n q s ls (node-good c _ g (λ ()) (λ ())) (flat-owing-o _ ow)) so
-need-of (inLanes (mergeᶠ nothing) f d n q o pre post c) {s} (_ , _ , _ , _ , u) g ow so =
-  (λ _ → ow) , need-of c u g (owing-row f d n q o (pre ʳ++ s ∷ post) (node-good c _ g (λ ()) (λ ()))
-                                (owing-≃ (≡→≃ (cong (Flat.JoinT _ (rows (env c) o) d) (sym (rowsL-ʳ++ pre))))
-                                         (flat-owing-l _ λ em → ow λ r → em (any-ʳ++ʳ (rowsL (env c) pre) (inj₁ r)))))
-                 (subst (λ X → SrcO c (Flat.RowT (λ a → pendRows (env c) (f a)) (rows (env c) o) d X)) (sym (rowsL-ʳ++ pre)) so)
-need-of (inOuter (mergeᶠ (just m)) f d n q ls c) {s} (_ , u) g ow so =
-  (λ _ → ow) , need-of c u g (bounded-owing m f d n q s ls (node-good c _ g (λ ()) (λ ())) (inj₁ ow)) so
-need-of (inLanes (mergeᶠ (just m)) f d n q o pre post c) {s} (_ , _ , _ , _ , u) g ow so =
-  (λ _ → ow) , need-of c u g (bounded-owing m f d n q o (pre ʳ++ s ∷ post) (node-good c _ g (λ ()) (λ ()))
-                                (inj₂ (owing-≃ (≡→≃ (cong Lanes (sym (rowsL-ʳ++ pre)))) λ em → ow λ r → em (any-ʳ++ʳ (rowsL (env c) pre) (inj₁ r)))))
-                 (subst (λ X → SrcO c (BoundedF.RowT m (λ a → pendRows (env c) (f a)) (rows (env c) o) d n q X)) (sym (rowsL-ʳ++ pre)) so)
-need-of (inOuter switchᶠ f d n q ls c) {s} (_ , u) g ow so =
-  (λ _ → ow) , need-of c u g (switch-owing f d n q s ls (node-good c _ g (λ ()) (λ ())) (inj₁ ow)) so
-need-of (inLanes switchᶠ f d n q o pre post c) {s} (_ , _ , _ , _ , u) g ow so =
-  (λ _ → ow) , need-of c u g (switch-owing f d n q o (pre ʳ++ s ∷ post) (node-good c _ g (λ ()) (λ ()))
-                                (inj₂ (owing-≃ (≡→≃ (cong Lanes (sym (rowsL-ʳ++ pre)))) λ em → ow λ r → em (any-ʳ++ʳ (rowsL (env c) pre) (inj₁ r)))))
-                 (subst (λ X → SrcO c (SwitchF.RowT (λ a → pendRows (env c) (f a)) (rows (env c) o) d n X)) (sym (rowsL-ʳ++ pre)) so)
-need-of (inOuter exhaustᶠ f d n q ls c) {s} (_ , u) g ow so =
-  (λ _ → ow) , need-of c u g (exhaust-owing f d n q s ls (node-good c _ g (λ ()) (λ ())) (inj₁ ow)) so
-need-of (inLanes exhaustᶠ f d n q o pre post c) {s} (_ , _ , _ , _ , u) g ow so =
-  (λ _ → ow) , need-of c u g (exhaust-owing f d n q o (pre ʳ++ s ∷ post) (node-good c _ g (λ ()) (λ ()))
-                                (inj₂ (owing-≃ (≡→≃ (cong Lanes (sym (rowsL-ʳ++ pre)))) λ em → ow λ r → em (any-ʳ++ʳ (rowsL (env c) pre) (inj₁ r)))))
-                 (subst (λ X → SrcO c (ExhaustF.RowT (λ a → pendRows (env c) (f a)) (rows (env c) o) d n X)) (sym (rowsL-ʳ++ pre)) so)
-need-of (inSrc k b c) {s} u g ow (ob , so) =
-  ob , need-of c u g (conn-owing k s b (subst (λ v → G (env c) v (connS k s b)) (upo-liv c u) (node-good c _ g (λ ()) (λ ()))) ow) so
-need-of (inBody k o c)                          (_ , u) g ow so = need-of c u g (λ em → ow λ r → em (Connecting.body r)) so
+upo-liv (inBody k o c) u     = upo-liv c u
 
 ------------------------------------------------------------------------
 -- A hole under a cut switched off

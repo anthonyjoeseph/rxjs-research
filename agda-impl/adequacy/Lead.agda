@@ -379,7 +379,7 @@ module Race {R Γ A B} (v : Bool) (c : Ctx R Γ B) (f : A → Obs Timeline Γ B)
   ρ = env c
 
   FR : EmissionSet B
-  FR = Flat.JoinT (λ x → pendRows ρ (f x)) (rows ρ o) d (rowsL ρ ls)
+  FR = Flat.JoinT (λ x → pendRows ρ (f x)) (rows ρ o) d n (rowsL ρ ls)
 
   lane-occ : ∀ {Q} (o′ o″ : Out B) → (∀ {b} → Fits o′ (out b) → Fits o″ (out b)) → Occ (Lanes (rowsL ρ ls)) Q o′ → Occ FR Q o″
   lane-occ o′ o″ fo oc = occ-bind oc go

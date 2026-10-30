@@ -73,38 +73,26 @@ Members: `sub-connect`, `sub-join`, `sub-joined`, `rise-src-nx`,
 
 Believed: a body reads its binder only through the binder's rows, and a
 good tree's connect source reads lawfully. Settled by bodies, or a body
-whose rows, goodness or owing differ under equal binder rows.
+whose rows or goodness differ under equal binder rows.
 
-Members: `rows-hot`, `good-hot`, `owes-hot`, `src-lawful`.
+Members: `rows-hot`, `good-hot`, `src-lawful`.
 
 #### A SKIP UNDER A CONNECT
 
 Untried: a skip at a source past its lead is unseen above its connect,
-and moves nothing it owes, the connect showing it a skip or a pin and
-each joiner a skip where it joined. Settled by bodies, or a source skip
-that changes what the connect shows.
+the connect showing it a skip or a pin and each joiner a skip where it
+joined. Settled by a body, or a source skip that changes what the
+connect shows.
 
-Members: `src-vis`, `src-owes-≈`.
+Members: `src-vis`.
 
-#### WHAT A CONNECT OWES
+#### AN OF IN A COMPLETED SOURCE
 
-Untried: a live connect whose source owes, owes; an of in a completed
-source runs out silently. Settled by bodies, or a live connect owing
-nothing over a source that owes.
+Untried: an of in a source its connect has seen complete runs out
+silently, its rows reaching no row above. Settled by a body, or such an
+of whose run shows.
 
-Members: `conn-owing`, `shut-of`.
-
-#### OWING AS ENTERED
-
-Believed: a merge of good parts owing a row owes one with finitely many
-before it, and a scan of a source owing a row owes one, its source's
-values having a least. The goal is a negation, so a finitary case split
-is free: finitely many rows lie before any row, each truncation-closed.
-Settled by bodies, or a good node whose every row has infinitely many
-before.
-
-Members: `owing-row`, `scan-owing`, `take-owing`, `bounded-owing`,
-`switch-owing`, `exhaust-owing`.
+Members: `shut-of`.
 
 #### THE SCAN STEPPED
 
@@ -147,24 +135,15 @@ Members: `met-of-shown`.
 
 #### THE GOOD TREE KEPT
 
-Untried: a mark run at an of keeps `Good`. Apartness is derived, not
-carried: `Rooted` reads it off Tier −1's invariant at the outer's entry.
-Owed: each outer still inside its entry, and a lane begun rooted at a
-value of its own, its rows in its subscription's world. Settled by
-bodies, or a program whose of run leaves two parts sharing a position.
+Untried: a mark run at an of, and a lane's end leaving its list and its
+merge's count, keep `Good`. Apartness is derived, not carried: `Rooted`
+reads it off Tier −1's invariant at the outer's entry. Owed: each outer
+still inside its entry, a lane begun rooted at a value of its own, its
+rows in its subscription's world, and every frame above a merge good
+over rows that may now end where the lane did. Settled by bodies, or a
+program whose of run leaves two parts sharing a position.
 
-Members: `good-of`, `good-done`.
-
-#### THE OWED
-
-Suspect: `Owes` reads a live node as owing a row, false for a cold that
-hushes (live, no rows, never ends), and `Rows.Flat` finishes a begun lane
-by `Gone`, which a hushing lane meets vacuously where the entered joiner's
-`Ended` does not; a failed take past its stop is live owing only its cut. Restate both as a live node owing no end. Then a closed
-of dropped changes nothing owed (`adequacy.AbsOf`). Settled by the
-restatement and a body, or a merge over a hushing lane.
-
-Members: `owes-closed`, `kept-owing`.
+Members: `good-of`, `good-done`, `good-lane-end`.
 
 #### THE MARK FOUND
 

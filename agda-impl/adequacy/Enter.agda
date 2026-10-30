@@ -73,10 +73,10 @@ module _ {A B : Set} {Lane Lane′ : Pos → A → EmissionSet B} {O : EmissionS
       bwd (Y.rhand x h)         = X.rhand (from bg x) h
 
 -- A merge with no outer rows and no lane begun: no rows.
-flat-∅ : ∀ {A B} (L : A → Pos → EmissionSet B) d → Flat.RowT L ∅ d [] ≃ ∅
-flat-∅ L d = (λ (r , _) → to′ r) ⇄ λ ()
+flat-∅ : ∀ {A B} (L : A → Pos → EmissionSet B) d n → Flat.RowT L ∅ d n [] ≃ ∅
+flat-∅ L d n = (λ (r , _) → to′ r) ⇄ λ ()
   where
-    to′ : ∀ {k e} → Flat.JoinT L ∅ d [] k e → ⊥
+    to′ : ∀ {k e} → Flat.JoinT L ∅ d n [] k e → ⊥
     to′ (Flat.val ())
     to′ (Flat.step ())
     to′ (Flat.opin ())
@@ -194,9 +194,9 @@ enter-map ρ f s p = proj₁ ⇄ λ x → x , reach′ x
 -- A MERGE ENTERED: the merge part way through, at its outer entered, not
 -- done, nothing begun.
 enter-merge : ∀ {Γ A B} (ρ : DenEnv Γ) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p
-            → pendRows ρ (flatMap (mergeᶠ nothing) f s) p ≃ Flat.RowT (λ a → pendRows ρ (f a)) (pendRows ρ s p) false []
+            → pendRows ρ (flatMap (mergeᶠ nothing) f s) p ≃ Flat.RowT (λ a → pendRows ρ (f a)) (pendRows ρ s p) false 0 []
 enter-merge ρ f s p =
-  trunc-≃ (joining-≃ ((λ (l , p) → reads l p) ⇄ λ (reads l p) → l , p) ((λ ()) ⇄ λ ()) (λ e → inj₂ e , tt) λ { (inj₁ () , _) ; (inj₂ e , _) → e })
+  trunc-≃ (joining-≃ ((λ (l , p) → reads l p) ⇄ λ (reads l p) → l , p) ((λ ()) ⇄ λ ()) (λ e → Flat.over-at (inj₂ e) tt) λ { (Flat.over-at (inj₁ ()) _) ; (Flat.over-at (inj₂ e) _) → e })
 
 -- A SCAN ENTERED: its source entered, scanned.
 enter-scan : ∀ {Γ A B} (ρ : DenEnv Γ) (f : B → A → B) z (s : Obs Timeline Γ A) p → pendRows ρ (scan f z s) p ≃ Scan.ScanT f z (pendRows ρ s p)
