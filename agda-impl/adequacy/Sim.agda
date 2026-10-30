@@ -45,6 +45,7 @@ open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
 open import adequacy.Skip using (After; after-conn)
 open import adequacy.Inv using (Inv; inv; good; Sim; Ends; open-alive)
 open import adequacy.LaneCp using (rise-lane-cp; rise-switch-lane-cp; rise-exhaust-lane-cp; rise-bounded-lane-cp)
+open import adequacy.LaneNx using (rise-lane-nx; rise-bounded-lane-nx; rise-switch-lane-nx; rise-exhaust-lane-nx)
 open import adequacy.AbsOf using (abs-of; up-plug)
 open import denotation.Read using (Meets; Run; Visible; loud; []; _∷_)
 open import adequacy.Swap using (Swap; good-swap)
@@ -335,11 +336,6 @@ postulate
   -- AN OUTER'S END, SHOWN ONLY WITH NO LANE RUNNING.
   rise-outer-cp : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) p
                 → Sim ⟨ inOuter (mergeᶠ nothing) f d n q ls c , o , rising cp , p ⟩ [] ⟨ c , flatS (mergeᶠ nothing) f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
-  -- A LANE'S VALUE PASSES, UNLESS THE LANE IS OVER.
-  rise-lane-nx : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s b p
-               → Sim ⟨ inLanes (mergeᶠ nothing) f d n q o pre post c , s , rising (nx b) , p ⟩ []
-                     (if alive s then ⟨ c , flatS (mergeᶠ nothing) f d n q o (pre Data.List.ʳ++ s ∷ post) , rising (nx b) , p ⟩
-                                 else ⟨ c , flatS (mergeᶠ nothing) f d n q o (pre Data.List.ʳ++ s ∷ post) , absorbed , p ⟩)
 
   -- A BOUNDED MERGE'S OUTER VALUE BEGINS ITS LANE WITH ROOM, ELSE WAITS.
   rise-bounded-nx : ∀ {R Γ A B} m f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p
@@ -349,11 +345,6 @@ postulate
   -- A BOUNDED MERGE'S OUTER END, SHOWN ONLY WITH NO LANE RUNNING OR WAITING.
   rise-bounded-cp : ∀ {R Γ A B} m f d n q ls (c : Ctx R Γ B) (o : St Γ A) p
                  → Sim ⟨ inOuter (mergeᶠ (just m)) f d n q ls c , o , rising cp , p ⟩ [] ⟨ c , flatS (mergeᶠ (just m)) f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
-  -- A BOUNDED MERGE'S LANE VALUE PASSES, UNLESS THE LANE IS OVER.
-  rise-bounded-lane-nx : ∀ {R Γ A B} m f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s b p
-                      → Sim ⟨ inLanes (mergeᶠ (just m)) f d n q o pre post c , s , rising (nx b) , p ⟩ []
-                            (if alive s then ⟨ c , flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s ∷ post) , rising (nx b) , p ⟩
-                                        else ⟨ c , flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
   -- A BOUNDED MERGE'S LANE END FREES ITS SLOT FOR THE FIRST WAITING VALUE.
   rise-bounded-lane-hand : ∀ {R Γ A B} m f d n a q (o : St Γ A) pre post (c : Ctx R Γ B) s p
                          → Sim ⟨ inLanes (mergeᶠ (just m)) f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ []
@@ -365,11 +356,6 @@ postulate
   -- A SWITCH'S OUTER END, SHOWN ONLY WITH NO LANE RUNNING.
   rise-switch-cp : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) p
                 → Sim ⟨ inOuter switchᶠ f d n q ls c , o , rising cp , p ⟩ [] ⟨ c , flatS switchᶠ f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
-  -- A SWITCH'S LANE VALUE PASSES, UNLESS THE LANE IS OVER.
-  rise-switch-lane-nx : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s b p
-                     → Sim ⟨ inLanes switchᶠ f d n q o pre post c , s , rising (nx b) , p ⟩ []
-                           (if alive s then ⟨ c , flatS switchᶠ f d n q o (pre ʳ++ s ∷ post) , rising (nx b) , p ⟩
-                                       else ⟨ c , flatS switchᶠ f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
   -- AN EXHAUST'S OUTER VALUE BEGINS ITS LANE WITH NONE RUNNING.
   rise-exhaust-run : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p → (n ≡ᵇ 0) ≡ true
                    → Sim ⟨ inOuter exhaustᶠ f d n q ls c , o , rising (nx a) , p ⟩ [] (start c exhaustᶠ f d n q o ls a p)
@@ -379,11 +365,6 @@ postulate
   -- AN EXHAUST'S OUTER END, SHOWN ONLY WITH NO LANE RUNNING.
   rise-exhaust-cp : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) p
                  → Sim ⟨ inOuter exhaustᶠ f d n q ls c , o , rising cp , p ⟩ [] ⟨ c , flatS exhaustᶠ f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
-  -- AN EXHAUST'S LANE VALUE PASSES, UNLESS THE LANE IS OVER.
-  rise-exhaust-lane-nx : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s b p
-                      → Sim ⟨ inLanes exhaustᶠ f d n q o pre post c , s , rising (nx b) , p ⟩ []
-                            (if alive s then ⟨ c , flatS exhaustᶠ f d n q o (pre ʳ++ s ∷ post) , rising (nx b) , p ⟩
-                                        else ⟨ c , flatS exhaustᶠ f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
 
   -- A SOURCE'S VALUE FEEDS ITS BODY.
   rise-src-nx : ∀ {R Γ X B} (k : CS) (b : St (X ∷ Γ) B) (c : Ctx R Γ B) s a p
