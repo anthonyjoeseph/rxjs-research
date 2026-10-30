@@ -52,7 +52,7 @@ data Next {R : Set} (k : Conf R) (p : Pos) : Ev R → Set₁ where
   done : Steps k [ (p , cp) ] → Next k p end
 
 -- `k′` a silent step on from `k`.
-_⇜_ : ∀ {R} → Conf R → Conf R → Set
+_⇜_ : ∀ {R} → Conf R → Conf R → Set₁
 _⇜_ {R} k′ k = Σ _ λ τ → Driver.step R k ≡ Driver.silent τ k′
 
 postulate
