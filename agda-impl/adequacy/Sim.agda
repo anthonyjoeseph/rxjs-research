@@ -44,7 +44,7 @@ open import adequacy.Search using (seek-ok)
 open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
 open import adequacy.Skip using (After; after-conn)
 open import adequacy.Inv using (Inv; inv; good; Sim; Ends; open-alive)
-open import adequacy.LaneCp using (rise-lane-cp)
+open import adequacy.LaneCp using (rise-lane-cp; rise-switch-lane-cp; rise-exhaust-lane-cp; rise-bounded-lane-cp)
 open import adequacy.AbsOf using (abs-of; up-plug)
 open import denotation.Read using (Meets; Run; Visible; loud; []; _∷_)
 open import adequacy.Swap using (Swap; good-swap)
@@ -355,10 +355,10 @@ postulate
                             (if alive s then ⟨ c , flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s ∷ post) , rising (nx b) , p ⟩
                                         else ⟨ c , flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
   -- A BOUNDED MERGE'S LANE END FREES ITS SLOT FOR THE FIRST WAITING VALUE.
-  rise-bounded-lane-cp : ∀ {R Γ A B} m f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s p
-                      → Sim ⟨ inLanes (mergeᶠ (just m)) f d n q o pre post c , s , rising cp , p ⟩ []
-                            (if alive s then dequeue c (mergeᶠ (just m)) f d (pred n) q o (pre ʳ++ ended s ∷ post) p
-                                        else ⟨ c , flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
+  rise-bounded-lane-hand : ∀ {R Γ A B} m f d n a q (o : St Γ A) pre post (c : Ctx R Γ B) s p
+                         → Sim ⟨ inLanes (mergeᶠ (just m)) f d n (a ∷ q) o pre post c , s , rising cp , p ⟩ []
+                               (if alive s then dequeue c (mergeᶠ (just m)) f d (pred n) (a ∷ q) o (pre ʳ++ ended s ∷ post) p
+                                           else ⟨ c , flatS (mergeᶠ (just m)) f d n (a ∷ q) o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
   -- A SWITCH'S OUTER VALUE CUTS EVERY RUNNING LANE AND BEGINS ITS OWN.
   rise-switch-nx : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p ls′ (t : Torn) → killAll ls ≡ (ls′ , t)
                  → Sim ⟨ inOuter switchᶠ f d n q ls c , o , rising (nx a) , p ⟩ [] (start c switchᶠ f d 0 q o ls′ a p)
@@ -369,11 +369,6 @@ postulate
   rise-switch-lane-nx : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s b p
                      → Sim ⟨ inLanes switchᶠ f d n q o pre post c , s , rising (nx b) , p ⟩ []
                            (if alive s then ⟨ c , flatS switchᶠ f d n q o (pre ʳ++ s ∷ post) , rising (nx b) , p ⟩
-                                       else ⟨ c , flatS switchᶠ f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
-  -- A SWITCH'S LANE END.
-  rise-switch-lane-cp : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s p
-                     → Sim ⟨ inLanes switchᶠ f d n q o pre post c , s , rising cp , p ⟩ []
-                           (if alive s then dequeue c switchᶠ f d (pred n) q o (pre ʳ++ ended s ∷ post) p
                                        else ⟨ c , flatS switchᶠ f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
   -- AN EXHAUST'S OUTER VALUE BEGINS ITS LANE WITH NONE RUNNING.
   rise-exhaust-run : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p → (n ≡ᵇ 0) ≡ true
@@ -388,11 +383,6 @@ postulate
   rise-exhaust-lane-nx : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s b p
                       → Sim ⟨ inLanes exhaustᶠ f d n q o pre post c , s , rising (nx b) , p ⟩ []
                             (if alive s then ⟨ c , flatS exhaustᶠ f d n q o (pre ʳ++ s ∷ post) , rising (nx b) , p ⟩
-                                        else ⟨ c , flatS exhaustᶠ f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
-  -- AN EXHAUST'S LANE END.
-  rise-exhaust-lane-cp : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s p
-                      → Sim ⟨ inLanes exhaustᶠ f d n q o pre post c , s , rising cp , p ⟩ []
-                            (if alive s then dequeue c exhaustᶠ f d (pred n) q o (pre ʳ++ ended s ∷ post) p
                                         else ⟨ c , flatS exhaustᶠ f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
 
   -- A SOURCE'S VALUE FEEDS ITS BODY.
@@ -453,7 +443,8 @@ rise-sim (inTake i w (overAt r) c) s e  p refl = rise-take-owed i w (overAt r) c
 rise-sim (inOuter (mergeᶠ (just m)) f d n q ls c) o (nx a) p refl = rise-bounded-nx m f d n q ls c o a p
 rise-sim (inOuter (mergeᶠ (just m)) f d n q ls c) o cp     p refl = rise-bounded-cp m f d n q ls c o p
 rise-sim (inLanes (mergeᶠ (just m)) f d n q o pre post c) s (nx b) p refl = rise-bounded-lane-nx m f d n q o pre post c s b p
-rise-sim (inLanes (mergeᶠ (just m)) f d n q o pre post c) s cp     p refl = rise-bounded-lane-cp m f d n q o pre post c s p
+rise-sim (inLanes (mergeᶠ (just m)) f d n [] o pre post c) s cp    p refl = rise-bounded-lane-cp m f d n o pre post c s p
+rise-sim (inLanes (mergeᶠ (just m)) f d n (a ∷ q) o pre post c) s cp p refl = rise-bounded-lane-hand m f d n a q o pre post c s p
 rise-sim (inOuter switchᶠ f d n q ls c) o (nx a) p eq with killAll ls in kl
 rise-sim (inOuter switchᶠ f d n q ls c) o (nx a) p refl | ls′ , t = rise-switch-nx f d n q ls c o a p ls′ t kl
 rise-sim (inOuter switchᶠ f d n q ls c) o cp     p refl = rise-switch-cp f d n q ls c o p

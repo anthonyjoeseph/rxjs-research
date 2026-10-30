@@ -25,6 +25,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (refl)
 
+open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; ix)
 open import denotation.EmissionSet using (EmissionSet; out; end; Ended; module Joining; _≺_; _≼_)
 open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; AgreeTo-sym; ≺-trans; ≺→≼; ≼-refl; ≼-≺-≺; ≼-or-≻; ≺-ext)
@@ -68,6 +69,13 @@ exhaustP L O d n Ls = record { lanes = Lane L ; outer = O ; begun = Lanes Ls ; o
 boundedP : ∀ {A B : Set} (m : ℕ) (L : A → Pos → EmissionSet B) (O : EmissionSet A) (d : Bool) (n : ℕ) (Qu : List A) (Ls : List (EmissionSet B)) → Policy A B
 boundedP m L O d n Qu Ls = record { lanes = BoundedF.LaneB m L O d n Qu Ls ; outer = O ; begun = BoundedF.Bg m L O d n Qu Ls ; over = BoundedF.Over m L O d n Qu Ls
                                   ; runs = BoundedF.Indexed m L O d n Qu Ls ; cut = λ _ _ → ⊥ ; hand = BoundedF.Queued m L O d n Qu Ls }
+
+-- Each joiner's policy, none waiting.
+polOf : ∀ {A B : Set} → FlatOp → (A → Pos → EmissionSet B) → EmissionSet A → Bool → ℕ → List (EmissionSet B) → Policy A B
+polOf (mergeᶠ nothing)  L O d n = flatP L O d n
+polOf (mergeᶠ (just m)) L O d n = boundedP m L O d n []
+polOf switchᶠ           L O d n = switchP L O d n
+polOf exhaustᶠ          L O d n = exhaustP L O d n
 
 ------------------------------------------------------------------------
 -- Read alike at and below a bound
