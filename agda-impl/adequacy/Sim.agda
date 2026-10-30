@@ -25,10 +25,10 @@ open import Data.List using (_ʳ++_)
 open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Timeline; root; Pos; ix; timelineAt; emit; stall; close)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; MapT; map-out; map-skip; map-pin; map-end; module Scan;
-  module TakeWhile; module Connecting; _≼_; _≺_; enter; ⟦_⟧; Proper; Den; Silent; Dep)
+  module TakeWhile; module Connecting; _≼_; _≺_; enter; ⟦_⟧; Den; Silent; Dep)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≼-or-≻; entered-few)
-open import denotation.Laws.Worlds using (GoodEnv; Lawful; Hots; InvAt)
-open import denotation.Laws using (inv-⟦⟧; good-cons)
+open import denotation.Laws.Worlds using (Hots; InvAt)
+open import denotation.Laws using (inv-⟦⟧)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; over; opening)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; seek; found; Mark; ofM; attM;
                     rise; run; start; dequeue; settle; alive; ended; mapEv; nx; cp; attAt; attached; Torn;
@@ -37,8 +37,8 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
-open import adequacy.Rows using (env; rows; pendRows; Closed; RT; toEv; Vis; Past; Lowest; Beyond; into; back; narrow; Plus; old; new; _≃_; _⇄_; silent; shown;
-  Steps; Shows*; Shows*-≃; ≃-sym; conv; []; _∷_; tau; val; fin)
+open import adequacy.Rows using (env; rows; pendRows; RT; toEv; Vis; Past; Lowest; Beyond; into; back; narrow; Plus; old; new;
+  _≃_; _⇄_; silent; shown; Steps; Shows*; Shows*-≃; ≃-sym; conv; []; _∷_; tau; val; fin)
 open import adequacy.Bound using (Good; G; Rooted; mergeG₀; OK)
 open import adequacy.Search using (seek-ok)
 open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
@@ -50,27 +50,9 @@ open import adequacy.LaneNx using (rise-lane-nx; rise-bounded-lane-nx; rise-swit
 open import adequacy.AbsOf using (abs-of; up-plug)
 open import denotation.Read using (Meets; Run; Visible; loud; []; _∷_)
 open import adequacy.Swap using (Swap; good-swap)
+open import adequacy.Env using (env-good)
 open import adequacy.Enter using (enter-map; enter-scan; enter-merge; flat-∅; enter-bounded; enter-switch; enter-exhaust; bounded-∅; switch-∅; exhaust-∅)
 
-postulate
-  -- A GOOD TREE'S CONNECT SOURCE READS LAWFULLY: its rows reachable, one
-  -- event at a position, none below another, as the binder its body reads.
-  src-lawful : ∀ {R Γ X B} (k : CS) (o : St Γ X) (b : St (X ∷ Γ) B) (c : Ctx R Γ B) → Good []ᴬ (plug c (connS k o b))
-             → Lawful (Proper (λ q e → rows (env c) o q e ⊎ Closed k q e))
-
--- A good tree's environment keeps the invariant: each binder a
--- connect's source.
-env-good : ∀ {R Γ A} (c : Ctx R Γ A) {s} → Good []ᴬ (plug c s) → GoodEnv (env c)
-env-good top                                         _ ()
-env-good (inMap f c)                                 g = env-good c g
-env-good (inScan f z c)                              g = env-good c g
-env-good (inCut l a c)                               g = env-good c g
-env-good (inLn b c)                                  g = env-good c g
-env-good (inOuter op f d n q ls c)                   g = env-good c g
-env-good (inLanes op f d n q o pre post c)           g = env-good c g
-env-good (inTake i q w c)                            g = env-good c g
-env-good (inSrc k b c)                               g = env-good c g
-env-good (inBody k o c) {s}                          g = good-cons (src-lawful k o s c g) (env-good c g)
 
 ------------------------------------------------------------------------
 -- Subscribing

@@ -29,7 +29,7 @@ open import denotation.Events using (Pos; ix; last)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; _≺_; _≼_; Truncate; Reach; Dep; MapT; map-out; map-skip;
   map-pin; map-end; module Joining; module Values; module Connecting; module Scan;
   module TakeWhile)
-open import denotation.Laws.Modulus using (≺-trans; ≺→≼; ≼-≺-≺; ≺-ext)
+open import denotation.Laws.Modulus using (≺-trans; ≺→≼; ≼-≺-≺; ≺-ext; ≼-refl)
 open import operation.PureObservable using (module Machine)
 open Machine using (Owe; free; cpAt; cutAt; overAt; Ctx; St; CS; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (TakeR; Kept; kept; Stops; stop; left; acc-val; up; env; rows; rowsL; pendRows; Lane; reads;
@@ -492,12 +492,13 @@ after-conn r σ t {p} ao at (Connecting.echo   {k} x _ _ _) = ≺-trans {p} {k} 
 after-conn r σ t {p} ao at (Connecting.kept   {k} x _ _ _) = ≺-trans {p} {k} {k ++ [ ix 0 ]} (ao x) (≺-ext k [])
 
 postulate
-  -- A SKIP AT A SOURCE IS UNSEEN ABOVE ITS CONNECT: the connect shows it
+  -- A SKIP AT A SOURCE IS UNSEEN ABOVE ITS CONNECT: a skip at or past the
+  -- source's lead `p`, the connect shows it
   -- as a skip or a pin under it, and every joiner fed it as a skip under
   -- where it joined, so what differs above is skips past `p` alone, and
   -- the frames above, every other part past `p`, end alike.
-  src-vis : ∀ {R Γ X B} (k : CS) (b : St (X ∷ Γ) B) (c : Ctx R Γ B) {t u : EmissionSet X} {p}
-          → After p (rows (Hot ∅ k ∷ᴬ env c) b) → LeadC c p → Since p t → Since p u → t ≈⟨ p ⟩ u
+  src-vis : ∀ {R Γ X B} (k : CS) (b : St (X ∷ Γ) B) (c : Ctx R Γ B) {t u : EmissionSet X} {p s}
+          → After p (rows (Hot ∅ k ∷ᴬ env c) b) → LeadC c p → p ≼ s → Since p t → Since p u → t ≈⟨ s ⟩ u
           → Vis (up (inSrc k b c) t) ≃ Vis (up (inSrc k b c) u)
 
 ------------------------------------------------------------------------
@@ -507,41 +508,42 @@ postulate
 ≃-id : ∀ {A} {t : EmissionSet A} → t ≃ t
 ≃-id = (λ x → x) ⇄ (λ x → x)
 
-up-vis : ∀ {R Γ A} (c : Ctx R Γ A) {t u : EmissionSet A} {p} → LeadC c p → Since p t → Since p u → t ≈⟨ p ⟩ u → Vis (up c t) ≃ Vis (up c u)
-up-vis top                                   ld st su eq = ≈-vis eq
-up-vis (inMap f c)                             ld st su eq = up-vis c ld (since-map f st) (since-map f su) (map-≈ f eq)
-up-vis (inScan f z c)                          ld st su eq = up-vis c ld (since-scan f z st) (since-scan f z su) (scan-≈ f z eq)
-up-vis (inCut true a c)                        ld st su eq = up-vis c ld st su eq
-up-vis (inCut false a c)                       ld st su eq = ≃-id
-up-vis (inLn true c)                           ld st su eq = up-vis c ld st su eq
-up-vis (inLn false c)                          ld st su eq = ≃-id
-up-vis (inTake i q w c)                        (lt , ld) st su eq = up-vis c ld (since-take i q w lt st) (since-take i q w lt su) (take-≈ i q w eq)
-up-vis (inOuter (mergeᶠ nothing) f d n q ls c) {t} {u} (al , ld) st su eq =
-  up-vis c ld (since-row L t Ls st sl) (since-row L u Ls su sl) (trunc-≈ (flat-≈ L Ls Ls eq (≈ᴸ-refl Ls)))
+-- A skip at or past the lead, unseen above.
+up-vis-at : ∀ {R Γ A} (c : Ctx R Γ A) {t u : EmissionSet A} {p s} → LeadC c p → p ≼ s → Since p t → Since p u → t ≈⟨ s ⟩ u → Vis (up c t) ≃ Vis (up c u)
+up-vis-at top                                   ld ps st su eq = ≈-vis eq
+up-vis-at (inMap f c)                             ld ps st su eq = up-vis-at c ld ps (since-map f st) (since-map f su) (map-≈ f eq)
+up-vis-at (inScan f z c)                          ld ps st su eq = up-vis-at c ld ps (since-scan f z st) (since-scan f z su) (scan-≈ f z eq)
+up-vis-at (inCut true a c)                        ld ps st su eq = up-vis-at c ld ps st su eq
+up-vis-at (inCut false a c)                       ld ps st su eq = ≃-id
+up-vis-at (inLn true c)                           ld ps st su eq = up-vis-at c ld ps st su eq
+up-vis-at (inLn false c)                          ld ps st su eq = ≃-id
+up-vis-at (inTake i q w c)                        (lt , ld) ps st su eq = up-vis-at c ld ps (since-take i q w lt st) (since-take i q w lt su) (take-≈ i q w eq)
+up-vis-at (inOuter (mergeᶠ nothing) f d n q ls c) {t} {u} (al , ld) ps st su eq =
+  up-vis-at c ld ps (since-row L t Ls st sl) (since-row L u Ls su sl) (trunc-≈ (flat-≈ L Ls Ls eq (≈ᴸ-refl Ls)))
   where
     L  = λ a → pendRows (env c) (f a)
     Ls = rowsL (env c) ls
     sl = after-since Ls al
-up-vis (inOuter (mergeᶠ (just m)) f d n q ls c) {t} {u} (al , ld) st su eq =
-  up-vis c ld (since-bounded m L t Ls st sl) (since-bounded m L u Ls su sl) (bounded-≈ m L Ls Ls eq (≈ᴸ-refl Ls))
+up-vis-at (inOuter (mergeᶠ (just m)) f d n q ls c) {t} {u} (al , ld) ps st su eq =
+  up-vis-at c ld ps (since-bounded m L t Ls st sl) (since-bounded m L u Ls su sl) (bounded-≈ m L Ls Ls eq (≈ᴸ-refl Ls))
   where
     L  = λ a → pendRows (env c) (f a)
     Ls = rowsL (env c) ls
     sl = after-since Ls al
-up-vis (inOuter switchᶠ f d n q ls c) {t} {u} (al , ld) st su eq =
-  up-vis c ld (since-switch L t Ls st sl) (since-switch L u Ls su sl) (switch-≈ L Ls Ls eq (≈ᴸ-refl Ls))
+up-vis-at (inOuter switchᶠ f d n q ls c) {t} {u} (al , ld) ps st su eq =
+  up-vis-at c ld ps (since-switch L t Ls st sl) (since-switch L u Ls su sl) (switch-≈ L Ls Ls eq (≈ᴸ-refl Ls))
   where
     L  = λ a → pendRows (env c) (f a)
     Ls = rowsL (env c) ls
     sl = after-since Ls al
-up-vis (inOuter exhaustᶠ f d n q ls c) {t} {u} (al , ld) st su eq =
-  up-vis c ld (since-exhaust L t Ls st sl) (since-exhaust L u Ls su sl) (exhaust-≈ L Ls Ls eq (≈ᴸ-refl Ls))
+up-vis-at (inOuter exhaustᶠ f d n q ls c) {t} {u} (al , ld) ps st su eq =
+  up-vis-at c ld ps (since-exhaust L t Ls st sl) (since-exhaust L u Ls su sl) (exhaust-≈ L Ls Ls eq (≈ᴸ-refl Ls))
   where
     L  = λ a → pendRows (env c) (f a)
     Ls = rowsL (env c) ls
     sl = after-since Ls al
-up-vis (inLanes (mergeᶠ nothing) f d n q o pre post c) {t} {u} (ao , apre , apost , ld) st su eq =
-  up-vis c ld (since-row L O Lt so slt) (since-row L O Lu so slu)
+up-vis-at (inLanes (mergeᶠ nothing) f d n q o pre post c) {t} {u} (ao , apre , apost , ld) ps st su eq =
+  up-vis-at c ld ps (since-row L O Lt so slt) (since-row L O Lu so slu)
        (trunc-≈ (flat-≈ L Lt Lu ≈-refl (≈ᴸ-hole (rowsL ρ pre) (eq ∷ ≈ᴸ-refl (rowsL ρ post)))))
   where
     ρ   = env c
@@ -552,8 +554,8 @@ up-vis (inLanes (mergeᶠ nothing) f d n q o pre post c) {t} {u} (ao , apre , ap
     so  = λ {q} {e} r → ≺→≼ {_} {q} (ao {q} {e} r)
     slt = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (st , after-since (rowsL ρ post) apost)
     slu = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (su , after-since (rowsL ρ post) apost)
-up-vis (inLanes (mergeᶠ (just m)) f d n q o pre post c) {t} {u} (ao , apre , apost , ld) st su eq =
-  up-vis c ld (since-bounded m L O Lt so slt) (since-bounded m L O Lu so slu)
+up-vis-at (inLanes (mergeᶠ (just m)) f d n q o pre post c) {t} {u} (ao , apre , apost , ld) ps st su eq =
+  up-vis-at c ld ps (since-bounded m L O Lt so slt) (since-bounded m L O Lu so slu)
        (bounded-≈ m L Lt Lu ≈-refl (≈ᴸ-hole (rowsL ρ pre) (eq ∷ ≈ᴸ-refl (rowsL ρ post))))
   where
     ρ   = env c
@@ -564,8 +566,8 @@ up-vis (inLanes (mergeᶠ (just m)) f d n q o pre post c) {t} {u} (ao , apre , a
     so  = λ {q} {e} r → ≺→≼ {_} {q} (ao {q} {e} r)
     slt = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (st , after-since (rowsL ρ post) apost)
     slu = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (su , after-since (rowsL ρ post) apost)
-up-vis (inLanes switchᶠ f d n q o pre post c) {t} {u} (ao , apre , apost , ld) st su eq =
-  up-vis c ld (since-switch L O Lt so slt) (since-switch L O Lu so slu)
+up-vis-at (inLanes switchᶠ f d n q o pre post c) {t} {u} (ao , apre , apost , ld) ps st su eq =
+  up-vis-at c ld ps (since-switch L O Lt so slt) (since-switch L O Lu so slu)
        (switch-≈ L Lt Lu ≈-refl (≈ᴸ-hole (rowsL ρ pre) (eq ∷ ≈ᴸ-refl (rowsL ρ post))))
   where
     ρ   = env c
@@ -576,8 +578,8 @@ up-vis (inLanes switchᶠ f d n q o pre post c) {t} {u} (ao , apre , apost , ld)
     so  = λ {q} {e} r → ≺→≼ {_} {q} (ao {q} {e} r)
     slt = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (st , after-since (rowsL ρ post) apost)
     slu = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (su , after-since (rowsL ρ post) apost)
-up-vis (inLanes exhaustᶠ f d n q o pre post c) {t} {u} (ao , apre , apost , ld) st su eq =
-  up-vis c ld (since-exhaust L O Lt so slt) (since-exhaust L O Lu so slu)
+up-vis-at (inLanes exhaustᶠ f d n q o pre post c) {t} {u} (ao , apre , apost , ld) ps st su eq =
+  up-vis-at c ld ps (since-exhaust L O Lt so slt) (since-exhaust L O Lu so slu)
        (exhaust-≈ L Lt Lu ≈-refl (≈ᴸ-hole (rowsL ρ pre) (eq ∷ ≈ᴸ-refl (rowsL ρ post))))
   where
     ρ   = env c
@@ -588,6 +590,10 @@ up-vis (inLanes exhaustᶠ f d n q o pre post c) {t} {u} (ao , apre , apost , ld
     so  = λ {q} {e} r → ≺→≼ {_} {q} (ao {q} {e} r)
     slt = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (st , after-since (rowsL ρ post) apost)
     slu = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (su , after-since (rowsL ρ post) apost)
-up-vis (inSrc k b c)                            (ab , ld) st su eq = src-vis k b c ab ld st su eq
-up-vis (inBody k o c) {t} {u}                   (ao , ld) st su eq =
-  up-vis c ld (since-conn (CS.connAt k) _ t ao st) (since-conn (CS.connAt k) _ u ao su) (conn-≈ (CS.connAt k) _ eq)
+up-vis-at (inSrc k b c)                            (ab , ld) ps st su eq = src-vis k b c ab ld ps st su eq
+up-vis-at (inBody k o c) {t} {u}                   (ao , ld) ps st su eq =
+  up-vis-at c ld ps (since-conn (CS.connAt k) _ t ao st) (since-conn (CS.connAt k) _ u ao su) (conn-≈ (CS.connAt k) _ eq)
+
+-- A skip at the lead, unseen above.
+up-vis : ∀ {R Γ A} (c : Ctx R Γ A) {t u : EmissionSet A} {p} → LeadC c p → Since p t → Since p u → t ≈⟨ p ⟩ u → Vis (up c t) ≃ Vis (up c u)
+up-vis c {p = p} ld = up-vis-at c ld (≼-refl {p})
