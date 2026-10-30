@@ -70,12 +70,12 @@ boundedP : ∀ {A B : Set} (m : ℕ) (L : A → Pos → EmissionSet B) (O : Emis
 boundedP m L O d n Qu Ls = record { lanes = BoundedF.LaneB m L O d n Qu Ls ; outer = O ; begun = BoundedF.Bg m L O d n Qu Ls ; over = BoundedF.Over m L O d n Qu Ls
                                   ; runs = BoundedF.Indexed m L O d n Qu Ls ; cut = λ _ _ → ⊥ ; hand = BoundedF.Queued m L O d n Qu Ls }
 
--- Each joiner's policy, none waiting.
-polOf : ∀ {A B : Set} → FlatOp → (A → Pos → EmissionSet B) → EmissionSet A → Bool → ℕ → List (EmissionSet B) → Policy A B
-polOf (mergeᶠ nothing)  L O d n = flatP L O d n
-polOf (mergeᶠ (just m)) L O d n = boundedP m L O d n []
-polOf switchᶠ           L O d n = switchP L O d n
-polOf exhaustᶠ          L O d n = exhaustP L O d n
+-- Each joiner's policy, the values `Qu` waiting.
+polOf : ∀ {A B : Set} → FlatOp → (A → Pos → EmissionSet B) → EmissionSet A → Bool → ℕ → List A → List (EmissionSet B) → Policy A B
+polOf (mergeᶠ nothing)  L O d n Qu = flatP L O d n
+polOf (mergeᶠ (just m)) L O d n Qu = boundedP m L O d n Qu
+polOf switchᶠ           L O d n Qu = switchP L O d n
+polOf exhaustᶠ          L O d n Qu = exhaustP L O d n
 
 ------------------------------------------------------------------------
 -- Read alike at and below a bound

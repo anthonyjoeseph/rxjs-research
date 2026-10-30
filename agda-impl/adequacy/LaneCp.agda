@@ -61,16 +61,16 @@ postulate
                 → Good [] (plug c (flatS op f d n [] o (pre ʳ++ lnS true (cutS true a s₀) ∷ post)))
                 → Good [] (plug c (flatS op f d (pred n) [] o (pre ʳ++ lnS false (cutS false a s₀) ∷ post)))
 
--- A joiner's node, none waiting, reads its policy.
-rows-flat : ∀ {Γ A B} (ρ : DenEnv Γ) op (f : A → Obs Timeline Γ B) d n (o : St Γ A) ls
-          → rows ρ (flatS op f d n [] o ls) ≡ Truncate (JoinP (polOf op (λ a → pendRows ρ (f a)) (rows ρ o) d n (rowsL ρ ls)))
-rows-flat ρ (mergeᶠ nothing)  f d n o ls = refl
-rows-flat ρ (mergeᶠ (just m)) f d n o ls = refl
-rows-flat ρ switchᶠ           f d n o ls = refl
-rows-flat ρ exhaustᶠ          f d n o ls = refl
+-- A joiner's node reads its policy.
+rows-flat : ∀ {Γ A B} (ρ : DenEnv Γ) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls
+          → rows ρ (flatS op f d n q o ls) ≡ Truncate (JoinP (polOf op (λ a → pendRows ρ (f a)) (rows ρ o) d n q (rowsL ρ ls)))
+rows-flat ρ (mergeᶠ nothing)  f d n q o ls = refl
+rows-flat ρ (mergeᶠ (just m)) f d n q o ls = refl
+rows-flat ρ switchᶠ           f d n q o ls = refl
+rows-flat ρ exhaustᶠ          f d n q o ls = refl
 
 -- A joiner over an empty outer and empty lanes shows nothing.
-pol-empty : ∀ {A B} op (L : A → Pos → EmissionSet B) {O} d n Ls → Empty O → Each Empty Ls → Empty (JoinP (polOf op L O d n Ls))
+pol-empty : ∀ {A B} op (L : A → Pos → EmissionSet B) {O} d n Ls → Empty O → Each Empty Ls → Empty (JoinP (polOf op L O d n [] Ls))
 pol-empty (mergeᶠ nothing)  L d n Ls eo el = join-empty _ eo (empty-any Ls el)
 pol-empty (mergeᶠ (just m)) L d n Ls eo el = join-empty _ eo bg
   where bg : ∀ {k e} → ¬ BoundedF.Bg m L _ d n [] Ls k e
@@ -115,15 +115,15 @@ module Cp {R Γ A B} (op : FlatOp) (f : A → Obs Timeline Γ B) (d : Bool) (n :
   ed   = lnS false (cutS false a s₀)
   LX   = Pre ʳ++ (Plus (rows ρ s₀) p end ∷ Post)
   LY   = Pre ʳ++ (∅ ∷ Post)
-  PX   = polOf op L O d n LX
-  Y    = JoinP (polOf op L O d (pred n) LY)
+  PX   = polOf op L O d n [] LX
+  Y    = JoinP (polOf op L O d (pred n) [] LY)
 
   node : ℕ → St Γ B
   node m = flatS op f d m [] o (pre ʳ++ ed ∷ post)
 
   rowsY : rows ρ (node (pred n)) ≃ Truncate Y
-  rowsY = ≃-trans (≡→≃ (rows-flat ρ op f d (pred n) o (pre ʳ++ ed ∷ post)))
-                  (trunc-≃ (≡→≃ (cong (λ Ls → JoinP (polOf op L O d (pred n) Ls)) (rowsL-ʳ++ pre))))
+  rowsY = ≃-trans (≡→≃ (rows-flat ρ op f d (pred n) [] o (pre ʳ++ ed ∷ post)))
+                  (trunc-≃ (≡→≃ (cong (λ Ls → JoinP (polOf op L O d (pred n) [] Ls)) (rowsL-ʳ++ pre))))
 
   sx′ = since-x L {p} {O} {d} {n} Pre Post {rows ρ s₀} ao apre apost en op
   sy′ = since-y L {p} {O} {d} {n} Pre Post {rows ρ s₀} ao apre apost en op
