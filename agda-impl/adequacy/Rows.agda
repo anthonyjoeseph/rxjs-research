@@ -28,7 +28,9 @@ open import denotation.Events using (Pos; Timeline; ix; last; inside)
 open import denotation.Read using (Visible)
 import denotation.Read as Read
 open import denotation.Laws.Modulus using (≺-trans)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; _≺_; _≼_; InE; enter; Truncate; MapT; ⟦_⟧; Ended; module Joining; module Values; module Scan; module TakeWhile; Den; hot; Proper; DenEnv; module Connecting)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; pin; end; _≺_; _≼_; InE; enter; Truncate; MapT; ⟦_⟧; Ended;
+  module Joining; module Values; module Scan; module TakeWhile; Den; hot; Proper; DenEnv;
+  module Connecting)
 open import operation.PureObservable using (module Machine; module Driver; Tape; play; ending; over)
 open Machine using (St; Ctx; CS; Owe; free; cpAt; cutAt; overAt; takeS; connS; joinS; coldS; scanS; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; load; moved; quiet; pend; ofS; mapS; cutS; lnS; flatS; alive; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; nx; cp) renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
 
