@@ -8,7 +8,8 @@
 -- The lanes agree only where one side subscribes them (`Lanes`): what
 -- shows a subscription on the other side is carried over first, by the
 -- lanes it reads, each earlier.  A switch reads a lane only until it is
--- cut, and under its subscription after.
+-- cut: a pin kept past the cut would need the cut to fall past a connect
+-- in the lane's world (`lanes-left`).
 --
 -- KEEPING THE ORDER MODULUS: a lane row is read only where its joiner
 -- shows a row at it, and an outer row under the row that shows it, so
@@ -25,17 +26,17 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 open import Relation.Nullary using (¬_)
 open import Data.Unit using (⊤; tt)
-open import Data.Empty using (⊥)
+open import Data.Empty using (⊥; ⊥-elim)
 
 open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; ix; inside)
-open import denotation.EmissionSet using (out; skip; end; EmissionSet; _≺_; _≼_; Den; enter; After; module Op)
+open import denotation.EmissionSet using (out; skip; end; pin; EmissionSet; _≺_; _≼_; Den; enter; After; module Op)
 import denotation.EmissionSet as ES
 open import denotation.Laws.Modulus
   using (≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext; AgreeTo; ⟨_⟩; upto; AgreeTo-sym; _~⟨_⟩_; ~-cold)
 open import denotation.Laws.Count using (Cnt; _≈ᶜ⟨_∣_⟩_; ≈ᶜ-sym; cnt-up; cnt-down; trunc-ag; Img; em; seen; seen-under)
-open import denotation.Laws.Worlds using (Ok; InvAt; InvD; world-after; ok-in; ok-step; in-world)
-open import denotation.Laws.JoinInv using (switch-cut-up)
+open import denotation.Laws.Worlds using (Ok; W⁼; InvAt; InvD; world-after; ok-in; ok-step)
+open import denotation.Laws.JoinInv using (switch-cut-up; module SwitchI)
 open import denotation.Laws.Nth using (module Nths)
 
 -- A condition on every value: read at or before `Q`, free past it.
@@ -79,10 +80,16 @@ module Join {A B : Set} (Q : Pos) where
   next-to : ∀ {o o′ : EmissionSet A} → AgreeTo Q o o′ → ∀ q q′ → q′ ≼ Q → ES.Values.Next o q q′ → ES.Values.Next o′ q q′
   next-to ao q q′ q′Q nx = over ao (λ k → q ≺ k → q′ ≼ k) (λ {k} Qk _ → beyond q′ k q′Q Qk) nx
 
-  -- A lane row is read before its lane is cut, or under its value's
-  -- second child.
+  -- A lane row is read before its lane is cut; past it, only a pin its
+  -- cut fell after.
   Read : (Pos → Pos → Set) → Pos → Pos → Set
-  Read Cut q k = ¬ Cut q k ⊎ T (inside (q ++ [ ix 1 ]) k)
+  Read Cut q k = ¬ Cut q k
+
+  -- A pin kept past a cut: its connect subscribed before the cut.
+  kept-before : ∀ {Cut : Pos → Set} → (∀ {k y} → Cut k → k ≼ y → Cut y) → ∀ {k r} → Cut k → ¬ Cut r → r ≺ k
+  kept-before cut-up {k} {r} c nc with ≼-or-≻ k r
+  ... | inj₁ kr = ⊥-elim (nc (cut-up c kr))
+  ... | inj₂ rk = rk
 
   -- A joiner, given its policy: its lanes, which values run them, where a
   -- lane is cut, where an end hands off, and what agreeing lanes are.
@@ -104,7 +111,9 @@ module Join {A B : Set} (Q : Pos) where
                   (runs-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes o f f′ → ∀ q → q ≼ Q → Runs f o q → Runs f′ o′ q)
                   (cut-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → ∀ q k → k ≼ Q → Cut f o q k → Cut f′ o′ q k)
                   (cut-up : ∀ {f : A → Den B} {o : EmissionSet A} {q k y} → Cut f o q k → k ≼ y → Cut f o q y)
-                  (hand-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes o f f′ → ∀ c → c ≼ Q → Hand f o c → Hand f′ o′ c) where
+                  (hand-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes o f f′ → ∀ c → c ≼ Q → Hand f o c → Hand f′ o′ c)
+                  (left-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes o f f′ → ∀ {q a k r} → o q (out a) → Runs f o q
+                           → k ≼ Q → Cut f o q k → ¬ Cut f o q r → Ln f o q a k (pin r) → Ln f′ o′ q a k (pin r)) where
 
       done-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes o f f′ → ∀ c → c ≼ Q → JF.Done f o c → JF.Done f′ o′ c
       done-to {f} {f′} {o} ao L c cQ ((c₀ , x , c₀c) , h) =
@@ -114,32 +123,34 @@ module Join {A B : Set} (Q : Pos) where
                 x  = bwd ao q qQ x′
                 r  = runs-to (AgreeTo-sym ao) (lanes-sym ao L) q qQ r′
                 (c′ , y , c′c) = h x r qc (λ ct → nc′ (cut-to {f} {f′} ao q c cQ ct))
-            in c′ , lane-to ao L x r (trans≼ c′ c c′c cQ) (inj₁ (λ ct → nc′ (cut-to {f} {f′} ao q c cQ (cut-up ct c′c)))) y , c′c
+            in c′ , lane-to ao L x r (trans≼ c′ c c′c cQ) (λ ct → nc′ (cut-to {f} {f′} ao q c cQ (cut-up ct c′c))) y , c′c
 
       join-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes o f f′ → ∀ y {e} → y ≼ Q → JT f o y e → JT f′ o′ y e
       join-to ao L _ yQ (JF.val {q} x)  = JF.val (fwd ao q (below q (q ++ [ ix 0 ]) (≺-ext q []) yQ) x)
       join-to ao L y yQ (JF.step x)     = JF.step (fwd ao y yQ x)
+      join-to ao L y yQ (JF.opin x)     = JF.opin (fwd ao y yQ x)
       join-to ao L y yQ (JF.oend x d)   = JF.oend (fwd ao y yQ x) (done-to ao L y yQ d)
       join-to ao L y yQ (JF.opass x nd) = JF.opass (fwd ao y yQ x) (λ d → nd (done-to (AgreeTo-sym ao) (lanes-sym ao L) y yQ d))
       join-to {f} {f′} ao L y yQ (JF.lane {q} x r l nc w) =
-        JF.lane (fwd ao q qQ x) (runs-to ao L q qQ r) (lane-to ao L x r yQ (inj₁ nc) l) (λ c → nc (cut-to {f′} {f} (AgreeTo-sym ao) q y yQ c)) w
+        JF.lane (fwd ao q qQ x) (runs-to ao L q qQ r) (lane-to ao L x r yQ nc l) (λ c → nc (cut-to {f′} {f} (AgreeTo-sym ao) q y yQ c)) w
         where qQ = below q y (lane-past l) yQ
       join-to {f} {f′} ao L y yQ (JF.lend {q} x r l nc nh d) =
-        JF.lend (fwd ao q qQ x) (runs-to ao L q qQ r) (lane-to ao L x r yQ (inj₁ nc) l) (λ c → nc (cut-to {f′} {f} (AgreeTo-sym ao) q y yQ c))
+        JF.lend (fwd ao q qQ x) (runs-to ao L q qQ r) (lane-to ao L x r yQ nc l) (λ c → nc (cut-to {f′} {f} (AgreeTo-sym ao) q y yQ c))
                 (λ h → nh (hand-to (AgreeTo-sym ao) (lanes-sym ao L) y yQ h)) (done-to ao L y yQ d)
         where qQ = below q y (lane-past l) yQ
       join-to {f} {f′} ao L y yQ (JF.lpass {q} x r l nc nh nd) =
-        JF.lpass (fwd ao q qQ x) (runs-to ao L q qQ r) (lane-to ao L x r yQ (inj₁ nc) l) (λ c → nc (cut-to {f′} {f} (AgreeTo-sym ao) q y yQ c))
+        JF.lpass (fwd ao q qQ x) (runs-to ao L q qQ r) (lane-to ao L x r yQ nc l) (λ c → nc (cut-to {f′} {f} (AgreeTo-sym ao) q y yQ c))
                  (λ h → nh (hand-to (AgreeTo-sym ao) (lanes-sym ao L) y yQ h)) (λ d → nd (done-to (AgreeTo-sym ao) (lanes-sym ao L) y yQ d))
         where qQ = below q y (lane-past l) yQ
       join-to {f} {f′} ao L _ yQ (JF.hand {q} {c = c} x r l nc h) =
-        JF.hand (fwd ao q qQ x) (runs-to ao L q qQ r) (lane-to ao L x r cQ (inj₁ nc) l) (λ ct → nc (cut-to {f′} {f} (AgreeTo-sym ao) q c cQ ct))
+        JF.hand (fwd ao q qQ x) (runs-to ao L q qQ r) (lane-to ao L x r cQ nc l) (λ ct → nc (cut-to {f′} {f} (AgreeTo-sym ao) q c cQ ct))
                 (hand-to ao L c cQ h)
         where
           cQ = below c (c ++ [ ix 0 ]) (≺-ext c []) yQ
           qQ = below q c (lane-past l) cQ
-      join-to {f} {f′} ao L y yQ (JF.left {q} x r l c ins) =
-        JF.left (fwd ao q qQ x) (runs-to ao L q qQ r) (lane-to ao L x r yQ (inj₂ ins) l) (cut-to {f} {f′} ao q y yQ c) ins
+      join-to {f} {f′} {o} ao L y yQ (JF.left {q} {r = r₀} x r l c nc) =
+        JF.left (fwd ao q qQ x) (runs-to ao L q qQ r) (left-to ao L x r yQ c nc l) (cut-to {f} {f′} ao q y yQ c)
+                (λ c′ → nc (cut-to {f′} {f} (AgreeTo-sym ao) q r₀ (below r₀ y (kept-before {Cut f o q} (λ {k′} {y′} → cut-up {f} {o} {q} {k′} {y′}) c nc) yQ) c′))
         where qQ = below q y (lane-past l) yQ
       join-to ao L _ _ (JF.run () _)
       join-to ao L _ _ (JF.rend () _ _)
@@ -156,6 +167,10 @@ module Join {A B : Set} (Q : Pos) where
       constructor lanes
       field lanes-at : ∀ {q a k} → o q (out a) → Runs f o q → q ≼ Q → k ≼ Q → Read (Cut f o) q k
                      → AgreeTo k (enter (f a) (q ++ [ ix 1 ])) (enter (f′ a) (q ++ [ ix 1 ]))
+            -- A pin its cut fell after, at or before the bound.
+            lanes-left : ∀ {q a k r} → o q (out a) → Runs f o q → q ≼ Q → k ≼ Q → Cut f o q k → ¬ Cut f o q r
+                       → (enter (f a) (q ++ [ ix 1 ]) k (pin r) → enter (f′ a) (q ++ [ ix 1 ]) k (pin r))
+                       × (enter (f′ a) (q ++ [ ix 1 ]) k (pin r) → enter (f a) (q ++ [ ix 1 ]) k (pin r))
     open Lanes public
 
     open JoiningJ (λ f _ → ES.LaneOf f) Runs Cut (λ _ _ _ → ⊥) Lanes public using (JT)
@@ -169,19 +184,24 @@ module Join {A B : Set} (Q : Pos) where
                   (cut-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → ∀ q k → k ≼ Q → Cut f o q k → Cut f′ o′ q k)
                   (cut-up : ∀ {f : A → Den B} {o : EmissionSet A} {q k y} → Cut f o q k → k ≼ y → Cut f o q y) where
       read-from : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → ∀ q k → k ≼ Q → Read (Cut f′ o′) q k → Read (Cut f o) q k
-      read-from {f} {f′} ao q k kQ (inj₁ nc) = inj₁ (λ c → nc (cut-to {f} {f′} ao q k kQ c))
-      read-from ao q k kQ (inj₂ i)           = inj₂ i
+      read-from {f} {f′} ao q k kQ nc c = nc (cut-to {f} {f′} ao q k kQ c)
 
       lanes-sym : ∀ {o o′ : EmissionSet A} {f f′} → AgreeTo Q o o′ → Lanes o f f′ → Lanes o′ f′ f
-      lanes-sym {f = f} {f′} ao L = lanes λ {q} {_} {k} x r qQ kQ rd →
-        AgreeTo-sym (lanes-at L (bwd ao q qQ x) (runs-from ao L q qQ r) qQ kQ (read-from {f} {f′} ao q k kQ rd))
+      lanes-sym {o} {o′} {f} {f′} ao L = lanes
+        (λ {q} {_} {k} x r qQ kQ rd → AgreeTo-sym (lanes-at L (bwd ao q qQ x) (runs-from ao L q qQ r) qQ kQ (read-from {f} {f′} ao q k kQ rd)))
+        (λ {q} {_} {k} {r₀} x r qQ kQ c nc →
+           let rQ = below r₀ k (kept-before {Cut f′ o′ q} (λ {k′} {y′} → cut-up {f′} {o′} {q} {k′} {y′}) c nc) kQ
+               (to , from) = lanes-left L (bwd ao q qQ x) (runs-from ao L q qQ r) qQ kQ (cut-to {f′} {f} (AgreeTo-sym ao) q k kQ c)
+                                        (λ c₀ → nc (cut-to {f} {f′} ao q r₀ rQ c₀))
+           in from , to)
 
       runs-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes o f f′ → ∀ q → q ≼ Q → Runs f o q → Runs f′ o′ q
       runs-to ao L = runs-from (AgreeTo-sym ao) (lanes-sym ao L)
 
       open JoiningJ (λ f _ → ES.LaneOf f) Runs Cut (λ _ _ _ → ⊥) Lanes using (module Policy)
       open Policy lanes-sym (λ ao L x r kQ rd l → lane-to L x r kQ rd l) (λ {_} {_} {q} (_ , sk) → ≺-trans {q} {q ++ [ ix 1 ]} (≺-ext q []) sk)
-                  runs-to cut-to cut-up (λ _ _ _ _ ()) public
+                  runs-to cut-to cut-up (λ _ _ _ _ ())
+                  (λ ao L {q} {_} {k} x r kQ c nc (y , sk) → proj₁ (lanes-left L x r (value-below q k sk kQ) kQ c nc) y , sk) public
 
   -- Every value runs, and no lane is cut.
   module MergeJ where
@@ -216,7 +236,7 @@ module Join {A B : Set} (Q : Pos) where
     cur-from : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes o f f′ → ∀ q₁ q → q₁ ≼ Q → Cur f′ o′ q₁ q → Cur f o q₁ q
     cur-from ao L q₁ _ q₁Q (cur₀ x mn) = cur₀ (bwd ao q₁ q₁Q x) (least-to (AgreeTo-sym ao) q₁ q₁Q mn)
     cur-from ao L q₂ _ q₂Q (run {q₁} {q} {a} {c} cu x l cq₂ x₂ lt nx) =
-      run cu₀ x₀ (bwd (lanes-at L x₀ (cur-run cu₀) qQ cQ (inj₁ λ ())) c (≼-refl {c}) (proj₁ l) , proj₂ l) cq₂ (bwd ao q₂ q₂Q x₂) lt
+      run cu₀ x₀ (bwd (lanes-at L x₀ (cur-run cu₀) qQ cQ (λ ())) c (≼-refl {c}) (proj₁ l) , proj₂ l) cq₂ (bwd ao q₂ q₂Q x₂) lt
           (next-to (AgreeTo-sym ao) q₁ q₂ q₂Q nx)
       where
         q₁Q = below q₁ q₂ lt q₂Q
@@ -226,7 +246,7 @@ module Join {A B : Set} (Q : Pos) where
         x₀  = bwd ao q qQ x
     cur-from {f} {f′} ao L q₂ q q₂Q (drop {q₁} {a = a} cu x nl x₂ lt nx) =
       drop cu₀ x₀ (unended {t = After (f′ a) (q ++ [ ix 1 ])} {After (f a) (q ++ [ ix 1 ])}
-                     (λ c cQ y → fwd (lanes-at L x₀ (cur-run cu₀) qQ cQ (inj₁ λ ())) c (≼-refl {c}) (proj₁ y) , proj₂ y) q₂ q₂Q nl)
+                     (λ c cQ y → fwd (lanes-at L x₀ (cur-run cu₀) qQ cQ (λ ())) c (≼-refl {c}) (proj₁ y) , proj₂ y) q₂ q₂Q nl)
            (bwd ao q₂ q₂Q x₂) lt (next-to (AgreeTo-sym ao) q₁ q₂ q₂Q nx)
       where
         q₁Q = below q₁ q₂ lt q₂Q
@@ -344,7 +364,7 @@ module Join {A B : Set} (Q : Pos) where
                    i , s , sub-to ao L (stem-≼ s (below s k sk kQ)) sb , lane-to {o} {f} {f′} L sb kQ (y , sk))
                 (λ {_} {_} {q} {_} {k} (_ , s , (_ , st) , (_ , sk)) → ≺-trans {q} {s} {k} (starts-past st) sk)
                 (λ ao _ q qQ (i , a , N) → i , a , nth-to ao qQ N)
-                (λ _ _ _ _ ()) (λ ()) queued-to
+                (λ _ _ _ _ ()) (λ ()) queued-to (λ _ _ _ _ _ ())
     open BP public
 
 ------------------------------------------------------------------------
@@ -354,13 +374,18 @@ module Join {A B : Set} (Q : Pos) where
 lane-upto : ∀ {A B : Set} q {f f′ : A → Den B} → (∀ a → f a ~⟨ q ⟩ f′ a) → ∀ q′ a {k} → k ≼ q → AgreeTo k (enter (f a) (q′ ++ [ ix 1 ])) (enter (f′ a) (q′ ++ [ ix 1 ]))
 lane-upto q af q′ a {k} kq = ⟨ (λ {y} yk → upto (af a (q′ ++ [ ix 1 ])) (≼-trans {y} {k} {q} yk kq)) ⟩
 
+-- And at the bound itself.
+lane-at : ∀ {A B : Set} q {f f′ : A → Den B} → (∀ a → f a ~⟨ q ⟩ f′ a) → ∀ q′ a {k e} → k ≼ q
+        → (enter (f a) (q′ ++ [ ix 1 ]) k e → enter (f′ a) (q′ ++ [ ix 1 ]) k e) × (enter (f′ a) (q′ ++ [ ix 1 ]) k e → enter (f a) (q′ ++ [ ix 1 ]) k e)
+lane-at q af q′ a {k} kq = upto (af a (q′ ++ [ ix 1 ])) kq
+
 flatMap-causal : ∀ {A B q} (op : FlatOp) {f f′ : A → Den B} {s s′ : Den A}
                → s ~⟨ q ⟩ s′ → (∀ a → f a ~⟨ q ⟩ f′ a) → Op.flatMap op f s ~⟨ q ⟩ Op.flatMap op f′ s′
 flatMap-causal {A} {q = q} (mergeᶠ nothing) {f} {f′} as af = ~-cold λ p → agree (as p) L
   where
     open Join.MergeJ q
     L : ∀ {o : EmissionSet A} → Lanes o f f′
-    L = lanes λ {q′} {a} _ _ _ kq _ → lane-upto q {f = f} {f′} af q′ a kq
+    L = lanes (λ {q′} {a} _ _ _ kq _ → lane-upto q {f = f} {f′} af q′ a kq) (λ {q′} {a} _ _ _ kq _ _ → lane-at q {f = f} {f′} af q′ a kq)
 flatMap-causal {A} {q = q} (mergeᶠ (just n)) {f} {f′} as af = ~-cold λ p → BP.agree (as p) L
   where
     open Join.BoundedJ q n
@@ -370,19 +395,19 @@ flatMap-causal {A} {q = q} switchᶠ {f} {f′} as af = ~-cold λ p → agree (a
   where
     open Join.SwitchJ q
     L : ∀ {o : EmissionSet A} → Lanes o f f′
-    L = lanes λ {q′} {a} _ _ _ kq _ → lane-upto q {f = f} {f′} af q′ a kq
+    L = lanes (λ {q′} {a} _ _ _ kq _ → lane-upto q {f = f} {f′} af q′ a kq) (λ {q′} {a} _ _ _ kq _ _ → lane-at q {f = f} {f′} af q′ a kq)
 flatMap-causal {A} {q = q} exhaustᶠ {f} {f′} as af = ~-cold λ p → agree (as p) L
   where
     open Join.ExhaustJ q
     L : ∀ {o : EmissionSet A} → Lanes o f f′
-    L = lanes λ {q′} {a} _ _ _ kq _ → lane-upto q {f = f} {f′} af q′ a kq
+    L = lanes (λ {q′} {a} _ _ _ kq _ → lane-upto q {f = f} {f′} af q′ a kq) (λ {q′} {a} _ _ _ kq _ _ → lane-at q {f = f} {f′} af q′ a kq)
 
 ------------------------------------------------------------------------
 -- The order modulus
 
 private
   -- What one side's joiner reads, few before a cut where it is.
-  module Keep {A B H n} {f f′ : A → Den B} {s s′ : Den A} (Is : InvD H s) (If : ∀ a → InvD H (f a))
+  module Keep {A B H n} {f f′ : A → Den B} {s s′ : Den A} (Is : InvD H s) (If : ∀ a → InvD H (f a)) (If′ : ∀ a → InvD H (f′ a))
               (as : s ≈ᶜ⟨ Ok H ∣ n ⟩ s′) (af : ∀ a → f a ≈ᶜ⟨ Ok H ∣ n ⟩ f′ a) (p : Pos) (ok : Ok H p) where
     o o′ : EmissionSet A
     o  = enter s p
@@ -405,9 +430,10 @@ private
     lane-ag {Q} {a} {s₀} k₀ c im = af a s₀ k₀ Q (inj₁ (cnt-up c im))
 
     module KJ (Runs : (A → Den B) → EmissionSet A → Pos → Set) (Cut : (A → Den B) → EmissionSet A → Pos → Pos → Set)
-              (cut-up : ∀ {q k y} → Cut f o q k → k ≼ y → Cut f o q y) (Q : Pos)
+              (cut-up : ∀ {q k y} → Cut f o q k → k ≼ y → Cut f o q y)
+              (uncut : ∀ {q a k r} → o q (out a) → W⁼ H (q ++ [ ix 1 ]) r → T (inside r k) → Cut f o q k → ¬ Cut f o q r → ⊥) (Q : Pos)
               (agree : AgreeTo Q o o′ → Join.JoinerJ.Lanes {A} {B} Q Runs Cut o f f′ → AgreeTo Q (Join.JoinerJ.JT Q Runs Cut f o) (Join.JoinerJ.JT Q Runs Cut f′ o′)) where
-      open ES.Joiner f o (Runs f o) (Cut f o) using (JoinT; val; step; oend; opass; lane; lend; lpass; left)
+      open ES.Joiner f o (Runs f o) (Cut f o) using (JoinT; val; step; opin; oend; opass; lane; lend; lpass)
       open Join.JoinerJ {A} {B} Q Runs Cut using (lanes)
       open Join {A} {B} Q using (Read)
 
@@ -417,6 +443,7 @@ private
           img-o : ∀ {y e} → o y e → y ≺ Q → ¬ ¬ Img JoinT Q y
           img-o {e = out _} x yQ = seen-under (val x) yQ
           img-o {e = skip}  x yQ = seen (step x) yQ
+          img-o {e = pin _} x yQ = seen (opin x) yQ
           img-o {e = end}   x yQ = em (λ d → seen (oend x d) yQ) (λ nd → seen (opass x nd) yQ)
 
           ao = outer c img-o
@@ -424,27 +451,32 @@ private
           -- Read at `k`, read at every lane row before it.
           img-l : ∀ {q a k} (x : o q (out a)) → Runs f o q → k ≼ Q → Read (Cut f o) q k
                 → ∀ {y e} → enter (f a) (q ++ [ ix 1 ]) y e → y ≺ k → ¬ ¬ Img JoinT k y
-          img-l {q} {a} {k} x r kQ rd {y} {e} l yk = em (cut rd) (uncut e l)
+          img-l {q} {a} {k} x r kQ rd {y} {e} l yk = em (λ cy _ → rd (cut-up cy (≺→≼ {y} {k} yk))) (run e l)
             where
               ly : ∀ {e′} → enter (f a) (q ++ [ ix 1 ]) y e′ → ES.LaneOf f q a y e′
               ly l′ = l′ , past {a = _} (val-ok x) l′
-              cut : Read (Cut f o) q k → Cut f o q y → ¬ ¬ Img JoinT k y
-              cut (inj₁ nc)  cy = λ _ → nc (cut-up cy (≺→≼ {y} {k} yk))
-              cut (inj₂ ins) cy = seen (left x r (ly l) cy (in-world (If a (q ++ [ ix 1 ]) (val-ok x)) l yk ins)) yk
-              uncut : ∀ e′ → enter (f a) (q ++ [ ix 1 ]) y e′ → ¬ Cut f o q y → ¬ ¬ Img JoinT k y
-              uncut (out _) l′ nc = seen (lane x r (ly l′) nc tt) yk
-              uncut skip    l′ nc = seen (lane x r (ly l′) nc tt) yk
-              uncut end     l′ nc = em (λ d → seen (lend x r (ly l′) nc (λ ()) d) yk) (λ nd → seen (lpass x r (ly l′) nc (λ ()) nd) yk)
+              run : ∀ e′ → enter (f a) (q ++ [ ix 1 ]) y e′ → ¬ Cut f o q y → ¬ ¬ Img JoinT k y
+              run (out _) l′ nc = seen (lane x r (ly l′) nc tt) yk
+              run skip    l′ nc = seen (lane x r (ly l′) nc tt) yk
+              run (pin _) l′ nc = seen (lane x r (ly l′) nc tt) yk
+              run end     l′ nc = em (λ d → seen (lend x r (ly l′) nc (λ ()) d) yk) (λ nd → seen (lpass x r (ly l′) nc (λ ()) nd) yk)
 
-          L = lanes λ {q} {a} {k} x r _ kQ rd → lane-ag (val-ok x) (cnt-down c kQ) (img-l x r kQ rd)
+          -- No lane keeps a pin past its cut, on either side.
+          unleft : ∀ {g : A → Den B} → (∀ a → InvD H (g a)) → ∀ {q a k r} → o q (out a) → enter (g a) (q ++ [ ix 1 ]) k (pin r)
+                 → Cut f o q k → ¬ Cut f o q r → ⊥
+          unleft Ig {q} {a} x l c nc = let (w⁼ , i) = InvAt.pinned (Ig a (q ++ [ ix 1 ]) (val-ok x)) l in uncut x w⁼ i c nc
 
-    module KM (Q : Pos) = KJ (λ _ _ _ → ⊤) (λ _ _ _ _ → ⊥) (λ ()) Q (Join.MergeJ.agree Q)
-    module KS (Q : Pos) = KJ (λ _ _ _ → ⊤) ES.Switch.Cut (λ {q} {k} {y} → switch-cut-up f o {q} {k} {y}) Q (Join.SwitchJ.agree Q)
-    module KE (Q : Pos) = KJ ES.Exhaust.Run (λ _ _ _ _ → ⊥) (λ ()) Q (Join.ExhaustJ.agree Q)
+          L = lanes (λ {q} {a} {k} x r _ kQ rd → lane-ag (val-ok x) (cnt-down c kQ) (img-l x r kQ rd))
+                    (λ x _ _ _ c nc → (λ l → ⊥-elim (unleft {f} If x l c nc)) , (λ l → ⊥-elim (unleft {f′} If′ x l c nc)))
+
+    module KM (Q : Pos) = KJ (λ _ _ _ → ⊤) (λ _ _ _ _ → ⊥) (λ ()) (λ _ _ _ ()) Q (Join.MergeJ.agree Q)
+    module KS (Q : Pos) = KJ (λ _ _ _ → ⊤) ES.Switch.Cut (λ {q} {k} {y} → switch-cut-up f o {q} {k} {y})
+                             (λ {q} {a} {k} {r} → SwitchI.uncut ok f If Io {q} {a} {k} {r}) Q (Join.SwitchJ.agree Q)
+    module KE (Q : Pos) = KJ ES.Exhaust.Run (λ _ _ _ _ → ⊥) (λ ()) (λ _ _ _ ()) Q (Join.ExhaustJ.agree Q)
 
     module KB (m : ℕ) (Q : Pos) where
       open ES.Values o using (Nth; first; next)
-      open ES.Bounded m f o using (Kth; Starts; room; freed; queued; Ends; Sched; Sub; JoinT; val; step; oend; opass; lane; hand; lend; lpass)
+      open ES.Bounded m f o using (Kth; Starts; room; freed; queued; Ends; Sched; Sub; JoinT; val; step; opin; oend; opass; lane; hand; lend; lpass)
       open Join.BoundedJ {A} {B} Q m using (lanes; module BP)
 
       open Nths o using (nth-val)
@@ -479,6 +511,7 @@ private
           img-o : ∀ {y e} → o y e → y ≺ Q → ¬ ¬ Img JoinT Q y
           img-o {e = out _} x yQ = seen-under (val x) yQ
           img-o {e = skip}  x yQ = seen (step x) yQ
+          img-o {e = pin _} x yQ = seen (opin x) yQ
           img-o {e = end}   x yQ = em (λ d → seen (oend x d) yQ) (λ nd → seen (opass x nd) yQ)
 
           ao = outer c img-o
@@ -486,6 +519,7 @@ private
           img-l : ∀ {i q s₀ a} (sb : Sub i q s₀ a) → ∀ {y e} → enter (f a) s₀ y e → y ≺ Q → ¬ ¬ Img JoinT Q y
           img-l {i} {s₀ = s₀} {a} sb {e = out _} l yQ = seen (lane (nth-val (proj₁ sb)) (i , a , proj₁ sb) (i , s₀ , sb , l , past (sub-ok sb) l) (λ ()) tt) yQ
           img-l {i} {s₀ = s₀} {a} sb {e = skip}  l yQ = seen (lane (nth-val (proj₁ sb)) (i , a , proj₁ sb) (i , s₀ , sb , l , past (sub-ok sb) l) (λ ()) tt) yQ
+          img-l {i} {s₀ = s₀} {a} sb {e = pin _} l yQ = seen (lane (nth-val (proj₁ sb)) (i , a , proj₁ sb) (i , s₀ , sb , l , past (sub-ok sb) l) (λ ()) tt) yQ
           img-l {i} {q} {s₀} {a} sb {y} {e = end} l yQ =
             em (λ qd → seen-under (hand x r ly (λ ()) qd) yQ)
                (λ nq → em (λ d → seen (lend x r ly (λ ()) nq d) yQ) (λ nd → seen (lpass x r ly (λ ()) nq nd) yQ))
@@ -505,14 +539,14 @@ flatMap-ne : ∀ {A B H k} (op : FlatOp) {f f′ : A → Den B} {s s′ : Den A}
            → InvD H s → InvD H s′ → (∀ a → InvD H (f a)) → (∀ a → InvD H (f′ a))
            → s ≈ᶜ⟨ Ok H ∣ k ⟩ s′ → (∀ a → f a ≈ᶜ⟨ Ok H ∣ k ⟩ f′ a) → Op.flatMap op f s ≈ᶜ⟨ Ok H ∣ k ⟩ Op.flatMap op f′ s′
 flatMap-ne {H = H} {k} (mergeᶠ nothing) {f} {f′} {s} {s′} Is Is′ If If′ as af p ok = trunc-ag λ
-  { Q (inj₁ c) → Keep.KM.side {H = H} {k} {f = f} {f′} {s} {s′} Is If as af p ok Q c
-  ; Q (inj₂ c) → AgreeTo-sym (Keep.KM.side {H = H} {k} {f = f′} {f} {s′} {s} Is′ If′ (≈ᶜ-sym {d = s} {s′} as) (λ a → ≈ᶜ-sym {d = f a} {f′ a} (af a)) p ok Q c) }
+  { Q (inj₁ c) → Keep.KM.side {H = H} {k} {f = f} {f′} {s} {s′} Is If If′ as af p ok Q c
+  ; Q (inj₂ c) → AgreeTo-sym (Keep.KM.side {H = H} {k} {f = f′} {f} {s′} {s} Is′ If′ If (≈ᶜ-sym {d = s} {s′} as) (λ a → ≈ᶜ-sym {d = f a} {f′ a} (af a)) p ok Q c) }
 flatMap-ne {H = H} {k} (mergeᶠ (just m)) {f} {f′} {s} {s′} Is Is′ If If′ as af p ok = trunc-ag λ
-  { Q (inj₁ c) → Keep.KB.side {H = H} {k} {f = f} {f′} {s} {s′} Is If as af p ok m Q c
-  ; Q (inj₂ c) → AgreeTo-sym (Keep.KB.side {H = H} {k} {f = f′} {f} {s′} {s} Is′ If′ (≈ᶜ-sym {d = s} {s′} as) (λ a → ≈ᶜ-sym {d = f a} {f′ a} (af a)) p ok m Q c) }
+  { Q (inj₁ c) → Keep.KB.side {H = H} {k} {f = f} {f′} {s} {s′} Is If If′ as af p ok m Q c
+  ; Q (inj₂ c) → AgreeTo-sym (Keep.KB.side {H = H} {k} {f = f′} {f} {s′} {s} Is′ If′ If (≈ᶜ-sym {d = s} {s′} as) (λ a → ≈ᶜ-sym {d = f a} {f′ a} (af a)) p ok m Q c) }
 flatMap-ne {H = H} {k} switchᶠ {f} {f′} {s} {s′} Is Is′ If If′ as af p ok = trunc-ag λ
-  { Q (inj₁ c) → Keep.KS.side {H = H} {k} {f = f} {f′} {s} {s′} Is If as af p ok Q c
-  ; Q (inj₂ c) → AgreeTo-sym (Keep.KS.side {H = H} {k} {f = f′} {f} {s′} {s} Is′ If′ (≈ᶜ-sym {d = s} {s′} as) (λ a → ≈ᶜ-sym {d = f a} {f′ a} (af a)) p ok Q c) }
+  { Q (inj₁ c) → Keep.KS.side {H = H} {k} {f = f} {f′} {s} {s′} Is If If′ as af p ok Q c
+  ; Q (inj₂ c) → AgreeTo-sym (Keep.KS.side {H = H} {k} {f = f′} {f} {s′} {s} Is′ If′ If (≈ᶜ-sym {d = s} {s′} as) (λ a → ≈ᶜ-sym {d = f a} {f′ a} (af a)) p ok Q c) }
 flatMap-ne {H = H} {k} exhaustᶠ {f} {f′} {s} {s′} Is Is′ If If′ as af p ok = trunc-ag λ
-  { Q (inj₁ c) → Keep.KE.side {H = H} {k} {f = f} {f′} {s} {s′} Is If as af p ok Q c
-  ; Q (inj₂ c) → AgreeTo-sym (Keep.KE.side {H = H} {k} {f = f′} {f} {s′} {s} Is′ If′ (≈ᶜ-sym {d = s} {s′} as) (λ a → ≈ᶜ-sym {d = f a} {f′ a} (af a)) p ok Q c) }
+  { Q (inj₁ c) → Keep.KE.side {H = H} {k} {f = f} {f′} {s} {s′} Is If If′ as af p ok Q c
+  ; Q (inj₂ c) → AgreeTo-sym (Keep.KE.side {H = H} {k} {f = f′} {f} {s′} {s} Is′ If′ If (≈ᶜ-sym {d = s} {s′} as) (λ a → ≈ᶜ-sym {d = f a} {f′ a} (af a)) p ok Q c) }

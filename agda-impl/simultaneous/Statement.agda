@@ -22,7 +22,7 @@
 -- instant it was released in, to pass `coherent`, fails it.
 --
 -- AN INSTANT'S END IS A FACT OF THE ROWS, NOT OF WHAT IS SHOWN: work no
--- subscriber sees (a skip) still runs in some instant, so a run is over,
+-- subscriber sees (a skip, a pin) still runs in some instant, so a run is over,
 -- and an instant left, by every row past it.  Those are read off the
 -- emission set directly, over its reached rows (`Seen`), never through a
 -- reader.
@@ -52,7 +52,7 @@ open import Function using (_⇔_)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_)
 
 open import denotation.Events using (_≟ᵖ_; Pos; Timeline; root)
-open import denotation.EmissionSet using (Ev; out; skip; end; EmissionSet; Proper; Seen; _≺_; enter; ⟦_⟧)
+open import denotation.EmissionSet using (Ev; out; end; Silent; EmissionSet; Proper; Seen; _≺_; enter; ⟦_⟧)
 open import denotation.Read using (Meets; After; cursor)
 open import simultaneous.InstEmit using (InstEmit)
 open import simultaneous.SObs using (SObs; module Elaborate)
@@ -110,7 +110,7 @@ Spent t c = Σ (List Pos) λ ks → ∀ {k e} → t k e → After c k → k ∈ 
 
 -- Past `c`, nothing a subscriber is shown.
 Quiet : ∀ {A} → EmissionSet A → Maybe Pos → Set
-Quiet t c = ∀ {k e} → t k e → After c k → e ≡ skip
+Quiet t c = ∀ {k e} → t k e → After c k → Silent e
 
 -- What was shown reaches the run's end: its completion, or past it only
 -- finitely much unseen work.

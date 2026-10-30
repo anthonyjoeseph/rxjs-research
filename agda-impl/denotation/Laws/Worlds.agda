@@ -31,9 +31,9 @@ open import Function using (Equivalence; _∘_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
 
 open import denotation.Events using (Pos; Label; ix; sub; last; inside; inside-++; inside-self; inside-cons; <ᵖ-part; <ᵖ-ix; <ᵖ-split; <ᵖ-between)
-open import denotation.Events using (ofᴱ)
-open import denotation.EmissionSet using (Ev; out; end; skip; EmissionSet; _≺_; _≼_; Den; hot; coldAt; enter; DenEnv; Truncate; InE; at-out;
-  at-end; on-out; spin; MapT; map-out; map-skip; map-end; Spin; module Scan;
+open import denotation.Events using (ofᴱ; Events)
+open import denotation.EmissionSet using (Ev; out; end; skip; pin; Silent; hush; held; EmissionSet; _≺_; _≼_; Den; hot; coldAt; enter; DenEnv; Truncate; InE; at-out;
+  at-end; on-out; on-skip; spin; MapT; map-out; map-skip; map-end; map-pin; Spin; module Scan;
   DeferT; guard; body; from; module Op)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺→≼; ≼-refl; ≼-trans; ≼-antisym; ≼-≺-≺; ≺-ext; ≼-false; LimD)
 
@@ -113,7 +113,8 @@ record InvAt {A} (H : Pos → Set) (p : Pos) (X : EmissionSet A) : Set where
     flat  : ∀ {y e l ys e′} → X y e → X (y ++ l ∷ ys) e′ → ⊥
     burst : ∀ {c y e} → X c end → X y e → c ≺ y → Σ Pos λ w → W⁼ H p w × T (inside w c) × T (inside w y)
     under : ∀ {q y w l e e′} → X q e → X y e′ → Plain l → W⁼ H (q ++ [ l ]) w → w ⊑ y → ⊥
-    quiet : ∀ {c y e} → X c end → X y e → c ≺ y → e ≡ skip
+    quiet : ∀ {c y e} → X c end → X y e → c ≺ y → Silent e
+    pinned : ∀ {y r} → X y (pin r) → W⁼ H p r × T (inside r y)
 
 -- At every admissible subscription.
 InvD : ∀ {A} → (Pos → Set) → Den A → Set
@@ -672,12 +673,13 @@ inv-widen {H = H} {t} {d} inv p (r , dj) = record
   ; burst = λ ce ye cy → bump (bu ce ye cy)
   ; under = un
   ; quiet = qu
+  ; pinned = λ x → let (w⁼ , i) = pn x in widen⁼ t w⁼ , i
   }
   where
     bump : ∀ {c y} → Σ Pos (λ w → W⁼ H p w × T (inside w c) × T (inside w y)) → Σ Pos (λ w → W⁼ (H ⊕ t) p w × T (inside w c) × T (inside w y))
     bump (w , w⁼ , i) = w , widen⁼ t w⁼ , i
 
-    open InvAt (inv p (r , λ hh w ins → dj (inj₂ hh) (widen t w) ins)) renaming (world to wo; real to re; func to fu; flat to fl; burst to bu; under to ud; quiet to qu)
+    open InvAt (inv p (r , λ hh w ins → dj (inj₂ hh) (widen t w) ins)) renaming (world to wo; real to re; func to fu; flat to fl; burst to bu; under to ud; quiet to qu; pinned to pn)
 
     un : ∀ {q y w l e e′} → enter d p q e → enter d p y e′ → Plain l → W⁼ (H ⊕ t) (q ++ [ l ]) w → w ⊑ y → ⊥
     un {q} {w = w} {l} x x′ pl v (zs , refl) with real-init w zs (re x′)
@@ -703,8 +705,9 @@ private
   -- A READING ONE LABEL DEEP keeps the invariant: its rows are siblings,
   -- under `p` together.
   shallow-inv : ∀ {A H p} {X : EmissionSet A} → Ok H p → (∀ {y e} → X y e → Below p y)
-              → (∀ {y e e′} → X y e → X y e′ → e ≡ e′) → (∀ {c y e} → X c end → X y e → c ≺ y → e ≡ skip) → InvAt H p X
-  shallow-inv {H = H} {p} (r , _) sh fu qu = record
+              → (∀ {y e e′} → X y e → X y e′ → e ≡ e′) → (∀ {c y e} → X c end → X y e → c ≺ y → Silent e)
+              → (∀ {y r} → X y (pin r) → ⊥) → InvAt H p X
+  shallow-inv {H = H} {p} (r , _) sh fu qu np = record
     { world = λ x → wo (sh x)
     ; real  = λ x → re (sh x)
     ; func  = fu
@@ -712,6 +715,7 @@ private
     ; burst = λ c y _ → p , here , ins (sh c) , ins (sh y)
     ; under = λ x y pl v le → un (sh x) (sh y) pl v le
     ; quiet = qu
+    ; pinned = λ x → ⊥-elim (np x)
     }
     where
       ne : ∀ {l₁ l₂ l} → p ++ [ l₂ ] ≡ (p ++ [ l₁ ]) ++ [ l ] → ⊥
@@ -737,9 +741,10 @@ private
   -- A reading whose rows are another's, ends kept, keeps its invariant.
   inv-via : ∀ {A B H p} {X : EmissionSet A} {Y : EmissionSet B}
           → (bk : ∀ {y e} → X y e → Σ (Ev B) (Y y)) → (∀ {y} → X y end → Y y end)
-          → (∀ {y e} (x : X y e) → proj₁ (bk x) ≡ skip → e ≡ skip)
+          → (∀ {y e} (x : X y e) → Silent (proj₁ (bk x)) → Silent e)
+          → (∀ {y r} → X y (pin r) → Y y (pin r))
           → (∀ {y e e′} → X y e → X y e′ → e ≡ e′) → InvAt H p Y → InvAt H p X
-  inv-via bk be bs fu I = record
+  inv-via bk be bs bp fu I = record
     { world = λ x → InvAt.world I (proj₂ (bk x))
     ; real  = λ x → InvAt.real I (proj₂ (bk x))
     ; func  = fu
@@ -747,6 +752,7 @@ private
     ; burst = λ c y cy → InvAt.burst I (be c) (proj₂ (bk y)) cy
     ; under = λ x y pl v le → InvAt.under I (proj₂ (bk x)) (proj₂ (bk y)) pl v le
     ; quiet = λ c y cy → bs y (InvAt.quiet I (be c) (proj₂ (bk y)) cy)
+    ; pinned = λ x → InvAt.pinned I (bp x)
     }
 
   of-end : ∀ {A} p i (xs : List A) {y} → InE (ofᴱ p i xs) y end → y ≡ p ++ [ last ]
@@ -803,12 +809,17 @@ private
       cong₂ f (acc-func (≼-antisym {q₀} {q₁} (λ h → nx′ (proj₂ (acc-val a)) h lt) (λ h → nx (proj₂ (acc-val a′)) h lt′)) a a′)
               (out-inj (fu x x′))
 
+-- A timeline's rows hold no pin.
+ine-pin : ∀ {A} {es : Events A} {y r} → InE es y (pin r) → ⊥
+ine-pin (on-out x)  = ine-pin x
+ine-pin (on-skip x) = ine-pin x
+
 empty-inv : ∀ {A H} → InvD H (Op.empty {A})
 empty-inv p ok = shallow-inv ok (λ { (at-end , _) → last , plain-last , refl }) (λ { (at-end , _) (at-end , _) → refl })
-  λ { (at-end , _) (at-end , _) cy → ⊥-elim (≺-irrefl {p ++ [ last ]} cy) }
+  (λ { (at-end , _) (at-end , _) cy → ⊥-elim (≺-irrefl {p ++ [ last ]} cy) }) λ { (() , _) }
 
 of-inv : ∀ {A H} (xs : List A) → InvD H (Op.of xs)
-of-inv xs p ok = shallow-inv ok (λ x → of-below p 0 xs (proj₁ x)) (λ x x′ → of-func p 0 xs (proj₁ x) (proj₁ x′)) qu
+of-inv xs p ok = shallow-inv ok (λ x → of-below p 0 xs (proj₁ x)) (λ x x′ → of-func p 0 xs (proj₁ x) (proj₁ x′)) qu (ine-pin ∘ proj₁)
   where
     qu : ∀ {c y e} → Truncate (InE (ofᴱ p 0 xs)) c end → Truncate (InE (ofᴱ p 0 xs)) y e → c ≺ y → _
     qu (c , _) (y , _) cy with of-end p 0 xs c | of-idx p 0 xs y
@@ -817,43 +828,46 @@ of-inv xs p ok = shallow-inv ok (λ x → of-below p 0 xs (proj₁ x)) (λ x x�
 
 spin-inv : ∀ {A H} → InvD H (Op.⊥ {A})
 spin-inv p ok = shallow-inv ok (λ { (spin i , _) → ix i , plain-ix , refl }) (λ x x′ → trans (spin-skip (proj₁ x)) (sym (spin-skip (proj₁ x′))))
-  λ _ y _ → spin-skip (proj₁ y)
+  (λ _ y _ → subst Silent (sym (spin-skip (proj₁ y))) hush) λ { (() , _) }
 
 map-inv : ∀ {A B H} (f : A → B) {s : Den A} → InvD H s → InvD H (Op.map f s)
-map-inv f {s} inv p ok = inv-via bk be bs fu (inv p ok)
+map-inv {A} {B} f {s} inv p ok = inv-via bk be bs bp fu (inv p ok)
   where
-    fu : ∀ {y e e′} → Truncate (MapT f (enter s p)) y e → Truncate (MapT f (enter s p)) y e′ → e ≡ e′
-    fu (map-out x , _)  (map-out x′ , _)  = cong (out ∘ f) (out-inj (InvAt.func (inv p ok) x x′))
-    fu (map-out x , _)  (map-skip x′ , _) with InvAt.func (inv p ok) x x′
-    ... | ()
-    fu (map-out x , _)  (map-end x′ , _)  with InvAt.func (inv p ok) x x′
-    ... | ()
-    fu (map-skip x , _) (map-out x′ , _)  with InvAt.func (inv p ok) x x′
-    ... | ()
-    fu (map-skip x , _) (map-skip x′ , _) = refl
-    fu (map-skip x , _) (map-end x′ , _)  with InvAt.func (inv p ok) x x′
-    ... | ()
-    fu (map-end x , _)  (map-out x′ , _)  with InvAt.func (inv p ok) x x′
-    ... | ()
-    fu (map-end x , _)  (map-skip x′ , _) with InvAt.func (inv p ok) x x′
-    ... | ()
-    fu (map-end x , _)  (map-end x′ , _)  = refl
+    mapE : Ev A → Ev B
+    mapE (out a) = out (f a)
+    mapE skip    = skip
+    mapE end     = end
+    mapE (pin r) = pin r
 
     bk : ∀ {y e} → Truncate (MapT f (enter s p)) y e → Σ _ (enter s p y)
     bk (map-out x , _)  = _ , x
     bk (map-skip x , _) = _ , x
     bk (map-end x , _)  = _ , x
+    bk (map-pin x , _)  = _ , x
+
+    bk-map : ∀ {y e} (x : Truncate (MapT f (enter s p)) y e) → e ≡ mapE (proj₁ (bk x))
+    bk-map (map-out x , _)  = refl
+    bk-map (map-skip x , _) = refl
+    bk-map (map-end x , _)  = refl
+    bk-map (map-pin x , _)  = refl
+
+    fu : ∀ {y e e′} → Truncate (MapT f (enter s p)) y e → Truncate (MapT f (enter s p)) y e′ → e ≡ e′
+    fu x x′ = trans (bk-map x) (trans (cong mapE (InvAt.func (inv p ok) (proj₂ (bk x)) (proj₂ (bk x′)))) (sym (bk-map x′)))
 
     be : ∀ {y} → Truncate (MapT f (enter s p)) y end → enter s p y end
     be (map-end x , _) = x
 
-    bs : ∀ {y e} (x : Truncate (MapT f (enter s p)) y e) → proj₁ (bk x) ≡ skip → e ≡ skip
+    bs : ∀ {y e} (x : Truncate (MapT f (enter s p)) y e) → Silent (proj₁ (bk x)) → Silent e
+    bs (map-skip x , _) _ = hush
+    bs (map-pin x , _)  _ = held
     bs (map-out x , _)  ()
-    bs (map-skip x , _) _ = refl
     bs (map-end x , _)  ()
 
+    bp : ∀ {y r} → Truncate (MapT f (enter s p)) y (pin r) → enter s p y (pin r)
+    bp (map-pin x , _) = x
+
 scan-inv : ∀ {A B H} (f : B → A → B) z {s : Den A} → InvD H s → InvD H (Op.scan f z s)
-scan-inv f z {s} inv p ok = inv-via bk be bs fu (inv p ok)
+scan-inv f z {s} inv p ok = inv-via bk be bs bp fu (inv p ok)
   where
     I = inv p ok
     open AccF f z (InvAt.func I)
@@ -874,26 +888,46 @@ scan-inv f z {s} inv p ok = inv-via bk be bs fu (inv p ok)
     fu (Scan.send x , _)  (Scan.sstep x′ , _) with InvAt.func I x x′
     ... | ()
     fu (Scan.send x , _)  (Scan.send x′ , _)  = refl
+    fu (Scan.spin x , _)  (Scan.spin x′ , _)  with InvAt.func I x x′
+    ... | refl = refl
+    fu (Scan.spin x , _)  (Scan.sval a′ , _)  with InvAt.func I (proj₂ (acc-val a′)) x
+    ... | ()
+    fu (Scan.spin x , _)  (Scan.sstep x′ , _) with InvAt.func I x x′
+    ... | ()
+    fu (Scan.spin x , _)  (Scan.send x′ , _)  with InvAt.func I x x′
+    ... | ()
+    fu (Scan.sval a , _)  (Scan.spin x′ , _)  with InvAt.func I (proj₂ (acc-val a)) x′
+    ... | ()
+    fu (Scan.sstep x , _) (Scan.spin x′ , _)  with InvAt.func I x x′
+    ... | ()
+    fu (Scan.send x , _)  (Scan.spin x′ , _)  with InvAt.func I x x′
+    ... | ()
 
     bk : ∀ {y e} → Truncate (Scan.ScanT f z (enter s p)) y e → Σ _ (enter s p y)
     bk (Scan.sval a , _)  = acc-row a
     bk (Scan.sstep x , _) = _ , x
     bk (Scan.send x , _)  = _ , x
+    bk (Scan.spin x , _)  = _ , x
 
     be : ∀ {y} → Truncate (Scan.ScanT f z (enter s p)) y end → enter s p y end
     be (Scan.send x , _) = x
 
-    bs : ∀ {y e} (x : Truncate (Scan.ScanT f z (enter s p)) y e) → proj₁ (bk x) ≡ skip → e ≡ skip
+    bs : ∀ {y e} (x : Truncate (Scan.ScanT f z (enter s p)) y e) → Silent (proj₁ (bk x)) → Silent e
     bs (Scan.sval (Scan.acc₀ _ _) , _)    ()
     bs (Scan.sval (Scan.acc _ _ _ _) , _) ()
-    bs (Scan.sstep x , _) _ = refl
+    bs (Scan.sstep x , _) _ = hush
+    bs (Scan.spin x , _)  _ = held
     bs (Scan.send x , _)  ()
+
+    bp : ∀ {y r} → Truncate (Scan.ScanT f z (enter s p)) y (pin r) → enter s p y (pin r)
+    bp (Scan.spin x , _) = x
 
 -- A DEFER keeps it: its guard lies before the body's subscription, and
 -- the body's world lies in its own.
 defer-inv : ∀ {A H} {s : Den A} → InvD H s → InvD H (Op.defer s)
 defer-inv {A} {H} {s} inv p ok = record { world = wo ; real = re ; func = λ x x′ → fu (view x) (view x′) ; flat = λ x x′ → fl (view x) (view x′)
-  ; burst = λ c y cy → bu (view c) (view y) cy ; under = λ x y → un (view x) (view y) ; quiet = λ c y cy → qu (view c) (view y) cy }
+  ; burst = λ c y cy → bu (view c) (view y) cy ; under = λ x y → un (view x) (view y) ; quiet = λ c y cy → qu (view c) (view y) cy
+  ; pinned = pn }
   where
     I = inv (p ++ [ ix 1 ]) (ok-step p ok)
     B = enter s (p ++ [ ix 1 ])
@@ -963,10 +997,14 @@ defer-inv {A} {H} {s} inv p ok = record { world = wo ; real = re ; func = λ x x
       anc-lead (world-anc⁼ (nest⁼ (inW (step (inW (InvAt.world I b)) pl)) v)) le rg (early [])
     un (inj₂ b) (inj₂ b′) pl v le = InvAt.under I b b′ pl v le
 
-    qu : ∀ {c y e} → View c end → View y e → c ≺ y → e ≡ skip
+    qu : ∀ {c y e} → View c end → View y e → c ≺ y → Silent e
     qu (inj₁ (_ , ())) _ _
-    qu _ (inj₁ (_ , refl)) _ = refl
+    qu _ (inj₁ (_ , refl)) _ = hush
     qu (inj₂ b) (inj₂ b′) cy = InvAt.quiet I b b′ cy
+
+    pn : ∀ {y r} → Truncate (DeferT s p) y (pin r) → W⁼ H p r × T (inside r y)
+    pn (body x , _) with InvAt.pinned I x
+    ... | w , i = inW (shrink⁼ w) , i
 
 -- A LIMIT keeps it: any finitely many of its rows are one member's.
 lim-inv : ∀ {A H} {c : ℕ → Den A} → (∀ n → InvD H (c n)) → InvD H (LimD c)
@@ -978,6 +1016,7 @@ lim-inv inv p ok = record
   ; burst = λ { (from N l , _) (from M m , _) cy → InvAt.burst (I (N ⊔ M)) (l (N ⊔ M) (m≤m⊔n N M)) (m (N ⊔ M) (m≤n⊔m N M)) cy }
   ; under = λ { (from N l , _) (from M m , _) pl v le → InvAt.under (I (N ⊔ M)) (l (N ⊔ M) (m≤m⊔n N M)) (m (N ⊔ M) (m≤n⊔m N M)) pl v le }
   ; quiet = λ { (from N l , _) (from M m , _) cy → InvAt.quiet (I (N ⊔ M)) (l (N ⊔ M) (m≤m⊔n N M)) (m (N ⊔ M) (m≤n⊔m N M)) cy }
+  ; pinned = λ { (from N l , _) → InvAt.pinned (I N) (l N ≤-refl) }
   }
   where
     I = λ n → inv n p ok

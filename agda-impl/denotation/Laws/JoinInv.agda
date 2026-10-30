@@ -11,9 +11,8 @@
 -- What follows an end follows the outer's end and every running lane's,
 -- so the outer's and the lanes' `burst` and `quiet` carry over.
 --
--- A switch's `left` rows never arise: a value cutting a lane before a row
--- inside its subscription would be an outer row under that subscription,
--- or under the cut lane's value.
+-- A switch's `left` rows never arise: a value cutting a lane past a pin's
+-- connect would be an outer row under the lane's world.
 module denotation.Laws.JoinInv where
 
 open import Data.Bool using (T)
@@ -27,7 +26,7 @@ open import Relation.Nullary using (¬_; yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
 open import denotation.Events using (Pos; ix; inside; _≟ᵖ_)
-open import denotation.EmissionSet using (Ev; out; skip; end; EmissionSet; _≺_; _≼_; Work; Den; enter; After; Truncate; module Joiner;
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Silent; hush; held; EmissionSet; _≺_; _≼_; Work; Den; enter; After; Truncate; module Joiner;
   module Switch; module Exhaust)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺→≼; ≼-antisym; ≼-or-≻; ≺-≼-≺; ≼-≺-≺)
 open import denotation.Laws.Worlds using (Plain; plain-ix; W; W⁼; step; here; inW; Real; Ok; InvAt; InvD; _⊑_; real-snoc;
@@ -109,7 +108,9 @@ module Join {A B : Set} {H : Pos → Set} {p : Pos} (ok : Ok H p) (f : A → Den
   end-before : ∀ {c₀ q a} → O c₀ end → O q (out a) → q ≺ c₀
   end-before {c₀} {q} oc xq with ≼-or-≻ c₀ q | ≼-or-≻ q c₀
   ... | inj₂ lt | _        = lt
-  ... | inj₁ _  | inj₂ lt′ = ⊥-elim (out≢skip (qu oc xq lt′))
+  ... | inj₁ _  | inj₂ lt′ = ⊥-elim (loud (qu oc xq lt′))
+    where loud : ∀ {a} → Silent (out a) → ⊥
+          loud ()
   ... | inj₁ le | inj₁ le′ = ⊥-elim (no-end oc (subst (λ z → O z (out _)) (≼-antisym {q} {c₀} le′ le) xq))
 
   -- No value's first child lies past the outer's end.
@@ -155,6 +156,7 @@ module Join {A B : Set} {H : Pos → Set} {p : Pos} (ok : Ok H p) (f : A → Den
     -- What an outer row shows.
     data OEv (c : Pos) : Ev A → Ev B → Set where
       o-skip : OEv c skip skip
+      o-pin  : ∀ {r} → OEv c (pin r) (pin r)
       o-end  : D c → OEv c end end
       o-pass : ¬ D c → OEv c end skip
 
@@ -171,6 +173,8 @@ module Join {A B : Set} {H : Pos → Set} {p : Pos} (ok : Ok H p) (f : A → Den
 
     o-nout : ∀ {y e₀ e} → OEv y e₀ e → O y e₀ → ∀ {a} → O y (out a) → ⊥
     o-nout o-skip     = no-skip
+    o-nout o-pin      = λ x x′ → case (fu x x′) where case : ∀ {r a} → pin r ≡ out a → ⊥
+                                                      case ()
     o-nout (o-end _)  = no-end
     o-nout (o-pass _) = no-end
 
@@ -181,6 +185,7 @@ module Join {A B : Set} {H : Pos → Set} {p : Pos} (ok : Ok H p) (f : A → Den
 
     o-func : ∀ {y e₀ e e′} → OEv y e₀ e → OEv y e₀ e′ → e ≡ e′
     o-func o-skip      o-skip      = refl
+    o-func o-pin       o-pin       = refl
     o-func (o-end _)   (o-end _)   = refl
     o-func (o-end d)   (o-pass nd) = ⊥-elim (nd d)
     o-func (o-pass nd) (o-end d)   = ⊥-elim (nd d)
@@ -197,11 +202,17 @@ module Join {A B : Set} {H : Pos → Set} {p : Pos} (ok : Ok H p) (f : A → Den
     l-func (l-pass _ nd) (l-end _ d)   = ⊥-elim (nd d)
     l-func (l-pass _ _)  (l-pass _ _)  = refl
 
-    o-skipped : ∀ {y e₀ e} → e₀ ≡ skip → OEv y e₀ e → e ≡ skip
-    o-skipped refl o-skip = refl
+    o-skipped : ∀ {y e₀ e} → Silent e₀ → OEv y e₀ e → Silent e
+    o-skipped hush o-skip = hush
+    o-skipped held o-pin  = held
 
-    l-skipped : ∀ {q a y e₀ e} → e₀ ≡ skip → LEv q a y e₀ e → e ≡ skip
-    l-skipped refl (l-work _ _) = refl
+    l-skipped : ∀ {q a y e₀ e} → Silent e₀ → LEv q a y e₀ e → Silent e
+    l-skipped s (l-work _ _) = s
+
+    pinned-v : ∀ {y r} → V y (pin r) → W⁼ H p r × T (inside r y)
+    pinned-v (v-o x o-pin)            = InvAt.pinned Io x
+    pinned-v (v-lane x l (l-work _ _)) with InvAt.pinned (LI x) (proj₁ l)
+    ... | w⁼ , i = nest⁼ (inW (sw x)) w⁼ , i
 
     world-v : ∀ {y e} → V y e → W H p y
     world-v (v-o x _)      = wo x
@@ -293,12 +304,12 @@ module Join {A B : Set} {H : Pos → Set} {p : Pos} (ok : Ok H p) (f : A → Den
         ...   | w , w⁼ , i₁ , i₂ =
           w , nest⁼ (inW (sw xq)) w⁼ , ⊑-inside (conv {w} {c′} {c} {y} (inside-⊑ w c′ i₁) le cy (inside-⊑ w y i₂)) , i₂
 
-    quiet-v : (∀ {c} → D c → Ended c) → ∀ {c y e} → V c end → V y e → c ≺ y → e ≡ skip
+    quiet-v : (∀ {c} → D c → Ended c) → ∀ {c y e} → V c end → V y e → c ≺ y → Silent e
     quiet-v en {c} {y} vc vy cy = go (en (done-v vc)) vy
       where
-        go : ∀ {e} → Ended c → V y e → e ≡ skip
+        go : ∀ {e} → Ended c → V y e → Silent e
         go ((c₀ , oc , le) , _) (v-o oy ev) = o-skipped (qu oc oy (≼-≺-≺ {c₀} {c} {y} le cy)) ev
-        go _ (v-val _ _) = refl
+        go _ (v-val _ _) = hush
         go (_ , ln) (v-lane xq l ev) with ln xq l (l-gate ev) cy
         ... | c′ , lc , le = l-skipped (InvAt.quiet (LI xq) (proj₁ lc) (proj₁ l) (≼-≺-≺ {c′} {c} {y} le cy)) ev
 
@@ -311,27 +322,29 @@ module Join {A B : Set} {H : Pos → Set} {p : Pos} (ok : Ok H p) (f : A → Den
       ; burst = λ c y cy → burst-v en (vw c) (vw y) cy
       ; under = λ x y pl v le → under-v (vw x) (vw y) pl v le
       ; quiet = λ c y cy → quiet-v en (vw c) (vw y) cy
+      ; pinned = λ x → pinned-v (vw x)
       }
 
--- A joiner, given its policy: a cut only ever grows, and never reaches
--- inside a run lane's subscription.
+-- A joiner, given its policy: a cut only ever grows, and never falls
+-- past a connect in a lane's world.
 module JoinerI {A B H p} (ok : Ok H p) (f : A → Den B) (fi : ∀ a → InvD H (f a)) {O : EmissionSet A} (Io : InvAt H p O)
                (Runs : Pos → Set) (Cut : Pos → Pos → Set) (cut-up : ∀ {q k y} → Cut q k → k ≼ y → Cut q y)
-               (uncut : ∀ {q a k} → O q (out a) → Cut q k → T (inside (q ++ [ ix 1 ]) k) → ⊥) where
-  open Joiner f O Runs Cut using (JoinT; val; step; oend; opass; lane; lend; lpass; hand; left; run; rend; rpass; rhand; Done)
-  open Join ok f fi Io using (module View; end-before)
+               (uncut : ∀ {q a k r} → O q (out a) → W⁼ H (q ++ [ ix 1 ]) r → T (inside r k) → Cut q k → ¬ Cut q r → ⊥) where
+  open Joiner f O Runs Cut using (JoinT; val; step; opin; oend; opass; lane; lend; lpass; hand; left; run; rend; rpass; rhand; Done)
+  open Join ok f fi Io using (module View; end-before; LI)
   open View Done (λ q _ y → Runs q × ¬ Cut q y)
 
   vw : ∀ {y e} → JoinT y e → V y e
   vw (val x)             = v-val x refl
   vw (step x)            = v-o x o-skip
+  vw (opin x)            = v-o x o-pin
   vw (oend x d)          = v-o x (o-end d)
   vw (opass x nd)        = v-o x (o-pass nd)
   vw (lane x r l nc w)   = v-lane x l (l-work (r , nc) w)
   vw (lend x r l nc _ d)   = v-lane x l (l-end (r , nc) d)
   vw (lpass x r l nc _ nd) = v-lane x l (l-pass (r , nc) nd)
   vw (hand _ _ _ _ ())
-  vw (left x _ _ c ins)    = ⊥-elim (uncut x c ins)
+  vw (left x _ l c nc)     = ⊥-elim (let (w⁼ , i) = InvAt.pinned (LI x) (proj₁ l) in uncut x w⁼ i c nc)
   vw (run () _)
   vw (rend () _ _)
   vw (rpass () _ _)
@@ -348,21 +361,21 @@ switch-cut-up : ∀ {A B : Set} (f : A → Den B) (o : EmissionSet A) {q k y} �
 switch-cut-up f o {k = k} {y} (q′ , a′ , x , qq′ , q′k) ky = q′ , a′ , x , qq′ , ≺-≼-≺ {q′} {k} {y} q′k ky
 
 module MergeI {A B H p} (ok : Ok H p) (f : A → Den B) (fi : ∀ a → InvD H (f a)) {O : EmissionSet A} (Io : InvAt H p O) where
-  open JoinerI ok f fi Io (λ _ → ⊤) (λ _ _ → ⊥) (λ ()) (λ _ ()) public using (inv)
+  open JoinerI ok f fi Io (λ _ → ⊤) (λ _ _ → ⊥) (λ ()) (λ _ _ _ ()) public using (inv)
 
 module SwitchI {A B H p} (ok : Ok H p) (f : A → Den B) (fi : ∀ a → InvD H (f a)) {O : EmissionSet A} (Io : InvAt H p O) where
   open Switch f O using (Cut)
   open Join ok f fi Io using (strict)
   open InvAt Io renaming (under to U)
 
-  -- A value cuts no lane inside its own subscription.
-  uncut : ∀ {q a k} → O q (out a) → Cut q k → T (inside (q ++ [ ix 1 ]) k) → ⊥
-  uncut {q} {k = k} xq (q′ , _ , xq′ , qq′ , q′k) ins with ≼-or-≻ (q ++ [ ix 1 ]) q′
-  ... | inj₁ le = U xq xq′ plain-ix here (conv {q ++ [ ix 1 ]} {q ++ [ ix 1 ]} {q′} {k} (⊑-refl _) le q′k (inside-⊑ _ k ins))
-  ... | inj₂ lt = strict xq xq′ qq′ (conv {q} {q} {q′} {q ++ [ ix 1 ]} (⊑-refl q) (≺→≼ {q} {q′} qq′) lt (⊑-snoc⁺ q))
+  -- A value cuts no lane past a connect in its world: the value would lie
+  -- under that world.
+  uncut : ∀ {q a k r} → O q (out a) → W⁼ H (q ++ [ ix 1 ]) r → T (inside r k) → Cut q k → ¬ Cut q r → ⊥
+  uncut {q} {k = k} {r} xq w⁼ ins (q′ , a′ , xq′ , qq′ , q′k) nc =
+    U xq xq′ plain-ix w⁼ (conv {r} {r} {q′} {k} (⊑-refl r) (λ lt → nc (q′ , a′ , xq′ , qq′ , lt)) q′k (inside-⊑ r k ins))
 
-  open JoinerI ok f fi Io (λ _ → ⊤) Cut (λ {q} {k} {y} → switch-cut-up f O {q} {k} {y}) (λ {q} {a} {k} → uncut {q} {a} {k}) public using (inv)
+  open JoinerI ok f fi Io (λ _ → ⊤) Cut (λ {q} {k} {y} → switch-cut-up f O {q} {k} {y}) (λ {q} {a} {k} {r} → uncut {q} {a} {k} {r}) public using (inv)
 
 module ExhaustI {A B H p} (ok : Ok H p) (f : A → Den B) (fi : ∀ a → InvD H (f a)) {O : EmissionSet A} (Io : InvAt H p O) where
   open Exhaust f O using (Run)
-  open JoinerI ok f fi Io Run (λ _ _ → ⊥) (λ ()) (λ _ ()) public using (inv)
+  open JoinerI ok f fi Io Run (λ _ _ → ⊥) (λ ()) (λ _ _ _ ()) public using (inv)

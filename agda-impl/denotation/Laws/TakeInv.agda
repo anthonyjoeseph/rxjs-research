@@ -5,7 +5,7 @@
 -- failing value and a row of the source at that value's position would
 -- clash, and do not: the source has one event there, and the row kept at
 -- it is either a passing value, a skip or end before every failure, or a
--- row left after one.
+-- pin.
 module denotation.Laws.TakeInv where
 
 open import Data.Bool using (Bool; T; true; false; not)
@@ -21,10 +21,10 @@ open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
 open import denotation.Events using (Pos; Label; ix; last; inside; inside-++; <ᵖ-part; <ᵖ-split; <ᵖ-apart)
-open import denotation.EmissionSet using (Ev; out; end; skip; EmissionSet; _≺_; module TakeWhile; module Op)
+open import denotation.EmissionSet using (Ev; out; end; skip; pin; Silent; hush; held; EmissionSet; _≺_; module TakeWhile; module Op)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺-ext; ≼-false; ≼-or-≻)
 open import denotation.Laws.Worlds using (Plain; plain-ix; plain-last; W; W⁼; step; here; inW; real-snoc; Real; InvAt; InvD;
-  ⊑-refl; ⊑-snoc⁺; ⊑-snoc; conv; in-world; ext≢; same-lead; flat-under; _⊑_; w-up; nest⁼)
+  ⊑-refl; ⊑-snoc⁺; ⊑-snoc; ⊑-inside; inside-⊑; conv; in-world; ext≢; same-lead; flat-under; _⊑_; w-up; nest⁼)
 
 private
   T-not : ∀ {b} → T b → T (not b) → ⊥
@@ -32,18 +32,19 @@ private
   T-not {false} ()
 
   module TI {A H p} (incl : Bool) (keep : A → Bool) {t : EmissionSet A} (I : InvAt H p t) where
-    open TakeWhile incl keep t p
+    open TakeWhile incl keep t
 
     -- What a kept row of the source asserts of its event.
     Keeps : Ev A → Set
     Keeps (out a) = T (keep a)
     Keeps skip    = ⊤
     Keeps end     = ⊤
+    Keeps (pin _) = ⊥
 
-    -- A row where the source's lies: kept before every failure, or left.
-    data Sm (y : Pos) : Ev A → Ev A → Set where
-      s-own  : ∀ {e} → Keeps e → ¬ Failed y → Sm y e e
-      s-left : ∀ {e₀} → Failed y → T (inside p y) → Sm y skip e₀
+    -- A row where the source's lies: kept before every failure, or a pin.
+    data Sm (y : Pos) : Ev A → Set where
+      s-own  : ∀ {e} → Keeps e → ¬ Failed y → Sm y e
+      s-left : ∀ {r} → ¬ Failed r → Sm y (pin r)
 
     -- A row below a failing value.
     data Sh (a : A) : Label → Ev A → Set where
@@ -51,7 +52,7 @@ private
       sh-stop : Sh a last end
 
     data Vw (y : Pos) (e : Ev A) : Set where
-      sm : ∀ {e₀} → t y e₀ → Sm y e e₀ → Vw y e
+      sm : t y e → Sm y e → Vw y e
       sh : ∀ {q a l} → t q (out a) → T (not (keep a)) → ¬ Failed q → Sh a l e → y ≡ q ++ [ l ] → Vw y e
 
     view : ∀ {y e} → TakeT y e → Vw y e
@@ -60,18 +61,19 @@ private
     view (stop x nk nf)   = sh x nk nf sh-stop refl
     view (step x nf)      = sm x (s-own tt nf)
     view (tend x nf)      = sm x (s-own tt nf)
-    view (left x f i)     = sm x (s-left f i)
+    view (left x nf)      = sm x (s-left nf)
 
     sh-plain : ∀ {a l e} → Sh a l e → Plain l
     sh-plain (sh-fail _) = plain-ix
     sh-plain sh-stop     = plain-last
 
     -- A row kept at a failing value's position is none.
-    clash : ∀ {y e e₀ a} → t y e₀ → Sm y e e₀ → t y (out a) → T (not (keep a)) → ¬ Failed y → ⊥
+    clash : ∀ {y e a} → t y e → Sm y e → t y (out a) → T (not (keep a)) → ¬ Failed y → ⊥
     clash x (s-own kp _) x′ nk _ = go (InvAt.func I x x′) kp nk
       where go : ∀ {e₀ a} → e₀ ≡ out a → Keeps e₀ → T (not (keep a)) → ⊥
             go refl kp′ nk′ = T-not kp′ nk′
-    clash _ (s-left f _) _ _ nf = nf f
+    clash x (s-left _) x′ _ _ with InvAt.func I x x′
+    ... | ()
 
     wo : ∀ {y e} → Vw y e → W H p y
     wo (sm x _)            = InvAt.world I x
@@ -86,10 +88,7 @@ private
     sh-func eq sh-stop     sh-stop     = refl
 
     fu : ∀ {y e e′} → Vw y e → Vw y e′ → e ≡ e′
-    fu (sm x (s-own _ _))   (sm x′ (s-own _ _))   = InvAt.func I x x′
-    fu (sm _ (s-own _ nf))  (sm _ (s-left f _))   = ⊥-elim (nf f)
-    fu (sm _ (s-left f _))  (sm _ (s-own _ nf))   = ⊥-elim (nf f)
-    fu (sm _ (s-left _ _))  (sm _ (s-left _ _))   = refl
+    fu (sm x _)             (sm x′ _)             = InvAt.func I x x′
     fu (sm x _)             (sh x′ _ _ _ refl)    = ⊥-elim (InvAt.flat I x′ x)
     fu (sh x _ _ _ refl)    (sm x′ _)             = ⊥-elim (InvAt.flat I x x′)
     fu (sh {q = q} x _ _ k eq) (sh {q = q′} x′ _ _ k′ eq′) with ∷ʳ-injectiveˡ q q′ (trans (sym eq) eq′) | ∷ʳ-injectiveʳ q q′ (trans (sym eq) eq′)
@@ -133,13 +132,14 @@ private
     ...   | ()
     bu (sh {q = r} xr nk nf sh-stop refl) (sm xy (s-own _ nfy)) cy =
       ⊥-elim (nfy (r , _ , xr , nk , ≺-trans {r} {r ++ [ last ]} (≺-ext r []) cy))
-    bu (sh {q = r} xr nk nf sh-stop refl) (sm xy (s-left _ iy)) cy =
-      p , here , Equivalence.from T-≡ (inside-++ p r [ last ] (Equivalence.to T-≡ (in-world I xr (≺-trans {r} {r ++ [ last ]} (≺-ext r []) cy) iy))) , iy
+    bu {y = y} (sh {q = r} xr nk nf sh-stop refl) (sm xy (s-left {w} nfw)) cy with InvAt.pinned I xy
+    ... | w⁼ , iy = w , w⁼ , Equivalence.from T-≡ (inside-++ w r [ last ] (Equivalence.to T-≡ (⊑-inside
+          (conv {w} {w} {r} {y} (⊑-refl w) (λ lt → nfw (r , _ , xr , nk , lt)) (≺-trans {r} {r ++ [ last ]} {y} (≺-ext r []) cy) (inside-⊑ w y iy))))) , iy
     bu (sh {q = r} xr nk nf sh-stop refl) (sh xy nk′ nf′ k′ refl) cy = ⊥-elim (stop-sh xr nk xy nf′ k′ cy)
 
     -- Only skips follow an end.
-    qu : ∀ {c y e} → Vw c end → Vw y e → c ≺ y → e ≡ skip
-    qu _ (sm _ (s-left _ _)) _ = refl
+    qu : ∀ {c y e} → Vw c end → Vw y e → c ≺ y → Silent e
+    qu _ (sm _ (s-left _)) _ = held
     qu (sm xc (s-own _ _)) (sm xy (s-own _ _)) cy = InvAt.quiet I xc xy cy
     qu {c} (sm xc (s-own _ _)) (sh {q = q′} xy _ _ _ refl) cy with ≼-or-≻ q′ c
     ... | inj₂ lt with InvAt.quiet I xc xy lt
@@ -150,6 +150,10 @@ private
     qu (sh {q = r} xr nk nf sh-stop refl) (sm xy (s-own _ nfy)) cy =
       ⊥-elim (nfy (r , _ , xr , nk , ≺-trans {r} {r ++ [ last ]} (≺-ext r []) cy))
     qu (sh xr nk nf sh-stop refl) (sh xy nk′ nf′ k′ refl) cy = ⊥-elim (stop-sh xr nk xy nf′ k′ cy)
+
+    pn : ∀ {y r} → Vw y (pin r) → W⁼ H p r × T (inside r y)
+    pn (sm x _)          = InvAt.pinned I x
+    pn (sh _ _ _ () _)
 
     -- Under a kept row's child lies no other: a row's child below a
     -- failing value is the value's, or under it.
@@ -177,5 +181,6 @@ takeWhile-inv i keep inv p ok = record
   ; burst = λ c y cy → bu (view (proj₁ c)) (view (proj₁ y)) cy
   ; under = λ x y → un (view (proj₁ x)) (view (proj₁ y))
   ; quiet = λ c y cy → qu (view (proj₁ c)) (view (proj₁ y)) cy
+  ; pinned = λ x → pn (view (proj₁ x))
   }
   where open TI i keep (inv p ok)

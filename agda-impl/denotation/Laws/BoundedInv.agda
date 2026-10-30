@@ -35,7 +35,7 @@ open import Relation.Nullary using (¬_; yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
 
 open import denotation.Events using (Pos; ix; inside; _≟ᵖ_)
-open import denotation.EmissionSet using (Ev; out; skip; end; EmissionSet; _≺_; _≼_; Work; Den; enter; After; Truncate; module Values;
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Silent; hush; EmissionSet; _≺_; _≼_; Work; Den; enter; After; Truncate; module Values;
   module Bounded)
 open import denotation.Laws.Modulus using (≺-trans; ≼-antisym; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext)
 open import denotation.Laws.Worlds using (Plain; plain-ix; W; W⁼; step; here; inW; Real; Ok; InvAt; InvD; _⊑_; real-snoc; ok-in; nest;
@@ -43,7 +43,7 @@ open import denotation.Laws.Worlds using (Plain; plain-ix; W; W⁼; step; here; 
 open import denotation.Laws.JoinInv using (ix01; ix10; below; module Kids; module Join)
 open import denotation.Laws.Nth using (module Nths)
 
-end≢skip : ∀ {C} → _≡_ {A = Ev C} end skip → ⊥
+end≢skip : ∀ {C} → Silent {C} end → ⊥
 end≢skip ()
 
 -- One end to a reading.
@@ -59,7 +59,7 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   open Values O using (Nth; first; next)
   open InvAt Io renaming (world to wo; real to re; func to fu; flat to fl; burst to bu; under to U; quiet to qu)
   open Join ok f fi Io using (sw; kids; kid-root; kid-lane; o-lane; val-lane; o-lead; o-lane-lead; end-before; val-after; module View)
-  open View Done (λ _ _ _ → ⊤) using (OEv; o-skip; o-end; o-pass; o-nout; o-func; o-skipped)
+  open View Done (λ _ _ _ → ⊤) using (OEv; o-skip; o-pin; o-end; o-pass; o-nout; o-func; o-skipped)
   open Nths O using (nth-val; nth-fun; nth-lt; nth-inj)
 
   ------------------------------------------------------------------------
@@ -423,6 +423,7 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   vw : ∀ {y e} → JoinT y e → V y e
   vw (val x)                           = v-val x refl
   vw (step x)                          = v-o x o-skip
+  vw (opin x)                          = v-o x o-pin
   vw (oend x d)                        = v-o x (o-end d)
   vw (opass x nd)                      = v-o x (o-pass nd)
   vw (lane _ _ (_ , _ , sb , l) _ w)     = v-l sb (l-work l w)
@@ -589,18 +590,23 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
       go d (v-l sb lv) cy with lane-done d sb
       ... | c′ , ac , le = lane-burst sb ac le lv cy
 
-  quiet-v : ∀ {c y e} → V c end → V y e → c ≺ y → e ≡ skip
+  quiet-v : ∀ {c y e} → V c end → V y e → c ≺ y → Silent e
   quiet-v vc vy = go (done-v vc) vy
     where
-      go : ∀ {c y e} → Done c → V y e → c ≺ y → e ≡ skip
+      go : ∀ {c y e} → Done c → V y e → c ≺ y → Silent e
       go {c} {y} ((c₀ , oc , le) , _) (v-o oy ev) cy = o-skipped (qu oc oy (≼-≺-≺ {c₀} {c} {y} le cy)) ev
-      go _ (v-val _ _) _ = refl
+      go _ (v-val _ _) _ = hush
       go {c} {y} d (v-l sb (l-work x _)) cy with lane-done d sb
       ... | c′ , ac , le = InvAt.quiet (LI sb) (proj₁ ac) (proj₁ x) (≼-≺-≺ {c′} {c} {y} le cy)
       go {c} {y} d (v-l sb (l-end x _ _)) cy with lane-done d sb
       ... | c′ , ac , le = ⊥-elim (end≢skip (InvAt.quiet (LI sb) (proj₁ ac) (proj₁ x) (≼-≺-≺ {c′} {c} {y} le cy)))
-      go _ (v-l _ (l-pass _ _ _)) _ = refl
-      go _ (v-l _ (l-hand _ _ _)) _ = refl
+      go _ (v-l _ (l-pass _ _ _)) _ = hush
+      go _ (v-l _ (l-hand _ _ _)) _ = hush
+
+  pinned-v : ∀ {y r} → V y (pin r) → W⁼ H p r × T (inside r y)
+  pinned-v (v-o x o-pin)            = InvAt.pinned Io x
+  pinned-v (v-l sb (l-work x _)) with InvAt.pinned (LI sb) (proj₁ x)
+  ... | w⁼ , i = nest⁼ (inW (s-w sb)) w⁼ , i
 
   inv : InvAt H p (Truncate JoinT)
   inv = record
@@ -611,4 +617,5 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
     ; burst = λ c y cy → burst-v (vw (proj₁ c)) (vw (proj₁ y)) cy
     ; under = λ x y pl v le → under-v (vw (proj₁ x)) (vw (proj₁ y)) pl v le
     ; quiet = λ c y cy → quiet-v (vw (proj₁ c)) (vw (proj₁ y)) cy
+    ; pinned = λ x → pinned-v (vw (proj₁ x))
     }
