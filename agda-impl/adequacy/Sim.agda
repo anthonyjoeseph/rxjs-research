@@ -412,6 +412,11 @@ postulate
   -- slack is one skip at `p`, and `reach-≈` counts that slack as one row.
   -- DEAD ROUTE: a `G` invariant emptying the source at a body's end: the
   --   source is still owed its whole subscription there.
+  -- DEAD ROUTE: `ConnT` dropping its `burst` pins past the body's end.
+  --   rxjs subscribes the source after a body that has already ended, so
+  --   an endless synchronous source still blocks a sibling; the pins
+  --   carry that.  And a pin's `Dep` reaches only rows before its
+  --   connect, so no row of the body's end can decide it.
   rise-body-cp : ∀ {R Γ X B} (k : CS) (o : St Γ X) (c : Ctx R Γ B) s p
                → Sim ⟨ inBody k o c , s , rising cp , p ⟩ [] ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
 
