@@ -16,13 +16,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE CONNECT'S SEARCH
 
-Riskiest: the connect's lead is a body; what is left is how its source's
-rows and its body's sit against each other. Open whether an over connect's
-source ties at all, and whether the pure order already keeps the source past
-a body's find. Settled by bodies, or a program whose source row lands at or
-before a body find no later than it.
+Riskiest: how a connect's source rows and its body's sit against each
+other. Open: whether a body's find never shares a source row's position (an
+invariant `Good` does not yet state), and whether a body's rows read a
+source's emissions only at or past them. Settled by bodies, or a program
+whose source row lands at or before a body find no later than it.
 
-Members: `unfed-after`, `over-tight`, `conn-body-src`.
+Members: `unfed-after`, `conn-body-src`.
 
 #### THE COLD STEPPED
 
@@ -162,14 +162,6 @@ subscription reads as its body one level down. Settled when each is a
 body.
 
 Members: `sub-empty`, `sub-of`, `sub-defer`.
-
-#### THE KEYS
-
-Believed: keys order as positions do, strictly and transitively, and a
-position just past another stays before the mark the other is before.
-Settled by bodies over `denotation.Events`' label comparisons.
-
-Members: `shift-after`, `<ᴷ-trans`, `<ᴷ-irrefl`, `≮ᴷ-trans`, `at-<ᵖ`.
 
 ## Tier 1 — the simultaneous spec
 

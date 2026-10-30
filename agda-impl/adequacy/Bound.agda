@@ -35,7 +35,7 @@ open import operation.PureObservable using (module Machine)
 
 open Machine using (St; Ctx; CS; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed; same?; _⊕_;
                     free; cpAt; cutAt; overAt; inScan; inTake; inSrc; inBody;
-                    ofS; doneS; mapS; cutS; cpM; cutM; lnS; flatS; coldS; scanS; takeS; connS; joinS; inMap; inCut; inLn; inOuter; inLanes; nx; cp; attached; attAt; attM; pend) renaming (Ev to Evᴹ; over to overᶜ)
+                    ofS; doneS; mapS; cutS; cpM; cutM; lnS; flatS; coldS; scanS; takeS; connS; joinS; inMap; inCut; inLn; inOuter; inLanes; nx; cp; attached; attAt; attM; pend) renaming (Ev to Evᴹ)
 open import adequacy.Rows using (acc-val; rows; rowsL; pendRows; toEv; Lanes; Each; Kth; AllEnd; EndsOf; Lane; reads; module Flat; module SwitchF; module ExhaustF; module BoundedF; ∅; Hot; Inbox; _∪_; Kept; Stops) renaming (kept to keptᴿ; stop to stopᴿ; left to leftᴿ; sub to subᴿ)
 
 ------------------------------------------------------------------------
@@ -208,15 +208,11 @@ race-mk d n q (just (found f m κ , h , o)) (just (found g m′ κ′ , k , o′
 ... | true  = ⊑-trans mx (raise-outer n q h o)
 ... | false = ⊑-trans my (raise-lane d n q k o′)
 
-raise-src : ∀ v h → h ⊑ (if v then h else shift h)
-raise-src true  h = ⊑-refl h
-raise-src false h = shift-⊑ h
-
-source-mk : ∀ {R A B} v (x : Maybe (Cand R A)) (y : Maybe (Cand R B)) → Mk x → Mk y → Mk (sourceT v x y)
-source-mk v nothing                      y                            _  my = my
-source-mk v (just (found f m κ , h , o)) nothing                      mx _  = ⊑-trans mx (raise-src v h)
-source-mk v (just (found f m κ , h , o)) (just (found g m′ κ′ , k , o′)) mx my with (if v then h else shift h) <ᴷ k
-... | true  = ⊑-trans mx (raise-src v h)
+source-mk : ∀ {R A B} (x : Maybe (Cand R A)) (y : Maybe (Cand R B)) → Mk x → Mk y → Mk (sourceT x y)
+source-mk nothing                      y                            _  my = my
+source-mk (just (found f m κ , h , o)) nothing                      mx _  = ⊑-trans mx (shift-⊑ h)
+source-mk (just (found f m κ , h , o)) (just (found g m′ κ′ , k , o′)) mx my with shift h <ᴷ k
+... | true  = ⊑-trans mx (shift-⊑ h)
 ... | false = my
 
 mutual
@@ -231,7 +227,7 @@ mutual
   kids-mark c (takeS i q w s) = retag-mk (raise-take i q w) (seek (inTake i q w c) s) (seek-mark (inTake i q w c) s)
   kids-mark c (flatS op f d n q o ls) =
     race-mk d n q (seek (inOuter op f d n q ls c) o) (lanes c op f d n q o [] ls) (seek-mark (inOuter op f d n q ls c) o) (lanes-mark c op f d n q o [] ls)
-  kids-mark c (connS k o b)   = source-mk (overᶜ k) (seek (inSrc k b c) o) (seek (inBody k o c) b) (seek-mark (inSrc k b c) o) (seek-mark (inBody k o c) b)
+  kids-mark c (connS k o b)   = source-mk (seek (inSrc k b c) o) (seek (inBody k o c) b) (seek-mark (inSrc k b c) o) (seek-mark (inBody k o c) b)
   kids-mark c (pend _ _)        = tt
   kids-mark c (coldS _ _)     = tt
   kids-mark c (ofS _ _ _)     = tt

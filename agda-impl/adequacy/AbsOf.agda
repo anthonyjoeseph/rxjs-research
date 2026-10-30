@@ -6,7 +6,7 @@
 -- the of's rows reaches the root, and its run is silent.
 module adequacy.AbsOf where
 
-open import Data.Bool using (true; false; T; if_then_else_; _∨_)
+open import Data.Bool using (true; false; T; _∨_)
 open import Data.Bool.Properties using (∧-identityʳ)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List.Relation.Unary.All using ([])
@@ -66,10 +66,10 @@ race-lands d n q (just (f , h , o)) (just (g , k , o′)) lx ly with h <ᴷ k
 ... | true  = lx
 ... | false = ly
 
-source-lands : ∀ {R A B} {t : St [] R} v (x : Maybe (Cand R A)) (y : Maybe (Cand R B)) → Lands t x → Lands t y → Lands t (sourceT v x y)
-source-lands v nothing            y                   _  ly = ly
-source-lands v (just (f , h , o)) nothing             lx _  = lx
-source-lands v (just (f , h , o)) (just (g , k , o′)) lx ly with (if v then h else shift h) <ᴷ k
+source-lands : ∀ {R A B} {t : St [] R} (x : Maybe (Cand R A)) (y : Maybe (Cand R B)) → Lands t x → Lands t y → Lands t (sourceT x y)
+source-lands nothing            y                   _  ly = ly
+source-lands (just (f , h , o)) nothing             lx _  = lx
+source-lands (just (f , h , o)) (just (g , k , o′)) lx ly with shift h <ᴷ k
 ... | true  = lx
 ... | false = ly
 
@@ -90,7 +90,7 @@ mutual
   kids-lands c (flatS op f d n q o ls) e =
     race-lands d n q (seek (inOuter op f d n q ls c) o) (lanes c op f d n q o [] ls) (seek-lands (inOuter op f d n q ls c) o e) (lanes-lands c op f d n q o [] ls e)
   kids-lands c (connS k o b)           e =
-    source-lands (over k) (seek (inSrc k b c) o) (seek (inBody k o c) b) (seek-lands (inSrc k b c) o e) (seek-lands (inBody k o c) b e)
+    source-lands (seek (inSrc k b c) o) (seek (inBody k o c) b) (seek-lands (inSrc k b c) o e) (seek-lands (inBody k o c) b e)
   kids-lands c (pend _ _)                e = tt₁
   kids-lands c (coldS _ _)             e = tt₁
   kids-lands c (ofS _ _ _)             e = tt₁

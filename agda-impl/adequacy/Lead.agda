@@ -370,12 +370,11 @@ mutual
   kids-leadᶜ C false c (scanS f z s) es g qt _ b =
     scan-leads false f z (seek (inScan f z c) s) tt (seek-leadᶜ C false (inScan f z c) s es g qt (before-retag C (scanT f z) (raise-scan f z) (seek (inScan f z c) s) b))
   kids-leadᶜ C v c (takeS i q w s) es g qt _ = take-leadᶜ C v c i q w s es g qt
-  kids-leadᶜ C true c (connS k@(cs cl sl sa nothing aS oA ca ea) o b) (on es) g@(go , gb , _ , tl) (on qt) w =
+  kids-leadᶜ C true c (connS k@(cs cl sl sa nothing aS oA ca ea) o b) (on es) g@(go , gb , _ , tl) (on qt) _ =
     conn-free-lead C c k o b es g (seek (inSrc k b c) o) (seek (inBody k o c) b) refl refl
       (seek-leadᶜ C true (inSrc k b c) o (on es) go (on (calm-fst C (env c) qt))) (seek-okᶜ C (inSrc k b c) o es go (calm-fst C (env c) qt))
       (λ C₂ c₂ air → let qb = body-quiet {C = C} {C₂ = C₂} {σ = rows (env c) o} k o b c₂ qt tl air in
          seek-leadᶜ C₂ true (inBody k o c) b (on (bind-single k o b es g)) gb (on qb) , seek-okᶜ C₂ (inBody k o c) b (bind-single k o b es g) gb qb)
-      w
   kids-leadᶜ C true c (connS k@(cs cl sl sa (just p) aS oA ca ea) o b) (on es) g@(held hf , gb , _ , tl) (on qt) w =
     conn-held-lead C c k o b (p ⊕ [ ix 1 ]) hf (ownBest c (connS k o b) (own (connS k o b))) (seek (inBody k o c) b)
       (first-at {f = (_ , _ , c , connS k o b)} {m = bodyM} (at (p ⊕ [ ix 1 ])) (ownBest c (connS k o b) (drop 1 (own (connS k o b)))) (own-stills c k o b (drop 1 (own (connS k o b)))))
