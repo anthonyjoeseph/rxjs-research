@@ -577,9 +577,8 @@ module _ {R : Set} where
 
   played-hush : ∀ pk → Hush (played pk)
   played-hush gone                                         = tt
-  played-hush (leaf b (ending e) cl dv st)                 = tt
-  played-hush (leaf false (play τ′ u i t fr) cl dv st)     = tt
-  played-hush (leaf false over cl dv st)                   = tt
+  played-hush (leaf true (ending e) cl dv st)              = tt
+  played-hush (leaf false l cl dv st)                      = tt
   played-hush (leaf true (play τ′ u i t fr) true dv st)    = tt
   played-hush (leaf true over true dv st)                  = tt
   played-hush (leaf true (play τ′ u i t (emit a k)) false dv st) = tt

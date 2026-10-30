@@ -44,4 +44,7 @@ cases =
     connect (defer (μ (connect (empty {t = natᵗ}) (of (nat 4 ∷ nat 1 ∷ [])))))
             (connect (scan (var (there (here refl))) (nat 5) (μ (empty {t = natᵗ})))
                      (flatMap switchᶠ (μ (connected (here refl))) (cold (script ((0 , 3 ∷ []) ∷ []) false true)))))
+  ∷ -- a source torn down by its body's end with its own end owed that tick: the pure engine still completed it
+  ("connect, torn source's end owed" ,
+    connect (cold (script ((1 , 7 ∷ []) ∷ []) true false)) (cold (script ((1 , []) ∷ []) true false)))
   ∷ []
