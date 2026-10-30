@@ -108,8 +108,8 @@ module _ {R : Set} (o : PureObs [] R) where
 
     -- The least visible row of a state, read as the program's past `c`,
     -- is the row met next.
-    same : ∀ {k} c {p e q e′} → Vis (RT k) ≃ Vis (Beyond t c) → Owed c p e → Lowest (RT k) q e′ → p ≡ q × e ≡ e′
-    same c r (((tp , _) , _) , vi , ap , lt) (v , lt′) =
+    same : ∀ k c {p e q e′} → Vis (RT k) ≃ Vis (Beyond t c) → Owed c p e → Lowest (RT k) q e′ → p ≡ q × e ≡ e′
+    same _ c r (((tp , _) , _) , vi , ap , lt) (v , lt′) =
       let (tq , cq) = into c (proj₁ (to r v))
           pq = ≼-antisym (lt tq (proj₂ v) cq) (lt′ (from r (back c tp ap , vi)))
       in pq , InvAt.func (inv-⟦⟧ o []ᴬ (λ ()) root (tt , λ ())) tp (subst (λ x → t x _) (sym pq) tq)
@@ -123,9 +123,9 @@ module _ {R : Set} (o : PureObs [] R) where
         ... | more pth = more (tau eq pth)
         ... | done st  = done (tau eq st)
         go (Driver.value τ q a k′) eq =
-          let (pq , ee) = same c r h (proj₁ (proj₂ (sim-val i eq))) in subst₂ (Next k) (sym pq) (sym ee) (more (val eq []))
+          let (pq , ee) = same k c r h (proj₁ (proj₂ (sim-val i eq))) in subst₂ (Next k) (sym pq) (sym ee) (more (val eq []))
         go (Driver.complete q) eq =
-          let (pq , ee) = same c r h (sim-fin i eq) in subst₂ (Next k) (sym pq) (sym ee) (done (fin eq))
+          let (pq , ee) = same k c r h (sim-fin i eq) in subst₂ (Next k) (sym pq) (sym ee) (done (fin eq))
         go Driver.drained eq = ⊥-elim (drained-quiet i eq (from r (back c tp ap , vi)))
 
     -- The last row met.
