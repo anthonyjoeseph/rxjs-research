@@ -39,13 +39,13 @@ Members: `enter-bounded`, `enter-switch`, `enter-exhaust`,
 `rise-exhaust-drop`, `rise-exhaust-cp`, `rise-exhaust-lane-nx`,
 `rise-exhaust-lane-cp`.
 
-#### THE JOINERS' SEARCH
+#### THE QUEUED SEARCH
 
-A joiner's search is stated whole, over the node, as a connect's is:
-its find keys and leads its rows. Settled by bodies over `MergeG`.
+A bounded merge's search with values waiting keys and leads its rows: a
+lane's end hands off to the queue's first just past it. Settled by
+bodies over the bounded schedule's `Queued` and `Starts`.
 
-Members: `bounded-ok`, `switch-ok`, `exhaust-ok`, `bounded-lead`,
-`switch-lead`, `exhaust-lead`.
+Members: `bounded-wait-ok`, `bounded-wait-lead`.
 
 #### THE CONNECT'S SEARCH
 

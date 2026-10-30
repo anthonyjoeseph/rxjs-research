@@ -19,19 +19,21 @@ open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁; tt to tt₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
+open import Relation.Nullary using (¬_)
 
-open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
+open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-split)
-open import denotation.EmissionSet using (EmissionSet; DenEnv; Ev; Truncate; out; skip; pin; end; _≺_; MapT; map-out; map-skip; map-pin; map-end; module Scan; at-out; at-end)
+open import denotation.EmissionSet using (EmissionSet; DenEnv; Ev; Truncate; module Joining; out; skip; pin; end; _≺_; MapT; map-out; map-skip; map-pin; map-end; module Scan; at-out; at-end)
 open import operation.Key using (Key; at; _<ᴷ_; ≮ᴷ-trans; at-<ᵖ; clash)
 open import operation.PureObservable using (module Machine; Tape; play; ending; over)
 open Machine using (St; Ctx; CS; Cand; found; Mark; ofM; attM; leafM; Att; Out; still; shows; nx; cp; seek; search; kids; lanes; own; ownBest; first; retag;
                     raceT; outerT; laneT; mapT; scanT; cutT; alive; outOf; closed; attached; attAt;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (env; rows; rowsL; pendRows; toEv; Lanes; Each; module Flat; Hot; ∅)
-open import adequacy.Bound using (_⊑_; ⊑i; ⊑-refl; ⊑-trans; <→⊑; ext-⊑; From; Bd; OK; OKL; Live;
-                                         Apart; Spread; Parts; rooted-parts; ⊑→≼; join-ok; MergeG; G; GL; GLn; Good; ofPos; from-weak; seek-ok; seek-ln; lane-ok; lanes-ok)
+open import adequacy.Rows using (env; rows; rowsL; pendRows; toEv; Lanes; Each; module BoundedF; Hot; ∅)
+open import adequacy.Bound using (rooted-single; _⊑_; ⊑i; ⊑-refl; ⊑-trans; <→⊑; ext-⊑; From; Bd; OK; OKL; Live; Apart; Spread;
+  Parts; rooted-parts; ⊑→≼; MergeG; G; GL; GLn; Good; ofPos; from-weak; lane-ok)
+open import adequacy.Search using (join-ok; seek-ok; seek-ln; lanes-ok; flat-race; switch-race; exhaust-race; bounded-race; switch-at; bounded-unqueued)
 open import adequacy.Skip using (After; LeadC; LeadT)
 
 open _⊑_
@@ -311,10 +313,10 @@ ln-leads (just (found (_ , _ , c′ , s′) m κ , K , o)) (e , l) = eLn e , l
 
 -- The winning lane's place in its list: the lanes before it lose to it
 -- strictly, as the walk saw them; the ones after it lose, ties included.
-LL : ∀ {R Γ A B} → Bool → Ctx R Γ B → (A → _) → Bool → _ → St Γ A → List (St Γ B) → List (St Γ B) → Maybe (Cand R B) → Set₁
-LL v c f d n o pre ls nothing = ⊤₁
-LL {Γ = Γ} {B = B} v c f d n o pre ls (just (found (_ , _ , c′ , s′) m κ , K , o′)) =
-  Σ (List (St Γ B)) λ pre₁ → Σ (List (St Γ B)) λ post₁ → Σ (Ext c′ (inLanes (mergeᶠ nothing) f d n [] o pre₁ post₁ c)) λ e →
+LL : ∀ {R Γ A B} → Bool → Ctx R Γ B → FlatOp → (A → _) → Bool → _ → St Γ A → List (St Γ B) → List (St Γ B) → Maybe (Cand R B) → Set₁
+LL v c op f d n o pre ls nothing = ⊤₁
+LL {Γ = Γ} {B = B} v c op f d n o pre ls (just (found (_ , _ , c′ , s′) m κ , K , o′)) =
+  Σ (List (St Γ B)) λ pre₁ → Σ (List (St Γ B)) λ post₁ → Σ (Ext c′ (inLanes op f d n [] o pre₁ post₁ c)) λ e →
     Live v (closed c′ ≡ false → ∀ P → OfAt s′ m P →
       LeadE e P × (Each (After P) (rowsL (env c) pre) → Each (After P) (rowsL (env c) pre₁)) × Each (After P) (rowsL (env c) post₁) × Tight (Lanes (rowsL (env c) ls)) P K o′)
 
@@ -330,7 +332,7 @@ x-tight false a s₀ Ls (strict lt)      = strict lt
 x-tight false a s₀ Ls (tie Q eq pq oc) = ⊥-elim (unocc oc λ ())
 
 -- One lane against the lanes after it: on a tie the earlier wins.
-module Step {R Γ A B} (v : Bool) (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St Γ A) (pre post : List (St Γ B))
+module Step {R Γ A B} (v : Bool) (c : Ctx R Γ B) (op : FlatOp) (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St Γ A) (pre post : List (St Γ B))
             (l : Bool) (a : Att) (s₀ : St Γ B) where
 
   ρ : DenEnv Γ
@@ -340,27 +342,27 @@ module Step {R Γ A B} (v : Bool) (c : Ctx R Γ B) (f : A → Obs Timeline Γ B)
   s = lnS l (cutS l a s₀)
 
   ll-shift : ∀ {Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ K} {o′ : Out B}
-           → LL v c f d n o (s ∷ pre) post (just (found (Γ′ , A′ , c′ , s′) m κ , K , o′))
+           → LL v c op f d n o (s ∷ pre) post (just (found (Γ′ , A′ , c′ , s′) m κ , K , o′))
            → Live v (∀ P → Tight (Lanes (rowsL ρ post)) P K o′ → After P (rows ρ s))
-           → LL v c f d n o pre (s ∷ post) (just (found (Γ′ , A′ , c′ , s′) m κ , K , o′))
+           → LL v c op f d n o pre (s ∷ post) (just (found (Γ′ , A′ , c′ , s′) m κ , K , o′))
   ll-shift (pre₁ , post₁ , e , ly) as = pre₁ , post₁ , e , lzip v go ly as
     where
       go : _ → _ → _
       go ly as cl P oa = let r = ly cl P oa ; tg = proj₂ (proj₂ (proj₂ r)) in
         proj₁ r , (λ ea → proj₁ (proj₂ r) (as P tg , ea)) , proj₁ (proj₂ (proj₂ r)) , tight-occ (λ oc → occ-bind oc λ x fe → hit (inj₂ x) fe) tg
 
-  x-wins : ∀ {Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ K} (ox : Out B) (e : Ext c′ (inLanes (mergeᶠ nothing) f d n [] o pre post c))
+  x-wins : ∀ {Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ K} (ox : Out B) (e : Ext c′ (inLanes op f d n [] o pre post c))
          → Live v (closed c′ ≡ false → ∀ P → OfAt s′ m P → LeadE e P × Tight (rows ρ s) P K ox)
          → Live v (∀ P → Tight (rows ρ s) P K ox → Each (After P) (rowsL ρ post))
-         → LL v c f d n o pre (s ∷ post) (just (found (Γ′ , A′ , c′ , s′) m κ , cutT l K ox))
+         → LL v c op f d n o pre (s ∷ post) (just (found (Γ′ , A′ , c′ , s′) m κ , cutT l K ox))
   x-wins ox e lx ap = pre , post , e , lzip v go lx ap
     where
       go : _ → _ → _
       go lx ap cl P oa = let r = lx cl P oa in proj₁ r , (λ ea → ea) , ap P (proj₂ r) , x-tight {ρ = ρ} l a s₀ (rowsL ρ post) (proj₂ r)
 
-  step : (x y : Maybe (Cand R B)) → Leads v (inLanes (mergeᶠ nothing) f d n [] o pre post c) (rows ρ s) x → LL v c f d n o (s ∷ pre) post y
+  step : (x y : Maybe (Cand R B)) → Leads v (inLanes op f d n [] o pre post c) (rows ρ s) x → LL v c op f d n o (s ∷ pre) post y
        → Live v (OK (rows ρ s) (retag (cutT l) x)) → Live v (OKL (rowsL ρ post) y) → Live v (Spread (rows ρ s ∷ rowsL ρ post))
-       → LL v c f d n o pre (s ∷ post) (first (retag (cutT l) x) y)
+       → LL v c op f d n o pre (s ∷ post) (first (retag (cutT l) x) y)
   step nothing nothing _ _ _ _ _ = tt₁
   step nothing (just (found (_ , _ , c′ , s′) m κ , K , o′)) _ ly okx _ _ =
     ll-shift {c′ = c′} {s′} {m} {κ} {K} {o′} ly (lmap v {X = OK {R} (rows ρ s) nothing} {Y = ∀ P → Tight (Lanes (rowsL ρ post)) P K o′ → After P (rows ρ s)} (λ em P _ {q} {e} r → ⊥-elim (em {q} {e} r)) okx)
@@ -373,46 +375,61 @@ module Step {R Γ A B} (v : Bool) (c : Ctx R Γ B) (f : A → Obs Timeline Γ B)
 ------------------------------------------------------------------------
 -- A merge: the outer against the lanes
 
-module Race {R Γ A B} (v : Bool) (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St Γ A) (ls : List (St Γ B)) where
+module Race {R Γ A B} (v : Bool) (c : Ctx R Γ B) (op : FlatOp) (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St Γ A) (ls : List (St Γ B))
+            (Ln : Pos → A → EmissionSet B) (Bg : EmissionSet B) (Over Runs : Pos → Set) (Cut : Pos → Pos → Set) (Hand : Pos → Set)
+            (bg-at : ∀ {Q e} → From (at Q) (rows (env c) o) → Lanes (rowsL (env c) ls) Q e → Bg Q e)
+            (no-hand : ∀ {Q} → Apart (rows (env c) o) (Lanes (rowsL (env c) ls)) → From (at Q) (rows (env c) o) → Lanes (rowsL (env c) ls) Q end → ¬ Hand Q) where
 
   ρ : DenEnv Γ
   ρ = env c
 
-  FR : EmissionSet B
-  FR = Flat.JoinT (λ x → pendRows ρ (f x)) (rows ρ o) d n (rowsL ρ ls)
+  module J = Joining Ln (rows ρ o) Bg Over Runs Cut Hand
 
-  lane-occ : ∀ {Q} (o′ o″ : Out B) → (∀ {b} → Fits o′ (out b) → Fits o″ (out b)) → Occ (Lanes (rowsL ρ ls)) Q o′ → Occ FR Q o″
-  lane-occ o′ o″ fo oc = occ-bind oc go
+  FR : EmissionSet B
+  FR = J.JoinT
+
+  -- A lane's row no later than every outer row: begun, and ending
+  -- handing off to none.
+  lane-occ : ∀ {Q} (o′ o″ : Out B) → (∀ {b} → Fits o′ (out b) → Fits o″ (out b)) → Apart (rows ρ o) (Lanes (rowsL ρ ls)) → From (at Q) (rows ρ o)
+           → Occ (Lanes (rowsL ρ ls)) Q o′ → Occ FR Q o″
+  lane-occ {Q} o′ o″ fo ap fk oc = occ-bind oc go
     where
-      go : ∀ {Q e} → Lanes (rowsL ρ ls) Q e → Fits o′ e → Occ FR Q o″
-      go {e = out b} x fe = hit (Flat.run x tt) (fo fe)
-      go {e = skip}  x _  = hit (Flat.run x tt) tt
-      go {e = pin _} x _  = hit (Flat.run x tt) tt
-      go {e = end}   x _  = occ λ k → k (Flat.rpass x (λ ()) λ dn → k (Flat.rend x (λ ()) dn) tt) tt
+      go : ∀ {e} → Lanes (rowsL ρ ls) Q e → Fits o′ e → Occ FR Q o″
+      go {e = out b} x fe = hit (J.run (bg-at fk x) tt) (fo fe)
+      go {e = skip}  x _  = hit (J.run (bg-at fk x) tt) tt
+      go {e = pin _} x _  = hit (J.run (bg-at fk x) tt) tt
+      go {e = end}   x _  = occ λ k → k (J.rpass (bg-at fk x) (no-hand ap fk x) λ dn → k (J.rend (bg-at fk x) (no-hand ap fk x) dn) tt) tt
 
   outer-still : ∀ {Q} → Occ (rows ρ o) Q still → Occ FR Q still
   outer-still oc = occ-bind oc go
     where
       go : ∀ {Q e} → rows ρ o Q e → Fits still e → Occ FR Q still
       go {e = out _} r ()
-      go {e = skip}  r _ = hit (Flat.step r) tt
-      go {e = pin _} r _ = hit (Flat.opin r) tt
-      go {e = end}   r _ = occ λ k → k (Flat.opass r λ dn → k (Flat.oend r dn) tt) tt
+      go {e = skip}  r _ = hit (J.step r) tt
+      go {e = pin _} r _ = hit (J.opin r) tt
+      go {e = end}   r _ = occ λ k → k (J.opass r λ dn → k (J.oend r dn) tt) tt
 
-  lane-tight : ∀ {P k} (o′ : Out B) → Tight (Lanes (rowsL ρ ls)) P k o′ → Tight FR P (proj₁ (laneT {A = A} d n [] k o′)) (proj₂ (laneT {A = A} d n [] k o′))
-  lane-tight still          tg = tight-occ (lane-occ still still λ ()) tg
-  lane-tight (shows (nx b)) tg = tight-occ (lane-occ (shows (nx b)) (shows (nx b)) λ fe → fe) tg
-  lane-tight (shows cp)     tg = tight-occ (lane-occ (shows cp) _ λ ()) tg
+  -- On a tie, the outer no earlier than the lane's row.
+  tight-from : ∀ {P k} {o′ o″ : Out B} → (∀ {Q} → From (at Q) (rows ρ o) → Occ (Lanes (rowsL ρ ls)) Q o′ → Occ FR Q o″) → From k (rows ρ o)
+             → Tight (Lanes (rowsL ρ ls)) P k o′ → Tight FR P k o″
+  tight-from h fk (strict lt)      = strict lt
+  tight-from h fk (tie Q eq pq oc) = tie Q eq pq (h (subst (λ K → From K (rows ρ o)) eq fk) oc)
+
+  lane-tight : ∀ {P k} (o′ : Out B) → Apart (rows ρ o) (Lanes (rowsL ρ ls)) → From k (rows ρ o) → Tight (Lanes (rowsL ρ ls)) P k o′
+             → Tight FR P (proj₁ (laneT {A = A} d n [] k o′)) (proj₂ (laneT {A = A} d n [] k o′))
+  lane-tight still          ap fk tg = tight-from (lane-occ still still (λ ()) ap) fk tg
+  lane-tight (shows (nx b)) ap fk tg = tight-from (lane-occ (shows (nx b)) (shows (nx b)) (λ fe → fe) ap) fk tg
+  lane-tight (shows cp)     ap fk tg = tight-from (lane-occ (shows cp) _ (λ ()) ap) fk tg
 
   outer-tight : ∀ {P h} (ox : Out A) → Tight (rows ρ o) P h ox → (∀ {e} → ox ≡ shows e → Σ Pos λ q → h ≡ at q × rows ρ o q (toEv e))
               → Tight FR P (proj₁ (outerT {B = B} n [] h ox)) (proj₂ (outerT {B = B} n [] h ox))
   outer-tight still tg sh = tight-occ outer-still tg
   outer-tight (shows (nx x)) tg sh with sh refl
-  ... | q , refl , r = tie (q ++ [ ix 0 ]) refl (⊑-trans (tight-⊑ tg) (ext-⊑ q [ ix 0 ])) (hit (Flat.val r) tt)
+  ... | q , refl , r = tie (q ++ [ ix 0 ]) refl (⊑-trans (tight-⊑ tg) (ext-⊑ q [ ix 0 ])) (hit (J.val r) tt)
   outer-tight (shows cp) tg sh with sh refl
-  ... | q , refl , r = tie q refl (tight-⊑ tg) (occ λ k → k (Flat.opass r λ dn → k (Flat.oend r dn) tt) tt)
+  ... | q , refl , r = tie q refl (tight-⊑ tg) (occ λ k → k (J.opass r λ dn → k (J.oend r dn) tt) tt)
 
-  outer-wins : ∀ {Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ h} (ox : Out A) (e : Ext c′ (inOuter (mergeᶠ nothing) f d n [] ls c))
+  outer-wins : ∀ {Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ h} (ox : Out A) (e : Ext c′ (inOuter op f d n [] ls c))
              → Live v (closed c′ ≡ false → ∀ P → OfAt s′ m P → LeadE e P × Tight (rows ρ o) P h ox)
              → Live v (Bd (rows ρ o) κ h ox)
              → Live v (∀ P → at P ⊑ h → Each (After P) (rowsL ρ ls))
@@ -422,23 +439,25 @@ module Race {R Γ A B} (v : Bool) (c : Ctx R Γ B) (f : A → Obs Timeline Γ B)
       go : _ → _ → _ → _
       go lx b al cl P oa = let r = lx cl P oa in (al P (tight-⊑ (proj₂ r)) , proj₁ r) , outer-tight ox (proj₂ r) (Bd.shown b)
 
-  lane-wins : ∀ {Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ k} (o′ : Out B) pre₁ post₁ (e : Ext c′ (inLanes (mergeᶠ nothing) f d n [] o pre₁ post₁ c))
+  lane-wins : ∀ {Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ k} (o′ : Out B) pre₁ post₁ (e : Ext c′ (inLanes op f d n [] o pre₁ post₁ c))
             → Live v (closed c′ ≡ false → ∀ P → OfAt s′ m P → LeadE e P × (⊤ → Each (After P) (rowsL ρ pre₁)) × Each (After P) (rowsL ρ post₁) × Tight (Lanes (rowsL ρ ls)) P k o′)
             → Live v (∀ P → Tight (Lanes (rowsL ρ ls)) P k o′ → After P (rows ρ o))
+            → Live v (From k (rows ρ o) × Parts (rows ρ o) (rowsL ρ ls))
             → Leads v c FR (just (found (Γ′ , A′ , c′ , s′) m κ , laneT {A = A} d n [] k o′))
-  lane-wins o′ pre₁ post₁ e ly ao = eLanes e , lzip v go ly ao
+  lane-wins o′ pre₁ post₁ e ly ao fp = eLanes e , lzip3 v go ly ao fp
     where
-      go : _ → _ → _
-      go ly ao cl P oa = let r = ly cl P oa ; tg = proj₂ (proj₂ (proj₂ r)) in
-        (ao P tg , proj₁ (proj₂ r) tt , proj₁ (proj₂ (proj₂ r)) , proj₁ r) , lane-tight o′ tg
+      go : _ → _ → _ → _
+      go ly ao (fk , pa) cl P oa = let r = ly cl P oa ; tg = proj₂ (proj₂ (proj₂ r)) in
+        (ao P tg , proj₁ (proj₂ r) tt , proj₁ (proj₂ (proj₂ r)) , proj₁ r) , lane-tight o′ (proj₁ pa) fk tg
 
   race-leads : (x : Maybe (Cand R A)) (y : Maybe (Cand R B))
-             → Leads v (inOuter (mergeᶠ nothing) f d n [] ls c) (rows ρ o) x → LL v c f d n o [] ls y
+             → Leads v (inOuter op f d n [] ls c) (rows ρ o) x → LL v c op f d n o [] ls y
              → Live v (OK (rows ρ o) x) → Live v (OKL (rowsL ρ ls) y) → Live v (Parts (rows ρ o) (rowsL ρ ls))
              → Leads v c FR (raceT d n [] x y)
   race-leads nothing nothing _ _ _ _ _ = tt₁
-  race-leads nothing (just (found (_ , _ , c′ , s′) m κ , k , o′)) _ (pre₁ , post₁ , e , ly) okx _ _ =
+  race-leads nothing (just (found (_ , _ , c′ , s′) m κ , k , o′)) _ (pre₁ , post₁ , e , ly) okx _ pa =
     lane-wins {c′ = c′} {s′} {m} {κ} {k} o′ pre₁ post₁ e ly (lmap v {X = OK {R} (rows ρ o) nothing} {Y = ∀ P → Tight (Lanes (rowsL ρ ls)) P k o′ → After P (rows ρ o)} (λ em P _ {q} {e} r → ⊥-elim (em {q} {e} r)) okx)
+      (lzip v {X = OK {R} (rows ρ o) nothing} {Z = From k (rows ρ o) × Parts (rows ρ o) (rowsL ρ ls)} (λ em p → (λ {q} {e} r → ⊥-elim (em {q} {e} r)) , p) okx pa)
   race-leads (just (found (_ , _ , c′ , s′) m κ , h , ox)) nothing (e , lx) _ okx oky _ =
     outer-wins {c′ = c′} {s′} {m} {κ} {h} ox e lx okx (lmap v {X = OKL {R} (rowsL ρ ls) nothing} {Y = ∀ P → at P ⊑ h → Each (After P) (rowsL ρ ls)} (λ em P _ → each-empty {P = P} (rowsL ρ ls) em) oky)
   race-leads (just (found (_ , _ , c′ , s′) m κ , h , ox)) (just (found (_ , _ , c″ , s″) m′ κ′ , k , o′)) (e , lx) (pre₁ , post₁ , e′ , ly) okx oky pa
@@ -447,6 +466,7 @@ module Race {R Γ A B} (v : Bool) (c : Ctx R Γ B) (f : A → Obs Timeline Γ B)
   ... | false = lane-wins {c′ = c″} {s″} {m′} {κ′} {k} o′ pre₁ post₁ e′ ly
                   (lzip v {X = OK (rows ρ o) (just (found (_ , _ , c′ , s′) m κ , h , ox))} {Z = ∀ P → Tight (Lanes (rowsL ρ ls)) P k o′ → After P (rows ρ o)} (λ b (pa : Parts (rows ρ o) (rowsL ρ ls)) P tg → past-tie {u = rows ρ o} tg (λ {q} {e} r → ⊑-trans (⊑i lt) (Bd.from b {q} {e} r))
                                                   (λ {q} {e} {e′} x r → proj₁ pa {q} {e′} {e} r x)) okx pa)
+                  (lzip v {X = OK (rows ρ o) (just (found (_ , _ , c′ , s′) m κ , h , ox))} {Z = From k (rows ρ o) × Parts (rows ρ o) (rowsL ρ ls)} (λ b p → (λ {q} {e} r → ⊑-trans (⊑i lt) (Bd.from b {q} {e} r)) , p) okx pa)
 
 ------------------------------------------------------------------------
 -- Every node
@@ -482,15 +502,10 @@ postulate
   take-lead : ∀ {R A} v (c : Ctx R [] A) i q w (s : St [] A) → G (env c) v (takeS i q w s)
             → Leads v c (rows (env c) (takeS i q w s)) (kids c (takeS i q w s))
 
-  -- A JOINER'S SEARCH LEADS, a bounded merge, a switch or an exhaust as a
-  -- merge's does: the raced find, every other part past it.  Stated whole,
-  -- as `bounded-ok` and its siblings are.
-  bounded-lead : ∀ {R A B} v (c : Ctx R [] B) m (f : A → Obs Timeline [] B) d n q (o : St [] A) ls → G (env c) v (flatS (mergeᶠ (just m)) f d n q o ls)
-               → Leads v c (rows (env c) (flatS (mergeᶠ (just m)) f d n q o ls)) (kids c (flatS (mergeᶠ (just m)) f d n q o ls))
-  switch-lead  : ∀ {R A B} v (c : Ctx R [] B) (f : A → Obs Timeline [] B) d n q (o : St [] A) ls → G (env c) v (flatS switchᶠ f d n q o ls)
-               → Leads v c (rows (env c) (flatS switchᶠ f d n q o ls)) (kids c (flatS switchᶠ f d n q o ls))
-  exhaust-lead : ∀ {R A B} v (c : Ctx R [] B) (f : A → Obs Timeline [] B) d n q (o : St [] A) ls → G (env c) v (flatS exhaustᶠ f d n q o ls)
-               → Leads v c (rows (env c) (flatS exhaustᶠ f d n q o ls)) (kids c (flatS exhaustᶠ f d n q o ls))
+  -- A BOUNDED MERGE'S SEARCH WITH VALUES WAITING LEADS: the raced find,
+  -- every other part past it, a lane's end handing off to the queue.
+  bounded-wait-lead : ∀ {R A B} v (c : Ctx R [] B) m (f : A → Obs Timeline [] B) d n a q (o : St [] A) ls → G (env c) v (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls)
+                    → Leads v c (rows (env c) (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls)) (kids c (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls))
 
 own-lead : ∀ {R Γ A} v (c : Ctx R Γ A) (s : St Γ A) → G (env c) v s → Leads v c (rows (env c) s) (ownBest c s (own s))
 own-lead true  c (ofS i p [])         _ = stop , λ { cl _ refl → tt , tie (p ++ [ last ]) refl (⊑-refl _) (hit at-end tt) }
@@ -519,31 +534,36 @@ mutual
   kids-lead v c (mapS f s)       g = map-leads v f (seek (inMap f c) s) (seek-lead v (inMap f c) s g)
   kids-lead v c (cutS true a s)  g = cut-on v (seek (inCut true a c) s) (seek-lead (v Data.Bool.∧ true) (inCut true a c) s g)
   kids-lead v c (cutS false a s) g = cut-off v (seek (inCut false a c) s) (seek-lead (v Data.Bool.∧ false) (inCut false a c) s g)
-  kids-lead true c (flatS (mergeᶠ nothing) f d n q o ls) m with MergeG.fresh m
-  ... | refl =
-    leads-trunc true (raceT d n [] (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls))
-      (join-ok c f d n o ls m)
-    (Race.race-leads true c f d n o ls
-      (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)
-      (seek-lead true (inOuter (mergeᶠ nothing) f d n [] ls c) o outer)
-      (lanes-lead true c f d n o [] ls lanesG (proj₂ (rooted-parts rooted)))
-      (seek-ok (inOuter (mergeᶠ nothing) f d n [] ls c) o outer)
-      (lanes-ok c f d n o [] ls lanesG)
-      (rooted-parts rooted))
-    where open MergeG m
-  kids-lead false c (flatS (mergeᶠ nothing) f d n q o ls) m with MergeG.fresh m
-  ... | refl =
-    leads-trunc false (raceT d n [] (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)) tt
-    (Race.race-leads false c f d n o ls
-      (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)
-      (seek-lead false (inOuter (mergeᶠ nothing) f d n [] ls c) o (MergeG.outer m))
-      (lanes-lead false c f d n o [] ls (MergeG.lanesG m) tt) tt tt tt)
+  kids-lead true c (flatS (mergeᶠ nothing) f d n q o ls) g with MergeG.fresh g
+  ... | refl = join-lead true c (mergeᶠ nothing) f d n o ls (λ _ x → x) (λ _ _ _ ()) outer lanesG (rooted-parts rooted)
+                 (join-ok c (mergeᶠ nothing) f d n o ls (flat-race (λ a → pendRows (env c) (f a)) (rows (env c) o) (rowsL (env c) ls) d n (rooted-single rooted) spent) outer lanesG)
+    where open MergeG g
+  kids-lead false c (flatS (mergeᶠ nothing) f d n q o ls) g with MergeG.fresh g
+  ... | refl = join-lead false c (mergeᶠ nothing) f d n o ls (λ _ x → x) (λ _ _ _ ()) (MergeG.outer g) (MergeG.lanesG g) tt tt
+  kids-lead true c (flatS (mergeᶠ (just m)) f d n [] o ls) (g , _) =
+    join-lead true c (mergeᶠ (just m)) f d n o ls (λ _ x → begun x) (bounded-unqueued m _ _ _ d n) outer lanesG (rooted-parts rooted)
+      (join-ok c (mergeᶠ (just m)) f d n o ls (bounded-race m (λ a → pendRows (env c) (f a)) (rows (env c) o) (rowsL (env c) ls) d n (rooted-single rooted) spent) outer lanesG)
+    where open MergeG g
+          open BoundedF m (λ a → pendRows (env c) (f a)) (rows (env c) o) d n [] (rowsL (env c) ls) using (begun)
+  kids-lead false c (flatS (mergeᶠ (just m)) f d n [] o ls) (g , _) =
+    join-lead false c (mergeᶠ (just m)) f d n o ls (λ _ x → begun x) (bounded-unqueued m _ _ _ d n) (MergeG.outer g) (MergeG.lanesG g) tt tt
+    where open BoundedF m (λ a → pendRows (env c) (f a)) (rows (env c) o) d n [] (rowsL (env c) ls) using (begun)
+  kids-lead v c (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls) g = bounded-wait-lead v c m f d n a q o ls g
+  kids-lead true c (flatS switchᶠ f d n q o ls) g with MergeG.fresh g
+  ... | refl = join-lead true c switchᶠ f d n o ls (switch-at _ _ _ d n) (λ _ _ _ ()) outer lanesG (rooted-parts rooted)
+                 (join-ok c switchᶠ f d n o ls (switch-race (λ a → pendRows (env c) (f a)) (rows (env c) o) (rowsL (env c) ls) d n (rooted-single rooted) spent) outer lanesG)
+    where open MergeG g
+  kids-lead false c (flatS switchᶠ f d n q o ls) g with MergeG.fresh g
+  ... | refl = join-lead false c switchᶠ f d n o ls (switch-at _ _ _ d n) (λ _ _ _ ()) (MergeG.outer g) (MergeG.lanesG g) tt tt
+  kids-lead true c (flatS exhaustᶠ f d n q o ls) g with MergeG.fresh g
+  ... | refl = join-lead true c exhaustᶠ f d n o ls (λ _ x → x) (λ _ _ _ ()) outer lanesG (rooted-parts rooted)
+                 (join-ok c exhaustᶠ f d n o ls (exhaust-race (λ a → pendRows (env c) (f a)) (rows (env c) o) (rowsL (env c) ls) d n (rooted-single rooted) spent) outer lanesG)
+    where open MergeG g
+  kids-lead false c (flatS exhaustᶠ f d n q o ls) g with MergeG.fresh g
+  ... | refl = join-lead false c exhaustᶠ f d n o ls (λ _ x → x) (λ _ _ _ ()) (MergeG.outer g) (MergeG.lanesG g) tt tt
   kids-lead v c (ofS _ _ _)      _ = tt₁
   kids-lead v c doneS            _ = tt₁
   kids-lead v c (pend _ _)         _ = tt₁
-  kids-lead v c (flatS (mergeᶠ (just m)) f d n q o ls) g = bounded-lead v c m f d n q o ls g
-  kids-lead v c (flatS switchᶠ f d n q o ls)           g = switch-lead v c f d n q o ls g
-  kids-lead v c (flatS exhaustᶠ f d n q o ls)          g = exhaust-lead v c f d n q o ls g
   kids-lead v c (lnS _ _)        ()
   kids-lead true  c (scanS f z s) g = scan-leads true f z (seek (inScan f z c) s) (seek-ok (inScan f z c) s g) (seek-lead true (inScan f z c) s g)
   kids-lead false c (scanS f z s) g = scan-leads false f z (seek (inScan f z c) s) tt (seek-lead false (inScan f z c) s g)
@@ -551,6 +571,28 @@ mutual
   kids-lead v c (coldS _ _)      _ = tt₁
   kids-lead v c (connS k o b)    g = conn-lead v c k o b g
   kids-lead v c (joinS _ _ () _) _
+
+  -- A joiner with nothing queued, by its policy: the race's find leads.
+  join-lead : ∀ {R A B} v (c : Ctx R [] B) op (f : A → Obs Timeline [] B) d n (o : St [] A) ls
+              {Ln : Pos → A → EmissionSet B} {Bg : EmissionSet B} {Over Runs : Pos → Set} {Cut : Pos → Pos → Set} {Hand : Pos → Set}
+            → (∀ {Q e} → From (at Q) (rows (env c) o) → Lanes (rowsL (env c) ls) Q e → Bg Q e)
+            → (∀ {Q} → Apart (rows (env c) o) (Lanes (rowsL (env c) ls)) → From (at Q) (rows (env c) o) → Lanes (rowsL (env c) ls) Q end → ¬ Hand Q)
+            → G (env c) v o → GL (env c) v ls → Live v (Parts (rows (env c) o) (rowsL (env c) ls))
+            → Live v (OK (Joining.JoinT Ln (rows (env c) o) Bg Over Runs Cut Hand)
+                         (raceT d n [] (seek (inOuter op f d n [] ls c) o) (lanes c op f d n [] o [] ls)))
+            → Leads v c (Truncate (Joining.JoinT Ln (rows (env c) o) Bg Over Runs Cut Hand))
+                        (raceT d n [] (seek (inOuter op f d n [] ls c) o) (lanes c op f d n [] o [] ls))
+  join-lead true c op f d n o ls {Ln} {Bg} {Over} {Runs} {Cut} {Hand} ba nh go gl pa ok =
+    leads-trunc true (raceT d n [] (seek (inOuter op f d n [] ls c) o) (lanes c op f d n [] o [] ls)) ok
+      (Race.race-leads true c op f d n o ls Ln Bg Over Runs Cut Hand ba nh
+        (seek (inOuter op f d n [] ls c) o) (lanes c op f d n [] o [] ls)
+        (seek-lead true (inOuter op f d n [] ls c) o go) (lanes-lead true c op f d n o [] ls gl (proj₂ pa))
+        (seek-ok (inOuter op f d n [] ls c) o go) (lanes-ok c op f d n [] o [] ls gl) pa)
+  join-lead false c op f d n o ls {Ln} {Bg} {Over} {Runs} {Cut} {Hand} ba nh go gl pa ok =
+    leads-trunc false (raceT d n [] (seek (inOuter op f d n [] ls c) o) (lanes c op f d n [] o [] ls)) tt
+      (Race.race-leads false c op f d n o ls Ln Bg Over Runs Cut Hand ba nh
+        (seek (inOuter op f d n [] ls c) o) (lanes c op f d n [] o [] ls)
+        (seek-lead false (inOuter op f d n [] ls c) o go) (lanes-lead false c op f d n o [] ls gl tt) tt tt tt)
 
   seek-ln-lead : ∀ {R A} v (c : Ctx R [] A) (s : St [] A) → GLn (env c) v s → Leads v c (rows (env c) s) (seek c s)
   seek-ln-lead v c (lnS true (cutS .true a s₀)) (refl , g₀ , _) = ln-leads (seek (inLn true c) (cutS true a s₀)) (seek-lead v (inLn true c) (cutS true a s₀) g₀)
@@ -578,44 +620,44 @@ mutual
   seek-ln-lead v c (connS _ _ _) ()
   seek-ln-lead v c (joinS _ _ _ _) ()
 
-  lanes-lead : ∀ {R A B} v (c : Ctx R [] B) (f : A → Obs Timeline [] B) d n (o : St [] A) pre (ls : List (St [] B)) → GL (env c) v ls → Live v (Spread (rowsL (env c) ls))
-             → LL v c f d n o pre ls (lanes c (mergeᶠ nothing) f d n [] o pre ls)
-  lanes-lead v c f d n o pre []         _         _  = tt₁
-  lanes-lead false c f d n o pre (lnS l (cutS .l a s₀) ∷ post) (gs@(refl , _) , gp) sp =
-    Step.step false c f d n o pre post l a s₀
-      (seek (inLanes (mergeᶠ nothing) f d n [] o pre post c) (lnS l (cutS l a s₀))) (lanes c (mergeᶠ nothing) f d n [] o (lnS l (cutS l a s₀) ∷ pre) post)
-      (seek-ln-lead false (inLanes (mergeᶠ nothing) f d n [] o pre post c) (lnS l (cutS l a s₀)) gs)
-      (lanes-lead false c f d n o (lnS l (cutS l a s₀) ∷ pre) post gp tt) tt tt tt
-  lanes-lead true c f d n o pre (lnS l (cutS .l a s₀) ∷ post) (gs@(refl , _) , gp) sp =
-    Step.step true c f d n o pre post l a s₀
-      (seek (inLanes (mergeᶠ nothing) f d n [] o pre post c) (lnS l (cutS l a s₀))) (lanes c (mergeᶠ nothing) f d n [] o (lnS l (cutS l a s₀) ∷ pre) post)
-      (seek-ln-lead true (inLanes (mergeᶠ nothing) f d n [] o pre post c) (lnS l (cutS l a s₀)) gs)
-      (lanes-lead true c f d n o (lnS l (cutS l a s₀) ∷ pre) post gp (proj₂ sp))
-      (lane-ok (lnS l (cutS l a s₀)) _ (seek-ln (inLanes (mergeᶠ nothing) f d n [] o pre post c) (lnS l (cutS l a s₀)) gs))
-      (lanes-ok c f d n o (lnS l (cutS l a s₀) ∷ pre) post gp)
+  lanes-lead : ∀ {R A B} v (c : Ctx R [] B) op (f : A → Obs Timeline [] B) d n (o : St [] A) pre (ls : List (St [] B)) → GL (env c) v ls → Live v (Spread (rowsL (env c) ls))
+             → LL v c op f d n o pre ls (lanes c op f d n [] o pre ls)
+  lanes-lead v c op f d n o pre []         _         _  = tt₁
+  lanes-lead false c op f d n o pre (lnS l (cutS .l a s₀) ∷ post) (gs@(refl , _) , gp) sp =
+    Step.step false c op f d n o pre post l a s₀
+      (seek (inLanes op f d n [] o pre post c) (lnS l (cutS l a s₀))) (lanes c op f d n [] o (lnS l (cutS l a s₀) ∷ pre) post)
+      (seek-ln-lead false (inLanes op f d n [] o pre post c) (lnS l (cutS l a s₀)) gs)
+      (lanes-lead false c op f d n o (lnS l (cutS l a s₀) ∷ pre) post gp tt) tt tt tt
+  lanes-lead true c op f d n o pre (lnS l (cutS .l a s₀) ∷ post) (gs@(refl , _) , gp) sp =
+    Step.step true c op f d n o pre post l a s₀
+      (seek (inLanes op f d n [] o pre post c) (lnS l (cutS l a s₀))) (lanes c op f d n [] o (lnS l (cutS l a s₀) ∷ pre) post)
+      (seek-ln-lead true (inLanes op f d n [] o pre post c) (lnS l (cutS l a s₀)) gs)
+      (lanes-lead true c op f d n o (lnS l (cutS l a s₀) ∷ pre) post gp (proj₂ sp))
+      (lane-ok (lnS l (cutS l a s₀)) _ (seek-ln (inLanes op f d n [] o pre post c) (lnS l (cutS l a s₀)) gs))
+      (lanes-ok c op f d n [] o (lnS l (cutS l a s₀) ∷ pre) post gp)
       sp
-  lanes-lead v c f d n o pre ((lnS _ (pend _ _)) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((lnS _ (coldS _ _)) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((lnS _ (ofS _ _ _)) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((lnS _ doneS) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((lnS _ (mapS _ _)) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((lnS _ (scanS _ _ _)) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((lnS _ (lnS _ _)) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((lnS _ (takeS _ _ _ _)) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((lnS _ (flatS _ _ _ _ _ _ _)) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((lnS _ (connS _ _ _)) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((lnS _ (joinS _ _ _ _)) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((pend _ _) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((coldS _ _) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((ofS _ _ _) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre (doneS ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((mapS _ _) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((scanS _ _ _) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((cutS _ _ _) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((takeS _ _ _ _) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((flatS _ _ _ _ _ _ _) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((connS _ _ _) ∷ post) (() , _) sp
-  lanes-lead v c f d n o pre ((joinS _ _ _ _) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((lnS _ (pend _ _)) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((lnS _ (coldS _ _)) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((lnS _ (ofS _ _ _)) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((lnS _ doneS) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((lnS _ (mapS _ _)) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((lnS _ (scanS _ _ _)) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((lnS _ (lnS _ _)) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((lnS _ (takeS _ _ _ _)) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((lnS _ (flatS _ _ _ _ _ _ _)) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((lnS _ (connS _ _ _)) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((lnS _ (joinS _ _ _ _)) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((pend _ _) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((coldS _ _) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((ofS _ _ _) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre (doneS ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((mapS _ _) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((scanS _ _ _) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((cutS _ _ _) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((takeS _ _ _ _) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((flatS _ _ _ _ _ _ _) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((connS _ _ _) ∷ post) (() , _) sp
+  lanes-lead v c op f d n o pre ((joinS _ _ _ _) ∷ post) (() , _) sp
 
 -- What the search finds at an of, every merge above it led.
 lead-found : ∀ {R Γ A} {t : St [] R} {c : Ctx R Γ A} {s : St Γ A} {m κ P} → closed c ≡ false → OfAt s m P → Good [] t

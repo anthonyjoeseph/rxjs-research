@@ -1,20 +1,17 @@
 {-# OPTIONS --guardedness #-}
 
--- THE LEAST MARK LEADS THE ROWS: whatever `seek` finds under a node is
--- keyed no later than every row the node still owes, and an event it
--- shows sits at that key, as a row.  Finding nothing, the node owes
--- nothing.  A merge's race is the only real case: the outer wins only
--- strictly before every lane, and a value it shows is a skip just past it.
+-- WHAT A FOUND MARK PROMISES, AND WHAT A GOOD NODE CARRIES: keys and
+-- their order, `OK` over a node's rows, and the node facts `G` that the
+-- search's proofs read.
 module adequacy.Bound where
 
-open import Data.Bool using (Bool; true; false; T; _∧_; if_then_else_; not)
+open import Data.Bool using (Bool; true; false; T; _∧_; if_then_else_)
 open import Data.Bool.Properties using (T-≡)
 open import Function.Bundles using (Equivalence)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; pred; _≡ᵇ_)
-open import Data.Nat.Properties using (≡ᵇ⇒≡)
+open import Data.Nat using (ℕ; zero; suc; pred)
 open import Data.List.Properties using (++-identityʳ; ∷ʳ-injectiveˡ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -29,15 +26,17 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (ofᴱ)
 open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-asym; <ᵖ-split; <ᵖ-step; <ᵖ-shift; <ᵖ-below; <ᵖ-part; <ᵖ-ix)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; _≺_; _≼_; Truncate; InE; enter; at-out; at-end; on-out; MapT; map-out; map-skip; map-pin; map-end; module Scan; module TakeWhile; DenEnv)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; end; _≺_; _≼_; InE; enter; at-out; at-end; on-out; MapT; map-out;
+  map-skip; map-pin; map-end; module Scan; DenEnv)
 open import denotation.Laws.Modulus using (≼-refl)
 open import denotation.Laws.Worlds using (InvAt; Hots; W; inW; plain-ix; apart-w) renaming (⊑-refl to ⊑ᵖ-refl)
 open import operation.Key using (Key; at; after; _<ᴷ_; ≮ᴷ-trans; <ᴷ-trans; <ᴷ-irrefl; at-<ᵖ; clash)
 open import operation.PureObservable using (module Machine)
+
 open Machine using (St; Ctx; CS; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed;
                     free; cpAt; cutAt; overAt; inScan; inTake; inSrc; inBody;
                     ofS; doneS; mapS; cutS; cpM; cutM; lnS; flatS; coldS; scanS; takeS; connS; joinS; inMap; inCut; inLn; inOuter; inLanes; nx; cp; attached; attAt; attM; pend) renaming (Ev to Evᴹ; over to overᶜ)
-open import adequacy.Rows using (acc-val; rows; rowsL; pendRows; toEv; Lanes; Each; Kth; AllEnd; EndsOf; reads; module Flat; ∅; Hot; Inbox; _∪_; Kept; Stops) renaming (kept to keptᴿ; stop to stopᴿ; left to leftᴿ)
+open import adequacy.Rows using (acc-val; rows; rowsL; pendRows; toEv; Lanes; Each; Kth; AllEnd; EndsOf; Lane; reads; module Flat; module SwitchF; module ExhaustF; module BoundedF; ∅; Hot; Inbox; _∪_; Kept; Stops) renaming (kept to keptᴿ; stop to stopᴿ; left to leftᴿ; sub to subᴿ)
 
 ------------------------------------------------------------------------
 -- Keys
@@ -654,305 +653,3 @@ lanes-first {Ls = Ls} (just (g , K , o)) (just (g′ , K′ , o′)) bx (fy , my
 
 ------------------------------------------------------------------------
 -- The race
-
-module Race {A B : Set} (L : A → Pos → EmissionSet B) (O : EmissionSet A) (Ls : List (EmissionSet B)) (d : Bool) (n : ℕ)
-            (sO : Single O) (over : T d → Empty O) where
-  open Flat L O d n Ls
-
-  -- Every row of the merge sits no earlier than some row of a part:
-  -- `K` bounding the outer's and the lanes', it bounds the merge's.
-  rows-from : ∀ K → From K O → Each (From K) Ls → From K JoinT
-  rows-from K fo fl (val r)          = ⊑-trans (fo r) (ext-⊑ _ [ ix 0 ])
-  rows-from K fo fl (step r)         = fo r
-  rows-from K fo fl (opin r)         = fo r
-  rows-from K fo fl (oend r _)       = fo r
-  rows-from K fo fl (opass r _)      = fo r
-  rows-from K fo fl (lane r _ (reads _ s) _ _) = ⊑-trans (fo r) (⊑-trans (ext-⊑ _ [ ix 1 ]) (≺→⊑ s))
-  rows-from K fo fl (lend r _ (reads _ s) _ _ _) = ⊑-trans (fo r) (⊑-trans (ext-⊑ _ [ ix 1 ]) (≺→⊑ s))
-  rows-from K fo fl (lpass r _ (reads _ s) _ _ _) = ⊑-trans (fo r) (⊑-trans (ext-⊑ _ [ ix 1 ]) (≺→⊑ s))
-  rows-from K fo fl (left r _ (reads _ s) _ _) = ⊑-trans (fo r) (⊑-trans (ext-⊑ _ [ ix 1 ]) (≺→⊑ s))
-  rows-from K fo fl (run x _)        = from-any Ls fl x
-  rows-from K fo fl (rend x _ _)     = from-any Ls fl x
-  rows-from K fo fl (rpass x _ _)    = from-any Ls fl x
-  rows-from K fo fl (hand _ _ _ _ ())
-  rows-from K fo fl (rhand _ ())
-
-  -- The outer showing a value at `q₀`: every row sits just past it or later.
-  past-val : ∀ {q₀ a} → O q₀ (out a) → From (at q₀) O → Each (From (at (q₀ ++ [ ix 0 ]))) Ls → From (at (q₀ ++ [ ix 0 ])) JoinT
-  past-val v fo fl (val r)          = shift-≮ _ (at _) (fo r)
-  past-val v fo fl (step r)         = past-⊑ (fo r) λ { refl → skip≢ (sO v r) }
-    where skip≢ : ∀ {a} → out a ≡ skip → ⊥
-          skip≢ ()
-  past-val v fo fl (opin r)         = past-⊑ (fo r) λ { refl → pin≢ (sO v r) }
-    where pin≢ : ∀ {a r′} → out a ≡ pin r′ → ⊥
-          pin≢ ()
-  past-val v fo fl (oend r _)       = past-⊑ (fo r) λ { refl → end≢ (sO v r) }
-    where end≢ : ∀ {a} → out a ≡ end → ⊥
-          end≢ ()
-  past-val v fo fl (opass r _)      = past-⊑ (fo r) λ { refl → end≢ (sO v r) }
-    where end≢ : ∀ {a} → out a ≡ end → ⊥
-          end≢ ()
-  past-val v fo fl (lane r _ (reads _ s) _ _) = ⊑-trans (shift-≮ _ (at _) (fo r)) (⊑-trans (ix01 _) (≺→⊑ s))
-  past-val v fo fl (lend r _ (reads _ s) _ _ _) = ⊑-trans (shift-≮ _ (at _) (fo r)) (⊑-trans (ix01 _) (≺→⊑ s))
-  past-val v fo fl (lpass r _ (reads _ s) _ _ _) = ⊑-trans (shift-≮ _ (at _) (fo r)) (⊑-trans (ix01 _) (≺→⊑ s))
-  past-val v fo fl (left r _ (reads _ s) _ _) = ⊑-trans (shift-≮ _ (at _) (fo r)) (⊑-trans (ix01 _) (≺→⊑ s))
-  past-val v fo fl (run x _)        = from-any Ls fl x
-  past-val v fo fl (rend x _ _)     = from-any Ls fl x
-  past-val v fo fl (rpass x _ _)    = from-any Ls fl x
-  past-val v fo fl (hand _ _ _ _ ())
-  past-val v fo fl (rhand _ ())
-
-  -- The outer's end at `q₀` with no lane running ends the merge.
-  outer-done : ∀ {q₀} → O q₀ end → From (at q₀) O → n ≡ 0 → Done q₀
-  outer-done {q₀} r fo refl = over-at (inj₂ (q₀ , r , ≼-refl {q₀})) tt , (λ v _ lt _ → ⊥-elim (⊑→≼ (fo v) lt))
-
-  -- A lane's end at `q`, the outer done and no other lane running, ends it.
-  lane-done : ∀ {q} → Lanes Ls q end → T d → pred n ≡ 0 → Done q
-  lane-done x td pn = over-at (inj₁ td) (one-end n Ls pn x) , (λ v _ _ _ → ⊥-elim (over td v))
-
-  empty-flat : Empty O → Each Empty Ls → Empty JoinT
-  empty-flat eo el (val r)       = eo r
-  empty-flat eo el (step r)      = eo r
-  empty-flat eo el (opin r)      = eo r
-  empty-flat eo el (oend r _)    = eo r
-  empty-flat eo el (opass r _)   = eo r
-  empty-flat eo el (lane r _ _ _ _)  = eo r
-  empty-flat eo el (lend r _ _ _ _ _)  = eo r
-  empty-flat eo el (lpass r _ _ _ _ _) = eo r
-  empty-flat eo el (left r _ _ _ _) = eo r
-  empty-flat eo el (run x _)    = empty-any Ls el x
-  empty-flat eo el (rend x _ _)  = empty-any Ls el x
-  empty-flat eo el (rpass x _ _)  = empty-any Ls el x
-  empty-flat eo el (hand _ _ _ _ ())
-  empty-flat eo el (rhand _ ())
-
-  -- A lane winning, the outer no earlier.
-  lane-wins : ∀ {R} (g : Found R) K (o′ : Out B) → From K O → OKL Ls (just (g , K , o′)) → OK JoinT (just (g , laneT {A = A} d n [] K o′))
-  lane-wins g K still fo (fl , ml , sl) =
-    record { from = rows-from K fo fl ; mark = ml ; shown = λ () }
-  lane-wins g K (shows (nx b)) fo (fl , ml , sl) =
-    record { from = rows-from K fo fl ; mark = ml
-           ; shown = λ { refl → let (q , k , x) = sl refl in q , k , run x tt } }
-  lane-wins g K (shows cp) fo (fl , ml , sl) = ends d refl (pred n ≡ᵇ 0) refl
-    where
-      ends : ∀ b → d ≡ b → ∀ c → (pred n ≡ᵇ 0) ≡ c → OK JoinT (just (g , K , (if b ∧ c then shows cp else still)))
-      ends true  de true  pn = record { from = rows-from K fo fl ; mark = ml
-                                      ; shown = λ { refl → let (q , k , x) = sl refl in q , k , rend x (λ ()) (lane-done x (subst T (sym de) tt) (≡ᵇ⇒≡ (pred n) 0 (subst T (sym pn) tt))) } }
-      ends true  de false pn = record { from = rows-from K fo fl ; mark = ml ; shown = λ () }
-      ends false de c     pn = record { from = rows-from K fo fl ; mark = ml ; shown = λ () }
-
-  -- The outer winning, the lanes no earlier than just past its key.
-  outer-wins : ∀ {R} (f : Found R) h (o : Out A) → Bd O (Found.key f) h o → Each (From (shift h)) Ls → OK JoinT (just (f , outerT n [] h o))
-  outer-wins f h still b fl =
-    record { from = rows-from h (from b) (from-weak Ls (shift-⊑ h) fl) ; mark = mark b ; shown = λ () }
-  outer-wins f h (shows (nx a)) b fl with shown b refl
-  ... | q₀ , refl , v = record { from = past-val v (from b) fl ; mark = ⊑-trans (mark b) (shift-⊑ (at q₀)) ; shown = λ () }
-  outer-wins f h (shows cp) b fl = ends (n ≡ᵇ 0) refl
-    where
-      ends : ∀ z → (n ≡ᵇ 0) ≡ z → OK JoinT (just (f , h , (if z ∧ true then shows cp else still)))
-      ends false nz = record { from = rows-from h (from b) (from-weak Ls (shift-⊑ h) fl) ; mark = mark b ; shown = λ () }
-      ends true  nz with shown b refl
-      ... | q₀ , refl , r = record { from = rows-from (at q₀) (from b) (from-weak Ls (shift-⊑ (at q₀)) fl) ; mark = mark b
-                                   ; shown = λ { refl → q₀ , refl , oend r (outer-done r (from b) (≡ᵇ⇒≡ n 0 (subst T (sym nz) tt))) } }
-
-  race-ok : ∀ {R} (x : Maybe (Cand R A)) (y : Maybe (Cand R B)) → OK O x → OKL Ls y → OK JoinT (raceT d n [] x y)
-  race-ok nothing            nothing             eo el = empty-flat eo el
-  race-ok nothing            (just (g , k , o′)) eo bl = lane-wins g k o′ (λ r → ⊥-elim (eo r)) bl
-  race-ok (just (f , h , o)) nothing             b  el = outer-wins f h o b (from-empty Ls el)
-  race-ok (just (f , h , o)) (just (g , k , o′)) b  bl with h <ᴷ k in lt
-  ... | true  = outer-wins f h o b (from-weak Ls (shift-< h k lt) (proj₁ bl))
-  ... | false = lane-wins g k o′ (λ r → ⊑-trans (⊑i lt) (from b r)) bl
-
--- As entered: nothing lies before where a mark is keyed, so what it
--- shows has nothing before it.
-ok-trunc : ∀ {R A} {t : EmissionSet A} (x : Maybe (Cand R A)) → OK t x → OK (Truncate t) x
-ok-trunc nothing            e (r , _) = e r
-ok-trunc (just (f , K , o)) b =
-  record { from = λ (r , _) → from b r ; mark = mark b
-         ; shown = λ eq → let (q , k , r) = shown b eq in q , k , r , ([] , λ {k′} y lt → ⊥-elim (⊑→≼ (subst (_⊑ at k′) k (from b y)) lt)) }
-
-------------------------------------------------------------------------
--- A take
-
-postulate
-  -- A GOOD NODE'S ROWS HOLD ONE EVENT A POSITION.
-  rows-single : ∀ {A} {ρ : DenEnv []} (s : St [] A) → Good ρ s → Single (rows ρ s)
-
--- At or past where it was decided, one of `p` and `q` before the other.
-⊑-split : ∀ {p q} → at p ⊑ at q → p ≺ q ⊎ p ≡ q
-⊑-split {p} {q} pq with <ᵖ-split p q (trans (sym (at-<ᵖ q p)) (un pq))
-... | inj₁ lt = inj₁ (Equivalence.from T-≡ lt)
-... | inj₂ eq = inj₂ eq
-
--- A take's row lies at or just past its source's.
-take-src : ∀ {A} {i} {w : A → Bool} {t : EmissionSet A} {k e} → TakeWhile.TakeT i w t k e → Σ Pos λ q → Σ (Ev A) λ e′ → t q e′ × at q ⊑ at k
-take-src (TakeWhile.pass r _ _)   = _ , _ , r , ⊑-refl _
-take-src (TakeWhile.fail r _ _ _) = _ , _ , r , ext-⊑ _ [ ix 0 ]
-take-src (TakeWhile.stop r _ _)   = _ , _ , r , ext-⊑ _ [ last ]
-take-src (TakeWhile.step r _)     = _ , _ , r , ⊑-refl _
-take-src (TakeWhile.tend r _)     = _ , _ , r , ⊑-refl _
-take-src (TakeWhile.left r _ _)   = _ , _ , r , ⊑-refl _
-
-take-from : ∀ {A} {i} {w : A → Bool} {t : EmissionSet A} K → From K t → From K (TakeWhile.TakeT i w t)
-take-from K fr x = let (_ , _ , r , le) = take-src x in ⊑-trans (fr r) le
-
--- Nothing fails before the least row.
-unfailed : ∀ {A} {i} {w : A → Bool} {t : EmissionSet A} {q₀} → From (at q₀) t → ¬ TakeWhile.Failed i w t q₀
-unfailed fr (_ , _ , r , _ , lt) = ⊑→≼ (fr r) lt
-
-noPin : ∀ {A} {a : A} {r} → out a ≡ pin r → ⊥
-noPin ()
-
--- Past a failing value at the least row, every row of the take lies just
--- past it.
-past-fail : ∀ {A} {i} {w : A → Bool} {t : EmissionSet A} {q₀ a} → Single t → t q₀ (out a) → w a ≡ false → From (at q₀) t
-          → From (at (q₀ ++ [ ix 0 ])) (TakeWhile.TakeT i w t)
-past-fail {w = w} {a = a} sg r wa fr (TakeWhile.pass r′ kp nf) with ⊑-split (fr r′)
-... | inj₁ lt   = ⊥-elim (nf (_ , _ , r , subst (λ b → T (not b)) (sym wa) tt , lt))
-... | inj₂ refl with sg r r′
-... | refl = ⊥-elim (subst T wa kp)
-past-fail sg r wa fr (TakeWhile.fail r′ _ _ _) = shift-≮ _ (at _) (fr r′)
-past-fail {q₀ = q₀} sg r wa fr (TakeWhile.stop r′ _ nf) with ⊑-split (fr r′)
-... | inj₁ lt   = ⊥-elim (nf (_ , _ , r , subst (λ b → T (not b)) (sym wa) tt , lt))
-... | inj₂ refl = ≺→⊑ (subst T (sym (<ᵖ-part q₀ {ix 0} {last} [] [] refl)) tt)
-past-fail sg r wa fr (TakeWhile.step r′ nf) with ⊑-split (fr r′)
-... | inj₁ lt   = ⊥-elim (nf (_ , _ , r , subst (λ b → T (not b)) (sym wa) tt , lt))
-... | inj₂ refl with sg r r′
-... | ()
-past-fail sg r wa fr (TakeWhile.tend r′ nf) with ⊑-split (fr r′)
-... | inj₁ lt   = ⊥-elim (nf (_ , _ , r , subst (λ b → T (not b)) (sym wa) tt , lt))
-... | inj₂ refl with sg r r′
-... | ()
-past-fail sg r wa fr (TakeWhile.left r′ _ _) = past-⊑ (fr r′) λ { refl → noPin (sg r r′) }
-
--- An unfailed take's search: its child's find, a failing value shown
--- just past it if inclusive, else dropped.
-take-free : ∀ {R A} i (w : A → Bool) {t : EmissionSet A} (y : Maybe (Cand R A)) → Single t → OK t y → OK (TakeWhile.TakeT i w t) (retag (takeT i w free) y)
-take-free i w nothing sg e x = let (_ , _ , r , _) = take-src x in e r
-take-free i w (just (f , K , still)) sg b = record { from = take-from K (from b) ; mark = mark b ; shown = λ () }
-take-free i w {t} (just (f , K , shows cp)) sg b =
-  record { from = take-from K (from b) ; mark = mark b
-         ; shown = λ { refl → let (q₀ , k , r) = shown b refl in q₀ , k , TakeWhile.tend r (unfailed {i = i} {w = w} {t = t} (λ r′ → subst (_⊑ at _) k (from b r′))) } }
-take-free i w {t} (just (f , K , shows (nx a))) sg b with w a in wa | shown b refl
-... | true  | q₀ , refl , r =
-  record { from = take-from (at q₀) (from b) ; mark = mark b
-         ; shown = λ { refl → q₀ , refl , TakeWhile.pass r (subst T (sym wa) tt) (unfailed {i = i} {w = w} {t = t} (from b)) } }
-... | false | q₀ , refl , r with i
-...   | true  = record { from = past-fail sg r wa (from b) ; mark = ⊑-trans (mark b) (shift-⊑ (at q₀))
-                       ; shown = λ { refl → q₀ ++ [ ix 0 ] , refl , TakeWhile.fail r (subst (λ b → T (not b)) (sym wa) tt) (unfailed {i = i} {w = w} {t = t} (from b)) tt } }
-...   | false = record { from = take-from (at q₀) (from b) ; mark = mark b ; shown = λ () }
-
--- A failed take's completion, shown at its stop unless closed above.
-stop-shown : ∀ {R Γ A} (c : Ctx R Γ A) r {t : EmissionSet A} {e} → (if not (closed c) then shows cp else still) ≡ shows e
-           → Σ Pos λ q → at (r ++ [ last ]) ≡ at q × Stops r t q (toEv e)
-stop-shown c r eq with closed c
-stop-shown c r ()   | true
-stop-shown c r refl | false = _ , refl , stopᴿ
-
-take-stop : ∀ {R Γ A} (c : Ctx R Γ A) i (w : A → Bool) r (s : St Γ A) {t : EmissionSet A} (y : Maybe (Cand R A)) → OK t y
-          → OK (Stops r t) (first (just (found (_ , _ , c , takeS i w (cpAt r) s) cpM (at (r ++ [ last ])) , at (r ++ [ last ]) , outOf c (takeS i w (cpAt r) s) cpM))
-                                  (retag (takeT i w (cpAt r)) y))
-take-stop c i w r s nothing e =
-  record { from = λ { stopᴿ → ⊑-refl _ ; (leftᴿ (keptᴿ x _ _)) → ⊥-elim (e x) } ; mark = ⊑-refl _ ; shown = stop-shown c r }
-take-stop c i w r s (just (g , h , o)) b with h <ᴷ at (r ++ [ last ]) in lt
-... | true  = record { from = λ { stopᴿ → <→⊑ h _ lt ; (leftᴿ (keptᴿ x _ _)) → from b x } ; mark = mark b ; shown = λ () }
-... | false = record { from = λ { stopᴿ → ⊑-refl _ ; (leftᴿ (keptᴿ x _ _)) → ⊑-trans (⊑i lt) (from b x) } ; mark = ⊑-refl _ ; shown = stop-shown c r }
-
--- Past its stop, a take keeps only its source's surviving pins, shown
--- by no find.
-kept-ok : ∀ {R A} i (w : A → Bool) o {r} {t : EmissionSet A} → (o ≡ free → ⊥) → (y : Maybe (Cand R A)) → OK t y → OK (Kept r t) (retag (takeT i w o) y)
-kept-ok i w free       nf y b = ⊥-elim (nf refl)
-kept-ok i w (cpAt _)   nf nothing e (keptᴿ x _ _) = e x
-kept-ok i w (cutAt _)  nf nothing e (keptᴿ x _ _) = e x
-kept-ok i w (overAt _) nf nothing e (keptᴿ x _ _) = e x
-kept-ok i w (cpAt _)   nf (just (f , K , o)) b = record { from = λ { (keptᴿ x _ _) → from b x } ; mark = mark b ; shown = λ () }
-kept-ok i w (cutAt _)  nf (just (f , K , o)) b = record { from = λ { (keptᴿ x _ _) → from b x } ; mark = mark b ; shown = λ () }
-kept-ok i w (overAt _) nf (just (f , K , o)) b = record { from = λ { (keptᴿ x _ _) → from b x } ; mark = mark b ; shown = λ () }
-
-------------------------------------------------------------------------
--- Every node
-
--- Under a cut switched off: silent whatever it holds.
-seek-off : ∀ {R Γ A} {ρ : DenEnv Γ} (c : Ctx R Γ A) a (s : St Γ A) → OK (rows ρ (cutS false a s)) (seek c (cutS false a s))
-seek-off c attached s = silenced (seek (inCut false attached c) s) (seek-mark (inCut false attached c) s)
-seek-off c (attAt p) s =
-  own-first (_ , _ , c , cutS false (attAt p) s) attM (after p) _ (silenced (seek (inCut false (attAt p) c) s) (seek-mark (inCut false (attAt p) c) s))
-
-postulate
-  -- A CONNECT'S SEEK LEADS ITS ROWS: whatever its source and body find,
-  -- the source winning only strictly before the body, keys every row the
-  -- connect still owes, its body's joiners' unfed rows included.
-  --
-  -- DEAD ROUTE: recursing into the body as `seek-ok` does into every
-  --   other node: `seek-ok` is stated at an empty environment, and a
-  --   joiner's rows read its binder, so no joiner's OK holds apart from
-  --   the source it reads.
-  -- DEAD ROUTE: reading the body under a quiet binder to reuse `seek-ok`:
-  --   `G` and `rows` read the environment, so a body good under its real
-  --   binder says nothing under a quiet one.
-  conn-ok : ∀ {R A X} {ρ : DenEnv []} (c : Ctx R [] A) k (o : St [] X) (b : St (X ∷ []) A) → Good ρ (connS k o b) → OK (rows ρ (connS k o b)) (seek c (connS k o b))
-
-  -- A COLD'S DUE MARK KEYS ITS ROWS: the next step of its tape, a frame's
-  -- value, stall or close, or its completion owed; a dead cold owes none.
-  cold-ok : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) b l → OK (rows ρ (coldS b l)) (seek c (coldS b l))
-
-  -- A JOINER'S SEARCH KEYS ITS ROWS, a bounded merge, a switch or an
-  -- exhaust as a merge's does: its outer's and lanes' finds raced.
-  bounded-ok : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) m (f : A → Obs Timeline [] B) d n q (o : St [] A) ls
-             → Good ρ (flatS (mergeᶠ (just m)) f d n q o ls) → OK (rows ρ (flatS (mergeᶠ (just m)) f d n q o ls)) (seek c (flatS (mergeᶠ (just m)) f d n q o ls))
-  switch-ok  : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) (f : A → Obs Timeline [] B) d n q (o : St [] A) ls
-             → Good ρ (flatS switchᶠ f d n q o ls) → OK (rows ρ (flatS switchᶠ f d n q o ls)) (seek c (flatS switchᶠ f d n q o ls))
-  exhaust-ok : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) (f : A → Obs Timeline [] B) d n q (o : St [] A) ls
-             → Good ρ (flatS exhaustᶠ f d n q o ls) → OK (rows ρ (flatS exhaustᶠ f d n q o ls)) (seek c (flatS exhaustᶠ f d n q o ls))
-
-mutual
-  seek-ok : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) (s : St [] A) → Good ρ s → OK (rows ρ s) (seek c s)
-  seek-ok c (ofS i p [])       _ = record { from = of-from p i [] ; mark = ⊑-refl _ ; shown = λ eq → _ , refl , of-shows c i p [] eq }
-  seek-ok c (ofS i p (x ∷ xs)) _ = record { from = of-from p i (x ∷ xs) ; mark = ⊑-refl _ ; shown = λ eq → _ , refl , of-shows c i p (x ∷ xs) eq }
-  seek-ok c doneS              _ = λ ()
-  seek-ok c (connS k o b)      g = conn-ok c k o b g
-  seek-ok c (coldS b l)        _ = cold-ok c b l
-  seek-ok c (mapS f s)         g = mapped f (seek (inMap f c) s) (seek-ok (inMap f c) s g)
-  seek-ok c (scanS f z s)      g = scanned f z (seek (inScan f z c) s) (seek-ok (inScan f z c) s g)
-  seek-ok c (takeS i q w s)    g = take-ok c i q w s g
-  seek-ok c (cutS true attached s)   g = kept (seek (inCut true attached c) s) (seek-ok (inCut true attached c) s g)
-  seek-ok {ρ = ρ} c (cutS false a s) _ = seek-off {ρ = ρ} c a s
-  seek-ok c (cutS true (attAt p) s)  g =
-    own-first (_ , _ , c , cutS true (attAt p) s) attM (after p) _ (kept (seek (inCut true (attAt p) c) s) (seek-ok (inCut true (attAt p) c) s g))
-  seek-ok {ρ = ρ} c (flatS (mergeᶠ nothing) f d n q o ls) m with MergeG.fresh m
-  ... | refl = ok-trunc (raceT d n [] (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)) (join-ok c f d n o ls m)
-  seek-ok c (flatS (mergeᶠ (just m)) f d n q o ls) g = bounded-ok c m f d n q o ls g
-  seek-ok c (flatS switchᶠ f d n q o ls)           g = switch-ok c f d n q o ls g
-  seek-ok c (flatS exhaustᶠ f d n q o ls)          g = exhaust-ok c f d n q o ls g
-
-  -- A TAKE'S SEARCH KEYS ITS ROWS: unfailed, its child's find retagged; a
-  -- failing value's completion owed at its stop; its kept pins after.
-  take-ok : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) i q w (s : St [] A) → Good ρ (takeS i q w s) → OK (rows ρ (takeS i q w s)) (seek c (takeS i q w s))
-  take-ok {ρ = ρ} c i q free s g =
-    ok-trunc (retag (takeT i q free) (seek (inTake i q free c) s))
-      (take-free i q (seek (inTake i q free c) s) (rows-single {ρ = ρ} s g) (seek-ok (inTake i q free c) s g))
-  take-ok c i q (cpAt r) s g = take-stop c i q r s (seek (inTake i q (cpAt r) c) s) (seek-ok (inTake i q (cpAt r) c) s g)
-  take-ok c i q (cutAt r) s g =
-    own-first (_ , _ , c , takeS i q (cutAt r) s) cutM (after r) _ (kept-ok i q (cutAt r) (λ ()) (seek (inTake i q (cutAt r) c) s) (seek-ok (inTake i q (cutAt r) c) s g))
-  take-ok c i q (overAt r) s g = kept-ok i q (overAt r) (λ ()) (seek (inTake i q (overAt r) c) s) (seek-ok (inTake i q (overAt r) c) s g)
-
-  -- The joiner before it is entered.
-  join-ok : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) (f : A → Obs Timeline [] B) d n (o : St [] A) ls → Good ρ (flatS (mergeᶠ nothing) f d n [] o ls)
-          → OK (Flat.JoinT (λ a → pendRows ρ (f a)) (rows ρ o) d n (rowsL ρ ls)) (raceT d n [] (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls))
-  join-ok {ρ = ρ} c f d n o ls m =
-    Race.race-ok (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n (rooted-single rooted) spent
-      (seek (inOuter (mergeᶠ nothing) f d n [] ls c) o) (lanes c (mergeᶠ nothing) f d n [] o [] ls)
-      (seek-ok (inOuter (mergeᶠ nothing) f d n [] ls c) o outer) (lanes-ok c f d n o [] ls lanesG)
-    where open MergeG m
-
-  seek-ln : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) (s : St [] A) → GoodLn ρ s → OK (rows ρ s) (seek c s)
-  seek-ln {ρ = ρ} c s g with lane-v s g
-  ... | on a s₀ g₀ _ = seek-ok (inLn true c) (cutS true a s₀) g₀
-  ... | off a s₀     = seek-off {ρ = ρ} (inLn false c) a s₀
-
-  lanes-ok : ∀ {R A B} {ρ : DenEnv []} (c : Ctx R [] B) f d n (o : St [] A) pre (ls : List (St [] B)) → GoodL ρ ls
-           → OKL (rowsL ρ ls) (lanes c (mergeᶠ nothing) f d n [] o pre ls)
-  lanes-ok c f d n o pre []         _          = tt
-  lanes-ok c f d n o pre (s ∷ post) (gs , gp) =
-    lanes-first (retag (cutT (alive s)) (seek (inLanes (mergeᶠ nothing) f d n [] o pre post c) s)) (lanes c (mergeᶠ nothing) f d n [] o (s ∷ pre) post)
-      (lane-ok s _ (seek-ln (inLanes (mergeᶠ nothing) f d n [] o pre post c) s gs)) (lanes-ok c f d n o (s ∷ pre) post gp)
