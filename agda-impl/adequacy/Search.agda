@@ -27,13 +27,13 @@ open import Data.List.Properties using (∷ʳ-injectiveˡ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-split; <ᵖ-part)
+open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-split; <ᵖ-part; Frame; burst; emit; stall; close)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; _≺_; _≼_; Truncate; module TakeWhile; DenEnv;
-  module Joining; module Values; MapT; map-out; map-skip; map-pin; map-end; module Scan)
+  module Joining; module Values; MapT; map-out; map-skip; map-pin; map-end; module Scan; InE; at-out; at-end)
 open import denotation.Laws.Modulus using (≼-refl)
 open import denotation.Laws.Worlds using (InvAt; Hots; W; inW; plain-ix; apart-w) renaming (⊑-refl to ⊑ᵖ-refl)
 open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᵖ; clash)
-open import operation.PureObservable using (module Machine)
+open import operation.PureObservable using (module Machine; play; ending; over)
 
 open Machine using (St; Ctx; CS; cs; _⊕_; bodyM; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed;
                     free; cpAt; cutAt; overAt; inScan; inTake; inSrc; inBody;
@@ -470,9 +470,9 @@ postulate
   -- A CONNECT'S BINDER HOLDS ONE EVENT A POSITION, its source's rows doing so.
   bind-single : ∀ {Γ X A} {ρ : DenEnv Γ} k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvSingle ρ → Good ρ (connS k o b) → EnvSingle (Hot (rows ρ o) k ∷ᴬ ρ)
 
-  -- A COLD'S DUE MARK KEYS ITS ROWS: the next step of its tape, a frame's
-  -- value, stall or close, or its completion owed; a dead cold owes none.
-  cold-ok : ∀ {R Γ A} {ρ : DenEnv Γ} (c : Ctx R Γ A) b l → OK (rows ρ (coldS b l)) (seek c (coldS b l))
+  -- A BURST'S ROWS LIE FROM ITS FRAME ON: the frame's own steps at its
+  -- index and after, the frames following under its close.
+  burst-from : ∀ {A t} τ u i (fr : Frame A t) → From (at (u ++ [ ix i ])) (InE (burst τ u i fr))
 
   -- A BOUNDED MERGE'S RACE WITH VALUES WAITING KEYS ITS ROWS up to the
   -- cap, every slot taken: the earliest lane end hands off to the
@@ -491,6 +491,25 @@ lanes-single (s ∷ ls) es (gs , gl) with lane-v s gs
 -- EVERY SEARCH KEYS ITS ROWS UP TO A CAP ITS BINDERS LEAVE QUIET: a
 -- connect's body is searched under a binder capped no later than the
 -- source's find, which is all a joiner of it can be asked to lead.
+
+-- A cold's due mark keys its rows: the next step of its tape, a frame's
+-- value, stall or close, or its completion owed; a dead cold owes none.
+cold-ok : ∀ {R Γ A} {ρ : DenEnv Γ} (c : Ctx R Γ A) b l → OK (rows ρ (coldS b l)) (seek c (coldS b l))
+cold-ok c true  over                         = λ ()
+cold-ok c false over                         = λ ()
+cold-ok c false (play τ u i t (emit a k))    = record { from = λ () ; mark = ⊑-refl _ ; shown = λ () }
+cold-ok c false (play τ u i t (stall k))     = record { from = λ () ; mark = ⊑-refl _ ; shown = λ () }
+cold-ok c false (play τ u i t (close k))     = record { from = λ () ; mark = ⊑-refl _ ; shown = λ () }
+cold-ok c false (ending e)                   = record { from = λ () ; mark = ⊑-refl _ ; shown = λ () }
+cold-ok c true  (play τ u i t (emit a k))    with closed c
+... | false = record { from = burst-from τ u i (emit a k) ; mark = ⊑-refl _ ; shown = λ { refl → _ , refl , at-out } }
+... | true  = record { from = burst-from τ u i (emit a k) ; mark = ⊑-refl _ ; shown = λ () }
+cold-ok c true  (play τ u i t (stall k))     = record { from = burst-from τ u i (stall k) ; mark = ⊑-refl _ ; shown = λ () }
+cold-ok c true  (play τ u i t (close k))     = record { from = burst-from τ u i (close k) ; mark = ⊑-refl _ ; shown = λ () }
+cold-ok c true  (ending e)                   with closed c
+... | false = record { from = λ { at-end → ⊑-refl _ } ; mark = ⊑-refl _ ; shown = λ { refl → _ , refl , at-end } }
+... | true  = record { from = λ { at-end → ⊑-refl _ } ; mark = ⊑-refl _ ; shown = λ () }
+
 mutual
   seek-okᶜ : ∀ {R Γ A} {ρ : DenEnv Γ} C (c : Ctx R Γ A) (s : St Γ A) → EnvSingle ρ → Good ρ s → Quiet C ρ s → OKᶜ C (rows ρ s) (seek c s)
   seek-okᶜ {ρ = ρ} C c (ofS i p [])       _ _ _ = okc {ρ = ρ} C c (ofS i p []) (record { from = of-from p i [] ; mark = ⊑-refl _ ; shown = λ eq → _ , refl , of-shows c i p [] eq })

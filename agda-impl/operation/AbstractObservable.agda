@@ -361,7 +361,7 @@ outOf c (ofS i p xs) ofM with closed c | xs
 outOf c (takeS i q (cpAt p) s) cpM = if not (closed c) then shows cp else still
 outOf c (joinS j g x ((q , e) ∷ ib)) joinM = if g ∧ not (closed c) then shows e else still
 outOf c (coldS b l) leafM with peek l
-... | just nothing  = if not (closed c) then shows cp else still
+... | just nothing  = if b ∧ not (closed c) then shows cp else still
 ... | just (just a) = if b ∧ not (closed c) then shows (nx a) else still
 ... | nothing       = still
 outOf c s m = still

@@ -27,11 +27,11 @@ Members: `conn-lead`.
 #### THE COLD STEPPED
 
 A cold entered at its timeline read where it subscribes, and each turn of
-its tape, keep `Inv`; its due mark keys and leads its rows. Open: whether
-a stall or a frame's close, a skip in its rows, moves nothing owed. Settled
-when each is a body.
+its tape, keep `Inv`, and a burst's rows lie from its frame on. Open:
+whether a stall or a frame's close, a skip in its rows, moves nothing owed.
+Settled when each is a body.
 
-Members: `sub-cold`, `abs-leaf`, `cold-ok`, `cold-lead`.
+Members: `sub-cold`, `abs-leaf`, `burst-from`.
 
 #### THE JOINERS STEPPED
 
@@ -121,26 +121,22 @@ its end, its stop and its cut keep `Inv`. Settled when each is a body.
 Members: `take-lead`, `rise-take-nx`, `rise-take-fail`,
 `rise-take-cp`, `rise-take-owed`, `abs-stop`, `abs-cut`.
 
-#### THE COMPLETE HALF
+#### THE SILENT RUN, FINITE
 
-Untried: every row met, some run shows. Route: a machine-only progress
-lemma, a measure on `Conf` (pending program, marks, context depth) bounding
-silent steps while a visible row is owed; a mark keyed `after` shows nothing
-and removes itself. Soundness then names what shows. The one row fact
-needed is that owing nothing is `Empty`. Settled by a body, or a program
-whose emission set holds a row no run reaches.
+Untried: short of a row a reader meets next, a run takes finitely many
+silent steps. Route: a lexicographic measure — visible rows owed before the
+met one (finitely many, by `Few`) then bookkeeping; needs `Moves.silent` to
+track rows, not only visible ones. Settled by a body, or a program whose
+engine stalls silently forever before a row its emission set holds.
 
-Members: `complete`.
+Members: `silent-finite`.
 
-#### THE SKIPS BETWEEN
+#### THE DRAINED ENGINE
 
-Untried: the engine's shown rows, each the least visible one left, are
-the shown rows of a reader's run, which meets every skip in order. Rows
-before each are finitely many, but which of a listing's positions are rows
-is undecided, and the oracle's listing is cut at a fixed horizon. Settled
-by a body, or a program showing a value past its end.
+Untried: an engine with no mark left owes no visible row. Settled by a body
+by state over `Inv`, or a drained state still owing one.
 
-Members: `met-of-shown`.
+Members: `drained-quiet`.
 
 #### THE GOOD TREE KEPT
 

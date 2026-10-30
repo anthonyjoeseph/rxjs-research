@@ -22,8 +22,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-split)
-open import denotation.EmissionSet using (EmissionSet; DenEnv; Ev; Truncate; module Joining; out; skip; pin; end; _≺_; MapT; map-out; map-skip; map-pin; map-end; module Scan; at-out; at-end)
+open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-split; emit; stall; close)
+open import denotation.EmissionSet using (EmissionSet; DenEnv; Ev; Truncate; module Joining; out; skip; pin; end; _≺_; MapT; map-out; map-skip; map-pin; map-end; module Scan; at-out; at-skip; at-end)
 open import operation.Key using (Key; at; _<ᴷ_; ≮ᴷ-trans; at-<ᵖ; clash)
 open import operation.PureObservable using (module Machine; Tape; play; ending; over)
 open Machine using (St; Ctx; CS; Cand; found; Mark; ofM; attM; leafM; Att; Out; still; shows; nx; cp; seek; search; kids; lanes; own; ownBest; first; retag;
@@ -208,11 +208,17 @@ relive : ∀ v {C : Set} {O L T₁ T₂ : Pos → Set} → (∀ {P} → T₁ P �
 relive true  h l cl P oa = proj₁ (l cl P oa) , h (proj₂ (l cl P oa))
 relive false h l         = tt
 
-first-leads : ∀ {R Γ A} {v} {c : Ctx R Γ A} {t} (x y : Maybe (Cand R A)) → Leads v c t x → Leads v c t y → Leads v c t (first x y)
-first-leads nothing            y                    lx ly = ly
+-- `y` taken over `x`: strictly earlier, or `x` nothing.
+Beats : ∀ {R A} → Maybe (Cand R A) → Maybe (Cand R A) → Set
+Beats nothing            y                    = ⊤
+Beats (just x)           nothing              = ⊤
+Beats (just (_ , h , _)) (just (_ , h′ , _))  = h′ <ᴷ h ≡ true
+
+first-leads : ∀ {R Γ A} {v} {c : Ctx R Γ A} {t} (x y : Maybe (Cand R A)) → Leads v c t x → (Beats x y → Leads v c t y) → Leads v c t (first x y)
+first-leads nothing            y                    lx ly = ly tt
 first-leads (just x)           nothing              lx ly = lx
 first-leads (just (f , h , o)) (just (g , h′ , o′)) lx ly with h′ <ᴷ h
-... | true  = ly
+... | true  = ly refl
 ... | false = lx
 
 -- Read as entered: the winner's own row has nothing of its node before it.
@@ -479,23 +485,41 @@ of-out c cl | false = refl
 -- Marks no of owns lead nothing.
 own-none : ∀ {R Γ A} v (c : Ctx R Γ A) {s : St Γ A} {t} ms → (∀ {m P} → OfAt s m P → ⊥) → Leads v c t (ownBest c s ms)
 own-none v     c []       no = tt₁
-own-none v c {s} {t} ((m , k) ∷ ms) no = first-leads {v = v} {c = c} {t = t} (just (found (_ , _ , c , s) m k , k , outOf c s m)) (ownBest c s ms) (one v) (own-none v c ms no)
+own-none v c {s} {t} ((m , k) ∷ ms) no = first-leads {v = v} {c = c} {t = t} (just (found (_ , _ , c , s) m k , k , outOf c s m)) (ownBest c s ms) (one v) (λ _ → own-none v c ms no)
   where
     one : ∀ v → Leads v c t (just (found (_ , _ , c , s) m k , k , outOf c s m))
     one true  = stop , λ cl P oa → ⊥-elim (no oa)
     one false = stop , tt
 
-postulate
-  -- A COLD'S OWN MARK LEADS: its tape's next step keys its rows, tight.
-  cold-lead : ∀ {R Γ A} v (c : Ctx R Γ A) b (l : Tape A) → Leads v c (rows (env c) (coldS b l)) (ownBest c (coldS b l) (own (coldS {Γ = Γ} b l)))
+-- A cold's own mark leads: its tape's next step keys its rows, tight.
+cold-lead : ∀ {R Γ A} v (c : Ctx R Γ A) b (l : Tape A) → Leads v c (rows (env c) (coldS b l)) (ownBest c (coldS b l) (own (coldS {Γ = Γ} b l)))
+cold-lead v     c b     over                       = tt₁
+cold-lead false c b     (play τ u i t fr)          = stop , tt
+cold-lead false c b     (ending e)                 = stop , tt
+cold-lead true  c false (play τ u i t fr)          = stop , λ _ _ ()
+cold-lead true  c false (ending e)                 = stop , λ _ _ ()
+cold-lead true  c true  (play τ u i t (emit a k))  with closed c
+... | false = stop , λ _ _ eq → tt , tie _ refl (subst (λ q → at _ ⊑ at q) eq (⊑-refl _)) (hit at-out refl)
+... | true  = stop , λ ()
+cold-lead true  c true  (play τ u i t (stall k))   = stop , λ _ _ eq → tt , tie _ refl (subst (λ q → at _ ⊑ at q) eq (⊑-refl _)) (hit at-skip tt)
+cold-lead true  c true  (play τ u i t (close k))   = stop , λ _ _ eq → tt , tie _ refl (subst (λ q → at _ ⊑ at q) eq (⊑-refl _)) (hit at-skip tt)
+cold-lead true  c true  (ending e)                 = stop , λ _ _ eq → tt , tie _ refl (subst (λ q → at _ ⊑ at q) eq (⊑-refl _)) (hit at-end tt)
 
+postulate
   -- A CONNECT'S SEARCH LEADS: whatever its source or its body finds, the
   -- source winning only strictly before the body, keys the connect's rows,
   -- and the part that lost lies past it: the body's own rows past a
   -- source's find, the source's rows past a body's.  Stated whole: the
   -- body's rows read its binder, so its lead holds only up to a cap, as
   -- `conn-okᶜ` bounds its search.
+  --
+  -- Only a find that beats the connect's own marks: with a completed
+  -- body's teardown owed, the source's find is keyed where it sits, and
+  -- a tie there has no connect row at its key, its echoes lying one
+  -- `ix 0` below.  The owed mark, just past the body's end, keys before
+  -- any source row, so that find never wins.
   conn-lead : ∀ {R A X} v (c : Ctx R [] A) k (o : St [] X) (b : St (X ∷ []) A) → G (env c) v (connS k o b)
+            → Beats (ownBest c (connS k o b) (own (connS k o b))) (kids c (connS k o b))
             → Leads v c (rows (env c) (connS k o b)) (kids c (connS k o b))
 
   -- A TAKE'S SEARCH LEADS: unfailed, its child's find through the take,
@@ -529,48 +553,48 @@ own-lead v c (joinS j g x ib)     _ = own-none v c {joinS j g x ib} (own (joinS 
 
 mutual
   seek-lead : ∀ {R A} v (c : Ctx R [] A) (s : St [] A) → G (env c) v s → Leads v c (rows (env c) s) (seek c s)
-  seek-lead v c s g = first-leads (ownBest c s (own s)) (kids c s) (own-lead v c s g) (kids-lead v c s g)
+  seek-lead v c s g = first-leads (ownBest c s (own s)) (kids c s) (own-lead v c s g) (λ w → kids-lead v c s g w)
 
-  kids-lead : ∀ {R A} v (c : Ctx R [] A) (s : St [] A) → G (env c) v s → Leads v c (rows (env c) s) (kids c s)
-  kids-lead v c (mapS f s)       g = map-leads v f (seek (inMap f c) s) (seek-lead v (inMap f c) s g)
-  kids-lead v c (cutS true a s)  g = cut-on v (seek (inCut true a c) s) (seek-lead (v Data.Bool.∧ true) (inCut true a c) s g)
-  kids-lead v c (cutS false a s) g = cut-off v (seek (inCut false a c) s) (seek-lead (v Data.Bool.∧ false) (inCut false a c) s g)
-  kids-lead true c (flatS (mergeᶠ nothing) f d n q o ls) g with MergeG.fresh g
+  kids-lead : ∀ {R A} v (c : Ctx R [] A) (s : St [] A) → G (env c) v s → Beats (ownBest c s (own s)) (kids c s) → Leads v c (rows (env c) s) (kids c s)
+  kids-lead v c (mapS f s)       g _ = map-leads v f (seek (inMap f c) s) (seek-lead v (inMap f c) s g)
+  kids-lead v c (cutS true a s)  g _ = cut-on v (seek (inCut true a c) s) (seek-lead (v Data.Bool.∧ true) (inCut true a c) s g)
+  kids-lead v c (cutS false a s) g _ = cut-off v (seek (inCut false a c) s) (seek-lead (v Data.Bool.∧ false) (inCut false a c) s g)
+  kids-lead true c (flatS (mergeᶠ nothing) f d n q o ls) g _ with MergeG.fresh g
   ... | refl = join-lead true c (mergeᶠ nothing) f d n o ls (λ _ x → x) (λ _ _ _ ()) outer lanesG (rooted-parts rooted)
                  (join-ok c (mergeᶠ nothing) f d n o ls (flat-race (λ a → pendRows (env c) (f a)) (rows (env c) o) (rowsL (env c) ls) d n (rooted-single rooted) spent) outer lanesG)
     where open MergeG g
-  kids-lead false c (flatS (mergeᶠ nothing) f d n q o ls) g with MergeG.fresh g
+  kids-lead false c (flatS (mergeᶠ nothing) f d n q o ls) g _ with MergeG.fresh g
   ... | refl = join-lead false c (mergeᶠ nothing) f d n o ls (λ _ x → x) (λ _ _ _ ()) (MergeG.outer g) (MergeG.lanesG g) tt tt
-  kids-lead true c (flatS (mergeᶠ (just m)) f d n [] o ls) (g , _) =
+  kids-lead true c (flatS (mergeᶠ (just m)) f d n [] o ls) (g , _) _ =
     join-lead true c (mergeᶠ (just m)) f d n o ls (λ _ x → begun x) (bounded-unqueued m _ _ _ d n) outer lanesG (rooted-parts rooted)
       (join-ok c (mergeᶠ (just m)) f d n o ls (bounded-race m (λ a → pendRows (env c) (f a)) (rows (env c) o) (rowsL (env c) ls) d n (rooted-single rooted) spent) outer lanesG)
     where open MergeG g
           open BoundedF m (λ a → pendRows (env c) (f a)) (rows (env c) o) d n [] (rowsL (env c) ls) using (begun)
-  kids-lead false c (flatS (mergeᶠ (just m)) f d n [] o ls) (g , _) =
+  kids-lead false c (flatS (mergeᶠ (just m)) f d n [] o ls) (g , _) _ =
     join-lead false c (mergeᶠ (just m)) f d n o ls (λ _ x → begun x) (bounded-unqueued m _ _ _ d n) (MergeG.outer g) (MergeG.lanesG g) tt tt
     where open BoundedF m (λ a → pendRows (env c) (f a)) (rows (env c) o) d n [] (rowsL (env c) ls) using (begun)
-  kids-lead v c (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls) g = bounded-wait-lead v c m f d n a q o ls g
-  kids-lead true c (flatS switchᶠ f d n q o ls) g with MergeG.fresh g
+  kids-lead v c (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls) g _ = bounded-wait-lead v c m f d n a q o ls g
+  kids-lead true c (flatS switchᶠ f d n q o ls) g _ with MergeG.fresh g
   ... | refl = join-lead true c switchᶠ f d n o ls (switch-at _ _ _ d n) (λ _ _ _ ()) outer lanesG (rooted-parts rooted)
                  (join-ok c switchᶠ f d n o ls (switch-race (λ a → pendRows (env c) (f a)) (rows (env c) o) (rowsL (env c) ls) d n (rooted-single rooted) spent) outer lanesG)
     where open MergeG g
-  kids-lead false c (flatS switchᶠ f d n q o ls) g with MergeG.fresh g
+  kids-lead false c (flatS switchᶠ f d n q o ls) g _ with MergeG.fresh g
   ... | refl = join-lead false c switchᶠ f d n o ls (switch-at _ _ _ d n) (λ _ _ _ ()) (MergeG.outer g) (MergeG.lanesG g) tt tt
-  kids-lead true c (flatS exhaustᶠ f d n q o ls) g with MergeG.fresh g
+  kids-lead true c (flatS exhaustᶠ f d n q o ls) g _ with MergeG.fresh g
   ... | refl = join-lead true c exhaustᶠ f d n o ls (λ _ x → x) (λ _ _ _ ()) outer lanesG (rooted-parts rooted)
                  (join-ok c exhaustᶠ f d n o ls (exhaust-race (λ a → pendRows (env c) (f a)) (rows (env c) o) (rowsL (env c) ls) d n (rooted-single rooted) spent) outer lanesG)
     where open MergeG g
-  kids-lead false c (flatS exhaustᶠ f d n q o ls) g with MergeG.fresh g
+  kids-lead false c (flatS exhaustᶠ f d n q o ls) g _ with MergeG.fresh g
   ... | refl = join-lead false c exhaustᶠ f d n o ls (λ _ x → x) (λ _ _ _ ()) (MergeG.outer g) (MergeG.lanesG g) tt tt
-  kids-lead v c (ofS _ _ _)      _ = tt₁
-  kids-lead v c doneS            _ = tt₁
-  kids-lead v c (pend _ _)         _ = tt₁
+  kids-lead v c (ofS _ _ _)      _ _ = tt₁
+  kids-lead v c doneS            _ _ = tt₁
+  kids-lead v c (pend _ _)         _ _ = tt₁
   kids-lead v c (lnS _ _)        ()
-  kids-lead true  c (scanS f z s) g = scan-leads true f z (seek (inScan f z c) s) (seek-ok (inScan f z c) s g) (seek-lead true (inScan f z c) s g)
-  kids-lead false c (scanS f z s) g = scan-leads false f z (seek (inScan f z c) s) tt (seek-lead false (inScan f z c) s g)
-  kids-lead v c (takeS i q w s)   g = take-lead v c i q w s g
-  kids-lead v c (coldS _ _)      _ = tt₁
-  kids-lead v c (connS k o b)    g = conn-lead v c k o b g
+  kids-lead true  c (scanS f z s) g _ = scan-leads true f z (seek (inScan f z c) s) (seek-ok (inScan f z c) s g) (seek-lead true (inScan f z c) s g)
+  kids-lead false c (scanS f z s) g _ = scan-leads false f z (seek (inScan f z c) s) tt (seek-lead false (inScan f z c) s g)
+  kids-lead v c (takeS i q w s)   g _ = take-lead v c i q w s g
+  kids-lead v c (coldS _ _)      _ _ = tt₁
+  kids-lead v c (connS k o b)    g w = conn-lead v c k o b g w
   kids-lead v c (joinS _ _ () _) _
 
   -- A joiner with nothing queued, by its policy: the race's find leads.

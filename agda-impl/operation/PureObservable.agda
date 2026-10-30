@@ -110,12 +110,12 @@ module Driver (R : Set) where
     complete : Pos → Step
     drained  : Step
 
-  -- A leaf's turn: a completion owed is delivered; a leaf gone, torn
-  -- down or closed stops; else its frame's next value delivered, a stall
-  -- skipped, a close rekeying it to its next frame.
+  -- A leaf's turn: a leaf gone or torn down stops; a completion owed is
+  -- delivered; a closed leaf stops; else its frame's next value delivered,
+  -- a stall skipped, a close rekeying it to its next frame.
   played : Poke R → Step
   played gone = drained
-  played (leaf b (ending e) cl dv st) = silent (tick e) (dv cp over false e)
+  played (leaf true (ending e) cl dv st) = silent (tick e) (dv cp over false e)
   played (leaf false l cl dv st) = silent 0 (st over)
   played (leaf true l true dv st) = silent 0 (st over)
   played (leaf true (play τ u i t (emit a k)) false dv st) =
