@@ -326,6 +326,11 @@ private
       before nothing  q = true
       before (just c) q = q <ᵖ c
 
+  -- A node under a dead cut or lane: `adequacy.Bound.G` reads it with
+  -- its liveness off, so nothing is asked of its reading.
+  dead : Node → Node
+  dead (node π f b _) = node π f b nothing
+
   inbox : ∀ {A} → List (Pos × Machine.Ev A) → List (Row A)
   inbox []                  = []
   inbox ((q , nx a) ∷ ib)   = (q , out a) ∷ inbox ib
@@ -379,11 +384,11 @@ mutual
   listN u ρ π b (cutS true a s) with listS u ρ (π ++ [ 0 ]) b s
   ... | l , ns = "cut" , l , ns
   listN u ρ π b (cutS false a s) with listS u ρ (π ++ [ 0 ]) b s
-  ... | _ , ns = "cut" , just ([] ⊣ false) , ns
+  ... | _ , ns = "cut" , just ([] ⊣ false) , mapL dead ns
   listN u ρ π b (lnS true s) with listS u ρ (π ++ [ 0 ]) b s
   ... | l , ns = "lane" , l , ns
   listN u ρ π b (lnS false s) with listS u ρ (π ++ [ 0 ]) b s
-  ... | _ , ns = "lane" , just ([] ⊣ false) , ns
+  ... | _ , ns = "lane" , just ([] ⊣ false) , mapL dead ns
   listN u ρ π b (takeS i q w s) with listS u ρ (π ++ [ 0 ]) b s
   ... | l , ns = "take" , lift₁ (takeR i q w) l , ns
   listN u ρ π b (flatS op f d n q o ls) with listS u ρ (π ++ [ 0 ]) b o | listLs u ρ π b 1 ls
@@ -398,7 +403,7 @@ mutual
       parts : ∀ {B} → Maybe (Listed B) → String
       parts nothing   = ""
       parts (just β) = " [source " +++ showRows (mapL erase (rows σ)) +++ "| body " +++ showRows (mapL erase (rows β)) +++ "]"
-  listN u ρ π b (joinS j true x ib)  = "join" , just (let h = rejoin j (lookup ρ x) in (inbox ib ++ rows h) ⊣ short h) , []
+  listN u ρ π b (joinS j true x ib)  = "join [binder " +++ showRows (mapL erase (rows (lookup ρ x))) +++ "]" , just (let h = rejoin j (lookup ρ x) in (inbox ib ++ rows h) ⊣ short h) , []
   listN u ρ π b (joinS j false x ib) = "join" , just (inbox ib ⊣ false) , []
   listN u ρ π b _                    = "done" , just ([] ⊣ false) , []
 
