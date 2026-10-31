@@ -74,8 +74,9 @@ data Owe : Set where
 -- source's subscription (the body subscribed at `p`), the source's
 -- attach (subscribed at `p`), the source's teardown (the body completed
 -- at `p`); where the connect is subscribed, and where its source ended,
--- once closed.
-record CS : Set where
+-- once closed; and the source as it was given, which the run never reads
+-- (the binder's frozen entry, for a reader of the rows).
+record CS (Γ : List Set) (X : Set) : Set₁ where
   constructor cs
   field
     closed  : Bool
@@ -86,6 +87,7 @@ record CS : Set where
     owedAt  : Maybe Pos
     connAt  : Pos
     endAt   : Pos
+    src     : Obs C Γ X
 
 data St (Γ : List Set) : Set → Set₁ where
   -- a subscription owed, and where it will be made
@@ -106,7 +108,7 @@ data St (Γ : List Set) : Set → Set₁ where
   -- outer done, lanes running, the values waiting for a slot, the
   -- outer's switch, every lane begun (oldest first)
   flatS : ∀ {A B} → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → St Γ B
-  connS : ∀ {X B} → CS → St Γ X → St (X ∷ Γ) B → St Γ B
+  connS : ∀ {X B} → CS Γ X → St Γ X → St (X ∷ Γ) B → St Γ B
   -- joined at `p`, live, its binder, and what it has been fed and not
   -- yet shown, each at the position it is shown at, in order
   joinS : ∀ {A} → Pos → Bool → A ∈ Γ → List (Pos × Ev A) → St Γ A
@@ -130,8 +132,8 @@ data Ctx (R : Set) : List Set → Set → Set₁ where
   inTake  : ∀ {Γ A} → Bool → (A → Bool) → Owe → Ctx R Γ A → Ctx R Γ A
   inOuter : ∀ {Γ A B} → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → List (St Γ B) → Ctx R Γ B → Ctx R Γ A
   inLanes : ∀ {Γ A B} → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → List (St Γ B) → Ctx R Γ B → Ctx R Γ B
-  inSrc   : ∀ {Γ X B} → CS → St (X ∷ Γ) B → Ctx R Γ B → Ctx R Γ X
-  inBody  : ∀ {Γ X B} → CS → St Γ X → Ctx R Γ B → Ctx R (X ∷ Γ) B
+  inSrc   : ∀ {Γ X B} → CS Γ X → St (X ∷ Γ) B → Ctx R Γ B → Ctx R Γ X
+  inBody  : ∀ {Γ X B} → CS Γ X → St Γ X → Ctx R Γ B → Ctx R (X ∷ Γ) B
 
 plug : ∀ {R Γ A} → Ctx R Γ A → St Γ A → St [] R
 plug top                               s = s
@@ -492,7 +494,7 @@ begin c (takeWhile i q s) p = ok ⟨ inCut true (attAt p) (inTake i q free c) , 
 begin c (flatMap op f s)  p = ok ⟨ inCut true (attAt p) (inOuter op f false 0 [] [] c) , pend s p , subscribing , p ⟩
 -- the body under `ix 0`; its source, once the body's subscription
 -- exists, under `ix 1`
-begin c (connect s b)     p = ok ⟨ inBody (cs false true false (just p) nothing nothing p root) (pend s (p ⊕ [ ix 1 ])) c , pend b (p ⊕ [ ix 0 ]) , subscribing , p ⊕ [ ix 0 ] ⟩
+begin c (connect s b)     p = ok ⟨ inBody (cs false true false (just p) nothing nothing p root s) (pend s (p ⊕ [ ix 1 ])) c , pend b (p ⊕ [ ix 0 ]) , subscribing , p ⊕ [ ix 0 ] ⟩
 -- a joiner keeps where it joined; a completed subject owes it its end under `last`
 begin c (connected x)     p with closedUp c x
 ... | true  = ok ⟨ c , ofS 0 p [] , absorbed , p ⟩

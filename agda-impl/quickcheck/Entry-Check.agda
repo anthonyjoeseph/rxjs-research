@@ -9,7 +9,8 @@
 -- first listing of a path is its ENTRY; every later one must lie inside
 -- it.  A row outside is printed with the node's former, whether it sits
 -- under a connect's body (where the reading hangs on the source's current
--- rows), and the row's kind.
+-- rows), and the row's kind; a connect's former carries its source's and
+-- its body's rows, now and at its entry.
 --
 -- Values are erased to their kind, since a node's type is not one the
 -- harness can compare.  A listing cut short by a budget is skipped as an
@@ -33,7 +34,7 @@ open import IO.Primitive.Core using (_>>=_)
 open import IO.Primitive.Finite using (putStrLn)
 open import Relation.Nullary using (does)
 
-open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
+open import Tree using (Obs; connected; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline; ix; last; inside; _<ᵖ_; _≟ᵖ_; ofᴱ)
 open import denotation.EmissionSet using (Ev; out; skip; pin; end)
 open import operation.PureObservable using (module Machine; module Driver)
@@ -45,7 +46,7 @@ open import quickcheck.Code using (toObs; timeline)
 open import quickcheck.Trace using (depth)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Tabled using (Row; Listed; _⊣_; rows; short; bind; concatMap; mapM; when; anyᵇ; allᵇ; _≼ᵇ_; endBy; endBefore;
-                                     ends; properᵇ; values; count; fuel; walk; mapRows; rejoin; hotOf; past; afterL; lanes; listT;
+                                     ends; properᵇ; values; count; fuel; walk; mapRows; rejoin; past; afterL; lanes; listT;
                                      module Order; scanRows; takeRows; connRows)
 
 ------------------------------------------------------------------------
@@ -76,6 +77,10 @@ showKind kout     = "out"
 showKind kskip    = "skip"
 showKind kend     = "end"
 showKind (kpin r) = "pin " +++ showPos r
+
+showRows : List (Pos × Kind) → String
+showRows []             = ""
+showRows ((q , k) ∷ rs) = "(" +++ showPos q +++ " " +++ showKind k +++ ") " +++ showRows rs
 
 ------------------------------------------------------------------------
 -- A joiner part way through, listed: `Joining`'s rows, given its outer's
@@ -300,8 +305,31 @@ private
   noted π f b nothing  = node π f b nothing
   noted π f b (just l) = node π f b (just (mapL erase (rows l) , short l))
 
-  closedRows : ∀ {A} → CS → List (Row A)
+  closedRows : ∀ {Γ A} → CS Γ A → List (Row A)
   closedRows k = when (CS.closed k) (CS.endAt k , end)
+
+  -- A binder's rows: what its source still owes, and its end once closed,
+  -- each a row of the source's frozen entry `F` before that entry's end.
+  frozenHot : ∀ {Γ A} → CS Γ A → Listed A → Listed A → Listed A
+  frozenHot k F σ = concatMap (λ { (q , e) → when (properᵇ (rows F) q ∧ anyᵇ (λ { (q′ , _) → does (q′ ≟ᵖ q) }) (rows F)) (q , e) })
+                              (rows σ ++ closedRows k)
+                  ⊣ (short σ ∨ short F)
+
+  -- A connect's source rows as its echoes read them: its subscribe burst
+  -- always, any other row only while the source lives and before the
+  -- body's end the connect still owes.
+  gated : ∀ {Γ A} → CS Γ A → Listed A → Listed A
+  gated k σ = concatMap (λ { (q , e) → when (inside (CS.connAt k ++ [ ix 1 ]) q ∨ (CS.srcLive k ∧ before (CS.owedAt k) q)) (q , e) }) (rows σ)
+            ⊣ short σ
+    where
+      before : Maybe Pos → Pos → Bool
+      before nothing  q = true
+      before (just c) q = q <ᵖ c
+
+  -- A node under a dead cut or lane: `adequacy.Bound.G` reads it with
+  -- its liveness off, so nothing is asked of its reading.
+  dead : Node → Node
+  dead (node π f b _) = node π f b nothing
 
   inbox : ∀ {A} → List (Pos × Machine.Ev A) → List (Row A)
   inbox []                  = []
@@ -345,6 +373,7 @@ mutual
   ... | f , l , ns = l , noted π f b l ∷ ns
 
   listN : ∀ {Γ A} → ℕ → All Listed Γ → List ℕ → Bool → St Γ A → String × Maybe (Listed A) × List Node
+  listN u ρ π b (pend (connected x) p) = "pend [binder " +++ showRows (mapL erase (rows (lookup ρ x))) +++ "]" , listT u (connected x) ρ p , []
   listN u ρ π b (pend o p)      = "pend" , listT u o ρ p , []
   listN u ρ π b (coldS true l)  = "cold" , just (walk fuel (tapeE l)) , []
   listN u ρ π b (coldS false l) = "cold" , just ([] ⊣ false) , []
@@ -356,20 +385,26 @@ mutual
   listN u ρ π b (cutS true a s) with listS u ρ (π ++ [ 0 ]) b s
   ... | l , ns = "cut" , l , ns
   listN u ρ π b (cutS false a s) with listS u ρ (π ++ [ 0 ]) b s
-  ... | _ , ns = "cut" , just ([] ⊣ false) , ns
+  ... | _ , ns = "cut" , just ([] ⊣ false) , mapL dead ns
   listN u ρ π b (lnS true s) with listS u ρ (π ++ [ 0 ]) b s
   ... | l , ns = "lane" , l , ns
   listN u ρ π b (lnS false s) with listS u ρ (π ++ [ 0 ]) b s
-  ... | _ , ns = "lane" , just ([] ⊣ false) , ns
+  ... | _ , ns = "lane" , just ([] ⊣ false) , mapL dead ns
   listN u ρ π b (takeS i q w s) with listS u ρ (π ++ [ 0 ]) b s
   ... | l , ns = "take" , lift₁ (takeR i q w) l , ns
   listN u ρ π b (flatS op f d n q o ls) with listS u ρ (π ++ [ 0 ]) b o | listLs u ρ π b 1 ls
   ... | lo , no | lls , nls = opName op , bind lo (λ o′ → bind (allJust lls) λ Ls → joiner u ρ op f d n q o′ Ls) , no ++ nls
   listN u ρ π b (connS k o s) with listS u ρ (π ++ [ 0 ]) b o
   ... | nothing , no = "connect" , nothing , no
-  ... | just σ , no with listS u (hotOf ((rows σ ++ closedRows k) ⊣ short σ) ∷ ρ) (π ++ [ 1 ]) true s
-  ...   | lb , nb = "connect" , lift₁ (connRows (CS.connAt k) σ) lb , no ++ nb
-  listN u ρ π b (joinS j true x ib)  = "join" , just (let h = rejoin j (lookup ρ x) in (inbox ib ++ rows h) ⊣ short h) , []
+  ... | just σ , no with listT u (CS.src k) ρ (CS.connAt k ++ [ ix 1 ])
+  ...   | nothing = "connect" , nothing , no
+  ...   | just F with listS u (frozenHot k F σ ∷ ρ) (π ++ [ 1 ]) true s
+  ...     | lb , nb = "connect" +++ parts lb , lift₁ (connRows (CS.connAt k) (gated k σ)) lb , no ++ nb
+    where
+      parts : ∀ {B} → Maybe (Listed B) → String
+      parts nothing   = ""
+      parts (just β) = " [frozen " +++ showRows (mapL erase (rows F)) +++ "| source " +++ showRows (mapL erase (rows σ)) +++ "| closed " +++ showRows (mapL erase (closedRows k)) +++ "| body " +++ showRows (mapL erase (rows β)) +++ "]"
+  listN u ρ π b (joinS j true x ib)  = "join [binder " +++ showRows (mapL erase (rows (lookup ρ x))) +++ "]" , just (let h = rejoin j (lookup ρ x) in (inbox ib ++ rows h) ⊣ short h) , []
   listN u ρ π b (joinS j false x ib) = "join" , just (inbox ib ⊣ false) , []
   listN u ρ π b _                    = "done" , just ([] ⊣ false) , []
 
@@ -381,12 +416,14 @@ mutual
 ------------------------------------------------------------------------
 -- The run, checked
 
--- A finding: the step, the node, and its rows outside its entry.
+-- A finding: the step, the node, its former as read at its entry, and
+-- its rows outside that entry.
 record Finding : Set where
   constructor finding
   field
     at    : ℕ
     nd    : Node
+    was   : String
     extra : List (Pos × Kind)
 
 private
@@ -396,9 +433,9 @@ private
   samePath _        _        = false
 
   Entries : Set
-  Entries = List (List ℕ × List (Pos × Kind) × Bool)
+  Entries = List (List ℕ × String × List (Pos × Kind) × Bool)
 
-  entryOf : List ℕ → Entries → Maybe (List (Pos × Kind) × Bool)
+  entryOf : List ℕ → Entries → Maybe (String × List (Pos × Kind) × Bool)
   entryOf π []                  = nothing
   entryOf π ((π′ , e) ∷ es) = if samePath π π′ then just e else entryOf π es
 
@@ -411,11 +448,11 @@ private
   visit t (nd ∷ ns) es with Node.seen nd
   ... | nothing = visit t ns es
   ... | just (rs , sh) with entryOf (Node.path nd) es
-  ...   | nothing = visit t ns ((Node.path nd , rs , sh) ∷ es)
-  ...   | just (e , true) = visit t ns es
-  ...   | just (e , false) with outside e rs | visit t ns es
+  ...   | nothing = visit t ns ((Node.path nd , Node.former nd , rs , sh) ∷ es)
+  ...   | just (_ , e , true) = visit t ns es
+  ...   | just (w , e , false) with outside e rs | visit t ns es
   ...     | []    | es′ , fs = es′ , fs
-  ...     | x ∷ xs | es′ , fs = es′ , finding t nd (x ∷ xs) ∷ fs
+  ...     | x ∷ xs | es′ , fs = es′ , finding t nd w (x ∷ xs) ∷ fs
 
   settled : ∀ {R} → Conf R → Bool
   settled c with Conf.mode c
@@ -449,20 +486,20 @@ private
   showPath []       = ""
   showPath (i ∷ is) = showℕ i +++ "/" +++ showPath is
 
-  showRows : List (Pos × Kind) → String
-  showRows []             = ""
-  showRows ((q , k) ∷ rs) = "(" +++ showPos q +++ " " +++ showKind k +++ ") " +++ showRows rs
-
   showFinding : ℕ → Finding → String
-  showFinding seed (finding t nd xs) =
+  showFinding seed (finding t nd w xs) =
     "entry-check: FAIL seed " +++ showℕ seed +++ " step " +++ showℕ t +++ " node " +++ showPath (Node.path nd)
     +++ " " +++ Node.former nd +++ (if Node.body nd then " under-body" else " outside-body") +++ " rows " +++ showRows xs
-
+    +++ "\n    at entry: " +++ w
   report : List ℕ → ℕ → IO Unit
   report []          bad = putStrLn ("entry-check: done " +++ showℕ bad +++ " failing seeds")
   report (seed ∷ ss) bad with probe 400 seed
-  ... | []    = report ss bad
-  ... | f ∷ _ = putStrLn (showFinding seed f) >>= λ _ → report ss (suc bad)
+  ... | []     = report ss bad
+  ... | f ∷ fs = each (f ∷ fs) >>= λ _ → report ss (suc bad)
+    where
+      each : List Finding → IO Unit
+      each []       = putStrLn ""
+      each (x ∷ xs) = putStrLn (showFinding seed x) >>= λ _ → each xs
 
 main : IO Unit
 main = report (upTo 300) 0

@@ -16,13 +16,16 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### A SKIP READ ABOVE
 
-Suspect: `Anc` takes a joiner's `Rooted` at its frozen entry, but the
-settled-entry check grows a joiner's rows past that entry where a `sub`
-re-reads a live connect binder (11 of 300 seeds: connect, scan, map).
-Open: freezing the connect binder's source env at its entry. Settled by
-`anc-≈` as a body over that freeze, or a skip it cannot carry.
+Suspect: a joiner's `Join` read across a skip at `p`, with every lane
+after `p`, moves only by that skip, whether the skip lies in its outer or
+in the hole lane; a joiner's frozen `Rooted` must not grow past its entry.
+Open: a connect's frozen entry is read under an environment whose
+enclosing binders still gain their `Closed` end, so a joiner nested under
+an enclosing lane later reads an end its entry lacked (entry-check, one
+seed). Settled by bodies over `Rows.Flat`'s policy, an entry frozen over
+its binders' ends, or a joiner whose `Join` a lane after `p` changes.
 
-Members: `anc-≈`.
+Members: `join-≈-outer`, `join-≈-lane`.
 
 #### A RISEN OUTER VALUE'S ENTRY
 
@@ -50,6 +53,15 @@ an invariant `Good` does not yet state. Settled by a body, or a program whose
 body finds at or under a source row not yet fed.
 
 Members: `body-apart`.
+
+#### THE ECHO GATE SEARCHED
+
+Untried: a connect reads its source's echoes only while the source lives
+and before an owed body end; whether `G` keeps a dead source's rows
+inside its burst, and an owed end's mark ahead of every source row past
+it. Settled by bodies, or a search finding a source row the gate drops.
+
+Members: `conn-dead-okᶜ`, `conn-owed-okᶜ`.
 
 #### THE COLD STEPPED
 
@@ -87,12 +99,12 @@ Members: `sub-connect`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`,
 
 #### THE BINDER READ
 
-Believed: a good tree's connect source reads lawfully, its rows and its
-end one event a position, none under another. Open: a connect under a
-switched-off cut, whose `G` asks nothing of its source. Settled by a body,
-or a good tree whose dead connect's source rows clash.
+Believed: a subscribed connect's source was entered where its binders in
+scope are hot, as its `pend` was. Open: `G`'s connect node records no
+entry, so nothing carries it past the subscription. Settled by an entry
+on the node, or a good tree whose connect entered inadmissibly.
 
-Members: `src-lawful`.
+Members: `conn-ok`.
 
 #### A SKIP UNDER A CONNECT
 
@@ -101,7 +113,7 @@ the connect showing it a skip or a pin and each joiner a skip where it
 joined. Settled by a body, or a source skip that changes what the
 connect shows.
 
-Members: `src-vis`.
+Members: `src-vis`, `anc-≈-src`.
 
 #### AN OF IN A COMPLETED SOURCE
 
@@ -115,10 +127,10 @@ Members: `shut-of`, `shut-begin`.
 
 Untried: a good node's rows hold one event at a position, its binders'
 doing so: a merge's parts apart by `Rooted`, a connect's body and source
-echoes by world, a binder's rejoins by its source's. Settled by a body by
-former, or a good tree with two rows at a position.
+echoes by world, a connect's frozen source rows by its entry. Settled by
+a body by former, or a good tree with two rows at a position.
 
-Members: `rows-single`, `bind-single`.
+Members: `rows-single`, `frozen-single`.
 
 #### THE TAKE STEPPED
 

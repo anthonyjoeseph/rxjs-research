@@ -37,7 +37,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
-open import adequacy.Rows using (env; rows; pendRows; RT; toEv; Vis; Past; Lowest; Beyond; into; back; narrow; Plus; old; new;
+open import adequacy.Rows using (env; rows; pendRows; Echoing; RT; toEv; Vis; Past; Lowest; Beyond; into; back; narrow; Plus; old; new;
   _≃_; _⇄_; silent; shown; Steps; Shows*; Shows*-≃; ≃-sym; conv; []; _∷_; tau; val; fin)
 open import adequacy.Bound using (Good; G; Rooted; mergeG₀; OK)
 open import adequacy.Search using (seek-ok)
@@ -147,7 +147,7 @@ postulate
   -- under `ix 1` until the body's subscription exists.
   sub-connect : ∀ {R Γ A B} (c : Ctx R Γ B) (s : Obs Timeline Γ A) b q p
               → Sim ⟨ c , pend (connect s b) q , subscribing , p ⟩ []
-                    ⟨ inBody (cs false true false (just q) nothing nothing q root) (pend s (q ⊕ [ ix 1 ])) c , pend b (q ⊕ [ ix 0 ]) , subscribing , q ⊕ [ ix 0 ] ⟩
+                    ⟨ inBody (cs false true false (just q) nothing nothing q root s) (pend s (q ⊕ [ ix 1 ])) c , pend b (q ⊕ [ ix 0 ]) , subscribing , q ⊕ [ ix 0 ] ⟩
   -- A COLD ENTERED: its timeline read at the subscription, its tape
   -- begun there.
   sub-cold : ∀ {R Γ A} (c : Ctx R Γ A) (x : Timeline A) q p
@@ -329,10 +329,10 @@ postulate
                     → Sim ⟨ inOuter exhaustᶠ f d n q ls c , o , rising (nx a) , p ⟩ [] ⟨ c , flatS exhaustᶠ f d n q o ls , absorbed , p ⟩
 
   -- A SOURCE'S VALUE FEEDS ITS BODY.
-  rise-src-nx : ∀ {R Γ X B} (k : CS) (b : St (X ∷ Γ) B) (c : Ctx R Γ B) s a p
+  rise-src-nx : ∀ {R Γ X B} (k : CS Γ X) (b : St (X ∷ Γ) B) (c : Ctx R Γ B) s a p
               → Sim ⟨ inSrc k b c , s , rising (nx a) , p ⟩ [] ⟨ c , connS k s (feed (hd refl) p (nx a) b) , absorbed , p ⟩
   -- A SOURCE'S END FEEDS ITS BODY AND CLOSES ITS CONNECT.
-  rise-src-cp : ∀ {R Γ X B} (k : CS) (b : St (X ∷ Γ) B) (c : Ctx R Γ B) s p
+  rise-src-cp : ∀ {R Γ X B} (k : CS Γ X) (b : St (X ∷ Γ) B) (c : Ctx R Γ B) s p
               → Sim ⟨ inSrc k b c , s , rising cp , p ⟩ [] ⟨ c , connS (record k { closed = true ; endAt = p }) s (feed (hd refl) p cp b) , absorbed , p ⟩
   -- A BODY'S END IS ITS CONNECT'S, ITS SOURCE OWED A TEARDOWN THERE.
   -- False against `Inv` as it stands: `connect(of(1,2), h => empty)` ends
@@ -350,18 +350,18 @@ postulate
   --   an endless synchronous source still blocks a sibling; the pins
   --   carry that.  And a pin's `Dep` reaches only rows before its
   --   connect, so no row of the body's end can decide it.
-  rise-body-cp : ∀ {R Γ X B} (k : CS) (o : St Γ X) (c : Ctx R Γ B) s p
+  rise-body-cp : ∀ {R Γ X B} (k : CS Γ X) (o : St Γ X) (c : Ctx R Γ B) s p
                → Sim ⟨ inBody k o c , s , rising cp , p ⟩ [] ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
 
 -- A BODY'S VALUE IS ITS CONNECT'S.
-rise-body-nx : ∀ {R Γ X B} (k : CS) (o : St Γ X) (c : Ctx R Γ B) s x p
+rise-body-nx : ∀ {R Γ X B} (k : CS Γ X) (o : St Γ X) (c : Ctx R Γ B) s x p
              → Sim ⟨ inBody k o c , s , rising (nx x) , p ⟩ [] ⟨ c , connS k o s , rising (nx x) , p ⟩
 rise-body-nx k o c s x p i with alive s in al
 rise-body-nx k o c s x p (inv g (_ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
 rise-body-nx k o c s x p (inv (a@(gs , sp , tl , a₁) , g) (uc , (afs , lc) , _ , af , _)) | true =
-  inv (a′ , node-f c (connS k o s) a′ (gs , tr s (anc-liv (inBody k o c) a) g , sp , tl)) (uc , lc , tt , after-conn (CS.connAt k) (rows (env c) o) (rows (env (inBody k o c)) s) {p} afs af , tt)
+  inv (a′ , node-f c (connS k o s) a′ (gs , tr s (anc-liv (inBody k o c) a) g , sp , tl)) (uc , lc , tt , after-conn (CS.connAt k) (Echoing k (rows (env c) o)) (rows (env (inBody k o c)) s) {p} (λ {q} {e} r → afs {q} {e} (proj₁ r)) af , tt)
   , silent (vis-≃ (up-≃ c (conn-plus-nx (CS.connAt k) _ _ p x)))
-  where a′ = anc-≃ c (connS k o s) (conn-plus-nx (CS.connAt k) (rows (env c) o) (rows (env (inBody k o c)) s) p x) a₁
+  where a′ = anc-≃ c (connS k o s) (conn-plus-nx (CS.connAt k) (Echoing k (rows (env c) o)) (rows (env (inBody k o c)) s) p x) a₁
 
 rise-sim : ∀ {R Γ A} {k′ : Conf R} {sh t} (c : Ctx R Γ A) (s : St Γ A) e p → stepᴹ ⟨ c , s , rising e , p ⟩ ≡ moved k′ sh t → Sim ⟨ c , s , rising e , p ⟩ sh k′
 rise-sim top            s e p refl = rise-top s e p

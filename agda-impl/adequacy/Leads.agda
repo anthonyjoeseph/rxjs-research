@@ -191,7 +191,7 @@ LeadE (eLn e)                                     P = LeadE e P
 LeadE (eOuter {ls = ls} {c = c} e)                P = Each (After P) (rowsL (env c) ls) × LeadE e P
 LeadE (eLanes {o = o} {pre = pre} {post = post} {c = c} e) P =
   After P (rows (env c) o) × Each (After P) (rowsL (env c) pre) × Each (After P) (rowsL (env c) post) × LeadE e P
-LeadE (eSrc {k = k} {b = b} {c = c} e)            P = After P (rows (Hot ∅ k ∷ᴬ env c) b) × LeadE e P
+LeadE (eSrc {k = k} {b = b} {c = c} e)            P = After P (rows (Hot (env c) ∅ k ∷ᴬ env c) b) × LeadE e P
 LeadE (eBody {o = o} {c = c} e)                   P = After P (rows (env c) o) × LeadE e P
 
 lead-ext : ∀ {R Γ′ A′ Γ A} {c′ : Ctx R Γ′ A′} {c : Ctx R Γ A} (e : Ext c′ c) {P} → LeadE e P → LeadC c P → LeadC c′ P

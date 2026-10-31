@@ -14,7 +14,7 @@ open import Data.Nat using (ℕ; zero; suc)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Product using (_×_; _,_; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -64,7 +64,7 @@ LeadC (inTake i q w c)                               p = LeadT w p × LeadC c p
 LeadC (inOuter op f d n q ls c)                      p = Each (After p) (rowsL (env c) ls) × LeadC c p
 LeadC (inLanes op f d n q o pre post c)              p =
   After p (rows (env c) o) × Each (After p) (rowsL (env c) pre) × Each (After p) (rowsL (env c) post) × LeadC c p
-LeadC (inSrc k b c)                                  p = After p (rows (Hot ∅ k ∷ᴬ env c) b) × LeadC c p
+LeadC (inSrc k b c)                                  p = After p (rows (Hot (env c) ∅ k ∷ᴬ env c) b) × LeadC c p
 LeadC (inBody k o c)                                 p = After p (rows (env c) o) × LeadC c p
 LeadC _                                              p = ⊤
 
@@ -497,8 +497,8 @@ postulate
   -- as a skip or a pin under it, and every joiner fed it as a skip under
   -- where it joined, so what differs above is skips past `p` alone, and
   -- the frames above, every other part past `p`, end alike.
-  src-vis : ∀ {R Γ X B} (k : CS) (b : St (X ∷ Γ) B) (c : Ctx R Γ B) {t u : EmissionSet X} {p s}
-          → After p (rows (Hot ∅ k ∷ᴬ env c) b) → LeadC c p → p ≼ s → Since p t → Since p u → t ≈⟨ s ⟩ u
+  src-vis : ∀ {R Γ X B} (k : CS Γ X) (b : St (X ∷ Γ) B) (c : Ctx R Γ B) {t u : EmissionSet X} {p s}
+          → After p (rows (Hot (env c) ∅ k ∷ᴬ env c) b) → LeadC c p → p ≼ s → Since p t → Since p u → t ≈⟨ s ⟩ u
           → Vis (up (inSrc k b c) t) ≃ Vis (up (inSrc k b c) u)
 
 ------------------------------------------------------------------------
@@ -592,7 +592,9 @@ up-vis-at (inLanes exhaustᶠ f d n q o pre post c) {t} {u} (ao , apre , apost ,
     slu = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (su , after-since (rowsL ρ post) apost)
 up-vis-at (inSrc k b c)                            (ab , ld) ps st su eq = src-vis k b c ab ld ps st su eq
 up-vis-at (inBody k o c) {t} {u}                   (ao , ld) ps st su eq =
-  up-vis-at c ld ps (since-conn (CS.connAt k) _ t ao st) (since-conn (CS.connAt k) _ u ao su) (conn-≈ (CS.connAt k) _ eq)
+  up-vis-at c ld ps (since-conn (CS.connAt k) _ t ae st) (since-conn (CS.connAt k) _ u ae su) (conn-≈ (CS.connAt k) _ eq)
+  where
+    ae = λ {q} {e} r → ao {q} {e} (proj₁ r)
 
 -- A skip at the lead, unseen above.
 up-vis : ∀ {R Γ A} (c : Ctx R Γ A) {t u : EmissionSet A} {p} → LeadC c p → Since p t → Since p u → t ≈⟨ p ⟩ u → Vis (up c t) ≃ Vis (up c u)
