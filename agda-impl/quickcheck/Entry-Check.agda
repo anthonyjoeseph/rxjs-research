@@ -416,8 +416,9 @@ mutual
 ------------------------------------------------------------------------
 -- The run, checked
 
--- A finding: the step, the node, its former as read at its entry, and
--- its rows outside that entry.
+-- A finding: the step, the node, its former as read at its entry, its
+-- rows outside that entry, and each ancestor's path with its former now
+-- and at its entry.
 record Finding : Set where
   constructor finding
   field
@@ -425,6 +426,7 @@ record Finding : Set where
     nd    : Node
     was   : String
     extra : List (Pos × Kind)
+    above : List (List ℕ × String × String)
 
 private
   samePath : List ℕ → List ℕ → Bool
@@ -452,7 +454,25 @@ private
   ...   | just (_ , e , true) = visit t ns es
   ...   | just (w , e , false) with outside e rs | visit t ns es
   ...     | []    | es′ , fs = es′ , fs
-  ...     | x ∷ xs | es′ , fs = es′ , finding t nd w (x ∷ xs) ∷ fs
+  ...     | x ∷ xs | es′ , fs = es′ , finding t nd w (x ∷ xs) [] ∷ fs
+
+  -- Every proper prefix of a path, outermost first.
+  prefixes : List ℕ → List (List ℕ)
+  prefixes []       = []
+  prefixes (i ∷ is) = [] ∷ mapL (i ∷_) (prefixes is)
+
+  nowOf : List ℕ → List Node → String
+  nowOf π []        = "?"
+  nowOf π (nd ∷ ns) = if samePath π (Node.path nd) then Node.former nd else nowOf π ns
+
+  wasOf : List ℕ → Entries → String
+  wasOf π es with entryOf π es
+  ... | just (w , _) = w
+  ... | nothing      = "?"
+
+  -- A finding with its ancestors read off this tree and the entries.
+  traced : List Node → Entries → Finding → Finding
+  traced ns es (finding t nd w xs _) = finding t nd w xs (mapL (λ π → π , nowOf π ns , wasOf π es) (prefixes (Node.path nd)))
 
   settled : ∀ {R} → Conf R → Bool
   settled c with Conf.mode c
@@ -463,8 +483,11 @@ private
 
   check : ℕ → ℕ → ℕ → Entries → Conf ℕ → List Finding
   check u zero    t es c = []
-  check u (suc k) t es c = here (if settled c then visit t (proj₂ (listS u [] [] false (plug (Conf.ctx c) (Conf.foc c)))) es else es , [])
+  check u (suc k) t es c = here (if settled c then visit t ns es else es , [])
     where
+      ns : List Node
+      ns = proj₂ (listS u [] [] false (plug (Conf.ctx c) (Conf.foc c)))
+
       next : Entries → D.Step → List Finding
       next es′ (silent _ c′)    = check u k (suc t) es′ c′
       next es′ (value _ _ _ c′) = check u k (suc t) es′ c′
@@ -472,7 +495,7 @@ private
 
       here : Entries × List Finding → List Finding
       here (es′ , [])     = next es′ (step c)
-      here (es′ , f ∷ fs) = f ∷ fs
+      here (es′ , f ∷ fs) = mapL (traced ns es) (f ∷ fs)
 
 -- The first findings of a seed's program, the run read for `k` steps.
 probe : ℕ → ℕ → List Finding
@@ -487,10 +510,14 @@ private
   showPath (i ∷ is) = showℕ i +++ "/" +++ showPath is
 
   showFinding : ℕ → Finding → String
-  showFinding seed (finding t nd w xs) =
+  showFinding seed (finding t nd w xs up) =
     "entry-check: FAIL seed " +++ showℕ seed +++ " step " +++ showℕ t +++ " node " +++ showPath (Node.path nd)
     +++ " " +++ Node.former nd +++ (if Node.body nd then " under-body" else " outside-body") +++ " rows " +++ showRows xs
-    +++ "\n    at entry: " +++ w
+    +++ "\n    at entry: " +++ w +++ ancestors up
+    where
+      ancestors : List (List ℕ × String × String) → String
+      ancestors []                  = ""
+      ancestors ((π , n , e) ∷ as) = "\n    above " +++ showPath π +++ " now: " +++ n +++ "\n      at entry: " +++ e +++ ancestors as
   report : List ℕ → ℕ → IO Unit
   report []          bad = putStrLn ("entry-check: done " +++ showℕ bad +++ " failing seeds")
   report (seed ∷ ss) bad with probe 400 seed
