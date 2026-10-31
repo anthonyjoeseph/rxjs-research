@@ -18,7 +18,8 @@ open import operation.PureObservable using (PureObs; module Machine)
 open Machine using (load)
 open import denotation.Read using (Meets)
 open import adequacy.Rows using (Steps; conv)
-open import adequacy.Sim using (sound)
+open import adequacy.Simulation using (sound)
+open import adequacy.Dispatch using (cursor)
 open import adequacy.Complete using (complete)
 
 -- The rows a reader of `o`'s emission set, subscribed at the root, meets
@@ -34,4 +35,4 @@ Complete o = ∀ {rs} → Met o rs → Σ _ λ rs′ → Steps (load o) rs′ ×
 
 
 adequacy : ∀ {R} (o : PureObs [] R) → Sound o × Complete o
-adequacy o = (λ st → sound st) , complete o
+adequacy o = (λ st → sound (cursor o) st) , complete o (cursor o)

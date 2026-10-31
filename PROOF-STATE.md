@@ -14,122 +14,32 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### A SKIP READ ABOVE
+#### THE SEARCH UNDER THE CURSOR
 
-Suspect: a joiner's `Join` read across a skip at `p`, with every lane
-after `p`, moves only by that skip, whether the skip lies in its outer or
-in the hole lane; a joiner's frozen `Rooted` must not grow past its entry.
-The entry check finds no node outside its entry.  Settled by bodies over
-`Rows.Flat`'s policy, or a `Join` a lane after `p` changes.
+Untried: the least mark a search finds leads every row still owed, so
+the cursor moves to just before what it delivers; nothing found, nothing
+owed. The cursor probe found no fall before a row. Settled when each is a
+body over `Inv`'s frames.
 
-Members: `join-≈-outer`, `join-≈-lane`.
+Members: `search-least`, `search-none`, `search-quiet`, `found-mark`.
 
-#### A RISEN OUTER VALUE'S ENTRY
+#### THE JOINER STEPPED
 
-Riskiest: a begun lane shows rowless in the subscribing tree while the run
-reads its pending rows, and a joiner is not monotone, so `Anc` does not
-transfer to it; and the value's position must be no other lane's root.
-Settled by that transfer, or a value risen outside its entry.
+An outer's value or end and a lane's, each rising into `Joined`/`Begun`
+by its policy: a switch's kill, an exhaust's drop, a bounded queue.
+Open: whether `Hole` and `Whole` carry each policy's bookkeeping. Settled
+when each is a body.
 
-Members: `begin-good`, `begin-ok`.
-
-#### A CONNECT ENDED BEFORE ITS SOURCE
-
-Riskiest: `Inv` asks a rising end's node to be `Empty`, but a body ending
-before its source's burst leaves that burst owed as silent pins. Open:
-`Ends cp` over visible rows only, which a lane's end then reads. Settled
-when `≈` carries silent rows past `p` with `Truncate`'s reach intact.
-
-Members: `rise-body-cp`.
-
-#### THE CONNECT'S SEARCH
-
-Riskiest: how a connect's source rows and its body's sit against each
-other. Open: whether a body's find lies under no row its source still owes,
-an invariant `Good` does not yet state. Settled by a body, or a program whose
-body finds at or under a source row not yet fed.
-
-Members: `body-apart`.
-
-#### THE ECHO GATE SEARCHED
-
-Untried: a connect reads its source's echoes only while the source lives
-and before an owed body end; whether `G` keeps a dead source's rows
-inside its burst, and an owed end's mark ahead of every source row past
-it. Settled by bodies, or a search finding a source row the gate drops.
-
-Members: `conn-dead-okᶜ`, `conn-owed-okᶜ`.
-
-#### THE COLD STEPPED
-
-A cold entered at its timeline read where it subscribes, and each turn of
-its tape, keep `Inv`, and a burst's rows lie from its frame on. Open:
-whether a stall or a frame's close, a skip in its rows, moves nothing owed.
-Settled when each is a body.
-
-Members: `sub-cold`, `abs-leaf`, `burst-from`.
-
-#### THE JOINERS STEPPED
-
-Untried: a bounded merge, a switch or an exhaust part way through reads
-its begun lanes over off its live count, not off each lane's rows, and
-each entry, outer value and outer end keeps `Inv`; a lane's end, value and
-begin are each one step over the policy, a switch's begin excepted. Open: whether `Rows.BoundedF`'s schedule
-from begun lanes tracks the machine's queue, with a lane gone or handed
-on. Settled when each is a body, or a bounded merge whose freed slot the
-schedule reads wrong.
-
-Members: `bounded-ends-at`, `bounded-val-at`, `bounded-outer-at`,
-`rise-bounded-lane-hand`, `rise-switch-nx`, `rise-exhaust-drop`,
-`bounded-begin-at`, `exhaust-begin-at`, `rise-bounded-wait`.
+Members: `rise-outer-nx`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`, `sub-flat`.
 
 #### THE CONNECT STEPPED
 
-A connect entered, a joiner joined, a source's or body's rise, a
-connect's own mark run and a joiner's next, each one step keeping `Inv`.
-Open: whether `G`'s connect node (source held until subscribed, a
-completed source owing nothing, its entry `Ok` while live) is enough for
-each; a source's end must leave its rows `Empty`. Settled when each is a
-body.
+A connect entered, a joiner joined, a source's or body's rise, its own
+marks and a joiner's next, each keeping `Inv`. Open: whether `s-join`'s
+inbox split and the frozen source cover a body ending before its source.
+Settled when each is a body.
 
-Members: `sub-connect`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`,
-`abs-con`, `abs-join`.
-
-#### A SKIP UNDER A CONNECT
-
-Untried: a skip at a source past its lead is unseen above its connect,
-the connect showing it a skip or a pin and each joiner a skip where it
-joined. Settled by a body, or a source skip that changes what the
-connect shows.
-
-Members: `src-vis`, `anc-≈-src`.
-
-#### AN OF IN A COMPLETED SOURCE
-
-Untried: an of or an outer value in a source its connect has seen
-complete runs out silently, its rows reaching no row above. Settled by a
-body, or such a run that shows.
-
-Members: `shut-of`, `shut-begin`.
-
-#### ONE EVENT A POSITION
-
-Untried: a good node's rows hold one event at a position, its binders'
-doing so: a merge's parts apart by `Rooted`, a connect's body and source
-echoes by world, a connect's frozen source rows by its entry. Settled by
-a body by former, or a good tree with two rows at a position.
-
-Members: `rows-single`.
-
-#### THE TAKE STEPPED
-
-Open: a failing value turns a take's rows from `Truncate`d to `Stops`,
-which is not truncated, so its stop row needs a `Reach` over the source's
-rows before it that `Inv` does not carry; and a take's search leads its
-rows, its stop and its cut keep `Inv`. Settled by that `Reach`, a
-truncated `Stops`, or a failing take whose stop waits on rows unbounded.
-
-Members: `take-leadᶜ`, `rise-take-fail`, `abs-stop`, `abs-cut`.
+Members: `sub-conn`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`, `rise-body-nx`, `rise-body-cp`, `run-con`, `run-join-nx`, `run-join-cp`.
 
 #### THE SILENT RUN, FINITE
 
@@ -141,23 +51,27 @@ engine stalls silently forever before a row its emission set holds.
 
 Members: `clock-mono`, `still-finite`.
 
-#### THE MARK FOUND
+#### THE COLD STEPPED
 
-Untried: a good tree's search finds an of's next, an attach, a
-connect's own mark or a joiner's next; an attach moves nothing owed, and
-an outer's end shows only with no lane running (`adequacy.Sim`). Settled when each is a body.
+A cold entered at its timeline, and each turn of its tape, keep `Inv`.
+Open: whether a stall or a frame's close moves nothing owed. Settled when
+each is a body.
 
-Members: `found-mark`, `abs-att`.
+Members: `sub-cold`, `abs-leaf`.
 
-#### THE SUBSCRIPTIONS ENTERED
+#### THE FOLD AND THE TAKE
 
-Believed: subscribing to `empty` or `of` enters exactly the rows its
-emission set begins with, those rows placed behind every ancestor's parts
-so its merges stay apart and end last; a `defer` entered at an admissible
-subscription reads as its body one level down. Settled when each is a
-body.
+A scan's fold and a take's test, rising: `s-scan`'s `Folded` and the
+take's `OweAt` advance by one row. Settled when each is a body.
 
-Members: `sub-empty`, `sub-of`, `sub-defer`.
+Members: `rise-scan-nx`, `rise-scan-cp`, `rise-take-nx`, `rise-take-cp`, `sub-scan`, `sub-take`.
+
+#### THE ENTRIES
+
+Believed: a subscription's entry is its program's meaning there, and an
+of's next delivers its next row. Settled when each is a body.
+
+Members: `sub-empty`, `sub-of`, `sub-map`, `sub-defer`, `run-of-nx`, `run-of-end`, `run-of-closed`, `run-stop-closed`.
 
 ## Tier 1 — the simultaneous spec
 
