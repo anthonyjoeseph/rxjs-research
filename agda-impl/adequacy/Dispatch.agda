@@ -475,7 +475,7 @@ cursor : ∀ {R} (o : PureObs [] R) → Simulation o
 cursor {R} o = record
   { I   = λ k → Σ Cur λ C → Inv Rt C k
   ; T   = λ i → RT Rt (proj₁ i)
-  ; i₀  = origin , settled c-sub (f-top ≃-refl) (λ _ → s-pend tt ≃-refl)
+  ; i₀  = origin , settled c-sub (f-top ≃-refl) (λ _ → s-pend tt (tt , λ ()) tt ≃-refl)
   ; t₀  = (λ { ((x , v , _) , v′) → x , v′ }) ⇄ (λ { (x , v) → (x , v , tt) , v })
   ; tau = tau
   ; val = val
