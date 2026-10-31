@@ -303,6 +303,11 @@ rise-ln true  c s e p (inv ((ct , el , lp , a) , g) (uc , lc , _ , af , en)) | t
 -- likewise; a failing value shown or not as the take is inclusive, its
 -- completion owed after it; its source's end its own.  Once failed, the
 -- take absorbs whatever still reaches it.
+--
+-- DEAD ROUTE: a macro-step climbing the value to a settled state, the
+--   lead a local hypothesis of one climb lemma.  The stop row's `Reach`
+--   over the source's rows before it is in no frame the climb passes, so
+--   the climb owes the same fact this step does.
 postulate
   rise-take-fail : ∀ {R Γ A} i (w : A → Bool) (c : Ctx R Γ A) s a p → w a ≡ false
                  → Sim ⟨ inTake i w free c , s , rising (nx a) , p ⟩ []
@@ -350,6 +355,10 @@ postulate
   --   an endless synchronous source still blocks a sibling; the pins
   --   carry that.  And a pin's `Dep` reaches only rows before its
   --   connect, so no row of the body's end can decide it.
+  -- DEAD ROUTE: a macro-step with the rising lead dropped from `Inv`, the
+  --   lead a local hypothesis of one climb lemma.  That hypothesis states
+  --   the same `Ends cp`, so the silent pins block the climb as they block
+  --   this step.
   rise-body-cp : ∀ {R Γ X B} (k : CS Γ X) (o : St Γ X) (c : Ctx R Γ B) s p
                → Sim ⟨ inBody k o c , s , rising cp , p ⟩ [] ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
 
