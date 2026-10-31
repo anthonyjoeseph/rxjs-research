@@ -348,6 +348,12 @@ postulate
   -- its parts, so the frames above, read through the run, need not hold
   -- of the rowless reading.  And the value's position must be no other
   -- lane's root, which nothing yet records.
+  --
+  -- DEAD ROUTE: restated at a settled state, after a macro-step.  The
+  --   rowless lane is gone only once its subscription has run to rest, a
+  --   synchronous cascade of unbounded depth whose nested values begin
+  --   lanes of their own, so no single climb reaches it; and the lane-root
+  --   fact is missing at any state.
   begin-good : ∀ {R Γ A B} op (f : A → Obs Timeline Γ B) d n q ls (c : Ctx R Γ B) (o : St Γ A) a p
              → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ → closed c ≡ false → q ≡ []
              → Good [] (plug c (flatS op f d (suc n) q o (reverse ls ʳ++ lnS true (cutS true (attAt (p ++ [ ix 1 ])) doneS) ∷ [])))
