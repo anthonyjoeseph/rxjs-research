@@ -9,7 +9,8 @@
 -- first listing of a path is its ENTRY; every later one must lie inside
 -- it.  A row outside is printed with the node's former, whether it sits
 -- under a connect's body (where the reading hangs on the source's current
--- rows), and the row's kind.
+-- rows), and the row's kind; a connect's former carries its source's and
+-- its body's rows, now and at its entry.
 --
 -- Values are erased to their kind, since a node's type is not one the
 -- harness can compare.  A listing cut short by a budget is skipped as an
@@ -76,6 +77,10 @@ showKind kout     = "out"
 showKind kskip    = "skip"
 showKind kend     = "end"
 showKind (kpin r) = "pin " +++ showPos r
+
+showRows : List (Pos × Kind) → String
+showRows []             = ""
+showRows ((q , k) ∷ rs) = "(" +++ showPos q +++ " " +++ showKind k +++ ") " +++ showRows rs
 
 ------------------------------------------------------------------------
 -- A joiner part way through, listed: `Joining`'s rows, given its outer's
@@ -377,7 +382,11 @@ mutual
   ... | just σ , no with listT u (CS.src k) ρ (CS.connAt k ++ [ ix 1 ])
   ...   | nothing = "connect" , nothing , no
   ...   | just F with listS u (frozenHot k F σ ∷ ρ) (π ++ [ 1 ]) true s
-  ...     | lb , nb = "connect" , lift₁ (connRows (CS.connAt k) σ) lb , no ++ nb
+  ...     | lb , nb = "connect" +++ parts lb , lift₁ (connRows (CS.connAt k) σ) lb , no ++ nb
+    where
+      parts : ∀ {B} → Maybe (Listed B) → String
+      parts nothing   = ""
+      parts (just β) = " [source " +++ showRows (mapL erase (rows σ)) +++ "| body " +++ showRows (mapL erase (rows β)) +++ "]"
   listN u ρ π b (joinS j true x ib)  = "join" , just (let h = rejoin j (lookup ρ x) in (inbox ib ++ rows h) ⊣ short h) , []
   listN u ρ π b (joinS j false x ib) = "join" , just (inbox ib ⊣ false) , []
   listN u ρ π b _                    = "done" , just ([] ⊣ false) , []
@@ -390,12 +399,14 @@ mutual
 ------------------------------------------------------------------------
 -- The run, checked
 
--- A finding: the step, the node, and its rows outside its entry.
+-- A finding: the step, the node, its former as read at its entry, and
+-- its rows outside that entry.
 record Finding : Set where
   constructor finding
   field
     at    : ℕ
     nd    : Node
+    was   : String
     extra : List (Pos × Kind)
 
 private
@@ -405,9 +416,9 @@ private
   samePath _        _        = false
 
   Entries : Set
-  Entries = List (List ℕ × List (Pos × Kind) × Bool)
+  Entries = List (List ℕ × String × List (Pos × Kind) × Bool)
 
-  entryOf : List ℕ → Entries → Maybe (List (Pos × Kind) × Bool)
+  entryOf : List ℕ → Entries → Maybe (String × List (Pos × Kind) × Bool)
   entryOf π []                  = nothing
   entryOf π ((π′ , e) ∷ es) = if samePath π π′ then just e else entryOf π es
 
@@ -420,11 +431,11 @@ private
   visit t (nd ∷ ns) es with Node.seen nd
   ... | nothing = visit t ns es
   ... | just (rs , sh) with entryOf (Node.path nd) es
-  ...   | nothing = visit t ns ((Node.path nd , rs , sh) ∷ es)
-  ...   | just (e , true) = visit t ns es
-  ...   | just (e , false) with outside e rs | visit t ns es
+  ...   | nothing = visit t ns ((Node.path nd , Node.former nd , rs , sh) ∷ es)
+  ...   | just (_ , e , true) = visit t ns es
+  ...   | just (w , e , false) with outside e rs | visit t ns es
   ...     | []    | es′ , fs = es′ , fs
-  ...     | x ∷ xs | es′ , fs = es′ , finding t nd (x ∷ xs) ∷ fs
+  ...     | x ∷ xs | es′ , fs = es′ , finding t nd w (x ∷ xs) ∷ fs
 
   settled : ∀ {R} → Conf R → Bool
   settled c with Conf.mode c
@@ -458,15 +469,11 @@ private
   showPath []       = ""
   showPath (i ∷ is) = showℕ i +++ "/" +++ showPath is
 
-  showRows : List (Pos × Kind) → String
-  showRows []             = ""
-  showRows ((q , k) ∷ rs) = "(" +++ showPos q +++ " " +++ showKind k +++ ") " +++ showRows rs
-
   showFinding : ℕ → Finding → String
-  showFinding seed (finding t nd xs) =
+  showFinding seed (finding t nd w xs) =
     "entry-check: FAIL seed " +++ showℕ seed +++ " step " +++ showℕ t +++ " node " +++ showPath (Node.path nd)
     +++ " " +++ Node.former nd +++ (if Node.body nd then " under-body" else " outside-body") +++ " rows " +++ showRows xs
-
+    +++ "\n    at entry: " +++ w
   report : List ℕ → ℕ → IO Unit
   report []          bad = putStrLn ("entry-check: done " +++ showℕ bad +++ " failing seeds")
   report (seed ∷ ss) bad with probe 400 seed
