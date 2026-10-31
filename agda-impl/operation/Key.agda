@@ -8,12 +8,11 @@ module operation.Key where
 open import Data.Bool using (Bool; true; false; _∧_; _∨_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_)
-open import Data.Nat using (zero; suc)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (does; yes; no)
 
-open import denotation.Events using (Pos; Label; ix; sub; last; _<ᵖ_; _≟ˡ_; <ᵖ-trans; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-split; <ᵖ-part; <ᵖ-cons)
+open import denotation.Events using (Pos; Label; _<ᵖ_; _≟ˡ_; <ᵖ-trans; <ᵖ-irrefl; <ᵖ-split)
 
 data Key : Set where
   at    : Pos → Key
@@ -117,15 +116,8 @@ private
   none _ true  _ refl refl = refl
   none _ false _ refl refl = refl
 
-  same : ∀ u v w {r} → u ≡ false → v ≡ true → w ≡ r → u ∨ (v ∧ w) ≡ r
-  same _ _ _ refl refl refl = refl
-
   pick : ∀ u v w → u ≡ false → v ≡ true → u ∨ (v ∧ w) ≡ true → w ≡ true
   pick _ _ _ refl refl h = h
-
-  lex-[] : ∀ x → lex x [] ≡ false
-  lex-[] []      = refl
-  lex-[] (_ ∷ _) = refl
 
   lex-irrefl : ∀ x → lex x x ≡ false
   lex-irrefl []      = refl
@@ -170,33 +162,6 @@ private
   ...   | _                | inj₂ (inj₁ refl) = ⊥-elim (clash e h₁)
   ...   | inj₂ (inj₂ yx)   | inj₂ (inj₂ zy)   = ⊥-elim (clash (lex-trans x z x e (lex-trans z y x zy yx)) (lex-irrefl x))
 
-  -- `ix 0` is the least label.
-  least : ∀ b → [ b ] <ᵖ [ ix 0 ] ≡ false
-  least (ix zero)    = refl
-  least (ix (suc _)) = refl
-  least (sub _)      = refl
-  least last         = refl
-
-  lex-at : ∀ p q → lex (labs p) (labs q) ≡ p <ᵖ q
-  lex-at []      []      = refl
-  lex-at []      (_ ∷ _) = refl
-  lex-at (_ ∷ _) []      = refl
-  lex-at (a ∷ p) (b ∷ q) with xtri (lab a) (lab b)
-  ... | inj₁ ab          = trans (ok₁ _ _ ab) (sym (<ᵖ-part [] {a} {b} p q ab))
-  ... | inj₂ (inj₂ ba)   =
-    trans (nope _ _ _ (≺-asym (lab a) (lab b) ba) (≺→≠ (lab a) (lab b) ba)) (sym (<ᵖ-asym (b ∷ q) (a ∷ p) (<ᵖ-part [] {b} {a} q p ba)))
-  ... | inj₂ (inj₁ refl) = trans (same _ _ _ (≺-irrefl (lab a)) (≐-refl (lab a)) (lex-at p q)) (sym (<ᵖ-cons a p q))
-
-  lex-shift : ∀ q r → lex (labs q) (labs r ++ [ top ]) ≡ true → lex (labs r ++ [ top ]) (labs (q ++ [ ix 0 ])) ≡ false
-  lex-shift []      []      _ = refl
-  lex-shift []      (b ∷ r) _ = none _ _ _ (least b) (lex-[] (labs r ++ [ top ]))
-  lex-shift (_ ∷ _) []      _ = refl
-  lex-shift (a ∷ q) (b ∷ r) h with xtri (lab a) (lab b)
-  ... | inj₁ ab          = nope _ _ _ (≺-asym (lab b) (lab a) ab) (≺→≠ (lab b) (lab a) ab)
-  ... | inj₂ (inj₁ refl) = none _ _ _ (≺-irrefl (lab a)) (lex-shift q r (pick _ _ _ (≺-irrefl (lab a)) (≐-refl (lab a)) h))
-  ... | inj₂ (inj₂ ba)   = ⊥-elim (clash h (nope _ _ _ (≺-asym (lab a) (lab b) ba) (≺→≠ (lab a) (lab b) ba)))
-
 -- Neither strictly before the next, twice: not strictly before the last.
 ≮ᴷ-trans : ∀ a b c → a <ᴷ b ≡ false → b <ᴷ c ≡ false → a <ᴷ c ≡ false
 ≮ᴷ-trans a b c = lex-≮ (ext a) (ext b) (ext c)
-

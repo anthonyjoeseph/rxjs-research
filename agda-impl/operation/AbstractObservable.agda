@@ -360,11 +360,6 @@ data Out (A : Set) : Set where
 Cand : Set → Set → Set₁
 Cand R A = Found R × Key × Out A
 
--- Just past a position: its `ix 0`.  Nothing lies strictly between.
-shift : Key → Key
-shift (at p)    = at (p ⊕ [ ix 0 ])
-shift (after p) = after p
-
 -- The earlier; the first on a tie.
 first : ∀ {R A} → Maybe (Cand R A) → Maybe (Cand R A) → Maybe (Cand R A)
 first nothing             y                     = y
@@ -406,24 +401,24 @@ scanT f z h still          = h , still
 cutT : ∀ {A} → Bool → Key → Out A → Key × Out A
 cutT l h o = h , (if l then o else still)
 
--- A failing value: inclusive, shown just past; else dropped, the end owed.
+-- A failing value: inclusive, shown; else dropped, the end owed.
 takeT : ∀ {A} → Bool → (A → Bool) → Owe → Key → Out A → Key × Out A
-takeT i q free h (shows (nx a)) = if q a then (h , shows (nx a)) else (if i then (shift h , shows (nx a)) else (h , still))
+takeT i q free h (shows (nx a)) = h , (if q a ∨ i then shows (nx a) else still)
 takeT i q free h o              = h , o
 takeT i q w    h o              = h , still
 
--- The outer's value is a skip just past it; its end ends the flatMap
--- only with nothing running or waiting; its skip stays where it is.
+-- The outer's value shows nothing; its end ends the flatMap only with
+-- nothing running or waiting.
 outerT : ∀ {A B : Set} → ℕ → List A → Key → Out A → Key × Out B
 outerT n q h (shows cp) = h , (if (n ≡ᵇ 0) ∧ null q then shows cp else still)
-outerT n q h (shows (nx a)) = shift h , still
+outerT n q h (shows (nx a)) = h , still
 outerT n q h still          = h , still
 
--- A lane's end: a skip just past it when a value waits, else the
--- flatMap's end once nothing else runs.
+-- A lane's end: nothing when a value waits, else the flatMap's end once
+-- nothing else runs.
 laneT : ∀ {A B : Set} → Bool → ℕ → List A → Key → Out B → Key × Out B
 laneT d n []      h (shows cp) = h , (if d ∧ (pred n ≡ᵇ 0) then shows cp else still)
-laneT d n (_ ∷ _) h (shows cp) = shift h , still
+laneT d n (_ ∷ _) h (shows cp) = h , still
 laneT d n q       h o          = h , o
 
 -- The outer only strictly before the earliest lane, each by its own
@@ -434,11 +429,12 @@ raceT d n q nothing            (just (g , k , o′))  = just (g , laneT d n q k 
 raceT d n q (just (f , h , o)) nothing              = just (f , outerT n q h o)
 raceT d n q (just (f , h , o)) (just (g , k , o′))  = if h <ᴷ k then just (f , outerT n q h o) else just (g , laneT d n q k o′)
 
--- The source only strictly before the body, a skip just past its event.
+-- The source only strictly before the body, showing nothing; every key
+-- raced as its own mark has it, so the least found is the least owned.
 sourceT : ∀ {R A B} → Maybe (Cand R A) → Maybe (Cand R B) → Maybe (Cand R B)
 sourceT nothing            b                    = b
-sourceT (just (f , h , o)) nothing              = just (f , shift h , still)
-sourceT (just (f , h , o)) (just (g , k , o′))  = if shift h <ᴷ k then just (f , shift h , still) else just (g , k , o′)
+sourceT (just (f , h , o)) nothing              = just (f , h , still)
+sourceT (just (f , h , o)) (just (g , k , o′))  = if h <ᴷ k then just (f , h , still) else just (g , k , o′)
 
 -- The mark the stepper races first under the hole, a node's own before
 -- its children on a tie.
