@@ -105,6 +105,28 @@ jobs:
       - name: make bug-cache
         run: make bug-cache
 
+  # A PROBE, not a gate: every node's reading stays inside the one it
+  # entered with.  Informational while the design question is open.
+  entry-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Agda
+        uses: ./.github/actions/agda-toolchain
+
+      - name: Cache compiled MAlonzo objects
+        uses: actions/cache@v4
+        with:
+          path: agda-impl/_cli/MAlonzo
+          key: agda-cli-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
+
+      - name: make entry-check
+        run: make entry-check
+
   # The oracle: every drawn program, on all three Agda engines,
   # gives the trace real rxjs does.
   oracle:

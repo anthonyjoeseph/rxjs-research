@@ -31,7 +31,7 @@ open import denotation.EmissionSet using (out; skip; end; EmissionSet; Den; Afte
 open import denotation.Laws.Nth using (module Nths)
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled using (Row; Listed; rows; short; concatMap; mapM; anyᵇ; endBy; values; outerRow; _≼ᵇ_;
-  module BoundedL; module Order)
+  count; module BoundedL; module Order)
 open import quickcheck.Tabled.Exact.Base
   using (Exact; Exactly; sound; complete; fromT; fromNot; offT; not-T; T-not; ∨-false; ∧-true; ∧-intro; off; or-of; or-right;
   ≟-refl; ≟-true; any⁻; any⁺; any-off; all⁻; all⁺; single⁻; when⁻; when⁺; if⁻; if-t; if-f; cm⁻; cm⁺; bind⁻; mapM⁻; mapM⁺;
@@ -49,7 +49,7 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
   open Tb.Values t using (Nth)
   open Nths t using (nth-val; nth-at; nth-inj)
   open BoundedL n ln o
-    using (vals; count; starts; Entry; laneAt; entry; laneEnds; entryEnds; endsOf; levels; done; laneRow; boundedRows)
+    using (vals; starts; Entry; laneAt; entry; laneEnds; entryEnds; endsOf; levels; done; laneRow; boundedRows)
     renaming (queued to queuedᵇ)
   open Order vals using (nths)
 

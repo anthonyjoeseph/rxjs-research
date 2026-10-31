@@ -1,4 +1,4 @@
-.PHONY: all help agda gate gate-cheap bug-cache oracle oracle-build bg bg-check bg-wait \
+.PHONY: all help agda gate gate-cheap bug-cache entry-check oracle oracle-build bg bg-check bg-wait \
         wiring wiring-gate wiring-selftest unsafe-check dup-check dup-selftest \
         imports-check imports-fix imports-selftest comments-check comments-selftest \
         roadmap-check roadmap-selftest find find-prose postulates notify split \
@@ -40,6 +40,7 @@ help:
 	@echo "  agda          typecheck $(SRC)/Main.agda — everything Main reaches"
 	@echo "  check         typecheck one module and what IT imports:  make check F=simultaneous/Statement.agda"
 	@echo "  bug-cache     compile the bug cache's runner and run every row"
+	@echo "  entry-check   probe: every node's reading stays inside its entry (CI only)"
 	@echo "  oracle        the three Agda engines against real rxjs (typescript/ drives it)"
 	@echo "  postulates    every postulate in $(SRC) by name — the work ledger"
 	@echo "  find          search the declared TYPE of every statement:  make find Q='⊑ lub'"
@@ -123,6 +124,23 @@ bug-cache: $(BUG_CACHE_BIN)
 	  if echo "$$out" | grep -q '^bug-cache: FAIL '; then \
 	    echo "bug-cache: RED — a known counterexample still fails"; exit 1; fi; \
 	  echo "bug-cache: GREEN"
+
+# THE SETTLED-ENTRY PROBE: every node's reading, at every settled step of
+# the pure run, inside the reading it entered with.  A probe gathering
+# evidence for a design question, run in CI only, never in the gate.
+ENTRY_BIN := $(SRC)/_cli/Entry-Check
+
+$(ENTRY_BIN): $(AGDA_SRC)
+	@cd $(SRC) && $(AGDA) --compile --compile-dir=_cli quickcheck/Entry-Check.agda
+	@touch $@
+
+entry-check: $(ENTRY_BIN)
+	@out=$$($(ENTRY_BIN)); echo "$$out"; \
+	  echo "$$out" | grep -q '^entry-check: done ' \
+	    || { echo "entry-check: RED — the probe never reached its closing line"; exit 1; }; \
+	  if echo "$$out" | grep -q '^entry-check: FAIL '; then \
+	    echo "entry-check: RED — a reading grew past its entry"; exit 1; fi; \
+	  echo "entry-check: GREEN"
 
 # The wiring law's mechanised check (see CLAUDE.md, "the wiring law: NEVER
 # LEAVE A PROOF HANGING").  Pure textual analysis of the tree, no Agda
