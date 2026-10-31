@@ -45,6 +45,8 @@ open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
 open import adequacy.Skip using (After; after-conn)
 open import adequacy.Inv using (Inv; inv; good; Sim; Ends; open-alive; anc-liv; node-f; ln-f; tr)
 open import adequacy.Above using (anc-≃)
+open import adequacy.RiseScan using (rise-scan-nx; rise-scan-cp)
+open import adequacy.RiseTake using (rise-take-nx; rise-take-cp; rise-take-owed)
 open import adequacy.LaneCp using (rise-lane-cp; rise-switch-lane-cp; rise-exhaust-lane-cp; rise-bounded-lane-cp)
 open import adequacy.OuterCp using (rise-outer-cp; rise-bounded-cp; rise-switch-cp; rise-exhaust-cp)
 open import adequacy.LaneNx using (rise-lane-nx; rise-bounded-lane-nx; rise-switch-lane-nx; rise-exhaust-lane-nx)
@@ -297,26 +299,14 @@ rise-ln true  c s e p (inv g (_ , _ , op , _)) | false = ⊥-elim (open-alive s 
 rise-ln true  c s e p (inv ((ct , el , lp , a) , g) (uc , lc , _ , af , en)) | true =
   inv (a , ln-f c s ct lp (λ ce r → el (old ce) (old r)) g (anc-liv c a)) (uc , lc , tt , af , en) , silent ≃-refl
 
--- A SCAN'S VALUE FOLDED: the source's least value leaves as the fold of
--- it, and the rest of the source's rows fold from there.
-postulate
-  rise-scan-nx : ∀ {R Γ A B} (f : B → A → B) z (c : Ctx R Γ B) s a p → Sim ⟨ inScan f z c , s , rising (nx a) , p ⟩ [] ⟨ c , scanS f (f z a) s , rising (nx (f z a)) , p ⟩
-  rise-scan-cp : ∀ {R Γ A B} (f : B → A → B) z (c : Ctx R Γ B) s p → Sim ⟨ inScan f z c , s , rising cp , p ⟩ [] ⟨ c , scanS f z s , rising cp , p ⟩
-
 -- A TAKE'S VALUE: kept while it passes, the source's rows past it taken
 -- likewise; a failing value shown or not as the take is inclusive, its
 -- completion owed after it; its source's end its own.  Once failed, the
 -- take absorbs whatever still reaches it.
 postulate
-  rise-take-nx   : ∀ {R Γ A} i (w : A → Bool) (c : Ctx R Γ A) s a p → w a ≡ true
-                 → Sim ⟨ inTake i w free c , s , rising (nx a) , p ⟩ [] ⟨ c , takeS i w free s , rising (nx a) , p ⟩
   rise-take-fail : ∀ {R Γ A} i (w : A → Bool) (c : Ctx R Γ A) s a p → w a ≡ false
                  → Sim ⟨ inTake i w free c , s , rising (nx a) , p ⟩ []
                        (if i then ⟨ c , takeS i w (cpAt p) s , rising (nx a) , p ⊕ [ ix 0 ] ⟩ else ⟨ c , takeS i w (cpAt p) s , absorbed , p ⟩)
-  rise-take-cp   : ∀ {R Γ A} i (w : A → Bool) (c : Ctx R Γ A) s p
-                 → Sim ⟨ inTake i w free c , s , rising cp , p ⟩ [] ⟨ c , takeS i w free s , rising cp , p ⟩
-  rise-take-owed : ∀ {R Γ A} i (w : A → Bool) o (c : Ctx R Γ A) s e p → (o ≡ free → ⊥)
-                 → Sim ⟨ inTake i w o c , s , rising e , p ⟩ [] ⟨ c , takeS i w o s , absorbed , p ⟩
 
 postulate
   -- A BOUNDED MERGE'S LANE END FREES ITS SLOT FOR THE FIRST WAITING VALUE.

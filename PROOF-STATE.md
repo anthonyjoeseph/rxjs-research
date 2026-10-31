@@ -42,15 +42,6 @@ when `≈` carries silent rows past `p` with `Truncate`'s reach intact.
 
 Members: `rise-body-cp`.
 
-#### A DONE JOINER RISEN AGAIN
-
-Refuted against `Inv` as it stands: a joiner done with no lane live and
-none waiting has risen its end, yet nothing stops its outer rising one.
-Open: an invariant tying a done joiner to a closed or spent frame above.
-Settled by that invariant, or a program whose done joiner's outer ends.
-
-Members: `rise-joiner-cp-spent`.
-
 #### THE CONNECT'S SEARCH
 
 Riskiest: how a connect's source rows and its body's sit against each
@@ -129,21 +120,15 @@ former, or a good tree with two rows at a position.
 
 Members: `rows-single`, `bind-single`.
 
-#### THE SCAN STEPPED
-
-Untried: a scan's rising value is its source's least, so the fold of it
-leads the scanned rows and the rest fold from it; an end rises unfolded.
-Settled when each is a body over `denotation.EmissionSet`'s `Scan.Acc`.
-
-Members: `rise-scan-nx`, `rise-scan-cp`.
-
 #### THE TAKE STEPPED
 
-Untried: a take's search leads its rows; a value passing or failing,
-its end, its stop and its cut keep `Inv`. Settled when each is a body.
+Open: a failing value turns a take's rows from `Truncate`d to `Stops`,
+which is not truncated, so its stop row needs a `Reach` over the source's
+rows before it that `Inv` does not carry; and a take's search leads its
+rows, its stop and its cut keep `Inv`. Settled by that `Reach`, a
+truncated `Stops`, or a failing take whose stop waits on rows unbounded.
 
-Members: `take-leadᶜ`, `rise-take-nx`, `rise-take-fail`,
-`rise-take-cp`, `rise-take-owed`, `abs-stop`, `abs-cut`.
+Members: `take-leadᶜ`, `rise-take-fail`, `abs-stop`, `abs-cut`.
 
 #### THE SILENT RUN, FINITE
 

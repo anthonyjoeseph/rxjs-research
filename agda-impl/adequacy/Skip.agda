@@ -404,16 +404,16 @@ kept-≈ {A} p₀ {p = p} eq = go (fwd eq) ⇆ go (bwd eq)
     ... | inj₁ x′       = inj₁ (kept x′ np ins)
     ... | inj₂ (_ , ())
 
+since-takeT : ∀ {A} i (q : A → Bool) {t : EmissionSet A} {p} → Since p t → Since p (TakeWhile.TakeT i q t)
+since-takeT i q {p = p} s (TakeWhile.pass x _ _)           = s x
+since-takeT i q {p = p} s (TakeWhile.fail {k} {a} x _ _ _) = ≺→≼ {p} {k ++ [ ix 0 ]} (≼-≺-≺ {p} {k} {k ++ [ ix 0 ]} (s {k} {out a} x) (≺-ext k []))
+since-takeT i q {p = p} s (TakeWhile.stop {k} {a} x _ _)   = ≺→≼ {p} {k ++ [ last ]} (≼-≺-≺ {p} {k} {k ++ [ last ]} (s {k} {out a} x) (≺-ext k []))
+since-takeT i q {p = p} s (TakeWhile.step x _)             = s x
+since-takeT i q {p = p} s (TakeWhile.tend x _)             = s x
+since-takeT i q {p = p} s (TakeWhile.left x _ _)           = s x
+
 since-take : ∀ {A} i (q : A → Bool) w {t : EmissionSet A} {p} → LeadT w p → Since p t → Since p (TakeR i q w t)
-since-take i q free {t} {p} _ s (r , _) = go r
-  where
-    go : ∀ {k e} → TakeWhile.TakeT i q t k e → p ≼ k
-    go (TakeWhile.pass x _ _)             = s x
-    go (TakeWhile.fail {k} {a} x _ _ _)   = ≺→≼ {p} {k ++ [ ix 0 ]} (≼-≺-≺ {p} {k} {k ++ [ ix 0 ]} (s {k} {out a} x) (≺-ext k []))
-    go (TakeWhile.stop {k} {a} x _ _)     = ≺→≼ {p} {k ++ [ last ]} (≼-≺-≺ {p} {k} {k ++ [ last ]} (s {k} {out a} x) (≺-ext k []))
-    go (TakeWhile.step x _)               = s x
-    go (TakeWhile.tend x _)               = s x
-    go (TakeWhile.left x _ _)             = s x
+since-take i q free _ s (r , _) = since-takeT i q s r
 since-take i q (cpAt p₀)  lt s stop                 = lt
 since-take i q (cpAt p₀)  lt s (left (kept x _ _))  = s x
 since-take i q (cutAt p₀) lt s (kept x _ _)         = s x
