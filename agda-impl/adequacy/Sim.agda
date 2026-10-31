@@ -43,7 +43,7 @@ open import adequacy.Bound using (Good; G; Rooted; mergeG₀; OK)
 open import adequacy.Search using (seek-ok)
 open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
 open import adequacy.Skip using (After; after-conn)
-open import adequacy.Inv using (Inv; inv; good; Sim; Ends; open-alive; anc-liv; node-f; ln-f; tr)
+open import adequacy.Inv using (Inv; inv; good; Sim; Ends; open-alive; upo-liv; anc-liv; node-f; ln-f; tr)
 open import adequacy.Above using (anc-≃)
 open import adequacy.RiseScan using (rise-scan-nx; rise-scan-cp)
 open import adequacy.RiseTake using (rise-take-nx; rise-take-cp; rise-take-owed)
@@ -96,7 +96,7 @@ sub-merge {A = A} {B} c f s q p (inv g (uc , ok)) = inv (good-swap c sw g) (uc ,
   where
     -- The outer about to enter at `p`: inside its own entry, nothing begun.
     rt : Rooted (rows (env c) (cutS true (attAt q) doneS)) []
-    rt = record { H = Hots (env c) ; X = pendRows (env c) s q ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c g) q ok ; sub = λ () ; qs = [] ; roots = tt }
+    rt = record { H = Hots (env c) ; X = pendRows (env c) s q ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c (upo-liv c uc) g) q ok ; sub = λ () ; qs = [] ; roots = tt }
     node′ : ∀ v → G (env c) v (doneS {A = B}) → G (env c) v (flatS (mergeᶠ nothing) f false 0 [] (cutS true (attAt q) (doneS {A = A})) [])
     node′ true  _ = record { outer = tt₁ ; lanesG = tt₁ ; fresh = refl ; count = refl ; spent = λ () ; rooted = rt }
     node′ false _ = mergeG₀ tt₁ tt₁ refl
@@ -109,7 +109,7 @@ sub-bounded : ∀ {R Γ A B} (c : Ctx R Γ B) m (f : A → Obs Timeline Γ B) (s
 sub-bounded {A = A} {B} c m f s q p (inv g (uc , ok)) = inv (good-swap c sw g) (uc , ok) , silent (vis-≃ (up-≃ c (enter-bounded (env c) m f s q)))
   where
     rt : Rooted (rows (env c) (cutS true (attAt q) doneS)) []
-    rt = record { H = Hots (env c) ; X = pendRows (env c) s q ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c g) q ok ; sub = λ () ; qs = [] ; roots = tt }
+    rt = record { H = Hots (env c) ; X = pendRows (env c) s q ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c (upo-liv c uc) g) q ok ; sub = λ () ; qs = [] ; roots = tt }
     node′ : ∀ v → G (env c) v (doneS {A = B}) → G (env c) v (flatS (mergeᶠ (just m)) f false 0 [] (cutS true (attAt q) (doneS {A = A})) [])
     node′ true  _ = (record { outer = tt₁ ; lanesG = tt₁ ; fresh = refl ; count = refl ; spent = λ () ; rooted = rt } , inj₁ refl)
     node′ false _ = (mergeG₀ tt₁ tt₁ refl , tt)
@@ -122,7 +122,7 @@ sub-switch : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) (s : 
 sub-switch {A = A} {B} c f s q p (inv g (uc , ok)) = inv (good-swap c sw g) (uc , ok) , silent (vis-≃ (up-≃ c (enter-switch (env c) f s q)))
   where
     rt : Rooted (rows (env c) (cutS true (attAt q) doneS)) []
-    rt = record { H = Hots (env c) ; X = pendRows (env c) s q ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c g) q ok ; sub = λ () ; qs = [] ; roots = tt }
+    rt = record { H = Hots (env c) ; X = pendRows (env c) s q ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c (upo-liv c uc) g) q ok ; sub = λ () ; qs = [] ; roots = tt }
     node′ : ∀ v → G (env c) v (doneS {A = B}) → G (env c) v (flatS switchᶠ f false 0 [] (cutS true (attAt q) (doneS {A = A})) [])
     node′ true  _ = record { outer = tt₁ ; lanesG = tt₁ ; fresh = refl ; count = refl ; spent = λ () ; rooted = rt }
     node′ false _ = mergeG₀ tt₁ tt₁ refl
@@ -135,7 +135,7 @@ sub-exhaust : ∀ {R Γ A B} (c : Ctx R Γ B) (f : A → Obs Timeline Γ B) (s :
 sub-exhaust {A = A} {B} c f s q p (inv g (uc , ok)) = inv (good-swap c sw g) (uc , ok) , silent (vis-≃ (up-≃ c (enter-exhaust (env c) f s q)))
   where
     rt : Rooted (rows (env c) (cutS true (attAt q) doneS)) []
-    rt = record { H = Hots (env c) ; X = pendRows (env c) s q ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c g) q ok ; sub = λ () ; qs = [] ; roots = tt }
+    rt = record { H = Hots (env c) ; X = pendRows (env c) s q ; p₀ = q ; inv = inv-⟦⟧ s (env c) (env-good c (upo-liv c uc) g) q ok ; sub = λ () ; qs = [] ; roots = tt }
     node′ : ∀ v → G (env c) v (doneS {A = B}) → G (env c) v (flatS exhaustᶠ f false 0 [] (cutS true (attAt q) (doneS {A = A})) [])
     node′ true  _ = record { outer = tt₁ ; lanesG = tt₁ ; fresh = refl ; count = refl ; spent = λ () ; rooted = rt }
     node′ false _ = mergeG₀ tt₁ tt₁ refl
@@ -358,8 +358,8 @@ rise-body-nx : ∀ {R Γ X B} (k : CS Γ X) (o : St Γ X) (c : Ctx R Γ B) s x p
              → Sim ⟨ inBody k o c , s , rising (nx x) , p ⟩ [] ⟨ c , connS k o s , rising (nx x) , p ⟩
 rise-body-nx k o c s x p i with alive s in al
 rise-body-nx k o c s x p (inv g (_ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
-rise-body-nx k o c s x p (inv (a@(gs , sp , tl , a₁) , g) (uc , (afs , lc) , _ , af , _)) | true =
-  inv (a′ , node-f c (connS k o s) a′ (gs , tr s (anc-liv (inBody k o c) a) g , sp , tl)) (uc , lc , tt , after-conn (CS.connAt k) (Echoing k (rows (env c) o)) (rows (env (inBody k o c)) s) {p} (λ {q} {e} r → afs {q} {e} (proj₁ r)) af , tt)
+rise-body-nx k o c s x p (inv (a@(gs , sp , tl , ok , a₁) , g) (uc , (afs , lc) , _ , af , _)) | true =
+  inv (a′ , node-f c (connS k o s) a′ (gs , tr s (anc-liv (inBody k o c) a) g , sp , tl , ok)) (uc , lc , tt , after-conn (CS.connAt k) (Echoing k (rows (env c) o)) (rows (env (inBody k o c)) s) {p} (λ {q} {e} r → afs {q} {e} (proj₁ r)) af , tt)
   , silent (vis-≃ (up-≃ c (conn-plus-nx (CS.connAt k) _ _ p x)))
   where a′ = anc-≃ c (connS k o s) (conn-plus-nx (CS.connAt k) (Echoing k (rows (env c) o)) (rows (env (inBody k o c)) s) p x) a₁
 

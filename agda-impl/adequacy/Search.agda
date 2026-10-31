@@ -32,18 +32,20 @@ open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-split; <ᵖ-part; Frame; burst; emit; stall; close)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; _≺_; _≼_; Truncate; module TakeWhile; DenEnv;
   module Joining; module Values; MapT; map-out; map-skip; map-pin; map-end; module Scan; InE; at-out; at-end; Rejoin; Bare; hot; enter)
+open import denotation.Laws using (good-cons)
 open import denotation.Laws.Modulus using (≼-refl; ≺-ext; ≺-irrefl; ≼-≺-≺; ≺-≼-≺)
-open import denotation.Laws.Worlds using (InvAt; Hots; W; inW; plain-ix; apart-w) renaming (⊑-refl to ⊑ᵖ-refl)
+open import denotation.Laws.Worlds using (InvAt; Hots; Ok; Lawful; W; inW; plain-ix; apart-w) renaming (⊑-refl to ⊑ᵖ-refl)
 open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᵖ; clash)
 open import operation.PureObservable using (module Machine; play; ending; over)
 
 open Machine using (St; Ctx; CS; cs; _⊕_; bodyM; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed;
                     free; cpAt; cutAt; overAt; inScan; inTake; inSrc; inBody;
                     ofS; doneS; mapS; cutS; cpM; cutM; lnS; flatS; coldS; scanS; takeS; connS; joinS; inMap; inCut; inLn; inOuter; inLanes; nx; cp; attached; attAt; attM; pend) renaming (Ev to Evᴹ)
-open import adequacy.Rows using (acc-val; rows; rowsL; pendRows; toEv; Lanes; Each; Kth; AllEnd; EndsOf; Lane; reads; hd; module Flat; module SwitchF; module ExhaustF; module BoundedF; ∅; Hot; Frozen; Echoing; _≃_; _⇄_; Inbox; _∪_; Kept; Stops) renaming (kept to keptᴿ; stop to stopᴿ; left to leftᴿ; sub to subᴿ; From to Fromᴿ)
+open import adequacy.Rows using (acc-val; rows; rowsL; pendRows; toEv; Lanes; Each; Kth; AllEnd; EndsOf; Lane; reads; hd; module Flat; module SwitchF; module ExhaustF; module BoundedF; ∅; Hot; Echoing; _≃_; _⇄_; Inbox; _∪_; Kept; Stops) renaming (kept to keptᴿ; stop to stopᴿ; left to leftᴿ; sub to subᴿ; From to Fromᴿ)
 open import adequacy.Up using (conn-≃; ≃-refl)
+open import adequacy.Env using (hot-lawful)
 open import adequacy.Cap using (irr; ⊑-<; <-⊑; ⊑-<⊑; ≮; dec; Past; OKᶜ; OKLᶜ; each-map; ok-cap; uncap; cap-retag; cap-sub;
-  one; own-stills; first-stillsᶜ; first-at; lanes-firstᶜ; Calm; Quiet; QuietL; calm-map; EnvSingle; body-quiet; conn-free; conn-held; told-nil; join-head)
+  one; own-stills; first-stillsᶜ; first-at; lanes-firstᶜ; Calm; Quiet; QuietL; calm-map; EnvSingle; EnvGood; body-quiet; conn-free; conn-held; told-nil; join-head)
 open import adequacy.Bound using (Apart; <→⊑; Bd; Empty; From; Good; GoodL; GoodLn; MergeG; OK; OKL; Single; _⊑_; ext-⊑;
   above-any; Above; After; held; raise-map; raise-scan; raise-cut; raise-take; raise-outer;
   raise-lane; from-empty; from-weak; ix01; kept; lane-ok; lane-v; mapped; of-from; of-shows;
@@ -681,15 +683,19 @@ postulate
   conn-owed-okᶜ : ∀ {R Γ A X} {ρ : DenEnv Γ} C (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ Γ) A) {p} → CS.owedAt k ≡ just p
                 → EnvSingle ρ → Good ρ (connS k o b) → Quiet C ρ (connS k o b) → OKᶜ C (rows ρ (connS k o b)) (seek c (connS k o b))
 
-  -- A CONNECT'S FROZEN ENTRY HOLDS ONE EVENT A POSITION: its source's
-  -- meaning entered where the connect subscribed it.
-  frozen-single : ∀ {Γ X A} {ρ : DenEnv Γ} k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvSingle ρ → Good ρ (connS k o b) → Single (Frozen ρ k)
+-- A GOOD CONNECT'S ENTRY: it subscribed its source admissibly.
+entry : ∀ {Γ X A} {ρ : DenEnv Γ} k (o : St Γ X) (b : St (X ∷ Γ) A) → Good ρ (connS k o b) → Ok (Hots ρ) (CS.connAt k ++ [ ix 1 ])
+entry k o b (_ , _ , _ , _ , ok) = ok
 
--- A CONNECT'S BINDER HOLDS ONE EVENT A POSITION: each row its frozen
--- entry's.
-bind-single : ∀ {Γ X A} {ρ : DenEnv Γ} k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvSingle ρ → Good ρ (connS k o b) → EnvSingle (Hot ρ (rows ρ o) k ∷ᴬ ρ)
-bind-single k o b es g (here refl) = hot-single (λ x x′ → frozen-single k o b es g (proj₁ (proj₁ x)) (proj₁ (proj₁ x′)))
-bind-single k o b es g (there x)   = es x
+-- A CONNECT'S BINDER, READ AS ITS BODY READS IT: one event a row, each
+-- its frozen entry's, and lawful, its source subscribed admissibly.
+bind-good : ∀ {Γ X A} {ρ : DenEnv Γ} k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvGood ρ → Good ρ (connS k o b) → EnvGood (Hot ρ (rows ρ o) k ∷ᴬ ρ)
+bind-good {ρ = ρ} k o b (es , ge) g = single , good-cons L ge
+  where
+    L = hot-lawful k ge (entry k o b g)
+    single : EnvSingle (Hot ρ (rows ρ o) k ∷ᴬ ρ)
+    single (here refl) = hot-single (Lawful.func L)
+    single (there x)   = es x
 
 postulate
 
@@ -727,7 +733,7 @@ cold-ok c true  (ending e)                   with closed c
 ... | true  = record { from = λ { at-end → ⊑-refl _ } ; mark = ⊑-refl _ ; shown = λ () }
 
 mutual
-  seek-okᶜ : ∀ {R Γ A} {ρ : DenEnv Γ} C (c : Ctx R Γ A) (s : St Γ A) → EnvSingle ρ → Good ρ s → Quiet C ρ s → OKᶜ C (rows ρ s) (seek c s)
+  seek-okᶜ : ∀ {R Γ A} {ρ : DenEnv Γ} C (c : Ctx R Γ A) (s : St Γ A) → EnvGood ρ → Good ρ s → Quiet C ρ s → OKᶜ C (rows ρ s) (seek c s)
   seek-okᶜ {ρ = ρ} C c (ofS i p [])       _ _ _ = okc {ρ = ρ} C c (ofS i p []) (record { from = of-from p i [] ; mark = ⊑-refl _ ; shown = λ eq → _ , refl , of-shows c i p [] eq })
   seek-okᶜ {ρ = ρ} C c (ofS i p (x ∷ xs)) _ _ _ = okc {ρ = ρ} C c (ofS i p (x ∷ xs)) (record { from = of-from p i (x ∷ xs) ; mark = ⊑-refl _ ; shown = λ eq → _ , refl , of-shows c i p (x ∷ xs) eq })
   seek-okᶜ {ρ = ρ} C c doneS              _ _ _ = okc {ρ = ρ} C c doneS (λ ())
@@ -754,7 +760,7 @@ mutual
     where open MergeG g
   seek-okᶜ {ρ = ρ} C c (flatS (mergeᶠ (just m)) f d n (a ∷ q) o ls) es (g , full) qt =
     okᶜ-trunc C _ (join-okᶜ C c (mergeᶠ (just m)) f d n (a ∷ q) o ls
-                     (queued-race m (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n a q (rooted-single rooted) (lanes-single ls es lanesG) (rooted-parts rooted)
+                     (queued-race m (λ a → pendRows ρ (f a)) (rows ρ o) (rowsL ρ ls) d n a q (rooted-single rooted) (lanes-single ls (proj₁ es) lanesG) (rooted-parts rooted)
                         ([ (λ ()) , (λ e → e) ]′ full))
                      es outer lanesG (calm-fst C ρ qt) (calm-snd C ρ qt))
     where open MergeG g
@@ -776,26 +782,26 @@ mutual
   -- the source winning only strictly before the body, keys every row the
   -- connect still owes up to the cap, its body searched under its binder
   -- capped no later than the source's find.
-  conn-okᶜ : ∀ {R Γ A X} {ρ : DenEnv Γ} C (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvSingle ρ → Good ρ (connS k o b) → Quiet C ρ (connS k o b)
+  conn-okᶜ : ∀ {R Γ A X} {ρ : DenEnv Γ} C (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvGood ρ → Good ρ (connS k o b) → Quiet C ρ (connS k o b)
            → OKᶜ C (rows ρ (connS k o b)) (seek c (connS k o b))
-  conn-okᶜ {ρ = ρ} C c k@(cs cl true sa nothing aS nothing ca ea _) o b es g@(go , gb , _ , tl) qt =
+  conn-okᶜ {ρ = ρ} C c k@(cs cl true sa nothing aS nothing ca ea _) o b es g@(go , gb , _ , tl , _) qt =
     okᶜ-≃ C (conn-≃ ca (echo-all k tt refl) ≃-refl) _ $ first-stillsᶜ C (ownBest c (connS k o b) (own (connS k o b))) _ (own-stills c k o b (own (connS k o b)))
       (conn-free {ρ = ρ} k (rows ρ o) {β = rows (Hot ρ (rows ρ o) k ∷ᴬ ρ) b} C (seek (inSrc k b c) o) (seek (inBody k o c) b)
          (seek-okᶜ C (inSrc k b c) o es go (calm-fst C ρ qt)) (seek-mark (inSrc k b c) o)
-         (λ C₂ c₂ air → seek-okᶜ C₂ (inBody k o c) b (bind-single k o b es g) gb (body-quiet {C = C} {C₂ = C₂} {σ = rows ρ o} k o b c₂ qt tl air)))
-  conn-okᶜ {ρ = ρ} C c k@(cs cl true sa (just p) aS nothing ca ea _) o b es g@(held hf , gb , _ , tl) qt =
+         (λ C₂ c₂ air → seek-okᶜ C₂ (inBody k o c) b (bind-good k o b es g) gb (body-quiet {C = C} {C₂ = C₂} {σ = rows ρ o} k o b c₂ qt tl air)))
+  conn-okᶜ {ρ = ρ} C c k@(cs cl true sa (just p) aS nothing ca ea _) o b es g@(held hf , gb , _ , tl , _) qt =
     okᶜ-≃ C (conn-≃ ca (echo-all k tt refl) ≃-refl) _ $ conn-held {ρ = ρ} k (rows ρ o) {β = rows (Hot ρ (rows ρ o) k ∷ᴬ ρ) b} C (p ⊕ [ ix 1 ]) (ownBest c (connS k o b) (own (connS k o b))) (seek (inBody k o c) b) hf
       (first-at {f = (_ , _ , c , connS k o b)} {m = bodyM} (at (p ⊕ [ ix 1 ])) (ownBest c (connS k o b) (drop 1 (own (connS k o b)))) (own-stills c k o b (drop 1 (own (connS k o b)))))
-      (λ C₂ c₂ air → seek-okᶜ C₂ (inBody k o c) b (bind-single k o b es g) gb (body-quiet {C = C} {C₂ = C₂} {σ = rows ρ o} k o b c₂ qt tl air))
-  conn-okᶜ C c k@(cs cl true sa _ aS (just p) ca ea _) o b es g qt = conn-owed-okᶜ C c k o b refl es g qt
-  conn-okᶜ C c k@(cs cl false sa _ aS oA ca ea _) o b es g qt = conn-dead-okᶜ C c k o b tt es g qt
+      (λ C₂ c₂ air → seek-okᶜ C₂ (inBody k o c) b (bind-good k o b es g) gb (body-quiet {C = C} {C₂ = C₂} {σ = rows ρ o} k o b c₂ qt tl air))
+  conn-okᶜ C c k@(cs cl true sa _ aS (just p) ca ea _) o b es g qt = conn-owed-okᶜ C c k o b refl (proj₁ es) g qt
+  conn-okᶜ C c k@(cs cl false sa _ aS oA ca ea _) o b es g qt = conn-dead-okᶜ C c k o b tt (proj₁ es) g qt
 
   -- A TAKE'S SEARCH KEYS ITS ROWS: unfailed, its child's find retagged; a
   -- failing value's completion owed at its stop; its kept pins after.
-  take-okᶜ : ∀ {R Γ A} {ρ : DenEnv Γ} C (c : Ctx R Γ A) i q w (s : St Γ A) → EnvSingle ρ → Good ρ (takeS i q w s) → Quiet C ρ (takeS i q w s)
+  take-okᶜ : ∀ {R Γ A} {ρ : DenEnv Γ} C (c : Ctx R Γ A) i q w (s : St Γ A) → EnvGood ρ → Good ρ (takeS i q w s) → Quiet C ρ (takeS i q w s)
            → OKᶜ C (rows ρ (takeS i q w s)) (seek c (takeS i q w s))
   take-okᶜ {ρ = ρ} C c i q free s es g qt =
-    okᶜ-trunc C _ (cap-retag C (takeT i q free) (raise-take i q free) take-src (λ y → take-free i q y (rows-single {ρ = ρ} s es g))
+    okᶜ-trunc C _ (cap-retag C (takeT i q free) (raise-take i q free) take-src (λ y → take-free i q y (rows-single {ρ = ρ} s (proj₁ es) g))
                     (seek (inTake i q free c) s) (seek-okᶜ C (inTake i q free c) s es g qt))
   take-okᶜ C c i q (cpAt r) s es g qt = take-stopᶜ C c i q r s (seek (inTake i q (cpAt r) c) s) (seek-okᶜ C (inTake i q (cpAt r) c) s es g qt)
   take-okᶜ C c i q (cutAt r) s es g qt =
@@ -808,17 +814,17 @@ mutual
 
   -- A joiner with nothing queued: its policy's race over its parts' finds.
   join-okᶜ : ∀ {R Γ A B} {ρ : DenEnv Γ} C (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls {J : EmissionSet B}
-           → Racesᶜ R (rows ρ o) (rowsL ρ ls) d n q J → EnvSingle ρ → Good ρ o → GoodL ρ ls → Quiet C ρ o → QuietL C ρ ls
+           → Racesᶜ R (rows ρ o) (rowsL ρ ls) d n q J → EnvGood ρ → Good ρ o → GoodL ρ ls → Quiet C ρ o → QuietL C ρ ls
            → OKᶜ C J (raceT d n q (seek (inOuter op f d n q ls c) o) (lanes c op f d n q o [] ls))
   join-okᶜ C c op f d n q o ls rc es go gl qo ql =
     rc C (seek (inOuter op f d n q ls c) o) (lanes c op f d n q o [] ls) (seek-okᶜ C (inOuter op f d n q ls c) o es go qo) (lanes-okᶜ C c op f d n q o [] ls es gl ql)
 
-  seek-lnᶜ : ∀ {R Γ A} {ρ : DenEnv Γ} C (c : Ctx R Γ A) (s : St Γ A) → EnvSingle ρ → GoodLn ρ s → Quiet C ρ s → OKᶜ C (rows ρ s) (seek c s)
+  seek-lnᶜ : ∀ {R Γ A} {ρ : DenEnv Γ} C (c : Ctx R Γ A) (s : St Γ A) → EnvGood ρ → GoodLn ρ s → Quiet C ρ s → OKᶜ C (rows ρ s) (seek c s)
   seek-lnᶜ {ρ = ρ} C c s es g qt with lane-v s g
   ... | on a s₀ g₀ _ = seek-okᶜ C (inLn true c) (cutS true a s₀) es g₀ qt
   ... | off a s₀     = okc {ρ = ρ} C c (lnS false (cutS false a s₀)) (seek-off {ρ = ρ} (inLn false c) a s₀)
 
-  lanes-okᶜ : ∀ {R Γ A B} {ρ : DenEnv Γ} C (c : Ctx R Γ B) op f d n q (o : St Γ A) pre (ls : List (St Γ B)) → EnvSingle ρ → GoodL ρ ls → QuietL C ρ ls
+  lanes-okᶜ : ∀ {R Γ A B} {ρ : DenEnv Γ} C (c : Ctx R Γ B) op f d n q (o : St Γ A) pre (ls : List (St Γ B)) → EnvGood ρ → GoodL ρ ls → QuietL C ρ ls
             → OKLᶜ C (rowsL ρ ls) (lanes c op f d n q o pre ls)
   lanes-okᶜ C c op f d n q o pre []         _ _          _  = inj₁ (tt , tt)
   lanes-okᶜ {ρ = ρ} C c op f d n q o pre (s ∷ post) es (gs , gp) ql =
@@ -829,5 +835,5 @@ mutual
 
 -- At no binder, every cap at once: exact.
 seek-ok : ∀ {R A} {ρ : DenEnv []} (c : Ctx R [] A) (s : St [] A) → Good ρ s → OK (rows ρ s) (seek c s)
-seek-ok c s g = uncap (seek c s) (λ C → seek-okᶜ C c s (λ ()) g (λ ()))
+seek-ok c s g = uncap (seek c s) (λ C → seek-okᶜ C c s ((λ ()) , (λ ())) g (λ ()))
 

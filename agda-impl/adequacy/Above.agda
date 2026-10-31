@@ -9,7 +9,7 @@ module adequacy.Above where
 
 open import Data.Bool using (Bool; true; false; T)
 open import Data.Empty using (⊥)
-open import Data.List using (List; []; _∷_; _ʳ++_)
+open import Data.List using (List; []; _∷_; _ʳ++_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -22,9 +22,10 @@ open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁; tt to tt₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Pos; Timeline)
+open import denotation.Events using (Pos; Timeline; ix)
 open import denotation.EmissionSet using (EmissionSet; DenEnv; MapT; module Scan; module Connecting)
 open import denotation.Laws.Modulus using (≺→≼)
+open import denotation.Laws.Worlds using (Ok; Hots)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; CS; alive; lnS; cutS; mapS; scanS; takeS; flatS; connS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
@@ -130,10 +131,10 @@ Anc (inLanes op f d n q o pre post c) s H =
   × Anc c (flatS op f d n q o (pre ʳ++ s ∷ post)) (JR op (λ a → pendRows (env c) (f a)) (rows (env c) o) d n q (rowsL (env c) pre ʳ++ H ∷ rowsL (env c) post))
 Anc (inSrc k b c)         s H =
   HeldIf (CS.bodyAt k) s × G (Hot (env c) H k ∷ᴬ env c) true b × (T (CS.closed k) → Empty H) × (T (CS.closed k) → Told (here refl) b)
-  × Anc c (connS k s b) (Connecting.ConnT (CS.connAt k) (Echoing k H) (rows (Hot (env c) H k ∷ᴬ env c) b))
+  × Ok (Hots (env c)) (CS.connAt k ++ [ ix 1 ]) × Anc c (connS k s b) (Connecting.ConnT (CS.connAt k) (Echoing k H) (rows (Hot (env c) H k ∷ᴬ env c) b))
 Anc (inBody k o c)        s H =
   SrcG (env c) true (CS.bodyAt k) o × (T (CS.closed k) → Empty (rows (env c) o)) × (T (CS.closed k) → Told (here refl) s)
-  × Anc c (connS k o s) (Connecting.ConnT (CS.connAt k) (Echoing k (rows (env c) o)) H)
+  × Ok (Hots (env c)) (CS.connAt k ++ [ ix 1 ]) × Anc c (connS k o s) (Connecting.ConnT (CS.connAt k) (Echoing k (rows (env c) o)) H)
 
 -- THE SAME ROWS, THE SAME FRAMES: every frame reads its hole only
 -- through its rows.
@@ -152,10 +153,10 @@ anc-≃ (inOuter op f d n q ls c) s eq (gl , j , a) =
 anc-≃ (inLanes op f d n q o pre post c) s eq (il , go , gp , gq , j , a) =
   il , go , gp , gq , join-≃ ≃-refl es j , anc-≃ c (flatS op f d n q o (pre ʳ++ s ∷ post)) (jr-≃ op (λ x → pendRows (env c) (f x)) d n q ≃-refl es) a
   where es = ʳ++-≈ (rowsL (env c) pre) (eq ∷ ≈ᴸ-refl (rowsL (env c) post))
-anc-≃ (inSrc k b c)      s eq (h , gb , sp , tl , a) =
-  h , good-hot k (env c) b eq true gb , (λ cl → empty-≃ eq (sp cl)) , tl
+anc-≃ (inSrc k b c)      s eq (h , gb , sp , tl , ok , a) =
+  h , good-hot k (env c) b eq true gb , (λ cl → empty-≃ eq (sp cl)) , tl , ok
   , anc-≃ c (connS k s b) (conn-≃ (CS.connAt k) (echo-≃ k eq) (rows-hot k (env c) b eq)) a
-anc-≃ (inBody k o c)     s eq (gs , sp , tl , a) = gs , sp , tl , anc-≃ c (connS k o s) (conn-≃ (CS.connAt k) ≃-refl eq) a
+anc-≃ (inBody k o c)     s eq (gs , sp , tl , ok , a) = gs , sp , tl , ok , anc-≃ c (connS k o s) (conn-≃ (CS.connAt k) ≃-refl eq) a
 
 ------------------------------------------------------------------------
 -- A hole swapped for one of the same shape
@@ -189,10 +190,10 @@ anc-swap (inOuter op f d n q ls c) sw (gl , j , a) =
 anc-swap (inLanes op f d n q o pre post c) sw (il , go , gp , gq , j , a) =
   ln sw il , go , gp , gq , record { fresh = Join.fresh j ; count = trans (Join.count j) (live-swap pre (live≡ sw)) ; spent = Join.spent j ; rooted = Join.rooted j }
   , anc-swap c (record { ln = λ () ; cut = λ () ; held = λ () ; live≡ = refl ; told = λ x (t , ts) → t , toldL-swap pre (told sw x) ts }) a
-anc-swap (inSrc k b c)      sw (h , gb , sp , tl , a) =
-  heldIf sw (CS.bodyAt k) h , gb , sp , tl , anc-swap c (record { ln = λ () ; cut = λ () ; held = λ () ; live≡ = refl ; told = λ x (t , tb) → told sw x t , tb }) a
-anc-swap (inBody k o c)     sw (gs , sp , tl , a) =
-  gs , sp , (λ cl → told sw (here refl) (tl cl))
+anc-swap (inSrc k b c)      sw (h , gb , sp , tl , ok , a) =
+  heldIf sw (CS.bodyAt k) h , gb , sp , tl , ok , anc-swap c (record { ln = λ () ; cut = λ () ; held = λ () ; live≡ = refl ; told = λ x (t , tb) → told sw x t , tb }) a
+anc-swap (inBody k o c)     sw (gs , sp , tl , ok , a) =
+  gs , sp , (λ cl → told sw (here refl) (tl cl)) , ok
   , anc-swap c (record { ln = λ () ; cut = λ () ; held = λ () ; live≡ = refl ; told = λ x (t , tb) → t , told sw (there x) tb }) a
 
 ------------------------------------------------------------------------
@@ -302,7 +303,7 @@ anc-≈ (inLanes op f d n q o pre post c) {t = t} {u} (ao , apre , apost , ld) s
     slu = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (su , after-since (rowsL ρ post) apost)
     r   = jr-≈ op (λ x → pendRows ρ (f x)) d n q so so slt slu ≈-refl (≈ᴸ-hole (rowsL ρ pre) (eq ∷≈ ≈ᴸ-refl⟨⟩ (rowsL ρ post)))
 anc-≈ (inSrc k b c)       ld st su eq a = anc-≈-src k b c ld st su eq a
-anc-≈ (inBody k o c) {t = t} {u} (ao , ld) st su eq (gs , sp , tl , a) =
-  gs , sp , tl , anc-≈ c ld (since-conn (CS.connAt k) _ t ae st) (since-conn (CS.connAt k) _ u ae su) (conn-≈ (CS.connAt k) _ eq) a
+anc-≈ (inBody k o c) {t = t} {u} (ao , ld) st su eq (gs , sp , tl , ok , a) =
+  gs , sp , tl , ok , anc-≈ c ld (since-conn (CS.connAt k) _ t ae st) (since-conn (CS.connAt k) _ u ae su) (conn-≈ (CS.connAt k) _ eq) a
   where
     ae = λ {q} {e} r → ao {q} {e} (proj₁ r)

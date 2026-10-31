@@ -11,18 +11,18 @@ open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_)
 open import Data.List.Relation.Unary.All using (lookup) renaming (_∷_ to _∷ᴬ_)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Sum using () renaming (map to ⊎-map)
+open import Data.Sum using (_⊎_) renaming (map to ⊎-map)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; ix)
-open import denotation.EmissionSet using (EmissionSet; DenEnv; _≼_)
+open import denotation.EmissionSet using (EmissionSet; DenEnv; _≼_; Proper)
 open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; AgreeTo-sym; trunc-to; _~⟨_⟩_; ~-refl; ≼-refl)
 open import denotation.Laws.ConnectNe using (proper-ag)
 open import denotation.Laws using (EnvAg; causal-⟦⟧; map-ag; scan-ag; take-ag; conn-ag; hot-causal; ag-cons)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; CS; Owe; free; cpAt; cutAt; overAt; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS)
 
-open import adequacy.Rows using (rows; rowsL; Hot; Echoing; Closed; _∪_; TakeR; Kept; kept; Stops; stop; left; _≃_; _⇄_;
+open import adequacy.Rows using (rows; rowsL; Hot; Frozen; Echoing; Closed; _∪_; TakeR; Kept; kept; Stops; stop; left; _≃_; _⇄_;
   module Flat; module SwitchF; module ExhaustF; module BoundedF)
 open import adequacy.Policy using (join-ag; flat-to; switch-to; exhaust-to; bounded-to)
 
@@ -54,13 +54,18 @@ take-r i w (cpAt p)   a = ⟨ (λ yq → stops-to a yq , stops-to (AgreeTo-sym a
 take-r i w (cutAt p)  a = ⟨ (λ yq → kept-to a yq , kept-to (AgreeTo-sym a) yq) ⟩
 take-r i w (overAt p) a = ⟨ (λ yq → kept-to a yq , kept-to (AgreeTo-sym a) yq) ⟩
 
--- A BINDER over agreeing rows agrees.
-hot-ag : ∀ {Γ A Q} {ρ ρ′ : DenEnv Γ} (k : CS Γ A) {t t′ : EmissionSet A} → EnvAg Q ρ ρ′ → AgreeTo Q t t′ → Hot ρ t k ~⟨ Q ⟩ Hot ρ′ t′ k
-hot-ag k e a = hot-causal (×-ag (proper-ag (causal-⟦⟧ (CS.src k) e (CS.connAt k ++ [ ix 1 ]))) (∪-ag a (ag-refl (Closed k))))
+-- A BINDER'S ROWS over agreeing rows agree.
+hot-raw : ∀ {Γ A Q} {ρ ρ′ : DenEnv Γ} (k : CS Γ A) {t t′ : EmissionSet A} → EnvAg Q ρ ρ′ → AgreeTo Q t t′
+        → AgreeTo Q (λ q e → Proper (Frozen ρ k) q e × (t q e ⊎ Closed k q e)) (λ q e → Proper (Frozen ρ′ k) q e × (t′ q e ⊎ Closed k q e))
+hot-raw k e a = ×-ag (proper-ag (causal-⟦⟧ (CS.src k) e (CS.connAt k ++ [ ix 1 ]))) (∪-ag a (ag-refl (Closed k)))
   where
     ×-ag : ∀ {A Q} {t t′ u u′ : EmissionSet A} → AgreeTo Q t t′ → AgreeTo Q u u′ → AgreeTo Q (λ q e → t q e × u q e) (λ q e → t′ q e × u′ q e)
     ×-ag b c = ⟨ (λ {y} {e} yq → (λ (f , x) → proj₁ (upto b {y} {e} yq) f , proj₁ (upto c {y} {e} yq) x)
                                 , (λ (f , x) → proj₂ (upto b {y} {e} yq) f , proj₂ (upto c {y} {e} yq) x)) ⟩
+
+-- A BINDER over agreeing rows agrees.
+hot-ag : ∀ {Γ A Q} {ρ ρ′ : DenEnv Γ} (k : CS Γ A) {t t′ : EmissionSet A} → EnvAg Q ρ ρ′ → AgreeTo Q t t′ → Hot ρ t k ~⟨ Q ⟩ Hot ρ′ t′ k
+hot-ag k e a = hot-causal (hot-raw k e a)
 
 ------------------------------------------------------------------------
 -- The joiners

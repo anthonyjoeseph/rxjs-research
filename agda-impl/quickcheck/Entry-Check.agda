@@ -299,11 +299,17 @@ record Node : Set where
     former : String
     body   : Bool
     seen   : Maybe (List (Pos × Kind) × Bool)
+    env    : List (List (Pos × Kind))
 
 private
-  noted : ∀ {A} → List ℕ → String → Bool → Maybe (Listed A) → Node
-  noted π f b nothing  = node π f b nothing
-  noted π f b (just l) = node π f b (just (mapL erase (rows l) , short l))
+  -- Every binder in scope, its rows erased, innermost first.
+  envOf : ∀ {Γ} → All Listed Γ → List (List (Pos × Kind))
+  envOf []      = []
+  envOf (l ∷ ρ) = mapL erase (rows l) ∷ envOf ρ
+
+  noted : ∀ {Γ A} → All Listed Γ → List ℕ → String → Bool → Maybe (Listed A) → Node
+  noted ρ π f b nothing  = node π f b nothing (envOf ρ)
+  noted ρ π f b (just l) = node π f b (just (mapL erase (rows l) , short l)) (envOf ρ)
 
   closedRows : ∀ {Γ A} → CS Γ A → List (Row A)
   closedRows k = when (CS.closed k) (CS.endAt k , end)
@@ -329,7 +335,7 @@ private
   -- A node under a dead cut or lane: `adequacy.Bound.G` reads it with
   -- its liveness off, so nothing is asked of its reading.
   dead : Node → Node
-  dead (node π f b _) = node π f b nothing
+  dead (node π f b _ e) = node π f b nothing e
 
   inbox : ∀ {A} → List (Pos × Machine.Ev A) → List (Row A)
   inbox []                  = []
@@ -370,7 +376,7 @@ private
 mutual
   listS : ∀ {Γ A} → ℕ → All Listed Γ → List ℕ → Bool → St Γ A → Maybe (Listed A) × List Node
   listS u ρ π b s with listN u ρ π b s
-  ... | f , l , ns = l , noted π f b l ∷ ns
+  ... | f , l , ns = l , noted ρ π f b l ∷ ns
 
   listN : ∀ {Γ A} → ℕ → All Listed Γ → List ℕ → Bool → St Γ A → String × Maybe (Listed A) × List Node
   listN u ρ π b (pend (connected x) p) = "pend [binder " +++ showRows (mapL erase (rows (lookup ρ x))) +++ "]" , listT u (connected x) ρ p , []
@@ -416,8 +422,9 @@ mutual
 ------------------------------------------------------------------------
 -- The run, checked
 
--- A finding: the step, the node, its former as read at its entry, and
--- its rows outside that entry.
+-- A finding: the step, the node, its former as read at its entry, its
+-- rows outside that entry, and each ancestor's path with its former now
+-- and at its entry.
 record Finding : Set where
   constructor finding
   field
@@ -425,6 +432,7 @@ record Finding : Set where
     nd    : Node
     was   : String
     extra : List (Pos × Kind)
+    above : List (List ℕ × String × String)
 
 private
   samePath : List ℕ → List ℕ → Bool
@@ -432,27 +440,57 @@ private
   samePath (i ∷ is) (j ∷ js) = (i ≡ᵇ j) ∧ samePath is js
   samePath _        _        = false
 
+  -- A node's entry: its former and rows then, whether cut short, and its
+  -- binders' rows then.
   Entries : Set
-  Entries = List (List ℕ × String × List (Pos × Kind) × Bool)
+  Entries = List (List ℕ × String × List (Pos × Kind) × Bool × List (List (Pos × Kind)))
 
-  entryOf : List ℕ → Entries → Maybe (String × List (Pos × Kind) × Bool)
+  entryOf : List ℕ → Entries → Maybe (String × List (Pos × Kind) × Bool × List (List (Pos × Kind)))
   entryOf π []                  = nothing
   entryOf π ((π′ , e) ∷ es) = if samePath π π′ then just e else entryOf π es
 
   outside : List (Pos × Kind) → List (Pos × Kind) → List (Pos × Kind)
   outside e = concatMap λ r → when (not (anyᵇ (sameRow r) e)) r
 
-  -- One settled tree's nodes against the entries, recording new ones.
+  -- Some binder holds a row it did not at the entry.
+  grown : List (List (Pos × Kind)) → List (List (Pos × Kind)) → Bool
+  grown (e ∷ es) (n ∷ ns) = anyᵇ (λ _ → true) (outside e n) ∨ grown es ns
+  grown _        _        = false
+
+  -- One settled tree's nodes against the entries, recording new ones.  A
+  -- node's meaning is read under its binders as they stand, so its entry
+  -- moves with them: a reading past its entry is a finding only while no
+  -- binder in scope has grown since; otherwise the entry is read again.
   visit : ℕ → List Node → Entries → Entries × List Finding
   visit t []        es = es , []
   visit t (nd ∷ ns) es with Node.seen nd
   ... | nothing = visit t ns es
   ... | just (rs , sh) with entryOf (Node.path nd) es
-  ...   | nothing = visit t ns ((Node.path nd , Node.former nd , rs , sh) ∷ es)
-  ...   | just (_ , e , true) = visit t ns es
-  ...   | just (w , e , false) with outside e rs | visit t ns es
-  ...     | []    | es′ , fs = es′ , fs
-  ...     | x ∷ xs | es′ , fs = es′ , finding t nd w (x ∷ xs) ∷ fs
+  ...   | nothing = visit t ns ((Node.path nd , Node.former nd , rs , sh , Node.env nd) ∷ es)
+  ...   | just (_ , e , true , _) = visit t ns es
+  ...   | just (w , e , false , v) with outside e rs | grown v (Node.env nd)
+  ...     | []     | _     = visit t ns es
+  ...     | x ∷ xs | true  = visit t ns ((Node.path nd , w , e ++ x ∷ xs , false , Node.env nd) ∷ es)
+  ...     | x ∷ xs | false with visit t ns es
+  ...       | es′ , fs = es′ , finding t nd w (x ∷ xs) [] ∷ fs
+
+  -- Every proper prefix of a path, outermost first.
+  prefixes : List ℕ → List (List ℕ)
+  prefixes []       = []
+  prefixes (i ∷ is) = [] ∷ mapL (i ∷_) (prefixes is)
+
+  nowOf : List ℕ → List Node → String
+  nowOf π []        = "?"
+  nowOf π (nd ∷ ns) = if samePath π (Node.path nd) then Node.former nd else nowOf π ns
+
+  wasOf : List ℕ → Entries → String
+  wasOf π es with entryOf π es
+  ... | just (w , _) = w
+  ... | nothing      = "?"
+
+  -- A finding with its ancestors read off this tree and the entries.
+  traced : List Node → Entries → Finding → Finding
+  traced ns es (finding t nd w xs _) = finding t nd w xs (mapL (λ π → π , nowOf π ns , wasOf π es) (prefixes (Node.path nd)))
 
   settled : ∀ {R} → Conf R → Bool
   settled c with Conf.mode c
@@ -463,8 +501,11 @@ private
 
   check : ℕ → ℕ → ℕ → Entries → Conf ℕ → List Finding
   check u zero    t es c = []
-  check u (suc k) t es c = here (if settled c then visit t (proj₂ (listS u [] [] false (plug (Conf.ctx c) (Conf.foc c)))) es else es , [])
+  check u (suc k) t es c = here (if settled c then visit t ns es else es , [])
     where
+      ns : List Node
+      ns = proj₂ (listS u [] [] false (plug (Conf.ctx c) (Conf.foc c)))
+
       next : Entries → D.Step → List Finding
       next es′ (silent _ c′)    = check u k (suc t) es′ c′
       next es′ (value _ _ _ c′) = check u k (suc t) es′ c′
@@ -472,7 +513,7 @@ private
 
       here : Entries × List Finding → List Finding
       here (es′ , [])     = next es′ (step c)
-      here (es′ , f ∷ fs) = f ∷ fs
+      here (es′ , f ∷ fs) = mapL (traced ns es) (f ∷ fs)
 
 -- The first findings of a seed's program, the run read for `k` steps.
 probe : ℕ → ℕ → List Finding
@@ -487,10 +528,14 @@ private
   showPath (i ∷ is) = showℕ i +++ "/" +++ showPath is
 
   showFinding : ℕ → Finding → String
-  showFinding seed (finding t nd w xs) =
+  showFinding seed (finding t nd w xs up) =
     "entry-check: FAIL seed " +++ showℕ seed +++ " step " +++ showℕ t +++ " node " +++ showPath (Node.path nd)
     +++ " " +++ Node.former nd +++ (if Node.body nd then " under-body" else " outside-body") +++ " rows " +++ showRows xs
-    +++ "\n    at entry: " +++ w
+    +++ "\n    at entry: " +++ w +++ ancestors up
+    where
+      ancestors : List (List ℕ × String × String) → String
+      ancestors []                  = ""
+      ancestors ((π , n , e) ∷ as) = "\n    above " +++ showPath π +++ " now: " +++ n +++ "\n      at entry: " +++ e +++ ancestors as
   report : List ℕ → ℕ → IO Unit
   report []          bad = putStrLn ("entry-check: done " +++ showℕ bad +++ " failing seeds")
   report (seed ∷ ss) bad with probe 400 seed
