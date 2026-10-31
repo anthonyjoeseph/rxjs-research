@@ -29,7 +29,7 @@ open import operation.PureObservable using (module Machine)
 
 open Machine using (St; Ctx; CS; cs; Cand; found; Out; still; shows; seek; own; ownBest; first; sourceT; shift; closed; outOf; same?;
                     connS; joinS; joinM; cp) renaming (Ev to Evᴹ)
-open import adequacy.Rows using (toEv; Each; Hot; Inbox; _∪_; this; that; Closed; shut)
+open import adequacy.Rows using (toEv; Each; Hot; Frozen; Inbox; _∪_; this; that; Closed; shut)
 open import adequacy.Bound using (_⊑_; ⊑i; ⊑-refl; ⊑-trans; <→⊑; ≺→⊑; ext-⊑; shift-≮; shift-⊑; Above; After; From; Single;
   Bd; OK; OKL; Mk; Fed; Told; ToldL; ToldAt)
 
@@ -273,27 +273,28 @@ by-closed false _ a = inj₁ (a (λ ()))
 -- A connect's body's binders: its own past `C₂` unless the source closed
 -- and every joiner was told; the rest as above it, `C₂` no later.
 body-quiet : ∀ {Γ X A} {ρ : DenEnv Γ} {C C₂} {σ : EmissionSet X} k (o : St Γ X) (b : St (X ∷ Γ) A) → C₂ ⊑ C
-           → Quiet C ρ (connS k o b) → (T (CS.closed k) → Told (here refl) b) → (¬ T (CS.closed k) → Air C₂ (Hot σ k ∷ᴬ ρ) (here refl))
-           → Quiet C₂ (Hot σ k ∷ᴬ ρ) b
+           → Quiet C ρ (connS k o b) → (T (CS.closed k) → Told (here refl) b) → (¬ T (CS.closed k) → Air C₂ (Hot ρ σ k ∷ᴬ ρ) (here refl))
+           → Quiet C₂ (Hot ρ σ k ∷ᴬ ρ) b
 body-quiet k o b c₂ q tl air (here refl) = by-closed (CS.closed k) tl air
 body-quiet k o b c₂ q tl air (there x) with q x
 ... | inj₁ a       = inj₁ (λ j {q} r → ⊑-< (at q) c₂ (a j r))
 ... | inj₂ (_ , t) = inj₂ t
 
 -- An open source's rows, as its binder holds them.
-bind-src : ∀ {A} {σ : EmissionSet A} {k} {D : Key → Set} → Above D σ → ¬ T (CS.closed k) → Above D (Proper (λ q e → σ q e ⊎ Closed k q e))
-bind-src dσ nc (inj₁ s , _)        = dσ s
-bind-src dσ nc (inj₂ (shut cl) , _) = ⊥-elim (nc cl)
+bind-src : ∀ {Γ A} {ρ : DenEnv Γ} {σ : EmissionSet A} {k : CS Γ A} {D : Key → Set} → Above D σ → ¬ T (CS.closed k)
+         → Above D (λ q e → Proper (Frozen ρ k) q e × (σ q e ⊎ Closed k q e))
+bind-src dσ nc (_ , inj₁ s)        = dσ s
+bind-src dσ nc (_ , inj₂ (shut cl)) = ⊥-elim (nc cl)
 
 -- A binder's rows past `C₂`: each a source's row heard past it, or its
 -- end heard late, no earlier than a row `D` bounds.
-bind-after : ∀ {A} (σ : EmissionSet A) k C₂ (D : Key → Set) → (∀ {a b} → D a → a ⊑ b → D b) → Above D σ
+bind-after : ∀ {Γ A} {ρ : DenEnv Γ} (σ : EmissionSet A) (k : CS Γ A) C₂ (D : Key → Set) → (∀ {a b} → D a → a ⊑ b → D b) → Above D σ
            → (∀ {x} l → [ ix 0 ] <ᵖ [ l ] ≡ true → D (at x) → C₂ <ᴷ at (x ++ [ l ]) ≡ true)
-           → ¬ T (CS.closed k) → ∀ j → After C₂ (enter (Hot σ k) j)
-bind-after σ k C₂ D up dσ ext nc j (Rejoin.shown x _ _ , _) = ext (sub j) refl (bind-src {σ = σ} {k = k} {D = D} dσ nc x)
-bind-after σ k C₂ D up dσ ext nc j (Rejoin.heard x _ , _)   = ext (sub j) refl (bind-src {σ = σ} {k = k} {D = D} dσ nc x)
-bind-after σ k C₂ D up dσ ext nc j (Rejoin.ended x _ , _)   = ext (sub j) refl (bind-src {σ = σ} {k = k} {D = D} dσ nc x)
-bind-after σ k C₂ D up dσ ext nc j (Rejoin.late x cj , _)   = ext last refl (up (bind-src {σ = σ} {k = k} {D = D} dσ nc x) (≼→⊑ cj))
+           → ¬ T (CS.closed k) → ∀ j → After C₂ (enter (Hot ρ σ k) j)
+bind-after {ρ = ρ} σ k C₂ D up dσ ext nc j (Rejoin.shown x _ _ , _) = ext (sub j) refl (bind-src {ρ = ρ} {σ = σ} {k = k} {D = D} dσ nc x)
+bind-after {ρ = ρ} σ k C₂ D up dσ ext nc j (Rejoin.heard x _ , _)   = ext (sub j) refl (bind-src {ρ = ρ} {σ = σ} {k = k} {D = D} dσ nc x)
+bind-after {ρ = ρ} σ k C₂ D up dσ ext nc j (Rejoin.ended x _ , _)   = ext (sub j) refl (bind-src {ρ = ρ} {σ = σ} {k = k} {D = D} dσ nc x)
+bind-after {ρ = ρ} σ k C₂ D up dσ ext nc j (Rejoin.late x cj , _)   = ext last refl (up (bind-src {ρ = ρ} {σ = σ} {k = k} {D = D} dσ nc x) (≼→⊑ cj))
 
 -- A connect's row: its body's, or a source row's just past it.
 conn-rows : ∀ {A B} {p} {σ : EmissionSet A} {β : EmissionSet B} (X : Key → Set) → (∀ {k e} → σ k e → X (at (k ++ [ ix 0 ])))
@@ -370,12 +371,12 @@ module Vs {R B : Set} (C C₂ h : Key) {T′ β : EmissionSet B}
 ------------------------------------------------------------------------
 -- A connect
 
-module _ {R B X : Set} {Γ} {ρ : DenEnv Γ} (k : CS) (σ : EmissionSet X) {β : EmissionSet B} where
+module _ {R B X : Set} {Γ} {ρ : DenEnv Γ} (k : CS Γ X) (σ : EmissionSet X) {β : EmissionSet B} where
   open Connecting (CS.connAt k) σ β using (ConnT; body)
 
   -- A body under binders past `C₂`, `C₂` no later than `C`.
   Body : Key → Maybe (Cand R B) → Set
-  Body C y = ∀ C₂ → C₂ ⊑ C → (¬ T (CS.closed k) → Air C₂ (Hot σ k ∷ᴬ ρ) (here refl)) → OKᶜ C₂ β y
+  Body C y = ∀ C₂ → C₂ ⊑ C → (¬ T (CS.closed k) → Air C₂ (Hot ρ σ k ∷ᴬ ρ) (here refl)) → OKᶜ C₂ β y
 
   -- Every other row past `C`: the body's find, uncapped.
   body-only : ∀ C (y : Maybe (Cand R B)) → (∀ {q e} → ConnT q e → β q e ⊎ C <ᴷ at q ≡ true) → OKᶜ C β y → OKᶜ C ConnT y

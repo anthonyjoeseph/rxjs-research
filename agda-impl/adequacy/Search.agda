@@ -616,7 +616,7 @@ seek-off c (attAt p) s =
 
 postulate
   -- A CONNECT'S BINDER HOLDS ONE EVENT A POSITION, its source's rows doing so.
-  bind-single : ∀ {Γ X A} {ρ : DenEnv Γ} k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvSingle ρ → Good ρ (connS k o b) → EnvSingle (Hot (rows ρ o) k ∷ᴬ ρ)
+  bind-single : ∀ {Γ X A} {ρ : DenEnv Γ} k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvSingle ρ → Good ρ (connS k o b) → EnvSingle (Hot ρ (rows ρ o) k ∷ᴬ ρ)
 
   -- A BURST'S ROWS LIE FROM ITS FRAME ON: the frame's own steps at its
   -- index and after, the frames following under its close.
@@ -703,13 +703,13 @@ mutual
   -- capped no later than the source's find.
   conn-okᶜ : ∀ {R Γ A X} {ρ : DenEnv Γ} C (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvSingle ρ → Good ρ (connS k o b) → Quiet C ρ (connS k o b)
            → OKᶜ C (rows ρ (connS k o b)) (seek c (connS k o b))
-  conn-okᶜ {ρ = ρ} C c k@(cs cl sl sa nothing aS oA ca ea) o b es g@(go , gb , _ , tl) qt =
+  conn-okᶜ {ρ = ρ} C c k@(cs cl sl sa nothing aS oA ca ea _) o b es g@(go , gb , _ , tl) qt =
     first-stillsᶜ C (ownBest c (connS k o b) (own (connS k o b))) _ (own-stills c k o b (own (connS k o b)))
-      (conn-free {ρ = ρ} k (rows ρ o) {β = rows (Hot (rows ρ o) k ∷ᴬ ρ) b} C (seek (inSrc k b c) o) (seek (inBody k o c) b)
+      (conn-free {ρ = ρ} k (rows ρ o) {β = rows (Hot ρ (rows ρ o) k ∷ᴬ ρ) b} C (seek (inSrc k b c) o) (seek (inBody k o c) b)
          (seek-okᶜ C (inSrc k b c) o es go (calm-fst C ρ qt)) (seek-mark (inSrc k b c) o)
          (λ C₂ c₂ air → seek-okᶜ C₂ (inBody k o c) b (bind-single k o b es g) gb (body-quiet {C = C} {C₂ = C₂} {σ = rows ρ o} k o b c₂ qt tl air)))
-  conn-okᶜ {ρ = ρ} C c k@(cs cl sl sa (just p) aS oA ca ea) o b es g@(held hf , gb , _ , tl) qt =
-    conn-held {ρ = ρ} k (rows ρ o) {β = rows (Hot (rows ρ o) k ∷ᴬ ρ) b} C (p ⊕ [ ix 1 ]) (ownBest c (connS k o b) (own (connS k o b))) (seek (inBody k o c) b) hf
+  conn-okᶜ {ρ = ρ} C c k@(cs cl sl sa (just p) aS oA ca ea _) o b es g@(held hf , gb , _ , tl) qt =
+    conn-held {ρ = ρ} k (rows ρ o) {β = rows (Hot ρ (rows ρ o) k ∷ᴬ ρ) b} C (p ⊕ [ ix 1 ]) (ownBest c (connS k o b) (own (connS k o b))) (seek (inBody k o c) b) hf
       (first-at {f = (_ , _ , c , connS k o b)} {m = bodyM} (at (p ⊕ [ ix 1 ])) (ownBest c (connS k o b) (drop 1 (own (connS k o b)))) (own-stills c k o b (drop 1 (own (connS k o b)))))
       (λ C₂ c₂ air → seek-okᶜ C₂ (inBody k o c) b (bind-single k o b es g) gb (body-quiet {C = C} {C₂ = C₂} {σ = rows ρ o} k o b c₂ qt tl air))
 

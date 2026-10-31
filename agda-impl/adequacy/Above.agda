@@ -125,8 +125,8 @@ Anc (inLanes op f d n q o pre post c) s H =
   × Join op d n q (live (pre ʳ++ s ∷ post)) (rows (env c) o) (rowsL (env c) pre ʳ++ H ∷ rowsL (env c) post)
   × Anc c (flatS op f d n q o (pre ʳ++ s ∷ post)) (JR op (λ a → pendRows (env c) (f a)) (rows (env c) o) d n q (rowsL (env c) pre ʳ++ H ∷ rowsL (env c) post))
 Anc (inSrc k b c)         s H =
-  HeldIf (CS.bodyAt k) s × G (Hot H k ∷ᴬ env c) true b × (T (CS.closed k) → Empty H) × (T (CS.closed k) → Told (here refl) b)
-  × Anc c (connS k s b) (Connecting.ConnT (CS.connAt k) H (rows (Hot H k ∷ᴬ env c) b))
+  HeldIf (CS.bodyAt k) s × G (Hot (env c) H k ∷ᴬ env c) true b × (T (CS.closed k) → Empty H) × (T (CS.closed k) → Told (here refl) b)
+  × Anc c (connS k s b) (Connecting.ConnT (CS.connAt k) H (rows (Hot (env c) H k ∷ᴬ env c) b))
 Anc (inBody k o c)        s H =
   SrcG (env c) true (CS.bodyAt k) o × (T (CS.closed k) → Empty (rows (env c) o)) × (T (CS.closed k) → Told (here refl) s)
   × Anc c (connS k o s) (Connecting.ConnT (CS.connAt k) (rows (env c) o) H)

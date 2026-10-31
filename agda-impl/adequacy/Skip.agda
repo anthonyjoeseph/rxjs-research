@@ -64,7 +64,7 @@ LeadC (inTake i q w c)                               p = LeadT w p × LeadC c p
 LeadC (inOuter op f d n q ls c)                      p = Each (After p) (rowsL (env c) ls) × LeadC c p
 LeadC (inLanes op f d n q o pre post c)              p =
   After p (rows (env c) o) × Each (After p) (rowsL (env c) pre) × Each (After p) (rowsL (env c) post) × LeadC c p
-LeadC (inSrc k b c)                                  p = After p (rows (Hot ∅ k ∷ᴬ env c) b) × LeadC c p
+LeadC (inSrc k b c)                                  p = After p (rows (Hot (env c) ∅ k ∷ᴬ env c) b) × LeadC c p
 LeadC (inBody k o c)                                 p = After p (rows (env c) o) × LeadC c p
 LeadC _                                              p = ⊤
 
@@ -497,8 +497,8 @@ postulate
   -- as a skip or a pin under it, and every joiner fed it as a skip under
   -- where it joined, so what differs above is skips past `p` alone, and
   -- the frames above, every other part past `p`, end alike.
-  src-vis : ∀ {R Γ X B} (k : CS) (b : St (X ∷ Γ) B) (c : Ctx R Γ B) {t u : EmissionSet X} {p s}
-          → After p (rows (Hot ∅ k ∷ᴬ env c) b) → LeadC c p → p ≼ s → Since p t → Since p u → t ≈⟨ s ⟩ u
+  src-vis : ∀ {R Γ X B} (k : CS Γ X) (b : St (X ∷ Γ) B) (c : Ctx R Γ B) {t u : EmissionSet X} {p s}
+          → After p (rows (Hot (env c) ∅ k ∷ᴬ env c) b) → LeadC c p → p ≼ s → Since p t → Since p u → t ≈⟨ s ⟩ u
           → Vis (up (inSrc k b c) t) ≃ Vis (up (inSrc k b c) u)
 
 ------------------------------------------------------------------------

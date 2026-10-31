@@ -19,12 +19,12 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import denotation.Events using (ix; inside)
 open import denotation.EmissionSet using (EmissionSet; module Connecting; _≺_; Proper)
-open import denotation.Laws.Modulus using (upto; ≼-or-≻; ≺-irrefl; ≼-≺-≺; ≺-≼-≺; ≺→≼)
+open import denotation.Laws.Modulus using (upto; ≼-or-≻; ≺-irrefl; ≼-≺-≺)
 open import denotation.Laws using (ag-cons; hot-below)
 open import operation.Key using (Key; at; _<ᴷ_)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; CS; Cand; found; still; shift; seek; own; ownBest; sourceT; closed; connS; inSrc; inBody)
-open import adequacy.Rows using (env; rows; Hot; ∅; _∪_; Closed)
+open import adequacy.Rows using (env; rows; Hot; Frozen; ∅; _∪_; Closed)
 open import adequacy.Causal using (rows-causal; env-refl)
 open import adequacy.Bound using (_⊑_; ⊑i; ⊑-refl; ⊑-trans; <→⊑; ext-⊑; shift-⊑; Bd; From; Good; ⊑→≼; apart-before)
 open import adequacy.Cap using (OKᶜ; EnvSingle; Air; bind-after; bind-past; meet; meet-ˡ; meet-ʳ; meet-hi; ext-<; ⊑-<; <-⊑; ≮; StillAt; still-at)
@@ -70,7 +70,7 @@ conn-body-src : ∀ {R Γ A X} (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ �
               → Bd (rows (env c) o) κ₁ h₀ o′
               → ∀ {Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ K o″} → seek (inBody k o c) b ≡ just (found (Γ′ , A′ , c′ , s′) m κ , K , o″)
               → K ⊑ (shift h₀)
-              → closed c′ ≡ false → ∀ P → OfAt s′ m P → Tight (rows (Hot (rows (env c) o) k ∷ᴬ env c) b) P K o″
+              → closed c′ ≡ false → ∀ P → OfAt s′ m P → Tight (rows (Hot (env c) (rows (env c) o) k ∷ᴬ env c) b) P K o″
               → After P (rows (env c) o)
 conn-body-src c k o b es g xe bσ ye Ksh cl P oa tg {q} x =
   apart-before _ (⊑-trans (tight-⊑ tg) Ksh) (from bσ x) (body-apart c k o b es g ye cl P oa x)
@@ -78,15 +78,15 @@ conn-body-src c k o b es g xe bσ ye Ksh cl P oa tg {q} x =
 ------------------------------------------------------------------------
 -- The body, under a cap no later
 
-BodyL : ∀ {R Γ A X} → Key → (c : Ctx R Γ A) → CS → St Γ X → St (X ∷ Γ) A → Maybe (Cand R A) → Set₁
-BodyL C c k o b y = ∀ C₂ → C₂ ⊑ C → (¬ T (CS.closed k) → Air C₂ (Hot (rows (env c) o) k ∷ᴬ env c) (here refl))
-                  → Leadsᶜ C₂ true (inBody k o c) (rows (Hot (rows (env c) o) k ∷ᴬ env c) b) y × OKᶜ C₂ (rows (Hot (rows (env c) o) k ∷ᴬ env c) b) y
+BodyL : ∀ {R Γ A X} → Key → (c : Ctx R Γ A) → CS Γ X → St Γ X → St (X ∷ Γ) A → Maybe (Cand R A) → Set₁
+BodyL C c k o b y = ∀ C₂ → C₂ ⊑ C → (¬ T (CS.closed k) → Air C₂ (Hot (env c) (rows (env c) o) k ∷ᴬ env c) (here refl))
+                  → Leadsᶜ C₂ true (inBody k o c) (rows (Hot (env c) (rows (env c) o) k ∷ᴬ env c) b) y × OKᶜ C₂ (rows (Hot (env c) (rows (env c) o) k ∷ᴬ env c) b) y
 
 -- The body's find, the source's rows past its event.
 body-win : ∀ {R Γ A X} C (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ Γ) A) C₂ {Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ K o″}
-         → C₂ ⊑ C → (¬ T (CS.closed k) → Air C₂ (Hot (rows (env c) o) k ∷ᴬ env c) (here refl)) → K ⊑ C₂
+         → C₂ ⊑ C → (¬ T (CS.closed k) → Air C₂ (Hot (env c) (rows (env c) o) k ∷ᴬ env c) (here refl)) → K ⊑ C₂
          → BodyL C c k o b (just (found (Γ′ , A′ , c′ , s′) m κ , K , o″))
-         → (closed c′ ≡ false → ∀ P → OfAt s′ m P → Tight (rows (Hot (rows (env c) o) k ∷ᴬ env c) b) P K o″ → After P (rows (env c) o))
+         → (closed c′ ≡ false → ∀ P → OfAt s′ m P → Tight (rows (Hot (env c) (rows (env c) o) k ∷ᴬ env c) b) P K o″ → After P (rows (env c) o))
          → Leads true c (rows (env c) (connS k o b)) (just (found (Γ′ , A′ , c′ , s′) m κ , K , o″))
 body-win C c k o b C₂ c₂ air kc bl aσ =
   eBody (proj₁ ly) , λ cl P oa → let (le , tg) = proj₂ ly cl P oa in (aσ cl P oa tg , le) , tight-occ body-occ tg
@@ -97,24 +97,24 @@ body-win C c k o b C₂ c₂ air kc bl aσ =
 -- binder row heard at `x` lands under `x`, so with no source row before
 -- `P` the body's rows up to `P` are the same with its source or without.
 unfed-after : ∀ {Γ X A} (ρ : _) k (o : St Γ X) (b : St (X ∷ Γ) A) → ∀ P
-            → From (at P) (rows ρ o) → After P (rows (Hot (rows ρ o) k ∷ᴬ ρ) b) → After P (rows (Hot ∅ k ∷ᴬ ρ) b)
+            → From (at P) (rows ρ o) → After P (rows (Hot ρ (rows ρ o) k ∷ᴬ ρ) b) → After P (rows (Hot ρ ∅ k ∷ᴬ ρ) b)
 unfed-after ρ k o b P fr aft {q} x with ≼-or-≻ q P
 ... | inj₂ Pq = Pq
 ... | inj₁ qP = aft (proj₂ (upto (rows-causal (ag-cons (hot-below fed unfed) (env-refl ρ)) b) {q} qP) x)
   where
-    fed : ∀ {y e} → y ≺ P → Proper (rows ρ o ∪ Closed k) y e → Proper (∅ ∪ Closed k) y e
-    fed {y} yP (inj₁ s , _)  = ⊥-elim (≺-irrefl {P} (≼-≺-≺ {P} {y} {P} (⊑→≼ (fr s)) yP))
-    fed     yP (inj₂ c , pr) = inj₂ c , λ { (inj₁ ()) ; (inj₂ c′) → pr (inj₂ c′) }
-    unfed : ∀ {y e} → y ≺ P → Proper (∅ ∪ Closed k) y e → Proper (rows ρ o ∪ Closed k) y e
-    unfed     yP (inj₁ () , _)
-    unfed {y} yP (inj₂ c , pr) = inj₂ c , λ { {c′} (inj₁ s) → ≺→≼ {y} {c′} (≺-≼-≺ {y} {P} {c′} yP (⊑→≼ (fr s))) ; (inj₂ c′) → pr (inj₂ c′) }
+    fed : ∀ {y e} → y ≺ P → Proper (Frozen ρ k) y e × (rows ρ o ∪ Closed k) y e → Proper (Frozen ρ k) y e × (∅ ∪ Closed k) y e
+    fed {y} yP (_ , inj₁ s) = ⊥-elim (≺-irrefl {P} (≼-≺-≺ {P} {y} {P} (⊑→≼ (fr s)) yP))
+    fed     yP (f , inj₂ c) = f , inj₂ c
+    unfed : ∀ {y e} → y ≺ P → Proper (Frozen ρ k) y e × (∅ ∪ Closed k) y e → Proper (Frozen ρ k) y e × (rows ρ o ∪ Closed k) y e
+    unfed yP (_ , inj₁ ())
+    unfed yP (f , inj₂ c) = f , inj₂ c
 
 -- The source's find raised, the body's rows unfed past its event.
 src-win : ∀ {R Γ A X} C (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ Γ) A) → Good (env c) (connS k o b)
         → ∀ {Γ₁ A₁} {c₁ : Ctx R Γ₁ A₁} {s₁ m κ h₀ o′}
         → Leadsᶜ C true (inSrc k b c) (rows (env c) o) (just (found (Γ₁ , A₁ , c₁ , s₁) m κ , h₀ , o′))
         → OKᶜ C (rows (env c) o) (just (found (Γ₁ , A₁ , c₁ , s₁) m κ , h₀ , o′))
-        → (C <ᴷ (shift h₀) ≡ false → ∀ P → at P ⊑ (shift h₀) → After P (rows (Hot (rows (env c) o) k ∷ᴬ env c) b))
+        → (C <ᴷ (shift h₀) ≡ false → ∀ P → at P ⊑ (shift h₀) → After P (rows (Hot (env c) (rows (env c) o) k ∷ᴬ env c) b))
         → Leadsᶜ C true c (rows (env c) (connS k o b)) (just (found (Γ₁ , A₁ , c₁ , s₁) m κ , (shift h₀) , still))
 src-win C c k o b g {c₁ = c₁} {s₁} {m} {κ} {h₀} {o′} lx ox ab bf =
   eSrc (proj₁ lx′) , λ cl P oa →
@@ -128,13 +128,13 @@ src-win C c k o b g {c₁ = c₁} {s₁} {m} {κ} {h₀} {o′} lx ox ab bf =
     okx = exact C (just (found (_ , _ , c₁ , s₁) m κ , h₀ , o′)) bx ox
 
 -- An open source's binder past the cap, nothing found.
-none-air : ∀ {R Γ X} {ρ : _} C k {σ : EmissionSet X} → OKᶜ {R} C σ nothing → ¬ T (CS.closed k) → Air {Γ = X ∷ Γ} C (Hot σ k ∷ᴬ ρ) (here refl)
+none-air : ∀ {R Γ X} {ρ : _} C k {σ : EmissionSet X} → OKᶜ {R} C σ nothing → ¬ T (CS.closed k) → Air {Γ = X ∷ Γ} C (Hot ρ σ k ∷ᴬ ρ) (here refl)
 none-air C k {σ} (inj₁ (_ , aσ)) nc = bind-after σ k C (λ a → C <ᴷ a ≡ true) (λ d e → <-⊑ C d e) aσ (λ {x} l _ c → <-⊑ C c (ext-⊑ x [ l ])) nc
 none-air C k (inj₂ (() , _)) nc
 
 -- An open source's binder past the earlier of the cap and its raised find.
 src-air : ∀ {R Γ X} {ρ : _} C k {σ : EmissionSet X} {f h₀ o′} → OKᶜ {R} C σ (just (f , h₀ , o′)) → ¬ T (CS.closed k)
-        → Air {Γ = X ∷ Γ} (meet C (shift h₀)) (Hot σ k ∷ᴬ ρ) (here refl)
+        → Air {Γ = X ∷ Γ} (meet C (shift h₀)) (Hot ρ σ k ∷ᴬ ρ) (here refl)
 src-air C k {σ} {h₀ = h₀} (inj₁ (_ , aσ)) nc =
   bind-after σ k (meet C h) (λ a → C <ᴷ a ≡ true) (λ d e → <-⊑ C d e) aσ (λ {x} l _ c → ⊑-< (at (x ++ [ l ])) (meet-ˡ C h) (<-⊑ C c (ext-⊑ x [ l ]))) nc
   where h = shift h₀
@@ -155,14 +155,14 @@ conn-free-lead {R} C c k o b es g nothing (just (found (_ , _ , c′ , s′) m �
   body-win C c k o b C {c′ = c′} {s′} {m} (⊑-refl C) (none-air {R = R} {ρ = env c} C k {σ = rows (env c) o} ox) (⊑i bf) bl (λ _ P _ tg → none-aft {R = R} {t = rows (env c) o} {C = C} (⊑i bf) ox P (tight-⊑ tg))
 conn-free-lead {R} C c k o b es g (just (found f₁ m₁ κ₁ , h₀ , o′)) nothing xe ye lx ox bl =
   src-win C c k o b g {Γ₁ = proj₁ f₁} {proj₁ (proj₂ f₁)} {c₁ = proj₁ (proj₂ (proj₂ f₁))} {proj₂ (proj₂ (proj₂ f₁))} {m₁} {κ₁} {h₀} {o′} lx ox
-    (λ bf P pk → none-aft {R = R} {t = rows (Hot (rows (env c) o) k ∷ᴬ env c) b} {C = meet C h} (meet-hi C h (⊑i bf))
+    (λ bf P pk → none-aft {R = R} {t = rows (Hot (env c) (rows (env c) o) k ∷ᴬ env c) b} {C = meet C h} (meet-hi C h (⊑i bf))
                    (proj₂ (bl (meet C h) (meet-ˡ C h) (src-air {R = R} {ρ = env c} C k {σ = rows (env c) o} {f = found f₁ m₁ κ₁} {h₀ = h₀} {o′ = o′} ox))) P pk)
   where h = shift h₀
 conn-free-lead {R} C c k o b es g (just (found f₁ m₁ κ₁ , h₀ , o′)) (just (found (_ , _ , c′ , s′) m κ , K , o″)) xe ye lx ox bl
   with (shift h₀) <ᴷ K in lt
 ... | true  =
   src-win C c k o b g {Γ₁ = proj₁ f₁} {proj₁ (proj₂ f₁)} {c₁ = proj₁ (proj₂ (proj₂ f₁))} {proj₂ (proj₂ (proj₂ f₁))} {m₁} {κ₁} {h₀} {o′} lx ox
-    (λ bf P pk → lost-strict {R = R} {t = rows (Hot (rows (env c) o) k ∷ᴬ env c) b} {C = meet C (shift h₀)} {P = P} {K = K} {K′ = shift h₀} {g = found (_ , _ , c′ , s′) m κ} {o = o″}
+    (λ bf P pk → lost-strict {R = R} {t = rows (Hot (env c) (rows (env c) o) k ∷ᴬ env c) b} {C = meet C (shift h₀)} {P = P} {K = K} {K′ = shift h₀} {g = found (_ , _ , c′ , s′) m κ} {o = o″}
                    pk (meet-hi C (shift h₀) (⊑i bf)) lt
                    (proj₂ (bl (meet C (shift h₀)) (meet-ˡ C _) (src-air {R = R} {ρ = env c} C k {σ = rows (env c) o} {f = found f₁ m₁ κ₁} {h₀ = h₀} {o′ = o′} ox))))
 ... | false = λ bf →
@@ -170,7 +170,7 @@ conn-free-lead {R} C c k o b es g (just (found f₁ m₁ κ₁ , h₀ , o′)) (
   where
     h = shift h₀
     aσ : C <ᴷ K ≡ false → OKᶜ C (rows (env c) o) (just (found f₁ m₁ κ₁ , h₀ , o′))
-       → closed c′ ≡ false → ∀ P → OfAt s′ m P → Tight (rows (Hot (rows (env c) o) k ∷ᴬ env c) b) P K o″ → After P (rows (env c) o)
+       → closed c′ ≡ false → ∀ P → OfAt s′ m P → Tight (rows (Hot (env c) (rows (env c) o) k ∷ᴬ env c) b) P K o″ → After P (rows (env c) o)
     aσ bf (inj₁ (_ , a))  cl P oa tg = aft {t = rows (env c) o} {C = C} (tight-⊑ tg) (⊑i bf) a
     aσ bf (inj₂ (_ , bσ)) cl P oa tg = conn-body-src c k o b es g xe bσ ye (≮ K h lt) cl P oa tg
 
@@ -183,13 +183,13 @@ conn-held-lead C c k o b q fσ _ (just (found (_ , _ , c′ , s′) m κ , K , o
   body-win C c k o b (meet C h) {c′ = c′} {s′} {m} (meet-ˡ C h) air (meet-glb C h (⊑i bf) (<→⊑ K h w)) bl
     (λ _ P _ tg → past-strict {u = rows (env c) o} {P} {K} {h} (tight-⊑ tg) w (λ r → ⊑-trans hq (fσ r)))
   where
-    air : ¬ T (CS.closed k) → Air (meet C h) (Hot (rows (env c) o) k ∷ᴬ env c) (here refl)
+    air : ¬ T (CS.closed k) → Air (meet C h) (Hot (env c) (rows (env c) o) k ∷ᴬ env c) (here refl)
     air nc = bind-after (rows (env c) o) k (meet C h) (at q ⊑_) ⊑-trans fσ
                (λ {x} l _ d → ⊑-< (at (x ++ [ l ])) (⊑-trans (meet-ʳ C h) (⊑-trans hq d)) (ext-< x l)) nc
 
 -- Switched off: only the frames.
 conn-off-lead : ∀ {R Γ A X} C (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ Γ) A) (x : Maybe (Cand R X)) (y : Maybe (Cand R A))
-              → Leadsᶜ C false (inSrc k b c) (rows (env c) o) x → Leadsᶜ C false (inBody k o c) (rows (Hot (rows (env c) o) k ∷ᴬ env c) b) y
+              → Leadsᶜ C false (inSrc k b c) (rows (env c) o) x → Leadsᶜ C false (inBody k o c) (rows (Hot (env c) (rows (env c) o) k ∷ᴬ env c) b) y
               → Leadsᶜ C false c (rows (env c) (connS k o b)) (sourceT x y)
 conn-off-lead C c k o b nothing nothing lx ly ()
 conn-off-lead C c k o b nothing (just (found (_ , _ , _ , _) _ _ , _ , _)) lx ly bf = eBody (proj₁ (ly bf)) , _

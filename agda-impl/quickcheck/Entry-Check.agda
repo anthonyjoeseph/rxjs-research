@@ -45,7 +45,7 @@ open import quickcheck.Code using (toObs; timeline)
 open import quickcheck.Trace using (depth)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Tabled using (Row; Listed; _⊣_; rows; short; bind; concatMap; mapM; when; anyᵇ; allᵇ; _≼ᵇ_; endBy; endBefore;
-                                     ends; properᵇ; values; count; fuel; walk; mapRows; rejoin; hotOf; past; afterL; lanes; listT;
+                                     ends; properᵇ; values; count; fuel; walk; mapRows; rejoin; past; afterL; lanes; listT;
                                      module Order; scanRows; takeRows; connRows)
 
 ------------------------------------------------------------------------
@@ -300,8 +300,15 @@ private
   noted π f b nothing  = node π f b nothing
   noted π f b (just l) = node π f b (just (mapL erase (rows l) , short l))
 
-  closedRows : ∀ {A} → CS → List (Row A)
+  closedRows : ∀ {Γ A} → CS Γ A → List (Row A)
   closedRows k = when (CS.closed k) (CS.endAt k , end)
+
+  -- A binder's rows: what its source still owes, and its end once closed,
+  -- each a row of the source's frozen entry `F` before that entry's end.
+  frozenHot : ∀ {Γ A} → CS Γ A → Listed A → Listed A → Listed A
+  frozenHot k F σ = concatMap (λ { (q , e) → when (properᵇ (rows F) q ∧ anyᵇ (λ { (q′ , _) → does (q′ ≟ᵖ q) }) (rows F)) (q , e) })
+                              (rows σ ++ closedRows k)
+                  ⊣ (short σ ∨ short F)
 
   inbox : ∀ {A} → List (Pos × Machine.Ev A) → List (Row A)
   inbox []                  = []
@@ -367,8 +374,10 @@ mutual
   ... | lo , no | lls , nls = opName op , bind lo (λ o′ → bind (allJust lls) λ Ls → joiner u ρ op f d n q o′ Ls) , no ++ nls
   listN u ρ π b (connS k o s) with listS u ρ (π ++ [ 0 ]) b o
   ... | nothing , no = "connect" , nothing , no
-  ... | just σ , no with listS u (hotOf ((rows σ ++ closedRows k) ⊣ short σ) ∷ ρ) (π ++ [ 1 ]) true s
-  ...   | lb , nb = "connect" , lift₁ (connRows (CS.connAt k) σ) lb , no ++ nb
+  ... | just σ , no with listT u (CS.src k) ρ (CS.connAt k ++ [ ix 1 ])
+  ...   | nothing = "connect" , nothing , no
+  ...   | just F with listS u (frozenHot k F σ ∷ ρ) (π ++ [ 1 ]) true s
+  ...     | lb , nb = "connect" , lift₁ (connRows (CS.connAt k) σ) lb , no ++ nb
   listN u ρ π b (joinS j true x ib)  = "join" , just (let h = rejoin j (lookup ρ x) in (inbox ib ++ rows h) ⊣ short h) , []
   listN u ρ π b (joinS j false x ib) = "join" , just (inbox ib ⊣ false) , []
   listN u ρ π b _                    = "done" , just ([] ⊣ false) , []

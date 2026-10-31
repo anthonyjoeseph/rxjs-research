@@ -145,8 +145,8 @@ Agree : ∀ {Γ} → DenEnv Γ → DenEnv Γ → Set₁
 Agree ρ ρ′ = ∀ Q → EnvAg Q ρ ρ′
 
 private
-  agree-cons : ∀ {Γ X} {ρ ρ′ : DenEnv Γ} (k : CS) (o : St Γ X) → Agree ρ ρ′ → Agree (Hot (rows ρ o) k ∷ᴬ ρ) (Hot (rows ρ′ o) k ∷ᴬ ρ′)
-  agree-cons k o e Q = ag-cons (hot-ag k (rows-causal (e Q) o)) (e Q)
+  agree-cons : ∀ {Γ X} {ρ ρ′ : DenEnv Γ} (k : CS Γ X) (o : St Γ X) → Agree ρ ρ′ → Agree (Hot ρ (rows ρ o) k ∷ᴬ ρ) (Hot ρ′ (rows ρ′ o) k ∷ᴬ ρ′)
+  agree-cons k o e Q = ag-cons (hot-ag k (e Q) (rows-causal (e Q) o)) (e Q)
 
   enter-≃ : ∀ {Γ A} {ρ ρ′ : DenEnv Γ} → Agree ρ ρ′ → (x : A ∈ Γ) → ∀ j → enter (lookup ρ x) j ≃ enter (lookup ρ′ x) j
   enter-≃ e x j = (λ {q} r → proj₁ (upto (e q x j) {q} (≼-refl {q})) r) ⇄ (λ {q} r → proj₂ (upto (e q x j) {q} (≼-refl {q})) r)
@@ -234,8 +234,8 @@ mutual
 
 -- A BINDER'S GOOD BODY, UP TO THE SAME ROWS: a body reads its binder
 -- only through the rows it holds.
-good-hot : ∀ {Γ X B} {t u : EmissionSet X} (k : CS) (ρ : DenEnv Γ) (b : St (X ∷ Γ) B) → t ≃ u → ∀ v → G (Hot t k ∷ᴬ ρ) v b → G (Hot u k ∷ᴬ ρ) v b
-good-hot k ρ b eq v = good-env (λ Q → ag-cons (hot-ag k ⟨ (λ _ → to eq , from eq) ⟩) (env-refl ρ)) v b
+good-hot : ∀ {Γ X B} {t u : EmissionSet X} (k : CS Γ X) (ρ : DenEnv Γ) (b : St (X ∷ Γ) B) → t ≃ u → ∀ v → G (Hot ρ t k ∷ᴬ ρ) v b → G (Hot ρ u k ∷ᴬ ρ) v b
+good-hot k ρ b eq v = good-env (λ Q → ag-cons (hot-ag k (env-refl ρ) ⟨ (λ _ → to eq , from eq) ⟩) (env-refl ρ)) v b
 
 good-swap : ∀ {R Γ A} (c : Ctx R Γ A) {s s′ : St Γ A} → Swap (env c) s s′ → ∀ {v} → G [] v (plug c s) → G [] v (plug c s′)
 good-swap top              sw {v} g = node sw v g

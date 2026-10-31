@@ -482,7 +482,7 @@ mutual
   G ρ b (flatS (mergeᶠ (just m)) f d n q o ls) = MergeG (G ρ b o) (GL ρ b ls) ρ b f d n [] o ls × Live b ((q ≡ []) ⊎ (n ≡ m))
   G ρ b (flatS switchᶠ f d n q o ls)          = MergeG (G ρ b o) (GL ρ b ls) ρ b f d n q o ls
   G ρ b (flatS exhaustᶠ f d n q o ls)         = MergeG (G ρ b o) (GL ρ b ls) ρ b f d n q o ls
-  G ρ b (connS k o s)                         = SrcG ρ b (CS.bodyAt k) o × G (Hot (rows ρ o) k ∷ᴬ ρ) b s × Live b (T (CS.closed k) → Empty (rows ρ o)) × Live b (T (CS.closed k) → Told (here refl) s)
+  G ρ b (connS k o s)                         = SrcG ρ b (CS.bodyAt k) o × G (Hot ρ (rows ρ o) k ∷ᴬ ρ) b s × Live b (T (CS.closed k) → Empty (rows ρ o)) × Live b (T (CS.closed k) → Told (here refl) s)
   G ρ b (joinS j true x ib)                   = Live₁ b (Fed ib (enter (lookup ρ x) j))
   G ρ b (joinS j false x ib)                  = Live₁ b (Fed ib ∅)
   G ρ b (coldS v l)                           = ⊤₁

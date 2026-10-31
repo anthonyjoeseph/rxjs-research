@@ -87,12 +87,12 @@ Members: `sub-connect`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`,
 
 #### THE BINDER READ
 
-Believed: a good tree's connect source reads lawfully, its rows and its
-end one event a position, none under another. Open: a connect under a
-switched-off cut, whose `G` asks nothing of its source. Settled by a body,
-or a good tree whose dead connect's source rows clash.
+Believed: a subscribed connect's source was entered where its binders in
+scope are hot, as its `pend` was. Open: `G`'s connect node records no
+entry, so nothing carries it past the subscription. Settled by an entry
+on the node, or a good tree whose connect entered inadmissibly.
 
-Members: `src-lawful`.
+Members: `conn-ok`.
 
 #### A SKIP UNDER A CONNECT
 
