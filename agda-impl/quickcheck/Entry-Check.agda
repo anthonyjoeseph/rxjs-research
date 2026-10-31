@@ -34,7 +34,7 @@ open import IO.Primitive.Core using (_>>=_)
 open import IO.Primitive.Finite using (putStrLn)
 open import Relation.Nullary using (does)
 
-open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
+open import Tree using (Obs; connected; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline; ix; last; inside; _<ᵖ_; _≟ᵖ_; ofᴱ)
 open import denotation.EmissionSet using (Ev; out; skip; pin; end)
 open import operation.PureObservable using (module Machine; module Driver)
@@ -373,6 +373,7 @@ mutual
   ... | f , l , ns = l , noted π f b l ∷ ns
 
   listN : ∀ {Γ A} → ℕ → All Listed Γ → List ℕ → Bool → St Γ A → String × Maybe (Listed A) × List Node
+  listN u ρ π b (pend (connected x) p) = "pend [binder " +++ showRows (mapL erase (rows (lookup ρ x))) +++ "]" , listT u (connected x) ρ p , []
   listN u ρ π b (pend o p)      = "pend" , listT u o ρ p , []
   listN u ρ π b (coldS true l)  = "cold" , just (walk fuel (tapeE l)) , []
   listN u ρ π b (coldS false l) = "cold" , just ([] ⊣ false) , []
@@ -402,7 +403,7 @@ mutual
     where
       parts : ∀ {B} → Maybe (Listed B) → String
       parts nothing   = ""
-      parts (just β) = " [source " +++ showRows (mapL erase (rows σ)) +++ "| body " +++ showRows (mapL erase (rows β)) +++ "]"
+      parts (just β) = " [frozen " +++ showRows (mapL erase (rows F)) +++ "| source " +++ showRows (mapL erase (rows σ)) +++ "| closed " +++ showRows (mapL erase (closedRows k)) +++ "| body " +++ showRows (mapL erase (rows β)) +++ "]"
   listN u ρ π b (joinS j true x ib)  = "join [binder " +++ showRows (mapL erase (rows (lookup ρ x))) +++ "]" , just (let h = rejoin j (lookup ρ x) in (inbox ib ++ rows h) ⊣ short h) , []
   listN u ρ π b (joinS j false x ib) = "join" , just (inbox ib ⊣ false) , []
   listN u ρ π b _                    = "done" , just ([] ⊣ false) , []
