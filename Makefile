@@ -1,4 +1,4 @@
-.PHONY: all help agda gate gate-cheap bug-cache entry-check oracle oracle-build bg bg-check bg-wait \
+.PHONY: all help agda gate gate-cheap bug-cache entry-check cursor-check oracle oracle-build bg bg-check bg-wait \
         wiring wiring-gate wiring-selftest unsafe-check dup-check dup-selftest \
         imports-check imports-fix imports-selftest comments-check comments-selftest \
         roadmap-check roadmap-selftest find find-prose postulates notify split \
@@ -41,6 +41,7 @@ help:
 	@echo "  check         typecheck one module and what IT imports:  make check F=simultaneous/Statement.agda"
 	@echo "  bug-cache     compile the bug cache's runner and run every row"
 	@echo "  entry-check   probe: every node's reading stays inside its entry (CI only)"
+	@echo "  cursor-check  probe: every live node owes its entry past one cursor (CI only)"
 	@echo "  oracle        the three Agda engines against real rxjs (typescript/ drives it)"
 	@echo "  postulates    every postulate in $(SRC) by name — the work ledger"
 	@echo "  find          search the declared TYPE of every statement:  make find Q='⊑ lub'"
@@ -141,6 +142,24 @@ entry-check: $(ENTRY_BIN)
 	  if echo "$$out" | grep -q '^entry-check: FAIL '; then \
 	    echo "entry-check: RED — a reading grew past its entry"; exit 1; fi; \
 	  echo "entry-check: GREEN"
+
+# THE CURSOR PROBE: every live node, at every settled step of the pure
+# run, has delivered exactly its entry's rows up to the latest position
+# delivered, and that position never runs back.  A probe gathering
+# evidence for a design question, run in CI only, never in the gate.
+CURSOR_BIN := $(SRC)/_cli/Cursor-Check
+
+$(CURSOR_BIN): $(AGDA_SRC)
+	@cd $(SRC) && $(AGDA) --compile --compile-dir=_cli quickcheck/Cursor-Check.agda
+	@touch $@
+
+cursor-check: $(CURSOR_BIN)
+	@out=$$($(CURSOR_BIN)); echo "$$out"; \
+	  echo "$$out" | grep -q '^cursor-check: done ' \
+	    || { echo "cursor-check: RED — the probe never reached its closing line"; exit 1; }; \
+	  if echo "$$out" | grep -q '^cursor-check: FAIL '; then \
+	    echo "cursor-check: RED — a node strayed from its entry past the cursor"; exit 1; fi; \
+	  echo "cursor-check: GREEN"
 
 # The wiring law's mechanised check (see CLAUDE.md, "the wiring law: NEVER
 # LEAVE A PROOF HANGING").  Pure textual analysis of the tree, no Agda
