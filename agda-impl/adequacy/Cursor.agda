@@ -234,7 +234,6 @@ data Sync where
   s-scan : ∀ {Γ} {sc : Scope Γ} {C} {A B} {f : B → A → B} {z z₀ s Es E}
          → Sync sc C s Es → Folded C f z₀ Es z → Scan.ScanT f z₀ Es ≈ E → Sync sc C (scanS f z s) E
   s-cut  : ∀ {Γ} {sc : Scope Γ} {C} {A} {a : Att} {s : St Γ A} {E} → Sync sc C s E → Sync sc C (cutS true a s) E
-  s-ln   : ∀ {Γ} {sc : Scope Γ} {C} {A} {s : St Γ A} {E} → Sync sc C s E → Sync sc C (lnS true s) E
   -- a takeWhile not yet failed: no failing value passed
   s-take : ∀ {Γ} {sc : Scope Γ} {C} {A} {i} {keep : A → Bool} {s Es E}
          → Sync sc C s Es → NoFail C keep Es

@@ -10,29 +10,32 @@ module adequacy.Dispatch where
 open import Data.Bool using (Bool; true; false; if_then_else_; not; _∧_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Nat using (_≡ᵇ_; suc)
-open import Data.List using (List; []; _∷_; [_])
+open import Data.List using (List; []; _∷_; [_]; _ʳ++_)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
+open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Maybe using (just; nothing)
-open import Data.Product using (Σ; _,_; _×_; proj₁)
+open import Data.Maybe using (Maybe; just; nothing) renaming (map to mapᴹ)
+open import Data.Product using (Σ; _,_; _×_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; subst)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Timeline; root; Pos; ix; last; timelineAt; emit; stall; close)
 open import denotation.EmissionSet using (EmissionSet; enter; ⟦_⟧; out; end)
-open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; over; opening)
+open import operation.Key using (Key; _<ᴷ_)
+open import operation.PureObservable using (due; PureObs; module Machine; module Driver; Tape; play; ending; over; opening)
 open Machine using (St; Ctx; Conf; scopeOf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; found; Mark; ofM; attM;
-                    rise; run; alive; nx; cp; attAt; Torn; Stepped; quiet; admit; closed; killAll; unsubIf; unsub; free; cpAt; cutAt; overAt;
-                    cut; cpM; cutM; CS; cs; closedUp; _⊕_; bodyM; srcAttM; owedM; joinM; leafM; leaf; starting; turn;
+                    rise; run; alive; nx; cp; attAt; attached; Torn; Stepped; quiet; admit; closed; killAll; unsubIf; unsub; free; cpAt; cutAt; overAt;
+                    cut; cpM; cutM; CS; cs; closedUp; _⊕_; unbound; seek; kids; lanes; own; ownBest; first; retag; raceT; sourceT; shift; Cand; Out; bodyM; srcAttM; owedM; joinM; leafM; leaf; starting; turn;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (≃-refl; Vis; Past; Lowest; _≃_; _⇄_; silent; shown)
-open import adequacy.Cursor using (Cur; origin; bef; Spent; Inv; settled; c-sub; f-top; s-pend; RT; SimC; keeps;
+open _≃_
+open import adequacy.Cursor using (Cur; origin; bef; Spent; Due; Sync; _≈_; c-abs; Inv; settled; c-sub; f-top; s-pend; RT; SimC; keeps;
   rise-top; rise-map; rise-cut; rise-cutx; rise-ln; rise-took; run-stop; run-cut; run-att)
 open import adequacy.Simulation using (Simulation)
+open import adequacy.Walk using (due-≈; climb; descend; refocus)
 
 ------------------------------------------------------------------------
 -- Within what is grown, every step moves or finds nothing to do
@@ -189,10 +192,121 @@ data Delivers {Γ A} : St Γ A → Mark → Pos → Set₁ where
   d-join : ∀ {j g x q e ib} → Delivers (joinS j g x ((q , e) ∷ ib)) joinM q
   d-stop : ∀ {i keep r s} → Delivers (takeS i keep (cpAt r) s) cpM (r ⊕ [ last ])
 
+-- A candidate's mark is one its node owns, its focus a hole of the tree
+-- searched.
+data Owned {R A} (t : St [] R) : Maybe (Cand R A) → Set₁ where
+  o-none : Owned t nothing
+  o-just : ∀ {Γ B c s m κ h o} → Marked {Γ} {B} s m → plug c s ≡ t → Owned t (just (found (Γ , B , c , s) m κ , h , o))
+
+first-owned : ∀ {R A t} {x y : Maybe (Cand R A)} → Owned t x → Owned t y → Owned t (first x y)
+first-owned o-none                 oy                      = oy
+first-owned (o-just mk pe)            o-none                  = o-just mk pe
+first-owned (o-just {h = h} mk pe)    (o-just {h = h′} mk′ pe′)   with h′ <ᴷ h
+... | true  = o-just mk′ pe′
+... | false = o-just mk pe
+
+retag-owned : ∀ {R A B t} {g : Key → Out A → Key × Out B} {x : Maybe (Cand R A)} → Owned t x → Owned t (retag g x)
+retag-owned o-none      = o-none
+retag-owned (o-just mk pe) = o-just mk pe
+
+race-owned : ∀ {R A B t} d n (q : List A) {x : Maybe (Cand R A)} {y : Maybe (Cand R B)} → Owned t x → Owned t y → Owned t (raceT d n q x y)
+race-owned d n q o-none                o-none                = o-none
+race-owned d n q o-none                (o-just mk pe)           = o-just mk pe
+race-owned d n q (o-just mk pe)           o-none                = o-just mk pe
+race-owned d n q (o-just {h = h} mk pe)   (o-just {h = k} mk′ pe′)  with h <ᴷ k
+... | true  = o-just mk pe
+... | false = o-just mk′ pe′
+
+source-owned : ∀ {R A B t} {x : Maybe (Cand R A)} {y : Maybe (Cand R B)} → Owned t x → Owned t y → Owned t (sourceT x y)
+source-owned o-none                oy                    = oy
+source-owned (o-just mk pe)           o-none                = o-just mk pe
+source-owned (o-just {h = h} mk pe)   (o-just {h = k} mk′ pe′)  with shift h <ᴷ k
+... | true  = o-just mk pe
+... | false = o-just mk′ pe′
+
+own-marked : ∀ {Γ A} (s : St Γ A) → All (λ mk → Marked s (proj₁ mk)) (own s)
+own-marked (coldS b l) with due l
+... | just _  = leafK b l ∷ᴬ []ᴬ
+... | nothing = []ᴬ
+own-marked (ofS i p [])                  = ofK i p [] ∷ᴬ []ᴬ
+own-marked (ofS i p (x ∷ xs))            = ofK i p (x ∷ xs) ∷ᴬ []ᴬ
+own-marked (cutS l (attAt p) s)          = attK l p s ∷ᴬ []ᴬ
+own-marked (cutS l attached s)           = []ᴬ
+own-marked (takeS i q (cpAt p) s)        = stopK i q p s ∷ᴬ []ᴬ
+own-marked (takeS i q (cutAt p) s)       = cutK i q p s ∷ᴬ []ᴬ
+own-marked (takeS i q free s)            = []ᴬ
+own-marked (takeS i q (overAt p) s)      = []ᴬ
+own-marked (connS k o b) with CS.bodyAt k | CS.attSrc k | CS.owedAt k
+... | just _  | just _  | just _  = B ∷ᴬ S ∷ᴬ O ∷ᴬ []ᴬ
+  where B = conK k o b bodyM (inj₁ refl); S = conK k o b srcAttM (inj₂ (inj₁ refl)); O = conK k o b owedM (inj₂ (inj₂ refl))
+... | just _  | just _  | nothing = conK k o b bodyM (inj₁ refl) ∷ᴬ conK k o b srcAttM (inj₂ (inj₁ refl)) ∷ᴬ []ᴬ
+... | just _  | nothing | just _  = conK k o b bodyM (inj₁ refl) ∷ᴬ conK k o b owedM (inj₂ (inj₂ refl)) ∷ᴬ []ᴬ
+... | just _  | nothing | nothing = conK k o b bodyM (inj₁ refl) ∷ᴬ []ᴬ
+... | nothing | just _  | just _  = conK k o b srcAttM (inj₂ (inj₁ refl)) ∷ᴬ conK k o b owedM (inj₂ (inj₂ refl)) ∷ᴬ []ᴬ
+... | nothing | just _  | nothing = conK k o b srcAttM (inj₂ (inj₁ refl)) ∷ᴬ []ᴬ
+... | nothing | nothing | just _  = conK k o b owedM (inj₂ (inj₂ refl)) ∷ᴬ []ᴬ
+... | nothing | nothing | nothing = []ᴬ
+own-marked (joinS j g x ((q , e) ∷ ib)) = joinK j g x q e ib ∷ᴬ []ᴬ
+own-marked (joinS j g x [])              = []ᴬ
+own-marked (pend _ _)                    = []ᴬ
+own-marked doneS                         = []ᴬ
+own-marked (mapS _ _)                    = []ᴬ
+own-marked (scanS _ _ _)                 = []ᴬ
+own-marked (lnS _ _)                     = []ᴬ
+own-marked (flatS _ _ _ _ _ _ _)         = []ᴬ
+
+ownBest-owned : ∀ {R Γ A} (c : Ctx R Γ A) s ms → All (λ mk → Marked s (proj₁ mk)) ms → Owned (plug c s) (ownBest c s ms)
+ownBest-owned c s []       []ᴬ          = o-none
+ownBest-owned c s (_ ∷ ms) (mk ∷ᴬ mks)  = first-owned (o-just mk refl) (ownBest-owned c s ms mks)
+
+mutual
+  seek-owned : ∀ {R Γ A} (c : Ctx R Γ A) s → Owned (plug c s) (seek c s)
+  seek-owned c s = first-owned (ownBest-owned c s (own s) (own-marked s)) (kids-owned c s)
+
+  kids-owned : ∀ {R Γ A} (c : Ctx R Γ A) s → Owned (plug c s) (kids c s)
+  kids-owned c (mapS f s)              = retag-owned (seek-owned (inMap f c) s)
+  kids-owned c (scanS f z s)           = retag-owned (seek-owned (inScan f z c) s)
+  kids-owned c (cutS l a s)            = retag-owned (seek-owned (inCut l a c) s)
+  kids-owned c (lnS b s)               = seek-owned (inLn b c) s
+  kids-owned c (takeS i q w s)         = retag-owned (seek-owned (inTake i q w c) s)
+  kids-owned c (flatS op f d n q o ls) = race-owned d n q (seek-owned (inOuter op f d n q ls c) o) (lanes-owned c op f d n q o [] ls)
+  kids-owned c (connS k o b)           = source-owned (seek-owned (inSrc k b c) o) (seek-owned (inBody k o c) b)
+  kids-owned c (pend _ _)              = o-none
+  kids-owned c (coldS _ _)             = o-none
+  kids-owned c (ofS _ _ _)             = o-none
+  kids-owned c doneS                   = o-none
+  kids-owned c (joinS _ _ _ _)         = o-none
+
+  lanes-owned : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q o pre ls
+              → Owned (plug c (flatS op f d n q o (pre ʳ++ ls))) (lanes c op f d n q o pre ls)
+  lanes-owned c op f d n q o pre []         = o-none
+  lanes-owned c op f d n q o pre (s ∷ post) =
+    first-owned (retag-owned (seek-owned (inLanes op f d n q o pre post c) s)) (lanes-owned c op f d n q o (s ∷ pre) post)
+
+found-of : ∀ {R B t} {x : Maybe (Cand R B)} {Γ A c′ s′ m κ}
+         → Owned t x → mapᴹ proj₁ x ≡ just (found (Γ , A , c′ , s′) m κ) → Marked s′ m × plug c′ s′ ≡ t
+found-of o-none         ()
+found-of (o-just mk pe) refl = mk , pe
+
+-- WHAT A SEARCH FINDS: a node's own mark, as `own` keys it, at a hole of
+-- the tree searched.
+found-mark : ∀ {R Γ′ A′} (c : Ctx R Γ′ A′) s {Γ A c′ s′ m κ}
+           → search top (plug c s) ≡ just (found (Γ , A , c′ , s′) m κ) → Marked s′ m
+found-mark c s fd = proj₁ (found-of (seek-owned top (plug c s)) fd)
+
+found-plug : ∀ {R Γ′ A′} (c : Ctx R Γ′ A′) s {Γ A c′ s′ m κ}
+           → search top (plug c s) ≡ just (found (Γ , A , c′ , s′) m κ) → plug c′ s′ ≡ plug c s
+found-plug c s fd = proj₂ (found-of (seek-owned top (plug c s)) fd)
+
 postulate
-  -- WHAT A SEARCH FINDS: a node's own mark, as `own` keys it.
-  found-mark : ∀ {R Γ′ A′} (c : Ctx R Γ′ A′) s {Γ A c′ s′ m κ}
-             → search top (plug c s) ≡ just (found (Γ , A , c′ , s′) m κ) → Marked s′ m
+  -- THE LEAST MARK OVER THE WHOLE TREE: one delivering at `p` leads
+  -- everything owed, so the cursor moves to just before `p` and the tree
+  -- stays in step.
+  least-shift : ∀ {R} {t : St [] R} {C E Γ A} {c′ : Ctx R Γ A} {s′ m κ p}
+              → Sync unbound C t E → search top t ≡ just (found (Γ , A , c′ , s′) m κ) → Delivers s′ m p
+              → Sync unbound (bef p) t E × Due C E ≃ Due (bef p) E
+  -- NO MARK, NOTHING OWED.
+  none-spent  : ∀ {R} {t : St [] R} {C E} → Sync unbound C t E → search top t ≡ nothing → Spent C E
 
 ------------------------------------------------------------------------
 -- The steps over a root's entry
@@ -268,23 +382,6 @@ module Over {R : Set} (Rt : EmissionSet R) where
                   → SimC Rt ⟨ inBody k o c , s , rising cp , p ⟩ [] ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
 
     --------------------------------------------------------------------
-    -- THE SEARCH: nothing found, nothing owed; the least mark leads
-    -- everything owed, so the focus moves to it and the cursor to just
-    -- before its delivery; a mark delivering nothing keeps the cursor.
-    search-none  : ∀ {C Γ A} {c : Ctx R Γ A} {s p}
-                 → Inv Rt C ⟨ c , s , absorbed , p ⟩ → search top (plug c s) ≡ nothing → Spent C Rt
-    search-least : ∀ {C Γ A} {c : Ctx R Γ A} {s r Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ p}
-                 → Inv Rt C ⟨ c , s , absorbed , r ⟩
-                 → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , s′) m κ)
-                 → Delivers s′ m p
-                 → Inv Rt (bef p) ⟨ c′ , s′ , absorbed , r ⟩ × Vis (RT Rt C) ≃ Vis (RT Rt (bef p))
-    search-quiet : ∀ {C Γ A} {c : Ctx R Γ A} {s r Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ}
-                 → Inv Rt C ⟨ c , s , absorbed , r ⟩
-                 → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , s′) m κ)
-                 → (∀ {p} → Delivers s′ m p → ⊥)
-                 → Inv Rt C ⟨ c′ , s′ , absorbed , r ⟩
-
-    --------------------------------------------------------------------
     -- MARK RUNS, the cursor just before what they deliver.
     run-of-nx     : ∀ {Γ A} {c : Ctx R Γ A} {i q x xs r} → closed c ≡ false
                   → Inv Rt (bef (q ⊕ [ ix i ])) ⟨ c , ofS i q (x ∷ xs) , absorbed , r ⟩
@@ -315,6 +412,36 @@ module Over {R : Set} (Rt : EmissionSet R) where
                   → SimC Rt ⟨ c , s , absorbed , p ⟩ [] k′
 
   ----------------------------------------------------------------------
+  -- THE SEARCH: the tree zipped up, the cursor moved over the whole tree,
+  -- and unzipped down to the mark found.
+
+  owed-≃ : ∀ {C C′ E} → E ≈ Rt → Due C E ≃ Due C′ E → Vis (RT Rt C) ≃ Vis (RT Rt C′)
+  owed-≃ {C} {C′} e d = (λ (x , v) → to (due-≈ {C = C′} e) (to d (from (due-≈ {C = C} e) x)) , v)
+                      ⇄ (λ (x , v) → to (due-≈ {C = C} e) (from d (from (due-≈ {C = C′} e) x)) , v)
+
+  search-none : ∀ {C Γ A} {c : Ctx R Γ A} {s p}
+              → Inv Rt C ⟨ c , s , absorbed , p ⟩ → search top (plug c s) ≡ nothing → Spent C Rt
+  search-none {C} (settled _ fr h) fd with climb Rt fr h
+  ... | _ , e , sy = λ d → none-spent sy fd (from (due-≈ {C = C} e) d)
+
+  search-least : ∀ {C Γ A} {c : Ctx R Γ A} {s r Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ p}
+               → Inv Rt C ⟨ c , s , absorbed , r ⟩
+               → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , s′) m κ)
+               → Delivers s′ m p
+               → Inv Rt (bef p) ⟨ c′ , s′ , absorbed , r ⟩ × Vis (RT Rt C) ≃ Vis (RT Rt (bef p))
+  search-least {C} {c = c} {s = s} {c′ = c′} {s′ = s′} {p = p} (settled _ fr h) fd dl with climb Rt fr h
+  ... | _ , e , sy with least-shift sy fd dl
+  ...   | sy′ , d with descend Rt c′ s′ (subst (λ t → Sync unbound _ t _) (sym (found-plug c s fd)) sy′) e
+  ...     | _ , _ , fr′ , h′ = settled c-abs fr′ h′ , owed-≃ {C = C} {C′ = bef p} e d
+
+  -- A mark delivering nothing keeps the cursor: the focus moved to it.
+  search-quiet : ∀ {C Γ A} {c : Ctx R Γ A} {s r Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ}
+               → Inv Rt C ⟨ c , s , absorbed , r ⟩
+               → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , s′) m κ)
+               → Inv Rt C ⟨ c′ , s′ , absorbed , r ⟩
+  search-quiet {c = c} {s = s} i fd = refocus Rt i (found-plug c s fd)
+
+  ----------------------------------------------------------------------
   -- Mark runs, assembled: the search, then the node's run.
 
   module _ {Γ′ A′} {c : Ctx R Γ′ A′} {s : St Γ′ A′} {p : Pos} where
@@ -331,17 +458,14 @@ module Over {R : Set} (Rt : EmissionSet R) where
     abs-att : ∀ {Γ A} {c′ : Ctx R Γ A} {l q s₀ κ k′ sh t}
             → search top (plug c s) ≡ just (found (Γ , A , c′ , cutS l (attAt q) s₀) attM κ) → run c′ (cutS l (attAt q) s₀) attM p ≡ moved k′ sh t
             → SimC Rt ⟨ c , s , absorbed , p ⟩ sh k′
-    abs-att {l = true}  {s₀ = s₀} fd refl = keeps Rt λ i → run-att Rt (λ _ → refl) (search-quiet i fd λ ())
+    abs-att {l = true}  {s₀ = s₀} fd refl = keeps Rt λ i → run-att Rt (λ _ → refl) (search-quiet i fd)
     abs-att {l = false} {s₀ = s₀} fd eq with unsub s₀ | eq
-    ... | s′ , _ | refl = keeps Rt λ i → run-att Rt (λ ()) (search-quiet i fd λ ())
+    ... | s′ , _ | refl = keeps Rt λ i → run-att Rt (λ ()) (search-quiet i fd)
 
     abs-con : ∀ {Γ A X} {c′ : Ctx R Γ A} {k} {o : St Γ X} {b m κ k′ sh t} → m ≡ bodyM ⊎ (m ≡ srcAttM ⊎ m ≡ owedM)
             → search top (plug c s) ≡ just (found (Γ , A , c′ , connS k o b) m κ) → run c′ (connS k o b) m p ≡ moved k′ sh t
             → SimC Rt ⟨ c , s , absorbed , p ⟩ sh k′
-    abs-con w fd eq {C} i with run-con w eq (search-quiet i fd (quiet-con w))
-      where
-        quiet-con : ∀ {m p₀} → m ≡ bodyM ⊎ (m ≡ srcAttM ⊎ m ≡ owedM) → Delivers _ m p₀ → ⊥
-        quiet-con w ()
+    abs-con w fd eq {C} i with run-con w eq (search-quiet i fd)
     ... | refl , i′ = C , i′ , silent ≃-refl
 
     abs-join : ∀ {Γ A} {c′ : Ctx R Γ A} {j g} {x : A ∈ Γ} {q e ib κ k′ sh t}
@@ -364,7 +488,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
             → run c′ (takeS j w (cutAt r) s₀) cutM p ≡ moved k′ sh t
             → SimC Rt ⟨ c , s , absorbed , p ⟩ sh k′
     abs-cut {s₀ = s₀} fd eq with cut s₀ | eq
-    ... | s′ , _ | refl = keeps Rt λ i → run-cut Rt (search-quiet i fd λ ())
+    ... | s′ , _ | refl = keeps Rt λ i → run-cut Rt (search-quiet i fd)
 
   ----------------------------------------------------------------------
   -- Where a step goes: on, linked a step at a time, engine or driver.

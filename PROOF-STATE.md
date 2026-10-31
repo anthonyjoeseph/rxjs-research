@@ -16,12 +16,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SEARCH UNDER THE CURSOR
 
-The least mark a search finds leads every row still owed. Open: each
-node's least key bounds its own owed rows, read off `Sync` (an inbox's
-and a queue's order now in it); refocusing is a walk over `Fr`. Settled
-when each is a body over `Inv`'s frames.
+Over the whole tree in step: the least mark delivering at `p` leads every
+visible row owed, and no mark means none owed. Open: each node's least key
+bounds its own owed rows, read off `Sync`, and a shift-retagged key ties
+none owed elsewhere. Settled when both are bodies by induction over `Sync`.
 
-Members: `search-least`, `search-none`, `search-quiet`, `found-mark`.
+Members: `least-shift`, `none-spent`.
 
 #### THE CONNECT STEPPED
 
