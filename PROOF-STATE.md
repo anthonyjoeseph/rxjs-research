@@ -14,16 +14,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE CONNECT STEPPED
-
-A connect entered, a joiner joined, a source's or body's rise, its own
-marks and a joiner's next, each keeping `Inv`. Open: `s-join` keeps its
-inbox ascending only if a source's visible rows stay in order once each
-is extended by `sub j`, false wherever one is a proper prefix of a later
-one. Settled by that fact as a body, or a program with such a pair.
-
-Members: `sub-conn`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`, `rise-body-nx`, `rise-body-cp`, `run-con`, `run-join-nx`, `run-join-cp`.
-
 #### THE SEARCH UNDER THE CURSOR
 
 The least mark a search finds leads every row still owed. Open: each
@@ -32,6 +22,15 @@ and a queue's order now in it); refocusing is a walk over `Fr`. Settled
 when each is a body over `Inv`'s frames.
 
 Members: `search-least`, `search-none`, `search-quiet`, `found-mark`.
+
+#### THE CONNECT STEPPED
+
+A connect entered, a joiner joined, a source's or body's rise, its own
+marks and a joiner's next, each keeping `Inv`. Open: a source's rise moves
+everything but the source from `bef p` to `aft p`, which needs no row but
+the source's at `p`. Settled when each is a body.
+
+Members: `sub-conn`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`, `rise-body-nx`, `rise-body-cp`, `run-con`, `run-join-nx`, `run-join-cp`.
 
 #### THE JOINER STEPPED
 

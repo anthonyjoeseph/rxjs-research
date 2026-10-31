@@ -56,6 +56,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; unbound; binds; CS; Owe
                     renaming (Ev to Evᴹ; Shown to Shownᴹ)
 open import denotation.Laws.Modulus using (≼-refl; ≺→≼; ≺-absurd; ≺-ext)
 open import adequacy.Rows using (_≃_; _⇄_; ≃-refl; Vis; Moves; silent; shown; toEv; Inbox; full; pendRows; Frozen; tapeE)
+open import denotation.Laws.Worlds using (Ok; Hots)
 open _≃_
 
 ------------------------------------------------------------------------
@@ -139,6 +140,12 @@ bump : Bool → ℕ → ℕ
 bump true  n = suc n
 bump false n = n
 
+-- Every connect of a scope subscribed where admissible: what makes each
+-- of its handles a lawful hot, whose rows lie none below another.
+Adm : ∀ {Γ} → Scope Γ → Set
+Adm unbound        = ⊤
+Adm (binds o p sc) = Ok (Hots (full sc)) p × Adm sc
+
 -- The values passed that wait for a slot, as the state's queue holds
 -- them: their lanes not yet subscribed.  The queue is FIFO and a freed
 -- slot goes to the head, so the queue is in the outer's position order.
@@ -213,7 +220,7 @@ data Sync where
   -- a subscription owed where the cursor has not passed: its program's
   -- entry
   s-pend : ∀ {Γ} {sc : Scope Γ} {C} {A} {o : Obs Timeline Γ A} {q E}
-         → Owes C q → pendRows (full sc) o q ≈ E → Sync sc C (pend o q) E
+         → Owes C q → Ok (Hots (full sc)) q → Adm sc → pendRows (full sc) o q ≈ E → Sync sc C (pend o q) E
   -- a started cold: what its tape has left is what its entry owes
   s-cold : ∀ {Γ} {sc : Scope Γ} {C} {A} {l} {E : EmissionSet A}
          → Due C E ≃ Due origin (InE (tapeE l)) → Sync sc C (coldS true l) E
@@ -258,6 +265,7 @@ data Sync where
          → Due C E ≃ (λ q e → Inbox ib q e ⊎ Due C (Unfed C (lookup (full sc) x) j) q e)
          → AllPairs (λ u v → proj₁ u ≺ proj₁ v) ib
          → (∀ {u q e} → u ∈ ib → Due C (Unfed C (lookup (full sc) x) j) q e → proj₁ u ≺ q)
+         → Adm sc
          → Sync sc C (joinS j true x ib) E
   s-joinx : ∀ {Γ} {sc : Scope Γ} {C} {A} {j} {x : A ∈ Γ} {ib E} → Spent C E → Sync sc C (joinS j false x ib) E
 
