@@ -19,7 +19,9 @@
 --
 -- Also reported, never failed: a silent step whose clock (the least mark
 -- due once absorbed, else the run's position; `adequacy.Complete.Clock`)
--- is earlier than the step before's, the shape `clock-mono` denies.
+-- is earlier than the step before's, the shape `clock-mono` denies.  A
+-- fall is reported only when the root shows a row after it, as
+-- `clock-mono`'s premise asks; one with no row after is only counted.
 --
 -- A node is named by its path of child indices, as `quickcheck.Entry-Check`
 -- names it.  An entry cut short by a budget is skipped.  A probe for
@@ -160,6 +162,7 @@ record Probe : Set where
   field
     book   : List Seen
     cursor : Maybe Pos
+    falls  : Maybe String
     backs  : List String
 
 private
@@ -175,8 +178,8 @@ private
 
   -- A node rising: its delivery, against its entry and the cursor.
   delivered : ℕ → Conf ℕ → Probe → Probe × List String
-  delivered t ⟨ c , _ , rising e , p ⟩ (probing bk cur bs) =
-    probing (deliver π r bk) (ahead cur) bs , back cur ++ stray (known π bk)
+  delivered t ⟨ c , _ , rising e , p ⟩ (probing bk cur fl bs) =
+    probing (deliver π r bk) (ahead cur) fl bs , back cur ++ stray (known π bk)
     where
       π = dirs c
       r = p , kindOf e
@@ -221,24 +224,41 @@ private
 
   -- A silent step's clock against the step before's; the first fall noted.
   ticked : ℕ → Conf ℕ → Conf ℕ → Probe → Probe
-  ticked t k k′ pr with Probe.backs pr | clockOf k′ <ᴷ clockOf k
-  ... | [] | true = record pr { backs = [ "step " +++ showℕ t +++ " clock " +++ showKey (clockOf k) +++ " then " +++ showKey (clockOf k′) ] }
-  ... | _  | _    = pr
+  ticked t k k′ pr with Probe.falls pr | clockOf k′ <ᴷ clockOf k
+  ... | nothing | true = record pr { falls = just ("step " +++ showℕ t +++ " clock " +++ showKey (clockOf k) +++ " then " +++ showKey (clockOf k′)) }
+  ... | _       | _    = pr
+
+  -- The root shows a row: a fall since the last one is met.
+  shown : Probe → Probe
+  shown (probing bk cur (just f) []) = probing bk cur nothing [ f ]
+  shown (probing bk cur _ bs)        = probing bk cur nothing bs
+
+  -- The run's result: its failures, its first met fall, and whether a
+  -- fall went unmet.
+  Result : Set
+  Result = List String × List String × Bool
+
+  ended : List String → Probe → Result
+  ended fs pr = fs , Probe.backs pr , unmet (Probe.falls pr)
+    where
+      unmet : Maybe String → Bool
+      unmet nothing  = false
+      unmet (just _) = true
 
   -- The run for `n` more steps: its first failures, and its clock's fall.
-  go : ℕ → ℕ → ℕ → Probe → Conf ℕ → List String × List String
-  go u zero    t pr k = [] , Probe.backs pr
+  go : ℕ → ℕ → ℕ → Probe → Conf ℕ → Result
+  go u zero    t pr k = ended [] pr
   go u (suc n) t pr k with look u t k pr
-  ... | pr′ , f ∷ fs = f ∷ fs , Probe.backs pr′
+  ... | pr′ , f ∷ fs = ended (f ∷ fs) pr′
   ... | pr′ , []     with step k
   ...   | silent _ k′    = go u n (suc t) (ticked t k k′ pr′) k′
-  ...   | value _ _ _ k′ = go u n (suc t) pr′ k′
-  ...   | complete _     = [] , Probe.backs pr′
-  ...   | drained        = arrears t " though the run drained" (λ _ → true) (deadS [] (plug (Conf.ctx k) (Conf.foc k))) (Probe.book pr′) , Probe.backs pr′
+  ...   | value _ _ _ k′ = go u n (suc t) (shown pr′) k′
+  ...   | complete _     = ended [] (shown pr′)
+  ...   | drained        = ended (arrears t " though the run drained" (λ _ → true) (deadS [] (plug (Conf.ctx k) (Conf.foc k))) (Probe.book pr′)) pr′
 
 -- A seed's program, its run read for `n` steps.
-probe : ℕ → ℕ → List String × List String
-probe n seed = let p = program seed in go (depth 3 p) n 0 (probing [] nothing []) (load (toObs timeline 3 p [] [] []))
+probe : ℕ → ℕ → List String × List String × Bool
+probe n seed = let p = program seed in go (depth 3 p) n 0 (probing [] nothing nothing []) (load (toObs timeline 3 p [] [] []))
 
 ------------------------------------------------------------------------
 -- The report
@@ -248,15 +268,19 @@ private
   each tag []       = putStrLn ""
   each tag (x ∷ xs) = putStrLn (tag +++ x) >>= λ _ → each tag xs
 
-  report : List ℕ → ℕ → ℕ → IO Unit
-  report []          bad bk = putStrLn ("cursor-check: done " +++ showℕ bad +++ " failing seeds, " +++ showℕ bk +++ " seeds whose clock ran back")
-  report (seed ∷ ss) bad bk with probe 400 seed
-  ... | [] , [] = report ss bad bk
-  ... | fs , cs =
+  count : Bool → ℕ → ℕ
+  count b n = if b then suc n else n
+
+  report : List ℕ → ℕ → ℕ → ℕ → IO Unit
+  report []          bad bk tl = putStrLn ("cursor-check: done " +++ showℕ bad +++ " failing seeds, " +++ showℕ bk +++ " seeds whose clock ran back before a row, "
+                                           +++ showℕ tl +++ " more whose clock ran back only after the last row")
+  report (seed ∷ ss) bad bk tl with probe 400 seed
+  ... | [] , [] , u = report ss bad bk (count u tl)
+  ... | fs , cs , u =
     putStrLn ("cursor-check: program " +++ showℕ seed +++ " " +++ showCode natᵗ (program seed)) >>= λ _ →
     each ("cursor-check: FAIL seed " +++ showℕ seed +++ " ") fs >>= λ _ →
     each ("cursor-check: CLOCK seed " +++ showℕ seed +++ " ") cs >>= λ _ →
-    report ss (bad + (if null fs then 0 else 1)) (bk + (if null cs then 0 else 1))
+    report ss (count (not (null fs)) bad) (count (not (null cs)) bk) (count (u ∧ null cs) tl)
 
 main : IO Unit
-main = report (upTo 300) 0 0
+main = report (upTo 300) 0 0 0
