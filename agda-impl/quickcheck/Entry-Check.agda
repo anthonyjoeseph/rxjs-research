@@ -315,6 +315,17 @@ private
                               (rows σ ++ closedRows k)
                   ⊣ (short σ ∨ short F)
 
+  -- A connect's source rows as its echoes read them: its subscribe burst
+  -- always, any other row only while the source lives and before the
+  -- body's end the connect still owes.
+  gated : ∀ {Γ A} → CS Γ A → Listed A → Listed A
+  gated k σ = concatMap (λ { (q , e) → when (inside (CS.connAt k ++ [ ix 1 ]) q ∨ (CS.srcLive k ∧ before (CS.owedAt k) q)) (q , e) }) (rows σ)
+            ⊣ short σ
+    where
+      before : Maybe Pos → Pos → Bool
+      before nothing  q = true
+      before (just c) q = q <ᵖ c
+
   inbox : ∀ {A} → List (Pos × Machine.Ev A) → List (Row A)
   inbox []                  = []
   inbox ((q , nx a) ∷ ib)   = (q , out a) ∷ inbox ib
@@ -382,7 +393,7 @@ mutual
   ... | just σ , no with listT u (CS.src k) ρ (CS.connAt k ++ [ ix 1 ])
   ...   | nothing = "connect" , nothing , no
   ...   | just F with listS u (frozenHot k F σ ∷ ρ) (π ++ [ 1 ]) true s
-  ...     | lb , nb = "connect" +++ parts lb , lift₁ (connRows (CS.connAt k) σ) lb , no ++ nb
+  ...     | lb , nb = "connect" +++ parts lb , lift₁ (connRows (CS.connAt k) (gated k σ)) lb , no ++ nb
     where
       parts : ∀ {B} → Maybe (Listed B) → String
       parts nothing   = ""
