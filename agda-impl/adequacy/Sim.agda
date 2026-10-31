@@ -43,7 +43,8 @@ open import adequacy.Bound using (Good; G; Rooted; mergeG₀; OK)
 open import adequacy.Search using (seek-ok)
 open import adequacy.Up using (up-≃; ≃-refl; vis-≃)
 open import adequacy.Skip using (After; after-conn)
-open import adequacy.Inv using (Inv; inv; good; Sim; Ends; open-alive)
+open import adequacy.Inv using (Inv; inv; good; Sim; Ends; open-alive; anc-liv; node-f; ln-f; tr)
+open import adequacy.Above using (anc-≃)
 open import adequacy.LaneCp using (rise-lane-cp; rise-switch-lane-cp; rise-exhaust-lane-cp; rise-bounded-lane-cp)
 open import adequacy.OuterCp using (rise-outer-cp; rise-bounded-cp; rise-switch-cp; rise-exhaust-cp)
 open import adequacy.LaneNx using (rise-lane-nx; rise-bounded-lane-nx; rise-switch-lane-nx; rise-exhaust-lane-nx)
@@ -190,7 +191,7 @@ sub-sim c (joinS j g x ib)  p _ refl = stay
 rise-top : ∀ {R} (s : St [] R) e p → Sim ⟨ top , s , rising e , p ⟩ [ (p , e) ] ⟨ top , s , absorbed , p ⟩
 rise-top s e p i with alive s in al
 rise-top s e p (inv g (_ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
-rise-top s e p (inv g (_ , _ , _ , ld , _)) | true = inv g tt , shown (new , vis e) least (to′ ⇄ from′)
+rise-top s e p (inv (_ , g) (_ , _ , _ , ld , _)) | true = inv g tt , shown (new , vis e) least (to′ ⇄ from′)
   where
     vis : ∀ e → Visible (toEv e)
     vis (nx _) = tt
@@ -277,20 +278,24 @@ conn-plus-nx r σ β p v = to′ ⇄ from′
 rise-map : ∀ {R Γ A B} (f : A → B) (c : Ctx R Γ B) s e p → Sim ⟨ inMap f c , s , rising e , p ⟩ [] ⟨ c , mapS f s , rising (mapEv f e) , p ⟩
 rise-map f c s e p i with alive s in al
 rise-map f c s e p (inv g (_ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
-rise-map f c s e p (inv g (uc , lc , _ , af , en)) | true =
-  inv g (uc , lc , tt , after-map f {p = p} af , ends-map f e en) , silent (vis-≃ (up-≃ c (map-plus f (rows (env c) s) p e)))
+rise-map f c s e p (inv (a , g) (uc , lc , _ , af , en)) | true =
+  inv (a′ , node-f c (mapS f s) a′ (tr s (anc-liv c a) g)) (uc , lc , tt , after-map f {p = p} af , ends-map f e en)
+  , silent (vis-≃ (up-≃ c (map-plus f (rows (env c) s) p e)))
+  where a′ = anc-≃ c (mapS f s) (map-plus f (rows (env c) s) p e) a
 
 rise-cut : ∀ {R Γ A} l a (c : Ctx R Γ A) s e p → Sim ⟨ inCut l a c , s , rising e , p ⟩ [] ⟨ c , cutS l a s , (if l then rising e else absorbed) , p ⟩
 rise-cut false a c s e p (inv g (() , _))
 rise-cut true  a c s e p i with alive s in al
 rise-cut true  a c s e p (inv g (_ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
-rise-cut true  a c s e p (inv g (uc , lc , _ , af , en)) | true = inv g (uc , lc , tt , af , en) , silent ≃-refl
+rise-cut true  a c s e p (inv (an , g) (uc , lc , _ , af , en)) | true =
+  inv (an , node-f c (cutS true a s) an (tr s (anc-liv (inCut true a c) an) g)) (uc , lc , tt , af , en) , silent ≃-refl
 
 rise-ln : ∀ {R Γ A} b (c : Ctx R Γ A) s e p → Sim ⟨ inLn b c , s , rising e , p ⟩ [] ⟨ c , lnS b s , rising e , p ⟩
 rise-ln false c s e p (inv g (() , _))
 rise-ln true  c s e p i with alive s in al
 rise-ln true  c s e p (inv g (_ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
-rise-ln true  c s e p (inv g (uc , lc , _ , af , en)) | true = inv g (uc , lc , tt , af , en) , silent ≃-refl
+rise-ln true  c s e p (inv ((ct , el , lp , a) , g) (uc , lc , _ , af , en)) | true =
+  inv (a , ln-f c s ct lp (λ ce r → el (old ce) (old r)) g (anc-liv c a)) (uc , lc , tt , af , en) , silent ≃-refl
 
 -- A SCAN'S VALUE FOLDED: the source's least value leaves as the fold of
 -- it, and the rest of the source's rows fold from there.
@@ -363,9 +368,10 @@ rise-body-nx : ∀ {R Γ X B} (k : CS) (o : St Γ X) (c : Ctx R Γ B) s x p
              → Sim ⟨ inBody k o c , s , rising (nx x) , p ⟩ [] ⟨ c , connS k o s , rising (nx x) , p ⟩
 rise-body-nx k o c s x p i with alive s in al
 rise-body-nx k o c s x p (inv g (_ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
-rise-body-nx k o c s x p (inv g (uc , (afs , lc) , _ , af , _)) | true =
-  inv g (uc , lc , tt , after-conn (CS.connAt k) (rows (env c) o) (rows (env (inBody k o c)) s) {p} afs af , tt)
+rise-body-nx k o c s x p (inv (a@(gs , sp , tl , a₁) , g) (uc , (afs , lc) , _ , af , _)) | true =
+  inv (a′ , node-f c (connS k o s) a′ (gs , tr s (anc-liv (inBody k o c) a) g , sp , tl)) (uc , lc , tt , after-conn (CS.connAt k) (rows (env c) o) (rows (env (inBody k o c)) s) {p} afs af , tt)
   , silent (vis-≃ (up-≃ c (conn-plus-nx (CS.connAt k) _ _ p x)))
+  where a′ = anc-≃ c (connS k o s) (conn-plus-nx (CS.connAt k) (rows (env c) o) (rows (env (inBody k o c)) s) p x) a₁
 
 rise-sim : ∀ {R Γ A} {k′ : Conf R} {sh t} (c : Ctx R Γ A) (s : St Γ A) e p → stepᴹ ⟨ c , s , rising e , p ⟩ ≡ moved k′ sh t → Sim ⟨ c , s , rising e , p ⟩ sh k′
 rise-sim top            s e p refl = rise-top s e p

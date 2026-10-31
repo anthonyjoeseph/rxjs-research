@@ -36,7 +36,7 @@ open Machine using (St; Ctx; CS; ⟨_,_,_,_⟩; plug; absorbed; rising; cp; aliv
 open import adequacy.Rows using (env; ∅; up; here; rows; rowsL; pendRows; Plus; old; new; Each; _≃_; _⇄_; ≃-sym; Moves;
   silent)
 open import adequacy.Up using (all-ʳ++; _∷_; up-≃; ≃-trans; vis-≃; plus-≃; trunc-≃)
-open import adequacy.Bound using (Empty; Good; G; GLn; on; off; lane-v; live; dead-empty; MergeG)
+open import adequacy.Bound using (Empty; G; GLn; on; off; lane-v; live; dead-empty; Rooted; shape)
 open import adequacy.Skip using (After; Since; LeadC; _≈⟨_⟩_; up-vis; ≈-refl; since-map; map-≈; since-scan; scan-≈; since-take; take-≈; since-row; flat-≈; after-since;
                                  since-bounded; since-switch; since-exhaust; bounded-≈; switch-≈; exhaust-≈;
                                  ≈ᴸ-hole; conn-≈; since-conn) renaming (≈ᴸ-refl to ≈ᴸ-refl⟨⟩; _∷_ to _∷≈_)
@@ -45,21 +45,17 @@ open import adequacy.Policy using (JoinP; DoneP; polOf)
 open import adequacy.JoinEnd using (join-empty)
 open import adequacy.Rows using (module SwitchF; module BoundedF)
 open import adequacy.Bound using (GL; empty-any)
-open import adequacy.Swap using (rowsL-ʳ++; ≡→≃; live-ʳ++; goodL-ʳ++⁻)
-open import adequacy.Inv using (Inv; inv; Sim; UpO; good-split; node-good; upo-liv)
+open import adequacy.Swap using (rowsL-ʳ++; ≡→≃; live-ʳ++; goodL-ʳ++; goodL-ʳ++⁻; toldL-swap)
+open import adequacy.Inv using (Inv; inv; Sim; UpO; GoodF; upo-liv; node-f; mkG; anc-join)
+open import adequacy.Above using (Anc; Join; JR; Same; anc-≃; anc-≈; anc-swap; fresh-nil; rooted-⊒; ⊒-ʳ++; ⊒-refl; _∷_)
 open import adequacy.Skip using (trunc-≈)
 
-postulate
-  -- A LANE'S END TAKEN, THE TREE STILL GOOD: a rowless lane over a
-  -- completed cut leaves its list and its joiner's count, and every node
-  -- above stays good reading the joiner's rows, which may now end where
-  -- the lane did.  The joiner's own node is direct; open is each frame
-  -- above, whose facts read those rows.
-  -- RECOVERY: git show 785ca3ec:agda-impl/adequacy/LaneCp.agda restores the merge node's `G` across the swap, in `Cp.good′`.
-  good-lane-end : ∀ {R Γ A B} op (f : A → Obs Timeline Γ B) d n (o : St Γ A) pre post (c : Ctx R Γ B) a (s₀ : St Γ B)
-                → Empty (rows (env c) s₀)
-                → Good [] (plug c (flatS op f d n [] o (pre ʳ++ lnS true (cutS true a s₀) ∷ post)))
-                → Good [] (plug c (flatS op f d (pred n) [] o (pre ʳ++ lnS false (cutS false a s₀) ∷ post)))
+-- A joiner reads its policy.
+jr-pol : ∀ {A B} op (L : A → Pos → EmissionSet B) O d n q Ls → JR op L O d n q Ls ≡ Truncate (JoinP (polOf op L O d n q Ls))
+jr-pol (mergeᶠ nothing)  L O d n q Ls = refl
+jr-pol (mergeᶠ (just m)) L O d n q Ls = refl
+jr-pol switchᶠ           L O d n q Ls = refl
+jr-pol exhaustᶠ          L O d n q Ls = refl
 
 -- A joiner's node reads its policy.
 rows-flat : ∀ {Γ A B} (ρ : DenEnv Γ) op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls
@@ -98,12 +94,13 @@ trunc-plus {t = t} {p} {v} sp = to′ ⇄ from′
 
 module Cp {R Γ A B} (op : FlatOp) (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (o : St Γ A) (pre post : List (St Γ B)) (c : Ctx R Γ B)
           (a : Att) (s₀ : St Γ B) (p : Pos)
-          (g : Good [] (plug c (flatS op f d n [] o (pre ʳ++ lnS true (cutS true a s₀) ∷ post))))
-          (mg : MergeG (G (env c) true o) (GL (env c) true (pre ʳ++ lnS true (cutS true a s₀) ∷ post)) (env c) true f d n [] o (pre ʳ++ lnS true (cutS true a s₀) ∷ post))
+          (go : G (env c) true o) (lanesG : GL (env c) true (pre ʳ++ lnS true (cutS true a s₀) ∷ post))
+          (j : Join op d n [] (live (pre ʳ++ lnS true (cutS true a s₀) ∷ post)) (rows (env c) o)
+                    (rowsL (env c) pre ʳ++ Plus (rows (env c) s₀) p end ∷ rowsL (env c) post))
+          (ac : Anc c (flatS op f d n [] o (pre ʳ++ lnS true (cutS true a s₀) ∷ post))
+                      (JR op (λ x → pendRows (env c) (f x)) (rows (env c) o) d n [] (rowsL (env c) pre ʳ++ Plus (rows (env c) s₀) p end ∷ rowsL (env c) post)))
           (uc : UpO c) (ao : After p (rows (env c) o)) (apre : Each (After p) (rowsL (env c) pre)) (apost : Each (After p) (rowsL (env c) post))
           (lc : LeadC c p) (en : Empty (rows (env c) s₀)) where
-
-  open MergeG mg
 
   ρ : DenEnv Γ
   ρ = env c
@@ -131,30 +128,47 @@ module Cp {R Γ A B} (op : FlatOp) (f : A → Obs Timeline Γ B) (d : Bool) (n :
   da  = done-at L {p} {O} {d} {n} Pre Post {rows ρ s₀} ao apre apost en op
 
   cnt : pred n ≡ live pre + live post
-  cnt = cong pred (trans count (trans (live-ʳ++ pre) (+-suc (live pre) (live post))))
+  cnt = cong pred (trans (Join.count j) (trans (live-ʳ++ pre) (+-suc (live pre) (live post))))
 
   ------------------------------------------------------------------------
   -- The tree after
 
-  good′ : Good [] (plug c (node (pred n)))
-  good′ = good-lane-end op f d n o pre post c a s₀ en g
+  N = flatS op f d n [] o (pre ʳ++ lnS true (cutS true a s₀) ∷ post)
+
+  same : Same N (node (pred n))
+  same = record { ln = λ () ; cut = λ () ; held = λ () ; live≡ = refl
+                ; told = λ x (t , ts) → t , toldL-swap pre (λ _ → tt) ts }
+
+  -- The node after, good wherever its frames place it.
+  gf′ : ∀ {H} → Anc c (node (pred n)) H → GoodF c (node (pred n))
+  gf′ an = node-f c (node (pred n)) an (mkG op go gl′ j′)
+    where
+      gs  = goodL-ʳ++⁻ pre lanesG
+      ged : GLn ρ true ed
+      ged = refl , shape s₀ (proj₁ (proj₂ (proj₁ (proj₂ gs)))) , tt
+      gl′ = goodL-ʳ++ pre (proj₁ gs) (ged , proj₂ (proj₂ gs))
+      j′ : Join op d (pred n) [] (live (pre ʳ++ ed ∷ post)) O (rowsL ρ (pre ʳ++ ed ∷ post))
+      j′ = record { fresh = fresh-nil op (pred n) ; count = trans cnt (sym (live-ʳ++ pre)) ; spent = Join.spent j
+                  ; rooted = subst (Rooted O) (sym (rowsL-ʳ++ pre)) (rooted-⊒ (⊒-ʳ++ Pre ((λ ()) ∷ ⊒-refl Post)) (Join.rooted j)) }
 
   ------------------------------------------------------------------------
   -- The two outcomes
 
   pass : ¬ DoneP PX p
        → Inv ⟨ c , node (pred n) , absorbed , p ⟩ × Moves (up c (Truncate (JoinP PX))) [] (up c (rows ρ (node (pred n))))
-  pass nd = inv good′ tt
+  pass nd = inv (anc-join c (node (pred n)) an (gf′ an)) tt
           , silent (≃-trans (up-vis c lc (λ (r , _) → sx′ r) (λ (r , _) → sy′ r) skip)
                             (vis-≃ (up-≃ c (≃-sym rowsY))))
-    where skip = trunc-≈ (fr Y (λ d → ⊥-elim (nd d)) (λ r → r) inj₁)
+    where
+      skip = trunc-≈ (fr Y (λ d → ⊥-elim (nd d)) (λ r → r) inj₁)
+      an   = anc-swap c same (anc-≃ c N (≃-sym rowsY) (anc-≈ c lc (λ (r , _) → sx′ r) (λ (r , _) → sy′ r) skip (subst (Anc c N) (jr-pol op L O d n [] LX) ac)))
 
   done : T d → pred n ≡ 0 → Inv ⟨ c , node (pred n) , rising cp , p ⟩ × Moves (up c (Truncate (JoinP PX))) [] (up c (Plus (rows ρ (node (pred n))) p end))
-  done td pz = inv good′ (uc , lc , tt , (λ r → ⊥-elim (empty-node r)) , empty-node)
+  done td pz = inv (an , gf′ an) (uc , lc , tt , (λ r → ⊥-elim (empty-node r)) , empty-node)
              , silent (≃-trans (up-vis c lc (λ (r , _) → sx′ r) (λ (r , _) → since′ r) skip)
                                (vis-≃ (up-≃ c to-node)))
     where
-      eo = spent td
+      eo = Join.spent j td
       z  = trans (sym cnt) pz
       gs = goodL-ʳ++⁻ pre lanesG
       ep = dead-empty pre (proj₁ gs) (m+n≡0⇒m≡0 (live pre) z)
@@ -170,6 +184,7 @@ module Cp {R Γ A B} (op : FlatOp) (f : A → Obs Timeline Γ B) (d : Bool) (n :
       since′ new     = ≼-refl {p}
       skip   = trunc-≈ (fr (Plus Y p end) (λ _ → new) old back)
       to-node = ≃-trans (trunc-plus sy′) (plus-≃ (≃-sym rowsY))
+      an     = anc-swap c same (anc-≃ c N to-node (anc-≈ c lc (λ (r , _) → sx′ r) (λ (r , _) → since′ r) skip (subst (Anc c N) (jr-pol op L O d n [] LX) ac)))
 
   ------------------------------------------------------------------------
   -- Which, by the counts
@@ -190,53 +205,41 @@ rise-lane-cp : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s 
              → Sim ⟨ inLanes (mergeᶠ nothing) f d n q o pre post c , s , rising cp , p ⟩ []
                    (if alive s then dequeue c (mergeᶠ nothing) f d (pred n) q o (pre ʳ++ ended s ∷ post) p
                                else ⟨ c , flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
-rise-lane-cp f d n q o pre post c s p (inv g (u , l , op′ , as , es)) with upo-liv (inLanes (mergeᶠ nothing) f d n q o pre post c) u
-... | lv with lane-v s (subst (λ v → GLn (env c) v s) lv (good-split (inLanes (mergeᶠ nothing) f d n q o pre post c) s g))
+rise-lane-cp f d n q o pre post c s p (inv ((il , go , gp , gq , j , ac) , gf) (u , (ao , apre , apost , lc) , op′ , as , es)) with upo-liv c u
+... | lv with lane-v s (subst (λ v → GLn (env c) v s) lv gf)
 ... | off a s₀ = ⊥-elim op′
-... | on a s₀ g₀ _ with subst (λ v → G (env c) v (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post))) lv
-                            (node-good c (flatS (mergeᶠ nothing) f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post)) g (λ ()) (λ ()))
-... | mg with MergeG.fresh mg | l
-... | refl | ao , apre , apost , lc =
-  Cp.result (mergeᶠ nothing) f d n o pre post c a s₀ p g mg u ao apre apost lc es
+... | on a s₀ g₀ _ with Join.fresh j
+... | refl = Cp.result (mergeᶠ nothing) f d n o pre post c a s₀ p go (goodL-ʳ++ pre gp (subst (λ v → GLn (env c) v (lnS true (cutS true a s₀))) lv gf , gq)) j ac u ao apre apost lc es
 
 -- A SWITCH'S LANE END.
 rise-switch-lane-cp : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s p
                     → Sim ⟨ inLanes switchᶠ f d n q o pre post c , s , rising cp , p ⟩ []
                           (if alive s then dequeue c switchᶠ f d (pred n) q o (pre ʳ++ ended s ∷ post) p
                                       else ⟨ c , flatS switchᶠ f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
-rise-switch-lane-cp f d n q o pre post c s p (inv g (u , l , op′ , as , es)) with upo-liv (inLanes switchᶠ f d n q o pre post c) u
-... | lv with lane-v s (subst (λ v → GLn (env c) v s) lv (good-split (inLanes switchᶠ f d n q o pre post c) s g))
+rise-switch-lane-cp f d n q o pre post c s p (inv ((il , go , gp , gq , j , ac) , gf) (u , (ao , apre , apost , lc) , op′ , as , es)) with upo-liv c u
+... | lv with lane-v s (subst (λ v → GLn (env c) v s) lv gf)
 ... | off a s₀ = ⊥-elim op′
-... | on a s₀ g₀ _ with subst (λ v → G (env c) v (flatS switchᶠ f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post))) lv
-                            (node-good c (flatS switchᶠ f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post)) g (λ ()) (λ ()))
-... | mg with MergeG.fresh mg | l
-... | refl | ao , apre , apost , lc =
-  Cp.result switchᶠ f d n o pre post c a s₀ p g mg u ao apre apost lc es
+... | on a s₀ g₀ _ with Join.fresh j
+... | refl = Cp.result switchᶠ f d n o pre post c a s₀ p go (goodL-ʳ++ pre gp (subst (λ v → GLn (env c) v (lnS true (cutS true a s₀))) lv gf , gq)) j ac u ao apre apost lc es
 
 -- AN EXHAUST'S LANE END.
 rise-exhaust-lane-cp : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s p
                      → Sim ⟨ inLanes exhaustᶠ f d n q o pre post c , s , rising cp , p ⟩ []
                            (if alive s then dequeue c exhaustᶠ f d (pred n) q o (pre ʳ++ ended s ∷ post) p
                                        else ⟨ c , flatS exhaustᶠ f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
-rise-exhaust-lane-cp f d n q o pre post c s p (inv g (u , l , op′ , as , es)) with upo-liv (inLanes exhaustᶠ f d n q o pre post c) u
-... | lv with lane-v s (subst (λ v → GLn (env c) v s) lv (good-split (inLanes exhaustᶠ f d n q o pre post c) s g))
+rise-exhaust-lane-cp f d n q o pre post c s p (inv ((il , go , gp , gq , j , ac) , gf) (u , (ao , apre , apost , lc) , op′ , as , es)) with upo-liv c u
+... | lv with lane-v s (subst (λ v → GLn (env c) v s) lv gf)
 ... | off a s₀ = ⊥-elim op′
-... | on a s₀ g₀ _ with subst (λ v → G (env c) v (flatS exhaustᶠ f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post))) lv
-                            (node-good c (flatS exhaustᶠ f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post)) g (λ ()) (λ ()))
-... | mg with MergeG.fresh mg | l
-... | refl | ao , apre , apost , lc =
-  Cp.result exhaustᶠ f d n o pre post c a s₀ p g mg u ao apre apost lc es
+... | on a s₀ g₀ _ with Join.fresh j
+... | refl = Cp.result exhaustᶠ f d n o pre post c a s₀ p go (goodL-ʳ++ pre gp (subst (λ v → GLn (env c) v (lnS true (cutS true a s₀))) lv gf , gq)) j ac u ao apre apost lc es
 
 -- A BOUNDED MERGE'S LANE END, NONE WAITING.
 rise-bounded-lane-cp : ∀ {R Γ A B} m f d n (o : St Γ A) pre post (c : Ctx R Γ B) s p
                      → Sim ⟨ inLanes (mergeᶠ (just m)) f d n [] o pre post c , s , rising cp , p ⟩ []
                            (if alive s then dequeue c (mergeᶠ (just m)) f d (pred n) [] o (pre ʳ++ ended s ∷ post) p
                                        else ⟨ c , flatS (mergeᶠ (just m)) f d n [] o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
-rise-bounded-lane-cp m f d n o pre post c s p (inv g (u , l , op′ , as , es)) with upo-liv (inLanes (mergeᶠ (just m)) f d n [] o pre post c) u
-... | lv with lane-v s (subst (λ v → GLn (env c) v s) lv (good-split (inLanes (mergeᶠ (just m)) f d n [] o pre post c) s g))
+rise-bounded-lane-cp m f d n o pre post c s p (inv ((il , go , gp , gq , j , ac) , gf) (u , (ao , apre , apost , lc) , op′ , as , es)) with upo-liv c u
+... | lv with lane-v s (subst (λ v → GLn (env c) v s) lv gf)
 ... | off a s₀ = ⊥-elim op′
-... | on a s₀ g₀ _ with subst (λ v → G (env c) v (flatS (mergeᶠ (just m)) f d n [] o (pre ʳ++ lnS true (cutS true a s₀) ∷ post))) lv
-                            (node-good c (flatS (mergeᶠ (just m)) f d n [] o (pre ʳ++ lnS true (cutS true a s₀) ∷ post)) g (λ ()) (λ ()))
-... | mg , _ with l
-... | ao , apre , apost , lc =
-  Cp.result (mergeᶠ (just m)) f d n o pre post c a s₀ p g mg u ao apre apost lc es
+... | on a s₀ g₀ _ =
+  Cp.result (mergeᶠ (just m)) f d n o pre post c a s₀ p go (goodL-ʳ++ pre gp (subst (λ v → GLn (env c) v (lnS true (cutS true a s₀))) lv gf , gq)) j ac u ao apre apost lc es

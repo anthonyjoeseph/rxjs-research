@@ -14,13 +14,22 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### A SKIP READ ABOVE
+
+Suspect: `Anc` takes a joiner's `Rooted` at its frozen entry, but the
+settled-entry check grows a joiner's rows past that entry where a `sub`
+re-reads a live connect binder (11 of 300 seeds: connect, scan, map).
+Open: freezing the connect binder's source env at its entry. Settled by
+`anc-≈` as a body over that freeze, or a skip it cannot carry.
+
+Members: `anc-≈`.
+
 #### A RISEN OUTER VALUE'S ENTRY
 
-Riskiest: `Inv` holds a rising outer value past the joiner's other parts,
-but not in its outer's frozen entry nor where its binders are hot; the
-begun lane's `Rooted` and `Subs` need both. Open: a lead field reading each
-frame through the risen row, not an entry on every node of `Good`. Settled
-by that field, or a value risen outside its entry.
+Riskiest: a begun lane shows rowless in the subscribing tree while the run
+reads its pending rows, and a joiner is not monotone, so `Anc` does not
+transfer to it; and the value's position must be no other lane's root.
+Settled by that transfer, or a value risen outside its entry.
 
 Members: `begin-good`, `begin-ok`.
 
@@ -145,18 +154,6 @@ steps passing no such row are few. Settled by bodies, or a program whose
 engine stalls silently forever before a row its emission set holds.
 
 Members: `clock-mono`, `still-finite`.
-
-#### THE GOOD TREE KEPT
-
-Untried: a mark run at an of, and a lane's end leaving its list and its
-merge's count, keep `Good`. Apartness is derived, not carried: `Rooted`
-reads it off Tier −1's invariant at the outer's entry. Owed: each outer
-still inside its entry, a lane begun rooted at a value of its own, its
-rows in its subscription's world, and every frame above a merge good
-over rows that may now end where the lane did. Settled by bodies, or a
-program whose of run leaves two parts sharing a position.
-
-Members: `good-of`, `good-done`, `good-lane-end`, `good-outer-end`.
 
 #### THE MARK FOUND
 
