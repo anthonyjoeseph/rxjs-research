@@ -16,28 +16,41 @@ open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _<?_; s≤s; z≤n)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred; <-≤-trans; n≮0; m≤n⇒m≤1+n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
-open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
 open import Induction.WellFounded using (Acc; acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; subst; subst₂; sym; trans)
-open import Relation.Nullary using (Dec; yes; no)
+open import Relation.Nullary using (Dec; yes; no; ¬_)
+open import Data.Bool.Properties using (T-≡)
+open import Function.Bundles using (Equivalence)
+open import Data.Sum using (inj₁; inj₂)
 
-open import denotation.Events using (Pos; root; _≟ᵖ_)
-open import denotation.EmissionSet using (Ev; out; end; EmissionSet; enter; ⟦_⟧; Seen; _≼_)
-open import denotation.Laws.Modulus using (≼-antisym)
+open import denotation.Events using (Pos; root; _≟ᵖ_; <ᵖ-split)
+open import denotation.EmissionSet using (Ev; out; end; EmissionSet; enter; ⟦_⟧; Seen; _≼_; _≺_)
+open import denotation.Laws.Modulus using (≼-antisym; ≼-false)
 open import denotation.Laws.Worlds using (InvAt)
 open import denotation.Laws using (inv-⟦⟧)
 open import denotation.Read using (Run; Meets; Visible; loud; cursor; []; _∷_)
 import denotation.Read as Read
 open import operation.PureObservable using (PureObs; module Machine; module Driver)
 open Machine using (Conf; load; nx; cp; absorbed) renaming (Shown to Shownᴹ)
-open import operation.Key using (Key; at; _<ᴷ_; clash)
-open import adequacy.Rows using (Steps; conv; RT; Vis; Past; Lowest; Beyond; into; back; narrow; past-≃; _≃_; ≃-sym; []; tau;
+open import operation.Key using (Key; at; _<ᴷ_; clash; ≮ᴷ-trans)
+open import adequacy.Rows using (Steps; conv; Vis; Past; Lowest; Beyond; into; back; narrow; past-≃; _≃_; ≃-sym; ≃-trans; []; tau;
   val; fin)
 open _≃_
-open import adequacy.Up using (≃-refl; ≃-trans)
-open import adequacy.Inv using (Inv; inv)
-open import adequacy.Sim using (sim-tau; sim-val; sim-fin; quiet-root; drained-quiet)
-open import adequacy.Bound using (_⊑_; ⊑i; ⊑-trans; ≼-≢)
+open import adequacy.Simulation using (Simulation; quiet-root)
+
+-- `a` no later than `b`.
+record _⊑_ (a b : Key) : Set where
+  constructor ⊑i
+  field un : b <ᴷ a ≡ false
+
+⊑-trans : ∀ {a b c} → a ⊑ b → b ⊑ c → a ⊑ c
+⊑-trans {a} {b} {c} ab bc = ⊑i (≮ᴷ-trans c b a (_⊑_.un bc) (_⊑_.un ab))
+
+-- At or before and not it: before.
+≼-≢ : ∀ {p q} → p ≼ q → ¬ p ≡ q → p ≺ q
+≼-≢ {p} {q} pq ne with <ᵖ-split p q (≼-false {p} {q} pq)
+... | inj₁ lt = Equivalence.from T-≡ lt
+... | inj₂ eq = ⊥-elim (ne eq)
 
 -- A run from `k` to `k′` showing `rs`.
 data Path {R : Set} : Conf R → Shownᴹ R → Conf R → Set₁ where
@@ -125,7 +138,9 @@ postulate
   still-finite : ∀ {R} (o : PureObs [] R) {rs k p e} → Path (load o) rs k
                → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ]) → Acc (Still (enter (⟦ o ⟧ []ᴬ) root) p) k
 
-module _ {R : Set} (o : PureObs [] R) where
+module _ {R : Set} (o : PureObs [] R) (S : Simulation o) where
+  open Simulation S using (I; T; i₀; t₀; dry) renaming (tau to simτ; val to simval; fin to simfin)
+
   private
     t : EmissionSet R
     t = enter (⟦ o ⟧ []ᴬ) root
@@ -149,17 +164,18 @@ module _ {R : Set} (o : PureObs [] R) where
 
     -- Along a run: the invariant, and the visible rows the program's past
     -- what it has shown.
-    along : ∀ {k₀ rs k} c → Path k₀ rs k → Inv k₀ → Vis (RT k₀) ≃ Vis (Beyond t c) → Inv k × Vis (RT k) ≃ Vis (Beyond t (cursor c (conv rs)))
+    along : ∀ {k₀ rs k} c → Path k₀ rs k → (i : I k₀) → Vis (T i) ≃ Vis (Beyond t c)
+          → Σ (I k) λ i′ → Vis (T i′) ≃ Vis (Beyond t (cursor c (conv rs)))
     along c []          i r = i , r
-    along {k₀} c (tau {k′ = k₁} e pth) i r =
-      let (i′ , q) = sim-tau i e
-      in along c pth i′ (≃-trans {t = Vis (RT k₁)} {u = Vis (RT k₀)} {v = Vis (Beyond t c)} (≃-sym q) r)
-    along {k₀} c (val {k′ = k₁} {p = p} e pth) i r =
-      let (i′ , (v , _) , q) = sim-val i e
+    along c (tau e pth) i r =
+      let (i′ , q) = simτ i e
+      in along c pth i′ (≃-trans {t = Vis (T i′)} {u = Vis (T i)} {v = Vis (Beyond t c)} (≃-sym q) r)
+    along c (val {p = p} e pth) i r =
+      let (i′ , (v , _) , q) = simval i e
           cq = proj₂ (into c (proj₁ (to r v)))
       in along (just p) pth i′
-           (≃-trans {t = Vis (RT k₁)} {u = Vis (Past p (RT k₀))} {v = Vis (Beyond t (just p))} (≃-sym q)
-             (≃-trans {u = Vis (Past p (Beyond t c))} (past-≃ {t = RT k₀} {u = Beyond t c} {p = p} r) (narrow {t = t} c cq)))
+           (≃-trans {t = Vis (T i′)} {u = Vis (Past p (T i))} {v = Vis (Beyond t (just p))} (≃-sym q)
+             (≃-trans {u = Vis (Past p (Beyond t c))} (past-≃ {t = T i} {u = Beyond t c} {p = p} r) (narrow {t = t} c cq)))
 
     -- The row met next past `c`.
     Owed : Maybe Pos → Pos → Ev R → Set
@@ -167,25 +183,26 @@ module _ {R : Set} (o : PureObs [] R) where
 
     -- The least visible row of a state, read as the program's past `c`,
     -- is the row met next.
-    same : ∀ k c {p e q e′} → Vis (RT k) ≃ Vis (Beyond t c) → Owed c p e → Lowest (RT k) q e′ → p ≡ q × e ≡ e′
+    same : ∀ {k} (i : I k) c {p e q e′} → Vis (T i) ≃ Vis (Beyond t c) → Owed c p e → Lowest (T i) q e′ → p ≡ q × e ≡ e′
     same _ c r (((tp , _) , _) , vi , ap , lt) (v , lt′) =
       let (tq , cq) = into c (proj₁ (to r v))
           pq = ≼-antisym (lt tq (proj₂ v) cq) (lt′ (from r (back c tp ap , vi)))
       in pq , InvAt.func (inv-⟦⟧ o []ᴬ (λ ()) root (tt , λ ())) tp (subst (λ x → t x _) (sym pq) tq)
 
     -- From a state on the run, the row met next is the next shown.
-    next : ∀ {k} c {p e} → Inv k → Vis (RT k) ≃ Vis (Beyond t c) → Owed c p e → Acc _⇜_ k → Next k p e
+    next : ∀ {k} c {p e} → (i : I k) → Vis (T i) ≃ Vis (Beyond t c) → Owed c p e → Acc _⇜_ k → Next k p e
     next {k} c {p} {e} i r h@(((tp , _) , _) , vi , ap , _) (acc rec) = go (Driver.step R k) refl
       where
         go : ∀ x → Driver.step R k ≡ x → Next k p e
-        go (Driver.silent τ k′) eq with next c (proj₁ (sim-tau i eq)) (≃-trans {t = Vis (RT k′)} {u = Vis (RT k)} {v = Vis (Beyond t c)} (≃-sym (proj₂ (sim-tau i eq))) r) h (rec (τ , eq))
-        ... | more pth = more (tau eq pth)
-        ... | done st  = done (tau eq st)
+        go (Driver.silent τ k′) eq with simτ i eq
+        ... | i′ , q with next c i′ (≃-trans {t = Vis (T i′)} {u = Vis (T i)} {v = Vis (Beyond t c)} (≃-sym q) r) h (rec (τ , eq))
+        ...   | more pth = more (tau eq pth)
+        ...   | done st  = done (tau eq st)
         go (Driver.value τ q a k′) eq =
-          let (pq , ee) = same k c r h (proj₁ (proj₂ (sim-val i eq))) in subst₂ (Next k) (sym pq) (sym ee) (more (val eq []))
+          let (pq , ee) = same i c r h (proj₁ (proj₂ (simval i eq))) in subst₂ (Next k) (sym pq) (sym ee) (more (val eq []))
         go (Driver.complete q) eq =
-          let (pq , ee) = same k c r h (sim-fin i eq) in subst₂ (Next k) (sym pq) (sym ee) (done (fin eq))
-        go Driver.drained eq = ⊥-elim (drained-quiet i eq (from r (back c tp ap , vi)))
+          let (pq , ee) = same i c r h (simfin i eq) in subst₂ (Next k) (sym pq) (sym ee) (done (fin eq))
+        go Driver.drained eq = ⊥-elim (dry i eq (from r (back c tp ap , vi)))
 
     -- The last row met.
     last : ∀ {c} xs {p e} → Run t c (xs ++ [ (p , e) ]) → Owed (cursor c xs) p e
@@ -234,7 +251,7 @@ module _ {R : Set} (o : PureObs [] R) where
 
     progress : ∀ {rs k p e} → Path (load o) rs k → Meets t (conv rs ++ [ (p , e) ]) → Next k p e
     progress {rs} pth m =
-      let (i , r) = along nothing pth (inv tt₁ (tt , (tt , λ ()))) (≃-refl {t = Vis (RT (load o))})
+      let (i , r) = along nothing pth i₀ t₀
       in next (cursor nothing (conv rs)) i r (last {c = nothing} (conv rs) m) (silent-finite pth m)
 
     -- Shown what was met so far, a run shows what is met next.

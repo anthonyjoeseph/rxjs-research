@@ -196,20 +196,7 @@ private
   ... | inj₂ (inj₁ refl) = none _ _ _ (≺-irrefl (lab a)) (lex-shift q r (pick _ _ _ (≺-irrefl (lab a)) (≐-refl (lab a)) h))
   ... | inj₂ (inj₂ ba)   = ⊥-elim (clash h (nope _ _ _ (≺-asym (lab a) (lab b) ba) (≺→≠ (lab a) (lab b) ba)))
 
-<ᴷ-trans : ∀ a b c → a <ᴷ b ≡ true → b <ᴷ c ≡ true → a <ᴷ c ≡ true
-<ᴷ-trans a b c = lex-trans (ext a) (ext b) (ext c)
-
-<ᴷ-irrefl : ∀ k → k <ᴷ k ≡ false
-<ᴷ-irrefl k = lex-irrefl (ext k)
-
 -- Neither strictly before the next, twice: not strictly before the last.
 ≮ᴷ-trans : ∀ a b c → a <ᴷ b ≡ false → b <ᴷ c ≡ false → a <ᴷ c ≡ false
 ≮ᴷ-trans a b c = lex-≮ (ext a) (ext b) (ext c)
 
--- At a position, keys compare as positions do.
-at-<ᵖ : ∀ p q → at p <ᴷ at q ≡ p <ᵖ q
-at-<ᵖ = lex-at
-
--- Just past a position, still before a mark's `after` the position is before.
-shift-after : ∀ q r → at q <ᴷ after r ≡ true → after r <ᴷ at (q ++ [ ix 0 ]) ≡ false
-shift-after = lex-shift

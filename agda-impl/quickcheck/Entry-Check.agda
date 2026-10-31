@@ -2,9 +2,9 @@
 
 -- THE SETTLED ENTRY, PROBED: does a node's reading only ever shrink?  The
 -- pure semantics runs each generated program, and at every settled step
--- (absorbed or subscribing) every node of the tree is listed as
--- `adequacy.Rows.rows` reads it, under the environment `adequacy.Rows.env`
--- gives it.  A node is named by its path of child indices, which the
+-- (absorbed or subscribing) every node of the tree is listed by what it
+-- still owes its parent (its READING), each binder read as its source's
+-- frozen entry less what the source no longer owes.  A node is named by its path of child indices, which the
 -- machine never renumbers: a flatMap's lanes are only ever appended.  The
 -- first listing of a path is its ENTRY; every later one must lie inside
 -- it.  A row outside is printed with the node's former, whether it sits
@@ -14,9 +14,8 @@
 --
 -- Values are erased to their kind, since a node's type is not one the
 -- harness can compare.  A listing cut short by a budget is skipped as an
--- entry, never as a later reading.  Each clause of `listS` mirrors one of
--- `adequacy.Rows.rows`; each joiner's, one of its `Rows` module over
--- `denotation.EmissionSet.Joining`.  A probe for `make entry-check`: no
+-- entry, never as a later reading.  Each joiner's clause of `listS`
+-- reads its lanes as `denotation.EmissionSet.Joining` does.  A probe for `make entry-check`: no
 -- proof reads it.
 module quickcheck.Entry-Check where
 
@@ -135,7 +134,7 @@ shortLanes = anyᵇ (λ { (_ , _ , l) → short l })
 outerOver : ∀ {A} → Bool → List (Row A) → Pos → Bool
 outerOver d o c = d ∨ endBy o c
 
--- `Rows.Flat`.
+-- A merge's reading: its outer's values' lanes and its begun lanes.
 flatL : ∀ {A B : Set} → (A → Pos → Maybe (Listed B)) → Listed A → Bool → ℕ → List (Listed B) → Maybe (Listed B)
 flatL ln o d n Ls =
   bind (lanes ln (values (rows o))) λ ls →
@@ -349,8 +348,8 @@ private
       before nothing  q = true
       before (just c) q = q <ᵖ c
 
-  -- A node under a dead cut or lane: `adequacy.Bound.G` reads it with
-  -- its liveness off, so nothing is asked of its reading.
+  -- A node under a dead cut or lane owes its parent nothing, so nothing
+  -- is asked of its reading.
   dead : Node → Node
   dead (node π f b _ e) = node π f b nothing e
 
