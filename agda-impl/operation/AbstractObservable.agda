@@ -579,8 +579,11 @@ rise (inLanes op f d n q o pre post c) s cp     p =
   ok (if alive s then dequeue c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p else ⟨ c , flatS op f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
 rise (inSrc k b c) s (nx a) p = ok ⟨ c , connS k s (feed (here refl) p (nx a) b) , absorbed , p ⟩
 rise (inSrc k b c) s cp     p = ok ⟨ c , connS (record k { closed = true ; endAt = p }) s (feed (here refl) p cp b) , absorbed , p ⟩
-rise (inBody k o c) s (nx b) p = ok ⟨ c , connS k o s , rising (nx b) , p ⟩
-rise (inBody k o c) s cp     p = ok ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
+-- a body after its source's teardown has completed, and is stopped
+rise (inBody k o c) s (nx b) p =
+  ok (if CS.srcLive k then ⟨ c , connS k o s , rising (nx b) , p ⟩ else ⟨ c , connS k o s , absorbed , p ⟩)
+rise (inBody k o c) s cp     p =
+  ok (if CS.srcLive k then ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩ else ⟨ c , connS k o s , absorbed , p ⟩)
 
 -- A mark run: the node's continuation, resumed where it was left.
 run : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Mark → Pos → Stepped R

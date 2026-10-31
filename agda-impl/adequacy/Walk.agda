@@ -6,7 +6,7 @@
 -- focus of the same tree, at the same cursor.
 module adequacy.Walk where
 
-open import Data.Bool using (T; true; false; not)
+open import Data.Bool using (Bool; T; true; false; not; _∧_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; reverse; _ʳ++_)
 open import Data.List.Properties using (ʳ++-defn)
@@ -22,10 +22,10 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; absorbed; Scope; unbound; bind
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (_≃_; _⇄_; ≃-refl; ≃-sym; ≃-trans)
 open import adequacy.Cursor using (Cur; Owes; Due; Spent; _≈_; Pol; Runs; Hole; LaneSt; l-live; l-dead; Begun; none; more; bump;
-  joined; Sync; s-pend; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat;
-  s-conn; s-join; s-joinx; Need; owes; lane; lanecut; Hold; u-map; u-scan; u-cut; u-ln; u-take;
+  joined; Sync; Src; src-pend; src-on; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat;
+  s-conn; s-join; s-joinx; Need; owes; lane; lanecut; pnd; Hold; u-map; u-scan; u-cut; u-ln; u-take;
   u-outer; u-lanes; u-src; u-body; Fr; f-top; f-off; f-map; f-scan; f-cut; f-take; f-took;
-  f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcx; f-body; Inv; settled; c-abs)
+  f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcp; f-srcx; f-body; Inv; settled; c-abs)
 open _≃_
 
 ------------------------------------------------------------------------
@@ -39,7 +39,6 @@ spent-≈ : ∀ {A} {C} {E E′ : EmissionSet A} → Spent C E → E ≈ E′ �
 spent-≈ {C = C} sp eq d = sp (from (due-≈ {C = C} eq) d)
 
 sync-≈ : ∀ {Γ} {sc : Scope Γ} {C A} {s : St Γ A} {E E′} → Sync sc C s E → E ≈ E′ → Sync sc C s E′
-sync-≈ (s-pend o ok adm eq)  e = s-pend o ok adm (≃-trans eq e)
 sync-≈ {C = C} (s-cold d) e = s-cold (≃-trans (≃-sym (due-≈ {C = C} e)) d)
 sync-≈ {C = C} (s-of d)   e = s-of (≃-trans (≃-sym (due-≈ {C = C} e)) d)
 sync-≈ {C = C} (s-done sp) e = s-done (spent-≈ {C = C} sp e)
@@ -47,7 +46,7 @@ sync-≈ (s-map sy eq)         e = s-map sy (≃-trans eq e)
 sync-≈ (s-scan sy fd eq)     e = s-scan sy fd (≃-trans eq e)
 sync-≈ (s-cut sy)            e = s-cut (sync-≈ sy e)
 sync-≈ (s-take sy nf eq)     e = s-take sy nf (≃-trans eq e)
-sync-≈ (s-took fl nr ow eq)  e = s-took fl nr ow (≃-trans eq e)
+sync-≈ (s-took fl nr fz ow eq) e = s-took fl nr fz ow (≃-trans eq e)
 sync-≈ (s-flat sy j eq)      e = s-flat sy j (≃-trans eq e)
 sync-≈ (s-conn sc b o fl eq) e = s-conn sc b o fl (≃-trans eq e)
 sync-≈ {C = C} (s-join eq d ap lt a) e = s-join (≃-trans eq e) (≃-trans (≃-sym (due-≈ {C = C} e)) d) ap lt a
@@ -103,6 +102,10 @@ notT false _  ()
 none′ : ∀ {A : Set} → EmissionSet A
 none′ _ _ = ⊥
 
+both : ∀ w v → T w → T v → T (w ∧ v)
+both true  _ _ x = x
+both false _ () _
+
 module _ {R : Set} (Rt : EmissionSet R) where
 
   ----------------------------------------------------------------------
@@ -124,19 +127,21 @@ module _ {R : Set} (Rt : EmissionSet R) where
   climb (f-scan fr fd eq)             h = climb fr λ t → s-scan (h t) fd eq
   climb (f-cut fr)                    h = climb fr λ t → s-cut (h t)
   climb (f-take fr nf eq)             h = climb fr λ t → s-take (h t) nf eq
-  climb (f-took fr fl nr ow eq)       h = climb fr λ _ → s-took fl nr ow eq
+  climb (f-took fr fl nr fz ow eq)    h = climb fr λ _ → s-took fl nr fz ow eq
   climb (f-outer fr j eq)             h = climb fr λ t → s-flat (h t) j eq
-  climb (f-lanes {pre = pre} {b = b} fr sy lf o nq r hl rt cnt wt wh od eq) (_ , _ , refl , h) =
-    climb fr λ _ → s-flat sy (joined bg wt wh od) eq
+  climb (f-lanes {pre = pre} {b = b} fr sy lf o nq r hl rt cnt wt wh od ah en eq) (_ , _ , refl , h) =
+    climb fr λ _ → s-flat sy (joined bg wt wh od ah en) eq
     where
       bg = subst (Begun _ _ _ _ _ _) (sym cnt)
              (subst (λ ls → Begun _ _ _ _ _ ls _) (sym (ʳ++-defn pre)) (begun-join lf o nq r (laneSt b hl h) rt))
   climb (f-lane fr)                   (at , l , refl , h) = climb fr (at , l , refl , h)
   climb (f-lnct fr)                   h = climb fr (_ , _ , refl , h)
-  climb (f-src fr sc lv bs fl fe eq)  h = climb fr λ t → s-conn sc bs (λ _ → sync-≈ (h t) (≃-sym fe)) fl eq
-  climb (f-srcx fr sc nl bs fl eq)    h = climb fr λ _ → s-conn sc bs (λ lv → ⊥-elim (notT _ nl lv)) fl eq
-  climb (f-body {k = k} fr sc os fl eq) h =
-    climb fr λ t → s-conn sc (subst (λ x → Sync (binds (CS.src k) (CS.connAt k) x) _ _ _) sc (h t)) os fl eq
+  climb (f-src fr sc lv bs fl fe eq)  h = climb fr λ t → s-conn sc (λ _ → bs) (λ _ → src-on (sync-≈ (h t) (≃-sym fe))) fl eq
+  climb (f-srcp fr sc lv ba adm bs fl fe eq) (_ , refl , pe) =
+    climb fr λ _ → s-conn sc (λ _ → bs) (λ _ → src-pend ba adm (≃-trans pe (≃-sym fe))) fl eq
+  climb (f-srcx fr sc nl fl eq)       h = climb fr λ _ → s-conn sc (λ lv → ⊥-elim (notT _ nl lv)) (λ lv → ⊥-elim (notT _ nl lv)) fl eq
+  climb (f-body {k = k} {w = w} fr sc ev os fl eq) h =
+    climb fr λ t → s-conn sc (λ lv → subst (λ x → Sync (binds (CS.src k) (CS.connAt k) x) _ _ _) sc (h (subst T (sym ev) (both w (CS.srcLive k) t lv)))) os fl eq
 
   ----------------------------------------------------------------------
   -- DOWN: every frame splits its parent's state into its hole's.
@@ -150,6 +155,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-map (owes false , _ , fr , _)            = owes false , none′ , f-off u-map fr , λ ()
   down-map (lane _ , _ , _ , (_ , _ , () , _))
   down-map (lanecut _ , _ , _ , (_ , _ , () , _))
+  down-map (pnd _ , _ , _ , (_ , () , _))
 
   down-scan : ∀ {C Γ A B} {f : B → A → B} {z} {c : Ctx R Γ B} {s} → Res C c (scanS f z s) → Res C (inScan f z c) s
   down-scan (owes true , _ , fr , h) with h _
@@ -157,6 +163,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-scan (owes false , _ , fr , _)            = owes false , none′ , f-off u-scan fr , λ ()
   down-scan (lane _ , _ , _ , (_ , _ , () , _))
   down-scan (lanecut _ , _ , _ , (_ , _ , () , _))
+  down-scan (pnd _ , _ , _ , (_ , () , _))
 
   down-cut : ∀ {C Γ A} {l a} {c : Ctx R Γ A} {s} → Res C c (cutS l a s) → Res C (inCut l a c) s
   down-cut (owes true , _ , fr , h) with h _
@@ -164,6 +171,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-cut (owes false , _ , fr , _)                  = owes false , none′ , f-off u-cut fr , λ ()
   down-cut (lane _ , _ , _ , (_ , _ , () , _))
   down-cut (lanecut b , _ , fr , (_ , _ , refl , h))  = owes b , _ , f-lnct fr , h
+  down-cut (pnd _ , _ , _ , (_ , () , _))
 
   down-ln : ∀ {C Γ A} {b} {c : Ctx R Γ A} {s} → Res C c (lnS b s) → Res C (inLn b c) s
   down-ln (owes true , _ , fr , h) with h _
@@ -171,14 +179,16 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-ln (owes false , _ , fr , _)                  = owes false , none′ , f-off u-ln fr , λ ()
   down-ln (lane b , _ , fr , (at , l , refl , h))    = lanecut b , _ , f-lane fr , (at , l , refl , h)
   down-ln (lanecut _ , _ , _ , (_ , _ , () , _))
+  down-ln (pnd _ , _ , _ , (_ , () , _))
 
   down-take : ∀ {C Γ A} {i keep w} {c : Ctx R Γ A} {s} → Res C c (takeS i keep w s) → Res C (inTake i keep w c) s
   down-take (owes true , _ , fr , h) with h _
   ... | s-take sy nf eq      = owes true , _ , f-take fr nf eq , λ _ → sy
-  ... | s-took fl nr ow eq   = owes false , none′ , f-took fr fl nr ow eq , λ ()
+  ... | s-took fl nr fz ow eq = owes false , none′ , f-took fr fl nr fz ow eq , λ ()
   down-take (owes false , _ , fr , _)            = owes false , none′ , f-off u-take fr , λ ()
   down-take (lane _ , _ , _ , (_ , _ , () , _))
   down-take (lanecut _ , _ , _ , (_ , _ , () , _))
+  down-take (pnd _ , _ , _ , (_ , () , _))
 
   down-outer : ∀ {C Γ A B} {op} {f} {d n qu ls} {c : Ctx R Γ B} {s : St Γ A}
              → Res C c (flatS op f d n qu s ls) → Res C (inOuter op f d n qu ls c) s
@@ -187,34 +197,40 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-outer (owes false , _ , fr , _)            = owes false , none′ , f-off u-outer fr , λ ()
   down-outer (lane _ , _ , _ , (_ , _ , () , _))
   down-outer (lanecut _ , _ , _ , (_ , _ , () , _))
+  down-outer (pnd _ , _ , _ , (_ , () , _))
 
   down-lanes : ∀ {C Γ A B} {op} {f} {d n qu} {o : St Γ A} {pre post} {c : Ctx R Γ B} {s}
              → Res C c (flatS op f d n qu o (pre ʳ++ s ∷ post)) → Res C (inLanes op f d n qu o pre post c) s
   down-lanes {pre = pre} (owes true , _ , fr , h) with h _
-  ... | s-flat sy (joined bg wt wh od) eq
+  ... | s-flat sy (joined bg wt wh od ah en) eq
     with begun-split (reverse pre) (subst (λ ls → Begun _ _ _ _ _ ls _) (ʳ++-defn pre) bg)
   ...   | split lf o nq r l rt cnt refl with laneHold l
-  ...     | _ , hl , hd = lane _ , _ , f-lanes fr sy lf o nq r hl rt cnt wt wh od eq , hd
+  ...     | _ , hl , hd = lane _ , _ , f-lanes fr sy lf o nq r hl rt cnt wt wh od ah en eq , hd
   down-lanes (owes false , _ , fr , _)            = owes false , none′ , f-off u-lanes fr , λ ()
   down-lanes (lane _ , _ , _ , (_ , _ , () , _))
   down-lanes (lanecut _ , _ , _ , (_ , _ , () , _))
+  down-lanes (pnd _ , _ , _ , (_ , () , _))
 
   down-src : ∀ {C Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s} → Res C c (connS k s b) → Res C (inSrc k b c) s
   down-src {k = k} (owes true , _ , fr , h) with h _
   ... | s-conn sc bs os fl eq with live? (CS.srcLive k)
-  ...   | inj₁ lv = owes true , _ , f-src fr sc lv bs fl ≃-refl eq , λ _ → os lv
-  ...   | inj₂ nl = owes false , none′ , f-srcx fr sc nl bs fl eq , λ ()
+  ...   | inj₂ nl = owes false , none′ , f-srcx fr sc nl fl eq , λ ()
+  ...   | inj₁ lv with os lv
+  ...     | src-on sy           = owes true , _ , f-src fr sc lv (bs lv) fl ≃-refl eq , λ _ → sy
+  ...     | src-pend ba adm pe  = pnd _ , _ , f-srcp fr sc lv ba adm (bs lv) fl ≃-refl eq , (_ , refl , pe)
   down-src (owes false , _ , fr , _)            = owes false , none′ , f-off u-src fr , λ ()
   down-src (lane _ , _ , _ , (_ , _ , () , _))
   down-src (lanecut _ , _ , _ , (_ , _ , () , _))
+  down-src (pnd _ , _ , _ , (_ , () , _))
 
   down-body : ∀ {C Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s} → Res C c (connS k o s) → Res C (inBody k o c) s
   down-body {C = C} {k = k} {s = s} (owes true , _ , fr , h) with h _
   ... | s-conn sc bs os fl eq =
-    owes true , _ , f-body fr sc os fl eq , λ _ → subst (λ x → Sync (binds (CS.src k) (CS.connAt k) x) C s _) (sym sc) bs
+    owes (CS.srcLive k) , _ , f-body fr sc refl os fl eq , λ lv → subst (λ x → Sync (binds (CS.src k) (CS.connAt k) x) C s _) (sym sc) (bs lv)
   down-body (owes false , _ , fr , _)            = owes false , none′ , f-off u-body fr , λ ()
   down-body (lane _ , _ , _ , (_ , _ , () , _))
   down-body (lanecut _ , _ , _ , (_ , _ , () , _))
+  down-body (pnd _ , _ , _ , (_ , () , _))
 
   descend : ∀ {C Γ A} (c : Ctx R Γ A) s {E} → Sync unbound C (plug c s) E → E ≈ Rt → Res C c s
   descend top                               s sy eq = owes true , _ , f-top eq , λ _ → sy

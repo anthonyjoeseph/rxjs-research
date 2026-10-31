@@ -32,8 +32,8 @@ open Machine using (St; Ctx; Conf; scopeOf; ⟨_,_,_,_⟩; subscribing; absorbed
                     renaming (Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (≃-refl; Vis; Past; Lowest; _≃_; _⇄_; silent; shown)
 open _≃_
-open import adequacy.Cursor using (Cur; origin; bef; Spent; Due; Sync; _≈_; c-abs; Inv; settled; c-sub; f-top; s-pend; RT; SimC; keeps;
-  rise-top; rise-map; rise-cut; rise-cutx; rise-ln; rise-took; run-stop; run-cut; run-att)
+open import adequacy.Cursor using (Cur; origin; bef; Spent; Due; Sync; _≈_; c-abs; Inv; settled; pending; f-top; RT; SimC; keeps;
+  rise-top; rise-map; rise-cut; rise-cutx; rise-ln; rise-took; rise-bodyx; run-stop; run-cut; run-att)
 open import adequacy.Simulation using (Simulation)
 open import adequacy.Walk using (due-≈; climb; descend; refocus)
 
@@ -74,8 +74,12 @@ rise-mv (inLanes op f d n q o pre post c) s (nx b) p = tt
 rise-mv (inLanes op f d n q o pre post c) s cp     p = tt
 rise-mv (inSrc k b c)             s (nx a) p = tt
 rise-mv (inSrc k b c)             s cp     p = tt
-rise-mv (inBody k o c)            s (nx b) p = tt
-rise-mv (inBody k o c)            s cp     p = tt
+rise-mv (inBody k o c)            s (nx b) p with CS.srcLive k
+... | true  = tt
+... | false = tt
+rise-mv (inBody k o c)            s cp     p with CS.srcLive k
+... | true  = tt
+... | false = tt
 
 run-of-mv : ∀ {R Γ A} (c : Ctx R Γ A) i q (xs : List A) p → Mv (run c (ofS i q xs) ofM p)
 run-of-mv c i q xs p with closed c | xs
@@ -376,9 +380,9 @@ module Over {R : Set} (Rt : EmissionSet R) where
                   → rise (inSrc k b c) s (nx a) p ≡ moved k′ sh t → SimC Rt ⟨ inSrc k b c , s , rising (nx a) , p ⟩ sh k′
     rise-src-cp   : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s p k′ sh t}
                   → rise (inSrc k b c) s cp p ≡ moved k′ sh t → SimC Rt ⟨ inSrc k b c , s , rising cp , p ⟩ sh k′
-    rise-body-nx  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s b p}
+    rise-body-nx  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s b p} → CS.srcLive k ≡ true
                   → SimC Rt ⟨ inBody k o c , s , rising (nx b) , p ⟩ [] ⟨ c , connS k o s , rising (nx b) , p ⟩
-    rise-body-cp  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s p}
+    rise-body-cp  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s p} → CS.srcLive k ≡ true
                   → SimC Rt ⟨ inBody k o c , s , rising cp , p ⟩ [] ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
 
     --------------------------------------------------------------------
@@ -548,8 +552,12 @@ module Over {R : Set} (Rt : EmissionSet R) where
   rise-sim (inLanes op f d n q o pre post c) s cp     p eq = rise-lane-cp eq
   rise-sim (inSrc k b c)             s (nx a) p eq   = rise-src-nx eq
   rise-sim (inSrc k b c)             s cp     p eq   = rise-src-cp eq
-  rise-sim (inBody k o c)            s (nx b) p refl = rise-body-nx
-  rise-sim (inBody k o c)            s cp     p refl = rise-body-cp
+  rise-sim (inBody k o c)            s (nx b) p eq with CS.srcLive k in lv | eq
+  ... | true  | refl = rise-body-nx lv
+  ... | false | refl = rise-bodyx Rt lv
+  rise-sim (inBody k o c)            s cp     p eq with CS.srcLive k in lv | eq
+  ... | true  | refl = rise-body-cp lv
+  ... | false | refl = rise-bodyx Rt lv
 
   -- A joiner subscribed, by its subject's end.
   join-mv : ∀ {Γ A} (c : Ctx R Γ A) (x : A ∈ Γ) q {p} → Mv (stepᴹ ⟨ c , pend (connected x) q , subscribing , p ⟩)
@@ -600,7 +608,7 @@ cursor : ∀ {R} (o : PureObs [] R) → Simulation o
 cursor {R} o = record
   { I   = λ k → Σ Cur λ C → Inv Rt C k
   ; T   = λ i → RT Rt (proj₁ i)
-  ; i₀  = origin , settled c-sub (f-top ≃-refl) (λ _ → s-pend tt (tt , λ ()) tt ≃-refl)
+  ; i₀  = origin , pending (f-top ≃-refl) (λ _ → tt , (tt , λ ()) , tt , ≃-refl)
   ; t₀  = (λ { ((x , v , _) , v′) → x , v′ }) ⇄ (λ { (x , v) → (x , v , tt) , v })
   ; tau = tau
   ; val = val

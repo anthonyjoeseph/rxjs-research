@@ -28,7 +28,7 @@
 -- past the cursor, is what is still to feed it.
 module adequacy.Cursor where
 
-open import Data.Bool using (Bool; T; true; false; not)
+open import Data.Bool using (Bool; T; true; false; not; _∧_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_; reverse; map)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -54,7 +54,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; unbound; binds; CS; Owe
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ)
-open import denotation.Laws.Modulus using (≼-refl; ≺→≼; ≺-absurd; ≺-ext)
+open import denotation.Laws.Modulus using (≼-refl; ≺→≼; ≺-absurd; ≺-ext; ≺-irrefl)
 open import adequacy.Rows using (_≃_; _⇄_; ≃-refl; Vis; Moves; silent; shown; toEv; Inbox; full; pendRows; Frozen; tapeE)
 open import denotation.Laws.Worlds using (Ok; Hots)
 open _≃_
@@ -161,6 +161,16 @@ Whole C P O vs ws = ∀ {q a} → O q (out a) → ¬ Owes C q → Runs P q → (
 OuterDone : ∀ {A} → Cur → EmissionSet A → Bool → Set
 OuterDone C O d = (T d → Σ Pos λ c → O c end × ¬ Owes C c) × (∀ {c} → O c end → ¬ Owes C c → T d)
 
+-- Every waiting value's lane starts past the end, still owed, of a begun
+-- lane no later value kills: the end that frees its slot.
+Ahead : ∀ {A B} → Cur → Pol A B → List (Pos × A) → List (Pos × A) → Set
+Ahead C P vs ws = ∀ {q a s} → (q , a) ∈ ws → Start P q a s
+  → Σ Pos λ q′ → Σ _ λ a′ → Σ Pos λ c → (q′ , a′) ∈ vs × Lane P q′ a′ c end × (∀ {q″} → Kill P q′ q″ → c ≼ q″) × Owes C c × c ≺ s
+
+-- A lane's rows lie none past its end.
+Ends : ∀ {A B} → Pol A B → EmissionSet A → Set
+Ends P O = ∀ {q a c k e} → O q (out a) → Lane P q a c end → Lane P q a k e → Visible e → k ≼ c
+
 ------------------------------------------------------------------------
 -- A NODE IN STEP WITH ITS FROZEN ENTRY: what its state still owes is
 -- exactly `E`'s visible rows past `C`.  `E` is pinned from below by a
@@ -187,6 +197,7 @@ data Begun {Γ A B} (sc : Scope Γ) (C : Cur) (P : Pol A B) (O : EmissionSet A) 
 data Joined {Γ A B} (sc : Scope Γ) (C : Cur) (P : Pol A B) (O : EmissionSet A) (d : Bool) (n : ℕ) (qu : List A)
             (ls : List (St Γ B)) : Set₁ where
   joined : ∀ {vs ws} → Begun sc C P O vs ls n → Waiting C P O ws qu → Whole C P O vs ws → OuterDone C O d
+         → Ahead C P vs ws → Ends P O
          → Joined sc C P O d n qu ls
 
 -- A scan's fold: of the values passed, the seed if none.
@@ -202,11 +213,12 @@ NoFail C keep Es = ∀ {q a} → Es q (out a) → T (not (keep a)) → Owes C q
 Failure : ∀ {A} → (A → Bool) → EmissionSet A → Pos → Set
 Failure keep Es r = Σ _ λ a → Es r (out a) × T (not (keep a)) × ¬ TakeWhile.Failed true keep Es r
 
--- What a takeWhile failed at `r` still owes itself.
-data OweAt : Owe → Pos → Set where
-  o-cp   : ∀ {r} → OweAt (cpAt r) r
-  o-cut  : ∀ {r} → OweAt (cutAt r) r
-  o-over : ∀ {r} → OweAt (overAt r) r
+-- What a takeWhile failed at `r` still owes itself: its completion, under
+-- `last`, until the cursor passes it.
+data OweAt (C : Cur) : Owe → Pos → Set where
+  o-cp   : ∀ {r} → Owes C (r ++ [ last ]) → OweAt C (cpAt r) r
+  o-cut  : ∀ {r} → ¬ Owes C (r ++ [ last ]) → OweAt C (cutAt r) r
+  o-over : ∀ {r} → ¬ Owes C (r ++ [ last ]) → OweAt C (overAt r) r
 
 -- A connect's flags, read off its source's frozen entry and its body's:
 -- closed once the source's end is passed while it runs, where it ended;
@@ -217,11 +229,11 @@ record Flags {Γ X B} (C : Cur) (k : CS Γ X) (β : EmissionSet B) : Set where
     unshut : T (CS.srcLive k) → ∀ {c} → Frozen k c end → ¬ Owes C c → T (CS.closed k)
     torn   : T (not (CS.srcLive k)) → Spent C β
 
+-- A connect's source: running, its frozen entry what it owes; or not yet
+-- subscribed, which its body's own mark does at the connect's `ix 1`.
+data Src : ∀ {Γ X} → Scope Γ → Cur → CS Γ X → St Γ X → Set₁
+
 data Sync where
-  -- a subscription owed where the cursor has not passed: its program's
-  -- entry
-  s-pend : ∀ {Γ} {sc : Scope Γ} {C} {A} {o : Obs Timeline Γ A} {q E}
-         → Owes C q → Ok (Hots (full sc)) q → Adm sc → pendRows (full sc) o q ≈ E → Sync sc C (pend o q) E
   -- a started cold: what its tape has left is what its entry owes
   s-cold : ∀ {Γ} {sc : Scope Γ} {C} {A} {l} {E : EmissionSet A}
          → Due C E ≃ Due origin (InE (tapeE l)) → Sync sc C (coldS true l) E
@@ -240,19 +252,20 @@ data Sync where
          → TakeWhile.TakeT i keep Es ≈ E → Sync sc C (takeS i keep free s) E
   -- failed at `r`: its source is not read again
   s-took : ∀ {Γ} {sc : Scope Γ} {C} {A} {i} {keep : A → Bool} {w s Es E r}
-         → Failure keep Es r → ¬ Owes C r → OweAt w r
+         → Failure keep Es r → ¬ Owes C r → (T i → ¬ Owes C (r ++ [ ix 0 ])) → OweAt C w r
          → TakeWhile.TakeT i keep Es ≈ E → Sync sc C (takeS i keep w s) E
   -- a joiner: its outer, and its bookkeeping over its policy
   s-flat : ∀ {Γ} {sc : Scope Γ} {C} {A B} {op} {f : A → Obs Timeline Γ B} {d n qu o ls O E}
          → Sync sc C o O → Joined sc C (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O d n qu ls
          → JoinF op (λ a → ⟦ f a ⟧ (full sc)) O ≈ E
          → Sync sc C (flatS op f d n qu o ls) E
-  -- a connect: its body, under its binder read whole, and its source
-  -- while the body owes
+  -- a connect: its body, under its binder read whole, and its source,
+  -- while the source runs; torn down, its body owes nothing and nothing
+  -- reads either
   s-conn : ∀ {Γ} {sc : Scope Γ} {C} {X B} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B} {β : EmissionSet B} {E}
          → CS.scope k ≡ sc
-         → Sync (binds (CS.src k) (CS.connAt k) sc) C b β
-         → (T (CS.srcLive k) → Sync sc C o (Frozen k))
+         → (T (CS.srcLive k) → Sync (binds (CS.src k) (CS.connAt k) sc) C b β)
+         → (T (CS.srcLive k) → Src sc C k o)
          → Flags C k β
          → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E
          → Sync sc C (connS k o b) E
@@ -268,6 +281,13 @@ data Sync where
          → Adm sc
          → Sync sc C (joinS j true x ib) E
   s-joinx : ∀ {Γ} {sc : Scope Γ} {C} {A} {j} {x : A ∈ Γ} {ib E} → Spent C E → Sync sc C (joinS j false x ib) E
+
+data Src where
+  src-pend : ∀ {Γ X} {sc : Scope Γ} {C} {k : CS Γ X} {o}
+           → CS.bodyAt k ≡ just (CS.connAt k) → Adm (binds (CS.src k) (CS.connAt k) sc)
+           → pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]) ≈ Frozen k
+           → Src sc C k (pend o (CS.connAt k ++ [ ix 1 ]))
+  src-on   : ∀ {Γ X} {sc : Scope Γ} {C} {k : CS Γ X} {o} → Sync sc C o (Frozen k) → Src sc C k o
 
 -- No rise in flight.
 data Calm {A : Set} : Machine.Mode A → Set where
@@ -285,12 +305,14 @@ data Need : Set where
   owes    : Bool → Need
   lane    : Bool → Need
   lanecut : Bool → Need
+  pnd     : Pos → Need
 
 -- The hole's state against its need.
 Hold : ∀ {Γ} → Scope Γ → Cur → Need → ∀ {A} → St Γ A → EmissionSet A → Set₁
 Hold sc C (owes w)    s E = T w → Sync sc C s E
 Hold sc C (lane b)    s E = Σ Att λ at → Σ (St _ _) λ l → s ≡ lnS b (cutS b at l) × (T b → Sync sc C l E)
 Hold sc C (lanecut b) s E = Σ Att λ at → Σ (St _ _) λ l → s ≡ cutS b at l × (T b → Sync sc C l E)
+Hold {Γ} sc C (pnd q) {A} s E = Σ (Obs Timeline Γ A) λ o → s ≡ pend o q × pendRows (full sc) o q ≈ E
 
 -- A rise in flight at `p` from the hole: delivered there, its row in the
 -- hole's entry.
@@ -298,6 +320,7 @@ Fly : ∀ {Γ} → Scope Γ → Pos → Need → ∀ {A} → St Γ A → Emissio
 Fly sc p (owes w)    s E e = T w → Sync sc (aft p) s E × E p (toEv e)
 Fly sc p (lane b)    s E e = Σ Att λ at → Σ (St _ _) λ l → s ≡ lnS b (cutS b at l) × (T b → Sync sc (aft p) l E × E p (toEv e))
 Fly sc p (lanecut b) s E e = Σ Att λ at → Σ (St _ _) λ l → s ≡ cutS b at l × (T b → Sync sc (aft p) l E × E p (toEv e))
+Fly {Γ} sc p (pnd q) {A} s E e = Σ (Obs Timeline Γ A) λ o → s ≡ pend o q × ⊥
 
 -- One frame inside another.
 data Up1 {R : Set} : ∀ {Γ A Γ′ A′} → Ctx R Γ A → Ctx R Γ′ A′ → Set₁ where
@@ -325,7 +348,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
     f-take  : ∀ {Γ A} {i} {keep : A → Bool} {c : Ctx R Γ A} {w E E′}
             → Fr C c (owes w) E′ → NoFail C keep E → TakeWhile.TakeT i keep E ≈ E′ → Fr C (inTake i keep free c) (owes w) E
     f-took  : ∀ {Γ A} {i} {keep : A → Bool} {o} {c : Ctx R Γ A} {w E Es E′ r}
-            → Fr C c (owes w) E′ → Failure keep Es r → ¬ Owes C r → OweAt o r → TakeWhile.TakeT i keep Es ≈ E′
+            → Fr C c (owes w) E′ → Failure keep Es r → ¬ Owes C r → (T i → ¬ Owes C (r ++ [ ix 0 ])) → OweAt C o r
+            → TakeWhile.TakeT i keep Es ≈ E′
             → Fr C (inTake i keep o c) (owes false) E
     f-outer : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n qu ls} {c : Ctx R Γ B} {w E E′}
             → Fr C c (owes w) E′
@@ -346,6 +370,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Waiting C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O ws qu
             → Whole C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O (vs₁ ++ (q , a) ∷ vs₂) ws
             → OuterDone C O d
+            → Ahead C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) (vs₁ ++ (q , a) ∷ vs₂) ws
+            → Ends (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O
             → JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O ≈ E′
             → Fr C (inLanes op f d n qu o pre post c) (lane b) E
     -- under a lane's list entry, its switch; under that, its program
@@ -356,28 +382,44 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) C b β
             → Flags C k β → Frozen k ≈ E → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′
             → Fr C (inSrc k b c) (owes w) E
+    -- a source not yet subscribed: its program, owed at the connect's
+    -- `ix 1`
+    f-srcp  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {w E E′ β}
+            → Fr C c (owes w) E′ → CS.scope k ≡ scopeOf c → T (CS.srcLive k)
+            → CS.bodyAt k ≡ just (CS.connAt k) → Adm (binds (CS.src k) (CS.connAt k) (scopeOf c))
+            → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) C b β
+            → Flags C k β → Frozen k ≈ E → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′
+            → Fr C (inSrc k b c) (pnd (CS.connAt k ++ [ ix 1 ])) E
     -- a source torn down: nothing reads it
     f-srcx  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {w E E′ β}
             → Fr C c (owes w) E′ → CS.scope k ≡ scopeOf c → T (not (CS.srcLive k))
-            → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) C b β
             → Flags C k β → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′
             → Fr C (inSrc k b c) (owes false) E
-    f-body  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {w E E′}
-            → Fr C c (owes w) E′ → CS.scope k ≡ scopeOf c
-            → (T (CS.srcLive k) → Sync (scopeOf c) C o (Frozen k))
+    -- a body: owed while its source runs
+    f-body  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {w v E E′}
+            → Fr C c (owes w) E′ → CS.scope k ≡ scopeOf c → v ≡ (w ∧ CS.srcLive k)
+            → (T (CS.srcLive k) → Src (scopeOf c) C k o)
             → Flags C k E
             → Connecting.ConnT (CS.connAt k) (Frozen k) E ≈ E′
-            → Fr C (inBody k o c) (owes w) E
+            → Fr C (inBody k o c) (owes v) E
 
   -- THE INVARIANT: settled, the hole and every frame at one cursor; a
-  -- rise in flight at `p`, its row in the hole's entry, delivered below
-  -- and not yet seen above.
+  -- subscription owed where the cursor has not passed, its program's
+  -- entry; a rise in flight at `p`, its row in the hole's entry, delivered
+  -- below and not yet seen above; or a rise in a subtree no live node
+  -- reads, at any cursor, reaching nothing owed.
   data Inv : Cur → Conf R → Set₁ where
     settled : ∀ {Γ A} {c : Ctx R Γ A} {s m p C w E} → Calm m
             → Fr C c w E → Hold (scopeOf c) C w s E → Inv C ⟨ c , s , m , p ⟩
+    pending : ∀ {Γ A} {c : Ctx R Γ A} {o q p C w E}
+            → Fr C c (owes w) E
+            → (T w → Owes C q × Ok (Hots (full (scopeOf c))) q × Adm (scopeOf c) × pendRows (full (scopeOf c)) o q ≈ E)
+            → Inv C ⟨ c , pend o q , subscribing , p ⟩
     flying  : ∀ {Γ A} {c : Ctx R Γ A} {s e p w E}
             → Fr (bef p) c w E → Fly (scopeOf c) p w s E e
             → Inv (bef p) ⟨ c , s , rising e , p ⟩
+    adrift  : ∀ {Γ A} {c : Ctx R Γ A} {s e p C E}
+            → Fr C c (owes false) E → Inv C ⟨ c , s , rising e , p ⟩
 
   -- What the root owes: its entry past the cursor.
   RT : Cur → EmissionSet R
@@ -390,25 +432,6 @@ module _ {R : Set} (Rt : EmissionSet R) where
   -- The invariant kept at its cursor.
   keeps : ∀ {k k′} → (∀ {C} → Inv C k → Inv C k′) → SimC k [] k′
   keeps g {C} i = C , g i , silent ≃-refl
-
-  -- A rise in flight is read at `bef p`.
-  fly : ∀ {Γ A} {c : Ctx R Γ A} {s e p k′ sh}
-      → (Inv (bef p) ⟨ c , s , rising e , p ⟩ → Σ Cur λ C′ → Inv C′ k′ × Moves (RT (bef p)) sh (RT C′))
-      → SimC ⟨ c , s , rising e , p ⟩ sh k′
-  fly g (settled () _ _)
-  fly g i@(flying _ _) = g i
-
-  -- A rise in flight on, the cursor kept.
-  flies : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {c′ : Ctx R Γ′ A′} {s s′ e e′ p}
-        → (Inv (bef p) ⟨ c , s , rising e , p ⟩ → Inv (bef p) ⟨ c′ , s′ , rising e′ , p ⟩)
-        → SimC ⟨ c , s , rising e , p ⟩ [] ⟨ c′ , s′ , rising e′ , p ⟩
-  flies {p = p} g = fly λ i → bef p , g i , silent ≃-refl
-
-  -- A rise absorbed, the cursor kept.
-  sinks : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {c′ : Ctx R Γ′ A′} {s s′ e p}
-        → (Inv (bef p) ⟨ c , s , rising e , p ⟩ → Inv (bef p) ⟨ c′ , s′ , absorbed , p ⟩)
-        → SimC ⟨ c , s , rising e , p ⟩ [] ⟨ c′ , s′ , absorbed , p ⟩
-  sinks {p = p} g = fly λ i → bef p , g i , silent ≃-refl
 
   ----------------------------------------------------------------------
   -- THE ROW SHOWN IS THE LEAST OWED, for free: a rise reaching the root
@@ -426,7 +449,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
 
   -- THE ROOT: the row shown, the cursor past it.
   rise-top : ∀ {s : St [] R} {e p} → SimC ⟨ top , s , rising e , p ⟩ [ (p , e) ] ⟨ top , s , absorbed , p ⟩
-  rise-top {p = p} = fly λ { (flying fr@(f-top eq) h) → aft p , settled c-abs (f-top eq) (λ w → proj₁ (h w)) , show-top fr h }
+  rise-top {p = p} (flying fr@(f-top eq) h) = aft p , settled c-abs (f-top eq) (λ w → proj₁ (h w)) , show-top fr h
+  rise-top (settled () _ _)
+  rise-top (adrift (f-off () _))
 
   ----------------------------------------------------------------------
   -- FRAMES THAT ONLY PASS A RISE
@@ -434,9 +459,12 @@ module _ {R : Set} (Rt : EmissionSet R) where
   -- MAP: the hole's row mapped.
   rise-map : ∀ {Γ A B} {f : A → B} {c : Ctx R Γ B} {s e p}
            → SimC ⟨ inMap f c , s , rising e , p ⟩ [] ⟨ c , mapS f s , rising (mapEv f e) , p ⟩
-  rise-map {f = f} {e = e} = flies λ
+  rise-map {f = f} {e = e} = keeps λ
     { (flying (f-map fr eq) h)    → flying fr λ w → let (sy , row) = h w in s-map sy eq , proj₁ (to eq (mapped e row , vis (mapEv f e)))
-    ; (flying (f-off u-map fr) h) → flying fr λ () }
+    ; (flying (f-off u-map fr) h) → flying fr λ ()
+    ; (adrift (f-map fr eq))      → adrift fr
+    ; (adrift (f-off u-map fr))   → adrift fr
+    ; (settled () _ _) }
     where
       mapped : ∀ {E q} (e : Evᴹ _) → E q (toEv e) → MapT f E q (toEv (mapEv f e))
       mapped (nx a) r = map-out r
@@ -445,31 +473,57 @@ module _ {R : Set} (Rt : EmissionSet R) where
   -- A LIVE CUT passes the row; one off absorbs it.
   rise-cut : ∀ {Γ A} {a} {c : Ctx R Γ A} {s e p}
            → SimC ⟨ inCut true a c , s , rising e , p ⟩ [] ⟨ c , cutS true a s , rising e , p ⟩
-  rise-cut = flies λ
+  rise-cut = keeps λ
     { (flying (f-cut fr) h)       → flying fr λ w → let (sy , row) = h w in s-cut sy , row
     ; (flying (f-lnct fr) h)      → flying fr (_ , _ , refl , h)
-    ; (flying (f-off u-cut fr) h) → flying fr λ () }
+    ; (flying (f-off u-cut fr) h) → flying fr λ ()
+    ; (adrift (f-cut fr))         → adrift fr
+    ; (adrift (f-off u-cut fr))   → adrift fr
+    ; (settled () _ _) }
 
   rise-cutx : ∀ {Γ A} {a} {c : Ctx R Γ A} {s e p}
             → SimC ⟨ inCut false a c , s , rising e , p ⟩ [] ⟨ c , cutS false a s , absorbed , p ⟩
-  rise-cutx = sinks λ
+  rise-cutx = keeps λ
     { (flying (f-lnct fr) h)      → settled c-abs fr (_ , _ , refl , λ ())
-    ; (flying (f-off u-cut fr) h) → settled c-abs fr (λ ()) }
+    ; (flying (f-off u-cut fr) h) → settled c-abs fr (λ ())
+    ; (adrift (f-lnct fr))        → settled c-abs fr (_ , _ , refl , λ ())
+    ; (adrift (f-off u-cut fr))   → settled c-abs fr (λ ())
+    ; (settled () _ _) }
 
   -- A LANE'S OWN FRAME passes the row.
   rise-ln : ∀ {Γ A} {b} {c : Ctx R Γ A} {s e p}
           → SimC ⟨ inLn b c , s , rising e , p ⟩ [] ⟨ c , lnS b s , rising e , p ⟩
-  rise-ln = flies λ
+  rise-ln = keeps λ
     { (flying (f-lane fr) (at , l , refl , h)) → flying fr (at , l , refl , h)
-    ; (flying (f-off u-ln fr) h)             → flying fr λ () }
+    ; (flying (f-off u-ln fr) h)             → flying fr λ ()
+    ; (adrift (f-off u-ln fr))               → adrift fr
+    ; (settled () _ _) }
 
   -- A TAKEWHILE OVER absorbs whatever still reaches it.
   rise-took : ∀ {Γ A} {i} {keep : A → Bool} {w} {c : Ctx R Γ A} {s e p} → w ≢ free
             → SimC ⟨ inTake i keep w c , s , rising e , p ⟩ [] ⟨ c , takeS i keep w s , absorbed , p ⟩
-  rise-took nf = sinks λ
-    { (flying (f-took fr fl nr ow eq) h) → settled c-abs fr (λ _ → s-took fl nr ow eq)
-    ; (flying (f-take fr _ _) h)         → ⊥-elim (nf refl)
-    ; (flying (f-off u-take fr) h)       → settled c-abs fr (λ ()) }
+  rise-took nf = keeps λ
+    { (flying (f-took fr fl nr fz ow eq) h) → settled c-abs fr (λ _ → s-took fl nr fz ow eq)
+    ; (flying (f-take fr _ _) h)            → ⊥-elim (nf refl)
+    ; (flying (f-off u-take fr) h)          → settled c-abs fr (λ ())
+    ; (adrift (f-took fr fl nr fz ow eq))   → settled c-abs fr (λ _ → s-took fl nr fz ow eq)
+    ; (adrift (f-take fr _ _))              → ⊥-elim (nf refl)
+    ; (adrift (f-off u-take fr))            → settled c-abs fr (λ ())
+    ; (settled () _ _) }
+
+  -- A BODY OF A TORN-DOWN SOURCE has completed: it is stopped, and
+  -- nothing reads it.
+  rise-bodyx : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s e p} → CS.srcLive k ≡ false
+             → SimC ⟨ inBody k o c , s , rising e , p ⟩ [] ⟨ c , connS k o s , absorbed , p ⟩
+  rise-bodyx nl = keeps λ
+    { (flying (f-body fr sc _ _ fl eq) _) → settled c-abs fr λ _ → s-conn sc (dead nl) (dead nl) fl eq
+    ; (flying (f-off u-body fr) _)        → settled c-abs fr (λ ())
+    ; (adrift (f-body fr sc _ _ fl eq))   → settled c-abs fr λ _ → s-conn sc (dead nl) (dead nl) fl eq
+    ; (adrift (f-off u-body fr))          → settled c-abs fr (λ ())
+    ; (settled () _ _) }
+    where
+      dead : ∀ {b} {X : Set₁} → b ≡ false → T b → X
+      dead refl ()
 
   ----------------------------------------------------------------------
   -- RUNS OF A TAKEWHILE'S OWN MARKS
@@ -483,11 +537,13 @@ module _ {R : Set} (Rt : EmissionSet R) where
       stopped : ∀ {Γ A} {sc : Scope Γ} {i} {keep : A → Bool} {s E}
               → Sync sc (bef (r ++ [ last ])) (takeS i keep (cpAt r) s) E
               → Sync sc (aft (r ++ [ last ])) (takeS i keep (cutAt r) s) E × E (r ++ [ last ]) end
-      stopped {A = A} (s-took (a , x , nk , nf) _ o-cp eq) =
-        s-took (a , x , nk , nf) (≺-absurd {r} {r ++ [ last ]} (≺-ext r {last} [])) o-cut eq
+      stopped {A = A} (s-took (a , x , nk , nf) _ fz (o-cp _) eq) =
+        s-took (a , x , nk , nf) (≺-absurd {r} {r ++ [ last ]} (≺-ext r {last} []))
+               (λ t lt → fz t (≺→≼ {r ++ [ last ]} {r ++ [ ix 0 ]} lt)) (o-cut (≺-irrefl {r ++ [ last ]})) eq
         , proj₁ (to eq (TakeWhile.stop x nk nf , vis {A = A} cp))
   run-stop (settled {w = lane _} _ fr (_ , _ , () , _))
   run-stop (settled {w = lanecut _} _ fr (_ , _ , () , _))
+  run-stop (settled {w = pnd _} _ fr (_ , () , _))
 
   -- Its source cut: the source is not read.
   run-cut : ∀ {C Γ A} {i} {keep : A → Bool} {c : Ctx R Γ A} {s s′ r p p′}
@@ -496,9 +552,10 @@ module _ {R : Set} (Rt : EmissionSet R) where
     where
       over : ∀ {Γ A} {sc : Scope Γ} {C} {i} {keep : A → Bool} {s s′ r} {E : EmissionSet A}
            → Sync sc C (takeS i keep (cutAt r) s) E → Sync sc C (takeS i keep (overAt r) s′) E
-      over (s-took fl nr o-cut eq) = s-took fl nr o-over eq
+      over (s-took fl nr fz (o-cut n) eq) = s-took fl nr fz (o-over n) eq
   run-cut (settled {w = lane _} _ fr (_ , _ , () , _))
   run-cut (settled {w = lanecut _} _ fr (_ , _ , () , _))
+  run-cut (settled {w = pnd _} _ fr (_ , () , _))
 
   -- A KILL SWITCH ATTACHED: live, nothing changes; off, nothing reads it.
   run-att : ∀ {C Γ A} {l} {c : Ctx R Γ A} {s s′ q p p′}
@@ -517,3 +574,4 @@ module _ {R : Set} (Rt : EmissionSet R) where
   ... | refl = settled c-abs fr (_ , _ , refl , h)
   run-att {l = false} same (settled {w = lanecut _} m fr (_ , _ , refl , h)) = settled c-abs fr (_ , _ , refl , λ ())
   run-att same (settled {w = lane _} _ fr (_ , _ , () , _))
+  run-att same (settled {w = pnd _} _ fr (_ , () , _))
