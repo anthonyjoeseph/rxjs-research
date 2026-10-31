@@ -70,12 +70,19 @@ data Owe : Set where
   cutAt  : Pos → Owe
   overAt : Pos → Owe
 
+-- The binders in scope, each as its connect was given: its source, with
+-- the binders in scope there, and where the connect was subscribed.
+data Scope : List Set → Set₁ where
+  unbound : Scope []
+  binds   : ∀ {Γ X} → Obs C Γ X → Pos → Scope Γ → Scope (X ∷ Γ)
+
 -- A connect's subject and its source's switch, and what it owes: the
 -- source's subscription (the body subscribed at `p`), the source's
 -- attach (subscribed at `p`), the source's teardown (the body completed
 -- at `p`); where the connect is subscribed, and where its source ended,
--- once closed; and the source as it was given, which the run never reads
--- (the binder's frozen entry, for a reader of the rows).
+-- once closed; and the source as it was given, with the binders in scope
+-- where it was given, which the run never reads (the binder's frozen
+-- entry, for a reader of the rows).
 record CS (Γ : List Set) (X : Set) : Set₁ where
   constructor cs
   field
@@ -88,6 +95,7 @@ record CS (Γ : List Set) (X : Set) : Set₁ where
     connAt  : Pos
     endAt   : Pos
     src     : Obs C Γ X
+    scope   : Scope Γ
 
 data St (Γ : List Set) : Set → Set₁ where
   -- a subscription owed, and where it will be made
@@ -134,6 +142,19 @@ data Ctx (R : Set) : List Set → Set → Set₁ where
   inLanes : ∀ {Γ A B} → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → List (St Γ B) → Ctx R Γ B → Ctx R Γ B
   inSrc   : ∀ {Γ X B} → CS Γ X → St (X ∷ Γ) B → Ctx R Γ B → Ctx R Γ X
   inBody  : ∀ {Γ X B} → CS Γ X → St Γ X → Ctx R Γ B → Ctx R (X ∷ Γ) B
+
+-- The binders in scope at the hole, as their connects were given.
+scopeOf : ∀ {R Γ A} → Ctx R Γ A → Scope Γ
+scopeOf top                               = unbound
+scopeOf (inMap f c)                       = scopeOf c
+scopeOf (inScan f z c)                    = scopeOf c
+scopeOf (inCut l a c)                     = scopeOf c
+scopeOf (inLn b c)                        = scopeOf c
+scopeOf (inTake i p w c)                  = scopeOf c
+scopeOf (inOuter op f d n q ls c)         = scopeOf c
+scopeOf (inLanes op f d n q o pre post c) = scopeOf c
+scopeOf (inSrc k b c)                     = scopeOf c
+scopeOf (inBody k o c)                    = binds (CS.src k) (CS.connAt k) (CS.scope k)
 
 plug : ∀ {R Γ A} → Ctx R Γ A → St Γ A → St [] R
 plug top                               s = s
@@ -494,7 +515,7 @@ begin c (takeWhile i q s) p = ok ⟨ inCut true (attAt p) (inTake i q free c) , 
 begin c (flatMap op f s)  p = ok ⟨ inCut true (attAt p) (inOuter op f false 0 [] [] c) , pend s p , subscribing , p ⟩
 -- the body under `ix 0`; its source, once the body's subscription
 -- exists, under `ix 1`
-begin c (connect s b)     p = ok ⟨ inBody (cs false true false (just p) nothing nothing p root s) (pend s (p ⊕ [ ix 1 ])) c , pend b (p ⊕ [ ix 0 ]) , subscribing , p ⊕ [ ix 0 ] ⟩
+begin c (connect s b)     p = ok ⟨ inBody (cs false true false (just p) nothing nothing p root s (scopeOf c)) (pend s (p ⊕ [ ix 1 ])) c , pend b (p ⊕ [ ix 0 ]) , subscribing , p ⊕ [ ix 0 ] ⟩
 -- a joiner keeps where it joined; a completed subject owes it its end under `last`
 begin c (connected x)     p with closedUp c x
 ... | true  = ok ⟨ c , ofS 0 p [] , absorbed , p ⟩

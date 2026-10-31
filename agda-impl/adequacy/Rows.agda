@@ -28,11 +28,12 @@ open import denotation.Events using (Pos; Timeline; ix; last; inside)
 open import denotation.Read using (Visible)
 import denotation.Read as Read
 open import denotation.Laws.Modulus using (≺-trans)
+open import denotation.Laws.Worlds using (Ok; Hots)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; pin; end; _≺_; _≼_; InE; enter; Truncate; MapT; ⟦_⟧; Ended;
   module Joining; module Values; module Scan; module TakeWhile; Den; hot; Proper; DenEnv;
   module Connecting)
 open import operation.PureObservable using (module Machine; module Driver; Tape; play; ending; over)
-open Machine using (St; Ctx; CS; Owe; free; cpAt; cutAt; overAt; takeS; connS; joinS; coldS; scanS; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; load; moved; quiet; pend; ofS; mapS; cutS; lnS; flatS; alive; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; nx; cp) renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
+open Machine using (St; Ctx; CS; Scope; unbound; binds; Owe; free; cpAt; cutAt; overAt; takeS; connS; joinS; coldS; scanS; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; load; moved; quiet; pend; ofS; mapS; cutS; lnS; flatS; alive; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; nx; cp) renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
 
 ------------------------------------------------------------------------
 -- Rows
@@ -285,16 +286,34 @@ pendRows ρ o p = enter (⟦ o ⟧ ρ) p
 data Closed {Γ A} (k : CS Γ A) : EmissionSet A where
   shut : T (CS.closed k) → Closed k (CS.endAt k) end
 
+-- THE BINDERS IN SCOPE AS THE DENOTATION READS THEM: each its source's
+-- whole meaning, entered where its connect subscribed it, up to that
+-- entry's end.  Not what they still owe: a source subscribed in the past
+-- read the rows its binders have delivered since.
+full : ∀ {Γ} → Scope Γ → DenEnv Γ
+full unbound         = []
+full (binds o p sc) = hot (Proper (pendRows (full sc) o (p ++ [ ix 1 ]))) ∷ full sc
+
+-- A SCOPE SUBSCRIBED ADMISSIBLY: each source entered where the binders
+-- around it, read whole, allow.
+ScopeOk : ∀ {Γ} → Scope Γ → Set
+ScopeOk unbound        = ⊤
+ScopeOk (binds o p sc) = ScopeOk sc × Ok (Hots (full sc)) (p ++ [ ix 1 ])
+
+-- A connect's source subscribed admissibly, its binders read whole.
+Admits : ∀ {Γ X} → CS Γ X → Set
+Admits k = ScopeOk (binds (CS.src k) (CS.connAt k) (CS.scope k))
+
 -- A connect's source as it was subscribed: its whole meaning, entered
 -- where the connect subscribes it.
-Frozen : ∀ {Γ A} → DenEnv Γ → CS Γ A → EmissionSet A
-Frozen ρ k = pendRows ρ (CS.src k) (CS.connAt k ++ [ ix 1 ])
+Frozen : ∀ {Γ A} → CS Γ A → EmissionSet A
+Frozen k = pendRows (full (CS.scope k)) (CS.src k) (CS.connAt k ++ [ ix 1 ])
 
 -- A BINDER'S MEANING: its source's frozen entry up to that entry's end,
 -- less what the source no longer owes; its end kept once closed; made
 -- hot.  A joiner rejoins what is past where it joined, or the end at once.
-Hot : ∀ {Γ A} → DenEnv Γ → EmissionSet A → CS Γ A → Den A
-Hot ρ t k = hot (λ q e → Proper (Frozen ρ k) q e × (t q e ⊎ Closed k q e))
+Hot : ∀ {Γ A} → EmissionSet A → CS Γ A → Den A
+Hot t k = hot (λ q e → Proper (Frozen k) q e × (t q e ⊎ Closed k q e))
 
 -- Before the body's end a connect still owes, if it owes one.
 Owed : Maybe Pos → Pos → Set
@@ -362,7 +381,7 @@ mutual
   rows ρ (flatS (mergeᶠ (just m)) f d n q o ls) = BoundedF.RowT m (λ a → pendRows ρ (f a)) (rows ρ o) d n q (rowsL ρ ls)
   rows ρ (flatS switchᶠ f d n q o ls)           = SwitchF.RowT (λ a → pendRows ρ (f a)) (rows ρ o) d n (rowsL ρ ls)
   rows ρ (flatS exhaustᶠ f d n q o ls)          = ExhaustF.RowT (λ a → pendRows ρ (f a)) (rows ρ o) d n (rowsL ρ ls)
-  rows ρ (connS k o b)                          = Connecting.ConnT (CS.connAt k) (Echoing k (rows ρ o)) (rows (Hot ρ (rows ρ o) k ∷ ρ) b)
+  rows ρ (connS k o b)                          = Connecting.ConnT (CS.connAt k) (Echoing k (rows ρ o)) (rows (Hot (rows ρ o) k ∷ ρ) b)
   rows ρ (joinS j true x ib)                    = Inbox ib ∪ enter (lookup ρ x) j
   rows ρ (joinS j false x ib)                   = Inbox ib
   rows ρ _                                      = ∅
@@ -382,7 +401,7 @@ env (inTake i p w c)                     = env c
 env (inOuter op f d n q ls c)            = env c
 env (inLanes op f d n q o pre post c)    = env c
 env (inSrc k b c)                        = env c
-env (inBody k o c)                       = Hot (env c) (rows (env c) o) k ∷ env c
+env (inBody k o c)                       = Hot (rows (env c) o) k ∷ env c
 
 -- What the root still owes, given what the hole owes.
 up : ∀ {R Γ A} → Ctx R Γ A → EmissionSet A → EmissionSet R
@@ -402,7 +421,7 @@ up (inLanes (mergeᶠ nothing) f d n q o pre post c)    H = up c (Flat.RowT (λ 
 up (inLanes (mergeᶠ (just m)) f d n q o pre post c)   H = up c (BoundedF.RowT m (λ a → pendRows (env c) (f a)) (rows (env c) o) d n q (rowsL (env c) pre ʳ++ (H ∷ rowsL (env c) post)))
 up (inLanes switchᶠ f d n q o pre post c)             H = up c (SwitchF.RowT (λ a → pendRows (env c) (f a)) (rows (env c) o) d n (rowsL (env c) pre ʳ++ (H ∷ rowsL (env c) post)))
 up (inLanes exhaustᶠ f d n q o pre post c)            H = up c (ExhaustF.RowT (λ a → pendRows (env c) (f a)) (rows (env c) o) d n (rowsL (env c) pre ʳ++ (H ∷ rowsL (env c) post)))
-up (inSrc k b c)                                      H = up c (Connecting.ConnT (CS.connAt k) (Echoing k H) (rows (Hot (env c) H k ∷ env c) b))
+up (inSrc k b c)                                      H = up c (Connecting.ConnT (CS.connAt k) (Echoing k H) (rows (Hot H k ∷ env c) b))
 up (inBody k o c)                                     H = up c (Connecting.ConnT (CS.connAt k) (Echoing k (rows (env c) o)) H)
 
 -- A rising event is owed only out of a live node: a lane out of its
