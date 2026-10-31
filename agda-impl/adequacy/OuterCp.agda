@@ -31,13 +31,14 @@ open Machine using (St; Ctx; ⟨_,_,_,_⟩; Mode; plug; absorbed; rising; cp; al
 open import adequacy.Rows using (env; up; here; rows; rowsL; pendRows; Plus; old; new; Lanes; Each; AllEnd; EndsOf; module Flat; module SwitchF; module BoundedF;
   _≃_; ≃-sym; Moves; silent)
 open import adequacy.Up using (up-≃; ≃-trans; vis-≃; plus-≃)
-open import adequacy.Bound using (Empty; Good; G; From; ⊑-refl; MergeG; dead-empty)
+open import adequacy.Bound using (Empty; G; GL; From; ⊑-refl; dead-empty; live)
 open import adequacy.Skip using (After; Since; LeadC; _≈⟨_⟩_; _⇆_; Skip; after-since; since-lanes; since-join; up-vis; trunc-≈)
 open import adequacy.Policy using (Policy; JoinP; DoneP; polOf; flatP; switchP; exhaustP; boundedP)
 open import adequacy.Flags using (flat-flags; switch-flags; exhaust-flags; bounded-flags; queued-flags)
-open import adequacy.LaneCp using (rows-flat; pol-empty; trunc-plus)
+open import adequacy.LaneCp using (rows-flat; pol-empty; trunc-plus; jr-pol)
 open import adequacy.Swap using (≡→≃)
-open import adequacy.Inv using (Inv; inv; Sim; UpO; open-alive; node-good; upo-liv)
+open import adequacy.Inv using (Inv; inv; Sim; UpO; GoodF; open-alive; upo-liv; node-f; mkG; anc-join)
+open import adequacy.Above using (Anc; Join; JR; Same; anc-≃; anc-≈; anc-swap; rooted-sub)
 
 open Policy
 
@@ -237,16 +238,6 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {p : Pos} {O : EmissionSe
 -- The step
 
 postulate
-  -- AN OUTER'S END, THE TREE STILL GOOD: the joiner marked done over an
-  -- outer owing nothing, every node above stays good reading the
-  -- joiner's rows, which may now end where its last lane does.  The
-  -- joiner's own node is direct; open is each frame above, whose facts
-  -- read those rows.
-  good-outer-end : ∀ {R Γ A B} op (f : A → Obs Timeline Γ B) n q (o : St Γ A) ls (c : Ctx R Γ B)
-                 → Empty (rows (env c) o)
-                 → Good [] (plug c (flatS op f false n q o ls))
-                 → Good [] (plug c (flatS op f true n q o ls))
-
   -- A DONE JOINER'S OUTER ENDING AGAIN: absorbed.  False against `Inv` as
   -- it stands: the joiner, marked done with no lane live and none
   -- waiting, is done at the end's position, so the rows before the step
@@ -259,12 +250,6 @@ postulate
   rise-joiner-cp-spent : ∀ {R Γ A B} op (f : A → Obs Timeline Γ B) ls (c : Ctx R Γ B) (o : St Γ A) p
                        → Sim ⟨ inOuter op f true 0 [] ls c , o , rising cp , p ⟩ [] ⟨ c , flatS op f true 0 [] o ls , absorbed , p ⟩
 
--- The joiner marked done.
-good-mark : ∀ {R Γ A B} op (f : A → Obs Timeline Γ B) d n q (o : St Γ A) ls (c : Ctx R Γ B)
-          → Empty (rows (env c) o) → Good [] (plug c (flatS op f d n q o ls)) → Good [] (plug c (flatS op f true n q o ls))
-good-mark op f false n q o ls c eo g = good-outer-end op f n q o ls c eo g
-good-mark op f true  n q o ls c eo g = g
-
 -- A done joiner, no lane live and none waiting, apart.
 by-spent : ∀ {A : Set} (P : Bool → ℕ → List A → Set₁) → P true 0 [] → (∀ d n q → (T d → n ≡ 0 → q ≡ [] → ⊥) → P d n q) → ∀ d n q → P d n q
 by-spent P s k true  zero    []      = s
@@ -273,7 +258,9 @@ by-spent P s k true  (suc n) q       = k true (suc n) q λ _ ()
 by-spent P s k true  zero    (a ∷ q) = k true zero (a ∷ q) λ _ _ ()
 
 module Ocp {R Γ A B} (op : FlatOp) (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (q : List A) (o : St Γ A) (ls : List (St Γ B)) (c : Ctx R Γ B) (p : Pos)
-           (g′ : Good [] (plug c (flatS op f true n q o ls)))
+           (go : G (env c) true o) (gl : GL (env c) true ls)
+           (j : Join op d n q (live ls) (Plus (rows (env c) o) p end) (rowsL (env c) ls))
+           (ac : Anc c (flatS op f d n q o ls) (JR op (λ x → pendRows (env c) (f x)) (Plus (rows (env c) o) p end) d n q (rowsL (env c) ls)))
            (uc : UpO c) (al : Each (After p) (rowsL (env c) ls)) (lc : LeadC c p) (eo : Empty (rows (env c) o))
            (el : n ≡ 0 → Each Empty (rowsL (env c) ls))
            (nq : ∀ {a q′} → q ≡ a ∷ q′ → ¬ DoneP (polOf op (λ x → pendRows (env c) (f x)) (Plus (rows (env c) o) p end) d n q (rowsL (env c) ls)) p)
@@ -298,16 +285,30 @@ module Ocp {R Γ A B} (op : FlatOp) (f : A → Obs Timeline Γ B) (d : Bool) (n 
   sx = OFrame.since-x E
   sy = OFrame.since-y E
 
+  N = flatS op f d n q o ls
+
+  same : Same N node
+  same = record { ln = λ () ; cut = λ () ; held = λ () ; live≡ = refl ; told = λ x t → t }
+
+  -- The joiner marked done, good wherever its frames place it.
+  gf′ : ∀ {H} → Anc c node H → GoodF c node
+  gf′ an = node-f c node an (mkG op go gl j′)
+    where
+      j′ : Join op true n q (live ls) O Ls
+      j′ = record { fresh = Join.fresh j ; count = Join.count j ; spent = λ _ → eo ; rooted = rooted-sub old (Join.rooted j) }
+
   Out : Mode B → Set₁
   Out m = Inv ⟨ c , node , m , p ⟩ × Moves (up c (Truncate (JoinP PJ))) [] (up c (here ρ node m p))
 
   pass : ¬ DoneP PJ p → Out absorbed
-  pass nd = inv g′ tt
+  pass nd = inv (anc-join c node an (gf′ an)) tt
           , silent (≃-trans (up-vis c lc (λ (r , _) → sx r) (λ (r , _) → sy r) skip) (vis-≃ (up-≃ c (≃-sym rowsY))))
-    where skip = trunc-≈ (OFrame.oframe-≈ E Y (λ dn → ⊥-elim (nd dn)) (λ r → r) inj₁)
+    where
+      skip = trunc-≈ (OFrame.oframe-≈ E Y (λ dn → ⊥-elim (nd dn)) (λ r → r) inj₁)
+      an   = anc-swap c same (anc-≃ c N (≃-sym rowsY) (anc-≈ c lc (λ (r , _) → sx r) (λ (r , _) → sy r) skip (subst (Anc c N) (jr-pol op L (Plus O p end) d n q Ls) ac)))
 
   done : n ≡ 0 → q ≡ [] → Out (rising cp)
-  done nz qz = inv g′ (uc , lc , tt , (λ r → ⊥-elim (empty-node r)) , empty-node)
+  done nz qz = inv (an , gf′ an) (uc , lc , tt , (λ r → ⊥-elim (empty-node r)) , empty-node)
              , silent (≃-trans (up-vis c lc (λ (r , _) → sx r) (λ (r , _) → since′ r) skip) (vis-≃ (up-≃ c to-node)))
     where
       D = done-at L {p} {O} {d} {n} q Ls eo al op nz qz
@@ -323,6 +324,7 @@ module Ocp {R Γ A B} (op : FlatOp) (f : A → Obs Timeline Γ B) (d : Bool) (n 
       since′ new     = ≼-refl {p}
       skip    = trunc-≈ (OFrame.oframe-≈ E (Plus Y p end) (λ _ → new) old back)
       to-node = ≃-trans (trunc-plus sy) (plus-≃ (≃-sym rowsY))
+      an      = anc-swap c same (anc-≃ c N to-node (anc-≈ c lc (λ (r , _) → sx r) (λ (r , _) → since′ r) skip (subst (Anc c N) (jr-pol op L (Plus O p end) d n q Ls) ac)))
 
   pick : ∀ b → d ≡ b → ∀ k → n ≡ k → ∀ Q → q ≡ Q → Out (if b then absorbed else settle true k (null Q))
   pick true  db zero    nk []      qQ = ⊥-elim (sp (subst T (sym db) tt) nk qQ)
@@ -342,12 +344,11 @@ nil≢ ()
 merge-cp : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) p → (T d → n ≡ 0 → q ≡ [] → ⊥)
          → Sim ⟨ inOuter (mergeᶠ nothing) f d n q ls c , o , rising cp , p ⟩ [] ⟨ c , flatS (mergeᶠ nothing) f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
 merge-cp f d n q ls c o p sp i with alive o in al
-merge-cp f d n q ls c o p sp (inv g (_ , _ , op′ , _)) | false = ⊥-elim (open-alive o op′ al)
-merge-cp f d n q ls c o p sp (inv g (u , (als , lc) , _ , _ , es)) | true
-  with subst (λ v → G (env c) v (flatS (mergeᶠ nothing) f d n q o ls)) (upo-liv c u) (node-good c (flatS (mergeᶠ nothing) f d n q o ls) g (λ ()) (λ ()))
-... | mg = Ocp.result (mergeᶠ nothing) f d n q o ls c p (good-mark (mergeᶠ nothing) f d n q o ls c es g) u als lc es
-                      (λ z → dead-empty ls (MergeG.lanesG mg) (trans (sym (MergeG.count mg)) z))
-                      (λ qz _ → nil≢ (trans (sym (MergeG.fresh mg)) qz)) sp
+merge-cp f d n q ls c o p sp (inv _ (_ , _ , op′ , _)) | false = ⊥-elim (open-alive o op′ al)
+merge-cp f d n q ls c o p sp (inv ((gl , j , ac) , gf) (u , (als , lc) , _ , _ , es)) | true =
+  Ocp.result (mergeᶠ nothing) f d n q o ls c p (subst (λ v → G (env c) v o) (upo-liv c u) gf) gl j ac u als lc es
+             (λ z → dead-empty ls gl (trans (sym (Join.count j)) z))
+             (λ qz _ → nil≢ (trans (sym (Join.fresh j)) qz)) sp
 
 rise-outer-cp : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) p
               → Sim ⟨ inOuter (mergeᶠ nothing) f d n q ls c , o , rising cp , p ⟩ [] ⟨ c , flatS (mergeᶠ nothing) f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
@@ -359,12 +360,11 @@ rise-outer-cp f d n q ls c o p =
 bounded-cp : ∀ {R Γ A B} m f d n q ls (c : Ctx R Γ B) (o : St Γ A) p → (T d → n ≡ 0 → q ≡ [] → ⊥)
            → Sim ⟨ inOuter (mergeᶠ (just m)) f d n q ls c , o , rising cp , p ⟩ [] ⟨ c , flatS (mergeᶠ (just m)) f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
 bounded-cp m f d n q ls c o p sp i with alive o in al
-bounded-cp m f d n q ls c o p sp (inv g (_ , _ , op′ , _)) | false = ⊥-elim (open-alive o op′ al)
-bounded-cp m f d n q ls c o p sp (inv g (u , (als , lc) , _ , _ , es)) | true
-  with subst (λ v → G (env c) v (flatS (mergeᶠ (just m)) f d n q o ls)) (upo-liv c u) (node-good c (flatS (mergeᶠ (just m)) f d n q o ls) g (λ ()) (λ ()))
-... | mg , _ = Ocp.result (mergeᶠ (just m)) f d n q o ls c p (good-mark (mergeᶠ (just m)) f d n q o ls c es g) u als lc es
-                          (λ z → dead-empty ls (MergeG.lanesG mg) (trans (sym (MergeG.count mg)) z))
-                          (owes-q (λ x → pendRows (env c) (f x)) {p} {rows (env c) o} {d} {n} q (rowsL (env c) ls) es als m) sp
+bounded-cp m f d n q ls c o p sp (inv _ (_ , _ , op′ , _)) | false = ⊥-elim (open-alive o op′ al)
+bounded-cp m f d n q ls c o p sp (inv ((gl , j , ac) , gf) (u , (als , lc) , _ , _ , es)) | true =
+  Ocp.result (mergeᶠ (just m)) f d n q o ls c p (subst (λ v → G (env c) v o) (upo-liv c u) gf) gl j ac u als lc es
+             (λ z → dead-empty ls gl (trans (sym (Join.count j)) z))
+             (owes-q (λ x → pendRows (env c) (f x)) {p} {rows (env c) o} {d} {n} q (rowsL (env c) ls) es als m) sp
 
 rise-bounded-cp : ∀ {R Γ A B} m f d n q ls (c : Ctx R Γ B) (o : St Γ A) p
                 → Sim ⟨ inOuter (mergeᶠ (just m)) f d n q ls c , o , rising cp , p ⟩ [] ⟨ c , flatS (mergeᶠ (just m)) f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
@@ -376,12 +376,11 @@ rise-bounded-cp m f d n q ls c o p =
 switch-cp : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) p → (T d → n ≡ 0 → q ≡ [] → ⊥)
           → Sim ⟨ inOuter switchᶠ f d n q ls c , o , rising cp , p ⟩ [] ⟨ c , flatS switchᶠ f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
 switch-cp f d n q ls c o p sp i with alive o in al
-switch-cp f d n q ls c o p sp (inv g (_ , _ , op′ , _)) | false = ⊥-elim (open-alive o op′ al)
-switch-cp f d n q ls c o p sp (inv g (u , (als , lc) , _ , _ , es)) | true
-  with subst (λ v → G (env c) v (flatS switchᶠ f d n q o ls)) (upo-liv c u) (node-good c (flatS switchᶠ f d n q o ls) g (λ ()) (λ ()))
-... | mg = Ocp.result switchᶠ f d n q o ls c p (good-mark switchᶠ f d n q o ls c es g) u als lc es
-                      (λ z → dead-empty ls (MergeG.lanesG mg) (trans (sym (MergeG.count mg)) z))
-                      (λ qz _ → nil≢ (trans (sym (MergeG.fresh mg)) qz)) sp
+switch-cp f d n q ls c o p sp (inv _ (_ , _ , op′ , _)) | false = ⊥-elim (open-alive o op′ al)
+switch-cp f d n q ls c o p sp (inv ((gl , j , ac) , gf) (u , (als , lc) , _ , _ , es)) | true =
+  Ocp.result switchᶠ f d n q o ls c p (subst (λ v → G (env c) v o) (upo-liv c u) gf) gl j ac u als lc es
+             (λ z → dead-empty ls gl (trans (sym (Join.count j)) z))
+             (λ qz _ → nil≢ (trans (sym (Join.fresh j)) qz)) sp
 
 rise-switch-cp : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) p
                → Sim ⟨ inOuter switchᶠ f d n q ls c , o , rising cp , p ⟩ [] ⟨ c , flatS switchᶠ f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
@@ -393,12 +392,11 @@ rise-switch-cp f d n q ls c o p =
 exhaust-cp : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) p → (T d → n ≡ 0 → q ≡ [] → ⊥)
            → Sim ⟨ inOuter exhaustᶠ f d n q ls c , o , rising cp , p ⟩ [] ⟨ c , flatS exhaustᶠ f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
 exhaust-cp f d n q ls c o p sp i with alive o in al
-exhaust-cp f d n q ls c o p sp (inv g (_ , _ , op′ , _)) | false = ⊥-elim (open-alive o op′ al)
-exhaust-cp f d n q ls c o p sp (inv g (u , (als , lc) , _ , _ , es)) | true
-  with subst (λ v → G (env c) v (flatS exhaustᶠ f d n q o ls)) (upo-liv c u) (node-good c (flatS exhaustᶠ f d n q o ls) g (λ ()) (λ ()))
-... | mg = Ocp.result exhaustᶠ f d n q o ls c p (good-mark exhaustᶠ f d n q o ls c es g) u als lc es
-                      (λ z → dead-empty ls (MergeG.lanesG mg) (trans (sym (MergeG.count mg)) z))
-                      (λ qz _ → nil≢ (trans (sym (MergeG.fresh mg)) qz)) sp
+exhaust-cp f d n q ls c o p sp (inv _ (_ , _ , op′ , _)) | false = ⊥-elim (open-alive o op′ al)
+exhaust-cp f d n q ls c o p sp (inv ((gl , j , ac) , gf) (u , (als , lc) , _ , _ , es)) | true =
+  Ocp.result exhaustᶠ f d n q o ls c p (subst (λ v → G (env c) v o) (upo-liv c u) gf) gl j ac u als lc es
+             (λ z → dead-empty ls gl (trans (sym (Join.count j)) z))
+             (λ qz _ → nil≢ (trans (sym (Join.fresh j)) qz)) sp
 
 rise-exhaust-cp : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) p
                 → Sim ⟨ inOuter exhaustᶠ f d n q ls c , o , rising cp , p ⟩ [] ⟨ c , flatS exhaustᶠ f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩

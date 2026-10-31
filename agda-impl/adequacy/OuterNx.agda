@@ -34,13 +34,14 @@ open Machine using (St; Ctx; ⟨_,_,_,_⟩; plug; absorbed; rising; subscribing;
                     inOuter; inCut; inLn; inLanes)
 open import adequacy.Rows using (env; up; rows; rowsL; pendRows; Plus; old; new; Lane; reads; Lanes; Each; Kth; AllEnd; EndsOf; module Flat; Moves; silent)
 open import adequacy.Up using (up-≃; ≃-trans; vis-≃)
-open import adequacy.Bound using (Good; GoodL; G; MergeG; live; lane-v; on; off)
+open import adequacy.Bound using (Good; GoodL; GL; live; lane-v; on; off)
 open import adequacy.Skip using (After; Since; LeadC; Skip; _≈⟨_⟩_; _⇆_; since-join; since-trunc; up-vis-at; trunc-≈)
 open import adequacy.Policy using (Policy; JoinP; DoneP; polOf; flatP; boundedP; exhaustP)
 open import adequacy.LaneEnd using (Has; kth-skip; kth-less)
 open import adequacy.Swap using (rowsL-ʳ++; ≡→≃)
 open import adequacy.Env using (env-good)
-open import adequacy.Inv using (Inv; inv; good; lead; Sim; UpO; Shut; open-alive; node-good; upo-liv; closed-dead)
+open import adequacy.Inv using (Inv; inv; good; lead; Sim; UpO; Shut; open-alive; upo-liv; closed-dead)
+open import adequacy.Above using (Join)
 
 open Policy
 
@@ -340,18 +341,13 @@ module Begin {R Γ A B} (op : FlatOp) (f : A → Obs Timeline Γ B) (d : Bool) (
 postulate
   -- THE BEGUN LANE'S TREE GOOD: the lane subscribed at the value's second
   -- child, out of its list but owed, the tree stays good with one more
-  -- live.  The lane is rooted at the value, which must lie in its outer's
-  -- entry; `Inv` says the outer's rows lie there, but not the value it
-  -- has just risen.  Every frame above reads the joiner's rows, now with
-  -- the lane's for the value's.
-  --
-  -- DEAD ROUTE: every live node's rows inside an entry frozen when it
-  --   subscribed, `Rooted`'s `sub` at each node of `Good`.  `Good` reads a
-  --   rising focus's ancestors with the risen row already gone, and a
-  --   joiner is not monotone in its parts: a lane's end gone leaves the
-  --   joiner not done, so its outer's end reads as a pass where the entry
-  --   holds the end.  Only a reading through the risen row, frame by frame
-  --   up the context as `LeadC` reads `After`, stays inside the entry.
+  -- live.  The lane is rooted at the value, which the joiner's facts read
+  -- through the risen row place in the outer's entry.  Open are two
+  -- things.  The subscribing tree shows the new lane rowless while the
+  -- run reads it with its pending rows, and a joiner is not monotone in
+  -- its parts, so the frames above, read through the run, need not hold
+  -- of the rowless reading.  And the value's position must be no other
+  -- lane's root, which nothing yet records.
   begin-good : ∀ {R Γ A B} op (f : A → Obs Timeline Γ B) d n q ls (c : Ctx R Γ B) (o : St Γ A) a p
              → Inv ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ → closed c ≡ false → q ≡ []
              → Good [] (plug c (flatS op f d (suc n) q o (reverse ls ʳ++ lnS true (cutS true (attAt (p ++ [ ix 1 ])) doneS) ∷ [])))
@@ -417,8 +413,11 @@ module At {R Γ A B} (op : FlatOp) (f : A → Obs Timeline Γ B) (d : Bool) (n :
   ao : After p (rows (env c) o)
   ao = proj₁ (proj₂ (proj₂ (proj₂ (lead i))))
 
-  node : G (env c) true (flatS op f d n q o ls)
-  node = subst (λ v → G (env c) v (flatS op f d n q o ls)) (upo-liv c uc) (node-good c (flatS op f d n q o ls) (good i) (λ ()) (λ ()))
+  gl : GL (env c) true ls
+  gl = proj₁ (proj₁ (good i))
+
+  j : Join op d n q (live ls) (Plus (rows (env c) o) p (out a)) (rowsL (env c) ls)
+  j = proj₁ (proj₂ (proj₁ (good i)))
 
 -- A MERGE'S OUTER VALUE BEGINS ITS LANE.
 rise-outer-nx : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p
@@ -428,9 +427,9 @@ rise-outer-nx f d n q ls c o a p i with closed c in cl
 ... | false with alive o in al
 ...   | false = ⊥-elim (open-alive o (At.oo (mergeᶠ nothing) f d n q ls c o a p i) al)
 ...   | true  =
-  Begin.result (mergeᶠ nothing) f d n q o ls c a p (begin-good (mergeᶠ nothing) f d n q ls c o a p i cl (MergeG.fresh node)) uc lc
+  Begin.result (mergeᶠ nothing) f d n q o ls c a p (begin-good (mergeᶠ nothing) f d n q ls c o a p i cl (Join.fresh j)) uc lc
                (begin-ok (mergeᶠ nothing) f d n q ls c o a p i cl)
-               (λ tp → merge-begin (λ x → pendRows (env c) (f x)) (rowsL (env c) ls) ao als tp (cap-of ls (MergeG.lanesG node) (MergeG.count node)))
+               (λ tp → merge-begin (λ x → pendRows (env c) (f x)) (rowsL (env c) ls) ao als tp (cap-of ls gl (Join.count j)))
   where open At (mergeᶠ nothing) f d n q ls c o a p i
 
 -- A BOUNDED MERGE'S OUTER VALUE BEGINS ITS LANE WITH ROOM, ELSE WAITS.
@@ -448,11 +447,11 @@ rise-bounded-nx m f d n q ls c o a p i with n <ᵇ m in lt
   Begin.result (mergeᶠ (just m)) f d n q o ls c a p (begin-good (mergeᶠ (just m)) f d n q ls c o a p i cl qz) uc lc
                (begin-ok (mergeᶠ (just m)) f d n q ls c o a p i cl)
                (λ tp → bounded-begin-at m (λ x → pendRows (env c) (f x)) q (rowsL (env c) ls) lt qz ao als tp
-                                        (cap-of ls (MergeG.lanesG (proj₁ node)) (MergeG.count (proj₁ node))))
+                                        (cap-of ls gl (Join.count j)))
   where
     open At (mergeᶠ (just m)) f d n q ls c o a p i
     qz : q ≡ []
-    qz = either (λ e → e) (λ e → ⊥-elim (no-room lt e)) (proj₂ node)
+    qz = either (λ e → e) (λ e → ⊥-elim (no-room lt e)) (Join.fresh j)
 
 -- AN EXHAUST'S OUTER VALUE BEGINS ITS LANE WITH NONE RUNNING.
 rise-exhaust-run : ∀ {R Γ A B} f d n q ls (c : Ctx R Γ B) (o : St Γ A) a p → (n ≡ᵇ 0) ≡ true
@@ -462,7 +461,7 @@ rise-exhaust-run f d n q ls c o a p z i with closed c in cl
 ... | false with alive o in al
 ...   | false = ⊥-elim (open-alive o (At.oo exhaustᶠ f d n q ls c o a p i) al)
 ...   | true  =
-  Begin.result exhaustᶠ f d n q o ls c a p (begin-good exhaustᶠ f d n q ls c o a p i cl (MergeG.fresh node)) uc lc
+  Begin.result exhaustᶠ f d n q o ls c a p (begin-good exhaustᶠ f d n q ls c o a p i cl (Join.fresh j)) uc lc
                (begin-ok exhaustᶠ f d n q ls c o a p i cl)
-               (λ tp → exhaust-begin-at (λ x → pendRows (env c) (f x)) (rowsL (env c) ls) z ao als tp (cap-of ls (MergeG.lanesG node) (MergeG.count node)))
+               (λ tp → exhaust-begin-at (λ x → pendRows (env c) (f x)) (rowsL (env c) ls) z ao als tp (cap-of ls gl (Join.count j)))
   where open At exhaustᶠ f d n q ls c o a p i

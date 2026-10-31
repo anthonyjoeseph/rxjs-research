@@ -15,7 +15,7 @@ open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ)
 open import Data.Product using (_×_; _,_; proj₁)
 open import Data.Unit using (tt)
-open import Relation.Binary.PropositionalEquality using (cong; subst)
+open import Relation.Binary.PropositionalEquality using (cong; subst; sym)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline)
@@ -23,20 +23,25 @@ open import denotation.EmissionSet using (out; DenEnv; Truncate)
 open import denotation.Laws.Modulus using (≺→≼)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; ⟨_,_,_,_⟩; plug; absorbed; rising; nx; alive; Att; cutS; lnS; flatS; inLanes)
-open import adequacy.Rows using (env; up; rows; rowsL; pendRows; Plus; Each; _≃_; ≃-sym; Moves; silent)
+open import adequacy.Rows using (env; up; rows; rowsL; pendRows; Plus; old; Each; _≃_; ≃-sym; Moves; silent)
 open import adequacy.Up using (up-≃; ≃-trans; vis-≃; plus-≃; trunc-≃)
-open import adequacy.Bound using (Good; GLn; on; off; lane-v)
+open import adequacy.Bound using (G; GL; GLn; on; off; lane-v; live; Rooted)
 open import adequacy.Skip using (After; Since; LeadC)
 open import adequacy.Policy using (JoinP; polOf)
 open import adequacy.JoinEnd using (module Val)
 open import adequacy.LaneVal using (val-at)
-open import adequacy.LaneCp using (rows-flat; trunc-plus)
-open import adequacy.Swap using (rowsL-ʳ++; ≡→≃)
-open import adequacy.Inv using (Inv; inv; Sim; UpO; good-split; upo-liv)
+open import adequacy.LaneCp using (rows-flat; trunc-plus; jr-pol)
+open import adequacy.Swap using (rowsL-ʳ++; ≡→≃; goodL-ʳ++)
+open import adequacy.Inv using (Inv; inv; Sim; UpO; upo-liv; node-f; mkG)
+open import adequacy.Above using (Anc; Join; JR; anc-≃; rooted-⊒; ⊒-ʳ++; ⊒-refl; _∷_)
 
 module Nx {R Γ A B} (op : FlatOp) (f : A → Obs Timeline Γ B) (d : Bool) (n : ℕ) (q : List A) (o : St Γ A) (pre post : List (St Γ B)) (c : Ctx R Γ B)
           (a : Att) (s₀ : St Γ B) (b : B) (p : Pos)
-          (g : Good [] (plug c (flatS op f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post))))
+          (go : G (env c) true o) (gl : GL (env c) true (pre ʳ++ lnS true (cutS true a s₀) ∷ post))
+          (j : Join op d n q (live (pre ʳ++ lnS true (cutS true a s₀) ∷ post)) (rows (env c) o)
+                    (rowsL (env c) pre ʳ++ Plus (rows (env c) s₀) p (out b) ∷ rowsL (env c) post))
+          (ac : Anc c (flatS op f d n q o (pre ʳ++ lnS true (cutS true a s₀) ∷ post))
+                      (JR op (λ x → pendRows (env c) (f x)) (rows (env c) o) d n q (rowsL (env c) pre ʳ++ Plus (rows (env c) s₀) p (out b) ∷ rowsL (env c) post)))
           (uc : UpO c) (ao : After p (rows (env c) o)) (apre : Each (After p) (rowsL (env c) pre)) (apost : Each (After p) (rowsL (env c) post))
           (lc : LeadC c p) (as : After p (rows (env c) s₀)) where
 
@@ -62,49 +67,55 @@ module Nx {R Γ A B} (op : FlatOp) (f : A → Obs Timeline Γ B) (d : Bool) (n :
   since-y {k} r = ≺→≼ {p} {k} (after-y r)
 
   result : Inv ⟨ c , node , rising (nx b) , p ⟩ × Moves (up c (Truncate (JoinP PX))) [] (up c (Plus (rows ρ node) p (out b)))
-  result = inv g (uc , lc , tt , (λ r → after-y (proj₁ (_≃_.to rowsY r))) , tt)
-         , silent (vis-≃ (up-≃ c (≃-trans (trunc-≃ val-≃) (≃-trans (trunc-plus since-y) (plus-≃ (≃-sym rowsY))))))
+  result = inv (an , node-f c node an (mkG op go gl j′)) (uc , lc , tt , (λ r → after-y (proj₁ (_≃_.to rowsY r))) , tt)
+         , silent (vis-≃ (up-≃ c to-node))
+    where
+      to-node = ≃-trans (trunc-≃ val-≃) (≃-trans (trunc-plus since-y) (plus-≃ (≃-sym rowsY)))
+      an      = anc-≃ c node to-node (subst (Anc c node) (jr-pol op L O d n q (Pre ʳ++ (Plus (rows ρ s₀) p (out b) ∷ Post))) ac)
+      j′ : Join op d n q (live (pre ʳ++ s ∷ post)) O (rowsL ρ (pre ʳ++ s ∷ post))
+      j′ = record { fresh = Join.fresh j ; count = Join.count j ; spent = Join.spent j
+                  ; rooted = subst (Rooted O) (sym (rowsL-ʳ++ pre)) (rooted-⊒ (⊒-ʳ++ Pre (old ∷ ⊒-refl Post)) (Join.rooted j)) }
 
 -- A LANE'S VALUE PASSES, UNLESS THE LANE IS OVER.
 rise-lane-nx : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s b p
              → Sim ⟨ inLanes (mergeᶠ nothing) f d n q o pre post c , s , rising (nx b) , p ⟩ []
                    (if alive s then ⟨ c , flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post) , rising (nx b) , p ⟩
                                else ⟨ c , flatS (mergeᶠ nothing) f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
-rise-lane-nx f d n q o pre post c s b p (inv g (u , l , op′ , as , _)) with upo-liv (inLanes (mergeᶠ nothing) f d n q o pre post c) u
-... | lv with lane-v s (subst (λ v → GLn (env c) v s) lv (good-split (inLanes (mergeᶠ nothing) f d n q o pre post c) s g))
+rise-lane-nx f d n q o pre post c s b p (inv ((il , go , gp , gq , j , ac) , gf) (u , (ao , apre , apost , lc) , op′ , as , _)) with upo-liv c u
+... | lv with lane-v s (subst (λ v → GLn (env c) v s) lv gf)
 ... | off a s₀ = ⊥-elim op′
-... | on a s₀ _ _ with l
-... | ao , apre , apost , lc = Nx.result (mergeᶠ nothing) f d n q o pre post c a s₀ b p g u ao apre apost lc as
+... | on a s₀ _ _ =
+  Nx.result (mergeᶠ nothing) f d n q o pre post c a s₀ b p go (goodL-ʳ++ pre gp (subst (λ v → GLn (env c) v (lnS true (cutS true a s₀))) lv gf , gq)) j ac u ao apre apost lc as
 
 -- A BOUNDED MERGE'S LANE VALUE.
 rise-bounded-lane-nx : ∀ {R Γ A B} m f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s b p
                      → Sim ⟨ inLanes (mergeᶠ (just m)) f d n q o pre post c , s , rising (nx b) , p ⟩ []
                            (if alive s then ⟨ c , flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s ∷ post) , rising (nx b) , p ⟩
                                        else ⟨ c , flatS (mergeᶠ (just m)) f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
-rise-bounded-lane-nx m f d n q o pre post c s b p (inv g (u , l , op′ , as , _)) with upo-liv (inLanes (mergeᶠ (just m)) f d n q o pre post c) u
-... | lv with lane-v s (subst (λ v → GLn (env c) v s) lv (good-split (inLanes (mergeᶠ (just m)) f d n q o pre post c) s g))
+rise-bounded-lane-nx m f d n q o pre post c s b p (inv ((il , go , gp , gq , j , ac) , gf) (u , (ao , apre , apost , lc) , op′ , as , _)) with upo-liv c u
+... | lv with lane-v s (subst (λ v → GLn (env c) v s) lv gf)
 ... | off a s₀ = ⊥-elim op′
-... | on a s₀ _ _ with l
-... | ao , apre , apost , lc = Nx.result (mergeᶠ (just m)) f d n q o pre post c a s₀ b p g u ao apre apost lc as
+... | on a s₀ _ _ =
+  Nx.result (mergeᶠ (just m)) f d n q o pre post c a s₀ b p go (goodL-ʳ++ pre gp (subst (λ v → GLn (env c) v (lnS true (cutS true a s₀))) lv gf , gq)) j ac u ao apre apost lc as
 
 -- A SWITCH'S LANE VALUE.
 rise-switch-lane-nx : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s b p
                     → Sim ⟨ inLanes switchᶠ f d n q o pre post c , s , rising (nx b) , p ⟩ []
                           (if alive s then ⟨ c , flatS switchᶠ f d n q o (pre ʳ++ s ∷ post) , rising (nx b) , p ⟩
                                       else ⟨ c , flatS switchᶠ f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
-rise-switch-lane-nx f d n q o pre post c s b p (inv g (u , l , op′ , as , _)) with upo-liv (inLanes switchᶠ f d n q o pre post c) u
-... | lv with lane-v s (subst (λ v → GLn (env c) v s) lv (good-split (inLanes switchᶠ f d n q o pre post c) s g))
+rise-switch-lane-nx f d n q o pre post c s b p (inv ((il , go , gp , gq , j , ac) , gf) (u , (ao , apre , apost , lc) , op′ , as , _)) with upo-liv c u
+... | lv with lane-v s (subst (λ v → GLn (env c) v s) lv gf)
 ... | off a s₀ = ⊥-elim op′
-... | on a s₀ _ _ with l
-... | ao , apre , apost , lc = Nx.result switchᶠ f d n q o pre post c a s₀ b p g u ao apre apost lc as
+... | on a s₀ _ _ =
+  Nx.result switchᶠ f d n q o pre post c a s₀ b p go (goodL-ʳ++ pre gp (subst (λ v → GLn (env c) v (lnS true (cutS true a s₀))) lv gf , gq)) j ac u ao apre apost lc as
 
 -- AN EXHAUST'S LANE VALUE.
 rise-exhaust-lane-nx : ∀ {R Γ A B} f d n q (o : St Γ A) pre post (c : Ctx R Γ B) s b p
                      → Sim ⟨ inLanes exhaustᶠ f d n q o pre post c , s , rising (nx b) , p ⟩ []
                            (if alive s then ⟨ c , flatS exhaustᶠ f d n q o (pre ʳ++ s ∷ post) , rising (nx b) , p ⟩
                                        else ⟨ c , flatS exhaustᶠ f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
-rise-exhaust-lane-nx f d n q o pre post c s b p (inv g (u , l , op′ , as , _)) with upo-liv (inLanes exhaustᶠ f d n q o pre post c) u
-... | lv with lane-v s (subst (λ v → GLn (env c) v s) lv (good-split (inLanes exhaustᶠ f d n q o pre post c) s g))
+rise-exhaust-lane-nx f d n q o pre post c s b p (inv ((il , go , gp , gq , j , ac) , gf) (u , (ao , apre , apost , lc) , op′ , as , _)) with upo-liv c u
+... | lv with lane-v s (subst (λ v → GLn (env c) v s) lv gf)
 ... | off a s₀ = ⊥-elim op′
-... | on a s₀ _ _ with l
-... | ao , apre , apost , lc = Nx.result exhaustᶠ f d n q o pre post c a s₀ b p g u ao apre apost lc as
+... | on a s₀ _ _ =
+  Nx.result exhaustᶠ f d n q o pre post c a s₀ b p go (goodL-ʳ++ pre gp (subst (λ v → GLn (env c) v (lnS true (cutS true a s₀))) lv gf , gq)) j ac u ao apre apost lc as

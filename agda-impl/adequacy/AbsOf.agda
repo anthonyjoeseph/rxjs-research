@@ -33,11 +33,12 @@ open Machine using (St; Ctx; CS; Cand; found; ⟨_,_,_,_⟩; absorbed; rising; p
 open import adequacy.Rows using (env; ∅; up; rows; Plus; module BoundedF; module SwitchF; module ExhaustF; old; new;
   module Flat; _≃_; _⇄_; ≃-sym; Moves; silent)
 open import adequacy.Up using (up-≃; ≃-refl; ≃-trans; vis-≃)
-open import adequacy.Bound using (Good; LnBody; ofPos; of-from; ⊑→≼)
+open import adequacy.Bound using (Good; G; LnBody; ofPos; of-from; ⊑→≼)
 open import adequacy.Skip using (After; LeadC)
 open import adequacy.Lead using (lead-found)
 open import adequacy.Swap using (rowsL-ʳ++; ≡→≃)
-open import adequacy.Inv using (Inv; inv; Sim; Open; UpO; good-split; unF; liv; Shut; closed-dead; dead-swap)
+open import adequacy.Inv using (Inv; inv; Sim; Open; UpO; GoodF; good-split; unF; liv; Shut; closed-dead; dead-swap; anc-split; node-f)
+open import adequacy.Above using (Anc; Same; anc-≃; anc-swap)
 
 ------------------------------------------------------------------------
 -- Where the search lands
@@ -243,12 +244,25 @@ found-lead : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ xs κ} → closed c ≡ false
            → search top (plug c (ofS i p₀ xs)) ≡ just (found (Γ , A , c , ofS i p₀ xs) ofM κ) → LeadC c (ofPos p₀ i xs)
 found-lead c {i} {p₀} {xs} cl g fd = lead-found {t = plug c (ofS i p₀ xs)} {c = c} {s = ofS i p₀ xs} cl refl g fd
 
-postulate
-  -- THE LEAST ROW TAKEN, THE TREE STILL GOOD.
-  good-of   : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ x xs κ} → closed c ≡ false → Good [] (plug c (ofS i p₀ (x ∷ xs)))
-            → search top (plug c (ofS i p₀ (x ∷ xs))) ≡ just (found (Γ , A , c , ofS i p₀ (x ∷ xs)) ofM κ) → Good [] (plug c (ofS (suc i) p₀ xs))
-  good-done : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ κ} → closed c ≡ false → Good [] (plug c (ofS i p₀ []))
-            → search top (plug c (ofS i p₀ [])) ≡ just (found (Γ , A , c , ofS i p₀ []) ofM κ) → Good [] (plug c doneS)
+-- What an of runs to: its rest, or done.
+data OfNext {Γ A} : St Γ A → Set where
+  rest : ∀ i p₀ xs → OfNext (ofS i p₀ xs)
+  over : OfNext doneS
+
+of-same : ∀ {Γ A} {s : St Γ A} i p₀ xs → OfNext s → Same (ofS i p₀ xs) s
+of-same i p₀ xs (rest _ _ _) = record { ln = λ () ; cut = λ () ; held = λ () ; live≡ = refl ; told = λ _ t → t }
+of-same i p₀ xs over         = record { ln = λ () ; cut = λ () ; held = λ () ; live≡ = refl ; told = λ _ t → t }
+
+of-g : ∀ {Γ A} {ρ : DenEnv Γ} {s : St Γ A} → OfNext s → G ρ true s
+of-g (rest _ _ _) = tt₁
+of-g over         = tt₁
+
+-- THE LEAST ROW TAKEN, READ ABOVE: the frames above an of, read through
+-- its rows, read through what it runs to with the row risen.
+anc-of : ∀ {R Γ A} (c : Ctx R Γ A) {s : St Γ A} {H} i p₀ xs → OfNext s → UpO c → Good [] (plug c (ofS i p₀ xs))
+       → rows (env c) (ofS i p₀ xs) ≃ H → Anc c s H × GoodF c s
+anc-of c {s} i p₀ xs on u g eq = an , node-f c s an (of-g on)
+  where an = anc-swap c (of-same i p₀ xs on) (anc-≃ c (ofS i p₀ xs) eq (anc-split c (ofS i p₀ xs) u g))
 
 -- An of under a dead lane, dropped: checked for shape only.
 good-closed : ∀ {R Γ A} (c : Ctx R Γ A) {i p₀ xs} → liv c ≡ false → Good [] (plug c (ofS i p₀ xs)) → Good [] (plug c doneS)
@@ -281,18 +295,20 @@ abs-of : ∀ {R Γ′ A′ Γ A} {c : Ctx R Γ′ A′} {s} {c′ : Ctx R Γ A} 
 abs-of {c = c} {s} {c′} {i} {p₀} {[]} p fd eq (inv g _) with closed c′ in cl
 abs-of {c = c} {s} {c′} {i} {p₀} {[]} p fd refl (inv g _) | true = closed-of c s c′ p₀ cl (search-plug (plug c s) fd) g
 abs-of {c = c} {s} {c′} {i} {p₀} {[]} p fd refl (inv g _) | false =
-  inv (good-done c′ cl g′ fd′) (upo-split c′ cl tt g′ , found-lead c′ cl g′ fd′ , tt , (λ ()) , (λ ()))
+  inv (anc-of c′ i p₀ [] over u g′ (of-last p₀ i)) (u , found-lead c′ cl g′ fd′ , tt , (λ ()) , (λ ()))
   , silent (vis-≃ (≃-trans (into c s c′ _ pl) (up-≃ c′ (of-last p₀ i))))
   where
     pl  = search-plug (plug c s) fd
     fd′ = subst (λ u → search top u ≡ _) (sym pl) fd
     g′  = subst (Good []) (sym pl) g
+    u   = upo-split c′ cl tt g′
 abs-of {c = c} {s} {c′} {i} {p₀} {x ∷ xs} p fd eq (inv g _) with closed c′ in cl
 abs-of {c = c} {s} {c′} {i} {p₀} {x ∷ xs} p fd refl (inv g _) | true = closed-of c s c′ p₀ cl (search-plug (plug c s) fd) g
 abs-of {c = c} {s} {c′} {i} {p₀} {x ∷ xs} p fd refl (inv g _) | false =
-  inv (good-of c′ cl g′ fd′) (upo-split c′ cl tt g′ , found-lead c′ cl g′ fd′ , tt , after-of p₀ i xs , tt)
+  inv (anc-of c′ i p₀ (x ∷ xs) (rest (suc i) p₀ xs) u g′ (of-next p₀ i x xs)) (u , found-lead c′ cl g′ fd′ , tt , after-of p₀ i xs , tt)
   , silent (vis-≃ (≃-trans (into c s c′ _ pl) (up-≃ c′ (of-next p₀ i x xs))))
   where
     pl  = search-plug (plug c s) fd
     fd′ = subst (λ u → search top u ≡ _) (sym pl) fd
     g′  = subst (Good []) (sym pl) g
+    u   = upo-split c′ cl tt g′
