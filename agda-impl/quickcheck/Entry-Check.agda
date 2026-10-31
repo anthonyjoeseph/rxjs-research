@@ -41,8 +41,8 @@ open import operation.PureObservable using (module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; CS; Owe; free; cpAt; cutAt; overAt;
                     Conf; plug; subscribing; absorbed; rising; load; nx; cp)
 open import adequacy.Rows using (tapeE)
-open import quickcheck.Ty using (showPos)
-open import quickcheck.Code using (toObs; timeline)
+open import quickcheck.Ty using (showPos; natᵗ)
+open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Trace using (depth)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Tabled using (Row; Listed; _⊣_; rows; short; bind; concatMap; mapM; when; anyᵇ; allᵇ; _≼ᵇ_; endBy; endBefore;
@@ -409,8 +409,8 @@ mutual
     where
       parts : ∀ {B} → Maybe (Listed B) → String
       parts nothing   = ""
-      parts (just β) = " [frozen " +++ showRows (mapL erase (rows F)) +++ "| source " +++ showRows (mapL erase (rows σ)) +++ "| closed " +++ showRows (mapL erase (closedRows k)) +++ "| body " +++ showRows (mapL erase (rows β)) +++ "]"
-  listN u ρ π b (joinS j true x ib)  = "join [binder " +++ showRows (mapL erase (rows (lookup ρ x))) +++ "]" , just (let h = rejoin j (lookup ρ x) in (inbox ib ++ rows h) ⊣ short h) , []
+      parts (just β) = " at " +++ showPos (CS.connAt k) +++ " end " +++ showPos (CS.endAt k) +++ " [frozen " +++ showRows (mapL erase (rows F)) +++ "| source " +++ showRows (mapL erase (rows σ)) +++ "| closed " +++ showRows (mapL erase (closedRows k)) +++ "| body " +++ showRows (mapL erase (rows β)) +++ "]"
+  listN u ρ π b (joinS j true x ib)  = "join at " +++ showPos j +++ " [binder " +++ showRows (mapL erase (rows (lookup ρ x))) +++ "]" , just (let h = rejoin j (lookup ρ x) in (inbox ib ++ rows h) ⊣ short h) , []
   listN u ρ π b (joinS j false x ib) = "join" , just (inbox ib ⊣ false) , []
   listN u ρ π b _                    = "done" , just ([] ⊣ false) , []
 
@@ -540,7 +540,7 @@ private
   report []          bad = putStrLn ("entry-check: done " +++ showℕ bad +++ " failing seeds")
   report (seed ∷ ss) bad with probe 400 seed
   ... | []     = report ss bad
-  ... | f ∷ fs = each (f ∷ fs) >>= λ _ → report ss (suc bad)
+  ... | f ∷ fs = putStrLn ("entry-check: program " +++ showCode natᵗ (program seed)) >>= λ _ → each (f ∷ fs) >>= λ _ → report ss (suc bad)
     where
       each : List Finding → IO Unit
       each []       = putStrLn ""
