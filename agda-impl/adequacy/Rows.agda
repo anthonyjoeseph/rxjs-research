@@ -296,6 +296,18 @@ Frozen ρ k = pendRows ρ (CS.src k) (CS.connAt k ++ [ ix 1 ])
 Hot : ∀ {Γ A} → DenEnv Γ → EmissionSet A → CS Γ A → Den A
 Hot ρ t k = hot (λ q e → Proper (Frozen ρ k) q e × (t q e ⊎ Closed k q e))
 
+-- Before the body's end a connect still owes, if it owes one.
+Owed : Maybe Pos → Pos → Set
+Owed nothing  q = ⊤
+Owed (just c) q = q ≺ c
+
+-- A CONNECT'S SOURCE AS ITS ECHOES READ IT: its subscribe burst always,
+-- any other row only while the source lives and before the body's end
+-- the connect owes.  The body's own end leaves its rows once delivered,
+-- so `Connecting.ConnT`'s `Alive` alone would revive the echoes past it.
+Echoing : ∀ {Γ A} → CS Γ A → EmissionSet A → EmissionSet A
+Echoing k σ q e = σ q e × (T (inside (CS.connAt k ++ [ ix 1 ]) q) ⊎ (T (CS.srcLive k) × Owed (CS.owedAt k) q))
+
 -- What a joiner has been fed and not shown.
 data Inbox {A : Set} : List (Pos × Evᴹ A) → EmissionSet A where
   this : ∀ {q e ib} → Inbox ((q , e) ∷ ib) q (toEv e)
@@ -350,7 +362,7 @@ mutual
   rows ρ (flatS (mergeᶠ (just m)) f d n q o ls) = BoundedF.RowT m (λ a → pendRows ρ (f a)) (rows ρ o) d n q (rowsL ρ ls)
   rows ρ (flatS switchᶠ f d n q o ls)           = SwitchF.RowT (λ a → pendRows ρ (f a)) (rows ρ o) d n (rowsL ρ ls)
   rows ρ (flatS exhaustᶠ f d n q o ls)          = ExhaustF.RowT (λ a → pendRows ρ (f a)) (rows ρ o) d n (rowsL ρ ls)
-  rows ρ (connS k o b)                          = Connecting.ConnT (CS.connAt k) (rows ρ o) (rows (Hot ρ (rows ρ o) k ∷ ρ) b)
+  rows ρ (connS k o b)                          = Connecting.ConnT (CS.connAt k) (Echoing k (rows ρ o)) (rows (Hot ρ (rows ρ o) k ∷ ρ) b)
   rows ρ (joinS j true x ib)                    = Inbox ib ∪ enter (lookup ρ x) j
   rows ρ (joinS j false x ib)                   = Inbox ib
   rows ρ _                                      = ∅
@@ -390,8 +402,8 @@ up (inLanes (mergeᶠ nothing) f d n q o pre post c)    H = up c (Flat.RowT (λ 
 up (inLanes (mergeᶠ (just m)) f d n q o pre post c)   H = up c (BoundedF.RowT m (λ a → pendRows (env c) (f a)) (rows (env c) o) d n q (rowsL (env c) pre ʳ++ (H ∷ rowsL (env c) post)))
 up (inLanes switchᶠ f d n q o pre post c)             H = up c (SwitchF.RowT (λ a → pendRows (env c) (f a)) (rows (env c) o) d n (rowsL (env c) pre ʳ++ (H ∷ rowsL (env c) post)))
 up (inLanes exhaustᶠ f d n q o pre post c)            H = up c (ExhaustF.RowT (λ a → pendRows (env c) (f a)) (rows (env c) o) d n (rowsL (env c) pre ʳ++ (H ∷ rowsL (env c) post)))
-up (inSrc k b c)                                      H = up c (Connecting.ConnT (CS.connAt k) H (rows (Hot (env c) H k ∷ env c) b))
-up (inBody k o c)                                     H = up c (Connecting.ConnT (CS.connAt k) (rows (env c) o) H)
+up (inSrc k b c)                                      H = up c (Connecting.ConnT (CS.connAt k) (Echoing k H) (rows (Hot (env c) H k ∷ env c) b))
+up (inBody k o c)                                     H = up c (Connecting.ConnT (CS.connAt k) (Echoing k (rows (env c) o)) H)
 
 -- A rising event is owed only out of a live node: a lane out of its
 -- list absorbs it.

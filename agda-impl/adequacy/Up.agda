@@ -21,7 +21,7 @@ open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; St; CS; free; cpAt; cutAt; overAt; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Causal using (rows-hot)
 open import adequacy.Policy using (Policy; JoinP; DoneP; flatP; switchP; exhaustP; boundedP)
-open import adequacy.Rows using (TakeR; kept; Stops; stop; left; up; env; pendRows; Vis; Plus; old; new; rowsL; From; Lanes;
+open import adequacy.Rows using (Echoing; TakeR; kept; Stops; stop; left; up; env; pendRows; Vis; Plus; old; new; rowsL; From; Lanes;
   Each; Kth; AllEnd; EndsOf; module Flat; module BoundedF; module SwitchF; module ExhaustF;
   _≃_; _⇄_; ≃-sym)
 
@@ -382,6 +382,10 @@ conn-≃ {A} {B} r es eb = go es eb ⇄ go (≃-sym es) (≃-sym eb)
     go es eb (Connecting.echo x al u ni)   = Connecting.echo (to es x) (λ y → al (from eb y)) u ni
     go es eb (Connecting.kept x al ni i)   = Connecting.kept (to es x) (λ y → al (from eb y)) ni i
 
+-- The same source: the same echoes.
+echo-≃ : ∀ {Γ A} (k : CS Γ A) {t u : EmissionSet A} → t ≃ u → Echoing k t ≃ Echoing k u
+echo-≃ k eq = (λ { (x , g) → to eq x , g }) ⇄ (λ { (x , g) → from eq x , g })
+
 -- THE CONGRUENCE.
 up-≃ : ∀ {R Γ A} (c : Ctx R Γ A) {t u : EmissionSet A} → t ≃ u → up c t ≃ up c u
 up-≃ top                                              eq = eq
@@ -400,5 +404,5 @@ up-≃ (inLanes (mergeᶠ nothing) f d n q o pre post c)  eq = up-≃ c (row-≃
 up-≃ (inLanes (mergeᶠ (just m)) f d n q o pre post c) eq = up-≃ c (bounded-≃ m (λ a → pendRows (env c) (f a)) ≃-refl (ʳ++-≈ (rowsL (env c) pre) (eq ∷ ≈ᴸ-refl (rowsL (env c) post))))
 up-≃ (inLanes switchᶠ f d n q o pre post c)           eq = up-≃ c (switch-≃ (λ a → pendRows (env c) (f a)) ≃-refl (ʳ++-≈ (rowsL (env c) pre) (eq ∷ ≈ᴸ-refl (rowsL (env c) post))))
 up-≃ (inLanes exhaustᶠ f d n q o pre post c)          eq = up-≃ c (exhaust-≃ (λ a → pendRows (env c) (f a)) ≃-refl (ʳ++-≈ (rowsL (env c) pre) (eq ∷ ≈ᴸ-refl (rowsL (env c) post))))
-up-≃ (inSrc k b c)                                    eq = up-≃ c (conn-≃ _ eq (rows-hot k (env c) b eq))
+up-≃ (inSrc k b c)                                    eq = up-≃ c (conn-≃ _ (echo-≃ k eq) (rows-hot k (env c) b eq))
 up-≃ (inBody k o c)                                   eq = up-≃ c (conn-≃ _ ≃-refl eq)

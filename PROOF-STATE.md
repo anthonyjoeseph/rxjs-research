@@ -51,6 +51,15 @@ body finds at or under a source row not yet fed.
 
 Members: `body-apart`.
 
+#### THE ECHO GATE SEARCHED
+
+Untried: a connect reads its source's echoes only while the source lives
+and before an owed body end; whether `G` keeps a dead source's rows
+inside its burst, and an owed end's mark ahead of every source row past
+it. Settled by bodies, or a search finding a source row the gate drops.
+
+Members: `conn-dead-okᶜ`, `conn-owed-okᶜ`.
+
 #### THE COLD STEPPED
 
 A cold entered at its timeline read where it subscribes, and each turn of

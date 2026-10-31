@@ -27,7 +27,7 @@ open Machine using (St; Ctx; CS; plug; alive; pend; coldS; ofS; doneS; mapS; sca
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (env; rows; rowsL; _≃_; _⇄_; Hot)
 open import adequacy.Causal using (rows-hot; rows-≃; rows-causal; hot-ag; env-refl)
-open import adequacy.Up using (_≈ᴸ_; []; _∷_; ≈ᴸ-refl; row-≃; map-≃; scan-≃; take-≃; ≃-refl; conn-≃; bounded-≃;
+open import adequacy.Up using (_≈ᴸ_; []; _∷_; ≈ᴸ-refl; row-≃; map-≃; scan-≃; take-≃; ≃-refl; conn-≃; echo-≃; bounded-≃;
   switch-≃; exhaust-≃)
 open import adequacy.Bound using (Empty; empty-any; EndLast; Roots; Rooted; Live; Live₁; G; GL; GLn; LnBody; SrcG; HeldAt; live;
   mergeG-map; MergeG; Told; ToldL; Fed) renaming (held to heldᴮ)
@@ -279,7 +279,7 @@ good-swap (inLanes exhaustᶠ f d n q o pre post c) {s} {s′} sw g =
                       ; node = λ { true m → mergeG-map (λ x → x) (goodL-swap pre (lane sw true)) (λ nl → trans nl (live-swap pre (live≡ sw))) (λ x → x) (rooted-≃ ≃-refl (lanes-≃ pre (same sw ∷ ≈ᴸ-refl (rowsL (env c) post)))) m
                                  ; false m → mergeG-map (λ x → x) (goodL-swap pre (lane sw false)) (λ x → x) (λ x → x) (λ x → x) m } }) g
 good-swap (inSrc k b c) {s} {s′} sw g =
-  good-swap c {s = connS k s b} {s′ = connS k s′ b} (record { same = conn-≃ _ (same sw) (rows-hot k (env c) b (same sw)) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = λ x (a , b) → told sw x a , b
+  good-swap c {s = connS k s b} {s′ = connS k s′ b} (record { same = conn-≃ _ (echo-≃ k (same sw)) (rows-hot k (env c) b (same sw)) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = λ x (a , b) → told sw x a , b
                       ; node = λ { v (gs , gb , sp , tl) → src-swap sw v (CS.bodyAt k) gs , good-hot k (env c) b (same sw) v gb , spent-≃ v (same sw) sp , tl } }) g
 good-swap (inBody k o c) {s} {s′} sw g =
   good-swap c {s = connS k o s} {s′ = connS k o s′} (record { same = conn-≃ _ ≃-refl (same sw) ; live≡ = refl ; lane = λ _ () ; body = λ _ _ () ; held = λ () ; told = λ x (a , b) → a , told sw (there x) b

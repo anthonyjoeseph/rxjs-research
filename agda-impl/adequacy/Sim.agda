@@ -37,7 +37,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
-open import adequacy.Rows using (env; rows; pendRows; RT; toEv; Vis; Past; Lowest; Beyond; into; back; narrow; Plus; old; new;
+open import adequacy.Rows using (env; rows; pendRows; Echoing; RT; toEv; Vis; Past; Lowest; Beyond; into; back; narrow; Plus; old; new;
   _≃_; _⇄_; silent; shown; Steps; Shows*; Shows*-≃; ≃-sym; conv; []; _∷_; tau; val; fin)
 open import adequacy.Bound using (Good; G; Rooted; mergeG₀; OK)
 open import adequacy.Search using (seek-ok)
@@ -359,9 +359,9 @@ rise-body-nx : ∀ {R Γ X B} (k : CS Γ X) (o : St Γ X) (c : Ctx R Γ B) s x p
 rise-body-nx k o c s x p i with alive s in al
 rise-body-nx k o c s x p (inv g (_ , _ , op , _)) | false = ⊥-elim (open-alive s op al)
 rise-body-nx k o c s x p (inv (a@(gs , sp , tl , a₁) , g) (uc , (afs , lc) , _ , af , _)) | true =
-  inv (a′ , node-f c (connS k o s) a′ (gs , tr s (anc-liv (inBody k o c) a) g , sp , tl)) (uc , lc , tt , after-conn (CS.connAt k) (rows (env c) o) (rows (env (inBody k o c)) s) {p} afs af , tt)
+  inv (a′ , node-f c (connS k o s) a′ (gs , tr s (anc-liv (inBody k o c) a) g , sp , tl)) (uc , lc , tt , after-conn (CS.connAt k) (Echoing k (rows (env c) o)) (rows (env (inBody k o c)) s) {p} (λ {q} {e} r → afs {q} {e} (proj₁ r)) af , tt)
   , silent (vis-≃ (up-≃ c (conn-plus-nx (CS.connAt k) _ _ p x)))
-  where a′ = anc-≃ c (connS k o s) (conn-plus-nx (CS.connAt k) (rows (env c) o) (rows (env (inBody k o c)) s) p x) a₁
+  where a′ = anc-≃ c (connS k o s) (conn-plus-nx (CS.connAt k) (Echoing k (rows (env c) o)) (rows (env (inBody k o c)) s) p x) a₁
 
 rise-sim : ∀ {R Γ A} {k′ : Conf R} {sh t} (c : Ctx R Γ A) (s : St Γ A) e p → stepᴹ ⟨ c , s , rising e , p ⟩ ≡ moved k′ sh t → Sim ⟨ c , s , rising e , p ⟩ sh k′
 rise-sim top            s e p refl = rise-top s e p

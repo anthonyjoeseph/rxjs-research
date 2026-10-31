@@ -10,6 +10,7 @@ module adequacy.Search where
 open import Data.Bool using (Bool; true; false; T; _∧_; if_then_else_; not)
 open import Data.Bool.Properties using (T-≡)
 open import Function.Bundles using (Equivalence)
+open import Function using (_$_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_]; drop; null)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -39,7 +40,8 @@ open import operation.PureObservable using (module Machine; play; ending; over)
 open Machine using (St; Ctx; CS; cs; _⊕_; bodyM; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed;
                     free; cpAt; cutAt; overAt; inScan; inTake; inSrc; inBody;
                     ofS; doneS; mapS; cutS; cpM; cutM; lnS; flatS; coldS; scanS; takeS; connS; joinS; inMap; inCut; inLn; inOuter; inLanes; nx; cp; attached; attAt; attM; pend) renaming (Ev to Evᴹ)
-open import adequacy.Rows using (acc-val; rows; rowsL; pendRows; toEv; Lanes; Each; Kth; AllEnd; EndsOf; Lane; reads; hd; module Flat; module SwitchF; module ExhaustF; module BoundedF; ∅; Hot; Frozen; Inbox; _∪_; Kept; Stops) renaming (kept to keptᴿ; stop to stopᴿ; left to leftᴿ; sub to subᴿ; From to Fromᴿ)
+open import adequacy.Rows using (acc-val; rows; rowsL; pendRows; toEv; Lanes; Each; Kth; AllEnd; EndsOf; Lane; reads; hd; module Flat; module SwitchF; module ExhaustF; module BoundedF; ∅; Hot; Frozen; Echoing; _≃_; _⇄_; Inbox; _∪_; Kept; Stops) renaming (kept to keptᴿ; stop to stopᴿ; left to leftᴿ; sub to subᴿ; From to Fromᴿ)
+open import adequacy.Up using (conn-≃; ≃-refl)
 open import adequacy.Cap using (irr; ⊑-<; <-⊑; ⊑-<⊑; ≮; dec; Past; OKᶜ; OKLᶜ; each-map; ok-cap; uncap; cap-retag; cap-sub;
   one; own-stills; first-stillsᶜ; first-at; lanes-firstᶜ; Calm; Quiet; QuietL; calm-map; EnvSingle; body-quiet; conn-free; conn-held; told-nil; join-head)
 open import adequacy.Bound using (Apart; <→⊑; Bd; Empty; From; Good; GoodL; GoodLn; MergeG; OK; OKL; Single; _⊑_; ext-⊑;
@@ -590,6 +592,19 @@ kept-src (keptᴿ x _ _) = _ , _ , x , ⊑-refl _
 okᶜ-trunc : ∀ {R A} C {t : EmissionSet A} (y : Maybe (Cand R A)) → OKᶜ C t y → OKᶜ C (Truncate t) y
 okᶜ-trunc C = cap-sub C ok-trunc (λ r → proj₁ r)
 
+-- The same rows, the same find.
+okᶜ-≃ : ∀ {R A} C {t u : EmissionSet A} → t ≃ u → (y : Maybe (Cand R A)) → OKᶜ C t y → OKᶜ C u y
+okᶜ-≃ C eq = cap-sub C ok (_≃_.from eq)
+  where
+    ok : ∀ y → OK _ y → OK _ y
+    ok nothing            e r = e (_≃_.from eq r)
+    ok (just (found _ _ _ , K , o)) b =
+      record { from = λ r → Bd.from b (_≃_.from eq r) ; mark = Bd.mark b ; shown = λ e → let (q , k , r) = Bd.shown b e in q , k , _≃_.to eq r }
+
+-- A live source owing no body end: its echoes are all its rows.
+echo-all : ∀ {Γ X} (k : CS Γ X) {t : EmissionSet X} → T (CS.srcLive k) → CS.owedAt k ≡ nothing → t ≃ Echoing k t
+echo-all k l refl = (λ x → x , inj₂ (l , tt)) ⇄ proj₁
+
 -- A switched-off joiner's inbox alone.
 inbox-ok : ∀ {R A} {u : EmissionSet A} (y : Maybe (Cand R A)) → OK (u ∪ ∅) y → OK u y
 inbox-ok nothing            e r = e (inj₁ r)
@@ -653,6 +668,19 @@ hot-single : ∀ {A} {t : EmissionSet A} → Single t → ∀ p → Single (ente
 hot-single st p (x , _) (x′ , _) = rejoin-single st x x′ refl
 
 postulate
+  -- A DEAD SOURCE'S SEARCH THROUGH ITS ECHO GATE: once its connect's body
+  -- has ended and its owed run has passed, the connect shows only the
+  -- source's subscribe burst, so whatever the source finds, its connect's
+  -- search keys every row the connect still owes up to the cap.
+  conn-dead-okᶜ : ∀ {R Γ A X} {ρ : DenEnv Γ} C (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ Γ) A) → T (not (CS.srcLive k))
+                → EnvSingle ρ → Good ρ (connS k o b) → Quiet C ρ (connS k o b) → OKᶜ C (rows ρ (connS k o b)) (seek c (connS k o b))
+
+  -- A BODY'S END OWED: between a body's end and its connect's owed run, the
+  -- connect's echoes stop before that end, and its owed mark is found no
+  -- later than any source row past it.
+  conn-owed-okᶜ : ∀ {R Γ A X} {ρ : DenEnv Γ} C (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ Γ) A) {p} → CS.owedAt k ≡ just p
+                → EnvSingle ρ → Good ρ (connS k o b) → Quiet C ρ (connS k o b) → OKᶜ C (rows ρ (connS k o b)) (seek c (connS k o b))
+
   -- A CONNECT'S FROZEN ENTRY HOLDS ONE EVENT A POSITION: its source's
   -- meaning entered where the connect subscribed it.
   frozen-single : ∀ {Γ X A} {ρ : DenEnv Γ} k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvSingle ρ → Good ρ (connS k o b) → Single (Frozen ρ k)
@@ -750,15 +778,17 @@ mutual
   -- capped no later than the source's find.
   conn-okᶜ : ∀ {R Γ A X} {ρ : DenEnv Γ} C (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvSingle ρ → Good ρ (connS k o b) → Quiet C ρ (connS k o b)
            → OKᶜ C (rows ρ (connS k o b)) (seek c (connS k o b))
-  conn-okᶜ {ρ = ρ} C c k@(cs cl sl sa nothing aS oA ca ea _) o b es g@(go , gb , _ , tl) qt =
-    first-stillsᶜ C (ownBest c (connS k o b) (own (connS k o b))) _ (own-stills c k o b (own (connS k o b)))
+  conn-okᶜ {ρ = ρ} C c k@(cs cl true sa nothing aS nothing ca ea _) o b es g@(go , gb , _ , tl) qt =
+    okᶜ-≃ C (conn-≃ ca (echo-all k tt refl) ≃-refl) _ $ first-stillsᶜ C (ownBest c (connS k o b) (own (connS k o b))) _ (own-stills c k o b (own (connS k o b)))
       (conn-free {ρ = ρ} k (rows ρ o) {β = rows (Hot ρ (rows ρ o) k ∷ᴬ ρ) b} C (seek (inSrc k b c) o) (seek (inBody k o c) b)
          (seek-okᶜ C (inSrc k b c) o es go (calm-fst C ρ qt)) (seek-mark (inSrc k b c) o)
          (λ C₂ c₂ air → seek-okᶜ C₂ (inBody k o c) b (bind-single k o b es g) gb (body-quiet {C = C} {C₂ = C₂} {σ = rows ρ o} k o b c₂ qt tl air)))
-  conn-okᶜ {ρ = ρ} C c k@(cs cl sl sa (just p) aS oA ca ea _) o b es g@(held hf , gb , _ , tl) qt =
-    conn-held {ρ = ρ} k (rows ρ o) {β = rows (Hot ρ (rows ρ o) k ∷ᴬ ρ) b} C (p ⊕ [ ix 1 ]) (ownBest c (connS k o b) (own (connS k o b))) (seek (inBody k o c) b) hf
+  conn-okᶜ {ρ = ρ} C c k@(cs cl true sa (just p) aS nothing ca ea _) o b es g@(held hf , gb , _ , tl) qt =
+    okᶜ-≃ C (conn-≃ ca (echo-all k tt refl) ≃-refl) _ $ conn-held {ρ = ρ} k (rows ρ o) {β = rows (Hot ρ (rows ρ o) k ∷ᴬ ρ) b} C (p ⊕ [ ix 1 ]) (ownBest c (connS k o b) (own (connS k o b))) (seek (inBody k o c) b) hf
       (first-at {f = (_ , _ , c , connS k o b)} {m = bodyM} (at (p ⊕ [ ix 1 ])) (ownBest c (connS k o b) (drop 1 (own (connS k o b)))) (own-stills c k o b (drop 1 (own (connS k o b)))))
       (λ C₂ c₂ air → seek-okᶜ C₂ (inBody k o c) b (bind-single k o b es g) gb (body-quiet {C = C} {C₂ = C₂} {σ = rows ρ o} k o b c₂ qt tl air))
+  conn-okᶜ C c k@(cs cl true sa _ aS (just p) ca ea _) o b es g qt = conn-owed-okᶜ C c k o b refl es g qt
+  conn-okᶜ C c k@(cs cl false sa _ aS oA ca ea _) o b es g qt = conn-dead-okᶜ C c k o b tt es g qt
 
   -- A TAKE'S SEARCH KEYS ITS ROWS: unfailed, its child's find retagged; a
   -- failing value's completion owed at its stop; its kept pins after.

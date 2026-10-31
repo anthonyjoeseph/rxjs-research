@@ -14,7 +14,7 @@ open import Data.Nat using (ℕ; zero; suc)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Product using (_×_; _,_; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -592,7 +592,9 @@ up-vis-at (inLanes exhaustᶠ f d n q o pre post c) {t} {u} (ao , apre , apost ,
     slu = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (su , after-since (rowsL ρ post) apost)
 up-vis-at (inSrc k b c)                            (ab , ld) ps st su eq = src-vis k b c ab ld ps st su eq
 up-vis-at (inBody k o c) {t} {u}                   (ao , ld) ps st su eq =
-  up-vis-at c ld ps (since-conn (CS.connAt k) _ t ao st) (since-conn (CS.connAt k) _ u ao su) (conn-≈ (CS.connAt k) _ eq)
+  up-vis-at c ld ps (since-conn (CS.connAt k) _ t ae st) (since-conn (CS.connAt k) _ u ae su) (conn-≈ (CS.connAt k) _ eq)
+  where
+    ae = λ {q} {e} r → ao {q} {e} (proj₁ r)
 
 -- A skip at the lead, unseen above.
 up-vis : ∀ {R Γ A} (c : Ctx R Γ A) {t u : EmissionSet A} {p} → LeadC c p → Since p t → Since p u → t ≈⟨ p ⟩ u → Vis (up c t) ≃ Vis (up c u)

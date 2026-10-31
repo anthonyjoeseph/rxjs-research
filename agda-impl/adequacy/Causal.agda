@@ -22,7 +22,7 @@ open import denotation.Laws using (EnvAg; causal-⟦⟧; map-ag; scan-ag; take-a
 open import operation.PureObservable using (module Machine)
 open Machine using (St; CS; Owe; free; cpAt; cutAt; overAt; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS)
 
-open import adequacy.Rows using (rows; rowsL; Hot; Closed; _∪_; TakeR; Kept; kept; Stops; stop; left; _≃_; _⇄_;
+open import adequacy.Rows using (rows; rowsL; Hot; Echoing; Closed; _∪_; TakeR; Kept; kept; Stops; stop; left; _≃_; _⇄_;
   module Flat; module SwitchF; module ExhaustF; module BoundedF)
 open import adequacy.Policy using (join-ag; flat-to; switch-to; exhaust-to; bounded-to)
 
@@ -35,6 +35,9 @@ ag-refl t = ⟨ (λ _ → (λ x → x) , (λ x → x)) ⟩
 ∪-ag : ∀ {A Q} {t t′ u u′ : EmissionSet A} → AgreeTo Q t t′ → AgreeTo Q u u′ → AgreeTo Q (t ∪ u) (t′ ∪ u′)
 ∪-ag a b = ⟨ (λ {y} {e} yq → ⊎-map (proj₁ (upto a {y} {e} yq)) (proj₁ (upto b {y} {e} yq))
                            , ⊎-map (proj₂ (upto a {y} {e} yq)) (proj₂ (upto b {y} {e} yq))) ⟩
+
+echo-ag : ∀ {Γ A Q} (k : CS Γ A) {t t′ : EmissionSet A} → AgreeTo Q t t′ → AgreeTo Q (Echoing k t) (Echoing k t′)
+echo-ag k a = ⟨ (λ {y} {e} yq → (λ { (x , g) → proj₁ (upto a {y} {e} yq) x , g }) , (λ { (x , g) → proj₂ (upto a {y} {e} yq) x , g })) ⟩
 
 private
   kept-to : ∀ {A Q p} {t t′ : EmissionSet A} → AgreeTo Q t t′ → ∀ {y e} → y ≼ Q → Kept p t y e → Kept p t′ y e
@@ -116,7 +119,7 @@ mutual
   rows-causal e (flatS (mergeᶠ (just m)) f d n q o ls) = bounded-ag m d n q (λ a → causal-⟦⟧ (f a) e) (rows-causal e o) (rowsL-causal e ls)
   rows-causal e (flatS switchᶠ f d n q o ls)           = switch-ag d n (λ a → causal-⟦⟧ (f a) e) (rows-causal e o) (rowsL-causal e ls)
   rows-causal e (flatS exhaustᶠ f d n q o ls)          = exhaust-ag d n (λ a → causal-⟦⟧ (f a) e) (rows-causal e o) (rowsL-causal e ls)
-  rows-causal e (connS k o b)                         = conn-ag (CS.connAt k) (rows-causal e o) (rows-causal (ag-cons (hot-ag k e (rows-causal e o)) e) b)
+  rows-causal e (connS k o b)                         = conn-ag (CS.connAt k) (echo-ag k (rows-causal e o)) (rows-causal (ag-cons (hot-ag k e (rows-causal e o)) e) b)
   rows-causal e (joinS j true x ib)                   = ∪-ag (ag-refl _) (e x j)
   rows-causal e (joinS j false x ib)                  = ag-refl _
 
