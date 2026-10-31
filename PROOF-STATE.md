@@ -14,12 +14,22 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE CONNECT STEPPED
+
+A connect entered, a joiner joined, a source's or body's rise, its own
+marks and a joiner's next, each keeping `Inv`. Open: `s-join` keeps its
+inbox ascending only if a source's visible rows stay in order once each
+is extended by `sub j`, false wherever one is a proper prefix of a later
+one. Settled by that fact as a body, or a program with such a pair.
+
+Members: `sub-conn`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`, `rise-body-nx`, `rise-body-cp`, `run-con`, `run-join-nx`, `run-join-cp`.
+
 #### THE SEARCH UNDER THE CURSOR
 
-Untried: the least mark a search finds leads every row still owed, so
-the cursor moves to just before what it delivers; nothing found, nothing
-owed. The cursor probe found no fall before a row. Settled when each is a
-body over `Inv`'s frames.
+The least mark a search finds leads every row still owed. Open: each
+node's least key bounds its own owed rows, read off `Sync` (an inbox's
+and a queue's order now in it); refocusing is a walk over `Fr`. Settled
+when each is a body over `Inv`'s frames.
 
 Members: `search-least`, `search-none`, `search-quiet`, `found-mark`.
 
@@ -27,27 +37,17 @@ Members: `search-least`, `search-none`, `search-quiet`, `found-mark`.
 
 An outer's value or end and a lane's, each rising into `Joined`/`Begun`
 by its policy: a switch's kill, an exhaust's drop, a bounded queue.
-Open: whether `Hole` and `Whole` carry each policy's bookkeeping. Settled
-when each is a body.
+Open: whether `Begun`'s live count makes a freed slot the queue head's
+`Starts.queued`. Settled when each is a body.
 
 Members: `rise-outer-nx`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`, `sub-flat`.
-
-#### THE CONNECT STEPPED
-
-A connect entered, a joiner joined, a source's or body's rise, its own
-marks and a joiner's next, each keeping `Inv`. Open: whether `s-join`'s
-inbox split and the frozen source cover a body ending before its source.
-Settled when each is a body.
-
-Members: `sub-conn`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`, `rise-body-nx`, `rise-body-cp`, `run-con`, `run-join-nx`, `run-join-cp`.
 
 #### THE SILENT RUN, FINITE
 
 Short of a row a reader meets next, a run is fuelled by the rows at or
-before it strictly past its clock. Open: whether the clock (the least mark
-due once absorbed, else the run's position) never runs back, and whether
-steps passing no such row are few. Settled by bodies, or a program whose
-engine stalls silently forever before a row its emission set holds.
+before it strictly past its clock. Open: whether the clock never runs
+back. Believed finite: `Few` counts skips and every defer leaves a guard
+skip. Settled by bodies.
 
 Members: `clock-mono`, `still-finite`.
 

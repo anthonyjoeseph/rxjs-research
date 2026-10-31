@@ -32,6 +32,7 @@ open import Data.Bool using (Bool; T; true; false; not; _∧_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_; reverse; map)
 open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.List.Relation.Unary.All using (lookup)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; suc; _+_)
@@ -139,9 +140,10 @@ bump true  n = suc n
 bump false n = n
 
 -- The values passed that wait for a slot, as the state's queue holds
--- them: their lanes not yet subscribed.
+-- them: their lanes not yet subscribed.  The queue is FIFO and a freed
+-- slot goes to the head, so the queue is in the outer's position order.
 Waiting : ∀ {A B} → Cur → Pol A B → EmissionSet A → List (Pos × A) → List A → Set
-Waiting C P O ws qu = map proj₂ ws ≡ qu
+Waiting C P O ws qu = map proj₂ ws ≡ qu × AllPairs (λ u v → proj₁ u ≺ proj₁ v) ws
   × (∀ {q a} → (q , a) ∈ ws → O q (out a) × ¬ Owes C q × Runs P q × (∀ {s} → Start P q a s → Owes C s))
 
 -- Every value passed that runs has begun its lane or waits.
@@ -248,10 +250,14 @@ data Sync where
          → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E
          → Sync sc C (connS k o b) E
   -- a joiner: what it was fed and has not shown, and what is still to
-  -- feed it
+  -- feed it.  The engine shows its inbox's head and appends in its
+  -- source's order, while the entry orders rows by their rejoined
+  -- position, so the inbox is ascending and ahead of all still unfed.
   s-join : ∀ {Γ} {sc : Scope Γ} {C} {A} {j} {x : A ∈ Γ} {ib E}
          → enter (lookup (full sc) x) j ≈ E
          → Due C E ≃ (λ q e → Inbox ib q e ⊎ Due C (Unfed C (lookup (full sc) x) j) q e)
+         → AllPairs (λ u v → proj₁ u ≺ proj₁ v) ib
+         → (∀ {u q e} → u ∈ ib → Due C (Unfed C (lookup (full sc) x) j) q e → proj₁ u ≺ q)
          → Sync sc C (joinS j true x ib) E
   s-joinx : ∀ {Γ} {sc : Scope Γ} {C} {A} {j} {x : A ∈ Γ} {ib E} → Spent C E → Sync sc C (joinS j false x ib) E
 
