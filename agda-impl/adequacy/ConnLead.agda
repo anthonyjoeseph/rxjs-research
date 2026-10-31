@@ -27,7 +27,7 @@ open Machine using (St; Ctx; CS; Cand; found; still; shift; seek; own; ownBest; 
 open import adequacy.Rows using (env; rows; Hot; Frozen; ∅; _∪_; Closed)
 open import adequacy.Causal using (rows-causal; env-refl)
 open import adequacy.Bound using (_⊑_; ⊑i; ⊑-refl; ⊑-trans; <→⊑; ext-⊑; shift-⊑; Bd; From; Good; ⊑→≼; apart-before)
-open import adequacy.Cap using (OKᶜ; EnvSingle; Air; bind-after; bind-past; meet; meet-ˡ; meet-ʳ; meet-hi; ext-<; ⊑-<; <-⊑; ≮; StillAt; still-at)
+open import adequacy.Cap using (OKᶜ; EnvSingle; EnvGood; Air; bind-after; bind-past; meet; meet-ˡ; meet-ʳ; meet-hi; ext-<; ⊑-<; <-⊑; ≮; StillAt; still-at)
 open import adequacy.Skip using (After)
 open import adequacy.Leads using (Leads; Leadsᶜ; Beats; eSrc; eBody; OfAt; Occ; Tight; strict; tie; occ-bind; hit; tight-⊑; tight-occ;
   past-strict; aft; none-aft; lost-strict; exact; up)
@@ -65,7 +65,7 @@ postulate
 
 -- A BODY'S FIND NO LATER THAN ITS SOURCE'S RAISED ONE: the source's
 -- rows lie strictly past the body's event.
-conn-body-src : ∀ {R Γ A X} (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvSingle (env c) → Good (env c) (connS k o b)
+conn-body-src : ∀ {R Γ A X} (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvGood (env c) → Good (env c) (connS k o b)
               → ∀ {Γ₁ A₁} {c₁ : Ctx R Γ₁ A₁} {s₁ m₁ κ₁ h₀ o′} → seek (inSrc k b c) o ≡ just (found (Γ₁ , A₁ , c₁ , s₁) m₁ κ₁ , h₀ , o′)
               → Bd (rows (env c) o) κ₁ h₀ o′
               → ∀ {Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ K o″} → seek (inBody k o c) b ≡ just (found (Γ′ , A′ , c′ , s′) m κ , K , o″)
@@ -73,7 +73,7 @@ conn-body-src : ∀ {R Γ A X} (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ �
               → closed c′ ≡ false → ∀ P → OfAt s′ m P → Tight (rows (Hot (env c) (rows (env c) o) k ∷ᴬ env c) b) P K o″
               → After P (rows (env c) o)
 conn-body-src c k o b es g xe bσ ye Ksh cl P oa tg {q} x =
-  apart-before _ (⊑-trans (tight-⊑ tg) Ksh) (from bσ x) (body-apart c k o b es g ye cl P oa x)
+  apart-before _ (⊑-trans (tight-⊑ tg) Ksh) (from bσ x) (body-apart c k o b (proj₁ es) g ye cl P oa x)
 
 ------------------------------------------------------------------------
 -- The body, under a cap no later
@@ -146,7 +146,7 @@ src-air C k {σ} {h₀ = h₀} (inj₂ (_ , bσ)) nc =
 -- The connect
 
 -- Its source subscribed.
-conn-free-lead : ∀ {R Γ A X} C (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvSingle (env c) → Good (env c) (connS k o b)
+conn-free-lead : ∀ {R Γ A X} C (c : Ctx R Γ A) k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvGood (env c) → Good (env c) (connS k o b)
                → (x : Maybe (Cand R X)) (y : Maybe (Cand R A)) → seek (inSrc k b c) o ≡ x → seek (inBody k o c) b ≡ y
                → Leadsᶜ C true (inSrc k b c) (rows (env c) o) x → OKᶜ C (rows (env c) o) x → BodyL C c k o b y
                → Leadsᶜ C true c (rows (env c) (connS k o b)) (sourceT x y)

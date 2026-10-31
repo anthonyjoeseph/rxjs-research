@@ -24,6 +24,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import denotation.Events using (Pos; ix; last; sub; _<ᵖ_; <ᵖ-below; <ᵖ-part)
 open import denotation.EmissionSet using (EmissionSet; Ev; _≼_; enter; Rejoin; Proper; DenEnv; module Connecting)
+open import denotation.Laws.Worlds using (GoodEnv)
 open import operation.Key using (Key; at; after; _<ᴷ_; <ᴷ-irrefl; ≮ᴷ-trans; at-<ᵖ; clash)
 open import operation.PureObservable using (module Machine)
 
@@ -265,6 +266,10 @@ calm-map f q x = map₂ (f x) (q x)
 -- One event a row at every binder's every join.
 EnvSingle : ∀ {Γ} → DenEnv Γ → Set₁
 EnvSingle {Γ} ρ = ∀ {X} (x : X ∈ Γ) j → Single (enter (lookup ρ x) j)
+
+-- What a search reads of its binders: one event a row, and each lawful.
+EnvGood : ∀ {Γ} → DenEnv Γ → Set₁
+EnvGood ρ = EnvSingle ρ × GoodEnv ρ
 
 by-closed : ∀ {P Q : Set} cl → (T cl → P) → (¬ T cl → Q) → Q ⊎ P
 by-closed true  t _ = inj₂ (t tt)

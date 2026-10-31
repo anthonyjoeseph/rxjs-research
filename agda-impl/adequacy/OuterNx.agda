@@ -325,7 +325,7 @@ module Begin {R Γ A B} (op : FlatOp) (f : A → Obs Timeline Γ B) (d : Bool) (
   -- The new lane's rows lie past where it subscribes: Tier −1's invariant.
   tp : ∀ {k e} → Tn k e → p₁ ≺ k
   tp r = world-after (InvAt.world I r) (InvAt.real I r)
-    where I = inv-⟦⟧ (f a) ρ (env-good c g′) p₁ ok₁
+    where I = inv-⟦⟧ (f a) ρ (env-good c (upo-liv c uc) g′) p₁ ok₁
 
   open BFrame (E tp)
 

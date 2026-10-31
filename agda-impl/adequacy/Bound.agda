@@ -29,7 +29,7 @@ open import denotation.Events using (Pos; Timeline; ix; last; inside; inside-sel
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; _≺_; _≼_; InE; enter; at-out; at-end; on-out; MapT; map-out;
   map-skip; map-pin; map-end; module Scan; DenEnv)
 open import denotation.Laws.Modulus using (≼-refl; ≼-false; ≼-trans; ≼-antisym; ≼-or-≻)
-open import denotation.Laws.Worlds using (InvAt; Hots; W; inW; plain-ix; apart-w) renaming (⊑-refl to ⊑ᵖ-refl)
+open import denotation.Laws.Worlds using (InvAt; Hots; Ok; W; inW; plain-ix; apart-w) renaming (⊑-refl to ⊑ᵖ-refl)
 open import operation.Key using (Key; at; after; _<ᴷ_; ≮ᴷ-trans; <ᴷ-trans; <ᴷ-irrefl; at-<ᵖ; clash; shift-after)
 open import operation.PureObservable using (module Machine)
 
@@ -468,6 +468,8 @@ mutual
 
 -- The fragment's shape everywhere, its row facts only where live: under
 -- a cut switched off nothing is owed, so nothing there is asked to agree.
+-- A live connect's entry: it subscribed its source where the binders in
+-- scope are hot, an admissible reading of its meaning.
 --
 -- REFUTED: 85ad69b9 found-lead without the parts apart, by a merge whose outer and lane are empty ofs at one position
 mutual
@@ -483,6 +485,7 @@ mutual
   G ρ b (flatS switchᶠ f d n q o ls)          = MergeG (G ρ b o) (GL ρ b ls) ρ b f d n q o ls
   G ρ b (flatS exhaustᶠ f d n q o ls)         = MergeG (G ρ b o) (GL ρ b ls) ρ b f d n q o ls
   G ρ b (connS k o s)                         = SrcG ρ b (CS.bodyAt k) o × G (Hot ρ (rows ρ o) k ∷ᴬ ρ) b s × Live b (T (CS.closed k) → Empty (rows ρ o)) × Live b (T (CS.closed k) → Told (here refl) s)
+                                                × Live b (Ok (Hots ρ) (CS.connAt k ++ [ ix 1 ]))
   G ρ b (joinS j true x ib)                   = Live₁ b (Fed ib (enter (lookup ρ x) j))
   G ρ b (joinS j false x ib)                  = Live₁ b (Fed ib ∅)
   G ρ b (coldS v l)                           = ⊤₁
@@ -536,7 +539,7 @@ mutual
   shape (scanS f z s)                             g = shape s g
   shape (lnS _ _)                                 ()
   shape (takeS i q w s)                           g = shape s g
-  shape {v = v} (connS k o b)                     (gs , gb , _) = shapeSrc {v = v} (CS.bodyAt k) o gs , shape b gb , tt , tt
+  shape {v = v} (connS k o b)                     (gs , gb , _) = shapeSrc {v = v} (CS.bodyAt k) o gs , shape b gb , tt , tt , tt
   shape (joinS j true x ib)                       _ = tt₁
   shape (joinS j false x ib)                      _ = tt₁
 

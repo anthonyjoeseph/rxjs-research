@@ -329,8 +329,8 @@ anc-liv (inLn false c)     ()
 anc-liv (inTake i q w c)   a = anc-liv c a
 anc-liv (inOuter op f d n q ls c) (_ , _ , a) = anc-liv c a
 anc-liv (inLanes op f d n q o pre post c) (_ , _ , _ , _ , _ , a) = anc-liv c a
-anc-liv (inSrc k b c)      (_ , _ , _ , _ , a) = anc-liv c a
-anc-liv (inBody k o c)     (_ , _ , _ , a) = anc-liv c a
+anc-liv (inSrc k b c)      (_ , _ , _ , _ , _ , a) = anc-liv c a
+anc-liv (inBody k o c)     (_ , _ , _ , _ , a) = anc-liv c a
 
 -- A GOOD NODE, IN ITS FRAME: where its frames place it, a node good
 -- outright is what its frame asks.
@@ -405,10 +405,10 @@ anc-join (inLanes op f d n q o pre post c) s (il , go , gp , gq , j , a) g =
     N  = flatS op f d n q o (pre ʳ++ s ∷ post)
     a′ = subst (Anc c N) (sym (trans (rows-jr (env c) op f d n q o (pre ʳ++ s ∷ post))
                                      (cong (JR op (λ x → pendRows (env c) (f x)) (rows (env c) o) d n q) (rowsL-ʳ++ pre)))) a
-anc-join (inSrc k b c)      s a@(h , gb , sp , tl , a₁) g =
-  anc-join c (connS k s b) a₁ (node-f c (connS k s b) a₁ (subst (λ v → SrcG (env c) v (CS.bodyAt k) s) (anc-liv (inSrc k b c) a) g , gb , sp , tl))
-anc-join (inBody k o c)     s a@(gs , sp , tl , a₁) g =
-  anc-join c (connS k o s) a₁ (node-f c (connS k o s) a₁ (gs , tr s (anc-liv (inBody k o c) a) g , sp , tl))
+anc-join (inSrc k b c)      s a@(h , gb , sp , tl , ok , a₁) g =
+  anc-join c (connS k s b) a₁ (node-f c (connS k s b) a₁ (subst (λ v → SrcG (env c) v (CS.bodyAt k) s) (anc-liv (inSrc k b c) a) g , gb , sp , tl , ok))
+anc-join (inBody k o c)     s a@(gs , sp , tl , ok , a₁) g =
+  anc-join c (connS k o s) a₁ (node-f c (connS k o s) a₁ (gs , tr s (anc-liv (inBody k o c) a) g , sp , tl , ok))
 
 -- A lane's facts, its frame's.
 ln-split : ∀ {R Γ A} (c : Ctx R Γ A) (s : St Γ A) → GoodF c (lnS true s) → liv c ≡ true → IsCutT s × EndLast (rows (env c) s) × LnParent c
@@ -461,12 +461,12 @@ anc-split (inLanes op f d n q o pre post c) s u g =
                               (cong (JR op (λ x → pendRows (env c) (f x)) (rows (env c) o) d n q) (rowsL-ʳ++ pre))) (anc-split c N u g)
   where N = flatS op f d n q o (pre ʳ++ s ∷ post)
 anc-split (inSrc k b c)      s u g =
-  let (gs , gb , sp , tl) = tr N (upo-liv c u) (node-good c N g (λ ()) (λ ()))
-  in held-if (CS.bodyAt k) s gs , gb , sp , tl , anc-split c N u g
+  let (gs , gb , sp , tl , ok) = tr N (upo-liv c u) (node-good c N g (λ ()) (λ ()))
+  in held-if (CS.bodyAt k) s gs , gb , sp , tl , ok , anc-split c N u g
   where N = connS k s b
 anc-split (inBody k o c)     s u g =
-  let (gs , gb , sp , tl) = tr N (upo-liv c u) (node-good c N g (λ ()) (λ ()))
-  in gs , sp , tl , anc-split c N u g
+  let (gs , gb , sp , tl , ok) = tr N (upo-liv c u) (node-good c N g (λ ()) (λ ()))
+  in gs , sp , tl , ok , anc-split c N u g
   where N = connS k o s
 
 -- The tree the seeker reads: a subscription still owed owes it nothing.
@@ -574,7 +574,7 @@ dead-swap (inLanes switchᶠ f d n q o pre post c)  dd sw g =
 dead-swap (inLanes exhaustᶠ f d n q o pre post c) dd sw g =
   dead-swap c dd (record { node₀ = mergeG-map (λ x → x) (goodL-swap pre (lane₀ sw)) (λ x → x) (λ x → x) (λ x → x) ; lane₀ = λ () ; body₀ = λ _ () ; held₀ = λ () }) g
 dead-swap (inSrc k b c)     dd sw g =
-  dead-swap c dd (record { node₀ = λ { (gs , gb , _) → src₀ (CS.bodyAt k) gs , shape b gb , tt , tt } ; lane₀ = λ () ; body₀ = λ _ () ; held₀ = λ () }) g
+  dead-swap c dd (record { node₀ = λ { (gs , gb , _) → src₀ (CS.bodyAt k) gs , shape b gb , tt , tt , tt } ; lane₀ = λ () ; body₀ = λ _ () ; held₀ = λ () }) g
   where
     src₀ : ∀ m → SrcG (env c) false m _ → SrcG (env c) false m _
     src₀ nothing  = node₀ sw

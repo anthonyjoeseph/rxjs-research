@@ -19,11 +19,10 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 Suspect: a joiner's `Join` read across a skip at `p`, with every lane
 after `p`, moves only by that skip, whether the skip lies in its outer or
 in the hole lane; a joiner's frozen `Rooted` must not grow past its entry.
-Open: a connect's frozen entry is read under an environment whose
-enclosing binders still gain their `Closed` end, so a joiner nested under
-an enclosing lane later reads an end its entry lacked (entry-check, one
-seed). Settled by bodies over `Rows.Flat`'s policy, an entry frozen over
-its binders' ends, or a joiner whose `Join` a lane after `p` changes.
+Open: a connect's entry moves with its binders, so a joiner's frozen
+`Rooted` may grow only by an end an enclosing binder gains; whether the
+`Join` read absorbs that growth. Settled by bodies over `Rows.Flat`'s
+policy, or a joiner whose `Join` a lane after `p` changes.
 
 Members: `join-≈-outer`, `join-≈-lane`.
 
@@ -91,20 +90,12 @@ Members: `bounded-ends-at`, `bounded-val-at`, `bounded-outer-at`,
 A connect entered, a joiner joined, a source's or body's rise, a
 connect's own mark run and a joiner's next, each one step keeping `Inv`.
 Open: whether `G`'s connect node (source held until subscribed, a
-completed source owing nothing) is enough for each; a source's end must
-leave its rows `Empty`. Settled when each is a body.
+completed source owing nothing, its entry `Ok` while live) is enough for
+each; a source's end must leave its rows `Empty`. Settled when each is a
+body.
 
 Members: `sub-connect`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`,
 `abs-con`, `abs-join`.
-
-#### THE BINDER READ
-
-Believed: a subscribed connect's source was entered where its binders in
-scope are hot, as its `pend` was. Open: `G`'s connect node records no
-entry, so nothing carries it past the subscription. Settled by an entry
-on the node, or a good tree whose connect entered inadmissibly.
-
-Members: `conn-ok`.
 
 #### A SKIP UNDER A CONNECT
 
@@ -130,7 +121,7 @@ doing so: a merge's parts apart by `Rooted`, a connect's body and source
 echoes by world, a connect's frozen source rows by its entry. Settled by
 a body by former, or a good tree with two rows at a position.
 
-Members: `rows-single`, `frozen-single`.
+Members: `rows-single`.
 
 #### THE TAKE STEPPED
 
