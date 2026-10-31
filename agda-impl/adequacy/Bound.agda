@@ -36,7 +36,7 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; CS; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed; same?; _⊕_;
                     free; cpAt; cutAt; overAt; inScan; inTake; inSrc; inBody;
                     ofS; doneS; mapS; cutS; cpM; cutM; lnS; flatS; coldS; scanS; takeS; connS; joinS; inMap; inCut; inLn; inOuter; inLanes; nx; cp; attached; attAt; attM; pend) renaming (Ev to Evᴹ)
-open import adequacy.Rows using (acc-val; rows; rowsL; pendRows; toEv; Lanes; Each; Kth; AllEnd; EndsOf; Lane; reads; module Flat; module SwitchF; module ExhaustF; module BoundedF; ∅; Hot; Inbox; _∪_; Kept; Stops) renaming (kept to keptᴿ; stop to stopᴿ; left to leftᴿ; sub to subᴿ)
+open import adequacy.Rows using (Admits; acc-val; rows; rowsL; pendRows; toEv; Lanes; Each; Kth; AllEnd; EndsOf; Lane; reads; module Flat; module SwitchF; module ExhaustF; module BoundedF; ∅; Hot; Inbox; _∪_; Kept; Stops) renaming (kept to keptᴿ; stop to stopᴿ; left to leftᴿ; sub to subᴿ)
 
 ------------------------------------------------------------------------
 -- Keys
@@ -484,8 +484,8 @@ mutual
   G ρ b (flatS (mergeᶠ (just m)) f d n q o ls) = MergeG (G ρ b o) (GL ρ b ls) ρ b f d n [] o ls × Live b ((q ≡ []) ⊎ (n ≡ m))
   G ρ b (flatS switchᶠ f d n q o ls)          = MergeG (G ρ b o) (GL ρ b ls) ρ b f d n q o ls
   G ρ b (flatS exhaustᶠ f d n q o ls)         = MergeG (G ρ b o) (GL ρ b ls) ρ b f d n q o ls
-  G ρ b (connS k o s)                         = SrcG ρ b (CS.bodyAt k) o × G (Hot ρ (rows ρ o) k ∷ᴬ ρ) b s × Live b (T (CS.closed k) → Empty (rows ρ o)) × Live b (T (CS.closed k) → Told (here refl) s)
-                                                × Live b (Ok (Hots ρ) (CS.connAt k ++ [ ix 1 ]))
+  G ρ b (connS k o s)                         = SrcG ρ b (CS.bodyAt k) o × G (Hot (rows ρ o) k ∷ᴬ ρ) b s × Live b (T (CS.closed k) → Empty (rows ρ o)) × Live b (T (CS.closed k) → Told (here refl) s)
+                                                × Live b (Admits k)
   G ρ b (joinS j true x ib)                   = Live₁ b (Fed ib (enter (lookup ρ x) j))
   G ρ b (joinS j false x ib)                  = Live₁ b (Fed ib ∅)
   G ρ b (coldS v l)                           = ⊤₁

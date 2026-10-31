@@ -6,7 +6,7 @@
 module adequacy.Causal where
 
 open import Data.Bool using (true; false)
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise; []; _∷_)
 open import Data.List.Relation.Unary.All using (lookup) renaming (_∷_ to _∷ᴬ_)
 open import Data.Maybe using (just; nothing)
@@ -14,10 +14,9 @@ open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_) renaming (map to ⊎-map)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Pos; ix)
+open import denotation.Events using (Pos)
 open import denotation.EmissionSet using (EmissionSet; DenEnv; _≼_; Proper)
 open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; AgreeTo-sym; trunc-to; _~⟨_⟩_; ~-refl; ≼-refl)
-open import denotation.Laws.ConnectNe using (proper-ag)
 open import denotation.Laws using (EnvAg; causal-⟦⟧; map-ag; scan-ag; take-ag; conn-ag; hot-causal; ag-cons)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; CS; Owe; free; cpAt; cutAt; overAt; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS)
@@ -55,17 +54,17 @@ take-r i w (cutAt p)  a = ⟨ (λ yq → kept-to a yq , kept-to (AgreeTo-sym a) 
 take-r i w (overAt p) a = ⟨ (λ yq → kept-to a yq , kept-to (AgreeTo-sym a) yq) ⟩
 
 -- A BINDER'S ROWS over agreeing rows agree.
-hot-raw : ∀ {Γ A Q} {ρ ρ′ : DenEnv Γ} (k : CS Γ A) {t t′ : EmissionSet A} → EnvAg Q ρ ρ′ → AgreeTo Q t t′
-        → AgreeTo Q (λ q e → Proper (Frozen ρ k) q e × (t q e ⊎ Closed k q e)) (λ q e → Proper (Frozen ρ′ k) q e × (t′ q e ⊎ Closed k q e))
-hot-raw k e a = ×-ag (proper-ag (causal-⟦⟧ (CS.src k) e (CS.connAt k ++ [ ix 1 ]))) (∪-ag a (ag-refl (Closed k)))
+hot-raw : ∀ {Γ A Q} (k : CS Γ A) {t t′ : EmissionSet A} → AgreeTo Q t t′
+        → AgreeTo Q (λ q e → Proper (Frozen k) q e × (t q e ⊎ Closed k q e)) (λ q e → Proper (Frozen k) q e × (t′ q e ⊎ Closed k q e))
+hot-raw k a = ×-ag (ag-refl (Proper (Frozen k))) (∪-ag a (ag-refl (Closed k)))
   where
     ×-ag : ∀ {A Q} {t t′ u u′ : EmissionSet A} → AgreeTo Q t t′ → AgreeTo Q u u′ → AgreeTo Q (λ q e → t q e × u q e) (λ q e → t′ q e × u′ q e)
     ×-ag b c = ⟨ (λ {y} {e} yq → (λ (f , x) → proj₁ (upto b {y} {e} yq) f , proj₁ (upto c {y} {e} yq) x)
                                 , (λ (f , x) → proj₂ (upto b {y} {e} yq) f , proj₂ (upto c {y} {e} yq) x)) ⟩
 
 -- A BINDER over agreeing rows agrees.
-hot-ag : ∀ {Γ A Q} {ρ ρ′ : DenEnv Γ} (k : CS Γ A) {t t′ : EmissionSet A} → EnvAg Q ρ ρ′ → AgreeTo Q t t′ → Hot ρ t k ~⟨ Q ⟩ Hot ρ′ t′ k
-hot-ag k e a = hot-causal (hot-raw k e a)
+hot-ag : ∀ {Γ A Q} (k : CS Γ A) {t t′ : EmissionSet A} → AgreeTo Q t t′ → Hot t k ~⟨ Q ⟩ Hot t′ k
+hot-ag k a = hot-causal (hot-raw k a)
 
 ------------------------------------------------------------------------
 -- The joiners
@@ -124,7 +123,7 @@ mutual
   rows-causal e (flatS (mergeᶠ (just m)) f d n q o ls) = bounded-ag m d n q (λ a → causal-⟦⟧ (f a) e) (rows-causal e o) (rowsL-causal e ls)
   rows-causal e (flatS switchᶠ f d n q o ls)           = switch-ag d n (λ a → causal-⟦⟧ (f a) e) (rows-causal e o) (rowsL-causal e ls)
   rows-causal e (flatS exhaustᶠ f d n q o ls)          = exhaust-ag d n (λ a → causal-⟦⟧ (f a) e) (rows-causal e o) (rowsL-causal e ls)
-  rows-causal e (connS k o b)                         = conn-ag (CS.connAt k) (echo-ag k (rows-causal e o)) (rows-causal (ag-cons (hot-ag k e (rows-causal e o)) e) b)
+  rows-causal e (connS k o b)                         = conn-ag (CS.connAt k) (echo-ag k (rows-causal e o)) (rows-causal (ag-cons (hot-ag k (rows-causal e o)) e) b)
   rows-causal e (joinS j true x ib)                   = ∪-ag (ag-refl _) (e x j)
   rows-causal e (joinS j false x ib)                  = ag-refl _
 
@@ -143,5 +142,5 @@ rows-≃ e s = (λ {q} x → proj₁ (upto (rows-causal (e q) s) {q} (≼-refl {
 
 -- A BINDER'S MEANING, UP TO THE SAME ROWS: a body reads its binder only
 -- through the rows it holds, so the same rows bound give the same body.
-rows-hot : ∀ {Γ X B} {t u : EmissionSet X} (k : CS Γ X) (ρ : DenEnv Γ) (b : St (X ∷ Γ) B) → t ≃ u → rows (Hot ρ t k ∷ᴬ ρ) b ≃ rows (Hot ρ u k ∷ᴬ ρ) b
-rows-hot k ρ b eq = rows-≃ (λ Q → ag-cons (hot-ag k (env-refl ρ) ⟨ (λ _ → _≃_.to eq , _≃_.from eq) ⟩) (env-refl ρ)) b
+rows-hot : ∀ {Γ X B} {t u : EmissionSet X} (k : CS Γ X) (ρ : DenEnv Γ) (b : St (X ∷ Γ) B) → t ≃ u → rows (Hot t k ∷ᴬ ρ) b ≃ rows (Hot u k ∷ᴬ ρ) b
+rows-hot k ρ b eq = rows-≃ (λ Q → ag-cons (hot-ag k ⟨ (λ _ → _≃_.to eq , _≃_.from eq) ⟩) (env-refl ρ)) b

@@ -19,11 +19,8 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 Suspect: a joiner's `Join` read across a skip at `p`, with every lane
 after `p`, moves only by that skip, whether the skip lies in its outer or
 in the hole lane; a joiner's frozen `Rooted` must not grow past its entry.
-Open: entry-check, one seed, binders unchanged: a join's inbox gains its
-source's close at the position the engine fed it, while the connect's
-frozen entry ends that source elsewhere, so the binder never holds it.
-Settled by bodies over `Rows.Flat`'s policy, a frozen entry placing the
-source's end where it is fed, or a `Join` a lane after `p` changes.
+The entry check finds no node outside its entry.  Settled by bodies over
+`Rows.Flat`'s policy, or a `Join` a lane after `p` changes.
 
 Members: `join-≈-outer`, `join-≈-lane`.
 

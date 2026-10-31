@@ -30,7 +30,7 @@ open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≼-or-≻; e
 open import denotation.Laws.Worlds using (Hots; InvAt)
 open import denotation.Laws using (inv-⟦⟧)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; over; opening)
-open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; seek; found; Mark; ofM; attM;
+open Machine using (St; Ctx; Conf; scopeOf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; seek; found; Mark; ofM; attM;
                     rise; run; start; dequeue; settle; alive; ended; mapEv; nx; cp; attAt; attached; Torn;
                     Stepped; quiet; begin; admit; closed; killAll; unsubIf; free; cpAt; cutAt; overAt; cut; cpM; cutM; CS; cs; feed; closedUp; _⊕_;
                     bodyM; srcAttM; owedM; joinM; leafM; Poke; gone; leaf; starting; turn;
@@ -147,7 +147,7 @@ postulate
   -- under `ix 1` until the body's subscription exists.
   sub-connect : ∀ {R Γ A B} (c : Ctx R Γ B) (s : Obs Timeline Γ A) b q p
               → Sim ⟨ c , pend (connect s b) q , subscribing , p ⟩ []
-                    ⟨ inBody (cs false true false (just q) nothing nothing q root s) (pend s (q ⊕ [ ix 1 ])) c , pend b (q ⊕ [ ix 0 ]) , subscribing , q ⊕ [ ix 0 ] ⟩
+                    ⟨ inBody (cs false true false (just q) nothing nothing q root s (scopeOf c)) (pend s (q ⊕ [ ix 1 ])) c , pend b (q ⊕ [ ix 0 ]) , subscribing , q ⊕ [ ix 0 ] ⟩
   -- A COLD ENTERED: its timeline read at the subscription, its tape
   -- begun there.
   sub-cold : ∀ {R Γ A} (c : Ctx R Γ A) (x : Timeline A) q p

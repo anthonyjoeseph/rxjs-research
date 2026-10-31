@@ -38,15 +38,15 @@ open import Tree using (Obs; connected; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline; ix; last; inside; _<ᵖ_; _≟ᵖ_; ofᴱ)
 open import denotation.EmissionSet using (Ev; out; skip; pin; end)
 open import operation.PureObservable using (module Machine; module Driver)
-open Machine using (St; pend; coldS; ofS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; CS; Owe; free; cpAt; cutAt; overAt;
+open Machine using (St; pend; coldS; ofS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; CS; Scope; unbound; binds; Owe; free; cpAt; cutAt; overAt;
                     Conf; plug; subscribing; absorbed; rising; load; nx; cp)
 open import adequacy.Rows using (tapeE)
-open import quickcheck.Ty using (showPos)
-open import quickcheck.Code using (toObs; timeline)
+open import quickcheck.Ty using (showPos; natᵗ)
+open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Trace using (depth)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Tabled using (Row; Listed; _⊣_; rows; short; bind; concatMap; mapM; when; anyᵇ; allᵇ; _≼ᵇ_; endBy; endBefore;
-                                     ends; properᵇ; values; count; fuel; walk; mapRows; rejoin; past; afterL; lanes; listT;
+                                     ends; properᵇ; values; count; fuel; walk; mapRows; rejoin; past; afterL; lanes; listT; hotOf;
                                      module Order; scanRows; takeRows; connRows)
 
 ------------------------------------------------------------------------
@@ -314,6 +314,22 @@ private
   closedRows : ∀ {Γ A} → CS Γ A → List (Row A)
   closedRows k = when (CS.closed k) (CS.endAt k , end)
 
+  -- The binders in scope read whole, as the denotation reads them: each
+  -- its source's entry where its connect subscribed it, up to its end.
+  fullL : ∀ {Γ} → ℕ → Scope Γ → Maybe (All Listed Γ)
+  fullL u unbound         = just []
+  fullL u (binds o p sc) with fullL u sc
+  ... | nothing = nothing
+  ... | just φ  with listT u o φ (p ++ [ ix 1 ])
+  ...   | nothing = nothing
+  ...   | just F  = just (hotOf F ∷ φ)
+
+  -- A connect's source as it was subscribed, its binders read whole.
+  frozenL : ∀ {Γ A} → ℕ → CS Γ A → Maybe (Listed A)
+  frozenL u k with fullL u (CS.scope k)
+  ... | nothing = nothing
+  ... | just φ  = listT u (CS.src k) φ (CS.connAt k ++ [ ix 1 ])
+
   -- A binder's rows: what its source still owes, and its end once closed,
   -- each a row of the source's frozen entry `F` before that entry's end.
   frozenHot : ∀ {Γ A} → CS Γ A → Listed A → Listed A → Listed A
@@ -402,15 +418,15 @@ mutual
   ... | lo , no | lls , nls = opName op , bind lo (λ o′ → bind (allJust lls) λ Ls → joiner u ρ op f d n q o′ Ls) , no ++ nls
   listN u ρ π b (connS k o s) with listS u ρ (π ++ [ 0 ]) b o
   ... | nothing , no = "connect" , nothing , no
-  ... | just σ , no with listT u (CS.src k) ρ (CS.connAt k ++ [ ix 1 ])
+  ... | just σ , no with frozenL u k
   ...   | nothing = "connect" , nothing , no
   ...   | just F with listS u (frozenHot k F σ ∷ ρ) (π ++ [ 1 ]) true s
   ...     | lb , nb = "connect" +++ parts lb , lift₁ (connRows (CS.connAt k) (gated k σ)) lb , no ++ nb
     where
       parts : ∀ {B} → Maybe (Listed B) → String
       parts nothing   = ""
-      parts (just β) = " [frozen " +++ showRows (mapL erase (rows F)) +++ "| source " +++ showRows (mapL erase (rows σ)) +++ "| closed " +++ showRows (mapL erase (closedRows k)) +++ "| body " +++ showRows (mapL erase (rows β)) +++ "]"
-  listN u ρ π b (joinS j true x ib)  = "join [binder " +++ showRows (mapL erase (rows (lookup ρ x))) +++ "]" , just (let h = rejoin j (lookup ρ x) in (inbox ib ++ rows h) ⊣ short h) , []
+      parts (just β) = " at " +++ showPos (CS.connAt k) +++ " end " +++ showPos (CS.endAt k) +++ " [frozen " +++ showRows (mapL erase (rows F)) +++ "| source " +++ showRows (mapL erase (rows σ)) +++ "| closed " +++ showRows (mapL erase (closedRows k)) +++ "| body " +++ showRows (mapL erase (rows β)) +++ "]"
+  listN u ρ π b (joinS j true x ib)  = "join at " +++ showPos j +++ " [binder " +++ showRows (mapL erase (rows (lookup ρ x))) +++ "]" , just (let h = rejoin j (lookup ρ x) in (inbox ib ++ rows h) ⊣ short h) , []
   listN u ρ π b (joinS j false x ib) = "join" , just (inbox ib ⊣ false) , []
   listN u ρ π b _                    = "done" , just ([] ⊣ false) , []
 
@@ -540,7 +556,7 @@ private
   report []          bad = putStrLn ("entry-check: done " +++ showℕ bad +++ " failing seeds")
   report (seed ∷ ss) bad with probe 400 seed
   ... | []     = report ss bad
-  ... | f ∷ fs = each (f ∷ fs) >>= λ _ → report ss (suc bad)
+  ... | f ∷ fs = putStrLn ("entry-check: program " +++ showCode natᵗ (program seed)) >>= λ _ → each (f ∷ fs) >>= λ _ → report ss (suc bad)
     where
       each : List Finding → IO Unit
       each []       = putStrLn ""
