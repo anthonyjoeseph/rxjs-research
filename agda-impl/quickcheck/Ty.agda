@@ -51,6 +51,18 @@ eqᵀ (listᵗ t) (a ∷ as) (b ∷ bs) = eqᵀ t a b ∧ eqᵀ (listᵗ t) as b
 eqᵀ (listᵗ t) _        _        = false
 eqᵀ nameᵗ     p        q        = does (p ≟ᵖ q)
 
+-- A position: no digit follows a separator, so the oracle's
+-- number-quoting never reaches inside a name.
+mutual
+  showPos : Pos → String
+  showPos []       = ""
+  showPos (l ∷ ls) = showLabel l ++ "." ++ showPos ls
+
+  showLabel : Label → String
+  showLabel (ix n)  = "i" ++ showℕ n
+  showLabel (sub q) = "s(" ++ showPos q ++ ")"
+  showLabel last    = "L"
+
 -- JSON, the oracle's wire format.
 showᵀ : ∀ t → ⟦ t ⟧ᵀ → String
 showᵀ unitᵗ     _        = "null"
@@ -66,15 +78,3 @@ showᵀ (listᵗ t) xs       = "[" ++ intersperse "," (go xs) ++ "]"
     go []       = []
     go (x ∷ xs) = showᵀ t x ∷ go xs
 showᵀ nameᵗ     p        = "{\"name\":\"" ++ showPos p ++ "\"}"
-  where
-    -- no digit follows a separator, so the oracle's number-quoting never
-    -- reaches inside a name
-    mutual
-      showPos : Pos → String
-      showPos []       = ""
-      showPos (l ∷ ls) = showLabel l ++ "." ++ showPos ls
-
-      showLabel : Label → String
-      showLabel (ix n)  = "i" ++ showℕ n
-      showLabel (sub q) = "s(" ++ showPos q ++ ")"
-      showLabel last    = "L"

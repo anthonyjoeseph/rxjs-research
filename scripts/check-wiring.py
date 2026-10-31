@@ -951,6 +951,8 @@ MODULE_ROOTS = {
                                     ("main",)),
     "quickcheck.Oracle-CLI": ("the oracle's Agda half — `make oracle`",
                               ("main",)),
+    "quickcheck.Entry-Check": ("the settled-entry probe — `make entry-check`",
+                               ("main",)),
 }
 
 _IMPORT_RE = re.compile(r"^\s*(?:open\s+)?import\s+([^\s;()]+)")

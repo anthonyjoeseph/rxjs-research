@@ -347,6 +347,12 @@ module ExhaustL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) wh
   exhaustRows = Ran.ranRows runs
 open ExhaustL public using (exhaustRows)
 
+-- How many of the lanes, each by its ends, end where `p` holds:
+-- `Bounded.Kth` holds at k when this is past k.
+count : (Pos → Bool) → List (List Pos) → ℕ
+count p []         = 0
+count p (es ∷ ess) = if anyᵇ p es then suc (count p ess) else count p ess
+
 -- `EmissionSet.Bounded.JoinT`: level by level, each value's lane at
 -- every start `Starts` allows, and each level's ends passed on to the
 -- next.
@@ -354,12 +360,6 @@ module BoundedL {A B : Set} (n : ℕ) (lane : A → Pos → Maybe (Listed B)) (o
   vals : List (Pos × A)
   vals = values (rows o)
   open Order vals using (after; nths)
-
-  -- How many of the lanes, each by its ends, end where `p` holds:
-  -- `Bounded.Kth` holds at k when this is past k.
-  count : (Pos → Bool) → List (List Pos) → ℕ
-  count p []         = 0
-  count p (es ∷ ess) = if anyᵇ p es then suc (count p ess) else count p ess
 
   -- `Bounded.Starts`, given the lanes before.
   queuedAt : ℕ → Pos → List (List Pos) → Pos → List Pos
