@@ -26,7 +26,7 @@ open import operation.Key using (Key; _<ᴷ_)
 open import operation.PureObservable using (due; PureObs; module Machine; module Driver; Tape; play; ending; over; opening)
 open Machine using (St; Ctx; Conf; scopeOf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; found; Mark; ofM; attM;
                     rise; run; alive; nx; cp; attAt; attached; Torn; Stepped; quiet; admit; closed; killAll; unsubIf; unsub; free; cpAt; cutAt; overAt;
-                    cut; cpM; cutM; CS; cs; closedUp; _⊕_; unbound; seek; kids; lanes; own; ownBest; first; retag; raceT; sourceT; shift; Cand; Out; bodyM; srcAttM; owedM; joinM; leafM; leaf; starting; turn;
+                    cut; cpM; cutM; CS; cs; closedUp; _⊕_; unbound; seek; kids; lanes; own; ownBest; first; retag; raceT; sourceT; Cand; Out; bodyM; srcAttM; owedM; joinM; leafM; leaf; starting; turn;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Shown to Shownᴹ; step to stepᴹ)
@@ -220,7 +220,7 @@ race-owned d n q (o-just {h = h} mk pe)   (o-just {h = k} mk′ pe′)  with h <
 source-owned : ∀ {R A B t} {x : Maybe (Cand R A)} {y : Maybe (Cand R B)} → Owned t x → Owned t y → Owned t (sourceT x y)
 source-owned o-none                oy                    = oy
 source-owned (o-just mk pe)           o-none                = o-just mk pe
-source-owned (o-just {h = h} mk pe)   (o-just {h = k} mk′ pe′)  with shift h <ᴷ k
+source-owned (o-just {h = h} mk pe)   (o-just {h = k} mk′ pe′)  with h <ᴷ k
 ... | true  = o-just mk pe
 ... | false = o-just mk′ pe′
 
