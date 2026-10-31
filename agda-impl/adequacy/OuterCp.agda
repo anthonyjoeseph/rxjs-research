@@ -237,18 +237,11 @@ module _ {A B : Set} (L : A → Pos → EmissionSet B) {p : Pos} {O : EmissionSe
 ------------------------------------------------------------------------
 -- The step
 
-postulate
-  -- A DONE JOINER'S OUTER ENDING AGAIN: absorbed.  False against `Inv` as
-  -- it stands: the joiner, marked done with no lane live and none
-  -- waiting, is done at the end's position, so the rows before the step
-  -- owe its end there and the rows after owe none.  Such a joiner has
-  -- already risen its end, and the frame that took it is, as the machine
-  -- runs, closed or above the program's end; `Inv` says neither of a done
-  -- joiner, so nothing stops its outer rising.  Settled by an invariant
-  -- tying a done joiner to its frame above, or a program whose done
-  -- joiner's outer ends.
-  rise-joiner-cp-spent : ∀ {R Γ A B} op (f : A → Obs Timeline Γ B) ls (c : Ctx R Γ B) (o : St Γ A) p
-                       → Sim ⟨ inOuter op f true 0 [] ls c , o , rising cp , p ⟩ [] ⟨ c , flatS op f true 0 [] o ls , absorbed , p ⟩
+-- A DONE JOINER'S OUTER ENDING AGAIN: never reached.  The frame reads its
+-- outer through the end rising, and a done joiner's outer owes no row.
+rise-joiner-cp-spent : ∀ {R Γ A B} op (f : A → Obs Timeline Γ B) ls (c : Ctx R Γ B) (o : St Γ A) p
+                     → Sim ⟨ inOuter op f true 0 [] ls c , o , rising cp , p ⟩ [] ⟨ c , flatS op f true 0 [] o ls , absorbed , p ⟩
+rise-joiner-cp-spent op f ls c o p (inv ((_ , j , _) , _) _) = ⊥-elim (Join.spent j tt new)
 
 -- A done joiner, no lane live and none waiting, apart.
 by-spent : ∀ {A : Set} (P : Bool → ℕ → List A → Set₁) → P true 0 [] → (∀ d n q → (T d → n ≡ 0 → q ≡ [] → ⊥) → P d n q) → ∀ d n q → P d n q

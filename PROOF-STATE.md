@@ -42,15 +42,6 @@ when `≈` carries silent rows past `p` with `Truncate`'s reach intact.
 
 Members: `rise-body-cp`.
 
-#### A DONE JOINER RISEN AGAIN
-
-Refuted against `Inv` as it stands: a joiner done with no lane live and
-none waiting has risen its end, yet nothing stops its outer rising one.
-Open: an invariant tying a done joiner to a closed or spent frame above.
-Settled by that invariant, or a program whose done joiner's outer ends.
-
-Members: `rise-joiner-cp-spent`.
-
 #### THE CONNECT'S SEARCH
 
 Riskiest: how a connect's source rows and its body's sit against each
