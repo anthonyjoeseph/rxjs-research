@@ -253,10 +253,11 @@ module Over {R : Set} (Rt : EmissionSet R) where
     rise-lane-cp  : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n q o pre post} {c : Ctx R Γ B} {s p k′ sh t}
                   → rise (inLanes op f d n q o pre post c) s cp p ≡ moved k′ sh t
                   → SimC Rt ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ sh k′
-    -- A feed appends at `p ⊕ [ sub j ]`: keeping the joiner's inbox
-    -- ascending owes that a source's visible rows, in order, stay in
-    -- order once each is extended by the same `sub j`, which fails
-    -- exactly where an earlier row is a proper prefix of a later one.
+    -- A feed appends at `p ⊕ [ sub j ]` and the inbox stays ascending:
+    -- `Adm` makes the source a lawful hot, its rows none below another.
+    -- What the step still owes is moving all but the source from `bef p`
+    -- to `aft p`: nothing but the source has a row at `p`.
+    -- RECOVERY: git show 1745f869 restores rejoin-mono, good-full and lawful-at.
     rise-src-nx   : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s a p k′ sh t}
                   → rise (inSrc k b c) s (nx a) p ≡ moved k′ sh t → SimC Rt ⟨ inSrc k b c , s , rising (nx a) , p ⟩ sh k′
     rise-src-cp   : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s p k′ sh t}
