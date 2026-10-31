@@ -18,9 +18,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 Suspect: a joiner's `Join` read across a skip at `p`, with every lane
 after `p`, moves only by that skip, whether the skip lies in its outer or
-in the hole lane; a joiner's frozen `Rooted` must not grow past its entry,
-which the frozen connect binder is meant to give. Settled by bodies over
-`Rows.Flat`'s policy, or a joiner whose `Join` a lane after `p` changes.
+in the hole lane; a joiner's frozen `Rooted` must not grow past its entry.
+Open: a connect's frozen entry is read under an environment whose
+enclosing binders still gain their `Closed` end, so a joiner nested under
+an enclosing lane later reads an end its entry lacked (entry-check, one
+seed). Settled by bodies over `Rows.Flat`'s policy, an entry frozen over
+its binders' ends, or a joiner whose `Join` a lane after `p` changes.
 
 Members: `join-≈-outer`, `join-≈-lane`.
 
