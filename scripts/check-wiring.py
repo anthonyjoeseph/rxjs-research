@@ -953,6 +953,8 @@ MODULE_ROOTS = {
                               ("main",)),
     "quickcheck.Entry-Check": ("the settled-entry probe — `make entry-check`",
                                ("main",)),
+    "quickcheck.Cursor-Check": ("the cursor probe — `make cursor-check`",
+                                ("main",)),
 }
 
 _IMPORT_RE = re.compile(r"^\s*(?:open\s+)?import\s+([^\s;()]+)")

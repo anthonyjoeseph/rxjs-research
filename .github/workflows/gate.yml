@@ -127,6 +127,28 @@ jobs:
       - name: make entry-check
         run: make entry-check
 
+  # A PROBE, not a gate: every live node owes its frozen entry past one
+  # global cursor.  Informational while the design question is open.
+  cursor-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Agda
+        uses: ./.github/actions/agda-toolchain
+
+      - name: Cache compiled MAlonzo objects
+        uses: actions/cache@v4
+        with:
+          path: agda-impl/_cli/MAlonzo
+          key: agda-cli-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
+
+      - name: make cursor-check
+        run: make cursor-check
+
   # The oracle: every drawn program, on all three Agda engines,
   # gives the trace real rxjs does.
   oracle:

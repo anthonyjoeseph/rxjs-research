@@ -314,16 +314,17 @@ private
   closedRows : ∀ {Γ A} → CS Γ A → List (Row A)
   closedRows k = when (CS.closed k) (CS.endAt k , end)
 
-  -- The binders in scope read whole, as the denotation reads them: each
-  -- its source's entry where its connect subscribed it, up to its end.
-  fullL : ∀ {Γ} → ℕ → Scope Γ → Maybe (All Listed Γ)
-  fullL u unbound         = just []
-  fullL u (binds o p sc) with fullL u sc
-  ... | nothing = nothing
-  ... | just φ  with listT u o φ (p ++ [ ix 1 ])
-  ...   | nothing = nothing
-  ...   | just F  = just (hotOf F ∷ φ)
+-- The binders in scope read whole, as the denotation reads them: each
+-- its source's entry where its connect subscribed it, up to its end.
+fullL : ∀ {Γ} → ℕ → Scope Γ → Maybe (All Listed Γ)
+fullL u unbound         = just []
+fullL u (binds o p sc) with fullL u sc
+... | nothing = nothing
+... | just φ  with listT u o φ (p ++ [ ix 1 ])
+...   | nothing = nothing
+...   | just F  = just (hotOf F ∷ φ)
 
+private
   -- A connect's source as it was subscribed, its binders read whole.
   frozenL : ∀ {Γ A} → ℕ → CS Γ A → Maybe (Listed A)
   frozenL u k with fullL u (CS.scope k)
@@ -450,12 +451,16 @@ record Finding : Set where
     extra : List (Pos × Kind)
     above : List (List ℕ × String × String)
 
-private
-  samePath : List ℕ → List ℕ → Bool
-  samePath []       []       = true
-  samePath (i ∷ is) (j ∷ js) = (i ≡ᵇ j) ∧ samePath is js
-  samePath _        _        = false
+samePath : List ℕ → List ℕ → Bool
+samePath []       []       = true
+samePath (i ∷ is) (j ∷ js) = (i ≡ᵇ j) ∧ samePath is js
+samePath _        _        = false
 
+showPath : List ℕ → String
+showPath []       = ""
+showPath (i ∷ is) = showℕ i +++ "/" +++ showPath is
+
+private
   -- A node's entry: its former and rows then, whether cut short, and its
   -- binders' rows then.
   Entries : Set
@@ -539,10 +544,6 @@ probe k seed = let p = program seed in check (depth 3 p) k 0 [] (load (toObs tim
 -- The report
 
 private
-  showPath : List ℕ → String
-  showPath []       = ""
-  showPath (i ∷ is) = showℕ i +++ "/" +++ showPath is
-
   showFinding : ℕ → Finding → String
   showFinding seed (finding t nd w xs up) =
     "entry-check: FAIL seed " +++ showℕ seed +++ " step " +++ showℕ t +++ " node " +++ showPath (Node.path nd)
