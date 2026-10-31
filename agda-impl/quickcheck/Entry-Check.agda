@@ -461,8 +461,12 @@ private
   report : List ℕ → ℕ → IO Unit
   report []          bad = putStrLn ("entry-check: done " +++ showℕ bad +++ " failing seeds")
   report (seed ∷ ss) bad with probe 400 seed
-  ... | []    = report ss bad
-  ... | f ∷ _ = putStrLn (showFinding seed f) >>= λ _ → report ss (suc bad)
+  ... | []     = report ss bad
+  ... | f ∷ fs = each (f ∷ fs) >>= λ _ → report ss (suc bad)
+    where
+      each : List Finding → IO Unit
+      each []       = putStrLn ""
+      each (x ∷ xs) = putStrLn (showFinding seed x) >>= λ _ → each xs
 
 main : IO Unit
 main = report (upTo 300) 0
