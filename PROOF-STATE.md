@@ -16,13 +16,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### A SKIP READ ABOVE
 
-Suspect: `Anc` takes a joiner's `Rooted` at its frozen entry, but the
-settled-entry check grows a joiner's rows past that entry where a `sub`
-re-reads a live connect binder (11 of 300 seeds: connect, scan, map).
-Open: freezing the connect binder's source env at its entry. Settled by
-`anc-≈` as a body over that freeze, or a skip it cannot carry.
+Suspect: a joiner's `Join` read across a skip at `p`, with every lane
+after `p`, moves only by that skip, whether the skip lies in its outer or
+in the hole lane; a joiner's frozen `Rooted` must not grow past its entry,
+which the frozen connect binder is meant to give. Settled by bodies over
+`Rows.Flat`'s policy, or a joiner whose `Join` a lane after `p` changes.
 
-Members: `anc-≈`.
+Members: `join-≈-outer`, `join-≈-lane`.
 
 #### A RISEN OUTER VALUE'S ENTRY
 
@@ -101,7 +101,7 @@ the connect showing it a skip or a pin and each joiner a skip where it
 joined. Settled by a body, or a source skip that changes what the
 connect shows.
 
-Members: `src-vis`.
+Members: `src-vis`, `anc-≈-src`.
 
 #### AN OF IN A COMPLETED SOURCE
 
@@ -115,10 +115,10 @@ Members: `shut-of`, `shut-begin`.
 
 Untried: a good node's rows hold one event at a position, its binders'
 doing so: a merge's parts apart by `Rooted`, a connect's body and source
-echoes by world, a binder's rejoins by its source's. Settled by a body by
-former, or a good tree with two rows at a position.
+echoes by world, a connect's frozen source rows by its entry. Settled by
+a body by former, or a good tree with two rows at a position.
 
-Members: `rows-single`, `bind-single`.
+Members: `rows-single`, `frozen-single`.
 
 #### THE TAKE STEPPED
 

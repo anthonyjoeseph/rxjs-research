@@ -20,16 +20,17 @@ open import Data.List.Relation.Unary.All using (lookup) renaming (_∷_ to _∷�
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Unit using (⊤; tt)
 open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁; tt to tt₁)
 open import Relation.Nullary using (¬_)
-open import Data.List.Properties using (∷ʳ-injectiveˡ)
+open import Data.List.Properties using (∷ʳ-injectiveˡ; ∷ʳ-injectiveʳ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline; ix; last; <ᵖ-split; <ᵖ-part; Frame; burst; emit; stall; close)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; _≺_; _≼_; Truncate; module TakeWhile; DenEnv;
-  module Joining; module Values; MapT; map-out; map-skip; map-pin; map-end; module Scan; InE; at-out; at-end)
+  module Joining; module Values; MapT; map-out; map-skip; map-pin; map-end; module Scan; InE; at-out; at-end; Rejoin; Bare; hot; enter)
 open import denotation.Laws.Modulus using (≼-refl; ≺-ext; ≺-irrefl; ≼-≺-≺; ≺-≼-≺)
 open import denotation.Laws.Worlds using (InvAt; Hots; W; inW; plain-ix; apart-w) renaming (⊑-refl to ⊑ᵖ-refl)
 open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᵖ; clash)
@@ -38,7 +39,7 @@ open import operation.PureObservable using (module Machine; play; ending; over)
 open Machine using (St; Ctx; CS; cs; _⊕_; bodyM; Cand; Found; found; Focus; Mark; Out; still; shows; seek; kids; lanes; own; ownBest; raceT; outerT; laneT; sourceT; retag; first; mapT; scanT; takeT; cutT; shift; alive; outOf; ofM; closed;
                     free; cpAt; cutAt; overAt; inScan; inTake; inSrc; inBody;
                     ofS; doneS; mapS; cutS; cpM; cutM; lnS; flatS; coldS; scanS; takeS; connS; joinS; inMap; inCut; inLn; inOuter; inLanes; nx; cp; attached; attAt; attM; pend) renaming (Ev to Evᴹ)
-open import adequacy.Rows using (acc-val; rows; rowsL; pendRows; toEv; Lanes; Each; Kth; AllEnd; EndsOf; Lane; reads; hd; module Flat; module SwitchF; module ExhaustF; module BoundedF; ∅; Hot; Inbox; _∪_; Kept; Stops) renaming (kept to keptᴿ; stop to stopᴿ; left to leftᴿ; sub to subᴿ; From to Fromᴿ)
+open import adequacy.Rows using (acc-val; rows; rowsL; pendRows; toEv; Lanes; Each; Kth; AllEnd; EndsOf; Lane; reads; hd; module Flat; module SwitchF; module ExhaustF; module BoundedF; ∅; Hot; Frozen; Inbox; _∪_; Kept; Stops) renaming (kept to keptᴿ; stop to stopᴿ; left to leftᴿ; sub to subᴿ; From to Fromᴿ)
 open import adequacy.Cap using (irr; ⊑-<; <-⊑; ⊑-<⊑; ≮; dec; Past; OKᶜ; OKLᶜ; each-map; ok-cap; uncap; cap-retag; cap-sub;
   one; own-stills; first-stillsᶜ; first-at; lanes-firstᶜ; Calm; Quiet; QuietL; calm-map; EnvSingle; body-quiet; conn-free; conn-held; told-nil; join-head)
 open import adequacy.Bound using (Apart; <→⊑; Bd; Empty; From; Good; GoodL; GoodLn; MergeG; OK; OKL; Single; _⊑_; ext-⊑;
@@ -614,9 +615,55 @@ seek-off c attached s = silenced (seek (inCut false attached c) s) (seek-mark (i
 seek-off c (attAt p) s =
   own-first (_ , _ , c , cutS false (attAt p) s) attM (after p) _ (silenced (seek (inCut false (attAt p) c) s) (seek-mark (inCut false (attAt p) c) s))
 
+-- A rejoin holds one event a position when what it rejoins does.
+rejoin-single : ∀ {A} {t : EmissionSet A} {p} → Single t → ∀ {y y′ e e′} → Rejoin p t y e → Rejoin p t y′ e′ → y ≡ y′ → e ≡ e′
+rejoin-single st (Rejoin.shown {q} x b _) (Rejoin.shown {q′} x′ _ _) eq with ∷ʳ-injectiveˡ q q′ eq
+... | refl = st x x′
+rejoin-single st (Rejoin.shown {q} x b _) (Rejoin.heard {q′} x′ _) eq with ∷ʳ-injectiveˡ q q′ eq
+... | refl = ⊥-elim (subst Bare (st x x′) b)
+rejoin-single st (Rejoin.shown {q} x b _) (Rejoin.ended {q′} x′ _) eq with ∷ʳ-injectiveˡ q q′ eq
+... | refl = st x x′
+rejoin-single st (Rejoin.shown {q} _ _ _) (Rejoin.late _ _) eq with ∷ʳ-injectiveʳ q _ eq
+... | ()
+rejoin-single st (Rejoin.heard {q} x _) (Rejoin.shown {q′} x′ b _) eq with ∷ʳ-injectiveˡ q q′ eq
+... | refl = ⊥-elim (subst Bare (st x′ x) b)
+rejoin-single st (Rejoin.heard _ _) (Rejoin.heard _ _) eq = refl
+rejoin-single st (Rejoin.heard {q} x _) (Rejoin.ended {q′} x′ _) eq with ∷ʳ-injectiveˡ q q′ eq
+... | refl with st x x′
+... | ()
+rejoin-single st (Rejoin.heard {q} _ _) (Rejoin.late _ _) eq with ∷ʳ-injectiveʳ q _ eq
+... | ()
+rejoin-single st (Rejoin.ended {q} x _) (Rejoin.shown {q′} x′ _ _) eq with ∷ʳ-injectiveˡ q q′ eq
+... | refl = st x x′
+rejoin-single st (Rejoin.ended {q} x _) (Rejoin.heard {q′} x′ _) eq with ∷ʳ-injectiveˡ q q′ eq
+... | refl with st x x′
+... | ()
+rejoin-single st (Rejoin.ended _ _) (Rejoin.ended _ _) eq = refl
+rejoin-single st (Rejoin.ended {q} _ _) (Rejoin.late _ _) eq with ∷ʳ-injectiveʳ q _ eq
+... | ()
+rejoin-single st (Rejoin.late _ _) (Rejoin.shown {q′} _ _ _) eq with ∷ʳ-injectiveʳ _ q′ eq
+... | ()
+rejoin-single st (Rejoin.late _ _) (Rejoin.heard {q′} _ _) eq with ∷ʳ-injectiveʳ _ q′ eq
+... | ()
+rejoin-single st (Rejoin.late _ _) (Rejoin.ended {q′} _ _) eq with ∷ʳ-injectiveʳ _ q′ eq
+... | ()
+rejoin-single st (Rejoin.late _ _) (Rejoin.late _ _) eq = refl
+
+hot-single : ∀ {A} {t : EmissionSet A} → Single t → ∀ p → Single (enter (hot t) p)
+hot-single st p (x , _) (x′ , _) = rejoin-single st x x′ refl
+
 postulate
-  -- A CONNECT'S BINDER HOLDS ONE EVENT A POSITION, its source's rows doing so.
-  bind-single : ∀ {Γ X A} {ρ : DenEnv Γ} k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvSingle ρ → Good ρ (connS k o b) → EnvSingle (Hot ρ (rows ρ o) k ∷ᴬ ρ)
+  -- A CONNECT'S FROZEN ENTRY HOLDS ONE EVENT A POSITION: its source's
+  -- meaning entered where the connect subscribed it.
+  frozen-single : ∀ {Γ X A} {ρ : DenEnv Γ} k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvSingle ρ → Good ρ (connS k o b) → Single (Frozen ρ k)
+
+-- A CONNECT'S BINDER HOLDS ONE EVENT A POSITION: each row its frozen
+-- entry's.
+bind-single : ∀ {Γ X A} {ρ : DenEnv Γ} k (o : St Γ X) (b : St (X ∷ Γ) A) → EnvSingle ρ → Good ρ (connS k o b) → EnvSingle (Hot ρ (rows ρ o) k ∷ᴬ ρ)
+bind-single k o b es g (here refl) = hot-single (λ x x′ → frozen-single k o b es g (proj₁ (proj₁ x)) (proj₁ (proj₁ x′)))
+bind-single k o b es g (there x)   = es x
+
+postulate
 
   -- A BURST'S ROWS LIE FROM ITS FRAME ON: the frame's own steps at its
   -- index and after, the frames following under its close.

@@ -15,8 +15,8 @@ open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ)
-open import Data.Product using (_×_; _,_)
-open import Data.Sum using (_⊎_; inj₁)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁; tt to tt₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans)
@@ -24,14 +24,18 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans)
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline)
 open import denotation.EmissionSet using (EmissionSet; DenEnv; MapT; module Scan; module Connecting)
+open import denotation.Laws.Modulus using (≺→≼)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; CS; alive; lnS; cutS; mapS; scanS; takeS; flatS; connS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (env; rows; rowsL; pendRows; TakeR; Hot; _≃_; module Flat; module BoundedF; module SwitchF; module ExhaustF)
-open import adequacy.Up using (_≈ᴸ_; []; _∷_; ≈ᴸ-refl; ʳ++-≈; row-≃; bounded-≃; switch-≃; exhaust-≃; map-≃; scan-≃; take-≃; conn-≃; ≃-refl)
+open import adequacy.Rows using (env; rows; rowsL; pendRows; TakeR; Hot; Each; _≃_; module Flat; module BoundedF; module SwitchF; module ExhaustF)
+open import adequacy.Up using (_≈ᴸ_; []; _∷_; ≈ᴸ-refl; ʳ++-≈; all-ʳ++; row-≃; bounded-≃; switch-≃; exhaust-≃; map-≃; scan-≃; take-≃; conn-≃; ≃-refl)
 open import adequacy.Causal using (rows-hot)
 open import adequacy.Bound using (Empty; EndLast; Rooted; Roots; G; GL; SrcG; Held; Told; live; ⊥₁)
-open import adequacy.Skip using (Since; LeadC; _≈⟨_⟩_)
+open import adequacy.Skip using (Since; LeadC; After; _≈⟨_⟩_; ≈-sym; ≈-refl; end-≈; _≈ᴸ⟨_⟩_; ≈ᴸ-hole; after-since; trunc-≈;
+                                  since-map; map-≈; since-scan; scan-≈; since-take; take-≈; since-conn; conn-≈;
+                                  since-row; flat-≈; since-bounded; bounded-≈; since-switch; switch-≈; since-exhaust; exhaust-≈)
+  renaming (≈ᴸ-refl to ≈ᴸ-refl⟨⟩; _∷_ to _∷≈_)
 open import adequacy.Swap using (rooted-≃; empty-≃; endlast-≃; good-hot; live-swap; toldL-swap)
 
 ------------------------------------------------------------------------
@@ -226,13 +230,77 @@ rooted-sub h r = record { H = Rooted.H r ; X = Rooted.X r ; p₀ = Rooted.p₀ r
 ------------------------------------------------------------------------
 -- A skip at the lead, read above
 
+-- An end lies past the lead, so a skip at the lead keeps it last.
+endlast-≈ : ∀ {A} {t u : EmissionSet A} {p} → Since p t → t ≈⟨ p ⟩ u → EndLast t → EndLast u
+endlast-≈ st eq el ce y with _≈⟨_⟩_.bwd eq y
+... | inj₁ x          = el (end-≈ (≈-sym eq) ce) x
+... | inj₂ (refl , _) = st (end-≈ (≈-sym eq) ce)
+
+-- A joiner's rows over parts agreeing but for a skip at the lead, each
+-- part at or past it.
+jr-≈ : ∀ {A B} op (L : A → Pos → EmissionSet B) {O O′ : EmissionSet A} d n q {Ls Ls′ : List (EmissionSet B)} {p}
+     → Since p O → Since p O′ → Each (Since p) Ls → Each (Since p) Ls′ → O ≈⟨ p ⟩ O′ → Ls ≈ᴸ⟨ p ⟩ Ls′
+     → Since p (JR op L O d n q Ls) × Since p (JR op L O′ d n q Ls′) × JR op L O d n q Ls ≈⟨ p ⟩ JR op L O′ d n q Ls′
+jr-≈ (mergeᶠ nothing) L {O} {O′} d n q {Ls} {Ls′} so so′ sl sl′ eo es =
+  since-row L {d = d} {n = n} O Ls so sl , since-row L {d = d} {n = n} O′ Ls′ so′ sl′ , trunc-≈ (flat-≈ L {d = d} {n = n} Ls Ls′ eo es)
+jr-≈ (mergeᶠ (just m)) L {O} {O′} d n q {Ls} {Ls′} so so′ sl sl′ eo es =
+  since-bounded m L {d = d} {n = n} {Qu = q} O Ls so sl , since-bounded m L {d = d} {n = n} {Qu = q} O′ Ls′ so′ sl′
+  , bounded-≈ m L {d = d} {n = n} {Qu = q} Ls Ls′ eo es
+jr-≈ switchᶠ L {O} {O′} d n q {Ls} {Ls′} so so′ sl sl′ eo es =
+  since-switch L {d = d} {n = n} O Ls so sl , since-switch L {d = d} {n = n} O′ Ls′ so′ sl′ , switch-≈ L {d = d} {n = n} Ls Ls′ eo es
+jr-≈ exhaustᶠ L {O} {O′} d n q {Ls} {Ls′} so so′ sl sl′ eo es =
+  since-exhaust L {d = d} {n = n} O Ls so sl , since-exhaust L {d = d} {n = n} O′ Ls′ so′ sl′ , exhaust-≈ L {d = d} {n = n} Ls Ls′ eo es
+
 postulate
-  -- A HOLE'S SKIP AT THE LEAD, READ ABOVE: frames read through a hole's
-  -- rows read through any rows agreeing with them but for a skip at the
-  -- lead, every row of both at or past it.  Every frame's map is causal,
-  -- so the two readings above agree but for rows at or past the lead.
-  -- Open is a joiner frame's `Rooted` entry, frozen before the lead: a
-  -- skip one reading gains at the lead must already be among the entry's
-  -- rows, which the settled-entry check finds failing where a joiner
-  -- re-reads a live connect binder.
-  anc-≈ : ∀ {R Γ A} (c : Ctx R Γ A) {s : St Γ A} {t u : EmissionSet A} {p} → LeadC c p → Since p t → Since p u → t ≈⟨ p ⟩ u → Anc c s t → Anc c s u
+  -- AN OUTER'S SKIP AT THE LEAD KEEPS ITS JOINER'S FACTS: a done outer
+  -- still owes nothing, and the skip lies inside the outer's frozen entry.
+  -- Open is that entry: the settled-entry check finds a joiner's outer
+  -- growing past it where a `sub` re-reads a live connect binder.
+  join-≈-outer : ∀ {A B : Set} {op d n q nl} {t u : EmissionSet A} {Ls : List (EmissionSet B)} {p}
+               → Each (After p) Ls → Since p t → Since p u → t ≈⟨ p ⟩ u → Join op d n q nl t Ls → Join op d n q nl u Ls
+
+  -- A LANE'S SKIP AT THE LEAD KEEPS ITS JOINER'S FACTS: the skip lies
+  -- under the lane's root.
+  join-≈-lane : ∀ {A B : Set} {op d n q nl} {O : EmissionSet A} (pre : List (EmissionSet B)) {post} {t u : EmissionSet B} {p}
+              → After p O → Each (After p) pre → Each (After p) post → Since p t → Since p u → t ≈⟨ p ⟩ u
+              → Join op d n q nl O (pre ʳ++ t ∷ post) → Join op d n q nl O (pre ʳ++ u ∷ post)
+
+  -- A SOURCE'S SKIP AT THE LEAD, READ ABOVE ITS CONNECT: its body's facts
+  -- hold over the binder with the skip, and the frames above read the
+  -- connect with it as without, the connect showing it a skip or a pin
+  -- and each joiner a skip where it joined (`adequacy.Skip.src-vis`).
+  anc-≈-src : ∀ {R Γ X B} (k : CS Γ X) (b : St (X ∷ Γ) B) (c : Ctx R Γ B) {s : St Γ X} {t u : EmissionSet X} {p}
+            → LeadC (inSrc k b c) p → Since p t → Since p u → t ≈⟨ p ⟩ u → Anc (inSrc k b c) s t → Anc (inSrc k b c) s u
+
+-- A HOLE'S SKIP AT THE LEAD, READ ABOVE: frames read through a hole's
+-- rows read through any rows agreeing with them but for a skip at the
+-- lead, every row of both at or past it.  Every frame's map is causal,
+-- so the readings above agree but for that skip; a joiner's entry and a
+-- connect's binder are the frames that must hold it.
+anc-≈ : ∀ {R Γ A} (c : Ctx R Γ A) {s : St Γ A} {t u : EmissionSet A} {p} → LeadC c p → Since p t → Since p u → t ≈⟨ p ⟩ u → Anc c s t → Anc c s u
+anc-≈ top                 ld st su eq a = a
+anc-≈ (inMap f c)         ld st su eq a = anc-≈ c ld (since-map f st) (since-map f su) (map-≈ f eq) a
+anc-≈ (inScan f z c)      ld st su eq a = anc-≈ c ld (since-scan f z st) (since-scan f z su) (scan-≈ f z eq) a
+anc-≈ (inCut true a′ c)   ld st su eq a = anc-≈ c ld st su eq a
+anc-≈ (inCut false a′ c)  ld st su eq ()
+anc-≈ (inLn true c)       ld st su eq (ct , el , lp , a) = ct , endlast-≈ st eq el , lp , anc-≈ c ld st su eq a
+anc-≈ (inLn false c)      ld st su eq ()
+anc-≈ (inTake i q w c)    (lt , ld) st su eq a = anc-≈ c ld (since-take i q w lt st) (since-take i q w lt su) (take-≈ i q w eq) a
+anc-≈ (inOuter op f d n q ls c) {t = t} {u} (al , ld) st su eq (gl , j , a) =
+  gl , join-≈-outer al st su eq j , anc-≈ c ld (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) a
+  where
+    Ls = rowsL (env c) ls
+    sl = after-since Ls al
+    r  = jr-≈ op (λ x → pendRows (env c) (f x)) d n q st su sl sl eq (≈ᴸ-refl⟨⟩ Ls)
+anc-≈ (inLanes op f d n q o pre post c) {t = t} {u} (ao , apre , apost , ld) st su eq (il , go , gp , gq , j , a) =
+  il , go , gp , gq , join-≈-lane (rowsL ρ pre) ao apre apost st su eq j
+  , anc-≈ c ld (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) a
+  where
+    ρ   = env c
+    so  = λ {q} {e} r → ≺→≼ {_} {q} (ao {q} {e} r)
+    slt = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (st , after-since (rowsL ρ post) apost)
+    slu = all-ʳ++ (rowsL ρ pre) (after-since (rowsL ρ pre) apre) (su , after-since (rowsL ρ post) apost)
+    r   = jr-≈ op (λ x → pendRows ρ (f x)) d n q so so slt slu ≈-refl (≈ᴸ-hole (rowsL ρ pre) (eq ∷≈ ≈ᴸ-refl⟨⟩ (rowsL ρ post)))
+anc-≈ (inSrc k b c)       ld st su eq a = anc-≈-src k b c ld st su eq a
+anc-≈ (inBody k o c) {t = t} {u} (ao , ld) st su eq (gs , sp , tl , a) =
+  gs , sp , tl , anc-≈ c ld (since-conn (CS.connAt k) _ t ao st) (since-conn (CS.connAt k) _ u ao su) (conn-≈ (CS.connAt k) _ eq) a
