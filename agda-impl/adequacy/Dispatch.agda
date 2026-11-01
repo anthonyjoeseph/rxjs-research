@@ -519,8 +519,8 @@ module Over {R : Set} (Rt : EmissionSet R) where
   closed-off (f-cut fr)                        t = closed-off fr t
   closed-off (f-take fr _ _ _)                 t = closed-off fr t
   closed-off (f-took _ _ _ _ _ _ _)            _ = refl
-  closed-off (f-outer fr _ _ _)                t = closed-off fr t
-  closed-off (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) t with closed-off fr t
+  closed-off (f-outer fr _ _ _ _)              t = closed-off fr t
+  closed-off (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) t with closed-off fr t
   ... | ()
   closed-off (f-lane fr)                       t = closed-off fr t
   closed-off (f-lnct {b = false} fr)           _ = refl

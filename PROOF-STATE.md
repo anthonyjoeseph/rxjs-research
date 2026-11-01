@@ -14,14 +14,16 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE FRAMES LIFTED
+#### THE JOINER STEPPED
 
-A row no frame shows moves every frame above it past `p`. Open: whether a
-joiner's outer and each lane hold regions apart (`Ro` clear of every lane's
-world, a bounded merge's queued lane capped at the freed lane's end), and
-begun lanes sit at distinct values. Settled when `fr-up` is a body.
+An outer's value or end and a lane's, each rising into `Joined`/`Begun`
+by its policy: a switch's kill, an exhaust's drop, a bounded queue.
+Open: whether each lane holds a region of its own, apart from the
+outer's (`JParts`), a queued lane's ending at the freed lane's end, and
+begun lanes stay ascending; whether `Begun`'s live count makes a freed
+slot the queue head's `Starts.queued`. Settled when each is a body.
 
-Members: `fr-up`.
+Members: `rise-outer-nx`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`, `sub-flat`.
 
 #### THE CONNECT STEPPED
 
@@ -32,15 +34,6 @@ its scope's hots, so the rest moves past `p`. Settled when each is a body.
 
 Members: `sub-conn`, `sub-join`, `sub-joined`, `run-con`, `run-join-nx`,
 `run-join-cp`, `rise-take-failᵢ`, `feed-up`.
-
-#### THE JOINER STEPPED
-
-An outer's value or end and a lane's, each rising into `Joined`/`Begun`
-by its policy: a switch's kill, an exhaust's drop, a bounded queue.
-Open: whether `Begun`'s live count makes a freed slot the queue head's
-`Starts.queued`. Settled when each is a body.
-
-Members: `rise-outer-nx`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`, `sub-flat`.
 
 #### THE SILENT RUN, FINITE
 
