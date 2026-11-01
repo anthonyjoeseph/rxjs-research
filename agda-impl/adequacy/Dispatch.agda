@@ -43,6 +43,7 @@ open import adequacy.Simulation using (Simulation)
 open import adequacy.Walk using (due-≈; climb; descend; refocus)
 open import adequacy.Least using (Lo; Keeps; mapKp; scanKp; cutKp; takeKp; outerKp; laneKp; seek-lo; seek-none)
 open import adequacy.Bound using (bound; shift; due-shift)
+open import adequacy.Up using (rise-body-nx; rise-body-cp)
 
 ------------------------------------------------------------------------
 -- Within what is grown, every step moves or finds nothing to do
@@ -425,10 +426,6 @@ module Over {R : Set} (Rt : EmissionSet R) where
                   → rise (inSrc k b c) s (nx a) p ≡ moved k′ sh t → SimC Rt ⟨ inSrc k b c , s , rising (nx a) , p ⟩ sh k′
     rise-src-cp   : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s p k′ sh t}
                   → rise (inSrc k b c) s cp p ≡ moved k′ sh t → SimC Rt ⟨ inSrc k b c , s , rising cp , p ⟩ sh k′
-    rise-body-nx  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s b p} → CS.srcLive k ≡ true
-                  → SimC Rt ⟨ inBody k o c , s , rising (nx b) , p ⟩ [] ⟨ c , connS k o s , rising (nx b) , p ⟩
-    rise-body-cp  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s p} → CS.srcLive k ≡ true
-                  → SimC Rt ⟨ inBody k o c , s , rising cp , p ⟩ [] ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
 
     --------------------------------------------------------------------
     -- MARK RUNS, the cursor just before what they deliver.
@@ -533,7 +530,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   closed-off (f-take fr _ _ _)                 t = closed-off fr t
   closed-off (f-took _ _ _ _ _ _ _)            _ = refl
   closed-off (f-outer fr _ _ _)                t = closed-off fr t
-  closed-off (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) t with closed-off fr t
+  closed-off (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) t with closed-off fr t
   ... | ()
   closed-off (f-lane fr)                       t = closed-off fr t
   closed-off (f-lnct {b = false} fr)           _ = refl
@@ -661,7 +658,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   body-cp : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s p k′ sh t} b → CS.srcLive k ≡ b
           → moved (if b then ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩ else ⟨ c , connS k o s , absorbed , p ⟩) [] [] ≡ moved k′ sh t
           → SimC Rt ⟨ inBody k o c , s , rising cp , p ⟩ sh k′
-  body-cp true  lv refl = rise-body-cp lv
+  body-cp true  lv refl = rise-body-cp Rt lv
   body-cp false lv refl = rise-bodyx Rt lv
 
   -- A rise, by its frame.
@@ -688,7 +685,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   rise-sim (inSrc k b c)             s (nx a) p eq   = rise-src-nx eq
   rise-sim (inSrc k b c)             s cp     p eq   = rise-src-cp eq
   rise-sim (inBody k o c)            s (nx b) p eq with CS.srcLive k in lv | eq
-  ... | true  | refl = rise-body-nx lv
+  ... | true  | refl = rise-body-nx Rt lv
   ... | false | refl = rise-bodyx Rt lv
   rise-sim (inBody k o c)            s cp     p eq   = body-cp (CS.srcLive k) refl eq
 

@@ -129,8 +129,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
   climb (f-take fr nf eq sd)          h = climb fr λ t → s-take (h t) nf eq sd
   climb (f-took fr fl nr fz ow eq sd) h = climb fr λ _ → s-took fl (λ {q} → nr {q}) fz ow eq sd
   climb (f-outer fr j eq sd)          h = climb fr λ t → s-flat (h t) j eq sd
-  climb (f-lanes {pre = pre} {b = b} fr sy lf o nq r hl rt cnt wt wh od ah en eq so sd) (_ , _ , refl , h) =
-    climb fr λ _ → s-flat sy (joined bg wt wh od ah en) eq so
+  climb (f-lanes {pre = pre} {b = b} fr sy lf o nq r hl rt cnt wt wh od ah en li eq so sd) (_ , _ , refl , h) =
+    climb fr λ _ → s-flat sy (joined bg wt wh od ah en li) eq so
     where
       bg = subst (Begun _ _ _ _ _ _ _) (sym cnt)
              (subst (λ ls → Begun _ _ _ _ _ _ ls _) (sym (ʳ++-defn pre)) (begun-join lf o nq r (laneSt b hl h sd) rt))
@@ -203,10 +203,10 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-lanes : ∀ {C Γ A B} {op} {f} {d n qu} {o : St Γ A} {pre post} {c : Ctx R Γ B} {s}
              → Res C c (flatS op f d n qu o (pre ʳ++ s ∷ post)) → Res C (inLanes op f d n qu o pre post c) s
   down-lanes {pre = pre} (owes true , _ , _ , fr , h) with h _
-  ... | s-flat sy (joined bg wt wh od ah en) eq so
+  ... | s-flat sy (joined bg wt wh od ah en li) eq so
     with begun-split (reverse pre) (subst (λ ls → Begun _ _ _ _ _ _ ls _) (ʳ++-defn pre) bg)
   ...   | split lf o nq r l rt cnt refl with laneHold l
-  ...     | _ , hl , hd , sd = lane _ , _ , _ , f-lanes fr sy lf o nq r hl rt cnt wt wh od ah en eq so sd , hd
+  ...     | _ , hl , hd , sd = lane _ , _ , _ , f-lanes fr sy lf o nq r hl rt cnt wt wh od ah en li eq so sd , hd
   down-lanes (owes false , _ , _ , fr , _)            = owes false , nowhere , none′ , f-off u-lanes fr , λ ()
   down-lanes (lane _ , _ , _ , _ , (_ , _ , () , _))
   down-lanes (lanecut _ , _ , _ , _ , (_ , _ , () , _))

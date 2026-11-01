@@ -17,14 +17,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE CONNECT STEPPED
 
 A connect entered, a joiner joined, a source's or body's rise, its own
-marks, a joiner's next and a take's failure, each keeping `Inv`. Open: a
-rise that stops short of the root moves everything else from `bef p` past
-`p`, which needs no row but the rising one's at `p`. Settled when each is
-a body.
+marks, a joiner's next and a take's failure, each keeping `Inv`. Open:
+whether every entry lands a region apart from its siblings' and clear of
+its scope's hots, so the rest moves past `p`. Settled when each is a body.
 
 Members: `sub-conn`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`,
-`rise-body-nx`, `rise-body-cp`, `run-con`, `run-join-nx`, `run-join-cp`,
-`rise-take-failᵢ`.
+`run-con`, `run-join-nx`, `run-join-cp`, `rise-take-failᵢ`.
 
 #### THE JOINER STEPPED
 

@@ -332,7 +332,7 @@ mutual
          → Sync sc Rg C o O → Joined sc Rg C (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O d n qu ls
          → Env (full sc) C p → Lo (flatS op f d n qu o ls) (at p)
          → JoinF op (λ a → ⟦ f a ⟧ (full sc)) O k e → Visible e → Owes C k → p ≼ k
-  flat-b {sc = sc} {C = C} {op = op} {f} {O = O} {p} {k} sy (joined bg _ wh _ ah en) env lo r v ow
+  flat-b {sc = sc} {C = C} {op = op} {f} {O = O} {p} {k} sy (joined bg _ wh _ ah en _) env lo r v ow
     with join-row op (λ a → ⟦ f a ⟧ (full sc)) O r v
   ... | inj₁ y = bound sy env (λ ki → lo (k-kid (k-outer ki))) (y , tt , ow)
   ... | inj₂ (q , a , y , ru , ln , kl) with lane-st op (λ a → ⟦ f a ⟧ (full sc)) O ln | owes? C q
@@ -448,8 +448,8 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
     joined-sh : ∀ {Γ} {sc : Scope Γ} {Rg} {A B} {P : Pol A B} {O : EmissionSet A} {d n qu ls}
               → (∀ {q e} → Due C O q e → p ≼ q) → Joined sc Rg C P O d n qu ls
               → Env (full sc) C p → (∀ {l} → l ∈ ls → Lo l (at p)) → Joined sc Rg (bef p) P O d n qu ls
-    joined-sh {P = P} {O} ob (joined {vs = vs} {ws = ws} bg (eq , ap , wf) wh od ah en) env lo =
-      joined (begun-sh bg env lo) (eq , ap , wait) whole od′ ahead en
+    joined-sh {P = P} {O} ob (joined {vs = vs} {ws = ws} bg (eq , ap , wf) wh od ah en li) env lo =
+      joined (begun-sh bg env lo) (eq , ap , wait) whole od′ ahead en li
       where
         lead : ∀ {q a s} → (q , a) ∈ ws → Start P q a s → p ≼ s
         lead i st with ah i st

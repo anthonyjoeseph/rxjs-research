@@ -186,6 +186,10 @@ Ahead C P vs ws = ∀ {q a s} → (q , a) ∈ ws → Start P q a s
 Ends : ∀ {A B} → Pol A B → EmissionSet A → Set
 Ends P O = ∀ {q a c k e} → O q (out a) → Lane P q a c end → Lane P q a k e → Visible e → k ≼ c
 
+-- A value's lane rows lie in its joiner's region.
+LanesIn : ∀ {A B} → Rgn → Pol A B → EmissionSet A → Set
+LanesIn Rg P O = ∀ {q a k e} → O q (out a) → Lane P q a k e → Visible e → Rg k
+
 -- A cold's frame played where its timeline puts it: under a reachable
 -- root, at or after the root's tick.
 Ticked : ∀ {A} → Tape A → Set
@@ -219,7 +223,7 @@ data Begun {Γ A B} (sc : Scope Γ) (Rg : Rgn) (C : Cur) (P : Pol A B) (O : Emis
 data Joined {Γ A B} (sc : Scope Γ) (Rg : Rgn) (C : Cur) (P : Pol A B) (O : EmissionSet A) (d : Bool) (n : ℕ) (qu : List A)
             (ls : List (St Γ B)) : Set₁ where
   joined : ∀ {vs ws} → Begun sc Rg C P O vs ls n → Waiting C P O ws qu → Whole C P O vs ws → OuterDone C O d
-         → Ahead C P vs ws → Ends P O
+         → Ahead C P vs ws → Ends P O → LanesIn Rg P O
          → Joined sc Rg C P O d n qu ls
 
 -- A scan's fold: of the values passed, the seed if none.
@@ -416,6 +420,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → OuterDone C O d
             → Ahead C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) (vs₁ ++ (q , a) ∷ vs₂) ws
             → Ends (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O
+            → LanesIn Rg (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O
             → JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O ≈ E′ → Sound Rg O → (T b → Sound Rg E)
             → Fr C Rg (inLanes op f d n qu o pre post c) (lane b) E
     -- under a lane's list entry, its switch; under that, its program
