@@ -4,9 +4,9 @@
 -- clock reaches a listed position, short of `P`.  Each pending
 -- subscription weighs its syntax (a defer one), by depth; each admin mark,
 -- pending or owed, and each mark keyed before `P` at no listed position,
--- its depth + 2; a rise, its depth; and, all absorbed with a listed mark
--- next, that mark's run: its climb, and the one mark it may leave behind,
--- twice its depth + 4.  A mark at or past `P` runs only as the
+-- an of's every value still owed counted, its depth + 2; a rise, its
+-- depth; and, all absorbed with a listed mark next, that mark's run: its
+-- climb, and the one mark it may leave behind, twice its depth + 4.  A mark at or past `P` runs only as the
 -- clock passes `P`, and a listed one only once the clock has reached it,
 -- so neither weighs.
 module adequacy.Weight where
@@ -62,6 +62,11 @@ module _ (ks : List Pos) (P : Pos) where
     bodyP d (just p) = wt d (at (p ++ [ ix 1 ])) + (2 + d)
     bodyP d nothing  = 0
 
+  -- An of's values still owed and its end.
+  ofW : ∀ {A : Set} → ℕ → ℕ → Pos → List A → ℕ
+  ofW d i p []       = wt d (at (p ++ [ last ]))
+  ofW d i p (_ ∷ xs) = wt d (at (p ++ [ ix i ])) + ofW d (suc i) p xs
+
   -- A connect's admin marks, owed and pending.
   connW : ∀ {Γ X} → ℕ → CS Γ X → ℕ
   connW d k = bodyP d (CS.bodyAt k) + one d (not (isNone (CS.attSrc k))) + one d (not (isNone (CS.owedAt k)))
@@ -74,8 +79,7 @@ module _ (ks : List Pos) (P : Pos) where
     pot d (coldS b l) with due l
     ... | just κ                   = wt d κ
     ... | nothing                  = 0
-    pot d (ofS i p [])             = wt d (at (p ++ [ last ]))
-    pot d (ofS i p (_ ∷ _))        = wt d (at (p ++ [ ix i ]))
+    pot d (ofS i p xs)             = ofW d i p xs
     pot d doneS                    = 0
     pot d (mapS _ s)               = pot (suc d) s
     pot d (scanS _ _ s)            = pot (suc d) s

@@ -347,14 +347,14 @@ private
     keysL []       = []
     keysL (s ∷ ls) = keysS s ++ keysL ls
 
-  -- A settled-free step: a mark keyed before the run's position.
+  -- A settled-free step: a mark keyed at or before the run's position.
   early : Conf ℕ → Maybe Key
   early ⟨ c , s , absorbed , p ⟩ = nothing
   early ⟨ c , s , _ , p ⟩ = firstL (keysS (plug c s))
     where
       firstL : List Key → Maybe Key
       firstL []       = nothing
-      firstL (κ ∷ κs) = if κ <ᴷ at p then just κ else firstL κs
+      firstL (κ ∷ κs) = if not (at p <ᴷ κ) then just κ else firstL κs
 
   record Meas : Set where
     constructor meas
@@ -389,11 +389,11 @@ private
       ... | true | _     = tagIf true (tg +++ "AROSE") (note true (tg +++ "AROSE step " +++ showℕ t +++ " " +++ stepKind k +++ " A " +++ showℕ a₀ +++ " then " +++ showℕ a₁) m′)
       ... | _    | false = m′
       ... | _    | true  with W ks P k ≤ᵇ W ks P k′
-      ...   | false = record m′ { stills = tick main (Meas.stills m′) }
+      ...   | false = tagIf main ("still " +++ stepKind k) (record m′ { stills = tick main (Meas.stills m′) })
       ...   | true  = record (note true (tg +++ "STUCK step " +++ showℕ t +++ " " +++ stepKind k +++ " clock " +++ showKey (clockOf k)
                                         +++ " then " +++ stepKind k′ +++ " clock " +++ showKey (clockOf k′)
                                         +++ " W " +++ showℕ (W ks P k) +++ " then " +++ showℕ (W ks P k′)) m′)
-                             { stills = tick main (Meas.stills m′) ; tags = (tg +++ "STUCK " +++ stepKind k) ∷ Meas.tags m′ }
+                             { stills = tick main (Meas.stills m′) ; tags = (tg +++ "STUCK " +++ stepKind k) ∷ (if main then ("still " +++ stepKind k) ∷ Meas.tags m′ else Meas.tags m′) }
 
   walkM : List Pos → ℕ → ℕ → List Pos → Conf ℕ → Meas → Meas
   walkM rws zero    t sh       k m = m
@@ -461,7 +461,7 @@ private
   stillReport : List ℕ → ℕ → ℕ → ℕ → List (String × ℕ) → IO Unit
   stillReport []          cutN sts bad ts =
     putStrLn ("cursor-check: still " +++ showℕ sts +++ " still steps, " +++ showℕ bad +++ " seeds with a finding, "
-              +++ showℕ cutN +++ " seeds unmeasured; findings by kind: " +++ showTally ts)
+              +++ showℕ cutN +++ " seeds unmeasured; steps and findings by kind: " +++ showTally ts)
   stillReport (seed ∷ ss) cutN sts bad ts with measure 400 seed
   ... | nothing = stillReport ss (suc cutN) sts bad ts
   ... | just (meas [] n st) = stillReport ss cutN (sts + n) bad (tally st ts)
