@@ -8,24 +8,27 @@
 module adequacy.Simulation where
 
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using ([])
+open import Data.List using ([]; _∷_; [_]; _++_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
-open import Data.Maybe using (nothing; just)
+open import Data.Maybe using (Maybe; nothing; just)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
 
 open import denotation.Events using (Pos; root)
-open import denotation.EmissionSet using (Ev; out; end; EmissionSet; enter; ⟦_⟧; Den; _≺_; _≼_; Dep; Silent)
+open import denotation.EmissionSet using (Ev; out; end; EmissionSet; enter; ⟦_⟧; Den; _≺_; _≼_; Dep; Silent; Seen)
 open import denotation.Laws.Modulus using (≼-or-≻; entered-few)
 open import denotation.Laws.Worlds using (InvAt)
 open import denotation.Laws using (inv-⟦⟧)
-open import denotation.Read using (Meets; Run; Visible; loud; []; _∷_)
+open import denotation.Read using (Meets; Run; Visible; loud; cursor; []; _∷_)
+import denotation.Read as Read
 open import operation.PureObservable using (PureObs; module Machine; module Driver)
 open Machine using (Conf; load)
-open import adequacy.Rows using (Steps; conv; Vis; Past; Lowest; Shows*; Shows*-≃; Beyond; into; back; narrow; _≃_; ≃-sym;
+open import adequacy.Rows using (Steps; conv; Vis; Past; Lowest; Shows*; Shows*-≃; Beyond; into; back; narrow; past-≃; _≃_; ≃-sym; ≃-trans;
   []; _∷_) renaming (tau to τˢ; val to valˢ; fin to finˢ)
+open import adequacy.Path using (Path)
+import adequacy.Path as P
 open _≃_
 
 record Simulation {R : Set} (o : PureObs [] R) : Set₂ where
@@ -86,3 +89,34 @@ met-of-shown {o = o} = run-of (⟦ o ⟧ []ᴬ) root (quiet-root o) nothing
 -- rows is shown.
 sound : ∀ {R} {o : PureObs [] R} → Simulation o → ∀ {rs} → Steps (load o) rs → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs)
 sound {o = o} S st = met-of-shown {o = o} (Shows*-≃ (Simulation.t₀ S) (Sound.sound-from S (Simulation.i₀ S) st))
+
+-- ALONG A RUN: the carrier on the conf reached, and the visible rows it
+-- owes the program's rows past what the run has shown.
+module Along {R : Set} {o : PureObs [] R} (S : Simulation o) where
+  open Simulation S using (I; T) renaming (tau to simτ; val to simval)
+
+  private
+    t : EmissionSet R
+    t = enter (⟦ o ⟧ []ᴬ) root
+
+  along : ∀ {k₀ rs k} c → Path k₀ rs k → (i : I k₀) → Vis (T i) ≃ Vis (Beyond t c)
+        → Σ (I k) λ i′ → Vis (T i′) ≃ Vis (Beyond t (cursor c (conv rs)))
+  along c P.[]        i r = i , r
+  along c (P.tau e pth) i r =
+    let (i′ , q) = simτ i e
+    in along c pth i′ (≃-trans {t = Vis (T i′)} {u = Vis (T i)} {v = Vis (Beyond t c)} (≃-sym q) r)
+  along c (P.val {p = p} e pth) i r =
+    let (i′ , (v , _) , q) = simval i e
+        cq = proj₂ (into c (proj₁ (to r v)))
+    in along (just p) pth i′
+         (≃-trans {t = Vis (T i′)} {u = Vis (Past p (T i))} {v = Vis (Beyond t (just p))} (≃-sym q)
+           (≃-trans {u = Vis (Past p (Beyond t c))} (past-≃ {t = T i} {u = Beyond t c} {p = p} r) (narrow {t = t} c cq)))
+
+  -- The row met next past `c`.
+  Owed : Maybe Pos → Pos → Ev R → Set
+  Owed c p e = Seen t p e × Visible e × Read.Least t c p
+
+  -- The last row met.
+  met-next : ∀ {c} xs {p e} → Run t c (xs ++ [ (p , e) ]) → Owed (cursor c xs) p e
+  met-next []       (h ∷ []) = h
+  met-next (_ ∷ xs) (_ ∷ m)  = met-next xs m

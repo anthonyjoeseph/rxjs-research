@@ -34,14 +34,30 @@ when each is a body.
 
 Members: `rise-outer-nx`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`, `sub-flat`.
 
-#### THE SILENT RUN, FINITE
+#### THE GUARD ROWS
 
-Short of a row a reader meets next, a run is fuelled by the rows at or
-before it strictly past its clock. Open: whether the clock never runs
-back. Believed finite: `Few` counts skips and every defer leaves a guard
-skip. Settled by bodies.
+A step that begins work a level down — a lane, a defer's body, a
+source's feed — leaves a row first, so is never still. Open: that the
+denotation has that row, at or before the one met next. Settled by
+bodies over the joiner's and connect's rows.
 
-Members: `clock-mono`, `still-finite`.
+Members: `lane-guard`, `echo-guard`, `defer-guard`.
+
+#### THE MARK AT ITS ROW
+
+Open: that an open cold's tick is an ancestor of a row at or before the
+row met next, so it is listed. Settled by a body over the cursor `Inv`.
+
+Members: `tick-row`.
+
+#### THE CLOCK AHEAD
+
+The clock never runs back: proven step by step over two engine key facts.
+Open: that mid-run no mark is keyed before the run's whole subtree is
+past, and a joiner's inbox stays in key order. Settled by an invariant
+beside `stamped`.
+
+Members: `floor`, `inbox-asc`.
 
 #### THE COLD STEPPED
 

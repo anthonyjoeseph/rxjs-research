@@ -11,9 +11,10 @@ open import Data.List using (List; []; _∷_; [_]; _++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _<?_; s≤s; z≤n)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred; <-≤-trans; n≮0; m≤n⇒m≤1+n)
+open import Data.Nat.Induction using (<-wellFounded)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred; <-≤-trans; ≤-<-trans; n≮0; m≤n⇒m≤1+n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Induction.WellFounded using (Acc; acc)
@@ -21,69 +22,22 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; subs
 open import Relation.Nullary using (Dec; yes; no)
 
 open import denotation.Events using (Pos; root; _≟ᵖ_)
-open import denotation.EmissionSet using (Ev; out; end; EmissionSet; enter; ⟦_⟧; Seen; _≼_)
+open import denotation.EmissionSet using (Ev; out; end; EmissionSet; enter; ⟦_⟧; _≼_)
 open import denotation.Laws.Modulus using (≼-antisym)
 open import denotation.Laws.Worlds using (InvAt)
 open import denotation.Laws using (inv-⟦⟧)
-open import denotation.Read using (Run; Meets; Visible; loud; cursor; []; _∷_)
+open import denotation.Read using (Run; Meets; loud; cursor; []; _∷_)
 import denotation.Read as Read
 open import operation.PureObservable using (PureObs; module Machine; module Driver)
 open Machine using (Conf; load; nx; cp; absorbed) renaming (Shown to Shownᴹ)
-open import operation.Key using (Key; at; _<ᴷ_; clash; ≮ᴷ-trans)
-open import adequacy.Rows using (≼-≢; Steps; conv; Vis; Past; Lowest; Beyond; into; back; narrow; past-≃; _≃_; ≃-sym; ≃-trans; []; tau;
-  val; fin)
+open import operation.Key using (Key; at; _<ᴷ_; clash)
+open import adequacy.Rows using (≼-≢; Steps; conv; Vis; Lowest; Beyond; into; back; _≃_; ≃-sym; ≃-trans; []; tau; val; fin)
 open _≃_
-open import adequacy.Simulation using (Simulation; quiet-root)
-
--- `a` no later than `b`.
-record _⊑_ (a b : Key) : Set where
-  constructor ⊑i
-  field un : b <ᴷ a ≡ false
-
-⊑-trans : ∀ {a b c} → a ⊑ b → b ⊑ c → a ⊑ c
-⊑-trans {a} {b} {c} ab bc = ⊑i (≮ᴷ-trans c b a (_⊑_.un bc) (_⊑_.un ab))
-
--- A run from `k` to `k′` showing `rs`.
-data Path {R : Set} : Conf R → Shownᴹ R → Conf R → Set₁ where
-  []  : ∀ {k} → Path k [] k
-  tau : ∀ {k k′ k″ t rs} → Driver.step R k ≡ Driver.silent t k′ → Path k′ rs k″ → Path k rs k″
-  val : ∀ {k k′ k″ t p a rs} → Driver.step R k ≡ Driver.value t p a k′ → Path k′ rs k″ → Path k ((p , nx a) ∷ rs) k″
-
-_▸_ : ∀ {R} {k k′ k″ : Conf R} {rs rs′} → Path k rs k′ → Path k′ rs′ k″ → Path k (rs ++ rs′) k″
-[]        ▸ q = q
-tau e pth ▸ q = tau e (pth ▸ q)
-val e pth ▸ q = val e (pth ▸ q)
-
-then : ∀ {R} {k k′ : Conf R} {rs rs′} → Path k rs k′ → Steps k′ rs′ → Steps k (rs ++ rs′)
-then []        st = st
-then (tau e p) st = tau e (then p st)
-then (val e p) st = val e (then p st)
-
--- What a run shows next.
-data Next {R : Set} (k : Conf R) (p : Pos) : Ev R → Set₁ where
-  more : ∀ {a k′} → Path k [ (p , nx a) ] k′ → Next k p (out a)
-  done : Steps k [ (p , cp) ] → Next k p end
-
--- `k′` a silent step on from `k`.
-_⇜_ : ∀ {R} → Conf R → Conf R → Set₁
-_⇜_ {R} k′ k = Σ _ λ τ → Driver.step R k ≡ Driver.silent τ k′
-
-_▸τ_ : ∀ {R} {k k′ k″ : Conf R} {rs} → Path k rs k′ → k″ ⇜ k′ → Path k rs k″
-[]        ▸τ (_ , e) = tau e []
-tau e pth ▸τ st      = tau e (pth ▸τ st)
-val e pth ▸τ st      = val e (pth ▸τ st)
-
--- THE RUN'S CLOCK: the least mark due once everything is absorbed; mid-run,
--- where the run is.
-Clock : ∀ {R} → Conf R → Key
-Clock k with Conf.mode k | Machine.next k
-... | absorbed | just κ = κ
-... | _        | _      = at (Conf.pos k)
-
--- `k′` a silent step on from `k`, its clock passing no row of `t` at or
--- before `p`.
-Still : ∀ {R} → EmissionSet R → Pos → Conf R → Conf R → Set₁
-Still t p k′ k = k′ ⇜ k × (∀ {q e} → t q e → q ≼ p → Clock k <ᴷ at q ≡ true → Clock k′ <ᴷ at q ≡ true)
+open import adequacy.Simulation using (Simulation; quiet-root; module Along)
+open import adequacy.Weight using (Clock; W; Wᶜ-kept; anc)
+open import adequacy.Lighten using (still-lightens)
+open import adequacy.Floor using (clock-mono)
+open import adequacy.Path using (_⊑_; ⊑i; ⊑-trans; Path; []; tau; val; _▸_; then; Next; more; done; _⇜_; _▸τ_; Still)
 
 -- Of `qs`, those strictly past `κ`.
 ahead : Key → List Pos → ℕ
@@ -113,24 +67,29 @@ ahead-drop {κ} {κ′} {qs = r ∷ _} h (there m) p n with κ′ <ᴷ at r in e
 ... | false | true  = m≤n⇒m≤1+n (ahead-drop h m p n)
 ... | false | false = ahead-drop h m p n
 
-postulate
-  -- THE CLOCK NEVER RUNS BACK: short of a row a reader meets next, a silent
-  -- step's clock is no earlier.  Mid-run the run's position leads every
-  -- mark due, and every mark a step makes lies at or past it.
-  -- DEAD ROUTE: the least mark due as the clock throughout.  A lane begun
-  --   by an outer's value makes marks under that value, before the outer's
-  --   next mark, so mid-run the least key falls.
-  clock-mono : ∀ {R} (o : PureObs [] R) {rs k k′ p e} → Path (load o) rs k
-             → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ]) → k′ ⇜ k → Clock k ⊑ Clock k′
+-- STILL STEPS LIGHTEN: a still step's clock leaves every listed row ahead
+-- that was, so no mark weighs more at the clock it ends on.
+still-lowers : ∀ {R} (o : PureObs [] R) {rs k k′ p e} → Path (load o) rs k
+             → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+             → ∀ ks → (∀ {q e′} → enter (⟦ o ⟧ []ᴬ) root q e′ → q ≼ p → q ∈ ks)
+             → Still (ks ++ anc ks) k′ k → W (ks ++ anc ks) p k′ < W (ks ++ anc ks) p k
+still-lowers o {k′ = k′} {p} pth m ks cov (st , kept) =
+  ≤-<-trans (Wᶜ-kept (ks ++ anc ks) p kept k′) (still-lightens o pth m ks cov (st , kept))
 
-  -- STILL STEPS ARE FEW: short of a row a reader meets next, a run whose
-  -- clock passes no row at or before it takes finitely many steps — the
-  -- climbs, the subscribes, and the marks of what nothing above shows.
-  still-finite : ∀ {R} (o : PureObs [] R) {rs k p e} → Path (load o) rs k
-               → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ]) → Acc (Still (enter (⟦ o ⟧ []ᴬ) root) p) k
+-- STILL STEPS ARE FEW: short of a row a reader meets next, a run whose
+-- clock passes no row at or before it, nor any ancestor of one, takes
+-- finitely many steps.
+still-finite : ∀ {R} (o : PureObs [] R) {rs k p e} → Path (load o) rs k
+             → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+             → ∀ ks → (∀ {q e′} → enter (⟦ o ⟧ []ᴬ) root q e′ → q ≼ p → q ∈ ks) → Acc (Still (ks ++ anc ks)) k
+still-finite o {rs} {k} {p} pth₀ m ks cov = go (<-wellFounded (W (ks ++ anc ks) p k)) pth₀
+  where
+    go : ∀ {k} → Acc _<_ (W (ks ++ anc ks) p k) → Path (load o) rs k → Acc (Still (ks ++ anc ks)) k
+    go (acc r) pth = acc λ st → go (r (still-lowers o pth m ks cov st)) (pth ▸τ proj₁ st)
 
 module _ {R : Set} (o : PureObs [] R) (S : Simulation o) where
   open Simulation S using (I; T; i₀; t₀; dry) renaming (tau to simτ; val to simval; fin to simfin)
+  open Along S using (along; Owed) renaming (met-next to last)
 
   private
     t : EmissionSet R
@@ -152,25 +111,6 @@ module _ {R : Set} (o : PureObs [] R) (S : Simulation o) where
     over : ∀ {p rs} → t p end → Run t (just p) rs → rs ≡ []
     over _  []                                = refl
     over tp ((((ty , _) , _) , vi , pq , _) ∷ _) = ⊥-elim (loud vi (quiet-root o tp ty pq))
-
-    -- Along a run: the invariant, and the visible rows the program's past
-    -- what it has shown.
-    along : ∀ {k₀ rs k} c → Path k₀ rs k → (i : I k₀) → Vis (T i) ≃ Vis (Beyond t c)
-          → Σ (I k) λ i′ → Vis (T i′) ≃ Vis (Beyond t (cursor c (conv rs)))
-    along c []          i r = i , r
-    along c (tau e pth) i r =
-      let (i′ , q) = simτ i e
-      in along c pth i′ (≃-trans {t = Vis (T i′)} {u = Vis (T i)} {v = Vis (Beyond t c)} (≃-sym q) r)
-    along c (val {p = p} e pth) i r =
-      let (i′ , (v , _) , q) = simval i e
-          cq = proj₂ (into c (proj₁ (to r v)))
-      in along (just p) pth i′
-           (≃-trans {t = Vis (T i′)} {u = Vis (Past p (T i))} {v = Vis (Beyond t (just p))} (≃-sym q)
-             (≃-trans {u = Vis (Past p (Beyond t c))} (past-≃ {t = T i} {u = Beyond t c} {p = p} r) (narrow {t = t} c cq)))
-
-    -- The row met next past `c`.
-    Owed : Maybe Pos → Pos → Ev R → Set
-    Owed c p e = Seen t p e × Visible e × Read.Least t c p
 
     -- The least visible row of a state, read as the program's past `c`,
     -- is the row met next.
@@ -195,11 +135,6 @@ module _ {R : Set} (o : PureObs [] R) (S : Simulation o) where
           let (pq , ee) = same i c r h (simfin i eq) in subst₂ (Next k) (sym pq) (sym ee) (done (fin eq))
         go Driver.drained eq = ⊥-elim (dry i eq (from r (back c tp ap , vi)))
 
-    -- The last row met.
-    last : ∀ {c} xs {p e} → Run t c (xs ++ [ (p , e) ]) → Owed (cursor c xs) p e
-    last []       (h ∷ []) = h
-    last (_ ∷ xs) (_ ∷ m)  = last xs m
-
     -- SILENT RUNS ARE FINITE: short of a row a reader meets next, a run
     -- takes finitely many silent steps.  The fuel: the rows at or before
     -- the met one strictly past the clock, few by `Few`; a step passing
@@ -209,36 +144,39 @@ module _ {R : Set} (o : PureObs [] R) (S : Simulation o) where
     --   so most silent steps drop no row and the measure never moves; a
     --   strengthened `Moves.silent` tracking dropped rows would fuel nothing.
     silent-finite : ∀ {rs k p e} → Path (load o) rs k → Meets t (conv rs ++ [ (p , e) ]) → Acc _⇜_ k
-    silent-finite {rs} {k₀} {p} {e} pth₀ m = fuel _ ≤-refl (still-finite o pth₀ m) pth₀
+    silent-finite {rs} {k₀} {p} {e} pth₀ m = fuel _ ≤-refl (still-finite o pth₀ m ks₀ listed₀) pth₀
       where
         few = proj₂ (proj₁ (last {c = nothing} (conv rs) m))
 
+        ks₀ : List Pos
+        ks₀ = p ∷ proj₁ few
+
         ks : List Pos
-        ks = p ∷ proj₁ few
+        ks = ks₀ ++ anc ks₀
 
         μ : Conf R → ℕ
         μ k = ahead (Clock k) ks
 
-        listed : ∀ {q e′} → t q e′ → q ≼ p → q ∈ ks
-        listed {q} tq le with q ≟ᵖ p
+        listed₀ : ∀ {q e′} → t q e′ → q ≼ p → q ∈ ks₀
+        listed₀ {q} tq le with q ≟ᵖ p
         ... | yes refl = here refl
         ... | no ne    = there (proj₂ few tq (≼-≢ le ne))
 
         mutual
-          fuel : ∀ n {k} → μ k ≤ n → Acc (Still t p) k → Path (load o) rs k → Acc _⇜_ k
+          fuel : ∀ n {k} → μ k ≤ n → Acc (Still ks) k → Path (load o) rs k → Acc _⇜_ k
           fuel n {k} le (acc rec) pth = acc λ {k′} st → on n le rec pth st (μ k′ <? μ k)
 
-          on : ∀ n {k k′} → μ k ≤ n → (∀ {k″} → Still t p k″ k → Acc (Still t p) k″) → Path (load o) rs k → k′ ⇜ k
+          on : ∀ n {k k′} → μ k ≤ n → (∀ {k″} → Still ks k″ k → Acc (Still ks) k″) → Path (load o) rs k → k′ ⇜ k
              → Dec (μ k′ < μ k) → Acc _⇜_ k′
           on zero    le _ _ _ (yes lt) = ⊥-elim (n≮0 (<-≤-trans lt le))
-          on (suc n) le _ pth st (yes lt) = fuel n (≤-pred (≤-trans lt le)) (still-finite o (pth ▸τ st) m) (pth ▸τ st)
+          on (suc n) le _ pth st (yes lt) = fuel n (≤-pred (≤-trans lt le)) (still-finite o (pth ▸τ st) m ks₀ listed₀) (pth ▸τ st)
           on n {k} {k′} le rec pth st (no ¬lt) = fuel n (≤-trans (ahead-mono h ks) le) (rec (st , kept)) (pth ▸τ st)
             where
-              h = clock-mono o pth m st
-              kept : ∀ {q e′} → t q e′ → q ≼ p → Clock k <ᴷ at q ≡ true → Clock k′ <ᴷ at q ≡ true
-              kept {q} tq le′ c with Clock k′ <ᴷ at q in e′
+              h = clock-mono o pth st
+              kept : ∀ {q} → q ∈ ks → Clock k <ᴷ at q ≡ true → Clock k′ <ᴷ at q ≡ true
+              kept {q} mq c with Clock k′ <ᴷ at q in e′
               ... | true  = refl
-              ... | false = ⊥-elim (¬lt (ahead-drop h (listed tq le′) c e′))
+              ... | false = ⊥-elim (¬lt (ahead-drop h mq c e′))
 
     progress : ∀ {rs k p e} → Path (load o) rs k → Meets t (conv rs ++ [ (p , e) ]) → Next k p e
     progress {rs} pth m =
