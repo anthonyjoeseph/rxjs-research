@@ -14,14 +14,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE CURSOR SHIFTED
-
-A tree in step at `C`, no key before an owed `p`, is in step at `bef p`.
-Open: a joiner's unfed rows read at the new cursor, through its binder's
-hot; every other part's negative facts are monotone. Settled by a body.
-
-Members: `shift`.
-
 #### THE CONNECT STEPPED
 
 A connect entered, a joiner joined, a source's or body's rise, its own
