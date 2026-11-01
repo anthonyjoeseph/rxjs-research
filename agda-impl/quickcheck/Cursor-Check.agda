@@ -23,6 +23,16 @@
 -- fall is reported only when the root shows a row after it, as
 -- `clock-mono`'s premise asks; one with no row after is only counted.
 --
+-- THE GAP, probed: at every run of a mark, the cursor moves up to the
+-- mark's key.  Every row of a live node's entry, of any kind, lying from
+-- the cursor up to that key is passed with no delivery: a GAP ROW.  The
+-- simulation lists a node's passed rows, so each must sit under a
+-- position the run has already stepped at: a position some step was at,
+-- or one it extends.  A visible row, end or pin under none fails.  A skip
+-- row under none is a cold's batch tail or empty batch, or its image,
+-- passed by the cold's own step and tied by no `Sync`: tallied, with the
+-- attached rows, by former and kind.
+--
 -- A node is named by its path of child indices, as `quickcheck.Entry-Check`
 -- names it.  An entry cut short by a budget is skipped.  A probe for
 -- `make cursor-check`: no proof reads it.
@@ -58,7 +68,7 @@ open import quickcheck.Trace using (depth)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Ty using (showPos; natᵗ)
 open import quickcheck.Tabled using (rows; short; concatMap; when; anyᵇ; listT)
-open import quickcheck.Entry-Check using (Kind; kout; kend; erase; sameRow; showRows; fullL; samePath; showPath)
+open import quickcheck.Entry-Check using (Kind; kout; kskip; kend; kpin; erase; sameRow; showRows; fullL; samePath; showPath)
 
 ------------------------------------------------------------------------
 -- Each node's entry, and what it has delivered
@@ -69,6 +79,7 @@ record Seen : Set where
     path   : List ℕ
     former : String
     entry  : Maybe (List (Pos × Kind))
+    whole  : Maybe (List (Pos × Kind))
     got    : List (Pos × Kind)
 
 private
@@ -87,14 +98,18 @@ private
   formerOf (connected _)     = "join"
   formerOf (defer _)         = "defer"
 
-  -- A node's entry: its program listed where it is subscribed, its
-  -- binders read whole, visible rows only; nothing when cut short.
-  entryOf : ∀ {Γ A} → ℕ → Scope Γ → Obs Timeline Γ A → Pos → Maybe (List (Pos × Kind))
-  entryOf u sc o q with fullL u sc
+  -- A node's entry, every row: its program listed where it is subscribed,
+  -- its binders read whole; nothing when cut short.
+  wholeOf : ∀ {Γ A} → ℕ → Scope Γ → Obs Timeline Γ A → Pos → Maybe (List (Pos × Kind))
+  wholeOf u sc o q with fullL u sc
   ... | nothing = nothing
   ... | just φ with listT u o φ q
   ...   | nothing = nothing
-  ...   | just l  = if short l then nothing else just (visible (mapL erase (rows l)))
+  ...   | just l  = if short l then nothing else just (mapL erase (rows l))
+
+  visibleM : Maybe (List (Pos × Kind)) → Maybe (List (Pos × Kind))
+  visibleM nothing   = nothing
+  visibleM (just rs) = just (visible rs)
 
   known : List ℕ → List Seen → Maybe Seen
   known π []       = nothing
@@ -170,6 +185,8 @@ record Probe : Set where
     cursor : Maybe Pos
     falls  : Maybe String
     backs  : List String
+    trail  : List Pos
+    tied   : List String
 
 private
   open module D = Driver ℕ using (step; silent; value; complete; drained)
@@ -179,13 +196,13 @@ private
   enter : ℕ → Conf ℕ → List Seen → List Seen
   enter u ⟨ c , pend o q , subscribing , _ ⟩ bk with known (dirs c) bk
   ... | just _  = bk
-  ... | nothing = seen (dirs c) (formerOf o) (entryOf u (scopeOf c) o q) [] ∷ bk
+  ... | nothing = let w = wholeOf u (scopeOf c) o q in seen (dirs c) (formerOf o) (visibleM w) w [] ∷ bk
   enter u _ bk = bk
 
   -- A node rising: its delivery, against its entry and the cursor.
   delivered : ℕ → Conf ℕ → Probe → Probe × List String
-  delivered t ⟨ c , _ , rising e , p ⟩ (probing bk cur fl bs) =
-    probing (deliver π r bk) (ahead cur) fl bs , back cur ++ stray (known π bk)
+  delivered t ⟨ c , _ , rising e , p ⟩ (probing bk cur fl bs tr td) =
+    probing (deliver π r bk) (ahead cur) fl bs tr td , back cur ++ stray (known π bk)
     where
       π = dirs c
       r = p , kindOf e
@@ -217,9 +234,53 @@ private
   reachedBy nothing  q = false
   reachedBy (just C) q = not (C <ᵖ q)
 
+  showKind′ : Kind → String
+  showKind′ kout     = "out"
+  showKind′ kskip    = "skip"
+  showKind′ kend     = "end"
+  showKind′ (kpin _) = "pin"
+
+  isSkip : Kind → Bool
+  isSkip kskip = true
+  isSkip _     = false
+
+  -- Under a position the run has stepped at.
+  stepped : List Pos → Pos → Bool
+  stepped tr y = anyᵇ (λ x → anyᵇ (λ s → does (x ≟ᵖ s)) tr) (prefixes y)
+
+  -- From the cursor up to the key: passed with no delivery.
+  inGap : Maybe Pos → Key → Pos → Bool
+  inGap nothing  κ y = at y <ᴷ κ
+  inGap (just C) κ y = not (y <ᵖ C) ∧ (at y <ᴷ κ)
+
+  -- A run of a mark keyed at `κ`: every live node's gap rows, the
+  -- unattached failed, the attached tallied.
+  gapped : ℕ → Key → Probe → List (List ℕ) → List String × List String
+  gapped t κ pr ds = concatMap one (Probe.book pr) , concatMap tag (Probe.book pr)
+    where
+      rowsOf : Seen → List (Pos × Kind)
+      rowsOf s with Seen.whole s
+      ... | nothing = []
+      ... | just rs = if live ds (Seen.path s) then concatMap (λ { (y , k) → when (inGap (Probe.cursor pr) κ y) (y , k) }) rs else []
+      one : Seen → List String
+      one s = concatMap (λ { (y , k) → when (not (stepped (Probe.trail pr) y) ∧ not (isSkip k))
+                ("GAP step " +++ showℕ t +++ " node " +++ showPath (Seen.path s) +++ " " +++ Seen.former s +++ " passes " +++ showRows [ y , k ]
+                 +++ "under no step; cursor " +++ showCursor (Probe.cursor pr) +++ " key " +++ showKey κ) }) (rowsOf s)
+      tag : Seen → List String
+      tag s = concatMap (λ { (y , k) → when (stepped (Probe.trail pr) y ∨ isSkip k)
+                (Seen.former s +++ " " +++ showKind′ k +++ (if stepped (Probe.trail pr) y then "" else " stepless")) }) (rowsOf s)
+
+  gapAt : ℕ → Conf ℕ → Probe → List String × List String
+  gapAt t ⟨ c , s , absorbed , _ ⟩ pr with search top (plug c s)
+  ... | nothing = [] , []
+  ... | just f  = gapped t (Found.key f) pr (deadS [] (plug c s))
+  gapAt t _ pr = [] , []
+
   look : ℕ → ℕ → Conf ℕ → Probe → Probe × List String
   look u t k pr with delivered t k (record pr { book = enter u k (Probe.book pr) })
-  ... | pr′ , fs = pr′ , fs ++ (if settled k then arrears t (" at or before the cursor " +++ showCursor (Probe.cursor pr′)) (reachedBy (Probe.cursor pr′))
+  ... | pr′ , fs with gapAt t k pr′
+  ...   | gs , tg = record pr′ { trail = Conf.pos k ∷ Probe.trail pr′ ; tied = tg ++ Probe.tied pr′ }
+                  , fs ++ gs ++ (if settled k then arrears t (" at or before the cursor " +++ showCursor (Probe.cursor pr′)) (reachedBy (Probe.cursor pr′))
                                                              (deadS [] (plug (Conf.ctx k) (Conf.foc k))) (Probe.book pr′)
                                                else [])
 
@@ -262,16 +323,16 @@ private
 
   -- The root shows a row: a fall since the last one is met.
   shown : Probe → Probe
-  shown (probing bk cur (just f) []) = probing bk cur nothing [ f ]
-  shown (probing bk cur _ bs)        = probing bk cur nothing bs
+  shown (probing bk cur (just f) [] tr td) = probing bk cur nothing [ f ] tr td
+  shown (probing bk cur _ bs tr td)        = probing bk cur nothing bs tr td
 
-  -- The run's result: its failures, its first met fall, and a fall no
-  -- row followed.
+  -- The run's result: its failures, its first met fall, a fall no row
+  -- followed, and its attached gap rows.
   Result : Set
-  Result = List String × List String × Maybe String
+  Result = List String × List String × Maybe String × List String
 
   ended : List String → Probe → Result
-  ended fs pr = fs , Probe.backs pr , Probe.falls pr
+  ended fs pr = fs , Probe.backs pr , Probe.falls pr , Probe.tied pr
 
   -- The run for `n` more steps: its first failures, and its clock's fall.
   go : ℕ → ℕ → ℕ → Probe → Conf ℕ → Result
@@ -285,8 +346,8 @@ private
   ...   | drained        = ended (arrears t " though the run drained" (λ _ → true) (deadS [] (plug (Conf.ctx k) (Conf.foc k))) (Probe.book pr′)) pr′
 
 -- A seed's program, its run read for `n` steps.
-probe : ℕ → ℕ → List String × List String × Maybe String
-probe n seed = let p = program seed in go (depth 3 p) n 0 (probing [] nothing nothing []) (load (toObs timeline 3 p [] [] []))
+probe : ℕ → ℕ → List String × List String × Maybe String × List String
+probe n seed = let p = program seed in go (depth 3 p) n 0 (probing [] nothing nothing [] [] []) (load (toObs timeline 3 p [] [] []))
 
 ------------------------------------------------------------------------
 -- THE SILENT RUN, MEASURED: `adequacy.Complete`'s fuel, read off a run.
@@ -448,18 +509,7 @@ private
   late true  seed nothing  = pure tt
   late true  seed (just f) = putStrLn ("cursor-check: LATEFALL seed " +++ showℕ seed +++ " " +++ f +++ " in " +++ showCode natᵗ (program seed))
 
-  report : List ℕ → ℕ → ℕ → ℕ → IO Unit
-  report []          bad bk tl = putStrLn ("cursor-check: done " +++ showℕ bad +++ " failing seeds, " +++ showℕ bk +++ " seeds whose clock ran back before a row, "
-                                           +++ showℕ tl +++ " more whose clock ran back only after the last row")
-  report (seed ∷ ss) bad bk tl with probe 400 seed
-  ... | [] , [] , u = late (tl <ᵇ 8) seed u >>= λ _ → report ss bad bk (count (some u) tl)
-  ... | fs , cs , u =
-    putStrLn ("cursor-check: program " +++ showℕ seed +++ " " +++ showCode natᵗ (program seed)) >>= λ _ →
-    each ("cursor-check: FAIL seed " +++ showℕ seed +++ " ") fs >>= λ _ →
-    each ("cursor-check: CLOCK seed " +++ showℕ seed +++ " ") cs >>= λ _ →
-    report ss (count (not (null fs)) bad) (count (not (null cs)) bk) (count (some u ∧ null cs) tl)
-
-  -- The still steps' kinds, tallied.
+  -- Kinds, tallied.
   tally : List String → List (String × ℕ) → List (String × ℕ)
   tally []       ts = ts
   tally (x ∷ xs) ts = tally xs (bump ts)
@@ -471,6 +521,18 @@ private
   showTally : List (String × ℕ) → String
   showTally []             = ""
   showTally ((x , n) ∷ ts) = x +++ " " +++ showℕ n +++ "; " +++ showTally ts
+
+  report : List ℕ → ℕ → ℕ → ℕ → List (String × ℕ) → IO Unit
+  report []          bad bk tl gs = putStrLn ("cursor-check: done " +++ showℕ bad +++ " failing seeds, " +++ showℕ bk +++ " seeds whose clock ran back before a row, "
+                                              +++ showℕ tl +++ " more whose clock ran back only after the last row; gap rows under a step, by former and kind: "
+                                              +++ showTally gs)
+  report (seed ∷ ss) bad bk tl gs with probe 400 seed
+  ... | [] , [] , u , g = late (tl <ᵇ 8) seed u >>= λ _ → report ss bad bk (count (some u) tl) (tally g gs)
+  ... | fs , cs , u , g =
+    putStrLn ("cursor-check: program " +++ showℕ seed +++ " " +++ showCode natᵗ (program seed)) >>= λ _ →
+    each ("cursor-check: FAIL seed " +++ showℕ seed +++ " ") fs >>= λ _ →
+    each ("cursor-check: CLOCK seed " +++ showℕ seed +++ " ") cs >>= λ _ →
+    report ss (count (not (null fs)) bad) (count (not (null cs)) bk) (count (some u ∧ null cs) tl) (tally g gs)
 
   stillReport : List ℕ → ℕ → ℕ → ℕ → List (String × ℕ) → IO Unit
   stillReport []          cutN sts bad ts =
@@ -487,4 +549,4 @@ private
     stillReport ss cutN (sts + n) (suc bad) (tally st ts)
 
 main : IO Unit
-main = report (upTo 300) 0 0 0 >>= λ _ → stillReport (upTo 300) 0 0 0 []
+main = report (upTo 300) 0 0 0 [] >>= λ _ → stillReport (upTo 300) 0 0 0 []

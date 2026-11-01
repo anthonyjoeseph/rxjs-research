@@ -14,16 +14,22 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE TIE KEPT
+#### THE GAP
 
-`Tie.TieK`: every live connect's frozen source rows, and every live
-joiner's meaning rows, are each a finite list, a key under the node, a
-fresh row of the subscription in progress, or a copy fed from a handle.
-Open: whether each step keeps it, most of all a subscription's fresh rows
-turning into keys, queued lane rows, and pins of a completed source.
-Settled when the three step leaves are bodies.
+A shift moves the cursor to the least key; a cold's or joiner's rows
+between the old cursor and it must be finitely many. Open: `Sync` ties
+visible rows only, so a skip row (batch tail, empty batch) is not tied to
+any step. Settled by bodies, likely via a key-relative past with ties on
+every row.
 
-Members: `tie-rise`, `tie-begin`, `tie-run`.
+Members: `gap-src`, `gap-shut`, `gap-flat`.
+
+#### THE JOINER'S PAST
+
+A joiner subscribed at `q`: every row of its meaning lies past `q`.
+Settled by a body over `pend-past` and each lane's subscription key.
+
+Members: `join-past`.
 
 #### THE CONNECT STEPPED
 

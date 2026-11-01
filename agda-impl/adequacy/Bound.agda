@@ -39,14 +39,14 @@ import denotation.Laws.Connect as LC
 open import operation.Key using (at; at-<ᴷ)
 open import operation.PureObservable using (module Machine; Tape; play; ending) renaming (over to tapeOver)
 open Machine using (St; Scope; unbound; binds; CS; cs; own; bodyM; cpAt; coldS; ofS; takeS; flatS; connS; joinS)
-open import adequacy.Rows using (full; pendRows; Inbox; this; that; tapeE)
+open import adequacy.Rows using (full; pendRows; Frozen; Inbox; this; that; tapeE)
 open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans; ≼-≢)
 open _≃_
 open import adequacy.Cursor using (Cur; origin; bef; aft; Owes; Due; Unfed; Adm; Ticked;
   Pol; Lane; Runs; Start; Kill; polF; JoinF; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Spent;
   Folded; fd-none; fd-last; Whole; Ahead;
   Joined; joined; Ends; Flags; Src; src-pend; src-on; src-shut; Failure; Gone; notT; Sound; OweAt; o-cp; o-cut; o-over;
-  Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx)
+  Behind; FewBefore; few-behind; JRo; JRl; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
 
 ------------------------------------------------------------------------
@@ -238,7 +238,7 @@ mutual
   bound (s-cut sy) env lo r = bound sy env (λ ki → lo (k-kid (k-cut ki))) r
   bound (s-take sy nf m _) env lo (x , v , ow) = take-b sy nf env (λ ki → lo (k-kid (k-take ki))) (from m (x , v)) ow
   bound (s-took fl g ni oa m sd) env lo (x , v , ow) = took-b fl g ni oa sd lo (from m (x , v)) ow
-  bound (s-flat _ sy jn m _) env lo (x , v , ow) = flat-b sy jn env lo (proj₁ (proj₁ (from (proj₂ m) (x , v)))) v ow
+  bound (s-flat _ sy jn m _ _) env lo (x , v , ow) = flat-b sy jn env lo (proj₁ (proj₁ (from (proj₂ m) (x , v)))) v ow
   bound (s-conn refl _ bs ss fl m) env lo (x , v , ow) = let ((y , _) , v′) = from (proj₁ m) (x , v) in conn-b bs ss fl env lo (y , v′) ow
   bound {sc = sc} (s-join _ d ap _ _) env lo r = join-b {sc = sc} d ap env lo r
   bound (s-joinx sp) env lo r = ⊥-elim (sp r)
@@ -313,8 +313,8 @@ mutual
   src-b : ∀ {Γ X B} {Rg C} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B} {p}
         → Src (CS.scope k) Rg C k o → Env (full (CS.scope k)) C p → Lo (connS k o b) (at p)
         → ∀ {q e} → Due C (adequacy.Rows.Frozen k) q e → p ≼ q
-  src-b (src-on _ sy) env lo r = bound sy env (λ ki → lo (k-kid (k-src ki))) r
-  src-b (src-shut _ sp) env lo r = ⊥-elim (sp r)
+  src-b (src-on _ sy _) env lo r = bound sy env (λ ki → lo (k-kid (k-src ki))) r
+  src-b (src-shut _ sp _) env lo r = ⊥-elim (sp r)
   src-b {k = k} {b = b} {p = p} (src-pend {o = o′} _ be (ok , a) _ _ _) env lo {q} (x , _ , _) =
     on p (CS.connAt k ++ [ ix 1 ]) q (lo-at lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
        (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok) x)
@@ -363,9 +363,55 @@ mutual
 -- what the tree owes is unchanged, since it owed nothing before that key.
 -- What a part owes moves up by `bound`; what it has passed stays passed.
 
+-- Nothing passed yet: every row past an owed position.
+behind-past : ∀ {A} C {q} {E : EmissionSet A} → Owes C q → (∀ {k e} → E k e → q ≺ k) → Behind C E
+behind-past C {q} ow ps = [] , λ {k} r no → ⊥-elim (no (owes-≼ C ow (≺→≼ {q} {k} (ps r))))
+
+-- A source not yet subscribed: nothing of it passed.
+behind-pend : ∀ {Γ X} {sc : Scope Γ} {C} {k : CS Γ X} → CS.scope k ≡ sc → Adm (binds (CS.src k) (CS.connAt k) sc)
+            → Owes C (CS.connAt k ++ [ ix 1 ]) → Behind C (Frozen k)
+behind-pend {C = C} {k = k} refl (ok , a) ow =
+  behind-past C ow (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok))
+
+-- A joiner subscribed at `q`: every row past `q`, its outer's and every
+-- lane's, each lane subscribed past its value.
+postulate
+  join-past : ∀ {Γ A B} (sc : Scope Γ) op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) {q} → Adm sc → Ok (Hots (full sc)) q
+            → ∀ {k e} → JoinF op (λ a → ⟦ f a ⟧ (full sc)) (pendRows (full sc) s q) k e → q ≺ k
+
+-- A source's rows a body row at `p` reads: few, by what the source has
+-- passed, or none yet, its subscription not before `p`.
+few-src : ∀ {Γ X} {sc : Scope Γ} {Rs} {k : CS Γ X} {o : St Γ X} {p} → CS.scope k ≡ sc → Src sc Rs (bef p) k o → FewBefore (Frozen k) p
+few-src _ (src-on _ _ bh)   = few-behind bh
+few-src _ (src-shut _ _ bh) = few-behind bh
+few-src {k = k} {p = p} refl (src-pend _ _ (ok , a) _ _ ow) = [] , λ {y} r lt →
+  ⊥-elim (ow (≺-trans {CS.connAt k ++ [ ix 1 ]} {y} {p}
+               (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok) r)
+               (≺-trans {y} {y ++ [ ix 0 ]} {p} (≺-ext y []) lt)))
+
 due-shift : ∀ {Γ} {sc : Scope Γ} {Rg} {C A} {s : St Γ A} {E p} → Sync sc Rg C s E → Owes C p → Env (full sc) C p → Lo s (at p)
           → Due C E ≃ Due (bef p) E
 due-shift {C = C} sy op env lo = (λ r@(x , v , _) → x , v , bound sy env lo r) ⇄ (λ (x , v , pq) → x , v , owes-≼ C op pq)
+
+-- THE GAP: the rows of a node a shift passes with no delivery, finitely
+-- many.  What the probe in `quickcheck.Cursor-Check` finds there: a cold's
+-- skip rows, a batch's tail or an empty batch, and their images through
+-- the formers above it, each between two of the cold's own keys or
+-- before its first.  `Sync` ties a node's meaning to its state through
+-- its visible rows only, so nothing here reaches those skip rows: what
+-- would is a tie over every row, a node's rows before its least key
+-- passed by its own steps.
+postulate
+  gap-src : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o : St Γ X} {p}
+          → Sync sc Rg C o (Frozen k) → Behind C (Frozen k) → Owes C p → Env (full sc) C p → Lo o (at p)
+          → Behind (bef p) (Frozen k)
+  gap-shut : ∀ {Γ X} {sc : Scope Γ} {C} {k : CS Γ X} {p}
+           → T (CS.closed k) → Spent C (Frozen k) → Behind C (Frozen k) → Owes C p → Env (full sc) C p
+           → Behind (bef p) (Frozen k)
+  gap-flat : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu o ls O p}
+           → Sync sc (JRo sc Rg op f O) C o O → Joined sc (JRl sc Rg op f O) C (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O d n qu ls
+           → Behind C (JoinF op (λ a → ⟦ f a ⟧ (full sc)) O) → Owes C p → Env (full sc) C p → Lo (flatS op f ω d n qu o ls) (at p)
+           → Behind (bef p) (JoinF op (λ a → ⟦ f a ⟧ (full sc)) O)
 
 module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
 
@@ -420,8 +466,8 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
     sh (s-take sy nf m sd) env lo = s-take (sh sy env lo′) (λ y nk → bound sy env lo′ (y , tt , nf y nk)) m sd
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-take ki))
     sh (s-took fl g ni oa m sd) env lo = s-took fl (λ {q} o → g {q} (dn o)) (λ t → nm (ni t)) (owe-sh oa lo) m sd
-    sh (s-flat ji sy jn m sd) env lo =
-      s-flat ji (sh sy env lo′) (joined-sh (bound sy env lo′) jn env (λ i ki → lo (k-kid (k-lane i ki)))) m sd
+    sh (s-flat ji sy jn m sd bh) env lo =
+      s-flat ji (sh sy env lo′) (joined-sh (bound sy env lo′) jn env (λ i ki → lo (k-kid (k-lane i ki)))) m sd (gap-flat sy jn bh op env lo)
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-outer ki))
     sh {sc = sc} (s-conn {k = k} refl pt bs ss fl m) env lo = s-conn refl pt bs′ (λ t → src-sh (ss t) env lo) fl′ m
       where
@@ -443,8 +489,8 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
            → Src (CS.scope k) Rg C k o → Env (full (CS.scope k)) C p → Lo (connS k o b) (at p) → Src (CS.scope k) Rg (bef p) k o
     src-sh {k = k} {b = b} (src-pend {o = o′} nc be adm pr wn _) env lo =
       src-pend nc be adm pr wn (lo-at lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
-    src-sh (src-on nc sy)       env lo = src-on nc (sh sy env (λ ki → lo (k-kid (k-src ki))))
-    src-sh (src-shut cl sp)     env lo = src-shut cl (spent sp)
+    src-sh {k = k} (src-on nc sy bh) env lo = src-on nc (sh sy env (λ ki → lo (k-kid (k-src ki)))) (gap-src {k = k} sy bh op env (λ ki → lo (k-kid (k-src ki))))
+    src-sh {k = k} (src-shut cl sp bh) env lo = src-shut cl (spent sp) (gap-shut {sc = CS.scope k} {k = k} cl sp bh op env)
 
     joined-sh : ∀ {Γ} {sc : Scope Γ} {Rl} {A B} {P : Pol A B} {O : EmissionSet A} {d n qu ls}
               → (∀ {q e} → Due C O q e → p ≼ q) → Joined sc Rl C P O d n qu ls

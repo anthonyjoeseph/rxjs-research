@@ -33,7 +33,7 @@ open import operation.Key using (Key; at; _<ᴷ_; at-<ᴷ; <ᴷ-trans; <ᴷ-irre
 open import adequacy.Rows using (conv; back; module _≃_)
 open import adequacy.Weight using (Clock; W; Wᶜ; anc; prefixes; listed; depth; syn; one; isNone; climb; module Weigh)
 open import adequacy.Dispatch using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-least; found-plug)
-open import adequacy.Told using (cursor)
+open import adequacy.Simulated using (cursor)
 open import adequacy.Path using (Path; Still; _⇜_)
 open import adequacy.Stamped using (frame-ahead; opening-ahead; pend-focus)
 open import adequacy.Floor.Keys using (below)
