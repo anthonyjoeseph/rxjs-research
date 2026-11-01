@@ -35,7 +35,7 @@ open import adequacy.Rows using (≼-≢; Steps; conv; Vis; Past; Lowest; Beyond
   val; fin)
 open _≃_
 open import adequacy.Simulation using (Simulation; quiet-root)
-open import adequacy.Weight using (W; anc)
+open import adequacy.Weight using (Clock; W; anc)
 
 -- `a` no later than `b`.
 record _⊑_ (a b : Key) : Set where
@@ -74,13 +74,6 @@ _▸τ_ : ∀ {R} {k k′ k″ : Conf R} {rs} → Path k rs k′ → k″ ⇜ k�
 []        ▸τ (_ , e) = tau e []
 tau e pth ▸τ st      = tau e (pth ▸τ st)
 val e pth ▸τ st      = val e (pth ▸τ st)
-
--- THE RUN'S CLOCK: the least mark due once everything is absorbed; mid-run,
--- where the run is.
-Clock : ∀ {R} → Conf R → Key
-Clock k with Conf.mode k | Machine.next k
-... | absorbed | just κ = κ
-... | _        | _      = at (Conf.pos k)
 
 -- `k′` a silent step on from `k`, its clock passing no listed position.
 Still : ∀ {R} → List Pos → Conf R → Conf R → Set₁
@@ -131,7 +124,7 @@ postulate
   still-lowers : ∀ {R} (o : PureObs [] R) {rs k k′ p e} → Path (load o) rs k
                → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
                → ∀ ks → (∀ {q e′} → enter (⟦ o ⟧ []ᴬ) root q e′ → q ≼ p → q ∈ ks)
-               → Still (ks ++ anc ks) k′ k → W (anc ks) p k′ < W (anc ks) p k
+               → Still (ks ++ anc ks) k′ k → W (ks ++ anc ks) p k′ < W (ks ++ anc ks) p k
 
 -- STILL STEPS ARE FEW: short of a row a reader meets next, a run whose
 -- clock passes no row at or before it, nor any ancestor of one, takes
@@ -139,9 +132,9 @@ postulate
 still-finite : ∀ {R} (o : PureObs [] R) {rs k p e} → Path (load o) rs k
              → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
              → ∀ ks → (∀ {q e′} → enter (⟦ o ⟧ []ᴬ) root q e′ → q ≼ p → q ∈ ks) → Acc (Still (ks ++ anc ks)) k
-still-finite o {rs} {k} {p} pth₀ m ks cov = go (<-wellFounded (W (anc ks) p k)) pth₀
+still-finite o {rs} {k} {p} pth₀ m ks cov = go (<-wellFounded (W (ks ++ anc ks) p k)) pth₀
   where
-    go : ∀ {k} → Acc _<_ (W (anc ks) p k) → Path (load o) rs k → Acc (Still (ks ++ anc ks)) k
+    go : ∀ {k} → Acc _<_ (W (ks ++ anc ks) p k) → Path (load o) rs k → Acc (Still (ks ++ anc ks)) k
     go (acc r) pth = acc λ st → go (r (still-lowers o pth m ks cov st)) (pth ▸τ proj₁ st)
 
 module _ {R : Set} (o : PureObs [] R) (S : Simulation o) where

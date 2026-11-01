@@ -52,7 +52,7 @@ open Machine using (St; Ev; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; fl
                     Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody;
                     attAt; attached; free; cpAt; cutAt; overAt; search; found; Found; own;
                     Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM)
-open import adequacy.Weight using (W; prefixes)
+open import adequacy.Weight using (Clock; W; prefixes)
 open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Trace using (depth)
 open import quickcheck.Quickcheck using (program)
@@ -254,15 +254,10 @@ private
   ... | just f  = "run " +++ markName (Found.mark f)
   ... | nothing = "quiet"
 
-  clockOf : Conf ℕ → Key
-  clockOf k with Conf.mode k | Machine.next k
-  ... | absorbed | just κ = κ
-  ... | _        | _      = at (Conf.pos k)
-
   -- A silent step's clock against the step before's; the first fall noted.
   ticked : ℕ → Conf ℕ → Conf ℕ → Probe → Probe
-  ticked t k k′ pr with Probe.falls pr | clockOf k′ <ᴷ clockOf k
-  ... | nothing | true = record pr { falls = just ("step " +++ showℕ t +++ " " +++ stepKind k +++ " clock " +++ showKey (clockOf k) +++ " then " +++ showKey (clockOf k′)) }
+  ticked t k k′ pr with Probe.falls pr | Clock k′ <ᴷ Clock k
+  ... | nothing | true = record pr { falls = just ("step " +++ showℕ t +++ " " +++ stepKind k +++ " clock " +++ showKey (Clock k) +++ " then " +++ showKey (Clock k′)) }
   ... | _       | _    = pr
 
   -- The root shows a row: a fall since the last one is met.
@@ -347,14 +342,14 @@ private
     keysL []       = []
     keysL (s ∷ ls) = keysS s ++ keysL ls
 
-  -- A settled-free step: a mark keyed at or before the run's position.
+  -- A settled-free step: a mark keyed before the run's position.
   early : Conf ℕ → Maybe Key
   early ⟨ c , s , absorbed , p ⟩ = nothing
   early ⟨ c , s , _ , p ⟩ = firstL (keysS (plug c s))
     where
       firstL : List Key → Maybe Key
       firstL []       = nothing
-      firstL (κ ∷ κs) = if not (at p <ᴷ κ) then just κ else firstL κs
+      firstL (κ ∷ κs) = if κ <ᴷ at p then just κ else firstL κs
 
   record Meas : Set where
     constructor meas
@@ -370,7 +365,7 @@ private
   -- `tg` names the listing: the rows at or before P (exact), or every row
   -- listed (wide), as `adequacy.Complete` lets any cover stand.
   judge : Bool → String → ℕ → List Pos → Pos → Conf ℕ → Conf ℕ → Meas → Meas
-  judge main tg t ks P k k′ m = still (aheadN (clockOf k) ks) (aheadN (clockOf k′) ks) (tagIf (main ∧ bad (early k)) "KEY" (note (main ∧ bad (early k)) keyLine m))
+  judge main tg t ks P k k′ m = still (aheadN (Clock k) ks) (aheadN (Clock k′) ks) (tagIf (main ∧ bad (early k)) "KEY" (note (main ∧ bad (early k)) keyLine m))
     where
       tick : Bool → ℕ → ℕ
       tick b n = if b then suc n else n
@@ -390,8 +385,8 @@ private
       ... | _    | false = m′
       ... | _    | true  with W ks P k ≤ᵇ W ks P k′
       ...   | false = tagIf main ("still " +++ stepKind k) (record m′ { stills = tick main (Meas.stills m′) })
-      ...   | true  = record (note true (tg +++ "STUCK step " +++ showℕ t +++ " " +++ stepKind k +++ " clock " +++ showKey (clockOf k)
-                                        +++ " then " +++ stepKind k′ +++ " clock " +++ showKey (clockOf k′)
+      ...   | true  = record (note true (tg +++ "STUCK step " +++ showℕ t +++ " " +++ stepKind k +++ " clock " +++ showKey (Clock k)
+                                        +++ " then " +++ stepKind k′ +++ " clock " +++ showKey (Clock k′)
                                         +++ " W " +++ showℕ (W ks P k) +++ " then " +++ showℕ (W ks P k′)) m′)
                              { stills = tick main (Meas.stills m′) ; tags = (tg +++ "STUCK " +++ stepKind k) ∷ (if main then ("still " +++ stepKind k) ∷ Meas.tags m′ else Meas.tags m′) }
 
