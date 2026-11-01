@@ -61,7 +61,7 @@ Members: `rise-scan-nx`, `rise-scan-cp`, `rise-take-nx`, `rise-take-cp`, `sub-sc
 Believed: a subscription's entry is its program's meaning there, and an
 of's next delivers its next row. Settled when each is a body.
 
-Members: `sub-empty`, `sub-of`, `sub-map`, `sub-defer`, `run-of-nx`, `run-of-end`, `run-of-closed`, `run-stop-closed`.
+Members: `sub-empty`, `sub-of`, `sub-map`, `sub-defer`, `run-of-nx`, `run-of-end`.
 
 ## Tier 1 — the simultaneous spec
 

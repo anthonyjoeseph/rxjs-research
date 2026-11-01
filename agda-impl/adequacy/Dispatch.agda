@@ -7,7 +7,7 @@
 -- are a `Simulation` of every program's run.
 module adequacy.Dispatch where
 
-open import Data.Bool using (Bool; true; false; if_then_else_; not; _∧_)
+open import Data.Bool using (Bool; true; false; if_then_else_; not; _∨_; T)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Nat using (_≡ᵇ_; suc)
 open import Data.List using (List; []; _∷_; [_]; _ʳ++_)
@@ -35,7 +35,8 @@ open Machine using (St; Ctx; Conf; Scope; scopeOf; ⟨_,_,_,_⟩; subscribing; a
 open import adequacy.Rows using (≃-refl; Vis; Past; Lowest; _≃_; _⇄_; silent; shown; Moves; this)
 open _≃_
 open import adequacy.Cursor using (Cur; origin; bef; Spent; Due; Sync; _≈_; c-abs; c-sub; Inv; settled; pending; adrift; f-top;
-  RT; SimC; keeps; Owes; Fr; Hold; owes; lane; lanecut; pnd; s-of; s-join; s-joinx; s-took;
+  RT; SimC; keeps; Owes; Fr; Hold; Need; owes; lane; lanecut; pnd; s-of; s-join; s-joinx; s-took;
+  f-off; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-srcx; f-body;
   o-cp; rise-top; rise-map; rise-cut; rise-cutx; rise-ln; rise-took; rise-bodyx; run-stop;
   run-cut; run-att)
 open import adequacy.Simulation using (Simulation)
@@ -440,16 +441,12 @@ module Over {R : Set} (Rt : EmissionSet R) where
     run-of-end    : ∀ {Γ A} {c : Ctx R Γ A} {i q r} → closed c ≡ false
                   → Inv Rt (bef (q ⊕ [ last ])) ⟨ c , ofS i q [] , absorbed , r ⟩
                   → Inv Rt (bef (q ⊕ [ last ])) ⟨ c , doneS , rising cp , q ⊕ [ last ] ⟩
-    run-of-closed : ∀ {C Γ A} {c : Ctx R Γ A} {i q} {xs : List A} {r} → closed c ≡ true
-                  → Inv Rt C ⟨ c , ofS i q xs , absorbed , r ⟩ → Inv Rt C ⟨ c , doneS , absorbed , q ⟩
-    run-stop-closed : ∀ {C Γ A} {c : Ctx R Γ A} {i} {w : A → Bool} {s r p} → closed c ≡ true
-                    → Inv Rt C ⟨ c , takeS i w (cpAt r) s , absorbed , p ⟩ → Inv Rt C ⟨ c , takeS i w (cutAt r) s , absorbed , r ⊕ [ last ] ⟩
-    run-join-nx   : ∀ {Γ A} {c : Ctx R Γ A} {j g} {x : A ∈ Γ} {q a ib r}
-                  → Inv Rt (bef q) ⟨ c , joinS j g x ((q , nx a) ∷ ib) , absorbed , r ⟩
-                  → Inv Rt (bef q) ⟨ c , joinS j g x ib , (if g ∧ not (closed c) then rising (nx a) else absorbed) , q ⟩
-    run-join-cp   : ∀ {Γ A} {c : Ctx R Γ A} {j g} {x : A ∈ Γ} {q ib r}
-                  → Inv Rt (bef q) ⟨ c , joinS j g x ((q , cp) ∷ ib) , absorbed , r ⟩
-                  → Inv Rt (bef q) ⟨ c , joinS j false x ib , (if g ∧ not (closed c) then rising cp else absorbed) , q ⟩
+    run-join-nx   : ∀ {Γ A} {c : Ctx R Γ A} {j} {x : A ∈ Γ} {q a ib r} → closed c ≡ false
+                  → Inv Rt (bef q) ⟨ c , joinS j true x ((q , nx a) ∷ ib) , absorbed , r ⟩
+                  → Inv Rt (bef q) ⟨ c , joinS j true x ib , rising (nx a) , q ⟩
+    run-join-cp   : ∀ {Γ A} {c : Ctx R Γ A} {j} {x : A ∈ Γ} {q ib r} → closed c ≡ false
+                  → Inv Rt (bef q) ⟨ c , joinS j true x ((q , cp) ∷ ib) , absorbed , r ⟩
+                  → Inv Rt (bef q) ⟨ c , joinS j false x ib , rising cp , q ⟩
     -- a connect's own marks: its source subscribed, attached or torn
     -- down
     run-con       : ∀ {C Γ A X} {c : Ctx R Γ A} {k} {o : St Γ X} {b m r k′ sh t}
@@ -519,6 +516,50 @@ module Over {R : Set} (Rt : EmissionSet R) where
            → Inv Rt C ⟨ c , joinS j false x (u ∷ ib) , absorbed , r ⟩ → Inv Rt C ⟨ c , joinS j false x ib , absorbed , p ⟩
   join-off (settled _ fr h) = settled c-abs fr (joinx-hold h)
 
+  -- Under a closed context nothing is owed: only a connect's ended
+  -- source or a switched-off lane closes one, and both owe nothing below.
+  Off : Need → Set
+  Off (owes b)    = b ≡ false
+  Off (lane _)    = ⊥
+  Off (lanecut _) = ⊥
+  Off (pnd _)     = ⊤
+
+  or-right : ∀ a {b} → T (not a) → T (a ∨ b) → T b
+  or-right false _ t = t
+
+  closed-off : ∀ {C Γ A} {c : Ctx R Γ A} {w E} → Fr Rt C c w E → T (closed c) → Off w
+  closed-off (f-top _)                         ()
+  closed-off (f-off _ _)                       _ = refl
+  closed-off (f-map fr _)                      t = closed-off fr t
+  closed-off (f-scan fr _ _)                   t = closed-off fr t
+  closed-off (f-cut fr)                        t = closed-off fr t
+  closed-off (f-take fr _ _)                   t = closed-off fr t
+  closed-off (f-took _ _ _ _ _ _)              _ = refl
+  closed-off (f-outer fr _ _)                  t = closed-off fr t
+  closed-off (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _) t with closed-off fr t
+  ... | ()
+  closed-off (f-lane fr)                       t = closed-off fr t
+  closed-off (f-lnct {b = false} fr)           _ = refl
+  closed-off (f-lnct {b = true} fr)            t = ⊥-elim (closed-off fr t)
+  closed-off (f-src {k = k} fr _ _ nc _ _ _ _) t = closed-off fr (or-right (CS.closed k) nc t)
+  closed-off (f-srcc _ _ _ _ _ _ _ _)          _ = refl
+  closed-off (f-srcp _ _ _ _ _ _ _ _ _)        _ = tt
+  closed-off (f-srcx _ _ _ _ _)                _ = refl
+  closed-off (f-body fr _ refl _ _ _)          t with closed-off fr t
+  ... | refl = refl
+
+  off-keep : ∀ {C Γ A} {c : Ctx R Γ A} {w E} {s s′ : St Γ A} {p} → (∀ {o q} → s ≢ pend o q)
+           → Fr Rt C c w E → Hold (scopeOf c) C w s E → Off w → Inv Rt C ⟨ c , s′ , absorbed , p ⟩
+  off-keep {w = owes _}    _  fr _ refl        = settled c-abs fr (λ ())
+  off-keep {w = lane _}    _  _  _ ()
+  off-keep {w = lanecut _} _  _  _ ()
+  off-keep {w = pnd _}     np _  (_ , e , _) _ = ⊥-elim (np e)
+
+  -- A run under a closed context delivers nothing and owes nothing.
+  closed-keep : ∀ {C Γ A} {c : Ctx R Γ A} {s s′ : St Γ A} {r p} → closed c ≡ true → (∀ {o q} → s ≢ pend o q)
+              → Inv Rt C ⟨ c , s , absorbed , r ⟩ → Inv Rt C ⟨ c , s′ , absorbed , p ⟩
+  closed-keep cl np (settled _ fr h) = off-keep np fr h (closed-off fr (subst T (sym cl) tt))
+
   -- A mark delivering nothing keeps the cursor: the focus moved to it.
   search-quiet : ∀ {C Γ A} {c : Ctx R Γ A} {s r Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ}
                → Inv Rt C ⟨ c , s , absorbed , r ⟩
@@ -535,8 +576,8 @@ module Over {R : Set} (Rt : EmissionSet R) where
            → search top (plug c s) ≡ just (found (Γ , A , c′ , ofS i q xs) ofM κ) → run c′ (ofS i q xs) ofM p ≡ moved k′ sh t
            → SimC Rt ⟨ c , s , absorbed , p ⟩ sh k′
     abs-of {c′ = c′} {xs = xs} fd eq with closed c′ in cl | xs | eq
-    ... | true  | []     | refl = keeps Rt λ i → run-of-closed cl (search-quiet i fd)
-    ... | true  | _ ∷ _  | refl = keeps Rt λ i → run-of-closed cl (search-quiet i fd)
+    ... | true  | []     | refl = keeps Rt λ i → closed-keep cl (λ ()) (search-quiet i fd)
+    ... | true  | _ ∷ _  | refl = keeps Rt λ i → closed-keep cl (λ ()) (search-quiet i fd)
     ... | false | []     | refl = λ i → stepped (search-least i fd d-ofx) (run-of-end cl)
     ... | false | _ ∷ _  | refl = λ i → stepped (search-least i fd d-of) (run-of-nx cl)
 
@@ -557,8 +598,12 @@ module Over {R : Set} (Rt : EmissionSet R) where
              → search top (plug c s) ≡ just (found (Γ , A , c′ , joinS j g x ((q , e) ∷ ib)) joinM κ)
              → run c′ (joinS j g x ((q , e) ∷ ib)) joinM p ≡ moved k′ sh t
              → SimC Rt ⟨ c , s , absorbed , p ⟩ sh k′
-    abs-join {g = true}  {e = nx a} fd refl i = stepped (search-least i fd d-join) run-join-nx
-    abs-join {g = true}  {e = cp}   fd refl i = stepped (search-least i fd d-join) run-join-cp
+    abs-join {c′ = c′} {g = true} {e = nx a} fd eq with closed c′ in cl | eq
+    ... | false | refl = λ i → stepped (search-least i fd d-join) (run-join-nx cl)
+    ... | true  | refl = keeps Rt λ i → closed-keep cl (λ ()) (search-quiet i fd)
+    abs-join {c′ = c′} {g = true} {e = cp}   fd eq with closed c′ in cl | eq
+    ... | false | refl = λ i → stepped (search-least i fd d-join) (run-join-cp cl)
+    ... | true  | refl = keeps Rt λ i → closed-keep cl (λ ()) (search-quiet i fd)
     abs-join {g = false} {e = nx a} fd refl   = keeps Rt λ i → join-off (search-quiet i fd)
     abs-join {g = false} {e = cp}   fd refl   = keeps Rt λ i → join-off (search-quiet i fd)
 
@@ -568,7 +613,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
              → SimC Rt ⟨ c , s , absorbed , p ⟩ sh k′
     abs-stop {c′ = c′} fd eq with closed c′ in cl | eq
     ... | false | refl = λ i → stepped (search-least i fd d-stop) (run-stop Rt)
-    ... | true  | refl = keeps Rt λ i → run-stop-closed cl (search-quiet i fd)
+    ... | true  | refl = keeps Rt λ i → closed-keep cl (λ ()) (search-quiet i fd)
 
     abs-cut : ∀ {Γ A} {c′ : Ctx R Γ A} {j} {w : A → Bool} {r s₀ κ k′ sh t}
             → search top (plug c s) ≡ just (found (Γ , A , c′ , takeS j w (cutAt r) s₀) cutM κ)

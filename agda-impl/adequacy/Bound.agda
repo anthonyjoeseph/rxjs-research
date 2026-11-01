@@ -45,7 +45,7 @@ open _≃_
 open import adequacy.Cursor using (Cur; origin; bef; aft; Owes; Due; Unfed; Adm; Ticked;
   Pol; Lane; Runs; Start; Kill; polF; JoinF; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Spent;
   Folded; fd-none; fd-last; Whole; Ahead;
-  Joined; joined; Ends; Flags; Src; src-pend; src-on; Failure; OweAt; o-cp; o-cut; o-over;
+  Joined; joined; Ends; Flags; Src; src-pend; src-on; src-shut; Failure; OweAt; o-cp; o-cut; o-over;
   Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
 
@@ -305,7 +305,8 @@ mutual
   src-b : ∀ {Γ X B} {C} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B} {p}
         → Src (CS.scope k) C k o → Env (full (CS.scope k)) C p → Lo (connS k o b) (at p)
         → ∀ {q e} → Due C (adequacy.Rows.Frozen k) q e → p ≼ q
-  src-b (src-on sy) env lo r = bound sy env (λ ki → lo (k-kid (k-src ki))) r
+  src-b (src-on _ sy) env lo r = bound sy env (λ ki → lo (k-kid (k-src ki))) r
+  src-b (src-shut _ sp) env lo r = ⊥-elim (sp r)
   src-b {k = k} {b = b} {p = p} (src-pend {o = o′} be (ok , a) _) env lo {q} (x , _ , _) =
     on p (CS.connAt k ++ [ ix 1 ]) q (lo-at lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
        (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok) x)
@@ -433,7 +434,8 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
     src-sh : ∀ {Γ X B} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B}
            → Src (CS.scope k) C k o → Env (full (CS.scope k)) C p → Lo (connS k o b) (at p) → Src (CS.scope k) (bef p) k o
     src-sh (src-pend be adm pr) env lo = src-pend be adm pr
-    src-sh (src-on sy)          env lo = src-on (sh sy env (λ ki → lo (k-kid (k-src ki))))
+    src-sh (src-on nc sy)       env lo = src-on nc (sh sy env (λ ki → lo (k-kid (k-src ki))))
+    src-sh (src-shut cl sp)     env lo = src-shut cl (spent sp)
 
     joined-sh : ∀ {Γ} {sc : Scope Γ} {A B} {P : Pol A B} {O : EmissionSet A} {d n qu ls}
               → (∀ {q e} → Due C O q e → p ≼ q) → Joined sc C P O d n qu ls

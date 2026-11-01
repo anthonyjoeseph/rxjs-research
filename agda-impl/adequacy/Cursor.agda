@@ -294,7 +294,9 @@ data Src where
            → CS.bodyAt k ≡ just (CS.connAt k) → Adm (binds (CS.src k) (CS.connAt k) sc)
            → pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]) ≈ Frozen k
            → Src sc C k (pend o (CS.connAt k ++ [ ix 1 ]))
-  src-on   : ∀ {Γ X} {sc : Scope Γ} {C} {k : CS Γ X} {o} → Sync sc C o (Frozen k) → Src sc C k o
+  src-on   : ∀ {Γ X} {sc : Scope Γ} {C} {k : CS Γ X} {o} → T (not (CS.closed k)) → Sync sc C o (Frozen k) → Src sc C k o
+  -- ended: nothing left to owe, whatever its subtree still holds
+  src-shut : ∀ {Γ X} {sc : Scope Γ} {C} {k : CS Γ X} {o} → T (CS.closed k) → Spent C (Frozen k) → Src sc C k o
 
 -- No rise in flight.
 data Calm {A : Set} : Machine.Mode A → Set where
@@ -385,10 +387,16 @@ module _ {R : Set} (Rt : EmissionSet R) where
     f-lane  : ∀ {Γ A} {c : Ctx R Γ A} {b E} → Fr C c (lane b) E → Fr C (inLn b c) (lanecut b) E
     f-lnct  : ∀ {Γ A} {a} {c : Ctx R Γ A} {b E} → Fr C c (lanecut b) E → Fr C (inCut b a c) (owes b) E
     f-src   : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {w E E′ β}
-            → Fr C c (owes w) E′ → CS.scope k ≡ scopeOf c → T (CS.srcLive k)
+            → Fr C c (owes w) E′ → CS.scope k ≡ scopeOf c → T (CS.srcLive k) → T (not (CS.closed k))
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) C b β
             → Flags C k β → Frozen k ≈ E → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′
             → Fr C (inSrc k b c) (owes w) E
+    -- a source ended while its connect runs: nothing reads what is left
+    f-srcc  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {w E E′ β}
+            → Fr C c (owes w) E′ → CS.scope k ≡ scopeOf c → T (CS.srcLive k) → T (CS.closed k) → Spent C (Frozen k)
+            → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) C b β
+            → Flags C k β → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′
+            → Fr C (inSrc k b c) (owes false) E
     -- a source not yet subscribed: its program, owed at the connect's
     -- `ix 1`
     f-srcp  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {w E E′ β}

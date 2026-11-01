@@ -22,10 +22,10 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; absorbed; Scope; unbound; bind
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (_≃_; _⇄_; ≃-refl; ≃-sym; ≃-trans)
 open import adequacy.Cursor using (Cur; Owes; Due; Spent; _≈_; Pol; Runs; Hole; LaneSt; l-live; l-dead; Begun; none; more; bump;
-  joined; Sync; src-pend; src-on; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took;
+  joined; Sync; src-pend; src-on; src-shut; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took;
   s-flat; s-conn; s-join; s-joinx; Need; owes; lane; lanecut; pnd; Hold; u-map; u-scan; u-cut;
   u-ln; u-take; u-outer; u-lanes; u-src; u-body; Fr; f-top; f-off; f-map; f-scan; f-cut;
-  f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcp; f-srcx; f-body; Inv;
+  f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-srcx; f-body; Inv;
   settled; c-abs)
 open _≃_
 
@@ -137,7 +137,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
              (subst (λ ls → Begun _ _ _ _ _ ls _) (sym (ʳ++-defn pre)) (begun-join lf o nq r (laneSt b hl h) rt))
   climb (f-lane fr)                   (at , l , refl , h) = climb fr (at , l , refl , h)
   climb (f-lnct fr)                   h = climb fr (_ , _ , refl , h)
-  climb (f-src fr sc lv bs fl fe eq)  h = climb fr λ t → s-conn sc (λ _ → bs) (λ _ → src-on (sync-≈ (h t) (≃-sym fe))) fl eq
+  climb (f-src fr sc lv nc bs fl fe eq) h = climb fr λ t → s-conn sc (λ _ → bs) (λ _ → src-on nc (sync-≈ (h t) (≃-sym fe))) fl eq
+  climb (f-srcc fr sc lv cl sp bs fl eq) h = climb fr λ _ → s-conn sc (λ _ → bs) (λ _ → src-shut cl sp) fl eq
   climb (f-srcp fr sc lv ba adm bs fl fe eq) (_ , refl , pe) =
     climb fr λ _ → s-conn sc (λ _ → bs) (λ _ → src-pend ba adm (≃-trans pe (≃-sym fe))) fl eq
   climb (f-srcx fr sc nl fl eq)       h = climb fr λ _ → s-conn sc (λ lv → ⊥-elim (notT _ nl lv)) (λ lv → ⊥-elim (notT _ nl lv)) fl eq
@@ -217,7 +218,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
   ... | s-conn sc bs os fl eq with live? (CS.srcLive k)
   ...   | inj₂ nl = owes false , none′ , f-srcx fr sc nl fl eq , λ ()
   ...   | inj₁ lv with os lv
-  ...     | src-on sy           = owes true , _ , f-src fr sc lv (bs lv) fl ≃-refl eq , λ _ → sy
+  ...     | src-on nc sy        = owes true , _ , f-src fr sc lv nc (bs lv) fl ≃-refl eq , λ _ → sy
+  ...     | src-shut cl sp      = owes false , none′ , f-srcc fr sc lv cl sp (bs lv) fl eq , λ ()
   ...     | src-pend ba adm pe  = pnd _ , _ , f-srcp fr sc lv ba adm (bs lv) fl ≃-refl eq , (_ , refl , pe)
   down-src (owes false , _ , fr , _)            = owes false , none′ , f-off u-src fr , λ ()
   down-src (lane _ , _ , _ , (_ , _ , () , _))
