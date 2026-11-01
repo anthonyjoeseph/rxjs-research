@@ -48,7 +48,7 @@ sync-≈ (s-scan sy fd eq sd)  e = s-scan sy fd (≃-trans eq e) sd
 sync-≈ (s-cut sy)            e = s-cut (sync-≈ sy e)
 sync-≈ (s-take sy nf eq sd)  e = s-take sy nf (≃-trans eq e) sd
 sync-≈ (s-took fl nr fz ow eq sd) e = s-took fl (λ {q} → nr {q}) fz ow (≃-trans eq e) sd
-sync-≈ (s-flat ji sy j (pn , eq , ps) sd) e = s-flat ji sy j (pn , ≃-trans eq e , ps) sd
+sync-≈ (s-flat ji sy j (pn , eq) sd) e = s-flat ji sy j (pn , ≃-trans eq e) sd
 sync-≈ (s-conn sc pt b o fl (eq , cl)) e = s-conn sc pt b o fl (≃-trans eq e , cl)
 sync-≈ {C = C} (s-join eq d ap lt a) e = s-join (≃-trans eq e) (≃-trans (≃-sym (due-≈ {C = C} e)) d) ap lt a
 sync-≈ {C = C} (s-joinx sp) e = s-joinx (spent-≈ {C = C} sp e)

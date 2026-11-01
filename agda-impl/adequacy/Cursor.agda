@@ -54,7 +54,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; unbound; binds; CS; Owe
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ)
-open import denotation.Laws.Modulus using (≼-refl; ≺→≼; ≺-ext; ≺-irrefl; ≺-trans; ≼-or-≻; ≼-≺-≺)
+open import denotation.Laws.Modulus using (≼-refl; ≺→≼; ≺-ext; ≺-irrefl; ≺-trans; ≼-or-≻)
 open import adequacy.Rows using (≼-≢; _≃_; _⇄_; ≃-refl; Vis; Moves; silent; shown; toEv; Inbox; full; pendRows; Frozen; tapeE)
 open import denotation.Laws.Worlds using (Ok; Hots; Real; W⁼; InvAt; InvD)
 open _≃_
@@ -154,26 +154,13 @@ ConnE r σ β E = Truncate (Connecting.ConnT r σ β) ≈ E × (∀ {y e} → β
 JoinG : ∀ {Γ A B} → Scope Γ → FlatOp → (A → Obs Timeline Γ B) → Obs Timeline Γ A × Pos → EmissionSet B
 JoinG sc op f ω = JoinF op (λ a → ⟦ f a ⟧ (full sc)) (pendRows (full sc) (proj₁ ω) (proj₂ ω))
 
--- The rows of `E` the cursor has passed, every kind, few: each one a
--- step the run took or the skip one left.
-Passed : ∀ {A} → Cur → EmissionSet A → Set
-Passed C E = Σ (List Pos) λ ks → ∀ {y e} → E y e → ¬ Owes C y → y ∈ ks
-
--- A joiner's entry: its rows truncated, its outer's rows the ghost's,
--- the rows it has passed few.
-JoinE : ∀ {Γ A B} → Cur → Scope Γ → FlatOp → (A → Obs Timeline Γ B) → Obs Timeline Γ A × Pos → EmissionSet A → EmissionSet B → Set₁
-JoinE C sc op f ω O E = pendRows (full sc) (proj₁ ω) (proj₂ ω) ≡ O × Truncate (JoinF op (λ a → ⟦ f a ⟧ (full sc)) O) ≈ E
-                      × Passed C (JoinG sc op f ω)
+-- A joiner's entry: its rows truncated, its outer's rows the ghost's.
+JoinE : ∀ {Γ A B} → Scope Γ → FlatOp → (A → Obs Timeline Γ B) → Obs Timeline Γ A × Pos → EmissionSet A → EmissionSet B → Set₁
+JoinE sc op f ω O E = pendRows (full sc) (proj₁ ω) (proj₂ ω) ≡ O × Truncate (JoinF op (λ a → ⟦ f a ⟧ (full sc)) O) ≈ E
 
 -- A source's rows a connect reads before `p`, few.
 FewBefore : ∀ {X} → EmissionSet X → Pos → Set
 FewBefore σ p = Σ (List Pos) λ ks → ∀ {y e} → σ y e → (y ++ [ ix 0 ]) ≺ p → y ∈ ks
-
--- Passed short of `p`: every row before it few, a source's rows before
--- their echoes too.
-
-passed-few : ∀ {X} {σ : EmissionSet X} {p} → Passed (bef p) σ → FewBefore σ p
-passed-few {p = p} (ks , h) = ks , λ {y} x lt → h x (λ py → ≺-irrefl {p} (≼-≺-≺ {p} {y} {p} py (≺-trans {y} {y ++ [ ix 0 ]} {p} (≺-ext y {ix 0} []) lt)))
 
 -- A begun lane as its joiner reads it: running from where it was
 -- subscribed, its entry its lane's; or over, by its end or a later value.
@@ -321,7 +308,6 @@ record Flags {Γ X B} (C : Cur) (k : CS Γ X) (β : EmissionSet B) : Set where
     shut   : T (CS.closed k) → Frozen k (CS.endAt k) end × ¬ Owes C (CS.endAt k)
     unshut : T (CS.srcLive k) → ∀ {c} → Frozen k c end → ¬ Owes C c → T (CS.closed k)
     torn   : T (not (CS.srcLive k)) → Spent C β
-    past   : Passed C (Frozen k)
 
 -- A connect's source: running, its frozen entry what it owes; or not yet
 -- subscribed, which its body's own mark does at the connect's `ix 1`.
@@ -363,7 +349,7 @@ data Sync where
   -- a joiner: its outer, and its bookkeeping over its policy
   s-flat : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu o ls O E}
          → JInv sc f O → Sync sc (JRo sc Rg op f O) C o O → Joined sc (JRl sc Rg op f O) C (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O d n qu ls
-         → JoinE C sc op f ω O E → Sound (JRo sc Rg op f O) O
+         → JoinE sc op f ω O E → Sound (JRo sc Rg op f O) O
          → Sync sc Rg C (flatS op f ω d n qu o ls) E
   -- a connect: its body, under its binder read whole, and its source,
   -- while the source runs; torn down, its body owes nothing and nothing
@@ -463,7 +449,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     f-outer : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu ls} {c : Ctx R Γ B} {Rg w E E′}
             → Fr C Rg c (owes w) E′ → JInv (scopeOf c) f E
             → Joined (scopeOf c) (JRl (scopeOf c) Rg op f E) C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E d n qu ls
-            → JoinE C (scopeOf c) op f ω E E′ → Sound (JRo (scopeOf c) Rg op f E) E
+            → JoinE (scopeOf c) op f ω E E′ → Sound (JRo (scopeOf c) Rg op f E) E
             → Fr C (JRo (scopeOf c) Rg op f E) (inOuter op f ω d n qu ls c) (owes w) E
     -- the hole a begun lane, between those before it and after it, in a
     -- joiner some live node reads
@@ -483,7 +469,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Asc (vs₁ ++ (q , a) ∷ vs₂)
             → Ends (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O
             → LanesIn (JRl (scopeOf c) Rg op f O) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O
-            → JoinE C (scopeOf c) op f ω O E′ → Sound (JRo (scopeOf c) Rg op f O) O → (T b → Sound (JRl (scopeOf c) Rg op f O q) E)
+            → JoinE (scopeOf c) op f ω O E′ → Sound (JRo (scopeOf c) Rg op f O) O → (T b → Sound (JRl (scopeOf c) Rg op f O q) E)
             → Fr C (JRl (scopeOf c) Rg op f O q) (inLanes op f ω d n qu o pre post c) (lane b) E
     -- under a lane's list entry, its switch; under that, its program
     f-lane  : ∀ {Γ A} {c : Ctx R Γ A} {Rg b E} → Fr C Rg c (lane b) E → Fr C Rg (inLn b c) (lanecut b) E
