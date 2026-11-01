@@ -26,7 +26,6 @@ open import denotation.Events using (Pos; root; ix; last; <ᵖ-below; <ᵖ-part;
 open import denotation.EmissionSet using (enter; ⟦_⟧; _≼_)
 open import denotation.Read using (Meets)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; opening; due; Tape; rest; play; ending) renaming (over to overT)
-open import denotation.Events using (timelineAt)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Mode; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising; nx; cp; closedUp; closed; alive; dirs; unsub; cut; killAll; ended; settle;
                     attAt; attached; free; cpAt; cutAt; overAt; search; found; own; run; unsubIf; ofM; attM; cpM; cutM; bodyM; srcAttM; owedM; joinM; leafM)
@@ -35,6 +34,7 @@ open import adequacy.Rows using (conv)
 open import adequacy.Weight using (Clock; W; Wᶜ; anc; prefixes; listed; depth; syn; one; isNone; climb; module Weigh)
 open import adequacy.Dispatch using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-least; found-plug)
 open import adequacy.Path using (Path; Still; _⇜_)
+open import adequacy.Stamped using (frame-ahead; opening-ahead)
 
 -- A position's child keyed strictly after it.
 below : ∀ q {l} → at q <ᴷ at (q ++ [ l ]) ≡ true
@@ -53,12 +53,6 @@ postulate
   -- subscribing has a pending subscription in focus, owed where the run is.
   pend-focus : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q}
              → Path (load o) rs ⟨ c , s , subscribing , q ⟩ → Σ (PureObs Γ A) λ o′ → s ≡ pend o′ q
-
-  -- A COLD OPENS AHEAD: a cold a run subscribes first comes due strictly
-  -- after where it was subscribed.
-  opening-ahead : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {x q κ}
-                → Path (load o) rs ⟨ c , pend (cold x) q , subscribing , q ⟩
-                → due (opening q (timelineAt x q)) ≡ just κ → at q <ᴷ κ ≡ true
 
   -- A DEFER'S GUARD IS MET: short of a row a reader meets next, a defer a
   -- run subscribes has its guard row, at or before the row met next.
@@ -106,12 +100,6 @@ postulate
            → closed c′ ≡ false
            → Σ Pos λ r → Σ _ λ e′ → enter (⟦ o ⟧ []ᴬ) root r e′ × r ≼ p × (u ++ [ ix i ]) ∈ prefixes r
 
-  -- A COLD'S NEXT FRAME IS AHEAD: a cold closing its frame comes due next
-  -- strictly after the due it played.
-  frame-ahead : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q Γ′ A′} {c′ : Ctx R Γ′ A′} {b τ u i t f κ κ′}
-              → Path (load o) rs ⟨ c , s , absorbed , q ⟩
-              → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS b (play τ u i t (close f))) leafM κ)
-              → due (rest τ (u ++ [ last ]) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true
 
 private
   conn-arith : ∀ w e x y → w ≤ e → suc ((((w + suc e) + 0) + 0 + e) + x + y) ≤ 2 + 3 * e + y + x

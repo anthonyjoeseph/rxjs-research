@@ -55,18 +55,17 @@ Members: `mark-short`, `tick-row`.
 #### THE CLOCK AHEAD
 
 No mark is due before the run's clock. Open: that the clock never runs
-back over a silent step, a source's feed comes due no sooner than a
-level down, and a cold's next frame comes due past its close. Settled by
-an engine key invariant.
+back over a silent step, and a source's feed comes due no sooner than a
+level down. Settled by an engine key invariant beside `stamped`.
 
-Members: `clock-mono`, `fed-ahead`, `frame-ahead`.
+Members: `clock-mono`, `fed-ahead`.
 
 #### THE SUBSCRIPTION MET
 
-Open: that a subscribing run has its pending subscription in focus, and
-a cold opens strictly past it. Settled by bodies.
+Open: that a subscribing run has its pending subscription in focus.
+Settled by a body.
 
-Members: `pend-focus`, `opening-ahead`.
+Members: `pend-focus`.
 
 #### THE COLD STEPPED
 
