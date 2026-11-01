@@ -26,13 +26,13 @@ open import Level using (Lift; lift) renaming (suc to lsuc; zero to lzero)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect;
   connected; defer)
-open import denotation.Events using (Pos; ix; last; tick; _<ᵖ_; <ᵖ-below; <ᵖ-part; ix-<; From; From∞; done; quiet; at; emit;
+open import denotation.Events using (Pos; ix; last; tick; _<ᵖ_; <ᵖ-below; <ᵖ-part; <ᵖ-asym; ix-<; From; From∞; done; quiet; at; emit;
   stall; close; timelineAt)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; opening; due; Tape; rest; play; ending) renaming (over to overT)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Mode; Att; attAt; attached; Owe; free; cpAt; cutAt; overAt; Ev; nx; cp; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising;
-                    unsub; cut; killAll; unsubIf; feed; feedL; queued; same?; rise; run; begin; start; dequeue; admit; ended; shutAt; closed; closedUp; alive; settle;
-                    search; found; Stepped; moved; starting; turn; quiet; Poke; gone; leaf; own; leafM)
+                    unsub; cut; killAll; unsubIf; feed; feedL; queued; inbox; same?; rise; run; begin; start; dequeue; admit; ended; shutAt; closed; closedUp; alive; settle;
+                    search; found; Stepped; moved; starting; turn; quiet; Poke; gone; leaf; own; leafM; joinM)
 open import operation.Key using (Key; _<ᴷ_; at-<ᴷ) renaming (at to atᴷ)
 open import adequacy.Dispatch using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-least; found-plug)
 open import adequacy.Path using (Path; []; tau; val)
@@ -69,9 +69,15 @@ OweOK (overAt p) = Ix p
 CSOK : ∀ {Γ X} → CS Γ X → Set
 CSOK k = MOK (CS.bodyAt k) × MOK (CS.attSrc k) × MOK (CS.owedAt k)
 
+-- An entry no earlier than the one before it.
+Behind : ∀ {A} → Pos → List (Pos × Ev A) → Set
+Behind q []            = ⊤
+Behind q ((r , _) ∷ _) = r <ᵖ q ≡ false
+
+-- An inbox stamped and in position order.
 QOK : ∀ {A} → List (Pos × Ev A) → Set
 QOK []             = ⊤
-QOK ((q , _) ∷ ib) = Ix q × QOK ib
+QOK ((q , _) ∷ ib) = Ix q × Behind q ib × QOK ib
 
 -- A pending subscription, at a position.
 IsPend : ∀ {Γ A} → St Γ A → Pos → Set
@@ -228,9 +234,17 @@ lok-ʳ++⁻ []        h = tt , h
 lok-ʳ++⁻ (s ∷ pre) h with lok-ʳ++⁻ pre h
 ... | hs , (h₁ , hp) = (h₁ , hs) , hp
 
-qok-++ : ∀ {A} (ib : List (Pos × Ev A)) {jb} → QOK ib → QOK jb → QOK (ib ++ jb)
-qok-++ []             _        hj = hj
-qok-++ ((q , _) ∷ ib) (h , hs) hj = h , qok-++ ib hs hj
+behind-inbox : ∀ {A} r (v : Pos × Ev A) ib → Behind r ib → proj₁ v <ᵖ r ≡ false → Behind r (inbox v ib)
+behind-inbox r v       []              _  hv = hv
+behind-inbox r (q , e) ((r′ , e′) ∷ ib) hb hv with r′ <ᵖ q
+... | true  = hb
+... | false = hv
+
+qok-inbox : ∀ {A} (v : Pos × Ev A) ib → Ix (proj₁ v) → QOK ib → QOK (inbox v ib)
+qok-inbox v       []              hv _             = hv , tt , tt
+qok-inbox (q , e) ((r , e′) ∷ ib) hv (h , hb , hs) with r <ᵖ q in lt
+... | true  = h , behind-inbox r (q , e) ib hb (<ᵖ-asym r q lt) , qok-inbox (q , e) ib hv hs
+... | false = hv , lt , h , hb , hs
 
 plug-ok : ∀ {R Γ A} (c : Ctx R Γ A) {s} → CtxOK c → StOK s → StOK (plug c s)
 plug-ok top                               hc                    hs = hs
@@ -319,11 +333,11 @@ unsubIf-ok false s h = h
 
 queued-ok : ∀ {A} j p (e : Ev A) ib → Ix j → Ix p → QOK ib → QOK (queued j p e ib)
 queued-ok j p (nx a) ib hj hp hb with j <ᵖ p
-... | true  = qok-++ ib hb (ix-⊕ p _ hp , tt)
+... | true  = qok-inbox _ ib (ix-⊕ p _ hp) hb
 ... | false = hb
 queued-ok j p cp ib hj hp hb with j <ᵖ p
-... | true  = qok-++ ib hb (ix-⊕ p _ hp , tt)
-... | false = qok-++ ib hb (ix-⊕ j _ hj , tt)
+... | true  = qok-inbox _ ib (ix-⊕ p _ hp) hb
+... | false = qok-inbox _ ib (ix-⊕ j _ hj) hb
 
 mutual
   feed-ok : ∀ {Γ X A} (i : X ∈ Γ) p (e : Ev X) (s : St Γ A) → Ix p → StOK s → StOK (feed i p e s)
@@ -473,8 +487,8 @@ run-ok c (conK (cs cl sl sa ba as (just p) ca ea sr sc) o b _ (inj₂ (inj₂ re
   with unsubIf sa o | unsubIf-ok sa o ho | body-unsubIf sa ba o hbo
 ... | o′ , t | h | hbo′ = lift (hc , ((hba , has , tt) , h , hb , hbo′) , hp , tt)
 run-ok c (conK (cs cl sl sa ba as nothing ca ea sr sc) o b _ (inj₂ (inj₂ refl))) r hc hs hr = lift (hc , hs , hr , tt)
-run-ok c (joinK j g x q (nx a) ib) r hc (hj , hq , hb) hr = lift (hc , (hj , hb) , hq , mode-if (g ∧ not (closed c)) tt tt)
-run-ok c (joinK j g x q cp ib)     r hc (hj , hq , hb) hr = lift (hc , (hj , hb) , hq , mode-if (g ∧ not (closed c)) tt tt)
+run-ok c (joinK j g x q (nx a) ib) r hc (hj , hq , _ , hb) hr = lift (hc , (hj , hb) , hq , mode-if (g ∧ not (closed c)) tt tt)
+run-ok c (joinK j g x q cp ib)     r hc (hj , hq , _ , hb) hr = lift (hc , (hj , hb) , hq , mode-if (g ∧ not (closed c)) tt tt)
 run-ok c (leafK b l) r hc hl hr = lift hl , (λ e l′ b′ p′ hl′ hp′ → hc , hl′ , hp′ , mode-if (not (closed c)) tt tt) , (λ l′ hl′ → hc , hl′ , hr , tt)
 run-ok c (stopK i q p s) r hc (hp , hs) hr = lift (hc , (hp , hs) , ix-⊕ p _ hp , mode-if (not (closed c)) tt tt)
 run-ok c (cutK i q p s) r hc (hp , hs) hr with cut s | cut-ok s hs
@@ -585,6 +599,15 @@ frame-ahead : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q Γ′ A
 frame-ahead o {c = c} {s} {c′ = c′} {τ = τ} {u} {i} {f = f} pth fd dr with stamped o pth
 ... | hc , hs , _ with unplug c′ tt (subst StOK (sym (found-plug c s fd)) (plug-ok c hc hs)) | proj₁ (found-least {t = plug c s} fd)
 ...   | _ , (hu , ht) | here refl = next-ahead τ u i (From∞.force f) hu ht dr
+
+-- A JOINER'S INBOX ASCENDS: the entry behind the head is no earlier.
+inbox-asc : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q Γ′ A′} {c′ : Ctx R Γ′ A′} {j g x q₀ e q₁ e₁ ib κ}
+          → Path (load o) rs ⟨ c , s , absorbed , q ⟩
+          → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , joinS j g x ((q₀ , e) ∷ (q₁ , e₁) ∷ ib)) joinM κ)
+          → atᴷ q₁ <ᴷ atᴷ q₀ ≡ false
+inbox-asc o {c = c} {s} {c′ = c′} {q₀ = q₀} {q₁ = q₁} pth fd with stamped o pth
+... | hc , hs , _ with unplug c′ tt (subst StOK (sym (found-plug c s fd)) (plug-ok c hc hs))
+...   | _ , (_ , (_ , b , _)) = trans (at-<ᴷ q₁ q₀) b
 
 -- A COLD OPENS AHEAD: a cold a run subscribes first comes due strictly
 -- after where it was subscribed.

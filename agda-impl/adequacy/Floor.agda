@@ -31,11 +31,11 @@ open import operation.PureObservable using (PureObs; module Machine; module Driv
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Mode; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising; nx; cp; closed; closedUp; alive; unsub; cut; killAll; ended; settle; shutAt;
-                    attAt; attached; free; cpAt; cutAt; overAt; search; found; own; run; unsubIf; feed; feedL; queued; Mark; ofM; attM; cpM; cutM; bodyM; srcAttM; owedM; joinM; leafM; Ev)
+                    attAt; attached; free; cpAt; cutAt; overAt; search; found; own; run; unsubIf; feed; feedL; queued; inbox; Mark; ofM; attM; cpM; cutM; bodyM; srcAttM; owedM; joinM; leafM; Ev)
 open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᴷ; <ᴷ-trans; ≮ᴷ-trans; <ᴷ-irrefl; clash)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
 open import adequacy.Dispatch using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-least; found-plug)
-open import adequacy.Stamped using (frame-ahead; opening-ahead; pend-focus)
+open import adequacy.Stamped using (frame-ahead; opening-ahead; pend-focus; inbox-asc)
 open import adequacy.Weight using (Clock)
 open import adequacy.Path using (_⊑_; ⊑i; ⊑-trans; Path; _⇜_)
 
@@ -368,29 +368,33 @@ same-l m h = _ , m , h
 
 -- A joiner's inbox fed: its head kept, or one strictly past where the
 -- feed falls, a level down.
+-- The head of an inbox an entry joins: the old head, or the entry.
+inbox-key : ∀ {Γ A} j {g} {x : A ∈ Γ} (v : Pos × Ev A) ib {κ} → KeyIn (joinS j g x (inbox v ib)) κ
+          → KeyIn (joinS j g x ib) κ ⊎ κ ≡ at (proj₁ v)
+inbox-key j v [] (k-own (here refl)) = inj₂ refl
+inbox-key j v [] (k-own (there ()))
+inbox-key j v [] (k-kid ())
+inbox-key j (q , e) ((r , e′) ∷ ib) h with r <ᵖ q
+inbox-key j (q , e) ((r , e′) ∷ ib) (k-own (here refl)) | true  = inj₁ (k-own (here refl))
+inbox-key j (q , e) ((r , e′) ∷ ib) (k-own (there ()))  | true
+inbox-key j (q , e) ((r , e′) ∷ ib) (k-kid ())          | true
+inbox-key j (q , e) ((r , e′) ∷ ib) (k-own (here refl)) | false = inj₂ refl
+inbox-key j (q , e) ((r , e′) ∷ ib) (k-own (there ()))  | false
+inbox-key j (q , e) ((r , e′) ∷ ib) (k-kid ())          | false
+
 queued-key : ∀ {Γ A} j p (e : Ev A) {g} {x : A ∈ Γ} ib {κ} → KeyIn (joinS j g x (queued j p e ib)) κ
            → KeyIn (joinS j g x ib) κ ⊎ at (p ++ [ ix 0 ]) <ᴷ κ ≡ true
-queued-key j p (nx a) [] h with j <ᵖ p
-queued-key j p (nx a) [] (k-own (here refl)) | true = inj₂ (trans (at-<ᴷ (p ++ [ ix 0 ]) _) (<ᵖ-part p [] [] refl))
-queued-key j p (nx a) [] (k-own (there ())) | true
-queued-key j p (nx a) [] (k-kid ()) | true
-queued-key j p (nx a) [] (k-own ()) | false
-queued-key j p (nx a) [] (k-kid ()) | false
-queued-key j p (nx a) (v ∷ ib) h with j <ᵖ p
-queued-key j p (nx a) (v ∷ ib) (k-own (here refl)) | true  = inj₁ (k-own (here refl))
-queued-key j p (nx a) (v ∷ ib) (k-own (there ())) | true
-queued-key j p (nx a) (v ∷ ib) (k-kid ()) | true
-queued-key j p (nx a) (v ∷ ib) h | false = inj₁ h
-queued-key j p cp (v ∷ ib) (k-own (here refl)) = inj₁ (k-own (here refl))
-queued-key j p cp (v ∷ ib) (k-own (there ()))
-queued-key j p cp (v ∷ ib) (k-kid ())
-queued-key j p cp [] h with j <ᵖ p in e
-queued-key j p cp [] (k-own (here refl)) | true = inj₂ (trans (at-<ᴷ (p ++ [ ix 0 ]) _) (<ᵖ-part p [] [] refl))
-queued-key j p cp [] (k-own (here refl)) | false with <ᵖ-split p j e
-... | inj₁ lt   = inj₂ (trans (at-<ᴷ (p ++ [ ix 0 ]) _) (<ᵖ-next p j last lt))
-... | inj₂ refl = inj₂ (trans (at-<ᴷ (p ++ [ ix 0 ]) _) (<ᵖ-part p [] [] refl))
-queued-key j p cp [] (k-own (there ())) | _
-queued-key j p cp [] (k-kid ()) | _
+queued-key j p (nx a) ib h with j <ᵖ p
+... | false = inj₁ h
+... | true with inbox-key j _ ib h
+...   | inj₁ h′   = inj₁ h′
+...   | inj₂ refl = inj₂ (trans (at-<ᴷ (p ++ [ ix 0 ]) _) (<ᵖ-part p [] [] refl))
+queued-key j p cp ib h with j <ᵖ p in e | inbox-key j _ ib h
+... | _     | inj₁ h′   = inj₁ h′
+... | true  | inj₂ refl = inj₂ (trans (at-<ᴷ (p ++ [ ix 0 ]) _) (<ᵖ-part p [] [] refl))
+... | false | inj₂ refl with <ᵖ-split p j e
+...   | inj₁ lt   = inj₂ (trans (at-<ᴷ (p ++ [ ix 0 ]) _) (<ᵖ-next p j last lt))
+...   | inj₂ refl = inj₂ (trans (at-<ᴷ (p ++ [ ix 0 ]) _) (<ᵖ-part p [] [] refl))
 
 mutual
   feed-key : ∀ {Γ X A} (i : X ∈ Γ) p (e : Ev X) (s : St Γ A) {κ} → KeyIn (feed i p e s) κ → KeyIn s κ ⊎ at (p ++ [ ix 0 ]) <ᴷ κ ≡ true
@@ -473,12 +477,6 @@ postulate
   -- apart from where the run now is.
   floor : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s m p}
         → Path (load o) rs ⟨ c , s , m , p ⟩ → Busy m → Lo (plug c s) (after p)
-
-  -- A JOINER'S INBOX ASCENDS: the entry behind the head is no earlier.
-  inbox-asc : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q Γ′ A′} {c′ : Ctx R Γ′ A′} {j g x q₀ e q₁ e₁ ib κ}
-            → Path (load o) rs ⟨ c , s , absorbed , q ⟩
-            → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , joinS j g x ((q₀ , e) ∷ (q₁ , e₁) ∷ ib)) joinM κ)
-            → at q₁ <ᴷ at q₀ ≡ false
 
 ------------------------------------------------------------------------
 -- A step, by mode
