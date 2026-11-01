@@ -9,7 +9,7 @@ open import Data.Bool using (Bool; true; false; _∧_; _∨_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
 open import Relation.Nullary using (does; yes; no)
 
 open import denotation.Events using (Pos; Label; _<ᵖ_; _≟ˡ_; <ᵖ-trans; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-split; <ᵖ-part; <ᵖ-cons)
@@ -119,6 +119,9 @@ private
   pick : ∀ u v w → u ≡ false → v ≡ true → u ∨ (v ∧ w) ≡ true → w ≡ true
   pick _ _ _ refl refl h = h
 
+  pickf : ∀ u v w → u ≡ false → v ≡ true → u ∨ (v ∧ w) ≡ false → w ≡ false
+  pickf _ _ _ refl refl h = h
+
   same : ∀ u v w {r} → u ≡ false → v ≡ true → w ≡ r → u ∨ (v ∧ w) ≡ r
   same _ _ _ refl refl refl = refl
 
@@ -188,3 +191,28 @@ private
 -- Positions' keys compare as the positions do.
 at-<ᴷ : ∀ p q → at p <ᴷ at q ≡ p <ᵖ q
 at-<ᴷ = lex-at
+
+-- Past `q` and not under it: past all of `q`'s subtree.
+after-lt : ∀ q y → q <ᵖ y ≡ true → (∀ z → y ≡ q ++ z → ⊥) → after q <ᴷ at y ≡ true
+after-lt []      y       h ne = ⊥-elim (ne y refl)
+after-lt (a ∷ q) []      () ne
+after-lt (a ∷ q) (b ∷ y) h ne with xtri (lab a) (lab b)
+... | inj₁ ab          = ok₁ _ _ ab
+... | inj₂ (inj₂ ba)   = ⊥-elim (clash (trans (lex-at (a ∷ q) (b ∷ y)) h)
+                                       (nope (lab a ≺ lab b) (lab a ≐ lab b) _ (≺-asym (lab a) (lab b) ba) (≺→≠ (lab a) (lab b) ba)))
+... | inj₂ (inj₁ refl) =
+  ok₂ (lab a ≺ lab a) (lab a ≐ lab a) _ (≐-refl (lab a))
+      (after-lt q y (trans (sym (<ᵖ-cons a q y)) h) λ z e → ne z (cong (a ∷_) e))
+
+-- An after no earlier than `q`, and not strictly under it: no earlier
+-- than `q`'s after.
+after-past : ∀ y q → after y <ᴷ at q ≡ false → (∀ z → y ≡ q ++ z → z ≡ []) → after y <ᴷ after q ≡ false
+after-past []      []      h ne = lex-irrefl (top ∷ [])
+after-past []      (b ∷ q) h ne = refl
+after-past (a ∷ y) []      h ne with () ← ne (a ∷ y) refl
+after-past (a ∷ y) (b ∷ q) h ne with xtri (lab a) (lab b)
+... | inj₁ ab          = ⊥-elim (clash (ok₁ _ _ ab) h)
+... | inj₂ (inj₂ ba)   = nope (lab a ≺ lab b) (lab a ≐ lab b) _ (≺-asym (lab a) (lab b) ba) (≺→≠ (lab a) (lab b) ba)
+... | inj₂ (inj₁ refl) =
+  same (lab a ≺ lab a) (lab a ≐ lab a) _ (≺-irrefl (lab a)) (≐-refl (lab a))
+       (after-past y q (pickf (lab a ≺ lab a) (lab a ≐ lab a) _ (≺-irrefl (lab a)) (≐-refl (lab a)) h) λ z e → ne z (cong (a ∷_) e))
