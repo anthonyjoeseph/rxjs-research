@@ -300,8 +300,10 @@ probe n seed = let p = program seed in go (depth 3 p) n 0 (probing [] nothing no
 -- silent step leaving A where it was is STILL.  W is a candidate
 -- potential every still step must lower: each pending subscription's
 -- syntax (a defer is one), weighted by depth; each admin mark, pending or
--- owed, and each mark keyed outside KS, at depth + 2; the depth of a
--- rise; and, once absorbed with a KS mark next, that mark's depth + 2.
+-- owed, and each mark keyed outside KS and before P, at depth + 2; the
+-- depth of a rise; and, once absorbed with a KS mark next, that mark's
+-- depth + 2.  A mark at or past P runs only as the clock passes P, so
+-- never on a still step.
 --
 -- Reported, never failed: a step whose A rose; a still step whose W did
 -- not fall, with its kind; a settled-free step (subscribing or rising)
@@ -358,9 +360,9 @@ private
     keysL (s ∷ ls) = keysS s ++ keysL ls
 
   -- The candidate potential.
-  module Pot (ks : List Pos) where
+  module Pot (ks : List Pos) (P : Pos) where
     wt : ℕ → Key → ℕ
-    wt d κ = if inKs ks κ then 0 else 2 + d
+    wt d κ = if inKs ks κ ∨ not (κ <ᴷ at P) then 0 else 2 + d
 
     syn : ∀ {Γ A} → ℕ → Obs Timeline Γ A → ℕ
     syn d (cold _)          = 3 + d
@@ -438,16 +440,20 @@ private
     field
       lines  : List String
       stills : ℕ
-      stuck  : List String
+      tags   : List String
 
   note : Bool → String → Meas → Meas
   note true  l (meas fs n st) = meas (fs ++ [ l ]) n st
   note false l m              = m
 
-  judge : ℕ → List Pos → Conf ℕ → Conf ℕ → Meas → Meas
-  judge t ks k k′ m = still (aheadN (clockOf k) ks) (aheadN (clockOf k′) ks) (note (bad (early k)) keyLine m)
+  judge : ℕ → List Pos → Pos → Conf ℕ → Conf ℕ → Meas → Meas
+  judge t rws P k k′ m = still (aheadN (clockOf k) ks) (aheadN (clockOf k′) ks) (tagIf (bad (early k)) "KEY" (note (bad (early k)) keyLine m))
     where
-      open Pot ks using (W)
+      ks = ksOf rws P
+      open Pot ks P using (W)
+      tagIf : Bool → String → Meas → Meas
+      tagIf true  x m′ = record m′ { tags = x ∷ Meas.tags m′ }
+      tagIf false x m′ = m′
       bad : Maybe Key → Bool
       bad nothing  = false
       bad (just _) = true
@@ -457,20 +463,20 @@ private
       keyLine = "KEY step " +++ showℕ t +++ " " +++ stepKind k +++ " at " +++ showPos (Conf.pos k) +++ " has a mark " +++ showE (early k)
       still : ℕ → ℕ → Meas → Meas
       still a₀ a₁ m′ with a₀ <ᵇ a₁ | a₁ ≡ᵇ a₀
-      ... | true | _     = note true ("AROSE step " +++ showℕ t +++ " " +++ stepKind k +++ " A " +++ showℕ a₀ +++ " then " +++ showℕ a₁) m′
+      ... | true | _     = tagIf true "AROSE" (note true ("AROSE step " +++ showℕ t +++ " " +++ stepKind k +++ " A " +++ showℕ a₀ +++ " then " +++ showℕ a₁) m′)
       ... | _    | false = m′
       ... | _    | true  with W k ≤ᵇ W k′
       ...   | false = record m′ { stills = suc (Meas.stills m′) }
       ...   | true  = record (note true ("STUCK step " +++ showℕ t +++ " " +++ stepKind k +++ " clock " +++ showKey (clockOf k)
                                         +++ " then " +++ stepKind k′ +++ " clock " +++ showKey (clockOf k′)
                                         +++ " W " +++ showℕ (W k) +++ " then " +++ showℕ (W k′)) m′)
-                             { stills = suc (Meas.stills m′) ; stuck = stepKind k ∷ Meas.stuck m′ }
+                             { stills = suc (Meas.stills m′) ; tags = ("STUCK " +++ stepKind k) ∷ Meas.tags m′ }
 
   walkM : List Pos → ℕ → ℕ → List Pos → Conf ℕ → Meas → Meas
   walkM rws zero    t sh       k m = m
   walkM rws (suc n) t []       k m = m
   walkM rws (suc n) t (P ∷ sh) k m with step k
-  ... | silent _ k′    = walkM rws n (suc t) (P ∷ sh) k′ (judge t (ksOf rws P) k k′ m)
+  ... | silent _ k′    = walkM rws n (suc t) (P ∷ sh) k′ (judge t rws P k k′ m)
   ... | value _ _ _ k′ = walkM rws n (suc t) sh k′ m
   ... | complete _     = m
   ... | drained        = m
@@ -500,15 +506,16 @@ private
   some nothing  = false
   some (just _) = true
 
-  late : ℕ → Maybe String → IO Unit
-  late seed nothing  = pure tt
-  late seed (just f) = putStrLn ("cursor-check: LATEFALL seed " +++ showℕ seed +++ " " +++ f +++ " in " +++ showCode natᵗ (program seed))
+  late : Bool → ℕ → Maybe String → IO Unit
+  late false seed _        = pure tt
+  late true  seed nothing  = pure tt
+  late true  seed (just f) = putStrLn ("cursor-check: LATEFALL seed " +++ showℕ seed +++ " " +++ f +++ " in " +++ showCode natᵗ (program seed))
 
   report : List ℕ → ℕ → ℕ → ℕ → IO Unit
   report []          bad bk tl = putStrLn ("cursor-check: done " +++ showℕ bad +++ " failing seeds, " +++ showℕ bk +++ " seeds whose clock ran back before a row, "
                                            +++ showℕ tl +++ " more whose clock ran back only after the last row")
   report (seed ∷ ss) bad bk tl with probe 400 seed
-  ... | [] , [] , u = late seed u >>= λ _ → report ss bad bk (count (some u) tl)
+  ... | [] , [] , u = late (tl <ᵇ 8) seed u >>= λ _ → report ss bad bk (count (some u) tl)
   ... | fs , cs , u =
     putStrLn ("cursor-check: program " +++ showℕ seed +++ " " +++ showCode natᵗ (program seed)) >>= λ _ →
     each ("cursor-check: FAIL seed " +++ showℕ seed +++ " ") fs >>= λ _ →
@@ -531,11 +538,13 @@ private
   stillReport : List ℕ → ℕ → ℕ → ℕ → List (String × ℕ) → IO Unit
   stillReport []          cutN sts bad ts =
     putStrLn ("cursor-check: still " +++ showℕ sts +++ " still steps, " +++ showℕ bad +++ " seeds with a finding, "
-              +++ showℕ cutN +++ " seeds unmeasured; stuck by kind: " +++ showTally ts)
+              +++ showℕ cutN +++ " seeds unmeasured; findings by kind: " +++ showTally ts)
   stillReport (seed ∷ ss) cutN sts bad ts with measure 400 seed
   ... | nothing = stillReport ss (suc cutN) sts bad ts
   ... | just (meas [] n st) = stillReport ss cutN (sts + n) bad (tally st ts)
-  ... | just (meas fs n st) =
+  ... | just (meas fs n st) with bad <ᵇ 25
+  ...   | false = stillReport ss cutN (sts + n) (suc bad) (tally st ts)
+  ...   | true  =
     putStrLn ("cursor-check: program " +++ showℕ seed +++ " " +++ showCode natᵗ (program seed)) >>= λ _ →
     each ("cursor-check: STILL seed " +++ showℕ seed +++ " ") (take 4 fs) >>= λ _ →
     stillReport ss cutN (sts + n) (suc bad) (tally st ts)
