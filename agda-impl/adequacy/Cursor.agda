@@ -45,7 +45,7 @@ open import Relation.Nullary using (¬_)
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline; ix; last; ofᴱ; tick)
 open import denotation.Read using (Visible)
-open import denotation.EmissionSet using (EmissionSet; out; end; _≺_; _≼_; enter; ⟦_⟧; Den; hot; coldAt; Rejoin; InE;
+open import denotation.EmissionSet using (EmissionSet; out; end; _≺_; _≼_; Reach; Truncate; enter; ⟦_⟧; Den; hot; coldAt; Rejoin; InE;
   MapT; map-out; map-end; LaneOf; module Scan; module TakeWhile; module Connecting;
   module Merge; module Bounded; module Switch; module Exhaust)
 open import operation.PureObservable using (module Machine; Tape; play; ending) renaming (over to tapeOver)
@@ -144,6 +144,15 @@ JoinF (mergeᶠ nothing)  f O = Merge.JoinT f O
 JoinF (mergeᶠ (just m)) f O = Bounded.JoinT m f O
 JoinF switchᶠ           f O = Switch.JoinT f O
 JoinF exhaustᶠ          f O = Exhaust.JoinT f O
+
+-- A connect's entry: its rows truncated, and its body's rows each with
+-- few before it.
+ConnE : ∀ {X B} → Pos → EmissionSet X → EmissionSet B → EmissionSet B → Set
+ConnE r σ β E = Truncate (Connecting.ConnT r σ β) ≈ E × (∀ {y e} → β y e → Reach β y e)
+
+-- A source's rows a connect reads before `p`, few.
+FewBefore : ∀ {X} → EmissionSet X → Pos → Set
+FewBefore σ p = Σ (List Pos) λ ks → ∀ {y e} → σ y e → (y ++ [ ix 0 ]) ≺ p → y ∈ ks
 
 -- A begun lane as its joiner reads it: running from where it was
 -- subscribed, its entry its lane's; or over, by its end or a later value.
@@ -342,7 +351,7 @@ data Sync where
          → (T (CS.srcLive k) → Sync (binds (CS.src k) (CS.connAt k) sc) (Parts.Rb pt) C b β)
          → (T (CS.srcLive k) → Src sc (Parts.Rs pt) C k o)
          → Flags C k β
-         → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E
+         → ConnE (CS.connAt k) (Frozen k) β E
          → Sync sc Rg C (connS k o b) E
   -- a joiner: what it was fed and has not shown, and what is still to
   -- feed it.  The engine shows its inbox's head and appends in its
@@ -460,14 +469,14 @@ module _ {R : Set} (Rt : EmissionSet R) where
     f-src   : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {Rg w E E′ β}
             → Fr C Rg c (owes w) E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (not (CS.closed k))
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β
-            → Flags C k β → Frozen k ≈ E → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′
+            → Flags C k β → Frozen k ≈ E → ConnE (CS.connAt k) (Frozen k) β E′
             → Fr C (Parts.Rs pt) (inSrc k b c) (owes w) E
     -- a source ended while its connect runs: nothing reads what is left
     f-srcc  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {Rg w E E′ β}
             → Fr C Rg c (owes w) E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (CS.closed k)
             → Spent C (Frozen k)
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β
-            → Flags C k β → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′
+            → Flags C k β → ConnE (CS.connAt k) (Frozen k) β E′
             → Fr C (Parts.Rs pt) (inSrc k b c) (owes false) E
     -- a source not yet subscribed: its program, owed at the connect's
     -- `ix 1`
@@ -475,20 +484,20 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Fr C Rg c (owes w) E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k)
             → CS.bodyAt k ≡ just (CS.connAt k) → Adm (binds (CS.src k) (CS.connAt k) (scopeOf c))
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β
-            → Flags C k β → Frozen k ≈ E → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′
+            → Flags C k β → Frozen k ≈ E → ConnE (CS.connAt k) (Frozen k) β E′
             → Owes C (CS.connAt k ++ [ ix 1 ])
             → Fr C (Parts.Rs pt) (inSrc k b c) (pnd (CS.connAt k ++ [ ix 1 ])) E
     -- a source torn down: nothing reads it
     f-srcx  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {Rg w E E′ β}
             → Fr C Rg c (owes w) E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (not (CS.srcLive k))
-            → Flags C k β → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′
+            → Flags C k β → ConnE (CS.connAt k) (Frozen k) β E′
             → Fr C (Parts.Rs pt) (inSrc k b c) (owes false) E
     -- a body: owed while its source runs
     f-body  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {Rg w v E E′}
             → Fr C Rg c (owes w) E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k E) → v ≡ (w ∧ CS.srcLive k)
             → (T (CS.srcLive k) → Src (scopeOf c) (Parts.Rs pt) C k o)
             → Flags C k E
-            → Connecting.ConnT (CS.connAt k) (Frozen k) E ≈ E′
+            → ConnE (CS.connAt k) (Frozen k) E E′
             → Fr C (Parts.Rb pt) (inBody k o c) (owes v) E
 
   -- THE INVARIANT: settled, the hole and every frame at one cursor; a

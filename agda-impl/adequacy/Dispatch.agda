@@ -32,14 +32,16 @@ open Machine using (St; Ctx; Conf; Scope; scopeOf; ⟨_,_,_,_⟩; subscribing; a
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Shown to Shownᴹ; step to stepᴹ)
-open import adequacy.Rows using (≃-refl; Vis; Past; Lowest; _≃_; _⇄_; silent; shown; Moves; this)
+open import adequacy.Rows using (Frozen; ≃-refl; Vis; Past; Lowest; _≃_; _⇄_; silent; shown; Moves; this)
 open _≃_
-open import adequacy.Cursor using (Cur; Rgn; origin; bef; Spent; Due; Sync; _≈_; c-abs; c-sub; Inv; settled; pending; adrift; f-top;
+open import adequacy.Cursor using (Cur; Rgn; FewBefore; origin; bef; Spent; Due; Sync; _≈_; c-abs; c-sub; Inv; settled; pending; adrift; f-top;
   RT; SimC; keeps; Owes; Fr; Hold; Need; owes; lane; lanecut; pnd; s-of; s-join; s-joinx; s-took;
   f-off; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-srcx; f-body;
   o-cp; rise-top; rise-map; rise-scan-nx; rise-scan-cp; rise-take-pass; rise-take-cp; rise-cut; rise-cutx; rise-ln; rise-took; rise-take-fail; rise-bodyx; run-stop;
   run-cut; run-att)
 open import adequacy.Simulation using (Simulation)
+open import adequacy.Path using (Path)
+import adequacy.Path as P
 open import adequacy.Walk using (due-≈; climb; descend; refocus)
 open import adequacy.Least using (Lo; Keeps; mapKp; scanKp; cutKp; takeKp; outerKp; laneKp; seek-lo; seek-none)
 open import adequacy.Bound using (bound; shift; due-shift)
@@ -362,6 +364,14 @@ none-spent {t = t} sy fd {q} r | nothing =
 none-spent sy () r | just _
 
 ------------------------------------------------------------------------
+-- What the run's history tells a step from `k`: at a body's rise, its
+-- source's rows before it few.
+
+Told : ∀ {R} → Conf R → Set₁
+Told {R} k = ∀ {Γ X B} {k′ : CS Γ X} {o} {c : Ctx R Γ B} {s e p}
+           → k ≡ ⟨ inBody k′ o c , s , rising e , p ⟩ → CS.srcLive k′ ≡ true → FewBefore (Frozen k′) p
+
+------------------------------------------------------------------------
 -- The steps over a root's entry
 
 module Over {R : Set} (Rt : EmissionSet R) where
@@ -381,15 +391,11 @@ module Over {R : Set} (Rt : EmissionSet R) where
     sub-take   : ∀ {C Γ A} {c : Ctx R Γ A} {i} {w : A → Bool} {s q p}
                → Inv Rt C ⟨ c , pend (takeWhile i w s) q , subscribing , p ⟩
                → Inv Rt C ⟨ inCut true (attAt q) (inTake i w free c) , pend s q , subscribing , q ⟩
-    -- A JOINER'S OR A CONNECT'S FRAME OWES ITS UNTRUNCATED ROWS, so these
-    -- two are false as stated.  `connect ones b`, `b` a cold with a row
-    -- at tick 1: the row is in `ConnT` and not in the connect's entry,
-    -- which `Truncate`s it past the infinitely many burst pins of
-    -- `Tree.ones` before it, so no frame takes the pending body.
-    -- `flatMap` over `ones` alike, past its outer's value rows.  The
-    -- frames must read `Truncate`, and then a rising row reaches only
-    -- through the rows the cursor passed being few: a fact of the run's
-    -- history, which no state shows, since `Sync` ties visible rows only.
+    -- A JOINER'S FRAME OWES ITS UNTRUNCATED ROWS, so this is false as
+    -- stated.  `flatMap` over `Tree.ones` with a lane row at tick 1: the
+    -- row is in `JoinF` and not in the joiner's entry, which `Truncate`s
+    -- it past the infinitely many outer value rows before it.  A
+    -- connect's frames read `ConnE` for the same reason.
     sub-flat   : ∀ {C Γ A B} {c : Ctx R Γ B} {op} {f : A → Obs Timeline Γ B} {s q p}
                → Inv Rt C ⟨ c , pend (flatMap op f s) q , subscribing , p ⟩
                → Inv Rt C ⟨ inCut true (attAt q) (inOuter op f false 0 [] [] c) , pend s q , subscribing , q ⟩
@@ -654,39 +660,39 @@ module Over {R : Set} (Rt : EmissionSet R) where
                                     (abs-leaf fd)
 
   -- The record update holds `srcLive` too, so the test is generalised alone.
-  body-cp : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s p k′ sh t} b → CS.srcLive k ≡ b
+  body-cp : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s p k′ sh t} b → CS.srcLive k ≡ b → Told ⟨ inBody k o c , s , rising cp , p ⟩
           → moved (if b then ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩ else ⟨ c , connS k o s , absorbed , p ⟩) [] [] ≡ moved k′ sh t
           → SimC Rt ⟨ inBody k o c , s , rising cp , p ⟩ sh k′
-  body-cp true  lv refl = rise-body-cp Rt lv
-  body-cp false lv refl = rise-bodyx Rt lv
+  body-cp true  lv tl refl = rise-body-cp Rt lv (tl refl lv)
+  body-cp false lv _  refl = rise-bodyx Rt lv
 
   -- A rise, by its frame.
-  rise-sim : ∀ {Γ A} {k′ : Conf R} {sh t} (c : Ctx R Γ A) (s : St Γ A) e p → rise c s e p ≡ moved k′ sh t → SimC Rt ⟨ c , s , rising e , p ⟩ sh k′
-  rise-sim top                       s e      p refl = rise-top Rt
-  rise-sim (inMap f c)               s e      p refl = rise-map Rt
-  rise-sim (inScan f z c)            s (nx a) p refl = rise-scan-nx Rt
-  rise-sim (inScan f z c)            s cp     p refl = rise-scan-cp Rt
-  rise-sim (inCut true a c)          s e      p refl = rise-cut Rt
-  rise-sim (inCut false a c)         s e      p refl = rise-cutx Rt
-  rise-sim (inLn b c)                s e      p refl = rise-ln Rt
-  rise-sim (inTake i w free c)       s (nx a) p eq with w a in wa | i | eq
+  rise-sim : ∀ {Γ A} {k′ : Conf R} {sh t} (c : Ctx R Γ A) (s : St Γ A) e p → Told ⟨ c , s , rising e , p ⟩ → rise c s e p ≡ moved k′ sh t → SimC Rt ⟨ c , s , rising e , p ⟩ sh k′
+  rise-sim top                       s e      p tl refl = rise-top Rt
+  rise-sim (inMap f c)               s e      p tl refl = rise-map Rt
+  rise-sim (inScan f z c)            s (nx a) p tl refl = rise-scan-nx Rt
+  rise-sim (inScan f z c)            s cp     p tl refl = rise-scan-cp Rt
+  rise-sim (inCut true a c)          s e      p tl refl = rise-cut Rt
+  rise-sim (inCut false a c)         s e      p tl refl = rise-cutx Rt
+  rise-sim (inLn b c)                s e      p tl refl = rise-ln Rt
+  rise-sim (inTake i w free c)       s (nx a) p tl eq with w a in wa | i | eq
   ... | true  | _     | refl = rise-take-pass Rt wa
   ... | false | true  | refl = rise-take-failᵢ wa
   ... | false | false | refl = rise-take-fail Rt wa
-  rise-sim (inTake i w free c)       s cp     p refl = rise-take-cp Rt
-  rise-sim (inTake i w (cpAt r) c)   s e      p refl = rise-took Rt (λ ())
-  rise-sim (inTake i w (cutAt r) c)  s e      p refl = rise-took Rt (λ ())
-  rise-sim (inTake i w (overAt r) c) s e      p refl = rise-took Rt (λ ())
-  rise-sim (inOuter op f d n q ls c) o (nx a) p eq   = rise-outer-nx eq
-  rise-sim (inOuter op f d n q ls c) o cp     p eq   = rise-outer-cp eq
-  rise-sim (inLanes op f d n q o pre post c) s (nx b) p eq = rise-lane-nx eq
-  rise-sim (inLanes op f d n q o pre post c) s cp     p eq = rise-lane-cp eq
-  rise-sim (inSrc k b c)             s (nx a) p eq   = rise-src-nx Rt eq
-  rise-sim (inSrc k b c)             s cp     p eq   = rise-src-cp Rt eq
-  rise-sim (inBody k o c)            s (nx b) p eq with CS.srcLive k in lv | eq
-  ... | true  | refl = rise-body-nx Rt lv
+  rise-sim (inTake i w free c)       s cp     p tl refl = rise-take-cp Rt
+  rise-sim (inTake i w (cpAt r) c)   s e      p tl refl = rise-took Rt (λ ())
+  rise-sim (inTake i w (cutAt r) c)  s e      p tl refl = rise-took Rt (λ ())
+  rise-sim (inTake i w (overAt r) c) s e      p tl refl = rise-took Rt (λ ())
+  rise-sim (inOuter op f d n q ls c) o (nx a) p tl eq   = rise-outer-nx eq
+  rise-sim (inOuter op f d n q ls c) o cp     p tl eq   = rise-outer-cp eq
+  rise-sim (inLanes op f d n q o pre post c) s (nx b) p tl eq = rise-lane-nx eq
+  rise-sim (inLanes op f d n q o pre post c) s cp     p tl eq = rise-lane-cp eq
+  rise-sim (inSrc k b c)             s (nx a) p tl eq   = rise-src-nx Rt eq
+  rise-sim (inSrc k b c)             s cp     p tl eq   = rise-src-cp Rt eq
+  rise-sim (inBody k o c)            s (nx b) p tl eq with CS.srcLive k in lv | eq
+  ... | true  | refl = rise-body-nx Rt lv (tl refl lv)
   ... | false | refl = rise-bodyx Rt lv
-  rise-sim (inBody k o c)            s cp     p eq   = body-cp (CS.srcLive k) refl eq
+  rise-sim (inBody k o c)            s cp     p tl eq   = body-cp (CS.srcLive k) refl tl eq
 
   -- A joiner subscribed, by its subject's end.
   join-mv : ∀ {Γ A} (c : Ctx R Γ A) (x : A ∈ Γ) q {p} → Mv (stepᴹ ⟨ c , pend (connected x) q , subscribing , p ⟩)
@@ -713,31 +719,43 @@ module Over {R : Set} (Rt : EmissionSet R) where
   reach-pend c (defer l)         q p = within tt λ { refl → keeps Rt sub-defer }
 
   -- Subscribing to a node already running: nothing to do.
-  reach : (k : Conf R) → Reach k
-  reach ⟨ c , s , rising e , p ⟩                        = within (rise-mv c s e p) (rise-sim c s e p)
-  reach ⟨ c , pend o q , subscribing , p ⟩              = reach-pend c o q p
-  reach ⟨ c , coldS b l , subscribing , p ⟩             = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , ofS j q xs , subscribing , p ⟩            = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , doneS , subscribing , p ⟩                 = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , mapS f s , subscribing , p ⟩              = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , scanS f z s , subscribing , p ⟩           = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , cutS l a s , subscribing , p ⟩            = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , lnS b s , subscribing , p ⟩               = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , takeS j q w s , subscribing , p ⟩         = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , flatS op f d n q o ls , subscribing , p ⟩ = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , connS k o b , subscribing , p ⟩           = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , joinS j g x ib , subscribing , p ⟩        = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , s , absorbed , p ⟩                        = linked (abs-link c s p)
+  reach : (k : Conf R) → Told k → Reach k
+  reach ⟨ c , s , rising e , p ⟩                        tl = within (rise-mv c s e p) (rise-sim c s e p tl)
+  reach ⟨ c , pend o q , subscribing , p ⟩              _ = reach-pend c o q p
+  reach ⟨ c , coldS b l , subscribing , p ⟩             _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , ofS j q xs , subscribing , p ⟩            _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , doneS , subscribing , p ⟩                 _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , mapS f s , subscribing , p ⟩              _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , scanS f z s , subscribing , p ⟩           _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , cutS l a s , subscribing , p ⟩            _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , lnS b s , subscribing , p ⟩               _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , takeS j q w s , subscribing , p ⟩         _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , flatS op f d n q o ls , subscribing , p ⟩ _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , connS k o b , subscribing , p ⟩           _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , joinS j g x ib , subscribing , p ⟩        _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , s , absorbed , p ⟩                        _ = linked (abs-link c s p)
 
 ------------------------------------------------------------------------
--- THE CURSOR SIMULATES EVERY RUN: the carrier a cursor and the invariant
--- at it, read as what the root owes past it.
+-- THE RUN'S HISTORY: at a body's rise its source shows few rows before
+-- it, a fact of the run to it; no state shows it, since `Sync` ties
+-- visible rows only.
+
+postulate
+  few-body : ∀ {R} {o : PureObs [] R} {rs Γ X B} {k : CS Γ X} {o′} {c : Ctx R Γ B} {s e p}
+           → Path (load o) rs ⟨ inBody k o′ c , s , rising e , p ⟩ → CS.srcLive k ≡ true → FewBefore (Frozen k) p
+
+told : ∀ {R} {o : PureObs [] R} {rs k} → Path (load o) rs k → Told k
+told pth refl = few-body pth
+
+------------------------------------------------------------------------
+-- THE CURSOR SIMULATES EVERY RUN: the carrier a cursor, the invariant at
+-- it, read as what the root owes past it, and the run so far.
 
 cursor : ∀ {R} (o : PureObs [] R) → Simulation o
 cursor {R} o = record
-  { I   = λ k → Σ Cur λ C → Inv Rt C k
+  { I   = Car
   ; T   = λ i → RT Rt (proj₁ i)
-  ; i₀  = origin , pending {Rg = λ _ → ⊤} (f-top ≃-refl) (λ _ → tt , (tt , λ ()) , tt , ≃-refl , λ _ → tt)
+  ; i₀  = origin , pending {Rg = λ _ → ⊤} (f-top ≃-refl) (λ _ → tt , (tt , λ ()) , tt , ≃-refl , λ _ → tt) , [] , P.[]
   ; t₀  = (λ { ((x , v , _) , v′) → x , v′ }) ⇄ (λ { (x , v) → (x , v , tt) , v })
   ; tau = tau
   ; val = val
@@ -749,31 +767,34 @@ cursor {R} o = record
     Rt = enter (⟦ o ⟧ []ᴬ) root
     open Over Rt
 
-    tau : ∀ {k k′ t} (i : Σ Cur λ C → Inv Rt C k) → Driver.step R k ≡ Driver.silent t k′
-        → Σ (Σ Cur λ C → Inv Rt C k′) λ i′ → Vis (RT Rt (proj₁ i)) ≃ Vis (RT Rt (proj₁ i′))
-    tau {k} (C , i) e = go (reach k)
+    Car : Conf R → Set₁
+    Car k = Σ Cur λ C → Inv Rt C k × Σ (Shownᴹ R) λ rs → Path (load o) rs k
+
+    tau : ∀ {k k′ t} (i : Car k) → Driver.step R k ≡ Driver.silent t k′
+        → Σ (Car k′) λ i′ → Vis (RT Rt (proj₁ i)) ≃ Vis (RT Rt (proj₁ i′))
+    tau {k} {t = t} (C , i , rs , pth) e = go (reach k (told pth))
       where
         go : Reach k → _
         go (driven h sim) with sim e i
-        ... | C′ , i′ , silent q = (C′ , i′) , q
+        ... | C′ , i′ , silent q = (C′ , i′ , rs , pth P.▸τ (t , e)) , q
         go (within mv sim) with τ-moved (stepᴹ k) mv e
         ... | _ , eq with sim eq i
-        ...   | C′ , i′ , silent q = (C′ , i′) , q
+        ...   | C′ , i′ , silent q = (C′ , i′ , rs , pth P.▸τ (t , e)) , q
         go (stills eq _) = ⊥-elim (quiet-τ eq e)
 
-    val : ∀ {k k′ t p a} (i : Σ Cur λ C → Inv Rt C k) → Driver.step R k ≡ Driver.value t p a k′
-        → Σ (Σ Cur λ C → Inv Rt C k′) λ i′ → Lowest (RT Rt (proj₁ i)) p (out a) × Vis (Past p (RT Rt (proj₁ i))) ≃ Vis (RT Rt (proj₁ i′))
-    val {k} {k′} {t} {p} {a} (C , i) e = go (reach k)
+    val : ∀ {k k′ t p a} (i : Car k) → Driver.step R k ≡ Driver.value t p a k′
+        → Σ (Car k′) λ i′ → Lowest (RT Rt (proj₁ i)) p (out a) × Vis (Past p (RT Rt (proj₁ i))) ≃ Vis (RT Rt (proj₁ i′))
+    val {k} {k′} {t} {p} {a} (C , i , rs , pth) e = go (reach k (told pth))
       where
-        go : Reach k → Σ (Σ Cur λ C → Inv Rt C k′) λ i′ → Lowest (RT Rt C) p (out a) × Vis (Past p (RT Rt C)) ≃ Vis (RT Rt (proj₁ i′))
+        go : Reach k → Σ (Car k′) λ i′ → Lowest (RT Rt C) p (out a) × Vis (Past p (RT Rt C)) ≃ Vis (RT Rt (proj₁ i′))
         go (driven h _) = ⊥-elim (hush-val h e)
         go (stills eq _) = ⊥-elim (quiet-val eq e)
         go (within mv sim) with val-moved (stepᴹ k) mv e
         ... | rest , tr , eq with sim eq i
-        ...   | C′ , i′ , shown v l q = (C′ , i′) , (v , l) , q
+        ...   | C′ , i′ , shown v l q = (C′ , i′ , _ , pth P.▸ P.val e P.[]) , (v , l) , q
 
-    fin : ∀ {k p} (i : Σ Cur λ C → Inv Rt C k) → Driver.step R k ≡ Driver.complete p → Lowest (RT Rt (proj₁ i)) p end
-    fin {k} {p} (C , i) e = go (reach k)
+    fin : ∀ {k p} (i : Car k) → Driver.step R k ≡ Driver.complete p → Lowest (RT Rt (proj₁ i)) p end
+    fin {k} {p} (C , i , _ , pth) e = go (reach k (told pth))
       where
         go : Reach k → Lowest (RT Rt C) p end
         go (driven h _) = ⊥-elim (hush-fin h e)
@@ -782,8 +803,8 @@ cursor {R} o = record
         ... | k′ , rest , tr , eq with sim eq i
         ...   | C′ , i′ , shown v l q = v , l
 
-    dry : ∀ {k} (i : Σ Cur λ C → Inv Rt C k) → Driver.step R k ≡ Driver.drained → ∀ {q e} → Vis (RT Rt (proj₁ i)) q e → ⊥
-    dry {k} (C , i) e = go (reach k)
+    dry : ∀ {k} (i : Car k) → Driver.step R k ≡ Driver.drained → ∀ {q e} → Vis (RT Rt (proj₁ i)) q e → ⊥
+    dry {k} (C , i , _ , pth) e = go (reach k (told pth))
       where
         go : Reach k → ∀ {q e′} → Vis (RT Rt C) q e′ → ⊥
         go (driven h _)   = ⊥-elim (hush-drained h e)

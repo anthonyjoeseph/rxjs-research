@@ -16,15 +16,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE TRUNCATED COMPOSITE
 
-Refuted: a connect's and a joiner's frames read `ConnT`/`JoinF` whole,
-but their entry truncates, so over the infinite synchronous `ones` a
-later body or lane row is owed by the frame and not by the root. Open:
-restate the frames over `Truncate`; a rising row then reaches only if
-the rows the cursor passed are few, which needs the run's history in
-the carrier, and a joiner's outer program pinned as a connect's source
-is. Settled when the restated entries typecheck.
+A joiner's frames still read `JoinF` whole, refuted over the infinite
+synchronous `ones`; the connect's now read `ConnE`, its body's rise
+taking few source rows before it from the run's history. Open: the
+joiner alike, its outer program pinned; whether a run's history bounds
+those rows. Settled when the restated entries typecheck.
 
-Members: `sub-conn`, `sub-flat`.
+Members: `sub-conn`, `sub-flat`, `few-body`.
 
 #### THE CONNECT STEPPED
 
