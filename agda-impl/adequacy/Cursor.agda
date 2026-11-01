@@ -49,7 +49,7 @@ open import denotation.EmissionSet using (EmissionSet; out; end; _≺_; _≼_; e
   MapT; map-out; map-end; LaneOf; module Scan; module TakeWhile; module Connecting;
   module Merge; module Bounded; module Switch; module Exhaust)
 open import operation.PureObservable using (module Machine; Tape; play; ending) renaming (over to tapeOver)
-open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; unbound; binds; CS; Owe; free; cpAt; cutAt; overAt; scopeOf;
+open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; unbound; binds; CS; Owe; closed; free; cpAt; cutAt; overAt; scopeOf;
                     Att; attached; attAt; subscribing; absorbed; rising; mapEv; nx; cp;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
@@ -473,10 +473,10 @@ module _ {R : Set} (Rt : EmissionSet R) where
                    × Within Rg (scopeOf c) q)
             → Inv C ⟨ c , pend o q , subscribing , p ⟩
     flying  : ∀ {Γ A} {c : Ctx R Γ A} {s e p Rg w E}
-            → Fr (bef p) Rg c w E → Fly (scopeOf c) Rg p w s E e
+            → Fr (bef p) Rg c w E → closed c ≡ false → Fly (scopeOf c) Rg p w s E e
             → Inv (bef p) ⟨ c , s , rising e , p ⟩
     adrift  : ∀ {Γ A} {c : Ctx R Γ A} {s e p C Rg E}
-            → Fr C Rg c (owes false) E → Inv C ⟨ c , s , rising e , p ⟩
+            → Fr C Rg c (owes false) E → closed c ≡ false → Inv C ⟨ c , s , rising e , p ⟩
 
   -- What the root owes: its entry past the cursor.
   RT : Cur → EmissionSet R
@@ -506,9 +506,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
 
   -- THE ROOT: the row shown, the cursor past it.
   rise-top : ∀ {s : St [] R} {e p} → SimC ⟨ top , s , rising e , p ⟩ [ (p , e) ] ⟨ top , s , absorbed , p ⟩
-  rise-top {p = p} (flying fr@(f-top eq) h) = aft p , settled c-abs (f-top eq) (λ w → proj₁ (h w)) , show-top fr h
+  rise-top {p = p} (flying fr@(f-top eq) _ h) = aft p , settled c-abs (f-top eq) (λ w → proj₁ (h w)) , show-top fr h
   rise-top (settled () _ _)
-  rise-top (adrift (f-off () _))
+  rise-top (adrift (f-off () _) _)
 
   ----------------------------------------------------------------------
   -- FRAMES THAT ONLY PASS A RISE
@@ -517,10 +517,10 @@ module _ {R : Set} (Rt : EmissionSet R) where
   rise-map : ∀ {Γ A B} {f : A → B} {c : Ctx R Γ B} {s e p}
            → SimC ⟨ inMap f c , s , rising e , p ⟩ [] ⟨ c , mapS f s , rising (mapEv f e) , p ⟩
   rise-map {f = f} {e = e} = keeps λ
-    { (flying (f-map fr eq sd) h) → flying fr λ w → let (sy , row) = h w in s-map sy eq sd , proj₁ (to eq (mapped e row , vis (mapEv f e)))
-    ; (flying (f-off u-map fr) h) → flying fr λ ()
-    ; (adrift (f-map fr _ _))     → adrift fr
-    ; (adrift (f-off u-map fr))   → adrift fr
+    { (flying (f-map fr eq sd) cl h) → flying fr cl λ w → let (sy , row) = h w in s-map sy eq sd , proj₁ (to eq (mapped e row , vis (mapEv f e)))
+    ; (flying (f-off u-map fr) cl h) → flying fr cl λ ()
+    ; (adrift (f-map fr _ _) cl)     → adrift fr cl
+    ; (adrift (f-off u-map fr) cl)   → adrift fr cl
     ; (settled () _ _) }
     where
       mapped : ∀ {E q} (e : Evᴹ _) → E q (toEv e) → MapT f E q (toEv (mapEv f e))
@@ -532,11 +532,11 @@ module _ {R : Set} (Rt : EmissionSet R) where
   rise-scan-nx : ∀ {Γ A B} {f : B → A → B} {z} {c : Ctx R Γ B} {s a p}
                → SimC ⟨ inScan f z c , s , rising (nx a) , p ⟩ [] ⟨ c , scanS f (f z a) s , rising (nx (f z a)) , p ⟩
   rise-scan-nx {f = f} {z = z} {a = a} {p = p} = keeps λ
-    { (flying (f-scan fr fd eq sd) h) → flying fr λ w → let (sy , row) = h w ; ac = folds fd row
+    { (flying (f-scan fr fd eq sd) cl h) → flying fr cl λ w → let (sy , row) = h w ; ac = folds fd row
                                                       in s-scan sy (fd-last ac (≺-irrefl {p}) (λ _ pk → pk)) eq sd , proj₁ (to eq (Scan.sval ac , _))
-    ; (flying (f-off u-scan fr) h)    → flying fr λ ()
-    ; (adrift (f-scan fr _ _ _))      → adrift fr
-    ; (adrift (f-off u-scan fr))      → adrift fr
+    ; (flying (f-off u-scan fr) cl h)    → flying fr cl λ ()
+    ; (adrift (f-scan fr _ _ _) cl)      → adrift fr cl
+    ; (adrift (f-off u-scan fr) cl)      → adrift fr cl
     ; (settled () _ _) }
     where
       folds : ∀ {z₀ E} → Folded (bef p) f z₀ E z → E p (out a) → Scan.Acc f z₀ E p (f z a)
@@ -550,11 +550,11 @@ module _ {R : Set} (Rt : EmissionSet R) where
   rise-scan-cp : ∀ {Γ A B} {f : B → A → B} {z} {c : Ctx R Γ B} {s p}
                → SimC ⟨ inScan f z c , s , rising cp , p ⟩ [] ⟨ c , scanS f z s , rising cp , p ⟩
   rise-scan-cp {f = f} {z = z} {p = p} = keeps λ
-    { (flying (f-scan fr fd eq sd) h) → flying fr λ w → let (sy , row) = h w
+    { (flying (f-scan fr fd eq sd) cl h) → flying fr cl λ w → let (sy , row) = h w
                                                       in s-scan sy (past sd row fd) eq sd , proj₁ (to eq (Scan.send row , _))
-    ; (flying (f-off u-scan fr) h)    → flying fr λ ()
-    ; (adrift (f-scan fr _ _ _))      → adrift fr
-    ; (adrift (f-off u-scan fr))      → adrift fr
+    ; (flying (f-off u-scan fr) cl h)    → flying fr cl λ ()
+    ; (adrift (f-scan fr _ _ _) cl)      → adrift fr cl
+    ; (adrift (f-off u-scan fr) cl)      → adrift fr cl
     ; (settled () _ _) }
     where
       after : ∀ {Rg E} → Sound Rg E → E p end → ∀ {q a} → E q (out a) → p ≼ q → p ≺ q
@@ -579,13 +579,13 @@ module _ {R : Set} (Rt : EmissionSet R) where
     rise-take-pass : ∀ {a} → keep a ≡ true
                    → SimC ⟨ inTake i keep free c , s , rising (nx a) , p ⟩ [] ⟨ c , takeS i keep free s , rising (nx a) , p ⟩
     rise-take-pass {a} kt = keeps λ
-      { (flying (f-take {E = E} fr nf eq sd) h) → flying fr λ w → let (sy , row) = h w
+      { (flying (f-take {E = E} fr nf eq sd) cl h) → flying fr cl λ w → let (sy , row) = h w
           in s-take sy (nf-aft sd row _ kept nf) eq sd , proj₁ (to eq (TakeWhile.pass row (subst T (sym kt) _) (unfailed {E} nf) , _))
-      ; (flying (f-took _ _ _ _ () _ _) _)
-      ; (flying (f-off u-take fr) h)      → flying fr λ ()
-      ; (adrift (f-take fr _ _ _))        → adrift fr
-      ; (adrift (f-took _ _ _ _ () _ _))
-      ; (adrift (f-off u-take fr))        → adrift fr
+      ; (flying (f-took _ _ _ _ () _ _) cl _)
+      ; (flying (f-off u-take fr) cl h)      → flying fr cl λ ()
+      ; (adrift (f-take fr _ _ _) cl)        → adrift fr cl
+      ; (adrift (f-took _ _ _ _ () _ _) cl)
+      ; (adrift (f-off u-take fr) cl)        → adrift fr cl
       ; (settled () _ _) }
       where
         kept : ∀ {a′} → out a′ ≡ out a → T (not (keep a′)) → ⊥
@@ -593,54 +593,54 @@ module _ {R : Set} (Rt : EmissionSet R) where
 
     rise-take-cp : SimC ⟨ inTake i keep free c , s , rising cp , p ⟩ [] ⟨ c , takeS i keep free s , rising cp , p ⟩
     rise-take-cp = keeps λ
-      { (flying (f-take {E = E} fr nf eq sd) h) → flying fr λ w → let (sy , row) = h w
+      { (flying (f-take {E = E} fr nf eq sd) cl h) → flying fr cl λ w → let (sy , row) = h w
           in s-take sy (nf-aft sd row _ (λ ()) nf) eq sd , proj₁ (to eq (TakeWhile.tend row (unfailed {E} nf) , _))
-      ; (flying (f-took _ _ _ _ () _ _) _)
-      ; (flying (f-off u-take fr) h)      → flying fr λ ()
-      ; (adrift (f-take fr _ _ _))        → adrift fr
-      ; (adrift (f-took _ _ _ _ () _ _))
-      ; (adrift (f-off u-take fr))        → adrift fr
+      ; (flying (f-took _ _ _ _ () _ _) cl _)
+      ; (flying (f-off u-take fr) cl h)      → flying fr cl λ ()
+      ; (adrift (f-take fr _ _ _) cl)        → adrift fr cl
+      ; (adrift (f-took _ _ _ _ () _ _) cl)
+      ; (adrift (f-off u-take fr) cl)        → adrift fr cl
       ; (settled () _ _) }
 
   -- A LIVE CUT passes the row; one off absorbs it.
   rise-cut : ∀ {Γ A} {a} {c : Ctx R Γ A} {s e p}
            → SimC ⟨ inCut true a c , s , rising e , p ⟩ [] ⟨ c , cutS true a s , rising e , p ⟩
   rise-cut = keeps λ
-    { (flying (f-cut fr) h)       → flying fr λ w → let (sy , row) = h w in s-cut sy , row
-    ; (flying (f-lnct fr) h)      → flying fr (_ , _ , refl , h)
-    ; (flying (f-off u-cut fr) h) → flying fr λ ()
-    ; (adrift (f-cut fr))         → adrift fr
-    ; (adrift (f-off u-cut fr))   → adrift fr
+    { (flying (f-cut fr) cl h)       → flying fr cl λ w → let (sy , row) = h w in s-cut sy , row
+    ; (flying (f-lnct fr) cl h)      → flying fr cl (_ , _ , refl , h)
+    ; (flying (f-off u-cut fr) cl h) → flying fr cl λ ()
+    ; (adrift (f-cut fr) cl)         → adrift fr cl
+    ; (adrift (f-off u-cut fr) cl)   → adrift fr cl
     ; (settled () _ _) }
 
   rise-cutx : ∀ {Γ A} {a} {c : Ctx R Γ A} {s e p}
             → SimC ⟨ inCut false a c , s , rising e , p ⟩ [] ⟨ c , cutS false a s , absorbed , p ⟩
   rise-cutx = keeps λ
-    { (flying (f-lnct fr) h)      → settled c-abs fr (_ , _ , refl , λ ())
-    ; (flying (f-off u-cut fr) h) → settled c-abs fr (λ ())
-    ; (adrift (f-lnct fr))        → settled c-abs fr (_ , _ , refl , λ ())
-    ; (adrift (f-off u-cut fr))   → settled c-abs fr (λ ())
+    { (flying (f-lnct fr) cl h)      → settled c-abs fr (_ , _ , refl , λ ())
+    ; (flying (f-off u-cut fr) cl h) → settled c-abs fr (λ ())
+    ; (adrift (f-lnct fr) cl)        → settled c-abs fr (_ , _ , refl , λ ())
+    ; (adrift (f-off u-cut fr) cl)   → settled c-abs fr (λ ())
     ; (settled () _ _) }
 
   -- A LANE'S OWN FRAME passes the row.
   rise-ln : ∀ {Γ A} {b} {c : Ctx R Γ A} {s e p}
           → SimC ⟨ inLn b c , s , rising e , p ⟩ [] ⟨ c , lnS b s , rising e , p ⟩
   rise-ln = keeps λ
-    { (flying (f-lane fr) (at , l , refl , h)) → flying fr (at , l , refl , h)
-    ; (flying (f-off u-ln fr) h)             → flying fr λ ()
-    ; (adrift (f-off u-ln fr))               → adrift fr
+    { (flying (f-lane fr) cl (at , l , refl , h)) → flying fr cl (at , l , refl , h)
+    ; (flying (f-off u-ln fr) cl h)             → flying fr cl λ ()
+    ; (adrift (f-off u-ln fr) cl)               → adrift fr cl
     ; (settled () _ _) }
 
   -- A TAKEWHILE OVER absorbs whatever still reaches it.
   rise-took : ∀ {Γ A} {i} {keep : A → Bool} {w} {c : Ctx R Γ A} {s e p} → w ≢ free
             → SimC ⟨ inTake i keep w c , s , rising e , p ⟩ [] ⟨ c , takeS i keep w s , absorbed , p ⟩
   rise-took nf = keeps λ
-    { (flying (f-took fr fl nr fz ow eq sd) h) → settled c-abs fr (λ _ → s-took fl (λ {q} → nr {q}) fz ow eq sd)
-    ; (flying (f-take fr _ _ _) h)          → ⊥-elim (nf refl)
-    ; (flying (f-off u-take fr) h)          → settled c-abs fr (λ ())
-    ; (adrift (f-took fr fl nr fz ow eq sd)) → settled c-abs fr (λ _ → s-took fl (λ {q} → nr {q}) fz ow eq sd)
-    ; (adrift (f-take fr _ _ _))            → ⊥-elim (nf refl)
-    ; (adrift (f-off u-take fr))            → settled c-abs fr (λ ())
+    { (flying (f-took fr fl nr fz ow eq sd) cl h) → settled c-abs fr (λ _ → s-took fl (λ {q} → nr {q}) fz ow eq sd)
+    ; (flying (f-take fr _ _ _) cl h)          → ⊥-elim (nf refl)
+    ; (flying (f-off u-take fr) cl h)          → settled c-abs fr (λ ())
+    ; (adrift (f-took fr fl nr fz ow eq sd) cl) → settled c-abs fr (λ _ → s-took fl (λ {q} → nr {q}) fz ow eq sd)
+    ; (adrift (f-take fr _ _ _) cl)            → ⊥-elim (nf refl)
+    ; (adrift (f-off u-take fr) cl)            → settled c-abs fr (λ ())
     ; (settled () _ _) }
 
   -- A TAKEWHILE'S FIRST FAILURE, NOT INCLUSIVE: nothing leaves, and it
@@ -648,14 +648,14 @@ module _ {R : Set} (Rt : EmissionSet R) where
   rise-take-fail : ∀ {Γ A} {keep : A → Bool} {c : Ctx R Γ A} {s a p} → keep a ≡ false
                  → SimC ⟨ inTake false keep free c , s , rising (nx a) , p ⟩ [] ⟨ c , takeS false keep (cpAt p) s , absorbed , p ⟩
   rise-take-fail {keep = keep} {a = a} {p = p} kf = keeps λ
-    { (flying (f-take fr nf eq sd) h) → settled c-abs fr λ w → let (_ , row) = h w in
+    { (flying (f-take fr nf eq sd) cl h) → settled c-abs fr λ w → let (_ , row) = h w in
         s-took (a , row , subst (λ b → T (not b)) (sym kf) _ , λ (_ , _ , y , nk , qp) → nf y nk qp)
                (λ pq → pq) (λ ()) (o-cp (≺→≼ {p} {p ++ [ last ]} (≺-ext p {last} []))) eq sd
-    ; (flying (f-took _ _ _ _ () _ _) _)
-    ; (flying (f-off u-take fr) h)      → settled c-abs fr (λ ())
-    ; (adrift (f-take fr _ _ _))        → settled c-abs fr (λ ())
-    ; (adrift (f-took _ _ _ _ () _ _))
-    ; (adrift (f-off u-take fr))        → settled c-abs fr (λ ())
+    ; (flying (f-took _ _ _ _ () _ _) cl _)
+    ; (flying (f-off u-take fr) cl h)      → settled c-abs fr (λ ())
+    ; (adrift (f-take fr _ _ _) cl)        → settled c-abs fr (λ ())
+    ; (adrift (f-took _ _ _ _ () _ _) cl)
+    ; (adrift (f-off u-take fr) cl)        → settled c-abs fr (λ ())
     ; (settled () _ _) }
 
   -- A BODY OF A TORN-DOWN SOURCE has completed: it is stopped, and
@@ -663,10 +663,10 @@ module _ {R : Set} (Rt : EmissionSet R) where
   rise-bodyx : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s e p} → CS.srcLive k ≡ false
              → SimC ⟨ inBody k o c , s , rising e , p ⟩ [] ⟨ c , connS k o s , absorbed , p ⟩
   rise-bodyx nl = keeps λ
-    { (flying (f-body fr sc pt _ _ fl eq) _) → settled c-abs fr λ _ → s-conn sc pt (dead nl) (dead nl) fl eq
-    ; (flying (f-off u-body fr) _)        → settled c-abs fr (λ ())
-    ; (adrift (f-body fr sc pt _ _ fl eq))   → settled c-abs fr λ _ → s-conn sc pt (dead nl) (dead nl) fl eq
-    ; (adrift (f-off u-body fr))          → settled c-abs fr (λ ())
+    { (flying (f-body fr sc pt _ _ fl eq) cl _) → settled c-abs fr λ _ → s-conn sc pt (dead nl) (dead nl) fl eq
+    ; (flying (f-off u-body fr) cl _)        → settled c-abs fr (λ ())
+    ; (adrift (f-body fr sc pt _ _ fl eq) cl)   → settled c-abs fr λ _ → s-conn sc pt (dead nl) (dead nl) fl eq
+    ; (adrift (f-off u-body fr) cl)          → settled c-abs fr (λ ())
     ; (settled () _ _) }
     where
       dead : ∀ {b} {X : Set₁} → b ≡ false → T b → X
@@ -677,9 +677,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
 
   -- Its completion owed, under `last` of the failing value.
   run-stop : ∀ {Γ A} {i} {keep : A → Bool} {c : Ctx R Γ A} {s r p}
-           → Inv (bef (r Machine.⊕ [ last ])) ⟨ c , takeS i keep (cpAt r) s , absorbed , p ⟩
+           → closed c ≡ false → Inv (bef (r Machine.⊕ [ last ])) ⟨ c , takeS i keep (cpAt r) s , absorbed , p ⟩
            → Inv (bef (r Machine.⊕ [ last ])) ⟨ c , takeS i keep (cutAt r) s , rising cp , r Machine.⊕ [ last ] ⟩
-  run-stop {r = r} (settled {w = owes _} _ fr h) = flying fr λ w → stopped (h w)
+  run-stop {r = r} cl (settled {w = owes _} _ fr h) = flying fr cl λ w → stopped (h w)
     where
       stopped : ∀ {Γ A} {sc : Scope Γ} {Rg} {i} {keep : A → Bool} {s E}
               → Sync sc Rg (bef (r ++ [ last ])) (takeS i keep (cpAt r) s) E
@@ -688,9 +688,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
         s-took (a , x , nk , nf) (λ {q} lt → ≺→≼ {r} {q} (≺-trans {r} {r ++ [ last ]} {q} (≺-ext r {last} []) lt))
                (λ t lt → fz t (≺→≼ {r ++ [ last ]} {r ++ [ ix 0 ]} lt)) (o-cut (≺-irrefl {r ++ [ last ]})) eq sd
         , proj₁ (to eq (TakeWhile.stop x nk nf , vis {A = A} cp))
-  run-stop (settled {w = lane _} _ fr (_ , _ , () , _))
-  run-stop (settled {w = lanecut _} _ fr (_ , _ , () , _))
-  run-stop (settled {w = pnd _} _ fr (_ , () , _))
+  run-stop _ (settled {w = lane _} _ fr (_ , _ , () , _))
+  run-stop _ (settled {w = lanecut _} _ fr (_ , _ , () , _))
+  run-stop _ (settled {w = pnd _} _ fr (_ , () , _))
 
   -- Its source cut: the source is not read.
   run-cut : ∀ {C Γ A} {i} {keep : A → Bool} {c : Ctx R Γ A} {s s′ r p p′}

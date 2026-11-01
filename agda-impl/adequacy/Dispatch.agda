@@ -483,19 +483,19 @@ module Over {R : Set} (Rt : EmissionSet R) where
   ...       | _ , _ , _ , fr′ , h″ = inj₁ (settled c-abs fr′ h″ , owed-≃ {C = C} {C′ = bef p} e d)
 
   -- In a subtree no live node reads, any mode keeps the cursor.
-  adrift-any : ∀ {C Γ A} {c : Ctx R Γ A} {Rg E} m {s p} → Fr Rt C Rg c (owes false) E → Inv Rt C ⟨ c , s , m , p ⟩
-  adrift-any subscribing fr = settled c-sub fr (λ ())
-  adrift-any absorbed    fr = settled c-abs fr (λ ())
-  adrift-any (rising _)  fr = adrift fr
+  adrift-any : ∀ {C Γ A} {c : Ctx R Γ A} {Rg E} m {s p} → closed c ≡ false → Fr Rt C Rg c (owes false) E → Inv Rt C ⟨ c , s , m , p ⟩
+  adrift-any subscribing _  fr = settled c-sub fr (λ ())
+  adrift-any absorbed    _  fr = settled c-abs fr (λ ())
+  adrift-any (rising _)  cl fr = adrift fr cl
 
   -- A search's outcome, run: the node's run at the shifted cursor, or
   -- adrift.
-  stepped : ∀ {C Γ A} {c′ : Ctx R Γ A} {s′ r p s″ m″ p″}
+  stepped : ∀ {C Γ A} {c′ : Ctx R Γ A} {s′ r p s″ m″ p″} → closed c′ ≡ false
           → (Inv Rt (bef p) ⟨ c′ , s′ , absorbed , r ⟩ × Vis (RT Rt C) ≃ Vis (RT Rt (bef p))) ⊎ (Σ Rgn λ Rg → Σ (EmissionSet A) (Fr Rt C Rg c′ (owes false)))
           → (Inv Rt (bef p) ⟨ c′ , s′ , absorbed , r ⟩ → Inv Rt (bef p) ⟨ c′ , s″ , m″ , p″ ⟩)
           → Σ Cur λ C′ → Inv Rt C′ ⟨ c′ , s″ , m″ , p″ ⟩ × Moves (RT Rt C) [] (RT Rt C′)
-  stepped (inj₁ (i , r)) g = _ , g i , silent r
-  stepped (inj₂ (_ , _ , fr)) g = _ , adrift-any _ fr , silent ≃-refl
+  stepped _  (inj₁ (i , r)) g = _ , g i , silent r
+  stepped cl (inj₂ (_ , _ , fr)) g = _ , adrift-any _ cl fr , silent ≃-refl
 
   -- A torn joiner's row dropped: nothing owed before, nothing after.
   joinx-hold : ∀ {Γ A} {sc : Scope Γ} {Rg C w j} {x : A ∈ Γ} {u ib E}
@@ -572,8 +572,8 @@ module Over {R : Set} (Rt : EmissionSet R) where
     abs-of {c′ = c′} {xs = xs} fd eq with closed c′ in cl | xs | eq
     ... | true  | []     | refl = keeps Rt λ i → closed-keep cl (λ ()) (search-quiet i fd)
     ... | true  | _ ∷ _  | refl = keeps Rt λ i → closed-keep cl (λ ()) (search-quiet i fd)
-    ... | false | []     | refl = λ i → stepped (search-least i fd d-ofx) (run-of-end cl)
-    ... | false | _ ∷ _  | refl = λ i → stepped (search-least i fd d-of) (run-of-nx cl)
+    ... | false | []     | refl = λ i → stepped cl (search-least i fd d-ofx) (run-of-end cl)
+    ... | false | _ ∷ _  | refl = λ i → stepped cl (search-least i fd d-of) (run-of-nx cl)
 
     abs-att : ∀ {Γ A} {c′ : Ctx R Γ A} {l q s₀ κ k′ sh t}
             → search top (plug c s) ≡ just (found (Γ , A , c′ , cutS l (attAt q) s₀) attM κ) → run c′ (cutS l (attAt q) s₀) attM p ≡ moved k′ sh t
@@ -593,10 +593,10 @@ module Over {R : Set} (Rt : EmissionSet R) where
              → run c′ (joinS j g x ((q , e) ∷ ib)) joinM p ≡ moved k′ sh t
              → SimC Rt ⟨ c , s , absorbed , p ⟩ sh k′
     abs-join {c′ = c′} {g = true} {e = nx a} fd eq with closed c′ in cl | eq
-    ... | false | refl = λ i → stepped (search-least i fd d-join) (run-join-nx cl)
+    ... | false | refl = λ i → stepped cl (search-least i fd d-join) (run-join-nx cl)
     ... | true  | refl = keeps Rt λ i → closed-keep cl (λ ()) (search-quiet i fd)
     abs-join {c′ = c′} {g = true} {e = cp}   fd eq with closed c′ in cl | eq
-    ... | false | refl = λ i → stepped (search-least i fd d-join) (run-join-cp cl)
+    ... | false | refl = λ i → stepped cl (search-least i fd d-join) (run-join-cp cl)
     ... | true  | refl = keeps Rt λ i → closed-keep cl (λ ()) (search-quiet i fd)
     abs-join {g = false} {e = nx a} fd refl   = keeps Rt λ i → join-off (search-quiet i fd)
     abs-join {g = false} {e = cp}   fd refl   = keeps Rt λ i → join-off (search-quiet i fd)
@@ -606,7 +606,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
              → run c′ (takeS j w (cpAt r) s₀) cpM p ≡ moved k′ sh t
              → SimC Rt ⟨ c , s , absorbed , p ⟩ sh k′
     abs-stop {c′ = c′} fd eq with closed c′ in cl | eq
-    ... | false | refl = λ i → stepped (search-least i fd d-stop) (run-stop Rt)
+    ... | false | refl = λ i → stepped cl (search-least i fd d-stop) (run-stop Rt cl)
     ... | true  | refl = keeps Rt λ i → closed-keep cl (λ ()) (search-quiet i fd)
 
     abs-cut : ∀ {Γ A} {c′ : Ctx R Γ A} {j} {w : A → Bool} {r s₀ κ k′ sh t}

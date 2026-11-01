@@ -215,7 +215,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → (∀ {Rg C E} → Sync (scopeOf c) Rg C (connS k o s) E → Sync (scopeOf c) Rg C (connS k′ o s) E)
             → SimC Rt ⟨ inBody k o c , s , rising e , p ⟩ [] ⟨ c , connS k′ o s , rising e , p ⟩
   rise-body {k = k} {c = c} {e = e} {p = p} lv fix = keeps Rt λ
-    { (flying (f-body {w = w} fr sc pt v src fl eq) h) → flying fr λ t →
+    { (flying (f-body {w = w} fr sc pt v src fl eq) cl h) → flying fr cl λ t →
         let (sy , row) = h (subst T (sym v) (wl w lv t))
             rb = Sound.rg (Parts.sb pt) row (vis e)
             ns = λ r → Parts.apart pt rb r
@@ -223,9 +223,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
         in fix (s-conn sc pt (λ _ → subst (λ x → Sync (binds (CS.src k) (CS.connAt k) x) _ _ _ _) sc sy)
                       (λ t′ → Past.src-up p (src t′) (Parts.ss pt) ns nh) (Past.flags-up p {k = k} (Parts.ss pt) ns fl) eq)
            , proj₁ (to eq (Connecting.body row , vis e))
-    ; (flying (f-off u-body fr) _)             → flying fr λ ()
-    ; (adrift (f-body {w = w} fr _ _ v _ _ _)) → adrift (subst (λ x → Fr Rt _ _ _ (owes x) _) (wf w lv v) fr)
-    ; (adrift (f-off u-body fr))               → adrift fr
+    ; (flying (f-off u-body fr) cl _)          → flying fr cl λ ()
+    ; (adrift (f-body {w = w} fr _ _ v _ _ _) cl) → adrift (subst (λ x → Fr Rt _ _ _ (owes x) _) (wf w lv v) fr) cl
+    ; (adrift (f-off u-body fr) cl)            → adrift fr cl
     ; (settled () _ _) }
 
   rise-body-nx : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s b p} → CS.srcLive k ≡ true
