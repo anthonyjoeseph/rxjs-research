@@ -14,6 +14,18 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE TRUNCATED COMPOSITE
+
+Refuted: a connect's and a joiner's frames read `ConnT`/`JoinF` whole,
+but their entry truncates, so over the infinite synchronous `ones` a
+later body or lane row is owed by the frame and not by the root. Open:
+restate the frames over `Truncate`; a rising row then reaches only if
+the rows the cursor passed are few, which needs the run's history in
+the carrier, and a joiner's outer program pinned as a connect's source
+is. Settled when the restated entries typecheck.
+
+Members: `sub-conn`, `sub-flat`.
+
 #### THE CONNECT STEPPED
 
 A connect entered, a joiner joined, a source's or body's rise, its own
@@ -21,7 +33,7 @@ marks, a joiner's next and a take's failure, each keeping `Inv`. Open:
 whether every entry lands a region apart from its siblings' and clear of
 its scope's hots, so the rest moves past `p`. Settled when each is a body.
 
-Members: `sub-conn`, `sub-join`, `sub-joined`, `run-con`, `run-join-nx`,
+Members: `sub-join`, `sub-joined`, `run-con`, `run-join-nx`,
 `run-join-cp`, `rise-take-failᵢ`, `feed-up`.
 
 #### THE JOINER STEPPED
@@ -32,7 +44,7 @@ Open: whether begun lanes stay ascending (`Asc`), and whether `Begun`'s
 live count makes a freed slot the queue head's `Starts.queued`. Settled
 when each is a body.
 
-Members: `rise-outer-nx`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`, `sub-flat`.
+Members: `rise-outer-nx`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`.
 
 #### THE GUARD ROWS
 

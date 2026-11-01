@@ -381,6 +381,15 @@ module Over {R : Set} (Rt : EmissionSet R) where
     sub-take   : ∀ {C Γ A} {c : Ctx R Γ A} {i} {w : A → Bool} {s q p}
                → Inv Rt C ⟨ c , pend (takeWhile i w s) q , subscribing , p ⟩
                → Inv Rt C ⟨ inCut true (attAt q) (inTake i w free c) , pend s q , subscribing , q ⟩
+    -- A JOINER'S OR A CONNECT'S FRAME OWES ITS UNTRUNCATED ROWS, so these
+    -- two are false as stated.  `connect ones b`, `b` a cold with a row
+    -- at tick 1: the row is in `ConnT` and not in the connect's entry,
+    -- which `Truncate`s it past the infinitely many burst pins of
+    -- `Tree.ones` before it, so no frame takes the pending body.
+    -- `flatMap` over `ones` alike, past its outer's value rows.  The
+    -- frames must read `Truncate`, and then a rising row reaches only
+    -- through the rows the cursor passed being few: a fact of the run's
+    -- history, which no state shows, since `Sync` ties visible rows only.
     sub-flat   : ∀ {C Γ A B} {c : Ctx R Γ B} {op} {f : A → Obs Timeline Γ B} {s q p}
                → Inv Rt C ⟨ c , pend (flatMap op f s) q , subscribing , p ⟩
                → Inv Rt C ⟨ inCut true (attAt q) (inOuter op f false 0 [] [] c) , pend s q , subscribing , q ⟩
