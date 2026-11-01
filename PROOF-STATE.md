@@ -38,28 +38,35 @@ Members: `rise-outer-nx`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`, `sub-
 
 Short of a row a reader meets next, a run is fuelled by the listed rows
 and their ancestors strictly past its clock, and between them by
-`adequacy.Weight`. Open: that the least mark's run, passing no listed
-row, lowers the weight at its clock, and that the clock never runs back;
-the cursor probe finds neither failing. Settled by bodies.
+`adequacy.Weight`; a climb and a subscribe are proven to lower it. Open:
+that the least mark's run, passing no listed row, lowers the weight at
+its clock. Settled by a body.
 
-Members: `lightens-run`, `clock-mono`.
+Members: `lightens-run`.
 
-#### THE STILL CLIMB
+#### THE GUARD ROWS
 
-A rise passing no listed row lowers the weight at its clock. Open:
-whether a take's failure, an outer's value and a lane's end each either
-pass a listed row or leave marks past the clock. Settled by a body.
+A step that begins work a level down — a lane, a defer's body, a
+source's feed — leaves a row first, so is never still. Open: that the
+denotation has that row, at or before the one met next. Settled by
+bodies over the joiner's and connect's rows.
 
-Members: `lightens-rise`.
+Members: `lane-guard`, `echo-guard`, `defer-guard`.
+
+#### THE CLOCK AHEAD
+
+No mark is due before the run's clock. Open: that the clock never runs
+back over a silent step, and a source's feed comes due no sooner than a
+level down. Settled by an engine key invariant.
+
+Members: `clock-mono`, `fed-ahead`.
 
 #### THE SUBSCRIPTION MET
 
-A subscribe lowers the weight, proven over three facts. Open: that a
-subscribing run has its pending subscription in focus, a cold opens
-strictly past it, and a defer's guard is a row at or before the one met
-next. Settled by bodies.
+Open: that a subscribing run has its pending subscription in focus, and
+a cold opens strictly past it. Settled by bodies.
 
-Members: `pend-focus`, `opening-ahead`, `defer-guard`.
+Members: `pend-focus`, `opening-ahead`.
 
 #### THE COLD STEPPED
 
