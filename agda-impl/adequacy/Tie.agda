@@ -32,7 +32,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs)
-open import denotation.Events using (Pos; Timeline; sub; last; <ᵖ-asym)
+open import denotation.Events using (Pos; Timeline; ix; sub; last; <ᵖ-asym)
 open import denotation.EmissionSet using (EmissionSet; Ev; _≺_; end) renaming (Reach to Reachᴱ)
 open import denotation.Laws.Modulus using (≺-trans; ≺-ext)
 open import operation.Key using (Key; at; after; _<ᴷ_; ≮ᴷ-trans)
@@ -204,7 +204,7 @@ copies : ∀ {H : Pred} {j p} → FewP H p → FewP (λ y → (Σ Pos λ h → H
 copies {H = H} {j} {p} (ks , f) = mapL (λ h → h ++ [ sub j ]) ks ++ [ j ++ [ last ] ] , go
   where
     go : ∀ {y} → (Σ Pos λ h → H h × y ≡ h ++ [ sub j ]) ⊎ y ≡ j ++ [ last ] → y ≺ p → y ∈ mapL (λ h → h ++ [ sub j ]) ks ++ [ j ++ [ last ] ]
-    go (inj₁ (h , hh , refl)) yp = ∈-++⁺ˡ (∈-map⁺ (λ h → h ++ [ sub j ]) (f {h} hh (≺-trans (≺-ext h []) yp)))
+    go (inj₁ (h , hh , refl)) yp = ∈-++⁺ˡ (∈-map⁺ (λ h → h ++ [ sub j ]) (f {h} hh (≺-trans {h} {h ++ [ sub j ]} {p} (≺-ext h {sub j} []) yp)))
     go (inj₂ refl)            yp = ∈-++⁺ʳ _ (here refl)
 
 -- THE FEEDS FEW: every joiner's copies, each handle's rows few, those of
@@ -294,7 +294,7 @@ module _ {R : Set} where
   env-down (inOuter op f ω d n q ls c)         t lo nf = env-down c t lo nf
   env-down (inLanes op f ω d n q o pre post c) t lo nf = env-down c t lo nf
   env-down (inSrc k b c)                     t lo nf = env-down c t lo nf
-  env-down (inBody k o c) {s}                t lo nf = hk-env k o s (down c t) (env-down c t lo nf) (lo-plug c lo) nf
+  env-down {p = p} (inBody k o c) {s}        t lo nf = hk-env k o s (down c t) (env-down {p = p} c t lo nf) (lo-plug c {connS k o s} {after p} lo) nf
 
 ------------------------------------------------------------------------
 -- A STEP KEEPS THE TIE, by the conf's mode: a rise, a subscription, the
@@ -347,29 +347,34 @@ module _ {R : Set} (o : PureObs [] R) where
 
   few-body : ∀ {rs Γ X B} {k : CS Γ X} {o′} {c : Ctx R Γ B} {s e p}
            → Path (load o) rs ⟨ inBody k o′ c , s , rising e , p ⟩ → closed c ≡ false → CS.srcLive k ≡ true → FewBefore (Frozen k) p
-  few-body {k = k} {o′} {c} {s} {e} pth op lv with down c (tie o pth) | floor o pth tt
-  ... | tc@(cv , to , _) | lo = proj₁ fp , λ {y} r yp → proj₂ fp {y} (_ , r) (≺-trans (≺-ext y []) yp)
+  few-body {k = k} {o′} {c} {s} {e} {p} pth op lv with down c (tie o pth) | floor o pth tt
+  ... | tc@(cv , to , _) | lo = proj₁ fp , λ {y} r yp → proj₂ fp {y} (_ , r) (≺-trans {y} {y ++ [ ix 0 ]} {p} (≺-ext y {ix 0} []) yp)
     where
-      fp : FewP (Rows (Frozen k)) _
-      fp = fin-cov (cv (T-not op) (subst T (sym lv) tt)) (lo-plug c lo) (nf₀ {e = e})
-             (fed-few o′ to (env-down c (tie o pth) lo (nf₀ {e = e})) (λ h → lo-plug c lo (k-kid (k-src h))) (nf₀ {e = e}))
+      fp : FewP (Rows (Frozen k)) p
+      fp = fin-cov {p = p} (cv (T-not op) (subst T (sym lv) tt)) (lo-plug c {connS k o′ s} {after p} lo) (λ {y} → nf₀ {e = e} {p} {y})
+             (fed-few {p = p} o′ to (env-down {p = p} c {connS k o′ s} (tie o pth) lo (λ {y} → nf₀ {e = e} {p} {y}))
+               (λ h → lo-plug c {connS k o′ s} {after p} lo (k-kid (k-src h))) (λ {y} → nf₀ {e = e} {p} {y}))
 
   -- A live joiner's rows before the floor few.
   flat-few : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu} {ou : St Γ A} {ls} (c : Ctx R Γ B) {F p}
            → Tight unbound none false F (plug c (flatS op f ω d n qu ou ls)) → Lo (plug c (flatS op f ω d n qu ou ls)) (after p) → NoF F p
            → closed c ≡ false → FewP (Rows (JoinG (scopeOf c) op f ω)) p
-  flat-few {ou = ou} {ls} c t lo nf op with down c t
+  flat-few {op = op′} {f} {ω} {d} {n} {qu} {ou} {ls} c {p = p} t lo nf op with down c {flatS op′ f ω d n qu ou ls} t
   ... | cv , to , tl =
-    fin-cov (cv (T-not op)) (lo-plug c lo) nf (fed-few (flatS _ _ _ _ _ _ ou ls) (cv , to , tl) (env-down c t lo nf) (lo-plug c lo) nf)
+    fin-cov {p = p} (cv (T-not op)) (lo-plug c {flatS op′ f ω d n qu ou ls} {after p} lo) nf
+      (fed-few {p = p} (flatS op′ f ω d n qu ou ls) (cv , to , tl) (env-down {p = p} c {flatS op′ f ω d n qu ou ls} t lo nf)
+        (lo-plug c {flatS op′ f ω d n qu ou ls} {after p} lo) nf)
 
-  few-outer : ∀ {rs Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu ls} {c : Ctx R Γ B} {s p}
+  few-outer : ∀ {rs Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu ls} {c : Ctx R Γ B} {s : St Γ A} {p}
             → Path (load o) rs ⟨ inOuter op f ω d n qu ls c , s , rising cp , p ⟩ → closed c ≡ false
             → Reachᴱ (JoinG (scopeOf c) op f ω) p end
-  few-outer {c = c} pth op with flat-few c (tie o pth) (floor o pth tt) nf₀ op
+  few-outer {A = A} {op = op′} {f} {ω} {d} {n} {qu} {ls} {c} {s} {p} pth op
+    with flat-few {op = op′} {f} {ω} {d} {n} {qu} {s} {ls} c {p = p} (tie o pth) (floor o pth tt) (λ {y} → nf₀ {A} {cp} {p} {y}) op
   ... | ks , f = ks , λ {y} r kp _ → f {y} (_ , r) kp
 
-  few-lane : ∀ {rs Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu ou pre post} {c : Ctx R Γ B} {s e p}
+  few-lane : ∀ {rs Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu ou pre post} {c : Ctx R Γ B} {s : St Γ B} {e p}
            → Path (load o) rs ⟨ inLanes op f ω d n qu ou pre post c , s , rising e , p ⟩ → closed c ≡ false
            → Reachᴱ (JoinG (scopeOf c) op f ω) p (toEv e)
-  few-lane {c = c} {e = e} pth op with flat-few c (tie o pth) (floor o pth tt) (nf₀ {e = e}) op
+  few-lane {op = op′} {f} {ω} {d} {n} {qu} {ou} {pre} {post} {c} {s} {e} {p} pth op
+    with flat-few {op = op′} {f} {ω} {d} {n} {qu} {ou} {pre ʳ++ s ∷ post} c {p = p} (tie o pth) (floor o pth tt) (λ {y} → nf₀ {e = e} {p} {y}) op
   ... | ks , f = ks , λ {y} r kp _ → f {y} (_ , r) kp

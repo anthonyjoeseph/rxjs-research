@@ -5,10 +5,10 @@
 module adequacy.Told where
 
 open import Data.Bool using (false)
-open import Data.Empty using (⊥-elim)
+open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using ([])
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
-open import Data.Product using (Σ; _,_; proj₁)
+open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
