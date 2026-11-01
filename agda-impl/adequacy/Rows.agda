@@ -12,22 +12,31 @@ open import Data.Bool using (T)
 open import Data.List using (List; []; _∷_; [_]; _++_)
 open import Data.List.Relation.Unary.All using ([]; _∷_)
 open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Empty using (⊥-elim)
 open import Data.Product using (_×_; _,_; proj₁)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs)
 open import denotation.Events using (ofᴱ; Events; burst; hush) renaming (end to endᴱ)
 open import denotation.Events using (Pos; Timeline; ix)
 open import denotation.Read using (Visible)
 import denotation.Read as Read
-open import denotation.Laws.Modulus using (≺-trans)
+open import denotation.Laws.Modulus using (≺-trans; ≼-or-≻; ≼-antisym)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; _≺_; _≼_; enter; ⟦_⟧; hot; Proper; DenEnv)
 open import operation.PureObservable using (module Machine; module Driver; Tape; play; ending; over)
 open Machine using (St; Ctx; CS; Scope; unbound; binds; Owe; free; cpAt; cutAt; overAt; takeS; connS; joinS; coldS; scanS; Conf; ⟨_,_,_,_⟩; Mode; subscribing; absorbed; rising; load; moved; quiet; pend; ofS; mapS; cutS; lnS; flatS; alive; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; nx; cp) renaming (Ev to Evᴹ; Shown to Shownᴹ; step to stepᴹ)
 
 ------------------------------------------------------------------------
 -- Rows
+
+-- At or before and not it: before.
+≼-≢ : ∀ {p q} → p ≼ q → ¬ p ≡ q → p ≺ q
+≼-≢ {p} {q} pq ne with ≼-or-≻ q p
+... | inj₁ qp = ⊥-elim (ne (≼-antisym {p} {q} pq qp))
+... | inj₂ lt = lt
 
 toEv : ∀ {A} → Evᴹ A → Ev A
 toEv (nx a) = out a

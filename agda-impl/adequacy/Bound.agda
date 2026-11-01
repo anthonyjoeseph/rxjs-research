@@ -45,7 +45,7 @@ open _≃_
 open import adequacy.Cursor using (Cur; origin; bef; aft; Owes; Due; Unfed; Adm; Ticked;
   Pol; Lane; Runs; Start; Kill; polF; JoinF; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Spent;
   Folded; fd-none; fd-last; Whole; Ahead;
-  Joined; joined; Ends; Flags; Src; src-pend; src-on; Failure; OweAt; o-cp; o-cut; o-over;
+  Joined; joined; Ends; Flags; Src; src-pend; src-on; src-shut; Failure; OweAt; o-cp; o-cut; o-over;
   Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
 
@@ -233,13 +233,13 @@ mutual
   bound {p = p} (s-of {i = i} {q = q₀} {xs = x ∷ xs} d) env lo {q} r =
     tr p (q₀ ++ [ ix i ]) q (lo-at lo (k-own (here refl))) (of-lb q₀ i (x ∷ xs) (proj₁ (to d r)))
   bound (s-done sp) env lo r = ⊥-elim (sp r)
-  bound (s-map sy m) env lo (x , v , ow) = map-b sy env (λ ki → lo (k-kid (k-map ki))) (from m (x , v)) ow
-  bound (s-scan sy _ m) env lo (x , v , ow) = scan-b sy env (λ ki → lo (k-kid (k-scan ki))) (from m (x , v)) ow
+  bound (s-map sy m _) env lo (x , v , ow) = map-b sy env (λ ki → lo (k-kid (k-map ki))) (from m (x , v)) ow
+  bound (s-scan sy _ m _) env lo (x , v , ow) = scan-b sy env (λ ki → lo (k-kid (k-scan ki))) (from m (x , v)) ow
   bound (s-cut sy) env lo r = bound sy env (λ ki → lo (k-kid (k-cut ki))) r
-  bound (s-take sy nf m) env lo (x , v , ow) = take-b sy nf env (λ ki → lo (k-kid (k-take ki))) (from m (x , v)) ow
+  bound (s-take sy nf m _) env lo (x , v , ow) = take-b sy nf env (λ ki → lo (k-kid (k-take ki))) (from m (x , v)) ow
   bound (s-took fl nr ni oa m) env lo (x , v , ow) = took-b fl nr ni oa lo (from m (x , v)) ow
-  bound (s-flat sy jn m) env lo (x , v , ow) = flat-b sy jn env lo (proj₁ (from m (x , v))) v ow
-  bound (s-conn refl bs ss fl m) env lo (x , v , ow) = conn-b bs ss fl env lo (from m (x , v)) ow
+  bound (s-flat sy jn m _) env lo (x , v , ow) = flat-b sy jn env lo (proj₁ (from m (x , v))) v ow
+  bound (s-conn refl bs ss fl m _) env lo (x , v , ow) = conn-b bs ss fl env lo (from m (x , v)) ow
   bound {sc = sc} (s-join _ d ap _ _) env lo r = join-b {sc = sc} d ap env lo r
   bound (s-joinx sp) env lo r = ⊥-elim (sp r)
 
@@ -305,7 +305,8 @@ mutual
   src-b : ∀ {Γ X B} {C} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B} {p}
         → Src (CS.scope k) C k o → Env (full (CS.scope k)) C p → Lo (connS k o b) (at p)
         → ∀ {q e} → Due C (adequacy.Rows.Frozen k) q e → p ≼ q
-  src-b (src-on sy) env lo r = bound sy env (λ ki → lo (k-kid (k-src ki))) r
+  src-b (src-on _ sy) env lo r = bound sy env (λ ki → lo (k-kid (k-src ki))) r
+  src-b (src-shut _ sp) env lo r = ⊥-elim (sp r)
   src-b {k = k} {b = b} {p = p} (src-pend {o = o′} be (ok , a) _) env lo {q} (x , _ , _) =
     on p (CS.connAt k ++ [ ix 1 ]) q (lo-at lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
        (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok) x)
@@ -344,7 +345,7 @@ mutual
   lane-b : ∀ {Γ} {sc : Scope Γ} {C A B} {P : Pol A B} {O q a l b k e p}
          → LaneSt sc C P q a l b → O q (out a) → (∀ {q′} → Kill P q q′ → k ≼ q′) → Lane P q a k e → Visible e → Owes C k
          → Ends P O → Env (full sc) C p → Lo l (at p) → p ≼ k
-  lane-b (l-live (h-live _ _ eq) sy) _ _ ln v ow _ env lo =
+  lane-b (l-live (h-live _ _ eq) sy _) _ _ ln v ow _ env lo =
     bound sy env (λ ki → lo (k-kid (k-ln (k-kid (k-cut ki))))) (proj₁ (to eq (ln , v)) , v , ow)
   lane-b {C = C} (l-dead (h-end lc nc)) y _ ln v ow en _ _ = ⊥-elim (nc (owes-≼ C ow (en y lc ln v)))
   lane-b {C = C} (l-dead (h-kill kq nq)) _ kl _ _ ow _ _ _ = ⊥-elim (nq (owes-≼ C ow (kl kq)))
@@ -404,17 +405,17 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
     sh sy@(s-cold tk d) env lo = s-cold tk (≃-trans (≃-sym (due-shift sy op env lo)) d)
     sh sy@(s-of d)      env lo = s-of (≃-trans (≃-sym (due-shift sy op env lo)) d)
     sh (s-done sp)      env lo = s-done (spent sp)
-    sh (s-map sy m)     env lo = s-map (sh sy env (λ ki → lo (k-kid (k-map ki)))) m
-    sh (s-scan sy fd m) env lo = s-scan (sh sy env lo′) (fold-sh sy env lo′ fd) m
+    sh (s-map sy m sd)  env lo = s-map (sh sy env (λ ki → lo (k-kid (k-map ki)))) m sd
+    sh (s-scan sy fd m sd) env lo = s-scan (sh sy env lo′) (fold-sh sy env lo′ fd) m sd
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-scan ki))
     sh (s-cut sy)       env lo = s-cut (sh sy env (λ ki → lo (k-kid (k-cut ki))))
-    sh (s-take sy nf m) env lo = s-take (sh sy env lo′) (λ y nk → bound sy env lo′ (y , tt , nf y nk)) m
+    sh (s-take sy nf m sd) env lo = s-take (sh sy env lo′) (λ y nk → bound sy env lo′ (y , tt , nf y nk)) m sd
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-take ki))
     sh (s-took fl nr ni oa m) env lo = s-took fl (nm nr) (λ t → nm (ni t)) (owe-sh oa lo) m
-    sh (s-flat sy jn m) env lo =
-      s-flat (sh sy env lo′) (joined-sh (bound sy env lo′) jn env (λ i ki → lo (k-kid (k-lane i ki)))) m
+    sh (s-flat sy jn m sd) env lo =
+      s-flat (sh sy env lo′) (joined-sh (bound sy env lo′) jn env (λ i ki → lo (k-kid (k-lane i ki)))) m sd
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-outer ki))
-    sh {sc = sc} (s-conn {k = k} refl bs ss fl m) env lo = s-conn refl bs′ (λ t → src-sh (ss t) env lo) fl′ m
+    sh {sc = sc} (s-conn {k = k} refl bs ss fl m sd) env lo = s-conn refl bs′ (λ t → src-sh (ss t) env lo) fl′ m sd
       where
         bs′ = λ t → sh (bs t) (env-bind {o = CS.src k} {r = CS.connAt k} (src-b (ss t) env lo) env) (λ ki → lo (k-kid (k-body ki)))
         unsh : T (CS.srcLive k) → ∀ {c} → adequacy.Rows.Frozen k c end → ¬ Owes (bef p) c → T (CS.closed k)
@@ -433,7 +434,8 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
     src-sh : ∀ {Γ X B} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B}
            → Src (CS.scope k) C k o → Env (full (CS.scope k)) C p → Lo (connS k o b) (at p) → Src (CS.scope k) (bef p) k o
     src-sh (src-pend be adm pr) env lo = src-pend be adm pr
-    src-sh (src-on sy)          env lo = src-on (sh sy env (λ ki → lo (k-kid (k-src ki))))
+    src-sh (src-on nc sy)       env lo = src-on nc (sh sy env (λ ki → lo (k-kid (k-src ki))))
+    src-sh (src-shut cl sp)     env lo = src-shut cl (spent sp)
 
     joined-sh : ∀ {Γ} {sc : Scope Γ} {A B} {P : Pol A B} {O : EmissionSet A} {d n qu ls}
               → (∀ {q e} → Due C O q e → p ≼ q) → Joined sc C P O d n qu ls
@@ -464,7 +466,7 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
 
     lane-sh : ∀ {Γ} {sc : Scope Γ} {A B} {P : Pol A B} {q a l b}
             → LaneSt sc C P q a l b → Env (full sc) C p → Lo l (at p) → LaneSt sc (bef p) P q a l b
-    lane-sh (l-live (h-live st ns eq) sy) env lo = l-live (h-live st (nm ns) eq) (sh sy env (λ ki → lo (k-kid (k-ln (k-kid (k-cut ki))))))
+    lane-sh (l-live (h-live st ns eq) sy sd) env lo = l-live (h-live st (nm ns) eq) (sh sy env (λ ki → lo (k-kid (k-ln (k-kid (k-cut ki)))))) sd
     lane-sh (l-dead {E = E} (h-end lc nc)) env lo = l-dead {E = E} (h-end lc (nm nc))
     lane-sh (l-dead {E = E} (h-kill kq nq)) env lo = l-dead {E = E} (h-kill kq (nm nq))
 

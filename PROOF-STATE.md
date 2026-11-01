@@ -17,11 +17,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE CONNECT STEPPED
 
 A connect entered, a joiner joined, a source's or body's rise, its own
-marks and a joiner's next, each keeping `Inv`. Open: a source's rise moves
-everything but the source from `bef p` to `aft p`, which needs no row but
-the source's at `p`. Settled when each is a body.
+marks, a joiner's next and a take's failure, each keeping `Inv`. Open: a
+rise that stops short of the root moves everything else from `bef p` past
+`p`, which needs no row but the rising one's at `p`. Settled when each is
+a body.
 
-Members: `sub-conn`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`, `rise-body-nx`, `rise-body-cp`, `run-con`, `run-join-nx`, `run-join-cp`.
+Members: `sub-conn`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`, `rise-body-nx`, `rise-body-cp`, `run-con`, `run-join-nx`, `run-join-cp`, `rise-take-failᵢ`, `rise-take-fail`.
 
 #### THE JOINER STEPPED
 
@@ -51,17 +52,17 @@ Members: `sub-cold`, `abs-leaf`.
 
 #### THE FOLD AND THE TAKE
 
-A scan's fold and a take's test, rising: `s-scan`'s `Folded` and the
-take's `OweAt` advance by one row. Settled when each is a body.
+A scan or take entered: its fold or test over no value passed. Settled
+when each is a body.
 
-Members: `rise-scan-nx`, `rise-scan-cp`, `rise-take-nx`, `rise-take-cp`, `sub-scan`, `sub-take`.
+Members: `sub-scan`, `sub-take`.
 
 #### THE ENTRIES
 
 Believed: a subscription's entry is its program's meaning there, and an
 of's next delivers its next row. Settled when each is a body.
 
-Members: `sub-empty`, `sub-of`, `sub-map`, `sub-defer`, `run-of-nx`, `run-of-end`, `run-of-closed`, `run-stop-closed`.
+Members: `sub-empty`, `sub-of`, `sub-map`, `sub-defer`, `run-of-nx`, `run-of-end`.
 
 ## Tier 1 — the simultaneous spec
 
