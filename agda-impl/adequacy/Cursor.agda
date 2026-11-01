@@ -39,7 +39,7 @@ open import Data.Nat using (ℕ; suc; _+_; _≤_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; subst; sym)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
@@ -528,6 +528,42 @@ module _ {R : Set} (Rt : EmissionSet R) where
       past : ∀ {z₀ E} → Sound E → E p end → Folded (bef p) f z₀ E z → Folded (aft p) f z₀ E z
       past sd row (fd-none ow)        = fd-none λ y → after sd row y (ow y)
       past sd row (fd-last ac nq nx′) = fd-last ac (λ pq → nq (≺→≼ {p} pq)) λ y qk → after sd row y (nx′ y qk)
+
+  -- A TAKEWHILE NOT YET FAILED: a value it keeps, or its source's end,
+  -- passed on; no failing value shares the row's position.
+  module _ {Γ A} {i} {keep : A → Bool} {c : Ctx R Γ A} {s p} where
+    unfailed : ∀ {E} → NoFail (bef p) keep E → ¬ TakeWhile.Failed i keep E p
+    unfailed {E} nf (q , _ , y , nk , qp) = nf {q} y nk qp
+
+    nf-aft : ∀ {E e′} → Sound E → E p e′ → Visible e′ → (∀ {a′} → out a′ ≡ e′ → T (not (keep a′)) → ⊥)
+           → NoFail (bef p) keep E → NoFail (aft p) keep E
+    nf-aft sd row v ok nf {q} y nk = ≼-≢ {p} {q} (nf y nk) λ { refl → ok (Sound.fn sd y row _ v) nk }
+
+    rise-take-pass : ∀ {a} → keep a ≡ true
+                   → SimC ⟨ inTake i keep free c , s , rising (nx a) , p ⟩ [] ⟨ c , takeS i keep free s , rising (nx a) , p ⟩
+    rise-take-pass {a} kt = keeps λ
+      { (flying (f-take {E = E} fr nf eq sd) h) → flying fr λ w → let (sy , row) = h w
+          in s-take sy (nf-aft sd row _ kept nf) eq sd , proj₁ (to eq (TakeWhile.pass row (subst T (sym kt) _) (unfailed {E} nf) , _))
+      ; (flying (f-took _ _ _ _ () _) _)
+      ; (flying (f-off u-take fr) h)      → flying fr λ ()
+      ; (adrift (f-take fr _ _ _))        → adrift fr
+      ; (adrift (f-took _ _ _ _ () _))
+      ; (adrift (f-off u-take fr))        → adrift fr
+      ; (settled () _ _) }
+      where
+        kept : ∀ {a′} → out a′ ≡ out a → T (not (keep a′)) → ⊥
+        kept refl nk = subst (λ b → T (not b)) kt nk
+
+    rise-take-cp : SimC ⟨ inTake i keep free c , s , rising cp , p ⟩ [] ⟨ c , takeS i keep free s , rising cp , p ⟩
+    rise-take-cp = keeps λ
+      { (flying (f-take {E = E} fr nf eq sd) h) → flying fr λ w → let (sy , row) = h w
+          in s-take sy (nf-aft sd row _ (λ ()) nf) eq sd , proj₁ (to eq (TakeWhile.tend row (unfailed {E} nf) , _))
+      ; (flying (f-took _ _ _ _ () _) _)
+      ; (flying (f-off u-take fr) h)      → flying fr λ ()
+      ; (adrift (f-take fr _ _ _))        → adrift fr
+      ; (adrift (f-took _ _ _ _ () _))
+      ; (adrift (f-off u-take fr))        → adrift fr
+      ; (settled () _ _) }
 
   -- A LIVE CUT passes the row; one off absorbs it.
   rise-cut : ∀ {Γ A} {a} {c : Ctx R Γ A} {s e p}
