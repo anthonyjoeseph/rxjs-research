@@ -34,7 +34,7 @@ open import adequacy.Stamped using (frame-ahead; opening-ahead; pend-focus; inbo
 open import adequacy.Weight using (Clock)
 open import adequacy.Path using (_⊑_; ⊑i; ⊑-trans; Path; _⇜_)
 
-open import adequacy.Floor.Busy using (floor)
+open import adequacy.Apart.Floor using (floor)
 open import adequacy.Floor.Keys using (Fewer; Into; asym; at-after; at-after₀; cold-key; cut-in; ended-in; ext-le; ext-⊑; feed-key; fewer-same; flat-in; kill-in; lanes-in; lo-weaken; own-fewer; plug-in; same-l; shut-fewer; sub-at; top-max; unsubIf-in; ⊑-refl)
 
 -- Once absorbed, the clock is no earlier than a bound on every key.

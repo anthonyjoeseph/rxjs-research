@@ -50,14 +50,6 @@ row met next, so it is listed. Settled by a body over the cursor `Inv`.
 
 Members: `tick-row`.
 
-#### THE CLOCK AHEAD
-
-Mid-run the floor holds step by step; open is the phase start: the least
-mark run from rest leaves every other mark past the subtree it opens.
-Settled by a pairwise-apart invariant on owed keys beside `stamped`.
-
-Members: `floor-run`.
-
 #### THE COLD STEPPED
 
 A cold entered at its timeline, and each turn of its tape, keep `Inv`.
