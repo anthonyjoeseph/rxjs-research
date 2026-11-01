@@ -36,12 +36,13 @@ Members: `rise-outer-nx`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`, `sub-
 
 #### THE SILENT RUN, FINITE
 
-Short of a row a reader meets next, a run is fuelled by the rows at or
-before it strictly past its clock. Open: whether the clock never runs
-back. Believed finite: `Few` counts skips and every defer leaves a guard
-skip. Settled by bodies.
+Short of a row a reader meets next, a run is fuelled by the listed rows
+and their ancestors strictly past its clock, and between them by
+`adequacy.Weight`. Open: a step-by-step proof that a still step lowers the
+weight, and that the clock never runs back; the cursor probe finds
+neither failing. Settled by bodies.
 
-Members: `clock-mono`, `still-finite`.
+Members: `clock-mono`, `still-lowers`.
 
 #### THE COLD STEPPED
 

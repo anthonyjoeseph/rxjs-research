@@ -34,7 +34,7 @@ open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_
 open import Data.List using (List; []; _∷_; _++_; [_]; upTo; null; length; take) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≡ᵇ_; _<ᵇ_; _≤ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _≡ᵇ_; _<ᵇ_; _≤ᵇ_)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.String using (String) renaming (_++_ to _+++_)
@@ -46,17 +46,18 @@ open import Relation.Nullary using (does)
 open import Tree using (Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Pos; Timeline; ix; last; _<ᵖ_; _≟ᵖ_)
 open import operation.Key using (Key; at; after; _<ᴷ_)
-open import operation.PureObservable using (module Machine; module Driver; due)
+open import operation.PureObservable using (module Machine; module Driver)
 open Machine using (St; Ev; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; pend; CS; Scope;
                     Conf; ⟨_,_,_,_⟩; plug; dirs; scopeOf; subscribing; absorbed; rising; load; nx; cp;
                     Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody;
                     attAt; attached; free; cpAt; cutAt; overAt; search; found; Found; own;
                     Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM)
+open import adequacy.Weight using (W; prefixes)
 open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Trace using (depth)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Ty using (showPos; natᵗ)
-open import quickcheck.Tabled using (rows; short; concatMap; when; anyᵇ; allᵇ; listT)
+open import quickcheck.Tabled using (rows; short; concatMap; when; anyᵇ; listT)
 open import quickcheck.Entry-Check using (Kind; kout; kend; erase; sameRow; showRows; fullL; samePath; showPath)
 
 ------------------------------------------------------------------------
@@ -319,25 +320,12 @@ private
   ... | complete p     = [ p ]
   ... | drained        = []
 
-  -- A position and every proper non-empty prefix of it.
-  prefixes : Pos → List Pos
-  prefixes []      = []
-  prefixes (l ∷ q) = [ l ] ∷ mapL (l ∷_) (prefixes q)
-
   ksOf : List Pos → Pos → List Pos
   ksOf rws P = concatMap prefixes (concatMap (λ q → when ((q <ᵖ P) ∨ does (q ≟ᵖ P)) q) rws) ++ prefixes P
-
-  inKs : List Pos → Key → Bool
-  inKs ks (at q)    = anyᵇ (λ r → does (q ≟ᵖ r)) ks
-  inKs ks (after _) = false
 
   aheadN : Key → List Pos → ℕ
   aheadN κ []       = 0
   aheadN κ (q ∷ qs) = if κ <ᴷ at q then suc (aheadN κ qs) else aheadN κ qs
-
-  sumL : List ℕ → ℕ
-  sumL []       = 0
-  sumL (n ∷ ns) = n + sumL ns
 
   -- Every mark key in a tree, a joiner's whole inbox included.
   mutual
@@ -359,73 +347,6 @@ private
     keysL []       = []
     keysL (s ∷ ls) = keysS s ++ keysL ls
 
-  -- The candidate potential.
-  module Pot (ks : List Pos) (P : Pos) where
-    wt : ℕ → Key → ℕ
-    wt d κ = if inKs ks κ ∨ not (κ <ᴷ at P) then 0 else 2 + d
-
-    syn : ∀ {Γ A} → ℕ → Obs Timeline Γ A → ℕ
-    syn d (cold _)          = 3 + d
-    syn d empty             = 3 + d
-    syn d (of _)            = 3 + d
-    syn d (map _ s)         = 1 + syn (suc d) s
-    syn d (scan _ _ s)      = 1 + syn (suc d) s
-    syn d (takeWhile _ _ s) = 1 + 2 * (2 + d) + (3 + d) + syn (2 + d) s
-    syn d (flatMap _ _ s)   = 1 + (3 + d) + syn (2 + d) s
-    syn d (connect s b)     = 1 + 3 * (2 + d) + syn (suc d) b + syn (suc d) s
-    syn d (connected _)     = 3 + d
-    syn d (defer _)         = 1
-
-    isNone : Maybe Pos → Bool
-    isNone nothing  = true
-    isNone (just _) = false
-
-    connPot : ∀ {Γ X} → ℕ → CS Γ X → ℕ
-    connPot d k = bodyP (CS.bodyAt k) + one (not (isNone (CS.attSrc k))) + one (not (isNone (CS.owedAt k)))
-                + one (CS.srcLive k ∧ isNone (CS.owedAt k))
-      where
-        one : Bool → ℕ
-        one b = if b then 2 + d else 0
-        bodyP : Maybe Pos → ℕ
-        bodyP (just p) = wt d (at (p ++ [ ix 1 ])) + (2 + d)
-        bodyP nothing  = 0
-
-    mutual
-      pot : ∀ {Γ A} → ℕ → St Γ A → ℕ
-      pot d (pend o q)               = syn d o
-      pot d (coldS b l) with due l
-      ... | just κ                   = wt d κ
-      ... | nothing                  = 0
-      pot d (ofS i p [])             = wt d (at (p ++ [ last ]))
-      pot d (ofS i p (_ ∷ _))        = wt d (at (p ++ [ ix i ]))
-      pot d doneS                    = 0
-      pot d (mapS _ s)               = pot (suc d) s
-      pot d (scanS _ _ s)            = pot (suc d) s
-      pot d (cutS _ (attAt _) s)     = (2 + d) + pot (suc d) s
-      pot d (cutS _ attached s)      = pot (suc d) s
-      pot d (lnS _ s)                = pot (suc d) s
-      pot d (takeS _ _ free s)       = 2 * (2 + d) + pot (suc d) s
-      pot d (takeS _ _ (cpAt p) s)   = wt d (at (p ++ [ last ])) + (2 + d) + pot (suc d) s
-      pot d (takeS _ _ (cutAt _) s)  = (2 + d) + pot (suc d) s
-      pot d (takeS _ _ (overAt _) s) = pot (suc d) s
-      pot d (flatS _ _ _ _ _ o ls)   = pot (suc d) o + potL (suc d) ls
-      pot d (connS k o b)            = connPot d k + pot (suc d) o + pot (suc d) b
-      pot d (joinS j g x ib)         = sumL (mapL (λ e → wt d (at (proj₁ e))) ib)
-
-      potL : ∀ {Γ A} → ℕ → List (St Γ A) → ℕ
-      potL d []       = 0
-      potL d (s ∷ ls) = pot d s + potL d ls
-
-    extra : Conf ℕ → ℕ
-    extra ⟨ c , s , rising _ , _ ⟩ = length (dirs c)
-    extra ⟨ c , s , absorbed , _ ⟩ with search top (plug c s)
-    ... | just (found (_ , _ , c′ , _) _ κ) = if inKs ks κ then 2 + length (dirs c′) else 0
-    ... | nothing                           = 0
-    extra _ = 0
-
-    W : Conf ℕ → ℕ
-    W k = pot 0 (plug (Conf.ctx k) (Conf.foc k)) + extra k
-
   -- A settled-free step: a mark keyed before the run's position.
   early : Conf ℕ → Maybe Key
   early ⟨ c , s , absorbed , p ⟩ = nothing
@@ -446,11 +367,13 @@ private
   note true  l (meas fs n st) = meas (fs ++ [ l ]) n st
   note false l m              = m
 
-  judge : ℕ → List Pos → Pos → Conf ℕ → Conf ℕ → Meas → Meas
-  judge t rws P k k′ m = still (aheadN (clockOf k) ks) (aheadN (clockOf k′) ks) (tagIf (bad (early k)) "KEY" (note (bad (early k)) keyLine m))
+  -- `tg` names the listing: the rows at or before P (exact), or every row
+  -- listed (wide), as `adequacy.Complete` lets any cover stand.
+  judge : Bool → String → ℕ → List Pos → Pos → Conf ℕ → Conf ℕ → Meas → Meas
+  judge main tg t ks P k k′ m = still (aheadN (clockOf k) ks) (aheadN (clockOf k′) ks) (tagIf (main ∧ bad (early k)) "KEY" (note (main ∧ bad (early k)) keyLine m))
     where
-      ks = ksOf rws P
-      open Pot ks P using (W)
+      tick : Bool → ℕ → ℕ
+      tick b n = if b then suc n else n
       tagIf : Bool → String → Meas → Meas
       tagIf true  x m′ = record m′ { tags = x ∷ Meas.tags m′ }
       tagIf false x m′ = m′
@@ -463,20 +386,20 @@ private
       keyLine = "KEY step " +++ showℕ t +++ " " +++ stepKind k +++ " at " +++ showPos (Conf.pos k) +++ " has a mark " +++ showE (early k)
       still : ℕ → ℕ → Meas → Meas
       still a₀ a₁ m′ with a₀ <ᵇ a₁ | a₁ ≡ᵇ a₀
-      ... | true | _     = tagIf true "AROSE" (note true ("AROSE step " +++ showℕ t +++ " " +++ stepKind k +++ " A " +++ showℕ a₀ +++ " then " +++ showℕ a₁) m′)
+      ... | true | _     = tagIf true (tg +++ "AROSE") (note true (tg +++ "AROSE step " +++ showℕ t +++ " " +++ stepKind k +++ " A " +++ showℕ a₀ +++ " then " +++ showℕ a₁) m′)
       ... | _    | false = m′
-      ... | _    | true  with W k ≤ᵇ W k′
-      ...   | false = record m′ { stills = suc (Meas.stills m′) }
-      ...   | true  = record (note true ("STUCK step " +++ showℕ t +++ " " +++ stepKind k +++ " clock " +++ showKey (clockOf k)
+      ... | _    | true  with W ks P k ≤ᵇ W ks P k′
+      ...   | false = record m′ { stills = tick main (Meas.stills m′) }
+      ...   | true  = record (note true (tg +++ "STUCK step " +++ showℕ t +++ " " +++ stepKind k +++ " clock " +++ showKey (clockOf k)
                                         +++ " then " +++ stepKind k′ +++ " clock " +++ showKey (clockOf k′)
-                                        +++ " W " +++ showℕ (W k) +++ " then " +++ showℕ (W k′)) m′)
-                             { stills = suc (Meas.stills m′) ; tags = ("STUCK " +++ stepKind k) ∷ Meas.tags m′ }
+                                        +++ " W " +++ showℕ (W ks P k) +++ " then " +++ showℕ (W ks P k′)) m′)
+                             { stills = tick main (Meas.stills m′) ; tags = (tg +++ "STUCK " +++ stepKind k) ∷ Meas.tags m′ }
 
   walkM : List Pos → ℕ → ℕ → List Pos → Conf ℕ → Meas → Meas
   walkM rws zero    t sh       k m = m
   walkM rws (suc n) t []       k m = m
   walkM rws (suc n) t (P ∷ sh) k m with step k
-  ... | silent _ k′    = walkM rws n (suc t) (P ∷ sh) k′ (judge t rws P k k′ m)
+  ... | silent _ k′    = walkM rws n (suc t) (P ∷ sh) k′ (judge true "" t (ksOf rws P) P k k′ (judge false "WIDE " t (ksOf rws P ++ concatMap prefixes rws) P k k′ m))
   ... | value _ _ _ k′ = walkM rws n (suc t) sh k′ m
   ... | complete _     = m
   ... | drained        = m

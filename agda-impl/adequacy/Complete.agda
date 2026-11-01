@@ -13,6 +13,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _<?_; s≤s; z≤n)
+open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred; <-≤-trans; n≮0; m≤n⇒m≤1+n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
@@ -34,6 +35,7 @@ open import adequacy.Rows using (≼-≢; Steps; conv; Vis; Past; Lowest; Beyond
   val; fin)
 open _≃_
 open import adequacy.Simulation using (Simulation; quiet-root)
+open import adequacy.Weight using (W; anc)
 
 -- `a` no later than `b`.
 record _⊑_ (a b : Key) : Set where
@@ -80,10 +82,9 @@ Clock k with Conf.mode k | Machine.next k
 ... | absorbed | just κ = κ
 ... | _        | _      = at (Conf.pos k)
 
--- `k′` a silent step on from `k`, its clock passing no row of `t` at or
--- before `p`.
-Still : ∀ {R} → EmissionSet R → Pos → Conf R → Conf R → Set₁
-Still t p k′ k = k′ ⇜ k × (∀ {q e} → t q e → q ≼ p → Clock k <ᴷ at q ≡ true → Clock k′ <ᴷ at q ≡ true)
+-- `k′` a silent step on from `k`, its clock passing no listed position.
+Still : ∀ {R} → List Pos → Conf R → Conf R → Set₁
+Still ks k′ k = k′ ⇜ k × (∀ {q} → q ∈ ks → Clock k <ᴷ at q ≡ true → Clock k′ <ᴷ at q ≡ true)
 
 -- Of `qs`, those strictly past `κ`.
 ahead : Key → List Pos → ℕ
@@ -123,11 +124,25 @@ postulate
   clock-mono : ∀ {R} (o : PureObs [] R) {rs k k′ p e} → Path (load o) rs k
              → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ]) → k′ ⇜ k → Clock k ⊑ Clock k′
 
-  -- STILL STEPS ARE FEW: short of a row a reader meets next, a run whose
-  -- clock passes no row at or before it takes finitely many steps — the
-  -- climbs, the subscribes, and the marks of what nothing above shows.
-  still-finite : ∀ {R} (o : PureObs [] R) {rs k p e} → Path (load o) rs k
-               → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ]) → Acc (Still (enter (⟦ o ⟧ []ᴬ) root) p) k
+  -- STILL STEPS LIGHTEN: short of a row a reader meets next, a step whose
+  -- clock passes no row at or before it, nor any ancestor of one, lowers
+  -- the run's weight — a climb by its height, a subscribe by its syntax,
+  -- the run of a mark nothing above shows by the mark.
+  still-lowers : ∀ {R} (o : PureObs [] R) {rs k k′ p e} → Path (load o) rs k
+               → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+               → ∀ ks → (∀ {q e′} → enter (⟦ o ⟧ []ᴬ) root q e′ → q ≼ p → q ∈ ks)
+               → Still (ks ++ anc ks) k′ k → W (anc ks) p k′ < W (anc ks) p k
+
+-- STILL STEPS ARE FEW: short of a row a reader meets next, a run whose
+-- clock passes no row at or before it, nor any ancestor of one, takes
+-- finitely many steps.
+still-finite : ∀ {R} (o : PureObs [] R) {rs k p e} → Path (load o) rs k
+             → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+             → ∀ ks → (∀ {q e′} → enter (⟦ o ⟧ []ᴬ) root q e′ → q ≼ p → q ∈ ks) → Acc (Still (ks ++ anc ks)) k
+still-finite o {rs} {k} {p} pth₀ m ks cov = go (<-wellFounded (W (anc ks) p k)) pth₀
+  where
+    go : ∀ {k} → Acc _<_ (W (anc ks) p k) → Path (load o) rs k → Acc (Still (ks ++ anc ks)) k
+    go (acc r) pth = acc λ st → go (r (still-lowers o pth m ks cov st)) (pth ▸τ proj₁ st)
 
 module _ {R : Set} (o : PureObs [] R) (S : Simulation o) where
   open Simulation S using (I; T; i₀; t₀; dry) renaming (tau to simτ; val to simval; fin to simfin)
@@ -209,36 +224,39 @@ module _ {R : Set} (o : PureObs [] R) (S : Simulation o) where
     --   so most silent steps drop no row and the measure never moves; a
     --   strengthened `Moves.silent` tracking dropped rows would fuel nothing.
     silent-finite : ∀ {rs k p e} → Path (load o) rs k → Meets t (conv rs ++ [ (p , e) ]) → Acc _⇜_ k
-    silent-finite {rs} {k₀} {p} {e} pth₀ m = fuel _ ≤-refl (still-finite o pth₀ m) pth₀
+    silent-finite {rs} {k₀} {p} {e} pth₀ m = fuel _ ≤-refl (still-finite o pth₀ m ks₀ listed₀) pth₀
       where
         few = proj₂ (proj₁ (last {c = nothing} (conv rs) m))
 
+        ks₀ : List Pos
+        ks₀ = p ∷ proj₁ few
+
         ks : List Pos
-        ks = p ∷ proj₁ few
+        ks = ks₀ ++ anc ks₀
 
         μ : Conf R → ℕ
         μ k = ahead (Clock k) ks
 
-        listed : ∀ {q e′} → t q e′ → q ≼ p → q ∈ ks
-        listed {q} tq le with q ≟ᵖ p
+        listed₀ : ∀ {q e′} → t q e′ → q ≼ p → q ∈ ks₀
+        listed₀ {q} tq le with q ≟ᵖ p
         ... | yes refl = here refl
         ... | no ne    = there (proj₂ few tq (≼-≢ le ne))
 
         mutual
-          fuel : ∀ n {k} → μ k ≤ n → Acc (Still t p) k → Path (load o) rs k → Acc _⇜_ k
+          fuel : ∀ n {k} → μ k ≤ n → Acc (Still ks) k → Path (load o) rs k → Acc _⇜_ k
           fuel n {k} le (acc rec) pth = acc λ {k′} st → on n le rec pth st (μ k′ <? μ k)
 
-          on : ∀ n {k k′} → μ k ≤ n → (∀ {k″} → Still t p k″ k → Acc (Still t p) k″) → Path (load o) rs k → k′ ⇜ k
+          on : ∀ n {k k′} → μ k ≤ n → (∀ {k″} → Still ks k″ k → Acc (Still ks) k″) → Path (load o) rs k → k′ ⇜ k
              → Dec (μ k′ < μ k) → Acc _⇜_ k′
           on zero    le _ _ _ (yes lt) = ⊥-elim (n≮0 (<-≤-trans lt le))
-          on (suc n) le _ pth st (yes lt) = fuel n (≤-pred (≤-trans lt le)) (still-finite o (pth ▸τ st) m) (pth ▸τ st)
+          on (suc n) le _ pth st (yes lt) = fuel n (≤-pred (≤-trans lt le)) (still-finite o (pth ▸τ st) m ks₀ listed₀) (pth ▸τ st)
           on n {k} {k′} le rec pth st (no ¬lt) = fuel n (≤-trans (ahead-mono h ks) le) (rec (st , kept)) (pth ▸τ st)
             where
               h = clock-mono o pth m st
-              kept : ∀ {q e′} → t q e′ → q ≼ p → Clock k <ᴷ at q ≡ true → Clock k′ <ᴷ at q ≡ true
-              kept {q} tq le′ c with Clock k′ <ᴷ at q in e′
+              kept : ∀ {q} → q ∈ ks → Clock k <ᴷ at q ≡ true → Clock k′ <ᴷ at q ≡ true
+              kept {q} mq c with Clock k′ <ᴷ at q in e′
               ... | true  = refl
-              ... | false = ⊥-elim (¬lt (ahead-drop h (listed tq le′) c e′))
+              ... | false = ⊥-elim (¬lt (ahead-drop h mq c e′))
 
     progress : ∀ {rs k p e} → Path (load o) rs k → Meets t (conv rs ++ [ (p , e) ]) → Next k p e
     progress {rs} pth m =
