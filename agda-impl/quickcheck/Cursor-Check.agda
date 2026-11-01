@@ -52,7 +52,7 @@ open Machine using (St; Ev; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; fl
                     Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody;
                     attAt; attached; free; cpAt; cutAt; overAt; search; found; Found; own;
                     Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM)
-open import adequacy.Weight using (Clock; W; prefixes)
+open import adequacy.Weight using (Clock; W; Wᶜ; prefixes)
 open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Trace using (depth)
 open import quickcheck.Quickcheck using (program)
@@ -293,13 +293,9 @@ probe n seed = let p = program seed in go (depth 3 p) n 0 (probing [] nothing no
 --
 -- P is the next row the root shows.  KS is the root's rows at or before P
 -- and every ancestor of each.  A counts KS strictly past the clock; a
--- silent step leaving A where it was is STILL.  W is a candidate
--- potential every still step must lower: each pending subscription's
--- syntax (a defer is one), weighted by depth; each admin mark, pending or
--- owed, and each mark keyed outside KS and before P, at depth + 2; the
--- depth of a rise; and, once absorbed with a KS mark next, that mark's
--- depth + 2.  A mark at or past P runs only as the clock passes P, so
--- never on a still step.
+-- silent step leaving A where it was is STILL.  Every still step must
+-- lower `adequacy.Weight.W`, both weighed at the clock the step starts
+-- from.
 --
 -- Reported, never failed: a step whose A rose; a still step whose W did
 -- not fall, with its kind; a settled-free step (subscribing or rising)
@@ -383,11 +379,11 @@ private
       still a₀ a₁ m′ with a₀ <ᵇ a₁ | a₁ ≡ᵇ a₀
       ... | true | _     = tagIf true (tg +++ "AROSE") (note true (tg +++ "AROSE step " +++ showℕ t +++ " " +++ stepKind k +++ " A " +++ showℕ a₀ +++ " then " +++ showℕ a₁) m′)
       ... | _    | false = m′
-      ... | _    | true  with W ks P k ≤ᵇ W ks P k′
+      ... | _    | true  with W ks P k ≤ᵇ Wᶜ ks P (Clock k) k′
       ...   | false = tagIf main ("still " +++ stepKind k) (record m′ { stills = tick main (Meas.stills m′) })
       ...   | true  = record (note true (tg +++ "STUCK step " +++ showℕ t +++ " " +++ stepKind k +++ " clock " +++ showKey (Clock k)
                                         +++ " then " +++ stepKind k′ +++ " clock " +++ showKey (Clock k′)
-                                        +++ " W " +++ showℕ (W ks P k) +++ " then " +++ showℕ (W ks P k′)) m′)
+                                        +++ " W " +++ showℕ (W ks P k) +++ " then " +++ showℕ (Wᶜ ks P (Clock k) k′)) m′)
                              { stills = tick main (Meas.stills m′) ; tags = (tg +++ "STUCK " +++ stepKind k) ∷ (if main then ("still " +++ stepKind k) ∷ Meas.tags m′ else Meas.tags m′) }
 
   walkM : List Pos → ℕ → ℕ → List Pos → Conf ℕ → Meas → Meas

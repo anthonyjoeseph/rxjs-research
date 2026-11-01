@@ -14,7 +14,7 @@ open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _<?_; s≤s; z≤n)
 open import Data.Nat.Induction using (<-wellFounded)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred; <-≤-trans; n≮0; m≤n⇒m≤1+n)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred; <-≤-trans; ≤-<-trans; n≮0; m≤n⇒m≤1+n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Induction.WellFounded using (Acc; acc)
@@ -35,7 +35,7 @@ open import adequacy.Rows using (≼-≢; Steps; conv; Vis; Past; Lowest; Beyond
   val; fin)
 open _≃_
 open import adequacy.Simulation using (Simulation; quiet-root)
-open import adequacy.Weight using (Clock; W; anc)
+open import adequacy.Weight using (Clock; W; Wᶜ; Wᶜ-kept; anc)
 
 -- `a` no later than `b`.
 record _⊑_ (a b : Key) : Set where
@@ -117,14 +117,24 @@ postulate
   clock-mono : ∀ {R} (o : PureObs [] R) {rs k k′ p e} → Path (load o) rs k
              → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ]) → k′ ⇜ k → Clock k ⊑ Clock k′
 
-  -- STILL STEPS LIGHTEN: short of a row a reader meets next, a step whose
-  -- clock passes no row at or before it, nor any ancestor of one, lowers
-  -- the run's weight — a climb by its height, a subscribe by its syntax,
-  -- the run of a mark nothing above shows by the mark.
-  still-lowers : ∀ {R} (o : PureObs [] R) {rs k k′ p e} → Path (load o) rs k
-               → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
-               → ∀ ks → (∀ {q e′} → enter (⟦ o ⟧ []ᴬ) root q e′ → q ≼ p → q ∈ ks)
-               → Still (ks ++ anc ks) k′ k → W (ks ++ anc ks) p k′ < W (ks ++ anc ks) p k
+  -- STILL STEPS LIGHTEN, WEIGHED AT THE CLOCK THEY START FROM: short of a
+  -- row a reader meets next, a step whose clock passes no row at or before
+  -- it, nor any ancestor of one, lowers the run's weight — a climb by its
+  -- height, a subscribe by its syntax, the run of a mark nothing above
+  -- shows by the mark.
+  still-lightens : ∀ {R} (o : PureObs [] R) {rs k k′ p e} → Path (load o) rs k
+                 → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+                 → ∀ ks → (∀ {q e′} → enter (⟦ o ⟧ []ᴬ) root q e′ → q ≼ p → q ∈ ks)
+                 → Still (ks ++ anc ks) k′ k → Wᶜ (ks ++ anc ks) p (Clock k) k′ < W (ks ++ anc ks) p k
+
+-- STILL STEPS LIGHTEN: a still step's clock leaves every listed row ahead
+-- that was, so no mark weighs more at the clock it ends on.
+still-lowers : ∀ {R} (o : PureObs [] R) {rs k k′ p e} → Path (load o) rs k
+             → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+             → ∀ ks → (∀ {q e′} → enter (⟦ o ⟧ []ᴬ) root q e′ → q ≼ p → q ∈ ks)
+             → Still (ks ++ anc ks) k′ k → W (ks ++ anc ks) p k′ < W (ks ++ anc ks) p k
+still-lowers o {k′ = k′} {p} pth m ks cov (st , kept) =
+  ≤-<-trans (Wᶜ-kept (ks ++ anc ks) p kept k′) (still-lightens o pth m ks cov (st , kept))
 
 -- STILL STEPS ARE FEW: short of a row a reader meets next, a run whose
 -- clock passes no row at or before it, nor any ancestor of one, takes

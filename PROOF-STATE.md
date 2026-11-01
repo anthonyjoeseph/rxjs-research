@@ -38,11 +38,11 @@ Members: `rise-outer-nx`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`, `sub-
 
 Short of a row a reader meets next, a run is fuelled by the listed rows
 and their ancestors strictly past its clock, and between them by
-`adequacy.Weight`. Open: a step-by-step proof that a still step lowers the
-weight, and that the clock never runs back; the cursor probe finds
+`adequacy.Weight`. Open: that a still step lowers the weight at the clock
+it starts from, and that the clock never runs back; the cursor probe finds
 neither failing. Settled by bodies.
 
-Members: `clock-mono`, `still-lowers`.
+Members: `still-lightens`, `clock-mono`.
 
 #### THE COLD STEPPED
 
