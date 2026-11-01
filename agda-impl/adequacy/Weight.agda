@@ -35,12 +35,13 @@ open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLan
                     Conf; ⟨_,_,_,_⟩; plug; dirs; subscribing; absorbed; rising;
                     attAt; attached; free; cpAt; cutAt; overAt)
 
--- THE RUN'S CLOCK: the least mark due once everything is absorbed; mid-run,
--- where the run is.
+-- THE RUN'S CLOCK: the least mark due once everything is absorbed, past
+-- every key once nothing is; mid-run, where the run is.
 Clock : ∀ {R} → Conf R → Key
 Clock k with Conf.mode k | Machine.next k
-... | absorbed | just κ = κ
-... | _        | _      = at (Conf.pos k)
+... | absorbed | just κ  = κ
+... | absorbed | nothing = after []
+... | _        | _       = at (Conf.pos k)
 
 -- A listed position.
 listed : List Pos → Key → Bool

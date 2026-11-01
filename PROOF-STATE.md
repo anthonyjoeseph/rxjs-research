@@ -52,11 +52,12 @@ Members: `tick-row`.
 
 #### THE CLOCK AHEAD
 
-No mark is due before the run's clock. Open: that the clock never runs
-back over a silent step, and a source's feed comes due no sooner than a
-level down. Settled by an engine key invariant beside `stamped`.
+The clock never runs back: proven step by step over two engine key facts.
+Open: that mid-run no mark is keyed before the run's whole subtree is
+past, and a joiner's inbox stays in key order. Settled by an invariant
+beside `stamped`.
 
-Members: `clock-mono`, `fed-ahead`.
+Members: `floor`, `inbox-asc`.
 
 #### THE COLD STEPPED
 

@@ -22,7 +22,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong; subst)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Events using (Pos; root; ix; last; <ᵖ-below; <ᵖ-part; <ᵖ-ix; _≟ᵖ_; emit; stall; close; From∞; Frame)
+open import denotation.Events using (Pos; root; ix; last; <ᵖ-part; <ᵖ-ix; _≟ᵖ_; emit; stall; close; From∞; Frame)
 open import denotation.EmissionSet using (enter; ⟦_⟧; _≼_)
 open import denotation.Read using (Meets) renaming (cursor to cursorᴿ)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; opening; due; Tape; rest; play; ending) renaming (over to overT)
@@ -35,6 +35,7 @@ open import adequacy.Weight using (Clock; W; Wᶜ; anc; prefixes; listed; depth;
 open import adequacy.Dispatch using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-least; found-plug; cursor)
 open import adequacy.Path using (Path; Still; _⇜_)
 open import adequacy.Stamped using (frame-ahead; opening-ahead; pend-focus)
+open import adequacy.Floor using (fed-ahead; below)
 open import adequacy.Simulation using (Simulation; module Along)
 open import adequacy.Cursor using (settled)
 import adequacy.Walk as Walk
@@ -42,10 +43,6 @@ open import adequacy.Walk using (due-≈)
 open import adequacy.Bound using (bound)
 open _≃_ using (from)
 open import denotation.Laws.Modulus using (≼-false)
-
--- A position's child keyed strictly after it.
-below : ∀ q {l} → at q <ᴷ at (q ++ [ l ]) ≡ true
-below q = trans (at-<ᴷ q _) (<ᵖ-below q [])
 
 -- A position's first child keyed before its second.
 part : ∀ q → at (q ++ [ ix 0 ]) <ᴷ at (q ++ [ ix 1 ]) ≡ true
@@ -77,12 +74,6 @@ postulate
              → Path (load o) rs ⟨ inSrc k b c , s , rising ε , q ⟩
              → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
              → Σ _ λ e′ → enter (⟦ o ⟧ []ᴬ) root (q ++ [ ix 0 ]) e′ × (q ++ [ ix 0 ]) ≼ p
-
-  -- A SOURCE'S FEED COMES DUE NO SOONER: once a source has risen, every
-  -- mark is due no earlier than the row a level down.
-  fed-ahead : ∀ {R} (o : PureObs [] R) {rs Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {s ε q k′}
-            → Path (load o) rs ⟨ inSrc k b c , s , rising ε , q ⟩ → k′ ⇜ ⟨ inSrc k b c , s , rising ε , q ⟩
-            → Clock k′ <ᴷ at (q ++ [ ix 0 ]) ≡ false
 
   -- A COLD'S TICK IS A ROW: short of a row a reader meets next, a cold an
   -- open observer hears plays its due at a row at or before it, or at an

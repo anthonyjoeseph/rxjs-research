@@ -36,6 +36,7 @@ open _≃_
 open import adequacy.Simulation using (Simulation; quiet-root; module Along)
 open import adequacy.Weight using (Clock; W; Wᶜ-kept; anc)
 open import adequacy.Lighten using (still-lightens)
+open import adequacy.Floor using (clock-mono)
 open import adequacy.Path using (_⊑_; ⊑i; ⊑-trans; Path; []; tau; val; _▸_; then; Next; more; done; _⇜_; _▸τ_; Still)
 
 -- Of `qs`, those strictly past `κ`.
@@ -65,16 +66,6 @@ ahead-drop {κ} {κ′} {qs = r ∷ _} h (there m) p n with κ′ <ᴷ at r in e
 ... | true  | false = ⊥-elim (clash (past-earlier r h e′) e)
 ... | false | true  = m≤n⇒m≤1+n (ahead-drop h m p n)
 ... | false | false = ahead-drop h m p n
-
-postulate
-  -- THE CLOCK NEVER RUNS BACK: short of a row a reader meets next, a silent
-  -- step's clock is no earlier.  Mid-run the run's position leads every
-  -- mark due, and every mark a step makes lies at or past it.
-  -- DEAD ROUTE: the least mark due as the clock throughout.  A lane begun
-  --   by an outer's value makes marks under that value, before the outer's
-  --   next mark, so mid-run the least key falls.
-  clock-mono : ∀ {R} (o : PureObs [] R) {rs k k′ p e} → Path (load o) rs k
-             → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ]) → k′ ⇜ k → Clock k ⊑ Clock k′
 
 -- STILL STEPS LIGHTEN: a still step's clock leaves every listed row ahead
 -- that was, so no mark weighs more at the clock it ends on.
@@ -181,7 +172,7 @@ module _ {R : Set} (o : PureObs [] R) (S : Simulation o) where
           on (suc n) le _ pth st (yes lt) = fuel n (≤-pred (≤-trans lt le)) (still-finite o (pth ▸τ st) m ks₀ listed₀) (pth ▸τ st)
           on n {k} {k′} le rec pth st (no ¬lt) = fuel n (≤-trans (ahead-mono h ks) le) (rec (st , kept)) (pth ▸τ st)
             where
-              h = clock-mono o pth m st
+              h = clock-mono o pth st
               kept : ∀ {q} → q ∈ ks → Clock k <ᴷ at q ≡ true → Clock k′ <ᴷ at q ≡ true
               kept {q} mq c with Clock k′ <ᴷ at q in e′
               ... | true  = refl
