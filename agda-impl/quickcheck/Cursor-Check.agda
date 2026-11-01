@@ -44,14 +44,14 @@ open import IO.Primitive.Finite using (putStrLn)
 open import Relation.Nullary using (does)
 
 open import Tree using (Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Events using (Pos; Timeline; ix; last; _<ᵖ_; _≟ᵖ_)
+open import denotation.Events using (Pos; Timeline; ix; last; _<ᵖ_; _≟ᵖ_; close; From∞)
 open import operation.Key using (Key; at; after; _<ᴷ_)
-open import operation.PureObservable using (module Machine; module Driver)
+open import operation.PureObservable using (module Machine; module Driver; play; rest; due)
 open Machine using (St; Ev; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; pend; CS; Scope;
                     Conf; ⟨_,_,_,_⟩; plug; dirs; scopeOf; subscribing; absorbed; rising; load; nx; cp;
                     Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody;
                     attAt; attached; free; cpAt; cutAt; overAt; search; found; Found; own;
-                    Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM)
+                    Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM; closed)
 open import adequacy.Weight using (Clock; W; Wᶜ; prefixes)
 open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Trace using (depth)
@@ -386,11 +386,34 @@ private
                                         +++ " W " +++ showℕ (W ks P k) +++ " then " +++ showℕ (Wᶜ ks P (Clock k) k′)) m′)
                              { stills = tick main (Meas.stills m′) ; tags = (tg +++ "STUCK " +++ stepKind k) ∷ (if main then ("still " +++ stepKind k) ∷ Meas.tags m′ else Meas.tags m′) }
 
+  -- The least mark a still run spends: never past the row met next, an
+  -- open cold's tick listed, a close's next frame due past it.
+  marks : ℕ → List Pos → Pos → Conf ℕ → Meas → Meas
+  marks t ks P ⟨ c , s , absorbed , _ ⟩ m with search top (plug c s)
+  ... | nothing = m
+  ... | just (found (_ , _ , c′ , s′) mk κ) = flag (at P <ᴷ κ) "PAST" (tick s′ m)
+    where
+      flag : Bool → String → Meas → Meas
+      flag false x m′ = m′
+      flag true  x m′ = record m′ { lines = Meas.lines m′ ++ [ x +++ " step " +++ showℕ t +++ " " +++ markName mk +++ " key " +++ showKey κ +++ " row " +++ showPos P ]
+                                  ; tags = x ∷ Meas.tags m′ }
+      ahead : Maybe Key → Bool
+      ahead (just κ′) = κ <ᴷ κ′
+      ahead nothing   = true
+      tick : ∀ {Γ A} → St Γ A → Meas → Meas
+      tick (coldS b (play τ u i t′ (close f))) m′ =
+        flag (not (ahead (due (rest τ (u ++ [ last ]) (From∞.force f))))) "BEHIND"
+             (flag (not (closed c′) ∧ not (anyᵇ (λ r → does ((u ++ [ ix i ]) ≟ᵖ r)) ks)) "UNLISTED" m′)
+      tick (coldS b (play τ u i t′ fr)) m′ =
+        flag (not (closed c′) ∧ not (anyᵇ (λ r → does ((u ++ [ ix i ]) ≟ᵖ r)) ks)) "UNLISTED" m′
+      tick _ m′ = m′
+  marks t ks P k m = m
+
   walkM : List Pos → ℕ → ℕ → List Pos → Conf ℕ → Meas → Meas
   walkM rws zero    t sh       k m = m
   walkM rws (suc n) t []       k m = m
   walkM rws (suc n) t (P ∷ sh) k m with step k
-  ... | silent _ k′    = walkM rws n (suc t) (P ∷ sh) k′ (judge true "" t (ksOf rws P) P k k′ (judge false "WIDE " t (ksOf rws P ++ concatMap prefixes rws) P k k′ m))
+  ... | silent _ k′    = walkM rws n (suc t) (P ∷ sh) k′ (marks t (ksOf rws P) P k (judge true "" t (ksOf rws P) P k k′ (judge false "WIDE " t (ksOf rws P ++ concatMap prefixes rws) P k k′ m)))
   ... | value _ _ _ k′ = walkM rws n (suc t) sh k′ m
   ... | complete _     = m
   ... | drained        = m
