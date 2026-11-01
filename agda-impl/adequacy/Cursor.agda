@@ -94,12 +94,13 @@ vis cp     = _
 Rgn : Set₁
 Rgn = Pos → Set
 
--- A frozen entry is a meaning: one visible row at a position, each inside
--- its subtree's region.
+-- A frozen entry is a meaning: one visible row at a position, none past
+-- its end, each inside its subtree's region.
 record Sound {A} (Rg : Rgn) (E : EmissionSet A) : Set where
   field
-    fn : ∀ {y e e′} → E y e → E y e′ → Visible e → Visible e′ → e ≡ e′
-    rg : ∀ {y e} → E y e → Visible e → Rg y
+    fn   : ∀ {y e e′} → E y e → E y e′ → Visible e → Visible e′ → e ≡ e′
+    ends : ∀ {c y e} → E c end → E y e → Visible e → y ≼ c
+    rg   : ∀ {y e} → E y e → Visible e → Rg y
 
 -- A subscription at `q` whose world lies in the region.
 Within : ∀ {Γ} → Rgn → Scope Γ → Pos → Set

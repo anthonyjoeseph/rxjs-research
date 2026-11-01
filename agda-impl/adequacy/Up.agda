@@ -8,9 +8,9 @@
 -- with nothing delivered.
 module adequacy.Up where
 
-open import Data.Bool using (T; true; false; _∧_)
-open import Data.Empty using (⊥)
-open import Data.List using ([]; _∷_; [_])
+open import Data.Bool using (T; true; false; _∧_; not; _∨_)
+open import Data.Empty using (⊥; ⊥-elim)
+open import Data.List using ([]; _∷_; [_]; _++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (lookup) renaming (_∷_ to _∷ᴬ_; [] to []ᴬ)
@@ -20,17 +20,19 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym
 open import Relation.Nullary using (¬_)
 open import Data.Maybe using (just)
 
-open import denotation.Events using (Pos)
+open import denotation.Events using (Pos; ix; Timeline)
+open import Tree using (Obs)
 open import denotation.Read using (Visible)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; _≺_; Den; hot; coldAt; DenEnv; shown; heard; ended; late;
+open import denotation.EmissionSet using (EmissionSet; Ev; out; end; Proper; _≺_; Den; hot; coldAt; DenEnv; shown; heard; ended; late;
   module TakeWhile; module Connecting)
-open import denotation.Laws.Modulus using (≺→≼; ≺-trans)
+open import denotation.Laws.Modulus using (≺→≼; ≺-trans; ≺-irrefl)
 open import denotation.Laws.Worlds using (Hots)
 open import operation.PureObservable using (module Machine)
-open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; binds; CS; scopeOf; connS; rising; nx; cp; inBody) renaming (Ev to Evᴹ)
-open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans; ≼-≢; full)
+open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; binds; CS; scopeOf; connS; rising; nx; cp; inBody; inSrc; feed; rise; moved; shutAt; absorbed) renaming (Ev to Evᴹ)
+open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans; ≃-refl; ≼-≢; full; Frozen; pendRows; Moves; silent; toEv)
 open _≃_
-open import adequacy.Cursor using (bef; aft; Pol; Runs; Start; Ahead; Whole; OuterDone; owes; Owes; Due; Spent; Unfed; Rgn;
+open import adequacy.Walk using (sync-≈)
+open import adequacy.Cursor using (bef; aft; Need; lane; lanecut; _≈_; Inv; RT; c-abs; f-src; f-srcc; f-srcp; f-srcx; u-src; Pol; Runs; Start; Ahead; Whole; OuterDone; owes; Owes; Due; Spent; Unfed; Rgn;
   Sound; vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded;
   fd-none; fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; OweAt; o-cp;
   o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat;
@@ -235,3 +237,157 @@ module _ {R : Set} (Rt : EmissionSet R) where
   rise-body-cp : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s p} → CS.srcLive k ≡ true
                → SimC Rt ⟨ inBody k o c , s , rising cp , p ⟩ [] ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
   rise-body-cp lv = rise-body lv re-owe
+
+
+------------------------------------------------------------------------
+-- A SOURCE'S RISE: fed at once to its body's joiners.  Nothing leaves:
+-- a connect shows its body's rows only, so the connect and every frame
+-- above it move past `p`.
+
+-- No visible row at `p`.
+NoRow : ∀ {A} → EmissionSet A → Pos → Set
+NoRow E p = ∀ {e} → E p e → Visible e → ⊥
+
+-- A hole some live node reads.
+data Live : Need → Set where
+  l-owes : Live (owes true)
+  l-lane : Live (lane true)
+  l-cut  : Live (lanecut true)
+
+-- Nothing at `p`: owed past it as from it.
+due-nr : ∀ {A} {E : EmissionSet A} {p} → NoRow E p → Due (bef p) E ≃ Due (aft p) E
+due-nr {p = p} nr = (λ (y , v , o) → y , v , Past.owes-up p (λ { refl → nr y v }) o) ⇄ (λ (y , v , o) → y , v , Past.dn p o)
+
+-- A connect's visible rows are its body's.
+conn-vis : ∀ {A B} {r : Pos} {σ : EmissionSet A} {β : EmissionSet B} {y e} → Connecting.ConnT r σ β y e → Visible e → β y e
+conn-vis (Connecting.body x) _ = x
+conn-vis (Connecting.burst _ _) ()
+conn-vis (Connecting.echo _ _ _ _) ()
+conn-vis (Connecting.kept _ _ _ _) ()
+
+or-shut : ∀ {x y} → T x → x ∨ y ≡ false → ⊥
+or-shut {true} _ ()
+
+torn : ∀ {ℓ} {b} {X : Set ℓ} → T (not b) → T b → X
+torn {b = true}  () _
+torn {b = false} _  ()
+
+shut-live : ∀ {Γ X} {k : CS Γ X} {p} → T (CS.srcLive k) → shutAt p k ≡ record k { closed = true ; endAt = p }
+shut-live {k = k} t with CS.srcLive k | t
+... | true  | _ = refl
+... | false | ()
+
+shut-torn : ∀ {Γ X} {k : CS Γ X} {p} → T (not (CS.srcLive k)) → shutAt p k ≡ k
+shut-torn {k = k} t with CS.srcLive k | t
+... | true  | ()
+... | false | _ = refl
+
+-- A connect's parts, its flags moved.
+re-parts : ∀ {Γ X B} {sc : Scope Γ} {Rg} {k : CS Γ X} {β : EmissionSet B} {p}
+         → Parts sc Rg k β → Parts sc Rg (record k { closed = true ; endAt = p }) β
+re-parts pt = record { Rb = Parts.Rb pt ; Rs = Parts.Rs pt ; b⊆ = Parts.b⊆ pt ; s⊆ = Parts.s⊆ pt ; apart = Parts.apart pt
+                     ; clear = Parts.clear pt ; sb = Parts.sb pt ; ss = Parts.ss pt }
+
+module _ {R : Set} (Rt : EmissionSet R) where
+
+  postulate
+    -- THE FRAMES ABOVE A ROW THEY DO NOT SHOW: a hole whose region holds
+    -- `p` and whose entry has no visible row there, under binders none
+    -- of which has one, moves every frame above it past `p`, the root's
+    -- entry with no row there either.
+    fr-up : ∀ {Γ A} {c : Ctx R Γ A} {Rg w E p} → Live w → Fr Rt (bef p) Rg c w E → Rg p → NoRow E p
+          → ¬ VHot (full (scopeOf c)) p → Fr Rt (aft p) Rg c w E × NoRow Rt p
+    -- A BINDER'S ROW FED: the joiners of the innermost binder take its
+    -- row at `p` into their inboxes; the body, apart from `p`, owes the
+    -- same past it.
+    -- A feed appends at `p ⊕ [ sub j ]` and the inbox stays ascending:
+    -- the source's row is a lawful hot, none below another.
+    -- RECOVERY: git show 1745f869 restores rejoin-mono, good-full and lawful-at.
+    feed-up : ∀ {Γ X B} {sc : Scope Γ} {o : Obs Timeline Γ X} {q Rb} {b : St (X ∷ Γ) B} {β e p}
+            → Sync (binds o q sc) Rb (bef p) b β → Sound Rb β → ¬ Rb p
+            → Proper (pendRows (full sc) o (q ++ [ ix 1 ])) p (toEv e) → ¬ VHot (full sc) p
+            → Sync (binds o q sc) Rb (aft p) (feed (here refl) p e b) β
+
+  -- What a running source's row at `p` leaves of its connect.
+  module Fed {Γ X B} {k : CS Γ X} {c : Ctx R Γ B} {Rg E E′ β} {e : Evᴹ X} {p}
+             (fr : Fr Rt (bef p) Rg c (owes true) E′) (sc : CS.scope k ≡ scopeOf c) (pt : Parts (scopeOf c) Rg k β)
+             (lv : T (CS.srcLive k)) (fz : Frozen k ≈ E) (eq : Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′)
+             (row : E p (toEv e)) where
+
+    fk : Frozen k p (toEv e)
+    fk = proj₁ (from fz (row , vis e))
+
+    rs : Parts.Rs pt p
+    rs = Sound.rg (Parts.ss pt) fk (vis e)
+
+    nr : NoRow E′ p
+    nr y v = let (cy , v′) = from eq (y , v) in Parts.apart pt (Sound.rg (Parts.sb pt) (conn-vis cy v′) v′) rs
+
+    nh : ¬ VHot (full (scopeOf c)) p
+    nh hv = Parts.clear pt (vhot-hots (full (scopeOf c)) hv) (Parts.s⊆ pt rs)
+
+    -- the frames above, past `p`
+    lifted : Fr Rt (aft p) Rg c (owes true) E′ × NoRow Rt p
+    lifted = fr-up l-owes fr (Parts.s⊆ pt rs) nr nh
+
+    moves : Moves (RT Rt (bef p)) [] (RT Rt (aft p))
+    moves = silent ((λ (x , v) → to d x , v) ⇄ (λ (x , v) → from d x , v))
+      where d = due-nr {E = Rt} (proj₂ lifted)
+
+    -- the body, fed
+    body : ∀ {b} → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) (bef p) b β
+         → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) (aft p) (feed (here refl) p e b) β
+    body sy = feed-up sy (Parts.sb pt) (λ r → Parts.apart pt r rs)
+                (subst (λ x → pendRows (full x) (CS.src k) (CS.connAt k ++ [ ix 1 ]) p (toEv e)) sc fk
+                , λ ce → Sound.ends (Parts.ss pt) (subst (λ x → pendRows (full x) (CS.src k) (CS.connAt k ++ [ ix 1 ]) _ end) (sym sc) ce) fk (vis e))
+                nh
+
+    -- a value: the source runs on, unclosed
+    flags-on : T (not (CS.closed k)) → (toEv e ≡ end → ⊥) → Flags (bef p) k β → Flags (aft p) k β
+    flags-on nc ne fl = record
+      { shut   = λ t → torn nc t
+      ; unshut = λ t {c} y n → Flags.unshut fl t y λ pc → n (≼-≢ {p} {c} pc λ { refl → ne (Sound.fn (Parts.ss pt) fk y (vis e) _) })
+      ; torn   = λ nt → torn nt lv }
+
+    -- its end: closed where it fell, owing nothing past it
+    flags-shut : toEv e ≡ end → Flags (aft p) (record k { closed = true ; endAt = p }) β
+    flags-shut ee = record { shut = λ _ → subst (Frozen k p) ee fk , ≺-irrefl {p} ; unshut = λ _ _ _ → _ ; torn = λ nt → torn nt lv }
+
+    src-done : ∀ {s} → toEv e ≡ end → Src (scopeOf c) (Parts.Rs pt) (aft p) (record k { closed = true ; endAt = p }) s
+    src-done ee = src-shut _ λ (y , v , py) → Sound.ends (Parts.ss pt) (subst (Frozen k p) ee fk) y v py
+
+  rise-src-nx : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s a p k′ sh t}
+              → rise (inSrc k b c) s (nx a) p ≡ moved k′ sh t → SimC Rt ⟨ inSrc k b c , s , rising (nx a) , p ⟩ sh k′
+  rise-src-nx {a = a} {p = p} refl (flying (f-src {w = true} fr sc pt lv nc sb fl fz eq) cl h) =
+    let (sy , row) = h _ ; open Fed {e = nx a} fr sc pt lv fz eq row
+    in aft p , settled c-abs (proj₁ lifted) (λ _ → s-conn sc pt (λ _ → body sb) (λ _ → src-on nc (sync-≈ sy (≃-sym fz))) (flags-on nc (λ ()) fl) eq)
+     , moves
+  rise-src-nx refl (flying (f-src {w = false} fr _ _ _ _ _ _ _ _) _ _) = _ , settled c-abs fr (λ ()) , silent ≃-refl
+  rise-src-nx refl (flying (f-srcc _ _ _ _ cl _ _ _ _) cl′ _)          = ⊥-elim (or-shut cl cl′)
+  rise-src-nx refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _) _ (_ , _ , ()))
+  rise-src-nx refl (flying (f-srcx fr sc pt nl fl eq) _ _)             = _ , settled c-abs fr (λ _ → s-conn sc pt (torn nl) (torn nl) fl eq) , silent ≃-refl
+  rise-src-nx refl (flying (f-off u-src fr) _ _)                       = _ , settled c-abs fr (λ ()) , silent ≃-refl
+  rise-src-nx refl (adrift (f-src fr _ _ _ _ _ _ _ _) _)               = _ , settled c-abs fr (λ ()) , silent ≃-refl
+  rise-src-nx refl (adrift (f-srcc _ _ _ _ cl _ _ _ _) cl′)            = ⊥-elim (or-shut cl cl′)
+  rise-src-nx refl (adrift (f-srcx fr sc pt nl fl eq) _)               = _ , settled c-abs fr (λ _ → s-conn sc pt (torn nl) (torn nl) fl eq) , silent ≃-refl
+  rise-src-nx refl (adrift (f-off u-src fr) _)                         = _ , settled c-abs fr (λ ()) , silent ≃-refl
+  rise-src-nx refl (settled () _ _)
+
+  -- Its end: the connect closed where it fell, while it runs.
+  rise-src-cp : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s p k′ sh t}
+              → rise (inSrc k b c) s cp p ≡ moved k′ sh t → SimC Rt ⟨ inSrc k b c , s , rising cp , p ⟩ sh k′
+  rise-src-cp {k = k} {b} {c} {s} {p} refl (flying (f-src {w = true} fr sc pt lv nc sb fl fz eq) cl h) =
+    let (sy , row) = h _ ; open Fed {e = cp} fr sc pt lv fz eq row
+    in aft p , subst (λ k″ → Inv Rt (aft p) ⟨ c , connS k″ s (feed (here refl) p cp b) , absorbed , p ⟩) (sym (shut-live lv))
+                 (settled c-abs (proj₁ lifted) (λ _ → s-conn sc (re-parts pt) (λ _ → body sb) (λ _ → src-done refl) (flags-shut refl) eq))
+     , moves
+  rise-src-cp refl (flying (f-src {w = false} fr _ _ _ _ _ _ _ _) _ _) = _ , settled c-abs fr (λ ()) , silent ≃-refl
+  rise-src-cp refl (flying (f-srcc _ _ _ _ cl _ _ _ _) cl′ _)          = ⊥-elim (or-shut cl cl′)
+  rise-src-cp refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _) _ (_ , _ , ()))
+  rise-src-cp {k = k} {b} {c} {s} {p} refl (flying (f-srcx fr sc pt nl fl eq) _ _) = _ , subst (λ k″ → Inv Rt _ ⟨ c , connS k″ s (feed (here refl) p cp b) , absorbed , p ⟩) (sym (shut-torn nl)) (settled c-abs fr (λ _ → s-conn sc pt (torn nl) (torn nl) fl eq)) , silent ≃-refl
+  rise-src-cp refl (flying (f-off u-src fr) _ _)                       = _ , settled c-abs fr (λ ()) , silent ≃-refl
+  rise-src-cp refl (adrift (f-src fr _ _ _ _ _ _ _ _) _)               = _ , settled c-abs fr (λ ()) , silent ≃-refl
+  rise-src-cp refl (adrift (f-srcc _ _ _ _ cl _ _ _ _) cl′)            = ⊥-elim (or-shut cl cl′)
+  rise-src-cp {k = k} {b} {c} {s} {p} refl (adrift (f-srcx fr sc pt nl fl eq) _) = _ , subst (λ k″ → Inv Rt _ ⟨ c , connS k″ s (feed (here refl) p cp b) , absorbed , p ⟩) (sym (shut-torn nl)) (settled c-abs fr (λ _ → s-conn sc pt (torn nl) (torn nl) fl eq)) , silent ≃-refl
+  rise-src-cp refl (adrift (f-off u-src fr) _)                         = _ , settled c-abs fr (λ ()) , silent ≃-refl
+  rise-src-cp refl (settled () _ _)

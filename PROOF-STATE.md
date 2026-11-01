@@ -14,6 +14,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE FRAMES LIFTED
+
+A row no frame shows moves every frame above it past `p`. Open: whether a
+joiner's outer and each lane hold regions apart (`Ro` clear of every lane's
+world, a bounded merge's queued lane capped at the freed lane's end), and
+begun lanes sit at distinct values. Settled when `fr-up` is a body.
+
+Members: `fr-up`.
+
 #### THE CONNECT STEPPED
 
 A connect entered, a joiner joined, a source's or body's rise, its own
@@ -21,8 +30,8 @@ marks, a joiner's next and a take's failure, each keeping `Inv`. Open:
 whether every entry lands a region apart from its siblings' and clear of
 its scope's hots, so the rest moves past `p`. Settled when each is a body.
 
-Members: `sub-conn`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`,
-`run-con`, `run-join-nx`, `run-join-cp`, `rise-take-failᵢ`.
+Members: `sub-conn`, `sub-join`, `sub-joined`, `run-con`, `run-join-nx`,
+`run-join-cp`, `rise-take-failᵢ`, `feed-up`.
 
 #### THE JOINER STEPPED
 
