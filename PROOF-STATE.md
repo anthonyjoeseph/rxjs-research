@@ -14,14 +14,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE SEARCH UNDER THE CURSOR
+#### THE CURSOR SHIFTED
 
-Over the whole tree in step: the least mark delivering at `p` leads every
-visible row owed, and no mark means none owed. Open: each node's least key
-bounds its own owed rows, read off `Sync`, and a shift-retagged key ties
-none owed elsewhere. Settled when both are bodies by induction over `Sync`.
+A tree in step at `C`, no key before an owed `p`, is in step at `bef p`.
+Open: a joiner's unfed rows read at the new cursor, through its binder's
+hot; every other part's negative facts are monotone. Settled by a body.
 
-Members: `least-shift`, `none-spent`.
+Members: `shift`.
 
 #### THE CONNECT STEPPED
 

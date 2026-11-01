@@ -40,7 +40,7 @@ spent-≈ : ∀ {A} {C} {E E′ : EmissionSet A} → Spent C E → E ≈ E′ �
 spent-≈ {C = C} sp eq d = sp (from (due-≈ {C = C} eq) d)
 
 sync-≈ : ∀ {Γ} {sc : Scope Γ} {C A} {s : St Γ A} {E E′} → Sync sc C s E → E ≈ E′ → Sync sc C s E′
-sync-≈ {C = C} (s-cold d) e = s-cold (≃-trans (≃-sym (due-≈ {C = C} e)) d)
+sync-≈ {C = C} (s-cold tk d) e = s-cold tk (≃-trans (≃-sym (due-≈ {C = C} e)) d)
 sync-≈ {C = C} (s-of d)   e = s-of (≃-trans (≃-sym (due-≈ {C = C} e)) d)
 sync-≈ {C = C} (s-done sp) e = s-done (spent-≈ {C = C} sp e)
 sync-≈ (s-map sy eq)         e = s-map sy (≃-trans eq e)

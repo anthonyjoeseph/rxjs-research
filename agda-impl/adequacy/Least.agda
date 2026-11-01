@@ -7,7 +7,7 @@ module adequacy.Least where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; _ʳ++_)
+open import Data.List using (List; []; _∷_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -86,52 +86,52 @@ retag-b : ∀ {R A B} {t : Key → Out A → Key × Out B} → Keeps t → ∀ (
         → Below (keyOf x) κ → Below (keyOf (retag t x)) κ
 retag-b kp (just (f , h , o)) {κ} b = keep κ (kp h o) b
 
-mapK : ∀ {A B} (f : A → B) → Keeps (mapT f)
-mapK f h still     = refl
-mapK f h (shows _) = refl
+mapKp : ∀ {A B} (f : A → B) → Keeps (mapT f)
+mapKp f h still     = refl
+mapKp f h (shows _) = refl
 
-scanK : ∀ {A B} (f : B → A → B) z → Keeps (scanT f z)
-scanK f z h still          = refl
-scanK f z h (shows (nx _)) = refl
-scanK f z h (shows cp)     = refl
+scanKp : ∀ {A B} (f : B → A → B) z → Keeps (scanT f z)
+scanKp f z h still          = refl
+scanKp f z h (shows (nx _)) = refl
+scanKp f z h (shows cp)     = refl
 
-cutK : ∀ {A} l → Keeps (cutT {A} l)
-cutK l h o = refl
+cutKp : ∀ {A} l → Keeps (cutT {A} l)
+cutKp l h o = refl
 
-takeK : ∀ {A} i (q : A → Bool) w → Keeps (takeT i q w)
-takeK i q free       h still          = refl
-takeK i q free       h (shows (nx _)) = refl
-takeK i q free       h (shows cp)     = refl
-takeK i q (cpAt _)   h o              = refl
-takeK i q (cutAt _)  h o              = refl
-takeK i q (overAt _) h o              = refl
+takeKp : ∀ {A} i (q : A → Bool) w → Keeps (takeT i q w)
+takeKp i q free       h still          = refl
+takeKp i q free       h (shows (nx _)) = refl
+takeKp i q free       h (shows cp)     = refl
+takeKp i q (cpAt _)   h o              = refl
+takeKp i q (cutAt _)  h o              = refl
+takeKp i q (overAt _) h o              = refl
 
-outerK : ∀ {A B : Set} n (q : List A) → Keeps (outerT {A} {B} n q)
-outerK n q h still          = refl
-outerK n q h (shows (nx _)) = refl
-outerK n q h (shows cp)     = refl
+outerKp : ∀ {A B : Set} n (q : List A) → Keeps (outerT {A} {B} n q)
+outerKp n q h still          = refl
+outerKp n q h (shows (nx _)) = refl
+outerKp n q h (shows cp)     = refl
 
-laneK : ∀ {A B : Set} d n (q : List A) → Keeps (laneT {A} {B} d n q)
-laneK d n []      h still          = refl
-laneK d n []      h (shows (nx _)) = refl
-laneK d n []      h (shows cp)     = refl
-laneK d n (_ ∷ _) h still          = refl
-laneK d n (_ ∷ _) h (shows (nx _)) = refl
-laneK d n (_ ∷ _) h (shows cp)     = refl
+laneKp : ∀ {A B : Set} d n (q : List A) → Keeps (laneT {A} {B} d n q)
+laneKp d n []      h still          = refl
+laneKp d n []      h (shows (nx _)) = refl
+laneKp d n []      h (shows cp)     = refl
+laneKp d n (_ ∷ _) h still          = refl
+laneKp d n (_ ∷ _) h (shows (nx _)) = refl
+laneKp d n (_ ∷ _) h (shows cp)     = refl
 
 race-l : ∀ {R A B} d n (q : List A) (x : Maybe (Cand R A)) (y : Maybe (Cand R B)) {κ}
        → Below (keyOf x) κ → Below (keyOf (raceT d n q x y)) κ
-race-l d n q (just (f , h , o)) nothing {κ} b = keep κ (outerK n q h o) b
+race-l d n q (just (f , h , o)) nothing {κ} b = keep κ (outerKp n q h o) b
 race-l d n q (just (f , h , o)) (just (g , k , o′)) {κ} b with h <ᴷ k in e
-... | true  = keep κ (outerK n q h o) b
-... | false = keep κ (laneK d n q k o′) (≮ᴷ-trans κ h k b e)
+... | true  = keep κ (outerKp n q h o) b
+... | false = keep κ (laneKp d n q k o′) (≮ᴷ-trans κ h k b e)
 
 race-r : ∀ {R A B} d n (q : List A) (x : Maybe (Cand R A)) (y : Maybe (Cand R B)) {κ}
        → Below (keyOf y) κ → Below (keyOf (raceT d n q x y)) κ
-race-r d n q nothing (just (g , k , o′)) {κ} b = keep κ (laneK d n q k o′) b
+race-r d n q nothing (just (g , k , o′)) {κ} b = keep κ (laneKp d n q k o′) b
 race-r d n q (just (f , h , o)) (just (g , k , o′)) {κ} b with h <ᴷ k in e
-... | true  = keep κ (outerK n q h o) (beat κ k h e b)
-... | false = keep κ (laneK d n q k o′) b
+... | true  = keep κ (outerKp n q h o) (beat κ k h e b)
+... | false = keep κ (laneKp d n q k o′) b
 
 source-l : ∀ {R A B} (x : Maybe (Cand R A)) (y : Maybe (Cand R B)) {κ}
          → Below (keyOf x) κ → Below (keyOf (sourceT x y)) κ
@@ -160,11 +160,11 @@ mutual
   seek-b c s (k-kid ki) = first-r (ownBest c s (own s)) (kids c s) (kids-b c s ki)
 
   kids-b : ∀ {R Γ A} (c : Ctx R Γ A) s {κ} → KidIn s κ → Below (keyOf (kids c s)) κ
-  kids-b c (mapS f s)    (k-map ki)  = retag-b (mapK f) (seek (inMap f c) s) (seek-b (inMap f c) s ki)
-  kids-b c (scanS f z s) (k-scan ki) = retag-b (scanK f z) (seek (inScan f z c) s) (seek-b (inScan f z c) s ki)
-  kids-b c (cutS l a s)  (k-cut ki)  = retag-b (cutK l) (seek (inCut l a c) s) (seek-b (inCut l a c) s ki)
+  kids-b c (mapS f s)    (k-map ki)  = retag-b (mapKp f) (seek (inMap f c) s) (seek-b (inMap f c) s ki)
+  kids-b c (scanS f z s) (k-scan ki) = retag-b (scanKp f z) (seek (inScan f z c) s) (seek-b (inScan f z c) s ki)
+  kids-b c (cutS l a s)  (k-cut ki)  = retag-b (cutKp l) (seek (inCut l a c) s) (seek-b (inCut l a c) s ki)
   kids-b c (lnS b s)     (k-ln ki)   = seek-b (inLn b c) s ki
-  kids-b c (takeS i q w s) (k-take ki) = retag-b (takeK i q w) (seek (inTake i q w c) s) (seek-b (inTake i q w c) s ki)
+  kids-b c (takeS i q w s) (k-take ki) = retag-b (takeKp i q w) (seek (inTake i q w c) s) (seek-b (inTake i q w c) s ki)
   kids-b c (flatS op f d n q o ls) (k-outer ki) =
     race-l d n q (seek (inOuter op f d n q ls c) o) (lanes c op f d n q o [] ls) (seek-b (inOuter op f d n q ls c) o ki)
   kids-b c (flatS op f d n q o ls) (k-lane mem ki) =
@@ -176,7 +176,7 @@ mutual
           → s ∈ ls → KeyIn s κ → Below (keyOf (lanes c op f d n q o pre ls)) κ
   lanes-b c op f d n q o pre (s ∷ post) (here refl) ki =
     first-l (retag (cutT (alive s)) (seek (inLanes op f d n q o pre post c) s)) (lanes c op f d n q o (s ∷ pre) post)
-            (retag-b (cutK (alive s)) (seek (inLanes op f d n q o pre post c) s) (seek-b (inLanes op f d n q o pre post c) s ki))
+            (retag-b (cutKp (alive s)) (seek (inLanes op f d n q o pre post c) s) (seek-b (inLanes op f d n q o pre post c) s ki))
   lanes-b c op f d n q o pre (s ∷ post) (there mem) ki =
     first-r (retag (cutT (alive s)) (seek (inLanes op f d n q o pre post c) s)) (lanes c op f d n q o (s ∷ pre) post)
             (lanes-b c op f d n q o (s ∷ pre) post mem ki)
@@ -190,25 +190,3 @@ seek-lo c s refl ki | just _ | b = b
 seek-none : ∀ {R Γ A} (c : Ctx R Γ A) s → seek c s ≡ nothing → ∀ {κ} → KeyIn s κ → ⊥
 seek-none c s eq ki with seek c s | seek-b c s ki
 seek-none c s refl ki | nothing | ()
-
-------------------------------------------------------------------------
--- A hole's keys are the tree's
-
-onto : ∀ {A : Set₁} (pre : List A) {s : A} ys → s ∈ ys → s ∈ (pre ʳ++ ys)
-onto []        ys m = m
-onto (x ∷ pre) ys m = onto pre (x ∷ ys) (there m)
-
-mid : ∀ {A : Set₁} (pre : List A) {s : A} post → s ∈ (pre ʳ++ s ∷ post)
-mid pre post = onto pre _ (here refl)
-
-plug-in : ∀ {R Γ A} (c : Ctx R Γ A) {s κ} → KeyIn s κ → KeyIn (plug c s) κ
-plug-in top                               ki = ki
-plug-in (inMap f c)                       ki = plug-in c (k-kid (k-map ki))
-plug-in (inScan f z c)                    ki = plug-in c (k-kid (k-scan ki))
-plug-in (inCut l a c)                     ki = plug-in c (k-kid (k-cut ki))
-plug-in (inLn b c)                        ki = plug-in c (k-kid (k-ln ki))
-plug-in (inTake i p w c)                  ki = plug-in c (k-kid (k-take ki))
-plug-in (inOuter op f d n q ls c)         ki = plug-in c (k-kid (k-outer ki))
-plug-in (inLanes op f d n q o pre post c) ki = plug-in c (k-kid (k-lane (mid pre post) ki))
-plug-in (inSrc k b c)                     ki = plug-in c (k-kid (k-src ki))
-plug-in (inBody k o c)                    ki = plug-in c (k-kid (k-body ki))

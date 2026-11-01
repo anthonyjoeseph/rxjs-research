@@ -28,6 +28,13 @@ open import denotation.Laws.Modulus using (≺→≼; ≼-refl; ≺-≼-≺; ≼
 open import denotation.Laws.Worlds using (Plain; plain-ix; plain-last; plain-sub; W; W⁼; step; timer; here; inW; Real; real-snoc; real-init; InvD; world-after; _⊑_; ⊑-≼; ⊑-snoc; ext≢; snoc≢[]; Anc; self; up; plain; named; anc-view; parent-fun; step-parent; anc-trans; anc-≼; world-anc⁼; nest-in; nonempty⁼; lone)
 open import denotation.Laws.Worlds.Leaves using (ine-pin)
 
+-- One slot before the next, and before the end.
+slot : ∀ r i → (r ++ [ ix i ]) ≺ (r ++ [ ix (suc i) ])
+slot r i = Equivalence.from T-≡ (<ᵖ-part r [] [] (<ᵖ-ix i))
+
+slot-last : ∀ r i → (r ++ [ ix i ]) ≺ (r ++ [ last ])
+slot-last r i = Equivalence.from T-≡ (<ᵖ-part r [] [] refl)
+
 private
   -- A reachable position before a timer's later tick.
   before-timer : ∀ e {T} ys → Real e → tick e < T → e ≺ (ix T ∷ ys)
@@ -41,12 +48,6 @@ private
   tick-snoc []          ()
   tick-snoc (sub _ ∷ _) ()
   tick-snoc (last ∷ _)  ()
-
-  slot : ∀ r i → (r ++ [ ix i ]) ≺ (r ++ [ ix (suc i) ])
-  slot r i = Equivalence.from T-≡ (<ᵖ-part r [] [] (<ᵖ-ix i))
-
-  slot-last : ∀ r i → (r ++ [ ix i ]) ≺ (r ++ [ last ])
-  slot-last r i = Equivalence.from T-≡ (<ᵖ-part r [] [] refl)
 
   step≼ : ∀ a b {y} → a ≺ b → b ≼ y → a ≼ y
   step≼ a b {y} ab by = ≺→≼ {a} {y} (≺-≼-≺ {a} {b} {y} ab by)
@@ -266,3 +267,8 @@ cold-inv {A} {H} c p (rp , dj) = record
         ... | r-timer {T} {r₀} _ with ⊑-snoc (ix T ∷ []) {sub (r₀ ++ [ last ])} le₂
         ...   | inj₁ le₃ = lone rp wp le₃
         ...   | inj₂ e   = off xq xy Rq R₂ (≺-ext r₂ {l₂} []) (anc-trans aq (world-anc⁼ (subst (W⁼ H (q ++ [ l ])) e v)))
+
+-- A frame played at or after its root's tick: every row at or after its
+-- next slot.
+burst-lb : ∀ {A t y e′} τ r i (b : Frame A t) → Real r → tick r ≤ τ + t → InE (burst τ r i b) y e′ → (r ++ [ ix i ]) ≼ y
+burst-lb {A} = CI.lb-b {A} (λ _ → ⊥) []

@@ -35,7 +35,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.List.Relation.Unary.All using (lookup)
 open import Data.Maybe using (just; nothing)
-open import Data.Nat using (ℕ; suc; _+_)
+open import Data.Nat using (ℕ; suc; _+_; _≤_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_)
 open import Data.Unit using (⊤)
@@ -43,12 +43,12 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Pos; Timeline; ix; last; ofᴱ)
+open import denotation.Events using (Pos; Timeline; ix; last; ofᴱ; tick)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (EmissionSet; out; end; _≺_; _≼_; enter; ⟦_⟧; Den; hot; coldAt; Rejoin; InE;
   MapT; map-out; map-end; LaneOf; module Scan; module TakeWhile; module Connecting;
   module Merge; module Bounded; module Switch; module Exhaust)
-open import operation.PureObservable using (module Machine)
+open import operation.PureObservable using (module Machine; Tape; play; ending) renaming (over to tapeOver)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; unbound; binds; CS; Owe; free; cpAt; cutAt; overAt; scopeOf;
                     Att; attached; attAt; subscribing; absorbed; rising; mapEv; nx; cp;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
@@ -56,7 +56,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; unbound; binds; CS; Owe
                     renaming (Ev to Evᴹ; Shown to Shownᴹ)
 open import denotation.Laws.Modulus using (≼-refl; ≺→≼; ≺-absurd; ≺-ext; ≺-irrefl)
 open import adequacy.Rows using (_≃_; _⇄_; ≃-refl; Vis; Moves; silent; shown; toEv; Inbox; full; pendRows; Frozen; tapeE)
-open import denotation.Laws.Worlds using (Ok; Hots)
+open import denotation.Laws.Worlds using (Ok; Hots; Real)
 open _≃_
 
 ------------------------------------------------------------------------
@@ -171,6 +171,13 @@ Ahead C P vs ws = ∀ {q a s} → (q , a) ∈ ws → Start P q a s
 Ends : ∀ {A B} → Pol A B → EmissionSet A → Set
 Ends P O = ∀ {q a c k e} → O q (out a) → Lane P q a c end → Lane P q a k e → Visible e → k ≼ c
 
+-- A cold's frame played where its timeline puts it: under a reachable
+-- root, at or after the root's tick.
+Ticked : ∀ {A} → Tape A → Set
+Ticked (play τ u i t fr) = Real u × tick u ≤ τ + t
+Ticked (ending _)        = ⊤
+Ticked tapeOver          = ⊤
+
 ------------------------------------------------------------------------
 -- A NODE IN STEP WITH ITS FROZEN ENTRY: what its state still owes is
 -- exactly `E`'s visible rows past `C`.  `E` is pinned from above by the
@@ -236,7 +243,7 @@ data Src : ∀ {Γ X} → Scope Γ → Cur → CS Γ X → St Γ X → Set₁
 data Sync where
   -- a started cold: what its tape has left is what its entry owes
   s-cold : ∀ {Γ} {sc : Scope Γ} {C} {A} {l} {E : EmissionSet A}
-         → Due C E ≃ Due origin (InE (tapeE l)) → Sync sc C (coldS true l) E
+         → Ticked l → Due C E ≃ Due origin (InE (tapeE l)) → Sync sc C (coldS true l) E
   -- an of: what it has left is what its entry owes
   s-of   : ∀ {Γ} {sc : Scope Γ} {C} {A} {i q} {xs : List A} {E}
          → Due C E ≃ Due origin (InE (ofᴱ q i xs)) → Sync sc C (ofS i q xs) E
