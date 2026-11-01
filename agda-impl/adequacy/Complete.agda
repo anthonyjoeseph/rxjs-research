@@ -18,14 +18,11 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Induction.WellFounded using (Acc; acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; subst; subst₂; sym; trans)
-open import Relation.Nullary using (Dec; yes; no; ¬_)
-open import Data.Bool.Properties using (T-≡)
-open import Function.Bundles using (Equivalence)
-open import Data.Sum using (inj₁; inj₂)
+open import Relation.Nullary using (Dec; yes; no)
 
-open import denotation.Events using (Pos; root; _≟ᵖ_; <ᵖ-split)
-open import denotation.EmissionSet using (Ev; out; end; EmissionSet; enter; ⟦_⟧; Seen; _≼_; _≺_)
-open import denotation.Laws.Modulus using (≼-antisym; ≼-false)
+open import denotation.Events using (Pos; root; _≟ᵖ_)
+open import denotation.EmissionSet using (Ev; out; end; EmissionSet; enter; ⟦_⟧; Seen; _≼_)
+open import denotation.Laws.Modulus using (≼-antisym)
 open import denotation.Laws.Worlds using (InvAt)
 open import denotation.Laws using (inv-⟦⟧)
 open import denotation.Read using (Run; Meets; Visible; loud; cursor; []; _∷_)
@@ -33,7 +30,7 @@ import denotation.Read as Read
 open import operation.PureObservable using (PureObs; module Machine; module Driver)
 open Machine using (Conf; load; nx; cp; absorbed) renaming (Shown to Shownᴹ)
 open import operation.Key using (Key; at; _<ᴷ_; clash; ≮ᴷ-trans)
-open import adequacy.Rows using (Steps; conv; Vis; Past; Lowest; Beyond; into; back; narrow; past-≃; _≃_; ≃-sym; ≃-trans; []; tau;
+open import adequacy.Rows using (≼-≢; Steps; conv; Vis; Past; Lowest; Beyond; into; back; narrow; past-≃; _≃_; ≃-sym; ≃-trans; []; tau;
   val; fin)
 open _≃_
 open import adequacy.Simulation using (Simulation; quiet-root)
@@ -45,12 +42,6 @@ record _⊑_ (a b : Key) : Set where
 
 ⊑-trans : ∀ {a b c} → a ⊑ b → b ⊑ c → a ⊑ c
 ⊑-trans {a} {b} {c} ab bc = ⊑i (≮ᴷ-trans c b a (_⊑_.un bc) (_⊑_.un ab))
-
--- At or before and not it: before.
-≼-≢ : ∀ {p q} → p ≼ q → ¬ p ≡ q → p ≺ q
-≼-≢ {p} {q} pq ne with <ᵖ-split p q (≼-false {p} {q} pq)
-... | inj₁ lt = Equivalence.from T-≡ lt
-... | inj₂ eq = ⊥-elim (ne eq)
 
 -- A run from `k` to `k′` showing `rs`.
 data Path {R : Set} : Conf R → Shownᴹ R → Conf R → Set₁ where

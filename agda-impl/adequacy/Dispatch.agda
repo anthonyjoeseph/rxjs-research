@@ -37,7 +37,7 @@ open _≃_
 open import adequacy.Cursor using (Cur; origin; bef; Spent; Due; Sync; _≈_; c-abs; c-sub; Inv; settled; pending; adrift; f-top;
   RT; SimC; keeps; Owes; Fr; Hold; Need; owes; lane; lanecut; pnd; s-of; s-join; s-joinx; s-took;
   f-off; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-srcx; f-body;
-  o-cp; rise-top; rise-map; rise-cut; rise-cutx; rise-ln; rise-took; rise-bodyx; run-stop;
+  o-cp; rise-top; rise-map; rise-scan-nx; rise-scan-cp; rise-cut; rise-cutx; rise-ln; rise-took; rise-bodyx; run-stop;
   run-cut; run-att)
 open import adequacy.Simulation using (Simulation)
 open import adequacy.Walk using (due-≈; climb; descend; refocus)
@@ -401,10 +401,6 @@ module Over {R : Set} (Rt : EmissionSet R) where
 
     --------------------------------------------------------------------
     -- RISES that read their frame's bookkeeping.
-    rise-scan-nx  : ∀ {Γ A B} {f : B → A → B} {z} {c : Ctx R Γ B} {s a p}
-                  → SimC Rt ⟨ inScan f z c , s , rising (nx a) , p ⟩ [] ⟨ c , scanS f (f z a) s , rising (nx (f z a)) , p ⟩
-    rise-scan-cp  : ∀ {Γ A B} {f : B → A → B} {z} {c : Ctx R Γ B} {s p}
-                  → SimC Rt ⟨ inScan f z c , s , rising cp , p ⟩ [] ⟨ c , scanS f z s , rising cp , p ⟩
     rise-take-nx  : ∀ {Γ A} {i} {w : A → Bool} {c : Ctx R Γ A} {s a p k′ sh t}
                   → rise (inTake i w free c) s (nx a) p ≡ moved k′ sh t → SimC Rt ⟨ inTake i w free c , s , rising (nx a) , p ⟩ sh k′
     rise-take-cp  : ∀ {Γ A} {i} {w : A → Bool} {c : Ctx R Γ A} {s p}
@@ -530,22 +526,22 @@ module Over {R : Set} (Rt : EmissionSet R) where
   closed-off : ∀ {C Γ A} {c : Ctx R Γ A} {w E} → Fr Rt C c w E → T (closed c) → Off w
   closed-off (f-top _)                         ()
   closed-off (f-off _ _)                       _ = refl
-  closed-off (f-map fr _)                      t = closed-off fr t
-  closed-off (f-scan fr _ _)                   t = closed-off fr t
+  closed-off (f-map fr _ _)                    t = closed-off fr t
+  closed-off (f-scan fr _ _ _)                 t = closed-off fr t
   closed-off (f-cut fr)                        t = closed-off fr t
-  closed-off (f-take fr _ _)                   t = closed-off fr t
+  closed-off (f-take fr _ _ _)                 t = closed-off fr t
   closed-off (f-took _ _ _ _ _ _)              _ = refl
-  closed-off (f-outer fr _ _)                  t = closed-off fr t
-  closed-off (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _) t with closed-off fr t
+  closed-off (f-outer fr _ _ _)                t = closed-off fr t
+  closed-off (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) t with closed-off fr t
   ... | ()
   closed-off (f-lane fr)                       t = closed-off fr t
   closed-off (f-lnct {b = false} fr)           _ = refl
   closed-off (f-lnct {b = true} fr)            t = ⊥-elim (closed-off fr t)
-  closed-off (f-src {k = k} fr _ _ nc _ _ _ _) t = closed-off fr (or-right (CS.closed k) nc t)
-  closed-off (f-srcc _ _ _ _ _ _ _ _)          _ = refl
-  closed-off (f-srcp _ _ _ _ _ _ _ _ _)        _ = tt
-  closed-off (f-srcx _ _ _ _ _)                _ = refl
-  closed-off (f-body fr _ refl _ _ _)          t with closed-off fr t
+  closed-off (f-src {k = k} fr _ _ nc _ _ _ _ _) t = closed-off fr (or-right (CS.closed k) nc t)
+  closed-off (f-srcc _ _ _ _ _ _ _ _ _)        _ = refl
+  closed-off (f-srcp _ _ _ _ _ _ _ _ _ _)      _ = tt
+  closed-off (f-srcx _ _ _ _ _ _)              _ = refl
+  closed-off (f-body fr _ refl _ _ _ _)        t with closed-off fr t
   ... | refl = refl
 
   off-keep : ∀ {C Γ A} {c : Ctx R Γ A} {w E} {s s′ : St Γ A} {p} → (∀ {o q} → s ≢ pend o q)
@@ -671,8 +667,8 @@ module Over {R : Set} (Rt : EmissionSet R) where
   rise-sim : ∀ {Γ A} {k′ : Conf R} {sh t} (c : Ctx R Γ A) (s : St Γ A) e p → rise c s e p ≡ moved k′ sh t → SimC Rt ⟨ c , s , rising e , p ⟩ sh k′
   rise-sim top                       s e      p refl = rise-top Rt
   rise-sim (inMap f c)               s e      p refl = rise-map Rt
-  rise-sim (inScan f z c)            s (nx a) p refl = rise-scan-nx
-  rise-sim (inScan f z c)            s cp     p refl = rise-scan-cp
+  rise-sim (inScan f z c)            s (nx a) p refl = rise-scan-nx Rt
+  rise-sim (inScan f z c)            s cp     p refl = rise-scan-cp Rt
   rise-sim (inCut true a c)          s e      p refl = rise-cut Rt
   rise-sim (inCut false a c)         s e      p refl = rise-cutx Rt
   rise-sim (inLn b c)                s e      p refl = rise-ln Rt

@@ -54,7 +54,7 @@ Members: `sub-cold`, `abs-leaf`.
 A scan's fold and a take's test, rising: `s-scan`'s `Folded` and the
 take's `OweAt` advance by one row. Settled when each is a body.
 
-Members: `rise-scan-nx`, `rise-scan-cp`, `rise-take-nx`, `rise-take-cp`, `sub-scan`, `sub-take`.
+Members: `rise-take-nx`, `rise-take-cp`, `sub-scan`, `sub-take`.
 
 #### THE ENTRIES
 
