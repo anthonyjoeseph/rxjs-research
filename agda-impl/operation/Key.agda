@@ -9,10 +9,10 @@ open import Data.Bool using (Bool; true; false; _∧_; _∨_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans)
 open import Relation.Nullary using (does; yes; no)
 
-open import denotation.Events using (Pos; Label; _<ᵖ_; _≟ˡ_; <ᵖ-trans; <ᵖ-irrefl; <ᵖ-split)
+open import denotation.Events using (Pos; Label; _<ᵖ_; _≟ˡ_; <ᵖ-trans; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-split; <ᵖ-part; <ᵖ-cons)
 
 data Key : Set where
   at    : Pos → Key
@@ -119,6 +119,9 @@ private
   pick : ∀ u v w → u ≡ false → v ≡ true → u ∨ (v ∧ w) ≡ true → w ≡ true
   pick _ _ _ refl refl h = h
 
+  same : ∀ u v w {r} → u ≡ false → v ≡ true → w ≡ r → u ∨ (v ∧ w) ≡ r
+  same _ _ _ refl refl refl = refl
+
   lex-irrefl : ∀ x → lex x x ≡ false
   lex-irrefl []      = refl
   lex-irrefl (a ∷ x) = none (a ≺ a) (a ≐ a) (lex x x) (≺-irrefl a) (lex-irrefl x)
@@ -162,6 +165,26 @@ private
   ...   | _                | inj₂ (inj₁ refl) = ⊥-elim (clash e h₁)
   ...   | inj₂ (inj₂ yx)   | inj₂ (inj₂ zy)   = ⊥-elim (clash (lex-trans x z x e (lex-trans z y x zy yx)) (lex-irrefl x))
 
+  lex-at : ∀ p q → lex (labs p) (labs q) ≡ p <ᵖ q
+  lex-at []      []      = refl
+  lex-at []      (_ ∷ _) = refl
+  lex-at (_ ∷ _) []      = refl
+  lex-at (a ∷ p) (b ∷ q) with xtri (lab a) (lab b)
+  ... | inj₁ ab          = trans (ok₁ _ _ ab) (sym (<ᵖ-part [] {a} {b} p q ab))
+  ... | inj₂ (inj₂ ba)   =
+    trans (nope _ _ _ (≺-asym (lab a) (lab b) ba) (≺→≠ (lab a) (lab b) ba)) (sym (<ᵖ-asym (b ∷ q) (a ∷ p) (<ᵖ-part [] {b} {a} q p ba)))
+  ... | inj₂ (inj₁ refl) = trans (same _ _ _ (≺-irrefl (lab a)) (≐-refl (lab a)) (lex-at p q)) (sym (<ᵖ-cons a p q))
+
 -- Neither strictly before the next, twice: not strictly before the last.
 ≮ᴷ-trans : ∀ a b c → a <ᴷ b ≡ false → b <ᴷ c ≡ false → a <ᴷ c ≡ false
 ≮ᴷ-trans a b c = lex-≮ (ext a) (ext b) (ext c)
+
+<ᴷ-trans : ∀ a b c → a <ᴷ b ≡ true → b <ᴷ c ≡ true → a <ᴷ c ≡ true
+<ᴷ-trans a b c = lex-trans (ext a) (ext b) (ext c)
+
+<ᴷ-irrefl : ∀ a → a <ᴷ a ≡ false
+<ᴷ-irrefl a = lex-irrefl (ext a)
+
+-- Positions' keys compare as the positions do.
+at-<ᴷ : ∀ p q → at p <ᴷ at q ≡ p <ᵖ q
+at-<ᴷ = lex-at
