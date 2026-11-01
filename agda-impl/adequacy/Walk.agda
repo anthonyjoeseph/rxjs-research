@@ -138,8 +138,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
   climb (f-lnct fr)                   h = climb fr (_ , _ , refl , h)
   climb (f-src fr sc pt lv nc bs fl fe eq) h = climb fr λ t → s-conn sc pt (λ _ → bs) (λ _ → src-on nc (sync-≈ (h t) (≃-sym fe))) fl eq
   climb (f-srcc fr sc pt lv cl sp bs fl eq) h = climb fr λ _ → s-conn sc pt (λ _ → bs) (λ _ → src-shut cl sp) fl eq
-  climb (f-srcp fr sc pt lv ba adm bs fl fe eq) (_ , refl , pe , wn) =
-    climb fr λ _ → s-conn sc pt (λ _ → bs) (λ _ → src-pend ba adm (≃-trans pe (≃-sym fe)) wn) fl eq
+  climb (f-srcp fr sc pt lv ba adm bs fl fe eq ow) (_ , refl , pe , wn) =
+    climb fr λ _ → s-conn sc pt (λ _ → bs) (λ _ → src-pend ba adm (≃-trans pe (≃-sym fe)) wn ow) fl eq
   climb (f-srcx fr sc pt nl fl eq)    h = climb fr λ _ → s-conn sc pt (λ lv → ⊥-elim (notT _ nl lv)) (λ lv → ⊥-elim (notT _ nl lv)) fl eq
   climb (f-body {k = k} {w = w} fr sc pt ev os fl eq) h =
     climb fr λ t → s-conn sc pt (λ lv → subst (λ x → Sync (binds (CS.src k) (CS.connAt k) x) _ _ _ _) sc (h (subst T (sym ev) (both w (CS.srcLive k) t lv)))) os fl eq
@@ -219,7 +219,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   ...   | inj₁ lv with os lv
   ...     | src-on nc sy        = owes true , _ , _ , f-src fr sc pt lv nc (bs lv) fl ≃-refl eq , λ _ → sy
   ...     | src-shut cl sp      = owes false , _ , none′ , f-srcc fr sc pt lv cl sp (bs lv) fl eq , λ ()
-  ...     | src-pend ba adm pe wn = pnd _ , _ , _ , f-srcp fr sc pt lv ba adm (bs lv) fl ≃-refl eq , (_ , refl , pe , wn)
+  ...     | src-pend ba adm pe wn ow = pnd _ , _ , _ , f-srcp fr sc pt lv ba adm (bs lv) fl ≃-refl eq ow , (_ , refl , pe , wn)
   down-src (owes false , _ , _ , fr , _)            = owes false , nowhere , none′ , f-off u-src fr , λ ()
   down-src (lane _ , _ , _ , _ , (_ , _ , () , _))
   down-src (lanecut _ , _ , _ , _ , (_ , _ , () , _))

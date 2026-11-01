@@ -527,7 +527,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   closed-off (f-lnct {b = true} fr)            t = ⊥-elim (closed-off fr t)
   closed-off (f-src {k = k} fr _ _ _ nc _ _ _ _) t = closed-off fr (or-right (CS.closed k) nc t)
   closed-off (f-srcc _ _ _ _ _ _ _ _ _)        _ = refl
-  closed-off (f-srcp _ _ _ _ _ _ _ _ _ _)      _ = tt
+  closed-off (f-srcp _ _ _ _ _ _ _ _ _ _ _)    _ = tt
   closed-off (f-srcx _ _ _ _ _ _)              _ = refl
   closed-off (f-body fr _ _ refl _ _ _)        t with closed-off fr t
   ... | refl = refl

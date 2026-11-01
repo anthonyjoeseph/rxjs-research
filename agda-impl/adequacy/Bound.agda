@@ -315,7 +315,7 @@ mutual
         → ∀ {q e} → Due C (adequacy.Rows.Frozen k) q e → p ≼ q
   src-b (src-on _ sy) env lo r = bound sy env (λ ki → lo (k-kid (k-src ki))) r
   src-b (src-shut _ sp) env lo r = ⊥-elim (sp r)
-  src-b {k = k} {b = b} {p = p} (src-pend {o = o′} be (ok , a) _ _) env lo {q} (x , _ , _) =
+  src-b {k = k} {b = b} {p = p} (src-pend {o = o′} be (ok , a) _ _ _) env lo {q} (x , _ , _) =
     on p (CS.connAt k ++ [ ix 1 ]) q (lo-at lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
        (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok) x)
 
@@ -441,7 +441,8 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
 
     src-sh : ∀ {Γ X B} {Rg} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B}
            → Src (CS.scope k) Rg C k o → Env (full (CS.scope k)) C p → Lo (connS k o b) (at p) → Src (CS.scope k) Rg (bef p) k o
-    src-sh (src-pend be adm pr wn) env lo = src-pend be adm pr wn
+    src-sh {k = k} {b = b} (src-pend {o = o′} be adm pr wn _) env lo =
+      src-pend be adm pr wn (lo-at lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
     src-sh (src-on nc sy)       env lo = src-on nc (sh sy env (λ ki → lo (k-kid (k-src ki))))
     src-sh (src-shut cl sp)     env lo = src-shut cl (spent sp)
 

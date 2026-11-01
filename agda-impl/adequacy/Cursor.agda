@@ -361,6 +361,7 @@ data Src where
   src-pend : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o}
            → CS.bodyAt k ≡ just (CS.connAt k) → Adm (binds (CS.src k) (CS.connAt k) sc)
            → pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]) ≈ Frozen k → Within Rg sc (CS.connAt k ++ [ ix 1 ])
+           → Owes C (CS.connAt k ++ [ ix 1 ])
            → Src sc Rg C k (pend o (CS.connAt k ++ [ ix 1 ]))
   src-on   : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o} → T (not (CS.closed k)) → Sync sc Rg C o (Frozen k) → Src sc Rg C k o
   -- ended: nothing left to owe, whatever its subtree still holds
@@ -475,6 +476,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → CS.bodyAt k ≡ just (CS.connAt k) → Adm (binds (CS.src k) (CS.connAt k) (scopeOf c))
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β
             → Flags C k β → Frozen k ≈ E → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′
+            → Owes C (CS.connAt k ++ [ ix 1 ])
             → Fr C (Parts.Rs pt) (inSrc k b c) (pnd (CS.connAt k ++ [ ix 1 ])) E
     -- a source torn down: nothing reads it
     f-srcx  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {Rg w E E′ β}

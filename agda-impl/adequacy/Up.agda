@@ -28,7 +28,7 @@ open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; Proper; ⟦_⟧; MapT; map-out; map-end; map-skip; map-pin; module Scan; _≺_; Den; hot; coldAt; DenEnv; shown; heard; ended; late;
   module TakeWhile; module Connecting)
 open import denotation.Laws.Modulus using (≺→≼; ≺-trans; ≺-irrefl; ≺-ext)
-open import denotation.Laws.Worlds using (Hots)
+open import denotation.Laws.Worlds using (Hots; W⁼)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; binds; CS; scopeOf; connS; rising; nx; cp; inBody; inSrc; feed; rise; moved; shutAt; absorbed) renaming (Ev to Evᴹ)
 open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans; ≃-refl; ≼-≢; full; Frozen; pendRows; Moves; silent; toEv)
@@ -189,7 +189,7 @@ module Past (p : Pos) where
 
     src-up : ∀ {Γ X} {sc : Scope Γ} {Rs : Rgn} {k : CS Γ X} {o}
            → Src sc Rs (bef p) k o → Sound Rs (adequacy.Rows.Frozen k) → ¬ Rs p → ¬ VHot (full sc) p → Src sc Rs (aft p) k o
-    src-up (src-pend be adm pr wn) ss nr nh = src-pend be adm pr wn
+    src-up (src-pend be adm pr wn ow) ss nr nh = src-pend be adm pr wn (owes-up (off nr (wn W⁼.here)) ow)
     src-up (src-on nc sy)          ss nr nh = src-on nc (up sy ss nr nh)
     src-up {k = k} (src-shut cl sp) ss nr nh = src-shut cl (spent-up {E = adequacy.Rows.Frozen k} sp)
 
@@ -219,7 +219,7 @@ module Past (p : Pos) where
 
 -- Where a connect owes its own end is no part of what it owes.
 src-owe : ∀ {Γ X} {sc : Scope Γ} {Rs : Rgn} {C} {k : CS Γ X} {o x} → Src sc Rs C k o → Src sc Rs C (record k { owedAt = x }) o
-src-owe (src-pend be adm pr wn) = src-pend be adm pr wn
+src-owe (src-pend be adm pr wn ow) = src-pend be adm pr wn ow
 src-owe (src-on nc sy)          = src-on nc sy
 src-owe (src-shut cl sp)        = src-shut cl sp
 
@@ -519,7 +519,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
      , moves
   rise-src-nx refl (flying (f-src {w = false} fr _ _ _ _ _ _ _ _) _ _) = _ , settled c-abs fr (λ ()) , silent ≃-refl
   rise-src-nx refl (flying (f-srcc _ _ _ _ cl _ _ _ _) cl′ _)          = ⊥-elim (or-shut cl cl′)
-  rise-src-nx refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _) _ (_ , _ , ()))
+  rise-src-nx refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _) _ (_ , _ , ()))
   rise-src-nx refl (flying (f-srcx fr sc pt nl fl eq) _ _)             = _ , settled c-abs fr (λ _ → s-conn sc pt (torn nl) (torn nl) fl eq) , silent ≃-refl
   rise-src-nx refl (flying (f-off u-src fr) _ _)                       = _ , settled c-abs fr (λ ()) , silent ≃-refl
   rise-src-nx refl (adrift (f-src fr _ _ _ _ _ _ _ _) _)               = _ , settled c-abs fr (λ ()) , silent ≃-refl
@@ -538,7 +538,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
      , moves
   rise-src-cp refl (flying (f-src {w = false} fr _ _ _ _ _ _ _ _) _ _) = _ , settled c-abs fr (λ ()) , silent ≃-refl
   rise-src-cp refl (flying (f-srcc _ _ _ _ cl _ _ _ _) cl′ _)          = ⊥-elim (or-shut cl cl′)
-  rise-src-cp refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _) _ (_ , _ , ()))
+  rise-src-cp refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _) _ (_ , _ , ()))
   rise-src-cp {k = k} {b} {c} {s} {p} refl (flying (f-srcx fr sc pt nl fl eq) _ _) = _ , subst (λ k″ → Inv Rt _ ⟨ c , connS k″ s (feed (here refl) p cp b) , absorbed , p ⟩) (sym (shut-torn nl)) (settled c-abs fr (λ _ → s-conn sc pt (torn nl) (torn nl) fl eq)) , silent ≃-refl
   rise-src-cp refl (flying (f-off u-src fr) _ _)                       = _ , settled c-abs fr (λ ()) , silent ≃-refl
   rise-src-cp refl (adrift (f-src fr _ _ _ _ _ _ _ _) _)               = _ , settled c-abs fr (λ ()) , silent ≃-refl
