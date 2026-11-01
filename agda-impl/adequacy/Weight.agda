@@ -16,21 +16,22 @@ module adequacy.Weight where
 
 open import Data.Bool using (Bool; true; false; _∧_; not; if_then_else_)
 open import Data.Bool.ListAction using (any)
-open import Data.List using (List; []; _∷_; _++_; [_]; length; concatMap) renaming (map to mapL)
+open import Data.List using (List; []; _∷_; _++_; [_]; length; concatMap; _ʳ++_) renaming (map to mapL)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Nat using (ℕ; suc; _+_; _*_; _≤_; z≤n)
-open import Data.Nat.Properties using (≤-refl; +-mono-≤)
+open import Data.Nat using (ℕ; suc; _+_; _*_; _≤_; _<_; z≤n)
+open import Data.Nat.Properties using (≤-refl; +-mono-≤; +-monoʳ-<)
+open import Data.Nat.Tactic.RingSolver using (solve-∀)
 open import Data.Product using (_×_; _,_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
 open import Relation.Nullary using (does; yes; no)
 
 open import Tree using (Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Pos; Timeline; ix; last; _≟ᵖ_)
 open import operation.Key using (Key; at; after; _<ᴷ_)
 open import operation.PureObservable using (module Machine; due)
-open Machine using (St; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; pend; CS;
+open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; pend; CS;
                     Conf; ⟨_,_,_,_⟩; plug; dirs; subscribing; absorbed; rising;
                     attAt; attached; free; cpAt; cutAt; overAt)
 
@@ -65,6 +66,19 @@ one d b = if b then 2 + d else 0
 isNone : Maybe Pos → Bool
 isNone nothing  = true
 isNone (just _) = false
+
+-- How deep a context's hole is.
+depth : ∀ {R Γ A} → Ctx R Γ A → ℕ
+depth top                       = 0
+depth (inMap _ c)               = suc (depth c)
+depth (inScan _ _ c)            = suc (depth c)
+depth (inCut _ _ c)             = suc (depth c)
+depth (inLn _ c)                = suc (depth c)
+depth (inTake _ _ _ c)          = suc (depth c)
+depth (inOuter _ _ _ _ _ _ c)   = suc (depth c)
+depth (inLanes _ _ _ _ _ _ _ _ c) = suc (depth c)
+depth (inSrc _ _ c)             = suc (depth c)
+depth (inBody _ _ c)            = suc (depth c)
 
 module Weigh (ks : List Pos) (P : Pos) (C : Key) where
   -- A mark keyed `κ`, `d` deep, the clock at `C`.
@@ -115,6 +129,80 @@ module Weigh (ks : List Pos) (P : Pos) (C : Key) where
     potL : ∀ {Γ A} → ℕ → List (St Γ A) → ℕ
     potL d []       = 0
     potL d (s ∷ ls) = pot d s + potL d ls
+
+  -- Lanes reversed onto lanes.
+  potL-ʳ++ : ∀ {Γ A} d (xs ys : List (St Γ A)) → potL d (xs ʳ++ ys) ≡ potL d xs + potL d ys
+  potL-ʳ++ d []       ys = refl
+  potL-ʳ++ d (x ∷ xs) ys = trans (potL-ʳ++ d xs (x ∷ ys)) (solve-∀-shift (potL d xs) (pot d x) (potL d ys))
+    where
+      solve-∀-shift : ∀ a b c → a + (b + c) ≡ (b + a) + c
+      solve-∀-shift = solve-∀
+
+  -- What a context weighs around its hole.
+  potC : ∀ {R Γ A} → Ctx R Γ A → ℕ
+  potC top                                = 0
+  potC (inMap _ c)                        = potC c
+  potC (inScan _ _ c)                     = potC c
+  potC (inCut _ (attAt _) c)              = potC c + (2 + depth c)
+  potC (inCut _ attached c)               = potC c
+  potC (inLn _ c)                         = potC c
+  potC (inTake _ _ free c)                = potC c + 2 * (2 + depth c)
+  potC (inTake _ _ (cpAt p) c)            = potC c + (wt (depth c) (at (p ++ [ last ])) + (2 + depth c))
+  potC (inTake _ _ (cutAt _) c)           = potC c + (2 + depth c)
+  potC (inTake _ _ (overAt _) c)          = potC c
+  potC (inOuter _ _ _ _ _ ls c)           = potC c + potL (suc (depth c)) ls
+  potC (inLanes _ _ _ _ _ o pre post c)   = potC c + (pot (suc (depth c)) o + (potL (suc (depth c)) pre + potL (suc (depth c)) post))
+  potC (inSrc k b c)                      = potC c + (connW (depth c) k + pot (suc (depth c)) b)
+  potC (inBody k o c)                     = potC c + (connW (depth c) k + pot (suc (depth c)) o)
+
+  -- A tree weighs its context around its hole and its hole at its depth.
+  pot-plug : ∀ {R Γ A} (c : Ctx R Γ A) s → pot 0 (plug c s) ≡ potC c + pot (depth c) s
+  pot-plug top s = refl
+  pot-plug (inMap f c) s = pot-plug c (mapS f s)
+  pot-plug (inScan f z c) s = pot-plug c (scanS f z s)
+  pot-plug (inCut l (attAt x) c) s = trans (pot-plug c (cutS l (attAt x) s)) (a3 (potC c) (2 + depth c) (pot (suc (depth c)) s))
+    where a3 : ∀ a b c → a + (b + c) ≡ (a + b) + c
+          a3 = solve-∀
+  pot-plug (inCut l attached c) s = pot-plug c (cutS l attached s)
+  pot-plug (inLn b c) s = pot-plug c (lnS b s)
+  pot-plug (inTake i q free c) s = trans (pot-plug c (takeS i q free s)) (a3 (potC c) (2 * (2 + depth c)) (pot (suc (depth c)) s))
+    where a3 : ∀ a b c → a + (b + c) ≡ (a + b) + c
+          a3 = solve-∀
+  pot-plug (inTake i q (cpAt p) c) s =
+    trans (pot-plug c (takeS i q (cpAt p) s)) (a4 (potC c) (wt (depth c) (at (p ++ [ last ]))) (2 + depth c) (pot (suc (depth c)) s))
+    where a4 : ∀ a b c d → a + ((b + c) + d) ≡ (a + (b + c)) + d
+          a4 = solve-∀
+  pot-plug (inTake i q (cutAt x) c) s = trans (pot-plug c (takeS i q (cutAt x) s)) (a3 (potC c) (2 + depth c) (pot (suc (depth c)) s))
+    where a3 : ∀ a b c → a + (b + c) ≡ (a + b) + c
+          a3 = solve-∀
+  pot-plug (inTake i q (overAt x) c) s = pot-plug c (takeS i q (overAt x) s)
+  pot-plug (inOuter op f d n q ls c) s = trans (pot-plug c (flatS op f d n q s ls)) (sw (potC c) (pot (suc (depth c)) s) (potL (suc (depth c)) ls))
+    where sw : ∀ a b c → a + (b + c) ≡ (a + c) + b
+          sw = solve-∀
+  pot-plug (inLanes op f d n q o pre post c) s =
+    trans (pot-plug c (flatS op f d n q o (pre ʳ++ s ∷ post)))
+      (trans (cong (λ x → potC c + (pot (suc (depth c)) o + x)) (potL-ʳ++ (suc (depth c)) pre (s ∷ post)))
+             (ln (potC c) (pot (suc (depth c)) o) (potL (suc (depth c)) pre) (pot (suc (depth c)) s) (potL (suc (depth c)) post)))
+    where ln : ∀ a b c d e → a + (b + (c + (d + e))) ≡ (a + (b + (c + e))) + d
+          ln = solve-∀
+  pot-plug (inSrc k b c) s = trans (pot-plug c (connS k s b)) (sw (potC c) (connW (depth c) k) (pot (suc (depth c)) s) (pot (suc (depth c)) b))
+    where sw : ∀ a b c d → a + ((b + c) + d) ≡ (a + (b + d)) + c
+          sw = solve-∀
+  pot-plug (inBody k o c) s = trans (pot-plug c (connS k o s)) (a4 (potC c) (connW (depth c) k) (pot (suc (depth c)) o) (pot (suc (depth c)) s))
+    where a4 : ∀ a b c d → a + ((b + c) + d) ≡ (a + (b + c)) + d
+          a4 = solve-∀
+
+  -- A mark strictly past the clock weighs no more than an unlisted one.
+  wt-ahead : ∀ d κ → C <ᴷ κ ≡ true → wt d κ ≤ 2 + d
+  wt-ahead d κ h with at P <ᴷ κ
+  ... | true  = z≤n
+  ... | false with listed ks κ
+  ...   | true rewrite h = z≤n
+  ...   | false = ≤-refl
+
+  -- A lighter hole, a lighter tree.
+  lighter-at : ∀ {R Γ A} (c : Ctx R Γ A) {s s′} → pot (depth c) s′ < pot (depth c) s → pot 0 (plug c s′) < pot 0 (plug c s)
+  lighter-at c {s} {s′} lt rewrite pot-plug c s | pot-plug c s′ = +-monoʳ-< (potC c) lt
 
 -- What the mode still owes: a rise's climb.
 climb : ∀ {R} → Conf R → ℕ

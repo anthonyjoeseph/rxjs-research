@@ -38,11 +38,28 @@ Members: `rise-outer-nx`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`, `sub-
 
 Short of a row a reader meets next, a run is fuelled by the listed rows
 and their ancestors strictly past its clock, and between them by
-`adequacy.Weight`. Open: that a still step lowers the weight at the clock
-it starts from, and that the clock never runs back; the cursor probe finds
-neither failing. Settled by bodies.
+`adequacy.Weight`. Open: that the least mark's run, passing no listed
+row, lowers the weight at its clock, and that the clock never runs back;
+the cursor probe finds neither failing. Settled by bodies.
 
-Members: `still-lightens`, `clock-mono`.
+Members: `lightens-run`, `clock-mono`.
+
+#### THE STILL CLIMB
+
+A rise passing no listed row lowers the weight at its clock. Open:
+whether a take's failure, an outer's value and a lane's end each either
+pass a listed row or leave marks past the clock. Settled by a body.
+
+Members: `lightens-rise`.
+
+#### THE SUBSCRIPTION MET
+
+A subscribe lowers the weight, proven over three facts. Open: that a
+subscribing run has its pending subscription in focus, a cold opens
+strictly past it, and a defer's guard is a row at or before the one met
+next. Settled by bodies.
+
+Members: `pend-focus`, `opening-ahead`, `defer-guard`.
 
 #### THE COLD STEPPED
 

@@ -30,54 +30,14 @@ open import denotation.Read using (Run; Meets; Visible; loud; cursor; []; _∷_)
 import denotation.Read as Read
 open import operation.PureObservable using (PureObs; module Machine; module Driver)
 open Machine using (Conf; load; nx; cp; absorbed) renaming (Shown to Shownᴹ)
-open import operation.Key using (Key; at; _<ᴷ_; clash; ≮ᴷ-trans)
+open import operation.Key using (Key; at; _<ᴷ_; clash)
 open import adequacy.Rows using (≼-≢; Steps; conv; Vis; Past; Lowest; Beyond; into; back; narrow; past-≃; _≃_; ≃-sym; ≃-trans; []; tau;
   val; fin)
 open _≃_
 open import adequacy.Simulation using (Simulation; quiet-root)
-open import adequacy.Weight using (Clock; W; Wᶜ; Wᶜ-kept; anc)
-
--- `a` no later than `b`.
-record _⊑_ (a b : Key) : Set where
-  constructor ⊑i
-  field un : b <ᴷ a ≡ false
-
-⊑-trans : ∀ {a b c} → a ⊑ b → b ⊑ c → a ⊑ c
-⊑-trans {a} {b} {c} ab bc = ⊑i (≮ᴷ-trans c b a (_⊑_.un bc) (_⊑_.un ab))
-
--- A run from `k` to `k′` showing `rs`.
-data Path {R : Set} : Conf R → Shownᴹ R → Conf R → Set₁ where
-  []  : ∀ {k} → Path k [] k
-  tau : ∀ {k k′ k″ t rs} → Driver.step R k ≡ Driver.silent t k′ → Path k′ rs k″ → Path k rs k″
-  val : ∀ {k k′ k″ t p a rs} → Driver.step R k ≡ Driver.value t p a k′ → Path k′ rs k″ → Path k ((p , nx a) ∷ rs) k″
-
-_▸_ : ∀ {R} {k k′ k″ : Conf R} {rs rs′} → Path k rs k′ → Path k′ rs′ k″ → Path k (rs ++ rs′) k″
-[]        ▸ q = q
-tau e pth ▸ q = tau e (pth ▸ q)
-val e pth ▸ q = val e (pth ▸ q)
-
-then : ∀ {R} {k k′ : Conf R} {rs rs′} → Path k rs k′ → Steps k′ rs′ → Steps k (rs ++ rs′)
-then []        st = st
-then (tau e p) st = tau e (then p st)
-then (val e p) st = val e (then p st)
-
--- What a run shows next.
-data Next {R : Set} (k : Conf R) (p : Pos) : Ev R → Set₁ where
-  more : ∀ {a k′} → Path k [ (p , nx a) ] k′ → Next k p (out a)
-  done : Steps k [ (p , cp) ] → Next k p end
-
--- `k′` a silent step on from `k`.
-_⇜_ : ∀ {R} → Conf R → Conf R → Set₁
-_⇜_ {R} k′ k = Σ _ λ τ → Driver.step R k ≡ Driver.silent τ k′
-
-_▸τ_ : ∀ {R} {k k′ k″ : Conf R} {rs} → Path k rs k′ → k″ ⇜ k′ → Path k rs k″
-[]        ▸τ (_ , e) = tau e []
-tau e pth ▸τ st      = tau e (pth ▸τ st)
-val e pth ▸τ st      = val e (pth ▸τ st)
-
--- `k′` a silent step on from `k`, its clock passing no listed position.
-Still : ∀ {R} → List Pos → Conf R → Conf R → Set₁
-Still ks k′ k = k′ ⇜ k × (∀ {q} → q ∈ ks → Clock k <ᴷ at q ≡ true → Clock k′ <ᴷ at q ≡ true)
+open import adequacy.Weight using (Clock; W; Wᶜ-kept; anc)
+open import adequacy.Lighten using (still-lightens)
+open import adequacy.Path using (_⊑_; ⊑i; ⊑-trans; Path; []; tau; val; _▸_; then; Next; more; done; _⇜_; _▸τ_; Still)
 
 -- Of `qs`, those strictly past `κ`.
 ahead : Key → List Pos → ℕ
@@ -116,16 +76,6 @@ postulate
   --   next mark, so mid-run the least key falls.
   clock-mono : ∀ {R} (o : PureObs [] R) {rs k k′ p e} → Path (load o) rs k
              → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ]) → k′ ⇜ k → Clock k ⊑ Clock k′
-
-  -- STILL STEPS LIGHTEN, WEIGHED AT THE CLOCK THEY START FROM: short of a
-  -- row a reader meets next, a step whose clock passes no row at or before
-  -- it, nor any ancestor of one, lowers the run's weight — a climb by its
-  -- height, a subscribe by its syntax, the run of a mark nothing above
-  -- shows by the mark.
-  still-lightens : ∀ {R} (o : PureObs [] R) {rs k k′ p e} → Path (load o) rs k
-                 → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
-                 → ∀ ks → (∀ {q e′} → enter (⟦ o ⟧ []ᴬ) root q e′ → q ≼ p → q ∈ ks)
-                 → Still (ks ++ anc ks) k′ k → Wᶜ (ks ++ anc ks) p (Clock k) k′ < W (ks ++ anc ks) p k
 
 -- STILL STEPS LIGHTEN: a still step's clock leaves every listed row ahead
 -- that was, so no mark weighs more at the clock it ends on.
