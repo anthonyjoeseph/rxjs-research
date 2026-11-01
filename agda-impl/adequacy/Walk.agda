@@ -21,7 +21,7 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; absorbed; Scope; unbound; binds; CS; scopeOf; plug; lnS; cutS; mapS; scanS; takeS; flatS; connS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (_≃_; _⇄_; ≃-refl; ≃-sym; ≃-trans)
-open import adequacy.Cursor using (Cur; Owes; Due; Spent; _≈_; Pol; Runs; Hole; LaneSt; l-live; l-dead; Begun; none; more; bump;
+open import adequacy.Cursor using (Cur; notT; Owes; Due; Spent; _≈_; Pol; Runs; Hole; LaneSt; l-live; l-dead; Begun; none; more; bump;
   joined; Sync; Sound; src-pend; src-on; src-shut; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took;
   s-flat; s-conn; s-join; s-joinx; Need; owes; lane; lanecut; pnd; Hold; u-map; u-scan; u-cut;
   u-ln; u-take; u-outer; u-lanes; u-src; u-body; Fr; f-top; f-off; f-map; f-scan; f-cut;
@@ -47,7 +47,7 @@ sync-≈ (s-map sy eq sd)      e = s-map sy (≃-trans eq e) sd
 sync-≈ (s-scan sy fd eq sd)  e = s-scan sy fd (≃-trans eq e) sd
 sync-≈ (s-cut sy)            e = s-cut (sync-≈ sy e)
 sync-≈ (s-take sy nf eq sd)  e = s-take sy nf (≃-trans eq e) sd
-sync-≈ (s-took fl nr fz ow eq) e = s-took fl nr fz ow (≃-trans eq e)
+sync-≈ (s-took fl nr fz ow eq sd) e = s-took fl (λ {q} → nr {q}) fz ow (≃-trans eq e) sd
 sync-≈ (s-flat sy j eq sd)   e = s-flat sy j (≃-trans eq e) sd
 sync-≈ (s-conn sc b o fl eq sd) e = s-conn sc b o fl (≃-trans eq e) sd
 sync-≈ {C = C} (s-join eq d ap lt a) e = s-join (≃-trans eq e) (≃-trans (≃-sym (due-≈ {C = C} e)) d) ap lt a
@@ -96,10 +96,6 @@ live? : ∀ b → T b ⊎ T (not b)
 live? true  = inj₁ _
 live? false = inj₂ _
 
-notT : ∀ b → T (not b) → T b → ⊥
-notT true  () _
-notT false _  ()
-
 none′ : ∀ {A : Set} → EmissionSet A
 none′ _ _ = ⊥
 
@@ -128,7 +124,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   climb (f-scan fr fd eq sd)          h = climb fr λ t → s-scan (h t) fd eq sd
   climb (f-cut fr)                    h = climb fr λ t → s-cut (h t)
   climb (f-take fr nf eq sd)          h = climb fr λ t → s-take (h t) nf eq sd
-  climb (f-took fr fl nr fz ow eq)    h = climb fr λ _ → s-took fl nr fz ow eq
+  climb (f-took fr fl nr fz ow eq sd) h = climb fr λ _ → s-took fl (λ {q} → nr {q}) fz ow eq sd
   climb (f-outer fr j eq sd)          h = climb fr λ t → s-flat (h t) j eq sd
   climb (f-lanes {pre = pre} {b = b} fr sy lf o nq r hl rt cnt wt wh od ah en eq so sd) (_ , _ , refl , h) =
     climb fr λ _ → s-flat sy (joined bg wt wh od ah en) eq so
@@ -186,7 +182,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-take : ∀ {C Γ A} {i keep w} {c : Ctx R Γ A} {s} → Res C c (takeS i keep w s) → Res C (inTake i keep w c) s
   down-take (owes true , _ , fr , h) with h _
   ... | s-take sy nf eq sd   = owes true , _ , f-take fr nf eq sd , λ _ → sy
-  ... | s-took fl nr fz ow eq = owes false , none′ , f-took fr fl nr fz ow eq , λ ()
+  ... | s-took fl nr fz ow eq sd = owes false , none′ , f-took fr fl nr fz ow eq sd , λ ()
   down-take (owes false , _ , fr , _)            = owes false , none′ , f-off u-take fr , λ ()
   down-take (lane _ , _ , _ , (_ , _ , () , _))
   down-take (lanecut _ , _ , _ , (_ , _ , () , _))

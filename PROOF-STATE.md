@@ -22,7 +22,9 @@ rise that stops short of the root moves everything else from `bef p` past
 `p`, which needs no row but the rising one's at `p`. Settled when each is
 a body.
 
-Members: `sub-conn`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`, `rise-body-nx`, `rise-body-cp`, `run-con`, `run-join-nx`, `run-join-cp`, `rise-take-failᵢ`, `rise-take-fail`.
+Members: `sub-conn`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`,
+`rise-body-nx`, `rise-body-cp`, `run-con`, `run-join-nx`, `run-join-cp`,
+`rise-take-failᵢ`.
 
 #### THE JOINER STEPPED
 

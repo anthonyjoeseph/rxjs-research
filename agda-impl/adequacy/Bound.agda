@@ -40,12 +40,12 @@ open import operation.Key using (at; at-<ᴷ)
 open import operation.PureObservable using (module Machine; Tape; play; ending) renaming (over to tapeOver)
 open Machine using (St; Scope; unbound; binds; CS; cs; own; bodyM; cpAt; coldS; ofS; takeS; flatS; connS; joinS)
 open import adequacy.Rows using (full; pendRows; Inbox; this; that; tapeE)
-open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans)
+open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans; ≼-≢)
 open _≃_
 open import adequacy.Cursor using (Cur; origin; bef; aft; Owes; Due; Unfed; Adm; Ticked;
   Pol; Lane; Runs; Start; Kill; polF; JoinF; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Spent;
   Folded; fd-none; fd-last; Whole; Ahead;
-  Joined; joined; Ends; Flags; Src; src-pend; src-on; src-shut; Failure; OweAt; o-cp; o-cut; o-over;
+  Joined; joined; Ends; Flags; Src; src-pend; src-on; src-shut; Failure; Gone; notT; Sound; OweAt; o-cp; o-cut; o-over;
   Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
 
@@ -237,7 +237,7 @@ mutual
   bound (s-scan sy _ m _) env lo (x , v , ow) = scan-b sy env (λ ki → lo (k-kid (k-scan ki))) (from m (x , v)) ow
   bound (s-cut sy) env lo r = bound sy env (λ ki → lo (k-kid (k-cut ki))) r
   bound (s-take sy nf m _) env lo (x , v , ow) = take-b sy nf env (λ ki → lo (k-kid (k-take ki))) (from m (x , v)) ow
-  bound (s-took fl nr ni oa m) env lo (x , v , ow) = took-b fl nr ni oa lo (from m (x , v)) ow
+  bound (s-took fl g ni oa m sd) env lo (x , v , ow) = took-b fl g ni oa sd lo (from m (x , v)) ow
   bound (s-flat sy jn m _) env lo (x , v , ow) = flat-b sy jn env lo (proj₁ (from m (x , v))) v ow
   bound (s-conn refl bs ss fl m _) env lo (x , v , ow) = conn-b bs ss fl env lo (from m (x , v)) ow
   bound {sc = sc} (s-join _ d ap _ _) env lo r = join-b {sc = sc} d ap env lo r
@@ -271,18 +271,26 @@ mutual
   take-b sy nf env lo (TakeWhile.left _ _ _ , ()) ow
 
   took-b : ∀ {Γ C A} {i} {keep : A → Bool} {w} {s : St Γ A} {Es r p q e}
-         → Failure keep Es r → ¬ Owes C r → (T i → ¬ Owes C (r ++ [ ix 0 ])) → OweAt C w r → Lo (takeS i keep w s) (at p)
+         → Failure keep Es r → Gone C r → (T i → ¬ Owes C (r ++ [ ix 0 ])) → OweAt C w r → Sound Es → Lo (takeS i keep w s) (at p)
          → Σ (TakeWhile.TakeT i keep Es q e) (λ _ → Visible e) → Owes C q → p ≼ q
-  took-b {C = C} {r = r} (a , y , nk , nf) nr ni oa lo (TakeWhile.pass y′ _ nfq , _) ow = ⊥-elim (nfq (r , a , y , nk , past C nr ow))
-  took-b {C = C} {r = r} (a , y , nk , nf) nr ni oa lo (TakeWhile.tend y′ nfq , _)   ow = ⊥-elim (nfq (r , a , y , nk , past C nr ow))
-  took-b {C = C} {r = r} (a , y , nk , nf) nr ni oa lo (TakeWhile.fail {q} y′ nk′ nfq inc , _) ow
+  took-b {keep = keep} {r = r} {q = q} (a , y , nk , nf) g ni oa sd lo (TakeWhile.pass y′ kp nfq , _) ow =
+    ⊥-elim (nfq (r , a , y , nk , ≼-≢ {r} {q} (g ow) λ { refl → kept (Sound.fn sd y y′ _ _) nk kp }))
+    where
+      kept : ∀ {b b′} → out b ≡ out b′ → T (not (keep b)) → T (keep b′) → ⊥
+      kept {b} refl nb kb = notT (keep b) nb kb
+  took-b {r = r} {q = q} (a , y , nk , nf) g ni oa sd lo (TakeWhile.tend y′ nfq , _) ow =
+    ⊥-elim (nfq (r , a , y , nk , ≼-≢ {r} {q} (g ow) λ { refl → no-end (Sound.fn sd y y′ _ _) }))
+    where
+      no-end : ∀ {b} → out b ≡ end → ⊥
+      no-end ()
+  took-b {C = C} {r = r} (a , y , nk , nf) nr ni oa sd lo (TakeWhile.fail {q} y′ nk′ nfq inc , _) ow
     with ≼-antisym {q} {r} (λ rq → nfq (r , a , y , nk , rq)) (λ qr → nf (q , _ , y′ , nk′ , qr))
   ... | refl = ⊥-elim (ni inc ow)
-  took-b {C = C} {r = r} (a , y , nk , nf) nr ni oa lo (TakeWhile.stop {q} y′ nk′ nfq , _) ow
+  took-b {C = C} {r = r} (a , y , nk , nf) nr ni oa sd lo (TakeWhile.stop {q} y′ nk′ nfq , _) ow
     with ≼-antisym {q} {r} (λ rq → nfq (r , a , y , nk , rq)) (λ qr → nf (q , _ , y′ , nk′ , qr))
   ... | refl = took-end oa lo ow
-  took-b fl nr ni oa lo (TakeWhile.step _ _ , ())   ow
-  took-b fl nr ni oa lo (TakeWhile.left _ _ _ , ()) ow
+  took-b fl nr ni oa sd lo (TakeWhile.step _ _ , ())   ow
+  took-b fl nr ni oa sd lo (TakeWhile.left _ _ _ , ()) ow
 
   took-end : ∀ {Γ C A} {i} {keep : A → Bool} {w} {s : St Γ A} {r p}
            → OweAt C w r → Lo (takeS i keep w s) (at p) → Owes C (r ++ [ last ]) → p ≼ (r ++ [ last ])
@@ -411,7 +419,7 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
     sh (s-cut sy)       env lo = s-cut (sh sy env (λ ki → lo (k-kid (k-cut ki))))
     sh (s-take sy nf m sd) env lo = s-take (sh sy env lo′) (λ y nk → bound sy env lo′ (y , tt , nf y nk)) m sd
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-take ki))
-    sh (s-took fl nr ni oa m) env lo = s-took fl (nm nr) (λ t → nm (ni t)) (owe-sh oa lo) m
+    sh (s-took fl g ni oa m sd) env lo = s-took fl (λ {q} o → g {q} (dn o)) (λ t → nm (ni t)) (owe-sh oa lo) m sd
     sh (s-flat sy jn m sd) env lo =
       s-flat (sh sy env lo′) (joined-sh (bound sy env lo′) jn env (λ i ki → lo (k-kid (k-lane i ki)))) m sd
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-outer ki))

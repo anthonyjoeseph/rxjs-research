@@ -37,7 +37,7 @@ open _≃_
 open import adequacy.Cursor using (Cur; origin; bef; Spent; Due; Sync; _≈_; c-abs; c-sub; Inv; settled; pending; adrift; f-top;
   RT; SimC; keeps; Owes; Fr; Hold; Need; owes; lane; lanecut; pnd; s-of; s-join; s-joinx; s-took;
   f-off; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-srcx; f-body;
-  o-cp; rise-top; rise-map; rise-scan-nx; rise-scan-cp; rise-take-pass; rise-take-cp; rise-cut; rise-cutx; rise-ln; rise-took; rise-bodyx; run-stop;
+  o-cp; rise-top; rise-map; rise-scan-nx; rise-scan-cp; rise-take-pass; rise-take-cp; rise-cut; rise-cutx; rise-ln; rise-took; rise-take-fail; rise-bodyx; run-stop;
   run-cut; run-att)
 open import adequacy.Simulation using (Simulation)
 open import adequacy.Walk using (due-≈; climb; descend; refocus)
@@ -333,7 +333,7 @@ delivers-owed : ∀ {Γ} {sc : Scope Γ} {C A} {s : St Γ A} {E m p} → Sync sc
 delivers-owed (s-of d)                   d-of   = proj₂ (proj₂ (from d (at-out , tt , tt)))
 delivers-owed (s-of d)                   d-ofx  = proj₂ (proj₂ (from d (at-end , tt , tt)))
 delivers-owed (s-join _ d _ _ _)         d-join = proj₂ (proj₂ (from d (inj₁ this)))
-delivers-owed (s-took _ _ _ (o-cp ow) _) d-stop = ow
+delivers-owed (s-took _ _ _ (o-cp ow) _ _) d-stop = ow
 
 -- No list entry, switch or pending program delivers.
 ln-none : ∀ {Γ A} {b} {l : St Γ A} {m p} → Delivers (lnS b l) m p → ⊥
@@ -401,13 +401,11 @@ module Over {R : Set} (Rt : EmissionSet R) where
 
     --------------------------------------------------------------------
     -- RISES that read their frame's bookkeeping.
-    -- A TAKEWHILE'S FIRST FAILURE: the row leaves under `ix 0` if
-    -- inclusive, else nothing does; either way what is above moves past
-    -- `p`, which needs no row but this one at `p`.
+    -- A TAKEWHILE'S FIRST FAILURE, INCLUSIVE: the row leaves under `ix 0`,
+    -- and what is above moves past `p`, which needs no row but this one
+    -- at `p`.
     rise-take-failᵢ : ∀ {Γ A} {w : A → Bool} {c : Ctx R Γ A} {s a p} → w a ≡ false
                     → SimC Rt ⟨ inTake true w free c , s , rising (nx a) , p ⟩ [] ⟨ c , takeS true w (cpAt p) s , rising (nx a) , p ⊕ [ ix 0 ] ⟩
-    rise-take-fail  : ∀ {Γ A} {w : A → Bool} {c : Ctx R Γ A} {s a p} → w a ≡ false
-                    → SimC Rt ⟨ inTake false w free c , s , rising (nx a) , p ⟩ [] ⟨ c , takeS false w (cpAt p) s , absorbed , p ⟩
     rise-outer-nx : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n q ls} {c : Ctx R Γ B} {o a p k′ sh t}
                   → rise (inOuter op f d n q ls c) o (nx a) p ≡ moved k′ sh t → SimC Rt ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ sh k′
     rise-outer-cp : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n q ls} {c : Ctx R Γ B} {o p k′ sh t}
@@ -533,7 +531,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   closed-off (f-scan fr _ _ _)                 t = closed-off fr t
   closed-off (f-cut fr)                        t = closed-off fr t
   closed-off (f-take fr _ _ _)                 t = closed-off fr t
-  closed-off (f-took _ _ _ _ _ _)              _ = refl
+  closed-off (f-took _ _ _ _ _ _ _)            _ = refl
   closed-off (f-outer fr _ _ _)                t = closed-off fr t
   closed-off (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) t with closed-off fr t
   ... | ()
@@ -678,7 +676,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   rise-sim (inTake i w free c)       s (nx a) p eq with w a in wa | i | eq
   ... | true  | _     | refl = rise-take-pass Rt wa
   ... | false | true  | refl = rise-take-failᵢ wa
-  ... | false | false | refl = rise-take-fail wa
+  ... | false | false | refl = rise-take-fail Rt wa
   rise-sim (inTake i w free c)       s cp     p refl = rise-take-cp Rt
   rise-sim (inTake i w (cpAt r) c)   s e      p refl = rise-took Rt (λ ())
   rise-sim (inTake i w (cutAt r) c)  s e      p refl = rise-took Rt (λ ())
