@@ -34,15 +34,16 @@ open Machine using (St; Ctx; Conf; Scope; scopeOf; ⟨_,_,_,_⟩; subscribing; a
                     renaming (Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (≃-refl; Vis; Past; Lowest; _≃_; _⇄_; silent; shown; Moves; this)
 open _≃_
-open import adequacy.Cursor using (Cur; origin; bef; Spent; Due; Sync; _≈_; c-abs; c-sub; Inv; settled; pending; adrift; f-top;
+open import adequacy.Cursor using (Cur; Rgn; origin; bef; Spent; Due; Sync; _≈_; c-abs; c-sub; Inv; settled; pending; adrift; f-top;
   RT; SimC; keeps; Owes; Fr; Hold; Need; owes; lane; lanecut; pnd; s-of; s-join; s-joinx; s-took;
   f-off; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-srcx; f-body;
-  o-cp; rise-top; rise-map; rise-scan-nx; rise-scan-cp; rise-take-pass; rise-take-cp; rise-cut; rise-cutx; rise-ln; rise-took; rise-bodyx; run-stop;
+  o-cp; rise-top; rise-map; rise-scan-nx; rise-scan-cp; rise-take-pass; rise-take-cp; rise-cut; rise-cutx; rise-ln; rise-took; rise-take-fail; rise-bodyx; run-stop;
   run-cut; run-att)
 open import adequacy.Simulation using (Simulation)
 open import adequacy.Walk using (due-≈; climb; descend; refocus)
 open import adequacy.Least using (Lo; Keeps; mapKp; scanKp; cutKp; takeKp; outerKp; laneKp; seek-lo; seek-none)
 open import adequacy.Bound using (bound; shift; due-shift)
+open import adequacy.Up using (rise-body-nx; rise-body-cp)
 
 ------------------------------------------------------------------------
 -- Within what is grown, every step moves or finds nothing to do
@@ -329,11 +330,11 @@ delivers-key d-stop (here refl) = refl
 delivers-key d-stop (there ())
 
 -- What a node in step delivers, it owes.
-delivers-owed : ∀ {Γ} {sc : Scope Γ} {C A} {s : St Γ A} {E m p} → Sync sc C s E → Delivers s m p → Owes C p
+delivers-owed : ∀ {Γ} {sc : Scope Γ} {Rg C A} {s : St Γ A} {E m p} → Sync sc Rg C s E → Delivers s m p → Owes C p
 delivers-owed (s-of d)                   d-of   = proj₂ (proj₂ (from d (at-out , tt , tt)))
 delivers-owed (s-of d)                   d-ofx  = proj₂ (proj₂ (from d (at-end , tt , tt)))
 delivers-owed (s-join _ d _ _ _)         d-join = proj₂ (proj₂ (from d (inj₁ this)))
-delivers-owed (s-took _ _ _ (o-cp ow) _) d-stop = ow
+delivers-owed (s-took _ _ _ (o-cp ow) _ _) d-stop = ow
 
 -- No list entry, switch or pending program delivers.
 ln-none : ∀ {Γ A} {b} {l : St Γ A} {m p} → Delivers (lnS b l) m p → ⊥
@@ -346,15 +347,15 @@ pend-none ()
 -- THE LEAST MARK OVER THE WHOLE TREE: one delivering at an owed `p` leads
 -- everything owed, so the cursor moves to just before `p` and the tree
 -- stays in step.
-least-shift : ∀ {R} {t : St [] R} {C E Γ A} {c′ : Ctx R Γ A} {s′ m κ p}
-            → Sync unbound C t E → search top t ≡ just (found (Γ , A , c′ , s′) m κ) → Delivers s′ m p → Owes C p
-            → Sync unbound (bef p) t E × Due C E ≃ Due (bef p) E
+least-shift : ∀ {R} {t : St [] R} {Rg C E Γ A} {c′ : Ctx R Γ A} {s′ m κ p}
+            → Sync unbound Rg C t E → search top t ≡ just (found (Γ , A , c′ , s′) m κ) → Delivers s′ m p → Owes C p
+            → Sync unbound Rg (bef p) t E × Due C E ≃ Due (bef p) E
 least-shift {t = t} sy fd dl op with found-least {t = t} fd
 ... | mi , lo with delivers-key dl mi
 ... | refl = shift sy op (λ ()) lo , due-shift sy op (λ ()) lo
 
 -- NO MARK, NOTHING OWED.
-none-spent : ∀ {R} {t : St [] R} {C E} → Sync unbound C t E → search top t ≡ nothing → Spent C E
+none-spent : ∀ {R} {t : St [] R} {Rg C E} → Sync unbound Rg C t E → search top t ≡ nothing → Spent C E
 none-spent {t = t} sy fd {q} r with seek top t in sk
 none-spent {t = t} sy fd {q} r | nothing =
   bound {p = q ⊕ [ ix 0 ]} sy (λ ()) (λ ki → ⊥-elim (seek-none top t sk ki)) r (≺-ext q [])
@@ -401,13 +402,11 @@ module Over {R : Set} (Rt : EmissionSet R) where
 
     --------------------------------------------------------------------
     -- RISES that read their frame's bookkeeping.
-    -- A TAKEWHILE'S FIRST FAILURE: the row leaves under `ix 0` if
-    -- inclusive, else nothing does; either way what is above moves past
-    -- `p`, which needs no row but this one at `p`.
+    -- A TAKEWHILE'S FIRST FAILURE, INCLUSIVE: the row leaves under `ix 0`,
+    -- and what is above moves past `p`, which needs no row but this one
+    -- at `p`.
     rise-take-failᵢ : ∀ {Γ A} {w : A → Bool} {c : Ctx R Γ A} {s a p} → w a ≡ false
                     → SimC Rt ⟨ inTake true w free c , s , rising (nx a) , p ⟩ [] ⟨ c , takeS true w (cpAt p) s , rising (nx a) , p ⊕ [ ix 0 ] ⟩
-    rise-take-fail  : ∀ {Γ A} {w : A → Bool} {c : Ctx R Γ A} {s a p} → w a ≡ false
-                    → SimC Rt ⟨ inTake false w free c , s , rising (nx a) , p ⟩ [] ⟨ c , takeS false w (cpAt p) s , absorbed , p ⟩
     rise-outer-nx : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n q ls} {c : Ctx R Γ B} {o a p k′ sh t}
                   → rise (inOuter op f d n q ls c) o (nx a) p ≡ moved k′ sh t → SimC Rt ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ sh k′
     rise-outer-cp : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n q ls} {c : Ctx R Γ B} {o p k′ sh t}
@@ -427,10 +426,6 @@ module Over {R : Set} (Rt : EmissionSet R) where
                   → rise (inSrc k b c) s (nx a) p ≡ moved k′ sh t → SimC Rt ⟨ inSrc k b c , s , rising (nx a) , p ⟩ sh k′
     rise-src-cp   : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s p k′ sh t}
                   → rise (inSrc k b c) s cp p ≡ moved k′ sh t → SimC Rt ⟨ inSrc k b c , s , rising cp , p ⟩ sh k′
-    rise-body-nx  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s b p} → CS.srcLive k ≡ true
-                  → SimC Rt ⟨ inBody k o c , s , rising (nx b) , p ⟩ [] ⟨ c , connS k o s , rising (nx b) , p ⟩
-    rise-body-cp  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s p} → CS.srcLive k ≡ true
-                  → SimC Rt ⟨ inBody k o c , s , rising cp , p ⟩ [] ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩
 
     --------------------------------------------------------------------
     -- MARK RUNS, the cursor just before what they deliver.
@@ -469,42 +464,42 @@ module Over {R : Set} (Rt : EmissionSet R) where
   search-none : ∀ {C Γ A} {c : Ctx R Γ A} {s p}
               → Inv Rt C ⟨ c , s , absorbed , p ⟩ → search top (plug c s) ≡ nothing → Spent C Rt
   search-none {C} (settled _ fr h) fd with climb Rt fr h
-  ... | _ , e , sy = λ d → none-spent sy fd (from (due-≈ {C = C} e) d)
+  ... | _ , _ , e , sy = λ d → none-spent sy fd (from (due-≈ {C = C} e) d)
 
   search-least : ∀ {C Γ A} {c : Ctx R Γ A} {s r Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ p}
                → Inv Rt C ⟨ c , s , absorbed , r ⟩
                → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , s′) m κ)
                → Delivers s′ m p
                → (Inv Rt (bef p) ⟨ c′ , s′ , absorbed , r ⟩ × Vis (RT Rt C) ≃ Vis (RT Rt (bef p)))
-                 ⊎ Σ (EmissionSet A′) (Fr Rt C c′ (owes false))
+                 ⊎ (Σ Rgn λ Rg → Σ (EmissionSet A′) (Fr Rt C Rg c′ (owes false)))
   search-least {C} {c = c} {s = s} {c′ = c′} {s′ = s′} {p = p} (settled _ fr h) fd dl with climb Rt fr h
-  ... | _ , e , sy with descend Rt c′ s′ (subst (λ t → Sync unbound _ t _) (sym (found-plug c s fd)) sy) e
-  ...   | owes false , _ , fr′ , _ = inj₂ (_ , fr′)
-  ...   | lane _ , _ , _ , (_ , _ , refl , _) = ⊥-elim (ln-none dl)
-  ...   | lanecut _ , _ , _ , (_ , _ , refl , _) = ⊥-elim (cut-none dl)
-  ...   | pnd _ , _ , _ , (_ , refl , _) = ⊥-elim (pend-none dl)
-  ...   | owes true , _ , _ , h′ with least-shift sy fd dl (delivers-owed (h′ tt) dl)
-  ...     | sy′ , d with descend Rt c′ s′ (subst (λ t → Sync unbound _ t _) (sym (found-plug c s fd)) sy′) e
-  ...       | _ , _ , fr′ , h″ = inj₁ (settled c-abs fr′ h″ , owed-≃ {C = C} {C′ = bef p} e d)
+  ... | _ , _ , e , sy with descend Rt c′ s′ (subst (λ t → Sync unbound _ _ t _) (sym (found-plug c s fd)) sy) e
+  ...   | owes false , _ , _ , fr′ , _ = inj₂ (_ , _ , fr′)
+  ...   | lane _ , _ , _ , _ , (_ , _ , refl , _) = ⊥-elim (ln-none dl)
+  ...   | lanecut _ , _ , _ , _ , (_ , _ , refl , _) = ⊥-elim (cut-none dl)
+  ...   | pnd _ , _ , _ , _ , (_ , refl , _) = ⊥-elim (pend-none dl)
+  ...   | owes true , _ , _ , _ , h′ with least-shift sy fd dl (delivers-owed (h′ tt) dl)
+  ...     | sy′ , d with descend Rt c′ s′ (subst (λ t → Sync unbound _ _ t _) (sym (found-plug c s fd)) sy′) e
+  ...       | _ , _ , _ , fr′ , h″ = inj₁ (settled c-abs fr′ h″ , owed-≃ {C = C} {C′ = bef p} e d)
 
   -- In a subtree no live node reads, any mode keeps the cursor.
-  adrift-any : ∀ {C Γ A} {c : Ctx R Γ A} {E} m {s p} → Fr Rt C c (owes false) E → Inv Rt C ⟨ c , s , m , p ⟩
-  adrift-any subscribing fr = settled c-sub fr (λ ())
-  adrift-any absorbed    fr = settled c-abs fr (λ ())
-  adrift-any (rising _)  fr = adrift fr
+  adrift-any : ∀ {C Γ A} {c : Ctx R Γ A} {Rg E} m {s p} → closed c ≡ false → Fr Rt C Rg c (owes false) E → Inv Rt C ⟨ c , s , m , p ⟩
+  adrift-any subscribing _  fr = settled c-sub fr (λ ())
+  adrift-any absorbed    _  fr = settled c-abs fr (λ ())
+  adrift-any (rising _)  cl fr = adrift fr cl
 
   -- A search's outcome, run: the node's run at the shifted cursor, or
   -- adrift.
-  stepped : ∀ {C Γ A} {c′ : Ctx R Γ A} {s′ r p s″ m″ p″}
-          → (Inv Rt (bef p) ⟨ c′ , s′ , absorbed , r ⟩ × Vis (RT Rt C) ≃ Vis (RT Rt (bef p))) ⊎ Σ (EmissionSet A) (Fr Rt C c′ (owes false))
+  stepped : ∀ {C Γ A} {c′ : Ctx R Γ A} {s′ r p s″ m″ p″} → closed c′ ≡ false
+          → (Inv Rt (bef p) ⟨ c′ , s′ , absorbed , r ⟩ × Vis (RT Rt C) ≃ Vis (RT Rt (bef p))) ⊎ (Σ Rgn λ Rg → Σ (EmissionSet A) (Fr Rt C Rg c′ (owes false)))
           → (Inv Rt (bef p) ⟨ c′ , s′ , absorbed , r ⟩ → Inv Rt (bef p) ⟨ c′ , s″ , m″ , p″ ⟩)
           → Σ Cur λ C′ → Inv Rt C′ ⟨ c′ , s″ , m″ , p″ ⟩ × Moves (RT Rt C) [] (RT Rt C′)
-  stepped (inj₁ (i , r)) g = _ , g i , silent r
-  stepped (inj₂ (_ , fr)) g = _ , adrift-any _ fr , silent ≃-refl
+  stepped _  (inj₁ (i , r)) g = _ , g i , silent r
+  stepped cl (inj₂ (_ , _ , fr)) g = _ , adrift-any _ cl fr , silent ≃-refl
 
   -- A torn joiner's row dropped: nothing owed before, nothing after.
-  joinx-hold : ∀ {Γ A} {sc : Scope Γ} {C w j} {x : A ∈ Γ} {u ib E}
-             → Hold sc C w (joinS j false x (u ∷ ib)) E → Hold sc C w (joinS j false x ib) E
+  joinx-hold : ∀ {Γ A} {sc : Scope Γ} {Rg C w j} {x : A ∈ Γ} {u ib E}
+             → Hold sc Rg C w (joinS j false x (u ∷ ib)) E → Hold sc Rg C w (joinS j false x ib) E
   joinx-hold {w = owes _} h t with h t
   ... | s-joinx sp = s-joinx sp
   joinx-hold {w = lane _}    (_ , _ , () , _)
@@ -526,29 +521,29 @@ module Over {R : Set} (Rt : EmissionSet R) where
   or-right : ∀ a {b} → T (not a) → T (a ∨ b) → T b
   or-right false _ t = t
 
-  closed-off : ∀ {C Γ A} {c : Ctx R Γ A} {w E} → Fr Rt C c w E → T (closed c) → Off w
+  closed-off : ∀ {C Γ A} {c : Ctx R Γ A} {Rg w E} → Fr Rt C Rg c w E → T (closed c) → Off w
   closed-off (f-top _)                         ()
   closed-off (f-off _ _)                       _ = refl
   closed-off (f-map fr _ _)                    t = closed-off fr t
   closed-off (f-scan fr _ _ _)                 t = closed-off fr t
   closed-off (f-cut fr)                        t = closed-off fr t
   closed-off (f-take fr _ _ _)                 t = closed-off fr t
-  closed-off (f-took _ _ _ _ _ _)              _ = refl
+  closed-off (f-took _ _ _ _ _ _ _)            _ = refl
   closed-off (f-outer fr _ _ _)                t = closed-off fr t
-  closed-off (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) t with closed-off fr t
+  closed-off (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) t with closed-off fr t
   ... | ()
   closed-off (f-lane fr)                       t = closed-off fr t
   closed-off (f-lnct {b = false} fr)           _ = refl
   closed-off (f-lnct {b = true} fr)            t = ⊥-elim (closed-off fr t)
-  closed-off (f-src {k = k} fr _ _ nc _ _ _ _ _) t = closed-off fr (or-right (CS.closed k) nc t)
+  closed-off (f-src {k = k} fr _ _ _ nc _ _ _ _) t = closed-off fr (or-right (CS.closed k) nc t)
   closed-off (f-srcc _ _ _ _ _ _ _ _ _)        _ = refl
   closed-off (f-srcp _ _ _ _ _ _ _ _ _ _)      _ = tt
   closed-off (f-srcx _ _ _ _ _ _)              _ = refl
-  closed-off (f-body fr _ refl _ _ _ _)        t with closed-off fr t
+  closed-off (f-body fr _ _ refl _ _ _)        t with closed-off fr t
   ... | refl = refl
 
-  off-keep : ∀ {C Γ A} {c : Ctx R Γ A} {w E} {s s′ : St Γ A} {p} → (∀ {o q} → s ≢ pend o q)
-           → Fr Rt C c w E → Hold (scopeOf c) C w s E → Off w → Inv Rt C ⟨ c , s′ , absorbed , p ⟩
+  off-keep : ∀ {C Γ A} {c : Ctx R Γ A} {Rg w E} {s s′ : St Γ A} {p} → (∀ {o q} → s ≢ pend o q)
+           → Fr Rt C Rg c w E → Hold (scopeOf c) Rg C w s E → Off w → Inv Rt C ⟨ c , s′ , absorbed , p ⟩
   off-keep {w = owes _}    _  fr _ refl        = settled c-abs fr (λ ())
   off-keep {w = lane _}    _  _  _ ()
   off-keep {w = lanecut _} _  _  _ ()
@@ -577,8 +572,8 @@ module Over {R : Set} (Rt : EmissionSet R) where
     abs-of {c′ = c′} {xs = xs} fd eq with closed c′ in cl | xs | eq
     ... | true  | []     | refl = keeps Rt λ i → closed-keep cl (λ ()) (search-quiet i fd)
     ... | true  | _ ∷ _  | refl = keeps Rt λ i → closed-keep cl (λ ()) (search-quiet i fd)
-    ... | false | []     | refl = λ i → stepped (search-least i fd d-ofx) (run-of-end cl)
-    ... | false | _ ∷ _  | refl = λ i → stepped (search-least i fd d-of) (run-of-nx cl)
+    ... | false | []     | refl = λ i → stepped cl (search-least i fd d-ofx) (run-of-end cl)
+    ... | false | _ ∷ _  | refl = λ i → stepped cl (search-least i fd d-of) (run-of-nx cl)
 
     abs-att : ∀ {Γ A} {c′ : Ctx R Γ A} {l q s₀ κ k′ sh t}
             → search top (plug c s) ≡ just (found (Γ , A , c′ , cutS l (attAt q) s₀) attM κ) → run c′ (cutS l (attAt q) s₀) attM p ≡ moved k′ sh t
@@ -598,10 +593,10 @@ module Over {R : Set} (Rt : EmissionSet R) where
              → run c′ (joinS j g x ((q , e) ∷ ib)) joinM p ≡ moved k′ sh t
              → SimC Rt ⟨ c , s , absorbed , p ⟩ sh k′
     abs-join {c′ = c′} {g = true} {e = nx a} fd eq with closed c′ in cl | eq
-    ... | false | refl = λ i → stepped (search-least i fd d-join) (run-join-nx cl)
+    ... | false | refl = λ i → stepped cl (search-least i fd d-join) (run-join-nx cl)
     ... | true  | refl = keeps Rt λ i → closed-keep cl (λ ()) (search-quiet i fd)
     abs-join {c′ = c′} {g = true} {e = cp}   fd eq with closed c′ in cl | eq
-    ... | false | refl = λ i → stepped (search-least i fd d-join) (run-join-cp cl)
+    ... | false | refl = λ i → stepped cl (search-least i fd d-join) (run-join-cp cl)
     ... | true  | refl = keeps Rt λ i → closed-keep cl (λ ()) (search-quiet i fd)
     abs-join {g = false} {e = nx a} fd refl   = keeps Rt λ i → join-off (search-quiet i fd)
     abs-join {g = false} {e = cp}   fd refl   = keeps Rt λ i → join-off (search-quiet i fd)
@@ -611,7 +606,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
              → run c′ (takeS j w (cpAt r) s₀) cpM p ≡ moved k′ sh t
              → SimC Rt ⟨ c , s , absorbed , p ⟩ sh k′
     abs-stop {c′ = c′} fd eq with closed c′ in cl | eq
-    ... | false | refl = λ i → stepped (search-least i fd d-stop) (run-stop Rt)
+    ... | false | refl = λ i → stepped cl (search-least i fd d-stop) (run-stop Rt cl)
     ... | true  | refl = keeps Rt λ i → closed-keep cl (λ ()) (search-quiet i fd)
 
     abs-cut : ∀ {Γ A} {c′ : Ctx R Γ A} {j} {w : A → Bool} {r s₀ κ k′ sh t}
@@ -663,7 +658,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   body-cp : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s p k′ sh t} b → CS.srcLive k ≡ b
           → moved (if b then ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩ else ⟨ c , connS k o s , absorbed , p ⟩) [] [] ≡ moved k′ sh t
           → SimC Rt ⟨ inBody k o c , s , rising cp , p ⟩ sh k′
-  body-cp true  lv refl = rise-body-cp lv
+  body-cp true  lv refl = rise-body-cp Rt lv
   body-cp false lv refl = rise-bodyx Rt lv
 
   -- A rise, by its frame.
@@ -678,7 +673,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   rise-sim (inTake i w free c)       s (nx a) p eq with w a in wa | i | eq
   ... | true  | _     | refl = rise-take-pass Rt wa
   ... | false | true  | refl = rise-take-failᵢ wa
-  ... | false | false | refl = rise-take-fail wa
+  ... | false | false | refl = rise-take-fail Rt wa
   rise-sim (inTake i w free c)       s cp     p refl = rise-take-cp Rt
   rise-sim (inTake i w (cpAt r) c)   s e      p refl = rise-took Rt (λ ())
   rise-sim (inTake i w (cutAt r) c)  s e      p refl = rise-took Rt (λ ())
@@ -690,7 +685,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   rise-sim (inSrc k b c)             s (nx a) p eq   = rise-src-nx eq
   rise-sim (inSrc k b c)             s cp     p eq   = rise-src-cp eq
   rise-sim (inBody k o c)            s (nx b) p eq with CS.srcLive k in lv | eq
-  ... | true  | refl = rise-body-nx lv
+  ... | true  | refl = rise-body-nx Rt lv
   ... | false | refl = rise-bodyx Rt lv
   rise-sim (inBody k o c)            s cp     p eq   = body-cp (CS.srcLive k) refl eq
 
@@ -743,7 +738,7 @@ cursor : ∀ {R} (o : PureObs [] R) → Simulation o
 cursor {R} o = record
   { I   = λ k → Σ Cur λ C → Inv Rt C k
   ; T   = λ i → RT Rt (proj₁ i)
-  ; i₀  = origin , pending (f-top ≃-refl) (λ _ → tt , (tt , λ ()) , tt , ≃-refl)
+  ; i₀  = origin , pending {Rg = λ _ → ⊤} (f-top ≃-refl) (λ _ → tt , (tt , λ ()) , tt , ≃-refl , λ _ → tt)
   ; t₀  = (λ { ((x , v , _) , v′) → x , v′ }) ⇄ (λ { (x , v) → (x , v , tt) , v })
   ; tau = tau
   ; val = val
