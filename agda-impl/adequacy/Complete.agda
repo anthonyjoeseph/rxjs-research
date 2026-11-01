@@ -11,7 +11,7 @@ open import Data.List using (List; []; _∷_; [_]; _++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _<?_; s≤s; z≤n)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred; <-≤-trans; ≤-<-trans; n≮0; m≤n⇒m≤1+n)
@@ -22,19 +22,18 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; subs
 open import Relation.Nullary using (Dec; yes; no)
 
 open import denotation.Events using (Pos; root; _≟ᵖ_)
-open import denotation.EmissionSet using (Ev; out; end; EmissionSet; enter; ⟦_⟧; Seen; _≼_)
+open import denotation.EmissionSet using (Ev; out; end; EmissionSet; enter; ⟦_⟧; _≼_)
 open import denotation.Laws.Modulus using (≼-antisym)
 open import denotation.Laws.Worlds using (InvAt)
 open import denotation.Laws using (inv-⟦⟧)
-open import denotation.Read using (Run; Meets; Visible; loud; cursor; []; _∷_)
+open import denotation.Read using (Run; Meets; loud; cursor; []; _∷_)
 import denotation.Read as Read
 open import operation.PureObservable using (PureObs; module Machine; module Driver)
 open Machine using (Conf; load; nx; cp; absorbed) renaming (Shown to Shownᴹ)
 open import operation.Key using (Key; at; _<ᴷ_; clash)
-open import adequacy.Rows using (≼-≢; Steps; conv; Vis; Past; Lowest; Beyond; into; back; narrow; past-≃; _≃_; ≃-sym; ≃-trans; []; tau;
-  val; fin)
+open import adequacy.Rows using (≼-≢; Steps; conv; Vis; Lowest; Beyond; into; back; _≃_; ≃-sym; ≃-trans; []; tau; val; fin)
 open _≃_
-open import adequacy.Simulation using (Simulation; quiet-root)
+open import adequacy.Simulation using (Simulation; quiet-root; module Along)
 open import adequacy.Weight using (Clock; W; Wᶜ-kept; anc)
 open import adequacy.Lighten using (still-lightens)
 open import adequacy.Path using (_⊑_; ⊑i; ⊑-trans; Path; []; tau; val; _▸_; then; Next; more; done; _⇜_; _▸τ_; Still)
@@ -99,6 +98,7 @@ still-finite o {rs} {k} {p} pth₀ m ks cov = go (<-wellFounded (W (ks ++ anc ks
 
 module _ {R : Set} (o : PureObs [] R) (S : Simulation o) where
   open Simulation S using (I; T; i₀; t₀; dry) renaming (tau to simτ; val to simval; fin to simfin)
+  open Along S using (along; Owed) renaming (met-next to last)
 
   private
     t : EmissionSet R
@@ -120,25 +120,6 @@ module _ {R : Set} (o : PureObs [] R) (S : Simulation o) where
     over : ∀ {p rs} → t p end → Run t (just p) rs → rs ≡ []
     over _  []                                = refl
     over tp ((((ty , _) , _) , vi , pq , _) ∷ _) = ⊥-elim (loud vi (quiet-root o tp ty pq))
-
-    -- Along a run: the invariant, and the visible rows the program's past
-    -- what it has shown.
-    along : ∀ {k₀ rs k} c → Path k₀ rs k → (i : I k₀) → Vis (T i) ≃ Vis (Beyond t c)
-          → Σ (I k) λ i′ → Vis (T i′) ≃ Vis (Beyond t (cursor c (conv rs)))
-    along c []          i r = i , r
-    along c (tau e pth) i r =
-      let (i′ , q) = simτ i e
-      in along c pth i′ (≃-trans {t = Vis (T i′)} {u = Vis (T i)} {v = Vis (Beyond t c)} (≃-sym q) r)
-    along c (val {p = p} e pth) i r =
-      let (i′ , (v , _) , q) = simval i e
-          cq = proj₂ (into c (proj₁ (to r v)))
-      in along (just p) pth i′
-           (≃-trans {t = Vis (T i′)} {u = Vis (Past p (T i))} {v = Vis (Beyond t (just p))} (≃-sym q)
-             (≃-trans {u = Vis (Past p (Beyond t c))} (past-≃ {t = T i} {u = Beyond t c} {p = p} r) (narrow {t = t} c cq)))
-
-    -- The row met next past `c`.
-    Owed : Maybe Pos → Pos → Ev R → Set
-    Owed c p e = Seen t p e × Visible e × Read.Least t c p
 
     -- The least visible row of a state, read as the program's past `c`,
     -- is the row met next.
@@ -162,11 +143,6 @@ module _ {R : Set} (o : PureObs [] R) (S : Simulation o) where
         go (Driver.complete q) eq =
           let (pq , ee) = same i c r h (simfin i eq) in subst₂ (Next k) (sym pq) (sym ee) (done (fin eq))
         go Driver.drained eq = ⊥-elim (dry i eq (from r (back c tp ap , vi)))
-
-    -- The last row met.
-    last : ∀ {c} xs {p e} → Run t c (xs ++ [ (p , e) ]) → Owed (cursor c xs) p e
-    last []       (h ∷ []) = h
-    last (_ ∷ xs) (_ ∷ m)  = last xs m
 
     -- SILENT RUNS ARE FINITE: short of a row a reader meets next, a run
     -- takes finitely many silent steps.  The fuel: the rows at or before

@@ -24,17 +24,24 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Pos; root; ix; last; <ᵖ-below; <ᵖ-part; <ᵖ-ix; _≟ᵖ_; emit; stall; close; From∞; Frame)
 open import denotation.EmissionSet using (enter; ⟦_⟧; _≼_)
-open import denotation.Read using (Meets)
+open import denotation.Read using (Meets) renaming (cursor to cursorᴿ)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; opening; due; Tape; rest; play; ending) renaming (over to overT)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Mode; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising; nx; cp; closedUp; closed; alive; dirs; unsub; cut; killAll; ended; settle;
                     attAt; attached; free; cpAt; cutAt; overAt; search; found; own; run; unsubIf; ofM; attM; cpM; cutM; bodyM; srcAttM; owedM; joinM; leafM)
 open import operation.Key using (Key; at; _<ᴷ_; at-<ᴷ; <ᴷ-trans; <ᴷ-irrefl; clash)
-open import adequacy.Rows using (conv)
+open import adequacy.Rows using (conv; back; module _≃_)
 open import adequacy.Weight using (Clock; W; Wᶜ; anc; prefixes; listed; depth; syn; one; isNone; climb; module Weigh)
-open import adequacy.Dispatch using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-least; found-plug)
+open import adequacy.Dispatch using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-least; found-plug; cursor)
 open import adequacy.Path using (Path; Still; _⇜_)
 open import adequacy.Stamped using (frame-ahead; opening-ahead)
+open import adequacy.Simulation using (Simulation; module Along)
+open import adequacy.Cursor using (settled)
+import adequacy.Walk as Walk
+open import adequacy.Walk using (due-≈)
+open import adequacy.Bound using (bound)
+open _≃_ using (from)
+open import denotation.Laws.Modulus using (≼-false)
 
 -- A position's child keyed strictly after it.
 below : ∀ q {l} → at q <ᴷ at (q ++ [ l ]) ≡ true
@@ -82,14 +89,6 @@ postulate
             → Path (load o) rs ⟨ inSrc k b c , s , rising ε , q ⟩ → k′ ⇜ ⟨ inSrc k b c , s , rising ε , q ⟩
             → Clock k′ <ᴷ at (q ++ [ ix 0 ]) ≡ false
 
-  -- THE LEAST MARK IS NOT PAST THE ROW: short of a row a reader meets
-  -- next, the least mark a run finds, keyed at a position, is keyed at or
-  -- before it.
-  mark-short : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q p e Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ mk u}
-             → Path (load o) rs ⟨ c , s , absorbed , q ⟩
-             → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
-             → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , s′) mk (at u)) → at p <ᴷ at u ≡ false
-
   -- A COLD'S TICK IS A ROW: short of a row a reader meets next, a cold an
   -- open observer hears plays its due at a row at or before it, or at an
   -- ancestor of one.
@@ -100,6 +99,22 @@ postulate
            → closed c′ ≡ false
            → Σ Pos λ r → Σ _ λ e′ → enter (⟦ o ⟧ []ᴬ) root r e′ × r ≼ p × (u ++ [ ix i ]) ∈ prefixes r
 
+
+-- THE LEAST MARK IS NOT PAST THE ROW: short of a row a reader meets
+-- next, the least mark a run finds, keyed at a position, is keyed at or
+-- before it.
+mark-short : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q p e Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ mk u}
+           → Path (load o) rs ⟨ c , s , absorbed , q ⟩
+           → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+           → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , s′) mk (at u)) → at p <ᴷ at u ≡ false
+mark-short {R} o {rs} {c = c} {s} {p = p} {u = u} pth m fd
+  with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o))
+     | Along.met-next (cursor o) {c = nothing} (conv rs) m
+... | (C , settled _ fr h) , r | ((tp , _) , _) , vi , ap , _ with Walk.climb (enter (⟦ o ⟧ []ᴬ) root) fr h
+...   | _ , _ , eq , sy =
+  trans (at-<ᴷ p u)
+    (≼-false {u} {p} (bound sy (λ ()) (proj₂ (found-least {t = plug c s} fd))
+      (from (due-≈ {C = C} eq) (proj₁ (from r (back (cursorᴿ nothing (conv rs)) tp ap , vi))))))
 
 private
   conn-arith : ∀ w e x y → w ≤ e → suc ((((w + suc e) + 0) + 0 + e) + x + y) ≤ 2 + 3 * e + y + x

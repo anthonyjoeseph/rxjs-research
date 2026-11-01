@@ -50,7 +50,7 @@ it is never past the row met next, and that an open cold's tick is the
 row of a position at or before it, so it is listed. Settled by bodies
 over the cursor `Inv`.
 
-Members: `mark-short`, `tick-row`.
+Members: `tick-row`.
 
 #### THE CLOCK AHEAD
 
