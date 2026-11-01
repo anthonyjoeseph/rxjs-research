@@ -34,7 +34,7 @@ open import adequacy.Rows using (conv; back; module _≃_)
 open import adequacy.Weight using (Clock; W; Wᶜ; anc; prefixes; listed; depth; syn; one; isNone; climb; module Weigh)
 open import adequacy.Dispatch using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-least; found-plug; cursor)
 open import adequacy.Path using (Path; Still; _⇜_)
-open import adequacy.Stamped using (frame-ahead; opening-ahead)
+open import adequacy.Stamped using (frame-ahead; opening-ahead; pend-focus)
 open import adequacy.Simulation using (Simulation; module Along)
 open import adequacy.Cursor using (settled)
 import adequacy.Walk as Walk
@@ -56,11 +56,6 @@ over : ∀ q → at (q ++ [ ix 1 ]) <ᴷ at (q ++ [ ix 0 ]) ≡ true → ⊥
 over q h = clash (<ᴷ-trans (at (q ++ [ ix 1 ])) (at (q ++ [ ix 0 ])) (at (q ++ [ ix 1 ])) h (part q)) (<ᴷ-irrefl (at (q ++ [ ix 1 ])))
 
 postulate
-  -- A SUBSCRIBING RUN IS AT ITS SUBSCRIPTION: every conf a run reaches
-  -- subscribing has a pending subscription in focus, owed where the run is.
-  pend-focus : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q}
-             → Path (load o) rs ⟨ c , s , subscribing , q ⟩ → Σ (PureObs Γ A) λ o′ → s ≡ pend o′ q
-
   -- A DEFER'S GUARD IS MET: short of a row a reader meets next, a defer a
   -- run subscribes has its guard row, at or before the row met next.
   defer-guard : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {l q p e}

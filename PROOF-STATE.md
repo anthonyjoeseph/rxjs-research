@@ -45,10 +45,8 @@ Members: `lane-guard`, `echo-guard`, `defer-guard`.
 
 #### THE MARK AT ITS ROW
 
-A still mark run is the least mark, so its weight is spent. Open: that
-it is never past the row met next, and that an open cold's tick is the
-row of a position at or before it, so it is listed. Settled by bodies
-over the cursor `Inv`.
+Open: that an open cold's tick is an ancestor of a row at or before the
+row met next, so it is listed. Settled by a body over the cursor `Inv`.
 
 Members: `tick-row`.
 
@@ -59,13 +57,6 @@ back over a silent step, and a source's feed comes due no sooner than a
 level down. Settled by an engine key invariant beside `stamped`.
 
 Members: `clock-mono`, `fed-ahead`.
-
-#### THE SUBSCRIPTION MET
-
-Open: that a subscribing run has its pending subscription in focus.
-Settled by a body.
-
-Members: `pend-focus`.
 
 #### THE COLD STEPPED
 
