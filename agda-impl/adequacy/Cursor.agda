@@ -173,9 +173,9 @@ Ends P O = ∀ {q a c k e} → O q (out a) → Lane P q a c end → Lane P q a k
 
 ------------------------------------------------------------------------
 -- A NODE IN STEP WITH ITS FROZEN ENTRY: what its state still owes is
--- exactly `E`'s visible rows past `C`.  `E` is pinned from below by a
--- subscription's program (`s-pend`) and from above by the frame it sits
--- in; every clause but those two only composes.
+-- exactly `E`'s visible rows past `C`.  `E` is pinned from above by the
+-- frame it sits in; a subscription not yet run is pinned by its program
+-- outside `Sync`, in `src-pend` and `pending`.
 
 data Sync : ∀ {Γ} → Scope Γ → Cur → ∀ {A} → St Γ A → EmissionSet A → Set₁
 

@@ -532,6 +532,13 @@ module Over {R : Set} (Rt : EmissionSet R) where
                                                      (λ l′ → ⟨ c′ , coldS b l′ , absorbed , p ⟩))
                                     (abs-leaf fd)
 
+  -- The record update holds `srcLive` too, so the test is generalised alone.
+  body-cp : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s p k′ sh t} b → CS.srcLive k ≡ b
+          → moved (if b then ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩ else ⟨ c , connS k o s , absorbed , p ⟩) [] [] ≡ moved k′ sh t
+          → SimC Rt ⟨ inBody k o c , s , rising cp , p ⟩ sh k′
+  body-cp true  lv refl = rise-body-cp lv
+  body-cp false lv refl = rise-bodyx Rt lv
+
   -- A rise, by its frame.
   rise-sim : ∀ {Γ A} {k′ : Conf R} {sh t} (c : Ctx R Γ A) (s : St Γ A) e p → rise c s e p ≡ moved k′ sh t → SimC Rt ⟨ c , s , rising e , p ⟩ sh k′
   rise-sim top                       s e      p refl = rise-top Rt
@@ -555,9 +562,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   rise-sim (inBody k o c)            s (nx b) p eq with CS.srcLive k in lv | eq
   ... | true  | refl = rise-body-nx lv
   ... | false | refl = rise-bodyx Rt lv
-  rise-sim (inBody k o c)            s cp     p eq with CS.srcLive k in lv | eq
-  ... | true  | refl = rise-body-cp lv
-  ... | false | refl = rise-bodyx Rt lv
+  rise-sim (inBody k o c)            s cp     p eq   = body-cp (CS.srcLive k) refl eq
 
   -- A joiner subscribed, by its subject's end.
   join-mv : ∀ {Γ A} (c : Ctx R Γ A) (x : A ∈ Γ) q {p} → Mv (stepᴹ ⟨ c , pend (connected x) q , subscribing , p ⟩)

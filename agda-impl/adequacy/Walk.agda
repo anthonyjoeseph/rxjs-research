@@ -6,7 +6,7 @@
 -- focus of the same tree, at the same cursor.
 module adequacy.Walk where
 
-open import Data.Bool using (Bool; T; true; false; not; _∧_)
+open import Data.Bool using (T; true; false; not; _∧_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; reverse; _ʳ++_)
 open import Data.List.Properties using (ʳ++-defn)
@@ -22,10 +22,11 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; absorbed; Scope; unbound; bind
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (_≃_; _⇄_; ≃-refl; ≃-sym; ≃-trans)
 open import adequacy.Cursor using (Cur; Owes; Due; Spent; _≈_; Pol; Runs; Hole; LaneSt; l-live; l-dead; Begun; none; more; bump;
-  joined; Sync; Src; src-pend; src-on; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat;
-  s-conn; s-join; s-joinx; Need; owes; lane; lanecut; pnd; Hold; u-map; u-scan; u-cut; u-ln; u-take;
-  u-outer; u-lanes; u-src; u-body; Fr; f-top; f-off; f-map; f-scan; f-cut; f-take; f-took;
-  f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcp; f-srcx; f-body; Inv; settled; c-abs)
+  joined; Sync; src-pend; src-on; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took;
+  s-flat; s-conn; s-join; s-joinx; Need; owes; lane; lanecut; pnd; Hold; u-map; u-scan; u-cut;
+  u-ln; u-take; u-outer; u-lanes; u-src; u-body; Fr; f-top; f-off; f-map; f-scan; f-cut;
+  f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcp; f-srcx; f-body; Inv;
+  settled; c-abs)
 open _≃_
 
 ------------------------------------------------------------------------
