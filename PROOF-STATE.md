@@ -18,8 +18,10 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 A connect's and a joiner's frames read their rows truncated (`ConnE`,
 `JoinE`, the joiner's outer pinned to its ghost), so a rise into either
-needs few rows before it, which no state shows. Open: whether a run's
-history bounds them. Settled when each history leaf is a body.
+needs few rows before it. Those rows include skips (echoes, guards), and
+`Sync` ties visible rows only, so `Inv` cannot count them. Open: whether
+every row a frame's entry has passed is one the run stepped at, kept by
+a per-step invariant over all rows. Settled when each history leaf is a body.
 
 Members: `few-body`, `few-outer`, `few-lane`.
 
