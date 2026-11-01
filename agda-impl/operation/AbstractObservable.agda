@@ -259,12 +259,18 @@ unsubIf false s = s , []
 ------------------------------------------------------------------------
 -- A connect's feed, pushed into each of its live joiners
 
--- A step at `p` queued last for a joiner joined at `j`: under where it
+-- An inbox kept in position order: an entry goes behind every one
+-- before it.
+inbox : ∀ {A} → Pos × Ev A → List (Pos × Ev A) → List (Pos × Ev A)
+inbox v              []              = [ v ]
+inbox (q , e) ((r , e′) ∷ ib) = if r <ᵖ q then (r , e′) ∷ inbox (q , e) ib else (q , e) ∷ (r , e′) ∷ ib
+
+-- A step at `p` queued for a joiner joined at `j`: under where it
 -- joined if it joined before; else a value is not its, and an end is at
 -- once.
 queued : ∀ {A} → Pos → Pos → Ev A → List (Pos × Ev A) → List (Pos × Ev A)
-queued j p (nx a) ib = if j <ᵖ p then ib ++ [ (p ⊕ [ subᴾ j ] , nx a) ] else ib
-queued j p cp     ib = ib ++ [ (if j <ᵖ p then p ⊕ [ subᴾ j ] else j ⊕ [ last ]) , cp ]
+queued j p (nx a) ib = if j <ᵖ p then inbox (p ⊕ [ subᴾ j ] , nx a) ib else ib
+queued j p cp     ib = inbox ((if j <ᵖ p then p ⊕ [ subᴾ j ] else j ⊕ [ last ]) , cp) ib
 
 -- Binder `i`'s step at `p`, fed to every joiner of it still live.
 mutual

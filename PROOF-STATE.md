@@ -52,12 +52,11 @@ Members: `tick-row`.
 
 #### THE CLOCK AHEAD
 
-The clock never runs back: proven step by step over two engine key facts.
-Open: that mid-run no mark is keyed before the run's whole subtree is
-past, and a joiner's inbox stays in key order. Settled by an invariant
-beside `stamped`.
+Mid-run the floor holds step by step; open is the phase start: the least
+mark run from rest leaves every other mark past the subtree it opens.
+Settled by a pairwise-apart invariant on owed keys beside `stamped`.
 
-Members: `floor`, `inbox-asc`.
+Members: `floor-run`.
 
 #### THE COLD STEPPED
 
