@@ -35,7 +35,8 @@ open import adequacy.Weight using (Clock; W; Wᶜ; anc; prefixes; listed; depth;
 open import adequacy.Dispatch using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-least; found-plug; cursor)
 open import adequacy.Path using (Path; Still; _⇜_)
 open import adequacy.Stamped using (frame-ahead; opening-ahead; pend-focus)
-open import adequacy.Floor using (fed-ahead; below)
+open import adequacy.Floor.Keys using (below)
+open import adequacy.Floor using (fed-ahead)
 open import adequacy.Simulation using (Simulation; module Along)
 open import adequacy.Cursor using (settled)
 import adequacy.Walk as Walk
