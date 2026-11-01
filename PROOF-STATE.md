@@ -34,16 +34,6 @@ when each is a body.
 
 Members: `rise-outer-nx`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`, `sub-flat`.
 
-#### THE SILENT RUN, FINITE
-
-Short of a row a reader meets next, a run is fuelled by the listed rows
-and their ancestors strictly past its clock, and between them by
-`adequacy.Weight`; a climb and a subscribe are proven to lower it. Open:
-that the least mark's run, passing no listed row, lowers the weight at
-its clock. Settled by a body.
-
-Members: `lightens-run`.
-
 #### THE GUARD ROWS
 
 A step that begins work a level down — a lane, a defer's body, a
@@ -53,13 +43,23 @@ bodies over the joiner's and connect's rows.
 
 Members: `lane-guard`, `echo-guard`, `defer-guard`.
 
+#### THE MARK AT ITS ROW
+
+A still mark run is the least mark, so its weight is spent. Open: that
+it is never past the row met next, and that an open cold's tick is the
+row of a position at or before it, so it is listed. Settled by bodies
+over the cursor `Inv`.
+
+Members: `mark-short`, `tick-row`.
+
 #### THE CLOCK AHEAD
 
 No mark is due before the run's clock. Open: that the clock never runs
-back over a silent step, and a source's feed comes due no sooner than a
-level down. Settled by an engine key invariant.
+back over a silent step, a source's feed comes due no sooner than a
+level down, and a cold's next frame comes due past its close. Settled by
+an engine key invariant.
 
-Members: `clock-mono`, `fed-ahead`.
+Members: `clock-mono`, `fed-ahead`, `frame-ahead`.
 
 #### THE SUBSCRIPTION MET
 

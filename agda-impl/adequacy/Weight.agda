@@ -56,7 +56,7 @@ syn d (map _ s)         = 1 + syn (suc d) s
 syn d (scan _ _ s)      = 1 + syn (suc d) s
 syn d (takeWhile _ _ s) = 1 + 2 * (2 + d) + (3 + d) + syn (2 + d) s
 syn d (flatMap _ _ s)   = 1 + (3 + d) + syn (2 + d) s
-syn d (connect s b)     = 1 + 3 * (2 + d) + syn (suc d) b + syn (suc d) s
+syn d (connect s b)     = 2 + 3 * (2 + d) + syn (suc d) b + syn (suc d) s
 syn d (connected _)     = 3 + d
 syn d (defer _)         = 1
 
@@ -86,7 +86,7 @@ module Weigh (ks : List Pos) (P : Pos) (C : Key) where
   wt d κ = if at P <ᴷ κ then 0 else if listed ks κ then (if C <ᴷ κ then 0 else 4 + 2 * d) else 2 + d
 
   bodyP : ℕ → Maybe Pos → ℕ
-  bodyP d (just p) = wt d (at (p ++ [ ix 1 ])) + (2 + d)
+  bodyP d (just p) = wt d (at (p ++ [ ix 1 ])) + (3 + d)
   bodyP d nothing  = 0
 
   -- An of's values still owed and its end.
