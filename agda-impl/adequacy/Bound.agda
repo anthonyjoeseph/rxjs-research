@@ -24,7 +24,7 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans)
 open import Relation.Nullary using (¬_)
 
-open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
+open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline; ix; last; ofᴱ)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (EmissionSet; out; end; skip; pin; _≺_; _≼_; Den; hot; coldAt; DenEnv; ⟦_⟧; Ended;
@@ -39,13 +39,13 @@ import denotation.Laws.Connect as LC
 open import operation.Key using (at; at-<ᴷ)
 open import operation.PureObservable using (module Machine; Tape; play; ending) renaming (over to tapeOver)
 open Machine using (St; Scope; unbound; binds; CS; cs; own; bodyM; cpAt; coldS; ofS; takeS; flatS; connS; joinS)
-open import adequacy.Rows using (full; pendRows; Inbox; this; that; tapeE)
+open import adequacy.Rows using (full; pendRows; Inbox; this; that; tapeE; Frozen)
 open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans; ≼-≢)
 open _≃_
 open import adequacy.Cursor using (Cur; origin; bef; aft; Owes; Due; Unfed; Adm; Ticked;
   Pol; Lane; Runs; Start; Kill; polF; JoinF; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Spent;
   Folded; fd-none; fd-last; Whole; Ahead;
-  Joined; joined; Ends; Flags; Src; src-pend; src-on; src-shut; Failure; Gone; notT; Sound; OweAt; o-cp; o-cut; o-over;
+  Joined; joined; Ends; Flags; Passed; JoinG; Src; src-pend; src-on; src-shut; Failure; Gone; notT; Sound; OweAt; o-cp; o-cut; o-over;
   Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
 
@@ -238,7 +238,7 @@ mutual
   bound (s-cut sy) env lo r = bound sy env (λ ki → lo (k-kid (k-cut ki))) r
   bound (s-take sy nf m _) env lo (x , v , ow) = take-b sy nf env (λ ki → lo (k-kid (k-take ki))) (from m (x , v)) ow
   bound (s-took fl g ni oa m sd) env lo (x , v , ow) = took-b fl g ni oa sd lo (from m (x , v)) ow
-  bound (s-flat _ sy jn m _) env lo (x , v , ow) = flat-b sy jn env lo (proj₁ (proj₁ (from (proj₂ m) (x , v)))) v ow
+  bound (s-flat _ sy jn m _) env lo (x , v , ow) = flat-b sy jn env lo (proj₁ (proj₁ (from (proj₁ (proj₂ m)) (x , v)))) v ow
   bound (s-conn refl _ bs ss fl m) env lo (x , v , ow) = let ((y , _) , v′) = from (proj₁ m) (x , v) in conn-b bs ss fl env lo (y , v′) ow
   bound {sc = sc} (s-join _ d ap _ _) env lo r = join-b {sc = sc} d ap env lo r
   bound (s-joinx sp) env lo r = ⊥-elim (sp r)
@@ -367,6 +367,20 @@ due-shift : ∀ {Γ} {sc : Scope Γ} {Rg} {C A} {s : St Γ A} {E p} → Sync sc 
           → Due C E ≃ Due (bef p) E
 due-shift {C = C} sy op env lo = (λ r@(x , v , _) → x , v , bound sy env lo r) ⇄ (λ (x , v , pq) → x , v , owes-≼ C op pq)
 
+-- THE ROWS A SHIFT PASSES ARE FEW.  Moving the cursor up to the least
+-- key passes the rows lying between, and `bound` places only the visible
+-- ones: a source's or joiner's skips there (echoes, guards, a lane's
+-- end) are the children of keys the run has stepped at, but no state
+-- ties them.  So what a connect's source and a joiner have passed stays
+-- few past the shift.
+postulate
+  src-passed  : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {X B} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B} {E p}
+              → Sync sc Rg C (connS k o b) E → Owes C p → Env (full sc) C p → Lo (connS k o b) (at p)
+              → Passed (bef p) (Frozen k)
+  flat-passed : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A B} {op : FlatOp} {f : A → Obs Timeline Γ B} {ω d n qu o ls E p}
+              → Sync sc Rg C (flatS op f ω d n qu o ls) E → Owes C p → Env (full sc) C p → Lo (flatS op f ω d n qu o ls) (at p)
+              → Passed (bef p) (JoinG sc op f ω)
+
 module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
 
   dn : ∀ {q} → Owes (bef p) q → Owes C q
@@ -420,10 +434,11 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
     sh (s-take sy nf m sd) env lo = s-take (sh sy env lo′) (λ y nk → bound sy env lo′ (y , tt , nf y nk)) m sd
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-take ki))
     sh (s-took fl g ni oa m sd) env lo = s-took fl (λ {q} o → g {q} (dn o)) (λ t → nm (ni t)) (owe-sh oa lo) m sd
-    sh (s-flat ji sy jn m sd) env lo =
-      s-flat ji (sh sy env lo′) (joined-sh (bound sy env lo′) jn env (λ i ki → lo (k-kid (k-lane i ki)))) m sd
+    sh sy₀@(s-flat ji sy jn (pn , eq , _) sd) env lo =
+      s-flat ji (sh sy env lo′) (joined-sh (bound sy env lo′) jn env (λ i ki → lo (k-kid (k-lane i ki))))
+             (pn , eq , flat-passed sy₀ op env lo) sd
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-outer ki))
-    sh {sc = sc} (s-conn {k = k} refl pt bs ss fl m) env lo = s-conn refl pt bs′ (λ t → src-sh (ss t) env lo) fl′ m
+    sh {sc = sc} sy₀@(s-conn {k = k} refl pt bs ss fl m) env lo = s-conn refl pt bs′ (λ t → src-sh (ss t) env lo) fl′ m
       where
         bs′ = λ t → sh (bs t) (env-bind {o = CS.src k} {r = CS.connAt k} (src-b (ss t) env lo) env) (λ ki → lo (k-kid (k-body ki)))
         unsh : T (CS.srcLive k) → ∀ {c} → adequacy.Rows.Frozen k c end → ¬ Owes (bef p) c → T (CS.closed k)
@@ -431,7 +446,7 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
         ... | inj₁ o  = ⊥-elim (n (src-b (ss t) env lo (y , tt , o)))
         ... | inj₂ no = Flags.unshut fl t y no
         fl′ = record { shut = λ c → proj₁ (Flags.shut fl c) , nm (proj₂ (Flags.shut fl c)) ; unshut = unsh
-                     ; torn = λ nt → spent (Flags.torn fl nt) }
+                     ; torn = λ nt → spent (Flags.torn fl nt) ; past = src-passed sy₀ op env lo }
     sh {sc = sc} (s-join {x = x} {E = E} en d ap hd adm) env lo = s-join en d′ ap (λ i u → hd i (unfed-dn (lookup (full sc) x) u)) adm
       where
         d′ = (λ r → [ inj₁ , (λ u → inj₂ (unfed-up (lookup (full sc) x) (env x) u)) ]′ (to d (due-dn {E = E} r)))

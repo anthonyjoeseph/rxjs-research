@@ -16,14 +16,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE TRUNCATED COMPOSITE
 
-A connect's and a joiner's frames read their rows truncated (`ConnE`,
-`JoinE`, the joiner's outer pinned to its ghost), so a rise into either
-needs few rows before it. Those rows include skips (echoes, guards), and
-`Sync` ties visible rows only, so `Inv` cannot count them. Open: whether
-every row a frame's entry has passed is one the run stepped at, kept by
-a per-step invariant over all rows. Settled when each history leaf is a body.
+A connect's and a joiner's frames carry `Passed`: their entry's rows not
+owed past the cursor are listed. Kept by every rise and rebuild; the one
+open step is the cursor's shift to the least key, which passes skips
+(echoes, guards, a lane's end) no state ties. Open: whether each passed
+skip is a child of a key the run stepped at. Settled when each is a body.
 
-Members: `few-body`, `few-outer`, `few-lane`.
+Members: `src-passed`, `flat-passed`.
 
 #### THE CONNECT STEPPED
 
@@ -83,7 +82,7 @@ Believed: a subscription's entry is its program's meaning there, and an
 of's next delivers its next row. Settled when each is a body.
 
 Members: `sub-empty`, `sub-of`, `sub-map`, `sub-defer`, `run-of-nx`, `run-of-end`,
-`flat-jinv`, `flat-joined`, `conn-flags`, `conn-ok`.
+`flat-jinv`, `flat-joined`, `flat-passed₀`, `conn-flags`, `conn-ok`.
 
 ## Tier 1 — the simultaneous spec
 

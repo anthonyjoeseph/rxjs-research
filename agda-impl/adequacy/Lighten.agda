@@ -97,7 +97,7 @@ mark-short : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q p e Γ�
 mark-short {R} o {rs} {c = c} {s} {p = p} {u = u} pth m fd
   with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o))
      | Along.met-next (cursor o) {c = nothing} (conv rs) m
-... | (C , settled _ fr h , _) , r | ((tp , _) , _) , vi , ap , _ with Walk.climb (enter (⟦ o ⟧ []ᴬ) root) fr h
+... | (C , settled _ fr h) , r | ((tp , _) , _) , vi , ap , _ with Walk.climb (enter (⟦ o ⟧ []ᴬ) root) fr h
 ...   | _ , _ , eq , sy =
   trans (at-<ᴷ p u)
     (≼-false {u} {p} (bound sy (λ ()) (proj₂ (found-least {t = plug c s} fd))
