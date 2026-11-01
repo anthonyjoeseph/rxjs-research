@@ -48,7 +48,7 @@ sync-≈ (s-scan sy fd eq sd)  e = s-scan sy fd (≃-trans eq e) sd
 sync-≈ (s-cut sy)            e = s-cut (sync-≈ sy e)
 sync-≈ (s-take sy nf eq sd)  e = s-take sy nf (≃-trans eq e) sd
 sync-≈ (s-took fl nr fz ow eq sd) e = s-took fl (λ {q} → nr {q}) fz ow (≃-trans eq e) sd
-sync-≈ (s-flat jp sy j eq sd) e = s-flat jp sy j (≃-trans eq e) sd
+sync-≈ (s-flat ji sy j eq sd) e = s-flat ji sy j (≃-trans eq e) sd
 sync-≈ (s-conn sc pt b o fl eq) e = s-conn sc pt b o fl (≃-trans eq e)
 sync-≈ {C = C} (s-join eq d ap lt a) e = s-join (≃-trans eq e) (≃-trans (≃-sym (due-≈ {C = C} e)) d) ap lt a
 sync-≈ {C = C} (s-joinx sp) e = s-joinx (spent-≈ {C = C} sp e)
@@ -128,9 +128,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
   climb (f-cut fr)                    h = climb fr λ t → s-cut (h t)
   climb (f-take fr nf eq sd)          h = climb fr λ t → s-take (h t) nf eq sd
   climb (f-took fr fl nr fz ow eq sd) h = climb fr λ _ → s-took fl (λ {q} → nr {q}) fz ow eq sd
-  climb (f-outer fr jp j eq sd)       h = climb fr λ t → s-flat jp (h t) j eq sd
-  climb (f-lanes {pre = pre} {b = b} fr jp sy lf o nq r hl rt cnt wt wh od ah ao en li eq so sd) (_ , _ , refl , h) =
-    climb fr λ _ → s-flat jp sy (joined bg wt wh od ah ao en li) eq so
+  climb (f-outer fr ji j eq sd)       h = climb fr λ t → s-flat ji (h t) j eq sd
+  climb (f-lanes {pre = pre} {b = b} fr ji sy lf o nq r hl rt cnt wt wh od ah ao en li eq so sd) (_ , _ , refl , h) =
+    climb fr λ _ → s-flat ji sy (joined bg wt wh od ah ao en li) eq so
     where
       bg = subst (Begun _ _ _ _ _ _ _) (sym cnt)
              (subst (λ ls → Begun _ _ _ _ _ _ ls _) (sym (ʳ++-defn pre)) (begun-join lf o nq r (laneSt b hl h sd) rt))
@@ -194,7 +194,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-outer : ∀ {C Γ A B} {op} {f} {d n qu ls} {c : Ctx R Γ B} {s : St Γ A}
              → Res C c (flatS op f d n qu s ls) → Res C (inOuter op f d n qu ls c) s
   down-outer (owes true , _ , _ , fr , h) with h _
-  ... | s-flat jp sy j eq sd = owes true , _ , _ , f-outer fr jp j eq sd , λ _ → sy
+  ... | s-flat ji sy j eq sd = owes true , _ , _ , f-outer fr ji j eq sd , λ _ → sy
   down-outer (owes false , _ , _ , fr , _)            = owes false , nowhere , none′ , f-off u-outer fr , λ ()
   down-outer (lane _ , _ , _ , _ , (_ , _ , () , _))
   down-outer (lanecut _ , _ , _ , _ , (_ , _ , () , _))
@@ -203,10 +203,10 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-lanes : ∀ {C Γ A B} {op} {f} {d n qu} {o : St Γ A} {pre post} {c : Ctx R Γ B} {s}
              → Res C c (flatS op f d n qu o (pre ʳ++ s ∷ post)) → Res C (inLanes op f d n qu o pre post c) s
   down-lanes {pre = pre} (owes true , _ , _ , fr , h) with h _
-  ... | s-flat jp sy (joined bg wt wh od ah ao en li) eq so
+  ... | s-flat ji sy (joined bg wt wh od ah ao en li) eq so
     with begun-split (reverse pre) (subst (λ ls → Begun _ _ _ _ _ _ ls _) (ʳ++-defn pre) bg)
   ...   | split lf o nq r l rt cnt refl with laneHold l
-  ...     | _ , hl , hd , sd = lane _ , _ , _ , f-lanes fr jp sy lf o nq r hl rt cnt wt wh od ah ao en li eq so sd , hd
+  ...     | _ , hl , hd , sd = lane _ , _ , _ , f-lanes fr ji sy lf o nq r hl rt cnt wt wh od ah ao en li eq so sd , hd
   down-lanes (owes false , _ , _ , fr , _)            = owes false , nowhere , none′ , f-off u-lanes fr , λ ()
   down-lanes (lane _ , _ , _ , _ , (_ , _ , () , _))
   down-lanes (lanecut _ , _ , _ , _ , (_ , _ , () , _))

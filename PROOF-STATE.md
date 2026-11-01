@@ -14,17 +14,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE JOINER STEPPED
-
-An outer's value or end and a lane's, each rising into `Joined`/`Begun`
-by its policy: a switch's kill, an exhaust's drop, a bounded queue.
-Open: whether each lane holds a region of its own, apart from the
-outer's (`JParts`), a queued lane's ending at the freed lane's end, and
-begun lanes stay ascending; whether `Begun`'s live count makes a freed
-slot the queue head's `Starts.queued`. Settled when each is a body.
-
-Members: `rise-outer-nx`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`, `sub-flat`.
-
 #### THE CONNECT STEPPED
 
 A connect entered, a joiner joined, a source's or body's rise, its own
@@ -34,6 +23,16 @@ its scope's hots, so the rest moves past `p`. Settled when each is a body.
 
 Members: `sub-conn`, `sub-join`, `sub-joined`, `run-con`, `run-join-nx`,
 `run-join-cp`, `rise-take-failᵢ`, `feed-up`.
+
+#### THE JOINER STEPPED
+
+An outer's value or end and a lane's, each rising into `Joined`/`Begun`
+by its policy: a switch's kill, an exhaust's drop, a bounded queue.
+Open: whether begun lanes stay ascending (`Asc`), and whether `Begun`'s
+live count makes a freed slot the queue head's `Starts.queued`. Settled
+when each is a body.
+
+Members: `rise-outer-nx`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`, `sub-flat`.
 
 #### THE SILENT RUN, FINITE
 

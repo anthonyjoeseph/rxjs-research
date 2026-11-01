@@ -56,7 +56,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; unbound; binds; CS; Owe
                     renaming (Ev to Evᴹ; Shown to Shownᴹ)
 open import denotation.Laws.Modulus using (≼-refl; ≺→≼; ≺-ext; ≺-irrefl; ≺-trans; ≼-or-≻)
 open import adequacy.Rows using (≼-≢; _≃_; _⇄_; ≃-refl; Vis; Moves; silent; shown; toEv; Inbox; full; pendRows; Frozen; tapeE)
-open import denotation.Laws.Worlds using (Ok; Hots; Real; W⁼)
+open import denotation.Laws.Worlds using (Ok; Hots; Real; W⁼; InvAt; InvD)
 open _≃_
 
 ------------------------------------------------------------------------
@@ -195,18 +195,29 @@ LanesIn Rl P O = ∀ {q a k e} → O q (out a) → Lane P q a k e → Visible e 
 Asc : ∀ {A} → List (Pos × A) → Set
 Asc = AllPairs (λ u v → proj₁ u ≺ proj₁ v)
 
--- A joiner's parts: its outer's region and each lane's, by the value that
--- began it, inside its own and apart.  A bounded merge subscribes a
--- queued lane under the end of the lane it frees, so a lane's region
--- stops at its end.
-record JParts (Rg : Rgn) : Set₁ where
+-- A lane's region, read off its policy: the world it subscribes in, up to
+-- its end.  A bounded merge subscribes a queued lane under the end of the
+-- lane it frees, inside that lane's world, so the cap is what keeps the
+-- two apart.
+LaneRg : ∀ {A B} → (Pos → Set) → Pol A B → EmissionSet A → Pos → Rgn
+LaneRg H P O q y = Real y × Σ _ λ a → Σ Pos λ s → O q (out a) × Start P q a s × W⁼ H s y × (∀ {c} → Lane P q a c end → y ≼ c)
+
+-- A joiner's parts: each value's lane in its region, the outer in what
+-- no lane's holds.
+JRl : ∀ {Γ A B} → Scope Γ → Rgn → FlatOp → (A → Obs Timeline Γ B) → EmissionSet A → Pos → Rgn
+JRl sc Rg op f O q y = Rg y × LaneRg (Hots (full sc)) (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O q y
+
+JRo : ∀ {Γ A B} → Scope Γ → Rgn → FlatOp → (A → Obs Timeline Γ B) → EmissionSet A → Rgn
+JRo sc Rg op f O y = Rg y × (∀ {q} → LaneRg (Hots (full sc)) (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O q y → ⊥)
+
+-- A joiner's outer entry keeps the invariant where it subscribed, and
+-- every lane's program everywhere admissible.
+record JInv {Γ A B} (sc : Scope Γ) (f : A → Obs Timeline Γ B) (O : EmissionSet A) : Set where
   field
-    Ro    : Rgn
-    Rl    : Pos → Rgn
-    o⊆    : ∀ {y} → Ro y → Rg y
-    l⊆    : ∀ {q y} → Rl q y → Rg y
-    apart : ∀ {q y} → Ro y → Rl q y → ⊥
-    sole  : ∀ {q q′ y} → Rl q y → Rl q′ y → q ≡ q′
+    at : Pos
+    ok : Ok (Hots (full sc)) at
+    io : InvAt (Hots (full sc)) at O
+    fi : ∀ a → InvD (Hots (full sc)) (⟦ f a ⟧ (full sc))
 
 -- A cold's frame played where its timeline puts it: under a reachable
 -- root, at or after the root's tick.
@@ -320,8 +331,8 @@ data Sync where
          → TakeWhile.TakeT i keep Es ≈ E → Sound Rg Es → Sync sc Rg C (takeS i keep w s) E
   -- a joiner: its outer, and its bookkeeping over its policy
   s-flat : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A B} {op} {f : A → Obs Timeline Γ B} {d n qu o ls O E}
-         → (jp : JParts Rg) → Sync sc (JParts.Ro jp) C o O → Joined sc (JParts.Rl jp) C (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O d n qu ls
-         → JoinF op (λ a → ⟦ f a ⟧ (full sc)) O ≈ E → Sound (JParts.Ro jp) O
+         → JInv sc f O → Sync sc (JRo sc Rg op f O) C o O → Joined sc (JRl sc Rg op f O) C (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O d n qu ls
+         → JoinF op (λ a → ⟦ f a ⟧ (full sc)) O ≈ E → Sound (JRo sc Rg op f O) O
          → Sync sc Rg C (flatS op f d n qu o ls) E
   -- a connect: its body, under its binder read whole, and its source,
   -- while the source runs; torn down, its body owes nothing and nothing
@@ -418,20 +429,20 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → TakeWhile.TakeT i keep Es ≈ E′ → Sound Rg Es
             → Fr C Rg′ (inTake i keep o c) (owes false) E
     f-outer : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n qu ls} {c : Ctx R Γ B} {Rg w E E′}
-            → Fr C Rg c (owes w) E′ → (jp : JParts Rg)
-            → Joined (scopeOf c) (JParts.Rl jp) C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E d n qu ls
-            → JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E ≈ E′ → Sound (JParts.Ro jp) E
-            → Fr C (JParts.Ro jp) (inOuter op f d n qu ls c) (owes w) E
+            → Fr C Rg c (owes w) E′ → JInv (scopeOf c) f E
+            → Joined (scopeOf c) (JRl (scopeOf c) Rg op f E) C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E d n qu ls
+            → JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E ≈ E′ → Sound (JRo (scopeOf c) Rg op f E) E
+            → Fr C (JRo (scopeOf c) Rg op f E) (inOuter op f d n qu ls c) (owes w) E
     -- the hole a begun lane, between those before it and after it, in a
     -- joiner some live node reads
     f-lanes : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n qu} {o : St Γ A} {pre post} {c : Ctx R Γ B}
                 {Rg E E′ O vs₁ vs₂ ws n₁ n₂ q a b}
-            → Fr C Rg c (owes true) E′ → (jp : JParts Rg)
-            → Sync (scopeOf c) (JParts.Ro jp) C o O
-            → Begun (scopeOf c) (JParts.Rl jp) C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O vs₁ (reverse pre) n₁
+            → Fr C Rg c (owes true) E′ → JInv (scopeOf c) f O
+            → Sync (scopeOf c) (JRo (scopeOf c) Rg op f O) C o O
+            → Begun (scopeOf c) (JRl (scopeOf c) Rg op f O) C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O vs₁ (reverse pre) n₁
             → O q (out a) → ¬ Owes C q → Runs (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) q
             → Hole C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) q a E b
-            → Begun (scopeOf c) (JParts.Rl jp) C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O vs₂ post n₂
+            → Begun (scopeOf c) (JRl (scopeOf c) Rg op f O) C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O vs₂ post n₂
             → n ≡ n₁ + bump b n₂
             → Waiting C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O ws qu
             → Whole C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O (vs₁ ++ (q , a) ∷ vs₂) ws
@@ -439,9 +450,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Ahead C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) (vs₁ ++ (q , a) ∷ vs₂) ws
             → Asc (vs₁ ++ (q , a) ∷ vs₂)
             → Ends (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O
-            → LanesIn (JParts.Rl jp) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O
-            → JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O ≈ E′ → Sound (JParts.Ro jp) O → (T b → Sound (JParts.Rl jp q) E)
-            → Fr C (JParts.Rl jp q) (inLanes op f d n qu o pre post c) (lane b) E
+            → LanesIn (JRl (scopeOf c) Rg op f O) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O
+            → JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O ≈ E′ → Sound (JRo (scopeOf c) Rg op f O) O → (T b → Sound (JRl (scopeOf c) Rg op f O q) E)
+            → Fr C (JRl (scopeOf c) Rg op f O q) (inLanes op f d n qu o pre post c) (lane b) E
     -- under a lane's list entry, its switch; under that, its program
     f-lane  : ∀ {Γ A} {c : Ctx R Γ A} {Rg b E} → Fr C Rg c (lane b) E → Fr C Rg (inLn b c) (lanecut b) E
     f-lnct  : ∀ {Γ A} {a} {c : Ctx R Γ A} {Rg b E} → Fr C Rg c (lanecut b) E → Fr C Rg (inCut b a c) (owes b) E

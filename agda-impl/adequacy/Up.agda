@@ -39,10 +39,11 @@ open import adequacy.Cursor using (bef; aft; Need; lane; lanecut; _≈_; Inv; RT
   h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none; fd-last; Joined; joined;
   Flags; Src; src-pend; src-on; src-shut; Parts; OweAt; o-cp; o-cut; o-over; Sync; s-cold;
   s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Fr;
-  f-off; f-body; u-body; settled; flying; adrift; SimC; keeps; Waiting; Lane; JParts; Asc;
+  f-off; f-body; u-body; settled; flying; adrift; SimC; keeps; Waiting; Lane; JRl; JRo; JInv; Asc;
   f-top; f-map; f-scan; f-cut; f-take; f-outer; f-lanes; f-lane; f-lnct; polF; JoinF; LanesIn;
   NoFail)
 open import adequacy.Bound using (join-row)
+open import adequacy.Regions using (lane-sole)
 
 -- A visible row of a binder in scope at `p`.
 VHot : ∀ {Γ} → DenEnv Γ → Pos → Set
@@ -169,9 +170,9 @@ module Past (p : Pos) where
         owe-up (o-cp o)   = o-cp (in-rg sd nr (proj₁ (to m (TakeWhile.stop y nk nf , vis {A = A} cp))) (vis {A = A} cp) o)
         owe-up (o-cut n)  = o-cut (nm n)
         owe-up (o-over n) = o-over (nm n)
-    up (s-flat jp sy jn m so)  sd nr nh =
-      s-flat jp (up sy so no nh) (joined-up (off-rg so no) (λ r → nr (JParts.l⊆ jp r)) nh jn) m so
-      where no = λ r → nr (JParts.o⊆ jp r)
+    up (s-flat ji sy jn m so)  sd nr nh =
+      s-flat ji (up sy so no nh) (joined-up (off-rg so no) (λ r → nr (proj₁ r)) nh jn) m so
+      where no = λ r → nr (proj₁ r)
     up (s-conn {k = k} refl pt bs ss fl m) sd nr nh =
       s-conn refl pt (λ t → up (bs t) (Parts.sb pt) nb (bind-nh {k = k} (off-rg (Parts.ss pt) ns) nh))
              (λ t → src-up (ss t) (Parts.ss pt) ns nh) (flags-up {k = k} (off-rg (Parts.ss pt) ns) fl) m
@@ -389,33 +390,35 @@ module _ {R : Set} (Rt : EmissionSet R) where
   fr-up {E = E} {p = p} l-owes (f-take fr nf m sd) rp nr nh =
     let (fr′ , nt) = fr-up l-owes fr rp (nr-≈ m (take-nr nr nf)) nh
     in f-take fr′ (λ y nk → Past.in-off p (nr-off {E = E} nr) y _ (nf y nk)) m sd , nt
-  fr-up {p = p} l-owes (f-outer {op = op} {f = f} {c = c} fr jp jn m so) rp nr nh =
-    let (fr′ , nt) = fr-up l-owes fr (JParts.o⊆ jp rp)
+  fr-up {p = p} l-owes (f-outer {op = op} {f = f} {c = c} {Rg = Rg₀} {E = E} fr ji jn m so) rp nr nh =
+    let (fr′ , nt) = fr-up l-owes fr (proj₁ rp)
                        (nr-≈ m (join-nr op (λ a → ⟦ f a ⟧ (full (scopeOf c))) (joined-li jn) (λ y → nr y _) (λ _ _ _ → nl))) nh
-    in f-outer fr′ jp (Past.joined-up p (nr-off nr) nl nh jn) m so , nt
+    in f-outer fr′ ji (Past.joined-up p (nr-off nr) nl nh jn) m so , nt
     where
-      nl : ∀ {q} → ¬ JParts.Rl jp q p
-      nl r = JParts.apart jp rp r
-  fr-up {p = p} l-lane (f-lanes {op = op} {f = f} {c = c} {O = O} {vs₁ = vs₁} {vs₂ = vs₂} {q = q₀} {a = a₀}
-                          fr jp sy lf y₀ nq ru (h-live st ns le) rt cnt wt wh od ah ao en li m so sd) rp nr nh =
-    let (fr′ , nt) = fr-up l-owes fr (JParts.l⊆ jp rp)
+      nl : ∀ {q} → ¬ JRl (scopeOf c) Rg₀ op f E q p
+      nl r = proj₂ rp (proj₂ r)
+  fr-up {p = p} l-lane (f-lanes {op = op} {f = f} {c = c} {Rg = Rg₀} {O = O} {vs₁ = vs₁} {vs₂ = vs₂} {q = q₀} {a = a₀}
+                          fr ji sy lf y₀ nq ru (h-live st ns le) rt cnt wt wh od ah ao en li m so sd) rp nr nh =
+    let (fr′ , nt) = fr-up l-owes fr (proj₁ rp)
                        (nr-≈ m (join-nr op (λ a → ⟦ f a ⟧ (full (scopeOf c))) li (λ y → no (Sound.rg so y _)) (λ y ln v _ → hole y ln v))) nh
-    in f-lanes fr′ jp (up sy so no nh) (begun-up nb₁ nh lf) y₀ (nm nq) ru (h-live st (nm ns) le) (begun-up nb₂ nh rt) cnt
+    in f-lanes fr′ ji (up sy so no nh) (begun-up nb₁ nh lf) y₀ (nm nq) ru (h-live st (nm ns) le) (begun-up nb₂ nh rt) cnt
                (wait-up ah′ wt) (whole-up wh) (od-up od) ah′ ao en li m so sd , nt
     where
       open Past p using (up; begun-up; nm; off-rg; module Book)
-      open Book {P = polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O} (off-rg so (λ r → JParts.apart jp r rp))
-      no : ¬ JParts.Ro jp p
-      no r = JParts.apart jp r rp
+      no : ¬ JRo (scopeOf c) Rg₀ op f O p
+      no r = proj₂ r (proj₂ rp)
+      open Book {P = polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O} (off-rg so no)
+      sole : ∀ {q q′} → JRl (scopeOf c) Rg₀ op f O q p → JRl (scopeOf c) Rg₀ op f O q′ p → q ≡ q′
+      sole r r′ = lane-sole (JInv.ok ji) (λ a → ⟦ f a ⟧ (full (scopeOf c))) (JInv.fi ji) (JInv.io ji) op (proj₂ r) (proj₂ r′)
       -- a lane's row at `p` is the hole's
       hole : ∀ {q a e} → O q (out a) → Lane (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) q a p e → Visible e → ⊥
-      hole y ln v with JParts.sole jp (li y ln v) rp
+      hole y ln v with sole (li y ln v) rp
       ... | refl with Sound.fn so y y₀ _ _
       ...   | refl = nr (proj₁ (to le (ln , v))) v
-      nb₁ : ∀ {q a} → (q , a) ∈ vs₁ → ¬ JParts.Rl jp q p
-      nb₁ i r = ≺-irrefl {q₀} (subst (λ x → x ≺ q₀) (JParts.sole jp r rp) (asc-pre vs₁ ao i))
-      nb₂ : ∀ {q a} → (q , a) ∈ vs₂ → ¬ JParts.Rl jp q p
-      nb₂ i r = ≺-irrefl {q₀} (subst (λ x → q₀ ≺ x) (JParts.sole jp r rp) (asc-post vs₁ ao i))
+      nb₁ : ∀ {q a} → (q , a) ∈ vs₁ → ¬ JRl (scopeOf c) Rg₀ op f O q p
+      nb₁ i r = ≺-irrefl {q₀} (subst (λ x → x ≺ q₀) (sole r rp) (asc-pre vs₁ ao i))
+      nb₂ : ∀ {q a} → (q , a) ∈ vs₂ → ¬ JRl (scopeOf c) Rg₀ op f O q p
+      nb₂ i r = ≺-irrefl {q₀} (subst (λ x → q₀ ≺ x) (sole r rp) (asc-post vs₁ ao i))
       val : ∀ {q a} → (q , a) ∈ vs₁ ++ (q₀ , a₀) ∷ vs₂ → O q (out a)
       val i with ∈-++⁻ vs₁ i
       ... | inj₁ i′          = begun-out lf i′
