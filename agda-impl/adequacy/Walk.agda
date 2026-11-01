@@ -191,8 +191,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-take (lanecut _ , _ , _ , _ , (_ , _ , () , _))
   down-take (pnd _ , _ , _ , _ , (_ , () , _))
 
-  down-outer : ∀ {C Γ A B} {op} {f} {d n qu ls} {c : Ctx R Γ B} {s : St Γ A}
-             → Res C c (flatS op f d n qu s ls) → Res C (inOuter op f d n qu ls c) s
+  down-outer : ∀ {C Γ A B} {op} {f} {ω} {d n qu ls} {c : Ctx R Γ B} {s : St Γ A}
+             → Res C c (flatS op f ω d n qu s ls) → Res C (inOuter op f ω d n qu ls c) s
   down-outer (owes true , _ , _ , fr , h) with h _
   ... | s-flat ji sy j eq sd = owes true , _ , _ , f-outer fr ji j eq sd , λ _ → sy
   down-outer (owes false , _ , _ , fr , _)            = owes false , nowhere , none′ , f-off u-outer fr , λ ()
@@ -200,8 +200,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-outer (lanecut _ , _ , _ , _ , (_ , _ , () , _))
   down-outer (pnd _ , _ , _ , _ , (_ , () , _))
 
-  down-lanes : ∀ {C Γ A B} {op} {f} {d n qu} {o : St Γ A} {pre post} {c : Ctx R Γ B} {s}
-             → Res C c (flatS op f d n qu o (pre ʳ++ s ∷ post)) → Res C (inLanes op f d n qu o pre post c) s
+  down-lanes : ∀ {C Γ A B} {op} {f} {ω} {d n qu} {o : St Γ A} {pre post} {c : Ctx R Γ B} {s}
+             → Res C c (flatS op f ω d n qu o (pre ʳ++ s ∷ post)) → Res C (inLanes op f ω d n qu o pre post c) s
   down-lanes {pre = pre} (owes true , _ , _ , fr , h) with h _
   ... | s-flat ji sy (joined bg wt wh od ah ao en li) eq so
     with begun-split (reverse pre) (subst (λ ls → Begun _ _ _ _ _ _ ls _) (ʳ++-defn pre) bg)
@@ -241,8 +241,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
   descend (inCut l a c)                     s sy eq = down-cut (descend c _ sy eq)
   descend (inLn b c)                        s sy eq = down-ln (descend c _ sy eq)
   descend (inTake i p w c)                  s sy eq = down-take (descend c _ sy eq)
-  descend (inOuter op f d n q ls c)         s sy eq = down-outer (descend c _ sy eq)
-  descend (inLanes op f d n q o pre post c) s sy eq = down-lanes (descend c _ sy eq)
+  descend (inOuter op f ω d n q ls c)         s sy eq = down-outer (descend c _ sy eq)
+  descend (inLanes op f ω d n q o pre post c) s sy eq = down-lanes (descend c _ sy eq)
   descend (inSrc k b c)                     s sy eq = down-src (descend c _ sy eq)
   descend (inBody k o c)                    s sy eq = down-body (descend c _ sy eq)
 

@@ -339,10 +339,10 @@ data Sync where
          → Failure keep Es r → Gone C r → (T i → ¬ Owes C (r ++ [ ix 0 ])) → OweAt C w r
          → TakeWhile.TakeT i keep Es ≈ E → Sound Rg Es → Sync sc Rg C (takeS i keep w s) E
   -- a joiner: its outer, and its bookkeeping over its policy
-  s-flat : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A B} {op} {f : A → Obs Timeline Γ B} {d n qu o ls O E}
+  s-flat : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu o ls O E}
          → JInv sc f O → Sync sc (JRo sc Rg op f O) C o O → Joined sc (JRl sc Rg op f O) C (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O d n qu ls
          → JoinF op (λ a → ⟦ f a ⟧ (full sc)) O ≈ E → Sound (JRo sc Rg op f O) O
-         → Sync sc Rg C (flatS op f d n qu o ls) E
+         → Sync sc Rg C (flatS op f ω d n qu o ls) E
   -- a connect: its body, under its binder read whole, and its source,
   -- while the source runs; torn down, its body owes nothing and nothing
   -- reads either
@@ -416,9 +416,9 @@ data Up1 {R : Set} : ∀ {Γ A Γ′ A′} → Ctx R Γ A → Ctx R Γ′ A′ �
   u-cut   : ∀ {Γ A} {l a} {c : Ctx R Γ A} → Up1 (inCut l a c) c
   u-ln    : ∀ {Γ A} {b} {c : Ctx R Γ A} → Up1 (inLn b c) c
   u-take  : ∀ {Γ A} {i} {keep : A → Bool} {w} {c : Ctx R Γ A} → Up1 (inTake i keep w c) c
-  u-outer : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n qu ls} {c : Ctx R Γ B} → Up1 (inOuter op f d n qu ls c) c
-  u-lanes : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n qu} {o : St Γ A} {pre post} {c : Ctx R Γ B}
-          → Up1 (inLanes op f d n qu o pre post c) c
+  u-outer : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu ls} {c : Ctx R Γ B} → Up1 (inOuter op f ω d n qu ls c) c
+  u-lanes : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu} {o : St Γ A} {pre post} {c : Ctx R Γ B}
+          → Up1 (inLanes op f ω d n qu o pre post c) c
   u-src   : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} → Up1 (inSrc k b c) c
   u-body  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} → Up1 (inBody k o c) c
 
@@ -438,14 +438,14 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Fr C Rg c (owes w) E′ → Failure keep Es r → Gone C r → (T i → ¬ Owes C (r ++ [ ix 0 ])) → OweAt C o r
             → TakeWhile.TakeT i keep Es ≈ E′ → Sound Rg Es
             → Fr C Rg′ (inTake i keep o c) (owes false) E
-    f-outer : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n qu ls} {c : Ctx R Γ B} {Rg w E E′}
+    f-outer : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu ls} {c : Ctx R Γ B} {Rg w E E′}
             → Fr C Rg c (owes w) E′ → JInv (scopeOf c) f E
             → Joined (scopeOf c) (JRl (scopeOf c) Rg op f E) C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E d n qu ls
             → JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E ≈ E′ → Sound (JRo (scopeOf c) Rg op f E) E
-            → Fr C (JRo (scopeOf c) Rg op f E) (inOuter op f d n qu ls c) (owes w) E
+            → Fr C (JRo (scopeOf c) Rg op f E) (inOuter op f ω d n qu ls c) (owes w) E
     -- the hole a begun lane, between those before it and after it, in a
     -- joiner some live node reads
-    f-lanes : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n qu} {o : St Γ A} {pre post} {c : Ctx R Γ B}
+    f-lanes : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu} {o : St Γ A} {pre post} {c : Ctx R Γ B}
                 {Rg E E′ O vs₁ vs₂ ws n₁ n₂ q a b}
             → Fr C Rg c (owes true) E′ → JInv (scopeOf c) f O
             → Sync (scopeOf c) (JRo (scopeOf c) Rg op f O) C o O
@@ -462,7 +462,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Ends (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O
             → LanesIn (JRl (scopeOf c) Rg op f O) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O
             → JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O ≈ E′ → Sound (JRo (scopeOf c) Rg op f O) O → (T b → Sound (JRl (scopeOf c) Rg op f O q) E)
-            → Fr C (JRl (scopeOf c) Rg op f O q) (inLanes op f d n qu o pre post c) (lane b) E
+            → Fr C (JRl (scopeOf c) Rg op f O q) (inLanes op f ω d n qu o pre post c) (lane b) E
     -- under a lane's list entry, its switch; under that, its program
     f-lane  : ∀ {Γ A} {c : Ctx R Γ A} {Rg b E} → Fr C Rg c (lane b) E → Fr C Rg (inLn b c) (lanecut b) E
     f-lnct  : ∀ {Γ A} {a} {c : Ctx R Γ A} {Rg b E} → Fr C Rg c (lanecut b) E → Fr C Rg (inCut b a c) (owes b) E

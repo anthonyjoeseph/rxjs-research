@@ -414,7 +414,7 @@ mutual
   ... | _ , ns = "lane" , just ([] ⊣ false) , mapL dead ns
   listN u ρ π b (takeS i q w s) with listS u ρ (π ++ [ 0 ]) b s
   ... | l , ns = "take" , lift₁ (takeR i q w) l , ns
-  listN u ρ π b (flatS op f d n q o ls) with listS u ρ (π ++ [ 0 ]) b o | listLs u ρ π b 1 ls
+  listN u ρ π b (flatS op f ω d n q o ls) with listS u ρ (π ++ [ 0 ]) b o | listLs u ρ π b 1 ls
   ... | lo , no | lls , nls = opName op , bind lo (λ o′ → bind (allJust lls) λ Ls → joiner u ρ op f d n q o′ Ls) , no ++ nls
   listN u ρ π b (connS k o s) with listS u ρ (π ++ [ 0 ]) b o
   ... | nothing , no = "connect" , nothing , no

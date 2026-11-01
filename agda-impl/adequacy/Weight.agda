@@ -76,8 +76,8 @@ depth (inScan _ _ c)            = suc (depth c)
 depth (inCut _ _ c)             = suc (depth c)
 depth (inLn _ c)                = suc (depth c)
 depth (inTake _ _ _ c)          = suc (depth c)
-depth (inOuter _ _ _ _ _ _ c)   = suc (depth c)
-depth (inLanes _ _ _ _ _ _ _ _ c) = suc (depth c)
+depth (inOuter _ _ _ _ _ _ _ c)   = suc (depth c)
+depth (inLanes _ _ _ _ _ _ _ _ _ c) = suc (depth c)
 depth (inSrc _ _ c)             = suc (depth c)
 depth (inBody _ _ c)            = suc (depth c)
 
@@ -123,7 +123,7 @@ module Weigh (ks : List Pos) (P : Pos) (C : Key) where
     pot d (takeS _ _ (cpAt p) s)   = wt d (at (p ++ [ last ])) + (2 + d) + pot (suc d) s
     pot d (takeS _ _ (cutAt _) s)  = (2 + d) + pot (suc d) s
     pot d (takeS _ _ (overAt _) s) = pot (suc d) s
-    pot d (flatS _ _ _ _ _ o ls)   = pot (suc d) o + potL (suc d) ls
+    pot d (flatS _ _ _ _ _ _ o ls)   = pot (suc d) o + potL (suc d) ls
     pot d (connS k o b)            = connW d k + pot (suc d) o + pot (suc d) b
     pot d (joinS j g x ib)         = inbox d ib
 
@@ -151,8 +151,8 @@ module Weigh (ks : List Pos) (P : Pos) (C : Key) where
   potC (inTake _ _ (cpAt p) c)            = potC c + (wt (depth c) (at (p ++ [ last ])) + (2 + depth c))
   potC (inTake _ _ (cutAt _) c)           = potC c + (2 + depth c)
   potC (inTake _ _ (overAt _) c)          = potC c
-  potC (inOuter _ _ _ _ _ ls c)           = potC c + potL (suc (depth c)) ls
-  potC (inLanes _ _ _ _ _ o pre post c)   = potC c + (pot (suc (depth c)) o + (potL (suc (depth c)) pre + potL (suc (depth c)) post))
+  potC (inOuter _ _ _ _ _ _ ls c)           = potC c + potL (suc (depth c)) ls
+  potC (inLanes _ _ _ _ _ _ o pre post c)   = potC c + (pot (suc (depth c)) o + (potL (suc (depth c)) pre + potL (suc (depth c)) post))
   potC (inSrc k b c)                      = potC c + (connW (depth c) k + pot (suc (depth c)) b)
   potC (inBody k o c)                     = potC c + (connW (depth c) k + pot (suc (depth c)) o)
 
@@ -177,11 +177,11 @@ module Weigh (ks : List Pos) (P : Pos) (C : Key) where
     where a3 : ∀ a b c → a + (b + c) ≡ (a + b) + c
           a3 = solve-∀
   pot-plug (inTake i q (overAt x) c) s = pot-plug c (takeS i q (overAt x) s)
-  pot-plug (inOuter op f d n q ls c) s = trans (pot-plug c (flatS op f d n q s ls)) (sw (potC c) (pot (suc (depth c)) s) (potL (suc (depth c)) ls))
+  pot-plug (inOuter op f ω d n q ls c) s = trans (pot-plug c (flatS op f ω d n q s ls)) (sw (potC c) (pot (suc (depth c)) s) (potL (suc (depth c)) ls))
     where sw : ∀ a b c → a + (b + c) ≡ (a + c) + b
           sw = solve-∀
-  pot-plug (inLanes op f d n q o pre post c) s =
-    trans (pot-plug c (flatS op f d n q o (pre ʳ++ s ∷ post)))
+  pot-plug (inLanes op f ω d n q o pre post c) s =
+    trans (pot-plug c (flatS op f ω d n q o (pre ʳ++ s ∷ post)))
       (trans (cong (λ x → potC c + (pot (suc (depth c)) o + x)) (potL-ʳ++ (suc (depth c)) pre (s ∷ post)))
              (ln (potC c) (pot (suc (depth c)) o) (potL (suc (depth c)) pre) (pot (suc (depth c)) s) (potL (suc (depth c)) post)))
     where ln : ∀ a b c d e → a + (b + (c + (d + e))) ≡ (a + (b + (c + e))) + d
@@ -266,7 +266,7 @@ module Mono (ks : List Pos) (P : Pos) (C₁ C₂ : Key)
     pot-mono d (takeS _ _ (cpAt p) s)   = +-mono-≤ (+-mono-≤ (h d (at (p ++ [ last ]))) (≤-refl {2 + d})) (pot-mono (suc d) s)
     pot-mono d (takeS _ _ (cutAt _) s)  = +-mono-≤ (≤-refl {2 + d}) (pot-mono (suc d) s)
     pot-mono d (takeS _ _ (overAt _) s) = pot-mono (suc d) s
-    pot-mono d (flatS _ _ _ _ _ o ls)   = +-mono-≤ (pot-mono (suc d) o) (potL-mono (suc d) ls)
+    pot-mono d (flatS _ _ _ _ _ _ o ls)   = +-mono-≤ (pot-mono (suc d) o) (potL-mono (suc d) ls)
     pot-mono d (connS k o b)            = +-mono-≤ (+-mono-≤ (connW-mono d k) (pot-mono (suc d) o)) (pot-mono (suc d) b)
     pot-mono d (joinS j g x ib)         = inbox-mono d ib
 

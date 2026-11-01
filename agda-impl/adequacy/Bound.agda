@@ -328,9 +328,9 @@ mutual
   join-b {ib = (q₀ , _) ∷ _} d (h ∷ _) env lo r | inj₁ this = lo-at lo (k-own (here refl))
   join-b {ib = (q₀ , _) ∷ _} {p = p} d (h ∷ _) env lo {q} r | inj₁ (that i) = on p q₀ q (lo-at lo (k-own (here refl))) (inbox-lt {q₀ = q₀} h i)
 
-  flat-b : ∀ {Γ} {sc : Scope Γ} {Rg Rl} {C A B} {op} {f : A → Obs Timeline Γ B} {d n qu o ls O p k e}
+  flat-b : ∀ {Γ} {sc : Scope Γ} {Rg Rl} {C A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu o ls O p k e}
          → Sync sc Rg C o O → Joined sc Rl C (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O d n qu ls
-         → Env (full sc) C p → Lo (flatS op f d n qu o ls) (at p)
+         → Env (full sc) C p → Lo (flatS op f ω d n qu o ls) (at p)
          → JoinF op (λ a → ⟦ f a ⟧ (full sc)) O k e → Visible e → Owes C k → p ≼ k
   flat-b {sc = sc} {C = C} {op = op} {f} {O = O} {p} {k} sy (joined bg _ wh _ ah _ en _) env lo r v ow
     with join-row op (λ a → ⟦ f a ⟧ (full sc)) O r v

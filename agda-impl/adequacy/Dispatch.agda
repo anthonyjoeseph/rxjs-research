@@ -54,12 +54,12 @@ Mv : ∀ {R} → Stepped R → Set
 Mv (moved _ _ _) = ⊤
 Mv _             = ⊥
 
-admit-mv : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q o ls a p → Mv (admit c op f d n q o ls a p)
-admit-mv c (Tree.mergeᶠ nothing)  f d n q o ls a p = tt
-admit-mv c (Tree.mergeᶠ (just m)) f d n q o ls a p = tt
-admit-mv c Tree.switchᶠ           f d n q o ls a p with killAll ls
+admit-mv : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) ω d n q o ls a p → Mv (admit c op f ω d n q o ls a p)
+admit-mv c (Tree.mergeᶠ nothing)  f ω d n q o ls a p = tt
+admit-mv c (Tree.mergeᶠ (just m)) f ω d n q o ls a p = tt
+admit-mv c Tree.switchᶠ           f ω d n q o ls a p with killAll ls
 ... | _ = tt
-admit-mv c Tree.exhaustᶠ          f d n q o ls a p with n ≡ᵇ 0
+admit-mv c Tree.exhaustᶠ          f ω d n q o ls a p with n ≡ᵇ 0
 ... | true  = tt
 ... | false = tt
 
@@ -78,10 +78,10 @@ rise-mv (inTake i q free c)       s cp     p = tt
 rise-mv (inTake i q (cpAt r) c)   s e      p = tt
 rise-mv (inTake i q (cutAt r) c)  s e      p = tt
 rise-mv (inTake i q (overAt r) c) s e      p = tt
-rise-mv (inOuter op f d n q ls c) o (nx a) p = admit-mv c op f d n q o ls a p
-rise-mv (inOuter op f d n q ls c) o cp     p = tt
-rise-mv (inLanes op f d n q o pre post c) s (nx b) p = tt
-rise-mv (inLanes op f d n q o pre post c) s cp     p = tt
+rise-mv (inOuter op f ω d n q ls c) o (nx a) p = admit-mv c op f ω d n q o ls a p
+rise-mv (inOuter op f ω d n q ls c) o cp     p = tt
+rise-mv (inLanes op f ω d n q o pre post c) s (nx b) p = tt
+rise-mv (inLanes op f ω d n q o pre post c) s cp     p = tt
 rise-mv (inSrc k b c)             s (nx a) p = tt
 rise-mv (inSrc k b c)             s cp     p = tt
 rise-mv (inBody k o c)            s (nx b) p with CS.srcLive k
@@ -268,7 +268,7 @@ own-marked doneS                         = []ᴬ
 own-marked (mapS _ _)                    = []ᴬ
 own-marked (scanS _ _ _)                 = []ᴬ
 own-marked (lnS _ _)                     = []ᴬ
-own-marked (flatS _ _ _ _ _ _ _)         = []ᴬ
+own-marked (flatS _ _ _ _ _ _ _ _)         = []ᴬ
 
 ownBest-owned : ∀ {R Γ A} (c : Ctx R Γ A) s ms → All (λ mk → Marked s (proj₁ mk)) ms → (∀ {mk} → mk ∈ ms → mk ∈ own s)
               → Owned (plug c s) (ownBest c s ms)
@@ -285,7 +285,7 @@ mutual
   kids-owned c (cutS l a s)            = retag-owned (cutKp l) (seek-owned (inCut l a c) s)
   kids-owned c (lnS b s)               = seek-owned (inLn b c) s
   kids-owned c (takeS i q w s)         = retag-owned (takeKp i q w) (seek-owned (inTake i q w c) s)
-  kids-owned c (flatS op f d n q o ls) = race-owned d n q (seek-owned (inOuter op f d n q ls c) o) (lanes-owned c op f d n q o [] ls)
+  kids-owned c (flatS op f ω d n q o ls) = race-owned d n q (seek-owned (inOuter op f ω d n q ls c) o) (lanes-owned c op f ω d n q o [] ls)
   kids-owned c (connS k o b)           = source-owned (seek-owned (inSrc k b c) o) (seek-owned (inBody k o c) b)
   kids-owned c (pend _ _)              = o-none
   kids-owned c (coldS _ _)             = o-none
@@ -293,11 +293,11 @@ mutual
   kids-owned c doneS                   = o-none
   kids-owned c (joinS _ _ _ _)         = o-none
 
-  lanes-owned : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q o pre ls
-              → Owned (plug c (flatS op f d n q o (pre ʳ++ ls))) (lanes c op f d n q o pre ls)
-  lanes-owned c op f d n q o pre []         = o-none
-  lanes-owned c op f d n q o pre (s ∷ post) =
-    first-owned (retag-owned (cutKp (alive s)) (seek-owned (inLanes op f d n q o pre post c) s)) (lanes-owned c op f d n q o (s ∷ pre) post)
+  lanes-owned : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) ω d n q o pre ls
+              → Owned (plug c (flatS op f ω d n q o (pre ʳ++ ls))) (lanes c op f ω d n q o pre ls)
+  lanes-owned c op f ω d n q o pre []         = o-none
+  lanes-owned c op f ω d n q o pre (s ∷ post) =
+    first-owned (retag-owned (cutKp (alive s)) (seek-owned (inLanes op f ω d n q o pre post c) s)) (lanes-owned c op f ω d n q o (s ∷ pre) post)
 
 found-of : ∀ {R B t} {x : Maybe (Cand R B)} {Γ A c′ s′ m κ}
          → Owned t x → mapᴹ proj₁ x ≡ just (found (Γ , A , c′ , s′) m κ) → Marked s′ m × plug c′ s′ ≡ t
@@ -396,9 +396,9 @@ module Over {R : Set} (Rt : EmissionSet R) where
     -- row is in `JoinF` and not in the joiner's entry, which `Truncate`s
     -- it past the infinitely many outer value rows before it.  A
     -- connect's frames read `ConnE` for the same reason.
-    sub-flat   : ∀ {C Γ A B} {c : Ctx R Γ B} {op} {f : A → Obs Timeline Γ B} {s q p}
+    sub-flat   : ∀ {C Γ A B} {c : Ctx R Γ B} {op} {f : A → Obs Timeline Γ B} {ω} {s q p}
                → Inv Rt C ⟨ c , pend (flatMap op f s) q , subscribing , p ⟩
-               → Inv Rt C ⟨ inCut true (attAt q) (inOuter op f false 0 [] [] c) , pend s q , subscribing , q ⟩
+               → Inv Rt C ⟨ inCut true (attAt q) (inOuter op f ω false 0 [] [] c) , pend s q , subscribing , q ⟩
     sub-conn   : ∀ {C Γ A B} {c : Ctx R Γ B} {s : Obs Timeline Γ A} {b q p}
                → Inv Rt C ⟨ c , pend (connect s b) q , subscribing , p ⟩
                → Inv Rt C ⟨ inBody (cs false true false (just q) nothing nothing q root s (scopeOf c)) (pend s (q ⊕ [ ix 1 ])) c
@@ -422,16 +422,16 @@ module Over {R : Set} (Rt : EmissionSet R) where
     -- at `p`.
     rise-take-failᵢ : ∀ {Γ A} {w : A → Bool} {c : Ctx R Γ A} {s a p} → w a ≡ false
                     → SimC Rt ⟨ inTake true w free c , s , rising (nx a) , p ⟩ [] ⟨ c , takeS true w (cpAt p) s , rising (nx a) , p ⊕ [ ix 0 ] ⟩
-    rise-outer-nx : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n q ls} {c : Ctx R Γ B} {o a p k′ sh t}
-                  → rise (inOuter op f d n q ls c) o (nx a) p ≡ moved k′ sh t → SimC Rt ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ sh k′
-    rise-outer-cp : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n q ls} {c : Ctx R Γ B} {o p k′ sh t}
-                  → rise (inOuter op f d n q ls c) o cp p ≡ moved k′ sh t → SimC Rt ⟨ inOuter op f d n q ls c , o , rising cp , p ⟩ sh k′
-    rise-lane-nx  : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n q o pre post} {c : Ctx R Γ B} {s b p k′ sh t}
-                  → rise (inLanes op f d n q o pre post c) s (nx b) p ≡ moved k′ sh t
-                  → SimC Rt ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩ sh k′
-    rise-lane-cp  : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n q o pre post} {c : Ctx R Γ B} {s p k′ sh t}
-                  → rise (inLanes op f d n q o pre post c) s cp p ≡ moved k′ sh t
-                  → SimC Rt ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ sh k′
+    rise-outer-nx : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n q ls} {c : Ctx R Γ B} {o a p k′ sh t}
+                  → rise (inOuter op f ω d n q ls c) o (nx a) p ≡ moved k′ sh t → SimC Rt ⟨ inOuter op f ω d n q ls c , o , rising (nx a) , p ⟩ sh k′
+    rise-outer-cp : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n q ls} {c : Ctx R Γ B} {o p k′ sh t}
+                  → rise (inOuter op f ω d n q ls c) o cp p ≡ moved k′ sh t → SimC Rt ⟨ inOuter op f ω d n q ls c , o , rising cp , p ⟩ sh k′
+    rise-lane-nx  : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n q o pre post} {c : Ctx R Γ B} {s b p k′ sh t}
+                  → rise (inLanes op f ω d n q o pre post c) s (nx b) p ≡ moved k′ sh t
+                  → SimC Rt ⟨ inLanes op f ω d n q o pre post c , s , rising (nx b) , p ⟩ sh k′
+    rise-lane-cp  : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n q o pre post} {c : Ctx R Γ B} {s p k′ sh t}
+                  → rise (inLanes op f ω d n q o pre post c) s cp p ≡ moved k′ sh t
+                  → SimC Rt ⟨ inLanes op f ω d n q o pre post c , s , rising cp , p ⟩ sh k′
     --------------------------------------------------------------------
     -- MARK RUNS, the cursor just before what they deliver.
     run-of-nx     : ∀ {Γ A} {c : Ctx R Γ A} {i q x xs r} → closed c ≡ false
@@ -683,10 +683,10 @@ module Over {R : Set} (Rt : EmissionSet R) where
   rise-sim (inTake i w (cpAt r) c)   s e      p tl refl = rise-took Rt (λ ())
   rise-sim (inTake i w (cutAt r) c)  s e      p tl refl = rise-took Rt (λ ())
   rise-sim (inTake i w (overAt r) c) s e      p tl refl = rise-took Rt (λ ())
-  rise-sim (inOuter op f d n q ls c) o (nx a) p tl eq   = rise-outer-nx eq
-  rise-sim (inOuter op f d n q ls c) o cp     p tl eq   = rise-outer-cp eq
-  rise-sim (inLanes op f d n q o pre post c) s (nx b) p tl eq = rise-lane-nx eq
-  rise-sim (inLanes op f d n q o pre post c) s cp     p tl eq = rise-lane-cp eq
+  rise-sim (inOuter op f ω d n q ls c) o (nx a) p tl eq   = rise-outer-nx eq
+  rise-sim (inOuter op f ω d n q ls c) o cp     p tl eq   = rise-outer-cp eq
+  rise-sim (inLanes op f ω d n q o pre post c) s (nx b) p tl eq = rise-lane-nx eq
+  rise-sim (inLanes op f ω d n q o pre post c) s cp     p tl eq = rise-lane-cp eq
   rise-sim (inSrc k b c)             s (nx a) p tl eq   = rise-src-nx Rt eq
   rise-sim (inSrc k b c)             s cp     p tl eq   = rise-src-cp Rt eq
   rise-sim (inBody k o c)            s (nx b) p tl eq with CS.srcLive k in lv | eq
@@ -730,7 +730,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   reach ⟨ c , cutS l a s , subscribing , p ⟩            _ = within tt λ { refl → keeps Rt λ i → i }
   reach ⟨ c , lnS b s , subscribing , p ⟩               _ = within tt λ { refl → keeps Rt λ i → i }
   reach ⟨ c , takeS j q w s , subscribing , p ⟩         _ = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , flatS op f d n q o ls , subscribing , p ⟩ _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , flatS op f ω d n q o ls , subscribing , p ⟩ _ = within tt λ { refl → keeps Rt λ i → i }
   reach ⟨ c , connS k o b , subscribing , p ⟩           _ = within tt λ { refl → keeps Rt λ i → i }
   reach ⟨ c , joinS j g x ib , subscribing , p ⟩        _ = within tt λ { refl → keeps Rt λ i → i }
   reach ⟨ c , s , absorbed , p ⟩                        _ = linked (abs-link c s p)
