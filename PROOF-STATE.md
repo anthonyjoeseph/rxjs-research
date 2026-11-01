@@ -21,15 +21,16 @@ marks, a joiner's next and a take's failure, each keeping `Inv`. Open:
 whether every entry lands a region apart from its siblings' and clear of
 its scope's hots, so the rest moves past `p`. Settled when each is a body.
 
-Members: `sub-conn`, `sub-join`, `sub-joined`, `rise-src-nx`, `rise-src-cp`,
-`run-con`, `run-join-nx`, `run-join-cp`, `rise-take-failᵢ`.
+Members: `sub-conn`, `sub-join`, `sub-joined`, `run-con`, `run-join-nx`,
+`run-join-cp`, `rise-take-failᵢ`, `feed-up`.
 
 #### THE JOINER STEPPED
 
 An outer's value or end and a lane's, each rising into `Joined`/`Begun`
 by its policy: a switch's kill, an exhaust's drop, a bounded queue.
-Open: whether `Begun`'s live count makes a freed slot the queue head's
-`Starts.queued`. Settled when each is a body.
+Open: whether begun lanes stay ascending (`Asc`), and whether `Begun`'s
+live count makes a freed slot the queue head's `Starts.queued`. Settled
+when each is a body.
 
 Members: `rise-outer-nx`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`, `sub-flat`.
 

@@ -238,7 +238,7 @@ mutual
   bound (s-cut sy) env lo r = bound sy env (λ ki → lo (k-kid (k-cut ki))) r
   bound (s-take sy nf m _) env lo (x , v , ow) = take-b sy nf env (λ ki → lo (k-kid (k-take ki))) (from m (x , v)) ow
   bound (s-took fl g ni oa m sd) env lo (x , v , ow) = took-b fl g ni oa sd lo (from m (x , v)) ow
-  bound (s-flat sy jn m _) env lo (x , v , ow) = flat-b sy jn env lo (proj₁ (from m (x , v))) v ow
+  bound (s-flat _ sy jn m _) env lo (x , v , ow) = flat-b sy jn env lo (proj₁ (from m (x , v))) v ow
   bound (s-conn refl _ bs ss fl m) env lo (x , v , ow) = conn-b bs ss fl env lo (from m (x , v)) ow
   bound {sc = sc} (s-join _ d ap _ _) env lo r = join-b {sc = sc} d ap env lo r
   bound (s-joinx sp) env lo r = ⊥-elim (sp r)
@@ -328,11 +328,11 @@ mutual
   join-b {ib = (q₀ , _) ∷ _} d (h ∷ _) env lo r | inj₁ this = lo-at lo (k-own (here refl))
   join-b {ib = (q₀ , _) ∷ _} {p = p} d (h ∷ _) env lo {q} r | inj₁ (that i) = on p q₀ q (lo-at lo (k-own (here refl))) (inbox-lt {q₀ = q₀} h i)
 
-  flat-b : ∀ {Γ} {sc : Scope Γ} {Rg} {C A B} {op} {f : A → Obs Timeline Γ B} {d n qu o ls O p k e}
-         → Sync sc Rg C o O → Joined sc Rg C (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O d n qu ls
+  flat-b : ∀ {Γ} {sc : Scope Γ} {Rg Rl} {C A B} {op} {f : A → Obs Timeline Γ B} {d n qu o ls O p k e}
+         → Sync sc Rg C o O → Joined sc Rl C (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O d n qu ls
          → Env (full sc) C p → Lo (flatS op f d n qu o ls) (at p)
          → JoinF op (λ a → ⟦ f a ⟧ (full sc)) O k e → Visible e → Owes C k → p ≼ k
-  flat-b {sc = sc} {C = C} {op = op} {f} {O = O} {p} {k} sy (joined bg _ wh _ ah en _) env lo r v ow
+  flat-b {sc = sc} {C = C} {op = op} {f} {O = O} {p} {k} sy (joined bg _ wh _ ah _ en _) env lo r v ow
     with join-row op (λ a → ⟦ f a ⟧ (full sc)) O r v
   ... | inj₁ y = bound sy env (λ ki → lo (k-kid (k-outer ki))) (y , tt , ow)
   ... | inj₂ (q , a , y , ru , ln , kl) with lane-st op (λ a → ⟦ f a ⟧ (full sc)) O ln | owes? C q
@@ -344,8 +344,8 @@ mutual
   ...       | q′ , a′ , c , iv′ , lc , kc , oc , cs′ =
               on p c k (begun-b {O = O} {k = c} {e = end} bg iv′ kc lc tt oc en env (λ i ki → lo (k-kid (k-lane i ki)))) (lt c s k cs′ sk)
 
-  begun-b : ∀ {Γ} {sc : Scope Γ} {Rg} {C A B} {P : Pol A B} {O vs ls n q a k e p}
-          → Begun sc Rg C P O vs ls n → (q , a) ∈ vs → (∀ {q′} → Kill P q q′ → k ≼ q′) → Lane P q a k e → Visible e → Owes C k
+  begun-b : ∀ {Γ} {sc : Scope Γ} {Rl} {C A B} {P : Pol A B} {O vs ls n q a k e p}
+          → Begun sc Rl C P O vs ls n → (q , a) ∈ vs → (∀ {q′} → Kill P q q′ → k ≼ q′) → Lane P q a k e → Visible e → Owes C k
           → Ends P O → Env (full sc) C p → (∀ {l} → l ∈ ls → Lo l (at p)) → p ≼ k
   begun-b {O = O} (more y _ _ ls _)  (here refl) kl ln v ow en env lo = lane-b {O = O} ls y kl ln v ow en env (lo (here refl))
   begun-b {O = O} (more _ _ _ _ bg) (there i)   kl ln v ow en env lo = begun-b {O = O} bg i kl ln v ow en env (λ i′ → lo (there i′))
@@ -420,8 +420,8 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
     sh (s-take sy nf m sd) env lo = s-take (sh sy env lo′) (λ y nk → bound sy env lo′ (y , tt , nf y nk)) m sd
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-take ki))
     sh (s-took fl g ni oa m sd) env lo = s-took fl (λ {q} o → g {q} (dn o)) (λ t → nm (ni t)) (owe-sh oa lo) m sd
-    sh (s-flat sy jn m sd) env lo =
-      s-flat (sh sy env lo′) (joined-sh (bound sy env lo′) jn env (λ i ki → lo (k-kid (k-lane i ki)))) m sd
+    sh (s-flat ji sy jn m sd) env lo =
+      s-flat ji (sh sy env lo′) (joined-sh (bound sy env lo′) jn env (λ i ki → lo (k-kid (k-lane i ki)))) m sd
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-outer ki))
     sh {sc = sc} (s-conn {k = k} refl pt bs ss fl m) env lo = s-conn refl pt bs′ (λ t → src-sh (ss t) env lo) fl′ m
       where
@@ -445,11 +445,11 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
     src-sh (src-on nc sy)       env lo = src-on nc (sh sy env (λ ki → lo (k-kid (k-src ki))))
     src-sh (src-shut cl sp)     env lo = src-shut cl (spent sp)
 
-    joined-sh : ∀ {Γ} {sc : Scope Γ} {Rg} {A B} {P : Pol A B} {O : EmissionSet A} {d n qu ls}
-              → (∀ {q e} → Due C O q e → p ≼ q) → Joined sc Rg C P O d n qu ls
-              → Env (full sc) C p → (∀ {l} → l ∈ ls → Lo l (at p)) → Joined sc Rg (bef p) P O d n qu ls
-    joined-sh {P = P} {O} ob (joined {vs = vs} {ws = ws} bg (eq , ap , wf) wh od ah en li) env lo =
-      joined (begun-sh bg env lo) (eq , ap , wait) whole od′ ahead en li
+    joined-sh : ∀ {Γ} {sc : Scope Γ} {Rl} {A B} {P : Pol A B} {O : EmissionSet A} {d n qu ls}
+              → (∀ {q e} → Due C O q e → p ≼ q) → Joined sc Rl C P O d n qu ls
+              → Env (full sc) C p → (∀ {l} → l ∈ ls → Lo l (at p)) → Joined sc Rl (bef p) P O d n qu ls
+    joined-sh {P = P} {O} ob (joined {vs = vs} {ws = ws} bg (eq , ap , wf) wh od ah ao en li) env lo =
+      joined (begun-sh bg env lo) (eq , ap , wait) whole od′ ahead ao en li
       where
         lead : ∀ {q a s} → (q , a) ∈ ws → Start P q a s → p ≼ s
         lead i st with ah i st
@@ -467,8 +467,8 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
         ahead i st with ah i st
         ... | q′ , a′ , c , iv , lc , kc , oc , cz = q′ , a′ , c , iv , lc , kc , begun-b {O = O} {k = c} {e = end} bg iv kc lc tt oc en env lo , cz
 
-    begun-sh : ∀ {Γ} {sc : Scope Γ} {Rg} {A B} {P : Pol A B} {O vs ls n}
-             → Begun sc Rg C P O vs ls n → Env (full sc) C p → (∀ {l} → l ∈ ls → Lo l (at p)) → Begun sc Rg (bef p) P O vs ls n
+    begun-sh : ∀ {Γ} {sc : Scope Γ} {Rl} {A B} {P : Pol A B} {O vs ls n}
+             → Begun sc Rl C P O vs ls n → Env (full sc) C p → (∀ {l} → l ∈ ls → Lo l (at p)) → Begun sc Rl (bef p) P O vs ls n
     begun-sh none                 env lo = none
     begun-sh (more y nq r ln bg) env lo = more y (nm nq) r (lane-sh ln env (lo (here refl))) (begun-sh bg env (λ i → lo (there i)))
 

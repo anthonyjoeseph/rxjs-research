@@ -43,7 +43,7 @@ open import adequacy.Simulation using (Simulation)
 open import adequacy.Walk using (due-≈; climb; descend; refocus)
 open import adequacy.Least using (Lo; Keeps; mapKp; scanKp; cutKp; takeKp; outerKp; laneKp; seek-lo; seek-none)
 open import adequacy.Bound using (bound; shift; due-shift)
-open import adequacy.Up using (rise-body-nx; rise-body-cp)
+open import adequacy.Up using (rise-body-nx; rise-body-cp; rise-src-nx; rise-src-cp)
 
 ------------------------------------------------------------------------
 -- Within what is grown, every step moves or finds nothing to do
@@ -417,16 +417,6 @@ module Over {R : Set} (Rt : EmissionSet R) where
     rise-lane-cp  : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n q o pre post} {c : Ctx R Γ B} {s p k′ sh t}
                   → rise (inLanes op f d n q o pre post c) s cp p ≡ moved k′ sh t
                   → SimC Rt ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ sh k′
-    -- A feed appends at `p ⊕ [ sub j ]` and the inbox stays ascending:
-    -- `Adm` makes the source a lawful hot, its rows none below another.
-    -- What the step still owes is moving all but the source from `bef p`
-    -- to `aft p`: nothing but the source has a row at `p`.
-    -- RECOVERY: git show 1745f869 restores rejoin-mono, good-full and lawful-at.
-    rise-src-nx   : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s a p k′ sh t}
-                  → rise (inSrc k b c) s (nx a) p ≡ moved k′ sh t → SimC Rt ⟨ inSrc k b c , s , rising (nx a) , p ⟩ sh k′
-    rise-src-cp   : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s p k′ sh t}
-                  → rise (inSrc k b c) s cp p ≡ moved k′ sh t → SimC Rt ⟨ inSrc k b c , s , rising cp , p ⟩ sh k′
-
     --------------------------------------------------------------------
     -- MARK RUNS, the cursor just before what they deliver.
     run-of-nx     : ∀ {Γ A} {c : Ctx R Γ A} {i q x xs r} → closed c ≡ false
@@ -529,8 +519,8 @@ module Over {R : Set} (Rt : EmissionSet R) where
   closed-off (f-cut fr)                        t = closed-off fr t
   closed-off (f-take fr _ _ _)                 t = closed-off fr t
   closed-off (f-took _ _ _ _ _ _ _)            _ = refl
-  closed-off (f-outer fr _ _ _)                t = closed-off fr t
-  closed-off (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) t with closed-off fr t
+  closed-off (f-outer fr _ _ _ _)              t = closed-off fr t
+  closed-off (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) t with closed-off fr t
   ... | ()
   closed-off (f-lane fr)                       t = closed-off fr t
   closed-off (f-lnct {b = false} fr)           _ = refl
@@ -682,8 +672,8 @@ module Over {R : Set} (Rt : EmissionSet R) where
   rise-sim (inOuter op f d n q ls c) o cp     p eq   = rise-outer-cp eq
   rise-sim (inLanes op f d n q o pre post c) s (nx b) p eq = rise-lane-nx eq
   rise-sim (inLanes op f d n q o pre post c) s cp     p eq = rise-lane-cp eq
-  rise-sim (inSrc k b c)             s (nx a) p eq   = rise-src-nx eq
-  rise-sim (inSrc k b c)             s cp     p eq   = rise-src-cp eq
+  rise-sim (inSrc k b c)             s (nx a) p eq   = rise-src-nx Rt eq
+  rise-sim (inSrc k b c)             s cp     p eq   = rise-src-cp Rt eq
   rise-sim (inBody k o c)            s (nx b) p eq with CS.srcLive k in lv | eq
   ... | true  | refl = rise-body-nx Rt lv
   ... | false | refl = rise-bodyx Rt lv

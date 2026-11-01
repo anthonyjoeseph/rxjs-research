@@ -549,6 +549,11 @@ ended : ∀ {Γ B} → St Γ B → St Γ B
 ended (lnS b (cutS l a s)) = lnS false (cutS false a s)
 ended s                    = s
 
+-- A source's end closes its connect where it fell, while the connect
+-- runs; a torn-down connect, its body over, keeps its flags.
+shutAt : ∀ {Γ X} → Pos → CS Γ X → CS Γ X
+shutAt p k = if CS.srcLive k then record k { closed = true ; endAt = p } else k
+
 -- A rise moves no position, except an inclusive takeWhile's failing
 -- value, under `ix 0`; a non-inclusive one's end is owed under `last`.  A connect's source feeds every
 -- live joiner of its subject at once, each to show it at its own turn.
@@ -578,7 +583,7 @@ rise (inLanes op f d n q o pre post c) s (nx b) p =
 rise (inLanes op f d n q o pre post c) s cp     p =
   ok (if alive s then dequeue c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p else ⟨ c , flatS op f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
 rise (inSrc k b c) s (nx a) p = ok ⟨ c , connS k s (feed (here refl) p (nx a) b) , absorbed , p ⟩
-rise (inSrc k b c) s cp     p = ok ⟨ c , connS (record k { closed = true ; endAt = p }) s (feed (here refl) p cp b) , absorbed , p ⟩
+rise (inSrc k b c) s cp     p = ok ⟨ c , connS (shutAt p k) s (feed (here refl) p cp b) , absorbed , p ⟩
 -- a body after its source's teardown has completed, and is stopped
 rise (inBody k o c) s (nx b) p =
   ok (if CS.srcLive k then ⟨ c , connS k o s , rising (nx b) , p ⟩ else ⟨ c , connS k o s , absorbed , p ⟩)
