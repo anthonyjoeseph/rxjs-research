@@ -97,7 +97,7 @@ mark-short : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q p e Γ�
 mark-short {R} o {rs} {c = c} {s} {p = p} {u = u} pth m fd
   with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o))
      | Along.met-next (cursor o) {c = nothing} (conv rs) m
-... | (C , settled _ fr h) , r | ((tp , _) , _) , vi , ap , _ with Walk.climb (enter (⟦ o ⟧ []ᴬ) root) fr h
+... | (C , settled _ fr h , _) , r | ((tp , _) , _) , vi , ap , _ with Walk.climb (enter (⟦ o ⟧ []ᴬ) root) fr h
 ...   | _ , _ , eq , sy =
   trans (at-<ᴷ p u)
     (≼-false {u} {p} (bound sy (λ ()) (proj₂ (found-least {t = plug c s} fd))
@@ -208,7 +208,7 @@ module Shed (ks : List Pos) (P : Pos) (C : Key) where
     unsub-le d (cutS l a s)            = ≤-refl
     unsub-le d (lnS b s)               = ≤-refl
     unsub-le d (takeS i q w s)         = take-le d w (cut-le (suc d) s)
-    unsub-le d (flatS op f b n q o ls) = +-mono-≤ (cut-le (suc d) o) (kill-le (suc d) ls)
+    unsub-le d (flatS op f ω b n q o ls) = +-mono-≤ (cut-le (suc d) o) (kill-le (suc d) ls)
     unsub-le d (connS k o b)           = +-mono-≤ (+-monoʳ-≤ (connW d k) (unsub-le (suc d) o)) (unsub-le (suc d) b)
     unsub-le d (joinS j g x ib)        = z≤n
 
@@ -223,7 +223,7 @@ module Shed (ks : List Pos) (P : Pos) (C : Key) where
     cut-le d (scanS f z s)        = ≤-refl
     cut-le d (lnS b s)            = ≤-refl
     cut-le d (takeS i q w s)      = ≤-refl
-    cut-le d (flatS op f b n q o ls) = ≤-refl
+    cut-le d (flatS op f ω b n q o ls) = ≤-refl
     cut-le d (connS k o b)        = ≤-refl
     cut-le d (joinS j g x ib)     = ≤-refl
 
@@ -239,7 +239,7 @@ module Shed (ks : List Pos) (P : Pos) (C : Key) where
     kill-le d (scanS f z s ∷ ls)         = keep d (scanS f z s) ls
     kill-le d (cutS l a s ∷ ls)          = keep d (cutS l a s) ls
     kill-le d (takeS i q w s ∷ ls)       = keep d (takeS i q w s) ls
-    kill-le d (flatS op f b n q o ms ∷ ls) = keep d (flatS op f b n q o ms) ls
+    kill-le d (flatS op f ω b n q o ms ∷ ls) = keep d (flatS op f ω b n q o ms) ls
     kill-le d (connS k o b ∷ ls)         = keep d (connS k o b) ls
     kill-le d (joinS j g x ib ∷ ls)      = keep d (joinS j g x ib) ls
 
@@ -258,7 +258,7 @@ module Shed (ks : List Pos) (P : Pos) (C : Key) where
   ended-le d (lnS b (scanS f z s))        = ≤-refl
   ended-le d (lnS b (lnS b′ s))           = ≤-refl
   ended-le d (lnS b (takeS i q w s))      = ≤-refl
-  ended-le d (lnS b (flatS op f b′ n q o ls)) = ≤-refl
+  ended-le d (lnS b (flatS op f ω b′ n q o ls)) = ≤-refl
   ended-le d (lnS b (connS k o s))        = ≤-refl
   ended-le d (lnS b (joinS j g x ib))     = ≤-refl
   ended-le d (pend o q)                   = ≤-refl
@@ -269,7 +269,7 @@ module Shed (ks : List Pos) (P : Pos) (C : Key) where
   ended-le d (scanS f z s)                = ≤-refl
   ended-le d (cutS l a s)                 = ≤-refl
   ended-le d (takeS i q w s)              = ≤-refl
-  ended-le d (flatS op f b n q o ls)      = ≤-refl
+  ended-le d (flatS op f ω b n q o ls)      = ≤-refl
   ended-le d (connS k o s)                = ≤-refl
   ended-le d (joinS j g x ib)             = ≤-refl
 
@@ -345,33 +345,33 @@ module Rose {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) 
   rose (inTake i f (cpAt r) c)  s ε pth g refl _ = up c _ ≤-refl z≤n
   rose (inTake i f (cutAt r) c) s ε pth g refl _ = up c _ ≤-refl z≤n
   rose (inTake i f (overAt r) c) s ε pth g refl _ = up c _ ≤-refl z≤n
-  rose (inOuter (mergeᶠ nothing) f d n qs ls c) s (nx a) pth g eq kept with closed c
-  rose (inOuter (mergeᶠ nothing) f d n qs ls c) s (nx a) pth g refl kept | true  = up c _ ≤-refl z≤n
-  rose (inOuter (mergeᶠ nothing) f d n qs ls c) s (nx a) pth g refl kept | false = ⊥-elim (begun kept (g refl))
-  rose (inOuter (mergeᶠ (just mx)) f d n qs ls c) s (nx a) pth g eq kept with n <ᵇ mx
-  rose (inOuter (mergeᶠ (just mx)) f d n qs ls c) s (nx a) pth g refl kept | false = up c _ ≤-refl z≤n
-  rose (inOuter (mergeᶠ (just mx)) f d n qs ls c) s (nx a) pth g eq kept | true with closed c
-  rose (inOuter (mergeᶠ (just mx)) f d n qs ls c) s (nx a) pth g refl kept | true | true  = up c _ ≤-refl z≤n
-  rose (inOuter (mergeᶠ (just mx)) f d n qs ls c) s (nx a) pth g refl kept | true | false = ⊥-elim (begun kept (g refl))
-  rose (inOuter switchᶠ f d n qs ls c) s (nx a) pth g eq kept with killAll ls | kill-le (suc (depth c)) ls
-  rose (inOuter switchᶠ f d n qs ls c) s (nx a) pth g eq kept | ls′ , t | h with closed c
-  rose (inOuter switchᶠ f d n qs ls c) s (nx a) pth g refl kept | ls′ , t | h | true  = up c _ (+-monoʳ-≤ (pot (suc (depth c)) s) h) z≤n
-  rose (inOuter switchᶠ f d n qs ls c) s (nx a) pth g refl kept | ls′ , t | h | false = ⊥-elim (begun kept (g refl))
-  rose (inOuter exhaustᶠ f d n qs ls c) s (nx a) pth g eq kept with n ≡ᵇ 0
-  rose (inOuter exhaustᶠ f d n qs ls c) s (nx a) pth g refl kept | false = up c _ ≤-refl z≤n
-  rose (inOuter exhaustᶠ f d n qs ls c) s (nx a) pth g eq kept | true with closed c
-  rose (inOuter exhaustᶠ f d n qs ls c) s (nx a) pth g refl kept | true | true  = up c _ ≤-refl z≤n
-  rose (inOuter exhaustᶠ f d n qs ls c) s (nx a) pth g refl kept | true | false = ⊥-elim (begun kept (g refl))
-  rose (inOuter op f d n qs ls c) s cp pth g refl _ = up c _ ≤-refl (climb-le (if d then absorbed else settle true n (null qs)))
-  rose (inLanes op f d n qs o′ pre post c) s (nx b) pth g eq kept with alive s
-  rose (inLanes op f d n qs o′ pre post c) s (nx b) pth g refl kept | true  = up c _ ≤-refl ≤-refl
-  rose (inLanes op f d n qs o′ pre post c) s (nx b) pth g refl kept | false = up c _ ≤-refl z≤n
-  rose (inLanes op f d n qs o′ pre post c) s cp pth g eq kept with alive s
-  rose (inLanes op f d n qs o′ pre post c) s cp pth g refl kept | false = up c _ ≤-refl z≤n
-  rose (inLanes op f d n [] o′ pre post c) s cp pth g refl kept | true = up c _ (lanes-le (depth c) o′ pre post s) (climb-le (settle d (pred n) true))
-  rose (inLanes op f d n (a ∷ qs) o′ pre post c) s cp pth g eq kept | true with closed c
-  rose (inLanes op f d n (a ∷ qs) o′ pre post c) s cp pth g refl kept | true | true  = up c _ (lanes-le (depth c) o′ pre post s) z≤n
-  rose (inLanes op f d n (a ∷ qs) o′ pre post c) s cp pth g refl kept | true | false = ⊥-elim (begun kept (g refl))
+  rose (inOuter (mergeᶠ nothing) f ω d n qs ls c) s (nx a) pth g eq kept with closed c
+  rose (inOuter (mergeᶠ nothing) f ω d n qs ls c) s (nx a) pth g refl kept | true  = up c _ ≤-refl z≤n
+  rose (inOuter (mergeᶠ nothing) f ω d n qs ls c) s (nx a) pth g refl kept | false = ⊥-elim (begun kept (g refl))
+  rose (inOuter (mergeᶠ (just mx)) f ω d n qs ls c) s (nx a) pth g eq kept with n <ᵇ mx
+  rose (inOuter (mergeᶠ (just mx)) f ω d n qs ls c) s (nx a) pth g refl kept | false = up c _ ≤-refl z≤n
+  rose (inOuter (mergeᶠ (just mx)) f ω d n qs ls c) s (nx a) pth g eq kept | true with closed c
+  rose (inOuter (mergeᶠ (just mx)) f ω d n qs ls c) s (nx a) pth g refl kept | true | true  = up c _ ≤-refl z≤n
+  rose (inOuter (mergeᶠ (just mx)) f ω d n qs ls c) s (nx a) pth g refl kept | true | false = ⊥-elim (begun kept (g refl))
+  rose (inOuter switchᶠ f ω d n qs ls c) s (nx a) pth g eq kept with killAll ls | kill-le (suc (depth c)) ls
+  rose (inOuter switchᶠ f ω d n qs ls c) s (nx a) pth g eq kept | ls′ , t | h with closed c
+  rose (inOuter switchᶠ f ω d n qs ls c) s (nx a) pth g refl kept | ls′ , t | h | true  = up c _ (+-monoʳ-≤ (pot (suc (depth c)) s) h) z≤n
+  rose (inOuter switchᶠ f ω d n qs ls c) s (nx a) pth g refl kept | ls′ , t | h | false = ⊥-elim (begun kept (g refl))
+  rose (inOuter exhaustᶠ f ω d n qs ls c) s (nx a) pth g eq kept with n ≡ᵇ 0
+  rose (inOuter exhaustᶠ f ω d n qs ls c) s (nx a) pth g refl kept | false = up c _ ≤-refl z≤n
+  rose (inOuter exhaustᶠ f ω d n qs ls c) s (nx a) pth g eq kept | true with closed c
+  rose (inOuter exhaustᶠ f ω d n qs ls c) s (nx a) pth g refl kept | true | true  = up c _ ≤-refl z≤n
+  rose (inOuter exhaustᶠ f ω d n qs ls c) s (nx a) pth g refl kept | true | false = ⊥-elim (begun kept (g refl))
+  rose (inOuter op f ω d n qs ls c) s cp pth g refl _ = up c _ ≤-refl (climb-le (if d then absorbed else settle true n (null qs)))
+  rose (inLanes op f ω d n qs o′ pre post c) s (nx b) pth g eq kept with alive s
+  rose (inLanes op f ω d n qs o′ pre post c) s (nx b) pth g refl kept | true  = up c _ ≤-refl ≤-refl
+  rose (inLanes op f ω d n qs o′ pre post c) s (nx b) pth g refl kept | false = up c _ ≤-refl z≤n
+  rose (inLanes op f ω d n qs o′ pre post c) s cp pth g eq kept with alive s
+  rose (inLanes op f ω d n qs o′ pre post c) s cp pth g refl kept | false = up c _ ≤-refl z≤n
+  rose (inLanes op f ω d n [] o′ pre post c) s cp pth g refl kept | true = up c _ (lanes-le (depth c) o′ pre post s) (climb-le (settle d (pred n) true))
+  rose (inLanes op f ω d n (a ∷ qs) o′ pre post c) s cp pth g eq kept | true with closed c
+  rose (inLanes op f ω d n (a ∷ qs) o′ pre post c) s cp pth g refl kept | true | true  = up c _ (lanes-le (depth c) o′ pre post s) z≤n
+  rose (inLanes op f ω d n (a ∷ qs) o′ pre post c) s cp pth g refl kept | true | false = ⊥-elim (begun kept (g refl))
   rose (inSrc k b c) s ε pth g eq kept =
     let (_ , tq , le) = echo-guard o pth m
     in ⊥-elim (clash (kept (∈-++⁺ˡ (cov tq le)) (below q)) (fed-ahead o pth (_ , eq)))
@@ -406,8 +406,8 @@ dirs-depth (inScan f z c)                    = snoc-len (dirs c) (dirs-depth c)
 dirs-depth (inCut l a c)                     = snoc-len (dirs c) (dirs-depth c)
 dirs-depth (inLn b c)                        = snoc-len (dirs c) (dirs-depth c)
 dirs-depth (inTake i f w c)                  = snoc-len (dirs c) (dirs-depth c)
-dirs-depth (inOuter op f d n q ls c)         = snoc-len (dirs c) (dirs-depth c)
-dirs-depth (inLanes op f d n q o pre post c) = snoc-len (dirs c) (dirs-depth c)
+dirs-depth (inOuter op f ω d n q ls c)         = snoc-len (dirs c) (dirs-depth c)
+dirs-depth (inLanes op f ω d n q o pre post c) = snoc-len (dirs c) (dirs-depth c)
 dirs-depth (inSrc k b c)                     = snoc-len (dirs c) (dirs-depth c)
 dirs-depth (inBody k o c)                    = snoc-len (dirs c) (dirs-depth c)
 

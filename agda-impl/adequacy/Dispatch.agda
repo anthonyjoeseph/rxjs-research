@@ -20,29 +20,32 @@ open import Data.Product using (Σ; _,_; _×_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; subst)
 
-open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Timeline; root; Pos; ix; last; timelineAt; emit; stall; close)
-open import denotation.EmissionSet using (EmissionSet; enter; ⟦_⟧; out; end; at-out; at-end)
-open import denotation.Laws.Modulus using (≺-ext)
+open import denotation.EmissionSet using (EmissionSet; enter; ⟦_⟧; out; end; at-out; at-end) renaming (Reach to Reachᴱ)
+open import denotation.Laws.Modulus using (≺-ext; ≺→≼; entered-reach)
+open import denotation.Laws.Worlds using (Ok; Hots; ok-step)
 open import operation.Key using (Key; _<ᴷ_; at)
 open import operation.PureObservable using (due; PureObs; module Machine; module Driver; Tape; play; ending; over; opening)
-open Machine using (St; Ctx; Conf; Scope; scopeOf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; found; Mark; ofM; attM;
+open Machine using (St; Ctx; Conf; Scope; binds; scopeOf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; found; Mark; ofM; attM;
                     rise; run; alive; nx; cp; attAt; attached; Torn; Stepped; quiet; admit; closed; killAll; unsubIf; unsub; free; cpAt; cutAt; overAt;
                     cut; cpM; cutM; CS; cs; closedUp; _⊕_; unbound; seek; kids; lanes; own; ownBest; first; retag; raceT; sourceT; Cand; Out; bodyM; srcAttM; owedM; joinM; leafM; leaf; starting; turn;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Shown to Shownᴹ; step to stepᴹ)
-open import adequacy.Rows using (≃-refl; Vis; Past; Lowest; _≃_; _⇄_; silent; shown; Moves; this)
+open import adequacy.Rows using (Frozen; toEv; pendRows; full; ≃-refl; Vis; Past; Lowest; _≃_; _⇄_; silent; shown; Moves; this)
 open _≃_
-open import adequacy.Cursor using (Cur; Rgn; origin; bef; Spent; Due; Sync; _≈_; c-abs; c-sub; Inv; settled; pending; adrift; f-top;
+open import adequacy.Cursor using (Cur; Rgn; FewBefore; JoinG; JoinE; Parts; Flags; src-pend; u-body; JInv; Joined; JRl; JRo; polF; Sound; Within; Adm; u-cut; u-outer; origin; bef; Spent; Due; Sync; _≈_; c-abs; c-sub; Inv; settled; pending; adrift; f-top;
   RT; SimC; keeps; Owes; Fr; Hold; Need; owes; lane; lanecut; pnd; s-of; s-join; s-joinx; s-took;
   f-off; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-srcx; f-body;
   o-cp; rise-top; rise-map; rise-scan-nx; rise-scan-cp; rise-take-pass; rise-take-cp; rise-cut; rise-cutx; rise-ln; rise-took; rise-take-fail; rise-bodyx; run-stop;
   run-cut; run-att)
 open import adequacy.Simulation using (Simulation)
+open import adequacy.Path using (Path)
+import adequacy.Path as P
 open import adequacy.Walk using (due-≈; climb; descend; refocus)
 open import adequacy.Least using (Lo; Keeps; mapKp; scanKp; cutKp; takeKp; outerKp; laneKp; seek-lo; seek-none)
-open import adequacy.Bound using (bound; shift; due-shift)
+open import adequacy.Bound using (bound; shift; due-shift; owes-≼)
 open import adequacy.Up using (rise-body-nx; rise-body-cp; rise-src-nx; rise-src-cp)
 
 ------------------------------------------------------------------------
@@ -52,12 +55,12 @@ Mv : ∀ {R} → Stepped R → Set
 Mv (moved _ _ _) = ⊤
 Mv _             = ⊥
 
-admit-mv : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q o ls a p → Mv (admit c op f d n q o ls a p)
-admit-mv c (Tree.mergeᶠ nothing)  f d n q o ls a p = tt
-admit-mv c (Tree.mergeᶠ (just m)) f d n q o ls a p = tt
-admit-mv c Tree.switchᶠ           f d n q o ls a p with killAll ls
+admit-mv : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) ω d n q o ls a p → Mv (admit c op f ω d n q o ls a p)
+admit-mv c (Tree.mergeᶠ nothing)  f ω d n q o ls a p = tt
+admit-mv c (Tree.mergeᶠ (just m)) f ω d n q o ls a p = tt
+admit-mv c Tree.switchᶠ           f ω d n q o ls a p with killAll ls
 ... | _ = tt
-admit-mv c Tree.exhaustᶠ          f d n q o ls a p with n ≡ᵇ 0
+admit-mv c Tree.exhaustᶠ          f ω d n q o ls a p with n ≡ᵇ 0
 ... | true  = tt
 ... | false = tt
 
@@ -76,10 +79,10 @@ rise-mv (inTake i q free c)       s cp     p = tt
 rise-mv (inTake i q (cpAt r) c)   s e      p = tt
 rise-mv (inTake i q (cutAt r) c)  s e      p = tt
 rise-mv (inTake i q (overAt r) c) s e      p = tt
-rise-mv (inOuter op f d n q ls c) o (nx a) p = admit-mv c op f d n q o ls a p
-rise-mv (inOuter op f d n q ls c) o cp     p = tt
-rise-mv (inLanes op f d n q o pre post c) s (nx b) p = tt
-rise-mv (inLanes op f d n q o pre post c) s cp     p = tt
+rise-mv (inOuter op f ω d n q ls c) o (nx a) p = admit-mv c op f ω d n q o ls a p
+rise-mv (inOuter op f ω d n q ls c) o cp     p = tt
+rise-mv (inLanes op f ω d n q o pre post c) s (nx b) p = tt
+rise-mv (inLanes op f ω d n q o pre post c) s cp     p = tt
 rise-mv (inSrc k b c)             s (nx a) p = tt
 rise-mv (inSrc k b c)             s cp     p = tt
 rise-mv (inBody k o c)            s (nx b) p with CS.srcLive k
@@ -266,7 +269,7 @@ own-marked doneS                         = []ᴬ
 own-marked (mapS _ _)                    = []ᴬ
 own-marked (scanS _ _ _)                 = []ᴬ
 own-marked (lnS _ _)                     = []ᴬ
-own-marked (flatS _ _ _ _ _ _ _)         = []ᴬ
+own-marked (flatS _ _ _ _ _ _ _ _)         = []ᴬ
 
 ownBest-owned : ∀ {R Γ A} (c : Ctx R Γ A) s ms → All (λ mk → Marked s (proj₁ mk)) ms → (∀ {mk} → mk ∈ ms → mk ∈ own s)
               → Owned (plug c s) (ownBest c s ms)
@@ -283,7 +286,7 @@ mutual
   kids-owned c (cutS l a s)            = retag-owned (cutKp l) (seek-owned (inCut l a c) s)
   kids-owned c (lnS b s)               = seek-owned (inLn b c) s
   kids-owned c (takeS i q w s)         = retag-owned (takeKp i q w) (seek-owned (inTake i q w c) s)
-  kids-owned c (flatS op f d n q o ls) = race-owned d n q (seek-owned (inOuter op f d n q ls c) o) (lanes-owned c op f d n q o [] ls)
+  kids-owned c (flatS op f ω d n q o ls) = race-owned d n q (seek-owned (inOuter op f ω d n q ls c) o) (lanes-owned c op f ω d n q o [] ls)
   kids-owned c (connS k o b)           = source-owned (seek-owned (inSrc k b c) o) (seek-owned (inBody k o c) b)
   kids-owned c (pend _ _)              = o-none
   kids-owned c (coldS _ _)             = o-none
@@ -291,11 +294,11 @@ mutual
   kids-owned c doneS                   = o-none
   kids-owned c (joinS _ _ _ _)         = o-none
 
-  lanes-owned : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) d n q o pre ls
-              → Owned (plug c (flatS op f d n q o (pre ʳ++ ls))) (lanes c op f d n q o pre ls)
-  lanes-owned c op f d n q o pre []         = o-none
-  lanes-owned c op f d n q o pre (s ∷ post) =
-    first-owned (retag-owned (cutKp (alive s)) (seek-owned (inLanes op f d n q o pre post c) s)) (lanes-owned c op f d n q o (s ∷ pre) post)
+  lanes-owned : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → Obs Timeline Γ B) ω d n q o pre ls
+              → Owned (plug c (flatS op f ω d n q o (pre ʳ++ ls))) (lanes c op f ω d n q o pre ls)
+  lanes-owned c op f ω d n q o pre []         = o-none
+  lanes-owned c op f ω d n q o pre (s ∷ post) =
+    first-owned (retag-owned (cutKp (alive s)) (seek-owned (inLanes op f ω d n q o pre post c) s)) (lanes-owned c op f ω d n q o (s ∷ pre) post)
 
 found-of : ∀ {R B t} {x : Maybe (Cand R B)} {Γ A c′ s′ m κ}
          → Owned t x → mapᴹ proj₁ x ≡ just (found (Γ , A , c′ , s′) m κ) → Marked s′ m × plug c′ s′ ≡ t
@@ -362,6 +365,26 @@ none-spent {t = t} sy fd {q} r | nothing =
 none-spent sy () r | just _
 
 ------------------------------------------------------------------------
+-- What the run's history tells a step from `k`: at a body's rise, its
+-- source's rows before it few; at a joiner's outer end or lane's rise,
+-- its rows before it few.
+
+record Told {R} (k : Conf R) : Set₁ where
+  field
+    atBody  : ∀ {Γ X B} {k′ : CS Γ X} {o} {c : Ctx R Γ B} {s e p}
+              → k ≡ ⟨ inBody k′ o c , s , rising e , p ⟩ → CS.srcLive k′ ≡ true → FewBefore (Frozen k′) p
+    atOuter : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu ls} {c : Ctx R Γ B} {s p}
+              → k ≡ ⟨ inOuter op f ω d n qu ls c , s , rising cp , p ⟩ → Reachᴱ (JoinG (scopeOf c) op f ω) p end
+    atLane  : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu o pre post} {c : Ctx R Γ B} {s e p}
+              → k ≡ ⟨ inLanes op f ω d n qu o pre post c , s , rising e , p ⟩ → Reachᴱ (JoinG (scopeOf c) op f ω) p (toEv e)
+
+------------------------------------------------------------------------
+-- A connect as entered at `q`: its source live, not yet subscribed.
+
+conn₀ : ∀ {Γ X} → Obs Timeline Γ X → Pos → Scope Γ → CS Γ X
+conn₀ s q sc = cs false true false (just q) nothing nothing q root s sc
+
+------------------------------------------------------------------------
 -- The steps over a root's entry
 
 module Over {R : Set} (Rt : EmissionSet R) where
@@ -381,13 +404,29 @@ module Over {R : Set} (Rt : EmissionSet R) where
     sub-take   : ∀ {C Γ A} {c : Ctx R Γ A} {i} {w : A → Bool} {s q p}
                → Inv Rt C ⟨ c , pend (takeWhile i w s) q , subscribing , p ⟩
                → Inv Rt C ⟨ inCut true (attAt q) (inTake i w free c) , pend s q , subscribing , q ⟩
-    sub-flat   : ∀ {C Γ A B} {c : Ctx R Γ B} {op} {f : A → Obs Timeline Γ B} {s q p}
-               → Inv Rt C ⟨ c , pend (flatMap op f s) q , subscribing , p ⟩
-               → Inv Rt C ⟨ inCut true (attAt q) (inOuter op f false 0 [] [] c) , pend s q , subscribing , q ⟩
-    sub-conn   : ∀ {C Γ A B} {c : Ctx R Γ B} {s : Obs Timeline Γ A} {b q p}
-               → Inv Rt C ⟨ c , pend (connect s b) q , subscribing , p ⟩
-               → Inv Rt C ⟨ inBody (cs false true false (just q) nothing nothing q root s (scopeOf c)) (pend s (q ⊕ [ ix 1 ])) c
-                          , pend b (q ⊕ [ ix 0 ]) , subscribing , q ⊕ [ ix 0 ] ⟩
+    -- A JOINER ENTERED: its outer's entry where it subscribed, every
+    -- lane's program admissible, nothing begun or queued, its outer's
+    -- rows in its region and clear of every lane's.
+    flat-jinv   : ∀ {Γ A B} {sc : Scope Γ} {f : A → Obs Timeline Γ B} {s q}
+                → Ok (Hots (full sc)) q → Adm sc → JInv sc f (pendRows (full sc) s q)
+    flat-joined : ∀ {C Γ A B} {sc : Scope Γ} {Rg} {op} {f : A → Obs Timeline Γ B} {s q}
+                → Owes C q → Ok (Hots (full sc)) q → Adm sc
+                → Joined sc (JRl sc Rg op f (pendRows (full sc) s q)) C (polF op (λ a → ⟦ f a ⟧ (full sc)) (pendRows (full sc) s q))
+                         (pendRows (full sc) s q) false 0 [] []
+    flat-sound  : ∀ {Γ A B} {sc : Scope Γ} {Rg} {op} {f : A → Obs Timeline Γ B} {s q}
+                → Ok (Hots (full sc)) q → Adm sc → Within Rg sc q → Sound (JRo sc Rg op f (pendRows (full sc) s q)) (pendRows (full sc) s q)
+    flat-within : ∀ {Γ A B} {sc : Scope Γ} {Rg} {op} {f : A → Obs Timeline Γ B} {s q}
+                → Ok (Hots (full sc)) q → Within Rg sc q → Within (JRo sc Rg op f (pendRows (full sc) s q)) sc q
+    -- A CONNECT ENTERED: its body and source in regions apart and clear
+    -- of the scope's hots, its flags fresh, its body admissible.
+    conn-parts : ∀ {Γ X B} {sc : Scope Γ} {Rg} {s : Obs Timeline Γ X} {b : Obs Timeline (X ∷ Γ) B} {q}
+               → Ok (Hots (full sc)) q → Adm sc → Within Rg sc q
+               → Σ (Parts sc Rg (conn₀ s q sc) (pendRows (full (binds s q sc)) b (q ⊕ [ ix 0 ]))) λ pt
+                 → Within (Parts.Rb pt) (binds s q sc) (q ⊕ [ ix 0 ]) × Within (Parts.Rs pt) sc (q ⊕ [ ix 1 ])
+    conn-flags : ∀ {C Γ X B} {sc : Scope Γ} {s : Obs Timeline Γ X} {b : Obs Timeline (X ∷ Γ) B} {q}
+               → Owes C q → Flags C (conn₀ s q sc) (pendRows (full (binds s q sc)) b (q ⊕ [ ix 0 ]))
+    conn-ok    : ∀ {Γ X} {sc : Scope Γ} {s : Obs Timeline Γ X} {q}
+               → Ok (Hots (full sc)) q → Adm sc → Ok (Hots (full (binds s q sc))) (q ⊕ [ ix 0 ])
     sub-cold   : ∀ {C Γ A} {c : Ctx R Γ A} {x : Timeline A} {q p}
                → Inv Rt C ⟨ c , pend (cold x) q , subscribing , p ⟩ → Inv Rt C ⟨ c , coldS true (opening q (timelineAt x q)) , absorbed , q ⟩
     sub-defer  : ∀ {C Γ A} {c : Ctx R Γ A} {l q p}
@@ -407,16 +446,16 @@ module Over {R : Set} (Rt : EmissionSet R) where
     -- at `p`.
     rise-take-failᵢ : ∀ {Γ A} {w : A → Bool} {c : Ctx R Γ A} {s a p} → w a ≡ false
                     → SimC Rt ⟨ inTake true w free c , s , rising (nx a) , p ⟩ [] ⟨ c , takeS true w (cpAt p) s , rising (nx a) , p ⊕ [ ix 0 ] ⟩
-    rise-outer-nx : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n q ls} {c : Ctx R Γ B} {o a p k′ sh t}
-                  → rise (inOuter op f d n q ls c) o (nx a) p ≡ moved k′ sh t → SimC Rt ⟨ inOuter op f d n q ls c , o , rising (nx a) , p ⟩ sh k′
-    rise-outer-cp : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n q ls} {c : Ctx R Γ B} {o p k′ sh t}
-                  → rise (inOuter op f d n q ls c) o cp p ≡ moved k′ sh t → SimC Rt ⟨ inOuter op f d n q ls c , o , rising cp , p ⟩ sh k′
-    rise-lane-nx  : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n q o pre post} {c : Ctx R Γ B} {s b p k′ sh t}
-                  → rise (inLanes op f d n q o pre post c) s (nx b) p ≡ moved k′ sh t
-                  → SimC Rt ⟨ inLanes op f d n q o pre post c , s , rising (nx b) , p ⟩ sh k′
-    rise-lane-cp  : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n q o pre post} {c : Ctx R Γ B} {s p k′ sh t}
-                  → rise (inLanes op f d n q o pre post c) s cp p ≡ moved k′ sh t
-                  → SimC Rt ⟨ inLanes op f d n q o pre post c , s , rising cp , p ⟩ sh k′
+    rise-outer-nx : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n q ls} {c : Ctx R Γ B} {o a p k′ sh t}
+                  → rise (inOuter op f ω d n q ls c) o (nx a) p ≡ moved k′ sh t → SimC Rt ⟨ inOuter op f ω d n q ls c , o , rising (nx a) , p ⟩ sh k′
+    rise-outer-cp : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n q ls} {c : Ctx R Γ B} {o p k′ sh t}
+                  → Reachᴱ (JoinG (scopeOf c) op f ω) p end → rise (inOuter op f ω d n q ls c) o cp p ≡ moved k′ sh t → SimC Rt ⟨ inOuter op f ω d n q ls c , o , rising cp , p ⟩ sh k′
+    rise-lane-nx  : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n q o pre post} {c : Ctx R Γ B} {s b p k′ sh t}
+                  → Reachᴱ (JoinG (scopeOf c) op f ω) p (out b) → rise (inLanes op f ω d n q o pre post c) s (nx b) p ≡ moved k′ sh t
+                  → SimC Rt ⟨ inLanes op f ω d n q o pre post c , s , rising (nx b) , p ⟩ sh k′
+    rise-lane-cp  : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n q o pre post} {c : Ctx R Γ B} {s p k′ sh t}
+                  → Reachᴱ (JoinG (scopeOf c) op f ω) p end → rise (inLanes op f ω d n q o pre post c) s cp p ≡ moved k′ sh t
+                  → SimC Rt ⟨ inLanes op f ω d n q o pre post c , s , rising cp , p ⟩ sh k′
     --------------------------------------------------------------------
     -- MARK RUNS, the cursor just before what they deliver.
     run-of-nx     : ∀ {Γ A} {c : Ctx R Γ A} {i q x xs r} → closed c ≡ false
@@ -442,6 +481,57 @@ module Over {R : Set} (Rt : EmissionSet R) where
                   → search top (plug c s) ≡ just (found (Γ , A , c′ , coldS b l) leafM κ)
                   → Driver.took R (run c′ (coldS b l) leafM p) ≡ Driver.silent t k′
                   → SimC Rt ⟨ c , s , absorbed , p ⟩ [] k′
+
+  ----------------------------------------------------------------------
+  -- A SUBSCRIPTION OWED, whichever way the invariant holds it: pending,
+  -- or a connect's source not yet subscribed.
+  PendV : ∀ {Γ A} → Cur → Ctx R Γ A → Obs Timeline Γ A → Pos → Set₁
+  PendV {A = A} C c o q = Σ Rgn λ Rg → Σ Bool λ w → Σ (EmissionSet A) λ E → Fr Rt C Rg c (owes w) E
+                        × (T w → Owes C q × Ok (Hots (full (scopeOf c))) q × Adm (scopeOf c) × pendRows (full (scopeOf c)) o q ≈ E
+                               × Within Rg (scopeOf c) q)
+
+  pend-view : ∀ {C Γ A} {c : Ctx R Γ A} {o q p} → Inv Rt C ⟨ c , pend o q , subscribing , p ⟩ → PendV C c o q
+  pend-view (pending fr h)                                  = _ , _ , _ , fr , h
+  pend-view (settled {w = owes false} c-sub fr _)           = _ , false , _ , fr , λ ()
+  pend-view (settled {w = owes true} c-sub fr h) with h tt
+  ... | ()
+  pend-view (settled {w = lane _} c-sub fr (_ , _ , () , _))
+  pend-view (settled {w = lanecut _} c-sub fr (_ , _ , () , _))
+  pend-view (settled {w = pnd _} c-sub (f-srcp {k = k} fr sc pt lv nc ba (ok , adm) bs fl fe eq ow) (_ , refl , pe , wn)) =
+    _ , _ , _ , f-src fr sc pt lv nc bs fl fe eq , λ _ → ow , ok-step (CS.connAt k) ok , adm , pe , wn
+
+  -- A joiner's entry, its outer's entered where it subscribed.
+  flat-entry : ∀ {Γ A B} (sc : Scope Γ) op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) q {E}
+             → pendRows (full sc) (flatMap op f s) q ≈ E → JoinE sc op f (s , q) (pendRows (full sc) s q) E
+  flat-entry sc (mergeᶠ nothing)  f s q eq = refl , eq
+  flat-entry sc (mergeᶠ (just m)) f s q eq = refl , eq
+  flat-entry sc switchᶠ           f s q eq = refl , eq
+  flat-entry sc exhaustᶠ          f s q eq = refl , eq
+
+  sub-conn : ∀ {C Γ A B} {c : Ctx R Γ B} {s : Obs Timeline Γ A} {b q p}
+           → Inv Rt C ⟨ c , pend (connect s b) q , subscribing , p ⟩
+           → Inv Rt C ⟨ inBody (conn₀ s q (scopeOf c)) (pend s (q ⊕ [ ix 1 ])) c , pend b (q ⊕ [ ix 0 ]) , subscribing , q ⊕ [ ix 0 ] ⟩
+  sub-conn {C = C} {c = c} {s = s} {b = b} {q = q} i with pend-view i
+  ... | Rg , false , _ , fr , _ =
+    pending {Rg = Rg} {w = false} {E = pendRows (full (binds s q (scopeOf c))) b (q ⊕ [ ix 0 ])} (f-off u-body fr) λ ()
+  ... | Rg , true  , _ , fr , h =
+    let (ow , ok , ad , eq , wi) = h tt
+        (pt , wb , ws) = conn-parts {s = s} {b = b} ok ad wi
+        ow₁ = owes-≼ C {q} {q ⊕ [ ix 1 ]} ow (≺→≼ {q} {q ⊕ [ ix 1 ]} (≺-ext q []))
+    in pending (f-body fr refl pt refl (λ _ → src-pend tt refl (ok , ad) ≃-refl ws ow₁) (conn-flags {s = s} {b = b} ow)
+                 (eq , entered-reach (⟦ b ⟧ (full (binds s q (scopeOf c)))) (q ⊕ [ ix 0 ])))
+         λ _ → owes-≼ C {q} {q ⊕ [ ix 0 ]} ow (≺→≼ {q} {q ⊕ [ ix 0 ]} (≺-ext q [])) , conn-ok {s = s} ok ad , (ok , ad) , ≃-refl , wb
+
+  sub-flat : ∀ {C Γ A B} {c : Ctx R Γ B} {op} {f : A → Obs Timeline Γ B} {s q p}
+           → Inv Rt C ⟨ c , pend (flatMap op f s) q , subscribing , p ⟩
+           → Inv Rt C ⟨ inCut true (attAt q) (inOuter op f (s , q) false 0 [] [] c) , pend s q , subscribing , q ⟩
+  sub-flat {c = c} {op = op} {f = f} {s = s} {q = q} i with pend-view i
+  ... | Rg , false , _ , fr , _ = pending {Rg = Rg} {w = false} {E = pendRows (full (scopeOf c)) s q} (f-off u-cut (f-off {Rg′ = Rg} {E = pendRows (full (scopeOf c)) s q} u-outer fr)) λ ()
+  ... | Rg , true  , _ , fr , h =
+    let (ow , ok , ad , eq , wi) = h tt
+    in pending (f-cut (f-outer fr (flat-jinv {f = f} {s = s} ok ad) (flat-joined {op = op} {f = f} {s = s} ow ok ad)
+                 (flat-entry (scopeOf c) op f s q eq) (flat-sound {op = op} {f = f} {s = s} ok ad wi)))
+         λ _ → ow , ok , ad , ≃-refl , flat-within {op = op} {f = f} {s = s} ok wi
 
   ----------------------------------------------------------------------
   -- THE SEARCH: the tree zipped up, the cursor moved over the whole tree,
@@ -527,7 +617,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   closed-off (f-lnct {b = true} fr)            t = ⊥-elim (closed-off fr t)
   closed-off (f-src {k = k} fr _ _ _ nc _ _ _ _) t = closed-off fr (or-right (CS.closed k) nc t)
   closed-off (f-srcc _ _ _ _ _ _ _ _ _)        _ = refl
-  closed-off (f-srcp _ _ _ _ _ _ _ _ _ _)      _ = tt
+  closed-off (f-srcp _ _ _ _ _ _ _ _ _ _ _ _) _ = tt
   closed-off (f-srcx _ _ _ _ _ _)              _ = refl
   closed-off (f-body fr _ _ refl _ _ _)        t with closed-off fr t
   ... | refl = refl
@@ -645,39 +735,39 @@ module Over {R : Set} (Rt : EmissionSet R) where
                                     (abs-leaf fd)
 
   -- The record update holds `srcLive` too, so the test is generalised alone.
-  body-cp : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s p k′ sh t} b → CS.srcLive k ≡ b
+  body-cp : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s p k′ sh t} b → CS.srcLive k ≡ b → Told ⟨ inBody k o c , s , rising cp , p ⟩
           → moved (if b then ⟨ c , connS (record k { owedAt = just p }) o s , rising cp , p ⟩ else ⟨ c , connS k o s , absorbed , p ⟩) [] [] ≡ moved k′ sh t
           → SimC Rt ⟨ inBody k o c , s , rising cp , p ⟩ sh k′
-  body-cp true  lv refl = rise-body-cp Rt lv
-  body-cp false lv refl = rise-bodyx Rt lv
+  body-cp true  lv tl refl = rise-body-cp Rt lv (Told.atBody tl refl lv)
+  body-cp false lv _  refl = rise-bodyx Rt lv
 
   -- A rise, by its frame.
-  rise-sim : ∀ {Γ A} {k′ : Conf R} {sh t} (c : Ctx R Γ A) (s : St Γ A) e p → rise c s e p ≡ moved k′ sh t → SimC Rt ⟨ c , s , rising e , p ⟩ sh k′
-  rise-sim top                       s e      p refl = rise-top Rt
-  rise-sim (inMap f c)               s e      p refl = rise-map Rt
-  rise-sim (inScan f z c)            s (nx a) p refl = rise-scan-nx Rt
-  rise-sim (inScan f z c)            s cp     p refl = rise-scan-cp Rt
-  rise-sim (inCut true a c)          s e      p refl = rise-cut Rt
-  rise-sim (inCut false a c)         s e      p refl = rise-cutx Rt
-  rise-sim (inLn b c)                s e      p refl = rise-ln Rt
-  rise-sim (inTake i w free c)       s (nx a) p eq with w a in wa | i | eq
+  rise-sim : ∀ {Γ A} {k′ : Conf R} {sh t} (c : Ctx R Γ A) (s : St Γ A) e p → Told ⟨ c , s , rising e , p ⟩ → rise c s e p ≡ moved k′ sh t → SimC Rt ⟨ c , s , rising e , p ⟩ sh k′
+  rise-sim top                       s e      p tl refl = rise-top Rt
+  rise-sim (inMap f c)               s e      p tl refl = rise-map Rt
+  rise-sim (inScan f z c)            s (nx a) p tl refl = rise-scan-nx Rt
+  rise-sim (inScan f z c)            s cp     p tl refl = rise-scan-cp Rt
+  rise-sim (inCut true a c)          s e      p tl refl = rise-cut Rt
+  rise-sim (inCut false a c)         s e      p tl refl = rise-cutx Rt
+  rise-sim (inLn b c)                s e      p tl refl = rise-ln Rt
+  rise-sim (inTake i w free c)       s (nx a) p tl eq with w a in wa | i | eq
   ... | true  | _     | refl = rise-take-pass Rt wa
   ... | false | true  | refl = rise-take-failᵢ wa
   ... | false | false | refl = rise-take-fail Rt wa
-  rise-sim (inTake i w free c)       s cp     p refl = rise-take-cp Rt
-  rise-sim (inTake i w (cpAt r) c)   s e      p refl = rise-took Rt (λ ())
-  rise-sim (inTake i w (cutAt r) c)  s e      p refl = rise-took Rt (λ ())
-  rise-sim (inTake i w (overAt r) c) s e      p refl = rise-took Rt (λ ())
-  rise-sim (inOuter op f d n q ls c) o (nx a) p eq   = rise-outer-nx eq
-  rise-sim (inOuter op f d n q ls c) o cp     p eq   = rise-outer-cp eq
-  rise-sim (inLanes op f d n q o pre post c) s (nx b) p eq = rise-lane-nx eq
-  rise-sim (inLanes op f d n q o pre post c) s cp     p eq = rise-lane-cp eq
-  rise-sim (inSrc k b c)             s (nx a) p eq   = rise-src-nx Rt eq
-  rise-sim (inSrc k b c)             s cp     p eq   = rise-src-cp Rt eq
-  rise-sim (inBody k o c)            s (nx b) p eq with CS.srcLive k in lv | eq
-  ... | true  | refl = rise-body-nx Rt lv
+  rise-sim (inTake i w free c)       s cp     p tl refl = rise-take-cp Rt
+  rise-sim (inTake i w (cpAt r) c)   s e      p tl refl = rise-took Rt (λ ())
+  rise-sim (inTake i w (cutAt r) c)  s e      p tl refl = rise-took Rt (λ ())
+  rise-sim (inTake i w (overAt r) c) s e      p tl refl = rise-took Rt (λ ())
+  rise-sim (inOuter op f ω d n q ls c) o (nx a) p tl eq   = rise-outer-nx eq
+  rise-sim (inOuter op f ω d n q ls c) o cp     p tl eq   = rise-outer-cp (Told.atOuter tl refl) eq
+  rise-sim (inLanes op f ω d n q o pre post c) s (nx b) p tl eq = rise-lane-nx (Told.atLane tl refl) eq
+  rise-sim (inLanes op f ω d n q o pre post c) s cp     p tl eq = rise-lane-cp (Told.atLane tl refl) eq
+  rise-sim (inSrc k b c)             s (nx a) p tl eq   = rise-src-nx Rt eq
+  rise-sim (inSrc k b c)             s cp     p tl eq   = rise-src-cp Rt eq
+  rise-sim (inBody k o c)            s (nx b) p tl eq with CS.srcLive k in lv | eq
+  ... | true  | refl = rise-body-nx Rt lv (Told.atBody tl refl lv)
   ... | false | refl = rise-bodyx Rt lv
-  rise-sim (inBody k o c)            s cp     p eq   = body-cp (CS.srcLive k) refl eq
+  rise-sim (inBody k o c)            s cp     p tl eq   = body-cp (CS.srcLive k) refl tl eq
 
   -- A joiner subscribed, by its subject's end.
   join-mv : ∀ {Γ A} (c : Ctx R Γ A) (x : A ∈ Γ) q {p} → Mv (stepᴹ ⟨ c , pend (connected x) q , subscribing , p ⟩)
@@ -704,31 +794,48 @@ module Over {R : Set} (Rt : EmissionSet R) where
   reach-pend c (defer l)         q p = within tt λ { refl → keeps Rt sub-defer }
 
   -- Subscribing to a node already running: nothing to do.
-  reach : (k : Conf R) → Reach k
-  reach ⟨ c , s , rising e , p ⟩                        = within (rise-mv c s e p) (rise-sim c s e p)
-  reach ⟨ c , pend o q , subscribing , p ⟩              = reach-pend c o q p
-  reach ⟨ c , coldS b l , subscribing , p ⟩             = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , ofS j q xs , subscribing , p ⟩            = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , doneS , subscribing , p ⟩                 = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , mapS f s , subscribing , p ⟩              = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , scanS f z s , subscribing , p ⟩           = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , cutS l a s , subscribing , p ⟩            = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , lnS b s , subscribing , p ⟩               = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , takeS j q w s , subscribing , p ⟩         = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , flatS op f d n q o ls , subscribing , p ⟩ = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , connS k o b , subscribing , p ⟩           = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , joinS j g x ib , subscribing , p ⟩        = within tt λ { refl → keeps Rt λ i → i }
-  reach ⟨ c , s , absorbed , p ⟩                        = linked (abs-link c s p)
+  reach : (k : Conf R) → Told k → Reach k
+  reach ⟨ c , s , rising e , p ⟩                        tl = within (rise-mv c s e p) (rise-sim c s e p tl)
+  reach ⟨ c , pend o q , subscribing , p ⟩              _ = reach-pend c o q p
+  reach ⟨ c , coldS b l , subscribing , p ⟩             _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , ofS j q xs , subscribing , p ⟩            _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , doneS , subscribing , p ⟩                 _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , mapS f s , subscribing , p ⟩              _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , scanS f z s , subscribing , p ⟩           _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , cutS l a s , subscribing , p ⟩            _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , lnS b s , subscribing , p ⟩               _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , takeS j q w s , subscribing , p ⟩         _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , flatS op f ω d n q o ls , subscribing , p ⟩ _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , connS k o b , subscribing , p ⟩           _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , joinS j g x ib , subscribing , p ⟩        _ = within tt λ { refl → keeps Rt λ i → i }
+  reach ⟨ c , s , absorbed , p ⟩                        _ = linked (abs-link c s p)
 
 ------------------------------------------------------------------------
--- THE CURSOR SIMULATES EVERY RUN: the carrier a cursor and the invariant
--- at it, read as what the root owes past it.
+-- THE RUN'S HISTORY: at a body's rise its source shows few rows before
+-- it, and at a joiner's outer end or lane's rise the joiner does, facts
+-- of the run to it; no state shows them, since `Sync` ties visible rows
+-- only.
+
+postulate
+  few-body  : ∀ {R} {o : PureObs [] R} {rs Γ X B} {k : CS Γ X} {o′} {c : Ctx R Γ B} {s e p}
+            → Path (load o) rs ⟨ inBody k o′ c , s , rising e , p ⟩ → CS.srcLive k ≡ true → FewBefore (Frozen k) p
+  few-outer : ∀ {R} {o : PureObs [] R} {rs Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu ls} {c : Ctx R Γ B} {s p}
+            → Path (load o) rs ⟨ inOuter op f ω d n qu ls c , s , rising cp , p ⟩ → Reachᴱ (JoinG (scopeOf c) op f ω) p end
+  few-lane  : ∀ {R} {o : PureObs [] R} {rs Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu o′ pre post} {c : Ctx R Γ B} {s e p}
+            → Path (load o) rs ⟨ inLanes op f ω d n qu o′ pre post c , s , rising e , p ⟩ → Reachᴱ (JoinG (scopeOf c) op f ω) p (toEv e)
+
+told : ∀ {R} {o : PureObs [] R} {rs k} → Path (load o) rs k → Told k
+told pth = record { atBody = λ { refl → few-body pth } ; atOuter = λ { refl → few-outer pth } ; atLane = λ { refl → few-lane pth } }
+
+------------------------------------------------------------------------
+-- THE CURSOR SIMULATES EVERY RUN: the carrier a cursor, the invariant at
+-- it, read as what the root owes past it, and the run so far.
 
 cursor : ∀ {R} (o : PureObs [] R) → Simulation o
 cursor {R} o = record
-  { I   = λ k → Σ Cur λ C → Inv Rt C k
+  { I   = Car
   ; T   = λ i → RT Rt (proj₁ i)
-  ; i₀  = origin , pending {Rg = λ _ → ⊤} (f-top ≃-refl) (λ _ → tt , (tt , λ ()) , tt , ≃-refl , λ _ → tt)
+  ; i₀  = origin , pending {Rg = λ _ → ⊤} (f-top ≃-refl) (λ _ → tt , (tt , λ ()) , tt , ≃-refl , λ _ → tt) , [] , P.[]
   ; t₀  = (λ { ((x , v , _) , v′) → x , v′ }) ⇄ (λ { (x , v) → (x , v , tt) , v })
   ; tau = tau
   ; val = val
@@ -740,31 +847,34 @@ cursor {R} o = record
     Rt = enter (⟦ o ⟧ []ᴬ) root
     open Over Rt
 
-    tau : ∀ {k k′ t} (i : Σ Cur λ C → Inv Rt C k) → Driver.step R k ≡ Driver.silent t k′
-        → Σ (Σ Cur λ C → Inv Rt C k′) λ i′ → Vis (RT Rt (proj₁ i)) ≃ Vis (RT Rt (proj₁ i′))
-    tau {k} (C , i) e = go (reach k)
+    Car : Conf R → Set₁
+    Car k = Σ Cur λ C → Inv Rt C k × Σ (Shownᴹ R) λ rs → Path (load o) rs k
+
+    tau : ∀ {k k′ t} (i : Car k) → Driver.step R k ≡ Driver.silent t k′
+        → Σ (Car k′) λ i′ → Vis (RT Rt (proj₁ i)) ≃ Vis (RT Rt (proj₁ i′))
+    tau {k} {t = t} (C , i , rs , pth) e = go (reach k (told pth))
       where
         go : Reach k → _
         go (driven h sim) with sim e i
-        ... | C′ , i′ , silent q = (C′ , i′) , q
+        ... | C′ , i′ , silent q = (C′ , i′ , rs , pth P.▸τ (t , e)) , q
         go (within mv sim) with τ-moved (stepᴹ k) mv e
         ... | _ , eq with sim eq i
-        ...   | C′ , i′ , silent q = (C′ , i′) , q
+        ...   | C′ , i′ , silent q = (C′ , i′ , rs , pth P.▸τ (t , e)) , q
         go (stills eq _) = ⊥-elim (quiet-τ eq e)
 
-    val : ∀ {k k′ t p a} (i : Σ Cur λ C → Inv Rt C k) → Driver.step R k ≡ Driver.value t p a k′
-        → Σ (Σ Cur λ C → Inv Rt C k′) λ i′ → Lowest (RT Rt (proj₁ i)) p (out a) × Vis (Past p (RT Rt (proj₁ i))) ≃ Vis (RT Rt (proj₁ i′))
-    val {k} {k′} {t} {p} {a} (C , i) e = go (reach k)
+    val : ∀ {k k′ t p a} (i : Car k) → Driver.step R k ≡ Driver.value t p a k′
+        → Σ (Car k′) λ i′ → Lowest (RT Rt (proj₁ i)) p (out a) × Vis (Past p (RT Rt (proj₁ i))) ≃ Vis (RT Rt (proj₁ i′))
+    val {k} {k′} {t} {p} {a} (C , i , rs , pth) e = go (reach k (told pth))
       where
-        go : Reach k → Σ (Σ Cur λ C → Inv Rt C k′) λ i′ → Lowest (RT Rt C) p (out a) × Vis (Past p (RT Rt C)) ≃ Vis (RT Rt (proj₁ i′))
+        go : Reach k → Σ (Car k′) λ i′ → Lowest (RT Rt C) p (out a) × Vis (Past p (RT Rt C)) ≃ Vis (RT Rt (proj₁ i′))
         go (driven h _) = ⊥-elim (hush-val h e)
         go (stills eq _) = ⊥-elim (quiet-val eq e)
         go (within mv sim) with val-moved (stepᴹ k) mv e
         ... | rest , tr , eq with sim eq i
-        ...   | C′ , i′ , shown v l q = (C′ , i′) , (v , l) , q
+        ...   | C′ , i′ , shown v l q = (C′ , i′ , _ , pth P.▸ P.val e P.[]) , (v , l) , q
 
-    fin : ∀ {k p} (i : Σ Cur λ C → Inv Rt C k) → Driver.step R k ≡ Driver.complete p → Lowest (RT Rt (proj₁ i)) p end
-    fin {k} {p} (C , i) e = go (reach k)
+    fin : ∀ {k p} (i : Car k) → Driver.step R k ≡ Driver.complete p → Lowest (RT Rt (proj₁ i)) p end
+    fin {k} {p} (C , i , _ , pth) e = go (reach k (told pth))
       where
         go : Reach k → Lowest (RT Rt C) p end
         go (driven h _) = ⊥-elim (hush-fin h e)
@@ -773,8 +883,8 @@ cursor {R} o = record
         ... | k′ , rest , tr , eq with sim eq i
         ...   | C′ , i′ , shown v l q = v , l
 
-    dry : ∀ {k} (i : Σ Cur λ C → Inv Rt C k) → Driver.step R k ≡ Driver.drained → ∀ {q e} → Vis (RT Rt (proj₁ i)) q e → ⊥
-    dry {k} (C , i) e = go (reach k)
+    dry : ∀ {k} (i : Car k) → Driver.step R k ≡ Driver.drained → ∀ {q e} → Vis (RT Rt (proj₁ i)) q e → ⊥
+    dry {k} (C , i , _ , pth) e = go (reach k (told pth))
       where
         go : Reach k → ∀ {q e′} → Vis (RT Rt C) q e′ → ⊥
         go (driven h _)   = ⊥-elim (hush-drained h e)

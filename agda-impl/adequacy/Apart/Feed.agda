@@ -59,7 +59,7 @@ mutual
   joiners i (cutS l a s)            = joiners i s
   joiners i (lnS b s)               = joiners i s
   joiners i (takeS v q w s)         = joiners i s
-  joiners i (flatS op f d n q o ls) = joiners i o ++ joinersL i ls
+  joiners i (flatS op f ω d n q o ls) = joiners i o ++ joinersL i ls
   joiners i (connS k o b)           = joiners i o ++ joiners (there i) b
   joiners i s                       = []
 
@@ -106,7 +106,7 @@ mutual
   feed-items i p e (cutS l a s)            = ↭-trans (↭-++ˡ (attI a) (feed-items i p e s)) (pull (attI a) _ (items s))
   feed-items i p e (lnS b s)               = feed-items i p e s
   feed-items i p e (takeS v q w s)         = ↭-trans (↭-++ˡ (oweI w) (feed-items i p e s)) (pull (oweI w) _ (items s))
-  feed-items i p e (flatS op f d n q o ls) rewrite nw-++ p e (joiners i o) {joinersL i ls} =
+  feed-items i p e (flatS op f ω d n q o ls) rewrite nw-++ p e (joiners i o) {joinersL i ls} =
     ↭-trans (↭-++ (feed-items i p e o) (feedL-items i p e ls)) (inter (nw p e (joiners i o)) (items o) (nw p e (joinersL i ls)) (itemsL ls))
   feed-items i p e (connS k o b) rewrite nw-++ p e (joiners i o) {joiners (there i) b} =
     ↭-trans (↭-++ˡ (csI k) (↭-trans (↭-++ (feed-items i p e o) (feed-items (there i) p e b))
@@ -134,7 +134,7 @@ mutual
   joiners-⊆ i (cutS l a s)            = ⊆-++ˡ (attI a) (joiners-⊆ i s)
   joiners-⊆ i (lnS b s)               = joiners-⊆ i s
   joiners-⊆ i (takeS v q w s)         = ⊆-++ˡ (oweI w) (joiners-⊆ i s)
-  joiners-⊆ i (flatS op f d n q o ls) =
+  joiners-⊆ i (flatS op f ω d n q o ls) =
     subst (_⊆ items o ++ itemsL ls) (sym (map-++ bk (joiners i o) (joinersL i ls))) (⊆-++ (joiners-⊆ i o) (joinersL-⊆ i ls))
   joiners-⊆ i (connS k o b)           =
     ⊆-++ˡ (csI k) (subst (_⊆ items o ++ items b) (sym (map-++ bk (joiners i o) (joiners (there i) b))) (⊆-++ (joiners-⊆ i o) (joiners-⊆ (there i) b)))

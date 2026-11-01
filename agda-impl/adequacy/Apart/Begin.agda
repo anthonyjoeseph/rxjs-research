@@ -64,7 +64,7 @@ module _ {R : Set} where
     grow c {t = pend (takeWhile i q s) p} {t′ = takeS i q free (cutS true (attAt p) (pend s p))} p [ cl p ] [ pt p ] [] [] ↭-refl ↭-refl
       (sub-refl (cl p) ∷ sub-pt (self p) ∷ []) ((cl-pt ∷ []) ∷ [] ∷ []) h
   begin-ap c (flatMap op f s) p hp h =
-    grow c {t = pend (flatMap op f s) p} {t′ = flatS op f false 0 [] (cutS true (attAt p) (pend s p)) []} p [ cl p ] [ pt p ] [] [] ↭-refl ↭-refl
+    grow c {t = pend (flatMap op f s) p} {t′ = flatS op f (s , p) false 0 [] (cutS true (attAt p) (pend s p)) []} p [ cl p ] [ pt p ] [] [] ↭-refl ↭-refl
       (sub-refl (cl p) ∷ sub-pt (self p) ∷ []) ((cl-pt ∷ []) ∷ [] ∷ []) h
   begin-ap c (connect s b) p hp h =
     grow c {t = pend (connect s b) p} {t′ = connS (cs false true false (just p) nothing nothing p root s (scopeOf c)) (pend s (p ++ [ ix 1 ])) (pend b (p ++ [ ix 0 ]))}

@@ -37,8 +37,8 @@ mutual
     k-cut   : ∀ {Γ A} {l a} {s : St Γ A} {κ} → KeyIn s κ → KidIn (cutS l a s) κ
     k-ln    : ∀ {Γ A} {b} {s : St Γ A} {κ} → KeyIn s κ → KidIn (lnS b s) κ
     k-take  : ∀ {Γ A} {i q w} {s : St Γ A} {κ} → KeyIn s κ → KidIn (takeS i q w s) κ
-    k-outer : ∀ {Γ A B} {op f d n q} {o : St Γ A} {ls : List (St Γ B)} {κ} → KeyIn o κ → KidIn (flatS op f d n q o ls) κ
-    k-lane  : ∀ {Γ A B} {op f d n q} {o : St Γ A} {ls : List (St Γ B)} {s κ} → s ∈ ls → KeyIn s κ → KidIn (flatS op f d n q o ls) κ
+    k-outer : ∀ {Γ A B} {op f ω d n q} {o : St Γ A} {ls : List (St Γ B)} {κ} → KeyIn o κ → KidIn (flatS op f ω d n q o ls) κ
+    k-lane  : ∀ {Γ A B} {op f ω d n q} {o : St Γ A} {ls : List (St Γ B)} {s κ} → s ∈ ls → KeyIn s κ → KidIn (flatS op f ω d n q o ls) κ
     k-src   : ∀ {Γ X B} {k} {o : St Γ X} {b : St (X ∷ Γ) B} {κ} → KeyIn o κ → KidIn (connS k o b) κ
     k-body  : ∀ {Γ X B} {k} {o : St Γ X} {b : St (X ∷ Γ) B} {κ} → KeyIn b κ → KidIn (connS k o b) κ
 
@@ -165,21 +165,21 @@ mutual
   kids-b c (cutS l a s)  (k-cut ki)  = retag-b (cutKp l) (seek (inCut l a c) s) (seek-b (inCut l a c) s ki)
   kids-b c (lnS b s)     (k-ln ki)   = seek-b (inLn b c) s ki
   kids-b c (takeS i q w s) (k-take ki) = retag-b (takeKp i q w) (seek (inTake i q w c) s) (seek-b (inTake i q w c) s ki)
-  kids-b c (flatS op f d n q o ls) (k-outer ki) =
-    race-l d n q (seek (inOuter op f d n q ls c) o) (lanes c op f d n q o [] ls) (seek-b (inOuter op f d n q ls c) o ki)
-  kids-b c (flatS op f d n q o ls) (k-lane mem ki) =
-    race-r d n q (seek (inOuter op f d n q ls c) o) (lanes c op f d n q o [] ls) (lanes-b c op f d n q o [] ls mem ki)
+  kids-b c (flatS op f ω d n q o ls) (k-outer ki) =
+    race-l d n q (seek (inOuter op f ω d n q ls c) o) (lanes c op f ω d n q o [] ls) (seek-b (inOuter op f ω d n q ls c) o ki)
+  kids-b c (flatS op f ω d n q o ls) (k-lane mem ki) =
+    race-r d n q (seek (inOuter op f ω d n q ls c) o) (lanes c op f ω d n q o [] ls) (lanes-b c op f ω d n q o [] ls mem ki)
   kids-b c (connS k o b) (k-src ki)  = source-l (seek (inSrc k b c) o) (seek (inBody k o c) b) (seek-b (inSrc k b c) o ki)
   kids-b c (connS k o b) (k-body ki) = source-r (seek (inSrc k b c) o) (seek (inBody k o c) b) (seek-b (inBody k o c) b ki)
 
-  lanes-b : ∀ {R Γ A B} (c : Ctx R Γ B) op f d n (q : List A) (o : St Γ A) pre (ls : List (St Γ B)) {s κ}
-          → s ∈ ls → KeyIn s κ → Below (keyOf (lanes c op f d n q o pre ls)) κ
-  lanes-b c op f d n q o pre (s ∷ post) (here refl) ki =
-    first-l (retag (cutT (alive s)) (seek (inLanes op f d n q o pre post c) s)) (lanes c op f d n q o (s ∷ pre) post)
-            (retag-b (cutKp (alive s)) (seek (inLanes op f d n q o pre post c) s) (seek-b (inLanes op f d n q o pre post c) s ki))
-  lanes-b c op f d n q o pre (s ∷ post) (there mem) ki =
-    first-r (retag (cutT (alive s)) (seek (inLanes op f d n q o pre post c) s)) (lanes c op f d n q o (s ∷ pre) post)
-            (lanes-b c op f d n q o (s ∷ pre) post mem ki)
+  lanes-b : ∀ {R Γ A B} (c : Ctx R Γ B) op f ω d n (q : List A) (o : St Γ A) pre (ls : List (St Γ B)) {s κ}
+          → s ∈ ls → KeyIn s κ → Below (keyOf (lanes c op f ω d n q o pre ls)) κ
+  lanes-b c op f ω d n q o pre (s ∷ post) (here refl) ki =
+    first-l (retag (cutT (alive s)) (seek (inLanes op f ω d n q o pre post c) s)) (lanes c op f ω d n q o (s ∷ pre) post)
+            (retag-b (cutKp (alive s)) (seek (inLanes op f ω d n q o pre post c) s) (seek-b (inLanes op f ω d n q o pre post c) s ki))
+  lanes-b c op f ω d n q o pre (s ∷ post) (there mem) ki =
+    first-r (retag (cutT (alive s)) (seek (inLanes op f ω d n q o pre post c) s)) (lanes c op f ω d n q o (s ∷ pre) post)
+            (lanes-b c op f ω d n q o (s ∷ pre) post mem ki)
 
 -- What the search finds, keyed `h`, is keyed no later than any mark.
 seek-lo : ∀ {R Γ A} (c : Ctx R Γ A) s {f h o} → seek c s ≡ just (f , h , o) → Lo s h

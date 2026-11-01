@@ -90,7 +90,7 @@ mutual
   items (cutS l a s)            = attI a ++ items s
   items (lnS b s)               = items s
   items (takeS i q w s)         = oweI w ++ items s
-  items (flatS op f d n q o ls) = items o ++ itemsL ls
+  items (flatS op f ω d n q o ls) = items o ++ itemsL ls
   items (connS k o b)           = csI k ++ items o ++ items b
   items (joinS j g x ib)        = ibI ib ++ gI g j
 
@@ -108,8 +108,8 @@ lhs (inScan f z c)                    = lhs c
 lhs (inCut l a c)                     = lhs c ++ attI a
 lhs (inLn b c)                        = lhs c
 lhs (inTake i q w c)                  = lhs c ++ oweI w
-lhs (inOuter op f d n q ls c)         = lhs c
-lhs (inLanes op f d n q o pre post c) = lhs c ++ items o ++ itemsL (reverse pre)
+lhs (inOuter op f ω d n q ls c)         = lhs c
+lhs (inLanes op f ω d n q o pre post c) = lhs c ++ items o ++ itemsL (reverse pre)
 lhs (inSrc k b c)                     = lhs c ++ csI k
 lhs (inBody k o c)                    = lhs c ++ csI k ++ items o
 
@@ -120,8 +120,8 @@ rhs (inScan f z c)                    = rhs c
 rhs (inCut l a c)                     = rhs c
 rhs (inLn b c)                        = rhs c
 rhs (inTake i q w c)                  = rhs c
-rhs (inOuter op f d n q ls c)         = itemsL ls ++ rhs c
-rhs (inLanes op f d n q o pre post c) = itemsL post ++ rhs c
+rhs (inOuter op f ω d n q ls c)         = itemsL ls ++ rhs c
+rhs (inLanes op f ω d n q o pre post c) = itemsL post ++ rhs c
 rhs (inSrc k b c)                     = items b ++ rhs c
 rhs (inBody k o c)                    = rhs c
 
@@ -145,9 +145,9 @@ plug-items (inScan f z c)                    t = plug-items c (scanS f z t)
 plug-items (inCut l a c)                     t = ≡-trans (plug-items c (cutS l a t)) (left (lhs c) (attI a) (items t) (rhs c))
 plug-items (inLn b c)                        t = plug-items c (lnS b t)
 plug-items (inTake i q w c)                  t = ≡-trans (plug-items c (takeS i q w t)) (left (lhs c) (oweI w) (items t) (rhs c))
-plug-items (inOuter op f d n q ls c)         t = ≡-trans (plug-items c (flatS op f d n q t ls)) (right (lhs c) (items t) (itemsL ls) (rhs c))
-plug-items (inLanes op f d n q o pre post c) t =
-  ≡-trans (plug-items c (flatS op f d n q o (pre ʳ++ t ∷ post)))
+plug-items (inOuter op f ω d n q ls c)         t = ≡-trans (plug-items c (flatS op f ω d n q t ls)) (right (lhs c) (items t) (itemsL ls) (rhs c))
+plug-items (inLanes op f ω d n q o pre post c) t =
+  ≡-trans (plug-items c (flatS op f ω d n q o (pre ʳ++ t ∷ post)))
   (cong (λ z → lhs c ++ (items o ++ z) ++ rhs c) (≡-trans (cong itemsL (ʳ++-defn pre)) (itemsL-++ (reverse pre)))
   ⟨≡⟩ reshape (lhs c) (items o) (itemsL (reverse pre)) (items t) (itemsL post) (rhs c))
   where
@@ -262,7 +262,7 @@ mutual
       owe (cpAt p)   = tt ∷ tt ∷ []
       owe (cutAt p)  = tt ∷ []
       owe (overAt p) = []
-  no-cl (flatS op f d n q o ls) = all-++ (no-cl o) (no-clL ls)
+  no-cl (flatS op f ω d n q o ls) = all-++ (no-cl o) (no-clL ls)
   no-cl (connS k o b)           = all-++ (cs-cl k) (all-++ (no-cl o) (no-cl b))
   no-cl (joinS j g x ib)        = all-++ (ib-cl ib) (g-cl g)
     where
@@ -340,14 +340,14 @@ mutual
   cover (mapS f s)              (k-own ())
   cover (scanS f z s)           (k-own ())
   cover (lnS b s)               (k-own ())
-  cover (flatS op f d n q o ls) (k-own ())
+  cover (flatS op f ω d n q o ls) (k-own ())
   cover (mapS f s)              (k-kid (k-map h))   = cover s h
   cover (scanS f z s)           (k-kid (k-scan h))  = cover s h
   cover (cutS l a s)            (k-kid (k-cut h))   = covers-r (attI a) _ (cover s h)
   cover (lnS b s)               (k-kid (k-ln h))    = cover s h
   cover (takeS i q w s)         (k-kid (k-take h))  = covers-r (oweI w) _ (cover s h)
-  cover (flatS op f d n q o ls) (k-kid (k-outer h)) = covers-l (items o) _ (cover o h)
-  cover (flatS op f d n q o ls) (k-kid (k-lane m h)) = covers-r (items o) _ (coverL ls m h)
+  cover (flatS op f ω d n q o ls) (k-kid (k-outer h)) = covers-l (items o) _ (cover o h)
+  cover (flatS op f ω d n q o ls) (k-kid (k-lane m h)) = covers-r (items o) _ (coverL ls m h)
   cover (connS k o b)           (k-kid (k-src h))   = covers-r (csI k) _ (covers-l (items o) _ (cover o h))
   cover (connS k o b)           (k-kid (k-body h))  = covers-r (csI k) _ (covers-r (items o) _ (cover b h))
 
@@ -424,7 +424,7 @@ mutual
     cn-keyed h (ix-⊕ p _ hp) (lo (k-own (here refl))) ∷ pt-under p [ last ] h (lo (k-own (here refl))) ∷ keyed s hs (λ h → lo (k-kid (k-take h)))
   keyed (takeS i q (cutAt p) s)     (_ , hs) lo = lo (k-own (here refl)) ∷ keyed s hs (λ h → lo (k-kid (k-take h)))
   keyed (takeS i q (overAt p) s)    (_ , hs) lo = keyed s hs (λ h → lo (k-kid (k-take h)))
-  keyed (flatS op f d n q o ls)     (ho , hl) lo = all-++ (keyed o ho (λ h → lo (k-kid (k-outer h)))) (keyedL ls hl (λ m h → lo (k-kid (k-lane m h))))
+  keyed (flatS op f ω d n q o ls)     (ho , hl) lo = all-++ (keyed o ho (λ h → lo (k-kid (k-outer h)))) (keyedL ls hl (λ m h → lo (k-kid (k-lane m h))))
   keyed (connS k o b)               ((hb , _ , _) , ho , hb′ , _) lo =
     all-++ (all-++ (body-keyed (CS.bodyAt k) hb (λ e → lo (k-own (own-bld k {o} {b} (ob e)))))
                    (all-++ (pt-keyed (CS.attSrc k) (λ e → lo (k-own (own-bld k {o} {b} (os e)))))
@@ -447,7 +447,7 @@ mutual
   unsub-⊆ (mapS f s)              = unsub-⊆ s
   unsub-⊆ (scanS f z s)           = unsub-⊆ s
   unsub-⊆ (takeS i p w s)         = ⊆-++ ⊆-refl (cut-⊆ s)
-  unsub-⊆ (flatS op f d n q o ls) = ⊆-++ (cut-⊆ o) (killAll-⊆ ls)
+  unsub-⊆ (flatS op f ω d n q o ls) = ⊆-++ (cut-⊆ o) (killAll-⊆ ls)
   unsub-⊆ (connS k o b)           = ⊆-++ (⊆-refl {x = csI k}) (⊆-++ (unsub-⊆ o) (unsub-⊆ b))
   unsub-⊆ (joinS j g x ib)        = none (ibI ib ++ gI g j)
     where
@@ -471,7 +471,7 @@ mutual
   cut-⊆ (scanS f z s)           = ⊆-refl
   cut-⊆ (lnS b s)               = ⊆-refl
   cut-⊆ (takeS i q w s)         = ⊆-refl
-  cut-⊆ (flatS op f d n q o ls) = ⊆-refl
+  cut-⊆ (flatS op f ω d n q o ls) = ⊆-refl
   cut-⊆ (connS k o b)           = ⊆-refl
   cut-⊆ (joinS j g x ib)        = ⊆-refl
 
@@ -487,7 +487,7 @@ mutual
   killAll-⊆ (scanS f z s ∷ ls)          = ⊆-++ ⊆-refl (killAll-⊆ ls)
   killAll-⊆ (cutS l a s ∷ ls)           = ⊆-++ ⊆-refl (killAll-⊆ ls)
   killAll-⊆ (takeS i q w s ∷ ls)        = ⊆-++ ⊆-refl (killAll-⊆ ls)
-  killAll-⊆ (flatS op f d n q o l ∷ ls) = ⊆-++ ⊆-refl (killAll-⊆ ls)
+  killAll-⊆ (flatS op f ω d n q o l ∷ ls) = ⊆-++ ⊆-refl (killAll-⊆ ls)
   killAll-⊆ (connS k o b ∷ ls)          = ⊆-++ ⊆-refl (killAll-⊆ ls)
   killAll-⊆ (joinS j g x ib ∷ ls)       = ⊆-++ ⊆-refl (killAll-⊆ ls)
 
@@ -506,7 +506,7 @@ ended-items (lnS b (mapS f s))      = refl
 ended-items (lnS b (scanS f z s))   = refl
 ended-items (lnS b (lnS x s))       = refl
 ended-items (lnS b (takeS i q w s)) = refl
-ended-items (lnS b (flatS op f d n q o ls)) = refl
+ended-items (lnS b (flatS op f ω d n q o ls)) = refl
 ended-items (lnS b (connS k o x))   = refl
 ended-items (lnS b (joinS j g x ib)) = refl
 ended-items (pend o q)              = refl
@@ -517,6 +517,6 @@ ended-items (mapS f s)              = refl
 ended-items (scanS f z s)           = refl
 ended-items (cutS l a s)            = refl
 ended-items (takeS i q w s)         = refl
-ended-items (flatS op f d n q o ls) = refl
+ended-items (flatS op f ω d n q o ls) = refl
 ended-items (connS k o b)           = refl
 ended-items (joinS j g x ib)        = refl

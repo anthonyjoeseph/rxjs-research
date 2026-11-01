@@ -50,11 +50,11 @@ private
 
 module _ {R : Set} where
   -- A lane begun a level down, its cut owed inside the run.
-  start-ap : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → PureObs Γ B) d n q o ls a p → Ix p
-           → W c (flatS op f d n q o ls) [ cl p ] → Apart (start c op f d n q o ls a p)
-  start-ap c op f d n q o ls a p hp h with closed c
-  ... | true  = stay c {t = flatS op f d n q o ls} absorbed ⊆-refl h
-  ... | false = grow c {t = flatS op f d n q o ls} {t′ = flatS op f d (suc n) q o (reverse ls ʳ++ lane ∷ [])} p [ cl q′ ] [ pt q′ ] [] (items o ++ itemsL ls)
+  start-ap : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → PureObs Γ B) ω d n q o ls a p → Ix p
+           → W c (flatS op f ω d n q o ls) [ cl p ] → Apart (start c op f ω d n q o ls a p)
+  start-ap c op f ω d n q o ls a p hp h with closed c
+  ... | true  = stay c {t = flatS op f ω d n q o ls} absorbed ⊆-refl h
+  ... | false = grow c {t = flatS op f ω d n q o ls} {t′ = flatS op f ω d (suc n) q o (reverse ls ʳ++ lane ∷ [])} p [ cl q′ ] [ pt q′ ] [] (items o ++ itemsL ls)
                   ↭-refl perm (sub-down (ix 1) hp ∷ sub-pt (under [ ix 1 ]) ∷ []) ((cl-pt ∷ []) ∷ [] ∷ []) h
     where
       q′ = p ++ [ ix 1 ]
@@ -62,24 +62,24 @@ module _ {R : Set} where
       perm : items o ++ itemsL (reverse ls ʳ++ lane ∷ []) ↭ pt q′ ∷ items o ++ itemsL ls
       perm rewrite snoc-items ls lane = ↭-trans (↭-reflexive (sym (++-assoc (items o) (itemsL ls) [ pt q′ ]))) (to-front (items o ++ itemsL ls) (pt q′))
 
-  dequeue-ap : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → PureObs Γ B) d n q o ls p → Ix p
-             → W c (flatS op f d n q o ls) [ cl p ] → Apart (dequeue c op f d n q o ls p)
-  dequeue-ap c op f d n []      o ls p hp h = stay c {t = flatS op f d n [] o ls} (settle d n true) ⊆-refl h
-  dequeue-ap c op f d n (a ∷ q) o ls p hp h =
-    start-ap c op f d n q o ls a p hp (stay c {t = flatS op f d n (a ∷ q) o ls} {t′ = flatS op f d n q o ls} (rising cp) ⊆-refl h)
+  dequeue-ap : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → PureObs Γ B) ω d n q o ls p → Ix p
+             → W c (flatS op f ω d n q o ls) [ cl p ] → Apart (dequeue c op f ω d n q o ls p)
+  dequeue-ap c op f ω d n []      o ls p hp h = stay c {t = flatS op f ω d n [] o ls} (settle d n true) ⊆-refl h
+  dequeue-ap c op f ω d n (a ∷ q) o ls p hp h =
+    start-ap c op f ω d n q o ls a p hp (stay c {t = flatS op f ω d n (a ∷ q) o ls} {t′ = flatS op f ω d n q o ls} (rising cp) ⊆-refl h)
 
-  admit-ap : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → PureObs Γ B) d n q o ls a p → Ix p
-           → W c (flatS op f d n q o ls) [ cl p ] → AS (admit c op f d n q o ls a p)
-  admit-ap c (mergeᶠ nothing)  f d n q o ls a p hp h = start-ap c _ f d n q o ls a p hp h
-  admit-ap c (mergeᶠ (just m)) f d n q o ls a p hp h with n <ᵇ m
-  ... | true  = start-ap c _ f d n q o ls a p hp h
-  ... | false = quit c {t = flatS (mergeᶠ (just m)) f d n q o ls} {t′ = flatS (mergeᶠ (just m)) f d n (q ++ [ a ]) o ls} ⊆-refl h
-  admit-ap c switchᶠ           f d n q o ls a p hp h with killAll ls | killAll-⊆ ls
-  ... | ls′ , _ | kl = start-ap c switchᶠ f d 0 q o ls′ a p hp
-                         (stay c {t = flatS switchᶠ f d n q o ls} {t′ = flatS switchᶠ f d 0 q o ls′} (rising cp) (⊆-++ (⊆-refl {x = items o}) kl) h)
-  admit-ap c exhaustᶠ          f d n q o ls a p hp h with n ≡ᵇ 0
-  ... | true  = start-ap c _ f d n q o ls a p hp h
-  ... | false = drop c {t = flatS exhaustᶠ f d n q o ls} h
+  admit-ap : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → PureObs Γ B) ω d n q o ls a p → Ix p
+           → W c (flatS op f ω d n q o ls) [ cl p ] → AS (admit c op f ω d n q o ls a p)
+  admit-ap c (mergeᶠ nothing)  f ω d n q o ls a p hp h = start-ap c _ f ω d n q o ls a p hp h
+  admit-ap c (mergeᶠ (just m)) f ω d n q o ls a p hp h with n <ᵇ m
+  ... | true  = start-ap c _ f ω d n q o ls a p hp h
+  ... | false = quit c {t = flatS (mergeᶠ (just m)) f ω d n q o ls} {t′ = flatS (mergeᶠ (just m)) f ω d n (q ++ [ a ]) o ls} ⊆-refl h
+  admit-ap c switchᶠ           f ω d n q o ls a p hp h with killAll ls | killAll-⊆ ls
+  ... | ls′ , _ | kl = start-ap c switchᶠ f ω d 0 q o ls′ a p hp
+                         (stay c {t = flatS switchᶠ f ω d n q o ls} {t′ = flatS switchᶠ f ω d 0 q o ls′} (rising cp) (⊆-++ (⊆-refl {x = items o}) kl) h)
+  admit-ap c exhaustᶠ          f ω d n q o ls a p hp h with n ≡ᵇ 0
+  ... | true  = start-ap c _ f ω d n q o ls a p hp h
+  ... | false = drop c {t = flatS exhaustᶠ f ω d n q o ls} h
 
   rise-ap : ∀ {Γ A} (c : Ctx R Γ A) s (e : Ev A) p → Ix p → W c s [ cl p ] → AS (rise c s e p)
   rise-ap top s (nx a) p hp h = drop top {t = s} h
@@ -101,17 +101,17 @@ module _ {R : Set} where
   rise-ap (inTake i q (cpAt r) c)   s e  p hp h = drop c {t = takeS i q (cpAt r) s} h
   rise-ap (inTake i q (cutAt r) c)  s e  p hp h = drop c {t = takeS i q (cutAt r) s} h
   rise-ap (inTake i q (overAt r) c) s e  p hp h = drop c {t = takeS i q (overAt r) s} h
-  rise-ap (inOuter op f d n q ls c) o (nx a) p hp h = admit-ap c op f d n q o ls a p hp h
-  rise-ap (inOuter op f d n q ls c) o cp     p hp h =
-    stay c {t = flatS op f d n q o ls} {t′ = flatS op f true n q o ls} (if d then absorbed else settle true n (null q)) ⊆-refl h
-  rise-ap (inLanes op f d n q o pre post c) s (nx b) p hp h with alive s
+  rise-ap (inOuter op f ω d n q ls c) o (nx a) p hp h = admit-ap c op f ω d n q o ls a p hp h
+  rise-ap (inOuter op f ω d n q ls c) o cp     p hp h =
+    stay c {t = flatS op f ω d n q o ls} {t′ = flatS op f ω true n q o ls} (if d then absorbed else settle true n (null q)) ⊆-refl h
+  rise-ap (inLanes op f ω d n q o pre post c) s (nx b) p hp h with alive s
   ... | true  = h
-  ... | false = drop c {t = flatS op f d n q o (pre ʳ++ s ∷ post)} h
-  rise-ap (inLanes op f d n q o pre post c) s cp     p hp h with alive s
-  ... | true  = dequeue-ap c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p hp
-                  (stay c {t = flatS op f d n q o (pre ʳ++ s ∷ post)} {t′ = flatS op f d (pred n) q o (pre ʳ++ ended s ∷ post)} (rising cp)
+  ... | false = drop c {t = flatS op f ω d n q o (pre ʳ++ s ∷ post)} h
+  rise-ap (inLanes op f ω d n q o pre post c) s cp     p hp h with alive s
+  ... | true  = dequeue-ap c op f ω d (pred n) q o (pre ʳ++ ended s ∷ post) p hp
+                  (stay c {t = flatS op f ω d n q o (pre ʳ++ s ∷ post)} {t′ = flatS op f ω d (pred n) q o (pre ʳ++ ended s ∷ post)} (rising cp)
                     (⊆-reflexive (cong (items o ++_) (mid-items pre post (ended-items s)))) h)
-  ... | false = drop c {t = flatS op f d n q o (pre ʳ++ s ∷ post)} h
+  ... | false = drop c {t = flatS op f ω d n q o (pre ʳ++ s ∷ post)} h
   rise-ap (inSrc k b c) s (nx a) p hp h = feed-ap c k k s b (nx a) hp refl h
   rise-ap (inSrc k b c) s cp     p hp h = feed-ap c k (shutAt p k) s b cp hp (shut k) h
     where

@@ -14,6 +14,17 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE TRUNCATED COMPOSITE
+
+A connect's and a joiner's frames read their rows truncated (`ConnE`,
+`JoinE`, the joiner's outer pinned to its ghost), so a rise into either
+needs few rows before it. Those rows include skips (echoes, guards), and
+`Sync` ties visible rows only, so `Inv` cannot count them. Open: whether
+every row a frame's entry has passed is one the run stepped at, kept by
+a per-step invariant over all rows. Settled when each history leaf is a body.
+
+Members: `few-body`, `few-outer`, `few-lane`.
+
 #### THE CONNECT STEPPED
 
 A connect entered, a joiner joined, a source's or body's rise, its own
@@ -21,8 +32,9 @@ marks, a joiner's next and a take's failure, each keeping `Inv`. Open:
 whether every entry lands a region apart from its siblings' and clear of
 its scope's hots, so the rest moves past `p`. Settled when each is a body.
 
-Members: `sub-conn`, `sub-join`, `sub-joined`, `run-con`, `run-join-nx`,
-`run-join-cp`, `rise-take-failᵢ`, `feed-up`.
+Members: `sub-join`, `sub-joined`, `run-con`, `run-join-nx`,
+`run-join-cp`, `rise-take-failᵢ`, `feed-up`, `conn-parts`, `flat-sound`,
+`flat-within`.
 
 #### THE JOINER STEPPED
 
@@ -32,7 +44,7 @@ Open: whether begun lanes stay ascending (`Asc`), and whether `Begun`'s
 live count makes a freed slot the queue head's `Starts.queued`. Settled
 when each is a body.
 
-Members: `rise-outer-nx`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`, `sub-flat`.
+Members: `rise-outer-nx`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`.
 
 #### THE GUARD ROWS
 
@@ -70,7 +82,8 @@ Members: `sub-scan`, `sub-take`.
 Believed: a subscription's entry is its program's meaning there, and an
 of's next delivers its next row. Settled when each is a body.
 
-Members: `sub-empty`, `sub-of`, `sub-map`, `sub-defer`, `run-of-nx`, `run-of-end`.
+Members: `sub-empty`, `sub-of`, `sub-map`, `sub-defer`, `run-of-nx`, `run-of-end`,
+`flat-jinv`, `flat-joined`, `conn-flags`, `conn-ok`.
 
 ## Tier 1 — the simultaneous spec
 

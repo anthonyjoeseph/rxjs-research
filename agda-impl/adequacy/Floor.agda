@@ -108,48 +108,48 @@ module _ {R : Set} where
   rises (inTake i f (cpAt r) c)  s ε q fl refl = clock-abs c (takeS i f (cpAt r) s) q (lo-weaken (at q) (after q) fl (at-after₀ q))
   rises (inTake i f (cutAt r) c) s ε q fl refl = clock-abs c (takeS i f (cutAt r) s) q (lo-weaken (at q) (after q) fl (at-after₀ q))
   rises (inTake i f (overAt r) c) s ε q fl refl = clock-abs c (takeS i f (overAt r) s) q (lo-weaken (at q) (after q) fl (at-after₀ q))
-  rises (inOuter (mergeᶠ nothing) f d n qs ls c) s (nx a) q fl eq with closed c
-  rises (inOuter (mergeᶠ nothing) f d n qs ls c) s (nx a) q fl refl | true  =
-    clock-abs c (flatS (mergeᶠ nothing) f d n qs s ls) q (lo-weaken (at q) (after q) fl (at-after₀ q))
-  rises (inOuter (mergeᶠ nothing) f d n qs ls c) s (nx a) q fl refl | false = ext-⊑ q [ ix 1 ]
-  rises (inOuter (mergeᶠ (just mx)) f d n qs ls c) s (nx a) q fl eq with n <ᵇ mx
-  rises (inOuter (mergeᶠ (just mx)) f d n qs ls c) s (nx a) q fl refl | false =
-    absorb c (flatS (mergeᶠ (just mx)) f d n qs s ls) (flatS (mergeᶠ (just mx)) f d n (qs ++ [ a ]) s ls) q
+  rises (inOuter (mergeᶠ nothing) f ω d n qs ls c) s (nx a) q fl eq with closed c
+  rises (inOuter (mergeᶠ nothing) f ω d n qs ls c) s (nx a) q fl refl | true  =
+    clock-abs c (flatS (mergeᶠ nothing) f ω d n qs s ls) q (lo-weaken (at q) (after q) fl (at-after₀ q))
+  rises (inOuter (mergeᶠ nothing) f ω d n qs ls c) s (nx a) q fl refl | false = ext-⊑ q [ ix 1 ]
+  rises (inOuter (mergeᶠ (just mx)) f ω d n qs ls c) s (nx a) q fl eq with n <ᵇ mx
+  rises (inOuter (mergeᶠ (just mx)) f ω d n qs ls c) s (nx a) q fl refl | false =
+    absorb c (flatS (mergeᶠ (just mx)) f ω d n qs s ls) (flatS (mergeᶠ (just mx)) f ω d n (qs ++ [ a ]) s ls) q
            (λ ki → inj₁ (flat-in (λ h → h) same-l ki)) (lo-weaken (at q) (after q) fl (at-after₀ q))
-  rises (inOuter (mergeᶠ (just mx)) f d n qs ls c) s (nx a) q fl eq | true with closed c
-  rises (inOuter (mergeᶠ (just mx)) f d n qs ls c) s (nx a) q fl refl | true | true  =
-    clock-abs c (flatS (mergeᶠ (just mx)) f d n qs s ls) q (lo-weaken (at q) (after q) fl (at-after₀ q))
-  rises (inOuter (mergeᶠ (just mx)) f d n qs ls c) s (nx a) q fl refl | true | false = ext-⊑ q [ ix 1 ]
-  rises (inOuter switchᶠ f d n qs ls c) s (nx a) q fl eq with killAll ls | (λ {x} {κ} → kill-in ls {x} {κ})
-  rises (inOuter switchᶠ f d n qs ls c) s (nx a) q fl eq | ls′ , t | kl with closed c
-  rises (inOuter switchᶠ f d n qs ls c) s (nx a) q fl refl | ls′ , t | kl | true  =
-    absorb c (flatS switchᶠ f d n qs s ls) (flatS switchᶠ f d 0 qs s ls′) q (λ ki → inj₁ (flat-in (λ h → h) kl ki)) (lo-weaken (at q) (after q) fl (at-after₀ q))
-  rises (inOuter switchᶠ f d n qs ls c) s (nx a) q fl refl | ls′ , t | kl | false = ext-⊑ q [ ix 1 ]
-  rises (inOuter exhaustᶠ f d n qs ls c) s (nx a) q fl eq with n ≡ᵇ 0
-  rises (inOuter exhaustᶠ f d n qs ls c) s (nx a) q fl refl | false =
-    clock-abs c (flatS exhaustᶠ f d n qs s ls) q (lo-weaken (at q) (after q) fl (at-after₀ q))
-  rises (inOuter exhaustᶠ f d n qs ls c) s (nx a) q fl eq | true with closed c
-  rises (inOuter exhaustᶠ f d n qs ls c) s (nx a) q fl refl | true | true  =
-    clock-abs c (flatS exhaustᶠ f d n qs s ls) q (lo-weaken (at q) (after q) fl (at-after₀ q))
-  rises (inOuter exhaustᶠ f d n qs ls c) s (nx a) q fl refl | true | false = ext-⊑ q [ ix 1 ]
-  rises (inOuter op f d n qs ls c) s cp q fl refl =
-    md-at (if d then absorbed else settle true n (null qs)) c (flatS op f d n qs s ls) (flatS op f true n qs s ls) q
+  rises (inOuter (mergeᶠ (just mx)) f ω d n qs ls c) s (nx a) q fl eq | true with closed c
+  rises (inOuter (mergeᶠ (just mx)) f ω d n qs ls c) s (nx a) q fl refl | true | true  =
+    clock-abs c (flatS (mergeᶠ (just mx)) f ω d n qs s ls) q (lo-weaken (at q) (after q) fl (at-after₀ q))
+  rises (inOuter (mergeᶠ (just mx)) f ω d n qs ls c) s (nx a) q fl refl | true | false = ext-⊑ q [ ix 1 ]
+  rises (inOuter switchᶠ f ω d n qs ls c) s (nx a) q fl eq with killAll ls | (λ {x} {κ} → kill-in ls {x} {κ})
+  rises (inOuter switchᶠ f ω d n qs ls c) s (nx a) q fl eq | ls′ , t | kl with closed c
+  rises (inOuter switchᶠ f ω d n qs ls c) s (nx a) q fl refl | ls′ , t | kl | true  =
+    absorb c (flatS switchᶠ f ω d n qs s ls) (flatS switchᶠ f ω d 0 qs s ls′) q (λ ki → inj₁ (flat-in (λ h → h) kl ki)) (lo-weaken (at q) (after q) fl (at-after₀ q))
+  rises (inOuter switchᶠ f ω d n qs ls c) s (nx a) q fl refl | ls′ , t | kl | false = ext-⊑ q [ ix 1 ]
+  rises (inOuter exhaustᶠ f ω d n qs ls c) s (nx a) q fl eq with n ≡ᵇ 0
+  rises (inOuter exhaustᶠ f ω d n qs ls c) s (nx a) q fl refl | false =
+    clock-abs c (flatS exhaustᶠ f ω d n qs s ls) q (lo-weaken (at q) (after q) fl (at-after₀ q))
+  rises (inOuter exhaustᶠ f ω d n qs ls c) s (nx a) q fl eq | true with closed c
+  rises (inOuter exhaustᶠ f ω d n qs ls c) s (nx a) q fl refl | true | true  =
+    clock-abs c (flatS exhaustᶠ f ω d n qs s ls) q (lo-weaken (at q) (after q) fl (at-after₀ q))
+  rises (inOuter exhaustᶠ f ω d n qs ls c) s (nx a) q fl refl | true | false = ext-⊑ q [ ix 1 ]
+  rises (inOuter op f ω d n qs ls c) s cp q fl refl =
+    md-at (if d then absorbed else settle true n (null qs)) c (flatS op f ω d n qs s ls) (flatS op f ω true n qs s ls) q
           (λ ki → inj₁ (flat-in (λ h → h) same-l ki)) (lo-weaken (at q) (after q) fl (at-after₀ q))
-  rises (inLanes op f d n qs o′ pre post c) s (nx b) q fl eq with alive s
-  rises (inLanes op f d n qs o′ pre post c) s (nx b) q fl refl | true  = ⊑-refl
-  rises (inLanes op f d n qs o′ pre post c) s (nx b) q fl refl | false =
-    clock-abs c (flatS op f d n qs o′ (pre ʳ++ s ∷ post)) q (lo-weaken (at q) (after q) fl (at-after₀ q))
-  rises (inLanes op f d n qs o′ pre post c) s cp q fl eq with alive s
-  rises (inLanes op f d n qs o′ pre post c) s cp q fl refl | false =
-    clock-abs c (flatS op f d n qs o′ (pre ʳ++ s ∷ post)) q (lo-weaken (at q) (after q) fl (at-after₀ q))
-  rises (inLanes op f d n [] o′ pre post c) s cp q fl refl | true =
-    md-at (settle d (pred n) true) c (flatS op f d n [] o′ (pre ʳ++ s ∷ post)) (flatS op f d (pred n) [] o′ (pre ʳ++ ended s ∷ post)) q
+  rises (inLanes op f ω d n qs o′ pre post c) s (nx b) q fl eq with alive s
+  rises (inLanes op f ω d n qs o′ pre post c) s (nx b) q fl refl | true  = ⊑-refl
+  rises (inLanes op f ω d n qs o′ pre post c) s (nx b) q fl refl | false =
+    clock-abs c (flatS op f ω d n qs o′ (pre ʳ++ s ∷ post)) q (lo-weaken (at q) (after q) fl (at-after₀ q))
+  rises (inLanes op f ω d n qs o′ pre post c) s cp q fl eq with alive s
+  rises (inLanes op f ω d n qs o′ pre post c) s cp q fl refl | false =
+    clock-abs c (flatS op f ω d n qs o′ (pre ʳ++ s ∷ post)) q (lo-weaken (at q) (after q) fl (at-after₀ q))
+  rises (inLanes op f ω d n [] o′ pre post c) s cp q fl refl | true =
+    md-at (settle d (pred n) true) c (flatS op f ω d n [] o′ (pre ʳ++ s ∷ post)) (flatS op f ω d (pred n) [] o′ (pre ʳ++ ended s ∷ post)) q
           (λ ki → inj₁ (flat-in (λ h → h) (lanes-in pre post (ended-in s)) ki)) (lo-weaken (at q) (after q) fl (at-after₀ q))
-  rises (inLanes op f d n (a ∷ qs) o′ pre post c) s cp q fl eq | true with closed c
-  rises (inLanes op f d n (a ∷ qs) o′ pre post c) s cp q fl refl | true | true  =
-    absorb c (flatS op f d n (a ∷ qs) o′ (pre ʳ++ s ∷ post)) (flatS op f d (pred n) qs o′ (pre ʳ++ ended s ∷ post)) q
+  rises (inLanes op f ω d n (a ∷ qs) o′ pre post c) s cp q fl eq | true with closed c
+  rises (inLanes op f ω d n (a ∷ qs) o′ pre post c) s cp q fl refl | true | true  =
+    absorb c (flatS op f ω d n (a ∷ qs) o′ (pre ʳ++ s ∷ post)) (flatS op f ω d (pred n) qs o′ (pre ʳ++ ended s ∷ post)) q
            (λ ki → inj₁ (flat-in (λ h → h) (lanes-in pre post (ended-in s)) ki)) (lo-weaken (at q) (after q) fl (at-after₀ q))
-  rises (inLanes op f d n (a ∷ qs) o′ pre post c) s cp q fl refl | true | false = ext-⊑ q [ ix 1 ]
+  rises (inLanes op f ω d n (a ∷ qs) o′ pre post c) s cp q fl refl | true | false = ext-⊑ q [ ix 1 ]
   rises (inSrc k b c) s (nx a) q fl refl =
     ⊑-trans (ext-⊑ q [ ix 0 ]) (clock-abs c (connS k s (feed (here refl) q (nx a) b)) q {at (q ++ [ ix 0 ])} (fed-lo c k k s b q (nx a) (fewer-same {k = k}) fl))
   rises (inSrc k b c) s cp q fl refl =

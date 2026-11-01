@@ -113,9 +113,10 @@ data St (Γ : List Set) : Set → Set₁ where
   lnS   : ∀ {A} → Bool → St Γ A → St Γ A
   -- the child is its source's switch
   takeS : ∀ {A} → Bool → (A → Bool) → Owe → St Γ A → St Γ A
+  -- the outer's program and where it subscribed, a ghost no step reads;
   -- outer done, lanes running, the values waiting for a slot, the
   -- outer's switch, every lane begun (oldest first)
-  flatS : ∀ {A B} → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → St Γ B
+  flatS : ∀ {A B} → FlatOp → (A → Obs C Γ B) → Obs C Γ A × Pos → Bool → ℕ → List A → St Γ A → List (St Γ B) → St Γ B
   connS : ∀ {X B} → CS Γ X → St Γ X → St (X ∷ Γ) B → St Γ B
   -- joined at `p`, live, its binder, and what it has been fed and not
   -- yet shown, each at the position it is shown at, in order
@@ -138,8 +139,8 @@ data Ctx (R : Set) : List Set → Set → Set₁ where
   inCut   : ∀ {Γ A} → Bool → Att → Ctx R Γ A → Ctx R Γ A
   inLn    : ∀ {Γ A} → Bool → Ctx R Γ A → Ctx R Γ A
   inTake  : ∀ {Γ A} → Bool → (A → Bool) → Owe → Ctx R Γ A → Ctx R Γ A
-  inOuter : ∀ {Γ A B} → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → List (St Γ B) → Ctx R Γ B → Ctx R Γ A
-  inLanes : ∀ {Γ A B} → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → List (St Γ B) → Ctx R Γ B → Ctx R Γ B
+  inOuter : ∀ {Γ A B} → FlatOp → (A → Obs C Γ B) → Obs C Γ A × Pos → Bool → ℕ → List A → List (St Γ B) → Ctx R Γ B → Ctx R Γ A
+  inLanes : ∀ {Γ A B} → FlatOp → (A → Obs C Γ B) → Obs C Γ A × Pos → Bool → ℕ → List A → St Γ A → List (St Γ B) → List (St Γ B) → Ctx R Γ B → Ctx R Γ B
   inSrc   : ∀ {Γ X B} → CS Γ X → St (X ∷ Γ) B → Ctx R Γ B → Ctx R Γ X
   inBody  : ∀ {Γ X B} → CS Γ X → St Γ X → Ctx R Γ B → Ctx R (X ∷ Γ) B
 
@@ -151,8 +152,8 @@ scopeOf (inScan f z c)                    = scopeOf c
 scopeOf (inCut l a c)                     = scopeOf c
 scopeOf (inLn b c)                        = scopeOf c
 scopeOf (inTake i p w c)                  = scopeOf c
-scopeOf (inOuter op f d n q ls c)         = scopeOf c
-scopeOf (inLanes op f d n q o pre post c) = scopeOf c
+scopeOf (inOuter op f ω d n q ls c)         = scopeOf c
+scopeOf (inLanes op f ω d n q o pre post c) = scopeOf c
 scopeOf (inSrc k b c)                     = scopeOf c
 scopeOf (inBody k o c)                    = binds (CS.src k) (CS.connAt k) (CS.scope k)
 
@@ -163,14 +164,14 @@ plug (inScan f z c)                    s = plug c (scanS f z s)
 plug (inCut l a c)                     s = plug c (cutS l a s)
 plug (inLn b c)                        s = plug c (lnS b s)
 plug (inTake i p w c)                  s = plug c (takeS i p w s)
-plug (inOuter op f d n q ls c)         s = plug c (flatS op f d n q s ls)
-plug (inLanes op f d n q o pre post c) s = plug c (flatS op f d n q o (pre ʳ++ s ∷ post))
+plug (inOuter op f ω d n q ls c)         s = plug c (flatS op f ω d n q s ls)
+plug (inLanes op f ω d n q o pre post c) s = plug c (flatS op f ω d n q o (pre ʳ++ s ∷ post))
 plug (inSrc k b c)                     s = plug c (connS k s b)
 plug (inBody k o c)                    s = plug c (connS k o s)
 
 -- The child index of the hole in its parent.
 dir : ∀ {R Γ A} → Ctx R Γ A → ℕ
-dir (inLanes op f d n q o pre post c) = suc (length pre)
+dir (inLanes op f ω d n q o pre post c) = suc (length pre)
 dir (inBody k o c)                    = 1
 dir _                                 = 0
 
@@ -181,8 +182,8 @@ dirs c@(inScan f z c′)                    = dirs c′ ++ [ dir c ]
 dirs c@(inCut l a c′)                     = dirs c′ ++ [ dir c ]
 dirs c@(inLn b c′)                        = dirs c′ ++ [ dir c ]
 dirs c@(inTake i p w c′)                  = dirs c′ ++ [ dir c ]
-dirs c@(inOuter op f d n q ls c′)         = dirs c′ ++ [ dir c ]
-dirs c@(inLanes op f d n q o pre post c′) = dirs c′ ++ [ dir c ]
+dirs c@(inOuter op f ω d n q ls c′)         = dirs c′ ++ [ dir c ]
+dirs c@(inLanes op f ω d n q o pre post c′) = dirs c′ ++ [ dir c ]
 dirs c@(inSrc k b c′)                     = dirs c′ ++ [ dir c ]
 dirs c@(inBody k o c′)                    = dirs c′ ++ [ dir c ]
 
@@ -196,8 +197,8 @@ closed (inScan f z c)                    = closed c
 closed (inCut l a c)                     = not l ∨ closed c
 closed (inLn b c)                        = closed c
 closed (inTake i p w c)                  = closed c
-closed (inOuter op f d n q ls c)         = closed c
-closed (inLanes op f d n q o pre post c) = closed c
+closed (inOuter op f ω d n q ls c)         = closed c
+closed (inLanes op f ω d n q o pre post c) = closed c
 closed (inSrc k b c)                     = CS.closed k ∨ closed c
 closed (inBody k o c)                    = closed c
 
@@ -209,8 +210,8 @@ closedUp (inScan f z c)                    x = closedUp c x
 closedUp (inCut l a c)                     x = closedUp c x
 closedUp (inLn b c)                        x = closedUp c x
 closedUp (inTake i p w c)                  x = closedUp c x
-closedUp (inOuter op f d n q ls c)         x = closedUp c x
-closedUp (inLanes op f d n q o pre post c) x = closedUp c x
+closedUp (inOuter op f ω d n q ls c)         x = closedUp c x
+closedUp (inLanes op f ω d n q o pre post c) x = closedUp c x
 closedUp (inSrc k b c)                     x = closedUp c x
 closedUp (inBody k o c)            (here refl) = CS.closed k
 closedUp (inBody k o c)            (there x)   = closedUp c x
@@ -237,7 +238,7 @@ mutual
   unsub (mapS f s)              = wrap (mapS f) (unsub s)
   unsub (scanS f z s)           = wrap (scanS f z) (unsub s)
   unsub (takeS i p w s)         = wrap (takeS i p w) (cut s)
-  unsub (flatS op f d n q o ls) = both (flatS op f d 0 q) (cut o) (killAll ls)
+  unsub (flatS op f ω d n q o ls) = both (flatS op f ω d 0 q) (cut o) (killAll ls)
   unsub (connS k o b)           = both (connS k) (unsub o) (unsub b)
   unsub (joinS j g x ib)        = joinS j false x [] , []
   unsub s                       = s , []
@@ -283,7 +284,7 @@ mutual
   feed i p e (cutS l a s)            = cutS l a (feed i p e s)
   feed i p e (lnS b s)               = lnS b (feed i p e s)
   feed i p e (takeS v q w s)         = takeS v q w (feed i p e s)
-  feed i p e (flatS op f d n q o ls) = flatS op f d n q (feed i p e o) (feedL i p e ls)
+  feed i p e (flatS op f ω d n q o ls) = flatS op f ω d n q (feed i p e o) (feedL i p e ls)
   feed i p e (connS k o b)           = connS k (feed i p e o) (feed (there i) p e b)
   feed i p e s                       = s
 
@@ -308,11 +309,11 @@ down zero          c (scanS f z s)           = just (_ , _ , inScan f z c , s)
 down zero          c (cutS l a s)            = just (_ , _ , inCut l a c , s)
 down zero          c (lnS b s)               = just (_ , _ , inLn b c , s)
 down zero          c (takeS i p w s)         = just (_ , _ , inTake i p w c , s)
-down zero          c (flatS op f d n q o ls) = just (_ , _ , inOuter op f d n q ls c , o)
+down zero          c (flatS op f ω d n q o ls) = just (_ , _ , inOuter op f ω d n q ls c , o)
 down zero          c (connS k o b)           = just (_ , _ , inSrc k b c , o)
 down (suc zero)    c (connS k o b)           = just (_ , _ , inBody k o c , b)
-down (suc i)       c (flatS op f d n q o ls) with pickL i [] ls
-... | just (pre , s , post) = just (_ , _ , inLanes op f d n q o pre post c , s)
+down (suc i)       c (flatS op f ω d n q o ls) with pickL i [] ls
+... | just (pre , s , post) = just (_ , _ , inLanes op f ω d n q o pre post c , s)
 ... | nothing               = nothing
 down _             c _                       = nothing
 
@@ -454,14 +455,14 @@ mutual
   kids c (cutS l a s)            = retag (cutT l) (seek (inCut l a c) s)
   kids c (lnS b s)               = seek (inLn b c) s
   kids c (takeS i q w s)         = retag (takeT i q w) (seek (inTake i q w c) s)
-  kids c (flatS op f d n q o ls) = raceT d n q (seek (inOuter op f d n q ls c) o) (lanes c op f d n q o [] ls)
+  kids c (flatS op f ω d n q o ls) = raceT d n q (seek (inOuter op f ω d n q ls c) o) (lanes c op f ω d n q o [] ls)
   kids c (connS k o b)           = sourceT (seek (inSrc k b c) o) (seek (inBody k o c) b)
   kids c _                       = nothing
 
-  lanes : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → List (St Γ B) → Maybe (Cand R B)
-  lanes c op f d n q o pre []         = nothing
-  lanes c op f d n q o pre (s ∷ post) =
-    first (retag (cutT (alive s)) (seek (inLanes op f d n q o pre post c) s)) (lanes c op f d n q o (s ∷ pre) post)
+  lanes : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs C Γ B) → Obs C Γ A × Pos → Bool → ℕ → List A → St Γ A → List (St Γ B) → List (St Γ B) → Maybe (Cand R B)
+  lanes c op f ω d n q o pre []         = nothing
+  lanes c op f ω d n q o pre (s ∷ post) =
+    first (retag (cutT (alive s)) (seek (inLanes op f ω d n q o pre post c) s)) (lanes c op f ω d n q o (s ∷ pre) post)
 
 search : ∀ {R Γ A} → Ctx R Γ A → St Γ A → Maybe (Found R)
 search c s = mapᴹ proj₁ (seek c s)
@@ -514,7 +515,7 @@ begin c (of xs)           p = ok ⟨ c , ofS 0 p xs , absorbed , p ⟩
 begin c (map f s)         p = ok ⟨ inMap f c , pend s p , subscribing , p ⟩
 begin c (scan f z s)      p = ok ⟨ inScan f z c , pend s p , subscribing , p ⟩
 begin c (takeWhile i q s) p = ok ⟨ inCut true (attAt p) (inTake i q free c) , pend s p , subscribing , p ⟩
-begin c (flatMap op f s)  p = ok ⟨ inCut true (attAt p) (inOuter op f false 0 [] [] c) , pend s p , subscribing , p ⟩
+begin c (flatMap op f s)  p = ok ⟨ inCut true (attAt p) (inOuter op f (s , p) false 0 [] [] c) , pend s p , subscribing , p ⟩
 -- the body under `ix 0`; its source, once the body's subscription
 -- exists, under `ix 1`
 begin c (connect s b)     p = ok ⟨ inBody (cs false true false (just p) nothing nothing p root s (scopeOf c)) (pend s (p ⊕ [ ix 1 ])) c , pend b (p ⊕ [ ix 0 ]) , subscribing , p ⊕ [ ix 0 ] ⟩
@@ -526,30 +527,30 @@ begin c (connected x)     p with closedUp c x
 begin c (defer l)         p = ok ⟨ c , pend (Later.force l) (p ⊕ [ ix 1 ]) , subscribing , p ⊕ [ ix 1 ] ⟩
 
 -- A lane begun under `ix 1`, unless the flatMap's own observer is closed.
-start : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → A → Pos → Conf R
-start c op f d n q o ls a p with closed c
-... | true  = ⟨ c , flatS op f d n q o ls , absorbed , p ⟩
-... | false = ⟨ inCut true (attAt (p ⊕ [ ix 1 ])) (inLn true (inLanes op f d (suc n) q o (reverse ls) [] c)) , pend (f a) (p ⊕ [ ix 1 ]) , subscribing , p ⊕ [ ix 1 ] ⟩
+start : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs C Γ B) → Obs C Γ A × Pos → Bool → ℕ → List A → St Γ A → List (St Γ B) → A → Pos → Conf R
+start c op f ω d n q o ls a p with closed c
+... | true  = ⟨ c , flatS op f ω d n q o ls , absorbed , p ⟩
+... | false = ⟨ inCut true (attAt (p ⊕ [ ix 1 ])) (inLn true (inLanes op f ω d (suc n) q o (reverse ls) [] c)) , pend (f a) (p ⊕ [ ix 1 ]) , subscribing , p ⊕ [ ix 1 ] ⟩
 
 -- The outer done, no lane running and, `e`, none waiting: complete.
 settle : ∀ {B} → Bool → ℕ → Bool → Mode B
 settle d n e = if d ∧ (n ≡ᵇ 0) ∧ e then rising cp else absorbed
 
 -- A slot freed: the next waiting value's lane begun, else settle.
-dequeue : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → Pos → Conf R
-dequeue c op f d n []      o ls p = ⟨ c , flatS op f d n [] o ls , settle d n true , p ⟩
-dequeue c op f d n (a ∷ q) o ls p = start c op f d n q o ls a p
+dequeue : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs C Γ B) → Obs C Γ A × Pos → Bool → ℕ → List A → St Γ A → List (St Γ B) → Pos → Conf R
+dequeue c op f ω d n []      o ls p = ⟨ c , flatS op f ω d n [] o ls , settle d n true , p ⟩
+dequeue c op f ω d n (a ∷ q) o ls p = start c op f ω d n q o ls a p
 
-admit : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs C Γ B) → Bool → ℕ → List A → St Γ A → List (St Γ B) → A → Pos → Stepped R
-admit c (mergeᶠ nothing)  f d n q o ls a p = ok (start c (mergeᶠ nothing) f d n q o ls a p)
-admit c (mergeᶠ (just m)) f d n q o ls a p =
-  ok (if n <ᵇ m then start c (mergeᶠ (just m)) f d n q o ls a p
-      else ⟨ c , flatS (mergeᶠ (just m)) f d n (q ++ [ a ]) o ls , absorbed , p ⟩)
-admit c switchᶠ           f d n q o ls a p with killAll ls
-... | ls′ , t = moved (start c switchᶠ f d 0 q o ls′ a p) [] t
-admit c exhaustᶠ          f d n q o ls a p with n ≡ᵇ 0
-... | true  = ok (start c exhaustᶠ f d n q o ls a p)
-... | false = ok ⟨ c , flatS exhaustᶠ f d n q o ls , absorbed , p ⟩
+admit : ∀ {R Γ A B} → Ctx R Γ B → FlatOp → (A → Obs C Γ B) → Obs C Γ A × Pos → Bool → ℕ → List A → St Γ A → List (St Γ B) → A → Pos → Stepped R
+admit c (mergeᶠ nothing)  f ω d n q o ls a p = ok (start c (mergeᶠ nothing) f ω d n q o ls a p)
+admit c (mergeᶠ (just m)) f ω d n q o ls a p =
+  ok (if n <ᵇ m then start c (mergeᶠ (just m)) f ω d n q o ls a p
+      else ⟨ c , flatS (mergeᶠ (just m)) f ω d n (q ++ [ a ]) o ls , absorbed , p ⟩)
+admit c switchᶠ           f ω d n q o ls a p with killAll ls
+... | ls′ , t = moved (start c switchᶠ f ω d 0 q o ls′ a p) [] t
+admit c exhaustᶠ          f ω d n q o ls a p with n ≡ᵇ 0
+... | true  = ok (start c exhaustᶠ f ω d n q o ls a p)
+... | false = ok ⟨ c , flatS exhaustᶠ f ω d n q o ls , absorbed , p ⟩
 
 ended : ∀ {Γ B} → St Γ B → St Γ B
 ended (lnS b (cutS l a s)) = lnS false (cutS false a s)
@@ -580,14 +581,14 @@ rise (inTake i q free c) s cp p = ok ⟨ c , takeS i q free s , rising cp , p �
 rise (inTake i q (cpAt r) c)  s e p = ok ⟨ c , takeS i q (cpAt r) s , absorbed , p ⟩
 rise (inTake i q (cutAt r) c) s e p = ok ⟨ c , takeS i q (cutAt r) s , absorbed , p ⟩
 rise (inTake i q (overAt r) c) s e p = ok ⟨ c , takeS i q (overAt r) s , absorbed , p ⟩
-rise (inOuter op f d n q ls c) o (nx a) p = admit c op f d n q o ls a p
+rise (inOuter op f ω d n q ls c) o (nx a) p = admit c op f ω d n q o ls a p
 -- A done outer's end is absorbed, as a stopped subscriber ignores it.
-rise (inOuter op f d n q ls c) o cp     p = ok ⟨ c , flatS op f true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
+rise (inOuter op f ω d n q ls c) o cp     p = ok ⟨ c , flatS op f ω true n q o ls , (if d then absorbed else settle true n (null q)) , p ⟩
 -- a lane out of its flatMap's list is over, and absorbs what still reaches it
-rise (inLanes op f d n q o pre post c) s (nx b) p =
-  ok (if alive s then ⟨ c , flatS op f d n q o (pre ʳ++ s ∷ post) , rising (nx b) , p ⟩ else ⟨ c , flatS op f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
-rise (inLanes op f d n q o pre post c) s cp     p =
-  ok (if alive s then dequeue c op f d (pred n) q o (pre ʳ++ ended s ∷ post) p else ⟨ c , flatS op f d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
+rise (inLanes op f ω d n q o pre post c) s (nx b) p =
+  ok (if alive s then ⟨ c , flatS op f ω d n q o (pre ʳ++ s ∷ post) , rising (nx b) , p ⟩ else ⟨ c , flatS op f ω d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
+rise (inLanes op f ω d n q o pre post c) s cp     p =
+  ok (if alive s then dequeue c op f ω d (pred n) q o (pre ʳ++ ended s ∷ post) p else ⟨ c , flatS op f ω d n q o (pre ʳ++ s ∷ post) , absorbed , p ⟩)
 rise (inSrc k b c) s (nx a) p = ok ⟨ c , connS k s (feed (here refl) p (nx a) b) , absorbed , p ⟩
 rise (inSrc k b c) s cp     p = ok ⟨ c , connS (shutAt p k) s (feed (here refl) p cp b) , absorbed , p ⟩
 -- a body after its source's teardown has completed, and is stopped

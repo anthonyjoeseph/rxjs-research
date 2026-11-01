@@ -175,8 +175,8 @@ plug-in (inScan f z c)                    h = plug-in c (k-kid (k-scan h))
 plug-in (inCut l a c)                     h = plug-in c (k-kid (k-cut h))
 plug-in (inLn b c)                        h = plug-in c (k-kid (k-ln h))
 plug-in (inTake i q w c)                  h = plug-in c (k-kid (k-take h))
-plug-in (inOuter op f d n q ls c)         h = plug-in c (k-kid (k-outer h))
-plug-in (inLanes op f d n q o pre post c) h = plug-in c (k-kid (k-lane (mem-self pre) h))
+plug-in (inOuter op f ω d n q ls c)         h = plug-in c (k-kid (k-outer h))
+plug-in (inLanes op f ω d n q o pre post c) h = plug-in c (k-kid (k-lane (mem-self pre) h))
 plug-in (inSrc k b c)                     h = plug-in c (k-kid (k-src h))
 plug-in (inBody k o c)                    h = plug-in c (k-kid (k-body h))
 
@@ -199,16 +199,16 @@ plug-swap (inTake i q w c) {s} {s′} h with plug-swap c {s = takeS i q w s} h
 ... | inj₁ (k-own m)           = inj₂ (plug-in c (k-own (subst (_ ∈_) (own-take w {s′} {s}) m)))
 ... | inj₁ (k-kid (k-take h′)) = inj₁ h′
 ... | inj₂ h′                  = inj₂ h′
-plug-swap (inOuter op f d n q ls c) {s} h with plug-swap c {s = flatS op f d n q s ls} h
+plug-swap (inOuter op f ω d n q ls c) {s} h with plug-swap c {s = flatS op f ω d n q s ls} h
 ... | inj₁ (k-kid (k-outer h′))  = inj₁ h′
 ... | inj₁ (k-kid (k-lane m h′)) = inj₂ (plug-in c (k-kid (k-lane m h′)))
 ... | inj₂ h′                    = inj₂ h′
-plug-swap (inLanes op f d n q o pre post c) {s} h with plug-swap c {s = flatS op f d n q o (pre ʳ++ s ∷ post)} h
+plug-swap (inLanes op f ω d n q o pre post c) {s} h with plug-swap c {s = flatS op f ω d n q o (pre ʳ++ s ∷ post)} h
 ... | inj₁ (k-kid (k-outer h′))  = inj₂ (plug-in c (k-kid (k-outer h′)))
 ... | inj₁ (k-kid (k-lane m h′)) with mem-swap pre {s = s} m
 ...   | inj₁ refl = inj₁ h′
 ...   | inj₂ m′   = inj₂ (plug-in c (k-kid (k-lane m′ h′)))
-plug-swap (inLanes op f d n q o pre post c) {s} h | inj₂ h′ = inj₂ h′
+plug-swap (inLanes op f ω d n q o pre post c) {s} h | inj₂ h′ = inj₂ h′
 plug-swap (inSrc k b c) {s} {s′} h with plug-swap c {s = connS k s b} h
 ... | inj₁ (k-own m)          = inj₂ (plug-in c (k-own (own-same k {s} {s′} {b} {b} m)))
 ... | inj₁ (k-kid (k-src h′))  = inj₁ h′
@@ -258,8 +258,8 @@ mutual
   unsub-in (lnS b s)               h = h
   unsub-in (takeS i q w s)         (k-own m) = k-own (subst (_ ∈_) (own-take w) m)
   unsub-in (takeS i q w s)         (k-kid (k-take h)) = k-kid (k-take (cut-in s h))
-  unsub-in (flatS op f d n q o ls) (k-kid (k-outer h)) = k-kid (k-outer (cut-in o h))
-  unsub-in (flatS op f d n q o ls) (k-kid (k-lane m h)) with kill-in ls m h
+  unsub-in (flatS op f ω d n q o ls) (k-kid (k-outer h)) = k-kid (k-outer (cut-in o h))
+  unsub-in (flatS op f ω d n q o ls) (k-kid (k-lane m h)) with kill-in ls m h
   ... | _ , m′ , h′ = k-kid (k-lane m′ h′)
   unsub-in (connS k o b)           (k-own m) = k-own (own-same k {o} {proj₁ (unsub o)} {b} {proj₁ (unsub b)} m)
   unsub-in (connS k o b)           (k-kid (k-src h)) = k-kid (k-src (unsub-in o h))
@@ -280,7 +280,7 @@ mutual
   cut-in (scanS f z s)           h = h
   cut-in (lnS b s)               h = h
   cut-in (takeS i q w s)         h = h
-  cut-in (flatS op f d n q o ls) h = h
+  cut-in (flatS op f ω d n q o ls) h = h
   cut-in (connS k o b)           h = h
   cut-in (joinS j g x ib)        h = h
 
@@ -297,7 +297,7 @@ mutual
   kill-in (scanS f z s ∷ ls)          m h = keep-l (scanS f z s) ls m h
   kill-in (cutS l a s ∷ ls)           m h = keep-l (cutS l a s) ls m h
   kill-in (takeS i q w s ∷ ls)        m h = keep-l (takeS i q w s) ls m h
-  kill-in (flatS op f d n q o ms ∷ ls) m h = keep-l (flatS op f d n q o ms) ls m h
+  kill-in (flatS op f ω d n q o ms ∷ ls) m h = keep-l (flatS op f ω d n q o ms) ls m h
   kill-in (connS k o b ∷ ls)          m h = keep-l (connS k o b) ls m h
   kill-in (joinS j g x ib ∷ ls)       m h = keep-l (joinS j g x ib) ls m h
 
@@ -324,7 +324,7 @@ ended-in (lnS b (mapS f s))           h = h
 ended-in (lnS b (scanS f z s))        h = h
 ended-in (lnS b (lnS b′ s))           h = h
 ended-in (lnS b (takeS i q w s))      h = h
-ended-in (lnS b (flatS op f b′ n q o ls)) h = h
+ended-in (lnS b (flatS op f ω b′ n q o ls)) h = h
 ended-in (lnS b (connS k o s))        h = h
 ended-in (lnS b (joinS j g x ib))     h = h
 ended-in (pend o q)                   h = h
@@ -335,7 +335,7 @@ ended-in (mapS f s)                   h = h
 ended-in (scanS f z s)                h = h
 ended-in (cutS l a s)                 h = h
 ended-in (takeS i q w s)              h = h
-ended-in (flatS op f b n q o ls)      h = h
+ended-in (flatS op f ω b n q o ls)      h = h
 ended-in (connS k o s)                h = h
 ended-in (joinS j g x ib)             h = h
 
@@ -347,9 +347,9 @@ lanes-in pre post {s} h m hx with mem-swap pre {s = s} m
 ... | inj₂ m′   = _ , m′ , hx
 
 -- A flatMap keeps no keys of its own.
-flat-in : ∀ {Γ A B} {op f d n q d′ n′ q′} {o o′ : St Γ A} {ls ls′ : List (St Γ B)} {κ}
+flat-in : ∀ {Γ A B} {op f ω d n q d′ n′ q′} {o o′ : St Γ A} {ls ls′ : List (St Γ B)} {κ}
         → (∀ {κ} → KeyIn o′ κ → KeyIn o κ) → (∀ {x κ} → x ∈ ls′ → KeyIn x κ → Σ _ λ y → y ∈ ls × KeyIn y κ)
-        → KeyIn (flatS op f d′ n′ q′ o′ ls′) κ → KeyIn (flatS op f d n q o ls) κ
+        → KeyIn (flatS op f ω d′ n′ q′ o′ ls′) κ → KeyIn (flatS op f ω d n q o ls) κ
 flat-in ho hl (k-kid (k-outer h)) = k-kid (k-outer (ho h))
 flat-in ho hl (k-kid (k-lane m h)) with hl m h
 ... | _ , m′ , h′ = k-kid (k-lane m′ h′)
@@ -410,10 +410,10 @@ mutual
   feed-key i p e (takeS v q w s) (k-kid (k-take h)) with feed-key i p e s h
   ... | inj₁ h′ = inj₁ (k-kid (k-take h′))
   ... | inj₂ lt = inj₂ lt
-  feed-key i p e (flatS op f d n q o ls) (k-kid (k-outer h)) with feed-key i p e o h
+  feed-key i p e (flatS op f ω d n q o ls) (k-kid (k-outer h)) with feed-key i p e o h
   ... | inj₁ h′ = inj₁ (k-kid (k-outer h′))
   ... | inj₂ lt = inj₂ lt
-  feed-key i p e (flatS op f d n q o ls) (k-kid (k-lane m h)) with feedL-key i p e ls m h
+  feed-key i p e (flatS op f ω d n q o ls) (k-kid (k-lane m h)) with feedL-key i p e ls m h
   ... | inj₁ (_ , m′ , h′) = inj₁ (k-kid (k-lane m′ h′))
   ... | inj₂ lt            = inj₂ lt
   feed-key i p e (connS k o b) (k-own m) = inj₁ (k-own (own-same k {o} {feed i p e o} {b} {feed (there i) p e b} m))

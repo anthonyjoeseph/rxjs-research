@@ -125,7 +125,7 @@ private
     deadS π (cutS true _ s)        = deadS (π ++ [ 0 ]) s
     deadS π (lnS true s)           = deadS (π ++ [ 0 ]) s
     deadS π (takeS _ _ _ s)        = deadS (π ++ [ 0 ]) s
-    deadS π (flatS _ _ _ _ _ o ls) = deadS (π ++ [ 0 ]) o ++ deadLs π 1 ls
+    deadS π (flatS _ _ _ _ _ _ o ls) = deadS (π ++ [ 0 ]) o ++ deadLs π 1 ls
     deadS π (connS k o b)          = (if CS.srcLive k then deadS (π ++ [ 0 ]) o else [ π ++ [ 0 ] ]) ++ deadS (π ++ [ 1 ]) b
     deadS π _                      = []
 
@@ -241,8 +241,8 @@ private
   ctxName (inCut _ _ _)           = "cut"
   ctxName (inLn _ _)              = "lane"
   ctxName (inTake _ _ _ _)        = "take"
-  ctxName (inOuter _ _ _ _ _ _ _) = "outer"
-  ctxName (inLanes _ _ _ _ _ _ _ _ _) = "lanes"
+  ctxName (inOuter _ _ _ _ _ _ _ _) = "outer"
+  ctxName (inLanes _ _ _ _ _ _ _ _ _ _) = "lanes"
   ctxName (inSrc _ _ _)           = "source"
   ctxName (inBody _ _ _)          = "body"
 
@@ -330,7 +330,7 @@ private
     kidsK (cutS _ _ s)             = keysS s
     kidsK (lnS _ s)                = keysS s
     kidsK (takeS _ _ _ s)          = keysS s
-    kidsK (flatS _ _ _ _ _ o ls)   = keysS o ++ keysL ls
+    kidsK (flatS _ _ _ _ _ _ o ls)   = keysS o ++ keysL ls
     kidsK (connS _ o b)            = keysS o ++ keysS b
     kidsK _                        = []
 

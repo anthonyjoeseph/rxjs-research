@@ -45,7 +45,7 @@ open import Relation.Nullary using (¬_)
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline; ix; last; ofᴱ; tick)
 open import denotation.Read using (Visible)
-open import denotation.EmissionSet using (EmissionSet; out; end; _≺_; _≼_; enter; ⟦_⟧; Den; hot; coldAt; Rejoin; InE;
+open import denotation.EmissionSet using (EmissionSet; out; end; _≺_; _≼_; Reach; Truncate; enter; ⟦_⟧; Den; hot; coldAt; Rejoin; InE;
   MapT; map-out; map-end; LaneOf; module Scan; module TakeWhile; module Connecting;
   module Merge; module Bounded; module Switch; module Exhaust)
 open import operation.PureObservable using (module Machine; Tape; play; ending) renaming (over to tapeOver)
@@ -144,6 +144,23 @@ JoinF (mergeᶠ nothing)  f O = Merge.JoinT f O
 JoinF (mergeᶠ (just m)) f O = Bounded.JoinT m f O
 JoinF switchᶠ           f O = Switch.JoinT f O
 JoinF exhaustᶠ          f O = Exhaust.JoinT f O
+
+-- A connect's entry: its rows truncated, and its body's rows each with
+-- few before it.
+ConnE : ∀ {X B} → Pos → EmissionSet X → EmissionSet B → EmissionSet B → Set
+ConnE r σ β E = Truncate (Connecting.ConnT r σ β) ≈ E × (∀ {y e} → β y e → Reach β y e)
+
+-- A joiner's rows, its outer the ghost's.
+JoinG : ∀ {Γ A B} → Scope Γ → FlatOp → (A → Obs Timeline Γ B) → Obs Timeline Γ A × Pos → EmissionSet B
+JoinG sc op f ω = JoinF op (λ a → ⟦ f a ⟧ (full sc)) (pendRows (full sc) (proj₁ ω) (proj₂ ω))
+
+-- A joiner's entry: its rows truncated, its outer's rows the ghost's.
+JoinE : ∀ {Γ A B} → Scope Γ → FlatOp → (A → Obs Timeline Γ B) → Obs Timeline Γ A × Pos → EmissionSet A → EmissionSet B → Set₁
+JoinE sc op f ω O E = pendRows (full sc) (proj₁ ω) (proj₂ ω) ≡ O × Truncate (JoinF op (λ a → ⟦ f a ⟧ (full sc)) O) ≈ E
+
+-- A source's rows a connect reads before `p`, few.
+FewBefore : ∀ {X} → EmissionSet X → Pos → Set
+FewBefore σ p = Σ (List Pos) λ ks → ∀ {y e} → σ y e → (y ++ [ ix 0 ]) ≺ p → y ∈ ks
 
 -- A begun lane as its joiner reads it: running from where it was
 -- subscribed, its entry its lane's; or over, by its end or a later value.
@@ -330,10 +347,10 @@ data Sync where
          → Failure keep Es r → Gone C r → (T i → ¬ Owes C (r ++ [ ix 0 ])) → OweAt C w r
          → TakeWhile.TakeT i keep Es ≈ E → Sound Rg Es → Sync sc Rg C (takeS i keep w s) E
   -- a joiner: its outer, and its bookkeeping over its policy
-  s-flat : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A B} {op} {f : A → Obs Timeline Γ B} {d n qu o ls O E}
+  s-flat : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu o ls O E}
          → JInv sc f O → Sync sc (JRo sc Rg op f O) C o O → Joined sc (JRl sc Rg op f O) C (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O d n qu ls
-         → JoinF op (λ a → ⟦ f a ⟧ (full sc)) O ≈ E → Sound (JRo sc Rg op f O) O
-         → Sync sc Rg C (flatS op f d n qu o ls) E
+         → JoinE sc op f ω O E → Sound (JRo sc Rg op f O) O
+         → Sync sc Rg C (flatS op f ω d n qu o ls) E
   -- a connect: its body, under its binder read whole, and its source,
   -- while the source runs; torn down, its body owes nothing and nothing
   -- reads either
@@ -342,7 +359,7 @@ data Sync where
          → (T (CS.srcLive k) → Sync (binds (CS.src k) (CS.connAt k) sc) (Parts.Rb pt) C b β)
          → (T (CS.srcLive k) → Src sc (Parts.Rs pt) C k o)
          → Flags C k β
-         → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E
+         → ConnE (CS.connAt k) (Frozen k) β E
          → Sync sc Rg C (connS k o b) E
   -- a joiner: what it was fed and has not shown, and what is still to
   -- feed it.  The engine shows its inbox's head and appends in its
@@ -359,8 +376,9 @@ data Sync where
 
 data Src where
   src-pend : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o}
-           → CS.bodyAt k ≡ just (CS.connAt k) → Adm (binds (CS.src k) (CS.connAt k) sc)
+           → T (not (CS.closed k)) → CS.bodyAt k ≡ just (CS.connAt k) → Adm (binds (CS.src k) (CS.connAt k) sc)
            → pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]) ≈ Frozen k → Within Rg sc (CS.connAt k ++ [ ix 1 ])
+           → Owes C (CS.connAt k ++ [ ix 1 ])
            → Src sc Rg C k (pend o (CS.connAt k ++ [ ix 1 ]))
   src-on   : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o} → T (not (CS.closed k)) → Sync sc Rg C o (Frozen k) → Src sc Rg C k o
   -- ended: nothing left to owe, whatever its subtree still holds
@@ -406,9 +424,9 @@ data Up1 {R : Set} : ∀ {Γ A Γ′ A′} → Ctx R Γ A → Ctx R Γ′ A′ �
   u-cut   : ∀ {Γ A} {l a} {c : Ctx R Γ A} → Up1 (inCut l a c) c
   u-ln    : ∀ {Γ A} {b} {c : Ctx R Γ A} → Up1 (inLn b c) c
   u-take  : ∀ {Γ A} {i} {keep : A → Bool} {w} {c : Ctx R Γ A} → Up1 (inTake i keep w c) c
-  u-outer : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n qu ls} {c : Ctx R Γ B} → Up1 (inOuter op f d n qu ls c) c
-  u-lanes : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n qu} {o : St Γ A} {pre post} {c : Ctx R Γ B}
-          → Up1 (inLanes op f d n qu o pre post c) c
+  u-outer : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu ls} {c : Ctx R Γ B} → Up1 (inOuter op f ω d n qu ls c) c
+  u-lanes : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu} {o : St Γ A} {pre post} {c : Ctx R Γ B}
+          → Up1 (inLanes op f ω d n qu o pre post c) c
   u-src   : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} → Up1 (inSrc k b c) c
   u-body  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} → Up1 (inBody k o c) c
 
@@ -428,14 +446,14 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Fr C Rg c (owes w) E′ → Failure keep Es r → Gone C r → (T i → ¬ Owes C (r ++ [ ix 0 ])) → OweAt C o r
             → TakeWhile.TakeT i keep Es ≈ E′ → Sound Rg Es
             → Fr C Rg′ (inTake i keep o c) (owes false) E
-    f-outer : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n qu ls} {c : Ctx R Γ B} {Rg w E E′}
+    f-outer : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu ls} {c : Ctx R Γ B} {Rg w E E′}
             → Fr C Rg c (owes w) E′ → JInv (scopeOf c) f E
             → Joined (scopeOf c) (JRl (scopeOf c) Rg op f E) C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E d n qu ls
-            → JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E ≈ E′ → Sound (JRo (scopeOf c) Rg op f E) E
-            → Fr C (JRo (scopeOf c) Rg op f E) (inOuter op f d n qu ls c) (owes w) E
+            → JoinE (scopeOf c) op f ω E E′ → Sound (JRo (scopeOf c) Rg op f E) E
+            → Fr C (JRo (scopeOf c) Rg op f E) (inOuter op f ω d n qu ls c) (owes w) E
     -- the hole a begun lane, between those before it and after it, in a
     -- joiner some live node reads
-    f-lanes : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n qu} {o : St Γ A} {pre post} {c : Ctx R Γ B}
+    f-lanes : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu} {o : St Γ A} {pre post} {c : Ctx R Γ B}
                 {Rg E E′ O vs₁ vs₂ ws n₁ n₂ q a b}
             → Fr C Rg c (owes true) E′ → JInv (scopeOf c) f O
             → Sync (scopeOf c) (JRo (scopeOf c) Rg op f O) C o O
@@ -451,42 +469,43 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Asc (vs₁ ++ (q , a) ∷ vs₂)
             → Ends (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O
             → LanesIn (JRl (scopeOf c) Rg op f O) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O
-            → JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O ≈ E′ → Sound (JRo (scopeOf c) Rg op f O) O → (T b → Sound (JRl (scopeOf c) Rg op f O q) E)
-            → Fr C (JRl (scopeOf c) Rg op f O q) (inLanes op f d n qu o pre post c) (lane b) E
+            → JoinE (scopeOf c) op f ω O E′ → Sound (JRo (scopeOf c) Rg op f O) O → (T b → Sound (JRl (scopeOf c) Rg op f O q) E)
+            → Fr C (JRl (scopeOf c) Rg op f O q) (inLanes op f ω d n qu o pre post c) (lane b) E
     -- under a lane's list entry, its switch; under that, its program
     f-lane  : ∀ {Γ A} {c : Ctx R Γ A} {Rg b E} → Fr C Rg c (lane b) E → Fr C Rg (inLn b c) (lanecut b) E
     f-lnct  : ∀ {Γ A} {a} {c : Ctx R Γ A} {Rg b E} → Fr C Rg c (lanecut b) E → Fr C Rg (inCut b a c) (owes b) E
     f-src   : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {Rg w E E′ β}
             → Fr C Rg c (owes w) E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (not (CS.closed k))
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β
-            → Flags C k β → Frozen k ≈ E → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′
+            → Flags C k β → Frozen k ≈ E → ConnE (CS.connAt k) (Frozen k) β E′
             → Fr C (Parts.Rs pt) (inSrc k b c) (owes w) E
     -- a source ended while its connect runs: nothing reads what is left
     f-srcc  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {Rg w E E′ β}
             → Fr C Rg c (owes w) E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (CS.closed k)
             → Spent C (Frozen k)
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β
-            → Flags C k β → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′
+            → Flags C k β → ConnE (CS.connAt k) (Frozen k) β E′
             → Fr C (Parts.Rs pt) (inSrc k b c) (owes false) E
     -- a source not yet subscribed: its program, owed at the connect's
     -- `ix 1`
     f-srcp  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {Rg w E E′ β}
-            → Fr C Rg c (owes w) E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k)
+            → Fr C Rg c (owes w) E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (not (CS.closed k))
             → CS.bodyAt k ≡ just (CS.connAt k) → Adm (binds (CS.src k) (CS.connAt k) (scopeOf c))
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β
-            → Flags C k β → Frozen k ≈ E → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′
+            → Flags C k β → Frozen k ≈ E → ConnE (CS.connAt k) (Frozen k) β E′
+            → Owes C (CS.connAt k ++ [ ix 1 ])
             → Fr C (Parts.Rs pt) (inSrc k b c) (pnd (CS.connAt k ++ [ ix 1 ])) E
     -- a source torn down: nothing reads it
     f-srcx  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {Rg w E E′ β}
             → Fr C Rg c (owes w) E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (not (CS.srcLive k))
-            → Flags C k β → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′
+            → Flags C k β → ConnE (CS.connAt k) (Frozen k) β E′
             → Fr C (Parts.Rs pt) (inSrc k b c) (owes false) E
     -- a body: owed while its source runs
     f-body  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {Rg w v E E′}
             → Fr C Rg c (owes w) E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k E) → v ≡ (w ∧ CS.srcLive k)
             → (T (CS.srcLive k) → Src (scopeOf c) (Parts.Rs pt) C k o)
             → Flags C k E
-            → Connecting.ConnT (CS.connAt k) (Frozen k) E ≈ E′
+            → ConnE (CS.connAt k) (Frozen k) E E′
             → Fr C (Parts.Rb pt) (inBody k o c) (owes v) E
 
   -- THE INVARIANT: settled, the hole and every frame at one cursor; a
