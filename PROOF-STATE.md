@@ -14,16 +14,16 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE TRUNCATED COMPOSITE
+#### THE TIE KEPT
 
-A connect's and a joiner's frames read their rows truncated (`ConnE`,
-`JoinE`, the joiner's outer pinned to its ghost), so a rise into either
-needs few rows before it. Those rows include skips (echoes, guards), and
-`Sync` ties visible rows only, so `Inv` cannot count them. Open: whether
-every row a frame's entry has passed is one the run stepped at, kept by
-a per-step invariant over all rows. Settled when each history leaf is a body.
+`Tie.TieK`: every live connect's frozen source rows, and every live
+joiner's meaning rows, are each a finite list, a key under the node, a
+fresh row of the subscription in progress, or a copy fed from a handle.
+Open: whether each step keeps it, most of all a subscription's fresh rows
+turning into keys, queued lane rows, and pins of a completed source.
+Settled when the three step leaves are bodies.
 
-Members: `few-body`, `few-outer`, `few-lane`.
+Members: `tie-rise`, `tie-begin`, `tie-run`.
 
 #### THE CONNECT STEPPED
 
