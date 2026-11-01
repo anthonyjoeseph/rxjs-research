@@ -29,29 +29,34 @@
 module quickcheck.Cursor-Check where
 
 open import Agda.Builtin.IO using (IO)
-open import Agda.Builtin.Unit using () renaming (⊤ to Unit)
-open import Data.Bool using (Bool; true; false; _∧_; not; if_then_else_)
-open import Data.List using (List; []; _∷_; _++_; [_]; upTo; null) renaming (map to mapL)
+open import Agda.Builtin.Unit using (tt) renaming (⊤ to Unit)
+open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
+open import Data.List using (List; []; _∷_; _++_; [_]; upTo; null; length; take) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≡ᵇ_; _<ᵇ_; _≤ᵇ_)
 open import Data.Nat.Show using () renaming (show to showℕ)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.String using (String) renaming (_++_ to _+++_)
-open import IO.Primitive.Core using (_>>=_)
+open import Data.String.Properties using (_==_)
+open import IO.Primitive.Core using (_>>=_; pure)
 open import IO.Primitive.Finite using (putStrLn)
+open import Relation.Nullary using (does)
 
 open import Tree using (Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Events using (Pos; Timeline; _<ᵖ_)
+open import denotation.Events using (Pos; Timeline; ix; last; _<ᵖ_; _≟ᵖ_)
 open import operation.Key using (Key; at; after; _<ᴷ_)
-open import operation.PureObservable using (module Machine; module Driver)
-open Machine using (St; Ev; coldS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; pend; CS; Scope;
-                    Conf; ⟨_,_,_,_⟩; plug; dirs; scopeOf; subscribing; absorbed; rising; load; nx; cp)
+open import operation.PureObservable using (module Machine; module Driver; due)
+open Machine using (St; Ev; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; pend; CS; Scope;
+                    Conf; ⟨_,_,_,_⟩; plug; dirs; scopeOf; subscribing; absorbed; rising; load; nx; cp;
+                    Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody;
+                    attAt; attached; free; cpAt; cutAt; overAt; search; found; Found; own;
+                    Mark; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM)
 open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Trace using (depth)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Ty using (showPos; natᵗ)
-open import quickcheck.Tabled using (rows; short; concatMap; when; anyᵇ; listT)
+open import quickcheck.Tabled using (rows; short; concatMap; when; anyᵇ; allᵇ; listT)
 open import quickcheck.Entry-Check using (Kind; kout; kend; erase; sameRow; showRows; fullL; samePath; showPath)
 
 ------------------------------------------------------------------------
@@ -217,6 +222,37 @@ private
                                                              (deadS [] (plug (Conf.ctx k) (Conf.foc k))) (Probe.book pr′)
                                                else [])
 
+  markName : Mark → String
+  markName ofM     = "ofM"
+  markName attM    = "attM"
+  markName bodyM   = "bodyM"
+  markName srcAttM = "srcAttM"
+  markName owedM   = "owedM"
+  markName cpM     = "cpM"
+  markName cutM    = "cutM"
+  markName joinM   = "joinM"
+  markName leafM   = "leafM"
+
+  ctxName : ∀ {R Γ A} → Ctx R Γ A → String
+  ctxName top                     = "top"
+  ctxName (inMap _ _)             = "map"
+  ctxName (inScan _ _ _)          = "scan"
+  ctxName (inCut _ _ _)           = "cut"
+  ctxName (inLn _ _)              = "lane"
+  ctxName (inTake _ _ _ _)        = "take"
+  ctxName (inOuter _ _ _ _ _ _ _) = "outer"
+  ctxName (inLanes _ _ _ _ _ _ _ _ _) = "lanes"
+  ctxName (inSrc _ _ _)           = "source"
+  ctxName (inBody _ _ _)          = "body"
+
+  stepKind : Conf ℕ → String
+  stepKind ⟨ c , pend o q , subscribing , _ ⟩ = "sub " +++ formerOf o
+  stepKind ⟨ c , s , subscribing , _ ⟩        = "sub stuck"
+  stepKind ⟨ c , s , rising _ , _ ⟩          = "rise " +++ ctxName c
+  stepKind ⟨ c , s , absorbed , _ ⟩ with search top (plug c s)
+  ... | just f  = "run " +++ markName (Found.mark f)
+  ... | nothing = "quiet"
+
   clockOf : Conf ℕ → Key
   clockOf k with Conf.mode k | Machine.next k
   ... | absorbed | just κ = κ
@@ -225,7 +261,7 @@ private
   -- A silent step's clock against the step before's; the first fall noted.
   ticked : ℕ → Conf ℕ → Conf ℕ → Probe → Probe
   ticked t k k′ pr with Probe.falls pr | clockOf k′ <ᴷ clockOf k
-  ... | nothing | true = record pr { falls = just ("step " +++ showℕ t +++ " clock " +++ showKey (clockOf k) +++ " then " +++ showKey (clockOf k′)) }
+  ... | nothing | true = record pr { falls = just ("step " +++ showℕ t +++ " " +++ stepKind k +++ " clock " +++ showKey (clockOf k) +++ " then " +++ showKey (clockOf k′)) }
   ... | _       | _    = pr
 
   -- The root shows a row: a fall since the last one is met.
@@ -233,17 +269,13 @@ private
   shown (probing bk cur (just f) []) = probing bk cur nothing [ f ]
   shown (probing bk cur _ bs)        = probing bk cur nothing bs
 
-  -- The run's result: its failures, its first met fall, and whether a
-  -- fall went unmet.
+  -- The run's result: its failures, its first met fall, and a fall no
+  -- row followed.
   Result : Set
-  Result = List String × List String × Bool
+  Result = List String × List String × Maybe String
 
   ended : List String → Probe → Result
-  ended fs pr = fs , Probe.backs pr , unmet (Probe.falls pr)
-    where
-      unmet : Maybe String → Bool
-      unmet nothing  = false
-      unmet (just _) = true
+  ended fs pr = fs , Probe.backs pr , Probe.falls pr
 
   -- The run for `n` more steps: its first failures, and its clock's fall.
   go : ℕ → ℕ → ℕ → Probe → Conf ℕ → Result
@@ -257,8 +289,201 @@ private
   ...   | drained        = ended (arrears t " though the run drained" (λ _ → true) (deadS [] (plug (Conf.ctx k) (Conf.foc k))) (Probe.book pr′)) pr′
 
 -- A seed's program, its run read for `n` steps.
-probe : ℕ → ℕ → List String × List String × Bool
+probe : ℕ → ℕ → List String × List String × Maybe String
 probe n seed = let p = program seed in go (depth 3 p) n 0 (probing [] nothing nothing []) (load (toObs timeline 3 p [] [] []))
+
+------------------------------------------------------------------------
+-- THE SILENT RUN, MEASURED: `adequacy.Complete`'s fuel, read off a run.
+--
+-- P is the next row the root shows.  KS is the root's rows at or before P
+-- and every ancestor of each.  A counts KS strictly past the clock; a
+-- silent step leaving A where it was is STILL.  W is a candidate
+-- potential every still step must lower: each pending subscription's
+-- syntax (a defer is one), weighted by depth; each admin mark, pending or
+-- owed, and each mark keyed outside KS, at depth + 2; the depth of a
+-- rise; and, once absorbed with a KS mark next, that mark's depth + 2.
+--
+-- Reported, never failed: a step whose A rose; a still step whose W did
+-- not fall, with its kind; a settled-free step (subscribing or rising)
+-- with a mark keyed before its position; a fall no row followed.  A
+-- seed whose root listing a budget cut short is not measured.
+
+private
+  shownL : ℕ → Conf ℕ → List Pos
+  shownL zero    k = []
+  shownL (suc n) k with step k
+  ... | silent _ k′    = shownL n k′
+  ... | value _ p _ k′ = p ∷ shownL n k′
+  ... | complete p     = [ p ]
+  ... | drained        = []
+
+  -- A position and every proper non-empty prefix of it.
+  prefixes : Pos → List Pos
+  prefixes []      = []
+  prefixes (l ∷ q) = [ l ] ∷ mapL (l ∷_) (prefixes q)
+
+  ksOf : List Pos → Pos → List Pos
+  ksOf rws P = concatMap prefixes (concatMap (λ q → when ((q <ᵖ P) ∨ does (q ≟ᵖ P)) q) rws) ++ prefixes P
+
+  inKs : List Pos → Key → Bool
+  inKs ks (at q)    = anyᵇ (λ r → does (q ≟ᵖ r)) ks
+  inKs ks (after _) = false
+
+  aheadN : Key → List Pos → ℕ
+  aheadN κ []       = 0
+  aheadN κ (q ∷ qs) = if κ <ᴷ at q then suc (aheadN κ qs) else aheadN κ qs
+
+  sumL : List ℕ → ℕ
+  sumL []       = 0
+  sumL (n ∷ ns) = n + sumL ns
+
+  -- Every mark key in a tree, a joiner's whole inbox included.
+  mutual
+    keysS : ∀ {Γ A} → St Γ A → List Key
+    keysS (joinS j g x ib)        = mapL (λ e → at (proj₁ e)) ib
+    keysS s                       = mapL proj₂ (own s) ++ kidsK s
+
+    kidsK : ∀ {Γ A} → St Γ A → List Key
+    kidsK (mapS _ s)               = keysS s
+    kidsK (scanS _ _ s)            = keysS s
+    kidsK (cutS _ _ s)             = keysS s
+    kidsK (lnS _ s)                = keysS s
+    kidsK (takeS _ _ _ s)          = keysS s
+    kidsK (flatS _ _ _ _ _ o ls)   = keysS o ++ keysL ls
+    kidsK (connS _ o b)            = keysS o ++ keysS b
+    kidsK _                        = []
+
+    keysL : ∀ {Γ A} → List (St Γ A) → List Key
+    keysL []       = []
+    keysL (s ∷ ls) = keysS s ++ keysL ls
+
+  -- The candidate potential.
+  module Pot (ks : List Pos) where
+    wt : ℕ → Key → ℕ
+    wt d κ = if inKs ks κ then 0 else 2 + d
+
+    syn : ∀ {Γ A} → ℕ → Obs Timeline Γ A → ℕ
+    syn d (cold _)          = 3 + d
+    syn d empty             = 3 + d
+    syn d (of _)            = 3 + d
+    syn d (map _ s)         = 1 + syn (suc d) s
+    syn d (scan _ _ s)      = 1 + syn (suc d) s
+    syn d (takeWhile _ _ s) = 1 + 2 * (2 + d) + (3 + d) + syn (2 + d) s
+    syn d (flatMap _ _ s)   = 1 + (3 + d) + syn (2 + d) s
+    syn d (connect s b)     = 1 + 3 * (2 + d) + syn (suc d) b + syn (suc d) s
+    syn d (connected _)     = 3 + d
+    syn d (defer _)         = 1
+
+    isNone : Maybe Pos → Bool
+    isNone nothing  = true
+    isNone (just _) = false
+
+    connPot : ∀ {Γ X} → ℕ → CS Γ X → ℕ
+    connPot d k = bodyP (CS.bodyAt k) + one (not (isNone (CS.attSrc k))) + one (not (isNone (CS.owedAt k)))
+                + one (CS.srcLive k ∧ isNone (CS.owedAt k))
+      where
+        one : Bool → ℕ
+        one b = if b then 2 + d else 0
+        bodyP : Maybe Pos → ℕ
+        bodyP (just p) = wt d (at (p ++ [ ix 1 ])) + (2 + d)
+        bodyP nothing  = 0
+
+    mutual
+      pot : ∀ {Γ A} → ℕ → St Γ A → ℕ
+      pot d (pend o q)               = syn d o
+      pot d (coldS b l) with due l
+      ... | just κ                   = wt d κ
+      ... | nothing                  = 0
+      pot d (ofS i p [])             = wt d (at (p ++ [ last ]))
+      pot d (ofS i p (_ ∷ _))        = wt d (at (p ++ [ ix i ]))
+      pot d doneS                    = 0
+      pot d (mapS _ s)               = pot (suc d) s
+      pot d (scanS _ _ s)            = pot (suc d) s
+      pot d (cutS _ (attAt _) s)     = (2 + d) + pot (suc d) s
+      pot d (cutS _ attached s)      = pot (suc d) s
+      pot d (lnS _ s)                = pot (suc d) s
+      pot d (takeS _ _ free s)       = 2 * (2 + d) + pot (suc d) s
+      pot d (takeS _ _ (cpAt p) s)   = wt d (at (p ++ [ last ])) + (2 + d) + pot (suc d) s
+      pot d (takeS _ _ (cutAt _) s)  = (2 + d) + pot (suc d) s
+      pot d (takeS _ _ (overAt _) s) = pot (suc d) s
+      pot d (flatS _ _ _ _ _ o ls)   = pot (suc d) o + potL (suc d) ls
+      pot d (connS k o b)            = connPot d k + pot (suc d) o + pot (suc d) b
+      pot d (joinS j g x ib)         = sumL (mapL (λ e → wt d (at (proj₁ e))) ib)
+
+      potL : ∀ {Γ A} → ℕ → List (St Γ A) → ℕ
+      potL d []       = 0
+      potL d (s ∷ ls) = pot d s + potL d ls
+
+    extra : Conf ℕ → ℕ
+    extra ⟨ c , s , rising _ , _ ⟩ = length (dirs c)
+    extra ⟨ c , s , absorbed , _ ⟩ with search top (plug c s)
+    ... | just (found (_ , _ , c′ , _) _ κ) = if inKs ks κ then 2 + length (dirs c′) else 0
+    ... | nothing                           = 0
+    extra _ = 0
+
+    W : Conf ℕ → ℕ
+    W k = pot 0 (plug (Conf.ctx k) (Conf.foc k)) + extra k
+
+  -- A settled-free step: a mark keyed before the run's position.
+  early : Conf ℕ → Maybe Key
+  early ⟨ c , s , absorbed , p ⟩ = nothing
+  early ⟨ c , s , _ , p ⟩ = firstL (keysS (plug c s))
+    where
+      firstL : List Key → Maybe Key
+      firstL []       = nothing
+      firstL (κ ∷ κs) = if κ <ᴷ at p then just κ else firstL κs
+
+  record Meas : Set where
+    constructor meas
+    field
+      lines  : List String
+      stills : ℕ
+      stuck  : List String
+
+  note : Bool → String → Meas → Meas
+  note true  l (meas fs n st) = meas (fs ++ [ l ]) n st
+  note false l m              = m
+
+  judge : ℕ → List Pos → Conf ℕ → Conf ℕ → Meas → Meas
+  judge t ks k k′ m = still (aheadN (clockOf k) ks) (aheadN (clockOf k′) ks) (note (bad (early k)) keyLine m)
+    where
+      open Pot ks using (W)
+      bad : Maybe Key → Bool
+      bad nothing  = false
+      bad (just _) = true
+      showE : Maybe Key → String
+      showE nothing  = ""
+      showE (just κ) = showKey κ
+      keyLine = "KEY step " +++ showℕ t +++ " " +++ stepKind k +++ " at " +++ showPos (Conf.pos k) +++ " has a mark " +++ showE (early k)
+      still : ℕ → ℕ → Meas → Meas
+      still a₀ a₁ m′ with a₀ <ᵇ a₁ | a₁ ≡ᵇ a₀
+      ... | true | _     = note true ("AROSE step " +++ showℕ t +++ " " +++ stepKind k +++ " A " +++ showℕ a₀ +++ " then " +++ showℕ a₁) m′
+      ... | _    | false = m′
+      ... | _    | true  with W k ≤ᵇ W k′
+      ...   | false = record m′ { stills = suc (Meas.stills m′) }
+      ...   | true  = record (note true ("STUCK step " +++ showℕ t +++ " " +++ stepKind k +++ " clock " +++ showKey (clockOf k)
+                                        +++ " then " +++ stepKind k′ +++ " clock " +++ showKey (clockOf k′)
+                                        +++ " W " +++ showℕ (W k) +++ " then " +++ showℕ (W k′)) m′)
+                             { stills = suc (Meas.stills m′) ; stuck = stepKind k ∷ Meas.stuck m′ }
+
+  walkM : List Pos → ℕ → ℕ → List Pos → Conf ℕ → Meas → Meas
+  walkM rws zero    t sh       k m = m
+  walkM rws (suc n) t []       k m = m
+  walkM rws (suc n) t (P ∷ sh) k m with step k
+  ... | silent _ k′    = walkM rws n (suc t) (P ∷ sh) k′ (judge t (ksOf rws P) k k′ m)
+  ... | value _ _ _ k′ = walkM rws n (suc t) sh k′ m
+  ... | complete _     = m
+  ... | drained        = m
+
+-- A seed's silent run measured for `n` steps; nothing when its root
+-- listing is cut short.
+measure : ℕ → ℕ → Maybe Meas
+measure n seed with program seed
+... | p with listT (depth 3 p) (toObs timeline 3 p [] [] []) [] (ix 0 ∷ [])
+...   | nothing = nothing
+...   | just l  =
+  if short l then nothing
+  else just (walkM (mapL proj₁ (rows l)) n 0 (shownL n (load (toObs timeline 3 p [] [] []))) (load (toObs timeline 3 p [] [] [])) (meas [] 0 []))
 
 ------------------------------------------------------------------------
 -- The report
@@ -271,16 +496,49 @@ private
   count : Bool → ℕ → ℕ
   count b n = if b then suc n else n
 
+  some : Maybe String → Bool
+  some nothing  = false
+  some (just _) = true
+
+  late : ℕ → Maybe String → IO Unit
+  late seed nothing  = pure tt
+  late seed (just f) = putStrLn ("cursor-check: LATEFALL seed " +++ showℕ seed +++ " " +++ f +++ " in " +++ showCode natᵗ (program seed))
+
   report : List ℕ → ℕ → ℕ → ℕ → IO Unit
   report []          bad bk tl = putStrLn ("cursor-check: done " +++ showℕ bad +++ " failing seeds, " +++ showℕ bk +++ " seeds whose clock ran back before a row, "
                                            +++ showℕ tl +++ " more whose clock ran back only after the last row")
   report (seed ∷ ss) bad bk tl with probe 400 seed
-  ... | [] , [] , u = report ss bad bk (count u tl)
+  ... | [] , [] , u = late seed u >>= λ _ → report ss bad bk (count (some u) tl)
   ... | fs , cs , u =
     putStrLn ("cursor-check: program " +++ showℕ seed +++ " " +++ showCode natᵗ (program seed)) >>= λ _ →
     each ("cursor-check: FAIL seed " +++ showℕ seed +++ " ") fs >>= λ _ →
     each ("cursor-check: CLOCK seed " +++ showℕ seed +++ " ") cs >>= λ _ →
-    report ss (count (not (null fs)) bad) (count (not (null cs)) bk) (count (u ∧ null cs) tl)
+    report ss (count (not (null fs)) bad) (count (not (null cs)) bk) (count (some u ∧ null cs) tl)
+
+  -- The still steps' kinds, tallied.
+  tally : List String → List (String × ℕ) → List (String × ℕ)
+  tally []       ts = ts
+  tally (x ∷ xs) ts = tally xs (bump ts)
+    where
+      bump : List (String × ℕ) → List (String × ℕ)
+      bump []              = [ (x , 1) ]
+      bump ((y , n) ∷ ys) = if x == y then (y , suc n) ∷ ys else (y , n) ∷ bump ys
+
+  showTally : List (String × ℕ) → String
+  showTally []             = ""
+  showTally ((x , n) ∷ ts) = x +++ " " +++ showℕ n +++ "; " +++ showTally ts
+
+  stillReport : List ℕ → ℕ → ℕ → ℕ → List (String × ℕ) → IO Unit
+  stillReport []          cutN sts bad ts =
+    putStrLn ("cursor-check: still " +++ showℕ sts +++ " still steps, " +++ showℕ bad +++ " seeds with a finding, "
+              +++ showℕ cutN +++ " seeds unmeasured; stuck by kind: " +++ showTally ts)
+  stillReport (seed ∷ ss) cutN sts bad ts with measure 400 seed
+  ... | nothing = stillReport ss (suc cutN) sts bad ts
+  ... | just (meas [] n st) = stillReport ss cutN (sts + n) bad (tally st ts)
+  ... | just (meas fs n st) =
+    putStrLn ("cursor-check: program " +++ showℕ seed +++ " " +++ showCode natᵗ (program seed)) >>= λ _ →
+    each ("cursor-check: STILL seed " +++ showℕ seed +++ " ") (take 4 fs) >>= λ _ →
+    stillReport ss cutN (sts + n) (suc bad) (tally st ts)
 
 main : IO Unit
-main = report (upTo 300) 0 0 0
+main = report (upTo 300) 0 0 0 >>= λ _ → stillReport (upTo 300) 0 0 0 []
