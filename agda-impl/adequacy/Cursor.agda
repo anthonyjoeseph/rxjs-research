@@ -56,7 +56,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; unbound; binds; CS; Owe
                     renaming (Ev to Evᴹ; Shown to Shownᴹ)
 open import denotation.Laws.Modulus using (≼-refl; ≺→≼; ≺-ext; ≺-irrefl; ≺-trans; ≼-or-≻)
 open import adequacy.Rows using (≼-≢; _≃_; _⇄_; ≃-refl; Vis; Moves; silent; shown; toEv; Inbox; full; pendRows; Frozen; tapeE)
-open import denotation.Laws.Worlds using (Ok; Hots; Real)
+open import denotation.Laws.Worlds using (Ok; Hots; Real; W⁼)
 open _≃_
 
 ------------------------------------------------------------------------
@@ -90,10 +90,20 @@ vis : ∀ {A} (e : Evᴹ A) → Visible (toEv e)
 vis (nx _) = _
 vis cp     = _
 
--- A frozen entry is a meaning: one visible row at a position.
-record Sound {A} (E : EmissionSet A) : Set where
+-- Where a subtree's rows may lie.
+Rgn : Set₁
+Rgn = Pos → Set
+
+-- A frozen entry is a meaning: one visible row at a position, each inside
+-- its subtree's region.
+record Sound {A} (Rg : Rgn) (E : EmissionSet A) : Set where
   field
     fn : ∀ {y e e′} → E y e → E y e′ → Visible e → Visible e′ → e ≡ e′
+    rg : ∀ {y e} → E y e → Visible e → Rg y
+
+-- A subscription at `q` whose world lies in the region.
+Within : ∀ {Γ} → Rgn → Scope Γ → Pos → Set
+Within Rg sc q = ∀ {y} → W⁼ (Hots (full sc)) q y → Rg y
 
 ------------------------------------------------------------------------
 -- A joiner's feed
@@ -189,28 +199,28 @@ Ticked tapeOver          = ⊤
 -- frame it sits in; a subscription not yet run is pinned by its program
 -- outside `Sync`, in `src-pend` and `pending`.
 
-data Sync : ∀ {Γ} → Scope Γ → Cur → ∀ {A} → St Γ A → EmissionSet A → Set₁
+data Sync : ∀ {Γ} → Scope Γ → Rgn → Cur → ∀ {A} → St Γ A → EmissionSet A → Set₁
 
 -- A lane in its joiner's list, live or over: its list entry over its
 -- switch, both on while it runs and both off once it is over.
-data LaneSt {Γ A B} (sc : Scope Γ) (C : Cur) (P : Pol A B) (q : Pos) (a : A) : St Γ B → Bool → Set₁ where
-  l-live : ∀ {at l E} → Hole C P q a E true → Sync sc C l E → Sound E → LaneSt sc C P q a (lnS true (cutS true at l)) true
-  l-dead : ∀ {at l E} → Hole C P q a E false → LaneSt sc C P q a (lnS false (cutS false at l)) false
+data LaneSt {Γ A B} (sc : Scope Γ) (Rg : Rgn) (C : Cur) (P : Pol A B) (q : Pos) (a : A) : St Γ B → Bool → Set₁ where
+  l-live : ∀ {at l E} → Hole C P q a E true → Sync sc Rg C l E → Sound Rg E → LaneSt sc Rg C P q a (lnS true (cutS true at l)) true
+  l-dead : ∀ {at l E} → Hole C P q a E false → LaneSt sc Rg C P q a (lnS false (cutS false at l)) false
 
 -- The values passed that began a lane, oldest first, and how many of
 -- their lanes run.
-data Begun {Γ A B} (sc : Scope Γ) (C : Cur) (P : Pol A B) (O : EmissionSet A) : List (Pos × A) → List (St Γ B) → ℕ → Set₁ where
-  none : Begun sc C P O [] [] 0
-  more : ∀ {q a l b vs ls n} → O q (out a) → ¬ Owes C q → Runs P q → LaneSt sc C P q a l b
-       → Begun sc C P O vs ls n → Begun sc C P O ((q , a) ∷ vs) (l ∷ ls) (bump b n)
+data Begun {Γ A B} (sc : Scope Γ) (Rg : Rgn) (C : Cur) (P : Pol A B) (O : EmissionSet A) : List (Pos × A) → List (St Γ B) → ℕ → Set₁ where
+  none : Begun sc Rg C P O [] [] 0
+  more : ∀ {q a l b vs ls n} → O q (out a) → ¬ Owes C q → Runs P q → LaneSt sc Rg C P q a l b
+       → Begun sc Rg C P O vs ls n → Begun sc Rg C P O ((q , a) ∷ vs) (l ∷ ls) (bump b n)
 
 -- A joiner's bookkeeping: its begun lanes and live count, its queue, and
 -- its outer's end.
-data Joined {Γ A B} (sc : Scope Γ) (C : Cur) (P : Pol A B) (O : EmissionSet A) (d : Bool) (n : ℕ) (qu : List A)
+data Joined {Γ A B} (sc : Scope Γ) (Rg : Rgn) (C : Cur) (P : Pol A B) (O : EmissionSet A) (d : Bool) (n : ℕ) (qu : List A)
             (ls : List (St Γ B)) : Set₁ where
-  joined : ∀ {vs ws} → Begun sc C P O vs ls n → Waiting C P O ws qu → Whole C P O vs ws → OuterDone C O d
+  joined : ∀ {vs ws} → Begun sc Rg C P O vs ls n → Waiting C P O ws qu → Whole C P O vs ws → OuterDone C O d
          → Ahead C P vs ws → Ends P O
-         → Joined sc C P O d n qu ls
+         → Joined sc Rg C P O d n qu ls
 
 -- A scan's fold: of the values passed, the seed if none.
 data Folded {A B} (C : Cur) (f : B → A → B) (z₀ : B) (Es : EmissionSet A) : B → Set where
@@ -251,65 +261,77 @@ record Flags {Γ X B} (C : Cur) (k : CS Γ X) (β : EmissionSet B) : Set where
 
 -- A connect's source: running, its frozen entry what it owes; or not yet
 -- subscribed, which its body's own mark does at the connect's `ix 1`.
-data Src : ∀ {Γ X} → Scope Γ → Cur → CS Γ X → St Γ X → Set₁
+data Src : ∀ {Γ X} → Scope Γ → Rgn → Cur → CS Γ X → St Γ X → Set₁
+
+-- A connect's two parts: its body's region and its source's, inside its
+-- own and apart, its own holding no row of a handle in scope.
+record Parts {Γ X B} (sc : Scope Γ) (Rg : Rgn) (k : CS Γ X) (β : EmissionSet B) : Set₁ where
+  field
+    Rb Rs : Rgn
+    b⊆    : ∀ {y} → Rb y → Rg y
+    s⊆    : ∀ {y} → Rs y → Rg y
+    apart : ∀ {y} → Rb y → Rs y → ⊥
+    clear : ∀ {y} → Hots (full sc) y → Rg y → ⊥
+    sb    : Sound Rb β
+    ss    : Sound Rs (Frozen k)
 
 data Sync where
   -- a started cold: what its tape has left is what its entry owes
-  s-cold : ∀ {Γ} {sc : Scope Γ} {C} {A} {l} {E : EmissionSet A}
-         → Ticked l → Due C E ≃ Due origin (InE (tapeE l)) → Sync sc C (coldS true l) E
+  s-cold : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A} {l} {E : EmissionSet A}
+         → Ticked l → Due C E ≃ Due origin (InE (tapeE l)) → Sync sc Rg C (coldS true l) E
   -- an of: what it has left is what its entry owes
-  s-of   : ∀ {Γ} {sc : Scope Γ} {C} {A} {i q} {xs : List A} {E}
-         → Due C E ≃ Due origin (InE (ofᴱ q i xs)) → Sync sc C (ofS i q xs) E
-  s-done : ∀ {Γ} {sc : Scope Γ} {C} {A} {E : EmissionSet A} → Spent C E → Sync sc C doneS E
-  s-map  : ∀ {Γ} {sc : Scope Γ} {C} {A B} {f : A → B} {s E E′} → Sync sc C s E → MapT f E ≈ E′ → Sound E → Sync sc C (mapS f s) E′
+  s-of   : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A} {i q} {xs : List A} {E}
+         → Due C E ≃ Due origin (InE (ofᴱ q i xs)) → Sync sc Rg C (ofS i q xs) E
+  s-done : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A} {E : EmissionSet A} → Spent C E → Sync sc Rg C doneS E
+  s-map  : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A B} {f : A → B} {s E E′} → Sync sc Rg C s E → MapT f E ≈ E′ → Sound Rg E → Sync sc Rg C (mapS f s) E′
   -- a scan: its fold of the values passed
-  s-scan : ∀ {Γ} {sc : Scope Γ} {C} {A B} {f : B → A → B} {z z₀ s Es E}
-         → Sync sc C s Es → Folded C f z₀ Es z → Scan.ScanT f z₀ Es ≈ E → Sound Es → Sync sc C (scanS f z s) E
-  s-cut  : ∀ {Γ} {sc : Scope Γ} {C} {A} {a : Att} {s : St Γ A} {E} → Sync sc C s E → Sync sc C (cutS true a s) E
+  s-scan : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A B} {f : B → A → B} {z z₀ s Es E}
+         → Sync sc Rg C s Es → Folded C f z₀ Es z → Scan.ScanT f z₀ Es ≈ E → Sound Rg Es → Sync sc Rg C (scanS f z s) E
+  s-cut  : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A} {a : Att} {s : St Γ A} {E} → Sync sc Rg C s E → Sync sc Rg C (cutS true a s) E
   -- a takeWhile not yet failed: no failing value passed
-  s-take : ∀ {Γ} {sc : Scope Γ} {C} {A} {i} {keep : A → Bool} {s Es E}
-         → Sync sc C s Es → NoFail C keep Es
-         → TakeWhile.TakeT i keep Es ≈ E → Sound Es → Sync sc C (takeS i keep free s) E
+  s-take : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A} {i} {keep : A → Bool} {s Es E}
+         → Sync sc Rg C s Es → NoFail C keep Es
+         → TakeWhile.TakeT i keep Es ≈ E → Sound Rg Es → Sync sc Rg C (takeS i keep free s) E
   -- failed at `r`: its source is not read again
-  s-took : ∀ {Γ} {sc : Scope Γ} {C} {A} {i} {keep : A → Bool} {w s Es E r}
+  s-took : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A} {i} {keep : A → Bool} {w s Es E r}
          → Failure keep Es r → Gone C r → (T i → ¬ Owes C (r ++ [ ix 0 ])) → OweAt C w r
-         → TakeWhile.TakeT i keep Es ≈ E → Sound Es → Sync sc C (takeS i keep w s) E
+         → TakeWhile.TakeT i keep Es ≈ E → Sound Rg Es → Sync sc Rg C (takeS i keep w s) E
   -- a joiner: its outer, and its bookkeeping over its policy
-  s-flat : ∀ {Γ} {sc : Scope Γ} {C} {A B} {op} {f : A → Obs Timeline Γ B} {d n qu o ls O E}
-         → Sync sc C o O → Joined sc C (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O d n qu ls
-         → JoinF op (λ a → ⟦ f a ⟧ (full sc)) O ≈ E → Sound O
-         → Sync sc C (flatS op f d n qu o ls) E
+  s-flat : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A B} {op} {f : A → Obs Timeline Γ B} {d n qu o ls O E}
+         → Sync sc Rg C o O → Joined sc Rg C (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O d n qu ls
+         → JoinF op (λ a → ⟦ f a ⟧ (full sc)) O ≈ E → Sound Rg O
+         → Sync sc Rg C (flatS op f d n qu o ls) E
   -- a connect: its body, under its binder read whole, and its source,
   -- while the source runs; torn down, its body owes nothing and nothing
   -- reads either
-  s-conn : ∀ {Γ} {sc : Scope Γ} {C} {X B} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B} {β : EmissionSet B} {E}
-         → CS.scope k ≡ sc
-         → (T (CS.srcLive k) → Sync (binds (CS.src k) (CS.connAt k) sc) C b β)
-         → (T (CS.srcLive k) → Src sc C k o)
+  s-conn : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {X B} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B} {β : EmissionSet B} {E}
+         → CS.scope k ≡ sc → (pt : Parts sc Rg k β)
+         → (T (CS.srcLive k) → Sync (binds (CS.src k) (CS.connAt k) sc) (Parts.Rb pt) C b β)
+         → (T (CS.srcLive k) → Src sc (Parts.Rs pt) C k o)
          → Flags C k β
-         → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E → Sound β
-         → Sync sc C (connS k o b) E
+         → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E
+         → Sync sc Rg C (connS k o b) E
   -- a joiner: what it was fed and has not shown, and what is still to
   -- feed it.  The engine shows its inbox's head and appends in its
   -- source's order, while the entry orders rows by their rejoined
   -- position, so the inbox is ascending and ahead of all still unfed.
-  s-join : ∀ {Γ} {sc : Scope Γ} {C} {A} {j} {x : A ∈ Γ} {ib E}
+  s-join : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A} {j} {x : A ∈ Γ} {ib E}
          → enter (lookup (full sc) x) j ≈ E
          → Due C E ≃ (λ q e → Inbox ib q e ⊎ Due C (Unfed C (lookup (full sc) x) j) q e)
          → AllPairs (λ u v → proj₁ u ≺ proj₁ v) ib
          → (∀ {u q e} → u ∈ ib → Due C (Unfed C (lookup (full sc) x) j) q e → proj₁ u ≺ q)
          → Adm sc
-         → Sync sc C (joinS j true x ib) E
-  s-joinx : ∀ {Γ} {sc : Scope Γ} {C} {A} {j} {x : A ∈ Γ} {ib E} → Spent C E → Sync sc C (joinS j false x ib) E
+         → Sync sc Rg C (joinS j true x ib) E
+  s-joinx : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A} {j} {x : A ∈ Γ} {ib E} → Spent C E → Sync sc Rg C (joinS j false x ib) E
 
 data Src where
-  src-pend : ∀ {Γ X} {sc : Scope Γ} {C} {k : CS Γ X} {o}
+  src-pend : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o}
            → CS.bodyAt k ≡ just (CS.connAt k) → Adm (binds (CS.src k) (CS.connAt k) sc)
-           → pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]) ≈ Frozen k
-           → Src sc C k (pend o (CS.connAt k ++ [ ix 1 ]))
-  src-on   : ∀ {Γ X} {sc : Scope Γ} {C} {k : CS Γ X} {o} → T (not (CS.closed k)) → Sync sc C o (Frozen k) → Src sc C k o
+           → pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]) ≈ Frozen k → Within Rg sc (CS.connAt k ++ [ ix 1 ])
+           → Src sc Rg C k (pend o (CS.connAt k ++ [ ix 1 ]))
+  src-on   : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o} → T (not (CS.closed k)) → Sync sc Rg C o (Frozen k) → Src sc Rg C k o
   -- ended: nothing left to owe, whatever its subtree still holds
-  src-shut : ∀ {Γ X} {sc : Scope Γ} {C} {k : CS Γ X} {o} → T (CS.closed k) → Spent C (Frozen k) → Src sc C k o
+  src-shut : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o} → T (CS.closed k) → Spent C (Frozen k) → Src sc Rg C k o
 
 -- No rise in flight.
 data Calm {A : Set} : Machine.Mode A → Set where
@@ -330,19 +352,19 @@ data Need : Set where
   pnd     : Pos → Need
 
 -- The hole's state against its need.
-Hold : ∀ {Γ} → Scope Γ → Cur → Need → ∀ {A} → St Γ A → EmissionSet A → Set₁
-Hold sc C (owes w)    s E = T w → Sync sc C s E
-Hold sc C (lane b)    s E = Σ Att λ at → Σ (St _ _) λ l → s ≡ lnS b (cutS b at l) × (T b → Sync sc C l E)
-Hold sc C (lanecut b) s E = Σ Att λ at → Σ (St _ _) λ l → s ≡ cutS b at l × (T b → Sync sc C l E)
-Hold {Γ} sc C (pnd q) {A} s E = Σ (Obs Timeline Γ A) λ o → s ≡ pend o q × pendRows (full sc) o q ≈ E
+Hold : ∀ {Γ} → Scope Γ → Rgn → Cur → Need → ∀ {A} → St Γ A → EmissionSet A → Set₁
+Hold sc Rg C (owes w)    s E = T w → Sync sc Rg C s E
+Hold sc Rg C (lane b)    s E = Σ Att λ at → Σ (St _ _) λ l → s ≡ lnS b (cutS b at l) × (T b → Sync sc Rg C l E)
+Hold sc Rg C (lanecut b) s E = Σ Att λ at → Σ (St _ _) λ l → s ≡ cutS b at l × (T b → Sync sc Rg C l E)
+Hold {Γ} sc Rg C (pnd q) {A} s E = Σ (Obs Timeline Γ A) λ o → s ≡ pend o q × pendRows (full sc) o q ≈ E × Within Rg sc q
 
 -- A rise in flight at `p` from the hole: delivered there, its row in the
 -- hole's entry.
-Fly : ∀ {Γ} → Scope Γ → Pos → Need → ∀ {A} → St Γ A → EmissionSet A → Evᴹ A → Set₁
-Fly sc p (owes w)    s E e = T w → Sync sc (aft p) s E × E p (toEv e)
-Fly sc p (lane b)    s E e = Σ Att λ at → Σ (St _ _) λ l → s ≡ lnS b (cutS b at l) × (T b → Sync sc (aft p) l E × E p (toEv e))
-Fly sc p (lanecut b) s E e = Σ Att λ at → Σ (St _ _) λ l → s ≡ cutS b at l × (T b → Sync sc (aft p) l E × E p (toEv e))
-Fly {Γ} sc p (pnd q) {A} s E e = Σ (Obs Timeline Γ A) λ o → s ≡ pend o q × ⊥
+Fly : ∀ {Γ} → Scope Γ → Rgn → Pos → Need → ∀ {A} → St Γ A → EmissionSet A → Evᴹ A → Set₁
+Fly sc Rg p (owes w)    s E e = T w → Sync sc Rg (aft p) s E × E p (toEv e)
+Fly sc Rg p (lane b)    s E e = Σ Att λ at → Σ (St _ _) λ l → s ≡ lnS b (cutS b at l) × (T b → Sync sc Rg (aft p) l E × E p (toEv e))
+Fly sc Rg p (lanecut b) s E e = Σ Att λ at → Σ (St _ _) λ l → s ≡ cutS b at l × (T b → Sync sc Rg (aft p) l E × E p (toEv e))
+Fly {Γ} sc Rg p (pnd q) {A} s E e = Σ (Obs Timeline Γ A) λ o → s ≡ pend o q × ⊥
 
 -- One frame inside another.
 data Up1 {R : Set} : ∀ {Γ A Γ′ A′} → Ctx R Γ A → Ctx R Γ′ A′ → Set₁ where
@@ -359,77 +381,78 @@ data Up1 {R : Set} : ∀ {Γ A Γ′ A′} → Ctx R Γ A → Ctx R Γ′ A′ �
 
 module _ {R : Set} (Rt : EmissionSet R) where
 
-  data Fr (C : Cur) : ∀ {Γ A} → Ctx R Γ A → Need → EmissionSet A → Set₁ where
-    f-top   : ∀ {E} → E ≈ Rt → Fr C top (owes true) E
+  data Fr (C : Cur) : ∀ {Γ A} → Rgn → Ctx R Γ A → Need → EmissionSet A → Set₁ where
+    f-top   : ∀ {Rg E} → E ≈ Rt → Fr C Rg top (owes true) E
     -- inside a subtree no live node reads
-    f-off   : ∀ {Γ A Γ′ A′} {c′ : Ctx R Γ A} {c : Ctx R Γ′ A′} {E E′} → Up1 c′ c → Fr C c (owes false) E′ → Fr C c′ (owes false) E
-    f-map   : ∀ {Γ A B} {f : A → B} {c : Ctx R Γ B} {w E E′} → Fr C c (owes w) E′ → MapT f E ≈ E′ → Sound E → Fr C (inMap f c) (owes w) E
-    f-scan  : ∀ {Γ A B} {f : B → A → B} {z z₀} {c : Ctx R Γ B} {w E E′}
-            → Fr C c (owes w) E′ → Folded C f z₀ E z → Scan.ScanT f z₀ E ≈ E′ → Sound E → Fr C (inScan f z c) (owes w) E
-    f-cut   : ∀ {Γ A} {a} {c : Ctx R Γ A} {w E} → Fr C c (owes w) E → Fr C (inCut true a c) (owes w) E
-    f-take  : ∀ {Γ A} {i} {keep : A → Bool} {c : Ctx R Γ A} {w E E′}
-            → Fr C c (owes w) E′ → NoFail C keep E → TakeWhile.TakeT i keep E ≈ E′ → Sound E → Fr C (inTake i keep free c) (owes w) E
-    f-took  : ∀ {Γ A} {i} {keep : A → Bool} {o} {c : Ctx R Γ A} {w E Es E′ r}
-            → Fr C c (owes w) E′ → Failure keep Es r → Gone C r → (T i → ¬ Owes C (r ++ [ ix 0 ])) → OweAt C o r
-            → TakeWhile.TakeT i keep Es ≈ E′ → Sound Es
-            → Fr C (inTake i keep o c) (owes false) E
-    f-outer : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n qu ls} {c : Ctx R Γ B} {w E E′}
-            → Fr C c (owes w) E′
-            → Joined (scopeOf c) C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E d n qu ls
-            → JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E ≈ E′ → Sound E
-            → Fr C (inOuter op f d n qu ls c) (owes w) E
+    f-off   : ∀ {Γ A Γ′ A′} {c′ : Ctx R Γ A} {c : Ctx R Γ′ A′} {Rg Rg′ E E′} → Up1 c′ c → Fr C Rg c (owes false) E′ → Fr C Rg′ c′ (owes false) E
+    f-map   : ∀ {Γ A B} {f : A → B} {c : Ctx R Γ B} {Rg w E E′} → Fr C Rg c (owes w) E′ → MapT f E ≈ E′ → Sound Rg E → Fr C Rg (inMap f c) (owes w) E
+    f-scan  : ∀ {Γ A B} {f : B → A → B} {z z₀} {c : Ctx R Γ B} {Rg w E E′}
+            → Fr C Rg c (owes w) E′ → Folded C f z₀ E z → Scan.ScanT f z₀ E ≈ E′ → Sound Rg E → Fr C Rg (inScan f z c) (owes w) E
+    f-cut   : ∀ {Γ A} {a} {c : Ctx R Γ A} {Rg w E} → Fr C Rg c (owes w) E → Fr C Rg (inCut true a c) (owes w) E
+    f-take  : ∀ {Γ A} {i} {keep : A → Bool} {c : Ctx R Γ A} {Rg w E E′}
+            → Fr C Rg c (owes w) E′ → NoFail C keep E → TakeWhile.TakeT i keep E ≈ E′ → Sound Rg E → Fr C Rg (inTake i keep free c) (owes w) E
+    f-took  : ∀ {Γ A} {i} {keep : A → Bool} {o} {c : Ctx R Γ A} {Rg Rg′ w E Es E′ r}
+            → Fr C Rg c (owes w) E′ → Failure keep Es r → Gone C r → (T i → ¬ Owes C (r ++ [ ix 0 ])) → OweAt C o r
+            → TakeWhile.TakeT i keep Es ≈ E′ → Sound Rg Es
+            → Fr C Rg′ (inTake i keep o c) (owes false) E
+    f-outer : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n qu ls} {c : Ctx R Γ B} {Rg w E E′}
+            → Fr C Rg c (owes w) E′
+            → Joined (scopeOf c) Rg C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E d n qu ls
+            → JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E ≈ E′ → Sound Rg E
+            → Fr C Rg (inOuter op f d n qu ls c) (owes w) E
     -- the hole a begun lane, between those before it and after it, in a
     -- joiner some live node reads
     f-lanes : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {d n qu} {o : St Γ A} {pre post} {c : Ctx R Γ B}
-                {E E′ O vs₁ vs₂ ws n₁ n₂ q a b}
-            → Fr C c (owes true) E′
-            → Sync (scopeOf c) C o O
-            → Begun (scopeOf c) C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O vs₁ (reverse pre) n₁
+                {Rg E E′ O vs₁ vs₂ ws n₁ n₂ q a b}
+            → Fr C Rg c (owes true) E′
+            → Sync (scopeOf c) Rg C o O
+            → Begun (scopeOf c) Rg C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O vs₁ (reverse pre) n₁
             → O q (out a) → ¬ Owes C q → Runs (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) q
             → Hole C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) q a E b
-            → Begun (scopeOf c) C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O vs₂ post n₂
+            → Begun (scopeOf c) Rg C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O vs₂ post n₂
             → n ≡ n₁ + bump b n₂
             → Waiting C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O ws qu
             → Whole C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O (vs₁ ++ (q , a) ∷ vs₂) ws
             → OuterDone C O d
             → Ahead C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) (vs₁ ++ (q , a) ∷ vs₂) ws
             → Ends (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O
-            → JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O ≈ E′ → Sound O → (T b → Sound E)
-            → Fr C (inLanes op f d n qu o pre post c) (lane b) E
+            → JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O ≈ E′ → Sound Rg O → (T b → Sound Rg E)
+            → Fr C Rg (inLanes op f d n qu o pre post c) (lane b) E
     -- under a lane's list entry, its switch; under that, its program
-    f-lane  : ∀ {Γ A} {c : Ctx R Γ A} {b E} → Fr C c (lane b) E → Fr C (inLn b c) (lanecut b) E
-    f-lnct  : ∀ {Γ A} {a} {c : Ctx R Γ A} {b E} → Fr C c (lanecut b) E → Fr C (inCut b a c) (owes b) E
-    f-src   : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {w E E′ β}
-            → Fr C c (owes w) E′ → CS.scope k ≡ scopeOf c → T (CS.srcLive k) → T (not (CS.closed k))
-            → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) C b β
-            → Flags C k β → Frozen k ≈ E → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′ → Sound β
-            → Fr C (inSrc k b c) (owes w) E
+    f-lane  : ∀ {Γ A} {c : Ctx R Γ A} {Rg b E} → Fr C Rg c (lane b) E → Fr C Rg (inLn b c) (lanecut b) E
+    f-lnct  : ∀ {Γ A} {a} {c : Ctx R Γ A} {Rg b E} → Fr C Rg c (lanecut b) E → Fr C Rg (inCut b a c) (owes b) E
+    f-src   : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {Rg w E E′ β}
+            → Fr C Rg c (owes w) E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (not (CS.closed k))
+            → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β
+            → Flags C k β → Frozen k ≈ E → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′
+            → Fr C (Parts.Rs pt) (inSrc k b c) (owes w) E
     -- a source ended while its connect runs: nothing reads what is left
-    f-srcc  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {w E E′ β}
-            → Fr C c (owes w) E′ → CS.scope k ≡ scopeOf c → T (CS.srcLive k) → T (CS.closed k) → Spent C (Frozen k)
-            → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) C b β
-            → Flags C k β → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′ → Sound β
-            → Fr C (inSrc k b c) (owes false) E
+    f-srcc  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {Rg w E E′ β}
+            → Fr C Rg c (owes w) E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (CS.closed k)
+            → Spent C (Frozen k)
+            → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β
+            → Flags C k β → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′
+            → Fr C (Parts.Rs pt) (inSrc k b c) (owes false) E
     -- a source not yet subscribed: its program, owed at the connect's
     -- `ix 1`
-    f-srcp  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {w E E′ β}
-            → Fr C c (owes w) E′ → CS.scope k ≡ scopeOf c → T (CS.srcLive k)
+    f-srcp  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {Rg w E E′ β}
+            → Fr C Rg c (owes w) E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k)
             → CS.bodyAt k ≡ just (CS.connAt k) → Adm (binds (CS.src k) (CS.connAt k) (scopeOf c))
-            → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) C b β
-            → Flags C k β → Frozen k ≈ E → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′ → Sound β
-            → Fr C (inSrc k b c) (pnd (CS.connAt k ++ [ ix 1 ])) E
+            → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β
+            → Flags C k β → Frozen k ≈ E → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′
+            → Fr C (Parts.Rs pt) (inSrc k b c) (pnd (CS.connAt k ++ [ ix 1 ])) E
     -- a source torn down: nothing reads it
-    f-srcx  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {w E E′ β}
-            → Fr C c (owes w) E′ → CS.scope k ≡ scopeOf c → T (not (CS.srcLive k))
-            → Flags C k β → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′ → Sound β
-            → Fr C (inSrc k b c) (owes false) E
+    f-srcx  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {Rg w E E′ β}
+            → Fr C Rg c (owes w) E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (not (CS.srcLive k))
+            → Flags C k β → Connecting.ConnT (CS.connAt k) (Frozen k) β ≈ E′
+            → Fr C (Parts.Rs pt) (inSrc k b c) (owes false) E
     -- a body: owed while its source runs
-    f-body  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {w v E E′}
-            → Fr C c (owes w) E′ → CS.scope k ≡ scopeOf c → v ≡ (w ∧ CS.srcLive k)
-            → (T (CS.srcLive k) → Src (scopeOf c) C k o)
+    f-body  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {Rg w v E E′}
+            → Fr C Rg c (owes w) E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k E) → v ≡ (w ∧ CS.srcLive k)
+            → (T (CS.srcLive k) → Src (scopeOf c) (Parts.Rs pt) C k o)
             → Flags C k E
-            → Connecting.ConnT (CS.connAt k) (Frozen k) E ≈ E′ → Sound E
-            → Fr C (inBody k o c) (owes v) E
+            → Connecting.ConnT (CS.connAt k) (Frozen k) E ≈ E′
+            → Fr C (Parts.Rb pt) (inBody k o c) (owes v) E
 
   -- THE INVARIANT: settled, the hole and every frame at one cursor; a
   -- subscription owed where the cursor has not passed, its program's
@@ -437,17 +460,18 @@ module _ {R : Set} (Rt : EmissionSet R) where
   -- below and not yet seen above; or a rise in a subtree no live node
   -- reads, at any cursor, reaching nothing owed.
   data Inv : Cur → Conf R → Set₁ where
-    settled : ∀ {Γ A} {c : Ctx R Γ A} {s m p C w E} → Calm m
-            → Fr C c w E → Hold (scopeOf c) C w s E → Inv C ⟨ c , s , m , p ⟩
-    pending : ∀ {Γ A} {c : Ctx R Γ A} {o q p C w E}
-            → Fr C c (owes w) E
-            → (T w → Owes C q × Ok (Hots (full (scopeOf c))) q × Adm (scopeOf c) × pendRows (full (scopeOf c)) o q ≈ E)
+    settled : ∀ {Γ A} {c : Ctx R Γ A} {s m p C Rg w E} → Calm m
+            → Fr C Rg c w E → Hold (scopeOf c) Rg C w s E → Inv C ⟨ c , s , m , p ⟩
+    pending : ∀ {Γ A} {c : Ctx R Γ A} {o q p C Rg w E}
+            → Fr C Rg c (owes w) E
+            → (T w → Owes C q × Ok (Hots (full (scopeOf c))) q × Adm (scopeOf c) × pendRows (full (scopeOf c)) o q ≈ E
+                   × Within Rg (scopeOf c) q)
             → Inv C ⟨ c , pend o q , subscribing , p ⟩
-    flying  : ∀ {Γ A} {c : Ctx R Γ A} {s e p w E}
-            → Fr (bef p) c w E → Fly (scopeOf c) p w s E e
+    flying  : ∀ {Γ A} {c : Ctx R Γ A} {s e p Rg w E}
+            → Fr (bef p) Rg c w E → Fly (scopeOf c) Rg p w s E e
             → Inv (bef p) ⟨ c , s , rising e , p ⟩
-    adrift  : ∀ {Γ A} {c : Ctx R Γ A} {s e p C E}
-            → Fr C c (owes false) E → Inv C ⟨ c , s , rising e , p ⟩
+    adrift  : ∀ {Γ A} {c : Ctx R Γ A} {s e p C Rg E}
+            → Fr C Rg c (owes false) E → Inv C ⟨ c , s , rising e , p ⟩
 
   -- What the root owes: its entry past the cursor.
   RT : Cur → EmissionSet R
@@ -466,7 +490,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   -- at `p` is in the root's entry, and the cursor at `bef p` owes nothing
   -- before `p`.
 
-  show-top : ∀ {s e p w E} → Fr (bef p) top (owes w) E → (T w → Sync unbound (aft p) s E × E p (toEv e))
+  show-top : ∀ {s e p Rg w E} → Fr (bef p) Rg top (owes w) E → (T w → Sync unbound Rg (aft p) s E × E p (toEv e))
            → Moves (RT (bef p)) [ (p , e) ] (RT (aft p))
   show-top {e = e} {p = p} (f-top eq) h with h _
   ... | _ , row = shown ((proj₁ (to eq (row , vis e)) , vis e , ≼-refl {p}) , vis e) (λ ((_ , _ , o) , _) → o) past
@@ -528,12 +552,12 @@ module _ {R : Set} (Rt : EmissionSet R) where
     ; (adrift (f-off u-scan fr))      → adrift fr
     ; (settled () _ _) }
     where
-      after : ∀ {E} → Sound E → E p end → ∀ {q a} → E q (out a) → p ≼ q → p ≺ q
+      after : ∀ {Rg E} → Sound Rg E → E p end → ∀ {q a} → E q (out a) → p ≼ q → p ≺ q
       after sd row {q} y pq = ≼-≢ {p} {q} pq λ { refl → out≢end (Sound.fn sd y row _ _) }
         where
           out≢end : ∀ {A} {a : A} → out a ≡ end → ⊥
           out≢end ()
-      past : ∀ {z₀ E} → Sound E → E p end → Folded (bef p) f z₀ E z → Folded (aft p) f z₀ E z
+      past : ∀ {z₀ Rg E} → Sound Rg E → E p end → Folded (bef p) f z₀ E z → Folded (aft p) f z₀ E z
       past sd row (fd-none ow)        = fd-none λ y → after sd row y (ow y)
       past sd row (fd-last ac nq nx′) = fd-last ac (λ pq → nq (≺→≼ {p} pq)) λ y qk → after sd row y (nx′ y qk)
 
@@ -543,7 +567,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     unfailed : ∀ {E} → NoFail (bef p) keep E → ¬ TakeWhile.Failed i keep E p
     unfailed {E} nf (q , _ , y , nk , qp) = nf {q} y nk qp
 
-    nf-aft : ∀ {E e′} → Sound E → E p e′ → Visible e′ → (∀ {a′} → out a′ ≡ e′ → T (not (keep a′)) → ⊥)
+    nf-aft : ∀ {Rg E e′} → Sound Rg E → E p e′ → Visible e′ → (∀ {a′} → out a′ ≡ e′ → T (not (keep a′)) → ⊥)
            → NoFail (bef p) keep E → NoFail (aft p) keep E
     nf-aft sd row v ok nf {q} y nk = ≼-≢ {p} {q} (nf y nk) λ { refl → ok (Sound.fn sd y row _ v) nk }
 
@@ -634,9 +658,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
   rise-bodyx : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s e p} → CS.srcLive k ≡ false
              → SimC ⟨ inBody k o c , s , rising e , p ⟩ [] ⟨ c , connS k o s , absorbed , p ⟩
   rise-bodyx nl = keeps λ
-    { (flying (f-body fr sc _ _ fl eq sd) _) → settled c-abs fr λ _ → s-conn sc (dead nl) (dead nl) fl eq sd
+    { (flying (f-body fr sc pt _ _ fl eq) _) → settled c-abs fr λ _ → s-conn sc pt (dead nl) (dead nl) fl eq
     ; (flying (f-off u-body fr) _)        → settled c-abs fr (λ ())
-    ; (adrift (f-body fr sc _ _ fl eq sd))   → settled c-abs fr λ _ → s-conn sc (dead nl) (dead nl) fl eq sd
+    ; (adrift (f-body fr sc pt _ _ fl eq))   → settled c-abs fr λ _ → s-conn sc pt (dead nl) (dead nl) fl eq
     ; (adrift (f-off u-body fr))          → settled c-abs fr (λ ())
     ; (settled () _ _) }
     where
@@ -652,9 +676,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
            → Inv (bef (r Machine.⊕ [ last ])) ⟨ c , takeS i keep (cutAt r) s , rising cp , r Machine.⊕ [ last ] ⟩
   run-stop {r = r} (settled {w = owes _} _ fr h) = flying fr λ w → stopped (h w)
     where
-      stopped : ∀ {Γ A} {sc : Scope Γ} {i} {keep : A → Bool} {s E}
-              → Sync sc (bef (r ++ [ last ])) (takeS i keep (cpAt r) s) E
-              → Sync sc (aft (r ++ [ last ])) (takeS i keep (cutAt r) s) E × E (r ++ [ last ]) end
+      stopped : ∀ {Γ A} {sc : Scope Γ} {Rg} {i} {keep : A → Bool} {s E}
+              → Sync sc Rg (bef (r ++ [ last ])) (takeS i keep (cpAt r) s) E
+              → Sync sc Rg (aft (r ++ [ last ])) (takeS i keep (cutAt r) s) E × E (r ++ [ last ]) end
       stopped {A = A} (s-took (a , x , nk , nf) _ fz (o-cp _) eq sd) =
         s-took (a , x , nk , nf) (λ {q} lt → ≺→≼ {r} {q} (≺-trans {r} {r ++ [ last ]} {q} (≺-ext r {last} []) lt))
                (λ t lt → fz t (≺→≼ {r ++ [ last ]} {r ++ [ ix 0 ]} lt)) (o-cut (≺-irrefl {r ++ [ last ]})) eq sd
@@ -668,8 +692,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
           → Inv C ⟨ c , takeS i keep (cutAt r) s , absorbed , p ⟩ → Inv C ⟨ c , takeS i keep (overAt r) s′ , absorbed , p′ ⟩
   run-cut (settled {w = owes _} m fr h) = settled c-abs fr λ w → over (h w)
     where
-      over : ∀ {Γ A} {sc : Scope Γ} {C} {i} {keep : A → Bool} {s s′ r} {E : EmissionSet A}
-           → Sync sc C (takeS i keep (cutAt r) s) E → Sync sc C (takeS i keep (overAt r) s′) E
+      over : ∀ {Γ A} {sc : Scope Γ} {Rg} {C} {i} {keep : A → Bool} {s s′ r} {E : EmissionSet A}
+           → Sync sc Rg C (takeS i keep (cutAt r) s) E → Sync sc Rg C (takeS i keep (overAt r) s′) E
       over (s-took fl nr fz (o-cut n) eq sd) = s-took fl (λ {q} → nr {q}) fz (o-over n) eq sd
   run-cut (settled {w = lane _} _ fr (_ , _ , () , _))
   run-cut (settled {w = lanecut _} _ fr (_ , _ , () , _))
@@ -682,11 +706,11 @@ module _ {R : Set} (Rt : EmissionSet R) where
   run-att {l = true} same (settled {w = owes _} m fr h) with same _
   ... | refl = settled c-abs fr λ w → att (h w)
     where
-      att : ∀ {Γ A} {sc : Scope Γ} {C} {q} {s : St Γ A} {E} → Sync sc C (cutS true (attAt q) s) E → Sync sc C (cutS true attached s) E
+      att : ∀ {Γ A} {sc : Scope Γ} {Rg} {C} {q} {s : St Γ A} {E} → Sync sc Rg C (cutS true (attAt q) s) E → Sync sc Rg C (cutS true attached s) E
       att (s-cut sy) = s-cut sy
   run-att {l = false} same (settled {w = owes _} m fr h) = settled c-abs fr λ w → off (h w)
     where
-      off : ∀ {Γ A} {sc : Scope Γ} {C} {q} {s s′ : St Γ A} {E} → Sync sc C (cutS false (attAt q) s) E → Sync sc C (cutS false attached s′) E
+      off : ∀ {Γ A} {sc : Scope Γ} {Rg} {C} {q} {s s′ : St Γ A} {E} → Sync sc Rg C (cutS false (attAt q) s) E → Sync sc Rg C (cutS false attached s′) E
       off ()
   run-att {l = true} same (settled {w = lanecut _} m fr (_ , _ , refl , h)) with same _
   ... | refl = settled c-abs fr (_ , _ , refl , h)
