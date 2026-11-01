@@ -81,6 +81,11 @@ Due C E q e = E q e × Visible e × Owes C q
 Spent : ∀ {A} → Cur → EmissionSet A → Set
 Spent C E = ∀ {q e} → Due C E q e → ⊥
 
+-- The rows of `E`, of any kind, the cursor has passed: finitely many.
+-- What a connect's body and a joiner read before the row in flight.
+Behind : ∀ {A} → Cur → EmissionSet A → Set
+Behind C E = Σ (List Pos) λ ks → ∀ {y e} → E y e → ¬ Owes C y → y ∈ ks
+
 -- Alike in every row a reader meets.
 _≈_ : ∀ {A} → EmissionSet A → EmissionSet A → Set
 E ≈ E′ = Vis E ≃ Vis E′
@@ -150,10 +155,6 @@ JoinF exhaustᶠ          f O = Exhaust.JoinT f O
 ConnE : ∀ {X B} → Pos → EmissionSet X → EmissionSet B → EmissionSet B → Set
 ConnE r σ β E = Truncate (Connecting.ConnT r σ β) ≈ E × (∀ {y e} → β y e → Reach β y e)
 
--- A joiner's rows, its outer the ghost's.
-JoinG : ∀ {Γ A B} → Scope Γ → FlatOp → (A → Obs Timeline Γ B) → Obs Timeline Γ A × Pos → EmissionSet B
-JoinG sc op f ω = JoinF op (λ a → ⟦ f a ⟧ (full sc)) (pendRows (full sc) (proj₁ ω) (proj₂ ω))
-
 -- A joiner's entry: its rows truncated, its outer's rows the ghost's.
 JoinE : ∀ {Γ A B} → Scope Γ → FlatOp → (A → Obs Timeline Γ B) → Obs Timeline Γ A × Pos → EmissionSet A → EmissionSet B → Set₁
 JoinE sc op f ω O E = pendRows (full sc) (proj₁ ω) (proj₂ ω) ≡ O × Truncate (JoinF op (λ a → ⟦ f a ⟧ (full sc)) O) ≈ E
@@ -161,6 +162,10 @@ JoinE sc op f ω O E = pendRows (full sc) (proj₁ ω) (proj₂ ω) ≡ O × Tru
 -- A source's rows a connect reads before `p`, few.
 FewBefore : ∀ {X} → EmissionSet X → Pos → Set
 FewBefore σ p = Σ (List Pos) λ ks → ∀ {y e} → σ y e → (y ++ [ ix 0 ]) ≺ p → y ∈ ks
+
+-- Passed before a row in flight at `p`: a source's few rows a connect reads.
+few-behind : ∀ {X} {σ : EmissionSet X} {p} → Behind (bef p) σ → FewBefore σ p
+few-behind {p = p} (ks , f) = ks , λ {y} r lt → f r (λ py → py (≺-trans {y} {y ++ [ ix 0 ]} {p} (≺-ext y {ix 0} []) lt))
 
 -- A begun lane as its joiner reads it: running from where it was
 -- subscribed, its entry its lane's; or over, by its end or a later value.
@@ -349,7 +354,7 @@ data Sync where
   -- a joiner: its outer, and its bookkeeping over its policy
   s-flat : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu o ls O E}
          → JInv sc f O → Sync sc (JRo sc Rg op f O) C o O → Joined sc (JRl sc Rg op f O) C (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O d n qu ls
-         → JoinE sc op f ω O E → Sound (JRo sc Rg op f O) O
+         → JoinE sc op f ω O E → Sound (JRo sc Rg op f O) O → Behind C (JoinF op (λ a → ⟦ f a ⟧ (full sc)) O)
          → Sync sc Rg C (flatS op f ω d n qu o ls) E
   -- a connect: its body, under its binder read whole, and its source,
   -- while the source runs; torn down, its body owes nothing and nothing
@@ -380,9 +385,10 @@ data Src where
            → pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]) ≈ Frozen k → Within Rg sc (CS.connAt k ++ [ ix 1 ])
            → Owes C (CS.connAt k ++ [ ix 1 ])
            → Src sc Rg C k (pend o (CS.connAt k ++ [ ix 1 ]))
-  src-on   : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o} → T (not (CS.closed k)) → Sync sc Rg C o (Frozen k) → Src sc Rg C k o
+  src-on   : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o} → T (not (CS.closed k)) → Sync sc Rg C o (Frozen k) → Behind C (Frozen k)
+           → Src sc Rg C k o
   -- ended: nothing left to owe, whatever its subtree still holds
-  src-shut : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o} → T (CS.closed k) → Spent C (Frozen k) → Src sc Rg C k o
+  src-shut : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o} → T (CS.closed k) → Spent C (Frozen k) → Behind C (Frozen k) → Src sc Rg C k o
 
 -- No rise in flight.
 data Calm {A : Set} : Machine.Mode A → Set where
@@ -450,6 +456,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Fr C Rg c (owes w) E′ → JInv (scopeOf c) f E
             → Joined (scopeOf c) (JRl (scopeOf c) Rg op f E) C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E d n qu ls
             → JoinE (scopeOf c) op f ω E E′ → Sound (JRo (scopeOf c) Rg op f E) E
+            → Behind C (JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E)
             → Fr C (JRo (scopeOf c) Rg op f E) (inOuter op f ω d n qu ls c) (owes w) E
     -- the hole a begun lane, between those before it and after it, in a
     -- joiner some live node reads
@@ -470,6 +477,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Ends (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O
             → LanesIn (JRl (scopeOf c) Rg op f O) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O
             → JoinE (scopeOf c) op f ω O E′ → Sound (JRo (scopeOf c) Rg op f O) O → (T b → Sound (JRl (scopeOf c) Rg op f O q) E)
+            → Behind C (JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O)
             → Fr C (JRl (scopeOf c) Rg op f O q) (inLanes op f ω d n qu o pre post c) (lane b) E
     -- under a lane's list entry, its switch; under that, its program
     f-lane  : ∀ {Γ A} {c : Ctx R Γ A} {Rg b E} → Fr C Rg c (lane b) E → Fr C Rg (inLn b c) (lanecut b) E
@@ -477,14 +485,14 @@ module _ {R : Set} (Rt : EmissionSet R) where
     f-src   : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {Rg w E E′ β}
             → Fr C Rg c (owes w) E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (not (CS.closed k))
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β
-            → Flags C k β → Frozen k ≈ E → ConnE (CS.connAt k) (Frozen k) β E′
+            → Flags C k β → Frozen k ≈ E → ConnE (CS.connAt k) (Frozen k) β E′ → Behind C (Frozen k)
             → Fr C (Parts.Rs pt) (inSrc k b c) (owes w) E
     -- a source ended while its connect runs: nothing reads what is left
     f-srcc  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {Rg w E E′ β}
             → Fr C Rg c (owes w) E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (CS.closed k)
             → Spent C (Frozen k)
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β
-            → Flags C k β → ConnE (CS.connAt k) (Frozen k) β E′
+            → Flags C k β → ConnE (CS.connAt k) (Frozen k) β E′ → Behind C (Frozen k)
             → Fr C (Parts.Rs pt) (inSrc k b c) (owes false) E
     -- a source not yet subscribed: its program, owed at the connect's
     -- `ix 1`

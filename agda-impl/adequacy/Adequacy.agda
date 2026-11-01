@@ -19,7 +19,7 @@ open Machine using (load)
 open import denotation.Read using (Meets)
 open import adequacy.Rows using (Steps; conv)
 open import adequacy.Simulation using (sound)
-open import adequacy.Told using (cursor)
+open import adequacy.Simulated using (cursor)
 open import adequacy.Complete using (complete)
 
 -- The rows a reader of `o`'s emission set, subscribed at the root, meets

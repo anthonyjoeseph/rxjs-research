@@ -28,8 +28,10 @@
 -- the cursor up to that key is passed with no delivery: a GAP ROW.  The
 -- simulation lists a node's passed rows, so each must sit under a
 -- position the run has already stepped at: a position some step was at,
--- or one it extends.  A gap row under none fails; the attached ones are
--- tallied by former and kind.
+-- or one it extends.  A visible row, end or pin under none fails.  A skip
+-- row under none is a cold's batch tail or empty batch, or its image,
+-- passed by the cold's own step and tied by no `Sync`: tallied, with the
+-- attached rows, by former and kind.
 --
 -- A node is named by its path of child indices, as `quickcheck.Entry-Check`
 -- names it.  An entry cut short by a budget is skipped.  A probe for
@@ -238,6 +240,10 @@ private
   showKind′ kend     = "end"
   showKind′ (kpin _) = "pin"
 
+  isSkip : Kind → Bool
+  isSkip kskip = true
+  isSkip _     = false
+
   -- Under a position the run has stepped at.
   stepped : List Pos → Pos → Bool
   stepped tr y = anyᵇ (λ x → anyᵇ (λ s → does (x ≟ᵖ s)) tr) (prefixes y)
@@ -257,11 +263,12 @@ private
       ... | nothing = []
       ... | just rs = if live ds (Seen.path s) then concatMap (λ { (y , k) → when (inGap (Probe.cursor pr) κ y) (y , k) }) rs else []
       one : Seen → List String
-      one s = concatMap (λ { (y , k) → when (not (stepped (Probe.trail pr) y))
+      one s = concatMap (λ { (y , k) → when (not (stepped (Probe.trail pr) y) ∧ not (isSkip k))
                 ("GAP step " +++ showℕ t +++ " node " +++ showPath (Seen.path s) +++ " " +++ Seen.former s +++ " passes " +++ showRows [ y , k ]
                  +++ "under no step; cursor " +++ showCursor (Probe.cursor pr) +++ " key " +++ showKey κ) }) (rowsOf s)
       tag : Seen → List String
-      tag s = concatMap (λ { (y , k) → when (stepped (Probe.trail pr) y) (Seen.former s +++ " " +++ showKind′ k) }) (rowsOf s)
+      tag s = concatMap (λ { (y , k) → when (stepped (Probe.trail pr) y ∨ isSkip k)
+                (Seen.former s +++ " " +++ showKind′ k +++ (if stepped (Probe.trail pr) y then "" else " stepless")) }) (rowsOf s)
 
   gapAt : ℕ → Conf ℕ → Probe → List String × List String
   gapAt t ⟨ c , s , absorbed , _ ⟩ pr with search top (plug c s)
