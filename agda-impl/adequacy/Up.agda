@@ -189,7 +189,7 @@ module Past (p : Pos) where
 
     src-up : ∀ {Γ X} {sc : Scope Γ} {Rs : Rgn} {k : CS Γ X} {o}
            → Src sc Rs (bef p) k o → Sound Rs (adequacy.Rows.Frozen k) → ¬ Rs p → ¬ VHot (full sc) p → Src sc Rs (aft p) k o
-    src-up (src-pend be adm pr wn ow) ss nr nh = src-pend be adm pr wn (owes-up (off nr (wn W⁼.here)) ow)
+    src-up (src-pend nc be adm pr wn ow) ss nr nh = src-pend nc be adm pr wn (owes-up (off nr (wn W⁼.here)) ow)
     src-up (src-on nc sy)          ss nr nh = src-on nc (up sy ss nr nh)
     src-up {k = k} (src-shut cl sp) ss nr nh = src-shut cl (spent-up {E = adequacy.Rows.Frozen k} sp)
 
@@ -219,7 +219,7 @@ module Past (p : Pos) where
 
 -- Where a connect owes its own end is no part of what it owes.
 src-owe : ∀ {Γ X} {sc : Scope Γ} {Rs : Rgn} {C} {k : CS Γ X} {o x} → Src sc Rs C k o → Src sc Rs C (record k { owedAt = x }) o
-src-owe (src-pend be adm pr wn ow) = src-pend be adm pr wn ow
+src-owe (src-pend nc be adm pr wn ow) = src-pend nc be adm pr wn ow
 src-owe (src-on nc sy)          = src-on nc sy
 src-owe (src-shut cl sp)        = src-shut cl sp
 
@@ -302,6 +302,10 @@ due-nr {p = p} nr = (λ (y , v , o) → y , v , Past.owes-up p (λ { refl → nr
 -- Alike rows, alike at `p`.
 nr-≈ : ∀ {A} {E E′ : EmissionSet A} {p} → E ≈ E′ → NoRow E p → NoRow E′ p
 nr-≈ eq nr y v = let (y′ , v′) = from eq (y , v) in nr y′ v′
+
+-- Truncated, still none at `p`.
+nr-tr : ∀ {A} {E : EmissionSet A} {p} → NoRow E p → NoRow (Truncate E) p
+nr-tr nr (y , _) v = nr y v
 
 nr-off : ∀ {A} {E : EmissionSet A} {p} → NoRow E p → Past.Off p E
 nr-off nr y v refl = nr y v
@@ -401,7 +405,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     in f-take fr′ (λ y nk → Past.in-off p (nr-off {E = E} nr) y _ (nf y nk)) m sd , nt
   fr-up {p = p} l-owes (f-outer {op = op} {f = f} {c = c} {Rg = Rg₀} {E = E} fr ji jn m so) rp nr nh =
     let (fr′ , nt) = fr-up l-owes fr (proj₁ rp)
-                       (nr-≈ m (join-nr op (λ a → ⟦ f a ⟧ (full (scopeOf c))) (joined-li jn) (λ y → nr y _) (λ _ _ _ → nl))) nh
+                       (nr-≈ (proj₂ m) (nr-tr (join-nr op (λ a → ⟦ f a ⟧ (full (scopeOf c))) (joined-li jn) (λ y → nr y _) (λ _ _ _ → nl)))) nh
     in f-outer fr′ ji (Past.joined-up p (nr-off nr) nl nh jn) m so , nt
     where
       nl : ∀ {q} → ¬ JRl (scopeOf c) Rg₀ op f E q p
@@ -409,7 +413,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   fr-up {p = p} l-lane (f-lanes {op = op} {f = f} {c = c} {Rg = Rg₀} {O = O} {vs₁ = vs₁} {vs₂ = vs₂} {q = q₀} {a = a₀}
                           fr ji sy lf y₀ nq ru (h-live st ns le) rt cnt wt wh od ah ao en li m so sd) rp nr nh =
     let (fr′ , nt) = fr-up l-owes fr (proj₁ rp)
-                       (nr-≈ m (join-nr op (λ a → ⟦ f a ⟧ (full (scopeOf c))) li (λ y → no (Sound.rg so y _)) (λ y ln v _ → hole y ln v))) nh
+                       (nr-≈ (proj₂ m) (nr-tr (join-nr op (λ a → ⟦ f a ⟧ (full (scopeOf c))) li (λ y → no (Sound.rg so y _)) (λ y ln v _ → hole y ln v)))) nh
     in f-lanes fr′ ji (up sy so no nh) (begun-up nb₁ nh lf) y₀ (nm nq) ru (h-live st (nm ns) le) (begun-up nb₂ nh rt) cnt
                (wait-up ah′ wt) (whole-up wh) (od-up od) ah′ ao en li m so sd , nt
     where
@@ -528,7 +532,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
      , moves
   rise-src-nx refl (flying (f-src {w = false} fr _ _ _ _ _ _ _ _) _ _) = _ , settled c-abs fr (λ ()) , silent ≃-refl
   rise-src-nx refl (flying (f-srcc _ _ _ _ cl _ _ _ _) cl′ _)          = ⊥-elim (or-shut cl cl′)
-  rise-src-nx refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _) _ (_ , _ , ()))
+  rise-src-nx refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _) _ (_ , _ , ()))
   rise-src-nx refl (flying (f-srcx fr sc pt nl fl eq) _ _)             = _ , settled c-abs fr (λ _ → s-conn sc pt (torn nl) (torn nl) fl eq) , silent ≃-refl
   rise-src-nx refl (flying (f-off u-src fr) _ _)                       = _ , settled c-abs fr (λ ()) , silent ≃-refl
   rise-src-nx refl (adrift (f-src fr _ _ _ _ _ _ _ _) _)               = _ , settled c-abs fr (λ ()) , silent ≃-refl
@@ -547,7 +551,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
      , moves
   rise-src-cp refl (flying (f-src {w = false} fr _ _ _ _ _ _ _ _) _ _) = _ , settled c-abs fr (λ ()) , silent ≃-refl
   rise-src-cp refl (flying (f-srcc _ _ _ _ cl _ _ _ _) cl′ _)          = ⊥-elim (or-shut cl cl′)
-  rise-src-cp refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _) _ (_ , _ , ()))
+  rise-src-cp refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _) _ (_ , _ , ()))
   rise-src-cp {k = k} {b} {c} {s} {p} refl (flying (f-srcx fr sc pt nl fl eq) _ _) = _ , subst (λ k″ → Inv Rt _ ⟨ c , connS k″ s (feed (here refl) p cp b) , absorbed , p ⟩) (sym (shut-torn nl)) (settled c-abs fr (λ _ → s-conn sc pt (torn nl) (torn nl) fl eq)) , silent ≃-refl
   rise-src-cp refl (flying (f-off u-src fr) _ _)                       = _ , settled c-abs fr (λ ()) , silent ≃-refl
   rise-src-cp refl (adrift (f-src fr _ _ _ _ _ _ _ _) _)               = _ , settled c-abs fr (λ ()) , silent ≃-refl

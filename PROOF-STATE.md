@@ -16,13 +16,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE TRUNCATED COMPOSITE
 
-A joiner's frames still read `JoinF` whole, refuted over the infinite
-synchronous `ones`; the connect's now read `ConnE`, its body's rise
-taking few source rows before it from the run's history. Open: the
-joiner alike, its outer program pinned; whether a run's history bounds
-those rows. Settled when the restated entries typecheck.
+A connect's and a joiner's frames read their rows truncated (`ConnE`,
+`JoinE`, the joiner's outer pinned to its ghost), so a rise into either
+needs few rows before it, which no state shows. Open: whether a run's
+history bounds them. Settled when each history leaf is a body.
 
-Members: `sub-conn`, `sub-flat`, `few-body`.
+Members: `few-body`, `few-outer`, `few-lane`.
 
 #### THE CONNECT STEPPED
 
@@ -32,7 +31,8 @@ whether every entry lands a region apart from its siblings' and clear of
 its scope's hots, so the rest moves past `p`. Settled when each is a body.
 
 Members: `sub-join`, `sub-joined`, `run-con`, `run-join-nx`,
-`run-join-cp`, `rise-take-failᵢ`, `feed-up`.
+`run-join-cp`, `rise-take-failᵢ`, `feed-up`, `conn-parts`, `flat-sound`,
+`flat-within`.
 
 #### THE JOINER STEPPED
 
@@ -80,7 +80,8 @@ Members: `sub-scan`, `sub-take`.
 Believed: a subscription's entry is its program's meaning there, and an
 of's next delivers its next row. Settled when each is a body.
 
-Members: `sub-empty`, `sub-of`, `sub-map`, `sub-defer`, `run-of-nx`, `run-of-end`.
+Members: `sub-empty`, `sub-of`, `sub-map`, `sub-defer`, `run-of-nx`, `run-of-end`,
+`flat-jinv`, `flat-joined`, `conn-flags`, `conn-ok`.
 
 ## Tier 1 — the simultaneous spec
 
