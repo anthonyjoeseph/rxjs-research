@@ -9,7 +9,7 @@
 -- up to the least key: a part's past grows by finitely many rows.
 module adequacy.Few where
 
-open import Data.Bool using (Bool; T; not)
+open import Data.Bool using (Bool; T)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_; map)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -17,20 +17,20 @@ open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; �
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (lookup)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
+open import Data.Sum using (inj₁; inj₂; [_,_]′)
 open import Data.Unit using (tt)
 open import Data.Maybe using (just; nothing)
 open import Function using (Equivalence)
 open import Data.Bool.Properties using (T-≡)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
+open import Relation.Binary.PropositionalEquality using (refl; subst)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Pos; Timeline; ix; last; sub; inside; ofᴱ; <ᵖ-split; <ᵖ-step)
-open import denotation.EmissionSet using (EmissionSet; out; end; pin; _≺_; _≼_; Den; hot; coldAt; DenEnv; ⟦_⟧; Ended; enter;
-  shown; heard; ended; late; InE; MapT; map-out; map-end; map-skip; map-pin;
-  module Joining; module Scan; module TakeWhile; module Connecting; module Bounded; module Switch)
-open import denotation.Laws.Modulus using (≼-trans; ≼-≺-≺; ≺-trans; ≺-ext; ≺-absurd; ≼-antisym; ≼-false; ≼-or-≻)
+open import denotation.Events using (Pos; Timeline; ix; last; sub; ofᴱ; <ᵖ-split; <ᵖ-step)
+open import denotation.EmissionSet using (EmissionSet; out; end; _≺_; _≼_; Den; hot; coldAt; DenEnv; ⟦_⟧; Ended; enter; shown; heard;
+  ended; late; InE; MapT; map-out; map-end; map-skip; map-pin; module Joining; module Scan;
+  module TakeWhile; module Connecting; module Bounded; module Switch)
+open import denotation.Laws.Modulus using (≼-≺-≺; ≺-trans; ≺-ext; ≺-absurd; ≼-antisym; ≼-false; ≼-or-≻)
 open import operation.Key using (at)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Scope; unbound; binds; CS; coldS; ofS; takeS; flatS; connS)

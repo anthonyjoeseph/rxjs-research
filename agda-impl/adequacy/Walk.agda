@@ -20,7 +20,7 @@ open import denotation.EmissionSet using (EmissionSet; out)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; absorbed; Scope; unbound; binds; CS; scopeOf; plug; lnS; cutS; mapS; scanS; takeS; flatS; connS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (_≃_; _⇄_; ≃-refl; ≃-sym; ≃-trans)
+open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans)
 open import adequacy.Cursor using (Cur; Rgn; notT; Owes; Due; Spent; _≈_; alike; ≈-refl; ≈-sym; ≈-trans; fin-≈; tail-≈; Pol; Runs; Hole; LaneSt; l-live; l-dead; Begun; none; more; bump;
   joined; Sync; Sound; src-pend; src-on; src-shut; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took;
   s-flat; s-conn; s-join; s-joinx; Need; owes; lane; lanecut; pnd; Hold; u-map; u-scan; u-cut;
