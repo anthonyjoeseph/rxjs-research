@@ -35,7 +35,7 @@ open Machine using (St; Ctx; Conf; Scope; binds; scopeOf; ⟨_,_,_,_⟩; subscri
                     renaming (Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (pendRows; full; ≃-refl; Vis; _≃_; _⇄_; silent; Moves; this)
 open _≃_
-open import adequacy.Cursor using (Cur; Rgn; JoinE; Parts; Flags; src-pend; u-body; JInv; Joined; JRl; JRo;
+open import adequacy.Cursor using (Cur; ≈-refl; Rgn; JoinE; Parts; Flags; src-pend; u-body; JInv; Joined; JRl; JRo;
   polF; Sound; Within; Adm; u-cut; u-outer; bef; Spent; Due; Sync; _≈_; c-abs; c-sub; Inv;
   settled; pending; adrift; f-top; RT; SimC; keeps; Owes; Fr; Hold; Need; owes; lane; lanecut;
   pnd; s-of; s-join; s-joinx; s-took; f-off; f-map; f-scan; f-cut; f-take; f-took; f-outer;
@@ -505,7 +505,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
     let (ow , ok , ad , eq , wi) = h tt
         (pt , wb , ws) = conn-parts {s = s} {b = b} ok ad wi
         ow₁ = owes-≼ C {q} {q ⊕ [ ix 1 ]} ow (≺→≼ {q} {q ⊕ [ ix 1 ]} (≺-ext q []))
-    in pending (f-body fr refl pt refl (λ _ → src-pend tt refl (ok , ad) ≃-refl ws ow₁) (conn-flags {s = s} {b = b} ow)
+    in pending (f-body fr refl pt refl (λ _ → src-pend tt refl (ok , ad) ≈-refl ws ow₁) (conn-flags {s = s} {b = b} ow)
                  (eq , entered-reach (⟦ b ⟧ (full (binds s q (scopeOf c)))) (q ⊕ [ ix 0 ])))
          λ _ → owes-≼ C {q} {q ⊕ [ ix 0 ]} ow (≺→≼ {q} {q ⊕ [ ix 0 ]} (≺-ext q [])) , conn-ok {s = s} ok ad , (ok , ad) , ≃-refl , wb
 
