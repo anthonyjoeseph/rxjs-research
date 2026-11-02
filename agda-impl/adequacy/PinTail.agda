@@ -35,7 +35,7 @@ open import denotation.Laws.BoundedInv using (module BoundedI)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Scope; unbound; binds; CS; takeS)
 open import adequacy.Rows using (full; Frozen)
-open import adequacy.Cursor using (Cur; bef; aft; Owes; Beneath; Pts; _∪ᵖ_; Burst; TailP; tailp; Sync; Src; Sound; NoFail; Pol;
+open import adequacy.Cursor using (Cur; bef; aft; Owes; Beneath; Pts; _∪ᵖ_; Burst; Held; held-dn; TailP; tailp; Sync; Src; Sound; NoFail; Pol;
   Lane; Runs; Start; Kept; polF; JoinF; JInv; h-live; h-end; h-kill; LaneSt; l-live; l-dead;
   Begun; none; more; Parts; joined; src-pend; src-on; src-shut; Torn; by; husk-of; src-husk;
   begun-husk; lane-husk; voc; cov; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took;
@@ -100,18 +100,12 @@ hot-nopin unbound        ()
 hot-nopin (binds o p sc) (here refl) (shown _ () _ , _)
 hot-nopin (binds o p sc) (there x)   e = hot-nopin sc x e
 
--- A connect's source row, at its first effect, that the connect shows as
--- a pin: inside its subscription, or a pin of a connect passed.
-Held : ∀ {Γ X} → Cur → CS Γ X → Pos → Ev X → Set
-Held C k k′ e = T (inside (CS.connAt k ++ [ ix 1 ]) k′) ⊎ Σ Pos λ p′ → e ≡ pin p′ × ¬ Owes C p′
+-- In its burst.
+in-burst : ∀ {Γ X} {C} {k : CS Γ X} {k′ e} → Frozen k k′ e → Held C k k′ e → Burst C k (ix0 k′)
+in-burst x h = _ , (_ , x , h) , refl
 
 SrcPT : ∀ {Γ X} → Cur → CS Γ X → Pts → Set
 SrcPT C k P = Σ (List Pos) λ ks → ∀ {k′ e} → Frozen k k′ e → Held C k k′ e → Owes C (ix0 k′) → P (ix0 k′) ⊎ ix0 k′ ∈ ks
-
--- In its burst.
-in-burst : ∀ {Γ X} {C} {k : CS Γ X} {k′ e} → Frozen k k′ e → Held C k k′ e → Burst k (ix0 k′)
-in-burst x (inj₁ i)              = _ , (_ , x , inj₁ i) , refl
-in-burst x (inj₂ (_ , refl , _)) = _ , (_ , x , inj₂ (λ ())) , refl
 
 mutual
   pin-tail : ∀ {Γ} {sc : Scope Γ} {Rg C A} {s : St Γ A} {E} (sy : Sync sc Rg C s E) → PinTail C E (proj₁ (husk-of sy))
@@ -157,7 +151,7 @@ mutual
   -- A source's: a burst begun before the cursor runs on in its isle; an
   -- attached one's is finitely many, and so are the rows the cursor passed.
   src-pt : ∀ {Γ X} {Rg C} {k : CS Γ X} {o} (sw : Src (CS.scope k) Rg C k o) (ss : Sound Rg (Frozen k)) → SrcPT C k (proj₁ (src-husk refl sw ss))
-  src-pt {C = C} {k = k} (src-pend _ _ _ _ _ _ _ _) _ = [] , λ x h _ → inj₁ (in-burst {C = C} {k = k} x h)
+  src-pt {C = C} {k = k} (src-pend _ _ _ _ _ _ _ ow) _ = [] , λ x h _ → inj₁ (in-burst {C = bef (CS.connAt k ++ [ ix 1 ])} {k = k} x (held-dn {C = C} {C′ = bef (CS.connAt k ++ [ ix 1 ])} {k = k} (λ {y} q → owes-≼ C ow q) h))
   src-pt {C = C} {k = k} (src-on nc sy bh sd af _) ss =
     by-elim (λ h → SrcPT C k (proj₁ h)) (CS.srcAtt k) _ _
       (λ t → let (ka , fa) = af t ; (ptl kp fp) = pin-tail sy ; (kh , fh) = bh in

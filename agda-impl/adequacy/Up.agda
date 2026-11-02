@@ -35,7 +35,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; binds; CS; scopeOf; con
 open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans; ≃-refl; ≼-≢; full; Frozen; pendRows; Moves; silent; toEv)
 open _≃_
 open import adequacy.Walk using (sync-≈)
-open import adequacy.Cursor using (Cur; bef; aft; Behind; Fin; Tail; fin-dn; tail-dn; alike; ≈-sym; FewBefore; ConnE; Need; owes; dead; lane; lanecut; pnd; _≈_; c-abs; Pol; Ahead; Whole; OuterDone; Owes; Due; Spent; Unfed; Rgn; Sound; vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none; fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; OweAt; o-cp; o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Fr; Waiting; Lane; JRl; JRo; JInv; Asc; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; polF; JoinF; LanesIn; NoFail; TailP; tailp-dn; Subd; SubdAt; subd; Torn; Unread; un-dead; un-torn; notT; by; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; sh-pend; husk-of; ⊑-trans; ∪-⊑; ⊑-refl; under-⊑; NoIsle; NoIsleL; Settles; sync-pend)
+open import adequacy.Cursor using (Cur; bef; aft; Behind; Fin; Tail; fin-dn; tail-dn; alike; ≈-sym; FewBefore; ConnE; Need; owes; dead; lane; lanecut; pnd; _≈_; c-abs; Pol; Ahead; Whole; OuterDone; Owes; Due; Spent; Unfed; Rgn; Sound; vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none; fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; OweAt; o-cp; o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Fr; Waiting; Lane; JRl; JRo; JInv; Asc; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; polF; JoinF; LanesIn; NoFail; TailP; tailp-dn; Subd; SubdAt; subd; Torn; Unread; un-dead; un-torn; notT; by; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; sh-pend; husk-of; ⊑-trans; ∪-⊑; ⊑-refl; under-⊑; NoIsle; NoIsleL; Settles; sync-pend; burst-dn)
 open import adequacy.Cursor.Rise using (Inv; RT; settled; flying; adrift; SimC; keeps; unread-at)
 open import adequacy.Bound using (join-row; owes?; few-src)
 open import adequacy.Regions using (lane-sole)
@@ -548,8 +548,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
       nhc = subst (λ x → ¬ VHot (full x) p) sc (λ h → nh (inj₂ h))
       nr′ : NoRow E′ p
       nr′ y v = let (cy , v′) = from (alike (proj₁ eq)) (y , v) in nr (conn-vis cy v′) v′
-  fr-up {Cr = Cr} {p = p} (f-isle u hb le na nc bh sd ss ao ni) _ _ _ _ =
-    Cr , f-isle u hb le na nc (Past.behind-up p bh) (Past.subd-up p sd) ss ao ni , silent ≃-refl
+  fr-up {Cr = Cr} {p = p} (f-isle {k = k} u hb le na nc bh sd ss ao ni) _ _ _ _ =
+    Cr , f-isle u hb (burst-dn {C = bef p} {C′ = aft p} {k = k} (λ {y} → Past.dn p {y}) le) na nc (Past.behind-up p bh) (Past.subd-up p sd) ss ao ni , silent ≃-refl
   fr-up (f-took _ _ _ _ _ _ _ _) ()
   fr-up (f-srcc _ _ _ _ _ _ _ _ _ _ _ _) ()
   fr-up (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
@@ -645,8 +645,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
                                               (λ nl → ⊥-elim (notT _ nl lv)) (flags-on nc (λ ()) fl) eq)
      , moves
   -- an isle's source runs on, its body read by none
-  rise-src-nx {a = a} {p = p} refl (flying (f-isle u hb le na nc bh sd ss ao ni) _ (sy , _)) =
-    _ , _ , unread-at Rt u (sh-isle na nc sy (Past.behind-up p bh) (Past.subd-up p sd) ss ao) (feed-husk {i = here refl} {p = p} {e = nx a} hb ni) le
+  rise-src-nx {k = k} {a = a} {p = p} refl (flying (f-isle u hb le na nc bh sd ss ao ni) _ (sy , _)) =
+    _ , _ , unread-at Rt u (sh-isle na nc sy (Past.behind-up p bh) (Past.subd-up p sd) ss ao) (feed-husk {i = here refl} {p = p} {e = nx a} hb ni) (burst-dn {C = bef p} {C′ = aft p} {k = k} (λ {y} → Past.dn p {y}) le)
     , silent ≃-refl
   rise-src-nx refl (flying (f-srcc _ _ _ _ _ _ _ _ _ _ _ _) _ ())
   rise-src-nx refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
@@ -678,8 +678,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
       (λ lt → _ , _ , unread-at Rt (unread-live Rt lt u)
                         (sh-islec na tt (λ (y , v , py) → Sound.ends ss row y v py) (shut-tail {k = k} sy ss row) (proj₂ (husk-of sy))
                                   (Past.behind-up p bh) (Past.subd-up p sd))
-                        fed le , silent ≃-refl)
-      (λ _ → _ , _ , unread-at Rt u (sh-isle na nc sy (Past.behind-up p bh) (Past.subd-up p sd) ss ao) fed le , silent ≃-refl)
+                        fed (burst-dn {C = bef p} {C′ = aft p} {k = k} (λ {y} → Past.dn p {y}) le) , silent ≃-refl)
+      (λ _ → _ , _ , unread-at Rt u (sh-isle na nc sy (Past.behind-up p bh) (Past.subd-up p sd) ss ao) fed (burst-dn {C = bef p} {C′ = aft p} {k = k} (λ {y} → Past.dn p {y}) le) , silent ≃-refl)
     where fed = feed-husk {i = here refl} {p = p} {e = cp} hb ni
   rise-src-cp refl (flying (f-srcc _ _ _ _ _ _ _ _ _ _ _ _) _ ())
   rise-src-cp refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())

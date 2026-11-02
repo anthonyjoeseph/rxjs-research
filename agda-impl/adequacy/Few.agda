@@ -248,7 +248,7 @@ before : ∀ {A} {C p} {E : EmissionSet A} → Behind C E → Lag C p E → Σ (
 before {C = C} (ks , f) (lag ls g) = ks ++ ls , λ {y} r yp → [ (λ o → ∈-++⁺ʳ ks (g r o yp)) , (λ no → ∈-++⁺ˡ (f r no)) ]′ (owes? C y)
 
 -- A burst's first effects before `p`: of its source's rows before `p`.
-burst-plag : ∀ {Γ X} {k : CS Γ X} {p} → Σ (List Pos) (λ ks → ∀ {y e} → Frozen k y e → y ≺ p → y ∈ ks) → PLag p (Burst k)
+burst-plag : ∀ {Γ X} {C} {k : CS Γ X} {p} → Σ (List Pos) (λ ks → ∀ {y e} → Frozen k y e → y ≺ p → y ∈ ks) → PLag p (Burst C k)
 burst-plag (ks , f) = map ix0 ks , λ { (k′ , (_ , x , _) , refl) yp → ∈-map⁺ ix0 (f x (below k′ yp)) }
 
 -- A scope's binders read at a cursor past every hot row before `p`.
@@ -321,8 +321,8 @@ mutual
     ⊥-elim (bl ba (≺-trans {CS.connAt k ++ [ ix 1 ]} {k′} {p}
                      (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok) x) (below k′ yp))) }
   srch-f {k = k} {p = p} (sh-isle {Ci = Ci} na nc sy bh sd ss ao) lo bl al =
-    let ie = subd-env {k = k} sd (att-slot {k = k} {p = p} ao bl al) in burst-plag {k = k} (before {C = Ci} {E = Frozen k} bh (few sy (proj₁ ie) (proj₂ ie) lo))
-  srch-f {k = k} (sh-islec {Ci = Ci} na cl sp tp hk bh sd) lo _ _ = burst-plag {k = k} (before {C = Ci} {E = Frozen k} bh (tailp-lag {C = Ci} tp (husk-f hk lo)))
+    let ie = subd-env {k = k} sd (att-slot {k = k} {p = p} ao bl al) in burst-plag {C = Ci} {k = k} (before {C = Ci} {E = Frozen k} bh (few sy (proj₁ ie) (proj₂ ie) lo))
+  srch-f {k = k} (sh-islec {Ci = Ci} na cl sp tp hk bh sd) lo _ _ = burst-plag {C = Ci} {k = k} (before {C = Ci} {E = Frozen k} bh (tailp-lag {C = Ci} tp (husk-f hk lo)))
 
   few : ∀ {Γ} {sc : Scope Γ} {Rg} {C A} {s : St Γ A} {E p} → Sync sc Rg C s E → Env (full sc) C p → EnvL (full sc) C p → LoP s p
       → Lag C p E
