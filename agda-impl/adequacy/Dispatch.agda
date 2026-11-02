@@ -507,7 +507,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
         ow₁ = owes-≼ C {q} {q ⊕ [ ix 1 ]} ow (≺→≼ {q} {q ⊕ [ ix 1 ]} (≺-ext q []))
     in pending (f-body fr refl pt refl (λ _ → src-pend tt refl (ok , ad) ≈-refl ws ow₁) (conn-flags {s = s} {b = b} ow)
                  (eq , entered-reach (⟦ b ⟧ (full (binds s q (scopeOf c)))) (q ⊕ [ ix 0 ])))
-         λ _ → owes-≼ C {q} {q ⊕ [ ix 0 ]} ow (≺→≼ {q} {q ⊕ [ ix 0 ]} (≺-ext q [])) , conn-ok {s = s} ok ad , (ok , ad) , ≃-refl , wb
+         λ _ → owes-≼ C {q} {q ⊕ [ ix 0 ]} ow (≺→≼ {q} {q ⊕ [ ix 0 ]} (≺-ext q [])) , conn-ok {s = s} ok ad , (ok , ad) , ≈-refl , wb
 
   sub-flat : ∀ {C Γ A B} {c : Ctx R Γ B} {op} {f : A → Obs Timeline Γ B} {s q p}
            → Inv Rt C ⟨ c , pend (flatMap op f s) q , subscribing , p ⟩
@@ -519,7 +519,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
     in pending (f-cut (f-outer fr (flat-jinv {f = f} {s = s} ok ad) (flat-joined {op = op} {f = f} {s = s} ow ok ad)
                  (flat-entry (scopeOf c) op f s q eq) (flat-sound {op = op} {f = f} {s = s} ok ad wi)
                  (behind-past C ow (join-past (scopeOf c) op f s ad ok))))
-         λ _ → ow , ok , ad , ≃-refl , flat-within {op = op} {f = f} {s = s} ok wi
+         λ _ → ow , ok , ad , ≈-refl , flat-within {op = op} {f = f} {s = s} ok wi
 
   ----------------------------------------------------------------------
   -- THE SEARCH: the tree zipped up, the cursor moved over the whole tree,
