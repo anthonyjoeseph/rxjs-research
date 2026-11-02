@@ -75,7 +75,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
               → SrcH (scopeOf c) (cs cl sl sa (just p) as ow cx ea sr sc) (pend o₀ q) Ps
               → Husk (binds sr cx sc) b Qb → P ⊑ (Ps ∪ᵖ Qb) → NoIsle b
               → Ran Cr ⟨ inSrc (cs cl sl sa nothing (just (p ++ [ ix 1 ])) ow cx ea sr sc) b c , pend o₀ q , subscribing , p ++ [ ix 1 ] ⟩
-  unread-body {Cr} {C} {cl = cl} {sl} {sa} {p} {as} {ow} {cx} {ea} {sr} {sc} un (sh-pend na nc refl scp (ok , adm) pe wn ss) hb le nb =
+  unread-body {Cr} {C} {cl = cl} {sl} {sa} {p} {as} {ow} {cx} {ea} {sr} {sc} un (sh-pend na nc refl _ scp (ok , adm) pe wn ss) hb le nb =
     Cr , bef (cx ++ [ ix 1 ]) ,
     pending (f-isle un hb le na nc (behind-pend {C = bef (cx ++ [ ix 1 ])} {k = cs cl sl sa nothing (just (p ++ [ ix 1 ])) ow cx ea sr sc} scp (ok , adm) (≼-refl {cx ++ [ ix 1 ]})) (subd (λ o → o) ok) ss (inj₁ refl) nb)
             (≼-refl {cx ++ [ ix 1 ]} , ok-step cx ok , adm , pe , wn) ,
@@ -97,11 +97,11 @@ module _ {R : Set} (Rt : EmissionSet R) where
   ... | src-on _ sy′ _ _ _ _ = ⊥-elim (sync-pend tt sy′)
   ... | src-shut cl′ sp tp hk bh sd =
     _ , _ , settled {Rg = nowhere} {E = none′} c-sub (f-srcc fr scp (re-parts refl pt) tt cl′ sp tp bh sd (bs tt) (re-body fl) eq) (_ , hk , ⊑-refl) , silent ≃-refl
-  ... | src-pend _ nc₀ refl _ _ _ ow with fr-shift Rt fr sy ow lo
+  ... | src-pend _ nc₀ refl _ _ _ _ ow with fr-shift Rt fr sy ow lo
   ...   | Cr′ , fr′ , s-conn scp′ pt′ bs′ ss′ _ fl′ eq′ , d with ss′ tt
   ...     | src-on _ sy′ _ _ _ _ = ⊥-elim (sync-pend tt sy′)
   ...     | src-shut cl′ _ _ _ _ _ = ⊥-elim (notT _ nc₀ cl′)
-  ...     | src-pend {k = k} na nc refl (ok , adm) pe wn _ =
+  ...     | src-pend {k = k} na nc refl _ (ok , adm) pe wn _ =
     Cr′ , bef (cx ++ [ ix 1 ]) ,
     pending (f-src fr′ scp′ (re-parts refl pt′) tt nc (bs′ tt) (re-body fl′) ≈-refl eq′
                    (behind-pend {C = bef (cx ++ [ ix 1 ])} {k = k} scp′ (ok , adm) (≼-refl {cx ++ [ ix 1 ]})) (subd (λ o → o) ok)

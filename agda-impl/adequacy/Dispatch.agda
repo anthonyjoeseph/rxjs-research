@@ -409,11 +409,11 @@ module Over {R : Set} (Rt : EmissionSet R) where
   -- A pending source, read as subscribing.
   srcp : ∀ {Cr C Γ A} {c : Ctx R Γ A} {o q Rg N E} → Fr Rt Cr C Rg c N E → N ≡ pnd q
        → pendRows (full (scopeOf c)) o q ≈ E → Within Rg (scopeOf c) q → PendV Cr C c o q
-  srcp {C = C} (f-srcp {k = k} fr sc pt lv nc na ba (ok , adm) bs fl fe eq ow sd nb) refl pe wn =
-    inj₁ (_ , _ , f-src fr sc pt lv nc bs fl fe eq (behind-pend {C = C} {k = k} sc (ok , adm) ow) sd (λ t → ⊥-elim (notT _ na t)) (λ _ → inj₂ ba) nb , ow , ok-step (CS.connAt k) ok , adm , pe , wn)
-  srcp (f-islep {k = k} u hb le na nc ba sc (ok , adm) ss nb) refl pe wn =
+  srcp {C = C} (f-srcp {k = k} fr sc pt lv nc na ba an (ok , adm) bs fl fe eq ow sd nb) refl pe wn =
+    inj₁ (_ , _ , f-src fr sc pt lv nc bs fl fe eq (behind-pend {C = C} {k = k} sc (ok , adm) ow) sd (λ t → ⊥-elim (notT _ na t)) (λ _ → inj₂ (ba , an)) nb , ow , ok-step (CS.connAt k) ok , adm , pe , wn)
+  srcp (f-islep {k = k} u hb le na nc ba an sc (ok , adm) ss nb) refl pe wn =
     inj₁ (_ , _ , f-isle u hb le na nc (behind-pend {C = bef (CS.connAt k ++ [ ix 1 ])} {k = k} sc (ok , adm) (≼-refl {CS.connAt k ++ [ ix 1 ]}))
-                         (subd (λ o → o) ok) ss (inj₂ ba) nb
+                         (subd (λ o → o) ok) ss (inj₂ (ba , an)) nb
          , ≼-refl {CS.connAt k ++ [ ix 1 ]} , ok-step (CS.connAt k) ok , adm , pe , wn)
   srcp (f-top _)                                                ()   _ _
   srcp (f-map _ _ _)                                            ()   _ _
@@ -466,7 +466,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   ... | inj₁ (Rg , _ , fr , ow , ok , ad , eq , wi) =
     let (pt , wb , ws) = conn-parts {s = s} {b = b} ok ad wi
         ow₁ = owes-≼ C {q} {q ⊕ [ ix 1 ]} ow (≺→≼ {q} {q ⊕ [ ix 1 ]} (≺-ext q []))
-    in pending (f-body fr refl pt tt (src-pend tt tt refl (ok , ad) ≈-refl ws ow₁) (conn-flags {s = s} {b = b} ow)
+    in pending (f-body fr refl pt tt (src-pend tt tt refl refl (ok , ad) ≈-refl ws ow₁) (conn-flags {s = s} {b = b} ow)
                  (eq , entered-reach (⟦ b ⟧ (full (binds s q (scopeOf c)))) (q ⊕ [ ix 0 ])))
          (owes-≼ C {q} {q ⊕ [ ix 0 ]} ow (≺→≼ {q} {q ⊕ [ ix 0 ]} (≺-ext q [])) , conn-ok {s = s} ok ad , (ok , ad) , ≈-refl , wb)
 
@@ -557,7 +557,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   closed-off (f-lnct {b = false} fr)                             _ = tt
   closed-off (f-src {k = k} fr _ _ _ nc _ _ _ _ _ _ _ _ _)       t = closed-off fr (and-right (CS.srcAtt k) (or-right (CS.closed k) nc t))
   closed-off (f-srcc _ _ _ _ _ _ _ _ _ _ _ _)                    _ = tt
-  closed-off (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)                _ = tt
+  closed-off (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)                _ = tt
   closed-off (f-body fr _ _ _ _ _ _)                             t = closed-off fr t
   closed-off (d-map _)                                           _ = tt
   closed-off (d-scan _)                                          _ = tt
@@ -570,7 +570,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   closed-off (d-body _ _ _)                                      _ = tt
   closed-off (f-isle {k = k} _ _ _ na nc _ _ _ _ _)              t = ⊥-elim (notT _ na (and-left (CS.srcAtt k) (or-right (CS.closed k) nc t)))
   closed-off (f-islec _ _ _ _ _ _ _ _ _)                         _ = tt
-  closed-off (f-islep {k = k} _ _ _ na nc _ _ _ _ _)            t = ⊥-elim (notT _ na (and-left (CS.srcAtt k) (or-right (CS.closed k) nc t)))
+  closed-off (f-islep {k = k} _ _ _ na nc _ _ _ _ _ _)            t = ⊥-elim (notT _ na (and-left (CS.srcAtt k) (or-right (CS.closed k) nc t)))
 
   off-keep : ∀ {Cr C Γ A} {c : Ctx R Γ A} {Rg N E} {s s′ : St Γ A} {p} → (Pending s → ⊥) → (∀ {P} → Rest (scopeOf c) s P → Rest (scopeOf c) s′ P)
            → Fr Rt Cr C Rg c N E → Hold (scopeOf c) Rg C N s E → Off N → Inv Rt Cr C ⟨ c , s′ , absorbed , p ⟩

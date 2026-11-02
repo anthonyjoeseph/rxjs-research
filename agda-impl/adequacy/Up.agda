@@ -203,7 +203,7 @@ module Past (p : Pos) where
 
     src-up : ∀ {Γ X} {sc : Scope Γ} {Rs : Rgn} {k : CS Γ X} {o}
            → Src sc Rs (bef p) k o → Sound Rs (adequacy.Rows.Frozen k) → ¬ Rs p → ¬ VHot (full sc) p → Src sc Rs (aft p) k o
-    src-up (src-pend na nc be adm pr wn ow) ss nr nh = src-pend na nc be adm pr wn (owes-up (off nr (wn W⁼.here)) ow)
+    src-up (src-pend na nc be an adm pr wn ow) ss nr nh = src-pend na nc be an adm pr wn (owes-up (off nr (wn W⁼.here)) ow)
     src-up (src-on nc sy bh sd af ao)    ss nr nh = src-on nc (up sy ss nr nh) (behind-up bh) (subd-up sd) af ao
     src-up {k = k} (src-shut cl sp tp hk bh sd) ss nr nh =
       src-shut cl (spent-up {E = adequacy.Rows.Frozen k} sp) (tailp-up tp) hk (behind-up bh) (subd-up sd)
@@ -234,7 +234,7 @@ module Past (p : Pos) where
 
 -- Where a connect owes its own end is no part of what it owes.
 src-owe : ∀ {Γ X} {sc : Scope Γ} {Rs : Rgn} {C} {k : CS Γ X} {o x} → Src sc Rs C k o → Src sc Rs C (record k { owedAt = x }) o
-src-owe (src-pend na nc be adm pr wn ow) = src-pend na nc be adm pr wn ow
+src-owe (src-pend na nc be an adm pr wn ow) = src-pend na nc be an adm pr wn ow
 src-owe (src-on nc sy bh sd af ao)     = src-on nc sy bh sd af ao
 src-owe (src-shut cl sp tp hk bh sd)   = src-shut cl sp tp hk bh sd
 
@@ -242,7 +242,7 @@ srch-owe : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o P x} → SrcH sc k o P �
 srch-owe (sh-dead hk)                    = sh-dead hk
 srch-owe (sh-isle na nc sy bh sd ss ao)  = sh-isle na nc sy bh sd ss ao
 srch-owe (sh-islec na cl sp tp hk bh sd) = sh-islec na cl sp tp hk bh sd
-srch-owe (sh-pend na nc ba sc adm pe wn ss) = sh-pend na nc ba sc adm pe wn ss
+srch-owe (sh-pend na nc ba an sc adm pe wn ss) = sh-pend na nc ba an sc adm pe wn ss
 
 husk-owe : ∀ {Γ X B} {sc : Scope Γ} {k : CS Γ X} {o} {b : St (X ∷ Γ) B} {P x}
          → Husk sc (connS k o b) P → Husk sc (connS (record k { owedAt = x }) o b) P
@@ -310,7 +310,7 @@ mutual
   srch-feed (sh-isle _ nc _ _ _ _ _)        (inj₂ (inj₁ t))   _  = ⊥-elim (notT _ nc t)
   srch-feed (sh-isle _ _ sy _ _ _ _)        (inj₂ (inj₂ pe))  _  = ⊥-elim (sync-pend pe sy)
   srch-feed (sh-islec na cl sp tp hk bh sd) _                 no = sh-islec na cl sp tp (feed-husk hk no) bh sd
-  srch-feed sh@(sh-pend _ _ _ _ _ _ _ _)    _                 _  = sh
+  srch-feed sh@(sh-pend _ _ _ _ _ _ _ _ _)    _                 _  = sh
 
 -- A shut flag set where its source runs; kept where it is torn down.
 shut-live : ∀ {Γ X} {k : CS Γ X} {p} → T (CS.srcLive k) → shutAt p k ≡ record k { closed = true ; endAt = p }
@@ -552,9 +552,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
     Cr , f-isle u hb le na nc (Past.behind-up p bh) (Past.subd-up p sd) ss ao ni , silent ≃-refl
   fr-up (f-took _ _ _ _ _ _ _ _) ()
   fr-up (f-srcc _ _ _ _ _ _ _ _ _ _ _ _) ()
-  fr-up (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
+  fr-up (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
   fr-up (f-islec _ _ _ _ _ _ _ _ _) ()
-  fr-up (f-islep _ _ _ _ _ _ _ _ _ _) ()
+  fr-up (f-islep _ _ _ _ _ _ _ _ _ _ _) ()
   fr-up (d-map _) ()
   fr-up (d-scan _) ()
   fr-up (d-cut _) ()
@@ -649,10 +649,10 @@ module _ {R : Set} (Rt : EmissionSet R) where
     _ , _ , unread-at Rt u (sh-isle na nc sy (Past.behind-up p bh) (Past.subd-up p sd) ss ao) (feed-husk {i = here refl} {p = p} {e = nx a} hb ni) le
     , silent ≃-refl
   rise-src-nx refl (flying (f-srcc _ _ _ _ _ _ _ _ _ _ _ _) _ ())
-  rise-src-nx refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
+  rise-src-nx refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
   rise-src-nx refl (flying (d-src _ _ _ _) _ ())
   rise-src-nx refl (flying (f-islec _ _ _ _ _ _ _ _ _) _ ())
-  rise-src-nx refl (flying (f-islep _ _ _ _ _ _ _ _ _ _) _ ())
+  rise-src-nx refl (flying (f-islep _ _ _ _ _ _ _ _ _ _ _) _ ())
   rise-src-nx refl (adrift (f-srcc _ _ _ _ cl _ _ _ _ _ _ _) cl′ _)  = ⊥-elim (or-shut cl cl′)
   rise-src-nx refl (adrift (f-islec _ _ _ _ cl _ _ _ _) cl′ _)       = ⊥-elim (or-shut cl cl′)
   rise-src-nx {a = a} {p = p} refl (adrift (d-src u hb le ni) _ (Q , hk , le′)) =
@@ -682,10 +682,10 @@ module _ {R : Set} (Rt : EmissionSet R) where
       (λ _ → _ , _ , unread-at Rt u (sh-isle na nc sy (Past.behind-up p bh) (Past.subd-up p sd) ss ao) fed le , silent ≃-refl)
     where fed = feed-husk {i = here refl} {p = p} {e = cp} hb ni
   rise-src-cp refl (flying (f-srcc _ _ _ _ _ _ _ _ _ _ _ _) _ ())
-  rise-src-cp refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
+  rise-src-cp refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
   rise-src-cp refl (flying (d-src _ _ _ _) _ ())
   rise-src-cp refl (flying (f-islec _ _ _ _ _ _ _ _ _) _ ())
-  rise-src-cp refl (flying (f-islep _ _ _ _ _ _ _ _ _ _) _ ())
+  rise-src-cp refl (flying (f-islep _ _ _ _ _ _ _ _ _ _ _) _ ())
   rise-src-cp refl (adrift (f-srcc _ _ _ _ cl _ _ _ _ _ _ _) cl′ _)  = ⊥-elim (or-shut cl cl′)
   rise-src-cp refl (adrift (f-islec _ _ _ _ cl _ _ _ _) cl′ _)       = ⊥-elim (or-shut cl cl′)
   rise-src-cp {k = k} {b} {c} {s} {p} refl {Cr = Cr} (adrift (d-src u hb le ni) _ (Q , hk , le′)) =

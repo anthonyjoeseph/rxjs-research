@@ -291,7 +291,7 @@ subd-env {sc = sc} {k = k} {C} {p} (subd past (_ , dj)) pq =
 att-slot : ∀ {Γ X} {k : CS Γ X} {p} → AttOwed k → (CS.bodyAt k ≡ just (CS.connAt k) → p ≼ (CS.connAt k ++ [ ix 1 ]))
          → (∀ {y} → CS.attSrc k ≡ just y → KAt p (after y)) → p ≼ (CS.connAt k ++ [ ix 2 ])
 att-slot (inj₁ e) _ al = al e refl
-att-slot {k = k} {p} (inj₂ e) bl _ q₂p =
+att-slot {k = k} {p} (inj₂ (e , _)) bl _ q₂p =
   bl e (≺-trans {q₁} {CS.connAt k ++ [ ix 2 ]} {p} (in-slot (CS.connAt k) q₁ (Equivalence.from T-≡ (inside-self q₁))) q₂p)
   where q₁ = CS.connAt k ++ [ ix 1 ]
 
@@ -317,7 +317,7 @@ mutual
          → (CS.bodyAt k ≡ just (CS.connAt k) → p ≼ (CS.connAt k ++ [ ix 1 ])) → (∀ {y} → CS.attSrc k ≡ just y → KAt p (after y))
          → PLag p P
   srch-f (sh-dead hk) lo _ _ = plag-under (husk-f hk lo)
-  srch-f {k = k} {p = p} (sh-pend _ _ ba refl (ok , a) _ _ _) _ bl _ = [] , λ { (k′ , (_ , x , _) , refl) yp →
+  srch-f {k = k} {p = p} (sh-pend _ _ ba _ refl (ok , a) _ _ _) _ bl _ = [] , λ { (k′ , (_ , x , _) , refl) yp →
     ⊥-elim (bl ba (≺-trans {CS.connAt k ++ [ ix 1 ]} {k′} {p}
                      (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok) x) (below k′ yp))) }
   srch-f {k = k} {p = p} (sh-isle {Ci = Ci} na nc sy bh sd ss ao) lo bl al =
@@ -364,7 +364,7 @@ mutual
         → Behind (bef p) (Frozen k)
   src-f {C = C} (src-on _ sy bh _ _ _) env ef lo = behind-bef {C = C} bh (few sy env ef (λ ki → lo (k-kid (k-src ki))))
   src-f {C = C} (src-shut _ _ tp hk bh _) env ef lo = behind-bef {C = C} bh (tailp-lag {C = C} tp (husk-f hk (λ ki → lo (k-kid (k-src ki)))))
-  src-f {k = k} {b = b} {p = p} (src-pend {o = o′} _ _ be a _ _ _) env ef lo =
+  src-f {k = k} {b = b} {p = p} (src-pend {o = o′} _ _ be _ a _ _ _) env ef lo =
     behind-pend {C = bef p} {k = k} refl a (lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
 
   -- A joiner's: its outer's, a value's first effect, a begun lane's, a
@@ -522,8 +522,8 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
     src-sh : ∀ {Γ X B} {Rg} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B}
            → Src (CS.scope k) Rg C k o → Env (full (CS.scope k)) C p → EnvL (full (CS.scope k)) C p → LoP (connS k o b) p
            → Src (CS.scope k) Rg (bef p) k o
-    src-sh {k = k} {b = b} (src-pend {o = o′} na nc be adm pr wn _) env ef lo =
-      src-pend na nc be adm pr wn (lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
+    src-sh {k = k} {b = b} (src-pend {o = o′} na nc be an adm pr wn _) env ef lo =
+      src-pend na nc be an adm pr wn (lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
     src-sh {k = k} (src-on nc sy bh sd af ao) env ef lo =
       src-on nc (sh sy env ef lo′) (behind-bef {C = C} bh (few sy env ef lo′)) (subd′ sd) af ao
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-src ki))
