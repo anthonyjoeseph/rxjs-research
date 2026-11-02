@@ -270,8 +270,17 @@ conn-reach (ks , fs) (bs , fb) = map (_++ [ ix 0 ]) ks ++ bs , λ
   ; (Connecting.kept x _ _ _) lt _ → ∈-++⁺ˡ (∈-map⁺ (_++ [ ix 0 ]) (fs x lt)) }
 
 -- A source closed at `p` owes, but for finitely many rows, what its
--- isles still run: a pin past its end is of a burst begun before it, so
--- of a source still in its subscribe call.
+-- isles still run.  Every row past the end is invisible (`Sound.ends`),
+-- so a skip or a pin.  A pin whose connect lies before the end is a pin
+-- of a burst the cursor passed, and `pin-tail` places it.  What stays
+-- open: the skips past the end, and a pin of a connect past it.  Each
+-- former's rows past its end are of its parts' past theirs, and a
+-- connect's burst pins and kept pins name connects before its body's end
+-- (`Connecting.kept` asks `Alive`), so both reduce to the leaves: a
+-- tape's rows past its entry's end, which `s-cold`'s `Tail` does not
+-- tie to the entry.
+-- DEAD ROUTE: `pin-tail` alone — it asks the pin's connect passed, which
+--   an end at `p` does not give, and it says nothing of skips.
 postulate
   shut-tail : ∀ {Γ X} {sc : Scope Γ} {Rs} {k : CS Γ X} {o : St Γ X} {p}
             → (sy : Sync sc Rs (aft p) o (Frozen k)) → Sound Rs (Frozen k) → Frozen k p end

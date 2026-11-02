@@ -244,6 +244,17 @@ burst-plag (ks , f) = map ix0 ks , λ { (k′ , (_ , x , _) , refl) yp → ∈-m
 -- past the least key, and finitely many lie before it.  The isle's
 -- cursor passed the root's when the part around it was torn down from
 -- inside its burst, and has moved since only within that burst.
+--
+-- What it needs that no hypothesis carries: a binder's row the isle's
+-- cursor owes lies past the isle's whole burst, so past every position
+-- inside `CS.connAt k ++ [ ix 1 ]`; and the isle's source holds a key
+-- inside its burst, so the least key is no later than that.  Both are
+-- true of an isle at its birth (a running subscribe call has work left,
+-- and a binder's source emits nothing inside a burst it does not drive),
+-- so they are fields of `sh-isle`, owed where an isle is born.
+-- DEAD ROUTE: a body over its hypotheses — `Lo o` bounds only the isle's
+--   own keys, and `Subd` only the isle's cursor from below, so a binder's
+--   owed row between the isle's cursor and its least key is not excluded.
 postulate
   isle-env : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o Ri Ci p}
            → T (not (CS.srcAtt k)) → T (not (CS.closed k)) → Sync sc Ri Ci o (Frozen k) → Behind Ci (Frozen k) → Subd sc Ci k

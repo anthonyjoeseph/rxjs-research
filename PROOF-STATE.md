@@ -16,18 +16,18 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE DEAD PART'S TAIL
 
-A part that stops (take's failure, a source's end) owes past the cursor
-only what its husk still runs, but for finitely many rows. Open: whether
-every pin past the stop is of a burst begun before it. Settled by bodies
-reading the stop's row against the husk.
+A source's end owes past the cursor only what its husk still runs, but
+for finitely many rows. Open: skips past the end, and pins of a connect
+past it; both reduce to a tape's rows past its entry's end. Settled by
+an end-tail walk beside `pin-tail`.
 
 Members: `shut-tail`.
 
 #### THE ISLE'S CURSOR
 
 An isle's binders, read at its own cursor, lie at or past the least key
-with finitely many before it. Open: whether the isle's cursor moves only
-within its burst once torn from the root's. Settled by a body over `Subd`.
+with finitely many before it. Open: two `sh-isle` fields, binder rows owed
+past the burst and a key inside it, owed at the isle's birth.
 
 Members: `isle-env`.
 
