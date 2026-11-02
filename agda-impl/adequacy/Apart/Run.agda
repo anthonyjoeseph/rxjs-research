@@ -30,7 +30,7 @@ open Machine using (Ctx; St; Mode; ofS; doneS; cutS; takeS; joinS; connS; coldS;
                     nx; cp; rising; absorbed; closed; unsubIf; cut; own; run; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM)
 open import operation.Key using () renaming (at to atᴷ)
 open import adequacy.Stamped using (Ix; ix-⊕; StOK)
-open import adequacy.Dispatch using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK)
+open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK)
 open import adequacy.Floor.Keys using (own-cls; ob)
 open import adequacy.Apart.Cone using (tag; cone-trans)
 open import adequacy.Apart.Region using (Rg; cn; tl; pt; cl; In; Sub; Keyed; f-cn; f-tl; sub-fut; sub-at; self)
