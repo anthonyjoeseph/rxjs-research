@@ -565,7 +565,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   rise-src-cp {k = k} {b} {c} {s} {p} refl (flying (f-src {w = true} fr sc pt lv nc sb fl fz eq bh) cl h) =
     let (sy , row) = h _ ; open Fed {e = cp} fr sc pt lv fz eq row
     in aft p , subst (λ k″ → Inv Rt (aft p) ⟨ c , connS k″ s (feed (here refl) p cp b) , absorbed , p ⟩) (sym (shut-live lv))
-                 (settled c-abs (proj₁ lifted) (λ _ → s-conn sc (re-parts pt) (λ _ → body sb) (λ _ → src-done refl (shut-fin (sync-≈ sy (≈-sym fz)) (Parts.ss pt) fk) bh) (flags-shut refl) eq))
+                 (settled c-abs (proj₁ lifted) (λ _ → s-conn sc (re-parts pt) (λ _ → body sb) (λ _ → src-done refl (shut-fin {k = k} {p = p} (sync-≈ sy (≈-sym fz)) (Parts.ss pt) fk) bh) (flags-shut refl) eq))
      , moves
   rise-src-cp refl (flying (f-src {w = false} fr _ _ _ _ _ _ _ _ _) _ _) = _ , settled c-abs fr (λ ()) , silent ≃-refl
   rise-src-cp refl (flying (f-srcc _ _ _ _ cl _ _ _ _ _ _) cl′ _)          = ⊥-elim (or-shut cl cl′)
