@@ -26,10 +26,10 @@ open import Relation.Nullary using (¬_; yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
 open import denotation.Events using (Pos; ix; inside; _≟ᵖ_)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Silent; hush; held; EmissionSet; _≺_; _≼_; Work; Den; enter; After; Truncate; module Joiner;
-  module Switch; module Exhaust)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; _≺_; _≼_; Work; Den; enter; After; Truncate;
+  module Joiner; module Switch; module Exhaust)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺→≼; ≼-antisym; ≼-or-≻; ≺-≼-≺; ≼-≺-≺)
-open import denotation.Laws.Worlds using (Plain; plain-ix; W; W⁼; step; here; inW; Real; Ok; InvAt; InvD; _⊑_; real-snoc; ok-in; nest-in; nest⁼; apart-w; leads; w-up; not-up; conv; ⊑-refl; ⊑-snoc; ⊑-snoc⁺; ⊑-inside; inside-⊑; flat-under; ext≢)
+open import denotation.Laws.Worlds using (Plain; plain-ix; W; W⁼; step; here; inW; Real; Ok; InvAt; InvD; _⊑_; real-snoc; ok-in; nest-in; nest⁼; apart-w; leads; w-up; not-up; conv; ⊑-refl; ⊑-snoc; ⊑-snoc⁺; ⊑-inside; inside-⊑; flat-under; ext≢; PinBy)
 open import denotation.Laws.Worlds.Leaves using (out-inj)
 
 out≢skip : ∀ {A} {a : A} → out a ≡ skip → ⊥
@@ -109,8 +109,8 @@ module Join {A B : Set} {H : Pos → Set} {p : Pos} (ok : Ok H p) (f : A → Den
   end-before {c₀} {q} oc xq with ≼-or-≻ c₀ q | ≼-or-≻ q c₀
   ... | inj₂ lt | _        = lt
   ... | inj₁ _  | inj₂ lt′ = ⊥-elim (loud (qu oc xq lt′))
-    where loud : ∀ {a} → Silent (out a) → ⊥
-          loud ()
+    where loud : ∀ {a} → PinBy c₀ (out a) → ⊥
+          loud (_ , () , _)
   ... | inj₁ le | inj₁ le′ = ⊥-elim (no-end oc (subst (λ z → O z (out _)) (≼-antisym {q} {c₀} le′ le) xq))
 
   -- No value's first child lies past the outer's end.
@@ -202,12 +202,12 @@ module Join {A B : Set} {H : Pos → Set} {p : Pos} (ok : Ok H p) (f : A → Den
     l-func (l-pass _ nd) (l-end _ d)   = ⊥-elim (nd d)
     l-func (l-pass _ _)  (l-pass _ _)  = refl
 
-    o-skipped : ∀ {y e₀ e} → Silent e₀ → OEv y e₀ e → Silent e
-    o-skipped hush o-skip = hush
-    o-skipped held o-pin  = held
+    -- A pin shows as itself.
+    o-pinned : ∀ {y e₀ e c} → PinBy c e₀ → OEv y e₀ e → PinBy c e
+    o-pinned (r , refl , lt) o-pin = r , refl , lt
 
-    l-skipped : ∀ {q a y e₀ e} → Silent e₀ → LEv q a y e₀ e → Silent e
-    l-skipped s (l-work _ _) = s
+    l-pinned : ∀ {q a y e₀ e c} → PinBy c e₀ → LEv q a y e₀ e → PinBy c e
+    l-pinned pb (l-work _ _) = pb
 
     pinned-v : ∀ {y r} → V y (pin r) → W⁼ H p r × T (inside r y)
     pinned-v (v-o x o-pin)            = InvAt.pinned Io x
@@ -304,14 +304,17 @@ module Join {A B : Set} {H : Pos → Set} {p : Pos} (ok : Ok H p) (f : A → Den
         ...   | w , w⁼ , i₁ , i₂ =
           w , nest⁼ (inW (sw xq)) w⁼ , ⊑-inside (conv {w} {c′} {c} {y} (inside-⊑ w c′ i₁) le cy (inside-⊑ w y i₂)) , i₂
 
-    quiet-v : (∀ {c} → D c → Ended c) → ∀ {c y e} → V c end → V y e → c ≺ y → Silent e
+    quiet-v : (∀ {c} → D c → Ended c) → ∀ {c y e} → V c end → V y e → c ≺ y → PinBy c e
     quiet-v en {c} {y} vc vy cy = go (en (done-v vc)) vy
       where
-        go : ∀ {e} → Ended c → V y e → Silent e
-        go ((c₀ , oc , le) , _) (v-o oy ev) = o-skipped (qu oc oy (≼-≺-≺ {c₀} {c} {y} le cy)) ev
-        go _ (v-val _ _) = hush
+        later : ∀ {c′ e} → c′ ≼ c → PinBy c′ e → PinBy c e
+        later {c′} le (r , eq , lt) = r , eq , ≺-≼-≺ {r} {c′} {c} lt le
+
+        go : ∀ {e} → Ended c → V y e → PinBy c e
+        go ((c₀ , oc , le) , _) (v-o oy ev) = later le (o-pinned (qu oc oy (≼-≺-≺ {c₀} {c} {y} le cy)) ev)
+        go ((c₀ , oc , le) , _) (v-val xq eq) = ⊥-elim (val-after oc xq (subst (c₀ ≺_) eq (≼-≺-≺ {c₀} {c} {y} le cy)))
         go (_ , ln) (v-lane xq l ev) with ln xq l (l-gate ev) cy
-        ... | c′ , lc , le = l-skipped (InvAt.quiet (LI xq) (proj₁ lc) (proj₁ l) (≼-≺-≺ {c′} {c} {y} le cy)) ev
+        ... | c′ , lc , le = later le (l-pinned (InvAt.quiet (LI xq) (proj₁ lc) (proj₁ l) (≼-≺-≺ {c′} {c} {y} le cy)) ev)
 
     inv-v : ∀ {X : EmissionSet B} → (∀ {y e} → X y e → V y e) → (∀ {c} → D c → Ended c) → InvAt H p X
     inv-v vw en = record

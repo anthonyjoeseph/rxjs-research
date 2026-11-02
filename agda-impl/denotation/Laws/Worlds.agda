@@ -29,7 +29,7 @@ open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
 open import denotation.Events using (Pos; Label; ix; sub; last; inside; inside-++; inside-self; inside-cons; <ᵖ-split; <ᵖ-between)
-open import denotation.EmissionSet using (Ev; end; pin; Silent; EmissionSet; _≺_; _≼_; Den; hot; coldAt; enter; DenEnv; from)
+open import denotation.EmissionSet using (Ev; end; pin; Silent; held; EmissionSet; _≺_; _≼_; Den; hot; coldAt; enter; DenEnv; from)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺→≼; ≼-refl; ≼-trans; ≼-≺-≺; ≺-ext; ≼-false)
 
 -- A label that opens no subscription.
@@ -96,9 +96,16 @@ x ⊑ y = Σ Pos λ zs → y ≡ x ++ zs
 --
 -- No row lies under the world of a row's plain child: that is where a
 -- joiner subscribes the row's lane, and an outer row there would meet the
--- lane's.  And only skips follow an end: a value after it would start a
--- lane past the joiner's end, outside its burst.
+-- lane's.  And only pins of earlier subscriptions follow an end: a value
+-- after it would start a lane past the joiner's end, outside its burst.
 --
+-- What follows an end: a pin of a subscription made before it.
+PinBy : ∀ {A} → Pos → Ev A → Set
+PinBy c e = Σ Pos λ r → e ≡ pin r × r ≺ c
+
+pinby-silent : ∀ {A} {c} {e : Ev A} → PinBy c e → Silent e
+pinby-silent (_ , refl , _) = held
+
 -- REFUTED: 67919a90 flatMap-inv without `under`, by an outer row under a timer rooted below its own value's first child
 record InvAt {A} (H : Pos → Set) (p : Pos) (X : EmissionSet A) : Set where
   field
@@ -108,7 +115,7 @@ record InvAt {A} (H : Pos → Set) (p : Pos) (X : EmissionSet A) : Set where
     flat  : ∀ {y e l ys e′} → X y e → X (y ++ l ∷ ys) e′ → ⊥
     burst : ∀ {c y e} → X c end → X y e → c ≺ y → Σ Pos λ w → W⁼ H p w × T (inside w c) × T (inside w y)
     under : ∀ {q y w l e e′} → X q e → X y e′ → Plain l → W⁼ H (q ++ [ l ]) w → w ⊑ y → ⊥
-    quiet : ∀ {c y e} → X c end → X y e → c ≺ y → Silent e
+    quiet : ∀ {c y e} → X c end → X y e → c ≺ y → PinBy c e
     pinned : ∀ {y r} → X y (pin r) → W⁼ H p r × T (inside r y)
 
 -- At every admissible subscription.

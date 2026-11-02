@@ -21,7 +21,7 @@ module denotation.Laws.BoundedInv where
 open import Data.Bool using (T)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using ([]; _∷_; _++_; [_])
-open import Data.List.Properties using (∷ʳ-injectiveˡ; ∷ʳ-injectiveʳ)
+open import Data.List.Properties using (∷ʳ-injectiveˡ; ∷ʳ-injectiveʳ; ++-identityʳ; ++-assoc)
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≤_; _<_)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties using (<-cmp; <⇒≱; <⇒≤; ≤-refl; ≤-trans; n≤1+n; n<1+n; m<n⇒m<1+n; ≤-<-trans; <-trans; <-irrefl;
@@ -32,25 +32,38 @@ open import Data.Unit using (⊤; tt)
 open import Induction.WellFounded using (Acc; acc)
 open import Relation.Binary.Definitions using (tri<; tri≈; tri>)
 open import Relation.Nullary using (¬_; yes; no)
+open import Data.Bool.Properties using (T-≡)
+open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
 
-open import denotation.Events using (Pos; ix; inside; _≟ᵖ_)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Silent; hush; EmissionSet; _≺_; _≼_; Work; Den; enter; After; Truncate; module Values;
-  module Bounded)
-open import denotation.Laws.Modulus using (≺-trans; ≼-antisym; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext)
-open import denotation.Laws.Worlds using (Plain; plain-ix; W; W⁼; step; here; inW; Real; Ok; InvAt; InvD; _⊑_; real-snoc; ok-in; nest; nest⁼; nest-in; leads; w-up; not-up; sib; same-lead; flat-under; conv; ⊑-refl; ⊑-snoc; ⊑-snoc⁺; ⊑-inside; inside-⊑; ext≢)
+open import denotation.Events using (Pos; ix; sub; last; inside; _≟ᵖ_; <ᵖ-between; <ᵖ-part; <ᵖ-split)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; _≺_; _≼_; Work; Den; enter; After; Truncate;
+  module Values; module Bounded)
+open import denotation.Laws.Modulus using (≺-trans; ≼-antisym; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext; ≺-irrefl; ≺-absurd; ≼-false)
+open import denotation.Laws.Worlds using (Plain; plain-ix; W; W⁼; step; here; inW; Real; Ok; InvAt; InvD; _⊑_; real-snoc; ok-in; nest; nest⁼; nest-in; leads; w-up; not-up; sib; same-lead; flat-under; conv; ⊑-refl; ⊑-snoc; ⊑-snoc⁺; ⊑-inside; inside-⊑; ext≢; PinBy)
 open import denotation.Laws.Worlds.Leaves using (out-inj)
 open import denotation.Laws.JoinInv using (ix01; ix10; below; module Kids; module Join)
 open import denotation.Laws.Nth using (module Nths)
 
-end≢skip : ∀ {C} → Silent {C} end → ⊥
-end≢skip ()
+end≢pin : ∀ {C} {c} → PinBy {C} c end → ⊥
+end≢pin (_ , () , _)
+
+-- Nothing lies strictly between a position and its first child.
+first-child : ∀ p {c} → p ≺ c → c ≺ (p ++ [ ix 0 ]) → ⊥
+first-child p {c} pc cp with <ᵖ-between p c [ ix 0 ] (Equivalence.to T-≡ pc) (Equivalence.to T-≡ cp)
+... | [] , refl = ≺-irrefl {p} (subst (p ≺_) (++-identityʳ p) pc)
+... | ix zero ∷ [] , refl = ≺-irrefl {p ++ [ ix 0 ]} cp
+... | ix zero ∷ w ∷ ws , refl =
+  ≺-absurd {p ++ ix 0 ∷ w ∷ ws} {p ++ [ ix 0 ]} cp (subst ((p ++ [ ix 0 ]) ≺_) (++-assoc p [ ix 0 ] (w ∷ ws)) (≺-ext (p ++ [ ix 0 ]) ws))
+... | ix (suc j) ∷ ws , refl = ≺-absurd {p ++ ix (suc j) ∷ ws} {p ++ [ ix 0 ]} cp (Equivalence.from T-≡ (<ᵖ-part p [] ws refl))
+... | sub e ∷ ws , refl = ≺-absurd {p ++ sub e ∷ ws} {p ++ [ ix 0 ]} cp (Equivalence.from T-≡ (<ᵖ-part p [] ws refl))
+... | last ∷ ws , refl = ≺-absurd {p ++ last ∷ ws} {p ++ [ ix 0 ]} cp (Equivalence.from T-≡ (<ᵖ-part p [] ws refl))
 
 -- One end to a reading.
 end-uniq : ∀ {C H s} {X : EmissionSet C} → InvAt H s X → ∀ {c c′} → X c end → X c′ end → c ≡ c′
 end-uniq I {c} {c′} x x′ with ≼-or-≻ c c′ | ≼-or-≻ c′ c
-... | _       | inj₂ lt  = ⊥-elim (end≢skip (InvAt.quiet I x x′ lt))
-... | inj₂ lt | _        = ⊥-elim (end≢skip (InvAt.quiet I x′ x lt))
+... | _       | inj₂ lt  = ⊥-elim (end≢pin (InvAt.quiet I x x′ lt))
+... | inj₂ lt | _        = ⊥-elim (end≢pin (InvAt.quiet I x′ x lt))
 ... | inj₁ le | inj₁ le′ = ≼-antisym {c} {c′} le le′
 
 -- A bounded merge of the outer `O` read at `p`.
@@ -59,7 +72,7 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   open Values O using (Nth; first; next)
   open InvAt Io renaming (world to wo; real to re; func to fu; flat to fl; burst to bu; under to U; quiet to qu)
   open Join ok f fi Io using (sw; kids; kid-root; kid-lane; o-lane; val-lane; o-lead; o-lane-lead; end-before; val-after; module View)
-  open View Done (λ _ _ _ → ⊤) using (OEv; o-skip; o-pin; o-end; o-pass; o-nout; o-func; o-skipped)
+  open View Done (λ _ _ _ → ⊤) using (OEv; o-skip; o-pin; o-end; o-pass; o-nout; o-func; o-pinned)
   open Nths O using (nth-val; nth-fun; nth-lt; nth-inj)
 
   ------------------------------------------------------------------------
@@ -590,18 +603,38 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
       go d (v-l sb lv) cy with lane-done d sb
       ... | c′ , ac , le = lane-burst sb ac le lv cy
 
-  quiet-v : ∀ {c y e} → V c end → V y e → c ≺ y → Silent e
-  quiet-v vc vy = go (done-v vc) vy
+  -- A queued lane's hand-over lies past the merge's end: no end shows at
+  -- the end that frees it, and nothing lies between that end and its
+  -- first child.
+  hand-after : ∀ {c c′ i q s a} → V c end → Sub i q s a → After (f a) s c′ end → Queued c′ → c′ ≼ c → c ≺ (c′ ++ [ ix 0 ]) → ⊥
+  hand-after {c} {c′} vc sb ac Q le cy with <ᵖ-split c′ c (≼-false {c′} {c} le)
+  ... | inj₁ lt   = first-child c′ (Equivalence.from T-≡ lt) cy
+  ... | inj₂ refl = at vc
     where
-      go : ∀ {c y e} → Done c → V y e → c ≺ y → Silent e
-      go {c} {y} ((c₀ , oc , le) , _) (v-o oy ev) cy = o-skipped (qu oc oy (≼-≺-≺ {c₀} {c} {y} le cy)) ev
-      go _ (v-val _ _) _ = hush
-      go {c} {y} d (v-l sb (l-work x _)) cy with lane-done d sb
-      ... | c′ , ac , le = InvAt.quiet (LI sb) (proj₁ ac) (proj₁ x) (≼-≺-≺ {c′} {c} {y} le cy)
-      go {c} {y} d (v-l sb (l-end x _ _)) cy with lane-done d sb
-      ... | c′ , ac , le = ⊥-elim (end≢skip (InvAt.quiet (LI sb) (proj₁ ac) (proj₁ x) (≼-≺-≺ {c′} {c} {y} le cy)))
-      go _ (v-l _ (l-pass _ _ _)) _ = hush
-      go _ (v-l _ (l-hand _ _ _)) _ = hush
+      at : V c′ end → ⊥
+      at (v-o oc _) with seat* sb
+      ... | seat′ _ _ _ nr rw = o-lane oc (nth-val nr) (nest rw (row-w sb ac))
+      at (v-l _ (l-work _ w))  = work-end w refl
+      at (v-l _ (l-end _ nQ _)) = nQ Q
+
+  quiet-v : ∀ {c y e} → V c end → V y e → c ≺ y → PinBy c e
+  quiet-v vc vy = go vc (done-v vc) vy
+    where
+      later : ∀ {c c′} {e : Ev B} → c′ ≼ c → PinBy c′ e → PinBy c e
+      later {c} {c′} le (r , eq , lt) = r , eq , ≺-≼-≺ {r} {c′} {c} lt le
+
+      go : ∀ {c y e} → V c end → Done c → V y e → c ≺ y → PinBy c e
+      go {c} {y} _ ((c₀ , oc , le) , _) (v-o oy ev) cy = later le (o-pinned (qu oc oy (≼-≺-≺ {c₀} {c} {y} le cy)) ev)
+      go {c} {y} _ ((c₀ , oc , le) , _) (v-val xq eq) cy = ⊥-elim (val-after oc xq (subst (c₀ ≺_) eq (≼-≺-≺ {c₀} {c} {y} le cy)))
+      go {c} {y} _ d (v-l sb (l-work x _)) cy with lane-done d sb
+      ... | c′ , ac , le = later le (InvAt.quiet (LI sb) (proj₁ ac) (proj₁ x) (≼-≺-≺ {c′} {c} {y} le cy))
+      go {c} {y} _ d (v-l sb (l-end x _ _)) cy with lane-done d sb
+      ... | c′ , ac , le = ⊥-elim (end≢pin (InvAt.quiet (LI sb) (proj₁ ac) (proj₁ x) (≼-≺-≺ {c′} {c} {y} le cy)))
+      go {c} {y} _ d (v-l sb (l-pass x _ _)) cy with lane-done d sb
+      ... | c′ , ac , le = ⊥-elim (end≢pin (InvAt.quiet (LI sb) (proj₁ ac) (proj₁ x) (≼-≺-≺ {c′} {c} {y} le cy)))
+      go vc d (v-l sb (l-hand x Q refl)) cy with lane-done d sb
+      ... | c′ , ac , le with lane-end sb ac x
+      ...   | refl = ⊥-elim (hand-after vc sb ac Q le cy)
 
   pinned-v : ∀ {y r} → V y (pin r) → W⁼ H p r × T (inside r y)
   pinned-v (v-o x o-pin)            = InvAt.pinned Io x
