@@ -26,18 +26,12 @@ open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Mode; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising; nx; cp; closed; closedUp; alive; unsub; cut; killAll; ended; settle; shutAt;
                     attAt; attached; free; cpAt; cutAt; overAt; search; found; own; run; unsubIf; feed; feedL; queued; inbox; Mark; ofM; attM; cpM; cutM; bodyM; srcAttM; owedM; joinM; leafM; Ev)
-open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᴷ; <ᴷ-trans; ≮ᴷ-trans; <ᴷ-irrefl; clash)
+open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᴷ; ≮ᴷ-trans; <ᴷ-irrefl; <ᴷ-asym)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
 open import adequacy.Path using (_⊑_; ⊑i)
 
 ------------------------------------------------------------------------
 -- Keys
-
--- Strictly earlier one way, not the other.
-asym : ∀ a b → a <ᴷ b ≡ true → b <ᴷ a ≡ false
-asym a b h with b <ᴷ a in e
-... | true  = ⊥-elim (clash (<ᴷ-trans a b a h e) (<ᴷ-irrefl a))
-... | false = refl
 
 -- No key past the last.
 top-max : ∀ κ → after [] <ᴷ κ ≡ false
@@ -80,7 +74,7 @@ below q = trans (at-<ᴷ q _) (<ᵖ-below q [])
 
 -- What a tree's keys are bounded below by, kept.
 lo-weaken : ∀ {Γ A} {t : St Γ A} X Y → Lo t Y → X <ᴷ Y ≡ true → Lo t X
-lo-weaken X Y lo h {κ} ki = ≮ᴷ-trans κ Y X (lo ki) (asym X Y h)
+lo-weaken X Y lo h {κ} ki = ≮ᴷ-trans κ Y X (lo ki) (<ᴷ-asym X Y h)
 
 -- A node's new keys: old ones, or none before `X`.
 Into : ∀ {Γ A} → Key → St Γ A → St Γ A → Set₁

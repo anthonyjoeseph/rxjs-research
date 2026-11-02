@@ -35,7 +35,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; binds; CS; scopeOf; con
 open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans; ≃-refl; ≼-≢; full; Frozen; pendRows; Moves; silent; toEv)
 open _≃_
 open import adequacy.Walk using (sync-≈)
-open import adequacy.Cursor using (Cur; bef; aft; Behind; Fin; Tail; fin-dn; tail-dn; alike; ≈-sym; FewBefore; ConnE; Need; owes; dead; lane; lanecut; pnd; _≈_; c-abs; Pol; Ahead; Whole; OuterDone; Owes; Due; Spent; Unfed; Rgn; Sound; vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none; fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; OweAt; o-cp; o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Fr; Waiting; Lane; JRl; JRo; JInv; Asc; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; polF; JoinF; LanesIn; NoFail; TailP; tailp-dn; Subd; SubdAt; subd; Torn; Unread; un-dead; un-torn; notT; by; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; sh-pend; husk-of; ⊑-trans; ∪-⊑; ⊑-refl; under-⊑; NoIsle; NoIsleL; Settles; sync-pend; burst-dn)
+open import adequacy.Cursor using (Cur; bef; aft; Behind; Fin; Tail; fin-dn; tail-dn; alike; ≈-sym; FewBefore; ConnE; Need; owes; dead; lane; lanecut; pnd; _≈_; c-abs; Pol; Ahead; Whole; OuterDone; Owes; Due; Spent; Unfed; Rgn; Sound; vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none; fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; re-parts; OweAt; o-cp; o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Fr; Waiting; Lane; JRl; JRo; JInv; Asc; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; polF; JoinF; LanesIn; NoFail; TailP; tailp-dn; Subd; SubdAt; subd; Torn; Unread; un-dead; un-torn; notT; by; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; sh-pend; husk-of; ⊑-trans; ∪-⊑; ⊑-refl; under-⊑; NoIsle; NoIsleL; Settles; sync-pend; burst-dn)
 open import adequacy.Cursor.Rise using (Inv; RT; settled; flying; adrift; SimC; keeps; unread-at)
 open import adequacy.Bound using (join-row; owes?; few-src)
 open import adequacy.Regions using (lane-sole)
@@ -251,11 +251,6 @@ husk-owe : ∀ {Γ X B} {sc : Scope Γ} {k : CS Γ X} {o} {b : St (X ∷ Γ) B} 
 husk-owe h-blank        = h-blank
 husk-owe (h-conn sh hb) = h-conn (srch-owe sh) hb
 
--- A connect's parts read again where it owes its own end.
-parts-owe : ∀ {Γ X B} {sc : Scope Γ} {Rg : Rgn} {k : CS Γ X} {β : EmissionSet B} {x} → Parts sc Rg k β → Parts sc Rg (record k { owedAt = x }) β
-parts-owe pt = record { Rb = Parts.Rb pt ; Rs = Parts.Rs pt ; b⊆ = Parts.b⊆ pt ; s⊆ = Parts.s⊆ pt ; apart = Parts.apart pt
-                      ; clear = Parts.clear pt ; sb = Parts.sb pt ; ss = Parts.ss pt }
-
 -- A connect's rows before a body row: its body's before it, and its
 -- source's before it.
 conn-reach : ∀ {A B} {r p : Pos} {σ : EmissionSet A} {β : EmissionSet B} {e} → FewBefore σ p → Reach β p e → Reach (Connecting.ConnT r σ β) p e
@@ -322,7 +317,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
         (let rb = Sound.rg (Parts.sb pt) row (vis e)
              ns = λ r → Parts.apart pt rb r
              nh = λ hv → Parts.clear pt (vhot-hots (full (scopeOf c)) hv) (Parts.b⊆ pt rb)
-         in s-conn sc (parts-owe pt) (λ _ → subst (λ x → Sync (binds (CS.src k) (CS.connAt k) x) _ _ _ _) sc sy)
+         in s-conn sc (re-parts refl pt) (λ _ → subst (λ x → Sync (binds (CS.src k) (CS.connAt k) x) _ _ _ _) sc sy)
                    (λ _ → src-owe (Past.src-up p src (Parts.ss pt) ns nh)) (λ nl → ⊥-elim (notT _ nl lt))
                    (fix row (Past.flags-up p {k = k} (Past.off-rg p (Parts.ss pt) ns) fl)) eq
           , proj₁ (to (alike (proj₁ eq)) ((Connecting.body row , conn-reach (few-src sc src) (proj₂ eq row)) , vis e)))
@@ -434,12 +429,6 @@ or-shut {true} _ ()
 torn : ∀ {ℓ} {b} {X : Set ℓ} → T (not b) → T b → X
 torn {b = true}  () _
 torn {b = false} _  ()
-
--- A connect's parts, its flags moved.
-re-parts : ∀ {Γ X B} {sc : Scope Γ} {Rg} {k : CS Γ X} {β : EmissionSet B} {p}
-         → Parts sc Rg k β → Parts sc Rg (record k { closed = true ; endAt = p }) β
-re-parts pt = record { Rb = Parts.Rb pt ; Rs = Parts.Rs pt ; b⊆ = Parts.b⊆ pt ; s⊆ = Parts.s⊆ pt ; apart = Parts.apart pt
-                     ; clear = Parts.clear pt ; sb = Parts.sb pt ; ss = Parts.ss pt }
 
 module _ {R : Set} (Rt : EmissionSet R) where
 
@@ -649,7 +638,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
         sy′ = sync-≈ sy (≈-sym fz)
     in Cr↑ , aft p
      , subst (λ k″ → Inv Rt Cr↑ (aft p) ⟨ c , connS k″ s (feed (here refl) p cp b) , absorbed , p ⟩) (sym (shut-live {k = k} {p} lv))
-             (settled c-abs fr↑ (s-conn sc (re-parts pt) (λ _ → body bs)
+             (settled c-abs fr↑ (s-conn sc (re-parts refl pt) (λ _ → body bs)
                                         (λ _ → src-done refl (end-tail sy′ (Parts.ss pt) fk (≺-irrefl {p})) (proj₂ (husk-of sy′)) bh sd)
                                         (λ nl → ⊥-elim (notT _ nl lv)) (flags-shut refl fl) eq))
      , moves

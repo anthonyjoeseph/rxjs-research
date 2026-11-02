@@ -623,6 +623,11 @@ data SrcH where
            → Within Ri sc (CS.connAt k ++ [ ix 1 ]) → Sound Ri (Frozen k)
            → SrcH sc k (pend o (CS.connAt k ++ [ ix 1 ])) (Burst (bef (CS.connAt k ++ [ ix 1 ])) k)
 
+-- A connect's parts read again under fields they do not read.
+re-parts : ∀ {Γ X B} {sc : Scope Γ} {Rg} {k k′ : CS Γ X} {β : EmissionSet B} → Frozen k ≡ Frozen k′ → Parts sc Rg k β → Parts sc Rg k′ β
+re-parts e pt = record { Rb = Parts.Rb pt ; Rs = Parts.Rs pt ; b⊆ = Parts.b⊆ pt ; s⊆ = Parts.s⊆ pt ; apart = Parts.apart pt
+                       ; clear = Parts.clear pt ; sb = Parts.sb pt ; ss = subst (Sound (Parts.Rs pt)) e (Parts.ss pt) }
+
 -- No rise in flight.
 data Calm {A : Set} : Machine.Mode A → Set where
   c-sub : Calm subscribing

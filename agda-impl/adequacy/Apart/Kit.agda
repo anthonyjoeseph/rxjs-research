@@ -25,9 +25,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym
 open import denotation.Events using (Pos; Label; ix; last; tick; _<ᵖ_; <ᵖ-irrefl; ix-<)
 open import operation.PureObservable using (module Machine; module Driver)
 open Machine using (Ctx; St; Mode; Conf; ⟨_,_,_,_⟩; plug; subscribing; absorbed; rising; Stepped)
-open import operation.Key using (at; after; _<ᴷ_; <ᴷ-irrefl; clash)
+open import operation.Key using (at; after; _<ᴷ_; <ᴷ-irrefl; clash; <ᴷ-asym)
 open import adequacy.Stamped using (Ix)
-open import adequacy.Floor.Keys using (asym)
 open import adequacy.Apart.Cone using (Cone; pre; cone-trans; cone-up; cone-apart; cone-after)
 open import adequacy.Apart.Region using (Rg; cn; tl; pt; cl; In; Out; Sep; NoCl; Sub; Fut; Keyed; sub-cl; f-cn; f-tl; after-in; far-of)
 open import adequacy.Apart.Items using (items; plug-items; lhs; rhs; hole; thin; no-cl; ap-++⁻)
@@ -95,7 +94,7 @@ tick-ix (ix _ ∷ _) q _ = refl
 -- A later sibling's subtree is past the run in an earlier one.
 far-sib : ∀ {p a b y} → Ix p → [ a ] <ᵖ [ b ] ≡ true → Cone (p ++ [ b ]) y
         → (at y <ᴷ after (p ++ [ a ]) ≡ false) × (Cone (p ++ [ a ]) y → ⊥)
-far-sib {p} {a} {b} {y} hp ab c = asym (after (p ++ [ a ])) (at y) (cone-after hp ab c) , λ c′ → cone-apart hp (ne-of ab) c′ c
+far-sib {p} {a} {b} {y} hp ab c = <ᴷ-asym (after (p ++ [ a ])) (at y) (cone-after hp ab c) , λ c′ → cone-apart hp (ne-of ab) c′ c
 
 -- The run in a child, a later sibling's subtree owed.
 cl-cn : ∀ {p a b} → Ix p → [ a ] <ᵖ [ b ] ≡ true → Sep (cl (p ++ [ a ])) (cn (p ++ [ b ]))
@@ -118,7 +117,7 @@ cl-up : ∀ {p l} → Sep (cl (p ++ [ l ])) (pt p)
 cl-up {p} {l} = out , out
   where
     out : Out (cl (p ++ [ l ])) p
-    out = asym (after (p ++ [ l ])) (after p) (after-in p l []) , λ c → ⊥-elim (cone-up l [] c)
+    out = <ᴷ-asym (after (p ++ [ l ])) (after p) (after-in p l []) , λ c → ⊥-elim (cone-up l [] c)
 
 -- A child's subtree owed, the after above it owed.
 cn-up : ∀ {p l} → Sep (cn (p ++ [ l ])) (pt p)

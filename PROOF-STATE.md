@@ -14,28 +14,11 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE DEAD PART'S TAIL
-
-A source's end owes past the cursor only what its husk still runs, but
-for finitely many rows. Open: skips past the end, and pins of a connect
-past it; both reduce to a tape's rows past its entry's end. Settled by
-an end-tail walk beside `pin-tail`.
-
-Members: `shut-tail`.
-
-#### THE ISLE'S CURSOR
-
-An isle's binders, read at its own cursor, lie at or past the least key
-with finitely many before it. Suspected false: an isle's source may hold
-no key inside its burst, so its least key lies past a binder row still owed.
-
-Members: `isle-env`.
-
 #### THE SHIFT UNDER A FOCUS
 
 The frames shifted to the least key and the hole's environment past it;
-the hole shifts by `shift`. Open: nothing beyond `shift` per frame and
-`isle-env` at an isle's. Settled by a body by frame.
+the hole shifts by `shift`. Open: nothing beyond `shift` per frame.
+Settled by a body by frame.
 
 Members: `fr-env`.
 
@@ -53,8 +36,7 @@ marks, a joiner's next and a take's failure, each keeping `Inv`. Open:
 whether every entry lands a region apart from its siblings' and clear of
 its scope's hots, so the rest moves past `p`. Settled when each is a body.
 
-Members: `sub-join`, `sub-joined`, `run-srcatt`, `run-owed`, `run-join-nx`,
-`run-join-cp`, `rise-take-failᵢ`, `feed-up`, `conn-parts`, `flat-sound`,
+Members: `sub-join`, `sub-joined`, `run-join-nx`, `run-join-cp`, `rise-take-failᵢ`, `feed-up`, `conn-parts`, `flat-sound`,
 `flat-within`.
 
 #### THE JOINER STEPPED

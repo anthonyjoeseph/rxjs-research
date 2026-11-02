@@ -24,8 +24,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Pos; Timeline; ix; last; inside)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; end; pin; _≺_; _≼_; enter; ⟦_⟧; shown; map-pin; module Scan;
+open import denotation.Events using (Pos; Timeline; ix; last)
+open import denotation.EmissionSet using (EmissionSet; out; end; pin; _≺_; _≼_; enter; ⟦_⟧; shown; map-pin; module Scan;
   module TakeWhile; module Connecting)
 open import denotation.Laws.Modulus using (≺→≼; ≺-ext; ≼-antisym)
 open import denotation.Laws.Worlds using (Real; InvAt; real-snoc; plain-ix; real-init; nonempty⁼; world-after⁼; inside-⊑)

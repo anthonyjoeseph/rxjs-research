@@ -7,7 +7,7 @@
 -- are a `Simulation` of every program's run.
 module adequacy.Dispatch where
 
-open import Data.Bool using (Bool; true; false; if_then_else_; not; _∨_; _∧_; T)
+open import Data.Bool using (Bool; true; false; if_then_else_; not; _∨_; T)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Nat using (_≡ᵇ_; suc)
 open import Data.List using (List; []; _∷_; [_]; _++_)
@@ -35,14 +35,20 @@ open Machine using (St; Ctx; Conf; Scope; binds; scopeOf; ⟨_,_,_,_⟩; subscri
                     renaming (Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (pendRows; full; ≃-refl; Vis; _≃_; silent; Moves; this)
 open _≃_
-open import adequacy.Cursor using (Cur; ≈-refl; Rgn; JoinE; Parts; Flags; src-pend; JInv; Joined; JRl; JRo; polF; Sound; Within; Adm; bef; Spent; Sync; _≈_; c-abs; c-sub; Owes; Fr; Hold; Need; owes; dead; lane; lanecut; pnd; Pts; ∅ᵖ; _⊑_; ∅-⊑; ⊑-refl; ⊑-trans; Rest; h-blank; h-take; hl-none; sh-dead; un-dead; Clear; Pending; pend-shape; notT; sync-pend; s-of; s-join; s-joinx; s-took; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; subd; o-cp)
+open import adequacy.Cursor using (Cur; ≈-refl; Rgn; JoinE; Parts; Flags; src-pend; JInv; Joined; JRl; JRo; polF; Sound; Within;
+  Adm; bef; Spent; Sync; _≈_; c-abs; c-sub; Owes; Fr; Hold; owes; dead; lane; lanecut; pnd;
+  Pts; ∅ᵖ; _⊑_; ∅-⊑; ⊑-refl; ⊑-trans; Rest; h-blank; h-take; hl-none; sh-dead; un-dead; Clear;
+  Pending; pend-shape; notT; sync-pend; s-of; s-join; s-joinx; s-took; f-top; f-map; f-scan;
+  f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body;
+  d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec;
+  f-islep; subd; o-cp)
 open import adequacy.Cursor.Rise using (Inv; settled; pending; adrift; RT; SimC; keeps; rise-top; rise-map; rise-scan-nx; rise-scan-cp; rise-take-pass; rise-take-cp; rise-cut; rise-cutx; rise-ln; rise-took; rise-take-fail; rise-bodyx; run-stop; run-cut; run-att)
 open import adequacy.Path using (Path)
 open import adequacy.Isle.Step using (found-clear; found-con)
-open import adequacy.RunCon using (vis-≃; body-noisle; Ran; con-body; con-att; Off; closed-off)
+open import adequacy.RunCon using (vis-≃; body-noisle; Ran; con-body; con-att; con-owed; Off; closed-off)
 open import adequacy.Stamped using (StOK; pend-of)
 open import adequacy.Isle using (G)
-open import adequacy.Floor.Keys using (own-cls; ob; os; plug-in)
+open import adequacy.Floor.Keys using (own-cls; ob; os; oo; plug-in)
 open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-least; found-mark; found-plug)
 open import adequacy.Walk using (due-≈; climb; descend; refocus; nowhere; none′)
 open import adequacy.Least using (Lo; seek-none; k-kid; k-src)
@@ -356,17 +362,6 @@ module Over {R : Set} (Rt : EmissionSet R) where
     run-join-cp   : ∀ {Cr Γ A} {c : Ctx R Γ A} {j} {x : A ∈ Γ} {q ib r} → closed c ≡ false
                   → Inv Rt Cr (bef q) ⟨ c , joinS j true x ((q , cp) ∷ ib) , absorbed , r ⟩
                   → Inv Rt Cr (bef q) ⟨ c , joinS j false x ib , rising cp , q ⟩
-    -- A CONNECT'S OWED TEARDOWN: its body over, its source stopped if
-    -- attached, nothing shown.  What it needs that the invariant lacks: a
-    -- `Flags` field placing the body's end at `CS.owedAt k` and passed,
-    -- from which `Torn`'s spent body follows by `Sound.ends`; and the torn
-    -- connect's `TailP`, the end-tail shape `shut-tail` has, for the body
-    -- past its end and the source's burst, attached (`AttFin`) or an isle.
-    run-owed      : ∀ {Cr C Γ A X} {c : Ctx R Γ A} {k} {o : St Γ X} {b κ r k′ sh t}
-                  → run c (connS k o b) owedM r ≡ moved k′ sh t
-                  → (owedM , κ) ∈ own (connS k o b) → Lo (plug c (connS k o b)) κ → StOK (connS k o b) → G (connS k o b)
-                  → Inv Rt Cr C ⟨ c , connS k o b , absorbed , r ⟩
-                  → sh ≡ [] × Ran Rt Cr k′
     -- A COLD'S TURN: its tape played one step, a value or its end rising,
     -- a stall or a frame's close moving nothing owed.
     abs-leaf      : ∀ {Γ′ A′ Γ A} {c : Ctx R Γ′ A′} {s} {c′ : Ctx R Γ A} {b} {l : Tape A} {κ t k′ p}
@@ -560,7 +555,10 @@ module Over {R : Set} (Rt : EmissionSet R) where
   run-con {k = cs cl sl sa bd nothing ow cx ea sr sc} {o} {b} (inj₂ (inj₁ refl)) _ mi lo st g i
     with own-cls (cs cl sl sa bd nothing ow cx ea sr sc) {o} {b} mi
   ... | os ()
-  run-con (inj₂ (inj₂ refl)) eq mi lo st g i = run-owed eq mi lo st g i
+  run-con {k = cs cl sl sa bd as (just q) cx ea sr sc} (inj₂ (inj₂ refl)) refl mi lo st g i = refl , con-owed Rt i
+  run-con {k = cs cl sl sa bd as nothing cx ea sr sc} {o} {b} (inj₂ (inj₂ refl)) _ mi lo st g i
+    with own-cls (cs cl sl sa bd as nothing cx ea sr sc) {o} {b} mi
+  ... | oo ()
 
   ----------------------------------------------------------------------
   -- Mark runs, assembled: the search, then the node's run.

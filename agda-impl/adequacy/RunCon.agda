@@ -15,12 +15,12 @@ open import Data.Maybe using (just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (¬_)
 
 open import denotation.Events using (Pos; ix; inside)
-open import denotation.EmissionSet using (EmissionSet; pin)
-open import denotation.Laws.Modulus using (≼-refl)
+open import denotation.EmissionSet using (EmissionSet; pin; end; module Connecting)
+open import denotation.Laws.Modulus using (≼-refl; ≺→≼)
 open import denotation.Laws.Worlds using (ok-step)
 open import operation.Key using (at; after; at-after-≮)
 open import operation.PureObservable using (module Machine)
@@ -28,17 +28,20 @@ open Machine using (St; Ctx; Conf; Scope; ⟨_,_,_,_⟩; subscribing; absorbed; 
                     pend; connS; inSrc; scopeOf; binds; closed; unsubIf)
 open import adequacy.Rows using (Frozen; ≃-refl; Vis; _≃_; _⇄_; silent; Moves)
 open _≃_
-open import adequacy.Cursor using (Cur; bef; Owes; Behind; Pts; Held; AttFin; AttOwed; TailP; tailp; Src; Sync; Subd; husk-of; unsubIf-husk; under-⊑; tailp-⊑; ∪-⊑; Parts; Flags; Sound; Husk; SrcH; Unread; NoIsle; _∪ᵖ_; _⊑_; ∅ᵖ; ∅-⊑; ⊑-refl; ⊑-trans;
-  h-blank; h-conn; sh-dead; sh-isle; sh-islec; sh-pend; src-pend; src-on; src-shut; s-conn; Torn; un-dead; un-torn;
-  owes; dead; lane; lanecut; pnd; c-abs; c-sub; ≈-refl; notT; sync-pend; subd;
-  Need; Fr; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-isle; f-islec; f-islep; f-body;
-  d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body)
+open import adequacy.Cursor using (Cur; bef; Owes; Behind; Pts; Held; AttFin; AttOwed; TailP; tailp; Src; Sync; Subd; husk-of;
+  src-husk; re-parts; unsubIf-husk; under-⊑; tailp-⊑; ∪-⊑; Parts; Flags; Sound; Husk; SrcH;
+  Unread; NoIsle; _∪ᵖ_; _⊑_; ∅ᵖ; ∅-⊑; ⊑-refl; ⊑-trans; h-blank; h-conn; sh-dead; sh-isle;
+  sh-islec; sh-pend; src-pend; src-on; src-shut; s-conn; Torn; un-dead; un-torn; owes; dead;
+  lane; lanecut; pnd; c-abs; c-sub; ≈-refl; notT; sync-pend; subd; Need; Fr; f-top; f-map;
+  f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp;
+  f-isle; f-islec; f-islep; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes;
+  d-src; d-body)
 open import adequacy.Cursor.Rise using (Inv; settled; pending; RT)
 open import adequacy.Least using (Lo; k-kid; k-body)
 open import adequacy.Floor.Keys using (plug-in)
-open import adequacy.Bound using (behind-pend; owes?; lo-att; in-slot)
-open import adequacy.Few using (fr-shift; few; before; subd-env)
-open import adequacy.PinTail using (pin-tail; ptl)
+open import adequacy.Bound using (behind-pend; owes?; owes-≼; lo-att; in-slot)
+open import adequacy.Few using (fr-shift; few; before; subd-env; nxt; cl)
+open import adequacy.PinTail using (pin-tail; ptl; end-tail; SrcPT; src-pt)
 open import adequacy.Walk using (nowhere; none′)
 open import adequacy.Stamped using (StOK)
 open import adequacy.Isle using (G; NoAttB; att-key; noatt-noisle)
@@ -46,11 +49,6 @@ open import adequacy.Isle using (G; NoAttB; att-key; noatt-noisle)
 -- What the root owes, moved row for row.
 vis-≃ : ∀ {A} {E E′ : EmissionSet A} → E ≃ E′ → Vis E ≃ Vis E′
 vis-≃ d = (λ (x , v) → to d x , v) ⇄ (λ (x , v) → from d x , v)
-
--- A connect's parts read again under fields they do not read.
-re-parts : ∀ {Γ X B} {sc : Scope Γ} {Rg} {k k′ : CS Γ X} {β : EmissionSet B} → Frozen k ≡ Frozen k′ → Parts sc Rg k β → Parts sc Rg k′ β
-re-parts e pt = record { Rb = Parts.Rb pt ; Rs = Parts.Rs pt ; b⊆ = Parts.b⊆ pt ; s⊆ = Parts.s⊆ pt ; apart = Parts.apart pt
-                       ; clear = Parts.clear pt ; sb = Parts.sb pt ; ss = subst (Sound (Parts.Rs pt)) e (Parts.ss pt) }
 
 -- A connect's flags read again under fields they do not read.
 re-flags : ∀ {Γ X B} {C} {cl sl sa p as ow cx ea sr sc sa′ p′ as′} {β : EmissionSet B}
@@ -137,6 +135,52 @@ torn-att : ∀ {Γ X B} {sc : Scope Γ} {C} {cl sl sa p ow cx ea sr sc′} {y} {
          → Torn sc C (cs cl sl true p nothing ow cx ea sr sc′) (proj₁ (unsubIf true o)) b β
 torn-att lo tn with srch-att true lo (Torn.sh tn)
 ... | P′ , sh′ , le = record { Ps = P′ ; Pb = Torn.Pb tn ; sh = sh′ ; bh = Torn.bh tn ; tl = tailp-⊑ (Torn.tl tn) (∪-⊑ le ⊑-refl) }
+
+------------------------------------------------------------------------
+-- A CONNECT'S OWED TEARDOWN: its body ended at a row the cursor has
+-- passed (`Flags.owed`), so past it the connect owes only pins of its
+-- source's burst, finitely many echoes, and what its body's isles still
+-- run (`end-tail`).  Its source, stopped if attached, keeps what it runs.
+
+-- A source torn down: what it runs, unsubscribed if attached.
+srch-off : ∀ {Γ X} {sc : Scope Γ} {cl sl sa p as ow cx ea sr sc′} {o : St Γ X} {P}
+         → SrcH sc (cs cl sl sa p as ow cx ea sr sc′) o P
+         → Σ Pts λ P′ → SrcH sc (cs cl false sa p as nothing cx ea sr sc′) (proj₁ (unsubIf sa o)) P′ × P ⊑ P′
+srch-off {sa = true} (sh-dead hk) with unsubIf-husk true hk
+... | _ , h , le = _ , sh-dead h , under-⊑ le
+srch-off {sa = true}  (sh-isle () _ _ _ _ _ _)
+srch-off {sa = true}  (sh-islec () _ _ _ _ _ _)
+srch-off {sa = true}  (sh-pend () _ _ _ _ _ _ _ _)
+srch-off {sa = false} (sh-dead hk)                          = _ , sh-dead hk , ⊑-refl
+srch-off {sa = false} (sh-isle na nc sy bh sd ss ao)        = _ , sh-isle na nc sy bh sd ss ao , ⊑-refl
+srch-off {sa = false} (sh-islec na cl sp tp hk bh sd)       = _ , sh-islec na cl sp tp hk bh sd , ⊑-refl
+srch-off {sa = false} (sh-pend na nc ba an sc adm pe wn ss) = _ , sh-pend na nc ba an sc adm pe wn ss , ⊑-refl
+
+-- A torn connect, torn again: its source stopped if attached.
+torn-off : ∀ {Γ X B} {sc : Scope Γ} {C} {cl sl sa p as ow cx ea sr sc′} {o : St Γ X} {b : St (X ∷ Γ) B} {β}
+         → Torn sc C (cs cl sl sa p as ow cx ea sr sc′) o b β
+         → Torn sc C (cs cl false sa p as nothing cx ea sr sc′) (proj₁ (unsubIf sa o)) b β
+torn-off tn with srch-off (Torn.sh tn)
+... | P′ , sh′ , le = record { Ps = P′ ; Pb = Torn.Pb tn ; sh = sh′ ; bh = Torn.bh tn ; tl = tailp-⊑ (Torn.tl tn) (∪-⊑ le ⊑-refl) }
+
+-- What a connect owes past its body's end.
+owed-tl : ∀ {Γ X B} {Rb C} {k : CS Γ X} {b : St (X ∷ Γ) B} {β : EmissionSet B} {Ps P′ q}
+        → (sy : Sync (binds (CS.src k) (CS.connAt k) (CS.scope k)) Rb C b β) → Sound Rb β → β q end → ¬ Owes C q
+        → SrcPT C k Ps → Ps ⊑ P′ → TailP C (Connecting.ConnT (CS.connAt k) (Frozen k) β) (P′ ∪ᵖ proj₁ (husk-of sy))
+owed-tl {C = C} {k = k} {β = β} {Ps = Ps} {P′} {q} sy sb qe nq (ks , fs) (ls , g) with end-tail sy sb qe nq
+... | tailp kb fb = tailp (kb ++ ls ++ ks ++ cl C) row
+  where
+    src : ∀ {y} → Ps y ⊎ y ∈ ks → (P′ ∪ᵖ proj₁ (husk-of sy)) y ⊎ y ∈ kb ++ ls ++ ks ++ cl C
+    src (inj₁ h) = [ (λ h′ → inj₁ (inj₁ h′)) , (λ i → inj₂ (∈-++⁺ʳ kb (∈-++⁺ˡ i))) ]′ (g h)
+    src (inj₂ i) = inj₂ (∈-++⁺ʳ kb (∈-++⁺ʳ ls (∈-++⁺ˡ i)))
+
+    row : ∀ {y e} → Connecting.ConnT (CS.connAt k) (Frozen k) β y e → Owes C y → (P′ ∪ᵖ proj₁ (husk-of sy)) y ⊎ y ∈ kb ++ ls ++ ks ++ cl C
+    row (Connecting.body x) o = [ (λ h → inj₁ (inj₂ h)) , (λ i → inj₂ (∈-++⁺ˡ i)) ]′ (fb x o)
+    row (Connecting.burst x ins) o = src (fs x (inj₁ ins) o)
+    row (Connecting.echo {y} x al _ _) o with owes? C y
+    ... | inj₁ oy = ⊥-elim (nq (owes-≼ C oy (≺→≼ {y} {q} (al qe))))
+    ... | inj₂ ny = inj₂ (∈-++⁺ʳ kb (∈-++⁺ʳ ls (∈-++⁺ʳ ks (nxt C ny o))))
+    row (Connecting.kept {p′ = p′} x al _ _) o = src (fs x (inj₂ (_ , refl , λ op → nq (owes-≼ C op (≺→≼ {p′} {q} (al qe))))) o)
 
 -- A body's run finds no attach owed in it: the body's every attach is
 -- keyed after its own run, and no mark of the tree is keyed before it.
@@ -270,3 +314,30 @@ module _ {R : Set} (Rt : EmissionSet R) where
   con-att lo (settled {N = lane _ _} c-abs fr (_ , _ , () , _))
   con-att lo (settled {N = lanecut _ _} c-abs fr (_ , _ , () , _))
   con-att lo (settled {N = pnd _} c-abs fr (_ , () , _))
+
+  -- THE OWED TEARDOWN.  Live, its source is torn down with it, its body
+  -- spent; already torn, its source is stopped if attached; in a part no
+  -- live node reads, either.
+  con-owed : ∀ {Cr C Γ X B} {c : Ctx R Γ B} {cl sl sa p as cx ea sr sc} {q} {o : St Γ X} {b : St (X ∷ Γ) B} {r}
+           → Inv Rt Cr C ⟨ c , connS (cs cl sl sa p as (just q) cx ea sr sc) o b , absorbed , r ⟩
+           → Ran Cr ⟨ c , connS (cs cl false sa p as nothing cx ea sr sc) (proj₁ (unsubIf sa o)) b , absorbed , q ⟩
+  con-owed {Cr} {C} {cl = cl} {sl = true} {sa} {p} {as} {cx} {ea} {sr} {sc} (settled {N = owes} c-abs fr (s-conn refl pt bs ss tn fl eq)) =
+    Cr , C , settled c-abs fr (s-conn refl (re-parts refl pt) (λ ()) (λ ()) (λ _ → tn′)
+      (record { shut = Flags.shut fl ; unshut = λ () ; owed = λ ()
+              ; torn = λ _ (x , v , o) → proj₂ (Flags.owed fl refl) (owes-≼ C o (Sound.ends (Parts.sb pt) (proj₁ (Flags.owed fl refl)) x v)) }) eq) ,
+    silent ≃-refl
+    where
+      srh = src-husk refl (ss tt) (Parts.ss pt)
+      off = srch-off (proj₂ srh)
+      tn′ = record { Ps = proj₁ off ; Pb = proj₁ (husk-of (bs tt)) ; sh = proj₁ (proj₂ off) ; bh = proj₂ (husk-of (bs tt))
+                   ; tl = owed-tl {k = cs cl false sa p as nothing cx ea sr sc} (bs tt) (Parts.sb pt) (proj₁ (Flags.owed fl refl)) (proj₂ (Flags.owed fl refl)) (src-pt (ss tt) (Parts.ss pt)) (proj₂ (proj₂ off)) }
+  con-owed {Cr} {C} {sl = false} (settled {N = owes} c-abs fr (s-conn scp pt bs ss tn fl eq)) =
+    Cr , C , settled c-abs fr (s-conn scp (re-parts refl pt) (λ ()) (λ ()) (λ t → torn-off (tn t))
+      (record { shut = Flags.shut fl ; unshut = λ () ; torn = Flags.torn fl ; owed = λ () }) eq) ,
+    silent ≃-refl
+  con-owed {Cr} {C} (settled {N = dead _} c-abs fr (_ , h-blank , le)) = Cr , C , settled c-abs fr (_ , h-blank , le) , silent ≃-refl
+  con-owed {Cr} {C} (settled {N = dead _} c-abs fr (_ , h-conn sh hb , le)) with srch-off sh
+  ... | _ , sh′ , le′ = Cr , C , settled c-abs fr (_ , h-conn sh′ hb , ⊑-trans le (∪-⊑ le′ ⊑-refl)) , silent ≃-refl
+  con-owed (settled {N = lane _ _} c-abs fr (_ , _ , () , _))
+  con-owed (settled {N = lanecut _ _} c-abs fr (_ , _ , () , _))
+  con-owed (settled {N = pnd _} c-abs fr (_ , () , _))

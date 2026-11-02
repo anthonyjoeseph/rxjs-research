@@ -20,9 +20,9 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (yes; no)
 
 open import denotation.Events using (Pos; ix; last; _<ᵖ_; _≟ˡ_; <ᵖ-below; <ᵖ-irrefl; <ᵖ-split; <ᵖ-trans)
-open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᴷ; <ᴷ-trans; ≮ᴷ-trans; clash; after-past)
+open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᴷ; <ᴷ-trans; ≮ᴷ-trans; clash; after-past; <ᴷ-asym)
 open import adequacy.Stamped using (Ix)
-open import adequacy.Floor.Keys using (asym; at-after₀)
+open import adequacy.Floor.Keys using (at-after₀)
 open import adequacy.Apart.Cone using (Cone; pre; cone-trans; cone-up; cone-low; cone-past)
 
 ------------------------------------------------------------------------
@@ -46,7 +46,7 @@ past-at q y h with q <ᵖ y in e
 -- No earlier than a position and outside its cone: past its after.
 past-cone : ∀ q y → at y <ᴷ at q ≡ false → (Cone q y → ⊥) → at y <ᴷ after q ≡ false
 past-cone q y h ne with <ᵖ-split q y (trans (sym (at-<ᴷ y q)) h)
-... | inj₁ qy   = asym (after q) (at y) (cone-past q y qy ne)
+... | inj₁ qy   = <ᴷ-asym (after q) (at y) (cone-past q y qy ne)
 ... | inj₂ refl = ⊥-elim (ne (subst (Cone q) (++-identityʳ q) (pre [])))
 
 self : ∀ q → Cone q q
@@ -211,12 +211,12 @@ sub-bk {p} B nb (_ , fb) with kind B nb
 -- The run a level down.
 sub-down : ∀ {p} l → Ix p → Sub (cl (p ++ [ l ])) (cl p)
 sub-down {p} l hp B nb (_ , fb) with kind B nb
-... | is-fut fB = dis-in fB (λ _ ()) , far-in fB (λ y iB → ≮ᴷ-trans (at y) (after p) (after (p ++ [ l ])) (proj₁ (far-out fB fb y iB)) (asym (after (p ++ [ l ])) (after p) (after-in p l []))
+... | is-fut fB = dis-in fB (λ _ ()) , far-in fB (λ y iB → ≮ᴷ-trans (at y) (after p) (after (p ++ [ l ])) (proj₁ (far-out fB fb y iB)) (<ᴷ-asym (after (p ++ [ l ])) (after p) (after-in p l []))
                                                 , λ c → proj₂ (far-out fB fb y iB) (cone-trans (pre [ l ]) c))
 ... | is-pt y refl = out , out
   where
     out : Out (cl (p ++ [ l ])) y
-    out = ≮ᴷ-trans (after y) (after p) (after (p ++ [ l ])) (proj₁ fb) (asym (after (p ++ [ l ])) (after p) (after-in p l []))
+    out = ≮ᴷ-trans (after y) (after p) (after (p ++ [ l ])) (proj₁ fb) (<ᴷ-asym (after (p ++ [ l ])) (after p) (after-in p l []))
         , λ c → ⊥-elim (cone-up l [] (subst (Cone (p ++ [ l ])) (proj₂ fb (cone-trans (pre [ l ]) c)) c))
 ... | is-bk j refl = <ᵖ-trans j p (p ++ [ l ]) fb (<ᵖ-below p []) , <ᵖ-trans j p (p ++ [ l ]) fb (<ᵖ-below p [])
 
