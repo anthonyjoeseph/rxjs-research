@@ -36,7 +36,7 @@ open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans; ≃-refl; ≼
 open _≃_
 open import adequacy.Walk using (sync-≈)
 open import adequacy.Enter using (module Lanes)
-open import adequacy.Cursor using (Cur; bef; aft; Behind; Fin; Tail; fin-dn; tail-dn; alike; ≈-sym; FewBefore; ConnE; Need; owes; dead; lane; lanecut; pnd; _≈_; c-abs; Pol; Ahead; Whole; OuterDone; Owes; Due; Spent; Unfed; Rgn; Sound; vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none; fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; re-parts; OweAt; o-cp; o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Fr; Waiting; Lane; JRl; JRo; JInv; Asc; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; polF; JoinF; LanesIn; NoFail; TailP; tailp-dn; Subd; SubdAt; subd; Torn; Unread; un-dead; un-torn; notT; by; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; sh-pend; husk-of; ⊑-trans; ∪-⊑; ⊑-refl; under-⊑; NoIsle; NoIsleL; Settles; sync-pend; burst-dn)
+open import adequacy.Cursor using (Cur; bef; aft; Behind; Fin; Tail; fin-dn; tail-dn; alike; voc; FewBefore; ConnE; Need; owes; dead; lane; lanecut; pnd; _≈_; c-abs; Pol; Ahead; Whole; OuterDone; Owes; Due; Spent; Unfed; Rgn; Sound; vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none; fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; re-parts; OweAt; o-cp; o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Fr; Waiting; Lane; JRl; JRo; JInv; Asc; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; polF; JoinF; LanesIn; NoFail; TailP; tailp-dn; Subd; SubdAt; subd; Torn; Unread; un-dead; un-torn; notT; by; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; sh-pend; husk-of; ⊑-trans; ∪-⊑; ⊑-refl; under-⊑; NoIsle; NoIsleL; Settles; sync-pend; burst-dn)
 open import adequacy.Cursor.Rise using (Inv; RT; settled; flying; adrift; SimC; keeps; unread-at)
 open import adequacy.Bound using (join-row; owes?; few-src)
 open import adequacy.Regions using (lane-sole)
@@ -481,7 +481,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       hole : ∀ {q a e} → O q (out a) → Lane (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) q a p e → Visible e → ⊥
       hole y ln v with sole (rl y ln) rp
       ... | refl with Sound.fn so y y₀ _ _
-      ...   | refl = nr (proj₁ (to (alike le) (ln , v))) v
+      ...   | refl = nr (proj₁ (from (alike le) (ln , v))) v
       nb₁ : ∀ {q a} → (q , a) ∈ vs₁ → ¬ JRl (scopeOf c) Rg₀ op f O q p
       nb₁ i r = ≺-irrefl {q₀} (subst (λ x → x ≺ q₀) (sole r rp) (asc-pre vs₁ ao i))
       nb₂ : ∀ {q a} → (q , a) ∈ vs₂ → ¬ JRl (scopeOf c) Rg₀ op f O q p
@@ -504,7 +504,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       nb : ¬ Parts.Rb pt p
       nb r = Parts.apart pt r rp
       of : Past.Off p (Frozen k)
-      of y v refl = nr (proj₁ (to (alike fz) (y , v))) v
+      of y v refl = nr (proj₁ (from (alike fz) (y , v))) v
       nhb : ¬ VHot (full (binds (CS.src k) (CS.connAt k) (scopeOf c))) p
       nhb (inj₁ (_ , (y , _) , v)) = of (subst (λ x → pendRows (full x) (CS.src k) (CS.connAt k ++ [ ix 1 ]) p _) (sym sc) y) v refl
       nhb (inj₂ h)                 = nh h
@@ -552,11 +552,11 @@ module _ {R : Set} (Rt : EmissionSet R) where
   -- What a running source's row at `p` leaves of its connect.
   module Fed {Cr Γ X B} {k : CS Γ X} {c : Ctx R Γ B} {Rg E E′ β} {e : Evᴹ X} {p}
              (fr : Fr Rt Cr (bef p) Rg c owes E′) (sc : CS.scope k ≡ scopeOf c) (pt : Parts (scopeOf c) Rg k β)
-             (lv : T (CS.srcLive k)) (fz : Frozen k ≈ E) (eq : ConnE (CS.connAt k) (Frozen k) β E′)
+             (lv : T (CS.srcLive k)) (fz : E ≈ Frozen k) (eq : ConnE (CS.connAt k) (Frozen k) β E′)
              (row : E p (toEv e)) where
 
     fk : Frozen k p (toEv e)
-    fk = proj₁ (from (alike fz) (row , vis e))
+    fk = voc fz row
 
     rs : Parts.Rs pt p
     rs = Sound.rg (Parts.ss pt) fk (vis e)
@@ -615,7 +615,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   rise-src-nx {a = a} {p = p} refl (flying (f-src fr sc pt lv nc bs fl fz eq bh sd af ao _) cl (sy , row)) =
     let open Fed {e = nx a} fr sc pt lv fz eq row
     in Cr↑ , aft p , settled c-abs fr↑ (s-conn sc pt (λ _ → body bs)
-                                              (λ _ → src-on nc (sync-≈ sy (≈-sym fz)) (Past.behind-up p bh) (Past.subd-up p sd) af ao)
+                                              (λ _ → src-on nc (sync-≈ sy fz) (Past.behind-up p bh) (Past.subd-up p sd) af ao)
                                               (λ nl → ⊥-elim (notT _ nl lv)) (flags-on nc (λ ()) fl) eq)
      , moves
   -- an isle's source runs on, its body read by none
@@ -639,7 +639,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
               → rise (inSrc k b c) s cp p ≡ moved k′ sh t → SimC Rt ⟨ inSrc k b c , s , rising cp , p ⟩ sh k′
   rise-src-cp {k = k} {b} {c} {s} {p} refl (flying (f-src fr sc pt lv nc bs fl fz eq bh sd _ _ _) cl (sy , row)) =
     let open Fed {e = cp} fr sc pt lv fz eq row
-        sy′ = sync-≈ sy (≈-sym fz)
+        sy′ = sync-≈ sy fz
     in Cr↑ , aft p
      , subst (λ k″ → Inv Rt Cr↑ (aft p) ⟨ c , connS k″ s (feed (here refl) p cp b) , absorbed , p ⟩) (sym (shut-live {k = k} {p} lv))
              (settled c-abs fr↑ (s-conn sc (re-parts refl pt) (λ _ → body bs)

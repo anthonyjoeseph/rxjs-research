@@ -40,9 +40,9 @@ open _≃_
 open import adequacy.Cursor using (Cur; origin; bef; aft; Owes; Due; Unfed; Pol; Lane; Runs; NoKill; Kept; polF; JoinF; h-live;
   h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Spent; Folded; fd-none; fd-last;
   Whole; Ahead; Joined; joined; Flags; Src; src-pend; src-on; src-shut; OweAt; o-cp; o-cut;
-  o-over; NoFail; Behind; Fin; fin-dn; tail-dn; _≈_; cov; voc; Subd; SubdAt; subd; TailP;
-  tailp; tailp-dn; Pts; _∪ᵖ_; Under; Burst; Torn; Husk; HuskL; SrcH; h-blank; h-map; h-scan;
-  h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; sh-dead; sh-isle; sh-islec; sh-pend; Sync;
+  o-over; NoFail; Behind; Fin; fin-dn; tail-dn; _≈_; cov; Subd; SubdAt; subd; TailP; tailp;
+  tailp-dn; Pts; _∪ᵖ_; Under; Burst; Torn; Husk; HuskL; SrcH; h-blank; h-map; h-scan; h-cut;
+  h-ln; h-take; h-flat; h-conn; hl-none; hl-more; sh-dead; sh-isle; sh-islec; sh-pend; Sync;
   s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx;
   Fr; owes; AttOwed)
 open import adequacy.Floor.Keys using (plug-in; own-bld; os)
@@ -417,7 +417,7 @@ mutual
   lane-f : ∀ {Γ} {sc : Scope Γ} {Rg} {C A B} {P : Pol A B} {q a l b p}
          → LaneSt sc Rg C P q a l b → Env (full sc) C p → EnvL (full sc) C p → LoP l p
          → Σ (List Pos) λ ks → ∀ {k e} → Kept P q a k e → Owes C k → k ≺ p → k ∈ ks
-  lane-f {P = P} (l-live (h-live _ eq) sy _) env ef lo with few sy env ef (λ ki → lo (k-kid (k-ln (k-kid (k-cut ki))))) | voc eq
+  lane-f {P = P} (l-live (h-live _ eq) sy _) env ef lo with few sy env ef (λ ki → lo (k-kid (k-ln (k-kid (k-cut ki))))) | cov eq
   ... | lag ke fe | lv , g = lv ++ ke , λ kp o kp′ → [ (λ r → ∈-++⁺ʳ lv (fe r o kp′)) , ∈-++⁺ˡ ]′ (g (kept-lane {P = P} kp))
   lane-f {C = C} (l-dead (h-end _ _ tp) hk) env ef lo  with tailp-lag {C = C} tp (husk-f hk (λ ki → lo (k-kid (k-ln (k-kid (k-cut ki))))))
   ... | lag ks f = ks , f

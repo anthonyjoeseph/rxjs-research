@@ -35,11 +35,11 @@ open import denotation.Laws.BoundedInv using (module BoundedI)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Scope; unbound; binds; CS; takeS)
 open import adequacy.Rows using (full; Frozen)
-open import adequacy.Cursor using (Cur; bef; aft; Owes; Beneath; Pts; _∪ᵖ_; Burst; Held; held-dn; TailP; tailp; Sync; Src; Sound; NoFail; Pol;
-  Lane; Runs; Start; Kept; polF; JoinF; JInv; h-live; h-end; h-kill; LaneSt; l-live; l-dead;
-  Begun; none; more; Parts; joined; src-pend; src-on; src-shut; Torn; by; husk-of; src-husk;
-  begun-husk; lane-husk; voc; cov; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took;
-  s-flat; s-conn; s-join; s-joinx)
+open import adequacy.Cursor using (Cur; bef; aft; Owes; Beneath; Pts; _∪ᵖ_; Burst; Held; held-dn; TailP; tailp; Sync; Src;
+  Sound; NoFail; Pol; Lane; Runs; Start; Kept; polF; JoinF; JInv; h-live; h-end; h-kill;
+  LaneSt; l-live; l-dead; Begun; none; more; Parts; joined; src-pend; src-on; src-shut; Torn;
+  by; husk-of; src-husk; begun-husk; lane-husk; cov; s-cold; s-of; s-done; s-map; s-scan;
+  s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx)
 open import adequacy.Bound using (owes?; owes-≼; starts-past; past)
 open import adequacy.Few using (join-pin; kept-lane; ix0)
 
@@ -179,7 +179,7 @@ mutual
 
   lane-pt : ∀ {Γ A B} {sc : Scope Γ} {Rg C} {P : Pol A B} {q a l b} (ln : LaneSt sc Rg C P q a l b)
           → Σ (List Pos) λ ks → ∀ {y r} → Kept P q a y (pin r) → Owes C y → ¬ Owes C r → proj₁ (lane-husk ln) y ⊎ y ∈ ks
-  lane-pt {C = C} {P = P} (l-live (h-live _ m) sy _) with pt-bn {C = C} (voc m) (λ x → x) (pin-tail sy)
+  lane-pt {C = C} {P = P} (l-live (h-live _ m) sy _) with pt-bn {C = C} (cov m) (λ x → x) (pin-tail sy)
   ... | ptl ks f = ks , λ kp → f (kept-lane {P = P} kp)
   lane-pt (l-dead (h-end _ _ (tailp ks f)) _)  = ks , λ kp o _ → f kp o
   lane-pt (l-dead (h-kill _ _ (tailp ks f)) _) = ks , λ kp o _ → f kp o

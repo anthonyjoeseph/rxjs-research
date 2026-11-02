@@ -66,7 +66,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
         → JoinE (scopeOf c) op f ω E E′ → Sound (JRo (scopeOf c) Rg op f E) E → Behind (bef p) (JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E)
         → Sync (scopeOf c) (JRo (scopeOf c) Rg op f E) (aft p) o E → E p (out a)
         → Start (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) p a (p ++ [ ix 1 ])
-        → Lane (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) p a ≈ pendRows (full (scopeOf c)) (f a) (p ++ [ ix 1 ])
+        → pendRows (full (scopeOf c)) (f a) (p ++ [ ix 1 ]) ≈ Lane (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) p a
         → Runs (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) p
         → Σ Cur λ Cr′ → Inv Rt Cr′ (aft p) ⟨ inCut true (attAt (p ++ [ ix 1 ])) (inLn true (inLanes op f ω d (suc n) q o (reverse ls) [] c))
                                             , pend (f a) (p ++ [ ix 1 ]) , subscribing , p ++ [ ix 1 ] ⟩
@@ -149,10 +149,10 @@ module _ {R : Set} (Rt : EmissionSet R) where
       I = JInv.fi ji a s (ok-step p (ok-in (JInv.ok ji) (InvAt.world (JInv.io ji) row) (InvAt.real (JInv.io ji) row)))
       g : ∀ {y e} → enter (⟦ f a ⟧ (full (scopeOf c))) s y e → _
       g x = world-after (InvAt.world I x) (InvAt.real I x)
-      ln : LaneOf (λ a → ⟦ f a ⟧ (full (scopeOf c))) p a ≈ pendRows (full (scopeOf c)) (f a) s
-      ln = record { alike = (λ ((x , _) , v) → x , v) ⇄ (λ (x , v) → (x , g x) , v)
-                  ; cov = [] , λ x → inj₁ (x , g x)
-                  ; voc = [] , λ x → inj₁ (proj₁ x) }
+      ln : pendRows (full (scopeOf c)) (f a) s ≈ LaneOf (λ a → ⟦ f a ⟧ (full (scopeOf c))) p a
+      ln = record { alike = (λ (x , v) → (x , g x) , v) ⇄ (λ ((x , _) , v) → x , v)
+                  ; cov = [] , λ x → inj₁ (proj₁ x)
+                  ; voc = λ x → x , g x }
   merge-start (flying (d-outer _ _ _) _ ())
   merge-start {f = f} {c = c} {a = a} {p = p} {Cr = Cr} {C = C} (adrift (d-outer {P = P₀} fr hl le) cl (Q₀ , hk , le₀)) with hl-rev hl hl-none
   ... | Qa , ha , lr =

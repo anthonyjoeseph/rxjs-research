@@ -62,7 +62,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; unbound; binds; CS; Owe
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; unsub; cut; killAll; unsubIf)
                     renaming (Ev to Evᴹ; Shown to Shownᴹ)
 open import denotation.Laws.Modulus using (≺-ext; ≺-trans)
-open import adequacy.Rows using (_≃_; ≃-refl; ≃-sym; ≃-trans; Vis; toEv; Inbox; full; pendRows; Frozen; tapeE)
+open import adequacy.Rows using (_≃_; ≃-refl; ≃-trans; Vis; toEv; Inbox; full; pendRows; Frozen; tapeE)
 open import denotation.Laws.Worlds using (Ok; Hots; Real; W; W⁼; Plain; InvAt; InvD) renaming (_⊑_ to _⊑ʷ_)
 open _≃_
 
@@ -97,26 +97,24 @@ Behind C E = Σ (List Pos) λ ks → ∀ {y e} → E y e → ¬ Owes C y → y �
 Beneath : ∀ {A} → EmissionSet A → EmissionSet A → Set
 Beneath E E′ = Σ (List Pos) λ ks → ∀ {y e} → E′ y e → E y e ⊎ y ∈ ks
 
--- Alike in every row a reader meets, and row for row but for finitely
--- many: a defer's guard is a skip no reader meets.
+-- Alike in every row a reader meets; every row of `E` a row of `E′`, and
+-- every row of `E′` one of `E` but for finitely many: a defer's guard is a
+-- skip no reader meets, left above when the defer passes it.
 record _≈_ {A} (E E′ : EmissionSet A) : Set where
   field
     alike : Vis E ≃ Vis E′
     cov   : Beneath E E′
-    voc   : Beneath E′ E
+    voc   : ∀ {y e} → E y e → E′ y e
 open _≈_ public
 
 beneath-trans : ∀ {A} {E E′ E″ : EmissionSet A} → Beneath E E′ → Beneath E′ E″ → Beneath E E″
 beneath-trans (ks , f) (ls , g) = ls ++ ks , λ r → [ (λ r′ → [ inj₁ , (λ i → inj₂ (∈-++⁺ʳ ls i)) ]′ (f r′)) , (λ i → inj₂ (∈-++⁺ˡ i)) ]′ (g r)
 
 ≈-refl : ∀ {A} {E : EmissionSet A} → E ≈ E
-≈-refl = record { alike = ≃-refl ; cov = [] , inj₁ ; voc = [] , inj₁ }
-
-≈-sym : ∀ {A} {E E′ : EmissionSet A} → E ≈ E′ → E′ ≈ E
-≈-sym m = record { alike = ≃-sym (alike m) ; cov = voc m ; voc = cov m }
+≈-refl = record { alike = ≃-refl ; cov = [] , inj₁ ; voc = λ r → r }
 
 ≈-trans : ∀ {A} {E E′ E″ : EmissionSet A} → E ≈ E′ → E′ ≈ E″ → E ≈ E″
-≈-trans m n = record { alike = ≃-trans (alike m) (alike n) ; cov = beneath-trans (cov m) (cov n) ; voc = beneath-trans (voc n) (voc m) }
+≈-trans m n = record { alike = ≃-trans (alike m) (alike n) ; cov = beneath-trans (cov m) (cov n) ; voc = λ r → voc n (voc m r) }
 
 -- Finitely many rows of `E` the cursor has not passed.
 Fin : ∀ {A} → Cur → EmissionSet A → Set
@@ -330,7 +328,7 @@ few-behind {p = p} (ks , f) = ks , λ {y} r lt → f r (λ py → py (≺-trans 
 -- subscribed, its entry its lane's; or over, by its end or a later value,
 -- what it still owes within what its state still runs.
 data Hole {A B} (C : Cur) (P : Pol A B) (q : Pos) (a : A) : Pts → EmissionSet B → Bool → Set₁ where
-  h-live : ∀ {s E} → Start P q a s → Lane P q a ≈ E → Hole C P q a ∅ᵖ E true
+  h-live : ∀ {s E} → Start P q a s → E ≈ Lane P q a → Hole C P q a ∅ᵖ E true
   h-end  : ∀ {c E Ph} → Lane P q a c end → ¬ Owes C c → TailP C (Kept P q a) Ph → Hole C P q a Ph E false
   h-kill : ∀ {q′ E Ph} → Kill P q q′ → ¬ Owes C q′ → TailP C (Kept P q a) Ph → Hole C P q a Ph E false
 
@@ -946,7 +944,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     f-src   : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {C Rg E E′ β}
             → Fr Cr C Rg c owes E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (not (CS.closed k))
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β
-            → Flags C k β → Frozen k ≈ E → ConnE (CS.connAt k) (Frozen k) β E′ → Behind C (Frozen k) → Subd (scopeOf c) C k
+            → Flags C k β → E ≈ Frozen k → ConnE (CS.connAt k) (Frozen k) β E′ → Behind C (Frozen k) → Subd (scopeOf c) C k
             → AttFin k → (T (not (CS.srcAtt k)) → AttOwed k) → NoIsle b → Fr Cr C (Parts.Rs pt) (inSrc k b c) owes E
     -- a source ended while its connect runs: nothing reads what is left
     f-srcc  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {C Rg Rg′ E E′ β P}
@@ -962,7 +960,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Fr Cr C Rg c owes E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (not (CS.closed k))
             → T (not (CS.srcAtt k)) → CS.bodyAt k ≡ just (CS.connAt k) → CS.attSrc k ≡ nothing → Adm (binds (CS.src k) (CS.connAt k) (scopeOf c))
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β
-            → Flags C k β → Frozen k ≈ E → ConnE (CS.connAt k) (Frozen k) β E′
+            → Flags C k β → E ≈ Frozen k → ConnE (CS.connAt k) (Frozen k) β E′
             → Owes C (CS.connAt k ++ [ ix 1 ]) → Subd (scopeOf c) C k → NoIsle b
             → Fr Cr C (Parts.Rs pt) (inSrc k b c) (pnd (CS.connAt k ++ [ ix 1 ])) E
     -- a body while its source runs

@@ -398,7 +398,7 @@ mutual
          → LaneSt sc Rg C P q a l b → O q (out a) → (∀ {q′} → Kill P q q′ → k ≼ q′) → Lane P q a k e → Visible e → Owes C k
          → Ends P O → Env (full sc) C p → LoP l p → p ≼ k
   lane-b (l-live (h-live _ eq) sy _) _ _ ln v ow _ env lo =
-    bound sy env (λ ki → lo (k-kid (k-ln (k-kid (k-cut ki))))) (proj₁ (to (alike eq) (ln , v)) , v , ow)
+    bound sy env (λ ki → lo (k-kid (k-ln (k-kid (k-cut ki))))) (proj₁ (from (alike eq) (ln , v)) , v , ow)
   lane-b {C = C} (l-dead (h-end lc nc _) _) y _ ln v ow en _ _ = ⊥-elim (nc (owes-≼ C ow (en y lc ln v)))
   lane-b {C = C} (l-dead (h-kill kq nq _) _) _ kl _ _ ow _ _ _ = ⊥-elim (nq (owes-≼ C ow (kl kq)))
 
