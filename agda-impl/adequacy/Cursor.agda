@@ -409,7 +409,7 @@ record Torn {Γ X B} (sc : Scope Γ) (C : Cur) (k : CS Γ X) (o : St Γ X) (b : 
   field
     Ps Pb : Pts
     sh    : SrcH sc k o Ps
-    bh    : Husk (binds (CS.src k) (CS.connAt k) sc) b Pb
+    bh    : Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Pb
     tl    : TailP C (Connecting.ConnT (CS.connAt k) (Frozen k) β) (Ps ∪ᵖ Pb)
 
 -- A lane in its joiner's list, live or over: its list entry over its
@@ -561,7 +561,7 @@ data Husk where
   h-flat  : ∀ {Γ} {sc : Scope Γ} {A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu o ls P Q}
           → Husk sc o P → HuskL sc ls Q → Husk sc (flatS op f ω d n qu o ls) (P ∪ᵖ Q)
   h-conn  : ∀ {Γ} {sc : Scope Γ} {X B} {k : CS Γ X} {o} {b : St (X ∷ Γ) B} {P Q}
-          → CS.scope k ≡ sc → SrcH sc k o P → Husk (binds (CS.src k) (CS.connAt k) sc) b Q → Husk sc (connS k o b) (P ∪ᵖ Q)
+          → SrcH sc k o P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Q → Husk sc (connS k o b) (P ∪ᵖ Q)
 
 data HuskL where
   hl-none : ∀ {Γ} {sc : Scope Γ} {A} → HuskL sc {A} [] ∅ᵖ
@@ -603,8 +603,8 @@ mutual
   husk-of (s-took _ _ _ _ _ hk _ _) = _ , h-take hk
   husk-of (s-flat _ sy (joined bg _ _ _ _ _ _ _) _ _ _) = _ , h-flat (proj₂ (husk-of sy)) (proj₂ (begun-husk bg))
   husk-of (s-conn {k = k} sc pt bs ss tn _ _) =
-    by (CS.srcLive k) (λ l → _ , h-conn sc (proj₂ (src-husk (ss l) (Parts.ss pt))) (proj₂ (husk-of (bs l))))
-                      (λ nl → _ , h-conn sc (Torn.sh (tn nl)) (Torn.bh (tn nl)))
+    by (CS.srcLive k) (λ l → _ , h-conn (proj₂ (src-husk (ss l) (Parts.ss pt))) (unbind sc (proj₂ (husk-of (bs l)))))
+                      (λ nl → _ , h-conn (Torn.sh (tn nl)) (Torn.bh (tn nl)))
   husk-of (s-join _ _ _ _ _)        = _ , h-blank
   husk-of (s-joinx _ _)             = _ , h-blank
 
@@ -620,6 +620,11 @@ mutual
   lane-husk : ∀ {Γ A B} {sc : Scope Γ} {Rg C} {P : Pol A B} {q a l b} → LaneSt sc Rg C P q a l b → Σ Pts (Husk sc l)
   lane-husk (l-live _ sy _) = _ , h-ln (h-cut (proj₂ (husk-of sy)))
   lane-husk (l-dead _ hk)   = _ , h-ln (h-cut hk)
+
+-- A body's husk read at its connect's own scope.
+unbind : ∀ {Γ X B} {k : CS Γ X} {sc} {b : St (X ∷ Γ) B} {Q} → CS.scope k ≡ sc
+       → Husk (binds (CS.src k) (CS.connAt k) sc) b Q → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Q
+unbind refl h = h
 
 -- One node's state in from what still runs around it.
 peel-take : ∀ {Γ} {sc : Scope Γ} {A} {i} {keep : A → Bool} {w s Q} → Husk sc (takeS i keep w s) Q → Σ Pts λ Q′ → Husk sc s Q′ × Q ⊑ Q′
@@ -641,7 +646,7 @@ mutual
   unsub-husk (h-ln hk)      = _ , h-ln hk , ⊑-refl
   unsub-husk (h-take hk)    = let (_ , h , le) = cut-husk hk in _ , h-take h , le
   unsub-husk (h-flat ho hl) = let (_ , h , le) = cut-husk ho ; (_ , g , le′) = kill-husk hl in _ , h-flat h g , ∪-⊑ le le′
-  unsub-husk (h-conn sc sh bh) = let (_ , h , le) = srch-unsub sh ; (_ , g , le′) = unsub-husk bh in _ , h-conn sc h g , ∪-⊑ le le′
+  unsub-husk (h-conn sh bh) = let (_ , h , le) = srch-unsub sh ; (_ , g , le′) = unsub-husk bh in _ , h-conn h g , ∪-⊑ le le′
 
   cut-husk : ∀ {Γ} {sc : Scope Γ} {A} {s : St Γ A} {P} → Husk sc s P → Σ Pts λ P′ → Husk sc (proj₁ (cut s)) P′ × P ⊑ P′
   cut-husk h-blank                   = _ , h-blank , ⊑-refl
@@ -652,7 +657,7 @@ mutual
   cut-husk hk@(h-ln _)               = _ , hk , ⊑-refl
   cut-husk hk@(h-take _)             = _ , hk , ⊑-refl
   cut-husk hk@(h-flat _ _)           = _ , hk , ⊑-refl
-  cut-husk hk@(h-conn _ _ _)         = _ , hk , ⊑-refl
+  cut-husk hk@(h-conn _ _)           = _ , hk , ⊑-refl
 
   kill-husk : ∀ {Γ} {sc : Scope Γ} {A} {ls : List (St Γ A)} {P} → HuskL sc ls P → Σ Pts λ P′ → HuskL sc (proj₁ (killAll ls)) P′ × P ⊑ P′
   kill-husk hl-none                          = _ , hl-none , ⊑-refl
@@ -664,7 +669,7 @@ mutual
   kill-husk (hl-more hk@(h-cut _) hl)        = kill-keep hk hl
   kill-husk (hl-more hk@(h-take _) hl)       = kill-keep hk hl
   kill-husk (hl-more hk@(h-flat _ _) hl)     = kill-keep hk hl
-  kill-husk (hl-more hk@(h-conn _ _ _) hl)   = kill-keep hk hl
+  kill-husk (hl-more hk@(h-conn _ _) hl)     = kill-keep hk hl
 
   -- A list entry no kill reaches, kept.
   kill-keep : ∀ {Γ} {sc : Scope Γ} {A} {l : St Γ A} {ls P Q} → Husk sc l P → HuskL sc ls Q
@@ -856,20 +861,20 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Fr Cr C Rg c (dead P) E′ → Husk (scopeOf c) o Qo → HuskL (scopeOf c) pre Qa → HuskL (scopeOf c) post Qb
             → P ⊑ (Qo ∪ᵖ (Qa ∪ᵖ (N ∪ᵖ Qb))) → Fr Cr C Rg′ (inLanes op f ω d n qu o pre post c) (dead N) E
     d-src   : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {C Rg′ P N Qb E}
-            → Unread Cr C c k P → CS.scope k ≡ scopeOf c → Husk (binds (CS.src k) (CS.connAt k) (scopeOf c)) b Qb
+            → Unread Cr C c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Qb
             → P ⊑ (Under N ∪ᵖ Qb) → Fr Cr C Rg′ (inSrc k b c) (dead N) E
     d-body  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {C Rg′ P N Ps E}
-            → Unread Cr C c k P → CS.scope k ≡ scopeOf c → SrcH (scopeOf c) k o Ps
+            → Unread Cr C c k P → SrcH (scopeOf c) k o Ps
             → P ⊑ (Ps ∪ᵖ N) → Fr Cr C Rg′ (inBody k o c) (dead N) E
     -- an isle: its source in step at its own cursor
     f-isle  : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {C Ri Ci P Qb}
-            → Unread Cr C c k P → CS.scope k ≡ scopeOf c → Husk (binds (CS.src k) (CS.connAt k) (scopeOf c)) b Qb
+            → Unread Cr C c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Qb
             → P ⊑ (Burst k ∪ᵖ Qb) → T (not (CS.srcAtt k)) → T (not (CS.closed k))
             → Behind Ci (Frozen k) → Subd (scopeOf c) Ci k → Sound Ri (Frozen k)
             → Fr Cr Ci Ri (inSrc k b c) owes (Frozen k)
     -- an isle whose source has ended
     f-islec : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {C Ci Rg′ P N Qb E}
-            → Unread Cr C c k P → CS.scope k ≡ scopeOf c → Husk (binds (CS.src k) (CS.connAt k) (scopeOf c)) b Qb
+            → Unread Cr C c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Qb
             → P ⊑ (Burst k ∪ᵖ Qb) → T (not (CS.srcAtt k)) → T (CS.closed k)
             → Spent Ci (Frozen k) → TailP Ci (Frozen k) N → Behind Ci (Frozen k) → Subd (scopeOf c) Ci k
             → Fr Cr C Rg′ (inSrc k b c) (dead N) E
@@ -1069,9 +1074,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
              → SimC ⟨ inBody k o c , s , rising e , p ⟩ [] ⟨ c , connS k o s , absorbed , p ⟩
   rise-bodyx nl = keeps λ
     { (flying (f-body _ _ _ lv _ _ _) _ _) → ⊥-elim (unlive nl lv)
-    ; (flying (d-body _ _ _ _) _ ())
-    ; (adrift (d-body (un-dead fr) sc sh le) cl (Q , hk , le′)) → settled c-abs fr (_ , h-conn sc sh hk , ⊑-trans le (∪-⊑ ⊑-refl le′))
-    ; (adrift (d-body (un-torn fr _ pt _ fl eq tp) sc sh le) cl (Q , hk , le′)) →
+    ; (flying (d-body _ _ _) _ ())
+    ; (adrift (d-body (un-dead fr) sh le) cl (Q , hk , le′)) → settled c-abs fr (_ , h-conn sh hk , ⊑-trans le (∪-⊑ ⊑-refl le′))
+    ; (adrift (d-body (un-torn fr sc pt _ fl eq tp) sh le) cl (Q , hk , le′)) →
         settled c-abs fr (s-conn sc pt (λ t → ⊥-elim (unlive nl t)) (λ t → ⊥-elim (unlive nl t))
                                  (λ _ → record { Ps = _ ; Pb = Q ; sh = sh ; bh = hk ; tl = tailp-⊑ tp (⊑-trans le (∪-⊑ ⊑-refl le′)) }) fl eq)
     ; (settled () _ _) }
