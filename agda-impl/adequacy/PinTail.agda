@@ -179,7 +179,7 @@ mutual
 
   lane-pt : ∀ {Γ A B} {sc : Scope Γ} {Rg C} {P : Pol A B} {q a l b} (ln : LaneSt sc Rg C P q a l b)
           → Σ (List Pos) λ ks → ∀ {y r} → Kept P q a y (pin r) → Owes C y → ¬ Owes C r → proj₁ (lane-husk ln) y ⊎ y ∈ ks
-  lane-pt {C = C} {P = P} (l-live (h-live _ _ m) sy _) with pt-bn {C = C} (voc m) (λ x → x) (pin-tail sy)
+  lane-pt {C = C} {P = P} (l-live (h-live _ m) sy _) with pt-bn {C = C} (voc m) (λ x → x) (pin-tail sy)
   ... | ptl ks f = ks , λ kp → f (kept-lane {P = P} kp)
   lane-pt (l-dead (h-end _ _ (tailp ks f)) _)  = ks , λ kp o _ → f kp o
   lane-pt (l-dead (h-kill _ _ (tailp ks f)) _) = ks , λ kp o _ → f kp o

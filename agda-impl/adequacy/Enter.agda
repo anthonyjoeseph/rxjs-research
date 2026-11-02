@@ -36,12 +36,12 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; flatMap; connect)
 open import denotation.Events using (Pos; Label; Timeline; ix; root; _≟ᵖ_)
 open import denotation.Read using (Visible)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; end; _≼_; Den; hot; ⟦_⟧; Proper; LaneOf; Ended; After; Truncate;
+open import denotation.EmissionSet using (EmissionSet; Ev; out; end; _≼_; _≺_; enter; Den; hot; ⟦_⟧; Proper; LaneOf; Ended; After; Truncate;
   module Joining; module Bounded; module Switch; module Exhaust; module Connecting)
 open import denotation.Laws.Modulus using (≼-or-≻; ≼-≺-≺; ≺-irrefl; ≺→≼)
 open import denotation.Laws.Worlds using (W; W⁼; step; here; inW; Plain; plain-ix; Real; Ok; Lawful; InvAt; InvD; Hots; _⊑_; ⊑-refl;
   ⊑-≼; ⊑-snoc⁺; PinBy; ⊑-inside; nest⁼; nest-in; narrow⁼; widen⁼; world-after; real-init;
-  nonempty⁼; ok-step)
+  nonempty⁼; ok-step; real-snoc; anc-lead; anc-trans; world-anc; world-anc⁼)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
 open import denotation.Laws.HotInv using (lawful-hot)
 open import denotation.Laws.JoinInv using (module Join; ix01)
@@ -365,6 +365,31 @@ module Lanes {Γ A B} (sc : Scope Γ) (f : A → Obs Timeline Γ B) {O : Emissio
   lane-rows op li x l with lane-row op x l
   ... | _ , st , w , ex = li x st w ex
 
+  -- A lane's rows lie past its start.
+  past : ∀ op {q′ a s′ r e} → Start (polF op f′ O) q′ a s′ → Lane (polF op f′ O) q′ a r e → enter (f′ a) s′ r e × s′ ≺ r
+  past (mergeᶠ nothing)  refl l = l
+  past (mergeᶠ (just m)) (_ , sb) (_ , _ , sb′ , ac) with Bo.same m sb sb′
+  ... | refl = ac
+  past switchᶠ           refl l = l
+  past exhaustᶠ          refl l = l
+
+  real-start : ∀ op {q′ a s′} → O q′ (out a) → Start (polF op f′ O) q′ a s′ → Real s′
+  real-start (mergeᶠ nothing)  {q′} x refl = real-snoc q′ plain-ix (InvAt.real Io x)
+  real-start (mergeᶠ (just m)) _ (_ , sb) with BoundedI.seat* (JInv.ok ji) m f′ (JInv.fi ji) Io sb
+  ... | BoundedI.seat′ _ rs _ _ _ = rs
+  real-start switchᶠ           {q′} x refl = real-snoc q′ plain-ix (InvAt.real Io x)
+  real-start exhaustᶠ          {q′} x refl = real-snoc q′ plain-ix (InvAt.real Io x)
+
+  -- A LANE SUBSCRIBED, WITHIN ITS REGION: no child of a lane's row leads
+  -- back to its start, so the start lies in the region, and so does every
+  -- position of its world clear of the lane's rows' children.
+  lane-within : ∀ op {Rl} → LanesIn H Rl (polF op f′ O) O → ∀ {q′ a s′} → O q′ (out a) → Start (polF op f′ O) q′ a s′
+              → Within (Rl q′) sc s′ (enter (f′ a) s′)
+  lane-within op li x st = li x st here back , λ w ex → li x st (inW w) (λ l → ex (proj₁ (past op st l)))
+    where
+      back : Excl H (Lane (polF op f′ O) _ _) _
+      back l pl v le = anc-lead (anc-trans (world-anc {H = H} (step here pl)) (world-anc⁼ v)) le (real-start op x st) (proj₂ (past op st l))
+
   ends : ∀ op → Ends (polF op f′ O) O
   ends (mergeᶠ nothing)  = un-ends
   ends (mergeᶠ (just m)) = Bo.ends m
@@ -375,7 +400,7 @@ module Lanes {Γ A B} (sc : Scope Γ) (f : A → Obs Timeline Γ B) {O : Emissio
 -- program admissible.
 flat-jinv : ∀ {Γ A B} {sc : Scope Γ} {f : A → Obs Timeline Γ B} {s q}
           → Ok (Hots (full sc)) q → Adm sc → JInv sc f (pendRows (full sc) s q)
-flat-jinv {sc = sc} {f} {s} {q} ok ad = record { at = q ; ok = ok ; io = Io ; fi = fi }
+flat-jinv {sc = sc} {f} {s} {q} ok ad = record { at = q ; ok = ok ; io = Io ; fi = fi ; adm = ad }
   where open FlatAt sc f s q ok ad
 
 -- Nothing begun or queued, every lane's world in its region.

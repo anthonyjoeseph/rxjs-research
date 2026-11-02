@@ -46,7 +46,7 @@ Open: whether begun lanes stay ascending (`Asc`), and whether `Begun`'s
 live count makes a freed slot the queue head's `Starts.queued`. Settled
 when each is a body.
 
-Members: `rise-outer-nx`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`.
+Members: `rise-outer-bounded`, `rise-outer-switch`, `rise-outer-exhaust`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`.
 
 #### THE GUARD ROWS
 

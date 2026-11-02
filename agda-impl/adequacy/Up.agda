@@ -156,12 +156,12 @@ module Past (p : Pos) where
 
   -- A joiner's bookkeeping past `p`: its outer's rows and its lanes'
   -- ends not at `p`.
-  module Book {A B} {P : Pol A B} {O : EmissionSet A} (oo : Off O) where
-    whole-up : ∀ {vs ws} → Whole (bef p) P O vs ws → Whole (aft p) P O vs ws
-    whole-up wh y nq r = wh y (λ o → nq (in-off oo y _ o)) r
+  module Book {A B} {P : Pol A B} {O : EmissionSet A} where
+    whole-up : ∀ {vs ws} → Off O → Whole (bef p) P O vs ws → Whole (aft p) P O vs ws
+    whole-up oo wh y nq r = wh y (λ o → nq (in-off oo y _ o)) r
 
-    od-up : ∀ {d} → OuterDone (bef p) O d → OuterDone (aft p) O d
-    od-up od = (λ t → let (c , y , n) = proj₁ od t in c , y , nm n)
+    od-up : ∀ {d} → Off O → OuterDone (bef p) O d → OuterDone (aft p) O d
+    od-up oo od = (λ t → let (c , y , n) = proj₁ od t in c , y , nm n)
              , (λ y n → proj₂ od y λ o → n (in-off oo y _ o))
 
     ahead-up : ∀ {vs ws} → (∀ {q a c} → (q , a) ∈ vs → Lane P q a c end → p ≡ c → ⊥) → Ahead (bef p) P vs ws → Ahead (aft p) P vs ws
@@ -216,7 +216,7 @@ module Past (p : Pos) where
 
     lane-up : ∀ {Γ} {sc : Scope Γ} {Rg : Rgn} {A B} {P : Pol A B} {q a l b} → ¬ Rg p → ¬ VHot (full sc) p
             → LaneSt sc Rg (bef p) P q a l b → LaneSt sc Rg (aft p) P q a l b
-    lane-up nr nh (l-live (h-live st ns e) sy sd) = l-live (h-live st (nm ns) e) (up sy sd nr nh) sd
+    lane-up nr nh (l-live (h-live st e) sy sd) = l-live (h-live st e) (up sy sd nr nh) sd
     lane-up nr nh (l-dead {E = E} (h-end {c = c} lc nc tp) hk)    = l-dead {E = E} (h-end lc (nm {c} nc) (tailp-up tp)) hk
     lane-up nr nh (l-dead {E = E} (h-kill {q′ = q′} kq nq tp) hk) = l-dead {E = E} (h-kill kq (nm {q′} nq) (tailp-up tp)) hk
 
@@ -229,10 +229,10 @@ module Past (p : Pos) where
     joined-up : ∀ {Γ} {sc : Scope Γ} {Rl : Pos → Rgn} {A B} {P : Pol A B} {O : EmissionSet A} {d n qu ls}
               → Off O → (∀ {q} → ¬ Rl q p) → ¬ VHot (full sc) p → (∀ {q a k e} → O q (out a) → Lane P q a k e → Rl q k)
               → Joined sc Rl (bef p) P O d n qu ls → Joined sc Rl (aft p) P O d n qu ls
-    joined-up {P = P} oo nl nh rl (joined bg wt wh od ah ao en li) =
-      joined (begun-up (λ _ → nl) nh bg) (wait-up ah′ wt) (whole-up wh) (od-up od) ah′ ao en li
+    joined-up {P = P} {O = O} oo nl nh rl (joined bg wt wh od ah ao en li) =
+      joined (begun-up (λ _ → nl) nh bg) (wait-up ah′ wt) (whole-up oo wh) (od-up oo od) ah′ ao en li
       where
-        open Book {P = P} oo
+        open Book {P = P} {O = O}
         ah′ = ahead-up (λ iv lc → λ { refl → nl (rl (begun-out bg iv) lc) }) ah
 
 ------------------------------------------------------------------------
@@ -464,17 +464,17 @@ module _ {R : Set} (Rt : EmissionSet R) where
       nl r = proj₂ rp (proj₂ r)
       rl = Lanes.lane-rows (scopeOf c) f ji op (joined-li jn)
   fr-up {p = p} (f-lanes {op = op} {f = f} {c = c} {Rg = Rg₀} {O = O} {vs₁ = vs₁} {vs₂ = vs₂} {q = q₀} {a = a₀}
-                   fr ji sy lf y₀ nq ru (h-live st ns le) rt cnt wt wh od ah ao en li m so sd bh) _ rp nr nh =
+                   fr ji sy lf y₀ nq ru (h-live st le) rt cnt wt wh od ah ao en li m so sd bh) _ rp nr nh =
     let (Cr′ , fr′ , mv) = fr-up fr tt (proj₁ rp)
                              (nr-≈ (proj₂ m) (nr-tr (join-nr op (λ a → ⟦ f a ⟧ (full (scopeOf c))) rl (λ y → no (Sound.rg so y _)) (λ y ln v _ → hole y ln v)))) nh
-    in Cr′ , f-lanes fr′ ji (up sy so no nh) (begun-up nb₁ nh lf) y₀ (nm nq) ru (h-live st (nm ns) le) (begun-up nb₂ nh rt) cnt
-                     (wait-up ah′ wt) (whole-up wh) (od-up od) ah′ ao en li m so sd (behind-up bh) , mv
+    in Cr′ , f-lanes fr′ ji (up sy so no nh) (begun-up nb₁ nh lf) y₀ (nm nq) ru (h-live st le) (begun-up nb₂ nh rt) cnt
+                     (wait-up ah′ wt) (whole-up (off-rg so no) wh) (od-up (off-rg so no) od) ah′ ao en li m so sd (behind-up bh) , mv
     where
       open Past p using (up; begun-up; nm; off-rg; behind-up; module Book)
       no : ¬ JRo (scopeOf c) Rg₀ op f O p
       no r = proj₂ r (proj₂ rp)
       rl = Lanes.lane-rows (scopeOf c) f ji op li
-      open Book {P = polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O} (off-rg so no)
+      open Book {P = polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O} {O = O}
       sole : ∀ {q q′} → JRl (scopeOf c) Rg₀ op f O q p → JRl (scopeOf c) Rg₀ op f O q′ p → q ≡ q′
       sole r r′ = lane-sole (JInv.ok ji) (λ a → ⟦ f a ⟧ (full (scopeOf c))) (JInv.fi ji) (JInv.io ji) op (proj₂ r) (proj₂ r′)
       -- a lane's row at `p` is the hole's

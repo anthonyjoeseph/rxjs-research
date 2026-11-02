@@ -330,7 +330,7 @@ few-behind {p = p} (ks , f) = ks , λ {y} r lt → f r (λ py → py (≺-trans 
 -- subscribed, its entry its lane's; or over, by its end or a later value,
 -- what it still owes within what its state still runs.
 data Hole {A B} (C : Cur) (P : Pol A B) (q : Pos) (a : A) : Pts → EmissionSet B → Bool → Set₁ where
-  h-live : ∀ {s E} → Start P q a s → ¬ Owes C s → Lane P q a ≈ E → Hole C P q a ∅ᵖ E true
+  h-live : ∀ {s E} → Start P q a s → Lane P q a ≈ E → Hole C P q a ∅ᵖ E true
   h-end  : ∀ {c E Ph} → Lane P q a c end → ¬ Owes C c → TailP C (Kept P q a) Ph → Hole C P q a Ph E false
   h-kill : ∀ {q′ E Ph} → Kill P q q′ → ¬ Owes C q′ → TailP C (Kept P q a) Ph → Hole C P q a Ph E false
 
@@ -412,6 +412,7 @@ record JInv {Γ A B} (sc : Scope Γ) (f : A → Obs Timeline Γ B) (O : Emission
     ok : Ok (Hots (full sc)) at
     io : InvAt (Hots (full sc)) at O
     fi : ∀ a → InvD (Hots (full sc)) (⟦ f a ⟧ (full sc))
+    adm : Adm sc
 
 -- A cold's frame played where its timeline puts it: under a reachable
 -- root, at or after the root's tick.

@@ -54,6 +54,7 @@ open import adequacy.Least using (Lo; seek-none; k-kid; k-src)
 open import adequacy.Bound using (bound; owes-≼; behind-past; behind-pend; join-past)
 open import adequacy.Few using (fr-shift)
 open import adequacy.Up using (rise-body-nx; rise-body-cp; rise-src-nx; rise-src-cp)
+open import adequacy.Admit using (rise-outer-nx)
 open import adequacy.Enter using (conn₀; conn-parts; conn-ok; flat-sound; flat-within; flat-joined; flat-jinv)
 
 ------------------------------------------------------------------------
@@ -312,11 +313,6 @@ module Over {R : Set} (Rt : EmissionSet R) where
     -- at `p`.
     rise-take-failᵢ : ∀ {Γ A} {w : A → Bool} {c : Ctx R Γ A} {s a p} → w a ≡ false
                     → SimC Rt ⟨ inTake true w free c , s , rising (nx a) , p ⟩ [] ⟨ c , takeS true w (cpAt p) s , rising (nx a) , p ⊕ [ ix 0 ] ⟩
-    -- A lane it subscribes lies within its region by the joiner's
-    -- `LanesIn` at the lane's `Start`: its rows lie past that real start.
-    -- RECOVERY: git show d7c38e01 restores lane-within, past and real-start.
-    rise-outer-nx : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n q ls} {c : Ctx R Γ B} {o a p k′ sh t}
-                  → rise (inOuter op f ω d n q ls c) o (nx a) p ≡ moved k′ sh t → SimC Rt ⟨ inOuter op f ω d n q ls c , o , rising (nx a) , p ⟩ sh k′
     rise-outer-cp : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n q ls} {c : Ctx R Γ B} {o p k′ sh t}
                   → rise (inOuter op f ω d n q ls c) o cp p ≡ moved k′ sh t → SimC Rt ⟨ inOuter op f ω d n q ls c , o , rising cp , p ⟩ sh k′
     rise-lane-nx  : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n q o pre post} {c : Ctx R Γ B} {s b p k′ sh t}
@@ -664,7 +660,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   rise-sim (inTake i w (cpAt r) c)   s e      p refl = rise-took Rt (λ ())
   rise-sim (inTake i w (cutAt r) c)  s e      p refl = rise-took Rt (λ ())
   rise-sim (inTake i w (overAt r) c) s e      p refl = rise-took Rt (λ ())
-  rise-sim (inOuter op f ω d n q ls c) o (nx a) p eq   = rise-outer-nx eq
+  rise-sim (inOuter op f ω d n q ls c) o (nx a) p eq   = rise-outer-nx Rt eq
   rise-sim (inOuter op f ω d n q ls c) o cp     p eq   = rise-outer-cp eq
   rise-sim (inLanes op f ω d n q o pre post c) s (nx b) p eq = rise-lane-nx eq
   rise-sim (inLanes op f ω d n q o pre post c) s cp     p eq = rise-lane-cp eq
