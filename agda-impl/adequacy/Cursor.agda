@@ -63,7 +63,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; unbound; binds; CS; Owe
                     renaming (Ev to Evᴹ; Shown to Shownᴹ)
 open import denotation.Laws.Modulus using (≺-ext; ≺-trans)
 open import adequacy.Rows using (_≃_; ≃-refl; ≃-sym; ≃-trans; Vis; toEv; Inbox; full; pendRows; Frozen; tapeE)
-open import denotation.Laws.Worlds using (Ok; Hots; Real; W⁼; InvAt; InvD)
+open import denotation.Laws.Worlds using (Ok; Hots; Real; W; W⁼; Plain; InvAt; InvD) renaming (_⊑_ to _⊑ʷ_)
 open _≃_
 
 ------------------------------------------------------------------------
@@ -251,9 +251,15 @@ record Sound {A} (Rg : Rgn) (E : EmissionSet A) : Set where
     past : ∀ {c y e} → E c end → E y e → c ≺ y → Σ Pos λ r → e ≡ pin r × r ≺ c
     rg   : ∀ {y e} → E y e → Visible e → Rg y
 
--- A subscription at `q` whose world lies in the region.
-Within : ∀ {Γ} → Rgn → Scope Γ → Pos → Set
-Within Rg sc q = ∀ {y} → W⁼ (Hots (full sc)) q y → Rg y
+-- Outside what `E`'s rows subscribe below them: no row's plain child's
+-- world leads `y`.
+Excl : ∀ {A} → (Pos → Set) → EmissionSet A → Pos → Set
+Excl H E y = ∀ {r e l w} → E r e → Plain l → W⁼ H (r ++ [ l ]) w → w ⊑ʷ y → ⊥
+
+-- A subscription at `q` reading `E`: it and its world lie in the region,
+-- but for what its rows subscribe below them, which is its children's.
+Within : ∀ {Γ A} → Rgn → Scope Γ → Pos → EmissionSet A → Set
+Within Rg sc q E = Rg q × (∀ {y} → W (Hots (full sc)) q y → Excl (Hots (full sc)) E y → Rg y)
 
 ------------------------------------------------------------------------
 -- A joiner's feed
@@ -382,12 +388,12 @@ LanesIn Rl P O = ∀ {q a k e} → O q (out a) → Lane P q a k e → Visible e 
 Asc : ∀ {A} → List (Pos × A) → Set
 Asc = AllPairs (λ u v → proj₁ u ≺ proj₁ v)
 
--- A lane's region, read off its policy: the world it subscribes in, up to
--- its end.  A bounded merge subscribes a queued lane under the end of the
--- lane it frees, inside that lane's world, so the cap is what keeps the
--- two apart.
+-- A lane's region, read off its policy: the world it subscribes in, but
+-- for what its rows subscribe below them.  A bounded merge subscribes a
+-- queued lane below the end of the lane it frees, inside that lane's
+-- world, so the exclusion is what keeps the two apart.
 LaneRg : ∀ {A B} → (Pos → Set) → Pol A B → EmissionSet A → Pos → Rgn
-LaneRg H P O q y = Real y × Σ _ λ a → Σ Pos λ s → O q (out a) × Start P q a s × W⁼ H s y × (∀ {c} → Lane P q a c end → y ≼ c)
+LaneRg H P O q y = Real y × Σ _ λ a → Σ Pos λ s → O q (out a) × Start P q a s × W⁼ H s y × Excl H (Lane P q a) y
 
 -- A joiner's parts: each value's lane in its region, the outer in what
 -- no lane's holds.
@@ -509,14 +515,15 @@ record Flags {Γ X B} (C : Cur) (k : CS Γ X) (β : EmissionSet B) : Set where
     owed   : ∀ {q} → CS.owedAt k ≡ just q → β q end × ¬ Owes C q
 
 -- A connect's two parts: its body's region and its source's, inside its
--- own and apart, its own holding no row of a handle in scope.
+-- own and apart, each holding no row of a handle in scope.
 record Parts {Γ X B} (sc : Scope Γ) (Rg : Rgn) (k : CS Γ X) (β : EmissionSet B) : Set₁ where
   field
     Rb Rs : Rgn
     b⊆    : ∀ {y} → Rb y → Rg y
     s⊆    : ∀ {y} → Rs y → Rg y
     apart : ∀ {y} → Rb y → Rs y → ⊥
-    clear : ∀ {y} → Hots (full sc) y → Rg y → ⊥
+    clear-b : ∀ {y} → Hots (full sc) y → Rb y → ⊥
+    clear-s : ∀ {y} → Hots (full sc) y → Rs y → ⊥
     sb    : Sound Rb β
     ss    : Sound Rs (Frozen k)
 
@@ -576,7 +583,8 @@ data Src where
   src-pend : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o}
            → T (not (CS.srcAtt k)) → T (not (CS.closed k)) → CS.bodyAt k ≡ just (CS.connAt k) → CS.attSrc k ≡ nothing
            → Adm (binds (CS.src k) (CS.connAt k) sc)
-           → pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]) ≈ Frozen k → Within Rg sc (CS.connAt k ++ [ ix 1 ])
+           → pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]) ≈ Frozen k
+           → Within Rg sc (CS.connAt k ++ [ ix 1 ]) (pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]))
            → Owes C (CS.connAt k ++ [ ix 1 ])
            → Src sc Rg C k (pend o (CS.connAt k ++ [ ix 1 ]))
   -- subscribed: the cursor at or past its subscription, made where
@@ -620,13 +628,13 @@ data SrcH where
   sh-pend  : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o Ri}
            → T (not (CS.srcAtt k)) → T (not (CS.closed k)) → CS.bodyAt k ≡ just (CS.connAt k) → CS.attSrc k ≡ nothing → CS.scope k ≡ sc
            → Adm (binds (CS.src k) (CS.connAt k) sc) → pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]) ≈ Frozen k
-           → Within Ri sc (CS.connAt k ++ [ ix 1 ]) → Sound Ri (Frozen k)
+           → Within Ri sc (CS.connAt k ++ [ ix 1 ]) (pendRows (full sc) o (CS.connAt k ++ [ ix 1 ])) → Sound Ri (Frozen k)
            → SrcH sc k (pend o (CS.connAt k ++ [ ix 1 ])) (Burst (bef (CS.connAt k ++ [ ix 1 ])) k)
 
 -- A connect's parts read again under fields they do not read.
 re-parts : ∀ {Γ X B} {sc : Scope Γ} {Rg} {k k′ : CS Γ X} {β : EmissionSet B} → Frozen k ≡ Frozen k′ → Parts sc Rg k β → Parts sc Rg k′ β
 re-parts e pt = record { Rb = Parts.Rb pt ; Rs = Parts.Rs pt ; b⊆ = Parts.b⊆ pt ; s⊆ = Parts.s⊆ pt ; apart = Parts.apart pt
-                       ; clear = Parts.clear pt ; sb = Parts.sb pt ; ss = subst (Sound (Parts.Rs pt)) e (Parts.ss pt) }
+                       ; clear-b = Parts.clear-b pt ; clear-s = Parts.clear-s pt ; sb = Parts.sb pt ; ss = subst (Sound (Parts.Rs pt)) e (Parts.ss pt) }
 
 -- No rise in flight.
 data Calm {A : Set} : Machine.Mode A → Set where
@@ -861,7 +869,7 @@ Hold sc Rg C owes          s E = Sync sc Rg C s E
 Hold sc Rg C (dead P)      s E = Rest sc s P
 Hold sc Rg C (lane b P)    s E = Σ Att λ at → Σ (St _ _) λ l → s ≡ lnS b (cutS b at l) × LaneHold sc Rg C b P l E
 Hold sc Rg C (lanecut b P) s E = Σ Att λ at → Σ (St _ _) λ l → s ≡ cutS b at l × LaneHold sc Rg C b P l E
-Hold {Γ} sc Rg C (pnd q) {A} s E = Σ (Obs Timeline Γ A) λ o → s ≡ pend o q × pendRows (full sc) o q ≈ E × Within Rg sc q
+Hold {Γ} sc Rg C (pnd q) {A} s E = Σ (Obs Timeline Γ A) λ o → s ≡ pend o q × pendRows (full sc) o q ≈ E × Within Rg sc q (pendRows (full sc) o q)
 
 data ⊥₁ : Set₁ where
 

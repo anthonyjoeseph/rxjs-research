@@ -29,7 +29,7 @@ open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; Proper; ⟦_⟧; MapT; map-out; map-end; map-skip; map-pin; module Scan; _≺_; Den; hot; coldAt; DenEnv; shown; heard; ended; late;
   module TakeWhile; module Connecting; Reach; Truncate)
 open import denotation.Laws.Modulus using (≺→≼; ≺-trans; ≺-irrefl; ≺-ext; ≼-antisym)
-open import denotation.Laws.Worlds using (Hots; W⁼)
+open import denotation.Laws.Worlds using (Hots)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; binds; CS; scopeOf; connS; rising; nx; cp; inBody; inSrc; feed; feedL; rise; moved; shutAt; absorbed) renaming (Ev to Evᴹ)
 open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans; ≃-refl; ≼-≢; full; Frozen; pendRows; Moves; silent; toEv)
@@ -205,7 +205,7 @@ module Past (p : Pos) where
 
     src-up : ∀ {Γ X} {sc : Scope Γ} {Rs : Rgn} {k : CS Γ X} {o}
            → Src sc Rs (bef p) k o → Sound Rs (adequacy.Rows.Frozen k) → ¬ Rs p → ¬ VHot (full sc) p → Src sc Rs (aft p) k o
-    src-up (src-pend na nc be an adm pr wn ow) ss nr nh = src-pend na nc be an adm pr wn (owes-up (off nr (wn W⁼.here)) ow)
+    src-up (src-pend na nc be an adm pr wn ow) ss nr nh = src-pend na nc be an adm pr wn (owes-up (off nr (proj₁ wn)) ow)
     src-up (src-on nc sy bh sd af ao)    ss nr nh = src-on nc (up sy ss nr nh) (behind-up bh) (subd-up sd) af ao
     src-up {k = k} (src-shut cl sp tp hk bh sd) ss nr nh =
       src-shut cl (spent-up {E = adequacy.Rows.Frozen k} sp) (tailp-up tp) hk (behind-up bh) (subd-up sd)
@@ -316,7 +316,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     { (flying (f-body fr sc pt _ src fl eq) cl (sy , row)) → flying fr cl
         (let rb = Sound.rg (Parts.sb pt) row (vis e)
              ns = λ r → Parts.apart pt rb r
-             nh = λ hv → Parts.clear pt (vhot-hots (full (scopeOf c)) hv) (Parts.b⊆ pt rb)
+             nh = λ hv → Parts.clear-b pt (vhot-hots (full (scopeOf c)) hv) rb
          in s-conn sc (re-parts refl pt) (λ _ → subst (λ x → Sync (binds (CS.src k) (CS.connAt k) x) _ _ _ _) sc sy)
                    (λ _ → src-owe (Past.src-up p src (Parts.ss pt) ns nh)) (λ nl → ⊥-elim (notT _ nl lt))
                    (fix row (Past.flags-up p {k = k} (Past.off-rg p (Parts.ss pt) ns) fl)) eq
@@ -561,7 +561,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     nr y v = let (cy , v′) = from (alike (proj₁ eq)) (y , v) in Parts.apart pt (Sound.rg (Parts.sb pt) (conn-vis cy v′) v′) rs
 
     nh : ¬ VHot (full (scopeOf c)) p
-    nh hv = Parts.clear pt (vhot-hots (full (scopeOf c)) hv) (Parts.s⊆ pt rs)
+    nh hv = Parts.clear-s pt (vhot-hots (full (scopeOf c)) hv) rs
 
     -- the frames above, past `p`
     lifted : Σ Cur λ Cr′ → Fr Rt Cr′ (aft p) Rg c owes E′ × Moves (RT Rt Cr) [] (RT Rt Cr′)

@@ -39,7 +39,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Fr Rt Cr C Rg c N E → Hold (scopeOf c) Rg C N s E → Inv Cr C ⟨ c , s , m , p ⟩
     pending : ∀ {Γ A} {c : Ctx R Γ A} {o q p Cr C Rg E}
             → Fr Rt Cr C Rg c owes E
-            → Owes C q × Ok (Hots (full (scopeOf c))) q × Adm (scopeOf c) × pendRows (full (scopeOf c)) o q ≈ E × Within Rg (scopeOf c) q
+            → Owes C q × Ok (Hots (full (scopeOf c))) q × Adm (scopeOf c) × pendRows (full (scopeOf c)) o q ≈ E
+              × Within Rg (scopeOf c) q (pendRows (full (scopeOf c)) o q)
             → Inv Cr C ⟨ c , pend o q , subscribing , p ⟩
     flying  : ∀ {Γ A} {c : Ctx R Γ A} {s e p Cr Rg N E}
             → Fr Rt Cr (bef p) Rg c N E → closed c ≡ false → Fly (scopeOf c) Rg p N s E e → Inv Cr (bef p) ⟨ c , s , rising e , p ⟩

@@ -2,12 +2,11 @@
 -- at its value's second child, and two values' children's worlds are
 -- apart (`Kids.kids`).  A bounded merge's lanes, taken in schedule order,
 -- lie under distinct roots, or the later under the second child of an end
--- of the earlier (`BoundedI.rel`): past that end, so past the earlier's
--- cap.
+-- of the earlier (`BoundedI.rel`): a world the earlier's region excludes.
 module adequacy.Regions where
 
 open import Data.Empty using (⊥-elim)
-open import Data.List using ([]; [_]; _++_)
+open import Data.List using ([_]; _++_)
 open import Data.List.Properties using (∷ʳ-injectiveˡ)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ)
@@ -20,8 +19,7 @@ open import Relation.Nullary using (yes; no)
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; ix; _≟ᵖ_)
 open import denotation.EmissionSet using (EmissionSet; out; Den)
-open import denotation.Laws.Modulus using (≺-ext; ≺-≼-≺)
-open import denotation.Laws.Worlds using (W⁼; here; inW; nest-in; plain-ix; world-after⁼; Ok; InvAt; InvD)
+open import denotation.Laws.Worlds using (W⁼; here; inW; nest-in; plain-ix; ⊑-refl; Ok; InvAt; InvD)
 open import denotation.Laws.JoinInv using (module Kids)
 open import denotation.Laws.BoundedInv using (module BoundedI)
 open import adequacy.Cursor using (LaneRg; polF)
@@ -43,14 +41,14 @@ module _ {A B : Set} {H : Pos → Set} {at : Pos} (ok : Ok H at) (F : A → Den 
     open BoundedI ok m F fi io
 
     bounded : ∀ {q q′ y} → LaneRg H (polF (mergeᶠ (just m)) F O) O q y → LaneRg H (polF (mergeᶠ (just m)) F O) O q′ y → q ≡ q′
-    bounded (ry , a , s , x , (i , sb) , w , cap) (_ , a′ , s′ , x′ , (i′ , sb′) , w′ , cap′) with <-cmp i i′
+    bounded (_ , a , s , x , (i , sb) , w , cap) (_ , a′ , s′ , x′ , (i′ , sb′) , w′ , cap′) with <-cmp i i′
     ... | tri≈ _ refl _ = proj₁ (sub-fun sb sb′)
     ... | tri< lt _ _ with rel lt sb sb′
     ...   | apart xr xr′ ne wr wr′ = ⊥-elim (apart-ww xr xr′ ne (w-trans wr w) (w-trans wr′ w′))
-    ...   | queued-in {c} ac _ wc  = ⊥-elim (cap (i , s , sb , ac) (≺-≼-≺ {c} (≺-ext c []) (world-after⁼ (w-trans wc w′) ry)))
-    bounded (ry , a , s , x , (i , sb) , w , cap) (_ , a′ , s′ , x′ , (i′ , sb′) , w′ , cap′) | tri> _ _ gt with rel gt sb′ sb
+    ...   | queued-in ac _ wc      = ⊥-elim (cap (i , s , sb , ac) plain-ix (w-trans wc w′) (⊑-refl _))
+    bounded (_ , a , s , x , (i , sb) , w , cap) (_ , a′ , s′ , x′ , (i′ , sb′) , w′ , cap′) | tri> _ _ gt with rel gt sb′ sb
     ...   | apart xr xr′ ne wr wr′ = ⊥-elim (apart-ww xr xr′ ne (w-trans wr w′) (w-trans wr′ w))
-    ...   | queued-in {c} ac _ wc  = ⊥-elim (cap′ (i′ , s′ , sb′ , ac) (≺-≼-≺ {c} (≺-ext c []) (world-after⁼ (w-trans wc w) ry)))
+    ...   | queued-in ac _ wc      = ⊥-elim (cap′ (i′ , s′ , sb′ , ac) plain-ix (w-trans wc w) (⊑-refl _))
 
   -- One lane to a position of a joiner's lane regions.
   lane-sole : ∀ op {q q′ y} → LaneRg H (polF op F O) O q y → LaneRg H (polF op F O) O q′ y → q ≡ q′

@@ -21,7 +21,7 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; subst; cong)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Timeline; root; Pos; ix; last; timelineAt; emit; stall; close)
+open import denotation.Events using (Timeline; Pos; ix; last; timelineAt; emit; stall; close)
 open import denotation.EmissionSet using (EmissionSet; ⟦_⟧; at-out; at-end)
 open import denotation.Laws.Modulus using (≺-ext; ≺→≼; ≼-refl; entered-reach)
 open import denotation.Laws.Worlds using (Ok; Hots; ok-step)
@@ -35,13 +35,13 @@ open Machine using (St; Ctx; Conf; Scope; binds; scopeOf; ⟨_,_,_,_⟩; subscri
                     renaming (Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (pendRows; full; ≃-refl; Vis; _≃_; silent; Moves; this)
 open _≃_
-open import adequacy.Cursor using (Cur; ≈-refl; Rgn; JoinE; Parts; Flags; src-pend; JInv; Joined; JRl; JRo; polF; Sound; Within;
-  Adm; bef; Spent; Sync; _≈_; c-abs; c-sub; Owes; Fr; Hold; owes; dead; lane; lanecut; pnd;
-  Pts; ∅ᵖ; _⊑_; ∅-⊑; ⊑-refl; ⊑-trans; Rest; h-blank; h-take; hl-none; sh-dead; un-dead; Clear;
-  Pending; pend-shape; notT; sync-pend; s-of; s-join; s-joinx; s-took; f-top; f-map; f-scan;
-  f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body;
-  d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec;
-  f-islep; subd; o-cp)
+open import adequacy.Cursor using (Cur; ≈-refl; Rgn; JoinE; Flags; src-pend; JInv; Joined; JRl; polF; Within; Adm; bef; Spent;
+  Sync; _≈_; c-abs; c-sub; Owes; Fr; Hold; owes; dead; lane; lanecut; pnd; Pts; ∅ᵖ; _⊑_; ∅-⊑;
+  ⊑-refl; ⊑-trans; Rest; h-blank; h-take; hl-none; sh-dead; un-dead; Clear; Pending;
+  pend-shape; notT; sync-pend; s-of; s-join; s-joinx; s-took; f-top; f-map; f-scan; f-cut;
+  f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map;
+  d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; subd;
+  o-cp)
 open import adequacy.Cursor.Rise using (Inv; settled; pending; adrift; RT; SimC; keeps; rise-top; rise-map; rise-scan-nx; rise-scan-cp; rise-take-pass; rise-take-cp; rise-cut; rise-cutx; rise-ln; rise-took; rise-take-fail; rise-bodyx; run-stop; run-cut; run-att)
 open import adequacy.Path using (Path)
 open import adequacy.Isle.Step using (found-clear; found-con)
@@ -55,6 +55,7 @@ open import adequacy.Least using (Lo; seek-none; k-kid; k-src)
 open import adequacy.Bound using (bound; owes-≼; behind-past; behind-pend; join-past)
 open import adequacy.Few using (fr-shift)
 open import adequacy.Up using (rise-body-nx; rise-body-cp; rise-src-nx; rise-src-cp)
+open import adequacy.Enter using (conn₀; conn-parts; conn-ok; flat-sound; flat-within)
 
 ------------------------------------------------------------------------
 -- Within what is grown, every step moves or finds nothing to do
@@ -271,12 +272,6 @@ none-spent {t = t} sy fd {q} r | nothing =
 none-spent sy () r | just _
 
 ------------------------------------------------------------------------
--- A connect as entered at `q`: its source live, not yet subscribed.
-
-conn₀ : ∀ {Γ X} → Obs Timeline Γ X → Pos → Scope Γ → CS Γ X
-conn₀ s q sc = cs false true false (just q) nothing nothing q root s sc
-
-------------------------------------------------------------------------
 -- The steps over a root's entry
 
 module Over {R : Set} (Rt : EmissionSet R) where
@@ -302,23 +297,12 @@ module Over {R : Set} (Rt : EmissionSet R) where
     flat-jinv   : ∀ {Γ A B} {sc : Scope Γ} {f : A → Obs Timeline Γ B} {s q}
                 → Ok (Hots (full sc)) q → Adm sc → JInv sc f (pendRows (full sc) s q)
     flat-joined : ∀ {C Γ A B} {sc : Scope Γ} {Rg} {op} {f : A → Obs Timeline Γ B} {s q}
-                → Owes C q → Ok (Hots (full sc)) q → Adm sc
+                → Owes C q → Ok (Hots (full sc)) q → Adm sc → Within Rg sc q (pendRows (full sc) (flatMap op f s) q)
                 → Joined sc (JRl sc Rg op f (pendRows (full sc) s q)) C (polF op (λ a → ⟦ f a ⟧ (full sc)) (pendRows (full sc) s q))
                          (pendRows (full sc) s q) false 0 [] []
-    flat-sound  : ∀ {Γ A B} {sc : Scope Γ} {Rg} {op} {f : A → Obs Timeline Γ B} {s q}
-                → Ok (Hots (full sc)) q → Adm sc → Within Rg sc q → Sound (JRo sc Rg op f (pendRows (full sc) s q)) (pendRows (full sc) s q)
-    flat-within : ∀ {Γ A B} {sc : Scope Γ} {Rg} {op} {f : A → Obs Timeline Γ B} {s q}
-                → Ok (Hots (full sc)) q → Within Rg sc q → Within (JRo sc Rg op f (pendRows (full sc) s q)) sc q
-    -- A CONNECT ENTERED: its body and source in regions apart and clear
-    -- of the scope's hots, its flags fresh, its body admissible.
-    conn-parts : ∀ {Γ X B} {sc : Scope Γ} {Rg} {s : Obs Timeline Γ X} {b : Obs Timeline (X ∷ Γ) B} {q}
-               → Ok (Hots (full sc)) q → Adm sc → Within Rg sc q
-               → Σ (Parts sc Rg (conn₀ s q sc) (pendRows (full (binds s q sc)) b (q ⊕ [ ix 0 ]))) λ pt
-                 → Within (Parts.Rb pt) (binds s q sc) (q ⊕ [ ix 0 ]) × Within (Parts.Rs pt) sc (q ⊕ [ ix 1 ])
+    -- A CONNECT ENTERED: its flags fresh.
     conn-flags : ∀ {C Γ X B} {sc : Scope Γ} {s : Obs Timeline Γ X} {b : Obs Timeline (X ∷ Γ) B} {q}
                → Owes C q → Flags C (conn₀ s q sc) (pendRows (full (binds s q sc)) b (q ⊕ [ ix 0 ]))
-    conn-ok    : ∀ {Γ X} {sc : Scope Γ} {s : Obs Timeline Γ X} {q}
-               → Ok (Hots (full sc)) q → Adm sc → Ok (Hots (full (binds s q sc))) (q ⊕ [ ix 0 ])
     sub-cold   : ∀ {Cr C Γ A} {c : Ctx R Γ A} {x : Timeline A} {q p}
                → Inv Rt Cr C ⟨ c , pend (cold x) q , subscribing , p ⟩ → Inv Rt Cr C ⟨ c , coldS true (opening q (timelineAt x q)) , absorbed , q ⟩
     sub-defer  : ∀ {Cr C Γ A} {c : Ctx R Γ A} {l q p}
@@ -376,12 +360,12 @@ module Over {R : Set} (Rt : EmissionSet R) where
   PendV : ∀ {Γ A} → Cur → Cur → Ctx R Γ A → Obs Timeline Γ A → Pos → Set₁
   PendV {A = A} Cr C c o q =
       (Σ Rgn λ Rg → Σ (EmissionSet A) λ E → Fr Rt Cr C Rg c owes E
-         × Owes C q × Ok (Hots (full (scopeOf c))) q × Adm (scopeOf c) × pendRows (full (scopeOf c)) o q ≈ E × Within Rg (scopeOf c) q)
+         × Owes C q × Ok (Hots (full (scopeOf c))) q × Adm (scopeOf c) × pendRows (full (scopeOf c)) o q ≈ E × Within Rg (scopeOf c) q (pendRows (full (scopeOf c)) o q))
     ⊎ (Σ Rgn λ Rg → Σ Pts λ P → Σ (EmissionSet A) λ E → Fr Rt Cr C Rg c (dead P) E × P ⊑ ∅ᵖ)
 
   -- A pending source, read as subscribing.
   srcp : ∀ {Cr C Γ A} {c : Ctx R Γ A} {o q Rg N E} → Fr Rt Cr C Rg c N E → N ≡ pnd q
-       → pendRows (full (scopeOf c)) o q ≈ E → Within Rg (scopeOf c) q → PendV Cr C c o q
+       → pendRows (full (scopeOf c)) o q ≈ E → Within Rg (scopeOf c) q (pendRows (full (scopeOf c)) o q) → PendV Cr C c o q
   srcp {C = C} (f-srcp {k = k} fr sc pt lv nc na ba an (ok , adm) bs fl fe eq ow sd nb) refl pe wn =
     inj₁ (_ , _ , f-src fr sc pt lv nc bs fl fe eq (behind-pend {C = C} {k = k} sc (ok , adm) ow) sd (λ t → ⊥-elim (notT _ na t)) (λ _ → inj₂ (ba , an)) nb , ow , ok-step (CS.connAt k) ok , adm , pe , wn)
   srcp (f-islep {k = k} u hb le na nc ba an sc (ok , adm) ss nb) refl pe wn =
@@ -450,10 +434,10 @@ module Over {R : Set} (Rt : EmissionSet R) where
   ... | inj₂ (_ , _ , _ , fr , le) =
     settled {Rg = nowhere} {N = dead ∅ᵖ} {E = none′} c-sub (d-cut {Rg = nowhere} {E′ = none′} (d-outer fr hl-none (⊑-trans le ∅-⊑))) (∅ᵖ , h-blank , ⊑-refl)
   ... | inj₁ (Rg , _ , fr , ow , ok , ad , eq , wi) =
-    pending (f-cut (f-outer fr (flat-jinv {f = f} {s = s} ok ad) (flat-joined {op = op} {f = f} {s = s} ow ok ad)
+    pending (f-cut (f-outer fr (flat-jinv {f = f} {s = s} ok ad) (flat-joined {op = op} {f = f} {s = s} ow ok ad wi)
               (flat-entry (scopeOf c) op f s q eq) (flat-sound {op = op} {f = f} {s = s} ok ad wi)
               (behind-past C ow (join-past (scopeOf c) op f s ad ok))))
-            (ow , ok , ad , ≈-refl , flat-within {op = op} {f = f} {s = s} ok wi)
+            (ow , ok , ad , ≈-refl , flat-within {op = op} {f = f} {s = s} ok ad wi)
 
   ----------------------------------------------------------------------
   -- THE SEARCH: the tree zipped up at the root's cursor, and unzipped

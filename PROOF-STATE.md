@@ -31,13 +31,12 @@ Members: `join-past`.
 
 #### THE CONNECT STEPPED
 
-A connect entered, a joiner joined, a source's or body's rise, its own
+A joiner joined, a source's or body's rise, its own
 marks, a joiner's next and a take's failure, each keeping `Inv`. Open:
 whether every entry lands a region apart from its siblings' and clear of
 its scope's hots, so the rest moves past `p`. Settled when each is a body.
 
-Members: `sub-join`, `sub-joined`, `run-join-nx`, `run-join-cp`, `rise-take-failᵢ`, `feed-up`, `conn-parts`, `flat-sound`,
-`flat-within`.
+Members: `sub-join`, `sub-joined`, `run-join-nx`, `run-join-cp`, `rise-take-failᵢ`, `feed-up`.
 
 #### THE JOINER STEPPED
 
@@ -86,7 +85,7 @@ Believed: a subscription's entry is its program's meaning there, and an
 of's next delivers its next row. Settled when each is a body.
 
 Members: `sub-empty`, `sub-of`, `sub-map`, `sub-defer`, `run-of-nx`, `run-of-end`,
-`flat-jinv`, `flat-joined`, `conn-flags`, `conn-ok`.
+`flat-jinv`, `flat-joined`, `conn-flags`.
 
 ## Tier 1 — the simultaneous spec
 
