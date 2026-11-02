@@ -28,7 +28,7 @@ open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLan
 open import operation.Key using (at; after; at-after-≮)
 open import adequacy.Least using (k-kid; k-body; Lo)
 open import adequacy.Floor.Keys using (plug-in; own-cls; ob; mem-self; mem-swap; unsubIf-in)
-open import adequacy.Stamped using (stamped; plug-ok; pend-focus)
+open import adequacy.Stamped using (StOK; stamped; plug-ok; unplug; pend-focus)
 open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-least; found-mark; found-plug)
 open import adequacy.Path using (Path; []; tau; val; _▸_)
 open import adequacy.Apart.Floor using (floor)
@@ -310,3 +310,12 @@ found-clear : ∀ {R} {o : PureObs [] R} {rs Γ′ A′} {c : Ctx R Γ′ A′} 
   → Path (load o) rs ⟨ c , s , absorbed , r ⟩ → search top (plug c s) ≡ just (found (Γ , A , c′ , s′) m κ) → Clear c′
 found-clear {o = o} {c = c} {s} pth fd with stamped o pth
 ... | hc , hs , _ = proj₁ (found-clr {t = plug c s} (proj₂ (isle-path o [] (tt₁ , tt₁) pth)) (plug-ok c hc hs) fd)
+
+-- THE FOUND CONNECT, read off the run: its stamps and its isles' invariant.
+found-con : ∀ {R} {o : PureObs [] R} {rs Γ′ A′} {c : Ctx R Γ′ A′} {s r Γ X B} {c′ : Ctx R Γ B} {k : CS Γ X} {o′ : St Γ X} {b m κ}
+  → Path (load o) rs ⟨ c , s , absorbed , r ⟩ → search top (plug c s) ≡ just (found (Γ , B , c′ , connS k o′ b) m κ)
+  → StOK (connS k o′ b) × G (connS k o′ b)
+found-con {o = o} {c = c} {s} {c′ = c′} pth fd with stamped o pth
+... | hc , hs , _ =
+  proj₂ (unplug c′ tt (subst StOK (sym (found-plug c s fd)) (plug-ok c hc hs)))
+  , g-hole c′ (subst G (sym (found-plug c s fd)) (proj₂ (isle-path o [] (tt₁ , tt₁) pth)))

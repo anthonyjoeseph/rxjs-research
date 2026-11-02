@@ -33,12 +33,16 @@ open Machine using (St; Ctx; Conf; Scope; binds; scopeOf; ⟨_,_,_,_⟩; subscri
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Shown to Shownᴹ; step to stepᴹ)
-open import adequacy.Rows using (pendRows; full; ≃-refl; Vis; _≃_; _⇄_; silent; Moves; this)
+open import adequacy.Rows using (pendRows; full; ≃-refl; Vis; _≃_; silent; Moves; this)
 open _≃_
 open import adequacy.Cursor using (Cur; ≈-refl; Rgn; JoinE; Parts; Flags; src-pend; JInv; Joined; JRl; JRo; polF; Sound; Within; Adm; bef; Spent; Sync; _≈_; c-abs; c-sub; Owes; Fr; Hold; Need; owes; dead; lane; lanecut; pnd; Pts; ∅ᵖ; _⊑_; ∅-⊑; ⊑-refl; ⊑-trans; Rest; h-blank; h-take; hl-none; sh-dead; un-dead; Clear; Pending; pend-shape; notT; sync-pend; s-of; s-join; s-joinx; s-took; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; subd; o-cp)
 open import adequacy.Cursor.Rise using (Inv; settled; pending; adrift; RT; SimC; keeps; rise-top; rise-map; rise-scan-nx; rise-scan-cp; rise-take-pass; rise-take-cp; rise-cut; rise-cutx; rise-ln; rise-took; rise-take-fail; rise-bodyx; run-stop; run-cut; run-att)
 open import adequacy.Path using (Path)
-open import adequacy.Isle.Step using (found-clear)
+open import adequacy.Isle.Step using (found-clear; found-con)
+open import adequacy.RunCon using (vis-≃; body-noisle; Ran; con-body)
+open import adequacy.Stamped using (StOK; pend-of)
+open import adequacy.Isle using (G)
+open import adequacy.Floor.Keys using (own-cls; ob)
 open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-least; found-mark; found-plug)
 open import adequacy.Walk using (due-≈; climb; descend; refocus; nowhere; none′)
 open import adequacy.Least using (Lo; seek-none)
@@ -241,8 +245,6 @@ marked-pend {s = s} p mk with pend-shape s p
 ... | _ , _ , refl with mk
 ...   | ()
 
-vis-≃ : ∀ {A} {E E′ : EmissionSet A} → E ≃ E′ → Vis E ≃ Vis E′
-vis-≃ d = (λ (x , v) → to d x , v) ⇄ (λ (x , v) → from d x , v)
 
 or-right : ∀ a {b} → T (not a) → T (a ∨ b) → T b
 or-right false _ t = t
@@ -363,16 +365,18 @@ module Over {R : Set} (Rt : EmissionSet R) where
     run-join-cp   : ∀ {Cr Γ A} {c : Ctx R Γ A} {j} {x : A ∈ Γ} {q ib r} → closed c ≡ false
                   → Inv Rt Cr (bef q) ⟨ c , joinS j true x ((q , cp) ∷ ib) , absorbed , r ⟩
                   → Inv Rt Cr (bef q) ⟨ c , joinS j false x ib , rising cp , q ⟩
-    -- A CONNECT'S OWN MARKS: its source subscribed, attached or torn
-    -- down, nothing shown.  Subscribing moves the cursors: the source's
-    -- frame reads `Subd`, so the hole's cursor stands at the connect's
-    -- `ix 1`, and only the mark's being least over the whole tree keeps
-    -- what the root owes.
-    run-con       : ∀ {Cr C Γ A X} {c : Ctx R Γ A} {k} {o : St Γ X} {b m κ r k′ sh t}
-                  → m ≡ bodyM ⊎ (m ≡ srcAttM ⊎ m ≡ owedM) → run c (connS k o b) m r ≡ moved k′ sh t
-                  → (m , κ) ∈ own (connS k o b) → Lo (plug c (connS k o b)) κ
+    -- A CONNECT'S SOURCE ATTACHED, or its owed teardown run: nothing
+    -- shown, the cursors kept.
+    run-srcatt    : ∀ {Cr C Γ A X} {c : Ctx R Γ A} {k} {o : St Γ X} {b κ r k′ sh t}
+                  → run c (connS k o b) srcAttM r ≡ moved k′ sh t
+                  → (srcAttM , κ) ∈ own (connS k o b) → Lo (plug c (connS k o b)) κ → StOK (connS k o b) → G (connS k o b)
                   → Inv Rt Cr C ⟨ c , connS k o b , absorbed , r ⟩
-                  → sh ≡ [] × (Σ Cur λ Cr′ → Σ Cur λ C′ → Inv Rt Cr′ C′ k′ × Moves (RT Rt Cr) [] (RT Rt Cr′))
+                  → sh ≡ [] × Ran Rt Cr k′
+    run-owed      : ∀ {Cr C Γ A X} {c : Ctx R Γ A} {k} {o : St Γ X} {b κ r k′ sh t}
+                  → run c (connS k o b) owedM r ≡ moved k′ sh t
+                  → (owedM , κ) ∈ own (connS k o b) → Lo (plug c (connS k o b)) κ → StOK (connS k o b) → G (connS k o b)
+                  → Inv Rt Cr C ⟨ c , connS k o b , absorbed , r ⟩
+                  → sh ≡ [] × Ran Rt Cr k′
     -- A COLD'S TURN: its tape played one step, a value or its end rising,
     -- a stall or a frame's close moving nothing owed.
     abs-leaf      : ∀ {Γ′ A′ Γ A} {c : Ctx R Γ′ A′} {s} {c′ : Ctx R Γ A} {b} {l : Tape A} {κ t k′ p}
@@ -585,6 +589,24 @@ module Over {R : Set} (Rt : EmissionSet R) where
   ... | C′ , i′ = Cr , C′ , g i′ , silent ≃-refl
 
   ----------------------------------------------------------------------
+  -- A CONNECT'S OWN MARKS: its source subscribed, attached or torn
+  -- down, nothing shown.  Subscribing moves the cursors: the source's
+  -- frame reads `Subd`, so the hole's cursor stands at the connect's
+  -- `ix 1`, and only the mark's being least over the whole tree keeps
+  -- what the root owes.
+  run-con : ∀ {Cr C Γ A X} {c : Ctx R Γ A} {k} {o : St Γ X} {b m κ r k′ sh t}
+          → m ≡ bodyM ⊎ (m ≡ srcAttM ⊎ m ≡ owedM) → run c (connS k o b) m r ≡ moved k′ sh t
+          → (m , κ) ∈ own (connS k o b) → Lo (plug c (connS k o b)) κ → StOK (connS k o b) → G (connS k o b)
+          → Inv Rt Cr C ⟨ c , connS k o b , absorbed , r ⟩
+          → sh ≡ [] × Ran Rt Cr k′
+  run-con {c = c} {k = cs cl sl sa (just p) as ow cx ea sr sc} {o} {b} (inj₁ refl) refl mi lo st g i
+    with own-cls (cs cl sl sa (just p) as ow cx ea sr sc) {o} {b} mi | pend-of o (proj₂ (proj₂ (proj₂ st)))
+  ... | ob refl | o₀ , refl = refl , con-body Rt (body-noisle c st g refl lo) lo i
+  run-con {Cr} {C} {k = cs cl sl sa nothing as ow cx ea sr sc} (inj₁ refl) refl mi lo st g i = refl , Cr , C , i , silent ≃-refl
+  run-con (inj₂ (inj₁ refl)) eq mi lo st g i = run-srcatt eq mi lo st g i
+  run-con (inj₂ (inj₂ refl)) eq mi lo st g i = run-owed eq mi lo st g i
+
+  ----------------------------------------------------------------------
   -- Mark runs, assembled: the search, then the node's run.
 
   module _ {Γ′ A′} {c : Ctx R Γ′ A′} {s : St Γ′ A′} {p : Pos} {o : PureObs [] R} {rs} (pth : Path (load o) rs ⟨ c , s , absorbed , p ⟩) where
@@ -616,8 +638,8 @@ module Over {R : Set} (Rt : EmissionSet R) where
     abs-con : ∀ {Γ A X} {c′ : Ctx R Γ A} {k} {o : St Γ X} {b m κ k′ sh t} → m ≡ bodyM ⊎ (m ≡ srcAttM ⊎ m ≡ owedM)
             → search top (plug c s) ≡ just (found (Γ , A , c′ , connS k o b) m κ) → run c′ (connS k o b) m p ≡ moved k′ sh t
             → SimC Rt ⟨ c , s , absorbed , p ⟩ sh k′
-    abs-con w fd eq i with focus fd i | found-lo c s fd
-    ... | _ , i′ | mi , lo with run-con w eq mi lo i′
+    abs-con w fd eq i with focus fd i | found-lo c s fd | found-con pth fd
+    ... | _ , i′ | mi , lo | st , g with run-con w eq mi lo st g i′
     ...   | refl , nx′ = nx′
 
     abs-join : ∀ {Γ A} {c′ : Ctx R Γ A} {j g} {x : A ∈ Γ} {q e ib κ k′ sh t}
