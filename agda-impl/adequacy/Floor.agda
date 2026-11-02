@@ -8,7 +8,7 @@
 -- those it spends, and owing new ones only at or past its clock.
 module adequacy.Floor where
 
-open import Data.Bool using (true; false; not; if_then_else_; _∧_)
+open import Data.Bool using (true; false; not; if_then_else_; _∧_; _∨_)
 open import Data.List using (List; []; _∷_; [_]; _++_; _ʳ++_; null)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -218,12 +218,12 @@ module _ {R : Set} where
   conns c q k@(cs cl sl sa (just p₀) as ow ca ea sr sc) o′ b .bodyM (inj₁ refl) mi lo refl = ⊑i (lo (plug-in c (k-own (here refl))))
   conns c q k@(cs cl sl sa nothing as ow ca ea sr sc) o′ b .bodyM (inj₁ refl) mi lo refl = clock-abs c (connS k o′ b) q lo
   conns c q k@(cs cl sl sa ba (just p₀) ow ca ea sr sc) o′ b .srcAttM (inj₂ (inj₁ refl)) {κ} mi lo refl =
-    absorb c (connS k o′ b) (connS (cs cl sl true ba nothing ow ca ea sr sc) (proj₁ (unsubIf (not sl) o′)) b) p₀ into lo
+    absorb c (connS k o′ b) (connS (cs cl sl true ba nothing ow ca ea sr sc) (proj₁ (unsubIf (not sl ∨ closed c) o′)) b) p₀ into lo
     where
-      into : Into κ (connS k o′ b) (connS (cs cl sl true ba nothing ow ca ea sr sc) (proj₁ (unsubIf (not sl) o′)) b)
-      into (k-own m) = inj₁ (k-own (own-fewer k (cs cl sl true ba nothing ow ca ea sr sc) {o′} {proj₁ (unsubIf (not sl) o′)} {b} {b}
+      into : Into κ (connS k o′ b) (connS (cs cl sl true ba nothing ow ca ea sr sc) (proj₁ (unsubIf (not sl ∨ closed c) o′)) b)
+      into (k-own m) = inj₁ (k-own (own-fewer k (cs cl sl true ba nothing ow ca ea sr sc) {o′} {proj₁ (unsubIf (not sl ∨ closed c) o′)} {b} {b}
                                        ((λ e → e) , (λ ()) , (λ e → e)) m))
-      into (k-kid (k-src h))  = inj₁ (k-kid (k-src (unsubIf-in (not sl) o′ h)))
+      into (k-kid (k-src h))  = inj₁ (k-kid (k-src (unsubIf-in (not sl ∨ closed c) o′ h)))
       into (k-kid (k-body h)) = inj₁ (k-kid (k-body h))
   conns c q k@(cs cl sl sa ba nothing ow ca ea sr sc) o′ b .srcAttM (inj₂ (inj₁ refl)) mi lo refl = clock-abs c (connS k o′ b) q lo
   conns c q k@(cs cl sl sa ba as (just p₀) ca ea sr sc) o′ b .owedM (inj₂ (inj₂ refl)) {κ} mi lo refl =

@@ -7,7 +7,7 @@
 -- are a `Simulation` of every program's run.
 module adequacy.Dispatch where
 
-open import Data.Bool using (Bool; true; false; if_then_else_; not; _∨_; T)
+open import Data.Bool using (Bool; true; false; if_then_else_; not; _∨_; _∧_; T)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Nat using (_≡ᵇ_; suc)
 open import Data.List using (List; []; _∷_; [_]; _ʳ++_)
@@ -107,7 +107,7 @@ run-con-mv : ∀ {R Γ A X} (c : Ctx R Γ A) k (o : St Γ X) b m p → m ≡ bod
 run-con-mv c k o b .bodyM p (inj₁ refl) with CS.bodyAt k
 ... | just _  = tt
 ... | nothing = tt
-run-con-mv c k o b .srcAttM p (inj₂ (inj₁ refl)) with CS.attSrc k | unsubIf (not (CS.srcLive k)) o
+run-con-mv c k o b .srcAttM p (inj₂ (inj₁ refl)) with CS.attSrc k | unsubIf (not (CS.srcLive k) ∨ closed c) o
 ... | just _  | _ = tt
 ... | nothing | _ = tt
 run-con-mv c k o b .owedM p (inj₂ (inj₂ refl)) with CS.owedAt k | unsubIf (CS.srcAtt k) o
@@ -589,6 +589,9 @@ module Over {R : Set} (Rt : EmissionSet R) where
   or-right : ∀ a {b} → T (not a) → T (a ∨ b) → T b
   or-right false _ t = t
 
+  and-right : ∀ a {b} → T (a ∧ b) → T b
+  and-right true t = t
+
   closed-off : ∀ {C Γ A} {c : Ctx R Γ A} {Rg w E} → Fr Rt C Rg c w E → T (closed c) → Off w
   closed-off (f-top _)                         ()
   closed-off (f-off _ _)                       _ = refl
@@ -603,7 +606,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   closed-off (f-lane fr)                       t = closed-off fr t
   closed-off (f-lnct {b = false} fr)           _ = refl
   closed-off (f-lnct {b = true} fr)            t = ⊥-elim (closed-off fr t)
-  closed-off (f-src {k = k} fr _ _ _ nc _ _ _ _ _) t = closed-off fr (or-right (CS.closed k) nc t)
+  closed-off (f-src {k = k} fr _ _ _ nc _ _ _ _ _) t = closed-off fr (and-right (CS.srcAtt k) (or-right (CS.closed k) nc t))
   closed-off (f-srcc _ _ _ _ _ _ _ _ _ _ _)    _ = refl
   closed-off (f-srcp _ _ _ _ _ _ _ _ _ _ _ _) _ = tt
   closed-off (f-srcx _ _ _ _ _ _)              _ = refl

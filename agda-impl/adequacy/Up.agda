@@ -259,6 +259,9 @@ wf true  refl ()
 wf false _    _ = refl
 
 -- A source closed at `p`: finitely many of its rows past its end.
+--
+-- SUSPECTED FALSE, by the program that breaks `took-fin`: as a connect's
+-- source, that takeWhile ends at its failure and its pins run on forever.
 postulate
   shut-fin : ∀ {Γ X} {sc : Scope Γ} {Rs} {k : CS Γ X} {o : St Γ X} {p}
            → Sync sc Rs (aft p) o (Frozen k) → Sound Rs (Frozen k) → Frozen k p end → Fin (aft p) (Frozen k)

@@ -448,7 +448,7 @@ mutual
   unsub-⊆ (scanS f z s)           = unsub-⊆ s
   unsub-⊆ (takeS i p w s)         = ⊆-++ ⊆-refl (cut-⊆ s)
   unsub-⊆ (flatS op f ω d n q o ls) = ⊆-++ (cut-⊆ o) (killAll-⊆ ls)
-  unsub-⊆ (connS k o b)           = ⊆-++ (⊆-refl {x = csI k}) (⊆-++ (unsub-⊆ o) (unsub-⊆ b))
+  unsub-⊆ (connS k o b)           = ⊆-++ (⊆-refl {x = csI k}) (⊆-++ (unsubIf-⊆ (CS.srcAtt k) o) (unsub-⊆ b))
   unsub-⊆ (joinS j g x ib)        = none (ibI ib ++ gI g j)
     where
       none : ∀ (L : List Rg) → [] ⊆ L
@@ -491,9 +491,9 @@ mutual
   killAll-⊆ (connS k o b ∷ ls)          = ⊆-++ ⊆-refl (killAll-⊆ ls)
   killAll-⊆ (joinS j g x ib ∷ ls)       = ⊆-++ ⊆-refl (killAll-⊆ ls)
 
-unsubIf-⊆ : ∀ {Γ A} b (s : St Γ A) → items (proj₁ (unsubIf b s)) ⊆ items s
-unsubIf-⊆ true  s = unsub-⊆ s
-unsubIf-⊆ false s = ⊆-refl
+  unsubIf-⊆ : ∀ {Γ A} b (s : St Γ A) → items (proj₁ (unsubIf b s)) ⊆ items s
+  unsubIf-⊆ true  s = unsub-⊆ s
+  unsubIf-⊆ false s = ⊆-refl
 
 -- A lane ended keeps what it owes.
 ended-items : ∀ {Γ B} (s : St Γ B) → items (ended s) ≡ items s

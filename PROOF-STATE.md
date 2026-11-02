@@ -17,8 +17,9 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE DEAD PART'S TAIL
 
 A part that stops (take's failure, a source's end) has finitely many rows
-past the cursor. Open: an infinite synchronous burst behind the stop.
-Settled by bodies over the part's `Sync` and `Sound`, or a refuting program.
+past the cursor. Suspected false: a stop inside a connect's body keeps its
+source's pins, an infinite burst when the source is `ones`. Settled by
+restating as `Tail` against the state still running, or a body.
 
 Members: `took-fin`, `shut-fin`.
 
