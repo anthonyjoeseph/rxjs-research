@@ -39,7 +39,7 @@ open import adequacy.Stamped using (frame-ahead; opening-ahead; pend-focus)
 open import adequacy.Floor.Keys using (below)
 open import adequacy.Floor using (fed-ahead)
 open import adequacy.Simulation using (Simulation; module Along)
-open import adequacy.Cursor using (settled)
+open import adequacy.Cursor.Rise using (settled)
 import adequacy.Walk as Walk
 open import adequacy.Walk using (due-≈)
 open import adequacy.Bound using (bound)
@@ -98,11 +98,11 @@ mark-short : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q p e Γ�
 mark-short {R} o {rs} {c = c} {s} {p = p} {u = u} pth m fd
   with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o))
      | Along.met-next (cursor o) {c = nothing} (conv rs) m
-... | (C , settled _ fr h , _) , r | ((tp , _) , _) , vi , ap , _ with Walk.climb (enter (⟦ o ⟧ []ᴬ) root) fr h
+... | (Cr , C , settled _ fr h , _) , r | ((tp , _) , _) , vi , ap , _ with Walk.climb (enter (⟦ o ⟧ []ᴬ) root) fr h
 ...   | _ , _ , eq , sy =
   trans (at-<ᴷ p u)
     (≼-false {u} {p} (bound sy (λ ()) (proj₂ (found-least {t = plug c s} fd))
-      (from (due-≈ {C = C} eq) (proj₁ (from r (back (cursorᴿ nothing (conv rs)) tp ap , vi))))))
+      (from (due-≈ {C = Cr} eq) (proj₁ (from r (back (cursorᴿ nothing (conv rs)) tp ap , vi))))))
 
 private
   conn-arith : ∀ w e x y → w ≤ e → suc ((((w + suc e) + 0) + 0 + e) + x + y) ≤ 2 + 3 * e + y + x

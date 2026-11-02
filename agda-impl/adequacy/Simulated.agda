@@ -15,7 +15,8 @@ open import denotation.EmissionSet using (EmissionSet; enter; ⟦_⟧; out; end)
 open import operation.PureObservable using (PureObs; module Machine; module Driver)
 open Machine using (Ctx; Conf; ⟨_,_,_,_⟩; rising; closed; load) renaming (Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (Vis; Past; Lowest; _≃_; _⇄_; silent; shown)
-open import adequacy.Cursor using (Cur; ≈-refl; Inv; pending; origin; f-top; RT)
+open import adequacy.Cursor using (Cur; ≈-refl; origin; f-top)
+open import adequacy.Cursor.Rise using (Inv; pending; RT)
 open import adequacy.Simulation using (Simulation)
 open import adequacy.Path using (Path)
 import adequacy.Path as P
@@ -29,7 +30,7 @@ cursor : ∀ {R} (o : PureObs [] R) → Simulation o
 cursor {R} o = record
   { I   = Car
   ; T   = λ i → RT Rt (proj₁ i)
-  ; i₀  = origin , pending {Rg = λ _ → ⊤} (f-top ≈-refl) (λ _ → tt , (tt , λ ()) , tt , ≈-refl , λ _ → tt) , [] , P.[]
+  ; i₀  = origin , origin , pending {Rg = λ _ → ⊤} (f-top ≈-refl) (tt , (tt , λ ()) , tt , ≈-refl , λ _ → tt) , [] , P.[]
   ; t₀  = (λ { ((x , v , _) , v′) → x , v′ }) ⇄ (λ { (x , v) → (x , v , tt) , v })
   ; tau = tau
   ; val = val
@@ -42,45 +43,45 @@ cursor {R} o = record
     open Over Rt
 
     Car : Conf R → Set₁
-    Car k = Σ Cur λ C → Inv Rt C k × Σ (Shownᴹ R) λ rs → Path (load o) rs k
+    Car k = Σ Cur λ Cr → Σ Cur λ C → Inv Rt Cr C k × Σ (Shownᴹ R) λ rs → Path (load o) rs k
 
     tau : ∀ {k k′ t} (i : Car k) → Driver.step R k ≡ Driver.silent t k′
         → Σ (Car k′) λ i′ → Vis (RT Rt (proj₁ i)) ≃ Vis (RT Rt (proj₁ i′))
-    tau {k} {t = t} (C , i , rs , pth) e = go (reach k)
+    tau {k} {t = t} (Cr , C , i , rs , pth) e = go (reach k pth)
       where
         go : Reach k → _
         go (driven h sim) with sim e i
-        ... | C′ , i′ , silent q = (C′ , i′ , rs , pth P.▸τ (t , e)) , q
+        ... | Cr′ , C′ , i′ , silent q = (Cr′ , C′ , i′ , rs , pth P.▸τ (t , e)) , q
         go (within mv sim) with τ-moved (stepᴹ k) mv e
         ... | _ , eq with sim eq i
-        ...   | C′ , i′ , silent q = (C′ , i′ , rs , pth P.▸τ (t , e)) , q
+        ...   | Cr′ , C′ , i′ , silent q = (Cr′ , C′ , i′ , rs , pth P.▸τ (t , e)) , q
         go (stills eq _) = ⊥-elim (quiet-τ eq e)
 
     val : ∀ {k k′ t p a} (i : Car k) → Driver.step R k ≡ Driver.value t p a k′
         → Σ (Car k′) λ i′ → Lowest (RT Rt (proj₁ i)) p (out a) × Vis (Past p (RT Rt (proj₁ i))) ≃ Vis (RT Rt (proj₁ i′))
-    val {k} {k′} {t} {p} {a} (C , i , rs , pth) e = go (reach k)
+    val {k} {k′} {t} {p} {a} (Cr , C , i , rs , pth) e = go (reach k pth)
       where
-        go : Reach k → Σ (Car k′) λ i′ → Lowest (RT Rt C) p (out a) × Vis (Past p (RT Rt C)) ≃ Vis (RT Rt (proj₁ i′))
+        go : Reach k → Σ (Car k′) λ i′ → Lowest (RT Rt Cr) p (out a) × Vis (Past p (RT Rt Cr)) ≃ Vis (RT Rt (proj₁ i′))
         go (driven h _) = ⊥-elim (hush-val h e)
         go (stills eq _) = ⊥-elim (quiet-val eq e)
         go (within mv sim) with val-moved (stepᴹ k) mv e
         ... | rest , tr , eq with sim eq i
-        ...   | C′ , i′ , shown v l q = (C′ , i′ , _ , pth P.▸ P.val e P.[]) , (v , l) , q
+        ...   | Cr′ , C′ , i′ , shown v l q = (Cr′ , C′ , i′ , _ , pth P.▸ P.val e P.[]) , (v , l) , q
 
     fin : ∀ {k p} (i : Car k) → Driver.step R k ≡ Driver.complete p → Lowest (RT Rt (proj₁ i)) p end
-    fin {k} {p} (C , i , _ , pth) e = go (reach k)
+    fin {k} {p} (Cr , C , i , _ , pth) e = go (reach k pth)
       where
-        go : Reach k → Lowest (RT Rt C) p end
+        go : Reach k → Lowest (RT Rt Cr) p end
         go (driven h _) = ⊥-elim (hush-fin h e)
         go (stills eq _) = ⊥-elim (quiet-fin eq e)
         go (within mv sim) with fin-moved (stepᴹ k) mv e
         ... | k′ , rest , tr , eq with sim eq i
-        ...   | C′ , i′ , shown v l q = v , l
+        ...   | _ , _ , _ , shown v l q = v , l
 
     dry : ∀ {k} (i : Car k) → Driver.step R k ≡ Driver.drained → ∀ {q e} → Vis (RT Rt (proj₁ i)) q e → ⊥
-    dry {k} (C , i , _ , pth) e = go (reach k)
+    dry {k} (Cr , C , i , _ , pth) e = go (reach k pth)
       where
-        go : Reach k → ∀ {q e′} → Vis (RT Rt C) q e′ → ⊥
+        go : Reach k → ∀ {q e′} → Vis (RT Rt Cr) q e′ → ⊥
         go (driven h _)   = ⊥-elim (hush-drained h e)
         go (within mv _)  = ⊥-elim (mv-drained (stepᴹ k) mv e)
         go (stills _ sp) v = sp i (proj₁ v)
