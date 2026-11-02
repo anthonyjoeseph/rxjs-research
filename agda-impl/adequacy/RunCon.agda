@@ -11,6 +11,7 @@ open import Data.Empty using (⊥-elim)
 open import Data.List using ([]; _∷_; [_]; _++_)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₂)
+open import Data.Sum using (inj₁)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 
@@ -76,11 +77,11 @@ module _ {R : Set} (Rt : EmissionSet R) where
               → Ran Cr ⟨ inSrc (cs cl sl sa nothing (just (p ++ [ ix 1 ])) ow cx ea sr sc) b c , pend o₀ q , subscribing , p ++ [ ix 1 ] ⟩
   unread-body {Cr} {C} {cl = cl} {sl} {sa} {p} {as} {ow} {cx} {ea} {sr} {sc} un (sh-pend na nc refl scp (ok , adm) pe wn ss) hb le nb =
     Cr , bef (cx ++ [ ix 1 ]) ,
-    pending (f-isle un hb le na nc (behind-pend {C = bef (cx ++ [ ix 1 ])} {k = cs cl sl sa nothing (just (p ++ [ ix 1 ])) ow cx ea sr sc} scp (ok , adm) (≼-refl {cx ++ [ ix 1 ]})) (subd (λ o → o) ok) ss nb)
+    pending (f-isle un hb le na nc (behind-pend {C = bef (cx ++ [ ix 1 ])} {k = cs cl sl sa nothing (just (p ++ [ ix 1 ])) ow cx ea sr sc} scp (ok , adm) (≼-refl {cx ++ [ ix 1 ]})) (subd (λ o → o) ok) ss (inj₁ refl) nb)
             (≼-refl {cx ++ [ ix 1 ]} , ok-step cx ok , adm , pe , wn) ,
     silent ≃-refl
   unread-body {Cr} {C} un (sh-dead hk) hb le nb = Cr , C , settled {Rg = nowhere} {E = none′} c-sub (d-src un hb le nb) (_ , hk , ⊑-refl) , silent ≃-refl
-  unread-body un (sh-isle _ _ sy _ _ _) hb le nb = ⊥-elim (sync-pend tt sy)
+  unread-body un (sh-isle _ _ sy _ _ _ _) hb le nb = ⊥-elim (sync-pend tt sy)
   unread-body {Cr} {C} un (sh-islec na cl sp tp hk bh sd) hb le nb =
     Cr , C , settled {Rg = nowhere} {E = none′} c-sub (f-islec un hb le na cl sp tp bh sd) (_ , hk , ⊑-refl) , silent ≃-refl
 
@@ -93,18 +94,18 @@ module _ {R : Set} (Rt : EmissionSet R) where
            → Inv Rt Cr C ⟨ c , connS (cs cl sl sa (just p) as ow cx ea sr sc) (pend o₀ q) b , absorbed , r ⟩
            → Ran Cr ⟨ inSrc (cs cl sl sa nothing (just (p ++ [ ix 1 ])) ow cx ea sr sc) b c , pend o₀ q , subscribing , p ++ [ ix 1 ] ⟩
   con-body {sl = true} {cx = cx} nb lo (settled {N = owes} c-abs fr sy@(s-conn scp pt bs ss tn fl eq)) with ss tt
-  ... | src-on _ sy′ _ _ _ = ⊥-elim (sync-pend tt sy′)
+  ... | src-on _ sy′ _ _ _ _ = ⊥-elim (sync-pend tt sy′)
   ... | src-shut cl′ sp tp hk bh sd =
     _ , _ , settled {Rg = nowhere} {E = none′} c-sub (f-srcc fr scp (re-parts refl pt) tt cl′ sp tp bh sd (bs tt) (re-body fl) eq) (_ , hk , ⊑-refl) , silent ≃-refl
   ... | src-pend _ nc₀ refl _ _ _ ow with fr-shift Rt fr sy ow lo
   ...   | Cr′ , fr′ , s-conn scp′ pt′ bs′ ss′ _ fl′ eq′ , d with ss′ tt
-  ...     | src-on _ sy′ _ _ _ = ⊥-elim (sync-pend tt sy′)
+  ...     | src-on _ sy′ _ _ _ _ = ⊥-elim (sync-pend tt sy′)
   ...     | src-shut cl′ _ _ _ _ _ = ⊥-elim (notT _ nc₀ cl′)
   ...     | src-pend {k = k} na nc refl (ok , adm) pe wn _ =
     Cr′ , bef (cx ++ [ ix 1 ]) ,
     pending (f-src fr′ scp′ (re-parts refl pt′) tt nc (bs′ tt) (re-body fl′) ≈-refl eq′
                    (behind-pend {C = bef (cx ++ [ ix 1 ])} {k = k} scp′ (ok , adm) (≼-refl {cx ++ [ ix 1 ]})) (subd (λ o → o) ok)
-                   (λ t → ⊥-elim (notT _ na t)) nb)
+                   (λ t → ⊥-elim (notT _ na t)) (λ _ → inj₁ refl) nb)
             (≼-refl {cx ++ [ ix 1 ]} , ok-step cx ok , adm , pe , wn) ,
     silent (vis-≃ d)
   con-body {sl = false} nb lo (settled {N = owes} c-abs fr (s-conn scp pt bs ss tn fl eq)) =

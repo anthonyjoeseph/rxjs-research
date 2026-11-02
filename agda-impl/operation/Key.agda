@@ -12,7 +12,8 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
 open import Relation.Nullary using (does; yes; no)
 
-open import denotation.Events using (Pos; Label; _<ᵖ_; _≟ˡ_; <ᵖ-trans; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-split; <ᵖ-part; <ᵖ-cons)
+open import Data.Nat using (zero; suc)
+open import denotation.Events using (Pos; Label; ix; sub; last; _<ᵖ_; _≟ˡ_; <ᵖ-trans; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-split; <ᵖ-part; <ᵖ-cons)
 
 data Key : Set where
   at    : Pos → Key
@@ -188,6 +189,14 @@ private
   no-top (a ∷ p) []      ()
   no-top (a ∷ p) (b ∷ y) e = no-top p y (cong tl e)
 
+  lex-nil : ∀ x → lex x [] ≡ false
+  lex-nil []      = refl
+  lex-nil (_ ∷ _) = refl
+
+  lex-top : ∀ y → lex (labs y) [ top ] ≡ true
+  lex-top []      = refl
+  lex-top (_ ∷ _) = refl
+
 -- A position's key and an after's never tie: one is strictly first.
 at-after-≮ : ∀ p y → at p <ᴷ after y ≡ false → after y <ᴷ at p ≡ false → ⊥
 at-after-≮ p y h₁ h₂ with lex-tot (labs p) (labs y ++ [ top ])
@@ -233,3 +242,32 @@ after-past (a ∷ y) (b ∷ q) h ne with xtri (lab a) (lab b)
 ... | inj₂ (inj₁ refl) =
   same (lab a ≺ lab a) (lab a ≐ lab a) _ (≺-irrefl (lab a)) (≐-refl (lab a))
        (after-past y q (pickf (lab a ≺ lab a) (lab a ≐ lab a) _ (≺-irrefl (lab a)) (≐-refl (lab a)) h) λ z e → ne z (cong (a ∷_) e))
+
+-- A connect's attach is keyed strictly before its next slot.
+attach-next : ∀ c → after (c ++ [ ix 1 ]) <ᴷ at (c ++ [ ix 2 ]) ≡ true
+attach-next []      = refl
+attach-next (a ∷ c) = ok₂ (lab a ≺ lab a) (lab a ≐ lab a) _ (≐-refl (lab a)) (attach-next c)
+
+-- No position lies between a connect's attach and its next slot.
+past-attach : ∀ c y → at y <ᴷ after (c ++ [ ix 1 ]) ≡ false → at y <ᴷ at (c ++ [ ix 2 ]) ≡ false
+past-attach []      []                            ()
+past-attach []      (ix zero ∷ y)                 ()
+past-attach []      (ix (suc zero) ∷ y)           h =
+  ⊥-elim (clash (ok₂ (lab (ix 1) ≺ lab (ix 1)) (lab (ix 1) ≐ lab (ix 1)) _ (≐-refl (lab (ix 1))) (lex-top y)) h)
+past-attach []      (ix (suc (suc zero)) ∷ y)     h = none _ _ _ refl (lex-nil (labs y))
+past-attach []      (ix (suc (suc (suc n))) ∷ y)  h = none _ _ _ refl (lex-nil (labs y))
+past-attach []      (sub _ ∷ y)                   h = none _ _ _ refl (lex-nil (labs y))
+past-attach []      (last ∷ y)                    h = none _ _ _ refl (lex-nil (labs y))
+past-attach (a ∷ c) []                            ()
+past-attach (a ∷ c) (b ∷ y) h with xtri (lab b) (lab a)
+... | inj₁ ba          = ⊥-elim (clash (ok₁ _ _ ba) h)
+... | inj₂ (inj₂ ab)   = nope (lab b ≺ lab a) (lab b ≐ lab a) _ (≺-asym (lab b) (lab a) ab) (≺→≠ (lab b) (lab a) ab)
+... | inj₂ (inj₁ refl) =
+  same (lab b ≺ lab b) (lab b ≐ lab b) _ (≺-irrefl (lab b)) (≐-refl (lab b))
+       (past-attach c y (pickf (lab b ≺ lab b) (lab b ≐ lab b) _ (≺-irrefl (lab b)) (≐-refl (lab b)) h))
+
+-- Strictly before, never the other way too.
+<ᴷ-asym : ∀ a b → a <ᴷ b ≡ true → b <ᴷ a ≡ false
+<ᴷ-asym a b h with b <ᴷ a in e
+... | false = refl
+... | true  = ⊥-elim (clash (<ᴷ-trans a b a h e) (<ᴷ-irrefl a))

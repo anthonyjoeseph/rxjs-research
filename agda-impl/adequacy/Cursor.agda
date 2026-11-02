@@ -176,6 +176,11 @@ Burst k = Under λ k′ → Σ _ λ e → Frozen k k′ e × (T (inside (CS.conn
 AttFin : ∀ {Γ X} → CS Γ X → Set
 AttFin k = T (CS.srcAtt k) → Σ (List Pos) λ ks → ∀ {y e} → Frozen k y e → T (inside (CS.connAt k ++ [ ix 1 ]) y) → y ∈ ks
 
+-- An unattached source's subscribe call still to return: its attach
+-- owed just after its connect's `ix 1`, or its body not yet run.
+AttOwed : ∀ {Γ X} → CS Γ X → Set
+AttOwed k = CS.attSrc k ≡ just (CS.connAt k ++ [ ix 1 ]) ⊎ CS.bodyAt k ≡ just (CS.connAt k)
+
 -- Within `Q` but for finitely many.
 _⊑_ : Pts → Pts → Set
 P ⊑ Q = Σ (List Pos) λ ks → ∀ {y} → P y → Q y ⊎ y ∈ ks
@@ -556,7 +561,7 @@ data Src where
   -- subscribed: the cursor at or past its subscription, made where
   -- admissible
   src-on   : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o} → T (not (CS.closed k)) → Sync sc Rg C o (Frozen k) → Behind C (Frozen k)
-           → Subd sc C k → AttFin k → Src sc Rg C k o
+           → Subd sc C k → AttFin k → (T (not (CS.srcAtt k)) → AttOwed k) → Src sc Rg C k o
   -- ended: nothing visible left to owe, the rest within what its subtree
   -- still runs
   src-shut : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o P} → T (CS.closed k) → Spent C (Frozen k)
@@ -584,7 +589,7 @@ data SrcH where
   sh-dead  : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o P} → Husk sc o P → SrcH sc k o (Under P)
   sh-isle  : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o Ri Ci}
            → T (not (CS.srcAtt k)) → T (not (CS.closed k)) → Sync sc Ri Ci o (Frozen k) → Behind Ci (Frozen k) → Subd sc Ci k
-           → Sound Ri (Frozen k) → SrcH sc k o (Burst k)
+           → Sound Ri (Frozen k) → AttOwed k → SrcH sc k o (Burst k)
   -- an isle whose source has ended
   sh-islec : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o Ci P}
            → T (not (CS.srcAtt k)) → T (CS.closed k) → Spent Ci (Frozen k) → TailP Ci (Frozen k) P → Husk sc o P
@@ -635,7 +640,7 @@ mutual
 
   src-husk : ∀ {Γ X} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} → CS.scope k ≡ sc → Src sc Rg C k o → Sound Rg (Frozen k) → Σ Pts (SrcH sc k o)
   src-husk sc (src-pend na nc ba adm pe wn _) ss       = _ , sh-pend na nc ba sc adm pe wn ss
-  src-husk _ (src-on {k = k} nc sy bh sd _) ss          = by (CS.srcAtt k) (λ _ → _ , sh-dead (proj₂ (husk-of sy))) (λ na → _ , sh-isle na nc sy bh sd ss)
+  src-husk _ (src-on {k = k} nc sy bh sd _ ao) ss       = by (CS.srcAtt k) (λ _ → _ , sh-dead (proj₂ (husk-of sy))) (λ na → _ , sh-isle na nc sy bh sd ss (ao na))
   src-husk _ (src-shut {C = C} {k = k} cl sp tp hk bh sd) _ = by (CS.srcAtt k) (λ _ → _ , sh-dead hk) (λ na → _ , sh-islec {Ci = C} na cl sp tp hk bh sd)
 
   begun-husk : ∀ {Γ A B} {sc : Scope Γ} {Rl C} {P : Pol A B} {O vs ls n} → Begun sc Rl C P O vs ls n → Σ Pts (HuskL sc ls)
@@ -721,7 +726,7 @@ mutual
   srch-unsub {k = k} (sh-dead hk) with CS.srcAtt k
   ... | true  = let (_ , h , le) = unsub-husk hk in _ , sh-dead h , under-⊑ le
   ... | false = _ , sh-dead hk , ⊑-refl
-  srch-unsub {k = k} sh@(sh-isle na _ _ _ _ _)    = _ , subst (λ o′ → SrcH _ k o′ _) (sym (unsubIf-off (CS.srcAtt k) na)) sh , ⊑-refl
+  srch-unsub {k = k} sh@(sh-isle na _ _ _ _ _ _)  = _ , subst (λ o′ → SrcH _ k o′ _) (sym (unsubIf-off (CS.srcAtt k) na)) sh , ⊑-refl
   srch-unsub {k = k} sh@(sh-islec na _ _ _ _ _ _) = _ , subst (λ o′ → SrcH _ k o′ _) (sym (unsubIf-off (CS.srcAtt k) na)) sh , ⊑-refl
   srch-unsub {k = k} sh@(sh-pend na _ _ _ _ _ _ _) = _ , subst (λ o′ → SrcH _ k o′ _) (sym (unsubIf-off (CS.srcAtt k) na)) sh , ⊑-refl
 
@@ -906,7 +911,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Fr Cr C Rg c owes E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (not (CS.closed k))
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β
             → Flags C k β → Frozen k ≈ E → ConnE (CS.connAt k) (Frozen k) β E′ → Behind C (Frozen k) → Subd (scopeOf c) C k
-            → AttFin k → NoIsle b → Fr Cr C (Parts.Rs pt) (inSrc k b c) owes E
+            → AttFin k → (T (not (CS.srcAtt k)) → AttOwed k) → NoIsle b → Fr Cr C (Parts.Rs pt) (inSrc k b c) owes E
     -- a source ended while its connect runs: nothing reads what is left
     f-srcc  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {C Rg Rg′ E E′ β P}
             → Fr Cr C Rg c owes E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (CS.closed k)
@@ -950,7 +955,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     f-isle  : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {C Ri Ci P Qb}
             → Unread Cr C c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Qb
             → P ⊑ (Burst k ∪ᵖ Qb) → T (not (CS.srcAtt k)) → T (not (CS.closed k))
-            → Behind Ci (Frozen k) → Subd (scopeOf c) Ci k → Sound Ri (Frozen k)
+            → Behind Ci (Frozen k) → Subd (scopeOf c) Ci k → Sound Ri (Frozen k) → AttOwed k
             → NoIsle b → Fr Cr Ci Ri (inSrc k b c) owes (Frozen k)
     -- an isle whose source has ended
     f-islec : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {C Ci Rg′ P N Qb E}

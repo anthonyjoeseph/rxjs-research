@@ -158,7 +158,7 @@ mutual
   -- attached one's is finitely many, and so are the rows the cursor passed.
   src-pt : ∀ {Γ X} {Rg C} {k : CS Γ X} {o} (sw : Src (CS.scope k) Rg C k o) (ss : Sound Rg (Frozen k)) → SrcPT C k (proj₁ (src-husk refl sw ss))
   src-pt {C = C} {k = k} (src-pend _ _ _ _ _ _ _) _ = [] , λ x h _ → inj₁ (in-burst {C = C} {k = k} x h)
-  src-pt {C = C} {k = k} (src-on nc sy bh sd af) ss =
+  src-pt {C = C} {k = k} (src-on nc sy bh sd af _) ss =
     by-elim (λ h → SrcPT C k (proj₁ h)) (CS.srcAtt k) _ _
       (λ t → let (ka , fa) = af t ; (ptl kp fp) = pin-tail sy ; (kh , fh) = bh in
              map ix0 (ka ++ (kp ++ kh)) , λ {k′} x h _ →
