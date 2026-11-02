@@ -242,7 +242,7 @@ mutual
   unsub (scanS f z s)           = wrap (scanS f z) (unsub s)
   unsub (takeS i p w s)         = wrap (takeS i p w) (cut s)
   unsub (flatS op f ω d n q o ls) = both (flatS op f ω d 0 q) (cut o) (killAll ls)
-  unsub (connS k o b)           = both (connS k) (unsub o) (unsub b)
+  unsub (connS k o b)           = both (connS k) (unsubIf (CS.srcAtt k) o) (unsub b)
   unsub (joinS j g x ib)        = joinS j false x [] , []
   unsub s                       = s , []
 
@@ -256,9 +256,9 @@ mutual
   killAll (lnS true s ∷ ls) = both (λ s′ ls′ → lnS false s′ ∷ ls′) (cut s) (killAll ls)
   killAll (l ∷ ls)          = wrap (l ∷_) (killAll ls)
 
-unsubIf : ∀ {Γ A} → Bool → St Γ A → St Γ A × Torn
-unsubIf true  s = unsub s
-unsubIf false s = s , []
+  unsubIf : ∀ {Γ A} → Bool → St Γ A → St Γ A × Torn
+  unsubIf true  s = unsub s
+  unsubIf false s = s , []
 
 ------------------------------------------------------------------------
 -- A connect's feed, pushed into each of its live joiners
@@ -615,7 +615,7 @@ run c (takeS i q (cutAt p) s) cutM _ with cut s
 run c (connS k o b) bodyM r with CS.bodyAt k
 ... | just p  = ok ⟨ inSrc (record k { bodyAt = nothing ; attSrc = just (p ⊕ [ ix 1 ]) }) b c , o , subscribing , p ⊕ [ ix 1 ] ⟩
 ... | nothing = ok ⟨ c , connS k o b , absorbed , r ⟩
-run c (connS k o b) srcAttM r with CS.attSrc k | unsubIf (not (CS.srcLive k)) o
+run c (connS k o b) srcAttM r with CS.attSrc k | unsubIf (not (CS.srcLive k) ∨ closed c) o
 ... | just p  | o′ , t = moved ⟨ c , connS (record k { srcAtt = true ; attSrc = nothing }) o′ b , absorbed , p ⟩ [] t
 ... | nothing | _      = ok ⟨ c , connS k o b , absorbed , r ⟩
 run c (connS k o b) owedM r with CS.owedAt k | unsubIf (CS.srcAtt k) o

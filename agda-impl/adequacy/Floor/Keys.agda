@@ -261,8 +261,8 @@ mutual
   unsub-in (flatS op f ω d n q o ls) (k-kid (k-outer h)) = k-kid (k-outer (cut-in o h))
   unsub-in (flatS op f ω d n q o ls) (k-kid (k-lane m h)) with kill-in ls m h
   ... | _ , m′ , h′ = k-kid (k-lane m′ h′)
-  unsub-in (connS k o b)           (k-own m) = k-own (own-same k {o} {proj₁ (unsub o)} {b} {proj₁ (unsub b)} m)
-  unsub-in (connS k o b)           (k-kid (k-src h)) = k-kid (k-src (unsub-in o h))
+  unsub-in (connS k o b)           (k-own m) = k-own (own-same k {o} {proj₁ (unsubIf (CS.srcAtt k) o)} {b} {proj₁ (unsub b)} m)
+  unsub-in (connS k o b)           (k-kid (k-src h)) = k-kid (k-src (unsubIf-in (CS.srcAtt k) o h))
   unsub-in (connS k o b)           (k-kid (k-body h)) = k-kid (k-body (unsub-in b h))
   unsub-in (joinS j g x ib)        (k-own ())
   unsub-in (joinS j g x ib)        (k-kid ())
@@ -309,9 +309,9 @@ mutual
   keep-l l ls (here refl) h = l , here refl , h
   keep-l l ls (there m)   h = kept-tail l ls m h
 
-unsubIf-in : ∀ {Γ A} b (s : St Γ A) {κ} → KeyIn (proj₁ (unsubIf b s)) κ → KeyIn s κ
-unsubIf-in true  s h = unsub-in s h
-unsubIf-in false s h = h
+  unsubIf-in : ∀ {Γ A} b (s : St Γ A) {κ} → KeyIn (proj₁ (unsubIf b s)) κ → KeyIn s κ
+  unsubIf-in true  s h = unsub-in s h
+  unsubIf-in false s h = h
 
 ended-in : ∀ {Γ B} (s : St Γ B) {κ} → KeyIn (ended s) κ → KeyIn s κ
 ended-in (lnS b (cutS l a s)) (k-kid (k-ln (k-own m))) = k-kid (k-ln (k-own (subst (_ ∈_) (own-cut a) m)))

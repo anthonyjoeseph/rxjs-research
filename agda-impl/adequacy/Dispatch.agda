@@ -107,7 +107,7 @@ run-con-mv : ∀ {R Γ A X} (c : Ctx R Γ A) k (o : St Γ X) b m p → m ≡ bod
 run-con-mv c k o b .bodyM p (inj₁ refl) with CS.bodyAt k
 ... | just _  = tt
 ... | nothing = tt
-run-con-mv c k o b .srcAttM p (inj₂ (inj₁ refl)) with CS.attSrc k | unsubIf (not (CS.srcLive k)) o
+run-con-mv c k o b .srcAttM p (inj₂ (inj₁ refl)) with CS.attSrc k | unsubIf (not (CS.srcLive k) ∨ closed c) o
 ... | just _  | _ = tt
 ... | nothing | _ = tt
 run-con-mv c k o b .owedM p (inj₂ (inj₂ refl)) with CS.owedAt k | unsubIf (CS.srcAtt k) o
