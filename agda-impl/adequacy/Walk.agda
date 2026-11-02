@@ -27,7 +27,7 @@ open import adequacy.Cursor using (Cur; Rgn; notT; Owes; Due; Spent; _≈_; alik
   Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; unbind;
   Need; owes; dead; lane; lanecut; pnd; onoff; Rest; LaneHold; Hold; Fr; Unread; un-dead; un-torn; f-top; f-map; f-scan; f-cut;
   f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes;
-  d-src; d-body; f-isle; f-islec; Inv; settled; c-abs)
+  d-src; d-body; f-isle; f-islec; Inv; settled; c-abs; NoIsle; Clear)
 open _≃_
 
 ------------------------------------------------------------------------
@@ -168,7 +168,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
                (subst (λ ls → Begun _ _ _ _ _ _ ls _) (sym (ʳ++-defn pre)) (begun-join lf o nq r (laneSt b hl h sd) rt))
     climb (f-lane fr)                   (at , l , refl , h) = climb fr (at , l , refl , h)
     climb (f-lnct {b = b} fr)           h = climb fr (_ , _ , refl , hold-lh b h)
-    climb (f-src fr sc pt lv nc bs fl fe eq bh sd) h =
+    climb (f-src fr sc pt lv nc bs fl fe eq bh sd _) h =
       climb fr (s-conn sc pt (λ _ → bs) (λ _ → src-on nc (sync-≈ h (≈-sym fe)) bh sd) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
     climb (f-srcc fr sc pt lv cl sp tp bh sd bs fl eq) (Q , hk , le) =
       climb fr (s-conn sc pt (λ _ → bs) (λ _ → src-shut cl sp (tailp-⊑ tp le) hk bh sd) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
@@ -184,9 +184,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
     climb (d-outer fr hl le)            (Q , hk , le′) = climb fr (_ , h-flat hk hl , ⊑-trans le (∪-⊑ le′ ⊑-refl))
     climb (d-lanes fr ho ha hb le)      (Q , hk , le′) with hl-rev ha (hl-more hk hb)
     ... | Q′ , hl , le″ = climb fr (_ , h-flat ho hl , ⊑-trans le (∪-⊑ ⊑-refl (⊑-trans (∪-⊑ ⊑-refl (∪-⊑ le′ ⊑-refl)) le″)))
-    climb (d-src u hb le)               (Q , hk , le′) = unread-up u (sh-dead hk) hb (⊑-trans le (∪-⊑ (under-⊑ le′) ⊑-refl))
+    climb (d-src u hb le _)             (Q , hk , le′) = unread-up u (sh-dead hk) hb (⊑-trans le (∪-⊑ (under-⊑ le′) ⊑-refl))
     climb (d-body u sh le)              (Q , hk , le′) = unread-up u sh hk (⊑-trans le (∪-⊑ ⊑-refl le′))
-    climb (f-isle u hb le na nc bh sd ss) h = unread-up u (sh-isle na nc h bh sd ss) hb le
+    climb (f-isle u hb le na nc bh sd ss _) h = unread-up u (sh-isle na nc h bh sd ss) hb le
     climb (f-islec u hb le na cl sp tp bh sd) (Q , hk , le′) = unread-up u (sh-islec na cl sp (tailp-⊑ tp le′) hk bh sd) hb le
 
     unread-up : ∀ {Cr C Γ X B} {c : Ctx R Γ B} {k : CS Γ X} {o b P Ps Qb} → Unread Rt Cr C c k P → SrcH (scopeOf c) k o Ps
@@ -204,10 +204,10 @@ module _ {R : Set} (Rt : EmissionSet R) where
 
   -- Down through a part no live node reads.
   src-dead : ∀ {Cr C Γ X B} {c : Ctx R Γ B} {k : CS Γ X} {s b P Ps Qb} → Unread Rt Cr C c k P → SrcH (scopeOf c) k s Ps
-           → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Qb → P ⊑ (Ps ∪ᵖ Qb) → Res Cr (inSrc k b c) s
-  src-dead {C = C} u (sh-dead hk) hb le                 = C , dead _ , nowhere , none′ , d-src u hb le , (_ , hk , ⊑-refl)
-  src-dead u (sh-isle na nc sy bh sd ss) hb le          = _ , owes , _ , _ , f-isle u hb le na nc bh sd ss , sy
-  src-dead {C = C} u (sh-islec na cl sp tp hk bh sd) hb le = C , dead _ , nowhere , none′ , f-islec u hb le na cl sp tp bh sd , (_ , hk , ⊑-refl)
+           → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Qb → P ⊑ (Ps ∪ᵖ Qb) → NoIsle b → Res Cr (inSrc k b c) s
+  src-dead {C = C} u (sh-dead hk) hb le nb                    = C , dead _ , nowhere , none′ , d-src u hb le nb , (_ , hk , ⊑-refl)
+  src-dead u (sh-isle na nc sy bh sd ss) hb le nb             = _ , owes , _ , _ , f-isle u hb le na nc bh sd ss nb , sy
+  src-dead {C = C} u (sh-islec na cl sp tp hk bh sd) hb le _  = C , dead _ , nowhere , none′ , f-islec u hb le na cl sp tp bh sd , (_ , hk , ⊑-refl)
 
   body-dead : ∀ {Cr C Γ X B} {c : Ctx R Γ B} {k : CS Γ X} {o b P Ps Qb} → Unread Rt Cr C c k P → SrcH (scopeOf c) k o Ps
             → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Qb → P ⊑ (Ps ∪ᵖ Qb) → Res Cr (inBody k o c) b
@@ -278,18 +278,19 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-lanes (_ , lanecut _ _ , _ , _ , _ , (_ , _ , () , _))
   down-lanes (_ , pnd _ , _ , _ , _ , (_ , () , _))
 
-  down-src : ∀ {Cr Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s} → Res Cr c (connS k s b) → Res Cr (inSrc k b c) s
-  down-src {k = k} (C , owes , _ , _ , fr , s-conn sc pt bs os tn fl eq) with live? (CS.srcLive k)
-  ... | inj₂ nl = let t = tn nl in src-dead (un-torn fr sc pt nl fl eq (Torn.tl t)) (Torn.sh t) (Torn.bh t) ⊑-refl
+  down-src : ∀ {Cr Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s} → NoIsle b → Res Cr c (connS k s b) → Res Cr (inSrc k b c) s
+  down-src {k = k} nb (C , owes , _ , _ , fr , s-conn sc pt bs os tn fl eq) with live? (CS.srcLive k)
+  ... | inj₂ nl = let t = tn nl in src-dead (un-torn fr sc pt nl fl eq (Torn.tl t)) (Torn.sh t) (Torn.bh t) ⊑-refl nb
   ... | inj₁ lv with os lv
-  ...   | src-on nc sy bh sd         = C , owes , _ , _ , f-src fr sc pt lv nc (bs lv) fl ≈-refl eq bh sd , sy
+  ...   | src-on nc sy bh sd         = C , owes , _ , _ , f-src fr sc pt lv nc (bs lv) fl ≈-refl eq bh sd nb , sy
   ...   | src-shut cl sp tp hk bh sd = C , dead _ , nowhere , none′ , f-srcc fr sc pt lv cl sp tp bh sd (bs lv) fl eq , (_ , hk , ⊑-refl)
   ...   | src-pend nc ba adm pe wn ow = C , pnd _ , _ , _ , f-srcp fr sc pt lv nc ba adm (bs lv) fl ≈-refl eq ow , (_ , refl , pe , wn)
-  down-src (C , dead P , _ , _ , fr , (Q , h-conn sh hb , le)) = src-dead (un-dead fr) sh hb le
-  down-src (C , dead P , _ , _ , fr , (Q , h-blank , le))     = C , dead ∅ᵖ , nowhere , none′ , d-src (un-dead fr) h-blank (⊑-trans le ∅-⊑) , (_ , h-blank , ⊑-refl)
-  down-src (_ , lane _ _ , _ , _ , _ , (_ , _ , () , _))
-  down-src (_ , lanecut _ _ , _ , _ , _ , (_ , _ , () , _))
-  down-src (_ , pnd _ , _ , _ , _ , (_ , () , _))
+  down-src nb (C , dead P , _ , _ , fr , (Q , h-conn sh hb , le)) = src-dead (un-dead fr) sh hb le nb
+  down-src nb (C , dead P , _ , _ , fr , (Q , h-blank , le))     =
+    C , dead ∅ᵖ , nowhere , none′ , d-src (un-dead fr) h-blank (⊑-trans le ∅-⊑) nb , (_ , h-blank , ⊑-refl)
+  down-src _ (_ , lane _ _ , _ , _ , _ , (_ , _ , () , _))
+  down-src _ (_ , lanecut _ _ , _ , _ , _ , (_ , _ , () , _))
+  down-src _ (_ , pnd _ , _ , _ , _ , (_ , () , _))
 
   down-body : ∀ {Cr Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s} → Res Cr c (connS k o s) → Res Cr (inBody k o c) s
   down-body {k = k} {s = s} (C , owes , _ , _ , fr , s-conn sc pt bs os tn fl eq) with live? (CS.srcLive k)
@@ -302,24 +303,24 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-body (_ , lanecut _ _ , _ , _ , _ , (_ , _ , () , _))
   down-body (_ , pnd _ , _ , _ , _ , (_ , () , _))
 
-  descend : ∀ {Cr Γ A} (c : Ctx R Γ A) s {Rg E} → Sync unbound Rg Cr (plug c s) E → E ≈ Rt → Res Cr c s
-  descend {Cr} top                          s sy eq = Cr , owes , _ , _ , f-top eq , sy
-  descend (inMap f c)                       s sy eq = down-map (descend c _ sy eq)
-  descend (inScan f z c)                    s sy eq = down-scan (descend c _ sy eq)
-  descend (inCut l a c)                     s sy eq = down-cut (descend c _ sy eq)
-  descend (inLn b c)                        s sy eq = down-ln (descend c _ sy eq)
-  descend (inTake i p w c)                  s sy eq = down-take (descend c _ sy eq)
-  descend (inOuter op f ω d n q ls c)         s sy eq = down-outer (descend c _ sy eq)
-  descend (inLanes op f ω d n q o pre post c) s sy eq = down-lanes (descend c _ sy eq)
-  descend (inSrc k b c)                     s sy eq = down-src (descend c _ sy eq)
-  descend (inBody k o c)                    s sy eq = down-body (descend c _ sy eq)
+  descend : ∀ {Cr Γ A} (c : Ctx R Γ A) s {Rg E} → Clear c → Sync unbound Rg Cr (plug c s) E → E ≈ Rt → Res Cr c s
+  descend {Cr} top                            s _          sy eq = Cr , owes , _ , _ , f-top eq , sy
+  descend (inMap f c)                         s cl         sy eq = down-map (descend c _ cl sy eq)
+  descend (inScan f z c)                      s cl         sy eq = down-scan (descend c _ cl sy eq)
+  descend (inCut l a c)                       s cl         sy eq = down-cut (descend c _ cl sy eq)
+  descend (inLn b c)                          s cl         sy eq = down-ln (descend c _ cl sy eq)
+  descend (inTake i p w c)                    s cl         sy eq = down-take (descend c _ cl sy eq)
+  descend (inOuter op f ω d n q ls c)         s cl         sy eq = down-outer (descend c _ cl sy eq)
+  descend (inLanes op f ω d n q o pre post c) s cl         sy eq = down-lanes (descend c _ cl sy eq)
+  descend (inSrc k b c)                       s (nb , cl)  sy eq = down-src nb (descend c _ cl sy eq)
+  descend (inBody k o c)                      s cl         sy eq = down-body (descend c _ cl sy eq)
 
   ----------------------------------------------------------------------
   -- REFOCUSING keeps the invariant: the same tree, the same root cursor;
-  -- the hole's world is wherever the new hole lies.
+  -- the hole's world is wherever the new hole lies, along a clear path.
 
   refocus : ∀ {Cr C Γ A Γ′ A′} {c : Ctx R Γ A} {c′ : Ctx R Γ′ A′} {s s′ r}
-          → Inv Rt Cr C ⟨ c , s , absorbed , r ⟩ → plug c′ s′ ≡ plug c s → Σ Cur λ C′ → Inv Rt Cr C′ ⟨ c′ , s′ , absorbed , r ⟩
-  refocus {c′ = c′} {s′ = s′} (settled _ fr h) eq with climb fr h
-  ... | _ , _ , top≈ , sy with descend c′ s′ (subst (λ t → Sync unbound _ _ t _) (sym eq) sy) top≈
+          → Inv Rt Cr C ⟨ c , s , absorbed , r ⟩ → plug c′ s′ ≡ plug c s → Clear c′ → Σ Cur λ C′ → Inv Rt Cr C′ ⟨ c′ , s′ , absorbed , r ⟩
+  refocus {c′ = c′} {s′ = s′} (settled _ fr h) eq cl with climb fr h
+  ... | _ , _ , top≈ , sy with descend c′ s′ cl (subst (λ t → Sync unbound _ _ t _) (sym eq) sy) top≈
   ...   | C′ , _ , _ , _ , fr′ , h′ = C′ , settled c-abs fr′ h′

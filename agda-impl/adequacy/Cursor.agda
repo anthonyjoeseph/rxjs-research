@@ -718,6 +718,52 @@ postulate
             → TailP (bef p) (TakeWhile.TakeT i keep Es) (proj₁ (husk-of sy))
 
 ------------------------------------------------------------------------
+-- NO ISLE IN A PART: every connect in it attached, closed, or not yet
+-- subscribed.  An isle's subscribe call is still running, so whatever
+-- runs lies inside its source: a connect whose source rises has no isle
+-- in its body, and a row fed there reaches none.
+
+data Pending {Γ A} : St Γ A → Set where
+  pd : ∀ {o q} → Pending (pend o q)
+
+-- Not an isle.
+Settles : ∀ {Γ X} → CS Γ X → St Γ X → Set
+Settles k o = T (CS.srcAtt k) ⊎ T (CS.closed k) ⊎ Pending o
+
+mutual
+  NoIsle : ∀ {Γ A} → St Γ A → Set
+  NoIsle (mapS _ s)                = NoIsle s
+  NoIsle (scanS _ _ s)             = NoIsle s
+  NoIsle (cutS _ _ s)              = NoIsle s
+  NoIsle (lnS _ s)                 = NoIsle s
+  NoIsle (takeS _ _ _ s)           = NoIsle s
+  NoIsle (flatS _ _ _ _ _ _ o ls)  = NoIsle o × NoIsleL ls
+  NoIsle (connS k o b)             = Settles k o × NoIsle o × NoIsle b
+  NoIsle _                         = ⊤
+
+  NoIsleL : ∀ {Γ A} → List (St Γ A) → Set
+  NoIsleL []       = ⊤
+  NoIsleL (l ∷ ls) = NoIsle l × NoIsleL ls
+
+-- The path clear: no isle in the body of a connect whose source it
+-- enters.
+Clear : ∀ {R Γ A} → Ctx R Γ A → Set
+Clear top                                 = ⊤
+Clear (inMap _ c)                         = Clear c
+Clear (inScan _ _ c)                      = Clear c
+Clear (inCut _ _ c)                       = Clear c
+Clear (inLn _ c)                          = Clear c
+Clear (inTake _ _ _ c)                    = Clear c
+Clear (inOuter _ _ _ _ _ _ _ c)           = Clear c
+Clear (inLanes _ _ _ _ _ _ _ _ _ c)       = Clear c
+Clear (inSrc _ b c)                       = NoIsle b × Clear c
+Clear (inBody _ _ c)                      = Clear c
+
+-- A node in step is no pending subscription.
+sync-pend : ∀ {Γ} {sc : Scope Γ} {Rg C A} {s : St Γ A} {E} → Pending s → Sync sc Rg C s E → ⊥
+sync-pend pd ()
+
+------------------------------------------------------------------------
 -- THE FRAMES ABOVE A HOLE: the hole's entry `E`, composed up to the
 -- root's, every other part in step.  What the hole itself owes is its
 -- `Need`: its entry; where it may still run on (a part no live node
@@ -827,7 +873,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Fr Cr C Rg c owes E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (not (CS.closed k))
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β
             → Flags C k β → Frozen k ≈ E → ConnE (CS.connAt k) (Frozen k) β E′ → Behind C (Frozen k) → Subd (scopeOf c) C k
-            → Fr Cr C (Parts.Rs pt) (inSrc k b c) owes E
+            → NoIsle b → Fr Cr C (Parts.Rs pt) (inSrc k b c) owes E
     -- a source ended while its connect runs: nothing reads what is left
     f-srcc  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {C Rg Rg′ E E′ β P}
             → Fr Cr C Rg c owes E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (CS.closed k)
@@ -862,7 +908,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → P ⊑ (Qo ∪ᵖ (Qa ∪ᵖ (N ∪ᵖ Qb))) → Fr Cr C Rg′ (inLanes op f ω d n qu o pre post c) (dead N) E
     d-src   : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {C Rg′ P N Qb E}
             → Unread Cr C c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Qb
-            → P ⊑ (Under N ∪ᵖ Qb) → Fr Cr C Rg′ (inSrc k b c) (dead N) E
+            → P ⊑ (Under N ∪ᵖ Qb) → NoIsle b → Fr Cr C Rg′ (inSrc k b c) (dead N) E
     d-body  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {C Rg′ P N Ps E}
             → Unread Cr C c k P → SrcH (scopeOf c) k o Ps
             → P ⊑ (Ps ∪ᵖ N) → Fr Cr C Rg′ (inBody k o c) (dead N) E
@@ -871,7 +917,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Unread Cr C c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Qb
             → P ⊑ (Burst k ∪ᵖ Qb) → T (not (CS.srcAtt k)) → T (not (CS.closed k))
             → Behind Ci (Frozen k) → Subd (scopeOf c) Ci k → Sound Ri (Frozen k)
-            → Fr Cr Ci Ri (inSrc k b c) owes (Frozen k)
+            → NoIsle b → Fr Cr Ci Ri (inSrc k b c) owes (Frozen k)
     -- an isle whose source has ended
     f-islec : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {C Ci Rg′ P N Qb E}
             → Unread Cr C c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Qb
@@ -907,6 +953,15 @@ module _ {R : Set} (Rt : EmissionSet R) where
   -- The invariant kept at its cursors.
   keeps : ∀ {k k′} → (∀ {Cr C} → Inv Cr C k → Inv Cr C k′) → SimC k [] k′
   keeps g {Cr} {C} i = Cr , C , g i , silent ≃-refl
+
+  -- A connect no live node reads, settled where it is read.
+  unread-at : ∀ {Cr C Γ X B} {c : Ctx R Γ B} {k : CS Γ X} {o b P Ps Qb p}
+            → Unread Cr C c k P → SrcH (scopeOf c) k o Ps → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Qb → P ⊑ (Ps ∪ᵖ Qb)
+            → Inv Cr C ⟨ c , connS k o b , absorbed , p ⟩
+  unread-at (un-dead fr) sh hb le = settled c-abs fr (_ , h-conn sh hb , le)
+  unread-at (un-torn fr sc pt nl fl eq tp) sh hb le =
+    settled c-abs fr (s-conn sc pt (λ t → ⊥-elim (notT _ nl t)) (λ t → ⊥-elim (notT _ nl t))
+                             (λ _ → record { Ps = _ ; Pb = _ ; sh = sh ; bh = hb ; tl = tailp-⊑ tp le }) fl eq)
 
   ----------------------------------------------------------------------
   -- THE ROW SHOWN IS THE LEAST OWED, for free: a rise reaching the root
@@ -1075,10 +1130,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   rise-bodyx nl = keeps λ
     { (flying (f-body _ _ _ lv _ _ _) _ _) → ⊥-elim (unlive nl lv)
     ; (flying (d-body _ _ _) _ ())
-    ; (adrift (d-body (un-dead fr) sh le) cl (Q , hk , le′)) → settled c-abs fr (_ , h-conn sh hk , ⊑-trans le (∪-⊑ ⊑-refl le′))
-    ; (adrift (d-body (un-torn fr sc pt _ fl eq tp) sh le) cl (Q , hk , le′)) →
-        settled c-abs fr (s-conn sc pt (λ t → ⊥-elim (unlive nl t)) (λ t → ⊥-elim (unlive nl t))
-                                 (λ _ → record { Ps = _ ; Pb = Q ; sh = sh ; bh = hk ; tl = tailp-⊑ tp (⊑-trans le (∪-⊑ ⊑-refl le′)) }) fl eq)
+    ; (adrift (d-body u sh le) cl (Q , hk , le′)) → unread-at u sh hk (⊑-trans le (∪-⊑ ⊑-refl le′))
     ; (settled () _ _) }
     where
       unlive : ∀ {b} → b ≡ false → T b → ⊥
