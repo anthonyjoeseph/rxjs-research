@@ -510,7 +510,7 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
         ... | inj₁ o  = ⊥-elim (n (src-b (ss t) env lo (y , tt , o)))
         ... | inj₂ no = Flags.unshut fl t y no
         fl′ = record { shut = λ c → proj₁ (Flags.shut fl c) , nm (proj₂ (Flags.shut fl c)) ; unshut = unsh
-                     ; torn = λ nt → spent (Flags.torn fl nt) }
+                     ; torn = λ nt → spent (Flags.torn fl nt) ; owed = λ e → proj₁ (Flags.owed fl e) , nm (proj₂ (Flags.owed fl e)) }
         tn′ = λ nt → let t = tn nt in record { Ps = Torn.Ps t ; Pb = Torn.Pb t ; sh = Torn.sh t ; bh = Torn.bh t ; tl = td (Torn.tl t) }
     sh {sc = sc} (s-join {x = x} {E = E} en d ap hd adm) env ef lo = s-join en d′ ap (λ i u → hd i (unfed-dn (lookup (full sc) x) u)) adm
       where

@@ -495,12 +495,14 @@ data OweAt (C : Cur) : Owe → Pos → Set where
 
 -- A connect's flags, read off its source's frozen entry and its body's:
 -- closed once the source's end is passed while it runs, where it ended;
--- torn only once the body owes nothing.
+-- torn only once the body owes nothing; its teardown owed only once the
+-- body's end is passed, where it ended.
 record Flags {Γ X B} (C : Cur) (k : CS Γ X) (β : EmissionSet B) : Set where
   field
     shut   : T (CS.closed k) → Frozen k (CS.endAt k) end × ¬ Owes C (CS.endAt k)
     unshut : T (CS.srcLive k) → ∀ {c} → Frozen k c end → ¬ Owes C c → T (CS.closed k)
     torn   : T (not (CS.srcLive k)) → Spent C β
+    owed   : ∀ {q} → CS.owedAt k ≡ just q → β q end × ¬ Owes C q
 
 -- A connect's two parts: its body's region and its source's, inside its
 -- own and apart, its own holding no row of a handle in scope.

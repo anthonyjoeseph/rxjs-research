@@ -53,9 +53,9 @@ re-parts e pt = record { Rb = Parts.Rb pt ; Rs = Parts.Rs pt ; b⊆ = Parts.b⊆
                        ; clear = Parts.clear pt ; sb = Parts.sb pt ; ss = subst (Sound (Parts.Rs pt)) e (Parts.ss pt) }
 
 -- A connect's flags read again under fields they do not read.
-re-flags : ∀ {Γ X B} {C} {cl sl sa p as ow cx ea sr sc sa′ p′ as′ ow′} {β : EmissionSet B}
-         → Flags C (cs {Γ} {X} cl sl sa p as ow cx ea sr sc) β → Flags C (cs cl sl sa′ p′ as′ ow′ cx ea sr sc) β
-re-flags fl = record { shut = Flags.shut fl ; unshut = Flags.unshut fl ; torn = Flags.torn fl }
+re-flags : ∀ {Γ X B} {C} {cl sl sa p as ow cx ea sr sc sa′ p′ as′} {β : EmissionSet B}
+         → Flags C (cs {Γ} {X} cl sl sa p as ow cx ea sr sc) β → Flags C (cs cl sl sa′ p′ as′ ow cx ea sr sc) β
+re-flags fl = record { shut = Flags.shut fl ; unshut = Flags.unshut fl ; torn = Flags.torn fl ; owed = Flags.owed fl }
 
 ------------------------------------------------------------------------
 -- A SOURCE'S ATTACH: its subscribe call has returned, so every key
