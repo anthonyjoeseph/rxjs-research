@@ -45,7 +45,8 @@ open import adequacy.Cursor using (Cur; Rgn; JoinE; Parts; Flags; src-pend; u-bo
 import adequacy.Path as P
 open import adequacy.Walk using (due-≈; climb; descend; refocus)
 open import adequacy.Least using (Lo; Keeps; mapKp; scanKp; cutKp; takeKp; outerKp; laneKp; seek-lo; seek-none)
-open import adequacy.Bound using (bound; shift; due-shift; owes-≼; behind-past; behind-pend; join-past)
+open import adequacy.Bound using (bound; owes-≼; behind-past; behind-pend; join-past)
+open import adequacy.Few using (shift; due-shift)
 open import adequacy.Up using (rise-body-nx; rise-body-cp; rise-src-nx; rise-src-cp)
 
 ------------------------------------------------------------------------
@@ -334,10 +335,10 @@ delivers-key d-stop (there ())
 
 -- What a node in step delivers, it owes.
 delivers-owed : ∀ {Γ} {sc : Scope Γ} {Rg C A} {s : St Γ A} {E m p} → Sync sc Rg C s E → Delivers s m p → Owes C p
-delivers-owed (s-of d)                   d-of   = proj₂ (proj₂ (from d (at-out , tt , tt)))
-delivers-owed (s-of d)                   d-ofx  = proj₂ (proj₂ (from d (at-end , tt , tt)))
+delivers-owed (s-of d _)                 d-of   = proj₂ (proj₂ (from d (at-out , tt , tt)))
+delivers-owed (s-of d _)                 d-ofx  = proj₂ (proj₂ (from d (at-end , tt , tt)))
 delivers-owed (s-join _ d _ _ _)         d-join = proj₂ (proj₂ (from d (inj₁ this)))
-delivers-owed (s-took _ _ _ (o-cp ow) _ _) d-stop = ow
+delivers-owed (s-took _ _ _ (o-cp ow) _ _ _) d-stop = ow
 
 -- No list entry, switch or pending program delivers.
 ln-none : ∀ {Γ A} {b} {l : St Γ A} {m p} → Delivers (lnS b l) m p → ⊥
@@ -355,7 +356,7 @@ least-shift : ∀ {R} {t : St [] R} {Rg C E Γ A} {c′ : Ctx R Γ A} {s′ m κ
             → Sync unbound Rg (bef p) t E × Due C E ≃ Due (bef p) E
 least-shift {t = t} sy fd dl op with found-least {t = t} fd
 ... | mi , lo with delivers-key dl mi
-... | refl = shift sy op (λ ()) lo , due-shift sy op (λ ()) lo
+... | refl = shift sy op (λ ()) (λ ()) lo , due-shift sy op (λ ()) lo
 
 -- NO MARK, NOTHING OWED.
 none-spent : ∀ {R} {t : St [] R} {Rg C E} → Sync unbound Rg C t E → search top t ≡ nothing → Spent C E
@@ -568,7 +569,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   joinx-hold : ∀ {Γ A} {sc : Scope Γ} {Rg C w j} {x : A ∈ Γ} {u ib E}
              → Hold sc Rg C w (joinS j false x (u ∷ ib)) E → Hold sc Rg C w (joinS j false x ib) E
   joinx-hold {w = owes _} h t with h t
-  ... | s-joinx sp = s-joinx sp
+  ... | s-joinx sp fn = s-joinx sp fn
   joinx-hold {w = lane _}    (_ , _ , () , _)
   joinx-hold {w = lanecut _} (_ , _ , () , _)
   joinx-hold {w = pnd _}     (_ , () , _)
@@ -595,7 +596,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   closed-off (f-scan fr _ _ _)                 t = closed-off fr t
   closed-off (f-cut fr)                        t = closed-off fr t
   closed-off (f-take fr _ _ _)                 t = closed-off fr t
-  closed-off (f-took _ _ _ _ _ _ _)            _ = refl
+  closed-off (f-took _ _ _ _ _ _ _ _)          _ = refl
   closed-off (f-outer fr _ _ _ _ _)            t = closed-off fr t
   closed-off (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) t with closed-off fr t
   ... | ()
@@ -603,7 +604,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   closed-off (f-lnct {b = false} fr)           _ = refl
   closed-off (f-lnct {b = true} fr)            t = ⊥-elim (closed-off fr t)
   closed-off (f-src {k = k} fr _ _ _ nc _ _ _ _ _) t = closed-off fr (or-right (CS.closed k) nc t)
-  closed-off (f-srcc _ _ _ _ _ _ _ _ _ _)      _ = refl
+  closed-off (f-srcc _ _ _ _ _ _ _ _ _ _ _)    _ = refl
   closed-off (f-srcp _ _ _ _ _ _ _ _ _ _ _ _) _ = tt
   closed-off (f-srcx _ _ _ _ _ _)              _ = refl
   closed-off (f-body fr _ _ refl _ _ _)        t with closed-off fr t

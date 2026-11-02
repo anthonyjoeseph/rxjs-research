@@ -23,15 +23,15 @@
 -- fall is reported only when the root shows a row after it, as
 -- `clock-mono`'s premise asks; one with no row after is only counted.
 --
--- THE GAP, probed: at every run of a mark, the cursor moves up to the
+-- The gap, probed: at every run of a mark, the cursor moves up to the
 -- mark's key.  Every row of a live node's entry, of any kind, lying from
 -- the cursor up to that key is passed with no delivery: a GAP ROW.  The
 -- simulation lists a node's passed rows, so each must sit under a
 -- position the run has already stepped at: a position some step was at,
 -- or one it extends.  A visible row, end or pin under none fails.  A skip
 -- row under none is a cold's batch tail or empty batch, or its image,
--- passed by the cold's own step and tied by no `Sync`: tallied, with the
--- attached rows, by former and kind.
+-- passed by the cold's own step: tallied, with the attached rows, by
+-- former and kind.
 --
 -- A node is named by its path of child indices, as `quickcheck.Entry-Check`
 -- names it.  An entry cut short by a budget is skipped.  A probe for

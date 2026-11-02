@@ -14,15 +14,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE GAP
+#### THE DEAD PART'S TAIL
 
-A shift moves the cursor to the least key; a cold's or joiner's rows
-between the old cursor and it must be finitely many. Open: `Sync` ties
-visible rows only, so a skip row (batch tail, empty batch) is not tied to
-any step. Settled by bodies, likely via a key-relative past with ties on
-every row.
+A part that stops (take's failure, a source's end) has finitely many rows
+past the cursor. Open: an infinite synchronous burst behind the stop.
+Settled by bodies over the part's `Sync` and `Sound`, or a refuting program.
 
-Members: `gap-src`, `gap-shut`, `gap-flat`.
+Members: `took-fin`, `shut-fin`.
 
 #### THE JOINER'S PAST
 
