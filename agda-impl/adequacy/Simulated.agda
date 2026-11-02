@@ -14,8 +14,8 @@ open import denotation.Events using (root)
 open import denotation.EmissionSet using (EmissionSet; enter; ⟦_⟧; out; end)
 open import operation.PureObservable using (PureObs; module Machine; module Driver)
 open Machine using (Ctx; Conf; ⟨_,_,_,_⟩; rising; closed; load) renaming (Shown to Shownᴹ; step to stepᴹ)
-open import adequacy.Rows using (≃-refl; Vis; Past; Lowest; _≃_; _⇄_; silent; shown)
-open import adequacy.Cursor using (Cur; Inv; pending; origin; f-top; RT)
+open import adequacy.Rows using (Vis; Past; Lowest; _≃_; _⇄_; silent; shown)
+open import adequacy.Cursor using (Cur; ≈-refl; Inv; pending; origin; f-top; RT)
 open import adequacy.Simulation using (Simulation)
 open import adequacy.Path using (Path)
 import adequacy.Path as P
@@ -29,7 +29,7 @@ cursor : ∀ {R} (o : PureObs [] R) → Simulation o
 cursor {R} o = record
   { I   = Car
   ; T   = λ i → RT Rt (proj₁ i)
-  ; i₀  = origin , pending {Rg = λ _ → ⊤} (f-top ≃-refl) (λ _ → tt , (tt , λ ()) , tt , ≃-refl , λ _ → tt) , [] , P.[]
+  ; i₀  = origin , pending {Rg = λ _ → ⊤} (f-top ≈-refl) (λ _ → tt , (tt , λ ()) , tt , ≈-refl , λ _ → tt) , [] , P.[]
   ; t₀  = (λ { ((x , v , _) , v′) → x , v′ }) ⇄ (λ { (x , v) → (x , v , tt) , v })
   ; tau = tau
   ; val = val
