@@ -11,6 +11,7 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; reverse; _ʳ++_)
 open import Data.List.Properties using (ʳ++-defn)
 open import Data.Nat using (ℕ; _+_)
+open import Data.Unit using (tt)
 open import Data.Product using (Σ; _×_; _,_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
@@ -21,13 +22,8 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; absorbed; Scope; unbound; binds; CS; scopeOf; plug; lnS; cutS; mapS; scanS; takeS; flatS; connS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans)
-open import adequacy.Cursor using (Cur; Rgn; notT; Owes; Due; Spent; _≈_; alike; ≈-refl; ≈-sym; ≈-trans; fin-≈; tail-≈; Pol; Runs; Hole; h-live; h-end; h-kill;
-  LaneSt; l-live; l-dead; Begun; none; more; bump; joined; Sync; Sound; src-pend; src-on; src-shut; s-cold; s-of; s-done; s-map; s-scan;
-  s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Torn; Pts; ∅ᵖ; _∪ᵖ_; _⊑_; ⊑-refl; ⊑-trans; ∪-⊑; under-⊑; ∅-⊑; tailp-⊑;
-  Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; unbind;
-  Need; owes; dead; lane; lanecut; pnd; onoff; Rest; LaneHold; Hold; Fr; Unread; un-dead; un-torn; f-top; f-map; f-scan; f-cut;
-  f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes;
-  d-src; d-body; f-isle; f-islec; Inv; settled; c-abs; NoIsle; Clear; Pending; pd)
+open import adequacy.Cursor using (Cur; Rgn; notT; Owes; Due; Spent; _≈_; alike; ≈-refl; ≈-sym; ≈-trans; fin-≈; tail-≈; Pol; Runs; Hole; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; bump; joined; Sync; Sound; src-pend; src-on; src-shut; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Torn; Pts; ∅ᵖ; _∪ᵖ_; _⊑_; ⊑-refl; ⊑-trans; ∪-⊑; under-⊑; ∅-⊑; tailp-⊑; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; Need; owes; dead; lane; lanecut; pnd; onoff; LaneHold; Hold; Fr; Unread; un-dead; un-torn; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; c-abs; NoIsle; Clear; Pending)
+open import adequacy.Cursor.Rise using (Inv; settled)
 open _≃_
 
 ------------------------------------------------------------------------
@@ -109,8 +105,8 @@ hl-blank (l ∷ ls) with hl-blank ls
 
 -- A dead lane's hole, its tail within more.
 hole-⊑ : ∀ {A B} {C} {P : Pol A B} {q a Ph Q E} → Hole C P q a Ph E false → Ph ⊑ Q → Hole C P q a Q E false
-hole-⊑ (h-end x o tp)  le = h-end x o (tailp-⊑ tp le)
-hole-⊑ (h-kill x o tp) le = h-kill x o (tailp-⊑ tp le)
+hole-⊑ {C = C} (h-end x o tp)  le = h-end x o (tailp-⊑ {C = C} tp le)
+hole-⊑ {C = C} (h-kill x o tp) le = h-kill x o (tailp-⊑ {C = C} tp le)
 
 -- A lane's state as its list entry holds it.
 laneSt : ∀ {Γ A B} {sc : Scope Γ} {Rg C} {P : Pol A B} {q a} b {at l E Ph}
@@ -284,7 +280,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   ... | inj₁ lv with os lv
   ...   | src-on nc sy bh sd         = C , owes , _ , _ , f-src fr sc pt lv nc (bs lv) fl ≈-refl eq bh sd nb , sy
   ...   | src-shut cl sp tp hk bh sd = C , dead _ , nowhere , none′ , f-srcc fr sc pt lv cl sp tp bh sd (bs lv) fl eq , (_ , hk , ⊑-refl)
-  ...   | src-pend _ _ _ _ _ _       = ⊥-elim (np pd)
+  ...   | src-pend _ _ _ _ _ _       = ⊥-elim (np tt)
   down-src _ nb (C , dead P , _ , _ , fr , (Q , h-conn sh hb , le)) = src-dead (un-dead fr) sh hb le nb
   down-src _ nb (C , dead P , _ , _ , fr , (Q , h-blank , le))     =
     C , dead ∅ᵖ , nowhere , none′ , d-src (un-dead fr) h-blank (⊑-trans le ∅-⊑) nb , (_ , h-blank , ⊑-refl)

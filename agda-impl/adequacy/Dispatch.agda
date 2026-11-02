@@ -35,15 +35,8 @@ open Machine using (St; Ctx; Conf; Scope; binds; scopeOf; ⟨_,_,_,_⟩; subscri
                     renaming (Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (pendRows; full; ≃-refl; Vis; _≃_; _⇄_; silent; Moves; this)
 open _≃_
-open import adequacy.Cursor using (Cur; ≈-refl; Rgn; JoinE; Parts; Flags; src-pend; JInv; Joined; JRl; JRo;
-  polF; Sound; Within; Adm; bef; Spent; Due; Sync; _≈_; c-abs; c-sub; Inv; settled; pending; adrift;
-  RT; SimC; keeps; Owes; Fr; Hold; Need; owes; dead; lane; lanecut; pnd; Pts; ∅ᵖ; _⊑_; ∅-⊑; ⊑-refl; ⊑-trans; Rest;
-  h-blank; h-take; hl-none; sh-dead; un-dead; Clear; Pending; pd; notT; sync-pend;
-  s-of; s-join; s-joinx; s-took; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer;
-  f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body;
-  f-isle; f-islec; o-cp; rise-top; rise-map;
-  rise-scan-nx; rise-scan-cp; rise-take-pass; rise-take-cp; rise-cut; rise-cutx; rise-ln;
-  rise-took; rise-take-fail; rise-bodyx; run-stop; run-cut; run-att)
+open import adequacy.Cursor using (Cur; ≈-refl; Rgn; JoinE; Parts; Flags; src-pend; JInv; Joined; JRl; JRo; polF; Sound; Within; Adm; bef; Spent; Sync; _≈_; c-abs; c-sub; Owes; Fr; Hold; Need; owes; dead; lane; lanecut; pnd; Pts; ∅ᵖ; _⊑_; ∅-⊑; ⊑-refl; ⊑-trans; Rest; h-blank; h-take; hl-none; sh-dead; un-dead; Clear; Pending; pend-shape; notT; sync-pend; s-of; s-join; s-joinx; s-took; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; o-cp)
+open import adequacy.Cursor.Rise using (Inv; settled; pending; adrift; RT; SimC; keeps; rise-top; rise-map; rise-scan-nx; rise-scan-cp; rise-take-pass; rise-take-cp; rise-cut; rise-cutx; rise-ln; rise-took; rise-take-fail; rise-bodyx; run-stop; run-cut; run-att)
 open import adequacy.Path using (Path)
 open import adequacy.Walk using (due-≈; climb; descend; refocus; nowhere; none′)
 open import adequacy.Least using (Lo; Keeps; mapKp; scanKp; cutKp; takeKp; outerKp; laneKp; seek-lo; seek-none)
@@ -340,7 +333,7 @@ delivers-owed : ∀ {Γ} {sc : Scope Γ} {Rg C A} {s : St Γ A} {E m p} → Sync
 delivers-owed (s-of d _)                 d-of   = proj₂ (proj₂ (from d (at-out , tt , tt)))
 delivers-owed (s-of d _)                 d-ofx  = proj₂ (proj₂ (from d (at-end , tt , tt)))
 delivers-owed (s-join _ d _ _ _)         d-join = proj₂ (proj₂ (from d (inj₁ this)))
-delivers-owed (s-took _ _ _ (o-cp ow) _ _ _) d-stop = ow
+delivers-owed (s-took _ _ _ (o-cp ow) _ _ _ _) d-stop = ow
 
 -- No list entry, switch or pending program delivers.
 ln-none : ∀ {Γ A} {b} {l : St Γ A} {m p} → Delivers (lnS b l) m p → ⊥
@@ -364,7 +357,9 @@ lo-at c s {c′ = c′} {s′ = s′} fd dl with found-lo c s fd
 
 -- No pending subscription owns a mark.
 marked-pend : ∀ {Γ A} {s : St Γ A} {m} → Pending s → Marked s m → ⊥
-marked-pend pd ()
+marked-pend {s = s} p mk with pend-shape s p
+... | _ , _ , refl with mk
+...   | ()
 
 vis-≃ : ∀ {A} {E E′ : EmissionSet A} → E ≃ E′ → Vis E ≃ Vis E′
 vis-≃ d = (λ (x , v) → to d x , v) ⇄ (λ (x , v) → from d x , v)
@@ -554,11 +549,11 @@ module Over {R : Set} (Rt : EmissionSet R) where
 
   pend-view : ∀ {Cr C Γ A} {c : Ctx R Γ A} {o q p} → Inv Rt Cr C ⟨ c , pend o q , subscribing , p ⟩ → PendV Cr C c o q
   pend-view (pending fr h)                                     = inj₁ (_ , _ , fr , h)
-  pend-view (settled {N = owes} c-sub fr h)                    = ⊥-elim (sync-pend pd h)
+  pend-view {o = o} {q} (settled {N = owes} c-sub fr h)       = ⊥-elim (sync-pend {s = pend o q} tt h)
   pend-view (settled {N = dead _} c-sub fr (_ , h-blank , le)) = inj₂ (_ , _ , _ , fr , le)
   pend-view (settled {N = lane _ _} c-sub fr (_ , _ , () , _))
   pend-view (settled {N = lanecut _ _} c-sub fr (_ , _ , () , _))
-  pend-view (settled {N = pnd _} c-sub fr (_ , refl , pe , wn)) = srcp fr refl pe wn
+  pend-view {o = o} (settled {N = pnd _} c-sub fr (_ , refl , pe , wn)) = srcp {o = o} fr refl pe wn
 
   -- A joiner's entry, its outer's entered where it subscribed.
   flat-entry : ∀ {Γ A B} (sc : Scope Γ) op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) q {E}
@@ -688,7 +683,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   off-keep {N = dead _}      _  tr fr h           _ = settled c-abs fr (tr h)
   off-keep {N = lane _ _}    _  _  _  _           ()
   off-keep {N = lanecut _ _} _  _  _  _           ()
-  off-keep {N = pnd _}       np _  _  (_ , e , _) _ = ⊥-elim (np (subst Pending (sym e) pd))
+  off-keep {N = pnd _}       np _  _  (_ , e , _) _ = ⊥-elim (np (subst Pending (sym e) tt))
 
   -- A run under a closed context delivers nothing and owes nothing.
   closed-keep : ∀ {Cr C Γ A} {c : Ctx R Γ A} {s s′ : St Γ A} {r p} → closed c ≡ true → (Pending s → ⊥)

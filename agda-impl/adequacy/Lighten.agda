@@ -39,7 +39,7 @@ open import adequacy.Stamped using (frame-ahead; opening-ahead; pend-focus)
 open import adequacy.Floor.Keys using (below)
 open import adequacy.Floor using (fed-ahead)
 open import adequacy.Simulation using (Simulation; module Along)
-open import adequacy.Cursor using (settled)
+open import adequacy.Cursor.Rise using (settled)
 import adequacy.Walk as Walk
 open import adequacy.Walk using (due-≈)
 open import adequacy.Bound using (bound)

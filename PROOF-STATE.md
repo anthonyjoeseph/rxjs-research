@@ -16,12 +16,37 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE DEAD PART'S TAIL
 
-A part that stops (take's failure, a source's end) has finitely many rows
-past the cursor. Suspected false: a stop inside a connect's body keeps its
-source's pins, an infinite burst when the source is `ones`. Settled by
-restating as `Tail` against the state still running, or a body.
+A part that stops (take's failure, a source's end) owes past the cursor
+only what its husk still runs, but for finitely many rows. Open: whether
+every pin past the stop is of a burst begun before it. Settled by bodies
+reading the stop's row against the husk.
 
-Members: `took-fin`, `shut-fin`.
+Members: `took-tail`, `shut-tail`.
+
+#### THE CLEAR PATH
+
+The found node's path enters no source whose connect's body holds an
+isle. Open: whether a reachable configuration keeps isles off every path
+the search takes. Settled by an invariant along `Path`, or a body over
+the search.
+
+Members: `found-clear`.
+
+#### THE ISLE'S CURSOR
+
+An isle's binders, read at its own cursor, lie at or past the least key
+with finitely many before it. Open: whether the isle's cursor moves only
+within its burst once torn from the root's. Settled by a body over `Subd`.
+
+Members: `isle-env`.
+
+#### THE SHIFT UNDER A FOCUS
+
+The frames shifted to the least key and the hole's environment past it;
+the hole shifts by `shift`. Open: nothing beyond `shift` per frame and
+`isle-env` at an isle's. Settled by a body by frame.
+
+Members: `fr-env`.
 
 #### THE JOINER'S PAST
 
