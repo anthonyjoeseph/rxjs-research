@@ -51,7 +51,7 @@ open import Relation.Nullary using (¬_)
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline; ix; last; ofᴱ; tick; inside)
 open import denotation.Read using (Visible)
-open import denotation.EmissionSet using (EmissionSet; out; end; pin; _≺_; _≼_; Reach; Truncate; enter; ⟦_⟧; Den; hot; coldAt; Rejoin;
+open import denotation.EmissionSet using (EmissionSet; out; end; pin; Unpinned; _≺_; _≼_; Reach; Truncate; enter; ⟦_⟧; Den; hot; coldAt; Rejoin;
   InE; MapT; LaneOf; module Scan; module TakeWhile; module Connecting; module Merge;
   module Bounded; module Switch; module Exhaust)
 open import operation.PureObservable using (module Machine; Tape; play; ending) renaming (over to tapeOver)
@@ -95,7 +95,7 @@ Behind C E = Σ (List Pos) λ ks → ∀ {y e} → E y e → ¬ Owes C y → y �
 
 -- Every row of `E′` a row of `E` at its position, but for finitely many.
 Beneath : ∀ {A} → EmissionSet A → EmissionSet A → Set
-Beneath E E′ = Σ (List Pos) λ ks → ∀ {y e} → E′ y e → Σ _ (E y) ⊎ y ∈ ks
+Beneath E E′ = Σ (List Pos) λ ks → ∀ {y e} → E′ y e → E y e ⊎ y ∈ ks
 
 -- Alike in every row a reader meets, and row for row but for finitely
 -- many: a defer's guard is a skip no reader meets.
@@ -107,10 +107,10 @@ record _≈_ {A} (E E′ : EmissionSet A) : Set where
 open _≈_ public
 
 beneath-trans : ∀ {A} {E E′ E″ : EmissionSet A} → Beneath E E′ → Beneath E′ E″ → Beneath E E″
-beneath-trans (ks , f) (ls , g) = ls ++ ks , λ r → [ (λ (_ , r′) → [ inj₁ , (λ i → inj₂ (∈-++⁺ʳ ls i)) ]′ (f r′)) , (λ i → inj₂ (∈-++⁺ˡ i)) ]′ (g r)
+beneath-trans (ks , f) (ls , g) = ls ++ ks , λ r → [ (λ r′ → [ inj₁ , (λ i → inj₂ (∈-++⁺ʳ ls i)) ]′ (f r′)) , (λ i → inj₂ (∈-++⁺ˡ i)) ]′ (g r)
 
 ≈-refl : ∀ {A} {E : EmissionSet A} → E ≈ E
-≈-refl = record { alike = ≃-refl ; cov = [] , λ r → inj₁ (_ , r) ; voc = [] , λ r → inj₁ (_ , r) }
+≈-refl = record { alike = ≃-refl ; cov = [] , inj₁ ; voc = [] , inj₁ }
 
 ≈-sym : ∀ {A} {E E′ : EmissionSet A} → E ≈ E′ → E′ ≈ E
 ≈-sym m = record { alike = ≃-sym (alike m) ; cov = voc m ; voc = cov m }
@@ -125,7 +125,7 @@ Fin C E = Σ (List Pos) λ ks → ∀ {y e} → E y e → Owes C y → y ∈ ks
 -- Every row of `E` the cursor has not passed a row of `T` at its
 -- position, but for finitely many.
 Tail : ∀ {A} → Cur → EmissionSet A → EmissionSet A → Set
-Tail C E T = Σ (List Pos) λ ks → ∀ {y e} → E y e → Owes C y → Σ _ (T y) ⊎ y ∈ ks
+Tail C E T = Σ (List Pos) λ ks → ∀ {y e} → E y e → Owes C y → T y e ⊎ y ∈ ks
 
 -- Owing less, still finitely many.
 fin-dn : ∀ {A} {C C′} {E : EmissionSet A} → (∀ {y} → Owes C′ y → Owes C y) → Fin C E → Fin C′ E
@@ -137,11 +137,11 @@ tail-dn d (ks , f) = ks , λ r o → f r (d o)
 -- Row for row, still finitely many.
 fin-≈ : ∀ {A} {C} {E E′ : EmissionSet A} → E ≈ E′ → Fin C E → Fin C E′
 fin-≈ m (ks , f) with cov m
-... | ls , g = ls ++ ks , λ r o → [ (λ (_ , r′) → ∈-++⁺ʳ ls (f r′ o)) , ∈-++⁺ˡ ]′ (g r)
+... | ls , g = ls ++ ks , λ r o → [ (λ r′ → ∈-++⁺ʳ ls (f r′ o)) , ∈-++⁺ˡ ]′ (g r)
 
 tail-≈ : ∀ {A} {C} {E E′ T : EmissionSet A} → E ≈ E′ → Tail C E T → Tail C E′ T
 tail-≈ m (ks , f) with cov m
-... | ls , g = ls ++ ks , λ r o → [ (λ (_ , r′) → [ inj₁ , (λ i → inj₂ (∈-++⁺ʳ ls i)) ]′ (f r′ o)) , (λ i → inj₂ (∈-++⁺ˡ i)) ]′ (g r)
+... | ls , g = ls ++ ks , λ r o → [ (λ r′ → [ inj₁ , (λ i → inj₂ (∈-++⁺ʳ ls i)) ]′ (f r′ o)) , (λ i → inj₂ (∈-++⁺ˡ i)) ]′ (g r)
 
 ------------------------------------------------------------------------
 -- WHERE A PART NO LIVE NODE READS STILL RUNS ON.  Unsubscribing cannot
@@ -164,10 +164,12 @@ _∪ᵖ_ : Pts → Pts → Pts
 Under : Pts → Pts
 Under P y = Σ Pos λ k → P k × y ≡ k ++ [ ix 0 ]
 
--- A connect's burst: each row of its source inside its subscription, at
--- that row's first effect.
+-- A connect's burst, at each row's first effect: its source's rows
+-- inside its subscription, and its source's pins.  A source still in its
+-- subscribe call never runs past it, so a pin past it is one a cut keeps
+-- (`Connecting.kept`) that nothing reads.
 Burst : ∀ {Γ X} → CS Γ X → Pts
-Burst k = Under λ k′ → Σ _ (Frozen k k′) × T (inside (CS.connAt k ++ [ ix 1 ]) k′)
+Burst k = Under λ k′ → Σ _ λ e → Frozen k k′ e × (T (inside (CS.connAt k ++ [ ix 1 ]) k′) ⊎ ¬ Unpinned e)
 
 -- Within `Q` but for finitely many.
 _⊑_ : Pts → Pts → Set

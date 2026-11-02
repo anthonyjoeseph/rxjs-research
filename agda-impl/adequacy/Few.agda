@@ -31,7 +31,6 @@ open import denotation.EmissionSet using (EmissionSet; out; end; _≺_; _≼_; D
   ended; late; InE; MapT; map-out; map-end; map-skip; map-pin; module Joining; module Scan;
   module TakeWhile; module Connecting; module Bounded; module Switch)
 open import denotation.Laws.Modulus using (≼-≺-≺; ≺-trans; ≺-ext; ≺-absurd; ≼-antisym; ≼-false; ≼-or-≻)
-open import denotation.Laws.Worlds using (⊑-≼; inside-⊑)
 open import operation.Key using (at)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Scope; scopeOf; plug; unbound; binds; CS; coldS; ofS; takeS; flatS; connS)
@@ -48,7 +47,8 @@ open import adequacy.Cursor using (Cur; origin; bef; aft; Owes; Due; Unfed; Pol;
 open import adequacy.Floor.Keys using (plug-in)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
 open import adequacy.Bound using (tr; on; lt; owes-≼; owes?; T?; lo-at; Env; env-bind; unfed-b; of-lb; cold-b;
-  lane-st; body-key; bound; src-b; join-b; begun-b; behind-pend)
+  lane-st; body-key; bound; src-b; join-b; begun-b; behind-pend; pend-past)
+open import denotation.Laws.Worlds using (Hots; ok-step)
 
 ------------------------------------------------------------------------
 -- Rows owed before `p`
@@ -84,7 +84,7 @@ lag-at back (lag ks f) = lag ks λ r o yp → f (proj₂ (back r)) o yp
 
 lag-≈ : ∀ {A} {C p} {E E′ : EmissionSet A} → E ≈ E′ → Lag C p E → Lag C p E′
 lag-≈ m (lag ks f) with cov m
-... | ls , g = lag (ls ++ ks) λ r o yp → [ (λ (_ , r′) → ∈-++⁺ʳ ls (f r′ o yp)) , ∈-++⁺ˡ ]′ (g r)
+... | ls , g = lag (ls ++ ks) λ r o yp → [ (λ r′ → ∈-++⁺ʳ ls (f r′ o yp)) , ∈-++⁺ˡ ]′ (g r)
 
 -- The one row a cursor owes whose parent it has passed: the row at it.
 cl : Cur → List Pos
@@ -223,7 +223,7 @@ before {C = C} (ks , f) (lag ls g) = ks ++ ls , λ {y} r yp → [ (λ o → ∈-
 
 -- A burst's first effects before `p`: of its source's rows before `p`.
 burst-plag : ∀ {Γ X} {k : CS Γ X} {p} → Σ (List Pos) (λ ks → ∀ {y e} → Frozen k y e → y ≺ p → y ∈ ks) → PLag p (Burst k)
-burst-plag (ks , f) = map ix0 ks , λ { (k′ , ((_ , x) , _) , refl) yp → ∈-map⁺ ix0 (f x (below k′ yp)) }
+burst-plag (ks , f) = map ix0 ks , λ { (k′ , (_ , x , _) , refl) yp → ∈-map⁺ ix0 (f x (below k′ yp)) }
 
 -- AN ISLE'S BINDERS read at its own cursor: their rows it owes lie at or
 -- past the least key, and finitely many lie before it.  The isle's
@@ -255,16 +255,17 @@ mutual
   srch-f : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o P p} → SrcH sc k o P → Lo o (at p)
          → (CS.bodyAt k ≡ just (CS.connAt k) → p ≼ (CS.connAt k ++ [ ix 1 ])) → PLag p P
   srch-f (sh-dead hk) lo _ = plag-under (husk-f hk lo)
-  srch-f {k = k} {p = p} (sh-pend _ _ ba _ _ _ _ _) _ bl = [] , λ { (k′ , ((_ , _) , ins) , refl) yp →
-    ⊥-elim (bl ba (≼-≺-≺ {CS.connAt k ++ [ ix 1 ]} {k′} {p} (⊑-≼ (inside-⊑ (CS.connAt k ++ [ ix 1 ]) k′ ins)) (below k′ yp))) }
+  srch-f {k = k} {p = p} (sh-pend _ _ ba refl (ok , a) _ _ _) _ bl = [] , λ { (k′ , (_ , x , _) , refl) yp →
+    ⊥-elim (bl ba (≺-trans {CS.connAt k ++ [ ix 1 ]} {k′} {p}
+                     (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok) x) (below k′ yp))) }
   srch-f {k = k} (sh-isle {Ci = Ci} na nc sy bh sd ss) lo _ =
     let ie = isle-env {k = k} na nc sy bh sd lo in burst-plag {k = k} (before {C = Ci} {E = Frozen k} bh (few sy (proj₁ ie) (proj₂ ie) lo))
   srch-f {k = k} (sh-islec {Ci = Ci} na cl sp tp hk bh sd) lo _ = burst-plag {k = k} (before {C = Ci} {E = Frozen k} bh (tailp-lag {C = Ci} tp (husk-f hk lo)))
 
   few : ∀ {Γ} {sc : Scope Γ} {Rg} {C A} {s : St Γ A} {E p} → Sync sc Rg C s E → Env (full sc) C p → EnvF (full sc) p → Lo s (at p)
       → Lag C p E
-  few (s-cold {l = l} tk _ (ks , f)) env ef lo = lag ks λ r o yp → [ (λ (_ , t) → ⊥-elim (cold-b l tk lo t yp)) , (λ i → i) ]′ (f r o)
-  few (s-of {xs = xs} _ (ks , f)) env ef lo = lag ks λ r o yp → [ (λ (_ , t) → ⊥-elim (of-p xs lo t yp)) , (λ i → i) ]′ (f r o)
+  few (s-cold {l = l} tk _ (ks , f)) env ef lo = lag ks λ r o yp → [ (λ t → ⊥-elim (cold-b l tk lo t yp)) , (λ i → i) ]′ (f r o)
+  few (s-of {xs = xs} _ (ks , f)) env ef lo = lag ks λ r o yp → [ (λ t → ⊥-elim (of-p xs lo t yp)) , (λ i → i) ]′ (f r o)
   few {C = C} (s-done _ fn) env ef lo = fin-lag {C = C} fn
   few (s-map sy m _) env ef lo = lag-≈ m (lag-at map-row (few sy env ef (λ ki → lo (k-kid (k-map ki)))))
   few (s-scan sy _ m _) env ef lo = lag-≈ m (lag-at scan-row (few sy env ef (λ ki → lo (k-kid (k-scan ki)))))
@@ -354,7 +355,7 @@ mutual
          → LaneSt sc Rg C P q a l b → Env (full sc) C p → EnvF (full sc) p → Lo l (at p)
          → Σ (List Pos) λ ks → ∀ {k e} → Kept P q a k e → Owes C k → k ≺ p → k ∈ ks
   lane-f {P = P} (l-live (h-live _ _ eq) sy _) env ef lo with few sy env ef (λ ki → lo (k-kid (k-ln (k-kid (k-cut ki))))) | voc eq
-  ... | lag ke fe | lv , g = lv ++ ke , λ kp o kp′ → [ (λ (_ , r) → ∈-++⁺ʳ lv (fe r o kp′)) , ∈-++⁺ˡ ]′ (g (kept-lane {P = P} kp))
+  ... | lag ke fe | lv , g = lv ++ ke , λ kp o kp′ → [ (λ r → ∈-++⁺ʳ lv (fe r o kp′)) , ∈-++⁺ˡ ]′ (g (kept-lane {P = P} kp))
   lane-f {C = C} (l-dead (h-end _ _ tp) hk) env ef lo  with tailp-lag {C = C} tp (husk-f hk (λ ki → lo (k-kid (k-ln (k-kid (k-cut ki))))))
   ... | lag ks f = ks , f
   lane-f {C = C} (l-dead (h-kill _ _ tp) hk) env ef lo with tailp-lag {C = C} tp (husk-f hk (λ ki → lo (k-kid (k-ln (k-kid (k-cut ki))))))
