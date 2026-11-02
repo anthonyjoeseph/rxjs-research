@@ -41,18 +41,18 @@ module _ {A B : Set} {H : Pos → Set} {at : Pos} (ok : Ok H at) (F : A → Den 
     open BoundedI ok m F fi io
 
     bounded : ∀ {q q′ y} → LaneRg H (polF (mergeᶠ (just m)) F O) O q y → LaneRg H (polF (mergeᶠ (just m)) F O) O q′ y → q ≡ q′
-    bounded (_ , a , s , x , (i , sb) , w , cap) (_ , a′ , s′ , x′ , (i′ , sb′) , w′ , cap′) with <-cmp i i′
+    bounded (a , s , x , (i , sb) , w , cap) (a′ , s′ , x′ , (i′ , sb′) , w′ , cap′) with <-cmp i i′
     ... | tri≈ _ refl _ = proj₁ (sub-fun sb sb′)
     ... | tri< lt _ _ with rel lt sb sb′
     ...   | apart xr xr′ ne wr wr′ = ⊥-elim (apart-ww xr xr′ ne (w-trans wr w) (w-trans wr′ w′))
     ...   | queued-in ac _ wc      = ⊥-elim (cap (i , s , sb , ac) plain-ix (w-trans wc w′) (⊑-refl _))
-    bounded (_ , a , s , x , (i , sb) , w , cap) (_ , a′ , s′ , x′ , (i′ , sb′) , w′ , cap′) | tri> _ _ gt with rel gt sb′ sb
+    bounded (a , s , x , (i , sb) , w , cap) (a′ , s′ , x′ , (i′ , sb′) , w′ , cap′) | tri> _ _ gt with rel gt sb′ sb
     ...   | apart xr xr′ ne wr wr′ = ⊥-elim (apart-ww xr xr′ ne (w-trans wr w′) (w-trans wr′ w))
     ...   | queued-in ac _ wc      = ⊥-elim (cap′ (i′ , s′ , sb′ , ac) plain-ix (w-trans wc w) (⊑-refl _))
 
   -- One lane to a position of a joiner's lane regions.
   lane-sole : ∀ op {q q′ y} → LaneRg H (polF op F O) O q y → LaneRg H (polF op F O) O q′ y → q ≡ q′
-  lane-sole (mergeᶠ nothing)  (_ , _ , _ , x , refl , w , _) (_ , _ , _ , x′ , refl , w′ , _) = plain x x′ w w′
+  lane-sole (mergeᶠ nothing)  (_ , _ , x , refl , w , _) (_ , _ , x′ , refl , w′ , _) = plain x x′ w w′
   lane-sole (mergeᶠ (just m)) r r′ = bounded m r r′
-  lane-sole switchᶠ           (_ , _ , _ , x , refl , w , _) (_ , _ , _ , x′ , refl , w′ , _) = plain x x′ w w′
-  lane-sole exhaustᶠ          (_ , _ , _ , x , refl , w , _) (_ , _ , _ , x′ , refl , w′ , _) = plain x x′ w w′
+  lane-sole switchᶠ           (_ , _ , x , refl , w , _) (_ , _ , x′ , refl , w′ , _) = plain x x′ w w′
+  lane-sole exhaustᶠ          (_ , _ , x , refl , w , _) (_ , _ , x′ , refl , w′ , _) = plain x x′ w w′

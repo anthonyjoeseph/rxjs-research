@@ -35,6 +35,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; binds; CS; scopeOf; con
 open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans; ≃-refl; ≼-≢; full; Frozen; pendRows; Moves; silent; toEv)
 open _≃_
 open import adequacy.Walk using (sync-≈)
+open import adequacy.Enter using (module Lanes)
 open import adequacy.Cursor using (Cur; bef; aft; Behind; Fin; Tail; fin-dn; tail-dn; alike; ≈-sym; FewBefore; ConnE; Need; owes; dead; lane; lanecut; pnd; _≈_; c-abs; Pol; Ahead; Whole; OuterDone; Owes; Due; Spent; Unfed; Rgn; Sound; vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none; fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; re-parts; OweAt; o-cp; o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Fr; Waiting; Lane; JRl; JRo; JInv; Asc; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; polF; JoinF; LanesIn; NoFail; TailP; tailp-dn; Subd; SubdAt; subd; Torn; Unread; un-dead; un-torn; notT; by; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; sh-pend; husk-of; ⊑-trans; ∪-⊑; ⊑-refl; under-⊑; NoIsle; NoIsleL; Settles; sync-pend; burst-dn)
 open import adequacy.Cursor.Rise using (Inv; RT; settled; flying; adrift; SimC; keeps; unread-at)
 open import adequacy.Bound using (join-row; owes?; few-src)
@@ -46,6 +47,9 @@ VHot : ∀ {Γ} → DenEnv Γ → Pos → Set
 VHot []ᴬ             _ = ⊥
 VHot (hot t ∷ᴬ ρ)    p = (Σ (Ev _) λ e → t p e × Visible e) ⊎ VHot ρ p
 VHot (coldAt _ ∷ᴬ ρ) p = VHot ρ p
+
+joined-li : ∀ {Γ} {sc : Scope Γ} {Rl C A B} {P : Pol A B} {O d n qu ls} → Joined sc Rl C P O d n qu ls → LanesIn (Hots (full sc)) Rl P O
+joined-li (joined _ _ _ _ _ _ _ li) = li
 
 vhot-hots : ∀ {Γ} (ρ : DenEnv Γ) {p} → VHot ρ p → Hots ρ p
 vhot-hots (hot t ∷ᴬ ρ)    (inj₁ (e , y , _)) = inj₁ (e , y)
@@ -186,8 +190,8 @@ module Past (p : Pos) where
         owe-up (o-cp o)   = o-cp (in-rg sd nr (proj₁ (to (alike m) (TakeWhile.stop y nk nf , vis {A = A} cp))) (vis {A = A} cp) o)
         owe-up (o-cut n)  = o-cut (nm n)
         owe-up (o-over n) = o-over (nm n)
-    up (s-flat ji sy jn m so bh) sd nr nh =
-      s-flat ji (up sy so no nh) (joined-up (off-rg so no) (λ r → nr (proj₁ r)) nh jn) m so (behind-up bh)
+    up (s-flat {sc = sc} {op = op} {f = f} ji sy jn m so bh) sd nr nh =
+      s-flat ji (up sy so no nh) (joined-up (off-rg so no) (λ r → nr (proj₁ r)) nh (Lanes.lane-rows sc f ji op (joined-li jn)) jn) m so (behind-up bh)
       where no = λ r → nr (proj₁ r)
     up (s-conn {k = k} refl pt bs ss tn fl m) sd nr nh =
       s-conn refl pt (λ t → up (bs t) (Parts.sb pt) nb (bind-nh {k = k} (off-rg (Parts.ss pt) ns) nh))
@@ -223,12 +227,13 @@ module Past (p : Pos) where
     begun-up nl nh (more y nq r ln bg) = more y (nm nq) r (lane-up (nl (here refl)) nh ln) (begun-up (λ i → nl (there i)) nh bg)
 
     joined-up : ∀ {Γ} {sc : Scope Γ} {Rl : Pos → Rgn} {A B} {P : Pol A B} {O : EmissionSet A} {d n qu ls}
-              → Off O → (∀ {q} → ¬ Rl q p) → ¬ VHot (full sc) p → Joined sc Rl (bef p) P O d n qu ls → Joined sc Rl (aft p) P O d n qu ls
-    joined-up {P = P} oo nl nh (joined bg wt wh od ah ao en li) =
+              → Off O → (∀ {q} → ¬ Rl q p) → ¬ VHot (full sc) p → (∀ {q a k e} → O q (out a) → Lane P q a k e → Rl q k)
+              → Joined sc Rl (bef p) P O d n qu ls → Joined sc Rl (aft p) P O d n qu ls
+    joined-up {P = P} oo nl nh rl (joined bg wt wh od ah ao en li) =
       joined (begun-up (λ _ → nl) nh bg) (wait-up ah′ wt) (whole-up wh) (od-up od) ah′ ao en li
       where
         open Book {P = P} oo
-        ah′ = ahead-up (λ iv lc → λ { refl → nl (li (begun-out bg iv) lc _) }) ah
+        ah′ = ahead-up (λ iv lc → λ { refl → nl (rl (begun-out bg iv) lc) }) ah
 
 ------------------------------------------------------------------------
 -- A BODY'S RISE while its source runs: the row is the connect's, and
@@ -397,15 +402,12 @@ take-nr nr nf (TakeWhile.left _ _ _)       ()
 -- A joiner's row at `p`: its outer's end, or a lane's, in that lane's
 -- region.
 join-nr : ∀ {A B} op (F : A → Den B) {O : EmissionSet A} {Rl : Pos → Rgn} {p}
-        → LanesIn Rl (polF op F O) O → (O p end → ⊥)
+        → (∀ {q a k e} → O q (out a) → Lane (polF op F O) q a k e → Rl q k) → (O p end → ⊥)
         → (∀ {q a e} → O q (out a) → Lane (polF op F O) q a p e → Visible e → Rl q p → ⊥)
         → NoRow (JoinF op F O) p
 join-nr op F {O} li ne nl r v with join-row op F O r v
 ... | inj₁ y                       = ne y
-... | inj₂ (_ , _ , y , _ , ln , _) = nl y ln v (li y ln v)
-
-joined-li : ∀ {Γ} {sc : Scope Γ} {Rl C A B} {P : Pol A B} {O d n qu ls} → Joined sc Rl C P O d n qu ls → LanesIn Rl P O
-joined-li (joined _ _ _ _ _ _ _ li) = li
+... | inj₂ (_ , _ , y , _ , ln , _) = nl y ln v (li y ln)
 
 -- Begun lanes in order: those before a lane began before it, those
 -- after, after.
@@ -455,27 +457,29 @@ module _ {R : Set} (Rt : EmissionSet R) where
     in Cr′ , f-take fr′ (λ y nk → Past.in-off p (nr-off {E = E} nr) y _ (nf y nk)) m sd , mv
   fr-up {p = p} (f-outer {op = op} {f = f} {c = c} {Rg = Rg₀} {E = E} fr ji jn m so bh) _ rp nr nh =
     let (Cr′ , fr′ , mv) = fr-up fr tt (proj₁ rp)
-                             (nr-≈ (proj₂ m) (nr-tr (join-nr op (λ a → ⟦ f a ⟧ (full (scopeOf c))) (joined-li jn) (λ y → nr y _) (λ _ _ _ → nl)))) nh
-    in Cr′ , f-outer fr′ ji (Past.joined-up p (nr-off nr) nl nh jn) m so (Past.behind-up p bh) , mv
+                             (nr-≈ (proj₂ m) (nr-tr (join-nr op (λ a → ⟦ f a ⟧ (full (scopeOf c))) rl (λ y → nr y _) (λ _ _ _ → nl)))) nh
+    in Cr′ , f-outer fr′ ji (Past.joined-up p (nr-off nr) nl nh rl jn) m so (Past.behind-up p bh) , mv
     where
       nl : ∀ {q} → ¬ JRl (scopeOf c) Rg₀ op f E q p
       nl r = proj₂ rp (proj₂ r)
+      rl = Lanes.lane-rows (scopeOf c) f ji op (joined-li jn)
   fr-up {p = p} (f-lanes {op = op} {f = f} {c = c} {Rg = Rg₀} {O = O} {vs₁ = vs₁} {vs₂ = vs₂} {q = q₀} {a = a₀}
                    fr ji sy lf y₀ nq ru (h-live st ns le) rt cnt wt wh od ah ao en li m so sd bh) _ rp nr nh =
     let (Cr′ , fr′ , mv) = fr-up fr tt (proj₁ rp)
-                             (nr-≈ (proj₂ m) (nr-tr (join-nr op (λ a → ⟦ f a ⟧ (full (scopeOf c))) li (λ y → no (Sound.rg so y _)) (λ y ln v _ → hole y ln v)))) nh
+                             (nr-≈ (proj₂ m) (nr-tr (join-nr op (λ a → ⟦ f a ⟧ (full (scopeOf c))) rl (λ y → no (Sound.rg so y _)) (λ y ln v _ → hole y ln v)))) nh
     in Cr′ , f-lanes fr′ ji (up sy so no nh) (begun-up nb₁ nh lf) y₀ (nm nq) ru (h-live st (nm ns) le) (begun-up nb₂ nh rt) cnt
                      (wait-up ah′ wt) (whole-up wh) (od-up od) ah′ ao en li m so sd (behind-up bh) , mv
     where
       open Past p using (up; begun-up; nm; off-rg; behind-up; module Book)
       no : ¬ JRo (scopeOf c) Rg₀ op f O p
       no r = proj₂ r (proj₂ rp)
+      rl = Lanes.lane-rows (scopeOf c) f ji op li
       open Book {P = polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O} (off-rg so no)
       sole : ∀ {q q′} → JRl (scopeOf c) Rg₀ op f O q p → JRl (scopeOf c) Rg₀ op f O q′ p → q ≡ q′
       sole r r′ = lane-sole (JInv.ok ji) (λ a → ⟦ f a ⟧ (full (scopeOf c))) (JInv.fi ji) (JInv.io ji) op (proj₂ r) (proj₂ r′)
       -- a lane's row at `p` is the hole's
       hole : ∀ {q a e} → O q (out a) → Lane (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) q a p e → Visible e → ⊥
-      hole y ln v with sole (li y ln v) rp
+      hole y ln v with sole (rl y ln) rp
       ... | refl with Sound.fn so y y₀ _ _
       ...   | refl = nr (proj₁ (to (alike le) (ln , v))) v
       nb₁ : ∀ {q a} → (q , a) ∈ vs₁ → ¬ JRl (scopeOf c) Rg₀ op f O q p

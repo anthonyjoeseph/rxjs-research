@@ -35,13 +35,12 @@ open Machine using (St; Ctx; Conf; Scope; binds; scopeOf; ⟨_,_,_,_⟩; subscri
                     renaming (Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (pendRows; full; ≃-refl; Vis; _≃_; silent; Moves; this)
 open _≃_
-open import adequacy.Cursor using (Cur; ≈-refl; Rgn; JoinE; Flags; src-pend; JInv; Joined; JRl; polF; Within; Adm; bef; Spent;
-  Sync; _≈_; c-abs; c-sub; Owes; Fr; Hold; owes; dead; lane; lanecut; pnd; Pts; ∅ᵖ; _⊑_; ∅-⊑;
-  ⊑-refl; ⊑-trans; Rest; h-blank; h-take; hl-none; sh-dead; un-dead; Clear; Pending;
-  pend-shape; notT; sync-pend; s-of; s-join; s-joinx; s-took; f-top; f-map; f-scan; f-cut;
-  f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map;
-  d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; subd;
-  o-cp)
+open import adequacy.Cursor using (Cur; ≈-refl; Rgn; JoinE; Flags; src-pend; Within; Adm; bef; Spent; Sync; _≈_; c-abs; c-sub;
+  Owes; Fr; Hold; owes; dead; lane; lanecut; pnd; Pts; ∅ᵖ; _⊑_; ∅-⊑; ⊑-refl; ⊑-trans; Rest;
+  h-blank; h-take; hl-none; sh-dead; un-dead; Clear; Pending; pend-shape; notT; sync-pend;
+  s-of; s-join; s-joinx; s-took; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes;
+  f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer;
+  d-lanes; d-src; d-body; f-isle; f-islec; f-islep; subd; o-cp)
 open import adequacy.Cursor.Rise using (Inv; settled; pending; adrift; RT; SimC; keeps; rise-top; rise-map; rise-scan-nx; rise-scan-cp; rise-take-pass; rise-take-cp; rise-cut; rise-cutx; rise-ln; rise-took; rise-take-fail; rise-bodyx; run-stop; run-cut; run-att)
 open import adequacy.Path using (Path)
 open import adequacy.Isle.Step using (found-clear; found-con)
@@ -55,7 +54,7 @@ open import adequacy.Least using (Lo; seek-none; k-kid; k-src)
 open import adequacy.Bound using (bound; owes-≼; behind-past; behind-pend; join-past)
 open import adequacy.Few using (fr-shift)
 open import adequacy.Up using (rise-body-nx; rise-body-cp; rise-src-nx; rise-src-cp)
-open import adequacy.Enter using (conn₀; conn-parts; conn-ok; flat-sound; flat-within)
+open import adequacy.Enter using (conn₀; conn-parts; conn-ok; flat-sound; flat-within; flat-joined; flat-jinv)
 
 ------------------------------------------------------------------------
 -- Within what is grown, every step moves or finds nothing to do
@@ -291,15 +290,6 @@ module Over {R : Set} (Rt : EmissionSet R) where
     sub-take   : ∀ {Cr C Γ A} {c : Ctx R Γ A} {i} {w : A → Bool} {s q p}
                → Inv Rt Cr C ⟨ c , pend (takeWhile i w s) q , subscribing , p ⟩
                → Inv Rt Cr C ⟨ inCut true (attAt q) (inTake i w free c) , pend s q , subscribing , q ⟩
-    -- A JOINER ENTERED: its outer's entry where it subscribed, every
-    -- lane's program admissible, nothing begun or queued, its outer's
-    -- rows in its region and clear of every lane's.
-    flat-jinv   : ∀ {Γ A B} {sc : Scope Γ} {f : A → Obs Timeline Γ B} {s q}
-                → Ok (Hots (full sc)) q → Adm sc → JInv sc f (pendRows (full sc) s q)
-    flat-joined : ∀ {C Γ A B} {sc : Scope Γ} {Rg} {op} {f : A → Obs Timeline Γ B} {s q}
-                → Owes C q → Ok (Hots (full sc)) q → Adm sc → Within Rg sc q (pendRows (full sc) (flatMap op f s) q)
-                → Joined sc (JRl sc Rg op f (pendRows (full sc) s q)) C (polF op (λ a → ⟦ f a ⟧ (full sc)) (pendRows (full sc) s q))
-                         (pendRows (full sc) s q) false 0 [] []
     -- A CONNECT ENTERED: its flags fresh.
     conn-flags : ∀ {C Γ X B} {sc : Scope Γ} {s : Obs Timeline Γ X} {b : Obs Timeline (X ∷ Γ) B} {q}
                → Owes C q → Flags C (conn₀ s q sc) (pendRows (full (binds s q sc)) b (q ⊕ [ ix 0 ]))

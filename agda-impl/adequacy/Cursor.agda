@@ -380,9 +380,10 @@ Ahead C P vs ws = ∀ {q a s} → (q , a) ∈ ws → Start P q a s
 Ends : ∀ {A B} → Pol A B → EmissionSet A → Set
 Ends P O = ∀ {q a c k e} → O q (out a) → Lane P q a c end → Lane P q a k e → Visible e → k ≼ c
 
--- A value's lane rows lie in the lane's region.
-LanesIn : ∀ {A B} → (Pos → Rgn) → Pol A B → EmissionSet A → Set
-LanesIn Rl P O = ∀ {q a k e} → O q (out a) → Lane P q a k e → Visible e → Rl q k
+-- A value's lane's world, but for what its rows subscribe below them,
+-- lies in the lane's region.
+LanesIn : ∀ {A B} → (Pos → Set) → (Pos → Rgn) → Pol A B → EmissionSet A → Set
+LanesIn H Rl P O = ∀ {q a s y} → O q (out a) → Start P q a s → W⁼ H s y → Excl H (Lane P q a) y → Rl q y
 
 -- In the outer's position order.
 Asc : ∀ {A} → List (Pos × A) → Set
@@ -393,7 +394,7 @@ Asc = AllPairs (λ u v → proj₁ u ≺ proj₁ v)
 -- queued lane below the end of the lane it frees, inside that lane's
 -- world, so the exclusion is what keeps the two apart.
 LaneRg : ∀ {A B} → (Pos → Set) → Pol A B → EmissionSet A → Pos → Rgn
-LaneRg H P O q y = Real y × Σ _ λ a → Σ Pos λ s → O q (out a) × Start P q a s × W⁼ H s y × Excl H (Lane P q a) y
+LaneRg H P O q y = Σ _ λ a → Σ Pos λ s → O q (out a) × Start P q a s × W⁼ H s y × Excl H (Lane P q a) y
 
 -- A joiner's parts: each value's lane in its region, the outer in what
 -- no lane's holds.
@@ -472,7 +473,7 @@ data Begun {Γ A B} (sc : Scope Γ) (Rl : Pos → Rgn) (C : Cur) (P : Pol A B) (
 data Joined {Γ A B} (sc : Scope Γ) (Rl : Pos → Rgn) (C : Cur) (P : Pol A B) (O : EmissionSet A) (d : Bool) (n : ℕ) (qu : List A)
             (ls : List (St Γ B)) : Set₁ where
   joined : ∀ {vs ws} → Begun sc Rl C P O vs ls n → Waiting C P O ws qu → Whole C P O vs ws → OuterDone C O d
-         → Ahead C P vs ws → Asc vs → Ends P O → LanesIn Rl P O
+         → Ahead C P vs ws → Asc vs → Ends P O → LanesIn (Hots (full sc)) Rl P O
          → Joined sc Rl C P O d n qu ls
 
 -- A scan's fold: of the values passed, the seed if none.
@@ -934,7 +935,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Ahead C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) (vs₁ ++ (q , a) ∷ vs₂) ws
             → Asc (vs₁ ++ (q , a) ∷ vs₂)
             → Ends (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O
-            → LanesIn (JRl (scopeOf c) Rg op f O) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O
+            → LanesIn (Hots (full (scopeOf c))) (JRl (scopeOf c) Rg op f O) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O
             → JoinE (scopeOf c) op f ω O E′ → Sound (JRo (scopeOf c) Rg op f O) O → (T b → Sound (JRl (scopeOf c) Rg op f O q) E)
             → Behind C (JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O)
             → Fr Cr C (JRl (scopeOf c) Rg op f O q) (inLanes op f ω d n qu o pre post c) (lane b Ph) E

@@ -19,34 +19,42 @@ module adequacy.Enter where
 
 open import Data.Bool using (true; false)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (_∷_; [_]; _++_)
+open import Data.List using ([]; _∷_; [_]; _++_)
+open import Data.List.Properties using (∷ʳ-injectiveˡ; ∷ʳ-injectiveʳ)
 open import Data.List.Relation.Unary.All using (_∷_)
+open import Data.List.Relation.Unary.AllPairs using ([])
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ)
+open import Data.Nat.Properties using (<-cmp)
+open import Relation.Binary.Definitions using (tri<; tri≈; tri>)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit using (⊤)
-open import Relation.Binary.PropositionalEquality using (refl)
+open import Data.Unit using (⊤; tt)
+open import Relation.Nullary using (yes; no)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; flatMap; connect)
-open import denotation.Events using (Pos; Label; Timeline; ix; root)
+open import denotation.Events using (Pos; Label; Timeline; ix; root; _≟ᵖ_)
 open import denotation.Read using (Visible)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; end; _≼_; Den; hot; ⟦_⟧; Proper; LaneOf; Ended; module Joining;
-  module Bounded; module Switch; module Exhaust; module Connecting)
-open import denotation.Laws.Modulus using (≼-or-≻; ≼-≺-≺; ≺-irrefl)
-open import denotation.Laws.Worlds using (W; W⁼; step; here; inW; Plain; plain-ix; Real; Ok; Lawful; InvAt; InvD; Hots; _⊑_;
-  ⊑-refl; ⊑-≼; ⊑-inside; nest⁼; nest-in; narrow⁼; widen⁼; world-after; real-init; nonempty⁼; ok-step)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; end; _≼_; _≺_; enter; Den; hot; ⟦_⟧; Proper; LaneOf; Ended; After; Truncate;
+  module Joining; module Bounded; module Switch; module Exhaust; module Connecting)
+open import denotation.Laws.Modulus using (≼-or-≻; ≼-≺-≺; ≺-irrefl; ≺→≼)
+open import denotation.Laws.Worlds using (W; W⁼; step; here; inW; Plain; plain-ix; Real; Ok; Lawful; InvAt; InvD; Hots; _⊑_; ⊑-refl;
+  ⊑-≼; ⊑-snoc⁺; PinBy; ⊑-inside; nest⁼; nest-in; narrow⁼; widen⁼; world-after; real-init;
+  nonempty⁼; ok-step; real-snoc; anc-lead; anc-trans; world-anc; world-anc⁼)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
 open import denotation.Laws.HotInv using (lawful-hot)
-open import denotation.Laws.JoinInv using (module Join)
+open import denotation.Laws.JoinInv using (module Join; ix01)
+open import denotation.Laws.Worlds.Leaves using (out-inj)
 open import denotation.Laws.BoundedInv using (module BoundedI)
 open import denotation.Laws.Nth using (module Nths)
 import denotation.Laws.Connect as LC
 open import operation.PureObservable using (module Machine)
 open Machine using (Scope; binds; CS; cs)
 open import adequacy.Rows using (full; pendRows)
-open import adequacy.Cursor using (Rgn; Sound; Excl; Within; Parts; JRo; LaneRg; Start; polF; Adm)
-open import adequacy.Bound using (good-full)
+open import adequacy.Cursor using (Rgn; Sound; Excl; Within; Parts; JRo; JRl; LaneRg; Start; polF; Adm; Owes; Joined; joined; JInv;
+  none; LanesIn; Ends; Lane; JoinF)
+open import adequacy.Bound using (good-full; owes-≼)
 
 ------------------------------------------------------------------------
 -- Excluded worlds
@@ -177,7 +185,7 @@ module FlatAt {Γ A B} (sc : Scope Γ) (f : A → Obs Timeline Γ B) (s : Obs Ti
 
   -- No lane's region holds what excludes the outer's children.
   no-lane : ∀ op {q′ y} → LaneRg H (polF op f′ O) O q′ y → Excl H O y → ⊥
-  no-lane op (_ , _ , _ , x , st , ws , _) ex = kid-lead (start-kid op x st) ws ex
+  no-lane op (_ , _ , x , st , ws , _) ex = kid-lead (start-kid op x st) ws ex
 
 -- A JOINER'S OUTER, ENTERED, lies in the joiner's region less its lanes'.
 flat-within : ∀ {Γ A B} {sc : Scope Γ} {Rg} {op} {f : A → Obs Timeline Γ B} {s q}
@@ -191,6 +199,226 @@ flat-sound : ∀ {Γ A B} {sc : Scope Γ} {Rg} {op} {f : A → Obs Timeline Γ B
            → Ok (Hots (full sc)) q → Adm sc → Within Rg sc q (pendRows (full sc) (flatMap op f s) q)
            → Sound (JRo sc Rg op f (pendRows (full sc) s q)) (pendRows (full sc) s q)
 flat-sound {sc = sc} {op = op} {f} {s} {q} ok ad wi = within-sound {sc = sc} (FlatAt.Io sc f s q ok ad) (flat-within {sc = sc} {op = op} {f = f} {s = s} {q = q} ok ad wi)
+
+-- A JOINER'S LANES, FROM ITS OUTER'S ENTRY.  A joiner row's child's world
+-- leads a position of a lane's world only if the row is the lane's own:
+-- an outer row's, a value's first child's and another lane's children's
+-- worlds are apart from the lane's, and of two bounded lanes the later
+-- lies under its own root or under an end of the earlier.  So a position
+-- of a lane's world clear of its own rows' children is clear of every
+-- joiner row's.
+module Lanes {Γ A B} (sc : Scope Γ) (f : A → Obs Timeline Γ B) {O : EmissionSet A} (ji : JInv sc f O) where
+  H : Pos → Set
+  H = Hots (full sc)
+
+  f′ : A → Den B
+  f′ a = ⟦ f a ⟧ (full sc)
+
+  at : Pos
+  at = JInv.at ji
+
+  Io : InvAt H at O
+  Io = JInv.io ji
+
+  module J = Join (JInv.ok ji) f′ (JInv.fi ji) Io
+
+  vis-pin : ∀ {c} {e : Ev B} → PinBy c e → Visible e → ⊥
+  vis-pin (_ , refl , _) ()
+
+  -- Every row of the outer lies past the joiner's subscription.
+  owed : ∀ {C} → Owes C at → ∀ {q′ e} → O q′ e → Owes C q′
+  owed {C} ow {q′} x = owes-≼ C ow (≺→≼ {at} {q′} (world-after (InvAt.world Io x) (InvAt.real Io x)))
+
+  -- An outer row's child's world leads no position of a value's second
+  -- child's but through that child.
+  kid-lane⁼ : ∀ {x e l w q′ e″ y} → O x e → Plain l → W⁼ H (x ++ [ l ]) w → O q′ e″ → W⁼ H (q′ ++ [ ix 1 ]) y
+            → (x ++ [ l ] ≡ q′ ++ [ ix 1 ] → ⊥) → w ⊑ y → ⊥
+  kid-lane⁼ ox pl v oq here     ne le = J.kid-root ox pl v oq plain-ix ne le
+  kid-lane⁼ ox pl v oq (inW yw) ne le = J.kid-lane ox pl v oq yw ne le
+
+  -- A lane at a value's second child.
+  module Un (Runs : Pos → Set) (Cut : Pos → Pos → Set) where
+    open J.View (λ _ → ⊥) (λ _ _ _ → ⊤) using (V; v-o; v-val; v-lane; o-skip; o-pin; o-pass; o-nout; l-work; l-pass)
+    open Joining (LaneOf f′) O (λ _ _ → ⊥) (Ended O) Runs Cut (λ _ → ⊥)
+      using (JoinT; val; opin; oend; opass; lane; lend; lpass; hand; left; run; rend; rpass; rhand) renaming (step to o-step)
+
+    -- Each row, shown whatever ends it.
+    vw : ∀ {y e} → JoinT y e → Σ (Ev B) (V y)
+    vw (val x)             = _ , v-val x refl
+    vw (o-step x)          = _ , v-o x o-skip
+    vw (opin x)            = _ , v-o x o-pin
+    vw (oend x _)          = _ , v-o x (o-pass (λ ()))
+    vw (opass x _)         = _ , v-o x (o-pass (λ ()))
+    vw (lane x _ l _ w)    = _ , v-lane x l (l-work tt w)
+    vw (lend x _ l _ _ _)  = _ , v-lane x l (l-pass tt (λ ()))
+    vw (lpass x _ l _ _ _) = _ , v-lane x l (l-pass tt (λ ()))
+    vw (hand _ _ _ _ ())
+    vw (left x _ l _ _)    = _ , v-lane x l (l-work tt tt)
+    vw (run () _)
+    vw (rend () _ _)
+    vw (rpass () _ _)
+    vw (rhand () _)
+
+    excl : ∀ {q′ a y} → O q′ (out a) → W⁼ H (q′ ++ [ ix 1 ]) y → Excl H (LaneOf f′ q′ a) y → Excl H (Truncate JoinT) y
+    excl {q′} {a} {y} xq yw ex jr = go (proj₂ (vw (proj₁ jr)))
+      where
+        go : ∀ {x e l w} → V x e → Plain l → W⁼ H (x ++ [ l ]) w → w ⊑ y → ⊥
+        go {x} (v-o ox ev) pl v le =
+          kid-lane⁼ ox pl v xq yw (λ eq → o-nout ev ox (subst (λ z → O z (out a)) (sym (∷ʳ-injectiveˡ x q′ eq)) xq)) le
+        go (v-val {q″} xr refl) pl v le =
+          kid-lane⁼ xr plain-ix (nest⁼ (inW (step here pl)) v) xq yw (λ eq → ix01 (∷ʳ-injectiveʳ q″ q′ eq)) le
+        go (v-lane {q″} xr l″ _) pl v le with q″ ≟ᵖ q′
+        ... | yes refl with out-inj (InvAt.func Io xr xq)
+        ...   | refl = ex l″ pl v le
+        go (v-lane {q″} xr l″ _) pl v le | no ne =
+          kid-lane⁼ xr plain-ix (nest⁼ (inW (step (inW (J.lw xr l″)) pl)) v) xq yw (λ eq → ne (∷ʳ-injectiveˡ q″ q′ eq)) le
+
+  un-ends : ∀ {q′ a c k e} → O q′ (out a) → LaneOf f′ q′ a c end → LaneOf f′ q′ a k e → Visible e → k ≼ c
+  un-ends {c = c} {k} x lc lk v with ≼-or-≻ k c
+  ... | inj₁ le = le
+  ... | inj₂ lt = ⊥-elim (vis-pin (InvAt.quiet (J.LI x) (proj₁ lc) (proj₁ lk) lt) v)
+
+  -- A bounded lane, wherever its schedule subscribes it.
+  module Bo (m : ℕ) where
+    open BoundedI (JInv.ok ji) m f′ (JInv.fi ji) Io
+      using (V; v-o; v-val; v-l; vw; lr; Lr; lr-row; lr-hand; Rel; apart; queued-in; rel; child-in; nest-under; row-not-c; lane-end;
+             module LK; LI; sub-fun; row-w; s-w; seat*; seat′)
+    open J.View (Bounded.Done m f′ O) (λ _ _ _ → ⊤) using (o-nout)
+    open Nths O using (nth-inj; nth-val)
+
+    Sub : ℕ → Pos → Pos → A → Set
+    Sub = Bounded.Sub m f′ O
+
+    same : ∀ {i i′ q′ s₁ s₂ a a′} → Sub i q′ s₁ a → Sub i′ q′ s₂ a′ → s₁ ≡ s₂
+    same sb sb′ with nth-inj (proj₁ sb) (proj₁ sb′)
+    ... | refl with sub-fun sb sb′
+    ...   | _ , _ , eq = eq
+
+    -- Under a lane's queued end's second child, against the lane.
+    nu⁼ : ∀ {j qj sj aj c x l w y} → Sub j qj sj aj → After (f′ aj) sj c end → Bounded.Queued m f′ O c → Lr aj sj x → Plain l
+        → W⁼ H (x ++ [ l ]) w → W⁼ H (c ++ [ ix 1 ]) y → w ⊑ y → ⊥
+    nu⁼ sb ac Q lx pl v (inW yw) le = nest-under sb ac Q lx pl v yw le
+    nu⁼ {c = c} {x} sb ac Q (lr-row x′ nq) pl v here le =
+      LK.kid-root sb (proj₁ x′) pl v (proj₁ ac) plain-ix
+        (λ eq → row-not-c sb ac Q x′ nq (subst (_⊑ (c ++ [ ix 1 ])) (sym (∷ʳ-injectiveˡ x c eq)) (⊑-snoc⁺ c))) le
+    nu⁼ {c = c} sb ac Q (lr-hand x _ refl) pl v here le with lane-end sb ac x
+    ... | refl = LK.kid-root sb (proj₁ ac) plain-ix (nest⁼ (inW (step here pl)) v) (proj₁ ac) plain-ix (λ eq → ix01 (∷ʳ-injectiveʳ c c eq)) le
+
+    excl : ∀ {i q′ s a y} → Sub i q′ s a → W⁼ H s y → Excl H (Bounded.Lane m f′ O q′ a) y → Excl H (Truncate (Bounded.JoinT m f′ O)) y
+    excl {i} {q′} {s} {a} {y} sb yw ex jr with seat* sb
+    ... | seat′ {r = r} _ _ _ nr rw = go (vw (proj₁ jr))
+      where
+        ry : W⁼ H (r ++ [ ix 1 ]) y
+        ry = nest⁼ rw yw
+
+        go : ∀ {x e l w} → V x e → Plain l → W⁼ H (x ++ [ l ]) w → w ⊑ y → ⊥
+        go {x} (v-o ox ev) pl v le =
+          kid-lane⁼ ox pl v (nth-val nr) ry (λ eq → o-nout ev ox (subst (λ z → O z (out _)) (sym (∷ʳ-injectiveˡ x r eq)) (nth-val nr))) le
+        go (v-val {q″} xr refl) pl v le =
+          kid-lane⁼ xr plain-ix (nest⁼ (inW (step here pl)) v) (nth-val nr) ry (λ eq → ix01 (∷ʳ-injectiveʳ q″ r eq)) le
+        go (v-l {i = j} sb′ lv) pl v le with <-cmp j i
+        ... | tri≈ _ refl _ with sub-fun sb′ sb
+        ...   | refl , refl , refl with lr sb lv
+        ...     | lr-row x′ _      = ex (i , s , sb , x′) pl v le
+        ...     | lr-hand ac _ refl = ex (i , s , sb , ac) plain-ix (nest⁼ (inW (step here pl)) v) le
+        go (v-l {i = j} sb′ lv) pl v le | tri< lt _ _ with rel lt sb′ sb
+        ... | apart xr₁ xr₂ ne rw₁ rw₂ =
+          kid-lane⁼ xr₁ plain-ix (child-in rw₁ sb′ (lr sb′ lv) pl v) xr₂ (nest⁼ rw₂ yw) (λ eq → ne (∷ʳ-injectiveˡ _ _ eq)) le
+        ... | queued-in ac Q v₁ = nu⁼ sb′ ac Q (lr sb′ lv) pl v (nest⁼ v₁ yw) le
+        go (v-l {i = j} sb′ lv) pl v le | tri> _ _ gt with rel gt sb sb′
+        ... | apart xr₁ xr₂ ne rw₁ rw₂ =
+          kid-lane⁼ xr₂ plain-ix (child-in rw₂ sb′ (lr sb′ lv) pl v) xr₁ (nest⁼ rw₁ yw) (λ eq → ne (sym (∷ʳ-injectiveˡ _ _ eq))) le
+        ... | queued-in ac Q v₁ = ex (i , s , sb , ac) plain-ix (child-in v₁ sb′ (lr sb′ lv) pl v) le
+
+    row : ∀ {q′ a k e} → Bounded.Lane m f′ O q′ a k e
+        → Σ Pos λ s′ → Σ ℕ (λ i → Sub i q′ s′ a) × W⁼ H s′ k × Excl H (Bounded.Lane m f′ O q′ a) k
+    row (i , _ , sb , ac) = _ , (i , sb) , inW (row-w sb ac) , own
+      where
+        own : Excl H (Bounded.Lane m f′ O _ _) _
+        own (_ , _ , sb′ , ar) pl v le with same sb sb′
+        ... | refl = InvAt.under (LI sb) (proj₁ ar) (proj₁ ac) pl v le
+
+    ends : ∀ {q′ a c k e} → O q′ (out a) → Bounded.Lane m f′ O q′ a c end → Bounded.Lane m f′ O q′ a k e → Visible e → k ≼ c
+    ends {c = c} {k} _ (_ , _ , sb , lc) (_ , _ , sb′ , lk) v with same sb sb′
+    ... | refl with ≼-or-≻ k c
+    ...   | inj₁ le = le
+    ...   | inj₂ lt = ⊥-elim (vis-pin (InvAt.quiet (LI sb) (proj₁ lc) (proj₁ lk) lt) v)
+
+  -- Every lane's world, but for what its rows subscribe below them, in
+  -- the joiner's region and the lane's.
+  lanes-in : ∀ op {Rg} → (∀ {y} → W H at y → Excl H (Truncate (JoinF op f′ O)) y → Rg y) → LanesIn H (JRl sc Rg op f O) (polF op f′ O) O
+  lanes-in (mergeᶠ nothing)  wi x refl yw ex = wi (nest-in (J.sw x) yw) (Un.excl (λ _ → ⊤) (λ _ _ → ⊥) x yw ex) , _ , _ , x , refl , yw , ex
+  lanes-in (mergeᶠ (just m)) wi x (i , sb) yw ex =
+    wi (nest-in (BoundedI.s-w (JInv.ok ji) m f′ (JInv.fi ji) Io sb) yw) (Bo.excl m sb yw ex) , _ , _ , x , (i , sb) , yw , ex
+  lanes-in switchᶠ           wi x refl yw ex = wi (nest-in (J.sw x) yw) (Un.excl (λ _ → ⊤) (Switch.Cut f′ O) x yw ex) , _ , _ , x , refl , yw , ex
+  lanes-in exhaustᶠ          wi x refl yw ex = wi (nest-in (J.sw x) yw) (Un.excl (Exhaust.Run f′ O) (λ _ _ → ⊥) x yw ex) , _ , _ , x , refl , yw , ex
+
+  -- A lane's row: in its world, clear of its own rows' children.
+  lane-row : ∀ op {q′ a k e} → O q′ (out a) → Lane (polF op f′ O) q′ a k e
+           → Σ Pos λ s′ → Start (polF op f′ O) q′ a s′ × W⁼ H s′ k × Excl H (Lane (polF op f′ O) q′ a) k
+  lane-row (mergeᶠ nothing)  x l = _ , refl , inW (J.lw x l) , λ l′ pl v le → InvAt.under (J.LI x) (proj₁ l′) (proj₁ l) pl v le
+  lane-row (mergeᶠ (just m)) _ l = Bo.row m l
+  lane-row switchᶠ           x l = _ , refl , inW (J.lw x l) , λ l′ pl v le → InvAt.under (J.LI x) (proj₁ l′) (proj₁ l) pl v le
+  lane-row exhaustᶠ          x l = _ , refl , inW (J.lw x l) , λ l′ pl v le → InvAt.under (J.LI x) (proj₁ l′) (proj₁ l) pl v le
+
+  lane-rows : ∀ op {Rl} → LanesIn H Rl (polF op f′ O) O → ∀ {q′ a k e} → O q′ (out a) → Lane (polF op f′ O) q′ a k e → Rl q′ k
+  lane-rows op li x l with lane-row op x l
+  ... | _ , st , w , ex = li x st w ex
+
+  -- A lane's rows lie past its start.
+  past : ∀ op {q′ a s′ r e} → Start (polF op f′ O) q′ a s′ → Lane (polF op f′ O) q′ a r e → enter (f′ a) s′ r e × s′ ≺ r
+  past (mergeᶠ nothing)  refl l = l
+  past (mergeᶠ (just m)) (_ , sb) (_ , _ , sb′ , ac) with Bo.same m sb sb′
+  ... | refl = ac
+  past switchᶠ           refl l = l
+  past exhaustᶠ          refl l = l
+
+  real-start : ∀ op {q′ a s′} → O q′ (out a) → Start (polF op f′ O) q′ a s′ → Real s′
+  real-start (mergeᶠ nothing)  {q′} x refl = real-snoc q′ plain-ix (InvAt.real Io x)
+  real-start (mergeᶠ (just m)) _ (_ , sb) with BoundedI.seat* (JInv.ok ji) m f′ (JInv.fi ji) Io sb
+  ... | BoundedI.seat′ _ rs _ _ _ = rs
+  real-start switchᶠ           {q′} x refl = real-snoc q′ plain-ix (InvAt.real Io x)
+  real-start exhaustᶠ          {q′} x refl = real-snoc q′ plain-ix (InvAt.real Io x)
+
+  -- A LANE SUBSCRIBED, WITHIN ITS REGION: no child of a lane's row leads
+  -- back to its start, so the start lies in the region, and so does every
+  -- position of its world clear of the lane's rows' children.
+  lane-within : ∀ op {Rl} → LanesIn H Rl (polF op f′ O) O → ∀ {q′ a s′} → O q′ (out a) → Start (polF op f′ O) q′ a s′
+              → Within (Rl q′) sc s′ (enter (f′ a) s′)
+  lane-within op li x st = li x st here back , λ w ex → li x st (inW w) (λ l → ex (proj₁ (past op st l)))
+    where
+      back : Excl H (Lane (polF op f′ O) _ _) _
+      back l pl v le = anc-lead (anc-trans (world-anc {H = H} (step here pl)) (world-anc⁼ v)) le (real-start op x st) (proj₂ (past op st l))
+
+  ends : ∀ op → Ends (polF op f′ O) O
+  ends (mergeᶠ nothing)  = un-ends
+  ends (mergeᶠ (just m)) = Bo.ends m
+  ends switchᶠ           = un-ends
+  ends exhaustᶠ          = un-ends
+
+-- A JOINER ENTERED: its outer's entry where it subscribed, every lane's
+-- program admissible.
+flat-jinv : ∀ {Γ A B} {sc : Scope Γ} {f : A → Obs Timeline Γ B} {s q}
+          → Ok (Hots (full sc)) q → Adm sc → JInv sc f (pendRows (full sc) s q)
+flat-jinv {sc = sc} {f} {s} {q} ok ad = record { at = q ; ok = ok ; io = Io ; fi = fi }
+  where open FlatAt sc f s q ok ad
+
+-- Nothing begun or queued, every lane's world in its region.
+flat-joined : ∀ {C Γ A B} {sc : Scope Γ} {Rg} {op} {f : A → Obs Timeline Γ B} {s q}
+            → Owes C q → Ok (Hots (full sc)) q → Adm sc → Within Rg sc q (pendRows (full sc) (flatMap op f s) q)
+            → Joined sc (JRl sc Rg op f (pendRows (full sc) s q)) C (polF op (λ a → ⟦ f a ⟧ (full sc)) (pendRows (full sc) s q))
+                     (pendRows (full sc) s q) false 0 [] []
+flat-joined {C} {sc = sc} {op = op} {f} {s} {q} ow ok ad wi =
+  joined {vs = []} {ws = []} none (refl , [] , λ ()) (λ x no _ → ⊥-elim (no (owed {C} ow x))) ((λ ()) , λ x no → no (owed {C} ow x))
+         (λ ()) [] (ends op) (lanes-in op (λ w ex → proj₂ wi w (as op ex)))
+  where
+    open Lanes sc f (flat-jinv {sc = sc} {f = f} {s = s} {q = q} ok ad)
+
+    as : ∀ op′ {y} → Excl H (Truncate (JoinF op′ f′ (pendRows (full sc) s q))) y → Excl H (pendRows (full sc) (flatMap op′ f s) q) y
+    as (mergeᶠ nothing)  ex = ex
+    as (mergeᶠ (just m)) ex = ex
+    as switchᶠ           ex = ex
+    as exhaustᶠ          ex = ex
 
 ------------------------------------------------------------------------
 -- A connect entered
