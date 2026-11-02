@@ -54,28 +54,44 @@ part q = trans (at-<ᴷ (q ++ [ ix 0 ]) (q ++ [ ix 1 ])) (<ᵖ-part q {ix 0} {ix
 over : ∀ q → at (q ++ [ ix 1 ]) <ᴷ at (q ++ [ ix 0 ]) ≡ true → ⊥
 over q h = clash (<ᴷ-trans (at (q ++ [ ix 1 ])) (at (q ++ [ ix 0 ])) (at (q ++ [ ix 1 ])) h (part q)) (<ᴷ-irrefl (at (q ++ [ ix 1 ])))
 
+-- A ROW AT OR UNDER `y`: a row of the root's entry at or before `p`, with
+-- `y` itself or one of its ancestors.  A connect shows its source's rows a
+-- level down, so a row made inside a source is met only under it.
+RowUnder : ∀ {R} → PureObs [] R → Pos → Pos → Set
+RowUnder o y p = Σ Pos λ r → Σ _ λ e′ → enter (⟦ o ⟧ []ᴬ) root r e′ × r ≼ p × y ∈ prefixes r
+
+-- An ancestor of a listed position, among the ancestors listed.
+anc-∈ : ∀ {y r} ks → r ∈ ks → y ∈ prefixes r → y ∈ anc ks
+anc-∈ (r ∷ ks) (here refl) my = ∈-++⁺ˡ my
+anc-∈ (x ∷ ks) (there mr) my = ∈-++⁺ʳ (prefixes x) (anc-∈ ks mr my)
+
+-- A row under `y` at or before the row met next: `y` listed.
+under-listed : ∀ {R} (o : PureObs [] R) p {y} ks → (∀ {q′ e′} → enter (⟦ o ⟧ []ᴬ) root q′ e′ → q′ ≼ p → q′ ∈ ks)
+             → RowUnder o y p → y ∈ ks ++ anc ks
+under-listed o p ks cov (_ , _ , tr , le , mr) = ∈-++⁺ʳ ks (anc-∈ ks (cov tr le) mr)
+
 postulate
   -- A DEFER'S GUARD IS MET: short of a row a reader meets next, a defer a
-  -- run subscribes has its guard row, at or before the row met next.
+  -- run subscribes has a row under its guard, at or before the row met next.
   defer-guard : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {l q p e}
               → Path (load o) rs ⟨ c , pend (defer l) q , subscribing , q ⟩
               → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
-              → Σ _ λ e′ → enter (⟦ o ⟧ []ᴬ) root (q ++ [ ix 0 ]) e′ × (q ++ [ ix 0 ]) ≼ p
+              → RowUnder o (q ++ [ ix 0 ]) p
 
   -- A LANE START PASSES ITS GUARD: a rise that subscribes begins a lane a
-  -- level down, past the row its outer value, or its freed slot, leaves,
-  -- at or before the row met next.
+  -- level down, past the row its outer value, or its freed slot, leaves:
+  -- a row under it at or before the row met next.
   lane-guard : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s ε q k′ p e}
              → Path (load o) rs ⟨ c , s , rising ε , q ⟩ → k′ ⇜ ⟨ c , s , rising ε , q ⟩ → Conf.mode k′ ≡ subscribing
              → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
-             → Σ _ λ e′ → enter (⟦ o ⟧ []ᴬ) root (q ++ [ ix 0 ]) e′ × (q ++ [ ix 0 ]) ≼ p
+             → RowUnder o (q ++ [ ix 0 ]) p
 
-  -- A SOURCE'S STEP IS ECHOED: a source rising under its connect leaves the
-  -- connect's row a level down, at or before the row met next.
+  -- A SOURCE'S STEP IS ECHOED: a source rising under its connect leaves a
+  -- row a level down, under it, at or before the row met next.
   echo-guard : ∀ {R} (o : PureObs [] R) {rs Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {s ε q p e}
              → Path (load o) rs ⟨ inSrc k b c , s , rising ε , q ⟩
              → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
-             → Σ _ λ e′ → enter (⟦ o ⟧ []ᴬ) root (q ++ [ ix 0 ]) e′ × (q ++ [ ix 0 ]) ≼ p
+             → RowUnder o (q ++ [ ix 0 ]) p
 
   -- A COLD'S TICK IS A ROW: short of a row a reader meets next, a cold an
   -- open observer hears plays its due at a row at or before it, or at an
@@ -85,7 +101,7 @@ postulate
            → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
            → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS b (play τ u i t fr)) leafM (at (u ++ [ ix i ])))
            → closed c′ ≡ false
-           → Σ Pos λ r → Σ _ λ e′ → enter (⟦ o ⟧ []ᴬ) root r e′ × r ≼ p × (u ++ [ ix i ]) ∈ prefixes r
+           → RowUnder o (u ++ [ ix i ]) p
 
 
 -- THE LEAST MARK IS NOT PAST THE ROW: short of a row a reader meets
@@ -163,8 +179,7 @@ module Begun {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ)
   begun (connect s′ b)     pth refl _ =
     lt0 (lighter-at c (conn-arith _ (2 + D) (syn (suc D) s′) (syn (suc D) b) (wt-ahead D (at (q ++ [ ix 1 ])) (below q))))
   begun (defer l)          pth refl kept =
-    let (_ , tq , le) = defer-guard o pth m
-    in ⊥-elim (over q (kept (∈-++⁺ˡ (cov tq le)) (below q)))
+    ⊥-elim (over q (kept (under-listed o p ks cov (defer-guard o pth m)) (below q)))
   begun (cold x)           pth refl _ = lt0 (lighter-at c (cold-lt _ (opening-ahead o pth)))
   begun empty              pth refl _ = lt0 (lighter-at c (s≤s (wt-ahead D (at (q ++ [ last ])) (below q))))
   begun (of xs)            pth refl _ = lt0 (lighter-at c (of-lt xs))
@@ -307,7 +322,7 @@ module Rose {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) 
     open Shed L p (at q)
 
     Guard : Set
-    Guard = Σ _ λ e′ → enter (⟦ o ⟧ []ᴬ) root (q ++ [ ix 0 ]) e′ × (q ++ [ ix 0 ]) ≼ p
+    Guard = RowUnder o (q ++ [ ix 0 ]) p
 
     Kept : Conf R → Set
     Kept k′ = ∀ {q′} → q′ ∈ L → at q <ᴷ at q′ ≡ true → Clock k′ <ᴷ at q′ ≡ true
@@ -322,7 +337,7 @@ module Rose {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) 
 
     -- A lane begun has passed its guard.
     begun : (∀ {q′} → q′ ∈ L → at q <ᴷ at q′ ≡ true → at (q ++ [ ix 1 ]) <ᴷ at q′ ≡ true) → Guard → ⊥
-    begun kept (_ , tq , le) = over q (kept (∈-++⁺ˡ (cov tq le)) (below q))
+    begun kept g = over q (kept (under-listed o p ks cov g) (below q))
 
     -- A takeWhile's failing value: its end owed past where it fell.
     failed : ∀ {Γ A} {i f} (s : St Γ A) d → pot d (takeS i f (cpAt q) s) ≤ pot d (takeS i f free s)
@@ -378,8 +393,7 @@ module Rose {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) 
   rose (inLanes op f ω d n (a ∷ qs) o′ pre post c) s cp pth g refl kept | true | true  = up c _ (lanes-le (depth c) o′ pre post s) z≤n
   rose (inLanes op f ω d n (a ∷ qs) o′ pre post c) s cp pth g refl kept | true | false = ⊥-elim (begun kept (g refl))
   rose (inSrc k b c) s ε pth g eq kept =
-    let (_ , tq , le) = echo-guard o pth m
-    in ⊥-elim (clash (kept (∈-++⁺ˡ (cov tq le)) (below q)) (fed-ahead o pth (_ , eq)))
+    ⊥-elim (clash (kept (under-listed o p ks cov (echo-guard o pth m)) (below q)) (fed-ahead o pth (_ , eq)))
   rose (inBody k o′ c) s (nx b) pth g eq kept with CS.srcLive k
   rose (inBody k o′ c) s (nx b) pth g refl kept | true  = up c _ ≤-refl ≤-refl
   rose (inBody k o′ c) s (nx b) pth g refl kept | false = up c _ ≤-refl z≤n
@@ -394,11 +408,6 @@ module Rose {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) 
 ... | no ¬e with m
 ...   | here e   = ⊥-elim (¬e e)
 ...   | there m′ = ∈-listed ks q m′
-
--- An ancestor of a listed position, among the ancestors listed.
-anc-∈ : ∀ {y r} ks → r ∈ ks → y ∈ prefixes r → y ∈ anc ks
-anc-∈ (r ∷ ks) (here refl) my = ∈-++⁺ˡ my
-anc-∈ (x ∷ ks) (there mr) my = ∈-++⁺ʳ (prefixes x) (anc-∈ ks mr my)
 
 -- A context's directions, one per level.
 snoc-len : ∀ {n} (xs : List ℕ) {x} → length xs ≡ n → length (xs ++ [ x ]) ≡ suc n
@@ -599,7 +608,7 @@ module Run {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) r
     subst (λ t → Wᶜ L p κ k′ < Weigh.pot L p κ 0 t + 0) (found-plug c s fd)
       (At.runs κ c′ (found-mark c s fd) (proj₁ (found-least {t = plug c s} fd))
         (λ { refl → mark-short o pth m fd })
-        (λ { cl refl refl refl → let (r , _ , tr , le , mr) = tick-row o pth m fd cl in ∈-listed L _ (∈-++⁺ʳ ks (anc-∈ ks (cov tr le) mr)) })
+        (λ { cl refl refl refl → ∈-listed L _ (under-listed o p ks cov (tick-row o pth m fd cl)) })
         (λ { refl refl dr → frame-ahead o pth fd dr })
         eq)
 

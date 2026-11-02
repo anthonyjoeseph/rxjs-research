@@ -51,9 +51,9 @@ Members: `rise-outer-bounded`, `rise-outer-switch`, `rise-outer-exhaust`, `rise-
 #### THE GUARD ROWS
 
 A step that begins work a level down — a lane, a defer's body, a
-source's feed — leaves a row first, so is never still. Open: that the
-denotation has that row, at or before the one met next. Settled by
-bodies over the joiner's and connect's rows.
+source's feed — leaves a row first, so is never still. Open: a root row
+under it, at or before the one met next; frame ties may drop a hidden row
+and an isle's frames tie no entry. Settled by bodies over the frames.
 
 Members: `lane-guard`, `echo-guard`, `defer-guard`.
 
