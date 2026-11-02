@@ -25,7 +25,7 @@ open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline; ix; last; inside)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; pin; _≺_; _≼_; enter; ⟦_⟧; shown; map-pin; module Scan;
+open import denotation.EmissionSet using (EmissionSet; Ev; out; end; pin; _≺_; _≼_; enter; ⟦_⟧; shown; map-pin; module Scan;
   module TakeWhile; module Connecting)
 open import denotation.Laws.Modulus using (≺→≼; ≺-ext; ≼-antisym)
 open import denotation.Laws.Worlds using (Real; InvAt; real-snoc; plain-ix; real-init; nonempty⁼; world-after⁼; inside-⊑)
@@ -40,7 +40,7 @@ open import adequacy.Cursor using (Cur; bef; aft; Owes; Beneath; Pts; _∪ᵖ_; 
   Begun; none; more; Parts; joined; src-pend; src-on; src-shut; Torn; by; husk-of; src-husk;
   begun-husk; lane-husk; voc; cov; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took;
   s-flat; s-conn; s-join; s-joinx)
-open import adequacy.Bound using (owes?; owes-≼; starts-past)
+open import adequacy.Bound using (owes?; owes-≼; starts-past; past)
 open import adequacy.Few using (join-pin; kept-lane; ix0)
 
 ------------------------------------------------------------------------
@@ -184,6 +184,19 @@ mutual
   lane-pt (l-dead (h-end _ _ (tailp ks f)) _)  = ks , λ kp o _ → f kp o
   lane-pt (l-dead (h-kill _ _ (tailp ks f)) _) = ks , λ kp o _ → f kp o
 
+
+------------------------------------------------------------------------
+-- A NODE ENDED BEFORE THE CURSOR owes what its isles still run, but for
+-- finitely many: past its end lie only pins of connects before it
+-- (`Sound.past`), which the cursor has passed.
+end-tail : ∀ {Γ} {sc : Scope Γ} {Rg C A} {s : St Γ A} {E} (sy : Sync sc Rg C s E) → Sound Rg E
+         → ∀ {c} → E c end → ¬ Owes C c → TailP C E (proj₁ (husk-of sy))
+end-tail {C = C} {E = E} sy sd {c} ce nc with pin-tail sy
+... | ptl ks f = tailp ks row
+  where
+    row : ∀ {y e} → E y e → Owes C y → proj₁ (husk-of sy) y ⊎ y ∈ ks
+    row {y} x o with Sound.past sd ce x (past C nc o)
+    ... | r , refl , rc = f x o λ or → nc (owes-≼ C or (≺→≼ {r} {c} rc))
 
 ------------------------------------------------------------------------
 -- A TAKEWHILE FAILING AT `p` owes what its source's isles still run.  A

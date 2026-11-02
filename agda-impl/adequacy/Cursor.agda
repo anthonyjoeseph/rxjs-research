@@ -240,11 +240,15 @@ Rgn : Set₁
 Rgn = Pos → Set
 
 -- A frozen entry is a meaning: one visible row at a position, none past
--- its end, each inside its subtree's region.
+-- its end, each inside its subtree's region.  What lies past its end is
+-- a pin of a connect subscribed before it: a hot binder is read `Proper`,
+-- a leaf stops at its end, a connect's echo waits on its body (`Alive`)
+-- and its burst is of its own subscription, which its body ends after.
 record Sound {A} (Rg : Rgn) (E : EmissionSet A) : Set where
   field
     fn   : ∀ {y e e′} → E y e → E y e′ → Visible e → Visible e′ → e ≡ e′
     ends : ∀ {c y e} → E c end → E y e → Visible e → y ≼ c
+    past : ∀ {c y e} → E c end → E y e → c ≺ y → Σ Pos λ r → e ≡ pin r × r ≺ c
     rg   : ∀ {y e} → E y e → Visible e → Rg y
 
 -- A subscription at `q` whose world lies in the region.

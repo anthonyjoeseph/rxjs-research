@@ -39,6 +39,7 @@ open import adequacy.Cursor using (Cur; bef; aft; Behind; Fin; Tail; fin-dn; tai
 open import adequacy.Cursor.Rise using (Inv; RT; settled; flying; adrift; SimC; keeps; unread-at)
 open import adequacy.Bound using (join-row; owes?; few-src)
 open import adequacy.Regions using (lane-sole)
+open import adequacy.PinTail using (end-tail)
 
 -- A visible row of a binder in scope at `p`.
 VHot : ∀ {Γ} → DenEnv Γ → Pos → Set
@@ -263,23 +264,6 @@ conn-reach (ks , fs) (bs , fb) = map (_++ [ ix 0 ]) ks ++ bs , λ
   ; (Connecting.burst x _)    lt _ → ∈-++⁺ˡ (∈-map⁺ (_++ [ ix 0 ]) (fs x lt))
   ; (Connecting.echo x _ _ _) lt _ → ∈-++⁺ˡ (∈-map⁺ (_++ [ ix 0 ]) (fs x lt))
   ; (Connecting.kept x _ _ _) lt _ → ∈-++⁺ˡ (∈-map⁺ (_++ [ ix 0 ]) (fs x lt)) }
-
--- A source closed at `p` owes, but for finitely many rows, what its
--- isles still run.  Every row past the end is invisible (`Sound.ends`),
--- so a skip or a pin.  A pin whose connect lies before the end is a pin
--- of a burst the cursor passed, and `pin-tail` places it.  What stays
--- open: the skips past the end, and a pin of a connect past it.  Each
--- former's rows past its end are of its parts' past theirs, and a
--- connect's burst pins and kept pins name connects before its body's end
--- (`Connecting.kept` asks `Alive`), so both reduce to the leaves: a
--- tape's rows past its entry's end, which `s-cold`'s `Tail` does not
--- tie to the entry.
--- DEAD ROUTE: `pin-tail` alone — it asks the pin's connect passed, which
---   an end at `p` does not give, and it says nothing of skips.
-postulate
-  shut-tail : ∀ {Γ X} {sc : Scope Γ} {Rs} {k : CS Γ X} {o : St Γ X} {p}
-            → (sy : Sync sc Rs (aft p) o (Frozen k)) → Sound Rs (Frozen k) → Frozen k p end
-            → TailP (aft p) (Frozen k) (proj₁ (husk-of sy))
 
 -- A ROW FED TO A PART NO LIVE NODE READS, with no isle in it, keeps
 -- what it still runs: a feed reaches joiners only.
@@ -666,14 +650,14 @@ module _ {R : Set} (Rt : EmissionSet R) where
     in Cr↑ , aft p
      , subst (λ k″ → Inv Rt Cr↑ (aft p) ⟨ c , connS k″ s (feed (here refl) p cp b) , absorbed , p ⟩) (sym (shut-live {k = k} {p} lv))
              (settled c-abs fr↑ (s-conn sc (re-parts pt) (λ _ → body bs)
-                                        (λ _ → src-done refl (shut-tail {k = k} sy′ (Parts.ss pt) fk) (proj₂ (husk-of sy′)) bh sd)
+                                        (λ _ → src-done refl (end-tail sy′ (Parts.ss pt) fk (≺-irrefl {p})) (proj₂ (husk-of sy′)) bh sd)
                                         (λ nl → ⊥-elim (notT _ nl lv)) (flags-shut refl fl) eq))
      , moves
   -- an isle's source ends inside its subscribe call: still an isle
   rise-src-cp {k = k} {b} {c} {s} {p} refl {Cr = Cr} (flying (f-isle u hb le na nc bh sd ss ao ni) _ (sy , row)) =
     shut-by {k = k} {p} (λ k″ → After Cr ⟨ c , connS k″ s (feed (here refl) p cp b) , absorbed , p ⟩)
       (λ lt → _ , _ , unread-at Rt (unread-live Rt lt u)
-                        (sh-islec na tt (λ (y , v , py) → Sound.ends ss row y v py) (shut-tail {k = k} sy ss row) (proj₂ (husk-of sy))
+                        (sh-islec na tt (λ (y , v , py) → Sound.ends ss row y v py) (end-tail sy ss row (≺-irrefl {p})) (proj₂ (husk-of sy))
                                   (Past.behind-up p bh) (Past.subd-up p sd))
                         fed (burst-dn {C = bef p} {C′ = aft p} {k = k} (λ {y} → Past.dn p {y}) le) , silent ≃-refl)
       (λ _ → _ , _ , unread-at Rt u (sh-isle na nc sy (Past.behind-up p bh) (Past.subd-up p sd) ss ao) fed (burst-dn {C = bef p} {C′ = aft p} {k = k} (λ {y} → Past.dn p {y}) le) , silent ≃-refl)
