@@ -111,7 +111,7 @@ hole-⊑ {C = C} (h-kill x o tp) le = h-kill x o (tailp-⊑ {C = C} tp le)
 -- A lane's state as its list entry holds it.
 laneSt : ∀ {Γ A B} {sc : Scope Γ} {Rg C} {P : Pol A B} {q a} b {at l E Ph}
        → Hole C P q a Ph E b → LaneHold sc Rg C b Ph l E → (T b → Sound Rg E) → LaneSt sc Rg C P q a (lnS b (cutS b at l)) b
-laneSt true  hl@(h-live _ _) h sd = l-live hl h (sd _)
+laneSt true  hl@(h-live _ _ _) h sd = l-live hl h (sd _)
 laneSt false hl (Q , hk , le) _     = l-dead (hole-⊑ hl le) hk
 
 laneHold : ∀ {Γ A B} {sc : Scope Γ} {Rg C} {P : Pol A B} {q a s b}

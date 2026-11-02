@@ -36,7 +36,7 @@ open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans; ≃-refl; ≼
 open _≃_
 open import adequacy.Walk using (sync-≈)
 open import adequacy.Enter using (module Lanes)
-open import adequacy.Cursor using (Cur; bef; aft; Behind; Fin; Tail; fin-dn; tail-dn; alike; voc; FewBefore; ConnE; Need; owes; dead; lane; lanecut; pnd; _≈_; c-abs; Pol; Ahead; Whole; OuterDone; Owes; Due; Spent; Unfed; Rgn; Sound; vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none; fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; re-parts; OweAt; o-cp; o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Fr; Waiting; Lane; JRl; JRo; JInv; Asc; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; polF; JoinF; LanesIn; NoFail; TailP; tailp-dn; Subd; SubdAt; subd; Torn; Unread; un-dead; un-torn; notT; by; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; sh-pend; husk-of; ⊑-trans; ∪-⊑; ⊑-refl; under-⊑; NoIsle; NoIsleL; Settles; sync-pend; burst-dn)
+open import adequacy.Cursor using (Cur; bef; aft; Behind; Fin; Tail; fin-dn; tail-dn; alike; voc; FewBefore; ConnE; Need; owes; dead; lane; lanecut; pnd; _≈_; c-abs; Pol; Kill; kill-out; Ahead; Whole; OuterDone; Owes; Due; Spent; Unfed; Rgn; Sound; vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none; fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; re-parts; OweAt; o-cp; o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Fr; Waiting; Lane; JRl; JRo; JInv; Asc; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; polF; JoinF; LanesIn; NoFail; TailP; tailp-dn; Subd; SubdAt; subd; Torn; Unread; un-dead; un-torn; notT; by; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; sh-pend; husk-of; ⊑-trans; ∪-⊑; ⊑-refl; under-⊑; NoIsle; NoIsleL; Settles; sync-pend; burst-dn)
 open import adequacy.Cursor.Rise using (Inv; RT; settled; flying; adrift; SimC; keeps; unread-at)
 open import adequacy.Bound using (join-row; owes?; few-src)
 open import adequacy.Regions using (lane-sole)
@@ -191,7 +191,7 @@ module Past (p : Pos) where
         owe-up (o-cut n)  = o-cut (nm n)
         owe-up (o-over n) = o-over (nm n)
     up (s-flat {sc = sc} {op = op} {f = f} ji sy jn m so bh) sd nr nh =
-      s-flat ji (up sy so no nh) (joined-up (off-rg so no) (λ r → nr (proj₁ r)) nh (Lanes.lane-rows sc f ji op (joined-li jn)) jn) m so (behind-up bh)
+      s-flat ji (up sy so no nh) (joined-up (off-rg so no) (kill-up op (off-rg so no)) (λ r → nr (proj₁ r)) nh (Lanes.lane-rows sc f ji op (joined-li jn)) jn) m so (behind-up bh)
       where no = λ r → nr (proj₁ r)
     up (s-conn {k = k} refl pt bs ss tn fl m) sd nr nh =
       s-conn refl pt (λ t → up (bs t) (Parts.sb pt) nb (bind-nh {k = k} (off-rg (Parts.ss pt) ns) nh))
@@ -214,23 +214,29 @@ module Past (p : Pos) where
     src-up {k = k} (src-shut cl sp tp hk bh sd) ss nr nh =
       src-shut cl (spent-up {E = adequacy.Rows.Frozen k} sp) (tailp-up tp) hk (behind-up bh) (subd-up sd)
 
-    lane-up : ∀ {Γ} {sc : Scope Γ} {Rg : Rgn} {A B} {P : Pol A B} {q a l b} → ¬ Rg p → ¬ VHot (full sc) p
-            → LaneSt sc Rg (bef p) P q a l b → LaneSt sc Rg (aft p) P q a l b
-    lane-up nr nh (l-live (h-live st e) sy sd) = l-live (h-live st e) (up sy sd nr nh) sd
-    lane-up nr nh (l-dead {E = E} (h-end {c = c} lc nc tp) hk)    = l-dead {E = E} (h-end lc (nm {c} nc) (tailp-up tp)) hk
-    lane-up nr nh (l-dead {E = E} (h-kill {q′ = q′} kq nq tp) hk) = l-dead {E = E} (h-kill kq (nm {q′} nq) (tailp-up tp)) hk
+    lane-up : ∀ {Γ} {sc : Scope Γ} {Rg : Rgn} {A B} {P : Pol A B} {q a l b} → (∀ {q′} → Kill P q q′ → Owes (bef p) q′ → Owes (aft p) q′)
+            → ¬ Rg p → ¬ VHot (full sc) p → LaneSt sc Rg (bef p) P q a l b → LaneSt sc Rg (aft p) P q a l b
+    lane-up ku nr nh (l-live (h-live st e uk) sy sd) = l-live (h-live st e (λ k → ku k (uk k))) (up sy sd nr nh) sd
+    lane-up ku nr nh (l-dead {E = E} (h-end {c = c} lc nc tp) hk)    = l-dead {E = E} (h-end lc (nm {c} nc) (tailp-up tp)) hk
+    lane-up ku nr nh (l-dead {E = E} (h-kill {q′ = q′} kq nq tp) hk) = l-dead {E = E} (h-kill kq (nm {q′} nq) (tailp-up tp)) hk
 
     begun-up : ∀ {Γ} {sc : Scope Γ} {Rl : Pos → Rgn} {A B} {P : Pol A B} {O : EmissionSet A} {vs ls n}
+             → (∀ {q q′} → Kill P q q′ → Owes (bef p) q′ → Owes (aft p) q′)
              → (∀ {q a} → (q , a) ∈ vs → ¬ Rl q p) → ¬ VHot (full sc) p
              → Begun sc Rl (bef p) P O vs ls n → Begun sc Rl (aft p) P O vs ls n
-    begun-up nl nh none                = none
-    begun-up nl nh (more y nq r ln bg) = more y (nm nq) r (lane-up (nl (here refl)) nh ln) (begun-up (λ i → nl (there i)) nh bg)
+    begun-up ku nl nh none                = none
+    begun-up ku nl nh (more y nq r ln bg) = more y (nm nq) r (lane-up ku (nl (here refl)) nh ln) (begun-up ku (λ i → nl (there i)) nh bg)
+
+    -- A value that kills a lane, owed and not at `p`, owed past it.
+    kill-up : ∀ {A B} op {F : A → Den B} {O : EmissionSet A} → Off O → ∀ {q q′} → Kill (polF op F O) q q′ → Owes (bef p) q′ → Owes (aft p) q′
+    kill-up op oo k = in-off oo (proj₁ (proj₂ (kill-out op k))) tt
 
     joined-up : ∀ {Γ} {sc : Scope Γ} {Rl : Pos → Rgn} {A B} {P : Pol A B} {O : EmissionSet A} {d n qu ls}
-              → Off O → (∀ {q} → ¬ Rl q p) → ¬ VHot (full sc) p → (∀ {q a k e} → O q (out a) → Lane P q a k e → Rl q k)
+              → Off O → (∀ {q q′} → Kill P q q′ → Owes (bef p) q′ → Owes (aft p) q′) → (∀ {q} → ¬ Rl q p) → ¬ VHot (full sc) p
+              → (∀ {q a k e} → O q (out a) → Lane P q a k e → Rl q k)
               → Joined sc Rl (bef p) P O d n qu ls → Joined sc Rl (aft p) P O d n qu ls
-    joined-up {P = P} {O = O} oo nl nh rl (joined bg wt wh od ah ao en li) =
-      joined (begun-up (λ _ → nl) nh bg) (wait-up ah′ wt) (whole-up oo wh) (od-up oo od) ah′ ao en li
+    joined-up {P = P} {O = O} oo ku nl nh rl (joined bg wt wh od ah ao en li) =
+      joined (begun-up ku (λ _ → nl) nh bg) (wait-up ah′ wt) (whole-up oo wh) (od-up oo od) ah′ ao en li
       where
         open Book {P = P} {O = O}
         ah′ = ahead-up (λ iv lc → λ { refl → nl (rl (begun-out bg iv) lc) }) ah
@@ -458,21 +464,22 @@ module _ {R : Set} (Rt : EmissionSet R) where
   fr-up {p = p} (f-outer {op = op} {f = f} {c = c} {Rg = Rg₀} {E = E} fr ji jn m so bh) _ rp nr nh =
     let (Cr′ , fr′ , mv) = fr-up fr tt (proj₁ rp)
                              (nr-≈ (proj₂ m) (nr-tr (join-nr op (λ a → ⟦ f a ⟧ (full (scopeOf c))) rl (λ y → nr y _) (λ _ _ _ → nl)))) nh
-    in Cr′ , f-outer fr′ ji (Past.joined-up p (nr-off nr) nl nh rl jn) m so (Past.behind-up p bh) , mv
+    in Cr′ , f-outer fr′ ji (Past.joined-up p (nr-off nr) (Past.kill-up p op (nr-off nr)) nl nh rl jn) m so (Past.behind-up p bh) , mv
     where
       nl : ∀ {q} → ¬ JRl (scopeOf c) Rg₀ op f E q p
       nl r = proj₂ rp (proj₂ r)
       rl = Lanes.lane-rows (scopeOf c) f ji op (joined-li jn)
   fr-up {p = p} (f-lanes {op = op} {f = f} {c = c} {Rg = Rg₀} {O = O} {vs₁ = vs₁} {vs₂ = vs₂} {q = q₀} {a = a₀}
-                   fr ji sy lf y₀ nq ru (h-live st le) rt cnt wt wh od ah ao en li m so sd bh) _ rp nr nh =
+                   fr ji sy lf y₀ nq ru (h-live st le uk) rt cnt wt wh od ah ao en li m so sd bh) _ rp nr nh =
     let (Cr′ , fr′ , mv) = fr-up fr tt (proj₁ rp)
                              (nr-≈ (proj₂ m) (nr-tr (join-nr op (λ a → ⟦ f a ⟧ (full (scopeOf c))) rl (λ y → no (Sound.rg so y _)) (λ y ln v _ → hole y ln v)))) nh
-    in Cr′ , f-lanes fr′ ji (up sy so no nh) (begun-up nb₁ nh lf) y₀ (nm nq) ru (h-live st le) (begun-up nb₂ nh rt) cnt
+    in Cr′ , f-lanes fr′ ji (up sy so no nh) (begun-up ku nb₁ nh lf) y₀ (nm nq) ru (h-live st le (λ k → ku k (uk k))) (begun-up ku nb₂ nh rt) cnt
                      (wait-up ah′ wt) (whole-up (off-rg so no) wh) (od-up (off-rg so no) od) ah′ ao en li m so sd (behind-up bh) , mv
     where
-      open Past p using (up; begun-up; nm; off-rg; behind-up; module Book)
+      open Past p using (up; begun-up; nm; off-rg; behind-up; kill-up; module Book)
       no : ¬ JRo (scopeOf c) Rg₀ op f O p
       no r = proj₂ r (proj₂ rp)
+      ku = kill-up op (off-rg so no)
       rl = Lanes.lane-rows (scopeOf c) f ji op li
       open Book {P = polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O} {O = O}
       sole : ∀ {q q′} → JRl (scopeOf c) Rg₀ op f O q p → JRl (scopeOf c) Rg₀ op f O q′ p → q ≡ q′

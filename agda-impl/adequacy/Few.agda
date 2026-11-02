@@ -37,7 +37,7 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Scope; scopeOf; plug; unbound; binds; CS; coldS; ofS; takeS; flatS; connS)
 open import adequacy.Rows using (full; pendRows; Frozen; _≃_; _⇄_; ≃-sym; ≃-trans)
 open _≃_
-open import adequacy.Cursor using (Cur; origin; bef; aft; Owes; Due; Unfed; Pol; Lane; Runs; NoKill; Kept; polF; JoinF; h-live;
+open import adequacy.Cursor using (Cur; origin; bef; aft; Owes; Due; Unfed; Pol; Lane; Runs; Kill; kill-out; NoKill; Kept; polF; JoinF; h-live;
   h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Spent; Folded; fd-none; fd-last;
   Whole; Ahead; Joined; joined; Flags; Src; src-pend; src-on; src-shut; OweAt; o-cp; o-cut;
   o-over; NoFail; Behind; Fin; fin-dn; tail-dn; _≈_; cov; Subd; SubdAt; subd; TailP; tailp;
@@ -417,7 +417,7 @@ mutual
   lane-f : ∀ {Γ} {sc : Scope Γ} {Rg} {C A B} {P : Pol A B} {q a l b p}
          → LaneSt sc Rg C P q a l b → Env (full sc) C p → EnvL (full sc) C p → LoP l p
          → Σ (List Pos) λ ks → ∀ {k e} → Kept P q a k e → Owes C k → k ≺ p → k ∈ ks
-  lane-f {P = P} (l-live (h-live _ eq) sy _) env ef lo with few sy env ef (λ ki → lo (k-kid (k-ln (k-kid (k-cut ki))))) | cov eq
+  lane-f {P = P} (l-live (h-live _ eq _) sy _) env ef lo with few sy env ef (λ ki → lo (k-kid (k-ln (k-kid (k-cut ki))))) | cov eq
   ... | lag ke fe | lv , g = lv ++ ke , λ kp o kp′ → [ (λ r → ∈-++⁺ʳ lv (fe r o kp′)) , ∈-++⁺ˡ ]′ (g (kept-lane {P = P} kp))
   lane-f {C = C} (l-dead (h-end _ _ tp) hk) env ef lo  with tailp-lag {C = C} tp (husk-f hk (λ ki → lo (k-kid (k-ln (k-kid (k-cut ki))))))
   ... | lag ks f = ks , f
@@ -497,8 +497,8 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
     sh (s-take sy nf m sd) env ef lo = s-take (sh sy env ef lo′) (λ y nk → bound sy env lo′ (y , tt , nf y nk)) m sd
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-take ki))
     sh (s-took fl g ni oa tp hk m sd) env ef lo = s-took fl (λ {q} o → g {q} (dn o)) (λ t → nm (ni t)) (owe-sh oa lo) (td tp) hk m sd
-    sh (s-flat ji sy jn m sd bh) env ef lo =
-      s-flat ji (sh sy env ef lo′) (joined-sh (bound sy env lo′) jn env ef (λ i ki → lo (k-kid (k-lane i ki)))) m sd
+    sh (s-flat {op = op} ji sy jn m sd bh) env ef lo =
+      s-flat ji (sh sy env ef lo′) (joined-sh (bound sy env lo′) (kill-out op) jn env ef (λ i ki → lo (k-kid (k-lane i ki)))) m sd
              (behind-bef {C = C} bh (flat-f sy jn env ef lo))
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-outer ki))
     sh {sc = sc} (s-conn {k = k} refl pt bs ss tn fl m) env ef lo = s-conn refl pt bs′ (λ t → src-sh (ss t) env ef lo) tn′ fl′ m
@@ -531,10 +531,10 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
       src-shut cl (spent sp) (td tp) hk (behind-bef {C = C} bh (tailp-lag {C = C} tp (husk-f hk (λ ki → lo (k-kid (k-src ki)))))) (subd′ sd)
 
     joined-sh : ∀ {Γ} {sc : Scope Γ} {Rl} {A B} {P : Pol A B} {O : EmissionSet A} {d n qu ls}
-              → (∀ {q e} → Due C O q e → p ≼ q) → Joined sc Rl C P O d n qu ls
+              → (∀ {q e} → Due C O q e → p ≼ q) → (∀ {q q′} → Kill P q q′ → Σ A λ a′ → O q′ (out a′) × q ≺ q′) → Joined sc Rl C P O d n qu ls
               → Env (full sc) C p → EnvL (full sc) C p → (∀ {l} → l ∈ ls → LoP l p) → Joined sc Rl (bef p) P O d n qu ls
-    joined-sh {P = P} {O} ob (joined {vs = vs} {ws = ws} bg (eq , ap , wf) wh od ah ao en li) env ef lo =
-      joined (begun-sh bg env ef lo) (eq , ap , wait) whole od′ ahead ao en li
+    joined-sh {P = P} {O} ob kr (joined {vs = vs} {ws = ws} bg (eq , ap , wf) wh od ah ao en li) env ef lo =
+      joined (begun-sh (λ k o → ob (proj₁ (proj₂ (kr k)) , tt , o)) bg env ef lo) (eq , ap , wait) whole od′ ahead ao en li
       where
         lead : ∀ {q a s} → (q , a) ∈ ws → adequacy.Cursor.Start P q a s → p ≼ s
         lead i st with ah i st
@@ -553,15 +553,17 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
         ... | q′ , a′ , c , iv , lc , kc , oc , cz = q′ , a′ , c , iv , lc , kc , begun-b {O = O} {k = c} {e = end} bg iv kc lc tt oc en env lo , cz
 
     begun-sh : ∀ {Γ} {sc : Scope Γ} {Rl} {A B} {P : Pol A B} {O vs ls n}
+             → (∀ {q q′} → Kill P q q′ → Owes C q′ → Owes (bef p) q′)
              → Begun sc Rl C P O vs ls n → Env (full sc) C p → EnvL (full sc) C p → (∀ {l} → l ∈ ls → LoP l p) → Begun sc Rl (bef p) P O vs ls n
-    begun-sh none                 env ef lo = none
-    begun-sh (more y nq r ln bg) env ef lo = more y (nm nq) r (lane-sh ln env ef (lo (here refl))) (begun-sh bg env ef (λ i → lo (there i)))
+    begun-sh ku none                 env ef lo = none
+    begun-sh ku (more y nq r ln bg) env ef lo = more y (nm nq) r (lane-sh ku ln env ef (lo (here refl))) (begun-sh ku bg env ef (λ i → lo (there i)))
 
     lane-sh : ∀ {Γ} {sc : Scope Γ} {Rg} {A B} {P : Pol A B} {q a l b}
+            → (∀ {q′} → Kill P q q′ → Owes C q′ → Owes (bef p) q′)
             → LaneSt sc Rg C P q a l b → Env (full sc) C p → EnvL (full sc) C p → LoP l p → LaneSt sc Rg (bef p) P q a l b
-    lane-sh (l-live (h-live st eq) sy sd) env ef lo = l-live (h-live st eq) (sh sy env ef (λ ki → lo (k-kid (k-ln (k-kid (k-cut ki)))))) sd
-    lane-sh (l-dead {E = E} (h-end lc nc tp) hk) env ef lo = l-dead {E = E} (h-end lc (nm nc) (td tp)) hk
-    lane-sh (l-dead {E = E} (h-kill kq nq tp) hk) env ef lo = l-dead {E = E} (h-kill kq (nm nq) (td tp)) hk
+    lane-sh ku (l-live (h-live st eq uk) sy sd) env ef lo = l-live (h-live st eq (λ k → ku k (uk k))) (sh sy env ef (λ ki → lo (k-kid (k-ln (k-kid (k-cut ki)))))) sd
+    lane-sh ku (l-dead {E = E} (h-end lc nc tp) hk) env ef lo = l-dead {E = E} (h-end lc (nm nc) (td tp)) hk
+    lane-sh ku (l-dead {E = E} (h-kill kq nq tp) hk) env ef lo = l-dead {E = E} (h-kill kq (nm nq) (td tp)) hk
 
 shift : ∀ {Γ} {sc : Scope Γ} {Rg} {C A} {s : St Γ A} {E p} → Sync sc Rg C s E → Owes C p → Env (full sc) C p → EnvL (full sc) C p
       → LoP s p → Sync sc Rg (bef p) s E

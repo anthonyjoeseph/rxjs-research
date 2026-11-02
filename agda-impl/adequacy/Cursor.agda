@@ -324,11 +324,23 @@ FewBefore σ p = Σ (List Pos) λ ks → ∀ {y e} → σ y e → (y ++ [ ix 0 ]
 few-behind : ∀ {X} {σ : EmissionSet X} {p} → Behind (bef p) σ → FewBefore σ p
 few-behind {p = p} (ks , f) = ks , λ {y} r lt → f r (λ py → py (≺-trans {y} {y ++ [ ix 0 ]} {p} (≺-ext y {ix 0} []) lt))
 
+-- No value that kills the lane at `q` passed.
+Unkilled : ∀ {A B} → Cur → Pol A B → Pos → Set
+Unkilled C P q = ∀ {q′} → Kill P q q′ → Owes C q′
+
+-- What kills a lane is a later value of its outer.
+kill-out : ∀ {A B} op {F : A → Den B} {O q q′} → Kill (polF op F O) q q′ → Σ A λ a′ → O q′ (out a′) × q ≺ q′
+kill-out (mergeᶠ nothing)  ()
+kill-out (mergeᶠ (just m)) ()
+kill-out switchᶠ           k = k
+kill-out exhaustᶠ          ()
+
 -- A begun lane as its joiner reads it: running from where it was
--- subscribed, its entry its lane's; or over, by its end or a later value,
--- what it still owes within what its state still runs.
+-- subscribed, its entry its lane's, no value killing it passed; or over,
+-- by its end or a later value, what it still owes within what its state
+-- still runs.
 data Hole {A B} (C : Cur) (P : Pol A B) (q : Pos) (a : A) : Pts → EmissionSet B → Bool → Set₁ where
-  h-live : ∀ {s E} → Start P q a s → E ≈ Lane P q a → Hole C P q a ∅ᵖ E true
+  h-live : ∀ {s E} → Start P q a s → E ≈ Lane P q a → Unkilled C P q → Hole C P q a ∅ᵖ E true
   h-end  : ∀ {c E Ph} → Lane P q a c end → ¬ Owes C c → TailP C (Kept P q a) Ph → Hole C P q a Ph E false
   h-kill : ∀ {q′ E Ph} → Kill P q q′ → ¬ Owes C q′ → TailP C (Kept P q a) Ph → Hole C P q a Ph E false
 
