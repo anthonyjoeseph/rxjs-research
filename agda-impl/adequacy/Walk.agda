@@ -27,7 +27,7 @@ open import adequacy.Cursor using (Cur; Rgn; notT; Owes; Due; Spent; _≈_; alik
   Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; unbind;
   Need; owes; dead; lane; lanecut; pnd; onoff; Rest; LaneHold; Hold; Fr; Unread; un-dead; un-torn; f-top; f-map; f-scan; f-cut;
   f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes;
-  d-src; d-body; f-isle; f-islec; Inv; settled; c-abs; NoIsle; Clear)
+  d-src; d-body; f-isle; f-islec; Inv; settled; c-abs; NoIsle; Clear; Pending; pd)
 open _≃_
 
 ------------------------------------------------------------------------
@@ -172,7 +172,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       climb fr (s-conn sc pt (λ _ → bs) (λ _ → src-on nc (sync-≈ h (≈-sym fe)) bh sd) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
     climb (f-srcc fr sc pt lv cl sp tp bh sd bs fl eq) (Q , hk , le) =
       climb fr (s-conn sc pt (λ _ → bs) (λ _ → src-shut cl sp (tailp-⊑ tp le) hk bh sd) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
-    climb (f-srcp fr sc pt lv nc ba adm bs fl fe eq ow) (_ , refl , pe , wn) =
+    climb (f-srcp fr sc pt lv nc ba adm bs fl fe eq ow _ _) (_ , refl , pe , wn) =
       climb fr (s-conn sc pt (λ _ → bs) (λ _ → src-pend nc ba adm (≈-trans pe (≈-sym fe)) wn ow) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
     climb (f-body {k = k} fr sc pt lv os fl eq) h =
       climb fr (s-conn sc pt (λ _ → subst (λ x → Sync (binds (CS.src k) (CS.connAt k) x) _ _ _ _) sc h) (λ _ → os) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
@@ -278,19 +278,19 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-lanes (_ , lanecut _ _ , _ , _ , _ , (_ , _ , () , _))
   down-lanes (_ , pnd _ , _ , _ , _ , (_ , () , _))
 
-  down-src : ∀ {Cr Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s} → NoIsle b → Res Cr c (connS k s b) → Res Cr (inSrc k b c) s
-  down-src {k = k} nb (C , owes , _ , _ , fr , s-conn sc pt bs os tn fl eq) with live? (CS.srcLive k)
+  down-src : ∀ {Cr Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s} → (Pending s → ⊥) → NoIsle b → Res Cr c (connS k s b) → Res Cr (inSrc k b c) s
+  down-src {k = k} np nb (C , owes , _ , _ , fr , s-conn sc pt bs os tn fl eq) with live? (CS.srcLive k)
   ... | inj₂ nl = let t = tn nl in src-dead (un-torn fr sc pt nl fl eq (Torn.tl t)) (Torn.sh t) (Torn.bh t) ⊑-refl nb
   ... | inj₁ lv with os lv
   ...   | src-on nc sy bh sd         = C , owes , _ , _ , f-src fr sc pt lv nc (bs lv) fl ≈-refl eq bh sd nb , sy
   ...   | src-shut cl sp tp hk bh sd = C , dead _ , nowhere , none′ , f-srcc fr sc pt lv cl sp tp bh sd (bs lv) fl eq , (_ , hk , ⊑-refl)
-  ...   | src-pend nc ba adm pe wn ow = C , pnd _ , _ , _ , f-srcp fr sc pt lv nc ba adm (bs lv) fl ≈-refl eq ow , (_ , refl , pe , wn)
-  down-src nb (C , dead P , _ , _ , fr , (Q , h-conn sh hb , le)) = src-dead (un-dead fr) sh hb le nb
-  down-src nb (C , dead P , _ , _ , fr , (Q , h-blank , le))     =
+  ...   | src-pend _ _ _ _ _ _       = ⊥-elim (np pd)
+  down-src _ nb (C , dead P , _ , _ , fr , (Q , h-conn sh hb , le)) = src-dead (un-dead fr) sh hb le nb
+  down-src _ nb (C , dead P , _ , _ , fr , (Q , h-blank , le))     =
     C , dead ∅ᵖ , nowhere , none′ , d-src (un-dead fr) h-blank (⊑-trans le ∅-⊑) nb , (_ , h-blank , ⊑-refl)
-  down-src _ (_ , lane _ _ , _ , _ , _ , (_ , _ , () , _))
-  down-src _ (_ , lanecut _ _ , _ , _ , _ , (_ , _ , () , _))
-  down-src _ (_ , pnd _ , _ , _ , _ , (_ , () , _))
+  down-src _ _ (_ , lane _ _ , _ , _ , _ , (_ , _ , () , _))
+  down-src _ _ (_ , lanecut _ _ , _ , _ , _ , (_ , _ , () , _))
+  down-src _ _ (_ , pnd _ , _ , _ , _ , (_ , () , _))
 
   down-body : ∀ {Cr Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s} → Res Cr c (connS k o s) → Res Cr (inBody k o c) s
   down-body {k = k} {s = s} (C , owes , _ , _ , fr , s-conn sc pt bs os tn fl eq) with live? (CS.srcLive k)
@@ -303,24 +303,26 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-body (_ , lanecut _ _ , _ , _ , _ , (_ , _ , () , _))
   down-body (_ , pnd _ , _ , _ , _ , (_ , () , _))
 
-  descend : ∀ {Cr Γ A} (c : Ctx R Γ A) s {Rg E} → Clear c → Sync unbound Rg Cr (plug c s) E → E ≈ Rt → Res Cr c s
-  descend {Cr} top                            s _          sy eq = Cr , owes , _ , _ , f-top eq , sy
-  descend (inMap f c)                         s cl         sy eq = down-map (descend c _ cl sy eq)
-  descend (inScan f z c)                      s cl         sy eq = down-scan (descend c _ cl sy eq)
-  descend (inCut l a c)                       s cl         sy eq = down-cut (descend c _ cl sy eq)
-  descend (inLn b c)                          s cl         sy eq = down-ln (descend c _ cl sy eq)
-  descend (inTake i p w c)                    s cl         sy eq = down-take (descend c _ cl sy eq)
-  descend (inOuter op f ω d n q ls c)         s cl         sy eq = down-outer (descend c _ cl sy eq)
-  descend (inLanes op f ω d n q o pre post c) s cl         sy eq = down-lanes (descend c _ cl sy eq)
-  descend (inSrc k b c)                       s (nb , cl)  sy eq = down-src nb (descend c _ cl sy eq)
-  descend (inBody k o c)                      s cl         sy eq = down-body (descend c _ cl sy eq)
+  -- The hole no pending subscription: a pending source is never
+  -- descended to, only subscribed from its connect's mark.
+  descend : ∀ {Cr Γ A} (c : Ctx R Γ A) s {Rg E} → (Pending s → ⊥) → Clear c → Sync unbound Rg Cr (plug c s) E → E ≈ Rt → Res Cr c s
+  descend {Cr} top                            s _  _          sy eq = Cr , owes , _ , _ , f-top eq , sy
+  descend (inMap f c)                         s _  cl         sy eq = down-map (descend c _ (λ ()) cl sy eq)
+  descend (inScan f z c)                      s _  cl         sy eq = down-scan (descend c _ (λ ()) cl sy eq)
+  descend (inCut l a c)                       s _  cl         sy eq = down-cut (descend c _ (λ ()) cl sy eq)
+  descend (inLn b c)                          s _  cl         sy eq = down-ln (descend c _ (λ ()) cl sy eq)
+  descend (inTake i p w c)                    s _  cl         sy eq = down-take (descend c _ (λ ()) cl sy eq)
+  descend (inOuter op f ω d n q ls c)         s _  cl         sy eq = down-outer (descend c _ (λ ()) cl sy eq)
+  descend (inLanes op f ω d n q o pre post c) s _  cl         sy eq = down-lanes (descend c _ (λ ()) cl sy eq)
+  descend (inSrc k b c)                       s np (nb , cl)  sy eq = down-src np nb (descend c _ (λ ()) cl sy eq)
+  descend (inBody k o c)                      s _  cl         sy eq = down-body (descend c _ (λ ()) cl sy eq)
 
   ----------------------------------------------------------------------
   -- REFOCUSING keeps the invariant: the same tree, the same root cursor;
   -- the hole's world is wherever the new hole lies, along a clear path.
 
   refocus : ∀ {Cr C Γ A Γ′ A′} {c : Ctx R Γ A} {c′ : Ctx R Γ′ A′} {s s′ r}
-          → Inv Rt Cr C ⟨ c , s , absorbed , r ⟩ → plug c′ s′ ≡ plug c s → Clear c′ → Σ Cur λ C′ → Inv Rt Cr C′ ⟨ c′ , s′ , absorbed , r ⟩
-  refocus {c′ = c′} {s′ = s′} (settled _ fr h) eq cl with climb fr h
-  ... | _ , _ , top≈ , sy with descend c′ s′ cl (subst (λ t → Sync unbound _ _ t _) (sym eq) sy) top≈
+          → Inv Rt Cr C ⟨ c , s , absorbed , r ⟩ → plug c′ s′ ≡ plug c s → (Pending s′ → ⊥) → Clear c′ → Σ Cur λ C′ → Inv Rt Cr C′ ⟨ c′ , s′ , absorbed , r ⟩
+  refocus {c′ = c′} {s′ = s′} (settled _ fr h) eq np cl with climb fr h
+  ... | _ , _ , top≈ , sy with descend c′ s′ np cl (subst (λ t → Sync unbound _ _ t _) (sym eq) sy) top≈
   ...   | C′ , _ , _ , _ , fr′ , h′ = C′ , settled c-abs fr′ h′

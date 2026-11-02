@@ -33,7 +33,7 @@ open import denotation.EmissionSet using (EmissionSet; out; end; _≺_; _≼_; D
 open import denotation.Laws.Modulus using (≼-≺-≺; ≺-trans; ≺-ext; ≺-absurd; ≼-antisym; ≼-false; ≼-or-≻)
 open import operation.Key using (at)
 open import operation.PureObservable using (module Machine)
-open Machine using (St; Scope; unbound; binds; CS; coldS; ofS; takeS; flatS; connS)
+open Machine using (St; Ctx; Scope; scopeOf; plug; unbound; binds; CS; coldS; ofS; takeS; flatS; connS)
 open import adequacy.Rows using (full; pendRows; Frozen; _≃_; _⇄_; ≃-sym; ≃-trans)
 open _≃_
 open import adequacy.Cursor using (Cur; origin; bef; aft; Owes; Due; Unfed; Pol; Lane; Runs; NoKill; Kept;
@@ -41,7 +41,7 @@ open import adequacy.Cursor using (Cur; origin; bef; aft; Owes; Due; Unfed; Pol;
   Folded; fd-none; fd-last; Whole; Ahead; Joined; joined; Flags; Src; src-pend; src-on; src-shut; OweAt; o-cp; o-cut; o-over;
   NoFail; Behind; Fin; fin-dn; tail-dn; _≈_; cov; voc; Sound; Subd; TailP; tailp-dn; Pts; _∪ᵖ_; Under; Burst; Torn;
   Husk; HuskL; SrcH; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; sh-dead; sh-isle; sh-islec;
-  Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx)
+  Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Fr; owes)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
 open import adequacy.Bound using (tr; on; lt; owes-≼; owes?; T?; lo-at; Env; env-bind; unfed-b; of-lb; cold-b;
   lane-st; body-key; bound; src-b; join-b; begun-b; behind-pend)
@@ -495,3 +495,17 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
 shift : ∀ {Γ} {sc : Scope Γ} {Rg} {C A} {s : St Γ A} {E p} → Sync sc Rg C s E → Owes C p → Env (full sc) C p → EnvF (full sc) p
       → Lo s (at p) → Sync sc Rg (bef p) s E
 shift sy op env ef lo = Shifted.sh op sy env ef lo
+
+------------------------------------------------------------------------
+-- THE CURSOR SHIFTED UNDER A FOCUS: `shift` frame by frame, from the
+-- hole up to its world's top.  In the root's world the root's cursor
+-- moves with it, what the root owes unchanged below the least key; in
+-- an isle's only the isle's cursor moves, and the root's stays.  Each
+-- frame's fields shift as the node's do in `Shifted`, its siblings by
+-- `shift` under the whole tree's least key, an isle's by `isle-env`.
+
+module _ {R : Set} (Rt : EmissionSet R) where
+  postulate
+    fr-shift : ∀ {Cr C Γ A} {c : Ctx R Γ A} {s : St Γ A} {Rg E p}
+             → Fr Rt Cr C Rg c owes E → Sync (scopeOf c) Rg C s E → Owes C p → Lo (plug c s) (at p)
+             → Σ Cur λ Cr′ → Fr Rt Cr′ (bef p) Rg c owes E × Sync (scopeOf c) Rg (bef p) s E × Due Cr Rt ≃ Due Cr′ Rt

@@ -548,7 +548,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     Cr , f-isle u hb le na nc (Past.behind-up p bh) (Past.subd-up p sd) ss ni , silent ≃-refl
   fr-up (f-took _ _ _ _ _ _ _ _) ()
   fr-up (f-srcc _ _ _ _ _ _ _ _ _ _ _ _) ()
-  fr-up (f-srcp _ _ _ _ _ _ _ _ _ _ _ _) ()
+  fr-up (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
   fr-up (f-islec _ _ _ _ _ _ _ _ _) ()
   fr-up (d-map _) ()
   fr-up (d-scan _) ()
@@ -644,7 +644,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     _ , _ , unread-at Rt u (sh-isle na nc sy (Past.behind-up p bh) (Past.subd-up p sd) ss) (feed-husk {i = here refl} {p = p} {e = nx a} hb ni) le
     , silent ≃-refl
   rise-src-nx refl (flying (f-srcc _ _ _ _ _ _ _ _ _ _ _ _) _ ())
-  rise-src-nx refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _) _ ())
+  rise-src-nx refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
   rise-src-nx refl (flying (d-src _ _ _ _) _ ())
   rise-src-nx refl (flying (f-islec _ _ _ _ _ _ _ _ _) _ ())
   rise-src-nx refl (adrift (f-srcc _ _ _ _ cl _ _ _ _ _ _ _) cl′ _)  = ⊥-elim (or-shut cl cl′)
@@ -676,7 +676,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       (λ _ → _ , _ , unread-at Rt u (sh-isle na nc sy (Past.behind-up p bh) (Past.subd-up p sd) ss) fed le , silent ≃-refl)
     where fed = feed-husk {i = here refl} {p = p} {e = cp} hb ni
   rise-src-cp refl (flying (f-srcc _ _ _ _ _ _ _ _ _ _ _ _) _ ())
-  rise-src-cp refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _) _ ())
+  rise-src-cp refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
   rise-src-cp refl (flying (d-src _ _ _ _) _ ())
   rise-src-cp refl (flying (f-islec _ _ _ _ _ _ _ _ _) _ ())
   rise-src-cp refl (adrift (f-srcc _ _ _ _ cl _ _ _ _ _ _ _) cl′ _)  = ⊥-elim (or-shut cl cl′)

@@ -881,14 +881,15 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β
             → Flags C k β → ConnE (CS.connAt k) (Frozen k) β E′
             → Fr Cr C Rg′ (inSrc k b c) (dead P) E
-    -- a source not yet subscribed: its program, owed at the connect's
-    -- `ix 1`
+    -- a source being subscribed: its program, owed at the connect's
+    -- `ix 1`; its body's burst over, so the cursor is past it and the
+    -- body holds no isle
     f-srcp  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {C Rg E E′ β}
             → Fr Cr C Rg c owes E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (not (CS.closed k))
             → CS.bodyAt k ≡ just (CS.connAt k) → Adm (binds (CS.src k) (CS.connAt k) (scopeOf c))
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β
             → Flags C k β → Frozen k ≈ E → ConnE (CS.connAt k) (Frozen k) β E′
-            → Owes C (CS.connAt k ++ [ ix 1 ])
+            → Owes C (CS.connAt k ++ [ ix 1 ]) → Subd (scopeOf c) C k → NoIsle b
             → Fr Cr C (Parts.Rs pt) (inSrc k b c) (pnd (CS.connAt k ++ [ ix 1 ])) E
     -- a body while its source runs
     f-body  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {C Rg E E′}
