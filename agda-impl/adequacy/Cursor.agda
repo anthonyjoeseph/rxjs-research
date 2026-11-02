@@ -497,6 +497,12 @@ data Up1 {R : Set} : ∀ {Γ A Γ′ A′} → Ctx R Γ A → Ctx R Γ′ A′ �
 
 -- A takeWhile failing at `p`: finitely many of its rows still owed, its
 -- source's burst past the failure what is left of them.
+--
+-- SUSPECTED FALSE.  A failure inside a connect's body, before its source is
+-- subscribed, keeps that source's pins, and rxjs then runs the source's
+-- whole subscribe burst: a takeWhile failing on a connect whose body is
+-- `of [ 0 ]` and whose source is `ones` owes infinitely many pin rows past
+-- `p`.  Real rxjs runs that source until the stack overflows.
 postulate
   took-fin : ∀ {Γ} {sc : Scope Γ} {Rg} {A} {i} {keep : A → Bool} {s : St Γ A} {Es a p}
            → Sync sc Rg (aft p) s Es → Sound Rg Es → Es p (out a) → T (not (keep a)) → NoFail (bef p) keep Es

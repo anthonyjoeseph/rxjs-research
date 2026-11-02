@@ -4,7 +4,7 @@
 -- starts from, by the step's mode — a climb, a subscribe, a mark run.
 module adequacy.Lighten where
 
-open import Data.Bool using (true; false; not; if_then_else_; _∧_)
+open import Data.Bool using (true; false; not; if_then_else_; _∧_; _∨_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_; length; _ʳ++_; null)
 open import Data.List.Properties using (length-++)
@@ -210,7 +210,7 @@ module Shed (ks : List Pos) (P : Pos) (C : Key) where
     unsub-le d (lnS b s)               = ≤-refl
     unsub-le d (takeS i q w s)         = take-le d w (cut-le (suc d) s)
     unsub-le d (flatS op f ω b n q o ls) = +-mono-≤ (cut-le (suc d) o) (kill-le (suc d) ls)
-    unsub-le d (connS k o b)           = +-mono-≤ (+-monoʳ-≤ (connW d k) (unsub-le (suc d) o)) (unsub-le (suc d) b)
+    unsub-le d (connS k o b)           = +-mono-≤ (+-monoʳ-≤ (connW d k) (unsubIf-le (CS.srcAtt k) (suc d) o)) (unsub-le (suc d) b)
     unsub-le d (joinS j g x ib)        = z≤n
 
     cut-le : ∀ {Γ A} d (s : St Γ A) → pot d (proj₁ (cut s)) ≤ pot d s
@@ -246,6 +246,10 @@ module Shed (ks : List Pos) (P : Pos) (C : Key) where
 
     keep : ∀ {Γ A} d (l : St Γ A) (ls : List (St Γ A)) → pot d l + potL d (proj₁ (killAll ls)) ≤ pot d l + potL d ls
     keep d l ls = +-monoʳ-≤ (pot d l) (kill-le d ls)
+
+    unsubIf-le : ∀ {Γ A} t d (s : St Γ A) → pot d (proj₁ (unsubIf t s)) ≤ pot d s
+    unsubIf-le true  d s = unsub-le d s
+    unsubIf-le false d s = ≤-refl
 
   -- A lane ended weighs as it did.
   ended-le : ∀ {Γ A} d (s : St Γ A) → pot d (ended s) ≤ pot d s
@@ -492,10 +496,6 @@ module Run {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) r
     admin : ∀ d {a b} → a ≤ b → 0 + a < (2 + d) + b
     admin d {b = b} h = s≤s (≤-trans h (m≤n+m b (suc d)))
 
-    unsubIf-le : ∀ {Γ A} t d (s : St Γ A) → pot d (proj₁ (unsubIf t s)) ≤ pot d s
-    unsubIf-le true  d s = unsub-le d s
-    unsubIf-le false d s = ≤-refl
-
     -- A cold whose next due is ahead weighs no more than an unlisted mark.
     cold-ahead : ∀ {Γ A} d b (l : Tape A) → (∀ {κ′} → due l ≡ just κ′ → κ <ᴷ κ′ ≡ true) → pot {Γ} d (coldS b l) ≤ 2 + d
     cold-ahead d b l ah with due l | ah
@@ -553,7 +553,7 @@ module Run {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) r
     conns c k@(cs cl sl sa ba (just p₀) ow ca ea sr sc) o′ b .srcAttM (inj₂ (inj₁ refl)) mi refl =
       hole c (+-monoˡ-< (pot (suc (depth c)) b)
                (+-mono-<-≤ (+-monoˡ-< _ (+-monoˡ-< _ (+-monoʳ-< (bodyP (depth c) ba) (s≤s z≤n))))
-                           (unsubIf-le (not sl) (suc (depth c)) o′)))
+                           (unsubIf-le (not sl ∨ closed c) (suc (depth c)) o′)))
     conns c k@(cs cl sl sa ba nothing ow ca ea sr sc) o′ b .srcAttM (inj₂ (inj₁ refl)) mi eq with own-src k o′ b mi
     ... | _ , ()
     conns c k@(cs cl sl sa ba as (just p₀) ca ea sr sc) o′ b .owedM (inj₂ (inj₂ refl)) mi refl =

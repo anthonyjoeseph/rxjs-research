@@ -9,7 +9,7 @@
 -- pending until its body's run subscribes it.
 module adequacy.Stamped where
 
-open import Data.Bool using (true; false; not; if_then_else_; _∧_)
+open import Data.Bool using (true; false; not; if_then_else_; _∧_; _∨_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_; _ʳ++_; null)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -288,7 +288,7 @@ mutual
   unsub-ok (scanS f z s)           h          = unsub-ok s h
   unsub-ok (takeS i p w s)         (hw , hs)  = hw , cut-ok s hs
   unsub-ok (flatS op f ω d n q o ls) (ho , hl)  = cut-ok o ho , killAll-ok ls hl
-  unsub-ok (connS k o b)           (hk , ho , hb , hbo) = hk , unsub-ok o ho , unsub-ok b hb , body-unsub (CS.bodyAt k) o hbo
+  unsub-ok (connS k o b)           (hk , ho , hb , hbo) = hk , unsubIf-ok (CS.srcAtt k) o ho , unsub-ok b hb , body-unsubIf (CS.srcAtt k) (CS.bodyAt k) o hbo
   unsub-ok (joinS j g x ib)        (hj , _)   = hj , tt
   unsub-ok (pend o q)              h          = h
   unsub-ok (ofS i p xs)            h          = h
@@ -327,9 +327,9 @@ mutual
   killAll-ok (connS k o b ∷ ls)         (h , hs)  = h , killAll-ok ls hs
   killAll-ok (joinS j g x ib ∷ ls)      (h , hs)  = h , killAll-ok ls hs
 
-unsubIf-ok : ∀ {Γ A} b (s : St Γ A) → StOK s → StOK (proj₁ (unsubIf b s))
-unsubIf-ok true  s h = unsub-ok s h
-unsubIf-ok false s h = h
+  unsubIf-ok : ∀ {Γ A} b (s : St Γ A) → StOK s → StOK (proj₁ (unsubIf b s))
+  unsubIf-ok true  s h = unsub-ok s h
+  unsubIf-ok false s h = h
 
 queued-ok : ∀ {A} j p (e : Ev A) ib → Ix j → Ix p → QOK ib → QOK (queued j p e ib)
 queued-ok j p (nx a) ib hj hp hb with j <ᵖ p
@@ -480,7 +480,7 @@ run-ok c (conK (cs cl sl sa (just p) as ow ca ea sr sc) o b _ (inj₁ refl)) r h
   lift (((tt , ix-⊕ p _ hp , how) , hb , hc , tt) , ho , ix-⊕ p _ hp , hbo)
 run-ok c (conK (cs cl sl sa nothing as ow ca ea sr sc) o b _ (inj₁ refl)) r hc hs hr = lift (hc , hs , hr , tt)
 run-ok c (conK (cs cl sl sa ba (just p) ow ca ea sr sc) o b _ (inj₂ (inj₁ refl))) r hc ((hba , hp , how) , ho , hb , hbo) hr
-  with unsubIf (not sl) o | unsubIf-ok (not sl) o ho | body-unsubIf (not sl) ba o hbo
+  with unsubIf (not sl ∨ closed c) o | unsubIf-ok (not sl ∨ closed c) o ho | body-unsubIf (not sl ∨ closed c) ba o hbo
 ... | o′ , t | h | hbo′ = lift (hc , ((hba , tt , how) , h , hb , hbo′) , hp , tt)
 run-ok c (conK (cs cl sl sa ba nothing ow ca ea sr sc) o b _ (inj₂ (inj₁ refl))) r hc hs hr = lift (hc , hs , hr , tt)
 run-ok c (conK (cs cl sl sa ba as (just p) ca ea sr sc) o b _ (inj₂ (inj₂ refl))) r hc ((hba , has , hp) , ho , hb , hbo) hr

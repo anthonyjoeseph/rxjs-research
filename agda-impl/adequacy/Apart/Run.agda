@@ -6,7 +6,7 @@
 -- drops regions.
 module adequacy.Apart.Run where
 
-open import Data.Bool using (true; false; not; _∧_; if_then_else_)
+open import Data.Bool using (true; false; not; _∧_; if_then_else_; _∨_)
 open import Data.Empty using (⊥-elim)
 open import Data.List using ([]; _∷_; [_]; _++_)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -133,7 +133,7 @@ module _ {R : Set} where
       drop-as = ⊆-++ (⊆-refl {x = [ cn (p ++ [ ix 1 ]) ]}) (pt a ∷ʳ ⊆-refl)
   run-ap c r (conK (cs z sl sa nothing as ow ca ea sr sc) o b _ (inj₁ refl)) mem hs kd h = h
   run-ap c r (conK (cs z sl sa ba (just p) ow ca ea sr sc) o b _ (inj₂ (inj₁ refl))) mem hs kd h
-    with unsubIf (not sl) o | unsubIf-⊆ (not sl) o
+    with unsubIf (not sl ∨ closed c) o | unsubIf-⊆ (not sl ∨ closed c) o
   ... | o′ , _ | sub =
     quit c {t = connS (cs z sl sa ba (just p) ow ca ea sr sc) o b} {t′ = connS (cs z sl true ba nothing ow ca ea sr sc) o′ b}
       (⊆-++ (⊆-++ (⊆-refl {x = mI bodyR ba}) (pt p ∷ʳ ⊆-refl)) (⊆-++ sub (⊆-refl {x = items b}))) h
