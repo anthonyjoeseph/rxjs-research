@@ -35,7 +35,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; binds; CS; scopeOf; con
 open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans; ≃-refl; ≼-≢; full; Frozen; pendRows; Moves; silent; toEv)
 open _≃_
 open import adequacy.Walk using (sync-≈)
-open import adequacy.Cursor using (Cur; bef; aft; Behind; Fin; Tail; fin-dn; tail-dn; alike; ≈-sym; FewBefore; ConnE; Need; owes; dead; lane; lanecut; pnd; _≈_; c-abs; Pol; Ahead; Whole; OuterDone; Owes; Due; Spent; Unfed; Rgn; Sound; vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none; fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; OweAt; o-cp; o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Fr; Waiting; Lane; JRl; JRo; JInv; Asc; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; polF; JoinF; LanesIn; NoFail; TailP; tailp-dn; Subd; SubdAt; subd; Torn; Unread; un-dead; un-torn; notT; by; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; husk-of; ⊑-trans; ∪-⊑; ⊑-refl; under-⊑; NoIsle; NoIsleL; Settles; sync-pend)
+open import adequacy.Cursor using (Cur; bef; aft; Behind; Fin; Tail; fin-dn; tail-dn; alike; ≈-sym; FewBefore; ConnE; Need; owes; dead; lane; lanecut; pnd; _≈_; c-abs; Pol; Ahead; Whole; OuterDone; Owes; Due; Spent; Unfed; Rgn; Sound; vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none; fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; OweAt; o-cp; o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Fr; Waiting; Lane; JRl; JRo; JInv; Asc; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; polF; JoinF; LanesIn; NoFail; TailP; tailp-dn; Subd; SubdAt; subd; Torn; Unread; un-dead; un-torn; notT; by; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; sh-pend; husk-of; ⊑-trans; ∪-⊑; ⊑-refl; under-⊑; NoIsle; NoIsleL; Settles; sync-pend)
 open import adequacy.Cursor.Rise using (Inv; RT; settled; flying; adrift; SimC; keeps; unread-at)
 open import adequacy.Bound using (join-row; owes?; few-src)
 open import adequacy.Regions using (lane-sole)
@@ -203,7 +203,7 @@ module Past (p : Pos) where
 
     src-up : ∀ {Γ X} {sc : Scope Γ} {Rs : Rgn} {k : CS Γ X} {o}
            → Src sc Rs (bef p) k o → Sound Rs (adequacy.Rows.Frozen k) → ¬ Rs p → ¬ VHot (full sc) p → Src sc Rs (aft p) k o
-    src-up (src-pend nc be adm pr wn ow) ss nr nh = src-pend nc be adm pr wn (owes-up (off nr (wn W⁼.here)) ow)
+    src-up (src-pend na nc be adm pr wn ow) ss nr nh = src-pend na nc be adm pr wn (owes-up (off nr (wn W⁼.here)) ow)
     src-up (src-on nc sy bh sd)          ss nr nh = src-on nc (up sy ss nr nh) (behind-up bh) (subd-up sd)
     src-up {k = k} (src-shut cl sp tp hk bh sd) ss nr nh =
       src-shut cl (spent-up {E = adequacy.Rows.Frozen k} sp) (tailp-up tp) hk (behind-up bh) (subd-up sd)
@@ -234,7 +234,7 @@ module Past (p : Pos) where
 
 -- Where a connect owes its own end is no part of what it owes.
 src-owe : ∀ {Γ X} {sc : Scope Γ} {Rs : Rgn} {C} {k : CS Γ X} {o x} → Src sc Rs C k o → Src sc Rs C (record k { owedAt = x }) o
-src-owe (src-pend nc be adm pr wn ow)  = src-pend nc be adm pr wn ow
+src-owe (src-pend na nc be adm pr wn ow) = src-pend na nc be adm pr wn ow
 src-owe (src-on nc sy bh sd)           = src-on nc sy bh sd
 src-owe (src-shut cl sp tp hk bh sd)   = src-shut cl sp tp hk bh sd
 
@@ -242,6 +242,7 @@ srch-owe : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o P x} → SrcH sc k o P �
 srch-owe (sh-dead hk)                    = sh-dead hk
 srch-owe (sh-isle na nc sy bh sd ss)     = sh-isle na nc sy bh sd ss
 srch-owe (sh-islec na cl sp tp hk bh sd) = sh-islec na cl sp tp hk bh sd
+srch-owe (sh-pend na nc ba sc adm pe wn ss) = sh-pend na nc ba sc adm pe wn ss
 
 husk-owe : ∀ {Γ X B} {sc : Scope Γ} {k : CS Γ X} {o} {b : St (X ∷ Γ) B} {P x}
          → Husk sc (connS k o b) P → Husk sc (connS (record k { owedAt = x }) o b) P
@@ -300,6 +301,7 @@ mutual
   srch-feed (sh-isle _ nc _ _ _ _)          (inj₂ (inj₁ t))   _  = ⊥-elim (notT _ nc t)
   srch-feed (sh-isle _ _ sy _ _ _)          (inj₂ (inj₂ pe))  _  = ⊥-elim (sync-pend pe sy)
   srch-feed (sh-islec na cl sp tp hk bh sd) _                 no = sh-islec na cl sp tp (feed-husk hk no) bh sd
+  srch-feed sh@(sh-pend _ _ _ _ _ _ _ _)    _                 _  = sh
 
 -- A shut flag set where its source runs; kept where it is torn down.
 shut-live : ∀ {Γ X} {k : CS Γ X} {p} → T (CS.srcLive k) → shutAt p k ≡ record k { closed = true ; endAt = p }
@@ -541,8 +543,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
     Cr , f-isle u hb le na nc (Past.behind-up p bh) (Past.subd-up p sd) ss ni , silent ≃-refl
   fr-up (f-took _ _ _ _ _ _ _ _) ()
   fr-up (f-srcc _ _ _ _ _ _ _ _ _ _ _ _) ()
-  fr-up (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
+  fr-up (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
   fr-up (f-islec _ _ _ _ _ _ _ _ _) ()
+  fr-up (f-islep _ _ _ _ _ _ _ _ _ _) ()
   fr-up (d-map _) ()
   fr-up (d-scan _) ()
   fr-up (d-cut _) ()
@@ -637,9 +640,10 @@ module _ {R : Set} (Rt : EmissionSet R) where
     _ , _ , unread-at Rt u (sh-isle na nc sy (Past.behind-up p bh) (Past.subd-up p sd) ss) (feed-husk {i = here refl} {p = p} {e = nx a} hb ni) le
     , silent ≃-refl
   rise-src-nx refl (flying (f-srcc _ _ _ _ _ _ _ _ _ _ _ _) _ ())
-  rise-src-nx refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
+  rise-src-nx refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
   rise-src-nx refl (flying (d-src _ _ _ _) _ ())
   rise-src-nx refl (flying (f-islec _ _ _ _ _ _ _ _ _) _ ())
+  rise-src-nx refl (flying (f-islep _ _ _ _ _ _ _ _ _ _) _ ())
   rise-src-nx refl (adrift (f-srcc _ _ _ _ cl _ _ _ _ _ _ _) cl′ _)  = ⊥-elim (or-shut cl cl′)
   rise-src-nx refl (adrift (f-islec _ _ _ _ cl _ _ _ _) cl′ _)       = ⊥-elim (or-shut cl cl′)
   rise-src-nx {a = a} {p = p} refl (adrift (d-src u hb le ni) _ (Q , hk , le′)) =
@@ -669,9 +673,10 @@ module _ {R : Set} (Rt : EmissionSet R) where
       (λ _ → _ , _ , unread-at Rt u (sh-isle na nc sy (Past.behind-up p bh) (Past.subd-up p sd) ss) fed le , silent ≃-refl)
     where fed = feed-husk {i = here refl} {p = p} {e = cp} hb ni
   rise-src-cp refl (flying (f-srcc _ _ _ _ _ _ _ _ _ _ _ _) _ ())
-  rise-src-cp refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
+  rise-src-cp refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
   rise-src-cp refl (flying (d-src _ _ _ _) _ ())
   rise-src-cp refl (flying (f-islec _ _ _ _ _ _ _ _ _) _ ())
+  rise-src-cp refl (flying (f-islep _ _ _ _ _ _ _ _ _ _) _ ())
   rise-src-cp refl (adrift (f-srcc _ _ _ _ cl _ _ _ _ _ _ _) cl′ _)  = ⊥-elim (or-shut cl cl′)
   rise-src-cp refl (adrift (f-islec _ _ _ _ cl _ _ _ _) cl′ _)       = ⊥-elim (or-shut cl cl′)
   rise-src-cp {k = k} {b} {c} {s} {p} refl {Cr = Cr} (adrift (d-src u hb le ni) _ (Q , hk , le′)) =

@@ -22,7 +22,7 @@ open import Data.Unit using (tt)
 open import Data.Maybe using (just; nothing)
 open import Function using (Equivalence)
 open import Data.Bool.Properties using (T-≡)
-open import Relation.Binary.PropositionalEquality using (refl; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
@@ -31,6 +31,7 @@ open import denotation.EmissionSet using (EmissionSet; out; end; _≺_; _≼_; D
   ended; late; InE; MapT; map-out; map-end; map-skip; map-pin; module Joining; module Scan;
   module TakeWhile; module Connecting; module Bounded; module Switch)
 open import denotation.Laws.Modulus using (≼-≺-≺; ≺-trans; ≺-ext; ≺-absurd; ≼-antisym; ≼-false; ≼-or-≻)
+open import denotation.Laws.Worlds using (⊑-≼; inside-⊑)
 open import operation.Key using (at)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Scope; scopeOf; plug; unbound; binds; CS; coldS; ofS; takeS; flatS; connS)
@@ -41,7 +42,7 @@ open import adequacy.Cursor using (Cur; origin; bef; aft; Owes; Due; Unfed; Pol;
   Whole; Ahead; Joined; joined; Flags; Src; src-pend; src-on; src-shut; OweAt; o-cp; o-cut;
   o-over; NoFail; Behind; Fin; fin-dn; tail-dn; _≈_; cov; voc; Subd; SubdAt; subd; TailP;
   tailp; tailp-dn; Pts; _∪ᵖ_; Under; Burst; Torn; Husk; HuskL; SrcH; h-blank; h-map; h-scan;
-  h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; sh-dead; sh-isle; sh-islec; Sync;
+  h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; sh-dead; sh-isle; sh-islec; sh-pend; Sync;
   s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx;
   Fr; owes)
 open import adequacy.Floor.Keys using (plug-in)
@@ -245,17 +246,20 @@ mutual
   husk-f (h-ln hk)      lo = husk-f hk (λ ki → lo (k-kid (k-ln ki)))
   husk-f (h-take hk)    lo = husk-f hk (λ ki → lo (k-kid (k-take ki)))
   husk-f (h-flat ho hl) lo = plag-∪ (husk-f ho (λ ki → lo (k-kid (k-outer ki)))) (huskl-f hl (λ i ki → lo (k-kid (k-lane i ki))))
-  husk-f (h-conn sh hb) lo = plag-∪ (srch-f sh (λ ki → lo (k-kid (k-src ki)))) (husk-f hb (λ ki → lo (k-kid (k-body ki))))
+  husk-f (h-conn {k = k} {o = o} {b = b} sh hb) lo = plag-∪ (srch-f sh (λ ki → lo (k-kid (k-src ki))) (λ be → lo-at lo (k-own (body-key k {o = o} {b = b} be)))) (husk-f hb (λ ki → lo (k-kid (k-body ki))))
 
   huskl-f : ∀ {Γ} {sc : Scope Γ} {A} {ls : List (St Γ A)} {P p} → HuskL sc ls P → (∀ {l} → l ∈ ls → Lo l (at p)) → PLag p P
   huskl-f hl-none         lo = [] , λ ()
   huskl-f (hl-more hk hl) lo = plag-∪ (husk-f hk (lo (here refl))) (huskl-f hl (λ i → lo (there i)))
 
-  srch-f : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o P p} → SrcH sc k o P → Lo o (at p) → PLag p P
-  srch-f (sh-dead hk) lo = plag-under (husk-f hk lo)
-  srch-f {k = k} (sh-isle {Ci = Ci} na nc sy bh sd ss) lo =
+  srch-f : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o P p} → SrcH sc k o P → Lo o (at p)
+         → (CS.bodyAt k ≡ just (CS.connAt k) → p ≼ (CS.connAt k ++ [ ix 1 ])) → PLag p P
+  srch-f (sh-dead hk) lo _ = plag-under (husk-f hk lo)
+  srch-f {k = k} {p = p} (sh-pend _ _ ba _ _ _ _ _) _ bl = [] , λ { (k′ , ((_ , _) , ins) , refl) yp →
+    ⊥-elim (bl ba (≼-≺-≺ {CS.connAt k ++ [ ix 1 ]} {k′} {p} (⊑-≼ (inside-⊑ (CS.connAt k ++ [ ix 1 ]) k′ ins)) (below k′ yp))) }
+  srch-f {k = k} (sh-isle {Ci = Ci} na nc sy bh sd ss) lo _ =
     let ie = isle-env {k = k} na nc sy bh sd lo in burst-plag {k = k} (before {C = Ci} {E = Frozen k} bh (few sy (proj₁ ie) (proj₂ ie) lo))
-  srch-f {k = k} (sh-islec {Ci = Ci} na cl sp tp hk bh sd) lo = burst-plag {k = k} (before {C = Ci} {E = Frozen k} bh (tailp-lag {C = Ci} tp (husk-f hk lo)))
+  srch-f {k = k} (sh-islec {Ci = Ci} na cl sp tp hk bh sd) lo _ = burst-plag {k = k} (before {C = Ci} {E = Frozen k} bh (tailp-lag {C = Ci} tp (husk-f hk lo)))
 
   few : ∀ {Γ} {sc : Scope Γ} {Rg} {C A} {s : St Γ A} {E p} → Sync sc Rg C s E → Env (full sc) C p → EnvF (full sc) p → Lo s (at p)
       → Lag C p E
@@ -279,8 +283,8 @@ mutual
          → (T (CS.srcLive k) → Src (CS.scope k) Rs C k o) → (T (not (CS.srcLive k)) → Torn (CS.scope k) C k o b β) → Flags C k β
          → Env (full (CS.scope k)) C p → EnvF (full (CS.scope k)) p → Lo (connS k o b) (at p)
          → Lag C p (Connecting.ConnT (CS.connAt k) (Frozen k) β)
-  conn-f {C = C} {k = k} bs ss tn fl env ef lo with T? (CS.srcLive k)
-  ... | inj₂ nt = tailp-lag {C = C} (Torn.tl (tn nt)) (plag-∪ (srch-f (Torn.sh (tn nt)) (λ ki → lo (k-kid (k-src ki)))) (husk-f (Torn.bh (tn nt)) (λ ki → lo (k-kid (k-body ki)))))
+  conn-f {C = C} {k = k} {o = o} {b = b} bs ss tn fl env ef lo with T? (CS.srcLive k)
+  ... | inj₂ nt = tailp-lag {C = C} (Torn.tl (tn nt)) (plag-∪ (srch-f (Torn.sh (tn nt)) (λ ki → lo (k-kid (k-src ki))) (λ be → lo-at lo (k-own (body-key k {o = o} {b = b} be)))) (husk-f (Torn.bh (tn nt)) (λ ki → lo (k-kid (k-body ki)))))
   ... | inj₁ t with src-f (ss t) env ef lo
   ...   | ks , fs with few (bs t) (env-bind {o = CS.src k} {r = CS.connAt k} (src-b (ss t) env lo) env)
                          (envf-bind {o = CS.src k} {r = CS.connAt k} (ks , fs) ef) (λ ki → lo (k-kid (k-body ki)))
@@ -296,7 +300,7 @@ mutual
         → Behind (bef p) (Frozen k)
   src-f {C = C} (src-on _ sy bh _) env ef lo = behind-bef {C = C} bh (few sy env ef (λ ki → lo (k-kid (k-src ki))))
   src-f {C = C} (src-shut _ _ tp hk bh _) env ef lo = behind-bef {C = C} bh (tailp-lag {C = C} tp (husk-f hk (λ ki → lo (k-kid (k-src ki)))))
-  src-f {k = k} {b = b} {p = p} (src-pend {o = o′} _ be a _ _ _) env ef lo =
+  src-f {k = k} {b = b} {p = p} (src-pend {o = o′} _ _ be a _ _ _) env ef lo =
     behind-pend {C = bef p} {k = k} refl a (lo-at lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
 
   -- A joiner's: its outer's, a value's first effect, a begun lane's, a
@@ -454,8 +458,8 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
     src-sh : ∀ {Γ X B} {Rg} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B}
            → Src (CS.scope k) Rg C k o → Env (full (CS.scope k)) C p → EnvF (full (CS.scope k)) p → Lo (connS k o b) (at p)
            → Src (CS.scope k) Rg (bef p) k o
-    src-sh {k = k} {b = b} (src-pend {o = o′} nc be adm pr wn _) env ef lo =
-      src-pend nc be adm pr wn (lo-at lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
+    src-sh {k = k} {b = b} (src-pend {o = o′} na nc be adm pr wn _) env ef lo =
+      src-pend na nc be adm pr wn (lo-at lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
     src-sh {k = k} (src-on nc sy bh sd) env ef lo =
       src-on nc (sh sy env ef lo′) (behind-bef {C = C} bh (few sy env ef lo′)) (subd′ sd)
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-src ki))

@@ -10,7 +10,7 @@ module adequacy.Dispatch where
 open import Data.Bool using (Bool; true; false; if_then_else_; not; _∨_; _∧_; T)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Nat using (_≡ᵇ_; suc)
-open import Data.List using (List; []; _∷_; [_])
+open import Data.List using (List; []; _∷_; [_]; _++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -23,7 +23,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Timeline; root; Pos; ix; last; timelineAt; emit; stall; close)
 open import denotation.EmissionSet using (EmissionSet; ⟦_⟧; at-out; at-end)
-open import denotation.Laws.Modulus using (≺-ext; ≺→≼; entered-reach)
+open import denotation.Laws.Modulus using (≺-ext; ≺→≼; ≼-refl; entered-reach)
 open import denotation.Laws.Worlds using (Ok; Hots; ok-step)
 open import operation.Key using (at)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; over; opening)
@@ -35,7 +35,7 @@ open Machine using (St; Ctx; Conf; Scope; binds; scopeOf; ⟨_,_,_,_⟩; subscri
                     renaming (Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (pendRows; full; ≃-refl; Vis; _≃_; _⇄_; silent; Moves; this)
 open _≃_
-open import adequacy.Cursor using (Cur; ≈-refl; Rgn; JoinE; Parts; Flags; src-pend; JInv; Joined; JRl; JRo; polF; Sound; Within; Adm; bef; Spent; Sync; _≈_; c-abs; c-sub; Owes; Fr; Hold; Need; owes; dead; lane; lanecut; pnd; Pts; ∅ᵖ; _⊑_; ∅-⊑; ⊑-refl; ⊑-trans; Rest; h-blank; h-take; hl-none; sh-dead; un-dead; Clear; Pending; pend-shape; notT; sync-pend; s-of; s-join; s-joinx; s-took; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; o-cp)
+open import adequacy.Cursor using (Cur; ≈-refl; Rgn; JoinE; Parts; Flags; src-pend; JInv; Joined; JRl; JRo; polF; Sound; Within; Adm; bef; Spent; Sync; _≈_; c-abs; c-sub; Owes; Fr; Hold; Need; owes; dead; lane; lanecut; pnd; Pts; ∅ᵖ; _⊑_; ∅-⊑; ⊑-refl; ⊑-trans; Rest; h-blank; h-take; hl-none; sh-dead; un-dead; Clear; Pending; pend-shape; notT; sync-pend; s-of; s-join; s-joinx; s-took; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; subd; o-cp)
 open import adequacy.Cursor.Rise using (Inv; settled; pending; adrift; RT; SimC; keeps; rise-top; rise-map; rise-scan-nx; rise-scan-cp; rise-take-pass; rise-take-cp; rise-cut; rise-cutx; rise-ln; rise-took; rise-take-fail; rise-bodyx; run-stop; run-cut; run-att)
 open import adequacy.Path using (Path)
 open import adequacy.Isle.Step using (found-clear)
@@ -393,8 +393,12 @@ module Over {R : Set} (Rt : EmissionSet R) where
   -- A pending source, read as subscribing.
   srcp : ∀ {Cr C Γ A} {c : Ctx R Γ A} {o q Rg N E} → Fr Rt Cr C Rg c N E → N ≡ pnd q
        → pendRows (full (scopeOf c)) o q ≈ E → Within Rg (scopeOf c) q → PendV Cr C c o q
-  srcp {C = C} (f-srcp {k = k} fr sc pt lv nc ba (ok , adm) bs fl fe eq ow sd nb) refl pe wn =
+  srcp {C = C} (f-srcp {k = k} fr sc pt lv nc _ ba (ok , adm) bs fl fe eq ow sd nb) refl pe wn =
     inj₁ (_ , _ , f-src fr sc pt lv nc bs fl fe eq (behind-pend {C = C} {k = k} sc (ok , adm) ow) sd nb , ow , ok-step (CS.connAt k) ok , adm , pe , wn)
+  srcp (f-islep {k = k} u hb le na nc ba sc (ok , adm) ss nb) refl pe wn =
+    inj₁ (_ , _ , f-isle u hb le na nc (behind-pend {C = bef (CS.connAt k ++ [ ix 1 ])} {k = k} sc (ok , adm) (≼-refl {CS.connAt k ++ [ ix 1 ]}))
+                         (subd (λ o → o) ok) ss nb
+         , ≼-refl {CS.connAt k ++ [ ix 1 ]} , ok-step (CS.connAt k) ok , adm , pe , wn)
   srcp (f-top _)                                                ()   _ _
   srcp (f-map _ _ _)                                            ()   _ _
   srcp (f-scan _ _ _ _)                                         ()   _ _
@@ -446,7 +450,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   ... | inj₁ (Rg , _ , fr , ow , ok , ad , eq , wi) =
     let (pt , wb , ws) = conn-parts {s = s} {b = b} ok ad wi
         ow₁ = owes-≼ C {q} {q ⊕ [ ix 1 ]} ow (≺→≼ {q} {q ⊕ [ ix 1 ]} (≺-ext q []))
-    in pending (f-body fr refl pt tt (src-pend tt refl (ok , ad) ≈-refl ws ow₁) (conn-flags {s = s} {b = b} ow)
+    in pending (f-body fr refl pt tt (src-pend tt tt refl (ok , ad) ≈-refl ws ow₁) (conn-flags {s = s} {b = b} ow)
                  (eq , entered-reach (⟦ b ⟧ (full (binds s q (scopeOf c)))) (q ⊕ [ ix 0 ])))
          (owes-≼ C {q} {q ⊕ [ ix 0 ]} ow (≺→≼ {q} {q ⊕ [ ix 0 ]} (≺-ext q [])) , conn-ok {s = s} ok ad , (ok , ad) , ≈-refl , wb)
 
@@ -537,7 +541,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   closed-off (f-lnct {b = false} fr)                             _ = tt
   closed-off (f-src {k = k} fr _ _ _ nc _ _ _ _ _ _ _)           t = closed-off fr (and-right (CS.srcAtt k) (or-right (CS.closed k) nc t))
   closed-off (f-srcc _ _ _ _ _ _ _ _ _ _ _ _)                    _ = tt
-  closed-off (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _)                _ = tt
+  closed-off (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)                _ = tt
   closed-off (f-body fr _ _ _ _ _ _)                             t = closed-off fr t
   closed-off (d-map _)                                           _ = tt
   closed-off (d-scan _)                                          _ = tt
@@ -550,6 +554,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   closed-off (d-body _ _ _)                                      _ = tt
   closed-off (f-isle {k = k} _ _ _ na nc _ _ _ _)                t = ⊥-elim (notT _ na (and-left (CS.srcAtt k) (or-right (CS.closed k) nc t)))
   closed-off (f-islec _ _ _ _ _ _ _ _ _)                         _ = tt
+  closed-off (f-islep {k = k} _ _ _ na nc _ _ _ _ _)            t = ⊥-elim (notT _ na (and-left (CS.srcAtt k) (or-right (CS.closed k) nc t)))
 
   off-keep : ∀ {Cr C Γ A} {c : Ctx R Γ A} {Rg N E} {s s′ : St Γ A} {p} → (Pending s → ⊥) → (∀ {P} → Rest (scopeOf c) s P → Rest (scopeOf c) s′ P)
            → Fr Rt Cr C Rg c N E → Hold (scopeOf c) Rg C N s E → Off N → Inv Rt Cr C ⟨ c , s′ , absorbed , p ⟩

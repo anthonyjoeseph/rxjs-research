@@ -542,7 +542,7 @@ data Sync where
 
 data Src where
   src-pend : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o}
-           → T (not (CS.closed k)) → CS.bodyAt k ≡ just (CS.connAt k) → Adm (binds (CS.src k) (CS.connAt k) sc)
+           → T (not (CS.srcAtt k)) → T (not (CS.closed k)) → CS.bodyAt k ≡ just (CS.connAt k) → Adm (binds (CS.src k) (CS.connAt k) sc)
            → pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]) ≈ Frozen k → Within Rg sc (CS.connAt k ++ [ ix 1 ])
            → Owes C (CS.connAt k ++ [ ix 1 ])
            → Src sc Rg C k (pend o (CS.connAt k ++ [ ix 1 ]))
@@ -582,6 +582,13 @@ data SrcH where
   sh-islec : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o Ci P}
            → T (not (CS.srcAtt k)) → T (CS.closed k) → Spent Ci (Frozen k) → TailP Ci (Frozen k) P → Husk sc o P
            → Behind Ci (Frozen k) → Subd sc Ci k → SrcH sc k o (Burst k)
+  -- a source not yet subscribed: its whole burst, which runs whatever
+  -- happens above it, its body's mark subscribing it regardless
+  sh-pend  : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o Ri}
+           → T (not (CS.srcAtt k)) → T (not (CS.closed k)) → CS.bodyAt k ≡ just (CS.connAt k) → CS.scope k ≡ sc
+           → Adm (binds (CS.src k) (CS.connAt k) sc) → pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]) ≈ Frozen k
+           → Within Ri sc (CS.connAt k ++ [ ix 1 ]) → Sound Ri (Frozen k)
+           → SrcH sc k (pend o (CS.connAt k ++ [ ix 1 ])) (Burst k)
 
 -- No rise in flight.
 data Calm {A : Set} : Machine.Mode A → Set where
@@ -614,15 +621,15 @@ mutual
   husk-of (s-took _ _ _ _ _ hk _ _) = _ , h-take hk
   husk-of (s-flat _ sy (joined bg _ _ _ _ _ _ _) _ _ _) = _ , h-flat (proj₂ (husk-of sy)) (proj₂ (begun-husk bg))
   husk-of (s-conn {k = k} sc pt bs ss tn _ _) =
-    by (CS.srcLive k) (λ l → _ , h-conn (proj₂ (src-husk (ss l) (Parts.ss pt))) (unbind {k = k} sc (proj₂ (husk-of (bs l)))))
+    by (CS.srcLive k) (λ l → _ , h-conn (proj₂ (src-husk sc (ss l) (Parts.ss pt))) (unbind {k = k} sc (proj₂ (husk-of (bs l)))))
                       (λ nl → _ , h-conn (Torn.sh (tn nl)) (Torn.bh (tn nl)))
   husk-of (s-join _ _ _ _ _)        = _ , h-blank
   husk-of (s-joinx _ _)             = _ , h-blank
 
-  src-husk : ∀ {Γ X} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} → Src sc Rg C k o → Sound Rg (Frozen k) → Σ Pts (SrcH sc k o)
-  src-husk (src-pend _ _ _ _ _ _) _                    = _ , sh-dead h-blank
-  src-husk (src-on {k = k} nc sy bh sd) ss             = by (CS.srcAtt k) (λ _ → _ , sh-dead (proj₂ (husk-of sy))) (λ na → _ , sh-isle na nc sy bh sd ss)
-  src-husk (src-shut {C = C} {k = k} cl sp tp hk bh sd) _ = by (CS.srcAtt k) (λ _ → _ , sh-dead hk) (λ na → _ , sh-islec {Ci = C} na cl sp tp hk bh sd)
+  src-husk : ∀ {Γ X} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} → CS.scope k ≡ sc → Src sc Rg C k o → Sound Rg (Frozen k) → Σ Pts (SrcH sc k o)
+  src-husk sc (src-pend na nc ba adm pe wn _) ss       = _ , sh-pend na nc ba sc adm pe wn ss
+  src-husk _ (src-on {k = k} nc sy bh sd) ss           = by (CS.srcAtt k) (λ _ → _ , sh-dead (proj₂ (husk-of sy))) (λ na → _ , sh-isle na nc sy bh sd ss)
+  src-husk _ (src-shut {C = C} {k = k} cl sp tp hk bh sd) _ = by (CS.srcAtt k) (λ _ → _ , sh-dead hk) (λ na → _ , sh-islec {Ci = C} na cl sp tp hk bh sd)
 
   begun-husk : ∀ {Γ A B} {sc : Scope Γ} {Rl C} {P : Pol A B} {O vs ls n} → Begun sc Rl C P O vs ls n → Σ Pts (HuskL sc ls)
   begun-husk none               = _ , hl-none
@@ -709,6 +716,7 @@ mutual
   ... | false = _ , sh-dead hk , ⊑-refl
   srch-unsub {k = k} sh@(sh-isle na _ _ _ _ _)    = _ , subst (λ o′ → SrcH _ k o′ _) (sym (unsubIf-off (CS.srcAtt k) na)) sh , ⊑-refl
   srch-unsub {k = k} sh@(sh-islec na _ _ _ _ _ _) = _ , subst (λ o′ → SrcH _ k o′ _) (sym (unsubIf-off (CS.srcAtt k) na)) sh , ⊑-refl
+  srch-unsub {k = k} sh@(sh-pend na _ _ _ _ _ _ _) = _ , subst (λ o′ → SrcH _ k o′ _) (sym (unsubIf-off (CS.srcAtt k) na)) sh , ⊑-refl
 
 unsubIf-husk : ∀ {Γ} {sc : Scope Γ} {A} {s : St Γ A} {P} b → Husk sc s P → Σ Pts λ P′ → Husk sc (proj₁ (unsubIf b s)) P′ × P ⊑ P′
 unsubIf-husk true  hk = unsub-husk hk
@@ -913,7 +921,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     -- body holds no isle
     f-srcp  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {C Rg E E′ β}
             → Fr Cr C Rg c owes E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (not (CS.closed k))
-            → CS.bodyAt k ≡ just (CS.connAt k) → Adm (binds (CS.src k) (CS.connAt k) (scopeOf c))
+            → T (not (CS.srcAtt k)) → CS.bodyAt k ≡ just (CS.connAt k) → Adm (binds (CS.src k) (CS.connAt k) (scopeOf c))
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β
             → Flags C k β → Frozen k ≈ E → ConnE (CS.connAt k) (Frozen k) β E′
             → Owes C (CS.connAt k ++ [ ix 1 ]) → Subd (scopeOf c) C k → NoIsle b
@@ -952,3 +960,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → P ⊑ (Burst k ∪ᵖ Qb) → T (not (CS.srcAtt k)) → T (CS.closed k)
             → Spent Ci (Frozen k) → TailP Ci (Frozen k) N → Behind Ci (Frozen k) → Subd (scopeOf c) Ci k
             → Fr Cr C Rg′ (inSrc k b c) (dead N) E
+    -- an isle's source not yet subscribed: its cursor at where it will be
+    f-islep : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {C Ri P Qb}
+            → Unread Cr C c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Qb
+            → P ⊑ (Burst k ∪ᵖ Qb) → T (not (CS.srcAtt k)) → T (not (CS.closed k)) → CS.bodyAt k ≡ just (CS.connAt k)
+            → CS.scope k ≡ scopeOf c → Adm (binds (CS.src k) (CS.connAt k) (scopeOf c)) → Sound Ri (Frozen k) → NoIsle b
+            → Fr Cr (bef (CS.connAt k ++ [ ix 1 ])) Ri (inSrc k b c) (pnd (CS.connAt k ++ [ ix 1 ])) (Frozen k)
