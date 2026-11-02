@@ -29,7 +29,7 @@ open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLan
                     attAt; attached; free; cpAt; cutAt; overAt; search; found; own; run; unsubIf; feed; feedL; queued; inbox; Mark; ofM; attM; cpM; cutM; bodyM; srcAttM; owedM; joinM; leafM; Ev)
 open import operation.Key using (at; after; _<ᴷ_; at-<ᴷ)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-cut; k-take; k-src; k-body; Lo)
-open import adequacy.Dispatch using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-least; found-plug)
+open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-least; found-plug)
 open import adequacy.Stamped using (frame-ahead; opening-ahead; pend-focus; inbox-asc)
 open import adequacy.Weight using (Clock)
 open import adequacy.Path using (_⊑_; ⊑i; ⊑-trans; Path; _⇜_)

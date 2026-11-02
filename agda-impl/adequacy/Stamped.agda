@@ -34,7 +34,7 @@ open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLan
                     unsub; cut; killAll; unsubIf; feed; feedL; queued; inbox; same?; rise; run; begin; start; dequeue; admit; ended; shutAt; closed; closedUp; alive; settle;
                     search; found; Stepped; moved; starting; turn; quiet; Poke; gone; leaf; own; leafM; joinM)
 open import operation.Key using (Key; _<ᴷ_; at-<ᴷ) renaming (at to atᴷ)
-open import adequacy.Dispatch using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-least; found-plug)
+open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-least; found-plug)
 open import adequacy.Path using (Path; []; tau; val)
 
 ------------------------------------------------------------------------

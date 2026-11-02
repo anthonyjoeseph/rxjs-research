@@ -178,6 +178,23 @@ private
     trans (nope _ _ _ (≺-asym (lab a) (lab b) ba) (≺→≠ (lab a) (lab b) ba)) (sym (<ᵖ-asym (b ∷ q) (a ∷ p) (<ᵖ-part [] {b} {a} q p ba)))
   ... | inj₂ (inj₁ refl) = trans (same _ _ _ (≺-irrefl (lab a)) (≐-refl (lab a)) (lex-at p q)) (sym (<ᵖ-cons a p q))
 
+  tl : List XL → List XL
+  tl []      = []
+  tl (_ ∷ x) = x
+
+  no-top : ∀ p y → labs p ≡ labs y ++ [ top ] → ⊥
+  no-top []      []      ()
+  no-top []      (_ ∷ _) ()
+  no-top (a ∷ p) []      ()
+  no-top (a ∷ p) (b ∷ y) e = no-top p y (cong tl e)
+
+-- A position's key and an after's never tie: one is strictly first.
+at-after-≮ : ∀ p y → at p <ᴷ after y ≡ false → after y <ᴷ at p ≡ false → ⊥
+at-after-≮ p y h₁ h₂ with lex-tot (labs p) (labs y ++ [ top ])
+... | inj₁ lt        = clash lt h₁
+... | inj₂ (inj₁ e)  = no-top p y e
+... | inj₂ (inj₂ gt) = clash gt h₂
+
 -- Neither strictly before the next, twice: not strictly before the last.
 ≮ᴷ-trans : ∀ a b c → a <ᴷ b ≡ false → b <ᴷ c ≡ false → a <ᴷ c ≡ false
 ≮ᴷ-trans a b c = lex-≮ (ext a) (ext b) (ext c)

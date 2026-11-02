@@ -23,15 +23,6 @@ reading the stop's row against the husk.
 
 Members: `took-tail`, `shut-tail`.
 
-#### THE CLEAR PATH
-
-The found node's path enters no source whose connect's body holds an
-isle. Open: whether a reachable configuration keeps isles off every path
-the search takes. Settled by an invariant along `Path`, or a body over
-the search.
-
-Members: `found-clear`.
-
 #### THE ISLE'S CURSOR
 
 An isle's binders, read at its own cursor, lie at or past the least key
