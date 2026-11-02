@@ -26,8 +26,8 @@ Members: `shut-tail`.
 #### THE ISLE'S CURSOR
 
 An isle's binders, read at its own cursor, lie at or past the least key
-with finitely many before it. Open: two `sh-isle` fields, binder rows owed
-past the burst and a key inside it, owed at the isle's birth.
+with finitely many before it. Suspected false: an isle's source may hold
+no key inside its burst, so its least key lies past a binder row still owed.
 
 Members: `isle-env`.
 
@@ -53,7 +53,7 @@ marks, a joiner's next and a take's failure, each keeping `Inv`. Open:
 whether every entry lands a region apart from its siblings' and clear of
 its scope's hots, so the rest moves past `p`. Settled when each is a body.
 
-Members: `sub-join`, `sub-joined`, `run-con`, `run-join-nx`,
+Members: `sub-join`, `sub-joined`, `run-srcatt`, `run-owed`, `run-join-nx`,
 `run-join-cp`, `rise-take-failᵢ`, `feed-up`, `conn-parts`, `flat-sound`,
 `flat-within`.
 

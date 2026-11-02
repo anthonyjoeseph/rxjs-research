@@ -365,13 +365,25 @@ module Over {R : Set} (Rt : EmissionSet R) where
     run-join-cp   : ∀ {Cr Γ A} {c : Ctx R Γ A} {j} {x : A ∈ Γ} {q ib r} → closed c ≡ false
                   → Inv Rt Cr (bef q) ⟨ c , joinS j true x ((q , cp) ∷ ib) , absorbed , r ⟩
                   → Inv Rt Cr (bef q) ⟨ c , joinS j false x ib , rising cp , q ⟩
-    -- A CONNECT'S SOURCE ATTACHED, or its owed teardown run: nothing
-    -- shown, the cursors kept.
+    -- A CONNECT'S SOURCE ATTACHED: its subscribe call returned, nothing
+    -- shown, the cursors kept.  What it needs that the invariant lacks:
+    -- `AttFin` for the attached source, finitely many of its rows inside
+    -- its subscribe call.  The attach is keyed `after` the call, so every
+    -- key inside it has run, but `few` bounds a node's past only below an
+    -- `at` key, and no position lies between the call and `after` it.  An
+    -- isle attaching in a torn part needs its burst inside what its husk
+    -- runs, but for finitely many, which is the same fact.
     run-srcatt    : ∀ {Cr C Γ A X} {c : Ctx R Γ A} {k} {o : St Γ X} {b κ r k′ sh t}
                   → run c (connS k o b) srcAttM r ≡ moved k′ sh t
                   → (srcAttM , κ) ∈ own (connS k o b) → Lo (plug c (connS k o b)) κ → StOK (connS k o b) → G (connS k o b)
                   → Inv Rt Cr C ⟨ c , connS k o b , absorbed , r ⟩
                   → sh ≡ [] × Ran Rt Cr k′
+    -- A CONNECT'S OWED TEARDOWN: its body over, its source stopped if
+    -- attached, nothing shown.  What it needs that the invariant lacks: a
+    -- `Flags` field placing the body's end at `CS.owedAt k` and passed,
+    -- from which `Torn`'s spent body follows by `Sound.ends`; and the torn
+    -- connect's `TailP`, the end-tail shape `shut-tail` has, for the body
+    -- past its end and the source's burst, attached (`AttFin`) or an isle.
     run-owed      : ∀ {Cr C Γ A X} {c : Ctx R Γ A} {k} {o : St Γ X} {b κ r k′ sh t}
                   → run c (connS k o b) owedM r ≡ moved k′ sh t
                   → (owedM , κ) ∈ own (connS k o b) → Lo (plug c (connS k o b)) κ → StOK (connS k o b) → G (connS k o b)

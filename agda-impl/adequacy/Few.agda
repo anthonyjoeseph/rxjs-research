@@ -248,10 +248,19 @@ burst-plag (ks , f) = map ix0 ks , λ { (k′ , (_ , x , _) , refl) yp → ∈-m
 -- What it needs that no hypothesis carries: a binder's row the isle's
 -- cursor owes lies past the isle's whole burst, so past every position
 -- inside `CS.connAt k ++ [ ix 1 ]`; and the isle's source holds a key
--- inside its burst, so the least key is no later than that.  Both are
--- true of an isle at its birth (a running subscribe call has work left,
--- and a binder's source emits nothing inside a burst it does not drive),
--- so they are fields of `sh-isle`, owed where an isle is born.
+-- inside its burst, so the least key is no later than that.  The first
+-- holds at the isle's birth: a binder's source emits nothing inside a
+-- burst it does not drive.
+--
+-- SUSPECT: the second does not.  A source `merge(of [1], connected y)`
+-- under a binder `y` whose rows come later: its `of` emits and ends
+-- inside the burst, the body's `take 1` ends on that row, and the owed
+-- teardown finds the source unattached and leaves it an isle.  Its
+-- source then holds only the joiner on `y`, which holds no key while its
+-- inbox is empty, so `Lo o (at p)` holds for every `p` while `y`'s next
+-- row is still owed.  What `srch-f` asks of an isle, finitely many burst
+-- rows before `p`, still holds there: no key inside the burst and no
+-- binder row inside it leaves every row inside it passed.
 -- DEAD ROUTE: a body over its hypotheses — `Lo o` bounds only the isle's
 --   own keys, and `Subd` only the isle's cursor from below, so a binder's
 --   owed row between the isle's cursor and its least key is not excluded.
