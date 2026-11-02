@@ -164,8 +164,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
                (subst (λ ls → Begun _ _ _ _ _ _ ls _) (sym (ʳ++-defn pre)) (begun-join lf o nq r (laneSt b hl h sd) rt))
     climb (f-lane fr)                   (at , l , refl , h) = climb fr (at , l , refl , h)
     climb (f-lnct {b = b} fr)           h = climb fr (_ , _ , refl , hold-lh b h)
-    climb (f-src fr sc pt lv nc bs fl fe eq bh sd _) h =
-      climb fr (s-conn sc pt (λ _ → bs) (λ _ → src-on nc (sync-≈ h (≈-sym fe)) bh sd) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
+    climb (f-src fr sc pt lv nc bs fl fe eq bh sd af _) h =
+      climb fr (s-conn sc pt (λ _ → bs) (λ _ → src-on nc (sync-≈ h (≈-sym fe)) bh sd af) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
     climb (f-srcc fr sc pt lv cl sp tp bh sd bs fl eq) (Q , hk , le) =
       climb fr (s-conn sc pt (λ _ → bs) (λ _ → src-shut cl sp (tailp-⊑ tp le) hk bh sd) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
     climb (f-srcp fr sc pt lv nc na ba adm bs fl fe eq ow _ _) (_ , refl , pe , wn) =
@@ -280,7 +280,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-src {k = k} np nb (C , owes , _ , _ , fr , s-conn sc pt bs os tn fl eq) with live? (CS.srcLive k)
   ... | inj₂ nl = let t = tn nl in src-dead (un-torn fr sc pt nl fl eq (Torn.tl t)) (Torn.sh t) (Torn.bh t) ⊑-refl nb
   ... | inj₁ lv with os lv
-  ...   | src-on nc sy bh sd         = C , owes , _ , _ , f-src fr sc pt lv nc (bs lv) fl ≈-refl eq bh sd nb , sy
+  ...   | src-on nc sy bh sd af      = C , owes , _ , _ , f-src fr sc pt lv nc (bs lv) fl ≈-refl eq bh sd af nb , sy
   ...   | src-shut cl sp tp hk bh sd = C , dead _ , nowhere , none′ , f-srcc fr sc pt lv cl sp tp bh sd (bs lv) fl eq , (_ , hk , ⊑-refl)
   ...   | src-pend _ _ _ _ _ _ _     = ⊥-elim (np tt)
   down-src _ nb (C , dead P , _ , _ , fr , (Q , h-conn sh hb , le)) = src-dead (un-dead fr) sh hb le nb

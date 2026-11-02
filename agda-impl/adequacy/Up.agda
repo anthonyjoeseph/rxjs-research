@@ -204,7 +204,7 @@ module Past (p : Pos) where
     src-up : ∀ {Γ X} {sc : Scope Γ} {Rs : Rgn} {k : CS Γ X} {o}
            → Src sc Rs (bef p) k o → Sound Rs (adequacy.Rows.Frozen k) → ¬ Rs p → ¬ VHot (full sc) p → Src sc Rs (aft p) k o
     src-up (src-pend na nc be adm pr wn ow) ss nr nh = src-pend na nc be adm pr wn (owes-up (off nr (wn W⁼.here)) ow)
-    src-up (src-on nc sy bh sd)          ss nr nh = src-on nc (up sy ss nr nh) (behind-up bh) (subd-up sd)
+    src-up (src-on nc sy bh sd af)       ss nr nh = src-on nc (up sy ss nr nh) (behind-up bh) (subd-up sd) af
     src-up {k = k} (src-shut cl sp tp hk bh sd) ss nr nh =
       src-shut cl (spent-up {E = adequacy.Rows.Frozen k} sp) (tailp-up tp) hk (behind-up bh) (subd-up sd)
 
@@ -235,7 +235,7 @@ module Past (p : Pos) where
 -- Where a connect owes its own end is no part of what it owes.
 src-owe : ∀ {Γ X} {sc : Scope Γ} {Rs : Rgn} {C} {k : CS Γ X} {o x} → Src sc Rs C k o → Src sc Rs C (record k { owedAt = x }) o
 src-owe (src-pend na nc be adm pr wn ow) = src-pend na nc be adm pr wn ow
-src-owe (src-on nc sy bh sd)           = src-on nc sy bh sd
+src-owe (src-on nc sy bh sd af)        = src-on nc sy bh sd af
 src-owe (src-shut cl sp tp hk bh sd)   = src-shut cl sp tp hk bh sd
 
 srch-owe : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o P x} → SrcH sc k o P → SrcH sc (record k { owedAt = x }) o P
@@ -516,9 +516,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
   fr-up (f-lane fr) lv rp nr nh = let (Cr′ , fr′ , mv) = fr-up fr lv rp nr nh in Cr′ , f-lane fr′ , mv
   fr-up (f-lnct {b = true} fr) _ rp nr nh = let (Cr′ , fr′ , mv) = fr-up fr tt rp nr nh in Cr′ , f-lnct fr′ , mv
   fr-up (f-lnct {b = false} _) ()
-  fr-up {p = p} (f-src {k = k} {c = c} {E′ = E′} fr sc pt lv nc sb fl fz eq bh sd ni) _ rp nr nh =
+  fr-up {p = p} (f-src {k = k} {c = c} {E′ = E′} fr sc pt lv nc sb fl fz eq bh sd af ni) _ rp nr nh =
     let (Cr′ , fr′ , mv) = fr-up fr tt (Parts.s⊆ pt rp) nr′ nh
-    in Cr′ , f-src fr′ sc pt lv nc (Past.up p sb (Parts.sb pt) nb nhb) (Past.flags-up p {k = k} of fl) fz eq (Past.behind-up p bh) (Past.subd-up p sd) ni , mv
+    in Cr′ , f-src fr′ sc pt lv nc (Past.up p sb (Parts.sb pt) nb nhb) (Past.flags-up p {k = k} of fl) fz eq (Past.behind-up p bh) (Past.subd-up p sd) af ni , mv
     where
       nb : ¬ Parts.Rb pt p
       nb r = Parts.apart pt r rp
@@ -629,10 +629,10 @@ module _ {R : Set} (Rt : EmissionSet R) where
 
   rise-src-nx : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s a p k′ sh t}
               → rise (inSrc k b c) s (nx a) p ≡ moved k′ sh t → SimC Rt ⟨ inSrc k b c , s , rising (nx a) , p ⟩ sh k′
-  rise-src-nx {a = a} {p = p} refl (flying (f-src fr sc pt lv nc bs fl fz eq bh sd _) cl (sy , row)) =
+  rise-src-nx {a = a} {p = p} refl (flying (f-src fr sc pt lv nc bs fl fz eq bh sd af _) cl (sy , row)) =
     let open Fed {e = nx a} fr sc pt lv fz eq row
     in Cr↑ , aft p , settled c-abs fr↑ (s-conn sc pt (λ _ → body bs)
-                                              (λ _ → src-on nc (sync-≈ sy (≈-sym fz)) (Past.behind-up p bh) (Past.subd-up p sd))
+                                              (λ _ → src-on nc (sync-≈ sy (≈-sym fz)) (Past.behind-up p bh) (Past.subd-up p sd) af)
                                               (λ nl → ⊥-elim (notT _ nl lv)) (flags-on nc (λ ()) fl) eq)
      , moves
   -- an isle's source runs on, its body read by none
@@ -654,7 +654,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   -- Its end: the connect closed where it fell, while it runs.
   rise-src-cp : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s p k′ sh t}
               → rise (inSrc k b c) s cp p ≡ moved k′ sh t → SimC Rt ⟨ inSrc k b c , s , rising cp , p ⟩ sh k′
-  rise-src-cp {k = k} {b} {c} {s} {p} refl (flying (f-src fr sc pt lv nc bs fl fz eq bh sd _) cl (sy , row)) =
+  rise-src-cp {k = k} {b} {c} {s} {p} refl (flying (f-src fr sc pt lv nc bs fl fz eq bh sd _ _) cl (sy , row)) =
     let open Fed {e = cp} fr sc pt lv fz eq row
         sy′ = sync-≈ sy (≈-sym fz)
     in Cr↑ , aft p

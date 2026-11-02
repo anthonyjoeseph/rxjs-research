@@ -171,6 +171,11 @@ Under P y = Σ Pos λ k → P k × y ≡ k ++ [ ix 0 ]
 Burst : ∀ {Γ X} → CS Γ X → Pts
 Burst k = Under λ k′ → Σ _ λ e → Frozen k k′ e × (T (inside (CS.connAt k ++ [ ix 1 ]) k′) ⊎ ¬ Unpinned e)
 
+-- An attached source's subscribe call has returned: finitely many of its
+-- rows lie inside it.
+AttFin : ∀ {Γ X} → CS Γ X → Set
+AttFin k = T (CS.srcAtt k) → Σ (List Pos) λ ks → ∀ {y e} → Frozen k y e → T (inside (CS.connAt k ++ [ ix 1 ]) y) → y ∈ ks
+
 -- Within `Q` but for finitely many.
 _⊑_ : Pts → Pts → Set
 P ⊑ Q = Σ (List Pos) λ ks → ∀ {y} → P y → Q y ⊎ y ∈ ks
@@ -551,7 +556,7 @@ data Src where
   -- subscribed: the cursor at or past its subscription, made where
   -- admissible
   src-on   : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o} → T (not (CS.closed k)) → Sync sc Rg C o (Frozen k) → Behind C (Frozen k)
-           → Subd sc C k → Src sc Rg C k o
+           → Subd sc C k → AttFin k → Src sc Rg C k o
   -- ended: nothing visible left to owe, the rest within what its subtree
   -- still runs
   src-shut : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o P} → T (CS.closed k) → Spent C (Frozen k)
@@ -630,7 +635,7 @@ mutual
 
   src-husk : ∀ {Γ X} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} → CS.scope k ≡ sc → Src sc Rg C k o → Sound Rg (Frozen k) → Σ Pts (SrcH sc k o)
   src-husk sc (src-pend na nc ba adm pe wn _) ss       = _ , sh-pend na nc ba sc adm pe wn ss
-  src-husk _ (src-on {k = k} nc sy bh sd) ss           = by (CS.srcAtt k) (λ _ → _ , sh-dead (proj₂ (husk-of sy))) (λ na → _ , sh-isle na nc sy bh sd ss)
+  src-husk _ (src-on {k = k} nc sy bh sd _) ss          = by (CS.srcAtt k) (λ _ → _ , sh-dead (proj₂ (husk-of sy))) (λ na → _ , sh-isle na nc sy bh sd ss)
   src-husk _ (src-shut {C = C} {k = k} cl sp tp hk bh sd) _ = by (CS.srcAtt k) (λ _ → _ , sh-dead hk) (λ na → _ , sh-islec {Ci = C} na cl sp tp hk bh sd)
 
   begun-husk : ∀ {Γ A B} {sc : Scope Γ} {Rl C} {P : Pol A B} {O vs ls n} → Begun sc Rl C P O vs ls n → Σ Pts (HuskL sc ls)
@@ -723,15 +728,6 @@ mutual
 unsubIf-husk : ∀ {Γ} {sc : Scope Γ} {A} {s : St Γ A} {P} b → Husk sc s P → Σ Pts λ P′ → Husk sc (proj₁ (unsubIf b s)) P′ × P ⊑ P′
 unsubIf-husk true  hk = unsub-husk hk
 unsubIf-husk false hk = _ , hk , ⊑-refl
-
--- A TAKEWHILE FAILING AT `p` owes what its source's isles still run.  A
--- pin it keeps is of a burst begun before the failure (`TakeWhile.left`),
--- so of a source still in its subscribe call around it; every other row
--- past the failure is one of finitely many at the failure itself.
-postulate
-  took-tail : ∀ {Γ} {sc : Scope Γ} {Rg} {A} {i} {keep : A → Bool} {s : St Γ A} {Es a p}
-            → (sy : Sync sc Rg (aft p) s Es) → Sound Rg Es → Es p (out a) → T (not (keep a)) → NoFail (bef p) keep Es
-            → TailP (bef p) (TakeWhile.TakeT i keep Es) (proj₁ (husk-of sy))
 
 ------------------------------------------------------------------------
 -- NO ISLE IN A PART: every connect in it attached, closed, or not yet
@@ -910,7 +906,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Fr Cr C Rg c owes E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (not (CS.closed k))
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β
             → Flags C k β → Frozen k ≈ E → ConnE (CS.connAt k) (Frozen k) β E′ → Behind C (Frozen k) → Subd (scopeOf c) C k
-            → NoIsle b → Fr Cr C (Parts.Rs pt) (inSrc k b c) owes E
+            → AttFin k → NoIsle b → Fr Cr C (Parts.Rs pt) (inSrc k b c) owes E
     -- a source ended while its connect runs: nothing reads what is left
     f-srcc  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {C Rg Rg′ E E′ β P}
             → Fr Cr C Rg c owes E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (CS.closed k)

@@ -17,7 +17,7 @@ open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; �
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (lookup)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (inj₁; inj₂; [_,_]′)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (tt)
 open import Data.Maybe using (just; nothing)
 open import Function using (Equivalence)
@@ -27,7 +27,7 @@ open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline; ix; last; sub; ofᴱ; <ᵖ-split; <ᵖ-step)
-open import denotation.EmissionSet using (EmissionSet; out; end; _≺_; _≼_; Den; hot; coldAt; DenEnv; ⟦_⟧; Ended; enter; shown; heard;
+open import denotation.EmissionSet using (EmissionSet; out; end; pin; _≺_; _≼_; Den; hot; coldAt; DenEnv; ⟦_⟧; Ended; enter; shown; heard;
   ended; late; InE; MapT; map-out; map-end; map-skip; map-pin; module Joining; module Scan;
   module TakeWhile; module Connecting; module Bounded; module Switch)
 open import denotation.Laws.Modulus using (≼-≺-≺; ≺-trans; ≺-ext; ≺-absurd; ≼-antisym; ≼-false; ≼-or-≻)
@@ -190,12 +190,27 @@ module _ {A B : Set} (P : Pol A B) (O : EmissionSet A) (Over : Pos → Set) (Cut
   jany (rpass () _ _)
   jany (rhand () _)
 
+  -- A pin: an outer pin, or a pin a begun lane keeps.
+  jpin : ∀ {k r} → JoinT k (pin r) → O k (pin r) ⊎ Σ Pos λ q → Σ A λ a → O q (out a) × Runs P q × Kept P q a k (pin r)
+  jpin (opin x)             = inj₁ x
+  jpin (lane x ru l nc _)   = inj₂ (_ , _ , x , ru , inj₁ (l , nk nc))
+  jpin (left x ru l nc ins) = inj₂ (_ , _ , x , ru , inj₂ (_ , refl , l , nk nc , ins))
+  jpin (run () _)
+
 join-any : ∀ {A B} op (F : A → Den B) (O : EmissionSet A) {k e} → JoinF op F O k e → JR (polF op F O) O k
 join-any (mergeᶠ nothing)  F O = jany (polF (mergeᶠ nothing) F O) O (Ended O) (λ _ _ → ⊥) (λ _ → ⊥) (λ _ ())
 join-any (mergeᶠ (just m)) F O = jany (polF (mergeᶠ (just m)) F O) O (Ended O) (λ _ _ → ⊥) (Bounded.Queued m F O) (λ _ ())
 join-any switchᶠ           F O = jany (polF switchᶠ F O) O (Ended O) (Switch.Cut F O) (λ _ → ⊥)
   (λ nc {q′} (a′ , x′ , qq′) q′k → nc (q′ , a′ , x′ , qq′ , q′k))
 join-any exhaustᶠ          F O = jany (polF exhaustᶠ F O) O (Ended O) (λ _ _ → ⊥) (λ _ → ⊥) (λ _ ())
+
+join-pin : ∀ {A B} op (F : A → Den B) (O : EmissionSet A) {k r} → JoinF op F O k (pin r)
+         → O k (pin r) ⊎ Σ Pos λ q → Σ A λ a → O q (out a) × Runs (polF op F O) q × Kept (polF op F O) q a k (pin r)
+join-pin (mergeᶠ nothing)  F O = jpin (polF (mergeᶠ nothing) F O) O (Ended O) (λ _ _ → ⊥) (λ _ → ⊥) (λ _ ())
+join-pin (mergeᶠ (just m)) F O = jpin (polF (mergeᶠ (just m)) F O) O (Ended O) (λ _ _ → ⊥) (Bounded.Queued m F O) (λ _ ())
+join-pin switchᶠ           F O = jpin (polF switchᶠ F O) O (Ended O) (Switch.Cut F O) (λ _ → ⊥)
+  (λ nc {q′} (a′ , x′ , qq′) q′k → nc (q′ , a′ , x′ , qq′ , q′k))
+join-pin exhaustᶠ          F O = jpin (polF exhaustᶠ F O) O (Ended O) (λ _ _ → ⊥) (λ _ → ⊥) (λ _ ())
 
 kept-lane : ∀ {A B} {P : Pol A B} {q a k e} → Kept P q a k e → Lane P q a k e
 kept-lane (inj₁ (l , _))         = l
@@ -299,7 +314,7 @@ mutual
   src-f : ∀ {Γ X B} {Rg C} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B} {p}
         → Src (CS.scope k) Rg C k o → Env (full (CS.scope k)) C p → EnvF (full (CS.scope k)) p → Lo (connS k o b) (at p)
         → Behind (bef p) (Frozen k)
-  src-f {C = C} (src-on _ sy bh _) env ef lo = behind-bef {C = C} bh (few sy env ef (λ ki → lo (k-kid (k-src ki))))
+  src-f {C = C} (src-on _ sy bh _ _) env ef lo = behind-bef {C = C} bh (few sy env ef (λ ki → lo (k-kid (k-src ki))))
   src-f {C = C} (src-shut _ _ tp hk bh _) env ef lo = behind-bef {C = C} bh (tailp-lag {C = C} tp (husk-f hk (λ ki → lo (k-kid (k-src ki)))))
   src-f {k = k} {b = b} {p = p} (src-pend {o = o′} _ _ be a _ _ _) env ef lo =
     behind-pend {C = bef p} {k = k} refl a (lo-at lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
@@ -461,8 +476,8 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
            → Src (CS.scope k) Rg (bef p) k o
     src-sh {k = k} {b = b} (src-pend {o = o′} na nc be adm pr wn _) env ef lo =
       src-pend na nc be adm pr wn (lo-at lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
-    src-sh {k = k} (src-on nc sy bh sd) env ef lo =
-      src-on nc (sh sy env ef lo′) (behind-bef {C = C} bh (few sy env ef lo′)) (subd′ sd)
+    src-sh {k = k} (src-on nc sy bh sd af) env ef lo =
+      src-on nc (sh sy env ef lo′) (behind-bef {C = C} bh (few sy env ef lo′)) (subd′ sd) af
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-src ki))
     src-sh {k = k} (src-shut cl sp tp hk bh sd) env ef lo =
       src-shut cl (spent sp) (td tp) hk (behind-bef {C = C} bh (tailp-lag {C = C} tp (husk-f hk (λ ki → lo (k-kid (k-src ki)))))) (subd′ sd)

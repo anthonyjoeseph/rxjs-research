@@ -21,7 +21,7 @@ only what its husk still runs, but for finitely many rows. Open: whether
 every pin past the stop is of a burst begun before it. Settled by bodies
 reading the stop's row against the husk.
 
-Members: `took-tail`, `shut-tail`.
+Members: `shut-tail`.
 
 #### THE ISLE'S CURSOR
 

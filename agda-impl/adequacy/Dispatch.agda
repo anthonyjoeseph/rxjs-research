@@ -393,8 +393,8 @@ module Over {R : Set} (Rt : EmissionSet R) where
   -- A pending source, read as subscribing.
   srcp : ∀ {Cr C Γ A} {c : Ctx R Γ A} {o q Rg N E} → Fr Rt Cr C Rg c N E → N ≡ pnd q
        → pendRows (full (scopeOf c)) o q ≈ E → Within Rg (scopeOf c) q → PendV Cr C c o q
-  srcp {C = C} (f-srcp {k = k} fr sc pt lv nc _ ba (ok , adm) bs fl fe eq ow sd nb) refl pe wn =
-    inj₁ (_ , _ , f-src fr sc pt lv nc bs fl fe eq (behind-pend {C = C} {k = k} sc (ok , adm) ow) sd nb , ow , ok-step (CS.connAt k) ok , adm , pe , wn)
+  srcp {C = C} (f-srcp {k = k} fr sc pt lv nc na ba (ok , adm) bs fl fe eq ow sd nb) refl pe wn =
+    inj₁ (_ , _ , f-src fr sc pt lv nc bs fl fe eq (behind-pend {C = C} {k = k} sc (ok , adm) ow) sd (λ t → ⊥-elim (notT _ na t)) nb , ow , ok-step (CS.connAt k) ok , adm , pe , wn)
   srcp (f-islep {k = k} u hb le na nc ba sc (ok , adm) ss nb) refl pe wn =
     inj₁ (_ , _ , f-isle u hb le na nc (behind-pend {C = bef (CS.connAt k ++ [ ix 1 ])} {k = k} sc (ok , adm) (≼-refl {CS.connAt k ++ [ ix 1 ]}))
                          (subd (λ o → o) ok) ss nb
@@ -410,7 +410,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   srcp (f-lane _)                                               ()   _ _
   srcp (f-lnct {b = true} _)                                    ()   _ _
   srcp (f-lnct {b = false} _)                                   ()   _ _
-  srcp (f-src _ _ _ _ _ _ _ _ _ _ _ _)                          ()   _ _
+  srcp (f-src _ _ _ _ _ _ _ _ _ _ _ _ _)                        ()   _ _
   srcp (f-srcc _ _ _ _ _ _ _ _ _ _ _ _)                         ()   _ _
   srcp (f-body _ _ _ _ _ _ _)                                   ()   _ _
   srcp (d-map _)                                                ()   _ _
@@ -539,7 +539,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   closed-off (f-lane fr)                                         t = closed-off fr t
   closed-off (f-lnct {b = true} fr)                              t = closed-off fr t
   closed-off (f-lnct {b = false} fr)                             _ = tt
-  closed-off (f-src {k = k} fr _ _ _ nc _ _ _ _ _ _ _)           t = closed-off fr (and-right (CS.srcAtt k) (or-right (CS.closed k) nc t))
+  closed-off (f-src {k = k} fr _ _ _ nc _ _ _ _ _ _ _ _)         t = closed-off fr (and-right (CS.srcAtt k) (or-right (CS.closed k) nc t))
   closed-off (f-srcc _ _ _ _ _ _ _ _ _ _ _ _)                    _ = tt
   closed-off (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)                _ = tt
   closed-off (f-body fr _ _ _ _ _ _)                             t = closed-off fr t
