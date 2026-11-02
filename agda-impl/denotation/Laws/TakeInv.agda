@@ -21,10 +21,10 @@ open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
 open import denotation.Events using (Pos; Label; ix; last; inside; inside-++; <ᵖ-part; <ᵖ-split; <ᵖ-apart)
-open import denotation.EmissionSet using (Ev; out; end; skip; pin; Silent; held; EmissionSet; _≺_; module TakeWhile; module Op)
-open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺-ext; ≼-false; ≼-or-≻)
+open import denotation.EmissionSet using (Ev; out; end; skip; pin; EmissionSet; _≺_; module TakeWhile; module Op)
+open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺-ext; ≼-false; ≼-or-≻; ≼-≺-≺)
 open import denotation.Laws.Worlds using (Plain; plain-ix; plain-last; W; W⁼; step; here; inW; real-snoc; Real; InvAt; InvD; ⊑-refl;
-  ⊑-snoc⁺; ⊑-snoc; ⊑-inside; inside-⊑; conv; ext≢; same-lead; flat-under; _⊑_; w-up; nest⁼)
+  ⊑-snoc⁺; ⊑-snoc; ⊑-inside; inside-⊑; conv; ext≢; same-lead; flat-under; _⊑_; w-up; nest⁼; PinBy)
 
 private
   T-not : ∀ {b} → T b → T (not b) → ⊥
@@ -137,13 +137,15 @@ private
           (conv {w} {w} {r} {y} (⊑-refl w) (λ lt → nfw (r , _ , xr , nk , lt)) (≺-trans {r} {r ++ [ last ]} {y} (≺-ext r []) cy) (inside-⊑ w y iy))))) , iy
     bu (sh {q = r} xr nk nf sh-stop refl) (sh xy nk′ nf′ k′ refl) cy = ⊥-elim (stop-sh xr nk xy nf′ k′ cy)
 
-    -- Only skips follow an end.
-    qu : ∀ {c y e} → Vw c end → Vw y e → c ≺ y → Silent e
-    qu _ (sm _ (s-left _)) _ = held
-    qu (sm xc (s-own _ _)) (sm xy (s-own _ _)) cy = InvAt.quiet I xc xy cy
+    -- Only pins follow an end: the source's own, or, past a stop, a pin
+    -- whose connect subscribed before the failing value.
+    qu : ∀ {c y e} → Vw c end → Vw y e → c ≺ y → PinBy c e
+    qu (sm xc (s-own _ _)) (sm xy _) cy = InvAt.quiet I xc xy cy
+    qu (sh {q = r} xr nk nf sh-stop refl) (sm xy (s-left {w} nfw)) cy =
+      w , refl , ≼-≺-≺ {w} {r} {r ++ [ last ]} (λ lt → nfw (r , _ , xr , nk , lt)) (≺-ext r [])
     qu {c} (sm xc (s-own _ _)) (sh {q = q′} xy _ _ _ refl) cy with ≼-or-≻ q′ c
     ... | inj₂ lt with InvAt.quiet I xc xy lt
-    ...   | ()
+    ...   | _ , () , _
     qu {c} (sm xc (s-own _ _)) (sh {q = q′} xy _ _ _ refl) cy | inj₁ le with same-lead I xy xc (conv (⊑-refl q′) le cy (⊑-snoc⁺ q′))
     ... | refl with InvAt.func I xy xc
     ...   | ()

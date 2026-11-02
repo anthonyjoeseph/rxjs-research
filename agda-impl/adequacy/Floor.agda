@@ -27,7 +27,7 @@ open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Mode; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising; nx; cp; closed; closedUp; alive; unsub; cut; killAll; ended; settle; shutAt;
                     attAt; attached; free; cpAt; cutAt; overAt; search; found; own; run; unsubIf; feed; feedL; queued; inbox; Mark; ofM; attM; cpM; cutM; bodyM; srcAttM; owedM; joinM; leafM; Ev)
-open import operation.Key using (at; after; _<ᴷ_; at-<ᴷ)
+open import operation.Key using (at; after; _<ᴷ_; at-<ᴷ; <ᴷ-asym)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-cut; k-take; k-src; k-body; Lo)
 open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-least; found-plug)
 open import adequacy.Stamped using (frame-ahead; opening-ahead; pend-focus; inbox-asc)
@@ -35,7 +35,7 @@ open import adequacy.Weight using (Clock)
 open import adequacy.Path using (_⊑_; ⊑i; ⊑-trans; Path; _⇜_)
 
 open import adequacy.Apart.Floor using (floor)
-open import adequacy.Floor.Keys using (Fewer; Into; asym; at-after; at-after₀; cold-key; cut-in; ended-in; ext-le; ext-⊑; feed-key; fewer-same; flat-in; kill-in; lanes-in; lo-weaken; own-fewer; plug-in; same-l; shut-fewer; sub-at; top-max; unsubIf-in; ⊑-refl)
+open import adequacy.Floor.Keys using (Fewer; Into; at-after; at-after₀; cold-key; cut-in; ended-in; ext-le; ext-⊑; feed-key; fewer-same; flat-in; kill-in; lanes-in; lo-weaken; own-fewer; plug-in; same-l; shut-fewer; sub-at; top-max; unsubIf-in; ⊑-refl)
 
 -- Once absorbed, the clock is no earlier than a bound on every key.
 clock-abs : ∀ {R Γ A} (c : Ctx R Γ A) s r {X} → Lo (plug c s) X → X ⊑ Clock ⟨ c , s , absorbed , r ⟩
@@ -79,7 +79,7 @@ fed-lo c k k′ s b q e fw fl = sub-at c {connS k s b} {connS k′ s (feed (here
     into (k-kid (k-src h)) = inj₁ (k-kid (k-src h))
     into {κ} (k-kid (k-body h)) with feed-key (here refl) q e b h
     ... | inj₁ h′ = inj₁ (k-kid (k-body h′))
-    ... | inj₂ lt = inj₂ (asym (at (q ++ [ ix 0 ])) κ lt)
+    ... | inj₂ lt = inj₂ (<ᴷ-asym (at (q ++ [ ix 0 ])) κ lt)
 
 -- A takeWhile's failing value: its end owed below where it fell.
 take-owe : ∀ {Γ A} {i f} (s : St Γ A) q → Into (at q) (takeS i f free s) (takeS i f (cpAt q) s)
@@ -173,7 +173,7 @@ module _ {R : Set} where
   begins o c (connect s′ b)     q pth lo refl = ext-⊑ q [ ix 0 ]
   begins o c (defer l)          q pth lo refl = ext-⊑ q [ ix 1 ]
   begins o c (cold x)           q pth lo refl =
-    absorb c (pend (cold x) q) (coldS true (opening q (timelineAt x q))) q (λ {κ} h → inj₂ (asym (at q) κ (opening-ahead o pth (cold-key h)))) lo
+    absorb c (pend (cold x) q) (coldS true (opening q (timelineAt x q))) q (λ {κ} h → inj₂ (<ᴷ-asym (at q) κ (opening-ahead o pth (cold-key h)))) lo
   begins o c empty              q pth lo refl = absorb c (pend empty q) (ofS 0 q []) q (λ h → inj₂ (of-key 0 q [] h)) lo
   begins o c (of xs)            q pth lo refl = absorb c (pend (of xs) q) (ofS 0 q xs) q (λ h → inj₂ (of-key 0 q xs h)) lo
   begins o c (connected x)      q pth lo eq with closedUp c x
@@ -204,11 +204,11 @@ module _ {R : Set} where
   leafs c q true  (play τ u i t (emit a f))  (here refl) lo ah refl | false = ⊑-refl
   leafs c q true  (play τ u i t (stall f)) {κ} (here refl) lo ah refl | false =
     absorb c (coldS true (play τ u i t (stall f))) (coldS true (play τ u (suc i) t (Frame∞.force f))) q
-      (λ { (k-own (here refl)) → inj₂ (asym κ (at (u ++ [ ix (suc i) ])) (trans (at-<ᴷ (u ++ [ ix i ]) (u ++ [ ix (suc i) ])) (<ᵖ-part u [] [] (<ᵖ-ix i))))
+      (λ { (k-own (here refl)) → inj₂ (<ᴷ-asym κ (at (u ++ [ ix (suc i) ])) (trans (at-<ᴷ (u ++ [ ix i ]) (u ++ [ ix (suc i) ])) (<ᵖ-part u [] [] (<ᵖ-ix i))))
          ; (k-own (there ())) ; (k-kid ()) }) lo
   leafs c q true  (play τ u i t (close f)) {κ} (here refl) lo ah refl | false =
     absorb c (coldS true (play τ u i t (close f))) (coldS true (rest τ (u ++ [ last ]) (From∞.force f))) q
-      (λ {κ′} h → inj₂ (asym κ κ′ (ah refl (cold-key h)))) lo
+      (λ {κ′} h → inj₂ (<ᴷ-asym κ κ′ (ah refl (cold-key h)))) lo
 
   -- A connect's admin mark: its body subscribed where it was keyed, or
   -- absorbed keeping fewer keys.
@@ -264,7 +264,7 @@ module _ {R : Set} where
   runs c q (leafK b l) mi lo ah asc eq = leafs c q b l mi lo (λ e → ah (cong (coldS b) e) refl) eq
   runs c q (stopK i f r s₀) (here refl) lo ah asc refl =
     md-at (if not (closed c) then rising cp else absorbed) c (takeS i f (cpAt r) s₀) (takeS i f (cutAt r) s₀) (r ++ [ last ])
-      (λ { (k-own (here refl)) → inj₂ (asym (at (r ++ [ last ])) (after r) (at-after r [ last ])) ; (k-own (there ())) ; (k-kid (k-take h)) → inj₁ (k-kid (k-take h)) }) lo
+      (λ { (k-own (here refl)) → inj₂ (<ᴷ-asym (at (r ++ [ last ])) (after r) (at-after r [ last ])) ; (k-own (there ())) ; (k-kid (k-take h)) → inj₁ (k-kid (k-take h)) }) lo
   runs c q (stopK i f r s₀) (there ()) lo ah asc eq
   runs c q (cutK i f r s₀) mi lo ah asc refl =
     absorb c (takeS i f (cutAt r) s₀) (takeS i f (overAt r) (proj₁ (cut s₀))) r

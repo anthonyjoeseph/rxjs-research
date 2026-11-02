@@ -14,28 +14,11 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE DEAD PART'S TAIL
-
-A part that stops (take's failure, a source's end) owes past the cursor
-only what its husk still runs, but for finitely many rows. Open: whether
-every pin past the stop is of a burst begun before it. Settled by bodies
-reading the stop's row against the husk.
-
-Members: `took-tail`, `shut-tail`.
-
-#### THE ISLE'S CURSOR
-
-An isle's binders, read at its own cursor, lie at or past the least key
-with finitely many before it. Open: whether the isle's cursor moves only
-within its burst once torn from the root's. Settled by a body over `Subd`.
-
-Members: `isle-env`.
-
 #### THE SHIFT UNDER A FOCUS
 
 The frames shifted to the least key and the hole's environment past it;
-the hole shifts by `shift`. Open: nothing beyond `shift` per frame and
-`isle-env` at an isle's. Settled by a body by frame.
+the hole shifts by `shift`. Open: nothing beyond `shift` per frame.
+Settled by a body by frame.
 
 Members: `fr-env`.
 
@@ -48,14 +31,12 @@ Members: `join-past`.
 
 #### THE CONNECT STEPPED
 
-A connect entered, a joiner joined, a source's or body's rise, its own
+A joiner joined, a source's or body's rise, its own
 marks, a joiner's next and a take's failure, each keeping `Inv`. Open:
 whether every entry lands a region apart from its siblings' and clear of
 its scope's hots, so the rest moves past `p`. Settled when each is a body.
 
-Members: `sub-join`, `sub-joined`, `run-con`, `run-join-nx`,
-`run-join-cp`, `rise-take-failᵢ`, `feed-up`, `conn-parts`, `flat-sound`,
-`flat-within`.
+Members: `sub-join`, `sub-joined`, `run-join-nx`, `run-join-cp`, `rise-take-failᵢ`, `feed-up`.
 
 #### THE JOINER STEPPED
 
@@ -65,7 +46,7 @@ Open: whether begun lanes stay ascending (`Asc`), and whether `Begun`'s
 live count makes a freed slot the queue head's `Starts.queued`. Settled
 when each is a body.
 
-Members: `rise-outer-nx`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`.
+Members: `rise-outer-bounded`, `rise-outer-switch`, `rise-outer-exhaust`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`.
 
 #### THE GUARD ROWS
 
@@ -104,7 +85,7 @@ Believed: a subscription's entry is its program's meaning there, and an
 of's next delivers its next row. Settled when each is a body.
 
 Members: `sub-empty`, `sub-of`, `sub-map`, `sub-defer`, `run-of-nx`, `run-of-end`,
-`flat-jinv`, `flat-joined`, `conn-flags`, `conn-ok`.
+`conn-flags`.
 
 ## Tier 1 — the simultaneous spec
 

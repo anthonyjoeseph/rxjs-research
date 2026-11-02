@@ -19,7 +19,7 @@ open import Data.Unit using (tt)
 open import denotation.Events using (Pos; root)
 open import denotation.EmissionSet using (Ev; out; end; EmissionSet; enter; ⟦_⟧; Den; _≺_; _≼_; Dep; Silent; Seen)
 open import denotation.Laws.Modulus using (≼-or-≻; entered-few)
-open import denotation.Laws.Worlds using (InvAt)
+open import denotation.Laws.Worlds using (InvAt; pinby-silent)
 open import denotation.Laws using (inv-⟦⟧)
 open import denotation.Read using (Meets; Run; Visible; loud; cursor; []; _∷_)
 import denotation.Read as Read
@@ -80,7 +80,7 @@ module _ {A} (d : Den A) (p₀ : Pos) (quiet : ∀ {c y e} → enter d p₀ c en
 
 -- Only silent rows follow a program's end.
 quiet-root : ∀ {R} (o : PureObs [] R) {c y e} → enter (⟦ o ⟧ []ᴬ) root c end → enter (⟦ o ⟧ []ᴬ) root y e → c ≺ y → Silent e
-quiet-root o = InvAt.quiet (inv-⟦⟧ o []ᴬ (λ ()) root (tt , λ ()))
+quiet-root o c y cy = pinby-silent (InvAt.quiet (inv-⟦⟧ o []ᴬ (λ ()) root (tt , λ ())) c y cy)
 
 met-of-shown : ∀ {R} {o : PureObs [] R} {vs} → Shows* (enter (⟦ o ⟧ []ᴬ) root) vs → Meets (enter (⟦ o ⟧ []ᴬ) root) vs
 met-of-shown {o = o} = run-of (⟦ o ⟧ []ᴬ) root (quiet-root o) nothing

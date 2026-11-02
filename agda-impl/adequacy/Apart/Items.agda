@@ -35,10 +35,10 @@ open import denotation.Events using (Pos; ix; last; _<ᵖ_; <ᵖ-part; <ᵖ-tran
 open import operation.PureObservable using (module Machine; Tape; play; ending) renaming (over to overT)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Att; attAt; attached; Owe; free; cpAt; cutAt; overAt; Ev; plug; own; unsub; cut; killAll; unsubIf; ended)
-open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᴷ; ≮ᴷ-trans)
+open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᴷ; ≮ᴷ-trans; <ᴷ-asym)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
 open import adequacy.Stamped using (Ix; ix-⊕; StOK; LOK; QOK; MOK)
-open import adequacy.Floor.Keys using (asym; at-after; OwnOf; ob; os; oo; own-cls; own-bld)
+open import adequacy.Floor.Keys using (at-after; OwnOf; ob; os; oo; own-cls; own-bld)
 open import adequacy.Apart.Cone using (cone-ge)
 open import adequacy.Apart.Region using (Rg; cn; tl; pt; bk; In; Sep; sep-sym; NoCl; Keyed; self)
 
@@ -385,7 +385,7 @@ tl-keyed {u} {i} h hu k y (inj₂ c) = past-of {u ++ [ ix i ]} h (≼-trans (inj
 
 -- A take's teardown after the end it owes.
 pt-under : ∀ p y h → at (p ++ y) <ᴷ h ≡ false → Keyed h (pt p)
-pt-under p y h k = ≮ᴷ-trans (after p) (at (p ++ y)) h (asym (at (p ++ y)) (after p) (at-after p y)) k
+pt-under p y h k = ≮ᴷ-trans (after p) (at (p ++ y)) h (<ᴷ-asym (at (p ++ y)) (after p) (at-after p y)) k
 
 private
   ib-keyed : ∀ {A h} q (e : Ev A) ib → QOK ((q , e) ∷ ib) → at q <ᴷ h ≡ false → All (Keyed h) (ibI ((q , e) ∷ ib))

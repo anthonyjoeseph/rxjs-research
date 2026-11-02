@@ -22,7 +22,8 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; unbound; binds; CS; Owe
 open import denotation.Laws.Modulus using (≼-refl; ≺→≼; ≺-ext; ≺-irrefl; ≺-trans; ≼-or-≻)
 open import adequacy.Rows using (≼-≢; _≃_; _⇄_; ≃-refl; Moves; silent; shown; toEv; full; pendRows)
 open import denotation.Laws.Worlds using (Ok; Hots)
-open import adequacy.Cursor using (Adm; Calm; Cur; Due; Fly; Folded; Fr; Hold; Husk; NoFail; Owes; Rest; Sound; SrcH; Sync; Unread; Within; _∪ᵖ_; _≈_; _⊑_; aft; alike; bef; c-abs; cut-husk; d-body; d-cut; d-ln; d-map; d-scan; d-take; dead; f-body; f-cut; f-lane; f-lnct; f-map; f-scan; f-take; f-took; f-top; fd-last; fd-none; h-conn; h-cut; h-ln; h-map; h-scan; h-take; husk-of; lane; lanecut; notT; o-cp; o-cut; o-over; owes; peel-cut; peel-take; pnd; s-conn; s-cut; s-map; s-scan; s-take; s-took; tailp-dn; tailp-⊑; took-tail; un-dead; un-torn; unsub-husk; unsubIf-husk; vis; ∪-⊑; ⊑-refl; ⊑-trans)
+open import adequacy.Cursor using (Adm; Calm; Cur; Due; Fly; Folded; Fr; Hold; Husk; NoFail; Owes; Rest; Sound; SrcH; Sync; Unread; Within; _∪ᵖ_; _≈_; _⊑_; aft; alike; bef; c-abs; cut-husk; d-body; d-cut; d-ln; d-map; d-scan; d-take; dead; f-body; f-cut; f-lane; f-lnct; f-map; f-scan; f-take; f-took; f-top; fd-last; fd-none; h-conn; h-cut; h-ln; h-map; h-scan; h-take; husk-of; lane; lanecut; notT; o-cp; o-cut; o-over; owes; peel-cut; peel-take; pnd; s-conn; s-cut; s-map; s-scan; s-take; s-took; tailp-dn; tailp-⊑; un-dead; un-torn; unsub-husk; unsubIf-husk; vis; ∪-⊑; ⊑-refl; ⊑-trans)
+open import adequacy.PinTail using (took-tail)
 
 open _≃_
 
@@ -38,7 +39,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Fr Rt Cr C Rg c N E → Hold (scopeOf c) Rg C N s E → Inv Cr C ⟨ c , s , m , p ⟩
     pending : ∀ {Γ A} {c : Ctx R Γ A} {o q p Cr C Rg E}
             → Fr Rt Cr C Rg c owes E
-            → Owes C q × Ok (Hots (full (scopeOf c))) q × Adm (scopeOf c) × pendRows (full (scopeOf c)) o q ≈ E × Within Rg (scopeOf c) q
+            → Owes C q × Ok (Hots (full (scopeOf c))) q × Adm (scopeOf c) × pendRows (full (scopeOf c)) o q ≈ E
+              × Within Rg (scopeOf c) q (pendRows (full (scopeOf c)) o q)
             → Inv Cr C ⟨ c , pend o q , subscribing , p ⟩
     flying  : ∀ {Γ A} {c : Ctx R Γ A} {s e p Cr Rg N E}
             → Fr Rt Cr (bef p) Rg c N E → closed c ≡ false → Fly (scopeOf c) Rg p N s E e → Inv Cr (bef p) ⟨ c , s , rising e , p ⟩
@@ -219,7 +221,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     { (flying (f-take fr nf eq sd) cl (sy , row)) → let nk = subst (λ b → T (not b)) (sym kf) _ in
         settled c-abs fr (s-took (a , row , nk , λ (_ , _ , y , nk , qp) → nf y nk qp)
                                  (λ pq → pq) (λ ()) (o-cp (≺→≼ {p} {p ++ [ last ]} (≺-ext p {last} [])))
-                                 (took-tail sy sd row nk nf) (proj₂ (husk-of sy)) eq sd)
+                                 (took-tail sy row nk nf) (proj₂ (husk-of sy)) eq sd)
     ; (flying (f-took _ _ _ _ _ _ _ _) _ ())
     ; (flying (d-take _) _ ())
     ; (adrift (f-took _ _ _ _ () _ _ _) _ _)

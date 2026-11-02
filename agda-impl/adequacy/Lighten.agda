@@ -42,7 +42,7 @@ open import adequacy.Simulation using (Simulation; module Along)
 open import adequacy.Cursor.Rise using (settled)
 import adequacy.Walk as Walk
 open import adequacy.Walk using (due-≈)
-open import adequacy.Bound using (bound)
+open import adequacy.Bound using (bound; lo-p)
 open _≃_ using (from)
 open import denotation.Laws.Modulus using (≼-false)
 
@@ -101,7 +101,7 @@ mark-short {R} o {rs} {c = c} {s} {p = p} {u = u} pth m fd
 ... | (Cr , C , settled _ fr h , _) , r | ((tp , _) , _) , vi , ap , _ with Walk.climb (enter (⟦ o ⟧ []ᴬ) root) fr h
 ...   | _ , _ , eq , sy =
   trans (at-<ᴷ p u)
-    (≼-false {u} {p} (bound sy (λ ()) (proj₂ (found-least {t = plug c s} fd))
+    (≼-false {u} {p} (bound sy (λ ()) (lo-p (proj₂ (found-least {t = plug c s} fd)))
       (from (due-≈ {C = Cr} eq) (proj₁ (from r (back (cursorᴿ nothing (conv rs)) tp ap , vi))))))
 
 private

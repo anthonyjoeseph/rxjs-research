@@ -17,11 +17,11 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import denotation.Events using (Pos; Label; ix; last; inside; inside-++; inside-self; <ᵖ-part; <ᵖ-ix)
 open import denotation.Events using (ofᴱ; Events)
-open import denotation.EmissionSet using (Ev; out; end; skip; pin; Silent; hush; held; EmissionSet; _≺_; Den; enter; Truncate; InE;
-  at-out; at-end; on-out; on-skip; spin; MapT; map-out; map-skip; map-end; map-pin; Spin;
-  module Scan; DeferT; guard; body; from; module Op)
+open import denotation.EmissionSet using (Ev; out; end; skip; pin; EmissionSet; _≺_; Den; enter; Truncate; InE; at-out; at-end; on-out;
+  on-skip; spin; MapT; map-out; map-skip; map-end; map-pin; Spin; module Scan; DeferT; guard;
+  body; from; module Op)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≼-antisym; ≺-ext; LimD)
-open import denotation.Laws.Worlds using (InvAt; InvD; Ok; Plain; Real; W; W⁼; _⊑_; anc-lead; apart; ext≢; here; inW; leads; nest-in; nest⁼; not-up; ok-step; plain-ix; plain-last; real-snoc; shrink; shrink⁼; sib; step; world-after; world-anc⁼; ⊑-snoc; ⊑-snoc⁺; ⊑-trans)
+open import denotation.Laws.Worlds using (InvAt; InvD; Ok; PinBy; Plain; Real; W; W⁼; _⊑_; anc-lead; apart; ext≢; here; inW; leads; nest-in; nest⁼; not-up; ok-step; plain-ix; plain-last; real-snoc; shrink; shrink⁼; sib; step; world-after; world-anc⁼; ⊑-snoc; ⊑-snoc⁺; ⊑-trans)
 
 ------------------------------------------------------------------------
 -- The leaves keep it
@@ -37,7 +37,7 @@ private
   -- A READING ONE LABEL DEEP keeps the invariant: its rows are siblings,
   -- under `p` together.
   shallow-inv : ∀ {A H p} {X : EmissionSet A} → Ok H p → (∀ {y e} → X y e → Below p y)
-              → (∀ {y e e′} → X y e → X y e′ → e ≡ e′) → (∀ {c y e} → X c end → X y e → c ≺ y → Silent e)
+              → (∀ {y e e′} → X y e → X y e′ → e ≡ e′) → (∀ {c y e} → X c end → X y e → c ≺ y → PinBy c e)
               → (∀ {y r} → X y (pin r) → ⊥) → InvAt H p X
   shallow-inv {H = H} {p} (r , _) sh fu qu np = record
     { world = λ x → wo (sh x)
@@ -73,7 +73,7 @@ private
   -- A reading whose rows are another's, ends kept, keeps its invariant.
   inv-via : ∀ {A B H p} {X : EmissionSet A} {Y : EmissionSet B}
           → (bk : ∀ {y e} → X y e → Σ (Ev B) (Y y)) → (∀ {y} → X y end → Y y end)
-          → (∀ {y e} (x : X y e) → Silent (proj₁ (bk x)) → Silent e)
+          → (∀ {y e r} (x : X y e) → proj₁ (bk x) ≡ pin r → e ≡ pin r)
           → (∀ {y r} → X y (pin r) → Y y (pin r))
           → (∀ {y e e′} → X y e → X y e′ → e ≡ e′) → InvAt H p Y → InvAt H p X
   inv-via bk be bs bp fu I = record
@@ -83,7 +83,7 @@ private
     ; flat  = λ x x′ → InvAt.flat I (proj₂ (bk x)) (proj₂ (bk x′))
     ; burst = λ c y cy → InvAt.burst I (be c) (proj₂ (bk y)) cy
     ; under = λ x y pl v le → InvAt.under I (proj₂ (bk x)) (proj₂ (bk y)) pl v le
-    ; quiet = λ c y cy → bs y (InvAt.quiet I (be c) (proj₂ (bk y)) cy)
+    ; quiet = λ c y cy → let (r , eq , lt) = InvAt.quiet I (be c) (proj₂ (bk y)) cy in r , bs y eq , lt
     ; pinned = λ x → InvAt.pinned I (bp x)
     }
 
@@ -102,6 +102,10 @@ private
 
   spin-skip : ∀ {A p y} {e : Ev A} → Spin p y e → e ≡ skip
   spin-skip (spin _) = refl
+
+  spin-end : ∀ {A p y} → Spin {A} p y end → ⊥
+  spin-end x with spin-skip x
+  ... | ()
 
   -- The rows of `of`, past the index it is at.
   of-idx : ∀ {A} p i (xs : List A) {y e} → InE (ofᴱ p i xs) y e → (Σ ℕ λ j → i ≤ j × y ≡ p ++ [ ix j ]) ⊎ y ≡ p ++ [ last ]
@@ -160,7 +164,7 @@ of-inv xs p ok = shallow-inv ok (λ x → of-below p 0 xs (proj₁ x)) (λ x x�
 
 spin-inv : ∀ {A H} → InvD H (Op.⊥ {A})
 spin-inv p ok = shallow-inv ok (λ { (spin i , _) → ix i , plain-ix , refl }) (λ x x′ → trans (spin-skip (proj₁ x)) (sym (spin-skip (proj₁ x′))))
-  (λ _ y _ → subst Silent (sym (spin-skip (proj₁ y))) hush) λ { (() , _) }
+  (λ c _ _ → ⊥-elim (spin-end (proj₁ c))) λ { (() , _) }
 
 map-inv : ∀ {A B H} (f : A → B) {s : Den A} → InvD H s → InvD H (Op.map f s)
 map-inv {A} {B} f {s} inv p ok = inv-via bk be bs bp fu (inv p ok)
@@ -189,9 +193,9 @@ map-inv {A} {B} f {s} inv p ok = inv-via bk be bs bp fu (inv p ok)
     be : ∀ {y} → Truncate (MapT f (enter s p)) y end → enter s p y end
     be (map-end x , _) = x
 
-    bs : ∀ {y e} (x : Truncate (MapT f (enter s p)) y e) → Silent (proj₁ (bk x)) → Silent e
-    bs (map-skip x , _) _ = hush
-    bs (map-pin x , _)  _ = held
+    bs : ∀ {y e r} (x : Truncate (MapT f (enter s p)) y e) → proj₁ (bk x) ≡ pin r → e ≡ pin r
+    bs (map-skip x , _) ()
+    bs (map-pin x , _)  refl = refl
     bs (map-out x , _)  ()
     bs (map-end x , _)  ()
 
@@ -244,11 +248,11 @@ scan-inv f z {s} inv p ok = inv-via bk be bs bp fu (inv p ok)
     be : ∀ {y} → Truncate (Scan.ScanT f z (enter s p)) y end → enter s p y end
     be (Scan.send x , _) = x
 
-    bs : ∀ {y e} (x : Truncate (Scan.ScanT f z (enter s p)) y e) → Silent (proj₁ (bk x)) → Silent e
+    bs : ∀ {y e r} (x : Truncate (Scan.ScanT f z (enter s p)) y e) → proj₁ (bk x) ≡ pin r → e ≡ pin r
     bs (Scan.sval (Scan.acc₀ _ _) , _)    ()
     bs (Scan.sval (Scan.acc _ _ _ _) , _) ()
-    bs (Scan.sstep x , _) _ = hush
-    bs (Scan.spin x , _)  _ = held
+    bs (Scan.sstep x , _) ()
+    bs (Scan.spin x , _)  refl = refl
     bs (Scan.send x , _)  ()
 
     bp : ∀ {y r} → Truncate (Scan.ScanT f z (enter s p)) y (pin r) → enter s p y (pin r)
@@ -329,9 +333,10 @@ defer-inv {A} {H} {s} inv p ok = record { world = wo ; real = re ; func = λ x x
       anc-lead (world-anc⁼ (nest⁼ (inW (step (inW (InvAt.world I b)) pl)) v)) le rg (early [])
     un (inj₂ b) (inj₂ b′) pl v le = InvAt.under I b b′ pl v le
 
-    qu : ∀ {c y e} → View c end → View y e → c ≺ y → Silent e
+    qu : ∀ {c y e} → View c end → View y e → c ≺ y → PinBy c e
     qu (inj₁ (_ , ())) _ _
-    qu _ (inj₁ (_ , refl)) _ = hush
+    qu {c} (inj₂ b) (inj₁ (refl , _)) cy =
+      ⊥-elim (≺-absurd {p ++ [ ix 1 ]} {p ++ [ ix 0 ]} (≺-trans {p ++ [ ix 1 ]} {c} {p ++ [ ix 0 ]} (after b) cy) (early []))
     qu (inj₂ b) (inj₂ b′) cy = InvAt.quiet I b b′ cy
 
     pn : ∀ {y r} → Truncate (DeferT s p) y (pin r) → W⁼ H p r × T (inside r y)

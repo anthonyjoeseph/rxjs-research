@@ -29,7 +29,7 @@ open import denotation.Laws.Worlds
   using (W; W⁼; step; timer; join; here; inW; plain-ix; Real; Ok; _⊕_; Lawful; InvAt; InvD; ok-step;
   real-snoc; shrink; shrink⁼; narrow; narrow⁼; ext≢; _⊑_; ⊑-refl; ⊑-snoc⁺; ⊑-trans; ⊑-snoc;
   ⊑-inside; inside-⊑; diverge; same-lead; flat-under; world-anc; world-anc⁼; anc-≼; apart;
-  anc-lead; tick-lead; Plain; widen⁼; nest⁼; w-up)
+  anc-lead; tick-lead; Plain; widen⁼; nest⁼; w-up; PinBy)
 
 module _ {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
          (Is : InvD H s) (IF : ∀ {t} → Lawful t → InvD (H ⊕ t) (F (hot t)))
@@ -231,6 +231,19 @@ module _ {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
   ... | inj₁ le = flat-under Iσ x x′ le
   ... | inj₂ e₂ = ext≢ (k ++ [ ix 0 ]) ys (trans eq (sym e₂))
 
+  -- A row echoed while the body runs lies before the body's end.
+  echo-before : ∀ {c k e′} → β c end → σ k e′ → Alive k → c ≺ (k ++ [ ix 0 ]) → ⊥
+  echo-before {c} {k} ce x a cy with <ᵖ-between k c [ ix 0 ] (Equivalence.to T-≡ (a ce)) (Equivalence.to T-≡ cy)
+  ... | zs , refl with source-leads (sw x) (bw ce) (zs , refl)
+  ...   | h , e , (_ , σh) , kh , (ms , eq) with same-lead Iσ x (proj₁ σh) kh
+  ...     | refl = ≺-absurd {k ++ zs} {k ++ [ ix 0 ]} cy
+                     (subst ((k ++ [ ix 0 ]) ≺_) (sym (trans eq (++-assoc k [ sub e ] ms)))
+                       (Equivalence.from T-≡ (<ᵖ-part k {ix 0} {sub e} [] ms refl)))
+
+  -- A body row lies past the connect.
+  p-before : ∀ {c e} → β c e → p ≺ c
+  p-before {c} ce = ≺-≼-≺ {p} {p₀} {c} (≺-ext p []) (anc-≼ (world-anc⁼ (bw ce)) (InvAt.real Iβ ce))
+
   between : ∀ {b c k} → b ≺ c → c ≺ k → b ⊑ k → b ⊑ c
   between {b} {c} bc ck (zs , refl) = <ᵖ-between b c zs (Equivalence.to T-≡ bc) (Equivalence.to T-≡ ck)
 
@@ -238,25 +251,26 @@ module _ {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
   bu (vs {k} {e′} _ _ _ eq) _ _ = end-tag k e′ eq
   bu (vb ce) (vb b) cy with InvAt.burst Iβ ce b cy
   ... | w , w⁼ , i = w , inW (narrow⁼ σ-wp w⁼) , i
-  bu {c} (vb ce) (vs {k} x (live a) refl _) cy with <ᵖ-between k c [ ix 0 ] (Equivalence.to T-≡ (a ce)) (Equivalence.to T-≡ cy)
-  ... | zs , refl with source-leads (sw x) (bw ce) (zs , refl)
-  ...   | h , e , (_ , σh) , kh , (ms , eq) with same-lead Iσ x (proj₁ σh) kh
-  ...     | refl = ⊥-elim (≺-absurd {k ++ zs} {k ++ [ ix 0 ]} cy
-                     (subst ((k ++ [ ix 0 ]) ≺_) (sym (trans eq (++-assoc k [ sub e ] ms)))
-                       (Equivalence.from T-≡ (<ᵖ-part k {ix 0} {sub e} [] ms refl))))
+  bu (vb ce) (vs x (live a) refl _) cy = ⊥-elim (echo-before ce x a cy)
   bu {c} (vb ce) (vs {k} x (brst i) refl _) cy = p , here , ⊑-inside (between pc cy py) , ⊑-inside py
     where
       py = ⊑-trans (pinned-under i) (⊑-snoc⁺ k)
-      pc : p ≺ c
-      pc = ≺-≼-≺ {p} {p₀} {c} (≺-ext p []) (anc-≼ (world-anc⁼ (bw ce)) (InvAt.real Iβ ce))
+      pc = p-before ce
   bu {c} (vb ce) (vs {k} x (kpt {p′} a′) refl _) cy with InvAt.pinned Iσ x
   ... | w⁼ , i = p′ , inW (shrink⁼ w⁼) , ⊑-inside (between (a′ ce) cy py) , ⊑-inside py
     where py = ⊑-trans (inside-⊑ p′ k i) (⊑-snoc⁺ k)
 
-  qu : ∀ {c y e} → V c end → V y e → c ≺ y → Silent e
+  -- Past the body's end, only pins: this connect's, subscribed before
+  -- any body row, or a source pin whose connect subscribed while the body
+  -- ran; a row echoed while the body runs lies before its end.
+  qu : ∀ {c y e} → V c end → V y e → c ≺ y → PinBy c e
   qu (vs {k} {e′} _ _ _ eq) _ _ = end-tag k e′ eq
-  qu (vb ce) (vb b) cy                = InvAt.quiet Iβ ce b cy
-  qu (vb _) (vs {k} {e′} _ _ _ refl) _ = tag-silent k e′
+  qu (vb ce) (vb b) cy          = InvAt.quiet Iβ ce b cy
+  qu (vb ce) (vs x (live a) refl _) cy = ⊥-elim (echo-before ce x a cy)
+  qu (vb ce) (vs x (brst i) refl eq) cy = p , trans eq (sym (tag-in i)) , p-before ce
+  qu (vb ce) (vs {k} {pin p′} x (kpt a′) refl eq) cy with inside r k
+  ... | true  = p , eq , p-before ce
+  ... | false = p′ , eq , a′ ce
 
   -- A pin, where it lies.
   pi : ∀ {y r′} → V y (pin r′) → W⁼ H p r′ × T (inside r′ y)
