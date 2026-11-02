@@ -39,13 +39,13 @@ open import adequacy.Cursor using (Cur; ≈-refl; Rgn; JoinE; Parts; Flags; src-
 open import adequacy.Cursor.Rise using (Inv; settled; pending; adrift; RT; SimC; keeps; rise-top; rise-map; rise-scan-nx; rise-scan-cp; rise-take-pass; rise-take-cp; rise-cut; rise-cutx; rise-ln; rise-took; rise-take-fail; rise-bodyx; run-stop; run-cut; run-att)
 open import adequacy.Path using (Path)
 open import adequacy.Isle.Step using (found-clear; found-con)
-open import adequacy.RunCon using (vis-≃; body-noisle; Ran; con-body)
+open import adequacy.RunCon using (vis-≃; body-noisle; Ran; con-body; con-att; Off; closed-off)
 open import adequacy.Stamped using (StOK; pend-of)
 open import adequacy.Isle using (G)
-open import adequacy.Floor.Keys using (own-cls; ob)
+open import adequacy.Floor.Keys using (own-cls; ob; os; plug-in)
 open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-least; found-mark; found-plug)
 open import adequacy.Walk using (due-≈; climb; descend; refocus; nowhere; none′)
-open import adequacy.Least using (Lo; seek-none)
+open import adequacy.Least using (Lo; seek-none; k-kid; k-src)
 open import adequacy.Bound using (bound; owes-≼; behind-past; behind-pend; join-past)
 open import adequacy.Few using (fr-shift)
 open import adequacy.Up using (rise-body-nx; rise-body-cp; rise-src-nx; rise-src-cp)
@@ -246,15 +246,6 @@ marked-pend {s = s} p mk with pend-shape s p
 ...   | ()
 
 
-or-right : ∀ a {b} → T (not a) → T (a ∨ b) → T b
-or-right false _ t = t
-
-and-right : ∀ a {b} → T (a ∧ b) → T b
-and-right true t = t
-
-and-left : ∀ a {b} → T (a ∧ b) → T a
-and-left true _ = tt
-
 -- What a part no live node reads still runs, kept by a mark's run.
 rest-of : ∀ {Γ} {sc : Scope Γ} {A} {i q} {xs : List A} {s″ : St Γ A} {P} → Rest sc (ofS i q xs) P → Rest sc s″ P
 rest-of (_ , h-blank , le) = _ , h-blank , le
@@ -365,19 +356,6 @@ module Over {R : Set} (Rt : EmissionSet R) where
     run-join-cp   : ∀ {Cr Γ A} {c : Ctx R Γ A} {j} {x : A ∈ Γ} {q ib r} → closed c ≡ false
                   → Inv Rt Cr (bef q) ⟨ c , joinS j true x ((q , cp) ∷ ib) , absorbed , r ⟩
                   → Inv Rt Cr (bef q) ⟨ c , joinS j false x ib , rising cp , q ⟩
-    -- A CONNECT'S SOURCE ATTACHED: its subscribe call returned, nothing
-    -- shown, the cursors kept.  What it needs that the invariant lacks:
-    -- `AttFin` for the attached source, finitely many of its rows inside
-    -- its subscribe call.  The attach is keyed `after` the call, so every
-    -- key inside it has run, but `few` bounds a node's past only below an
-    -- `at` key, and no position lies between the call and `after` it.  An
-    -- isle attaching in a torn part needs its burst inside what its husk
-    -- runs, but for finitely many, which is the same fact.
-    run-srcatt    : ∀ {Cr C Γ A X} {c : Ctx R Γ A} {k} {o : St Γ X} {b κ r k′ sh t}
-                  → run c (connS k o b) srcAttM r ≡ moved k′ sh t
-                  → (srcAttM , κ) ∈ own (connS k o b) → Lo (plug c (connS k o b)) κ → StOK (connS k o b) → G (connS k o b)
-                  → Inv Rt Cr C ⟨ c , connS k o b , absorbed , r ⟩
-                  → sh ≡ [] × Ran Rt Cr k′
     -- A CONNECT'S OWED TEARDOWN: its body over, its source stopped if
     -- attached, nothing shown.  What it needs that the invariant lacks: a
     -- `Flags` field placing the body's end at `CS.owedAt k` and passed,
@@ -533,45 +511,6 @@ module Over {R : Set} (Rt : EmissionSet R) where
            → Inv Rt Cr C ⟨ c , joinS j false x (u ∷ ib) , absorbed , r ⟩ → Inv Rt Cr C ⟨ c , joinS j false x ib , absorbed , p ⟩
   join-off (settled _ fr h) = settled c-abs fr (joinx-hold h)
 
-  -- Under a closed context nothing is owed: only a connect's ended
-  -- source or a switched-off lane closes one, and both are parts no live
-  -- node reads, or a source not yet subscribed.
-  Off : Need → Set
-  Off owes          = ⊥
-  Off (dead _)      = ⊤
-  Off (lane _ _)    = ⊥
-  Off (lanecut _ _) = ⊥
-  Off (pnd _)       = ⊤
-
-  closed-off : ∀ {Cr C Γ A} {c : Ctx R Γ A} {Rg N E} → Fr Rt Cr C Rg c N E → T (closed c) → Off N
-  closed-off (f-top _)                                           ()
-  closed-off (f-map fr _ _)                                      t = closed-off fr t
-  closed-off (f-scan fr _ _ _)                                   t = closed-off fr t
-  closed-off (f-cut fr)                                          t = closed-off fr t
-  closed-off (f-take fr _ _ _)                                   t = closed-off fr t
-  closed-off (f-took _ _ _ _ _ _ _ _)                            _ = tt
-  closed-off (f-outer fr _ _ _ _ _)                              t = closed-off fr t
-  closed-off (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) t = closed-off fr t
-  closed-off (f-lane fr)                                         t = closed-off fr t
-  closed-off (f-lnct {b = true} fr)                              t = closed-off fr t
-  closed-off (f-lnct {b = false} fr)                             _ = tt
-  closed-off (f-src {k = k} fr _ _ _ nc _ _ _ _ _ _ _ _ _)       t = closed-off fr (and-right (CS.srcAtt k) (or-right (CS.closed k) nc t))
-  closed-off (f-srcc _ _ _ _ _ _ _ _ _ _ _ _)                    _ = tt
-  closed-off (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)                _ = tt
-  closed-off (f-body fr _ _ _ _ _ _)                             t = closed-off fr t
-  closed-off (d-map _)                                           _ = tt
-  closed-off (d-scan _)                                          _ = tt
-  closed-off (d-cut _)                                           _ = tt
-  closed-off (d-ln _)                                            _ = tt
-  closed-off (d-take _)                                          _ = tt
-  closed-off (d-outer _ _ _)                                     _ = tt
-  closed-off (d-lanes _ _ _ _ _)                                 _ = tt
-  closed-off (d-src _ _ _ _)                                     _ = tt
-  closed-off (d-body _ _ _)                                      _ = tt
-  closed-off (f-isle {k = k} _ _ _ na nc _ _ _ _ _)              t = ⊥-elim (notT _ na (and-left (CS.srcAtt k) (or-right (CS.closed k) nc t)))
-  closed-off (f-islec _ _ _ _ _ _ _ _ _)                         _ = tt
-  closed-off (f-islep {k = k} _ _ _ na nc _ _ _ _ _ _)            t = ⊥-elim (notT _ na (and-left (CS.srcAtt k) (or-right (CS.closed k) nc t)))
-
   off-keep : ∀ {Cr C Γ A} {c : Ctx R Γ A} {Rg N E} {s s′ : St Γ A} {p} → (Pending s → ⊥) → (∀ {P} → Rest (scopeOf c) s P → Rest (scopeOf c) s′ P)
            → Fr Rt Cr C Rg c N E → Hold (scopeOf c) Rg C N s E → Off N → Inv Rt Cr C ⟨ c , s′ , absorbed , p ⟩
   off-keep {N = owes}        _  _  _  _           ()
@@ -584,7 +523,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   closed-keep : ∀ {Cr C Γ A} {c : Ctx R Γ A} {s s′ : St Γ A} {r p} → closed c ≡ true → (Pending s → ⊥)
               → (∀ {P} → Rest (scopeOf c) s P → Rest (scopeOf c) s′ P)
               → Inv Rt Cr C ⟨ c , s , absorbed , r ⟩ → Inv Rt Cr C ⟨ c , s′ , absorbed , p ⟩
-  closed-keep cl np tr (settled _ fr h) = off-keep np tr fr h (closed-off fr (subst T (sym cl) tt))
+  closed-keep cl np tr (settled _ fr h) = off-keep np tr fr h (closed-off Rt fr (subst T (sym cl) tt))
 
   -- A mark delivering nothing keeps the root's cursor: the focus moved
   -- to it, along a clear path.
@@ -615,7 +554,12 @@ module Over {R : Set} (Rt : EmissionSet R) where
     with own-cls (cs cl sl sa (just p) as ow cx ea sr sc) {o} {b} mi | pend-of o (proj₂ (proj₂ (proj₂ st)))
   ... | ob refl | o₀ , refl = refl , con-body Rt (body-noisle c st g refl lo) lo i
   run-con {Cr} {C} {k = cs cl sl sa nothing as ow cx ea sr sc} (inj₁ refl) refl mi lo st g i = refl , Cr , C , i , silent ≃-refl
-  run-con (inj₂ (inj₁ refl)) eq mi lo st g i = run-srcatt eq mi lo st g i
+  run-con {c = c} {k = cs cl sl sa bd (just y) ow cx ea sr sc} {o} {b} (inj₂ (inj₁ refl)) refl mi lo st g i
+    with own-cls (cs cl sl sa bd (just y) ow cx ea sr sc) {o} {b} mi
+  ... | os refl = refl , con-att Rt (λ ki → lo (plug-in c (k-kid (k-src ki)))) i
+  run-con {k = cs cl sl sa bd nothing ow cx ea sr sc} {o} {b} (inj₂ (inj₁ refl)) _ mi lo st g i
+    with own-cls (cs cl sl sa bd nothing ow cx ea sr sc) {o} {b} mi
+  ... | os ()
   run-con (inj₂ (inj₂ refl)) eq mi lo st g i = run-owed eq mi lo st g i
 
   ----------------------------------------------------------------------
