@@ -66,6 +66,19 @@ open import adequacy.Cursor using (Src; src-pend; src-on; src-shut; Parts)
 open import adequacy.Rows using (Frozen)
 open Machine using (CS) renaming (Ev to Evᴹ)
 open import adequacy.Bound using (behind-pend)
+open import Data.Bool using (not)
+open import Data.List using (_ʳ++_)
+open import Relation.Binary.PropositionalEquality using (trans)
+open import denotation.Events using (inside)
+open import denotation.EmissionSet using (pin)
+open import denotation.Laws.Worlds using (⊑-inside; inside-⊑; ⊑-≼)
+open import denotation.Laws.Modulus using (≼-≺-≺; ≺-≼-≺)
+open import adequacy.Cursor using (notT; Unread; SubdAt; Flags; module Flags)
+open import operation.Key using (at; after; _<ᴷ_; <ᴷ-trans; after-lt)
+open import adequacy.Floor.Keys using (plug-in; own-bld; oo; at-after₀)
+open import adequacy.Least using (Lo; k-own)
+open import adequacy.Apart.Floor using (floor)
+open Machine using (plug; mapS; scanS; cutS; lnS; takeS; flatS; connS)
 
 -- The first-child chain below `q`: `q ++ [ ix 0 ]`, and each first child
 -- of one.
@@ -107,11 +120,14 @@ under-∈ (a ∷ q) xs = there (∈-map⁺ (a ∷_) (under-∈ q xs))
 
 -- A row at a chain's foot, of an entry with few rows behind `q`, reaches
 -- what it depends on: those behind and the chain.
-reach-zs : ∀ {A} {t : EmissionSet A} {q y e} → Behind (bef q) t → Zs q y → t y e → Truncate t y e
-reach-zs {t = t} {q} {y} (ks , f) z r = r , ks ++ zl z , λ {k} {e′} tk ky _ → go tk ky (≼-or-≻ q k)
+zs-reach : ∀ {A} {t : EmissionSet A} {q y e} → Behind (bef q) t → Zs q y → Reach t y e
+zs-reach {t = t} {q} {y} (ks , f) z = ks ++ zl z , λ {k} {e′} tk ky _ → go tk ky (≼-or-≻ q k)
   where go : ∀ {k e′} → t k e′ → k ≺ y → q ≼ k ⊎ k ≺ q → k ∈ ks ++ zl z
         go tk ky (inj₁ qk) = ∈-++⁺ʳ ks (zs-btw z qk ky)
         go tk ky (inj₂ kq) = ∈-++⁺ˡ (f tk λ qk → qk kq)
+
+reach-zs : ∀ {A} {t : EmissionSet A} {q y e} → Behind (bef q) t → Zs q y → t y e → Truncate t y e
+reach-zs bh z r = r , zs-reach bh z
 
 -- Nothing visible from `q` up to, not including, `y`.
 record Clr {A} (q y : Pos) (E : EmissionSet A) : Set where
@@ -317,41 +333,141 @@ clr-conn {p = p} {σ} {β} {q} {y} (clr c) = clr go
         go (Connecting.echo _ _ _ _) ()
         go (Connecting.kept _ _ _ _) ()
 
--- No connect's source on the way up.
-srcFree : ∀ {R Γ A} → Ctx R Γ A → Bool
-srcFree top                               = true
-srcFree (inMap f c)                       = srcFree c
-srcFree (inScan f z c)                    = srcFree c
-srcFree (inCut l a c)                     = srcFree c
-srcFree (inLn b c)                        = srcFree c
-srcFree (inTake i p w c)                  = srcFree c
-srcFree (inOuter op f ω d n q ls c)       = srcFree c
-srcFree (inLanes op f ω d n q o pre post c) = srcFree c
-srcFree (inSrc k b c)                     = false
-srcFree (inBody k o c)                    = srcFree c
+-- A flag, true or false.
+bool? : ∀ b → T b ⊎ b ≡ false
+bool? true  = inj₁ tt
+bool? false = inj₂ refl
+
+nT : ∀ {b} → b ≡ false → T (not b)
+nT refl = tt
+
+-- A silent row a lift carries: a skip, or a pin of a connect at or above it.
+data Mute {A : Set} (y : Pos) : Ev A → Set where
+  m-skip : Mute y skip
+  m-pin  : ∀ {r} → T (inside r y) → Mute y (pin r)
+
+mute-work : ∀ {A y} {e : Ev A} → Mute y e → Work e
+mute-work m-skip    = tt
+mute-work (m-pin _) = tt
+
+mute-z : ∀ {A y} {e : Ev A} → Mute y e → Mute (y ++ [ ix 0 ]) e
+mute-z m-skip          = m-skip
+mute-z {y = y} (m-pin {r} i) = m-pin (⊑-inside (⊑-trans (inside-⊑ r y i) (⊑-snoc⁺ y)))
+
+map-m : ∀ {A B} {f : A → B} {t : EmissionSet A} {y e} → Mute y e → t y e → Σ (Ev B) λ e′ → MapT f t y e′ × Mute y e′
+map-m m-skip    r = skip , map-skip r , m-skip
+map-m (m-pin i) r = pin _ , map-pin r , m-pin i
+
+scan-m : ∀ {A B} {f : B → A → B} {z} {t : EmissionSet A} {y e} → Mute y e → t y e → Σ (Ev B) λ e′ → Scan.ScanT f z t y e′ × Mute y e′
+scan-m m-skip    r = skip , Scan.sstep r , m-skip
+scan-m (m-pin i) r = pin _ , Scan.spin r , m-pin i
+
+-- A takeWhile keeps a silent row short of its failure: a pin, since its
+-- connect lies at or above it.
+take-m : ∀ {A} {i} {keep : A → Bool} {t : EmissionSet A} {y e} → Mute y e → t y e → ¬ TakeWhile.Failed i keep t y → TakeWhile.TakeT i keep t y e
+take-m m-skip r nf = TakeWhile.step r nf
+take-m {y = y} (m-pin {p′} i) r nf =
+  TakeWhile.left r (λ { (q′ , a , x , k , lt) → nf (q′ , a , x , k , ≺-≼-≺ {q′} {p′} {y} lt (⊑-≼ (inside-⊑ p′ y i))) }) i
+
+jpin : ∀ op {A B} {F : A → Den B} {O q r} → O q (pin r) → JoinF op F O q (pin r)
+jpin (mergeᶠ nothing) {F = F} {O} x = Merge.opin {f = F} {o = O} x
+jpin (mergeᶠ (just m)) {F = F} {O} x = Bounded.opin {n = m} {f = F} {o = O} x
+jpin switchᶠ {F = F} {O} x = Switch.opin {f = F} {o = O} x
+jpin exhaustᶠ {F = F} {O} x = Exhaust.opin {f = F} {o = O} x
+
+jrow : ∀ op {A B} {F : A → Den B} {O : EmissionSet A} {y e} → Mute y e → O y e → Σ (Ev B) λ e′ → JoinF op F O y e′ × Mute y e′
+jrow op {F = F} {O} m-skip    r = skip , jstep op {F = F} {O} r , m-skip
+jrow op {F = F} {O} (m-pin i) r = pin _ , jpin op {F = F} {O} r , m-pin i
+
+-- A source's silent row, a level down in its connect: a pin inside the
+-- subscribe burst, an echo past it while the body runs, a kept pin.
+src-row : ∀ {A B} {p} {σ : EmissionSet A} {β : EmissionSet B} {y e} → σ y e → Mute y e → Connecting.Alive p σ β y
+        → Σ (Ev B) λ e′ → Connecting.ConnT p σ β (y ++ [ ix 0 ]) e′ × Mute (y ++ [ ix 0 ]) e′
+src-row {p = p} {y = y} r mu al with bool? (inside (p ++ [ ix 1 ]) y)
+... | inj₁ i = pin p , Connecting.burst r i , m-pin (⊑-inside (⊑-trans (⊑-trans (⊑-snoc⁺ p) (inside-⊑ (p ++ [ ix 1 ]) y i)) (⊑-snoc⁺ y)))
+... | inj₂ ni with mu
+...   | m-skip = skip , Connecting.echo r al tt (nT ni) , m-skip
+...   | m-pin {p′} i = pin p′ , Connecting.kept r (λ be → ≼-≺-≺ {p′} {y} (⊑-≼ (inside-⊑ p′ y i)) (al be)) (nT ni) i , mute-z (m-pin i)
+
+-- THE FLOOR, frame by frame: every connect a source frame reads owes its
+-- body's end no sooner than the clock.
+Lo₀ : ∀ {R Γ A} → Pos → Ctx R Γ A → Set
+Lo₀ q top                               = ⊤
+Lo₀ q (inMap f c)                       = Lo₀ q c
+Lo₀ q (inScan f z c)                    = Lo₀ q c
+Lo₀ q (inCut l a c)                     = Lo₀ q c
+Lo₀ q (inLn b c)                        = Lo₀ q c
+Lo₀ q (inTake i p w c)                  = Lo₀ q c
+Lo₀ q (inOuter op f ω d n qu ls c)      = Lo₀ q c
+Lo₀ q (inLanes op f ω d n qu o pre post c) = Lo₀ q c
+Lo₀ q (inSrc k b c)                     = (∀ {c₀} → CS.owedAt k ≡ just c₀ → after c₀ <ᴷ after q ≡ false) × Lo₀ q c
+Lo₀ q (inBody k o c)                    = Lo₀ q c
+
+lo₀ : ∀ {R Γ A} (c : Ctx R Γ A) {s : St Γ A} {q} → Lo (plug c s) (after q) → Lo₀ q c
+lo₀ top                                lo = tt
+lo₀ (inMap f c) {s}                    lo = lo₀ c {mapS f s} lo
+lo₀ (inScan f z c) {s}                 lo = lo₀ c {scanS f z s} lo
+lo₀ (inCut l a c) {s}                  lo = lo₀ c {cutS l a s} lo
+lo₀ (inLn b c) {s}                     lo = lo₀ c {lnS b s} lo
+lo₀ (inTake i p w c) {s}               lo = lo₀ c {takeS i p w s} lo
+lo₀ (inOuter op f ω d n qu ls c) {s}   lo = lo₀ c {flatS op f ω d n qu s ls} lo
+lo₀ (inLanes op f ω d n qu o pre post c) {s} lo = lo₀ c {flatS op f ω d n qu o (pre ʳ++ s ∷ post)} lo
+lo₀ (inSrc k b c) {s}                  lo = (λ eq → lo (plug-in c (k-own (own-bld k {s} {b} (oo eq))))) , lo₀ c {connS k s b} lo
+lo₀ (inBody k o c) {s}                 lo = lo₀ c {connS k o s} lo
+
+tf : true ≡ false → ⊥
+tf ()
+
+-- A live source's connect has its body alive at `y`, every point from the
+-- source's hole `q` to `y` on its first-child chain: its body's end at or
+-- past `q` would lie in the source's part, and one before `q` would be
+-- owed behind the floor.
+conn-alive : ∀ {Γ X B} {sc : Scope Γ} {Rg} {k : CS Γ X} {β : EmissionSet B} {q y} (pt : Parts sc Rg k β)
+           → Flags (bef q) k β → T (CS.srcLive k) → (∀ {c₀} → CS.owedAt k ≡ just c₀ → after c₀ <ᴷ after q ≡ false)
+           → (CS.connAt k ++ [ ix 1 ]) ≼ q → Parts.Rs pt q → (∀ {c₀} → q ≼ c₀ → c₀ ≼ y → Ze q c₀)
+           → Connecting.Alive (CS.connAt k) (Frozen k) β y
+conn-alive {q = q} {y} pt fl lv lof past g on {c₀} be with ≼-or-≻ q c₀
+... | inj₁ qc with ≼-or-≻ c₀ y
+...   | inj₁ cy = ⊥-elim (Parts.b-chain pt past g (on qc cy) (Sound.rg (Parts.sb pt) be tt))
+...   | inj₂ yc = yc
+conn-alive {q = q} pt fl lv lof past g on {c₀} be | inj₂ cq with bool? (inside c₀ q)
+... | inj₁ i  = ⊥-elim (Parts.b-lead pt (Sound.rg (Parts.sb pt) be tt) g (inside-⊑ c₀ q i))
+... | inj₂ ni = ⊥-elim (tf (trans (sym (<ᴷ-trans (after c₀) (at q) (after q) (after-lt c₀ q (Equivalence.to T-≡ cq) ne) (at-after₀ q)))
+                                  (lof (Flags.ended fl lv be λ qc → qc cq))))
+  where ne : ∀ z′ → q ≡ c₀ ++ z′ → ⊥
+        ne z′ eq = notT (inside c₀ q) (nT ni) (⊑-inside (z′ , eq))
 
 module Lift {R : Set} (Rt : EmissionSet R) where
 
-  -- A skip of the root's at a chain's foot, the chain clear.
+  -- A row of the root's at a chain's foot, the chain clear.
   Lifted : Cur → Pos → Set
-  Lifted Cr q = Σ Pos λ r → Rt r skip × Zs q r × Clr q r Rt × Cr ≡ bef q
+  Lifted Cr q = Σ Pos λ r → Σ (Ev R) λ e → Rt r e × Zs q r × Clr q r Rt × Cr ≡ bef q
 
-  lift : ∀ {Cr Γ A} {c : Ctx R Γ A} {Rg N E q y} → Fr Rt Cr (bef q) Rg c N E → T (srcFree c) → LiveN N
-       → E y skip → Zs q y → Clr q y E → Rg q → Lifted Cr q
-  lift {y = y} (f-top m) sf   _ r z cl g = y , voc m r , z , clr-≈ m cl , refl
-  lift (f-map fr m _) sf      _ r z cl g = lift fr sf _ (voc m (map-skip r)) z (clr-≈ m (clr-map cl)) g
-  lift (f-scan fr _ m _) sf   _ r z cl g = lift fr sf _ (voc m (Scan.sstep r)) z (clr-≈ m (clr-scan cl)) g
-  lift (f-cut fr) sf          _ r z cl g = lift fr sf _ r z cl g
-  lift {q = q} {y} (f-take {i = i} fr nf m _) sf _ r z cl g = lift fr sf _ (voc m (TakeWhile.step r (unfailed {i = i} {q = q} {y} nf cl))) z (clr-≈ m (clr-take {q = q} {y} nf cl)) g
-  lift (f-lane fr) sf         l r z cl g = lift fr sf l r z cl g
-  lift (f-lnct {b = true} fr) sf _ r z cl g = lift fr sf _ r z cl g
+  -- The lift met a source in its subscribe burst under a connect no live
+  -- node reads.
+  data Isled (Cr : Cur) : Set₁ where
+    isled : ∀ {Γ X B} {c : Ctx R Γ B} {k : CS Γ X} {C P} → Unread Rt Cr C c k P → T (not (CS.srcAtt k)) → Isled Cr
+
+  lift : ∀ {Cr Γ A} {c : Ctx R Γ A} {Rg N E q y e} → Fr Rt Cr (bef q) Rg c N E → Lo₀ q c → LiveN N
+       → E y e → Mute y e → Zs q y → Clr q y E → Rg q → Lifted Cr q ⊎ Isled Cr
+  lift {y = y} (f-top m) lo _ r mu z cl g = inj₁ (y , _ , voc m r , z , clr-≈ m cl , refl)
+  lift (f-map fr m _) lo _ r mu z cl g =
+    let (_ , r′ , mu′) = map-m mu r in lift fr lo _ (voc m r′) mu′ z (clr-≈ m (clr-map cl)) g
+  lift (f-scan fr _ m _) lo _ r mu z cl g =
+    let (_ , r′ , mu′) = scan-m mu r in lift fr lo _ (voc m r′) mu′ z (clr-≈ m (clr-scan cl)) g
+  lift (f-cut fr) lo _ r mu z cl g = lift fr lo _ r mu z cl g
+  lift {q = q} {y} (f-take {i = i} fr nf m _) lo _ r mu z cl g =
+    lift fr lo _ (voc m (take-m mu r (unfailed {i = i} {q = q} {y} nf cl))) mu z (clr-≈ m (clr-take {q = q} {y} nf cl)) g
+  lift (f-lane fr) lo l r mu z cl g = lift fr lo l r mu z cl g
+  lift (f-lnct {b = true} fr) lo _ r mu z cl g = lift fr lo _ r mu z cl g
   lift (f-lnct {b = false} fr) _ ()
-  lift {q = q} {y} (f-outer {op = op} {f = f} {c = c} {E = O} fr ji (joined _ _ _ _ _ _ _ li) je _ bh) sf _ r z cl g =
-    lift fr sf _ (voc (proj₂ je) (reach-zs bh z (jstep op r))) z
+  lift {q = q} {y} (f-outer {op = op} {f = f} {c = c} {E = O} fr ji (joined _ _ _ _ _ _ _ li) je _ bh) lo _ r mu z cl g =
+    let (_ , r′ , mu′) = jrow op {F = F′} {O} mu r in
+    lift fr lo _ (voc (proj₂ je) (reach-zs bh z r′)) mu′ z
       (clr-≈ (proj₂ je) (clr-tr (clr-join op {F = F′} {O} (λ e qw wy → clear cl e tt qw wy) λ x l _ qw wy → proj₂ g (on-chain (scopeOf c) f ji op li z x l qw wy)))) (proj₁ g)
     where F′ = λ a → ⟦ f a ⟧ (full (scopeOf c))
-  lift {q = q} {y} (f-lanes {op = op} {f = f} {c = c} {O = O} {q = q₀} {a} fr ji _ _ x _ rn (h-live _ le uk) _ _ _ _ _ _ _ _ li je so _ bh) sf _ r z cl g =
-    lift fr sf _ (voc (proj₂ je) (reach-zs bh z (jlane op {F = F′} {O} x rn ly nk tt))) z (clr-≈ (proj₂ je) (clr-tr (clr-join op {F = F′} {O} oc lc))) (proj₁ g)
+  lift {q = q} {y} (f-lanes {op = op} {f = f} {c = c} {O = O} {q = q₀} {a} fr ji _ _ x _ rn (h-live _ le uk) _ _ _ _ _ _ _ _ li je so _ bh) lo _ r mu z cl g =
+    lift fr lo _ (voc (proj₂ je) (reach-zs bh z (jlane op {F = F′} {O} x rn ly nk (mute-work mu)))) mu z (clr-≈ (proj₂ je) (clr-tr (clr-join op {F = F′} {O} oc lc))) (proj₁ g)
     where
       F′ = λ a → ⟦ f a ⟧ (full (scopeOf c))
       ly = voc le r
@@ -369,11 +485,25 @@ module Lift {R : Set} (Rt : EmissionSet R) where
       ...   | refl = clear cl (proj₁ (from (alike le) (l , v))) v qw wy
   lift (f-lanes _ _ _ _ _ _ _ (h-end _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
   lift (f-lanes _ _ _ _ _ _ _ (h-kill _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
-  lift (f-src _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
-  lift (f-body fr sc pt _ sr _ _ ce) sf _ r z cl g =
-    lift fr sf _ (voc (proj₁ ce) (Connecting.body r , conn-reach {e = skip} (src-behind sc sr) z (proj₂ ce r))) z
+  lift {q = q} {y} (f-src {k = k} {β = β} fr _ pt lv _ _ bβ fl fz ce bσ sd _ _ _) (lof , lo) _ r mu z cl g =
+    let (_ , row , mu′) = src-row (voc fz r) mu alive in
+    lift fr lo tt (voc (proj₁ ce) (row , conn-reach bσ (z+ z) (zs-reach bβ (z+ z)))) mu′ (z+ z)
+      (clr-≈ (proj₁ ce) (clr-tr (clr-conn clb))) (Parts.s⊆ pt g)
+    where
+      past : (CS.connAt k ++ [ ix 1 ]) ≼ q
+      past = SubdAt.past sd {q} (≼-refl {q})
+      clb : Clr q (y ++ [ ix 0 ]) β
+      clb = clr λ b v qw wy → Parts.b-chain pt past g (zl-ze (z+ z) (zs-btw (z+ z) qw wy)) (Sound.rg (Parts.sb pt) b v)
+      on : ∀ {c₀} → q ≼ c₀ → c₀ ≼ y → Ze q c₀
+      on {c₀} qc cy with <ᵖ-split c₀ y (≼-false {c₀} {y} cy)
+      ... | inj₁ lt   = zl-ze z (zs-btw z qc (Equivalence.from T-≡ lt))
+      ... | inj₂ refl = zs-ze z
+      alive : Connecting.Alive (CS.connAt k) (Frozen k) β y
+      alive = conn-alive {q = q} {y} pt fl lv lof past g on
+  lift (f-body fr sc pt _ sr _ _ ce) lo _ r mu z cl g =
+    lift fr lo _ (voc (proj₁ ce) (Connecting.body r , conn-reach (src-behind sc sr) z (proj₂ ce r))) mu z
       (clr-≈ (proj₁ ce) (clr-tr (clr-conn cl))) (Parts.b⊆ pt g)
-  lift (f-isle _ _ _ _ _ _ _ _ _ _) ()
+  lift (f-isle u _ _ na _ _ _ _ _ _) _ _ _ _ _ _ _ = inj₂ (isled u na)
   lift (f-took _ _ _ _ _ _ _ _) _ ()
   lift (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
   lift (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
@@ -403,9 +533,9 @@ module Outer {R} (o : PureObs [] R) where
   -- An outer's value in flight: its first child a skip of the joiner's,
   -- nothing visible at the value, carried up.
   outer-row : ∀ {Cr Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu ls} {c : Ctx R Γ B} {s a q Rg N E}
-            → Fr Rt Cr (bef q) Rg (inOuter op f ω d n qu ls c) N E → T (srcFree c) → Fly (scopeOf c) Rg q N s E (nx a) → Lifted Cr q
-  outer-row {q = q} (f-outer {op = op} {f = f} {c = c} {E = O} fr ji (joined _ _ _ _ _ _ _ li) je sd bh) sf (_ , x) =
-    lift fr sf tt (voc (proj₂ je) (reach-zs bh z₁ (jval op {F = F′} {O} x))) z₁
+            → Fr Rt Cr (bef q) Rg (inOuter op f ω d n qu ls c) N E → Lo₀ q c → Fly (scopeOf c) Rg q N s E (nx a) → Lifted Cr q ⊎ Isled Cr
+  outer-row {q = q} (f-outer {op = op} {f = f} {c = c} {E = O} fr ji (joined _ _ _ _ _ _ _ li) je sd bh) lo (_ , x) =
+    lift fr lo tt (voc (proj₂ je) (reach-zs bh z₁ (jval op {F = F′} {O} x))) m-skip z₁
       (clr-≈ (proj₂ je) (clr-tr (clr-join op {F = F′} {O} oc lc))) (proj₁ (Sound.rg sd x tt))
     where
       F′ = λ a → ⟦ f a ⟧ (full (scopeOf c))
@@ -420,7 +550,7 @@ module Outer {R} (o : PureObs [] R) where
   -- Lifted, clear at `q`, the cursor short of the row met next: a row
   -- under the first child at or before it.
   under : ∀ {Cr q p e} → Lifted Cr q → Due Cr Rt p e → RowUnder o (q ++ [ ix 0 ]) p
-  under {q = q} (r , tr , z , cl , refl) (tp , vp , ow) = pick tr (zs-under z) (λ t v → clear cl t v (≼-refl {q}) (zs-past z)) tp vp ow
+  under {q = q} (r , _ , tr , z , cl , refl) (tp , vp , ow) = pick tr (zs-under z) (λ t v → clear cl t v (≼-refl {q}) (zs-past z)) tp vp ow
 
   -- The row met next, owed at the cursor the run reaches.
   met : ∀ {rs k p e} (pth : Path (load o) rs k) → Meets Rt (conv rs ++ [ (p , e) ])
@@ -429,26 +559,17 @@ module Outer {R} (o : PureObs [] R) where
                     | Along.met-next (cursor o) {c = nothing} (conv rs) m
   ... | (Cr , _) , r | ((tp , _) , _) , vi , ap , _ = proj₁ (from r (back (cursorᴿ nothing (conv rs)) tp ap , vi))
 
--- A flag, true or false.
-bool? : ∀ b → T b ⊎ b ≡ false
-bool? true  = inj₁ tt
-bool? false = inj₂ refl
-
 postulate
-  -- AN OUTER'S GUARD UNDER A SOURCE: an outer under a connect's source,
-  -- its value rising, has a row under its first child, at or before the
-  -- row met next.
-  --
-  -- The unwritten route is `Lift.lift` through the source's frame.  A
-  -- source row inside the subscribe burst shows as the connect's pin at
-  -- its first child, so the lift must carry pins, which a takeWhile keeps
-  -- only short of its failure and a lane only uncut.  A row past the
-  -- burst shows as an echo only while the body is alive at it, which
-  -- needs the body to have no end on the chain.
+  -- AN OUTER'S GUARD IN AN ISLE: an outer whose lift meets a source in
+  -- its subscribe burst under a connect no live node reads, its value
+  -- rising, has a row under its first child, at or before the row met
+  -- next.  Nothing such a source runs shows where the root reads, so the
+  -- row must come from elsewhere; suspected false, as `guard-adrift` is.
   guard-src : ∀ {R} (o : PureObs [] R) {rs Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu ls} {c : Ctx R Γ B} {s a q p e}
             → Path (load o) rs ⟨ inOuter op f ω d n qu ls c , s , rising (nx a) , q ⟩
             → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
-            → srcFree c ≡ false
+            → ∀ {Cr C Rg N E} → Fr (enter (⟦ o ⟧ []ᴬ) root) Cr C Rg (inOuter op f ω d n qu ls c) N E
+            → Lift.Isled (enter (⟦ o ⟧ []ᴬ) root) Cr
             → RowUnder o (q ++ [ ix 0 ]) p
 
   -- AN OUTER'S GUARD IN A DEAD PART: an outer no live node reads, its
@@ -466,11 +587,12 @@ outer-guard : ∀ {R} (o : PureObs [] R) {rs Γ A B} {op} {f : A → Obs Timelin
             → Path (load o) rs ⟨ inOuter op f ω d n qu ls c , s , rising (nx a) , q ⟩
             → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
             → RowUnder o (q ++ [ ix 0 ]) p
-outer-guard o {c = c} pth m with bool? (srcFree c)
-... | inj₂ sf = guard-src o pth m sf
-... | inj₁ sf with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o)) | Outer.met o pth m
-...   | (_ , _ , flying fr _ fy , _) , _ | d = Outer.under o (Outer.outer-row o fr sf fy) d
-...   | (_ , _ , adrift fr _ _ , _) , _ | _ = guard-adrift o pth m fr
+outer-guard o {op = op} {f} {ω} {d} {n} {qu} {ls} {c} {s} pth m
+  with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o)) | Outer.met o pth m
+... | (_ , _ , flying fr _ fy , _) , _ | du with Outer.outer-row o fr (lo₀ c {flatS op f ω d n qu s ls} (floor o pth tt)) fy
+...   | inj₁ lf = Outer.under o lf du
+...   | inj₂ il = guard-src o pth m fr il
+outer-guard o pth m | (_ , _ , adrift fr _ _ , _) , _ | _ = guard-adrift o pth m fr
 
 postulate
   -- A LANE'S HAND-OFF PASSES ITS GUARD: a lane ending with values queued
