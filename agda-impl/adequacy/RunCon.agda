@@ -28,7 +28,8 @@ open Machine using (St; Ctx; Conf; Scope; ⟨_,_,_,_⟩; subscribing; absorbed; 
                     pend; connS; inSrc; scopeOf; binds; closed; unsubIf)
 open import adequacy.Rows using (Frozen; ≃-refl; Vis; _≃_; _⇄_; silent; Moves)
 open _≃_
-open import adequacy.Cursor using (Cur; bef; Owes; Behind; Pts; Held; AttFin; AttOwed; TailP; tailp; Src; Sync; Subd; husk-of; src-husk; re-parts; unsubIf-husk; quiet-unsubIf; under-⊑; tailp-⊑; ∪-⊑; Parts; Flags; Sound; Husk; SrcH; NoIsle; _∪ᵖ_; _⊑_; ⊑-refl; ⊑-trans; h-blank; h-conn; sh-dead; sh-isle; sh-islec; sh-pend; src-pend; src-on; src-shut; s-conn; Torn; c-abs; c-sub; ≈-refl; notT; sync-pend; subd)
+open import adequacy.Cursor using (Cur; bef; Owes; Behind; Pts; Held; AttFin; AttOwed; TailP; tailp; Src; Sync; Subd; re-parts; under-⊑; tailp-⊑; ∪-⊑; Parts; Flags; Sound; Husk; SrcH; _∪ᵖ_; _⊑_; ⊑-refl; ⊑-trans; h-blank; h-conn; sh-dead; sh-isle; sh-islec; sh-pend; src-pend; src-on; src-shut; s-conn; Torn; ≈-refl; notT; subd)
+open import adequacy.Cursor.Tear using (husk-of; src-husk; unsubIf-husk; quiet-unsubIf; NoIsle; c-abs; c-sub; sync-pend)
 open import adequacy.Cursor.Frame using (Unread; un-dead; un-torn; owes; dead; lane; lanecut; pnd; Need; Fr; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-isle; f-islec; f-islep; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body)
 open import adequacy.Cursor.Rise using (Inv; settled; pending; RT)
 open import adequacy.Least using (Lo; k-kid; k-body)

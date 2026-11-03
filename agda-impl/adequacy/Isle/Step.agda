@@ -32,7 +32,7 @@ open import adequacy.Stamped using (StOK; stamped; plug-ok; unplug; pend-focus)
 open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-least; found-mark; found-plug)
 open import adequacy.Path using (Path; []; tau; val; _▸_)
 open import adequacy.Apart.Floor using (floor)
-open import adequacy.Cursor using (Clear)
+open import adequacy.Cursor.Tear using (Clear)
 open import adequacy.Isle using (⊤₁; tt₁; AttK; a-here; a-src; a-body; a-map; a-scan; a-cut; a-ln; a-take; a-outer; a-lane; NoAttB; att-key;
                                  AttL; Late; G; GL; ClearA; gl-mem; gl-of; gl-ʳ++; ʳ++-mem; LSub; g-hole; Swap; gd-swap; gd-sub;
                                  Keep; kp-unsubIf; kp-cut; kp-kill; kp-ended; kp-feed; found-clr)

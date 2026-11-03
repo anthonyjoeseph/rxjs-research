@@ -35,7 +35,8 @@ open Machine using (St; Ctx; Conf; Scope; binds; scopeOf; ⟨_,_,_,_⟩; subscri
                     renaming (Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (pendRows; full; ≃-refl; Vis; _≃_; silent; Moves; this)
 open _≃_
-open import adequacy.Cursor using (Cur; ≈-refl; Rgn; JoinE; Flags; src-pend; Within; Adm; bef; Spent; Sync; _≈_; c-abs; c-sub; Owes; Pts; h-blank; h-take; Quiet; Clear; Pending; pend-shape; notT; sync-pend; s-of; s-join; s-joinx; s-took; subd; o-cp)
+open import adequacy.Cursor using (Cur; ≈-refl; Rgn; JoinE; Flags; src-pend; Within; Adm; bef; Spent; Sync; _≈_; Owes; Pts; h-blank; h-take; Quiet; notT; s-of; s-join; s-joinx; s-took; subd; o-cp)
+open import adequacy.Cursor.Tear using (c-abs; c-sub; Clear; Pending; pend-shape; sync-pend)
 open import adequacy.Cursor.Frame using (Fr; Hold; owes; dead; lane; lanecut; pnd; Rest; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep)
 open import adequacy.Cursor.Rise using (Inv; settled; pending; adrift; RT; SimC; keeps; rise-top; rise-map; rise-scan-nx; rise-scan-cp; rise-take-pass; rise-take-cp; rise-cut; rise-cutx; rise-ln; rise-took; rise-take-fail; rise-bodyx; run-stop; run-cut; run-att)
 open import adequacy.Path using (Path)

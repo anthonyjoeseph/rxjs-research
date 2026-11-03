@@ -30,7 +30,7 @@ open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-l
                                    Keeps; mapKp; scanKp; cutKp; takeKp; outerKp; laneKp; Below; keyOf; seek-b)
 open import adequacy.Floor.Keys using (ob; os; own-bld; plug-in; mem-self; mem-swap; unsubIf-in; offIf-in)
 open import adequacy.Stamped using (StOK; LOK; BodyOK; IsPend; is-pend)
-open import adequacy.Cursor using (Settles; NoIsle; NoIsleL; Clear; Pending)
+open import adequacy.Cursor.Tear using (Settles; NoIsle; NoIsleL; Clear; Pending)
 
 record ⊤₁ : Set₁ where
   constructor tt₁
