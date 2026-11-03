@@ -22,7 +22,8 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; unbound; binds; CS; Owe
 open import denotation.Laws.Modulus using (≼-refl; ≺→≼; ≺-ext; ≺-irrefl; ≺-trans; ≼-or-≻)
 open import adequacy.Rows using (≼-≢; _≃_; _⇄_; ≃-refl; Moves; silent; shown; toEv; full; pendRows)
 open import denotation.Laws.Worlds using (Ok; Hots)
-open import adequacy.Cursor using (Adm; Calm; Cur; Due; Fly; Folded; Fr; Hold; Husk; NoFail; Owes; Rest; Sound; SrcH; Sync; Unread; Within; _∪ᵖ_; _≈_; _⊑_; aft; alike; bef; c-abs; cut-husk; d-body; d-cut; d-ln; d-map; d-scan; d-take; dead; f-body; f-cut; f-lane; f-lnct; f-map; f-scan; f-take; f-took; f-top; fd-last; fd-none; h-conn; h-cut; h-ln; h-map; h-scan; h-take; husk-of; lane; lanecut; notT; o-cp; o-cut; o-over; owes; peel-cut; peel-take; pnd; s-conn; s-cut; s-map; s-scan; s-take; s-took; tailp-dn; tailp-⊑; un-dead; un-torn; unsub-husk; unsubIf-husk; vis; ∪-⊑; ⊑-refl; ⊑-trans)
+open import adequacy.Cursor using (Adm; Calm; Cur; Due; Folded; Husk; NoFail; Owes; Sound; SrcH; Sync; Within; _∪ᵖ_; _≈_; _⊑_; aft; alike; bef; c-abs; cut-husk; fd-last; fd-none; h-conn; h-cut; h-ln; h-map; h-scan; h-take; husk-of; notT; o-cp; o-cut; o-over; peel-cut; peel-take; s-conn; s-cut; s-map; s-scan; s-take; s-took; tailp-dn; tailp-⊑; unsub-husk; unsubIf-husk; vis; ∪-⊑; ⊑-refl; ⊑-trans)
+open import adequacy.Cursor.Frame using (Fly; Fr; Hold; Rest; Unread; d-body; d-cut; d-ln; d-map; d-scan; d-take; dead; f-body; f-cut; f-lane; f-lnct; f-map; f-scan; f-take; f-took; f-top; lane; lanecut; owes; pnd; un-dead; un-torn)
 open import adequacy.PinTail using (took-tail)
 
 open _≃_

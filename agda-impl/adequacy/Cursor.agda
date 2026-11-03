@@ -35,7 +35,7 @@ module adequacy.Cursor where
 
 open import Data.Bool using (Bool; T; true; false; not)
 open import Data.Empty using (⊥)
-open import Data.List using (List; []; _∷_; [_]; _++_; reverse; map)
+open import Data.List using (List; []; _∷_; [_]; _++_; map)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.List.Relation.Unary.All using (lookup)
@@ -443,6 +443,24 @@ data Sync : ∀ {Γ} → Scope Γ → Rgn → Cur → ∀ {A} → St Γ A → Em
 -- subscribed, which its body's own mark does at the connect's `ix 1`.
 data Src : ∀ {Γ X} → Scope Γ → Rgn → Cur → CS Γ X → St Γ X → Set₁
 
+-- NOTHING IN STEP: no subscription pending, every connect's source
+-- attached or ended.
+QuietL : ∀ {Γ A} → List (St Γ A) → Set
+
+Quiet : ∀ {Γ A} → St Γ A → Set
+Quiet (pend _ _)               = ⊥
+Quiet (mapS _ s)               = Quiet s
+Quiet (scanS _ _ s)            = Quiet s
+Quiet (cutS _ _ s)             = Quiet s
+Quiet (lnS _ s)                = Quiet s
+Quiet (takeS _ _ _ s)          = Quiet s
+Quiet (flatS _ _ _ _ _ _ o ls) = Quiet o × QuietL ls
+Quiet (connS k o b)            = (T (CS.srcAtt k) ⊎ T (CS.closed k)) × Quiet o × Quiet b
+Quiet _                        = ⊤
+
+QuietL []       = ⊤
+QuietL (l ∷ ls) = Quiet l × QuietL ls
+
 -- A PART NO LIVE NODE READS: no entry ties it, only where it may still
 -- run on, cursor-free.  Its isles are the one thing in it still in step.
 data Husk : ∀ {Γ} → Scope Γ → ∀ {A} → St Γ A → Pts → Set₁
@@ -622,7 +640,7 @@ data Src where
 
 data Husk where
   -- nothing in it still in step
-  h-blank : ∀ {Γ} {sc : Scope Γ} {A} {s : St Γ A} → Husk sc s ∅ᵖ
+  h-blank : ∀ {Γ} {sc : Scope Γ} {A} {s : St Γ A} → Quiet s → Husk sc s ∅ᵖ
   h-map   : ∀ {Γ} {sc : Scope Γ} {A B} {f : A → B} {s P} → Husk sc s P → Husk sc (mapS f s) P
   h-scan  : ∀ {Γ} {sc : Scope Γ} {A B} {f : B → A → B} {z s P} → Husk sc s P → Husk sc (scanS f z s) P
   h-cut   : ∀ {Γ} {sc : Scope Γ} {A} {l a} {s : St Γ A} {P} → Husk sc s P → Husk sc (cutS l a s) P
@@ -638,7 +656,7 @@ data HuskL where
   hl-more : ∀ {Γ} {sc : Scope Γ} {A} {l : St Γ A} {ls P Q} → Husk sc l P → HuskL sc ls Q → HuskL sc (l ∷ ls) (P ∪ᵖ Q)
 
 data SrcH where
-  sh-dead  : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o P} → Husk sc o P → SrcH sc k o (Under P)
+  sh-dead  : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o P} → Husk sc o P → T (CS.srcAtt k) ⊎ T (CS.closed k) → SrcH sc k o (Under P)
   sh-isle  : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o Ri Ci}
            → T (not (CS.srcAtt k)) → T (not (CS.closed k)) → Sync sc Ri Ci o (Frozen k) → Behind Ci (Frozen k) → Subd sc Ci k
            → Sound Ri (Frozen k) → AttOwed k → SrcH sc k o (Burst Ci k)
@@ -683,9 +701,9 @@ unbind refl h = h
 
 mutual
   husk-of : ∀ {Γ} {sc : Scope Γ} {Rg C A} {s : St Γ A} {E} → Sync sc Rg C s E → Σ Pts (Husk sc s)
-  husk-of (s-cold _ _ _)            = _ , h-blank
-  husk-of (s-of _ _)                = _ , h-blank
-  husk-of (s-done _ _)              = _ , h-blank
+  husk-of (s-cold _ _ _)            = _ , h-blank tt
+  husk-of (s-of _ _)                = _ , h-blank tt
+  husk-of (s-done _ _)              = _ , h-blank tt
   husk-of (s-map sy _ _)            = _ , h-map (proj₂ (husk-of sy))
   husk-of (s-scan sy _ _ _)         = _ , h-scan (proj₂ (husk-of sy))
   husk-of (s-cut sy)                = _ , h-cut (proj₂ (husk-of sy))
@@ -695,13 +713,13 @@ mutual
   husk-of (s-conn {k = k} sc pt bs _ ss tn _ _) =
     by (CS.srcLive k) (λ l → _ , h-conn (proj₂ (src-husk sc (ss l) (Parts.ss pt))) (unbind {k = k} sc (proj₂ (husk-of (bs l)))))
                       (λ nl → _ , h-conn (Torn.sh (tn nl)) (Torn.bh (tn nl)))
-  husk-of (s-join _ _ _ _ _)        = _ , h-blank
-  husk-of (s-joinx _ _)             = _ , h-blank
+  husk-of (s-join _ _ _ _ _)        = _ , h-blank tt
+  husk-of (s-joinx _ _)             = _ , h-blank tt
 
   src-husk : ∀ {Γ X} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} → CS.scope k ≡ sc → Src sc Rg C k o → Sound Rg (Frozen k) → Σ Pts (SrcH sc k o)
   src-husk sc (src-pend na nc ba an adm pe wn _) ss    = _ , sh-pend na nc ba an sc adm pe wn ss
-  src-husk _ (src-on {k = k} nc sy bh sd _ ao) ss       = by (CS.srcAtt k) (λ _ → _ , sh-dead (proj₂ (husk-of sy))) (λ na → _ , sh-isle na nc sy bh sd ss (ao na))
-  src-husk _ (src-shut {C = C} {k = k} cl sp tp hk bh sd) _ = by (CS.srcAtt k) (λ _ → _ , sh-dead hk) (λ na → _ , sh-islec {Ci = C} na cl sp tp hk bh sd)
+  src-husk _ (src-on {k = k} nc sy bh sd _ ao) ss       = by (CS.srcAtt k) (λ t → _ , sh-dead (proj₂ (husk-of sy)) (inj₁ t)) (λ na → _ , sh-isle na nc sy bh sd ss (ao na))
+  src-husk _ (src-shut {C = C} {k = k} cl sp tp hk bh sd) _ = by (CS.srcAtt k) (λ t → _ , sh-dead hk (inj₁ t)) (λ na → _ , sh-islec {Ci = C} na cl sp tp hk bh sd)
 
   begun-husk : ∀ {Γ A B} {sc : Scope Γ} {Rl C} {P : Pol A B} {O vs ls n} → Begun sc Rl C P O vs ls n → Σ Pts (HuskL sc ls)
   begun-husk none               = _ , hl-none
@@ -713,12 +731,65 @@ mutual
 
 -- One node's state in from what still runs around it.
 peel-take : ∀ {Γ} {sc : Scope Γ} {A} {i} {keep : A → Bool} {w s Q} → Husk sc (takeS i keep w s) Q → Σ Pts λ Q′ → Husk sc s Q′ × Q ⊑ Q′
-peel-take h-blank     = _ , h-blank , ⊑-refl
+peel-take (h-blank q) = _ , h-blank q , ⊑-refl
 peel-take (h-take hk) = _ , hk , ⊑-refl
 
 peel-cut : ∀ {Γ} {sc : Scope Γ} {A} {l a} {s : St Γ A} {Q} → Husk sc (cutS l a s) Q → Σ Pts λ Q′ → Husk sc s Q′ × Q ⊑ Q′
-peel-cut h-blank    = _ , h-blank , ⊑-refl
+peel-cut (h-blank q) = _ , h-blank q , ⊑-refl
 peel-cut (h-cut hk) = _ , hk , ⊑-refl
+
+-- TEARING DOWN KEEPS NOTHING IN STEP: every connect's flags kept, a
+-- pending subscription left as it is.
+mutual
+  quiet-unsub : ∀ {Γ A} {s : St Γ A} → Quiet s → Quiet (proj₁ (unsub s))
+  quiet-unsub {s = pend _ _}               ()
+  quiet-unsub {s = coldS true _}           _             = tt
+  quiet-unsub {s = coldS false _}          _             = tt
+  quiet-unsub {s = ofS _ _ _}              _             = tt
+  quiet-unsub {s = doneS}                  _             = tt
+  quiet-unsub {s = mapS _ s}               q             = quiet-unsub {s = s} q
+  quiet-unsub {s = scanS _ _ s}            q             = quiet-unsub {s = s} q
+  quiet-unsub {s = cutS _ _ _}             q             = q
+  quiet-unsub {s = lnS _ _}                q             = q
+  quiet-unsub {s = takeS _ _ _ s}          q             = quiet-cut {s = s} q
+  quiet-unsub {s = flatS _ _ _ _ _ _ o ls} (qo , ql)    = quiet-cut {s = o} qo , quiet-kill {ls = ls} ql
+  quiet-unsub {s = connS k _ b}            (f , qo , qb) = f , quiet-unsubIf (CS.srcAtt k) qo , quiet-unsub {s = b} qb
+  quiet-unsub {s = joinS _ _ _ _}          _             = tt
+
+  quiet-cut : ∀ {Γ A} {s : St Γ A} → Quiet s → Quiet (proj₁ (cut s))
+  quiet-cut {s = cutS _ attached s}  q = quiet-unsub {s = s} q
+  quiet-cut {s = cutS _ (attAt _) _} q = q
+  quiet-cut {s = pend _ _}           q = q
+  quiet-cut {s = coldS _ _}          q = q
+  quiet-cut {s = ofS _ _ _}          q = q
+  quiet-cut {s = doneS}              q = q
+  quiet-cut {s = mapS _ _}           q = q
+  quiet-cut {s = scanS _ _ _}        q = q
+  quiet-cut {s = lnS _ _}            q = q
+  quiet-cut {s = takeS _ _ _ _}      q = q
+  quiet-cut {s = flatS _ _ _ _ _ _ _ _} q = q
+  quiet-cut {s = connS _ _ _}        q = q
+  quiet-cut {s = joinS _ _ _ _}      q = q
+
+  quiet-kill : ∀ {Γ A} {ls : List (St Γ A)} → QuietL ls → QuietL (proj₁ (killAll ls))
+  quiet-kill {ls = []}                          _        = tt
+  quiet-kill {ls = lnS true s ∷ ls}              (q , ql) = quiet-cut {s = s} q , quiet-kill {ls = ls} ql
+  quiet-kill {ls = lnS false _ ∷ ls}             (q , ql) = q , quiet-kill {ls = ls} ql
+  quiet-kill {ls = pend _ _ ∷ ls}                (q , ql) = q , quiet-kill {ls = ls} ql
+  quiet-kill {ls = coldS _ _ ∷ ls}               (q , ql) = q , quiet-kill {ls = ls} ql
+  quiet-kill {ls = ofS _ _ _ ∷ ls}               (q , ql) = q , quiet-kill {ls = ls} ql
+  quiet-kill {ls = doneS ∷ ls}                   (q , ql) = q , quiet-kill {ls = ls} ql
+  quiet-kill {ls = mapS _ _ ∷ ls}                (q , ql) = q , quiet-kill {ls = ls} ql
+  quiet-kill {ls = scanS _ _ _ ∷ ls}             (q , ql) = q , quiet-kill {ls = ls} ql
+  quiet-kill {ls = cutS _ _ _ ∷ ls}              (q , ql) = q , quiet-kill {ls = ls} ql
+  quiet-kill {ls = takeS _ _ _ _ ∷ ls}           (q , ql) = q , quiet-kill {ls = ls} ql
+  quiet-kill {ls = flatS _ _ _ _ _ _ _ _ ∷ ls}   (q , ql) = q , quiet-kill {ls = ls} ql
+  quiet-kill {ls = connS _ _ _ ∷ ls}             (q , ql) = q , quiet-kill {ls = ls} ql
+  quiet-kill {ls = joinS _ _ _ _ ∷ ls}           (q , ql) = q , quiet-kill {ls = ls} ql
+
+  quiet-unsubIf : ∀ {Γ A} b {s : St Γ A} → Quiet s → Quiet (proj₁ (unsubIf b s))
+  quiet-unsubIf true  {s} q = quiet-unsub {s = s} q
+  quiet-unsubIf false     q = q
 
 -- UNSUBSCRIBING keeps every isle: it never reaches a source in its
 -- subscribe call.
@@ -728,7 +799,7 @@ unsubIf-off false _ = refl
 
 mutual
   unsub-husk : ∀ {Γ} {sc : Scope Γ} {A} {s : St Γ A} {P} → Husk sc s P → Σ Pts λ P′ → Husk sc (proj₁ (unsub s)) P′ × P ⊑ P′
-  unsub-husk h-blank        = _ , h-blank , ⊑-refl
+  unsub-husk {s = s} (h-blank q) = _ , h-blank (quiet-unsub {s = s} q) , ⊑-refl
   unsub-husk (h-map hk)     = let (_ , h , le) = unsub-husk hk in _ , h-map h , le
   unsub-husk (h-scan hk)    = let (_ , h , le) = unsub-husk hk in _ , h-scan h , le
   unsub-husk (h-cut hk)     = _ , h-cut hk , ⊑-refl
@@ -738,7 +809,7 @@ mutual
   unsub-husk (h-conn sh bh) = let (_ , h , le) = srch-unsub sh ; (_ , g , le′) = unsub-husk bh in _ , h-conn h g , ∪-⊑ le le′
 
   cut-husk : ∀ {Γ} {sc : Scope Γ} {A} {s : St Γ A} {P} → Husk sc s P → Σ Pts λ P′ → Husk sc (proj₁ (cut s)) P′ × P ⊑ P′
-  cut-husk h-blank                   = _ , h-blank , ⊑-refl
+  cut-husk {s = s} (h-blank q)      = _ , h-blank (quiet-cut {s = s} q) , ⊑-refl
   cut-husk (h-cut {a = attached} hk) = let (_ , h , le) = unsub-husk hk in _ , h-cut h , le
   cut-husk (h-cut {a = attAt _} hk)  = _ , h-cut hk , ⊑-refl
   cut-husk hk@(h-map _)              = _ , hk , ⊑-refl
@@ -750,7 +821,7 @@ mutual
 
   kill-husk : ∀ {Γ} {sc : Scope Γ} {A} {ls : List (St Γ A)} {P} → HuskL sc ls P → Σ Pts λ P′ → HuskL sc (proj₁ (killAll ls)) P′ × P ⊑ P′
   kill-husk hl-none                          = _ , hl-none , ⊑-refl
-  kill-husk (hl-more {l = l} h-blank hl)     = kill-blank l hl
+  kill-husk (hl-more {l = l} (h-blank q) hl) = kill-blank l q hl
   kill-husk (hl-more (h-ln {b = true} hk) hl) = let (_ , h , le) = cut-husk hk ; (_ , g , le′) = kill-husk hl in _ , hl-more (h-ln h) g , ∪-⊑ le le′
   kill-husk (hl-more hk@(h-ln {b = false} _) hl) = kill-keep hk hl
   kill-husk (hl-more hk@(h-map _) hl)        = kill-keep hk hl
@@ -765,34 +836,32 @@ mutual
             → Σ Pts λ P′ → HuskL sc (l ∷ proj₁ (killAll ls)) P′ × (P ∪ᵖ Q) ⊑ P′
   kill-keep hk hl = let (_ , g , le) = kill-husk hl in _ , hl-more hk g , ∪-⊑ ⊑-refl le
 
-  kill-blank : ∀ {Γ} {sc : Scope Γ} {A} (l : St Γ A) {ls Q} → HuskL sc ls Q
+  kill-blank : ∀ {Γ} {sc : Scope Γ} {A} (l : St Γ A) {ls Q} → Quiet l → HuskL sc ls Q
              → Σ Pts λ P′ → HuskL sc (proj₁ (killAll (l ∷ ls))) P′ × (∅ᵖ ∪ᵖ Q) ⊑ P′
-  kill-blank (lnS true _)        hl = let (_ , g , le) = kill-husk hl in _ , hl-more h-blank g , ∪-⊑ ⊑-refl le
-  kill-blank (lnS false _)       hl = kill-keep h-blank hl
-  kill-blank (pend _ _)          hl = kill-keep h-blank hl
-  kill-blank (coldS _ _)         hl = kill-keep h-blank hl
-  kill-blank (ofS _ _ _)         hl = kill-keep h-blank hl
-  kill-blank doneS               hl = kill-keep h-blank hl
-  kill-blank (mapS _ _)          hl = kill-keep h-blank hl
-  kill-blank (scanS _ _ _)       hl = kill-keep h-blank hl
-  kill-blank (cutS _ _ _)        hl = kill-keep h-blank hl
-  kill-blank (takeS _ _ _ _)     hl = kill-keep h-blank hl
-  kill-blank (flatS _ _ _ _ _ _ _ _) hl = kill-keep h-blank hl
-  kill-blank (connS _ _ _)       hl = kill-keep h-blank hl
-  kill-blank (joinS _ _ _ _)     hl = kill-keep h-blank hl
+  kill-blank (lnS true s)        q hl = let (_ , g , le) = kill-husk hl in _ , hl-more (h-blank (quiet-cut {s = s} q)) g , ∪-⊑ ⊑-refl le
+  kill-blank (lnS false _)       q hl = kill-keep (h-blank q) hl
+  kill-blank (pend _ _)          q hl = kill-keep (h-blank q) hl
+  kill-blank (coldS _ _)         q hl = kill-keep (h-blank q) hl
+  kill-blank (ofS _ _ _)         q hl = kill-keep (h-blank q) hl
+  kill-blank doneS               q hl = kill-keep (h-blank q) hl
+  kill-blank (mapS _ _)          q hl = kill-keep (h-blank q) hl
+  kill-blank (scanS _ _ _)       q hl = kill-keep (h-blank q) hl
+  kill-blank (cutS _ _ _)        q hl = kill-keep (h-blank q) hl
+  kill-blank (takeS _ _ _ _)     q hl = kill-keep (h-blank q) hl
+  kill-blank (flatS _ _ _ _ _ _ _ _) q hl = kill-keep (h-blank q) hl
+  kill-blank (connS _ _ _)       q hl = kill-keep (h-blank q) hl
+  kill-blank (joinS _ _ _ _)     q hl = kill-keep (h-blank q) hl
+
+  unsubIf-husk : ∀ {Γ} {sc : Scope Γ} {A} {s : St Γ A} {P} b → Husk sc s P → Σ Pts λ P′ → Husk sc (proj₁ (unsubIf b s)) P′ × P ⊑ P′
+  unsubIf-husk true  hk = unsub-husk hk
+  unsubIf-husk false hk = _ , hk , ⊑-refl
 
   srch-unsub : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o P} → SrcH sc k o P
              → Σ Pts λ P′ → SrcH sc k (proj₁ (unsubIf (CS.srcAtt k) o)) P′ × P ⊑ P′
-  srch-unsub {k = k} (sh-dead hk) with CS.srcAtt k
-  ... | true  = let (_ , h , le) = unsub-husk hk in _ , sh-dead h , under-⊑ le
-  ... | false = _ , sh-dead hk , ⊑-refl
+  srch-unsub {k = k} (sh-dead hk sf) = let (_ , h , le) = unsubIf-husk (CS.srcAtt k) hk in _ , sh-dead h sf , under-⊑ le
   srch-unsub {k = k} sh@(sh-isle na _ _ _ _ _ _)  = _ , subst (λ o′ → SrcH _ k o′ _) (sym (unsubIf-off (CS.srcAtt k) na)) sh , ⊑-refl
   srch-unsub {k = k} sh@(sh-islec na _ _ _ _ _ _) = _ , subst (λ o′ → SrcH _ k o′ _) (sym (unsubIf-off (CS.srcAtt k) na)) sh , ⊑-refl
   srch-unsub {k = k} sh@(sh-pend na _ _ _ _ _ _ _ _) = _ , subst (λ o′ → SrcH _ k o′ _) (sym (unsubIf-off (CS.srcAtt k) na)) sh , ⊑-refl
-
-unsubIf-husk : ∀ {Γ} {sc : Scope Γ} {A} {s : St Γ A} {P} b → Husk sc s P → Σ Pts λ P′ → Husk sc (proj₁ (unsubIf b s)) P′ × P ⊑ P′
-unsubIf-husk true  hk = unsub-husk hk
-unsubIf-husk false hk = _ , hk , ⊑-refl
 
 ------------------------------------------------------------------------
 -- NO ISLE IN A PART: every connect in it attached, closed, or not yet
@@ -860,172 +929,3 @@ sync-pend : ∀ {Γ} {sc : Scope Γ} {Rg C A} {s : St Γ A} {E} → Pending s �
 sync-pend {s = s} p sy with pend-shape s p
 ... | _ , _ , refl with sy
 ...   | ()
-
-------------------------------------------------------------------------
--- THE FRAMES ABOVE A HOLE: the hole's entry `E`, composed up to the
--- root's, every other part in step.  What the hole itself owes is its
--- `Need`: its entry; where it may still run on (a part no live node
--- reads); or a lane's shape — the joiner's list entry and the switch
--- under it, both on or both off — which the joiner reads off the lane's
--- state.
-
-data Need : Set₁ where
-  owes    : Need
-  dead    : Pts → Need
-  lane    : Bool → Pts → Need
-  lanecut : Bool → Pts → Need
-  pnd     : Pos → Need
-
--- On, its entry; off, where it may still run on.
-onoff : Bool → Pts → Need
-onoff true  _ = owes
-onoff false P = dead P
-
--- A part no live node reads: what it still runs covers its need.
-Rest : ∀ {Γ} → Scope Γ → ∀ {A} → St Γ A → Pts → Set₁
-Rest sc s P = Σ Pts λ Q → Husk sc s Q × P ⊑ Q
-
-LaneHold : ∀ {Γ} → Scope Γ → Rgn → Cur → Bool → Pts → ∀ {A} → St Γ A → EmissionSet A → Set₁
-LaneHold sc Rg C true  P l E = Sync sc Rg C l E
-LaneHold sc Rg C false P l E = Rest sc l P
-
--- The hole's state against its need.
-Hold : ∀ {Γ} → Scope Γ → Rgn → Cur → Need → ∀ {A} → St Γ A → EmissionSet A → Set₁
-Hold sc Rg C owes          s E = Sync sc Rg C s E
-Hold sc Rg C (dead P)      s E = Rest sc s P
-Hold sc Rg C (lane b P)    s E = Σ Att λ at → Σ (St _ _) λ l → s ≡ lnS b (cutS b at l) × LaneHold sc Rg C b P l E
-Hold sc Rg C (lanecut b P) s E = Σ Att λ at → Σ (St _ _) λ l → s ≡ cutS b at l × LaneHold sc Rg C b P l E
-Hold {Γ} sc Rg C (pnd q) {A} s E = Σ (Obs Timeline Γ A) λ o → s ≡ pend o q × pendRows (full sc) o q ≈ E × Within Rg sc q (pendRows (full sc) o q)
-
-data ⊥₁ : Set₁ where
-
--- A rise in flight at `p` from the hole: delivered there, its row in the
--- hole's entry.
-Fly : ∀ {Γ} → Scope Γ → Rgn → Pos → Need → ∀ {A} → St Γ A → EmissionSet A → Evᴹ A → Set₁
-Fly sc Rg p owes          s E e = Sync sc Rg (aft p) s E × E p (toEv e)
-Fly sc Rg p (dead _)      s E e = ⊥₁
-Fly sc Rg p (lane b P)    s E e = Σ Att λ at → Σ (St _ _) λ l → s ≡ lnS b (cutS b at l) × T b × Sync sc Rg (aft p) l E × E p (toEv e)
-Fly sc Rg p (lanecut b P) s E e = Σ Att λ at → Σ (St _ _) λ l → s ≡ cutS b at l × T b × Sync sc Rg (aft p) l E × E p (toEv e)
-Fly sc Rg p (pnd q)       s E e = ⊥₁
-
-module _ {R : Set} (Rt : EmissionSet R) where
-
-  -- The root's cursor, and the cursor of the world the hole is in: the
-  -- root's, or an isle's.
-  data Fr (Cr : Cur) : Cur → ∀ {Γ A} → Rgn → Ctx R Γ A → Need → EmissionSet A → Set₁
-
-  -- A connect no live node reads, as what is above it sees it: inside a
-  -- part no live node reads, its need there; or torn down under a live
-  -- node, its rows owed within what its parts still run.
-  data Unread (Cr C : Cur) {Γ X B} (c : Ctx R Γ B) (k : CS Γ X) : Pts → Set₁ where
-    un-dead : ∀ {Rg P E} → Fr Cr C Rg c (dead P) E → Unread Cr C c k P
-    un-torn : ∀ {Rg E P β} → Fr Cr C Rg c owes E → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (not (CS.srcLive k))
-            → Flags C k β → ConnE (CS.connAt k) (Frozen k) β E → TailP C (Connecting.ConnT (CS.connAt k) (Frozen k) β) P
-            → Unread Cr C c k P
-
-  data Fr Cr where
-    f-top   : ∀ {Rg E} → E ≈ Rt → Fr Cr Cr Rg top owes E
-    f-map   : ∀ {Γ A B} {f : A → B} {c : Ctx R Γ B} {C Rg E E′} → Fr Cr C Rg c owes E′ → MapT f E ≈ E′ → Sound Rg E → Fr Cr C Rg (inMap f c) owes E
-    f-scan  : ∀ {Γ A B} {f : B → A → B} {z z₀} {c : Ctx R Γ B} {C Rg E E′}
-            → Fr Cr C Rg c owes E′ → Folded C f z₀ E z → Scan.ScanT f z₀ E ≈ E′ → Sound Rg E → Fr Cr C Rg (inScan f z c) owes E
-    f-cut   : ∀ {Γ A} {a} {c : Ctx R Γ A} {C Rg E} → Fr Cr C Rg c owes E → Fr Cr C Rg (inCut true a c) owes E
-    f-take  : ∀ {Γ A} {i} {keep : A → Bool} {c : Ctx R Γ A} {C Rg E E′}
-            → Fr Cr C Rg c owes E′ → NoFail C keep E → TakeWhile.TakeT i keep E ≈ E′ → Sound Rg E → Fr Cr C Rg (inTake i keep free c) owes E
-    -- a takeWhile failed at `r`: what it still owes within what its
-    -- source still runs
-    f-took  : ∀ {Γ A} {i} {keep : A → Bool} {o} {c : Ctx R Γ A} {C Rg Rg′ E Es E′ r P}
-            → Fr Cr C Rg c owes E′ → Failure keep Es r → Gone C r → (T i → ¬ Owes C (r ++ [ ix 0 ])) → OweAt C o r
-            → TailP C (TakeWhile.TakeT i keep Es) P → TakeWhile.TakeT i keep Es ≈ E′ → Sound Rg Es
-            → Fr Cr C Rg′ (inTake i keep o c) (dead P) E
-    f-outer : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu ls} {c : Ctx R Γ B} {C Rg E E′}
-            → Fr Cr C Rg c owes E′ → JInv (scopeOf c) f E
-            → Joined (scopeOf c) (JRl (scopeOf c) Rg op f E) C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E d n qu ls
-            → JoinE (scopeOf c) op f ω E E′ → Sound (JRo (scopeOf c) Rg op f E) E
-            → Behind C (JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E)
-            → Fr Cr C (JRo (scopeOf c) Rg op f E) (inOuter op f ω d n qu ls c) owes E
-    -- the hole a begun lane, between those before it and after it, in a
-    -- joiner some live node reads
-    f-lanes : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu} {o : St Γ A} {pre post} {c : Ctx R Γ B}
-                {C Rg E E′ O vs₁ vs₂ ws n₁ n₂ q a b Ph}
-            → Fr Cr C Rg c owes E′ → JInv (scopeOf c) f O
-            → Sync (scopeOf c) (JRo (scopeOf c) Rg op f O) C o O
-            → Begun (scopeOf c) (JRl (scopeOf c) Rg op f O) C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O vs₁ (reverse pre) n₁
-            → O q (out a) → ¬ Owes C q → Runs (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) q
-            → Hole C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) q a Ph E b
-            → Begun (scopeOf c) (JRl (scopeOf c) Rg op f O) C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O vs₂ post n₂
-            → n ≡ n₁ + bump b n₂
-            → Waiting C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O ws qu
-            → Whole C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O (vs₁ ++ (q , a) ∷ vs₂) ws
-            → OuterDone C O d
-            → Ahead C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) (vs₁ ++ (q , a) ∷ vs₂) ws
-            → Asc (vs₁ ++ (q , a) ∷ vs₂)
-            → Ends (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O
-            → LanesIn (Hots (full (scopeOf c))) (JRl (scopeOf c) Rg op f O) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O
-            → JoinE (scopeOf c) op f ω O E′ → Sound (JRo (scopeOf c) Rg op f O) O → (T b → Sound (JRl (scopeOf c) Rg op f O q) E)
-            → Behind C (JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O)
-            → Fr Cr C (JRl (scopeOf c) Rg op f O q) (inLanes op f ω d n qu o pre post c) (lane b Ph) E
-    -- under a lane's list entry, its switch; under that, its program
-    f-lane  : ∀ {Γ A} {c : Ctx R Γ A} {C Rg b P E} → Fr Cr C Rg c (lane b P) E → Fr Cr C Rg (inLn b c) (lanecut b P) E
-    f-lnct  : ∀ {Γ A} {a} {c : Ctx R Γ A} {C Rg b P E} → Fr Cr C Rg c (lanecut b P) E → Fr Cr C Rg (inCut b a c) (onoff b P) E
-    f-src   : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {C Rg E E′ β}
-            → Fr Cr C Rg c owes E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (not (CS.closed k))
-            → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β → Behind C β
-            → Flags C k β → E ≈ Frozen k → ConnE (CS.connAt k) (Frozen k) β E′ → Behind C (Frozen k) → Subd (scopeOf c) C k
-            → AttFin k → (T (not (CS.srcAtt k)) → AttOwed k) → NoIsle b → Fr Cr C (Parts.Rs pt) (inSrc k b c) owes E
-    -- a source ended while its connect runs: nothing reads what is left
-    f-srcc  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {C Rg Rg′ E E′ β P}
-            → Fr Cr C Rg c owes E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (CS.closed k)
-            → Spent C (Frozen k) → TailP C (Frozen k) P → Behind C (Frozen k) → Subd (scopeOf c) C k
-            → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β → Behind C β
-            → Flags C k β → ConnE (CS.connAt k) (Frozen k) β E′
-            → Fr Cr C Rg′ (inSrc k b c) (dead P) E
-    -- a source being subscribed: its program, owed at the connect's
-    -- `ix 1`; its body's burst over, so the cursor is past it and the
-    -- body holds no isle
-    f-srcp  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {C Rg E E′ β}
-            → Fr Cr C Rg c owes E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (not (CS.closed k))
-            → T (not (CS.srcAtt k)) → CS.bodyAt k ≡ just (CS.connAt k) → CS.attSrc k ≡ nothing → Adm (binds (CS.src k) (CS.connAt k) (scopeOf c))
-            → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β → Behind C β
-            → Flags C k β → E ≈ Frozen k → ConnE (CS.connAt k) (Frozen k) β E′
-            → Owes C (CS.connAt k ++ [ ix 1 ]) → Subd (scopeOf c) C k → NoIsle b
-            → Fr Cr C (Parts.Rs pt) (inSrc k b c) (pnd (CS.connAt k ++ [ ix 1 ])) E
-    -- a body while its source runs
-    f-body  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {C Rg E E′}
-            → Fr Cr C Rg c owes E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k E) → T (CS.srcLive k)
-            → Src (scopeOf c) (Parts.Rs pt) C k o → Behind C E → Flags C k E → ConnE (CS.connAt k) (Frozen k) E E′
-            → Fr Cr C (Parts.Rb pt) (inBody k o c) owes E
-    -- inside a part no live node reads
-    d-map   : ∀ {Γ A B} {f : A → B} {c : Ctx R Γ B} {C Rg Rg′ P E E′} → Fr Cr C Rg c (dead P) E′ → Fr Cr C Rg′ (inMap f c) (dead P) E
-    d-scan  : ∀ {Γ A B} {f : B → A → B} {z} {c : Ctx R Γ B} {C Rg Rg′ P E E′} → Fr Cr C Rg c (dead P) E′ → Fr Cr C Rg′ (inScan f z c) (dead P) E
-    d-cut   : ∀ {Γ A} {l a} {c : Ctx R Γ A} {C Rg Rg′ P E E′} → Fr Cr C Rg c (dead P) E′ → Fr Cr C Rg′ (inCut l a c) (dead P) E
-    d-ln    : ∀ {Γ A} {b} {c : Ctx R Γ A} {C Rg Rg′ P E E′} → Fr Cr C Rg c (dead P) E′ → Fr Cr C Rg′ (inLn b c) (dead P) E
-    d-take  : ∀ {Γ A} {i} {keep : A → Bool} {w} {c : Ctx R Γ A} {C Rg Rg′ P E E′} → Fr Cr C Rg c (dead P) E′ → Fr Cr C Rg′ (inTake i keep w c) (dead P) E
-    d-outer : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu ls} {c : Ctx R Γ B} {C Rg Rg′ P N Q E E′}
-            → Fr Cr C Rg c (dead P) E′ → HuskL (scopeOf c) ls Q → P ⊑ (N ∪ᵖ Q) → Fr Cr C Rg′ (inOuter op f ω d n qu ls c) (dead N) E
-    d-lanes : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu} {o : St Γ A} {pre post} {c : Ctx R Γ B} {C Rg Rg′ P N Qo Qa Qb E E′}
-            → Fr Cr C Rg c (dead P) E′ → Husk (scopeOf c) o Qo → HuskL (scopeOf c) pre Qa → HuskL (scopeOf c) post Qb
-            → P ⊑ (Qo ∪ᵖ (Qa ∪ᵖ (N ∪ᵖ Qb))) → Fr Cr C Rg′ (inLanes op f ω d n qu o pre post c) (dead N) E
-    d-src   : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {C Rg′ P N Qb E}
-            → Unread Cr C c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Qb
-            → P ⊑ (Under N ∪ᵖ Qb) → NoIsle b → Fr Cr C Rg′ (inSrc k b c) (dead N) E
-    d-body  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {C Rg′ P N Ps E}
-            → Unread Cr C c k P → SrcH (scopeOf c) k o Ps
-            → P ⊑ (Ps ∪ᵖ N) → Fr Cr C Rg′ (inBody k o c) (dead N) E
-    -- an isle: its source in step at its own cursor
-    f-isle  : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {C Ri Ci P Qb}
-            → Unread Cr C c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Qb
-            → P ⊑ (Burst Ci k ∪ᵖ Qb) → T (not (CS.srcAtt k)) → T (not (CS.closed k))
-            → Behind Ci (Frozen k) → Subd (scopeOf c) Ci k → Sound Ri (Frozen k) → AttOwed k
-            → NoIsle b → Fr Cr Ci Ri (inSrc k b c) owes (Frozen k)
-    -- an isle whose source has ended
-    f-islec : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {C Ci Rg′ P N Qb E}
-            → Unread Cr C c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Qb
-            → P ⊑ (Burst Ci k ∪ᵖ Qb) → T (not (CS.srcAtt k)) → T (CS.closed k)
-            → Spent Ci (Frozen k) → TailP Ci (Frozen k) N → Behind Ci (Frozen k) → Subd (scopeOf c) Ci k
-            → Fr Cr C Rg′ (inSrc k b c) (dead N) E
-    -- an isle's source not yet subscribed: its cursor at where it will be
-    f-islep : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {C Ri P Qb}
-            → Unread Cr C c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Qb
-            → P ⊑ (Burst (bef (CS.connAt k ++ [ ix 1 ])) k ∪ᵖ Qb) → T (not (CS.srcAtt k)) → T (not (CS.closed k)) → CS.bodyAt k ≡ just (CS.connAt k) → CS.attSrc k ≡ nothing
-            → CS.scope k ≡ scopeOf c → Adm (binds (CS.src k) (CS.connAt k) (scopeOf c)) → Sound Ri (Frozen k) → NoIsle b
-            → Fr Cr (bef (CS.connAt k ++ [ ix 1 ])) Ri (inSrc k b c) (pnd (CS.connAt k ++ [ ix 1 ])) (Frozen k)

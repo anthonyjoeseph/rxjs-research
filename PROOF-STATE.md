@@ -57,7 +57,7 @@ but a connect's source, whose echo needs its body unended and whose burst
 leaves pins; a dead part may tie no root row; a bounded hand-off needs
 `Hand` from the queue. Settled by bodies over the frames.
 
-Members: `guard-src`, `guard-adrift`, `lanes-guard`, `echo-guard`, `defer-guard`.
+Members: `guard-src`, `lanes-guard`, `echo-guard`, `defer-guard`.
 
 #### THE MARK AT ITS ROW
 

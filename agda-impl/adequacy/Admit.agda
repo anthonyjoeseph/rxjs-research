@@ -7,7 +7,7 @@
 -- the cursor has not passed, is pending within its own region.
 module adequacy.Admit where
 
-open import Data.Bool using (true; false)
+open import Data.Bool using (T; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Unit using (tt)
 open import Data.Nat using (suc)
@@ -35,13 +35,12 @@ open import denotation.Laws.Worlds using (InvAt; ok-step; ok-in; world-after; �
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; ⟨_,_,_,_⟩; scopeOf; closed; rise; moved; start; subscribing; rising; nx; attAt; pend;
                     inOuter; inLanes; inLn; inCut)
-open import adequacy.Rows using (full; pendRows; Moves; silent; ≃-refl; _⇄_)
-open import adequacy.Cursor using (Cur; Pol; Kill; kill-out; owes; bef; aft; Owes; _≈_; ≈-refl; Sound; Fr; f-outer; f-lanes; f-lane; f-lnct; d-outer; d-lanes; d-ln; d-cut;
-  JInv; Joined; joined; Begun; none; more; JoinE; JRl; JRo; Behind; Sync; polF; JoinF; Lane; Start; Runs; Whole; OuterDone; Ahead; Asc;
-  h-live; c-sub; ∅ᵖ; _∪ᵖ_; _⊑_; ⊑-trans; ⊑-refl; ∪-⊑; h-blank; hl-none)
+open import adequacy.Rows using (full; pendRows; Moves; _⇄_)
+open import adequacy.Cursor using (Cur; Pol; Kill; kill-out; bef; aft; Owes; _≈_; ≈-refl; Sound; JInv; Joined; joined; Begun; none; more; JoinE; JRl; JRo; Behind; Sync; polF; JoinF; Lane; Start; Runs; Whole; OuterDone; Ahead; Asc; h-live)
+open import adequacy.Cursor.Frame using (owes; Fr; f-outer; f-lanes; f-lane; f-lnct; d-outer)
 open import adequacy.Cursor.Rise using (Inv; RT; SimC; settled; pending; flying; adrift)
 open import adequacy.Enter using (module Lanes; within-sound)
-open import adequacy.Walk using (pt-⊑; hl-rev)
+open import adequacy.Walk using (dead-closed)
 open import adequacy.Up using (module Past; VHot; vhot-hots; begun-out; nr-≈; nr-tr; join-nr; fr-up; After)
 
 -- A begun lane's value, passed.
@@ -154,13 +153,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
                   ; cov = [] , λ x → inj₁ (proj₁ x)
                   ; voc = λ x → x , g x }
   merge-start (flying (d-outer _ _ _) _ ())
-  merge-start {f = f} {c = c} {a = a} {p = p} {Cr = Cr} {C = C} (adrift (d-outer {P = P₀} fr hl le) cl (Q₀ , hk , le₀)) with hl-rev hl hl-none
-  ... | Qa , ha , lr =
-    subst (After Rt Cr) (sym (start-open {c = c} {op = mergeᶠ nothing} {f = f} {a = a} {p = p} cl))
-      (Cr , C , settled {Rg = λ _ → ⊥} {E = λ _ _ → ⊥} c-sub (d-cut {Rg = λ _ → ⊥} {E′ = λ _ _ → ⊥} (d-ln {Rg = λ _ → ⊥} {E′ = λ _ _ → ⊥} (d-lanes fr hk ha hl-none le′))) (∅ᵖ , h-blank , ⊑-refl) , silent ≃-refl)
-    where
-      le′ : P₀ ⊑ (Q₀ ∪ᵖ (Qa ∪ᵖ (∅ᵖ ∪ᵖ ∅ᵖ)))
-      le′ = ⊑-trans le (⊑-trans (∪-⊑ le₀ (⊑-trans (pt-⊑ inj₁) lr)) (pt-⊑ λ { (inj₁ x) → inj₁ x ; (inj₂ x) → inj₂ (inj₁ x) }))
+  merge-start (adrift fr cl _) = ⊥-elim (subst T cl (dead-closed Rt fr refl))
   merge-start (settled () _ _)
 
   postulate

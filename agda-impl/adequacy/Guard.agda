@@ -24,21 +24,18 @@ open import denotation.Read using (Visible)
 open import denotation.Laws.Modulus using (≼-false; ≼-or-≻; ≼-refl)
 open import denotation.Laws.BoundedInv using (first-child)
 open import adequacy.Weight using (prefixes)
-open import adequacy.Cursor using (Cur; bef; Behind; _≈_; alike; voc; Need; owes; dead; lane; lanecut; pnd; NoFail; Rgn; Sound;
-  Lane; Runs; Start; Kill; kill-out; polF; JoinF; LaneRg; LanesIn; JRl; JInv; joined; h-live;
-  h-end; h-kill; Fr; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane;
-  f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes;
-  d-src; d-body; f-isle; f-islec; f-islep; Ze; e₀; e+)
+open import adequacy.Cursor using (Cur; bef; Behind; _≈_; alike; voc; NoFail; Rgn; Sound; Lane; Runs; Start; Kill; kill-out; polF; JoinF; LaneRg; LanesIn; JRl; JInv; joined; h-live; h-end; h-kill; Ze; e₀; e+)
+open import adequacy.Cursor.Frame using (Need; owes; dead; lane; lanecut; pnd; Fr; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep)
 open import adequacy.Rows using (module _≃_)
 open _≃_ using (from)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; Scope; scopeOf)
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import Data.Maybe using (just; nothing)
-open import Data.List.Properties using (∷ʳ-injectiveˡ; ∷ʳ-injectiveʳ)
+open import Data.List.Properties using (∷ʳ-injectiveʳ)
 open import denotation.Events using (Timeline)
 open import denotation.EmissionSet using (Den; ⟦_⟧; Work; module Joining; module Merge; module Bounded; module Switch; module Exhaust)
-open import denotation.Laws.Worlds using (W⁼; here; inW; step; timer; join; ⊑-trans; ⊑-snoc⁺)
+open import denotation.Laws.Worlds using (here; step; ⊑-trans; ⊑-snoc⁺)
 open import adequacy.Rows using (full)
 open import denotation.Laws.Worlds using (Hots)
 open import adequacy.Enter using (module Lanes; w-down)
@@ -58,8 +55,10 @@ open import adequacy.Rows using (conv; back)
 open import adequacy.Simulated using (cursor)
 open import adequacy.Simulation using (Simulation; module Along)
 open import adequacy.Path using (Path)
-open import adequacy.Cursor using (Fly; Due)
+open import adequacy.Cursor using (Due)
+open import adequacy.Cursor.Frame using (Fly)
 open import adequacy.Cursor.Rise using (flying; adrift)
+open import adequacy.Walk using (dead-closed)
 open import Data.List using (map)
 open import denotation.EmissionSet using (Reach; Dep; module Connecting)
 open import adequacy.Cursor using (Src; src-pend; src-on; src-shut; Parts)
@@ -73,7 +72,8 @@ open import denotation.Events using (inside)
 open import denotation.EmissionSet using (pin)
 open import denotation.Laws.Worlds using (⊑-inside; inside-⊑; ⊑-≼)
 open import denotation.Laws.Modulus using (≼-≺-≺; ≺-≼-≺)
-open import adequacy.Cursor using (notT; Unread; SubdAt; Flags; module Flags)
+open import adequacy.Cursor using (notT; SubdAt; Flags; module Flags)
+open import adequacy.Cursor.Frame using (Unread)
 open import operation.Key using (at; after; _<ᴷ_; <ᴷ-trans; after-lt)
 open import adequacy.Floor.Keys using (plug-in; own-bld; oo; at-after₀)
 open import adequacy.Least using (Lo; k-own)
@@ -514,7 +514,7 @@ module Lift {R : Set} (Rt : EmissionSet R) where
   lift (d-take _) _ ()
   lift (d-outer _ _ _) _ ()
   lift (d-lanes _ _ _ _ _) _ ()
-  lift (d-src _ _ _ _) _ ()
+  lift (d-src _ _ _ _ _) _ ()
   lift (d-body _ _ _) _ ()
   lift (f-islec _ _ _ _ _ _ _ _ _) _ ()
   lift (f-islep _ _ _ _ _ _ _ _ _ _ _) _ ()
@@ -564,22 +564,13 @@ postulate
   -- its subscribe burst under a connect no live node reads, its value
   -- rising, has a row under its first child, at or before the row met
   -- next.  Nothing such a source runs shows where the root reads, so the
-  -- row must come from elsewhere; suspected false, as `guard-adrift` is.
+  -- row must come from elsewhere.
   guard-src : ∀ {R} (o : PureObs [] R) {rs Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu ls} {c : Ctx R Γ B} {s a q p e}
             → Path (load o) rs ⟨ inOuter op f ω d n qu ls c , s , rising (nx a) , q ⟩
             → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
             → ∀ {Cr C Rg N E} → Fr (enter (⟦ o ⟧ []ᴬ) root) Cr C Rg (inOuter op f ω d n qu ls c) N E
             → Lift.Isled (enter (⟦ o ⟧ []ᴬ) root) Cr
             → RowUnder o (q ++ [ ix 0 ]) p
-
-  -- AN OUTER'S GUARD IN A DEAD PART: an outer no live node reads, its
-  -- value rising, has a row under its first child, at or before the row
-  -- met next.
-  guard-adrift : ∀ {R} (o : PureObs [] R) {rs Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu ls} {c : Ctx R Γ B} {s a q p e}
-               → Path (load o) rs ⟨ inOuter op f ω d n qu ls c , s , rising (nx a) , q ⟩
-               → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
-               → ∀ {Cr C Rg P E} → Fr (enter (⟦ o ⟧ []ᴬ) root) Cr C Rg (inOuter op f ω d n qu ls c) (dead P) E
-               → RowUnder o (q ++ [ ix 0 ]) p
 
 -- AN OUTER'S GUARD IS MET: an outer's value rising has a row under its
 -- first child, at or before the row met next.
@@ -592,7 +583,7 @@ outer-guard o {op = op} {f} {ω} {d} {n} {qu} {ls} {c} {s} pth m
 ... | (_ , _ , flying fr _ fy , _) , _ | du with Outer.outer-row o fr (lo₀ c {flatS op f ω d n qu s ls} (floor o pth tt)) fy
 ...   | inj₁ lf = Outer.under o lf du
 ...   | inj₂ il = guard-src o pth m fr il
-outer-guard o pth m | (_ , _ , adrift fr _ _ , _) , _ | _ = guard-adrift o pth m fr
+outer-guard o pth m | (_ , _ , adrift fr cl _ , _) , _ | _ = ⊥-elim (subst T cl (dead-closed (enter (⟦ o ⟧ []ᴬ) root) fr refl))
 
 postulate
   -- A LANE'S HAND-OFF PASSES ITS GUARD: a lane ending with values queued

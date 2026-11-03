@@ -37,14 +37,8 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Scope; scopeOf; plug; unbound; binds; CS; coldS; ofS; takeS; flatS; connS)
 open import adequacy.Rows using (full; pendRows; Frozen; _≃_; _⇄_; ≃-sym; ≃-trans)
 open _≃_
-open import adequacy.Cursor using (Cur; origin; bef; aft; Owes; Due; Unfed; Pol; Lane; Runs; Kill; kill-out; NoKill; Kept; polF; JoinF; h-live;
-  h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Spent; Folded; fd-none; fd-last;
-  Whole; Ahead; Joined; joined; Flags; Src; src-pend; src-on; src-shut; OweAt; o-cp; o-cut;
-  o-over; NoFail; Behind; Fin; fin-dn; tail-dn; _≈_; cov; Subd; SubdAt; subd; TailP; tailp;
-  tailp-dn; Pts; _∪ᵖ_; Under; Burst; Torn; Husk; HuskL; SrcH; h-blank; h-map; h-scan; h-cut;
-  h-ln; h-take; h-flat; h-conn; hl-none; hl-more; sh-dead; sh-isle; sh-islec; sh-pend; Sync;
-  s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx;
-  Fr; owes; AttOwed)
+open import adequacy.Cursor using (Cur; origin; bef; aft; Owes; Due; Unfed; Pol; Lane; Runs; Kill; kill-out; NoKill; Kept; polF; JoinF; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Spent; Folded; fd-none; fd-last; Whole; Ahead; Joined; joined; Flags; Src; src-pend; src-on; src-shut; OweAt; o-cp; o-cut; o-over; NoFail; Behind; Fin; fin-dn; tail-dn; _≈_; cov; Subd; SubdAt; subd; TailP; tailp; tailp-dn; Pts; _∪ᵖ_; Under; Burst; Torn; Husk; HuskL; SrcH; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; sh-dead; sh-isle; sh-islec; sh-pend; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; AttOwed)
+open import adequacy.Cursor.Frame using (Fr; owes)
 open import adequacy.Floor.Keys using (plug-in; own-bld; os)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
 open import adequacy.Bound using (tr; on; lt; owes-≼; owes?; T?; LoP; KAt; lo-p; next-slot; in-slot; Env; env-bind; unfed-b; of-lb; cold-b;
@@ -300,7 +294,7 @@ att-slot {k = k} {p} (inj₂ (e , _)) bl _ q₂p =
 
 mutual
   husk-f : ∀ {Γ} {sc : Scope Γ} {A} {s : St Γ A} {P p} → Husk sc s P → LoP s p → PLag p P
-  husk-f h-blank        lo = [] , λ ()
+  husk-f (h-blank _)    lo = [] , λ ()
   husk-f (h-map hk)     lo = husk-f hk (λ ki → lo (k-kid (k-map ki)))
   husk-f (h-scan hk)    lo = husk-f hk (λ ki → lo (k-kid (k-scan ki)))
   husk-f (h-cut hk)     lo = husk-f hk (λ ki → lo (k-kid (k-cut ki)))
@@ -316,7 +310,7 @@ mutual
   srch-f : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o P p} → SrcH sc k o P → LoP o p
          → (CS.bodyAt k ≡ just (CS.connAt k) → p ≼ (CS.connAt k ++ [ ix 1 ])) → (∀ {y} → CS.attSrc k ≡ just y → KAt p (after y))
          → PLag p P
-  srch-f (sh-dead hk) lo _ _ = plag-under (husk-f hk lo)
+  srch-f (sh-dead hk _) lo _ _ = plag-under (husk-f hk lo)
   srch-f {k = k} {p = p} (sh-pend _ _ ba _ refl (ok , a) _ _ _) _ bl _ = [] , λ { (k′ , (_ , x , _) , refl) yp →
     ⊥-elim (bl ba (≺-trans {CS.connAt k ++ [ ix 1 ]} {k′} {p}
                      (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok) x) (below k′ yp))) }

@@ -28,14 +28,8 @@ open Machine using (St; Ctx; Conf; Scope; ⟨_,_,_,_⟩; subscribing; absorbed; 
                     pend; connS; inSrc; scopeOf; binds; closed; unsubIf)
 open import adequacy.Rows using (Frozen; ≃-refl; Vis; _≃_; _⇄_; silent; Moves)
 open _≃_
-open import adequacy.Cursor using (Cur; bef; Owes; Behind; Pts; Held; AttFin; AttOwed; TailP; tailp; Src; Sync; Subd; husk-of;
-  src-husk; re-parts; unsubIf-husk; under-⊑; tailp-⊑; ∪-⊑; Parts; Flags; Sound; Husk; SrcH;
-  Unread; NoIsle; _∪ᵖ_; _⊑_; ∅ᵖ; ∅-⊑; ⊑-refl; ⊑-trans; h-blank; h-conn; sh-dead; sh-isle;
-  sh-islec; sh-pend; src-pend; src-on; src-shut; s-conn; Torn; un-dead; un-torn; owes; dead;
-  lane; lanecut; pnd; c-abs; c-sub; ≈-refl; notT; sync-pend; subd; Need; Fr; f-top; f-map;
-  f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp;
-  f-isle; f-islec; f-islep; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes;
-  d-src; d-body)
+open import adequacy.Cursor using (Cur; bef; Owes; Behind; Pts; Held; AttFin; AttOwed; TailP; tailp; Src; Sync; Subd; husk-of; src-husk; re-parts; unsubIf-husk; quiet-unsubIf; under-⊑; tailp-⊑; ∪-⊑; Parts; Flags; Sound; Husk; SrcH; NoIsle; _∪ᵖ_; _⊑_; ⊑-refl; ⊑-trans; h-blank; h-conn; sh-dead; sh-isle; sh-islec; sh-pend; src-pend; src-on; src-shut; s-conn; Torn; c-abs; c-sub; ≈-refl; notT; sync-pend; subd)
+open import adequacy.Cursor.Frame using (Unread; un-dead; un-torn; owes; dead; lane; lanecut; pnd; Need; Fr; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-isle; f-islec; f-islep; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body)
 open import adequacy.Cursor.Rise using (Inv; settled; pending; RT)
 open import adequacy.Least using (Lo; k-kid; k-body)
 open import adequacy.Floor.Keys using (plug-in)
@@ -111,14 +105,14 @@ islec-att {Ci = Ci} (tailp ts tf) (bs , bf) = ts ++ bs , λ { {k′} (_ , x , _)
 srch-att : ∀ {Γ X} {sc : Scope Γ} {cl sl sa p ow cx ea sr sc′} {y} {o : St Γ X} {P} bb
          → Lo o (after y) → SrcH sc (cs cl sl sa p (just y) ow cx ea sr sc′) o P
          → Σ Pts λ P′ → SrcH sc (cs cl sl true p nothing ow cx ea sr sc′) (proj₁ (unsubIf bb o)) P′ × P ⊑ P′
-srch-att bb lo (sh-dead hk) with unsubIf-husk bb hk
-... | _ , h , le = _ , sh-dead h , under-⊑ le
+srch-att bb lo (sh-dead hk _) with unsubIf-husk bb hk
+... | _ , h , le = _ , sh-dead h (inj₁ tt) , under-⊑ le
 srch-att {cl = cl} {sl} {sa} {p} {ow} {cx} {ea} {sr} {sc′} bb lo (sh-isle na nc sy bh sd ss (inj₁ refl)) with unsubIf-husk bb (proj₂ (husk-of sy))
-... | _ , h , le = _ , sh-dead h , ⊑-trans (under-⊑ (isle-att {k = k} sy bh (att-fin {k = k} sy bh sd lo))) (under-⊑ le)
+... | _ , h , le = _ , sh-dead h (inj₁ tt) , ⊑-trans (under-⊑ (isle-att {k = k} sy bh (att-fin {k = k} sy bh sd lo))) (under-⊑ le)
   where k = cs cl sl sa p (just (cx ++ [ ix 1 ])) ow cx ea sr sc′
 srch-att bb lo (sh-isle _ _ _ _ _ _ (inj₂ (_ , ())))
 srch-att {cl = cl} {sl} {sa} {p} {ow} {cx} {ea} {sr} {sc′} {y} bb lo (sh-islec _ _ _ tp hk bh _) with unsubIf-husk bb hk
-... | _ , h , le = _ , sh-dead h , ⊑-trans (under-⊑ (islec-att {k = cs cl sl sa p (just y) ow cx ea sr sc′} tp bh)) (under-⊑ le)
+... | _ , h , le = _ , sh-dead h (inj₁ tt) , ⊑-trans (under-⊑ (islec-att {k = cs cl sl sa p (just y) ow cx ea sr sc′} tp bh)) (under-⊑ le)
 srch-att bb lo (sh-pend _ _ _ () _ _ _ _ _)
 
 -- A live source, attached.
@@ -146,12 +140,12 @@ torn-att lo tn with srch-att true lo (Torn.sh tn)
 srch-off : ∀ {Γ X} {sc : Scope Γ} {cl sl sa p as ow cx ea sr sc′} {o : St Γ X} {P}
          → SrcH sc (cs cl sl sa p as ow cx ea sr sc′) o P
          → Σ Pts λ P′ → SrcH sc (cs cl false sa p as nothing cx ea sr sc′) (proj₁ (unsubIf sa o)) P′ × P ⊑ P′
-srch-off {sa = true} (sh-dead hk) with unsubIf-husk true hk
-... | _ , h , le = _ , sh-dead h , under-⊑ le
+srch-off {sa = true} (sh-dead hk f) with unsubIf-husk true hk
+... | _ , h , le = _ , sh-dead h f , under-⊑ le
 srch-off {sa = true}  (sh-isle () _ _ _ _ _ _)
 srch-off {sa = true}  (sh-islec () _ _ _ _ _ _)
 srch-off {sa = true}  (sh-pend () _ _ _ _ _ _ _ _)
-srch-off {sa = false} (sh-dead hk)                          = _ , sh-dead hk , ⊑-refl
+srch-off {sa = false} (sh-dead hk f)                        = _ , sh-dead hk f , ⊑-refl
 srch-off {sa = false} (sh-isle na nc sy bh sd ss ao)        = _ , sh-isle na nc sy bh sd ss ao , ⊑-refl
 srch-off {sa = false} (sh-islec na cl sp tp hk bh sd)       = _ , sh-islec na cl sp tp hk bh sd , ⊑-refl
 srch-off {sa = false} (sh-pend na nc ba an sc adm pe wn ss) = _ , sh-pend na nc ba an sc adm pe wn ss , ⊑-refl
@@ -239,7 +233,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   closed-off (d-take _)                                          _ = tt
   closed-off (d-outer _ _ _)                                     _ = tt
   closed-off (d-lanes _ _ _ _ _)                                 _ = tt
-  closed-off (d-src _ _ _ _)                                     _ = tt
+  closed-off (d-src _ _ _ _ _)                                   _ = tt
   closed-off (d-body _ _ _)                                      _ = tt
   closed-off (f-isle {k = k} _ _ _ na nc _ _ _ _ _)              t = ⊥-elim (notT _ na (and-left (CS.srcAtt k) (or-right (CS.closed k) nc t)))
   closed-off (f-islec _ _ _ _ _ _ _ _ _)                         _ = tt
@@ -262,7 +256,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     pending (f-isle un hb le na nc (behind-pend {C = bef (cx ++ [ ix 1 ])} {k = cs cl sl sa nothing (just (p ++ [ ix 1 ])) ow cx ea sr sc} scp (ok , adm) (≼-refl {cx ++ [ ix 1 ]})) (subd (λ o → o) ok) ss (inj₁ refl) nb)
             (≼-refl {cx ++ [ ix 1 ]} , ok-step cx ok , adm , pe , wn) ,
     silent ≃-refl
-  unread-body {Cr} {C} un (sh-dead hk) hb le nb = Cr , C , settled {Rg = nowhere} {E = none′} c-sub (d-src un hb le nb) (_ , hk , ⊑-refl) , silent ≃-refl
+  unread-body {Cr} {C} un (sh-dead hk f) hb le nb = Cr , C , settled {Rg = nowhere} {E = none′} c-sub (d-src un hb le nb f) (_ , hk , ⊑-refl) , silent ≃-refl
   unread-body un (sh-isle _ _ sy _ _ _ _) hb le nb = ⊥-elim (sync-pend tt sy)
   unread-body {Cr} {C} un (sh-islec na cl sp tp hk bh sd) hb le nb =
     Cr , C , settled {Rg = nowhere} {E = none′} c-sub (f-islec un hb le na cl sp tp bh sd) (_ , hk , ⊑-refl) , silent ≃-refl
@@ -292,8 +286,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     silent (vis-≃ d)
   con-body {sl = false} nb lo (settled {N = owes} c-abs fr (s-conn scp pt bs _ ss tn fl eq)) =
     unread-body (un-torn fr scp (re-parts refl refl pt) tt (re-flags fl) eq (Torn.tl (tn tt))) (Torn.sh (tn tt)) (Torn.bh (tn tt)) ⊑-refl nb
-  con-body {Cr} {C} nb lo (settled {N = dead _} c-abs fr (_ , h-blank , le)) =
-    Cr , C , settled {Rg = nowhere} {E = none′} c-sub (d-src {N = ∅ᵖ} (un-dead fr) h-blank (⊑-trans le ∅-⊑) nb) (∅ᵖ , h-blank , ⊑-refl) , silent ≃-refl
+  con-body nb lo (settled {N = dead _} c-abs fr (_ , h-blank (_ , () , _) , le))
   con-body nb lo (settled {N = dead _} c-abs fr (_ , h-conn sh hb , le)) = unread-body (un-dead fr) sh hb le nb
   con-body nb lo (settled {N = lane _ _} c-abs fr (_ , _ , () , _))
   con-body nb lo (settled {N = lanecut _ _} c-abs fr (_ , _ , () , _))
@@ -312,7 +305,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
     Cr , C , settled c-abs fr (s-conn scp (re-parts refl refl pt) bs bb (λ t → src-att lo (ss t)) (λ ()) (re-flags fl) eq) , silent ≃-refl
   con-att {Cr} {C} {sl = false} lo (settled {N = owes} c-abs fr (s-conn scp pt bs _ ss tn fl eq)) =
     Cr , C , settled c-abs fr (s-conn scp (re-parts refl refl pt) (λ ()) (λ ()) (λ ()) (λ t → torn-att lo (tn t)) (re-flags fl) eq) , silent ≃-refl
-  con-att {Cr} {C} lo (settled {N = dead _} c-abs fr (_ , h-blank , le)) = Cr , C , settled c-abs fr (_ , h-blank , le) , silent ≃-refl
+  con-att {Cr} {C} {c = c} {sl = sl} {o = o} lo (settled {N = dead _} c-abs fr (_ , h-blank (_ , qo , qb) , le)) =
+    Cr , C , settled c-abs fr (_ , h-blank (inj₁ tt , quiet-unsubIf (not sl ∨ closed c) {s = o} qo , qb) , le) , silent ≃-refl
   con-att {Cr} {C} {c = c} {sl = sl} lo (settled {N = dead _} c-abs fr (_ , h-conn sh hb , le)) with srch-att (not sl ∨ closed c) lo sh
   ... | _ , sh′ , le′ = Cr , C , settled c-abs fr (_ , h-conn sh′ hb , ⊑-trans le (∪-⊑ le′ ⊑-refl)) , silent ≃-refl
   con-att lo (settled {N = lane _ _} c-abs fr (_ , _ , () , _))
@@ -339,7 +333,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
     Cr , C , settled c-abs fr (s-conn scp (re-parts refl refl pt) (λ ()) (λ ()) (λ ()) (λ t → torn-off (tn t))
       (record { shut = Flags.shut fl ; unshut = λ () ; torn = Flags.torn fl ; owed = λ () ; ended = λ () }) eq) ,
     silent ≃-refl
-  con-owed {Cr} {C} (settled {N = dead _} c-abs fr (_ , h-blank , le)) = Cr , C , settled c-abs fr (_ , h-blank , le) , silent ≃-refl
+  con-owed {Cr} {C} {sa = sa} {o = o} (settled {N = dead _} c-abs fr (_ , h-blank (f , qo , qb) , le)) =
+    Cr , C , settled c-abs fr (_ , h-blank (f , quiet-unsubIf sa {s = o} qo , qb) , le) , silent ≃-refl
   con-owed {Cr} {C} (settled {N = dead _} c-abs fr (_ , h-conn sh hb , le)) with srch-off sh
   ... | _ , sh′ , le′ = Cr , C , settled c-abs fr (_ , h-conn sh′ hb , ⊑-trans le (∪-⊑ le′ ⊑-refl)) , silent ≃-refl
   con-owed (settled {N = lane _ _} c-abs fr (_ , _ , () , _))

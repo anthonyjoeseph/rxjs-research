@@ -21,7 +21,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; cong)
 open import Relation.Nullary using (¬_)
-open import Data.Maybe using (just)
+open import Data.Maybe using (just; nothing)
 
 open import denotation.Events using (Pos; ix; Timeline)
 open import Tree using (Obs)
@@ -31,12 +31,13 @@ open import denotation.EmissionSet using (EmissionSet; Ev; out; end; Proper; ⟦
 open import denotation.Laws.Modulus using (≺→≼; ≺-trans; ≺-irrefl; ≺-ext; ≼-antisym)
 open import denotation.Laws.Worlds using (Hots)
 open import operation.PureObservable using (module Machine)
-open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; binds; CS; scopeOf; connS; rising; nx; cp; inBody; inSrc; feed; feedL; rise; moved; shutAt; absorbed) renaming (Ev to Evᴹ)
+open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; binds; CS; scopeOf; connS; rising; nx; cp; inBody; inSrc; feed; feedL; rise; moved; shutAt; absorbed; same?; joinS; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS) renaming (Ev to Evᴹ)
 open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans; ≃-refl; ≼-≢; full; Frozen; pendRows; Moves; silent; toEv)
 open _≃_
 open import adequacy.Walk using (sync-≈)
 open import adequacy.Enter using (module Lanes)
-open import adequacy.Cursor using (Cur; bef; aft; Behind; Fin; Tail; fin-dn; tail-dn; alike; voc; FewBefore; ConnE; Need; owes; dead; lane; lanecut; pnd; _≈_; c-abs; Pol; Kill; kill-out; Ahead; Whole; OuterDone; Owes; Due; Spent; Unfed; Rgn; Sound; vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none; fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; re-parts; OweAt; o-cp; o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Fr; Waiting; Lane; JRl; JRo; JInv; Asc; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; polF; JoinF; LanesIn; NoFail; TailP; tailp-dn; Subd; SubdAt; subd; Torn; Unread; un-dead; un-torn; notT; by; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; sh-pend; husk-of; ⊑-trans; ∪-⊑; ⊑-refl; under-⊑; NoIsle; NoIsleL; Settles; sync-pend; burst-dn)
+open import adequacy.Cursor using (Cur; bef; aft; Behind; Fin; Tail; fin-dn; tail-dn; alike; voc; FewBefore; ConnE; _≈_; c-abs; Pol; Kill; kill-out; Ahead; Whole; OuterDone; Owes; Due; Spent; Unfed; Rgn; Sound; vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none; fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; re-parts; OweAt; o-cp; o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Waiting; Lane; JRl; JRo; JInv; Asc; polF; JoinF; LanesIn; NoFail; TailP; tailp-dn; Subd; SubdAt; subd; Torn; notT; by; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; sh-pend; husk-of; Quiet; QuietL; ⊑-trans; ∪-⊑; ⊑-refl; under-⊑; NoIsle; NoIsleL; Settles; sync-pend; burst-dn)
+open import adequacy.Cursor.Frame using (Need; owes; dead; lane; lanecut; pnd; Fr; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; Unread; un-dead; un-torn)
 open import adequacy.Cursor.Rise using (Inv; RT; settled; flying; adrift; SimC; keeps; unread-at)
 open import adequacy.Bound using (join-row; owes?; few-src)
 open import adequacy.Regions using (lane-sole)
@@ -254,14 +255,14 @@ src-owe (src-on nc sy bh sd af ao)     = src-on nc sy bh sd af ao
 src-owe (src-shut cl sp tp hk bh sd)   = src-shut cl sp tp hk bh sd
 
 srch-owe : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o P x} → SrcH sc k o P → SrcH sc (record k { owedAt = x }) o P
-srch-owe (sh-dead hk)                    = sh-dead hk
+srch-owe (sh-dead hk f)                  = sh-dead hk f
 srch-owe (sh-isle na nc sy bh sd ss ao)  = sh-isle na nc sy bh sd ss ao
 srch-owe (sh-islec na cl sp tp hk bh sd) = sh-islec na cl sp tp hk bh sd
 srch-owe (sh-pend na nc ba an sc adm pe wn ss) = sh-pend na nc ba an sc adm pe wn ss
 
 husk-owe : ∀ {Γ X B} {sc : Scope Γ} {k : CS Γ X} {o} {b : St (X ∷ Γ) B} {P x}
          → Husk sc (connS k o b) P → Husk sc (connS (record k { owedAt = x }) o b) P
-husk-owe h-blank        = h-blank
+husk-owe (h-blank q)    = h-blank q
 husk-owe (h-conn sh hb) = h-conn (srch-owe sh) hb
 
 -- A connect's rows before a body row: its body's before it, and its
@@ -276,8 +277,29 @@ conn-reach (ks , fs) (bs , fb) = map (_++ [ ix 0 ]) ks ++ bs , λ
 -- A ROW FED TO A PART NO LIVE NODE READS, with no isle in it, keeps
 -- what it still runs: a feed reaches joiners only.
 mutual
+  quiet-feed : ∀ {Γ X A} {i : X ∈ Γ} {p e} (s : St Γ A) → Quiet s → Quiet (feed i p e s)
+  quiet-feed {i = i} (joinS _ true x _) _ with same? i x
+  ... | just refl = tt
+  ... | nothing   = tt
+  quiet-feed (joinS _ false _ _)      _             = tt
+  quiet-feed (pend _ _)               ()
+  quiet-feed (coldS _ _)              _             = tt
+  quiet-feed (ofS _ _ _)              _             = tt
+  quiet-feed doneS                    _             = tt
+  quiet-feed (mapS _ s)               q             = quiet-feed s q
+  quiet-feed (scanS _ _ s)            q             = quiet-feed s q
+  quiet-feed (cutS _ _ s)             q             = quiet-feed s q
+  quiet-feed (lnS _ s)                q             = quiet-feed s q
+  quiet-feed (takeS _ _ _ s)          q             = quiet-feed s q
+  quiet-feed (flatS _ _ _ _ _ _ o ls) (qo , ql)     = quiet-feed o qo , quiet-feedL ls ql
+  quiet-feed (connS _ o b)            (f , qo , qb) = f , quiet-feed o qo , quiet-feed b qb
+
+  quiet-feedL : ∀ {Γ X A} {i : X ∈ Γ} {p e} (ls : List (St Γ A)) → QuietL ls → QuietL (feedL i p e ls)
+  quiet-feedL []       _        = tt
+  quiet-feedL (l ∷ ls) (q , ql) = quiet-feed l q , quiet-feedL ls ql
+
   feed-husk : ∀ {Γ} {sc : Scope Γ} {X A} {i : X ∈ Γ} {p e} {s : St Γ A} {P} → Husk sc s P → NoIsle s → Husk sc (feed i p e s) P
-  feed-husk h-blank        _              = h-blank
+  feed-husk {s = s} (h-blank q) _        = h-blank (quiet-feed s q)
   feed-husk (h-map hk)     ni             = h-map (feed-husk hk ni)
   feed-husk (h-scan hk)    ni             = h-scan (feed-husk hk ni)
   feed-husk (h-cut hk)     ni             = h-cut (feed-husk hk ni)
@@ -292,7 +314,7 @@ mutual
 
   srch-feed : ∀ {Γ} {sc : Scope Γ} {X Y} {i : X ∈ Γ} {p e} {k : CS Γ Y} {o P} → SrcH sc k o P → Settles k o → NoIsle o
             → SrcH sc k (feed i p e o) P
-  srch-feed (sh-dead hk)                    _                 no = sh-dead (feed-husk hk no)
+  srch-feed (sh-dead hk f)                  _                 no = sh-dead (feed-husk hk no) f
   srch-feed (sh-isle na _ _ _ _ _ _)        (inj₁ t)          _  = ⊥-elim (notT _ na t)
   srch-feed (sh-isle _ nc _ _ _ _ _)        (inj₂ (inj₁ t))   _  = ⊥-elim (notT _ nc t)
   srch-feed (sh-isle _ _ sy _ _ _ _)        (inj₂ (inj₂ pe))  _  = ⊥-elim (sync-pend pe sy)
@@ -553,7 +575,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   fr-up (d-take _) ()
   fr-up (d-outer _ _ _) ()
   fr-up (d-lanes _ _ _ _ _) ()
-  fr-up (d-src _ _ _ _) ()
+  fr-up (d-src _ _ _ _ _) ()
   fr-up (d-body _ _ _) ()
 
   postulate
@@ -649,13 +671,13 @@ module _ {R : Set} (Rt : EmissionSet R) where
     , silent ≃-refl
   rise-src-nx refl (flying (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
   rise-src-nx refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
-  rise-src-nx refl (flying (d-src _ _ _ _) _ ())
+  rise-src-nx refl (flying (d-src _ _ _ _ _) _ ())
   rise-src-nx refl (flying (f-islec _ _ _ _ _ _ _ _ _) _ ())
   rise-src-nx refl (flying (f-islep _ _ _ _ _ _ _ _ _ _ _) _ ())
   rise-src-nx refl (adrift (f-srcc _ _ _ _ cl _ _ _ _ _ _ _ _) cl′ _)  = ⊥-elim (or-shut cl cl′)
   rise-src-nx refl (adrift (f-islec _ _ _ _ cl _ _ _ _) cl′ _)       = ⊥-elim (or-shut cl cl′)
-  rise-src-nx {a = a} {p = p} refl (adrift (d-src u hb le ni) _ (Q , hk , le′)) =
-    _ , _ , unread-at Rt u (sh-dead hk) (feed-husk {i = here refl} {p = p} {e = nx a} hb ni) (⊑-trans le (∪-⊑ (under-⊑ le′) ⊑-refl))
+  rise-src-nx {a = a} {p = p} refl (adrift (d-src u hb le ni f) _ (Q , hk , le′)) =
+    _ , _ , unread-at Rt u (sh-dead hk f) (feed-husk {i = here refl} {p = p} {e = nx a} hb ni) (⊑-trans le (∪-⊑ (under-⊑ le′) ⊑-refl))
     , silent ≃-refl
   rise-src-nx refl (settled () _ _)
 
@@ -682,15 +704,15 @@ module _ {R : Set} (Rt : EmissionSet R) where
     where fed = feed-husk {i = here refl} {p = p} {e = cp} hb ni
   rise-src-cp refl (flying (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
   rise-src-cp refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
-  rise-src-cp refl (flying (d-src _ _ _ _) _ ())
+  rise-src-cp refl (flying (d-src _ _ _ _ _) _ ())
   rise-src-cp refl (flying (f-islec _ _ _ _ _ _ _ _ _) _ ())
   rise-src-cp refl (flying (f-islep _ _ _ _ _ _ _ _ _ _ _) _ ())
   rise-src-cp refl (adrift (f-srcc _ _ _ _ cl _ _ _ _ _ _ _ _) cl′ _)  = ⊥-elim (or-shut cl cl′)
   rise-src-cp refl (adrift (f-islec _ _ _ _ cl _ _ _ _) cl′ _)       = ⊥-elim (or-shut cl cl′)
-  rise-src-cp {k = k} {b} {c} {s} {p} refl {Cr = Cr} (adrift (d-src u hb le ni) _ (Q , hk , le′)) =
+  rise-src-cp {k = k} {b} {c} {s} {p} refl {Cr = Cr} (adrift (d-src u hb le ni f) _ (Q , hk , le′)) =
     shut-by {k = k} {p} (λ k″ → After Cr ⟨ c , connS k″ s (feed (here refl) p cp b) , absorbed , p ⟩)
-      (λ lt → _ , _ , unread-at Rt (unread-live Rt lt u) (sh-dead hk) fed le″ , silent ≃-refl)
-      (λ _ → _ , _ , unread-at Rt u (sh-dead hk) fed le″ , silent ≃-refl)
+      (λ lt → _ , _ , unread-at Rt (unread-live Rt lt u) (sh-dead hk (inj₂ tt)) fed le″ , silent ≃-refl)
+      (λ _ → _ , _ , unread-at Rt u (sh-dead hk f) fed le″ , silent ≃-refl)
     where
       fed = feed-husk {i = here refl} {p = p} {e = cp} hb ni
       le″ = ⊑-trans le (∪-⊑ (under-⊑ le′) ⊑-refl)
