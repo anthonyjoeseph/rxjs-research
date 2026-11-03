@@ -14,14 +14,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE SHIFT UNDER A FOCUS
-
-The frames shifted to the least key and the hole's environment past it;
-the hole shifts by `shift`. Open: nothing beyond `shift` per frame.
-Settled by a body by frame.
-
-Members: `fr-env`.
-
 #### THE JOINER'S PAST
 
 A joiner subscribed at `q`: every row of its meaning lies past `q`.

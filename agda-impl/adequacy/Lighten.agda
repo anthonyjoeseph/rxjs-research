@@ -75,8 +75,8 @@ postulate
   --   subscription's cursor owes `q` but may lie before it, and the rows
   --   between (an earlier lane's end, an outer's guard) are listed by no
   --   frame's `Behind`, so the joiner's `Truncate` cannot be built; the
-  --   frames must first be re-cursored to `bef q`, as `fr-env` does for a
-  --   hole that has a `Sync`, which a pending one never has (`sync-pend`).
+  --   frames must first be re-cursored to `bef q`, as `rc` does for a
+  --   hole whose rows it is given.
   defer-guard : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {l q p e}
               → Path (load o) rs ⟨ c , pend (defer l) q , subscribing , q ⟩
               → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
