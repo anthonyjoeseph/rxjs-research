@@ -452,6 +452,13 @@ postulate
   -- AN OUTER'S GUARD UNDER A SOURCE: an outer under a connect's source,
   -- its value rising, has a row under its first child, at or before the
   -- row met next.
+  --
+  -- The unwritten route is `Lift.lift` through the source's frame.  A
+  -- source row inside the subscribe burst shows as the connect's pin at
+  -- its first child, so the lift must carry pins, which a takeWhile keeps
+  -- only short of its failure and a lane only uncut.  A row past the
+  -- burst shows as an echo only while the body is alive at it, which
+  -- needs the body to have no end on the chain.
   guard-src : ∀ {R} (o : PureObs [] R) {rs Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu ls} {c : Ctx R Γ B} {s a q p e}
             → Path (load o) rs ⟨ inOuter op f ω d n qu ls c , s , rising (nx a) , q ⟩
             → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])

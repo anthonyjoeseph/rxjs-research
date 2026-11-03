@@ -68,6 +68,15 @@ under-listed o p ks cov (_ , _ , tr , le , mr) = ∈-++⁺ʳ ks (anc-∈ ks (cov
 postulate
   -- A DEFER'S GUARD IS MET: short of a row a reader meets next, a defer a
   -- run subscribes has a row under its guard, at or before the row met next.
+  -- Its guard is the defer's own skip at `ix 0`; `Lift.lift` carries it
+  -- up once the frames hold their rows behind `bef q`.
+  --
+  -- DEAD ROUTE: lifting from the pending frame as it stands.  A pending
+  --   subscription's cursor owes `q` but may lie before it, and the rows
+  --   between (an earlier lane's end, an outer's guard) are listed by no
+  --   frame's `Behind`, so the joiner's `Truncate` cannot be built; the
+  --   frames must first be re-cursored to `bef q`, as `fr-env` does for a
+  --   hole that has a `Sync`, which a pending one never has (`sync-pend`).
   defer-guard : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {l q p e}
               → Path (load o) rs ⟨ c , pend (defer l) q , subscribing , q ⟩
               → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
