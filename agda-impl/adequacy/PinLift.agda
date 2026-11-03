@@ -10,9 +10,11 @@ module adequacy.PinLift where
 
 open import Data.Bool using (T; not)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; [_]; _++_; map)
+open import Data.Bool using (Bool)
+open import Data.List using (List; []; _∷_; [_]; _++_; map; concatMap)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-map⁺)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-map⁺; ∈-concatMap⁺)
+open import Data.List.Relation.Unary.Any as Any using (here; there)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -21,7 +23,7 @@ open import Relation.Nullary using (¬_)
 open import denotation.Events using (Pos; ix; last; inside)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; pin; _≺_; _≼_; Dep; Reach; Few; MapT; map-out; map-skip; map-pin; map-end;
   module Scan; module TakeWhile)
-open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≺→≼)
+open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≺→≼; ≼-refl; ≼-≺-≺)
 open import adequacy.Cursor using (Cur; Owes; Behind; _≈_; cov; voc)
 open import adequacy.Bound using (owes-≼)
 
@@ -74,3 +76,24 @@ reach-scan = reach-img λ where
   (Scan.sstep x) → _ , x , λ ()
   (Scan.spin x)  → _ , x , λ { refl → refl }
   (Scan.send x)  → _ , x , λ ()
+
+-- Every row of `E′` at or under a row of `E`, among its `g`-images, its
+-- pins kept in place.
+reach-mv : ∀ {A B} {E : EmissionSet A} {E′ : EmissionSet B} {y r} (g : Pos → List Pos)
+         → (∀ {k′ e′} → E′ k′ e′ → Σ Pos λ k → Σ (Ev A) λ e → E k e × k ≼ k′ × k′ ∈ g k × (e′ ≡ pin r → e ≡ pin r))
+         → Reach E y (pin r) → Reach E′ y (pin r)
+reach-mv {y = y} {r = r} g im (ks , f) = concatMap g ks , λ {k′} x ky d → let (k , _ , x′ , le , m , pp) = im x in
+  ∈-concatMap⁺ g (Any.map (λ { refl → m }) (f x′ (≼-≺-≺ {k} {k′} {y} le ky) (λ i → [ (λ lt → inj₁ (≼-≺-≺ {k} {k′} {r} le lt)) , (λ eq → inj₂ (pp eq)) ]′ (d i))))
+
+-- A take's rows: at its source's, or one under it.
+tk : Pos → List Pos
+tk k = k ∷ (k ++ [ ix 0 ]) ∷ (k ++ [ last ]) ∷ []
+
+reach-take : ∀ {A} {incl} {keep : A → Bool} {E : EmissionSet A} {y r} → Reach E y (pin r) → Reach (TakeWhile.TakeT incl keep E) y (pin r)
+reach-take = reach-mv tk λ where
+  (TakeWhile.pass {q} x _ _)   → q , _ , x , ≼-refl {q} , here refl , λ ()
+  (TakeWhile.fail {q} x _ _ _) → q , _ , x , ≺→≼ {q} {q ++ [ ix 0 ]} (≺-ext q []) , there (here refl) , λ ()
+  (TakeWhile.stop {q} x _ _)   → q , _ , x , ≺→≼ {q} {q ++ [ last ]} (≺-ext q []) , there (there (here refl)) , λ ()
+  (TakeWhile.step {q} x _)     → q , _ , x , ≼-refl {q} , here refl , λ ()
+  (TakeWhile.tend {q} x _)     → q , _ , x , ≼-refl {q} , here refl , λ ()
+  (TakeWhile.left {q} x _ _)   → q , _ , x , ≼-refl {q} , here refl , λ { refl → refl }
