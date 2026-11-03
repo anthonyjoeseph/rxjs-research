@@ -64,7 +64,9 @@ open import denotation.EmissionSet using (Reach; Dep; module Connecting)
 open import adequacy.Cursor using (Src; src-pend; src-on; src-shut; Parts)
 open import adequacy.Rows using (Frozen)
 open Machine using (CS) renaming (Ev to Evᴹ)
-open import adequacy.Bound using (behind-pend)
+open import adequacy.Bound using (behind-pend; lo-p)
+open import adequacy.Floor.Keys using (lo-weaken; at-after)
+open import adequacy.FrameBound using (fb-u)
 open import Data.Bool using (not)
 open import Data.List using (_ʳ++_)
 open import Relation.Binary.PropositionalEquality using (trans)
@@ -81,6 +83,8 @@ open import adequacy.Floor.Keys using (plug-in; own-bld; oo; at-after₀)
 open import adequacy.Least using (Lo; k-own)
 open import adequacy.Apart.Floor using (floor)
 open Machine using (plug; mapS; scanS; cutS; lnS; takeS; flatS; connS)
+open Machine using (binds; free)
+open import adequacy.Cursor using (Husk; Burst; Subd; AttOwed; NoIsle; _⊑_; _∪ᵖ_)
 
 -- The first-child chain below `q`: `q ++ [ ix 0 ]`, and each first child
 -- of one.
@@ -137,21 +141,28 @@ record Clr {A} (q y : Pos) (E : EmissionSet A) : Set where
   field clear : ∀ {w e} → E w e → Visible e → q ≼ w → w ≺ y → ⊥
 open Clr
 
+-- A row under the first child, and a row at or past the first child: a
+-- row under it at or before the latter.
+cap : ∀ {A} {t : EmissionSet A} {q r e′ p e} → t r e′ → (Σ Pos λ xs → r ≡ (q ++ [ ix 0 ]) ++ xs)
+    → t p e → (q ++ [ ix 0 ]) ≼ p
+    → Σ Pos λ r′ → Σ (Ev A) λ e″ → t r′ e″ × r′ ≼ p × (q ++ [ ix 0 ]) ∈ prefixes r′
+cap {q = q} {r} {e′} {p} tr (xs , refl) tp zp with ≼-or-≻ r p
+... | inj₁ rp = r , e′ , tr , rp , under-∈ q xs
+... | inj₂ pr with <ᵖ-split (q ++ [ ix 0 ]) p (≼-false {q ++ [ ix 0 ]} {p} zp)
+...   | inj₂ refl = p , _ , tp , ≼-refl {p} , subst (λ u → (q ++ [ ix 0 ]) ∈ prefixes u) (++-identityʳ _) (under-∈ q [])
+...   | inj₁ zp′ with <ᵖ-between (q ++ [ ix 0 ]) p xs zp′ (Equivalence.to T-≡ pr)
+...     | zs , refl = _ , _ , tp , ≼-refl {(q ++ [ ix 0 ]) ++ zs} , under-∈ q zs
+
 -- Clear at `q`, a row under its first child: a row under it at or before
 -- any visible row at or past `q`.
 pick : ∀ {A} {t : EmissionSet A} {q r e′ p e} → t r e′ → (Σ Pos λ xs → r ≡ (q ++ [ ix 0 ]) ++ xs)
      → (∀ {e″} → t q e″ → Visible e″ → ⊥) → t p e → Visible e → q ≼ p
      → Σ Pos λ r′ → Σ (Ev A) λ e″ → t r′ e″ × r′ ≼ p × (q ++ [ ix 0 ]) ∈ prefixes r′
-pick {q = q} {r} {e′} {p} tr (xs , refl) cq tp vp qp with ≼-or-≻ r p
-... | inj₁ rp = r , e′ , tr , rp , under-∈ q xs
-... | inj₂ pr with <ᵖ-split q p (≼-false {q} {p} qp)
-...   | inj₂ refl = ⊥-elim (cq tp vp)
-...   | inj₁ qp′ with ≼-or-≻ (q ++ [ ix 0 ]) p
-...     | inj₂ pz = ⊥-elim (first-child q (Equivalence.from T-≡ qp′) pz)
-...     | inj₁ zp with <ᵖ-split (q ++ [ ix 0 ]) p (≼-false {q ++ [ ix 0 ]} {p} zp)
-...       | inj₂ refl = p , _ , tp , ≼-refl {p} , subst (λ u → (q ++ [ ix 0 ]) ∈ prefixes u) (++-identityʳ _) (under-∈ q [])
-...       | inj₁ zp′ with <ᵖ-between (q ++ [ ix 0 ]) p xs zp′ (Equivalence.to T-≡ pr)
-...         | zs , refl = _ , _ , tp , ≼-refl {(q ++ [ ix 0 ]) ++ zs} , under-∈ q zs
+pick {q = q} {p = p} tr u cq tp vp qp with <ᵖ-split q p (≼-false {q} {p} qp)
+... | inj₂ refl = ⊥-elim (cq tp vp)
+... | inj₁ qp′ with ≼-or-≻ (q ++ [ ix 0 ]) p
+...   | inj₂ pz = ⊥-elim (first-child q (Equivalence.from T-≡ qp′) pz)
+...   | inj₁ zp = cap tr u tp zp
 
 ------------------------------------------------------------------------
 -- THE LIFT: a skip at a chain's foot, nothing visible on the chain,
@@ -458,30 +469,35 @@ module Lift {R : Set} (Rt : EmissionSet R) where
   Lifted Cr q = Σ Pos λ r → Σ (Ev R) λ e → Rt r e × Zs q r × Clr q r Rt × Cr ≡ bef q
 
   -- The lift met a source in its subscribe burst under a connect no live
-  -- node reads.
-  data Isled (Cr : Cur) : Set₁ where
-    isled : ∀ {Γ X B} {c : Ctx R Γ B} {k : CS Γ X} {C P} → Unread Rt Cr C c k P → T (not (CS.srcAtt k)) → Isled Cr
+  -- node reads: the isle's frame, where it sits in the root's state, and
+  -- the isle's row the lift carried, at the step or on its chain.
+  data Isled (Cr : Cur) (q : Pos) (S : St [] R) : Set₁ where
+    isled : ∀ {Γ X B} {c : Ctx R Γ B} {k : CS Γ X} {b : St (X ∷ Γ) B} {o C P Qb Ri y e}
+          → Unread Rt Cr C c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Qb → P ⊑ (Burst (bef q) k ∪ᵖ Qb)
+          → T (not (CS.srcAtt k)) → T (not (CS.closed k)) → Behind (bef q) (Frozen k) → Subd (scopeOf c) (bef q) k
+          → Sound Ri (Frozen k) → AttOwed k → NoIsle b
+          → S ≡ plug c (connS k o b) → Frozen k y e → y ≡ q ⊎ Zs q y → Isled Cr q S
 
-  lift : ∀ {Cr Γ A} {c : Ctx R Γ A} {Rg N E q y e} → Fr Rt Cr (bef q) Rg c N E → Lo₀ q c → LiveN N
-       → E y e → Mute y e → Zs q y → Clr q y E → Rg q → Lifted Cr q ⊎ Isled Cr
+  lift : ∀ {Cr Γ A} {c : Ctx R Γ A} {s : St Γ A} {Rg N E q y e} → Fr Rt Cr (bef q) Rg c N E → Lo₀ q c → LiveN N
+       → E y e → Mute y e → Zs q y → Clr q y E → Rg q → Lifted Cr q ⊎ Isled Cr q (plug c s)
   lift {y = y} (f-top m) lo _ r mu z cl g = inj₁ (y , _ , voc m r , z , clr-≈ m cl , refl)
-  lift (f-map fr m _) lo _ r mu z cl g =
-    let (_ , r′ , mu′) = map-m mu r in lift fr lo _ (voc m r′) mu′ z (clr-≈ m (clr-map cl)) g
-  lift (f-scan fr _ m _) lo _ r mu z cl g =
-    let (_ , r′ , mu′) = scan-m mu r in lift fr lo _ (voc m r′) mu′ z (clr-≈ m (clr-scan cl)) g
-  lift (f-cut fr) lo _ r mu z cl g = lift fr lo _ r mu z cl g
-  lift {q = q} {y} (f-take {i = i} fr nf m _) lo _ r mu z cl g =
-    lift fr lo _ (voc m (take-m mu r (unfailed {i = i} {q = q} {y} nf cl))) mu z (clr-≈ m (clr-take {q = q} {y} nf cl)) g
-  lift (f-lane fr) lo l r mu z cl g = lift fr lo l r mu z cl g
-  lift (f-lnct {b = true} fr) lo _ r mu z cl g = lift fr lo _ r mu z cl g
+  lift {s = s} (f-map {f = f} fr m _) lo _ r mu z cl g =
+    let (_ , r′ , mu′) = map-m mu r in lift {s = mapS f s} fr lo _ (voc m r′) mu′ z (clr-≈ m (clr-map cl)) g
+  lift {s = s} (f-scan {f = f} {z = z₀} fr _ m _) lo _ r mu z cl g =
+    let (_ , r′ , mu′) = scan-m mu r in lift {s = scanS f z₀ s} fr lo _ (voc m r′) mu′ z (clr-≈ m (clr-scan cl)) g
+  lift {s = s} (f-cut {a = a} fr) lo _ r mu z cl g = lift {s = cutS true a s} fr lo _ r mu z cl g
+  lift {s = s} {q = q} {y} (f-take {i = i} {keep = keep} fr nf m _) lo _ r mu z cl g =
+    lift {s = takeS i keep free s} fr lo _ (voc m (take-m mu r (unfailed {i = i} {q = q} {y} nf cl))) mu z (clr-≈ m (clr-take {q = q} {y} nf cl)) g
+  lift {s = s} (f-lane {b = b} fr) lo l r mu z cl g = lift {s = lnS b s} fr lo l r mu z cl g
+  lift {s = s} (f-lnct {a = a} {b = true} fr) lo _ r mu z cl g = lift {s = cutS true a s} fr lo _ r mu z cl g
   lift (f-lnct {b = false} fr) _ ()
-  lift {q = q} {y} (f-outer {op = op} {f = f} {c = c} {E = O} fr ji (joined _ _ _ _ _ _ _ li) je _ bh) lo _ r mu z cl g =
+  lift {s = s} {q = q} {y} (f-outer {op = op} {f = f} {ω = ω} {d = d} {n = n} {qu = qu} {ls = ls} {c = c} {E = O} fr ji (joined _ _ _ _ _ _ _ li) je _ bh) lo _ r mu z cl g =
     let (_ , r′ , mu′) = jrow op {F = F′} {O} mu r in
-    lift fr lo _ (voc (proj₂ je) (reach-zs bh z r′)) mu′ z
+    lift {s = flatS op f ω d n qu s ls} fr lo _ (voc (proj₂ je) (reach-zs bh z r′)) mu′ z
       (clr-≈ (proj₂ je) (clr-tr (clr-join op {F = F′} {O} (λ e qw wy → clear cl e tt qw wy) λ x l _ qw wy → proj₂ g (on-chain (scopeOf c) f ji op li z x l qw wy)))) (proj₁ g)
     where F′ = λ a → ⟦ f a ⟧ (full (scopeOf c))
-  lift {q = q} {y} (f-lanes {op = op} {f = f} {c = c} {O = O} {q = q₀} {a} fr ji _ _ x _ rn (h-live _ le uk) _ _ _ _ _ _ _ _ li je so _ bh) lo _ r mu z cl g =
-    lift fr lo _ (voc (proj₂ je) (reach-zs bh z (jlane op {F = F′} {O} x rn ly nk (mute-work mu)))) mu z (clr-≈ (proj₂ je) (clr-tr (clr-join op {F = F′} {O} oc lc))) (proj₁ g)
+  lift {s = s} {q = q} {y} (f-lanes {op = op} {f = f} {ω = ω} {d = d} {n = n} {qu = qu} {o = o′} {pre = pre} {post = post} {c = c} {O = O} {q = q₀} {a} fr ji _ _ x _ rn (h-live _ le uk) _ _ _ _ _ _ _ _ li je so _ bh) lo _ r mu z cl g =
+    lift {s = flatS op f ω d n qu o′ (pre ʳ++ s ∷ post)} fr lo _ (voc (proj₂ je) (reach-zs bh z (jlane op {F = F′} {O} x rn ly nk (mute-work mu)))) mu z (clr-≈ (proj₂ je) (clr-tr (clr-join op {F = F′} {O} oc lc))) (proj₁ g)
     where
       F′ = λ a → ⟦ f a ⟧ (full (scopeOf c))
       ly = voc le r
@@ -499,9 +515,9 @@ module Lift {R : Set} (Rt : EmissionSet R) where
       ...   | refl = clear cl (proj₁ (from (alike le) (l , v))) v qw wy
   lift (f-lanes _ _ _ _ _ _ _ (h-end _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
   lift (f-lanes _ _ _ _ _ _ _ (h-kill _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
-  lift {q = q} {y} (f-src {k = k} {β = β} fr _ pt lv _ _ bβ fl fz ce bσ sd _ _ _) (lof , lo) _ r mu z cl g =
+  lift {s = s} {q = q} {y} (f-src {k = k} {b = b} {β = β} fr _ pt lv _ _ bβ fl fz ce bσ sd _ _ _) (lof , lo) _ r mu z cl g =
     let (_ , row , mu′) = src-row (voc fz r) mu alive in
-    lift fr lo tt (voc (proj₁ ce) (row , conn-reach bσ (z+ z) (zs-reach bβ (z+ z)))) mu′ (z+ z)
+    lift {s = connS k s b} fr lo tt (voc (proj₁ ce) (row , conn-reach bσ (z+ z) (zs-reach bβ (z+ z)))) mu′ (z+ z)
       (clr-≈ (proj₁ ce) (clr-tr (clr-conn clb))) (Parts.s⊆ pt g)
     where
       past : (CS.connAt k ++ [ ix 1 ]) ≼ q
@@ -514,10 +530,10 @@ module Lift {R : Set} (Rt : EmissionSet R) where
       ... | inj₂ refl = zs-ze z
       alive : Connecting.Alive (CS.connAt k) (Frozen k) β y
       alive = conn-alive {q = q} {y} pt fl lv lof past g on
-  lift (f-body fr sc pt _ sr _ _ ce) lo _ r mu z cl g =
-    lift fr lo _ (voc (proj₁ ce) (Connecting.body r , conn-reach (src-behind sc sr) z (proj₂ ce r))) mu z
+  lift {s = s} (f-body {k = k} {o = o′} fr sc pt _ sr _ _ ce) lo _ r mu z cl g =
+    lift {s = connS k o′ s} fr lo _ (voc (proj₁ ce) (Connecting.body r , conn-reach (src-behind sc sr) z (proj₂ ce r))) mu z
       (clr-≈ (proj₁ ce) (clr-tr (clr-conn cl))) (Parts.b⊆ pt g)
-  lift (f-isle u _ _ na _ _ _ _ _ _) _ _ _ _ _ _ _ = inj₂ (isled u na)
+  lift (f-isle u hb le na nc bh sd ss ao ni) _ _ r _ z _ _ = inj₂ (isled u hb le na nc bh sd ss ao ni refl r (inj₂ z))
   lift (f-took _ _ _ _ _ _ _ _) _ ()
   lift (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
   lift (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
@@ -547,9 +563,10 @@ module Outer {R} (o : PureObs [] R) where
   -- An outer's value in flight: its first child a skip of the joiner's,
   -- nothing visible at the value, carried up.
   outer-row : ∀ {Cr Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu ls} {c : Ctx R Γ B} {s a q Rg N E}
-            → Fr Rt Cr (bef q) Rg (inOuter op f ω d n qu ls c) N E → Lo₀ q c → Fly (scopeOf c) Rg q N s E (nx a) → Lifted Cr q ⊎ Isled Cr
-  outer-row {q = q} (f-outer {op = op} {f = f} {c = c} {E = O} fr ji (joined _ _ _ _ _ _ _ li) je sd bh) lo (_ , x) =
-    lift fr lo tt (voc (proj₂ je) (reach-zs bh z₁ (jval op {F = F′} {O} x))) m-skip z₁
+            → Fr Rt Cr (bef q) Rg (inOuter op f ω d n qu ls c) N E → Lo₀ q c → Fly (scopeOf c) Rg q N s E (nx a)
+            → Lifted Cr q ⊎ Isled Cr q (plug c (flatS op f ω d n qu s ls))
+  outer-row {s = s} {q = q} (f-outer {op = op} {f = f} {ω = ω} {d = d} {n = n} {qu = qu} {ls = ls} {c = c} {E = O} fr ji (joined _ _ _ _ _ _ _ li) je sd bh) lo (_ , x) =
+    lift {s = flatS op f ω d n qu s ls} fr lo tt (voc (proj₂ je) (reach-zs bh z₁ (jval op {F = F′} {O} x))) m-skip z₁
       (clr-≈ (proj₂ je) (clr-tr (clr-join op {F = F′} {O} oc lc))) (proj₁ (Sound.rg sd x tt))
     where
       F′ = λ a → ⟦ f a ⟧ (full (scopeOf c))
@@ -563,10 +580,11 @@ module Outer {R} (o : PureObs [] R) where
 
   -- A source's step in flight: its row a level down, carried up.
   src-step : ∀ {Cr Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s ε q Rg N E}
-           → Fr Rt Cr (bef q) Rg (inSrc k b c) N E → Lo₀ q (inSrc k b c) → Fly (scopeOf c) Rg q N s E ε → Lifted Cr q ⊎ Isled Cr
-  src-step {ε = ε} {q} (f-src {k = k} {β = β} fr _ pt lv _ _ bβ fl fz ce bσ sd _ _ _) (lof , lo) (_ , row) =
+           → Fr Rt Cr (bef q) Rg (inSrc k b c) N E → Lo₀ q (inSrc k b c) → Fly (scopeOf c) Rg q N s E ε
+           → Lifted Cr q ⊎ Isled Cr q (plug c (connS k s b))
+  src-step {s = s} {ε = ε} {q} (f-src {k = k} {b = b} {β = β} fr _ pt lv _ _ bβ fl fz ce bσ sd _ _ _) (lof , lo) (_ , row) =
     let (_ , cr , mu) = src-out fk (unp ε) alive in
-    lift fr lo tt (voc (proj₁ ce) (cr , conn-reach bσ z₁ (zs-reach bβ z₁))) mu z₁
+    lift {s = connS k s b} fr lo tt (voc (proj₁ ce) (cr , conn-reach bσ z₁ (zs-reach bβ z₁))) mu z₁
       (clr-≈ (proj₁ ce) (clr-tr (clr-conn clb))) (Parts.s⊆ pt rs)
     where
       fk = voc fz row
@@ -582,7 +600,7 @@ module Outer {R} (o : PureObs [] R) where
       ... | inj₂ refl = e₀
       alive : Connecting.Alive (CS.connAt k) (Frozen k) β q
       alive = conn-alive {q = q} {q} pt fl lv lof past rs on
-  src-step (f-isle u _ _ na _ _ _ _ _ _) _ _ = inj₂ (isled u na)
+  src-step (f-isle u hb le na nc bh sd ss ao ni) _ (_ , row) = inj₂ (isled u hb le na nc bh sd ss ao ni refl row (inj₁ refl))
   src-step (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
   src-step (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
   src-step (d-src _ _ _ _ _) _ ()
@@ -602,16 +620,24 @@ module Outer {R} (o : PureObs [] R) where
   ... | (Cr , _) , r | ((tp , _) , _) , vi , ap , _ = proj₁ (from r (back (cursorᴿ nothing (conv rs)) tp ap , vi))
 
 postulate
-  -- A GUARD IN AN ISLE: a step rising whose lift meets a source in its
-  -- subscribe burst under a connect no live node reads has a row under
-  -- its first child, at or before the row met next.  Nothing such a
-  -- source runs shows where the root reads but its pins.
-  guard-src : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s ε q p e}
-            → Path (load o) rs ⟨ c , s , rising ε , q ⟩
-            → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
-            → ∀ {Cr C Rg N E} → Fr (enter (⟦ o ⟧ []ᴬ) root) Cr C Rg c N E
-            → Lift.Isled (enter (⟦ o ⟧ []ᴬ) root) Cr
-            → RowUnder o (q ++ [ ix 0 ]) p
+  -- AN ISLE SHOWS UNDER ITS STEP: a step rising whose lift meets a source
+  -- in its subscribe burst under a connect no live node reads has a row of
+  -- the root's entry under its first child.  Nothing such a source runs
+  -- shows where the root reads but its pins.
+  isle-row : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s ε q Cr}
+           → Path (load o) rs ⟨ c , s , rising ε , q ⟩
+           → Lift.Isled (enter (⟦ o ⟧ []ᴬ) root) Cr q (plug c s)
+           → Σ Pos λ r → Σ (Ev R) λ e′ → enter (⟦ o ⟧ []ᴬ) root r e′ × Σ Pos λ xs → r ≡ (q ++ [ ix 0 ]) ++ xs
+
+-- A GUARD IN AN ISLE: a row under the step's first child, at or before
+-- the row met next, which the connect's frames bound past it.
+guard-src : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s ε q p e Cr}
+          → Path (load o) rs ⟨ c , s , rising ε , q ⟩ → Due Cr (enter (⟦ o ⟧ []ᴬ) root) p e
+          → Lift.Isled (enter (⟦ o ⟧ []ᴬ) root) Cr q (plug c s)
+          → RowUnder o (q ++ [ ix 0 ]) p
+guard-src o {q = q} pth du il@(Lift.isled u _ _ _ _ _ _ _ _ _ eq _ _) with isle-row o pth il
+... | _ , _ , tr , un = cap tr un (proj₁ du) (fb-u (enter (⟦ o ⟧ []ᴬ) root) u lo du)
+  where lo = lo-p (lo-weaken (at (q ++ [ ix 0 ])) (after q) (subst (λ S → Lo S (after q)) eq (floor o pth tt)) (at-after q [ ix 0 ]))
 
 -- AN OUTER'S GUARD IS MET: an outer's value rising has a row under its
 -- first child, at or before the row met next.
@@ -623,7 +649,7 @@ outer-guard o {op = op} {f} {ω} {d} {n} {qu} {ls} {c} {s} pth m
   with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o)) | Outer.met o pth m
 ... | (_ , _ , flying fr _ fy , _) , _ | du with Outer.outer-row o fr (lo₀ c {flatS op f ω d n qu s ls} (floor o pth tt)) fy
 ...   | inj₁ lf = Outer.under o lf du
-...   | inj₂ il = guard-src o pth m fr il
+...   | inj₂ il = guard-src o pth du il
 outer-guard o pth m | (_ , _ , adrift fr cl _ , _) , _ | _ = ⊥-elim (subst T cl (dead-closed (enter (⟦ o ⟧ []ᴬ) root) fr refl))
 
 -- A SOURCE'S STEP IS ECHOED: a source rising under its connect leaves a
@@ -636,7 +662,7 @@ echo-guard o {k = k} {b} {c} {s} pth m
   with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o)) | Outer.met o pth m
 ... | (_ , _ , flying fr _ fy , _) , _ | du with Outer.src-step o fr (lo₀ (inSrc k b c) {s} (floor o pth tt)) fy
 ...   | inj₁ lf = Outer.under o lf du
-...   | inj₂ il = guard-src o pth m fr il
+...   | inj₂ il = guard-src o pth du il
 echo-guard o pth m | (_ , _ , adrift fr cl _ , _) , _ | _ = ⊥-elim (subst T cl (dead-closed (enter (⟦ o ⟧ []ᴬ) root) fr refl))
 
 postulate

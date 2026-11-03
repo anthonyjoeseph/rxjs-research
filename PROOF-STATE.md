@@ -58,7 +58,7 @@ dead frames that tie no entry, and past the root's cursor rather than the
 isle's; a bounded hand-off needs `Hand` from the queue. Settled by bodies
 over the frames.
 
-Members: `guard-src`, `lanes-guard`, `defer-guard`.
+Members: `isle-row`, `lanes-guard`, `defer-guard`.
 
 #### THE MARK AT ITS ROW
 

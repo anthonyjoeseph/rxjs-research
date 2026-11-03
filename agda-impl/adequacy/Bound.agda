@@ -46,8 +46,8 @@ open import adequacy.Rows using (full; pendRows; Frozen; Inbox; this; that; tape
 open import adequacy.Rows using (_≃_; ≼-≢)
 open _≃_
 open import adequacy.Cursor using (Cur; origin; bef; aft; Owes; Due; Unfed; Adm; Ticked; Pol; Lane; Runs; Start; Kill; polF;
-  JoinF; Whole; Ahead; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; more; Joined; joined; Ends;
-  Flags; Src; src-pend; src-on; src-shut; Failure; Gone; notT; Sound; OweAt; o-cp; o-cut;
+  JoinF; Whole; Ahead; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; more; joined;
+  Ends; Flags; Src; src-pend; src-on; src-shut; Failure; Gone; notT; Sound; OweAt; o-cp; o-cut;
   o-over; Behind; FewBefore; few-behind; alike; Sync; s-cold; s-of; s-done; s-map; s-scan;
   s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)

@@ -9,32 +9,32 @@
 -- never the isle's own.
 module adequacy.FrameBound where
 
-open import Data.Bool using (Bool; T; true; false; not)
+open import Data.Bool using (T; true; false)
 open import Data.Empty using (⊥-elim)
 open import Data.List using (List; _∷_; _++_; reverse; _ʳ++_)
 open import Data.List.Properties using (ʳ++-defn)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit.Polymorphic using (⊤)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 
 open import denotation.Events using (Pos)
-open import denotation.EmissionSet using (EmissionSet; out; end; _≼_; ⟦_⟧; module Connecting)
+open import denotation.EmissionSet using (EmissionSet; out; _≼_; ⟦_⟧)
 open import denotation.Read using (Visible)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Scope; binds; CS; scopeOf; plug; takeS; connS; flatS)
 open import adequacy.Rows using (full; Frozen)
 open import adequacy.Rows using (module _≃_)
 open _≃_
-open import adequacy.Cursor using (Cur; Owes; Due; Pol; Begun; Lane; Kill; Ends; ConnE; Flags; Src; Hole; h-live; h-end; h-kill;
+open import adequacy.Cursor using (Cur; Owes; Pol; Begun; Lane; Kill; Ends; ConnE; Flags; Src; Hole; h-live; h-end; h-kill;
   joined; alike; notT)
 open import adequacy.Cursor.Frame using (Need; owes; dead; lane; lanecut; pnd; ⊥₁; Fr; Unread; un-dead; un-torn;
   f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body;
   d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep)
-open import adequacy.Least using (k-kid; k-outer; k-lane; k-src; k-body)
+open import adequacy.Least using (k-kid; k-outer; k-lane; k-body)
 open import adequacy.Floor.Keys using (plug-in)
 open import adequacy.Bound using (Bnd; LoP; Env; owes-≼; map-b; scan-b; take-b; took-b; conn-b; flat-b; begun-b; bound; src-b)
 
